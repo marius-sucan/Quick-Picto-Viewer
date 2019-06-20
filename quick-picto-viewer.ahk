@@ -22,13 +22,13 @@
 #Include, Gdip.ahk
 
 Global PVhwnd, hGDIwin, resultedFilesList := []
-   , currentFileIndex, maxFilesIndex := 0
+   , currentFileIndex, maxFilesIndex := 0, mainFilesListString := ""
    , appTitle := "AHK Picture Viewer", FirstRun := 1
    , hPicOnGui1, scriptStartTime := A_TickCount
    , RandyIMGids := [], SLDhasFiles := 0, IMGlargerViewPort := 0
    , IMGdecalageY := 1, IMGdecalageX := 1, imgQuality
    , RandyIMGnow := 0, GDIPToken, Agifu, gdiBitmapSmall
-   , gdiBitmapSmallView, gdiBitmapViewScale
+   , gdiBitmapSmallView, gdiBitmapViewScale, msgDisplayTime := 2000
    , slideShowRunning := 0, CurrentSLD := "", winGDIcreated :=0
    , LargeListCount := 1, usrFilesFilteru := ""
    , ResolutionWidth, ResolutionHeight, isAlwaysOnTop := 0
@@ -76,7 +76,7 @@ OpenSLD(fileNamu, doFilesCheck:=0, dontStartSlide:=0) {
   {
      showTOOLtip("ERROR: Failed to load file...")
      SoundBeep 
-     SetTimer, RemoveTooltip, -2000
+     SetTimer, RemoveTooltip, % -msgDisplayTime
      Return
   }
 
@@ -86,7 +86,7 @@ OpenSLD(fileNamu, doFilesCheck:=0, dontStartSlide:=0) {
   GenerateRandyList()
   If (dontStartSlide=1)
   {
-     SetTimer, RemoveTooltip, -2000
+     SetTimer, RemoveTooltip, % -msgDisplayTime
      Return
   }
 
@@ -103,7 +103,7 @@ OpenSLD(fileNamu, doFilesCheck:=0, dontStartSlide:=0) {
      currentFileIndex := 1
      IDshowImage(1)
   }
-  SetTimer, RemoveTooltip, -2000
+  SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
 GenerateRandyList() {
@@ -152,7 +152,7 @@ resetSlideshowTimer(showMsg) {
    {
       delayu := slideShowDelay//1000
       showTOOLtip("Slideshow speed: " delayu)
-      SetTimer, RemoveTooltip, -2000
+      SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 }
 
@@ -185,7 +185,7 @@ CopyImage2clip() {
      {
         showTOOLtip("ERROR: Failed to copy image to clipboard...")
         SoundBeep 
-        SetTimer, RemoveTooltip, -2000
+        SetTimer, RemoveTooltip, % -msgDisplayTime
         Return
      }
      FlipImgV := FlipImgH := 0
@@ -198,7 +198,7 @@ CopyImage2clip() {
         showTOOLtip("Image copied to the clipboard...")
      Else
         showTOOLtip("ERROR: Failed to copy the image to the clipboard...")
-     SetTimer, RemoveTooltip, -2000
+     SetTimer, RemoveTooltip, % -msgDisplayTime
      r2 := IDshowImage(currentFileIndex)
      If !r2
         informUserFileMissing()
@@ -206,7 +206,7 @@ CopyImage2clip() {
   {
      showTOOLtip("ERROR: Failed to copy image to clipboard...")
      SoundBeep 
-     SetTimer, RemoveTooltip, -2000
+     SetTimer, RemoveTooltip, % -msgDisplayTime
   }
 }
 
@@ -473,7 +473,7 @@ FirstPicture() {
    showTOOLtip("Total images loaded: " maxFilesIndex)
    If !r
       informUserFileMissing()
-   SetTimer, RemoveTooltip, -2000
+   SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
 LastPicture() { 
@@ -484,7 +484,7 @@ LastPicture() {
    showTOOLtip("Total images loaded: " maxFilesIndex)
    If !r
       informUserFileMissing()
-   SetTimer, RemoveTooltip, -2000
+   SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
 GuiClose:
@@ -562,7 +562,7 @@ ToggleImageSizingMode() {
 
     friendly := DefineImgSizing()
     showTOOLtip("Rescaling mode: " friendly)
-    SetTimer, RemoveTooltip, -2000
+    SetTimer, RemoveTooltip, % -msgDisplayTime
     r := IDshowImage(currentFileIndex)
     If !r
        informUserFileMissing()
@@ -582,14 +582,14 @@ InfoToggleSlideShowu() {
   If (slideShowRunning!=1)
   {
      showTOOLtip("Slideshow stopped")
-     SetTimer, RemoveTooltip, -2000
+     SetTimer, RemoveTooltip, % -msgDisplayTime
   } Else 
   {
      delayu := slideShowDelay//1000
      friendly := DefineSlideShowType()
      etaTime := "Estimated time: " SecToHHMMSS(Round((slideShowDelay/1000)*maxFilesIndex))
      ToolTip, Started %friendly% slideshow (speed: %delayu%).`nTotal files: %maxFilesIndex%.`n%etaTime%
-     SetTimer, RemoveTooltip, -2000
+     SetTimer, RemoveTooltip, % -msgDisplayTime
   }
 }
 
@@ -699,7 +699,7 @@ SwitchSlideModes() {
 
    friendly := DefineSlideShowType()
    showTOOLtip("Slideshow mode: " friendly)
-   SetTimer, RemoveTooltip, -2000
+   SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
 ToggleImgFX() {
@@ -718,7 +718,7 @@ ToggleImgFX() {
    }
 
    showTOOLtip("Image colors: " friendly)
-   SetTimer, RemoveTooltip, -2000
+   SetTimer, RemoveTooltip, % -msgDisplayTime
    r := IDshowImage(currentFileIndex)
    If !r
       informUserFileMissing()
@@ -732,7 +732,7 @@ ToggleIMGalign() {
       imageAligned := 1
 
    showTOOLtip("Image alignment: " imageAligned)
-   SetTimer, RemoveTooltip, -2000
+   SetTimer, RemoveTooltip, % -msgDisplayTime
    r := IDshowImage(currentFileIndex)
    If !r
       informUserFileMissing()
@@ -771,7 +771,7 @@ ChangeLumos(dir) {
       showTOOLtip("Image colors: UNALTERED")
    Else
       showTOOLtip("Image brightness: " lumosAdjust)
-   SetTimer, RemoveTooltip, -2000
+   SetTimer, RemoveTooltip, % -msgDisplayTime
    SetTimer, DelayiedImageDisplay, -10
 }
 
@@ -793,7 +793,7 @@ ChangeZoom(dir) {
       zoomLevel := 15
 
    showTOOLtip("Zoom level: " Round(zoomLevel*100) "%")
-   SetTimer, RemoveTooltip, -2000
+   SetTimer, RemoveTooltip, % -msgDisplayTime
    SetTimer, DelayiedImageDisplay, -10
 }
 
@@ -814,7 +814,7 @@ ChangeGammos(dir) {
       GammosAdjust := 1
 
    showTOOLtip("Image gamma: " GammosAdjust)
-   SetTimer, RemoveTooltip, -2000
+   SetTimer, RemoveTooltip, % -msgDisplayTime
    SetTimer, DelayiedImageDisplay, -10
 }
 
@@ -825,7 +825,7 @@ TransformIMGv() {
    If (FlipImgV=1)
    {
       showTOOLtip("Image mirrored vertically")
-      SetTimer, RemoveTooltip, -2000
+      SetTimer, RemoveTooltip, % -msgDisplayTime
    }
    r := IDshowImage(currentFileIndex)
    If !r
@@ -839,7 +839,7 @@ TransformIMGh() {
    If (FlipImgH=1)
    {
       showTOOLtip("Image mirrored horizontally")
-      SetTimer, RemoveTooltip, -2000
+      SetTimer, RemoveTooltip, % -msgDisplayTime
    }
    r := IDshowImage(currentFileIndex)
    If !r
@@ -948,7 +948,7 @@ Jump2index() {
 informUserFileMissing() {
    showTOOLtip("ERROR: The current file is missing...")
    SoundBeep, 300, 50
-   SetTimer, RemoveTooltip, -2000
+   SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
 enableFilesFilter() {
@@ -983,7 +983,7 @@ enableFilesFilter() {
          RefreshFilesList(doFilesCheck)
       }
       SoundBeep, 950, 100
-      SetTimer, RemoveTooltip, -2000
+      SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 }
 
@@ -1044,7 +1044,7 @@ SaveFilesList() {
       }
       FileAppend, %filesListu%, %file2save%, utf-16
       throwMSGwriteError()
-      SetTimer, RemoveTooltip, -2000
+      SetTimer, RemoveTooltip, % -msgDisplayTime
       SoundBeep, 900, 100
       CurrentSLD := backCurrentSLD
    }
@@ -1052,9 +1052,24 @@ SaveFilesList() {
 
 cleanFilesList(noFilesCheck:=0) {
    Critical, on
+   If (slideShowRunning=1)
+      ToggleSlideShowu()
 
+   WnoFilesCheck := (noFilesCheck=2) ? 2 : 0
    If (maxFilesIndex>1)
    {
+      filterBehaviour := InStr(usrFilesFilteru, "&") ? 1 : 2
+      If StrLen(filesFilter)>1
+      {
+         showTOOLtip("(Please wait) Preparing the files list...")
+         backfilesFilter := filesFilter
+         backusrFilesFilteru := usrFilesFilteru
+         usrFilesFilteru := filesFilter := ""
+         If RegExMatch(CurrentSLD, "i)(\.sld)$")
+            OpenSLD(CurrentSLD, 0, 1)
+         Else If StrLen(CurrentSLD)>3
+            coreOpenFolder(CurrentSLD, 0)
+      }
       backCurrentSLD := CurrentSLD
       CurrentSLD := ""
       showTOOLtip("(Please wait) Checking files list...")
@@ -1063,6 +1078,12 @@ cleanFilesList(noFilesCheck:=0) {
           r := resultedFilesList[A_Index]
           If (InStr(r, "||") || !r)
              Continue
+
+          If StrLen(backfilesFilter)>1
+          {
+             z := filterCoreString(r, filterBehaviour, backfilesFilter)
+             noFilesCheck := (z=1) ? 2 : WnoFilesCheck
+          }
 
           If (noFilesCheck!="2")
           {
@@ -1080,12 +1101,21 @@ cleanFilesList(noFilesCheck:=0) {
           maxFilesIndex++
           resultedFilesList[maxFilesIndex] := A_LoopField
       }
-      GenerateRandyList()
+
+      CurrentSLD := backCurrentSLD
+      If StrLen(backfilesFilter)>1
+      {
+         usrFilesFilteru := backusrFilesFilteru
+         filesFilter := backfilesFilter
+         RefreshFilesList(10)
+      } Else
+      {
+         GenerateRandyList()
+         RandomPicture()
+      }
       SoundBeep, 950, 100
       Sleep, 25
-      RandomPicture()
-      SetTimer, RemoveTooltip, -2000
-      CurrentSLD := backCurrentSLD
+      SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 }
 
@@ -1155,7 +1185,7 @@ SortFilesList(SortCriterion) {
       SoundBeep, 950, 100
       Sleep, 25
       RandomPicture()
-      SetTimer, RemoveTooltip, -2000
+      SetTimer, RemoveTooltip, % -msgDisplayTime
       CurrentSLD := backCurrentSLD
    }
 }
@@ -1290,7 +1320,7 @@ DeletePicture() {
      SoundBeep
   }
   Sleep, 500
-  SetTimer, RemoveTooltip, -2000
+  SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
 RenameThisFile() {
@@ -1302,7 +1332,7 @@ RenameThisFile() {
   If !FileExist(file2rem)
   {
      showTOOLtip("File does not exist...`n" file2rem)
-     SetTimer, RemoveTooltip, -2000
+     SetTimer, RemoveTooltip, % -msgDisplayTime
      SoundBeep 
      Return
   }
@@ -1323,7 +1353,7 @@ RenameThisFile() {
         } Else
         {
            showTOOLtip("Rename operation canceled...")
-           SetTimer, RemoveTooltip, -2000
+           SetTimer, RemoveTooltip, % -msgDisplayTime
            Return
         }
      }
@@ -1334,7 +1364,7 @@ RenameThisFile() {
      {
         showTOOLtip("ERROR: Access denied... File could not be renamed.")
         SoundBeep
-        SetTimer, RemoveTooltip, -2000
+        SetTimer, RemoveTooltip, % -msgDisplayTime
      } Else
      {
         resultedFilesList[currentFileIndex] := OutDir "\" newFileName
@@ -1367,20 +1397,23 @@ renewCurrentFilesList() {
   currentFileIndex := 1
 }
 
-coreOpenFolder(thisFolder) {
+coreOpenFolder(thisFolder, doOptionals:=1) {
    If StrLen(thisFolder)>3
    {
       renewCurrentFilesList()
       GetFilesList(thisFolder "\*")
-      GenerateRandyList()
-      If (maxFilesIndex>0)
-         IDshowImage(1)
-      Else
-         Gosub, GuiSize
+      If (doOptionals=1)
+      {
+         GenerateRandyList()
+         If (maxFilesIndex>0)
+            IDshowImage(1)
+         Else
+            Gosub, GuiSize
+      }
    }
 }
 
-RefreshFilesList(mustDoFilesCheck:=0) {
+RefreshFilesList(mustDoFilesCheck:=0,noImage:=0) {
   If (slideShowRunning=1)
      ToggleSlideShowu()
 
@@ -1395,7 +1428,7 @@ RefreshFilesList(mustDoFilesCheck:=0) {
         doFilesCheck := 0
 
      OpenSLD(CurrentSLD, 0, 1)
-     If (doFilesCheck=1)
+     If (doFilesCheck=1 && !filesFilter)
         cleanFilesList()
      Else
         RandomPicture()
@@ -1437,7 +1470,7 @@ OpenFiles() {
       GenerateRandyList()
       currentFileIndex := detectFileID(imgpath)
       IDshowImage(currentFileIndex)
-      SetTimer, RemoveTooltip, -2000
+      SetTimer, RemoveTooltip, % -msgDisplayTime
       CurrentSLD := "|" SelectedDir
    }
 }
@@ -1490,7 +1523,7 @@ GuiDropFiles:
       currentFileIndex := detectFileID(imgpath)
       IDshowImage(currentFileIndex)
       CurrentSLD := "|" imagedir
-      SetTimer, RemoveTooltip, -2000
+      SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 Return
 
@@ -1799,7 +1832,7 @@ ShowTheImage(imgpath, usePrevious:=0) {
          winTitle := "[*] " winTitle
          Gui, 1: Show,, % winTitle
          showTOOLtip("ERROR: Unable to load the file...`n" imgpath)
-         SetTimer, RemoveTooltip, -2000
+         SetTimer, RemoveTooltip, % -msgDisplayTime
       }
 
       If (A_TickCount - lastInvoked2>125) && (A_TickCount - lastInvoked>95)
@@ -1820,7 +1853,7 @@ ShowTheImage(imgpath, usePrevious:=0) {
           If (WinActive("A")=PVhwnd)
           {
              showTOOLtip("ERROR: Unable to display the image...")
-             SetTimer, RemoveTooltip, -2000
+             SetTimer, RemoveTooltip, % -msgDisplayTime
           }
           SoundBeep, 300, 100
           Return "fail"
@@ -2215,7 +2248,7 @@ ToggleViewModeTouch() {
    zoomLevel := IMGdecalageY := IMGdecalageX := 1
    If (IMGresizingMode=1)
    {
-      IMGresizingMode := 2
+      IMGresizingMode := 3
       ToggleImageSizingMode()
    } Else
    {
@@ -2299,9 +2332,8 @@ sldGenerateFilesList(readThisFile, doFilesCheck) {
 
           If StrLen(filesFilter)>1
           {
-             If (!RegExMatch(line, "i)(" filesFilter ")") && filterBehaviour=2)
-                Continue
-             Else If (RegExMatch(line, "i)(" filesFilter ")") && filterBehaviour=1)
+             z := filterCoreString(line, filterBehaviour, filesFilter)
+             If (z=1)
                 Continue
           }
           maxFilesIndex++
@@ -2314,6 +2346,19 @@ sldGenerateFilesList(readThisFile, doFilesCheck) {
     }
     currentFileIndex := 1
     CurrentSLD := readThisFile
+}
+
+filterCoreString(stringu, behave, thisFilter) {
+  If (behave=2)
+  {
+     If !RegExMatch(stringu, "i)(" thisFilter ")")
+        mustSkip := 1
+  } Else
+  {
+     If RegExMatch(stringu, "i)(" thisFilter ")")
+        mustSkip := 1
+  }
+  Return mustSkip
 }
 
 GetFilesList(strDir, doRecursive:=1) {
@@ -2333,16 +2378,16 @@ GetFilesList(strDir, doRecursive:=1) {
       {
          If StrLen(filesFilter)>1
          {
-            If (!RegExMatch(A_LoopFileFullPath, "i)(" filesFilter ")") && filterBehaviour=2)
-               Continue
-            Else If (RegExMatch(A_LoopFileFullPath, "i)(" filesFilter ")") && filterBehaviour=1)
+            z := filterCoreString(A_LoopFileFullPath, filterBehaviour, filesFilter)
+            If (z=1)
                Continue
          }
+
          maxFilesIndex++
          resultedFilesList[maxFilesIndex] := A_LoopFileFullPath
       }
   }
-  SetTimer, RemoveTooltip, -2000
+  SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
 IDshowImage(imgID,opentehFile:=0) {
