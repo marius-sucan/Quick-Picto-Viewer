@@ -26,8 +26,8 @@ Global PVhwnd, hGDIwin, resultedFilesList := []
    , appTitle := "AHK Picture Viewer", FirstRun := 1
    , hPicOnGui, scriptStartTime := A_TickCount
    , RandyIMGids := [], SLDhasFiles := 0, IMGlargerViewPort := 0
-   , IMGdecalageY := 1, IMGdecalageX := 1
-   , RandyIMGnow := 0, GDIPToken, Agifu
+   , IMGdecalageY := 1, IMGdecalageX := 1, imgQuality := 5
+   , RandyIMGnow := 0, GDIPToken, Agifu, gdiBitmapSmall
    , slideShowRunning := 0, CurrentSLD := "", winGDIcreated :=0
    , LargeListCount := 1, usrFilesFilteru := ""
    , gdiBitmap, mainSettingsFile := "ahk-picture-viewer.ini"
@@ -549,6 +549,7 @@ ToggleSlideShowu() {
   If (slideShowRunning=1)
   {
      slideShowRunning := 0
+     imgQuality := 5
      SetTimer, RandomPicture, Off
      SetTimer, NextPicture, Off
      SetTimer, PreviousPicture, Off
@@ -556,6 +557,7 @@ ToggleSlideShowu() {
   } Else 
   {
      slideShowRunning := 1
+     imgQuality := 2
      SetTimer, preventScreenOff, 59520
      If (SlideHowMode=1)
         SetTimer, RandomPicture, %slideShowDelay%
@@ -671,6 +673,8 @@ ChangeLumos(dir) {
       GammosAdjust := 0
       lumosAdjust := 1
       imgFxMode := 1
+      If (IMGresizingMode=4)
+         zoomLevel := 1
    }
 
    If (lumosAdjust<0)
@@ -770,20 +774,21 @@ PanIMGonScreen(direction) {
       Return
 
    GetClientSize(mainWidth, mainHeight, PVhwnd)
-   If (direction="U")
+   If (direction="U" && FlipImgV=0) || (direction="D" && FlipImgV=1)
       IMGdecalageY := IMGdecalageY + Round(mainHeight*0.1)
-   Else If (direction="D")
+   Else If (direction="D" && FlipImgV=0) || (direction="U" && FlipImgV=1)
       IMGdecalageY := IMGdecalageY - Round(mainHeight*0.1)
-   Else If (direction="L")
+   Else If (direction="L" && FlipImgH=0) || (direction="R" && FlipImgH=1)
       IMGdecalageX := IMGdecalageX + Round(mainWidth*0.1)
-   Else If (direction="R")
-      IMGdecalageX := IMGdecalageX - Round(mainWidth*0.2)
+   Else If (direction="R" && FlipImgH=0) || (direction="L" && FlipImgH=1)
+      IMGdecalageX := IMGdecalageX - Round(mainWidth*0.1)
 
    SetTimer, DelayiedImageDisplay, -5
 }
 
 DelayiedImageDisplay() {
    ShowTheImage("lol", 1)
+   SetTimer, ReloadThisPicture, -550
 }
 
 Jump2index() {
@@ -1556,9 +1561,8 @@ createGDIwin() {
 ShowTheImage(imgpath, usePrevious:=0) {
    Critical, on
 
-   Static prevImgH, prevImgW, prevImgPath
+   Static prevImgPath, lastInvoked2 := 1
         , lastInvoked := 1, prevPicCtrl := 1
-        , lastInvoked2 := 1
 
    If (usePrevious=1 && StrLen(prevImgPath)>3)
       imgpath := prevImgPath
@@ -1590,21 +1594,8 @@ ShowTheImage(imgpath, usePrevious:=0) {
    If (A_TickCount - lastInvoked>85) && (A_TickCount - lastInvoked2>85)  || (usePrevious=1)
    {
        lastInvoked := A_TickCount
-       If (usePrevious!=1 && StrLen(imgpath)>3)
-       {
-          r1 := GetImgDimension(imgpath, imgW, imgH)
-          prevImgW := imgW
-          prevImgH := imgH
-       } Else If (usePrevious=1 && StrLen(prevImgPath)>3)
-       {
-          r1 := 1, imgW := prevImgW
-          imgH := prevImgH
-       }
-
-       If r1
-          r2 := ResizeImage(imgpath, imgW, imgH, usePrevious)
-
-       if (!r1 || !r2)
+       r2 := ResizeImage(imgpath, usePrevious)
+       if !r2
        {
           If (WinActive("A")=PVhwnd)
           {
@@ -1622,17 +1613,47 @@ ShowTheImage(imgpath, usePrevious:=0) {
    {
        winPrefix := defineWinTitlePrefix()
        Gui, 1: Show,, % winPrefix winTitle
-       SetTimer, ReloadThisPicture, -200
+       SetTimer, ReloadThisPicture, -250
    }
    lastInvoked2 := A_TickCount
 }
 
-ResizeImage(imgpath, imgW, imgH, usePrevious) {
-   WinGetPos, mainX, mainY,,, ahk_id %PVhwnd%
+ResizeImage(imgpath, usePrevious) {
+    Static prevImgPath, prevImgW, prevImgH, mainX, mainY
+    If (winGDIcreated!=1)
+       createGDIwin()
+
+    If (imgpath!=prevImgPath || !gdiBitmap)
+    {
+       DestroyGDIbmp()
+       Sleep, 1
+       gdiBitmap := Gdip_CreateBitmapFromFile(imgpath)
+    }
+
+    If (!gdiBitmap || ErrorLevel)
+    {
+       SoundBeep 
+       Return 0
+    }
+
+   prevImgPath := imgpath
    GetClientSize(GuiW, GuiH, PVhwnd)
+   If (usePrevious!=1)
+   {
+      WinGetPos, mainX, mainY,,, ahk_id %PVhwnd%
+      prevImgW := imgW := Gdip_GetImageWidth(gdiBitmap)
+      prevImgH := imgH := Gdip_GetImageHeight(gdiBitmap)
+   } Else If (usePrevious=1) 
+   {
+      imgH := prevImgH // 4
+      imgW := prevImgW // 4
+   }
+
+   If (usePrevious=1)
+      RescaleBMP(imgpath, prevImgW, prevImgH)
+
    PicRatio := Round(imgW/imgH, 5)
    GuiRatio := Round(GuiW/GuiH, 5)
-
    if (imgW <= GuiW) && (imgH <= GuiH)
    {
       ResizedW := GuiW
@@ -1685,10 +1706,13 @@ ResizeImage(imgpath, imgW, imgH, usePrevious) {
       ws := Round(ResizedW / imgW * 100) "%"
    }
 
-   IMGlargerViewPort := (ResizedH>GuiH+5 || ResizedW>GuiW+5) ? 1 : 0
-   wscale := Round(ResizedW / imgW, 3)
-   hscale := Round(ResizedH / imgH, 3)
+   If (usePrevious=1 && IMGresizingMode=4)
+   {
+      ResizedW := ResizedW * 4
+      ResizedH := ResizedH * 4
+   }
 
+   IMGlargerViewPort := (ResizedH>GuiH+5 || ResizedW>GuiW+5) ? 1 : 0
    SplitPath, imgpath, OutFileName, OutDir
    winPrefix := defineWinTitlePrefix()
    winTitle := winPrefix currentFileIndex "/" maxFilesIndex " [" ws "] " OutFileName " | " OutDir
@@ -1697,30 +1721,29 @@ ResizeImage(imgpath, imgW, imgH, usePrevious) {
    Else ; If (usePrevious!=1)
       Gui, 1: Show, , % winTitle
 
-   r := Gdip_ShowImgonGui(imgpath, wscale, hscale, imgW, imgH)
+   r := Gdip_ShowImgonGui(ResizedW, ResizedH, imgW, imgH, GuiW, GuiH, usePrevious)
    Return r
 }
 
-Gdip_ShowImgonGui(imgpath, wscale, hscale, Width, Height) {
+RescaleBMP(imgpath, width, height) {
+  Critical, on
+  ; halve res
+  Static prevImgPath
+  If (imgpath=prevImgPath && gdiBitmapSmall)
+     Return
+
+  Gdip_DisposeImage(gdiBitmapSmall)
+  gdiBitmapSmall := Gdip_CreateBitmap(Width // 4, Height // 4)
+  G2 := Gdip_GraphicsFromImage(gdiBitmapSmall)
+  Gdip_SetInterpolationMode(G2, imgQuality)
+  Gdip_SetSmoothingMode(G2, 3)
+  Gdip_DrawImage(G2, gdiBitmap, 0, 0, Width // 4, Height // 4, 0, 0, Width, Height)
+  Gdip_DeleteGraphics(G2)
+  prevImgPath := imgpath
+}
+
+Gdip_ShowImgonGui(newW, newH, Width, Height, mainWidth, mainHeight, usePrevious) {
     Critical, on
-    Static prevImgPath
-    If (winGDIcreated!=1)
-       createGDIwin()
-
-    If (imgpath!=prevImgPath || !gdiBitmap)
-    {
-       DestroyGDIbmp()
-       Sleep, 1
-       gdiBitmap := Gdip_CreateBitmapFromFile(imgpath)
-    }
-
-    If (!gdiBitmap || ErrorLevel)
-    {
-       SoundBeep 
-       Return 0
-    }
-
-    prevImgPath := imgpath
     If (imgFxMode=2)       ; grayscale
        matrix := "0.299|0.299|0.299|0|0|0.587|0.587|0.587|0|0|0.114|0.114|0.114|0|0|0|0|0|1|0|0|0|0|0|1"
     Else If (imgFxMode=3)  ; negative / invert
@@ -1728,16 +1751,12 @@ Gdip_ShowImgonGui(imgpath, wscale, hscale, Width, Height) {
     Else If (imgFxMode=4) && (lumosAdjust!=1 || GammosAdjust!=0)
        matrix := lumosAdjust "|0|0|0|0|0|" lumosAdjust "|0|0|0|0|0|" lumosAdjust "|0|0|0|0|0|1|0|" GammosAdjust "|" GammosAdjust "|" GammosAdjust "|0|1"
 
-    newW := Width * wscale
-    newH := Height * hscale
-    GetClientSize(mainWidth, mainHeight, PVhwnd)
-    ; JEE_ClientToScreen(hPicOnGui, 1, 1, mainX, mainY)
     hbm := CreateDIBSection(mainWidth, mainHeight)
     hdc := CreateCompatibleDC()
     obm := SelectObject(hdc, hbm)
     G := Gdip_GraphicsFromHDC(hdc)
-    Gdip_SetInterpolationMode(G, 1)
-    Gdip_SetSmoothingMode(G, 1)
+    Gdip_SetInterpolationMode(G, imgQuality)
+    Gdip_SetSmoothingMode(G, 3)
 
     If (FlipImgH=1)
     {
@@ -1751,21 +1770,22 @@ Gdip_ShowImgonGui(imgpath, wscale, hscale, Width, Height) {
        Gdip_TranslateWorldTransform(G, 0, -mainHeight)
     }
 
-    calcIMGcoord(mainWidth, mainHeight, newW, newH, DestPosX, DestPosY)
-    r1 := Gdip_DrawImage(G, gdiBitmap, DestPosX, DestPosY, newW, newH, 0, 0, Width, Height, matrix)
+    whichImg := (usePrevious=1 && gdiBitmapSmall) ? gdiBitmapSmall : gdiBitmap
+    calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY)
+    r1 := Gdip_DrawImage(G, whichImg, DestPosX, DestPosY, newW, newH, 0, 0, Width, Height, matrix)
     Gdip_ResetWorldTransform(G)
     r2 := UpdateLayeredWindow(hGDIwin, hdc, 0, 0, mainWidth, mainHeight)
-    Gdip_DeleteBrush(pBrush1)
     Gdip_DeleteGraphics(G)
     Gui, 2: Show, NoActivate
-    SetTimer, DestroyGDIbmp, -900
+    SetTimer, DestroyGDIbmp, -2000
     r := (r1!=0 || !r2) ? 0 : 1
     Return r
 }
 
-calcIMGcoord(mainWidth, mainHeight, newW, newH, ByRef DestPosX, ByRef DestPosY) {
+calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, ByRef DestPosX, ByRef DestPosY) {
     Static orderu := {1:7, 2:8, 3:9, 4:4, 5:5, 6:6, 7:1, 8:2, 9:3}
     modus := orderu[imageAligned]
+
     LY := mainHeight - newH
     LX := mainWidth - newW
     If (modus=1)
@@ -1848,7 +1868,10 @@ GDIupdater() {
    }
 
    If (maxFilesIndex>0) && (A_TickCount - scriptStartTime>500)
+   {
       ShowTheImage("lol", 1)
+      SetTimer, ReloadThisPicture, -550
+   }
 }
 
 DestroyGDIbmp() {
