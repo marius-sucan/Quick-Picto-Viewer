@@ -24,12 +24,14 @@
 Global PVhwnd, hGDIwin, resultedFilesList := []
    , currentFileIndex, maxFilesIndex := 0
    , appTitle := "AHK Picture Viewer", FirstRun := 1
-   , hPicOnGUI, scriptStartTime := A_TickCount
-   , prevDisplayiedIMGs := [], SLDhasFiles := 0
-   , prevDisplayiedIMGnow := 0, GDIPToken, Agifu
-   , slideShowRunning := 0, CurrentSLD := ""
+   , hPicOnGui, scriptStartTime := A_TickCount
+   , prevRandyIMGs := [], prevRandyIMGids := [], SLDhasFiles := 0
+   , prevRandyIMGnow := 0, GDIPToken, Agifu
+   , slideShowRunning := 0, CurrentSLD := "", winGDIcreated :=0
    , LargeListCount := 1, usrFilesFilteru := ""
+   , gdiBitmap, lumosAdjust := 0, luminalShade
    , mainSettingsFile := "ahk-picture-viewer.ini"
+   , RegExFilesPattern := "i)(\\.*\.(tif|emf|jpg|jpeg|png|bmp|gif))$"
 ; User settings
    , WindowBgrColor := "010101", slideShowDelay := 3000
    , IMGresizingMode := 1, SlideHowMode := 1
@@ -39,6 +41,9 @@ Global PVhwnd, hGDIwin, resultedFilesList := []
 DetectHiddenWindows, On
 CoordMode, Mouse, Screen
 OnExit, Cleanup
+
+; OnMessage(0x07, "activateMainWin")
+; OnMessage(0x06, "activateMainWin")
 Loop, 9
    OnMessage(255+A_Index, "PreventKeyPressBeep" )   ; 0x100 to 0x108
 
@@ -47,6 +52,7 @@ if !(GDIPToken := Gdip_Startup())
    Msgbox, 48, %appTitle%, Error: unable to initialize GDI+... Program exits.
    ExitApp
 }
+
 IniRead, FirstRun, % mainSettingsFile, General, FirstRun, @
 If (FirstRun!=0)
 {
@@ -165,6 +171,7 @@ CopyImage2clip() {
      }
      FlipImgV := FlipImgH := 0
      imgFxMode := 1
+     lumosAdjust := 0
      Sleep, 2
      r := Gdip_SetBitmapToClipboard(pBitmap)
      Sleep, 2
@@ -181,7 +188,7 @@ CopyImage2clip() {
   }
 }
 
-#If (WinActive("ahk_id " PVhwnd))
+#If (WinActive("ahk_id " PVhwnd) || WinActive("ahk_id " hGDIwin))
     ~^vk4F::    ; Ctrl+O
        OpenFiles()
     Return
@@ -190,6 +197,11 @@ CopyImage2clip() {
        OpenFolders()
     Return
 
+    !Space::
+       Win_ShowSysMenu(PVhwnd)
+    Return
+
+    ~!F4::
     ~Esc::
        Gosub, Cleanup
     Return
@@ -198,11 +210,6 @@ CopyImage2clip() {
 #If (WinActive("ahk_id " PVhwnd) && CurrentSLD)
     ~^vk4A::    ; Ctrl+J
        Jump2index()
-    Return
-
-    ~Insert::
-       imgpath := resultedFilesList[currentFileIndex]
-       newShowImage(imgpath)
     Return
 
     ~^vk43::    ; Ctrl+C
@@ -217,9 +224,22 @@ CopyImage2clip() {
       OpenThisFile()
     Return
 
+    ~vkDB::   ; [
+      ChangeLumos(-1)
+    Return
+
+    ~vkDD::   ; ]
+      ChangeLumos(1)
+    Return
+
+    ~vkDC::   ; \
+      ChangeLumos(2)
+    Return
+
     ~^vk45::   ; Ctrl+E
       OpenThisFileFolder()
     Return
+
     ~^vk46::   ; Ctrl+F
       enableFilesFilter()
     Return
@@ -281,7 +301,7 @@ CopyImage2clip() {
        RandomPicture()
     Return
 
-    ~^vk52::     ; Ctrl+R
+    ~F2::
        RenameThisFile()
     Return
 
@@ -289,6 +309,7 @@ CopyImage2clip() {
        ToggleImgFX()
     Return
 
+    ~F10::
     ~AppsKey::
        Gosub, GuiContextMenu
     Return
@@ -296,6 +317,7 @@ CopyImage2clip() {
     ~Del::
        DeletePicture()
     Return
+
 
     ~WheelUp::
     ~Right::
@@ -345,7 +367,8 @@ invertRecursiveness() {
 }
 
 ReloadThisPicture() {
-  IDshowImage(currentFileIndex)
+  If (CurrentSLD && maxFilesIndex>0)
+     IDshowImage(currentFileIndex)
 }
 
 FirstPicture() { 
@@ -369,9 +392,11 @@ LastPicture() {
 
 GuiClose:
 Cleanup:
+   DestroyGDIbmp()
    writeSlideSettings(mainSettingsFile)
    Gdip_Shutdown(GDIPToken)  
-ExitApp
+   ExitApp
+Return
 
 OnlineHelp:
    Run, http://www.autohotkey.com/forum/topic62808.html
@@ -383,25 +408,34 @@ GuiContextMenu:
    BuildMenu()
 Return 
 
-GuiSize:
-   If (A_EventInfo=1 || !CurrentSLD)   ;minimized
-      Return
-   If (maxFilesIndex>0) && (A_TickCount - scriptStartTime>500)
-   {
-      ShowTheImage("lol", 1)
-   } Else
-   {
-      GuiControl, Hide, PicOnGui1
-      GuiControl, Hide, PicOnGui2
-   }
-Return
+activateMainWin() {
+   WinActivate, ahk_id %PVhwnd%
+}
 
-ProvokeExit() {
+DblClickAction() {
+   Critical, on
    Static lastInvoked := 0
+   MouseGetPos, , , OutputVarWin
+   If (OutputVarWin!=PVhwnd)
+      Return
+
    If (A_TickCount - lastInvoked<250) && (lastInvoked>1)
-      Gosub, Cleanup
-   Else If (maxFilesIndex>1 && CurrentSLD)
+   {
+      If (slideShowRunning=1)
+         ToggleSlideShowu()
+
+      destroyGDIwin()
+      Sleep, 25
+      Gui, 1: Show, NoActivate Minimize, AHK Picture Viewer: %CurrentSLD%
+   } Else If (maxFilesIndex>1 && CurrentSLD)
+   {
+      Sleep, 50
       GoNextSlide()
+   } Else If (!CurrentSLD)
+   {
+      Sleep, 50
+      OpenFiles()
+   }
 
    lastInvoked := A_TickCount
 }
@@ -409,9 +443,11 @@ ProvokeExit() {
 ToggleImageSizingMode() {
     If (slideShowRunning=1)
        resetSlideshowTimer(0)
+
     IMGresizingMode++
     If (IMGresizingMode>3)
        IMGresizingMode := 1
+
     friendly := DefineImgSizing()
     Tooltip, Rescaling mode: %friendly%
     SetTimer, RemoveTooltip, -2000
@@ -444,9 +480,9 @@ InfoToggleSlideShowu() {
 preventScreenOff() {
   If (slideShowRunning=1 && WinActive("A")=PVhwnd)
   {
-     MouseMove, 1, 0, 1, R
-     MouseMove, -1, 0, 1, R
-     SendEvent, {Up}
+     MouseMove, 2, 0, 2, R
+     MouseMove, -2, 0, 2, R
+;     SendEvent, {Up}
   }
 }
 
@@ -471,8 +507,14 @@ ToggleSlideShowu() {
   }
 }
 
-
 GoNextSlide() {
+  Sleep, 200
+  If GetKeyState("LButton", "P")
+  {
+     SetTimer, GoNextSlide, -200
+     Return
+  }
+
   If (slideShowRunning=1)
      resetSlideshowTimer(0)
 
@@ -509,11 +551,13 @@ DefineFXmodes() {
 }
 
 SwitchSlideModes() {
-   If (slideShowRunning=1)
-      resetSlideshowTimer(0)
    SlideHowMode++
    If (SlideHowMode>3)
       SlideHowMode := 1
+
+   If (slideShowRunning=1)
+      resetSlideshowTimer(0)
+
    friendly := DefineSlideShowType()
    ToolTip, Slideshow mode: %friendly%.
    SetTimer, RemoveTooltip, -2000
@@ -527,6 +571,37 @@ ToggleImgFX() {
       imgFxMode := 1
    friendly := DefineFXmodes()
    ToolTip, Image colors: %friendly%.
+   SetTimer, RemoveTooltip, -2000
+   IDshowImage(currentFileIndex)
+}
+
+adjustLumosPrefs() {
+   If (lumosAdjust<-10)
+      lumosAdjust := -10
+
+   If (lumosAdjust>10)
+      lumosAdjust := 10
+
+   luminalAlpha := Abs(lumosAdjust) * 25
+   If (lumosAdjust<0)
+      luminalShade := Format("{1:#02x}", luminalAlpha) "000000"
+   Else
+      luminalShade := Format("{1:#02x}", luminalAlpha) "ffffff"
+}
+
+ChangeLumos(dir) {
+   If (slideShowRunning=1)
+      resetSlideshowTimer(0)
+
+   If (dir=1)
+      lumosAdjust++
+   Else
+      lumosAdjust--
+
+   If (dir=2)
+      lumosAdjust := 0
+
+   ToolTip, Image brightness: %lumosAdjust%0 `%.
    SetTimer, RemoveTooltip, -2000
    IDshowImage(currentFileIndex)
 }
@@ -632,7 +707,6 @@ throwMSGwriteError() {
   }
 }
 
-
 SaveFilesList() {
    Critical, on
    If StrLen(maxFilesIndex)>1
@@ -672,6 +746,9 @@ SaveFilesList() {
       Loop, % maxFilesIndex + 1
       {
           r := resultedFilesList[A_Index]
+          If InStr(r, "||")
+             Continue
+
           If (r && FileExist(r))
              filesListu .= r "`n"
       }
@@ -694,6 +771,9 @@ cleanFilesList() {
       Loop, % maxFilesIndex + 1
       {
           r := resultedFilesList[A_Index]
+          If InStr(r, "||")
+             Continue
+
           If (r && FileExist(r))
              filesListu .= r "`n"
       }
@@ -730,6 +810,7 @@ readSlideSettings(readThisFile) {
      IniRead, tstfilesFilter, %readThisFile%, General, usrFilesFilteru, @
      IniRead, tstFlipImgH, %readThisFile%, General, FlipImgH, @
      IniRead, tstFlipImgV, %readThisFile%, General, FlipImgV, @
+     IniRead, tstlumosAdjust, %readThisFile%, General, lumosAdjust, @
 
      If (tstslideshowdelay!="@" && tstslideshowdelay>300)
         slideShowDelay := tstslideShowDelay
@@ -751,6 +832,9 @@ readSlideSettings(readThisFile) {
      }
      If (tstfilesFilter!="@" && StrLen(Trim(tstfilesFilter))>2)
         usrFilesFilteru := tstfilesFilter
+
+     If tstlumosAdjust is number
+        lumosAdjust := tstlumosAdjust
 }
 
 writeSlideSettings(file2save) {
@@ -762,6 +846,7 @@ writeSlideSettings(file2save) {
     IniWrite, % WindowBgrColor, %file2save%, General, WindowBgrColor
     IniWrite, % FlipImgH, %file2save%, General, FlipImgH
     IniWrite, % FlipImgV, %file2save%, General, FlipImgV
+    IniWrite, % lumosAdjust, %file2save%, General, lumosAdjust
     throwMSGwriteError()
 }
 
@@ -783,29 +868,32 @@ RandomPicture() {
   resultu := resultedFilesList[currentFileIndex]
   If resultu
   {
+     resultu := StrReplace(resultu, "||")
      r := ShowTheImage(resultu)
      If (r="fail")
         Return
 
      If (maxLimitReached!=1)
         findLatestRandyID()
-     prevDisplayiedIMGnow++
-     If (prevDisplayiedIMGnow>50)
+
+     prevRandyIMGnow++
+     If (prevRandyIMGnow>50)
      {
-        prevDisplayiedIMGnow := 1
+        prevRandyIMGnow := 1
         maxLimitReached := 1
      }
-     prevDisplayiedIMGs[prevDisplayiedIMGnow] := resultu
+     prevRandyIMGs[prevRandyIMGnow] := resultu
+     prevRandyIMGids[prevRandyIMGnow] := currentFileIndex
   }
 }
 
 findLatestRandyID() {
    Loop, 50
    {
-      imgpath := prevDisplayiedIMGs[51 - A_Index]
+      imgpath := prevRandyIMGs[51 - A_Index]
       If StrLen(imgpath)>3
       {
-         prevDisplayiedIMGnow := 51 - A_Index
+         prevRandyIMGnow := 51 - A_Index
          Break
       }
    }
@@ -815,20 +903,22 @@ PrevRandyPicture() {
   If (slideShowRunning=1)
      ToggleSlideShowu()
 
-  If (prevDisplayiedIMGnow<2)
+  If (prevRandyIMGnow<2)
   {
      findLatestRandyID()
-     prevDisplayiedIMGnow++
+     prevRandyIMGnow++
   }
 
-  prevDisplayiedIMGnow--
-  If (prevDisplayiedIMGnow<1)
-     prevDisplayiedIMGnow := 1
+  prevRandyIMGnow--
+  If (prevRandyIMGnow<1)
+     prevRandyIMGnow := 1
 
-  imgpath := prevDisplayiedIMGs[prevDisplayiedIMGnow]
+  imgpath := prevRandyIMGs[prevRandyIMGnow]
   If imgpath
   {
-     currentFileIndex := detectFileID(imgpath)
+     currentFileIndex := prevRandyIMGids[prevRandyIMGnow]
+     If !currentFileIndex
+        currentFileIndex := detectFileID(imgpath)
      ShowTheImage(imgpath)
   }
 }
@@ -837,17 +927,19 @@ NextRandyPicture() {
   If (slideShowRunning=1)
      ToggleSlideShowu()
 
-  prevDisplayiedIMGnow++
-  imgpath := prevDisplayiedIMGs[prevDisplayiedIMGnow]
+  prevRandyIMGnow++
+  imgpath := prevRandyIMGs[prevRandyIMGnow]
   If !imgpath
   {
-     prevDisplayiedIMGnow := 1
-     imgpath := prevDisplayiedIMGs[prevDisplayiedIMGnow]
+     prevRandyIMGnow := 1
+     imgpath := prevRandyIMGs[prevRandyIMGnow]
   }
 
   If imgpath
   {
-     currentFileIndex := detectFileID(imgpath)
+     currentFileIndex := prevRandyIMGids[prevRandyIMGnow]
+     If !currentFileIndex
+        currentFileIndex := detectFileID(imgpath)
      ShowTheImage(imgpath)
   }
 }
@@ -855,11 +947,16 @@ NextRandyPicture() {
 DeletePicture() {
   If (slideShowRunning=1)
      ToggleSlideShowu()
+
+  DestroyGDIbmp()
+  Sleep, 2
   file2rem := resultedFilesList[currentFileIndex]
+  file2rem := StrReplace(file2rem, "||")
   ToolTip, File deleted...
   FileSetAttrib, -R, %file2rem%
   Sleep, 2
   FileDelete, %file2rem%
+  resultedFilesList[currentFileIndex] := "||" file2rem
   If ErrorLevel
   {
      ToolTip, File already deleted or access denied...
@@ -872,6 +969,9 @@ DeletePicture() {
 RenameThisFile() {
   If (slideShowRunning=1)
      ToggleSlideShowu()
+
+  DestroyGDIbmp()
+  Sleep, 2
   file2rem := resultedFilesList[currentFileIndex]
   If !FileExist(file2rem)
   {
@@ -880,6 +980,7 @@ RenameThisFile() {
      SoundBeep 
      Return
   }
+
   SplitPath, file2rem, OutFileName, OutDir
   InputBox, newFileName, Rename file, Please type the new file name.,,,,,,,, %OutFileName%
   If !ErrorLevel
@@ -940,8 +1041,8 @@ OpenFolders() {
 }
 
 renewCurrentFilesList() {
-  prevDisplayiedIMGs := []
-  prevDisplayiedIMGnow := 0
+  prevRandyIMGs := []
+  prevRandyIMGnow := 0
   resultedFilesList := []
   maxFilesIndex := 0
   currentFileIndex := 1
@@ -1148,7 +1249,7 @@ BuildMenu() {
    If (FlipImgH=1)
       Menu, PVview, Check, Mirror &horizontally`tH
 
-   imgpath := prevDisplayiedIMGs[prevDisplayiedIMGnow]
+   imgpath := prevRandyIMGs[prevRandyIMGnow]
    Menu, PVnav, Add, &First`tHome, FirstPicture
    Menu, PVnav, Add, &Previous`tRight, PreviousPicture
    Menu, PVnav, Add, &Next`tLeft, NextPicture
@@ -1163,7 +1264,7 @@ BuildMenu() {
    Menu, PVtFile, Add, 
    Menu, PVtFile, Add, &Open (with external app)`tO, OpenThisFile
    Menu, PVtFile, Add, &Open containing folder`tCtrl+E, OpenThisFileFolder
-   Menu, PVtFile, Add, &Rename`tCtrl+R, RenameThisFile
+   Menu, PVtFile, Add, &Rename`tF2, RenameThisFile
    Menu, PVtFile, Add, &Delete`tDelete, DeletePicture
 
    DefNAMErefresh := RegExMatch(CurrentSLD, "i)(\.sld)$") ? "Reload .SLD file" : "Refresh opened folder(s)"
@@ -1201,69 +1302,82 @@ BuildMenu() {
    Menu, PVmenu, Show
 }
 
+
+defineWinTitlePrefix() {
+   If StrLen(usrFilesFilteru)>1
+      winPrefix .= "F "
+
+   If (slideShowRunning=1)
+   {
+      winPrefix .= "S"
+      If (SlideHowMode=1)
+         winPrefix .= "R "
+      Else If (SlideHowMode=2)
+         winPrefix .= "B "
+      Else If (SlideHowMode=3)
+         winPrefix .= "F "
+   }
+
+   If (FlipImgV=1)
+      winPrefix .= "V "
+   If (FlipImgH=1)
+      winPrefix .= "H "
+
+   If (imgFxMode=2)
+      winPrefix .= "G "
+   Else If (imgFxMode=3)
+      winPrefix .= "I "
+
+   If (IMGresizingMode=3)
+      winPrefix .= "O "
+
+   Return winPrefix
+}
+
+
+SetParentID(Window_ID, theOther) {
+  Return DllCall("SetParent", "uint", theOther, "uint", Window_ID) ; success = handle to previous parent, failure =null 
+}
+
 BuildGUI() {
    global ;PicOnGUI, PVhwnd, appTitle, ScriptMsg , ScriptMsgW, ScriptMsgH, hue
    local MaxGUISize, MinGUISize, initialwh, guiw, guih
    MaxGUISize = -DPIScale
-   MinGUISize := "-DpiScale +MinSize" . A_ScreenWidth//4 . "x" . A_ScreenHeight//4
-   initialwh := "w" . A_ScreenWidth//3 . " h" . A_ScreenHeight//3
+   MinGUISize := "+MinSize" A_ScreenWidth//4 "x" A_ScreenHeight//4
+   initialwh := "w" A_ScreenWidth//3 " h" A_ScreenHeight//3
    Gui, 1: Color, %WindowBgrColor%
    Gui, 1: Margin, 0, 0
    GUI, 1: -DPIScale +Resize %MaxGUISize% %MinGUISize% +hwndPVhwnd +LastFound +OwnDialogs
-   Gui, 1: Add, Picture, x1 y1 gProvokeExit vPicOnGUI1
-   Gui, 1: Add, Picture, x1 y1 gProvokeExit vPicOnGUI2
-   ; GuiControl, Disable, PicOnGui1
-   ; GuiControl, Disable, PicOnGui2
-   GuiControl, Hide, PicOnGui1
-   GuiControl, Hide, PicOnGui2
-   Gui, 1: Show, maximize center %initialwh%, %appTitle%
-
-   Gui, 2: -Caption +E0x80000 +LastFound +AlwaysOnTop +ToolWindow +OwnDialogs +hwndhGDIwin
-   Gui, 2: Show, NoActivate
+   Gui, 1: Add, Text, x1 y1 w2 h2 gDblClickAction vPicOnGui hwndhPicOnGui,
+   Gui, 1: Show, Maximize Center %initialwh%, %appTitle%
+   createGDIwin()
+   GetClientSize(GuiW, GuiH, PVhwnd)
+   GuiControl, 1: Move, PicOnGUI, % "w" GuiW " h" GuiH
 }
 
-newShowImage(imgpath) {
-    If !pBitmap := Gdip_CreateBitmapFromFile(imgpath)
-       Return
+destroyGDIwin() {
+   DestroyGDIbmp()
+   Gui, 2: Destroy
+   winGDIcreated := 0
+}
 
-    OriginalWidth := Gdip_GetImageWidth(pBitmap)
-    OriginalHeight := Gdip_GetImageHeight(pBitmap)
-    Ratio := OriginalWidth/OriginalHeight
-
-    If (OriginalWidth >= A_ScreenWidth//2) || (OriginalHeight >= A_ScreenHeight//2)
-    {
-      If (OriginalWidth >= OriginalHeight)
-         Width := A_ScreenWidth//2, Height := Width*(1/Ratio)
-      Else
-         Height := A_ScreenHeight//2, Width := Height*Ratio
-    } Else
-    {
-        Width := OriginalWidth
-        Height := OriginalHeight
-    }
-
-    Gdip_GetRotatedDimensions(Width, Height, Angle, RWidth, RHeight)
-    Gdip_GetRotatedTranslation(Width, Height, Angle, xTranslation, yTranslation)
-    hbm := CreateDIBSection(RWidth, RHeight)
-    hdc := CreateCompatibleDC()
-    obm := SelectObject(hdc, hbm)
-    G := Gdip_GraphicsFromHDC(hdc)
-    Gdip_SetInterpolationMode(G, 1)
-
-    Gdip_TranslateWorldTransform(G, xTranslation, yTranslation)
-    Gdip_RotateWorldTransform(G, Angle)
-    If Horizontal
-       Gdip_ScaleWorldTransform(G, -1, 1), Gdip_TranslateWorldTransform(G, -Width, 0)
-    If Vertical
-       Gdip_ScaleWorldTransform(G, 1, -1), Gdip_TranslateWorldTransform(G, 0, -Height)
-    Gdip_DrawImage(G, pBitmap, 0, 0, Width, Height, 0, 0, OriginalWidth, OriginalHeight)
-    Gdip_ResetWorldTransform(G)
-    UpdateLayeredWindow(hGDIwin, hdc, (A_ScreenWidth-RWidth)//2, (A_ScreenHeight-RHeight)//2, RWidth, RHeight)
-    Gdip_DeleteGraphics(G)
-    Gdip_DisposeImage(pBitmap)
+createGDIwin() {
+   Critical, on
+   Sleep, 15
+   destroyGDIwin()
+   Sleep, 35
+   Gui, 2: -DPIScale +E0x20 -Caption +E0x80000 +ToolWindow -OwnDialogs +hwndhGDIwin +Owner
+   Gui, 2: Show, NoActivate, %appTitle%: Picture container
+   SetParentID(PVhwnd, hGDIwin)
+   Sleep, 5
+   WinActivate, ahk_id %PVhwnd%
+   Sleep, 5
+   winGDIcreated := 1
 }
 
 ShowTheImage(imgpath, usePrevious:=0) {
+   Critical, on
+
    Static prevImgH, prevImgW, prevImgPath
         , lastInvoked := 1, prevPicCtrl := 1
         , lastInvoked2 := 1
@@ -1272,69 +1386,73 @@ ShowTheImage(imgpath, usePrevious:=0) {
       imgpath := prevImgPath
 
    FileGetSize, fileSizu, %imgpath%
+   SplitPath, imgpath, OutFileName, OutDir
+   winTitle := currentFileIndex "/" maxFilesIndex " | " OutFileName " | " OutDir
    If (!FileExist(imgpath) && !fileSizu && usePrevious=0)
    {
       If (WinActive("A")=PVhwnd)
       {
-         Gui, 1: Show,, *!(%currentFileIndex%/%maxFilesIndex%) %imgpath%
+         winTitle := "[*] " winTitle
+         Gui, 1: Show,, % winTitle
          Tooltip, ERROR: Unable to load the file...`n%imgpath%
          SetTimer, RemoveTooltip, -2000
       }
-      If (A_TickCount - lastInvoked2>125)
+
+      If (A_TickCount - lastInvoked2>125) && (A_TickCount - lastInvoked>95)
+      {
          SoundBeep, 300, 50
-      lastInvoked2 := A_TickCount
+         lastInvoked2 := A_TickCount
+      }
+      lastInvoked := A_TickCount
       Return "fail"
    }
 
-   lastInvoked2 := A_TickCount
-   SplitPath, imgpath, imgname
-   WinGetPos, mainX, mainY,,, ahk_id %PVhwnd%
-   GetClientSize(mainWid, mainHeig, PVhwnd)
-   If (WinActive("A")!=PVhwnd && slideShowRunning=1)
-      Gui, 1: Show, NoActivate x%mainX% y%mainY% w%mainWid% h%mainHeig%, (%currentFileIndex%/%maxFilesIndex%) %imgpath%
-   Else
-      Gui, 1: Show,, (%currentFileIndex%/%maxFilesIndex%) %imgpath%
-
-   If (A_TickCount - lastInvoked>95) || (usePrevious=1)
+   If (A_TickCount - lastInvoked>85) && (A_TickCount - lastInvoked2>85)  || (usePrevious=1)
    {
-     lastInvoked := A_TickCount
-     thisPicCtrl := (prevPicCtrl=1) ? 2 : 1
-     If (usePrevious!=1 && StrLen(imgpath)>3)
-     {
-        r := GetImgDimension(imgpath, imgW, imgH)
-        prevImgW := imgW
-        prevImgH := imgH
-     } Else If (usePrevious=1 && StrLen(prevImgPath)>3)
-     {
-        thisPicCtrl := prevPicCtrl
-        r := 1, imgW := prevImgW
-        imgH := prevImgH
-     }
+       lastInvoked := A_TickCount
+       If (usePrevious!=1 && StrLen(imgpath)>3)
+       {
+          r1 := GetImgDimension(imgpath, imgW, imgH)
+          prevImgW := imgW
+          prevImgH := imgH
+       } Else If (usePrevious=1 && StrLen(prevImgPath)>3)
+       {
+          r1 := 1, imgW := prevImgW
+          imgH := prevImgH
+       }
 
-     if !r
-     {
-        If (WinActive("A")=PVhwnd)
-        {
-           Tooltip, ERROR: Unable to display the image...
-           SetTimer, RemoveTooltip, -2000
-        }
-        SoundBeep, 300, 100
-        Return "fail"
-     }
+       If r1
+          r2 := ResizeImage(imgpath, imgW, imgH, usePrevious)
 
-     result := ResizeImage(thisPicCtrl, mainWid, mainHeig, imgpath, imgW, imgH, usePrevious)
-     If (usePrevious!=1 && StrLen(imgpath)>3)
-        prevImgPath := imgpath
-     prevPicCtrl := thisPicCtrl
-     lastInvoked := A_TickCount
-   } Else SetTimer, ReloadThisPicture, -300
-   lastInvoked := A_TickCount
+       if (!r1 || !r2)
+       {
+          If (WinActive("A")=PVhwnd)
+          {
+             Tooltip, ERROR: Unable to display the image...
+             SetTimer, RemoveTooltip, -2000
+          }
+          SoundBeep, 300, 100
+          Return "fail"
+       }
+
+       If (usePrevious!=1 && StrLen(imgpath)>3)
+          prevImgPath := imgpath
+       lastInvoked := A_TickCount
+   } Else
+   {
+       winPrefix := defineWinTitlePrefix()
+       Gui, 1: Show,, % winPrefix winTitle
+       SetTimer, ReloadThisPicture, -200
+   }
+   lastInvoked2 := A_TickCount
 }
 
-ResizeImage(tehCtrl, GuiW, GuiH, imgpath, imgW, imgH, usePrevious) {
-   Static ohBitmap
+ResizeImage(imgpath, imgW, imgH, usePrevious) {
+   WinGetPos, mainX, mainY,,, ahk_id %PVhwnd%
+   GetClientSize(GuiW, GuiH, PVhwnd)
    PicRatio := Round(imgW/imgH, 5)
    GuiRatio := Round(GuiW/GuiH, 5)
+
    if (imgW <= GuiW) && (imgH <= GuiH)
    {
       ResizedW := GuiW
@@ -1368,57 +1486,132 @@ ResizeImage(tehCtrl, GuiW, GuiH, imgpath, imgW, imgH, usePrevious) {
 
    wscale := Round(ResizedW / imgW, 3)
    hscale := Round(ResizedH / imgH, 3)
-   ; If RegExMatch(imgpath, "i)(\.gif)$")
-   ; {
-   ;    SoundBeep 
-   ;    GuiControl, Hide, PicOnGUI1
-   ;    GuiControl, Hide, PicOnGUI2
-   ;    Agifu := AddAnimatedGIF(imgpath, (GuiW-ResizedW)//2, (GuiH-ResizedH)//2, ResizedW, ResizedH)
-   ;    Return
-   ; }
+   ws := Round(ResizedW / imgW * 100)
 
-   If (usePrevious=0)
+   SplitPath, imgpath, OutFileName, OutDir
+   winPrefix := defineWinTitlePrefix()
+   winTitle := winPrefix currentFileIndex "/" maxFilesIndex " [" ws "%] " OutFileName " | " OutDir
+   If (WinActive("A")!=PVhwnd && slideShowRunning=1)
+      Gui, 1: Show, NoActivate x%mainX% y%mainY% w%GuiW% h%GuiH%, % winTitle
+   Else ; If (usePrevious!=1)
+      Gui, 1: Show, , % winTitle
+
+   r := Gdip_ShowImgonGui(imgpath, wscale, hscale, imgW, imgH)
+   Return r
+}
+
+Gdip_ShowImgonGui(imgpath, wscale, hscale, Width, Height) {
+    Critical, on
+    Static prevImgPath
+    If (winGDIcreated!=1)
+       createGDIwin()
+
+    If (imgpath!=prevImgPath || !gdiBitmap)
+    {
+       DestroyGDIbmp()
+       Sleep, 1
+       gdiBitmap := Gdip_CreateBitmapFromFile(imgpath)
+    }
+
+    If (!gdiBitmap || ErrorLevel)
+    {
+       SoundBeep 
+       Return 0
+    }
+
+    prevImgPath := imgpath
+    If (imgFxMode=2)       ; grayscale
+       matrix := "0.299|0.299|0.299|0|0|0.587|0.587|0.587|0|0|0.114|0.114|0.114|0|0|0|0|0|1|0|0|0|0|0|1"
+    Else If (imgFxMode=3)  ; negative / invert
+       matrix := "-1|0|0|0|0|0|-1|0|0|0|0|0|-1|0|0|0|0|0|1|0|1|1|1|0|1"
+
+    newW := Width * wscale
+    newH := Height * hscale
+    GetClientSize(mainWidth, mainHeight, PVhwnd)
+    ; JEE_ClientToScreen(hPicOnGui, 1, 1, mainX, mainY)
+    hbm := CreateDIBSection(mainWidth, mainHeight)
+    hdc := CreateCompatibleDC()
+    obm := SelectObject(hdc, hbm)
+    G := Gdip_GraphicsFromHDC(hdc)
+    Gdip_SetInterpolationMode(G, 1)
+    Gdip_SetSmoothingMode(G, 1)
+
+    If (FlipImgH=1)
+    {
+       Gdip_ScaleWorldTransform(G, -1, 1)
+       Gdip_TranslateWorldTransform(G, -mainWidth, 0)
+    }
+
+    If (FlipImgV=1)
+    {
+       Gdip_ScaleWorldTransform(G, 1, -1)
+       Gdip_TranslateWorldTransform(G, 0, -mainHeight)
+    }
+
+    DestPosX := mainWidth//2 - newW//2
+    DestPosY := mainHeight//2 - newH//2
+    r1 := Gdip_DrawImage(G, gdiBitmap, DestPosX, DestPosY, newW, newH, 0, 0, Width, Height, matrix)
+
+    ; If (lumosAdjust!=0)
+    ; {
+    ;    adjustLumosPrefs()
+    ;    pBrush1 := Gdip_BrushCreateSolid(luminalShade)
+    ;    Gdip_FillRectangle(G, pBrush1, DestPosX, DestPosY, newW, newH)
+    ; }
+
+    Gdip_ResetWorldTransform(G)
+    r2 := UpdateLayeredWindow(hGDIwin, hdc, 0, 0, mainWidth, mainHeight)
+    Gdip_DeleteBrush(pBrush1)
+    Gdip_DeleteGraphics(G)
+    Gui, 2: Show, NoActivate
+    SetTimer, DestroyGDIbmp, -900
+    r := (r1!=0 || !r2) ? 0 : 1
+    Return r
+}
+
+GuiSize:
+   GDIupdater()
+Return
+
+GDIupdater() {
+   If (!CurrentSLD || !maxFilesIndex) || (A_TickCount - scriptStartTime<600)
+      Return
+   If (slideShowRunning=1)
+      resetSlideshowTimer(0)
+
+   GetClientSize(GuiW, GuiH, PVhwnd)
+   GuiControl, 1: Move, PicOnGUI, % "w" GuiW " h" GuiH
+   imgpath := resultedFilesList[currentFileIndex]
+   If (!FileExist(imgpath) || A_EventInfo=1 || !CurrentSLD)
    {
-      DeleteObject(ohBitmap)
-      ohBitmap := Gdip_ShowImgonGui(imgpath, wscale, hscale, imgW, imgH)
+      If (slideShowRunning=1)
+         ToggleSlideShowu()
+      Sleep, 25
+      destroyGDIwin()
+      Return
    }
-   otherPicCtrl := (tehCtrl=1) ? 2 : 1
-   GuiControl, MoveDraw, PicOnGui%tehCtrl%, % "w" ResizedW " h" ResizedH " x" (GuiW-ResizedW)//2 " y" (GuiH-ResizedH)//2
-   GuiControl,, PicOnGui%tehCtrl%, HBITMAP:*%ohBitmap%
-   GuiControl, Show, PicOnGUI%tehCtrl%
-   GuiControl, Hide, PicOnGUI%otherPicCtrl%
-   Return 1
+
+   If (maxFilesIndex>0) && (A_TickCount - scriptStartTime>500)
+      ShowTheImage("lol", 1)
 }
 
-Gdip_ShowImgonGui(imgfile, wscale, hscale, Width, Height) {
-  pBitmap := Gdip_CreateBitmapFromFile(imgfile)
-  If !pBitmap || ErrorLevel
-  {
-     SoundBeep 
-     Return 0
-  }
-  If (imgFxMode=2)       ; grayscale
-     matrix := "0.299|0.299|0.299|0|0|0.587|0.587|0.587|0|0|0.114|0.114|0.114|0|0|0|0|0|1|0|0|0|0|0|1"
-  Else If (imgFxMode=3)  ; negative / invert
-     matrix := "-1|0|0|0|0|0|-1|0|0|0|0|0|-1|0|0|0|0|0|1|0|1|1|1|0|1"
-
-  newW := Width * wscale
-  newH := Height * hscale
-  pBitmap2 := Gdip_CreateBitmap(newW, newH)
-  G2 := Gdip_GraphicsFromImage(pBitmap2)
-  Gdip_SetInterpolationMode(G2, 1)
-  Gdip_SetSmoothingMode(G2, 1)
-  If (FlipImgH=1)
-     Gdip_ScaleWorldTransform(G2, -1, 1), Gdip_TranslateWorldTransform(G2, -newW, 0)
-  If (FlipImgV=1)
-     Gdip_ScaleWorldTransform(G2, 1, -1), Gdip_TranslateWorldTransform(G2, 0, -newH)
-
-  Gdip_DrawImage(G2, pBitmap, 0, 0, Width * wscale, Height * hscale, 0, 0, Width, Height, matrix)
-  ohBitmap := Gdip_CreateHBITMAPFromBitmap(pBitmap2)
-  Gdip_DeleteGraphics(G), Gdip_DisposeImage(pBitmap)
-  Gdip_DeleteGraphics(G2), Gdip_DisposeImage(pBitmap2)
-  Return ohBitmap
+DestroyGDIbmp() {
+   Gdip_DisposeImage(gdiBitmap)
+   gdiBitmap := ""
 }
+
+JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
+; function by jeeswg found on:
+; https://autohotkey.com/boards/viewtopic.php?t=38472
+
+  VarSetCapacity(POINT, 8)
+  NumPut(vPosX, &POINT, 0, "Int")
+  NumPut(vPosY, &POINT, 4, "Int")
+  DllCall("user32\ClientToScreen", Ptr,hWnd, Ptr,&POINT)
+  vPosX2 := NumGet(&POINT, 0, "Int")
+  vPosY2 := NumGet(&POINT, 4, "Int")
+}
+
 
 GetClientSize(ByRef w, ByRef h, hwnd) {
 ; by Lexikos http://www.autohotkey.com/forum/post-170475.html
@@ -1454,8 +1647,11 @@ sldGenerateFilesList(readThisFile, doFilesCheck) {
           line := StrReplace(line, "|")
        } Else doRecursive := 1
 
-       SplitPath, line, OutFileName, OutDir
-       If (StrLen(OutDir)>2 && RegExMatch(line, "i)(\.(tif|emf|jpg|jpeg|png|bmp|gif))$"))
+       SplitPath, line, OutFileName, OutDir,, OutDrive
+       If InStr(OutDrive, "p://")
+          Continue
+
+       If (StrLen(OutDir)>2 && RegExMatch(line, RegExFilesPattern))
        {
           If (doFilesCheck=1)
           {
@@ -1495,7 +1691,7 @@ GetFilesList(strDir, doRecursive:=1) {
   dig := (doRecursive=2) ? "" : "R"
   Loop, Files, %strDir%, %dig%
   {
-      If RegExMatch(A_LoopFileName, "i)(\.(tif|emf|jpg|jpeg|png|bmp|gif))$")
+      If RegExMatch(A_LoopFileName, RegExFilesPattern)
       {
          If StrLen(filesFilter)>1
          {
@@ -1519,6 +1715,7 @@ IDshowImage(imgID,opentehFile:=0) {
        Return
     }
 
+    resultu := StrReplace(resultu, "||")
     If (opentehFile=1)
     {
        If !FileExist(resultu)
@@ -1534,6 +1731,26 @@ IDshowImage(imgID,opentehFile:=0) {
 
 PreventKeyPressBeep() {
    IfEqual,A_Gui,1,Return 0 ; prevent keystrokes for GUI 1 only
+}
+
+Win_ShowSysMenu(Hwnd) {
+; Source: https://github.com/majkinetor/mm-autohotkey/blob/master/Appbar/Taskbar/Win.ahk
+
+  static WM_SYSCOMMAND = 0x112, TPM_RETURNCMD=0x100
+  oldDetect := A_DetectHiddenWindows
+  DetectHiddenWindows, on
+  Process, Exist
+  h := WinExist("ahk_pid " ErrorLevel)
+  DetectHiddenWindows, %oldDetect%
+;  if X=mouse
+;    VarSetCapacity(POINT, 8), DllCall("GetCursorPos", "uint", &POINT), X := NumGet(POINT), Y := NumGet(POINT, 4)
+  ; WinGetPos, X, Y, ,, ahk_id %Hwnd%
+  JEE_ClientToScreen(hPicOnGui, 1, 1, X, Y)
+  hSysMenu := DllCall("GetSystemMenu", "Uint", Hwnd, "int", False) 
+  r := DllCall("TrackPopupMenu", "uint", hSysMenu, "uint", TPM_RETURNCMD, "int", X, "int", Y, "int", 0, "uint", h, "uint", 0)
+  ifEqual, r, 0, return
+  PostMessage, WM_SYSCOMMAND, r,,,ahk_id %Hwnd%
+  return 1
 }
 
 AddAnimatedGIF(imagefullpath , x="", y="", w="", h="", guiname = "1") {
