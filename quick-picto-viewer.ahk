@@ -30,6 +30,7 @@ Global PVhwnd, hGDIwin, resultedFilesList := []
    , RandyIMGnow := 0, GDIPToken, Agifu, gdiBitmapSmall
    , slideShowRunning := 0, CurrentSLD := "", winGDIcreated :=0
    , LargeListCount := 1, usrFilesFilteru := ""
+   , ResolutionWidth, ResolutionHeight
    , gdiBitmap, mainSettingsFile := "ahk-picture-viewer.ini"
    , RegExFilesPattern := "i)(.\\*\.(tif|emf|jpg|jpeg|png|bmp|gif))$"
 ; User settings
@@ -1627,8 +1628,6 @@ ShowTheImage(imgpath, usePrevious:=0) {
           SoundBeep, 300, 100
           Return "fail"
        } Else prevImgPath := imgpath
-       If (usePrevious=1)
-          SetTimer, ReloadThisPicture, -550
        lastInvoked := A_TickCount
 ;       counteru++
 ;       ToolTip, a %counteru%
@@ -1641,8 +1640,38 @@ ShowTheImage(imgpath, usePrevious:=0) {
    lastInvoked2 := A_TickCount
 }
 
+calcImgSize(modus, imgW, imgH, GuiW, GuiH, ByRef ResizedW, ByRef ResizedH) {
+   PicRatio := Round(imgW/imgH, 5)
+   GuiRatio := Round(GuiW/GuiH, 5)
+   if (imgW <= GuiW) && (imgH <= GuiH)
+   {
+      ResizedW := GuiW
+      ResizedH := Round(ResizedW / PicRatio, 5)
+      If (ResizedH>GuiH)
+      {
+         ResizedH := (imgH <= GuiH) ? GuiH : imgH         ;set the maximum picture height to the original height
+         ResizedW := Round(ResizedH * PicRatio, 5)
+      }   
+
+      If (modus=2)
+      {
+         ResizedW := imgW
+         ResizedH := imgH
+      }
+   } else if (PicRatio > GuiRatio)
+   {
+      ResizedW := GuiW
+      ResizedH := Round(ResizedW / PicRatio, 5)
+   } else
+   {
+      ResizedH := (imgH >= GuiH) ? GuiH : imgH         ;set the maximum picture height to the original height
+      ResizedW := Round(ResizedH * PicRatio, 5)
+   }
+}
+
 ResizeImage(imgpath, usePrevious) {
-    Static oImgW, oImgH, prevImgPath, prevImgW, prevImgH, mainX, mainY
+    Static oImgW, oImgH, prevImgPath, prevImgW, prevImgH
+         , mainX, mainY, tinyW, tinyH
     If (winGDIcreated!=1)
        createGDIwin()
 
@@ -1668,40 +1697,13 @@ ResizeImage(imgpath, usePrevious) {
       prevImgH := imgH := oImgH
    } Else If (usePrevious=1) 
    {
-      imgH := prevImgH // 4
-      imgW := prevImgW // 4
+      RescaleBMPtiny(imgpath, prevImgW, prevImgH, tinyW, tinyH)
+      imgW := tinyW
+      imgH := tinyH
+      wscale := oImgW / tinyW
    }
 
-   If (usePrevious=1)
-      RescaleBMPtiny(imgpath, prevImgW, prevImgH)
-
-   PicRatio := Round(imgW/imgH, 5)
-   GuiRatio := Round(GuiW/GuiH, 5)
-   if (imgW <= GuiW) && (imgH <= GuiH)
-   {
-      ResizedW := GuiW
-      ResizedH := Round(ResizedW / PicRatio, 5)
-      If (ResizedH>GuiH)
-      {
-         ResizedH := (imgH <= GuiH) ? GuiH : imgH         ;set the maximum picture height to the original height
-         ResizedW := Round(ResizedH * PicRatio, 5)
-      }   
-
-      If (IMGresizingMode=2)
-      {
-         ResizedW := imgW
-         ResizedH := imgH
-      }
-   } else if (PicRatio > GuiRatio)
-   {
-      ResizedW := GuiW
-      ResizedH := Round(ResizedW / PicRatio, 5)
-   } else
-   {
-      ResizedH := (imgH >= GuiH) ? GuiH : imgH         ;set the maximum picture height to the original height
-      ResizedW := Round(ResizedH * PicRatio, 5)
-   }
-
+   calcImgSize(IMGresizingMode, imgW, imgH, GuiW, GuiH, ResizedW, ResizedH)
    If (IMGresizingMode=3)
    {
       lGuiW := (GuiW>imgW) ? imgW : GuiW
@@ -1729,10 +1731,10 @@ ResizeImage(imgpath, usePrevious) {
       ws := Round(ResizedW / imgW * 100) "%"
    }
 
-   If (usePrevious=1 && IMGresizingMode=4)
+   If (usePrevious=1 && (IMGresizingMode>=3 || (imgW=ResizedW && imgH=ResizedH)))
    {
-      ResizedW := ResizedW * 4
-      ResizedH := ResizedH * 4
+      ResizedW := ResizedW * wscale
+      ResizedH := ResizedH * wscale
    }
 
    IMGlargerViewPort := ((ResizedH-5>GuiH+1) || (ResizedW-5>GuiW+1)) ? 1 : 0
@@ -1744,21 +1746,58 @@ ResizeImage(imgpath, usePrevious) {
    Else ; If (usePrevious!=1)
       Gui, 1: Show, , % winTitle
 
-   r := Gdip_ShowImgonGui(ResizedW, ResizedH, GuiW, GuiH, usePrevious)
+   r := Gdip_ShowImgonGui(imgW, imgH, ResizedW, ResizedH, GuiW, GuiH, usePrevious)
+   If (usePrevious=1)
+      SetTimer, ReloadThisPicture, -550
+
    Return r
 }
 
-RescaleBMPtiny(imgpath, width, height) {
+calcScreenLimits() {
+; the function calculates screen boundaries for the user given X/Y position for the OSD
+    WinGetPos, mainX, mainY,,, ahk_id %PVhwnd%
+    ActiveMon := MWAGetMonitorMouseIsIn(mainX, mainY)
+    If !ActiveMon
+    {
+       ActiveMon := MWAGetMonitorMouseIsIn()
+       If !ActiveMon
+          Return
+    }
+
+    SysGet, mCoord, MonitorWorkArea, %ActiveMon%
+    ResolutionWidth := Abs(max(mCoordRight, mCoordLeft) - min(mCoordRight, mCoordLeft))
+    ResolutionHeight := Abs(max(mCoordTop, mCoordBottom) - min(mCoordTop, mCoordBottom)) 
+}
+
+RescaleBMPtiny(imgpath, imgW, imgH, ByRef ResizedW, ByRef ResizedH) {
   Critical, on
   ; one quarter resolution
-  Static prevImgPath
+  Static prevImgPath, prevResizedW, prevResizedH
   If (imgpath=prevImgPath && gdiBitmapSmall)
+  {
+     ResizedW := prevResizedW
+     ResizedH := prevResizedH
      Return
+  }
 
   Gdip_DisposeImage(gdiBitmapSmall)
-  gdiBitmapSmall := Gdip_CreateBitmap(Width // 4, Height // 4)
+  calcScreenLimits()
+  If (imgW//3>ResolutionWidth//2) || (imgH//3>ResolutionHeight//2)
+  {
+     calcImgSize(1, imgW, imgH, ResolutionWidth//2, ResolutionHeight//2, ResizedW, ResizedH)
+  } Else
+  {
+     ResizedW := Round(imgW//3)
+     ResizedH := Round(imgH//3)
+  }
+  prevResizedW := ResizedW
+  prevResizedH := ResizedH
+  gdiBitmapSmall := Gdip_CreateBitmap(ResizedW, ResizedH)
   G2 := Gdip_GraphicsFromImage(gdiBitmapSmall)
-  Gdip_DrawImage(G2, gdiBitmap, 0, 0, Width // 4, Height // 4, 0, 0, Width, Height)
+  thisImgQuality := (userimgQuality=1) ? 3 : 5
+  Gdip_SetInterpolationMode(G2, thisImgQuality)
+  Gdip_SetSmoothingMode(G2, 3)
+  Gdip_DrawImage(G2, gdiBitmap, 0, 0, ResizedW, ResizedH, 0, 0, imgW, imgH)
   Gdip_DeleteGraphics(G2)
   prevImgPath := imgpath
 }
@@ -1771,12 +1810,34 @@ CloneMainBMP(imgpath, ByRef width, ByRef height) {
   Height := Gdip_GetImageHeight(oBitmap)
   gdiBitmap := Gdip_CreateBitmap(Width, Height)
   G3 := Gdip_GraphicsFromImage(gdiBitmap)
+  Gdip_SetInterpolationMode(G3, 5)
+  Gdip_SetSmoothingMode(G3, 3)
   Gdip_DrawImage(G3, oBitmap, 0, 0, Width, Height, 0, 0, Width, Height)
   Gdip_DeleteGraphics(G3)
   Gdip_DisposeImage(oBitmap)
 }
 
-Gdip_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious) {
+CloneResizerBMP(whichImg, newW, newH) {
+  Critical, on
+  Static prevWhichImg, prevImgW, prevImgH
+  If (prevImgW=newW && prevImgH=newH && prevWhichImg=whichImg)
+     Return
+
+  Gdip_DisposeImage(gdiBitmapViewScale)
+  Width := Gdip_GetImageWidth(whichImg)
+  Height := Gdip_GetImageHeight(whichImg)
+  gdiBitmapViewScale := Gdip_CreateBitmap(newW, newH)
+  G4 := Gdip_GraphicsFromImage(gdiBitmapViewScale)
+  Gdip_SetInterpolationMode(G4, imgQuality)
+  Gdip_SetSmoothingMode(G4, 3)
+  Gdip_DrawImage(G4, whichImg, 0, 0, newW, newH, 0, 0, Width, Height)
+  Gdip_DeleteGraphics(G4)
+  prevWhichImg := whichImg
+  prevImgW := newW
+  prevImgH := newH
+}
+
+Gdip_ShowImgonGui(ImgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious) {
     Critical, on
     If (imgFxMode=2)       ; grayscale
        matrix := "0.299|0.299|0.299|0|0|0.587|0.587|0.587|0|0|0.114|0.114|0.114|0|0|0|0|0|1|0|0|0|0|0|1"
@@ -1785,12 +1846,11 @@ Gdip_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious) {
     Else If (imgFxMode=4) && (lumosAdjust!=1 || GammosAdjust!=0)
        matrix := lumosAdjust "|0|0|0|0|0|" lumosAdjust "|0|0|0|0|0|" lumosAdjust "|0|0|0|0|0|1|0|" GammosAdjust "|" GammosAdjust "|" GammosAdjust "|0|1"
 
-    thisImgQuality := (usePrevious=1 && userimgQuality=1) ? 3 : imgQuality
     hbm := CreateDIBSection(mainWidth, mainHeight)
     hdc := CreateCompatibleDC()
     obm := SelectObject(hdc, hbm)
     G := Gdip_GraphicsFromHDC(hdc)
-    Gdip_SetInterpolationMode(G, thisImgQuality)
+    Gdip_SetInterpolationMode(G, imgQuality)
     Gdip_SetSmoothingMode(G, 3)
 
     If (FlipImgH=1)
@@ -1806,10 +1866,8 @@ Gdip_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious) {
     }
 
     whichImg := (usePrevious=1 && gdiBitmapSmall) ? gdiBitmapSmall : gdiBitmap
-    Width := Gdip_GetImageWidth(whichImg)
-    Height := Gdip_GetImageHeight(whichImg)
     calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY)
-    r1 := Gdip_DrawImage(G, whichImg, DestPosX, DestPosY, newW, newH, 0, 0, Width, Height, matrix)
+    r1 := Gdip_DrawImage(G, whichImg, DestPosX, DestPosY, newW, newH, 0, 0, imgW, imgH, matrix)
     Gdip_ResetWorldTransform(G)
     r2 := UpdateLayeredWindow(hGDIwin, hdc, 0, 0, mainWidth, mainHeight)
 
@@ -2123,4 +2181,67 @@ AddAnimatedGIF(imagefullpath , x="", y="", w="", h="", guiname = "1") {
 showTOOLtip(msg) {
    If (WinActive("A")=PVhwnd) && (noTooltipMSGs=0)
       Tooltip, %msg%
+}
+
+MWAGetMonitorMouseIsIn(coordX:=0,coordY:=0) {
+; function from: https://autohotkey.com/boards/viewtopic.php?f=6&t=54557
+; by Maestr0
+
+  ; get the mouse coordinates first
+  If (coordX && coordY)
+  {
+     Mx := coordX
+     My := coordY
+  } Else GetPhysicalCursorPos(mX, mY)
+
+  SysGet, MonitorCount, 80  ; monitorcount, so we know how many monitors there are, and the number of loops we need to do
+  Loop, %MonitorCount%
+  {
+    SysGet, mon%A_Index%, Monitor, %A_Index%  ; "Monitor" will get the total desktop space of the monitor, including taskbars
+
+    If (Mx>=mon%A_Index%left) && (Mx<mon%A_Index%right)
+    && (My>=mon%A_Index%top) && (My<mon%A_Index%bottom)
+    {
+       ActiveMon := A_Index
+       Break
+    }
+  }
+
+  Return ActiveMon
+}
+
+
+GetPhysicalCursorPos(ByRef mX, ByRef mY) {
+; function from: https://github.com/jNizM/AHK_DllCall_WinAPI/blob/master/src/Cursor%20Functions/GetPhysicalCursorPos.ahk
+; by jNizM, modified by Marius Șucan
+    Static lastMx, lastMy, lastInvoked := 1
+    If (A_TickCount - lastInvoked<70)
+    {
+       mX := lastMx
+       mY := lastMy
+       Return
+    }
+
+    lastInvoked := A_TickCount
+    If (A_OSVersion="WIN_XP")
+    {
+       MouseGetPos, mX, mY
+       lastMx := mX
+       lastMy := mY
+       Return
+    }
+
+    Static POINT
+         , init := VarSetCapacity(POINT, 8, 0) && NumPut(8, POINT, "Int")
+    GPC := DllCall("user32.dll\GetPhysicalCursorPos", "Ptr", &POINT)
+    If !GPC
+    {
+       MouseGetPos, mX, mY
+       Return
+;      Return DllCall("kernel32.dll\GetLastError")
+    }
+
+    lastMx := mX := NumGet(POINT, 0, "Int")
+    lastMy := mY := NumGet(POINT, 4, "Int")
+    Return
 }
