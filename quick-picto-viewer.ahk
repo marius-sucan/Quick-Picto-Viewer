@@ -25,8 +25,9 @@ Global PVhwnd, hGDIwin, resultedFilesList := []
    , currentFileIndex, maxFilesIndex := 0
    , appTitle := "AHK Picture Viewer", FirstRun := 1
    , hPicOnGui, scriptStartTime := A_TickCount
-   , prevRandyIMGs := [], prevRandyIMGids := [], SLDhasFiles := 0
-   , prevRandyIMGnow := 0, GDIPToken, Agifu
+   , RandyIMGids := [], SLDhasFiles := 0, IMGlargerViewPort := 0
+   , IMGdecalageY := 1, IMGdecalageX := 1
+   , RandyIMGnow := 0, GDIPToken, Agifu
    , slideShowRunning := 0, CurrentSLD := "", winGDIcreated :=0
    , LargeListCount := 1, usrFilesFilteru := ""
    , gdiBitmap, mainSettingsFile := "ahk-picture-viewer.ini"
@@ -37,6 +38,7 @@ Global PVhwnd, hGDIwin, resultedFilesList := []
    , lumosAdjust := 1, GammosAdjust := 0
    , imgFxMode := 1, FlipImgH := 0, FlipImgV := 0
    , imageAligned := 5, filesFilter := ""
+   , noTooltipMSGs := 1, zoomLevel := 1.5
 
 DetectHiddenWindows, On
 CoordMode, Mouse, Screen
@@ -79,11 +81,16 @@ OpenSLD(fileNamu, doFilesCheck:=0, dontStartSlide:=0) {
   showTOOLtip("Loading files - please wait...")
   Gui, 1: Show,, Loading files - please wait...
   sldGenerateFilesList(fileNamu, doFilesCheck)
+  GenerateRandyList()
   If (dontStartSlide=1)
   {
      SetTimer, RemoveTooltip, -2000
      Return
   }
+
+  FileReadLine, firstLine, % fileNamu, 1
+  If InStr(firstLine, "[General]")
+     readSlideSettings(fileNamu)
 
   If (maxFilesIndex>2)
   {
@@ -95,6 +102,16 @@ OpenSLD(fileNamu, doFilesCheck:=0, dontStartSlide:=0) {
      IDshowImage(1)
   }
   SetTimer, RemoveTooltip, -2000
+}
+
+GenerateRandyList() {
+   RandyIMGids := []
+   Loop, % maxFilesIndex
+       indexListu .= A_Index "+"
+   Sort, indexListu, Random D+
+   Loop, Parse, indexListu, +
+       RandyIMGids[A_Index] := A_LoopField
+   RandyIMGnow := 1
 }
 
 OpenThisFileFolder() {
@@ -265,13 +282,29 @@ CopyImage2clip() {
        PrevRandyPicture()
     Return
 
+    ~+Space::
+       GoNextSlide()
+    Return
+
     ~^BackSpace::
     ~+BackSpace::
     ~!BackSpace::
-       NextRandyPicture()
+       RandomPicture()
+    Return
+
+    ~vkBB::    ; [=]
+       ChangeZoom(1)
     Return
 
     ~vkBD::   ; [-]
+       ChangeZoom(-1)
+    Return
+
+    ~vkBE::    ; [,]
+       IncreaseSlideSpeed()
+    Return
+
+    ~vkBC::   ; [.]
        DecreaseSlideSpeed()
     Return
 
@@ -288,10 +321,6 @@ CopyImage2clip() {
           cleanFilesList()
        Else
           RefreshFilesList()
-    Return
-
-    ~vkBB::    ; [=]
-       IncreaseSlideSpeed()
     Return
 
     ~vk48::    ; H
@@ -331,19 +360,34 @@ CopyImage2clip() {
        DeletePicture()
     Return
 
+    ~Up::
+       If (IMGlargerViewPort=1 && IMGresizingMode>=3)
+          PanIMGonScreen("U")
+    Return
+
+    ~Down::
+       If (IMGlargerViewPort=1 && IMGresizingMode=4)
+          PanIMGonScreen("D")
+    Return
 
     ~WheelUp::
     ~Right::
        If (slideShowRunning=1)
           ToggleSlideShowu()
-       NextPicture()
+       If (IMGlargerViewPort=1 && IMGresizingMode=4)
+          PanIMGonScreen("R")
+       Else
+          NextPicture()
     Return
 
     ~WheelDown::
     ~Left::
        If (slideShowRunning=1)
           ToggleSlideShowu()
-       PreviousPicture()
+       If (IMGlargerViewPort=1 && IMGresizingMode=4)
+          PanIMGonScreen("L")
+       Else
+          PreviousPicture()
     Return
 
     ~PgDn::
@@ -458,7 +502,7 @@ ToggleImageSizingMode() {
        resetSlideshowTimer(0)
 
     IMGresizingMode++
-    If (IMGresizingMode>3)
+    If (IMGresizingMode>4)
        IMGresizingMode := 1
 
     friendly := DefineImgSizing()
@@ -471,6 +515,8 @@ DefineImgSizing() {
    friendly := (IMGresizingMode=1) ? "ADAPT ALL INTO VIEW" : "ADAPT ONLY LARGE IMAGES"
    If (IMGresizingMode=3)
       friendly := "NONE (ORIGINAL SIZE)"
+   Else If (IMGresizingMode=4)
+      friendly := "CUSTOM ZOOM: " Round(zoomLevel * 100) "%"
    Return friendly
 }
 
@@ -641,6 +687,27 @@ ChangeLumos(dir) {
    IDshowImage(currentFileIndex)
 }
 
+ChangeZoom(dir) {
+   If (slideShowRunning=1)
+      resetSlideshowTimer(0)
+
+   If (dir=1)
+      zoomLevel := (zoomLevel<1 || IMGlargerViewPort=0) ? zoomLevel + 0.05 : zoomLevel + 0.15
+   Else
+      zoomLevel := (zoomLevel<1 || IMGlargerViewPort=0) ? zoomLevel - 0.05 : zoomLevel - 0.15
+
+   IMGresizingMode := 4
+   If (zoomLevel<0)
+      zoomLevel := 0.001
+
+   If (zoomLevel>10)
+      zoomLevel := 10
+
+   showTOOLtip("Zoom level: " Round(zoomLevel*100) "%")
+   SetTimer, RemoveTooltip, -2000
+   SetTimer, DelayiedImageDisplay, -5
+}
+
 ChangeGammos(dir) {
    If (slideShowRunning=1)
       resetSlideshowTimer(0)
@@ -693,6 +760,30 @@ NextPicture() {
    If (currentFileIndex>maxFilesIndex)
       currentFileIndex := 1
    IDshowImage(currentFileIndex)
+}
+
+PanIMGonScreen(direction) {
+   If (slideShowRunning=1)
+      ToggleSlideShowu()
+   If (GetKeyState("Left", "P")!=1 && GetKeyState("Right", "P")!=1)
+   && (GetKeyState("Down", "P")!=1 && GetKeyState("Up", "P")!=1)
+      Return
+
+   GetClientSize(mainWidth, mainHeight, PVhwnd)
+   If (direction="U")
+      IMGdecalageY := IMGdecalageY + Round(mainHeight*0.1)
+   Else If (direction="D")
+      IMGdecalageY := IMGdecalageY - Round(mainHeight*0.1)
+   Else If (direction="L")
+      IMGdecalageX := IMGdecalageX + Round(mainWidth*0.1)
+   Else If (direction="R")
+      IMGdecalageX := IMGdecalageX - Round(mainWidth*0.2)
+
+   SetTimer, DelayiedImageDisplay, -5
+}
+
+DelayiedImageDisplay() {
+   ShowTheImage("lol", 1)
 }
 
 Jump2index() {
@@ -816,7 +907,7 @@ SaveFilesList() {
    }
 }
 
-cleanFilesList() {
+cleanFilesList(noFilesCheck:=0) {
    Critical, on
 
    If (maxFilesIndex>1)
@@ -827,30 +918,98 @@ cleanFilesList() {
       Loop, % maxFilesIndex + 1
       {
           r := resultedFilesList[A_Index]
-          If InStr(r, "||")
+          If (InStr(r, "||") || !r)
              Continue
 
-          If (r && FileExist(r))
-             filesListu .= r "`n"
+          If (noFilesCheck!="2")
+          {
+             If FileExist(r)
+                filesListu .= r "`n"
+          } Else filesListu .= r "`n"
       }
-      Sort, filesListu, U D`n
-      file2save := "temp-" A_NowUTC ".sld"
-      FileAppend, %filesListu%, %file2save%, utf-16
-      throwMSGwriteError()
       showTOOLtip("(Please wait) Removing duplicates from the list...")
+      Sort, filesListu, U D`n
       renewCurrentFilesList()
-      Loop, Read, %file2save%
+      Loop, Parse, filesListu,`n
       {
-         If StrLen(A_LoopReadLine)<4
-            Continue
-
-         maxFilesIndex++
-         resultedFilesList[maxFilesIndex] := A_LoopReadLine
+          If StrLen(A_LoopField)<2
+             Continue
+          maxFilesIndex++
+          resultedFilesList[maxFilesIndex] := A_LoopField
       }
+      GenerateRandyList()
       SoundBeep, 950, 100
       Sleep, 25
-      FileDelete, %file2save%
-      throwMSGwriteError()
+      RandomPicture()
+      SetTimer, RemoveTooltip, -2000
+      CurrentSLD := backCurrentSLD
+   }
+}
+
+ActSortName() {
+   cleanFilesList(2)
+}
+
+ActSortSize() {
+   SortFilesList("size")
+}
+   SortFilesList("resolution")
+
+ActSortModified() {
+   SortFilesList("modified")
+}
+
+ActSortCreated() {
+   SortFilesList("created")
+}
+
+ActSortResolution() {
+
+}
+
+SortFilesList(SortCriterion) {
+   Critical, on
+
+   If (maxFilesIndex>1)
+   {
+      backCurrentSLD := CurrentSLD
+      CurrentSLD := ""
+      showTOOLtip("(Please wait) Gathering files information...")
+      Loop, % maxFilesIndex + 1
+      {
+          r := resultedFilesList[A_Index]
+          If (InStr(r, "||") || !r || !FileExist(r))
+             Continue
+
+          If (SortCriterion="size")
+             FileGetSize, SortBy, %r%
+          Else If (SortCriterion="modified")
+             FileGetTime, SortBy, %r%, M
+          Else If (SortCriterion="created")
+             FileGetTime, SortBy, %r%, C
+          Else If (SortCriterion="resolution")
+          {
+             op := GetImgDimension(r, Wi, He)
+             SortBy := (op=1) ? Round(Wi/100 * He/100) : 0
+          }
+
+          If StrLen(SortBy)>1
+             filesListu .= SortBy " |!\!|" r "`n"
+      }
+      Sort, filesListu, N D`n
+      showTOOLtip("Generating files index...")
+      renewCurrentFilesList()
+      Loop, Parse, filesListu,`n
+      {
+          If StrLen(A_LoopField)<2
+             Continue
+          line := StrSplit(A_LoopField, "|!\!|")
+          maxFilesIndex++
+          resultedFilesList[maxFilesIndex] := line[2]
+      }
+      GenerateRandyList()
+      SoundBeep, 950, 100
+      Sleep, 25
       RandomPicture()
       SetTimer, RemoveTooltip, -2000
       CurrentSLD := backCurrentSLD
@@ -872,7 +1031,7 @@ readSlideSettings(readThisFile) {
 
      If (tstslideshowdelay!="@" && tstslideshowdelay>300)
         slideShowDelay := tstslideShowDelay
-     If (tstimgresizingmode!="@" && StrLen(tstIMGresizingMode)=1 && tstIMGresizingMode<4)
+     If (tstimgresizingmode!="@" && StrLen(tstIMGresizingMode)=1 && tstIMGresizingMode<5)
         IMGresizingMode := tstIMGresizingMode
      If (tstimgFxMode!="@" && StrLen(tstimgFxMode)=1 && tstimgFxMode<5)
         imgFxMode := tstimgFxMode
@@ -915,97 +1074,32 @@ writeSlideSettings(file2save) {
 }
 
 RandomPicture() {
-  Static maxLimitReached, prevJump1, prevjump2
+   ; Static 
 
-  Random, newJump, 1, %maxFilesIndex%
-  Loop, 3
-  {
-     If (newJump=currentFileIndex || newJump=prevJump1 || newJump=prevJump2) && (maxFilesIndex>1)
-        Random, newJump, 1, %maxFilesIndex%
-  }
-  If (maxFilesIndex=2)
-     newJump := (currentFileIndex=2) ? 1 : 2
+   RandyIMGnow++
+   If (RandyIMGnow<1)
+      RandyIMGnow := maxFilesIndex
+   If (RandyIMGnow>maxFilesIndex)
+      RandyIMGnow := 1
 
-  prevJump2 := prevJump1
-  prevJump1 := newJump
-  currentFileIndex := newJump
-  resultu := resultedFilesList[currentFileIndex]
-  If resultu
-  {
-     resultu := StrReplace(resultu, "||")
-     r := ShowTheImage(resultu)
-     If (r="fail")
-        Return
-
-     If (maxLimitReached!=1)
-        findLatestRandyID()
-
-     prevRandyIMGnow++
-     If (prevRandyIMGnow>50)
-     {
-        prevRandyIMGnow := 1
-        maxLimitReached := 1
-     }
-     prevRandyIMGs[prevRandyIMGnow] := resultu
-     prevRandyIMGids[prevRandyIMGnow] := currentFileIndex
-  }
-}
-
-findLatestRandyID() {
-   Loop, 50
-   {
-      imgpath := prevRandyIMGs[51 - A_Index]
-      If StrLen(imgpath)>3
-      {
-         prevRandyIMGnow := 51 - A_Index
-         Break
-      }
-   }
+   currentFileIndex := RandyIMGids[RandyIMGnow]
+   resultu := resultedFilesList[currentFileIndex]
+   IDshowImage(currentFileIndex)
 }
 
 PrevRandyPicture() {
-  If (slideShowRunning=1)
-     ToggleSlideShowu()
+   If (slideShowRunning=1)
+      ToggleSlideShowu()
 
-  If (prevRandyIMGnow<2)
-  {
-     findLatestRandyID()
-     prevRandyIMGnow++
-  }
+   RandyIMGnow--
+   If (RandyIMGnow<1)
+      RandyIMGnow := maxFilesIndex
+   If (RandyIMGnow>maxFilesIndex)
+      RandyIMGnow := 1
 
-  prevRandyIMGnow--
-  If (prevRandyIMGnow<1)
-     prevRandyIMGnow := 1
-
-  imgpath := prevRandyIMGs[prevRandyIMGnow]
-  If imgpath
-  {
-     currentFileIndex := prevRandyIMGids[prevRandyIMGnow]
-     If !currentFileIndex
-        currentFileIndex := detectFileID(imgpath)
-     ShowTheImage(imgpath)
-  }
-}
-
-NextRandyPicture() {
-  If (slideShowRunning=1)
-     ToggleSlideShowu()
-
-  prevRandyIMGnow++
-  imgpath := prevRandyIMGs[prevRandyIMGnow]
-  If !imgpath
-  {
-     prevRandyIMGnow := 1
-     imgpath := prevRandyIMGs[prevRandyIMGnow]
-  }
-
-  If imgpath
-  {
-     currentFileIndex := prevRandyIMGids[prevRandyIMGnow]
-     If !currentFileIndex
-        currentFileIndex := detectFileID(imgpath)
-     ShowTheImage(imgpath)
-  }
+   currentFileIndex := RandyIMGids[RandyIMGnow]
+   resultu := resultedFilesList[currentFileIndex]
+   IDshowImage(currentFileIndex)
 }
 
 DeletePicture() {
@@ -1117,6 +1211,7 @@ coreOpenFolder(thisFolder) {
    {
       renewCurrentFilesList()
       GetFilesList(thisFolder "\*")
+      GenerateRandyList()
       If (maxFilesIndex>0)
          IDshowImage(1)
       Else
@@ -1178,6 +1273,7 @@ OpenFiles() {
       }
       Gui, 1: Show,, Loading files - please wait...
       GetFilesList(SelectedDir "\*|")
+      GenerateRandyList()
       currentFileIndex := detectFileID(imgpath)
       IDshowImage(currentFileIndex)
       SetTimer, RemoveTooltip, -2000
@@ -1229,6 +1325,7 @@ GuiDropFiles:
          Return
       }
       GetFilesList(imagedir "\*|")
+      GenerateRandyList()
       currentFileIndex := detectFileID(imgpath)
       IDshowImage(currentFileIndex)
       CurrentSLD := "|" imagedir
@@ -1340,16 +1437,22 @@ BuildMenu() {
    Menu, PVtFile, Add, &Rename`tF2, RenameThisFile
    Menu, PVtFile, Add, &Delete`tDelete, DeletePicture
 
-   DefNAMErefresh := RegExMatch(CurrentSLD, "i)(\.sld)$") ? "Reload .SLD file" : "Refresh opened folder(s)"
-   Menu, PVfList, Add, %DefNAMErefresh%`tF5, RefreshFilesList
+   Menu, PVsort, Add, &Path and name, ActSortName
+   Menu, PVsort, Add, &File size, ActSortSize
+   Menu, PVsort, Add, &Modified date, ActSortModified
+   Menu, PVsort, Add, &Created date, ActSortCreated
+   Menu, PVsort, Add, &Resolution (very slow), ActSortResolution
+
+   Menu, PVfList, Add, &Refresh opened folder(s)`tF5, RefreshFilesList
    If (maxFilesIndex>2)
    {
       If (RegExMatch(CurrentSLD, "i)(\.sld)$") && SLDhasFiles=1)
-         Menu, PVfList, Add, Clean duplicate/inexistent entries, cleanFilesList
-      Menu, PVfList, Add, Text filtering`tCtrl+F, enableFilesFilter
+         Menu, PVfList, Add, &Clean duplicate/inexistent entries, cleanFilesList
+      Menu, PVfList, Add, &Text filtering`tCtrl+F, enableFilesFilter
       If StrLen(filesFilter)>1
-         Menu, PVfList, Check, Text filtering`tCtrl+F
-      Menu, PVfList, Add, Save as slideshow, SaveFilesList
+         Menu, PVfList, Check, &Text filtering`tCtrl+F
+      Menu, PVfList, Add,
+      Menu, PVfList, Add, &Sort by, :PVsort
    }
 
    Menu, PVmenu, Add, &Open File`tCtrl+O, OpenFiles
@@ -1462,7 +1565,9 @@ ShowTheImage(imgpath, usePrevious:=0) {
 
    FileGetSize, fileSizu, %imgpath%
    SplitPath, imgpath, OutFileName, OutDir
-   winTitle := currentFileIndex "/" maxFilesIndex " | " OutFileName " | " OutDir
+   If (IMGresizingMode=4)
+      zoomu := " [" Round(zoomLevel * 100) "%]"
+   winTitle := currentFileIndex "/" maxFilesIndex zoomu " | " OutFileName " | " OutDir
    If (!FileExist(imgpath) && !fileSizu && usePrevious=0)
    {
       If (WinActive("A")=PVhwnd)
@@ -1563,13 +1668,24 @@ ResizeImage(imgpath, imgW, imgH, usePrevious) {
          ws := Round(((lGuiW*lGuiH) / (imgW*imgH)) * 100)
          ws .= "% visible"
       } Else If (ws>100)
+      {
          ws := "100%"
-      Else
-         ws .= "%"
+      } Else ws .= "%"
+      zoomLevel := 1
       ResizedW := imgW
       ResizedH := imgH
-   } Else ws := Round(ResizedW / imgW * 100) "%"
+   } Else If (IMGresizingMode=4)
+   {
+      ResizedW := Round(imgW * zoomLevel, 3)
+      ResizedH := Round(imgH * zoomLevel, 3)
+      ws := Round(zoomLevel * 100) "%"
+   } Else
+   {
+      zoomLevel := Round(ResizedW / imgW, 3)
+      ws := Round(ResizedW / imgW * 100) "%"
+   }
 
+   IMGlargerViewPort := (ResizedH>GuiH+5 || ResizedW>GuiW+5) ? 1 : 0
    wscale := Round(ResizedW / imgW, 3)
    hscale := Round(ResizedH / imgH, 3)
 
@@ -1650,18 +1766,20 @@ Gdip_ShowImgonGui(imgpath, wscale, hscale, Width, Height) {
 calcIMGcoord(mainWidth, mainHeight, newW, newH, ByRef DestPosX, ByRef DestPosY) {
     Static orderu := {1:7, 2:8, 3:9, 4:4, 5:5, 6:6, 7:1, 8:2, 9:3}
     modus := orderu[imageAligned]
+    LY := mainHeight - newH
+    LX := mainWidth - newW
     If (modus=1)
     {
        DestPosX := 0
-       DestPosY := mainHeight - newH
+       DestPosY := LY
     } Else If (modus=2)
     {
        DestPosX := mainWidth//2 - newW//2
-       DestPosY := mainHeight - newH
+       DestPosY := LY
     } Else If (modus=3)
     {
-       DestPosX := mainWidth - newW
-       DestPosY := mainHeight - newH
+       DestPosX := LX
+       DestPosY := LY
     } Else If (modus=4)
     {
        DestPosX := 0
@@ -1672,9 +1790,9 @@ calcIMGcoord(mainWidth, mainHeight, newW, newH, ByRef DestPosX, ByRef DestPosY) 
        DestPosY := mainHeight//2 - newH//2
     } Else If (modus=6)
     {
-       DestPosX := mainWidth - newW
+       DestPosX := LX
        DestPosY := mainHeight//2 - newH//2
-    } Else If (modus=7)
+    } Else If (modus=7 || IMGresizingMode=4)
     {
        DestPosX := 0
        DestPosY := 0
@@ -1684,9 +1802,26 @@ calcIMGcoord(mainWidth, mainHeight, newW, newH, ByRef DestPosX, ByRef DestPosY) 
        DestPosY := 0
     } Else If (modus=9)
     {
-       DestPosX := mainWidth - newW
+       DestPosX := LX
        DestPosY := 0
-    } Else DestPosY := DestPosX := 0
+    }
+
+    If (IMGlargerViewPort!=1)
+       IMGdecalageY := IMGdecalageY := 1
+
+    If (IMGresizingMode=4)
+    {
+       DestPosX := IMGdecalageX
+       DestPosY := IMGdecalageY
+       If (DestPosX<LX)
+          DestPosX := IMGdecalageX := LX
+       If (DestPosY<LY)
+          DestPosY := IMGdecalageY := LY
+       If (DestPosX>0)
+          DestPosX := IMGdecalageX := 0
+       If (DestPosY>0)
+          DestPosY := IMGdecalageY := 0
+    }
 }
 
 GuiSize:
@@ -1736,10 +1871,18 @@ JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
 
 GetClientSize(ByRef w, ByRef h, hwnd) {
 ; by Lexikos http://www.autohotkey.com/forum/post-170475.html
+    Static prevW, prevH, lastInvoked := 1
+    If (A_TickCount - lastInvoked<50)
+    {
+       W := prevW
+       H := prevH
+       Return
+    }
     VarSetCapacity(rc, 16, 0)
     DllCall("GetClientRect", "uint", hwnd, "uint", &rc)
-    w := NumGet(rc, 8, "int")
-    h := NumGet(rc, 12, "int")
+    prevW := w := NumGet(rc, 8, "int")
+    prevH := h := NumGet(rc, 12, "int")
+    lastInvoked := A_TickCount
 } 
 
 sldGenerateFilesList(readThisFile, doFilesCheck) {
@@ -1749,19 +1892,20 @@ sldGenerateFilesList(readThisFile, doFilesCheck) {
     FileRead, tehFileVar, %readThisFile%
     FileReadLine, firstLine, %readThisFile%, 1
     If InStr(firstLine, "[General]")
-    {
        properFormat := 1
-       readSlideSettings(readThisFile)
-    } Else
+    Else
        tehFileVar := RegExReplace(tehFileVar, "\x22", "@")
 
     filterBehaviour := InStr(usrFilesFilteru, "&") ? 1 : 2
     Loop, Parse, tehFileVar,`n,`r
     {
-       line := StrReplace(A_LoopField, "@-")
+       line := Trim(A_LoopField)
        If (properFormat!=1)
+       {
+          line := StrReplace(line, "@-")
           line := StrReplace(line, "@")
-       line := Trim(line)
+       }
+
        If InStr(A_LoopField, "|")
        {
           doRecursive := 2
@@ -1893,6 +2037,6 @@ AddAnimatedGIF(imagefullpath , x="", y="", w="", h="", guiname = "1") {
 }
 
 showTOOLtip(msg) {
-   If (WinActive("A")=PVhwnd)
+   If (WinActive("A")=PVhwnd) && (noTooltipMSGs=0)
       Tooltip, %msg%
 }
