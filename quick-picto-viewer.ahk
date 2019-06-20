@@ -1,8 +1,8 @@
 ; Script Name:    AHK Picture Viewer
 ; Language:       English
 ; Platform:       Windows XP or later
-; Author:         sbc and Marius Șucan
-; Script Original Version: 1.0.0 on Oct 4, 2010
+; Author:         Marius Șucan
+; Script Original Version: 1.0.0 on Oct 4, 2010 by SBC
 ; Script Current Version: 2.0.0 on vendredi 24 mai 2019
 ; Script Function:
 ; Display images and slideshows; jpeg, jpg, bmp, png, gif, tif, emf
@@ -15,7 +15,7 @@
 ; Licence: GPL. Please reffer to this page for more information. http://www.gnu.org/licenses/gpl.html
 ;_________________________________________________________________________________________________________________Auto Execute Section____
 
-#Noenv
+#NoEnv
 #NoTrayIcon
 #MaxMem, 1924
 #Singleinstance, off
@@ -31,17 +31,22 @@ Global PVhwnd, hGDIwin, resultedFilesList := []
    , RandyIMGnow := 0, GDIPToken, Agifu, gdiBitmapSmall
    , gdiBitmapSmallView, gdiBitmapViewScale, msgDisplayTime := 2000
    , slideShowRunning := 0, CurrentSLD := "", winGDIcreated :=0
-   , ResolutionWidth, ResolutionHeight, isAlwaysOnTop := 0
+   , ResolutionWidth, ResolutionHeight
    , gdiBitmap, mainSettingsFile := "ahk-picture-viewer.ini"
    , RegExFilesPattern := "i)(.\\*\.(tif|emf|jpg|png|bmp|gif|tiff|jpeg))$"
-
-; User settings
+   , LargeUIfontValue := 14, version := "2.0.0", AnyWindowOpen := 0
+   , PrefsLargeFonts := 0, OSDbgrColor := "131209", OSDtextColor := "FFFEFA"
+   , OSDfntSize := 14, OSDFontName := "Arial"
+ 
+ ; User settings
    , WindowBgrColor := "010101", slideShowDelay := 3000
    , IMGresizingMode := 1, SlideHowMode := 1, TouchScreenMode := 1
    , lumosAdjust := 1, GammosAdjust := 0, userimgQuality := 1
    , imgFxMode := 1, FlipImgH := 0, FlipImgV := 0
-   , imageAligned := 5, filesFilter := ""
+   , imageAligned := 5, filesFilter := "", isAlwaysOnTop := 0
    , noTooltipMSGs := 1, zoomLevel := 1, skipDeadFiles := 0
+   , isTitleBarHidden := 0, lumosGrayAdjust := 0, GammosGrayAdjust := 0
+
 imgQuality := (userimgQuality=1) ? 7 : 5
 DetectHiddenWindows, On
 CoordMode, Mouse, Screen
@@ -83,7 +88,7 @@ OpenSLD(fileNamu, doFilesCheck:=0, dontStartSlide:=0) {
 
   filesFilter := usrFilesFilteru := ""
   showTOOLtip("Loading files - please wait...")
-  Gui, 1: Show,, Loading files - please wait...
+  WinSetTitle, ahk_id %PVhwnd%,, Loading files - please wait...
   sldGenerateFilesList(fileNamu, doFilesCheck)
   GenerateRandyList()
   FileReadLine, firstLine, % fileNamu, 1
@@ -153,7 +158,7 @@ resetSlideshowTimer(showMsg) {
    If (showMsg=1)
    {
       delayu := slideShowDelay//1000
-      showTOOLtip("Slideshow speed: " delayu)
+      showTOOLtip("Slideshow speed: " delayu " second(s)")
       SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 }
@@ -171,7 +176,11 @@ CopyImagePath() {
 
   imgpath := resultedFilesList[currentFileIndex]
   If FileExist(imgpath)
+  {
      Clipboard := imgpath
+     showTOOLtip("File path copied to clipboard...")
+     SetTimer, RemoveTooltip, % -msgDisplayTime
+  }
 }
 
 CopyImage2clip() {
@@ -197,9 +206,9 @@ CopyImage2clip() {
      Sleep, 2
      Gdip_DisposeImage(pBitmap)
      If r1
-        showTOOLtip("Image copied to the clipboard...")
+        showTOOLtip("Image copied to clipboard...")
      Else
-        showTOOLtip("ERROR: Failed to copy the image to the clipboard...")
+        showTOOLtip("ERROR: Failed to copy the image to clipboard...")
      SetTimer, RemoveTooltip, % -msgDisplayTime
      r2 := IDshowImage(currentFileIndex)
      If !r2
@@ -244,6 +253,14 @@ CopyImage2clip() {
        CopyImage2clip()
     Return
 
+    ~k::    ; Ctrl+C
+       r1 := resultedFilesList[currentFileIndex]
+       r2 := testFileExists(r1)
+       MsgBox, % "a" r2
+    Return
+
+
+    ~^+vk43::    ; Ctrl+Shift+C
     ~+vk43::    ; Shift+C
        CopyImagePath()
     Return
@@ -467,7 +484,7 @@ FirstPicture() {
 
    currentFileIndex := 1
    r := IDshowImage(1)
-   showTOOLtip("Total images loaded: " maxFilesIndex)
+   showTOOLtip("Total images loaded: 1 / " maxFilesIndex)
    If !r
       informUserFileMissing()
    SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -483,6 +500,10 @@ LastPicture() {
       informUserFileMissing()
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
+
+SettingsGUIAGuiEscape:
+   CloseWindow()
+Return
 
 GuiClose:
 Cleanup:
@@ -560,6 +581,7 @@ ToggleImageSizingMode() {
     friendly := DefineImgSizing()
     showTOOLtip("Rescaling mode: " friendly)
     SetTimer, RemoveTooltip, % -msgDisplayTime
+    writeSlideSettings(mainSettingsFile)
     r := IDshowImage(currentFileIndex)
     If !r
        informUserFileMissing()
@@ -585,7 +607,7 @@ InfoToggleSlideShowu() {
      delayu := slideShowDelay//1000
      friendly := DefineSlideShowType()
      etaTime := "Estimated time: " SecToHHMMSS(Round((slideShowDelay/1000)*maxFilesIndex))
-     ToolTip, Started %friendly% slideshow (speed: %delayu%).`nTotal files: %maxFilesIndex%.`n%etaTime%
+     showTOOLtip("Started " friendly " slideshow (speed: " delayu ").`nTotal files: "  maxFilesIndex ".`n" etaTime)
      SetTimer, RemoveTooltip, % -msgDisplayTime
   }
 }
@@ -697,6 +719,7 @@ SwitchSlideModes() {
    friendly := DefineSlideShowType()
    showTOOLtip("Slideshow mode: " friendly)
    SetTimer, RemoveTooltip, % -msgDisplayTime
+   writeSlideSettings(mainSettingsFile)
 }
 
 ToggleImgFX() {
@@ -707,18 +730,25 @@ ToggleImgFX() {
       imgFxMode := 1
 
    friendly := DefineFXmodes()
-   If (imgFxMode=4 && lumosAdjust=1 && GammosAdjust=0)
-   {
-      lumosAdjust := 1.3
-      GammosAdjust := -0.3
-      friendly .= "`nPlease adjust brightness and gamma...`nUse [ and ] with or without Shift."
-   }
+   If (imgFxMode=2)
+      friendly .= "`nBrightness: " Round(lumosGrayAdjust, 3) "`nGamma: " Round(GammosGrayAdjust, 3)
+   Else If (imgFxMode=4)
+      friendly .= "`nBrightness: " Round(lumosAdjust, 3) "`nGamma: " Round(GammosAdjust, 3)
 
+   If (imgFxMode=2 || imgFxMode=4)
+      friendly .= "`n `nYou can adjust brightness and gamma using`n [ and ] with or without Shift."
    showTOOLtip("Image colors: " friendly)
    SetTimer, RemoveTooltip, % -msgDisplayTime
+   writeSlideSettings(mainSettingsFile)
    r := IDshowImage(currentFileIndex)
    If !r
       informUserFileMissing()
+}
+
+defineImgAlign() {
+   modes := {1:"Top-left corner", 2:"Top-center", 3:"Top-right corner", 4:"Left-center", 5:"Center", 6:"Right-center", 7:"Bottom-left corner", 8:"Bottom-center", 9:"Bottom-right corner"}
+   r := modes[imageAligned]
+   Return r
 }
 
 ToggleIMGalign() {
@@ -728,8 +758,9 @@ ToggleIMGalign() {
    If (imageAligned>9)
       imageAligned := 1
 
-   showTOOLtip("Image alignment: " imageAligned)
+   showTOOLtip("Image alignment: " defineImgAlign())
    SetTimer, RemoveTooltip, % -msgDisplayTime
+   writeSlideSettings(mainSettingsFile)
    r := IDshowImage(currentFileIndex)
    If !r
       informUserFileMissing()
@@ -740,39 +771,70 @@ ResetImageView() {
 }
 
 ChangeLumos(dir) {
+   Static prevValues
    If (slideShowRunning=1)
       resetSlideshowTimer(0)
+   If (imgFxMode!=2 && imgFxMode!=4 && dir!=2)
+      imgFxMode := 4
 
-   If (dir=1)
-      lumosAdjust := lumosAdjust + 0.2
-   Else
-      lumosAdjust := (lumosAdjust<1) ?  lumosAdjust - 0.1 : lumosAdjust - 0.25
+   If (imgFxMode=2)
+   {
+      If (dir=1)
+         lumosGrayAdjust := lumosGrayAdjust + 0.1
+      Else
+         lumosGrayAdjust := lumosGrayAdjust - 0.1
+      If (lumosGrayAdjust<-25)
+         lumosGrayAdjust := -25
+      Else If (lumosGrayAdjust>25)
+         lumosGrayAdjust := 25
+   } Else
+   {
+      If (dir=1)
+         lumosAdjust := lumosAdjust + 0.2
+      Else
+         lumosAdjust := (lumosAdjust<1) ?  lumosAdjust - 0.1 : lumosAdjust - 0.25
 
-   imgFxMode := 4
+      If (lumosAdjust<0)
+         lumosAdjust := 0.001
+      Else If (lumosAdjust>25)
+         lumosAdjust := 25
+   }
+
    If (dir=2)
    {
-      GammosAdjust := FlipImgH := FlipImgV := 0
-      lumosAdjust := 1
+      If (imgFxMode=2)
+      {
+         lumosGrayAdjust := GammosGrayAdjust := 0
+      } Else If (imgFxMode=4)
+      {
+         GammosAdjust := 0
+         lumosAdjust := 1
+      }
+
+      FlipImgH := FlipImgV := 0
       imgFxMode := 1
       If (IMGresizingMode=4)
          IMGdecalageY := IMGdecalageX := zoomLevel := 1
    }
 
-   If (lumosAdjust<0)
-      lumosAdjust := 0.001
-
-   If (lumosAdjust>10)
-      lumosAdjust := 10
-
+   value2show := (imgFxMode=2) ? Round(lumosGrayAdjust, 3) : Round(lumosAdjust, 3)
    If (dir=2)
       showTOOLtip("Image colors: UNALTERED")
    Else
-      showTOOLtip("Image brightness: " lumosAdjust)
+      showTOOLtip("Image brightness: " value2show)
+
    SetTimer, RemoveTooltip, % -msgDisplayTime
+   newValues := "a" GammosGrayAdjust lumosGrayAdjust imageAligned IMGdecalageY IMGdecalageX zoomLevel currentFileIndex imgFxMode IMGresizingMode GammosAdjust lumosAdjust
+   If (prevValues=newValues)
+      Return
+
+   prevValues := newValues
    SetTimer, DelayiedImageDisplay, -10
 }
 
 ChangeZoom(dir) {
+   Static prevValues
+
    If (slideShowRunning=1)
       resetSlideshowTimer(0)
 
@@ -791,33 +853,52 @@ ChangeZoom(dir) {
 
    showTOOLtip("Zoom level: " Round(zoomLevel*100) "%")
    SetTimer, RemoveTooltip, % -msgDisplayTime
+   newValues := "a" GammosGrayAdjust lumosGrayAdjust imageAligned IMGdecalageY IMGdecalageX zoomLevel currentFileIndex imgFxMode IMGresizingMode GammosAdjust lumosAdjust
+   If (prevValues=newValues)
+      Return
+
+   prevValues := newValues
    SetTimer, DelayiedImageDisplay, -10
 }
 
 ChangeGammos(dir) {
+   Static prevValues
    If (slideShowRunning=1)
       resetSlideshowTimer(0)
 
+   If (imgFxMode!=2 && imgFxMode!=4)
+      imgFxMode := 4
+
+   value2Adjust := (imgFxMode=2) ? GammosGrayAdjust : GammosAdjust
    If (dir=1)
-      GammosAdjust := GammosAdjust + 0.05
+      value2Adjust := value2Adjust + 0.05
    Else
-      GammosAdjust := GammosAdjust - 0.05
+      value2Adjust := value2Adjust - 0.05
 
-   imgFxMode := 4
-   If (GammosAdjust<-1)
-      GammosAdjust := -1
+   If (value2Adjust<-25)
+      value2Adjust := -25
+   Else If (value2Adjust>1)
+      value2Adjust := 1
 
-   If (GammosAdjust>1)
-      GammosAdjust := 1
+   If (imgFxMode=2)
+      GammosGrayAdjust := value2Adjust
+   Else
+      GammosAdjust := value2Adjust
 
-   showTOOLtip("Image gamma: " GammosAdjust)
+   showTOOLtip("Image gamma: " Round(value2Adjust, 3))
    SetTimer, RemoveTooltip, % -msgDisplayTime
+   newValues := "a" GammosGrayAdjust lumosGrayAdjust imageAligned IMGdecalageY IMGdecalageX zoomLevel currentFileIndex imgFxMode IMGresizingMode GammosAdjust lumosAdjust
+   If (prevValues=newValues)
+      Return
+
+   prevValues := newValues
    SetTimer, DelayiedImageDisplay, -10
 }
 
 TransformIMGv() {
    If (slideShowRunning=1)
       resetSlideshowTimer(0)
+
    FlipImgV := !FlipImgV
    If (FlipImgV=1)
    {
@@ -873,6 +954,12 @@ NextPicture(dummy:=0, inLoop:=0) {
 }
 
 PanIMGonScreen(direction) {
+   If (IMGresizingMode!=4)
+   {
+      IMGdecalageX := IMGdecalageY := 1
+      Return
+   }
+
    If (slideShowRunning=1)
       ToggleSlideShowu()
    If (GetKeyState("Left", "P")!=1 && GetKeyState("Right", "P")!=1)
@@ -942,8 +1029,31 @@ Jump2index() {
    }
 }
 
+testFileExists(imgpath) {
+  ; https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-getfilesize
+  ; H := DllCall("kernel32\GetFileAttributesW", "Str", imgpath)
+  ; H := DllCall("shlwapi.dll\PathFileExistsW", "Str", imgpath)
+  ; If (h>0)
+  ;    Return 256
+  VarSetCapacity(dummy, 1024, 0)
+  H := DllCall("kernel32\FindFirstFileW", "Str", imgpath, "Ptr", &dummy, "Ptr")
+  Return H
+}
+
+; 3m 24s - GetFileAttributesW
+; 26s
+
+; 3m 25s    - PathFileExistsW
+; 26 s
+
+; 2m 43s - FindFirstFileW
+; 30s
+
+; 3m 25s - FileExist("")
+; 25s
+
 informUserFileMissing() {
-   showTOOLtip("ERROR: The current file is missing...")
+   showTOOLtip("ERROR: File not found...")
    SoundBeep, 300, 50
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
@@ -958,7 +1068,7 @@ enableFilesFilter() {
 
    If StrLen(filesFilter)>1
    {
-      showTOOLtip("To exclude files matching the string - `nplease insert '&' (and) into your string`n`nCurrent filter: " filesFilter)
+      showTOOLtip("To exclude files matching the string, `nplease insert '&&' (and) into your string`n `nCurrent filter: " filesFilter)
       SetTimer, RemoveTooltip, -5000
    }
 
@@ -1070,6 +1180,7 @@ SaveFilesList() {
          Sleep, 2
       }
 
+      WinSetTitle, ahk_id %PVhwnd%,, Saving files - please wait...
       showTOOLtip("(Please wait) Saving files list into`n" file2save)
       Loop, % maxFilesIndex + 1
       {
@@ -1077,13 +1188,33 @@ SaveFilesList() {
           If (InStr(r, "||") || !r)
              Continue
 
+          SplitPath, r,, OutDir
+          foldersList .= OutDir "`n"
           filesListu .= r "`n"
       }
-      FileAppend, %filesListu%, %file2save%, utf-16
+      Sort, foldersList, U D`n
+      foldersListu := "`n[Folders]`n"
+      Loop, Parse, foldersList, `n
+      {
+          If !A_LoopField
+             Continue
+          FileGetTime, dirDate, % A_LoopField, M
+          foldersListu .= "Fn" A_Index "=" A_LoopField "\`n"
+          foldersListu .= "Fd" A_Index "=" dirDate "`n"
+      }
+
+      foldersListu .= "`n[FilesList]`n"
+      Sleep, 10
+      FileAppend, % foldersListu, %file2save%, utf-16
+      Sleep, 10
+      FileAppend, % filesListu, %file2save%, utf-16
       throwMSGwriteError()
       SetTimer, RemoveTooltip, % -msgDisplayTime
-      SoundBeep, 900, 100
+      r := IDshowImage(currentFileIndex)
       CurrentSLD := backCurrentSLD
+      SoundBeep, 900, 100
+      If !r
+         informUserFileMissing()
    }
 }
 
@@ -1107,6 +1238,7 @@ cleanFilesList(noFilesCheck:=0) {
          FilterFilesIndex()
       }
 
+      WinSetTitle, ahk_id %PVhwnd%,, Cleaning files list - please wait...
       showTOOLtip("(Please wait) Checking files list...")
       Loop, % maxFilesIndex + 1
       {
@@ -1122,7 +1254,8 @@ cleanFilesList(noFilesCheck:=0) {
 
           If (noFilesCheck!="2")
           {
-             If FileExist(r)
+             If (testFileExists(r)>100)
+;             If FileExist(r)
                 filesListu .= r "`n"
           } Else filesListu .= r "`n"
       }
@@ -1196,6 +1329,7 @@ SortFilesList(SortCriterion) {
          FilterFilesIndex()
       }
 
+      WinSetTitle, ahk_id %PVhwnd%,, Sorting files list - please wait...
       showTOOLtip("(Please wait) Gathering files information...")
       Loop, % maxFilesIndex + 1
       {
@@ -1281,11 +1415,14 @@ readSlideSettings(readThisFile) {
      IniRead, tstFlipImgV, %readThisFile%, General, FlipImgV, @
      IniRead, tstlumosAdjust, %readThisFile%, General, lumosAdjust, @
      IniRead, tstGammosAdjust, %readThisFile%, General, GammosAdjust, @
+     IniRead, tstlumosGrAdjust, %readThisFile%, General, lumosGrayAdjust, @
+     IniRead, tstGammosGrAdjust, %readThisFile%, General, GammosGrayAdjust, @
      IniRead, tstimageAligned, %readThisFile%, General, imageAligned, @
      IniRead, tstnoTooltipMSGs, %readThisFile%, General, noTooltipMSGs, @
      IniRead, tstuserimgQuality, %readThisFile%, General, userimgQuality, @
      IniRead, tstTouchScreenMode, %readThisFile%, General, TouchScreenMode, @
      IniRead, tstskipDeadFiles, %readThisFile%, General, skipDeadFiles, @
+     IniRead, tstisAlwaysOnTop, %readThisFile%, General, isAlwaysOnTop, @
 
      If (tstslideshowdelay!="@" && tstslideshowdelay>300)
         slideShowDelay := tstslideShowDelay
@@ -1305,6 +1442,8 @@ readSlideSettings(readThisFile) {
         skipDeadFiles := tstskipDeadFiles
      If (tstFlipImgH!="@" && (tstFlipImgH=1 || tstFlipImgH=0))
         FlipImgV := tstFlipImgV
+     If (tstisAlwaysOnTop!="@" && (tstisAlwaysOnTop=1 || tstisAlwaysOnTop=0))
+        isAlwaysOnTop := tstisAlwaysOnTop
      If (tstslidehowmode!="@" && StrLen(tstSlideHowMode)=1 && tstSlideHowMode<4)
         SlideHowMode := tstSlideHowMode
      If (tstimageAligned!="@" && StrLen(tstimageAligned)=1 && tstimageAligned<10)
@@ -1323,7 +1462,14 @@ readSlideSettings(readThisFile) {
         lumosAdjust := tstlumosAdjust
      If (tstGammosAdjust!="@")
         GammosAdjust := tstGammosAdjust
+
+     If (tstlumosGrAdjust!="@")
+        lumosGrayAdjust := tstlumosGrAdjust
+     If (tstGammosGrAdjust!="@")
+        GammosGrayAdjust := tstGammosGrAdjust
+
      imgQuality := (userimgQuality=1) ? 7 : 5
+     WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%
 }
 
 writeSlideSettings(file2save) {
@@ -1337,11 +1483,14 @@ writeSlideSettings(file2save) {
     IniWrite, % FlipImgV, %file2save%, General, FlipImgV
     IniWrite, % lumosAdjust, %file2save%, General, lumosAdjust
     IniWrite, % GammosAdjust, %file2save%, General, GammosAdjust
+    IniWrite, % lumosGrayAdjust, %file2save%, General, lumosGrayAdjust
+    IniWrite, % GammosGrayAdjust, %file2save%, General, GammosGrayAdjust
     IniWrite, % imageAligned, %file2save%, General, imageAligned
     IniWrite, % userimgQuality, %file2save%, General, userimgQuality
     IniWrite, % noTooltipMSGs, %file2save%, General, noTooltipMSGs
     IniWrite, % TouchScreenMode, %file2save%, General, TouchScreenMode
     IniWrite, % skipDeadFiles, %file2save%, General, skipDeadFiles
+    IniWrite, % isAlwaysOnTop, %file2save%, General, isAlwaysOnTop
     throwMSGwriteError()
 }
 
@@ -1389,17 +1538,16 @@ DeletePicture() {
   Sleep, 5
   file2rem := resultedFilesList[currentFileIndex]
   file2rem := StrReplace(file2rem, "||")
-  showTOOLtip("File deleted...")
+  SplitPath, file2rem, OutFileName, OutDir
   FileSetAttrib, -R, %file2rem%
   Sleep, 5
   FileDelete, %file2rem%
   resultedFilesList[currentFileIndex] := "||" file2rem
-
   If ErrorLevel
   {
      showTOOLtip("File already deleted or access denied...")
      SoundBeep, 300, 900
-  }
+  } Else showTOOLtip("File deleted...`n" OutFileName "`n" OutDir)
 
   If StrLen(filesFilter)>1
   {
@@ -1478,7 +1626,7 @@ OpenFolders() {
    If (SelectedDir)
    {
       usrFilesFilteru := filesFilter := CurrentSLD := ""
-      Gui, 1: Show,, Loading files - please wait...
+      WinSetTitle, ahk_id %PVhwnd%,, Loading files - please wait...
       coreOpenFolder(SelectedDir)
       CurrentSLD := SelectedDir
    }
@@ -1550,7 +1698,7 @@ OpenFiles() {
          OpenSLD(imgpath)
          Return
       }
-      Gui, 1: Show,, Loading files - please wait...
+      WinSetTitle, ahk_id %PVhwnd%,, Loading files - please wait...
       GetFilesList(SelectedDir "\*|")
       GenerateRandyList()
       currentFileIndex := detectFileID(imgpath)
@@ -1628,8 +1776,31 @@ GuiDropFiles:
    }
 Return
 
+showTOOLtip(msg) {
+   If (WinActive("A")=PVhwnd) && (noTooltipMSGs=0)
+   {
+      ; Tooltip, %msg%
+      TooltipCreator(msg)
+   } Else
+   {
+      msg := StrReplace(msg, "`n", "  ")
+      WinSetTitle, ahk_id %PVhwnd%,, % msg
+      Sleep, 5
+   }
+}
+
 RemoveTooltip() {
    Tooltip
+   TooltipCreator(1, 1)
+
+   If (noTooltipMSGs=1)
+   {
+      If (CurrentSLD)
+         winTitle := appTitle ": " currentFileIndex "/" maxFilesIndex " | " CurrentSLD
+      Else
+         winTitle := appTitle " v" version
+      WinSetTitle, ahk_id %PVhwnd%,, % winTitle 
+   }
 }
 
 GetImgDimension(imgpath, ByRef w, ByRef h) {
@@ -1656,7 +1827,7 @@ BuildTray() {
    Menu, Tray, Add,
    Menu, Tray, Add, &More options, BuildMenu
    Menu, Tray, Add,
-   Menu, Tray, Add, &About / Help, OnlineHelp
+   Menu, Tray, Add, &About, AboutWindow
    Menu, Tray, Add,
    Menu, Tray, Add, &Exit`tEsc, Cleanup
 }
@@ -1674,37 +1845,36 @@ BuildMenu() {
       Menu, PVprefs, Delete
    }
 
-   sliMode := DefineSlideShowType()
-   sliSpeed := slideShowDelay//1000
+   sliSpeed := slideShowDelay//1000 " sec."
    Menu, PVsliMenu, Add, &Start slideshow`tSpace, ToggleSlideShowu
    Menu, PVsliMenu, Add,
    Menu, PVsliMenu, Add, &Toggle slideshow mode`tS, SwitchSlideModes
-   Menu, PVsliMenu, Add, %sliMode%, SwitchSlideModes
-   Menu, PVsliMenu, Disable, %sliMode%
+   Menu, PVsliMenu, Add, % DefineSlideShowType(), SwitchSlideModes
+   Menu, PVsliMenu, Disable, % DefineSlideShowType()
    Menu, PVsliMenu, Add,
    Menu, PVsliMenu, Add, &Increase speed`tMinus [-], IncreaseSlideSpeed
    Menu, PVsliMenu, Add, &Decrease speed`tEqual [=], DecreaseSlideSpeed
    Menu, PVsliMenu, Add, Current speed: %sliSpeed%, DecreaseSlideSpeed
    Menu, PVsliMenu, Disable, Current speed: %sliSpeed%
 
-   infoImgResize := DefineImgSizing()
-   infoImgFX := DefineFXmodes()
-   infolumosAdjust := Round(lumosAdjust, 2)
-   infoGammosAdjust := Round(GammosAdjust, 2)
+   infolumosAdjust := (imgFxMode=4) ? Round(lumosAdjust, 2) : Round(lumosGrayAdjust, 2)
+   infoGammosAdjust := (imgFxMode=4) ? Round(GammosAdjust, 2) : Round(GammosGrayAdjust, 2)
    Menu, PVview, Add, Image &alignment: %imageAligned%`tA, ToggleIMGalign
+   Menu, PVview, Add, % defineImgAlign(), ToggleIMGalign
+   Menu, PVview, Disable, % defineImgAlign()
    Menu, PVview, Add,
    Menu, PVview, Add, &Toggle Resizing Mode`tT, ToggleImageSizingMode
-   Menu, PVview, Add, %infoImgResize%, ToggleImageSizingMode
-   Menu, PVview, Disable, %infoImgResize%
+   Menu, PVview, Add, % DefineImgSizing(), ToggleImageSizingMode
+   Menu, PVview, Disable, % DefineImgSizing()
    Menu, PVview, Add,
    Menu, PVview, Add, &Switch colors display`tF, ToggleImgFX
-   Menu, PVview, Add, %infoImgFX%, ToggleImgFX
-   If (imgFxMode=4)
+   Menu, PVview, Add, % DefineFXmodes(), ToggleImgFX
+   Menu, PVview, Disable, % DefineFXmodes()
+   If (imgFxMode=4 || imgFxMode=2)
    {
-      Menu, PVview, Add, B: %infolumosAdjust% / G: %infoGammosAdjust%, ToggleImgFX
-      Menu, PVview, Disable, B: %infolumosAdjust% / G: %infoGammosAdjust%
+      Menu, PVview, Add, Br: %infolumosAdjust% / Ga: %infoGammosAdjust%, ToggleImgFX
+      Menu, PVview, Disable, Br: %infolumosAdjust% / Ga: %infoGammosAdjust%
    }
-   Menu, PVview, Disable, %infoImgFX%
    Menu, PVview, Add,
    Menu, PVview, Add, Mirror &horizontally`tH, TransformIMGh
    Menu, PVview, Add, Mirror &vertically`tV, TransformIMGv
@@ -1763,7 +1933,8 @@ BuildMenu() {
    }
 
    Menu, PVprefs, Add, &Always on top, ToggleAllonTop
-   Menu, PVprefs, Add, &No Info-ToolTips, ToggleInfoToolTips
+   Menu, PVprefs, Add, &Hide title bar, ToggleTitleBaru
+   Menu, PVprefs, Add, &No OSD information, ToggleInfoToolTips
    Menu, PVprefs, Add, &High quality resampling, ToggleImgQuality
    Menu, PVprefs, Add, &Touch screen mode, ToggleTouchMode
    Menu, PVprefs, Add, &Skip missing files, ToggleSkipDeadFiles
@@ -1774,9 +1945,11 @@ BuildMenu() {
    If (isAlwaysOnTop=1)
       Menu, PVprefs, Check, &Always on top
    If (noTooltipMSGs=1)
-      Menu, PVprefs, Check, &No Info-ToolTips
+      Menu, PVprefs, Check, &No OSD information
    If (TouchScreenMode=1)
       Menu, PVprefs, Check, &Touch screen mode
+   If (isTitleBarHidden=1)
+      Menu, PVprefs, Check, &Hide title bar
 
 
    Menu, PVmenu, Add, &Open File`tCtrl+O, OpenFiles
@@ -1796,7 +1969,7 @@ BuildMenu() {
    }
 
    Menu, PVmenu, Add, Prefe&rences, :PVprefs
-   Menu, PVmenu, Add, About / Help, OnlineHelp
+   Menu, PVmenu, Add, About, AboutWindow
    Menu, PVmenu, Add,
    Menu, PVmenu, Add, &Exit`tEsc, Cleanup
    wasCreated := 1
@@ -1806,9 +1979,18 @@ BuildMenu() {
 ToggleAllonTop() {
    isAlwaysOnTop := !isAlwaysOnTop
    If (isAlwaysOnTop=1)
-      Winset, AlwaysOnTop, 1, ahk_id %PVhwnd%
+      WinSet, AlwaysOnTop, 1, ahk_id %PVhwnd%
    Else
-      Winset, AlwaysOnTop, 0, ahk_id %PVhwnd%
+      WinSet, AlwaysOnTop, 0, ahk_id %PVhwnd%
+   writeSlideSettings(mainSettingsFile)
+}
+
+ToggleTitleBaru() {
+   isTitleBarHidden := !isTitleBarHidden
+   If (isTitleBarHidden=1)
+      Gui, 1: -Caption
+   Else
+      Gui, 1: +Caption
 }
 
 ToggleInfoToolTips() {
@@ -1861,6 +2043,8 @@ defineWinTitlePrefix() {
 
    If (IMGresizingMode=3)
       winPrefix .= "O "
+   Else If (IMGresizingMode=4)
+      winPrefix .= "Z "
 
    Return winPrefix
 }
@@ -1882,6 +2066,7 @@ BuildGUI() {
    Gui, 1: Add, Text, x1 y1 w1 h1 BackgroundTrans gWinClickAction vPicOnGui1 hwndhPicOnGui1,
    Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans gWinClickAction vPicOnGui2,
    Gui, 1: Add, Text, x3 y3 w3 h3 BackgroundTrans gWinClickAction vPicOnGui3,
+
    Gui, 1: Show, Maximize Center %initialwh%, %appTitle%
    createGDIwin()
    updateUIctrl()
@@ -1895,6 +2080,7 @@ updateUIctrl() {
    GuiControl, 1: Move, PicOnGUI1, % "w" ctrlW " h" GuiH
    GuiControl, 1: Move, PicOnGUI2, % "w" ctrlW " h" GuiH " x" ctrlX1
    GuiControl, 1: Move, PicOnGUI3, % "w" ctrlW " h" GuiH " x" ctrlX2
+   WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%   
 }
 
 destroyGDIwin() {
@@ -1941,8 +2127,8 @@ ShowTheImage(imgpath, usePrevious:=0) {
       If (WinActive("A")=PVhwnd)
       {
          winTitle := "[*] " winTitle
-         Gui, 1: Show,, % winTitle
-         showTOOLtip("ERROR: Unable to load the file...`n" imgpath)
+         WinSetTitle, ahk_id %PVhwnd%,, % winTitle
+         showTOOLtip("ERROR: Unable to load file...`n" OutFileName "`n" OutDir)
          SetTimer, RemoveTooltip, % -msgDisplayTime
       }
 
@@ -1970,12 +2156,12 @@ ShowTheImage(imgpath, usePrevious:=0) {
           Return "fail"
        } Else prevImgPath := imgpath
        lastInvoked := A_TickCount
-;       counteru++
-;       ToolTip, a %counteru%
    } Else ; If (wasForcedHigh!=1)
    {
+       If (noTooltipMSGs=1)
+          SetTimer, RemoveTooltip, Off
        winPrefix := defineWinTitlePrefix()
-       Gui, 1: Show,, % winPrefix winTitle
+       WinSetTitle, ahk_id %PVhwnd%,, % winPrefix winTitle
        SetTimer, ReloadThisPicture, -290
    }
    lastInvoked2 := A_TickCount
@@ -2012,7 +2198,7 @@ calcImgSize(modus, imgW, imgH, GuiW, GuiH, ByRef ResizedW, ByRef ResizedH) {
 
 ResizeImage(imgpath, usePrevious) {
     Static oImgW, oImgH, prevImgPath, prevImgW, prevImgH
-         , mainX, mainY, tinyW, tinyH
+         , mainX, mainY, tinyW, tinyH, wscale
     If (winGDIcreated!=1)
        createGDIwin()
 
@@ -2044,7 +2230,7 @@ ResizeImage(imgpath, usePrevious) {
       wscale := oImgW / tinyW
    }
 
-   calcImgSize(IMGresizingMode, imgW, imgH, GuiW, GuiH, ResizedW, ResizedH)
+   calcImgSize(IMGresizingMode, oimgW, oimgH, GuiW, GuiH, ResizedW, ResizedH)
    If (IMGresizingMode=3)
    {
       lGuiW := (GuiW>imgW) ? imgW : GuiW
@@ -2069,7 +2255,7 @@ ResizeImage(imgpath, usePrevious) {
    } Else
    {
       zoomLevel := Round(ResizedW / imgW, 3)
-      ws := Round(ResizedW / imgW * 100) "%"
+      ws := Round(ResizedW / oImgW * 100) "%"
    }
 
    If (usePrevious=1 && (IMGresizingMode>=3 || (imgW=ResizedW && imgH=ResizedH)))
@@ -2078,14 +2264,13 @@ ResizeImage(imgpath, usePrevious) {
       ResizedH := ResizedH * wscale
    }
 
+   If (noTooltipMSGs=1)
+      SetTimer, RemoveTooltip, Off
    IMGlargerViewPort := ((ResizedH-5>GuiH+1) || (ResizedW-5>GuiW+1)) ? 1 : 0
    SplitPath, imgpath, OutFileName, OutDir
    winPrefix := defineWinTitlePrefix()
    winTitle := winPrefix currentFileIndex "/" maxFilesIndex " [" ws "] " OutFileName " | " OutDir
-   If (WinActive("A")!=PVhwnd && slideShowRunning=1)
-      Gui, 1: Show, NoActivate x%mainX% y%mainY% w%GuiW% h%GuiH%, % winTitle
-   Else ; If (usePrevious!=1)
-      Gui, 1: Show, , % winTitle
+   WinSetTitle, ahk_id %PVhwnd%,, % winTitle
 
    ResizedW := Round(ResizedW)
    ResizedH := Round(ResizedH)
@@ -2198,7 +2383,13 @@ CloneResizerBMP(imgpath, IDwhichImg, whichImg, newW, newH) {
 Gdip_ShowImgonGui(imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, useCaches) {
     Critical, on
     If (imgFxMode=2)       ; grayscale
-       matrix := "0.299|0.299|0.299|0|0|0.587|0.587|0.587|0|0|0.114|0.114|0.114|0|0|0|0|0|1|0|0|0|0|0|1"
+    {
+       Ra := 0.300 + lumosGrayAdjust
+       Ga := 0.585 + lumosGrayAdjust
+       Ba := 0.115 + lumosGrayAdjust
+       matrix := Ra "|" Ra "|" Ra "|0|0|" Ga "|" Ga "|" Ga "|0|0|" Ba "|" Ba "|" Ba "|0|0|0|0|0|1|0|" GammosGrayAdjust "|" GammosGrayAdjust "|" GammosGrayAdjust "|0|1"
+    }
+;       matrix := "0.299|0.299|0.299|0|0|0.587|0.587|0.587|0|0|0.114|0.114|0.114|0|0|0|0|0|1|0|0|0|0|0|1"
     Else If (imgFxMode=3)  ; negative / invert
        matrix := "-1|0|0|0|0|0|-1|0|0|0|0|0|-1|0|0|0|0|0|1|0|1|1|1|0|1"
     Else If (imgFxMode=4) && (lumosAdjust!=1 || GammosAdjust!=0)
@@ -2230,7 +2421,8 @@ Gdip_ShowImgonGui(imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, us
        whichImg := (usePrevious=1 && gdiBitmapSmallView) ? gdiBitmapSmallView : gdiBitmapViewScale
     imgW := Gdip_GetImageWidth(whichImg)
     imgH := Gdip_GetImageHeight(whichImg)
-; ToolTip, %imgW% -- %imgH% == %newW% -- %newH%
+
+;   ToolTip, %imgW% -- %imgH% == %newW% -- %newH%
     calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY)
     r1 := Gdip_DrawImage(G, whichImg, DestPosX, DestPosY, newW, newH, 0, 0, imgW, imgH, matrix)
     Gdip_ResetWorldTransform(G)
@@ -2342,8 +2534,10 @@ GDIupdater() {
    {
       If (slideShowRunning=1)
          ToggleSlideShowu()
-      Sleep, 25
-      destroyGDIwin()
+      SetTimer, DelayiedImageDisplay, Off
+      SetTimer, ReloadThisPicture, Off
+      If (!FileExist(imgpath) || !CurrentSLD)
+         destroyGDIwin()
       Return
    }
 
@@ -2548,11 +2742,6 @@ AddAnimatedGIF(imagefullpath , x="", y="", w="", h="", guiname = "1") {
   return "AG" AGcount
 }
 
-showTOOLtip(msg) {
-   If (WinActive("A")=PVhwnd) && (noTooltipMSGs=0)
-      Tooltip, %msg%
-}
-
 MWAGetMonitorMouseIsIn(coordX:=0,coordY:=0) {
 ; function from: https://autohotkey.com/boards/viewtopic.php?f=6&t=54557
 ; by Maestr0
@@ -2568,7 +2757,6 @@ MWAGetMonitorMouseIsIn(coordX:=0,coordY:=0) {
   Loop, %MonitorCount%
   {
     SysGet, mon%A_Index%, Monitor, %A_Index%  ; "Monitor" will get the total desktop space of the monitor, including taskbars
-
     If (Mx>=mon%A_Index%left) && (Mx<mon%A_Index%right)
     && (My>=mon%A_Index%top) && (My<mon%A_Index%bottom)
     {
@@ -2579,7 +2767,6 @@ MWAGetMonitorMouseIsIn(coordX:=0,coordY:=0) {
 
   Return ActiveMon
 }
-
 
 GetPhysicalCursorPos(ByRef mX, ByRef mY) {
 ; function from: https://github.com/jNizM/AHK_DllCall_WinAPI/blob/master/src/Cursor%20Functions/GetPhysicalCursorPos.ahk
@@ -2614,4 +2801,98 @@ GetPhysicalCursorPos(ByRef mX, ByRef mY) {
     lastMx := mX := NumGet(POINT, 0, "Int")
     lastMy := mY := NumGet(POINT, 4, "Int")
     Return
+}
+
+reverseArray(Byref a) {
+; function by RHCP from https://autohotkey.com/board/topic/97722-some-array-functions/
+    aIndices := []
+    For index, in a
+        aIndices.insert(index)
+    aStorage := []
+    Loop, % aIndices.maxIndex() 
+       aStorage.insert(a[aIndices[aIndices.maxIndex() - A_index + 1]]) 
+    a := aStorage
+    Return aStorage
+}
+
+AboutWindow() {
+    If (AnyWindowOpen=1)
+    {
+       CloseWindow()
+       Return
+    }
+    AnyWindowOpen := 1
+    Gui, SettingsGUIA: Destroy
+    Sleep, 15
+    Gui, SettingsGUIA: Default
+    Gui, SettingsGUIA: -MaximizeBox -MinimizeBox hwndhSetWinGui
+    Gui, SettingsGUIA: Margin, 15, 15
+    btnWid := 100
+    txtWid := 360
+    Gui, Font, s19 Bold, Arial, -wrap
+    Gui, Add, Text, x10 y15, %appTitle%
+    Gui, Font
+    If (PrefsLargeFonts=1)
+    {
+       btnWid := btnWid + 50
+       txtWid := txtWid + 105
+       Gui, Font, s%LargeUIfontValue%
+    }
+    Gui, Add, Link, xp y+5, Developed by <a href="http://marius.sucan.ro/">Marius Șucan</a>.
+    Gui, Add, Link, xp y+10 w%txtWid%, Based on the prototype image viewer by <a href="http://sites.google.com/site/littlescripting/">SBC</a> from October 2010 published on <a href="https://autohotkey.com/board/topic/58226-ahk-picture-viewer/">AHK forums</a>.
+    Gui, Add, Text, xp y+10, Current version released on: jeudi 6 juin 2019.
+    Gui, Add, Text, xp y+10, Dedicated to people with large image collections :-).
+
+    Gui, Font, Normal
+    Gui, Add, Button, xs+5 y+25 h30 w105 Default gCloseWindow, Close
+    Gui, SettingsGUIA: Show, AutoSize, About %appTitle% v%Version%
+}
+
+CloseWindow() {
+    Gui, SettingsGUIA: Destroy
+    AnyWindowOpen := 0
+}
+
+TooltipCreator(msg:=0,killWin:=0) {
+    Critical, On
+    Static prevMsg, lastInvoked := 1
+    If (killWin=1)
+    {
+       Gui, ToolTipGuia: Destroy
+       toolTipGuiCreated := 0
+       Return
+    }
+
+    If (StrLen(msg)<3)
+       Return
+
+    If (A_TickCount-lastInvoked<200)
+    {
+       If (prevMsg!=msg) && !RegExMatch(msg, "i)(zoom level\: |image brightness\: |image gamma\: )")
+          msg := prevMsg "`n" msg
+       Else Return
+    }
+
+    lastInvoked := A_TickCount
+    Gui, ToolTipGuia: Destroy
+    thisFntSize := (PrefsLargeFonts=1) ? OSDfntSize*2 : OSDfntSize
+    bgrColor := OSDbgrColor
+    txtColor := OSDtextColor
+    isBold :=  " Bold"
+    Sleep, 5
+    Gui, ToolTipGuia: -DPIScale -Caption +Owner +ToolWindow +hwndhGuiTip
+    Gui, ToolTipGuia: Margin, % thisFntSize + 5, % thisFntSize + 3
+    Gui, ToolTipGuia: Color, c%bgrColor%
+    Gui, ToolTipGuia: Font, s%thisFntSize% %isBold% Q5, %OSDFontName%
+    Gui, ToolTipGuia: Add, Text, c%txtColor% gRemoveTooltip, %msg%
+;    Gui, ToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, GuiTipsWin
+
+    GetClientSize(mainWidth, mainHeight, PVhwnd)
+    JEE_ClientToScreen(hPicOnGui1, 1, 1, GuiX, GuiY)
+    thisOpacity := (PrefsLargeFonts=1) ? 235 : 195
+    WinSet, Transparent, %thisOpacity%, ahk_id %hGuiTip%
+    toolTipGuiCreated := 1
+    prevMsg := msg
+    WinSet, Region, 0-0 R6-6 w%mainWidth% h%mainHeight%, ahk_id %hGuiTip%
+    Gui, ToolTipGuia: Show, NoActivate AutoSize x%GuiX% y%GuiY%, GuiTipsWin
 }
