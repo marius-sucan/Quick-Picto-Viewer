@@ -17,7 +17,7 @@
 
 #Noenv
 #NoTrayIcon
-#MaxMem, 1524
+#MaxMem, 1924
 #Singleinstance, off
 #Include, Gdip.ahk
 
@@ -26,7 +26,7 @@ Global PVhwnd, hGDIwin, resultedFilesList := []
    , appTitle := "AHK Picture Viewer", FirstRun := 1
    , hPicOnGui, scriptStartTime := A_TickCount
    , RandyIMGids := [], SLDhasFiles := 0, IMGlargerViewPort := 0
-   , IMGdecalageY := 1, IMGdecalageX := 1, imgQuality := 5
+   , IMGdecalageY := 1, IMGdecalageX := 1, imgQuality
    , RandyIMGnow := 0, GDIPToken, Agifu, gdiBitmapSmall
    , slideShowRunning := 0, CurrentSLD := "", winGDIcreated :=0
    , LargeListCount := 1, usrFilesFilteru := ""
@@ -35,11 +35,11 @@ Global PVhwnd, hGDIwin, resultedFilesList := []
 ; User settings
    , WindowBgrColor := "010101", slideShowDelay := 3000
    , IMGresizingMode := 1, SlideHowMode := 1
-   , lumosAdjust := 1, GammosAdjust := 0
+   , lumosAdjust := 1, GammosAdjust := 0, userimgQuality := 1
    , imgFxMode := 1, FlipImgH := 0, FlipImgV := 0
    , imageAligned := 5, filesFilter := ""
    , noTooltipMSGs := 1, zoomLevel := 1.5
-
+imgQuality := (userimgQuality=1) ? 7 : 5
 DetectHiddenWindows, On
 CoordMode, Mouse, Screen
 OnExit, Cleanup
@@ -211,6 +211,10 @@ CopyImage2clip() {
        OpenFiles()
     Return
 
+    ~^1::
+       Reload
+    Return
+
     ~+vk4F::    ; Shift+O
        OpenFolders()
     Return
@@ -259,7 +263,7 @@ CopyImage2clip() {
     Return
 
     ~vkDC::   ; \
-      ChangeLumos(2)
+      ResetImageView()
     Return
 
     ~^vk45::   ; Ctrl+E
@@ -425,7 +429,14 @@ invertRecursiveness() {
 
 ReloadThisPicture() {
   If (CurrentSLD && maxFilesIndex>0)
-     IDshowImage(currentFileIndex)
+  {
+     If (GetKeyState("LButton", "P")=1)
+     {
+        Settimer, ReloadThisPicture, -550
+        Return
+     }
+     IDshowImage(currentFileIndex, 2)
+  }
 }
 
 FirstPicture() { 
@@ -501,6 +512,7 @@ ToggleImageSizingMode() {
     If (slideShowRunning=1)
        resetSlideshowTimer(0)
 
+    IMGdecalageX := IMGdecalageX := 1
     IMGresizingMode++
     If (IMGresizingMode>4)
        IMGresizingMode := 1
@@ -549,7 +561,7 @@ ToggleSlideShowu() {
   If (slideShowRunning=1)
   {
      slideShowRunning := 0
-     imgQuality := 5
+     imgQuality := (userimgQuality=1) ? 7 : 5
      SetTimer, RandomPicture, Off
      SetTimer, NextPicture, Off
      SetTimer, PreviousPicture, Off
@@ -557,7 +569,7 @@ ToggleSlideShowu() {
   } Else 
   {
      slideShowRunning := 1
-     imgQuality := 2
+     imgQuality := 7
      SetTimer, preventScreenOff, 59520
      If (SlideHowMode=1)
         SetTimer, RandomPicture, %slideShowDelay%
@@ -658,6 +670,10 @@ ToggleIMGalign() {
    IDshowImage(currentFileIndex)
 }
 
+ResetImageView() {
+    ChangeLumos(2)
+}
+
 ChangeLumos(dir) {
    If (slideShowRunning=1)
       resetSlideshowTimer(0)
@@ -670,11 +686,11 @@ ChangeLumos(dir) {
    imgFxMode := 4
    If (dir=2)
    {
-      GammosAdjust := 0
+      GammosAdjust := FlipImgH := FlipImgV := 0
       lumosAdjust := 1
       imgFxMode := 1
       If (IMGresizingMode=4)
-         zoomLevel := 1
+         IMGdecalageY := IMGdecalageX := zoomLevel := 1
    }
 
    If (lumosAdjust<0)
@@ -701,11 +717,12 @@ ChangeZoom(dir) {
       zoomLevel := (zoomLevel<1 || IMGlargerViewPort=0) ? zoomLevel - 0.05 : zoomLevel - 0.15
 
    IMGresizingMode := 4
-   If (zoomLevel<0)
-      zoomLevel := 0.001
+   imageAligned := 5
+   If (zoomLevel<0.04)
+      zoomLevel := 0.015
 
-   If (zoomLevel>10)
-      zoomLevel := 10
+   If (zoomLevel>15)
+      zoomLevel := 15
 
    showTOOLtip("Zoom level: " Round(zoomLevel*100) "%")
    SetTimer, RemoveTooltip, -2000
@@ -787,8 +804,7 @@ PanIMGonScreen(direction) {
 }
 
 DelayiedImageDisplay() {
-   ShowTheImage("lol", 1)
-   SetTimer, ReloadThisPicture, -550
+   IDshowImage(currentFileIndex)
 }
 
 Jump2index() {
@@ -1418,6 +1434,8 @@ BuildMenu() {
    Menu, PVview, Add,
    Menu, PVview, Add, Mirror &horizontally`tH, TransformIMGh
    Menu, PVview, Add, Mirror &vertically`tV, TransformIMGv
+   Menu, PVview, Add,
+   Menu, PVview, Add, Reset image vie&w`t\, ResetImageView
    If (FlipImgV=1)
       Menu, PVview, Check, Mirror &vertically`tV
 
@@ -1561,11 +1579,16 @@ createGDIwin() {
 ShowTheImage(imgpath, usePrevious:=0) {
    Critical, on
 
-   Static prevImgPath, lastInvoked2 := 1
+   Static prevImgPath, lastInvoked2 := 1, counteru
         , lastInvoked := 1, prevPicCtrl := 1
 
-   If (usePrevious=1 && StrLen(prevImgPath)>3)
-      imgpath := prevImgPath
+   If (imgpath=prevImgPath && StrLen(prevImgPath)>3 && usePrevious!=2)
+      usePrevious := 1
+   If (usePrevious=2)
+   {
+      wasForcedHigh := 1
+      usePrevious := 0
+   }
 
    FileGetSize, fileSizu, %imgpath%
    SplitPath, imgpath, OutFileName, OutDir
@@ -1591,11 +1614,11 @@ ShowTheImage(imgpath, usePrevious:=0) {
       Return "fail"
    }
 
-   If (A_TickCount - lastInvoked>85) && (A_TickCount - lastInvoked2>85)  || (usePrevious=1)
+   If (A_TickCount - lastInvoked>85) && (A_TickCount - lastInvoked2>85) || (usePrevious=1)
    {
        lastInvoked := A_TickCount
        r2 := ResizeImage(imgpath, usePrevious)
-       if !r2
+       If !r2
        {
           If (WinActive("A")=PVhwnd)
           {
@@ -1604,16 +1627,17 @@ ShowTheImage(imgpath, usePrevious:=0) {
           }
           SoundBeep, 300, 100
           Return "fail"
-       }
-
-       If (usePrevious!=1 && StrLen(imgpath)>3)
-          prevImgPath := imgpath
+       } Else prevImgPath := imgpath
+       If (usePrevious=1)
+          SetTimer, ReloadThisPicture, -550
        lastInvoked := A_TickCount
-   } Else
+;       counteru++
+;       ToolTip, a %counteru%
+   } Else ; If (wasForcedHigh!=1)
    {
        winPrefix := defineWinTitlePrefix()
        Gui, 1: Show,, % winPrefix winTitle
-       SetTimer, ReloadThisPicture, -250
+       SetTimer, ReloadThisPicture, -290
    }
    lastInvoked2 := A_TickCount
 }
@@ -1712,7 +1736,7 @@ ResizeImage(imgpath, usePrevious) {
       ResizedH := ResizedH * 4
    }
 
-   IMGlargerViewPort := (ResizedH>GuiH+5 || ResizedW>GuiW+5) ? 1 : 0
+   IMGlargerViewPort := ((ResizedH-5>GuiH+1) || (ResizedW-5>GuiW+1)) ? 1 : 0
    SplitPath, imgpath, OutFileName, OutDir
    winPrefix := defineWinTitlePrefix()
    winTitle := winPrefix currentFileIndex "/" maxFilesIndex " [" ws "] " OutFileName " | " OutDir
@@ -1751,6 +1775,7 @@ Gdip_ShowImgonGui(newW, newH, Width, Height, mainWidth, mainHeight, usePrevious)
     Else If (imgFxMode=4) && (lumosAdjust!=1 || GammosAdjust!=0)
        matrix := lumosAdjust "|0|0|0|0|0|" lumosAdjust "|0|0|0|0|0|" lumosAdjust "|0|0|0|0|0|1|0|" GammosAdjust "|" GammosAdjust "|" GammosAdjust "|0|1"
 
+    thisImgQuality := (usePrevious=1 && userimgQuality=1) ? 3 : imgQuality
     hbm := CreateDIBSection(mainWidth, mainHeight)
     hdc := CreateCompatibleDC()
     obm := SelectObject(hdc, hbm)
@@ -1785,6 +1810,8 @@ Gdip_ShowImgonGui(newW, newH, Width, Height, mainWidth, mainHeight, usePrevious)
 calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, ByRef DestPosX, ByRef DestPosY) {
     Static orderu := {1:7, 2:8, 3:9, 4:4, 5:5, 6:6, 7:1, 8:2, 9:3}
     modus := orderu[imageAligned]
+    If (IMGresizingMode=4)
+       modus := 5
 
     LY := mainHeight - newH
     LX := mainWidth - newW
@@ -1812,10 +1839,9 @@ calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, ByRef DestPosX, ByR
     {
        DestPosX := LX
        DestPosY := mainHeight//2 - newH//2
-    } Else If (modus=7 || IMGresizingMode=4)
+    } Else If (modus=7)
     {
-       DestPosX := 0
-       DestPosY := 0
+       DestPosX := DestPosY := 0
     } Else If (modus=8)
     {
        DestPosX := mainWidth//2 - newW//2
@@ -1824,23 +1850,39 @@ calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, ByRef DestPosX, ByR
     {
        DestPosX := LX
        DestPosY := 0
-    }
+    } Else DestPosX := DestPosY := 0
 
     If (IMGlargerViewPort!=1)
-       IMGdecalageY := IMGdecalageY := 1
-
-    If (IMGresizingMode=4)
     {
-       DestPosX := IMGdecalageX
-       DestPosY := IMGdecalageY
-       If (DestPosX<LX)
-          DestPosX := IMGdecalageX := LX
-       If (DestPosY<LY)
-          DestPosY := IMGdecalageY := LY
-       If (DestPosX>0)
-          DestPosX := IMGdecalageX := 0
-       If (DestPosY>0)
-          DestPosY := IMGdecalageY := 0
+       IMGdecalageY := IMGdecalageY := 1
+    } Else If (IMGresizingMode=4)
+    {
+       If (IMGdecalageX<LX//2) && (newW>mainWidth)
+          IMGdecalageX := LX//2
+       If (IMGdecalageY<LY//2) && (newH>mainHeight)
+          IMGdecalageY := LY//2
+
+       If (newW-5>mainWidth)
+          DestPosX := DestPosX + IMGdecalageX
+       Else
+          IMGdecalageX := 0
+
+       If (newH-5>mainHeight)
+          DestPosY := DestPosY + IMGdecalageY
+       Else
+          IMGdecalageY := 0
+
+       If (DestPosX>0) && (newW>mainWidth)
+       {
+          DestPosX := 0
+          IMGdecalageX := - LX//2
+       }
+
+       If (DestPosY>0) && (newH>mainHeight)
+       {
+          DestPosY := 0
+          IMGdecalageY := - LY//2
+       }
     }
 }
 
@@ -1869,7 +1911,7 @@ GDIupdater() {
 
    If (maxFilesIndex>0) && (A_TickCount - scriptStartTime>500)
    {
-      ShowTheImage("lol", 1)
+      DelayiedImageDisplay()
       SetTimer, ReloadThisPicture, -550
    }
 }
@@ -2014,6 +2056,9 @@ IDshowImage(imgID,opentehFile:=0) {
           Sleep, 900
        }
        Run, %resultu%
+    } Else If (opentehFile=2)
+    {
+        ShowTheImage(resultu, 2)
     } Else ShowTheImage(resultu)
 }
 
