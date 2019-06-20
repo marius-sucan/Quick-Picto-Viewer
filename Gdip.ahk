@@ -472,7 +472,7 @@ CreateDIBSection(w, h, hdc="", bpp=32, ByRef ppvBits=0)
 					, "uint", 0, Ptr)
 
 	if !hdc
-		ReleaseDC(hdc2)
+     ReleaseDC(hdc2)
 	return hbm
 }
 
@@ -1842,10 +1842,12 @@ Gdip_SetBitmapToClipboard(pBitmap)
 	DllCall("RtlMoveMemory", Ptr, pdib+40, Ptr, NumGet(oi, off2 - (A_PtrSize ? A_PtrSize : 4), Ptr), Ptr, NumGet(oi, off1, "UInt"))
 	DllCall("GlobalUnlock", Ptr, hdib)
 	DllCall("DeleteObject", Ptr, hBitmap)
-	DllCall("OpenClipboard", Ptr, 0)
+	r1 := DllCall("OpenClipboard", Ptr, 0)
 	DllCall("EmptyClipboard")
-	DllCall("SetClipboardData", "uint", 8, Ptr, hdib)
+	r2 := DllCall("SetClipboardData", "uint", 8, Ptr, hdib)
 	DllCall("CloseClipboard")
+	r := (!r1 || !r2) ? 0 : 1
+  Return r
 }
 
 ;#####################################################################################
