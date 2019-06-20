@@ -29,14 +29,14 @@ Global PVhwnd, hGDIwin, resultedFilesList := []
    , prevRandyIMGnow := 0, GDIPToken, Agifu
    , slideShowRunning := 0, CurrentSLD := "", winGDIcreated :=0
    , LargeListCount := 1, usrFilesFilteru := ""
-   , gdiBitmap, lumosAdjust := 0, luminalShade
-   , mainSettingsFile := "ahk-picture-viewer.ini"
-   , RegExFilesPattern := "i)(\\.*\.(tif|emf|jpg|jpeg|png|bmp|gif))$"
+   , gdiBitmap, mainSettingsFile := "ahk-picture-viewer.ini"
+   , RegExFilesPattern := "i)(.\\*\.(tif|emf|jpg|jpeg|png|bmp|gif))$"
 ; User settings
    , WindowBgrColor := "010101", slideShowDelay := 3000
    , IMGresizingMode := 1, SlideHowMode := 1
+   , lumosAdjust := 1, GammosAdjust := 0
    , imgFxMode := 1, FlipImgH := 0, FlipImgV := 0
-   , filesFilter := ""
+   , imageAligned := 5, filesFilter := ""
 
 DetectHiddenWindows, On
 CoordMode, Mouse, Screen
@@ -70,13 +70,13 @@ Return
 OpenSLD(fileNamu, doFilesCheck:=0, dontStartSlide:=0) {
   If !FileExist(fileNamu)
   {
+     showTOOLtip("ERROR: Failed to load file...")
      SoundBeep 
-     ToolTip, Failed to load file..
      SetTimer, RemoveTooltip, -2000
      Return
   }
 
-  ToolTip, Loading files - please wait...
+  showTOOLtip("Loading files - please wait...")
   Gui, 1: Show,, Loading files - please wait...
   sldGenerateFilesList(fileNamu, doFilesCheck)
   If (dontStartSlide=1)
@@ -132,7 +132,7 @@ resetSlideshowTimer(showMsg) {
    If (showMsg=1)
    {
       delayu := slideShowDelay//1000
-      ToolTip, Slideshow speed: %delayu%
+      showTOOLtip("Slideshow speed: " delayu)
       SetTimer, RemoveTooltip, -2000
    }
 }
@@ -164,25 +164,26 @@ CopyImage2clip() {
      pBitmap := Gdip_CreateBitmapFromFile(imgpath)
      If !pBitmap
      {
-        Tooltip, Failed to copy image to clipboard...
+        showTOOLtip("ERROR: Failed to copy image to clipboard...")
         SoundBeep 
         SetTimer, RemoveTooltip, -2000
         Return
      }
      FlipImgV := FlipImgH := 0
      imgFxMode := 1
-     lumosAdjust := 0
      Sleep, 2
      r := Gdip_SetBitmapToClipboard(pBitmap)
      Sleep, 2
      Gdip_DisposeImage(pBitmap)
      If r
-        ToolTip, Image copied to the clipboard...
+        showTOOLtip("Image copied to the clipboard...")
+     Else
+        showTOOLtip("ERROR: Failed to copy the image to the clipboard...")
      SetTimer, RemoveTooltip, -2000
      IDshowImage(currentFileIndex)
   } Else
   {
-     Tooltip, Failed to copy image to clipboard...
+     showTOOLtip("ERROR: Failed to copy image to clipboard...")
      SoundBeep 
      SetTimer, RemoveTooltip, -2000
   }
@@ -230,6 +231,14 @@ CopyImage2clip() {
 
     ~vkDD::   ; ]
       ChangeLumos(1)
+    Return
+
+    ~+vkDB::   ; Shift + [
+      ChangeGammos(-1)
+    Return
+
+    ~+vkDD::   ; Shift + ]
+      ChangeGammos(1)
     Return
 
     ~vkDC::   ; \
@@ -309,6 +318,10 @@ CopyImage2clip() {
        ToggleImgFX()
     Return
 
+    ~vk41::     ; A
+       ToggleIMGalign()
+    Return
+
     ~F10::
     ~AppsKey::
        Gosub, GuiContextMenu
@@ -377,7 +390,7 @@ FirstPicture() {
 
    currentFileIndex := 1
    IDshowImage(1)
-   Tooltip, Total images loaded: %maxFilesIndex%.
+   showTOOLtip("Total images loaded: " maxFilesIndex)
    SetTimer, RemoveTooltip, -2000
 }
 
@@ -386,7 +399,7 @@ LastPicture() {
       ToggleSlideShowu()
    currentFileIndex := maxFilesIndex
    IDshowImage(maxFilesIndex)
-   Tooltip, Total images loaded: %maxFilesIndex%.
+   showTOOLtip("Total images loaded: " maxFilesIndex)
    SetTimer, RemoveTooltip, -2000
 }
 
@@ -449,7 +462,7 @@ ToggleImageSizingMode() {
        IMGresizingMode := 1
 
     friendly := DefineImgSizing()
-    Tooltip, Rescaling mode: %friendly%
+    showTOOLtip("Rescaling mode: " friendly)
     SetTimer, RemoveTooltip, -2000
     IDshowImage(currentFileIndex)
 }
@@ -457,7 +470,7 @@ ToggleImageSizingMode() {
 DefineImgSizing() {
    friendly := (IMGresizingMode=1) ? "ADAPT ALL INTO VIEW" : "ADAPT ONLY LARGE IMAGES"
    If (IMGresizingMode=3)
-      friendly := "NONE (ORIGINAL SIZES)"
+      friendly := "NONE (ORIGINAL SIZE)"
    Return friendly
 }
 
@@ -465,7 +478,7 @@ InfoToggleSlideShowu() {
   ToggleSlideShowu()
   If (slideShowRunning!=1)
   {
-     ToolTip, Slideshow stopped.
+     showTOOLtip("Slideshow stopped")
      SetTimer, RemoveTooltip, -2000
   } Else 
   {
@@ -547,6 +560,8 @@ DefineFXmodes() {
    friendly := (imgFxMode=1) ? "ORIGINAL" : "GRAYSCALE"
    If (imgFxMode=3)
       friendly := "INVERTED"
+   Else If (imgFxMode=4)
+      friendly := "PERSONALIZED"
    Return friendly
 }
 
@@ -559,7 +574,7 @@ SwitchSlideModes() {
       resetSlideshowTimer(0)
 
    friendly := DefineSlideShowType()
-   ToolTip, Slideshow mode: %friendly%.
+   showTOOLtip("Slideshow mode: " friendly)
    SetTimer, RemoveTooltip, -2000
 }
 
@@ -567,26 +582,32 @@ ToggleImgFX() {
    If (slideShowRunning=1)
       resetSlideshowTimer(0)
    imgFxMode++
-   If (imgFxMode>3)
+   If (imgFxMode>4)
       imgFxMode := 1
+
    friendly := DefineFXmodes()
-   ToolTip, Image colors: %friendly%.
+   If (imgFxMode=4 && lumosAdjust=1 && GammosAdjust=0)
+   {
+      lumosAdjust := 1.3
+      GammosAdjust := -0.3
+      friendly .= "`nPlease adjust brightness and gamma...`nUse [ and ] with or without Shift."
+   }
+
+   showTOOLtip("Image colors: " friendly)
    SetTimer, RemoveTooltip, -2000
    IDshowImage(currentFileIndex)
 }
 
-adjustLumosPrefs() {
-   If (lumosAdjust<-10)
-      lumosAdjust := -10
+ToggleIMGalign() {
+   If (slideShowRunning=1)
+      resetSlideshowTimer(0)
+   imageAligned++
+   If (imageAligned>9)
+      imageAligned := 1
 
-   If (lumosAdjust>10)
-      lumosAdjust := 10
-
-   luminalAlpha := Abs(lumosAdjust) * 25
-   If (lumosAdjust<0)
-      luminalShade := Format("{1:#02x}", luminalAlpha) "000000"
-   Else
-      luminalShade := Format("{1:#02x}", luminalAlpha) "ffffff"
+   showTOOLtip("Image alignment: " imageAligned)
+   SetTimer, RemoveTooltip, -2000
+   IDshowImage(currentFileIndex)
 }
 
 ChangeLumos(dir) {
@@ -594,14 +615,49 @@ ChangeLumos(dir) {
       resetSlideshowTimer(0)
 
    If (dir=1)
-      lumosAdjust++
+      lumosAdjust := lumosAdjust + 0.2
    Else
-      lumosAdjust--
+      lumosAdjust := (lumosAdjust<1) ?  lumosAdjust - 0.1 : lumosAdjust - 0.25
+
+   imgFxMode := 4
+   If (dir=2)
+   {
+      GammosAdjust := 0
+      lumosAdjust := 1
+      imgFxMode := 1
+   }
+
+   If (lumosAdjust<0)
+      lumosAdjust := 0.001
+
+   If (lumosAdjust>10)
+      lumosAdjust := 10
 
    If (dir=2)
-      lumosAdjust := 0
+      showTOOLtip("Image colors: UNALTERED")
+   Else
+      showTOOLtip("Image brightness: " lumosAdjust)
+   SetTimer, RemoveTooltip, -2000
+   IDshowImage(currentFileIndex)
+}
 
-   ToolTip, Image brightness: %lumosAdjust%0 `%.
+ChangeGammos(dir) {
+   If (slideShowRunning=1)
+      resetSlideshowTimer(0)
+
+   If (dir=1)
+      GammosAdjust := GammosAdjust + 0.05
+   Else
+      GammosAdjust := GammosAdjust - 0.05
+
+   imgFxMode := 4
+   If (GammosAdjust<-1)
+      GammosAdjust := -1
+
+   If (GammosAdjust>1)
+      GammosAdjust := 1
+
+   showTOOLtip("Image gamma: " GammosAdjust)
    SetTimer, RemoveTooltip, -2000
    IDshowImage(currentFileIndex)
 }
@@ -612,7 +668,7 @@ TransformIMGv() {
    FlipImgV := !FlipImgV
    If (FlipImgV=1)
    {
-      ToolTip, Image mirrored vertically.
+      showTOOLtip("Image mirrored vertically")
       SetTimer, RemoveTooltip, -2000
    }
    IDshowImage(currentFileIndex)
@@ -624,7 +680,7 @@ TransformIMGh() {
    FlipImgH := !FlipImgH
    If (FlipImgH=1)
    {
-      ToolTip, Image mirrored horizonatally.
+      showTOOLtip("Image mirrored horizonatally")
       SetTimer, RemoveTooltip, -2000
    }
    IDshowImage(currentFileIndex)
@@ -633,9 +689,9 @@ TransformIMGh() {
 NextPicture() {
    currentFileIndex++
    If (currentFileIndex<1)
-      currentFileIndex := 1
-   If (currentFileIndex>maxFilesIndex)
       currentFileIndex := maxFilesIndex
+   If (currentFileIndex>maxFilesIndex)
+      currentFileIndex := 1
    IDshowImage(currentFileIndex)
 }
 
@@ -671,14 +727,14 @@ enableFilesFilter() {
 
    If StrLen(filesFilter)>1
    {
-      ToolTip, To exclude files matching the string - `nplease insert '&' (and) into your string`nCurrent filter: %filesFilter%
+      showTOOLtip("To exclude files matching the string - `nplease insert '&' (and) into your string`n`nCurrent filter: " filesFilter)
       SetTimer, RemoveTooltip, -5000
    } Else LargeListCount := maxFilesIndex
 
    InputBox, usrFilesFilteru, Files filter: %usrFilesFilteru%, Type the string to filter files. Files path and/or name must include the string you provide.,,,,,,,, %usrFilesFilteru%
    If !ErrorLevel
    {
-      ToolTip, Please wait... Filtering files...
+      showTOOLtip("Please wait... Filtering files...")
       doFilesCheck := (LargeListCount<2048) ? 2 : 10
       filesFilter := usrFilesFilteru
       Loop, Parse, chars2escape
@@ -742,7 +798,7 @@ SaveFilesList() {
          Sleep, 2
       }
 
-      ToolTip, (Please wait) Saving files list into`n%file2save%
+      showTOOLtip("(Please wait) Saving files list into`n" file2save)
       Loop, % maxFilesIndex + 1
       {
           r := resultedFilesList[A_Index]
@@ -767,7 +823,7 @@ cleanFilesList() {
    {
       backCurrentSLD := CurrentSLD
       CurrentSLD := ""
-      ToolTip, (Please wait) Checking files list...
+      showTOOLtip("(Please wait) Checking files list...")
       Loop, % maxFilesIndex + 1
       {
           r := resultedFilesList[A_Index]
@@ -781,7 +837,7 @@ cleanFilesList() {
       file2save := "temp-" A_NowUTC ".sld"
       FileAppend, %filesListu%, %file2save%, utf-16
       throwMSGwriteError()
-      ToolTip, (Please wait) Removing duplicates from the list...
+      showTOOLtip("(Please wait) Removing duplicates from the list...")
       renewCurrentFilesList()
       Loop, Read, %file2save%
       {
@@ -811,12 +867,14 @@ readSlideSettings(readThisFile) {
      IniRead, tstFlipImgH, %readThisFile%, General, FlipImgH, @
      IniRead, tstFlipImgV, %readThisFile%, General, FlipImgV, @
      IniRead, tstlumosAdjust, %readThisFile%, General, lumosAdjust, @
+     IniRead, tstGammosAdjust, %readThisFile%, General, GammosAdjust, @
+     IniRead, tstimageAligned, %readThisFile%, General, imageAligned, @
 
      If (tstslideshowdelay!="@" && tstslideshowdelay>300)
         slideShowDelay := tstslideShowDelay
      If (tstimgresizingmode!="@" && StrLen(tstIMGresizingMode)=1 && tstIMGresizingMode<4)
         IMGresizingMode := tstIMGresizingMode
-     If (tstimgFxMode!="@" && StrLen(tstimgFxMode)=1 && tstimgFxMode<4)
+     If (tstimgFxMode!="@" && StrLen(tstimgFxMode)=1 && tstimgFxMode<5)
         imgFxMode := tstimgFxMode
      If (tstFlipImgV!="@" && (tstFlipImgV=1 || tstFlipImgV=0))
         FlipImgV := tstFlipImgV
@@ -824,6 +882,8 @@ readSlideSettings(readThisFile) {
         FlipImgV := tstFlipImgV
      If (tstslidehowmode!="@" && StrLen(tstSlideHowMode)=1 && tstSlideHowMode<4)
         SlideHowMode := tstSlideHowMode
+     If (tstimageAligned!="@" && StrLen(tstimageAligned)=1 && tstimageAligned<10)
+        imageAligned := tstimageAligned
      If (tstWindowBgrColor!="@" && StrLen(tstWindowBgrColor)=6)
      {
         WindowBgrColor := tstWindowBgrColor
@@ -833,8 +893,10 @@ readSlideSettings(readThisFile) {
      If (tstfilesFilter!="@" && StrLen(Trim(tstfilesFilter))>2)
         usrFilesFilteru := tstfilesFilter
 
-     If tstlumosAdjust is number
+     If (tstlumosAdjust!="@")
         lumosAdjust := tstlumosAdjust
+     If (tstGammosAdjust!="@")
+        GammosAdjust := tstGammosAdjust
 }
 
 writeSlideSettings(file2save) {
@@ -847,6 +909,8 @@ writeSlideSettings(file2save) {
     IniWrite, % FlipImgH, %file2save%, General, FlipImgH
     IniWrite, % FlipImgV, %file2save%, General, FlipImgV
     IniWrite, % lumosAdjust, %file2save%, General, lumosAdjust
+    IniWrite, % GammosAdjust, %file2save%, General, GammosAdjust
+    IniWrite, % imageAligned, %file2save%, General, imageAligned
     throwMSGwriteError()
 }
 
@@ -952,18 +1016,18 @@ DeletePicture() {
   Sleep, 2
   file2rem := resultedFilesList[currentFileIndex]
   file2rem := StrReplace(file2rem, "||")
-  ToolTip, File deleted...
+  showTOOLtip("File deleted... `n" file2rem)
   FileSetAttrib, -R, %file2rem%
   Sleep, 2
   FileDelete, %file2rem%
   resultedFilesList[currentFileIndex] := "||" file2rem
   If ErrorLevel
   {
-     ToolTip, File already deleted or access denied...
+     showTOOLtip("File already deleted or access denied...")
      SoundBeep
   }
   Sleep, 500
-  Tooltip
+  SetTimer, RemoveTooltip, -2000
 }
 
 RenameThisFile() {
@@ -975,7 +1039,7 @@ RenameThisFile() {
   file2rem := resultedFilesList[currentFileIndex]
   If !FileExist(file2rem)
   {
-     ToolTip, File does not exist...
+     showTOOLtip("File does not exist...`n" file2rem)
      SetTimer, RemoveTooltip, -2000
      SoundBeep 
      Return
@@ -996,7 +1060,7 @@ RenameThisFile() {
            FileDelete, %OutDir%\%newFileName%
         } Else
         {
-           Tooltip, Rename operation canceled...
+           showTOOLtip("Rename operation canceled...")
            SetTimer, RemoveTooltip, -2000
            Return
         }
@@ -1006,8 +1070,8 @@ RenameThisFile() {
      FileMove, %file2rem%, %OutDir%\%newFileName%
      If ErrorLevel
      {
+        showTOOLtip("ERROR: Access denied... File could not be renamed.")
         SoundBeep
-        ToolTip, ERROR: Access denied...
         SetTimer, RemoveTooltip, -2000
      } Else
      {
@@ -1020,9 +1084,9 @@ RenameThisFile() {
 PreviousPicture() {
    currentFileIndex--
    If (currentFileIndex<1)
-      currentFileIndex := 1
-   If (currentFileIndex>maxFilesIndex)
       currentFileIndex := maxFilesIndex
+   If (currentFileIndex>maxFilesIndex)
+      currentFileIndex := 1
    IDshowImage(currentFileIndex)
 }
 
@@ -1092,7 +1156,7 @@ OpenFiles() {
     if (!SelectImg || ErrorLevel)
        Return
 
-    Loop, parse, SelectImg, `n
+    Loop, Parse, SelectImg, `n
     {
        If (A_Index=1)
           SelectedDir := A_LoopField
@@ -1104,7 +1168,7 @@ OpenFiles() {
 
    if (SelectedDir)
    {
-      Tooltip, Opening file...
+      showTOOLtip("Opening file...")
       usrFilesFilteru := filesFilter := CurrentSLD := ""
       renewCurrentFilesList()
       If RegExMatch(imgpath, "i)(.\.sld)$")
@@ -1116,7 +1180,7 @@ OpenFiles() {
       GetFilesList(SelectedDir "\*|")
       currentFileIndex := detectFileID(imgpath)
       IDshowImage(currentFileIndex)
-      Tooltip
+      SetTimer, RemoveTooltip, -2000
       CurrentSLD := "|" SelectedDir
    }
 }
@@ -1149,7 +1213,7 @@ GuiDropFiles:
 
    if (imgpath)
    {
-      Tooltip, Opening file...
+      showTOOLtip("Opening file...")
       If (slideShowRunning=1)
          ToggleSlideShowu()
 
@@ -1168,7 +1232,7 @@ GuiDropFiles:
       currentFileIndex := detectFileID(imgpath)
       IDshowImage(currentFileIndex)
       CurrentSLD := "|" imagedir
-      Tooltip
+      SetTimer, RemoveTooltip, -2000
    }
 Return
 
@@ -1233,12 +1297,21 @@ BuildMenu() {
 
    infoImgResize := DefineImgSizing()
    infoImgFX := DefineFXmodes()
+   infolumosAdjust := Round(lumosAdjust, 2)
+   infoGammosAdjust := Round(GammosAdjust, 2)
+   Menu, PVview, Add, Image &alignment: %imageAligned%`tA, ToggleIMGalign
+   Menu, PVview, Add,
    Menu, PVview, Add, &Toggle Resizing Mode`tT, ToggleImageSizingMode
    Menu, PVview, Add, %infoImgResize%, ToggleImageSizingMode
    Menu, PVview, Disable, %infoImgResize%
    Menu, PVview, Add,
    Menu, PVview, Add, &Switch colors display`tF, ToggleImgFX
    Menu, PVview, Add, %infoImgFX%, ToggleImgFX
+   If (imgFxMode=4)
+   {
+      Menu, PVview, Add, B: %infolumosAdjust% / G: %infoGammosAdjust%, ToggleImgFX
+      Menu, PVview, Disable, B: %infolumosAdjust% / G: %infoGammosAdjust%
+   }
    Menu, PVview, Disable, %infoImgFX%
    Menu, PVview, Add,
    Menu, PVview, Add, Mirror &horizontally`tH, TransformIMGh
@@ -1327,6 +1400,8 @@ defineWinTitlePrefix() {
       winPrefix .= "G "
    Else If (imgFxMode=3)
       winPrefix .= "I "
+   Else If (imgFxMode=4)
+      winPrefix .= "A "
 
    If (IMGresizingMode=3)
       winPrefix .= "O "
@@ -1348,7 +1423,7 @@ BuildGUI() {
    Gui, 1: Color, %WindowBgrColor%
    Gui, 1: Margin, 0, 0
    GUI, 1: -DPIScale +Resize %MaxGUISize% %MinGUISize% +hwndPVhwnd +LastFound +OwnDialogs
-   Gui, 1: Add, Text, x1 y1 w2 h2 gDblClickAction vPicOnGui hwndhPicOnGui,
+   Gui, 1: Add, Text, x1 y1 w2 h2 BackgroundTrans gDblClickAction vPicOnGui hwndhPicOnGui,
    Gui, 1: Show, Maximize Center %initialwh%, %appTitle%
    createGDIwin()
    GetClientSize(GuiW, GuiH, PVhwnd)
@@ -1394,7 +1469,7 @@ ShowTheImage(imgpath, usePrevious:=0) {
       {
          winTitle := "[*] " winTitle
          Gui, 1: Show,, % winTitle
-         Tooltip, ERROR: Unable to load the file...`n%imgpath%
+         showTOOLtip("ERROR: Unable to load the file...`n" imgpath)
          SetTimer, RemoveTooltip, -2000
       }
 
@@ -1428,7 +1503,7 @@ ShowTheImage(imgpath, usePrevious:=0) {
        {
           If (WinActive("A")=PVhwnd)
           {
-             Tooltip, ERROR: Unable to display the image...
+             showTOOLtip("ERROR: Unable to display the image...")
              SetTimer, RemoveTooltip, -2000
           }
           SoundBeep, 300, 100
@@ -1480,17 +1555,27 @@ ResizeImage(imgpath, imgW, imgH, usePrevious) {
 
    If (IMGresizingMode=3)
    {
+      lGuiW := (GuiW>imgW) ? imgW : GuiW
+      lGuiH := (GuiH>imgH) ? imgH : GuiH
+      ws := Round(ResizedW / imgW * 100)
+      If (ws<100)
+      {
+         ws := Round(((lGuiW*lGuiH) / (imgW*imgH)) * 100)
+         ws .= "% visible"
+      } Else If (ws>100)
+         ws := "100%"
+      Else
+         ws .= "%"
       ResizedW := imgW
       ResizedH := imgH
-   }
+   } Else ws := Round(ResizedW / imgW * 100) "%"
 
    wscale := Round(ResizedW / imgW, 3)
    hscale := Round(ResizedH / imgH, 3)
-   ws := Round(ResizedW / imgW * 100)
 
    SplitPath, imgpath, OutFileName, OutDir
    winPrefix := defineWinTitlePrefix()
-   winTitle := winPrefix currentFileIndex "/" maxFilesIndex " [" ws "%] " OutFileName " | " OutDir
+   winTitle := winPrefix currentFileIndex "/" maxFilesIndex " [" ws "] " OutFileName " | " OutDir
    If (WinActive("A")!=PVhwnd && slideShowRunning=1)
       Gui, 1: Show, NoActivate x%mainX% y%mainY% w%GuiW% h%GuiH%, % winTitle
    Else ; If (usePrevious!=1)
@@ -1524,6 +1609,8 @@ Gdip_ShowImgonGui(imgpath, wscale, hscale, Width, Height) {
        matrix := "0.299|0.299|0.299|0|0|0.587|0.587|0.587|0|0|0.114|0.114|0.114|0|0|0|0|0|1|0|0|0|0|0|1"
     Else If (imgFxMode=3)  ; negative / invert
        matrix := "-1|0|0|0|0|0|-1|0|0|0|0|0|-1|0|0|0|0|0|1|0|1|1|1|0|1"
+    Else If (imgFxMode=4) && (lumosAdjust!=1 || GammosAdjust!=0)
+       matrix := lumosAdjust "|0|0|0|0|0|" lumosAdjust "|0|0|0|0|0|" lumosAdjust "|0|0|0|0|0|1|0|" GammosAdjust "|" GammosAdjust "|" GammosAdjust "|0|1"
 
     newW := Width * wscale
     newH := Height * hscale
@@ -1548,17 +1635,8 @@ Gdip_ShowImgonGui(imgpath, wscale, hscale, Width, Height) {
        Gdip_TranslateWorldTransform(G, 0, -mainHeight)
     }
 
-    DestPosX := mainWidth//2 - newW//2
-    DestPosY := mainHeight//2 - newH//2
+    calcIMGcoord(mainWidth, mainHeight, newW, newH, DestPosX, DestPosY)
     r1 := Gdip_DrawImage(G, gdiBitmap, DestPosX, DestPosY, newW, newH, 0, 0, Width, Height, matrix)
-
-    ; If (lumosAdjust!=0)
-    ; {
-    ;    adjustLumosPrefs()
-    ;    pBrush1 := Gdip_BrushCreateSolid(luminalShade)
-    ;    Gdip_FillRectangle(G, pBrush1, DestPosX, DestPosY, newW, newH)
-    ; }
-
     Gdip_ResetWorldTransform(G)
     r2 := UpdateLayeredWindow(hGDIwin, hdc, 0, 0, mainWidth, mainHeight)
     Gdip_DeleteBrush(pBrush1)
@@ -1569,6 +1647,48 @@ Gdip_ShowImgonGui(imgpath, wscale, hscale, Width, Height) {
     Return r
 }
 
+calcIMGcoord(mainWidth, mainHeight, newW, newH, ByRef DestPosX, ByRef DestPosY) {
+    Static orderu := {1:7, 2:8, 3:9, 4:4, 5:5, 6:6, 7:1, 8:2, 9:3}
+    modus := orderu[imageAligned]
+    If (modus=1)
+    {
+       DestPosX := 0
+       DestPosY := mainHeight - newH
+    } Else If (modus=2)
+    {
+       DestPosX := mainWidth//2 - newW//2
+       DestPosY := mainHeight - newH
+    } Else If (modus=3)
+    {
+       DestPosX := mainWidth - newW
+       DestPosY := mainHeight - newH
+    } Else If (modus=4)
+    {
+       DestPosX := 0
+       DestPosY := mainHeight//2 - newH//2
+    } Else If (modus=5)
+    {
+       DestPosX := mainWidth//2 - newW//2
+       DestPosY := mainHeight//2 - newH//2
+    } Else If (modus=6)
+    {
+       DestPosX := mainWidth - newW
+       DestPosY := mainHeight//2 - newH//2
+    } Else If (modus=7)
+    {
+       DestPosX := 0
+       DestPosY := 0
+    } Else If (modus=8)
+    {
+       DestPosX := mainWidth//2 - newW//2
+       DestPosY := 0
+    } Else If (modus=9)
+    {
+       DestPosX := mainWidth - newW
+       DestPosY := 0
+    } Else DestPosY := DestPosX := 0
+}
+
 GuiSize:
    GDIupdater()
 Return
@@ -1576,6 +1696,7 @@ Return
 GDIupdater() {
    If (!CurrentSLD || !maxFilesIndex) || (A_TickCount - scriptStartTime<600)
       Return
+
    If (slideShowRunning=1)
       resetSlideshowTimer(0)
 
@@ -1679,9 +1800,9 @@ sldGenerateFilesList(readThisFile, doFilesCheck) {
 }
 
 GetFilesList(strDir, doRecursive:=1) {
-  ToolTip, Loading the list of files... please wait.`n%strDir%
-
+  showTOOLtip("Loading the list of files... please wait.`n" strDir)
   filterBehaviour := InStr(usrFilesFilteru, "&") ? 1 : 2
+
   If InStr(strDir, "|")
   {
      doRecursive := 2
@@ -1720,7 +1841,7 @@ IDshowImage(imgID,opentehFile:=0) {
     {
        If !FileExist(resultu)
        {
-          Tooltip, ERROR: The file is missing...
+          showTOOLtip("ERROR: The file is missing...`n" resultu)
           SoundBeep 
           SetTimer, RemoveTooltip, -2000
           Sleep, 900
@@ -1769,4 +1890,9 @@ AddAnimatedGIF(imagefullpath , x="", y="", w="", h="", guiname = "1") {
   AG%AGcount%.navigate("about:blank")
   AG%AGcount%.document.write(html)
   return "AG" AGcount
+}
+
+showTOOLtip(msg) {
+   If (WinActive("A")=PVhwnd)
+      Tooltip, %msg%
 }
