@@ -24,22 +24,23 @@
 Global PVhwnd, hGDIwin, resultedFilesList := []
    , currentFileIndex, maxFilesIndex := 0
    , appTitle := "AHK Picture Viewer", FirstRun := 1
-   , hPicOnGui, scriptStartTime := A_TickCount
+   , hPicOnGui1, scriptStartTime := A_TickCount
    , RandyIMGids := [], SLDhasFiles := 0, IMGlargerViewPort := 0
    , IMGdecalageY := 1, IMGdecalageX := 1, imgQuality
    , RandyIMGnow := 0, GDIPToken, Agifu, gdiBitmapSmall
+   , gdiBitmapSmallView, gdiBitmapViewScale
    , slideShowRunning := 0, CurrentSLD := "", winGDIcreated :=0
    , LargeListCount := 1, usrFilesFilteru := ""
-   , ResolutionWidth, ResolutionHeight
+   , ResolutionWidth, ResolutionHeight, isAlwaysOnTop := 0
    , gdiBitmap, mainSettingsFile := "ahk-picture-viewer.ini"
-   , RegExFilesPattern := "i)(.\\*\.(tif|emf|jpg|jpeg|png|bmp|gif))$"
+   , RegExFilesPattern := "i)(.\\*\.(tif|emf|jpg|png|bmp|gif|tiff|jpeg))$"
 ; User settings
    , WindowBgrColor := "010101", slideShowDelay := 3000
-   , IMGresizingMode := 1, SlideHowMode := 1
+   , IMGresizingMode := 1, SlideHowMode := 1, TouchScreenMode := 1
    , lumosAdjust := 1, GammosAdjust := 0, userimgQuality := 1
    , imgFxMode := 1, FlipImgH := 0, FlipImgV := 0
    , imageAligned := 5, filesFilter := ""
-   , noTooltipMSGs := 1, zoomLevel := 1.5
+   , noTooltipMSGs := 1, zoomLevel := 1, skipDeadFiles := 0
 imgQuality := (userimgQuality=1) ? 7 : 5
 DetectHiddenWindows, On
 CoordMode, Mouse, Screen
@@ -122,7 +123,7 @@ OpenThisFileFolder() {
     If resultu
     {
        SplitPath, resultu, , dir2open
-       Run, %dir2open%
+       Try Run, %dir2open%
     }
 }
 
@@ -190,15 +191,17 @@ CopyImage2clip() {
      FlipImgV := FlipImgH := 0
      imgFxMode := 1
      Sleep, 2
-     r := Gdip_SetBitmapToClipboard(pBitmap)
+     r1 := Gdip_SetBitmapToClipboard(pBitmap)
      Sleep, 2
      Gdip_DisposeImage(pBitmap)
-     If r
+     If r1
         showTOOLtip("Image copied to the clipboard...")
      Else
         showTOOLtip("ERROR: Failed to copy the image to the clipboard...")
      SetTimer, RemoveTooltip, -2000
-     IDshowImage(currentFileIndex)
+     r2 := IDshowImage(currentFileIndex)
+     If !r2
+        informUserFileMissing()
   } Else
   {
      showTOOLtip("ERROR: Failed to copy image to clipboard...")
@@ -247,6 +250,10 @@ CopyImage2clip() {
       OpenThisFile()
     Return
 
+    ~vk49::   ; I
+      ShowImgInfos()
+    Return
+
     ~vkDB::   ; [
       ChangeLumos(-1)
     Return
@@ -283,6 +290,18 @@ CopyImage2clip() {
        ToggleImageSizingMode()
     Return
 
+    ~vkBF::
+    ~NumpadDiv::
+       IMGresizingMode := 0
+       ToggleImageSizingMode()
+    Return
+
+    ~NumpadMult::
+       IMGresizingMode := 3
+       IMGdecalageX := IMGdecalageY := zoomLevel := 1
+       ToggleImageSizingMode()
+    Return
+
     ~BackSpace::
        PrevRandyPicture()
     Return
@@ -297,10 +316,12 @@ CopyImage2clip() {
        RandomPicture()
     Return
 
+    ~NumpadAdd::
     ~vkBB::    ; [=]
        ChangeZoom(1)
     Return
 
+    ~NumpadSub::
     ~vkBD::   ; [-]
        ChangeZoom(-1)
     Return
@@ -429,6 +450,7 @@ invertRecursiveness() {
 }
 
 ReloadThisPicture() {
+  Settimer, DelayiedImageDisplay, Off
   If (CurrentSLD && maxFilesIndex>0)
   {
      If (GetKeyState("LButton", "P")=1)
@@ -436,7 +458,9 @@ ReloadThisPicture() {
         Settimer, ReloadThisPicture, -550
         Return
      }
-     IDshowImage(currentFileIndex, 2)
+     r := IDshowImage(currentFileIndex, 2)
+     If !r
+        informUserFileMissing()
   }
 }
 
@@ -445,8 +469,10 @@ FirstPicture() {
       ToggleSlideShowu()
 
    currentFileIndex := 1
-   IDshowImage(1)
+   r := IDshowImage(1)
    showTOOLtip("Total images loaded: " maxFilesIndex)
+   If !r
+      informUserFileMissing()
    SetTimer, RemoveTooltip, -2000
 }
 
@@ -454,8 +480,10 @@ LastPicture() {
    If (slideShowRunning=1)
       ToggleSlideShowu()
    currentFileIndex := maxFilesIndex
-   IDshowImage(maxFilesIndex)
+   r := IDshowImage(maxFilesIndex)
    showTOOLtip("Total images loaded: " maxFilesIndex)
+   If !r
+      informUserFileMissing()
    SetTimer, RemoveTooltip, -2000
 }
 
@@ -469,7 +497,7 @@ Cleanup:
 Return
 
 OnlineHelp:
-   Run, http://www.autohotkey.com/forum/topic62808.html
+   Try Run, http://www.autohotkey.com/forum/topic62808.html
 Return
 
 GuiContextMenu:
@@ -482,31 +510,44 @@ activateMainWin() {
    WinActivate, ahk_id %PVhwnd%
 }
 
-DblClickAction() {
+WinClickAction() {
    Critical, on
    Static lastInvoked := 0
    MouseGetPos, , , OutputVarWin
    If (OutputVarWin!=PVhwnd)
       Return
 
-   If (A_TickCount - lastInvoked<250) && (lastInvoked>1)
+   If (A_TickCount - lastInvoked<250) && (lastInvoked>1 && CurrentSLD)
    {
+      If (TouchScreenMode=0)
+      {
+         OpenFiles()
+         lastInvoked := A_TickCount
+         Return
+      }
       If (slideShowRunning=1)
-         ToggleSlideShowu()
-
-      ; destroyGDIwin()
+         InfoToggleSlideShowu()
       Sleep, 25
-      Gui, 1: Show, NoActivate Minimize, AHK Picture Viewer: %CurrentSLD%
+      ResetImageView()
    } Else If (maxFilesIndex>1 && CurrentSLD)
    {
+      If (TouchScreenMode=0)
+      {
+         lastInvoked := A_TickCount
+         Return
+      }
       Sleep, 50
-      GoNextSlide()
+      If (A_GuiControl="PicOnGUI3")
+         GoNextSlide()
+      Else If (A_GuiControl="PicOnGUI1")
+         GoPrevSlide()
+      Else If (A_GuiControl="PicOnGUI2")
+         ToggleViewModeTouch()
    } Else If (!CurrentSLD)
    {
       Sleep, 50
       OpenFiles()
    }
-
    lastInvoked := A_TickCount
 }
 
@@ -522,7 +563,9 @@ ToggleImageSizingMode() {
     friendly := DefineImgSizing()
     showTOOLtip("Rescaling mode: " friendly)
     SetTimer, RemoveTooltip, -2000
-    IDshowImage(currentFileIndex)
+    r := IDshowImage(currentFileIndex)
+    If !r
+       informUserFileMissing()
 }
 
 DefineImgSizing() {
@@ -583,7 +626,7 @@ ToggleSlideShowu() {
 }
 
 GoNextSlide() {
-  Sleep, 200
+  Sleep, 100
   If GetKeyState("LButton", "P")
   {
      SetTimer, GoNextSlide, -200
@@ -595,6 +638,25 @@ GoNextSlide() {
 
   If (SlideHowMode=1)
      RandomPicture()
+  Else If (SlideHowMode=2)
+     PreviousPicture()
+  Else If (SlideHowMode=3)
+     NextPicture()
+}
+
+GoPrevSlide() {
+  Sleep, 100
+  If GetKeyState("LButton", "P")
+  {
+     SetTimer, GoPrevSlide, -200
+     Return
+  }
+
+  If (slideShowRunning=1)
+     resetSlideshowTimer(0)
+
+  If (SlideHowMode=1)
+     PrevRandyPicture()
   Else If (SlideHowMode=2)
      PreviousPicture()
   Else If (SlideHowMode=3)
@@ -657,7 +719,9 @@ ToggleImgFX() {
 
    showTOOLtip("Image colors: " friendly)
    SetTimer, RemoveTooltip, -2000
-   IDshowImage(currentFileIndex)
+   r := IDshowImage(currentFileIndex)
+   If !r
+      informUserFileMissing()
 }
 
 ToggleIMGalign() {
@@ -669,7 +733,9 @@ ToggleIMGalign() {
 
    showTOOLtip("Image alignment: " imageAligned)
    SetTimer, RemoveTooltip, -2000
-   IDshowImage(currentFileIndex)
+   r := IDshowImage(currentFileIndex)
+   If !r
+      informUserFileMissing()
 }
 
 ResetImageView() {
@@ -706,7 +772,7 @@ ChangeLumos(dir) {
    Else
       showTOOLtip("Image brightness: " lumosAdjust)
    SetTimer, RemoveTooltip, -2000
-   IDshowImage(currentFileIndex)
+   SetTimer, DelayiedImageDisplay, -10
 }
 
 ChangeZoom(dir) {
@@ -728,7 +794,7 @@ ChangeZoom(dir) {
 
    showTOOLtip("Zoom level: " Round(zoomLevel*100) "%")
    SetTimer, RemoveTooltip, -2000
-   SetTimer, DelayiedImageDisplay, -5
+   SetTimer, DelayiedImageDisplay, -10
 }
 
 ChangeGammos(dir) {
@@ -749,7 +815,7 @@ ChangeGammos(dir) {
 
    showTOOLtip("Image gamma: " GammosAdjust)
    SetTimer, RemoveTooltip, -2000
-   IDshowImage(currentFileIndex)
+   SetTimer, DelayiedImageDisplay, -10
 }
 
 TransformIMGv() {
@@ -761,7 +827,9 @@ TransformIMGv() {
       showTOOLtip("Image mirrored vertically")
       SetTimer, RemoveTooltip, -2000
    }
-   IDshowImage(currentFileIndex)
+   r := IDshowImage(currentFileIndex)
+   If !r
+      informUserFileMissing()
 }
 
 TransformIMGh() {
@@ -770,19 +838,41 @@ TransformIMGh() {
    FlipImgH := !FlipImgH
    If (FlipImgH=1)
    {
-      showTOOLtip("Image mirrored horizonatally")
+      showTOOLtip("Image mirrored horizontally")
       SetTimer, RemoveTooltip, -2000
    }
-   IDshowImage(currentFileIndex)
+   r := IDshowImage(currentFileIndex)
+   If !r
+      informUserFileMissing()
 }
 
-NextPicture() {
+PreviousPicture(dummy:=0, inLoop:=0) {
+   currentFileIndex--
+   If (currentFileIndex<1)
+      currentFileIndex := maxFilesIndex
+   If (currentFileIndex>maxFilesIndex)
+      currentFileIndex := 1
+
+   r := IDshowImage(currentFileIndex)
+   If (!r && inLoop<250)
+   {
+      inLoop++
+      PreviousPicture(0, inLoop)
+   } Else inLoop := 0
+}
+
+NextPicture(dummy:=0, inLoop:=0) {
    currentFileIndex++
    If (currentFileIndex<1)
       currentFileIndex := maxFilesIndex
    If (currentFileIndex>maxFilesIndex)
       currentFileIndex := 1
-   IDshowImage(currentFileIndex)
+   r := IDshowImage(currentFileIndex)
+   If (!r && inLoop<250)
+   {
+      inLoop++
+      NextPicture(0, inLoop)
+   } Else inLoop := 0
 }
 
 PanIMGonScreen(direction) {
@@ -802,11 +892,33 @@ PanIMGonScreen(direction) {
    Else If (direction="R" && FlipImgH=0) || (direction="L" && FlipImgH=1)
       IMGdecalageX := IMGdecalageX - Round(mainWidth*0.1)
 
-   SetTimer, DelayiedImageDisplay, -5
+   SetTimer, DelayiedImageDisplay, -10
 }
 
 DelayiedImageDisplay() {
-   IDshowImage(currentFileIndex)
+   r := IDshowImage(currentFileIndex)
+   If !r
+      informUserFileMissing()
+}
+
+ShowImgInfos() {
+   resultu := resultedFilesList[currentFileIndex]
+   If !FileExist(resultu)
+   {
+      informUserFileMissing()
+      Return
+   }
+   FileGetSize, FileSizu, % resultu, K
+   FileGetTime, FileDateM, % resultu, M
+   FileGetTime, FileDateC, % resultu, C
+   FormatTime, FileDateM, % FileDateM, dddd, d MMMM yyyy, HH:mm:ss
+   FormatTime, FileDateC, % FileDateC, dddd, d MMMM yyyy, HH:mm:ss
+
+   SplitPath, resultu, OutFileName, OutDir
+   Width := Gdip_GetImageWidth(gdiBitmap)
+   Height := Gdip_GetImageHeight(gdiBitmap)
+   Zoomu := Round(zoomLevel*100)
+   MsgBox, 64, %appTitle%: File information, Name:`n%OutFileName%`n`nLocation:`n%OutDir%\`n`nFile size: %fileSizu% kilobytes`nFile created on: %FileDateC%`nFile modified on: %FileDateM%`n`nResolution (W x H): %Width% x %Height% (in pixels)`nCurrent zoom level: %zoomu%`%
 }
 
 Jump2index() {
@@ -827,8 +939,16 @@ Jump2index() {
          currentFileIndex := 1
       If (currentFileIndex>maxFilesIndex)
          currentFileIndex := maxFilesIndex
-      IDshowImage(currentFileIndex)
+      r := IDshowImage(currentFileIndex)
+      If !r
+         informUserFileMissing()
    }
+}
+
+informUserFileMissing() {
+   showTOOLtip("ERROR: The current file is missing...")
+   SoundBeep, 300, 50
+   SetTimer, RemoveTooltip, -2000
 }
 
 enableFilesFilter() {
@@ -976,7 +1096,6 @@ ActSortName() {
 ActSortSize() {
    SortFilesList("size")
 }
-   SortFilesList("resolution")
 
 ActSortModified() {
    SortFilesList("modified")
@@ -987,7 +1106,9 @@ ActSortCreated() {
 }
 
 ActSortResolution() {
-
+   MsgBox, 52, %appTitle%, This operation can take a lot of time. Each file will be read to identify it is resolution in pixels. Are you sure you want to sort the list by resolution?
+   IfMsgBox, Yes
+        SortFilesList("resolution")
 }
 
 SortFilesList(SortCriterion) {
@@ -1051,6 +1172,10 @@ readSlideSettings(readThisFile) {
      IniRead, tstlumosAdjust, %readThisFile%, General, lumosAdjust, @
      IniRead, tstGammosAdjust, %readThisFile%, General, GammosAdjust, @
      IniRead, tstimageAligned, %readThisFile%, General, imageAligned, @
+     IniRead, tstnoTooltipMSGs, %readThisFile%, General, noTooltipMSGs, @
+     IniRead, tstuserimgQuality, %readThisFile%, General, userimgQuality, @
+     IniRead, tstTouchScreenMode, %readThisFile%, General, TouchScreenMode, @
+     IniRead, tstskipDeadFiles, %readThisFile%, General, skipDeadFiles, @
 
      If (tstslideshowdelay!="@" && tstslideshowdelay>300)
         slideShowDelay := tstslideShowDelay
@@ -1058,14 +1183,23 @@ readSlideSettings(readThisFile) {
         IMGresizingMode := tstIMGresizingMode
      If (tstimgFxMode!="@" && StrLen(tstimgFxMode)=1 && tstimgFxMode<5)
         imgFxMode := tstimgFxMode
+     If (tstnoTooltipMSGs!="@" && (tstnoTooltipMSGs=1 || tstnoTooltipMSGs=0))
+        noTooltipMSGs := tstnoTooltipMSGs
+     If (tstTouchScreenMode!="@" && (tstTouchScreenMode=1 || tstTouchScreenMode=0))
+        TouchScreenMode := tstTouchScreenMode
+     If (tstuserimgQuality!="@" && (tstuserimgQuality=1 || tstuserimgQuality=0))
+        userimgQuality := tstuserimgQuality
      If (tstFlipImgV!="@" && (tstFlipImgV=1 || tstFlipImgV=0))
         FlipImgV := tstFlipImgV
+     If (tstskipDeadFiles!="@" && (tstskipDeadFiles=1 || tstskipDeadFiles=0))
+        skipDeadFiles := tstskipDeadFiles
      If (tstFlipImgH!="@" && (tstFlipImgH=1 || tstFlipImgH=0))
         FlipImgV := tstFlipImgV
      If (tstslidehowmode!="@" && StrLen(tstSlideHowMode)=1 && tstSlideHowMode<4)
         SlideHowMode := tstSlideHowMode
      If (tstimageAligned!="@" && StrLen(tstimageAligned)=1 && tstimageAligned<10)
         imageAligned := tstimageAligned
+
      If (tstWindowBgrColor!="@" && StrLen(tstWindowBgrColor)=6)
      {
         WindowBgrColor := tstWindowBgrColor
@@ -1079,6 +1213,7 @@ readSlideSettings(readThisFile) {
         lumosAdjust := tstlumosAdjust
      If (tstGammosAdjust!="@")
         GammosAdjust := tstGammosAdjust
+     imgQuality := (userimgQuality=1) ? 7 : 5
 }
 
 writeSlideSettings(file2save) {
@@ -1093,11 +1228,15 @@ writeSlideSettings(file2save) {
     IniWrite, % lumosAdjust, %file2save%, General, lumosAdjust
     IniWrite, % GammosAdjust, %file2save%, General, GammosAdjust
     IniWrite, % imageAligned, %file2save%, General, imageAligned
+    IniWrite, % userimgQuality, %file2save%, General, userimgQuality
+    IniWrite, % noTooltipMSGs, %file2save%, General, noTooltipMSGs
+    IniWrite, % TouchScreenMode, %file2save%, General, TouchScreenMode
+    IniWrite, % skipDeadFiles, %file2save%, General, skipDeadFiles
     throwMSGwriteError()
 }
 
-RandomPicture() {
-   ; Static 
+RandomPicture(dummy:=0, inLoop:=0) {
+   ; Static inLoop := 0
 
    RandyIMGnow++
    If (RandyIMGnow<1)
@@ -1106,11 +1245,15 @@ RandomPicture() {
       RandyIMGnow := 1
 
    currentFileIndex := RandyIMGids[RandyIMGnow]
-   resultu := resultedFilesList[currentFileIndex]
-   IDshowImage(currentFileIndex)
+   r := IDshowImage(currentFileIndex)
+   If (!r && inLoop<250)
+   {
+      inLoop++
+      RandomPicture(0, inLoop)
+   } Else inLoop := 0
 }
 
-PrevRandyPicture() {
+PrevRandyPicture(dummy:=0, inLoop:=0) {
    If (slideShowRunning=1)
       ToggleSlideShowu()
 
@@ -1121,8 +1264,12 @@ PrevRandyPicture() {
       RandyIMGnow := 1
 
    currentFileIndex := RandyIMGids[RandyIMGnow]
-   resultu := resultedFilesList[currentFileIndex]
-   IDshowImage(currentFileIndex)
+   r := IDshowImage(currentFileIndex)
+   If (!r && inLoop<250)
+   {
+      inLoop++
+      PrevRandyPicture(0, inLoop)
+   } Else inLoop := 0
 }
 
 DeletePicture() {
@@ -1191,18 +1338,11 @@ RenameThisFile() {
      } Else
      {
         resultedFilesList[currentFileIndex] := OutDir "\" newFileName
-        IDshowImage(currentFileIndex)
+        r := IDshowImage(currentFileIndex)
+        If !r
+           informUserFileMissing()
      }
   }
-}
-
-PreviousPicture() {
-   currentFileIndex--
-   If (currentFileIndex<1)
-      currentFileIndex := maxFilesIndex
-   If (currentFileIndex>maxFilesIndex)
-      currentFileIndex := 1
-   IDshowImage(currentFileIndex)
 }
 
 OpenFolders() {
@@ -1267,7 +1407,7 @@ OpenFiles() {
    If (slideShowRunning=1)
       ToggleSlideShowu()
 
-    pattern := "Images (*.jpg; *.bmp; *.png; *.gif; *.tif; *.emf; *.sld; *.jpeg)"
+    pattern := "Images (*.jpg; *.bmp; *.png; *.gif; *.tif; *.emf; *.sld; *.jpeg; *.tiff)"
     FileSelectFile, SelectImg, M1, %A_WorkingDir%, Open Image or Slideshow, %pattern%
     if (!SelectImg || ErrorLevel)
        Return
@@ -1324,7 +1464,7 @@ GuiDropFiles:
 ;     MsgBox, % A_LoopField
       If (A_Index>1500)
          Break
-      Else If RegExMatch(A_LoopField, "i)(\.(jpg|emf|tif|jpeg|png|bmp|gif|sld))$")
+      Else If RegExMatch(A_LoopField, "i)(\.(jpg|emf|tiff|tif|jpeg|png|bmp|gif|sld))$")
          imgpath := A_LoopField
    }
 
@@ -1397,12 +1537,12 @@ BuildMenu() {
       Menu, PVview, Delete
       Menu, PVfList, Delete
       Menu, PVtFile, Delete
+      Menu, PVprefs, Delete
    }
 
    sliMode := DefineSlideShowType()
    sliSpeed := slideShowDelay//1000
    Menu, PVsliMenu, Add, &Start slideshow`tSpace, ToggleSlideShowu
-   Menu, PVsliMenu, Add, Next &slide`tL-Click, GoNextSlide
    Menu, PVsliMenu, Add,
    Menu, PVsliMenu, Add, &Toggle slideshow mode`tS, SwitchSlideModes
    Menu, PVsliMenu, Add, %sliMode%, SwitchSlideModes
@@ -1442,7 +1582,6 @@ BuildMenu() {
    If (FlipImgH=1)
       Menu, PVview, Check, Mirror &horizontally`tH
 
-   imgpath := prevRandyIMGs[prevRandyIMGnow]
    Menu, PVnav, Add, &First`tHome, FirstPicture
    Menu, PVnav, Add, &Previous`tRight, PreviousPicture
    Menu, PVnav, Add, &Next`tLeft, NextPicture
@@ -1450,8 +1589,7 @@ BuildMenu() {
    Menu, PVnav, Add,
    Menu, PVnav, Add, &Jump at #`tCtrl+J, Jump2index
    Menu, PVnav, Add, &Random`tR, RandomPicture
-   If imgpath
-      Menu, PVnav, Add, &Prev. random image`tBackspace, PrevRandyPicture
+   Menu, PVnav, Add, &Prev. random image`tBackspace, PrevRandyPicture
 
    Menu, PVtFile, Add, &Copy image to Clipboard`tCtrl+C, CopyImage2clip
    Menu, PVtFile, Add, 
@@ -1459,6 +1597,8 @@ BuildMenu() {
    Menu, PVtFile, Add, &Open containing folder`tCtrl+E, OpenThisFileFolder
    Menu, PVtFile, Add, &Rename`tF2, RenameThisFile
    Menu, PVtFile, Add, &Delete`tDelete, DeletePicture
+   Menu, PVtFile, Add,
+   Menu, PVtFile, Add, &Information`tI, ShowImgInfos
 
    Menu, PVsort, Add, &Path and name, ActSortName
    Menu, PVsort, Add, &File size, ActSortSize
@@ -1478,6 +1618,23 @@ BuildMenu() {
       Menu, PVfList, Add, &Sort by, :PVsort
    }
 
+   Menu, PVprefs, Add, &Always on top, ToggleAllonTop
+   Menu, PVprefs, Add, &No Info-ToolTips, ToggleInfoToolTips
+   Menu, PVprefs, Add, &High quality resampling, ToggleImgQuality
+   Menu, PVprefs, Add, &Touch screen mode, ToggleTouchMode
+   Menu, PVprefs, Add, &Skip missing files, ToggleSkipDeadFiles
+   If (userimgQuality=1)
+      Menu, PVprefs, Check, &High quality resampling
+   If (skipDeadFiles=1)
+      Menu, PVprefs, Check, &Skip missing files
+   If (isAlwaysOnTop=1)
+      Menu, PVprefs, Check, &Always on top
+   If (noTooltipMSGs=1)
+      Menu, PVprefs, Check, &No Info-ToolTips
+   If (TouchScreenMode=1)
+      Menu, PVprefs, Check, &Touch screen mode
+
+
    Menu, PVmenu, Add, &Open File`tCtrl+O, OpenFiles
    Menu, PVmenu, Add, &Open Folders`tShift+O, OpenFolders
    Menu, PVmenu, Add,
@@ -1494,6 +1651,7 @@ BuildMenu() {
       Menu, PVmenu, Add,
    }
 
+   Menu, PVmenu, Add, Prefe&rences, :PVprefs
    Menu, PVmenu, Add, About / Help, OnlineHelp
    Menu, PVmenu, Add,
    Menu, PVmenu, Add, &Exit`tEsc, Cleanup
@@ -1501,6 +1659,34 @@ BuildMenu() {
    Menu, PVmenu, Show
 }
 
+ToggleAllonTop() {
+   isAlwaysOnTop := !isAlwaysOnTop
+   If (isAlwaysOnTop=1)
+      Winset, AlwaysOnTop, 1, ahk_id %PVhwnd%
+   Else
+      Winset, AlwaysOnTop, 0, ahk_id %PVhwnd%
+}
+
+ToggleInfoToolTips() {
+    noTooltipMSGs := !noTooltipMSGs
+    writeSlideSettings(mainSettingsFile)
+}
+
+ToggleSkipDeadFiles() {
+    skipDeadFiles := !skipDeadFiles
+    writeSlideSettings(mainSettingsFile)
+}
+
+ToggleImgQuality() {
+    userimgQuality := !userimgQuality
+    imgQuality := (userimgQuality=1) ? 7 : 5
+    writeSlideSettings(mainSettingsFile)
+}
+
+ToggleTouchMode() {
+    TouchScreenMode := !TouchScreenMode
+    writeSlideSettings(mainSettingsFile)
+}
 
 defineWinTitlePrefix() {
    If StrLen(usrFilesFilteru)>1
@@ -1541,19 +1727,30 @@ SetParentID(Window_ID, theOther) {
 }
 
 BuildGUI() {
-   global ;PicOnGUI, PVhwnd, appTitle, ScriptMsg , ScriptMsgW, ScriptMsgH, hue
-   local MaxGUISize, MinGUISize, initialwh, guiw, guih
+   Global PicOnGUI1, PicOnGUI2, PicOnGUI3
+   ; local MaxGUISize, MinGUISize, initialwh, guiw, guih
    MaxGUISize = -DPIScale
    MinGUISize := "+MinSize" A_ScreenWidth//4 "x" A_ScreenHeight//4
    initialwh := "w" A_ScreenWidth//3 " h" A_ScreenHeight//3
    Gui, 1: Color, %WindowBgrColor%
    Gui, 1: Margin, 0, 0
    GUI, 1: -DPIScale +Resize %MaxGUISize% %MinGUISize% +hwndPVhwnd +LastFound +OwnDialogs
-   Gui, 1: Add, Text, x1 y1 w2 h2 BackgroundTrans gDblClickAction vPicOnGui hwndhPicOnGui,
+   Gui, 1: Add, Text, x1 y1 w1 h1 BackgroundTrans gWinClickAction vPicOnGui1 hwndhPicOnGui1,
+   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans gWinClickAction vPicOnGui2,
+   Gui, 1: Add, Text, x3 y3 w3 h3 BackgroundTrans gWinClickAction vPicOnGui3,
    Gui, 1: Show, Maximize Center %initialwh%, %appTitle%
    createGDIwin()
+   updateUIctrl()
+}
+
+updateUIctrl() {
    GetClientSize(GuiW, GuiH, PVhwnd)
-   GuiControl, 1: Move, PicOnGUI, % "w" GuiW " h" GuiH
+   ctrlW := GuiW//3
+   ctrlX1 := ctrlW
+   ctrlX2 := ctrlW * 2
+   GuiControl, 1: Move, PicOnGUI1, % "w" ctrlW " h" GuiH
+   GuiControl, 1: Move, PicOnGUI2, % "w" ctrlW " h" GuiH " x" ctrlX1
+   GuiControl, 1: Move, PicOnGUI3, % "w" ctrlW " h" GuiH " x" ctrlX2
 }
 
 destroyGDIwin() {
@@ -1746,7 +1943,15 @@ ResizeImage(imgpath, usePrevious) {
    Else ; If (usePrevious!=1)
       Gui, 1: Show, , % winTitle
 
-   r := Gdip_ShowImgonGui(imgW, imgH, ResizedW, ResizedH, GuiW, GuiH, usePrevious)
+   ResizedW := Round(ResizedW)
+   ResizedH := Round(ResizedH)
+   whichImg := (usePrevious=1 && gdiBitmapSmall) ? gdiBitmapSmall : gdiBitmap
+   IDwhichImg := (usePrevious=1 && gdiBitmapSmall) ? 2 : 1
+   If (IMGlargerViewPort!=1)
+      CloneResizerBMP(imgpath, IDwhichImg, whichImg, ResizedW, ResizedH)
+   Else
+      useCaches := "no"
+   r := Gdip_ShowImgonGui(imgW, imgH, ResizedW, ResizedH, GuiW, GuiH, usePrevious, useCaches)
    If (usePrevious=1)
       SetTimer, ReloadThisPicture, -550
 
@@ -1817,27 +2022,36 @@ CloneMainBMP(imgpath, ByRef width, ByRef height) {
   Gdip_DisposeImage(oBitmap)
 }
 
-CloneResizerBMP(whichImg, newW, newH) {
+CloneResizerBMP(imgpath, IDwhichImg, whichImg, newW, newH) {
   Critical, on
-  Static prevWhichImg, prevImgW, prevImgH
-  If (prevImgW=newW && prevImgH=newH && prevWhichImg=whichImg)
+  Static prevWhichImgA, prevWhichImgB
+  newImg := IDwhichImg imgpath newW newH
+  If (IDwhichImg=1 && prevWhichImgA=newImg)
+  || (IDwhichImg=2 && prevWhichImgB=newImg)
      Return
 
-  Gdip_DisposeImage(gdiBitmapViewScale)
   Width := Gdip_GetImageWidth(whichImg)
   Height := Gdip_GetImageHeight(whichImg)
-  gdiBitmapViewScale := Gdip_CreateBitmap(newW, newH)
-  G4 := Gdip_GraphicsFromImage(gdiBitmapViewScale)
+  If (IDwhichImg=1)
+  {
+     prevWhichImgA := IDwhichImg imgpath newW newH
+     Gdip_DisposeImage(gdiBitmapViewScale)
+     gdiBitmapViewScale := Gdip_CreateBitmap(newW, newH)
+     G4 := Gdip_GraphicsFromImage(gdiBitmapViewScale)
+  } Else
+  {
+     prevWhichImgB := IDwhichImg imgpath newW newH
+     Gdip_DisposeImage(gdiBitmapSmallView)
+     gdiBitmapSmallView := Gdip_CreateBitmap(newW, newH)
+     G4 := Gdip_GraphicsFromImage(gdiBitmapSmallView)
+  }
   Gdip_SetInterpolationMode(G4, imgQuality)
   Gdip_SetSmoothingMode(G4, 3)
   Gdip_DrawImage(G4, whichImg, 0, 0, newW, newH, 0, 0, Width, Height)
   Gdip_DeleteGraphics(G4)
-  prevWhichImg := whichImg
-  prevImgW := newW
-  prevImgH := newH
 }
 
-Gdip_ShowImgonGui(ImgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious) {
+Gdip_ShowImgonGui(imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, useCaches) {
     Critical, on
     If (imgFxMode=2)       ; grayscale
        matrix := "0.299|0.299|0.299|0|0|0.587|0.587|0.587|0|0|0.114|0.114|0.114|0|0|0|0|0|1|0|0|0|0|0|1"
@@ -1850,7 +2064,8 @@ Gdip_ShowImgonGui(ImgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious) {
     hdc := CreateCompatibleDC()
     obm := SelectObject(hdc, hbm)
     G := Gdip_GraphicsFromHDC(hdc)
-    Gdip_SetInterpolationMode(G, imgQuality)
+    thisImgQuality := (useCaches="no") ? imgQuality : 5
+    Gdip_SetInterpolationMode(G, thisImgQuality)
     Gdip_SetSmoothingMode(G, 3)
 
     If (FlipImgH=1)
@@ -1865,7 +2080,13 @@ Gdip_ShowImgonGui(ImgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious) {
        Gdip_TranslateWorldTransform(G, 0, -mainHeight)
     }
 
-    whichImg := (usePrevious=1 && gdiBitmapSmall) ? gdiBitmapSmall : gdiBitmap
+    If (useCaches="no")
+       whichImg := (usePrevious=1 && gdiBitmapSmall) ? gdiBitmapSmall : gdiBitmap
+    Else
+       whichImg := (usePrevious=1 && gdiBitmapSmallView) ? gdiBitmapSmallView : gdiBitmapViewScale
+    imgW := Gdip_GetImageWidth(whichImg)
+    imgH := Gdip_GetImageHeight(whichImg)
+; ToolTip, %imgW% -- %imgH% == %newW% -- %newH%
     calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY)
     r1 := Gdip_DrawImage(G, whichImg, DestPosX, DestPosY, newW, newH, 0, 0, imgW, imgH, matrix)
     Gdip_ResetWorldTransform(G)
@@ -1965,14 +2186,13 @@ GuiSize:
 Return
 
 GDIupdater() {
+   updateUIctrl()
    If (!CurrentSLD || !maxFilesIndex) || (A_TickCount - scriptStartTime<600)
       Return
 
    If (slideShowRunning=1)
       resetSlideshowTimer(0)
 
-   GetClientSize(GuiW, GuiH, PVhwnd)
-   GuiControl, 1: Move, PicOnGUI, % "w" GuiW " h" GuiH
    imgpath := resultedFilesList[currentFileIndex]
    If (!FileExist(imgpath) || A_EventInfo=1 || !CurrentSLD)
    {
@@ -1985,8 +2205,22 @@ GDIupdater() {
 
    If (maxFilesIndex>0) && (A_TickCount - scriptStartTime>500)
    {
-      DelayiedImageDisplay()
-      SetTimer, ReloadThisPicture, -550
+;      DelayiedImageDisplay()
+      SetTimer, DelayiedImageDisplay, -15
+      SetTimer, ReloadThisPicture, -750
+   }
+}
+
+ToggleViewModeTouch() {
+   zoomLevel := IMGdecalageY := IMGdecalageX := 1
+   If (IMGresizingMode=1)
+   {
+      IMGresizingMode := 2
+      ToggleImageSizingMode()
+   } Else
+   {
+      IMGresizingMode := 0
+      ToggleImageSizingMode()
    }
 }
 
@@ -2116,24 +2350,24 @@ IDshowImage(imgID,opentehFile:=0) {
     If !resultu
     {
        SoundBeep 
-       Return
+       Return 0
     }
 
+    FileGetSize, fileSizu, %resultu%
     resultu := StrReplace(resultu, "||")
+    If (!fileSizu && !FileExist(resultu) && skipDeadFiles=1)
+       Return 0
+
     If (opentehFile=1)
     {
        If !FileExist(resultu)
-       {
-          showTOOLtip("ERROR: The file is missing...`n" resultu)
-          SoundBeep 
-          SetTimer, RemoveTooltip, -2000
-          Sleep, 900
-       }
-       Run, %resultu%
+          informUserFileMissing()
+       Try Run, %resultu%
     } Else If (opentehFile=2)
     {
         ShowTheImage(resultu, 2)
     } Else ShowTheImage(resultu)
+    Return 1
 }
 
 PreventKeyPressBeep() {
@@ -2152,7 +2386,7 @@ Win_ShowSysMenu(Hwnd) {
 ;  if X=mouse
 ;    VarSetCapacity(POINT, 8), DllCall("GetCursorPos", "uint", &POINT), X := NumGet(POINT), Y := NumGet(POINT, 4)
   ; WinGetPos, X, Y, ,, ahk_id %Hwnd%
-  JEE_ClientToScreen(hPicOnGui, 1, 1, X, Y)
+  JEE_ClientToScreen(hPicOnGui1, 1, 1, X, Y)
   hSysMenu := DllCall("GetSystemMenu", "Uint", Hwnd, "int", False) 
   r := DllCall("TrackPopupMenu", "uint", hSysMenu, "uint", TPM_RETURNCMD, "int", X, "int", Y, "int", 0, "uint", h, "uint", 0)
   ifEqual, r, 0, return
