@@ -26,18 +26,19 @@
 #Include, Gdip.ahk
 
 Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
-   , hGuiTip := 1, hGuiThumbsHL := 1
+   , hGuiTip := 1, hGuiThumbsHL := 1, prevFullThumbsUpdate := 1
    , winGDIcreated := 0, ThumbsWinGDIcreated := 0
+   , hPicOnGui1, scriptStartTime := A_TickCount
    , resultedFilesList := [], currentFileIndex, maxFilesIndex := 0
    , appTitle := "AHK Picture Viewer", FirstRun := 1
    , bckpResultedFilesList := [], bkcpMaxFilesIndex := 0
+   , filteredMap2mainList := []
    , DynamicFoldersList := "", historyList, GIFsGuiCreated := 0
-   , hPicOnGui1, scriptStartTime := A_TickCount
    , RandyIMGids := [], SLDhasFiles := 0, IMGlargerViewPort := 0
    , IMGdecalageY := 1, IMGdecalageX := 1, imgQuality, usrFilesFilteru := ""
    , RandyIMGnow := 0, GDIPToken, Agifu, gdiBitmapSmall
    , gdiBitmapSmallView, gdiBitmapViewScale, msgDisplayTime := 3000
-   , slideShowRunning := 0, CurrentSLD := ""
+   , slideShowRunning := 0, CurrentSLD := "", markedSelectFile := ""
    , ResolutionWidth, ResolutionHeight, prevStartIndex := -1
    , gdiBitmap, mainSettingsFile := "ahk-picture-viewer.ini"
    , RegExFilesPattern := "i)(.\\*\.(dib|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg))$"
@@ -58,13 +59,13 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , imageAligned := 5, filesFilter := "", isAlwaysOnTop := 0
    , noTooltipMSGs := 1, zoomLevel := 1, skipDeadFiles := 0
    , isTitleBarHidden := 0, lumosGrayAdjust := 0, GammosGrayAdjust := 0
-   , MustLoadSLDprefs := 0, animGIFsSupport := 1
+   , MustLoadSLDprefs := 0, animGIFsSupport := 1, move2recycler := 1
+   , SLDcacheFilesList := 1, autoRemDeadEntry := 1
 
 imgQuality := (userimgQuality=1) ? 7 : 5
 DetectHiddenWindows, On
 CoordMode, Mouse, Screen
 OnExit, Cleanup
-
 
 OnMessage(0x205, "WM_RBUTTONUP")
 OnMessage(0x216, "WM_MOVING")
@@ -162,6 +163,18 @@ identifyThisWin() {
     Return
 
     ~Tab::
+       markThisFileNow()
+    Return
+
+    ~Insert::
+       addNewFile2list()
+    Return
+
+    ~+Insert::
+       addNewFolder2list()
+    Return
+
+    ~F11::
     ~Enter::
        ToggleThumbsMode()
     Return
@@ -170,12 +183,16 @@ identifyThisWin() {
        CopyImage2clip()
     Return
 
+    ~vk43::    ; C
+       CompareImagesAB()
+    Return
+
     ~^vk4B::    ; Ctrl+K
        convert2jpeg()
     Return
 
     ~^+vk43::    ; Ctrl+Shift+C
-    ~+vk43::    ; Shift+C
+    ~+vk43::     ; Shift+C
        CopyImagePath()
     Return
 
@@ -262,6 +279,10 @@ identifyThisWin() {
        ChangeZoom(-1)
     Return
 
+    ~!Delete::
+       InListMultiEntriesRemover()
+    Return
+
     ~vkBE::    ; [,]
        IncreaseSlideSpeed()
     Return
@@ -287,7 +308,10 @@ identifyThisWin() {
     Return
 
     ~Space::
-       InfoToggleSlideShowu()
+       If (thumbsDisplaying=1)
+          markThisFileNow()
+       Else
+          InfoToggleSlideShowu()
     Return 
 
     ~vk52::     ; R
@@ -303,7 +327,7 @@ identifyThisWin() {
     Return
 
     ~vk4D::     ; M
-       QuickMoveFile2Dest()
+       invokeQuickMoveMenu()
     Return
 
     ~vk46::     ; F
@@ -340,6 +364,11 @@ identifyThisWin() {
     ~Right::
        If (slideShowRunning=1)
           ToggleSlideShowu()
+       If (InStr(A_ThisHotkey, "wheel") && IMGlargerViewPort=1)
+       {
+          ChangeZoom(1)
+          Return
+       }
        If (IMGlargerViewPort=1 && IMGresizingMode=4)
           PanIMGonScreen("R")
        Else
@@ -350,6 +379,11 @@ identifyThisWin() {
     ~Left::
        If (slideShowRunning=1)
           ToggleSlideShowu()
+       If (InStr(A_ThisHotkey, "wheel") && IMGlargerViewPort=1)
+       {
+          ChangeZoom(-1)
+          Return
+       }
        If (IMGlargerViewPort=1 && IMGresizingMode=4)
           PanIMGonScreen("L")
        Else
@@ -405,9 +439,12 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
      IniRead, UseCachedList, % fileNamu, General, UseCachedList, @
      IniRead, testStaticFolderz, % fileNamu, Folders, Fi1, @
      IniRead, testDynaFolderz, % fileNamu, DynamicFolderz, DF1, @
-;     MsgBox, %testStaticFolderz%`n %testDynaFolderz%
      If StrLen(testDynaFolderz)>4
         DynamicFoldersList := "hexists"
+
+     IniRead, tstSLDcacheFilesList, % fileNamu, General, SLDcacheFilesList, @
+     If (tstSLDcacheFilesList=1 || tstSLDcacheFilesList=0)
+        SLDcacheFilesList := tstSLDcacheFilesList
   }
 
   mustGenerateStaticFolders := (InStr(firstLine, "[General]") && StrLen(testStaticFolderz)>8) ? 0 : 1
@@ -507,13 +544,31 @@ CopyImagePath() {
   If (slideShowRunning=1)
      ToggleSlideShowu()
 
-  imgpath := resultedFilesList[currentFileIndex]
-  If FileExist(imgpath)
+  If (markedSelectFile)
+     filesElected := (currentFileIndex>markedSelectFile) ? currentFileIndex - markedSelectFile + 1 : markedSelectFile - currentFileIndex + 1
+
+  If (markedSelectFile>0 && filesElected>1)
   {
-     Clipboard := imgpath
-     showTOOLtip("File path copied to clipboard...")
+     startPoint := (currentFileIndex<markedSelectFile) ? currentFileIndex : markedSelectFile
+     Loop, % filesElected
+     {
+        thisFileIndex := startPoint + A_Index - 1
+        file2rem := resultedFilesList[thisFileIndex]
+        file2rem := StrReplace(file2rem, "||")
+        listu .= file2rem "`n"
+     }
+     Clipboard := listu
+     showTOOLtip("The file paths of " filesElected " files were copied to clipboard...")
      SetTimer, RemoveTooltip, % -msgDisplayTime
+     markedSelectFile := ""
+     Return
   }
+
+  imgpath := resultedFilesList[currentFileIndex]
+  imgpath := StrReplace(imgpath, "||")
+  Clipboard := imgpath
+  showTOOLtip("File path copied to clipboard...`n" imgpath)
+  SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
 CopyImage2clip() {
@@ -660,10 +715,15 @@ InitGuiContextMenu() {
    BuildMenu()
 }
 
-
 activateMainWin() {
    If (toolTipGuiCreated=1)
       TooltipCreator(1, 1)
+   If (thumbsDisplaying=1)
+   {
+      If (identifyThisWin()=1)
+         Gui, thumbsGuiHL: Show, NoActivate
+      Else Gui, thumbsGuiHL: Hide
+   }
 }
 
 ToggleThumbsMode() {
@@ -682,7 +742,7 @@ ToggleThumbsMode() {
       lastInvoked := A_TickCount
       Return
    } Else If (CurrentSLD && maxFilesIndex>1)
-      UpdateThumbsScreen()
+      SetTimer, UpdateThumbsScreen, -50
 
    lastInvoked := A_TickCount
 }
@@ -756,13 +816,14 @@ UpdateThumbsScreen(forceThis:=0) {
       DestroyGIFuWin()
 
    thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, startIndex, mainWidth, mainHeight)
-   If (prevStartIndex!=startIndex) || (forceThis=1)
+   If (prevStartIndex!=startIndex) || (forceThis=2)
    {
+      Gui, thumbsGuiHL: Hide
       showTOOLtip("Generating thumbnails, please wait...")
       GdipCleanMain()
-      Gdip_ShowThumbsnails(startIndex)
+      r := Gdip_ShowThumbsnails(startIndex)
       SetTimer, RemoveTooltip, -500
-   }
+   } Else r := 1
    prevStartIndex := startIndex
    rowIndex := 0
    columnIndex := -1
@@ -779,6 +840,8 @@ UpdateThumbsScreen(forceThis:=0) {
       DestPosY := 1 + thumbsH*rowIndex
    }
 
+   If !r
+      prevStartIndex := -1
    Gui, 3: Show, NoActivate
    Sleep, 1
    Gui, thumbsGuiHL: Show, NoActivate x%GuiX% y%GuiY% w%mainWidth% h%mainHeight%, ThumbsWinHighLight
@@ -854,7 +917,12 @@ WinClickAction(forceThis:=0) {
             lastInvoked2 := A_TickCount
             Return
          }
-         currentFileIndex := newIndex
+
+         If (GetKeyState("Ctrl", "P") || GetKeyState("Shift", "P"))
+         {
+             markedSelectFile := (markedSelectFile=newIndex || markedSelectFile=currentFileIndex) ? "" : newIndex
+             prevStartIndex := -1
+         } Else currentFileIndex := newIndex
          SetTimer, DelayiedImageDisplay, -25
       }
 
@@ -1076,6 +1144,7 @@ ToggleImgFX(dir:=0) {
    SetTimer, RemoveTooltip, % -msgDisplayTime
    If (thumbsDisplaying=1)
       SetTimer, RefreshThumbsList, -250
+   Else prevStartIndex := -1
 
    writeMainSettings()
    r := IDshowImage(currentFileIndex)
@@ -1447,12 +1516,15 @@ testFileExists(imgpath) {
 ; 25s
 
 informUserFileMissing() {
+   Critical, on
    imgpath := resultedFilesList[currentFileIndex]
    SplitPath, imgpath, OutFileName, OutDir
    showTOOLtip("ERROR: File not found or access denied...`n" OutFileName "`n" OutDir)
    winTitle := currentFileIndex "/" maxFilesIndex " | " OutFileName " | " OutDir
    WinSetTitle, ahk_id %PVhwnd%,, % winTitle
    SoundBeep, 300, 50
+   If (autoRemDeadEntry=1)
+      remCurrentEntry(0, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -1474,7 +1546,7 @@ enableFilesFilter() {
    If !ErrorLevel
    {
       backCurrentSLD := CurrentSLD
-      CurrentSLD := ""
+      markedSelectFile := CurrentSLD := ""
       showTOOLtip("Applying filter on the list of files, please wait...")
       If StrLen(filesFilter)<2
       {
@@ -1504,6 +1576,8 @@ enableFilesFilter() {
 
 FilterFilesIndex() {
     newFilesList := []
+    newMappingList := []
+    filteredMap2mainList := []
     filterBehaviour := InStr(usrFilesFilteru, "&") ? 1 : 2
     Loop, % bkcpMaxFilesIndex + 1
     {
@@ -1511,6 +1585,7 @@ FilterFilesIndex() {
         If (InStr(r, "||") || !r)
            Continue
 
+        thisIndex++
         If StrLen(filesFilter)>1
         {
            z := filterCoreString(r, filterBehaviour, filesFilter)
@@ -1519,11 +1594,16 @@ FilterFilesIndex() {
         }
         newFilesIndex++
         newFilesList[newFilesIndex] := r
+        If StrLen(filesFilter)>1
+           newMappingList[newFilesIndex] := thisIndex
    }
    renewCurrentFilesList()
+   If StrLen(filesFilter)>1
+      filteredMap2mainList := newMappingList.Clone()
    resultedFilesList := newFilesList.Clone()
    maxFilesIndex := newFilesIndex
    newFilesList := []
+   newMappingList := []
    GenerateRandyList()
 }
 
@@ -1535,6 +1615,157 @@ throwMSGwriteError() {
      MsgBox, 16, %appTitle%: ERROR, Unable to write or access the files: permission denied...
      lastInvoked := A_TickCount
   }
+}
+
+InListMultiEntriesRemover() {
+  If (markedSelectFile)
+  {
+     filesElected := (currentFileIndex>markedSelectFile) ? currentFileIndex - markedSelectFile + 1 : markedSelectFile - currentFileIndex + 1
+     If (markedSelectFile>0 && filesElected>1)
+        itsMultiFiles := 1
+     Else remCurrentEntry(0, 0)
+  } Else remCurrentEntry(0, 0)
+
+  If (itsMultiFiles!=1)
+     Return
+
+  If (filesElected>50)
+  {
+     MsgBox, 52, %appTitle%, Are you sure you want to remove %filesElected% entries from the slideshow files list?
+     IfMsgBox, No
+       Return
+  }
+
+   startPoint := (currentFileIndex<markedSelectFile) ? currentFileIndex : markedSelectFile
+   showTOOLtip("Removing " filesElected " index entries, please wait...")
+   prevStartIndex := -1
+   prevMaxy := maxFilesIndex
+   Loop, % filesElected
+   {
+      thisFileIndex := startPoint + A_Index - 1
+      resultedFilesList[thisFileIndex] := ""
+      If StrLen(filesFilter)>1
+      {
+         z := filteredMap2mainList[thisFileIndex]
+         bckpResultedFilesList[z] := ""
+      }
+   }
+
+   If StrLen(filesFilter)>1
+   {
+      FilterFilesIndex()
+   } Else
+   {
+      dummy := resultedFilesList.Clone()
+      renewCurrentFilesList()
+      Loop, % prevMaxy
+      {
+         line := dummy[A_Index]
+         If (StrLen(line)<4 || InStr(line, "||"))
+            Continue
+         maxFilesIndex++
+         resultedFilesList[maxFilesIndex] := line
+      }
+      GenerateRandyList()
+   }
+
+   showTOOLtip(filesElected " index entries removed...")
+   If (maxFilesIndex<1)
+   {
+      If (thumbsDisplaying=1)
+         ToggleThumbsMode()
+      Gui, 3: Hide
+      GdipCleanMain()
+      If StrLen(filesFilter)>1
+      {
+         showTOOLtip("Removing files list index filter, please wait...")
+         usrFilesFilteru := filesFilter := ""
+         FilterFilesIndex()
+         RandomPicture()
+      } Else MsgBox,, %appTitle%, No files left in the index, please (re)open a file or folder.
+   } Else
+   {
+      startPoint--
+      If (startPoint<2)
+         startPoint := 1
+      currentFileIndex := startPoint
+      r := IDshowImage(currentFileIndex)
+      If !r
+         informUserFileMissing()
+   }
+   SoundBeep , 900, 100
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+remCurrentEntry(dummy, silentus:=0) {
+   Critical, on
+   prevStartIndex := -1
+   file2remA := resultedFilesList.RemoveAt(currentFileIndex)
+   file2rem := StrReplace(file2remA, "||")
+   maxFilesIndex--
+   SplitPath, file2rem, OutFileName, OutDir
+
+   If StrLen(filesFilter)>1
+   {
+      z := detectFileIDbkcpList(file2remA)
+      If (z="fail")
+         z := detectFileIDbkcpList(file2rem)
+      If (z!="fail" && z>=1)
+      {
+         y := bckpResultedFilesList.RemoveAt(z)
+         bkcpMaxFilesIndex--
+      }
+   }
+   If (silentus!=1)
+      showTOOLtip("Index entry removed...`n" OutFileName "`n" OutDir)
+
+   If (maxFilesIndex<1)
+   {
+      If (thumbsDisplaying=1)
+         ToggleThumbsMode()
+      Gui, 3: Hide
+      GdipCleanMain()
+      If StrLen(filesFilter)>1
+      {
+         showTOOLtip("Removing files list index filter, please wait...")
+         usrFilesFilteru := filesFilter := ""
+         FilterFilesIndex()
+         RandomPicture()
+      } Else MsgBox,, %appTitle%, No files left in the index, please (re)open a file or folder.
+   } Else
+   {
+      currentFileIndex--
+      If (slideShowRunning!=1 && silentus=0)
+         r := IDshowImage(currentFileIndex)
+      Else r := 1
+
+      If !r
+         informUserFileMissing()
+   }
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+WritePrefsIntoSLD() {
+   Critical, on
+   If (slideShowRunning=1)
+      ToggleSlideShowu()
+
+   FileSelectFile, file2save, S3, % CurrentSLD, Save slideshow settings into file..., Slideshow (*.sld)
+   If (!ErrorLevel && StrLen(file2save)>3)
+   {
+      If !RegExMatch(file2save, "i)(.\.sld)$")
+         file2save .= ".sld"
+
+      FileReadLine, firstLine, % file2save, 1
+      If InStr(firstLine, "[General]")
+      {
+         IniWrite, % (SLDcacheFilesList=1) ? "Yes" : "Nope", % file2save, General, UseCachedList
+         Sleep, 10
+         writeSlideSettings(file2save)
+      } Else 
+         MsgBox, 64, %appTitle%: Save slideshow settings error, The selected file appears not to have the correct file format.`nPlease select a .SLD file already saved by this application.
+   }
+
 }
 
 SaveFilesList() {
@@ -1581,24 +1812,31 @@ SaveFilesList() {
          IniWrite, Nope, % file2save, General, IgnoreThesePrefs
       Else
          IniWrite, Yes, % file2save, General, IgnoreThesePrefs
-      IniWrite, Yes, % file2save, General, UseCachedList
+      
+      IniWrite, % (SLDcacheFilesList=1) ? "Yes" : "Nope", % file2save, General, UseCachedList
       Sleep, 10
       writeSlideSettings(file2save)
       WinSetTitle, ahk_id %PVhwnd%,, Saving slideshow - please wait...
       showTOOLtip("Saving list of " maxFilesIndex " entries into...`n" file2save "`nPlease wait...")
       thisTmpFile := !newTmpFile ? backCurrentSLD : newTmpFile
-      saveDynaFolders := (DynamicFoldersList="hexists") ? coreLoadDynaFolders(thisTmpFile) : DynamicFoldersList
+      saveDynaFolders := InStr(DynamicFoldersList, "hexists") ? coreLoadDynaFolders(thisTmpFile) : DynamicFoldersList
       dynaFolderListu := "`n[DynamicFolderz]`n"
       Loop, Parse, saveDynaFolders, `n
       {
-          If (StrLen(A_LoopField)<4 || !FileExist(A_LoopField))
+          fileTest := StrReplace(A_LoopField, "|")
+          If (StrLen(A_LoopField)<4 || !FileExist(fileTest))
              Continue
           countDynas++
           dynaFolderListu .= "DF" countDynas "=" A_LoopField "`n"
       }
+      If (SLDcacheFilesList=0)
+         mustGenerateStaticFolders := 0
 
       Loop, % maxFilesIndex + 1
       {
+          If (SLDcacheFilesList=0)
+             Continue
+
           r := resultedFilesList[A_Index]
           If (InStr(r, "||") || !r)
              Continue
@@ -1620,7 +1858,7 @@ SaveFilesList() {
              FileGetTime, dirDate, % A_LoopField, M
              foldersListu .= "Fi" A_Index "=" dirDate "*&*" A_LoopField "`n"
          }
-      } Else
+      } Else If (SLDcacheFilesList=1)
       {
          thisTmpFile := !newTmpFile ? backCurrentSLD : newTmpFile
          foldersListu .= LoadStaticFoldersCached(thisTmpFile)
@@ -1668,7 +1906,7 @@ cleanFilesList(noFilesCheck:=0) {
    If (maxFilesIndex>1)
    {
       backCurrentSLD := CurrentSLD
-      CurrentSLD := ""
+      markedSelectFile := CurrentSLD := ""
       filterBehaviour := InStr(usrFilesFilteru, "&") ? 1 : 2
       If StrLen(filesFilter)>1
       {
@@ -1868,6 +2106,7 @@ readSlideSettings(readThisFile) {
      IniRead, tstisTitleBarHidden, %readThisFile%, General, isTitleBarHidden, @
      IniRead, tstthumbsAratio, %readThisFile%, General, thumbsAratio, @
      IniRead, tstthumbsZoomLevel, %readThisFile%, General, thumbsZoomLevel, @
+     IniRead, tstSLDcacheFilesList, %readThisFile%, General, SLDcacheFilesList, @
 
      If (tstslideshowdelay!="@" && tstslideshowdelay>300)
         slideShowDelay := tstslideShowDelay
@@ -1877,6 +2116,8 @@ readSlideSettings(readThisFile) {
         imgFxMode := tstimgFxMode
      If (tstnoTooltipMSGs=1 || tstnoTooltipMSGs=0)
         noTooltipMSGs := tstnoTooltipMSGs
+     If (tstSLDcacheFilesList=1 || tstSLDcacheFilesList=0)
+        SLDcacheFilesList := tstSLDcacheFilesList
      If (tstTouchScreenMode=1 || tstTouchScreenMode=0)
         TouchScreenMode := tstTouchScreenMode
      If (tstuserimgQuality=1 || tstuserimgQuality=0)
@@ -1935,6 +2176,7 @@ writeMainSettings() {
     writeSlideSettings(mainSettingsFile)
     IniWrite, % MustLoadSLDprefs, % mainSettingsFile, General, MustLoadSLDprefs
     IniWrite, % prevFileMovePath, % mainSettingsFile, General, prevFileMovePath
+    IniWrite, % autoRemDeadEntry, % mainSettingsFile, General, autoRemDeadEntry
     IniWrite, % askDeleteFiles, % mainSettingsFile, General, askDeleteFiles
     IniWrite, % enableThumbsCaching, % mainSettingsFile, General, enableThumbsCaching
 }
@@ -1945,10 +2187,13 @@ loadMainSettings() {
     IniRead, tstprevFileMovePath, % mainSettingsFile, General, prevFileMovePath, @
     IniRead, tstaskDeleteFiles, % mainSettingsFile, General, askDeleteFiles, @
     IniRead, tstenableThumbsCaching, % mainSettingsFile, General, enableThumbsCaching, @
+    IniRead, tstautoRemDeadEntry, % mainSettingsFile, General, autoRemDeadEntry, @
     If (tstenableThumbsCaching=1 || tstenableThumbsCaching=0)
        enableThumbsCaching := tstenableThumbsCaching
     If (tstaskDeleteFiles=1 || tstaskDeleteFiles=0)
        askDeleteFiles := tstaskDeleteFiles
+    If (tstautoRemDeadEntry=1 || tstautoRemDeadEntry=0)
+       autoRemDeadEntry := tstautoRemDeadEntry
     If (tstMustLoadSLDprefs=1 || tstMustLoadSLDprefs=0)
        MustLoadSLDprefs := tstMustLoadSLDprefs
     If (tstprevFileMovePath!="@" || StrLen(tstprevFileMovePath)>3)
@@ -1956,6 +2201,7 @@ loadMainSettings() {
 }
 
 writeSlideSettings(file2save) {
+    IniWrite, % SLDcacheFilesList, %file2save%, General, SLDcacheFilesList
     IniWrite, % IMGresizingMode, %file2save%, General, IMGresizingMode
     IniWrite, % imgFxMode, %file2save%, General, imgFxMode
     IniWrite, % SlideHowMode, %file2save%, General, SlideHowMode
@@ -1995,9 +2241,12 @@ readRecentEntries() {
    }
 }
 
-RecentFilesManager() {
+RecentFilesManager(dummy:=0,addPrevMoveDest:=0) {
   readRecentEntries()
   entry2add := CurrentSLD
+  If (addPrevMoveDest=2)
+     entry2add := prevFileMovePath
+
   If StrLen(entry2add)<4
      Return
 
@@ -2066,38 +2315,119 @@ PrevRandyPicture(dummy:=0, inLoop:=0) {
    } Else inLoop := 0
 }
 
+markThisFileNow() {
+  markedSelectFile := (markedSelectFile=currentFileIndex) ? "" : currentFileIndex
+  prevStartIndex := -1
+  SetTimer, DelayiedImageDisplay, -25
+}
+
+CompareImagesAB() {
+  Static prevImgIndex
+  If (!markedSelectFile)
+     Return
+  If (slideShowRunning=1)
+     ToggleSlideShowu()
+
+  If (markedSelectFile!=currentFileIndex)
+  {
+     prevImgIndex := currentFileIndex
+     currentFileIndex := markedSelectFile
+  } Else If (markedSelectFile=currentFileIndex)
+  {
+     If !prevImgIndex
+        prevImgIndex := currentFileIndex++
+     currentFileIndex := prevImgIndex
+  }
+
+  r := IDshowImage(currentFileIndex)
+  If !r
+     informUserFileMissing()
+}
+
 DeletePicture() {
   If (slideShowRunning=1)
      ToggleSlideShowu()
 
-  If (askDeleteFiles=1)
+  If (markedSelectFile)
+     filesElected := (currentFileIndex>markedSelectFile) ? currentFileIndex - markedSelectFile + 1 : markedSelectFile - currentFileIndex + 1
+
+  If (askDeleteFiles=1 || filesElected)
   {
-     MsgBox, 52, %appTitle%, Are you sure you want to delete the current file?
+     msgTimer := A_TickCount
+     msgInfos := (markedSelectFile>0 && filesElected>1) ? filesElected " files" : "the current file"
+     MsgBox, 52, %appTitle%, Are you sure you want to delete %msgInfos% ?
      IfMsgBox, Yes
        good2go := 1
+
+     delayu := filesElected ? 950 : 650
+     If (A_TickCount - msgTimer < delayu)
+     {
+        showTOOLtip("Operation aborted. User answered ""Yes"" too fast.")
+        SetTimer, RemoveTooltip, % -msgDisplayTime
+        good2go := 0
+     }
   } Else good2go := 1
+
   If (good2go!=1)
      Return
 
   Sleep, 5
+  If (markedSelectFile>0 && filesElected>1)
+  {
+     showTOOLtip("Moving to recycle bin " filesElected " files, please wait...")
+     startPoint := (currentFileIndex<markedSelectFile) ? currentFileIndex : markedSelectFile
+     Loop, % filesElected
+     {
+        thisFileIndex := startPoint + A_Index - 1
+        file2rem := resultedFilesList[thisFileIndex]
+        file2rem := StrReplace(file2rem, "||")
+        FileSetAttrib, -R, %file2rem%
+        Sleep, 1
+        If (move2recycler=1)
+           FileRecycle, %file2rem%
+
+        If !ErrorLevel
+        {
+           resultedFilesList[thisFileIndex] := "||" file2rem
+           If StrLen(filesFilter)>1
+           {
+              z := detectFileIDbkcpList(file2rem)
+              If (z!="fail" && z>=1)
+                 bckpResultedFilesList[z] := "||" file2rem
+           }
+        } Else someErrors := ". Errors occured during file operations..."
+     }
+     markedSelectFile := ""
+     showTOOLtip(filesElected " files deleted" someErrors)
+     SetTimer, RemoveTooltip, % -msgDisplayTime
+     Return
+  }
+
+  markedSelectFile := ""
   file2rem := resultedFilesList[currentFileIndex]
   file2rem := StrReplace(file2rem, "||")
   SplitPath, file2rem, OutFileName, OutDir
   FileSetAttrib, -R, %file2rem%
   Sleep, 5
-  FileDelete, %file2rem%
-  resultedFilesList[currentFileIndex] := "||" file2rem
+  If (move2recycler=1)
+     FileRecycle, %file2rem%
+  Else
+     FileDelete, %file2rem%
+
   If ErrorLevel
   {
      showTOOLtip("File already deleted or access denied...")
-     SoundBeep, 300, 900
-  } Else showTOOLtip("File deleted...`n" OutFileName "`n" OutDir)
-
-  If StrLen(filesFilter)>1
+     SoundBeep, 300, 100
+  } Else
   {
-     z := detectFileIDbkcpList(file2rem)
-     If (z!="fail" && z>=1)
-        bckpResultedFilesList[z] := "||" file2rem
+     resultedFilesList[currentFileIndex] := "||" file2rem
+     If StrLen(filesFilter)>1
+     {
+        z := detectFileIDbkcpList(file2rem)
+        If (z!="fail" && z>=1)
+           bckpResultedFilesList[z] := "||" file2rem
+     }
+     showTOOLtip("File deleted...`n" OutFileName "`n" OutDir)
   }
   Sleep, 50
   SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -2114,7 +2444,7 @@ RenameThisFile() {
   {
      showTOOLtip("File does not exist or access denied...`n" OutFileName "`n" OutDir)
      SetTimer, RemoveTooltip, % -msgDisplayTime
-     SoundBeep 
+     SoundBeep, 300, 100
      Return
   }
 
@@ -2123,7 +2453,7 @@ RenameThisFile() {
   {
      If FileExist(OutDir "\" newFileName)
      {
-        SoundBeep 
+        SoundBeep, 300, 100
         MsgBox, 52, %appTitle%, A file with the name provided already exists.`nDo you want to overwrite it?`n`n%newFileName%
         IfMsgBox, Yes
         {
@@ -2143,7 +2473,7 @@ RenameThisFile() {
      If ErrorLevel
      {
         showTOOLtip("ERROR: Access denied... File could not be renamed.")
-        SoundBeep
+        SoundBeep, 300, 100
         SetTimer, RemoveTooltip, % -msgDisplayTime
      } Else
      {
@@ -2173,7 +2503,7 @@ MoveFile2Dest() {
    {
       showTOOLtip("File does not exist or access denied...`n" OldOutFileName "`n" OldOutDir)
       SetTimer, RemoveTooltip, % -msgDisplayTime
-      SoundBeep 
+      SoundBeep, 300, 100
       Return
    }
 
@@ -2220,6 +2550,7 @@ MoveFile2Dest() {
       If (StrLen(prevFileMovePath)>3 && wasNoError=1)
       {
          writeMainSettings()
+         RecentFilesManager(0,2)
          showTOOLtip("File moved to...`n" NewOutDir "\")
          resultedFilesList[currentFileIndex] := file2save
          If StrLen(filesFilter)>1
@@ -2233,7 +2564,57 @@ MoveFile2Dest() {
    }
 }
 
-QuickMoveFile2Dest() {
+invokeQuickMoveMenu() {
+   Static wasCreated
+   If (wasCreated=1)
+      Menu, QuickMoveMenu, Delete
+
+   readRecentEntries()
+   StringRight, infoPrevMovePath, prevFileMovePath, 25
+   Menu, QuickMoveMenu, Add, &0. %infoPrevMovePath%, OpenQuickItemDir
+   Loop, Parse, historyList, `n
+   {
+      If (A_Index>15)
+         Break
+      line := StrReplace(A_LoopField, "|")
+      SplitPath, line, OutFileName, OutDir
+      If StrLen(OutDir)<4
+         Continue
+      countItemz++
+      StringRight, entryu, OutDir, 25
+      Menu, QuickMoveMenu, Add, &%countItemz%. %entryu%, OpenQuickItemDir
+   }
+
+   Menu, QuickMoveMenu, Add, 
+   Menu, QuickMoveMenu, Add, &Choose a new folder, EraseHistory
+   wasCreated := 1
+   Menu, QuickMoveMenu, Show 
+}
+
+OpenQuickItemDir() {
+  Sleep, 25
+  TestOpenThisu := SubStr(A_ThisMenuItem, 1, 2)
+  If (TestOpenThisu="0.")
+  {
+     folderu := prevFileMovePath
+  } Else
+  {
+     openThisu := SubStr(A_ThisMenuItem, 2, InStr(A_ThisMenuItem, ". ")-2)
+     IniRead, hEntry, % mainSettingsFile, Recents, E%openThisu%, @
+     hEntry := StrReplace(hEntry, "|")
+     hEntry := Trim(hEntry)
+     SplitPath, hEntry,, folderu
+  }
+
+  If StrLen(folderu)>4
+     QuickMoveFile2Dest(folderu)
+  Else 
+     SoundBeep, 300, 100
+
+; MsgBox, %openthisu% -- %newentry%
+}
+
+QuickMoveFile2Dest(finalDest) {
    If (slideShowRunning=1)
       ToggleSlideShowu()
  
@@ -2244,58 +2625,121 @@ QuickMoveFile2Dest() {
    {
       showTOOLtip("File does not exist or access denied...`n" OldOutFileName "`n" OldOutDir)
       SetTimer, RemoveTooltip, % -msgDisplayTime
-      SoundBeep 
+      SoundBeep, 300, 100 
       Return
    }
 
-   If (OldOutDir=prevFileMovePath)
+   If (OldOutDir=finalDest)
    {
       showTOOLtip("Destination equals to initial location...`nOperation ignored.")
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
    }
 
-   If StrLen(prevFileMovePath)>3
-   {
-      file2save := prevFileMovePath "\" OldOutFileName
-      If FileExist(file2save)
-      {
-         MsgBox, 52, %appTitle%, A file with the same name already exists in the destination folder... Do you want to overwrite the file?`n`n%OldOutFileName%`n%NewOutDir%
-         IfMsgBox, Yes
-         {
-            FileSetAttrib, -R, %file2save%
-            Sleep, 5
-            FileDelete, %file2save%
-            Sleep, 5
-            FileMove, %file2rem%, %file2save%, 1
-            If ErrorLevel
-               wasError := 1
-            throwMSGwriteError()
-         } Else Return
-      } Else
-      {
-         FileMove, %file2rem%, %file2save%, 1
-         If ErrorLevel
-            wasError := 1
-      }
+    file2save := finalDest "\" OldOutFileName
+    If FileExist(file2save)
+    {
+       MsgBox, 52, %appTitle%, A file with the same name already exists in the destination folder... Do you want to overwrite the file?`n`n%OldOutFileName%`n%NewOutDir%
+       IfMsgBox, Yes
+       {
+          FileSetAttrib, -R, %file2save%
+          Sleep, 5
+          FileDelete, %file2save%
+          Sleep, 5
+          FileMove, %file2rem%, %file2save%, 1
+          If ErrorLevel
+             wasError := 1
+          throwMSGwriteError()
+       } Else Return
+    } Else
+    {
+       FileMove, %file2rem%, %file2save%, 1
+       If ErrorLevel
+          wasError := 1
+    }
 
-      If (wasError!=1)
+    If (wasError!=1)
+    {
+       prevFileMovePath := finalDest
+       showTOOLtip("File moved to...`n" finalDest "\")
+       resultedFilesList[currentFileIndex] := file2save
+       If StrLen(filesFilter)>1
+       {
+          z := detectFileIDbkcpList(file2rem)
+          If (z!="fail" && z>=1)
+             bckpResultedFilesList[z] := file2save
+       }
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+    }
+}
+
+multiJpegConvert() {
+   mustDeleteFile := 0
+   If (markedSelectFile)
+      filesElected := (currentFileIndex>markedSelectFile) ? currentFileIndex - markedSelectFile + 1 : markedSelectFile - currentFileIndex + 1
+
+   If (filesElected>100)
+   {
+      MsgBox, 52, %appTitle%, Are you sure you want to convert to JPEG %filesElected% files?
+      IfMsgBox, No
+        Return
+   }
+
+   MsgBox, 52, %appTitle%, Do you want to remove the original files after conversion to JPEG? %filesElected% files are marked for this operation.
+   IfMsgBox, Yes
+     mustDeleteFile := 1
+
+   startPoint := (currentFileIndex<markedSelectFile) ? currentFileIndex : markedSelectFile
+   showTOOLtip("Converting to JPEG " filesElected " files, please wait...")
+   Loop, % filesElected
+   {
+      thisFileIndex := startPoint + A_Index - 1
+      file2rem := resultedFilesList[thisFileIndex]
+      If RegExMatch(file2rem, "i)(.\.(gif|jpg|jpeg))$")
+         Continue
+      file2rem := StrReplace(file2rem, "||")
+      SplitPath, file2rem, OutFileName, OutDir, OutExtension, OutNameNoExt
+      Sleep, 5
+      pBitmap := Gdip_CreateBitmapFromFile(file2rem)
+      file2save := OutDir "\" OutNameNoExt ".jpg"
+      r := Gdip_SaveBitmapToFile(pBitmap, file2save, 80)
+      If r
+         someErrors := ". Errors occured during file operations..."
+      Gdip_DisposeImage(pBitmap)
+      If (mustDeleteFile=1 && !r)
       {
-         showTOOLtip("File moved to...`n" prevFileMovePath "\")
-         resultedFilesList[currentFileIndex] := file2save
+         FileSetAttrib, -R, %file2rem%
+         If (move2recycler=1)
+            FileRecycle, %file2rem%
+         resultedFilesList[thisFileIndex] := file2save
          If StrLen(filesFilter)>1
          {
             z := detectFileIDbkcpList(file2rem)
             If (z!="fail" && z>=1)
                bckpResultedFilesList[z] := file2save
          }
-         SetTimer, RemoveTooltip, % -msgDisplayTime
       }
-   } Else MoveFile2Dest()
+   }
+   markedSelectFile := ""
+   showTOOLtip("Finished converting to JPEG " filesElected " files" someErrors)
+   SoundBeep , 900, 100
+   SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
 convert2jpeg() {
+  Critical, on
   Static asku := "a", mustDeleteFile := 0
+
+  If (markedSelectFile)
+  {
+     filesElected := (currentFileIndex>markedSelectFile) ? currentFileIndex - markedSelectFile + 1 : markedSelectFile - currentFileIndex + 1
+     If (markedSelectFile>0 && filesElected>1)
+     {
+        multiJpegConvert()
+        Return
+     }
+  }
+
   file2rem := resultedFilesList[currentFileIndex]
   If RegExMatch(file2rem, "i)(.\.(gif|jpg|jpeg))$")
      Return
@@ -2323,7 +2767,10 @@ convert2jpeg() {
   If (mustDeleteFile=1 && !r)
   {
      FileSetAttrib, -R, %file2rem%
-     FileDelete, %file2rem%
+     If (move2recycler=1)
+        FileRecycle, %file2rem%
+     Else
+        FileDelete, %file2rem%
      resultedFilesList[currentFileIndex] := file2save
      If StrLen(filesFilter)>1
      {
@@ -2345,6 +2792,7 @@ OpenFolders() {
 
 renewCurrentFilesList() {
   prevRandyIMGs := []
+  markedSelectFile := ""
   prevRandyIMGnow := 0
   resultedFilesList := []
   maxFilesIndex := 0
@@ -2417,6 +2865,93 @@ OpenFiles() {
       coreOpenFolder("|" SelectedDir, 0)
       currentFileIndex := detectFileID(imgpath)
       IDshowImage(currentFileIndex)
+   }
+}
+
+addNewFile2list() {
+   If (slideShowRunning=1)
+      ToggleSlideShowu()
+
+    pattern := "Images (*.jpg; *.bmp; *.png; *.gif; *.tif; *.emf; *.jpeg; *.tiff; *.wmf; *.rle; *.dib)"
+    FileSelectFile, SelectImg, M3, %A_WorkingDir%, Add image file to list, %pattern%
+    if (!SelectImg || ErrorLevel)
+       Return
+
+    showTOOLtip("Please wait...")
+    Loop, Parse, SelectImg, `n
+    {
+       If (A_Index=1)
+       {
+          SelectedDir := A_LoopField
+       } Else
+       {
+          countFiles++
+          imgsListu .= SelectedDir "\" A_LoopField "`n"
+       }
+    }
+
+   if StrLen(imgsListu)>3
+   {
+      markedSelectFile := ""
+      If StrLen(filesFilter)>1
+      {
+         usrFilesFilteru := filesFilter := ""
+         FilterFilesIndex()
+      }
+      showTOOLtip("Adding " countFiles " files into the current files list...")
+      Loop, Parse, imgsListu, `n
+      {
+         line := Trim(A_LoopField)
+         If StrLen(line)<3
+            Continue
+
+         SLDhasFiles := 1
+         If RegExMatch(line, RegExFilesPattern)
+         {
+            maxFilesIndex++
+            resultedFilesList[maxFilesIndex] := line
+         }
+      }
+   }
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+addNewFolder2list() {
+   If (slideShowRunning=1)
+      ToggleSlideShowu()
+
+    pattern := "All files (*.*;)"
+    FileSelectFile, SelectImg, S2, %A_WorkingDir%\this.folder, Add new folder(s) to the list, %pattern%
+    if (!SelectImg || ErrorLevel)
+       Return
+
+    Loop, Parse, SelectImg, `n
+    {
+       If (A_Index=1)
+          SelectedDir := A_LoopField
+       Else if (A_Index>2)
+          Break
+    }
+
+   if (SelectedDir)
+   {
+      markedSelectFile := ""
+      MsgBox, 52, %appTitle%, Do you want to scan for files recursively, in all subfolders?
+      IfMsgBox, No
+        isRecursive := "|"
+      If StrLen(filesFilter)>1
+      {
+         usrFilesFilteru := filesFilter := ""
+         FilterFilesIndex()
+      }
+      SplitPath, SelectedDir, OutFileName, OutDir
+      SelectedDir := OutDir
+      GetFilesList(isRecursive SelectedDir "\*")
+      GenerateRandyList()
+      mustGenerateStaticFolders := 1
+      DynamicFoldersList .= "`n" isRecursive SelectedDir
+      SoundBeep , 900, 100
+      RandomPicture()
    }
 }
 
@@ -2632,6 +3167,12 @@ BuildMenu() {
    Menu, PVtFile, Add, &Open (with external app)`tO, OpenThisFile
    Menu, PVtFile, Add, &Open containing folder`tCtrl+E, OpenThisFileFolder
    Menu, PVtFile, Add, 
+   Menu, PVtFile, Add, Mar&k this file`tTab, markThisFileNow
+   If (markedSelectFile=currentFileIndex)
+      Menu, PVtFile, Check, Mar&k this file`tTab
+
+   If markedSelectFile
+      Menu, PVtFile, Add, Compare this file with marked file`tC, CompareImagesAB
 
    file2rem := resultedFilesList[currentFileIndex]
    If !RegExMatch(file2rem, "i)(.\.(gif|jpg|jpeg))$")
@@ -2640,7 +3181,7 @@ BuildMenu() {
    Menu, PVtFile, Add, &Rename`tF2, RenameThisFile
    Menu, PVtFile, Add, &Move file to...`tCtrl+M, MoveFile2Dest
    If infoPrevMovePath
-      Menu, PVtFile, Add, %infoPrevMovePath%`tM, QuickMoveFile2Dest
+      Menu, PVtFile, Add, %infoPrevMovePath%`tM, invokeQuickMoveMenu
    Menu, PVtFile, Add,
    Menu, PVtFile, Add, &Information`tI, ShowImgInfos
 
@@ -2661,7 +3202,17 @@ BuildMenu() {
    Menu, PVfList, Add,
    If (maxFilesIndex>2)
    {
-      Menu, PVfList, Add, Save list as slideshow, SaveFilesList
+      Menu, PVfList, Add, Add files`tInsert, addNewFile2list
+      Menu, PVfList, Add, Add folder(s)`tShift+Insert, addNewFolder2list
+      Menu, PVfList, Add, Remove current file entry`tAlt+Delete, InListMultiEntriesRemover
+      Menu, PVfList, Add, Auto-remove entries of dead files, ToggleAutoRemEntries
+      If (autoRemDeadEntry=1)
+         Menu, PVfList, Check, Auto-remove entries of dead files
+      Menu, PVfList, Add,
+      Menu, PVfList, Add, Save list as slideshow (.SLD), SaveFilesList
+      Menu, PVfList, Add, Cache files list in .SLD file, ToggleSLDcache
+      If (SLDcacheFilesList=1)
+         Menu, PVfList, Check, Cache files list in .SLD file
       Menu, PVfList, Add,
       If (RegExMatch(CurrentSLD, "i)(\.sld)$") && SLDhasFiles=1)
          Menu, PVfList, Add, &Clean duplicate/inexistent entries, cleanFilesList
@@ -2674,9 +3225,12 @@ BuildMenu() {
          Menu, PVfList, Add, &Invert applied filter, invertFilesFilter
       }
       Menu, PVfList, Add,
-      Menu, PVfList, Add, &Sort by, :PVsort
+      If (thumbsDisplaying!=1)
+         Menu, PVfList, Add, &Sort by, :PVsort
    }
 
+   Menu, PVprefs, Add, Save settings into .SLD, WritePrefsIntoSLD
+   Menu, PVprefs, Add, 
    Menu, PVprefs, Add, &Always on top, ToggleAllonTop
    Menu, PVprefs, Add, &Hide title bar, ToggleTitleBaru
    Menu, PVprefs, Add, &No OSD information, ToggleInfoToolTips
@@ -2745,6 +3299,8 @@ BuildMenu() {
    {
       Menu, PVmenu, Add, C&urrent file, :PVtFile
       Menu, PVmenu, Add, Files l&ist, :PVfList
+      If (thumbsDisplaying=1 && maxFilesIndex>1)
+         Menu, PVmenu, Add, &Sort by, :PVsort
       Menu, PVmenu, Add, Vie&w, :PVview
       If (maxFilesIndex>1 && CurrentSLD)
       {
@@ -2793,6 +3349,16 @@ ToggleAllonTop() {
 
 ToggleAnimGIFsupport() {
    animGIFsSupport := !animGIFsSupport
+   writeMainSettings()
+}
+
+ToggleAutoRemEntries() {
+   autoRemDeadEntry := !autoRemDeadEntry
+   writeMainSettings()
+}
+
+ToggleSLDcache() {
+   SLDcacheFilesList := !SLDcacheFilesList
    writeMainSettings()
 }
 
@@ -2966,7 +3532,10 @@ ShowTheImage(imgpath, usePrevious:=0) {
 
    If (thumbsDisplaying=1)
    {
-      UpdateThumbsScreen()
+      If (A_TickCount - prevFullThumbsUpdate < 300) || (A_TickCount - lastInvoked2 < 100)
+         lastInvoked2 := A_TickCount
+      delayu := (A_TickCount - lastInvoked2 < 200) ? 350 : 5
+      SetTimer, UpdateThumbsScreen, % -delayu
       WinSetTitle, ahk_id %PVhwnd%,, % "THUMBS: " winTitle
       Return
    }
@@ -2986,6 +3555,8 @@ ShowTheImage(imgpath, usePrevious:=0) {
          SoundBeep, 300, 50
          lastInvoked2 := A_TickCount
       }
+      If (autoRemDeadEntry=1)
+         remCurrentEntry(0, 1)
       lastInvoked := A_TickCount
       Return "fail"
    }
@@ -3047,7 +3618,7 @@ calcImgSize(modus, imgW, imgH, GuiW, GuiH, ByRef ResizedW, ByRef ResizedH) {
 
 ResizeImage(imgpath, usePrevious) {
     Static oImgW, oImgH, prevImgPath, prevImgW, prevImgH
-         , mainX, mainY, wscale
+         , mainX, mainY, tinyW, tinyH, wscale
     If (winGDIcreated!=1)
        createGDIwin()
 
@@ -3070,9 +3641,10 @@ ResizeImage(imgpath, usePrevious) {
       prevImgH := imgH := oImgH
    } Else If (usePrevious=1) 
    {
-      RescaleBMPtiny(imgpath, prevImgW, prevImgH)
-      Gdip_GetImageDimensions(gdiBitmapSmall, imgW, imgH)
-      wscale := oImgW / imgW
+      RescaleBMPtiny(imgpath, prevImgW, prevImgH, tinyW, tinyH)
+      imgW := tinyW
+      imgH := tinyH
+      wscale := oImgW / tinyW
    }
 
    calcImgSize(IMGresizingMode, oimgW, oimgH, GuiW, GuiH, ResizedW, ResizedH)
@@ -3125,7 +3697,7 @@ ResizeImage(imgpath, usePrevious) {
       CloneResizerBMP(imgpath, IDwhichImg, whichImg, ResizedW, ResizedH)
    Else
       useCaches := "no"
-   r := Gdip_ShowImgonGui(wscale, ResizedW, ResizedH, GuiW, GuiH, usePrevious, useCaches, imgpath, CountFrames)
+   r := Gdip_ShowImgonGui(imgW, imgH, ResizedW, ResizedH, GuiW, GuiH, usePrevious, useCaches, imgpath, CountFrames)
    If (usePrevious=1)
       SetTimer, ReloadThisPicture, -550
 
@@ -3148,7 +3720,7 @@ calcScreenLimits() {
     ResolutionHeight := Abs(max(mCoordTop, mCoordBottom) - min(mCoordTop, mCoordBottom)) 
 }
 
-RescaleBMPtiny(imgpath, imgW, imgH) {
+RescaleBMPtiny(imgpath, imgW, imgH, ByRef ResizedW, ByRef ResizedH) {
   Critical, on
   ; one quarter resolution
   Static prevImgPath, prevResizedW, prevResizedH
@@ -3248,18 +3820,11 @@ getColorMatrix()  {
     Return matrix
 }
 
-Gdip_ShowImgonGui(wscale, newW, newH, mainWidth, mainHeight, usePrevious, useCaches, imgpath, CountFrames) {
+Gdip_ShowImgonGui(imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, useCaches, imgpath, CountFrames) {
     Critical, on
 
     matrix := getColorMatrix()
-
-    If (useCaches="no")
-       whichImg := (usePrevious=1 && gdiBitmapSmall) ? gdiBitmapSmall : gdiBitmap
-    Else
-       whichImg := (usePrevious=1 && gdiBitmapSmallView) ? gdiBitmapSmallView : gdiBitmapViewScale
-    Gdip_GetImageDimensions(whichImg, imgW, imgH)
-
-    hbm := CreateDIBSection(imgW, imgH)
+    hbm := CreateDIBSection(mainWidth, mainHeight)
     hdc := CreateCompatibleDC()
     obm := SelectObject(hdc, hbm)
     G := Gdip_GraphicsFromHDC(hdc)
@@ -3270,24 +3835,38 @@ Gdip_ShowImgonGui(wscale, newW, newH, mainWidth, mainHeight, usePrevious, useCac
     If (FlipImgH=1)
     {
        Gdip_ScaleWorldTransform(G, -1, 1)
-       Gdip_TranslateWorldTransform(G, -imgW, 0)
+       Gdip_TranslateWorldTransform(G, -mainWidth, 0)
     }
 
     If (FlipImgV=1)
     {
        Gdip_ScaleWorldTransform(G, 1, -1)
-       Gdip_TranslateWorldTransform(G, 0, -imgH)
+       Gdip_TranslateWorldTransform(G, 0, -mainHeight)
     }
 
+    If (useCaches="no")
+       whichImg := (usePrevious=1 && gdiBitmapSmall) ? gdiBitmapSmall : gdiBitmap
+    Else
+       whichImg := (usePrevious=1 && gdiBitmapSmallView) ? gdiBitmapSmallView : gdiBitmapViewScale
+    Gdip_GetImageDimensions(whichImg, imgW, imgH)
 
 ;   ToolTip, %imgW% -- %imgH% == %newW% -- %newH%
     calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY)
-    ; newW := imgW
-    ; newH := imgH
-    r1 := Gdip_DrawImage(G, whichImg, 0, 0, newW, newH, 0, 0, imgW, imgH, matrix)
-    ; Gdip_ResetWorldTransform(G)
+    r1 := Gdip_DrawImage(G, whichImg, DestPosX, DestPosY, newW, newH, 0, 0, imgW, imgH, matrix)
     If (GIFsGuiCreated=1)
        GIFguiCreator(1, 1)
+
+    If (markedSelectFile)
+    {
+       pBrush := Gdip_BrushCreateSolid("0x77999999")
+       sqPosX := (markedSelectFile<currentFileIndex) ? 0 : mainWidth - OSDfntSize*5
+       If (currentFileIndex=markedSelectFile)
+       {
+          Gdip_FillRectangle(G, pBrush, 0, 0, mainWidth, OSDfntSize*2)
+          Gdip_FillRectangle(G, pBrush, 0, 0, OSDfntSize*2, mainHeight)
+       } Else Gdip_FillRectangle(G, pBrush, sqPosX, 0, OSDfntSize*5, OSDfntSize*5)
+       Gdip_DeleteBrush(pBrush)
+    }
 
     If (CountFrames>1 && animGIFsSupport=1 && (prevAnimGIFwas!=imgpath || (A_TickCount - lastGIFdestroy > 9500)))
     {
@@ -3295,15 +3874,7 @@ Gdip_ShowImgonGui(wscale, newW, newH, mainWidth, mainHeight, usePrevious, useCac
        prevAnimGIFwas := imgpath
        r2 := UpdateLayeredWindow(hGDIwin, hdc, 0, 0, 1, 1)
        GIFguiCreator(imgpath, 0, DestPosX, DestPosY, newW, newH, mainWidth, mainHeight)
-    } Else
-    {
-       If (usePrevious=1 && IMGlargerViewPort=1)
-       {
-          imgW := imgW * wscale
-          imgH := imgH * wscale
-       }
-       r2 := UpdateLayeredWindow(hGDIwin, hdc, 0, 0, imgW, imgH)
-    }
+    } Else r2 := UpdateLayeredWindow(hGDIwin, hdc, 0, 0, mainWidth, mainHeight)
 
     SelectObject(hdc, obm)
     DeleteObject(hbm)
@@ -3367,6 +3938,9 @@ generateImgThumbCache(imgpath, newImgSize) {
 
 Gdip_ShowThumbsnails(startIndex) {
     Critical, on
+
+    prevFullThumbsUpdate := A_TickCount
+    mainStartZeit := A_TickCount
     matrix := getColorMatrix()
     thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, ignoreVaru, mainWidth, mainHeight)
     hbm := CreateDIBSection(mainWidth, mainHeight)
@@ -3375,13 +3949,21 @@ Gdip_ShowThumbsnails(startIndex) {
     G := Gdip_GraphicsFromHDC(hdc)
     Gdip_SetInterpolationMode(G, imgQuality)
     Gdip_SetSmoothingMode(G, 3)
-    rowIndex := 0
+    pBrush := Gdip_BrushCreateSolid("0x77999999")
+    rowIndex := imgsListed := 0
     maxZeit := columnIndex := -1
-    mainStartZeit := A_TickCount
+    Gui, 3: Show, NoActivate
+
     Loop, % maxItemsW*maxItemsH*2
     {
+        If GetKeyState("Esc", "P")
+        {
+           abandonAll := 1
+           Break
+        }
         startZeit := A_TickCount
-        imgpath := resultedFilesList[startIndex + A_Index - 1]
+        thisFileIndex := startIndex + A_Index - 1
+        imgpath := resultedFilesList[thisFileIndex]
         FileGetSize, fileSizu, % imgpath
         FileGetTime, FileDateM, % imgpath, m
         fileInfos := imgpath fileSizu FileDateM
@@ -3389,8 +3971,7 @@ Gdip_ShowThumbsnails(startIndex) {
         file2save := A_ScriptDir "\thumbs-cache\" MD5name ".jpg"
         thisImgFile := FileExist(file2save) ? file2save : imgpath
         oBitmap := Gdip_CreateBitmapFromFile(thisImgFile)
-        imgW := Gdip_GetImageWidth(oBitmap)
-        imgH := Gdip_GetImageHeight(oBitmap)
+        Gdip_GetImageDimensions(oBitmap, imgW, imgH)
         calcImgSize(1, imgW, imgH, thumbsW, thumbsH, newW, newH)
         columnIndex++
         If (columnIndex>=maxItemsW)
@@ -3402,20 +3983,37 @@ Gdip_ShowThumbsnails(startIndex) {
         If (rowIndex>=maxItemsH)
            Break
 
-        If (!imgW || !imgH || !oBitmap)
-           Continue
-
         DestPosX := thumbsW//2 - newW//2 + thumbsW*columnIndex
         DestPosY := thumbsH//2 - newH//2 + thumbsH*rowIndex
+        If (thisFileIndex=markedSelectFile)
+           Gdip_FillRectangle(G, pBrush, thumbsW*columnIndex, thumbsH*rowIndex, thumbsW, thumbsH)
+
+        If (!imgW || !imgH || !oBitmap || !FileExist(imgpath))
+           Continue
         r1 := Gdip_DrawImage(G, oBitmap, DestPosX, DestPosY, newW, newH, 0, 0, imgW, imgH, matrix)
+        If (thisFileIndex=markedSelectFile)
+        {
+           Gdip_FillRectangle(G, pBrush, thumbsW*columnIndex, thumbsH*rowIndex, thumbsW, OSDfntSize*3)
+           Gdip_FillRectangle(G, pBrush, thumbsW*columnIndex, thumbsH*rowIndex, OSDfntSize*3, thumbsH)
+        }
         Gdip_DisposeImage(oBitmap)
         r2 := UpdateLayeredWindow(hGDIthumbsWin, hdc, 0, 0, mainWidth, mainHeight)
         endZeit := A_TickCount
         thisZeit := endZeit - startZeit
         If (thisZeit>maxZeit)
            maxZeit := thisZeit
+
+        imgsListed++
         If (thisZeit>150 && file2save!=thisImgFile)
            ListImg2Cache .= imgpath "`n"
+        Else
+           ListImgNotCached .= imgpath "`n"
+
+        If GetKeyState("Esc", "P")
+        {
+           abandonAll := 1
+           Break
+        }
     }
     mainEndZeit := A_TickCount
     Sleep, 2
@@ -3424,23 +4022,57 @@ Gdip_ShowThumbsnails(startIndex) {
 ;   ToolTip, %imgW% -- %imgH% == %newW% -- %newH%
     If (GIFsGuiCreated=1)
        GIFguiCreator(1, 1)
-    r2 := UpdateLayeredWindow(hGDIthumbsWin, hdc, 0, 0, mainWidth, mainHeight)
+    If (markedSelectFile)
+    {
+       sqPosX := (markedSelectFile<currentFileIndex) ? 0 : mainWidth - OSDfntSize*4
+       Gdip_FillRectangle(G, pBrush, sqPosX, 0, OSDfntSize*4, OSDfntSize*4)
+       r2 := UpdateLayeredWindow(hGDIthumbsWin, hdc, 0, 0, mainWidth, mainHeight)
+    }
+    Gdip_DeleteBrush(pBrush)
     SelectObject(hdc, obm)
     DeleteObject(hbm)
     DeleteDC(hdc)
     Gdip_DeleteGraphics(G)
+
+    prevFullThumbsUpdate := A_TickCount
+    loopZeit := mainEndZeit - mainStartZeit
+    If (abandonAll=1)
+       Return 0
+
     If (StrLen(ListImg2Cache)>1  && enableThumbsCaching=1)
     {
-       loopZeit := mainEndZeit - mainStartZeit
-       thumbsCacheSize := (maxZeit>300 || loopZeit>950) ? 300 : 600
+       listHasCached := 1
+       thumbsCacheSize := (maxZeit>300 || loopZeit>600) ? 350 : 600
        showTOOLtip("Caching thumbnails, please wait...")
        Loop, Parse, ListImg2Cache, `n
+       {
            generateImgThumbCache(A_LoopField, thumbsCacheSize)
+           If GetKeyState("Esc", "P")
+           {
+              abandonAll := 1
+              Break
+           }
+       }
        SetTimer, RemoveTooltip, -500
     }
 
-    ; Gui, 3: Show, NoActivate
-    r := (r1!=0 || !r2) ? 0 : 1
+    If (listHasCached!=1 && loopZeit>450 && imgsListed>5)
+    {
+       showTOOLtip("Caching smaller thumbnails, please wait...")
+       Loop, Parse, ListImgNotCached, `n
+       {
+           generateImgThumbCache(A_LoopField, 200)
+           If GetKeyState("Esc", "P")
+           {
+              abandonAll := 1
+              Break
+           }
+       }
+       SetTimer, RemoveTooltip, -500
+    }
+
+    prevFullThumbsUpdate := A_TickCount
+    r := (r1!=0 || !r2 || abandonAll=1) ? 0 : 1
     Return r
 }
 
@@ -3569,7 +4201,7 @@ GDIupdater() {
 }
 
 RefreshThumbsList() {
-   UpdateThumbsScreen(1)
+   UpdateThumbsScreen(2)
 }
 
 ToggleViewModeTouch() {
@@ -3626,7 +4258,8 @@ ReloadDynamicFolderz(fileNamu) {
     Loop, Parse, listu,`n
     {
        line := Trim(A_LoopField)
-       If (RegExMatch(line, RegExFilesPattern) || StrLen(line)<4)
+       fileTest := StrReplace(line, "|")
+       If (RegExMatch(line, RegExFilesPattern) || StrLen(line)<4 || !FileExist(fileTest))
           Continue
        Else
           GetFilesList(line "\*")
@@ -3643,15 +4276,16 @@ coreLoadDynaFolders(fileNamu) {
        If (countFails>3)
           Break
    }
+   listu .= "`n" DynamicFoldersList
    Sort, listu, U D'n
    Return listu
 }
 
 RegenerateEntireList() {
     showTOOLtip("Refreshing files list, please wait...")
-    If (DynamicFoldersList="hexists")
+    If RegExMatch(CurrentSLD, "i)(\.sld)$")
        listu := coreLoadDynaFolders(CurrentSLD)
-    Else If (StrLen(DynamicFoldersList)>6)
+    Else If (StrLen(DynamicFoldersList)>3)
        listu := DynamicFoldersList
     Else Return
 
@@ -3667,7 +4301,8 @@ RegenerateEntireList() {
     Loop, Parse, listu,`n
     {
        line := Trim(A_LoopField)
-       If (RegExMatch(line, RegExFilesPattern) || StrLen(line)<4)
+       fileTest := StrReplace(line, "|")
+       If (RegExMatch(line, RegExFilesPattern) || StrLen(line)<4 || !FileExist(fileTest))
           Continue
        Else
           GetFilesList(line "\*")
@@ -3765,9 +4400,18 @@ IDshowImage(imgID,opentehFile:=0) {
     }
 
     FileGetSize, fileSizu, %resultu%
+    isPipe := InStr(resultu, "||")
     resultu := StrReplace(resultu, "||")
     If (!fileSizu && !FileExist(resultu) && skipDeadFiles=1 && opentehFile!=250)
+    {
+       If (autoRemDeadEntry=1 && imgID=currentFileIndex)
+          remCurrentEntry(0, 1)
        Return 0
+    }
+
+    If isPipe                  ; remove «deleted file» marker if somehow the file is back
+       If FileExist(resultu)
+          resultedFilesList[imgID] := resultu
 
     If (opentehFile=1)
     {
