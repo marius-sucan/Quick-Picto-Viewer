@@ -1,23 +1,27 @@
-; Script Name:    AHK Picture Viewer
-; Language:       English
-; Platform:       Windows XP or later
-; Author:         Marius Șucan
-; Script Original Version: 1.0.0 on Oct 4, 2010 by SBC
-; Script Current Version: 2.7.0 on mardi 18 juin 2019
-; Script Function:
-; Display images and slideshows; jpeg, jpg, bmp, png, gif, tif, emf
+; Original script details:
+;   Name:    AHK Picture Viewer
+;   Version: 1.0.0 on Oct 4, 2010 by SBC
+;   Platform: Windows XP or later
+;   Author:  SBC - http://sites.google.com/site/littlescripting/
+;   Found on: https://autohotkey.com/board/topic/58226-ahk-picture-viewer/
 ;
-; Website of SBC: http://sites.google.com/site/littlescripting/
-; Website of Marius Șucan: http://marius.sucan.ro/
+; New script details:
+;   Name:    Quick Picto Viewer
+;   Version: 2.8.0 on jeudi 20 juin 2019
+;   Platform: Windows 7 or later
+;   Author:  Marius Șucan -  http://marius.sucan.ro/
+;   GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 ;
-; AHK forum address for the original script:
-; https://autohotkey.com/board/topic/58226-ahk-picture-viewer/
-; Licence: GPL. Please reffer to this page for more information. http://www.gnu.org/licenses/gpl.html
+; Script Main Functionalities:
+; Display images and creates slideshows;
+; using GDI+ supported formats: jpeg, jpg, bmp, png, gif, tif, emf
+;
+; Original Licence: GPL. Please reffer to this page for more information. http://www.gnu.org/licenses/gpl.html
 ;_________________________________________________________________________________________________________________Auto Execute Section____
 
-;@Ahk2Exe-SetName AHK Picture and Slideshow Viewer v2
-;@Ahk2Exe-SetDescription AHK Picture and Slideshow Viewer v2
-;@Ahk2Exe-SetVersion 2.7.0
+;@Ahk2Exe-SetName Quick Picto Viewer
+;@Ahk2Exe-SetDescription Quick Picto Viewer
+;@Ahk2Exe-SetVersion 2.8.0
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2019)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
  
@@ -30,6 +34,7 @@
 #MaxMem, 1924
 #SingleInstance, off
 #Include, Gdip.ahk
+SetWinDelay, 1
 
 Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , hGuiTip := 1, hGuiThumbsHL := 1, hSetWinGui := 1
@@ -38,7 +43,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , prevTooltipDisplayTime := 1, mainCompiledPath := ""
    , filteredMap2mainList := [], thumbsCacheFolder := A_ScriptDir "\thumbs-cache"
    , resultedFilesList := [], currentFileIndex, maxFilesIndex := 0
-   , appTitle := "AHK Picture Viewer", FirstRun := 1
+   , appTitle := "Quick Picto Viewer", FirstRun := 1
    , bckpResultedFilesList := [], bkcpMaxFilesIndex := 0
    , DynamicFoldersList := "", historyList, GIFsGuiCreated := 0
    , RandyIMGids := [], SLDhasFiles := 0, IMGlargerViewPort := 0
@@ -47,15 +52,16 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , gdiBitmapSmallView, gdiBitmapViewScale, msgDisplayTime := 3000
    , slideShowRunning := 0, CurrentSLD := "", markedSelectFile := ""
    , ResolutionWidth, ResolutionHeight, prevStartIndex := -1
-   , gdiBitmap, mainSettingsFile := "ahk-picture-viewer.ini"
+   , gdiBitmap, mainSettingsFile := "quick-picto-viewer.ini"
    , RegExFilesPattern := "i)(.\\*\.(dib|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg))$"
-   , LargeUIfontValue := 14, version := "2.7.0", AnyWindowOpen := 0, toolTipGuiCreated := 0
+   , LargeUIfontValue := 14, AnyWindowOpen := 0, toolTipGuiCreated := 0
    , PrefsLargeFonts := 0, OSDbgrColor := "131209", OSDtextColor := "FFFEFA"
    , OSDfntSize := 14, OSDFontName := "Arial", prevOpenFolderPath := ""
    , mustGenerateStaticFolders := 1, lastWinDrag := 1
    , prevFileMovePath := "", lastGIFdestroy := 1, prevAnimGIFwas := ""
    , thumbsW := 300, thumbsH := 300, thumbsDisplaying := 0
    , othumbsW := 300, othumbsH := 300
+   , version := "2.8.0", vReleaseDate := "20/06/2019"
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1
    , thumbsAratio := 3, thumbsZoomLevel := 1
@@ -67,7 +73,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , noTooltipMSGs := 0, zoomLevel := 1, skipDeadFiles := 0
    , isTitleBarHidden := 0, lumosGrayAdjust := 0, GammosGrayAdjust := 0
    , MustLoadSLDprefs := 0, animGIFsSupport := 1, move2recycler := 1
-   , SLDcacheFilesList := 1, autoRemDeadEntry := 1
+   , SLDcacheFilesList := 1, autoRemDeadEntry := 1, CountFilesFolderzList := 0
 
 imgQuality := (userimgQuality=1) ? 7 : 5
 DetectHiddenWindows, On
@@ -110,8 +116,11 @@ Return
 identifyThisWin() {
   A := WinActive("A")
   If (A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin || A=hGIFsGuiDummy || A=hGuiTip || A=hGuiThumbsHL)
+  {
+     If (A!=PVhwnd)
+        WinActivate, ahk_id %PVhwnd%
      Return 1
-  Else Return 0
+  } Else Return 0
 }
 
 #If (identifyThisWin()=1)
@@ -141,7 +150,10 @@ identifyThisWin() {
 
     ~!F4::
     ~Esc::
-       If (GIFsGuiCreated=1)
+       If (AnyWindowOpen>0)
+       {
+          CloseWindow()
+       } Else If (GIFsGuiCreated=1)
        {
           DestroyGIFuWin()
           Global lastGIFdestroy := A_TickCount
@@ -360,17 +372,17 @@ identifyThisWin() {
     Return
 
     ~Up::
-       If (thumbsDisplaying=1)
-          ThumbsNavigator("Upu")
-       Else If (IMGlargerViewPort=1 && IMGresizingMode>=3)
+       If (IMGlargerViewPort=1 && IMGresizingMode>=3)
           PanIMGonScreen("U")
+       Else
+          ThumbsNavigator("Upu")
     Return
 
     ~Down::
-       If (thumbsDisplaying=1)
-          ThumbsNavigator("Down")
-       Else If (IMGlargerViewPort=1 && IMGresizingMode=4)
+       If (IMGlargerViewPort=1 && IMGresizingMode=4)
           PanIMGonScreen("D")
+       Else
+          ThumbsNavigator("Down")
     Return
 
     ~WheelUp::
@@ -453,7 +465,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
      IniRead, testStaticFolderz, % fileNamu, Folders, Fi1, @
      IniRead, testDynaFolderz, % fileNamu, DynamicFolderz, DF1, @
      If StrLen(testDynaFolderz)>4
-        DynamicFoldersList := "`nhexists`n"
+        DynamicFoldersList := "|hexists|"
 
      IniRead, tstSLDcacheFilesList, % fileNamu, General, SLDcacheFilesList, @
      If (tstSLDcacheFilesList=1 || tstSLDcacheFilesList=0)
@@ -466,7 +478,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
 
   If InStr(firstLine, "[General]") 
   {
-     If (maxFilesIndex<3 || UseCachedList!="Yes") && (DynamicFoldersList="`nhexists`n")
+     If (maxFilesIndex<3 || UseCachedList!="Yes") && (DynamicFoldersList="|hexists|")
         ReloadDynamicFolderz(fileNamu)
 
      IniRead, IgnoreThesePrefs, % fileNamu, General, IgnoreThesePrefs, @
@@ -751,7 +763,7 @@ ToggleThumbsMode() {
    {
       thumbsDisplaying := 0
       Gui, thumbsGuiHL: Hide
-      Gui, 3: Hide
+      WinMove, ahk_id %hGDIthumbsWin%,, 1, 1, 1, 1
       IDshowImage(currentFileIndex)
       lastInvoked := A_TickCount
       Return
@@ -859,16 +871,17 @@ UpdateThumbsScreen(forceThis:=0) {
 
    If !r
       prevStartIndex := -1
-   Gui, 3: Show, NoActivate
-   Sleep, 1
-   If (identifyThisWin()=1)
+   WinMove, ahk_id %hGDIthumbsWin%,, %GuiX%, %GuiY%, %mainWidth%, %mainHeight%
+   WinSet, Region, 0-0 R6-6 w%mainWidth% h%mainHeight% , ahk_id %hGDIthumbsWin%
+   WinSet, Region, %DestPosX%-%DestPosY% R6-6 w%thumbsW% h%thumbsH% , ahk_id %hGuiThumbsHL%
+   Sleep, 0
+   If (identifyThisWin()=1 && GetKeyState("LButton")!=1)
       Gui, thumbsGuiHL: Show, NoActivate x%GuiX% y%GuiY% w%mainWidth% h%mainHeight%, ThumbsWinHighLight
 
-   WinSet, AlwaysOnTop, 1, ThumbsWinHighLight
+   WinSet, AlwaysOnTop, 1, ahk_id %hGuiThumbsHL%
    GdipCleanMain()
-   Sleep, 1
-   WinSet, AlwaysOnTop, 0, ThumbsWinHighLight
-   WinSet, Region, %DestPosX%-%DestPosY% R6-6 w%thumbsW% h%thumbsH% , ThumbsWinHighLight
+   Sleep, 0
+   WinSet, AlwaysOnTop, 0, ahk_id %hGuiThumbsHL%
 }
 
 panIMGclick() {
@@ -958,6 +971,8 @@ WinClickAction(forceThis:=0) {
          } Else currentFileIndex := newIndex
          SetTimer, DelayiedImageDisplay, -25
       }
+      JEE_ClientToScreen(hPicOnGui1, 1, 1, GuiX, GuiY)
+      Gui, thumbsGuiHL: Show, NoActivate x%GuiX% y%GuiY%
 
       lastInvoked := A_TickCount
       Return
@@ -1624,32 +1639,35 @@ enableFilesFilter() {
    GUI, 1: +OwnDialogs
    InputBox, usrFilesFilteru, Files filter: %usrFilesFilteru%, Type the string to filter files. Files path and/or name must include the string you provide.,,,,,,,, %usrFilesFilteru%
    If !ErrorLevel
-   {
-      backCurrentSLD := CurrentSLD
-      markedSelectFile := CurrentSLD := ""
-      showTOOLtip("Applying filter on the list of files, please wait...")
-      If StrLen(filesFilter)<2
-      {
-         bckpResultedFilesList := []
-         bckpResultedFilesList := resultedFilesList.Clone()
-         bkcpMaxFilesIndex := maxFilesIndex
-      }
-      filesFilter := JEE_StrRegExLiteral(usrFilesFilteru)
-      filesFilter := StrReplace(filesFilter, "&")
- ;    MsgBox, % "Z " filesFilter
-      FilterFilesIndex()
-      If (maxFilesIndex<1)
-      {
-         MsgBox,, %appTitle%, No files matched your filtering criteria:`n%usrFilesFilteru%`n`nThe application will now reload the full list of files.
-         usrFilesFilteru := filesFilter := ""
-         FilterFilesIndex()
-      }
-      If (maxFilesIndex>0)
-         RandomPicture()
-      SoundBeep, 950, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      CurrentSLD := backCurrentSLD
-   }
+      coreEnableFiltru(usrFilesFilteru)
+}
+
+coreEnableFiltru(stringu) {
+  backCurrentSLD := CurrentSLD
+  markedSelectFile := CurrentSLD := ""
+  showTOOLtip("Applying filter on the list of files, please wait...")
+  If StrLen(filesFilter)<2
+  {
+     bckpResultedFilesList := []
+     bckpResultedFilesList := resultedFilesList.Clone()
+     bkcpMaxFilesIndex := maxFilesIndex
+  }
+  usrFilesFilteru := stringu
+  filesFilter := JEE_StrRegExLiteral(stringu)
+  filesFilter := StrReplace(filesFilter, "&")
+;    MsgBox, % "Z " filesFilter
+  FilterFilesIndex()
+  If (maxFilesIndex<1)
+  {
+     MsgBox,, %appTitle%, No files matched your filtering criteria:`n%usrFilesFilteru%`n`nThe application will now reload the full list of files.
+     usrFilesFilteru := filesFilter := ""
+     FilterFilesIndex()
+  }
+  If (maxFilesIndex>0)
+     RandomPicture()
+  SoundBeep, 950, 100
+  SetTimer, RemoveTooltip, % -msgDisplayTime
+  CurrentSLD := backCurrentSLD
 }
 
 FilterFilesIndex() {
@@ -1902,7 +1920,7 @@ SaveFilesList() {
       WinSetTitle, ahk_id %PVhwnd%,, Saving slideshow - please wait...
       showTOOLtip("Saving list of " maxFilesIndex " entries into...`n" file2save "`nPlease wait...")
       thisTmpFile := !newTmpFile ? backCurrentSLD : newTmpFile
-      saveDynaFolders := InStr(DynamicFoldersList, "`nhexists`n") ? coreLoadDynaFolders(thisTmpFile) : DynamicFoldersList
+      saveDynaFolders := InStr(DynamicFoldersList, "|hexists|") ? coreLoadDynaFolders(thisTmpFile) : DynamicFoldersList
       dynaFolderListu := "`n[DynamicFolderz]`n"
       Loop, Parse, saveDynaFolders, `n
       {
@@ -1958,7 +1976,7 @@ SaveFilesList() {
       FileDelete, % newTmpFile
       SetTimer, RemoveTooltip, % -msgDisplayTime
       CurrentSLD := file2save
-      DynamicFoldersList := "`nhexists`n"
+      DynamicFoldersList := "|hexists|"
       mustGenerateStaticFolders := 0
       SoundBeep, 900, 100
       r := IDshowImage(currentFileIndex)
@@ -2292,6 +2310,7 @@ writeMainSettings() {
     writeSlideSettings(mainSettingsFile)
     IniWrite, % MustLoadSLDprefs, % mainSettingsFile, General, MustLoadSLDprefs
     IniWrite, % prevFileMovePath, % mainSettingsFile, General, prevFileMovePath
+    IniWrite, % PrefsLargeFonts, % mainSettingsFile, General, PrefsLargeFonts
     IniWrite, % prevOpenFolderPath, % mainSettingsFile, General, prevOpenFolderPath
     IniWrite, % autoRemDeadEntry, % mainSettingsFile, General, autoRemDeadEntry
     IniWrite, % askDeleteFiles, % mainSettingsFile, General, askDeleteFiles
@@ -2303,6 +2322,7 @@ loadMainSettings() {
     IniRead, tstMustLoadSLDprefs, % mainSettingsFile, General, MustLoadSLDprefs, @
     IniRead, tstprevFileMovePath, % mainSettingsFile, General, prevFileMovePath, @
     IniRead, tstprevOpenFolderPath, % mainSettingsFile, General, prevOpenFolderPath, @
+    IniRead, tstPrefsLargeFonts, % mainSettingsFile, General, PrefsLargeFonts, @
     IniRead, tstaskDeleteFiles, % mainSettingsFile, General, askDeleteFiles, @
     IniRead, tstenableThumbsCaching, % mainSettingsFile, General, enableThumbsCaching, @
     IniRead, tstautoRemDeadEntry, % mainSettingsFile, General, autoRemDeadEntry, @
@@ -2312,6 +2332,8 @@ loadMainSettings() {
        askDeleteFiles := tstaskDeleteFiles
     If (tstautoRemDeadEntry=1 || tstautoRemDeadEntry=0)
        autoRemDeadEntry := tstautoRemDeadEntry
+    If (tstPrefsLargeFonts=1 || tstPrefsLargeFonts=0)
+       PrefsLargeFonts := tstPrefsLargeFonts
     If (tstMustLoadSLDprefs=1 || tstMustLoadSLDprefs=0)
        MustLoadSLDprefs := tstMustLoadSLDprefs
     If (tstprevFileMovePath!="@" || StrLen(tstprevFileMovePath)>3)
@@ -3294,7 +3316,7 @@ addNewFolder2list() {
    {
       zPlitPath(SelectedDir, 0, OutFileName, OutDir)
       SelectedDir := OutDir
-      foldersListu := InStr(DynamicFoldersList, "`nhexists`n") ? coreLoadDynaFolders(CurrentSLD) : DynamicFoldersList
+      foldersListu := InStr(DynamicFoldersList, "|hexists|") ? coreLoadDynaFolders(CurrentSLD) : DynamicFoldersList
       Loop, Parse, foldersListu, `n
       {
           line := Trim(A_LoopField)
@@ -3406,7 +3428,7 @@ GuiDropFiles:
       SetTimer, RemoveTooltip, % -msgDisplayTime
    } Else if StrLen(folderu)>3
    {
-      mainFoldersListu := InStr(DynamicFoldersList, "`nhexists`n") ? coreLoadDynaFolders(CurrentSLD) : DynamicFoldersList
+      mainFoldersListu := InStr(DynamicFoldersList, "|hexists|") ? coreLoadDynaFolders(CurrentSLD) : DynamicFoldersList
       CloseWindow()
       If (slideShowRunning=1)
          ToggleSlideShowu()
@@ -3705,6 +3727,7 @@ BuildMenu() {
    Menu, PVprefs, Add, &Always on top, ToggleAllonTop
    Menu, PVprefs, Add, &Hide title bar, ToggleTitleBaru
    Menu, PVprefs, Add, &No OSD information, ToggleInfoToolTips
+   Menu, PVprefs, Add, &Large UI fonts, ToggleLargeUIfonts
    Menu, PVprefs, Add, &High quality resampling, ToggleImgQuality
    Menu, PVprefs, Add, 
    If (thumbsDisplaying!=1)
@@ -3731,6 +3754,8 @@ BuildMenu() {
       Menu, PVprefs, Check, &Prompt before file delete
    If (MustLoadSLDprefs=0)
       Menu, PVprefs, Check, &Ignore stored SLD settings
+   If (PrefsLargeFonts=1)
+      Menu, PVprefs, Check, &Large UI fonts
    If (userimgQuality=1)
       Menu, PVprefs, Check, &High quality resampling
    If (skipDeadFiles=1)
@@ -3854,6 +3879,11 @@ ToggleInfoToolTips() {
     writeMainSettings()
 }
 
+ToggleLargeUIfonts() {
+    PrefsLargeFonts := !PrefsLargeFonts
+    writeMainSettings()
+}
+
 ToggleThumbsCaching() {
     enableThumbsCaching := !enableThumbsCaching
     writeMainSettings()
@@ -3962,9 +3992,9 @@ createGDIwin() {
    ; destroyGDIwin()
    Sleep, 35
    WinGetPos, , , mainW, mainH, ahk_id %PVhwnd%
-   Gui, 2: -DPIScale +hwndhGDIwin +E0x20 -Caption +E0x80000
-   Gui, 2: Show, NoActivate w%mainW% h%mainH%, %appTitle%: Picture container
-   SetParentID(PVhwnd, hGDIwin)
+   Gui, 2: -DPIScale +hwndhGDIwin +E0x20 -Caption +E0x80000 +Owner1
+   Gui, 2: Show, NoActivate, %appTitle%: Picture container
+   ; SetParentID(PVhwnd, hGDIwin)
    Sleep, 5
    WinActivate, ahk_id %PVhwnd%
    Sleep, 5
@@ -3976,9 +4006,9 @@ createGDIwinThumbs() {
    Sleep, 15
    Gui, 3: Destroy
    Sleep, 35
-   Gui, 3: -DPIScale +E0x20 -Caption +E0x80000 +hwndhGDIthumbsWin
+   Gui, 3: -DPIScale +E0x20 -Caption +E0x80000 +hwndhGDIthumbsWin +Owner1
    Gui, 3: Show, NoActivate, %appTitle%: Thumbnails container
-   SetParentID(PVhwnd, hGDIthumbsWin)
+   ; SetParentID(PVhwnd, hGDIthumbsWin)
    Sleep, 5
    WinActivate, ahk_id %PVhwnd%
    Sleep, 5
@@ -3993,6 +4023,7 @@ ShowTheImage(imgpath, usePrevious:=0) {
 
    If (imgpath=prevImgPath && StrLen(prevImgPath)>3 && usePrevious!=2)
       usePrevious := 1
+
    If (usePrevious=2)
    {
       wasForcedHigh := 1
@@ -4342,43 +4373,28 @@ Gdip_ShowImgonGui(imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, us
        } Else Gdip_FillRectangle(G, pBrush, sqPosX, 0, OSDfntSize*5, OSDfntSize*5)
        Gdip_DeleteBrush(pBrush)
     }
-    WinGetPos,,, winWidth, winHeight, ahk_id %PVhwnd%
-    decalageX := winWidth - mainWidth
-    decalageY := winHeight - mainHeight
 
-    WinGetPos, mainX, mainY,,, ahk_id %PVhwnd%
+    JEE_ClientToScreen(hPicOnGui1, 1, 1, mainX, mainY)
     If (CountFrames>1 && animGIFsSupport=1 && (prevAnimGIFwas!=imgpath || (A_TickCount - lastGIFdestroy > 9500)))
     {
        Sleep, 15
        prevAnimGIFwas := imgpath
-       r2 := UpdateLayeredWindow(hGDIwin, hdc, 0, 0, 1, 1)
+       r2 := UpdateLayeredWindow(hGDIwin, hdc,,, 1, 1)
        GIFguiCreator(imgpath, 0, DestPosX, DestPosY, newW, newH, mainWidth, mainHeight)
-    } Else r2 := UpdateLayeredWindow(hGDIwin, hdc, 0, 0, mainWidth, mainHeight)
+    } Else r2 := UpdateLayeredWindow(hGDIwin, hdc,,, mainWidth, mainHeight)
 
     SelectObject(hdc, obm)
     DeleteObject(hbm)
     DeleteDC(hdc)
     Gdip_DeleteGraphics(G)
-
-    Gui, 2: Show, NoActivate
+    WinMove, ahk_id %hGDIwin%,, %mainX%, %mainY%
     r := (r1!=0 || !r2) ? 0 : 1
     Return r
 }
 
 GdipCleanMain() {
-    GetClientSize(mainWidth, mainHeight, PVhwnd)
-    hbm := CreateDIBSection(mainWidth, mainHeight)
-    hdc := CreateCompatibleDC()
-    obm := SelectObject(hdc, hbm)
-    G := Gdip_GraphicsFromHDC(hdc)
-    pBrush := Gdip_BrushCreateSolid("0xff" WindowBgrColor)
-    Gdip_FillRectangle(G, pBrush, 0, 0, mainWidth+2, mainHeight+2)
-    r3 := UpdateLayeredWindow(hGDIwin, hdc, 0, 0, mainWidth, mainHeight)
-    SelectObject(hdc, obm)
-    DeleteObject(hbm)
-    DeleteDC(hdc)
-    Gdip_DeleteGraphics(G)
-    Gdip_DeleteBrush(pBrush)
+    JEE_ClientToScreen(hPicOnGui1, 1, 1, GuiX, GuiY)
+    WinMove, ahk_id %hGDIwin%,, %GuiX%, %GuiY%, 1, 1
 }
 
 EraseThumbsCache() {
@@ -4429,10 +4445,13 @@ Gdip_ShowThumbsnails(startIndex) {
     Gdip_SetInterpolationMode(G, imgQuality)
     Gdip_SetSmoothingMode(G, 3)
     pBrush := Gdip_BrushCreateSolid("0x77999999")
+    pBrush2 := Gdip_BrushCreateSolid("0xFF" WindowBgrColor)
     rowIndex := imgsListed := 0
     maxImgSize := maxZeit := columnIndex := -1
 
-    Gui, 3: Show, NoActivate
+    JEE_ClientToScreen(hPicOnGui1, 1, 1, mainX, mainY)
+    WinMove, ahk_id %hGDIthumbsWin%,, %mainX%, %mainY%
+    Gdip_FillRectangle(G, pBrush2, 0, 0, mainWidth, mainHeight)
     Loop, % maxItemsW*maxItemsH*2
     {
         If GetKeyState("Esc", "P")
@@ -4477,7 +4496,7 @@ Gdip_ShowThumbsnails(startIndex) {
            Gdip_FillRectangle(G, pBrush, thumbsW*columnIndex, thumbsH*rowIndex, OSDfntSize*3, thumbsH)
         }
         Gdip_DisposeImage(oBitmap)
-        r2 := UpdateLayeredWindow(hGDIthumbsWin, hdc, 0, 0, mainWidth, mainHeight)
+        r2 := UpdateLayeredWindow(hGDIthumbsWin, hdc,,, mainWidth, mainHeight)
         endZeit := A_TickCount
         thisZeit := endZeit - startZeit
         If (thisZeit>maxZeit)
@@ -4491,7 +4510,9 @@ Gdip_ShowThumbsnails(startIndex) {
         If (thisZeit>150 && file2save!=thisImgFile)
            ListImg2Cache .= imgpath "`n"
 
-        ListAllIMGs .= imgpath "`n"
+        If (imgW>130 || imgH>130)   ; images still worth bothering to cache
+           ListAllIMGs .= imgpath "`n"
+
         If GetKeyState("Esc", "P")
         {
            abandonAll := 1
@@ -4509,7 +4530,7 @@ Gdip_ShowThumbsnails(startIndex) {
     {
        sqPosX := (markedSelectFile<currentFileIndex) ? 0 : mainWidth - OSDfntSize*4
        Gdip_FillRectangle(G, pBrush, sqPosX, 0, OSDfntSize*4, OSDfntSize*4)
-       r2 := UpdateLayeredWindow(hGDIthumbsWin, hdc, 0, 0, mainWidth, mainHeight)
+       r2 := UpdateLayeredWindow(hGDIthumbsWin, hdc,,, mainWidth, mainHeight)
     }
     Gdip_DeleteBrush(pBrush)
     SelectObject(hdc, obm)
@@ -4681,21 +4702,23 @@ GDIupdater() {
       Return 1
    }
 
-   If (!CurrentSLD || !maxFilesIndex) || (A_TickCount - scriptStartTime<600)
+   If (A_TickCount - scriptStartTime<600)
       Return 1
 
    If (slideShowRunning=1)
       resetSlideshowTimer(0)
 
    imgpath := resultedFilesList[currentFileIndex]
-   If (!FileExist(imgpath) || A_EventInfo=1 || !CurrentSLD)
+   If (!FileExist(imgpath) || !imgpath || !maxFilesIndex || A_EventInfo=1 || !CurrentSLD)
    {
       If (slideShowRunning=1)
          ToggleSlideShowu()
       SetTimer, DelayiedImageDisplay, Off
       SetTimer, ReloadThisPicture, Off
-      If (!FileExist(imgpath) || !CurrentSLD)
-         GdipCleanMain()
+      prevStartIndex := -1
+      If (thumbsDisplaying=1)
+         WinMove, ahk_id %hGDIthumbsWin%,, 1, 1, 1, 1
+      Else GdipCleanMain()
       Return
    }
 
@@ -4705,8 +4728,14 @@ GDIupdater() {
       If !((A_TickCount - lastWinDrag>450) && (isTitleBarHidden=1))
          SetTimer, DelayiedImageDisplay, -15
       SetTimer, ReloadThisPicture, -750
+      prevStartIndex := -1
    } Else If (thumbsDisplaying=1 && maxFilesIndex>1)
-      SetTimer, RefreshThumbsList, -350
+   {
+      GetClientSize(mainWidth, mainHeight, PVhwnd)
+      WinSet, Region, 0-0 R6-6 w%mainWidth% h%mainHeight% , ahk_id %hGDIthumbsWin%
+      delayu := (A_TickCount - lastWinDrag<450) ? 550 : 325
+      SetTimer, RefreshThumbsList, % -delayu
+   }
 }
 
 RefreshThumbsList() {
@@ -4775,7 +4804,7 @@ ReloadDynamicFolderz(fileNamu) {
     }
 }
 
-coreLoadDynaFolders(fileNamu, SkipSMTH:=0) {
+coreLoadDynaFolders(fileNamu) {
    Loop, 987
    {
        IniRead, newFolder, % fileNamu, DynamicFolderz, DF%A_Index%, @
@@ -4786,18 +4815,25 @@ coreLoadDynaFolders(fileNamu, SkipSMTH:=0) {
        If (countFails>3)
           Break
    }
-   listu .= "`n" DynamicFoldersList
+   listu := listu "`n" DynamicFoldersList
    Sort, listu, U D'n
    Return listu
 }
 
 RegenerateEntireList() {
     showTOOLtip("Refreshing files list, please wait...")
-    If RegExMatch(CurrentSLD, "i)(\.sld)$" && InStr(DynamicFoldersList, "`nhexists`n"))
+    If (RegExMatch(CurrentSLD, "i)(\.sld)$") && InStr(DynamicFoldersList, "|hexists|"))
        listu := coreLoadDynaFolders(CurrentSLD)
     Else If (StrLen(DynamicFoldersList)>3)
        listu := DynamicFoldersList
-    Else Return
+
+    listu := StrReplace(listu, "|hexists|")
+    If StrLen(listu)<4
+    {
+       showTOOLtip("No list of dynamic folders found...")
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
 
     If StrLen(filesFilter)>1
     {
@@ -4814,8 +4850,7 @@ RegenerateEntireList() {
        fileTest := StrReplace(line, "|")
        If (RegExMatch(line, RegExFilesPattern) || StrLen(line)<4 || !FileExist(fileTest))
           Continue
-       Else
-          GetFilesList(line "\*")
+       GetFilesList(line "\*")
     }
     GenerateRandyList()
     SoundBeep , 900, 100
@@ -5076,10 +5111,13 @@ AboutWindow() {
        Gui, Font, s%LargeUIfontValue%
     }
     Gui, Add, Link, xp y+5, Developed by <a href="http://marius.sucan.ro/">Marius Șucan</a>.
-    Gui, Add, Link, xp y+10 w%txtWid%, Based on the prototype image viewer by <a href="http://sites.google.com/site/littlescripting/">SBC</a> from October 2010 published on <a href="https://autohotkey.com/board/topic/58226-ahk-picture-viewer/">AHK forums</a>.
-    Gui, Add, Text, xp y+10, Current version released on: jeudi 6 juin 2019.
-    Gui, Add, Text, xp y+10, Dedicated to people with large image collections :-).
-
+    Gui, Add, Link, y+10 w%txtWid%, Based on the prototype image viewer by <a href="http://sites.google.com/site/littlescripting/">SBC</a> from October 2010 published on <a href="https://autohotkey.com/board/topic/58226-ahk-picture-viewer/">AHK forums</a>.
+    Gui, Add, Text, y+10 w%txtWid%, Current version: v%Version% from %vReleaseDate%. 
+    Gui, Add, Text, y+10 w%txtWid%, Dedicated to people with really large image collections and slideshow needs :-).
+    Gui, Add, Text, y+10 w%txtWid%, This application contains code from various entities. You can find more details in the source code.
+    Gui, Font, Bold
+    Gui, Add, Link, y+15 w%txtWid%, To keep the development going, <a href="https://www.paypal.me/MariusSucan/10">please donate</a> or <a href="mailto:marius.sucan@gmail.com?subject=%appName% v%Version%">send me feedback</a>.
+    Gui, Add, Link, y+15 w%txtWid%, New and previous versions are available on <a href="https://github.com/marius-sucan/Quick-Picto-Viewer">GitHub</a>.
     Gui, Font, Normal
     Gui, Add, Button, xs+5 y+25 h30 w105 Default gCloseWindow, Close
     Gui, SettingsGUIA: Show, AutoSize, About %appTitle% v%Version%
@@ -5094,23 +5132,24 @@ FolderzPanelWindow() {
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: -MaximizeBox -MinimizeBox hwndhSetWinGui
     Gui, SettingsGUIA: Margin, 15, 15
-    btnWid := 100
+    btnWid := 130
     txtWid := 360
-    lstWid := 435
+    lstWid := 545
     If (PrefsLargeFonts=1)
     {
-       lstWid := lstWid + 245
-       btnWid := btnWid + 50
+       lstWid := lstWid + 230
+       btnWid := btnWid + 70
        txtWid := txtWid + 105
        Gui, Font, s%LargeUIfontValue%
     }
     Gui, Add, Text, x15 y15, Please select the folder you want updated.`nFolders marked with (*) are changed since the last scan.`nThis folders list was generated based on the indexed files.
-    Gui, Add, ListView, y+10 w%lstWid% gActionListViewKBDs r12 Grid vLViewOthers, #|Date|(?)|Folder path
+    Gui, Add, ListView, y+10 w%lstWid% gFolderzFilterListBTN r12 Grid vLViewOthers, #|Date|(?)|Folder path|Files
 
-    Gui, Font, Normal
-    Gui, Add, Button, xs+5 y+5 h30 w70 Default gCloseWindow, Close
-    Gui, Add, Button, x+5 h30 w135 gUpdateSelFolder, Scan selected folder
-    Gui, Add, Button, x+5 h30 w185 gIgnoreSelFolder, Ignore changes for selected folder
+    Gui, Add, Checkbox, xs+0 y+10 gToggleCountFilesFoldersList Checked%CountFilesFolderzList% vCountFilesFolderzList, Count files in folders list
+    Gui, Add, Button, xs+0 y+10 h30 w130 gUpdateSelFolder, &Rescan folder
+    Gui, Add, Button, x+5 h30 w%btnWid% gIgnoreSelFolder, &Ignore changes
+    Gui, Add, Button, x+5 h30 w%btnWid% gRemFilesStaticFolder, Re&move files from list
+    Gui, Add, Button, x+5 h30 w%btnWid% gOpenDynaFolderBTN, &Open folder in Explorer
     Gui, SettingsGUIA: Show, AutoSize, Folders updater: %appTitle%
     Sleep, 25
     PopulateStaticFolderzList()
@@ -5125,26 +5164,34 @@ DynamicFolderzPanelWindow() {
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: -MaximizeBox -MinimizeBox hwndhSetWinGui
     Gui, SettingsGUIA: Margin, 15, 15
-    btnWid := 100
+    btnWid := 140
     txtWid := 360
-    lstWid := 435
+    lstWid := 445
     If (PrefsLargeFonts=1)
     {
-       lstWid := lstWid + 245
-       btnWid := btnWid + 50
+       lstWid := lstWid + 235
+       btnWid := btnWid + 65
        txtWid := txtWid + 105
        Gui, Font, s%LargeUIfontValue%
     }
-    Gui, Add, Text, x15 y15,This folders list is used to generate the files list index.`nPlease note, after removing folders, the files list must be regenerated to reflect the changes.
-    Gui, Add, ListView, y+10 w%lstWid% r12 Grid vLViewDynas, #|(?)|Folder path
+    Gui, Add, Text, x15 y15,This folders list is used to generate the files list index.
+    Gui, Add, ListView, y+10 w%lstWid% gFolderzFilterListBTN r12 Grid vLViewDynas, #|(?)|Folder path
 
-    Gui, Font, Normal
-    Gui, Add, Button, xs+5 y+5 h30 w70 Default gCloseWindow, Close
-    Gui, Add, Button, x+5 h30 w135 gBTNaddNewFolder2list, Add folder
-    Gui, Add, Button, x+5 h30 w185 gRemDynaSelFolder, Remove folder
+    Gui, Add, Button, xs+0 y+5  h30 w70 gBTNaddNewFolder2list, &Add
+    Gui, Add, Button, x+5 h30 w80 gRemDynaSelFolder, &Remove
+    Gui, Add, Button, x+5 h30 w%btnWid% gInvertRecurseDynaFolder, &Invert recursive state
+    Gui, Add, Button, x+5 h30 w%btnWid% gOpenDynaFolderBTN, &Open folder in Explorer
     Gui, SettingsGUIA: Show, AutoSize, Dynamic folders list: %appTitle%
     Sleep, 25
     PopulateDynamicFolderzList()
+}
+
+ToggleCountFilesFoldersList() {
+  GuiControlGet, CountFilesFolderzList
+  If (AnyWindowOpen=3)
+     DynamicFolderzPanelWindow()
+  Else If (AnyWindowOpen=2)
+     FolderzPanelWindow()
 }
 
 BTNaddNewFolder2list() {
@@ -5152,18 +5199,6 @@ BTNaddNewFolder2list() {
     Sleep, 25
     If (r="cancel")
        WinActivate, ahk_id %hSetWinGui%
-}
-
-ActionListViewKBDs() {
-  Static lastAsked := 1
-  If (A_GuiEvent="DoubleClick")
-  {
-     Gui, SettingsGUIA: ListView, LViewOthers
-     LV_GetText(indexSelected, A_EventInfo, 1)
-     If (!indexSelected)
-        Return
-     Else UpdateSelFolder()
-  }
 }
 
 IgnoreSelFolder() {
@@ -5181,7 +5216,7 @@ IgnoreSelFolder() {
        Msgbox, 48, %appTitle%, ERROR: The loaded .SLD file does not seem to be in the correct format. Operation aborted.
        Return
     }
-    Sleep, 50
+    Sleep, 25
     CloseWindow()
     Sleep, 50
     FileGetTime, dirDate, % folderu, M
@@ -5190,6 +5225,24 @@ IgnoreSelFolder() {
     showTOOLtip("Folders list information updated")
     SetTimer, RemoveTooltip, % -msgDisplayTime
     Sleep, 50
+    FolderzPanelWindow()
+}
+
+RemFilesStaticFolder() {
+    Gui, SettingsGUIA: ListView, LViewOthers
+    RowNumber := LV_GetNext(0, "F")
+    LV_GetText(folderu, RowNumber, 4)
+    LV_GetText(indexSelected, RowNumber, 1)
+    If (StrLen(folderu)<3 || folderu="folder path")
+       Return
+
+    Sleep, 25
+    CloseWindow()
+    Sleep, 50
+    MsgBox, 52, %appTitle%, Would you like to remove the files from the index/list pertaining to the static folder selected?`n`n%folderu%
+    IfMsgBox, Yes
+      remFilesFromList("|" folderu)
+    Sleep, 550
     FolderzPanelWindow()
 }
 
@@ -5202,18 +5255,130 @@ RemDynaSelFolder() {
 
     CloseWindow()
     Sleep, 50
-    foldersListu := InStr(DynamicFoldersList, "`nhexists`n") ? coreLoadDynaFolders(CurrentSLD) : DynamicFoldersList
+    foldersListu := InStr(DynamicFoldersList, "|hexists|") ? coreLoadDynaFolders(CurrentSLD) : DynamicFoldersList
     Loop, Parse, foldersListu, `n
     {
         line := Trim(A_LoopField)
         fileTest := StrReplace(line, "|")
-        If (StrLen(line)<2 || !FileExist(fileTest) || line="hexists" || folderu=line)
+        If (StrLen(line)<2 || !FileExist(fileTest) || line="|hexists|" || folderu=line)
            Continue
         newFoldersList .= line "`n"
     }
 
     DynamicFoldersList := newFoldersList
+    MsgBox, 52, %appTitle%, Would you like to remove the files from the index/list pertaining to the removed folder as well ?`n`n%folderu%
+    IfMsgBox, Yes
+      remFilesFromList(folderu)
+    Sleep, 500
     DynamicFolderzPanelWindow()
+}
+
+OpenDynaFolderBTN() {
+    whichLV := (AnyWindowOpen=3) ? "LViewDynas" : "LViewOthers"
+    Gui, SettingsGUIA: ListView, % whichLV
+    RowNumber := LV_GetNext(0, "F")
+    colNum := (AnyWindowOpen=3) ? 3 : 4
+    LV_GetText(folderu, RowNumber, colNum)
+    If (StrLen(folderu)<3 || folderu="folder path")
+       Return
+
+    folderu := StrReplace(folderu, "|")
+    Try Run, % folderu
+}
+
+FolderzFilterListBTN() {
+    whichLV := (AnyWindowOpen=3) ? "LViewDynas" : "LViewOthers"
+    Gui, SettingsGUIA: ListView, % whichLV
+    RowNumber := LV_GetNext(0, "F")
+    colNum := (AnyWindowOpen=3) ? 3 : 4
+    LV_GetText(folderu, RowNumber, colNum)
+    If (StrLen(folderu)<3 || folderu="folder path") || (A_GuiEvent!="DoubleClick")
+       Return
+
+    CloseWindow()
+    folderu := StrReplace(folderu, "|")
+    coreEnableFiltru(folderu)
+}
+
+InvertRecurseDynaFolder() {
+    Gui, SettingsGUIA: ListView, LViewDynas
+    RowNumber := LV_GetNext(0, "F")
+    LV_GetText(folderu, RowNumber, 3)
+
+    If (StrLen(folderu)<3 || folderu="folder path")
+       Return
+
+    CloseWindow()
+    Sleep, 25
+    foldersListu := InStr(DynamicFoldersList, "|hexists|") ? coreLoadDynaFolders(CurrentSLD) : DynamicFoldersList
+    Loop, Parse, foldersListu, `n
+    {
+        line := Trim(A_LoopField)
+        fileTest := StrReplace(line, "|")
+        If (StrLen(line)<2 || !FileExist(fileTest) || line="|hexists|")
+           Continue
+        If (line=folderu)
+        {
+           isPipe := InStr(line, "|") ? 1 : 0
+           line := StrReplace(line, "|")
+           If (isPipe!=1)
+              line := "|" line
+        }
+        newFoldersList .= line "`n"
+    }
+
+    DynamicFoldersList := newFoldersList
+    Sleep, 25
+    DynamicFolderzPanelWindow()
+}
+
+remFilesFromList(SelectedDir) {
+    showTOOLtip("Removing files from the list pertaining to...`n" SelectedDir "\`n")
+    backCurrentSLD := CurrentSLD
+    markedSelectFile := CurrentSLD := ""
+    If StrLen(filesFilter)>1
+    {
+       usrFilesFilteru := filesFilter := ""
+       FilterFilesIndex()
+    }
+
+    oldMaxy := maxFilesIndex
+    isPipe := InStr(SelectedDir, "|") ? 1 : 0
+    SelectedDir := StrReplace(SelectedDir, "|")
+    newArrayu := []
+    Loop, % maxFilesIndex + 1
+    {
+        r := resultedFilesList[A_Index]
+        If (InStr(r, "||") || !r)
+           Continue
+        If !isPipe
+        {
+           If InStr(r, SelectedDir "\")
+              Continue
+        } Else If (isPipe=1)
+        {
+           rT := StrReplace(r, SelectedDir "\")
+           If !InStr(rT, "\")
+              Continue
+        }
+        countFiles++
+        newArrayu[countFiles] := r
+    }
+
+    renewCurrentFilesList()
+    maxFilesIndex := countFiles
+    resultedFilesList := newArrayu.Clone()
+    GenerateRandyList()
+    prevStartIndex := -1
+    filesRemoved := oldMaxy - maxFilesIndex
+    If (filesRemoved<1)
+       filesRemoved := 0
+    showTOOLtip("Finished removing " filesRemoved " files from the list...")
+    RandomPicture()
+    CurrentSLD := backCurrentSLD
+    SoundBeep, 950, 100
+    Sleep, 25
+    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
 UpdateSelFolder() {
@@ -5282,7 +5447,7 @@ UpdateSelFolder() {
     Sort, filesListu, U D`n
 
     showTOOLtip("Saving files list into`n" backCurrentSLD "`nPlease wait...")
-    saveDynaFolders := InStr(DynamicFoldersList, "`nhexists`n") ? coreLoadDynaFolders(backCurrentSLD) : DynamicFoldersList
+    saveDynaFolders := InStr(DynamicFoldersList, "|hexists|") ? coreLoadDynaFolders(backCurrentSLD) : DynamicFoldersList
     dynaFolderListu := "`n[DynamicFolderz]`n"
     Loop, Parse, saveDynaFolders, `n
     {
@@ -5293,10 +5458,10 @@ UpdateSelFolder() {
         dynaFolderListu .= "DF" countDynas "=" A_LoopField "`n"
     }
 
-     Sort, foldersList, U D`n
-     foldersListu := "`n[Folders]`n"
-     foldersListu .= LoadStaticFoldersCached(backCurrentSLD)
-     foldersListu .= "`n[FilesList]`n"
+    Sort, foldersList, U D`n
+    foldersListu := "`n[Folders]`n"
+    foldersListu .= LoadStaticFoldersCached(backCurrentSLD)
+    foldersListu .= "`n[FilesList]`n"
 
     SLDcacheFilesList := 1
     IniRead, IgnorePrefs, % backCurrentSLD, General, IgnoreThesePrefs, @
@@ -5342,6 +5507,18 @@ PopulateStaticFolderzList() {
 
     foldersListu := LoadStaticFoldersCached(CurrentSLD)
     Gui, SettingsGUIA: ListView, LViewOthers
+
+    If (CountFilesFolderzList=1)
+    {
+       markedSelectFile := ""
+       If StrLen(filesFilter)>1
+       {
+          usrFilesFilteru := filesFilter := ""
+          FilterFilesIndex()
+       }
+       Tooltip, Press ESC to abort...
+    }
+
     Loop, Parse, foldersListu, `n
     {
         If StrLen(A_LoopField)<2
@@ -5359,20 +5536,49 @@ PopulateStaticFolderzList() {
         dirDate := SubStr(dirDate, 1, StrLen(dirDate)-2)
         FormatTime, dirDate, % dirDate, yyyy/MM/dd-HH:mm
 ;        dirDate := SubStr(dirDate, 1, 4) "-" SubStr(dirDate, 5, 2) "-" SubStr(dirDate, 8, 2)
-        LV_Add(A_Index, indexu, dirDate, statusu, folderu)
+        countFiles := 0
+        If (CountFilesFolderzList=1)
+        {
+           Loop, % maxFilesIndex + 1
+           {
+               r := resultedFilesList[A_Index]
+               If (InStr(r, "||") || !r)
+                  Continue
+ 
+               rT := StrReplace(r, folderu "\")
+               If InStr(rT, "\")
+                  Continue
+               countFiles++
+
+               If GetKeyState("Esc", "P")
+               {
+                  abandonAll := 1
+                  Break
+               }
+           }
+           If (abandonAll=1)
+              Break
+        } Else countFiles := "-"
+        LV_Add(A_Index, indexu, dirDate, statusu, folderu, countFiles)
     }
-    Loop, 3
+    LV_ModifyCol(4, "Integer")
+    Loop, 4
         LV_ModifyCol(A_Index, "AutoHdr Left")
     LV_ModifyCol(3, "Sort")
+    If (CountFilesFolderzList=1)
+    {
+       SoundBeep , 900, 100
+       Tooltip
+    }
 }
 
 PopulateDynamicFolderzList() {
-    foldersListu := InStr(DynamicFoldersList, "`nhexists`n") ? coreLoadDynaFolders(CurrentSLD) : DynamicFoldersList
+    foldersListu := InStr(DynamicFoldersList, "|hexists|") ? coreLoadDynaFolders(CurrentSLD) : DynamicFoldersList
     Gui, SettingsGUIA: ListView, LViewDynas
     Loop, Parse, foldersListu, `n
     {
         line := Trim(A_LoopField)
-        If (StrLen(line)<2 || line="hexists")
+        If (StrLen(line)<2 || line="|hexists|")
            Continue
         counteru++
         statusu := InStr(line, "|") ? "_" : "[R]"
@@ -5413,12 +5619,12 @@ TooltipCreator(msg:=0,killWin:=0) {
 
     lastInvoked := A_TickCount
     Gui, ToolTipGuia: Destroy
-    thisFntSize := (PrefsLargeFonts=1) ? OSDfntSize*2 : OSDfntSize
+    thisFntSize := (PrefsLargeFonts=1) ? Round(OSDfntSize*1.5) : OSDfntSize
     bgrColor := OSDbgrColor
     txtColor := OSDtextColor
     isBold :=  " Bold"
     Sleep, 5
-    Gui, ToolTipGuia: -DPIScale -Caption +Owner +ToolWindow +E0x80000 +E0x20 +hwndhGuiTip
+    Gui, ToolTipGuia: -DPIScale -Caption +Owner1 +ToolWindow +E0x80000 +E0x20 +hwndhGuiTip
     Gui, ToolTipGuia: Margin, % thisFntSize + 5, % thisFntSize + 3
     Gui, ToolTipGuia: Color, c%bgrColor%
     Gui, ToolTipGuia: Font, s%thisFntSize% %isBold% Q5, %OSDFontName%
@@ -5505,8 +5711,23 @@ WM_RBUTTONUP(wP, lP, msg, hwnd) {
 }
 
 WM_MOVING() {
+  Global lastWinDrag := A_TickCount
   If (thumbsDisplaying=1)
      Gui, thumbsGuiHL: Hide
+  SetTimer, updateGDIwinPos, -1
+}
+
+updateGDIwinPos() {
+  JEE_ClientToScreen(hPicOnGui1, 1, 1, GuiX, GuiY)
+  GetClientSize(mainWidth, mainHeight, PVhwnd)
+
+  If (thumbsDisplaying=1)
+  {
+     WinMove, ahk_id %hGDIthumbsWin%,, %GuiX%, %GuiY% ; , %mainWidth%, %mainHeight%
+     WinSet, Region, 0-0 R6-6 w%mainWidth% h%mainHeight% , ahk_id %hGDIthumbsWin%
+  }
+  WinMove, ahk_id %hGDIWin%,, %GuiX%, %GuiY% ; , %mainWidth%, %mainHeight%
+
 }
 
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
