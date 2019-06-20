@@ -461,6 +461,7 @@ LastPicture() {
 GuiClose:
 Cleanup:
    DestroyGDIbmp()
+   ; Gdip_DisposeImage(gdiBitmapSmall)
    writeSlideSettings(mainSettingsFile)
    Gdip_Shutdown(GDIPToken)  
    ExitApp
@@ -492,7 +493,7 @@ DblClickAction() {
       If (slideShowRunning=1)
          ToggleSlideShowu()
 
-      destroyGDIwin()
+      ; destroyGDIwin()
       Sleep, 25
       Gui, 1: Show, NoActivate Minimize, AHK Picture Viewer: %CurrentSLD%
    } Else If (maxFilesIndex>1 && CurrentSLD)
@@ -1127,7 +1128,6 @@ DeletePicture() {
   If (slideShowRunning=1)
      ToggleSlideShowu()
 
-  DestroyGDIbmp()
   Sleep, 2
   file2rem := resultedFilesList[currentFileIndex]
   file2rem := StrReplace(file2rem, "||")
@@ -1149,7 +1149,6 @@ RenameThisFile() {
   If (slideShowRunning=1)
      ToggleSlideShowu()
 
-  DestroyGDIbmp()
   Sleep, 2
   file2rem := resultedFilesList[currentFileIndex]
   If !FileExist(file2rem)
@@ -1565,7 +1564,7 @@ destroyGDIwin() {
 createGDIwin() {
    Critical, on
    Sleep, 15
-   destroyGDIwin()
+   ; destroyGDIwin()
    Sleep, 35
    Gui, 2: -DPIScale +E0x20 -Caption +E0x80000 +ToolWindow -OwnDialogs +hwndhGDIwin +Owner
    Gui, 2: Show, NoActivate, %appTitle%: Picture container
@@ -1643,7 +1642,7 @@ ShowTheImage(imgpath, usePrevious:=0) {
 }
 
 ResizeImage(imgpath, usePrevious) {
-    Static prevImgPath, prevImgW, prevImgH, mainX, mainY
+    Static oImgW, oImgH, prevImgPath, prevImgW, prevImgH, mainX, mainY
     If (winGDIcreated!=1)
        createGDIwin()
 
@@ -1651,7 +1650,7 @@ ResizeImage(imgpath, usePrevious) {
     {
        DestroyGDIbmp()
        Sleep, 1
-       gdiBitmap := Gdip_CreateBitmapFromFile(imgpath)
+       CloneMainBMP(imgpath, oImgW, oImgH)
     }
 
     If (!gdiBitmap || ErrorLevel)
@@ -1665,8 +1664,8 @@ ResizeImage(imgpath, usePrevious) {
    If (usePrevious!=1)
    {
       WinGetPos, mainX, mainY,,, ahk_id %PVhwnd%
-      prevImgW := imgW := Gdip_GetImageWidth(gdiBitmap)
-      prevImgH := imgH := Gdip_GetImageHeight(gdiBitmap)
+      prevImgW := imgW := oImgW
+      prevImgH := imgH := oImgH
    } Else If (usePrevious=1) 
    {
       imgH := prevImgH // 4
@@ -1674,7 +1673,7 @@ ResizeImage(imgpath, usePrevious) {
    }
 
    If (usePrevious=1)
-      RescaleBMP(imgpath, prevImgW, prevImgH)
+      RescaleBMPtiny(imgpath, prevImgW, prevImgH)
 
    PicRatio := Round(imgW/imgH, 5)
    GuiRatio := Round(GuiW/GuiH, 5)
@@ -1745,13 +1744,13 @@ ResizeImage(imgpath, usePrevious) {
    Else ; If (usePrevious!=1)
       Gui, 1: Show, , % winTitle
 
-   r := Gdip_ShowImgonGui(ResizedW, ResizedH, imgW, imgH, GuiW, GuiH, usePrevious)
+   r := Gdip_ShowImgonGui(ResizedW, ResizedH, GuiW, GuiH, usePrevious)
    Return r
 }
 
-RescaleBMP(imgpath, width, height) {
+RescaleBMPtiny(imgpath, width, height) {
   Critical, on
-  ; halve res
+  ; one quarter resolution
   Static prevImgPath
   If (imgpath=prevImgPath && gdiBitmapSmall)
      Return
@@ -1759,14 +1758,25 @@ RescaleBMP(imgpath, width, height) {
   Gdip_DisposeImage(gdiBitmapSmall)
   gdiBitmapSmall := Gdip_CreateBitmap(Width // 4, Height // 4)
   G2 := Gdip_GraphicsFromImage(gdiBitmapSmall)
-  Gdip_SetInterpolationMode(G2, imgQuality)
-  Gdip_SetSmoothingMode(G2, 3)
   Gdip_DrawImage(G2, gdiBitmap, 0, 0, Width // 4, Height // 4, 0, 0, Width, Height)
   Gdip_DeleteGraphics(G2)
   prevImgPath := imgpath
 }
 
-Gdip_ShowImgonGui(newW, newH, Width, Height, mainWidth, mainHeight, usePrevious) {
+CloneMainBMP(imgpath, ByRef width, ByRef height) {
+  Critical, on
+  Gdip_DisposeImage(gdiBitmap)
+  oBitmap := Gdip_CreateBitmapFromFile(imgpath)
+  Width := Gdip_GetImageWidth(oBitmap)
+  Height := Gdip_GetImageHeight(oBitmap)
+  gdiBitmap := Gdip_CreateBitmap(Width, Height)
+  G3 := Gdip_GraphicsFromImage(gdiBitmap)
+  Gdip_DrawImage(G3, oBitmap, 0, 0, Width, Height, 0, 0, Width, Height)
+  Gdip_DeleteGraphics(G3)
+  Gdip_DisposeImage(oBitmap)
+}
+
+Gdip_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious) {
     Critical, on
     If (imgFxMode=2)       ; grayscale
        matrix := "0.299|0.299|0.299|0|0|0.587|0.587|0.587|0|0|0.114|0.114|0.114|0|0|0|0|0|1|0|0|0|0|0|1"
@@ -1780,7 +1790,7 @@ Gdip_ShowImgonGui(newW, newH, Width, Height, mainWidth, mainHeight, usePrevious)
     hdc := CreateCompatibleDC()
     obm := SelectObject(hdc, hbm)
     G := Gdip_GraphicsFromHDC(hdc)
-    Gdip_SetInterpolationMode(G, imgQuality)
+    Gdip_SetInterpolationMode(G, thisImgQuality)
     Gdip_SetSmoothingMode(G, 3)
 
     If (FlipImgH=1)
@@ -1796,13 +1806,19 @@ Gdip_ShowImgonGui(newW, newH, Width, Height, mainWidth, mainHeight, usePrevious)
     }
 
     whichImg := (usePrevious=1 && gdiBitmapSmall) ? gdiBitmapSmall : gdiBitmap
+    Width := Gdip_GetImageWidth(whichImg)
+    Height := Gdip_GetImageHeight(whichImg)
     calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY)
     r1 := Gdip_DrawImage(G, whichImg, DestPosX, DestPosY, newW, newH, 0, 0, Width, Height, matrix)
     Gdip_ResetWorldTransform(G)
     r2 := UpdateLayeredWindow(hGDIwin, hdc, 0, 0, mainWidth, mainHeight)
+
+    SelectObject(hdc, obm)
+    DeleteObject(hbm)
+    DeleteDC(hdc)
     Gdip_DeleteGraphics(G)
+
     Gui, 2: Show, NoActivate
-    SetTimer, DestroyGDIbmp, -2000
     r := (r1!=0 || !r2) ? 0 : 1
     Return r
 }
