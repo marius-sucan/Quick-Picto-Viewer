@@ -26,21 +26,21 @@ Global PVhwnd, hGDIwin, resultedFilesList := []
    , currentFileIndex, maxFilesIndex := 0
    , appTitle := "AHK Picture Viewer", FirstRun := 1
    , bckpResultedFilesList := [], bkcpMaxFilesIndex := 0
-   , DynamicFoldersList := "", historyList
+   , DynamicFoldersList := "", historyList, GIFsGuiCreated := 0
    , hPicOnGui1, scriptStartTime := A_TickCount
    , RandyIMGids := [], SLDhasFiles := 0, IMGlargerViewPort := 0
    , IMGdecalageY := 1, IMGdecalageX := 1, imgQuality, usrFilesFilteru := ""
    , RandyIMGnow := 0, GDIPToken, Agifu, gdiBitmapSmall
    , gdiBitmapSmallView, gdiBitmapViewScale, msgDisplayTime := 3000
    , slideShowRunning := 0, CurrentSLD := "", winGDIcreated :=0
-   , ResolutionWidth, ResolutionHeight
+   , ResolutionWidth, ResolutionHeight, hGIFsGuiDummy
    , gdiBitmap, mainSettingsFile := "ahk-picture-viewer.ini"
    , RegExFilesPattern := "i)(.\\*\.(tif|emf|jpg|png|bmp|gif|tiff|jpeg))$"
    , LargeUIfontValue := 14, version := "2.0.0", AnyWindowOpen := 0, toolTipGuiCreated := 0
    , PrefsLargeFonts := 0, OSDbgrColor := "131209", OSDtextColor := "FFFEFA"
    , OSDfntSize := 14, OSDFontName := "Arial"
    , mustGenerateStaticFolders := 1, lastWinDrag := 1
-   , prevFileMovePath := ""
+   , prevFileMovePath := "", lastGIFdestroy := 1, prevAnimGIFwas := ""
  
  ; User settings
    , WindowBgrColor := "010101", slideShowDelay := 3000
@@ -50,7 +50,7 @@ Global PVhwnd, hGDIwin, resultedFilesList := []
    , imageAligned := 5, filesFilter := "", isAlwaysOnTop := 0
    , noTooltipMSGs := 1, zoomLevel := 1, skipDeadFiles := 0
    , isTitleBarHidden := 0, lumosGrayAdjust := 0, GammosGrayAdjust := 0
-   , MustLoadSLDprefs := 0
+   , MustLoadSLDprefs := 0, animGIFsSupport := 0
 
 imgQuality := (userimgQuality=1) ? 7 : 5
 DetectHiddenWindows, On
@@ -82,7 +82,7 @@ BuildGUI()
 Return
 ;_________________________________________________________________________________________________________________Hotkeys_________________
 
-#If (WinActive("ahk_id " PVhwnd) || WinActive("ahk_id " hGDIwin))
+#If (WinActive("ahk_id " PVhwnd) || WinActive("ahk_id " hGDIwin) || WinActive("ahk_id " hGIFsGuiDummy))
     ~^vk4F::    ; Ctrl+O
        OpenFiles()
     Return
@@ -99,13 +99,36 @@ Return
        Win_ShowSysMenu(PVhwnd)
     Return
 
+
     ~!F4::
     ~Esc::
-       Gosub, Cleanup
+       If (GIFsGuiCreated=1)
+       {
+          DestroyGIFuWin()
+          Global lastGIFdestroy := A_TickCount
+          prevAnimGIFwas := resultedFilesList[currentFileIndex]
+          ReloadThisPicture()
+       } Else Gosub, Cleanup
     Return
 #If
 
-#If (WinActive("ahk_id " PVhwnd) && CurrentSLD && maxFilesIndex>1)
+#If ((WinActive("ahk_id " PVhwnd) || WinActive("ahk_id " hGDIwin) || WinActive("ahk_id " hGIFsGuiDummy)) && GIFsGuiCreated=1)
+    ~LButton::
+      DestroyGIFuWin()
+      Global lastGIFdestroy := A_TickCount
+      prevAnimGIFwas := resultedFilesList[currentFileIndex]
+      SetTimer, DelayiedImageDisplay, -100
+    Return
+
+    ~RButton::
+      DestroyGIFuWin()
+      Global lastGIFdestroy := A_TickCount
+      prevAnimGIFwas := resultedFilesList[currentFileIndex]
+      IDshowImage(currentFileIndex)
+    Return
+#If
+
+#If ((WinActive("ahk_id " PVhwnd) || WinActive("ahk_id " hGDIwin) || WinActive("ahk_id " hGIFsGuiDummy)) && CurrentSLD && maxFilesIndex>1)
     ~^vk4A::    ; Ctrl+J
        Jump2index()
     Return
@@ -113,13 +136,6 @@ Return
     ~^vk43::    ; Ctrl+C
        CopyImage2clip()
     Return
-
-    ~k::    ; Ctrl+C
-       r1 := resultedFilesList[currentFileIndex]
-       r2 := testFileExists(r1)
-       MsgBox, % "a" r2
-    Return
-
 
     ~^+vk43::    ; Ctrl+Shift+C
     ~+vk43::    ; Shift+C
@@ -264,6 +280,8 @@ Return
 
     ~F10::
     ~AppsKey::
+       ReloadThisPicture()
+       Sleep, 25
        Gosub, GuiContextMenu
     Return
 
@@ -494,7 +512,7 @@ CopyImage2clip() {
 }
 
 invertRecursiveness() {
-   If (RegExMatch(CurrentSLD, "i)(\.sld)$") || !CurrentSLD)
+   If (RegExMatch(CurrentSLD, "i)(.\.sld)$") || !CurrentSLD)
       Return
 
    isPipe := InStr(CurrentSLD, "|") ? 1 : 0
@@ -560,13 +578,12 @@ Cleanup:
    ExitApp
 Return
 
-OnlineHelp:
-   Try Run, http://www.autohotkey.com/forum/topic62808.html
-Return
-
 GuiContextMenu:
    If (slideShowRunning=1)
       ToggleSlideShowu()
+   If (GIFsGuiCreated=1)
+      DestroyGIFuWin()
+   Sleep, 5
    BuildMenu()
 Return 
 
@@ -1521,6 +1538,7 @@ readSlideSettings(readThisFile) {
      IniRead, tstTouchScreenMode, %readThisFile%, General, TouchScreenMode, @
      IniRead, tstskipDeadFiles, %readThisFile%, General, skipDeadFiles, @
      IniRead, tstisAlwaysOnTop, %readThisFile%, General, isAlwaysOnTop, @
+     IniRead, tstanimGIFsSupport, %readThisFile%, General, animGIFsSupport, @
      IniRead, tstisTitleBarHidden, %readThisFile%, General, isTitleBarHidden, @
 
      If (tstslideshowdelay!="@" && tstslideshowdelay>300)
@@ -1535,12 +1553,14 @@ readSlideSettings(readThisFile) {
         TouchScreenMode := tstTouchScreenMode
      If (tstuserimgQuality=1 || tstuserimgQuality=0)
         userimgQuality := tstuserimgQuality
+     If (tstFlipImgH=1 || tstFlipImgH=0)
+        FlipImgH := tstFlipImgH
      If (tstFlipImgV=1 || tstFlipImgV=0)
         FlipImgV := tstFlipImgV
      If (tstskipDeadFiles=1 || tstskipDeadFiles=0)
         skipDeadFiles := tstskipDeadFiles
-     If (tstFlipImgH=1 || tstFlipImgH=0)
-        FlipImgV := tstFlipImgV
+     If (tstanimGIFsSupport=1 || tstanimGIFsSupport=0)
+        animGIFsSupport := tstanimGIFsSupport
      If (tstisAlwaysOnTop=1 || tstisAlwaysOnTop=0)
         isAlwaysOnTop := tstisAlwaysOnTop
      If (tstisTitleBarHidden=1 || tstisTitleBarHidden=0)
@@ -1615,6 +1635,7 @@ writeSlideSettings(file2save) {
     IniWrite, % skipDeadFiles, %file2save%, General, skipDeadFiles
     IniWrite, % isAlwaysOnTop, %file2save%, General, isAlwaysOnTop
     IniWrite, % isTitleBarHidden, %file2save%, General, isTitleBarHidden
+    IniWrite, % animGIFsSupport, %file2save%, General, animGIFsSupport
     IniWrite, % version, %file2save%, General, version
     throwMSGwriteError()
 }
@@ -2224,10 +2245,13 @@ BuildMenu() {
    Menu, PVprefs, Add, &Hide title bar, ToggleTitleBaru
    Menu, PVprefs, Add, &No OSD information, ToggleInfoToolTips
    Menu, PVprefs, Add, &High quality resampling, ToggleImgQuality
+   Menu, PVprefs, Add, An&imated GIFs support (experimental), ToggleAnimGIFsupport
    Menu, PVprefs, Add, &Touch screen mode, ToggleTouchMode
    Menu, PVprefs, Add, &Skip missing files, ToggleSkipDeadFiles
    Menu, PVprefs, Add, 
    Menu, PVprefs, Add, &Ignore stored SLD settings, ToggleIgnoreSLDprefs
+   If (animGIFsSupport=1)
+      Menu, PVprefs, Check, An&imated GIFs support (experimental)
    If (MustLoadSLDprefs=0)
       Menu, PVprefs, Check, &Ignore stored SLD settings
    If (userimgQuality=1)
@@ -2314,6 +2338,11 @@ ToggleAllonTop() {
       WinSet, AlwaysOnTop, 1, ahk_id %PVhwnd%
    Else
       WinSet, AlwaysOnTop, 0, ahk_id %PVhwnd%
+   writeMainSettings()
+}
+
+ToggleAnimGIFsupport() {
+   animGIFsSupport := !animGIFsSupport
    writeMainSettings()
 }
 
@@ -2543,7 +2572,7 @@ ResizeImage(imgpath, usePrevious) {
     {
        DestroyGDIbmp()
        Sleep, 1
-       CloneMainBMP(imgpath, oImgW, oImgH)
+       CloneMainBMP(imgpath, oImgW, oImgH, CountFrames)
     }
 
     If (!gdiBitmap || ErrorLevel)
@@ -2617,7 +2646,7 @@ ResizeImage(imgpath, usePrevious) {
       CloneResizerBMP(imgpath, IDwhichImg, whichImg, ResizedW, ResizedH)
    Else
       useCaches := "no"
-   r := Gdip_ShowImgonGui(imgW, imgH, ResizedW, ResizedH, GuiW, GuiH, usePrevious, useCaches)
+   r := Gdip_ShowImgonGui(imgW, imgH, ResizedW, ResizedH, GuiW, GuiH, usePrevious, useCaches, imgpath, CountFrames)
    If (usePrevious=1)
       SetTimer, ReloadThisPicture, -550
 
@@ -2673,12 +2702,20 @@ RescaleBMPtiny(imgpath, imgW, imgH, ByRef ResizedW, ByRef ResizedH) {
   prevImgPath := imgpath
 }
 
-CloneMainBMP(imgpath, ByRef width, ByRef height) {
+CloneMainBMP(imgpath, ByRef width, ByRef height, ByRef CountFrames) {
   Critical, on
   Gdip_DisposeImage(gdiBitmap)
   oBitmap := Gdip_CreateBitmapFromFile(imgpath)
+  If RegExMatch(imgpath, "i)(.\.gif)$") && (animGIFsSupport=1)
+  {
+     DllCall("gdiplus\GdipImageGetFrameDimensionsCount", "UInt", oBitmap, "UInt*", Countu)
+     VarSetCapacity(dIDs,16,0)
+     DllCall("gdiplus\GdipImageGetFrameDimensionsList", "UInt", oBitmap, "Uint", &dIDs, "UInt", Countu)
+     DllCall("gdiplus\GdipImageGetFrameCount", "UInt", oBitmap, "Uint", &dIDs, "UInt*", CountFrames)
+  } Else CountFrames := 0
   Width := Gdip_GetImageWidth(oBitmap)
   Height := Gdip_GetImageHeight(oBitmap)
+
   gdiBitmap := Gdip_CreateBitmap(Width, Height)
   G3 := Gdip_GraphicsFromImage(gdiBitmap)
   Gdip_SetInterpolationMode(G3, 5)
@@ -2717,7 +2754,7 @@ CloneResizerBMP(imgpath, IDwhichImg, whichImg, newW, newH) {
   Gdip_DeleteGraphics(G4)
 }
 
-Gdip_ShowImgonGui(imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, useCaches) {
+Gdip_ShowImgonGui(imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, useCaches, imgpath, CountFrames) {
     Critical, on
     If (imgFxMode=2)       ; grayscale
     {
@@ -2763,7 +2800,16 @@ Gdip_ShowImgonGui(imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, us
     calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY)
     r1 := Gdip_DrawImage(G, whichImg, DestPosX, DestPosY, newW, newH, 0, 0, imgW, imgH, matrix)
     Gdip_ResetWorldTransform(G)
-    r2 := UpdateLayeredWindow(hGDIwin, hdc, 0, 0, mainWidth, mainHeight)
+    If (GIFsGuiCreated=1)
+       GIFguiCreator(1, 1)
+
+    If (CountFrames>1 && animGIFsSupport=1 && (prevAnimGIFwas!=imgpath || (A_TickCount - lastGIFdestroy > 9500)))
+    {
+       Sleep, 15
+       prevAnimGIFwas := imgpath
+       r2 := UpdateLayeredWindow(hGDIwin, hdc, 0, 0, 1, 1)
+       GIFguiCreator(imgpath, 0, DestPosX, DestPosY, newW, newH, mainWidth, mainHeight)
+    } Else r2 := UpdateLayeredWindow(hGDIwin, hdc, 0, 0, mainWidth, mainHeight)
 
     SelectObject(hdc, obm)
     DeleteObject(hbm)
@@ -2863,8 +2909,15 @@ GDIupdater() {
    If (toolTipGuiCreated=1)
       TooltipCreator(1, 1)
 
+   SetTimer, ReloadThisPicture, Off
+   If (GIFsGuiCreated=1) || (A_TickCount - lastGIFdestroy<300)
+   {
+      DestroyGIFuWin()
+      Return 1
+   }
+
    If (!CurrentSLD || !maxFilesIndex) || (A_TickCount - scriptStartTime<600)
-      Return
+      Return 1
 
    If (slideShowRunning=1)
       resetSlideshowTimer(0)
@@ -3125,20 +3178,22 @@ Win_ShowSysMenu(Hwnd) {
 
 AddAnimatedGIF(imagefullpath , x="", y="", w="", h="", guiname = "1") {
   global AG1
-  static AGcount:=0, controlAdded, pic
-  AGcount := 1
-  html := "<html><body style='background-color: transparent' style='overflow:hidden' leftmargin='0' topmargin='0'><img src='" imagefullpath "' width=" w " height=" h " border=0 padding=0></body></html>"
+  static AGcount := 1, pic
+  Static jsCode := "oncontextmenu=""return false"" onselectstart=""return false"" ondragstart=""return false"""
+  ; Static jsCode := "<script>  var client = {  init: function() {  var o=this`;   $(""img"").mousedown(function(e){  e.preventDefault()  })`;  $(""body"").on(""contextmenu"",function(e){  return false`;  })`;}}`;   </script>"
+  html := "<html><body " jsCode " style='background-color: transparent' style='overflow:hidden' leftmargin='0' topmargin='0'><img src='" imagefullpath "' width=" w " height=" h " border=0 padding=0></body></html>"
+; Clipboard := html
   Gui, AnimGifxx:Add, Picture, vpic, %imagefullpath%
   GuiControlGet, pic, AnimGifxx:Pos
   Gui, AnimGifxx:Destroy
-  If (controlAdded!=1)
-  {
-     controlAdded := 1
-     Gui, %guiname%: Add, ActiveX, % (x = "" ? " " : " x" x ) . (y = "" ? " " : " y" y ) . (w = "" ? " w" picW : " w" w ) . (h = "" ? " h" picH : " h" h ) " vAG" AGcount, Shell.Explorer
-  }
+  Gui, %guiname%:Add, ActiveX, % (x = "" ? " " : " x" x ) . (y = "" ? " " : " y" y ) . (w = "" ? " w" picW : " w" w ) . (h = "" ? " h" picH : " h" h ) " gDestroyGIFuWin vAG" AGcount, Shell.Explorer
   AG%AGcount%.navigate("about:blank")
   AG%AGcount%.document.write(html)
-  return "AG" AGcount
+  Return "AG" AGcount
+}
+
+DestroyGIFuWin() {
+   GIFguiCreator(1,1)
 }
 
 MWAGetMonitorMouseIsIn(coordX:=0,coordY:=0) {
@@ -3299,6 +3354,38 @@ TooltipCreator(msg:=0,killWin:=0) {
     Gui, ToolTipGuia: Show, NoActivate AutoSize x%GuiX% y%GuiY%, GuiTipsWin
 }
 
+GIFguiCreator(imgpath:=1, killWin:=0, xPos:=1, yPos:=1, imgW:=1, imgH:=1, mainWidth:=1, mainHeight:=1) {
+    Critical, On
+    Static lastInvoked := 1
+    If (killWin=1)
+    {
+       Gui, GIFsGuia: Destroy
+       GIFsGuiCreated := 0
+       Return
+    }
+
+    If (StrLen(imgpath)<3) || (A_TickCount-lastInvoked<200)
+    {
+       GIFguiCreator(1,1)
+       Return
+    }
+    SetTimer, DelayiedImageDisplay, Off
+    SetTimer, ReloadThisPicture, Off
+    lastInvoked := A_TickCount
+    Gui, GIFsGuia: Destroy
+    bgrColor := OSDbgrColor
+    Sleep, 5
+    Gui, GIFsGuia: -DPIScale -Caption +Owner +ToolWindow +E0x20 +hwndhGIFsGuiDummy
+    Gui, GIFsGuia: Margin, 0, 0
+    Gui, GIFsGuia: Color, c%bgrColor%
+    AddAnimatedGIF(imgpath , xPos, yPos, imgW, imgH, "GIFsGuia")
+    JEE_ClientToScreen(hPicOnGui1, 1, 1, GuiX, GuiY)
+    WinSet, Region, %xPos%-%yPos% R6-6 w%imgW% h%imgH%, ahk_id %hGIFsGuiDummy%
+    Gui, GIFsGuia: Show, NoActivate x%GuiX% y%GuiY% h%mainWidth% h%mainHeight%, GIFsAnimWindow
+    ; WinSet, AlwaysOnTop, 1, ahk_id %hGIFsGuiDummy%
+    ; SetParentID(PVhwnd, hGIFsGuiDummy)
+    GIFsGuiCreated := 1
+}
 
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
 ; Function by Drugwash
