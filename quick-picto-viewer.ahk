@@ -24,16 +24,17 @@
 Global PVhwnd, hGDIwin, resultedFilesList := []
    , currentFileIndex, maxFilesIndex := 0, mainFilesListString := ""
    , appTitle := "AHK Picture Viewer", FirstRun := 1
+   , bckpResultedFilesList := [], bkcpMaxFilesIndex := 0
    , hPicOnGui1, scriptStartTime := A_TickCount
    , RandyIMGids := [], SLDhasFiles := 0, IMGlargerViewPort := 0
-   , IMGdecalageY := 1, IMGdecalageX := 1, imgQuality
+   , IMGdecalageY := 1, IMGdecalageX := 1, imgQuality, usrFilesFilteru := ""
    , RandyIMGnow := 0, GDIPToken, Agifu, gdiBitmapSmall
    , gdiBitmapSmallView, gdiBitmapViewScale, msgDisplayTime := 2000
    , slideShowRunning := 0, CurrentSLD := "", winGDIcreated :=0
-   , LargeListCount := 1, usrFilesFilteru := ""
    , ResolutionWidth, ResolutionHeight, isAlwaysOnTop := 0
    , gdiBitmap, mainSettingsFile := "ahk-picture-viewer.ini"
    , RegExFilesPattern := "i)(.\\*\.(tif|emf|jpg|png|bmp|gif|tiff|jpeg))$"
+
 ; User settings
    , WindowBgrColor := "010101", slideShowDelay := 3000
    , IMGresizingMode := 1, SlideHowMode := 1, TouchScreenMode := 1
@@ -80,19 +81,20 @@ OpenSLD(fileNamu, doFilesCheck:=0, dontStartSlide:=0) {
      Return
   }
 
+  filesFilter := usrFilesFilteru := ""
   showTOOLtip("Loading files - please wait...")
   Gui, 1: Show,, Loading files - please wait...
   sldGenerateFilesList(fileNamu, doFilesCheck)
   GenerateRandyList()
+  FileReadLine, firstLine, % fileNamu, 1
+  If InStr(firstLine, "[General]")
+     readSlideSettings(fileNamu)
+
   If (dontStartSlide=1)
   {
      SetTimer, RemoveTooltip, % -msgDisplayTime
      Return
   }
-
-  FileReadLine, firstLine, % fileNamu, 1
-  If InStr(firstLine, "[General]")
-     readSlideSettings(fileNamu)
 
   If (maxFilesIndex>2)
   {
@@ -233,7 +235,7 @@ CopyImage2clip() {
     Return
 #If
 
-#If (WinActive("ahk_id " PVhwnd) && CurrentSLD)
+#If (WinActive("ahk_id " PVhwnd) && CurrentSLD && maxFilesIndex>1)
     ~^vk4A::    ; Ctrl+J
        Jump2index()
     Return
@@ -342,13 +344,6 @@ CopyImage2clip() {
        invertRecursiveness()
     Return
 
-    ~^F5::
-       If (RegExMatch(CurrentSLD, "i)(\.sld)$") && SLDhasFiles=1)
-          cleanFilesList()
-       Else
-          RefreshFilesList()
-    Return
-
     ~vk48::    ; H
        TransformIMGh()
     Return
@@ -441,11 +436,13 @@ CopyImage2clip() {
 invertRecursiveness() {
    If (RegExMatch(CurrentSLD, "i)(\.sld)$") || !CurrentSLD)
       Return
+
    isPipe := InStr(CurrentSLD, "|") ? 1 : 0
    If (isPipe=1)
       CurrentSLD := StrReplace(CurrentSLD, "|")
    Else
       CurrentSLD := "|" CurrentSLD
+
    RefreshFilesList()
 }
 
@@ -963,28 +960,63 @@ enableFilesFilter() {
    {
       showTOOLtip("To exclude files matching the string - `nplease insert '&' (and) into your string`n`nCurrent filter: " filesFilter)
       SetTimer, RemoveTooltip, -5000
-   } Else LargeListCount := maxFilesIndex
+   }
 
    InputBox, usrFilesFilteru, Files filter: %usrFilesFilteru%, Type the string to filter files. Files path and/or name must include the string you provide.,,,,,,,, %usrFilesFilteru%
    If !ErrorLevel
    {
-      showTOOLtip("Please wait... Filtering files...")
-      doFilesCheck := (LargeListCount<2048) ? 2 : 10
+      backCurrentSLD := CurrentSLD
+      CurrentSLD := ""
+      showTOOLtip("(Please wait) Applying files filter...")
+      If StrLen(filesFilter)<2
+      {
+         bckpResultedFilesList := []
+         bckpResultedFilesList := resultedFilesList.Clone()
+         bkcpMaxFilesIndex := maxFilesIndex
+      }
       filesFilter := usrFilesFilteru
       Loop, Parse, chars2escape
           filesFilter := StrReplace(filesFilter, A_LoopField, "\" A_LoopField)
       filesFilter := StrReplace(filesFilter, "&")
-      ; MsgBox, % filesFilter
-      RefreshFilesList(doFilesCheck)
+ ;    MsgBox, % "Z " filesFilter
+      FilterFilesIndex()
       If (maxFilesIndex<1)
       {
          MsgBox,, %appTitle%, No files matched your filtering criteria:`n%usrFilesFilteru%`n`nThe application will now reload the full list of files.
          usrFilesFilteru := filesFilter := ""
-         RefreshFilesList(doFilesCheck)
+         FilterFilesIndex()
       }
+      If (maxFilesIndex>0)
+         RandomPicture()
       SoundBeep, 950, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
+      CurrentSLD := backCurrentSLD
    }
+}
+
+FilterFilesIndex() {
+    newFilesList := []
+    filterBehaviour := InStr(usrFilesFilteru, "&") ? 1 : 2
+    Loop, % bkcpMaxFilesIndex + 1
+    {
+        r := bckpResultedFilesList[A_Index]
+        If (InStr(r, "||") || !r)
+           Continue
+
+        If StrLen(filesFilter)>1
+        {
+           z := filterCoreString(r, filterBehaviour, filesFilter)
+           If (z=1)
+              Continue
+        }
+        newFilesIndex++
+        newFilesList[newFilesIndex] := r
+   }
+   renewCurrentFilesList()
+   resultedFilesList := newFilesList.Clone()
+   maxFilesIndex := newFilesIndex
+   newFilesList := []
+   GenerateRandyList()
 }
 
 throwMSGwriteError() {
@@ -999,11 +1031,17 @@ throwMSGwriteError() {
 
 SaveFilesList() {
    Critical, on
+
    If StrLen(maxFilesIndex)>1
+   {
+      If StrLen(filesFilter)>1
+         MsgBox, 64, %appTitle%: Save slideshow, The files list is filtered down to %maxFilesIndex% files from %bkcpMaxFilesIndex%.`n`nTo save as a slideshow the entire list of files, remove the filter.
       FileSelectFile, file2save, S26,, Save files list as Slideshow, Slideshow (*.sld)
+   }
 
    If (!ErrorLevel && StrLen(file2save)>3)
    {
+
       backCurrentSLD := CurrentSLD
       CurrentSLD := ""
       If !RegExMatch(file2save, "i)(.\.sld)$")
@@ -1036,11 +1074,10 @@ SaveFilesList() {
       Loop, % maxFilesIndex + 1
       {
           r := resultedFilesList[A_Index]
-          If InStr(r, "||")
+          If (InStr(r, "||") || !r)
              Continue
 
-          If (r && FileExist(r))
-             filesListu .= r "`n"
+          filesListu .= r "`n"
       }
       FileAppend, %filesListu%, %file2save%, utf-16
       throwMSGwriteError()
@@ -1058,6 +1095,8 @@ cleanFilesList(noFilesCheck:=0) {
    WnoFilesCheck := (noFilesCheck=2) ? 2 : 0
    If (maxFilesIndex>1)
    {
+      backCurrentSLD := CurrentSLD
+      CurrentSLD := ""
       filterBehaviour := InStr(usrFilesFilteru, "&") ? 1 : 2
       If StrLen(filesFilter)>1
       {
@@ -1065,13 +1104,9 @@ cleanFilesList(noFilesCheck:=0) {
          backfilesFilter := filesFilter
          backusrFilesFilteru := usrFilesFilteru
          usrFilesFilteru := filesFilter := ""
-         If RegExMatch(CurrentSLD, "i)(\.sld)$")
-            OpenSLD(CurrentSLD, 0, 1)
-         Else If StrLen(CurrentSLD)>3
-            coreOpenFolder(CurrentSLD, 0)
+         FilterFilesIndex()
       }
-      backCurrentSLD := CurrentSLD
-      CurrentSLD := ""
+
       showTOOLtip("(Please wait) Checking files list...")
       Loop, % maxFilesIndex + 1
       {
@@ -1098,21 +1133,23 @@ cleanFilesList(noFilesCheck:=0) {
       {
           If StrLen(A_LoopField)<2
              Continue
+
           maxFilesIndex++
           resultedFilesList[maxFilesIndex] := A_LoopField
       }
 
-      CurrentSLD := backCurrentSLD
       If StrLen(backfilesFilter)>1
       {
+         bckpResultedFilesList := []
+         bckpResultedFilesList := resultedFilesList.Clone()
+         bkcpMaxFilesIndex := maxFilesIndex
          usrFilesFilteru := backusrFilesFilteru
          filesFilter := backfilesFilter
-         RefreshFilesList(10)
-      } Else
-      {
-         GenerateRandyList()
-         RandomPicture()
-      }
+         FilterFilesIndex()
+      } Else GenerateRandyList()
+
+      RandomPicture()
+      CurrentSLD := backCurrentSLD
       SoundBeep, 950, 100
       Sleep, 25
       SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -1136,7 +1173,7 @@ ActSortCreated() {
 }
 
 ActSortResolution() {
-   MsgBox, 52, %appTitle%, This operation can take a lot of time. Each file will be read to identify it is resolution in pixels. Are you sure you want to sort the list by resolution?
+   MsgBox, 52, %appTitle%, This operation can take a lot of time. Each file will be read to identify its resolution in pixels. Are you sure you want to sort the list?
    IfMsgBox, Yes
         SortFilesList("resolution")
 }
@@ -1148,11 +1185,35 @@ SortFilesList(SortCriterion) {
    {
       backCurrentSLD := CurrentSLD
       CurrentSLD := ""
+      If StrLen(filesFilter)>1
+      {
+         MsgBox, 64, %appTitle%: Sort operation, The files list is filtered down to %maxFilesIndex% files from %bkcpMaxFilesIndex%. Only the files matched by current filter will be sorted, not all the files.`n`nTo sort all files, remove the filter.
+         filterBehaviour := InStr(usrFilesFilteru, "&") ? 1 : 2
+         showTOOLtip("(Please wait) Preparing the files list...")
+         backfilesFilter := filesFilter
+         backusrFilesFilteru := usrFilesFilteru
+         usrFilesFilteru := filesFilter := ""
+         FilterFilesIndex()
+      }
+
       showTOOLtip("(Please wait) Gathering files information...")
       Loop, % maxFilesIndex + 1
       {
           r := resultedFilesList[A_Index]
-          If (InStr(r, "||") || !r || !FileExist(r))
+          If (InStr(r, "||") || !r)
+             Continue
+
+          If StrLen(backfilesFilter)>1
+          {
+             z := filterCoreString(r, filterBehaviour, backfilesFilter)
+             If (z=1)
+             {
+                notSortedFilesListu .= r "`n"
+                Continue
+             }
+          }
+
+          If !FileExist(r)
              Continue
 
           If (SortCriterion="size")
@@ -1181,10 +1242,29 @@ SortFilesList(SortCriterion) {
           maxFilesIndex++
           resultedFilesList[maxFilesIndex] := line[2]
       }
-      GenerateRandyList()
+
+      Loop, Parse, notSortedFilesListu,`n
+      {
+          If StrLen(A_LoopField)<2
+             Continue
+
+          maxFilesIndex++
+          resultedFilesList[maxFilesIndex] := A_LoopField
+      }
+
+      If StrLen(backfilesFilter)>1
+      {
+         bckpResultedFilesList := []
+         bckpResultedFilesList := resultedFilesList.Clone()
+         bkcpMaxFilesIndex := maxFilesIndex
+         usrFilesFilteru := backusrFilesFilteru
+         filesFilter := backfilesFilter
+         FilterFilesIndex()
+      } Else GenerateRandyList()
+
+      RandomPicture()
       SoundBeep, 950, 100
       Sleep, 25
-      RandomPicture()
       SetTimer, RemoveTooltip, % -msgDisplayTime
       CurrentSLD := backCurrentSLD
    }
@@ -1196,7 +1276,7 @@ readSlideSettings(readThisFile) {
      IniRead, tstSlideHowMode, %readThisFile%, General, SlideHowMode, @
      IniRead, tstimgFxMode, %readThisFile%, General, imgFxMode, @
      IniRead, tstWindowBgrColor, %readThisFile%, General, WindowBgrColor, @
-     IniRead, tstfilesFilter, %readThisFile%, General, usrFilesFilteru, @
+     ; IniRead, tstfilesFilter, %readThisFile%, General, usrFilesFilteru, @
      IniRead, tstFlipImgH, %readThisFile%, General, FlipImgH, @
      IniRead, tstFlipImgV, %readThisFile%, General, FlipImgV, @
      IniRead, tstlumosAdjust, %readThisFile%, General, lumosAdjust, @
@@ -1306,20 +1386,28 @@ DeletePicture() {
   If (slideShowRunning=1)
      ToggleSlideShowu()
 
-  Sleep, 2
+  Sleep, 5
   file2rem := resultedFilesList[currentFileIndex]
   file2rem := StrReplace(file2rem, "||")
-  showTOOLtip("File deleted... `n" file2rem)
+  showTOOLtip("File deleted...")
   FileSetAttrib, -R, %file2rem%
-  Sleep, 2
+  Sleep, 5
   FileDelete, %file2rem%
   resultedFilesList[currentFileIndex] := "||" file2rem
+
   If ErrorLevel
   {
      showTOOLtip("File already deleted or access denied...")
-     SoundBeep
+     SoundBeep, 300, 900
   }
-  Sleep, 500
+
+  If StrLen(filesFilter)>1
+  {
+     z := detectFileIDbkcpList(file2rem)
+     If (z!="fail" && z>=1)
+        bckpResultedFilesList[z] := "||" file2rem
+  }
+  Sleep, 50
   SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -1370,7 +1458,14 @@ RenameThisFile() {
         resultedFilesList[currentFileIndex] := OutDir "\" newFileName
         r := IDshowImage(currentFileIndex)
         If !r
+        {
            informUserFileMissing()
+        } Else If StrLen(filesFilter)>1
+        {
+           z := detectFileIDbkcpList(file2rem)
+           If (z!="fail" && z>=1)
+              bckpResultedFilesList[z] := OutDir "\" newFileName
+        }
      }
   }
 }
@@ -1417,21 +1512,11 @@ RefreshFilesList(mustDoFilesCheck:=0,noImage:=0) {
   If (slideShowRunning=1)
      ToggleSlideShowu()
 
-  If (StrLen(filesFilter)<3)
-     LargeListCount := maxFilesIndex
-
   If RegExMatch(CurrentSLD, "i)(\.sld)$")
   {
      currentFileIndex := 1
-     doFilesCheck := (LargeListCount<2048) ? 1 : 0
-     If (mustDoFilesCheck=10)
-        doFilesCheck := 0
-
      OpenSLD(CurrentSLD, 0, 1)
-     If (doFilesCheck=1 && !filesFilter)
-        cleanFilesList()
-     Else
-        RandomPicture()
+     RandomPicture()
   } Else If StrLen(CurrentSLD)>3
      coreOpenFolder(CurrentSLD)
 }
@@ -1487,6 +1572,22 @@ detectFileID(imgpath) {
     }
     If !good
        good := 1
+
+    Return good
+}
+
+detectFileIDbkcpList(imgpath) {
+    Loop, % bkcpMaxFilesIndex + 1
+    {
+       r := bckpResultedFilesList[A_Index]
+       If (r=imgpath)
+       {
+          good := A_Index
+          Break
+       }
+    }
+    If !good
+       good := "fail"
 
     Return good
 }
@@ -1639,9 +1740,19 @@ BuildMenu() {
    Menu, PVsort, Add, &Created date, ActSortCreated
    Menu, PVsort, Add, &Resolution (very slow), ActSortResolution
 
-   Menu, PVfList, Add, &Refresh opened folder(s)`tF5, RefreshFilesList
+   defMenuRefresh := RegExMatch(CurrentSLD, "i)(\.sld)$") ? "&Reload .SLD file" : "&Refresh opened folder(s)"
+   StringRight, defMenuRefreshItm, CurrentSLD, 30
+   If defMenuRefreshItm
+   {
+      Menu, PVfList, Add, %defMenuRefresh%`tF5, RefreshFilesList
+      Menu, PVfList, Add, %defMenuRefreshItm%, RefreshFilesList
+      Menu, PVfList, Disable, %defMenuRefreshItm%
+   }
+   Menu, PVfList, Add,
    If (maxFilesIndex>2)
    {
+      Menu, PVfList, Add, Save list as slideshow, SaveFilesList
+      Menu, PVfList, Add,
       If (RegExMatch(CurrentSLD, "i)(\.sld)$") && SLDhasFiles=1)
          Menu, PVfList, Add, &Clean duplicate/inexistent entries, cleanFilesList
       Menu, PVfList, Add, &Text filtering`tCtrl+F, enableFilesFilter
@@ -2274,7 +2385,6 @@ JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
   vPosY2 := NumGet(&POINT, 4, "Int")
 }
 
-
 GetClientSize(ByRef w, ByRef h, hwnd) {
 ; by Lexikos http://www.autohotkey.com/forum/post-170475.html
     Static prevW, prevH, lastInvoked := 1
@@ -2297,21 +2407,15 @@ sldGenerateFilesList(readThisFile, doFilesCheck) {
     SLDhasFiles := 0
     FileRead, tehFileVar, %readThisFile%
     FileReadLine, firstLine, %readThisFile%, 1
-    If InStr(firstLine, "[General]")
-       properFormat := 1
-    Else
-       tehFileVar := RegExReplace(tehFileVar, "\x22", "@")
+    If !InStr(firstLine, "[General]")
+    {
+       StringReplace, tehFileVar, tehFileVar,"-,,All
+       StringReplace, tehFileVar, tehFileVar,",,All
+    }
 
-    filterBehaviour := InStr(usrFilesFilteru, "&") ? 1 : 2
     Loop, Parse, tehFileVar,`n,`r
     {
        line := Trim(A_LoopField)
-       If (properFormat!=1)
-       {
-          line := StrReplace(line, "@-")
-          line := StrReplace(line, "@")
-       }
-
        If InStr(A_LoopField, "|")
        {
           doRecursive := 2
@@ -2327,13 +2431,6 @@ sldGenerateFilesList(readThisFile, doFilesCheck) {
           If (doFilesCheck=1)
           {
              If !FileExist(line)
-                Continue
-          }
-
-          If StrLen(filesFilter)>1
-          {
-             z := filterCoreString(line, filterBehaviour, filesFilter)
-             If (z=1)
                 Continue
           }
           maxFilesIndex++
@@ -2363,8 +2460,6 @@ filterCoreString(stringu, behave, thisFilter) {
 
 GetFilesList(strDir, doRecursive:=1) {
   showTOOLtip("Loading the list of files... please wait.`n" strDir)
-  filterBehaviour := InStr(usrFilesFilteru, "&") ? 1 : 2
-
   If InStr(strDir, "|")
   {
      doRecursive := 2
@@ -2376,13 +2471,6 @@ GetFilesList(strDir, doRecursive:=1) {
   {
       If RegExMatch(A_LoopFileName, RegExFilesPattern)
       {
-         If StrLen(filesFilter)>1
-         {
-            z := filterCoreString(A_LoopFileFullPath, filterBehaviour, filesFilter)
-            If (z=1)
-               Continue
-         }
-
          maxFilesIndex++
          resultedFilesList[maxFilesIndex] := A_LoopFileFullPath
       }
@@ -2391,10 +2479,13 @@ GetFilesList(strDir, doRecursive:=1) {
 }
 
 IDshowImage(imgID,opentehFile:=0) {
+    Static lastInvoked := 1
     resultu := resultedFilesList[imgID]
     If !resultu
     {
-       SoundBeep 
+       If ( A_TickCount - lastInvoked>1050)
+          SoundBeep, 300, 50
+       lastInvoked := A_TickCount
        Return 0
     }
 
