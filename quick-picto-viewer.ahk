@@ -17,26 +17,30 @@
 
 #NoEnv
 #NoTrayIcon
+#MaxHotkeysPerInterval, 500
 #MaxMem, 1924
 #Singleinstance, off
 #Include, Gdip.ahk
 
 Global PVhwnd, hGDIwin, resultedFilesList := []
-   , currentFileIndex, maxFilesIndex := 0, mainFilesListString := ""
+   , currentFileIndex, maxFilesIndex := 0
    , appTitle := "AHK Picture Viewer", FirstRun := 1
    , bckpResultedFilesList := [], bkcpMaxFilesIndex := 0
+   , DynamicFoldersList := "", historyList
    , hPicOnGui1, scriptStartTime := A_TickCount
    , RandyIMGids := [], SLDhasFiles := 0, IMGlargerViewPort := 0
    , IMGdecalageY := 1, IMGdecalageX := 1, imgQuality, usrFilesFilteru := ""
    , RandyIMGnow := 0, GDIPToken, Agifu, gdiBitmapSmall
-   , gdiBitmapSmallView, gdiBitmapViewScale, msgDisplayTime := 2000
+   , gdiBitmapSmallView, gdiBitmapViewScale, msgDisplayTime := 3000
    , slideShowRunning := 0, CurrentSLD := "", winGDIcreated :=0
    , ResolutionWidth, ResolutionHeight
    , gdiBitmap, mainSettingsFile := "ahk-picture-viewer.ini"
    , RegExFilesPattern := "i)(.\\*\.(tif|emf|jpg|png|bmp|gif|tiff|jpeg))$"
-   , LargeUIfontValue := 14, version := "2.0.0", AnyWindowOpen := 0
+   , LargeUIfontValue := 14, version := "2.0.0", AnyWindowOpen := 0, toolTipGuiCreated := 0
    , PrefsLargeFonts := 0, OSDbgrColor := "131209", OSDtextColor := "FFFEFA"
    , OSDfntSize := 14, OSDFontName := "Arial"
+   , mustGenerateStaticFolders := 1, lastWinDrag := 1
+   , prevFileMovePath := ""
  
  ; User settings
    , WindowBgrColor := "010101", slideShowDelay := 3000
@@ -46,14 +50,16 @@ Global PVhwnd, hGDIwin, resultedFilesList := []
    , imageAligned := 5, filesFilter := "", isAlwaysOnTop := 0
    , noTooltipMSGs := 1, zoomLevel := 1, skipDeadFiles := 0
    , isTitleBarHidden := 0, lumosGrayAdjust := 0, GammosGrayAdjust := 0
+   , MustLoadSLDprefs := 0
 
 imgQuality := (userimgQuality=1) ? 7 : 5
 DetectHiddenWindows, On
 CoordMode, Mouse, Screen
 OnExit, Cleanup
 
-; OnMessage(0x07, "activateMainWin")
-; OnMessage(0x06, "activateMainWin")
+OnMessage(0x200, "WM_MOUSEMOVE")
+OnMessage(0x06, "activateMainWin")
+OnMessage(0x08, "activateMainWin")
 Loop, 9
    OnMessage(255+A_Index, "PreventKeyPressBeep" )   ; 0x100 to 0x108
 
@@ -66,160 +72,15 @@ if !(GDIPToken := Gdip_Startup())
 IniRead, FirstRun, % mainSettingsFile, General, FirstRun, @
 If (FirstRun!=0)
 {
-   writeSlideSettings(mainSettingsFile)
+   writeMainSettings()
    FirstRun := 0
    IniWrite, % FirstRun, % mainSettingsFile, General, FirstRun
-} Else readSlideSettings(mainSettingsFile)
+} Else loadMainSettings()
 
 BuildTray()
 BuildGUI()
-; OpenSLD("E:\Sucan twins\photos test\tv-only.sld")
 Return
 ;_________________________________________________________________________________________________________________Hotkeys_________________
-
-OpenSLD(fileNamu, doFilesCheck:=0, dontStartSlide:=0) {
-  If !FileExist(fileNamu)
-  {
-     showTOOLtip("ERROR: Failed to load file...")
-     SoundBeep 
-     SetTimer, RemoveTooltip, % -msgDisplayTime
-     Return
-  }
-
-  filesFilter := usrFilesFilteru := ""
-  showTOOLtip("Loading files - please wait...")
-  WinSetTitle, ahk_id %PVhwnd%,, Loading files - please wait...
-  sldGenerateFilesList(fileNamu, doFilesCheck)
-  GenerateRandyList()
-  FileReadLine, firstLine, % fileNamu, 1
-  If InStr(firstLine, "[General]")
-     readSlideSettings(fileNamu)
-
-  If (dontStartSlide=1)
-  {
-     SetTimer, RemoveTooltip, % -msgDisplayTime
-     Return
-  }
-
-  If (maxFilesIndex>2)
-  {
-     RandomPicture()
-     InfoToggleSlideShowu()
-  } Else
-  {
-     currentFileIndex := 1
-     IDshowImage(1)
-  }
-  SetTimer, RemoveTooltip, % -msgDisplayTime
-}
-
-GenerateRandyList() {
-   RandyIMGids := []
-   Loop, % maxFilesIndex
-       indexListu .= A_Index "+"
-   Sort, indexListu, Random D+
-   Loop, Parse, indexListu, +
-       RandyIMGids[A_Index] := A_LoopField
-   RandyIMGnow := 1
-}
-
-OpenThisFileFolder() {
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-    resultu := resultedFilesList[currentFileIndex]
-    If resultu
-    {
-       SplitPath, resultu, , dir2open
-       Try Run, %dir2open%
-    }
-}
-
-OpenThisFile() {
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-    IDshowImage(currentFileIndex, 1)
-}
-
-IncreaseSlideSpeed() {
-   slideShowDelay := slideShowDelay + 1000
-   If (slideShowDelay>12000)
-      slideShowDelay := 12500
-   resetSlideshowTimer(1)
-}
-
-resetSlideshowTimer(showMsg) {
-   If (slideShowRunning=1)
-   {
-      ToggleSlideShowu()
-      Sleep, 1
-      ToggleSlideShowu()
-   }
-
-   If (showMsg=1)
-   {
-      delayu := slideShowDelay//1000
-      showTOOLtip("Slideshow speed: " delayu " second(s)")
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-   }
-}
-
-DecreaseSlideSpeed() {
-   slideShowDelay := slideShowDelay - 1000
-   If (slideShowDelay<900)
-      slideShowDelay := 500
-   resetSlideshowTimer(1)
-}
-
-CopyImagePath() {
-  If (slideShowRunning=1)
-     ToggleSlideShowu()
-
-  imgpath := resultedFilesList[currentFileIndex]
-  If FileExist(imgpath)
-  {
-     Clipboard := imgpath
-     showTOOLtip("File path copied to clipboard...")
-     SetTimer, RemoveTooltip, % -msgDisplayTime
-  }
-}
-
-CopyImage2clip() {
-  If (slideShowRunning=1)
-     ToggleSlideShowu()
-
-  imgpath := resultedFilesList[currentFileIndex]
-  FileGetSize, fileSizu, %imgpath%
-  If (FileExist(imgpath) && fileSizu>500)
-  {
-     pBitmap := Gdip_CreateBitmapFromFile(imgpath)
-     If !pBitmap
-     {
-        showTOOLtip("ERROR: Failed to copy image to clipboard...")
-        SoundBeep 
-        SetTimer, RemoveTooltip, % -msgDisplayTime
-        Return
-     }
-     FlipImgV := FlipImgH := 0
-     imgFxMode := 1
-     Sleep, 2
-     r1 := Gdip_SetBitmapToClipboard(pBitmap)
-     Sleep, 2
-     Gdip_DisposeImage(pBitmap)
-     If r1
-        showTOOLtip("Image copied to clipboard...")
-     Else
-        showTOOLtip("ERROR: Failed to copy the image to clipboard...")
-     SetTimer, RemoveTooltip, % -msgDisplayTime
-     r2 := IDshowImage(currentFileIndex)
-     If !r2
-        informUserFileMissing()
-  } Else
-  {
-     showTOOLtip("ERROR: Failed to copy image to clipboard...")
-     SoundBeep 
-     SetTimer, RemoveTooltip, % -msgDisplayTime
-  }
-}
 
 #If (WinActive("ahk_id " PVhwnd) || WinActive("ahk_id " hGDIwin))
     ~^vk4F::    ; Ctrl+O
@@ -381,8 +242,20 @@ CopyImage2clip() {
        RenameThisFile()
     Return
 
+    ~^vk4D::    ; Ctrl+M
+       MoveFile2Dest()
+    Return
+
+    ~vk4D::     ; M
+       QuickMoveFile2Dest()
+    Return
+
     ~vk46::     ; F
        ToggleImgFX()
+    Return
+
+    ~+vk46::     ; Shift+F
+       ToggleImgFX(2)
     Return
 
     ~vk41::     ; A
@@ -449,16 +322,189 @@ CopyImage2clip() {
 
 ;_________________________________________________________________________________________________________________Labels__________________
 
+OpenSLD(fileNamu, dontStartSlide:=0) {
+  If !FileExist(fileNamu)
+  {
+     showTOOLtip("ERROR: Failed to load file...")
+     SoundBeep 
+     SetTimer, RemoveTooltip, % -msgDisplayTime
+     Return
+  }
+  renewCurrentFilesList()
+  DynamicFoldersList := CurrentSLD := ""
+  filesFilter := usrFilesFilteru := ""
+  SLDhasFiles := 0
+  mustRemQuotes := 1
+  showTOOLtip("Loading files, please wait...")
+  WinSetTitle, ahk_id %PVhwnd%,, Loading files - please wait...
+  FileReadLine, firstLine, % fileNamu, 1
+  If InStr(firstLine, "[General]") 
+  {
+     mustRemQuotes := 0
+     IniRead, UseCachedList, % fileNamu, General, UseCachedList, @
+     IniRead, testStaticFolderz, % fileNamu, Folders, Fi1, @
+     IniRead, testDynaFolderz, % fileNamu, DynamicFolderz, DF1, @
+;     MsgBox, %testStaticFolderz%`n %testDynaFolderz%
+     If StrLen(testDynaFolderz)>4
+        DynamicFoldersList := "hexists"
+  }
+
+  mustGenerateStaticFolders := (InStr(firstLine, "[General]") && StrLen(testStaticFolderz)>8) ? 0 : 1
+  If (UseCachedList="Yes" && InStr(firstLine, "[General]")) || !InStr(firstLine, "[General]")
+     sldGenerateFilesList(fileNamu, 0, mustRemQuotes)
+
+  If InStr(firstLine, "[General]") 
+  {
+     If (maxFilesIndex<3 || UseCachedList!="Yes") && (DynamicFoldersList="hexists" && InStr(firstLine, "[General]"))
+        ReloadDynamicFolderz(fileNamu)
+
+     IniRead, IgnoreThesePrefs, % fileNamu, General, IgnoreThesePrefs, @
+     If (IgnoreThesePrefs="nope") && (MustLoadSLDprefs=1)
+        readSlideSettings(fileNamu)
+  }
+
+  GenerateRandyList()
+  currentFileIndex := 1
+  CurrentSLD := fileNamu
+  RecentFilesManager()
+  If (dontStartSlide=1)
+  {
+     SetTimer, RemoveTooltip, % -msgDisplayTime
+     Return
+  }
+
+  If (maxFilesIndex>2)
+  {
+     RandomPicture()
+     InfoToggleSlideShowu()
+  } Else
+  {
+     currentFileIndex := 1
+     IDshowImage(1)
+  }
+  SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+GenerateRandyList() {
+   RandyIMGids := []
+   Loop, % maxFilesIndex
+       indexListu .= A_Index "+"
+   Sort, indexListu, Random D+
+   Loop, Parse, indexListu, +
+       RandyIMGids[A_Index] := A_LoopField
+   RandyIMGnow := 1
+}
+
+OpenThisFileFolder() {
+    If (slideShowRunning=1)
+       ToggleSlideShowu()
+    resultu := resultedFilesList[currentFileIndex]
+    If resultu
+    {
+       SplitPath, resultu, , dir2open
+       Try Run, %dir2open%
+    }
+}
+
+OpenThisFile() {
+    If (slideShowRunning=1)
+       ToggleSlideShowu()
+    IDshowImage(currentFileIndex, 1)
+}
+
+IncreaseSlideSpeed() {
+   slideShowDelay := slideShowDelay + 1000
+   If (slideShowDelay>12000)
+      slideShowDelay := 12500
+   resetSlideshowTimer(1)
+}
+
+resetSlideshowTimer(showMsg) {
+   If (slideShowRunning=1)
+   {
+      ToggleSlideShowu()
+      Sleep, 1
+      ToggleSlideShowu()
+   }
+
+   If (showMsg=1)
+   {
+      delayu := Round(slideShowDelay/1000, 2)
+      showTOOLtip("Slideshow speed: " delayu " second(s)")
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+   }
+}
+
+DecreaseSlideSpeed() {
+   slideShowDelay := slideShowDelay - 1000
+   If (slideShowDelay<900)
+      slideShowDelay := 500
+   resetSlideshowTimer(1)
+}
+
+CopyImagePath() {
+  If (slideShowRunning=1)
+     ToggleSlideShowu()
+
+  imgpath := resultedFilesList[currentFileIndex]
+  If FileExist(imgpath)
+  {
+     Clipboard := imgpath
+     showTOOLtip("File path copied to clipboard...")
+     SetTimer, RemoveTooltip, % -msgDisplayTime
+  }
+}
+
+CopyImage2clip() {
+  If (slideShowRunning=1)
+     ToggleSlideShowu()
+
+  imgpath := resultedFilesList[currentFileIndex]
+  FileGetSize, fileSizu, %imgpath%
+  If (FileExist(imgpath) && fileSizu>500)
+  {
+     pBitmap := Gdip_CreateBitmapFromFile(imgpath)
+     If !pBitmap
+     {
+        showTOOLtip("ERROR: Failed to copy image to clipboard...")
+        SoundBeep 
+        SetTimer, RemoveTooltip, % -msgDisplayTime
+        Return
+     }
+     FlipImgV := FlipImgH := 0
+     imgFxMode := 1
+     Sleep, 2
+     r1 := Gdip_SetBitmapToClipboard(pBitmap)
+     Sleep, 2
+     Gdip_DisposeImage(pBitmap)
+     If r1
+        showTOOLtip("Image copied to clipboard...")
+     Else
+        showTOOLtip("ERROR: Failed to copy the image to clipboard...")
+     SetTimer, RemoveTooltip, % -msgDisplayTime
+     r2 := IDshowImage(currentFileIndex)
+     If !r2
+        informUserFileMissing()
+  } Else
+  {
+     showTOOLtip("ERROR: Failed to copy image to clipboard...")
+     SoundBeep 
+     SetTimer, RemoveTooltip, % -msgDisplayTime
+  }
+}
 
 invertRecursiveness() {
    If (RegExMatch(CurrentSLD, "i)(\.sld)$") || !CurrentSLD)
       Return
 
    isPipe := InStr(CurrentSLD, "|") ? 1 : 0
-   If (isPipe=1)
-      CurrentSLD := StrReplace(CurrentSLD, "|")
-   Else
+   CurrentSLD := StrReplace(CurrentSLD, "|")
+   DynamicFoldersList := StrReplace(DynamicFoldersList, "|")
+   If (isPipe!=1)
+   {
       CurrentSLD := "|" CurrentSLD
+      DynamicFoldersList := "|" DynamicFoldersList
+   }
 
    RefreshFilesList()
 }
@@ -509,7 +555,7 @@ GuiClose:
 Cleanup:
    DestroyGDIbmp()
    ; Gdip_DisposeImage(gdiBitmapSmall)
-   writeSlideSettings(mainSettingsFile)
+   writeMainSettings()
    Gdip_Shutdown(GDIPToken)  
    ExitApp
 Return
@@ -525,17 +571,19 @@ GuiContextMenu:
 Return 
 
 activateMainWin() {
-   WinActivate, ahk_id %PVhwnd%
+   If (toolTipGuiCreated=1)
+      TooltipCreator(1, 1)
 }
 
 WinClickAction() {
    Critical, on
    Static lastInvoked := 0
    MouseGetPos, , , OutputVarWin
-   If (OutputVarWin!=PVhwnd)
+   TooltipCreator(1, 1)
+   If (OutputVarWin!=PVhwnd) || (A_TickCount - lastWinDrag>450) && (isTitleBarHidden=1)
       Return
 
-   If (A_TickCount - lastInvoked<250) && (lastInvoked>1 && CurrentSLD)
+   If (A_TickCount - lastInvoked<250) && (lastInvoked>1 && CurrentSLD && maxFilesIndex>0)
    {
       If (TouchScreenMode=0)
       {
@@ -561,7 +609,7 @@ WinClickAction() {
          GoPrevSlide()
       Else If (A_GuiControl="PicOnGUI2")
          ToggleViewModeTouch()
-   } Else If (!CurrentSLD)
+   } Else If (!CurrentSLD || maxFilesIndex<1)
    {
       Sleep, 50
       OpenFiles()
@@ -581,7 +629,7 @@ ToggleImageSizingMode() {
     friendly := DefineImgSizing()
     showTOOLtip("Rescaling mode: " friendly)
     SetTimer, RemoveTooltip, % -msgDisplayTime
-    writeSlideSettings(mainSettingsFile)
+    writeMainSettings()
     r := IDshowImage(currentFileIndex)
     If !r
        informUserFileMissing()
@@ -604,10 +652,10 @@ InfoToggleSlideShowu() {
      SetTimer, RemoveTooltip, % -msgDisplayTime
   } Else 
   {
-     delayu := slideShowDelay//1000
+     delayu := Round(slideShowDelay/1000, 2)
      friendly := DefineSlideShowType()
-     etaTime := "Estimated time: " SecToHHMMSS(Round((slideShowDelay/1000)*maxFilesIndex))
-     showTOOLtip("Started " friendly " slideshow (speed: " delayu ").`nTotal files: "  maxFilesIndex ".`n" etaTime)
+     etaTime := "Estimated time: " SecToHHMMSS(Round((slideShowDelay/1000,2)*maxFilesIndex))
+     showTOOLtip("Started " friendly " slideshow`nSpeed: " delayu " sec.`nTotal files: "  maxFilesIndex "`n" etaTime)
      SetTimer, RemoveTooltip, % -msgDisplayTime
   }
 }
@@ -719,15 +767,22 @@ SwitchSlideModes() {
    friendly := DefineSlideShowType()
    showTOOLtip("Slideshow mode: " friendly)
    SetTimer, RemoveTooltip, % -msgDisplayTime
-   writeSlideSettings(mainSettingsFile)
+   writeMainSettings()
 }
 
-ToggleImgFX() {
+ToggleImgFX(dir:=0) {
    If (slideShowRunning=1)
       resetSlideshowTimer(0)
-   imgFxMode++
+
+   If (dir=2)
+      imgFxMode--
+   Else
+      imgFxMode++
+
    If (imgFxMode>4)
       imgFxMode := 1
+   Else If (imgFxMode<1)
+      imgFxMode := 4
 
    friendly := DefineFXmodes()
    If (imgFxMode=2)
@@ -739,7 +794,7 @@ ToggleImgFX() {
       friendly .= "`n `nYou can adjust brightness and gamma using`n [ and ] with or without Shift."
    showTOOLtip("Image colors: " friendly)
    SetTimer, RemoveTooltip, % -msgDisplayTime
-   writeSlideSettings(mainSettingsFile)
+   writeMainSettings()
    r := IDshowImage(currentFileIndex)
    If !r
       informUserFileMissing()
@@ -760,7 +815,7 @@ ToggleIMGalign() {
 
    showTOOLtip("Image alignment: " defineImgAlign())
    SetTimer, RemoveTooltip, % -msgDisplayTime
-   writeSlideSettings(mainSettingsFile)
+   writeMainSettings()
    r := IDshowImage(currentFileIndex)
    If !r
       informUserFileMissing()
@@ -1141,19 +1196,18 @@ throwMSGwriteError() {
 
 SaveFilesList() {
    Critical, on
+   If (slideShowRunning=1)
+      ToggleSlideShowu()
 
    If StrLen(maxFilesIndex)>1
    {
       If StrLen(filesFilter)>1
          MsgBox, 64, %appTitle%: Save slideshow, The files list is filtered down to %maxFilesIndex% files from %bkcpMaxFilesIndex%.`n`nTo save as a slideshow the entire list of files, remove the filter.
-      FileSelectFile, file2save, S26,, Save files list as Slideshow, Slideshow (*.sld)
+      FileSelectFile, file2save, S2, % CurrentSLD, Save files list as Slideshow, Slideshow (*.sld)
    }
 
    If (!ErrorLevel && StrLen(file2save)>3)
    {
-
-      backCurrentSLD := CurrentSLD
-      CurrentSLD := ""
       If !RegExMatch(file2save, "i)(.\.sld)$")
          file2save .= ".sld"
       If FileExist(file2save)
@@ -1164,7 +1218,11 @@ SaveFilesList() {
          {
             FileSetAttrib, -R, %file2save%
             Sleep, 2
-            FileDelete, %file2save%
+            If (file2save=CurrentSLD)
+            {
+               newTmpFile := file2save "-bkcp"
+               FileMove, %file2save%, %newTmpFile%, 1
+            } Else FileDelete, %file2save%
             throwMSGwriteError()
          } Else
          {
@@ -1172,50 +1230,90 @@ SaveFilesList() {
             Return
          }
       }
+      backCurrentSLD := CurrentSLD
+      CurrentSLD := ""
       Sleep, 2
       MsgBox, 52, %appTitle%, Do you want to store the current slideshow settings as well ?
       IfMsgBox, Yes
+         IniWrite, Nope, % file2save, General, IgnoreThesePrefs
+      Else
+         IniWrite, Yes, % file2save, General, IgnoreThesePrefs
+      IniWrite, Yes, % file2save, General, UseCachedList
+      Sleep, 10
+      writeSlideSettings(file2save)
+      WinSetTitle, ahk_id %PVhwnd%,, Saving slideshow - please wait...
+      showTOOLtip("Saving list of " maxFilesIndex " entries into...`n" file2save "`nPlease wait...")
+      thisTmpFile := !newTmpFile ? backCurrentSLD : newTmpFile
+      saveDynaFolders := (DynamicFoldersList="hexists") ? coreLoadDynaFolders(thisTmpFile) : DynamicFoldersList
+      dynaFolderListu := "`n[DynamicFolderz]`n"
+      Loop, Parse, saveDynaFolders, `n
       {
-         writeSlideSettings(file2save)
-         Sleep, 2
+          If (StrLen(A_LoopField)<4 || !FileExist(A_LoopField))
+             Continue
+          countDynas++
+          dynaFolderListu .= "DF" countDynas "=" A_LoopField "`n"
       }
 
-      WinSetTitle, ahk_id %PVhwnd%,, Saving files - please wait...
-      showTOOLtip("(Please wait) Saving files list into`n" file2save)
       Loop, % maxFilesIndex + 1
       {
           r := resultedFilesList[A_Index]
           If (InStr(r, "||") || !r)
              Continue
-
-          SplitPath, r,, OutDir
-          foldersList .= OutDir "`n"
+          If (mustGenerateStaticFolders=1)
+          {
+             SplitPath, r,, OutDir
+             foldersList .= OutDir "`n"
+          }
           filesListu .= r "`n"
       }
       Sort, foldersList, U D`n
       foldersListu := "`n[Folders]`n"
-      Loop, Parse, foldersList, `n
+      If (mustGenerateStaticFolders=1)
       {
-          If !A_LoopField
-             Continue
-          FileGetTime, dirDate, % A_LoopField, M
-          foldersListu .= "Fn" A_Index "=" A_LoopField "\`n"
-          foldersListu .= "Fd" A_Index "=" dirDate "`n"
+         Loop, Parse, foldersList, `n
+         {
+             If !A_LoopField
+                Continue
+             FileGetTime, dirDate, % A_LoopField, M
+             foldersListu .= "Fi" A_Index "=" dirDate "*&*" A_LoopField "`n"
+         }
+      } Else
+      {
+         thisTmpFile := !newTmpFile ? backCurrentSLD : newTmpFile
+         foldersListu .= LoadStaticFoldersCached(thisTmpFile)
       }
 
       foldersListu .= "`n[FilesList]`n"
       Sleep, 10
-      FileAppend, % foldersListu, %file2save%, utf-16
+      FileAppend, % dynaFolderListu, % file2save, UTF-16
       Sleep, 10
-      FileAppend, % filesListu, %file2save%, utf-16
+      FileAppend, % foldersListu, % file2save, UTF-16
+      Sleep, 10
+      FileAppend, % filesListu, % file2save, UTF-16
       throwMSGwriteError()
+      FileDelete, % newTmpFile
       SetTimer, RemoveTooltip, % -msgDisplayTime
-      r := IDshowImage(currentFileIndex)
-      CurrentSLD := backCurrentSLD
+      CurrentSLD := file2save
+      DynamicFoldersList := "hexists"
+      mustGenerateStaticFolders := 0
       SoundBeep, 900, 100
+      r := IDshowImage(currentFileIndex)
       If !r
          informUserFileMissing()
    }
+}
+
+LoadStaticFoldersCached(fileNamu) {
+   Loop, 9876
+   {
+       IniRead, newFolder, % fileNamu, Folders, Fi%A_Index%, @
+       If (StrLen(newFolder)>8 && InStr(newFolder, "*&*"))
+          staticFoldersListCache .= "Fi" A_Index "=" newFolder "`n"
+       Else countFails++
+       If (countFails>3)
+          Break
+   }
+   Return staticFoldersListCache
 }
 
 cleanFilesList(noFilesCheck:=0) {
@@ -1231,7 +1329,7 @@ cleanFilesList(noFilesCheck:=0) {
       filterBehaviour := InStr(usrFilesFilteru, "&") ? 1 : 2
       If StrLen(filesFilter)>1
       {
-         showTOOLtip("(Please wait) Preparing the files list...")
+         showTOOLtip("Preparing the files list...")
          backfilesFilter := filesFilter
          backusrFilesFilteru := usrFilesFilteru
          usrFilesFilteru := filesFilter := ""
@@ -1239,7 +1337,7 @@ cleanFilesList(noFilesCheck:=0) {
       }
 
       WinSetTitle, ahk_id %PVhwnd%,, Cleaning files list - please wait...
-      showTOOLtip("(Please wait) Checking files list...")
+      showTOOLtip("Checking files list, please wait...")
       Loop, % maxFilesIndex + 1
       {
           r := resultedFilesList[A_Index]
@@ -1423,6 +1521,7 @@ readSlideSettings(readThisFile) {
      IniRead, tstTouchScreenMode, %readThisFile%, General, TouchScreenMode, @
      IniRead, tstskipDeadFiles, %readThisFile%, General, skipDeadFiles, @
      IniRead, tstisAlwaysOnTop, %readThisFile%, General, isAlwaysOnTop, @
+     IniRead, tstisTitleBarHidden, %readThisFile%, General, isTitleBarHidden, @
 
      If (tstslideshowdelay!="@" && tstslideshowdelay>300)
         slideShowDelay := tstslideShowDelay
@@ -1430,20 +1529,22 @@ readSlideSettings(readThisFile) {
         IMGresizingMode := tstIMGresizingMode
      If (tstimgFxMode!="@" && StrLen(tstimgFxMode)=1 && tstimgFxMode<5)
         imgFxMode := tstimgFxMode
-     If (tstnoTooltipMSGs!="@" && (tstnoTooltipMSGs=1 || tstnoTooltipMSGs=0))
+     If (tstnoTooltipMSGs=1 || tstnoTooltipMSGs=0)
         noTooltipMSGs := tstnoTooltipMSGs
-     If (tstTouchScreenMode!="@" && (tstTouchScreenMode=1 || tstTouchScreenMode=0))
+     If (tstTouchScreenMode=1 || tstTouchScreenMode=0)
         TouchScreenMode := tstTouchScreenMode
-     If (tstuserimgQuality!="@" && (tstuserimgQuality=1 || tstuserimgQuality=0))
+     If (tstuserimgQuality=1 || tstuserimgQuality=0)
         userimgQuality := tstuserimgQuality
-     If (tstFlipImgV!="@" && (tstFlipImgV=1 || tstFlipImgV=0))
+     If (tstFlipImgV=1 || tstFlipImgV=0)
         FlipImgV := tstFlipImgV
-     If (tstskipDeadFiles!="@" && (tstskipDeadFiles=1 || tstskipDeadFiles=0))
+     If (tstskipDeadFiles=1 || tstskipDeadFiles=0)
         skipDeadFiles := tstskipDeadFiles
-     If (tstFlipImgH!="@" && (tstFlipImgH=1 || tstFlipImgH=0))
+     If (tstFlipImgH=1 || tstFlipImgH=0)
         FlipImgV := tstFlipImgV
-     If (tstisAlwaysOnTop!="@" && (tstisAlwaysOnTop=1 || tstisAlwaysOnTop=0))
+     If (tstisAlwaysOnTop=1 || tstisAlwaysOnTop=0)
         isAlwaysOnTop := tstisAlwaysOnTop
+     If (tstisTitleBarHidden=1 || tstisTitleBarHidden=0)
+        isTitleBarHidden := tstisTitleBarHidden
      If (tstslidehowmode!="@" && StrLen(tstSlideHowMode)=1 && tstSlideHowMode<4)
         SlideHowMode := tstSlideHowMode
      If (tstimageAligned!="@" && StrLen(tstimageAligned)=1 && tstimageAligned<10)
@@ -1468,8 +1569,30 @@ readSlideSettings(readThisFile) {
      If (tstGammosGrAdjust!="@")
         GammosGrayAdjust := tstGammosGrAdjust
 
+     If (isTitleBarHidden=1)
+        Gui, 1: -Caption
+     Else
+        Gui, 1: +Caption
+
      imgQuality := (userimgQuality=1) ? 7 : 5
      WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%
+}
+
+writeMainSettings() {
+    writeSlideSettings(mainSettingsFile)
+    IniWrite, % MustLoadSLDprefs, % mainSettingsFile, General, MustLoadSLDprefs
+    IniWrite, % prevFileMovePath, % mainSettingsFile, General, prevFileMovePath
+}
+
+loadMainSettings() {
+    readSlideSettings(mainSettingsFile)
+    IniRead, tstMustLoadSLDprefs, % mainSettingsFile, General, MustLoadSLDprefs, @
+    IniRead, tstprevFileMovePath, % mainSettingsFile, General, prevFileMovePath, @
+    If (tstMustLoadSLDprefs=1 || tstMustLoadSLDprefs=0)
+       MustLoadSLDprefs := tstMustLoadSLDprefs
+
+    If (tstprevFileMovePath!="@" || StrLen(tstprevFileMovePath)>3)
+       prevFileMovePath := tstprevFileMovePath
 }
 
 writeSlideSettings(file2save) {
@@ -1491,7 +1614,54 @@ writeSlideSettings(file2save) {
     IniWrite, % TouchScreenMode, %file2save%, General, TouchScreenMode
     IniWrite, % skipDeadFiles, %file2save%, General, skipDeadFiles
     IniWrite, % isAlwaysOnTop, %file2save%, General, isAlwaysOnTop
+    IniWrite, % isTitleBarHidden, %file2save%, General, isTitleBarHidden
+    IniWrite, % version, %file2save%, General, version
     throwMSGwriteError()
+}
+
+readRecentEntries() {
+   If StrLen(historyList)>4
+      Return
+
+   historyList := ""
+   Loop, 15
+   {
+       IniRead, newEntry, % mainSettingsFile, Recents, E%A_Index%, @
+       If StrLen(newEntry)>4
+          historyList .= newEntry "`n"
+   }
+}
+
+RecentFilesManager() {
+  readRecentEntries()
+  entry2add := CurrentSLD
+  If StrLen(entry2add)<4
+     Return
+
+  Loop, Parse, historyList, `n
+  {
+      If (A_LoopField=entry2add)
+      {
+         isAddedAlready := 1
+         Break
+      }
+  }
+  If (isAddedAlready=1)
+     Return
+
+  historyList := entry2add "`n" historyList
+  Loop, Parse, historyList, `n
+  {
+      If (A_Index>15)
+         Break
+
+      If StrLen(A_LoopField)<4
+         Continue
+      countItemz++
+      IniWrite, % A_LoopField, % mainSettingsFile, Recents, E%countItemz%
+      newHistoryList .= A_LoopField "`n"
+  }
+  historyList := newHistoryList
 }
 
 RandomPicture(dummy:=0, inLoop:=0) {
@@ -1565,15 +1735,15 @@ RenameThisFile() {
 
   Sleep, 2
   file2rem := resultedFilesList[currentFileIndex]
+  SplitPath, file2rem, OutFileName, OutDir
   If !FileExist(file2rem)
   {
-     showTOOLtip("File does not exist...`n" file2rem)
+     showTOOLtip("File does not exist or access denied...`n" OutFileName "`n" OutDir)
      SetTimer, RemoveTooltip, % -msgDisplayTime
      SoundBeep 
      Return
   }
 
-  SplitPath, file2rem, OutFileName, OutDir
   InputBox, newFileName, Rename file, Please type the new file name.,,,,,,,, %OutFileName%
   If !ErrorLevel
   {
@@ -1618,18 +1788,133 @@ RenameThisFile() {
   }
 }
 
+MoveFile2Dest() {
+   If (slideShowRunning=1)
+      ToggleSlideShowu()
+
+   Sleep, 2
+   file2rem := resultedFilesList[currentFileIndex]
+   SplitPath, file2rem, OldOutFileName, OldOutDir
+   If !FileExist(file2rem)
+   {
+      showTOOLtip("File does not exist or access denied...`n" OldOutFileName "`n" OldOutDir)
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      SoundBeep 
+      Return
+   }
+
+   FileSelectFile, file2save, S2, % file2rem, Move file to, select destination..., All files (*.*)
+   If (!ErrorLevel && StrLen(file2save)>3)
+   {
+      SplitPath, file2save, NewOutFileName, NewOutDir
+      If (NewOutDir=OldOutDir)
+      {
+         showTOOLtip("Destination equals to initial location...`nOperation ignored.")
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return
+      }
+
+      file2save := NewOutDir "\" OldOutFileName
+      If FileExist(file2save)
+      {
+         MsgBox, 52, %appTitle%, A file with the same name already exists in the destination folder... Do you want to overwrite the file?`n`n%OldOutFileName%`n%NewOutDir%
+         IfMsgBox, Yes
+         {
+            FileSetAttrib, -R, %file2save%
+            Sleep, 5
+            FileDelete, %file2save%
+            Sleep, 5
+            FileMove, %file2rem%, %file2save%, 1
+            If !ErrorLevel
+            {
+               wasNoError := 1
+               prevFileMovePath := NewOutDir
+            }
+            throwMSGwriteError()
+         } Else Return
+      } Else
+      {
+         FileMove, %file2rem%, %file2save%, 1
+         If !ErrorLevel
+         {
+            wasNoError := 1
+            prevFileMovePath := NewOutDir
+         }
+         throwMSGwriteError()
+      }
+
+      If (StrLen(prevFileMovePath)>3 && wasNoError=1)
+      {
+         writeMainSettings()
+         showTOOLtip("File moved to...`n" NewOutDir "\")
+         resultedFilesList[currentFileIndex] := file2save
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+      }
+   }
+}
+
+QuickMoveFile2Dest() {
+   If (slideShowRunning=1)
+      ToggleSlideShowu()
+ 
+   Sleep, 2
+   file2rem := resultedFilesList[currentFileIndex]
+   SplitPath, file2rem, OldOutFileName, OldOutDir
+   If !FileExist(file2rem)
+   {
+      showTOOLtip("File does not exist or access denied...`n" OldOutFileName "`n" OldOutDir)
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      SoundBeep 
+      Return
+   }
+
+   If (OldOutDir=prevFileMovePath)
+   {
+      showTOOLtip("Destination equals to initial location...`nOperation ignored.")
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   If StrLen(prevFileMovePath)>3
+   {
+      file2save := prevFileMovePath "\" OldOutFileName
+      If FileExist(file2save)
+      {
+         MsgBox, 52, %appTitle%, A file with the same name already exists in the destination folder... Do you want to overwrite the file?`n`n%OldOutFileName%`n%NewOutDir%
+         IfMsgBox, Yes
+         {
+            FileSetAttrib, -R, %file2save%
+            Sleep, 5
+            FileDelete, %file2save%
+            Sleep, 5
+            FileMove, %file2rem%, %file2save%, 1
+            If ErrorLevel
+               wasError := 1
+            throwMSGwriteError()
+         } Else Return
+      } Else
+      {
+         FileMove, %file2rem%, %file2save%, 1
+         If ErrorLevel
+            wasError := 1
+      }
+
+      If (wasError!=1)
+      {
+         showTOOLtip("File moved to...`n" prevFileMovePath "\")
+         resultedFilesList[currentFileIndex] := file2save
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+      }
+   } Else MoveFile2Dest()
+}
+
 OpenFolders() {
    If (slideShowRunning=1)
       ToggleSlideShowu()
 
    FileSelectFolder, SelectedDir, *%A_WorkingDir%, 2, Select the folder with images. All images found in sub-folders will be loaded as well.
    If (SelectedDir)
-   {
-      usrFilesFilteru := filesFilter := CurrentSLD := ""
-      WinSetTitle, ahk_id %PVhwnd%,, Loading files - please wait...
       coreOpenFolder(SelectedDir)
-      CurrentSLD := SelectedDir
-   }
 }
 
 renewCurrentFilesList() {
@@ -1643,27 +1928,34 @@ renewCurrentFilesList() {
 coreOpenFolder(thisFolder, doOptionals:=1) {
    If StrLen(thisFolder)>3
    {
+      usrFilesFilteru := filesFilter := CurrentSLD := ""
+      WinSetTitle, ahk_id %PVhwnd%,, Loading files - please wait...
       renewCurrentFilesList()
       GetFilesList(thisFolder "\*")
+      GenerateRandyList()
+      mustGenerateStaticFolders := 1
+      DynamicFoldersList := thisFolder "`n"
+      CurrentSLD := thisFolder
+      RecentFilesManager()
+      SetTimer, RemoveTooltip, % -msgDisplayTime
       If (doOptionals=1)
       {
-         GenerateRandyList()
          If (maxFilesIndex>0)
-            IDshowImage(1)
+            RandomPicture()
          Else
             Gosub, GuiSize
       }
    }
 }
 
-RefreshFilesList(mustDoFilesCheck:=0,noImage:=0) {
+RefreshFilesList() {
   If (slideShowRunning=1)
      ToggleSlideShowu()
 
   If RegExMatch(CurrentSLD, "i)(\.sld)$")
   {
      currentFileIndex := 1
-     OpenSLD(CurrentSLD, 0, 1)
+     OpenSLD(CurrentSLD, 1)
      RandomPicture()
   } Else If StrLen(CurrentSLD)>3
      coreOpenFolder(CurrentSLD)
@@ -1690,21 +1982,14 @@ OpenFiles() {
 
    if (SelectedDir)
    {
-      showTOOLtip("Opening file...")
-      usrFilesFilteru := filesFilter := CurrentSLD := ""
-      renewCurrentFilesList()
       If RegExMatch(imgpath, "i)(.\.sld)$")
       {
          OpenSLD(imgpath)
          Return
       }
-      WinSetTitle, ahk_id %PVhwnd%,, Loading files - please wait...
-      GetFilesList(SelectedDir "\*|")
-      GenerateRandyList()
+      coreOpenFolder("|" SelectedDir, 0)
       currentFileIndex := detectFileID(imgpath)
       IDshowImage(currentFileIndex)
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      CurrentSLD := "|" SelectedDir
    }
 }
 
@@ -1760,19 +2045,14 @@ GuiDropFiles:
       If !imagedir
          Return
 
-      usrFilesFilteru := filesFilter := CurrentSLD := ""
-      renewCurrentFilesList()
       If RegExMatch(imgpath, "i)(.\.sld)$")
       {
          OpenSLD(imgpath)
          Return
       }
-      GetFilesList(imagedir "\*|")
-      GenerateRandyList()
+      coreOpenFolder("|" imagedir, 0)
       currentFileIndex := detectFileID(imgpath)
       IDshowImage(currentFileIndex)
-      CurrentSLD := "|" imagedir
-      SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 Return
 
@@ -1843,9 +2123,10 @@ BuildMenu() {
       Menu, PVfList, Delete
       Menu, PVtFile, Delete
       Menu, PVprefs, Delete
+      Menu, PVopenF, Delete
    }
 
-   sliSpeed := slideShowDelay//1000 " sec."
+   sliSpeed := Round(slideShowDelay/1000, 2) " sec."
    Menu, PVsliMenu, Add, &Start slideshow`tSpace, ToggleSlideShowu
    Menu, PVsliMenu, Add,
    Menu, PVsliMenu, Add, &Toggle slideshow mode`tS, SwitchSlideModes
@@ -1895,12 +2176,17 @@ BuildMenu() {
    Menu, PVnav, Add, &Random`tR, RandomPicture
    Menu, PVnav, Add, &Prev. random image`tBackspace, PrevRandyPicture
 
+   StringRight, infoPrevMovePath, prevFileMovePath, 25
    Menu, PVtFile, Add, &Copy image to Clipboard`tCtrl+C, CopyImage2clip
    Menu, PVtFile, Add, 
    Menu, PVtFile, Add, &Open (with external app)`tO, OpenThisFile
    Menu, PVtFile, Add, &Open containing folder`tCtrl+E, OpenThisFileFolder
-   Menu, PVtFile, Add, &Rename`tF2, RenameThisFile
+   Menu, PVtFile, Add, 
    Menu, PVtFile, Add, &Delete`tDelete, DeletePicture
+   Menu, PVtFile, Add, &Rename`tF2, RenameThisFile
+   Menu, PVtFile, Add, &Move file to...`tCtrl+M, MoveFile2Dest
+   If infoPrevMovePath
+      Menu, PVtFile, Add, %infoPrevMovePath%`tM, QuickMoveFile2Dest
    Menu, PVtFile, Add,
    Menu, PVtFile, Add, &Information`tI, ShowImgInfos
 
@@ -1925,6 +2211,8 @@ BuildMenu() {
       Menu, PVfList, Add,
       If (RegExMatch(CurrentSLD, "i)(\.sld)$") && SLDhasFiles=1)
          Menu, PVfList, Add, &Clean duplicate/inexistent entries, cleanFilesList
+      If (RegExMatch(CurrentSLD, "i)(\.sld)$") && StrLen(DynamicFoldersList)>6)
+         Menu, PVfList, Add, &Regenerate the entire list, RegenerateEntireList
       Menu, PVfList, Add, &Text filtering`tCtrl+F, enableFilesFilter
       If StrLen(filesFilter)>1
          Menu, PVfList, Check, &Text filtering`tCtrl+F
@@ -1938,6 +2226,10 @@ BuildMenu() {
    Menu, PVprefs, Add, &High quality resampling, ToggleImgQuality
    Menu, PVprefs, Add, &Touch screen mode, ToggleTouchMode
    Menu, PVprefs, Add, &Skip missing files, ToggleSkipDeadFiles
+   Menu, PVprefs, Add, 
+   Menu, PVprefs, Add, &Ignore stored SLD settings, ToggleIgnoreSLDprefs
+   If (MustLoadSLDprefs=0)
+      Menu, PVprefs, Check, &Ignore stored SLD settings
    If (userimgQuality=1)
       Menu, PVprefs, Check, &High quality resampling
    If (skipDeadFiles=1)
@@ -1952,14 +2244,34 @@ BuildMenu() {
       Menu, PVprefs, Check, &Hide title bar
 
 
-   Menu, PVmenu, Add, &Open File`tCtrl+O, OpenFiles
-   Menu, PVmenu, Add, &Open Folders`tShift+O, OpenFolders
+   readRecentEntries()
+   Menu, PVopenF, Add, &Open File`tCtrl+O, OpenFiles
+   Menu, PVopenF, Add, &Open Folders`tShift+O, OpenFolders
+   Menu, PVopenF, Add,
+   Loop, Parse, historyList, `n
+   {
+      If (A_Index>15)
+         Break
+
+      If StrLen(A_LoopField)<4
+         Continue
+      countItemz++
+      StringRight, entryu, A_LoopField, 25
+      Menu, PVopenF, Add, &%countItemz%. %entryu%, OpenRecentEntry
+   }
+   If (countItemz>0)
+   {
+      Menu, PVopenF, Add, 
+      Menu, PVopenF, Add, &Erase history, EraseHistory
+   }
+
+   Menu, PVmenu, Add, &Open..., :PVopenF
    Menu, PVmenu, Add,
    If (maxFilesIndex>0 && CurrentSLD)
    {
-      Menu, PVmenu, Add, File, :PVtFile
-      Menu, PVmenu, Add, Files list, :PVfList
-      Menu, PVmenu, Add, View, :PVview
+      Menu, PVmenu, Add, C&urrent file, :PVtFile
+      Menu, PVmenu, Add, Files l&ist, :PVfList
+      Menu, PVmenu, Add, Vie&w, :PVview
       If (maxFilesIndex>1 && CurrentSLD)
       {
          Menu, PVmenu, Add, Navigation, :PVnav
@@ -1976,13 +2288,33 @@ BuildMenu() {
    Menu, PVmenu, Show
 }
 
+EraseHistory() {
+   historyList := ""
+   Loop, 15
+       IniWrite, 0, % mainSettingsFile, Recents, E%A_Index%
+}
+
+OpenRecentEntry() {
+  openThisu := SubStr(A_ThisMenuItem, 2, InStr(A_ThisMenuItem, ". ")-2)
+  IniRead, newEntry, % mainSettingsFile, Recents, E%openThisu%, @
+; MsgBox, %openthisu% -- %newentry%
+  newEntry := Trim(newEntry)
+  If StrLen(newEntry)>4
+  {
+     If RegExMatch(newEntry, "i)(\.sld)$")
+        OpenSLD(newEntry)
+     Else
+        coreOpenFolder(newEntry)
+  }
+}
+
 ToggleAllonTop() {
    isAlwaysOnTop := !isAlwaysOnTop
    If (isAlwaysOnTop=1)
       WinSet, AlwaysOnTop, 1, ahk_id %PVhwnd%
    Else
       WinSet, AlwaysOnTop, 0, ahk_id %PVhwnd%
-   writeSlideSettings(mainSettingsFile)
+   writeMainSettings()
 }
 
 ToggleTitleBaru() {
@@ -1991,27 +2323,33 @@ ToggleTitleBaru() {
       Gui, 1: -Caption
    Else
       Gui, 1: +Caption
+   writeMainSettings()
 }
 
 ToggleInfoToolTips() {
     noTooltipMSGs := !noTooltipMSGs
-    writeSlideSettings(mainSettingsFile)
+    writeMainSettings()
 }
 
 ToggleSkipDeadFiles() {
     skipDeadFiles := !skipDeadFiles
-    writeSlideSettings(mainSettingsFile)
+    writeMainSettings()
+}
+
+ToggleIgnoreSLDprefs() {
+    MustLoadSLDprefs := !MustLoadSLDprefs
+    writeMainSettings()
 }
 
 ToggleImgQuality() {
     userimgQuality := !userimgQuality
     imgQuality := (userimgQuality=1) ? 7 : 5
-    writeSlideSettings(mainSettingsFile)
+    writeMainSettings()
 }
 
 ToggleTouchMode() {
     TouchScreenMode := !TouchScreenMode
-    writeSlideSettings(mainSettingsFile)
+    writeMainSettings()
 }
 
 defineWinTitlePrefix() {
@@ -2048,7 +2386,6 @@ defineWinTitlePrefix() {
 
    Return winPrefix
 }
-
 
 SetParentID(Window_ID, theOther) {
   Return DllCall("SetParent", "uint", theOther, "uint", Window_ID) ; success = handle to previous parent, failure =null 
@@ -2523,6 +2860,9 @@ Return
 
 GDIupdater() {
    updateUIctrl()
+   If (toolTipGuiCreated=1)
+      TooltipCreator(1, 1)
+
    If (!CurrentSLD || !maxFilesIndex) || (A_TickCount - scriptStartTime<600)
       Return
 
@@ -2544,7 +2884,8 @@ GDIupdater() {
    If (maxFilesIndex>0) && (A_TickCount - scriptStartTime>500)
    {
 ;      DelayiedImageDisplay()
-      SetTimer, DelayiedImageDisplay, -15
+      If !((A_TickCount - lastWinDrag>450) && (isTitleBarHidden=1))
+         SetTimer, DelayiedImageDisplay, -15
       SetTimer, ReloadThisPicture, -750
    }
 }
@@ -2590,18 +2931,73 @@ GetClientSize(ByRef w, ByRef h, hwnd) {
     }
     VarSetCapacity(rc, 16, 0)
     DllCall("GetClientRect", "uint", hwnd, "uint", &rc)
-    prevW := w := NumGet(rc, 8, "int")
-    prevH := h := NumGet(rc, 12, "int")
+    prevW := W := NumGet(rc, 8, "int")
+    prevH := H := NumGet(rc, 12, "int")
     lastInvoked := A_TickCount
 } 
 
-sldGenerateFilesList(readThisFile, doFilesCheck) {
+ReloadDynamicFolderz(fileNamu) {
+    showTOOLtip("Refreshing files list, please wait...")
+    bckpResultedFilesList := []
+    bkcpMaxFilesIndex := 0
+    listu := coreLoadDynaFolders(fileNamu)
+    Loop, Parse, listu,`n
+    {
+       line := Trim(A_LoopField)
+       If (RegExMatch(line, RegExFilesPattern) || StrLen(line)<4)
+          Continue
+       Else
+          GetFilesList(line "\*")
+    }
+}
+
+coreLoadDynaFolders(fileNamu) {
+   Loop, 987
+   {
+       IniRead, newFolder, % fileNamu, DynamicFolderz, DF%A_Index%, @
+       If StrLen(newFolder)>3
+          listu .= newFolder "`n"
+       Else countFails++
+       If (countFails>3)
+          Break
+   }
+   Sort, listu, U D'n
+   Return listu
+}
+
+RegenerateEntireList() {
+    showTOOLtip("Refreshing files list, please wait...")
+    If (DynamicFoldersList="hexists")
+       listu := coreLoadDynaFolders(CurrentSLD)
+    Else If (StrLen(DynamicFoldersList)>6)
+       listu := DynamicFoldersList
+    Else Return
+
+    If StrLen(filesFilter)>1
+    {
+       usrFilesFilteru := filesFilter := ""
+       FilterFilesIndex()
+    }
+    bckpResultedFilesList := []
+    bkcpMaxFilesIndex := 0
     renewCurrentFilesList()
-    CurrentSLD := ""
-    SLDhasFiles := 0
+    mustGenerateStaticFolders := 1
+    Loop, Parse, listu,`n
+    {
+       line := Trim(A_LoopField)
+       If (RegExMatch(line, RegExFilesPattern) || StrLen(line)<4)
+          Continue
+       Else
+          GetFilesList(line "\*")
+    }
+    GenerateRandyList()
+    SoundBeep , 900, 100
+    RandomPicture()
+}
+
+sldGenerateFilesList(readThisFile, doFilesCheck, mustRemQuotes) {
     FileRead, tehFileVar, %readThisFile%
-    FileReadLine, firstLine, %readThisFile%, 1
-    If !InStr(firstLine, "[General]")
+    If (mustRemQuotes=1)
     {
        StringReplace, tehFileVar, tehFileVar,"-,,All
        StringReplace, tehFileVar, tehFileVar,",,All
@@ -2610,7 +3006,10 @@ sldGenerateFilesList(readThisFile, doFilesCheck) {
     Loop, Parse, tehFileVar,`n,`r
     {
        line := Trim(A_LoopField)
-       If InStr(A_LoopField, "|")
+       If RegExMatch(line, "i)^(df.*\=|fi.*\=)")
+          Continue
+
+       If InStr(line, "|")
        {
           doRecursive := 2
           line := StrReplace(line, "|")
@@ -2632,11 +3031,11 @@ sldGenerateFilesList(readThisFile, doFilesCheck) {
           resultedFilesList[maxFilesIndex] := line
        } Else If (StrLen(OutDir)>2 && StrLen(OutFileName)<2)
        {
+          isRecursive := (doRecursive=2) ? "|" : ""
+          DynamicFoldersList .= "`n" isRecursive OutDir "`n"
           GetFilesList(OutDir "\*", doRecursive)
        }
     }
-    currentFileIndex := 1
-    CurrentSLD := readThisFile
 }
 
 filterCoreString(stringu, behave, thisFilter) {
@@ -2653,7 +3052,7 @@ filterCoreString(stringu, behave, thisFilter) {
 }
 
 GetFilesList(strDir, doRecursive:=1) {
-  showTOOLtip("Loading the list of files... please wait.`n" strDir)
+  showTOOLtip("Loading files from...`n" strDir "`n")
   If InStr(strDir, "|")
   {
      doRecursive := 2
@@ -2868,9 +3267,12 @@ TooltipCreator(msg:=0,killWin:=0) {
 
     If (A_TickCount-lastInvoked<200)
     {
-       If (prevMsg!=msg) && !RegExMatch(msg, "i)(zoom level\: |image brightness\: |image gamma\: )")
+       If (prevMsg!=msg) && !RegExMatch(msg, "i)(show speed\: |zoom level\: |image brightness\: |image gamma\: )")
+       {
+          minLen := StrLen(msg) + 150
           msg := prevMsg "`n" msg
-       Else Return
+          StringRight, msg, msg, % minLen
+       } Else Return
     }
 
     lastInvoked := A_TickCount
@@ -2880,7 +3282,7 @@ TooltipCreator(msg:=0,killWin:=0) {
     txtColor := OSDtextColor
     isBold :=  " Bold"
     Sleep, 5
-    Gui, ToolTipGuia: -DPIScale -Caption +Owner +ToolWindow +hwndhGuiTip
+    Gui, ToolTipGuia: -DPIScale -Caption +Owner +ToolWindow +E0x80000 +E0x20 +hwndhGuiTip
     Gui, ToolTipGuia: Margin, % thisFntSize + 5, % thisFntSize + 3
     Gui, ToolTipGuia: Color, c%bgrColor%
     Gui, ToolTipGuia: Font, s%thisFntSize% %isBold% Q5, %OSDFontName%
@@ -2896,3 +3298,24 @@ TooltipCreator(msg:=0,killWin:=0) {
     WinSet, Region, 0-0 R6-6 w%mainWidth% h%mainHeight%, ahk_id %hGuiTip%
     Gui, ToolTipGuia: Show, NoActivate AutoSize x%GuiX% y%GuiY%, GuiTipsWin
 }
+
+
+WM_MOUSEMOVE(wP, lP, msg, hwnd) {
+; Function by Drugwash
+  Global
+  Local A
+  A := WinActive("A")
+  If (isTitleBarHidden=1 && A=PVhwnd && (wP&0x1))
+  {
+     ; ToolTip, looooooool
+     PostMessage, 0xA1, 2,,, ahk_id %PVhwnd%
+     lastWinDrag := A_TickCount
+     SetTimer, trackMouseDragging, -50
+  }
+}
+
+trackMouseDragging() {
+    lastWinDrag := A_TickCount
+}
+
+
