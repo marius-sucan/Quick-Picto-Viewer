@@ -32,9 +32,10 @@
 <li>Support for animated .GIFs in slideshows.</li>
 <li>Support for drag 'n drop of folders or files onto main UI.</li>
 <li>Copy image to clipboard.</li>
+<li>Various keyboard shortcuts to facilitate its usage.</li>
 <li>All the potentially lengthy operations can be stopped with Escape :-).</li>
 </ul> 
 
 <p>Developed by <a href="http://marius.sucan.ro/">Marius Șucan</a>.</p>
 
-<p>I coded the application as an <a href="https://autohotkey.com/">AHK script</a> for AutoHotkey_H v1.1.30. To execute/compile the source code one needs <a href="https://hotkeyit.github.io/v2/">AutoHotkey_H v1.1+</a>.</p>
+<p>I coded the application as an <a href="https://autohotkey.com/">AHK script</a> for AutoHotkey_L v1.1.30. To execute/compile the source code one needs AHK_L.</p>

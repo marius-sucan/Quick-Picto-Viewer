@@ -1,4 +1,4 @@
-; Original script details:
+﻿; Original script details:
 ;   Name:    AHK Picture Viewer
 ;   Version: 1.0.0 on Oct 4, 2010 by SBC
 ;   Platform: Windows XP or later
@@ -7,7 +7,7 @@
 ;
 ; New script details:
 ;   Name:    Quick Picto Viewer
-;   Version: 2.8.0 on jeudi 20 juin 2019
+;   Version: 2.9.0 on vendredi 21 juin 2019
 ;   Platform: Windows 7 or later
 ;   Author:  Marius Șucan -  http://marius.sucan.ro/
 ;   GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
@@ -21,7 +21,7 @@
 
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 2.8.0
+;@Ahk2Exe-SetVersion 2.9.0
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2019)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
  
@@ -60,8 +60,8 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , mustGenerateStaticFolders := 1, lastWinDrag := 1
    , prevFileMovePath := "", lastGIFdestroy := 1, prevAnimGIFwas := ""
    , thumbsW := 300, thumbsH := 300, thumbsDisplaying := 0
-   , othumbsW := 300, othumbsH := 300
-   , version := "2.8.0", vReleaseDate := "20/06/2019"
+   , othumbsW := 300, othumbsH := 300, ForceRegenStaticFolders := 0
+   , version := "2.9.0", vReleaseDate := "21/06/2019"
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1
    , thumbsAratio := 3, thumbsZoomLevel := 1
@@ -212,6 +212,14 @@ identifyThisWin() {
        CompareImagesAB()
     Return
 
+    ~^vk55::    ; Ctrl+U
+       FolderzPanelWindow()
+    Return
+
+    ~!vk55::    ; Alt+U
+       DynamicFolderzPanelWindow()
+    Return
+
     ~^vk4B::    ; Ctrl+K
        convert2jpeg()
     Return
@@ -259,6 +267,10 @@ identifyThisWin() {
 
     ~vk53::   ; S
        SwitchSlideModes()
+    Return
+
+    ~^vk53::   ; Ctrl+S
+       SaveFilesList()
     Return
 
     ~vk54::   ; T
@@ -450,6 +462,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
      SetTimer, RemoveTooltip, % -msgDisplayTime
      Return
   }
+  ForceRegenStaticFolders := 0
   renewCurrentFilesList()
   DynamicFoldersList := CurrentSLD := ""
   filesFilter := usrFilesFilteru := ""
@@ -723,12 +736,27 @@ SettingsGUIAGuiEscape:
    CloseWindow()
 Return
 
-GuiClose:
-Cleanup:
+TrueCleanup() {
+   Gui, 1: Destroy
+   Gui, 2: Destroy
+   Gui, 3: Destroy
    DestroyGDIbmp()
+   RemoveTooltip()
+   DestroyGIFuWin()
+   Sleep, 2
+    Gdip_DisposeImage(gdiBitmap)
+; these lead to crashes; no idea why
+   ; Gdip_DisposeImage(gdiBitmapSmallView)
+   ; Gdip_DisposeImage(gdiBitmapViewScale)
    ; Gdip_DisposeImage(gdiBitmapSmall)
+   Sleep, 2
    writeMainSettings()
    Gdip_Shutdown(GDIPToken)  
+}
+
+GuiClose:
+Cleanup:
+   TrueCleanup()
    ExitApp
 Return
 
@@ -1921,6 +1949,7 @@ SaveFilesList() {
       showTOOLtip("Saving list of " maxFilesIndex " entries into...`n" file2save "`nPlease wait...")
       thisTmpFile := !newTmpFile ? backCurrentSLD : newTmpFile
       saveDynaFolders := InStr(DynamicFoldersList, "|hexists|") ? coreLoadDynaFolders(thisTmpFile) : DynamicFoldersList
+      Sort, saveDynaFolders, UD`n
       dynaFolderListu := "`n[DynamicFolderz]`n"
       Loop, Parse, saveDynaFolders, `n
       {
@@ -1941,7 +1970,7 @@ SaveFilesList() {
           r := resultedFilesList[A_Index]
           If (InStr(r, "||") || !r)
              Continue
-          If (mustGenerateStaticFolders=1)
+          If (mustGenerateStaticFolders=1 || ForceRegenStaticFolders=1)
           {
              zPlitPath(r, 1, irrelevantVar, OutDir)
              foldersList .= OutDir "`n"
@@ -1950,8 +1979,9 @@ SaveFilesList() {
       }
       Sort, foldersList, U D`n
       foldersListu := "`n[Folders]`n"
-      If (mustGenerateStaticFolders=1)
+      If (mustGenerateStaticFolders=1 || ForceRegenStaticFolders=1)
       {
+         ForceRegenStaticFolders := 0
          Loop, Parse, foldersList, `n
          {
              If !A_LoopField
@@ -1962,9 +1992,8 @@ SaveFilesList() {
       } Else If (SLDcacheFilesList=1)
       {
          thisTmpFile := !newTmpFile ? backCurrentSLD : newTmpFile
-         foldersListu .= LoadStaticFoldersCached(thisTmpFile)
+         foldersListu .= LoadStaticFoldersCached(thisTmpFile, irrelevantVar)
       }
-
       foldersListu .= "`n[FilesList]`n"
       Sleep, 10
       FileAppend, % dynaFolderListu, % file2save, UTF-16
@@ -1985,13 +2014,17 @@ SaveFilesList() {
    }
 }
 
-LoadStaticFoldersCached(fileNamu) {
+LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders) {
     FileRead, tehFileVar, %fileNamu%
+    countStaticFolders := 0
     Loop, Parse, tehFileVar,`n,`r
     {
        line := Trim(A_LoopField)
        If (RegExMatch(line, "i)^(Fi[0-9].*\=.*\*\&\*[a-z]\:\\..)") && !RegExMatch(line, RegExFilesPattern))
+       {
+          countStaticFolders++
           staticFoldersListCache .= line "`n"
+       }
     }
     Return staticFoldersListCache
 }
@@ -3311,46 +3344,54 @@ addNewFolder2list() {
        Else If (A_Index>2)
           Break
    }
-
+   zPlitPath(SelectedDir, 0, OutFileName, OutDir)
+   SelectedDir := OutDir
    If (SelectedDir)
    {
-      zPlitPath(SelectedDir, 0, OutFileName, OutDir)
-      SelectedDir := OutDir
-      foldersListu := InStr(DynamicFoldersList, "|hexists|") ? coreLoadDynaFolders(CurrentSLD) : DynamicFoldersList
-      Loop, Parse, foldersListu, `n
-      {
-          line := Trim(A_LoopField)
-          line := StrReplace(line, "|")
-          ; MsgBox, % line "\`n" SelectedDir "\"
-          If (SelectedDir=line)
-             warningMsg := 1
-      }
-
-      If (warningMsg=1)
-      {
-         MsgBox,, %appTitle%, Folder already added into the list.`n`n%SelectedDir%\
-         Return "cancel"
-      }
-
       CloseWindow()
       prevOpenFolderPath := SelectedDir
-      writeMainSettings()
-      markedSelectFile := ""
       MsgBox, 52, %appTitle%, Do you want to scan for files recursively, in all subfolders?
       IfMsgBox, No
         isRecursive := "|"
-      If StrLen(filesFilter)>1
+      coreAddNewFolder(isRecursive SelectedDir, 1)
+      If RegExMatch(CurrentSLD, "i)(.\.sld)$")
       {
-         usrFilesFilteru := filesFilter := ""
-         FilterFilesIndex()
-      }
-      GetFilesList(isRecursive SelectedDir "\*")
-      GenerateRandyList()
-      mustGenerateStaticFolders := 1
-      DynamicFoldersList .= "`n" isRecursive SelectedDir
-      SoundBeep , 900, 100
-      RandomPicture()
+         FileReadLine, firstLine, % CurrentSLD, 1
+         IniRead, tstSLDcacheFilesList, % CurrentSLD, General, SLDcacheFilesList, @
+         If (!InStr(firstLine, "[General]") || tstSLDcacheFilesList!=1)
+            good2go := "null"
+      } Else good2go := "null"
+
+      modus := isRecursive ? 1 : 0
+      If (mustGenerateStaticFolders=0 && good2go!="null" && RegExMatch(CurrentSLD, "i)(.\.sld)$"))
+         updateCachedStaticFolders(SelectedDir, modus)
+      Else mustGenerateStaticFolders := 1
+
+      listu := DynamicFoldersList "`n" isRecursive SelectedDir "`n"
+      Sort, listu, UD`n
+      DynamicFoldersList := listu
+      writeMainSettings()
    }
+}
+
+coreAddNewFolder(SelectedDir, remAll) {
+    backCurrentSLD := CurrentSLD
+    CurrentSLD := markedSelectFile := ""
+    If StrLen(filesFilter)>1
+    {
+       usrFilesFilteru := filesFilter := ""
+       FilterFilesIndex()
+    }
+    If (remAll=1)
+       thisFolder := StrReplace(SelectedDir, "|")
+    Else
+       thisFolder := SelectedDir
+    remFilesFromList(thisFolder, 1)
+    GetFilesList(SelectedDir "\*")
+    GenerateRandyList()
+    SoundBeep , 900, 100
+    CurrentSLD := backCurrentSLD
+    RandomPicture()
 }
 
 detectFileID(imgpath) {
@@ -3549,10 +3590,7 @@ associateSLDsNow() {
 }
 
 restartAppu() {
-   DestroyGDIbmp()
-   ; Gdip_DisposeImage(gdiBitmapSmall)
-   writeMainSettings()
-   Gdip_Shutdown(GDIPToken)  
+   TrueCleanup()
    Try Reload
    Sleep, 50
    ExitApp
@@ -3691,13 +3729,13 @@ BuildMenu() {
    {
       Menu, PVfList, Add, Add files`tInsert, addNewFile2list
       Menu, PVfList, Add, Add folder(s)`tShift+Insert, addNewFolder2list
-      Menu, PVfList, Add, Manage folder(s) list`t, DynamicFolderzPanelWindow
+      Menu, PVfList, Add, Manage folder(s) list`tAlt+U, DynamicFolderzPanelWindow
       Menu, PVfList, Add, Remove current file entry`tAlt+Delete, InListMultiEntriesRemover
       Menu, PVfList, Add, Auto-remove entries of dead files, ToggleAutoRemEntries
       If (autoRemDeadEntry=1)
          Menu, PVfList, Check, Auto-remove entries of dead files
       Menu, PVfList, Add,
-      Menu, PVfList, Add, Save list as slideshow (.SLD), SaveFilesList
+      Menu, PVfList, Add, Save list as slideshow (.SLD)`tCtrl+S, SaveFilesList
       Menu, PVfList, Add, Cache files list in .SLD file, ToggleSLDcache
       If (SLDcacheFilesList=1)
          Menu, PVfList, Check, Cache files list in .SLD file
@@ -3707,7 +3745,7 @@ BuildMenu() {
       If (RegExMatch(CurrentSLD, "i)(\.sld)$") && StrLen(DynamicFoldersList)>6)
          Menu, PVfList, Add, &Regenerate the entire list, RegenerateEntireList
       If (RegExMatch(CurrentSLD, "i)(\.sld)$") && mustGenerateStaticFolders!=1 && SLDcacheFilesList=1)
-         Menu, PVfList, Add, &Update files list selectively, FolderzPanelWindow
+         Menu, PVfList, Add, &Update files list selectively`tCtrl+U, FolderzPanelWindow
       Menu, PVfList, Add, &Text filtering`tCtrl+F, enableFilesFilter
       If StrLen(filesFilter)>1
       {
@@ -4809,14 +4847,15 @@ coreLoadDynaFolders(fileNamu) {
    {
        IniRead, newFolder, % fileNamu, DynamicFolderz, DF%A_Index%, @
        If StrLen(newFolder)>3
-          listu .= newFolder "`n"
+          listu .= Trim(newFolder) "`n"
        Else countFails++
 
        If (countFails>3)
           Break
    }
-   listu := listu "`n" DynamicFoldersList
-   Sort, listu, U D'n
+   listu := listu "`n" Trim(DynamicFoldersList) "`n"
+   Sort, listu, UD`n
+;   SoundBeep 
    Return listu
 }
 
@@ -5125,6 +5164,9 @@ AboutWindow() {
 
 FolderzPanelWindow() {
     Static LViewOthers
+    If (slideShowRunning=1)
+       ToggleSlideShowu()
+
     CloseWindow()
     AnyWindowOpen := 2
     Gui, SettingsGUIA: Destroy
@@ -5146,6 +5188,7 @@ FolderzPanelWindow() {
     Gui, Add, ListView, y+10 w%lstWid% gFolderzFilterListBTN r12 Grid vLViewOthers, #|Date|(?)|Folder path|Files
 
     Gui, Add, Checkbox, xs+0 y+10 gToggleCountFilesFoldersList Checked%CountFilesFolderzList% vCountFilesFolderzList, Count files in folders list
+    Gui, Add, Checkbox, xs+0 y+10 gToggleForceRegenStaticFs Checked%ForceRegenStaticFolders% vForceRegenStaticFolders, Force this list to be refreshed on .SLD save
     Gui, Add, Button, xs+0 y+10 h30 w130 gUpdateSelFolder, &Rescan folder
     Gui, Add, Button, x+5 h30 w%btnWid% gIgnoreSelFolder, &Ignore changes
     Gui, Add, Button, x+5 h30 w%btnWid% gRemFilesStaticFolder, Re&move files from list
@@ -5157,6 +5200,9 @@ FolderzPanelWindow() {
 
 DynamicFolderzPanelWindow() {
     Static LViewDynas
+    If (slideShowRunning=1)
+      ToggleSlideShowu()
+
     CloseWindow()
     AnyWindowOpen := 3
     Gui, SettingsGUIA: Destroy
@@ -5166,10 +5212,10 @@ DynamicFolderzPanelWindow() {
     Gui, SettingsGUIA: Margin, 15, 15
     btnWid := 140
     txtWid := 360
-    lstWid := 445
+    lstWid := 495
     If (PrefsLargeFonts=1)
     {
-       lstWid := lstWid + 235
+       lstWid := lstWid + 215
        btnWid := btnWid + 65
        txtWid := txtWid + 105
        Gui, Font, s%LargeUIfontValue%
@@ -5179,6 +5225,7 @@ DynamicFolderzPanelWindow() {
 
     Gui, Add, Button, xs+0 y+5  h30 w70 gBTNaddNewFolder2list, &Add
     Gui, Add, Button, x+5 h30 w80 gRemDynaSelFolder, &Remove
+    Gui, Add, Button, x+5 h30 w80 gRescanDynaFolder, Re&scan
     Gui, Add, Button, x+5 h30 w%btnWid% gInvertRecurseDynaFolder, &Invert recursive state
     Gui, Add, Button, x+5 h30 w%btnWid% gOpenDynaFolderBTN, &Open folder in Explorer
     Gui, SettingsGUIA: Show, AutoSize, Dynamic folders list: %appTitle%
@@ -5192,6 +5239,10 @@ ToggleCountFilesFoldersList() {
      DynamicFolderzPanelWindow()
   Else If (AnyWindowOpen=2)
      FolderzPanelWindow()
+}
+
+ToggleForceRegenStaticFs() {
+  GuiControlGet, ForceRegenStaticFolders
 }
 
 BTNaddNewFolder2list() {
@@ -5241,7 +5292,12 @@ RemFilesStaticFolder() {
     Sleep, 50
     MsgBox, 52, %appTitle%, Would you like to remove the files from the index/list pertaining to the static folder selected?`n`n%folderu%
     IfMsgBox, Yes
+    {
       remFilesFromList("|" folderu)
+      GenerateRandyList()
+      SoundBeep, 950, 100
+      RandomPicture()
+    }
     Sleep, 550
     FolderzPanelWindow()
 }
@@ -5268,7 +5324,12 @@ RemDynaSelFolder() {
     DynamicFoldersList := newFoldersList
     MsgBox, 52, %appTitle%, Would you like to remove the files from the index/list pertaining to the removed folder as well ?`n`n%folderu%
     IfMsgBox, Yes
+    {
       remFilesFromList(folderu)
+      GenerateRandyList()
+      SoundBeep, 950, 100
+      RandomPicture()
+    }
     Sleep, 500
     DynamicFolderzPanelWindow()
 }
@@ -5315,25 +5376,82 @@ InvertRecurseDynaFolder() {
     {
         line := Trim(A_LoopField)
         fileTest := StrReplace(line, "|")
-        If (StrLen(line)<2 || !FileExist(fileTest) || line="|hexists|")
+        If (StrLen(line)<2 || !FileExist(fileTest) || line="|hexists|" || line=folderu)
            Continue
-        If (line=folderu)
-        {
-           isPipe := InStr(line, "|") ? 1 : 0
-           line := StrReplace(line, "|")
-           If (isPipe!=1)
-              line := "|" line
-        }
         newFoldersList .= line "`n"
     }
+    isPipe := InStr(folderu, "|") ? 1 : 0
+    folderu := StrReplace(folderu, "|")
+    If (isPipe!=1)
+       folderu := "|" folderu
+    newFoldersList .= folderu "`n"
 
+    Sort, newFoldersList, UD`n
     DynamicFoldersList := newFoldersList
     Sleep, 25
     DynamicFolderzPanelWindow()
 }
 
-remFilesFromList(SelectedDir) {
-    showTOOLtip("Removing files from the list pertaining to...`n" SelectedDir "\`n")
+rescanDynaFolder() {
+    Gui, SettingsGUIA: ListView, LViewDynas
+    RowNumber := LV_GetNext(0, "F")
+    LV_GetText(folderu, RowNumber, 3)
+
+    If (StrLen(folderu)<3 || folderu="folder path")
+       Return
+
+    CloseWindow()
+    Sleep, 25
+    ; msgbox, % folderu
+    coreAddNewFolder(folderu, 1)
+
+    If RegExMatch(CurrentSLD, "i)(.\.sld)$")
+    {
+       FileReadLine, firstLine, % CurrentSLD, 1
+       IniRead, tstSLDcacheFilesList, % CurrentSLD, General, SLDcacheFilesList, @
+       If (!InStr(firstLine, "[General]") || tstSLDcacheFilesList!=1 || InStr(folderu, "|"))
+          good2go := "null"
+    } Else good2go := "null"
+
+    If (mustGenerateStaticFolders=0 && good2go!="null" && RegExMatch(CurrentSLD, "i)(.\.sld)$"))
+       updateCachedStaticFolders(folderu, 0)
+
+    Sleep, 550
+    DynamicFolderzPanelWindow()
+}
+
+updateCachedStaticFolders(folderu, onlyMainFolder) {
+   thisIndex := 0
+   foldersListu := LoadStaticFoldersCached(CurrentSLD, countStaticFolders) "`n"
+   If !InStr(foldersListu, folderu "`n")
+   {
+      thisIndex++
+      FileGetTime, dirDate, % folderu, M
+      tehValue := dirDate "*&*" folderu
+      indexu := countStaticFolders + thisIndex
+      IniWrite, % tehValue, % CurrentSLD, Folders, Fi%indexu%
+   }
+
+   If (onlyMainFolder=1)
+      Return
+
+   Loop, Files, %folderu%\*, RD
+   {
+        If !InStr(foldersListu, A_LoopFileFullPath "`n")
+        {
+           thisIndex++
+           FileGetTime, dirDate, %A_LoopFileFullPath%, M
+           tehValue := dirDate "*&*" A_LoopFileFullPath
+           indexu := countStaticFolders + thisIndex
+         ;  MsgBox, % A_LoopFileFullPath
+           IniWrite, % tehValue, % CurrentSLD, Folders, Fi%indexu%
+        }
+   }  
+}
+
+remFilesFromList(SelectedDir, silentus:=0) {
+    If (silentus=0)
+       showTOOLtip("Removing files from the list pertaining to...`n" SelectedDir "\`n")
     backCurrentSLD := CurrentSLD
     markedSelectFile := CurrentSLD := ""
     If StrLen(filesFilter)>1
@@ -5368,15 +5486,13 @@ remFilesFromList(SelectedDir) {
     renewCurrentFilesList()
     maxFilesIndex := countFiles
     resultedFilesList := newArrayu.Clone()
-    GenerateRandyList()
     prevStartIndex := -1
     filesRemoved := oldMaxy - maxFilesIndex
     If (filesRemoved<1)
        filesRemoved := 0
-    showTOOLtip("Finished removing " filesRemoved " files from the list...")
-    RandomPicture()
+    If (silentus=0)
+       showTOOLtip("Finished removing " filesRemoved " files from the list...")
     CurrentSLD := backCurrentSLD
-    SoundBeep, 950, 100
     Sleep, 25
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
@@ -5397,115 +5513,30 @@ UpdateSelFolder() {
        Return
     }
 
+    MsgBox, 52, %appTitle%, Do you want to scan for new files recursively, in all subfolders?
+    IfMsgBox, No
+      isRecursive := "|"
+
     CloseWindow()
     Sleep, 25
-    showTOOLtip("Scanning for files in...`n" folderu "\`n")
-    backCurrentSLD := CurrentSLD
-    markedSelectFile := CurrentSLD := ""
-    If StrLen(filesFilter)>1
-    {
-       usrFilesFilteru := filesFilter := ""
-       FilterFilesIndex()
-    }
+    coreAddNewFolder(isRecursive folderu, 0)
+    If !isRecursive
+       updateCachedStaticFolders(folderu, 0)
 
-    Loop, Files, %folderu%\*
-    {
-        If RegExMatch(A_LoopFileName, RegExFilesPattern)
-        {
-           countFilez++
-           newFilesList .= A_LoopFileFullPath "`n"
-        }
-        If GetKeyState("Esc", "P")
-        {
-           abandonAll := 1
-           Break
-        }
-    }
-
-    If (abandonAll=1)
-    {
-       showTOOLtip("Operation aborted... Files list remains unchanged.")
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
-
-    showTOOLtip("Generating files list...")
-    Loop, % maxFilesIndex + 1
-    {
-        r := resultedFilesList[A_Index]
-        If (InStr(r, "||") || !r)
-           Continue
-
-        rT := StrReplace(r, folderu "\")
-        If InStr(rT, "\")
-           filesListu .= r "`n"
-        Else If (testFileExists(r)>100)
-           filesListu .= r "`n"
-    }
-    filesListu := newFilesList "`n" filesListu
-    showTOOLtip("Removing duplicates from the list, please wait...")
-    Sort, filesListu, U D`n
-
-    showTOOLtip("Saving files list into`n" backCurrentSLD "`nPlease wait...")
-    saveDynaFolders := InStr(DynamicFoldersList, "|hexists|") ? coreLoadDynaFolders(backCurrentSLD) : DynamicFoldersList
-    dynaFolderListu := "`n[DynamicFolderz]`n"
-    Loop, Parse, saveDynaFolders, `n
-    {
-        fileTest := StrReplace(A_LoopField, "|")
-        If (StrLen(A_LoopField)<4 || !FileExist(fileTest))
-           Continue
-        countDynas++
-        dynaFolderListu .= "DF" countDynas "=" A_LoopField "`n"
-    }
-
-    Sort, foldersList, U D`n
-    foldersListu := "`n[Folders]`n"
-    foldersListu .= LoadStaticFoldersCached(backCurrentSLD)
-    foldersListu .= "`n[FilesList]`n"
-
-    SLDcacheFilesList := 1
-    IniRead, IgnorePrefs, % backCurrentSLD, General, IgnoreThesePrefs, @
-    Sleep, 25
-    FileDelete, % backCurrentSLD
-    Sleep, 25
-    IniWrite, % IgnorePrefs, % backCurrentSLD, General, IgnoreThesePrefs
-    IniWrite, Yes, % backCurrentSLD, General, UseCachedList
-    writeSlideSettings(backCurrentSLD)
-
-    Sleep, 10
-    FileAppend, % dynaFolderListu, % backCurrentSLD, UTF-16
-    Sleep, 10
-    FileAppend, % foldersListu, % backCurrentSLD, UTF-16
-    Sleep, 10
-    FileAppend, % filesListu, % backCurrentSLD, UTF-16
-    throwMSGwriteError()
-    renewCurrentFilesList()
-
-    Loop, Parse, filesListu,`n
-    {
-        If StrLen(A_LoopField)<2
-           Continue
-
-        maxFilesIndex++
-        resultedFilesList[maxFilesIndex] := A_LoopField
-    }
+    Sleep, 500
     FileGetTime, dirDate, % folderu, M
     tehValue := dirDate "*&*" folderu
-    IniWrite, % tehValue, % backCurrentSLD, Folders, Fi%indexSelected%
-    GenerateRandyList()
-    prevStartIndex := -1
-    RandomPicture()
-    CurrentSLD := backCurrentSLD
-    SoundBeep, 950, 100
+    IniWrite, % tehValue, % CurrentSLD, Folders, Fi%indexSelected%
     Sleep, 25
     SetTimer, RemoveTooltip, % -msgDisplayTime
+    FolderzPanelWindow()
 }
 
 PopulateStaticFolderzList() {
     If (mustGenerateStaticFolders=1 || SLDcacheFilesList!=1)
        Return
 
-    foldersListu := LoadStaticFoldersCached(CurrentSLD)
+    foldersListu := LoadStaticFoldersCached(CurrentSLD, irrelevantVar)
     Gui, SettingsGUIA: ListView, LViewOthers
 
     If (CountFilesFolderzList=1)
@@ -5519,6 +5550,9 @@ PopulateStaticFolderzList() {
        Tooltip, Press ESC to abort...
     }
 
+    LV_ModifyCol(5, "Integer")
+    LV_ModifyCol(1, "Integer")
+    LV_ModifyCol(0, "Integer")
     Loop, Parse, foldersListu, `n
     {
         If StrLen(A_LoopField)<2
@@ -5561,10 +5595,10 @@ PopulateStaticFolderzList() {
         } Else countFiles := "-"
         LV_Add(A_Index, indexu, dirDate, statusu, folderu, countFiles)
     }
-    LV_ModifyCol(4, "Integer")
-    Loop, 4
+    Loop, 5
         LV_ModifyCol(A_Index, "AutoHdr Left")
     LV_ModifyCol(3, "Sort")
+    ; LV_ModifyCol(5, "Integer")
     If (CountFilesFolderzList=1)
     {
        SoundBeep , 900, 100
