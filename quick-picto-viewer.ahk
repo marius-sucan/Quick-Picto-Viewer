@@ -21,7 +21,7 @@
 
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 3.0.0
+;@Ahk2Exe-SetVersion 3.1.0
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2019)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
  
@@ -40,6 +40,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , hGuiTip := 1, hGuiThumbsHL := 1, hSetWinGui := 1
    , prevFullThumbsUpdate := 1, winGDIcreated := 0, ThumbsWinGDIcreated := 0
    , hPicOnGui1, scriptStartTime := A_TickCount
+   , newStaticFoldersListCache := ""
    , prevTooltipDisplayTime := 1, mainCompiledPath := ""
    , filteredMap2mainList := [], thumbsCacheFolder := A_ScriptDir "\thumbs-cache"
    , resultedFilesList := [], currentFileIndex, maxFilesIndex := 0
@@ -61,7 +62,8 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , prevFileMovePath := "", lastGIFdestroy := 1, prevAnimGIFwas := ""
    , thumbsW := 300, thumbsH := 300, thumbsDisplaying := 0
    , othumbsW := 300, othumbsH := 300, ForceRegenStaticFolders := 0
-   , version := "3.0.0", vReleaseDate := "23/06/2019"
+   , CountFilesFolderzList := 0, RecursiveStaticRescan := 0
+   , version := "3.1.0", vReleaseDate := "25/06/2019"
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1
    , thumbsAratio := 3, thumbsZoomLevel := 1
@@ -73,7 +75,8 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , noTooltipMSGs := 0, zoomLevel := 1, skipDeadFiles := 0
    , isTitleBarHidden := 0, lumosGrayAdjust := 0, GammosGrayAdjust := 0
    , MustLoadSLDprefs := 0, animGIFsSupport := 1, move2recycler := 1
-   , SLDcacheFilesList := 1, autoRemDeadEntry := 1, CountFilesFolderzList := 0
+   , SLDcacheFilesList := 1, autoRemDeadEntry := 1
+   , easySlideStoppage := 0
 
 imgQuality := (userimgQuality=1) ? 7 : 5
 DetectHiddenWindows, On
@@ -213,10 +216,13 @@ identifyThisWin(noReact:=0) {
     Return
 
     ~^vk55::    ; Ctrl+U
-       FolderzPanelWindow()
+       ForceRegenStaticFolders := 0
+       If (RegExMatch(CurrentSLD, "i)(\.sld)$") && mustGenerateStaticFolders!=1 && SLDcacheFilesList=1)
+          FolderzPanelWindow()
     Return
 
     ~!vk55::    ; Alt+U
+       ForceRegenStaticFolders := 0
        DynamicFolderzPanelWindow()
     Return
 
@@ -331,7 +337,7 @@ identifyThisWin(noReact:=0) {
        ChangeZoom(-1)
     Return
 
-    ~!Delete::
+    !Delete::
        InListMultiEntriesRemover()
     Return
 
@@ -360,7 +366,7 @@ identifyThisWin(noReact:=0) {
     Return
 
     ~Space::
-       If (thumbsDisplaying=1)
+       If (thumbsDisplaying=1 || markedSelectFile)
           markThisFileNow()
        Else
           InfoToggleSlideShowu()
@@ -415,6 +421,11 @@ identifyThisWin(noReact:=0) {
 
     ~WheelUp::
     ~Right::
+       If (InStr(A_ThisHotkey, "wheel") && thumbsDisplaying=1)
+       {
+          ThumbsNavigator("PgUp")
+          Return
+       }
        If (InStr(A_ThisHotkey, "wheel") && IMGresizingMode=4 && thumbsDisplaying!=1)
        {
           ChangeZoom(1)
@@ -432,6 +443,11 @@ identifyThisWin(noReact:=0) {
 
     ~WheelDown::
     ~Left::
+       If (InStr(A_ThisHotkey, "wheel") && thumbsDisplaying=1)
+       {
+          ThumbsNavigator("PgDn")
+          Return
+       }
        If (InStr(A_ThisHotkey, "wheel") && IMGresizingMode=4 && thumbsDisplaying!=1)
        {
           ChangeZoom(-1)
@@ -484,7 +500,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
   }
   ForceRegenStaticFolders := 0
   renewCurrentFilesList()
-  DynamicFoldersList := CurrentSLD := ""
+  newStaticFoldersListCache := DynamicFoldersList := CurrentSLD := ""
   filesFilter := usrFilesFilteru := ""
   SLDhasFiles := 0
   mustRemQuotes := 1
@@ -578,7 +594,9 @@ IncreaseSlideSpeed() {
 }
 
 resetSlideshowTimer(showMsg) {
-   If (slideShowRunning=1)
+   If (easySlideStoppage=1 && slideShowRunning=1)
+      ToggleSlideShowu()
+   Else If (slideShowRunning=1)
    {
       ToggleSlideShowu()
       Sleep, 1
@@ -773,14 +791,11 @@ InitGuiContextMenu() {
 }
 
 activateMainWin() {
+   If (easySlideStoppage=1 && slideShowRunning=1)
+      ToggleSlideShowu()
+
    If (toolTipGuiCreated=1)
       TooltipCreator(1, 1)
-   If (thumbsDisplaying=1)
-   {
-      If (identifyThisWin(2)=1)
-         Gui, thumbsGuiHL: Show, NoActivate
-      Else Gui, thumbsGuiHL: Hide
-   }
 }
 
 ToggleThumbsMode() {
@@ -790,10 +805,10 @@ ToggleThumbsMode() {
       Return
 
    lastInvoked := A_TickCount
+   GdipCleanMain()
    If (thumbsDisplaying=1)
    {
       thumbsDisplaying := 0
-      Gui, thumbsGuiHL: Hide
       WinMove, ahk_id %hGDIthumbsWin%,, 1, 1, 1, 1
       r := IDshowImage(currentFileIndex)
       If !r
@@ -887,7 +902,6 @@ UpdateThumbsScreen(forceThis:=0) {
          r := 1
       } Else
       {
-         Gui, thumbsGuiHL: Hide
          If (A_TickCount - prevTooltipDisplayTime > 1000)
          {
             showTOOLtip("Generating thumbnails, please wait...")
@@ -898,41 +912,23 @@ UpdateThumbsScreen(forceThis:=0) {
       }
    } Else r := 1
    prevStartIndex := startIndex
-   rowIndex := 0
-   columnIndex := -1
-   JEE_ClientToScreen(hPicOnGui1, 1, 1, GuiX, GuiY)
-   Loop, % currentFileIndex - startIndex + 1
-   {
-      columnIndex++
-      If (columnIndex>=maxItemsW)
-      {
-         rowIndex++
-         columnIndex := 0
-      }
-      DestPosX := 1 + thumbsW*columnIndex
-      DestPosY := 1 + thumbsH*rowIndex
-   }
-
+   mainGdipWinThumbsGrid()
    If !r
       prevStartIndex := -1
-   WinMove, ahk_id %hGDIthumbsWin%,, %GuiX%, %GuiY%, %mainWidth%, %mainHeight%
-   WinSet, Region, 0-0 R6-6 w%mainWidth% h%mainHeight% , ahk_id %hGDIthumbsWin%
-   WinSet, Region, %DestPosX%-%DestPosY% R6-6 w%thumbsW% h%thumbsH% , ahk_id %hGuiThumbsHL%
-   Sleep, -1
-   If (identifyThisWin()=1 && GetKeyState("LButton")!=1)
-      Gui, thumbsGuiHL: Show, NoActivate x%GuiX% y%GuiY% w%mainWidth% h%mainHeight%, ThumbsWinHighLight
 
-   If (skippedBeats!=1)
-   {
-      WinSet, AlwaysOnTop, 1, ahk_id %hGuiThumbsHL%
-      GdipCleanMain()
-      Sleep, -1
-      WinSet, AlwaysOnTop, 0, ahk_id %hGuiThumbsHL%
-   }
+   JEE_ClientToScreen(hPicOnGui1, 1, 1, GuiX, GuiY)
+   If (A_OSVersion="WIN_7")
+      WinMove, ahk_id %hGDIthumbsWin%,, %GuiX%, %GuiY%, %mainWidth%, %mainHeight%
+   Else
+      WinMove, ahk_id %hGDIthumbsWin%,, 1, 1, %mainWidth%, %mainHeight%
+   WinSet, Region, 0-0 R6-6 w%mainWidth% h%mainHeight% , ahk_id %hGDIthumbsWin%
    lastInvoked := A_TickCount
 }
 
 panIMGclick() {
+   If (slideShowRunning=1)
+      ToggleSlideShowu()
+
    GetPhysicalCursorPos(oX, oY)
    oDx := IMGdecalageX
    oDy := IMGdecalageY
@@ -1019,9 +1015,6 @@ WinClickAction(forceThis:=0) {
          } Else currentFileIndex := newIndex
          SetTimer, DelayiedImageDisplay, -25
       }
-      JEE_ClientToScreen(hPicOnGui1, 1, 1, GuiX, GuiY)
-      Gui, thumbsGuiHL: Show, NoActivate x%GuiX% y%GuiY%
-
       lastInvoked := A_TickCount
       Return
    }
@@ -1550,6 +1543,7 @@ PanIMGonScreen(direction) {
 
    If (slideShowRunning=1)
       ToggleSlideShowu()
+
    If (GetKeyState("Left", "P")!=1 && GetKeyState("Right", "P")!=1)
    && (GetKeyState("Down", "P")!=1 && GetKeyState("Up", "P")!=1)
       Return
@@ -2031,8 +2025,15 @@ SaveFilesList() {
 }
 
 LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders) {
-    FileRead, tehFileVar, %fileNamu%
     countStaticFolders := 0
+    If StrLen(newStaticFoldersListCache)>5
+    {
+       Loop, Parse, newStaticFoldersListCache,`n,`r
+          countStaticFolders++
+       Return newStaticFoldersListCache
+    }
+
+    FileRead, tehFileVar, %fileNamu%
     Loop, Parse, tehFileVar,`n,`r
     {
        line := Trim(A_LoopField)
@@ -2066,7 +2067,7 @@ cleanFilesList(noFilesCheck:=0) {
       }
 
       WinSetTitle, ahk_id %PVhwnd%,, Cleaning files list - please wait...
-      showTOOLtip("Checking files list, please wait...")
+      showTOOLtip("Preparing the files list, please wait...")
       Loop, % maxFilesIndex + 1
       {
           r := resultedFilesList[A_Index]
@@ -2102,7 +2103,7 @@ cleanFilesList(noFilesCheck:=0) {
       }
 
       showTOOLtip("Removing duplicates from the list, please wait...")
-      Sort, filesListu, U D`n
+      Sort, filesListu, U\D`n
       renewCurrentFilesList()
       Loop, Parse, filesListu,`n
       {
@@ -2290,6 +2291,7 @@ readSlideSettings(readThisFile) {
      IniRead, tstthumbsAratio, %readThisFile%, General, thumbsAratio, @
      IniRead, tstthumbsZoomLevel, %readThisFile%, General, thumbsZoomLevel, @
      IniRead, tstSLDcacheFilesList, %readThisFile%, General, SLDcacheFilesList, @
+     IniRead, tsteasySlideStoppage, %readThisFile%, General, easySlideStoppage, @
 
      If (tstslideshowdelay!="@" && tstslideshowdelay>300)
         slideShowDelay := tstslideShowDelay
@@ -2303,6 +2305,8 @@ readSlideSettings(readThisFile) {
         SLDcacheFilesList := tstSLDcacheFilesList
      If (tstTouchScreenMode=1 || tstTouchScreenMode=0)
         TouchScreenMode := tstTouchScreenMode
+     If (tsteasySlideStoppage=1 || tsteasySlideStoppage=0)
+        easySlideStoppage := tsteasySlideStoppage
      If (tstuserimgQuality=1 || tstuserimgQuality=0)
         userimgQuality := tstuserimgQuality
      If (tstFlipImgH=1 || tstFlipImgH=0)
@@ -2415,6 +2419,7 @@ writeSlideSettings(file2save) {
     IniWrite, % animGIFsSupport, %file2save%, General, animGIFsSupport
     IniWrite, % thumbsAratio, %file2save%, General, thumbsAratio
     IniWrite, % thumbsZoomLevel, %file2save%, General, thumbsZoomLevel
+    IniWrite, % easySlideStoppage, %file2save%, General, easySlideStoppage
     IniWrite, % version, %file2save%, General, version
     throwMSGwriteError()
 }
@@ -2508,7 +2513,6 @@ markThisFileNow() {
   If (maxFilesIndex<3)
      Return
   markedSelectFile := (markedSelectFile=currentFileIndex) ? "" : currentFileIndex
-  prevStartIndex := -1
   SetTimer, DelayiedImageDisplay, -25
 }
 
@@ -2637,6 +2641,8 @@ DeletePicture() {
   }
   Sleep, 50
   SetTimer, RemoveTooltip, % -msgDisplayTime
+  If (thumbsDisplaying=1)
+     SetTimer, mainGdipWinThumbsGrid, -25
 }
 
 MultiRenameFiles() {
@@ -2645,7 +2651,7 @@ MultiRenameFiles() {
 
   GUI, 1: +OwnDialogs
   Sleep, 2
-  InputBox, OriginalNewFileName, Rename %filesElected% files, Please type the new file name pattern.,,,,,,,, %OutFileName%
+  InputBox, OriginalNewFileName, Rename %filesElected% files, File rename patterns possible:`nPrefix [this] suffix.`nReplace string/with this,,,,,,,, %OutFileName%
   If (!ErrorLevel && StrLen(OriginalNewFileName)>1)
   {
      If (filesElected>100)
@@ -3194,6 +3200,7 @@ OpenFolders() {
    FileSelectFolder, SelectedDir, *%startPath%, 2, Select the folder with images. All images found in sub-folders will be loaded as well.
    If (SelectedDir)
    {
+      newStaticFoldersListCache := ""
       prevOpenFolderPath := SelectedDir
       writeMainSettings()
       coreOpenFolder(SelectedDir)
@@ -3271,6 +3278,7 @@ OpenFiles() {
 
    if (SelectedDir)
    {
+      newStaticFoldersListCache := ""
       prevOpenFolderPath := SelectedDir
       writeMainSettings()
       If RegExMatch(imgpath, "i)(.\.sld)$")
@@ -3371,8 +3379,7 @@ addNewFolder2list() {
       If RegExMatch(CurrentSLD, "i)(.\.sld)$")
       {
          FileReadLine, firstLine, % CurrentSLD, 1
-         IniRead, tstSLDcacheFilesList, % CurrentSLD, General, SLDcacheFilesList, @
-         If (!InStr(firstLine, "[General]") || tstSLDcacheFilesList!=1)
+         If (!InStr(firstLine, "[General]") || SLDcacheFilesList!=1)
             good2go := "null"
       } Else good2go := "null"
 
@@ -3465,7 +3472,7 @@ GuiDropFiles:
 
       CloseWindow()
       showTOOLtip("Opening file...`n" imgpath)
-      markedSelectFile := ""
+      newStaticFoldersListCache := markedSelectFile := ""
       If StrLen(filesFilter)>1
       {
          usrFilesFilteru := filesFilter := ""
@@ -3521,6 +3528,7 @@ GuiDropFiles:
       }
       If (stuffAdded=1)
       {
+         newStaticFoldersListCache := ""
          mustGenerateStaticFolders := 1
          GenerateRandyList()
       }
@@ -3612,6 +3620,8 @@ restartAppu() {
 
 BuildMenu() {
    Static wasCreated
+
+   ForceRegenStaticFolders := 0
    If (wasCreated=1)
    {
       Menu, PVmenu, Delete
@@ -3626,6 +3636,7 @@ BuildMenu() {
 
    sliSpeed := Round(slideShowDelay/1000, 2) " sec."
    Menu, PVsliMenu, Add, &Start slideshow`tSpace, ToggleSlideShowu
+   Menu, PVsliMenu, Add, &Easy slideshow stopping, ToggleEasySlideStop
    Menu, PVsliMenu, Add,
    Menu, PVsliMenu, Add, &Toggle slideshow mode`tS, SwitchSlideModes
    Menu, PVsliMenu, Add, % DefineSlideShowType(), SwitchSlideModes
@@ -3635,6 +3646,8 @@ BuildMenu() {
    Menu, PVsliMenu, Add, &Decrease speed`tEqual [=], DecreaseSlideSpeed
    Menu, PVsliMenu, Add, Current speed: %sliSpeed%, DecreaseSlideSpeed
    Menu, PVsliMenu, Disable, Current speed: %sliSpeed%
+   If (easySlideStoppage=1)
+      Menu, PVsliMenu, Check, &Easy slideshow stopping
 
    infolumosAdjust := (imgFxMode=4) ? Round(lumosAdjust, 2) : Round(lumosGrayAdjust, 2)
    infoGammosAdjust := (imgFxMode=4) ? Round(GammosAdjust, 2) : Round(GammosGrayAdjust, 2)
@@ -3900,6 +3913,11 @@ ToggleAllonTop() {
    writeMainSettings()
 }
 
+ToggleEasySlideStop() {
+   easySlideStoppage := !easySlideStoppage
+   writeMainSettings()
+}
+
 ToggleAnimGIFsupport() {
    animGIFsSupport := !animGIFsSupport
    writeMainSettings()
@@ -4017,9 +4035,10 @@ BuildGUI() {
    Gui, 1: Add, Text, x3 y3 w3 h3 BackgroundTrans gWinClickAction vPicOnGui3,
 
    Gui, 1: Show, Maximize Center %initialwh%, %appTitle%
-   createGDIwin()
    createGDIwinThumbs()
-   ThumbGuiEmphasizer()
+   Sleep, 2
+   createGDIwin()
+   ; ThumbGuiEmphasizer()
    updateUIctrl()
 }
 
@@ -4049,7 +4068,8 @@ createGDIwin() {
    WinGetPos, , , mainW, mainH, ahk_id %PVhwnd%
    Gui, 2: -DPIScale +hwndhGDIwin +E0x20 -Caption +E0x80000 +Owner1
    Gui, 2: Show, NoActivate, %appTitle%: Picture container
-   ; SetParentID(PVhwnd, hGDIwin)
+   If (A_OSVersion!="WIN_7")
+      SetParentID(PVhwnd, hGDIwin)
    Sleep, 5
    WinActivate, ahk_id %PVhwnd%
    Sleep, 5
@@ -4063,7 +4083,8 @@ createGDIwinThumbs() {
    Sleep, 35
    Gui, 3: -DPIScale +E0x20 -Caption +E0x80000 +hwndhGDIthumbsWin +Owner1
    Gui, 3: Show, NoActivate, %appTitle%: Thumbnails container
-   ; SetParentID(PVhwnd, hGDIthumbsWin)
+   If (A_OSVersion!="WIN_7")
+      SetParentID(PVhwnd, hGDIthumbsWin)
    Sleep, 5
    WinActivate, ahk_id %PVhwnd%
    Sleep, 5
@@ -4093,7 +4114,7 @@ ShowTheImage(imgpath, usePrevious:=0) {
 
    If (thumbsDisplaying=1)
    {
-      UpdateThumbsScreen()
+      SetTimer, UpdateThumbsScreen, -15
       WinSetTitle, ahk_id %PVhwnd%,, % "THUMBS: " winTitle
       Return
    }
@@ -4370,7 +4391,7 @@ CloneResizerBMP(imgpath, IDwhichImg, whichImg, newW, newH) {
   Gdip_GetImageDimensions(whichImg, imgWidth, imgHeight)
   If (IDwhichImg=1)
   {
-     If (imgWidth>ResolutionWidth*3 || imgHeight>ResolutionHeight*3) && (enableThumbsCaching=1)
+     If (imgWidth>ResolutionWidth*2 || imgHeight>ResolutionHeight*2) && (enableThumbsCaching=1)
      {
         calcImgSize(1, imgWidth, imgHeight, ResolutionWidth, ResolutionHeight, newW, newH)
         img2cache := 1
@@ -4508,14 +4529,14 @@ Gdip_ShowImgonGui(imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, us
        Gdip_DeleteBrush(pBrush)
     }
 
-    JEE_ClientToScreen(hPicOnGui1, 1, 1, mainX, mainY)
+    dummyPos := (A_OSVersion!="WIN_7") ? 1 : ""
     If (CountFrames>1 && animGIFsSupport=1 && (prevAnimGIFwas!=imgpath || (A_TickCount - lastGIFdestroy > 9500)))
     {
        Sleep, 15
        prevAnimGIFwas := imgpath
-       r2 := UpdateLayeredWindow(hGDIwin, hdc,,, 1, 1)
+       r2 := UpdateLayeredWindow(hGDIwin, hdc, dummyPos, dummyPos, 1, 1)
        GIFguiCreator(imgpath, 0, DestPosX, DestPosY, newW, newH, mainWidth, mainHeight)
-    } Else r2 := UpdateLayeredWindow(hGDIwin, hdc,,, mainWidth, mainHeight)
+    } Else r2 := UpdateLayeredWindow(hGDIwin, hdc, dummyPos, dummyPos, mainWidth, mainHeight)
 
     SelectObject(hdc, obm)
     DeleteObject(hbm)
@@ -4523,14 +4544,106 @@ Gdip_ShowImgonGui(imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, us
     Gdip_DeleteGraphics(G)
     If (cachedImgFile=1)
        Gdip_DisposeImage(whichImg)
-    WinMove, ahk_id %hGDIwin%,, %mainX%, %mainY%
+    If (A_OSVersion="WIN_7")
+    {
+       JEE_ClientToScreen(hPicOnGui1, 1, 1, mainX, mainY)
+       WinMove, ahk_id %hGDIwin%,, %mainX%, %mainY%
+    }
     r := (r1!=0 || !r2) ? 0 : 1
     Return r
 }
 
 GdipCleanMain() {
-    JEE_ClientToScreen(hPicOnGui1, 1, 1, GuiX, GuiY)
-    WinMove, ahk_id %hGDIwin%,, %GuiX%, %GuiY%, 1, 1
+    ; If (A_OSVersion="WIN_7")
+    ;    JEE_ClientToScreen(hPicOnGui1, 1, 1, GuiX, GuiY)
+    ; Else GuiX := GuiY := 1
+    ; WinMove, ahk_id %hGDIwin%,, %GuiX%, %GuiY%, 1, 1
+
+    dummyPos := (A_OSVersion!="WIN_7") ? 1 : ""
+    GetClientSize(mainWidth, mainHeight, PVhwnd)
+    hbm := CreateDIBSection(mainWidth, mainHeight)
+    hdc := CreateCompatibleDC()
+    obm := SelectObject(hdc, hbm)
+    G := Gdip_GraphicsFromHDC(hdc)
+    pBrush := Gdip_BrushCreateSolid("0x44" WindowBgrColor)
+    Gdip_FillRectangle(G, pBrush, 0, 0, mainWidth+2, mainHeight+2)
+    r2 := UpdateLayeredWindow(hGDIwin, hdc, dummyPos, dummyPos, mainWidth, mainHeight)
+    SelectObject(hdc, obm)
+    DeleteObject(hbm)
+    DeleteDC(hdc)
+    Gdip_DeleteGraphics(G)
+    Gdip_DeleteBrush(pBrush)
+}
+
+mainGdipWinThumbsGrid() {
+    GetClientSize(mainWidth, mainHeight, PVhwnd)
+    hbm := CreateDIBSection(mainWidth, mainHeight)
+    hdc := CreateCompatibleDC()
+    obm := SelectObject(hdc, hbm)
+    G := Gdip_GraphicsFromHDC(hdc)
+    pBrush1 := Gdip_BrushCreateSolid("0x88999999")
+    pBrush2 := Gdip_BrushCreateSolid("0x55999999")
+    pBrush3 := Gdip_BrushCreateSolid("0x39999922")
+    pBrush4 := Gdip_BrushCreateSolid("0xaa" WindowBgrColor)
+
+    thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, startIndex, mainWidth, mainHeight)
+    rowIndex := 0
+    columnIndex := -1
+    Loop, % maxItemsW*maxItemsH*2
+    {
+        thisFileIndex := startIndex + A_Index - 1
+        imgpath := resultedFilesList[thisFileIndex]
+        columnIndex++
+        If (columnIndex>=maxItemsW)
+        {
+           rowIndex++
+           columnIndex := 0
+        }
+
+        If (rowIndex>=maxItemsH)
+           Break
+
+        DestPosX := thumbsW*columnIndex
+        DestPosY := thumbsH*rowIndex
+        If !FileExist(imgpath)
+           Gdip_FillRectangle(G, pBrush4, DestPosX, DestPosY, thumbsW, thumbsH)
+
+        If (thisFileIndex=currentFileIndex)
+           Gdip_FillRectangle(G, pBrush1, DestPosX, DestPosY, thumbsW, thumbsH)
+
+        testRange := 0
+        pointA := (currentFileIndex>markedSelectFile) ? markedSelectFile : currentFileIndex
+        pointB := (currentFileIndex>markedSelectFile) ? currentFileIndex : markedSelectFile
+        if thisFileIndex between %pointA% and %pointB%
+           testRange := 1
+
+        If (testRange=1 && markedSelectFile>0)
+           Gdip_FillRectangle(G, pBrush3, DestPosX, DestPosY, thumbsW, thumbsH)
+
+        If (thisFileIndex=markedSelectFile)
+        {
+           Gdip_FillRectangle(G, pBrush2, DestPosX, DestPosY, thumbsW, thumbsH)
+           Gdip_FillRectangle(G, pBrush2, DestPosX, DestPosY, thumbsW, OSDfntSize*3)
+           Gdip_FillRectangle(G, pBrush2, DestPosX, DestPosY, OSDfntSize*3, thumbsH)
+        }
+    }
+
+    If (markedSelectFile)
+    {
+       sqPosX := (markedSelectFile<currentFileIndex) ? 0 : mainWidth - OSDfntSize*4
+       Gdip_FillRectangle(G, pBrush1, sqPosX, 0, OSDfntSize*4, OSDfntSize*4)
+    }
+
+    dummyPos := (A_OSVersion!="WIN_7") ? 1 : ""
+    r2 := UpdateLayeredWindow(hGDIwin, hdc, dummyPos, dummyPos, mainWidth, mainHeight)
+    SelectObject(hdc, obm)
+    DeleteObject(hbm)
+    DeleteDC(hdc)
+    Gdip_DeleteGraphics(G)
+    Gdip_DeleteBrush(pBrush1)
+    Gdip_DeleteBrush(pBrush2)
+    Gdip_DeleteBrush(pBrush3)
+    Gdip_DeleteBrush(pBrush4)
 }
 
 EraseThumbsCache() {
@@ -4594,14 +4707,18 @@ Gdip_ShowThumbsnails(startIndex) {
     G := Gdip_GraphicsFromHDC(hdc)
     Gdip_SetInterpolationMode(G, imgQuality)
     Gdip_SetSmoothingMode(G, 3)
-    pBrush := Gdip_BrushCreateSolid("0x77999999")
-    pBrush2 := Gdip_BrushCreateSolid("0xFF" WindowBgrColor)
+    pBrush := Gdip_BrushCreateSolid("0x77" WindowBgrColor)
     rowIndex := imgsListed := 0
     maxImgSize := maxZeit := columnIndex := -1
+    dummyPos := (A_OSVersion!="WIN_7") ? 1 : ""
 
-    JEE_ClientToScreen(hPicOnGui1, 1, 1, mainX, mainY)
-    WinMove, ahk_id %hGDIthumbsWin%,, %mainX%, %mainY%
-    Gdip_FillRectangle(G, pBrush2, 0, 0, mainWidth, mainHeight)
+    If (A_OSVersion="WIN_7")
+    {
+      JEE_ClientToScreen(hPicOnGui1, 1, 1, mainX, mainY)
+      WinMove, ahk_id %hGDIthumbsWin%,, %mainX%, %mainY%
+    }
+
+    Gdip_FillRectangle(G, pBrush, 0, 0, mainWidth, mainHeight)
     Loop, % maxItemsW*maxItemsH*2
     {
         If GetKeyState("Esc", "P")
@@ -4630,20 +4747,12 @@ Gdip_ShowThumbsnails(startIndex) {
 
         DestPosX := thumbsW//2 - newW//2 + thumbsW*columnIndex
         DestPosY := thumbsH//2 - newH//2 + thumbsH*rowIndex
-        If (thisFileIndex=markedSelectFile)
-           Gdip_FillRectangle(G, pBrush, thumbsW*columnIndex, thumbsH*rowIndex, thumbsW, thumbsH)
-
         If (!imgW || !imgH || !oBitmap || !FileExist(imgpath))
            Continue
 
         r1 := Gdip_DrawImage(G, oBitmap, DestPosX, DestPosY, newW, newH, 0, 0, imgW, imgH, matrix)
-        If (thisFileIndex=markedSelectFile)
-        {
-           Gdip_FillRectangle(G, pBrush, thumbsW*columnIndex, thumbsH*rowIndex, thumbsW, OSDfntSize*3)
-           Gdip_FillRectangle(G, pBrush, thumbsW*columnIndex, thumbsH*rowIndex, OSDfntSize*3, thumbsH)
-        }
         Gdip_DisposeImage(oBitmap)
-        r2 := UpdateLayeredWindow(hGDIthumbsWin, hdc,,, mainWidth, mainHeight)
+        r2 := UpdateLayeredWindow(hGDIthumbsWin, hdc, dummyPos, dummyPos, mainWidth, mainHeight)
         endZeit := A_TickCount
         thisZeit := endZeit - startZeit
         If (thisZeit>maxZeit)
@@ -4673,17 +4782,12 @@ Gdip_ShowThumbsnails(startIndex) {
 ;   ToolTip, %imgW% -- %imgH% == %newW% -- %newH%
     If (GIFsGuiCreated=1)
        GIFguiCreator(1, 1)
-    If (markedSelectFile)
-    {
-       sqPosX := (markedSelectFile<currentFileIndex) ? 0 : mainWidth - OSDfntSize*4
-       Gdip_FillRectangle(G, pBrush, sqPosX, 0, OSDfntSize*4, OSDfntSize*4)
-       r2 := UpdateLayeredWindow(hGDIthumbsWin, hdc,,, mainWidth, mainHeight)
-    }
-    Gdip_DeleteBrush(pBrush)
+
     SelectObject(hdc, obm)
     DeleteObject(hbm)
     DeleteDC(hdc)
     Gdip_DeleteGraphics(G)
+    Gdip_DeleteBrush(pBrush)
 
     prevFullThumbsUpdate := A_TickCount
     loopZeit := mainEndZeit - mainStartZeit
@@ -4842,9 +4946,14 @@ GDIupdater() {
       TooltipCreator(1, 1)
 
    SetTimer, ReloadThisPicture, Off
-   Gui, thumbsGuiHL: Hide
    If (GIFsGuiCreated=1) || (A_TickCount - lastGIFdestroy<300)
    {
+      If (A_EventInfo=1)
+      {
+         SetTimer, DelayiedImageDisplay, Off
+         SetTimer, ReloadThisPicture, Off
+         prevStartIndex := -1
+      }
       DestroyGIFuWin()
       Return 1
    }
@@ -4863,6 +4972,8 @@ GDIupdater() {
       SetTimer, DelayiedImageDisplay, Off
       SetTimer, ReloadThisPicture, Off
       prevStartIndex := -1
+      If (A_TickCount - lastWinDrag<350)
+         Return
       If (thumbsDisplaying=1)
          WinMove, ahk_id %hGDIthumbsWin%,, 1, 1, 1, 1
       Else GdipCleanMain()
@@ -4871,9 +4982,8 @@ GDIupdater() {
 
    If (maxFilesIndex>0) && (A_TickCount - scriptStartTime>500) && (thumbsDisplaying!=1)
    {
-;      DelayiedImageDisplay()
-      If !((A_TickCount - lastWinDrag>450) && (isTitleBarHidden=1))
-         SetTimer, DelayiedImageDisplay, -15
+      delayu := (A_TickCount - lastWinDrag<450) ? 450 : 15
+      SetTimer, DelayiedImageDisplay, % -delayu
       SetTimer, ReloadThisPicture, -750
       prevStartIndex := -1
    } Else If (thumbsDisplaying=1 && maxFilesIndex>1)
@@ -4969,6 +5079,7 @@ coreLoadDynaFolders(fileNamu) {
 }
 
 RegenerateEntireList() {
+    newStaticFoldersListCache := ""
     showTOOLtip("Refreshing files list, please wait...")
     If (RegExMatch(CurrentSLD, "i)(\.sld)$") && InStr(DynamicFoldersList, "|hexists|"))
        listu := coreLoadDynaFolders(CurrentSLD)
@@ -5296,8 +5407,9 @@ FolderzPanelWindow() {
     Gui, Add, Text, x15 y15, Please select the folder you want updated.`nFolders marked with (*) are changed since the last scan.`nThis folders list was generated based on the indexed files.
     Gui, Add, ListView, y+10 w%lstWid% gFolderzFilterListBTN r12 Grid vLViewOthers, #|Date|(?)|Folder path|Files
 
-    Gui, Add, Checkbox, xs+0 y+10 gToggleCountFilesFoldersList Checked%CountFilesFolderzList% vCountFilesFolderzList, Count files in folders list
-    Gui, Add, Checkbox, xs+0 y+10 gToggleForceRegenStaticFs Checked%ForceRegenStaticFolders% vForceRegenStaticFolders, Force this list to be refreshed on .SLD save
+    Gui, Add, Checkbox, xs+0 y+10 gToggleCountFilesFoldersList Checked%CountFilesFolderzList% vCountFilesFolderzList, Count files in folders list (recursively)
+    Gui, Add, Checkbox, x+10 gToggleForceRegenStaticFs Checked%ForceRegenStaticFolders% vForceRegenStaticFolders, Force this list to be refreshed on .SLD save
+    Gui, Add, Checkbox, xs+0 y+10 gToggleRecursiveStaticRescan vRecursiveStaticRescan Checked%RecursiveStaticRescan%, Perform recursive (in sub-folders) folder scan
     Gui, Add, Button, xs+0 y+10 h30 w130 gUpdateSelFolder, &Rescan folder
     Gui, Add, Button, x+5 h30 w%btnWid% gIgnoreSelFolder, &Ignore changes
     Gui, Add, Button, x+5 h30 w%btnWid% gRemFilesStaticFolder, Re&move files from list
@@ -5354,6 +5466,10 @@ ToggleCountFilesFoldersList() {
 
 ToggleForceRegenStaticFs() {
   GuiControlGet, ForceRegenStaticFolders
+}
+
+ToggleRecursiveStaticRescan() {
+  GuiControlGet, RecursiveStaticRescan
 }
 
 BTNaddNewFolder2list() {
@@ -5514,8 +5630,8 @@ rescanDynaFolder() {
     CloseWindow()
     Sleep, 25
     ; msgbox, % folderu
-    coreAddNewFolder(folderu, 1)
 
+    coreAddNewFolder(folderu, 1)
     If RegExMatch(CurrentSLD, "i)(.\.sld)$")
     {
        FileReadLine, firstLine, % CurrentSLD, 1
@@ -5531,33 +5647,45 @@ rescanDynaFolder() {
     DynamicFolderzPanelWindow()
 }
 
-updateCachedStaticFolders(folderu, onlyMainFolder) {
+updateCachedStaticFolders(mainFolderu, onlyMainFolder) {
    thisIndex := 0
    foldersListu := LoadStaticFoldersCached(CurrentSLD, countStaticFolders) "`n"
-   If !InStr(foldersListu, folderu "`n")
+
+   FileGetTime, dirDate, % mainFolderu, M
+   newEntry := dirDate "*&*" mainFolderu "`n"
+
+   showTOOLtip("Updating static folders list...")
+   Loop, Parse, foldersListu, `n
    {
-      thisIndex++
-      FileGetTime, dirDate, % folderu, M
-      tehValue := dirDate "*&*" folderu
-      indexu := countStaticFolders + thisIndex
-      IniWrite, % tehValue, % CurrentSLD, Folders, Fi%indexu%
+       lineArru := StrSplit(A_LoopField, "*&*")
+       folderu := lineArru[2], oldDateu := lineArru[1]
+       If !FileExist(folderu)
+          Continue
+       oldDateu := SubStr(oldDateu, InStr(oldDateu, "=")+1)
+       newFoldersList .= oldDateu "*&*" folderu "`n"
    }
 
-   If (onlyMainFolder=1)
-      Return
-
-   Loop, Files, %folderu%\*, RD
+   If (onlyMainFolder!=1)
    {
-        If !InStr(foldersListu, A_LoopFileFullPath "`n")
-        {
-           thisIndex++
-           FileGetTime, dirDate, %A_LoopFileFullPath%, M
-           tehValue := dirDate "*&*" A_LoopFileFullPath
-           indexu := countStaticFolders + thisIndex
-         ;  MsgBox, % A_LoopFileFullPath
-           IniWrite, % tehValue, % CurrentSLD, Folders, Fi%indexu%
-        }
-   }  
+      Loop, Files, %mainFolderu%\*, RD
+      {
+          FileGetTime, dirDate, %A_LoopFileFullPath%, M
+          MoreNewFileFolders .= dirDate "*&*" A_LoopFileFullPath "`n"
+   ;       Tooltip, % MoreNewFileFolders
+      }
+   }
+
+   FinalStaticFoldersList := newFoldersList "`n" MoreNewFileFolders "`n" newEntry
+   Sort, FinalStaticFoldersList, U D`n
+   thisIndex := 0
+   newStaticFoldersListCache := ""
+   Loop, Parse, FinalStaticFoldersList, `n
+   {
+        If StrLen(A_LoopField)<5
+           Continue
+        thisIndex++
+        newStaticFoldersListCache .= "Fi" thisIndex "=" A_LoopField "`n"
+   }
 }
 
 remFilesFromList(SelectedDir, silentus:=0) {
@@ -5624,8 +5752,7 @@ UpdateSelFolder() {
        Return
     }
 
-    MsgBox, 52, %appTitle%, Do you want to scan for new files recursively, in all subfolders?
-    IfMsgBox, No
+    If (RecursiveStaticRescan!=1)
       isRecursive := "|"
 
     CloseWindow()
@@ -5658,7 +5785,18 @@ PopulateStaticFolderzList() {
           usrFilesFilteru := filesFilter := ""
           FilterFilesIndex()
        }
-       Tooltip, Press ESC to abort...
+
+       Tooltip, Preparing files list... please wait.
+       Loop, % maxFilesIndex + 1
+       {
+           r := resultedFilesList[A_Index]
+           If (InStr(r, "||") || !r)
+              Continue
+
+           theEntireListu .= r "`n"
+       }
+
+       Tooltip, Counting files in each folder... please wait.
     }
 
     LV_ModifyCol(5, "Integer")
@@ -5681,28 +5819,10 @@ PopulateStaticFolderzList() {
         dirDate := SubStr(dirDate, 1, StrLen(dirDate)-2)
         FormatTime, dirDate, % dirDate, yyyy/MM/dd-HH:mm
 ;        dirDate := SubStr(dirDate, 1, 4) "-" SubStr(dirDate, 5, 2) "-" SubStr(dirDate, 8, 2)
-        countFiles := 0
         If (CountFilesFolderzList=1)
         {
-           Loop, % maxFilesIndex + 1
-           {
-               r := resultedFilesList[A_Index]
-               If (InStr(r, "||") || !r)
-                  Continue
- 
-               rT := StrReplace(r, folderu "\")
-               If InStr(rT, "\")
-                  Continue
-               countFiles++
-
-               If GetKeyState("Esc", "P")
-               {
-                  abandonAll := 1
-                  Break
-               }
-           }
-           If (abandonAll=1)
-              Break
+           matchThis := JEE_StrRegExLiteral(folderu "\")
+           RegExReplace(theEntireListu, matchThis,, countFiles)
         } Else countFiles := "-"
         LV_Add(A_Index, indexu, dirDate, statusu, folderu, countFiles)
     }
@@ -5857,22 +5977,21 @@ WM_RBUTTONUP(wP, lP, msg, hwnd) {
 
 WM_MOVING() {
   Global lastWinDrag := A_TickCount
-  If (thumbsDisplaying=1)
-     Gui, thumbsGuiHL: Hide
   SetTimer, updateGDIwinPos, -1
 }
 
 updateGDIwinPos() {
-  JEE_ClientToScreen(hPicOnGui1, 1, 1, GuiX, GuiY)
-  GetClientSize(mainWidth, mainHeight, PVhwnd)
+  If (A_OSVersion="WIN_7")
+     JEE_ClientToScreen(hPicOnGui1, 1, 1, GuiX, GuiY)
+  Else GuiX := GuiY := 1
 
+  GetClientSize(mainWidth, mainHeight, PVhwnd)
   If (thumbsDisplaying=1)
   {
      WinMove, ahk_id %hGDIthumbsWin%,, %GuiX%, %GuiY% ; , %mainWidth%, %mainHeight%
      WinSet, Region, 0-0 R6-6 w%mainWidth% h%mainHeight% , ahk_id %hGDIthumbsWin%
   }
   WinMove, ahk_id %hGDIWin%,, %GuiX%, %GuiY% ; , %mainWidth%, %mainHeight%
-
 }
 
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
@@ -5984,4 +6103,3 @@ initCompiled() {
    thumbsCacheFolder := OutDir "\thumbs-cache"
    mainSettingsFile := OutDir "\" mainSettingsFile
 }
-
