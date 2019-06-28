@@ -19,20 +19,19 @@
 <li>List images as thumbnails with preset aspect ratios: square, wide or tall. Easy to adjust their size as well.</li>
 <li>Adaptive thumbnails caching to sizes ranging from 600 pixels to 125 pixels. On fast PCs, no caching occurs.</li>
 <li>Touch screen friendly hot-areas on the UI to navigate or zoom into images.</li>
-<li>Display images in grayscale, inverted or personalized colors. Easy to adjust gamma and brightness.</li>
+<li>Display images in grayscale, inverted or personalized colors. Easy to adjust gamma and brightness. Option to save adjusted image, or apply adjusments on multiple images in one go.</li>
 <li>Various modes to adapt images to window.</li>
 <li>Multiple slideshow directions available and easy to change speed between images: random order, backwards or forwads.</li>
-<li>Perform actions on image files: rename, convert to jpeg, delete or move</li>
-<li>Possibility to perform operations on multiple files at once: delete, move, convert to jpeg and rename.</li>
+<li>Perform actions on image files: resize, change/adjust colors, rename, convert to jpeg, delete or move</li>
+<li>Operations in batch [on multiple files at once]: resize images, change/adjust colors, convert to jpeg, delete, move, and rename.</li>
 <li>Multi-rename allows adding a prefix and/or suffix to renamed files, or to count them, or search and replace strings in file names.</li>
-<li>Own slideshow format to store list of folders and cache files lists.</li>
+<li>Quick Picto Viewer has its own slideshow format to store list of folders and cache files lists.</li>
 <li>Ability to selectively refresh the cached files list from selected folders.</li>
 <li>Option to filter the list of files using keywords. The operator | [or] is allowed.</li>
-<li>Very fast loading of cached or not cached lists of files. Tested with 600000 images, load times under 10 seconds.</li>
+<li>Very fast loading of cached or not cached lists of files. Tested with 700000 images, load times under 10 seconds.</li>
 <li>Support for animated .GIFs in slideshows.</li>
 <li>Support for drag 'n drop of folders or files onto main UI.</li>
 <li>Copy image to clipboard.</li>
-<li>Various keyboard shortcuts to facilitate its usage.</li>
 <li>All the potentially lengthy operations can be stopped with Escape :-).</li>
 </ul> 
 
