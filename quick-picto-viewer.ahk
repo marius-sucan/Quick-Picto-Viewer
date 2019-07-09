@@ -21,8 +21,8 @@
 
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 3.2.0
-;@Ahk2Exe-SetCopyright Marius Şucan (2019-2019)
+;@Ahk2Exe-SetVersion 3.3.0
+;@Ahk2Exe-SetCopyright Marius Şucan (2019)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
  
 #NoEnv
@@ -63,8 +63,11 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , thumbsW := 300, thumbsH := 300, thumbsDisplaying := 0
    , othumbsW := 300, othumbsH := 300, ForceRegenStaticFolders := 0
    , CountFilesFolderzList := 0, RecursiveStaticRescan := 0
-   , imgHUDbaseUnit := 65, lastLongOperationAbort := 1
-   , version := "3.2.0", vReleaseDate := "28/06/2019"
+   , UsrMustInvertFilter := 0, overwriteConflictingFile := 0
+   , prevFileSavePath := "", imgHUDbaseUnit := 65, lastLongOperationAbort := 1
+   , lastOtherWinClose := 1, UsrCopyMoveOperation := 2
+   , version := "3.3.0", vReleaseDate := "09/07/2019"
+
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1
    , thumbsAratio := 3, thumbsZoomLevel := 1
@@ -78,7 +81,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , MustLoadSLDprefs := 0, animGIFsSupport := 1, move2recycler := 1
    , SLDcacheFilesList := 1, autoRemDeadEntry := 1
    , easySlideStoppage := 0, ResizeInPercentage := 0
-   , ResizeKeepAratio := 1, ResizeQualityHigh := 1
+   , ResizeKeepAratio := 1, ResizeQualityHigh := 1, ResizeRotationUser := 1
    , ResizeApplyEffects := 1
 
 imgQuality := (userimgQuality=1) ? 7 : 5
@@ -127,7 +130,7 @@ identifyThisWin(noReact:=0) {
   A := WinActive("A")
   If (A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin || A=hGIFsGuiDummy || A=hGuiTip || A=hGuiThumbsHL)
   {
-     If (A!=PVhwnd && noReact!=2) && (A_TickCount - lastInvoked > 150)
+     If (A_OSVersion="WIN_7" && A!=PVhwnd && noReact!=2) && (A_TickCount - lastInvoked > 150)
      {
         lastInvoked := A_TickCount
         WinActivate, ahk_id %PVhwnd%
@@ -172,29 +175,17 @@ identifyThisWin(noReact:=0) {
        addNewFile2list()
     Return
 
+    ~^vk56::   ; Ctrl+V
+       PasteClipboardIMG()
+    Return
+
     ~+Esc::
        restartAppu()
     Return
 
     ~!F4::
     ~Esc::
-       If (A_TickCount - lastLongOperationAbort < 1500)
-          Return
-       If (AnyWindowOpen>0)
-       {
-          CloseWindow()
-          showTOOLtip("Other window closed...")
-          SetTimer, RemoveTooltip, % -msgDisplayTime
-       } Else If (GIFsGuiCreated=1)
-       {
-          DestroyGIFuWin()
-          Global lastGIFdestroy := A_TickCount
-          prevAnimGIFwas := resultedFilesList[currentFileIndex]
-          ReloadThisPicture()
-       } Else If (thumbsDisplaying=1)
-       {
-          ToggleThumbsMode()
-       } Else Gosub, Cleanup
+       escRoutine()
     Return
 #If
 
@@ -211,6 +202,104 @@ identifyThisWin(noReact:=0) {
       Global lastGIFdestroy := A_TickCount
       prevAnimGIFwas := resultedFilesList[currentFileIndex]
       IDshowImage(currentFileIndex)
+    Return
+#If
+
+#If (identifyThisWin()=1 && !AnyWindowOpen && currentFileIndex=0 && !CurrentSLD)
+    ~vk49::   ; I
+      ShowImgInfosPanel()
+    Return
+
+    ~vkDB::   ; [
+      ChangeLumos(-1)
+    Return
+
+    ~vkDD::   ; ]
+      ChangeLumos(1)
+    Return
+
+    ~+vkDB::   ; Shift + [
+      ChangeGammos(-1)
+    Return
+
+    ~+vkDD::   ; Shift + ]
+      ChangeGammos(1)
+    Return
+
+    ~vkDC::   ; \
+      ResetImageView()
+    Return
+
+    ~vkBF::
+    ~NumpadDiv::
+       IMGresizingMode := 0
+       ToggleImageSizingMode()
+    Return
+
+    ~NumpadMult::
+       IMGresizingMode := 3
+       IMGdecalageX := IMGdecalageY := zoomLevel := 1
+       ToggleImageSizingMode()
+    Return
+
+    ~NumpadAdd::
+    ~vkBB::    ; [=]
+       ChangeZoom(1)
+    Return
+
+    ~NumpadSub::
+    ~vkBD::   ; [-]
+       ChangeZoom(-1)
+    Return
+
+    ~vk48::    ; H
+       TransformIMGh()
+    Return
+
+   ~vk56::    ; V
+       TransformIMGv()
+    Return
+
+    ~vk46::     ; F
+       ToggleImgFX()
+    Return
+
+    ~+vk46::     ; Shift+F
+       ToggleImgFX(2)
+    Return
+
+    ~vk41::     ; A
+       ToggleIMGalign()
+    Return
+
+    ~Up::
+       If (IMGlargerViewPort=1 && IMGresizingMode>=3)
+          PanIMGonScreen("U")
+    Return
+
+    ~Down::
+       If (IMGlargerViewPort=1 && IMGresizingMode=4)
+          PanIMGonScreen("D")
+    Return
+
+    ~WheelUp::
+    ~Right::
+       If (InStr(A_ThisHotkey, "wheel") && IMGresizingMode=4 && thumbsDisplaying!=1)
+       {
+          ChangeZoom(1)
+          Return
+       } Else If (IMGlargerViewPort=1 && IMGresizingMode=4)
+          PanIMGonScreen("R")
+    Return
+
+    ~WheelDown::
+    ~Left::
+       If (InStr(A_ThisHotkey, "wheel") && IMGresizingMode=4 && thumbsDisplaying!=1)
+       {
+          ChangeZoom(-1)
+          Return
+       } Else If (IMGlargerViewPort=1 && IMGresizingMode=4)
+          PanIMGonScreen("L")
     Return
 #If
 
@@ -236,8 +325,12 @@ identifyThisWin(noReact:=0) {
        CopyImage2clip()
     Return
 
-    ~vk43::    ; C
+    ~vk42::    ; B
        CompareImagesAB()
+    Return
+
+    ~vk43::    ; C
+       InvokeCopyFiles()
     Return
 
     ~^vk55::    ; Ctrl+U
@@ -265,7 +358,7 @@ identifyThisWin(noReact:=0) {
     Return
 
     ~vk49::   ; I
-      ShowImgInfos()
+      ShowImgInfosPanel()
     Return
 
     ~vkDB::   ; [
@@ -301,7 +394,11 @@ identifyThisWin(noReact:=0) {
     Return
 
     ~^vk53::   ; Ctrl+S
-       SaveFilesList()
+       SaveClipboardImage()
+    Return
+
+    ~+^vk53::   ; Ctrl+Shift+S
+       SaveClipboardImage("yay")
     Return
 
     ~vk54::   ; T
@@ -386,7 +483,7 @@ identifyThisWin(noReact:=0) {
        TransformIMGh()
     Return
 
-    ~vk56::    ; V
+   ~vk56::    ; V
        TransformIMGv()
     Return
 
@@ -410,12 +507,8 @@ identifyThisWin(noReact:=0) {
        RenameThisFile()
     Return
 
-    ~^vk4D::    ; Ctrl+M
-       MoveFile2Dest()
-    Return
-
     ~vk4D::     ; M
-       invokeQuickMoveMenu()
+       InvokeMoveFiles()
     Return
 
     ~vk46::     ; F
@@ -587,6 +680,31 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
   SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
+escRoutine() {
+   If (A_TickCount - lastLongOperationAbort < 1500)
+      Return
+
+   If (AnyWindowOpen>0)
+   {
+      CloseWindow()
+      showTOOLtip("Other window closed...")
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+   } Else If (GIFsGuiCreated=1)
+   {
+      DestroyGIFuWin()
+      Global lastGIFdestroy := A_TickCount
+      prevAnimGIFwas := resultedFilesList[currentFileIndex]
+      ReloadThisPicture()
+   } Else If (thumbsDisplaying=1)
+   {
+      ToggleThumbsMode()
+   } Else
+   {
+      If (A_TickCount - lastOtherWinClose > 500)
+         Gosub, Cleanup
+   }
+}
+
 GenerateRandyList() {
    RandyIMGids := []
    Loop, % maxFilesIndex
@@ -598,6 +716,9 @@ GenerateRandyList() {
 }
 
 OpenThisFileFolder() {
+    If (currentFileIndex=0)
+       Return
+
     If (slideShowRunning=1)
        ToggleSlideShowu()
 
@@ -648,6 +769,9 @@ DecreaseSlideSpeed() {
 }
 
 CopyImagePath() {
+  If (currentFileIndex=0)
+     Return
+
   If (slideShowRunning=1)
      ToggleSlideShowu()
 
@@ -679,6 +803,8 @@ CopyImagePath() {
 }
 
 CopyImage2clip() {
+  If (currentFileIndex=0)
+     Return
   If (slideShowRunning=1)
      ToggleSlideShowu()
 
@@ -686,7 +812,7 @@ CopyImage2clip() {
   FileGetSize, fileSizu, %imgpath%
   If (FileExist(imgpath) && fileSizu>500)
   {
-     r := coreResizeIMG(imgpath, 0, 0, "clippo")
+     r := coreResizeIMG(imgpath, 0, 0, "--", 1, 1, 0)
      If r
         showTOOLtip("Image copied to clipboard...")
      Else
@@ -729,7 +855,14 @@ invertFilesFilter() {
 }
 
 ReloadThisPicture() {
-  Settimer, DelayiedImageDisplay, Off
+  SetTimer, DelayiedImageDisplay, Off
+  clippyTest := resultedFilesList[0]
+  If (currentFileIndex=0 && InStr(clippyTest, "Current-Clipboard"))
+  {
+     ShowTheImage(clippyTest, 2)
+     Return
+  }
+
   If (CurrentSLD && maxFilesIndex>0)
   {
      If (GetKeyState("LButton", "P")=1)
@@ -932,7 +1065,7 @@ UpdateThumbsScreen(forceThis:=0) {
             SetTimer, RemoveTooltip, -500
          }
          GdipCleanMain()
-         r := Gdip_ShowThumbsnails(startIndex)
+         r := Gdip_ShowThumbnails(startIndex)
       }
    } Else r := 1
    prevStartIndex := startIndex
@@ -1011,15 +1144,26 @@ WinClickAction(forceThis:=0) {
             Break
          }
       }
+
+      scrollXpos := mainWidth - imgHUDbaseUnit//2
+      If (mX+decalageX>scrollXpos)
+      {
+         newIndexu := ((mY-decalageY)/mainHeight)*100
+         newIndexu := Ceil((maxFilesIndex/100)*newIndexu)
+         If (newIndexu<1)
+            currentFileIndex := 1
+         Else If (newIndexu>maxFilesIndex)
+            currentFileIndex := maxFilesIndex-1
+         Else
+            currentFileIndex := newIndexu
+         SetTimer, DelayiedImageDisplay, -50
+         Return
+      }
+
       maxWidu := maxItemsW*thumbsW + decalageX - 1
       maxHeitu := maxItemsH*thumbsH + decalageY - 1
       If (maxWidu<mX || maxHeitu<mY)
-      {
-         If (A_TickCount - lastInvoked2 < 300)
-            ThumbsNavigator("PgDn")
-         lastInvoked2 := A_TickCount
          Return
-      }
 
       If (newIndex=currentFileIndex) && (A_TickCount - lastInvoked>350) && (forceThis!="rClick")
       {
@@ -1030,12 +1174,7 @@ WinClickAction(forceThis:=0) {
       If newIndex
       {
          If (newIndex>maxFilesIndex)
-         {
-            If (A_TickCount - lastInvoked2 < 300)
-               ThumbsNavigator("PgUp")
-            lastInvoked2 := A_TickCount
             Return
-         }
 
          If (GetKeyState("Ctrl", "P") || GetKeyState("Shift", "P"))
             markedSelectFile := (markedSelectFile=newIndex || markedSelectFile=currentFileIndex) ? "" : newIndex
@@ -1103,6 +1242,9 @@ WinClickAction(forceThis:=0) {
       }
    } Else If (!CurrentSLD || maxFilesIndex<1)
    {
+      clippyTest := resultedFilesList[0]
+      If (!CurrentSLD && currentFileIndex=0 && InStr(clippyTest, "Current-Clipboard"))
+         Return
       Sleep, 50
       OpenFiles()
    }
@@ -1246,6 +1388,9 @@ DefineFXmodes() {
       friendly := "INVERTED"
    Else If (imgFxMode=4)
       friendly := "PERSONALIZED"
+   Else If (imgFxMode=5)
+      friendly := "AUTO-ADJUSTED"
+
    Return friendly
 }
 
@@ -1272,10 +1417,10 @@ ToggleImgFX(dir:=0) {
    Else
       imgFxMode++
 
-   If (imgFxMode>4)
+   If (imgFxMode>5)
       imgFxMode := 1
    Else If (imgFxMode<1)
-      imgFxMode := 4
+      imgFxMode := 5
 
    friendly := DefineFXmodes()
    If (imgFxMode=2)
@@ -1290,6 +1435,24 @@ ToggleImgFX(dir:=0) {
    If (thumbsDisplaying=1)
       SetTimer, RefreshThumbsList, -250
    Else prevStartIndex := -1
+
+   If (imgFxMode=5 && thumbsDisplaying!=1)
+   {
+      imgpath := resultedFilesList[currentFileIndex]
+      MD5name := generateThumbName(imgpath, 1)
+      IniRead, valuez, % mainSettingsFile, AutoLevels, % MD5name, @
+      If (InStr(valuez, "||") && valuez!="@" && StrLen(valuez)>4)
+      {
+         valu := StrSplit(valuez, "||")
+         lumosAdjust := Trim(valu[1])
+         GammosAdjust := Trim(valu[2])
+      } Else 
+      {
+         lumosAdjust := 1
+         GammosAdjust := 0
+      }
+   }
+
 
    writeMainSettings()
    r := IDshowImage(currentFileIndex)
@@ -1323,6 +1486,14 @@ ToggleIMGalign() {
 }
 
 ResetImageView() {
+    If (imgFxMode=5)
+    {
+       imgpath := resultedFilesList[currentFileIndex]
+       MD5name := generateThumbName(imgpath, 1)
+       IniWrite, --, % mainSettingsFile, AutoLevels, % MD5name
+       Sleep, 25
+    }
+
     ChangeLumos(2)
 }
 
@@ -1543,6 +1714,38 @@ NextPicture(dummy:=0, inLoop:=0) {
    } Else inLoop := 0
 }
 
+PasteClipboardIMG() {
+    clipBMP := Gdip_CreateBitmapFromClipboard()
+    If InStr(clipBMP, "err-")
+    {
+       showTOOLtip("Unable to retrieve image from clipboard...")
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
+
+    file2save := thumbsCacheFolder "\Current-Clipboard.png"
+    r := Gdip_SaveBitmapToFile(clipBMP, file2save)
+    Gdip_DisposeImage(clipBMP)
+    If r
+    {
+       showTOOLtip("Failed to store image from clipboard...")
+       SoundBeep , 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
+    If (slideShowRunning=1)
+       ToggleSlideShowu()
+
+    If (thumbsDisplaying=1)
+       ToggleThumbsMode()
+
+    imgFxMode := 1
+    markedSelectFile := ""
+    FlipImgH := FlipImgV := currentFileIndex := 0
+    resultedFilesList[0] := file2save
+    ShowTheImage(file2save, 2)
+}
+
 ThumbsNavigator(keyu) {
   resetSlideshowTimer(0)
   thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, startIndex, mainWidth, mainHeight)
@@ -1598,10 +1801,74 @@ DelayiedImageDisplay() {
       informUserFileMissing()
 }
 
-ShowImgInfos() {
-   If (thumbsDisplaying=1)
-      ToggleThumbsMode()
+ShowImgInfosPanel() {
+    Global LViewMetaD
+    If (thumbsDisplaying=1)
+       ToggleThumbsMode()
 
+    If (slideShowRunning=1)
+       ToggleSlideShowu()
+
+    CloseWindow()
+    Sleep, 15
+    Gui, SettingsGUIA: Destroy
+    Sleep, 15
+    AnyWindowOpen := 5
+    Gui, SettingsGUIA: Default
+    Gui, SettingsGUIA: -MaximizeBox -MinimizeBox hwndhSetWinGui
+    Gui, SettingsGUIA: Margin, 15, 15
+    btnWid := 130
+    txtWid := 360
+    lstWid := 545
+    If (PrefsLargeFonts=1)
+    {
+       lstWid := lstWid + 230
+       btnWid := btnWid + 70
+       txtWid := txtWid + 105
+       Gui, Font, s%LargeUIfontValue%
+    }
+
+    Gui, Add, ListView, x15 y15 w%lstWid% r12 Grid vLViewMetaD, Property|Data
+
+    Gui, Add, Button, xs+0 y+15 h30 w%btnWid% gcopyIMGinfos2clip, &Copy to clipboard
+    Gui, Add, Button, x+5 hp w%btnWid% gOpenThisFileFolder, &Open in folder
+    Gui, Add, Button, x+5 hp w90 Default gCloseWindow, C&lose
+    Gui, SettingsGUIA: Show, AutoSize, Image metadata: %appTitle%
+    PopulateImgInfos()
+}
+
+copyIMGinfos2clip() {
+   Gui, SettingsGUIA: ListView, LViewMetaD
+   aR := aC := 0
+   Loop
+   {
+       aC++
+       If (aC>2)
+       {
+          aR++
+          aC := 1
+       }
+       LV_GetText(valu, aR, aC)
+       delimu := (aC=1) ? ": " : "`n"
+       If !valu 
+          delimu := ""
+       textu .= valu delimu
+       Sleep, 10
+       ; ToolTip, %valu% -- %aC% -- %aR%
+       If (!valu && A_Index>19)
+          Break
+   }
+
+   If StrLen(textu)>10
+   {
+      Try Clipboard := textu
+      showTOOLtip("File details copied to the clipboard...")
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+   }
+}
+
+PopulateImgInfos() {
+   Gui, SettingsGUIA: ListView, LViewMetaD
    resultu := resultedFilesList[currentFileIndex]
    If !FileExist(resultu)
    {
@@ -1618,7 +1885,41 @@ ShowImgInfos() {
    Width := Gdip_GetImageWidth(gdiBitmap)
    Height := Gdip_GetImageHeight(gdiBitmap)
    Zoomu := Round(zoomLevel*100)
-   MsgBox, 64, %appTitle%: File information, Name:`n%fileNamu%`n`nLocation:`n%folderu%\`n`nFile size: %fileSizu% kilobytes`nFile created on: %FileDateC%`nFile modified on: %FileDateM%`n`nResolution (W x H): %Width% x %Height% (in pixels)`nCurrent zoom level: %zoomu%`%
+
+   generalInfos := "File name||" fileNamu "`nLocation||" folderu "\`nFile size||" fileSizu " kilobytes`nDate created||" FileDateC "`nDate modified||" FileDateM "`nResolution (W x H)||" Width " x " Height " (in pixels)`nCurrent zoom level||" zoomu " %"
+   Loop, Parse, generalInfos, `n
+   {
+       lineArru := StrSplit(A_LoopField, "||")
+       LV_Add(A_Index, lineArru[1], lineArru[2])
+   }
+
+   thumbBMP := Gdip_CreateBitmapFromFile(resultu)
+   If RegExMatch(resultu, "i)(.\.gif)$")
+   {
+      CountFrames := getGIFframesCount(thumbBMP)
+      LV_Add(A_Index, "Animated GIF frames", CountFrames)
+   } 
+
+   MoreProperties := Gdip_GetAllPropertyItems(thumbBMP)
+   For ID, Val In MoreProperties
+   {
+      If ID Is Integer
+      {
+         PropName := Gdip_GetPropertyTagName(ID)
+         PropType := Gdip_GetPropertyTagType(Val.Type)
+         If (val.value && StrLen(PropName)>1 && PropName!="unknown")
+         {
+            If (PropName="frame delay") || (PropName="bits per sample")
+            {
+               valu := SubStr(Val.Value, 1, InStr(Val.Value, A_Space))
+               LV_Add(A_Index, PropName, valu)
+            } Else LV_Add(A_Index, PropName, Val.Value)
+         }
+      }
+   }
+   Gdip_DisposeImage(thumbBMP)
+   Loop, 2
+       LV_ModifyCol(A_Index, "AutoHdr Left")
 }
 
 Jump2index() {
@@ -1700,23 +2001,119 @@ JEE_StrRegExLiteral(vText) {
   Return vOutput
 }
 
-enableFilesFilter() {
-   If (maxFilesIndex<3 && !usrFilesFilteru)
-      Return
+FiltersComboAction() {
+  If (A_GuiControlEvent="DoubleClick")
+     ApplyPanelFilter()
+}
 
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
-   If StrLen(filesFilter)>1
+readRecentFiltersEntries() {
+   testFilteru := StrReplace(usrFilesFilteru, "&")
+   entriesList := (StrLen(usrFilesFilteru)>1) ? "--={ no filter }=--`n" : ""
+   Loop, 20
    {
-      showTOOLtip("To exclude files matching the string, `nplease insert '&&' (and) into your string`n `nCurrent filter: " filesFilter)
-      SetTimer, RemoveTooltip, -5000
+       IniRead, newEntry, % mainSettingsFile, RecentFilters, E%A_Index%, @
+       addSel := (Trim(newEntry)=Trim(testFilteru)) ? "`n" : ""
+       If StrLen(newEntry)>1
+          entriesList .= Trim(newEntry) "`n" addSel
    }
+   Return entriesList
+}
 
-   GUI, 1: +OwnDialogs
-   InputBox, usrFilesFilteru, Files filter: %usrFilesFilteru%, Type the string to filter files. Files path and/or name must include the string you provide.,,,,,,,, %usrFilesFilteru%
-   If !ErrorLevel
-      coreEnableFiltru(usrFilesFilteru)
+EraseFilterzHisto() {
+  IniDelete, % mainSettingsFile, RecentFilters
+  CloseWindow()
+  Sleep, 50
+  enableFilesFilter()
+}
+
+enableFilesFilter() {
+    Global UsrEditFilter
+    If (maxFilesIndex<3 && !usrFilesFilteru)
+       Return
+
+    If (slideShowRunning=1)
+       ToggleSlideShowu()
+
+    CloseWindow()
+    Sleep, 15
+    Gui, SettingsGUIA: Destroy
+    Sleep, 15
+    AnyWindowOpen := 6
+    Gui, SettingsGUIA: Default
+    Gui, SettingsGUIA: -MaximizeBox -MinimizeBox hwndhSetWinGui
+    Gui, SettingsGUIA: Margin, 15, 15
+    btnWid := 80
+    txtWid := 360
+    EditWid := 399
+    If (PrefsLargeFonts=1)
+    {
+       EditWid := EditWid + 200
+       btnWid := btnWid + 70
+       txtWid := txtWid + 105
+       Gui, Font, s%LargeUIfontValue%
+    }
+
+    listu := readRecentFiltersEntries()
+    If (!InStr(listu, "`n`n") && StrLen(usrFilesFilteru)>1)
+       listu := usrFilesFilteru "`n`n" listu
+
+    Gui, +Delimiter`n
+    Gui, Add, Text, x15 y15 w%txtWid%, Type a string to filter file names and/or paths.
+    Gui, Add, ComboBox, y+10 w%EditWid% r7 gFiltersComboAction Simple vUsrEditFilter, % listu
+    Gui, Add, Text, y+7 w%txtWid%, Tip: you can begin the string with \> to use RegEx.
+
+    Gui, Add, Button, xs+0 y+20 h30 w%btnWid% Default gApplyPanelFilter, &Apply filter
+    Gui, Add, Checkbox, x+5 hp Checked%UsrMustInvertFilter% vUsrMustInvertFilter, Invert filter
+    Gui, Add, Button, x+35 hp w%btnWid% gEraseFilterzHisto, Erase &history
+    Gui, Add, Button, x+5 hp w85 gCloseWindow, C&lose
+    Gui, SettingsGUIA: Show, AutoSize, Files list filtering: %appTitle%
+}
+
+ApplyPanelFilter() {
+   GuiControlGet, UsrEditFilter
+   GuiControlGet, UsrMustInvertFilter
+   CloseWindow()
+   Sleep, 2
+   UsrEditFilter := Trim(UsrEditFilter)
+   UsrEditFilter := StrReplace(UsrEditFilter, "&")
+   RecentFiltersManager(UsrEditFilter)
+   If (UsrMustInvertFilter=1 && StrLen(UsrEditFilter)>0)
+      UsrEditFilter := "&" UsrEditFilter
+
+   If InStr(UsrEditFilter, "{ no filter }")
+      UsrEditFilter := ""
+   coreEnableFiltru(UsrEditFilter)
+}
+
+RecentFiltersManager(entry2add) {
+  entry2add := Trim(entry2add)
+  mainListu := readRecentFiltersEntries()
+  If StrLen(entry2add)<3
+     Return
+
+  Loop, Parse, mainListu, `n
+  {
+      If (A_LoopField=entry2add)
+      {
+         isAddedAlready := 1
+         Break
+      }
+  }
+
+  If (isAddedAlready=1)
+     Return
+
+  mainListu := entry2add "`n" mainListu
+  Loop, Parse, mainListu, `n
+  {
+      If (A_Index>20)
+         Break
+
+      If StrLen(A_LoopField)<3
+         Continue
+      countItemz++
+      IniWrite, % A_LoopField, % mainSettingsFile, RecentFilters, E%countItemz%
+  }
 }
 
 coreEnableFiltru(stringu) {
@@ -1731,13 +2128,18 @@ coreEnableFiltru(stringu) {
      bkcpMaxFilesIndex := maxFilesIndex
   }
   usrFilesFilteru := stringu
-  filesFilter := JEE_StrRegExLiteral(stringu)
+  testRegEx := SubStr(stringu, 1, 2)
+
+  If (testRegEx!="\>")
+     filesFilter := JEE_StrRegExLiteral(stringu)
+  Else
+     filesFilter := SubStr(stringu, 3)
   filesFilter := StrReplace(filesFilter, "&")
 ;    MsgBox, % "Z " filesFilter
   FilterFilesIndex()
   If (maxFilesIndex<1)
   {
-     MsgBox,, %appTitle%, No files matched your filtering criteria:`n%usrFilesFilteru%`n`nThe application will now reload the full list of files.
+     MsgBox,, %appTitle%, No files matched your filtering criteria:`n%usrFilesFilteru%`n`nThe application will now restore the full list of files.
      usrFilesFilteru := filesFilter := ""
      FilterFilesIndex()
   }
@@ -1951,7 +2353,7 @@ SaveFilesList() {
       If StrLen(filesFilter)>1
          MsgBox, 64, %appTitle%: Save slideshow, The files list is filtered down to %maxFilesIndex% files from %bkcpMaxFilesIndex%.`n`nTo save as a slideshow the entire list of files, remove the filter.
       FileSelectFile, file2save, S2, % CurrentSLD, Save files list as Slideshow, Slideshow (*.sld)
-   }
+   } Else Return
 
    If (!ErrorLevel && StrLen(file2save)>3)
    {
@@ -2004,7 +2406,7 @@ SaveFilesList() {
           dynaFolderListu .= "DF" countDynas "=" A_LoopField "`n"
       }
       If (SLDcacheFilesList=0)
-         mustGenerateStaticFolders := 0
+         ForceRegenStaticFolders := mustGenerateStaticFolders := 0
 
       Loop, % maxFilesIndex + 1
       {
@@ -2333,7 +2735,7 @@ readSlideSettings(readThisFile) {
         slideShowDelay := tstslideShowDelay
      If (tstimgresizingmode!="@" && StrLen(tstIMGresizingMode)=1 && tstIMGresizingMode<5)
         IMGresizingMode := tstIMGresizingMode
-     If (tstimgFxMode!="@" && StrLen(tstimgFxMode)=1 && tstimgFxMode<5)
+     If (tstimgFxMode!="@" && valueBetween(tstimgFxMode, 1, 5))
         imgFxMode := tstimgFxMode
      If (tstnoTooltipMSGs=1 || tstnoTooltipMSGs=0)
         noTooltipMSGs := tstnoTooltipMSGs
@@ -2357,11 +2759,11 @@ readSlideSettings(readThisFile) {
         isAlwaysOnTop := tstisAlwaysOnTop
      If (tstisTitleBarHidden=1 || tstisTitleBarHidden=0)
         isTitleBarHidden := tstisTitleBarHidden
-     If (tstslidehowmode!="@" && StrLen(tstSlideHowMode)=1 && tstSlideHowMode<4)
+     If (tstslidehowmode!="@" && valueBetween(tstSlideHowMode, 1, 3))
         SlideHowMode := tstSlideHowMode
-     If (tstimageAligned!="@" && StrLen(tstimageAligned)=1 && tstimageAligned<10)
+     If (tstimageAligned!="@" && valueBetween(tstimageAligned, 1, 9))
         imageAligned := tstimageAligned
-     If (tstthumbsAratio!="@" && StrLen(tstthumbsAratio)=1 && tstthumbsAratio<4)
+     If (tstthumbsAratio!="@" && valueBetween(tstthumbsAratio, 1, 3))
         thumbsAratio := tstthumbsAratio
 
      If (tstWindowBgrColor!="@" && StrLen(tstWindowBgrColor)=6)
@@ -2408,6 +2810,8 @@ writeMainSettings() {
     IniWrite, % ResizeKeepAratio, % mainSettingsFile, General, ResizeKeepAratio
     IniWrite, % ResizeQualityHigh, % mainSettingsFile, General, ResizeQualityHigh
     IniWrite, % ResizeApplyEffects, % mainSettingsFile, General, ResizeApplyEffects
+    IniWrite, % ResizeRotationUser, % mainSettingsFile, General, ResizeRotationUser
+    IniWrite, % prevFileSavePath, % mainSettingsFile, General, prevFileSavePath
 }
 
 loadMainSettings() {
@@ -2423,8 +2827,12 @@ loadMainSettings() {
     IniRead, tstResizeInPercentage, % mainSettingsFile, General, ResizeInPercentage, @
     IniRead, tstResizeKeepAratio, % mainSettingsFile, General, ResizeKeepAratio, @
     IniRead, tstResizeQualityHigh, % mainSettingsFile, General, ResizeQualityHigh, @
+    IniRead, tstResizeRotationUser, % mainSettingsFile, General, ResizeRotationUser, @
+    IniRead, tstprevFileSavePath, % mainSettingsFile, General, prevFileSavePath, @
     If (tstResizeInPercentage=1 || tstResizeInPercentage=0)
        ResizeInPercentage := tstResizeInPercentage
+    If (valueBetween(tstResizeRotationUser, 1, 4) && tstResizeRotationUser!="@")
+       ResizeRotationUser := tstResizeRotationUser
     If (tstResizeKeepAratio=1 || tstResizeKeepAratio=0)
        ResizeKeepAratio := tstResizeKeepAratio
     If (tstResizeQualityHigh=1 || tstResizeQualityHigh=0)
@@ -2443,6 +2851,8 @@ loadMainSettings() {
        MustLoadSLDprefs := tstMustLoadSLDprefs
     If (tstprevFileMovePath!="@" || StrLen(tstprevFileMovePath)>3)
        prevFileMovePath := tstprevFileMovePath
+    If (tstprevFileSavePath!="@" || StrLen(tstprevFileSavePath)>3)
+       prevFileSavePath := tstprevFileSavePath
     If (tstprevOpenFolderPath!="@" || StrLen(tstprevOpenFolderPath)>3)
        prevOpenFolderPath := tstprevOpenFolderPath
 }
@@ -2562,7 +2972,10 @@ PrevRandyPicture(dummy:=0, inLoop:=0) {
 }
 
 markThisFileNow() {
-  If (maxFilesIndex<3)
+  If (currentFileIndex=0)
+     Return
+
+  If (maxFilesIndex<3 || AnyWindowOpen>0)
      Return
   markedSelectFile := (markedSelectFile=currentFileIndex) ? "" : currentFileIndex
   SetTimer, DelayiedImageDisplay, -25
@@ -2699,15 +3112,78 @@ DeletePicture() {
      SetTimer, mainGdipWinThumbsGrid, -25
 }
 
-MultiRenameFiles() {
-  If (markedSelectFile)
-     filesElected := (currentFileIndex>markedSelectFile) ? currentFileIndex - markedSelectFile + 1 : markedSelectFile - currentFileIndex + 1
+readRecentMultiRenameEntries() {
+   entriesList := ""
+   Loop, 35
+   {
+       IniRead, newEntry, % mainSettingsFile, RecentMultiRename, E%A_Index%, @
+       If StrLen(newEntry)>1
+          entriesList .= Trim(newEntry) "`n"
+   }
+   Return entriesList
+}
 
-  GUI, 1: +OwnDialogs
-  Sleep, 2
-  InputBox, OriginalNewFileName, Rename %filesElected% files, File rename patterns possible:`nPrefix [this] suffix.`nReplace string/with this,,,,,,,, %OutFileName%
-  If (!ErrorLevel && StrLen(OriginalNewFileName)>1)
+MultiRenameFiles() {
+    Global UsrEditNewFileName
+    If (maxFilesIndex<2)
+       Return
+
+    If (slideShowRunning=1)
+       ToggleSlideShowu()
+
+    CloseWindow()
+    Sleep, 15
+    Gui, SettingsGUIA: Destroy
+    Sleep, 15
+    AnyWindowOpen := 8
+    Gui, SettingsGUIA: Default
+    Gui, SettingsGUIA: -MaximizeBox -MinimizeBox hwndhSetWinGui
+    Gui, SettingsGUIA: Margin, 15, 15
+    btnWid := 100
+    txtWid := 360
+    EditWid := 395
+    If (PrefsLargeFonts=1)
+    {
+       EditWid := EditWid + 220
+       btnWid := btnWid + 70
+       txtWid := txtWid + 105
+       Gui, Font, s%LargeUIfontValue%
+    }
+    If (markedSelectFile)
+       filesElected := (currentFileIndex>markedSelectFile) ? currentFileIndex - markedSelectFile + 1 : markedSelectFile - currentFileIndex + 1
+
+    listu := readRecentMultiRenameEntries()
+    overwriteConflictingFile := 0
+    Gui, +Delimiter`n
+    Gui, Add, Text, x15 y15 w%txtWid%, Selected files: %filesElected%. Type a pattern to rename the files.
+    Gui, Add, ComboBox, y+10 w%EditWid% gMultiRenameComboAction r12 Simple vUsrEditNewFileName, % listu
+    Gui, Add, Checkbox, y+10 Checked%overwriteConflictingFile% voverwriteConflictingFile, In case of file name collisions, overwrite the other files with these ones
+
+    Gui, Add, Button, xs+0 y+20 h30 w%btnWid% Default gcoreMultiRenameFiles, &Rename files
+    Gui, Add, Button, x+5 hp w%btnWid% gEraseMultiRenameHisto, Erase &history
+    Gui, Add, Button, x+5 hp w85 gMultiRenameHelp, H&elp
+    Gui, Add, Button, x+5 hp wp gCloseWindow, C&ancel
+    Gui, SettingsGUIA: Show, AutoSize, Rename multiple files: %appTitle%
+}
+
+MultiRenameHelp() {
+    MsgBox,, Help multi-rename: %appTitle%, File extensions remain unchanged regardless of the pattern used.`nFile rename patterns possible:`n`na) Prefix [this] suffix`nThe token [this] is replaced with the file name.`n`nb) Replace string/with this`nUse "/" to perform search and replace in file names.`n`nc) any text`nFiles will be counted, to avoid naming conflicts.
+}
+
+MultiRenameComboAction() {
+  If (A_GuiControlEvent="DoubleClick")
+     coreMultiRenameFiles()
+}
+
+coreMultiRenameFiles() {
+  GuiControlGet, UsrEditNewFileName
+  GuiControlGet, overwriteConflictingFile
+  OriginalNewFileName := UsrEditNewFileName
+
+  If (StrLen(OriginalNewFileName)>1)
   {
+     If (markedSelectFile)
+        filesElected := (currentFileIndex>markedSelectFile) ? currentFileIndex - markedSelectFile + 1 : markedSelectFile - currentFileIndex + 1
      If (filesElected>100)
      {
         MsgBox, 52, %appTitle%, Are you sure you want to rename the selected files?`n`nYou have selected %filesElected% files to be renamed...
@@ -2717,11 +3193,8 @@ MultiRenameFiles() {
         If (good2go!=1)
            Return
      }
-
-     MsgBox, 52, %appTitle%, Would you like to overwrite files in case of file name collisions in their respective folders?
-     IfMsgBox, Yes
-       overwriteFiles := 1
-
+     CloseWindow()
+     overwriteFiles := overwriteConflictingFile
      startPoint := (currentFileIndex<markedSelectFile) ? currentFileIndex : markedSelectFile
      showTOOLtip("Renaming " filesElected " files, please wait...`nPattern: " OriginalNewFileName)
      If InStr(OriginalNewFileName, "//")
@@ -2729,6 +3202,7 @@ MultiRenameFiles() {
      Else If InStr(OriginalNewFileName, "\\")
         strArr := StrSplit(OriginalNewFileName, "\\")
 
+     RecentMultiRenamesManager(OriginalNewFileName)
      countFilez := 0
      Loop, % filesElected
      {
@@ -2803,40 +3277,116 @@ MultiRenameFiles() {
   }
 }
 
-RenameThisFile() {
-  If (slideShowRunning=1)
-     ToggleSlideShowu()
-
-  If (markedSelectFile)
-  {
-     filesElected := (currentFileIndex>markedSelectFile) ? currentFileIndex - markedSelectFile + 1 : markedSelectFile - currentFileIndex + 1
-     If (markedSelectFile>0 && filesElected>1)
-     {
-        MultiRenameFiles()
-        Return
-     }
-  }
-
-
-  Sleep, 2
-  file2rem := resultedFilesList[currentFileIndex]
-  zPlitPath(file2rem, 0, OutFileName, OutDir)
-  If !FileExist(file2rem)
-  {
-     showTOOLtip("File does not exist or access denied...`n" OutFileName "`n" OutDir)
-     SetTimer, RemoveTooltip, % -msgDisplayTime
-     SoundBeep, 300, 100
+RecentMultiRenamesManager(entry2add) {
+  entry2add := Trim(entry2add)
+  mainListu := readRecentMultiRenameEntries()
+  If StrLen(entry2add)<3
      Return
-  }
-  GUI, 1: +OwnDialogs
-  InputBox, newFileName, Rename file, Please type the new file name.,,,,,,,, %OutFileName%
-  If (!ErrorLevel && StrLen(newFileName)>1)
+
+  Loop, Parse, mainListu, `n
   {
+      If (A_LoopField=entry2add)
+      {
+         isAddedAlready := 1
+         Break
+      }
+  }
+
+  If (isAddedAlready=1)
+     Return
+
+  mainListu := entry2add "`n" mainListu
+  Loop, Parse, mainListu, `n
+  {
+      If (A_Index>35)
+         Break
+
+      If StrLen(A_LoopField)<3
+         Continue
+      countItemz++
+      IniWrite, % A_LoopField, % mainSettingsFile, RecentMultiRename, E%countItemz%
+  }
+}
+
+EraseMultiRenameHisto() {
+  IniDelete, % mainSettingsFile, RecentMultiRename
+  CloseWindow()
+  RenameThisFile()
+}
+
+RenameThisFile() {
+    Global newFileName
+    If (slideShowRunning=1)
+       ToggleSlideShowu()
+    If (currentFileIndex=0)
+       Return
+
+    If (markedSelectFile)
+    {
+       filesElected := (currentFileIndex>markedSelectFile) ? currentFileIndex - markedSelectFile + 1 : markedSelectFile - currentFileIndex + 1
+       If (markedSelectFile>0 && filesElected>1)
+       {
+          MultiRenameFiles()
+          Return
+       }
+    }
+
+    Sleep, 2
+    file2rem := resultedFilesList[currentFileIndex]
+    zPlitPath(file2rem, 0, OutFileName, OutDir)
+    If !FileExist(file2rem)
+    {
+       showTOOLtip("File does not exist or access denied...`n" OutFileName "`n" OutDir)
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       SoundBeep, 300, 100
+       Return
+    }
+
+    CloseWindow()
+    Sleep, 15
+    Gui, SettingsGUIA: Destroy
+    Sleep, 15
+    AnyWindowOpen := 7
+    Gui, SettingsGUIA: Default
+    Gui, SettingsGUIA: -MaximizeBox -MinimizeBox hwndhSetWinGui
+    Gui, SettingsGUIA: Margin, 15, 15
+    btnWid := 100
+    txtWid := 360
+    EditWid := 395
+    If (PrefsLargeFonts=1)
+    {
+       EditWid := EditWid + 230
+       btnWid := btnWid + 70
+       txtWid := txtWid + 105
+       Gui, Font, s%LargeUIfontValue%
+    }
+
+    overwriteConflictingFile := 0
+    Gui, Add, Text, x15 y15 w%txtWid%, Please type the new file name...
+    Gui, Add, Edit, y+7 w%EditWid% r1 limit9025 -multi -wantTab -wrap vnewFileName, % OutFileName
+    Gui, Add, Checkbox, y+10 Checked%overwriteConflictingFile% voverwriteConflictingFile, In case of file name collision, overwrite the other file with this one
+
+    Gui, Add, Button, xs+0 y+20 h30 w%btnWid% Default gRenameBTNaction, &Rename file
+    Gui, Add, Button, x+5 hp w90 gCloseWindow, C&ancel
+    Gui, SettingsGUIA: Show, AutoSize, Rename file: %appTitle%
+}
+
+RenameBTNaction() {
+  GuiControlGet, newFileName
+  GuiControlGet, overwriteConflictingFile
+
+  newFileName := Trim(newFileName)
+  If (StrLen(newFileName)>2)
+  {
+     file2rem := resultedFilesList[currentFileIndex]
+     zPlitPath(file2rem, 0, OutFileName, OutDir)
+     If (!FileExist(file2rem) || Trim(OutFileName)=newFileName)
+        Return
+
+     CloseWindow()
      If FileExist(OutDir "\" newFileName)
      {
-        SoundBeep, 300, 100
-        MsgBox, 52, %appTitle%, A file with the name provided already exists in its folder.`nDo you want to overwrite it?`n`n%newFileName%
-        IfMsgBox, Yes
+        If (overwriteConflictingFile=1)
         {
            FileSetAttrib, -R, %file2rem%
            Sleep, 2
@@ -2844,14 +3394,14 @@ RenameThisFile() {
            Sleep, 2
         } Else
         {
-           showTOOLtip("Rename operation canceled...")
+           showTOOLtip("Rename operation abandoned.`nFile names conflict...`n" newFileName)
            SetTimer, RemoveTooltip, % -msgDisplayTime
            Return
         }
      }
 
      Sleep, 2
-     FileMove, %file2rem%, %OutDir%\%newFileName%
+     FileMove, %file2rem%, %OutDir%\%newFileName%, 1
      If ErrorLevel
      {
         showTOOLtip("ERROR: Access denied... File could not be renamed.")
@@ -2874,16 +3424,80 @@ RenameThisFile() {
   }
 }
 
-MoveFile2Dest() {
+SaveClipboardImage(dummy:=0) {
    If (slideShowRunning=1)
       ToggleSlideShowu()
 
+   clippyTest := resultedFilesList[0]
+   If (currentFileIndex=0 && InStr(clippyTest, "Current-Clipboard"))
+      good2go := 1
+
+   If (dummy="yay" && thumbsDisplaying!=1)
+      good2go := 1
+
+   If (good2go!=1)
+   {
+      SaveFilesList()
+      Return
+   }
+
+   If (dummy="yay")
+   {
+      file2rem := resultedFilesList[currentFileIndex]
+      file2rem := StrReplace(file2rem, "||")
+   }
+
+   defaultu := (dummy="yay") ? file2rem : prevFileSavePath
    GUI, 1: +OwnDialogs
-   FileSelectFile, file2save, S2, %prevFileMovePath%\this-folder, Move file to - select destination folder..., All files (*.*)
+   FileSelectFile, file2save, S18, % defaultu, Save image as..., Images (*.png; *.jpg; *.bmp; *.tif)
+   If (!ErrorLevel && StrLen(file2save)>3)
+   {
+      If !RegExMatch(file2save, "i)(.\.(png|jpg|bmp|jpeg|tiff|tif))$")
+      {
+         Msgbox, 48, %appTitle%, ERROR: Please use a supported file format. Allowed formats: .JPG, .TIF, .PNG or .BMP.
+         Return
+      }
+      If (dummy!="yay")
+         file2rem := thumbsCacheFolder "\Current-Clipboard.png"
+
+      zPlitPath(file2rem, 0, OutFileName, OutDir)
+      prevFileSavePath := OutDir
+      writeMainSettings()
+      r := coreResizeIMG(file2rem, 0, 0, file2save, 1, 0, 0)
+      If r
+      {
+         showTOOLtip("Failed to save image file...`n" OutFileName "`n" OutDir "\")
+         SoundBeep , 300, 100
+      } Else showTOOLtip("Image file saved...`n" OutFileName "`n" OutDir "\")
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+   }
+}
+
+ChooseFilesDest() {
+   If (slideShowRunning=1)
+      ToggleSlideShowu()
+
+   If (currentFileIndex=0)
+      Return
+
+   If (AnyWindowOpen>0)
+   {
+      CloseWindow()
+      wasOpen := 1
+   }
+
+   GUI, 1: +OwnDialogs
+   FileSelectFile, file2save, S2, %prevFileMovePath%\this-folder, Please select destination folder..., All files (*.*)
    If (!ErrorLevel && StrLen(file2save)>3)
    {
       zPlitPath(file2save, 0, OldOutFileName, OldOutDir)
-      QuickMoveFile2Dest(OldOutDir)
+      If (wasOpen=1)
+      {
+         prevFileMovePath := OldOutDir
+         RecentCopyMoveManager(OldOutDir)
+         Sleep, 25
+         CopyMovePanelWindow()
+      } Else Return
    }
 }
 
@@ -2908,56 +3522,215 @@ zPlitPath(inputu, fastMode, ByRef fileNamu, ByRef folderu) {
     }
 }
 
-invokeQuickMoveMenu() {
-   Static wasCreated
-   If (wasCreated=1)
-      Menu, QuickMoveMenu, Delete
-
-   readRecentEntries()
-   StringRight, infoPrevMovePath, prevFileMovePath, 25
-   Menu, QuickMoveMenu, Add, &0. Previous: %infoPrevMovePath%, OpenQuickItemDir
-   Loop, Parse, historyList, `n
+readRecentFileDesties() {
+   listu := prevFileMovePath "`n" prevOpenFolderPath "`n" prevFileSavePath "`n"
+   Loop, 15
    {
-      If (A_Index>15)
-         Break
-
-      If !A_LoopField
-         Continue
-
-      zPlitPath(A_LoopField, 0, fileNamu, OutDir)
-      countItemz++
-      If InStr(addedList, "/" OutDir "\")
-         Continue
-      addedList .= "/" OutDir "\"
-      StringRight, entryu, OutDir, 25
-      Menu, QuickMoveMenu, Add, &%countItemz%. %entryu%, OpenQuickItemDir
+       IniRead, newEntry, % mainSettingsFile, RecentFDestinations, E%A_Index%, @
+       If (StrLen(newEntry)>4 && FileExist(newEntry) && !InStr(listu, newEntry "`n"))
+          listu .= newEntry "`n"
    }
+   Return listu
+}
 
-   Menu, QuickMoveMenu, Add, 
-   Menu, QuickMoveMenu, Add, &Choose a new folder, MoveFile2Dest
-   wasCreated := 1
-   Menu, QuickMoveMenu, Show 
+InvokeMoveFiles() {
+   UsrCopyMoveOperation := 2
+   CopyMovePanelWindow()
+}
+
+InvokeCopyFiles() {
+   UsrCopyMoveOperation := 3
+   CopyMovePanelWindow()
+}
+
+CopyMovePanelWindow() {
+    Global UsrEditFileDestination, BtnCpyMv
+    If (slideShowRunning=1)
+       ToggleSlideShowu()
+
+    CloseWindow()
+    Sleep, 15
+    Gui, SettingsGUIA: Destroy
+    Sleep, 15
+    AnyWindowOpen := 9
+    Gui, SettingsGUIA: Default
+    Gui, SettingsGUIA: -MaximizeBox -MinimizeBox hwndhSetWinGui
+    Gui, SettingsGUIA: Margin, 15, 15
+    btnWid := 125
+    txtWid := 360
+    EditWid := 395
+    If (PrefsLargeFonts=1)
+    {
+       EditWid := EditWid + 220
+       btnWid := btnWid + 70
+       txtWid := txtWid + 105
+       Gui, Font, s%LargeUIfontValue%
+    }
+
+    listu := readRecentFileDesties()
+    listu .= "--={ other destinations }=--`n"
+
+    readRecentEntries()
+    Loop, Parse, historyList, `n
+    {
+       If (A_Index>15)
+          Break 
+
+       If StrLen(A_LoopField<4)
+          Continue 
+
+       zPlitPath(A_LoopField, 0, fileNamu, OutDir)
+       If InStr(listu, OutDir "`n") || !FileExist(OutDir)
+          Continue
+       listu .= OutDir "`n"
+    } 
+
+    mainDynaFoldersListu := InStr(DynamicFoldersList, "|hexists|") ? coreLoadDynaFolders(CurrentSLD) : DynamicFoldersList
+    Loop, Parse, mainDynaFoldersListu, `n
+    {
+        If (A_Index>15)
+           Break
+
+        If StrLen(A_LoopField)<4
+           Continue
+
+        folderu := StrReplace(A_LoopField, "|")
+        If InStr(listu, folderu "`n") || !FileExist(folderu)
+           Continue
+        listu .= folderu "`n"
+    }
+
+    ; staticfoldersListu := LoadStaticFoldersCached(CurrentSLD, irrelevantVar)
+    ; Loop, Parse, staticfoldersListu, `n
+    ; {
+    ;     If (A_Index>5)
+    ;        Break
+    ;     If StrLen(A_LoopField)<4
+    ;        Continue
+
+    ;     lineArru := StrSplit(A_LoopField, "*&*")
+    ;     folderu := lineArru[2]
+    ;     If InStr(listu, folderu "`n") || !FileExist(folderu)
+    ;        Continue
+    ;     listu .= folderu "`n"
+    ; }
+
+    Loop, Parse, listu, `n
+    {
+        If !A_LoopField
+           Continue
+        indexu := InStr(A_LoopField, "{ other dest") ? "" : A_Index - 1 "; "
+        finalListu .= indexu A_LoopField "`n"
+        If (A_Index=1)
+           finalListu .= "`n"
+    }
+
+    If (markedSelectFile)
+       filesElected := (currentFileIndex>markedSelectFile) ? currentFileIndex - markedSelectFile + 1 : markedSelectFile - currentFileIndex + 1
+
+    If (filesElected>1)
+       infoSelection := "Selected files: " filesElected ". "
+
+    overwriteConflictingFile := 0
+    Gui, +Delimiter`n
+    Gui, Add, Text, x15 y15 Section, %infoSelection%Please select or type destination folder...
+    Gui, Add, ComboBox, xs y+10 w%EditWid% gCopyMoveComboAction r12 Simple vUsrEditFileDestination, % finalListu
+    Gui, Add, Checkbox, y+10 Checked%overwriteConflictingFile% voverwriteConflictingFile, When file name(s) collide, overwrite file(s) found in selected folder
+
+    btnName := (UsrCopyMoveOperation=2) ? "Move" : "Copy"
+    Gui, Add, Button, xs y+20 h30 w%btnWid% gChooseFilesDest, &Choose a new folder
+    Gui, Add, DropDownList, x+5 w%btnWid% gchangeCopyMoveAction AltSubmit Choose%UsrCopyMoveOperation% vUsrCopyMoveOperation, Action...`nMove file(s)`nCopy file(s)
+    Gui, Add, Button, xs y+20 h30 w%btnWid% Default gOpenQuickItemDir vBtnCpyMv, &Proceed...
+    Gui, Add, Button, x+5 hp w%btnWid% gEraseCopyMoveHisto, Erase &history
+    Gui, Add, Button, x+5 hp w80 gCloseWindow, C&ancel
+    Gui, SettingsGUIA: Show, AutoSize, %btnName% file(s) to...: %appTitle%
+}
+
+changeCopyMoveAction() {
+  GuiControlGet, UsrCopyMoveOperation
+  btnName := (UsrCopyMoveOperation=2) ? "Move" : "Copy"
+  ; GuiControl, SettingsGUIA:, BtnCpyMv, &%btnName% file(s)
+  Gui, SettingsGUIA: Show,, %btnName% file(s) to...: %appTitle%
+  If (UsrCopyMoveOperation=1)
+     GuiControl, SettingsGUIA: Disable, BtnCpyMv
+  Else
+     GuiControl, SettingsGUIA: Enable, BtnCpyMv
+}
+
+CopyMoveComboAction() {
+  Static lastInvoked := 1
+  GuiControlGet, UsrEditFileDestination
+  If (A_GuiControlEvent="DoubleClick")
+  {
+     OpenQuickItemDir()
+  } Else If (A_GuiControlEvent="Normal") && (A_TickCount - lastInvoked > 50) && StrLen(UsrEditFileDestination)<5
+    && !InStr(UsrEditFileDestination, ":\") && InStr(UsrEditFileDestination, ";")
+  {
+     SendInput, {Up}
+     lastInvoked := A_TickCount
+  }
+}
+
+EraseCopyMoveHisto() {
+  IniDelete, % mainSettingsFile, RecentFDestinations
+  CloseWindow()
+  CopyMovePanelWindow()
 }
 
 OpenQuickItemDir() {
-  Sleep, 25
-  TestOpenThisu := SubStr(A_ThisMenuItem, 1, 3)
-  If (TestOpenThisu="&0.")
+  GuiControlGet, UsrEditFileDestination
+  GuiControlGet, UsrCopyMoveOperation
+  GuiControlGet, overwriteConflictingFile
+
+  If (UsrCopyMoveOperation=1)
+     Return
+
+  folderu := Trim(UsrEditFileDestination)
+  If (b := InStr(folderu, "; "))
+     folderu := SubStr(folderu, b+2)
+
+  If !InStr(folderu, ":\")
+     Return
+
+  If (StrLen(folderu)>4 && FileExist(folderu))
   {
-     folderu := prevFileMovePath
-  } Else
+     CloseWindow()
+     Sleep, 2
+     QuickMoveFile2Dest(folderu)
+  } Else SoundBeep, 300, 100
+
+ ; MsgBox, %folderu% -- %newentry%
+}
+
+RecentCopyMoveManager(entry2add) {
+  entry2add := Trim(entry2add)
+  mainListu := readRecentFileDesties()
+  If StrLen(entry2add)<3
+     Return
+
+  Loop, Parse, mainListu, `n
   {
-     openThisu := SubStr(A_ThisMenuItem, 2, InStr(A_ThisMenuItem, ". ")-2)
-     IniRead, hEntry, % mainSettingsFile, Recents, E%openThisu%, @
-     zPlitPath(hEntry, 0, fileNamu, folderu)
+      If (A_LoopField=entry2add)
+      {
+         isAddedAlready := 1
+         Break
+      }
   }
 
-  If StrLen(folderu)>4
-     QuickMoveFile2Dest(folderu)
-  Else 
-     SoundBeep, 300, 100
+  If (isAddedAlready=1)
+     Return
 
-; MsgBox, %openthisu% -- %newentry%
+  mainListu := entry2add "`n" mainListu
+  Loop, Parse, mainListu, `n
+  {
+      If (A_Index>15)
+         Break
+
+      If StrLen(A_LoopField)<4
+         Continue
+      countItemz++
+      IniWrite, % A_LoopField, % mainSettingsFile, RecentFDestinations, E%countItemz%
+  }
 }
 
 QuickMoveFile2Dest(finalDest) {
@@ -2984,31 +3757,47 @@ QuickMoveFile2Dest(finalDest) {
       Return
    }
 
-   If (OldOutDir=finalDest)
-   {
-      showTOOLtip("Destination equals to initial location...`nOperation ignored.")
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+    If (OldOutDir=finalDest)
+    {
+       showTOOLtip("Destination equals to initial location...`nOperation ignored.`n" finalDest "\")
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
 
     file2save := finalDest "\" OldOutFileName
     If FileExist(file2save)
     {
-       MsgBox, 52, %appTitle%, A file with the same name already exists in the destination folder... Do you want to overwrite the file?`n`n%OldOutFileName%`n%NewOutDir%
-       IfMsgBox, Yes
+       If (overwriteConflictingFile=1)
        {
           FileSetAttrib, -R, %file2save%
           Sleep, 5
           FileDelete, %file2save%
           Sleep, 5
-          FileMove, %file2rem%, %file2save%, 1
+          If (UsrCopyMoveOperation=2)
+             FileMove, %file2rem%, %file2save%, 1
+          Else
+             FileCopy, %file2rem%, %file2save%, 1
           If ErrorLevel
-             wasError := 1
-          throwMSGwriteError()
-       } Else Return
+          {
+             actName := (UsrCopyMoveOperation=2) ? "move" : "copy"
+             showTOOLtip(OldOutFileName "`nFailed to  " actName " file to...`n" finalDest "\")
+             SoundBeep, 300, 100
+             SetTimer, RemoveTooltip, % -msgDisplayTime
+             Return
+          }
+       } Else
+       {
+          showTOOLtip("A file with the same name exists in the destination folder.`nOperation aborted...`n" OldOutFileName "`n" finalDest "\")
+          SoundBeep, 300, 100
+          SetTimer, RemoveTooltip, % -msgDisplayTime
+          Return
+       }
     } Else
     {
-       FileMove, %file2rem%, %file2save%, 1
+       If (UsrCopyMoveOperation=2)
+          FileMove, %file2rem%, %file2save%
+       Else
+          FileCopy, %file2rem%, %file2save%
        If ErrorLevel
           wasError := 1
     }
@@ -3016,15 +3805,25 @@ QuickMoveFile2Dest(finalDest) {
     If (wasError!=1)
     {
        prevFileMovePath := finalDest
-       RecentFilesManager(0,2)
-       showTOOLtip("File moved to...`n" OldOutFileName "`n" finalDest "\")
-       resultedFilesList[currentFileIndex] := file2save
-       If StrLen(filesFilter)>1
+       actName := (UsrCopyMoveOperation=2) ? "moved" : "copied"
+       showTOOLtip("File " actName " to...`n" OldOutFileName "`n" finalDest "\")
+       If (UsrCopyMoveOperation=2)
+          resultedFilesList[currentFileIndex] := file2save
+       If (StrLen(filesFilter)>1 && UsrCopyMoveOperation=2)
        {
           z := detectFileIDbkcpList(file2rem)
           If (z!="fail" && z>=1)
              bckpResultedFilesList[z] := file2save
        }
+       RecentCopyMoveManager(finalDest)
+       Sleep, 25
+       ; RecentFilesManager(0, 2)
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+    } Else
+    {
+       actName := (UsrCopyMoveOperation=2) ? "move" : "copy"
+       showTOOLtip(OldOutFileName "`nFailed to  " actName " file to...`n" finalDest "\")
+       SoundBeep, 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
     }
 }
@@ -3044,27 +3843,29 @@ MultiMoveFile(finalDest) {
          Return
    }
 
-   MsgBox, 52, %appTitle%, Would you like to overwrite files in case of file name collisions in the destination folder?`n`n%finalDest%
-   IfMsgBox, Yes
-     overwriteFiles := 1
-
    lastInvoked := A_TickCount
+   overwriteFiles := overwriteConflictingFile
    startPoint := (currentFileIndex<markedSelectFile) ? currentFileIndex : markedSelectFile
-   showTOOLtip("Moving " filesElected " files to`n" finalDest "\`nPlease wait...")
+   If (UsrCopyMoveOperation=2)
+      showTOOLtip("Moving " filesElected " files to`n" finalDest "\`nPlease wait...")
+   Else
+      showTOOLtip("Copying " filesElected " files to`n" finalDest "\`nPlease wait...")
    prevFileMovePath := finalDest
-   RecentFilesManager(0, 2)
+   RecentCopyMoveManager(finalDest)
+   Sleep, 25
+   ; RecentFilesManager(0, 2)
    Loop, % filesElected
    {
-     wasError := 0
-     thisFileIndex := startPoint + A_Index - 1
-     file2rem := resultedFilesList[thisFileIndex]
-     zPlitPath(file2rem, 0, OldOutFileName, OldOutDir)
-     If !FileExist(file2rem)
-        Continue
+      thisFileIndex := startPoint + A_Index - 1
+      file2rem := resultedFilesList[thisFileIndex]
+      zPlitPath(file2rem, 0, OldOutFileName, OldOutDir)
+      If !FileExist(file2rem)
+         Continue
 
-     If (OldOutDir=finalDest)
-        Continue
+      If (OldOutDir=finalDest)
+         Continue
 
+      wasError := skippedFile := 0
       file2save := finalDest "\" OldOutFileName
       If FileExist(file2save)
       {
@@ -3074,13 +3875,23 @@ MultiMoveFile(finalDest) {
             Sleep, 5
             FileDelete, %file2save%
             Sleep, 5
-            FileMove, %file2rem%, %file2save%, 1
+            If (UsrCopyMoveOperation=2)
+               FileMove, %file2rem%, %file2save%, 1
+            Else
+               FileCopy, %file2rem%, %file2save%, 1
             If ErrorLevel
                wasError++
-         } Else Continue
+         } Else
+         {
+            skippedFile := 1
+            Continue
+         }
       } Else
       {
-         FileMove, %file2rem%, %file2save%, 1
+         If (UsrCopyMoveOperation=2)
+            FileMove, %file2rem%, %file2save%, 1
+         Else
+            FileCopy, %file2rem%, %file2save%, 1
          If ErrorLevel
             wasError++
       }
@@ -3088,14 +3899,17 @@ MultiMoveFile(finalDest) {
       If (!wasError)
       {
          filezMoved++
-         resultedFilesList[thisFileIndex] := file2save
-         If StrLen(filesFilter)>1
+         If (UsrCopyMoveOperation=2)
+            resultedFilesList[thisFileIndex] := file2save
+         If (StrLen(filesFilter)>1 && UsrCopyMoveOperation=2)
          {
             z := detectFileIDbkcpList(file2rem)
             If (z!="fail" && z>=1)
                bckpResultedFilesList[z] := file2save
          }
-      } Else someErrors := "`nErrors occured during file operations..."
+      } Else If (skippedFile!=1)
+         someErrors := "`nErrors occured during file operations..."
+
       If GetKeyState("Esc", "P")
       {
          lastLongOperationAbort := A_TickCount
@@ -3106,11 +3920,24 @@ MultiMoveFile(finalDest) {
    markedSelectFile := ""
    prevStartIndex := -1
    SetTimer, DelayiedImageDisplay, -100
+   If (UsrCopyMoveOperation=2)
+   {
+      If (abandonAll=1)
+         showTOOLtip("Operation aborted. " filezMoved " out of " filesElected " selected files were moved to`n" finalDest "\" someErrors)
+      Else
+         showTOOLtip("Finished moving " filezMoved " out of " filesElected " files to`n" finalDest "\" someErrors)
+   } Else
+   {
+      If (abandonAll=1)
+         showTOOLtip("Operation aborted. " filezMoved " out of " filesElected " selected files were copied to`n" finalDest "\" someErrors)
+      Else
+         showTOOLtip("Finished copying " filezMoved " out of " filesElected " files to`n" finalDest "\" someErrors)
+   }
+
    If (abandonAll=1)
-      showTOOLtip("Operation aborted. " filezMoved " out of " filesElected " selected files were moved to`n" finalDest "\" someErrors)
+      SoundBeep, 900, 100
    Else
-      showTOOLtip("Finished moving " filezMoved " out of " filesElected " files to`n" finalDest "\" someErrors)
-   SoundBeep , 900, 100
+      SoundBeep, 300, 100
    SetTimer, RemoveTooltip, % -msgDisplayTime
    lastInvoked := A_TickCount
 }
@@ -3189,16 +4016,22 @@ multiJpegConvert() {
    prevStartIndex := -1
    SetTimer, DelayiedImageDisplay, -100
    If (abandonAll=1)
+   {
       showTOOLtip("Operation aborted. "  filesConverted " out of " filesElected " selected files were converted to JPEG" someErrors)
-   Else
+      SoundBeep , 300, 100
+   } Else
+   {
       showTOOLtip("Finished converting to JPEG "  filesConverted " out of " filesElected " selected files" someErrors)
-   SoundBeep , 900, 100
+      SoundBeep , 900, 100
+   }
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
 convert2jpeg() {
   Critical, on
   Static asku := "a", mustDeleteFile := 0
+  If (currentFileIndex=0)
+     Return
 
   If (markedSelectFile)
   {
@@ -3226,6 +4059,7 @@ convert2jpeg() {
      showTOOLtip("Failed to convert file...`n" OutFileName "`n" OutDir "\")
      SoundBeep , 300, 100
   } Else showTOOLtip("File converted succesfully to JPEG...`n" OutNameNoExt ".jpg`n" OutDir)
+
   SetTimer, RemoveTooltip, % -msgDisplayTime
   If (asku="a" && !r)
   {
@@ -3279,13 +4113,21 @@ renewCurrentFilesList() {
 }
 
 coreOpenFolder(thisFolder, doOptionals:=1) {
-   If StrLen(thisFolder)>3
+   If (StrLen(thisFolder)>3 && FileExist(thisFolder))
    {
       CloseWindow()
       usrFilesFilteru := filesFilter := CurrentSLD := ""
       WinSetTitle, ahk_id %PVhwnd%,, Loading files - please wait...
       renewCurrentFilesList()
       GetFilesList(thisFolder "\*")
+      If (maxFilesIndex=0)
+      {
+        showTOOLtip("ERROR: Found no recognized image files in the folder...`n" thisFolder "\")
+        SoundBeep , 300, 100
+        SetTimer, RemoveTooltip, % -msgDisplayTime
+        Return
+      }
+
       GenerateRandyList()
       mustGenerateStaticFolders := 1
       DynamicFoldersList := thisFolder "`n"
@@ -3299,6 +4141,11 @@ coreOpenFolder(thisFolder, doOptionals:=1) {
          Else
             Gosub, GuiSize
       }
+   } Else
+   {
+      showTOOLtip("ERROR: The folder seems to be inexistent...`n" thisFolder "\")
+      SoundBeep , 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 }
 
@@ -3613,7 +4460,10 @@ Return
 
 showTOOLtip(msg) {
    Sleep, 5
-   If (identifyThisWin()=1 && noTooltipMSGs=0)
+   If (AnyWindowOpen>0 && WinActive("A")=hSetWinGui)
+   {
+      Tooltip, %msg%
+   } Else If (identifyThisWin()=1 && noTooltipMSGs=0)
    {
       ; Tooltip, %msg%
       TooltipCreator(msg)
@@ -3713,6 +4563,7 @@ BuildMenu() {
       Menu, PVtFile, Delete
       Menu, PVprefs, Delete
       Menu, PVopenF, Delete
+      Menu, PVsort, Delete
    }
 
    sliSpeed := Round(slideShowDelay/1000, 2) " sec."
@@ -3764,11 +4615,12 @@ BuildMenu() {
    Menu, PVview, Add, &Switch colors display`tF, ToggleImgFX
    Menu, PVview, Add, % DefineFXmodes(), ToggleImgFX
    Menu, PVview, Disable, % DefineFXmodes()
-   If (imgFxMode=4 || imgFxMode=2)
+   If (imgFxMode=5 || imgFxMode=4 || imgFxMode=2)
    {
       Menu, PVview, Add, Br: %infolumosAdjust% / Ga: %infoGammosAdjust%, ToggleImgFX
       Menu, PVview, Disable, Br: %infolumosAdjust% / Ga: %infoGammosAdjust%
    }
+
    Menu, PVview, Add,
    If (thumbsDisplaying!=1)
    {
@@ -3802,7 +4654,7 @@ BuildMenu() {
       Menu, PVtFile, Check, Mar&k this file`tTab
 
    If markedSelectFile
-      Menu, PVtFile, Add, Compare this file with marked file`tC, CompareImagesAB
+      Menu, PVtFile, Add, Compare this file with marked file`tB, CompareImagesAB
 
    file2rem := resultedFilesList[currentFileIndex]
    If !RegExMatch(file2rem, "i)(.\.(gif|jpg|jpeg))$")
@@ -3811,17 +4663,18 @@ BuildMenu() {
    Menu, PVtFile, Add, &Delete`tDelete, DeletePicture
    Menu, PVtFile, Add, &Rename`tF2, RenameThisFile
    Menu, PVtFile, Add,
-   Menu, PVtFile, Add, &Move file to...`tCtrl+M, MoveFile2Dest
-   If infoPrevMovePath
-      Menu, PVtFile, Add, %infoPrevMovePath%`tM, invokeQuickMoveMenu
+   Menu, PVtFile, Add, &Move file to...`tM, InvokeMoveFiles
+   Menu, PVtFile, Add, &Copy file to...`tC, InvokeCopyFiles
    Menu, PVtFile, Add,
-   Menu, PVtFile, Add, &Information`tI, ShowImgInfos
+   Menu, PVtFile, Add, &Information`tI, ShowImgInfosPanel
 
    Menu, PVsort, Add, &Path and name, ActSortName
    Menu, PVsort, Add, &File size, ActSortSize
    Menu, PVsort, Add, &Modified date, ActSortModified
    Menu, PVsort, Add, &Created date, ActSortCreated
    Menu, PVsort, Add, &Resolution (very slow), ActSortResolution
+   Menu, PVsort, Add, 
+   Menu, PVsort, Add, R&everse list, ReverseListNow
 
    defMenuRefresh := RegExMatch(CurrentSLD, "i)(\.sld)$") ? "&Reload .SLD file" : "&Refresh opened folder(s)"
    StringRight, defMenuRefreshItm, CurrentSLD, 30
@@ -3918,11 +4771,10 @@ BuildMenu() {
    readRecentEntries()
    Menu, PVopenF, Add, &Open File`tCtrl+O, OpenFiles
    Menu, PVopenF, Add, &Open Folders`tShift+O, OpenFolders
+   Menu, PVopenF, Add,
    If (maxFilesIndex<1 || !CurrentSLD)
-   {
-      Menu, PVopenF, Add,
       Menu, PVopenF, Add, Insert file(s)`tInsert, addNewFile2list
-   }
+   Menu, PVopenF, Add, Paste clipboard`tCtrl+V, PasteClipboardIMG
    Menu, PVopenF, Add,
    Loop, Parse, historyList, `n
    {
@@ -3933,7 +4785,7 @@ BuildMenu() {
          Continue
 
       countItemz++
-      StringRight, entryu, A_LoopField, 25
+      entryu := SubStr(A_LoopField, -30)
       Menu, PVopenF, Add, &%countItemz%. %entryu%, OpenRecentEntry
    }
    If (countItemz>0)
@@ -3942,7 +4794,18 @@ BuildMenu() {
       Menu, PVopenF, Add, &Erase history, EraseHistory
    }
 
+   Menu, PVopenF, Add, 
+   If StrLen(prevFileSavePath)>3
+      Menu, PVopenF, Add, % "O1. " SubStr(prevFileSavePath, -30), OpenRecentEntry
+   If StrLen(prevFileMovePath)>3
+      Menu, PVopenF, Add, % "O2. " SubStr(prevFileMovePath, -30), OpenRecentEntry
+   If StrLen(prevOpenFolderPath)>3
+      Menu, PVopenF, Add, % "O3. " SubStr(prevOpenFolderPath, -30), OpenRecentEntry
+
+   clippyTest := resultedFilesList[0]
    Menu, PVmenu, Add, &Open..., :PVopenF
+   If (currentFileIndex=0 && InStr(clippyTest, "Current-Clipboard"))
+      Menu, PVmenu, Add, &Save image...`tCtrl+S, SaveClipboardImage
    Menu, PVmenu, Add,
    If (maxFilesIndex>0 && CurrentSLD)
    {
@@ -3957,7 +4820,8 @@ BuildMenu() {
          Menu, PVmenu, Add, Slideshow, :PVsliMenu
       }
       Menu, PVmenu, Add,
-   }
+   } Else If (currentFileIndex=0 && InStr(clippyTest, "Current-Clipboard"))
+      Menu, PVmenu, Add, Vie&w, :PVview
 
    Menu, PVmenu, Add, Prefe&rences, :PVprefs
    Menu, PVmenu, Add, About, AboutWindow
@@ -3975,7 +4839,22 @@ EraseHistory() {
 }
 
 OpenRecentEntry() {
-  openThisu := SubStr(A_ThisMenuItem, 2, InStr(A_ThisMenuItem, ". ")-2)
+  testOs := A_ThisMenuItem
+  If RegExMatch(testOs, "i)^(o1\. )")
+  {
+     coreOpenFolder(prevFileSavePath)
+     Return
+  } Else If RegExMatch(testOs, "i)^(o2\. )")
+  {
+     coreOpenFolder(prevFileMovePath)
+     Return
+  } Else If RegExMatch(testOs, "i)^(o3\. )")
+  {
+     coreOpenFolder(prevOpenFolderPath)
+     Return
+  }
+
+  openThisu := SubStr(testOs, 2, InStr(testOs, ". ")-2)
   IniRead, newEntry, % mainSettingsFile, Recents, E%openThisu%, @
 ; MsgBox, %openthisu% -- %newentry%
   newEntry := Trim(newEntry)
@@ -3986,7 +4865,7 @@ OpenRecentEntry() {
         OpenSLD(newEntry)
      } Else
      {
-        prevOpenFolderPath := newEntry
+        prevOpenFolderPath := StrReplace(newEntry, "|")
         coreOpenFolder(newEntry)
      }
   }
@@ -3995,9 +4874,9 @@ OpenRecentEntry() {
 ToggleAllonTop() {
    isAlwaysOnTop := !isAlwaysOnTop
    If (isAlwaysOnTop=1)
-      WinSet, AlwaysOnTop, 1, ahk_id %PVhwnd%
+      WinSet, AlwaysOnTop, On, ahk_id %PVhwnd%
    Else
-      WinSet, AlwaysOnTop, 0, ahk_id %PVhwnd%
+      WinSet, AlwaysOnTop, Off, ahk_id %PVhwnd%
    writeMainSettings()
 }
 
@@ -4095,7 +4974,7 @@ defineWinTitlePrefix() {
       winPrefix .= "G "
    Else If (imgFxMode=3)
       winPrefix .= "I "
-   Else If (imgFxMode=4)
+   Else If (imgFxMode=4 || imgFxMode=5)
       winPrefix .= "A "
 
    If (IMGresizingMode=3)
@@ -4432,6 +5311,14 @@ RescaleBMPtiny(imgpath, imgW, imgH, ByRef ResizedW, ByRef ResizedH) {
   prevImgPath := imgpath
 }
 
+getGIFframesCount(whichImg) {
+    DllCall("gdiplus\GdipImageGetFrameDimensionsCount", "UInt", whichImg, "UInt*", Countu)
+    VarSetCapacity(dIDs,16,0)
+    DllCall("gdiplus\GdipImageGetFrameDimensionsList", "UInt", whichImg, "Uint", &dIDs, "UInt", Countu)
+    DllCall("gdiplus\GdipImageGetFrameCount", "UInt", whichImg, "Uint", &dIDs, "UInt*", CountFrames)
+    Return CountFrames
+}
+
 CloneMainBMP(imgpath, ByRef width, ByRef height, ByRef CountFrames) {
   Critical, on
   If (IMGresizingMode=1 && enableThumbsCaching=1)
@@ -4451,12 +5338,9 @@ CloneMainBMP(imgpath, ByRef width, ByRef height, ByRef CountFrames) {
   Gdip_DisposeImage(gdiBitmap)
   oBitmap := Gdip_CreateBitmapFromFile(imgpath)
   If RegExMatch(imgpath, "i)(.\.gif)$") && (animGIFsSupport=1)
-  {
-     DllCall("gdiplus\GdipImageGetFrameDimensionsCount", "UInt", oBitmap, "UInt*", Countu)
-     VarSetCapacity(dIDs,16,0)
-     DllCall("gdiplus\GdipImageGetFrameDimensionsList", "UInt", oBitmap, "Uint", &dIDs, "UInt", Countu)
-     DllCall("gdiplus\GdipImageGetFrameCount", "UInt", oBitmap, "Uint", &dIDs, "UInt*", CountFrames)
-  } Else CountFrames := 0
+     CountFrames := getGIFframesCount(oBitmap)
+  Else CountFrames := 0
+
   Gdip_GetImageDimensions(oBitmap, Width, Height)
   gdiBitmap := Gdip_CreateBitmap(Width, Height)
   G3 := Gdip_GraphicsFromImage(gdiBitmap)
@@ -4465,6 +5349,153 @@ CloneMainBMP(imgpath, ByRef width, ByRef height, ByRef CountFrames) {
   Gdip_DrawImage(G3, oBitmap, 0, 0, Width, Height, 0, 0, Width, Height)
   Gdip_DeleteGraphics(G3)
   Gdip_DisposeImage(oBitmap)
+  If (CountFrames=0 && imgFxMode=5)
+     AdaptiveImgLight(gdiBitmap, imgpath, Width, Height)
+}
+
+AdaptiveImgLight(whichImg, imgpath, Width, Height) {
+   Static matrix := "0.299|0.299|0.299|0|0|0.587|0.587|0.587|0|0|0.114|0.114|0.114|0|0|0|0|0|1|0|0|0|0|0|1"
+   brLvlArray := []
+   MD5name := generateThumbName(imgpath, 1)
+   IniRead, valuez, % mainSettingsFile, AutoLevels, % MD5name, @
+   If (InStr(valuez, "||") && valuez!="@" && StrLen(valuez)>4)
+   {
+      valu := StrSplit(valuez, "||")
+      lumosAdjust := Trim(valu[1])
+      GammosAdjust := Trim(valu[2])
+      Return
+   }
+ 
+   calcImgSize(1, Width, Height, 500, 500, ResizedW, ResizedH)
+startZeit := A_TickCount
+   thumbBMP := Gdip_CreateBitmap(ResizedW, ResizedH)
+   G3 := Gdip_GraphicsFromImage(thumbBMP)
+   Gdip_SetInterpolationMode(G3, 7)
+ 
+   Gdip_DrawImage(G3, whichImg, 0, 0, ResizedW, ResizedH, 0, 0, Width, Height, matrix)
+   pX := pY := lumosAdjust := 1
+   PREminBrLvl := minBrLvl := 256
+   PREmaxBrLvl := maxBrLvl := sumTotal := countTotalPixelz := thisBrLvl := 0
+   GammosAdjust := countBrightPixelz := countMidPixelz := countDarkPixelz := 0
+
+   Loop, % ResizedW*ResizedH + 1
+   {
+       pX++
+       If (pX>ResizedW)
+       {
+          pY++
+          pX := 1
+       }
+       If (pY>ResizedH)
+          Break
+
+       ARGBhex := Gdip_GetPixel(thumbBMP, pX, pY)
+       If (!ARGBhex || ARGBhex="0x0" || ARGBhex=0)
+          Continue
+
+       thisBrLvl := colorHEX2RGB(ARGBhex)
+       brLvlArray[A_Index] := thisBrLvl
+
+       If (thisBrLvl>PREmaxBrLvl)
+          PREmaxBrLvl := thisBrLvl
+       Else If (PREmaxBrLvl>maxBrLvl+3)
+          maxBrLvl := PREmaxBrLvl
+ 
+       If (thisBrLvl<PREminBrLvl && thisBrLvl>1)
+          PREminBrLvl := thisBrLvl
+       Else If (PREminBrLvl<minBrLvl && thisBrLvl>1)
+          minBrLvl := PREminBrLvl
+ 
+       sumTotal := sumTotal + thisBrLvl
+       countTotalPixelz++
+       If (thisBrLvl<40)
+          countDarkPixelz++
+       Else If (thisBrLvl>170)
+          countBrightPixelz++
+       Else If (valueBetween(thisBrLvl, 50, 165))
+          countMidPixelz++
+   }
+
+   If (countTotalPixelz<(ResizedW*ResizedH)/1.5)
+   {
+      lumosAdjust := 1
+      GammosAdjust := 0
+      Return
+   }
+
+   avgBrLvl := Round(sumTotal/countTotalPixelz)
+   Loop, % countTotalPixelz
+   {
+        thisBrLvl := brLvlArray[A_Index]
+        If (valueBetween(thisBrLvl, avgBrLvl - 12, avgBrLvl + 12))
+           countFlatties++
+   }
+   percBrgPx := (countBrightPixelz/countTotalPixelz) * 100
+   percDrkPx := Round((countDarkPixelz/countTotalPixelz) * 100)
+   percMidPixu := Round((countMidPixelz/countTotalPixelz) * 100)
+   percMidPx := Round(100 - percBrgPx - percDrkPx)
+   percAvgPx := Round((countFlatties/countTotalPixelz) * 100)
+
+   multiplieru := 256/maxBrLvl
+   If (percBrgPx<1.1 && percBrgPx>0)
+   {
+      newMaxBrLvl := 1
+      Loop, % countTotalPixelz
+      {
+         thisBrLvl := brLvlArray[A_Index]
+         If (thisBrLvl<maxBrLvl-30)
+         {
+            If (thisBrLvl>newMaxBrLvl)
+               newMaxBrLvl := thisBrLvl
+         }
+      }
+      newMaxBrLvl := newMaxBrLvl - percDrkPx/9 - percAvgPx/10
+      multiplieru := 256/newMaxBrLvl
+   }
+   multiplieru := multiplieru + (256 - (avgBrLvl + maxBrLvl)/1.5)/450
+   If (multiplieru<1)
+      multiplieru := 1
+
+   lumosAdjust := multiplieru
+   GammosAdjust := - lumosAdjust/40 + 0.025
+
+   If (percBrgPx>25)
+   {
+      darkerOffset := (minBrLvl/multiplieru)/250 + avgBrLvl/(600 - avgBrLvl/10)
+      darkerOffset := darkerOffset/(percDrkPx + 1)
+   } Else If (percBrgPx>1.2)
+   {
+      darkerOffset := minBrLvl/350
+   } Else darkerOffset := minBrLvl/500
+
+   lumosAdjust := lumosAdjust + darkerOffset
+   GammosAdjust := GammosAdjust - darkerOffset
+   endZeit := A_TickCount
+;   ToolTip, % 1 + startZeit - endZeit,,, 2
+
+
+   ; ToolTip, % minBrLvl "," newMaxBrLvl  "," maxBrLvl ", A=" avgBrLvl ", L=" percBrgPx "%, D=" percDrkPx "%, M=" percMidPx "%//" percMidPixu "%, avgz=" percAvgPx "%, cL=" lumosAdjust ", cG=" GammosAdjust,,, 2
+   Gdip_DeleteGraphics(G3)
+   Gdip_DisposeImage(thumbBMP)
+   IniWrite, %lumosAdjust%||%GammosAdjust%, % mainSettingsFile, AutoLevels, % MD5name
+}
+
+colorHEX2RGB(ARGB){
+  Static maxBrLvl := 256
+  SetFormat, Integer, HEX
+  ARGB += 0 ; & 0x00ffffff
+  SetFormat, Integer, D
+  StringRight, tiny, ARGB, 2
+  cR := "0x" tiny
+  cR += 0
+  ; BrLvl := Round((cR/maxBrLvl) * 100)
+  ; Sleep, 2
+  ; Tooltip, %cR% -- `n%brlvl%`n%argb%
+  Return cR ; BrLvl
+}
+
+ARGBtoRGB(ARGB){
+  return ARGB
 }
 
 CloneResizerBMP(imgpath, IDwhichImg, whichImg, newW, newH) {
@@ -4530,8 +5561,8 @@ CloneResizerBMP(imgpath, IDwhichImg, whichImg, newW, newH) {
   Return resultu
 }
 
-generateThumbName(imgpath) {
-   If (enableThumbsCaching!=1)
+generateThumbName(imgpath, forceThis:=0) {
+   If (enableThumbsCaching!=1 && forceThis=0)
       Return
    FileGetSize, fileSizu, % imgpath
    FileGetTime, FileDateM, % imgpath, M
@@ -4551,9 +5582,19 @@ getColorMatrix()  {
     } Else If (imgFxMode=3)  ; negative / invert
     {
        matrix := "-1|0|0|0|0|0|-1|0|0|0|0|0|-1|0|0|0|0|0|1|0|1|1|1|0|1"
-    } Else If (imgFxMode=4) && (lumosAdjust!=1 || GammosAdjust!=0)
+    } Else If (imgFxMode=4 || imgFxMode=5) && (lumosAdjust!=1 || GammosAdjust!=0)
     {
-       matrix := lumosAdjust "|0|0|0|0|0|" lumosAdjust "|0|0|0|0|0|" lumosAdjust "|0|0|0|0|0|1|0|" GammosAdjust "|" GammosAdjust "|" GammosAdjust "|0|1"
+       ; matrix adjusted for lisibility
+       B := lumosAdjust
+       G := GammosAdjust
+       F := 0
+       matrix =  %B%|%F%|%F%|0|0
+                |%F%|%B%|%F%|0|0
+                |%F%|%F%|%B%|0|0
+                |0  |0  |0  |1|0
+                |%G%|%G%|%G%|0|1
+       matrix := StrReplace(matrix, A_Space)
+;       matrix := lumosAdjust "|0|0|0|0|0|" lumosAdjust "|0|0|0|0|0|" lumosAdjust "|0|0|0|0|0|1|0|" GammosAdjust "|" GammosAdjust "|" GammosAdjust "|0|1"
     }
     Return matrix
 }
@@ -4593,7 +5634,14 @@ Gdip_ShowImgonGui(imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, us
        file2save := thumbsCacheFolder "\big-" MD5name ".jpg"
        cachedImgFile := FileExist(file2save) ? 1 : 0
        If (cachedImgFile=1)
+       {
           whichImg := Gdip_CreateBitmapFromFile(file2save)
+          If (imgFxMode=5)
+          {
+             AdaptiveImgLight(whichImg, imgpath, imgW, imgH)
+             matrix := getColorMatrix()
+          }
+       }
     }
 
     Gdip_GetImageDimensions(whichImg, imgW, imgH)
@@ -4767,8 +5815,8 @@ mainGdipWinThumbsGrid() {
     scrollYpos := Round((mainHeight/100)*scrollYpos)
     scrollHeight := (maxItemsPage/maxFilesIndex)*100
     scrollHeight := Ceil((mainHeight/100)*scrollHeight)
-    If (scrollHeight<3)
-       scrollHeight := 3
+    If (scrollHeight<10)
+       scrollHeight := 10
 
     lineThickns := imgHUDbaseUnit
     Gdip_FillRectangle(G, pBrush5, mainWidth - lineThickns//2, 0, lineThickns//2, mainHeight)
@@ -4790,6 +5838,8 @@ mainGdipWinThumbsGrid() {
 EraseThumbsCache() {
    startZeit := A_TickCount
    showTOOLtip("Emptying thumbnails cache, please wait...")
+   IniDelete, % mainSettingsFile, AutoLevels
+
    Loop, Files, %thumbsCacheFolder%\*.jpg
    {
       FileDelete, % A_LoopFileFullPath
@@ -4803,7 +5853,7 @@ EraseThumbsCache() {
    }
    If (abandonAll=1)
    {
-      showTOOLtip("Operation aborted... Removed " countFilez "cached thumbnails...")
+      showTOOLtip("Operation aborted... Removed " countFilez " cached thumbnails...")
       SetTimer, RemoveTooltip, % -msgDisplayTime
    } Else If (A_TickCount - startZeit>1500)
       showTOOLtip("Finished removing " countFilez " cached thumbnails")
@@ -4835,12 +5885,15 @@ generateImgThumbCache(imgpath, newImgSize) {
     Gdip_DisposeImage(thumbBMP)
 }
 
-Gdip_ShowThumbsnails(startIndex) {
+Gdip_ShowThumbnails(startIndex) {
     Critical, on
 
     prevFullThumbsUpdate := A_TickCount
     mainStartZeit := A_TickCount
     matrix := getColorMatrix()
+    If (imgFxMode=5)
+       matrix := ""
+
     thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, ignoreVaru, mainWidth, mainHeight)
     hbm := CreateDIBSection(mainWidth, mainHeight)
     hdc := CreateCompatibleDC()
@@ -5224,6 +6277,9 @@ coreLoadDynaFolders(fileNamu) {
 }
 
 RegenerateEntireList() {
+    If (AnyWindowOpen>0)
+       CloseWindow()
+
     newStaticFoldersListCache := ""
     showTOOLtip("Refreshing files list, please wait...")
     If (RegExMatch(CurrentSLD, "i)(\.sld)$") && InStr(DynamicFoldersList, "|hexists|"))
@@ -5484,7 +6540,33 @@ GetPhysicalCursorPos(ByRef mX, ByRef mY) {
     Return
 }
 
-reverseArray(Byref a) {
+trimArray(arr) { ; Hash O(n) 
+; Function by errorseven from:
+; https://stackoverflow.com/questions/46432447/how-do-i-remove-duplicates-from-an-autohotkey-array
+    hash := {}
+    newArr := []
+    For e, v in arr
+    {
+        If (!hash.Haskey(v))
+        {
+           hash[(v)] := 1
+           newArr.push(v)
+        }
+    }
+    Return newArr
+}
+
+ReverseListNow() {
+    showTOOLtip("Reversing files list order...")
+;    resultedFilesList := trimArray(resultedFilesList)
+    resultedFilesList := reverseArray(resultedFilesList)
+    prevStartIndex := -1
+    SetTimer, DelayiedImageDisplay, -50
+    SoundBeep , 900, 100
+    SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+reverseArray(a) {
 ; function by RHCP from https://autohotkey.com/board/topic/97722-some-array-functions/
     aIndices := []
     For index, in a
@@ -5492,23 +6574,44 @@ reverseArray(Byref a) {
     aStorage := []
     Loop, % aIndices.maxIndex() 
        aStorage.insert(a[aIndices[aIndices.maxIndex() - A_index + 1]]) 
-    a := aStorage
+
     Return aStorage
 }
 
-coreResizeIMG(imgpath, newW, newH, file2save) {
+coreResizeIMG(imgpath, newW, newH, file2save, goFX, toClippy, rotateMode) {
     oBitmap := Gdip_CreateBitmapFromFile(imgpath)
     Gdip_GetImageDimensions(oBitmap, imgW, imgH)
     If !newW
        newW := imgW
     If !newH
        newH := imgH
-    thumbBMP := Gdip_CreateBitmap(newW, newH)
+    Angle := 0
+    If (rotateMode=2)
+       Angle := 90
+    Else If (rotateMode=3)
+       Angle := 180
+    Else If (rotateMode=4)
+       Angle := -90
+
+    If (rotateMode>=2)
+    {
+       Gdip_GetRotatedDimensions(newW, newH, Angle, RWidth, RHeight)
+       Gdip_GetRotatedTranslation(newW, newH, Angle, xTranslation, yTranslation)
+       thumbBMP := Gdip_CreateBitmap(RWidth, RHeight)
+    } Else thumbBMP := Gdip_CreateBitmap(newW, newH)
+
     G2 := Gdip_GraphicsFromImage(thumbBMP)
     thisImgQuality := (ResizeQualityHigh=1) ? 7 : 5
     Gdip_SetInterpolationMode(G2, thisImgQuality)
     Gdip_SetSmoothingMode(G2, 3)
-    If (ResizeApplyEffects=1 || file2save="clippo")
+
+    If (rotateMode>=2)
+    {
+       Gdip_TranslateWorldTransform(G2, xTranslation, yTranslation)
+       Gdip_RotateWorldTransform(G2, Angle)
+    }
+
+    If (ResizeApplyEffects=1 || goFX=1)
     {
         If (FlipImgH=1)
         {
@@ -5525,12 +6628,13 @@ coreResizeIMG(imgpath, newW, newH, file2save) {
     }
 
     Gdip_DrawImage(G2, oBitmap, 0, 0, newW, newH, 0, 0, imgW, imgH, matrix)
-    If (file2save="clippy" || file2save="clippo")
+    Sleep, 1
+    Gdip_DisposeImage(oBitmap)
+    If (toClippy=1)
        r := Gdip_SetBitmapToClipboard(thumbBMP)
     Else
        r := Gdip_SaveBitmapToFile(thumbBMP, file2save, 85)
     Gdip_DeleteGraphics(G2)
-    Gdip_DisposeImage(oBitmap)
     Gdip_DisposeImage(thumbBMP)
     Return r
 }
@@ -5546,7 +6650,8 @@ AboutWindow() {
     btnWid := 100
     txtWid := 360
     Gui, Font, s19 Bold, Arial, -wrap
-    Gui, Add, Text, x10 y15, %appTitle%
+    Gui, Add, Button, x1 y1 h1 w1 Default gCloseWindow, Close
+    Gui, Add, Text, x10 y15 Section, %appTitle%
     Gui, Font
     If (PrefsLargeFonts=1)
     {
@@ -5554,7 +6659,7 @@ AboutWindow() {
        txtWid := txtWid + 105
        Gui, Font, s%LargeUIfontValue%
     }
-    Gui, Add, Link, xp y+5, Developed by <a href="http://marius.sucan.ro/">Marius Șucan</a>.
+    Gui, Add, Link, xs y+5, Developed by <a href="http://marius.sucan.ro/">Marius Șucan</a>.
     Gui, Add, Link, y+10 w%txtWid%, Based on the prototype image viewer by <a href="http://sites.google.com/site/littlescripting/">SBC</a> from October 2010 published on <a href="https://autohotkey.com/board/topic/58226-ahk-picture-viewer/">AHK forums</a>.
     Gui, Add, Text, y+10 w%txtWid%, Current version: v%Version% from %vReleaseDate%. 
     Gui, Add, Text, y+10 w%txtWid%, Dedicated to people with really large image collections and slideshow needs :-).
@@ -5574,7 +6679,6 @@ ResizeImagePanelWindow() {
 
     CloseWindow()
     AnyWindowOpen := 4
-
     If (markedSelectFile)
     {
        filesElected := (currentFileIndex>markedSelectFile) ? currentFileIndex - markedSelectFile + 1 : markedSelectFile - currentFileIndex + 1
@@ -5625,6 +6729,7 @@ ResizeImagePanelWindow() {
        Gui, Add, Text, xs y+15, Result (W x H) in pixels
     Gui, Add, Edit, xs+15 y+5 w%editWid% r1 Disabled -wrap vResultEditWidth, % (multipleFilesMode=1) ? "--" : oImgW
     Gui, Add, Edit, x+5 w%editWid% r1 Disabled -wrap vResultEditHeight, % (multipleFilesMode=1) ? "--" : oImgH
+    Gui, Add, DropDownList, x+5 w115 gTglRszRotation AltSubmit Choose%ResizeRotationUser% vResizeRotationUser, Rotate: 0°|90° [CW]|180° [CW]|-90° [CCW]
     Gui, Add, Checkbox, xs y+15 gTglRszKeepAratio Checked%ResizeKeepAratio% vResizeKeepAratio, Keep aspect ratio
     Gui, Add, Checkbox, y+5 gTglRszQualityHigh Checked%ResizeQualityHigh% vResizeQualityHigh, High quality resampling
     Gui, Add, Checkbox, y+5 gTglRszApplyEffects Checked%ResizeApplyEffects% vResizeApplyEffects, Apply effects activated in main window`n(eg. grayscale or flip image H/V)
@@ -5772,6 +6877,7 @@ SaveResizedIMG() {
    GuiControlGet, ResizeQualityHigh
    GuiControlGet, ResizeApplyEffects
    GuiControlGet, ResizeInPercentage
+   GuiControlGet, ResizeRotationUser
 
    If (markedSelectFile)
    {
@@ -5796,10 +6902,10 @@ SaveResizedIMG() {
    {
       If !RegExMatch(file2save, "i)(.\.(png|jpg|bmp|jpeg|tiff|tif))$")
       {
-         Msgbox, 48, %appTitle%, ERROR: Please define a file format. Allowed formats: .JPG, .TIF, .PNG or .BMP.
+         Msgbox, 48, %appTitle%, ERROR: Please use a supported file format. Allowed formats: .JPG, .TIF, .PNG or .BMP.
          Return
       }
-      r := coreResizeIMG(img2resizePath, ResultEditWidth, ResultEditHeight, file2save)
+      r := coreResizeIMG(img2resizePath, ResultEditWidth, ResultEditHeight, file2save, 0, 0, ResizeRotationUser)
       If r
       {
          Msgbox, 48, %appTitle%, ERROR: Unable to save file. Error code: %r%.
@@ -5816,6 +6922,7 @@ Copy2ClipResizedIMG() {
    GuiControlGet, ResultEditHeight
    GuiControlGet, ResizeQualityHigh
    GuiControlGet, ResizeApplyEffects
+   GuiControlGet, ResizeRotationUser
 
    If (!ResultEditHeight || !ResultEditWidth
    || ResultEditWidth<5 || ResultEditHeight<5)
@@ -5824,7 +6931,7 @@ Copy2ClipResizedIMG() {
       Return
    }
 
-   r := coreResizeIMG(img2resizePath, ResultEditWidth, ResultEditHeight, "clippy")
+   r := coreResizeIMG(img2resizePath, ResultEditWidth, ResultEditHeight, "--", 0, 1, ResizeRotationUser)
    If r
       showTOOLtip("Resized image copied to clipboard")
    Else
@@ -5944,6 +7051,11 @@ TglRszKeepAratio() {
    writeMainSettings()
 }
 
+TglRszRotation() {
+   GuiControlGet, ResizeRotationUser
+   writeMainSettings()
+}
+
 TglRszQualityHigh() {
    GuiControlGet, ResizeQualityHigh
    writeMainSettings()
@@ -5966,26 +7078,26 @@ FolderzPanelWindow() {
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: -MaximizeBox -MinimizeBox hwndhSetWinGui
     Gui, SettingsGUIA: Margin, 15, 15
-    btnWid := 130
+    btnWid := 115
     txtWid := 360
     lstWid := 545
     If (PrefsLargeFonts=1)
     {
        lstWid := lstWid + 230
-       btnWid := btnWid + 70
+       btnWid := btnWid + 75
        txtWid := txtWid + 105
        Gui, Font, s%LargeUIfontValue%
     }
     Gui, Add, Text, x15 y15, Please select the folder you want updated.`nFolders marked with (*) are changed since the last scan.`nThis folders list was generated based on the indexed files.
     Gui, Add, ListView, y+10 w%lstWid% gFolderzFilterListBTN r12 Grid vLViewOthers, #|Date|(?)|Folder path|Files
 
-    Gui, Add, Checkbox, xs+0 y+10 gToggleCountFilesFoldersList Checked%CountFilesFolderzList% vCountFilesFolderzList, Count files in folders list (recursively)
-    Gui, Add, Checkbox, x+10 gToggleForceRegenStaticFs Checked%ForceRegenStaticFolders% vForceRegenStaticFolders, Force this list to be refreshed on .SLD save
-    Gui, Add, Checkbox, xs+0 y+10 gToggleRecursiveStaticRescan vRecursiveStaticRescan Checked%RecursiveStaticRescan%, Perform recursive (in sub-folders) folder scan
+    Gui, Add, Checkbox, xs+0 y+10 gToggleCountFilesFoldersList Checked%CountFilesFolderzList% vCountFilesFolderzList, &Count files in folders list (recursively)
+    Gui, Add, Checkbox, x+10 gToggleForceRegenStaticFs Checked%ForceRegenStaticFolders% vForceRegenStaticFolders, &Force this list to be refreshed on .SLD save
+    Gui, Add, Checkbox, xs+0 y+10 gToggleRecursiveStaticRescan vRecursiveStaticRescan Checked%RecursiveStaticRescan%, &Perform recursive (in sub-folders) folder scan
     Gui, Add, Button, xs+0 y+10 h30 w130 gUpdateSelFolder, &Rescan folder
-    Gui, Add, Button, x+5 h30 w%btnWid% gIgnoreSelFolder, &Ignore changes
-    Gui, Add, Button, x+5 h30 w%btnWid% gRemFilesStaticFolder, Re&move files from list
-    Gui, Add, Button, x+5 h30 w%btnWid% gOpenDynaFolderBTN, &Open folder in Explorer
+    Gui, Add, Button, x+5 hp w%btnWid% gIgnoreSelFolder, &Ignore changes
+    Gui, Add, Button, x+5 hp w%btnWid% gRemFilesStaticFolder, Re&move files from list
+    Gui, Add, Button, x+5 hp w%btnWid% gOpenDynaFolderBTN, &Open folder
     Gui, SettingsGUIA: Show, AutoSize, Folders updater: %appTitle%
     Sleep, 25
     PopulateStaticFolderzList()
@@ -6003,7 +7115,7 @@ DynamicFolderzPanelWindow() {
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: -MaximizeBox -MinimizeBox hwndhSetWinGui
     Gui, SettingsGUIA: Margin, 15, 15
-    btnWid := 140
+    btnWid := 120
     txtWid := 360
     lstWid := 535
     If (PrefsLargeFonts=1)
@@ -6016,11 +7128,13 @@ DynamicFolderzPanelWindow() {
     Gui, Add, Text, x15 y15,This folders list is used to generate the files list index.
     Gui, Add, ListView, y+10 w%lstWid% gFolderzFilterListBTN r12 Grid vLViewDynas, #|(?)|Folder path
 
+    btnWid2 := (PrefsLargeFonts=1) ? 85 : 45
     Gui, Add, Button, xs+0 y+5  h30 w70 gBTNaddNewFolder2list, &Add
-    Gui, Add, Button, x+5 h30 w80 gRemDynaSelFolder, &Remove
-    Gui, Add, Button, x+5 h30 w80 gRescanDynaFolder, Re&scan
-    Gui, Add, Button, x+5 h30 w%btnWid% gInvertRecurseDynaFolder, &Invert recursive state
-    Gui, Add, Button, x+5 h30 w%btnWid% gOpenDynaFolderBTN, &Open folder in Explorer
+    Gui, Add, Button, x+5 hp w%btnWid2% gRemDynaSelFolder, &Remove
+    Gui, Add, Button, x+5 hp wp gRescanDynaFolder, Re&scan
+    Gui, Add, Button, x+5 hp wp+30 gRegenerateEntireList, R&escan all
+    Gui, Add, Button, x+5 hp w%btnWid% gInvertRecurseDynaFolder, &Invert recursive state
+    Gui, Add, Button, x+5 hp w115 gOpenDynaFolderBTN, &Open folder
     Gui, SettingsGUIA: Show, AutoSize, Dynamic folders list: %appTitle%
     Sleep, 25
     LV_ModifyCol(1, "Integer")
@@ -6069,9 +7183,7 @@ IgnoreSelFolder() {
     Sleep, 25
     CloseWindow()
     Sleep, 50
-    FileGetTime, dirDate, % folderu, M
-    tehValue := dirDate "*&*" folderu
-    IniWrite, % tehValue, % CurrentSLD, Folders, Fi%indexSelected%
+    updateCachedStaticFolders(folderu, 1)
     showTOOLtip("Folders list information updated")
     SetTimer, RemoveTooltip, % -msgDisplayTime
     Sleep, 50
@@ -6227,16 +7339,6 @@ updateCachedStaticFolders(mainFolderu, onlyMainFolder) {
    newEntry := dirDate "*&*" mainFolderu "`n"
 
    showTOOLtip("Updating static folders list...")
-   Loop, Parse, foldersListu, `n
-   {
-       lineArru := StrSplit(A_LoopField, "*&*")
-       folderu := lineArru[2], oldDateu := lineArru[1]
-       If !FileExist(folderu)
-          Continue
-       oldDateu := SubStr(oldDateu, InStr(oldDateu, "=")+1)
-       newFoldersList .= oldDateu "*&*" folderu "`n"
-   }
-
    If (onlyMainFolder!=1)
    {
       Loop, Files, %mainFolderu%\*, RD
@@ -6245,6 +7347,16 @@ updateCachedStaticFolders(mainFolderu, onlyMainFolder) {
           MoreNewFileFolders .= dirDate "*&*" A_LoopFileFullPath "`n"
    ;       Tooltip, % MoreNewFileFolders
       }
+   }
+
+   Loop, Parse, foldersListu, `n
+   {
+       lineArru := StrSplit(A_LoopField, "*&*")
+       folderu := lineArru[2], oldDateu := lineArru[1]
+       If !FileExist(folderu) || (folderu=mainFolderu) || InStr(MoreNewFileFolders, "*&*" folderu "`n")
+          Continue
+       oldDateu := SubStr(oldDateu, InStr(oldDateu, "=")+1)
+       newFoldersList .= oldDateu "*&*" folderu "`n"
    }
 
    FinalStaticFoldersList := newFoldersList "`n" MoreNewFileFolders "`n" newEntry
@@ -6325,18 +7437,13 @@ UpdateSelFolder() {
     }
 
     If (RecursiveStaticRescan!=1)
-      isRecursive := "|"
+       isRecursive := "|"
 
     CloseWindow()
     Sleep, 25
     coreAddNewFolder(isRecursive folderu, 0)
-    If !isRecursive
-       updateCachedStaticFolders(folderu, 0)
-
-    Sleep, 500
-    FileGetTime, dirDate, % folderu, M
-    tehValue := dirDate "*&*" folderu
-    IniWrite, % tehValue, % CurrentSLD, Folders, Fi%indexSelected%
+    modus := isRecursive ? 1 : 0
+    updateCachedStaticFolders(folderu, modus)
     Sleep, 25
     SetTimer, RemoveTooltip, % -msgDisplayTime
     FolderzPanelWindow()
@@ -6345,7 +7452,6 @@ UpdateSelFolder() {
 PopulateStaticFolderzList() {
     If (mustGenerateStaticFolders=1 || SLDcacheFilesList!=1)
        Return
-
     foldersListu := LoadStaticFoldersCached(CurrentSLD, irrelevantVar)
     Gui, SettingsGUIA: ListView, LViewOthers
 
@@ -6373,7 +7479,6 @@ PopulateStaticFolderzList() {
            }
            theEntireListu .= r "`n"
        }
-
        Tooltip, Counting files in each folder... please wait.
     }
 
@@ -6399,18 +7504,19 @@ PopulateStaticFolderzList() {
         oldDateu := SubStr(oldDateu, InStr(oldDateu, "=")+1)
         FileGetTime, dirDate, % folderu, M
         statusu := (dirDate!=oldDateu) ? "(*)" : "_"
-        If !dirDate
-           Continue
+;        If !dirDate
+ ;          Continue
         dirDate := SubStr(dirDate, 1, StrLen(dirDate)-2)
         FormatTime, dirDate, % dirDate, yyyy/MM/dd-HH:mm
-;        dirDate := SubStr(dirDate, 1, 4) "-" SubStr(dirDate, 5, 2) "-" SubStr(dirDate, 8, 2)
         If (CountFilesFolderzList=1)
         {
-           matchThis := JEE_StrRegExLiteral(folderu "\")
-           RegExReplace(theEntireListu, matchThis,, countFiles)
+           ; matchThis := JEE_StrRegExLiteral(folderu "\")
+           ; nonae := RegExReplace(theEntireListu, matchThis,, countFiles)
+           nonae := StrReplace(theEntireListu, folderu "\",, countFiles)
         } Else countFiles := "-"
         LV_Add(A_Index, indexu, dirDate, statusu, folderu, countFiles)
     }
+
     Loop, 5
         LV_ModifyCol(A_Index, "AutoHdr Left")
     LV_ModifyCol(3, "Sort")
@@ -6441,6 +7547,7 @@ CloseWindow() {
     If (A_TickCount - lastLongOperationAbort < 1000)
        Return
 
+    lastOtherWinClose := A_TickCount
     Gui, SettingsGUIA: Destroy
     If (GIFsGuiCreated=1)
        DestroyGIFuWin()

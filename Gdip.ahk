@@ -1,4 +1,4 @@
-; Gdip standard library v1.45 by tic (Tariq Porter) 07/09/11
+﻿; Gdip standard library v1.45 by tic (Tariq Porter) 07/09/11
 ; Modifed by Rseding91 using fincs 64 bit compatible Gdip library 5/1/2013
 ; Supports: Basic, _L ANSi, _L Unicode x86 and _L Unicode x64
 ; taken https://autohotkey.com/boards/viewtopic.php?t=6517
@@ -1815,15 +1815,15 @@ Gdip_CreateBitmapFromClipboard()
 	Ptr := A_PtrSize ? "UPtr" : "UInt"
 	
 	if !DllCall("OpenClipboard", Ptr, 0)
-		return -1
+		 Return "ERR-1"
 	if !DllCall("IsClipboardFormatAvailable", "uint", 8)
-		return -2
+		 Return "ERR-2"
 	if !hBitmap := DllCall("GetClipboardData", "uint", 2, Ptr)
-		return -3
+		 Return "ERR-3"
 	if !pBitmap := Gdip_CreateBitmapFromHBITMAP(hBitmap)
-		return -4
+		 Return "ERR-4"
 	if !DllCall("CloseClipboard")
-		return -5
+		 Return "ERR-5"
 	DeleteObject(hBitmap)
 	return pBitmap
 }
@@ -2715,4 +2715,463 @@ StrGetB(Address, Length=-1, Encoding=0)
 	return String
 }
 
+
+
+;_______________________________________________________________________________________________________________________
+; Gdip_LoadImageFromFile() - Creates an Image object based on a file.
+; Parameters:
+;     PicPath     -  Valid path of an image file.
+; Return values:
+;     On success  -  Pointer to the Image object.
+;     On failure  -  0, ErrorLevel contains the GDIP status
+;_______________________________________________________________________________________________________________________
+Gdip_LoadImageFromFile(PicPath) {
+   pImage := 0
+   R := DllCall("Gdiplus.dll\GdipLoadImageFromFile", "WStr", PicPath, "UPtrP", pImage)
+   ErrorLevel := R
+   Return pImage
+}
+;_______________________________________________________________________________________________________________________
+; Gdip_GetPropertyCount() - Gets the number of properties (pieces of metadata) stored in this Image object.
+; Parameters:
+;     pImage      -  Pointer to the Image object.
+; Return values:
+;     On success  -  Number of properties.
+;     On failure  -  0, ErrorLevel contains the GDIP status
+;_______________________________________________________________________________________________________________________
+Gdip_GetPropertyCount(pImage) {
+   PropCount := 0
+   R := DllCall("Gdiplus.dll\GdipGetPropertyCount", "Ptr", pImage, "UIntP", PropCount)
+   ErrorLevel := R
+   Return PropCount
+}
+;_______________________________________________________________________________________________________________________
+; Gdip_GetPropertyIdList() - Gets an aray of the property identifiers used in the metadata of this Image object.
+; Parameters:
+;     pImage      -  Pointer to the Image object.
+; Return values:
+;     On success  -  Array containing the property identifiers as integer keys and the name retrieved from
+;                    Gdip_GetPropertyTagName(PropID) as values.
+;                    The total number of properties is stored in Array.Count.
+;     On failure  -  False, ErrorLevel contains the GDIP status
+;_______________________________________________________________________________________________________________________
+Gdip_GetPropertyIdList(pImage) {
+   PropNum := Gdip_GetPropertyCount(pImage)
+   If (ErrorLevel) || (PropNum = 0)
+      Return False
+   VarSetCapacity(PropIDList, 4 * PropNum, 0)
+   R := DllCall("Gdiplus.dll\GdipGetPropertyIdList", "Ptr", pImage, "UInt", PropNum, "Ptr", &PropIDList)
+   If (R) {
+      ErrorLevel := R
+      Return False
+   }
+   PropArray := {Count: PropNum}
+   Loop, % PropNum {
+      PropID := NumGet(PropIDList, (A_Index - 1) << 2, "UInt")
+      PropArray[PropID] := Gdip_GetPropertyTagName(PropID)
+   }
+   Return PropArray
+}
+;_______________________________________________________________________________________________________________________
+; Gdip_GetPropertyItem() - Gets a specified property item (piece of metadata) from this Image object.
+; Parameters:
+;     pImage      -  Pointer to the Image object.
+;     PropID      -  Integer that identifies the property item to be retrieved (see Gdip_GetPropertyTagName()).
+; Return values:
+;     On success  -  Property item object containing three keys:
+;                       Length   -  Length of the value in bytes.
+;                       Type     -  Type of the value (see Gdip_GetPropertyTagType()).
+;                       Value    -  The value itself.
+;     On failure  -  False, ErrorLevel contains the GDIP status
+;_______________________________________________________________________________________________________________________
+Gdip_GetPropertyItem(pImage, PropID) {
+   PropItem := {Length: 0, Type: 0, Value: ""}
+   ItemSize := 0
+   R := DllCall("Gdiplus.dll\GdipGetPropertyItemSize", "Ptr", pImage, "UInt", PropID, "UIntP", ItemSize)
+   If (R) {
+      ErrorLevel := R
+      Return False
+   }
+   VarSetCapacity(Item, ItemSize, 0)
+   R := DllCall("Gdiplus.dll\GdipGetPropertyItem", "Ptr", pImage, "UInt", PropID, "UInt", ItemSize, "Ptr", &Item)
+   If (R) {
+      ErrorLevel := R
+      Return False
+   }
+   PropLen := NumGet(Item, 4, "UInt")
+   PropType := NumGet(Item, 8, "Short")
+   PropAddr := NumGet(Item, 8 + A_PtrSize, "UPtr")
+   PropItem.Length := PropLen
+   PropItem.Type := PropType
+   If (PropLen > 0) {
+      PropVal := ""
+      Gdip_GetPropertyItemValue(PropVal, PropLen, PropType, PropAddr)
+      If (PropType = 1) || (PropType = 7) {
+         PropItem.SetCapacity("Value", PropLen)
+         ValAddr := PropItem.GetAddress("Value")
+         DllCall("Kernel32.dll\RtlMoveMemory", "Ptr", ValAddr, "Ptr", &PropVal, "Ptr", PropLen)
+      } Else {
+         PropItem.Value := PropVal
+      }
+   }
+   ErrorLevel := 0
+   Return PropItem
+}
+;_______________________________________________________________________________________________________________________
+; Gdip_GetAllPropertyItems() - Gets all the property items (metadata) stored in this Image object.
+; Parameters:
+;     pImage      -  Pointer to the Image object.
+; Return values:
+;     On success  -  Properties object containing one integer key for each property ID. Each value is an object
+;                    containing three keys:
+;                       Length   -  Length of the value in bytes.
+;                       Type     -  Type of the value (see Gdip_GetPropertyTagType()).
+;                       Value    -  The value itself.
+;                    The total number of properties is stored in Properties.Count.
+;     On failure  -  False, ErrorLevel contains the GDIP status
+;_______________________________________________________________________________________________________________________
+Gdip_GetAllPropertyItems(pImage) {
+   BufSize := PropNum := ErrorLevel := 0
+   R := DllCall("Gdiplus.dll\GdipGetPropertySize", "Ptr", pImage, "UIntP", BufSize, "UIntP", PropNum)
+   If (R) || (PropNum = 0) {
+      ErrorLevel := R ? R : 19 ; 19 = PropertyNotFound
+      Return False
+   }
+   VarSetCapacity(Buffer, BufSize, 0)
+   R := DllCall("Gdiplus.dll\GdipGetAllPropertyItems", "Ptr", pImage, "UInt", BufSize, "UInt", PropNum, "Ptr", &Buffer)
+   If (R) {
+      ErrorLevel := R
+      Return False
+   }
+   PropsObj := {Count: PropNum}
+   PropSize := 8 + (2 * A_PtrSize)
+   Loop, % PropNum {
+      OffSet := PropSize * (A_Index - 1)
+      PropID := NumGet(Buffer, OffSet, "UInt")
+      PropLen := NumGet(Buffer, OffSet + 4, "UInt")
+      PropType := NumGet(Buffer, OffSet + 8, "Short")
+      PropAddr := NumGet(Buffer, OffSet + 8 + A_PtrSize, "UPtr")
+      PropVal := ""
+      PropsObj[PropID] := {}
+      PropsObj[PropID, "Length"] := PropLen
+      PropsObj[PropID, "Type"] := PropType
+      PropsObj[PropID, "Value"] := PropVal
+      If (PropLen > 0) {
+         Gdip_GetPropertyItemValue(PropVal, PropLen, PropType, PropAddr)
+         If (PropType = 1) || (PropType = 7) {
+            PropsObj[PropID].SetCapacity("Value", PropLen)
+            ValAddr := PropsObj[PropID].GetAddress("Value")
+            DllCall("Kernel32.dll\RtlMoveMemory", "Ptr", ValAddr, "Ptr", PropAddr, "Ptr", PropLen)
+         } Else {
+            PropsObj[PropID].Value := PropVal
+         }
+      }
+   }
+   ErrorLevel := 0
+   Return PropsObj
+}
+;_______________________________________________________________________________________________________________________
+; Gdip_GetPropertyTagName() - Gets the name for the integer identifier of this property as defined in "Gdiplusimaging.h".
+; Parameters:
+;     PropID      -  Integer that identifies the property item to be retrieved.
+; Return values:
+;     On success  -  Corresponding name.
+;     On failure  -  "Unknown"
+;_______________________________________________________________________________________________________________________
+Gdip_GetPropertyTagName(PropID) {
+   ; All tags are taken from "Gdiplusimaging.h", probably there will be more.
+   ; For most of them you'll find a description on http://msdn.microsoft.com/en-us/library/ms534418(VS.85).aspx
+   Static PropTags
+   Static Init := Gdip_GetPropertyTagName("*INIT*")
+   If (PropID == "*INIT*") {
+      PropTags := {}
+  ;    PropTags[0x0000] := "GpsVer"
+      PropTags[0x0001] := "GPS LatitudeRef"
+      PropTags[0x0002] := "GPS Latitude"
+      PropTags[0x0003] := "GPS LongitudeRef"
+      PropTags[0x0004] := "GPS Longitude"
+      PropTags[0x0005] := "GPS AltitudeRef"
+      PropTags[0x0006] := "GPS Altitude"
+      PropTags[0x0007] := "GPS Time"
+      PropTags[0x0008] := "GPS Satellites"
+      PropTags[0x0009] := "GPS Status"
+      PropTags[0x000A] := "GPS MeasureMode"
+      ; PropTags[0x000B] := "GpsGpsDop"                 ; Measurement precision
+      ; PropTags[0x000C] := "GpsSpeedRef"
+      ; PropTags[0x000D] := "GpsSpeed"
+      ; PropTags[0x000E] := "GpsTrackRef"
+      ; PropTags[0x000F] := "GpsTrack"
+      ; PropTags[0x0010] := "GpsImgDirRef"
+      ; PropTags[0x0011] := "GpsImgDir"
+      ; PropTags[0x0012] := "GpsMapDatum"
+      ; PropTags[0x0013] := "GpsDestLatRef"
+      ; PropTags[0x0014] := "GpsDestLat"
+      ; PropTags[0x0015] := "GpsDestLongRef"
+      ; PropTags[0x0016] := "GpsDestLong"
+      ; PropTags[0x0017] := "GpsDestBearRef"
+      ; PropTags[0x0018] := "GpsDestBear"
+      ; PropTags[0x0019] := "GpsDestDistRef"
+      ; PropTags[0x001A] := "GpsDestDist"
+      ; PropTags[0x001B] := "GpsProcessingMethod"
+      ; PropTags[0x001C] := "GpsAreaInformation"
+      PropTags[0x001D] := "GPS Date"
+      PropTags[0x001E] := "GPS Differential"
+      PropTags[0x00FE] := "NewSubfileType"
+      PropTags[0x00FF] := "SubfileType"
+      ; PropTags[0x0100] := "ImageWidth"
+      ; PropTags[0x0101] := "ImageHeight"
+      PropTags[0x0102] := "Bits Per Sample"
+      PropTags[0x0103] := "Compression"
+      PropTags[0x0106] := "Photometric Interp"
+      PropTags[0x0107] := "ThreshHolding"
+   ;   PropTags[0x0108] := "CellWidth"
+  ;    PropTags[0x0109] := "CellHeight"
+      PropTags[0x010A] := "FillOrder"
+      PropTags[0x010D] := "Document Name"
+      PropTags[0x010E] := "Image Description"
+      PropTags[0x010F] := "Equipment Make"
+      PropTags[0x0110] := "Equipment Model"
+      PropTags[0x0111] := "Strip Offsets"
+      PropTags[0x0112] := "Orientation"
+      PropTags[0x0115] := "Samples Per Pixel"
+ ;     PropTags[0x0116] := "RowsPerStrip"
+;      PropTags[0x0117] := "StripBytesCount"
+      PropTags[0x0118] := "Min Sample Value"
+      PropTags[0x0119] := "Max Sample Value"
+      ; PropTags[0x011A] := "XResolution"               ; Image resolution in width direction
+      ; PropTags[0x011B] := "YResolution"               ; Image resolution in height direction
+      PropTags[0x011C] := "Planar Config"              ; Image data arrangement
+      PropTags[0x011D] := "Page Name"
+      ; PropTags[0x011E] := "XPosition"
+      ; PropTags[0x011F] := "YPosition"
+ ;     PropTags[0x0120] := "FreeOffset"
+;      PropTags[0x0121] := "FreeByteCounts"
+      PropTags[0x0122] := "GrayResponseUnit"
+      PropTags[0x0123] := "GrayResponseCurve"
+ ;     PropTags[0x0124] := "T4Option"
+;      PropTags[0x0125] := "T6Option"
+      PropTags[0x0128] := "Resolution Unit"            ; Unit of X and Y resolution
+      ; PropTags[0x0129] := "PageNumber"
+      PropTags[0x012D] := "Transfer Function"
+      PropTags[0x0131] := "Software Used"
+      PropTags[0x0132] := "Internal Date Time"
+      PropTags[0x013B] := "Artist"
+      PropTags[0x013C] := "Host Computer"
+      PropTags[0x013D] := "Predictor"
+      PropTags[0x013E] := "White Point"
+      PropTags[0x013F] := "Primary Chromaticities"
+      PropTags[0x0140] := "Color Map"
+      PropTags[0x0141] := "Halftone Hints"
+      ; PropTags[0x0142] := "TileWidth"
+      ; PropTags[0x0143] := "TileLength"
+      ; PropTags[0x0144] := "TileOffset"
+      ; PropTags[0x0145] := "TileByteCounts"
+      PropTags[0x014C] := "Ink Set"
+      PropTags[0x014D] := "Ink Names"
+      PropTags[0x014E] := "Number Of Inks"
+      PropTags[0x0150] := "Dot Range"
+      PropTags[0x0151] := "Target Printer"
+      PropTags[0x0152] := "Extra Samples"
+      PropTags[0x0153] := "Sample Format"
+      PropTags[0x0154] := "SMin Sample Value"
+      PropTags[0x0155] := "SMax Sample Value"
+      PropTags[0x0156] := "Transfer Range"
+      PropTags[0x0200] := "JPEGProc"
+      ; PropTags[0x0201] := "JPEGInterFormat"
+      ; PropTags[0x0202] := "JPEGInterLength"
+      ; PropTags[0x0203] := "JPEGRestartInterval"
+      PropTags[0x0205] := "JPEGLosslessPredictors"
+      ; PropTags[0x0206] := "JPEGPointTransforms"
+      ; PropTags[0x0207] := "JPEGQTables"
+      ; PropTags[0x0208] := "JPEGDCTables"
+      PropTags[0x0209] := "JPEGACTables"
+      ; PropTags[0x0211] := "YCbCrCoefficients"
+      ; PropTags[0x0212] := "YCbCrSubsampling"
+      ; PropTags[0x0213] := "YCbCrPositioning"
+      ; PropTags[0x0214] := "REFBlackWhite"
+      PropTags[0x0301] := "Gamma"
+      PropTags[0x0302] := "ICC Profile Descriptor"
+      PropTags[0x0303] := "SRGB Rendering Intent"
+      PropTags[0x0320] := "Image Title"
+      ; PropTags[0x5001] := "ResolutionXUnit"
+      ; PropTags[0x5002] := "ResolutionYUnit"
+      ; PropTags[0x5003] := "ResolutionXLengthUnit"
+      ; PropTags[0x5004] := "ResolutionYLengthUnit"
+      ; PropTags[0x5005] := "PrintFlags"
+      ; PropTags[0x5006] := "PrintFlagsVersion"
+      ; PropTags[0x5007] := "PrintFlagsCrop"
+      ; PropTags[0x5008] := "PrintFlagsBleedWidth"
+      ; PropTags[0x5009] := "PrintFlagsBleedWidthScale"
+      ; PropTags[0x500A] := "HalftoneLPI"
+      ; PropTags[0x500B] := "HalftoneLPIUnit"
+      ; PropTags[0x500C] := "HalftoneDegree"
+      ; PropTags[0x500D] := "HalftoneShape"
+      ; PropTags[0x500E] := "HalftoneMisc"
+      ; PropTags[0x500F] := "HalftoneScreen"
+      PropTags[0x5010] := "JPEG Quality"
+      PropTags[0x5011] := "Grid Size"
+      ; PropTags[0x5012] := "ThumbnailFormat"           ; 1 = JPEG, 0 = RAW RGB
+      ; PropTags[0x5013] := "ThumbnailWidth"
+      ; PropTags[0x5014] := "ThumbnailHeight"
+      ; PropTags[0x5015] := "ThumbnailColorDepth"
+      ; PropTags[0x5016] := "ThumbnailPlanes"
+      ; PropTags[0x5017] := "ThumbnailRawBytes"
+      ; PropTags[0x5018] := "ThumbnailSize"
+      ; PropTags[0x5019] := "ThumbnailCompressedSize"
+      PropTags[0x501A] := "Color Transfer Function"
+      ; PropTags[0x501B] := "ThumbnailData"             ; RAW thumbnail bits in JPEG format or RGB format depends on ThumbnailFormat
+      ; PropTags[0x5020] := "ThumbnailImageWidth"       ; Thumbnail width
+      ; PropTags[0x5021] := "ThumbnailImageHeight"      ; Thumbnail height
+      ; PropTags[0x5022] := "ThumbnailBitsPerSample"    ; Number of bits per component
+      ; PropTags[0x5023] := "ThumbnailCompression"      ; Compression Scheme
+      ; PropTags[0x5024] := "ThumbnailPhotometricInterp"   ; Pixel composition
+      ; PropTags[0x5025] := "ThumbnailImageDescription" ; Image Tile
+      ; PropTags[0x5026] := "ThumbnailEquipMake"        ; Manufacturer of Image Input equipment
+      ; PropTags[0x5027] := "ThumbnailEquipModel"       ; Model of Image input equipment
+      ; PropTags[0x5028] := "ThumbnailStripOffsets"     ; Image data location
+      ; PropTags[0x5029] := "ThumbnailOrientation"      ; Orientation of image
+      ; PropTags[0x502A] := "ThumbnailSamplesPerPixel"  ; Number of components
+      ; PropTags[0x502B] := "ThumbnailRowsPerStrip"     ; Number of rows per strip
+      ; PropTags[0x502C] := "ThumbnailStripBytesCount"  ; Bytes per compressed strip
+      ; PropTags[0x502D] := "ThumbnailResolutionX"      ; Resolution in width direction
+      ; PropTags[0x502E] := "ThumbnailResolutionY"      ; Resolution in height direction
+      ; PropTags[0x502F] := "ThumbnailPlanarConfig"     ; Image data arrangement
+      ; PropTags[0x5030] := "ThumbnailResolutionUnit"   ; Unit of X and Y Resolution
+      ; PropTags[0x5031] := "ThumbnailTransferFunction" ; Transfer function
+      ; PropTags[0x5032] := "ThumbnailSoftwareUsed"     ; Software used
+      ; PropTags[0x5033] := "ThumbnailDateTime"         ; File change date and time
+      ; PropTags[0x5034] := "ThumbnailArtist"           ; Person who created the image
+      ; PropTags[0x5035] := "ThumbnailWhitePoint"       ; White point chromaticity
+      ; PropTags[0x5036] := "ThumbnailPrimaryChromaticities"   ; Chromaticities of primaries
+      ; PropTags[0x5037] := "ThumbnailYCbCrCoefficients"   ; Color space transformation coefficients
+      ; PropTags[0x5038] := "ThumbnailYCbCrSubsampling" ; Subsampling ratio of Y to C
+      ; PropTags[0x5039] := "ThumbnailYCbCrPositioning" ; Y and C position
+      ; PropTags[0x503A] := "ThumbnailRefBlackWhite"    ; Pair of black and white reference values
+      ; PropTags[0x503B] := "ThumbnailCopyRight"        ; CopyRight holder
+      ; PropTags[0x5090] := "LuminanceTable"
+      ; PropTags[0x5091] := "ChrominanceTable"
+      PropTags[0x5100] := "Frame Delay"
+      PropTags[0x5101] := "Loop Count"
+      ; PropTags[0x5102] := "Global Palette"
+;      PropTags[0x5103] := "Index Background"
+ ;     PropTags[0x5104] := "Index Transparent"
+      PropTags[0x5110] := "Pixel Unit"                 ; Unit specifier for pixel/unit
+      PropTags[0x5111] := "Pixel Per Unit X"             ; Pixels per unit in X
+      PropTags[0x5112] := "Pixel Per Unit Y"             ; Pixels per unit in Y
+  ;    PropTags[0x5113] := "Palette Histogram"          ; Palette histogram
+      PropTags[0x8298] := "Copyright"
+      PropTags[0x829A] := "EXIF Exposure Time"
+      PropTags[0x829D] := "EXIF F Number"
+      ; PropTags[0x8769] := "ExifIFD"
+      PropTags[0x8773] := "ICC Profile"                ; This TAG is defined by ICC for embedded ICC in TIFF
+      PropTags[0x8822] := "EXIF ExposureProg"
+      PropTags[0x8824] := "EXIF SpectralSense"
+      ; PropTags[0x8825] := "GpsIFD"
+      PropTags[0x8827] := "EXIF ISO Speed"
+      ; PropTags[0x8828] := "ExifOECF"
+;      PropTags[0x9000] := "ExifVer"
+      PropTags[0x9003] := "EXIF DTOrig"                ; Date & time of original
+      PropTags[0x9004] := "EXIF DTDigitized"           ; Date & time of digital data generation
+      ; PropTags[0x9101] := "EXIF CompConfig"
+      PropTags[0x9102] := "EXIF CompBPP"
+      PropTags[0x9201] := "EXIF Shutter Speed"
+      PropTags[0x9202] := "EXIF Aperture"
+      PropTags[0x9203] := "EXIF Brightness"
+      PropTags[0x9204] := "EXIF Exposure Bias"
+      PropTags[0x9205] := "EXIF Max. Aperture"
+      PropTags[0x9206] := "EXIF Subject Dist"
+      PropTags[0x9207] := "EXIF Metering Mode"
+      PropTags[0x9208] := "EXIF Light Source"
+      PropTags[0x9209] := "EXIF Flash"
+      PropTags[0x920A] := "EXIF Focal Length"
+      PropTags[0x9214] := "EXIF Subject Area"           ; exif 2.2 Subject Area
+      PropTags[0x927C] := "EXIF Maker Note"
+      PropTags[0x9286] := "EXIF Comments"
+      ; PropTags[0x9290] := "EXIF DTSubsec"              ; Date & Time subseconds
+      ; PropTags[0x9291] := "EXIF DTOrigSS"              ; Date & Time original subseconds
+      ; PropTags[0x9292] := "EXIF DTDigSS"               ; Date & TIme digitized subseconds
+      ; PropTags[0xA000] := "EXIF FPXVer"
+      PropTags[0xA001] := "EXIF Color Space"
+      PropTags[0xA002] := "EXIF PixXDim"
+      PropTags[0xA003] := "EXIF PixYDim"
+      PropTags[0xA004] := "EXIF Related WAV"            ; related sound file
+      PropTags[0xA005] := "EXIF Interop"
+      PropTags[0xA20B] := "EXIF Flash Energy"
+      ; PropTags[0xA20C] := "EXIF Spatial FR"             ; Spatial Frequency Response
+      PropTags[0xA20E] := "EXIF Focal X Res"             ; Focal Plane X Resolution
+      PropTags[0xA20F] := "EXIF Focal Y Res"             ; Focal Plane Y Resolution
+      PropTags[0xA210] := "EXIF FocalResUnit"          ; Focal Plane Resolution Unit
+      PropTags[0xA214] := "EXIF Subject Loc"
+      PropTags[0xA215] := "EXIF Exposure Index"
+      PropTags[0xA217] := "EXIF Sensing Method"
+      PropTags[0xA300] := "EXIF File Source"
+      PropTags[0xA301] := "EXIF Scene Type"
+      PropTags[0xA302] := "EXIF CfaPattern"
+      PropTags[0xA401] := "EXIF Custom Rendered"
+      PropTags[0xA402] := "EXIF Exposure Mode"
+      PropTags[0xA403] := "EXIF White Balance"
+      PropTags[0xA404] := "EXIF Digital Zoom Ratio"
+      PropTags[0xA405] := "EXIF Focal Length In 35mmFilm"
+      PropTags[0xA406] := "EXIF Scene Capture Type"
+      PropTags[0xA407] := "EXIF Gain Control"
+      PropTags[0xA408] := "EXIF Contrast"
+      PropTags[0xA409] := "EXIF Saturation"
+      PropTags[0xA40A] := "EXIF Sharpness"
+      PropTags[0xA40B] := "EXIF Device Setting Description"
+      PropTags[0xA40C] := "EXIF Subject Distance Range"
+      PropTags[0xA420] := "EXIF Unique Image ID"
+      Return "*DONE*"
+   }
+   Return PropTags.HasKey(PropID) ? PropTags[PropID] : "Unknown"
+}
+;_______________________________________________________________________________________________________________________
+; Gdip_GetPropertyTagType() - Gets the name for he type of this property's value as defined in "Gdiplusimaging.h".
+; Parameters:
+;     PropType    -  Integer that identifies the type of the property item to be retrieved.
+; Return values:
+;     On success  -  Corresponding type.
+;     On failure  -  "Unknown"
+; MSDN:
+;_______________________________________________________________________________________________________________________
+Gdip_GetPropertyTagType(PropType) {
+   ; 1: Byte, 2: ASCII, 3: Short, 4: Long, 5: Rational, 7: Undefined, 9: SLong, 10: SRational
+   Static PropTypes := {1: "Byte", 2: "ASCII", 3: "Short", 4: "Long", 5: "Rational", 7: "Undefined", 9: "SLong"
+                      , 10: "SRational"}
+   Return PropTypes.HasKey(PropType) ? PropTypes[PropType] : "Unknown"
+}
+;_______________________________________________________________________________________________________________________
+;
+; Gdip_GetPropertyItemValue() - Reserved for internal use
+;_______________________________________________________________________________________________________________________
+Gdip_GetPropertyItemValue(ByRef PropVal, PropLen, PropType, PropAddr) {
+   PropVal := ""
+   If (PropType = 2) {
+      PropVal := StrGet(PropAddr, PropLen, "CP0")
+      Return True
+   }
+   If (PropType = 3) {
+      Loop, % (PropLen // 2)
+         PropVal .= (A_Index > 1 ? " " : "") . NumGet(PropAddr + 0, (A_Index - 1) << 1, "Short")
+      Return True
+   }
+   If (PropType = 4) || (PropType = 9) {
+      NumType := PropType = 4 ? "UInt" : "Int"
+      Loop, % (PropLen // 4)
+         PropVal .= (A_Index > 1 ? " " : "") . NumGet(PropAddr + 0, (A_Index - 1) << 2, NumType)
+      Return True
+   }
+   If (PropType = 5) || (PropType = 10) {
+      NumType := PropType = 5 ? "UInt" : "Int"
+      Loop, % (PropLen // 8)
+         PropVal .= (A_Index > 1 ? " " : "") . NumGet(PropAddr + 0, (A_Index - 1) << 2, NumType)
+                 .  "/" . NumGet(PropAddr + 4, (A_Index - 1) << 2, NumType)
+      Return True
+   }
+   If (PropType = 1) || (PropType = 7) {
+      VarSetCapacity(PropVal, PropLen, 0)
+      DllCall("Kernel32.dll\RtlMoveMemory", "Ptr", &PropVal, "Ptr", PropAddr, "Ptr", PropLen)
+      Return True
+   }
+   Return False
+}
 
