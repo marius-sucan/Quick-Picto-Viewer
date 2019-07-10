@@ -1,16 +1,16 @@
 ﻿; Original script details:
-;   Name:    AHK Picture Viewer
-;   Version: 1.0.0 on Oct 4, 2010 by SBC
+;   Name:     AHK Picture Viewer
+;   Version:  1.0.0 on Oct 4, 2010 by SBC
 ;   Platform: Windows XP or later
-;   Author:  SBC - http://sites.google.com/site/littlescripting/
+;   Author:   SBC - http://sites.google.com/site/littlescripting/
 ;   Found on: https://autohotkey.com/board/topic/58226-ahk-picture-viewer/
 ;
 ; New script details:
-;   Name:    Quick Picto Viewer
-;   Version: [see change logs file]
+;   Name:     Quick Picto Viewer
+;   Version:  [see change logs file]
 ;   Platform: Windows 7 or later
-;   Author:  Marius Șucan -  http://marius.sucan.ro/
-;   GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
+;   Author:   Marius Șucan -  http://marius.sucan.ro/
+;   GitHub:   https://github.com/marius-sucan/Quick-Picto-Viewer
 ;
 ; Script Main Functionalities:
 ; Display images and creates slideshows;
@@ -21,7 +21,7 @@
 
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 3.3.0
+;@Ahk2Exe-SetVersion 3.3.1
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
  
@@ -66,7 +66,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , UsrMustInvertFilter := 0, overwriteConflictingFile := 0
    , prevFileSavePath := "", imgHUDbaseUnit := 65, lastLongOperationAbort := 1
    , lastOtherWinClose := 1, UsrCopyMoveOperation := 2
-   , version := "3.3.0", vReleaseDate := "09/07/2019"
+   , version := "3.3.1", vReleaseDate := "10/07/2019"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1
@@ -1440,7 +1440,7 @@ ToggleImgFX(dir:=0) {
    {
       imgpath := resultedFilesList[currentFileIndex]
       MD5name := generateThumbName(imgpath, 1)
-      IniRead, valuez, % mainSettingsFile, AutoLevels, % MD5name, @
+      IniRead, valuez, % thumbsCacheFolder "\colorsinfo.ini", AutoLevels, % MD5name, @
       If (InStr(valuez, "||") && valuez!="@" && StrLen(valuez)>4)
       {
          valu := StrSplit(valuez, "||")
@@ -1490,7 +1490,7 @@ ResetImageView() {
     {
        imgpath := resultedFilesList[currentFileIndex]
        MD5name := generateThumbName(imgpath, 1)
-       IniWrite, --, % mainSettingsFile, AutoLevels, % MD5name
+       IniWrite, --, % thumbsCacheFolder "\colorsinfo.ini", AutoLevels, % MD5name
        Sleep, 25
     }
 
@@ -3545,6 +3545,7 @@ InvokeCopyFiles() {
 
 CopyMovePanelWindow() {
     Global UsrEditFileDestination, BtnCpyMv
+    Static prevmainDynaFoldersListu, prevCurrentSLD, lastInvoked := 1
     If (slideShowRunning=1)
        ToggleSlideShowu()
 
@@ -3585,7 +3586,16 @@ CopyMovePanelWindow() {
        listu .= OutDir "`n"
     } 
 
-    mainDynaFoldersListu := InStr(DynamicFoldersList, "|hexists|") ? coreLoadDynaFolders(CurrentSLD) : DynamicFoldersList
+    If (prevmainDynaFoldersListu && prevCurrentSLD=CurrentSLD) && (A_TickCount - lastInvoked<45670)
+    {
+       mainDynaFoldersListu := prevmainDynaFoldersListu
+    } Else
+    {
+       prevmainDynaFoldersListu := mainDynaFoldersListu := InStr(DynamicFoldersList, "|hexists|") ? coreLoadDynaFolders(CurrentSLD) : DynamicFoldersList
+       prevCurrentSLD := CurrentSLD
+       lastInvoked := A_TickCount
+    }
+
     Loop, Parse, mainDynaFoldersListu, `n
     {
         If (A_Index>15)
@@ -4113,7 +4123,8 @@ renewCurrentFilesList() {
 }
 
 coreOpenFolder(thisFolder, doOptionals:=1) {
-   If (StrLen(thisFolder)>3 && FileExist(thisFolder))
+   testThis := StrReplace(thisFolder, "|")
+   If (StrLen(thisFolder)>3 && FileExist(testThis))
    {
       CloseWindow()
       usrFilesFilteru := filesFilter := CurrentSLD := ""
@@ -5357,7 +5368,7 @@ AdaptiveImgLight(whichImg, imgpath, Width, Height) {
    Static matrix := "0.299|0.299|0.299|0|0|0.587|0.587|0.587|0|0|0.114|0.114|0.114|0|0|0|0|0|1|0|0|0|0|0|1"
    brLvlArray := []
    MD5name := generateThumbName(imgpath, 1)
-   IniRead, valuez, % mainSettingsFile, AutoLevels, % MD5name, @
+   IniRead, valuez, % thumbsCacheFolder "\colorsinfo.ini", AutoLevels, % MD5name, @
    If (InStr(valuez, "||") && valuez!="@" && StrLen(valuez)>4)
    {
       valu := StrSplit(valuez, "||")
@@ -5477,7 +5488,7 @@ startZeit := A_TickCount
    ; ToolTip, % minBrLvl "," newMaxBrLvl  "," maxBrLvl ", A=" avgBrLvl ", L=" percBrgPx "%, D=" percDrkPx "%, M=" percMidPx "%//" percMidPixu "%, avgz=" percAvgPx "%, cL=" lumosAdjust ", cG=" GammosAdjust,,, 2
    Gdip_DeleteGraphics(G3)
    Gdip_DisposeImage(thumbBMP)
-   IniWrite, %lumosAdjust%||%GammosAdjust%, % mainSettingsFile, AutoLevels, % MD5name
+   IniWrite, %lumosAdjust%||%GammosAdjust%, % thumbsCacheFolder "\colorsinfo.ini", AutoLevels, % MD5name
 }
 
 colorHEX2RGB(ARGB){
@@ -5839,6 +5850,7 @@ EraseThumbsCache() {
    startZeit := A_TickCount
    showTOOLtip("Emptying thumbnails cache, please wait...")
    IniDelete, % mainSettingsFile, AutoLevels
+   FileDelete, % thumbsCacheFolder "\colorsinfo.ini"
 
    Loop, Files, %thumbsCacheFolder%\*.jpg
    {
@@ -5851,6 +5863,7 @@ EraseThumbsCache() {
          Break
       }
    }
+
    If (abandonAll=1)
    {
       showTOOLtip("Operation aborted... Removed " countFilez " cached thumbnails...")
