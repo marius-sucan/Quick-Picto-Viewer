@@ -21,7 +21,7 @@
 
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 3.3.1
+;@Ahk2Exe-SetVersion 3.3.5
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
  
@@ -66,7 +66,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , UsrMustInvertFilter := 0, overwriteConflictingFile := 0
    , prevFileSavePath := "", imgHUDbaseUnit := 65, lastLongOperationAbort := 1
    , lastOtherWinClose := 1, UsrCopyMoveOperation := 2
-   , version := "3.3.1", vReleaseDate := "10/07/2019"
+   , version := "3.3.5", vReleaseDate := "10/07/2019"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1
@@ -814,9 +814,14 @@ CopyImage2clip() {
   {
      r := coreResizeIMG(imgpath, 0, 0, "--", 1, 1, 0)
      If r
+     {
         showTOOLtip("Image copied to clipboard...")
-     Else
+        SoundBeep, 900, 100
+     } Else
+     {
         showTOOLtip("ERROR: Failed to copy the image to clipboard...")
+        SoundBeep, 300, 900
+     }
      SetTimer, RemoveTooltip, % -msgDisplayTime
   } Else
   {
@@ -3467,8 +3472,12 @@ SaveClipboardImage(dummy:=0) {
       If r
       {
          showTOOLtip("Failed to save image file...`n" OutFileName "`n" OutDir "\")
-         SoundBeep , 300, 100
-      } Else showTOOLtip("Image file saved...`n" OutFileName "`n" OutDir "\")
+         SoundBeep, 300, 900
+      } Else
+      {
+         showTOOLtip("Image file saved...`n" OutFileName "`n" OutDir "\")
+         SoundBeep, 900, 100
+      }
       SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 }
@@ -3523,7 +3532,14 @@ zPlitPath(inputu, fastMode, ByRef fileNamu, ByRef folderu) {
 }
 
 readRecentFileDesties() {
-   listu := prevFileMovePath "`n" prevOpenFolderPath "`n" prevFileSavePath "`n"
+   listu := ""
+   If FileExist(prevFileSavePath)
+      listu .= prevFileSavePath "`n"
+   If FileExist(prevFileMovePath)
+      listu .= prevFileMovePath "`n"
+   If FileExist(prevOpenFolderPath)
+      listu .= prevOpenFolderPath "`n"
+
    Loop, 15
    {
        IniRead, newEntry, % mainSettingsFile, RecentFDestinations, E%A_Index%, @
@@ -4124,7 +4140,8 @@ renewCurrentFilesList() {
 
 coreOpenFolder(thisFolder, doOptionals:=1) {
    testThis := StrReplace(thisFolder, "|")
-   If (StrLen(thisFolder)>3 && FileExist(testThis))
+   testThis := FileExist(testThis)
+   If (StrLen(thisFolder)>3 && InStr(testThis, "D"))
    {
       CloseWindow()
       usrFilesFilteru := filesFilter := CurrentSLD := ""
@@ -4133,8 +4150,10 @@ coreOpenFolder(thisFolder, doOptionals:=1) {
       GetFilesList(thisFolder "\*")
       If (maxFilesIndex=0)
       {
+        GdipCleanMain(1)
         showTOOLtip("ERROR: Found no recognized image files in the folder...`n" thisFolder "\")
         SoundBeep , 300, 100
+        WinSetTitle, ahk_id %PVhwnd%,, %appTitle%
         SetTimer, RemoveTooltip, % -msgDisplayTime
         Return
       }
@@ -4154,6 +4173,8 @@ coreOpenFolder(thisFolder, doOptionals:=1) {
       }
    } Else
    {
+      GdipCleanMain()
+      WinSetTitle, ahk_id %PVhwnd%,, %appTitle%
       showTOOLtip("ERROR: The folder seems to be inexistent...`n" thisFolder "\")
       SoundBeep , 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -4796,9 +4817,14 @@ BuildMenu() {
          Continue
 
       countItemz++
+      testThis := StrReplace(A_LoopField, "|")
       entryu := SubStr(A_LoopField, -30)
-      Menu, PVopenF, Add, &%countItemz%. %entryu%, OpenRecentEntry
+      If !InStr(A_LoopField, "|") && !RegExMatch(A_LoopField, "i)(\.sld)$")
+         entryu := "(R) " entryu
+      If FileExist(testThis)
+         Menu, PVopenF, Add, &%countItemz%. %entryu%, OpenRecentEntry
    }
+
    If (countItemz>0)
    {
       Menu, PVopenF, Add, 
@@ -4806,11 +4832,11 @@ BuildMenu() {
    }
 
    Menu, PVopenF, Add, 
-   If StrLen(prevFileSavePath)>3
+   If (StrLen(prevFileSavePath)>3 && FileExist(prevFileSavePath))
       Menu, PVopenF, Add, % "O1. " SubStr(prevFileSavePath, -30), OpenRecentEntry
-   If StrLen(prevFileMovePath)>3
+   If (StrLen(prevFileMovePath)>3 && FileExist(prevFileMovePath))
       Menu, PVopenF, Add, % "O2. " SubStr(prevFileMovePath, -30), OpenRecentEntry
-   If StrLen(prevOpenFolderPath)>3
+   If (StrLen(prevOpenFolderPath)>3 && FileExist(prevOpenFolderPath))
       Menu, PVopenF, Add, % "O3. " SubStr(prevOpenFolderPath, -30), OpenRecentEntry
 
    clippyTest := resultedFilesList[0]
@@ -4853,15 +4879,15 @@ OpenRecentEntry() {
   testOs := A_ThisMenuItem
   If RegExMatch(testOs, "i)^(o1\. )")
   {
-     coreOpenFolder(prevFileSavePath)
+     coreOpenFolder("|" prevFileSavePath)
      Return
   } Else If RegExMatch(testOs, "i)^(o2\. )")
   {
-     coreOpenFolder(prevFileMovePath)
+     coreOpenFolder("|" prevFileMovePath)
      Return
   } Else If RegExMatch(testOs, "i)^(o3\. )")
   {
-     coreOpenFolder(prevOpenFolderPath)
+     coreOpenFolder("|" prevOpenFolderPath)
      Return
   }
 
@@ -5366,7 +5392,6 @@ CloneMainBMP(imgpath, ByRef width, ByRef height, ByRef CountFrames) {
 
 AdaptiveImgLight(whichImg, imgpath, Width, Height) {
    Static matrix := "0.299|0.299|0.299|0|0|0.587|0.587|0.587|0|0|0.114|0.114|0.114|0|0|0|0|0|1|0|0|0|0|0|1"
-   brLvlArray := []
    MD5name := generateThumbName(imgpath, 1)
    IniRead, valuez, % thumbsCacheFolder "\colorsinfo.ini", AutoLevels, % MD5name, @
    If (InStr(valuez, "||") && valuez!="@" && StrLen(valuez)>4)
@@ -5376,18 +5401,20 @@ AdaptiveImgLight(whichImg, imgpath, Width, Height) {
       GammosAdjust := Trim(valu[2])
       Return
    }
- 
+
+   brLvlArray := []
+   tempBrLvlArray := []
+   startZeit := A_TickCount
    calcImgSize(1, Width, Height, 500, 500, ResizedW, ResizedH)
-startZeit := A_TickCount
    thumbBMP := Gdip_CreateBitmap(ResizedW, ResizedH)
    G3 := Gdip_GraphicsFromImage(thumbBMP)
    Gdip_SetInterpolationMode(G3, 7)
  
-   Gdip_DrawImage(G3, whichImg, 0, 0, ResizedW, ResizedH, 0, 0, Width, Height, matrix)
+   minBrLvl := 256
    pX := pY := lumosAdjust := 1
-   PREminBrLvl := minBrLvl := 256
-   PREmaxBrLvl := maxBrLvl := sumTotal := countTotalPixelz := thisBrLvl := 0
+   maxBrLvl := sumTotal := countTotalPixelz := thisBrLvl := 0
    GammosAdjust := countBrightPixelz := countMidPixelz := countDarkPixelz := 0
+   Gdip_DrawImage(G3, whichImg, 0, 0, ResizedW, ResizedH, 0, 0, Width, Height, matrix)
 
    Loop, % ResizedW*ResizedH + 1
    {
@@ -5404,27 +5431,11 @@ startZeit := A_TickCount
        If (!ARGBhex || ARGBhex="0x0" || ARGBhex=0)
           Continue
 
-       thisBrLvl := colorHEX2RGB(ARGBhex)
-       brLvlArray[A_Index] := thisBrLvl
-
-       If (thisBrLvl>PREmaxBrLvl)
-          PREmaxBrLvl := thisBrLvl
-       Else If (PREmaxBrLvl>maxBrLvl+3)
-          maxBrLvl := PREmaxBrLvl
- 
-       If (thisBrLvl<PREminBrLvl && thisBrLvl>1)
-          PREminBrLvl := thisBrLvl
-       Else If (PREminBrLvl<minBrLvl && thisBrLvl>1)
-          minBrLvl := PREminBrLvl
- 
-       sumTotal := sumTotal + thisBrLvl
        countTotalPixelz++
-       If (thisBrLvl<40)
-          countDarkPixelz++
-       Else If (thisBrLvl>170)
-          countBrightPixelz++
-       Else If (valueBetween(thisBrLvl, 50, 165))
-          countMidPixelz++
+       counter%ARGBhex%++
+       tempBrLvlArray[ARGBhex] := counter%ARGBhex%
+;       Sleep, 2
+ ;      ToolTip, % tempBrLvlArray[ARGBhex] "--"
    }
 
    If (countTotalPixelz<(ResizedW*ResizedH)/1.5)
@@ -5434,12 +5445,43 @@ startZeit := A_TickCount
       Return
    }
 
-   avgBrLvl := Round(sumTotal/countTotalPixelz)
-   Loop, % countTotalPixelz
+   For k, v in tempBrLvlArray
    {
-        thisBrLvl := brLvlArray[A_Index]
-        If (valueBetween(thisBrLvl, avgBrLvl - 12, avgBrLvl + 12))
-           countFlatties++
+       countLoops++
+       thisBrLvl := colorHEX2RGB(k)
+       ; Sleep, 50
+       ; ToolTip, % "--- " k " --- " v " --- " thisBrLvl
+       BrLvlArray[thisBrLvl] := v
+   }
+
+   Loop, 256
+   {
+       thisIndex := A_Index - 1
+       nrPixelz := brLvlArray[thisIndex]
+       If !nrPixelz
+          Continue
+
+       sumTotal += nrPixelz * thisIndex
+       If (thisIndex>maxBrLvl && nrPixelz>12)
+          maxBrLvl := thisIndex
+       
+       If (thisIndex<minBrLvl && nrPixelz>12)
+          minBrLvl := thisIndex
+
+       If (thisIndex<40)
+          countDarkPixelz += nrPixelz
+       Else If (thisIndex>170)
+          countBrightPixelz += nrPixelz
+       Else If (valueBetween(thisIndex, 50, 165))
+          countMidPixelz += nrPixelz
+   }
+
+   avgBrLvl := Round(sumTotal/countTotalPixelz)
+   Loop, 22
+   {
+       nrPixelz := brLvlArray[avgBrLvl - 11 + A_Index]
+       If nrPixelz
+          countFlatties += nrPixelz
    }
    percBrgPx := (countBrightPixelz/countTotalPixelz) * 100
    percDrkPx := Round((countDarkPixelz/countTotalPixelz) * 100)
@@ -5448,28 +5490,12 @@ startZeit := A_TickCount
    percAvgPx := Round((countFlatties/countTotalPixelz) * 100)
 
    multiplieru := 256/maxBrLvl
-   If (percBrgPx<1.1 && percBrgPx>0)
-   {
-      newMaxBrLvl := 1
-      Loop, % countTotalPixelz
-      {
-         thisBrLvl := brLvlArray[A_Index]
-         If (thisBrLvl<maxBrLvl-30)
-         {
-            If (thisBrLvl>newMaxBrLvl)
-               newMaxBrLvl := thisBrLvl
-         }
-      }
-      newMaxBrLvl := newMaxBrLvl - percDrkPx/9 - percAvgPx/10
-      multiplieru := 256/newMaxBrLvl
-   }
    multiplieru := multiplieru + (256 - (avgBrLvl + maxBrLvl)/1.5)/450
    If (multiplieru<1)
       multiplieru := 1
 
    lumosAdjust := multiplieru
    GammosAdjust := - lumosAdjust/40 + 0.025
-
    If (percBrgPx>25)
    {
       darkerOffset := (minBrLvl/multiplieru)/250 + avgBrLvl/(600 - avgBrLvl/10)
@@ -5479,34 +5505,23 @@ startZeit := A_TickCount
       darkerOffset := minBrLvl/350
    } Else darkerOffset := minBrLvl/500
 
-   lumosAdjust := lumosAdjust + darkerOffset
-   GammosAdjust := GammosAdjust - darkerOffset
-   endZeit := A_TickCount
-;   ToolTip, % 1 + startZeit - endZeit,,, 2
-
-
-   ; ToolTip, % minBrLvl "," newMaxBrLvl  "," maxBrLvl ", A=" avgBrLvl ", L=" percBrgPx "%, D=" percDrkPx "%, M=" percMidPx "%//" percMidPixu "%, avgz=" percAvgPx "%, cL=" lumosAdjust ", cG=" GammosAdjust,,, 2
+   lumosAdjust := lumosAdjust + darkerOffset/1.2
+   GammosAdjust := GammosAdjust - darkerOffset/1.2
+   resultu := A_TickCount - startZeit
+;   ToolTip, % resultu " -- " minBrLvl "," maxBrLvl ", A=" avgBrLvl ", L=" percBrgPx "%, D=" percDrkPx "%, M=" percMidPx "%//" percMidPixu "%, avgz=" percAvgPx "%, cL=" lumosAdjust ", cG=" GammosAdjust,,, 2
    Gdip_DeleteGraphics(G3)
    Gdip_DisposeImage(thumbBMP)
    IniWrite, %lumosAdjust%||%GammosAdjust%, % thumbsCacheFolder "\colorsinfo.ini", AutoLevels, % MD5name
 }
 
-colorHEX2RGB(ARGB){
-  Static maxBrLvl := 256
+colorHEX2RGB(ARGB) {
   SetFormat, Integer, HEX
-  ARGB += 0 ; & 0x00ffffff
+  ARGB += 0
   SetFormat, Integer, D
   StringRight, tiny, ARGB, 2
   cR := "0x" tiny
   cR += 0
-  ; BrLvl := Round((cR/maxBrLvl) * 100)
-  ; Sleep, 2
-  ; Tooltip, %cR% -- `n%brlvl%`n%argb%
   Return cR ; BrLvl
-}
-
-ARGBtoRGB(ARGB){
-  return ARGB
 }
 
 CloneResizerBMP(imgpath, IDwhichImg, whichImg, newW, newH) {
@@ -6637,6 +6652,9 @@ coreResizeIMG(imgpath, newW, newH, file2save, goFX, toClippy, rotateMode) {
            Gdip_ScaleWorldTransform(G2, 1, -1)
            Gdip_TranslateWorldTransform(G2, 0, -newH)
         }
+
+        If (imgFxMode=5)
+           AdaptiveImgLight(oBitmap, imgpath, imgW, imgH)
         matrix := getColorMatrix()
     }
 
@@ -6664,7 +6682,7 @@ AboutWindow() {
     txtWid := 360
     Gui, Font, s19 Bold, Arial, -wrap
     Gui, Add, Button, x1 y1 h1 w1 Default gCloseWindow, Close
-    Gui, Add, Text, x10 y15 Section, %appTitle%
+    Gui, Add, Text, x10 y15 Section, %appTitle% v%Version%
     Gui, Font
     If (PrefsLargeFonts=1)
     {
@@ -6678,7 +6696,7 @@ AboutWindow() {
     Gui, Add, Text, y+10 w%txtWid%, Dedicated to people with really large image collections and slideshow needs :-).
     Gui, Add, Text, y+10 w%txtWid%, This application contains code from various entities. You can find more details in the source code.
     Gui, Font, Bold
-    Gui, Add, Link, y+15 w%txtWid%, To keep the development going, <a href="https://www.paypal.me/MariusSucan/10">please donate</a> or <a href="mailto:marius.sucan@gmail.com?subject=%appName% v%Version%">send me feedback</a>.
+    Gui, Add, Link, y+15 w%txtWid%, To keep the development going, <a href="https://www.paypal.me/MariusSucan/10">please donate</a> or <a href="mailto:marius.sucan@gmail.com?subject=%appTitle% v%Version%">send me feedback</a>.
     Gui, Add, Link, y+15 w%txtWid%, New and previous versions are available on <a href="https://github.com/marius-sucan/Quick-Picto-Viewer">GitHub</a>.
     Gui, Font, Normal
     Gui, Add, Button, xs+5 y+25 h30 w105 Default gCloseWindow, Close
@@ -6915,16 +6933,18 @@ SaveResizedIMG() {
    {
       If !RegExMatch(file2save, "i)(.\.(png|jpg|bmp|jpeg|tiff|tif))$")
       {
+         SoundBeep, 300, 100
          Msgbox, 48, %appTitle%, ERROR: Please use a supported file format. Allowed formats: .JPG, .TIF, .PNG or .BMP.
          Return
       }
       r := coreResizeIMG(img2resizePath, ResultEditWidth, ResultEditHeight, file2save, 0, 0, ResizeRotationUser)
       If r
       {
+         SoundBeep, 300, 100
          Msgbox, 48, %appTitle%, ERROR: Unable to save file. Error code: %r%.
          Return
       }
-      SoundBeep , 900, 100
+      SoundBeep, 900, 100
       showTOOLtip("Resized image saved.")
       SetTimer, RemoveTooltip, % -msgDisplayTime
    }
@@ -6940,15 +6960,16 @@ Copy2ClipResizedIMG() {
    If (!ResultEditHeight || !ResultEditWidth
    || ResultEditWidth<5 || ResultEditHeight<5)
    {
-      SoundBeep , 300, 100
+      SoundBeep, 300, 900
       Return
    }
 
    r := coreResizeIMG(img2resizePath, ResultEditWidth, ResultEditHeight, "--", 0, 1, ResizeRotationUser)
    If r
+   {
       showTOOLtip("Resized image copied to clipboard")
-   Else
-      Msgbox, 48, %appTitle%, ERROR: Unable to copy resized image to clipboard... Error code: %r%.
+      SoundBeep, 900, 100
+   } Else Msgbox, 48, %appTitle%, ERROR: Unable to copy resized image to clipboard... Error code: %r%.
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -7528,6 +7549,11 @@ PopulateStaticFolderzList() {
            nonae := StrReplace(theEntireListu, folderu "\",, countFiles)
         } Else countFiles := "-"
         LV_Add(A_Index, indexu, dirDate, statusu, folderu, countFiles)
+        If (A_Index=5)
+        {
+           Loop, 5
+               LV_ModifyCol(A_Index, "AutoHdr Left")
+        }
     }
 
     Loop, 5
@@ -7652,7 +7678,7 @@ WM_RBUTTONUP(wP, lP, msg, hwnd) {
   If (okay!=1)
      Return
 
-  If (thumbsDisplaying=1)
+  If (thumbsDisplaying=1 && maxFilesIndex>0)
      WinClickAction("rClick")
 
   delayu := (thumbsDisplaying=1) ? -90 : -5
