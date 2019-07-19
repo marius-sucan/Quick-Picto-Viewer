@@ -21,7 +21,7 @@
 
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 3.3.5
+;@Ahk2Exe-SetVersion 3.4.0
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
  
@@ -66,7 +66,8 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , UsrMustInvertFilter := 0, overwriteConflictingFile := 0
    , prevFileSavePath := "", imgHUDbaseUnit := 65, lastLongOperationAbort := 1
    , lastOtherWinClose := 1, UsrCopyMoveOperation := 2
-   , version := "3.3.5", vReleaseDate := "10/07/2019"
+   , ForceNoColorMatrix := 0
+   , version := "3.4.0", vReleaseDate := "19/07/2019"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1
@@ -74,7 +75,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , WindowBgrColor := "010101", slideShowDelay := 3000
    , IMGresizingMode := 1, SlideHowMode := 1, TouchScreenMode := 1
    , lumosAdjust := 1, GammosAdjust := 0, userimgQuality := 1
-   , imgFxMode := 1, FlipImgH := 0, FlipImgV := 0
+   , imgFxMode := 1, FlipImgH := 0, FlipImgV := 0, satAdjust := 1
    , imageAligned := 5, filesFilter := "", isAlwaysOnTop := 0
    , noTooltipMSGs := 0, zoomLevel := 1, skipDeadFiles := 0
    , isTitleBarHidden := 0, lumosGrayAdjust := 0, GammosGrayAdjust := 0
@@ -82,7 +83,8 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , SLDcacheFilesList := 1, autoRemDeadEntry := 1
    , easySlideStoppage := 0, ResizeInPercentage := 0
    , ResizeKeepAratio := 1, ResizeQualityHigh := 1, ResizeRotationUser := 1
-   , ResizeApplyEffects := 1
+   , ResizeApplyEffects := 1, autoAdjustMode := 1, doSatAdjusts := 1
+   , chnRdecalage := 0, chnGdecalage := 0, chnBdecalage := 0
 
 imgQuality := (userimgQuality=1) ? 7 : 5
 DetectHiddenWindows, On
@@ -226,6 +228,14 @@ identifyThisWin(noReact:=0) {
       ChangeGammos(1)
     Return
 
+    ~^vkDB::   ; Ctrl + [
+      ChangeSaturation(-1)
+    Return
+
+    ~^vkDD::   ; Ctrl + ]
+      ChangeSaturation(1)
+    Return
+
     ~vkDC::   ; \
       ResetImageView()
     Return
@@ -258,6 +268,10 @@ identifyThisWin(noReact:=0) {
 
    ~vk56::    ; V
        TransformIMGv()
+    Return
+
+    ~vk55::  ;  U
+       ColorsAdjusterPanelWindow()
     Return
 
     ~vk46::     ; F
@@ -367,6 +381,14 @@ identifyThisWin(noReact:=0) {
 
     ~vkDD::   ; ]
       ChangeLumos(1)
+    Return
+
+    ~^vkDB::   ; Ctrl + [
+      ChangeSaturation(-1)
+    Return
+
+    ~^vkDD::   ; Ctrl + ]
+      ChangeSaturation(1)
     Return
 
     ~+vkDB::   ; Shift + [
@@ -509,6 +531,10 @@ identifyThisWin(noReact:=0) {
 
     ~vk4D::     ; M
        InvokeMoveFiles()
+    Return
+
+    ~vk55::  ;  U
+       ColorsAdjusterPanelWindow()
     Return
 
     ~vk46::     ; F
@@ -1109,6 +1135,11 @@ WinClickAction(forceThis:=0) {
    Critical, on
    If AnyWindowOpen
    {
+      If (AnyWindowOpen=10 && imgFxMode!=1)
+      {
+         ForceNoColorMatrix := !ForceNoColorMatrix
+         SetTimer, DelayiedImageDisplay, -50
+      }
       WinActivate, ahk_id %hSetWinGui%
       Return
    }
@@ -1387,18 +1418,6 @@ DefineSlideShowType() {
    Return friendly
 }
 
-DefineFXmodes() {
-   friendly := (imgFxMode=1) ? "ORIGINAL" : "GRAYSCALE"
-   If (imgFxMode=3)
-      friendly := "INVERTED"
-   Else If (imgFxMode=4)
-      friendly := "PERSONALIZED"
-   Else If (imgFxMode=5)
-      friendly := "AUTO-ADJUSTED"
-
-   Return friendly
-}
-
 SwitchSlideModes() {
    SlideHowMode++
    If (SlideHowMode>3)
@@ -1413,6 +1432,17 @@ SwitchSlideModes() {
    writeMainSettings()
 }
 
+DefineFXmodes() {
+   Static FXmodesLabels := {1:"ORIGINAL", 2:"PERSONALIZED", 3:"AUTO-ADJUSTED", 4:"GRAYSCALE", 5:"GRAYSCALE RED CHANNEL", 6:"GRAYSCALE GREEN CHANNEL", 7:"GRAYSCALE BLUE CHANNEL", 8:"INVERTED"}
+   If FXmodesLabels.HasKey(imgFxMode)
+      friendly := FXmodesLabels[imgFxMode]
+   Else
+      friendly := "Colors FX: " imgFxMode
+   If (imgFxMode=3)
+      friendly .= A_Space autoAdjustMode
+   Return friendly
+}
+
 ToggleImgFX(dir:=0) {
    If (slideShowRunning=1)
       resetSlideshowTimer(0)
@@ -1422,42 +1452,32 @@ ToggleImgFX(dir:=0) {
    Else
       imgFxMode++
 
-   If (imgFxMode>5)
+   If (imgFxMode>8)
       imgFxMode := 1
    Else If (imgFxMode<1)
-      imgFxMode := 5
+      imgFxMode := 8
 
    friendly := DefineFXmodes()
-   If (imgFxMode=2)
-      friendly .= "`nBrightness: " Round(lumosGrayAdjust, 3) "`nGamma: " Round(GammosGrayAdjust, 3)
-   Else If (imgFxMode=4)
-      friendly .= "`nBrightness: " Round(lumosAdjust, 3) "`nGamma: " Round(GammosAdjust, 3)
+   If (imgFxMode=4)
+      friendly .= "`nBrightness: " Round(lumosGrayAdjust, 3) "`nContrast: " Round(GammosGrayAdjust, 3)
+   Else If (imgFxMode=2)
+      friendly .= "`nBrightness: " Round(lumosAdjust, 3) "`nContrast: " Round(GammosAdjust, 3) "`nSaturation: " Round(satAdjust*100) "%"
 
-   If (imgFxMode=2 || imgFxMode=4)
-      friendly .= "`n `nYou can adjust brightness and gamma using`n [ and ] with or without Shift."
+   If (imgFxMode=4)
+      friendly .= "`n `nYou can adjust brightness and contrast using`n [ and ] with or without Shift."
+   Else If (imgFxMode=2)
+      friendly .= "`n `nYou can adjust brightness, contrast and saturation using`n [ and ] with or without Shift or Ctrl."
    showTOOLtip("Image colors: " friendly)
    SetTimer, RemoveTooltip, % -msgDisplayTime
    If (thumbsDisplaying=1)
       SetTimer, RefreshThumbsList, -250
    Else prevStartIndex := -1
 
-   If (imgFxMode=5 && thumbsDisplaying!=1)
+   If (imgFxMode=3 && thumbsDisplaying!=1)
    {
       imgpath := resultedFilesList[currentFileIndex]
-      MD5name := generateThumbName(imgpath, 1)
-      IniRead, valuez, % thumbsCacheFolder "\colorsinfo.ini", AutoLevels, % MD5name, @
-      If (InStr(valuez, "||") && valuez!="@" && StrLen(valuez)>4)
-      {
-         valu := StrSplit(valuez, "||")
-         lumosAdjust := Trim(valu[1])
-         GammosAdjust := Trim(valu[2])
-      } Else 
-      {
-         lumosAdjust := 1
-         GammosAdjust := 0
-      }
+      AdaptiveImgLight(gdiBitmap, imgpath, 1, 1)
    }
-
 
    writeMainSettings()
    r := IDshowImage(currentFileIndex)
@@ -1491,15 +1511,8 @@ ToggleIMGalign() {
 }
 
 ResetImageView() {
-    If (imgFxMode=5)
-    {
-       imgpath := resultedFilesList[currentFileIndex]
-       MD5name := generateThumbName(imgpath, 1)
-       IniWrite, --, % thumbsCacheFolder "\colorsinfo.ini", AutoLevels, % MD5name
-       Sleep, 25
-    }
-
-    ChangeLumos(2)
+   Critical, on
+   ChangeLumos(2)
 }
 
 ChangeLumos(dir) {
@@ -1507,41 +1520,26 @@ ChangeLumos(dir) {
    If (slideShowRunning=1)
       resetSlideshowTimer(0)
    If (imgFxMode!=2 && imgFxMode!=4 && dir!=2)
-      imgFxMode := 4
-
-   If (imgFxMode=2)
-   {
-      If (dir=1)
-         lumosGrayAdjust := lumosGrayAdjust + 0.1
-      Else
-         lumosGrayAdjust := lumosGrayAdjust - 0.1
-      If (lumosGrayAdjust<-25)
-         lumosGrayAdjust := -25
-      Else If (lumosGrayAdjust>25)
-         lumosGrayAdjust := 25
-   } Else
-   {
-      If (dir=1)
-         lumosAdjust := lumosAdjust + 0.2
-      Else
-         lumosAdjust := (lumosAdjust<1) ?  lumosAdjust - 0.1 : lumosAdjust - 0.25
-
-      If (lumosAdjust<0)
-         lumosAdjust := 0.001
-      Else If (lumosAdjust>25)
-         lumosAdjust := 25
-   }
+      imgFxMode := 2
 
    If (dir=2)
    {
-      If (imgFxMode=2)
+      If (imgFxMode=4)
       {
-         lumosGrayAdjust := GammosGrayAdjust := 0
-      } Else If (imgFxMode=4)
+         GammosGrayAdjust := 0
+         lumosGrayAdjust := 1
+      } Else If (imgFxMode=2)
       {
+         satAdjust := 1
          GammosAdjust := 0
          lumosAdjust := 1
       }
+
+      If (imgFxMode=2 || imgFxMode=3)
+         chnRdecalage := chnGdecalage := chnBdecalage := 0
+
+      FlipImgH := FlipImgV := 0
+      imgFxMode := 1
 
       If (thumbsDisplaying=1)
       {
@@ -1551,13 +1549,32 @@ ChangeLumos(dir) {
          SetTimer, RefreshThumbsList, -250
       }
 
-      FlipImgH := FlipImgV := 0
-      imgFxMode := 1
       If (IMGresizingMode=4)
-         IMGdecalageY := IMGdecalageX := zoomLevel := 1
+         zoomLevel := 1
+   } Else If (imgFxMode=4)
+   {
+      If (dir=1)
+         lumosGrayAdjust := lumosGrayAdjust + 0.05
+      Else
+         lumosGrayAdjust := lumosGrayAdjust - 0.05
+      If (lumosGrayAdjust<0)
+         lumosGrayAdjust := 0
+      Else If (lumosGrayAdjust>25)
+         lumosGrayAdjust := 25
+   } Else
+   {
+      If (dir=1)
+         lumosAdjust := (lumosAdjust<=1) ? lumosAdjust + 0.05 : lumosAdjust + 0.1
+      Else
+         lumosAdjust := (lumosAdjust<=1) ? lumosAdjust - 0.05 : lumosAdjust - 0.1
+
+      If (lumosAdjust<0)
+         lumosAdjust := 0.001
+      Else If (lumosAdjust>25)
+         lumosAdjust := 25
    }
 
-   value2show := (imgFxMode=2) ? Round(lumosGrayAdjust, 3) : Round(lumosAdjust, 3)
+   value2show := (imgFxMode=4) ? Round(lumosGrayAdjust, 3) : Round(lumosAdjust, 3)
    If (dir=2)
       showTOOLtip("Image colors: UNALTERED")
    Else
@@ -1567,7 +1584,7 @@ ChangeLumos(dir) {
       prevStartIndex := -1
    SetTimer, RemoveTooltip, % -msgDisplayTime
    newValues := "a" GammosGrayAdjust lumosGrayAdjust imageAligned IMGdecalageY IMGdecalageX zoomLevel currentFileIndex imgFxMode IMGresizingMode GammosAdjust lumosAdjust
-   If (prevValues=newValues)
+   If (prevValues=newValues && dir!=2)
       Return
 
    prevValues := newValues
@@ -1627,9 +1644,9 @@ ChangeGammos(dir) {
       resetSlideshowTimer(0)
 
    If (imgFxMode!=2 && imgFxMode!=4)
-      imgFxMode := 4
+      imgFxMode := 2
 
-   value2Adjust := (imgFxMode=2) ? GammosGrayAdjust : GammosAdjust
+   value2Adjust := (imgFxMode=4) ? GammosGrayAdjust : GammosAdjust
    If (dir=1)
       value2Adjust := value2Adjust + 0.05
    Else
@@ -1640,16 +1657,49 @@ ChangeGammos(dir) {
    Else If (value2Adjust>1)
       value2Adjust := 1
 
-   If (imgFxMode=2)
+   If (imgFxMode=4)
       GammosGrayAdjust := value2Adjust
    Else
       GammosAdjust := value2Adjust
 
    If (thumbsDisplaying!=1)
       prevStartIndex := -1
-   showTOOLtip("Image gamma: " Round(value2Adjust, 3))
+   showTOOLtip("Image contrast: " Round(value2Adjust, 3))
    SetTimer, RemoveTooltip, % -msgDisplayTime
    newValues := "a" GammosGrayAdjust lumosGrayAdjust imageAligned IMGdecalageY IMGdecalageX zoomLevel currentFileIndex imgFxMode IMGresizingMode GammosAdjust lumosAdjust
+   If (prevValues=newValues)
+      Return
+
+   prevValues := newValues
+   SetTimer, DelayiedImageDisplay, -10
+}
+
+ChangeSaturation(dir) {
+   Static prevValues
+   If (slideShowRunning=1)
+      resetSlideshowTimer(0)
+
+   If (imgFxMode=4)
+      satAdjust := 0
+   imgFxMode := 2
+
+   value2Adjust := satAdjust
+   If (dir=1)
+      value2Adjust := value2Adjust + 0.05
+   Else
+      value2Adjust := value2Adjust - 0.05
+
+   If (value2Adjust<0)
+      value2Adjust := 0
+   Else If (value2Adjust>3.00)
+      value2Adjust := 3.00
+
+   satAdjust := value2Adjust
+   If (thumbsDisplaying!=1)
+      prevStartIndex := -1
+   showTOOLtip("Image saturation: " Round(value2Adjust*100) "%")
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+   newValues := "a" satAdjust lumosGrayAdjust imageAligned IMGdecalageY IMGdecalageX zoomLevel currentFileIndex imgFxMode IMGresizingMode GammosAdjust lumosAdjust
    If (prevValues=newValues)
       Return
 
@@ -1806,11 +1856,7 @@ DelayiedImageDisplay() {
       informUserFileMissing()
 }
 
-ShowImgInfosPanel() {
-    Global LViewMetaD
-    If (thumbsDisplaying=1)
-       ToggleThumbsMode()
-
+createSettingsGUI(IDwin) {
     If (slideShowRunning=1)
        ToggleSlideShowu()
 
@@ -1818,10 +1864,18 @@ ShowImgInfosPanel() {
     Sleep, 15
     Gui, SettingsGUIA: Destroy
     Sleep, 15
-    AnyWindowOpen := 5
     Gui, SettingsGUIA: Default
-    Gui, SettingsGUIA: -MaximizeBox -MinimizeBox hwndhSetWinGui
+    Gui, SettingsGUIA: -MaximizeBox -MinimizeBox +Owner1 hwndhSetWinGui
     Gui, SettingsGUIA: Margin, 15, 15
+    AnyWindowOpen := IDwin
+}
+
+ShowImgInfosPanel() {
+    Global LViewMetaD
+    If (thumbsDisplaying=1)
+       ToggleThumbsMode()
+
+    createSettingsGUI(5)
     btnWid := 130
     txtWid := 360
     lstWid := 545
@@ -1834,7 +1888,6 @@ ShowImgInfosPanel() {
     }
 
     Gui, Add, ListView, x15 y15 w%lstWid% r12 Grid vLViewMetaD, Property|Data
-
     Gui, Add, Button, xs+0 y+15 h30 w%btnWid% gcopyIMGinfos2clip, &Copy to clipboard
     Gui, Add, Button, x+5 hp w%btnWid% gOpenThisFileFolder, &Open in folder
     Gui, Add, Button, x+5 hp w90 Default gCloseWindow, C&lose
@@ -2036,17 +2089,7 @@ enableFilesFilter() {
     If (maxFilesIndex<3 && !usrFilesFilteru)
        Return
 
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
-    CloseWindow()
-    Sleep, 15
-    Gui, SettingsGUIA: Destroy
-    Sleep, 15
-    AnyWindowOpen := 6
-    Gui, SettingsGUIA: Default
-    Gui, SettingsGUIA: -MaximizeBox -MinimizeBox hwndhSetWinGui
-    Gui, SettingsGUIA: Margin, 15, 15
+    createSettingsGUI(6)
     btnWid := 80
     txtWid := 360
     EditWid := 399
@@ -2723,6 +2766,7 @@ readSlideSettings(readThisFile) {
      IniRead, tstGammosAdjust, %readThisFile%, General, GammosAdjust, @
      IniRead, tstlumosGrAdjust, %readThisFile%, General, lumosGrayAdjust, @
      IniRead, tstGammosGrAdjust, %readThisFile%, General, GammosGrayAdjust, @
+     IniRead, tstsatAdjust, %readThisFile%, General, satAdjust, @
      IniRead, tstimageAligned, %readThisFile%, General, imageAligned, @
      IniRead, tstnoTooltipMSGs, %readThisFile%, General, noTooltipMSGs, @
      IniRead, tstuserimgQuality, %readThisFile%, General, userimgQuality, @
@@ -2735,19 +2779,28 @@ readSlideSettings(readThisFile) {
      IniRead, tstthumbsZoomLevel, %readThisFile%, General, thumbsZoomLevel, @
      IniRead, tstSLDcacheFilesList, %readThisFile%, General, SLDcacheFilesList, @
      IniRead, tsteasySlideStoppage, %readThisFile%, General, easySlideStoppage, @
+     IniRead, tstautoAdjustMode, %readThisFile%, General, autoAdjustMode, @
+     IniRead, tstdoSatAdjusts, %readThisFile%, General, doSatAdjusts, @
+     IniRead, tstchnRdecalage, %readThisFile%, General, chnRdecalage, @
+     IniRead, tstchnGdecalage, %readThisFile%, General, chnGdecalage, @
+     IniRead, tstchnBdecalage, %readThisFile%, General, chnBdecalage, @
 
      If (tstslideshowdelay!="@" && tstslideshowdelay>300)
         slideShowDelay := tstslideShowDelay
      If (tstimgresizingmode!="@" && StrLen(tstIMGresizingMode)=1 && tstIMGresizingMode<5)
         IMGresizingMode := tstIMGresizingMode
-     If (tstimgFxMode!="@" && valueBetween(tstimgFxMode, 1, 5))
+     If (tstimgFxMode!="@" && valueBetween(tstimgFxMode, 1, 7))
         imgFxMode := tstimgFxMode
+     If (tstautoAdjustMode!="@" && valueBetween(tstautoAdjustMode, 1, 3))
+        autoAdjustMode := tstautoAdjustMode
      If (tstnoTooltipMSGs=1 || tstnoTooltipMSGs=0)
         noTooltipMSGs := tstnoTooltipMSGs
      If (tstSLDcacheFilesList=1 || tstSLDcacheFilesList=0)
         SLDcacheFilesList := tstSLDcacheFilesList
      If (tstTouchScreenMode=1 || tstTouchScreenMode=0)
         TouchScreenMode := tstTouchScreenMode
+     If (tstdoSatAdjusts=1 || tstdoSatAdjusts=0)
+        doSatAdjusts := tstdoSatAdjusts
      If (tsteasySlideStoppage=1 || tsteasySlideStoppage=0)
         easySlideStoppage := tsteasySlideStoppage
      If (tstuserimgQuality=1 || tstuserimgQuality=0)
@@ -2780,10 +2833,18 @@ readSlideSettings(readThisFile) {
      If (tstfilesFilter!="@" && StrLen(Trim(tstfilesFilter))>2)
         usrFilesFilteru := tstfilesFilter
 
+     If (tstchnRdecalage!="@")
+        chnRdecalage := tstchnRdecalage
+     If (tstchnGdecalage!="@")
+        chnGdecalage := tstchnGdecalage
+     If (tstchnBdecalage!="@")
+        chnBdecalage := tstchnBdecalage
      If (tstlumosAdjust!="@")
         lumosAdjust := tstlumosAdjust
      If (tstGammosAdjust!="@")
         GammosAdjust := tstGammosAdjust
+     If (tstsatAdjust!="@")
+        satAdjust := tstsatAdjust
 
      If (tstlumosGrAdjust!="@")
         lumosGrayAdjust := tstlumosGrAdjust
@@ -2876,8 +2937,14 @@ writeSlideSettings(file2save) {
     IniWrite, % GammosAdjust, %file2save%, General, GammosAdjust
     IniWrite, % lumosGrayAdjust, %file2save%, General, lumosGrayAdjust
     IniWrite, % GammosGrayAdjust, %file2save%, General, GammosGrayAdjust
+    IniWrite, % satAdjust, %file2save%, General, satAdjust
     IniWrite, % imageAligned, %file2save%, General, imageAligned
     IniWrite, % userimgQuality, %file2save%, General, userimgQuality
+    IniWrite, % doSatAdjusts, % mainSettingsFile, General, doSatAdjusts
+    IniWrite, % autoAdjustMode, % mainSettingsFile, General, autoAdjustMode
+    IniWrite, % chnRdecalage, % mainSettingsFile, General, chnRdecalage
+    IniWrite, % chnGdecalage, % mainSettingsFile, General, chnGdecalage
+    IniWrite, % chnBdecalage, % mainSettingsFile, General, chnBdecalage
     IniWrite, % noTooltipMSGs, %file2save%, General, noTooltipMSGs
     IniWrite, % TouchScreenMode, %file2save%, General, TouchScreenMode
     IniWrite, % skipDeadFiles, %file2save%, General, skipDeadFiles
@@ -3133,17 +3200,7 @@ MultiRenameFiles() {
     If (maxFilesIndex<2)
        Return
 
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
-    CloseWindow()
-    Sleep, 15
-    Gui, SettingsGUIA: Destroy
-    Sleep, 15
-    AnyWindowOpen := 8
-    Gui, SettingsGUIA: Default
-    Gui, SettingsGUIA: -MaximizeBox -MinimizeBox hwndhSetWinGui
-    Gui, SettingsGUIA: Margin, 15, 15
+    createSettingsGUI(8)
     btnWid := 100
     txtWid := 360
     EditWid := 395
@@ -3347,14 +3404,7 @@ RenameThisFile() {
        Return
     }
 
-    CloseWindow()
-    Sleep, 15
-    Gui, SettingsGUIA: Destroy
-    Sleep, 15
-    AnyWindowOpen := 7
-    Gui, SettingsGUIA: Default
-    Gui, SettingsGUIA: -MaximizeBox -MinimizeBox hwndhSetWinGui
-    Gui, SettingsGUIA: Margin, 15, 15
+    createSettingsGUI(7)
     btnWid := 100
     txtWid := 360
     EditWid := 395
@@ -3430,6 +3480,8 @@ RenameBTNaction() {
 }
 
 SaveClipboardImage(dummy:=0) {
+   Static lastInvoked := 1
+
    If (slideShowRunning=1)
       ToggleSlideShowu()
 
@@ -3453,6 +3505,8 @@ SaveClipboardImage(dummy:=0) {
    }
 
    defaultu := (dummy="yay") ? file2rem : prevFileSavePath
+   If (A_TickCount - lastInvoked < 2500)
+      defaultu := prevFileSavePath
    GUI, 1: +OwnDialogs
    FileSelectFile, file2save, S18, % defaultu, Save image as..., Images (*.png; *.jpg; *.bmp; *.tif)
    If (!ErrorLevel && StrLen(file2save)>3)
@@ -3462,10 +3516,11 @@ SaveClipboardImage(dummy:=0) {
          Msgbox, 48, %appTitle%, ERROR: Please use a supported file format. Allowed formats: .JPG, .TIF, .PNG or .BMP.
          Return
       }
+      showTOOLtip("Please wait, saving image...")
       If (dummy!="yay")
          file2rem := thumbsCacheFolder "\Current-Clipboard.png"
 
-      zPlitPath(file2rem, 0, OutFileName, OutDir)
+      zPlitPath(file2save, 0, OutFileName, OutDir)
       prevFileSavePath := OutDir
       writeMainSettings()
       r := coreResizeIMG(file2rem, 0, 0, file2save, 1, 0, 0)
@@ -3480,6 +3535,7 @@ SaveClipboardImage(dummy:=0) {
       }
       SetTimer, RemoveTooltip, % -msgDisplayTime
    }
+   lastInvoked := A_TickCount
 }
 
 ChooseFilesDest() {
@@ -3531,14 +3587,17 @@ zPlitPath(inputu, fastMode, ByRef fileNamu, ByRef folderu) {
     }
 }
 
-readRecentFileDesties() {
+readRecentFileDesties(modus:=0) {
    listu := ""
-   If FileExist(prevFileSavePath)
-      listu .= prevFileSavePath "`n"
-   If FileExist(prevFileMovePath)
-      listu .= prevFileMovePath "`n"
-   If FileExist(prevOpenFolderPath)
-      listu .= prevOpenFolderPath "`n"
+   If (modus!=1)
+   {
+      If FileExist(prevFileSavePath)
+         listu .= prevFileSavePath "`n"
+      If FileExist(prevFileMovePath)
+         listu .= prevFileMovePath "`n"
+      If FileExist(prevOpenFolderPath)
+         listu .= prevOpenFolderPath "`n"
+   }
 
    Loop, 15
    {
@@ -3562,17 +3621,8 @@ InvokeCopyFiles() {
 CopyMovePanelWindow() {
     Global UsrEditFileDestination, BtnCpyMv
     Static prevmainDynaFoldersListu, prevCurrentSLD, lastInvoked := 1
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
 
-    CloseWindow()
-    Sleep, 15
-    Gui, SettingsGUIA: Destroy
-    Sleep, 15
-    AnyWindowOpen := 9
-    Gui, SettingsGUIA: Default
-    Gui, SettingsGUIA: -MaximizeBox -MinimizeBox hwndhSetWinGui
-    Gui, SettingsGUIA: Margin, 15, 15
+    createSettingsGUI(9)
     btnWid := 125
     txtWid := 360
     EditWid := 395
@@ -3584,6 +3634,7 @@ CopyMovePanelWindow() {
        Gui, Font, s%LargeUIfontValue%
     }
 
+    ToolTip, Please wait...,,, 2
     listu := readRecentFileDesties()
     listu .= "--={ other destinations }=--`n"
 
@@ -3663,6 +3714,7 @@ CopyMovePanelWindow() {
     Gui, Add, ComboBox, xs y+10 w%EditWid% gCopyMoveComboAction r12 Simple vUsrEditFileDestination, % finalListu
     Gui, Add, Checkbox, y+10 Checked%overwriteConflictingFile% voverwriteConflictingFile, When file name(s) collide, overwrite file(s) found in selected folder
 
+    ToolTip,,,,2
     btnName := (UsrCopyMoveOperation=2) ? "Move" : "Copy"
     Gui, Add, Button, xs y+20 h30 w%btnWid% gChooseFilesDest, &Choose a new folder
     Gui, Add, DropDownList, x+5 w%btnWid% gchangeCopyMoveAction AltSubmit Choose%UsrCopyMoveOperation% vUsrCopyMoveOperation, Action...`nMove file(s)`nCopy file(s)
@@ -3730,11 +3782,12 @@ OpenQuickItemDir() {
 
 RecentCopyMoveManager(entry2add) {
   entry2add := Trim(entry2add)
-  mainListu := readRecentFileDesties()
+  mainListu := readRecentFileDesties(1)
+
   If StrLen(entry2add)<3
      Return
 
-  Loop, Parse, mainListu, `n
+  Loop, Parse, mainListu,`n
   {
       If (A_LoopField=entry2add)
       {
@@ -4613,8 +4666,9 @@ BuildMenu() {
    If (easySlideStoppage=1)
       Menu, PVsliMenu, Check, &Easy slideshow stopping
 
-   infolumosAdjust := (imgFxMode=4) ? Round(lumosAdjust, 2) : Round(lumosGrayAdjust, 2)
-   infoGammosAdjust := (imgFxMode=4) ? Round(GammosAdjust, 2) : Round(GammosGrayAdjust, 2)
+   infolumosAdjust := (imgFxMode=2 || imgFxMode=3) ? Round(lumosAdjust, 2) : Round(lumosGrayAdjust, 2)
+   infoGammosAdjust := (imgFxMode=2 || imgFxMode=3) ? Round(GammosAdjust, 2) : Round(GammosGrayAdjust, 2)
+   infoSatAdjust := Round(satAdjust*100)
    infoThumbsMode := (thumbsDisplaying=1) ? "Switch to image view" : "Switch to thumbnails list"
    If (maxFilesIndex>1)
    {
@@ -4647,10 +4701,10 @@ BuildMenu() {
    Menu, PVview, Add, &Switch colors display`tF, ToggleImgFX
    Menu, PVview, Add, % DefineFXmodes(), ToggleImgFX
    Menu, PVview, Disable, % DefineFXmodes()
-   If (imgFxMode=5 || imgFxMode=4 || imgFxMode=2)
+   If (imgFxMode=2 || imgFxMode=3 || imgFxMode=4)
    {
-      Menu, PVview, Add, Br: %infolumosAdjust% / Ga: %infoGammosAdjust%, ToggleImgFX
-      Menu, PVview, Disable, Br: %infolumosAdjust% / Ga: %infoGammosAdjust%
+      Menu, PVview, Add, Br: %infolumosAdjust% / Ctr: %infoGammosAdjust% / dS: %infoSatAdjust%, ToggleImgFX
+      Menu, PVview, Disable, Br: %infolumosAdjust% / Ctr: %infoGammosAdjust% / dS: %infoSatAdjust%
    }
 
    Menu, PVview, Add,
@@ -4833,11 +4887,17 @@ BuildMenu() {
 
    Menu, PVopenF, Add, 
    If (StrLen(prevFileSavePath)>3 && FileExist(prevFileSavePath))
-      Menu, PVopenF, Add, % "O1. " SubStr(prevFileSavePath, -30), OpenRecentEntry
-   If (StrLen(prevFileMovePath)>3 && FileExist(prevFileMovePath))
-      Menu, PVopenF, Add, % "O2. " SubStr(prevFileMovePath, -30), OpenRecentEntry
-   If (StrLen(prevOpenFolderPath)>3 && FileExist(prevOpenFolderPath))
-      Menu, PVopenF, Add, % "O3. " SubStr(prevOpenFolderPath, -30), OpenRecentEntry
+      aListu := prevFileSavePath "`n"
+   If (StrLen(prevFileMovePath)>3 && FileExist(prevFileMovePath) && !InStr(aListu, prevFileMovePath "`n"))
+      aListu .= prevFileMovePath "`n"
+   If (StrLen(prevOpenFolderPath)>3 && FileExist(prevOpenFolderPath) && !InStr(aListu, prevOpenFolderPath "`n"))
+      aListu .= prevOpenFolderPath "`n"
+   Loop, Parse, aListu, `n
+   {
+      If !A_LoopField
+         Continue
+      Menu, PVopenF, Add, % "O" A_Index ". " SubStr(A_LoopField, -30), OpenRecentEntry
+   }
 
    clippyTest := resultedFilesList[0]
    Menu, PVmenu, Add, &Open..., :PVopenF
@@ -4988,12 +5048,14 @@ ToggleTouchMode() {
 }
 
 defineWinTitlePrefix() {
+   Static FXmodesLabels := {2:"cP", 3:"cA", 4:"cG", 5:"cR", 6:"cG", 7:"cB", 8:"cI"}
+
    If StrLen(usrFilesFilteru)>1
       winPrefix .= "F "
 
    If (slideShowRunning=1)
    {
-      winPrefix .= "S"
+      winPrefix .= "s"
       If (SlideHowMode=1)
          winPrefix .= "R "
       Else If (SlideHowMode=2)
@@ -5007,12 +5069,8 @@ defineWinTitlePrefix() {
    If (FlipImgH=1)
       winPrefix .= "H "
 
-   If (imgFxMode=2)
-      winPrefix .= "G "
-   Else If (imgFxMode=3)
-      winPrefix .= "I "
-   Else If (imgFxMode=4 || imgFxMode=5)
-      winPrefix .= "A "
+   If FXmodesLabels.HasKey(imgFxMode)
+      winPrefix .= FXmodesLabels[imgFxMode] A_Space
 
    If (IMGresizingMode=3)
       winPrefix .= "O "
@@ -5023,7 +5081,147 @@ defineWinTitlePrefix() {
 }
 
 SetParentID(Window_ID, theOther) {
-  Return DllCall("SetParent", "uint", theOther, "uint", Window_ID) ; success = handle to previous parent, failure =null 
+  r := DllCall("SetParent", "uint", theOther, "uint", Window_ID) ; success = handle to previous parent, failure =null 
+  Return r
+}
+
+drawWelcomeImg(goAgain:=0) {
+    If (maxFilesIndex>0 || StrLen(CurrentSLD)>1 || AnyWindowOpen>0)
+       Return
+
+    If (A_TickCount - scriptStartTime>3000)
+    {
+       If (identifyThisWin()!=1)
+          Return
+    }
+
+    GetClientSize(mainWidth, mainHeight, PVhwnd)
+    hbm := CreateDIBSection(mainWidth, mainHeight)
+    hdc := CreateCompatibleDC()
+    obm := SelectObject(hdc, hbm)
+    G := Gdip_GraphicsFromHDC(hdc)
+    Gdip_SetInterpolationMode(G, 5)
+    Gdip_SetSmoothingMode(G, 5)
+    pPen1 := Gdip_BrushCreateSolid(0x33882211)
+    pPen3 := Gdip_BrushCreateSolid(0x33118822)
+    pPen2 := Gdip_BrushCreateSolid(0x33112288)
+    pPen4 := Gdip_BrushCreateSolid(0x77030201)
+    dummyPos := (A_OSVersion!="WIN_7") ? 1 : ""
+    Random, modelu, 1, 6
+    Random, iterations, 10, 30
+    If (modelu=1)
+    {
+       Loop, % iterations
+       {  
+          Random, xPos, 5, % mainWidth
+          Random, yPos, 5, % mainHeight
+          Random, w, 5, % mainWidth
+          Random, h, 5, % mainHeight
+          w += 10
+          h += 10
+          Random, pen, 1, 3
+          Gdip_FillRectangle(G, pPen%pen%, xPos, yPos, w, h)
+       }
+    } Else If (modelu=2)
+    {
+       Loop, % iterations
+       {  
+          Random, xPos, 5, % mainWidth
+          Random, yPos, 5, % mainHeight
+          Random, w, 5, % mainWidth//2 + mainHeight//2
+          w += 5
+          h := w
+          Random, pen, 1, 3
+          Gdip_FillEllipse(G, pPen%pen%, xPos, yPos, w, h)
+       }
+    } Else If (modelu=3 || modelu=5)
+    {
+       Random, moduz, 1, 9
+       Loop, % iterations
+       {  
+          Random, w, 5, % mainWidth//1.5 + mainHeight//1.5
+          w += 5
+          h := w
+          Random, deviation, -25, 25
+          If (modelu=5)
+             Random, moduz, 1, 9
+
+          If (moduz=1)
+          {
+             xPos := mainWidth//2 - w//2 + deviation
+             yPos := mainHeight//2 - h//2 + deviation
+          } Else If (moduz=2)
+          {
+             xPos := 1 - w//2 + deviation
+             yPos := mainHeight//2 - h//2 + deviation
+          } Else If (moduz=3)
+          {
+             xPos := 1 - w//2 + deviation
+             yPos := 1 - h//2 + deviation
+          } Else If (moduz=4)
+          {
+             xPos := mainWidth//2 - w//2 + deviation
+             yPos := 1 - h//2 + deviation
+          } Else If (moduz=5)
+          {
+             xPos := mainWidth - w//2 + deviation
+             yPos := 1 - h//2 + deviation
+          } Else If (moduz=6)
+          {
+             xPos := mainWidth - w//2 + deviation
+             yPos := mainHeight - h//2 + deviation
+          } Else If (moduz=7)
+          {
+             xPos := mainWidth//2 - w//2 + deviation
+             yPos := mainHeight - h//2 + deviation
+          } Else If (moduz=8)
+          {
+             xPos := mainWidth - w//2 + deviation
+             yPos := mainHeight//2 - h//2 + deviation
+          } Else
+          {
+             xPos := 1 - w//2 + deviation
+             yPos := mainHeight - h//2 + deviation
+          }
+          Random, pen, 1, 3
+          Gdip_FillEllipse(G, pPen%pen%, xPos, yPos, w, h)
+       }
+    } Else If (modelu=4)
+    {
+       Loop, % iterations
+       {  
+          Random, xPos, 5, % mainWidth
+          y := 0
+          Random, w, 5, % mainWidth//2
+          w += 5
+          h := mainHeight
+          Random, pen, 1, 3
+          Gdip_FillRectangle(G, pPen%pen%, xPos, yPos, w, h)
+       }
+    } Else ; If (modelu=6)
+    {
+       Loop, % iterations
+       {  
+          x := 0
+          Random, yPos, 5, % mainHeight
+          w := mainWidth
+          Random, h, 5, % mainHeight//2
+          h += 5
+          Random, pen, 1, 3
+          Gdip_FillRectangle(G, pPen%pen%, xPos, yPos, w, h)
+       }
+    }
+    Gdip_FillRectangle(G, pPen4, 0, 0, mainWidth, mainHeight)
+    r2 := UpdateLayeredWindow(hGDIwin, hdc, dummyPos, dummyPos, mainWidth, mainHeight)
+    SelectObject(hdc, obm)
+    DeleteObject(hbm)
+    DeleteDC(hdc)
+    Gdip_DeleteGraphics(G)
+    Gdip_DeleteBrush(pPen1)
+    Gdip_DeleteBrush(pPen2)
+    Gdip_DeleteBrush(pPen3)
+    Gdip_DeleteBrush(pPen4)
+    SetTimer, drawWelcomeImg, -3000
 }
 
 BuildGUI() {
@@ -5043,6 +5241,8 @@ BuildGUI() {
    Sleep, 2
    createGDIwin()
    updateUIctrl()
+   Sleep, 1
+   drawWelcomeImg("yay")
 }
 
 updateUIctrl() {
@@ -5386,73 +5586,33 @@ CloneMainBMP(imgpath, ByRef width, ByRef height, ByRef CountFrames) {
   Gdip_DrawImage(G3, oBitmap, 0, 0, Width, Height, 0, 0, Width, Height)
   Gdip_DeleteGraphics(G3)
   Gdip_DisposeImage(oBitmap)
-  If (CountFrames=0 && imgFxMode=5)
+  If (CountFrames=0 && imgFxMode=3)
      AdaptiveImgLight(gdiBitmap, imgpath, Width, Height)
 }
 
 AdaptiveImgLight(whichImg, imgpath, Width, Height) {
-   Static matrix := "0.299|0.299|0.299|0|0|0.587|0.587|0.587|0|0|0.114|0.114|0.114|0|0|0|0|0|1|0|0|0|0|0|1"
-   MD5name := generateThumbName(imgpath, 1)
-   IniRead, valuez, % thumbsCacheFolder "\colorsinfo.ini", AutoLevels, % MD5name, @
-   If (InStr(valuez, "||") && valuez!="@" && StrLen(valuez)>4)
-   {
-      valu := StrSplit(valuez, "||")
-      lumosAdjust := Trim(valu[1])
-      GammosAdjust := Trim(valu[2])
-      Return
-   }
-
-   brLvlArray := []
-   tempBrLvlArray := []
+   brLvlArray := [], ArrChR := [], ArrChG := [], ArrChB := []
    startZeit := A_TickCount
-   calcImgSize(1, Width, Height, 500, 500, ResizedW, ResizedH)
-   thumbBMP := Gdip_CreateBitmap(ResizedW, ResizedH)
-   G3 := Gdip_GraphicsFromImage(thumbBMP)
-   Gdip_SetInterpolationMode(G3, 7)
- 
-   minBrLvl := 256
-   pX := pY := lumosAdjust := 1
-   maxBrLvl := sumTotal := countTotalPixelz := thisBrLvl := 0
+   rMinBrLvl := minBrLvl := 256
+   rgbMaxBrLvl := modePointV := lumosAdjust := 1
+   maxBrLvl := sumTotalBr := countTotalPixelz := thisBrLvl := 0
    GammosAdjust := countBrightPixelz := countMidPixelz := countDarkPixelz := 0
-   Gdip_DrawImage(G3, whichImg, 0, 0, ResizedW, ResizedH, 0, 0, Width, Height, matrix)
+   If (Width=1 && Height=1)
+      Gdip_GetImageDimensions(whichImg, Width, Height)
 
-   Loop, % ResizedW*ResizedH + 1
-   {
-       pX++
-       If (pX>ResizedW)
-       {
-          pY++
-          pX := 1
-       }
-       If (pY>ResizedH)
-          Break
+   xCrop := Width//11
+   yCrop := Height//11
+   wCrop := Width - xCrop*2 + 1
+   hCrop := Height - yCrop*2 + 1
+   cropBmp := Gdip_CloneBitmapArea(whichImg, xCrop, yCrop, wCrop, hCrop)
+  ; Gu := Gdip_GraphicsFromImage(cropBmp)
+   Gdip_GetHisto(cropBmp, 3, brLvlArray, 0, 0)
+   Gdip_GetHisto(cropBmp, 2, ArrChR, ArrChG, ArrChB)
+   rTotalPixelz := Width*Height
+   TotalPixelz := wCrop*hCrop
+   minMaxThreshold := Floor(rTotalPixelz*0.000015) + 1
 
-       ARGBhex := Gdip_GetPixel(thumbBMP, pX, pY)
-       If (!ARGBhex || ARGBhex="0x0" || ARGBhex=0)
-          Continue
-
-       countTotalPixelz++
-       counter%ARGBhex%++
-       tempBrLvlArray[ARGBhex] := counter%ARGBhex%
-;       Sleep, 2
- ;      ToolTip, % tempBrLvlArray[ARGBhex] "--"
-   }
-
-   If (countTotalPixelz<(ResizedW*ResizedH)/1.5)
-   {
-      lumosAdjust := 1
-      GammosAdjust := 0
-      Return
-   }
-
-   For k, v in tempBrLvlArray
-   {
-       countLoops++
-       thisBrLvl := colorHEX2RGB(k)
-       ; Sleep, 50
-       ; ToolTip, % "--- " k " --- " v " --- " thisBrLvl
-       BrLvlArray[thisBrLvl] := v
-   }
+; gather image histogram statistics
 
    Loop, 256
    {
@@ -5461,67 +5621,237 @@ AdaptiveImgLight(whichImg, imgpath, Width, Height) {
        If !nrPixelz
           Continue
 
-       sumTotal += nrPixelz * thisIndex
-       If (thisIndex>maxBrLvl && nrPixelz>12)
+       sumTotalBr += nrPixelz * thisIndex
+       If (nrPixelz>modePointV)
+       {
+          modePointV := nrPixelz
+          modePointK := thisIndex
+       }
+
+       If (thisIndex>maxBrLvl && nrPixelz>minMaxThreshold)
           maxBrLvl := thisIndex
-       
-       If (thisIndex<minBrLvl && nrPixelz>12)
+
+       If (thisIndex<minBrLvl && nrPixelz>minMaxThreshold)
           minBrLvl := thisIndex
 
-       If (thisIndex<40)
+       If (thisIndex<rMinBrLvl && nrPixelz>2)
+          rMinBrLvl := thisIndex
+
+       If (valueBetween(thisIndex, 4, 40))
           countDarkPixelz += nrPixelz
-       Else If (thisIndex>170)
+       Else If (valueBetween(thisIndex, 170, 253))
           countBrightPixelz += nrPixelz
        Else If (valueBetween(thisIndex, 50, 165))
           countMidPixelz += nrPixelz
    }
 
-   avgBrLvl := Round(sumTotal/countTotalPixelz)
-   Loop, 22
+   avgBrLvl := Round(sumTotalBr/TotalPixelz)
+   Loop, 23
    {
        nrPixelz := brLvlArray[avgBrLvl - 11 + A_Index]
        If nrPixelz
           countFlatties += nrPixelz
    }
-   percBrgPx := (countBrightPixelz/countTotalPixelz) * 100
-   percDrkPx := Round((countDarkPixelz/countTotalPixelz) * 100)
-   percMidPixu := Round((countMidPixelz/countTotalPixelz) * 100)
-   percMidPx := Round(100 - percBrgPx - percDrkPx)
-   percAvgPx := Round((countFlatties/countTotalPixelz) * 100)
 
-   multiplieru := 256/maxBrLvl
-   multiplieru := multiplieru + (256 - (avgBrLvl + maxBrLvl)/1.5)/450
-   If (multiplieru<1)
-      multiplieru := 1
+   Loop, 11
+   {
+       nrPixelz := brLvlArray[modePointK - 6 + A_Index]
+       If nrPixelz
+          countModies += nrPixelz
+   }
+
+   aMinBrLvl := (rMinBrLvl + minBrLvl)//2
+   Loop, 10
+   {
+       nrPixelz := brLvlArray[aMinBrLvl + A_Index]
+       If nrPixelz
+          countLowestPx += nrPixelz
+   }
+   percmodePx := Round((countModies/TotalPixelz)*100, 4)
+   percBrgPx := Round((countBrightPixelz/TotalPixelz) * 100, 4)
+   percLowPx := Round((countLowestPx/TotalPixelz) * 100, 4)
+   percDrkPx := Round((countDarkPixelz/TotalPixelz) * 100, 4)
+   percMidPixu := Round((countMidPixelz/TotalPixelz) * 100, 4)
+   oPercAvgPx := Round((countFlatties/TotalPixelz) * 100, 4)
+   If (percmodePx<=0.00015)
+      percmodePx += 0.000156
+   If (percMidPixu<=0.00015)
+      percMidPixu += 0.000156
+   If (percBrgPx<=0.00025)
+      percBrgPx += 0.000256
+   If (percDrkPx<=0.001)
+      percDrkPx += 0.01512
+   percAvgPx := Round((oPercAvgPx + percmodePx + percMidPixu)/3, 4)
+   percMidPx := 100 - percBrgPx - percDrkPx
+   If (percMidPx<=0.00025)
+      percMidPx += 0.000256
+
+   Gdip_DisposeImage(cropBmp)
+
+; make the image brighter if max. luminance [maxBrLvl] is less than 255
+
+   multiplieruA := 255.1/maxBrLvl + (percDrkPx + (255.1 - avgBrLvl)/3 + (255.1 - (modePointK+avgBrLvl)/2)/3)/(500 + maxBrLvl*2 + avgBrLvl*10)
+   If (percBrgPx>1.25)
+      multiplieruA := multiplieruA - Round(percMidPx/450, 4)
+
+   multiplieruB := 255.1/maxBrLvl + (percDrkPx/8 + (255.1 - avgBrLvl)/15 + (255.1 - modePointK)/10)/50 - percBrgPx/25 - ((percMidPixu + percMidPx)/2)/40
+   multiplieru := (multiplieruA + multiplieruB)/2
+
+   If (multiplieru<=1)
+      multiplieru := 1.0002
+   If (multiplieru<=1.15)
+   {
+      multiplieruC := 255.1/maxBrLvl + (percDrkPx + (255.1 - avgBrLvl)/3 + (255.1 - (modePointK+avgBrLvl)/2)/3)/(500 + maxBrLvl*2 + avgBrLvl*10)
+      If (percBrgPx>1.25)
+         multiplieruC := multiplieruC - Round(percMidPx/450, 4)
+      multiplieru := multiplieruC/1.25
+      If (multiplieru<=1)
+         multiplieru := 1.0002
+   }
 
    lumosAdjust := multiplieru
-   GammosAdjust := - lumosAdjust/40 + 0.025
-   If (percBrgPx>25)
-   {
-      darkerOffset := (minBrLvl/multiplieru)/250 + avgBrLvl/(600 - avgBrLvl/10)
-      darkerOffset := darkerOffset/(percDrkPx + 1)
-   } Else If (percBrgPx>1.2)
-   {
-      darkerOffset := minBrLvl/350
-   } Else darkerOffset := minBrLvl/500
+   GammosAdjust := - lumosAdjust/40 + 0.025 + ((percDrkPx + percAvgPx)/(900 + percBrgPx*100 + avgBrLvl*2))/3.25
 
-   lumosAdjust := lumosAdjust + darkerOffset/1.2
-   GammosAdjust := GammosAdjust - darkerOffset/1.2
-   resultu := A_TickCount - startZeit
-;   ToolTip, % resultu " -- " minBrLvl "," maxBrLvl ", A=" avgBrLvl ", L=" percBrgPx "%, D=" percDrkPx "%, M=" percMidPx "%//" percMidPixu "%, avgz=" percAvgPx "%, cL=" lumosAdjust ", cG=" GammosAdjust,,, 2
-   Gdip_DeleteGraphics(G3)
-   Gdip_DisposeImage(thumbBMP)
-   IniWrite, %lumosAdjust%||%GammosAdjust%, % thumbsCacheFolder "\colorsinfo.ini", AutoLevels, % MD5name
+; make the image darker when lacking contrast or min. luminance level [minBrLvl] is higher than 1
+   darkerOffsetA := rMinBrLvl*multiplieru
+   darkerOffsetA := (darkerOffsetA - 3)/105
+   darkerOffsetB := (aMinBrLvl/multiplieru/(200 - percBrgPx/4) + percBrgPx/percDrkPx/avgBrLvl/300)/1.5
+   darkerOffsetC := (minBrLvl/multiplieru)/250 + avgBrLvl/(600 - avgBrLvl/10)
+   darkerOffset := (darkerOffsetA + darkerOffsetB)/2 - percLowPx/700
+   testGammosAdjust := GammosAdjust - darkerOffset/1.1
+   If (testGammosAdjust>-0.02 && aMinBrLvl>3)
+      darkerOffset := darkerOffsetC/1.5
+   If (darkerOffset<=0)
+      darkerOffset := 0.00001
+
+   lumosAdjust := lumosAdjust + darkerOffset
+   GammosAdjust := GammosAdjust - darkerOffset/1.1
+
+   If (autoAdjustMode=2)
+   {
+      lumosAdjust := multiplieru := 255.1/maxBrLvl
+      GammosAdjust := - lumosAdjust/40 + 0.025
+   } Else If (autoAdjustMode=3)
+   {
+      darkerOffset := rMinBrLvl/255
+      lumosAdjust := 1 + darkerOffset*1.1
+      GammosAdjust := 0 - darkerOffset*1.3
+   }
+
+; adjust saturation
+   If (doSatAdjusts=1)
+   {
+      Loop, 256
+      {
+          thisIndex := A_Index
+          nrPixR := ArrChR[thisIndex]
+          nrPixG := ArrChG[thisIndex]
+          nrPixB := ArrChB[thisIndex]
+          If (nrPixR="" || nrPixG="" || nrPixB="")
+             Continue
+ 
+          sumTotalR += nrPixR * thisIndex
+          sumTotalG += nrPixG * thisIndex
+          sumTotalB += nrPixB * thisIndex
+          If (thisIndex>rgbMaxBrLvl && nrPixelz>minMaxThreshold)
+             rgbMaxBrLvl := thisIndex
+          BrLvlDifs := maxU(NrPixR, NrPixG, NrPixB) - minU(NrPixR, NrPixG, NrPixB)
+          If (BrLvlDifs<minMaxThreshold*2) || (nrPixR+nrPixB+nrPixB<minMaxThreshold*3)
+             Continue
+          tNrPixR += nrPixR
+          tNrPixG += nrPixG
+          tNrPixB += nrPixB
+          tNrPixAll += maxU(NrPixR, NrPixG, NrPixB)
+          AllBrLvlDifs += BrLvlDifs
+      }
+   }
+   BrLvlDiffX := maxU(tNrPixR, tNrPixG, tNrPixB) - minU(tNrPixR, tNrPixG, tNrPixB)
+   PrcLvlDiffX := Round((BrLvlDiffX/tNrPixAll)*100, 4)
+   PrcLvlDiffXa := Round((AllBrLvlDifs/tNrPixAll)*100, 4)
+
+   v1a := ArrChR[maxBrLvl]
+   v2a := ArrChG[maxBrLvl]
+   v3a := ArrChB[maxBrLvl]
+   v1b := ArrChR[maxBrLvl - 1]
+   v2b := ArrChG[maxBrLvl - 1]
+   v3b := ArrChB[maxBrLvl - 1]
+   v1e := ArrChR[modePointK]
+   v2e := ArrChG[modePointK]
+   v3e := ArrChB[modePointK]
+   ; hmmu := maxU(v1a, v2a, v3a) " -- " minU(v1a, v2a, v3a) " -- " v1a "," v2a "," v3a
+
+   BrLvlDiffA := maxU(v1a, v2a, v3a) - minU(v1a, v2a, v3a)
+   BrLvlDiffB := maxU(v1b, v2b, v3b) - minU(v1b, v2b, v3b)
+   BrLvlDiffE := maxU(v1e, v2e, v3e) - minU(v1e, v2e, v3e)
+   PrcLvlDiffA := Round((BrLvlDiffA/maxU(v1a, v2a, v3a))*100, 4)
+   PrcLvlDiffB := Round((BrLvlDiffB/maxU(v1b, v2b, v3b))*100, 4)
+   PrcLvlDiffE := Round((BrLvlDiffE/maxU(v1e, v2e, v3e))*100, 4)
+   avgLvlsDiff := (PrcLvlDiffA + PrcLvlDiffB + PrcLvlDiffE)/3
+
+   satAdjust := 1
+   satLevel := (lumosAdjust - GammosAdjust - 1)/15 - percDrkPx/50
+   If (satLevel<0)
+      satLevel := 0
+   satAdjust := 1 - satLevel
+   If (satAdjust<0.5)
+      satAdjust := 0.5
+   Else If (PrcLvlDiffX>0.5)
+      satAdjust := satAdjust - PrcLvlDiffX/50 + 0.02
+
+   If (PrcLvlDiffX<0.2)
+   {
+      PrcLvlDiffX := Round((3*BrLvlDiffX/TotalPixelz)*100, 4)
+      satAdjust := satAdjust + PrcLvlDiffX/40 + 0.02
+   }
+
+   If (avgLvlsDiff>95)
+      satAdjust := satAdjust - (avgLvlsDiff - 95)/100 + 0.02
+   Else If (avgLvlsDiff<20)
+      satAdjust := satAdjust + (20 - avgLvlsDiff)/100
+
+   If (PrcLvlDiffXa>50)
+      satAdjust -= PrcLvlDiffXa/1000
+   Else
+      satAdjust += PrcLvlDiffXa/700
+
+   avgBrLvlR := Round(sumTotalR/TotalPixelz)
+   avgBrLvlG := Round(sumTotalG/TotalPixelz)
+   avgBrLvlB := Round(sumTotalB/TotalPixelz)
+   chnlDiffs := maxU(avgBrLvlR, avgBrLvlG, avgBrLvlB) - minU(avgBrLvlR, avgBrLvlG, avgBrLvlB)
+   chnlDiffs := Round((chnlDiffs/maxBrLvl)*100, 4)
+   If (avgBrLvlR>250 || avgBrLvlG>250 || avgBrLvlB>250) && (avgBrLvlR!=avgBrLvlB || avgBrLvlR!=avgBrLvlG ||  avgBrLvlB!=avgBrLvlG)
+      satAdjust -= 0.05
+
+   If (satAdjust<0.86)
+      satAdjust += percDrkPx/800
+   If (satAdjust<0.70)
+      satAdjust := 0.70
+
+   If (satAdjust>0.8 && chnlDiffs>=20)
+      satAdjust -= chnlDiffs>50 ? chnlDiffs/825 : chnlDiffs/950
+   Else If (chnlDiffs<11)
+      satAdjust += (100 - chnlDiffs)/950
+
+   If (doSatAdjusts!=1)
+      satAdjust := 1
+
+   execTime := A_TickCount - startZeit
+;   ToolTip, % "avgRGB=" avgBrLvlR ", " avgBrLvlG ", " avgBrLvlB ", ChnlDiff=" chnlDiffs  ", AvgLvlDif=" avgLvlsDiff " %, diffA=" PrcLvlDiffA " %, diffE=" PrcLvlDiffE " %, diffX=" PrcLvlDiffX "/" PrcLvlDiffXa "% `nTh=" minMaxThreshold ", min=" minBrLvl "/" rMinBrLvl ", max=" maxBrLvl ", A=" avgBrLvl ", mP=" modePointK " [" modePointV " / " percmodePx "% ]"  ",`nL=" percBrgPx "%, D=" percDrkPx "%, Dl=" percLowPx "%, Mr=" percMidPx "% / Mo=" percMidPixu "%, oAvg=" oPercAvgPx "%, fAvg=" percAvgPx "%`ncL=" lumosAdjust ", cG=" GammosAdjust ", cS=" satAdjust ", T=" execTime "ms",,, 2
 }
 
-colorHEX2RGB(ARGB) {
-  SetFormat, Integer, HEX
-  ARGB += 0
-  SetFormat, Integer, D
-  StringRight, tiny, ARGB, 2
-  cR := "0x" tiny
-  cR += 0
-  Return cR ; BrLvl
+
+minU(val1, val2, val3:="null") {
+  a := (val1<val2) ? val1 : val2
+  If (val3!="null")
+     a := (a<val3) ? a : val3
+  Return a
+}
+
+maxU(val1, val2, val3:="null") {
+  a := (val1>val2) ? val1 : val2
+  If (val3!="null")
+     a := (a>val3) ? a : val3
+  Return a
 }
 
 CloneResizerBMP(imgpath, IDwhichImg, whichImg, newW, newH) {
@@ -5597,30 +5927,113 @@ generateThumbName(imgpath, forceThis:=0) {
    Return MD5name
 }
 
-getColorMatrix()  {
+getColorMatrix() {
+; infos from http://www.graficaobscura.com/matrix/index.html
+    Static NTSCr := 0.300, NTSCg := 0.587, NTSCb := 0.115
     matrix := ""
-    If (imgFxMode=2)       ; grayscale
+    If (ForceNoColorMatrix=1 && AnyWindowOpen=10)
+       Return matrix
+
+    If (imgFxMode=4)       ; grayscale
     {
-       Ra := 0.300 + lumosGrayAdjust
-       Ga := 0.585 + lumosGrayAdjust
-       Ba := 0.115 + lumosGrayAdjust
+       LGA := (lumosGrayAdjust<=1) ? lumosGrayAdjust/1.5 - 0.6666 : lumosGrayAdjust - 1
+       Ra := NTSCr + LGA
+       If (Ra<0)
+          Ra := 0
+       Ga := NTSCg + LGA
+       If (Ga<0)
+          Ga := 0
+       Ba := NTSCb + LGA
+       If (Ba<0)
+          Ba := 0
        matrix := Ra "|" Ra "|" Ra "|0|0|" Ga "|" Ga "|" Ga "|0|0|" Ba "|" Ba "|" Ba "|0|0|0|0|0|1|0|" GammosGrayAdjust "|" GammosGrayAdjust "|" GammosGrayAdjust "|0|1"
-    } Else If (imgFxMode=3)  ; negative / invert
+    } Else If (imgFxMode=5)       ; grayscale R
+    {
+       Ga := 0, Ba := 0, GGA := 0
+       Ra := 1
+       matrix := Ra "|" Ra "|" Ra "|0|0|" Ga "|" Ga "|" Ga "|0|0|" Ba "|" Ba "|" Ba "|0|0|0|0|0|1|0|" GGA+0.01 "|" GGA "|" GGA "|0|1"
+    } Else If (imgFxMode=6)       ; grayscale G
+    {
+       Ra := 0, Ba := 0, GGA := 0
+       Ga := 1
+       matrix := Ra "|" Ra "|" Ra "|0|0|" Ga "|" Ga "|" Ga "|0|0|" Ba "|" Ba "|" Ba "|0|0|0|0|0|1|0|" GGA "|" GGA+0.01 "|" GGA "|0|1"
+    } Else If (imgFxMode=7)       ; grayscale B
+    {
+       Ra := 0, Ga := 0, GGA := 0
+       Ba := 1
+       matrix := Ra "|" Ra "|" Ra "|0|0|" Ga "|" Ga "|" Ga "|0|0|" Ba "|" Ba "|" Ba "|0|0|0|0|0|1|0|" GGA "|" GGA "|" GGA+0.01 "|0|1"
+    } Else If (imgFxMode=8)  ; negative / invert
     {
        matrix := "-1|0|0|0|0|0|-1|0|0|0|0|0|-1|0|0|0|0|0|1|0|1|1|1|0|1"
-    } Else If (imgFxMode=4 || imgFxMode=5) && (lumosAdjust!=1 || GammosAdjust!=0)
+    } Else If (imgFxMode=2 || imgFxMode=3) ; && (lumosAdjust!=1 || GammosAdjust!=0)
     {
-       ; matrix adjusted for lisibility
-       B := lumosAdjust
        G := GammosAdjust
-       F := 0
-       matrix =  %B%|%F%|%F%|0|0
-                |%F%|%B%|%F%|0|0
-                |%F%|%F%|%B%|0|0
-                |0  |0  |0  |1|0
-                |%G%|%G%|%G%|0|1
-       matrix := StrReplace(matrix, A_Space)
-;       matrix := lumosAdjust "|0|0|0|0|0|" lumosAdjust "|0|0|0|0|0|" lumosAdjust "|0|0|0|0|0|1|0|" GammosAdjust "|" GammosAdjust "|" GammosAdjust "|0|1"
+       sL := satAdjust
+       sLi := 1 - satAdjust
+       bLa := lumosAdjust - 1
+       bL := lumosAdjust
+       If (sL>1)
+       {
+          z := (bL<1) ? bL : 1
+          sL := sL*z
+          If (sL<0.98)
+             sL := 0.98
+
+          y := z*(1 - sL)
+          mA := z*(y*NTSCr + sL + bLa + chnRdecalage)
+          mB := z*(y*NTSCr)
+          mC := z*(y*NTSCr)
+          mD := z*(y*NTSCg)
+          mE := z*(y*NTSCg + sL + bLa + chnGdecalage)
+          mF := z*(y*NTSCg)
+          mG := z*(y*NTSCb)
+          mH := z*(y*NTSCb)
+          mI := z*(y*NTSCb + sL + bLa + chnBdecalage)
+          mtrx = %mA%|%mB%|%mC%|0|0
+                |%mD%|%mE%|%mF%|0|0
+                |%mG%|%mH%|%mI%|0|0
+                |0   |0   |0   |1|0
+                |%G% |%G% |%G% |0|1
+       } Else
+       {
+          z := (bL<1) ? bL : 1
+          tR := NTSCr - 0.5 + bL/2
+          tG := NTSCg - 0.5 + bL/2
+          tB := NTSCb - 0.5 + bL/2
+          rB := z*(tR*sLi+bL*(1 - sLi) + chnRdecalage)
+          gB := z*(tG*sLi+bL*(1 - sLi) + chnGdecalage)
+          bB := z*(tB*sLi+bL*(1 - sLi) + chnBdecalage)     ; Formula used: A*w + B*(1 – w)
+          rF := z*(NTSCr*sLi + (bL/2 - 0.5)*sLi)
+          gF := z*(NTSCg*sLi + (bL/2 - 0.5)*sLi)
+          bF := z*(NTSCb*sLi + (bL/2 - 0.5)*sLi)
+
+          rB := rB*z+rF*(1 - z)
+          gB := gB*z+gF*(1 - z)
+          bB := bB*z+bF*(1 - z)     ; Formula used: A*w + B*(1 – w)
+          If (rB<0)
+             rB := 0
+          If (gB<0)
+             gB := 0
+          If (bB<0)
+             bB := 0
+          If (rF<0)
+             rF := 0
+ 
+          If (gF<0)
+             gF := 0
+ 
+          If (bF<0)
+             bF := 0
+
+          ; ToolTip, % rB " - " rF " --- " gB " - " gF
+          mtrx = %rB%|%rF%|%rF%|0|0
+                |%gF%|%gB%|%gF%|0|0
+                |%bF%|%bF%|%bB%|0|0
+                |0   |0   |0   |1|0
+                |%G% |%G% |%G% |0|1
+          ; matrix adjusted for lisibility
+       }
+       matrix := StrReplace(mtrx, A_Space)
     }
     Return matrix
 }
@@ -5662,9 +6075,9 @@ Gdip_ShowImgonGui(imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, us
        If (cachedImgFile=1)
        {
           whichImg := Gdip_CreateBitmapFromFile(file2save)
-          If (imgFxMode=5)
+          If (imgFxMode=3)
           {
-             AdaptiveImgLight(whichImg, imgpath, imgW, imgH)
+             AdaptiveImgLight(whichImg, imgpath, 1, 1)
              matrix := getColorMatrix()
           }
        }
@@ -5918,9 +6331,8 @@ Gdip_ShowThumbnails(startIndex) {
 
     prevFullThumbsUpdate := A_TickCount
     mainStartZeit := A_TickCount
-    matrix := getColorMatrix()
-    If (imgFxMode=5)
-       matrix := ""
+    If (imgFxMode!=3)
+       matrix := getColorMatrix()
 
     thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, ignoreVaru, mainWidth, mainHeight)
     hbm := CreateDIBSection(mainWidth, mainHeight)
@@ -6653,7 +7065,7 @@ coreResizeIMG(imgpath, newW, newH, file2save, goFX, toClippy, rotateMode) {
            Gdip_TranslateWorldTransform(G2, 0, -newH)
         }
 
-        If (imgFxMode=5)
+        If (imgFxMode=3)
            AdaptiveImgLight(oBitmap, imgpath, imgW, imgH)
         matrix := getColorMatrix()
     }
@@ -6671,13 +7083,7 @@ coreResizeIMG(imgpath, newW, newH, file2save, goFX, toClippy, rotateMode) {
 }
 
 AboutWindow() {
-    CloseWindow()
-    AnyWindowOpen := 1
-    Gui, SettingsGUIA: Destroy
-    Sleep, 15
-    Gui, SettingsGUIA: Default
-    Gui, SettingsGUIA: -MaximizeBox -MinimizeBox hwndhSetWinGui
-    Gui, SettingsGUIA: Margin, 15, 15
+    createSettingsGUI(1)
     btnWid := 100
     txtWid := 360
     Gui, Font, s19 Bold, Arial, -wrap
@@ -6703,13 +7109,298 @@ AboutWindow() {
     Gui, SettingsGUIA: Show, AutoSize, About %appTitle% v%Version%
 }
 
+BtnChangeSatPlus() {
+  ChangeSaturation(1)
+  updatePanelColorsInfo()
+  updatePanelColorSliderz()
+}
+
+BtnChangeSatMin() {
+  ChangeSaturation(-1)
+  updatePanelColorsInfo()
+  updatePanelColorSliderz()
+}
+
+BtnChangeLumPlus() {
+  ChangeLumos(1)
+  updatePanelColorsInfo()
+  updatePanelColorSliderz()
+}
+
+BtnChangeLumMin() {
+  ChangeLumos(-1)
+  updatePanelColorsInfo()
+  updatePanelColorSliderz()
+}
+
+BtnChangeGammPlus() {
+  ChangeGammos(1)
+  updatePanelColorsInfo()
+  updatePanelColorSliderz()
+}
+
+BtnChangeGammMin() {
+  ChangeGammos(-1)
+  updatePanelColorsInfo()
+  updatePanelColorSliderz()
+}
+
+ColorsAdjusterPanelWindow() {
+    Global sliderBright, sliderContrst, sliderSatu, realTimePreview, CustomZoomCB
+         , infoBright, infoContrst, infoSatu, BtnLumPlus, BtnLumMin, BtnFlipH
+         , BtnGammPlus, BtnGammMin, BtnSatPlus, BtnSatMin, ResizeModeDL, BtnFlipV
+         , infoRGBchnls, RGBcbList := "-3.0|-2.0|-1.5|-1.0|-0.9|-0.8|-0.7|-0.6|-0.5|-0.4|-0.3|-0.2|-0.1|0.0|0.1|0.2|0.3|0.4|0.5|0.6|0.7|0.8|0.9|1.0|1.5|2.0|3.0"
+
+    createSettingsGUI(10)
+    ForceNoColorMatrix := 0
+    imgQuality := 5
+    btnWid := 100
+    txtWid := slideWid := 280
+
+    If (PrefsLargeFonts=1)
+    {
+       slideWid := slideWid + 135
+       btnWid := btnWid + 70
+       txtWid := txtWid + 135
+       Gui, Font, s%LargeUIfontValue%
+    }
+
+    thisZL := Round(zoomLevel*100) "%"
+    Gui, Add, DropDownList, x15 y15 Section w%txtWid% gColorPanelTriggerImageUpdate AltSubmit Choose%IMGresizingMode% vIMGresizingMode, Adapt all images into view|Adapt only large images|Original resolution (100`%)|Custom zoom level
+    Gui, Add, ComboBox, x+1 w90 Center gColorPanelTriggerImageUpdate vCustomZoomCB, 10`%|25`%|50`%|75`%|125`%|150`%|200`%|300`%|500`%|%thisZL%||
+    Gui, Add, DropDownList, xs y+5 w%txtWid% gColorPanelTriggerImageUpdate AltSubmit Choose%imgFxMode% vimgFxMode, Original image colors|Personalized colors|Auto-adjusted colors|Grayscale|Red channel|Green channel|Blue channel
+    Gui, Add, Checkbox, x+1 hp w90 +0x1000 gColorPanelTriggerImageUpdate Checked%FlipImgV% vFlipImgV, Flip V
+    Gui, Add, DropDownList, xs y+5 w%txtWid% gColorPanelTriggerImageUpdate AltSubmit Choose%autoAdjustMode% vAutoAdjustMode, Adaptive mixed mode|Increase brightness|Increase contrast
+    Gui, Add, Checkbox, x+1 hp w90 +0x1000 gColorPanelTriggerImageUpdate Checked%FlipImgH% vFlipImgH, Flip H
+    Gui, Add, Checkbox, xs y+5 gColorPanelTriggerImageUpdate Checked%doSatAdjusts% vdoSatAdjusts, Auto-adjust image saturation level
+    Gui, Add, Text, y+15 w%txtWid% vinfoBright, Brightness: ----
+    Gui, Add, Slider, y+5 AltSubmit ToolTip NoTicks w%slideWid% gColorPanelTriggerImageUpdate vsliderBright Range-100-100, 1
+    Gui, Add, Button, x+1 hp w45 gBtnChangeLumPlus vBtnLumPlus, +
+    Gui, Add, Button, x+1 hp w45 gBtnChangeLumMin vBtnLumMin, -
+    Gui, Add, Text, xs y+8 w%txtWid% vinfoContrst, Contrast: ----
+    Gui, Add, Slider, y+5 AltSubmit ToolTip NoTicks w%slideWid% gColorPanelTriggerImageUpdate vsliderContrst Range-100-100, 1
+    Gui, Add, Button, x+1 hp w45 gBtnChangeGammPlus vBtnGammPlus, -
+    Gui, Add, Button, x+1 hp w45 gBtnChangeGammMin vBtnGammMin, +
+    Gui, Add, Text, xs y+8 w%txtWid% vinfoSatu, Saturation: ----
+    Gui, Add, Slider, y+5 AltSubmit ToolTip NoTicks w%slideWid% gColorPanelTriggerImageUpdate vsliderSatu Range-100-100, 1
+    Gui, Add, Button, x+1 hp w45 gBtnChangeSatPlus vBtnSatPlus, +
+    Gui, Add, Button, x+1 hp w45 gBtnChangeSatMin vBtnSatMin, -
+    ; Gui, Add, Checkbox, xs y+15 gColorPanelTriggerImageUpdate Checked%realTimePreview% vrealTimePreview, Update image in real time
+    Gui, Add, Text, xs y+15 vinfoRGBchnls, RGB channels balance:
+    Gui, Add, ComboBox, x+5 w65 gColorPanelTriggerImageUpdate vchnRdecalage, %RGBcbList%|%chnRdecalage%||
+    Gui, Add, ComboBox, x+5 wp gColorPanelTriggerImageUpdate vchnGdecalage, %RGBcbList%|%chnGdecalage%||
+    Gui, Add, ComboBox, x+5 wp gColorPanelTriggerImageUpdate vchnBdecalage, %RGBcbList%|%chnBdecalage%||
+
+    Gui, Add, Button, xs+0 y+20 h30 w35 gBtnPrevImg, <<
+    Gui, Add, Button, x+5 hp wp gBtnNextImg, >>
+    Gui, Add, Button, x+5 hp w%btnWid% gBtnResetImageView, &Reset image view
+    Gui, Add, Button, x+5 hp w%btnWid% gBtnSaveIMG, &Save image as
+    Gui, Add, Button, x+5 hp w80 gCloseWindow, C&lose
+    Gui, SettingsGUIA: Show, AutoSize, Adjust image view: %appTitle%
+
+    updatePanelColorsInfo()
+    updatePanelColorSliderz()
+}
+
+BtnSaveIMG() {
+   SaveClipboardImage("yay")
+}
+
+BtnNextImg() {
+  If (maxFilesIndex<2 || !maxFilesIndex)
+     Return
+
+  NextPicture()
+  If (imgFxMode=3)
+  {
+     updatePanelColorsInfo()
+     updatePanelColorSliderz()
+  }
+}
+
+BtnPrevImg() {
+  If (maxFilesIndex<2 || !maxFilesIndex)
+     Return
+
+  PreviousPicture()
+  If (imgFxMode=3)
+  {
+     updatePanelColorsInfo()
+     updatePanelColorSliderz()
+  }
+}
+
+updatePanelColorSliderz() {
+   If (imgFxMode=1 || imgFxMode=2 || imgFxMode=3)
+   {
+      infoSliderBright := (lumosAdjust>1) ? Floor((lumosAdjust - 1)/14*100) : - Floor((1 - lumosAdjust)*100)
+      infoSliderContrst := (GammosAdjust<0) ? Floor(Abs(GammosAdjust)/15*100) : - Floor((Abs(GammosAdjust))*100)
+      infoSliderSatu := (satAdjust>1) ? Floor((satAdjust - 1)/2*100) : - Floor((1 - satAdjust)*100)
+      GuiControl, SettingsGUIA:, sliderSatu, % infoSliderSatu 
+      GuiControl, SettingsGUIA:, sliderBright, % infoSliderBright
+      GuiControl, SettingsGUIA:, sliderContrst, % infoSliderContrst
+   } Else If (imgFxMode=4)
+   {
+      infoSliderBright := (lumosGrayAdjust>1) ? Floor((lumosGrayAdjust - 1)/14*100) :  - Floor((1 - lumosGrayAdjust)*100)
+      infoSliderContrst := (GammosGrayAdjust<0) ? Floor(Abs(GammosGrayAdjust)/15*100) : - Floor((Abs(GammosGrayAdjust))*100)
+      GuiControl, SettingsGUIA:, sliderBright, % infoSliderBright
+      GuiControl, SettingsGUIA:, sliderContrst, % infoSliderContrst
+      GuiControl, SettingsGUIA:, sliderSatu, 0
+   }
+}
+
+updatePanelColorsInfo() {
+   GuiControlGet, imgFxMode
+   GuiControlGet, IMGresizingMode
+   infolumosAdjust := (imgFxMode=4) ? Round(lumosGrayAdjust, 3) : Round(lumosAdjust, 3)
+   infoGammosAdjust := (imgFxMode=4) ? Round(GammosGrayAdjust, 3) : Round(GammosAdjust, 3)
+   infoSatAdjust := Round(satAdjust, 3)
+   GuiControl, SettingsGUIA:, infoBright, % "Brightness: " infolumosAdjust
+   GuiControl, SettingsGUIA:, infoContrst, % "Contrast: " infoGammosAdjust
+   GuiControl, SettingsGUIA:, infoSatu, % "Saturation: " infoSatAdjust
+   If (IMGresizingMode=4)
+      GuiControl, SettingsGUIA: Enable, CustomZoomCB
+   Else
+      GuiControl, SettingsGUIA: Disable, CustomZoomCB
+
+   If (imgFxMode=2)
+   {
+      GuiControl, SettingsGUIA: Enable, sliderSatu
+      GuiControl, SettingsGUIA: Enable, sliderBright
+      GuiControl, SettingsGUIA: Enable, sliderContrst
+      GuiControl, SettingsGUIA: Enable, BtnLumPlus
+      GuiControl, SettingsGUIA: Enable, BtnLumMin
+      GuiControl, SettingsGUIA: Enable, BtnGammPlus
+      GuiControl, SettingsGUIA: Enable, BtnGammMin
+      GuiControl, SettingsGUIA: Enable, BtnSatPlus
+      GuiControl, SettingsGUIA: Enable, BtnSatMin
+      GuiControl, SettingsGUIA: Enable, infoBright
+      GuiControl, SettingsGUIA: Enable, infoContrst
+      GuiControl, SettingsGUIA: Enable, infoSatu
+   } Else If (imgFxMode=4)
+   {
+      GuiControl, SettingsGUIA: Enable, infoBright
+      GuiControl, SettingsGUIA: Enable, infoContrst
+      GuiControl, SettingsGUIA: Disable, infoSatu
+      GuiControl, SettingsGUIA: Enable, sliderBright
+      GuiControl, SettingsGUIA: Enable, sliderContrst
+      GuiControl, SettingsGUIA: Disable, sliderSatu
+      GuiControl, SettingsGUIA: Enable, BtnLumPlus
+      GuiControl, SettingsGUIA: Enable, BtnLumMin
+      GuiControl, SettingsGUIA: Enable, BtnGammPlus
+      GuiControl, SettingsGUIA: Enable, BtnGammMin
+      GuiControl, SettingsGUIA: Disable, BtnSatPlus
+      GuiControl, SettingsGUIA: Disable, BtnSatMin
+   } Else
+   {
+      GuiControl, SettingsGUIA: Disable, infoBright
+      GuiControl, SettingsGUIA: Disable, infoContrst
+      GuiControl, SettingsGUIA: Disable, infoSatu
+      GuiControl, SettingsGUIA: Disable, BtnLumPlus
+      GuiControl, SettingsGUIA: Disable, BtnLumMin
+      GuiControl, SettingsGUIA: Disable, BtnGammPlus
+      GuiControl, SettingsGUIA: Disable, BtnGammMin
+      GuiControl, SettingsGUIA: Disable, BtnSatPlus
+      GuiControl, SettingsGUIA: Disable, BtnSatMin
+      GuiControl, SettingsGUIA: Disable, sliderSatu
+      GuiControl, SettingsGUIA: Disable, sliderBright
+      GuiControl, SettingsGUIA: Disable, sliderContrst
+   }
+
+   If (imgFxMode=2 || imgFxMode=3)
+   {
+      GuiControl, SettingsGUIA: Enable, infoRGBchnls
+      GuiControl, SettingsGUIA: Enable, chnRdecalage
+      GuiControl, SettingsGUIA: Enable, chnGdecalage
+      GuiControl, SettingsGUIA: Enable, chnBdecalage
+   } Else
+   {
+      GuiControl, SettingsGUIA: Disable, infoRGBchnls
+      GuiControl, SettingsGUIA: Disable, chnRdecalage
+      GuiControl, SettingsGUIA: Disable, chnGdecalage
+      GuiControl, SettingsGUIA: Disable, chnBdecalage
+   }
+   If (imgFxMode=3)
+   {
+      GuiControl, SettingsGUIA: Enable, autoAdjustMode
+      GuiControl, SettingsGUIA: Enable, doSatAdjusts
+   } Else
+   {
+      GuiControl, SettingsGUIA: Disable, autoAdjustMode
+      GuiControl, SettingsGUIA: Disable, doSatAdjusts
+   }
+}
+
+btnResetImageView() {
+  ; GuiControlGet, realTimePreview
+  ForceNoColorMatrix := 0
+  GuiControl, SettingsGUIA: Choose, imgFxMode, 1
+  GuiControl, SettingsGUIA: Choose, chnRdecalage, 14
+  GuiControl, SettingsGUIA: Choose, chnGdecalage, 14
+  GuiControl, SettingsGUIA: Choose, chnBdecalage, 14
+  GuiControl, SettingsGUIA: Choose, IMGresizingMode, 1
+  IMGresizingMode := imgFxMode := satAdjust := lumosAdjust := lumosGrayAdjust := 1
+  chnRdecalage := chnGdecalage := chnBdecalage := GammosAdjust := GammosGrayAdjust := 0
+  updatePanelColorsInfo()
+  infoBright := infoSatu := 1
+  infoContrst := sliderSatu := sliderBright := sliderContrst := 0
+
+  GuiControl, SettingsGUIA:, infoBright, Brightness: 1.009
+  GuiControl, SettingsGUIA:, infoContrst, Contrast: 0.000
+  GuiControl, SettingsGUIA:, infoSatu, Saturation: 1.000
+  GuiControl, SettingsGUIA:, sliderSatu, 0
+  GuiControl, SettingsGUIA:, sliderBright, 0
+  GuiControl, SettingsGUIA:, sliderContrst, 0
+  writeMainSettings()
+;  If (realTimePreview=1)
+     SetTimer, DelayiedImageDisplay, -50
+}
+
+ColorPanelTriggerImageUpdate() {
+   Critical, On
+   GuiControlGet, imgFxMode
+   GuiControlGet, doSatAdjusts
+   GuiControlGet, autoAdjustMode
+   GuiControlGet, sliderBright
+   GuiControlGet, sliderContrst
+   GuiControlGet, sliderSatu
+   GuiControlGet, FlipImgV
+   GuiControlGet, FlipImgH
+   GuiControlGet, CustomZoomCB
+   GuiControlGet, IMGresizingMode
+   GuiControlGet, chnRdecalage
+   GuiControlGet, chnGdecalage
+   GuiControlGet, chnBdecalage
+   ; GuiControlGet, realTimePreview
+
+   ForceNoColorMatrix := 0
+   zoomLevel := StrReplace(CustomZoomCB, "%")
+   zoomLevel := StrReplace(zoomLevel, A_Space)/100
+   If (imgFxMode=2)
+   {
+      lumosAdjust := (sliderBright>0) ? 0.14*sliderBright + 1 : 0.01*Abs(sliderBright + 100)
+      GammosAdjust := (sliderContrst>0) ? -0.15*sliderContrst : 0.01*Abs(sliderContrst)
+      satAdjust := (sliderSatu>0) ? 0.02*sliderSatu + 1 : 0.01*Abs(sliderSatu + 100)
+   } Else If (imgFxMode=4)
+   {
+      lumosGrayAdjust := (sliderBright>0) ? 0.14*sliderBright + 1 : 0.01*Abs(sliderBright + 100)
+      GammosGrayAdjust := (sliderContrst>0) ? -0.15*sliderContrst : 0.01*Abs(sliderContrst)
+   }
+
+   If (imgFxMode=3)
+   {
+      imgpath := resultedFilesList[currentFileIndex]
+      AdaptiveImgLight(gdiBitmap, imgpath, 1, 1)
+      updatePanelColorSliderz()
+   }
+   updatePanelColorsInfo()
+   ; If (realTimePreview=1)
+      DelayiedImageDisplay()
+ ;     SetTimer, DelayiedImageDisplay, -25
+}
+
 ResizeImagePanelWindow() {
     Global userEditWidth, userEditHeight, ResultEditWidth, ResultEditHeight
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
-    CloseWindow()
-    AnyWindowOpen := 4
     If (markedSelectFile)
     {
        filesElected := (currentFileIndex>markedSelectFile) ? currentFileIndex - markedSelectFile + 1 : markedSelectFile - currentFileIndex + 1
@@ -6718,12 +7409,8 @@ ResizeImagePanelWindow() {
        Else markedSelectFile := ""
     }
 
-    Gui, SettingsGUIA: Destroy
-    Sleep, 15
-    Gui, SettingsGUIA: Default
-    Gui, SettingsGUIA: -MaximizeBox -MinimizeBox hwndhSetWinGui
-    Gui, SettingsGUIA: Margin, 15, 15
-    btnWid := 130
+    createSettingsGUI(4)
+    btnWid := 110
     txtWid := 360
     editWid := 45
     If (PrefsLargeFonts=1)
@@ -6773,7 +7460,7 @@ ResizeImagePanelWindow() {
        Gui, Add, Button, xs+0 y+15 h30 w%btnWid% gCopy2ClipResizedIMG, &Copy to clipboard
        Gui, Add, Button, x+5 h30 w%btnWid% gSaveResizedIMG, &Save image as...
     }
-    Gui, Add, Button, x+5 h30 w90 gCloseWindow, C&lose
+    Gui, Add, Button, x+5 h30 w85 gCloseWindow, C&lose
     Gui, SettingsGUIA: Show, AutoSize, Resize image: %appTitle%
 }
 
@@ -6892,10 +7579,14 @@ batchIMGresizer(desiredW, desiredH, isPercntg) {
       countFilez := 0
    SetTimer, DelayiedImageDisplay, -100
    If (abandonAll=1)
+   {
       showTOOLtip("Operation aborted. "  countFilez " out of " filesElected " selected files were resized until now..." someErrors)
-   Else
+      SoundBeep, 300, 100
+   } Else
+   {
       showTOOLtip("Finished resizing "  countFilez " out of " filesElected " selected files" someErrors)
-   SoundBeep , 900, 100
+      SoundBeep, 900, 100
+   }
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -7102,16 +7793,8 @@ TglRszApplyEffects() {
 
 FolderzPanelWindow() {
     Static LViewOthers
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
 
-    CloseWindow()
-    AnyWindowOpen := 2
-    Gui, SettingsGUIA: Destroy
-    Sleep, 15
-    Gui, SettingsGUIA: Default
-    Gui, SettingsGUIA: -MaximizeBox -MinimizeBox hwndhSetWinGui
-    Gui, SettingsGUIA: Margin, 15, 15
+    createSettingsGUI(2)
     btnWid := 115
     txtWid := 360
     lstWid := 545
@@ -7139,16 +7822,8 @@ FolderzPanelWindow() {
 
 DynamicFolderzPanelWindow() {
     Static LViewDynas
-    If (slideShowRunning=1)
-      ToggleSlideShowu()
 
-    CloseWindow()
-    AnyWindowOpen := 3
-    Gui, SettingsGUIA: Destroy
-    Sleep, 15
-    Gui, SettingsGUIA: Default
-    Gui, SettingsGUIA: -MaximizeBox -MinimizeBox hwndhSetWinGui
-    Gui, SettingsGUIA: Margin, 15, 15
+    createSettingsGUI(3)
     btnWid := 120
     txtWid := 360
     lstWid := 535
@@ -7486,9 +8161,9 @@ UpdateSelFolder() {
 PopulateStaticFolderzList() {
     If (mustGenerateStaticFolders=1 || SLDcacheFilesList!=1)
        Return
+
     foldersListu := LoadStaticFoldersCached(CurrentSLD, irrelevantVar)
     Gui, SettingsGUIA: ListView, LViewOthers
-
     If (CountFilesFolderzList=1)
     {
        markedSelectFile := ""
@@ -7586,6 +8261,8 @@ CloseWindow() {
     If (A_TickCount - lastLongOperationAbort < 1000)
        Return
 
+    ForceNoColorMatrix := 0
+    imgQuality := (userimgQuality=1) ? 7 : 5
     lastOtherWinClose := A_TickCount
     Gui, SettingsGUIA: Destroy
     If (GIFsGuiCreated=1)
@@ -7609,11 +8286,12 @@ TooltipCreator(msg:=0,killWin:=0) {
 
     If (A_TickCount-lastInvoked<200)
     {
-       If (prevMsg!=msg) && !RegExMatch(msg, "i)(show speed\: |zoom level\: |image brightness\: |image gamma\: )")
+       If (prevMsg!=msg) && !RegExMatch(msg, "i)(show speed\: |zoom level\: |image (brightness|contrast|gamma|saturation)\:\s)")
        {
           minLen := StrLen(msg) + 150
-          msg := prevMsg "`n" msg
-          StringRight, msg, msg, % minLen
+          msg := msg "`n `n" prevMsg
+          If (StrLen(msg)>minLen+5)
+             msg := SubStr(msg, 1, minLen) " [...]"
        } Else Return
     }
 
@@ -7673,14 +8351,30 @@ GIFguiCreator(imgpath:=1, killWin:=0, xPos:=1, yPos:=1, imgW:=1, imgH:=1, mainWi
 }
 
 WM_RBUTTONUP(wP, lP, msg, hwnd) {
+  Static lastState := 0
+
   A := WinActive("A")
   okay := (A=PVhwnd) || (A=hGDIwin) ? 1 : 0
   If (okay!=1)
      Return
 
   If (thumbsDisplaying=1 && maxFilesIndex>0)
+  {
      WinClickAction("rClick")
-
+  } Else If (AnyWindowOpen=10)
+  {
+;     WinSet, Transparent, % (lastState=1) ? 255 : 10, ahk_id %hSetWinGui%
+     GetClientSize(mainWidth, mainHeight, hSetWinGui)
+     WinGetPos,,, Width, Height, ahk_id %hSetWinGui%
+     thisHeight := (Height - mainHeight)//1.5
+     thisWidth := mainWidth//3
+     If (lastState=0)
+        Gui, SettingsGUIA: Show, w%thisWidth% h%thisHeight%
+     Else
+        Gui, SettingsGUIA: Show, AutoSize
+     lastState := !lastState
+     Return
+  }
   delayu := (thumbsDisplaying=1) ? -90 : -5
   SetTimer, InitGuiContextMenu, % delayu
 }
