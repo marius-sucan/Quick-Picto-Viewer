@@ -4,7 +4,7 @@
 
 <p>This is an image viewer based on GDI+. It can open: .dib, .tif, .tiff, .emf, .wmf, .rle, .png, .bmp, .gif, .jpeg files.</p>
 
-<p>QPV is also able to create image slideshows and cache very large dynamic lists of files. Unlike other applications of this kind, it can load, on my system, a list of 500000 files on my system in under 10 seconds, while XnView Classic or Irfan View need more than 15 minutes.</p>
+<p>QPV is also able to create image slideshows and cache very large dynamic lists of files. Unlike other applications of this kind, it can load, on my system, a list of 500000 files in under 10 seconds, while XnView Classic or Irfan View need more than 15 minutes.</p>
 
 <p width="600" height="540"><img width="600" height="540" alt="Quick Picture Viewer - screenshot" src="http://marius.sucan.ro/media/files/blog/ahk-scripts/quick-picto-viewer-screenshot.jpg"></p>
 
@@ -24,8 +24,8 @@
 <li>Display images in grayscale, inverted or personalized colors. Option to save adjusted image, or apply adjusments on multiple images in one go.</li>
 <li>Various modes to adapt images to window.</li>
 <li>Multiple slideshow directions available and easy to change speed between images: random order, backwards or forwads.</li>
-<li>Perform actions on image files: resize, change/adjust colors, rename, convert to jpeg, delete, copy or move.</li>
-<li>Operations in batch [on multiple files at once]: resize images, change/adjust colors, convert to jpeg, delete, copy, move, and rename.</li>
+<li>Perform actions on image files: resize, crop, change/adjust colors, rename, convert to jpeg, delete, copy or move.</li>
+<li>Operations in batch [on multiple files at once]: resize and/or crop images, change/adjust colors, convert to jpeg, delete, copy, move, and rename.</li>
 <li>Multi-rename allows adding a prefix and/or suffix to renamed files, or to count them, or search and replace strings in file names.</li>
 <li>Quick Picto Viewer has its own slideshow format to store list of folders and cache files lists.</li>
 <li>Ability to selectively refresh the cached files list from selected folders.</li>
