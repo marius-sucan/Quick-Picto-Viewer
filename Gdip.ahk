@@ -2,8 +2,10 @@
 ; Modifed by Rseding91 using fincs 64 bit compatible Gdip library 5/1/2013
 ; Supports: Basic, _L ANSi, _L Unicode x86 and _L Unicode x64
 ; taken https://autohotkey.com/boards/viewtopic.php?t=6517
+; Additionally modified by Marius Șucan in July/August 2019.
 ;
-; Updated 19/07/2019 - Added a few GDI+ functions found on AHK forums
+; Updated 08/08/2019 - Added Gdip_GetDIBits() and Gdip_CreateDIBitmap()
+; Updated 19/07/2019 - Added Gdip_GetHistogram() and GetProperty GDI+ functions found on the AHK forums
 ; Updated 20/02/2014 - fixed Gdip_CreateRegion() and Gdip_GetClipRegion() on AHK Unicode x86
 ; Updated 13/05/2013 - fixed Gdip_SetBitmapToClipboard() on AHK Unicode x64
 ;
@@ -73,19 +75,19 @@ UpdateLayeredWindow(hwnd, hdc, x="", y="", w="", h="", Alpha=255) {
    if ((x != "") && (y != ""))
       VarSetCapacity(pt, 8), NumPut(x, pt, 0, "UInt"), NumPut(y, pt, 4, "UInt")
 
-   if (w = "") ||(h = "")
+   if (w = "") || (h = "")
       WinGetPos,,, w, h, ahk_id %hwnd%
    
    return DllCall("UpdateLayeredWindow"
                , Ptr, hwnd
                , Ptr, 0
                , Ptr, ((x = "") && (y = "")) ? 0 : &pt
-               , "int64*", w|h<<32
+               , "Int64*", w|h<<32
                , Ptr, hdc
-               , "int64*", 0
-               , "uint", 0
+               , "Int64*", 0
+               , "Uint", 0
                , "UInt*", Alpha<<16|1<<24
-               , "uint", 2)
+               , "UInt", 2)
 }
 
 ;#####################################################################################
@@ -529,7 +531,6 @@ SelectObject(hdc, hgdiobj) {
 ;                    After the object is deleted, the specified handle is no longer valid
 ;
 ; hObject            Handle to a logical pen, brush, font, bitmap, region, or palette to delete
-;
 ; return             Nonzero indicates success. Zero indicates that the specified handle is not valid or that the handle is currently selected into a device context
 
 DeleteObject(hObject) {
@@ -615,10 +616,10 @@ Gdip_LibraryVersion() {
 ;#####################################################################################
 ; Function           Gdip_LibrarySubVersion
 ; Description        Get the current library sub version
-; retur   n          The library sub version
+; return             The library sub version
 ; notes              This is the sub-version currently maintained by Rseding91
 Gdip_LibrarySubVersion() {
-   return 1.48
+   return 1.90
 }
 
 ;#####################################################################################
@@ -1590,9 +1591,46 @@ Gdip_CreateBitmapFromFile(sFile, IconNumber=1, IconSize="") {
    return pBitmap
 }
 
+Gdip_CreateDIBitmap(hdc, bmpInfoHeader, CBM_INIT, pBits, BITMAPINFO, DIB_COLORS) {
+; This function creates a hBitmap from a pointer of data-bits [pBits]
+; The hBitmap is created according to the information found in
+; BITMAPINFO and bmpInfoHeader pointers.
+
+; Function written by Marius Șucan.
+; many thanks to Drugwash for the help offered.
+
+   Ptr := A_PtrSize ? "UPtr" : "UInt"
+   hBitmap := DllCall("CreateDIBitmap"
+            , Ptr, hdc
+            , Ptr, bmpInfoHeader
+            , "uint", CBM_INIT    ; =4
+            , Ptr, pBits
+            , Ptr, BITMAPINFO
+            , "uint", DIB_COLORS, Ptr)    ; PAL=1 ; RGB=2
+
+   Return hBitmap
+}
+
+Gdip_GetDIBits(hdc, hBitmap, start, cLines, pBits, BITMAPINFO, DIB_COLORS) {
+; This function returns the data-bits from a hBitmap
+; into the pBits pointer.
+; Function written by Marius Șucan
+
+   Ptr := A_PtrSize ? "UPtr" : "UInt"
+   r := DllCall("GetDIBits"
+            , Ptr, hdc
+            , Ptr, hBitmap
+            , "uint", start
+            , "uint", cLines
+            , Ptr, pBits
+            , Ptr, BITMAPINFO
+            , "uint", DIB_COLORS, Ptr)    ; PAL=1 ; RGB=2
+
+   Return r
+}
+
 Gdip_CreateBitmapFromHBITMAP(hBitmap, Palette=0) {
    Ptr := A_PtrSize ? "UPtr" : "UInt"
-   
    DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", Ptr, hBitmap, Ptr, Palette, A_PtrSize ? "UPtr*" : "uint*", pBitmap)
    return pBitmap
 }
@@ -1650,7 +1688,7 @@ Gdip_SetBitmapToClipboard(pBitmap) {
    r2 := DllCall("SetClipboardData", "uint", 8, Ptr, hdib)
    DllCall("CloseClipboard")
    r := (!r1 || !r2) ? 0 : 1
-  Return r
+   Return r
 }
 
 Gdip_CloneBitmapArea(pBitmap, x, y, w, h, Format=0x26200A) {
@@ -1802,8 +1840,12 @@ Gdip_DeleteBrush(pBrush) {
    return DllCall("gdiplus\GdipDeleteBrush", A_PtrSize ? "UPtr" : "UInt", pBrush)
 }
 
-Gdip_DisposeImage(pBitmap) {
-   return DllCall("gdiplus\GdipDisposeImage", A_PtrSize ? "UPtr" : "UInt", pBitmap)
+Gdip_DisposeImage(pBitmap, noErr:=0) {
+; modified by Marius Șucan
+   r := DllCall("gdiplus\GdipDisposeImage", A_PtrSize ? "UPtr" : "UInt", pBitmap)
+   If (r=2 || r=1) && (noErr=1)
+      r := 0
+   Return r
 }
 
 Gdip_DeleteGraphics(pGraphics) {
@@ -2202,7 +2244,7 @@ Gdip_ResetClip(pGraphics) {
 
 Gdip_GetClipRegion(pGraphics) {
    Region := Gdip_CreateRegion()
-   DllCall("gdiplus\GdipGetClip", A_PtrSize ? "*Ptr" : "UInt", pGraphics, "UInt*", Region)
+   DllCall("gdiplus\GdipGetClip", A_PtrSize ? "UPtr" : "UInt", pGraphics, "UInt*", Region)
    return Region
 }
 
