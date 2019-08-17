@@ -21,7 +21,7 @@
 
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 3.6.0
+;@Ahk2Exe-SetVersion 3.6.5
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
  
@@ -34,13 +34,14 @@
 #MaxMem, 1924
 #IfTimeout, 25
 #SingleInstance, off
+#UseHook, Off
 #Include, Gdip.ahk
 #Include, freeimage.ahk
 SetWinDelay, 1
 
 Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , hGuiTip := 1, hGuiThumbsHL := 1, hSetWinGui := 1
-   , prevFullThumbsUpdate := 1, winGDIcreated := 0, ThumbsWinGDIcreated := 0
+   , editDummy, prevFullThumbsUpdate := 1, winGDIcreated := 0, ThumbsWinGDIcreated := 0
    , hPicOnGui1, scriptStartTime := A_TickCount, lastEditRHChange :=1
    , newStaticFoldersListCache := "", lastEditRWChange := 1
    , prevTooltipDisplayTime := 1, mainCompiledPath := "", wasInitFIMlib := 0
@@ -56,12 +57,12 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , slideShowRunning := 0, CurrentSLD := "", markedSelectFile := ""
    , ResolutionWidth, ResolutionHeight, prevStartIndex := -1
    , gdiBitmap, mainSettingsFile := "quick-picto-viewer.ini"
-   , RegExFilesPattern := "i)(.\\*\.(dib|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|dng|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
-   , RegExFIMformPtrn := "i)(.\\*\.(DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|dng|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
+   , RegExFilesPattern := "i)(.\\*\.(dib|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
+   , RegExFIMformPtrn := "i)(.\\*\.(DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
    , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|jng|jif|jfif|jpg|jpe|jpeg|ppm|xpm))$"
    , openFptrn1 := "*.png;*.bmp;*.gif;*.jpg;*.tif;*.tga;*.webp;*.jpeg"
    , openFptrn2 := "*.dds;*.emf;*.exr;*.g3;*.hdp;*.iff;*.j2c;*.j2k;*.jbg;*.jif;*.jng;*.jp2;*.jxr;*.koa;*.lbm;*.mng;*.pbm;*.pcd;*.pct;*.pcx;*.pfm;*.pgm;*.pic;*.ppm;*.psd;*.ras;*.sgi;*.wap;*.wbm;*.wbmp;*.wdp;*.wmf;*.xbm;*.xpm"
-   , openFptrn3 := "*.3fr;*.arw;*.bay;*.bmq;*.cap;*.cine;*.cr2;*.crw;*.cs1;*.dc2;*.dcr;*.dng;*.drf;*.dsc;*.erf;*.fff;*.hdr;*.ia;*.iiq;*.k25;*.kc2;*.kdc;*.mdc;*.mef;*.mos;*.mrw;*.nef;*.nrw;*.orf;*.pef;*.ptx;*.pxn;*.qtk;*.raf;*.raw;*.rdc;*.rw2;*.rwz;*.sr2;*.srf;*.x3f"
+   , openFptrn3 := "*.3fr;*.arw;*.bay;*.bmq;*.cap;*.cine;*.cr2;*.crw;*.cs1;*.dc2;*.dcr;*.drf;*.dsc;*.erf;*.fff;*.hdr;*.ia;*.iiq;*.k25;*.kc2;*.kdc;*.mdc;*.mef;*.mos;*.mrw;*.nef;*.nrw;*.orf;*.pef;*.ptx;*.pxn;*.qtk;*.raf;*.raw;*.rdc;*.rw2;*.rwz;*.sr2;*.srf;*.x3f"
    , openFptrn4 := "*.tiff;*.targa;*.jpe;*.dib;*.pict;*.rle"
    , LargeUIfontValue := 14, AnyWindowOpen := 0, toolTipGuiCreated := 0
    , PrefsLargeFonts := 0, OSDbgrColor := "131209", OSDtextColor := "FFFEFA"
@@ -83,11 +84,11 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , hCursN := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32512, "Ptr")  ; IDC_ARROW
    , remCacheOldDays := 0, jpegDoCrop := 0, jpegDesiredOperation := 1
    , rDesireWriteFMT := "", FIMfailed2init := 0
-   , version := "3.6.0", vReleaseDate := "11/08/2019"
+   , version := "3.6.5", vReleaseDate := "17/08/2019"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1
-   , thumbsAratio := 3, thumbsZoomLevel := 1
+   , thumbsAratio := 3, thumbsZoomLevel := 1, zatAdjust := 0
    , WindowBgrColor := "010101", slideShowDelay := 3000
    , IMGresizingMode := 1, SlideHowMode := 1, TouchScreenMode := 1
    , lumosAdjust := 1, GammosAdjust := 0, userimgQuality := 0
@@ -102,14 +103,14 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , ResizeApplyEffects := 1, autoAdjustMode := 1, doSatAdjusts := 1
    , ResizeDestFolder, ResizeUseDestDir := 0, chnRdecalage := 0, chnGdecalage := 0
    , chnBdecalage := 0, alwaysOpenwithFIM := 0, bwDithering := 0
-   , userUnsprtWriteFMT := 1, userDesireWriteFMT := 10
+   , userUnsprtWriteFMT := 1, userDesireWriteFMT := 10, hueAdjust := 0
 
 imgQuality := (userimgQuality=1) ? 7 : 5
 DetectHiddenWindows, On
 CoordMode, Mouse, Screen
 OnExit, Cleanup
 
-If (A_IsCompiled)
+If A_IsCompiled
    initCompiled()
 
 OnMessage(0x205, "WM_RBUTTONUP")
@@ -121,14 +122,14 @@ If (A_OSVersion="WIN_7")
    OnMessage(0x216, "WM_MOVING")
 ; OnMessage(0x388, "WM_PENEVENT")
 OnMessage(0x200, "WM_MOUSEMOVE")
-OnMessage(0x06, "activateMainWin")
-OnMessage(0x08, "activateMainWin")
+OnMessage(0x06, "activateMainWin")   ; WM_ACTIVATE 
+OnMessage(0x08, "activateMainWin")   ; WM_KILLFOCUS 
 Loop, 9
-   OnMessage(255+A_Index, "PreventKeyPressBeep")   ; 0x100 to 0x108
+    OnMessage(255+A_Index, "PreventKeyPressBeep")   ; 0x100 to 0x108
 
 if !(GDIPToken := Gdip_Startup())
 {
-   Msgbox, 48, %appTitle%, Error: unable to initialize GDI+...`n`nProgram will now exit.
+   Msgbox, 48, %appTitle%, ERROR: unable to initialize GDI+...`n`nThe program will now exit.
    ExitApp
 }
 
@@ -169,30 +170,24 @@ identifyThisWin(noReact:=0) {
 #If (identifyThisWin()=1)
     ~^vk4F::    ; Ctrl+O
        If AnyWindowOpen
-       {
-          WinActivate, ahk_id %hSetWinGui%
           Return
-       }
+
        If (imageLoading!=1)
           OpenFiles()
     Return
 
     ~!vk4F::    ; Alt+O
        If AnyWindowOpen
-       {
-          WinActivate, ahk_id %hSetWinGui%
           Return
-       }
+
        If (imageLoading!=1)
           OpenRawFiles()
     Return
 
     ~+vk4F::    ; Shift+O
        If AnyWindowOpen
-       {
-          WinActivate, ahk_id %hSetWinGui%
           Return
-       }
+
        If (imageLoading!=1)
           OpenFolders()
     Return
@@ -281,6 +276,10 @@ identifyThisWin(noReact:=0) {
 
     vkDC Up::   ; \
       ResetImageView()
+    Return
+
+    ^vkDC Up::   ; Ctrl+\
+      HardResetImageView()
     Return
 
     +vkDC Up::   ; Shift+\
@@ -467,6 +466,10 @@ identifyThisWin(noReact:=0) {
 
     vkDC Up::   ; \
       ResetImageView()
+    Return
+
+    ^vkDC Up::   ; Ctrl+\
+      HardResetImageView()
     Return
 
     +vkDC Up::   ; Shift+\
@@ -935,19 +938,19 @@ CopyImage2clip() {
   If (FileExist(imgpath) && fileSizu>500)
   {
      r := coreResizeIMG(imgpath, 0, 0, "--", 1, 1, 0)
-     If r
+     If !r
      {
         showTOOLtip("Image copied to clipboard...")
         SoundBeep, 900, 100
      } Else
      {
-        showTOOLtip("ERROR: Failed to copy the image to clipboard...")
+        showTOOLtip("Failed to copy the image to clipboard... Error code: " r)
         SoundBeep, 300, 900
      }
      SetTimer, RemoveTooltip, % -msgDisplayTime
   } Else
   {
-     showTOOLtip("ERROR: Failed to copy image to clipboard...")
+     showTOOLtip("ERROR: Failed to copy image to clipboard... Error code: " r)
      SoundBeep, 300, 900
      SetTimer, RemoveTooltip, % -msgDisplayTime
   }
@@ -1062,7 +1065,7 @@ TrueCleanup() {
    DestroyGIFuWin()
    Sleep, 2
    If (wasInitFIMlib=1)
-      FreeImage_FoxInit(False) ; Unload Dll
+      FreeImage_FoxInit(0) ; Unload Dll
 
    disposeCacheIMGs()
    If AprevGdiBitmap
@@ -1098,6 +1101,9 @@ activateMainWin() {
 
    If (easySlideStoppage=1 && slideShowRunning=1)
       ToggleSlideShowu()
+
+   If (A_TickCount - lastInvoked > 530)
+      GuiControl, 1:, editDummy, -
 
    If (toolTipGuiCreated=1)
       TooltipCreator(1, 1)
@@ -1166,7 +1172,7 @@ ChangeThumbsAratio() {
      thumbsAratio := 1
 
   coreChangeThumbsAratio()
-  showTOOLtip("Thumbnails aspect ratio: " defineThumbsAratio())
+  showTOOLtip("Thumbnails aspect ratio: " defineThumbsAratio() "`nSize: " thumbsW " x " thumbsH " (pixels)")
   SetTimer, RemoveTooltip, % -msgDisplayTime
   RefreshThumbsList()
   writeMainSettings()
@@ -1879,14 +1885,14 @@ ToggleImgFX(dir:=0) {
 
    friendly := DefineFXmodes()
    If (imgFxMode=4)
-      friendly .= "`nBrightness: " Round(lumosGrayAdjust, 3) "`nContrast: " Round(GammosGrayAdjust, 3)
+      friendly .= "`nBrightness: " Round(lumosGrayAdjust, 3) "`nContrast: " Round(GammosGrayAdjust, 3) "`nVibrance: " Round(zatAdjust) "%" "`nHue: " Round(hueAdjust) "°"
    Else If (imgFxMode=2)
-      friendly .= "`nBrightness: " Round(lumosAdjust, 3) "`nContrast: " Round(GammosAdjust, 3) "`nSaturation: " Round(satAdjust*100) "%"
+      friendly .= "`nBrightness: " Round(lumosAdjust, 3) "`nContrast: " Round(GammosAdjust, 3) "`nSaturation: " Round(satAdjust*100) "%" "`nVibrance: " Round(zatAdjust) "%" "`nHue: " Round(hueAdjust) "°"
+   Else If (imgFxMode=3)
+      friendly .= "`nVibrance: " Round(zatAdjust) "%" "`nHue: " Round(hueAdjust) "°"
 
-   If (imgFxMode=4)
-      friendly .= "`n `nYou can adjust brightness and contrast using`n [ and ] with or without Shift."
-   Else If (imgFxMode=2)
-      friendly .= "`n `nYou can adjust brightness, contrast and saturation using`n [ and ] with or without Shift or Ctrl."
+   If (imgFxMode=4 || imgFxMode=3 || imgFxMode=2)
+      friendly .= "`n `nPress U to adjust colors display options."
    showTOOLtip("Image colors: " friendly)
    SetTimer, RemoveTooltip, % -msgDisplayTime
    If (thumbsDisplaying=1)
@@ -1936,8 +1942,11 @@ ToggleIMGalign() {
 }
 
 toggleColorAdjustments() {
-  If (imgFxMode!=1)
+  If (imgFxMode!=1 && thumbsDisplaying!=1)
   {
+     If (slideShowRunning=1)
+        resetSlideshowTimer(0)
+
      ForceNoColorMatrix := !ForceNoColorMatrix
      AnyWindowOpen := (ForceNoColorMatrix=1) ? 10 : 0
      dummyTimerDelayiedImageDisplay(50)
@@ -1946,6 +1955,8 @@ toggleColorAdjustments() {
 }
 
 resetClrMatrix() {
+   If (slideShowRunning=1)
+      resetSlideshowTimer(0)
    AnyWindowOpen := ForceNoColorMatrix := 0
    dummyTimerDelayiedImageDisplay(50)
 }
@@ -1955,7 +1966,12 @@ ResetImageView() {
    ChangeLumos(2)
 }
 
-ChangeLumos(dir) {
+HardResetImageView() {
+   Critical, on
+   ChangeLumos(2, "k")
+}
+
+ChangeLumos(dir, dummy:=0) {
    Static prevValues
    If (slideShowRunning=1)
       resetSlideshowTimer(0)
@@ -1965,12 +1981,18 @@ ChangeLumos(dir) {
    If (dir=2)
    {
       o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
-      If (imgFxMode=4)
+      If (dummy="k" && valueBetween(imgFxMode, 2, 4)=1)
+      {
+         chnRdecalage := chnGdecalage := chnBdecalage := 0
+         bwDithering := hueAdjust := zatAdjust := 0
+      }
+
+      If (imgFxMode=4 || dummy="k")
       {
          ; bwDithering := 0
          GammosGrayAdjust := 0
          lumosGrayAdjust := 1
-      } Else If (imgFxMode=2)
+      } Else If (imgFxMode=2 || dummy="k")
       {
          satAdjust := lumosAdjust := 1
          GammosAdjust := 0
@@ -2053,7 +2075,7 @@ ChangeZoom(dir) {
          thumbsZoomLevel := 0.35
       Else If (thumbsZoomLevel>10)
          thumbsZoomLevel := 10
-      showTOOLtip("Thumbnails zoom level: " Round(thumbsZoomLevel*100) "%")
+      showTOOLtip("Thumbnails zoom level: " Round(thumbsZoomLevel*100) "%`nSize: " thumbsW " x " thumbsH " (pixels)")
       SetTimer, RemoveTooltip, % -msgDisplayTime
       SetTimer, RefreshThumbsList, -250
       Return
@@ -2215,7 +2237,7 @@ NextPicture(dummy:=0, inLoop:=0) {
 PasteClipboardIMG() {
     changeMcursor()
     clipBMP := Gdip_CreateBitmapFromClipboard()
-    If (InStr(clipBMP, "err-") || !clipBMP)
+    If (valueBetween(Abs(clipBMP), 1, 5) || !clipBMP)
     {
        showTOOLtip("Unable to retrieve image from clipboard...")
        SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -2421,12 +2443,10 @@ copyIMGinfos2clip() {
        }
        LV_GetText(valu, aR, aC)
        delimu := (aC=1) ? ": " : "`n"
-       If !valu 
-          delimu := ""
        textu .= valu delimu
-       Sleep, 10
+       Sleep, 1
        ; ToolTip, %valu% -- %aC% -- %aR%
-       If (!valu && A_Index>19)
+       If (valu="" && A_Index>95)
           Break
    }
 
@@ -3363,6 +3383,8 @@ readSlideSettings(readThisFile) {
      IniRead, tstthumbsZoomLevel, %readThisFile%, General, thumbsZoomLevel, @
      IniRead, tstSLDcacheFilesList, %readThisFile%, General, SLDcacheFilesList, @
      IniRead, tsteasySlideStoppage, %readThisFile%, General, easySlideStoppage, @
+     IniRead, tstzatAdjust, %readThisFile%, General, zatAdjust, @
+     IniRead, tsthueAdjust, %readThisFile%, General, hueAdjust, @
      IniRead, tstautoAdjustMode, %readThisFile%, General, autoAdjustMode, @
      IniRead, tstdoSatAdjusts, %readThisFile%, General, doSatAdjusts, @
      IniRead, tstchnRdecalage, %readThisFile%, General, chnRdecalage, @
@@ -3433,6 +3455,10 @@ readSlideSettings(readThisFile) {
         GammosAdjust := tstGammosAdjust
      If (tstsatAdjust!="@")
         satAdjust := tstsatAdjust
+     If (tstzatAdjust!="@")
+        zatAdjust := tstzatAdjust
+     If (tsthueAdjust!="@")
+        hueAdjust := tsthueAdjust
      If (tstusrAdaptiveThreshold!="@")
         usrAdaptiveThreshold := tstusrAdaptiveThreshold
 
@@ -3569,6 +3595,8 @@ writeSlideSettings(file2save) {
     IniWrite, % skipDeadFiles, %file2save%, General, skipDeadFiles
     IniWrite, % isAlwaysOnTop, %file2save%, General, isAlwaysOnTop
     IniWrite, % bwDithering, %file2save%, General, bwDithering
+    IniWrite, % zatAdjust, %file2save%, General, zatAdjust
+    IniWrite, % hueAdjust, %file2save%, General, hueAdjust
     IniWrite, % isTitleBarHidden, %file2save%, General, isTitleBarHidden
     IniWrite, % animGIFsSupport, %file2save%, General, animGIFsSupport
     IniWrite, % thumbsAratio, %file2save%, General, thumbsAratio
@@ -5462,7 +5490,7 @@ BuildMenu() {
 
    infolumosAdjust := (imgFxMode=2 || imgFxMode=3) ? Round(lumosAdjust, 2) : Round(lumosGrayAdjust, 2)
    infoGammosAdjust := (imgFxMode=2 || imgFxMode=3) ? Round(GammosAdjust, 2) : Round(GammosGrayAdjust, 2)
-   infoSatAdjust := Round(satAdjust*100)
+   infoSatAdjust := (imgFxMode=4) ? zatAdjust : Round(satAdjust*100)
    infoThumbsMode := (thumbsDisplaying=1) ? "Switch to image view" : "Switch to thumbnails list"
    If (maxFilesIndex>1)
    {
@@ -5834,9 +5862,15 @@ ToggleEasySlideStop() {
 
 ToggleAlwaysFIMus() {
    alwaysOpenwithFIM := !alwaysOpenwithFIM
-   initFIMGmodule()
+   r := initFIMGmodule()
+   If InStr(r, "err - 126")
+      friendly := "`n`nPlease install the Rubntime Redistributable Packages of Visual Studio 2013 included in the Quick Picto Viewer ZIP compiled package."
+   Else If InStr(r, "err - 404")
+      friendly := "`n`nThe FreeImage.dll file seems to be missing..."
+
    If (FIMfailed2init=1)
-      Msgbox, 48, %appTitle%, ERROR: The FreeImage library failed to properly initialize. Various image file formats will no longer be supported.
+      Msgbox, 48, %appTitle%, ERROR: The FreeImage library failed to properly initialize. Various image file formats will no longer be supported. Error code: %r%.%friendly%
+
    writeMainSettings()
 }
 
@@ -6110,6 +6144,7 @@ BuildGUI() {
    Gui, 1: Margin, 0, 0
    GUI, 1: -DPIScale +Resize %MinGUISize% +hwndPVhwnd +LastFound +OwnDialogs
    Gui, 1: Add, Text, x1 y1 w1 h1 BackgroundTrans gWinClickAction vPicOnGui1 hwndhPicOnGui1,
+   Gui, 1: Add, Edit, xp-100 yp-100 w1 h1 veditDummy,
    Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans gWinClickAction vPicOnGui2a,
    Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans gWinClickAction vPicOnGui2b,
    Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans gWinClickAction vPicOnGui2c,
@@ -6571,15 +6606,30 @@ SaveFIMfile(file2save, pBitmap) {
 }
 
 initFIMGmodule() {
+  Static firstTimer := 1
   If (wasInitFIMlib!=1)
   {
-     r := FreeImage_FoxInit(True) ; Load the FreeImage Dll
+     r := FreeImage_FoxInit(1) ; Load the FreeImage Dll
      wasInitFIMlib := r ? 1 : 0
   }
 
-  If !wasInitFIMlib
+  If InStr(r, "err - ")
+  {
      bwDithering := alwaysOpenwithFIM := 0
-  FIMfailed2init := (wasInitFIMlib=1) ? 0 : 1
+     FIMfailed2init := 1
+     If InStr(r, "err - 126")
+        friendly := "`n`nPlease install the Rubntime Redistributable Packages of Visual Studio 2013 included in the Quick Picto Viewer ZIP compiled package."
+     Else If InStr(r, "err - 404")
+        friendly := "`n`nThe FreeImage.dll file seems to be missing..."
+     If (firstTimer=1)
+     {
+        SoundBeep, 300, 900
+        Msgbox, 48, %appTitle%, ERROR: The FreeImage library failed to properly initialize. Some image file formats will no longer be supported. Error code: %r%.%friendly%
+     }
+  } Else FIMfailed2init := 0
+
+  firstTimer := 0
+  Return r
 }
 
 FreeImageLoader(imgpath, doBw, noBPPconv) {
@@ -6707,12 +6757,10 @@ CloneMainBMP(imgpath, ByRef imgW, ByRef imgH, ByRef CountFrames, mustReloadIMG) 
   } Else If (slowLoaded=1 || imgW>ResolutionWidth*factoru || imgH>ResolutionHeight*factoru) && (enableThumbsCaching=1 
     && !FileExist(file2load) && (IMGresizingMode=1 || IMGresizingMode=2))
   {
-     If !InStr(FileExist(thumbsCacheFolder), "D")
-     {
-        FileCreateDir, %thumbsCacheFolder%
-        If ErrorLevel
-           skippedBeats := 1
-     }
+     er := createThumbsFolder()
+     If (er="error")
+        skippedBeats := 1
+
      If (skippedBeats!=1)
      {
         calcImgSize(1, imgW, imgH, ResolutionWidth, ResolutionHeight, newW, newH)
@@ -6770,9 +6818,13 @@ AdaptiveImgLight(whichImg, imgpath, Width, Height) {
       wasOk := 0
       cropBmp := whichImg
    }
-  ; Gu := Gdip_GraphicsFromImage(cropBmp)
-   Gdip_GetHistogram(cropBmp, 3, brLvlArray, 0, 0)
+
    Gdip_GetHistogram(cropBmp, 2, ArrChR, ArrChG, ArrChB)
+   pEffect := Gdip_CreateEffect(6, 0, -99, 0)
+   rT := Gdip_ApplyEffect(cropBmp, pEffect)
+   Gdip_DisposeEffect(pEffect)
+   Gdip_GetHistogram(cropBmp, 3, brLvlArray, 0, 0)
+
    rTotalPixelz := Width*Height
    TotalPixelz := wCrop*hCrop
    otherThreshold := (usrAdaptiveThreshold>0) ? usrAdaptiveThreshold : 2
@@ -6986,7 +7038,7 @@ AdaptiveImgLight(whichImg, imgpath, Width, Height) {
    avgBrLvlB := Round(sumTotalB/TotalPixelz)
    chnlDiffs := maxU(avgBrLvlR, avgBrLvlG, avgBrLvlB) - minU(avgBrLvlR, avgBrLvlG, avgBrLvlB)
    chnlDiffs := Round((chnlDiffs/maxBrLvl)*100, 4)
-   If (avgBrLvlR>250 || avgBrLvlG>250 || avgBrLvlB>250) && (avgBrLvlR!=avgBrLvlB || avgBrLvlR!=avgBrLvlG ||  avgBrLvlB!=avgBrLvlG)
+   If (avgBrLvlR>240 || avgBrLvlG>240 || avgBrLvlB>240) && (avgBrLvlR!=avgBrLvlB || avgBrLvlR!=avgBrLvlG ||  avgBrLvlB!=avgBrLvlG)
       satAdjust -= 0.05
 
    If (satAdjust<0.86)
@@ -7000,14 +7052,14 @@ AdaptiveImgLight(whichImg, imgpath, Width, Height) {
       satAdjust += (100 - chnlDiffs)/950
 
    otherz := (avgBrLvlG + avgBrLvlB)//1.5
-   redLevelu := (avgBrLvlR>otherz+5 && avgBrLvlR<100 && otherz/avgBrLvlR<0.4) ? 1 - otherz/avgBrLvlR : 0
-   newLumAdjust := redLevelu*4 - avgBrLvlR/255 - percBrgPx/100
-   If (redLevelu>0 && newLumAdjust>0) && (lumosAdjust - newLumAdjust>0.999) && (autoAdjustMode=1)
-   {
-      lumosAdjust -= newLumAdjust
-      satAdjust -= redLevelu/10
-   }
-   satAdjust -= redLevelu/15
+   rLevelu := (avgBrLvlR>otherz+5 && avgBrLvlR<100 && otherz/avgBrLvlR<0.5) ? 1 - otherz/avgBrLvlR : 0
+   satAdjust -= rLevelu/11
+   otherz := (avgBrLvlR + avgBrLvlB)//1.5
+   gLevelu := (avgBrLvlG>otherz+5 && avgBrLvlG<100 && otherz/avgBrLvlG<0.5) ? 1 - otherz/avgBrLvlG : 0
+   satAdjust -= gLevelu/11
+   otherz := (avgBrLvlG + avgBrLvlR)//1.5
+   bLevelu := (avgBrLvlB>otherz+5 && avgBrLvlB<100 && otherz/avgBrLvlB<0.5) ? 1 - otherz/avgBrLvlB : 0
+   satAdjust -= bLevelu/11
    If (doSatAdjusts!=1)
       satAdjust := 1
 
@@ -7050,7 +7102,7 @@ getColorMatrix() {
     If (ForceNoColorMatrix=1 && AnyWindowOpen=10)
        Return matrix
 
-    If (imgFxMode=4)       ; grayscale
+    If (imgFxMode=4 && bwDithering=0)       ; grayscale
     {
        LGA := (lumosGrayAdjust<=1) ? lumosGrayAdjust/1.5 - 0.6666 : lumosGrayAdjust - 1
        Ra := NTSCr + LGA
@@ -7202,6 +7254,7 @@ QPV_ShowImgonGuiPrev(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, new
           Gdip_FillPie(G, pBrush, mainWidth//2 - indicWidth//4, mainHeight//2 - indicWidth//4, indicWidth//2, indicWidth//2, 0, 180)
           Gdip_FillPie(G, pBrush, mainWidth//2 - indicWidth//8, mainHeight//2 - indicWidth//8, indicWidth//4, indicWidth//4, 180, 360)
        }
+
        If (IMGlargerViewPort=1)
        {
           marginErr := (usePrevious=1) ? 12 : 25
@@ -7339,6 +7392,7 @@ QPV_ShowImgonGuiPrev(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, new
     Return r
 }
 
+
 QPV_ShowImgonGui(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, imgpath, CountFrames, wasForcedHigh) {
     Critical, on
     Static IDviewPortCache, PREVtestIDvPcache
@@ -7413,7 +7467,18 @@ QPV_ShowImgonGui(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, newH, m
        Gdip_TranslateWorldTransform(G2, 0, -mainHeight)
     }
 
-    r1 := Gdip_DrawImage(G2, ViewPortBMPcache, 0, 0, mainWidth, mainHeight, 0, 0, mainWidth, mainHeight, matrix)
+    o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
+    applyAdjusts := (ForceNoColorMatrix=1 && AnyWindowOpen=10) ? 0 : 1
+    thisZatAdjust := (imgFxMode=4 && bwDithering=0 && zatAdjust=0) ? -99 : zatAdjust
+    If (thisZatAdjust=0 && hueAdjust=0)
+       applyAdjusts := 0
+    If (imgFxMode=2 || imgFxMode=3 || imgFxMode=4) && (applyAdjusts=1 && o_bwDithering=0)
+    {
+       pEffect := Gdip_CreateEffect(6, hueAdjust, thisZatAdjust, 0)
+       r1 := Gdip_DrawImageFX(G2, ViewPortBMPcache, 0, 0, mainWidth, mainHeight, matrix, pEffect)
+       Gdip_DisposeEffect(pEffect)
+    } Else r1 := Gdip_DrawImage(G2, ViewPortBMPcache, 0, 0, mainWidth, mainHeight, 0, 0, mainWidth, mainHeight, matrix)
+
     pBrush := Gdip_BrushCreateSolid("0x99898898")
     If (markedSelectFile || FlipImgV=1 || FlipImgH=1 || IMGlargerViewPort=1 || imgFxMode>1)
     {
@@ -7430,6 +7495,7 @@ QPV_ShowImgonGui(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, newH, m
           Gdip_FillPie(G2, pBrush, mainWidth//2 - indicWidth//4, mainHeight//2 - indicWidth//4, indicWidth//2, indicWidth//2, 0, 180)
           Gdip_FillPie(G2, pBrush, mainWidth//2 - indicWidth//8, mainHeight//2 - indicWidth//8, indicWidth//4, indicWidth//4, 180, 360)
        }
+
        If (IMGlargerViewPort=1)
        {
           marginErr := (usePrevious=1) ? 12 : 25
@@ -7441,6 +7507,7 @@ QPV_ShowImgonGui(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, newH, m
              If (DestPosY>-newH+mainHeight+marginErr)
                 Gdip_FillRectangle(G2, pBrush, 0, mainHeight - lineThickns2//2, mainWidth, lineThickns2//2)
           }
+
           If (newW>mainWidth)
           {
              If (DestPosX<-marginErr)
@@ -7823,22 +7890,37 @@ EraseThumbsCache(dummy:=0) {
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
-generateImgThumbCache(imgpath, newImgSize) {
-    Critical, on
+createThumbsFolder() {
     If !InStr(FileExist(thumbsCacheFolder), "D")
     {
        FileCreateDir, %thumbsCacheFolder%
        If ErrorLevel
-          Return
+          Return "error"
     }
+}
+
+generateImgThumbCache(imgpath, newImgSize) {
+    Critical, on
+    r := createThumbsFolder()
+    If (r="error")
+       Return r
+
     MD5name := generateThumbName(imgpath)
+    file2save := thumbsCacheFolder "\" MD5name ".jpg"
+    thisImgFile := FileExist(file2save) ? file2save : imgpath
     changeMcursor()
-    oBitmap := LoadBitmapFromFileu(imgpath)
+    oBitmap := LoadBitmapFromFileu(thisImgFile)
     If !oBitmap
-       Return
+       Return "error"
 
     Gdip_GetImageDimensions(oBitmap, imgW, imgH)
     calcImgSize(1, imgW, imgH, newImgSize, newImgSize, ResizedW, ResizedH)
+    If (valueBetween(imgW, ResizedW - 15, ResizedW + 15) && valueBetween(imgH, ResizedH - 15, ResizedH + 15))
+    {
+       cacheUsed := 1
+       ResizedW -= 50
+       ResizedH -= 50
+    }
     thumbBMP := Gdip_CreateBitmap(ResizedW, ResizedH)
     G2 := Gdip_GraphicsFromImage(thumbBMP)
     thisImgQuality := (userimgQuality=1) ? 3 : 5
@@ -7846,10 +7928,11 @@ generateImgThumbCache(imgpath, newImgSize) {
     Gdip_SetSmoothingMode(G2, 3)
     changeMcursor()
     Gdip_DrawImage(G2, oBitmap, 0, 0, ResizedW, ResizedH, 0, 0, imgW, imgH)
-    file2save := thumbsCacheFolder "\" MD5name ".jpg"
+    Gdip_DisposeImage(oBitmap, 1)
+    If (cacheUsed=1)
+       Sleep, 1
     r := Gdip_SaveBitmapToFile(thumbBMP, file2save, 85)
     Gdip_DeleteGraphics(G2)
-    Gdip_DisposeImage(oBitmap, 1)
     Gdip_DisposeImage(thumbBMP, 1)
 }
 
@@ -7870,8 +7953,11 @@ QPV_ShowThumbnails(startIndex) {
     G := Gdip_GraphicsFromHDC(hdc)
     Gdip_SetInterpolationMode(G, imgQuality)
     Gdip_SetSmoothingMode(G, 3)
+    thumbsBitmap := Gdip_CreateBitmap(mainWidth, mainHeight)
+    G2 := Gdip_GraphicsFromImage(thumbsBitmap)
+    Gdip_SetInterpolationMode(G2, 5)
     pBrush := Gdip_BrushCreateSolid("0x77" WindowBgrColor)
-    rowIndex := imgsListed := 0
+    hasUpdated := rowIndex := imgsListed := 0
     maxImgSize := maxZeit := columnIndex := -1
     dummyPos := (A_OSVersion!="WIN_7") ? 1 : ""
 
@@ -7883,9 +7969,12 @@ QPV_ShowThumbnails(startIndex) {
     If (GIFsGuiCreated=1)
        DestroyGIFuWin()
 
-    Gdip_FillRectangle(G, pBrush, 0, 0, mainWidth, mainHeight)
+    createThumbsFolder()
+    Gdip_FillRectangle(G2, pBrush, 0, 0, mainWidth, mainHeight)
+    prevGUIupdate := A_TickCount
     Loop, % maxItemsW*maxItemsH*2
     {
+        hasUpdated := 0
         If GetKeyState("Esc", "P")
         {
            lastLongOperationAbort := A_TickCount
@@ -7894,15 +7983,6 @@ QPV_ShowThumbnails(startIndex) {
         }
         startZeit := A_TickCount
         thisFileIndex := startIndex + A_Index - 1
-        imgpath := resultedFilesList[thisFileIndex]
-        MD5name := generateThumbName(imgpath)
-        file2save := thumbsCacheFolder "\" MD5name ".jpg"
-        thisImgFile := FileExist(file2save) ? file2save : imgpath
-        changeMcursor()
-        oBitmap := LoadBitmapFromFileu(thisImgFile)
-        If oBitmap
-           Gdip_GetImageDimensions(oBitmap, imgW, imgH)
-        calcImgSize(1, imgW, imgH, thumbsW, thumbsH, newW, newH)
         columnIndex++
         If (columnIndex>=maxItemsW)
         {
@@ -7913,29 +7993,45 @@ QPV_ShowThumbnails(startIndex) {
         If (rowIndex>=maxItemsH)
            Break
 
+        imgpath := resultedFilesList[thisFileIndex]
+        MD5name := generateThumbName(imgpath)
+        file2save := thumbsCacheFolder "\" MD5name ".jpg"
+        thisImgFile := FileExist(file2save) ? file2save : imgpath
+        changeMcursor()
+        oBitmap := LoadBitmapFromFileu(thisImgFile)
+        If oBitmap
+           Gdip_GetImageDimensions(oBitmap, imgW, imgH)
+        calcImgSize(1, imgW, imgH, thumbsW, thumbsH, newW, newH)
         DestPosX := thumbsW//2 - newW//2 + thumbsW*columnIndex
         DestPosY := thumbsH//2 - newH//2 + thumbsH*rowIndex
         If (!imgW || !imgH || !oBitmap || !FileExist(imgpath))
            Continue
 
         changeMcursor()
-        r1 := Gdip_DrawImage(G, oBitmap, DestPosX, DestPosY, newW, newH, 0, 0, imgW, imgH, matrix)
+        r1 := Gdip_DrawImage(G2, oBitmap, DestPosX, DestPosY, newW, newH, 0, 0, imgW, imgH)
         oBitmap := Gdip_DisposeImage(oBitmap, 1)
-        r2 := UpdateLayeredWindow(hGDIthumbsWin, hdc, dummyPos, dummyPos, mainWidth, mainHeight)
         endZeit := A_TickCount
         thisZeit := endZeit - startZeit
+        If (A_TickCount - prevGUIupdate > 350)
+        {
+           r1 := Gdip_DrawImage(G, thumbsBitmap, 0, 0, mainWidth, mainHeight, 0, 0, mainWidth, mainHeight)
+           r2 := UpdateLayeredWindow(hGDIthumbsWin, hdc, dummyPos, dummyPos, mainWidth, mainHeight)
+           prevGUIupdate := A_TickCount
+           hasUpdated := 1
+        }
         If (thisZeit>maxZeit)
            maxZeit := thisZeit
-        If (imgW>maxImgSize)
-           maxImgSize := imgW
-        If (imgH>maxImgSize)
-           maxImgSize := imgH
+        If (imgW>maxImgSize || imgH>maxImgSize)
+           maxImgSize := maxU(imgW, imgH)
 
         imgsListed++
-        If (thisZeit>150 && file2save!=thisImgFile)
-           ListImg2Cache .= imgpath "`n"
-
-        If (imgW>130 || imgH>130)   ; images still worth bothering to cache
+        If (thisZeit>160 && file2save!=thisImgFile && enableThumbsCaching=1
+        && valueBetween(newW, 115, 395) && valueBetween(newW, 110, 395))
+        {
+           tmpBMP := Gdip_CloneBitmapArea(thumbsBitmap, DestPosX, DestPosY, newW, newH)
+           Gdip_SaveBitmapToFile(tmpBMP, file2save, 85)
+           Gdip_DisposeImage(tmpBMP, 1)
+        } Else If (enableThumbsCaching=1 && (imgW>130 || imgH>130))   ; images still worth bothering to cache
            ListAllIMGs .= imgpath "`n"
 
         If GetKeyState("Esc", "P")
@@ -7950,6 +8046,22 @@ QPV_ShowThumbnails(startIndex) {
     If oBitmap
        Gdip_DisposeImage(oBitmap, 1)
 
+    thisZatAdjust := (imgFxMode=4 && bwDithering=0 && zatAdjust=0) ? -99 : zatAdjust
+    applyAdjusts := (thisZatAdjust=0 && hueAdjust=0) ? 0 : 1
+    If (imgFxMode=2 || imgFxMode=3 || imgFxMode=4) && (applyAdjusts=1)
+    {
+       pEffect := Gdip_CreateEffect(6, hueAdjust, thisZatAdjust, 0)
+       r1 := Gdip_DrawImageFX(G, thumbsBitmap, 0, 0, mainWidth, mainHeight, matrix, pEffect)
+       r2 := UpdateLayeredWindow(hGDIthumbsWin, hdc, dummyPos, dummyPos, mainWidth, mainHeight)
+       Gdip_DisposeEffect(pEffect)
+    } Else If (matrix || hasUpdated=0)
+    {
+       r1 := Gdip_DrawImage(G, thumbsBitmap, 0, 0, mainWidth, mainHeight, 0, 0, mainWidth, mainHeight, matrix)
+       r2 := UpdateLayeredWindow(hGDIthumbsWin, hdc, dummyPos, dummyPos, mainWidth, mainHeight)
+    }
+
+    Gdip_DeleteGraphics(G2)
+    Gdip_DisposeImage(thumbsBitmap, 1)
 ;   ToolTip, %imgW% -- %imgH% == %newW% -- %newH%
     SelectObject(hdc, obm)
     DeleteObject(hbm)
@@ -7962,25 +8074,6 @@ QPV_ShowThumbnails(startIndex) {
     If (abandonAll=1)
        Return 0
 
-    If (StrLen(ListImg2Cache)>1 && enableThumbsCaching=1)
-    {
-       listHasCached := 1
-       thumbsCacheSize := (maxZeit>350 || loopZeit>700) ? 350 : 600
-       showTOOLtip("Caching " thumbsCacheSize "px thumbnails, please wait...")
-       Loop, Parse, ListImg2Cache, `n
-       {
-           changeMcursor()
-           generateImgThumbCache(A_LoopField, thumbsCacheSize)
-           If GetKeyState("Esc", "P")
-           {
-              lastLongOperationAbort := A_TickCount
-              abandonAll := 1
-              Break
-           }
-       }
-       SetTimer, RemoveTooltip, -500
-    }
-
     If (maxImgSize<135)
        listHasCached := 1
 
@@ -7991,7 +8084,7 @@ QPV_ShowThumbnails(startIndex) {
     {
        good2go := 1
        newSize := 250
-    } Else If (maxImgSize<255)
+    } Else If (maxImgSize<259)
     {
        good2go := 1
        newSize := 120
@@ -8620,8 +8713,10 @@ reverseArray(a) {
 }
 
 coreResizeIMG(imgpath, newW, newH, file2save, goFX, toClippy, rotateMode, soloMode:=1, imgW:=0, imgH:=0, batchMode:=0) {
-     If (soloMode=1)
-     {
+    Static imgOrientOpt := {"i000":0, "i100":1, "i200":2, "i300":3, "i010":4, "i110":5, "i210":6, "i310":7, "i001":6, "i101":7, "i201":4, "i301":5, "i011":2, "i111":3, "i211":0, "i311":1}
+
+    If (soloMode=1)
+    {
         changeMcursor()
         doBw := (ResizeApplyEffects=1 || goFX=1) ? 1 : 0
         oBitmap := LoadBitmapFromFileu(imgpath, doBw)
@@ -8634,14 +8729,6 @@ coreResizeIMG(imgpath, newW, newH, file2save, goFX, toClippy, rotateMode, soloMo
         If !oBitmap
            Return rr
     } Else oBitmap := soloMode
-
-    Angle := 0
-    If (rotateMode=2)
-       Angle := 90
-    Else If (rotateMode=3)
-       Angle := 180
-    Else If (rotateMode=4)
-       Angle := -90
 
     If (ResizeApplyEffects=1 || goFX=1)
     {
@@ -8733,51 +8820,31 @@ coreResizeIMG(imgpath, newW, newH, file2save, goFX, toClippy, rotateMode, soloMo
     thisImgQuality := (ResizeQualityHigh=1) ? 7 : 5
     Gdip_SetInterpolationMode(G2, thisImgQuality)
     Gdip_SetSmoothingMode(G2, 3)
-
-    changeMcursor()
-    Gdip_DrawImage(G2, oBitmap, 0, 0, zImgSelW, zImgSelH, imgSelPx, imgSelPy, imgSelW, imgSelH, matrix)
-    fImgW := zImgSelW
-    fImgH := zImgSelH
-
-    ; Gdip_GetImageDimensions(thumbBMP, fImgW, fImgH)
-    ; MsgBox, % fimgW " x " fimgH "`n" imgSelW " x " imgSelH "`n" zLv ", " zLh
-    Gdip_GetRotatedDimensions(fImgW, fImgH, Angle, RWidth, RHeight)
-    Gdip_GetRotatedTranslation(fImgW, fImgH, Angle, xTranslation, yTranslation)
-    RWidth := Floor(RWidth) - 1, RHeight := Floor(RHeight) - 1
-    xTranslation := Round(xTranslation) - 1, yTranslation := Round(yTranslation) - 1
-    If (rotateMode=2)
-       RWidth := RWidth - 2, xTranslation := xTranslation - 2
-    Else If (rotateMode=3 || rotateMode=4)
-       RHeight := RHeight - 2, yTranslation := yTranslation - 2
-
-    zBitmap := Gdip_CreateBitmap(RWidth, RHeight)
-    G3 := Gdip_GraphicsFromImage(zBitmap)
-    Gdip_SetInterpolationMode(G3, thisImgQuality)
-    Gdip_SetSmoothingMode(G3, 3)
-    Gdip_TranslateWorldTransform(G3, xTranslation, yTranslation)
-    Gdip_RotateWorldTransform(G3, Angle)
     pBrush := Gdip_BrushCreateSolid(0xFF555555)
-    Gdip_FillRectangle(G3, pBrush, 0, 0, fImgW+5, fImgH+5)
+    Gdip_FillRectangle(G2, pBrush, 0, 0, zImgSelW+5, zImgSelH+5)
     Gdip_DeleteBrush(pBrush)
-    If (ResizeApplyEffects=1 || goFX=1)
-    {
-       If (FlipImgH=1)
-       {
-          Gdip_ScaleWorldTransform(G3, -1, 1)
-          Gdip_TranslateWorldTransform(G3, -fImgW, 0)
-       }
 
-       If (FlipImgV=1)
-       {
-          Gdip_ScaleWorldTransform(G3, 1, -1)
-          Gdip_TranslateWorldTransform(G3, 0, -fImgH)
-       }
+    o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
+    applyAdjusts := (ResizeApplyEffects=1 || goFX=1) ? 1 : 0
+    thisZatAdjust := (imgFxMode=4 && bwDithering=0 && zatAdjust=0) ? -99 : zatAdjust
+    If (thisZatAdjust=0 && hueAdjust=0)
+       applyAdjusts := 0
+
+    If (imgFxMode=2 || imgFxMode=3 || imgFxMode=4) && (applyAdjusts=1 && o_bwDithering=0)
+    {
+       pEffect := Gdip_CreateEffect(6, hueAdjust, thisZatAdjust, 0)
+       Gdip_ApplyEffect(oBitmap, pEffect)
+       Gdip_DisposeEffect(pEffect)
     }
 
     changeMcursor()
-    Gdip_DrawImage(G3, thumbBMP, 0, 0, fImgW, fImgH, 0, 0, fImgW, fImgH, "")
+    Gdip_DrawImage(G2, oBitmap, 0, 0, zImgSelW, zImgSelH, imgSelPx, imgSelPy, imgSelW, imgSelH, matrix)
     Gdip_DisposeImage(oBitmap, 1)
     Sleep, 1
+    imgFoperation := rotateMode - 1
+    imgFoperation := imgOrientOpt["i" imgFoperation FlipImgH FlipImgV]
+    If (imgFoperation>0)
+       Gdip_ImageRotateFlip(thumbBMP, imgFoperation)
 
     If (userUnsprtWriteFMT=3 && batchMode=1)
     {
@@ -8791,15 +8858,12 @@ coreResizeIMG(imgpath, newW, newH, file2save, goFX, toClippy, rotateMode, soloMo
 
     changeMcursor()
     If (toClippy=1)
-       r := Gdip_SetBitmapToClipboard(zBitmap)
+       r := Gdip_SetBitmapToClipboard(thumbBMP)
     Else
-       r := Gdip_SaveBitmapToFile(zBitmap, file2save, 90)
+       r := Gdip_SaveBitmapToFile(thumbBMP, file2save, 90)
     If (toClippy!=1) && (r=-2 || r=-1)
-       r := SaveFIMfile(file2save, zBitmap)
+       r := SaveFIMfile(file2save, thumbBMP)
     Gdip_DeleteGraphics(G2)
-    Gdip_DeleteGraphics(G3)
-    If zBitmap
-       Gdip_DisposeImage(zBitmap, 1)
     If thumbBMP
        Gdip_DisposeImage(thumbBMP, 1)
     Return r
@@ -9041,8 +9105,8 @@ coreJpegLossLessAction(imgpath) {
 
 ColorsAdjusterPanelWindow() {
     Global sliderBright, sliderContrst, sliderSatu, realTimePreview, CustomZoomCB
-         , infoBright, infoContrst, infoSatu, BtnLumPlus, BtnLumMin, BtnFlipH
-         , BtnGammPlus, BtnGammMin, BtnSatPlus, BtnSatMin, ResizeModeDL, BtnFlipV
+         , infoBright, infoContrst, infoSatu, BtnLumPlus, BtnLumMin, BtnFlipH, infoZatAdjust
+         , BtnGammPlus, BtnGammMin, BtnSatPlus, BtnSatMin, ResizeModeDL, BtnFlipV, infohueAdjust
          , infoRGBchnls, RGBcbList := "-3.0|-2.0|-1.5|-1.0|-0.9|-0.8|-0.7|-0.6|-0.5|-0.4|-0.3|-0.2|-0.1|0.0|0.1|0.2|0.3|0.4|0.5|0.6|0.7|0.8|0.9|1.0|1.5|2.0|3.0"
 
     If (thumbsDisplaying=1)
@@ -9054,6 +9118,7 @@ ColorsAdjusterPanelWindow() {
     ForceNoColorMatrix := 0
     btnWid := 100
     txtWid := slideWid := 280
+    slide2Wid := 180
     initFIMGmodule()
     If !wasInitFIMlib
        bwDithering := 0
@@ -9061,6 +9126,7 @@ ColorsAdjusterPanelWindow() {
     If (PrefsLargeFonts=1)
     {
        slideWid := slideWid + 135
+       slide2Wid := slide2Wid + 65
        btnWid := btnWid + 70
        txtWid := txtWid + 135
        Gui, Font, s%LargeUIfontValue%
@@ -9088,6 +9154,10 @@ ColorsAdjusterPanelWindow() {
     Gui, Add, Slider, y+5 AltSubmit ToolTip NoTicks w%slideWid% gColorPanelTriggerImageUpdate vsliderSatu Range-100-100, 1
     Gui, Add, Button, x+1 hp w45 gBtnChangeSatPlus vBtnSatPlus, +
     Gui, Add, Button, x+1 hp w45 gBtnChangeSatMin vBtnSatMin, -
+    Gui, Add, Text, xs y+8 w%slide2Wid% vinfoZatAdjust, Vibrance: ----
+    Gui, Add, Text, x+5 w%slide2Wid% vinfohueAdjust, Hue: ----
+    Gui, Add, Slider, xs y+5 AltSubmit ToolTip w%slide2Wid% gColorPanelTriggerImageUpdate vzatAdjust Range-100-100, % zatAdjust
+    Gui, Add, Slider, x+5 AltSubmit ToolTip w%slide2Wid% gColorPanelTriggerImageUpdate vhueAdjust Range-180-180, % hueAdjust
     ; Gui, Add, Checkbox, xs y+15 gColorPanelTriggerImageUpdate Checked%realTimePreview% vrealTimePreview, Update image in real time
     Gui, Add, Text, xs y+15 vinfoRGBchnls, RGB channels balance:
     Gui, Add, ComboBox, x+5 w65 gColorPanelTriggerImageUpdate vchnRdecalage, %RGBcbList%|%chnRdecalage%||
@@ -9161,17 +9231,21 @@ updatePanelColorsInfo() {
    GuiControlGet, imgFxMode
    GuiControlGet, IMGresizingMode
    GuiControlGet, usrAdaptiveThreshold
+   GuiControlGet, bwDithering
    infolumosAdjust := (imgFxMode=4) ? Round(lumosGrayAdjust, 3) : Round(lumosAdjust, 3)
    infoGammosAdjust := (imgFxMode=4) ? Round(GammosGrayAdjust, 3) : Round(GammosAdjust, 3)
    infoSatAdjust := Round(satAdjust, 3)
    GuiControl, SettingsGUIA:, infoBright, % "Brightness: " infolumosAdjust
    GuiControl, SettingsGUIA:, infoContrst, % "Contrast: " infoGammosAdjust
    GuiControl, SettingsGUIA:, infoSatu, % "Saturation: " infoSatAdjust
+   GuiControl, SettingsGUIA:, infoZatAdjust, % "Vibrance: " zatAdjust "%"
+   GuiControl, SettingsGUIA:, infohueAdjust, % "Hue: " hueAdjust "°"
    If (IMGresizingMode=4)
       GuiControl, SettingsGUIA: Enable, CustomZoomCB
    Else
       GuiControl, SettingsGUIA: Disable, CustomZoomCB
 
+   o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
    If (imgFxMode=2)
    {
       GuiControl, SettingsGUIA: Enable, sliderSatu
@@ -9186,7 +9260,7 @@ updatePanelColorsInfo() {
       GuiControl, SettingsGUIA: Enable, infoBright
       GuiControl, SettingsGUIA: Enable, infoContrst
       GuiControl, SettingsGUIA: Enable, infoSatu
-   } Else If (imgFxMode=4)
+   } Else If (imgFxMode=4 && o_bwDithering=0)
    {
       GuiControl, SettingsGUIA: Enable, infoBright
       GuiControl, SettingsGUIA: Enable, infoContrst
@@ -9221,6 +9295,20 @@ updatePanelColorsInfo() {
    Else
       GuiControl, SettingsGUIA: Disable, bwDithering
 
+   If (imgFxMode=2 || imgFxMode=3 || imgFxMode=4) && (o_bwDithering=0)
+   {
+      GuiControl, SettingsGUIA: Enable, zatAdjust
+      GuiControl, SettingsGUIA: Enable, infoZatAdjust
+      GuiControl, SettingsGUIA: Enable, hueAdjust
+      GuiControl, SettingsGUIA: Enable, infohueAdjust
+   } Else
+   {
+      GuiControl, SettingsGUIA: Disable, zatAdjust
+      GuiControl, SettingsGUIA: Disable, infoZatAdjust
+      GuiControl, SettingsGUIA: Disable, hueAdjust
+      GuiControl, SettingsGUIA: Disable, infohueAdjust
+   }
+
    If (imgFxMode=2 || imgFxMode=3)
    {
       GuiControl, SettingsGUIA: Enable, infoRGBchnls
@@ -9234,6 +9322,7 @@ updatePanelColorsInfo() {
       GuiControl, SettingsGUIA: Disable, chnGdecalage
       GuiControl, SettingsGUIA: Disable, chnBdecalage
    }
+
    If (imgFxMode=3)
    {
       GuiControl, SettingsGUIA: Enable, autoAdjustMode
@@ -9259,7 +9348,7 @@ btnResetImageView() {
   GuiControl, SettingsGUIA: Choose, IMGresizingMode, 1
   GuiControl, SettingsGUIA:, bwDithering, 0
   IMGresizingMode := imgFxMode := satAdjust := lumosAdjust := lumosGrayAdjust := 1
-  chnRdecalage := chnGdecalage := chnBdecalage := GammosAdjust := GammosGrayAdjust := 0
+  zatAdjust := hueAdjust := chnRdecalage := chnGdecalage := chnBdecalage := GammosAdjust := GammosGrayAdjust := 0
   updatePanelColorsInfo()
   usrAdaptiveThreshold := infoBright := infoSatu := 1
   bwDithering := infoContrst := sliderSatu := sliderBright := sliderContrst := 0
@@ -9267,6 +9356,8 @@ btnResetImageView() {
   GuiControl, SettingsGUIA:, infoBright, Brightness: 1.009
   GuiControl, SettingsGUIA:, infoContrst, Contrast: 0.000
   GuiControl, SettingsGUIA:, infoSatu, Saturation: 1.000
+  GuiControl, SettingsGUIA:, hueAdjust, 0
+  GuiControl, SettingsGUIA:, zatAdjust, 0
   GuiControl, SettingsGUIA:, sliderSatu, 0
   GuiControl, SettingsGUIA:, sliderBright, 0
   GuiControl, SettingsGUIA:, sliderContrst, 0
@@ -9298,6 +9389,8 @@ ColorPanelTriggerImageUpdate() {
    GuiControlGet, chnRdecalage
    GuiControlGet, chnGdecalage
    GuiControlGet, chnBdecalage
+   GuiControlGet, zatAdjust
+   GuiControlGet, hueAdjust
    ; GuiControlGet, realTimePreview
 
    ForceNoColorMatrix := 0
@@ -9665,7 +9758,7 @@ Copy2ClipResizedIMG() {
    }
 
    r := coreResizeIMG(img2resizePath, ResultEditWidth, ResultEditHeight, "--", 0, 1, ResizeRotationUser)
-   If r
+   If !r
    {
       showTOOLtip("Resized image copied to clipboard")
       SoundBeep, 900, 100
@@ -10429,6 +10522,7 @@ WM_RBUTTONUP(wP, lP, msg, hwnd) {
   If (okay!=1)
      Return
 
+  GuiControl, 1:, editDummy, -
   If (thumbsDisplaying=1 && maxFilesIndex>0)
   {
      WinClickAction("rClick")
@@ -10588,7 +10682,8 @@ initCompiled() {
    Current_PID := GetCurrentProcessId()
    fullPath2exe := GetModuleFileNameEx(Current_PID)
    zPlitPath(fullPath2exe, 0, OutFileName, OutDir)
-   mainCompiledPath := OutDir "\"
+   mainCompiledPath := OutDir
    thumbsCacheFolder := OutDir "\thumbs-cache"
    mainSettingsFile := OutDir "\" mainSettingsFile
 }
+

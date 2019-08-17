@@ -15,27 +15,30 @@
 ; - It now works with FreeImage v3.18 and AHK_L v1.1.30.
 ; - Added many new functions and cleaned up the code. Fixed bugs.
 
-FreeImage_FoxInit(isInit=True) {
+FreeImage_FoxInit(isInit:=1) {
    Static hFIDll
-   If isInit
-      hFIDll := DllCall("LoadLibrary", "Str", FreeImage_FoxGetDllPath(), "Ptr")
+   DllPath := FreeImage_FoxGetDllPath()
+   If !DllPath
+      Return "err - 404"
+
+   If (isInit=1)
+      hFIDll := DllCall("LoadLibrary", "Str", DllPath, "Ptr")
    Else
       DllCall("FreeLibrary", "UInt", hFIDll)
+
+   If (isInit=1 && !hFIDll)
+      Return "err - " A_LastError
+
    Return hFIDll
 }
 
-FreeImage_FoxGetDllPath(DllName="FreeImage.dll") {
-   DirList =
-   (Join`n Ltrim
-      %A_scriptdir%\bin32
-      %A_scriptdir%\lib
-      %A_scriptdir%
-   )
-
-   Loop, parse, DirList, `n
+FreeImage_FoxGetDllPath(DllName:="FreeImage.dll") {
+   DirList := "|" A_WorkingDir "|" mainCompiledPath "|" A_scriptdir "|" A_scriptdir "\bin32|" A_scriptdir "\lib|"
+   DllPath := ""
+   Loop, Parse, DirList, |
    {
-      IfExist, %A_LoopField%\%DllName%
-         DllPath := A_LoopField . "\" . DllName
+      If FileExist(A_LoopField "\" DllName)
+         DllPath := A_LoopField "\" DllName
    }
 
    Return DllPath
