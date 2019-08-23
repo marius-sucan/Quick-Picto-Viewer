@@ -1,16 +1,26 @@
-﻿; Gdip standard library v1.55 on 08/14/2019
+﻿; Gdip_All.ahk - GDI+ library compilation of user contributed GDI+ functions
+; a fork from https://github.com/mmikeww/AHKv2-Gdip
+; made by Marius Șucan
+;
+; Gdip standard library v1.57 on 08/23/2019
+; Gdip standard library v1.56 on 08/21/2019
+; Gdip standard library v1.55 on 08/14/2019
 ; Gdip standard library v1.54 on 11/15/2017
 ; Gdip standard library v1.53 on 06/19/2017
 ; Gdip standard library v1.52 on 06/11/2017
 ; Gdip standard library v1.51 on 01/27/2017
 ; Gdip standard library v1.50 on 11/20/2016
 ; Gdip standard library v1.45 by tic (Tariq Porter) 07/09/11
-; Modifed by Rseding91 using fincs 64 bit compatible Gdip library 5/1/2013
-; Supports: Basic, _L ANSi, _L Unicode x86 and _L Unicode x64
+; Modified by Rseding91 using fincs 64 bit compatible Gdip library 5/1/2013
+; Supports: AHK_L / AHK_H Unicode/ANSI x86/x64 
 ;
+; Updated 08/23/2019 - Added Gdip_FillRoundedRectangle2() and Gdip_DrawRoundedRectangle2(); extracted from Gdip2 by Tariq [tic] and corrected functions names
+; Updated 08/21/2019 - Added GenerateColorMatrix()
+; Updated 08/19/2019 - Added twelve functions. Extracted from a class wrapper for GDI+ written by nnnik in 2017.
+; Updated 08/18/2019 - Added Gdip_AddPathRectangle() and eight PathGradient related functions by JustMe
 ; Updated 08/16/2019 - Added Gdip_DrawImageFX(), Gdip_CreateEffect() and other related functions
 ; Updated 08/15/2019 - Added Gdip_DrawRoundedLine() by DevX and Rabiator
-; Updated 08/15/2019 - Added GraphicsPath functions by "Learning one" and updated by Marius Șucan
+; Updated 08/15/2019 - Added eleven GraphicsPath related functions by "Learning one" and updated by Marius Șucan
 ; Updated 08/14/2019 - Added Gdip_IsVisiblePathPoint() and RotateAtCenter() by RazorHalo
 ; Updated 08/08/2019 - Added Gdip_GetDIBits() and Gdip_CreateDIBitmap()
 ; Updated 07/19/2019 - Added Gdip_GetHistogram() by swagfag and GetProperty GDI+ functions by JustMe
@@ -54,7 +64,6 @@
 ; ProfileNotFound       = 21
 ;
 ;#####################################################################################
-;#####################################################################################
 ; FUNCTIONS
 ;#####################################################################################
 ;
@@ -94,7 +103,7 @@ UpdateLayeredWindow(hwnd, hdc, x:="", y:="", w:="", h:="", Alpha:=255) {
    if (w = "") || (h = "")
    {
       CreateRect( winRect, 0, 0, 0, 0 ) ;is 16 on both 32 and 64
-      DllCall( "GetWindowRect", Ptr, hwnd, Ptr, &winRect )
+      DllCall("GetWindowRect", Ptr, hwnd, Ptr, &winRect )
       w := NumGet(winRect, 8, "UInt")  - NumGet(winRect, 0, "UInt")
       h := NumGet(winRect, 12, "UInt") - NumGet(winRect, 4, "UInt")
    }
@@ -237,7 +246,7 @@ SetStretchBltMode(hdc, iStretchMode:=4) {
 
 SetImage(hwnd, hBitmap) {
    Ptr := A_PtrSize ? "UPtr" : "UInt"
-   E := DllCall( "SendMessage", Ptr, hwnd, "UInt", 0x172, "UInt", 0x0, Ptr, hBitmap )
+   E := DllCall("SendMessage", Ptr, hwnd, "UInt", 0x172, "UInt", 0x0, Ptr, hBitmap )
    DeleteObject(E)
    return E
 }
@@ -295,7 +304,7 @@ SetImage(hwnd, hBitmap) {
 SetSysColorToControl(hwnd, SysColor:=15) {
    Ptr := A_PtrSize ? "UPtr" : "UInt"
    CreateRect( winRect, 0, 0, 0, 0 ) ;is 16 on both 32 and 64
-   DllCall( "GetWindowRect", Ptr, hwnd, Ptr, &winRect )
+   DllCall("GetWindowRect", Ptr, hwnd, Ptr, &winRect )
    w := NumGet(winRect, 8, "UInt")  - NumGet(winRect, 0, "UInt")
    h := NumGet(winRect, 12, "UInt") - NumGet(winRect, 4, "UInt")
    bc := DllCall("GetSysColor", "Int", SysColor, "UInt")
@@ -329,10 +338,10 @@ Gdip_BitmapFromScreen(Screen:=0, Raster:="") {
    Ptr := A_PtrSize ? "UPtr" : "UInt"
    if (Screen = 0)
    {
-      _x := DllCall( "GetSystemMetrics", "Int", 76 )
-      _y := DllCall( "GetSystemMetrics", "Int", 77 )
-      _w := DllCall( "GetSystemMetrics", "Int", 78 )
-      _h := DllCall( "GetSystemMetrics", "Int", 79 )
+      _x := DllCall("GetSystemMetrics", "Int", 76 )
+      _y := DllCall("GetSystemMetrics", "Int", 77 )
+      _w := DllCall("GetSystemMetrics", "Int", 78 )
+      _h := DllCall("GetSystemMetrics", "Int", 79 )
    }
    else if (SubStr(Screen, 1, 5) = "hwnd:")
    {
@@ -340,7 +349,7 @@ Gdip_BitmapFromScreen(Screen:=0, Raster:="") {
       if !WinExist("ahk_id " Screen)
          return -2
       CreateRect( winRect, 0, 0, 0, 0 ) ;is 16 on both 32 and 64
-      DllCall( "GetWindowRect", Ptr, Screen, Ptr, &winRect )
+      DllCall("GetWindowRect", Ptr, Screen, Ptr, &winRect )
       _w := NumGet(winRect, 8, "UInt")  - NumGet(winRect, 0, "UInt")
       _h := NumGet(winRect, 12, "UInt") - NumGet(winRect, 4, "UInt")
       _x := _y := 0
@@ -383,7 +392,7 @@ Gdip_BitmapFromScreen(Screen:=0, Raster:="") {
 Gdip_BitmapFromHWND(hwnd) {
    Ptr := A_PtrSize ? "UPtr" : "UInt"
    CreateRect( winRect, 0, 0, 0, 0 ) ;is 16 on both 32 and 64
-   DllCall( "GetWindowRect", Ptr, hwnd, Ptr, &winRect )
+   DllCall("GetWindowRect", Ptr, hwnd, Ptr, &winRect )
    Width := NumGet(winRect, 8, "UInt") - NumGet(winRect, 0, "UInt")
    Height := NumGet(winRect, 12, "UInt") - NumGet(winRect, 4, "UInt")
    hbm := CreateDIBSection(Width, Height), hdc := CreateCompatibleDC(), obm := SelectObject(hdc, hbm)
@@ -417,16 +426,18 @@ CreateRectF(ByRef RectF, x, y, w, h) {
 ; Description        Creates a Rect object, containing a the coordinates and dimensions of a rectangle
 ;
 ; RectF              Name to call the RectF object
-; x                  x-coordinate of the upper left corner of the rectangle
-; y                  y-coordinate of the upper left corner of the rectangle
-; w                  Width of the rectangle
-; h                  Height of the rectangle
-;
+; x, y               x, y-coordinates of the upper left corner of the rectangle
+; x2, y2             x, y-coordinates of the bottom right corner of the rectangle
+
 ; return          No return value
 
-CreateRect(ByRef Rect, x, y, w, h) {
+CreateRect(ByRef Rect, x, y, x2, y2) {
+; modified by Marius Șucan according to dangerdogL2121
+; found on https://autohotkey.com/board/topic/29449-gdi-standard-library-145-by-tic/page-93
+
    VarSetCapacity(Rect, 16)
-   NumPut(x, Rect, 0, "uint"), NumPut(y, Rect, 4, "uint"), NumPut(w, Rect, 8, "uint"), NumPut(h, Rect, 12, "uint")
+   NumPut(x, Rect, 0, "uint"), NumPut(y, Rect, 4, "uint")
+   NumPut(x2, Rect, 8, "uint"), NumPut(y2, Rect, 12, "uint")
 }
 ;#####################################################################################
 
@@ -538,9 +549,9 @@ DestroyIcon(hIcon) {
 ;
 ; hIcon              Pointer to an icon or cursor
 ; Width              ByRef variable. This variable is set to the icon's width
-; Height          ByRef variable. This variable is set to the icon's height
+; Height             ByRef variable. This variable is set to the icon's height
 ;
-; return          If the function succeeds, the return value is zero, otherwise:
+; return           If the function succeeds, the return value is zero, otherwise:
 ;                 -1 = Could not retrieve the icon's info. Check A_LastError for extended information
 ;                 -2 = Could not delete the icon's bitmask bitmap
 ;                 -3 = Could not delete the icon's color bitmap
@@ -550,7 +561,6 @@ GetIconDimensions(hIcon, ByRef Width, ByRef Height) {
    Width := Height := 0
 
    VarSetCapacity(ICONINFO, size := 16 + 2 * A_PtrSize, 0)
-
    if !DllCall("user32\GetIconInfo", Ptr, hIcon, Ptr, &ICONINFO)
       return -1
    
@@ -728,27 +738,27 @@ Gdip_LibraryVersion() {
 
 ;#####################################################################################
 
-; Function           Gdip_LibrarySubVersion
-; Description        Get the current library sub version
+; Function        Gdip_LibrarySubVersion
+; Description     Get the current library sub version
 ;
 ; return          the library sub version
 ;
-; notes              This is the sub-version currently maintained by Rseding91
-;              Updated by guest3456 preliminary AHK v2 support
+; notes           This is the sub-version currently maintained by Rseding91
+;                 Updated by guest3456 preliminary AHK v2 support
 Gdip_LibrarySubVersion() {
-   return 1.55
+   return 1.57
 }
 
 ;#####################################################################################
 
 ; Function:          Gdip_BitmapFromBRA
-; Description:          Gets a pointer to a gdi+ bitmap from a BRA file
+; Description:       Gets a pointer to a gdi+ bitmap from a BRA file
 ;
 ; BRAFromMemIn       The variable for a BRA file read to memory
 ; File               The name of the file, or its number that you would like (This depends on alternate parameter)
 ; Alternate          Changes whether the File parameter is the file name or its number
 ;
-; return             If the function succeeds, the return value is a pointer to a gdi+ bitmap
+; return           If the function succeeds, the return value is a pointer to a gdi+ bitmap
 ;                 -1 = The BRA variable is empty
 ;                 -2 = The BRA has an incorrect header
 ;                 -3 = The BRA has information missing
@@ -783,7 +793,7 @@ Gdip_BitmapFromBRA(ByRef BRAFromMemIn, File, Alternate := 0) {
    DllCall("RtlMoveMemory", "Ptr", pData, "Ptr", &BRAFromMemIn + Offset, "Ptr", Size)
    DllCall("GlobalUnlock", "Ptr", hData)
    DllCall("Ole32.dll\CreateStreamOnHGlobal", "Ptr", hData, "Int", 1, "PtrP", pStream)
-   DllCall("Gdiplus.dll\GdipCreateBitmapFromStream", "Ptr", pStream, "PtrP", pBitmap)
+   DllCall("gdiplus\GdipCreateBitmapFromStream", "Ptr", pStream, "PtrP", pBitmap)
    ObjRelease(pStream)
    Return pBitmap
 }
@@ -793,9 +803,9 @@ Gdip_BitmapFromBRA(ByRef BRAFromMemIn, File, Alternate := 0) {
 ; Function:          Gdip_BitmapFromBase64
 ; Description:       Creates a bitmap from a Base64 encoded string
 ;
-; Base64          ByRef variable. Base64 encoded string. Immutable, ByRef to avoid performance overhead of passing long strings.
+; Base64           ByRef variable. Base64 encoded string. Immutable, ByRef to avoid performance overhead of passing long strings.
 ;
-; return          If the function succeeds, the return value is a pointer to a bitmap, otherwise:
+; return           If the function succeeds, the return value is a pointer to a bitmap, otherwise:
 ;                 -1 = Could not calculate the length of the required buffer
 ;                 -2 = Could not decode the Base64 encoded string
 ;                 -3 = Could not create a memory stream
@@ -879,6 +889,39 @@ Gdip_DrawRoundedRectangle(pGraphics, pPen, x, y, w, h, r) {
    return _E
 }
 
+Gdip_DrawRoundedRectangle2(pGraphics, pPen, x, y, w, h, r) {
+; extracted from: https://github.com/tariqporter/Gdip2/blob/master/lib/Object.ahk
+; and adapted by Marius Șucan
+
+   penWidth := Gdip_GetPenWidth(pPen)
+   pw := penWidth / 2
+   if (w <= h && (r + pw > w / 2))
+   {
+      r := (w / 2 > pw) ? w / 2 - pw : 0
+   } else if (h < w && r + pw > h / 2)
+   {
+      r := (h / 2 > pw) ? h / 2 - pw : 0
+   } else if (r < pw / 2)
+   {
+      r := pw / 2
+   }
+
+   r2 := r * 2
+   path1 := Gdip_CreatePath(0)
+   Gdip_AddPathArc(path1, x + pw, y + pw, r2, r2, 180, 90)
+   Gdip_AddPathLine(path1, x + pw + r, y + pw, x + w - r - pw, y + pw)
+   Gdip_AddPathArc(path1, x + w - r2 - pw, y + pw, r2, r2, 270, 90)
+   Gdip_AddPathLine(path1, x + w - pw, y + r + pw, x + w - pw, y + h - r - pw)
+   Gdip_AddPathArc(path1, x + w - r2 - pw, y + h - r2 - pw, r2, r2, 0, 90)
+   Gdip_AddPathLine(path1, x + w - r - pw, y + h - pw, x + r + pw, y + h - pw)
+   Gdip_AddPathArc(path1, x + pw, y + h - r2 - pw, r2, r2, 90, 90)
+   Gdip_AddPathLine(path1, x + pw, y + h - r - pw, x + pw, y + r + pw)
+   Gdip_ClosePathFigure(path1)
+   _E := Gdip_DrawPath(pGraphics, pPen, path1)
+   Gdip_DeletePath(path1)
+   return _E
+}
+
 ;#####################################################################################
 
 ; Function           Gdip_DrawEllipse
@@ -919,13 +962,13 @@ Gdip_DrawEllipse(pGraphics, pPen, x, y, w, h) {
 ;
 ; return          status enumeration. 0 = success
 ;
-; notes              as all coordinates are taken from the top left of each pixel, then the entire width/height should be specified as subtracting the pen width
+; notes            as all coordinates are taken from the top left of each pixel, then the entire width/height should be specified as subtracting the pen width
 
 Gdip_DrawBezier(pGraphics, pPen, x1, y1, x2, y2, x3, y3, x4, y4) {
    Ptr := A_PtrSize ? "UPtr" : "UInt"
 
    return DllCall("gdiplus\GdipDrawBezier"
-               , Ptr, pgraphics
+               , Ptr, pGraphics
                , Ptr, pPen
                , "float", x1
                , "float", y1
@@ -935,6 +978,40 @@ Gdip_DrawBezier(pGraphics, pPen, x1, y1, x2, y2, x3, y3, x4, y4) {
                , "float", y3
                , "float", x4
                , "float", y4)
+}
+
+;#####################################################################################
+
+; Function           Gdip_DrawBezierCurve
+; Description        This function uses a pen to draw beziers
+; pGraphics          Pointer to the Graphics of a bitmap
+; pPen               Pointer to a pen
+; Points
+;   An array of starting and control points of a Bezier line
+;   A single Bezier line consists of 4 points a starting point 2 control
+;   points and an end point.
+;   The line never actually goes through the control points.
+;   The control points define the tangent in the starting and end points and their
+;   distance controls how strongly the curve follows there.
+;
+; Return: status enumeration. 0 = success
+;
+; This function was extracted by Marius Șucan from a class based wrapper around
+; the GDI+ API made by nnnik.
+; Source: https://github.com/nnnik/classGDIp
+;
+; Example points array:
+; BezierPointsArray := [ [ 0, 0], [ 1000, 0 ], [ 0, 600 ], [ 1000, 600 ], [ 1000, 0 ], [ 0, 600 ], [ 0, 0 ] ]
+
+Gdip_DrawBezierCurve(pGraphics, pPen, points) {
+   pointsBuffer := ""
+   VarSetCapacity(pointsBuffer,  8 * points.Length(), 0 )
+   for each, point in points
+   {
+      NumPut(point.1, pointsBuffer, each * 8 - 8, "float" )
+      NumPut(point.2, pointsBuffer, each * 8 - 4, "float" )
+   }
+   return DllCall("gdiplus\GdipDrawBeziers", "UPtr", pGraphics, "UPtr", pPen, "UPtr", &pointsBuffer, "UInt", points.Length())
 }
 
 ;#####################################################################################
@@ -1074,14 +1151,34 @@ Gdip_FillRectangle(pGraphics, pBrush, x, y, w, h) {
 ; Description        This function uses a brush to fill a rounded rectangle in the Graphics of a bitmap
 ;
 ; pGraphics          Pointer to the Graphics of a bitmap
-; pBrush          Pointer to a brush
+; pBrush             Pointer to a brush
 ; x                  x-coordinate of the top left of the rounded rectangle
 ; y                  y-coordinate of the top left of the rounded rectangle
 ; w                  width of the rectanlge
 ; h                  height of the rectangle
 ; r                  radius of the rounded corners
 ;
-; return          status enumeration. 0 = success
+; return             status enumeration. 0 = success
+
+Gdip_FillRoundedRectangle2(pGraphics, pBrush, x, y, w, h, r) {
+; extracted from: https://github.com/tariqporter/Gdip2/blob/master/lib/Object.ahk
+; and adapted by Marius Șucan
+
+   r := (w <= h) ? (r < w // 2) ? r : w // 2 : (r < h // 2) ? r : h // 2
+   path1 := Gdip_CreatePath(0)
+   Gdip_AddPathRectangle(path1, x+r, y, w-(2*r), r)
+   Gdip_AddPathRectangle(path1, x+r, y+h-r, w-(2*r), r)
+   Gdip_AddPathRectangle(path1, x, y+r, r, h-(2*r))
+   Gdip_AddPathRectangle(path1, x+w-r, y+r, r, h-(2*r))
+   Gdip_AddPathRectangle(path1, x+r, y+r, w-(2*r), h-(2*r))
+   Gdip_AddPathPie(path1, x, y, 2*r, 2*r, 180, 90)
+   Gdip_AddPathPie(path1, x+w-(2*r), y, 2*r, 2*r, 270, 90)
+   Gdip_AddPathPie(path1, x, y+h-(2*r), 2*r, 2*r, 90, 90)
+   Gdip_AddPathPie(path1, x+w-(2*r), y+h-(2*r), 2*r, 2*r, 0, 90)
+   E := Gdip_FillPath(pGraphics, pBrush, path1)
+   Gdip_DeletePath(path1)
+   return E
+}
 
 Gdip_FillRoundedRectangle(pGraphics, pBrush, x, y, w, h, r) {
    Region := Gdip_GetClipRegion(pGraphics)
@@ -1297,10 +1394,10 @@ Gdip_DrawImagePointsRect(pGraphics, pBitmap, Points, sx:="", sy:="", sw:="", sh:
 ;
 ; return          status enumeration. 0 = success
 ;
-; notes              if sx,sy,sw,sh are missed then the entire source bitmap will be used
+; notes           if sx,sy,sw,sh are missed then the entire source bitmap will be used
 ;                 Gdip_DrawImage performs faster
 ;                 Matrix can be omitted to just draw with no alteration to ARGB
-;                 Matrix may be passed as a digit from 0 - 1 to change just transparency
+;                 Matrix may be passed as a digit from 0.0 - 1.0 to change just transparency
 ;                 Matrix can be passed as a matrix with any delimiter. For example:
 ;                 MatrixBright=
 ;                 (
@@ -1311,7 +1408,7 @@ Gdip_DrawImagePointsRect(pGraphics, pBitmap, Points, sx:="", sy:="", sw:="", sh:
 ;                 0.05  |0.05 |0.05 |0    |1
 ;                 )
 ;
-; notes              MatrixBright = 1.5|0|0|0|0|0|1.5|0|0|0|0|0|1.5|0|0|0|0|0|1|0|0.05|0.05|0.05|0|1
+; notes           MatrixBright = 1.5|0|0|0|0|0|1.5|0|0|0|0|0|1.5|0|0|0|0|0|1|0|0.05|0.05|0.05|0|1
 ;                 MatrixGreyScale = 0.299|0.299|0.299|0|0|0.587|0.587|0.587|0|0|0.114|0.114|0.114|0|0|0|0|0|1|0|0|0|0|0|1
 ;                 MatrixNegative = -1|0|0|0|0|0|-1|0|0|0|0|0|-1|0|0|0|0|0|1|0|1|1|1|0|1
 
@@ -1369,7 +1466,7 @@ Gdip_DrawImage(pGraphics, pBitmap, dx:="", dy:="", dw:="", dh:="", sx:="", sy:="
 ;
 ; return          returns an image matrix on sucess or 0 if it fails
 ;
-; notes              MatrixBright = 1.5|0|0|0|0|0|1.5|0|0|0|0|0|1.5|0|0|0|0|0|1|0|0.05|0.05|0.05|0|1
+; notes           MatrixBright = 1.5|0|0|0|0|0|1.5|0|0|0|0|0|1.5|0|0|0|0|0|1|0|0.05|0.05|0.05|0|1
 ;                 MatrixGreyScale = 0.299|0.299|0.299|0|0|0.587|0.587|0.587|0|0|0.114|0.114|0.114|0|0|0|0|0|1|0|0|0|0|0|1
 ;                 MatrixNegative = -1|0|0|0|0|0|-1|0|0|0|0|0|-1|0|0|0|0|0|1|0|1|1|1|0|1
 
@@ -1461,10 +1558,10 @@ Gdip_ReleaseDC(pGraphics, hdc) {
 ; pGraphics          Pointer to the graphics of a bitmap
 ; ARGB               The colour to clear the graphics to
 ;
-; return          status enumeration. 0 = success
+; return             status enumeration. 0 = success
 ;
 ; notes              By default this will make the background invisible
-;                 Using clipping regions you can clear a particular area on the graphics rather than clearing the entire graphics
+;                    Using clipping regions you can clear a particular area on the graphics rather than clearing the entire graphics
 
 Gdip_GraphicsClear(pGraphics, ARGB:=0x00ffffff) {
    return DllCall("gdiplus\GdipGraphicsClear", A_PtrSize ? "UPtr" : "UInt", pGraphics, "int", ARGB)
@@ -1873,6 +1970,7 @@ Gdip_CreateBitmapFromClipboard() {
 
 Gdip_SetBitmapToClipboard(pBitmap) {
 ; modified by Marius Șucan to have this function report errors
+
    Ptr := A_PtrSize ? "UPtr" : "UInt"
    off1 := A_PtrSize = 8 ? 52 : 44, off2 := A_PtrSize = 8 ? 32 : 24
    r1 := DllCall("OpenClipboard", Ptr, 0)
@@ -1933,6 +2031,29 @@ Gdip_CreatePen(ARGB, w) {
    return pPen
 }
 
+      
+Gdip_SetPenWidth(pPen, width) {
+   return DllCall("gdiplus\GdipSetPenWidth", "UPtr", pPen, "float", width)
+}
+
+Gdip_GetPenWidth(pPen) {
+   DllCall("gdiplus\GdipGetPenWidth", "UPtr", pPen, "float*", width)
+   return width
+}
+
+Gdip_SetPenColor(pPen, ARGB) {
+   return DllCall("gdiplus\GdipSetPenColor", "UPtr", pPen, "UInt", ARGB)
+}
+
+Gdip_GetPenColor() {
+   DllCall("gdiplus\GdipGetPenColor", "UPtr", pPen, "UInt*", ARGB)
+   return ARGB
+}
+
+Gdip_SetPenBrushFill(pPen, pBrush) {
+   return DllCall("gdiplus\GdipSetPenBrushFill", "UPtr", pPen, "UPtr", pBrush)
+}
+
 ;#####################################################################################
 
 Gdip_CreatePenFromBrush(pBrush, w) {
@@ -1942,6 +2063,11 @@ Gdip_CreatePenFromBrush(pBrush, w) {
    return pPen
 }
 
+Gdip_ClonePen(pPen) {
+   r := DllCall("gdiplus\GdipClonePen", "UPtr", pPen, "UPtr*", newPen)
+   Return newPen
+}
+
 ;#####################################################################################
 
 Gdip_BrushCreateSolid(ARGB:=0xff000000) {
@@ -1949,6 +2075,16 @@ Gdip_BrushCreateSolid(ARGB:=0xff000000) {
 
    DllCall("gdiplus\GdipCreateSolidFill", "UInt", ARGB, A_PtrSize ? "UPtr*" : "UInt*", pBrush)
    return pBrush
+}
+
+Gdip_SetSolidFillColor(pBrush, ARGB) {
+   r := DllCall("gdiplus\GdipSetSolidFillColor", "UPtr", pBrush, "UInt", ARGB)
+   return r
+}
+
+Gdip_GetSolidFillColorgetColor(pBrush) {
+   r := DllCall("gdiplus\GdipGetSolidFillColor", "UPtr", pBrush, "UInt*", ARGB)
+   return ARGB
 }
 
 ;#####################################################################################
@@ -2028,7 +2164,8 @@ Gdip_CreateTextureBrush(pBitmap, WrapMode:=1, x:=0, y:=0, w:="", h:="") {
 }
 
 ;#####################################################################################
-
+; Linear gradient brush options:
+; wrap mode specifies how the pattern is repeated once it exceeds the defined space
 ; WrapModeTile = 0
 ; WrapModeTileFlipX = 1
 ; WrapModeTileFlipY = 2
@@ -2040,6 +2177,19 @@ Gdip_CreateLineBrush(x1, y1, x2, y2, ARGB1, ARGB2, WrapMode:=1) {
    CreatePointF(PointF1, x1, y1), CreatePointF(PointF2, x2, y2)
    DllCall("gdiplus\GdipCreateLineBrush", Ptr, &PointF1, Ptr, &PointF2, "Uint", ARGB1, "Uint", ARGB2, "int", WrapMode, A_PtrSize ? "UPtr*" : "UInt*", LGpBrush)
    return LGpBrush
+}
+
+Gdip_SetLineColors(LGpBrush, ARGB1, ARGB2) {
+   r := DllCall("gdiplus\GdipSetLineColors", "UPtr", LGpBrush, "UInt", ARGB1, "UInt", ARGB2)
+   return r
+}
+
+Gdip_GetLineColors(LGpBrush, ByRef ARGB1, ByRef ARGB2) {
+   VarSetCapacity(colors, 8, 0)
+   r := DllCall("gdiplus\GdipGetLineColors", "UPtr", LGpBrush, "Ptr", &colors)
+   ARGB1 := NumGet(colors, 0, "UInt")
+   ARGB2 := NumGet(colors, 4, "UInt")
+   return r
 }
 
 ;#####################################################################################
@@ -2298,12 +2448,20 @@ Gdip_FontFamilyCreate(Font) {
       DllCall("MultiByteToWideChar", "uint", 0, "uint", 0, Ptr, &Font, "int", -1, Ptr, &wFont, "int", nSize)
    }
 
-   DllCall("gdiplus\GdipCreateFontFamilyFromName"
+   _E := DllCall("gdiplus\GdipCreateFontFamilyFromName"
                , Ptr, A_IsUnicode ? &Font : &wFont
                , "uint", 0
                , A_PtrSize ? "UPtr*" : "UInt*", hFamily)
 
    return hFamily
+}
+
+Gdip_CreateFontFromDC(hDC) {
+   ; a font must be selected in the hDC for this function to work
+   ; function extracted from a class based wrapper around the GDI+ API made by nnnik
+
+   r := DllCall("gdiplus\GdipCreateFontFromDC", "UPtr", hDC, "UPtr*", pFont)
+   Return pFont
 }
 
 ;#####################################################################################
@@ -2333,6 +2491,10 @@ Gdip_CreatePath(BrushMode:=0) {
 
 Gdip_AddPathEllipse(pPath, x, y, w, h) {
    return DllCall("gdiplus\GdipAddPathEllipse", A_PtrSize ? "UPtr" : "UInt", pPath, "float", x, "float", y, "float", w, "float", h)
+}
+
+Gdip_AddPathRectangle(pPath, x, y, w, h) {
+   return DllCall("gdiplus\GdipAddPathRectangle", A_PtrSize ? "UPtr" : "UInt", pPath, "float", x, "float", y, "float", w, "float", h)
 }
 
 Gdip_AddPathPolygon(pPath, Points) {
@@ -2559,13 +2721,13 @@ Gdip_GetLockBitPixel(Scan0, x, y, Stride) {
 ;#####################################################################################
 
 Gdip_PixelateBitmap(pBitmap, ByRef pBitmapOut, BlockSize) {
+; it does not work on x64, AHK_L Unicode, Windows 10 
+
    static PixelateBitmap
-
    Ptr := A_PtrSize ? "UPtr" : "UInt"
-
    if (!PixelateBitmap)
    {
-      if A_PtrSize != 8 ; x86 machine code
+      if (A_PtrSize!=8) ; x86 machine code
       MCode_PixelateBitmap := "
       (LTrim Join
       558BEC83EC3C8B4514538B5D1C99F7FB56578BC88955EC894DD885C90F8E830200008B451099F7FB8365DC008365E000894DC88955F08945E833FF897DD4
@@ -2854,10 +3016,11 @@ MDMF_GetInfo(HMON) {
 
 
 ;######################################################################################################################################
-; The following functions are written by JustMe
+; The following functions are written by Just Me
 ; Taken from https://autohotkey.com/board/topic/85238-get-image-metadata-using-gdi-ahk-l/
 ; October 2013; minimal modifications by Marius Șucan in July 2019
 ;######################################################################################################################################
+;
 ; Gdip_GetPropertyCount() - Gets the number of properties (pieces of metadata) stored in this Image object.
 ; Parameters:
 ;     pImage      -  Pointer to the Image object.
@@ -2868,7 +3031,7 @@ MDMF_GetInfo(HMON) {
 Gdip_GetPropertyCount(pImage) {
    PropCount := 0
    Ptr := A_PtrSize ? "UPtr" : "UInt"
-   R := DllCall("Gdiplus.dll\GdipGetPropertyCount", Ptr, pImage, "UIntP", PropCount)
+   R := DllCall("gdiplus\GdipGetPropertyCount", Ptr, pImage, "UIntP", PropCount)
    ErrorLevel := R
    Return PropCount
 }
@@ -2890,13 +3053,16 @@ Gdip_GetPropertyIdList(pImage) {
    If (ErrorLevel) || (PropNum = 0)
       Return False
    VarSetCapacity(PropIDList, 4 * PropNum, 0)
-   R := DllCall("Gdiplus.dll\GdipGetPropertyIdList", Ptr, pImage, "UInt", PropNum, "Ptr", &PropIDList)
+   R := DllCall("gdiplus\GdipGetPropertyIdList", Ptr, pImage, "UInt", PropNum, "Ptr", &PropIDList)
    If (R) {
       ErrorLevel := R
       Return False
    }
+
    PropArray := {Count: PropNum}
-   Loop, % PropNum {
+
+   Loop %PropNum%
+   {
       PropID := NumGet(PropIDList, (A_Index - 1) << 2, "UInt")
       PropArray[PropID] := Gdip_GetPropertyTagName(PropID)
    }
@@ -2918,7 +3084,7 @@ Gdip_GetPropertyIdList(pImage) {
 Gdip_GetPropertyItem(pImage, PropID) {
    PropItem := {Length: 0, Type: 0, Value: ""}
    ItemSize := 0
-   R := DllCall("Gdiplus.dll\GdipGetPropertyItemSize", "Ptr", pImage, "UInt", PropID, "UIntP", ItemSize)
+   R := DllCall("gdiplus\GdipGetPropertyItemSize", "Ptr", pImage, "UInt", PropID, "UIntP", ItemSize)
    If (R) {
       ErrorLevel := R
       Return False
@@ -2926,7 +3092,7 @@ Gdip_GetPropertyItem(pImage, PropID) {
 
    Ptr := A_PtrSize ? "UPtr" : "UInt"
    VarSetCapacity(Item, ItemSize, 0)
-   R := DllCall("Gdiplus.dll\GdipGetPropertyItem", Ptr, pImage, "UInt", PropID, "UInt", ItemSize, "Ptr", &Item)
+   R := DllCall("gdiplus\GdipGetPropertyItem", Ptr, pImage, "UInt", PropID, "UInt", ItemSize, "Ptr", &Item)
    If (R) {
       ErrorLevel := R
       Return False
@@ -2967,21 +3133,23 @@ Gdip_GetPropertyItem(pImage, PropID) {
 
 Gdip_GetAllPropertyItems(pImage) {
    BufSize := PropNum := ErrorLevel := 0
-   R := DllCall("Gdiplus.dll\GdipGetPropertySize", "Ptr", pImage, "UIntP", BufSize, "UIntP", PropNum)
+   R := DllCall("gdiplus\GdipGetPropertySize", "Ptr", pImage, "UIntP", BufSize, "UIntP", PropNum)
    If (R) || (PropNum = 0) {
       ErrorLevel := R ? R : 19 ; 19 = PropertyNotFound
       Return False
    }
    VarSetCapacity(Buffer, BufSize, 0)
    Ptr := A_PtrSize ? "UPtr" : "UInt"
-   R := DllCall("Gdiplus.dll\GdipGetAllPropertyItems", Ptr, pImage, "UInt", BufSize, "UInt", PropNum, "Ptr", &Buffer)
+   R := DllCall("gdiplus\GdipGetAllPropertyItems", Ptr, pImage, "UInt", BufSize, "UInt", PropNum, "Ptr", &Buffer)
    If (R) {
       ErrorLevel := R
       Return False
    }
    PropsObj := {Count: PropNum}
    PropSize := 8 + (2 * A_PtrSize)
-   Loop, % PropNum {
+
+   Loop %PropNum%
+   {
       OffSet := PropSize * (A_Index - 1)
       PropID := NumGet(Buffer, OffSet, "UInt")
       PropLen := NumGet(Buffer, OffSet + 4, "UInt")
@@ -2992,9 +3160,11 @@ Gdip_GetAllPropertyItems(pImage) {
       PropsObj[PropID, "Length"] := PropLen
       PropsObj[PropID, "Type"] := PropType
       PropsObj[PropID, "Value"] := PropVal
-      If (PropLen > 0) {
+      If (PropLen > 0)
+      {
          Gdip_GetPropertyItemValue(PropVal, PropLen, PropType, PropAddr)
-         If (PropType = 1) || (PropType = 7) {
+         If (PropType = 1) || (PropType = 7)
+         {
             PropsObj[PropID].SetCapacity("Value", PropLen)
             ValAddr := PropsObj[PropID].GetAddress("Value")
             DllCall("Kernel32.dll\RtlMoveMemory", "Ptr", ValAddr, "Ptr", PropAddr, "Ptr", PropLen)
@@ -3023,10 +3193,12 @@ Gdip_GetPropertyTagName(PropID) {
 ; I commented the tags I personally find irrelevant...
 ; and made the names more human friendly, readable
 
-   Static PropTags
-   Static Init := Gdip_GetPropertyTagName("*INIT*")
-   If (PropID == "*INIT*") {
-      PropTags := {}
+   Static PropTags := []
+        , Init := Gdip_GetPropertyTagName("*INIT*")
+
+   If (PropID="*INIT*")
+   {
+      ; PropTags := {}
       ; PropTags[0x0000] := "GpsVer"
       PropTags[0x0001] := "GPS LatitudeRef"
       PropTags[0x0002] := "GPS Latitude"
@@ -3211,7 +3383,7 @@ Gdip_GetPropertyTagName(PropID) {
       ; PropTags[0x8825] := "GpsIFD"
       PropTags[0x8827] := "EXIF ISO Speed"
       ; PropTags[0x8828] := "ExifOECF"
-      PropTags[0x9000] := "ExifVer"
+      ; PropTags[0x9000] := "ExifVer"
       PropTags[0x9003] := "EXIF DTOrig"                ; Date & time of original
       PropTags[0x9004] := "EXIF DTDigitized"           ; Date & time of digital data generation
       ; PropTags[0x9101] := "EXIF CompConfig"
@@ -3284,29 +3456,41 @@ Gdip_GetPropertyTagType(PropType) {
 Gdip_GetPropertyItemValue(ByRef PropVal, PropLen, PropType, PropAddr) {
 ; Gdip_GetPropertyItemValue() - Reserved for internal use
    PropVal := ""
-   If (PropType = 2) {
+   If (PropType = 2)
+   {
       PropVal := StrGet(PropAddr, PropLen, "CP0")
       Return True
    }
-   If (PropType = 3) {
-      Loop, % (PropLen // 2)
+
+   If (PropType = 3)
+   {
+      PropyLen := PropLen // 2
+      Loop %PropyLen%
          PropVal .= (A_Index > 1 ? " " : "") . NumGet(PropAddr + 0, (A_Index - 1) << 1, "Short")
       Return True
    }
-   If (PropType = 4) || (PropType = 9) {
+
+   If (PropType = 4) || (PropType = 9)
+   {
       NumType := PropType = 4 ? "UInt" : "Int"
-      Loop, % (PropLen // 4)
+      PropyLen := PropLen // 4
+      Loop %PropyLen%
          PropVal .= (A_Index > 1 ? " " : "") . NumGet(PropAddr + 0, (A_Index - 1) << 2, NumType)
       Return True
    }
-   If (PropType = 5) || (PropType = 10) {
+
+   If (PropType = 5) || (PropType = 10)
+   {
       NumType := PropType = 5 ? "UInt" : "Int"
-      Loop, % (PropLen // 8)
+      PropyLen := PropLen // 8
+      Loop %PropyLen%
          PropVal .= (A_Index > 1 ? " " : "") . NumGet(PropAddr + 0, (A_Index - 1) << 2, NumType)
                  .  "/" . NumGet(PropAddr + 4, (A_Index - 1) << 2, NumType)
       Return True
    }
-   If (PropType = 1) || (PropType = 7) {
+
+   If (PropType = 1) || (PropType = 7)
+   {
       VarSetCapacity(PropVal, PropLen, 0)
       DllCall("Kernel32.dll\RtlMoveMemory", "Ptr", &PropVal, "Ptr", PropAddr, "Ptr", PropLen)
       Return True
@@ -3314,12 +3498,8 @@ Gdip_GetPropertyItemValue(ByRef PropVal, PropLen, PropType, PropAddr) {
    Return False
 }
 
-
-;#####################################################################################
-; HitTest Function by RazorHalo
-;#####################################################################################
-
 Gdip_IsVisiblePathPoint(pPath, x, y, pGraphics) {
+; HitTest Function by RazorHalo
   Ptr := A_PtrSize ? "UPtr" : "UInt"
 
   DllCall("gdiplus\GdipIsVisiblePathPoint", Ptr, pPath, "float", x, "float", y, Ptr, pGraphics, A_PtrSize ? "UPtr*" : "UInt*", result)
@@ -3327,44 +3507,46 @@ Gdip_IsVisiblePathPoint(pPath, x, y, pGraphics) {
 }
 
 ;#####################################################################################
-; RotateAtCenter Function by RazorHalo
+; RotateAtCenter() and related Functions by RazorHalo
+; from https://www.autohotkey.com/boards/viewtopic.php?f=6&t=6517&start=260
+; in April 2019.
 ;#####################################################################################
 ; The Matrix order has to be "Append" for the transformations to be applied in the correct order - instead of the default "Prepend"
 
 RotateAtCenter(pPath, Angle, MatrixOrder:=1) {
-  ;Get bouinding rectangle of the graphics path
-  ;returns array x,y,w,h
+  ; Gets the bounding rectangle of the graphics path
+  ; returns array x, y, w, h
   Rect := Gdip_GetPathWorldBounds(pPath)
-  
-  ;Calcualte center of bounding rectangle which will be the center of the graphics path
+
+  ; Calcualte center of bounding rectangle which will be the center of the graphics path
   cX := Rect.x + (Rect.w / 2)
   cY := Rect.y + (Rect.h / 2)
   
-  ;Create a Matrix for the transformations
+  ; Create a Matrix for the transformations
   pMatrix := Gdip_CreateMatrix()
   
-  ;Move the GraphicsPath center to the origin (0, 0) of the graphics object
+  ; Move the GraphicsPath center to the origin (0, 0) of the graphics object
   Gdip_TranslateMatrix(pMatrix, -cX , -cY)
 
-  ;Rotate matrix on graphics object origin
+  ; Rotate matrix on graphics object origin
   Gdip_RotateMatrix(pMatrix, Angle, MatrixOrder)
   
-  ;Move the GraphicsPath origin point back to its original position
+  ; Move the GraphicsPath origin point back to its original position
   Gdip_TranslateMatrix(pMatrix, cX, cY, MatrixOrder)
 
-  ;Apply the transformations
+  ; Apply the transformations
   Gdip_TransformPath(pPath, pMatrix)
   
-  ;Reset Matrix?  Delete Matrix?  Do I still need it for future rotations?
+  ; Reset Matrix?  Delete Matrix?  Do I still need it for future rotations?
   GDip_DeleteMatrix(pMatrix)
 
 }
 
 ;#####################################################################################
-; GraphicsPath functions added by RazorHalo
-;#####################################################################################
-
-; NOTE: Be aware of the order that transoformations are applied.  You may need to pass MatrixOrder as 1 for "Append"
+; Matrix transformations functions by RazorHalo
+;
+; NOTE: Be aware of the order that transformations are applied.  You may need
+; to pass MatrixOrder as 1 for "Append"
 ; the (default is 0 for "Prepend") to get the correct results.
 
 Gdip_ResetMatrix(pMatrix) {
@@ -3431,9 +3613,10 @@ Gdip_GetLastStatus(pMatrix) {
 
 ;#####################################################################################
 ; GraphicsPath functions added by Learning one
-; updated on 14/08/2019 by Marius Șucan
+; found on https://autohotkey.com/board/topic/29449-gdi-standard-library-145-by-tic/page-75
+; Updated on 14/08/2019 by Marius Șucan
 ;#####################################################################################
-
+;
 ; Function Gdip_AddPathBeziers
 ; Description Adds a sequence of connected Bézier splines to the current figure of this path.
 ;
@@ -3484,11 +3667,10 @@ Gdip_AddPathLines(pPath, Points) {
     NumPut(Coord[1], PointF, 8*(A_Index-1), "float")
     NumPut(Coord[2], PointF, (8*(A_Index-1))+4, "float")
   }
-  return DllCall("gdiplus\GdipAddPathLine2", Ptr, pPath, Ptr, &PointF, "int", Points0)
+  return DllCall("gdiplus\GdipAddPathLine2", Ptr, pPath, Ptr, &PointF, "int", Points.Length())
 }
 
-Gdip_AddPathLine(pPath, x1, y1, x2, y2) 
-{
+Gdip_AddPathLine(pPath, x1, y1, x2, y2) {
   Ptr := A_PtrSize ? "UPtr" : "UInt"
   
   return DllCall("gdiplus\GdipAddPathLine", Ptr, pPath, "float", x1, "float", y1, "float", x2, "float", y2)
@@ -3507,7 +3689,7 @@ Gdip_AddPathPie(pPath, x, y, w, h, StartAngle, SweepAngle) {
 }
 
 Gdip_StartPathFigure(pPath) {
- ; Starts a new figure without closing the current figure. Subsequent points added to this path are added to the new figure.
+  ; Starts a new figure without closing the current figure. Subsequent points added to this path are added to the new figure.
   Ptr := A_PtrSize ? "UPtr" : "UInt"
 
   return DllCall("gdiplus\GdipStartPathFigure", Ptr, pPath)
@@ -3521,14 +3703,14 @@ Gdip_ClosePathFigure(pPath) {
 }
 
 ;#####################################################################################
-; Function Gdip_DrawPath
-; Description draws a sequence of lines and curves defined by a GraphicsPath object
+; Function: Gdip_DrawPath
+; Description: Draws a sequence of lines and curves defined by a GraphicsPath object
 ;
-; pGraphics Pointer to the Graphics of a bitmap
-; pPen Pointer to a pen
-; pPath Pointer to a Path
+; pGraphics: Pointer to the Graphics of a bitmap
+; pPen: Pointer to a pen
+; pPath: Pointer to a Path
 ;
-; return status enumeration. 0 = success
+; return: status enumeration. 0 = success
 
 Gdip_DrawPath(pGraphics, pPen, pPath) {
   Ptr := A_PtrSize ? "UPtr" : "UInt"
@@ -3551,8 +3733,112 @@ Gdip_ClonePath(pPath) {
   return pPathClone
 }
 
+;######################################################################################################################################
+; The following PathGradient functions were written by Just Me in March 2012
+; source: https://autohotkey.com/board/topic/29449-gdi-standard-library-145-by-tic/page-65
 
+Gdip_PathGradientCreateFromPath(pPath) {
+   ; Creates and returns a path gradient brush.
+   ; pPath              path object returned from Gdip_CreatePath()
+   DllCall("gdiplus\GdipCreatePathGradientFromPath", "Ptr", pPath, "PtrP", pBrush)
+   Return pBrush
+}
 
+Gdip_PathGradientSetCenterPoint(pBrush, X, Y) {
+   ; Sets the center point of this path gradient brush.
+   ; pBrush             Brush object returned from Gdip_PathGradientCreateFromPath().
+   ; X                  X-position (pixel).
+   ; Y                  Y-position (pixel).
+   VarSetCapacity(POINTF, 8)
+   NumPut(X, POINTF, 0, "Float")
+   NumPut(Y, POINTF, 4, "Float")
+   Return DllCall("gdiplus\GdipSetPathGradientCenterPoint", "Ptr", pBrush, "Ptr", &POINTF)
+}
+
+Gdip_PathGradientSetCenterColor(pBrush, CenterColor) {
+   ; Sets the center color of this path gradient brush.
+   ; pBrush             Brush object returned from Gdip_PathGradientCreateFromPath().
+   ; CenterColor        ARGB color value: A(lpha)R(ed)G(reen)B(lue).
+   Return DllCall("gdiplus\GdipSetPathGradientCenterColor", "Ptr", pBrush, "UInt", CenterColor)   
+}
+
+Gdip_PathGradientSetSurroundColors(pBrush, SurroundColors) {
+   ; Sets the surround colors of this path gradient brush. 
+   ; pBrush             Brush object returned from Gdip_PathGradientCreateFromPath().
+   ; SurroundColours    One or more ARGB color values seperated by pipe (|)).
+   ; updated by Marius Șucan 
+
+   Colors := StrSplit(SurroundColors, "|")
+   tColors := Colors.Length()
+   VarSetCapacity(ColorArray, 4 * tColors, 0)
+
+   Loop %tColors% {
+      NumPut(Colors[A_Index], ColorArray, 4 * (A_Index - 1), "UInt")
+   }
+
+   Return DllCall("gdiplus\GdipSetPathGradientSurroundColorsWithCount", "Ptr", pBrush, "Ptr", &ColorArray
+                , "IntP", tColors)
+}
+
+Gdip_PathGradientSetSigmaBlend(pBrush, Focus, Scale:=1) {
+   ; Sets the blend shape of this path gradient brush to bell shape.
+   ; pBrush             Brush object returned from Gdip_PathGradientCreateFromPath().
+   ; Focus              Number that specifies where the center color will be at its highest intensity.
+   ;                    Values: 1.0 (center) - 0.0 (border)
+   ; Scale              Number that specifies the maximum intensity of center color that gets blended with 
+   ;                    the boundary color.
+   ;                    Values:  1.0 (100 %) - 0.0 (0 %)
+   Return DllCall("gdiplus\GdipSetPathGradientSigmaBlend", "Ptr", pBrush, "Float", Focus, "Float", Scale)
+}
+
+Gdip_PathGradientSetLinearBlend(pBrush, Focus, Scale:=1) {
+   ; Sets the blend shape of this path gradient brush to triangular shape.
+   ; pBrush             Brush object returned from Gdip_PathGradientCreateFromPath()
+   ; Focus              Number that specifies where the center color will be at its highest intensity.
+   ;                    Values: 1.0 (center) - 0.0 (border)
+   ; Scale              Number that specifies the maximum intensity of center color that gets blended with 
+   ;                    the boundary color.
+   ;                    Values:  1.0 (100 %) - 0.0 (0 %)
+   Return DllCall("gdiplus\GdipSetPathGradientLinearBlend", "Ptr", pBrush, "Float", Focus, "Float", Scale)
+}
+
+Gdip_PathGradientSetFocusScales(pBrush, xScale, yScale) {
+   ; Sets the focus scales of this path gradient brush.
+   ; pBrush             Brush object returned from Gdip_PathGradientCreateFromPath().
+   ; xScale             Number that specifies the x focus scale.
+   ;                    Values: 0.0 (0 %) - 1.0 (100 %)
+   ; yScale             Number that specifies the y focus scale.
+   ;                    Values: 0.0 (0 %) - 1.0 (100 %)
+   Return DllCall("gdiplus\GdipSetPathGradientFocusScales", "Ptr", pBrush, "Float", xScale, "Float", yScale)
+}
+
+Gdip_AddPathGradient(pGraphics, x, y, w, h, cX, cY, cClr, sClr, BlendFocus, ScaleX, ScaleY, Shape) {
+; X, Y   - coordinates where to add the gradient path object 
+; W, H   - the width and height of the path gradient object 
+; cX, cY - the coordinates of the Center Point of the gradient within the wdith and height object boundaries
+; cClr   - the center color in 0xARGB
+; sClr   - the surrounding color in 0xARGB
+; BlendFocus - 0.0 to 1.0; where the center color reaches the highest intensity
+; shape   - 1 = rectangle ; 0 = ellipse
+; function based on the example provided by Just Me for the path gradient functions
+; adaptations/modifications by Marius Șucan
+
+   pPath := Gdip_CreatePath(pGraphics)
+   If (Shape=1)
+      Gdip_AddPathRectangle(pPath, x, y, W, H)
+   Else
+      Gdip_AddPathEllipse(pPath, x, y, W, H)
+   zBrush := Gdip_PathGradientCreateFromPath(pPath)
+   Gdip_PathGradientSetCenterPoint(zBrush, cX, cY)
+   Gdip_PathGradientSetCenterColor(zBrush, cClr)
+   Gdip_PathGradientSetSurroundColors(zBrush, sClr)
+   Gdip_PathGradientSetSigmaBlend(zBrush, BlendFocus)
+   Gdip_PathGradientSetLinearBlend(zBrush, BlendFocus)
+   Gdip_PathGradientSetFocusScales(zBrush, ScaleX, ScaleY)
+   Gdip_FillPath(pGraphics, zBrush, pPath)
+   Gdip_DeleteBrush(zBrush)
+   Gdip_DeletePath(pPath)
+}
 
 ;######################################################################################################################################
 ; Function written by swagfag in July 2019
@@ -3566,18 +3852,18 @@ Gdip_GetHistogram(pBitmap, whichFormat, ByRef newArrayA, ByRef newArrayB, ByRef 
    Static sizeofUInt := 4
 
    ; HistogramFormats := {ARGB: 0, PARGB: 1, RGB: 2, Gray: 3, B: 4, G: 5, R: 6, A: 7}
-   z := DllCall("gdiplus.dll\GdipBitmapGetHistogramSize", "UInt", whichFormat, "UInt*", numEntries)
+   z := DllCall("gdiplus\GdipBitmapGetHistogramSize", "UInt", whichFormat, "UInt*", numEntries)
 
    newArrayA := [], newArrayB := [], newArrayC := []
    VarSetCapacity(ch0, numEntries * sizeofUInt)
    VarSetCapacity(ch1, numEntries * sizeofUInt)
    VarSetCapacity(ch2, numEntries * sizeofUInt)
    If (whichFormat=2)
-      r := DllCall("gdiplus.dll\GdipBitmapGetHistogram", "Ptr", pBitmap, "UInt", whichFormat, "UInt", numEntries, "Ptr", &ch0, "Ptr", &ch1, "Ptr", &ch2, "Ptr", 0)
+      r := DllCall("gdiplus\GdipBitmapGetHistogram", "Ptr", pBitmap, "UInt", whichFormat, "UInt", numEntries, "Ptr", &ch0, "Ptr", &ch1, "Ptr", &ch2, "Ptr", 0)
    Else If (whichFormat=3)
-      r:= DllCall("gdiplus.dll\GdipBitmapGetHistogram", "Ptr", pBitmap, "UInt", whichFormat, "UInt", numEntries, "Ptr", &ch0, "Ptr", 0, "Ptr", 0, "Ptr", 0)
+      r:= DllCall("gdiplus\GdipBitmapGetHistogram", "Ptr", pBitmap, "UInt", whichFormat, "UInt", numEntries, "Ptr", &ch0, "Ptr", 0, "Ptr", 0, "Ptr", 0)
 
-   Loop % numEntries
+   Loop %numEntries%
    {
       i := A_Index - 1
       r := NumGet(&ch0+0, i * sizeofUInt, "UInt")
@@ -3655,10 +3941,11 @@ Gdip_GetDIBits(hdc, hBitmap, start, cLines, pBits, BITMAPINFO, DIB_COLORS) {
 Gdip_DrawImageFX(pGraphics, pBitmap, sX:=0, sY:=0, sW:="", sH:="", matrix:="", pEffect:="") {
 ; written by Marius Șucan
 
-    If (Matrix&1 = "")
+    If !IsNumber(Matrix)
        ImageAttr := Gdip_SetImageAttributesColorMatrix(Matrix)
     Else if (Matrix != 1)
        ImageAttr := Gdip_SetImageAttributesColorMatrix("1|0|0|0|0|0|1|0|0|0|0|0|1|0|0|0|0|0|" Matrix "|0|0|0|0|0|1")
+
 
     if (sX="" && sY="")
        sX := sY := 0
@@ -3687,6 +3974,8 @@ Gdip_DrawImageFX(pGraphics, pBitmap, sX:=0, sY:=0, sW:="", sH:="", matrix:="", p
 Gdip_ApplyEffect(pBitmap, pEffect) {
 ; written by Marius Șucan
 ; many thanks to Drugwash for the help provided
+  If InStr(pEffect, "err-")
+     Return pEffect
 
   Gdip_GetImageDimensions(pBitmap, Width, Height)
   CreateRectF(RectF, 0, 0, Width, Height)
@@ -3732,7 +4021,7 @@ Gdip_CreateEffect(whichFX, paramA, paramB, paramC:=0) {
 
     r1 := COM_GUID4String(eFXguid, "{" gdipImgFX[whichFX] "}" )
     If r1
-       Return
+       Return "err-" r1
 
     If (A_PtrSize=4) ; 32 bits
     {
@@ -3749,7 +4038,7 @@ Gdip_CreateEffect(whichFX, paramA, paramB, paramC:=0) {
           , Ptr2, pEffect)
     }
     If r2
-       Return
+       Return "err-" r2
 
     ; r2 := GetStatus(A_LineNumber ":GdipCreateEffect", r2)
     FXsize := 8
@@ -3757,7 +4046,7 @@ Gdip_CreateEffect(whichFX, paramA, paramB, paramC:=0) {
     If (whichFX=1)   ; Blur FX
     {
        NumPut(paramA, FXparams, 0, "Float")   ; radius range [0, 255]
-       NumPut(paramB, FXparams, 4, "Uchar")     ; bool 0, 1
+       NumPut(paramB, FXparams, 4, "Uchar")   ; bool 0, 1
     } Else If (whichFX=2)   ; Sharpen FX
     {
        NumPut(paramA, FXparams, 0, "Float")   ; range radius [0, 255]
@@ -3788,7 +4077,7 @@ Gdip_CreateEffect(whichFX, paramA, paramB, paramC:=0) {
     If r3
     {
        Gdip_DisposeEffect(pEffect)
-       Return
+       Return "err-" r3
     }
     ; r3 := GetStatus(A_LineNumber ":GdipSetEffectParameters", r3)
     ; ToolTip, % r1 " -- " r2 " -- " r3 " -- " r4,,, 2
@@ -3801,7 +4090,163 @@ Gdip_DisposeEffect(pEffect) {
    Return r
 }
 
-Gdip_CreateBitmapFromGraphics(Width, Height, pGraphics) {
-    DllCall("gdiplus\GdipCreateBitmapFromGraphics", "int", Width, "int", Height, "Ptr", pGraphics, "Ptr", pBitmap)
-    Return pBitmap
+
+GenerateColorMatrix(modus, bright:=1, contrast:=0, saturation:=1, alph:=1, chnRdec:=0, chnGdec:=0,chnBdec:=0) {
+; parameters ranges / intervals:
+; bright:     [0.001 - 20.0]
+; contrast:   [-20.0 - 1.00]
+; saturation: [0.001 - 5.00]
+; alph:       [0.001 - 1.00]
+;
+; modus options:
+; 0 - personalized colors based on the bright, contrast [hue], saturation parameters
+; 1 - personalized colors based on the bright, contrast, saturation parameters
+; 2 - grayscale image
+; 3 - grayscale R channel
+; 4 - grayscale G channel
+; 5 - grayscale B channel
+; 6 - negative / invert image
+;
+; chnRdec, chnGdec, chnBdec only apply in modus=1
+; these represent offsets for the RGB channels
+
+; in modus=0 the parameters have other ranges:
+; bright:     [-5.00 - 5.00]
+; hue:        [-1.57 - 1.57]  ; pi/2 - contrast stands for hue in this mode
+; saturation: [0.001 - 5.00]
+; formulas for modus=0 were written by Smurth
+; extracted from https://autohotkey.com/board/topic/29449-gdi-standard-library-145-by-tic/page-86
+;
+; function written by Marius Șucan
+; infos from http://www.graficaobscura.com/matrix/index.html
+; real NTSC values: r := 0.300, g := 0.587, b := 0.115
+
+    Static NTSCr := 0.308, NTSCg := 0.650, NTSCb := 0.095   ; personalized values
+    matrix := ""
+
+    If (modus=2)       ; grayscale
+    {
+       LGA := (bright<=1) ? bright/1.5 - 0.6666 : bright - 1
+       Ra := NTSCr + LGA
+       If (Ra<0)
+          Ra := 0
+       Ga := NTSCg + LGA
+       If (Ga<0)
+          Ga := 0
+       Ba := NTSCb + LGA
+       If (Ba<0)
+          Ba := 0
+       matrix := Ra "|" Ra "|" Ra "|0|0|" Ga "|" Ga "|" Ga "|0|0|" Ba "|" Ba "|" Ba "|0|0|0|0|0|" alph "|0|" contrast "|" contrast "|" contrast "|0|1"
+    } Else If (modus=3)       ; grayscale R
+    {
+       Ga := 0, Ba := 0, GGA := 0
+       Ra := bright
+       matrix := Ra "|" Ra "|" Ra "|0|0|" Ga "|" Ga "|" Ga "|0|0|" Ba "|" Ba "|" Ba "|0|0|0|0|0|" alph "|0|" GGA+0.01 "|" GGA "|" GGA "|0|1"
+    } Else If (modus=4)       ; grayscale G
+    {
+       Ra := 0, Ba := 0, GGA := 0
+       Ga := bright
+       matrix := Ra "|" Ra "|" Ra "|0|0|" Ga "|" Ga "|" Ga "|0|0|" Ba "|" Ba "|" Ba "|0|0|0|0|0|" alph "|0|" GGA "|" GGA+0.01 "|" GGA "|0|1"
+    } Else If (modus=5)       ; grayscale B
+    {
+       Ra := 0, Ga := 0, GGA := 0
+       Ba := bright
+       matrix := Ra "|" Ra "|" Ra "|0|0|" Ga "|" Ga "|" Ga "|0|0|" Ba "|" Ba "|" Ba "|0|0|0|0|0|" alph "|0|" GGA "|" GGA "|" GGA+0.01 "|0|1"
+    } Else If (modus=6)  ; negative / invert
+    {
+       matrix := "-1|0|0|0|0|0|-1|0|0|0|0|0|-1|0|0|0|0|0|" alph "|0|1|1|1|0|1"
+    } Else If (modus=1)   ; personalized saturation, contrast and brightness 
+    {
+       bL := bright, aL := alph
+       G := contrast, sL := saturation
+       sLi := 1 - saturation
+       bLa := bright - 1
+       If (sL>1)
+       {
+          z := (bL<1) ? bL : 1
+          sL := sL*z
+          If (sL<0.98)
+             sL := 0.98
+
+          y := z*(1 - sL)
+          mA := z*(y*NTSCr + sL + bLa + chnRdec)
+          mB := z*(y*NTSCr)
+          mC := z*(y*NTSCr)
+          mD := z*(y*NTSCg)
+          mE := z*(y*NTSCg + sL + bLa + chnGdec)
+          mF := z*(y*NTSCg)
+          mG := z*(y*NTSCb)
+          mH := z*(y*NTSCb)
+          mI := z*(y*NTSCb + sL + bLa + chnBdec)
+          mtrx:= mA "|" mB "|" mC "|  0   |0"
+           . "|" mD "|" mE "|" mF "|  0   |0"
+           . "|" mG "|" mH "|" mI "|  0   |0"
+           . "|  0   |  0   |  0   |" aL "|0"
+           . "|" G  "|" G  "|" G  "|  0   |1"
+       } Else
+       {
+          z := (bL<1) ? bL : 1
+          tR := NTSCr - 0.5 + bL/2
+          tG := NTSCg - 0.5 + bL/2
+          tB := NTSCb - 0.5 + bL/2
+          rB := z*(tR*sLi+bL*(1 - sLi) + chnRdec)
+          gB := z*(tG*sLi+bL*(1 - sLi) + chnGdec)
+          bB := z*(tB*sLi+bL*(1 - sLi) + chnBdec)     ; Formula used: A*w + B*(1 – w)
+          rF := z*(NTSCr*sLi + (bL/2 - 0.5)*sLi)
+          gF := z*(NTSCg*sLi + (bL/2 - 0.5)*sLi)
+          bF := z*(NTSCb*sLi + (bL/2 - 0.5)*sLi)
+
+          rB := rB*z+rF*(1 - z)
+          gB := gB*z+gF*(1 - z)
+          bB := bB*z+bF*(1 - z)     ; Formula used: A*w + B*(1 – w)
+          If (rB<0)
+             rB := 0
+          If (gB<0)
+             gB := 0
+          If (bB<0)
+             bB := 0
+          If (rF<0)
+             rF := 0
+ 
+          If (gF<0)
+             gF := 0
+ 
+          If (bF<0)
+             bF := 0
+
+          ; ToolTip, % rB " - " rF " --- " gB " - " gF
+          mtrx:= rB "|" rF "|" rF "|  0   |0"
+           . "|" gF "|" gB "|" gF "|  0   |0"
+           . "|" bF "|" bF "|" bB "|  0   |0"
+           . "|  0   |  0   |  0   |" aL "|0"
+           . "|" G  "|" G  "|" G  "|  0   |1"
+          ; matrix adjusted for lisibility
+       }
+       matrix := StrReplace(mtrx, A_Space)
+    } Else If (modus=0)   ; personalized hue, saturation and brightness
+    {
+       s1 := contrast   ; in this mode, contrast stands for hue
+       s2 := saturation
+       s3 := bright
+       aL := alph
+ 
+       s1 := s2*sin(s1)
+       sc := 1-s2
+       r := NTSCr*sc-s1
+       g := NTSCg*sc-s1
+       b := NTSCb*sc-s1
+ 
+       rB := r+s2+3*s1
+       gB := g+s2+3*s1
+       bB := b+s2+3*s1
+       mtrx :=   rB "|" r  "|" r  "|  0   |0"
+           . "|" g  "|" gB "|" g  "|  0   |0"
+           . "|" b  "|" b  "|" bB "|  0   |0"
+           . "|  0   |  0   |  0   |" aL "|0"
+           . "|" s3 "|" s3 "|" s3 "|  0   |1"
+       matrix := StrReplace(mtrx, A_Space)
+    }
+    Return matrix
 }
+
+

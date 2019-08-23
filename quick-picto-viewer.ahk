@@ -12,7 +12,7 @@
 ;   Author:   Marius Șucan -  http://marius.sucan.ro/
 ;   GitHub:   https://github.com/marius-sucan/Quick-Picto-Viewer
 ;
-; Script Main Functionalities:
+; Script main functionalities:
 ; Display images and creates slideshows;
 ; using GDI+ supported formats: jpeg, jpg, bmp, png, gif, tif, emf
 ;
@@ -21,7 +21,7 @@
 
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 3.6.5
+;@Ahk2Exe-SetVersion 3.6.7
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
  
@@ -35,7 +35,7 @@
 #IfTimeout, 25
 #SingleInstance, off
 #UseHook, Off
-#Include, Gdip.ahk
+#Include, Gdip_All.ahk
 #Include, freeimage.ahk
 SetWinDelay, 1
 
@@ -76,15 +76,15 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , prevFileSavePath := "", imgHUDbaseUnit := 65, lastLongOperationAbort := 1
    , lastOtherWinClose := 1, UsrCopyMoveOperation := 2, editingSelectionNow := 0
    , ForceNoColorMatrix := 0, activateImgSelection := 0, prevFastDisplay := 1
-   , imgSelX1 := 0, imgSelY1 := 0, imgSelX2 := -1, imgSelY2 := -1
+   , imgSelX1 := 0, imgSelY1 := 0, imgSelX2 := -1, imgSelY2 := -1, adjustNowSel := 0
    , selDotX, selDotY, selDotAx, selDotAy, selDotBx, selDotBy, selDotCx, selDotCy
    , dotsSize := imgHUDbaseUnit//4, ViewPortBMPcache, startZeitIMGload, LbtnDwn := 0
    , imageLoading := 0, PrevGuiSizeEvent := 0, imgSelOutViewPort := 0, prevGUIresize := 1
    , mPosCtrl, isThisHDRimg := 0, hCursBusy := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32514, "Ptr")  ; IDC_WAIT
    , hCursN := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32512, "Ptr")  ; IDC_ARROW
-   , remCacheOldDays := 0, jpegDoCrop := 0, jpegDesiredOperation := 1
-   , rDesireWriteFMT := "", FIMfailed2init := 0
-   , version := "3.6.5", vReleaseDate := "17/08/2019"
+   , remCacheOldDays := 0, jpegDoCrop := 0, jpegDesiredOperation := 1, prevDestPosX
+   , rDesireWriteFMT := "", FIMfailed2init := 0, prevMaxSelX, prevMaxSelY, prevDestPosY
+   , version := "3.6.7", vReleaseDate := "21/08/2019"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1
@@ -197,16 +197,22 @@ identifyThisWin(noReact:=0) {
     Return
 
     ~F10::
-    ~AppsKey::
+    AppsKey::
        InitGuiContextMenu()
     Return
 
     ~Insert Up::
+       If AnyWindowOpen
+          Return
+
        If (imageLoading!=1)
           addNewFile2list()
     Return
 
     ~^vk56 Up::   ; Ctrl+V
+       If AnyWindowOpen
+          Return
+
        If (imageLoading!=1)
           PasteClipboardIMG()
     Return
@@ -878,8 +884,9 @@ resetSlideshowTimer(showMsg) {
 
    If (showMsg=1)
    {
+      friendly := (slideShowRunning=1) ? "running" : "stopped"
       delayu := Round(slideShowDelay/1000, 2)
-      showTOOLtip("Slideshow speed: " delayu " second(s)")
+      showTOOLtip("Slideshow speed: " delayu " second(s)`nCurrently " friendly)
       SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 }
@@ -1454,6 +1461,10 @@ WinClickAction(forceThis:=0) {
       nImgSelY1 := imgSelY1
       nImgSelX2 := imgSelX2
       nImgSelY2 := imgSelY2
+      adjustNowSel := 1
+      cleanThumbsWindow()
+      DelayiedImageDisplay()
+      drawImgSelectionOnWindow(1)
       thisZeit := 1
       ctrlState := (GetKeyState("Ctrl", "P") && dotActive=9) ? 1 : 0
       While, ((GetKeyState("LButton", "P") || LbtnDwn=1) && dotActive && ctrlState=0)
@@ -1534,7 +1545,10 @@ WinClickAction(forceThis:=0) {
                 imgSelY2 := nImgSelY2
           }
           If !(valueBetween(Abs(changePosY), 0, 2) && valueBetween(Abs(changePosX), 0, 2))
-             filterDelayiedImageDisplay()
+          {
+             drawImgSelectionOnWindow(2)
+             selModif := 1
+          }
 
           zImgSelX1 := Round(imgSelX1*zoomLevel)
           zImgSelY1 := Round(imgSelY1*zoomLevel)
@@ -1544,6 +1558,7 @@ WinClickAction(forceThis:=0) {
           imgSelH := maxU(zImgSelY1, zImgSelY2) - minU(zImgSelY1, zImgSelY2)
           If (dotActive=9)
              addMsg := "Dragging selection...`n"
+
           If (A_TickCount - prevTippu>90) && (LbtnDwn!=1)
           {
              ToolTip, % addMsg "X / Y: " zImgSelX1 ", " zImgSelY1 "`nW / H: " imgSelW ", " imgSelH, % decalageX + 10, % decalageY + 10
@@ -1553,6 +1568,10 @@ WinClickAction(forceThis:=0) {
           If (thisWind!=PVhwnd && LbtnDwn=1)
              Break
       }
+      drawImgSelectionOnWindow(3)
+      adjustNowSel := 0
+      DelayiedImageDisplay()
+      cleanThumbsWindow()
       If (LbtnDwn!=1 && dotActive=9 && valueBetween(Abs(changePosY), 0, 2) && valueBetween(Abs(changePosX), 0, 2))
          thisZeit := dotActive := ctrlState := 0
       SetTimer, ResetLbtn, -50
@@ -1888,7 +1907,7 @@ ToggleImgFX(dir:=0) {
       friendly .= "`nBrightness: " Round(lumosGrayAdjust, 3) "`nContrast: " Round(GammosGrayAdjust, 3) "`nVibrance: " Round(zatAdjust) "%" "`nHue: " Round(hueAdjust) "°"
    Else If (imgFxMode=2)
       friendly .= "`nBrightness: " Round(lumosAdjust, 3) "`nContrast: " Round(GammosAdjust, 3) "`nSaturation: " Round(satAdjust*100) "%" "`nVibrance: " Round(zatAdjust) "%" "`nHue: " Round(hueAdjust) "°"
-   Else If (imgFxMode=3)
+   Else If (imgFxMode=3 || imgFxMode=8)
       friendly .= "`nVibrance: " Round(zatAdjust) "%" "`nHue: " Round(hueAdjust) "°"
 
    If (imgFxMode=4 || imgFxMode=3 || imgFxMode=2)
@@ -3397,7 +3416,7 @@ readSlideSettings(readThisFile) {
         slideShowDelay := tstslideShowDelay
      If (tstimgresizingmode!="@" && StrLen(tstIMGresizingMode)=1 && tstIMGresizingMode<5)
         IMGresizingMode := tstIMGresizingMode
-     If (tstimgFxMode!="@" && valueBetween(tstimgFxMode, 1, 7))
+     If (tstimgFxMode!="@" && valueBetween(tstimgFxMode, 1, 8))
         imgFxMode := tstimgFxMode
      If (tstautoAdjustMode!="@" && valueBetween(tstautoAdjustMode, 1, 3))
         autoAdjustMode := tstautoAdjustMode
@@ -5960,6 +5979,9 @@ defineWinTitlePrefix() {
    If StrLen(usrFilesFilteru)>1
       winPrefix .= "F "
 
+   If (activateImgSelection=1)
+      winPrefix .= "SEL "
+
    If (slideShowRunning=1)
    {
       winPrefix .= "s"
@@ -5996,6 +6018,12 @@ drawWelcomeImg(goAgain:=0) {
     If (maxFilesIndex>0 || StrLen(CurrentSLD)>1 || AnyWindowOpen>0)
        Return
 
+    If (A_TickCount - scriptStartTime<1000)
+    {
+       SetTimer, drawWelcomeImg, -500
+       Return
+    }
+
     If (A_TickCount - scriptStartTime>3000)
     {
        If (identifyThisWin()!=1)
@@ -6009,11 +6037,13 @@ drawWelcomeImg(goAgain:=0) {
     G := Gdip_GraphicsFromHDC(hdc)
     Gdip_SetInterpolationMode(G, 5)
     Gdip_SetSmoothingMode(G, 5)
+    pBr0 := Gdip_BrushCreateSolid("0xFF" WindowBgrColor)
     pBr1 := Gdip_BrushCreateSolid(0x33882211)
     pBr3 := Gdip_BrushCreateSolid(0x33118822)
     pBr2 := Gdip_BrushCreateSolid(0x33112288)
-    pBr4 := Gdip_BrushCreateSolid(0x77030201)
+    pBr4 := Gdip_BrushCreateSolid(0x66030201)
     pBr5 := Gdip_BrushCreateSolid(0x88939291)
+    Gdip_FillRectangle(G, pBr0, 0, 0, mainWidth, mainHeight)
     If GetKeyState("CapsLock", "T")
        Gdip_FillRectangle(G, pBr5, 0, 0, mainWidth, mainHeight)
     dummyPos := (A_OSVersion!="WIN_7") ? 1 : ""
@@ -6123,16 +6153,34 @@ drawWelcomeImg(goAgain:=0) {
     }
     If !GetKeyState("Shift", "P")
        Gdip_FillRectangle(G, pBr4, 0, 0, mainWidth, mainHeight)
+
+    matrix := getColorMatrix()
+    If (imgFxMode=3)
+       matrix := ""
+
+    Gdip_AddPathGradient(G, 0, 0, mainWidth, mainHeight, mainWidth//2, mainHeight//2, "0x00000000", "0x55000000", 1, 0, 0, 1)
+    BMPcache := Gdip_CreateBitmapFromHBITMAP(hbm)
+    pEffect := Gdip_CreateEffect(1, 20, 0, 0)
+    r1 := Gdip_DrawImageFX(G, BMPcache, 0, 0, mainWidth, mainHeight, matrix, pEffect)
     r2 := UpdateLayeredWindow(hGDIwin, hdc, dummyPos, dummyPos, mainWidth, mainHeight, 255)
+    If (A_OSVersion="WIN_7")
+    {
+       JEE_ClientToScreen(hPicOnGui1, 1, 1, mainX, mainY)
+       WinMove, ahk_id %hGDIwin%,, %mainX%, %mainY%
+    }
+
     SelectObject(hdc, obm)
     DeleteObject(hbm)
     DeleteDC(hdc)
     Gdip_DeleteGraphics(G)
+    Gdip_DisposeEffect(pEffect)
+    Gdip_DeleteBrush(pBr0)
     Gdip_DeleteBrush(pBr1)
     Gdip_DeleteBrush(pBr2)
     Gdip_DeleteBrush(pBr3)
     Gdip_DeleteBrush(pBr4)
     Gdip_DeleteBrush(pBr5)
+    Gdip_DisposeImage(BMPcache, 1)
     SetTimer, drawWelcomeImg, -3000
 }
 
@@ -7094,115 +7142,22 @@ generateThumbName(imgpath, forceThis:=0) {
 }
 
 getColorMatrix() {
-; infos from http://www.graficaobscura.com/matrix/index.html
-;   Static NTSCr := 0.300, NTSCg := 0.587, NTSCb := 0.115
-    Static NTSCr := 0.308, NTSCg := 0.650, NTSCb := 0.095   ; personalized values
-
     matrix := ""
     If (ForceNoColorMatrix=1 && AnyWindowOpen=10)
        Return matrix
 
     If (imgFxMode=4 && bwDithering=0)       ; grayscale
-    {
-       LGA := (lumosGrayAdjust<=1) ? lumosGrayAdjust/1.5 - 0.6666 : lumosGrayAdjust - 1
-       Ra := NTSCr + LGA
-       If (Ra<0)
-          Ra := 0
-       Ga := NTSCg + LGA
-       If (Ga<0)
-          Ga := 0
-       Ba := NTSCb + LGA
-       If (Ba<0)
-          Ba := 0
-       matrix := Ra "|" Ra "|" Ra "|0|0|" Ga "|" Ga "|" Ga "|0|0|" Ba "|" Ba "|" Ba "|0|0|0|0|0|1|0|" GammosGrayAdjust "|" GammosGrayAdjust "|" GammosGrayAdjust "|0|1"
-    } Else If (imgFxMode=5)       ; grayscale R
-    {
-       Ga := 0, Ba := 0, GGA := 0
-       Ra := 1
-       matrix := Ra "|" Ra "|" Ra "|0|0|" Ga "|" Ga "|" Ga "|0|0|" Ba "|" Ba "|" Ba "|0|0|0|0|0|1|0|" GGA+0.01 "|" GGA "|" GGA "|0|1"
-    } Else If (imgFxMode=6)       ; grayscale G
-    {
-       Ra := 0, Ba := 0, GGA := 0
-       Ga := 1
-       matrix := Ra "|" Ra "|" Ra "|0|0|" Ga "|" Ga "|" Ga "|0|0|" Ba "|" Ba "|" Ba "|0|0|0|0|0|1|0|" GGA "|" GGA+0.01 "|" GGA "|0|1"
-    } Else If (imgFxMode=7)       ; grayscale B
-    {
-       Ra := 0, Ga := 0, GGA := 0
-       Ba := 1
-       matrix := Ra "|" Ra "|" Ra "|0|0|" Ga "|" Ga "|" Ga "|0|0|" Ba "|" Ba "|" Ba "|0|0|0|0|0|1|0|" GGA "|" GGA "|" GGA+0.01 "|0|1"
-    } Else If (imgFxMode=8)  ; negative / invert
-    {
-       matrix := "-1|0|0|0|0|0|-1|0|0|0|0|0|-1|0|0|0|0|0|1|0|1|1|1|0|1"
-    } Else If (imgFxMode=2 || imgFxMode=3) ; && (lumosAdjust!=1 || GammosAdjust!=0)
-    {
-       G := GammosAdjust
-       sL := satAdjust
-       sLi := 1 - satAdjust
-       bLa := lumosAdjust - 1
-       bL := lumosAdjust
-       If (sL>1)
-       {
-          z := (bL<1) ? bL : 1
-          sL := sL*z
-          If (sL<0.98)
-             sL := 0.98
-
-          y := z*(1 - sL)
-          mA := z*(y*NTSCr + sL + bLa + chnRdecalage)
-          mB := z*(y*NTSCr)
-          mC := z*(y*NTSCr)
-          mD := z*(y*NTSCg)
-          mE := z*(y*NTSCg + sL + bLa + chnGdecalage)
-          mF := z*(y*NTSCg)
-          mG := z*(y*NTSCb)
-          mH := z*(y*NTSCb)
-          mI := z*(y*NTSCb + sL + bLa + chnBdecalage)
-          mtrx = %mA%|%mB%|%mC%|0|0
-                |%mD%|%mE%|%mF%|0|0
-                |%mG%|%mH%|%mI%|0|0
-                |0   |0   |0   |1|0
-                |%G% |%G% |%G% |0|1
-       } Else
-       {
-          z := (bL<1) ? bL : 1
-          tR := NTSCr - 0.5 + bL/2
-          tG := NTSCg - 0.5 + bL/2
-          tB := NTSCb - 0.5 + bL/2
-          rB := z*(tR*sLi+bL*(1 - sLi) + chnRdecalage)
-          gB := z*(tG*sLi+bL*(1 - sLi) + chnGdecalage)
-          bB := z*(tB*sLi+bL*(1 - sLi) + chnBdecalage)     ; Formula used: A*w + B*(1 – w)
-          rF := z*(NTSCr*sLi + (bL/2 - 0.5)*sLi)
-          gF := z*(NTSCg*sLi + (bL/2 - 0.5)*sLi)
-          bF := z*(NTSCb*sLi + (bL/2 - 0.5)*sLi)
-
-          rB := rB*z+rF*(1 - z)
-          gB := gB*z+gF*(1 - z)
-          bB := bB*z+bF*(1 - z)     ; Formula used: A*w + B*(1 – w)
-          If (rB<0)
-             rB := 0
-          If (gB<0)
-             gB := 0
-          If (bB<0)
-             bB := 0
-          If (rF<0)
-             rF := 0
- 
-          If (gF<0)
-             gF := 0
- 
-          If (bF<0)
-             bF := 0
-
-          ; ToolTip, % rB " - " rF " --- " gB " - " gF
-          mtrx = %rB%|%rF%|%rF%|0|0
-                |%gF%|%gB%|%gF%|0|0
-                |%bF%|%bF%|%bB%|0|0
-                |0   |0   |0   |1|0
-                |%G% |%G% |%G% |0|1
-          ; matrix adjusted for lisibility
-       }
-       matrix := StrReplace(mtrx, A_Space)
-    }
+       matrix := GenerateColorMatrix(2, lumosGrayAdjust, GammosGrayAdjust)
+    Else If (imgFxMode=5)       ; grayscale R
+       matrix := GenerateColorMatrix(3)
+    Else If (imgFxMode=6)       ; grayscale G
+       matrix := GenerateColorMatrix(4)
+    Else If (imgFxMode=7)       ; grayscale B
+       matrix := GenerateColorMatrix(5)
+    Else If (imgFxMode=8)  ; negative / invert
+       matrix := GenerateColorMatrix(6)
+    Else If (imgFxMode=2 || imgFxMode=3) ; personalized
+       matrix := GenerateColorMatrix(1, lumosAdjust, GammosAdjust, satAdjust, 1, chnRdecalage, chnGdecalage, chnBdecalage)
     Return matrix
 }
 
@@ -7238,6 +7193,8 @@ QPV_ShowImgonGuiPrev(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, new
        GIFguiCreator(1, 1)
 
 ;   ToolTip, %imgW% -- %imgH% == %newW% -- %newH%
+    prevDestPosX := DestPosX
+    prevDestPosY := DestPosY
     pBrush := Gdip_BrushCreateSolid("0xAA898898")
     indicWidth := 150
     lineThickns := imgHUDbaseUnit
@@ -7246,9 +7203,9 @@ QPV_ShowImgonGuiPrev(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, new
     {
        sqPosX := (markedSelectFile<currentFileIndex) ? 0 : mainWidth - lineThickns
        If (FlipImgH=1 && usePrevious=1)
-          Gdip_FillRoundedRectangle(G, pBrush, mainWidth//2 - indicWidth//2, mainHeight//2 - lineThickns2//2, indicWidth, lineThickns2, lineThickns2//2)
+          Gdip_FillRoundedRectangle2(G, pBrush, mainWidth//2 - indicWidth//2, mainHeight//2 - lineThickns2//2, indicWidth, lineThickns2, lineThickns2//2)
        If (FlipImgV=1 && usePrevious=1)
-          Gdip_FillRoundedRectangle(G, pBrush, mainWidth//2 - lineThickns2//2, mainHeight//2 - indicWidth//2, lineThickns2, indicWidth, lineThickns2//2)
+          Gdip_FillRoundedRectangle2(G, pBrush, mainWidth//2 - lineThickns2//2, mainHeight//2 - indicWidth//2, lineThickns2, indicWidth, lineThickns2//2)
        If (imgFxMode>1 && usePrevious=1)
        {
           Gdip_FillPie(G, pBrush, mainWidth//2 - indicWidth//4, mainHeight//2 - indicWidth//4, indicWidth//2, indicWidth//2, 0, 180)
@@ -7299,6 +7256,8 @@ QPV_ShowImgonGuiPrev(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, new
        Gdip_DeletePen(pPen2)
     }
 
+    prevMaxSelX := maxSelX := roImgW ? roImgW : oImgW
+    prevMaxSelY := maxSelY := roImgH ? roImgH : oImgH
     If (activateImgSelection=1)
     {
        pPen1 := Gdip_CreatePen("0xCCbbccbb", lineThickns)
@@ -7308,8 +7267,6 @@ QPV_ShowImgonGuiPrev(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, new
        nimgSelY2 := maxU(imgSelY1, imgSelY2)
        If (editingSelectionNow!=1)
        {
-          maxSelX :=  roImgW ? roImgW : oImgW
-          maxSelY :=  roImgH ? roImgH : oImgH
           If (nImgSelX1>maxSelX)
              nImgSelX1 := maxSelX - 10
           If (nImgSelY1>maxSelY)
@@ -7343,32 +7300,12 @@ QPV_ShowImgonGuiPrev(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, new
 
        Gdip_FillRectangle(G, pBrush, imgSelPx, imgSelPy, imgSelW, imgSelH)
        Gdip_DrawRectangle(G, pPen1, imgSelPx, imgSelPy, imgSelW, imgSelH)
-       If (editingSelectionNow=1)
-       {
-          dotsSize := imgHUDbaseUnit//7
-          If (usePrevious!=1)
-             dotsSize := (PrefsLargeFonts=1) ? imgHUDbaseUnit//2.5 : imgHUDbaseUnit//4
-          pBrush2 := Gdip_BrushCreateSolid("0xFFbbccFF")
-          selDotX := imgSelPx - dotsSize//2
-          selDotY := imgSelPy - dotsSize//2
-          selDotAx := imgSelPx + imgSelW - dotsSize//2
-          selDotAy := imgSelPy + imgSelH - dotsSize//2
-          selDotBx := imgSelPx + imgSelW - dotsSize//2
-          selDotBy := imgSelPy - dotsSize//2
-          selDotCx := imgSelPx - dotsSize//2
-          selDotCy := imgSelPy + imgSelH - dotsSize//2
-          Gdip_FillRectangle(G, pBrush2, selDotX, selDotY, dotsSize, dotsSize)
-          Gdip_FillRectangle(G, pBrush2, SelDotAx, SelDotAy, dotsSize, dotsSize)
-          Gdip_FillRectangle(G, pBrush2, SelDotBx, SelDotBy, dotsSize, dotsSize)
-          Gdip_FillRectangle(G, pBrush2, SelDotCx, SelDotCy, dotsSize, dotsSize)
-          Gdip_DeleteBrush(pBrush2)
-       }
        Gdip_DeletePen(pPen1)
     }
 
     Gdip_DeleteBrush(pBrush)
     dummyPos := (A_OSVersion!="WIN_7") ? 1 : ""
-    If (CountFrames>1 && animGIFsSupport=1 && (prevAnimGIFwas!=imgpath || (A_TickCount - lastGIFdestroy > 9500)))
+    If (CountFrames>1 && AnyWindowOpen=0 && animGIFsSupport=1 && (prevAnimGIFwas!=imgpath || (A_TickCount - lastGIFdestroy > 9500)))
     {
        Sleep, 15
        prevAnimGIFwas := imgpath
@@ -7392,6 +7329,103 @@ QPV_ShowImgonGuiPrev(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, new
     Return r
 }
 
+cleanThumbsWindow() {
+    prevStartIndex := -1
+    GetClientSize(mainWidth, mainHeight, PVhwnd)
+    hbm := CreateDIBSection(mainWidth, mainHeight)
+    hdc := CreateCompatibleDC()
+    obm := SelectObject(hdc, hbm)
+    G2 := Gdip_GraphicsFromHDC(hdc)
+    pBrush := Gdip_BrushCreateSolid("0x99898898")
+    Gdip_FillRectangle(G2, pBrush, 1, 1, 1, 1)
+    Gdip_DeleteBrush(pBrush)
+    dummyPos := (A_OSVersion!="WIN_7") ? 1 : ""
+    r2 := UpdateLayeredWindow(hGDIthumbsWin, hdc, dummyPos, dummyPos, mainWidth, mainHeight, 255)
+    SelectObject(hdc, obm)
+    DeleteObject(hbm)
+    DeleteDC(hdc)
+    Gdip_DeleteGraphics(G2)
+    If (A_OSVersion="WIN_7")
+    {
+       JEE_ClientToScreen(hPicOnGui1, 1, 1, mainX, mainY)
+       WinMove, ahk_id %hGDIthumbsWin%,, %mainX%, %mainY%
+    }
+}
+
+drawImgSelectionOnWindow(operation) {
+     Static hbm, hdc, obm, G2, maxSelY, maxSelX, dummyPos
+          , lineThickns, pBrush, pBrush2, pPen1
+
+     prevStartIndex := -1
+     If (operation=1)
+     {
+        dummyPos := (A_OSVersion!="WIN_7") ? 1 : ""
+        GetClientSize(mainWidth, mainHeight, PVhwnd)
+        hbm := CreateDIBSection(mainWidth, mainHeight)
+        hdc := CreateCompatibleDC()
+        obm := SelectObject(hdc, hbm)
+        G2 := Gdip_GraphicsFromHDC(hdc)
+        Gdip_SetInterpolationMode(G2, 5)
+        Gdip_SetSmoothingMode(G2, 5)
+        maxSelX := prevMaxSelX
+        maxSelY := prevMaxSelY
+        lineThickns := (PrefsLargeFonts=1) ? imgHUDbaseUnit//8 : imgHUDbaseUnit//11
+        pBrush := Gdip_BrushCreateSolid("0x99898898")
+        pBrush2 := Gdip_BrushCreateSolid("0xFFffaaFF")
+        pPen1 := Gdip_CreatePen("0xffbbccbb", lineThickns)
+     } Else If (operation=2)
+     {
+        Gdip_GraphicsClear(G2)
+        nImgSelX1 := minU(imgSelX1, imgSelX2)
+        nImgSelY1 := minU(imgSelY1, imgSelY2)
+        nimgSelX2 := maxU(imgSelX1, imgSelX2)
+        nimgSelY2 := maxU(imgSelY1, imgSelY2)
+        imgSelX1 := nImgSelX1 
+        imgSelY1 := nImgSelY1 
+        imgSelX2 := nimgSelX2 
+        imgSelY2 := nimgSelY2 
+        zImgSelX1 := nImgSelX1*zoomLevel
+        zImgSelX2 := nImgSelX2*zoomLevel
+        zImgSelY1 := nImgSelY1*zoomLevel
+        zImgSelY2 := nImgSelY2*zoomLevel
+   
+        imgSelW := maxU(zImgSelX1, zImgSelX2) - minU(zImgSelX1, zImgSelX2)
+        imgSelH := maxU(zImgSelY1, zImgSelY2) - minU(zImgSelY1, zImgSelY2)
+        If (imgSelW<35)
+           imgSelW := 35
+        If (imgSelH<35)
+           imgSelH := 35
+   
+        imgSelPx := prevDestPosX + minU(zImgSelX1, zImgSelX2)
+        imgSelPy := prevDestPosY + minU(zImgSelY1, zImgSelY2)
+   
+        Gdip_FillRectangle(G2, pBrush, imgSelPx, imgSelPy, imgSelW, imgSelH)
+        Gdip_DrawRectangle(G2, pPen1, imgSelPx, imgSelPy, imgSelW, imgSelH)
+        dotsSize := (PrefsLargeFonts=1) ? imgHUDbaseUnit//2.5 : imgHUDbaseUnit//4
+        selDotX := imgSelPx - dotsSize//2
+        selDotY := imgSelPy - dotsSize//2
+        selDotAx := imgSelPx + imgSelW - dotsSize//2
+        selDotAy := imgSelPy + imgSelH - dotsSize//2
+        selDotBx := imgSelPx + imgSelW - dotsSize//2
+        selDotBy := imgSelPy - dotsSize//2
+        selDotCx := imgSelPx - dotsSize//2
+        selDotCy := imgSelPy + imgSelH - dotsSize//2
+        Gdip_FillRectangle(G2, pBrush2, selDotX, selDotY, dotsSize, dotsSize)
+        Gdip_FillRectangle(G2, pBrush2, SelDotAx, SelDotAy, dotsSize, dotsSize)
+        Gdip_FillRectangle(G2, pBrush2, SelDotBx, SelDotBy, dotsSize, dotsSize)
+        Gdip_FillRectangle(G2, pBrush2, SelDotCx, SelDotCy, dotsSize, dotsSize)
+        r2 := UpdateLayeredWindow(hGDIwin, hdc, dummyPos, dummyPos, mainWidth, mainHeight, 255)
+     } Else
+     {
+        Gdip_DeleteBrush(pBrush2)
+        Gdip_DeleteBrush(pBrush)
+        Gdip_DeletePen(pPen1)
+        SelectObject(hdc, obm)
+        DeleteObject(hbm)
+        DeleteDC(hdc)
+        Gdip_DeleteGraphics(G2)
+     }
+}
 
 QPV_ShowImgonGui(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, imgpath, CountFrames, wasForcedHigh) {
     Critical, on
@@ -7422,6 +7456,8 @@ QPV_ShowImgonGui(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, newH, m
     Gdip_GetImageDimensions(whichImg, imgW, imgH)
     calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY)
     thisIDviewPortCache := imgpath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight usePrevious
+    prevDestPosX := DestPosX
+    prevDestPosY := DestPosY
     If (thisIDviewPortCache!=IDviewPortCache || !ViewPortBMPcache || CountFrames>1) && (usePrevious!=1)
     {
        r1 := Gdip_DrawImage(G, whichImg, DestPosX, DestPosY, newW, newH, 0, 0, imgW, imgH, matrix)
@@ -7472,7 +7508,8 @@ QPV_ShowImgonGui(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, newH, m
     thisZatAdjust := (imgFxMode=4 && bwDithering=0 && zatAdjust=0) ? -99 : zatAdjust
     If (thisZatAdjust=0 && hueAdjust=0)
        applyAdjusts := 0
-    If (imgFxMode=2 || imgFxMode=3 || imgFxMode=4) && (applyAdjusts=1 && o_bwDithering=0)
+
+    If (imgFxMode=2 || imgFxMode=3 || imgFxMode=4 || imgFxMode=8) && (applyAdjusts=1 && o_bwDithering=0)
     {
        pEffect := Gdip_CreateEffect(6, hueAdjust, thisZatAdjust, 0)
        r1 := Gdip_DrawImageFX(G2, ViewPortBMPcache, 0, 0, mainWidth, mainHeight, matrix, pEffect)
@@ -7487,9 +7524,9 @@ QPV_ShowImgonGui(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, newH, m
        lineThickns2 := lineThickns//4
        sqPosX := (markedSelectFile<currentFileIndex) ? 0 : mainWidth - lineThickns
        If (FlipImgH=1 && usePrevious=1)
-          Gdip_FillRoundedRectangle(G2, pBrush, mainWidth//2 - indicWidth//2, mainHeight//2 - lineThickns2//2, indicWidth, lineThickns2, lineThickns2//2)
+          Gdip_FillRoundedRectangle2(G2, pBrush, mainWidth//2 - indicWidth//2, mainHeight//2 - lineThickns2//2, indicWidth, lineThickns2, lineThickns2//2)
        If (FlipImgV=1 && usePrevious=1)
-          Gdip_FillRoundedRectangle(G2, pBrush, mainWidth//2 - lineThickns2//2, mainHeight//2 - indicWidth//2, lineThickns2, indicWidth, lineThickns2//2)
+          Gdip_FillRoundedRectangle2(G2, pBrush, mainWidth//2 - lineThickns2//2, mainHeight//2 - indicWidth//2, lineThickns2, indicWidth, lineThickns2//2)
        If (imgFxMode>1 && usePrevious=1)
        {
           Gdip_FillPie(G2, pBrush, mainWidth//2 - indicWidth//4, mainHeight//2 - indicWidth//4, indicWidth//2, indicWidth//2, 0, 180)
@@ -7524,14 +7561,16 @@ QPV_ShowImgonGui(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, newH, m
           Gdip_FillRectangle(G2, pBrush, sqPosX, 0, lineThickns, lineThickns)
     }
 
-    If (activateImgSelection=1)
+    prevMaxSelX := maxSelX := roImgW ? roImgW : oImgW
+    prevMaxSelY := maxSelY := roImgH ? roImgH : oImgH
+    If (activateImgSelection=1 && adjustNowSel!=1)
     {
-       maxSelX := roImgW ? roImgW : oImgW
-       maxSelY := roImgH ? roImgH : oImgH
        lineThickns := (PrefsLargeFonts=1) ? imgHUDbaseUnit//8 : imgHUDbaseUnit//11
        If (usePrevious=1)
           lineThickns :=  imgHUDbaseUnit//13
+
        pPen1 := Gdip_CreatePen("0xCCbbccbb", lineThickns)
+       pBrush3 := Gdip_BrushCreateSolid("0x77898898")
        If (imgSelX2=-1)
        {
           imgSelX1 := maxSelX//2
@@ -7614,7 +7653,7 @@ QPV_ShowImgonGui(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, newH, m
              imgSelOutViewPort := 1
           }
        }
-       Gdip_FillRectangle(G2, pBrush, imgSelPx, imgSelPy, imgSelW, imgSelH)
+       Gdip_FillRectangle(G2, pBrush3, imgSelPx, imgSelPy, imgSelW, imgSelH)
        Gdip_DrawRectangle(G2, pPen1, imgSelPx, imgSelPy, imgSelW, imgSelH)
        If (editingSelectionNow=1)
        {
@@ -7637,10 +7676,12 @@ QPV_ShowImgonGui(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, newH, m
           Gdip_DeleteBrush(pBrush2)
        }
        Gdip_DeletePen(pPen1)
+       Gdip_DeleteBrush(pBrush3)
     }
 
+    whichWin := (adjustNowSel=1) ? hGDIthumbsWin : hGDIwin
     If (mustDisplay=1)
-       r2 := UpdateLayeredWindow(hGDIwin, hdc, dummyPos, dummyPos, mainWidth, mainHeight, 255)
+       r2 := UpdateLayeredWindow(whichWin, hdc, dummyPos, dummyPos, mainWidth, mainHeight, 255)
     SelectObject(hdc, obm)
     DeleteObject(hbm)
     DeleteDC(hdc)
@@ -7650,7 +7691,7 @@ QPV_ShowImgonGui(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, newH, m
     If (A_OSVersion="WIN_7")
     {
        JEE_ClientToScreen(hPicOnGui1, 1, 1, mainX, mainY)
-       WinMove, ahk_id %hGDIwin%,, %mainX%, %mainY%
+       WinMove, ahk_id %whichWin%,, %mainX%, %mainY%
     }
     r := (r1!=0 || !r2) ? 0 : 1
     totalZeit := A_TickCount - startZeitIMGload
@@ -7794,11 +7835,11 @@ mainGdipWinThumbsGrid() {
            Gdip_FillRectangle(G10, pBrush4, DestPosX, DestPosY, thumbsW, thumbsH)
 
         If (thisFileIndex=currentFileIndex)
-           Gdip_FillRectangle(G10, pBrush1, DestPosX, DestPosY, thumbsW, thumbsH)
+           Gdip_FillRoundedRectangle2(G10, pBrush1, DestPosX, DestPosY, thumbsW, thumbsH, 16)
 
         testRange := valueBetween(thisFileIndex, currentFileIndex, markedSelectFile)
         If (testRange=1 && markedSelectFile>0)
-           Gdip_FillRectangle(G10, pBrush3, DestPosX, DestPosY, thumbsW, thumbsH)
+           Gdip_FillRoundedRectangle2(G10, pBrush3, DestPosX, DestPosY, thumbsW, thumbsH, 16)
 
         If (thisFileIndex=markedSelectFile)
         {
@@ -7811,7 +7852,7 @@ mainGdipWinThumbsGrid() {
     If (markedSelectFile)
     {
        sqPosX := (markedSelectFile<currentFileIndex) ? 0 : mainWidth - imgHUDbaseUnit
-       Gdip_FillRectangle(G10, pBrush1, sqPosX, 0, imgHUDbaseUnit, imgHUDbaseUnit)
+       Gdip_FillRoundedRectangle2(G10, pBrush1, sqPosX, 0, imgHUDbaseUnit, imgHUDbaseUnit, 16)
     }
 
     thisFileIndex := currentFileIndex
@@ -8048,7 +8089,7 @@ QPV_ShowThumbnails(startIndex) {
 
     thisZatAdjust := (imgFxMode=4 && bwDithering=0 && zatAdjust=0) ? -99 : zatAdjust
     applyAdjusts := (thisZatAdjust=0 && hueAdjust=0) ? 0 : 1
-    If (imgFxMode=2 || imgFxMode=3 || imgFxMode=4) && (applyAdjusts=1)
+    If (imgFxMode=2 || imgFxMode=3 || imgFxMode=4 || imgFxMode=8) && (applyAdjusts=1)
     {
        pEffect := Gdip_CreateEffect(6, hueAdjust, thisZatAdjust, 0)
        r1 := Gdip_DrawImageFX(G, thumbsBitmap, 0, 0, mainWidth, mainHeight, matrix, pEffect)
@@ -8301,7 +8342,7 @@ JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
 GetClientSize(ByRef w, ByRef h, hwnd) {
 ; by Lexikos http://www.autohotkey.com/forum/post-170475.html
     Static prevW, prevH, lastInvoked := 1
-    If (A_TickCount - lastInvoked<50)
+    If (A_TickCount - lastInvoked<90)
     {
        W := prevW
        H := prevH
@@ -8830,7 +8871,7 @@ coreResizeIMG(imgpath, newW, newH, file2save, goFX, toClippy, rotateMode, soloMo
     If (thisZatAdjust=0 && hueAdjust=0)
        applyAdjusts := 0
 
-    If (imgFxMode=2 || imgFxMode=3 || imgFxMode=4) && (applyAdjusts=1 && o_bwDithering=0)
+    If (imgFxMode=2 || imgFxMode=3 || imgFxMode=4 || imgFxMode=8) && (applyAdjusts=1 && o_bwDithering=0)
     {
        pEffect := Gdip_CreateEffect(6, hueAdjust, thisZatAdjust, 0)
        Gdip_ApplyEffect(oBitmap, pEffect)
@@ -9135,7 +9176,7 @@ ColorsAdjusterPanelWindow() {
     thisZL := Round(zoomLevel*100) "%"
     Gui, Add, DropDownList, x15 y15 Section w%txtWid% gColorPanelTriggerImageUpdate AltSubmit Choose%IMGresizingMode% vIMGresizingMode, Adapt all images into view|Adapt only large images|Original resolution (100`%)|Custom zoom level
     Gui, Add, ComboBox, x+1 w90 gColorPanelTriggerImageUpdate vCustomZoomCB, 10`%|25`%|50`%|75`%|125`%|150`%|200`%|300`%|500`%|%thisZL%||
-    Gui, Add, DropDownList, xs y+5 w%txtWid% gColorPanelTriggerImageUpdate AltSubmit Choose%imgFxMode% vimgFxMode, Original image colors|Personalized colors|Auto-adjusted colors|Grayscale|Red channel|Green channel|Blue channel
+    Gui, Add, DropDownList, xs y+5 w%txtWid% gColorPanelTriggerImageUpdate AltSubmit Choose%imgFxMode% vimgFxMode, Original image colors|Personalized colors|Auto-adjusted colors|Grayscale|Red channel|Green channel|Blue channel|Inverted colors
     Gui, Add, Checkbox, x+1 hp w45 +0x1000 gColorPanelTriggerImageUpdate Checked%FlipImgV% vFlipImgV, V
     Gui, Add, Checkbox, x+1 hp w45 +0x1000 gColorPanelTriggerImageUpdate Checked%FlipImgH% vFlipImgH, H
     Gui, Add, DropDownList, xs y+5 w%txtWid% gColorPanelTriggerImageUpdate AltSubmit Choose%autoAdjustMode% vAutoAdjustMode, Adaptive mixed mode|Increase brightness|Increase contrast
@@ -9295,7 +9336,7 @@ updatePanelColorsInfo() {
    Else
       GuiControl, SettingsGUIA: Disable, bwDithering
 
-   If (imgFxMode=2 || imgFxMode=3 || imgFxMode=4) && (o_bwDithering=0)
+   If (imgFxMode=2 || imgFxMode=3 || imgFxMode=4 || imgFxMode=8) && (o_bwDithering=0)
    {
       GuiControl, SettingsGUIA: Enable, zatAdjust
       GuiControl, SettingsGUIA: Enable, infoZatAdjust
