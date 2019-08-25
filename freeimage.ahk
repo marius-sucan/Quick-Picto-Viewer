@@ -22,7 +22,7 @@ FreeImage_FoxInit(isInit:=1) {
       Return "err - 404"
 
    If (isInit=1)
-      hFIDll := DllCall("LoadLibraryW", "WStr", DllPath, "Ptr")
+      hFIDll := DllCall("LoadLibraryW", "WStr", DllPath, "UPtr")
    Else
       DllCall("FreeLibrary", "UInt", hFIDll)
 

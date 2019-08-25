@@ -21,7 +21,7 @@
 
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 3.6.7
+;@Ahk2Exe-SetVersion 3.6.8
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
  
@@ -84,7 +84,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , hCursN := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32512, "Ptr")  ; IDC_ARROW
    , remCacheOldDays := 0, jpegDoCrop := 0, jpegDesiredOperation := 1, prevDestPosX
    , rDesireWriteFMT := "", FIMfailed2init := 0, prevMaxSelX, prevMaxSelY, prevDestPosY
-   , version := "3.6.7", vReleaseDate := "21/08/2019"
+   , version := "3.6.8", vReleaseDate := "25/08/2019"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1
@@ -113,6 +113,13 @@ OnExit, Cleanup
 If A_IsCompiled
    initCompiled()
 
+if !(GDIPToken := Gdip_Startup())
+{
+   Msgbox, 48, %appTitle%, ERROR: unable to initialize GDI+...`n`nThe program will now exit.
+   ExitApp
+}
+
+
 OnMessage(0x205, "WM_RBUTTONUP")
 OnMessage(0x201, "WM_LBUTTONDOWN")
 OnMessage(0x203, "WM_LBUTTONDOWN") ; WM_LBUTTONDOWN double click
@@ -127,12 +134,6 @@ OnMessage(0x08, "activateMainWin")   ; WM_KILLFOCUS
 Loop, 9
     OnMessage(255+A_Index, "PreventKeyPressBeep")   ; 0x100 to 0x108
 
-if !(GDIPToken := Gdip_Startup())
-{
-   Msgbox, 48, %appTitle%, ERROR: unable to initialize GDI+...`n`nThe program will now exit.
-   ExitApp
-}
-
 IniRead, FirstRun, % mainSettingsFile, General, FirstRun, @
 If (FirstRun!=0)
 {
@@ -143,10 +144,17 @@ If (FirstRun!=0)
 
 BuildTray()
 BuildGUI()
-If RegExMatch(A_Args[1], "i)(.\.sld)$")
-   OpenSLD(A_Args[1])
+
+Loop, 5
+{
+   If RegExMatch(A_Args[A_Index], "i)(.\.sld)$")
+      OpenSLD(A_Args[A_Index])
+   Else If RegExMatch(A_Args[A_Index], RegExFilesPattern)
+      OpenArgFile(A_Args[A_Index])
+}
 
 Return
+
 ;_____________________________________Hotkeys_________________
 
 identifyThisWin(noReact:=0) {
@@ -197,6 +205,12 @@ identifyThisWin(noReact:=0) {
     Return
 
     ~F10::
+    ~+F10::
+    ~!F10::
+    ^AppsKey::
+    +AppsKey::
+    #AppsKey::
+    !AppsKey::
     AppsKey::
        InitGuiContextMenu()
     Return
@@ -734,6 +748,7 @@ identifyThisWin(noReact:=0) {
     Return
 #If
 
+
 ;____________Functions__________________
 
 OpenSLD(fileNamu, dontStartSlide:=0) {
@@ -772,7 +787,21 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
 
   mustGenerateStaticFolders := (InStr(firstLine, "[General]") && StrLen(testStaticFolderz)>8) ? 0 : 1
   If (UseCachedList="Yes" && InStr(firstLine, "[General]")) || !InStr(firstLine, "[General]")
-     sldGenerateFilesList(fileNamu, 0, mustRemQuotes)
+     res := sldGenerateFilesList(fileNamu, 0, mustRemQuotes)
+
+  If (res="abandoned")
+  {
+     ForceRegenStaticFolders := SLDhasFiles := 0
+     renewCurrentFilesList()
+     newStaticFoldersListCache := DynamicFoldersList := CurrentSLD := ""
+     filesFilter := usrFilesFilteru := ""
+     WinSetTitle, ahk_id %PVhwnd%,, %appTitle%.
+     SetTimer, ResetImgLoadStatus, -50
+     GdipCleanMain()
+     cleanThumbsWindow()
+     drawWelcomeImg()
+     Return
+  }
 
   If InStr(firstLine, "[General]") 
   {
@@ -1085,8 +1114,14 @@ TrueCleanup() {
    Gdip_Shutdown(GDIPToken)  
 }
 
+1GuiClose:
 GuiClose:
 Cleanup:
+   If AnyWindowOpen
+   {
+      CloseWindow()
+      Sleep, 25
+   }
    TrueCleanup()
    ExitApp
 Return
@@ -1835,11 +1870,17 @@ GoPrevSlide() {
 SecToHHMMSS(Sec) {
   OldFormat := A_FormatFloat
   SetFormat, Float, 02.0
-  Hrs  := Sec//3600/1
+  Hrs := Sec//3600/1
   Min := Mod(Sec//60, 60)/1
   Sec := Mod(Sec,60)/1
   SetFormat, Float, %OldFormat%
-  Return (Hrs ? Hrs ":" : "") Min ":" Sec
+  If (hrs>26)
+     dayz := Round(hrs/24, 2)
+  If (dayz>=1.1)
+     r := dayz " days"
+  Else
+     r := (Hrs ? Hrs "h " : "") Min "m " Sec "s"
+  Return r
 }
 
 DefineSlideShowType() {
@@ -1857,7 +1898,8 @@ SwitchSlideModes() {
    If (slideShowRunning=1)
       resetSlideshowTimer(0)
 
-   friendly := DefineSlideShowType()
+   friendly := DefineSlideShowType() "`nCurrently "
+   friendly .= (slideShowRunning=1) ? "running" : "stopped"
    showTOOLtip("Slideshow mode: " friendly)
    SetTimer, RemoveTooltip, % -msgDisplayTime
    writeMainSettings()
@@ -3164,7 +3206,7 @@ cleanFilesList(noFilesCheck:=0) {
              noFilesCheck := (z=1) ? 2 : WnoFilesCheck
           }
 
-          If GetKeyState("Esc", "P")
+          If (GetKeyState("Esc", "P") && identifyThisWin())
           {
              lastLongOperationAbort := A_TickCount
              abandonAll := 1
@@ -3309,7 +3351,7 @@ SortFilesList(SortCriterion) {
              SortBy := (op=1) ? Round(Wi/100 * He/100) : 0
           }
 
-          If GetKeyState("Esc", "P")
+          If (GetKeyState("Esc", "P") && identifyThisWin())
           {
              lastLongOperationAbort := A_TickCount
              abandonAll := 1
@@ -3675,6 +3717,8 @@ RecentFilesManager(dummy:=0,addPrevMoveDest:=0) {
 
 RandomPicture(dummy:=0, inLoop:=0) {
    ; Static inLoop := 0
+   If (maxFilesIndex=0 || maxFilesIndex="") && (!CurrentSLD)
+      Return
 
    RandyIMGnow++
    If (RandyIMGnow<1)
@@ -3779,7 +3823,7 @@ DeletePicture() {
      startPoint := (currentFileIndex<markedSelectFile) ? currentFileIndex : markedSelectFile
      Loop, % filesElected
      {
-        If GetKeyState("Esc", "P")
+        If (GetKeyState("Esc", "P") && identifyThisWin())
         {
            lastLongOperationAbort := A_TickCount
            abandonAll := 1
@@ -3810,7 +3854,7 @@ DeletePicture() {
                  bckpResultedFilesList[z] := "||" file2rem
            }
         } Else someErrors := "`nErrors occured during file operations..."
-        If GetKeyState("Esc", "P")
+        If (GetKeyState("Esc", "P") && identifyThisWin())
         {
            lastLongOperationAbort := A_TickCount
            abandonAll := 1
@@ -4017,7 +4061,7 @@ coreMultiRenameFiles() {
             }
          }
 
-         If GetKeyState("Esc", "P")
+         If (GetKeyState("Esc", "P") && identifyThisWin())
          {
             lastLongOperationAbort := A_TickCount
             abandonAll := 1
@@ -4759,7 +4803,7 @@ batchCopyMoveFile(finalDest) {
       } Else If (skippedFile!=1)
          someErrors := "`nErrors occured during file operations..."
 
-      If GetKeyState("Esc", "P")
+      If (GetKeyState("Esc", "P") && identifyThisWin())
       {
          lastLongOperationAbort := A_TickCount
          abandonAll := 1
@@ -4831,7 +4875,7 @@ batchConvert2jpeg() {
          prevMSGdisplay := A_TickCount
       }
 
-      If GetKeyState("Esc", "P")
+      If (GetKeyState("Esc", "P") && identifyThisWin())
       {
          lastLongOperationAbort := A_TickCount
          abandonAll := 1
@@ -4867,7 +4911,7 @@ batchConvert2jpeg() {
                bckpResultedFilesList[z] := file2save
          }
       }
-      If GetKeyState("Esc", "P")
+      If (GetKeyState("Esc", "P") && identifyThisWin())
       {
          lastLongOperationAbort := A_TickCount
          abandonAll := 1
@@ -5097,6 +5141,15 @@ OpenFiles(dummy:=0) {
       currentFileIndex := detectFileID(imgpath)
       IDshowImage(currentFileIndex)
    }
+}
+
+OpenArgFile(inputu) {
+    imageLoading := 1
+    zPlitPath(inputu, 0, OutFileName, OutDir)
+    coreOpenFolder("|" OutDir, 0)
+    currentFileIndex := detectFileID(inputu)
+    IDshowImage(currentFileIndex)
+    imageLoading := 0
 }
 
 addNewFile2list() {
@@ -5883,7 +5936,7 @@ ToggleAlwaysFIMus() {
    alwaysOpenwithFIM := !alwaysOpenwithFIM
    r := initFIMGmodule()
    If InStr(r, "err - 126")
-      friendly := "`n`nPlease install the Rubntime Redistributable Packages of Visual Studio 2013 included in the Quick Picto Viewer ZIP compiled package."
+      friendly := "`n`nPlease install the Runtime Redistributable Packages of Visual Studio 2015."
    Else If InStr(r, "err - 404")
       friendly := "`n`nThe FreeImage.dll file seems to be missing..."
 
@@ -6018,7 +6071,7 @@ drawWelcomeImg(goAgain:=0) {
     If (maxFilesIndex>0 || StrLen(CurrentSLD)>1 || AnyWindowOpen>0)
        Return
 
-    If (A_TickCount - scriptStartTime<1000)
+    If (A_TickCount - scriptStartTime<1000) && (imageLoading!=1)
     {
        SetTimer, drawWelcomeImg, -500
        Return
@@ -7909,7 +7962,7 @@ EraseThumbsCache(dummy:=0) {
          prevMSGdisplay := A_TickCount
       }
 
-      If GetKeyState("Esc", "P")
+      If (GetKeyState("Esc", "P") && identifyThisWin())
       {
          lastLongOperationAbort := A_TickCount
          abandonAll := 1
@@ -8016,7 +8069,7 @@ QPV_ShowThumbnails(startIndex) {
     Loop, % maxItemsW*maxItemsH*2
     {
         hasUpdated := 0
-        If GetKeyState("Esc", "P")
+        If (GetKeyState("Esc", "P") && identifyThisWin())
         {
            lastLongOperationAbort := A_TickCount
            abandonAll := 1
@@ -8075,7 +8128,7 @@ QPV_ShowThumbnails(startIndex) {
         } Else If (enableThumbsCaching=1 && (imgW>130 || imgH>130))   ; images still worth bothering to cache
            ListAllIMGs .= imgpath "`n"
 
-        If GetKeyState("Esc", "P")
+        If (GetKeyState("Esc", "P") && identifyThisWin())
         {
            lastLongOperationAbort := A_TickCount
            abandonAll := 1
@@ -8137,7 +8190,7 @@ QPV_ShowThumbnails(startIndex) {
        Loop, Parse, ListAllIMGs, `n
        {
            generateImgThumbCache(A_LoopField, newSize)
-           If GetKeyState("Esc", "P")
+           If (GetKeyState("Esc", "P") && identifyThisWin())
            {
               lastLongOperationAbort := A_TickCount
               abandonAll := 1
@@ -8446,6 +8499,13 @@ sldGenerateFilesList(readThisFile, doFilesCheck, mustRemQuotes) {
           line := StrReplace(line, "|")
        } Else doRecursive := 1
 
+       If (GetKeyState("Esc", "P") && identifyThisWin())
+       {
+          lastLongOperationAbort := A_TickCount
+          abandonAll := 1
+          Break
+       }
+
        changeMcursor()
        If (RegExMatch(line, RegExFilesPattern) && RegExMatch(line, "i)^(.\:\\.)"))
        {
@@ -8470,6 +8530,15 @@ sldGenerateFilesList(readThisFile, doFilesCheck, mustRemQuotes) {
        }
     }
     Try DllCall("user32\SetCursor", "Ptr", hCursN)
+
+    If (abandonAll=1)
+    {
+       showTOOLtip("Operation aborted. Files list empty.")
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       SoundBeep, 950, 100
+       Try DllCall("user32\SetCursor", "Ptr", hCursN)
+       Return "abandoned"
+    }
 }
 
 filterCoreString(stringu, behave, thisFilter) {
@@ -8511,7 +8580,7 @@ GetFilesList(strDir, doRecursive:=1) {
       }
 
       changeMcursor()
-      If GetKeyState("Esc", "P")
+      If (GetKeyState("Esc", "P") && identifyThisWin())
       {
          lastLongOperationAbort := A_TickCount
          abandonAll := 1
@@ -8572,18 +8641,23 @@ Win_ShowSysMenu(Hwnd) {
 ; Source: https://github.com/majkinetor/mm-autohotkey/blob/master/Appbar/Taskbar/Win.ahk
 ; modified by Marius Șucan
 
-  Static WM_SYSCOMMAND = 0x112, TPM_RETURNCMD=0x100
-  oldDetect := A_DetectHiddenWindows
-  DetectHiddenWindows, on
-  Process, Exist
-  h := WinExist("ahk_pid " ErrorLevel)
-  DetectHiddenWindows, %oldDetect%
+  Static WM_SYSCOMMAND := 0x112, TPM_RETURNCMD := 0x100
+
+  h := WinExist("ahk_id " hwnd)
   JEE_ClientToScreen(hPicOnGui1, 1, 1, X, Y)
+  Suspend, on
+  SetTimer, unSuspendu, -250
   hSysMenu := DllCall("GetSystemMenu", "Uint", Hwnd, "int", False) 
   r := DllCall("TrackPopupMenu", "uint", hSysMenu, "uint", TPM_RETURNCMD, "int", X, "int", Y, "int", 0, "uint", h, "uint", 0)
-  IfEqual, r, 0, return
-  PostMessage, WM_SYSCOMMAND, r,,,ahk_id %Hwnd%
+  If (r=0)
+     Return
+
+  SendMessage, WM_SYSCOMMAND, r,,,ahk_id %Hwnd%
   Return 1
+}
+
+unSuspendu() {
+  Suspend, Off
 }
 
 AddAnimatedGIF(imagefullpath , x="", y="", w="", h="", guiname = "1") {
@@ -9071,7 +9145,7 @@ batchJpegLLoperations() {
      countFilez := countTFilez := 0
      Loop, % filesElected
      {
-        If GetKeyState("Esc", "P")
+        If (GetKeyState("Esc", "P") && identifyThisWin())
         {
            lastLongOperationAbort := A_TickCount
            abandonAll := 1
@@ -9636,7 +9710,7 @@ batchIMGresizer(desiredW, desiredH, isPercntg) {
          prevMSGdisplay := A_TickCount
       }
 
-      If GetKeyState("Esc", "P")
+      If (GetKeyState("Esc", "P") && identifyThisWin())
       {
          lastLongOperationAbort := A_TickCount
          abandonAll := 1
@@ -9684,7 +9758,7 @@ batchIMGresizer(desiredW, desiredH, isPercntg) {
          countFilez++
       Else someErrors := "`nErrors occured during file operations..."
 
-      If GetKeyState("Esc", "P")
+      If (GetKeyState("Esc", "P") && identifyThisWin())
       {
          lastLongOperationAbort := A_TickCount
          abandonAll := 1
@@ -10352,7 +10426,7 @@ PopulateStaticFolderzList() {
            If (InStr(r, "||") || !r)
               Continue
 
-           If GetKeyState("Esc", "P")
+           If (GetKeyState("Esc", "P") && identifyThisWin())
            {
               lastLongOperationAbort := A_TickCount
               abandonAll := 1
@@ -10371,7 +10445,7 @@ PopulateStaticFolderzList() {
         If StrLen(A_LoopField)<2
            Continue
 
-        If GetKeyState("Esc", "P")
+        If (GetKeyState("Esc", "P") && identifyThisWin())
         {
            lastLongOperationAbort := A_TickCount
            abandonAll := 1
