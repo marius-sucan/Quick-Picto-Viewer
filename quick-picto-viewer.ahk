@@ -21,7 +21,7 @@
 
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 3.6.8
+;@Ahk2Exe-SetVersion 3.6.9
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
  
@@ -84,7 +84,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , hCursN := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32512, "Ptr")  ; IDC_ARROW
    , remCacheOldDays := 0, jpegDoCrop := 0, jpegDesiredOperation := 1, prevDestPosX
    , rDesireWriteFMT := "", FIMfailed2init := 0, prevMaxSelX, prevMaxSelY, prevDestPosY
-   , version := "3.6.8", vReleaseDate := "25/08/2019"
+   , version := "3.6.9", vReleaseDate := "28/08/2019"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1
@@ -966,6 +966,7 @@ CopyImagePath() {
 CopyImage2clip() {
   If (currentFileIndex=0)
      Return
+
   If (slideShowRunning=1)
      ToggleSlideShowu()
 
@@ -974,22 +975,23 @@ CopyImage2clip() {
   If (FileExist(imgpath) && fileSizu>500)
   {
      r := coreResizeIMG(imgpath, 0, 0, "--", 1, 1, 0)
-     If !r
-     {
-        showTOOLtip("Image copied to clipboard...")
-        SoundBeep, 900, 100
-     } Else
-     {
-        showTOOLtip("Failed to copy the image to clipboard... Error code: " r)
-        SoundBeep, 300, 900
-     }
-     SetTimer, RemoveTooltip, % -msgDisplayTime
+  } Else If gdiBitmap
+  {
+     Gdip_GetImageDimensions(gdiBitmap, imgW, imgH)
+     dummyBMP := Gdip_CloneBitmapArea(gdiBitmap, 0, 0, imgW, imgH)
+     r := coreResizeIMG(imgpath, imgW, imgH, "--", 1, 1, 1, dummyBMP, imgW, imgH, 0)
+  } Else r := 0
+
+  If !r
+  {
+     showTOOLtip("Image copied to clipboard...")
+     SoundBeep, 900, 100
   } Else
   {
-     showTOOLtip("ERROR: Failed to copy image to clipboard... Error code: " r)
+     showTOOLtip("Failed to copy the image to clipboard... Error code: " r)
      SoundBeep, 300, 900
-     SetTimer, RemoveTooltip, % -msgDisplayTime
   }
+  SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
 invertRecursiveness() {
@@ -1312,7 +1314,10 @@ WinClickAction(forceThis:=0) {
    Critical, on
    Static thisZeit := 1, prevTippu := 1, lastInvoked := 1, lastInvoked2 := 1
    If (AnyWindowOpen=1)
+   {
       CloseWindow()
+      Return
+   }
 
    If AnyWindowOpen
    {
@@ -1320,7 +1325,7 @@ WinClickAction(forceThis:=0) {
       {
          ForceNoColorMatrix := !ForceNoColorMatrix
          dummyTimerDelayiedImageDisplay(50)
-      }
+      } Else SoundPlay, *-1
       WinActivate, ahk_id %hSetWinGui%
       Return
    }
@@ -2451,6 +2456,16 @@ ShowImgInfosPanel() {
     If (thumbsDisplaying=1)
        ToggleThumbsMode()
 
+    imgpath := resultedFilesList[currentFileIndex]
+    zPlitPath(imgpath, 0, fileNamu, folderu)
+    FileGetSize, fileSizu, %imgpath%
+    If !(FileExist(imgpath) && fileSizu>500)
+    {
+       showTOOLtip("ERROR: File not found or access denied...`n" fileNamu "`n" folderu "\")
+       SoundBeep, 300, 50
+       Return
+    }
+
     createSettingsGUI(5)
     btnWid := 130
     txtWid := 360
@@ -2606,31 +2621,6 @@ PopulateImgInfos() {
        LV_ModifyCol(A_Index, "AutoHdr Left")
 }
 
-Jump2index() {
-   If (maxFilesIndex<3)
-      Return
-
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
-   GUI, 1: +OwnDialogs
-   InputBox, jumpy, Jump at index #, Type the Type the index number you want to jump to.,,,,,,,, %currentFileIndex%
-   If !ErrorLevel
-   {
-      If jumpy is not Number
-         Return
-
-      currentFileIndex := jumpy
-      If (currentFileIndex<1)
-         currentFileIndex := 1
-      If (currentFileIndex>maxFilesIndex)
-         currentFileIndex := maxFilesIndex
-      r := IDshowImage(currentFileIndex)
-      If !r
-         informUserFileMissing()
-   }
-}
-
 testFileExists(imgpath) {
   ; https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-getfilesize
   ; H := DllCall("kernel32\GetFileAttributesW", "Str", imgpath)
@@ -2647,7 +2637,7 @@ informUserFileMissing() {
    imgpath := resultedFilesList[currentFileIndex]
    zPlitPath(imgpath, 0, fileNamu, folderu)
    showTOOLtip("ERROR: File not found or access denied...`n" fileNamu "`n" folderu "\")
-   winTitle := currentFileIndex "/" maxFilesIndex " | " OutFileName " | " OutDir
+   winTitle := "[*] " currentFileIndex "/" maxFilesIndex " | " fileNamu " | " folderu
    WinSetTitle, ahk_id %PVhwnd%,, % winTitle
    SoundBeep, 300, 50
    If (autoRemDeadEntry=1)
@@ -4272,6 +4262,54 @@ RenameBTNaction() {
   }
 }
 
+Jump2index() {
+    Global newJumpIndex
+    If (maxFilesIndex<3)
+       Return
+
+    If (slideShowRunning=1)
+       ToggleSlideShowu()
+
+    createSettingsGUI(13)
+    btnWid := 100
+    txtWid := 350
+    EditWid := 355
+    If (PrefsLargeFonts=1)
+    {
+       EditWid := EditWid + 230
+       btnWid := btnWid + 70
+       txtWid := txtWid + 105
+       Gui, Font, s%LargeUIfontValue%
+    }
+
+    Gui, Add, Text, x15 y15 w%txtWid%, Please type the index number you want to jump to...
+    Gui, Add, Edit, y+7 w%EditWid% r1 limit9025 -multi -wantTab -wrap vnewJumpIndex, % currentFileIndex
+
+    Gui, Add, Button, xs+0 y+20 h30 w%btnWid% Default gJump2indexBTNaction, &Jump to index
+    Gui, Add, Button, x+5 hp w90 gCloseWindow, C&ancel
+    Gui, SettingsGUIA: Show, AutoSize, Jump to index #: %appTitle%
+}
+
+jump2indexBTNaction() {
+  GuiControlGet, newJumpIndex
+  newJumpIndex := Trim(newJumpIndex)
+  If newJumpIndex is Number
+  {
+     If (newJumpIndex<1)
+        Return
+
+     CloseWindow()
+     currentFileIndex := newJumpIndex
+     If (currentFileIndex<1)
+        currentFileIndex := 1
+     If (currentFileIndex>maxFilesIndex)
+        currentFileIndex := maxFilesIndex
+     r := IDshowImage(currentFileIndex)
+     If !r
+        informUserFileMissing()
+  }
+}
+
 SaveClipboardImage(dummy:=0) {
    Static lastInvoked := 1
 
@@ -4317,6 +4355,8 @@ SaveClipboardImage(dummy:=0) {
          Msgbox, 48, %appTitle%, ERROR: This format is currently unsupported. The FreeImage library failed to properly initialize.`n`n%OutFileName%
          Return
       }
+      If (activateImgSelection=1)
+         toggleImgSelection()
 
       showTOOLtip("Please wait, saving image...`n" OutFileName)
       If (dummy!="yay")
@@ -4324,7 +4364,17 @@ SaveClipboardImage(dummy:=0) {
 
       prevFileSavePath := OutDir
       writeMainSettings()
-      r := coreResizeIMG(file2rem, 0, 0, file2save, 1, 0, 0)
+      FileGetSize, fileSizu, %file2rem%
+      If (FileExist(file2rem) && fileSizu>500)
+      {
+         r := coreResizeIMG(file2rem, 0, 0, file2save, 1, 0, 0)
+      } Else If gdiBitmap
+      {
+         Gdip_GetImageDimensions(gdiBitmap, imgW, imgH)
+         dummyBMP := Gdip_CloneBitmapArea(gdiBitmap, 0, 0, imgW, imgH)
+         r := coreResizeIMG(file2rem, imgW, imgH, file2save, 1, 0, 0, dummyBMP, imgW, imgH, 0)
+      }
+
       If r
       {
          showTOOLtip("Failed to save image file...`n" OutFileName "`n" OutDir "\")
@@ -5642,11 +5692,10 @@ BuildMenu() {
    Menu, PVselv, Add, &Copy to Clipboard`tCtrl+C, CopyImage2clip
 
    StringRight, infoPrevMovePath, prevFileMovePath, 25
+   Menu, PVtFile, Add, &Save image as...`tCtrl+Shift+S, BtnSaveIMG
    If (activateImgSelection!=1)
-   {
-      Menu, PVtFile, Add, &Copy image to Clipboard`tCtrl+C, CopyImage2clip
-      Menu, PVtFile, Add, 
-   }
+      Menu, PVtFile, Add, &Copy image to clipboard`tCtrl+C, CopyImage2clip
+   Menu, PVtFile, Add, 
    Menu, PVtFile, Add, &Open (with external app)`tO, OpenThisFile
    Menu, PVtFile, Add, &Open containing folder`tCtrl+E, OpenThisFileFolder
    Menu, PVtFile, Add, 
@@ -6386,21 +6435,24 @@ ShowTheImage(imgpath, usePrevious:=0) {
       {
          winTitle := "[*] " winTitle
          WinSetTitle, ahk_id %PVhwnd%,, % winTitle
-         showTOOLtip("ERROR: Unable to load file...`n" OutFileName "`n" OutDir "\")
+         showTOOLtip("ERROR: File not found or access denied...`n" OutFileName "`n" OutDir "\")
          SetTimer, RemoveTooltip, % -msgDisplayTime
       }
 
-      If (A_TickCount - lastInvoked2>125) && (A_TickCount - lastInvoked>95)
-      {
-         SoundBeep, 300, 50
-         lastInvoked2 := A_TickCount
+      If (imgpath!=prevImgPath)
+      { 
+         If (A_TickCount - lastInvoked2>125) && (A_TickCount - lastInvoked>95)
+         {
+            SoundBeep, 300, 50
+            lastInvoked2 := A_TickCount
+         }
+ 
+         If (autoRemDeadEntry=1)
+            remCurrentEntry(0, 1)
+         lastInvoked := A_TickCount
+         SetTimer, ResetImgLoadStatus, -15
+         Return "fail"
       }
-
-      If (autoRemDeadEntry=1)
-         remCurrentEntry(0, 1)
-      lastInvoked := A_TickCount
-      SetTimer, ResetImgLoadStatus, -15
-      Return "fail"
    }
 
    If (A_TickCount - lastInvoked>85) && (A_TickCount - lastInvoked2>85) || (usePrevious=1) || (wasForcedHigh=1)
@@ -8328,7 +8380,7 @@ GDIupdater() {
       resetSlideshowTimer(0)
 
    imgpath := resultedFilesList[currentFileIndex]
-   If (!FileExist(imgpath) || !imgpath || !maxFilesIndex || PrevGuiSizeEvent=1 || !CurrentSLD)
+   If (!imgpath || !maxFilesIndex || PrevGuiSizeEvent=1 || !CurrentSLD)
    {
       If (slideShowRunning=1)
          ToggleSlideShowu()
@@ -8594,7 +8646,7 @@ GetFilesList(strDir, doRecursive:=1) {
 }
 
 IDshowImage(imgID, opentehFile:=0) {
-    Static lastInvoked := 1
+    Static prevImgPath, lastInvoked := 1
     resultu := resultedFilesList[imgID]
     If !resultu
     {
@@ -8607,7 +8659,8 @@ IDshowImage(imgID, opentehFile:=0) {
     FileGetSize, fileSizu, %resultu%
     isPipe := InStr(resultu, "||")
     resultu := StrReplace(resultu, "||")
-    If (!fileSizu && !FileExist(resultu) && skipDeadFiles=1 && opentehFile!=250)
+    If (!fileSizu && !FileExist(resultu) && skipDeadFiles=1
+    && opentehFile!=250 && resultu!=prevImgPath)
     {
        If (autoRemDeadEntry=1 && imgID=currentFileIndex)
           remCurrentEntry(0, 1)
@@ -8615,9 +8668,12 @@ IDshowImage(imgID, opentehFile:=0) {
     }
 
     If isPipe                  ; remove «deleted file» marker if somehow the file is back
+    {
        If FileExist(resultu)
           resultedFilesList[imgID] := resultu
-
+    }
+    
+    prevImgPath := (opentehFile=0 || opentehFile=2) ? resultu : 0
     If (opentehFile=1)
     {
        If !FileExist(resultu)
@@ -9048,6 +9104,23 @@ BtnChangeGammMin() {
 }
 
 PanelJpegPerformOperation() {
+    Global jpegLLbtnACT
+    If (markedSelectFile)
+       filesElected := (currentFileIndex>markedSelectFile) ? currentFileIndex - markedSelectFile + 1 : markedSelectFile - currentFileIndex + 1
+
+    If !filesElected
+    {
+       imgpath := resultedFilesList[currentFileIndex]
+       zPlitPath(imgpath, 0, fileNamu, folderu)
+       FileGetSize, fileSizu, %imgpath%
+       If !(FileExist(imgpath) && fileSizu>500)
+       {
+          showTOOLtip("ERROR: File not found or access denied...`n" fileNamu "`n" folderu "\")
+          SoundBeep, 300, 50
+          Return
+       }
+    }
+
     createSettingsGUI(12)
     btnWid := 100
     txtWid := slideWid := 280
@@ -9059,9 +9132,6 @@ PanelJpegPerformOperation() {
        txtWid := txtWid + 135
        Gui, Font, s%LargeUIfontValue%
     }
-    If (markedSelectFile)
-       filesElected := (currentFileIndex>markedSelectFile) ? currentFileIndex - markedSelectFile + 1 : markedSelectFile - currentFileIndex + 1
-
     Gui, Add, Text, x15 y15 Section, Please choose a JPEG lossless operation...
     Gui, Add, DropDownList, y+10 Section w%txtWid% AltSubmit Choose%jpegDesiredOperation% vjpegDesiredOperation, None|Flip Horizontally|Flip Vertically|Transpose|Transverse|Rotate 90|Rotate 180|Rotate -90
     Gui, Add, Checkbox, y+10 Checked%jpegDoCrop% vjpegDoCrop, Crop image(s) to selected area (irreversible)
@@ -9073,7 +9143,7 @@ PanelJpegPerformOperation() {
     {
        Gui, Add, Button, xs+0 y+25 h30 w35 gPreviousPicture, <<
        Gui, Add, Button, x+5 hp wp gNextPicture, >>
-       Gui, Add, Button, x+5 hp w%btnWid% Default gBtnPerformJpegOp, &Perform operation
+       Gui, Add, Button, x+5 hp w%btnWid% Default gBtnPerformJpegOp vjpegLLbtnACT, &Perform operation
     } Else
        Gui, Add, Button, xs+0 y+20 h30 w%btnWid% Default gBtnPerformJpegOp, &Perform operation
     Gui, Add, Button, x+5 hp w80 gCloseWindow, C&lose
@@ -9084,6 +9154,7 @@ BtnPerformJpegOp() {
     Static lastInvoked := 1
     GuiControlGet, jpegDesiredOperation
     GuiControlGet, jpegDoCrop
+    GuiControlGet, jpegLLbtnACT
     If (A_TickCount - lastInvoked < 150) || (jpegDesiredOperation=1 && jpegDoCrop=0)
        Return
 
@@ -9106,6 +9177,8 @@ BtnPerformJpegOp() {
        Return
     } Else r := coreJpegLossLessAction(imgpath)
 
+    GuiControl, SettingsGUIA: Disable, jpegLLbtnACT
+    SetTimer, reactivateJpegLLopBTN, -800
     If r
     {
        showTOOLtip("JPEG operation completed succesfully.")
@@ -9118,6 +9191,11 @@ BtnPerformJpegOp() {
     lastInvoked := A_TickCount
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
+reactivateJpegLLopBTN() {
+    If (AnyWindowOpen=12)
+       GuiControl, SettingsGUIA: Enable, jpegLLbtnACT
+}
+
 
 batchJpegLLoperations() {
   If (markedSelectFile)
@@ -9226,6 +9304,15 @@ ColorsAdjusterPanelWindow() {
 
     If (thumbsDisplaying=1)
        Return
+
+    imgpath := resultedFilesList[currentFileIndex]
+    FileGetSize, fileSizu, %imgpath%
+    If !(FileExist(imgpath) && fileSizu>500)
+    {
+       showTOOLtip("ERROR: File not found or access denied...`n" fileNamu "`n" folderu "\")
+       SoundBeep, 300, 50
+       Return
+    }
 
     changeMcursor()
     ToolTip, Please wait...,,, 2
@@ -9568,8 +9655,17 @@ ResizeImagePanelWindow() {
     img2resizePath := resultedFilesList[currentFileIndex]
     If (multipleFilesMode!=1)
     {
+       zPlitPath(img2resizePath, 0, fileNamu, folderu)
        r1 := GetImgFileDimension(img2resizePath, oImgW, oImgH, 0)
        FileGetSize, fileSizu, % img2resizePath, K
+       If !r1
+       {
+          showTOOLtip("ERROR: File not found or access denied...`n" fileNamu "`n" folderu "\")
+          SoundBeep, 300, 50
+          img2resizePath := ""
+          CloseWindow()
+          Return
+       }
     } Else
     {
        oImgW := ResolutionWidth

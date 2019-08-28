@@ -2228,7 +2228,12 @@ Gdip_DeleteBrush(pBrush) {
 ;#####################################################################################
 
 Gdip_DisposeImage(pBitmap, noErr:=0) {
-; modified by Marius Șucan
+; modified by Marius Șucan to help avoid crashes 
+; by disposing a non-existent pBitmap
+
+   If (StrLen(pBitmap)<=2 && noErr=1)
+      Return 0
+
    r := DllCall("gdiplus\GdipDisposeImage", A_PtrSize ? "UPtr" : "UInt", pBitmap)
    If (r=2 || r=1) && (noErr=1)
       r := 0
