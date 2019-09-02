@@ -21,7 +21,7 @@
 
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 3.6.9
+;@Ahk2Exe-SetVersion 3.7.0
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
  
@@ -66,7 +66,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , openFptrn4 := "*.tiff;*.targa;*.jpe;*.dib;*.pict;*.rle"
    , LargeUIfontValue := 14, AnyWindowOpen := 0, toolTipGuiCreated := 0
    , PrefsLargeFonts := 0, OSDbgrColor := "131209", OSDtextColor := "FFFEFA"
-   , OSDfntSize := 10, OSDFontName := "Arial", prevOpenFolderPath := ""
+   , PasteFntSize := 17, OSDfntSize := 14, OSDFontName := "Arial", prevOpenFolderPath := ""
    , mustGenerateStaticFolders := 1, lastWinDrag := 1, img2resizePath := ""
    , prevFileMovePath := "", lastGIFdestroy := 1, prevAnimGIFwas := ""
    , thumbsW := 300, thumbsH := 300, thumbsDisplaying := 0
@@ -82,9 +82,11 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , imageLoading := 0, PrevGuiSizeEvent := 0, imgSelOutViewPort := 0, prevGUIresize := 1
    , mPosCtrl, isThisHDRimg := 0, hCursBusy := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32514, "Ptr")  ; IDC_WAIT
    , hCursN := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32512, "Ptr")  ; IDC_ARROW
-   , remCacheOldDays := 0, jpegDoCrop := 0, jpegDesiredOperation := 1, prevDestPosX
+   , remCacheOldDays := 0, jpegDoCrop := 0, jpegDesiredOperation := 1, prevDestPosX, prevMPosCtrl := ""
    , rDesireWriteFMT := "", FIMfailed2init := 0, prevMaxSelX, prevMaxSelY, prevDestPosY
-   , version := "3.6.9", vReleaseDate := "28/08/2019"
+   , CCLVO := "-E0x200 +Border -Hdr -Multi +ReadOnly Report AltSubmit gSetColors", FontList := []
+   , pBrushHatch, pBrushWinBGR
+   , version := "3.7.0", vReleaseDate := "02/09/2019"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1
@@ -104,10 +106,12 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , ResizeDestFolder, ResizeUseDestDir := 0, chnRdecalage := 0, chnGdecalage := 0
    , chnBdecalage := 0, alwaysOpenwithFIM := 0, bwDithering := 0
    , userUnsprtWriteFMT := 1, userDesireWriteFMT := 10, hueAdjust := 0
+   , DisplayTimeUser := 3, FontBolded := 1, FontItalica := 0
 
 imgQuality := (userimgQuality=1) ? 7 : 5
 DetectHiddenWindows, On
 CoordMode, Mouse, Screen
+CoordMode, ToolTip, Screen
 OnExit, Cleanup
 
 If A_IsCompiled
@@ -118,7 +122,6 @@ if !(GDIPToken := Gdip_Startup())
    Msgbox, 48, %appTitle%, ERROR: unable to initialize GDI+...`n`nThe program will now exit.
    ExitApp
 }
-
 
 OnMessage(0x205, "WM_RBUTTONUP")
 OnMessage(0x201, "WM_LBUTTONDOWN")
@@ -144,6 +147,7 @@ If (FirstRun!=0)
 
 BuildTray()
 BuildGUI()
+InitStuff()
 
 Loop, 5
 {
@@ -182,6 +186,15 @@ identifyThisWin(noReact:=0) {
 
        If (imageLoading!=1)
           OpenFiles()
+    Return
+
+    ~F12::    ; Ctrl+P
+    ~^vk50::    ; Ctrl+P
+       If AnyWindowOpen
+          Return
+
+       If (imageLoading!=1)
+          PrefsPanelWindow()
     Return
 
     ~!vk4F::    ; Alt+O
@@ -1037,7 +1050,6 @@ extraDummyReloadThisPicture() {
   ReloadThisPicture()
 }
 
-
 ReloadThisPicture() {
   SetTimer, dummyTimerDelayiedImageDisplay, Off
   clippyTest := resultedFilesList[0]
@@ -1110,6 +1122,11 @@ TrueCleanup() {
       AprevGdiBitmap := Gdip_DisposeImage(AprevGdiBitmap)
    If BprevGdiBitmap
       BprevGdiBitmap := Gdip_DisposeImage(BprevGdiBitmap)
+   If pBrushWinBGR
+      Gdip_DeleteBrush(pBrushWinBGR)
+   If pBrushHatch
+      Gdip_DeleteBrush(pBrushHatch)
+
    Sleep, 2
    writeMainSettings()
    lastInvoked := A_TickCount
@@ -1310,6 +1327,12 @@ panIMGclick(oX:=0, oY:=0, oDx:=0, oDy:=0) {
    SetTimer, ResetLbtn, -25
 }
 
+GetMouseCoord2wind(hwnd, ByRef nx, ByRef ny) {
+    ; CoordMode, Mouse, Screen
+    MouseGetPos, ox, oy
+    JEE_ScreenToClient(hwnd, ox, oy, nx, ny)
+}
+
 WinClickAction(forceThis:=0) {
    Critical, on
    Static thisZeit := 1, prevTippu := 1, lastInvoked := 1, lastInvoked2 := 1
@@ -1343,18 +1366,11 @@ WinClickAction(forceThis:=0) {
    }
 
    spaceState := GetKeyState("Space", "P") ? 1 : 0
-   WinGetPos, winXu, winYu, winWidth, winHeight, ahk_id %PVhwnd%
+   GetMouseCoord2wind(PVhwnd, mX, mY)
    If (thumbsDisplaying=1 && maxFilesIndex>0)
    {
-      CoordMode, Mouse, Window
-      MouseGetPos, mX, mY
-      CoordMode, Mouse, Screen
-  ;   GetPhysicalCursorPos(mX, mY)
       thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, startIndex, mainWidth, mainHeight)
-      decalageX := winWidth - mainWidth
-      decalageY := winHeight - mainHeight
-      rowIndex := 0
-      columnIndex := -1
+      rowIndex := 0, columnIndex := -1
       Loop, % maxItemsPage*2
       {
          columnIndex++
@@ -1363,8 +1379,8 @@ WinClickAction(forceThis:=0) {
             rowIndex++
             columnIndex := 0
          }
-         DestPosX := decalageX + thumbsW*columnIndex + thumbsW
-         DestPosY := decalageY + thumbsH*rowIndex + thumbsH
+         DestPosX := thumbsW*columnIndex + thumbsW
+         DestPosY := thumbsH*rowIndex + thumbsH
          If (DestPosX>mX && DestPosY>mY)
          {
             newIndex := startIndex + A_Index - 1
@@ -1373,9 +1389,9 @@ WinClickAction(forceThis:=0) {
       }
 
       scrollXpos := mainWidth - imgHUDbaseUnit//2
-      If (mX+decalageX>scrollXpos)
+      If (mX>scrollXpos)
       {
-         newIndexu := ((mY-decalageY)/mainHeight)*100
+         newIndexu := ((mY-15)/mainHeight)*100
          newIndexu := Ceil((maxFilesIndex/100)*newIndexu)
          If (newIndexu<1)
             currentFileIndex := 1
@@ -1387,8 +1403,8 @@ WinClickAction(forceThis:=0) {
          Return
       }
 
-      maxWidu := maxItemsW*thumbsW + decalageX - 1
-      maxHeitu := maxItemsH*thumbsH + decalageY - 1
+      maxWidu := maxItemsW*thumbsW - 1
+      maxHeitu := maxItemsH*thumbsH  - 1
       If (maxWidu<mX || maxHeitu<mY)
          Return
 
@@ -1416,9 +1432,9 @@ WinClickAction(forceThis:=0) {
    } Else If (editingSelectionNow=1 && activateImgSelection=1 && spaceState!=1 && thumbsDisplaying!=1)
    {
       GetClientSize(mainWidth, mainHeight, PVhwnd)
-      JEE_ClientToScreen(hPicOnGui1, 0, 0, tGuiX, tGuiY)
-      decalageX := tGuiX - winXu
-      decalageY := tGuiY - winYu
+      mXoT := mX, mYoT := mY
+      JEE_ClientToScreen(hPicOnGui1, 1, 1, mainX, mainY)
+      MouseGetPos, mXo, mYo
       nSelDotX  := selDotX,  nSelDotAx := selDotAx
       nSelDotBx := selDotBx, nSelDotCx := selDotCx
       nSelDotY  := selDotY,  nSelDotAy := selDotAy
@@ -1426,10 +1442,10 @@ WinClickAction(forceThis:=0) {
 
       If (FlipImgH=1)
       {
-         nSelDotX := mainWidth - selDotX - decalageX - dotsSize
-         nSelDotAx := mainWidth - selDotAx - decalageX - dotsSize
-         nSelDotBx := mainWidth - selDotBx - decalageX - dotsSize
-         nSelDotCx := mainWidth - selDotCx - decalageX - dotsSize
+         nSelDotX := mainWidth - selDotX - dotsSize
+         nSelDotAx := mainWidth - selDotAx - dotsSize
+         nSelDotBx := mainWidth - selDotBx - dotsSize
+         nSelDotCx := mainWidth - selDotCx - dotsSize
       }
 
       If (FlipImgV=1)
@@ -1440,10 +1456,6 @@ WinClickAction(forceThis:=0) {
          nSelDotCy := mainHeight - selDotCy - decalageY + dotsSize
       }
 
-      CoordMode, Mouse, Window
-      MouseGetPos, mXo, mYo
-      GetPhysicalCursorPos(mXa, mYa)
-      JEE_ScreenToWindow(hGDIwin, mXa, mYa, mXoT, mYoT)
       zL := (zoomLevel>1) ? zoomLevel : 1/zoomLevel
       If (valueBetween(mXoT, nselDotX, nselDotX + dotsSize) && valueBetween(mYoT, nselDotY, nselDotY + dotsSize))
       {
@@ -1601,7 +1613,7 @@ WinClickAction(forceThis:=0) {
 
           If (A_TickCount - prevTippu>90) && (LbtnDwn!=1)
           {
-             ToolTip, % addMsg "X / Y: " zImgSelX1 ", " zImgSelY1 "`nW / H: " imgSelW ", " imgSelH, % decalageX + 10, % decalageY + 10
+             ToolTip, % addMsg "X / Y: " zImgSelX1 ", " zImgSelY1 "`nW / H: " imgSelW ", " imgSelH, % mainX + 10, % mainY + 10
              prevTippu := A_TickCount
           }
           thisZeit := A_TickCount
@@ -1616,7 +1628,6 @@ WinClickAction(forceThis:=0) {
          thisZeit := dotActive := ctrlState := 0
       SetTimer, ResetLbtn, -50
       ToolTip
-      CoordMode, Mouse, Screen
       If (dotActive || (A_TickCount - thisZeit<350)) && (ctrlState=0)
          Return
    }
@@ -1648,30 +1659,23 @@ WinClickAction(forceThis:=0) {
          Return
       }
       Sleep, 5
+      prevMPosCtrl := A_GuiControl
       If (A_GuiControl="PicOnGUI3")
          winGoNextSlide()
       Else If (A_GuiControl="PicOnGUI1")
          winGoPrevSlide()
       Else If (A_GuiControl="PicOnGUI2a" || A_GuiControl="PicOnGUI2b" || A_GuiControl="PicOnGUI2c")
       {
-         CoordMode, Mouse, Window
-         MouseGetPos, mX, mY
-         CoordMode, Mouse, Screen
          GetClientSize(mainWidth, mainHeight, PVhwnd)
-         decalageY := winHeight - mainHeight
-
-         If (mY - decalageY<winHeight//5)
+         If (mY<mainHeight//5)
          {
             ChangeZoom(1)
             Return
-         }
-
-         If (mY>winHeight-winHeight//5)
+         } Else If (mY>mainHeight - mainHeight//5)
          {
             ChangeZoom(-1)
             Return
-         }
-         If (IMGlargerViewPort=1 && thumbsDisplaying!=1)
+         } Else If (IMGlargerViewPort=1 && thumbsDisplaying!=1)
             SetTimer, panIMGclick, -25
          Else
             winGoSlide()
@@ -1709,13 +1713,13 @@ winGoSlide() {
      SetTimer, winGoSlide, -25
      Return
   }
-  If (mPosCtrl="PicOnGUI1")
+  If (mPosCtrl="PicOnGUI1" && prevMPosCtrl!="PicOnGUI1")
      GoPrevSlide()
-  Else If (mPosCtrl="PicOnGUI3")
+  Else If (mPosCtrl="PicOnGUI3" && prevMPosCtrl!="PicOnGUI3")
      GoNextSlide()
-  Else If (mPosCtrl="PicOnGUI2a")
+  Else If (mPosCtrl="PicOnGUI2a" && prevMPosCtrl!="PicOnGUI2a")
      ThumbsNavigator("Upu", "-")
-  Else If (mPosCtrl="PicOnGUI2c")
+  Else If (mPosCtrl="PicOnGUI2c" && prevMPosCtrl!="PicOnGUI2c")
      ThumbsNavigator("Down", "-")
 }
 
@@ -1741,6 +1745,17 @@ JEE_ScreenToWindow(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
   vWinY := NumGet(&RECT, 4, "Int")
   vPosX2 := vPosX - vWinX
   vPosY2 := vPosY - vWinY
+}
+
+JEE_ScreenToClient(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
+; function by jeeswg found on:
+; https://autohotkey.com/boards/viewtopic.php?t=38472
+  VarSetCapacity(POINT, 8)
+  NumPut(vPosX, &POINT, 0, "Int")
+  NumPut(vPosY, &POINT, 4, "Int")
+  DllCall("user32\ScreenToClient", Ptr,hWnd, Ptr,&POINT)
+  vPosX2 := NumGet(&POINT, 0, "Int")
+  vPosY2 := NumGet(&POINT, 4, "Int")
 }
 
 
@@ -2302,14 +2317,65 @@ NextPicture(dummy:=0, inLoop:=0) {
 
 PasteClipboardIMG() {
     changeMcursor()
+    ToolTip, Pasting image...
     clipBMP := Gdip_CreateBitmapFromClipboard()
     If (valueBetween(Abs(clipBMP), 1, 5) || !clipBMP)
     {
-       showTOOLtip("Unable to retrieve image from clipboard...")
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Try DllCall("user32\SetCursor", "Ptr", hCursN)
-       Return
+       Try testClipType := DllCall("IsClipboardFormatAvailable", "uint", 15) ; do not paste file paths [CF_HDROP]
+       If (testClipType!=1)
+          Try toPaste := Trim(Clipboard)
+
+       If StrLen(toPaste)>2
+       {
+          toPaste := SubStr(toPaste, 1, 9500)
+          calcScreenLimits()
+          hbm := CreateDIBSection(ResolutionWidth, ResolutionHeight*5)
+          hdc := CreateCompatibleDC()
+          obm := SelectObject(hdc, hbm)
+          G := Gdip_GraphicsFromHDC(hdc)
+          Gdip_SetInterpolationMode(G, 7)
+          pBr0 := Gdip_BrushCreateSolid("0xFF" OSDbgrColor)
+          Gdip_FillRectangle(G, pBr0, 0, 0, ResolutionWidth, ResolutionHeight*5)
+          If (FontBolded=1)
+             txtStyle .= " Bold"
+          If (FontItalica=1)
+             txtStyle .= " Italic"
+          txtOptions := "x1 y1 w99p h99p Left cee" OSDtextColor " r4 s" PasteFntSize txtStyle
+          dimensions := Gdip_TextToGraphics(G, toPaste, txtOptions, OSDFontName, ResolutionWidth, ResolutionHeight*5, 0)
+          txtRes := StrSplit(dimensions, "|")
+          txtResW := Ceil(txtRes[3]+2)
+          If (txtResW>ResolutionWidth)
+             txtResW := ResolutionWidth
+          txtResH := Ceil(txtRes[4]+2)
+          If (txtResH>ResolutionHeight*5)
+             txtResH := ResolutionHeight*5
+          clipBMPa := Gdip_CreateBitmapFromHBITMAP(hbm)
+          clipBMPb := Gdip_CloneBitmapArea(clipBMPa, 0, 0, txtResW, txtResH)
+          borderSize := Floor(PasteFntSize*1.15)
+          clipBMP := Gdip_CreateBitmap(txtResW + borderSize * 2, txtResH + borderSize*2)
+          G3 := Gdip_GraphicsFromImage(clipBMP)
+          Gdip_FillRectangle(G3, pBr0, 0, 0, txtResW + borderSize*2+2, txtResH + borderSize*2+2)
+          Gdip_DrawImage(G3, clipBMPb, borderSize, borderSize, txtResW, txtResH, 0, 0, txtResW, txtResH)
+          Gdip_DeleteGraphics(G3)
+          Gdip_DisposeImage(clipBMPa, 1)
+          Gdip_DisposeImage(clipBMPb, 1)
+          Gdip_DeleteBrush(pBr0)
+          SelectObject(hdc, obm)
+          DeleteObject(hbm)
+          DeleteDC(hdc)
+          showTOOLtip("Text clipboard content rendered as image...`nOSD font and colors used")
+          SetTimer, RemoveTooltip, % -msgDisplayTime
+       } Else
+       {
+          Tooltip
+          showTOOLtip("Unable to retrieve image from clipboard...")
+          SetTimer, RemoveTooltip, % -msgDisplayTime
+          Try DllCall("user32\SetCursor", "Ptr", hCursN)
+          Return
+       }
     }
+
+    disposeCacheIMGs()
     If (activateImgSelection=1)
        toggleImgSelection()
     file2save := thumbsCacheFolder "\Current-Clipboard.png"
@@ -2318,6 +2384,7 @@ PasteClipboardIMG() {
     Gdip_DisposeImage(clipBMP, 1)
     If r
     {
+       Tooltip
        showTOOLtip("Failed to store image from clipboard...")
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -2337,6 +2404,7 @@ PasteClipboardIMG() {
     FlipImgH := FlipImgV := currentFileIndex := 0
     resultedFilesList[0] := file2save
     ShowTheImage(file2save, 2)
+    Tooltip
 }
 
 thumbsSelector(aKey) {
@@ -2592,7 +2660,7 @@ PopulateImgInfos() {
 
    If RegExMatch(resultu, "i)(.\.gif)$")
    {
-      CountFrames := getGIFframesCount(thumbBMP)
+      CountFrames := Gdip_GetImageFramesCount(thumbBMP)
       LV_Add(A_Index, "Animated GIF frames", CountFrames)
    } 
 
@@ -2603,8 +2671,11 @@ PopulateImgInfos() {
       {
          PropName := Gdip_GetPropertyTagName(ID)
          PropType := Gdip_GetPropertyTagType(Val.Type)
-         If (val.value && StrLen(PropName)>1 && PropName!="unknown")
+         If (val.value && StrLen(PropName)>1 && PropName!="unknown" && PropType!="undefined" && PropType!="byte")
          {
+            If InStr(PropName, "nancetable") || InStr(PropName, "jpeg") || InStr(PropName, "thumbnail") || InStr(PropName, "printflag")
+               Continue
+
             If (PropName="frame delay") || (PropName="bits per sample")
             {
                valu := SubStr(Val.Value, 1, InStr(Val.Value, A_Space))
@@ -2770,6 +2841,13 @@ RecentFiltersManager(entry2add) {
   }
 }
 
+triggerOwnDialogs() {
+  If AnyWindowOpen
+     Gui, SettingsGUIA: +OwnDialogs
+  Else
+     Gui, 1: +OwnDialogs
+}
+
 coreEnableFiltru(stringu) {
   backCurrentSLD := CurrentSLD
   markedSelectFile := CurrentSLD := ""
@@ -2793,6 +2871,7 @@ coreEnableFiltru(stringu) {
   FilterFilesIndex()
   If (maxFilesIndex<1)
   {
+     triggerOwnDialogs()
      MsgBox,, %appTitle%, No files matched your filtering criteria:`n%usrFilesFilteru%`n`nThe application will now restore the full list of files.
      usrFilesFilteru := filesFilter := ""
      FilterFilesIndex()
@@ -2842,6 +2921,7 @@ throwMSGwriteError() {
   If (ErrorLevel=1)
   {
      SoundBeep, 300, 900
+     triggerOwnDialogs()
      MsgBox, 16, %appTitle%: ERROR, Unable to write or access the files: permission denied...
      lastInvoked := A_TickCount
   }
@@ -2861,6 +2941,7 @@ InListMultiEntriesRemover() {
 
    If (filesElected>90)
    {
+      triggerOwnDialogs()
       MsgBox, 52, %appTitle%, Are you sure you want to remove %filesElected% entries from the slideshow files list?
       IfMsgBox, Yes
         good2go := 1
@@ -2920,7 +3001,11 @@ InListMultiEntriesRemover() {
          usrFilesFilteru := filesFilter := ""
          FilterFilesIndex()
          RandomPicture()
-      } Else MsgBox,, %appTitle%, No files left in the index, please (re)open a file or folder.
+      } Else
+      {
+         triggerOwnDialogs()
+         MsgBox,, %appTitle%, No files left in the index, please (re)open a file or folder.
+      }
    } Else
    {
       startPoint--
@@ -2966,7 +3051,11 @@ remCurrentEntry(dummy, silentus:=0) {
          usrFilesFilteru := filesFilter := ""
          FilterFilesIndex()
          RandomPicture()
-      } Else MsgBox,, %appTitle%, No files left in the index, please (re)open a file or folder.
+      } Else
+      {
+         triggerOwnDialogs()
+         MsgBox,, %appTitle%, No files left in the index, please (re)open a file or folder.
+      }
    } Else
    {
       currentFileIndex--
@@ -2985,7 +3074,7 @@ WritePrefsIntoSLD() {
    If (slideShowRunning=1)
       ToggleSlideShowu()
 
-   GUI, 1: +OwnDialogs
+   triggerOwnDialogs()
    FileSelectFile, file2save, S3, % CurrentSLD, Save slideshow settings into file..., Slideshow (*.sld)
    If (!ErrorLevel && StrLen(file2save)>3)
    {
@@ -2999,7 +3088,10 @@ WritePrefsIntoSLD() {
          Sleep, 10
          writeSlideSettings(file2save)
       } Else 
+      {
+         triggerOwnDialogs()
          MsgBox, 64, %appTitle%: Save slideshow settings error, The selected file appears not to have the correct file format.`nPlease select a .SLD file already saved by this application.
+      }
    }
 
 }
@@ -3011,7 +3103,7 @@ SaveFilesList() {
 
    If StrLen(maxFilesIndex)>1
    {
-      GUI, 1: +OwnDialogs
+      triggerOwnDialogs()
       If StrLen(filesFilter)>1
          MsgBox, 64, %appTitle%: Save slideshow, The files list is filtered down to %maxFilesIndex% files from %bkcpMaxFilesIndex%.`n`nTo save as a slideshow the entire list of files, remove the filter.
       FileSelectFile, file2save, S2, % CurrentSLD, Save files list as Slideshow, Slideshow (*.sld)
@@ -3044,6 +3136,7 @@ SaveFilesList() {
       backCurrentSLD := CurrentSLD
       CurrentSLD := ""
       Sleep, 2
+      triggerOwnDialogs()
       MsgBox, 52, %appTitle%, Do you want to store the current slideshow settings as well ?
       IfMsgBox, Yes
          IniWrite, Nope, % file2save, General, IgnoreThesePrefs
@@ -3277,6 +3370,7 @@ ActSortCreated() {
 }
 
 ActSortResolution() {
+   triggerOwnDialogs()
    MsgBox, 52, %appTitle%, This operation can take a lot of time. Each file will be read to identify its resolution in pixels.`n`nAre you sure you want to sort the list?
    IfMsgBox, Yes
         SortFilesList("resolution")
@@ -3291,6 +3385,7 @@ SortFilesList(SortCriterion) {
       markedSelectFile := CurrentSLD := ""
       If StrLen(filesFilter)>1
       {
+         triggerOwnDialogs()
          MsgBox, 64, %appTitle%: Sort operation, The files list is filtered down to %maxFilesIndex% files from %bkcpMaxFilesIndex%. Only the files matched by current filter will be sorted, not all the files.`n`nTo sort all files, remove the filter.
          filterBehaviour := InStr(usrFilesFilteru, "&") ? 1 : 2
          showTOOLtip("Preparing the files list, please wait...")
@@ -3547,6 +3642,14 @@ writeMainSettings() {
     IniWrite, % prevFileSavePath, % mainSettingsFile, General, prevFileSavePath
     IniWrite, % alwaysOpenwithFIM, % mainSettingsFile, General, alwaysOpenwithFIM
     IniWrite, % userHQraw, % mainSettingsFile, General, userHQraw
+    IniWrite, % OSDFontName, % mainSettingsFile, General, OSDFontName
+    IniWrite, % FontBolded, % mainSettingsFile, General, FontBolded
+    IniWrite, % FontItalica, % mainSettingsFile, General, FontItalica
+    IniWrite, % OSDfntSize, % mainSettingsFile, General, OSDfntSize
+    IniWrite, % PasteFntSize, % mainSettingsFile, General, PasteFntSize
+    IniWrite, % OSDbgrColor, % mainSettingsFile, General, OSDbgrColor
+    IniWrite, % OSDtextColor, % mainSettingsFile, General, OSDtextColor
+    IniWrite, % DisplayTimeUser, % mainSettingsFile, General, DisplayTimeUser
 }
 
 loadMainSettings() {
@@ -3569,6 +3672,24 @@ loadMainSettings() {
     IniRead, tstprevFileSavePath, % mainSettingsFile, General, prevFileSavePath, @
     IniRead, tstalwaysOpenwithFIM, % mainSettingsFile, General, alwaysOpenwithFIM, @
     IniRead, tstuserHQraw, % mainSettingsFile, General, userHQraw, @
+    IniRead, tstOSDFontName, % mainSettingsFile, General, OSDFontName, @
+    IniRead, tstFontBolded, % mainSettingsFile, General, FontBolded, @
+    IniRead, tstFontItalica, % mainSettingsFile, General, FontItalica, @
+    IniRead, tstOSDfntSize, % mainSettingsFile, General, OSDfntSize, @
+    IniRead, tstPasteFntSize, % mainSettingsFile, General, PasteFntSize, @
+    IniRead, tstOSDbgrColor, % mainSettingsFile, General, OSDbgrColor, @
+    IniRead, tstOSDtextColor, % mainSettingsFile, General, OSDtextColor, @
+    IniRead, tstDisplayTimeUser, % mainSettingsFile, General, DisplayTimeUser, @
+    If tstDisplayTimeUser is Number
+       DisplayTimeUser := tstDisplayTimeUser
+    If tstOSDfntSize is Number
+       OSDfntSize := tstOSDfntSize
+    If tstPasteFntSize is Number
+       PasteFntSize := tstPasteFntSize
+    If (tstFontBolded=1 || tstFontBolded=0)
+       FontBolded := tstFontBolded
+    If (tstFontItalica=1 || tstFontItalica=0)
+       FontItalica := tstFontItalica
     If (tstalwaysOpenwithFIM=1 || tstalwaysOpenwithFIM=0)
        alwaysOpenwithFIM := tstalwaysOpenwithFIM
     If (tstuserHQraw=1 || tstuserHQraw=0)
@@ -3597,14 +3718,20 @@ loadMainSettings() {
        PrefsLargeFonts := tstPrefsLargeFonts
     If (tstMustLoadSLDprefs=1 || tstMustLoadSLDprefs=0)
        MustLoadSLDprefs := tstMustLoadSLDprefs
-    If (tstprevFileMovePath!="@" || StrLen(tstprevFileMovePath)>3)
+    If (StrLen(tstprevFileMovePath)>3)
        prevFileMovePath := tstprevFileMovePath
-    If (tstprevFileSavePath!="@" || StrLen(tstprevFileSavePath)>3)
+    If (StrLen(tstOSDFontName)>2)
+       OSDFontName := tstOSDFontName
+    If (StrLen(tstprevFileSavePath)>3)
        prevFileSavePath := tstprevFileSavePath
-    If (tstprevOpenFolderPath!="@" || StrLen(tstprevOpenFolderPath)>3)
+    If (StrLen(tstprevOpenFolderPath)>3)
        prevOpenFolderPath := tstprevOpenFolderPath
-    If (tstResizeDestFolder!="@" || StrLen(tstResizeDestFolder)>3)
+    If (StrLen(tstResizeDestFolder)>3)
        ResizeDestFolder := tstResizeDestFolder
+    If (tstOSDbgrColor!="@" && StrLen(tstOSDbgrColor)=6)
+       OSDbgrColor := tstOSDbgrColor
+    If (tstOSDtextColor!="@" && StrLen(tstOSDtextColor)=6)
+       OSDtextColor := tstOSDtextColor
 
     If !prevOpenFolderPath
        prevOpenFolderPath := A_WorkingDir
@@ -3616,6 +3743,8 @@ loadMainSettings() {
        Else
           ResizeDestFolder := A_WorkingDir
     }
+
+    msgDisplayTime := DisplayTimeUser*1000
 }
 
 writeSlideSettings(file2save) {
@@ -3789,6 +3918,7 @@ DeletePicture() {
   {
      msgTimer := A_TickCount
      msgInfos := (markedSelectFile>0 && filesElected>1) ? filesElected " files" : "the current file"
+     triggerOwnDialogs()
      MsgBox, 52, %appTitle%, Are you sure you want to delete %msgInfos% ?
      IfMsgBox, Yes
        good2go := 1
@@ -3944,6 +4074,7 @@ batchRenameFiles() {
 }
 
 MultiRenameHelp() {
+    triggerOwnDialogs()
     MsgBox,, Help multi-rename: %appTitle%, File extensions remain unchanged regardless of the pattern used.`nFile rename patterns possible:`n`na) Prefix [this] suffix`nThe token [this] is replaced with the file name.`n`nb) Replace string//with this`nUse "//" or "\\" to perform search and replace in file names.`n`nc) any text`nFiles will be counted, to avoid naming conflicts.
 }
 
@@ -3971,6 +4102,7 @@ coreMultiRenameFiles() {
      strArrB := filterFileName(strArr[2])
      If !strArrA
         Return
+
      If (!strArrB && StrLen(strArr[2])>0)
         Return
   } Else OriginalNewFileName := filterFileName(UsrEditNewFileName)
@@ -3981,6 +4113,7 @@ coreMultiRenameFiles() {
         filesElected := (currentFileIndex>markedSelectFile) ? currentFileIndex - markedSelectFile + 1 : markedSelectFile - currentFileIndex + 1
      If (filesElected>100)
      {
+        triggerOwnDialogs()
         MsgBox, 52, %appTitle%, Are you sure you want to rename the selected files?`n`nYou have selected %filesElected% files to be renamed...
         IfMsgBox, Yes
           good2go := 1
@@ -4262,13 +4395,143 @@ RenameBTNaction() {
   }
 }
 
+PrefsPanelWindow() {
+    createSettingsGUI(14)
+    btnWid := 100
+    txtWid := 350
+    columnBpos1 := 125
+    columnBpos2 := 205
+    EditWid := 60
+    If (PrefsLargeFonts=1)
+    {
+       columnBpos1 := columnBpos1 + 50
+       columnBpos2 := columnBpos2 + 50
+       EditWid := EditWid + 50
+       btnWid := btnWid + 70
+       txtWid := txtWid + 105
+       Gui, Font, s%LargeUIfontValue%
+    }
+
+    Global editF4, editF5, editF6
+    Gui, Add, Text, x15 y15 w%txtWid%, The text style options apply to the On-Screen Display in the viewport. The same text style is used to render as images texts pasted from the clipboard.
+    Gui, Add, Text, y+15 Section, Font name
+    Gui, Add, Text, xs yp+30, Font size (OSD / clipboard)
+    Gui, Add, Text, xs yp+30, Text color and style
+    Gui, Add, Text, xs yp+30, Background color
+    Gui, Add, Text, xs yp+30, Display time (in sec.)
+    Gui, Add, Text, xs yp+30, Window background color
+
+    Gui, Add, DropDownList, xs+%columnBpos2% ys+0 Section w190 gupdateUIsettings Sort Choose1 vOSDFontName, %OSDFontName%
+    Gui, Add, Edit, xs+0 yp+30 w%editWid% r1 gupdateUIsettings limit3 -multi number -wantCtrlA -wantReturn -wantTab -wrap veditF5, %OSDfntSize%
+    Gui, Add, UpDown, vOSDfntSize Range12-350, %OSDfntSize%
+    Gui, Add, Edit, x+2 w%editWid% r1 gupdateUIsettings limit3 -multi number -wantCtrlA -wantReturn -wantTab -wrap veditF4, %PasteFntSize%
+    Gui, Add, UpDown, vPasteFntSize Range12-350, %PasteFntSize%
+
+    Gui, Add, ListView, xs yp+30 w%editWid% h28 %CCLVO% Background%OSDtextColor% vOSDtextColor hwndhLV1,
+    Gui, Add, Checkbox, x+2 yp hp w27 +0x1000 gupdateUIsettings Checked%FontBolded% vFontBolded, B
+    Gui, Add, Checkbox, x+2 yp hp w27 +0x1000 gupdateUIsettings Checked%FontItalica% vFontItalica, I
+    Gui, Add, ListView,  xs+0 yp+30 gupdateUIsettings w%editWid% hp %CCLVO% Background%OSDbgrColor% vOSDbgrColor hwndhLV2,
+    Gui, Add, Edit, xs+0 yp+30 gupdateUIsettings w%editWid% hp r1 limit2 -multi number -wantCtrlA -wantReturn -wantTab -wrap veditF6, %DisplayTimeUser%
+    Gui, Add, UpDown, vDisplayTimeUser Range1-99, %DisplayTimeUser%
+    Gui, Add, ListView, xs+0 yp+30 w%editWid% hp %CCLVO% Background%WindowBgrColor% vWindowbgrColor hwndhLV3,
+
+    If !FontList._NewEnum()[k, v]
+    {
+       Fnt_GetListOfFonts()
+       FontList := trimArray(FontList)
+    }
+
+    Loop, % FontList.MaxIndex()
+    {
+        fontNameInstalled := FontList[A_Index]
+        If (fontNameInstalled ~= "i)(@|biz ud|ud digi kyo|oem|extb|symbol|marlett|wst_|glyph|reference specialty|system|terminal|mt extra|small fonts|cambria math|this font is not|fixedsys|emoji|hksc| mdl|wingdings|webdings)") || (fontNameInstalled=OSDFontName)
+           Continue
+        GuiControl, SettingsGUIA:, OSDFontName, %fontNameInstalled%
+    }
+
+    Gui, Add, Button, xm+0 y+20 h30 w%btnWid% gOpenUImenu, &More options
+    Gui, Add, Button, x+5 hp w90 gPrefsCloseBTN Default, Clo&se
+    Gui, SettingsGUIA: Show, AutoSize, Interface settings: %appTitle%
+}
+
+updateUIsettings() {
+     If (AnyWindowOpen!=14)
+        Return
+     GuiControlGet, DisplayTimeUser
+     GuiControlGet, OSDFontName
+     GuiControlGet, OSDfntSize
+     GuiControlGet, PasteFntSize
+     GuiControlGet, FontBolded
+     GuiControlGet, FontItalica
+     msgDisplayTime := DisplayTimeUser*1000
+     writeMainSettings()
+}
+
+PrefsCloseBTN() {
+     updateUIsettings()
+     Gui, 1: Color, %WindowBgrColor%
+     CloseWindow()
+}
+
+setColors(hC, event, c, err=0) {
+; Function by Drugwash
+; Critical MUST be disabled below! If that's not done, script will enter a deadlock !
+  Static
+  oc := A_IsCritical
+  Critical, Off
+  If (event != "Normal")
+     Return
+  g := A_Gui, ctrl := A_GuiControl
+  r := %ctrl% := hexRGB(Dlg_Color(%ctrl%, hC))
+  Critical, %oc%
+  GuiControl, %g%:+Background%r%, %ctrl%
+  Gui, 1: Color, %WindowBgrColor%
+  updateUIsettings()
+  refreshWinBGRbrush()
+}
+
+hexRGB(c) {
+; unknown source
+  r := ((c&255)<<16)+(c&65280)+((c&0xFF0000)>>16)
+  c := "000000"
+  DllCall("msvcrt\sprintf", "AStr", c, "AStr", "%06X", "UInt", r, "CDecl")
+  Return c
+}
+
+Dlg_Color(Color,hwnd) {
+; Function by maestrith 
+; from: [AHK 1.1] Font and Color Dialogs 
+; https://autohotkey.com/board/topic/94083-ahk-11-font-and-color-dialogs/
+; Modified by Marius Șucan and Drugwash
+
+  Static
+  If !cpdInit {
+     VarSetCapacity(CUSTOM,64,0), cpdInit:=1, size:=VarSetCapacity(CHOOSECOLOR,9*A_PtrSize,0)
+  }
+
+  Color := "0x" hexRGB(InStr(Color, "0x") ? Color : Color ? "0x" Color : 0x0)
+  NumPut(size,CHOOSECOLOR,0,"UInt"),NumPut(hwnd,CHOOSECOLOR,A_PtrSize,"Ptr")
+  ,NumPut(Color,CHOOSECOLOR,3*A_PtrSize,"UInt"),NumPut(3,CHOOSECOLOR,5*A_PtrSize,"UInt")
+  ,NumPut(&CUSTOM,CHOOSECOLOR,4*A_PtrSize,"Ptr")
+  If !ret := DllCall("comdlg32\ChooseColorW","Ptr",&CHOOSECOLOR,"UInt")
+     Exit
+
+  SetFormat, Integer, H
+  Color := NumGet(CHOOSECOLOR,3*A_PtrSize,"UInt")
+  SetFormat, Integer, D
+  Return Color
+}
+
+OpenUImenu() {
+   deleteMenus()
+   createInterfaceMenuOptions()
+   showThisMenu("PvUIprefs")
+}
+
 Jump2index() {
     Global newJumpIndex
     If (maxFilesIndex<3)
        Return
-
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
 
     createSettingsGUI(13)
     btnWid := 100
@@ -4338,7 +4601,7 @@ SaveClipboardImage(dummy:=0) {
    defaultu := (dummy="yay") ? file2rem : prevFileSavePath
    If (A_TickCount - lastInvoked < 2500)
       defaultu := prevFileSavePath
-   GUI, 1: +OwnDialogs
+   triggerOwnDialogs()
    FileSelectFile, file2save, S18, % defaultu, Save image as..., Images (*.BMP;*.GIF;*.HDP;*.J2C;*.J2K;*.JFIF;*.JIF;*.JNG;*.JP2;*.JPE;*.JPEG;*.JPG;*.JXR;*.PNG;*.PPM;*.TGA;*.TIF;*.TIFF;*.WDP;*.WEBP;*.XPM)
    If (!ErrorLevel && StrLen(file2save)>3)
    {
@@ -4402,7 +4665,7 @@ ChooseFilesDest() {
       wasOpen := 1
    }
 
-   GUI, 1: +OwnDialogs
+   triggerOwnDialogs()
    FileSelectFile, file2save, S2, %prevFileMovePath%\this-folder, Please select destination folder..., All files (*.*)
    If (!ErrorLevel && StrLen(file2save)>3)
    {
@@ -4769,6 +5032,7 @@ batchCopyMoveFile(finalDest) {
 
    If (A_TickCount - lastInvoked > 29500) || (filesElected>100)
    {
+      triggerOwnDialogs()
       MsgBox, 52, %appTitle%, Are you sure you want to move the selected files?`n`nYou have selected %filesElected% files to be moved to`n%finalDest%
       IfMsgBox, Yes
         good2go := 1
@@ -4891,6 +5155,7 @@ batchConvert2jpeg() {
    If (markedSelectFile)
       filesElected := (currentFileIndex>markedSelectFile) ? currentFileIndex - markedSelectFile + 1 : markedSelectFile - currentFileIndex + 1
 
+   triggerOwnDialogs()
    If (filesElected>100)
    {
       MsgBox, 52, %appTitle%, Are you sure you want to convert to JPEG %filesElected% files?
@@ -5056,7 +5321,7 @@ OpenFolders() {
    If (slideShowRunning=1)
       ToggleSlideShowu()
 
-   GUI, 1: +OwnDialogs
+   triggerOwnDialogs()
    startPath := prevOpenFolderPath
    FileSelectFolder, SelectedDir, *%startPath%, 2, Select the folder with images. All images found in sub-folders will be loaded as well.
    If (SelectedDir)
@@ -5150,7 +5415,7 @@ OpenFiles(dummy:=0) {
    If (slideShowRunning=1)
       ToggleSlideShowu()
 
-    GUI, 1: +OwnDialogs
+    triggerOwnDialogs()
     If (dummy="raws")
     {
        winTitle := "Open Camera RAW files..."
@@ -5206,7 +5471,7 @@ addNewFile2list() {
    If (slideShowRunning=1)
       ToggleSlideShowu()
 
-    GUI, 1: +OwnDialogs
+    triggerOwnDialogs()
     pattern := "Images (" openFptrn1 ";" openFptrn2 ";" openFptrn3 ")"
     startPath := prevOpenFolderPath
     FileSelectFile, SelectImg, M3, % startPath, Add image file to list, %pattern%
@@ -5267,7 +5532,7 @@ addNewFolder2list() {
    If (slideShowRunning=1)
       ToggleSlideShowu()
 
-    GUI, 1: +OwnDialogs
+    triggerOwnDialogs()
     pattern := "All files (*.*;)"
     startPath := prevOpenFolderPath
     FileSelectFile, SelectImg, S2, %startPath%\this.folder, Add new folder(s) to the list, %pattern%
@@ -5289,6 +5554,7 @@ addNewFolder2list() {
       CloseWindow()
       Sleep, 1
       prevOpenFolderPath := SelectedDir
+      triggerOwnDialogs()
       MsgBox, 52, %appTitle%, Do you want to scan for files recursively, in all subfolders?
       IfMsgBox, No
         isRecursive := "|"
@@ -5568,7 +5834,7 @@ InitGuiContextMenu() {
 }
 
 BuildMenu() {
-   Static wasCreated, lastInvoked := 1
+   Static lastInvoked := 1
    If (AnyWindowOpen)
    {
       If (A_TickCount - lastInvoked < 950)
@@ -5579,22 +5845,9 @@ BuildMenu() {
       Return
    }
 
+   deleteMenus()
    Global lastWinDrag := A_TickCount
    ForceRegenStaticFolders := 0
-   If (wasCreated=1)
-   {
-      Menu, PVmenu, Delete
-      Menu, PVsliMenu, Delete
-      Menu, PVnav, Delete
-      Menu, PVview, Delete
-      Menu, PVfList, Delete
-      Menu, PVtFile, Delete
-      Menu, PVprefs, Delete
-      Menu, PVopenF, Delete
-      Menu, PVsort, Delete
-      Menu, PVselv, Delete
-   }
-
    sliSpeed := Round(slideShowDelay/1000, 2) " sec."
    Menu, PVsliMenu, Add, &Start slideshow`tSpace, ToggleSlideShowu
    Menu, PVsliMenu, Add, &Easy slideshow stopping, ToggleEasySlideStop
@@ -5778,10 +6031,6 @@ BuildMenu() {
       Menu, PVprefs, Add, Associate with .SLD files, associateSLDsNow
 
    Menu, PVprefs, Add, 
-   Menu, PVprefs, Add, &Always on top, ToggleAllonTop
-   Menu, PVprefs, Add, &Hide title bar, ToggleTitleBaru
-   Menu, PVprefs, Add, &No OSD information, ToggleInfoToolTips
-   Menu, PVprefs, Add, &Large UI fonts, ToggleLargeUIfonts
    Menu, PVprefs, Add, &High quality resampling, ToggleImgQuality
    Menu, PVprefs, Add, &Load Camera RAW files in high quality, ToggleRAWquality
    Menu, PVprefs, Add, &Load any image format using FreeImage, ToggleAlwaysFIMus
@@ -5789,11 +6038,8 @@ BuildMenu() {
    If (thumbsDisplaying!=1)
    {
       Menu, PVprefs, Add, An&imated GIFs support (experimental), ToggleAnimGIFsupport
-      Menu, PVprefs, Add, &Touch screen mode, ToggleTouchMode
       If (animGIFsSupport=1)
          Menu, PVprefs, Check, An&imated GIFs support (experimental)
-      If (TouchScreenMode=1)
-         Menu, PVprefs, Check, &Touch screen mode
    }
    Menu, PVprefs, Add, 
    If InStr(FileExist(thumbsCacheFolder), "D")
@@ -5813,18 +6059,10 @@ BuildMenu() {
       Menu, PVprefs, Check, &Prompt before file delete
    If (MustLoadSLDprefs=0)
       Menu, PVprefs, Check, &Ignore stored SLD settings
-   If (PrefsLargeFonts=1)
-      Menu, PVprefs, Check, &Large UI fonts
    If (userimgQuality=1)
       Menu, PVprefs, Check, &High quality resampling
    If (skipDeadFiles=1)
       Menu, PVprefs, Check, &Skip missing files
-   If (isAlwaysOnTop=1)
-      Menu, PVprefs, Check, &Always on top
-   If (noTooltipMSGs=1)
-      Menu, PVprefs, Check, &No OSD information
-   If (getCaptionStyle()=1)
-      Menu, PVprefs, Check, &Hide title bar
 
    readRecentEntries()
    Menu, PVopenF, Add, &Image file(s) or slideshow`tCtrl+O, OpenFiles
@@ -5904,6 +6142,8 @@ BuildMenu() {
       Menu, PVmenu, Add, Vie&w, :PVview
    }
 
+   createInterfaceMenuOptions()
+   Menu, PVmenu, Add, Inter&face, :PvUIprefs
    Menu, PVmenu, Add, Prefe&rences, :PVprefs
    If markedSelectFile
       Menu, PVmenu, Add, Dro&p files selections, dropFilesSelect
@@ -5911,21 +6151,59 @@ BuildMenu() {
    Menu, PVmenu, Add,
    Menu, PVmenu, Add, Restart`tShift+Esc, restartAppu
    Menu, PVmenu, Add, &Exit`tEsc, Cleanup
-   wasCreated := 1
+   showThisMenu("PVmenu")
+}
 
+showThisMenu(menarg) {
    o_isTitleBarHidden := isTitleBarHidden
    isTitleBarHidden := 0
    Suspend, On
-   Menu, PVmenu, Show
+   Menu, % menarg, Show
    Suspend, Off
    Global lastWinDrag := A_TickCount
    Global lastOtherWinClose := A_TickCount
    isTitleBarHidden := o_isTitleBarHidden
 }
 
+deleteMenus() {
+    Static menusList := "PVmenu|PVsliMenu|PVnav|PVview|PVfList|PVtFile|PVprefs|PvUIprefs|PVopenF|PVsort|PVselv"
+    Loop, Parse, menusList, |
+    {
+        If !A_LoopField
+           Continue
+
+        Menu, % A_LoopField, UseErrorLevel
+        Menu, % A_LoopField, Delete
+    }
+}
+
 dropFilesSelect() {
    markedSelectFile := ""
    dummyTimerDelayiedImageDisplay(50)
+}
+
+createInterfaceMenuOptions() {
+   Menu, PvUIprefs, Add, &Touch screen mode, ToggleTouchMode
+   Menu, PvUIprefs, Add, &Always on top, ToggleAllonTop
+   Menu, PvUIprefs, Add, &Hide title bar, ToggleTitleBaru
+   Menu, PvUIprefs, Add, &No OSD information, ToggleInfoToolTips
+   Menu, PvUIprefs, Add, &Large UI fonts, ToggleLargeUIfonts
+   If !AnyWindowOpen
+   {
+      Menu, PvUIprefs, Add, 
+      Menu, PvUIprefs, Add, Additional settings`tF12, PrefsPanelWindow
+   }
+
+   If (TouchScreenMode=1)
+      Menu, PvUIprefs, Check, &Touch screen mode
+   If (PrefsLargeFonts=1)
+      Menu, PvUIprefs, Check, &Large UI fonts
+   If (isAlwaysOnTop=1)
+      Menu, PvUIprefs, Check, &Always on top
+   If (noTooltipMSGs=1)
+      Menu, PvUIprefs, Check, &No OSD information
+   If (getCaptionStyle()=1)
+      Menu, PvUIprefs, Check, &Hide title bar
 }
 
 EraseHistory() {
@@ -5990,7 +6268,10 @@ ToggleAlwaysFIMus() {
       friendly := "`n`nThe FreeImage.dll file seems to be missing..."
 
    If (FIMfailed2init=1)
+   {
+      triggerOwnDialogs()
       Msgbox, 48, %appTitle%, ERROR: The FreeImage library failed to properly initialize. Various image file formats will no longer be supported. Error code: %r%.%friendly%
+   }
 
    writeMainSettings()
 }
@@ -6041,6 +6322,9 @@ ToggleInfoToolTips() {
 
 ToggleLargeUIfonts() {
     PrefsLargeFonts := !PrefsLargeFonts
+    If (AnyWindowOpen=14)
+       PrefsPanelWindow()
+
     writeMainSettings()
 }
 
@@ -6117,7 +6401,11 @@ SetParentID(Window_ID, theOther) {
 }
 
 drawWelcomeImg(goAgain:=0) {
-    If (maxFilesIndex>0 || StrLen(CurrentSLD)>1 || AnyWindowOpen>0)
+    clippyTest := resultedFilesList[0]
+    If (currentFileIndex=0 && InStr(clippyTest, "Current-Clipboard"))
+       thisClippyIMG := 1
+
+    If (maxFilesIndex>0 || thisClippyIMG=1 || StrLen(CurrentSLD)>1 || AnyWindowOpen>0)
        Return
 
     If (A_TickCount - scriptStartTime<1000) && (imageLoading!=1)
@@ -6139,13 +6427,12 @@ drawWelcomeImg(goAgain:=0) {
     G := Gdip_GraphicsFromHDC(hdc)
     Gdip_SetInterpolationMode(G, 5)
     Gdip_SetSmoothingMode(G, 5)
-    pBr0 := Gdip_BrushCreateSolid("0xFF" WindowBgrColor)
     pBr1 := Gdip_BrushCreateSolid(0x33882211)
     pBr3 := Gdip_BrushCreateSolid(0x33118822)
     pBr2 := Gdip_BrushCreateSolid(0x33112288)
     pBr4 := Gdip_BrushCreateSolid(0x66030201)
     pBr5 := Gdip_BrushCreateSolid(0x88939291)
-    Gdip_FillRectangle(G, pBr0, 0, 0, mainWidth, mainHeight)
+    Gdip_FillRectangle(G, pBrushWinBGR, 0, 0, mainWidth, mainHeight)
     If GetKeyState("CapsLock", "T")
        Gdip_FillRectangle(G, pBr5, 0, 0, mainWidth, mainHeight)
     dummyPos := (A_OSVersion!="WIN_7") ? 1 : ""
@@ -6276,7 +6563,6 @@ drawWelcomeImg(goAgain:=0) {
     DeleteDC(hdc)
     Gdip_DeleteGraphics(G)
     Gdip_DisposeEffect(pEffect)
-    Gdip_DeleteBrush(pBr0)
     Gdip_DeleteBrush(pBr1)
     Gdip_DeleteBrush(pBr2)
     Gdip_DeleteBrush(pBr3)
@@ -6284,6 +6570,18 @@ drawWelcomeImg(goAgain:=0) {
     Gdip_DeleteBrush(pBr5)
     Gdip_DisposeImage(BMPcache, 1)
     SetTimer, drawWelcomeImg, -3000
+}
+
+InitStuff() {
+   pBrushHatch := Gdip_BrushCreateHatch("0xff999999", "0xff111111", 50)
+   pBrushWinBGR := Gdip_BrushCreateSolid("0xFF" WindowBgrColor)
+}
+
+refreshWinBGRbrush() {
+   If pBrushWinBGR
+      Gdip_DeleteBrush(pBrushWinBGR)
+   Sleep, 1
+   pBrushWinBGR := Gdip_BrushCreateSolid("0xFF" WindowBgrColor)
 }
 
 BuildGUI() {
@@ -6724,14 +7022,6 @@ RescaleBMPtiny(imgpath, imgW, imgH, ByRef ResizedW, ByRef ResizedH, wasForcedHig
   prevImgPath := imgpath
 }
 
-getGIFframesCount(whichImg) {
-    DllCall("gdiplus\GdipImageGetFrameDimensionsCount", "UInt", whichImg, "UInt*", Countu)
-    VarSetCapacity(dIDs,16,0)
-    DllCall("gdiplus\GdipImageGetFrameDimensionsList", "UInt", whichImg, "Uint", &dIDs, "UInt", Countu)
-    DllCall("gdiplus\GdipImageGetFrameCount", "UInt", whichImg, "Uint", &dIDs, "UInt*", CountFrames)
-    Return CountFrames
-}
-
 SaveFIMfile(file2save, pBitmap) {
   initFIMGmodule()
   If !wasInitFIMlib
@@ -6777,6 +7067,7 @@ initFIMGmodule() {
      If (firstTimer=1)
      {
         SoundBeep, 300, 900
+        triggerOwnDialogs()
         Msgbox, 48, %appTitle%, ERROR: The FreeImage library failed to properly initialize. Some image file formats will no longer be supported. Error code: %r%.%friendly%
      }
   } Else FIMfailed2init := 0
@@ -6836,8 +7127,10 @@ FreeImageLoader(imgpath, doBw, noBPPconv) {
   imgIDs := hFIFimgA "|" hFIFimgB "|" hFIFimgC "|" hFIFimgZ
   Sort, imgIDs, UD|
   Loop, Parse, imgIDs, |
+  {
       If A_LoopField
          FreeImage_UnLoad(A_LoopField)
+  }
 
   eTime := A_tickcount - sTime
   ; ToolTip, % imgW ", " imgW2,,,2
@@ -6906,7 +7199,7 @@ CloneMainBMP(imgpath, ByRef imgW, ByRef imgH, ByRef CountFrames, mustReloadIMG) 
   Gdip_GetImageDimensions(oBitmap, imgW, imgH)
   If RegExMatch(imgpath, "i)(.\.gif)$") && (animGIFsSupport=1)
   {
-     CountFrames := getGIFframesCount(oBitmap)
+     CountFrames := Gdip_GetImageFramesCount(oBitmap)
   } Else If (slowLoaded=1 || imgW>ResolutionWidth*factoru || imgH>ResolutionHeight*factoru) && (enableThumbsCaching=1 
     && !FileExist(file2load) && (IMGresizingMode=1 || IMGresizingMode=2))
   {
@@ -7278,6 +7571,7 @@ QPV_ShowImgonGuiPrev(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, new
     Gdip_SetInterpolationMode(G, thisImgQuality)
     Gdip_SetSmoothingMode(G, 3)
 
+    Gdip_FillRectangle(G, pBrushWinBGR, 0, 0, mainWidth, mainHeight)
     If (FlipImgH=1)
     {
        Gdip_ScaleWorldTransform(G, -1, 1)
@@ -7293,6 +7587,8 @@ QPV_ShowImgonGuiPrev(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, new
     whichImg := (usePrevious=1 && gdiBitmapSmall) ? gdiBitmapSmall : gdiBitmap
     Gdip_GetImageDimensions(whichImg, imgW, imgH)
     calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY)
+    zL := (zoomLevel<1) ? 1 : zoomLevel*2
+    Gdip_FillRectangle(G, pBrushHatch, DestPosX + 1, DestPosY + 1, newW - Ceil(2*zL), newH - Ceil(2*zL))
     r1 := Gdip_DrawImage(G, whichImg, DestPosX, DestPosY, newW, newH, 0, 0, imgW, imgH, matrix)
     If (GIFsGuiCreated=1)
        GIFguiCreator(1, 1)
@@ -7560,6 +7856,8 @@ QPV_ShowImgonGui(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, newH, m
     whichImg := (usePrevious=1 && gdiBitmapSmall) ? gdiBitmapSmall : gdiBitmap
     Gdip_GetImageDimensions(whichImg, imgW, imgH)
     calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY)
+    zL := (zoomLevel<1) ? 1 : zoomLevel*2
+    Gdip_FillRectangle(G, pBrushHatch, DestPosX + 1, DestPosY + 1, newW - Ceil(2*zL), newH - Ceil(2*zL))
     thisIDviewPortCache := imgpath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight usePrevious
     prevDestPosX := DestPosX
     prevDestPosY := DestPosY
@@ -7620,6 +7918,12 @@ QPV_ShowImgonGui(roImgW, roImgH, oImgW, oImgH, wscale, imgW, imgH, newW, newH, m
        r1 := Gdip_DrawImageFX(G2, ViewPortBMPcache, 0, 0, mainWidth, mainHeight, matrix, pEffect)
        Gdip_DisposeEffect(pEffect)
     } Else r1 := Gdip_DrawImage(G2, ViewPortBMPcache, 0, 0, mainWidth, mainHeight, 0, 0, mainWidth, mainHeight, matrix)
+
+    Rehion := Gdip_GetClipRegion(G2)
+    Gdip_SetClipRect(G2, DestPosX, DestPosY, newW, newH, 4)
+    Gdip_FillRectangle(G2, pBrushWinBGR, 0, 0, mainWidth, mainHeight)
+    Gdip_SetClipRegion(G2, Rehion, 0)
+    Gdip_DeleteRegion(Rehion)
 
     pBrush := Gdip_BrushCreateSolid("0x99898898")
     If (markedSelectFile || FlipImgV=1 || FlipImgH=1 || IMGlargerViewPort=1 || imgFxMode>1)
@@ -8102,7 +8406,6 @@ QPV_ShowThumbnails(startIndex) {
     thumbsBitmap := Gdip_CreateBitmap(mainWidth, mainHeight)
     G2 := Gdip_GraphicsFromImage(thumbsBitmap)
     Gdip_SetInterpolationMode(G2, 5)
-    pBrush := Gdip_BrushCreateSolid("0x77" WindowBgrColor)
     hasUpdated := rowIndex := imgsListed := 0
     maxImgSize := maxZeit := columnIndex := -1
     dummyPos := (A_OSVersion!="WIN_7") ? 1 : ""
@@ -8116,7 +8419,8 @@ QPV_ShowThumbnails(startIndex) {
        DestroyGIFuWin()
 
     createThumbsFolder()
-    Gdip_FillRectangle(G2, pBrush, 0, 0, mainWidth, mainHeight)
+    Gdip_FillRectangle(G, pBrushWinBGR, 0, 0, mainWidth, mainHeight)
+    pBrush2 := Gdip_BrushCreateSolid("0x33111111")
     prevGUIupdate := A_TickCount
     Loop, % maxItemsW*maxItemsH*2
     {
@@ -8150,6 +8454,7 @@ QPV_ShowThumbnails(startIndex) {
         calcImgSize(1, imgW, imgH, thumbsW, thumbsH, newW, newH)
         DestPosX := thumbsW//2 - newW//2 + thumbsW*columnIndex
         DestPosY := thumbsH//2 - newH//2 + thumbsH*rowIndex
+        Gdip_FillRectangle(G2, pBrush2, thumbsW*columnIndex+1, thumbsH*rowIndex+1, thumbsW-2, thumbsH-2)
         If (!imgW || !imgH || !oBitmap || !FileExist(imgpath))
            Continue
 
@@ -8189,6 +8494,7 @@ QPV_ShowThumbnails(startIndex) {
     }
     mainEndZeit := A_TickCount
     Sleep, 1
+    Gdip_DeleteBrush(pBrush2)
     If oBitmap
        Gdip_DisposeImage(oBitmap, 1)
 
@@ -8213,7 +8519,6 @@ QPV_ShowThumbnails(startIndex) {
     DeleteObject(hbm)
     DeleteDC(hdc)
     Gdip_DeleteGraphics(G)
-    Gdip_DeleteBrush(pBrush)
     Try DllCall("user32\SetCursor", "Ptr", hCursN)
     prevFullThumbsUpdate := A_TickCount
     loopZeit := mainEndZeit - mainStartZeit
@@ -8380,7 +8685,12 @@ GDIupdater() {
       resetSlideshowTimer(0)
 
    imgpath := resultedFilesList[currentFileIndex]
-   If (!imgpath || !maxFilesIndex || PrevGuiSizeEvent=1 || !CurrentSLD)
+   clippyTest := resultedFilesList[0]
+   If (currentFileIndex=0 && InStr(clippyTest, "Current-Clipboard"))
+      thisClippyIMG := 1
+
+
+   If (!imgpath || !maxFilesIndex || PrevGuiSizeEvent=1 || !CurrentSLD) && (thisClippyIMG!=1)
    {
       If (slideShowRunning=1)
          ToggleSlideShowu()
@@ -8394,7 +8704,7 @@ GDIupdater() {
       Return
    }
 
-   If (maxFilesIndex>0 && PrevGuiSizeEvent!=1 && thumbsDisplaying!=1) && (A_TickCount - scriptStartTime>500)
+   If (maxFilesIndex>0 && PrevGuiSizeEvent!=1 && thumbsDisplaying!=1) && (A_TickCount - scriptStartTime>500) || (thisClippyIMG=1)
    {
       delayu := (A_TickCount - lastWinDrag<450) ? 450 : 15
       filterDelayiedImageDisplay()
@@ -8439,7 +8749,7 @@ JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
   VarSetCapacity(POINT, 8)
   NumPut(vPosX, &POINT, 0, "Int")
   NumPut(vPosY, &POINT, 4, "Int")
-  DllCall("user32\ClientToScreen", Ptr,hWnd, Ptr,&POINT)
+  DllCall("user32\ClientToScreen", "Ptr", hWnd, "Ptr", &POINT)
   vPosX2 := NumGet(&POINT, 0, "Int")
   vPosY2 := NumGet(&POINT, 4, "Int")
 }
@@ -8991,9 +9301,9 @@ coreResizeIMG(imgpath, newW, newH, file2save, goFX, toClippy, rotateMode, soloMo
     thisImgQuality := (ResizeQualityHigh=1) ? 7 : 5
     Gdip_SetInterpolationMode(G2, thisImgQuality)
     Gdip_SetSmoothingMode(G2, 3)
-    pBrush := Gdip_BrushCreateSolid(0xFF555555)
-    Gdip_FillRectangle(G2, pBrush, 0, 0, zImgSelW+5, zImgSelH+5)
-    Gdip_DeleteBrush(pBrush)
+    ; pBrush := Gdip_BrushCreateSolid(0xFF555555)
+    ; Gdip_FillRectangle(G2, pBrush, 0, 0, zImgSelW+5, zImgSelH+5)
+    ; Gdip_DeleteBrush(pBrush)
 
     o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
     applyAdjusts := (ResizeApplyEffects=1 || goFX=1) ? 1 : 0
@@ -9040,6 +9350,11 @@ coreResizeIMG(imgpath, newW, newH, file2save, goFX, toClippy, rotateMode, soloMo
     Return r
 }
 
+warningsBoxInfo() {
+    triggerOwnDialogs()
+    MsgBox,, %appTitle%, This application has limited support for color depths lower or higher than 32 bits. The support for alpha channel [RGBA] is also limited.`n`nGiven these limitations, certain operations/features provided within the application can produce undesired results if the images have an alpha channel that renders the image not entirely opaque or an uncommon color depth.`n`nAdditionaly, there is no support for multi-frames/paged images.
+}
+
 AboutWindow() {
     createSettingsGUI(1)
     btnWid := 100
@@ -9064,6 +9379,7 @@ AboutWindow() {
     Gui, Add, Link, y+15 w%txtWid%, New and previous versions are available on <a href="https://github.com/marius-sucan/Quick-Picto-Viewer">GitHub</a>.
     Gui, Font, Normal
     Gui, Add, Button, xs+5 y+25 h30 w105 Default gCloseWindow, Close
+    Gui, Add, Button, x+5 hp gwarningsBoxInfo, &Warnings
     Gui, SettingsGUIA: Show, AutoSize, About %appTitle% v%Version%
 }
 
@@ -9162,6 +9478,7 @@ BtnPerformJpegOp() {
     initFIMGmodule()
     If !wasInitFIMlib
     {
+       triggerOwnDialogs()
        Msgbox, 48, %appTitle%, ERROR: Unable to initialize Free Image library module...`n`nThis functionality is currently unavailable.
        Return
     }
@@ -9204,6 +9521,7 @@ batchJpegLLoperations() {
   If (filesElected>1)
   {
      msgInfos := (jpegDoCrop=1) ? "`n`nThe crop operation IS irreversible!" : ""
+     triggerOwnDialogs()
      MsgBox, 52, %appTitle%, Are you sure you want to perform the JPEG transformations on the selected files? There are currently %filesElected% selected files.%msgInfos%
      IfMsgBox, Yes
        good2go := 1
@@ -9692,6 +10010,7 @@ ResizeImagePanelWindow() {
     Gui, Add, Edit, xs+15 y+5 w%editWid% r1 Disabled -wrap vResultEditWidth, % (multipleFilesMode=1) ? "--" : oImgW
     Gui, Add, Edit, x+5 w%editWid% r1 Disabled -wrap vResultEditHeight, % (multipleFilesMode=1) ? "--" : oImgH
     Gui, Add, DropDownList, x+5 wp+30 gTglRszRotation AltSubmit Choose%ResizeRotationUser% vResizeRotationUser, Rotate: 0°|90° [CW]|180° [CW]|-90° [CCW]
+    Gui, Add, Button, x+5 hp gwarningsBoxInfo, &Warnings
     Gui, Add, Checkbox, xs y+15 gTglRszKeepAratio Checked%ResizeKeepAratio% vResizeKeepAratio, Keep aspect ratio
     Gui, Add, Checkbox, y+5 gTglRszCropping Checked%ResizeWithCrop% vResizeWithCrop, Crop image(s) to the viewport selection
     Gui, Add, Checkbox, y+5 gTglRszQualityHigh Checked%ResizeQualityHigh% vResizeQualityHigh, High quality resampling
@@ -9724,7 +10043,7 @@ ResizeImagePanelWindow() {
 }
 
 ChngRszDestFldr() {
-    GUI, 1: +OwnDialogs
+    triggerOwnDialogs()
     pattern := "All files (*.*;)"
     startPath := ResizeDestFolder
     FileSelectFile, SelectImg, S2, %startPath%\this.folder, Add new folder(s) to the list, %pattern%
@@ -9771,6 +10090,7 @@ batchIMGresizer(desiredW, desiredH, isPercntg) {
    overwriteWarning := (ResizeUseDestDir!=1) ? "`n`nWARNING: All the original files will be overwritten." : ""
    If (filesElected>0)
    {
+      triggerOwnDialogs()
       MsgBox, 52, %appTitle%, Are you sure you want to process multiple images in one go? There are %filesElected% selected files for this operation.%overwriteWarning%
       IfMsgBox, Yes
         good2go := 1
@@ -9902,6 +10222,7 @@ BTNsaveResizedIMG() {
          If (!RegExMatch(rDesireWriteFMT, "i)(bmp|png|tif|gif|jpg)$") && wasInitFIMlib!=1)
          {
             SoundBeep, 300, 100
+            triggerOwnDialogs()
             Msgbox, 48, %appTitle%, ERROR: The "%rDesireWriteFMT%" format is currently unsupported. The FreeImage library failed to properly initialize.
             Return
          }
@@ -9921,7 +10242,7 @@ BTNsaveResizedIMG() {
    zPlitPath(img2resizePath, 0, OutFileName, OutDir)
    startPath := (ResizeUseDestDir=1) ? ResizeDestFolder "\" OutFileName : img2resizePath
 
-   GUI, SettingsGUIA: +OwnDialogs
+   triggerOwnDialogs()
    FileSelectFile, file2save, S18, % startPath, Save processed image as..., Images (*.BMP;*.GIF;*.HDP;*.J2C;*.J2K;*.JFIF;*.JIF;*.JNG;*.JP2;*.JPE;*.JPEG;*.JPG;*.JXR;*.PNG;*.PPM;*.TGA;*.TIF;*.TIFF;*.WDP;*.WEBP;*.XPM)
    If (!ErrorLevel && StrLen(file2save)>3)
    {
@@ -9973,7 +10294,11 @@ Copy2ClipResizedIMG() {
    {
       showTOOLtip("Resized image copied to clipboard")
       SoundBeep, 900, 100
-   } Else Msgbox, 48, %appTitle%, ERROR: Unable to copy resized image to clipboard... Error code: %r%.
+   } Else 
+   {
+      triggerOwnDialogs()
+      Msgbox, 48, %appTitle%, ERROR: Unable to copy resized image to clipboard... Error code: %r%.
+   }
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -10228,6 +10553,7 @@ IgnoreSelFolder() {
     IniRead, tstSLDcacheFilesList, % CurrentSLD, General, SLDcacheFilesList, @
     If (!InStr(firstLine, "[General]") || tstSLDcacheFilesList!=1)
     {
+       triggerOwnDialogs()
        Msgbox, 48, %appTitle%, ERROR: The loaded .SLD file does not seem to be in the correct format. Operation aborted.
        Return
     }
@@ -10252,6 +10578,7 @@ RemFilesStaticFolder() {
     Sleep, 25
     CloseWindow()
     Sleep, 50
+    triggerOwnDialogs()
     MsgBox, 52, %appTitle%, Would you like to remove the files from the index/list pertaining to the static folder selected?`n`n%folderu%
     IfMsgBox, Yes
     {
@@ -10284,6 +10611,7 @@ RemDynaSelFolder() {
     }
 
     DynamicFoldersList := newFoldersList
+    triggerOwnDialogs()
     MsgBox, 52, %appTitle%, Would you like to remove the files from the index/list pertaining to the removed folder as well ?`n`n%folderu%
     IfMsgBox, Yes
     {
@@ -10483,6 +10811,7 @@ UpdateSelFolder() {
     IniRead, tstSLDcacheFilesList, % CurrentSLD, General, SLDcacheFilesList, @
     If (!InStr(firstLine, "[General]") || tstSLDcacheFilesList!=1)
     {
+       triggerOwnDialogs()
        Msgbox, 48, %appTitle%, ERROR: The loaded .SLD file does not seem to be in the correct format. Operation aborted.
        Return
     }
@@ -10609,6 +10938,7 @@ CloseWindow() {
     Gui, SettingsGUIA: Destroy
     If (GIFsGuiCreated=1)
        DestroyGIFuWin()
+
     AnyWindowOpen := 0
     WinActivate, ahk_id %PVhwnd%
 }
@@ -10634,7 +10964,7 @@ TooltipCreator(msg:=0,killWin:=0) {
 
     lastInvoked := A_TickCount
     Gui, ToolTipGuia: Destroy
-    thisFntSize := (PrefsLargeFonts=1) ? Round(OSDfntSize*1.5) : OSDfntSize
+    thisFntSize := OSDfntSize
     Sleep, 5
     Gui, ToolTipGuia: -DPIScale -Caption +Owner1 +ToolWindow +E0x80000 +E0x20 +hwndhGuiTip
     Gui, ToolTipGuia: Margin, % thisFntSize + 5, % thisFntSize + 3
@@ -10887,6 +11217,46 @@ GetModuleFileNameEx(PID) {
 
 GetCurrentProcessId() {
     Return DllCall("Kernel32.dll\GetCurrentProcessId")
+}
+
+Fnt_GetListOfFonts() {
+; function stripped down from Font Library 3.0 by jballi
+; from https://autohotkey.com/boards/viewtopic.php?t=4379
+
+    Static Dummy65612414
+          ,HWND_DESKTOP := 0   ;-- Device constants
+          ,LF_FACESIZE  := 32  ;-- In TCHARS - LOGFONT constants
+
+    ;-- Initialize and populate LOGFONT structure
+    Fnt_EnumFontFamExProc_List := ""
+    p_CharSet := 1
+    p_Flags := 0x800
+    VarSetCapacity(LOGFONT,A_IsUnicode ? 92:60,0)
+    NumPut(p_CharSet,LOGFONT,23,"UChar")                ;-- lfCharSet
+
+    ;-- Enumerate fonts
+    EFFEP := RegisterCallback("Fnt_EnumFontFamExProc","F")
+    hDC := DllCall("user32\GetDC","Ptr",HWND_DESKTOP)
+    DllCall("gdi32\EnumFontFamiliesExW"
+       ,"Ptr", hDC                                      ;-- hdc
+       ,"Ptr", &LOGFONT                                 ;-- lpLogfont
+       ,"Ptr", EFFEP                                    ;-- lpEnumFontFamExProc
+       ,"Ptr", p_Flags                                  ;-- lParam
+       ,"UInt", 0)                                      ;-- dwFlags (must be 0)
+
+    DllCall("user32\ReleaseDC","Ptr",HWND_DESKTOP,"Ptr",hDC)
+    DllCall("GlobalFree", "Ptr", EFFEP)
+    Return Fnt_EnumFontFamExProc_List
+}
+
+Fnt_EnumFontFamExProc(lpelfe,lpntme,FontType,p_Flags) {
+    Fnt_EnumFontFamExProc_List := 0
+    Static Dummy62479817
+          ,LF_FACESIZE := 32     ;-- In TCHARS - LOGFONT constants
+
+    l_FaceName := StrGet(lpelfe+28,LF_FACESIZE)
+    FontList.Push(l_FaceName)    ;-- Append the font name to the list
+    Return 1                     ;-- Continue enumeration
 }
 
 initCompiled() {
