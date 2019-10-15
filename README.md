@@ -6,7 +6,9 @@
 
 <p>QPV is able to create image slideshows and cache very large dynamic lists of files. Unlike other applications of this kind, it can load, on my system, a list of 500000 files in under 10 seconds, while XnView Classic or Irfan View need more than 15 minutes.</p>
 
-<p width="600" height="540"><img width="600" height="540" alt="Quick Picture Viewer - screenshot" src="http://marius.sucan.ro/media/files/blog/ahk-scripts/quick-picto-viewer-screenshot.jpg"></p>
+<p width="600" height="540"><img width="600" height="540" alt="Quick Picture Viewer - thumbnails list screenshot" src="http://marius.sucan.ro/media/files/blog/ahk-scripts/quick-picto-viewer-screenshot.jpg"></p>
+
+<p width="600" height="540"><img width="600" height="540" alt="Quick Picture Viewer - image view screenshot" src="http://marius.sucan.ro/media/files/blog/ahk-scripts/quick-picto-viewer-screenshot2.jpg"></p>
 
 <h2><a href="http://marius.sucan.ro/media/files/blog/ahk-scripts/quick-picto-viewer-compiled.zip">Download latest version</a> (compiled for x64/x32, Windows binary)</h2>
 
@@ -22,20 +24,26 @@
 <li>Options to control brightness, contrast, saturation and RGB color channels balance/intensity.</li>
 <li>Adaptive auto-adjustment of brightness, contrast and saturation of displayied images.</li>
 <li>Display images in grayscale, inverted or personalized colors. Option to save adjusted image, or apply adjusments on multiple images in one go.</li>
+<li>Real-time luminance histogram for the image displayied.</li>
 <li>Various modes to adapt images to window.</li>
+<li>Images can be rotated or mirrored horizontally and vertically in the viewport.</li>
 <li>Multiple slideshow directions available and easy to change speed between images: random order, backwards or forwads.</li>
 <li>Perform JPEG lossless operations in batch: flip or crop images.</li>
-<li>Perform actions on image files: resize, rotate, crop, change/adjust colors, rename, convert to jpeg, delete, copy or move.</li>
-<li>Batch processing: Apply operations on multiple files at once: resize, rotate and/or crop images, change/adjust colors, convert to jpeg or other formats, delete, copy, move, and rename.</li>
+<li>Perform actions on image files: resize, rotate [at any degree], crop, change/adjust colors, rename, convert to different file formats, rename, delete, copy or move.</li>
+<li>Batch processing. You can apply any of the previously mentioned action or operation on multiple files at once.</li>
 <li>Multi-rename allows adding a prefix and/or suffix to renamed files, or to count them, or search and replace strings in file names.</li>
+<li>Paste texts from clipboard and render them as images. Text and background colors, font style, alignment and size can be personalized.</li>
 <li>Quick Picto Viewer has its own slideshow format to store list of folders and cache files lists.</li>
 <li>Ability to selectively refresh the cached files list from selected folders.</li>
 <li>Option to filter the list of files using keywords. The operator | [or] is allowed.</li>
 <li>Very fast loading of cached or not cached lists of files. Tested with 700000 images and it loads in 10 seconds on my system.</li>
+<li>Resize and crop images preserving alpha-channel on save even when image colors are adjusted.</li>
 <li>Support for animated .GIFs in slideshows.</li>
+<li>Support for multi-paged TIFFs and GIF frames. Ability to go through each image frame/page.</li>
 <li>Support for drag 'n drop of folders or files onto main UI.</li>
 <li>Paste image from clipboard and save it. 18 file formats supported for saving an image.</li>
 <li>Copy to clipboard: the entire image or an area selected from it.</li>
+<li>Ambiental textured window background. Automatically generated background based on the current image displayied.</li>
 <li>Fancy welcome screen random-generated images :-).</li>
 <li>All the potentially lengthy operations can be stopped with Escape :-).</li>
 </ul> 

@@ -1,11 +1,14 @@
-﻿; Original Date: 2012-3-29
+﻿; Original Date: 2012-03-29
 ; Original Author: linpinger
 ; Original URL : http://www.autohotkey.net/~linpinger/index.html
 ; This version available on Github: https://github.com/marius-sucan/Quick-Picto-Viewer
 
 ; Change log:
 ; =============================
-; 11th of August 2019
+; 21th of September 2019 by Marius Șucan
+; - Implemented additional functions.
+;
+; 11th of August 2019 by Marius Șucan
 ; - Added ConvertFIMtoPBITMAP() and ConvertPBITMAPtoFIM() functions
 ; - Implemented 32 bits support for AHK_L 32 bits and FreeImage 32 bits.
 ; - FreeImage_Save() now relies on FreeImage_GetFIFFromFilename() to get the file format code
@@ -124,6 +127,8 @@ FreeImage_Allocate(width, height, bpp=32, red_mask=0xFF000000, green_mask=0x00FF
 FreeImage_Load(ImPath, GFT:=-1, flag:=0, ByRef dGFT:=0) {
    If (GFT=-1 || GFT="")
       dGFT := GFT := FreeImage_GetFileType(ImPath)
+   If (GFT="" || !ImPath)
+      Return
    Return DllCall(getFIMfunc("LoadU"), "Int", GFT, "WStr", ImPath, "int", flag)
 }
 
@@ -138,6 +143,8 @@ FreeImage_Clone(hImage) {
 }
 
 FreeImage_UnLoad(hImage) {
+   If StrLen(hImage)<4
+      Return
    Return DllCall(getFIMfunc("Unload"), "Int", hImage)
 }
 
@@ -208,8 +215,20 @@ FreeImage_GetInfo(hImage) {
    Return DllCall(getFIMfunc("GetInfo"), "Int", hImage)
 }
 
-FreeImage_GetColorType(hImage) {
-   Return DllCall(getFIMfunc("GetColorType"), "Int", hImage)
+FreeImage_GetColorType(hImage, humanReadable:=1) {
+; 0 = MINISBLACK - Monochrome bitmap (1-bit) : first palette entry is black. Palletised bitmap (4 or 8-bit) and single - channel non standard bitmap: the bitmap has a greyscale palette
+; 1 = MINISWHITE - Monochrome bitmap (1-bit) : first palette entry is white. Palletised bitmap (4 or 8-bit) : the bitmap has an inverted greyscale palette
+; 2 = PALETTE - Palettized bitmap (1, 4 or 8 bit)
+; 3 = RGB - High-color bitmap (16, 24 or 32 bit), RGB16 or RGBF
+; 4 = RGBALPHA - High-color bitmap with an alpha channel (32 bit bitmap, RGBA16 or RGBAF)
+; 5 = CMYK - CMYK bitmap (32 bit only)
+
+   Static ColorsTypes := {0:"MINISBLACK", 1:"MINISWHITE", 2:"PALETTIZED", 3:"RGB", 4:"RGB-ALPHA", 5:"CMYK"}
+   r := DllCall(getFIMfunc("GetColorType"), "Int", hImage)
+   If (ColorsTypes.HasKey(r) && humanReadable=1)
+      r := ColorsTypes[r]
+
+   Return r
 }
 
 FreeImage_GetRedMask(hImage) {
@@ -261,29 +280,33 @@ FreeImage_HasBackgroundColor(hImage) {
 }
 
 FreeImage_GetBackgroundColor(hImage) {
-   VarSetCapacity(RGB, 4)
-   RetValue := DllCall(getFIMfunc("GetBackgroundColor"), "Int", hImage, "UInt", &RGB)
+   VarSetCapacity(RGBQUAD, 4)
+   RetValue := DllCall(getFIMfunc("GetBackgroundColor"), "Int", hImage, "UInt", &RGBQUAD)
    If RetValue
-      return, NumGet(RGB, 0, "UChar") . ":" . NumGet(RGB, 1, "UChar") . ":" . NumGet(RGB, 2, "UChar") . ":" . NumGet(RGB, 3, "UChar")
+      return NumGet(RGBQUAD, 2, "Uchar") "," NumGet(RGBQUAD, 1, "Uchar") "," NumGet(RGBQUAD, 0, "Uchar") "," NumGet(RGBQUAD, 3, "Uchar")
    else
-      return, RetValue
+      return RetValue
 }
 
-FreeImage_SetBackgroundColor(hImage, RGBArray="255:255:255:0") {
-   If ( RGBArray != "" ) {
-      StringSplit, RGBA_, RGBArray, :, %A_space%
-      VarSetCapacity(RGB, 4)
-      NumPut(RGBA_1, RGB, 0, "UChar") , NumPut(RGBA_2, RGB, 1, "UChar") , NumPut(RGBA_3, RGB, 2, "UChar") , NumPut(RGBA_4, RGB, 3, "UChar")
-   } else
-      RGB := 0
-   Return DllCall(getFIMfunc("SetBackgroundColor"), "Int", hImage, "UInt", &RGB)
+FreeImage_SetBackgroundColor(hImage, RGBArray:="255,255,255,0") {
+   If (RGBArray!="")
+   {
+      RGBA := StrSplit(RGBArray, ",")
+      VarSetCapacity(RGBQUAD, 4)
+      NumPut(RGBA[3], RGBQUAD, 0, "UChar")
+      NumPut(RGBA[2], RGBQUAD, 1, "UChar")
+      NumPut(RGBA[1], RGBQUAD, 2, "UChar")
+      NumPut(RGBA[4], RGBQUAD, 3, "UChar")
+   } else RGBQUAD := 0
+   Return DllCall(getFIMfunc("SetBackgroundColor"), "Int", hImage, "UInt", &RGBQUAD)
 }
 
 ; === File type functions ===
 ; missing functions: GetFileTypeFromHandle, GetFileTypeFromMemory,
 ; and ValidateFromHandle, ValidateFromMemory
 
-FreeImage_GetFileType(ImPath) {  ; 0:BMP 2:JPG 13:PNG 18:TIF 25:GIF
+FreeImage_GetFileType(ImPath) {
+   ; 0:BMP 2:JPG 13:PNG 18:TIF 25:GIF
    r := DllCall(getFIMfunc("GetFileTypeU"), "WStr", ImPath, "Int", 0)
    If (r=-1)
       r := FreeImage_GetFIFFromFilename(ImPath)
@@ -308,34 +331,42 @@ FreeImage_GetScanLine(hImage, iScanline) { ; Base 0
    Return DllCall(getFIMfunc("GetScanLine"), "Int", hImage, "Int", iScanline)
 }
 
-FreeImage_GetPixelIndex(hImage, xPos, yPos) { ; Base 0
+FreeImage_GetPixelIndex(hImage, xPos, yPos) {
+; It works only with 1, 4 and 8 bit images.
    VarSetCapacity(IndexNum, 1)
    RetValue := DllCall(getFIMfunc("GetPixelIndex"), "int", hImage, "Uint", xPos, "Uint", yPos, "Uint", &IndexNum)
    If RetValue
-      return, Numget(IndexNum, 0, "Uchar")
+      return NumGet(IndexNum, 0, "Uchar")
    else
-      return, RetValue
+      return RetValue
 }
 
 FreeImage_SetPixelIndex(hImage, xPos, yPos, nIndex) {
+; It works only with 1, 4 and 8 bit images.
    VarSetCapacity(IndexNum, 1)
    NumPut(nIndex, IndexNum, 0, "Uchar")
    Return DllCall(getFIMfunc("SetPixelIndex"), "int", hImage, "Uint", xPos, "Uint", yPos, "Uint", &IndexNum)
 }
 
 FreeImage_GetPixelColor(hImage, xPos, yPos) {
+; It works only with 16, 24 and 32 bit images.
+
    VarSetCapacity(RGBQUAD, 4)
    RetValue := DllCall(getFIMfunc("GetPixelColor") , "int", hImage, "Uint", xPos, "Uint", yPos, "Uint", &RGBQUAD)
    If RetValue
-      return, Numget(RGBQUAD, 0, "Uchar") . ":" . Numget(RGBQUAD, 1, "Uchar") . ":" . Numget(RGBQUAD, 2, "Uchar") . ":" . Numget(RGBQUAD, 3, "Uchar")
+      return NumGet(RGBQUAD, 2, "Uchar") "," NumGet(RGBQUAD, 1, "Uchar") "," NumGet(RGBQUAD, 0, "Uchar") "," NumGet(RGBQUAD, 3, "Uchar")
    else
-      return, RetValue
+      return RetValue
 }
 
-FreeImage_SetPixelColor(hImage, xPos, yPos, RGBArray="255:255:255:0") {
-   StringSplit, RGBA_, RGBArray, :, %A_space%
+FreeImage_SetPixelColor(hImage, xPos, yPos, RGBArray="255,255,255,0") {
+; It works only with 16, 24 and 32 bit images.
+   RGBA := StrSplit(RGBArray, ",")
    VarSetCapacity(RGBQUAD, 4)
-   NumPut(RGBA_1, RGBQUAD, 0, "UChar") , NumPut(RGBA_2, RGBQUAD, 1, "UChar") , NumPut(RGBA_3, RGBQUAD, 2, "UChar") , NumPut(RGBA_4, RGBQUAD, 3, "UChar")
+   NumPut(RGBA[3], RGBQUAD, 0, "UChar")
+   NumPut(RGBA[2], RGBQUAD, 1, "UChar")
+   NumPut(RGBA[1], RGBQUAD, 2, "UChar")
+   NumPut(RGBA[4], RGBQUAD, 3, "UChar")
    Return DllCall(getFIMfunc("SetPixelColor"), "int", hImage, "Uint", xPos, "Uint", yPos, "Uint", &RGBQUAD)
 }
 
@@ -440,8 +471,8 @@ FreeImage_SaveToMemory(FIF,hImage, hMemory, Flags) { ; 0:BMP 2:JPG 13:PNG 18:TIF
 ; 26 functions available in the FreeImage Library
 
 ; === Toolkit functions ===
-; 38 functions available in the FreeImage Library
-; only 11 implemented
+; 34 functions available in the FreeImage Library
+; only 15 implemented
 
 FreeImage_Rotate(hImage, angle) {
 ; missing color parameter
@@ -484,11 +515,24 @@ FreeImage_Paste(hImageDst, hImageSrc, nLeft, nTop, nAlpha) {
    Return DllCall(getFIMfunc("Paste"), "Int", hImageDst, "int", hImageSrc, "int", nLeft, "int", nTop, "int", nAlpha)
 }
 
-FreeImage_Composite(hImage, useFileBkg=False, RGBArray="255:255:255:0", hImageBkg=False) {
-   StringSplit, RGBA_, RGBArray, :, %A_space%
+FreeImage_Composite(hImage, useFileBkg:=0, RGBArray:="255,255,255", hImageBkg:=0) {
+   RGBA := StrSplit(RGBArray, ",")
    VarSetCapacity(RGBQUAD, 4)
-   NumPut(RGBA_1, RGBQUAD, 0, "UChar") , NumPut(RGBA_2, RGBQUAD, 1, "UChar") , NumPut(RGBA_3, RGBQUAD, 2, "UChar") , NumPut(RGBA_4, RGBQUAD, 3, "UChar")
+   NumPut(RGBA[3], RGBQUAD, 0, "UChar")
+   NumPut(RGBA[2], RGBQUAD, 1, "UChar")
+   NumPut(RGBA[1], RGBQUAD, 2, "UChar")
+   NumPut(RGBA[4], RGBQUAD, 3, "UChar")
    Return DllCall(getFIMfunc("Composite"), "int", hImage, "int", useFileBkg, "Uint", &RGBQUAD, "int", hImageBkg)
+}
+
+FreeImage_PreMultiplyWithAlpha(hImage) {
+; Return value: 1 -- succes; 0 -- fail
+   Return DllCall(getFIMfunc("PreMultiplyWithAlpha"), "Int", hImage)
+}
+
+FreeImage_Invert(hImage) {
+; Return value: 1 -- succes; 0 -- fail
+   Return DllCall(getFIMfunc("Invert"), "Int", hImage)
 }
 
 FreeImage_JPEGTransform(SrcImPath, DstImPath, ImgOperation) {
@@ -511,6 +555,34 @@ FreeImage_JPEGTransformCombined(SrcImPath, DstImPath, ImgOperation, x1, y1, x2, 
 }
 
 ; === Other functions ===
+
+FreeImage_GetChannel(hImage, channel) {
+; Return value: 0 = failed.
+; Channel to retrieve:
+; 0 - RGB
+; 1 - RED
+; 2 - GREEN
+; 3 - BLUE
+; 4 - ALPHA
+; 5 - BLACK 
+
+   Return DllCall(getFIMfunc("GetChannel"), "Int", hImage, "Int", channel)
+}
+
+FreeImage_SetChannel(hImage, hImageGrey, channel) {
+; hImageGrey must be in Greyscale format.
+;
+; Return value: 0 = failed.
+; Channel to set:
+; 0 - RGB
+; 1 - RED
+; 2 - GREEN
+; 3 - BLUE
+; 4 - ALPHA
+; 5 - BLACK 
+
+   Return DllCall(getFIMfunc("SetChannel"), "Int", hImage, "Int", hImageGrey, "Int", channel)
+}
 
 getFIMfunc(funct) {
 ; for some crazy reason, in the 32 bits DLL of FreeImage
@@ -562,39 +634,60 @@ getFIMfunc(funct) {
    Return funct
 }
 
-ConvertFIMtoPBITMAP(hFIFimgA, destWin) {
+ConvertFIMtoPBITMAP(hFIFimgA) {
 ; destWin parameter is the window you intend to display it in required for GetDC()
-; this function relies on GDI+ AHK library v1.90 [the edition modified by Marius Șucan]
+; this function relies on GDI+ AHK library v1.75 [the edition modified by Marius Șucan]
+; If succesful, the function returns a 32-bit RGBA pBitmap.
+
+  imgW := FreeImage_GetWidth(hFIFimgA)
+  imgH := FreeImage_GetHeight(hFIFimgA)
   imgBPP := Trim(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
   If (imgBPP>32)
      hFIFimgB := FreeImage_ToneMapping(hFIFimgA, 0, 1.85, 0)
 
   hFIFimgC := hFIFimgB ? hFIFimgB : hFIFimgA
-  pBits := FreeImage_GetBits(hFIFimgC)
-  bitmapInfo := FreeImage_GetInfo(hFIFimgC)
-  bmpInfoHeader := FreeImage_GetInfoHeader(hFIFimgC)
-  hdc := DllCall("GetDC", "UInt", destWin)
-  hBITMAP := Gdip_CreateDIBitmap(hDC, bmpInfoHeader, 4, pBits, bitmapInfo, 0)
-  pBITMAP := Gdip_CreateBitmapFromHBITMAP(hBITMAP)
-  DeleteDC(hdc)
-  r2 := DeleteObject(hBITMAP)
-  If hFIFimgB
-     FreeImage_UnLoad(hFIFimgB)
-  Return pBITMAP
+  hFIFimgD := FreeImage_ConvertTo(hFIFimgC, "32Bits")
+  pBits := FreeImage_GetBits(hFIFimgD)
+
+  nBitmap := Gdip_CreateBitmap(imgW, imgH, 0, imgW*4, pBits)
+  Gdip_ImageRotateFlip(nBitmap, 6)
+  pBitmap := Gdip_CreateBitmap(imgW, imgH)
+  G := Gdip_GraphicsFromImage(pBitmap)
+  E := Gdip_DrawImageFast(G, nBitmap, 0, 0)
+  Gdip_DeleteGraphics(G)
+  Gdip_DisposeImage(nBitmap)
+
+  imgIDs := hFIFimgA "|" hFIFimgB "|" hFIFimgC "|" hFIFimgD
+  Sort, imgIDs, UD|
+  Loop, Parse, imgIDs, |
+  {
+      If A_LoopField
+         FreeImage_UnLoad(A_LoopField)
+  }
+  Return pBitmap
 }
 
 ConvertPBITMAPtoFIM(pBitmap, destWin) {
-; this function relies on GDI+ AHK library v1.90 [the edition modified by Marius Șucan]
+; this function relies on GDI+ AHK library v1.75 [the edition modified by Marius Șucan]
   hBitmap := Gdip_CreateHBITMAPFromBitmap(pBitmap)
+  If !hBitmap
+     Return
+
   Gdip_GetImageDimensions(pBitmap, imgW, imgH)
   hFIFimgA := FreeImage_Allocate(imgW, imgH, 32)
   pBits := FreeImage_GetBits(hFIFimgA)
   bitmapInfo := FreeImage_GetInfo(hFIFimgA)
-  hdc := DllCall("GetDC", "UInt", destWin)
+  hdc := GetDC(destWin)
   bmpInfoHeader := FreeImage_GetInfoHeader(hFIFimgA)
-  r1 := Gdip_GetDIBits(hdc, hBitmap, 0, imgH, pBits, bitmapInfo, 2)
+  E := Gdi_GetDIBits(hdc, hBitmap, 0, imgH, pBits, bitmapInfo, 0)
+  SelectObject(hdc, hBitmap)
+  DeleteObject(hBitmap)
   DeleteDC(hdc)
-  r2 := DeleteObject(hBitmap)
+  If !E
+  {
+     FreeImage_UnLoad(hFIFimgA)
+     Return
+  }
   Return hFIFimgA
 }
 

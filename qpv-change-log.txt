@@ -2,6 +2,25 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v3.8.0 (2019-10-15)
+  - [new] option to navigate between GIF frames or multi-paged TIFFs using Page Up/Down; by pressing Ctrl+C, the currently visible frame is copied to the clipboard
+  - [new] option to display luminance histogram for the current image, in real time during color adjustments
+  - [new] ability to make file selections that are not limited to ranges; files can now be individually selected
+  - [new] scrollbars to help with panning images larger than the viewport
+  - [new] gamma and threshold color adjustment options
+  - [new] option to render opaque semi-transparent pixels in images with an alpha channel
+  - [new] rotate images in the viewport in steps of 15 degrees with [9] or [0] or at any degree in the image view panel
+  - [new] ambiental textured window background , automatically generated based on the current image displayied
+  - [new] alpha channel support for images loaded or saved through the FreeImage library
+  - [new] option to choose text alignment for texts pasted from the clipboard
+  - [new] status bar in thumbnails list mode
+  - [new] file information box in the HUD/OSD; press I to invoke it
+  - [new] option to have the viewport image selection coordinates in percentages relative to image width and height
+  - optimizations to the image drawing routines; image down-scailing occurs only if the image is drawn slowly
+  - improvements and bug fixes related to image viewport selections
+  - reorganized the image view [color adjustments] panel
+  - various additional minor improvements
+
 - v3.7.0 (2019-09-02)
   - [new] when text is found in the clipboard, on pressing Ctrl+V, it will be rendered as an image [similar to how IrfanView does it]
   - [new] interface settings panel; the user can now change colors, fonts and sizes; these options will be reused for rendering clipboard texts as images
