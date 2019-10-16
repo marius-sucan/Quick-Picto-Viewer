@@ -2536,6 +2536,7 @@ Gdip_RotateBitmapAtCenter(pBitmap, Angle, pBrush:=0, InterpolationMode:=7, Pixel
     newBitmap := Gdip_CreateBitmap(RWidth, RHeight, PixelFormat)
     G := Gdip_GraphicsFromImage(newBitmap)
     Gdip_SetInterpolationMode(G, InterpolationMode)
+    Gdip_SetSmoothingMode(G, 4)
     If pBrush
        Gdip_FillRectangle(G, pBrush, 0, 0, RWidth, RHeight)
     Gdip_TranslateWorldTransform(G, xTranslation, yTranslation)

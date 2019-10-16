@@ -2,6 +2,11 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v3.8.1 (2019-10-16)
+  - added shift + click to create a new selection in the image view
+  - added ctrl + wheel up/down to zoom in/out
+  - important bug fixes to resize panel features and batch processing
+
 - v3.8.0 (2019-10-15)
   - [new] option to navigate between GIF frames or multi-paged TIFFs using Page Up/Down; by pressing Ctrl+C, the currently visible frame is copied to the clipboard
   - [new] option to display luminance histogram for the current image, in real time during color adjustments

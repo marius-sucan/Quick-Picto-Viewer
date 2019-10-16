@@ -21,7 +21,7 @@
 
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 3.7.5
+;@Ahk2Exe-SetVersion 3.8.1
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
  
@@ -59,9 +59,10 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , slideShowRunning := 0, CurrentSLD := "", markedSelectFile := ""
    , ResolutionWidth, ResolutionHeight, prevStartIndex := -1
    , gdiBitmap, mainSettingsFile := "quick-picto-viewer.ini"
-   , RegExFilesPattern := "i)(.\\*\.(dib|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
+   , RegExFilesPattern := "i)(.\\*\.(dib|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif))$"
    , RegExFIMformPtrn := "i)(.\\*\.(DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
    , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|jng|jif|jfif|jpg|jpe|jpeg|ppm|xpm))$"
+   , saveAlphaTypesRegEX := "i)(.\.(j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp))$"
    , openFptrn1 := "*.png;*.bmp;*.gif;*.jpg;*.tif;*.tga;*.webp;*.jpeg"
    , openFptrn2 := "*.dds;*.emf;*.exr;*.g3;*.hdp;*.iff;*.j2c;*.j2k;*.jbg;*.jif;*.jng;*.jp2;*.jxr;*.koa;*.lbm;*.mng;*.pbm;*.pcd;*.pct;*.pcx;*.pfm;*.pgm;*.pic;*.ppm;*.psd;*.ras;*.sgi;*.wap;*.wbm;*.wbmp;*.wdp;*.wmf;*.xbm;*.xpm"
    , openFptrn3 := "*.3fr;*.arw;*.bay;*.bmq;*.cap;*.cine;*.cr2;*.crw;*.cs1;*.dc2;*.dcr;*.drf;*.dsc;*.erf;*.fff;*.hdr;*.ia;*.iiq;*.k25;*.kc2;*.kdc;*.mdc;*.mef;*.mos;*.mrw;*.nef;*.nrw;*.orf;*.pef;*.ptx;*.pxn;*.qtk;*.raf;*.raw;*.rdc;*.rw2;*.rwz;*.sr2;*.srf;*.x3f"
@@ -94,7 +95,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , FIMimgBPP, imageLoadedWithFIF, FIMformat, coreIMGzeitLoad, desiredFrameIndex := 0
    , diffIMGdecX := 0, diffIMGdecY := 0, anotherVPcache, oldZoomLevel := 0
    , hitTestSelectionPath, scrollBarHy := 0, scrollBarVx := 0, HistogramBMP
-   , version := "3.8.0", vReleaseDate := "15/10/2019"
+   , version := "3.8.1", vReleaseDate := "16/10/2019"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1
@@ -270,6 +271,10 @@ identifyThisWin(noReact:=0) {
        restartAppu()
     Return
 
+    ~F1::
+       AboutWindow()
+    Return
+
     ~!F4::
     ~Esc::
        escRoutine()
@@ -415,6 +420,16 @@ identifyThisWin(noReact:=0) {
     Down::
        If (IMGlargerViewPort=1 && IMGresizingMode=4)
           PanIMGonScreen("D")
+    Return
+
+    ^WheelUp::
+       IMGresizingMode := 4
+       ChangeZoom(1, "WheelUp")
+    Return
+
+    ^WheelDown::
+       IMGresizingMode := 4
+       ChangeZoom(-1, "WheelDown")
     Return
 
     WheelUp::
@@ -760,6 +775,16 @@ identifyThisWin(noReact:=0) {
           ThumbsNavigator("Down", A_ThisHotkey)
     Return
 
+    ^WheelUp::
+       IMGresizingMode := 4
+       ChangeZoom(1, "WheelUp")
+    Return
+
+    ^WheelDown::
+       IMGresizingMode := 4
+       ChangeZoom(-1, "WheelDown")
+    Return
+
     WheelUp::
     Right::
     +Right::
@@ -1080,16 +1105,16 @@ CopyImage2clip() {
      Gdip_GetImageDimensions(gdiBitmap, imgW, imgH)
      dummyBMP := Gdip_CloneBitmap(gdiBitmap)
      r := coreResizeIMG(imgPath, imgW, imgH, "--", 1, 1, 0, dummyBMP, imgW, imgH, 0)
-  } Else r := 0
+  } Else r := "Err"
 
-  If !r
-  {
-     showTOOLtip("Image copied to clipboard...")
-     SoundBeep, 900, 100
-  } Else
+  If r
   {
      showTOOLtip("Failed to copy the image to clipboard... Error code: " r)
      SoundBeep, 300, 900
+  } Else
+  {
+     showTOOLtip("Image copied to clipboard...")
+     SoundBeep, 900, 100
   }
   SetTimer, RemoveTooltip, % -msgDisplayTime
 }
@@ -1716,6 +1741,16 @@ WinClickAction(forceThis:=0) {
          Return
       }
    }
+
+   If ((activateImgSelection!=1) || (imgSelOutViewPort=1 && activateImgSelection=1) || (imgSelLargerViewPort=1 && activateImgSelection=1))
+   && (CurrentSLD && GetKeyState("LButton", "P") && GetKeyState("Shift", "P"))
+   {
+      imgSelX2 := imgSelY2 := (IMGlargerViewPort=1) ? "C" : -1
+      activateImgSelection := editingSelectionNow :=1
+      dummyTimerDelayiedImageDisplay(50)
+      Return
+   }
+
 
    If (editingSelectionNow=1 && activateImgSelection=1 && spaceState!=1 && thumbsDisplaying!=1)
    {
@@ -2779,9 +2814,9 @@ PreviousPicture(dummy:=0, inLoop:=0, selForbidden:=0) {
 
    currentFileIndex--
    If (currentFileIndex<1)
-      currentFileIndex := (thumbsDisplaying=1 || shiftPressed=1) ? 1 : maxFilesIndex
+      currentFileIndex := (thumbsDisplaying=1 || shiftPressed=1 || selForbidden=1) ? 1 : maxFilesIndex
    If (currentFileIndex>maxFilesIndex)
-      currentFileIndex := (thumbsDisplaying=1 || shiftPressed=1) ? maxFilesIndex : 1
+      currentFileIndex := (thumbsDisplaying=1 || shiftPressed=1 || selForbidden=1) ? maxFilesIndex : 1
 
    If (shiftPressed=1)
       thumbsSelector("Left", "+Left", prevFileIndex)
@@ -2802,9 +2837,9 @@ NextPicture(dummy:=0, inLoop:=0, selForbidden:=0) {
 
    currentFileIndex++
    If (currentFileIndex<1)
-      currentFileIndex := (thumbsDisplaying=1 || shiftPressed=1) ? 1 : maxFilesIndex
+      currentFileIndex := (thumbsDisplaying=1 || shiftPressed=1 || selForbidden=1) ? 1 : maxFilesIndex
    If (currentFileIndex>maxFilesIndex)
-      currentFileIndex := (thumbsDisplaying=1 || shiftPressed=1) ? maxFilesIndex : 1
+      currentFileIndex := (thumbsDisplaying=1 || shiftPressed=1 || selForbidden=1) ? maxFilesIndex : 1
 
    If (shiftPressed=1)
       thumbsSelector("Right", "+Right", prevFileIndex)
@@ -2951,7 +2986,7 @@ PasteClipboardIMG() {
        Gdip_DisposeImage(clipBMP)
        clipBMP := dummyBMP
     }
-
+    
     If (activateImgSelection=1 || editingSelectionNow=1)
        toggleImgSelection()
     file2save := thumbsCacheFolder "\Current-Clipboard.png"
@@ -2975,9 +3010,9 @@ PasteClipboardIMG() {
     If (thumbsDisplaying=1)
        ToggleThumbsMode()
 
-    imgFxMode := 1
+    imgFxMode := IMGresizingMode := 1
     markedSelectFile := thumbSelFileList := ""
-    FlipImgH := FlipImgV := currentFileIndex := 0
+    vpIMGrotation := FlipImgH := FlipImgV := currentFileIndex := 0
     resultedFilesList[0] := file2save
     ShowTheImage(file2save, 2)
     Tooltip
@@ -5414,8 +5449,15 @@ SaveClipboardImage(dummy:=0) {
          Msgbox, 48, %appTitle%, ERROR: This format is currently unsupported. The FreeImage library failed to properly initialize.`n`n%OutFileName%
          Return
       }
+
       If (activateImgSelection=1)
-         toggleImgSelection()
+      {
+         MsgBox, 52, %appTitle%, An area of the image is selected in the viewport. Would you like to save only the selected area? By answering no, the entire image will be saved.
+         IfMsgBox, Yes
+            allowCropping := 1
+         If (allowCropping!=1)
+            toggleImgSelection()
+      }
 
       showTOOLtip("Please wait, saving image...`n" OutFileName)
       If (dummy!="yay")
@@ -5423,16 +5465,17 @@ SaveClipboardImage(dummy:=0) {
 
       prevFileSavePath := OutDir
       writeMainSettings()
-      FileGetSize, fileSizu, %file2rem%
-      If (FileExist(file2rem) && fileSizu>500)
-      {
-         r := coreResizeIMG(file2rem, 0, 0, file2save, 1, 0, 0)
-      } Else If gdiBitmap
+      ; FileGetSize, fileSizu, %file2rem%
+      ; If (FileExist(file2rem) && fileSizu>500)
+      ; {
+      ;    r := coreResizeIMG(file2rem, 0, 0, file2save, 1, 0, 0)
+      ; } Else
+      If gdiBitmap
       {
          Gdip_GetImageDimensions(gdiBitmap, imgW, imgH)
          dummyBMP := Gdip_CloneBitmap(gdiBitmap)
          r := coreResizeIMG(file2rem, imgW, imgH, file2save, 1, 0, 0, dummyBMP, imgW, imgH, 0)
-      }
+      } Else r := "Err"
 
       If r
       {
@@ -6953,7 +6996,7 @@ BuildMenu() {
    Menu, PVmenu, Add, Prefe&rences, :PVprefs
    If markedSelectFile
       Menu, PVmenu, Add, Dro&p files selections`tShift+Tab, dropFilesSelection
-   Menu, PVmenu, Add, About, AboutWindow
+   Menu, PVmenu, Add, About`tF1, AboutWindow
    Menu, PVmenu, Add,
    Menu, PVmenu, Add, Restart`tShift+Esc, restartAppu
    Menu, PVmenu, Add, &Exit`tEsc, Cleanup
@@ -9029,7 +9072,18 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY) {
 
        pPen := (editingSelectionNow=1) ? pPen1d : pPen1
        Gdip_SetPenWidth(pPen, lineThickns)
-       If (imgSelX2=-1) && (imgSelY2=-1)
+       If (imgSelX2="C") && (imgSelY2="C" && IMGlargerViewPort=1)
+       {
+          GetMouseCoord2wind(PVhwnd, mX, mY)
+          x1 := (DestPosX<0) ? Abs(DestPosX)/newW : 0
+          imgSelX1 := Round(x1*maxSelX)
+          y1 := (DestPosY<0) ? Abs(DestPosY)/newH : 0
+          imgSelY1 := Round(y1*maxSelY)
+          imgSelX2 := Round(imgSelX1 + mX/zoomLevel) + 5
+          imgSelY2 := Round(imgSelY1 + mY/zoomLevel) + 5
+          imgSelX1 := imgSelX2 - 15
+          imgSelY1 := imgSelY2 - 15
+       } Else If (imgSelX2=-1 && imgSelY2=-1)
        {
           x1 := (DestPosX<0) ? Abs(DestPosX)/newW : 0
           imgSelX1 := Round(x1*maxSelX)
@@ -9738,7 +9792,7 @@ resetImgSelection() {
 newImgSelection() {
   IMGdecalageX := IMGdecalageY := 0
   resetImgSelection()
-  Sleep, 2
+  Sleep, 1
   ToggleEditImgSelection()
 }
 
@@ -9928,6 +9982,14 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, mustShowNames:=0) {
     If (scrollHeight<15)
        scrollHeight := 15
 
+    If (noTooltipMSGs=0)
+    {
+       infoBoxBMP := drawTextInBox(theMsg, OSDFontName, Round(OSDfntSize*0.9), mainWidth, mainHeight//3, OSDtextColor, "0xFF" OSDbgrColor, 1)
+       Gdip_GetImageDimensions(infoBoxBMP, infoW, infoH)
+       Gdip_DrawImage(glPG, infoBoxBMP, -1, mainHeight - infoH,,,,,,, 0.85)
+       Gdip_DisposeImage(infoBoxBMP, 1)
+    }
+
     lineThickns := imgHUDbaseUnit//2
     If (scrollHeight<mainHeight)
     {
@@ -9936,13 +9998,6 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, mustShowNames:=0) {
        Gdip_FillRectangle(glPG, pBrushD, mainWidth - lineThickns + 5, scrollYpos, lineThickns, scrollHeight)
     }
 
-    If (noTooltipMSGs=0)
-    {
-       infoBoxBMP := drawTextInBox(theMsg, OSDFontName, Round(OSDfntSize*0.9), mainWidth, mainHeight//3, OSDtextColor, "0xFF" OSDbgrColor, 1)
-       Gdip_GetImageDimensions(infoBoxBMP, infoW, infoH)
-       Gdip_DrawImage(glPG, infoBoxBMP, -1, mainHeight - infoH,,,,,,, 0.85)
-       Gdip_DisposeImage(infoBoxBMP, 1)
-    }
     r2 := UpdateLayeredWindow(hGDIwin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight, 255)
 }
 
@@ -10892,11 +10947,14 @@ coreResizeIMG(imgPath, newW, newH, file2save, goFX, toClippy, rotateAngle, soloM
        decideGDIPimageFX(matrix, imageAttribs, pEffect)
     }
 
+    oPixFmt := Gdip_GetImagePixelFormat(oBitmap, 2)
+    brushRequired := !InStr(oPixFmt, "argb") ? 1 : 0
+
     pixFmt := (toClippy=1) ? "0x21808" : "0x26200A"     ;24-RGB  //  32-ARGB
     thisImgQuality := (ResizeQualityHigh=1) ? 7 : 5
     If (activateImgSelection=1 && ResizeCropAfterRotation=1 && ResizeWithCrop=1 && rotateAngle>0)
     {
-       oBitmap := coreRotateBMP(oBitmap, rotateAngle, goFX, thisImgQuality, pixFmt)
+       oBitmap := coreRotateBMP(oBitmap, rotateAngle, goFX, thisImgQuality, pixFmt, brushRequired)
        Gdip_GetImageDimensions(oBitmap, imgW, imgH)
     }
 
@@ -10989,19 +11047,6 @@ coreResizeIMG(imgPath, newW, newH, file2save, goFX, toClippy, rotateAngle, soloM
        Gdip_DisposeEffect(pEffect)
     }
 
-    If (toClippy=1)
-       Gdip_FillRectangle(G2, pBrushWinBGR, -2, -2, imgW + 4, imgH + 4)
-
-    changeMcursor()
-    Gdip_DrawImage(G2, oBitmap, 0, 0, zImgSelW, zImgSelH, imgSelPx, imgSelPy, imgSelW, imgSelH, matrix, 2, imageAttribs)
-    Gdip_DisposeImage(oBitmap, 1)
-    Sleep, 0
-    confirmSimpleRotation := (rotateAngle=0 || rotateAngle=90 || rotateAngle=180 || rotateAngle=270) ? 1 : 0
-    If (activateImgSelection=1 && ResizeCropAfterRotation=0 && ResizeWithCrop=1 && rotateAngle>0) || (rotateAngle>0 && activateImgSelection!=1) || (rotateAngle>0 && ResizeWithCrop!=1)
-       thumbBMP := coreRotateBMP(thumbBMP, rotateAngle, goFX, thisImgQuality, pixFmt)
-    Else If (confirmSimpleRotation!=1 && ResizeApplyEffects=1 && activateImgSelection=1 && ResizeCropAfterRotation=1 && ResizeWithCrop=1 && rotateAngle>0)
-       flipBitmap(thumbBMP, 1)
-
     If (userUnsprtWriteFMT=3 && batchMode=1)
     {
        zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
@@ -11011,6 +11056,19 @@ coreResizeIMG(imgPath, newW, newH, file2save, goFX, toClippy, rotateAngle, soloM
        zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
        file2save := OutDir "\" OutNameNoExt "." rDesireWriteFMT
     }
+
+    If (toClippy=1 || brushRequired=1) || (!RegExMatch(file2save, saveAlphaTypesRegEX) && toClippy!=1)
+       Gdip_FillRectangle(G2, pBrushWinBGR, -2, -2, imgW + 4, imgH + 4)
+
+    If (goFX=1 || ResizeApplyEffects=1)
+       setMainCanvasTransform(zImgSelW, zImgSelH, G2)
+    changeMcursor()
+    Gdip_DrawImage(G2, oBitmap, 0, 0, zImgSelW, zImgSelH, imgSelPx, imgSelPy, imgSelW, imgSelH, matrix, 2, imageAttribs)
+    Gdip_DisposeImage(oBitmap, 1)
+    Sleep, 0
+
+    If (activateImgSelection=1 && ResizeCropAfterRotation=0 && ResizeWithCrop=1 && rotateAngle>0) || (rotateAngle>0 && activateImgSelection!=1) || (rotateAngle>0 && ResizeWithCrop!=1)
+       thumbBMP := coreRotateBMP(thumbBMP, rotateAngle, goFX, thisImgQuality, pixFmt, brushRequired)
 
     changeMcursor()
     If (toClippy=1)
@@ -11027,7 +11085,7 @@ coreResizeIMG(imgPath, newW, newH, file2save, goFX, toClippy, rotateAngle, soloM
     Return r
 }
 
-coreRotateBMP(whichBitmap, rotateAngle, goFX, thisImgQuality, pixFmt) {
+coreRotateBMP(whichBitmap, rotateAngle, goFX, thisImgQuality, pixFmt, brushRequired) {
     Static imgOrientOpt := {"i000":0, "i100":1, "i200":2, "i300":3, "i010":4, "i110":5, "i210":6, "i310":7, "i001":6, "i101":7, "i201":4, "i301":5, "i011":2, "i111":3, "i211":0, "i311":1}
 
     confirmSimpleRotation := (rotateAngle=0 || rotateAngle=90 || rotateAngle=180 || rotateAngle=270) ? 1 : 0
@@ -11036,18 +11094,19 @@ coreRotateBMP(whichBitmap, rotateAngle, goFX, thisImgQuality, pixFmt) {
        imgFoperation := (rotateAngle=90) ? 1 : 0
        imgFoperation := (rotateAngle=180) ? 2 : imgFoperation
        imgFoperation := (rotateAngle=270) ? 3 : imgFoperation
-       If (goFX=1 || ResizeApplyEffects=1)
-          imgFoperation := imgOrientOpt["i" imgFoperation FlipImgH FlipImgV]
+;       If (goFX=1 || ResizeApplyEffects=1)
+;          imgFoperation := imgOrientOpt["i" imgFoperation FlipImgH FlipImgV]
        If (imgFoperation>0)
           Gdip_ImageRotateFlip(whichBitmap, imgFoperation)
        thumbBMP := whichBitmap
     } Else
     {
-       zBitmap := Gdip_RotateBitmapAtCenter(whichBitmap, rotateAngle, pBrushWinBGR, thisImgQuality, pixFmt)
+       whichBrush := (brushRequired=1) ? pBrushWinBGR : ""
+       zBitmap := Gdip_RotateBitmapAtCenter(whichBitmap, rotateAngle, whichBrush, thisImgQuality, pixFmt)
        Gdip_DisposeImage(whichBitmap, 1)
        thumbBMP := zBitmap
-       If (goFX=1 || ResizeApplyEffects=1) && (ResizeCropAfterRotation=1)
-          flipBitmap(thumbBMP, 1)
+;       If (goFX=1 || ResizeApplyEffects=1) && (ResizeCropAfterRotation=1)
+;          flipBitmap(thumbBMP, 1)
     }
     Return thumbBMP
 }
@@ -11062,7 +11121,7 @@ flipBitmap(whichBmp, ignoreThis:=0) {
 
 warningsBoxInfo() {
     triggerOwnDialogs()
-    MsgBox,, %appTitle%, This application has limited support for color depths lower or higher than 32 bits. The support for alpha channel [RGBA] is also limited.`n`nGiven these limitations, certain operations/features provided within the application can produce undesired results if the images have an alpha channel that renders the image not entirely opaque or an uncommon color depth.`n`nAdditionaly, there is no support for multi-frames/paged images.
+    MsgBox,, %appTitle%, This application has limited support for color depths other than 24 and 32 bits. When saving images in formats that do not support an alpha channel, the window background color is used.`n`nWhile there is full support for multi-frames/paged images [GIFs and TIFFs only] in the viewport... on file save, only the first frame will be preserved.
 }
 
 AboutWindow() {
@@ -11089,7 +11148,7 @@ AboutWindow() {
     Gui, Add, Link, y+15 w%txtWid%, New and previous versions are available on <a href="https://github.com/marius-sucan/Quick-Picto-Viewer">GitHub</a>.
     Gui, Font, Normal
     Gui, Add, Button, xs+5 y+25 h30 w105 Default gCloseWindow, Close
-    Gui, Add, Button, x+5 hp gwarningsBoxInfo, &Warnings
+    ; Gui, Add, Button, x+5 hp gwarningsBoxInfo, &Warnings
     Gui, SettingsGUIA: Show, AutoSize, About %appTitle% v%Version%
 }
 
