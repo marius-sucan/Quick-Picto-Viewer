@@ -2742,7 +2742,8 @@ changeDesiredFrame(dir:=1) {
       showTOOLtip("Image frame index: " value2Adjust " / " totalFramesIndex)
       SetTimer, RemoveTooltip, % -msgDisplayTime
       lastInvoked := A_TickCount
-   }
+   } Else SetTimer, showCurrentFrameIndex, -400
+
    Global lastGIFdestroy := A_TickCount
    newValues := value2Adjust currentFileIndex
    If (prevValues!=newValues)
@@ -2750,6 +2751,11 @@ changeDesiredFrame(dir:=1) {
       SetTimer, RefreshImageFile, -5
       prevValues := newValues
    }
+}
+
+showCurrentFrameIndex() {
+    showTOOLtip("Image frame index: " desiredFrameIndex " / " totalFramesIndex)
+    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
 TransformIMGv() {
@@ -2900,16 +2906,16 @@ drawTextInBox(theString, fntName, theFntSize, maxW, maxH, txtColor, bgrColor, No
 
 drawHistogram(dataArray, maxYlimit, LengthX, Scale, fgrColor, bgrColor, borderSize, infoBoxBMP) {
     graphPath := Gdip_CreatePath()
-    PointsList .= 0 "," 100 "|"
+    PointsList .= 0 "," 125 "|"
     Loop, % LengthX
     {
-        y1 := 100 - ((dataArray[A_Index - 1]/maxYlimit) * 100)
+        y1 := 125 - ((dataArray[A_Index - 1]/maxYlimit) * 100)
         If (y1<0)
            y1 := 0
         PointsList .= A_Index - 1 ","  y1 "|"
     }
-    PointsList .= LengthX + 1 "," 100
-    Gdip_AddPathClosedCurve(graphPath, PointsList, 0.01)
+    PointsList .= LengthX + 1 "," 125
+    Gdip_AddPathClosedCurve(graphPath, PointsList, 0.001)
     pMatrix := Gdip_CreateMatrix()
     Gdip_ScaleMatrix(pMatrix, Scale, Scale, 1)
     Gdip_TransformPath(graphPath, pMatrix)
@@ -8440,6 +8446,8 @@ createHistogramBMP(whichBmp) {
        stringArray .= nrPixelz "." (thisIndex+1) "`n"
        If (nrPixelz>0)
           stringArray2 .= (thisIndex+1) "." nrPixelz "`n"
+       If (nrPixelz>1)
+          stringArray3 .= (thisIndex+1) "." nrPixelz "`n"
        sumTotalBr += nrPixelz * (thisIndex+1)
        SimpleSumTotalBr += nrPixelz
        If (nrPixelz>modePointV)
@@ -8450,7 +8458,7 @@ createHistogramBMP(whichBmp) {
        If (nrPixelz<modePointV && nrPixelz>2ndMaxV)
           2ndMaxV := nrPixelz
 
-       If (nrPixelz<minBrLvlV && nrPixelz>0)
+       If (nrPixelz<minBrLvlV && nrPixelz>2)
        {
           minBrLvlV := nrPixelz
           minBrLvlK := thisIndex
@@ -8461,12 +8469,12 @@ createHistogramBMP(whichBmp) {
    GetClientSize(mainWidth, mainHeight, PVhwnd)
    avgBrLvlK := Round(sumTotalBr/TotalPixelz - 1, 1)
    avgBrLvlV := brLvlArray[Round(avgBrLvlK)]
-   2ndMaxV := (2ndMaxV + avgBrLvlV)//2 + minBrLvlV
    modePointK2 := ST_ReadLine(stringArray, "L")
    modePointK2 := StrSplit(modePointK2, ".")
-   rangeA := ST_ReadLine(stringArray2, 1)
+   2ndMaxVa := (2ndMaxV + avgBrLvlV)//2 + minBrLvlV
+   rangeA := ST_ReadLine(stringArray3, 1)
    rangeA := StrSplit(rangeA, ".")
-   rangeB := ST_ReadLine(stringArray2, "L")
+   rangeB := ST_ReadLine(stringArray3, "L")
    rangeB := StrSplit(rangeB, ".")
    Loop, 256
    {
@@ -8481,7 +8489,9 @@ createHistogramBMP(whichBmp) {
    meanValue := SimpleSumTotalBr/rangeC
    meanValuePrc := Round(meanValue/TotalPixelz * 100)
    meanValuePrc := (meanValuePrc>0) ? " (" meanValuePrc "%) " : ""
-
+   
+   2ndMaxVb := (2ndMaxV + meanValue)//2 + minBrLvlV
+   2ndMaxV := minU(2ndMaxVa, 2ndMaxVb)
    Loop, 256
    {
        lookMean := ST_ReadLine(stringArray, A_Index)
@@ -8979,7 +8989,7 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY) {
 
     If (totalFramesIndex>0)
     {
-        bulletSize := imgHUDbaseUnit//3.5
+        bulletSize := imgHUDbaseUnit//3
         totalBulletsWidth := bulletSize * totalFramesIndex
         If (totalBulletsWidth>mainWidth)
            bulletsPerc := Round(desiredFrameIndex/totalFramesIndex, 3)
@@ -9866,8 +9876,8 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, mustShowNames:=0) {
        Gdip_DeleteBrush(pBrush4)
        Gdip_DeleteBrush(pBrush5)
        brushesCreated := 0
+    } Else If (mustDestroyBrushes=1)
        Return
-    }
 
     If (brushesCreated!=1)
     {
@@ -9922,7 +9932,6 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, mustShowNames:=0) {
            Gdip_DrawImage(glPG, infoBoxBMP, DestPosX, DestPosY,,,,,,, 0.75)
            infoBoxBMP := Gdip_DisposeImage(infoBoxBMP, 1)
         }
-
         If (!FileExist(imgPath) && StrLen(ImgPath)>5)
            Gdip_FillRectangle(glPG, pBrush4, DestPosX, DestPosY, thumbsW, thumbsH)
 
@@ -10192,6 +10201,14 @@ QPV_ShowThumbnails(startIndex) {
         flipBitmap(oBitmap)
         changeMcursor()
         r1 := Gdip_DrawImageRect(G2, oBitmap, DestPosX, DestPosY, newW, newH)
+        totalFrames := Gdip_GetBitmapFramesCount(oBitmap) - 1
+        If (totalFrames>1)
+        {
+           infoBoxBMP := drawTextInBox(totalFrames " F", OSDFontName, OSDfntSize//1.4, thumbsW, thumbsH, OSDtextColor, "0xFF" OSDbgrColor, 0, 0)
+           Gdip_DrawImage(G2, infoBoxBMP, DestPosX, DestPosY,,,,,,, 0.85)
+           infoBoxBMP := Gdip_DisposeImage(infoBoxBMP, 1)
+        }
+
         oBitmap := Gdip_DisposeImage(oBitmap, 1)
         endZeit := A_TickCount
         thisZeit := endZeit - startZeit

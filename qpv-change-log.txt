@@ -2,6 +2,9 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v3.8.2 (2019-10-17)
+  - bug fixes
+
 - v3.8.1 (2019-10-16)
   - added shift + click to create a new selection in the image view
   - added ctrl + wheel up/down to zoom in/out
