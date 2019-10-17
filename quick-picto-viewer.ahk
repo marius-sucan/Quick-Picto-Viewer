@@ -21,7 +21,7 @@
 
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 3.8.1
+;@Ahk2Exe-SetVersion 3.8.3
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
  
@@ -95,7 +95,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , FIMimgBPP, imageLoadedWithFIF, FIMformat, coreIMGzeitLoad, desiredFrameIndex := 0
    , diffIMGdecX := 0, diffIMGdecY := 0, anotherVPcache, oldZoomLevel := 0
    , hitTestSelectionPath, scrollBarHy := 0, scrollBarVx := 0, HistogramBMP
-   , version := "3.8.1", vReleaseDate := "16/10/2019"
+   , version := "3.8.3", vReleaseDate := "17/10/2019"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1
@@ -3419,14 +3419,23 @@ PopulateImgInfos() {
        LV_ModifyCol(A_Index, "AutoHdr Left")
 }
 
-testFileExists(imgpath) {
+FileRexists(filePath) {
+   FileGetSize, fileSizu, % filePath
+   fileAttribs := FileExist(filePath)
+   If (!fileAttribs || InStr(fileAttribs, "D") || fileSizu<512 || !FileSizu)
+      Return 0
+   Else
+      Return 1
+
+}
+testFileExistence(imgPath) {
   ; https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-getfilesize
-  ; H := DllCall("kernel32\GetFileAttributesW", "Str", imgpath)
-  ; H := DllCall("shlwapi.dll\PathFileExistsW", "Str", imgpath)
+  ; H := DllCall("kernel32\GetFileAttributesW", "Str", imgPath)
+  ; H := DllCall("shlwapi.dll\PathFileExistsW", "Str", imgPath)
   ; If (h>0)
   ;    Return 256
   VarSetCapacity(dummy, 1024, 0)
-  H := DllCall("kernel32\FindFirstFileW", "Str", imgpath, "Ptr", &dummy, "Ptr")
+  H := DllCall("kernel32\FindFirstFileW", "Str", imgPath, "Ptr", &dummy, "Ptr")
   Return H
 }
 
@@ -4030,7 +4039,7 @@ cleanFilesList(noFilesCheck:=0) {
                 showTOOLtip("Checking for dead files... " countTFilez "/" maxFilesIndex ", please wait...")
                 prevMSGdisplay := A_TickCount
              }
-             If (testFileExists(r)>100)  ; If FileExist(r)
+             If (testFileExistence(r)>100)  ; If FileExist(r)
                 filesListu .= r "`n"
           } Else filesListu .= r "`n"
       }
@@ -7673,8 +7682,7 @@ ShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
    If (InStr(AprevImgCall, imgPath) || InStr(BprevImgCall, imgPath)) && (ForceIMGload=0)
       ignoreFileCheck := 1
 
-   FileGetSize, fileSizu, %imgPath%
-   If (!FileExist(imgPath) && !fileSizu && usePrevious=0 && ignoreFileCheck!=1)
+   If (!FileRexists(imgPath) && usePrevious=0 && ignoreFileCheck!=1)
    {
       If (WinActive("A")=PVhwnd)
       {
@@ -7709,9 +7717,11 @@ ShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
        {
           If (WinActive("A")=PVhwnd)
           {
-             showTOOLtip("ERROR: Unable to display the image...")
+             showTOOLtip("ERROR: Unable to display the image...`nPossibly malformed image file format.")
              SetTimer, RemoveTooltip, % -msgDisplayTime
           }
+          winTitle := "[*] " winTitle
+          WinSetTitle, ahk_id %PVhwnd%,, % winTitle
           SoundBeep, 300, 100
           SetTimer, ResetImgLoadStatus, -15
           Return "fail"
@@ -7790,12 +7800,12 @@ ResizeImageGDIwin(imgpath, usePrevious, ForceIMGload) {
     o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
     If ((IMGresizingMode=1 || IMGresizingMode=2) && enableThumbsCaching=1)
     {
-       MD5name := generateThumbName(imgpath)
+       MD5name := generateThumbName(imgPath)
        file2load := thumbsCacheFolder "\big-" o_bwDithering userHQraw MD5name ".png"
        cachedImgFile := FileExist(file2load) ? 1 : 0
     } Else cachedImgFile := 0
 
-    IDthisImgPath := imgpath "-" cachedImgFile o_bwDithering userHQraw
+    IDthisImgPath := imgPath "-" cachedImgFile o_bwDithering userHQraw
     If (imgpath!=prevImgPath || IDthisImgPath!=IDprevImgPath || !gdiBitmap || ForceIMGload=1)
     {
        gdiBMPchanged := 1
@@ -8275,7 +8285,7 @@ CloneMainBMP(imgPath, cachedImgFile, ByRef imgW, ByRef imgH, ByRef CountFrames, 
   FileGetTime, FileDateM, % imgpath, M
   o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
   thisImgCall := imgPath o_bwDithering fileSizu FileDateM vpIMGrotation RenderOpaqueIMG cachedImgFile
-  If !FileExist(imgPath) && (InStr(AprevImgCall, imgPath) || InStr(BprevImgCall, imgPath))
+  If !FileRexists(imgPath) && (InStr(AprevImgCall, imgPath) || InStr(BprevImgCall, imgPath))
      thisImgCall := InStr(AprevImgCall, imgPath) ? AprevImgCall : BprevImgCall
      
   If gdiBitmap
@@ -8325,7 +8335,7 @@ CloneMainBMP(imgPath, cachedImgFile, ByRef imgW, ByRef imgH, ByRef CountFrames, 
   totalIMGres := imgW + imgH
   totalScreenRes := ResolutionWidth + ResolutionHeight
 
-  If RegExMatch(imgpath, "i)(.\.gif)$") 
+  If RegExMatch(imgPath, "i)(.\.gif)$") 
   {
      gifLoaded := 1
      If (animGIFsSupport=1)
@@ -9876,6 +9886,7 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, mustShowNames:=0) {
        Gdip_DeleteBrush(pBrush4)
        Gdip_DeleteBrush(pBrush5)
        brushesCreated := 0
+       Return
     } Else If (mustDestroyBrushes=1)
        Return
 
@@ -9932,7 +9943,7 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, mustShowNames:=0) {
            Gdip_DrawImage(glPG, infoBoxBMP, DestPosX, DestPosY,,,,,,, 0.75)
            infoBoxBMP := Gdip_DisposeImage(infoBoxBMP, 1)
         }
-        If (!FileExist(imgPath) && StrLen(ImgPath)>5)
+        If (!FileRexists(imgPath) && StrLen(ImgPath)>5)
            Gdip_FillRectangle(glPG, pBrush4, DestPosX, DestPosY, thumbsW, thumbsH)
 
         If (thisFileIndex=currentFileIndex)
@@ -10189,7 +10200,7 @@ QPV_ShowThumbnails(startIndex) {
         calcIMGdimensions(imgW, imgH, thumbsW, thumbsH, newW, newH)
         DestPosX := thumbsW//2 - newW//2 + thumbsW*columnIndex
         DestPosY := thumbsH//2 - newH//2 + thumbsH*rowIndex
-        If (!imgW || !imgH || !oBitmap || !FileExist(imgpath))
+        If (!imgW || !imgH || !oBitmap || !FileExist(imgPath))
            Continue
 
         pixFmt := Gdip_GetImagePixelFormat(oBitmap, 2)
@@ -10613,7 +10624,7 @@ sldGenerateFilesList(readThisFile, doFilesCheck, mustRemQuotes) {
        {
           If (doFilesCheck=1)
           {
-             If !FileExist(line)
+             If !FileRexists(line)
                 Continue
           }
           maxFilesIndex++
@@ -10669,7 +10680,7 @@ GetFilesList(strDir, doRecursive:=1) {
   addedNow := 0
   Loop, Files, %strDir%, %dig%
   {
-      If RegExMatch(A_LoopFileName, RegExFilesPattern)
+      If RegExMatch(A_LoopFileName, RegExFilesPattern) && (A_LoopFileSize>512)
       {
          addedNow++
          maxFilesIndex++
@@ -10710,7 +10721,7 @@ IDshowImage(imgID, opentehFile:=0) {
     imgPath := StrReplace(imgPath, "||")
     If isPipe                  ; remove «deleted file» marker if somehow the file is back
     {
-       If FileExist(imgPath)
+       If FileRexists(imgPath)
           resultedFilesList[imgID] := imgPath
     }
     If (InStr(AprevImgCall, imgPath) || InStr(BprevImgCall, imgPath))
@@ -10718,9 +10729,7 @@ IDshowImage(imgID, opentehFile:=0) {
 
     If (ignoreFileCheck!=1 && skipDeadFiles=1)
     {
-       FileGetSize, fileSizu, %imgPath%
-       If (!fileSizu && !FileExist(imgPath) 
-       && opentehFile!=250 && imgPath!=prevImgPath)
+       If (!FileRexists(imgPath) && opentehFile!=250 && imgPath!=prevImgPath)
        {
           If (autoRemDeadEntry=1 && imgID=currentFileIndex)
              remCurrentEntry(0, 1)
@@ -10731,7 +10740,7 @@ IDshowImage(imgID, opentehFile:=0) {
     prevImgPath := (opentehFile=0 || opentehFile=2) ? imgPath : 0
     If (opentehFile=1)
     {
-       If !FileExist(imgPath)
+       If !FileRexists(imgPath)
           informUserFileMissing()
        Try Run, %imgPath%
     } Else If (opentehFile=2)
