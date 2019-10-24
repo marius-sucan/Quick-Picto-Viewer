@@ -2,6 +2,13 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v3.8.5 (2019-10-24)
+  - [new] option to play associated sound files; MP3, WAV and WMA supported; slideshow speed based on audios duration; many thanks to SpeedMaster and burque505
+  - [new] option to display the alpha channel
+  - [new] option to simulate 2/4/6/8/16 bits display mode for images; option to have this rendered with dithering or not
+  - implemented Black/White dithering display mode through GDI+, not through FreeImage, as it previously was
+  - renamed option "no semi-transparent pixels" to "remove alpha channel"
+  
 - v3.8.3 (2019-10-17)
   - bug fixes
 

@@ -21,7 +21,7 @@
 
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 3.8.3
+;@Ahk2Exe-SetVersion 3.8.5
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
  
@@ -37,6 +37,7 @@
 #UseHook, Off
 #Include, Gdip_All.ahk
 #Include, freeimage.ahk
+#Include, MCI.ahk
 SetWinDelay, 1
 
 Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
@@ -49,12 +50,12 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , prevTooltipDisplayTime := 1, mainCompiledPath := "", wasInitFIMlib := 0
    , filteredMap2mainList := [], thumbsCacheFolder := A_ScriptDir "\thumbs-cache"
    , resultedFilesList := [], currentFileIndex, maxFilesIndex := 0
-   , appTitle := "Quick Picto Viewer", FirstRun := 1
+   , appTitle := "Quick Picto Viewer", FirstRun := 1, hSNDmediaFile
    , bckpResultedFilesList := [], bkcpMaxFilesIndex := 0
    , DynamicFoldersList := "", historyList, GIFsGuiCreated := 0
    , RandyIMGids := [], SLDhasFiles := 0, IMGlargerViewPort := 0
    , IMGdecalageY := 1, IMGdecalageX := 1, imgQuality, usrFilesFilteru := ""
-   , RandyIMGnow := 0, GDIPToken, Agifu, gdiBitmapSmall
+   , RandyIMGnow := 0, GDIPToken, Agifu, gdiBitmapSmall, hSNDmedia
    , AprevGdiBitmap, BprevGdiBitmap, msgDisplayTime := 3000
    , slideShowRunning := 0, CurrentSLD := "", markedSelectFile := ""
    , ResolutionWidth, ResolutionHeight, prevStartIndex := -1
@@ -78,7 +79,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , UsrMustInvertFilter := 0, overwriteConflictingFile := 0, LastPrevFastDisplay := 0
    , prevFileSavePath := "", imgHUDbaseUnit := Round(OSDfntSize*3.5), lastLongOperationAbort := 1
    , lastOtherWinClose := 1, UsrCopyMoveOperation := 2, editingSelectionNow := 0
-   , ForceNoColorMatrix := 0, activateImgSelection := 0, prevFastDisplay := 1
+   , ForceNoColorMatrix := 0, activateImgSelection := 0, prevFastDisplay := 1, hSNDmediaDuration
    , imgSelX1 := 0, imgSelY1 := 0, imgSelX2 := -1, imgSelY2 := -1, adjustNowSel := 0
    , selDotX, selDotY, selDotAx, selDotAy, selDotBx, selDotBy, selDotCx, selDotCy
    , prcSelX1, prcSelX2, prcSelY1, prcSelY2, PannedFastDisplay := 1, thumbSelFileList
@@ -94,8 +95,8 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , dummyPos := (A_OSVersion!="WIN_7") ? 0 : "" , totalFramesIndex, pVwinTitle, AprevImgCall, BprevImgCall
    , FIMimgBPP, imageLoadedWithFIF, FIMformat, coreIMGzeitLoad, desiredFrameIndex := 0
    , diffIMGdecX := 0, diffIMGdecY := 0, anotherVPcache, oldZoomLevel := 0
-   , hitTestSelectionPath, scrollBarHy := 0, scrollBarVx := 0, HistogramBMP
-   , version := "3.8.3", vReleaseDate := "17/10/2019"
+   , hitTestSelectionPath, scrollBarHy := 0, scrollBarVx := 0, HistogramBMP, internalColorDepth := 0
+   , version := "3.8.5", vReleaseDate := "24/10/2019"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1
@@ -114,11 +115,11 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , ResizeApplyEffects := 1, autoAdjustMode := 1, doSatAdjusts := 1
    , ResizeDestFolder, ResizeUseDestDir := 0, chnRdecalage := 0, chnGdecalage := 0
    , chnBdecalage := 0, alwaysOpenwithFIM := 0, bwDithering := 0, showHistogram := 0
-   , userUnsprtWriteFMT := 1, userDesireWriteFMT := 10, hueAdjust := 0
+   , userUnsprtWriteFMT := 1, userDesireWriteFMT := 10, hueAdjust := 0, syncSlideShow2Audios := 0
    , DisplayTimeUser := 3, FontBolded := 1, FontItalica := 0, showInfoBoxHUD := 0
    , usrTextureBGR := 0, realGammos := 1, imgThreshold := 0, relativeImgSelCoords := 1
-   , RenderOpaqueIMG := 1, vpIMGrotation := 0, usrTextAlign := "Left"
-   , ResizeCropAfterRotation := 1
+   , RenderOpaqueIMG := 1, vpIMGrotation := 0, usrTextAlign := "Left", autoPlaySNDs := 1
+   , ResizeCropAfterRotation := 1, usrColorDepth := 1, ColorDepthDithering := 1, mediaSNDvolume := 80
 
 imgQuality := (userimgQuality=1) ? 7 : 5
 DetectHiddenWindows, On
@@ -175,7 +176,6 @@ Loop, 6
       OpenArgFile(A_Args[A_Index])
       Break
    }
-   
 }
 
 If (doWelcomeNow=1)
@@ -389,11 +389,19 @@ identifyThisWin(noReact:=0) {
     Return
 
     vk46 Up::     ; F
-       ToggleImgFX()
+       ToggleImgFX(-1)
     Return
 
     +vk46 Up::     ; Shift+F
-       ToggleImgFX(2)
+       ToggleImgFX(1)
+    Return
+
+    +vk51 Up::  ;  Shift+Q-
+       ToggleImgColorDepth(1)
+    Return
+
+    vk51 Up::  ;   Q
+       ToggleImgColorDepth(-1)
     Return
 
     vk41 Up::     ; A
@@ -739,16 +747,40 @@ identifyThisWin(noReact:=0) {
        ColorsAdjusterPanelWindow()
     Return
 
+    +vk51 Up::  ;  Shift+Q-
+       ToggleImgColorDepth(1)
+    Return
+
+    vk51 Up::  ;   Q
+       ToggleImgColorDepth(-1)
+    Return
+
     vk46 Up::     ; F
-       ToggleImgFX()
+       ToggleImgFX(-1)
     Return
 
     +vk46 Up::     ; Shift+F
-       ToggleImgFX(2)
+       ToggleImgFX(1)
     Return
 
     vk41 Up::     ; A
        ToggleIMGalign()
+    Return
+    
+    vk58 Up::   ; X
+       PlayAudioFileAssociatedNow()
+    Return
+
+    +vk58 Up::   ; Shift+X
+       StopMediaPlaying()
+    Return
+
+    vk31::   ; 1
+       ChangeVolume(-1)
+    Return
+
+    vk32::   ; 1
+       ChangeVolume(1)
     Return
 
     ^vk41 Up::     ; Ctrl+A
@@ -887,6 +919,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
      SetTimer, RemoveTooltip, % -msgDisplayTime
      Return
   }
+
   imageLoading := mustRemQuotes := 1
   If (CurrentSLD && maxFilesIndex>0)
      GdipCleanMain(2)
@@ -1095,11 +1128,6 @@ CopyImage2clip() {
      ToggleSlideShowu()
 
   imgPath := resultedFilesList[currentFileIndex]
-  ; FileGetSize, fileSizu, %imgpath%
-  ; If (FileExist(imgpath) && fileSizu>500)
-  ; {
-  ;    r := coreResizeIMG(imgpath, 0, 0, "--", 1, 1, 0)
-  ; } Else
   If gdiBitmap
   {
      Gdip_GetImageDimensions(gdiBitmap, imgW, imgH)
@@ -1366,10 +1394,14 @@ ToggleThumbsMode() {
       r := IDshowImage(currentFileIndex)
       If !r
          informUserFileMissing()
+      If hSNDmediaFile
+         MCI_Resume(hSNDmedia)
       lastInvoked := A_TickCount
       Return
    } Else If (CurrentSLD && maxFilesIndex>1)
    {
+      If hSNDmediaFile
+         MCI_Pause(hSNDmedia)
       setTexHatchScale(thumbsZoomLevel/2)
       UpdateThumbsScreen()
    }
@@ -2163,7 +2195,11 @@ InfoToggleSlideShowu() {
 
 preventScreenOff() {
   ; if the user is idle ;-)
+  Static lastInvoked := 1
+  If (A_TickCount - lastInvoked < 10500) || (slideShowRunning!=1)
+     Return
 
+  lastInvoked := A_TickCount
   If (!GetKeyState("Space", "P") && slideShowRunning=1 && WinActive("A")=PVhwnd)
   {
      MouseMove, 2, 0, 2, R
@@ -2181,19 +2217,21 @@ ToggleSlideShowu() {
      SetTimer, RandomPicture, Off
      SetTimer, NextPicture, Off
      SetTimer, PreviousPicture, Off
-     SetTimer, preventScreenOff, Off
   } Else If (thumbsDisplaying!=1)
   {
      slideShowRunning := 1
      imgQuality := 7
      Gdip_SetInterpolationMode(glPG, imgQuality)
-     SetTimer, preventScreenOff, 59520
+     If (hSNDmediaFile && hSNDmediaDuration && hSNDmedia)
+        milisec := MCI_Length(hSNDmedia) 
+
+     thisSlideSpeed := (milisec>slideShowDelay) ? milisec : slideShowDelay
      If (SlideHowMode=1)
-        SetTimer, RandomPicture, %slideShowDelay%
+        SetTimer, RandomPicture, % thisSlideSpeed
      Else If (SlideHowMode=2)
-        SetTimer, PreviousPicture, %slideShowDelay%
+        SetTimer, PreviousPicture, % thisSlideSpeed
      Else If (SlideHowMode=3)
-        SetTimer, NextPicture, %slideShowDelay%
+        SetTimer, NextPicture, % thisSlideSpeed
   }
 }
 
@@ -2276,7 +2314,7 @@ SwitchSlideModes() {
 }
 
 DefineFXmodes() {
-   Static FXmodesLabels := {1:"ORIGINAL", 2:"PERSONALIZED", 3:"AUTO-ADJUSTED", 4:"GRAYSCALE", 5:"GRAYSCALE RED CHANNEL", 6:"GRAYSCALE GREEN CHANNEL", 7:"GRAYSCALE BLUE CHANNEL", 8:"INVERTED"}
+   Static FXmodesLabels := {1:"ORIGINAL", 2:"PERSONALIZED", 3:"AUTO-ADJUSTED", 4:"GRAYSCALE", 5:"RED CHANNEL", 6:"GREEN CHANNEL", 7:"BLUE CHANNEL", 8:"ALPHA CHANNEL", 9:"INVERTED COLORS"}
        , otherFXLabels := {1:"ADAPTIVE", 2:"BRIGHTNESS", 3:"CONTRAST"}
    If FXmodesLabels.HasKey(imgFxMode)
       friendly := FXmodesLabels[imgFxMode]
@@ -2288,7 +2326,55 @@ DefineFXmodes() {
    If (bwDithering=1 && imgFxMode=4)
       friendly := "BLACK/WHITE DITHERED"
 
+   If (imgFxMode=1 && RenderOpaqueIMG=1 && InStr(currentPixFmt, "argb"))
+      friendly .= "`nAlpha channel: REMOVED"
+
    Return friendly
+}
+
+ToggleImgColorDepth(dir:=0) {
+   If (thumbsDisplaying=1)
+      Return
+
+   If (slideShowRunning=1)
+      resetSlideshowTimer(0)
+
+   If (imgFxMode=4 && bwDithering=1)
+   {
+      imgFxMode := 1
+      Return
+   }
+
+   good2go := (imgFxMode=1 || imgFxMode=2 || imgFxMode=3 || imgFxMode=8) ? 1 : 0
+   If (good2go!=1)
+      imgFxMode := 1
+
+   If (dir=1)
+      usrColorDepth--
+   Else
+      usrColorDepth++
+
+   If (usrColorDepth>9)
+      usrColorDepth := 1
+   Else If (usrColorDepth<1)
+      usrColorDepth := 9
+
+   prevStartIndex := -1
+   infoColorDepth := (usrColorDepth>1) ? defineColorDepth() : "NONE"
+   showTOOLtip("Image color depth simulated: " infoColorDepth)
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+   writeMainSettings()
+   SetTimer, RefreshImageFile, -50
+}
+
+defineColorDepth() {
+   Static bitsOptions := {0:0, 1:0, 2:2, 3:3, 4:4, 5:5, 6:6, 7:7, 8:8, 9:16}
+
+   internalColorDepth := bitsOptions[usrColorDepth]
+   r := internalColorDepth " bits [" 2**internalColorDepth " colors]"
+   If (r<1)
+      r := currentPixFmt
+   Return r
 }
 
 ToggleImgFX(dir:=0) {
@@ -2296,31 +2382,38 @@ ToggleImgFX(dir:=0) {
       resetSlideshowTimer(0)
 
    o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
-   If (dir=2)
+   If (dir=1)
       imgFxMode--
    Else
       imgFxMode++
 
    If (imgFxMode=3 && thumbsDisplaying=1)
    {
-      If (dir=2)
+      If (dir=1)
          imgFxMode--
       Else
          imgFxMode++
    }
 
-   If (imgFxMode>8)
+   ; If (InStr(currentPixFmt, "indexed") && dir!=1 && imgFxMode=5 && thumbsDisplaying!=1)
+   ;    imgFxMode := 8
+   ; Else If (InStr(currentPixFmt, "indexed") && dir=1 && imgFxMode=7 && thumbsDisplaying!=1)
+   ;    imgFxMode := 4
+
+   If (imgFxMode>9)
       imgFxMode := 1
    Else If (imgFxMode<1)
-      imgFxMode := 8
+      imgFxMode := 9
 
    friendly := DefineFXmodes()
    If (imgFxMode=4)
       friendly .= "`nBrightness: " Round(lumosGrayAdjust, 3) "`nContrast: " Round(GammosGrayAdjust, 3) "`nVibrance: " Round(zatAdjust) "%" "`nHue: " Round(hueAdjust) "°"
    Else If (imgFxMode=2)
       friendly .= "`nBrightness: " Round(lumosAdjust, 3) "`nContrast: " Round(GammosAdjust, 3) "`nSaturation: " Round(satAdjust*100) "%" "`nVibrance: " Round(zatAdjust) "%" "`nHue: " Round(hueAdjust) "°"
-   Else If (imgFxMode=3 || imgFxMode=8)
+   Else If (imgFxMode=3 || imgFxMode=9)
       friendly .= "`nVibrance: " Round(zatAdjust) "%" "`nHue: " Round(hueAdjust) "°"
+   If (usrColorDepth>1 && imgFxMode=1)
+      friendly .= "`nImage color depth: ALTERED [ " defineColorDepth() " ]"
 
    If (imgFxMode=4 || imgFxMode=3 || imgFxMode=2)
       friendly .= "`n `nPress U to adjust colors display options."
@@ -2410,10 +2503,14 @@ ChangeLumos(dir, dummy:=0) {
    If (imgFxMode!=2 && imgFxMode!=4 && dir!=2)
       imgFxMode := 2
 
+   o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
    If (dir=2)
    {
-      o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
-      otherFX := (vpIMGrotation>0 && thumbsDisplaying!=1) ? 1 : 0
+      
+      If (imgFxMode=4 && lumosGrayAdjust=1 && GammosGrayAdjust=0)
+         mustResetFxMode := 1
+
+      otherFX := (vpIMGrotation>0 && thumbsDisplaying!=1) || (usrColorDepth>1 && dummy="k") ? 1 : 0
       If (dummy="k" && imgFxMode>1)
       {
          chnRdecalage := chnGdecalage := chnBdecalage := 0
@@ -2434,10 +2531,17 @@ ChangeLumos(dir, dummy:=0) {
       If (imgFxMode=2 || imgFxMode=3)
          chnRdecalage := chnGdecalage := chnBdecalage := 0
 
-      If (thumbsDisplaying!=1)
-         vpIMGrotation := 0
-      FlipImgH := FlipImgV := 0
-      realGammos := imgFxMode := 1
+      realGammos := 1
+      If (imgFxMode=1)
+      {
+         zoomLevel := 1
+         FlipImgH := FlipImgV := 0
+         If (thumbsDisplaying!=1)
+           vpIMGrotation := 0
+      }
+
+      If (imgFxMode=2 || imgFxMode=3 || imgFxMode>4 || mustResetFxMode=1)
+         imgFxMode := 1
 
       If (thumbsDisplaying=1)
       {
@@ -2447,8 +2551,8 @@ ChangeLumos(dir, dummy:=0) {
          SetTimer, RefreshThumbsList, -250
       }
 
-      If (IMGresizingMode=4)
-         zoomLevel := 1
+      If (dummy="k")
+         usrColorDepth := internalColorDepth := 0
    } Else If (imgFxMode=4)
    {
       If (dir=1)
@@ -2474,9 +2578,18 @@ ChangeLumos(dir, dummy:=0) {
 
    value2show := (imgFxMode=4) ? Round(lumosGrayAdjust, 3) : Round(lumosAdjust, 3)
    If (dir=2)
-      showTOOLtip("Image display: unaltered`n`nTo reset all the adjustments`nto their defaults press Ctrl + \")
-   Else
-      showTOOLtip("Image brightness: " value2show)
+   {
+      If (imgFxMode=4)
+         addMsg := DefineFXmodes()
+      If (imgFxMode=1 && RenderOpaqueIMG=1 && InStr(currentPixFmt, "argb"))
+         addMsg .= "`nAlpha channel: REMOVED"
+      If (imgFxMode=1 && usrColorDepth>1)
+         addMsg .= "`nImage color depth: ALTERED [ " defineColorDepth() " ]"
+      If (vpIMGrotation>0)
+         addMsg .= "`nImage rotated: " vpIMGrotation "° degrees."
+      addMsg .= defineIMGmirroring()
+      showTOOLtip("Image display: UNALTERED " addMsg " `n`nTo reset all the adjustments`nto their defaults press Ctrl + \")
+   } Else showTOOLtip("Image brightness: " value2show)
 
    If (thumbsDisplaying!=1)
       prevStartIndex := -1
@@ -2487,11 +2600,23 @@ ChangeLumos(dir, dummy:=0) {
 
    prevValues := newValues
    If (o_bwDithering=1 || otherFX=1)
-      RefreshImageFile()
+      SetTimer, RefreshImageFile, -50
    Else
       dummyTimerDelayiedImageDisplay(10)
 }
-
+defineIMGmirroring() {
+    If (FlipImgH=1 || FlipImgV=1)
+    {
+       infoMirroring := "`nImage mirroring: "
+       If (FlipImgV=1 && FlipImgH=0)
+          infoMirroring :=  infoMirroring "VERTICAL"
+       Else If (FlipImgV=0 && FlipImgH=1)
+          infoMirroring := infoMirroring "HORIZONTAL"
+       Else If (FlipImgV=1 && FlipImgH=1)
+          infoMirroring := infoMirroring "VERTICAL, HORIZONTAL"
+    }
+    Return infoMirroring
+}
 ChangeZoom(dir, key:=0) {
    Static prevValues
    If (slideShowRunning=1)
@@ -2597,6 +2722,7 @@ ChangeGammos(dir) {
    If (slideShowRunning=1)
       resetSlideshowTimer(0)
 
+   o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
    If (imgFxMode!=2 && imgFxMode!=4)
       imgFxMode := 2
 
@@ -2636,7 +2762,10 @@ ChangeGammos(dir) {
       Return
 
    prevValues := newValues
-   dummyTimerDelayiedImageDisplay(10)
+   If (o_bwDithering=1)
+      SetTimer, RefreshImageFile, -50
+   Else
+      dummyTimerDelayiedImageDisplay(10)
 }
 
 ChangeSaturation(dir) {
@@ -2670,6 +2799,33 @@ ChangeSaturation(dir) {
 
    prevValues := newValues
    dummyTimerDelayiedImageDisplay(10)
+}
+
+ChangeVolume(dir) {
+   If (thumbsDisplaying=1)
+      Return
+
+   If (slideShowRunning=1)
+      resetSlideshowTimer(0)
+
+   value2Adjust := mediaSNDvolume
+   If (dir=1)
+      value2Adjust := value2Adjust + 5
+   Else
+      value2Adjust := value2Adjust - 5
+
+   If (value2Adjust<1)
+      value2Adjust := 1
+   Else If (value2Adjust>100)
+      value2Adjust := 100
+
+   If !hSNDmedia
+      infoMedia := "`nNo audio is currently playing..."
+
+   mediaSNDvolume := value2Adjust
+   SetVolume(mediaSNDvolume)
+   showTOOLtip("Audio volume: " value2Adjust "%" infoMedia)
+   SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
 MenuChangeImgRotationInVP() {
@@ -3246,10 +3402,9 @@ ShowImgInfosPanel() {
     If (thumbsDisplaying=1)
        ToggleThumbsMode()
 
-    imgpath := resultedFilesList[currentFileIndex]
-    zPlitPath(imgpath, 0, fileNamu, folderu)
-    FileGetSize, fileSizu, %imgpath%
-    If !(FileExist(imgpath) && fileSizu>500)
+    imgPath := resultedFilesList[currentFileIndex]
+    zPlitPath(imgPath, 0, fileNamu, folderu)
+    If !FileRexists(imgPath)
     {
        showTOOLtip("ERROR: File not found or access denied...`n" fileNamu "`n" folderu "\")
        SoundBeep, 300, 50
@@ -3481,6 +3636,8 @@ readRecentFiltersEntries() {
    Loop, 20
    {
        IniRead, newEntry, % mainSettingsFile, RecentFilters, E%A_Index%, @
+       If (newEntry="--={ no filter }=--")
+          Continue
        addSel := (Trim(newEntry)=Trim(testFilteru)) ? "`n" : ""
        If StrLen(newEntry)>1
           entriesList .= Trim(newEntry) "`n" addSel
@@ -3534,6 +3691,8 @@ ApplyPanelFilter() {
    CloseWindow()
    Sleep, 2
    UsrEditFilter := Trim(UsrEditFilter)
+   UsrEditFilter := Trim(UsrEditFilter, "|")
+   UsrEditFilter := StrReplace(UsrEditFilter, "||", "|")
    UsrEditFilter := StrReplace(UsrEditFilter, "&")
    RecentFiltersManager(UsrEditFilter)
 
@@ -4276,9 +4435,21 @@ readSlideSettings(readThisFile) {
      IniRead, tstbwDithering, %readThisFile%, General, bwDithering, @
      IniRead, tstRenderOpaqueIMG, %readThisFile%, General, RenderOpaqueIMG, @
      IniRead, tstusrTextureBGR, %readThisFile%, General, usrTextureBGR, @
+     IniRead, tstusrColorDepth, %readThisFile%, General, usrColorDepth, @
+     IniRead, tstColorDepthDithering, %readThisFile%, General, ColorDepthDithering, @
+     IniRead, tstautoPlaySNDs, %readThisFile%, General, autoPlaySNDs, @
+     IniRead, tstsyncSlideShow2Audios, %readThisFile%, General, syncSlideShow2Audios, @
 
+     If (tstsyncSlideShow2Audios=1 || tstsyncSlideShow2Audios=0)
+        syncSlideShow2Audios := tstsyncSlideShow2Audios
+     If (tstautoPlaySNDs=1 || tstautoPlaySNDs=0)
+        autoPlaySNDs := tstautoPlaySNDs
      If (tstusrTextureBGR=1 || tstusrTextureBGR=0)
         usrTextureBGR := tstusrTextureBGR
+     If (tstColorDepthDithering=1 || tstColorDepthDithering=0)
+        ColorDepthDithering := tstColorDepthDithering
+     If valueBetween(tstusrColorDepth, 0, 9)
+        usrColorDepth := tstusrColorDepth
      If (tstRenderOpaqueIMG=1 || tstRenderOpaqueIMG=0)
         RenderOpaqueIMG := tstRenderOpaqueIMG
      If (tstslideshowdelay!="@" && tstslideshowdelay>200)
@@ -4364,6 +4535,7 @@ readSlideSettings(readThisFile) {
      Else
         Gui, 1: +Caption
 
+     defineColorDepth()
      coreChangeThumbsAratio()
      WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%
 }
@@ -4399,6 +4571,7 @@ writeMainSettings() {
     IniWrite, % relativeImgSelCoords, % mainSettingsFile, General, relativeImgSelCoords
     IniWrite, % showInfoBoxHUD, % mainSettingsFile, General, showInfoBoxHUD
     IniWrite, % showHistogram, % mainSettingsFile, General, showHistogram
+    IniWrite, % mediaSNDvolume, % mainSettingsFile, General, mediaSNDvolume
 }
 
 loadMainSettings() {
@@ -4435,6 +4608,7 @@ loadMainSettings() {
     IniRead, tstshowInfoBoxHUD, % mainSettingsFile, General, showInfoBoxHUD, @
     IniRead, tstshowHistogram, % mainSettingsFile, General, showHistogram, @
     IniRead, tstResizeCropAfterRotation, % mainSettingsFile, General, ResizeCropAfterRotation, @
+    IniRead, tstmediaSNDvolume, % mainSettingsFile, General, mediaSNDvolume, @
     If (tstuserimgQuality=1 || tstuserimgQuality=0)
     {
        userimgQuality := tstuserimgQuality
@@ -4449,6 +4623,8 @@ loadMainSettings() {
        OSDfntSize := tstOSDfntSize
     If tstPasteFntSize is Number
        PasteFntSize := tstPasteFntSize
+    If tstmediaSNDvolume is Number
+       mediaSNDvolume := tstmediaSNDvolume
     If (tstResizeCropAfterRotation=1 || tstResizeCropAfterRotation=0)
        ResizeCropAfterRotation := tstResizeCropAfterRotation
     If (tstFontBolded=1 || tstFontBolded=0)
@@ -4518,6 +4694,7 @@ loadMainSettings() {
     If (OSDfntSize<9)
        OSDfntSize := 9
 
+    SetVolume(mediaSNDvolume)
     imgHUDbaseUnit := (PrefsLargeFonts=1) ? Round(OSDfntSize*6.5) : Round(OSDfntSize*5.25)
     msgDisplayTime := DisplayTimeUser*1000
 }
@@ -4532,6 +4709,8 @@ writeSlideSettings(file2save) {
     IniWrite, % WindowBgrColor, %file2save%, General, WindowBgrColor
     IniWrite, % FlipImgH, %file2save%, General, FlipImgH
     IniWrite, % FlipImgV, %file2save%, General, FlipImgV
+    IniWrite, % usrColorDepth, %file2save%, General, usrColorDepth
+    IniWrite, % ColorDepthDithering, %file2save%, General, ColorDepthDithering
     IniWrite, % lumosAdjust, %file2save%, General, lumosAdjust
     IniWrite, % GammosAdjust, %file2save%, General, GammosAdjust
     IniWrite, % lumosGrayAdjust, %file2save%, General, lumosGrayAdjust
@@ -4561,6 +4740,8 @@ writeSlideSettings(file2save) {
     IniWrite, % easySlideStoppage, %file2save%, General, easySlideStoppage
     IniWrite, % version, %file2save%, General, version
     IniWrite, % usrTextureBGR, % mainSettingsFile, General, usrTextureBGR
+    IniWrite, % syncSlideShow2Audios, % mainSettingsFile, General, syncSlideShow2Audios
+    IniWrite, % autoPlaySNDs, % mainSettingsFile, General, autoPlaySNDs
     throwMSGwriteError()
 }
 
@@ -5480,11 +5661,6 @@ SaveClipboardImage(dummy:=0) {
 
       prevFileSavePath := OutDir
       writeMainSettings()
-      ; FileGetSize, fileSizu, %file2rem%
-      ; If (FileExist(file2rem) && fileSizu>500)
-      ; {
-      ;    r := coreResizeIMG(file2rem, 0, 0, file2save, 1, 0, 0)
-      ; } Else
       If gdiBitmap
       {
          Gdip_GetImageDimensions(gdiBitmap, imgW, imgH)
@@ -6184,6 +6360,8 @@ renewCurrentFilesList() {
   maxFilesIndex := 0
   prevStartIndex := -1
   currentFileIndex := 1
+  If hSNDmedia
+     StopMediaPlaying()
 }
 
 coreOpenFolder(thisFolder, doOptionals:=1) {
@@ -6493,17 +6671,17 @@ GuiDropFiles:
          folderu .= line "`n"
    }
 
-   if (imgpath)
+   if (imgPath)
    {
       If (slideShowRunning=1)
          ToggleSlideShowu()
-      zPlitPath(imgpath, 0, OutFileName, OutDir)
+      zPlitPath(imgPath, 0, OutFileName, OutDir)
  
       If !OutDir
          Return
 
       CloseWindow()
-      showTOOLtip("Opening file...`n" imgpath)
+      showTOOLtip("Opening file...`n" imgPath)
       newStaticFoldersListCache := markedSelectFile := ""
       If StrLen(filesFilter)>1
       {
@@ -6733,25 +6911,28 @@ BuildMenu() {
       If (activateImgSelection=1)
          Menu, PVview, Check, &Show selection`tD
       Menu, PVview, Add,
-      Menu, PVview, Add, No semi-transparent pixels, ToggleRenderOpaque
+      Menu, PVview, Add, Remove alpha channel, ToggleRenderOpaque
       Menu, PVview, Add, Image &rotation: %vpIMGrotation%°`t9`, 0, MenuChangeImgRotationInVP
       Menu, PVview, Add, Image &alignment: %imageAligned%`tA, ToggleIMGalign
       Menu, PVview, Add, % defineImgAlign(), ToggleIMGalign
       Menu, PVview, Disable, % defineImgAlign()
       Menu, PVview, Add,
+      Menu, PVview, Add, &Toggle color depth`tQ, ToggleImgColorDepth
+      Menu, PVview, Add, % defineColorDepth(), ToggleImgColorDepth
+      Menu, PVview, Disable, % defineColorDepth()
       Menu, PVview, Add, &Toggle resizing mode`tT, ToggleImageSizingMode
       Menu, PVview, Add, % DefineImgSizing(), ToggleImageSizingMode
       Menu, PVview, Disable, % DefineImgSizing()
       If !InStr(currentPixFmt, "argb")
-         Menu, PVview, Disable, No semi-transparent pixels
+         Menu, PVview, Disable, Remove alpha channel
       If (RenderOpaqueIMG=1)
-         Menu, PVview, Check, No semi-transparent pixels
+         Menu, PVview, Check, Remove alpha channel
 
       If (IMGresizingMode=4)
          Menu, PVview, Disable, Image &alignment: %imageAligned%`tA
    }
    Menu, PVview, Add,
-   Menu, PVview, Add, &Switch colors display`tF, ToggleImgFX
+   Menu, PVview, Add, &Toggle colors display mode`tF, ToggleImgFX
    Menu, PVview, Add, % DefineFXmodes(), ToggleImgFX
    Menu, PVview, Disable, % DefineFXmodes()
    If (imgFxMode=2 || imgFxMode=3 || imgFxMode=4)
@@ -6974,6 +7155,23 @@ BuildMenu() {
       Menu, PVopenF, Add, % "O" A_Index ". " SubStr(A_LoopField, -30), OpenRecentEntry
    }
 
+   Menu, PVsounds, Add, Play associated sound file`tX, PlayAudioFileAssociatedNow
+   Menu, PVsounds, Add, Stop playing`tShift+X, StopMediaPlaying
+   Menu, PVsounds, Add, 
+   Menu, PVsounds, Add, Auto-play sound files, ToggleAutoPlaySND
+   If (autoPlaySNDs=1)
+      Menu, PVsounds, Check, Auto-play sound files
+   Menu, PVsounds, Add, Slideshow speed based on sound files duration, ToggleAutoPlaySNDslideDuration
+   If (syncSlideShow2Audios=1)
+      Menu, PVsounds, Check, Slideshow speed based on sound files duration
+   If (autoPlaySNDs!=1)
+      Menu, PVsounds, Disable, Slideshow speed based on sound files duration
+   Menu, PVsounds, Add, 
+   Menu, PVsounds, Add, Change audio volume`t1`,2, ChangeVolume
+   Menu, PVsounds, Add, Audio volume: %mediaSNDvolume%`%, dummy
+   Menu, PVsounds, Disable, Audio volume: %mediaSNDvolume%`%
+
+; the main menu
    clippyTest := resultedFilesList[0]
    Menu, PVmenu, Add, &Open..., :PVopenF
    If (currentFileIndex=0 && InStr(clippyTest, "Current-Clipboard"))
@@ -6985,13 +7183,15 @@ BuildMenu() {
       Menu, PVmenu, Add, Edit selection`tE, ToggleEditImgSelection
    If (maxFilesIndex>0 && CurrentSLD)
    {
-      If (thumbsDisplaying!=1 && activateImgSelection=1 && thumbsDisplaying!=1)
+      If (thumbsDisplaying!=1 && activateImgSelection=1)
          Menu, PVmenu, Add, Selec&tion, :PVselv
       Menu, PVmenu, Add, C&urrent file, :PVtFile
       Menu, PVmenu, Add, Files l&ist, :PVfList
       If (thumbsDisplaying=1 && maxFilesIndex>1)
          Menu, PVmenu, Add, &Sort by, :PVsort
-      Menu, PVmenu, Add, Vie&w, :PVview
+      Menu, PVmenu, Add, Image vie&w, :PVview
+      If (thumbsDisplaying!=1)
+         Menu, PVmenu, Add, Sounds, :PVsounds
       If (maxFilesIndex>1 && CurrentSLD)
       {
          Menu, PVmenu, Add, Navigation, :PVnav
@@ -7030,7 +7230,7 @@ showThisMenu(menarg) {
 }
 
 deleteMenus() {
-    Static menusList := "PVmenu|PVsliMenu|PVnav|PVview|PVfList|PVtFile|PVprefs|PvUIprefs|PVopenF|PVsort|PVselv"
+    Static menusList := "PVmenu|PVsliMenu|PVnav|PVview|PVfList|PVtFile|PVprefs|PvUIprefs|PVopenF|PVsort|PVselv|PVsounds"
     Loop, Parse, menusList, |
     {
         If !A_LoopField
@@ -7129,6 +7329,16 @@ ToggleAllonTop() {
 
 ToggleEasySlideStop() {
    easySlideStoppage := !easySlideStoppage
+   writeMainSettings()
+}
+
+ToggleAutoPlaySND() {
+   autoPlaySNDs := !autoPlaySNDs
+   writeMainSettings()
+}
+
+ToggleAutoPlaySNDslideDuration() {
+   syncSlideShow2Audios := !syncSlideShow2Audios
    writeMainSettings()
 }
 
@@ -7284,6 +7494,8 @@ defineWinTitlePrefix() {
       Else If (SlideHowMode=3)
          winPrefix .= "F "
    }
+   If (usrColorDepth>1)
+      winPrefix .= internalColorDepth  " bits "
 
    If (FlipImgV=1)
       winPrefix .= "V "
@@ -7440,7 +7652,7 @@ drawWelcomeImg() {
        Gdip_FillRectangle(glPG, pBr4, 0, 0, mainWidth, mainHeight)
 
     matrix := getColorMatrix()
-    If (imgFxMode=3)
+    If (imgFxMode=3 || imgFxMode=8)
        matrix := ""
 
     Gdip_AddPathGradient(glPG, 0, 0, mainWidth, mainHeight, mainWidth//2, mainHeight//2, "0x00000000", "0x55000000", 1, 0, 0, 1)
@@ -7801,18 +8013,18 @@ ResizeImageGDIwin(imgpath, usePrevious, ForceIMGload) {
     If ((IMGresizingMode=1 || IMGresizingMode=2) && enableThumbsCaching=1)
     {
        MD5name := generateThumbName(imgPath)
-       file2load := thumbsCacheFolder "\big-" o_bwDithering userHQraw MD5name ".png"
+       file2load := thumbsCacheFolder "\big-" userHQraw MD5name ".png"
        cachedImgFile := FileExist(file2load) ? 1 : 0
     } Else cachedImgFile := 0
 
-    IDthisImgPath := imgPath "-" cachedImgFile o_bwDithering userHQraw
+    IDthisImgPath := imgPath "-" cachedImgFile userHQraw
     If (imgpath!=prevImgPath || IDthisImgPath!=IDprevImgPath || !gdiBitmap || ForceIMGload=1)
     {
        gdiBMPchanged := 1
-       If (imgpath!=prevImgPath)
+       If (imgPath!=prevImgPath)
           desiredFrameIndex := 0
-       mustReloadIMG := (IDthisImgPath!=IDprevImgPath && cachedImgFile=1 && imgpath=prevImgPath) || (ForceIMGload=1) ? 1 : 0
-       If (IDthisImgPath!=IDprevImgPath && cachedImgFile=0 && imgpath=prevImgPath)
+       mustReloadIMG := (IDthisImgPath!=IDprevImgPath && cachedImgFile=1 && imgPath=prevImgPath) || (ForceIMGload=1) ? 1 : 0
+       If (IDthisImgPath!=IDprevImgPath && cachedImgFile=0 && imgPath=prevImgPath)
           GdipCleanMain(2)
        disposeCacheIMGs()
        If (A_TickCount - lastTitleChange>400)
@@ -7827,7 +8039,7 @@ ResizeImageGDIwin(imgpath, usePrevious, ForceIMGload) {
     If ((IMGresizingMode=1 || IMGresizingMode=2) && enableThumbsCaching=1)
     {
        cachedImgFile := FileExist(file2load) ? 1 : 0
-       IDthisImgPath := imgpath "-" cachedImgFile
+       IDthisImgPath := imgPath "-" cachedImgFile
     }
 
     If (!gdiBitmap || r1="error")
@@ -7839,7 +8051,7 @@ ResizeImageGDIwin(imgpath, usePrevious, ForceIMGload) {
     }
 
    prevImgPath := imgPath
-   IDprevImgPath := imgPath "-" cachedImgFile o_bwDithering userHQraw
+   IDprevImgPath := imgPath "-" cachedImgFile userHQraw
    GetClientSize(GuiW, GuiH, PVhwnd)
    If (usePrevious!=1)
    {
@@ -7951,7 +8163,7 @@ drawinfoBox(mainWidth, mainHeight) {
        infoFrames := "`nMultiple pages: "  desiredFrameIndex " / " totalFramesIndex
 
     imgPath := resultedFilesList[currentFileIndex]
-    zPlitPath(imgPath, 0, fileNamu, folderu)
+    zPlitPath(imgPath, 0, fileNamu, folderu, OutNameNoExt)
     FileGetSize, fileSizu, % ImgPath, K
     FileGetTime, FileDateM, % ImgPath, M
     FormatTime, FileDateM, % FileDateM, dd/MM/yyyy, HH:mm
@@ -7971,17 +8183,7 @@ drawinfoBox(mainWidth, mainHeight) {
     If (slideShowRunning=1)
        infoSlider := "`nSlideshow running: " DefineSlideShowType() " @ " sliSpeed
 
-    If (FlipImgH=1 || FlipImgV=1)
-    {
-       infoMirroring := "`nImage mirroring: "
-       If (FlipImgV=1 && FlipImgH=0)
-          infoMirroring :=  infoMirroring "VERTICAL"
-       Else If (FlipImgV=0 && FlipImgH=1)
-          infoMirroring := infoMirroring "HORIZONTAL"
-       Else If (FlipImgV=1 && FlipImgH=1)
-          infoMirroring := infoMirroring "VERTICAL, HORIZONTAL"
-    }
-
+    infoMirroring := defineIMGmirroring()
     If (activateImgSelection=1)
     {
        imgSelW := maxU(ImgSelX1, ImgSelX2) - minU(ImgSelX1, ImgSelX2)
@@ -7996,6 +8198,8 @@ drawinfoBox(mainWidth, mainHeight) {
        }
        infoSelection := "`n `nSelection coordinates:`nX / Y: " ImgSelX1 ", " ImgSelY1 x1 y1 "`nW / H: " imgSelW ", " imgSelH wP hP moreSelInfo
     }
+    If (usrColorDepth>1)
+       infoColorDepth := "`nImage color depth: ALTERED [ " defineColorDepth() " ]"
 
     If StrLen(usrFilesFilteru)>1
        infoFilteru := "`nFiles list filtered from " bkcpMaxFilesIndex " to " maxFilesIndex ".`nFilter pattern: " usrFilesFilteru
@@ -8003,8 +8207,29 @@ drawinfoBox(mainWidth, mainHeight) {
     If (totalZeit>=10)
        InfoLoadTime := "`nViewport refresh speed: ~" totalZeit " milisec."
 
+    thisSNDfile :=  IdentifyAudioFileAssociated()
+    If thisSNDfile
+    {
+       zPlitPath(thisSNDfile, 0, OutFileName, null)
+       If hSNDmedia
+          statusMedia := " - " MCI_Status(hSNDmedia)
+
+       If hSNDmediaDuration
+       {
+          If hSNDmedia
+          {
+             sndMediaPos := MCI_Position(hSNDmedia)
+             sndMediaPos := (sndMediaPos>3500) ? MCI_ToHHMMSS(sndMediaPos) " / " : ""
+             If (sndMediaPos=hSNDmediaDuration)
+                sndMediaPos := ""
+          }
+          mediaDuration := " (" sndMediaPos hSNDmediaDuration  ")"
+       }
+       infoAudio := "`nAudio file associated: " OutFileName mediaDuration statusMedia
+    }
+
     infoColors := "`nColors display mode: " DefineFXmodes() " [" currentPixFmt "]"
-    entireString := folderu "\`n[ " currentFileIndex " / " maxFilesIndex " ] " fileNamu fileMsg infoRes infoSizing infoMirroring infoColors infoFrames InfoLoadTime infoFilesSel infoSlider infoSelection infoFilteru
+    entireString := folderu "\`n[ " currentFileIndex " / " maxFilesIndex " ] " fileNamu fileMsg infoRes infoSizing infoMirroring infoColors infoColorDepth infoFrames InfoLoadTime infoFilesSel infoAudio infoSlider infoSelection infoFilteru
     infoBoxBMP := drawTextInBox(entireString, OSDFontName, OSDfntSize//1.1, mainWidth//1.3, mainHeight//1.3, OSDtextColor, "0xFF" OSDbgrColor, 1, 1)
     Gdip_DrawImage(glPG, infoBoxBMP, 0, 0,,,,,,, 0.85)
     infoBoxBMP := Gdip_DisposeImage(infoBoxBMP, 1)
@@ -8120,7 +8345,7 @@ initFIMGmodule() {
 
   If InStr(r, "err - ")
   {
-     bwDithering := alwaysOpenwithFIM := 0
+     alwaysOpenwithFIM := 0
      FIMfailed2init := 1
      If InStr(r, "err - 126")
         friendly := "`n`nPlease install the Rubntime Redistributable Packages of Visual Studio 2013 included in the Quick Picto Viewer ZIP compiled package."
@@ -8138,7 +8363,7 @@ initFIMGmodule() {
   Return r
 }
 
-FreeImageLoader(imgpath, doBw, noBPPconv) {
+FreeImageLoader(imgPath, doBw, noBPPconv) {
   Critical, on
   sTime := A_tickcount  
   initFIMGmodule()
@@ -8171,9 +8396,9 @@ FreeImageLoader(imgpath, doBw, noBPPconv) {
   }
 
   changeMcursor()
-  If (bwDithering=1 && imgFxMode=4 && doBw=1)
-     hFIFimgZ := hFIFimgB ? FreeImage_Dither(hFIFimgB, 0) : FreeImage_Dither(hFIFimgA, 0)
-  Else
+  ; If (bwDithering=1 && imgFxMode=4 && doBw=1)
+  ;    hFIFimgZ := hFIFimgB ? FreeImage_Dither(hFIFimgB, 0) : FreeImage_Dither(hFIFimgA, 0)
+  ; Else
      hFIFimgZ := hFIFimgB ? hFIFimgB : hFIFimgA
 
   hFIFimgC := hFIFimgZ ? hFIFimgZ : hFIFimgA
@@ -8263,7 +8488,6 @@ FreeImageLoader(imgpath, doBw, noBPPconv) {
 LoadBitmapFromFileu(imgPath, doBw:=0, noBPPconv:=0, forceGDIp:=0) {
   coreIMGzeitLoad := A_TickCount
   If RegExMatch(imgPath, RegExFIMformPtrn) || (alwaysOpenwithFIM=1 && forceGDIp=1)
-  || (bwDithering=1 && imgFxMode=4 && doBw=1)
   {
      oBitmap := FreeImageLoader(imgPath, doBw, noBPPconv)
      imageLoadedWithFIF := 1
@@ -8273,26 +8497,25 @@ LoadBitmapFromFileu(imgPath, doBw:=0, noBPPconv:=0, forceGDIp:=0) {
      oBitmap := Gdip_CreateBitmapFromFile(imgPath)
      imageLoadedWithFIF := 0
   }
-
   Return oBitmap
 }
 
 CloneMainBMP(imgPath, cachedImgFile, ByRef imgW, ByRef imgH, ByRef CountFrames, mustReloadIMG) {
   Critical, on
+  Static prevMD5name
 
   hasFullReloaded := CountFrames := 0
-  FileGetSize, fileSizu, % imgpath, K
-  FileGetTime, FileDateM, % imgpath, M
+  MD5name := generateThumbName(imgPath, 1)
+  mustNotReloadFile := (prevMD5name=MD5name) ? 1 : 0
   o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
-  thisImgCall := imgPath o_bwDithering fileSizu FileDateM vpIMGrotation RenderOpaqueIMG cachedImgFile
+  thisImgCall := MD5name o_bwDithering vpIMGrotation RenderOpaqueIMG cachedImgFile
   If !FileRexists(imgPath) && (InStr(AprevImgCall, imgPath) || InStr(BprevImgCall, imgPath))
      thisImgCall := InStr(AprevImgCall, imgPath) ? AprevImgCall : BprevImgCall
-     
+
   If gdiBitmap
      gdiBitmap := Gdip_DisposeImage(gdiBitmap, 1)
 
-  MD5name := generateThumbName(imgPath)
-  file2load := thumbsCacheFolder "\big-" o_bwDithering userHQraw MD5name ".png"
+  file2load := thumbsCacheFolder "\big-" userHQraw MD5name ".png"
   ignoreCache := (RegExMatch(imgPath, "i)(.\.gif)$") && animGIFsSupport=1) || (AnyWindowOpen=5) ? 1 : mustReloadIMG
   If (AprevImgCall=thisImgCall && AprevGdiBitmap && ignoreCache=0)
   {
@@ -8310,18 +8533,19 @@ CloneMainBMP(imgPath, cachedImgFile, ByRef imgW, ByRef imgH, ByRef CountFrames, 
 
   changeMcursor()
   oBitmap := LoadBitmapFromFileu(imgPath, 1, 0)
-  slowFileLoad := (A_TickCount - coreIMGzeitLoad > 650) ? 1 : 0
+  slowFileLoad := (A_TickCount - coreIMGzeitLoad > 450) ? 1 : 0
   If !oBitmap
      Return "error"
 
   hasFullReloaded := 1
   totalFramesIndex := Gdip_GetBitmapFramesCount(oBitmap) - 1
   If (totalFramesIndex<0)
-      totalFramesIndex := 0
+     totalFramesIndex := 0
+
   If (desiredFrameIndex>=totalFramesIndex)
      desiredFrameIndex := totalFramesIndex
 
-  If RegExMatch(imgpath, "i)(.\.(gif|tif|tiff))$")
+  If RegExMatch(imgPath, "i)(.\.(gif|tif|tiff))$")
   {
      If (totalFramesIndex>1 && slideShowRunning=1 && SlideHowMode=1)
         Random, desiredFrameIndex, 0, % totalFramesIndex
@@ -8341,7 +8565,7 @@ CloneMainBMP(imgPath, cachedImgFile, ByRef imgW, ByRef imgH, ByRef CountFrames, 
      If (animGIFsSupport=1)
         CountFrames := totalFramesIndex
   } Else If (totalIMGres/totalScreenRes>3 || slowFileLoad=1) && (enableThumbsCaching=1 
-    && !FileExist(file2load) && cachedImgFile!=1 && (IMGresizingMode=1 || IMGresizingMode=2))
+    && !FileExist(file2load) && multiFrameImg!=1 && cachedImgFile!=1 && (IMGresizingMode=1 || IMGresizingMode=2))
   {
      er := createThumbsFolder()
      If (er="error")
@@ -8359,7 +8583,7 @@ CloneMainBMP(imgPath, cachedImgFile, ByRef imgW, ByRef imgH, ByRef CountFrames, 
      newH := imgH
 
   BprevImgCall := AprevImgCall
-  AprevImgCall := imgpath o_bwDithering fileSizu FileDateM vpIMGrotation RenderOpaqueIMG cachedImgFile
+  AprevImgCall := MD5name o_bwDithering vpIMGrotation RenderOpaqueIMG cachedImgFile
   thisImgQuality := (userimgQuality=1 && mustSaveFile) ? 7 : 5
   changeMcursor()
   pixFmt := Gdip_GetImagePixelFormat(oBitmap, 2)
@@ -8375,15 +8599,15 @@ CloneMainBMP(imgPath, cachedImgFile, ByRef imgW, ByRef imgH, ByRef CountFrames, 
 
   rBitmap := Gdip_ResizeBitmap(oBitmap, newW, newH, 0, thisImgQuality, pixFmt)
   Gdip_DisposeImage(oBitmap, 1)
-
   If (mustSaveFile=1 && multiFrameImg!=1)
      z := Gdip_SaveBitmapToFile(rBitmap, file2load, 90)
 
   If (RenderOpaqueIMG=1 && brushRequired!=1)
   {
-     nBitmap := Gdip_RenderPixelsOpaque(rBitmap)
+     nBitmap := Gdip_RenderPixelsOpaque(rBitmap, pBrushWinBGR)
      Gdip_DisposeImage(rBitmap, 1)
      rBitmap := nBitmap
+     brushRequired := 1
   }
 
   If (vpIMGrotation>0)
@@ -8395,6 +8619,15 @@ CloneMainBMP(imgPath, cachedImgFile, ByRef imgW, ByRef imgH, ByRef CountFrames, 
      Gdip_DisposeImage(rBitmap, 1)
      rBitmap := nBitmap
   }
+
+  If (bwDithering=1 && imgFxMode=4)
+  {
+     zBitmap := Gdip_BitmapConvertGray(rBitmap, hueAdjust, zatAdjust, lumosGrayAdjust, GammosGrayAdjust)
+     Gdip_DisposeImage(rBitmap)
+     rBitmap := zBitmap
+     E := Gdip_BitmapSetColorDepth(rBitmap, "BW", 1)
+  } Else If (usrColorDepth>1)
+     E := Gdip_BitmapSetColorDepth(rBitmap, internalColorDepth, ColorDepthDithering)
 
   gdiBitmap := rBitmap
   extractAmbientalTexture()
@@ -8412,6 +8645,127 @@ extractAmbientalTexture() {
     {
        decideGDIPimageFX(matrix, imageAttribs, pEffect)
        AmbientalTexBrush := Gdip_CreateTextureBrush(gdiBitmap, 3, 3, 3, 150, 150, matrix, 0, 0, 0, imageAttribs)
+    }
+
+    preventScreenOff()
+    OnImgChangeRemoveTooltip()
+    If (autoPlaySNDs=1)
+    {
+       AutoPlayAudioFileAssociated()
+       identifyAudioMediaLength()
+    }
+}
+
+OnImgChangeRemoveTooltip() {
+  Static prevImgPath := ""
+  imgPath := currentFileIndex "="  resultedFilesList[currentFileIndex]
+  If (imgPath=prevImgPath)
+  {
+     Return
+  } Else
+  {
+     RemoveTooltip()
+     If (hSNDmedia && autoPlaySNDs!=1)
+        StopMediaPlaying()
+  }
+
+  prevImgPath := imgPath
+}
+
+identifyAudioMediaLength() {
+   If hSNDmedia
+   {
+      milisec := MCI_Length(hSNDmedia)
+      hSNDmediaDuration := MCI_ToHHMMSS(milisec)
+      If (syncSlideShow2Audios=1 && slideShowRunning=1)
+         resetSlideshowTimer(0)
+   } Else If (syncSlideShow2Audios=1 && slideShowRunning=1)
+         resetSlideshowTimer(0)
+
+}
+
+IdentifyAudioFileAssociated() {
+    imgPath := resultedFilesList[currentFileIndex]
+    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
+    audioFile1 := OutDir "\" OutNameNoExt ".WAv"
+    audioFile2 := OutDir "\" OutNameNoExt ".WMA"
+    audioFile3 := OutDir "\" OutNameNoExt ".MP3"
+
+    If FileRexists(audioFile1)
+       thisSNDfile := audioFile1
+    Else If FileRexists(audioFile2)
+       thisSNDfile := audioFile2
+    Else If FileRexists(audioFile3)
+       thisSNDfile := audioFile3
+    Else
+       thisSNDfile := 0
+    Return thisSNDfile
+}
+
+PlayAudioFileAssociatedNow() {
+    If (thumbsDisplaying=1)
+       Return
+
+    ohSNDmediaFile := hSNDmediaFile
+    ohSNDmedia := hSNDmedia
+    StopMediaPlaying()
+    If (ohSNDmediaFile && ohSNDmedia)
+    {
+       zPlitPath(ohSNDmediaFile, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
+       showTOOLtip("Media file stopped: `n" OutFileName "`n" OutDir "\")
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       dummyTimerDelayiedImageDisplay(50)
+       Return
+    }
+
+    thisSNDfile := IdentifyAudioFileAssociated()
+    If thisSNDfile
+    {
+       hSNDmediaFile := thisSNDfile
+       hSNDmedia := MCI_Open(hSNDmediaFile,,,0)
+       E := MCI_Play(hSNDmedia)
+       identifyAudioMediaLength()
+       zPlitPath(hSNDmediaFile, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
+       thisMsg := (E || !hSNDmedia) ? "ERROR: " E " - " hSNDmedia ". Unable to play media file: `n" : "Media file now playing: `n(" hSNDmediaDuration ") " 
+       showTOOLtip(thisMsg OutFileName "`n" OutDir "\")
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+
+       If (E || !hSNDmedia)
+          StopMediaPlaying()
+       dummyTimerDelayiedImageDisplay(50)
+    } Else
+    {
+       imgPath := resultedFilesList[currentFileIndex]
+       zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
+       showTOOLtip("No media file found to play...`n" OutNameNoExt " (.WAV / .WMA / .MP3)`n" OutDir "\")
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+    }
+}
+
+AutoPlayAudioFileAssociated() {
+    Static prevAudioFile
+    thisSNDfile := IdentifyAudioFileAssociated()
+    If (thisSNDfile=prevAudioFile && StrLen(thisSNDfile)>3)
+       Return
+
+    StopMediaPlaying()
+    If thisSNDfile
+    {
+       hSNDmediaFile := thisSNDfile
+       hSNDmedia := MCI_Open(hSNDmediaFile,,,0)
+       E := MCI_Play(hSNDmedia)
+       If (E || !hSNDmedia)
+          StopMediaPlaying()
+       Else
+          prevAudioFile := hSNDmediaFile
+    } Else prevAudioFile := ""
+}
+
+StopMediaPlaying() {
+    If hSNDmedia
+    {
+       MCI_Stop(hSNDmedia)
+       hSNDmediaDuration := hSNDmedia := hSNDmediaFile := ""
     }
 }
 
@@ -9232,7 +9586,7 @@ generateThumbName(imgPath, forceThis:=0) {
 
    FileGetSize, fileSizu, % imgPath
    FileGetTime, FileDateM, % imgPath, M
-   fileInfos := imgpath fileSizu FileDateM
+   fileInfos := imgPath fileSizu FileDateM
    MD5name := CalcStringHash(fileInfos, 0x8003)
    Return MD5name
 }
@@ -9250,7 +9604,9 @@ getColorMatrix() {
        matrix := GenerateColorMatrix(4)
     Else If (imgFxMode=7)       ; grayscale B
        matrix := GenerateColorMatrix(5)
-    Else If (imgFxMode=8)  ; negative / invert
+    Else If (imgFxMode=8)  ; alpha channel
+       matrix := GenerateColorMatrix(7)
+    Else If (imgFxMode=9)  ; negative / invert
        matrix := GenerateColorMatrix(6)
     Else If (imgFxMode=2 || imgFxMode=3) ; personalized
        matrix := GenerateColorMatrix(1, lumosAdjust, GammosAdjust, satAdjust, 1, chnRdecalage, chnGdecalage, chnBdecalage)
@@ -9260,10 +9616,10 @@ getColorMatrix() {
 decideGDIPimageFX(ByRef matrix, ByRef imageAttribs, ByRef pEffect) {
     matrix := imageAttribs := pEffect := ""
     matrix := getColorMatrix()
-    If (thumbsDisplaying=1 && imgFxMode=3)
+    If (thumbsDisplaying=1 && (imgFxMode=3 || imgFxMode=8))
        matrix := ""
 
-    thisFXapplies := (imgFxMode=2 || imgFxMode=3 || imgFxMode=4 || imgFxMode=8) ? 1 : 0
+    thisFXapplies := (imgFxMode=2 || imgFxMode=3 || imgFxMode=4 || imgFxMode=9) ? 1 : 0
     mustCreateAttribs := (realGammos!=1 && imgThreshold=0 && !matrix) || (ForceNoColorMatrix=1 || imgFxMode=1) ? 0 : 1
     If (mustCreateAttribs=1)
     {
@@ -9289,13 +9645,13 @@ QPV_ShowImgonGuiPrev(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, ma
     Critical, on
     Static prevUpdate, displayFastWas := 1
     If (A_TickCount - prevUpdate > 700)
-        displayFastWas := 1
+       displayFastWas := 1
 
     prevUpdate := A_TickCount
     thisZeit := A_TickCount
     Gdip_GraphicsClear(glPG, "0x77" WindowBgrColor)
     decideGDIPimageFX(matrix, imageAttribs, pEffect)
-    whichImg := (usePrevious=1 && gdiBitmapSmall) ? gdiBitmapSmall : gdiBitmap
+    whichImg := (usePrevious=1 && gdiBitmapSmall && imgFxMode!=8) ? gdiBitmapSmall : gdiBitmap
     Gdip_GetImageDimensions(whichImg, imgW, imgH)
     calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY)
     thisIMGres := imgW + imgH
@@ -9329,10 +9685,13 @@ QPV_ShowImgonGuiPrev(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, ma
     zL := (zoomLevel<1) ? 1 : zoomLevel*2
     whichBrush := (userimgQuality=1) ? pBrushHatch : pBrushHatchLow
     Gdip_SetClipRect(glPG, 0, 0, mainWidth, mainHeight)
-    If InStr(currentPixFmt, "ARGB")
-       Gdip_FillRectangle(glPG, whichBrush, DestPosX + 1, DestPosY + 1, newW - 2, newH - 2)
-    Else
-       Gdip_FillRectangle(glPG, pBrushWinBGR, DestPosX, DestPosY, newW, newH)
+    If (imgFxMode!=8)
+    {
+       If (InStr(currentPixFmt, "ARGB") && RenderOpaqueIMG!=1)
+          Gdip_FillRectangle(glPG, whichBrush, DestPosX + 1, DestPosY + 1, newW - 2, newH - 2)
+       Else
+          Gdip_FillRectangle(glPG, pBrushWinBGR, DestPosX, DestPosY, newW, newH)
+    }
 
     setMainCanvasTransform(mainWidth, mainHeight)
     If (newW>mainWidth || newH>mainHeight)
@@ -9382,7 +9741,8 @@ QPV_ShowImgonGuiPrev(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, ma
     ; ToolTip, %imgW% -- %imgH% == %newW% -- %newH%
     prevDestPosX := DestPosX
     prevDestPosY := DestPosY
-    drawHUDelements(2, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY)
+    whichMode := (imgFxMode=8) ? 1 : 2
+    drawHUDelements(whichMode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY)
     Gdip_ResetWorldTransform(glPG)
     If imageAttribs
        Gdip_DisposeImageAttributes(imageAttribs)
@@ -9551,7 +9911,7 @@ QPV_ShowImgonGui(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, mainHe
 
     createGDIPcanvas(mainWidth, mainHeight)
     testIDvPcache := imgPath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight
-    If (usePrevious=1 && testIDvPcache!=PREVtestIDvPcache) || (CountFrames>1)
+    If (usePrevious=1 && testIDvPcache!=PREVtestIDvPcache) || (CountFrames>1) || (imgFxMode=8 && InStr(currentPixFmt, "argb") && RenderOpaqueIMG!=1)
     {
        r := QPV_ShowImgonGuiPrev(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, imgPath, CountFrames)
        Return r
@@ -9564,6 +9924,7 @@ QPV_ShowImgonGui(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, mainHe
 
     whichImg := (usePrevious=1 && gdiBitmapSmall) ? gdiBitmapSmall : gdiBitmap
     Gdip_GetImageDimensions(whichImg, imgW, imgH)
+
     calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY)
     remDestPosX := DestPosX - prevDestPosX
     remDestPosY := DestPosY - prevDestPosY
@@ -9575,10 +9936,13 @@ QPV_ShowImgonGui(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, mainHe
 
     zL := (zoomLevel<1) ? 1 : zoomLevel*2
     whichBrush := (userimgQuality=1) ? pBrushHatch : pBrushHatchLow
-    If InStr(currentPixFmt, "ARGB")
-       Gdip_FillRectangle(glPG, whichBrush, DestPosX + 1, DestPosY + 1, newW - 2, newH - 2)
-    Else
-       Gdip_FillRectangle(glPG, pBrushWinBGR, DestPosX, DestPosY, newW, newH)
+    If (imgFxMode!=8)
+    {
+       If (InStr(currentPixFmt, "ARGB") && RenderOpaqueIMG!=1)
+          Gdip_FillRectangle(glPG, whichBrush, DestPosX + 1, DestPosY + 1, newW - 2, newH - 2)
+       Else
+          Gdip_FillRectangle(glPG, pBrushWinBGR, DestPosX, DestPosY, newW, newH)
+    }
 
     thisIDviewPortCache := imgPath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight usePrevious
     If (thisIDviewPortCache!=IDviewPortCache || !ViewPortBMPcache || CountFrames>1) && (usePrevious!=1)
@@ -10209,6 +10573,11 @@ QPV_ShowThumbnails(startIndex) {
            whichBrush := (userimgQuality=1) ? pBrushHatch : pBrushHatchLow
            Gdip_FillRectangle(G2, whichBrush, DestPosX, DestPosY, newW, newH)
         }
+        If (bwDithering=1 && imgFxMode=4)
+           nullu := ""
+        Else If (usrColorDepth>1 && (file2save=thisImgFile || enableThumbsCaching=0))
+          E := Gdip_BitmapSetColorDepth(oBitmap, internalColorDepth, ColorDepthDithering)
+
         flipBitmap(oBitmap)
         changeMcursor()
         r1 := Gdip_DrawImageRect(G2, oBitmap, DestPosX, DestPosY, newW, newH)
@@ -10256,6 +10625,14 @@ QPV_ShowThumbnails(startIndex) {
     Sleep, 0
     If oBitmap
        Gdip_DisposeImage(oBitmap, 1)
+
+    If (bwDithering=1 && imgFxMode=4)
+    {
+       zBitmap := Gdip_BitmapConvertGray(thumbsBitmap, hueAdjust, zatAdjust, lumosGrayAdjust, GammosGrayAdjust)
+       Gdip_DisposeImage(thumbsBitmap)
+       thumbsBitmap := zBitmap
+       E := Gdip_BitmapSetColorDepth(thumbsBitmap, "BW", 1)
+    } 
 
     If pEffect
     {
@@ -10968,15 +11345,23 @@ coreResizeIMG(imgPath, newW, newH, file2save, goFX, toClippy, rotateAngle, soloM
 
     If (ResizeApplyEffects=1 || goFX=1)
     {
+       mustDoBw := (bwDithering=1 && imgFxMode=4) ? 1 : 0
        If (imgFxMode=3 && toClippy!=1)
           AdaptiveImgLight(oBitmap, imgPath, 1, 1)
        decideGDIPimageFX(matrix, imageAttribs, pEffect)
     }
 
     oPixFmt := Gdip_GetImagePixelFormat(oBitmap, 2)
-    brushRequired := !InStr(oPixFmt, "argb") ? 1 : 0
+    brushRequired := !InStr(oPixFmt, "argb") || (toClippy=1) ? 1 : 0
+    If (InStr(oPixFmt, "argb") && RenderOpaqueIMG=1 && (goFX=1 || ResizeApplyEffects=1))
+    {
+       nBitmap := Gdip_RenderPixelsOpaque(oBitmap, pBrushWinBGR)
+       Gdip_DisposeImage(rBitmap, 1)
+       oBitmap := nBitmap
+       brushRequired := must24bits := 1
+    }
 
-    pixFmt := (toClippy=1) ? "0x21808" : "0x26200A"     ;24-RGB  //  32-ARGB
+    pixFmt := (toClippy=1 || must24bits=1) ? "0x21808" : "0x26200A"     ; 24-RGB  //  32-ARGB
     thisImgQuality := (ResizeQualityHigh=1) ? 7 : 5
     If (activateImgSelection=1 && ResizeCropAfterRotation=1 && ResizeWithCrop=1 && rotateAngle>0)
     {
@@ -11067,11 +11452,6 @@ coreResizeIMG(imgPath, newW, newH, file2save, goFX, toClippy, rotateAngle, soloM
 
     thumbBMP := Gdip_CreateBitmap(zImgSelW, zImgSelH, pixFmt)
     G2 := Gdip_GraphicsFromImage(thumbBMP, thisImgQuality, 4, 2)
-    If pEffect
-    {
-       Gdip_BitmapApplyEffect(oBitmap, pEffect)
-       Gdip_DisposeEffect(pEffect)
-    }
 
     If (userUnsprtWriteFMT=3 && batchMode=1)
     {
@@ -11087,7 +11467,24 @@ coreResizeIMG(imgPath, newW, newH, file2save, goFX, toClippy, rotateAngle, soloM
        Gdip_FillRectangle(G2, pBrushWinBGR, -2, -2, imgW + 4, imgH + 4)
 
     If (goFX=1 || ResizeApplyEffects=1)
+    {
        setMainCanvasTransform(zImgSelW, zImgSelH, G2)
+       If (bwDithering=1 && imgFxMode=4)
+       {
+          zBitmap := Gdip_BitmapConvertGray(oBitmap, hueAdjust, zatAdjust, lumosGrayAdjust, GammosGrayAdjust)
+          Gdip_DisposeImage(rBitmap)
+          oBitmap := zBitmap
+          E := Gdip_BitmapSetColorDepth(oBitmap, "BW", 1)
+       } Else If (usrColorDepth>1)
+          E := Gdip_BitmapSetColorDepth(oBitmap, internalColorDepth, ColorDepthDithering)
+ 
+       If pEffect
+       {
+          Gdip_BitmapApplyEffect(oBitmap, pEffect)
+          Gdip_DisposeEffect(pEffect)
+       }
+    }
+
     changeMcursor()
     Gdip_DrawImage(G2, oBitmap, 0, 0, zImgSelW, zImgSelH, imgSelPx, imgSelPy, imgSelW, imgSelH, matrix, 2, imageAttribs)
     Gdip_DisposeImage(oBitmap, 1)
@@ -11222,8 +11619,7 @@ PanelJpegPerformOperation() {
     {
        imgPath := resultedFilesList[currentFileIndex]
        zPlitPath(imgPath, 0, fileNamu, folderu)
-       FileGetSize, fileSizu, %imgpath%
-       If !(FileExist(imgPath) && fileSizu>500)
+       If !FileRexists(imgPath)
        {
           showTOOLtip("ERROR: File not found or access denied...`n" fileNamu "`n" folderu "\")
           SoundBeep, 300, 50
@@ -11423,8 +11819,7 @@ ColorsAdjusterPanelWindow() {
        Return
 
     imgPath := resultedFilesList[currentFileIndex]
-    FileGetSize, fileSizu, % imgPath
-    If !(FileExist(imgPath) && fileSizu>500)
+    If !FileRexists(imgPath)
     {
        showTOOLtip("ERROR: File not found or access denied...`n" fileNamu "`n" folderu "\")
        SoundBeep, 300, 50
@@ -11438,13 +11833,12 @@ ColorsAdjusterPanelWindow() {
     ToolTip, Please wait...,,, 2
     createSettingsGUI(10)
     ForceNoColorMatrix := 0
+    If (usrColorDepth=0)
+       usrColorDepth := 1
+
     btnWid := 100
     txtWid := slideWid := 280
     slide2Wid := 180
-    initFIMGmodule()
-    If !wasInitFIMlib
-       bwDithering := 0
-
     If (PrefsLargeFonts=1)
     {
        slideWid := slideWid + 135
@@ -11461,7 +11855,7 @@ ColorsAdjusterPanelWindow() {
     Gui, Add, Tab3,, Main|Others
 
     Gui, Tab, 1 ; general
-    Gui, Add, DropDownList, x+15 y+15 Section w%txtWid% gColorPanelTriggerImageUpdate AltSubmit Choose%imgFxMode% vimgFxMode, Original image colors|Personalized colors|Auto-adjusted colors|Grayscale|Red channel|Green channel|Blue channel|Inverted colors
+    Gui, Add, DropDownList, x+15 y+15 Section w%txtWid% gColorPanelTriggerImageUpdate AltSubmit Choose%imgFxMode% vimgFxMode, Original image colors|Personalized colors|Auto-adjusted colors|Grayscale|Red channel|Green channel|Blue channel|Alpha channel|Inverted colors
     Gui, Add, DropDownList, xs y+5 w%txtWid% gColorPanelTriggerImageUpdate AltSubmit Choose%autoAdjustMode% vAutoAdjustMode, Adaptive mixed mode|Increase brightness|Increase contrast
     Gui, Add, ComboBox, x+1 w90 gColorPanelTriggerImageUpdate vusrAdaptiveThreshold, -2000|-100|-50|-2|1|2|50|1000|2000|%usrAdaptiveThreshold%||
     Gui, Add, Checkbox, xs y+5 w%txtWid% gColorPanelTriggerImageUpdate Checked%doSatAdjusts% vdoSatAdjusts, Auto-adjust image saturation level
@@ -11494,6 +11888,8 @@ ColorsAdjusterPanelWindow() {
 
     Gui, Tab, 2 ; others
     Gui, Add, DropDownList, x+15 y+15 Section w%txtWid% gColorPanelTriggerImageUpdate AltSubmit Choose%IMGresizingMode% vIMGresizingMode, Adapt all images into view|Adapt only large images into view|Original resolution (100`%)|Custom zoom level
+    Gui, Add, DropDownList, y+10 w%txtWid% gColorPanelTriggerImageUpdate AltSubmit Choose%usrColorDepth% vusrColorDepth, Simulate color depth|2 bits [4 colors]|3 bits [8 colors]|4 bits [16 colors]|5 bits [32 colors]|6 bits [64 colors]|7 bits [128 colors]|8 bits [256 colors]|16 bits [65536 colors]
+    Gui, Add, Checkbox, x+5 gColorPanelTriggerImageUpdate Checked%ColorDepthDithering% vColorDepthDithering, Dithering
     Gui, Add, Text, xs y+10 w%slide2Wid% gBtnResetRotation vinfoImgRotation, Image rotation: ----
     Gui, Add, Checkbox, x+5 gColorPanelTriggerImageUpdate Checked%UIdoubleZoom% vUIdoubleZoom, 2x
     Gui, Add, Text, x+1 w%slide2Wid% gBtnResetZoom vinfoImgZoom, Image zoom: ----
@@ -11502,7 +11898,7 @@ ColorsAdjusterPanelWindow() {
     Gui, Add, Text, xs y+10, Flip image
     Gui, Add, Checkbox, x+10 gColorPanelTriggerImageUpdate Checked%FlipImgV% vFlipImgV, vertically
     Gui, Add, Checkbox, x+10 gColorPanelTriggerImageUpdate Checked%FlipImgH% vFlipImgH, horizontally
-    Gui, Add, Checkbox, xs y+10 gColorPanelTriggerImageUpdate Checked%RenderOpaqueIMG% vRenderOpaqueIMG, No semi-transparent pixels [for RGBA images]
+    Gui, Add, Checkbox, xs y+10 gColorPanelTriggerImageUpdate Checked%RenderOpaqueIMG% vRenderOpaqueIMG, Remove alpha channel [for RGBA images]
     Gui, Add, Checkbox, xs y+10 gColorPanelTriggerImageUpdate Checked%userimgQuality% vuserimgQuality, High quality image resampling
     Gui, Add, Checkbox, xs y+10 gColorPanelTriggerImageUpdate Checked%usrTextureBGR% vusrTextureBGR, Auto-generated ambiental textured viewport background
     Gui, Add, Checkbox, xs y+10 gColorPanelTriggerImageUpdate Checked%showHistogram% vshowHistogram, Display the image luminance histogram
@@ -11685,6 +12081,16 @@ updatePanelColorsInfo() {
    Else
       GuiControl, SettingsGUIA: Disable, usrTextureBGR
 
+   If (usrColorDepth>1)
+   {
+      GuiControl, SettingsGUIA: Disable, RenderOpaqueIMG
+      GuiControl, SettingsGUIA: Enable, ColorDepthDithering
+   } Else
+   {
+      GuiControl, SettingsGUIA: Enable, RenderOpaqueIMG
+      GuiControl, SettingsGUIA: Disable, ColorDepthDithering
+   }
+
    If (IMGresizingMode=4)
    {
       GuiControl, SettingsGUIA: Enable, CustomZoomCB
@@ -11698,7 +12104,7 @@ updatePanelColorsInfo() {
    }
 
    o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
-   If (imgFxMode=2 || (imgFxMode=4 && o_bwDithering=0) || imgFxMode=8)
+   If (imgFxMode=2) || (imgFxMode=4 && o_bwDithering=0) || (imgFxMode=9)
    {
       GuiControl, SettingsGUIA: Enable, infoRealGammos
       GuiControl, SettingsGUIA: Enable, UIrealGammos
@@ -11752,12 +12158,12 @@ updatePanelColorsInfo() {
       GuiControl, SettingsGUIA: Disable, sliderContrst
    }
 
-   If (imgFxMode=4 && wasInitFIMlib=1)
+   If (imgFxMode=4)
       GuiControl, SettingsGUIA: Enable, bwDithering
    Else
       GuiControl, SettingsGUIA: Disable, bwDithering
 
-   If (imgFxMode=2 || imgFxMode=3 || imgFxMode=4 || imgFxMode=8) && (o_bwDithering=0)
+   If (imgFxMode=2 || imgFxMode=3 || imgFxMode=4 || imgFxMode=9) && (o_bwDithering=0)
    {
       GuiControl, SettingsGUIA: Enable, zatAdjust
       GuiControl, SettingsGUIA: Enable, infoZatAdjust
@@ -11805,18 +12211,21 @@ updatePanelColorsInfo() {
 btnResetImageView() {
   ; GuiControlGet, realTimePreview
   ForceNoColorMatrix := 0
+  prevsColorDepthDithering := ColorDepthDithering
+  prevColorDepth := usrColorDepth
   prevbwDithering := bwDithering
   prevRenderOpaqueIMG := RenderOpaqueIMG
   prevvpIMGrotation := vpIMGrotation
   prevusrTextureBGR := usrTextureBGR
   GuiControl, SettingsGUIA: Choose, imgFxMode, 1
+  GuiControl, SettingsGUIA: Choose, usrColorDepth, 1
   GuiControl, SettingsGUIA: Choose, usrAdaptiveThreshold, 5
   GuiControl, SettingsGUIA: Choose, chnRdecalage, 14
   GuiControl, SettingsGUIA: Choose, chnGdecalage, 14
   GuiControl, SettingsGUIA: Choose, chnBdecalage, 14
   GuiControl, SettingsGUIA: Choose, IMGresizingMode, 1
   GuiControl, SettingsGUIA:, bwDithering, 0
-  IMGresizingMode := imgFxMode := satAdjust := lumosAdjust := lumosGrayAdjust := 1
+  ColorDepthDithering := usrColorDepth := IMGresizingMode := imgFxMode := satAdjust := lumosAdjust := lumosGrayAdjust := 1
   vpIMGrotation := zatAdjust := hueAdjust := chnRdecalage := chnGdecalage := chnBdecalage := GammosAdjust := GammosGrayAdjust := 0
   updatePanelColorsInfo()
   UIrealGammos := realGammos := usrAdaptiveThreshold := infoBright := infoSatu := 1
@@ -11840,10 +12249,11 @@ btnResetImageView() {
   GuiControl, SettingsGUIA:, RenderOpaqueIMG, 0
   GuiControl, SettingsGUIA:, FlipImgV, 0
   GuiControl, SettingsGUIA:, FlipImgH, 0
+  GuiControl, SettingsGUIA:, ColorDepthDithering, 1
   writeMainSettings()
 
   If (prevbwDithering=1 || prevRenderOpaqueIMG=1
-  || prevusrTextureBGR=1 || prevvpIMGrotation!=0)
+  || prevusrTextureBGR=1 || prevvpIMGrotation!=0 || prevColorDepth>1 || prevColorDepthDithering=0)
      RefreshImageFile()
   Else
      dummyTimerDelayiedImageDisplay(50)
@@ -11855,6 +12265,9 @@ ColorPanelTriggerImageUpdate() {
         , prevRenderOpaqueIMG := "--"
         , prevusrTextureBGR := "--"
         , prevvpIMGrotation := "--"
+        , prevColorDepth := "--"
+   If (prevColorDepth="--")
+      prevColorDepth := usrColorDepth ColorDepthDithering
    If (prevbwDithering="--")
       prevbwDithering := bwDithering
    If (prevRenderOpaqueIMG="--")
@@ -11889,6 +12302,8 @@ ColorPanelTriggerImageUpdate() {
    GuiControlGet, vpIMGrotation
    GuiControlGet, UIdoubleZoom
    GuiControlGet, usrTextureBGR
+   GuiControlGet, usrColorDepth
+   GuiControlGet, ColorDepthDithering
    ; GuiControlGet, realTimePreview
 
    ForceNoColorMatrix := 0
@@ -11929,14 +12344,15 @@ ColorPanelTriggerImageUpdate() {
       prevvpIMGrotation := vpIMGrotation
    }
 
-
    updatePanelColorsInfo()
    If (prevbwDithering!=bwDithering || prevRenderOpaqueIMG!=RenderOpaqueIMG
-   || prevusrTextureBGR!=usrTextureBGR || mustReloadIMG=1)
+   || prevusrTextureBGR!=usrTextureBGR || mustReloadIMG=1 || prevColorDepth!=usrColorDepth)
    {
       prevbwDithering := bwDithering
+      prevColorDepth := usrColorDepth ColorDepthDithering
       prevRenderOpaqueIMG := RenderOpaqueIMG
       prevusrTextureBGR := usrTextureBGR
+      defineColorDepth()
       RefreshImageFile()
    } Else filterDelayiedImageDisplay()
 }
@@ -11944,10 +12360,7 @@ ColorPanelTriggerImageUpdate() {
 ResizeImagePanelWindow() {
     Global userEditWidth, userEditHeight, ResultEditWidth, ResultEditHeight, btnFldr
     filesElected := getSelectedFiles(0, 1)
-    If (filesElected>1)
-       multipleFilesMode := 1
-    Else
-       markedSelectFile := ""
+    multipleFilesMode := (filesElected>1) ? 1 : ""
 
     createSettingsGUI(4)
     btnWid := 110
@@ -12503,6 +12916,21 @@ TglRszQualityHigh() {
 TglRszApplyEffects() {
    GuiControlGet, ResizeApplyEffects
    writeMainSettings()
+   If (ResizeApplyEffects=1)
+   {
+      infoMirroring := defineIMGmirroring()
+      If (usrColorDepth>1)
+         infoColorDepth := "`nImage color depth: ALTERED [ " defineColorDepth() " ]"
+      If (imgFxMode>1)
+         infoColors := "`nColors display mode: " DefineFXmodes() " [" currentPixFmt "]"
+      If (RenderOpaqueIMG=1)
+         infoRenderOpaque .= "`nAlpha channel: REMOVED"
+ 
+      entireString := infoMirroring infoColors infoColorDepth infoRenderOpaque
+      entireString := (entireString) ?  "Effects currently activated: " entireString : "No effects currently activated."
+      triggerOwnDialogs()
+      MsgBox,, %appTitle%, % entireString
+   }
 }
 
 FolderzPanelWindow() {
@@ -13340,6 +13768,12 @@ ST_Insert(insert,input,pos=1) {
   Return output
 }
 
+SetVolume(val:=100, r:="") {
+; Function by Drugwash
+  v := Round(val*655.35)
+  vr := r="" ? v : Round(r*655.35)
+  Try DllCall("winmm\waveOutSetVolume", "UInt", 0, "UInt", (v|vr<<16))
+}
 
 initCompiled() {
    Current_PID := GetCurrentProcessId()

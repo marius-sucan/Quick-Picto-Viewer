@@ -6,6 +6,8 @@
 
 <p>QPV is able to create image slideshows and cache very large dynamic lists of files. Unlike other applications of this kind, it can load, on my system, a list of 500000 files in under 10 seconds, while XnView Classic or Irfan View need more than 15 minutes.</p>
 
+<p>Quick Picto Viewer is also able to play sound files associated with images, automatically or on demand, and even generate slideshows that are in synch with the audio files duration. Supported audio formats: WAV, MP3 and WMA.</p>
+
 <p width="600" height="540"><img width="600" height="540" alt="Quick Picture Viewer - thumbnails list screenshot" src="http://marius.sucan.ro/media/files/blog/ahk-scripts/quick-picto-viewer-screenshot.jpg"></p>
 
 <p width="600" height="540"><img width="600" height="540" alt="Quick Picture Viewer - image view screenshot" src="http://marius.sucan.ro/media/files/blog/ahk-scripts/quick-picto-viewer-screenshot2.jpg"></p>
