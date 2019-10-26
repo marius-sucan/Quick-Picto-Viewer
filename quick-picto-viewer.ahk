@@ -21,7 +21,7 @@
 
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 3.8.6
+;@Ahk2Exe-SetVersion 3.8.7
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
  
@@ -94,9 +94,9 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , CCLVO := "-E0x200 +Border -Hdr -Multi +ReadOnly Report AltSubmit gSetColors", FontList := []
    , dummyPos := (A_OSVersion!="WIN_7") ? 0 : "" , totalFramesIndex, pVwinTitle, AprevImgCall, BprevImgCall
    , FIMimgBPP, imageLoadedWithFIF, FIMformat, coreIMGzeitLoad, desiredFrameIndex := 0
-   , diffIMGdecX := 0, diffIMGdecY := 0, anotherVPcache, oldZoomLevel := 0
+   , diffIMGdecX := 0, diffIMGdecY := 0, anotherVPcache, oldZoomLevel := 0, fullPath2exe
    , hitTestSelectionPath, scrollBarHy := 0, scrollBarVx := 0, HistogramBMP, internalColorDepth := 0
-   , version := "3.8.6", vReleaseDate := "26/10/2019"
+   , version := "3.8.7", vReleaseDate := "26/10/2019"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1
@@ -6836,7 +6836,7 @@ BuildTray() {
 }
 
 associateSLDsNow() {
-  FileAssociate("QPVslideshow",".sld", A_ScriptDir "\" A_ScriptName)
+  FileAssociate("QPVslideshow",".sld", fullPath2exe)
 }
 
 associateWithImages() {
@@ -6848,10 +6848,11 @@ associateWithImages() {
       If !A_LoopField
          Continue
 
-      FileAssociate("QPVimage." A_LoopField,"." A_LoopField, mainCompiledPath "\" A_ScriptName,,1)
+      FileAssociate("QPVimage." A_LoopField,"." A_LoopField, fullPath2exe,,1)
   }
-
+  Sleep, 25
   RunWait, *RunAs %mainCompiledPath%\regFiles\runThis.bat
+  Sleep, 5
   FileDelete, %mainCompiledPath%\regFiles\*.reg
   FileDelete, %mainCompiledPath%\regFiles\*.bat
 
@@ -6863,9 +6864,12 @@ associateWithImages() {
         If !A_LoopField
            Continue
 
-        FileAssociate("QPVimage." A_LoopField,"." A_LoopField, mainCompiledPath "\" A_ScriptName,,1)
+        FileAssociate("QPVimage." A_LoopField,"." A_LoopField, fullPath2exe,,1)
     }
+
+    Sleep, 25
     RunWait, *RunAs %mainCompiledPath%\regFiles\runThis.bat
+    Sleep, 5
     FileDelete, %mainCompiledPath%\regFiles\*.reg
     FileDelete, %mainCompiledPath%\regFiles\*.bat
   }
@@ -8637,6 +8641,8 @@ CloneMainBMP(imgPath, cachedImgFile, ByRef imgW, ByRef imgH, ByRef CountFrames, 
      pixFmt := "0x26200A" ; 32-ARGB
   Else
      pixFmt := Gdip_GetImagePixelFormat(oBitmap, 1)
+
+  ; Tooltip, % Gdip_GetImageRawFormat(oBitmap),,,10
 
   rBitmap := Gdip_ResizeBitmap(oBitmap, newW, newH, 0, thisImgQuality, pixFmt)
   Gdip_DisposeImage(oBitmap, 1)
@@ -13859,8 +13865,8 @@ FileAssociate(Label,Ext,Cmd,Icon:="", batchMode:=0) {
 
   If Label
      RegRead, CheckLabel, HKEY_CLASSES_ROOT\%Label%, FriendlyTypeName
-  ; Do not allow the modification of some important registry labels
 
+  ; Do not allow the modification of some important registry labels
   iF (Cmd!="" && CheckLabel)
      Return 0
 
@@ -13885,18 +13891,24 @@ FileAssociate(Label,Ext,Cmd,Icon:="", batchMode:=0) {
      regFile .= "`n[HKEY_CLASSES_ROOT\" QPVslideshow "\DefaultIcon]`n@=" Icon "`n`n"
 
   If !InStr(FileExist(mainCompiledPath "\regFiles"), "D")
+  {
      FileCreateDir, %mainCompiledPath%\regFiles
+     Sleep, 1
+  }
 
-  FileDelete, %mainCompiledPath%\regFiles\RegisterFileFormat%Ext%.reg
-  FileAppend, % regFile, %mainCompiledPath%\regFiles\RegisterFileFormat%Ext%.reg
-  runTarget := "Reg Import """ mainCompiledPath "\regFiles\RegisterFileFormat" Ext ".reg" """" "`n"
+  iExt := StrReplace(Ext, ".")
+  FileDelete, %mainCompiledPath%\regFiles\RegFormat%iExt%.reg
+  Sleep, 1
+  FileAppend, % regFile, %mainCompiledPath%\regFiles\RegFormat%iExt%.reg
+  runTarget := "Reg Import """ mainCompiledPath "\regFiles\RegFormat" iExt ".reg" """" "`n"
   If !InStr("|WIN_7|WIN_8|WIN_8.1|WIN_VISTA|WIN_2003|WIN_XP|WIN_2000|", "|" A_OSVersion "|")
-     runTarget .= """" mainCompiledPath "\SetUserFTA.exe """ Ext A_Space Label "`n"
+     runTarget .= """" mainCompiledPath "\SetUserFTA.exe""" A_Space Ext A_Space Label "`n"
   FileAppend, % runTarget, %mainCompiledPath%\regFiles\runThis.bat
   If (batchMode!=1)
   {
+     Sleep, 1
      RunWait, *RunAs %mainCompiledPath%\regFiles\runThis.bat
-     FileDelete, %mainCompiledPath%\regFiles\RegisterFileFormat%Ext%.reg
+     FileDelete, %mainCompiledPath%\regFiles\RegFormat%iExt%.reg
      FileDelete, %mainCompiledPath%\regFiles\runThis.bat
   }
 
