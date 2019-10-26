@@ -21,7 +21,7 @@
 
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 3.8.5
+;@Ahk2Exe-SetVersion 3.8.6
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
  
@@ -96,7 +96,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , FIMimgBPP, imageLoadedWithFIF, FIMformat, coreIMGzeitLoad, desiredFrameIndex := 0
    , diffIMGdecX := 0, diffIMGdecY := 0, anotherVPcache, oldZoomLevel := 0
    , hitTestSelectionPath, scrollBarHy := 0, scrollBarVx := 0, HistogramBMP, internalColorDepth := 0
-   , version := "3.8.5", vReleaseDate := "24/10/2019"
+   , version := "3.8.6", vReleaseDate := "26/10/2019"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1
@@ -121,7 +121,6 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , RenderOpaqueIMG := 1, vpIMGrotation := 0, usrTextAlign := "Left", autoPlaySNDs := 1
    , ResizeCropAfterRotation := 1, usrColorDepth := 1, ColorDepthDithering := 1, mediaSNDvolume := 80
 
-imgQuality := (userimgQuality=1) ? 7 : 5
 DetectHiddenWindows, On
 CoordMode, Mouse, Screen
 CoordMode, ToolTip, Screen
@@ -170,6 +169,7 @@ Loop, 6
    } Else If RegExMatch(A_Args[A_Index], "i)(.\.sld)$")
    {
       OpenSLD(A_Args[A_Index])
+      Global scriptStartTime := A_TickCount
       Break
    } Else If RegExMatch(A_Args[A_Index], RegExFilesPattern)
    {
@@ -4610,10 +4610,8 @@ loadMainSettings() {
     IniRead, tstResizeCropAfterRotation, % mainSettingsFile, General, ResizeCropAfterRotation, @
     IniRead, tstmediaSNDvolume, % mainSettingsFile, General, mediaSNDvolume, @
     If (tstuserimgQuality=1 || tstuserimgQuality=0)
-    {
        userimgQuality := tstuserimgQuality
-       imgQuality := (userimgQuality=1) ? 7 : 5
-    }
+    imgQuality := (userimgQuality=1) ? 7 : 5
 
     If (tstusrTextAlign="Left" || tstusrTextAlign="Right" || tstusrTextAlign="Center")
        usrTextAlign := tstusrTextAlign
@@ -6369,7 +6367,8 @@ coreOpenFolder(thisFolder, doOptionals:=1) {
    testThis := FileExist(testThis)
    If (StrLen(thisFolder)>3 && InStr(testThis, "D"))
    {
-      CloseWindow()
+      If (A_TickCount - scriptStartTime>350)
+         CloseWindow()
       usrFilesFilteru := filesFilter := CurrentSLD := ""
       WinSetTitle, ahk_id %PVhwnd%,, Loading files - please wait...
       renewCurrentFilesList()
@@ -6481,10 +6480,23 @@ OpenFiles(dummy:=0) {
 
 OpenArgFile(inputu) {
     imageLoading := 1
+    Global scriptStartTime := A_TickCount
+    ShowTheImage(inputu, 2)
+    Global scriptStartTime := A_TickCount
     zPlitPath(inputu, 0, OutFileName, OutDir)
+    If (vpIMGrotation>0)
+       zoomu := " @ " vpIMGrotation "°"
+    zoomu := " [" Round(zoomLevel * 100) "%" zoomu "]"
+    winPrefix := defineWinTitlePrefix()
+
+    SetTimer, GDIupdater, Off
     coreOpenFolder("|" OutDir, 0)
+    Global scriptStartTime := A_TickCount
     currentFileIndex := detectFileID(inputu)
-    IDshowImage(currentFileIndex)
+    winTitle := winPrefix currentFileIndex "/" maxFilesIndex zoomu " | " OutFileName " | " OutDir "\"
+    WinSetTitle, ahk_id %PVhwnd%,, % winTitle
+    RemoveTooltip()
+    ; IDshowImage(currentFileIndex)
     imageLoading := 0
 }
 
@@ -6824,17 +6836,40 @@ BuildTray() {
 }
 
 associateSLDsNow() {
-    lol := "`%`%1"
-    batch =
-    (Ltrim
-       assoc .sld=SlideShow
-       ftype SlideShow="%A_ScriptFullPath%" "%lol%"
-    )
+  FileAssociate("QPVslideshow",".sld", A_ScriptDir "\" A_ScriptName)
+}
 
-    FileAppend, %batch%, %A_ScriptDir%\assocu.bat
-    RunWait, *RunAs %A_ScriptDir%\assocu.bat
-    Sleep, 50
-    FileDelete, %A_ScriptDir%\assocu.bat
+associateWithImages() {
+  Static FileFormatsCommon := "png|bmp|gif|jpg|tif|tga|webp|jpeg|tiff|exr|hdr|psd"
+       , allFormats := "dib|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif"
+
+  Loop, Parse, FileFormatsCommon, "|"
+  {
+      If !A_LoopField
+         Continue
+
+      FileAssociate("QPVimage." A_LoopField,"." A_LoopField, mainCompiledPath "\" A_ScriptName,,1)
+  }
+
+  RunWait, *RunAs %mainCompiledPath%\regFiles\runThis.bat
+  FileDelete, %mainCompiledPath%\regFiles\*.reg
+  FileDelete, %mainCompiledPath%\regFiles\*.bat
+
+  MsgBox, 36, %appTitle%, %appTitle% was now associated with common image file formats. Would you like to associate it with all the 85 supported file formats?
+  IfMsgBox, Yes
+  {
+    Loop, Parse, allFormats, "|"
+    {
+        If !A_LoopField
+           Continue
+
+        FileAssociate("QPVimage." A_LoopField,"." A_LoopField, mainCompiledPath "\" A_ScriptName,,1)
+    }
+    RunWait, *RunAs %mainCompiledPath%\regFiles\runThis.bat
+    FileDelete, %mainCompiledPath%\regFiles\*.reg
+    FileDelete, %mainCompiledPath%\regFiles\*.bat
+  }
+
 }
 
 restartAppu() {
@@ -7071,7 +7106,10 @@ BuildMenu() {
 
    Menu, PVprefs, Add, Save settings into .SLD, WritePrefsIntoSLD
    If A_IsCompiled
+   {
       Menu, PVprefs, Add, Associate with .SLD files, associateSLDsNow
+      Menu, PVprefs, Add, Associate with image files, associateWithImages
+   }
 
    Menu, PVprefs, Add, 
    Menu, PVprefs, Add, &High quality resampling, ToggleImgQuality
@@ -7480,6 +7518,9 @@ defineWinTitlePrefix() {
 
    If StrLen(usrFilesFilteru)>1
       winPrefix .= "F "
+
+   If hSNDmedia
+      winPrefix .= "(A) "
 
    If (activateImgSelection=1)
       winPrefix .= "SEL "
@@ -10792,11 +10833,17 @@ GuiSize:
    PrevGuiSizeEvent := A_EventInfo
    prevGUIresize := A_TickCount
   ; If (imageLoading!=1) ; && (A_TickCount - startZeitIMGload>130)
+   thisZeit := A_TickCount - scriptStartTime
+   If (thisZeit>450)
       SetTimer, GDIupdater, -25
 Return
 
 GDIupdater() {
    updateUIctrl()
+   thisZeit := A_TickCount - scriptStartTime
+   If (thisZeit<450)
+      Return
+
    If (toolTipGuiCreated=1)
       TooltipCreator(1, 1)
 
@@ -10811,7 +10858,7 @@ GDIupdater() {
       Return 1
    }
 
-   If (A_TickCount - scriptStartTime<600) ;  || (imageLoading=1)
+   If (thisZeit<600) ;  || (imageLoading=1)
       Return 1
 
    If (slideShowRunning=1)
@@ -13784,4 +13831,75 @@ initCompiled() {
    mainSettingsFile := OutDir "\" mainSettingsFile
 }
 
+RunAdminMode() {
+  If !A_IsAdmin
+  {
+      Try {
+         If A_IsCompiled
+            Run *RunAs "%A_ScriptFullPath%" /restart
+         Else
+            Run *RunAs "%A_AhkPath%" /restart "%A_ScriptFullPath%"
+
+         ExitApp
+      }
+  }
+}
+
+FileAssociate(Label,Ext,Cmd,Icon:="", batchMode:=0) {
+; by Ħakito: https://autohotkey.com/boards/viewtopic.php?f=6&t=55638 
+; modified by Marius Șucan to AHK v1.1
+
+  ; Weeds out faulty extensions, which must start with a period, and contain more than 1 character
+  iF (SubStr(Ext,1,1)!="." || StrLen(Ext)<=1)
+     Return 0
+
+  ; Weeds out faulty labels such as ".exe" which is an extension and not a label
+  iF (SubStr(Label,1,1)=".")
+     Return 0
+
+  If Label
+     RegRead, CheckLabel, HKEY_CLASSES_ROOT\%Label%, FriendlyTypeName
+  ; Do not allow the modification of some important registry labels
+
+  iF (Cmd!="" && CheckLabel)
+     Return 0
+
+  regFile := "Windows Registry Editor Version 5.00`n`n"
+  ; Note that "HKEY_CLASSES_ROOT" actually writes to "HKEY_LOCAL_MACHINE\SOFTWARE\Classes"
+  ; If the command is just a simple path, then convert it into a proper run command
+  iF (SubStr(Cmd,2,2)=":\" && FileExist(Cmd))
+     Cmd := """" Cmd """" A_Space """" "%1" """"
+  Else
+     Return 0
+
+  Cmd := StrReplace(Cmd, "\", "\\")
+  Cmd := StrReplace(Cmd, """", "\""")
+  regFile .= "[HKEY_CLASSES_ROOT\" Ext "]`n@=" """" Label """" "`n"
+  regFile .= "`n[HKEY_CLASSES_ROOT\" Label "]`n@=" """" Label """" "`n"
+  regFile .= "`n[HKEY_CLASSES_ROOT\" Label "\Shell\Open\Command]`n@=" """" Cmd """" "`n"
+  regFile .= "`n[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\" Ext "\UserChoice]`n""ProgId""=" """" Label """" "`n"
+  regFile .= "`n[-HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FileExts\" Ext "\OpenWithProgids]`n"
+  regFile .= "`n[-HKEY_CLASSES_ROOT\" Ext "\OpenWithProgids]`n`n"
+
+  If Icon
+     regFile .= "`n[HKEY_CLASSES_ROOT\" QPVslideshow "\DefaultIcon]`n@=" Icon "`n`n"
+
+  If !InStr(FileExist(mainCompiledPath "\regFiles"), "D")
+     FileCreateDir, %mainCompiledPath%\regFiles
+
+  FileDelete, %mainCompiledPath%\regFiles\RegisterFileFormat%Ext%.reg
+  FileAppend, % regFile, %mainCompiledPath%\regFiles\RegisterFileFormat%Ext%.reg
+  runTarget := "Reg Import """ mainCompiledPath "\regFiles\RegisterFileFormat" Ext ".reg" """" "`n"
+  If !InStr("|WIN_7|WIN_8|WIN_8.1|WIN_VISTA|WIN_2003|WIN_XP|WIN_2000|", "|" A_OSVersion "|")
+     runTarget .= """" mainCompiledPath "\SetUserFTA.exe """ Ext A_Space Label "`n"
+  FileAppend, % runTarget, %mainCompiledPath%\regFiles\runThis.bat
+  If (batchMode!=1)
+  {
+     RunWait, *RunAs %mainCompiledPath%\regFiles\runThis.bat
+     FileDelete, %mainCompiledPath%\regFiles\RegisterFileFormat%Ext%.reg
+     FileDelete, %mainCompiledPath%\regFiles\runThis.bat
+  }
+
+  return 1
+}
 

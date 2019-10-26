@@ -2,6 +2,10 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v3.8.6 (2019-10-26)
+  - [new] option to associate with image file formats [works with Windows 10 ]; option only available if the script is compiled;
+    - on Windows 10, this makes use of SetUserFTA.exe developed by Christoph Kolbicz from http://kolbi.cz/blog/2017/10/25/setuserfta-userchoice-hash-defeated-set-file-type-associations-per-user/
+
 - v3.8.5 (2019-10-24)
   - [new] option to play associated sound files; MP3, WAV and WMA supported; slideshow speed based on audios duration; many thanks to SpeedMaster and burque505
   - [new] option to display the alpha channel
