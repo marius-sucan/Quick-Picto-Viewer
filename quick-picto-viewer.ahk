@@ -21,7 +21,7 @@
 
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 3.8.7
+;@Ahk2Exe-SetVersion 3.8.8
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
  
@@ -96,7 +96,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , FIMimgBPP, imageLoadedWithFIF, FIMformat, coreIMGzeitLoad, desiredFrameIndex := 0
    , diffIMGdecX := 0, diffIMGdecY := 0, anotherVPcache, oldZoomLevel := 0, fullPath2exe
    , hitTestSelectionPath, scrollBarHy := 0, scrollBarVx := 0, HistogramBMP, internalColorDepth := 0
-   , version := "3.8.7", vReleaseDate := "26/10/2019"
+   , version := "3.8.8", vReleaseDate := "27/10/2019"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1
@@ -3496,7 +3496,7 @@ PopulateImgInfos() {
 
    zPlitPath(resultu, 0, fileNamu, folderu)
    changeMcursor()
-   thumbBMP := LoadBitmapFromFileu(resultu, 0, 1)
+   thumbBMP := LoadBitmapFromFileu(resultu, 1)
    If thumbBMP
       Gdip_GetImageDimensions(thumbBMP, Width, Height)
 
@@ -3528,7 +3528,9 @@ PopulateImgInfos() {
 
    If (imageLoadedWithFIF=0)
    {
+      rawFmt := Gdip_GetImageRawFormat(thumbBMP)
       pixFmt := Gdip_GetImagePixelFormat(thumbBMP, 2)
+      LV_Add(A_Index, "Image file format", rawFmt)
       LV_Add(A_Index, "Image pixel format", pixFmt)
  
       If RegExMatch(resultu, "i)(.\.(gif|tif|tiff))$")
@@ -6813,7 +6815,7 @@ GetImgFileDimension(imgpath, ByRef W, ByRef H, fastWay:=1) {
 
    prevImgPath := thisImgPath
    changeMcursor()
-   pBitmap := LoadBitmapFromFileu(imgpath, 0, fastWay)
+   pBitmap := LoadBitmapFromFileu(imgPath, fastWay)
    prevW := W := Gdip_GetImageWidth(pBitmap)
    prevH := H := Gdip_GetImageHeight(pBitmap)
    If pBitmap
@@ -7410,14 +7412,13 @@ ToggleAlwaysFIMus() {
       friendly := "`n`nPlease install the Runtime Redistributable Packages of Visual Studio 2015."
    Else If InStr(r, "err - 404")
       friendly := "`n`nThe FreeImage.dll file seems to be missing..."
+   writeMainSettings()
 
    If (FIMfailed2init=1)
    {
       triggerOwnDialogs()
       Msgbox, 48, %appTitle%, ERROR: The FreeImage library failed to properly initialize. Various image file formats will no longer be supported. Error code: %r%.%friendly%
-   }
-
-   writeMainSettings()
+   } Else RefreshImageFile()
 }
 
 ToggleAnimGIFsupport() {
@@ -7518,7 +7519,7 @@ ToggleTouchMode() {
 }
 
 defineWinTitlePrefix() {
-   Static FXmodesLabels := {2:"cP", 3:"cA", 4:"cG", 5:"cR", 6:"cG", 7:"cB", 8:"cI"}
+   Static FXmodesLabels := {2:"cP", 3:"cAUTO", 4:"cGR", 5:"cR", 6:"cG", 7:"cB", 8:"cA", 9:"cI"}
 
    If StrLen(usrFilesFilteru)>1
       winPrefix .= "F "
@@ -8058,7 +8059,7 @@ ResizeImageGDIwin(imgpath, usePrevious, ForceIMGload) {
     If ((IMGresizingMode=1 || IMGresizingMode=2) && enableThumbsCaching=1)
     {
        MD5name := generateThumbName(imgPath)
-       file2load := thumbsCacheFolder "\big-" userHQraw MD5name ".png"
+       file2load := thumbsCacheFolder "\big-" alwaysOpenwithFIM userHQraw MD5name ".png"
        cachedImgFile := FileExist(file2load) ? 1 : 0
     } Else cachedImgFile := 0
 
@@ -8302,7 +8303,7 @@ calcScreenLimits() {
     lastInvoked := A_TickCount
 }
 
-RescaleBMPtiny(imgpath, imgW, imgH, ByRef ResizedW, ByRef ResizedH, actionu) {
+RescaleBMPtiny(imgPath, imgW, imgH, ByRef ResizedW, ByRef ResizedH, actionu) {
   Critical, on
   ; one quarter resolution
   Static prevImgPath, prevResizedW, prevResizedH
@@ -8312,7 +8313,7 @@ RescaleBMPtiny(imgpath, imgW, imgH, ByRef ResizedW, ByRef ResizedH, actionu) {
   If (actionu=1)
      Return "null"
 
-  If (imgpath=prevImgPath && gdiBitmapSmall && actionu!=1)
+  If (imgPath=prevImgPath && gdiBitmapSmall && actionu!=1)
   {
      ResizedW := prevResizedW
      ResizedH := prevResizedH
@@ -8421,8 +8422,8 @@ FreeImageLoader(imgPath, doBw, noBPPconv) {
      noPixels := (userHQraw=1 && thumbsDisplaying=0) ? 0 : 5
 
   changeMcursor()
-  hFIFimgA := FreeImage_Load(imgpath, -1, noPixels) ; load image
-  If (noBPPconv=0)
+  hFIFimgA := FreeImage_Load(imgPath, -1, noPixels) ; load image
+  If (noBPPconv=0 && RenderOpaqueIMG!=1)
      alphaBitmap := FreeImage_GetChannel(hFIFimgA, 4)
 
   imgBPP := Trim(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
@@ -8465,7 +8466,7 @@ FreeImageLoader(imgPath, doBw, noBPPconv) {
         pixelsColorTest3 := FreeImage_GetPixelIndex(hFIFimgR, imgW - 2, imgH - 2)
         If (pixelsColorTest1<20 && pixelsColorTest2<20 && pixelsColorTest3<20)
            mustTestThis := 1
-        Else If (pixelsColorTest1>245 && pixelsColorTest2>245 && pixelsColorTest3>245)
+        Else If (pixelsColorTest1>240 && pixelsColorTest2>240 && pixelsColorTest3>240)
            mustTestThis := 2
 
         If (mustTestThis=1 || mustTestThis=2)
@@ -8474,8 +8475,8 @@ FreeImageLoader(imgPath, doBw, noBPPconv) {
            pvBits := FreeImage_GetBits(hFIFimgR)
            bitmapInfo2 := FreeImage_GetInfo(hFIFimgR)
            testBMP := Gdip_CreateBitmapFromGdiDib(bitmapInfo2, pvBits)
-           testUniformity := Gdip_TestBitmapUniformity(testBMP, maxLevelIndex, maxLevelPixels)
-           If (testUniformity=1 && mustTestThis=1)
+           isUniform := Gdip_TestBitmapUniformity(testBMP, 3, maxLevelIndex, maxLevelPixels)
+           If (isUniform=1 && maxLevelIndex<6)
               FreeImage_Invert(hFIFimgR)
            Gdip_DisposeImage(testBMP)
         }
@@ -8483,7 +8484,7 @@ FreeImageLoader(imgPath, doBw, noBPPconv) {
         r := FreeImage_SetChannel(hFIFimgD, hFIFimgR, 4)
         FreeImage_UnLoad(hFIFimgR)
         FreeImage_UnLoad(alphaBitmap)
-        If (testUniformity=1 && mustTestThis=2)
+        If (isUniform=1 && mustTestThis=2 && maxLevelIndex>249)
            alphaBitmap := ""
      } Else hFIFimgD := FreeImage_ConvertTo(hFIFimgC, "24Bits")
 
@@ -8530,9 +8531,9 @@ FreeImageLoader(imgPath, doBw, noBPPconv) {
   Return pBitmap
 }
 
-LoadBitmapFromFileu(imgPath, doBw:=0, noBPPconv:=0, forceGDIp:=0) {
+LoadBitmapFromFileu(imgPath, noBPPconv:=0, forceGDIp:=0) {
   coreIMGzeitLoad := A_TickCount
-  If RegExMatch(imgPath, RegExFIMformPtrn) || (alwaysOpenwithFIM=1 && forceGDIp=1)
+  If RegExMatch(imgPath, RegExFIMformPtrn) || (alwaysOpenwithFIM=1 && forceGDIp=0)
   {
      oBitmap := FreeImageLoader(imgPath, doBw, noBPPconv)
      imageLoadedWithFIF := 1
@@ -8560,7 +8561,7 @@ CloneMainBMP(imgPath, cachedImgFile, ByRef imgW, ByRef imgH, ByRef CountFrames, 
   If gdiBitmap
      gdiBitmap := Gdip_DisposeImage(gdiBitmap, 1)
 
-  file2load := thumbsCacheFolder "\big-" userHQraw MD5name ".png"
+  file2load := thumbsCacheFolder "\big-" alwaysOpenwithFIM userHQraw MD5name ".png"
   ignoreCache := (RegExMatch(imgPath, "i)(.\.gif)$") && animGIFsSupport=1) || (AnyWindowOpen=5) ? 1 : mustReloadIMG
   If (AprevImgCall=thisImgCall && AprevGdiBitmap && ignoreCache=0)
   {
@@ -8577,7 +8578,7 @@ CloneMainBMP(imgPath, cachedImgFile, ByRef imgW, ByRef imgH, ByRef CountFrames, 
   }
 
   changeMcursor()
-  oBitmap := LoadBitmapFromFileu(imgPath, 1, 0)
+  oBitmap := LoadBitmapFromFileu(imgPath)
   slowFileLoad := (A_TickCount - coreIMGzeitLoad > 450) ? 1 : 0
   If !oBitmap
      Return "error"
@@ -8590,7 +8591,15 @@ CloneMainBMP(imgPath, cachedImgFile, ByRef imgW, ByRef imgH, ByRef CountFrames, 
   If (desiredFrameIndex>=totalFramesIndex)
      desiredFrameIndex := totalFramesIndex
 
-  If RegExMatch(imgPath, "i)(.\.(gif|tif|tiff))$")
+  rawFmt := Gdip_GetImageRawFormat(oBitmap)
+  If (rawFmt="png" && RenderOpaqueIMG!=1)
+  {
+     isUniform := Gdip_TestBitmapUniformity(oBitmap, 7, maxLevelIndex)
+     If (isUniform=1 && (valueBetween(maxLevelIndex, 0, 5) || valueBetween(maxLevelIndex, 250, 255)))
+        Gdip_BitmapSetColorDepth(oBitmap, 24)
+  }
+
+  If RegExMatch(rawFmt, "i)(gif|tiff)$")
   {
      If (totalFramesIndex>1 && slideShowRunning=1 && SlideHowMode=1)
         Random, desiredFrameIndex, 0, % totalFramesIndex
@@ -8604,7 +8613,7 @@ CloneMainBMP(imgPath, cachedImgFile, ByRef imgW, ByRef imgH, ByRef CountFrames, 
   totalIMGres := imgW + imgH
   totalScreenRes := ResolutionWidth + ResolutionHeight
 
-  If RegExMatch(imgPath, "i)(.\.gif)$") 
+  If (rawFmt="gif")
   {
      gifLoaded := 1
      If (animGIFsSupport=1)
@@ -8641,8 +8650,6 @@ CloneMainBMP(imgPath, cachedImgFile, ByRef imgW, ByRef imgH, ByRef CountFrames, 
      pixFmt := "0x26200A" ; 32-ARGB
   Else
      pixFmt := Gdip_GetImagePixelFormat(oBitmap, 1)
-
-  ; Tooltip, % Gdip_GetImageRawFormat(oBitmap),,,10
 
   rBitmap := Gdip_ResizeBitmap(oBitmap, newW, newH, 0, thisImgQuality, pixFmt)
   Gdip_DisposeImage(oBitmap, 1)
@@ -9795,12 +9802,12 @@ QPV_ShowImgonGuiPrev(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, ma
        Gdip_DisposeImageAttributes(imageAttribs)
     If (thisLowMode!=1)
        displayFastWas := (A_TickCount - thisZeit < 125) ? 1 : 0
-    If (CountFrames>1 && AnyWindowOpen=0 && animGIFsSupport=1 && (prevAnimGIFwas!=imgpath || (A_TickCount - lastGIFdestroy > 9500)))
+    If (CountFrames>1 && AnyWindowOpen=0 && animGIFsSupport=1 && (prevAnimGIFwas!=imgPath || (A_TickCount - lastGIFdestroy > 9500)))
     {
        Sleep, 15
-       prevAnimGIFwas := imgpath
+       prevAnimGIFwas := imgPath
        r2 := UpdateLayeredWindow(hGDIwin, glHDC, dummyPos, dummyPos, 1, 1)
-       GIFguiCreator(imgpath, 0, DestPosX, DestPosY, newW, newH, mainWidth, mainHeight)
+       GIFguiCreator(imgPath, 0, DestPosX, DestPosY, newW, newH, mainWidth, mainHeight)
     } Else
     {
        whichWin := (adjustNowSel=1) ? hGDIthumbsWin : hGDIwin
@@ -9952,14 +9959,18 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="") {
 
 QPV_ShowImgonGui(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, imgpath, CountFrames, ForceIMGload) {
     Critical, on
-    Static IDviewPortCache, PREVtestIDvPcache, 
+    Static IDviewPortCache, PREVtestIDvPcache
     If (ForceIMGload=1)
        IDviewPortCache := PREVtestIDvPcache := ""
 
     createGDIPcanvas(mainWidth, mainHeight)
-    testIDvPcache := imgPath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight
-    If (usePrevious=1 && testIDvPcache!=PREVtestIDvPcache) || (CountFrames>1) || (imgFxMode=8 && InStr(currentPixFmt, "argb") && RenderOpaqueIMG!=1)
+    testIDvPcache := imgPath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight desiredFrameIndex
+    If (CountFrames>1 && AnyWindowOpen=0 && animGIFsSupport=1 && (prevAnimGIFwas!=imgPath || (A_TickCount - lastGIFdestroy > 9500)))
+       mustPlayAnim := 1
+
+    If (usePrevious=1 && testIDvPcache!=PREVtestIDvPcache) || (mustPlayAnim=1) || (imgFxMode=8 && InStr(currentPixFmt, "argb") && RenderOpaqueIMG!=1)
     {
+       IDviewPortCache := PREVtestIDvPcache := ""
        r := QPV_ShowImgonGuiPrev(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, imgPath, CountFrames)
        Return r
     }
@@ -9991,7 +10002,7 @@ QPV_ShowImgonGui(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, mainHe
           Gdip_FillRectangle(glPG, pBrushWinBGR, DestPosX, DestPosY, newW, newH)
     }
 
-    thisIDviewPortCache := imgPath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight usePrevious
+    thisIDviewPortCache := imgPath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight usePrevious desiredFrameIndex
     If (thisIDviewPortCache!=IDviewPortCache || !ViewPortBMPcache || CountFrames>1) && (usePrevious!=1)
     {
        prevDestPosX := DestPosX
@@ -10066,8 +10077,8 @@ QPV_ShowImgonGui(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, mainHe
           }
 
           ViewPortBMPcache := Gdip_DisposeImage(ViewPortBMPcache, 1)
-          IDviewPortCache := imgPath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight usePrevious
-          PREVtestIDvPcache := imgPath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight
+          IDviewPortCache := imgPath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight usePrevious desiredFrameIndex
+          PREVtestIDvPcache := imgPath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight desiredFrameIndex
           ViewPortBMPcache := Gdip_CreateBitmapFromHBITMAP(glHbitmap)
           ; r2 := UpdateLayeredWindow(hGDIwin, hdc, dummyPos, dummyPos, mainWidth, mainHeight, 255)
        }
@@ -10435,8 +10446,6 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, mustShowNames:=0) {
 EraseThumbsCache(dummy:=0) {
    startZeit := A_TickCount
    showTOOLtip("Emptying thumbnails cache, please wait...")
-   IniDelete, % mainSettingsFile, AutoLevels
-   FileDelete, % thumbsCacheFolder "\colorsinfo.ini"
    prevMSGdisplay := A_TickCount
    countTFilez := countFilez := 0
    Loop, Files, %thumbsCacheFolder%\*.jpg
@@ -10517,18 +10526,18 @@ createThumbsFolder() {
     }
 }
 
-generateImgThumbCache(imgpath, newImgSize) {
+generateImgThumbCache(imgPath, newImgSize) {
     Critical, on
     r := createThumbsFolder()
     If (r="error")
        Return r
 
-    MD5name := generateThumbName(imgpath)
+    MD5name := generateThumbName(imgPath)
     file2save := thumbsCacheFolder "\" MD5name ".jpg"
-    thisImgFile := FileExist(file2save) ? file2save : imgpath
+    thisImgFile := FileExist(file2save) ? file2save : imgPath
     whichLIB := (thisImgFile=file2save) ? 1 : 0
     changeMcursor()
-    oBitmap := LoadBitmapFromFileu(thisImgFile, 0, 0, whichLIB)
+    oBitmap := LoadBitmapFromFileu(thisImgFile, 0, whichLIB)
     If !oBitmap
        Return "error"
 
@@ -10605,7 +10614,7 @@ QPV_ShowThumbnails(startIndex) {
         thisImgFile := FileExist(file2save) ? file2save : imgPath
         whichLIB := (thisImgFile=file2save) ? 1 : 0
         changeMcursor()
-        oBitmap := LoadBitmapFromFileu(thisImgFile, 0, 0, whichLIB)
+        oBitmap := LoadBitmapFromFileu(thisImgFile, 0, whichLIB)
         If oBitmap
            Gdip_GetImageDimensions(oBitmap, imgW, imgH)
         calcIMGdimensions(imgW, imgH, thumbsW, thumbsH, newW, newH)
@@ -10616,10 +10625,8 @@ QPV_ShowThumbnails(startIndex) {
 
         pixFmt := Gdip_GetImagePixelFormat(oBitmap, 2)
         If InStr(pixFmt, "ARGB")
-        {
-           whichBrush := (userimgQuality=1) ? pBrushHatch : pBrushHatchLow
-           Gdip_FillRectangle(G2, whichBrush, DestPosX, DestPosY, newW, newH)
-        }
+           Gdip_FillRectangle(G2, pBrushHatchLow, DestPosX, DestPosY, newW, newH)
+
         If (bwDithering=1 && imgFxMode=4)
            nullu := ""
         Else If (usrColorDepth>1 && (file2save=thisImgFile || enableThumbsCaching=0))
@@ -11381,8 +11388,7 @@ reverseArray(a) {
 coreResizeIMG(imgPath, newW, newH, file2save, goFX, toClippy, rotateAngle, soloMode:=1, imgW:=0, imgH:=0, batchMode:=0) {
     If (soloMode=1)
     {
-        doBw := (ResizeApplyEffects=1 || goFX=1) ? 1 : 0
-        oBitmap := LoadBitmapFromFileu(imgPath, doBw)
+        oBitmap := LoadBitmapFromFileu(imgPath)
         Gdip_GetImageDimensions(oBitmap, imgW, imgH)
         rr := (toClippy=1) ? "" : "error"
         If !newW
@@ -12601,7 +12607,7 @@ batchIMGresizer(desiredW, desiredH, isPercntg) {
          Break
       }
 
-      oBitmap := LoadBitmapFromFileu(imgPath, ResizeApplyEffects)
+      oBitmap := LoadBitmapFromFileu(imgPath)
       If !oBitmap
       {
          someErrors := "`nErrors occured during file operations..."

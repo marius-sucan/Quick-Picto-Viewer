@@ -6,6 +6,7 @@
 ;
 ; Gdip standard library versions:
 ; by Marius Șucan - gathered user-contributed functions and implemented hundreds of new functions
+; - v1.78 on 10/27/2019
 ; - v1.77 on 10/06/2019
 ; - v1.76 on 09/27/2019
 ; - v1.75 on 09/23/2019
@@ -47,6 +48,7 @@
 ; - v1.01 on 31/05/2008
 ;
 ; Detailed history:
+; - 10/27/2019 = Added 5 new GDI+ functions and bug fixes for Gdip_TestBitmapUniformity(), Gdip_RotateBitmapAtCenter() and Gdip_ResizeBitmap()
 ; - 10/06/2019 = Added more parameters to Gdip_GraphicsFromImage/HDC/HWND and added Gdip_GetPixelColor()
 ; - 09/27/2019 = bug fixes...
 ; - 09/23/2019 = Added 4 new functions and improved Gdip_CreateBitmap() [ Marius Șucan ]
@@ -785,7 +787,7 @@ Gdip_LibraryVersion() {
 ;                 Updated by Marius Șucan reflecting the work on Gdip_all extended compilation
 
 Gdip_LibrarySubVersion() {
-   return 1.77
+   return 1.78
 }
 
 ;#####################################################################################
@@ -2034,7 +2036,7 @@ Gdip_GetPixel(pBitmap, x, y) {
    ; should use Format("{1:#x}", ARGB)
 }
 
-Gdip_GetPixelColor(pBitmap, x, y, format) {
+Gdip_GetPixelColor(pBitmap, x, y, Format) {
    ARGBdec := Gdip_GetPixel(pBitmap, x, y)
    If (format=1)  ; in HEX
    {
@@ -2129,6 +2131,21 @@ Gdip_GetImageBounds(pBitmap) {
   }
 
   return rData
+}
+
+Gdip_GetImageRawFormat(pBitmap) {
+; retrieves the pBitmap [file] format
+
+  Static RawFormatsList := {"{B96B3CA9-0728-11D3-9D7B-0000F81EF32E}":"Undefined", "{B96B3CAA-0728-11D3-9D7B-0000F81EF32E}":"MemoryBMP", "{B96B3CAB-0728-11D3-9D7B-0000F81EF32E}":"BMP", "{B96B3CAC-0728-11D3-9D7B-0000F81EF32E}":"EMF", "{B96B3CAD-0728-11D3-9D7B-0000F81EF32E}":"WMF", "{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}":"JPEG", "{B96B3CAF-0728-11D3-9D7B-0000F81EF32E}":"PNG", "{B96B3CB0-0728-11D3-9D7B-0000F81EF32E}":"GIF", "{B96B3CB1-0728-11D3-9D7B-0000F81EF32E}":"TIFF", "{B96B3CB2-0728-11D3-9D7B-0000F81EF32E}":"EXIF", "{B96B3CB5-0728-11D3-9D7B-0000F81EF32E}":"Icon"}
+  Ptr := A_PtrSize ? "UPtr" : "UInt"
+  VarSetCapacity(pGuid, 16, 0)
+  E1 := DllCall("gdiplus\GdipGetImageRawFormat", Ptr, pBitmap, "Ptr", &pGuid)
+
+  size := VarSetCapacity(sguid, (38 << !!A_IsUnicode) + 1, 0)
+  E2 := DllCall("ole32.dll\StringFromGUID2", "ptr", &pguid, "ptr", &sguid, "int", size)
+  R1 := E2 ? StrGet(&sguid) : E2
+  R2 := RawFormatsList[R1]
+  Return R2 ? R2 : R1
 }
 
 Gdip_GetImagePixelFormat(pBitmap, mode:=0) {
@@ -3498,6 +3515,9 @@ Gdip_DeleteMatrix(hMatrix) {
 ;#####################################################################################
 
 Gdip_DrawOrientedString(pGraphics, String, FontName, Size, Style, X, Y, Width, Height, Angle:=0, pBrush:=0, pPen:=0, Align:=0, ScaleX:=1) {
+; FontName can be a name of an already installed font or it can point to a font file
+; to be loaded and used to draw the string.
+
 ; Size   - in em, in world units [font size]
 ; Remarks: a high value might be required; over 60, 90... to see the text.
 ; X, Y   - coordinates for the rectangle where the text will be drawn
@@ -3531,7 +3551,11 @@ Gdip_DrawOrientedString(pGraphics, String, FontName, Size, Style, X, Y, Width, H
    If (!pBrush && !pPen)
       Return -3
 
-   hFontFamily := Gdip_FontFamilyCreate(FontName)
+   If RegExMatch(Font, "^(.\:\\.)")
+      hFontFamily := Gdip_CreateFontFamilyFromFile(Font)
+   Else
+      hFontFamily := Gdip_FontFamilyCreate(FontName)
+
    If !hFontFamily
       hFontFamily := Gdip_FontFamilyCreateGeneric(1)
  
@@ -3575,6 +3599,9 @@ Gdip_DrawOrientedString(pGraphics, String, FontName, Size, Style, X, Y, Width, H
 }
 
 Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:="", Measure:=0, userBrush:=0, Unit:=0) {
+; Font parameter can be a name of an already installed font or it can point to a font file
+; to be loaded and used to draw the string.
+;
 ; Set Unit to 3 [Pts] to have the texts rendered at the same size
 ; with the texts rendered in GUIs with -DPIscale
 ;
@@ -3635,8 +3662,11 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
       Colour := "0x" (Colour && Colour[2] ? Colour[2] : "ff000000")
    Rendering := (Rendering && (Rendering[1] >= 0) && (Rendering[1] <= 5)) ? Rendering[1] : 4
    Size := (Size && (Size[1] > 0)) ? Size[2] ? IHeight*(Size[1]/100) : Size[1] : 12
+   If RegExMatch(Font, "^(.\:\\.)")
+      hFontFamily := Gdip_CreateFontFamilyFromFile(Font)
+   Else
+      hFontFamily := Gdip_FontFamilyCreate(Font)
 
-   hFontFamily := Gdip_FontFamilyCreate(Font)
    If !hFontFamily
       hFontFamily := Gdip_FontFamilyCreateGeneric(1)
 
@@ -3748,6 +3778,8 @@ Gdip_DrawStringAlongPolygon(pGraphics, String, FontName, FontSize, Style, pBrush
 ; If given, a pPath object will be segmented according to the precision defined by «flatness».
 ;
 ; pGraphics    - a pointer to a pGraphics object where to draw the text
+; FontName       can be the name of an already installed font or it can point to a font file
+;                to be loaded and used to draw the string.
 ; FontSize     - in em, in world units
 ;                a high value might be required; over 60, 90... to see the text.
 ; pBrush       - a pointer to a pBrush object to fill the text with
@@ -3793,9 +3825,14 @@ Gdip_DrawStringAlongPolygon(pGraphics, String, FontName, FontSize, Style, pBrush
    If (!pPath && !DriverPoints)
       Return -4
 
-   hFontFamily := Gdip_FontFamilyCreate(FontName)
+   If RegExMatch(Font, "^(.\:\\.)")
+      hFontFamily := Gdip_CreateFontFamilyFromFile(Font)
+   Else
+      hFontFamily := Gdip_FontFamilyCreate(FontName)
+
    If !hFontFamily
       hFontFamily := Gdip_FontFamilyCreateGeneric(1)
+
    If !hFontFamily
       Return -1
 
@@ -4071,8 +4108,32 @@ Gdip_FontFamilyCreate(FontName) {
    return hFontFamily
 }
 
+Gdip_CreateFontFamilyFromFile(FontFile, FontName := "") {
+; function by tmplinshi
+; source: https://www.autohotkey.com/boards/viewtopic.php?f=6&t=813&p=298435#p297794
+
+   DllCall("gdiplus\GdipNewPrivateFontCollection", "ptr*", hCollection)
+   ; FileRead, fontData, *c %FontFile%
+   ; DllCall("gdiplus\GdipPrivateAddMemoryFont", "ptr", hCollection, "ptr", &fontData, "uint", VarSetCapacity(fontData))
+   E := DllCall("gdiplus\GdipPrivateAddFontFile", "ptr", hCollection, "str", FontFile)
+
+   if (FontName="" && !E)
+   {
+      VarSetCapacity(pFontFamily, 10, 0)
+      DllCall("gdiplus\GdipGetFontCollectionFamilyList", "ptr", hCollection, "int", 1, "ptr", &pFontFamily, "int*", found)
+
+      VarSetCapacity(FontName, 100)
+      DllCall("gdiplus\GdipGetFamilyName", "ptr", NumGet(pFontFamily, 0, "ptr"), "str", FontName, "ushort", 1033)
+   }
+
+   If (hCollection && !E)
+      DllCall("gdiplus\GdipCreateFontFamilyFromName", "str", FontName, "ptr", hCollection, "uint*", hFontFamily)
+   Return hFontFamily
+}
+
+
 Gdip_FontFamilyCreateGeneric(whichStyle) {
-; This function returns a hFamily font object that uses a generic font.
+; This function returns a hFontFamily font object that uses a generic font.
 ;
 ; whichStyle options:
 ; 0 - monospace generic font 
@@ -6213,8 +6274,8 @@ Gdip_GetHistogram(pBitmap, whichFormat, ByRef newArrayA, ByRef newArrayB, ByRef 
    VarSetCapacity(ch2, numEntries * sizeofUInt)
    If (whichFormat=2)
       r := DllCall("gdiplus\GdipBitmapGetHistogram", "Ptr", pBitmap, "UInt", whichFormat, "UInt", numEntries, "Ptr", &ch0, "Ptr", &ch1, "Ptr", &ch2, "Ptr", 0)
-   Else If (whichFormat=3)
-      r:= DllCall("gdiplus\GdipBitmapGetHistogram", "Ptr", pBitmap, "UInt", whichFormat, "UInt", numEntries, "Ptr", &ch0, "Ptr", 0, "Ptr", 0, "Ptr", 0)
+   Else If (whichFormat>2)
+      r := DllCall("gdiplus\GdipBitmapGetHistogram", "Ptr", pBitmap, "UInt", whichFormat, "UInt", numEntries, "Ptr", &ch0, "Ptr", 0, "Ptr", 0, "Ptr", 0)
 
    Loop %numEntries%
    {
@@ -6815,37 +6876,43 @@ Gdip_RenderPixelsOpaque(pBitmap, pBrush:=0, alphaLevel:=0) {
     Return newBitmap
 }
 
-Gdip_TestBitmapUniformity(pBitmap, ByRef maxLevelIndex, ByRef maxLevelPixels) {
+Gdip_TestBitmapUniformity(pBitmap, HistogramFormat:=3, ByRef maxLevelIndex:=0, ByRef maxLevelPixels:=0) {
 ; This function tests whether the given pBitmap 
 ; is in a single shade [color] or not.
-; It retrieves the intensity/gray histogram and
-; checks how many pixels are for each level [0, 255].
+
+; If HistogramFormat parameter is set to 3, the function 
+; retrieves the intensity/gray histogram and checks
+; how many pixels are for each level [0, 255].
+;
 ; If all pixels are found at a single level,
 ; the return value is 1, because the pBitmap is considered
 ; uniform, in a single shade.
+;
+; One can set the HistogramFormat to 4 [R], 5 [G], 6 [B] or 7 [A]
+; to test for the uniformity of a specific channel.
+;
 ; A threshold value of 0.0005% of all the pixels, is used.
 ; This is to ensure that a few pixels do not change the status.
 
    LevelsArray := []
-   maxLevelIndex := maxLevelPixels := nrPixels := ""
+   maxLevelIndex := maxLevelPixels := nrPixels := 9
    Gdip_GetImageDimensions(pBitmap, Width, Height)
-   Gdip_GetHistogram(pBitmap, 3, LevelsArray, 0, 0)
+   Gdip_GetHistogram(pBitmap, HistogramFormat, LevelsArray, 0, 0)
    Loop, 256
    {
        nrPixels := Round(LevelsArray[A_Index - 1])
-       histoList .= nrPixels "|"
-       If (!maxLevel || nrPixels>maxLevel)
-       {
-          maxLevelPixels := nrPixels
-          maxLevelIndex := A_Index - 1
-       }
+       If (nrPixels>0)
+          histoList .= nrPixels "." A_Index - 1 "|"
    }
    Sort, histoList, NURD|
    histoList := Trim(histoList, "|")
    histoListSortedArray := StrSplit(histoList, "|")
-
+   maxLevel := StrSplit(histoListSortedArray[1], ".")
+   maxLevelIndex := maxLevel[2]
+   maxLevelPixels := maxLevel[1]
+   ; ToolTip, % maxLevelIndex " -- " maxLevelPixels " | " histoListSortedArray[1] "`n" histoList, , , 3
    pixelsThreshold := Round((Width * Height) * 0.0005) + 1
-   If (histoListSortedArray[2]<pixelsThreshold)
+   If (Floor(histoListSortedArray[2])<pixelsThreshold)
       Return 1
    Else 
       Return 0
@@ -6864,7 +6931,7 @@ Gdip_SetBitmapAlphaChannel(pBitmap, AlphaMaskBitmap) {
       Return -1
 
    newBitmap := Gdip_RenderPixelsOpaque(pBitmap)
-   alphaUniform := Gdip_TestBitmapUniformity(AlphaMaskBitmap, maxLevelIndex, maxLevelPixels)
+   alphaUniform := Gdip_TestBitmapUniformity(AlphaMaskBitmap, 3, maxLevelIndex, maxLevelPixels)
    If (alphaUniform=1)
    {
       ; if the given AlphaMaskBitmap is only in a single shade,
@@ -6985,7 +7052,7 @@ Gdip_BitmapSetColorDepth(pBitmap, bitsDepth, useDithering:=1) {
    Else If (bitsDepth=16)
       E := Gdip_BitmapConvertFormat(pBitmap, 0x21005, ditheringMode, 1, Colors, 1, Colors, 0, 0)
    Else If (bitsDepth=24)
-      E := Gdip_BitmapConvertFormat(pBitmap, 0x21808, 2, 1, Colors, 1, Colors, 0, 0)
+      E := Gdip_BitmapConvertFormat(pBitmap, 0x21808, 2, 1, 0, 0, 0, 0, 0)
    Else
       E := -1
    Return E
