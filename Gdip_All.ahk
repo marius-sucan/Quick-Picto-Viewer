@@ -6,6 +6,7 @@
 ;
 ; Gdip standard library versions:
 ; by Marius Șucan - gathered user-contributed functions and implemented hundreds of new functions
+; - v1.79 on 10/28/2019
 ; - v1.78 on 10/27/2019
 ; - v1.77 on 10/06/2019
 ; - v1.76 on 09/27/2019
@@ -48,6 +49,7 @@
 ; - v1.01 on 31/05/2008
 ;
 ; Detailed history:
+; - 10/28/2019 = Added 7 new GDI+ functions and fixes related to Gdip_CreateFontFamilyFromFile()
 ; - 10/27/2019 = Added 5 new GDI+ functions and bug fixes for Gdip_TestBitmapUniformity(), Gdip_RotateBitmapAtCenter() and Gdip_ResizeBitmap()
 ; - 10/06/2019 = Added more parameters to Gdip_GraphicsFromImage/HDC/HWND and added Gdip_GetPixelColor()
 ; - 09/27/2019 = bug fixes...
@@ -787,7 +789,7 @@ Gdip_LibraryVersion() {
 ;                 Updated by Marius Șucan reflecting the work on Gdip_all extended compilation
 
 Gdip_LibrarySubVersion() {
-   return 1.78
+   return 1.79
 }
 
 ;#####################################################################################
@@ -2705,6 +2707,11 @@ Gdip_ResetPenTransform(pPen) {
    Return DllCall("gdiplus\GdipResetPenTransform", Ptr, pPen)
 }
 
+Gdip_MultiplyPenTransform(pPen, hMatrix, matrixOrder:=0) {
+   Ptr := A_PtrSize ? "UPtr" : "UInt"
+   Return DllCall("gdiplus\GdipMultiplyPenTransform", Ptr, pPen, Ptr, hMatrix, "int", matrixOrder)
+}
+
 Gdip_RotatePenTransform(pPen, Angle, matrixOrder:=0) {
    Ptr := A_PtrSize ? "UPtr" : "UInt"
    Return DllCall("gdiplus\GdipRotatePenTransform", Ptr, pPen, "float", Angle, "int", matrixOrder)
@@ -3228,6 +3235,11 @@ Gdip_TranslateTextureTransform(pTexBrush, X, Y, MatrixOrder:=0) {
    return DllCall("gdiplus\GdipTranslateTextureTransform", Ptr, pTexBrush, "float", X, "float", Y, "int", MatrixOrder)
 }
 
+Gdip_MultiplyTextureTransform(pTexBrush, hMatrix, matrixOrder:=0) {
+   Ptr := A_PtrSize ? "UPtr" : "UInt"
+   Return DllCall("gdiplus\GdipMultiplyTextureTransform", Ptr, pTexBrush, Ptr, hMatrix, "int", matrixOrder)
+}
+
 Gdip_SetTextureTransform(pTexBrush, hMatrix) {
    Ptr := A_PtrSize ? "UPtr" : "UInt"
    return DllCall("gdiplus\GdipSetTextureTransform", Ptr, pTexBrush, Ptr, hMatrix)
@@ -3364,6 +3376,11 @@ Gdip_ResetLinearGrBrushTransform(pLinearGradientBrush) {
 Gdip_ScaleLinearGrBrushTransform(pLinearGradientBrush, ScaleX, ScaleY, matrixOrder:=0) {
    Ptr := A_PtrSize ? "UPtr" : "UInt"
    return DllCall("gdiplus\GdipScaleLineTransform", Ptr, pLinearGradientBrush, "float", ScaleX, "float", ScaleY, "int", matrixOrder)
+}
+
+Gdip_MultiplyLinearGrBrushTransform(pLinearGradientBrush, hMatrix, matrixOrder:=0) {
+   Ptr := A_PtrSize ? "UPtr" : "UInt"
+   Return DllCall("gdiplus\GdipMultiplyLineTransform", Ptr, pLinearGradientBrush, Ptr, hMatrix, "int", matrixOrder)
 }
 
 Gdip_TranslateLinearGrBrushTransform(pLinearGradientBrush, X, Y, matrixOrder:=0) {
@@ -3551,16 +3568,21 @@ Gdip_DrawOrientedString(pGraphics, String, FontName, Size, Style, X, Y, Width, H
    If (!pBrush && !pPen)
       Return -3
 
-   If RegExMatch(Font, "^(.\:\\.)")
-      hFontFamily := Gdip_CreateFontFamilyFromFile(Font)
-   Else
-      hFontFamily := Gdip_FontFamilyCreate(FontName)
+   If RegExMatch(FontName, "^(.\:\\.)")
+   {
+      hFontCollection := Gdip_NewPrivateFontCollection()
+      hFontFamily := Gdip_CreateFontFamilyFromFile(FontName, hFontCollection)
+   } Else hFontFamily := Gdip_FontFamilyCreate(FontName)
 
    If !hFontFamily
       hFontFamily := Gdip_FontFamilyCreateGeneric(1)
  
    If !hFontFamily
+   {
+      If hFontCollection
+         Gdip_DeletePrivateFontCollection(hFontCollection)
       Return -1
+   }
 
    FormatStyle := 0x4000
    hStringFormat := Gdip_StringFormatCreate(FormatStyle)
@@ -3570,6 +3592,8 @@ Gdip_DrawOrientedString(pGraphics, String, FontName, Size, Style, X, Y, Width, H
    If !hStringFormat
    {
       Gdip_DeleteFontFamily(hFontFamily)
+      If hFontCollection
+         Gdip_DeletePrivateFontCollection(hFontCollection)
       Return -2
    }
 
@@ -3595,6 +3619,8 @@ Gdip_DrawOrientedString(pGraphics, String, FontName, Size, Style, X, Y, Width, H
    Gdip_DeleteStringFormat(hStringFormat)
    Gdip_DeleteFontFamily(hFontFamily)
    Gdip_DeletePath(pPath)
+   If hFontCollection
+      Gdip_DeletePrivateFontCollection(hFontCollection)
    Return E ? E : PathBounds
 }
 
@@ -3663,9 +3689,10 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
    Rendering := (Rendering && (Rendering[1] >= 0) && (Rendering[1] <= 5)) ? Rendering[1] : 4
    Size := (Size && (Size[1] > 0)) ? Size[2] ? IHeight*(Size[1]/100) : Size[1] : 12
    If RegExMatch(Font, "^(.\:\\.)")
-      hFontFamily := Gdip_CreateFontFamilyFromFile(Font)
-   Else
-      hFontFamily := Gdip_FontFamilyCreate(Font)
+   {
+      hFontCollection := Gdip_NewPrivateFontCollection()
+      hFontFamily := Gdip_CreateFontFamilyFromFile(Font, hFontCollection)
+   } Else hFontFamily := Gdip_FontFamilyCreate(Font)
 
    If !hFontFamily
       hFontFamily := Gdip_FontFamilyCreateGeneric(1)
@@ -3675,6 +3702,7 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
    hStringFormat := Gdip_StringFormatCreate(FormatStyle)
    If !hStringFormat
       hStringFormat := Gdip_StringFormatGetGeneric(1)
+
    pBrush := PassBrush ? pBrush : Gdip_BrushCreateSolid(Colour)
    if !(hFontFamily && hFont && hStringFormat && pBrush && pGraphics)
    {
@@ -3687,6 +3715,8 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
          Gdip_DeleteFont(hFont)
       If hFontFamily
          Gdip_DeleteFontFamily(hFontFamily)
+      If hFontCollection
+         Gdip_DeletePrivateFontCollection(hFontCollection)
       return E
    }
 
@@ -3720,6 +3750,8 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
    Gdip_DeleteStringFormat(hStringFormat)
    Gdip_DeleteFont(hFont)
    Gdip_DeleteFontFamily(hFontFamily)
+   If hFontCollection
+      Gdip_DeletePrivateFontCollection(hFontCollection)
    return _E ? _E : ReturnRC
 }
 
@@ -3825,20 +3857,27 @@ Gdip_DrawStringAlongPolygon(pGraphics, String, FontName, FontSize, Style, pBrush
    If (!pPath && !DriverPoints)
       Return -4
 
-   If RegExMatch(Font, "^(.\:\\.)")
-      hFontFamily := Gdip_CreateFontFamilyFromFile(Font)
-   Else
-      hFontFamily := Gdip_FontFamilyCreate(FontName)
+   If RegExMatch(FontName, "^(.\:\\.)")
+   {
+      hFontCollection := Gdip_NewPrivateFontCollection()
+      hFontFamily := Gdip_CreateFontFamilyFromFile(FontName, hFontCollection)
+   } Else hFontFamily := Gdip_FontFamilyCreate(FontName)
 
    If !hFontFamily
       hFontFamily := Gdip_FontFamilyCreateGeneric(1)
 
    If !hFontFamily
+   {
+      If hFontCollection
+         Gdip_DeletePrivateFontCollection(hFontCollection)
       Return -1
+   }
 
    hFont := Gdip_FontCreate(hFontFamily, FontSize, Style, Unit)
    If !hFont
    {
+      If hFontCollection
+         Gdip_DeletePrivateFontCollection(hFontCollection)
       Gdip_DeleteFontFamily(hFontFamily)
       Return -2
    }
@@ -3846,7 +3885,13 @@ Gdip_DrawStringAlongPolygon(pGraphics, String, FontName, FontSize, Style, pBrush
    Points := StrSplit(DriverPoints, "|")
    PointsCount := Points.Length()
    If (PointsCount<2)
+   {
+      If hFontCollection
+         Gdip_DeletePrivateFontCollection(hFontCollection)
+      Gdip_DeleteFont(hFont)
+      Gdip_DeleteFontFamily(hFontFamily)
       Return -3
+   }
 
    txtLen := StrLen(String)
    If (PointsCount<txtLen)
@@ -3861,9 +3906,12 @@ Gdip_DrawStringAlongPolygon(pGraphics, String, FontName, FontSize, Style, pBrush
       }
       String := SubStr(String, 1, totalResult)
    } Else newDriverPoints := DriverPoints
+
    E := Gdip_DrawDrivenString(pGraphics, String, hFont, pBrush, newDriverPoints, 1, hMatrix)
    Gdip_DeleteFont(hFont)
    Gdip_DeleteFontFamily(hFontFamily)
+   If hFontCollection
+      Gdip_DeletePrivateFontCollection(hFontCollection)
    return E   
 }
 
@@ -4108,29 +4156,42 @@ Gdip_FontFamilyCreate(FontName) {
    return hFontFamily
 }
 
-Gdip_CreateFontFamilyFromFile(FontFile, FontName := "") {
+Gdip_NewPrivateFontCollection() {
+   DllCall("gdiplus\GdipNewPrivateFontCollection", "ptr*", hFontCollection)
+   Return hFontCollection
+}
+
+Gdip_DeletePrivateFontCollection(hFontCollection) {
+   Return DllCall("gdiplus\GdipDeletePrivateFontCollection", "ptr*", hFontCollection)
+}
+
+Gdip_CreateFontFamilyFromFile(FontFile, hFontCollection, FontName:="") {
+; hFontCollection - the collection to add the font to
+; Pass the result of Gdip_NewPrivateFontCollection() to this parameter
+; to create a private collection of fonts.
+; After no longer needing the private fonts, use Gdip_DeletePrivateFontCollection()
+; to free up resources.
+;
 ; function by tmplinshi
 ; source: https://www.autohotkey.com/boards/viewtopic.php?f=6&t=813&p=298435#p297794
+; modified by Marius Șucan
+   If !hFontCollection
+      Return
 
-   DllCall("gdiplus\GdipNewPrivateFontCollection", "ptr*", hCollection)
-   ; FileRead, fontData, *c %FontFile%
-   ; DllCall("gdiplus\GdipPrivateAddMemoryFont", "ptr", hCollection, "ptr", &fontData, "uint", VarSetCapacity(fontData))
-   E := DllCall("gdiplus\GdipPrivateAddFontFile", "ptr", hCollection, "str", FontFile)
-
+   E := DllCall("gdiplus\GdipPrivateAddFontFile", "ptr", hFontCollection, "str", FontFile)
    if (FontName="" && !E)
    {
       VarSetCapacity(pFontFamily, 10, 0)
-      DllCall("gdiplus\GdipGetFontCollectionFamilyList", "ptr", hCollection, "int", 1, "ptr", &pFontFamily, "int*", found)
+      DllCall("gdiplus\GdipGetFontCollectionFamilyList", "ptr", hFontCollection, "int", 1, "ptr", &pFontFamily, "int*", found)
 
       VarSetCapacity(FontName, 100)
       DllCall("gdiplus\GdipGetFamilyName", "ptr", NumGet(pFontFamily, 0, "ptr"), "str", FontName, "ushort", 1033)
    }
 
-   If (hCollection && !E)
-      DllCall("gdiplus\GdipCreateFontFamilyFromName", "str", FontName, "ptr", hCollection, "uint*", hFontFamily)
+   If !E
+      DllCall("gdiplus\GdipCreateFontFamilyFromName", "str", FontName, "ptr", hFontCollection, "uint*", hFontFamily)
    Return hFontFamily
 }
-
 
 Gdip_FontFamilyCreateGeneric(whichStyle) {
 ; This function returns a hFontFamily font object that uses a generic font.
@@ -4787,6 +4848,11 @@ Gdip_ScaleWorldTransform(pGraphics, ScaleX, ScaleY, MatrixOrder:=0) {
 
 Gdip_TranslateWorldTransform(pGraphics, x, y, MatrixOrder:=0) {
    return DllCall("gdiplus\GdipTranslateWorldTransform", A_PtrSize ? "UPtr" : "UInt", pGraphics, "float", x, "float", y, "int", MatrixOrder)
+}
+
+Gdip_MultiplyWorldTransform(pGraphics, hMatrix, matrixOrder:=0) {
+   Ptr := A_PtrSize ? "UPtr" : "UInt"
+   Return DllCall("gdiplus\GdipMultiplyWorldTransform", Ptr, pGraphics, Ptr, hMatrix, "int", matrixOrder)
 }
 
 Gdip_ResetWorldTransform(pGraphics) {
@@ -6155,6 +6221,11 @@ Gdip_PathGradientScaleTransform(pPathGradientBrush, ScaleX, ScaleY, matrixOrder:
 Gdip_PathGradientTranslateTransform(pPathGradientBrush, X, Y, matrixOrder:=0) {
    Ptr := A_PtrSize ? "UPtr" : "UInt"
    Return DllCall("gdiplus\GdipTranslatePathGradientTransform", Ptr, pPathGradientBrush, "float", X, "float", Y, "int", matrixOrder)
+}
+
+Gdip_PathGradientMultiplyTransform(pPathGradientBrush, hMatrix, matrixOrder:=0) {
+   Ptr := A_PtrSize ? "UPtr" : "UInt"
+   Return DllCall("gdiplus\GdipMultiplyPathGradientTransform", Ptr, pPathGradientBrush, Ptr, hMatrix, "int", matrixOrder)
 }
 
 Gdip_PathGradientSetTransform(pPathGradientBrush, pMatrix) {

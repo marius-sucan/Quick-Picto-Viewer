@@ -21,7 +21,7 @@
 
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 3.8.8
+;@Ahk2Exe-SetVersion 3.8.9
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
  
@@ -96,7 +96,8 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , FIMimgBPP, imageLoadedWithFIF, FIMformat, coreIMGzeitLoad, desiredFrameIndex := 0
    , diffIMGdecX := 0, diffIMGdecY := 0, anotherVPcache, oldZoomLevel := 0, fullPath2exe
    , hitTestSelectionPath, scrollBarHy := 0, scrollBarVx := 0, HistogramBMP, internalColorDepth := 0
-   , version := "3.8.8", vReleaseDate := "27/10/2019"
+   , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
+   , version := "3.8.9", vReleaseDate := "28/10/2019"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1
@@ -121,6 +122,12 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1
    , RenderOpaqueIMG := 1, vpIMGrotation := 0, usrTextAlign := "Left", autoPlaySNDs := 1
    , ResizeCropAfterRotation := 1, usrColorDepth := 1, ColorDepthDithering := 1, mediaSNDvolume := 80
 
+RegRead, InitCheckReg, %QPVregEntry%, Running
+RegRead, InitTimeReg, %QPVregEntry%, LastStartTime
+; MsgBox, % InitTimeReg " --- " InitCheckRes
+If ((A_TickCount - InitTimeReg < 600)  && IsNumber(InitTimeReg) && (InitCheckReg=1) && InitTimeReg>0)
+   ExitApp
+
 DetectHiddenWindows, On
 CoordMode, Mouse, Screen
 CoordMode, ToolTip, Screen
@@ -129,9 +136,11 @@ OnExit, Cleanup
 If A_IsCompiled
    initCompiled()
 
-if !(GDIPToken := Gdip_Startup())
+thisGDIPversion := Gdip_LibrarySubVersion()
+GDIPToken := Gdip_Startup()
+if (!GDIPToken || thisGDIPversion<1.78)
 {
-   Msgbox, 48, %appTitle%, ERROR: unable to initialize GDI+...`n`nThe program will now exit.
+   MsgBox, 48, %appTitle%, ERROR: unable to initialize GDI+...`n`nThe program will now exit.`n`nRequired GDI+ library wrapper: v1.78 - extended compilation edition.
    ExitApp
 }
 
@@ -142,6 +151,7 @@ OnMessage(0x202, "ResetLbtn") ; WM_LBUTTONUP
 OnMessage(0x2a3, "ResetLbtn") ; WM_MOUSELEAVE
 If (A_OSVersion="WIN_7")
    OnMessage(0x216, "WM_MOVING")
+
 ; OnMessage(0x388, "WM_PENEVENT")
 OnMessage(0x200, "WM_MOUSEMOVE")
 OnMessage(0x06, "activateMainWin")   ; WM_ACTIVATE 
@@ -149,6 +159,8 @@ OnMessage(0x08, "activateMainWin")   ; WM_KILLFOCUS
 Loop, 9
     OnMessage(255+A_Index, "PreventKeyPressBeep")   ; 0x100 to 0x108
 
+RegWrite, REG_SZ, %QPVregEntry%, Running, 1
+RegWrite, REG_SZ, %QPVregEntry%, LastStartTime, % A_TickCount
 IniRead, FirstRun, % mainSettingsFile, General, FirstRun, @
 If (FirstRun!=0)
 {
@@ -703,7 +715,7 @@ identifyThisWin(noReact:=0) {
     Return
 
     ~F5 Up::
-       RefreshImageFile()
+       RefreshImageFileAction()
     Return
 
     ~+F5 Up::
@@ -1049,9 +1061,50 @@ OpenThisFileFolder() {
 }
 
 OpenThisFile() {
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-    IDshowImage(currentFileIndex, 1)
+  Static lastInvoked := 1
+
+  imgPath := resultedFilesList[currentFileIndex]
+  zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, Ext)
+  labelu := "QPVimage." Ext
+
+  RegRead, regEntryA, HKEY_CLASSES_ROOT\.%Ext%
+  If (regEntryA=labelu)
+     testA := 1
+
+  RegRead, regEntryB, HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.%Ext%\UserChoice, ProgId
+  If (regEntryB=labelu)
+     testB := 1
+
+  If (slideShowRunning=1)
+     ToggleSlideShowu()
+
+  If (GIFsGuiCreated=1)
+     DestroyGIFuWin()
+
+  isAssociated := (testA=1 && testB=1) ? 1 : 0
+  newInstanceOption := (A_IsCompiled) ? 1 : 0
+  InvokeOpenWithMenu(imgPath, newInstanceOption)
+}
+
+OpenNewQPVinstance() {
+   imgPath := resultedFilesList[currentFileIndex]
+   Run, "%fullPath2exe%" "%imgPath%"
+}
+
+OpenWithDefaultApp() {
+  IDshowImage(currentFileIndex, 1)
+}
+
+InvokeOpenWithMenu(imgPath, newInstanceOption) {
+    CreateOpenWithMenu(imgPath)
+    Menu, OpenWithMenu, Add,
+    If (newInstanceOption=1)
+       Menu, OpenWithMenu, Add, &0. Open file in a new instance, OpenNewQPVinstance
+    Menu, OpenWithMenu, Add, &1. Open with default application, OpenWithDefaultApp
+    Menu, OpenWithMenu, Add, &2. «Open with» dialog, invokeSHopenWith
+    Menu, OpenWithMenu, Add,
+    Menu, OpenWithMenu, Add, &Cancel, dummy
+    showThisMenu("OpenWithMenu")
 }
 
 IncreaseSlideSpeed() {
@@ -1064,8 +1117,9 @@ IncreaseSlideSpeed() {
 
 resetSlideshowTimer(showMsg) {
    If (easySlideStoppage=1 && slideShowRunning=1)
+   {
       ToggleSlideShowu()
-   Else If (slideShowRunning=1)
+   } Else If (slideShowRunning=1)
    {
       ToggleSlideShowu()
       Sleep, 1
@@ -1267,6 +1321,7 @@ TrueCleanup() {
    If (A_TickCount - lastInvoked < 900)
       Return
 
+   RegWrite, REG_SZ, %QPVregEntry%, Running, 0
    If hitTestSelectionPath
    {
       editingSelectionNow := activateImgSelection := 0
@@ -6408,6 +6463,15 @@ coreOpenFolder(thisFolder, doOptionals:=1) {
    }
 }
 
+RefreshImageFileAction() {
+   If (thumbsDisplaying!=1)
+   {
+      RefreshImageFile()
+      showTOOLtip("Image file reloaded...")
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+   } Else RefreshFilesList()
+}
+
 RefreshImageFile() {
    ; disposeCacheIMGs()
    r := IDshowImage(currentFileIndex, 3)
@@ -6483,6 +6547,7 @@ OpenFiles(dummy:=0) {
 OpenArgFile(inputu) {
     imageLoading := 1
     Global scriptStartTime := A_TickCount
+    currentFileIndex := 0
     ShowTheImage(inputu, 2)
     Global scriptStartTime := A_TickCount
     zPlitPath(inputu, 0, OutFileName, OutDir)
@@ -7889,7 +7954,7 @@ ShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
    Static prevImgPath, lastInvoked2 := 1, counteru
         , lastInvoked := 1, prevPicCtrl := 1
 
-   WinGet, winStateu, MinMax , ahk_id %PVhwnd%
+   WinGet, winStateu, MinMax, ahk_id %PVhwnd%
    If (winStateu=-1)
       Return
 
@@ -7936,7 +8001,7 @@ ShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
       usePrevious := 0
       ForceIMGload := 1
    }
-
+   ; ToolTip, % AprevImgCall "`n" BprevImgCall "`n" imgPath,,,2
    If (InStr(AprevImgCall, imgPath) || InStr(BprevImgCall, imgPath)) && (ForceIMGload=0)
       ignoreFileCheck := 1
 
@@ -8200,7 +8265,7 @@ ResizeImageGDIwin(imgpath, usePrevious, ForceIMGload) {
    Return r
 }
 
-drawinfoBox(mainWidth, mainHeight) {
+drawinfoBox(mainWidth, mainHeight, imgPath) {
     maxSelX := prevMaxSelX, maxSelY := prevMaxSelY
     filesElected := getSelectedFiles()
     infoFilesSel := (filesElected>0) ? "`nFiles selected: " filesElected : ""
@@ -8208,7 +8273,6 @@ drawinfoBox(mainWidth, mainHeight) {
     If (totalFramesIndex>0)
        infoFrames := "`nMultiple pages: "  desiredFrameIndex " / " totalFramesIndex
 
-    imgPath := resultedFilesList[currentFileIndex]
     zPlitPath(imgPath, 0, fileNamu, folderu, OutNameNoExt)
     FileGetSize, fileSizu, % ImgPath, K
     FileGetTime, FileDateM, % ImgPath, M
@@ -8253,7 +8317,7 @@ drawinfoBox(mainWidth, mainHeight) {
     If (totalZeit>=10)
        InfoLoadTime := "`nViewport refresh speed: ~" totalZeit " milisec."
 
-    thisSNDfile :=  IdentifyAudioFileAssociated()
+    thisSNDfile := IdentifyAudioFileAssociated()
     If thisSNDfile
     {
        zPlitPath(thisSNDfile, 0, OutFileName, null)
@@ -8275,7 +8339,8 @@ drawinfoBox(mainWidth, mainHeight) {
     }
 
     infoColors := "`nColors display mode: " DefineFXmodes() " [" currentPixFmt "]"
-    entireString := folderu "\`n[ " currentFileIndex " / " maxFilesIndex " ] " fileNamu fileMsg infoRes infoSizing infoMirroring infoColors infoColorDepth infoFrames InfoLoadTime infoFilesSel infoAudio infoSlider infoSelection infoFilteru
+    fileRelatedInfos := (StrLen(folderu)>3) ? folderu "\`n[ " currentFileIndex " / " maxFilesIndex " ] " fileNamu fileMsg : ""
+    entireString := fileRelatedInfos infoRes infoSizing infoMirroring infoColors infoColorDepth infoFrames InfoLoadTime infoFilesSel infoAudio infoSlider infoSelection infoFilteru
     infoBoxBMP := drawTextInBox(entireString, OSDFontName, OSDfntSize//1.1, mainWidth//1.3, mainHeight//1.3, OSDtextColor, "0xFF" OSDbgrColor, 1, 1)
     Gdip_DrawImage(glPG, infoBoxBMP, 0, 0,,,,,,, 0.85)
     infoBoxBMP := Gdip_DisposeImage(infoBoxBMP, 1)
@@ -8554,7 +8619,7 @@ CloneMainBMP(imgPath, cachedImgFile, ByRef imgW, ByRef imgH, ByRef CountFrames, 
   MD5name := generateThumbName(imgPath, 1)
   mustNotReloadFile := (prevMD5name=MD5name) ? 1 : 0
   o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
-  thisImgCall := MD5name o_bwDithering vpIMGrotation RenderOpaqueIMG cachedImgFile
+  thisImgCall := MD5name o_bwDithering vpIMGrotation RenderOpaqueIMG cachedImgFile imgPath
   If !FileRexists(imgPath) && (InStr(AprevImgCall, imgPath) || InStr(BprevImgCall, imgPath))
      thisImgCall := InStr(AprevImgCall, imgPath) ? AprevImgCall : BprevImgCall
 
@@ -8579,11 +8644,11 @@ CloneMainBMP(imgPath, cachedImgFile, ByRef imgW, ByRef imgH, ByRef CountFrames, 
 
   changeMcursor()
   oBitmap := LoadBitmapFromFileu(imgPath)
-  slowFileLoad := (A_TickCount - coreIMGzeitLoad > 450) ? 1 : 0
   If !oBitmap
      Return "error"
 
   hasFullReloaded := 1
+  slowFileLoad := (A_TickCount - coreIMGzeitLoad > 450) ? 1 : 0
   totalFramesIndex := Gdip_GetBitmapFramesCount(oBitmap) - 1
   If (totalFramesIndex<0)
      totalFramesIndex := 0
@@ -8637,7 +8702,7 @@ CloneMainBMP(imgPath, cachedImgFile, ByRef imgW, ByRef imgH, ByRef CountFrames, 
      newH := imgH
 
   BprevImgCall := AprevImgCall
-  AprevImgCall := MD5name o_bwDithering vpIMGrotation RenderOpaqueIMG cachedImgFile
+  AprevImgCall := MD5name o_bwDithering vpIMGrotation RenderOpaqueIMG cachedImgFile imgPath
   thisImgQuality := (userimgQuality=1 && mustSaveFile) ? 7 : 5
   changeMcursor()
   pixFmt := Gdip_GetImagePixelFormat(oBitmap, 2)
@@ -9268,7 +9333,7 @@ maxU(val1, val2, val3:="null") {
   Return a
 }
 
-drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY) {
+drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, imgPath) {
     Static prevImgPath, lastInvoked := 1
 
     maxSelX := prevMaxSelX, maxSelY := prevMaxSelY
@@ -9278,7 +9343,7 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY) {
     lineThickns2 := lineThickns//4
     If (showHistogram=1)
     {
-       thisImgCall := resultedFilesList[currentFileIndex] currentFileIndex zoomLevel IMGresizingMode imgFxMode
+       thisImgCall := imgPath currentFileIndex zoomLevel IMGresizingMode imgFxMode
        If (imgFxMode!=1 || IMGresizingMode!=1)
        {
           prevImgPath := 0
@@ -9631,7 +9696,7 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY) {
     }
 
     If (showInfoBoxHUD=1 && !AnyWindowOpen)
-       drawinfoBox(mainWidth, mainHeight)
+       drawinfoBox(mainWidth, mainHeight, imgPath)
 }
 
 generateThumbName(imgPath, forceThis:=0) {
@@ -9796,7 +9861,7 @@ QPV_ShowImgonGuiPrev(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, ma
     prevDestPosX := DestPosX
     prevDestPosY := DestPosY
     whichMode := (imgFxMode=8) ? 1 : 2
-    drawHUDelements(whichMode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY)
+    drawHUDelements(whichMode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, imgPath)
     Gdip_ResetWorldTransform(glPG)
     If imageAttribs
        Gdip_DisposeImageAttributes(imageAttribs)
@@ -9957,7 +10022,7 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="") {
      }
 }
 
-QPV_ShowImgonGui(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, imgpath, CountFrames, ForceIMGload) {
+QPV_ShowImgonGui(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, imgPath, CountFrames, ForceIMGload) {
     Critical, on
     Static IDviewPortCache, PREVtestIDvPcache
     If (ForceIMGload=1)
@@ -10120,7 +10185,7 @@ QPV_ShowImgonGui(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, mainHe
     } Else Gdip_FillRectangle(glPG, pBrushWinBGR, -1, -1, mainWidth+2, mainHeight+2)
     Gdip_ResetClip(glPG)
 
-    drawHUDelements(1, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY)
+    drawHUDelements(1, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, imgPath)
     whichWin := (adjustNowSel=1) ? hGDIthumbsWin : hGDIwin
     If (mustDisplay=1)
        r2 := UpdateLayeredWindow(whichWin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight, 255)
@@ -11511,7 +11576,6 @@ coreResizeIMG(imgPath, newW, newH, file2save, goFX, toClippy, rotateAngle, soloM
 
     thumbBMP := Gdip_CreateBitmap(zImgSelW, zImgSelH, pixFmt)
     G2 := Gdip_GraphicsFromImage(thumbBMP, thisImgQuality, 4, 2)
-
     If (userUnsprtWriteFMT=3 && batchMode=1)
     {
        zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
@@ -13919,5 +13983,184 @@ FileAssociate(Label,Ext,Cmd,Icon:="", batchMode:=0) {
   }
 
   return 1
+}
+
+; ==================================================================================================================================
+; function by «just me», source https://www.autohotkey.com/boards/viewtopic.php?t=18081
+;
+; Creates an 'open with' menu for the passed file.
+; Parameters:
+;     FilePath    -  Fully qualified path of a single file.
+;     Recommended -  Show only recommended apps (True/False).
+;                    Default: True
+;     ShowMenu    -  Immediately show the menu (True/False).
+;                    Default: False
+;     MenuName    -  The name of the menu.
+;                    Default: OpenWithMenu
+;     Others      -  Name of the submenu holding not recommended apps (if Recommended has been set to False).
+;                    Default: Others
+; Return values:
+;     On success the function returns the menu's name unless ShowMenu has been set to True.
+;     If the menu couldn't be created, the function returns False.
+; Remarks:
+;     Requires AHK 1.1.23.07+ and Win Vista+!!!
+;     The function registers itself as the menu handler.
+; Credits:
+;     Based on code by querty12 -> autohotkey.com/boards/viewtopic.php?p=86709#p86709.
+;     I hadn't even heard anything about the related API functions before.
+; MSDN:
+;     SHAssocEnumHandlers -> msdn.microsoft.com/en-us/library/bb762109%28v=vs.85%29.aspx
+;     SHCreateItemFromParsingName -> msdn.microsoft.com/en-us/library/bb762134%28v=vs.85%29.aspx
+; ==================================================================================================================================
+CreateOpenWithMenu(FilePath, Recommended := 1, ShowMenu := 0, MenuName := "OpenWithMenu", Others := "Others") {
+   Static RecommendedHandlers := []
+        , OtherHandlers := []
+        , HandlerID := A_TickCount
+        , HandlerFunc := 0
+        , ThisMenuName := ""
+        , ThisOthers := ""
+   ; -------------------------------------------------------------------------------------------------------------------------------
+   Static IID_IShellItem := 0, BHID_DataObject := 0, IID_IDataObject := 0
+        , Init := VarSetCapacity(IID_IShellItem, 16, 0) . VarSetCapacity(BHID_DataObject, 16, 0)
+          . VarSetCapacity(IID_IDataObject, 16, 0)
+          . DllCall("Ole32.dll\IIDFromString", "WStr", "{43826d1e-e718-42ee-bc55-a1e261c37bfe}", "Ptr", &IID_IShellItem)
+          . DllCall("Ole32.dll\IIDFromString", "WStr", "{B8C0BD9F-ED24-455c-83E6-D5390C4FE8C4}", "Ptr", &BHID_DataObject)
+          . DllCall("Ole32.dll\IIDFromString", "WStr", "{0000010e-0000-0000-C000-000000000046}", "Ptr", &IID_IDataObject)
+   ; -------------------------------------------------------------------------------------------------------------------------------
+   ; Handler call
+   If (Recommended = HandlerID) {
+      AssocHandlers := A_ThisMenu = ThisMenuName ? RecommendedHandlers : OtherHandlers
+      If (AssocHandler := AssocHandlers[A_ThisMenuItemPos]) && FileExist(FilePath) {
+         AssocHandlerInvoke := NumGet(NumGet(AssocHandler + 0, "UPtr"), A_PtrSize * 8, "UPtr")
+         If !DllCall("Shell32.dll\SHCreateItemFromParsingName", "WStr", FilePath, "Ptr", 0, "Ptr", &IID_IShellItem, "PtrP", Item) {
+            BindToHandler := NumGet(NumGet(Item + 0, "UPtr"), A_PtrSize * 3, "UPtr")
+            If !DllCall(BindToHandler, "Ptr", Item, "Ptr", 0, "Ptr", &BHID_DataObject, "Ptr", &IID_IDataObject, "PtrP", DataObj) {
+               DllCall(AssocHandlerInvoke, "Ptr", AssocHandler, "Ptr", DataObj)
+               ObjRelease(DataObj)
+            }
+            ObjRelease(Item)
+         }
+      }
+      Try Menu, %ThisMenuName%, DeleteAll
+      For Each, AssocHandler In RecommendedHandlers
+         ObjRelease(AssocHandler)
+      For Each, AssocHandler In OtherHandlers
+         ObjRelease(AssocHandler)
+      RecommendedHandlers:= []
+      OtherHandlers:= []
+      Return
+   }
+   ; -------------------------------------------------------------------------------------------------------------------------------
+   ; User call
+   If !FileExist(FilePath)
+      Return 0
+
+   ThisMenuName := MenuName
+   ThisOthers := Others
+   SplitPath, FilePath, , , Ext
+   For Each, AssocHandler In RecommendedHandlers
+      ObjRelease(AssocHandler)
+   For Each, AssocHandler In OtherHandlers
+      ObjRelease(AssocHandler)
+   RecommendedHandlers:= []
+   OtherHandlers:= []
+   Try Menu, %ThisMenuName%, DeleteAll
+   Try Menu, %ThisOthers%, DeleteAll
+   ; Try to get the default association
+   Size := VarSetCapacity(FriendlyName, 520, 0) // 2
+   DllCall("Shlwapi.dll\AssocQueryString", "UInt", 0, "UInt", 4, "Str", "." . Ext, "Ptr", 0, "Str", FriendlyName, "UIntP", Size)
+   HandlerID := A_TickCount
+   HandlerFunc := Func(A_ThisFunc).Bind(FilePath, HandlerID)
+   Filter := !!Recommended ; ASSOC_FILTER_NONE = 0, ASSOC_FILTER_RECOMMENDED = 1
+   ; Enumerate the apps and build the menu
+   If DllCall("Shell32.dll\SHAssocEnumHandlers", "WStr", "." . Ext, "UInt", Filter, "PtrP", EnumHandler)
+      Return 0
+
+   EnumHandlerNext := NumGet(NumGet(EnumHandler + 0, "UPtr"), A_PtrSize * 3, "UPtr")
+   While (!DllCall(EnumHandlerNext, "Ptr", EnumHandler, "UInt", 1, "PtrP", AssocHandler, "UIntP", Fetched) && Fetched)
+   {
+      VTBL := NumGet(AssocHandler + 0, "UPtr")
+      AssocHandlerGetUIName := NumGet(VTBL + 0, A_PtrSize * 4, "UPtr")
+      AssocHandlerGetIconLocation := NumGet(VTBL + 0, A_PtrSize * 5, "UPtr")
+      AssocHandlerIsRecommended := NumGet(VTBL + 0, A_PtrSize * 6, "UPtr")
+      UIName := ""
+      If !DllCall(AssocHandlerGetUIName, "Ptr", AssocHandler, "PtrP", StrPtr, "UInt")
+      {
+         UIName := StrGet(StrPtr, "UTF-16")
+         DllCall("Ole32.dll\CoTaskMemFree", "Ptr", StrPtr)
+      } Else UIName := AssocHandler
+
+      If (UIName!="")
+      {
+         If !DllCall(AssocHandlerGetIconLocation, "Ptr", AssocHandler, "PtrP", StrPtr, "IntP", IconIndex := 0, "UInt")
+         {
+            IconPath := StrGet(StrPtr, "UTF-16")
+            DllCall("Ole32.dll\CoTaskMemFree", "Ptr", StrPtr)
+         }
+
+         If (SubStr(IconPath, 1, 1) = "@")
+         {
+            VarSetCapacity(Resource, 4096, 0)
+            If !DllCall("Shlwapi.dll\SHLoadIndirectString", "WStr", IconPath, "Ptr", &Resource, "UInt", 2048, "PtrP", 0)
+               IconPath := StrGet(&Resource, "UTF-16")
+         }
+         ItemName := StrReplace(UIName, "&", "&&")
+         If (Recommended || !DllCall(AssocHandlerIsRecommended, "Ptr", AssocHandler, "UInt"))
+         {
+            If (UIName=FriendlyName)
+            {
+               If RecommendedHandlers.Length()
+               {
+                  Menu, %ThisMenuName%, Insert, 1&, %ItemName%, % HandlerFunc
+                  RecommendedHandlers.InsertAt(1, AssocHandler)
+               } Else
+               {
+                  Menu, %ThisMenuName%, Add, %ItemName%, % HandlerFunc
+                  RecommendedHandlers.Push(AssocHandler)
+               }
+         ;      Menu, %ThisMenuName%, Default, %ItemName%
+            } Else
+            {
+               Menu, %ThisMenuName%, Add, %ItemName%, % HandlerFunc
+               RecommendedHandlers.Push(AssocHandler)
+            }
+            Try Menu, %ThisMenuName%, Icon, %ItemName%, %IconPath%, %IconIndex%
+         } Else
+         {
+            Menu, %ThisOthers%, Add, %ItemName%, % HandlerFunc
+            OtherHandlers.Push(AssocHandler)
+            Try Menu, %ThisOthers%, Icon, %ItemName%, %IconPath%, %IconIndex%
+         }
+      } Else ObjRelease(AssocHandler)
+   }
+
+   ObjRelease(EnumHandler)
+   ; All done
+   If !RecommendedHandlers.Length() && !OtherHandlers.Length()
+      Return 0
+
+   If OtherHandlers.Length()
+      Menu, %ThisMenuName%, Add, %ThisOthers%, :%ThisOthers%
+
+   If (ShowMenu)
+      Menu, %ThisMenuName%, Show
+   Else
+      Return ThisMenuName
+}
+
+invokeSHopenWith() {
+; function by zcooler
+; source:  https://www.autohotkey.com/boards/viewtopic.php?t=17850
+
+  ; msdn.microsoft.com/en-us/library/windows/desktop/bb762234(v=vs.85).aspx
+  ; OAIF_ALLOW_REGISTRATION   0x00000001 - Enable the "always use this program" checkbox. If not passed, it will be disabled.
+  ; OAIF_REGISTER_EXT         0x00000002 - Do the registration after the user hits the OK button.
+  ; OAIF_EXEC                 0x00000004 - Execute file after registering.
+  OAIF := {ALLOW_REGISTRATION: 0x00000001, REGISTER_EXT: 0x00000002, EXEC: 0x00000004}
+  imgPath := resultedFilesList[currentFileIndex]
+  VarSetCapacity(OPENASINFO, A_PtrSize * 3, 0)
+  NumPut(&imgPath, OPENASINFO, 0, "Ptr")
+  NumPut(0x04, OPENASINFO, A_PtrSize * 2, "UInt")
+  DllCall("Shell32.dll\SHOpenWithDialog", "Ptr", 0, "Ptr", &OPENASINFO)
 }
 

@@ -2,6 +2,10 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v3.8.9 (2019-10-28)
+  - [new] the option to «Open with external application» now shows a list of applications associated with the image file format
+  - [new] Quick Picto Viewer now prevents rapid spawning of instances of itself; for example when opening dozens/hundreds of files by mistake
+
 - v3.8.8 (2019-10-27)
   - various bug fixes
 
