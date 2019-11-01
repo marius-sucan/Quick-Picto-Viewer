@@ -2,6 +2,12 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v3.9.0 (2019-11-01)
+  - [new] added option to highlight image borders
+  - [new] created an application icon ;-)
+  - various small changes to improve usability; additional visual cues to indicate what is going on
+  - bug fixes
+
 - v3.8.9 (2019-10-28)
   - [new] the option to «Open with external application» now shows a list of applications associated with the image file format
   - [new] Quick Picto Viewer now prevents rapid spawning of instances of itself; for example when opening dozens/hundreds of files by mistake

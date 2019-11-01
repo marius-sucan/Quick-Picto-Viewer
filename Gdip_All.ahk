@@ -30,9 +30,9 @@
 ; - v1.58 on 08/29/2019
 ; - v1.57 on 08/23/2019
 ; - v1.56 on 08/21/2019
+; - v1.55 on 08/14/2019
 ;
 ; bug fixes and AHK v2 compatibility by mmikeww and others
-; - v1.55 on 08/14/2019
 ; - v1.54 on 11/15/2017
 ; - v1.53 on 06/19/2017
 ; - v1.52 on 06/11/2017
@@ -4482,6 +4482,7 @@ Gdip_AddPathToPath(pPathA, pPathB, fConnect) {
 Gdip_AddPathStringSimplified(pPath, String, FontName, Size, Style, X, Y, Width, Height, Align:=0, NoWrap:=0) {
 ; Adds the outline of a given string with the given font name, size and style 
 ; to a Path object.
+
 ; Size - in em, in world units [font size]
 ; Remarks: a high value might be required; over 60, 90... to see the text.
 
@@ -4502,12 +4503,21 @@ Gdip_AddPathStringSimplified(pPath, String, FontName, Size, Style, X, Y, Width, 
 ; Strikeout = 8
 
    FormatStyle := NoWrap ? 0x4000 | 0x1000 : 0x4000
-   hFontFamily := Gdip_FontFamilyCreate(FontName)
+   If RegExMatch(FontName, "^(.\:\\.)")
+   {
+      hFontCollection := Gdip_NewPrivateFontCollection()
+      hFontFamily := Gdip_CreateFontFamilyFromFile(FontName, hFontCollection)
+   } Else hFontFamily := Gdip_FontFamilyCreate(FontName)
+
    If !hFontFamily
       hFontFamily := Gdip_FontFamilyCreateGeneric(1)
  
    If !hFontFamily
+   {
+      If hFontCollection
+         Gdip_DeletePrivateFontCollection(hFontCollection)
       Return -1
+   }
 
    hStringFormat := Gdip_StringFormatCreate(FormatStyle)
    If !hStringFormat
@@ -4516,6 +4526,8 @@ Gdip_AddPathStringSimplified(pPath, String, FontName, Size, Style, X, Y, Width, 
    If !hStringFormat
    {
       Gdip_DeleteFontFamily(hFontFamily)
+      If hFontCollection
+         Gdip_DeletePrivateFontCollection(hFontCollection)
       Return -2
    }
 
@@ -4524,6 +4536,8 @@ Gdip_AddPathStringSimplified(pPath, String, FontName, Size, Style, X, Y, Width, 
    E := Gdip_AddPathString(pPath, String, hFontFamily, Style, Size, hStringFormat, X, Y, Width, Height)
    Gdip_DeleteStringFormat(hStringFormat)
    Gdip_DeleteFontFamily(hFontFamily)
+   If hFontCollection
+      Gdip_DeletePrivateFontCollection(hFontCollection)
    Return E
 }
 
