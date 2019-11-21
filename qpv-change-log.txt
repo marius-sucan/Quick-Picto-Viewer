@@ -2,6 +2,19 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v3.9.8 (2019-11-21)
+  - [new] advanced auto-crop image option; applicable on multiple images at once
+  - [new] panel to decide action to perform on deleting multiple entries from the list
+  - [new] convert file format panel; allows to quickly convert to a specified image format a single image or multiple ones
+  - [new] added shortcut for changing gamma; Alt + ] / [. Also available with Ctrl for Saturation and Shift for Contrast.
+  - [new] sort images by similarity with the selected image
+  - [new] sort images by image width or height, aspect ratio and resolution
+  - [new] sort images by their luminance histogram average or median
+  - [new] support for copy/paste images with alpha channel
+  - [new] panel to precisely define the length of the slideshow; the speed of the slides is calculated based on the user defined total play time and amount images loaded
+  - [new] support for processing [crop, rotation, rescaling] high-dynamic range images: JXR, EXR, HDR, TIFF and PFM formats. High-color depths preserved.
+  - all the potentially long operations are now interruptible with a mouse click or tap on the UI, or with Escape
+
 - v3.9.0 (2019-11-01)
   - [new] added option to highlight image borders
   - [new] created an application icon ;-)
@@ -45,7 +58,7 @@
   - [new] gamma and threshold color adjustment options
   - [new] option to render opaque semi-transparent pixels in images with an alpha channel
   - [new] rotate images in the viewport in steps of 15 degrees with [9] or [0] or at any degree in the image view panel
-  - [new] ambiental textured window background , automatically generated based on the current image displayied
+  - [new] ambiental textured window background , automatically generated based on the current image displayed
   - [new] alpha channel support for images loaded or saved through the FreeImage library
   - [new] option to choose text alignment for texts pasted from the clipboard
   - [new] status bar in thumbnails list mode
@@ -142,13 +155,13 @@
 - v3.2.0 (2019-06-28)
   - [new] option to resize image; this operation can be performed on multiple files at once, in batch
   - using the image resizer, one can convert images colors to grayscale, flip images or adjust gamma and brightness, keeping intact the image dimensions
-  - [new] Heads-Up Display elements to indicate when multiple files are selected, or when the image is displayied with altered colors, flipped; or when you can pan the image
+  - [new] Heads-Up Display elements to indicate when multiple files are selected, or when the image is displayed with altered colors, flipped; or when you can pan the image
   - when you copy the image to the clipboard, it is now copied as seen in the picture viewer, with effects or color alterations applied
   - other small fixes or improvements
 
 - v3.1.0 (2019-06-25)
   - [new] option to have QPV immediately stop the slideshow when the user performs actions, eg. presses keys or changes the window focus
-  - the UI is now visually highlighting selected or removed files in real time, when the thumbnails list is displayied 
+  - the UI is now visually highlighting selected or removed files in real time, when the thumbnails list is displayed 
   - improved performance for updating very large static folders lists and immense files lists
   - improved the performance for counting files in folders [in a cached files list] ;-)
 

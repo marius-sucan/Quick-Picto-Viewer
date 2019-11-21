@@ -151,7 +151,22 @@ FreeImage_UnLoad(hImage) {
 ; === Bitmap information functions ===
 ; missing functions: GetThumbnail SetThumbnail
 
-FreeImage_GetImageType(hImage) {
+FreeImage_GetImageType(hImage, humanReadable:=0) {
+; Possible return values:
+; 0 = FIT_UNKNOWN ;   Unknown format (returned value only, never use it as input value for other functions)
+; 1 = FIT_BITMAP ;   Standard image: 1-, 4-, 8-, 16-, 24-, 32-bit
+; 2 = FIT_UINT16 ;   Array of unsigned short: unsigned 16-bit
+; 3 = FIT_INT16 ;   Array of short: signed 16-bit
+; 4 = FIT_UINT32 ;   Array of unsigned long: unsigned 32-bit
+; 5 = FIT_INT32 ;   Array of long: signed 32-bit
+; 6 = FIT_FLOAT ;   Array of float: 32-bit IEEE floating point
+; 7 = FIT_DOUBLE ;   Array of double: 64-bit IEEE floating point
+; 8 = FIT_COMPLEX ;   Array of FICOMPLEX: 2 x 64-bit IEEE floating point
+; 9 = FIT_RGB16 ;   48-bit RGB image: 3 x unsigned 16-bit
+; 10 = FIT_RGBA16 ;   64-bit RGBA image: 4 x unsigned 16-bit
+; 11 = FIT_RGBF ;   96-bit RGB float image: 3 x 32-bit IEEE floating point
+; 12 = FIT_RGBAF ;   128-bit RGBA float image: 4 x 32-bit IEEE floating point
+
    Return DllCall(getFIMfunc("GetImageType"), "int", hImage)
 }
 
@@ -169,6 +184,11 @@ FreeImage_GetWidth(hImage) {
 
 FreeImage_GetHeight(hImage) {
    Return DllCall(getFIMfunc("GetHeight"), "Int", hImage)
+}
+
+FreeImage_GetImageDimensions(hImage, ByRef imgW, ByRef imgH) {
+   imgH := FreeImage_GetHeight(hImage)
+   imgW := FreeImage_GetWidth(hImage)
 }
 
 FreeImage_GetLine(hImage) {
@@ -675,6 +695,9 @@ ConvertPBITMAPtoFIM(pBitmap, destWin) {
 
   Gdip_GetImageDimensions(pBitmap, imgW, imgH)
   hFIFimgA := FreeImage_Allocate(imgW, imgH, 32)
+  If !hFIFimgA
+     Return
+
   pBits := FreeImage_GetBits(hFIFimgA)
   bitmapInfo := FreeImage_GetInfo(hFIFimgA)
   hdc := GetDC(destWin)

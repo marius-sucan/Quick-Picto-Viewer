@@ -23,10 +23,12 @@
 <li>List images as thumbnails with preset aspect ratios: square, wide or tall. Easy to adjust their size as well. Use T and +/- keys.</li>
 <li>Adaptive thumbnails caching to sizes ranging from 600 pixels to 125 pixels. On fast PCs, no caching occurs.</li>
 <li>Touch screen friendly hot-areas on the UI to navigate or zoom into images.</li>
+<li>Sort images by histogram average or median point, resolution, aspect ratio, or by similarity.</li>
 <li>Options to control brightness, contrast, saturation and RGB color channels balance/intensity.</li>
-<li>Adaptive auto-adjustment of brightness, contrast and saturation of displayied images.</li>
+<li>Advanced yet easy to use auto-crop for images.</li>
+<li>Adaptive auto-adjustment of brightness, contrast and saturation of displayed images.</li>
 <li>Display images in grayscale, inverted or personalized colors. Option to save adjusted image, or apply adjusments on multiple images in one go.</li>
-<li>Real-time luminance histogram for the image displayied.</li>
+<li>Real-time luminance histogram for the image displayed.</li>
 <li>Various modes to adapt images to window.</li>
 <li>Images can be rotated or mirrored horizontally and vertically in the viewport.</li>
 <li>Multiple slideshow directions available and easy to change speed between images: random order, backwards or forwads.</li>
@@ -45,9 +47,9 @@
 <li>Support for drag 'n drop of folders or files onto main UI.</li>
 <li>Paste image from clipboard and save it. 18 file formats supported for saving an image.</li>
 <li>Copy to clipboard: the entire image or an area selected from it.</li>
-<li>Ambiental textured window background. Automatically generated background based on the current image displayied.</li>
+<li>Ambiental textured window background. Automatically generated background based on the current image displayed.</li>
 <li>Fancy welcome screen random-generated images :-).</li>
-<li>All the potentially lengthy operations can be stopped with Escape :-).</li>
+<li>All the potentially lengthy operations can be stopped with Escape or by a single click on the main window :-).</li>
 </ul> 
 
 <p>Developed by <a href="http://marius.sucan.ro/">Marius Șucan</a>.</p>

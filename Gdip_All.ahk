@@ -6,6 +6,7 @@
 ;
 ; Gdip standard library versions:
 ; by Marius Șucan - gathered user-contributed functions and implemented hundreds of new functions
+; - v1.80 on 11/01/2019
 ; - v1.79 on 10/28/2019
 ; - v1.78 on 10/27/2019
 ; - v1.77 on 10/06/2019
@@ -49,6 +50,7 @@
 ; - v1.01 on 31/05/2008
 ;
 ; Detailed history:
+; - 11/01/2019 = Implemented support for a private font file for Gdip_AddPathStringSimplified()
 ; - 10/28/2019 = Added 7 new GDI+ functions and fixes related to Gdip_CreateFontFamilyFromFile()
 ; - 10/27/2019 = Added 5 new GDI+ functions and bug fixes for Gdip_TestBitmapUniformity(), Gdip_RotateBitmapAtCenter() and Gdip_ResizeBitmap()
 ; - 10/06/2019 = Added more parameters to Gdip_GraphicsFromImage/HDC/HWND and added Gdip_GetPixelColor()
@@ -286,6 +288,9 @@ SetStretchBltMode(hdc, iStretchMode:=4) {
 ; return             If the function succeeds, the return value is nonzero
 
 SetImage(hwnd, hBitmap) {
+; STM_SETIMAGE = 0x172
+; Example: Gui, Add, Text, 0xE w500 h300 hwndhPic          ; SS_Bitmap    = 0xE
+
    Ptr := A_PtrSize ? "UPtr" : "UInt"
    E := DllCall("SendMessage", Ptr, hwnd, "UInt", 0x172, "UInt", 0x0, Ptr, hBitmap )
    DeleteObject(E)
@@ -578,6 +583,9 @@ CreateDIBSection(w, h, hdc:="", bpp:=32, ByRef ppvBits:=0) {
 ; PW_CLIENTONLY      = 1
 
 PrintWindow(hwnd, hdc, Flags:=0) {
+; set flags to 2, to capture hardware accelerated windows
+; this only applies on Windows 8.1 and later versions.
+
    Ptr := A_PtrSize ? "UPtr" : "UInt"
    return DllCall("PrintWindow", Ptr, hwnd, Ptr, hdc, "uint", Flags)
 }
@@ -789,7 +797,7 @@ Gdip_LibraryVersion() {
 ;                 Updated by Marius Șucan reflecting the work on Gdip_all extended compilation
 
 Gdip_LibrarySubVersion() {
-   return 1.79
+   return 1.80
 }
 
 ;#####################################################################################
@@ -2316,6 +2324,68 @@ Gdip_CreateBitmapFromFile(sFile, IconNumber:=1, IconSize:="") {
    return pBitmap
 }
 
+Gdip_CreateBitmapFromHBITMAPalpha(hImage) {
+; function by iseahound found on:
+; https://www.autohotkey.com/boards/viewtopic.php?f=6&t=63345
+; part of https://github.com/iseahound/Graphics/blob/master/lib/Graphics.ahk
+
+   ; struct BITMAP - https://docs.microsoft.com/en-us/windows/desktop/api/wingdi/ns-wingdi-tagbitmap
+   DllCall("GetObject"
+            , "ptr", hImage
+            , "int", VarSetCapacity(dib, 76+2*(A_PtrSize=8?4:0)+2*A_PtrSize)
+            , "ptr", &dib) ; sizeof(DIBSECTION) = x86:84, x64:104
+   width  := NumGet(dib, 4, "uint")
+   height := NumGet(dib, 8, "uint")
+   bpp    := NumGet(dib, 18, "ushort")
+
+   ; Fallback to built-in method if pixels are not ARGB.
+   if (bpp != 32)
+      return Gdip_CreateBitmapFromHBITMAP(hImage)
+
+   ; Create a handle to a device context and associate the hImage.
+   hdc := CreateCompatibleDC()
+   obm := SelectObject(hdc, hImage)
+
+   ; Buffer the hImage with a top-down device independent bitmap via negative height.
+   ; Note that a DIB is an hBitmap, pixels are formatted as pARGB, and has a pointer to the bits.
+   cdc := CreateCompatibleDC(hdc)
+   hbm := CreateDIBSection(width, -height, hdc, 32, pBits)
+   ob2 := SelectObject(cdc, hbm)
+
+   ; Create a new Bitmap (different from an hBitmap) which holds ARGB pixel values.
+   pBitmap := Gdip_CreateBitmap(width, height)
+
+   ; Create a Scan0 buffer pointing to pBits. The buffer has pixel format pARGB.
+   VarSetCapacity(Rect, 16, 0)
+      , NumPut( width, Rect,  8,  "uint")
+      , NumPut(height, Rect, 12,  "uint")
+   VarSetCapacity(BitmapData, 16+2*(A_PtrSize ? A_PtrSize : 4), 0)
+      , NumPut(       width, BitmapData,  0,  "uint") ; Width
+      , NumPut(      height, BitmapData,  4,  "uint") ; Height
+      , NumPut(   4 * width, BitmapData,  8,   "int") ; Stride
+      , NumPut(     0xE200B, BitmapData, 12,   "int") ; PixelFormat
+      , NumPut(       pBits, BitmapData, 16,   "ptr") ; Scan0
+   DllCall("gdiplus\GdipBitmapLockBits"
+            ,   "ptr", pBitmap
+            ,   "ptr", &Rect
+            ,  "uint", 7            ; hImageLockMode.UserInputBuffer | hImageLockMode.ReadWrite
+            ,   "int", 0xE200B      ; Format32bppPArgb
+            ,   "ptr", &BitmapData)
+
+   ; Ensure that our hBitmap (hImage) is top-down by copying it to a top-down bitmap.
+   BitBlt(cdc, 0, 0, width, height, hdc, 0, 0)
+
+   ; Convert the pARGB pixels copied into the device independent bitmap (hbm) to ARGB.
+   DllCall("gdiplus\GdipBitmapUnlockBits", "ptr",pBitmap, "ptr",&BitmapData)
+
+   ; Cleanup the buffer and device contexts.
+   SelectObject(cdc, ob2)
+   DeleteObject(hbm), DeleteDC(cdc)
+   SelectObject(hdc, obm), DeleteDC(hdc)
+
+   return pBitmap
+}
+
 Gdip_CreateBitmapFromHBITMAP(hBitmap, hPalette:=0) {
 ; Creates a Bitmap GDI+ object from a GDI bitmap handle.
 ; hPalette - Handle to a GDI palette used to define the bitmap colors
@@ -2380,7 +2450,7 @@ Gdip_CreateBitmapFromClipboard() {
    }
 
    DllCall("CloseClipboard")
-   pBitmap := Gdip_CreateBitmapFromHBITMAP(hBitmap)
+   pBitmap := Gdip_CreateBitmapFromHBITMAPalpha(hBitmap)
    If hBitmap
       DeleteObject(hBitmap)
 
@@ -6863,14 +6933,21 @@ Gdip_CompareBitmaps(pBitmapA, pBitmapB, accuracy:=25) {
 ; Added accuracy factor.
 
    If (accuracy>99)
-      accuracy := 99
+      accuracy := 100
    Else If (accuracy<5)
       accuracy := 5
 
    Gdip_GetImageDimensions(pBitmapA, WidthA, HeightA)
    Gdip_GetImageDimensions(pBitmapB, WidthB, HeightB)
-   pBitmap1 := Gdip_ResizeBitmap(pBitmapA, Floor(WidthA*(accuracy/100)), Floor(HeightA*(accuracy/100)), 0, 5)
-   pBitmap2 := Gdip_ResizeBitmap(pBitmapB, Floor(WidthB*(accuracy/100)), Floor(HeightB*(accuracy/100)), 0, 5)
+   If (accuracy!=100)
+   {
+      pBitmap1 := Gdip_ResizeBitmap(pBitmapA, Floor(WidthA*(accuracy/100)), Floor(HeightA*(accuracy/100)), 0, 5)
+      pBitmap2 := Gdip_ResizeBitmap(pBitmapB, Floor(WidthB*(accuracy/100)), Floor(HeightB*(accuracy/100)), 0, 5)
+   } Else
+   {
+      pBitmap1 := pBitmapA
+      pBitmap2 := pBitmapB
+   }
 
    Gdip_GetImageDimensions(pBitmap1, Width1, Height1)
    Gdip_GetImageDimensions(pBitmap2, Width2, Height2)
@@ -6893,8 +6970,12 @@ Gdip_CompareBitmaps(pBitmapA, pBitmapB, accuracy:=25) {
    }
 
    Gdip_UnlockBits(pBitmap1, BitmapData1), Gdip_UnlockBits(pBitmap2, BitmapData2)
-   Gdip_DisposeImage(pBitmap1), Gdip_DisposeImage(pBitmap2)
-   return z/(Width1*Width2*3*255/100)
+   If (accuracy!=100)
+   {
+      Gdip_DisposeImage(pBitmap1)
+      Gdip_DisposeImage(pBitmap2)
+   }
+   Return z/(Width1*Width2*3*255/100)
 }
 
 Gdip_RetrieveBitmapChannel(pBitmap, channel) {
@@ -6983,13 +7064,13 @@ Gdip_TestBitmapUniformity(pBitmap, HistogramFormat:=3, ByRef maxLevelIndex:=0, B
    maxLevelIndex := maxLevelPixels := nrPixels := 9
    Gdip_GetImageDimensions(pBitmap, Width, Height)
    Gdip_GetHistogram(pBitmap, HistogramFormat, LevelsArray, 0, 0)
-   Loop, 256
+   Loop 256
    {
        nrPixels := Round(LevelsArray[A_Index - 1])
        If (nrPixels>0)
           histoList .= nrPixels "." A_Index - 1 "|"
    }
-   Sort, histoList, NURD|
+   Sort histoList, NURD|
    histoList := Trim(histoList, "|")
    histoListSortedArray := StrSplit(histoList, "|")
    maxLevel := StrSplit(histoListSortedArray[1], ".")
@@ -7201,8 +7282,6 @@ Gdip_BitmapConvertFormat(pBitmap, PixelFormat, DitherType, DitherPaletteType, Pa
    Ptr := A_PtrSize ? "UPtr" : "UInt"
    E1 := DllCall("gdiplus\GdipInitializePalette", "UPtr", &hPalette, "uint", PaletteType, "uint", OptimalColors, "Int", UseTransparentColor, Ptr, pBitmap)
    E2 := DllCall("gdiplus\GdipBitmapConvertFormat", Ptr, pBitmap, "uint", PixelFormat, "uint", DitherType, "uint", DitherPaletteType, "uPtr", &hPalette, "float", AlphaThresholdPercent)
-   E := E1 ? E2
+   E := E1 ? E1 : E2
    Return E
 }
-
-
