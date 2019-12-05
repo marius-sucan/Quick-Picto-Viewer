@@ -41,6 +41,7 @@
 #Include, MCI.ahk
 #Include, module-common-functions.ahk
 SetWinDelay, 1
+SetBatchLines, -1
 
 Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1, pPen4
    , glPG, glOBM, glHbitmap, glHDC, pPen1, pPen1d, pPen2, pPen3, AmbientalTexBrush
@@ -131,34 +132,49 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, hGIFsGuiDummy := 1, pPen4
    , borderAroundImage := 0, performAutoCropNow := 0, usrAutoCropColorTolerance := 5, usrAutoCropImgThreshold := 0.005 
    , SimpleOperationsDoCrop := 0, SimpleOperationsRotateAngle := "0°", SimpleOperationsScaleImgFactor := "100 %"
    , SimpleOperationsNoPromptOnSave := 0, SimpleOperationsFlipV := 0, SimpleOperationsFlipH := 0, doSlidesTransitions := 0
-   , systemCores := 1
+   , systemCores := 1, realSystemCores := 1, hasInitSpecialMode := 0
 
-EnvGet, systemCores, NUMBER_OF_PROCESSORS
-systemCores := systemCores * 3
-
+EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 RegRead, InitCheckReg, %QPVregEntry%, Running
 RegRead, InitTimeReg, %QPVregEntry%, LastStartTime
 ; MsgBox, % InitTimeReg " --- " InitCheckRes
-If ((A_TickCount - InitTimeReg < 600)  && IsNumber(InitTimeReg) && (InitCheckReg=1) && InitTimeReg>0)
+If ((A_TickCount - InitTimeReg < 600) && IsNumber(InitTimeReg) && InitCheckReg=1 && InitTimeReg>0)
+{
+   hasInitSpecialMode := 1
    ExitApp
+}
 
 If !A_IsCompiled
    Menu, Tray, Icon, quick-picto-viewer.ico
-
 
 DetectHiddenWindows, On
 CoordMode, Mouse, Screen
 CoordMode, ToolTip, Screen
 OnExit, Cleanup
+           FileRead, lola, module-interface.ahk
+
+Global zoza := ahkthread(lola)
+
 
 If A_IsCompiled
    initCompiled()
 
 thisGDIPversion := Gdip_LibrarySubVersion()
 GDIPToken := Gdip_Startup()
-if (!GDIPToken || thisGDIPversion<1.78)
+If (!GDIPToken || thisGDIPversion<1.78)
 {
    MsgBox, 48, %appTitle%, ERROR: unable to initialize GDI+...`n`nThe program will now exit.`n`nRequired GDI+ library wrapper: v1.78 - extended compilation edition.
+   hasInitSpecialMode := 1
+   ExitApp
+}
+
+; RegRead, initArgu, %QPVregEntry%, initArgu
+If InStr(A_Args[1], "sort-histo") && (InitCheckReg=1)
+{
+   hasInitSpecialMode := 1
+   initFIMGmodule()
+   argsGiven := StrSplit(A_Args[1], "||")
+   sortUsingMultiCores(A_Args[2], A_Args[3], A_Args[4])
    ExitApp
 }
 
@@ -275,8 +291,10 @@ identifyThisWin(noReact:=0) {
 
     !Space::
         ; testAlgo()
-        testAlgoSingle()
-;       Win_ShowSysMenu(PVhwnd)
+;;        testAlgoSingle()
+;   gugu := zoza.ahkgetvar.BlaBla
+
+       Win_ShowSysMenu(PVhwnd)
     Return
 
     ~F10::
@@ -1173,7 +1191,8 @@ OpenThisFile() {
 
 OpenNewQPVinstance() {
    imgPath := resultedFilesList[currentFileIndex]
-   Run, "%fullPath2exe%" "%imgPath%"
+   thisPath := A_IsCompiled ? fullPath2exe : A_ScriptFullPath
+   Run, "%thisPath%" "%imgPath%"
 }
 
 OpenWithDefaultApp() {
@@ -1425,7 +1444,7 @@ Return
 TrueCleanup() {
    Critical, on
    Static lastInvoked := 1
-   If (A_TickCount - lastInvoked < 900)
+   If (A_TickCount - lastInvoked < 900) || (hasInitSpecialMode=1)
       Return
 
    WinSet, Region, 0-0 w1 h1, ahk_id %PVhwnd%
@@ -2044,7 +2063,7 @@ WinClickAction(forceThis:=0) {
       o_imageLoading := imageLoading
       cleanThumbsWindow()
       coreReloadThisPicture()
-      ; r2 := UpdateLayeredWindow(hGDIthumbsWin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight, 255)
+      ; r2 := UpdateLayeredWindow(hGDIthumbsWin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight)
       drawImgSelectionOnWindow(1)
       ; thisZeit := A_TickCount
       ctrlState := (GetKeyState("Ctrl", "P") && dotActive=9) ? 1 : 0
@@ -4526,10 +4545,18 @@ SortFilesList(SortCriterion) {
 
    If (maxFilesIndex>1)
    {
+      filesPerCore := maxFilesIndex//(realSystemCores + 1)
+      If (filesPerCore<5 && realSystemCores>1)
+      {
+          systemCores := maxFilesIndex//5
+          filesPerCore := maxFilesIndex//systemCores
+      } Else systemCores := realSystemCores + 1
+
+      mustDoMultiCore := (systemCores>1 && filesPerCore>5 && A_IsCompiled) ? 1 : 0
       prevImgPath := resultedFilesList[currentFileIndex]
       imageLoading := 1
       showTOOLtip("Gathering information for " maxFilesIndex " files, please wait...")
-      If (SortCriterion="similarity")
+      If (SortCriterion="similarity" && mustDoMultiCore!=1)
       {
          img2Compare := resultedFilesList[currentFileIndex]
          oBitmap := LoadBitmapFromFileu(img2Compare)
@@ -4568,11 +4595,15 @@ SortFilesList(SortCriterion) {
 
       prevMSGdisplay := A_TickCount
       startOperation := A_TickCount
-      If (systemCores>1 && maxFilesIndex>250
-      && (SortCriterion="similarity" || InStr(SortCriterion, "histogram")))
+      If (mustDoMultiCore=1 && (SortCriterion="similarity" || InStr(SortCriterion, "histogram")))
       {
+         createThumbsFolder()
          filesListu := sortMultiThreadsWorkLoad(resultedFilesList, maxFilesIndex, SortCriterion, filterBehaviour, backfilesFilter, countTFilez, notSortedFilesListu)
          wasMultiThreaded := 1
+         If (filesListu="error" || !filesListu)
+            errorOccured := abandonAll := 1
+         Else If (filesListu="single-core")
+            wasMultiThreaded := filesListu :=  ""
       }
 
       If (wasMultiThreaded!=1)
@@ -4694,7 +4725,9 @@ SortFilesList(SortCriterion) {
 
       If (abandonAll=1)
       {
-         showTOOLtip("Operation aborted. Files list unchanged.")
+         If errorOccured
+            msgInfos := "`nErrors occured. Multi-threading error."
+         showTOOLtip("Operation aborted. Files list unchanged. " msgInfos)
          SetTimer, RemoveTooltip, % -msgDisplayTime
          CurrentSLD := backCurrentSLD
          SoundBeep, 950, 100
@@ -4712,7 +4745,7 @@ SortFilesList(SortCriterion) {
       If (A_TickCount - prevMSGdisplay>1500)
          showTOOLtip("Generating files index...")
       renewCurrentFilesList()
-      Loop, Parse, filesListu,`n
+      Loop, Parse, filesListu,`n,`r
       {
           If StrLen(A_LoopField)<2
              Continue
@@ -4756,6 +4789,10 @@ SortFilesList(SortCriterion) {
 sortMultiThreadsWorkLoad(whichArray, maxList, SortCriterion, filterBehaviour, backfilesFilter, ByRef countTFilez, ByRef notSortedFilesListu) {
   trenchSize := maxList//systemCores
   countTFilez := 0
+  startOperation := A_TickCount
+
+  RegWrite, REG_SZ, %QPVregEntry%, mustAbortAllOperations, 0
+  showTOOLtip("Preparing workload for sorting the files list...")
   Loop, % systemCores - 1
   {
       thisIndex := A_Index
@@ -4782,7 +4819,7 @@ sortMultiThreadsWorkLoad(whichArray, maxList, SortCriterion, filterBehaviour, ba
 
   Loop, % maxList - trenchSize*(systemCores - 1)
   {
-      r := whichArray[trenchSize*(systemCores-1) + A_Index]
+      r := whichArray[trenchSize*(systemCores - 1) + A_Index]
       If (InStr(r, "||") || !r)
          Continue
 
@@ -4800,43 +4837,224 @@ sortMultiThreadsWorkLoad(whichArray, maxList, SortCriterion, filterBehaviour, ba
       filesListu%systemCores% .= r "`n"
   }
 
-  FileRead, varScript, module-ahk-h-sort.ahk
-
   Loop, % systemCores
   {
       varu := filesListu%A_Index%
-      FileDelete, tempList%A_Index%.txt
-      FileAppend, % varu, tempList%A_Index%.txt, utf-16
+      FileDelete, %thumbsCacheFolder%\tempList%A_Index%.txt
+      FileAppend, % varu, %thumbsCacheFolder%\tempList%A_Index%.txt, utf-16
   }
 
+  Sleep, 50
+  If (SortCriterion="similarity")
+  {
+     img2Compare := resultedFilesList[currentFileIndex]
+     RegWrite, REG_SZ, %QPVregEntry%, img2Compare, % img2Compare
+  }
+
+  thisPID := DllCall("GetCurrentProcessId")
   Loop, % systemCores
   {
-      varThisScript := StrReplace(varScript, "; placeholder", "SortCriterion := " chr(34) SortCriterion chr(34) chr(10) "FileRead, filesList, tempList" A_Index ".txt" Chr(10))
-; if A_Index=1
-; try Clipboard := varThisScript
-      sortFuncThread%A_Index% := ahkThread(varThisScript)
-;       Sleep, 2500
- ;     sortFuncThread%A_Index%.ahkPostFunction["sortMainCore", SortCriterion, filesListu%A_Index%]
+      RegWrite, REG_SZ, %QPVregEntry%, ThreadJob%A_Index%, 0
+      Run, "%fullPath2exe%" sort-histo- %SortCriterion% %A_Index% %thisPID%,, UseErrorLevel, pidThread%A_Index%
+      If !ErrorLevel
+      {
+         RegWrite, REG_SZ, %QPVregEntry%, ThreadRunning%A_Index%, 1
+      } Else
+      {
+         fatalError := 1
+         Break
+      }
+      Sleep, 1
   }
 
+  If (fatalError=1)
+  {
+     Loop, % systemCores
+         Try FileDelete, %thumbsCacheFolder%\tempList%A_Index%.txt
+     Return (SortCriterion="similarity") ? "error" : "single-core"
+  }
+
+  Sleep, 1500
+  thisZeit := A_TickCount
+  prevMSGdisplay := A_TickCount
   Loop
   {
       Loop, % systemCores
-         jobDone += sortFuncThread%A_Index%.AHKgetvar.operationDone
+      {
+         thisPIDdead := threadsCrashed := 0
+         InitCheckReg := 1
+         RegRead, InitCheckReg, %QPVregEntry%, ThreadRunning%A_Index%
+         thisPIDcheck := pidThread%A_Index%
+         Process, Exist, % thisPIDcheck
+         thisPIDdead := (!ErrorLevel && thisPIDcheck) && (A_TickCount - thisZeit > 1500) ? 1 : 0
+         If (InitCheckReg=0 || thisPIDdead=1)
+            jobDone++
+         If (InitCheckReg=1 && thisPIDdead=1)
+            threadsCrashed++
+      }
 
-      If (jobDone=systemCores)
+      If (jobDone>systemCores-1)
+      {
          Break
-      Else
+      } Else
+      {
          Sleep, 300
-ToolTip, cores: %jobsdone%
+         processedFiles := 0
+         executingCanceableOperation := A_TickCount
+         If (A_TickCount - prevMSGdisplay>3000)
+         {
+            Loop, % systemCores
+            {
+               InitCheckReg := 1
+               RegRead, countThese, %QPVregEntry%, ThreadJob%A_Index%
+               If (countThese>0)
+                  processedFiles += countThese
+            }
+
+            zeitOperation := A_TickCount - startOperation
+            percDone := Round((processedFiles / countTFilez) * 100) "% )"
+            percLeft := (1 - processedFiles / countTFilez) * 100
+            zeitLeft := (zeitOperation/processedFiles) * countTFilez - zeitOperation
+            etaTime := "`nEstimated time left: " SecToHHMMSS(Round(zeitLeft/1000, 3))
+            etaTime .= "`nElapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)) " ( " percDone
+            etaTime .= "`nUsing " systemCores - jobDone " execution threads"
+            If threadsCrashed
+               etaTime .= "`n" threadsCrashed " threads have crashed..."
+  
+            showTOOLtip("Gathering information for "  processedFiles "/" countTFilez " files, please wait..." etaTime)
+            prevMSGdisplay := A_TickCount
+         }
+      }
+
+      If (GetKeyState("Esc", "P") && identifyThisWin()) || (mustAbandonCurrentOperations=1)
+      {
+         RegWrite, REG_SZ, %QPVregEntry%, mustAbortAllOperations, 1
+         lastLongOperationAbort := A_TickCount
+         executingCanceableOperation := mustAbandonCurrentOperations := 0
+         abandonAll := 1
+         Break
+      }
       jobDone := 0
   }
 
   Loop, % systemCores
-        theFinalList .= sortFuncThread%A_Index%.AHKgetvar.resultsList
+  {
+        RegWrite, REG_SZ, %QPVregEntry%, ThreadRunning%A_Index%, 0
+        If (abandonAll!=1)
+           FileRead, results, %thumbsCacheFolder%\tempList%A_Index%.txt
+        theFinalList .= results
+        Try FileDelete, %thumbsCacheFolder%\tempList%A_Index%.txt
+  }
+  If (abandonAll=1)
+     theFinalList := "error"
 
   ; Try Clipboard := theFinalList
   Return theFinalList
+}
+
+sortUsingMultiCores(SortCriterion, coreThread, pid2check) {
+  resultsList := ""
+  operationDone := 0
+  FileRead, filesList, %thumbsCacheFolder%\tempList%coreThread%.txt
+  ; thisPID := DllCall("GetCurrentProcessId")
+  ; RegWrite, REG_SZ, %QPVregEntry%, pidThread%coreThread%, % thisPID
+  ; MsgBox, % SortCriterion " -- " coreThread "`n" filesList
+  RegRead, img2Compare, %QPVregEntry%, img2Compare
+  If (SortCriterion="similarity" && StrLen(img2Compare)>3 && InStr(img2Compare, ":\"))
+  {
+     oBitmap := LoadBitmapFromFileu(img2Compare)
+     If oBitmap
+     {
+        Gdip_GetImageDimensions(oBitmap, oImgW, oImgH)
+        o_picRatio := Round(oImgW/oImgH, 3)
+        zBitmap := Gdip_ResizeBitmap(oBitmap, 250, 250, 1, 7)
+        gBitmap := Gdip_BitmapConvertGray(zBitmap)
+ 
+        o_thisHistoAvg := calcHistoAvgFile(zBitmap, "histogram", 3)
+        oBitmap := Gdip_DisposeImage(oBitmap, 1)
+        Gdip_GetImageDimensions(zBitmap, rImgW, rImgH)
+     }
+  }
+
+  Loop, Parse, filesList,`n,`r
+  {
+       If A_LoopField
+          r := A_LoopField
+       Else
+          Continue
+
+       If (SortCriterion="similarity")
+       {
+          op := GetImgFileDimension(r, Wi, He)
+          PicRatio := Round(Wi/He, 3)
+          If valueBetween(PicRatio, o_picRatio + 0.4, o_picRatio - 0.4)
+          {
+             thisHistoAvg := 0.001
+             oBitmap := LoadBitmapFromFileu(r)
+             If oBitmap
+             {
+                xBitmap := Gdip_ResizeBitmap(oBitmap, rImgW, rImgH, 0, 3)
+                thisHistoAvg := calcHistoAvgFile(xBitmap, "histogram", 3)
+             }
+
+             ; ToolTip, % o_thisHistoAvg "--" thisHistoAvg, , , 2
+             If !valueBetween(thisHistoAvg, o_thisHistoAvg + 45, o_thisHistoAvg - 45)
+             {
+                oBitmap := Gdip_DisposeImage(oBitmap, 1)
+                xBitmap := Gdip_DisposeImage(xBitmap, 1)
+             }
+          }
+
+          If oBitmap
+          {
+             oBitmap := Gdip_DisposeImage(oBitmap, 1)
+             lBitmap := Gdip_BitmapConvertGray(xBitmap)
+             SortByA := 100 - Gdip_CompareBitmaps(zBitmap, xBitmap, 100)
+             SortByB := 100 - Gdip_CompareBitmaps(gBitmap, lBitmap, 100)
+             SortBy := (SortByA + SortByB)/2
+             Gdip_DisposeImage(xBitmap, 1)
+             Gdip_DisposeImage(lBitmap, 1)
+          } Else SortBy := (op=1) ? "0.01" thisHistoAvg : 0
+       } Else If InStr(SortCriterion, "histogram")
+       {
+          oBitmap := LoadBitmapFromFileu(r)
+          If oBitmap
+          {
+             xBitmap := Gdip_ResizeBitmap(oBitmap, 300, 300, 1, 3)
+             SortBy := calcHistoAvgFile(xBitmap, SortCriterion, 3)
+             xBitmap := Gdip_DisposeImage(xBitmap, 1)
+             oBitmap := Gdip_DisposeImage(oBitmap, 1)
+          } Else SortBy := 0
+       }
+       If StrLen(SortBy)>1
+          resultsList .= SortBy " |!\!|" r "`n"
+
+       countFilez++
+       RegWrite, REG_SZ, %QPVregEntry%, ThreadJob%coreThread%, % countFilez
+       RegRead, mustAbortAllOperations, %QPVregEntry%, mustAbortAllOperations
+       Process, Exist, % pid2check
+       If (!ErrorLevel || mustAbortAllOperations=1)
+       {
+          abandonAll := 1
+          Break
+       }
+   }
+
+   If (SortCriterion="similarity")
+   {
+      Gdip_DisposeImage(zBitmap, 1)
+      Gdip_DisposeImage(gBitmap, 1)
+   }
+
+   Try FileDelete, %thumbsCacheFolder%\tempList%coreThread%.txt
+   Sleep, 1
+   If (abandonAll!=1)
+      FileAppend, % resultsList, %thumbsCacheFolder%\tempList%coreThread%.txt, utf-16
+   Sleep, 1
+   RegWrite, REG_SZ, %QPVregEntry%, ThreadRunning%coreThread%, 0
+   RegWrite, REG_SZ, %QPVregEntry%, img2Compare, 0
+   operationDone := 1
+   ; cleanupThread()
 }
 
 readSlideSettings(readThisFile) {
@@ -8435,7 +8653,7 @@ drawWelcomeImg() {
        r1 := Gdip_DrawImageFX(glPG, BMPcache, 0, 0, mainWidth, mainHeight, matrix, pEffect)
     }
 
-    r2 := UpdateLayeredWindow(hGDIwin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight, 255)
+    r2 := UpdateLayeredWindow(hGDIwin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight)
     If (A_OSVersion="WIN_7")
     {
        JEE_ClientToScreen(hPicOnGui1, 1, 1, mainX, mainY)
@@ -10332,7 +10550,7 @@ QPV_ShowImgonGuiPrev(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, ma
     } Else
     {
        whichWin := (adjustNowSel=1) ? hGDIthumbsWin : hGDIwin
-       r2 := UpdateLayeredWindow(whichWin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight, 255)
+       r2 := UpdateLayeredWindow(whichWin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight)
     }
 
     If (A_OSVersion="WIN_7")
@@ -10348,7 +10566,7 @@ cleanThumbsWindow() {
     prevStartIndex := -1
     GetClientSize(mainWidth, mainHeight, PVhwnd)
     Gdip_GraphicsClear(glPG, "0xFF" WindowBGRcolor)
-    r2 := UpdateLayeredWindow(hGDIthumbsWin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight, 255)
+    r2 := UpdateLayeredWindow(hGDIthumbsWin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight)
     If (A_OSVersion="WIN_7")
     {
        JEE_ClientToScreen(hPicOnGui1, 1, 1, mainX, mainY)
@@ -10480,7 +10698,7 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="") {
         Gdip_FillRectangle(glPG, pBrushD, SelDotAx, SelDotAy, dotsSize, dotsSize)
         Gdip_FillRectangle(glPG, pBrushD, SelDotBx, SelDotBy, dotsSize, dotsSize)
         Gdip_FillRectangle(glPG, pBrushD, SelDotCx, SelDotCy, dotsSize, dotsSize)
-        r2 := UpdateLayeredWindow(hGDIwin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight, 255)
+        r2 := UpdateLayeredWindow(hGDIwin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight)
      } Else
      {
         InfoW := InfoH := ""
@@ -10678,9 +10896,9 @@ QPV_ShowImgonGui(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, mainHe
        prevStartIndex := -1
        tempBMP := Gdip_CreateBitmapFromHBITMAP(glHbitmap)
        Gdip_DrawImageFast(glPG, tempBMP)
-       r2 := UpdateLayeredWindow(hGDIthumbsWin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight, 255)
+       r2 := UpdateLayeredWindow(hGDIthumbsWin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight)
        Gdip_DrawImageFast(glPG, yetAnotherVPcache)
-       r2 := UpdateLayeredWindow(hGDIwin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight, 255)
+       r2 := UpdateLayeredWindow(hGDIwin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight)
        Loop, 255
        {
            opacity := 255 - A_Index*15
@@ -10695,12 +10913,12 @@ QPV_ShowImgonGui(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, mainHe
     }
 
     If (mustDisplay=1)
-       r2 := UpdateLayeredWindow(whichWin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight, 255)
+       r2 := UpdateLayeredWindow(whichWin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight)
 
     If (imageHasFaded=1)
     {
        Gdip_GraphicsClear(glPG, "0xFF" WindowBGRcolor)
-       UpdateLayeredWindow(hGDIthumbsWin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight, 255)
+       UpdateLayeredWindow(hGDIthumbsWin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight)
        Gdip_DrawImageFast(glPG, tempBMP)
        Gdip_DisposeImage(tempBMP, 1)
     }
@@ -10910,7 +11128,7 @@ GdipCleanMain(modus:=0) {
        Gdip_DeleteBrush(yBrush)
        Gdip_DisposeImage(BMPcache)
     } Else Gdip_GraphicsClear(glPG, opacity WindowBgrColor)
-    r2 := UpdateLayeredWindow(hGDIwin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight, 255)
+    r2 := UpdateLayeredWindow(hGDIwin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight)
 }
 
 mainGdipWinThumbsGrid(mustDestroyBrushes:=0, mustShowNames:=0) {
@@ -11067,7 +11285,7 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, mustShowNames:=0) {
        Gdip_FillRectangle(glPG, pBrushD, mainWidth - lineThickns + 5, scrollYpos, lineThickns, scrollHeight)
     }
 
-    r2 := UpdateLayeredWindow(hGDIwin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight, 255)
+    r2 := UpdateLayeredWindow(hGDIwin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight)
 }
 
 EraseThumbsCache(dummy:=0) {
@@ -11469,18 +11687,17 @@ calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, ByRef DestPosX, ByR
 }
 
 GuiSize:
+   ; UpdateLayeredWindow(hGDIthumbsWin, glHDC, 0, 0, 1, 1, 255)
+   ; UpdateLayeredWindow(hGDIwin, glHDC, 0, 0, 1, 1, 255)
    PrevGuiSizeEvent := A_EventInfo
    prevGUIresize := A_TickCount
   ; If (imageLoading!=1) ; && (A_TickCount - startZeitIMGload>130)
-   thisZeit := A_TickCount - scriptStartTime
-   If (thisZeit>450)
-      SetTimer, GDIupdater, -25
+   SetTimer, GDIupdater, -5
 Return
 
 GDIupdater() {
    updateUIctrl()
-   thisZeit := A_TickCount - scriptStartTime
-   If (thisZeit<450)
+   If (A_TickCount - scriptStartTime<450)
       Return
 
    If (toolTipGuiCreated=1)
@@ -11496,9 +11713,6 @@ GDIupdater() {
          extendedDestroyGIFuWin(0)
       Return 1
    }
-
-   If (thisZeit<600) ;  || (imageLoading=1)
-      Return 1
 
    resetSlideshowTimer(0)
    imgPath := resultedFilesList[currentFileIndex]
