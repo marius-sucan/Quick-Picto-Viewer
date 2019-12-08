@@ -980,7 +980,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
   If !FileExist(fileNamu)
   {
      showTOOLtip("ERROR: Failed to load file...")
-     SoundBeep 
+     SoundBeep, 300, 100
      SetTimer, RemoveTooltip, % -msgDisplayTime
      Return
   }
@@ -1776,7 +1776,7 @@ WinClickAction(forceThis:=0, thisCtrlClicked:=0) {
    {
       ; handle clicks in the viewport when another GUI is open
       ; notable exception is the ColorsAdjusterPanelWindow() [AnyWindowOpen=10]
-      If (AnyWindowOpen=10 && imgFxMode!=1)
+      If (AnyWindowOpen=10)
       {
          GetMouseCoord2wind(PVhwnd, mX, mY)
          GetClientSize(mainWidth, mainHeight, PVhwnd)
@@ -1805,12 +1805,6 @@ WinClickAction(forceThis:=0, thisCtrlClicked:=0) {
    MouseGetPos, , , OutputVarWin
    If (toolTipGuiCreated=1)
       TooltipCreator(1, 1)
-
-   If (forceThis!=2)
-   {
-      If (OutputVarWin!=PVhwnd) || (A_TickCount - lastWinDrag>450) && (isTitleBarHidden=1 && thumbsDisplaying=0)
-         Return
-   }
 
    spaceState := GetKeyState("Space", "P") ? 1 : 0
    GetMouseCoord2wind(PVhwnd, mX, mY)
@@ -1882,6 +1876,7 @@ WinClickAction(forceThis:=0, thisCtrlClicked:=0) {
    GetClientSize(mainWidth, mainHeight, PVhwnd)
    If (maxFilesIndex>0 && CurrentSLD && IMGlargerViewPort=1 && IMGresizingMode=4 && (scrollBarHy>1 || scrollBarVx>1) && thumbsDisplaying!=1)
    {
+     SoundBeep 
       ; handle H/V scrollbars for images larger than the viewport
       If (scrollBarHy>1) && ((mY>scrollBarHy && FlipImgV=0)
       || (mY<(mainHeight - scrollBarHy) && FlipImgV=1))
@@ -3382,7 +3377,7 @@ PasteClipboardIMG() {
     {
        Tooltip
        showTOOLtip("Failed to store image from clipboard...")
-       SoundBeep , 300, 100
+       SoundBeep, 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
        Try DllCall("user32\SetCursor", "Ptr", hCursN)
        Return
@@ -4207,7 +4202,7 @@ InListMultiEntriesRemover() {
       dummyTimerDelayiedImageDisplay(50)
    }
 
-   SoundBeep , 900, 100
+   SoundBeep, 900, 100
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -4662,7 +4657,7 @@ SortFilesList(SortCriterion) {
          If !oBitmap
          {
             imageLoading := 0
-            SoundBeep , 300, 100
+            SoundBeep, 300, 100
             msgBoxWrapper(appTitle ": ERROR", "The selected file seems to not exist or it has an incorrect image file format. Please try again with another file...", 0, 0, "error")
             Return -1
          }
@@ -5790,7 +5785,7 @@ multiFileDelete() {
    filesElected := getSelectedFiles(0, 1)
    If (filesElected<2)
    {
-      SoundBeep , 300, 100
+      SoundBeep, 300, 100
       Return
    }
 
@@ -6077,7 +6072,7 @@ coreMultiRenameFiles() {
         showTOOLtip("Operation aborted. "  filezRenamed " out of " filesElected " selected files were renamed" someErrors)
      Else
         showTOOLtip("Finished renaming "  filezRenamed " out of " filesElected " selected files" someErrors)
-     SoundBeep , 900, 100
+     SoundBeep, 900, 100
      SetTimer, RemoveTooltip, % -msgDisplayTime
   }
 }
@@ -7257,11 +7252,11 @@ batchConvert2jpeg() {
    If (abandonAll=1)
    {
       showTOOLtip("Operation aborted. "  filesConverted " out of " filesElected " selected files were converted to ." rDesireWriteFMT someErrors)
-      SoundBeep , 300, 100
+      SoundBeep, 300, 100
    } Else
    {
       showTOOLtip("Finished converting to ." rDesireWriteFMT A_Space filesConverted " out of " filesElected " selected files" someErrors)
-      SoundBeep , 900, 100
+      SoundBeep, 900, 100
    }
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
@@ -7275,7 +7270,7 @@ convert2format() {
   If RegExMatch(file2rem, "i)(.\.(" rDesireWriteFMT "))$")
   {
      showTOOLtip("The image file seems to be already in the given file format: ." rDesireWriteFMT)
-     SoundBeep , 300, 100
+     SoundBeep, 300, 100
      SetTimer, RemoveTooltip, % -msgDisplayTime
      Return "err"
   }
@@ -7295,7 +7290,7 @@ convert2format() {
   {
      ToolTip
      showTOOLtip("A file with the same name already exists in the destination folder...")
-     SoundBeep , 300, 100
+     SoundBeep, 300, 100
      SetTimer, RemoveTooltip, % -msgDisplayTime
      Return "err"
   } Else If FileExist(file2save)
@@ -7317,7 +7312,7 @@ convert2format() {
   If r
   {
      showTOOLtip("Failed to convert file...`n" OutFileName "`n" OutDir "\")
-     SoundBeep , 300, 100
+     SoundBeep, 300, 100
   } Else showTOOLtip("File converted succesfully to ." rDesireWriteFMT "...`n" OutNameNoExt "." rDesireWriteFMT "`n" destImgPath "\")
 
   Try DllCall("user32\SetCursor", "Ptr", hCursN)
@@ -7384,7 +7379,7 @@ coreOpenFolder(thisFolder, doOptionals:=1) {
       {
          GdipCleanMain(1)
          showTOOLtip("ERROR: Found no recognized image files in the folder...`n" thisFolder "\")
-         SoundBeep , 300, 100
+         SoundBeep, 300, 100
          WinSetTitle, ahk_id %PVhwnd%,, %appTitle%
          SetTimer, RemoveTooltip, % -msgDisplayTime
          Return
@@ -7408,7 +7403,7 @@ coreOpenFolder(thisFolder, doOptionals:=1) {
       GdipCleanMain(0)
       WinSetTitle, ahk_id %PVhwnd%,, %appTitle%
       showTOOLtip("ERROR: The folder seems to be inexistent...`n" thisFolder "\")
-      SoundBeep , 300, 100
+      SoundBeep, 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 }
@@ -7657,7 +7652,7 @@ coreAddNewFolder(SelectedDir, remAll) {
     remFilesFromList(thisFolder, 1)
     GetFilesList(SelectedDir "\*")
     GenerateRandyList()
-    SoundBeep , 900, 100
+    SoundBeep, 900, 100
     CurrentSLD := backCurrentSLD
     RandomPicture()
 }
@@ -7773,7 +7768,7 @@ GuiDroppedFiles(imgPath, folderu) {
       If !CurrentSLD
          CurrentSLD := lastOne "\newFile.SLD"
       Try DllCall("user32\SetCursor", "Ptr", hCursN)
-      SoundBeep , 900, 100
+      SoundBeep, 900, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       RandomPicture()
    }
@@ -9185,9 +9180,9 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
 
       yetAnotherVPcache := Gdip_CreateBitmapFromHBITMAP(glHbitmap)
    }
-   r := QPV_ShowImgonGui(oImgW, oImgH, ws, imgW, imgH, ResizedW, ResizedH, GuiW, GuiH, usePrevious, imgPath, ForceIMGload, hasFullReloaded)
+   r := QPV_ShowImgonGui(oImgW, oImgH, ws, imgW, imgH, ResizedW, ResizedH, GuiW, GuiH, usePrevious, imgPath, ForceIMGload, hasFullReloaded, wasPrevious)
    delayu := (A_TickCount - prevFastDisplay < 300) ? 90 : 550
-   If (usePrevious=1 && animGIFplaying!=1)
+   If (wasPrevious=1 && animGIFplaying!=1)
       dummyTimerReloadThisPicture(delayu)
 
    filesElected := getSelectedFiles()
@@ -10722,7 +10717,7 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="") {
      }
 }
 
-QPV_ShowImgonGui(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceIMGload, hasFullReloaded) {
+QPV_ShowImgonGui(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceIMGload, hasFullReloaded, ByRef wasPrevious) {
     Critical, on
     Static IDviewPortCache, PREVtestIDvPcache
     If (ForceIMGload=1)
@@ -10735,11 +10730,12 @@ QPV_ShowImgonGui(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, mainHe
 
     If (usePrevious=1 && testIDvPcache!=PREVtestIDvPcache) || (mustPlayAnim=1) || (imgFxMode=8 && InStr(currentPixFmt, "argb") && RenderOpaqueIMG!=1)
     {
+       wasPrevious := usePrevious
        IDviewPortCache := PREVtestIDvPcache := ""
        r := QPV_ShowImgonGuiPrev(oImgW, oImgH, wscale, imgW, imgH, newW, newH, mainWidth, mainHeight, usePrevious, imgPath)
        Return r
-    }
-SoundBeep 
+    } Else wasPrevious := 0
+
     startZeit := A_TickCount  
     oldZoomLevel := matrix := ""
     prevDrawingMode := 1
@@ -11702,12 +11698,7 @@ GDIupdater() {
 
    SetTimer, dummyTimerReloadThisPicture, Off
    SetTimer, dummyTimerDelayiedImageDisplay, Off
-   If (animGIFplaying=1) ; || (A_TickCount - lastGIFdestroy<300)
-   {
-      DestroyGIFuWin()
-      Return 1
-   }
-
+   DestroyGIFuWin()
    resetSlideshowTimer(0)
    imgPath := resultedFilesList[currentFileIndex]
    clippyTest := resultedFilesList[0]
@@ -11859,7 +11850,7 @@ RegenerateEntireList() {
        GetFilesList(line "\*")
     }
     GenerateRandyList()
-    SoundBeep , 900, 100
+    SoundBeep, 900, 100
     RandomPicture()
 }
 
@@ -12140,7 +12131,7 @@ ReverseListNow() {
     prevStartIndex := -1
     CurrentSLD := backCurrentSLD
     dummyTimerDelayiedImageDisplay(50)
-    SoundBeep , 900, 100
+    SoundBeep, 900, 100
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -12152,7 +12143,7 @@ RandomizeListNow() {
     CurrentSLD := backCurrentSLD
     prevStartIndex := -1
     dummyTimerDelayiedImageDisplay(50)
-    SoundBeep , 900, 100
+    SoundBeep, 900, 100
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -12621,7 +12612,7 @@ BtnPerformJpegOp() {
        RefreshImageFile()
     } Else
     {
-       SoundBeep , 300, 100
+       SoundBeep, 300, 100
        msgBoxWrapper(appTitle ": ERROR", "The JPEG operation has failed. The file might not be a JPEG as the file extension suggests...", 0, 0, "error")
     }
     lastInvoked := A_TickCount
@@ -13472,7 +13463,7 @@ batchIMGresizer(desiredW, desiredH, isPercntg) {
    || desiredW<1 || desiredH<1)
    {
       showTOOLtip("Incorrect values given...")
-      SoundBeep , 300, 100
+      SoundBeep, 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
    }
@@ -13480,7 +13471,7 @@ batchIMGresizer(desiredW, desiredH, isPercntg) {
    If (desiredW<5 || desiredH<5) && (isPercntg!=1)
    {
       showTOOLtip("Incorrect values given...")
-      SoundBeep , 300, 100
+      SoundBeep, 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
    }
@@ -13999,7 +13990,7 @@ IgnoreSelFolder() {
     IniRead, tstSLDcacheFilesList, % CurrentSLD, General, SLDcacheFilesList, @
     If (!InStr(firstLine, "[General]") || tstSLDcacheFilesList!=1)
     {
-       SoundBeep , 300, 100
+       SoundBeep, 300, 100
        msgBoxWrapper(appTitle ": ERROR", "The loaded .SLD file does not seem to be in the correct format. Operation aborted.`n`n" CurrentSLD, 0, 0, "error")
        Return
     }
@@ -14257,7 +14248,7 @@ UpdateSelFolder() {
     IniRead, tstSLDcacheFilesList, % CurrentSLD, General, SLDcacheFilesList, @
     If (!InStr(firstLine, "[General]") || tstSLDcacheFilesList!=1)
     {
-       SoundBeep , 300, 100
+       SoundBeep, 300, 100
        msgBoxWrapper(appTitle ": ERROR", "The loaded .SLD file does not seem to be in the correct format. Operation aborted.`n`n" CurrentSLD, 0, 0, "error")
        Return
     }
@@ -14366,7 +14357,7 @@ startZeit := A_TickCount
     LV_ModifyCol(3, "Sort")
     If (CountFilesFolderzList=1)
     {
-       SoundBeep , 900, 100
+       SoundBeep, 900, 100
        CountFilesFolderzList := 0
        GuiControl, SettingsGUIA:, CountFilesFolderzList, 0
     }
@@ -15003,7 +14994,7 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode:=0, forceNoSel:=0) {
    {
       If (silentMode=0)
       {
-         SoundBeep , 900, 100
+         SoundBeep, 900, 100
          showTOOLtip("The image seems to be uniformly colored.")
       }
       Return
@@ -15019,7 +15010,7 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode:=0, forceNoSel:=0) {
 
    If (silentMode=0)
    {
-      SoundBeep , 900, 100
+      SoundBeep, 900, 100
       SetTimer, RemoveTooltip, -500
    }
 
@@ -15727,7 +15718,7 @@ BtnPerformSimpleProcessing() {
     zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, oExt)
     If (!filesElected && !RegExMatch(imgPath, thisRegEX))
     {
-       SoundBeep , 300, 100
+       SoundBeep, 300, 100
        msgBoxWrapper(appTitle ": ERROR", "This file format (." oExt ") cannot be processed in «Simple mode». Please use the «Advanced mode» which allows file format conversions.", 0, 0, "exclamation")
        Return
     }
@@ -15845,11 +15836,11 @@ batchSimpleProcessing(rotateAngle, scaleImgFactor) {
    If (abandonAll=1)
    {
       showTOOLtip("Operation aborted. "  filesConverted " out of " filesElected " selected files were processed." someErrors)
-      SoundBeep , 300, 100
+      SoundBeep, 300, 100
    } Else
    {
       showTOOLtip("Finished processing " filesConverted " out of " filesElected " selected files" someErrors)
-      SoundBeep , 900, 100
+      SoundBeep, 900, 100
    }
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
