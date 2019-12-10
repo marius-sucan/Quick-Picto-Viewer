@@ -2,6 +2,14 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.0.0 (2019-12-10) [alpha, work in progress]
+  - [improvement] animated GIFs are now fully supported; they can now be color adjusted as well 
+  - [improvement] sort by histogram and image similarity uses multiple cores; this makes the operations much faster
+  - [improvement] files counting in the static folders panel is now much faster
+  - [improvement] Quick Picto Viewer interface is now separated from the core, to allow for a more responsive user interface 
+  - [improvement] many improvements to the touch screen usability
+  - fixed a bug when resizing Quick Picto Viewer window that caused frequent hanging/freezing
+
 - v3.9.8 (2019-11-21)
   - [new] advanced auto-crop image option; applicable on multiple images at once
   - [new] panel to decide action to perform on deleting multiple entries from the list
