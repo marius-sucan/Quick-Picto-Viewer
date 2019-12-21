@@ -14714,7 +14714,8 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
      If (hitB=1)
        Try DllCall("user32\SetCursor", "Ptr", hCursFinger)
      Else If (hitA=1)
-       Try DllCall("user32\SetCursor", "Ptr", hCursMove)
+       ;Try DllCall("user32\SetCursor", "Ptr", hCursMove)
+       Try DllCall("SetClassLong" . (A_PtrSize=8 ? "Ptr" : ""), "Ptr", hWnd, "Int", -12, "Ptr", hCursMove)
   } Else If (hitTestSelectionPath && thumbsDisplaying=1 && CurrentSLD && imageLoading!=1 && maxFilesIndex>1)
   {
      GetMouseCoord2wind(PVhwnd, mX, mY)
