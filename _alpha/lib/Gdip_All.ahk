@@ -204,13 +204,10 @@ BitBlt(ddc, dx, dy, dw, dh, sdc, sx, sy, raster:="") {
    Ptr := A_PtrSize ? "UPtr" : "UInt"
    return DllCall("gdi32\BitBlt"
                , Ptr, dDC
-               , "int", dX
-               , "int", dY
-               , "int", dW
-               , "int", dH
+               , "int", dX, "int", dY
+               , "int", dW, "int", dH
                , Ptr, sDC
-               , "int", sX
-               , "int", sY
+               , "int", sX, "int", sY
                , "uint", Raster ? Raster : 0x00CC0020)
 }
 
@@ -238,15 +235,11 @@ StretchBlt(ddc, dx, dy, dw, dh, sdc, sx, sy, sw, sh, Raster:="") {
 
    return DllCall("gdi32\StretchBlt"
                , Ptr, ddc
-               , "int", dX
-               , "int", dY
-               , "int", dW
-               , "int", dH
+               , "int", dX, "int", dY
+               , "int", dW, "int", dH
                , Ptr, sdc
-               , "int", sX
-               , "int", sY
-               , "int", sW
-               , "int", sH
+               , "int", sX, "int", sY
+               , "int", sW, "int", sH
                , "uint", Raster ? Raster : 0x00CC0020)
 }
 
@@ -1561,10 +1554,8 @@ Gdip_DrawImageRect(pGraphics, pBitmap, X, Y, W, H) {
    _E := DllCall("gdiplus\GdipDrawImageRect"
             , Ptr, pGraphics
             , Ptr, pBitmap
-            , "float", X
-            , "float", Y
-            , "float", W
-            , "float", H)
+            , "float", X, "float", Y
+            , "float", W, "float", H)
    return _E
 }
 
@@ -1949,30 +1940,31 @@ Gdip_SaveBitmapToFile(pBitmap, sOutput, Quality:=75) {
    _p := 0
 
    SplitPath sOutput,,, Extension
-   if !RegExMatch(Extension, "^(?i:BMP|DIB|RLE|JPG|JPEG|JPE|JFIF|GIF|TIF|TIFF|PNG)$")
-      return -1
-   Extension := "." Extension
+   If !RegExMatch(Extension, "^(?i:BMP|DIB|RLE|JPG|JPEG|JPE|JFIF|GIF|TIF|TIFF|PNG)$")
+      Return -1
 
+   Extension := "." Extension
    DllCall("gdiplus\GdipGetImageEncodersSize", "uint*", nCount, "uint*", nSize)
    VarSetCapacity(ci, nSize)
    DllCall("gdiplus\GdipGetImageEncoders", "uint", nCount, "uint", nSize, Ptr, &ci)
-   if !(nCount && nSize)
-      return -2
+   If !(nCount && nSize)
+      Return -2
 
-   If (A_IsUnicode){
+   If (A_IsUnicode)
+   {
       StrGet_Name := "StrGet"
-
       N := (A_AhkVersion < 2) ? nCount : "nCount"
       Loop %N%
       {
          sString := %StrGet_Name%(NumGet(ci, (idx := (48+7*A_PtrSize)*(A_Index-1))+32+3*A_PtrSize), "UTF-16")
-         if !InStr(sString, "*" Extension)
-            continue
+         If !InStr(sString, "*" Extension)
+            Continue
 
          pCodec := &ci+idx
-         break
+         Break
       }
-   } else {
+   } Else
+   {
       N := (A_AhkVersion < 2) ? nCount : "nCount"
       Loop %N%
       {
@@ -1980,21 +1972,21 @@ Gdip_SaveBitmapToFile(pBitmap, sOutput, Quality:=75) {
          nSize := DllCall("WideCharToMultiByte", "uint", 0, "uint", 0, "uint", Location, "int", -1, "uint", 0, "int",  0, "uint", 0, "uint", 0)
          VarSetCapacity(sString, nSize)
          DllCall("WideCharToMultiByte", "uint", 0, "uint", 0, "uint", Location, "int", -1, "str", sString, "int", nSize, "uint", 0, "uint", 0)
-         if !InStr(sString, "*" Extension)
-            continue
+         If !InStr(sString, "*" Extension)
+            Continue
 
          pCodec := &ci+76*(A_Index-1)
-         break
+         Break
       }
    }
 
-   if !pCodec
-      return -3
+   If !pCodec
+      Return -3
 
-   if (Quality != 75)
+   If (Quality!=75)
    {
       Quality := (Quality < 0) ? 0 : (Quality > 100) ? 100 : Quality
-      if RegExMatch(Extension, "^\.(?i:JPG|JPEG|JPE|JFIF)$")
+      If RegExMatch(Extension, "^\.(?i:JPG|JPEG|JPE|JFIF)$")
       {
          DllCall("gdiplus\GdipGetEncoderParameterListSize", Ptr, pBitmap, Ptr, pCodec, "uint*", nSize)
          VarSetCapacity(EncoderParameters, nSize, 0)
@@ -2004,29 +1996,29 @@ Gdip_SaveBitmapToFile(pBitmap, sOutput, Quality:=75) {
          Loop %N%
          {
             elem := (24+(A_PtrSize ? A_PtrSize : 4))*(A_Index-1) + 4 + (pad := A_PtrSize = 8 ? 4 : 0)
-            if (NumGet(EncoderParameters, elem+16, "UInt") = 1) && (NumGet(EncoderParameters, elem+20, "UInt") = 6)
+            If (NumGet(EncoderParameters, elem+16, "UInt") = 1) && (NumGet(EncoderParameters, elem+20, "UInt") = 6)
             {
                _p := elem+&EncoderParameters-pad-4
                NumPut(Quality, NumGet(NumPut(4, NumPut(1, _p+0)+20, "UInt")), "UInt")
-               break
+               Break
             }
          }
       }
    }
 
-   if (!A_IsUnicode)
+   If (!A_IsUnicode)
    {
       nSize := DllCall("MultiByteToWideChar", "uint", 0, "uint", 0, Ptr, &sOutput, "int", -1, Ptr, 0, "int", 0)
       VarSetCapacity(wOutput, nSize*2)
       DllCall("MultiByteToWideChar", "uint", 0, "uint", 0, Ptr, &sOutput, "int", -1, Ptr, &wOutput, "int", nSize)
       VarSetCapacity(wOutput, -1)
-      if !VarSetCapacity(wOutput)
-         return -4
+      If !VarSetCapacity(wOutput)
+         Return -4
       _E := DllCall("gdiplus\GdipSaveImageToFile", Ptr, pBitmap, Ptr, &wOutput, Ptr, pCodec, "uint", _p ? _p : 0)
-   }
-   else
+   } Else
       _E := DllCall("gdiplus\GdipSaveImageToFile", Ptr, pBitmap, Ptr, &sOutput, Ptr, pCodec, "uint", _p ? _p : 0)
-   return _E ? -5 : 0
+
+   Return _E ? -5 : 0
 }
 
 ;#####################################################################################
@@ -2339,7 +2331,7 @@ Gdip_CreateBitmapFromHBITMAPalpha(hImage) {
    bpp    := NumGet(dib, 18, "ushort")
 
    ; Fallback to built-in method if pixels are not ARGB.
-   if (bpp != 32)
+   if (bpp!=32)
       return Gdip_CreateBitmapFromHBITMAP(hImage)
 
    ; Create a handle to a device context and associate the hImage.
@@ -2497,7 +2489,7 @@ Gdip_SetBitmapToClipboard(pBitmap) {
    Return E
 }
 
-Gdip_CloneBitmapArea(pBitmap, x, y, w, h, PixelFormat:=0, KeepPixelFormat:=0) {
+Gdip_CloneBitmapArea(pBitmap, x:="", y:="", w:=0, h:=0, PixelFormat:=0, KeepPixelFormat:=0) {
 ; The new pBitmap is by default in the 32-ARGB PixelFormat.
 ;
 ; If the specified coordinates exceed the boundaries of pBitmap
@@ -2509,11 +2501,18 @@ Gdip_CloneBitmapArea(pBitmap, x, y, w, h, PixelFormat:=0, KeepPixelFormat:=0) {
    If (KeepPixelFormat=1)
       PixelFormat := Gdip_GetImagePixelFormat(pBitmap, 1)
 
+   If (y="")
+      y := 0
+
+   If (x="")
+      x := 0
+
+   If (!w && !h)
+      Gdip_GetImageDimensions(pBitmap, w, h)
+
    E := DllCall("gdiplus\GdipCloneBitmapArea"
-               , "float", x
-               , "float", y
-               , "float", w
-               , "float", h
+               , "float", x, "float", y
+               , "float", w, "float", h
                , "int", PixelFormat
                , A_PtrSize ? "UPtr" : "UInt", pBitmap
                , A_PtrSize ? "UPtr*" : "UInt*", pBitmapDest)
@@ -2610,7 +2609,7 @@ Gdip_ImageRotateFlip(pBitmap, RotateFlipType:=1) {
 
 Gdip_RotateBitmapAtCenter(pBitmap, Angle, pBrush:=0, InterpolationMode:=7, PixelFormat:=0) {
 ; the pBrush will be used to fill the background of the image
-; by default, it is black
+; by default, it is black.
 ; It returns the pointer to a new pBitmap.
 
     If !Angle
@@ -2669,6 +2668,7 @@ Gdip_RotateBitmapAtCenter(pBitmap, Angle, pBrush:=0, InterpolationMode:=7, Pixel
 Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:=7, KeepPixelFormat:=0) {
 ; KeepPixelFormat can receive a specific PixelFormat.
 ; The function returns a pointer to a new pBitmap.
+; Default is 0 = 32-ARGB
 
     Gdip_GetImageDimensions(pBitmap, Width, Height)
     If (KeepRatio=1)
@@ -2691,9 +2691,7 @@ Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:=7, Keep
        hbm := CreateDIBSection(ResizedW, ResizedH,,24)
        hdc := CreateCompatibleDC()
        obm := SelectObject(hdc, hbm)
-       G := Gdip_GraphicsFromHDC(hdc)
-       Gdip_SetInterpolationMode(G, InterpolationMode)
-       Gdip_SetSmoothingMode(G, 4)
+       G := Gdip_GraphicsFromHDC(hdc, InterpolationMode, 4)
        Gdip_DrawImageRect(G, pBitmap, 0, 0, ResizedW, ResizedH)
        newBitmap := Gdip_CreateBitmapFromHBITMAP(hbm)
        If (KeepPixelFormat=1)
@@ -2704,8 +2702,7 @@ Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:=7, Keep
     } Else
     {
        newBitmap := Gdip_CreateBitmap(ResizedW, ResizedH, PixelFormat)
-       G := Gdip_GraphicsFromImage(newBitmap)
-       Gdip_SetInterpolationMode(G, InterpolationMode)
+       G := Gdip_GraphicsFromImage(newBitmap, InterpolationMode)
        Gdip_DrawImageRect(G, pBitmap, 0, 0, ResizedW, ResizedH)
     }
 
@@ -3754,7 +3751,7 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
    ypos := (ypos && (ypos[1] != "")) ? ypos[2] ? IHeight*(ypos[1]/100) : ypos[1] : 0
    Width := (Width && Width[1]) ? Width[2] ? IWidth*(Width[1]/100) : Width[1] : IWidth
    Height := (Height && Height[1]) ? Height[2] ? IHeight*(Height[1]/100) : Height[1] : IHeight
-   if !PassBrush
+   If !PassBrush
       Colour := "0x" (Colour && Colour[2] ? Colour[2] : "ff000000")
    Rendering := (Rendering && (Rendering[1] >= 0) && (Rendering[1] <= 5)) ? Rendering[1] : 4
    Size := (Size && (Size[1] > 0)) ? Size[2] ? IHeight*(Size[1]/100) : Size[1] : 12
@@ -3796,8 +3793,17 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
       Gdip_SetStringFormatTrimming(hStringFormat, 3)
    Gdip_SetTextRenderingHint(pGraphics, Rendering)
    ReturnRC := Gdip_MeasureString(pGraphics, Text, hFont, hStringFormat, RC)
+   ReturnRCtest := StrSplit(ReturnRC, "|")
+   testX := Floor(ReturnRCtest[1]) - 2
+   If (testX>xpos) ; error correction for different text alignments
+   {
+      nxpos := Floor(xpos - (testX - xpos))
+      CreateRectF(RC, nxpos, ypos, Width, Height)
+      ReturnRC := Gdip_MeasureString(pGraphics, Text, hFont, hStringFormat, RC)
+      ; MsgBox, % nxpos "--" xpos "--" ypos "`n" width "--" height "`n" ReturnRC
+   }
 
-   if vPos
+   If vPos
    {
       ReturnRC := StrSplit(ReturnRC, "|")
       if (vPos[0] = "vCentre") || (vPos[0] = "vCenter")
@@ -7138,8 +7144,12 @@ Gdip_SetBitmapAlphaChannel(pBitmap, AlphaMaskBitmap) {
 }
 
 calcIMGdimensions(imgW, imgH, givenW, givenH, ByRef ResizedW, ByRef ResizedH) {
-; imgW, imgH    - original image width and height
-; givenW, givenH  - the width and height [in pixels] to adapt to
+; This function calculates from original imgW and imgH 
+; new image dimensions that maintain the aspect ratio
+; and are within the boundaries of givenW and givenH.
+;
+; imgW, imgH         - original image width and height
+; givenW, givenH     - the width and height [in pixels] to adapt to
 ; ResizedW, ResizedH - the width and height resulted from adapting imgW, imgH to givenW, givenH
 ;                      by keeping the aspect ratio
 
@@ -7289,12 +7299,13 @@ Gdip_BitmapConvertFormat(pBitmap, PixelFormat, DitherType, DitherPaletteType, Pa
 
 Gdip_GetImageThumbnail(pBitmap, W, H) {
     DllCall("gdiplus\GdipGetImageThumbnail"
-        ,"UPtr",pBitmap                                 ;-- *image
-        ,"UInt",W                                       ;-- thumbWidth
-        ,"UInt",H                                       ;-- thumbHeight
-        ,"UPtr*",pThumbnail                             ;-- **thumbImage
-        ,"UPtr",0                                       ;-- callback
-        ,"UPtr",0)                                      ;-- callbackData
+        ,"UPtr",pBitmap                         ;-- *image
+        ,"UInt",W                               ;-- thumbWidth
+        ,"UInt",H                               ;-- thumbHeight
+        ,"UPtr*",pThumbnail                     ;-- **thumbImage
+        ,"UPtr",0                               ;-- callback
+        ,"UPtr",0)                              ;-- callbackData
 
    Return pThumbnail
 }
+

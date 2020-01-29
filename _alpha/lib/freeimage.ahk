@@ -20,7 +20,7 @@
 
 FreeImage_FoxInit(isInit:=1) {
    Static hFIDll
-   DllPath := FreeImage_FoxGetDllPath()
+   DllPath := FreeImage_FoxGetDllPath("freeimage.dll")
    If !DllPath
       Return "err - 404"
 
@@ -35,8 +35,8 @@ FreeImage_FoxInit(isInit:=1) {
    Return hFIDll
 }
 
-FreeImage_FoxGetDllPath(DllName:="FreeImage.dll") {
-   DirList := "|" A_WorkingDir "|" mainCompiledPath "|" A_scriptdir "|" A_scriptdir "\bin|" A_scriptdir "\lib|"
+FreeImage_FoxGetDllPath(DllName) {
+   DirList := "|" A_WorkingDir "|" mainCompiledPath "|" A_scriptdir "|" A_scriptdir "\bin|" A_scriptdir "\lib|" mainCompiledPath "\lib|"
    DllPath := ""
    Loop, Parse, DirList, |
    {
@@ -132,7 +132,7 @@ FreeImage_Load(ImPath, GFT:=-1, flag:=0, ByRef dGFT:=0) {
    Return DllCall(getFIMfunc("LoadU"), "Int", GFT, "WStr", ImPath, "int", flag)
 }
 
-FreeImage_Save(hImage, ImPath, ImgArg=0) {
+FreeImage_Save(hImage, ImPath, ImgArg:=0) {
    ; FIMfrmt := {"BMP":0, "JPG":2, "JPEG":2, "PNG":13, "TIF":18, "TIFF":18, "GIF":25}
    OutExt := FreeImage_GetFIFFromFilename(ImPath)
    Return DllCall(getFIMfunc("SaveU"), "Int", OutExt, "Int", hImage, "WStr", ImPath, "int", ImgArg)
@@ -519,6 +519,18 @@ FreeImage_Rescale(hImage, w, h, filter:=3) {
    Return DllCall(getFIMfunc("Rescale"), "Int", hImage, "Int", w, "Int", h, "Int", filter)
 }
 
+FreeImage_MakeThumbnail(hImage, squareSize, convert:=1) {
+; Filter parameter options
+; 0 = FILTER_BOX;        Box, pulse, Fourier window, 1st order (constant) B-Spline
+; 1 = FILTER_BILINEAR;   Bilinear filter
+; 2 = FILTER_BSPLINE;    4th order (cubic) B-Spline
+; 3 = FILTER_BICUBIC;    Mitchell and Netravali's two-param cubic filter
+; 4 = FILTER_CATMULLROM; Catmull-Rom spline, Overhauser spline
+; 5 = FILTER_LANCZOS3;   Lanczos-windowed sinc filter
+
+   Return DllCall(getFIMfunc("MakeThumbnail"), "Int", hImage, "Int", squareSize, "Int", convert)
+}
+
 FreeImage_AdjustColors(hImage, bright, contrast, gamma, invert) {
 ; bright and contrast interval: [-100, 100]
 ; gamma interval: [0.0, 2.0]
@@ -712,5 +724,34 @@ ConvertPBITMAPtoFIM(pBitmap, destWin) {
      Return
   }
   Return hFIFimgA
+}
+
+SimpleConvertFimToPBitmap(hFIFimgA) {
+   imgBPP := Trim(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
+   If (imgBPP!=32 && imgBPP)
+   {
+      hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "32Bits")
+      If hFIFimgB
+      {
+         FreeImage_UnLoad(hFIFimgA)
+         hFIFimgA := hFIFimgB
+      }
+   }
+   If !imgBPP
+      Return
+
+  FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
+  bitmapInfo := FreeImage_GetInfo(hFIFimgA)
+  pBits := FreeImage_GetBits(hFIFimgA)
+  nBitmap := Gdip_CreateBitmap(imgW, imgH, 0, imgW*4, pBits)
+  Gdip_ImageRotateFlip(nBitmap, 6)
+  ; nBitmap := Gdip_CreateBitmapFromGdiDib(bitmapInfo, pBits)
+
+  pBitmap := Gdip_CreateBitmap(imgW, imgH)    ; 32-RGB
+  G := Gdip_GraphicsFromImage(pBitmap)
+  Gdip_DrawImageFast(G, nBitmap)
+  Gdip_DeleteGraphics(G)
+  Gdip_DisposeImage(nBitmap)
+  Return pBitmap
 }
 
