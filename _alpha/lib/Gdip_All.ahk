@@ -1,4 +1,4 @@
-﻿; Gdip_All.ahk - GDI+ library compilation of user contributed GDI+ functions
+; Gdip_All.ahk - GDI+ library compilation of user contributed GDI+ functions
 ; made by Marius Șucan: https://github.com/marius-sucan/AHK-GDIp-Library-Compilation
 ; a fork from: https://github.com/mmikeww/AHKv2-Gdip
 ; based on https://github.com/tariqporter/Gdip
@@ -928,7 +928,7 @@ Gdip_DrawRoundedRectangle(pGraphics, pPen, x, y, w, h, r) {
    return _E
 }
 
-Gdip_DrawRoundedRectangle2(pGraphics, pPen, x, y, w, h, r) {
+Gdip_DrawRoundedRectangle2(pGraphics, pPen, x, y, w, h, r, angle:=0) {
 ; extracted from: https://github.com/tariqporter/Gdip2/blob/master/lib/Object.ahk
 ; and adapted by Marius Șucan
 
@@ -956,6 +956,8 @@ Gdip_DrawRoundedRectangle2(pGraphics, pPen, x, y, w, h, r) {
    Gdip_AddPathArc(path1, x + pw, y + h - r2 - pw, r2, r2, 90, 90)
    Gdip_AddPathLine(path1, x + pw, y + h - r - pw, x + pw, y + r + pw)
    Gdip_ClosePathFigure(path1)
+   If (angle>0)
+      Gdip_RotatePathAtCenter(path1, angle)
    _E := Gdip_DrawPath(pGraphics, pPen, path1)
    Gdip_DeletePath(path1)
    return _E
@@ -1156,10 +1158,8 @@ Gdip_DrawLine(pGraphics, pPen, x1, y1, x2, y2) {
    return DllCall("gdiplus\GdipDrawLine"
                , Ptr, pGraphics
                , Ptr, pPen
-               , "float", x1
-               , "float", y1
-               , "float", x2
-               , "float", y2)
+               , "float", x1, "float", y1
+               , "float", x2, "float", y2)
 }
 
 ;#####################################################################################
@@ -1196,10 +1196,8 @@ Gdip_FillRectangle(pGraphics, pBrush, x, y, w, h) {
    return DllCall("gdiplus\GdipFillRectangle"
                , Ptr, pGraphics
                , Ptr, pBrush
-               , "float", x
-               , "float", y
-               , "float", w
-               , "float", h)
+               , "float", x, "float", y
+               , "float", w, "float", h)
 }
 
 ;#####################################################################################
@@ -1491,11 +1489,11 @@ Gdip_DrawImage(pGraphics, pBitmap, dx:="", dy:="", dw:="", dh:="", sx:="", sy:="
    {
       if !IsNumber(Matrix)
          ImageAttr := Gdip_SetImageAttributesColorMatrix(Matrix)
-      else if (Matrix != 1)
+      else if (Matrix!=1)
          ImageAttr := Gdip_SetImageAttributesColorMatrix("1|0|0|0|0|0|1|0|0|0|0|0|1|0|0|0|0|0|" Matrix "|0|0|0|0|0|1")
    } Else usrImageAttr := 1
 
-   If (dx!="" && dy!="" && sx="" && sy="" && sw="" && sh="")
+   If (dx!="" && dy!="" && dw="" && dh="" && sx="" && sy="" && sw="" && sh="")
    {
       sx := sy := 0
       sw := dw := Gdip_GetImageWidth(pBitmap)
@@ -1507,11 +1505,10 @@ Gdip_DrawImage(pGraphics, pBitmap, dx:="", dy:="", dw:="", dh:="", sx:="", sy:="
          sx := dx := 0, sy := dy := 0
          sw := dw := Gdip_GetImageWidth(pBitmap)
          sh := dh := Gdip_GetImageHeight(pBitmap)
-      } else
+      } Else
       {
          sx := sy := 0
-         sw := Gdip_GetImageWidth(pBitmap)
-         sh := Gdip_GetImageHeight(pBitmap)
+         Gdip_GetImageDimensions(pBitmap, sw, sh)
       }
    }
 
@@ -2040,13 +2037,17 @@ Gdip_GetPixel(pBitmap, x, y) {
 
 Gdip_GetPixelColor(pBitmap, x, y, Format) {
    ARGBdec := Gdip_GetPixel(pBitmap, x, y)
-   If (format=1)  ; in HEX
+   If (format=1)  ; in RGBA [HEX; 00-FF]
    {
       Return Format("{1:#x}", ARGBdec)
    } Else If (format=2)  ; in RGBA [0-255]
    {
       Gdip_FromARGB(ARGBdec, A, R, G, B)
       Return R "," G "," B "," A
+   } Else If (format=3)  ; in BGR [HEX; 00-FF]
+   {
+      clr := Format("{1:#x}", ARGBdec)
+      Return "0x" SubStr(clr, -1) SubStr(clr, 7, 2) SubStr(clr, 5, 2)
    } Else Return ARGBdec
 }
 
@@ -2485,6 +2486,7 @@ Gdip_SetBitmapToClipboard(pBitmap) {
    DeleteObject(hBitmap)
    r3 := DllCall("SetClipboardData", "uint", 8, Ptr, hdib) ; CF_DIB = 8
    DllCall("CloseClipboard")
+   DllCall("GlobalFree", Ptr, hdib)
    E := r3 ? 0 : -4    ; 0 - success
    Return E
 }
@@ -2934,20 +2936,19 @@ Gdip_SetPenCompoundArray(pPen, inCompounds) {
 ;                  ExampleCompounds := "0.0|0.2|0.7|1.0"
 ; Remarks        - The elements in the string array must be in increasing order, between 0 and not greater than 1.
 ;                  Suppose you want a pen to draw two parallel lines where the width of the first line is 20 percent of the pen's
-;                  width, the width of the space that separates the two lines is 50 percent of the pen' s width, and the width
+;                  width, the width of the space that separates the two lines is 50 percent of the pen's width, and the width
 ;                  of the second line is 30 percent of the pen's width. Start by creating a pPen object and an array of compound
 ;                  values. For this, you can then set the compound array by passing the array with the values "0.0|0.2|0.7|1.0".
 ; Return status enumeration
 
    arrCompounds := StrSplit(inCompounds, "|")
    totalCompounds := arrCompounds.Length()
-   VarSetCapacity(pCompounds, 4 * totalCompounds, 0)
-   Loop %totalCompounds% {
-      NumPut(arrCompounds[A_Index], pCompounds, 4 * (A_Index - 1), "float")
-   }
+   VarSetCapacity(pCompounds, 8 * totalCompounds, 0)
+   Loop %totalCompounds%
+      NumPut(arrCompounds[A_Index], &pCompounds, 4*(A_Index - 1), "float")
 
    Ptr := A_PtrSize ? "UPtr" : "UInt"
-   Return DllCall("gdiplus\GdipSetPenCompoundArray", Ptr, pPen, "uptr", &pCompounds, "int", totalCompounds)
+   Return DllCall("gdiplus\GdipSetPenCompoundArray", Ptr, pPen, Ptr, &pCompounds, "int", totalCompounds)
 }
 
 Gdip_SetPenDashStyle(pPen, DashStyle) {
@@ -2982,7 +2983,7 @@ Gdip_SetPenDashArray(pPen, Dashes) {
    PointsCount := Points.Length()
    VarSetCapacity(PointsF, 8 * PointsCount, 0)
    Loop %PointsCount%
-       NumPut(Points[A_Index], &PointsF, 4*(A_Index-1), "float")
+       NumPut(Points[A_Index], &PointsF, 4*(A_Index - 1), "float")
 
    Return DllCall("gdiplus\GdipSetPenDashArray", Ptr, pPen, Ptr, &PointsF, "int", PointsCount)
 }
@@ -3543,6 +3544,10 @@ Gdip_GetBrushType(pBrush) {
 ; Delete resources
 ;#####################################################################################
 
+Gdip_DeleteRegion(Region) {
+   return DllCall("gdiplus\GdipDeleteRegion", A_PtrSize ? "UPtr" : "UInt", Region)
+}
+
 Gdip_DeletePen(pPen) {
    return DllCall("gdiplus\GdipDeletePen", A_PtrSize ? "UPtr" : "UInt", pPen)
 }
@@ -3582,6 +3587,10 @@ Gdip_DeleteStringFormat(hStringFormat) {
 
 Gdip_DeleteFontFamily(hFontFamily) {
    return DllCall("gdiplus\GdipDeleteFontFamily", A_PtrSize ? "UPtr" : "UInt", hFontFamily)
+}
+
+Gdip_DeletePrivateFontCollection(hFontCollection) {
+   Return DllCall("gdiplus\GdipDeletePrivateFontCollection", "ptr*", hFontCollection)
 }
 
 Gdip_DeleteMatrix(hMatrix) {
@@ -3709,6 +3718,9 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
 ; The first four elements represent the boundaries of the text.
 ; The string is returned by Gdip_MeasureString()
 
+   Static Styles := "Regular|Bold|Italic|BoldItalic|Underline|Strikeout"
+        , Alignments := "Near|Left|Centre|Center|Far|Right"
+
    IWidth := Width, IHeight:= Height
    pattern_opts := (A_AhkVersion < "2") ? "iO)" : "i)"
    RegExMatch(Options, pattern_opts "X([\-\d\.]+)(p*)", xpos)
@@ -3733,15 +3745,15 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
    if !(IWidth && IHeight) && ((xpos && xpos[2]) || (ypos && ypos[2]) || (Width && Width[2]) || (Height && Height[2]) || (Size && Size[2]))
       return -1
 
-   Style := 0, Styles := "Regular|Bold|Italic|BoldItalic|Underline|Strikeout"
-   For eachStyle, valStyle in StrSplit( Styles, "|" )
+   Style := 0
+   For eachStyle, valStyle in StrSplit(Styles, "|")
    {
       if RegExMatch(Options, "\b" valStyle)
          Style |= (valStyle != "StrikeOut") ? (A_Index-1) : 8
    }
 
-   Align := 0, Alignments := "Near|Left|Centre|Center|Far|Right"
-   For eachAlignment, valAlignment in StrSplit( Alignments, "|" )
+   Align := 0
+   For eachAlignment, valAlignment in StrSplit(Alignments, "|")
    {
       if RegExMatch(Options, "\b" valAlignment)
          Align |= A_Index//2.1   ; 0|0|1|1|2|2
@@ -4237,10 +4249,6 @@ Gdip_NewPrivateFontCollection() {
    Return hFontCollection
 }
 
-Gdip_DeletePrivateFontCollection(hFontCollection) {
-   Return DllCall("gdiplus\GdipDeletePrivateFontCollection", "ptr*", hFontCollection)
-}
-
 Gdip_CreateFontFamilyFromFile(FontFile, hFontCollection, FontName:="") {
 ; hFontCollection - the collection to add the font to
 ; Pass the result of Gdip_NewPrivateFontCollection() to this parameter
@@ -4494,6 +4502,33 @@ Gdip_AddPathRectangle(pPath, x, y, w, h) {
    return DllCall("gdiplus\GdipAddPathRectangle", A_PtrSize ? "UPtr" : "UInt", pPath, "float", x, "float", y, "float", w, "float", h)
 }
 
+Gdip_AddPathRoundedRectangle(pPath, x, y, w, h, r) {
+; extracted from: https://github.com/tariqporter/Gdip2/blob/master/lib/Object.ahk
+; and adapted by Marius Șucan
+   E := 0
+   r := (w <= h) ? (r < w / 2) ? r : w / 2 : (r < h / 2) ? r : h / 2
+   If (E := Gdip_AddPathRectangle(pPath, x+r, y, w-(2*r), r))
+      Return E
+   If (E := Gdip_AddPathRectangle(pPath, x+r, y+h-r, w-(2*r), r))
+      Return E
+   If (E := Gdip_AddPathRectangle(pPath, x, y+r, r, h-(2*r)))
+      Return E
+   If (E := Gdip_AddPathRectangle(pPath, x+w-r, y+r, r, h-(2*r)))
+      Return E
+   If (E := Gdip_AddPathRectangle(pPath, x+r, y+r, w-(2*r), h-(2*r)))
+      Return E
+   If (E := Gdip_AddPathPie(pPath, x, y, 2*r, 2*r, 180, 90))
+      Return E
+   If (E := Gdip_AddPathPie(pPath, x+w-(2*r), y, 2*r, 2*r, 270, 90))
+      Return E
+   If (E := Gdip_AddPathPie(pPath, x, y+h-(2*r), 2*r, 2*r, 90, 90))
+      Return E
+   If (E := Gdip_AddPathPie(pPath, x+w-(2*r), y+h-(2*r), 2*r, 2*r, 0, 90))
+      Return E
+   Return E
+}
+
+
 Gdip_AddPathPolygon(pPath, Points) {
 ; Points: the coordinates of all the points passed as x1,y1|x2,y2|x3,y3..... [minimum three points must be given]
 
@@ -4689,6 +4724,14 @@ Gdip_FlattenPath(pPath, flatness, hMatrix:=0) {
 ; hMatrix - a pointer to a transformation matrix to apply.
    Ptr := A_PtrSize ? "UPtr" : "UInt"
    return DllCall("gdiplus\GdipFlattenPath", Ptr, pPath, Ptr, hMatrix, "float", flatness)
+}
+
+Gdip_WidenPath(pPath, pPen, hMatrix:=0, Flatness:=1) {
+; Replaces this path with curves that enclose the area that is filled when this path is drawn by a specified pen.
+; This method also flattens the path.
+
+  Ptr := A_PtrSize ? "UPtr" : "UInt"
+  return DllCall("gdiplus\GdipWidenPath", Ptr, pPath, "uint", pPen, Ptr, hMatrix, "float", Flatness)
 }
 
 Gdip_PathOutline(pPath, flatness:=1, hMatrix:=0) {
@@ -5320,10 +5363,6 @@ Gdip_CloneRegion(Region) {
    return newRegion
 }
 
-Gdip_DeleteRegion(Region) {
-   return DllCall("gdiplus\GdipDeleteRegion", A_PtrSize ? "UPtr" : "UInt", Region)
-}
-
 ;#####################################################################################
 ; BitmapLockBits
 ;#####################################################################################
@@ -5713,6 +5752,7 @@ Gdip_GetPropertyIdList(pImage) {
    }
    Return PropArray
 }
+
 ;######################################################################################################################################
 ; Gdip_GetPropertyItem() - Gets a specified property item (piece of metadata) from this Image object.
 ; Parameters:
@@ -6102,14 +6142,6 @@ Gdip_DrawPath(pGraphics, pPen, pPath) {
   return DllCall("gdiplus\GdipDrawPath", Ptr, pGraphics, Ptr, pPen, Ptr, pPath)
 }
 
-Gdip_WidenPath(pPath, pPen, hMatrix:=0, Flatness:=1) {
-; Replaces this path with curves that enclose the area that is filled when this path is drawn by a specified pen.
-; This method also flattens the path.
-
-  Ptr := A_PtrSize ? "UPtr" : "UInt"
-  return DllCall("gdiplus\GdipWidenPath", Ptr, pPath, "uint", pPen, Ptr, hMatrix, "float", Flatness)
-}
-
 Gdip_ClonePath(pPath) {
   Ptr := A_PtrSize ? "UPtr" : "UInt"
   Ptr2 := A_PtrSize ? "UPtr*" : "UInt*"
@@ -6211,7 +6243,7 @@ Gdip_AddPathGradient(pGraphics, x, y, w, h, cX, cY, cClr, sClr, BlendFocus, Scal
 ; function based on the example provided by Just Me for the path gradient functions
 ; adaptations/modifications by Marius Șucan
 
-   pPath := Gdip_CreatePath(pGraphics)
+   pPath := Gdip_CreatePath()
    If (Shape=1)
       Gdip_AddPathRectangle(pPath, x, y, W, H)
    Else
@@ -6563,6 +6595,7 @@ Gdi_GetDIBits(hDC, hBitmap, start, cLines, pBits, BITMAPINFO, DIB_COLORS) {
 ;
 ; pGraphics       Pointer to the Graphics of a bitmap
 ; pBitmap         Pointer to a bitmap to be drawn
+; dX, dY          x, y coordinates of the destination upper-left corner where the image will be painted
 ; sX, sY          x, y coordinates of the source upper-left corner
 ; sW, sH          width and height of the source image
 ; Matrix          a color matrix used to alter image attributes when drawing
@@ -6601,7 +6634,7 @@ Gdi_GetDIBits(hDC, hBitmap, start, cLines, pBits, BITMAPINFO, DIB_COLORS) {
 ; Function written by Marius Șucan.
 
 
-Gdip_DrawImageFX(pGraphics, pBitmap, sX:=0, sY:=0, sW:="", sH:="", matrix:="", pEffect:="", Unit:=2, ImageAttr:=0, hMatrix:=0) {
+Gdip_DrawImageFX(pGraphics, pBitmap, dX:="", dY:="", sX:="", sY:="", sW:="", sH:="", matrix:="", pEffect:="", ImageAttr:=0, hMatrix:=0, Unit:=2) {
     Ptr := A_PtrSize ? "UPtr" : "UInt"
     If !ImageAttr
     {
@@ -6617,6 +6650,12 @@ Gdip_DrawImageFX(pGraphics, pBitmap, sX:=0, sY:=0, sW:="", sH:="", matrix:="", p
     if (sW="" && sH="")
        Gdip_GetImageDimensions(pBitmap, sW, sH)
 
+    if (!hMatrix && dX!="" && dY!="")
+    {
+       hMatrix := dhMatrix := Gdip_CreateMatrix()
+       Gdip_TranslateMatrix(dhMatrix, dX, dY, 1)
+    }
+
     CreateRectF(sourceRect, sX, sY, sW, sH)
     E := DllCall("gdiplus\GdipDrawImageFX"
       , Ptr, pGraphics
@@ -6627,6 +6666,9 @@ Gdip_DrawImageFX(pGraphics, pBitmap, sX:=0, sY:=0, sW:="", sH:="", matrix:="", p
       , Ptr, ImageAttr
       , "Uint", Unit)            ; srcUnit
     ; r4 := GetStatus(A_LineNumber ":GdipDrawImageFX",r4)
+
+   If dhMatrix
+      Gdip_DeleteMatrix(dhMatrix)
 
     If (ImageAttr && usrImageAttr!=1)
        Gdip_DisposeImageAttributes(ImageAttr)
@@ -6722,21 +6764,21 @@ Gdip_CreateEffect(whichFX, paramA, paramB, paramC:=0) {
     {
        NumPut(paramA, FXparams, 0, "Float")   ; range radius [0, 255]
        NumPut(paramB, FXparams, 4, "Float")   ; range amount [0, 100]
-    } Else If (whichFX=5)   ; Brightness Contrast
+    } Else If (whichFX=5)   ; Brightness / Contrast
     {
        NumPut(paramA, FXparams, 0, "Int")     ; range brightness [-255, 255]
        NumPut(paramB, FXparams, 4, "Int")     ; range contrast [-255, 255]
-    } Else If (whichFX=6)   ; Hue Saturation Lightness
+    } Else If (whichFX=6)   ; Hue / Saturation / Lightness
     {
        NumPut(paramA, FXparams, 0, "Int")     ; range hue [-180, 180]
        NumPut(paramB, FXparams, 4, "Int")     ; range saturation [-100, 100]
        NumPut(paramC, FXparams, 8, "Int")     ; range light [-100, 100]
-    } Else If (whichFX=7)   ; levels adjust
+    } Else If (whichFX=7)   ; Levels adjust
     {
        NumPut(paramA, FXparams, 0, "Int")     ; range highlights [0, 100]
        NumPut(paramB, FXparams, 4, "Int")     ; range midtones [-100, 100]
        NumPut(paramC, FXparams, 8, "Int")     ; range shadows [0, 100]
-    } Else If (whichFX=8)   ; tint adjust
+    } Else If (whichFX=8)   ; Tint adjust
     {
        NumPut(paramA, FXparams, 0, "Int")     ; range hue [180, 180]
        NumPut(paramB, FXparams, 4, "Int")     ; range amount [0, 100]
@@ -7094,7 +7136,7 @@ Gdip_TestBitmapUniformity(pBitmap, HistogramFormat:=3, ByRef maxLevelIndex:=0, B
 
 Gdip_SetBitmapAlphaChannel(pBitmap, AlphaMaskBitmap) {
 ; Replaces the alpha channel of the given pBitmap
-; based on the AlphaMaskBitmap.
+; based on the red channel of AlphaMaskBitmap.
 ; AlphaMaskBitmap must be grayscale for optimal results.
 ; Both pBitmap and AlphaMaskBitmap must be in 32-ARGB PixelFormat.
 
@@ -7122,19 +7164,17 @@ Gdip_SetBitmapAlphaChannel(pBitmap, AlphaMaskBitmap) {
 
    E1 := Gdip_LockBits(newBitmap, 0, 0, Width1, Height1, Stride1, Scan01, BitmapData1)
    E2 := Gdip_LockBits(AlphaMaskBitmap, 0, 0, Width2, Height2, Stride2, Scan02, BitmapData2)
-   z := 0
    Loop %Height1%
    {
       y++
       Loop %Width1%
       {
          pX := A_Index-1, pY := y-1
-         Gdip_FromARGB(NumGet(Scan02+0, (pX*4)+(pY*Stride2), "UInt"), A2, R2, G2, B2)       ; Gdip_GetLockBitPixel()
-         newAlpha := useAlphaChannel=1 ? A2 : (R2 + G2 + B2)//3
-         If (newAlpha>254)
+         R2 := Gdip_RFromARGB(NumGet(Scan02+0, (pX*4)+(pY*Stride2), "UInt"))       ; Gdip_GetLockBitPixel()
+         If (R2>254)
             Continue
          Gdip_FromARGB(NumGet(Scan01+0, (pX*4)+(pY*Stride1), "UInt"), A1, R1, G1, B1)
-         NumPut(Gdip_ToARGB(newAlpha, R1, G1, B1), Scan01+0, (pX*4)+(pY*Stride1), "UInt")    ; Gdip_SetLockBitPixel()
+         NumPut(Gdip_ToARGB(R2, R1, G1, B1), Scan01+0, (pX*4)+(pY*Stride1), "UInt")    ; Gdip_SetLockBitPixel()
       }
    }
 
@@ -7200,7 +7240,7 @@ Gdip_BitmapConvertGray(pBitmap, hue:=0, vibrance:=-40, brightness:=1, contrast:=
     Gdip_SetInterpolationMode(G, InterpolationMode)
     pEffect := Gdip_CreateEffect(6, hue, vibrance, 0)
     matrix := GenerateColorMatrix(2, brightness, contrast)
-    r1 := Gdip_DrawImageFX(G, pBitmap, 0, 0, Width, Height, matrix, pEffect)
+    r1 := Gdip_DrawImageFX(G, pBitmap, 0, 0, 0, 0, Width, Height, matrix, pEffect)
     Gdip_DisposeEffect(pEffect)
     Gdip_DeleteGraphics(G)
     Return newBitmap
@@ -7230,6 +7270,10 @@ Gdip_BitmapSetColorDepth(pBitmap, bitsDepth, useDithering:=1) {
       E := Gdip_BitmapConvertFormat(pBitmap, 0x21005, ditheringMode, 1, Colors, 1, Colors, 0, 0)
    Else If (bitsDepth=24)
       E := Gdip_BitmapConvertFormat(pBitmap, 0x21808, 2, 1, 0, 0, 0, 0, 0)
+   Else If (bitsDepth=24)
+      E := Gdip_BitmapConvertFormat(pBitmap, 0x21808, 2, 1, 0, 0, 0, 0, 0)
+   Else If (bitsDepth=32)
+      E := Gdip_BitmapConvertFormat(pBitmap, 0x26200A, 2, 1, 0, 0, 0, 0, 0)
    Else
       E := -1
    Return E
@@ -7307,5 +7351,88 @@ Gdip_GetImageThumbnail(pBitmap, W, H) {
         ,"UPtr",0)                              ;-- callbackData
 
    Return pThumbnail
+}
+
+ConvertRGBtoHSL(R, G, B) {
+; http://www.easyrgb.com/index.php?X=MATH&H=18#text18
+   SetFormat, float, 0.5 ; for some reason I need this for some colors to work.
+
+   R := (R / 255)
+   G := (G / 255)
+   B := (B / 255)
+
+   Min     := min(R, G, B)
+   Max     := max(R, G, B)
+   del_Max := Max - Min
+
+   L := (Max + Min) / 2
+
+   if (del_Max = 0)
+   {
+      H := S := 0
+   }else
+   {
+      if (L < 0.5)
+         S := del_Max / (Max + Min)
+      else
+         S := del_Max / (2 - Max - Min)
+
+      del_R := (((Max - R) / 6) + (del_Max / 2)) / del_Max
+      del_G := (((Max - G) / 6) + (del_Max / 2)) / del_Max
+      del_B := (((Max - B) / 6) + (del_Max / 2)) / del_Max
+
+      if (R = Max)
+      {
+         H := del_B - del_G
+      } else
+      {
+         if (G = Max)
+            H := (1 / 3) + del_R - del_B
+         else if (B = Max)
+            H := (2 / 3) + del_G - del_R
+      }
+      if (H < 0)
+         H += 1
+      if (H > 1)
+         H -= 1
+   }
+   ; return round(h*360) "," s "," l
+   ; return (h*360) "," s "," l
+   return [abs(round(h*360)), abs(s), abs(l)]
+}
+
+ConvertHSLtoRGB(H, S, L) {
+; http://www.had2know.com/technology/hsl-rgb-color-converter.html
+
+   H := H/360
+   if (S == 0)
+   {
+      R := L*255
+      G := L*255
+      B := L*255
+   } else
+   {
+      if (L < 0.5)
+         var_2 := L * (1 + S)
+      else
+         var_2 := (L + S) - (S * L)
+       var_1 := 2 * L - var_2
+
+       R := 255 * ConvertHueToRGB(var_1, var_2, H + (1 / 3))
+       G := 255 * ConvertHueToRGB(var_1, var_2, H)
+       B := 255 * ConvertHueToRGB(var_1, var_2, H - (1 / 3))
+   }
+   ; Return round(R) "," round(G) "," round(B)
+   ; Return (R) "," (G) "," (B)
+   Return [round(R), round(G), round(B)]
+}
+
+ConvertHueToRGB(v1, v2, vH) {
+   vH := ((vH<0) ? ++vH : vH)
+   vH := ((vH>1) ? --vH : vH)
+   return  ((6 * vH) < 1) ? (v1 + (v2 - v1) * 6 * vH)
+         : ((2 * vH) < 1) ? (v2)
+         : ((3 * vH) < 2) ? (v1 + (v2 - v1) * ((2 / 3) - vH) * 6)
+         : v1
 }
 

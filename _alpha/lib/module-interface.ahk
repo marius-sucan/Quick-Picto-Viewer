@@ -19,6 +19,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3
      , maxFilesIndex := 0, thumbsDisplaying := 0, executingCanceableOperation := 1
      , runningLongOperation := 0, alterFilesIndex := 0, animGIFplaying := 0
      , canCancelImageLoad := 0, hGDIinfosWin, hGDIselectWin, hasAdvancedSlide := 1
+     , imgEditPanelOpened := 0
 
 If !A_IsCompiled
    Try Menu, Tray, Icon, quick-picto-viewer.ico
@@ -349,7 +350,8 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
              mustAbandonCurrentOperations := 1
        } Else SoundBeep , % 250 + 100*lastCloseInvoked, 100
        Return
-    } Else MainExe.ahkPostFunction("ToggleThumbsMode")
+    } Else If !AnyWindowOpen
+       MainExe.ahkPostFunction("ToggleThumbsMode")
 }
 
 WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
@@ -396,7 +398,7 @@ WM_RBUTTONUP(wP, lP, msg, hwnd) {
      canCancelImageLoad := 4
      MainExe.ahkPostFunction("WinClickAction", "rclick", A_GuiControl)
      Return
-  } Else If (AnyWindowOpen=10)
+  } Else If (AnyWindowOpen=10 || imgEditPanelOpened=1)
   {
      MainExe.ahkPostFunction("toggleColorsAdjusterPanelWindow", lastState)
      lastState := !lastState
@@ -547,9 +549,9 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   thisPos := mX "-" mY
   If (A_TickCount - lastInvoked > 55) && (thisPos!=prevPos)
   {
-
+     thisPrefsWinOpen := (imgEditPanelOpened=1) ? 0 : AnyWindowOpen
      lastInvoked := A_TickCount
-     If (slideShowRunning!=1 && !AnyWindowOpen && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1)
+     If (slideShowRunning!=1 && !thisPrefsWinOpen && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1)
         MainExe.ahkPostFunction("MouseMoveResponder")
      prevPos := mX "-" mY
   }
@@ -703,7 +705,7 @@ byeByeRoutine() {
       } Else If (thumbsDisplaying=1)
       {
          thumbsDisplaying := 0
-         MainExe.ahkPostFunction("MenuDummyToggleThumbsMode")
+         MainExe.ahkPostFunction("MenuReturnIMGedit")
       } Else lastCloseInvoked++
       Return
    } Else lastCloseInvoked := 10
@@ -804,7 +806,7 @@ turnOffSlideshow() {
   Return
 #If
 
-#If, (((canCancelImageLoad=1) || (thumbsDisplaying=1 && imageLoading=1)) && identifyThisWin()=1)
+#If, (((animGIFplaying=1) || (canCancelImageLoad=1) || (thumbsDisplaying=1 && imageLoading=1)) && identifyThisWin()=1)
   ~Left::
   ~Up::
   ~PgUp::
@@ -815,6 +817,8 @@ turnOffSlideshow() {
   ~End::
      alterFilesIndex++
      canCancelImageLoad := 4
+     If (animGIFplaying=1)
+        animGIFplaying := 0
   Return
 #If
 

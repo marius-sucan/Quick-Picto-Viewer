@@ -2,11 +2,42 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
-- v4.0.0 (2019-12-10) [alpha, work in progress]
-  - [improvement] animated GIFs are now fully supported; they can now be color adjusted as well 
+- v4.0.0 (2020-01-29) [alpha, work in progress - to be released...]
+  - [new] fill image selected area with a rectangle, triangle, ellipse or other shapes in the orientation, color and opacity of your choosing
+  - [new] support for EXIF orientation in JPEGs; images will be rotated for display accordingly to the stored metadata
+  - [new] search through indexed files
+  - [new] sort files list by folder path or file name
+  - [new] besides the thumbnails list, now the user can choose to see just list of file entries, without thumbnails
+  - [new] selection grid - highlighting thirds and ellipse inscribed in the rectangular selection
+  - [new] rotate, flip, crop, fade or blur image selected area
+  - [new] ellipse selection
+  - [new] Shift/Alt modifier keys as constraints when adjusting the image selection
+  - [new] selection adjustable with Ctrl+Shift+ / Alt + arrow keys
+  - [new] draw lines and arcs using the selection area
+  - [new] paste in place with options how to adapt the pasted image to the selection area; options to rotate image on paste
+  - [new] ability to change OSD font sizes with Ctrl [+] / [-]
+  - [new] display and/or create text captions/annotations associated to image files
+  - [new] option to allow GIFs to play entirely during slideshows before going to the next slide
+  - [new] ability to pan zoomed image avoiding the limit imposed by screen boundaries
+  - [new] ability to navigate between selected files only with Ctrl + Home/End, Ctrl + Left/Right
+  - [new] change an index entry, if user wants to have it point to a new file
+  - [new] toggle true full-screen mode with F11 shortcut key
+  - [new] auto-reset image view adjustments on image change, therefore no longer enforcing «permanent» adjustments
+  - [new] insert to the current file list or create a new files list on drag-n-drop from explorer
+  - [new] limit memory consumption; this can drastically reduce the performance of Quick Picto Viewer 
+  - [new] automatically downscale images larger than the screen resolution prior to applying computationally intensive image effects
+  - [new] SQLlite database format for storing slideshow files list; in this format, various file details are cached, which enables much faster files list resorting later on in different user sessions
+  - [new] invert files selection, filter list to selected files, jump to first/last selected file
+  - [improvement] a single thumbnail cannot be bigger than half of the main window size
+  - [improvement] ability to cancel/prevent real-time image effects being applied on a currently loading image by clicking or pressing navigation keys
+  - [improvement] multi-threaded enabled processing for batch operations: file format conversion, jpeg lossless operations
+  - [improvement] multi-threaded thumbnails loading and generation for images, in-memory caching and various optimizations
   - [improvement] sort by histogram and image similarity uses multiple cores; this makes the operations much faster
+  - [improvement] animated GIFs are now fully supported; they can now be color adjusted as well 
   - [improvement] files counting in the static folders panel is now much faster
+  - [improvement] SLD saving, sorting by file path and name, and removing multiple entries from the list ... are now much faster
   - [improvement] Quick Picto Viewer interface is now separated from the core, to allow for a more responsive user interface 
+  - [improvement] various HUD histogram box calculations fixes
   - [improvement] many improvements to the touch screen usability
   - fixed a bug when resizing Quick Picto Viewer window that caused frequent hanging/freezing
 
