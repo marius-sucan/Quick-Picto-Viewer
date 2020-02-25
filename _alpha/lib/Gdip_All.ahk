@@ -6,6 +6,7 @@
 ;
 ; Gdip standard library versions:
 ; by Marius Șucan - gathered user-contributed functions and implemented hundreds of new functions
+; - v1.81 on 25/02/2020
 ; - v1.80 on 11/01/2019
 ; - v1.79 on 10/28/2019
 ; - v1.78 on 10/27/2019
@@ -50,6 +51,7 @@
 ; - v1.01 on 31/05/2008
 ;
 ; Detailed history:
+; - 25/02/2020 = Added several new functions, including for color conversions [from Tidbit], improved/fixed several functions
 ; - 11/01/2019 = Implemented support for a private font file for Gdip_AddPathStringSimplified()
 ; - 10/28/2019 = Added 7 new GDI+ functions and fixes related to Gdip_CreateFontFamilyFromFile()
 ; - 10/27/2019 = Added 5 new GDI+ functions and bug fixes for Gdip_TestBitmapUniformity(), Gdip_RotateBitmapAtCenter() and Gdip_ResizeBitmap()
@@ -2239,6 +2241,15 @@ Gdip_BitmapSetResolution(pBitmap, dpix, dpiy) {
    return DllCall("gdiplus\GdipBitmapSetResolution", A_PtrSize ? "UPtr" : "uint", pBitmap, "float", dpix, "float", dpiy)
 }
 
+Gdip_BitmapGetDPIResolution(pBitmap, ByRef dpix, ByRef dpiy) {
+   dpix := dpiy := 0
+   If StrLen(pBitmap)<3
+      Return
+
+   dpix := Gdip_GetImageHorizontalResolution(pBitmap)
+   dpiy := Gdip_GetImageVerticalResolution(pBitmap)
+}
+
 Gdip_CreateBitmapFromGraphics(pGraphics, Width, Height) {
   Ptr := A_PtrSize ? "UPtr" : "UInt"
   PtrA := A_PtrSize ? "UPtr*" : "UInt*"
@@ -2646,7 +2657,7 @@ Gdip_RotateBitmapAtCenter(pBitmap, Angle, pBrush:=0, InterpolationMode:=7, Pixel
 
     Gdip_SetInterpolationMode(G, InterpolationMode)
     Gdip_SetSmoothingMode(G, 4)
-    If pBrush
+    If StrLen(pBrush)>1
        Gdip_FillRectangle(G, pBrush, 0, 0, RWidth, RHeight)
     Gdip_TranslateWorldTransform(G, xTranslation, yTranslation)
     Gdip_RotateWorldTransform(G, Angle)
@@ -3497,11 +3508,14 @@ Gdip_GetLinearGrBrushWrapMode(pLinearGradientBrush) {
 }
 
 Gdip_SetLinearGrBrushLinearBlend(pLinearGradientBrush, nFocus, nScale) {
+; https://purebasic.developpez.com/tutoriels/gdi/documentation/GdiPlus/LinearGradientBrush/html/GdipSetLineLinearBlend.html
+
    Ptr := A_PtrSize ? "UPtr" : "UInt"
    Return DllCall("gdiplus\GdipSetLineLinearBlend", Ptr, pLinearGradientBrush, "float", nFocus, "float", nScale)
 }
 
 Gdip_SetLinearGrBrushSigmaBlend(pLinearGradientBrush, nFocus, nScale) {
+; https://purebasic.developpez.com/tutoriels/gdi/documentation/GdiPlus/LinearGradientBrush/html/GdipSetLineSigmaBlend.html
    Ptr := A_PtrSize ? "UPtr" : "UInt"
    Return DllCall("gdiplus\GdipSetLineSigmaBlend", Ptr, pLinearGradientBrush, "float", nFocus, "float", nScale)
 }
@@ -3517,6 +3531,14 @@ Gdip_GetLinearGrBrushBlendCount(pLinearGradientBrush) {
    If E
       return -1
    Return result
+}
+
+Gdip_SetLinearGrBrushPresetBlend(pBrush, pA, pB, pC, pD, clr1, clr2, clr3, clr4) {
+   Ptr := A_PtrSize ? "UPtr" : "UInt"
+   CreateRectF(POSITIONS, pA, pB, pC, pD)
+   CreateRect(COLORS, clr1, clr2, clr3, clr4)
+   E:= DllCall("gdiplus\GdipSetLinePresetBlend", Ptr, pBrush, "Ptr", &COLORS, "Ptr", &POSITIONS, "Int", 4)
+   Return E
 }
 
 Gdip_CloneBrush(pBrush) {
@@ -5028,6 +5050,19 @@ Gdip_GetRotatedDimensions(Width, Height, Angle, ByRef RWidth, ByRef RHeight) {
    RHeight := Abs(Width*Sin(TAngle))+Abs(Height*Cos(Tangle))
 }
 
+Gdip_GetRotatedEllipseDimensions(Width, Height, Angle, ByRef RWidth, ByRef RHeight) {
+   if !(Width && Height)
+      return -1
+
+   pPath := Gdip_CreatePath()
+   Gdip_AddPathEllipse(pPath, 0, 0, Width, Height)
+   Gdip_RotatePathAtCenter(pPath, Angle)
+   pathBounds := Gdip_GetPathWorldBounds(pPath)
+   Gdip_DeletePath(pPath)
+   RWidth := pathBounds.w
+   RHeight := pathBounds.h
+}
+
 Gdip_GetWorldTransform(pGraphics) {
 ; Returns the world transformation matrix of a pGraphics object.
 ; On error, it returns -1
@@ -6008,12 +6043,17 @@ Gdip_RotateMatrix(hMatrix, Angle, MatrixOrder:=0) {
    return DllCall("gdiplus\GdipRotateMatrix", Ptr, hMatrix, "float", Angle, "Int", MatrixOrder)
 }
 
-Gdip_GetPathWorldBounds(pPath) {
+
+Gdip_GetPathWorldBounds(pPath, hMatrix:=0, pPen:=0) {
+; hMatrix to use for calculating the boundaries
+; pPen to use for calculating the boundaries
+; Both will not affect the actual GraphicsPath.
+
   Ptr := A_PtrSize ? "UPtr" : "UInt"
   rData := {}
 
   VarSetCapacity(RectF, 16, 0)
-  status := DllCall("gdiplus\GdipGetPathWorldBounds", Ptr, pPath, Ptr, &RectF, ptr, 0, ptr, 0)
+  status := DllCall("gdiplus\GdipGetPathWorldBounds", Ptr, pPath, Ptr, &RectF, Ptr, hMatrix, Ptr, pPen)
 
   If (!status) {
         rData.x := NumGet(&RectF, 0, "float")
@@ -6257,9 +6297,10 @@ Gdip_AddPathGradient(pGraphics, x, y, w, h, cX, cY, cClr, sClr, BlendFocus, Scal
    Gdip_PathGradientSetSigmaBlend(zBrush, BlendFocus)
    Gdip_PathGradientSetLinearBlend(zBrush, BlendFocus)
    Gdip_PathGradientSetFocusScales(zBrush, ScaleX, ScaleY)
-   Gdip_FillPath(pGraphics, zBrush, pPath)
+   E := Gdip_FillPath(pGraphics, zBrush, pPath)
    Gdip_DeleteBrush(zBrush)
    Gdip_DeletePath(pPath)
+   Return E
 }
 
 ;######################################################################################################################################
@@ -7435,4 +7476,5 @@ ConvertHueToRGB(v1, v2, vH) {
          : ((3 * vH) < 2) ? (v1 + (v2 - v1) * ((2 / 3) - vH) * 6)
          : v1
 }
+
 
