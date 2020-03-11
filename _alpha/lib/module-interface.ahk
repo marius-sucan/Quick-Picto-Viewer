@@ -19,7 +19,15 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3
      , maxFilesIndex := 0, thumbsDisplaying := 0, executingCanceableOperation := 1
      , runningLongOperation := 0, alterFilesIndex := 0, animGIFplaying := 0
      , canCancelImageLoad := 0, hGDIinfosWin, hGDIselectWin, hasAdvancedSlide := 1
-     , imgEditPanelOpened := 0
+     , imgEditPanelOpened := 0, showMainMenuBar := 1
+
+Global activateImgSelection, allowGIFsPlayEntirely, allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, AnyWindowOpen, askDeleteFiles
+, AutoDownScaleIMGs, autoPlaySNDs, autoRemDeadEntry, ColorDepthDithering, countItemz, currentFileIndex, CurrentSLD, defMenuRefreshItm, doSlidesTransitions
+, DynamicFoldersList, easySlideStoppage, editingSelectionNow, EllipseSelectMode, enableThumbsCaching, filesFilter, FlipImgH, FlipImgV, hSNDmedia, imgFxMode
+, IMGresizingMode, imgSelX2, imgSelY2, LimitSelectBoundsImg, markedSelectFile, maxFilesIndex, minimizeMemUsage, mustGenerateStaticFolders, MustLoadSLDprefs
+, noTooltipMSGs, PrefsLargeFonts, RenderOpaqueIMG, resetImageViewOnChange, showHistogram, showImgAnnotations, showInfoBoxHUD, showSelectionGrid, skipDeadFiles
+, skipSeenImagesSlider, SLDcacheFilesList, SLDhasFiles, sldsPattern, syncSlideShow2Audios, thumbnailsListMode, thumbsCacheFolder, thumbsDisplaying, totalFramesIndex
+, TouchScreenMode, userHQraw, userimgQuality, UserMemBMP, usrTextureBGR, 
 
 If !A_IsCompiled
    Try Menu, Tray, Icon, quick-picto-viewer.ico
@@ -33,8 +41,13 @@ OnMessage(0x207, "WM_MBUTTONDOWN")
 ; OnMessage(0x203, "WM_LBUTTON_DBL") ; WM_LBUTTONDOWN double click
 OnMessage(0x202, "ResetLbtn") ; WM_LBUTTONUP
 OnMessage(0x216, "WM_MOVING")
+; OnMessage(0x211, "WM_ENTERMENULOOP")
+; OnMessage(0x212, "WM_EXITMENULOOP")
+; OnMessage(0x125, "WM_EXITMENULOOP")
+; OnMessage(0x126, "WM_EXITMENULOOP")
 
 OnMessage(0x200, "WM_MOUSEMOVE")
+; OnMessage(0x2A3, "WM_MOUSELEAVE")
 OnMessage(0x06, "activateMainWin")   ; WM_ACTIVATE 
 OnMessage(0x08, "activateMainWin")   ; WM_KILLFOCUS 
 
@@ -339,8 +352,10 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
        turnOffSlideshow()
        Return
     }
-
-    If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
+    If (imgEditPanelOpened=1)
+    {
+       MainExe.ahkPostFunction("CloseWindow")
+    } Else If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
     {
        If (mustAbandonCurrentOperations!=1)
        {
@@ -357,6 +372,9 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
 WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
     If (A_TickCount - scriptStartZeit<500)
        Return
+    If (hotkeysSuspended=1)
+       UnlockKeys()
+
     MainExe.ahkPostFunction("WinClickAction", "double-click", A_GuiControl)
 }
 
@@ -376,7 +394,7 @@ WM_RBUTTONUP(wP, lP, msg, hwnd) {
   ; thumbsDisplaying := MainExe.ahkgetvar.thumbsDisplaying
   ; AnyWindowOpen := MainExe.ahkgetvar.AnyWindowOpen
   ; maxFilesIndex := MainExe.ahkgetvar.maxFilesIndex
-  okay := (A=PVhwnd || A=hGDIwin || hwndhGDIthumbsWin) ? 1 : 0
+  okay := (A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin) ? 1 : 0
   If (okay!=1)
      Return
 
@@ -400,8 +418,7 @@ WM_RBUTTONUP(wP, lP, msg, hwnd) {
      Return
   } Else If (AnyWindowOpen=10 || imgEditPanelOpened=1)
   {
-     MainExe.ahkPostFunction("toggleColorsAdjusterPanelWindow", lastState)
-     lastState := !lastState
+     MainExe.ahkPostFunction("toggleImgEditPanelWindow")
      Return
   }
 
@@ -410,7 +427,7 @@ WM_RBUTTONUP(wP, lP, msg, hwnd) {
 }
 
 InitGuiContextMenu() {
-    MainExe.ahkPostFunction("InitGuiContextMenu")
+    MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 slideshowsHandler(thisSlideSpeed, act, how) {
@@ -585,6 +602,9 @@ trackMouseDragging() {
     lastWinDrag := A_TickCount
 }
 
+WM_MOUSELEAVE() {
+  SoundBeep 
+}
 activateMainWin() {
    Static lastInvoked := 1
    LbtnDwn := 0
@@ -737,6 +757,19 @@ identifyThisWin() {
      Return 0
 }
 
+WM_ENTERMENULOOP() {
+  If (runningLongOperation!=1 && imageLoading!=1)
+  {
+     hotkeysSuspended := 1
+     MainExe.ahkPostFunction("doSuspendu", 1)
+  }
+}
+
+WM_EXITMENULOOP() {
+; it does not work; why ? ^_^ 
+  SetTimer, unSuspendu, -150
+}
+
 Win_ShowSysMenu(Hwnd) {
 ; Source: https://github.com/majkinetor/mm-autohotkey/blob/master/Appbar/Taskbar/Win.ahk
 ; modified by Marius Șucan
@@ -746,7 +779,7 @@ Win_ShowSysMenu(Hwnd) {
   MainExe.ahkPostFunction("doSuspendu", 1)
   h := WinExist("ahk_id " hwnd)
   JEE_ClientToScreen(hPicOnGui1, 1, 1, X, Y)
-  SetTimer, unSuspendu, -250
+  SetTimer, unSuspendu, -150
   hSysMenu := DllCall("GetSystemMenu", "Uint", Hwnd, "int", False) 
   r := DllCall("TrackPopupMenu", "uint", hSysMenu, "uint", TPM_RETURNCMD, "int", X, "int", Y, "int", 0, "uint", h, "uint", 0)
   If (r=0)
@@ -801,6 +834,11 @@ turnOffSlideshow() {
      byeByeRoutine()
   Return
 
+  ~F11::
+     If (imgEditPanelOpened=1)
+        MainExe.ahkPostFunction("toggleImgEditPanelWindow")
+  Return
+
   !Space::
      Win_ShowSysMenu(PVhwnd)
   Return
@@ -835,3 +873,200 @@ turnOffSlideshow() {
   Return
 #If
 
+
+
+
+
+
+
+
+
+
+
+
+MenuCopyAction() {
+   If (thumbsDisplaying=1)
+      InvokeCopyFiles()
+   Else
+      CopyImage2clip()
+}
+
+MenuSelectAction() {
+   If (thumbsDisplaying=1)
+      MenuMarkThisFileNow()
+   Else
+      ToggleEditImgSelection()
+}
+
+MenuSelectAllAction() {
+   If (thumbsDisplaying=1)
+      MenuMarkThisFileNow()
+   Else
+      ToggleEditImgSelection()
+}
+
+MenuRefreshAction() {
+   If (thumbsDisplaying=1)
+      RefreshFilesList()
+   Else
+      RefreshImageFileAction()
+}
+
+MenuSaveAction() {
+   If (thumbsDisplaying=1)
+      SaveFilesList()
+   Else
+      SaveClipboardImage("yay")
+}
+
+BuildFakeMenu() {
+
+; main menu
+   infoThumbsMode := (thumbsDisplaying=1) ? "IMAGE VIEW" : "LIST VIEW"
+   Menu, PVmenu, Add, MENU, InitGuiContextMenu
+   Menu, PVmenu, Add, 
+   Menu, PVmenu, Add, OPEN, OpenDialogFiles
+   Menu, PVmenu, Add, SAVE, MenuSaveAction
+   Menu, PVmenu, Add, REFRESH, MenuRefreshAction
+   Menu, PVmenu, Add, 
+   Menu, PVmenu, Add, %infoThumbsMode%, MenuDummyToggleThumbsMode
+   Menu, PVmenu, Add, 
+   Menu, PVmenu, Add, SELECT, MenuSelectAction
+   Menu, PVmenu, Add, ALL/NONE, dummy
+   Menu, PVmenu, Add, 
+   Menu, PVmenu, Add, COPY, MenuCopyAction
+   If (thumbsDisplaying!=1)
+      Menu, PVmenu, Add, PASTE, MenuCopyAction
+   Menu, PVmenu, Add, ERASE, MenuCopyAction
+   Menu, PVmenu, Add, 
+   Menu, PVmenu, Add, SEARCH, PanelSearchIndex
+   Menu, PVmenu, Add, JUMP TO, PanelJump2index
+   Menu, PVmenu, Add, RESET, ResetImageView
+   If (thumbsDisplaying=1)
+   {
+      Menu, PVmenu, Add, 
+      Menu, PVmenu, Add, [ + ], dummy
+      Menu, PVmenu, Add, 
+      Menu, PVmenu, Add, [ - ], dummy
+      Menu, PVmenu, Add, 
+   } Else
+   {
+      Menu, PVmenu, Add, 
+      Menu, PVmenu, Add, PLAY, dummyInfoToggleSlideShowu
+      Menu, PVmenu, Add, 
+      Menu, PVmenu, Add, INFO, ToggleHistoInfoBoxu
+      Menu, PVmenu, Add, 
+      Menu, PVmenu, Add, PREV. PANEL, openPreviousPanel
+      Menu, PVmenu, Add, 
+   }
+}
+
+CopyImage2clip() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+CopyImagePath() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+dummy() {
+   Sleep, -1
+}
+
+dummyInfoToggleSlideShowu() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+MenuMarkThisFileNow() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+OpenDialogFiles() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+PanelJump2index() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+InvokeCopyFiles() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+PanelPasteInPlace() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+PanelSearchIndex() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+PasteClipboardIMG() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+RefreshFilesList() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+RefreshImageFileAction() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+RegenerateEntireList() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+SaveClipboardImage(arg) {
+  MainExe.ahkPostFunction(A_ThisFunc, arg)
+}
+
+SaveFilesList() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+selectAllFiles() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+ResetImageView() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+toggleListViewModeThumbs() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+MenuDummyToggleThumbsMode() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+openPreviousPanel() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+ToggleHistoInfoBoxu() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+ToggleEditImgSelection() {
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+
+deleteMenus() {
+    Static menusList := "PVmenu|"
+    Loop, Parse, menusList, |
+        Try Menu, % A_LoopField, Delete
+}
+
+UpdateMenuBar() {
+   Gui, 1: Menu
+   deleteMenus()
+   If (showMainMenuBar!=1)
+      Return
+   Sleep, 1
+   BuildFakeMenu()
+   Sleep, 0
+   Gui, 1: Menu, PVmenu
+}

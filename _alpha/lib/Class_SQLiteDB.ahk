@@ -36,8 +36,8 @@ Class SQLiteDB {
    ; +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
    ; +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
    Static Version := ""
-   Static _SQLiteDLL := A_ScriptDir . "\SQLite3.dll"
    Static _RefCount := 0
+   Static hasFailedInit := 0
    Static _MinVersion := "3.6"
    ; ===================================================================================================================
    ; CLASS _Table
@@ -520,24 +520,30 @@ Class SQLiteDB {
       This._Queries := {}               ; Valid queries                                 (Object)
       This._Stmts := {}                 ; Valid prepared statements                     (Object)
       If (This.Base._RefCount = 0) {
-         SQLiteDLL := This.Base._SQLiteDLL
+         SQLiteDLL := mainCompiledPath "\Lib\SQLite3.dll"
+         This.Base._SQLiteDLL := SQLiteDLL
          If !FileExist(SQLiteDLL)
             If FileExist(A_ScriptDir . "\SQLiteDB.ini") {
                IniRead, SQLiteDLL, %A_ScriptDir%\SQLiteDB.ini, Main, DllPath, %SQLiteDLL%
                This.Base._SQLiteDLL := SQLiteDLL
          }
          If !(DLL := DllCall("LoadLibrary", "Str", This.Base._SQLiteDLL, "UPtr")) {
+            This.Base.hasFailedInit := 1
             MsgBox, 16, SQLiteDB Error, % "DLL " . SQLiteDLL . " does not exist!"
-            ExitApp
+            ; ExitApp
          }
-         This.Base.Version := StrGet(DllCall("SQlite3.dll\sqlite3_libversion", "Cdecl UPtr"), "UTF-8")
-         SQLVersion := StrSplit(This.Base.Version, ".")
-         MinVersion := StrSplit(This.Base._MinVersion, ".")
-         If (SQLVersion[1] < MinVersion[1]) || ((SQLVersion[1] = MinVersion[1]) && (SQLVersion[2] < MinVersion[2])){
-            DllCall("FreeLibrary", "Ptr", DLL)
-            MsgBox, 16, SQLite ERROR, % "Version " . This.Base.Version .  " of SQLite3.dll is not supported!`n`n"
-                                      . "You can download the current version from www.sqlite.org!"
-            ExitApp
+         If (This.Base.hasFailedInit!=1)
+         {
+            This.Base.Version := StrGet(DllCall("SQlite3.dll\sqlite3_libversion", "Cdecl UPtr"), "UTF-8")
+            SQLVersion := StrSplit(This.Base.Version, ".")
+            MinVersion := StrSplit(This.Base._MinVersion, ".")
+            If (SQLVersion[1] < MinVersion[1]) || ((SQLVersion[1] = MinVersion[1]) && (SQLVersion[2] < MinVersion[2])){
+               This.Base.hasFailedInit := 1
+               DllCall("FreeLibrary", "Ptr", DLL)
+               MsgBox, 16, SQLite ERROR, % "Version " . This.Base.Version .  " of SQLite3.dll is not supported!`n`n"
+                                         . "You can download the current version from www.sqlite.org!"
+               ; ExitApp
+            }
          }
       }
       This.Base._RefCount += 1
@@ -653,6 +659,8 @@ Class SQLiteDB {
       This.ErrorMsg := ""
       This.ErrorCode := 0
       HDB := 0
+      If This.Base.hasFailedInit
+         Return False
       If (DBPath = "")
          DBPath := MEMDB
       If (DBPath = This._Path) && (This._Handle)

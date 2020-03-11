@@ -8,11 +8,13 @@
 #SingleInstance, force
 #Persistent
 #UseHook, Off
+#Include E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\Lib\wia.ahk
 SetWinDelay, 1
 Global GDIPToken, MainExe := AhkExported()
      , mainCompiledPath := "", wasInitFIMlib := 0, listBitmaps := ""
      , operationDone := 1, resultsList := "", FIMfailed2init := 0
      , waitDataCollect := 1, operationFailed := 0
+     , RegExFIMformPtrn := "i)(.\\*\.(DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
 
 ; E := initThisThread()
 Return
@@ -47,6 +49,13 @@ cleanMess() {
 
 MonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerImg, coreIndex, thisfileIndex, thisBindex) {
    Critical, on
+   ; If !RegExMatch(imgPath, RegExFIMformPtrn)
+   ; {
+   ;    does not run multi-threaded...
+   ;    wiaMonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerImg, coreIndex, thisfileIndex, thisBindex)
+   ;    Return
+   ; }
+
    operationDone := 0
    hFIFimgA := 0
    finalBitmap := 0
@@ -143,6 +152,53 @@ MonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerIm
    ; RegWrite, REG_SZ, %QPVregEntry%, thumbThreadDone%coreIndex%, 1
    ; MainExe.ahkassign("thumbCoreRun" coreIndex, operationDone)
    ; cleanupThread()
+}
+
+wiaMonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerImg, coreIndex, thisfileIndex, thisBindex) {
+   Critical, on
+
+   operationDone := 0
+   hFIFimgA := 0
+   finalBitmap := 0
+   waitDataCollect := 0
+   operationFailed := 0
+   startZeit := A_TickCount
+   resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
+
+        Try wiaImg := WIA_LoadImage(imgPath)
+        sWiaImg := WIA_ScaleImage(wiaImg, thumbsSizeQuality, 0)
+
+        If IsObject(wiaImg)
+           Try PicObj := WIA_GetImageBitmap(swiaImg)
+
+        If (PicObj.Handle)
+        {
+           ; If wiaImg.IsAlphaPixelFormat
+           ;    finalBitmap := Gdip_CreateBitmapFromHBITMAPalpha(PicObj.Handle)
+           ; Else
+              finalBitmap := Gdip_CreateBitmapFromHBITMAP(PicObj.Handle)
+           DeleteObject(PicObj.Handle)
+        }
+        wiaImg := ""
+        PicObj := ""
+
+
+      If (mustSaveFile=1 && thisZeit>timePerImg)
+         savedFile := WIA_SaveImage(sWiaImg, file2save)
+      Else savedFile := "yeah"
+
+      If (finalBitmap && thisZeit>timePerImg && mustSaveFile=1 && !savedFile)
+         r := Gdip_SaveBitmapToFile(finalBitmap, file2save)
+      Else If (!finalBitmap && mustSaveFile=1 && savedFile)
+         finalBitmap := Gdip_CreateBitmapFromFile(file2save)
+   
+
+   listBitmaps .=  finalBitmap "|"
+   ; Sleep, 0
+   waitDataCollect := 1
+   operationDone := 1
+   operationFailed := 0
+   resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
 }
 
 /*
@@ -546,3 +602,15 @@ Gdip_DrawImageFast(pGraphics, pBitmap, X:=0, Y:=0) {
             , "float", Y)
    return _E
 }
+
+Gdip_CreateBitmapFromHBITMAP(hBitmap, hPalette:=0) {
+; Creates a Bitmap GDI+ object from a GDI bitmap handle.
+; hPalette - Handle to a GDI palette used to define the bitmap colors
+; if the hBitmap is a device-dependent bitmap [DDB].
+
+   Ptr := A_PtrSize ? "UPtr" : "UInt"
+   pBitmap := ""
+   DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", Ptr, hBitmap, Ptr, hPalette, A_PtrSize ? "UPtr*" : "uint*", pBitmap)
+   return pBitmap
+}
+

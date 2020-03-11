@@ -166,8 +166,11 @@ FreeImage_GetImageType(hImage, humanReadable:=0) {
 ; 10 = FIT_RGBA16 ;   64-bit RGBA image: 4 x unsigned 16-bit
 ; 11 = FIT_RGBF ;   96-bit RGB float image: 3 x 32-bit IEEE floating point
 ; 12 = FIT_RGBAF ;   128-bit RGBA float image: 4 x 32-bit IEEE floating point
-
-   Return DllCall(getFIMfunc("GetImageType"), "int", hImage)
+      Static imgTypes := {0:"UNKNOWN", 1:"Standard Bitmap", 2:"UINT16", 3:"INT16", 4:"UINT32", 5:"INT32", 6:"FLOAT [32-bit]", 7:"DOUBLE [64-bit]", 8:"COMPLEX [2x64-bit]", 9:"RGB16 [48-bit]", 10:"RGBA16 [64-bit]", 11:"RGBF [96-bit]", 12:"RGBAF [128-bit]"}
+      r := DllCall(getFIMfunc("GetImageType"), "int", hImage)
+      If (humanReadable=1 && imgTypes.HasKey(r))
+         r := imgTypes[r]
+      Return r
 }
 
 FreeImage_GetColorsUsed(hImage) {
@@ -235,15 +238,19 @@ FreeImage_GetInfo(hImage) {
    Return DllCall(getFIMfunc("GetInfo"), "Int", hImage)
 }
 
+FreeImage_GetPageCount(hImage) {
+   Return DllCall(getFIMfunc("FreeImage_GetPageCount"), "Int", hImage)
+}
+
 FreeImage_GetColorType(hImage, humanReadable:=1) {
-; 0 = MINISBLACK - Monochrome bitmap (1-bit) : first palette entry is black. Palletised bitmap (4 or 8-bit) and single - channel non standard bitmap: the bitmap has a greyscale palette
-; 1 = MINISWHITE - Monochrome bitmap (1-bit) : first palette entry is white. Palletised bitmap (4 or 8-bit) : the bitmap has an inverted greyscale palette
-; 2 = PALETTE - Palettized bitmap (1, 4 or 8 bit)
-; 3 = RGB - High-color bitmap (16, 24 or 32 bit), RGB16 or RGBF
+; 0 = MINISWHITE  - Monochrome bitmap (1-bit) : first palette entry is white. Palletised bitmap (4 or 8-bit) - the bitmap has an inverted greyscale palette
+; 1 = MINISBLACK - Monochrome bitmap (1-bit) : first palette entry is black. Palletised bitmap (4 or 8-bit) and single - channel non-standard bitmap: the bitmap has a greyscale palette
+; 2 = RGB  - High-color bitmap (16, 24 or 32 bit), RGB16 or RGBF
+; 3 = PALETTE - Palettized bitmap (1, 4 or 8 bit)
 ; 4 = RGBALPHA - High-color bitmap with an alpha channel (32 bit bitmap, RGBA16 or RGBAF)
 ; 5 = CMYK - CMYK bitmap (32 bit only)
 
-   Static ColorsTypes := {0:"MINISBLACK", 1:"MINISWHITE", 2:"PALETTIZED", 3:"RGB", 4:"RGB-ALPHA", 5:"CMYK"}
+   Static ColorsTypes := {1:"MINISBLACK", 0:"MINISWHITE", 3:"PALETTIZED", 2:"RGB", 4:"RGBA", 5:"CMYK"}
    r := DllCall(getFIMfunc("GetColorType"), "Int", hImage)
    If (ColorsTypes.HasKey(r) && humanReadable=1)
       r := ColorsTypes[r]
@@ -325,11 +332,14 @@ FreeImage_SetBackgroundColor(hImage, RGBArray:="255,255,255,0") {
 ; missing functions: GetFileTypeFromHandle, GetFileTypeFromMemory,
 ; and ValidateFromHandle, ValidateFromMemory
 
-FreeImage_GetFileType(ImPath) {
-   ; 0:BMP 2:JPG 13:PNG 18:TIF 25:GIF
+FreeImage_GetFileType(ImPath, humanReadable:=0) {
+   Static fileTypes := {0:"BMP", 1:"ICO", 2:"JPEG", 3:"JNG", 4:"KOALA", 5:"LBM", 5:"IFF", 6:"MNG", 7:"PBM", 8:"PBMRAW", 9:"PCD", 10:"PCX", 11:"PGM", 12:"PGMRAW", 13:"PNG", 14:"PPM", 15:"PPMRAW", 16:"RAS", 17:"TARGA", 18:"TIFF", 19:"WBMP", 20:"PSD", 21:"CUT", 22:"XBM", 23:"XPM", 24:"DDS", 25:"GIF", 26:"HDR", 27:"FAXG3", 28:"SGI", 29:"EXR", 30:"J2K", 31:"JP2", 32:"PFM", 33:"PICT", 34:"RAW", 35:"WEBP", 36:"JXR"}
    r := DllCall(getFIMfunc("GetFileTypeU"), "WStr", ImPath, "Int", 0)
    If (r=-1)
       r := FreeImage_GetFIFFromFilename(ImPath)
+   If (humanReadable=1 && fileTypes.HasKey(r))
+      r := fileTypes[r]
+
    Return r
 }
 
@@ -416,14 +426,14 @@ FreeImage_Threshold(hImage, TT=0) { ; TT: 0 - 255
 }
 
 FreeImage_Dither(hImage, algo=0) {
-; algo parameter: dithering method
-; 0 = FID_FS; Floyd & Steinberg error diffusion algorithm
-; 1 = FID_BAYER4x4; Bayer ordered dispersed dot dithering (order 2 – 4x4 -dithering matrix)
-; 2 = FID_BAYER8x8; Bayer ordered dispersed dot dithering (order 3 – 8x8 -dithering matrix)
-; 3 = FID_BAYER16x16; Bayer ordered dispersed dot dithering (order 4 – 16x16 dithering matrix)
-; 4 = FID_CLUSTER6x6; Ordered clustered dot dithering (order 3 - 6x6 matrix)
-; 5 = FID_CLUSTER8x8; Ordered clustered dot dithering (order 4 - 8x8 matrix)
-; 6 = FID_CLUSTER16x16; Ordered clustered dot dithering (order 8 - 16x16 matrix)
+; ALGO parameter: dithering method
+; FID_FS           = 0   //! Floyd & Steinberg error diffusion
+; FID_BAYER4x4     = 1   //! Bayer ordered dispersed dot dithering (order 2 dithering matrix)
+; FID_BAYER8x8     = 2   //! Bayer ordered dispersed dot dithering (order 3 dithering matrix)
+; FID_CLUSTER6x6   = 3   //! Ordered clustered dot dithering (order 3 - 6x6 matrix)
+; FID_CLUSTER8x8   = 4   //! Ordered clustered dot dithering (order 4 - 8x8 matrix)
+; FID_CLUSTER16x16 = 5   //! Ordered clustered dot dithering (order 8 - 16x16 matrix)
+; FID_BAYER16x16   = 6   //! Bayer ordered dispersed dot dithering (order 4 dithering matrix)
 
    Return DllCall(getFIMfunc("Dither"), "int", hImage, "int", algo)
 }
@@ -510,9 +520,9 @@ FreeImage_FlipVertical(hImage) {
 FreeImage_Rescale(hImage, w, h, filter:=3) {
 ; Filter parameter options
 ; 0 = FILTER_BOX;        Box, pulse, Fourier window, 1st order (constant) B-Spline
-; 1 = FILTER_BILINEAR;   Bilinear filter
-; 2 = FILTER_BSPLINE;    4th order (cubic) B-Spline
-; 3 = FILTER_BICUBIC;    Mitchell and Netravali's two-param cubic filter
+; 1 = FILTER_BICUBIC;    Mitchell and Netravali's two-param cubic filter
+; 2 = FILTER_BILINEAR;   Bilinear filter
+; 3 = FILTER_BSPLINE;    4th order (cubic) B-Spline
 ; 4 = FILTER_CATMULLROM; Catmull-Rom spline, Overhauser spline
 ; 5 = FILTER_LANCZOS3;   Lanczos-windowed sinc filter
 
@@ -522,9 +532,9 @@ FreeImage_Rescale(hImage, w, h, filter:=3) {
 FreeImage_MakeThumbnail(hImage, squareSize, convert:=1) {
 ; Filter parameter options
 ; 0 = FILTER_BOX;        Box, pulse, Fourier window, 1st order (constant) B-Spline
-; 1 = FILTER_BILINEAR;   Bilinear filter
-; 2 = FILTER_BSPLINE;    4th order (cubic) B-Spline
-; 3 = FILTER_BICUBIC;    Mitchell and Netravali's two-param cubic filter
+; 1 = FILTER_BICUBIC;    Mitchell and Netravali's two-param cubic filter
+; 2 = FILTER_BILINEAR;   Bilinear filter
+; 3 = FILTER_BSPLINE;    4th order (cubic) B-Spline
 ; 4 = FILTER_CATMULLROM; Catmull-Rom spline, Overhauser spline
 ; 5 = FILTER_LANCZOS3;   Lanczos-windowed sinc filter
 
@@ -572,7 +582,7 @@ FreeImage_JPEGTransform(SrcImPath, DstImPath, ImgOperation) {
 ; 0 = NONE                1 = Flip Horizontally
 ; 2 = Flip Vertically     3 = Transpose
 ; 4 = Transverse          5 = Rotate 90
-; 6 = Rotate 180          7 = Rotate -90
+; 6 = Rotate 180          7 = Rotate -90 [270]
 ; Return value: 1 -- succes; 0 -- fail
    Return DllCall(getFIMfunc("JPEGTransformU"), "WStr", SrcImPath, "WStr", DstImPath, "int", ImgOperation)
 }
