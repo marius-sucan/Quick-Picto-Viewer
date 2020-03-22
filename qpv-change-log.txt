@@ -2,32 +2,46 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
-- v4.0.0 (2020-01-29) [alpha, work in progress - to be released...]
+- known issues
+  - loading images larger than 300 MPx through FreeImage library, causes crash on coversion to GDI+ object
+  - panning/zooming large images on 32 bits edition ... is very slow
+  - high memory consumption; all operations need a lot of RAM [zoom/pan, etc]
+
+- v4.0.0 (2020-03-22) [alpha, work in progress - to be released...]
+  - [new] quick shortcuts toolbar [F10]; to further facilitate the usage of QPV
+  - [new] ability to change OSD font sizes with Ctrl [+] / [-]
+  - [new] toggle true full-screen mode with F11 shortcut key
+  - [new] create new image panel
+  - [new] easy to crop image or adjust canvas size according to the selection area using Shift + Enter
   - [new] fill image selected area with a rectangle, triangle, ellipse or other shapes in the orientation, color and opacity of your choosing
+  - [new] transform tool for selected area with options to rotate, flip, crop, fade, adjust colors or blur, live in the viewport
+  - [new] option to insert text in selected area, oriented at any angle
+  - [new] draw lines and arcs using the selection area
+  - [new] paste in place with options how to adapt the pasted image to the selection area; options to rotate image on paste
+  - [new] undo/redo selections, ellipse selection, rotated selections
+  - [new] selection grid - highlighting thirds and ellipse inscribed in the rectangular selection
+  - [new] selection adjustable with Ctrl+Shift+ / Alt + arrow keys
+  - [new] Shift/Alt modifier keys as constraints when adjusting the image selection
+  - [new] copy/move panel supports relative paths: .\new-folder [to create a new folder in the parent folder] or \new-folder [to create a new sub-folder]... or just .\ to copy/move up in hierachy
+  - [new] journal/session logging; this gives the opportunity for users to see OSD messages they perhaps missed reading in time ;-)
+  - [new] option to record a list of seen images, and to have these skipped during slideshows
+  - [new] acquire images from WIA enabled devices [e.g., scanners]
   - [new] support for EXIF orientation in JPEGs; images will be rotated for display accordingly to the stored metadata
   - [new] search through indexed files
   - [new] sort files list by folder path or file name
   - [new] besides the thumbnails list, now the user can choose to see just list of file entries, without thumbnails
-  - [new] selection grid - highlighting thirds and ellipse inscribed in the rectangular selection
-  - [new] rotate, flip, crop, fade or blur image selected area
-  - [new] ellipse selection
-  - [new] Shift/Alt modifier keys as constraints when adjusting the image selection
-  - [new] selection adjustable with Ctrl+Shift+ / Alt + arrow keys
-  - [new] draw lines and arcs using the selection area
-  - [new] paste in place with options how to adapt the pasted image to the selection area; options to rotate image on paste
-  - [new] ability to change OSD font sizes with Ctrl [+] / [-]
   - [new] display and/or create text captions/annotations associated to image files
   - [new] option to allow GIFs to play entirely during slideshows before going to the next slide
   - [new] ability to pan zoomed image avoiding the limit imposed by screen boundaries
   - [new] ability to navigate between selected files only with Ctrl + Home/End, Ctrl + Left/Right
-  - [new] change an index entry, if user wants to have it point to a new file
-  - [new] toggle true full-screen mode with F11 shortcut key
+  - [new] change an index entry, if user wants to have it point to a different file
   - [new] auto-reset image view adjustments on image change, therefore no longer enforcing «permanent» adjustments
   - [new] insert to the current file list or create a new files list on drag-n-drop from explorer
   - [new] limit memory consumption; this can drastically reduce the performance of Quick Picto Viewer 
   - [new] automatically downscale images larger than the screen resolution prior to applying computationally intensive image effects
-  - [new] SQLlite database format for storing slideshow files list; in this format, various file details are cached, which enables much faster files list resorting later on in different user sessions
+  - [new - not yet done] SQLlite database format for storing slideshow files list; in this format, various file details are cached, which enables much faster files list resorting later on in different user sessions
   - [new] invert files selection, filter list to selected files, jump to first/last selected file
+  - [improvement] when QPV starts with an image file as argument, the folder's files list is ignored; it is loaded only if the user attempts to navigate between files
   - [improvement] a single thumbnail cannot be bigger than half of the main window size
   - [improvement] ability to cancel/prevent real-time image effects being applied on a currently loading image by clicking or pressing navigation keys
   - [improvement] multi-threaded enabled processing for batch operations: file format conversion, jpeg lossless operations

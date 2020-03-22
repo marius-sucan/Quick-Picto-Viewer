@@ -19,7 +19,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3
      , maxFilesIndex := 0, thumbsDisplaying := 0, executingCanceableOperation := 1
      , runningLongOperation := 0, alterFilesIndex := 0, animGIFplaying := 0
      , canCancelImageLoad := 0, hGDIinfosWin, hGDIselectWin, hasAdvancedSlide := 1
-     , imgEditPanelOpened := 0, showMainMenuBar := 1
+     , imgEditPanelOpened := 0, showMainMenuBar := 1, undoLevelsRecorded := 0, UserMemBMP := 0
 
 Global activateImgSelection, allowGIFsPlayEntirely, allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, AnyWindowOpen, askDeleteFiles
 , AutoDownScaleIMGs, autoPlaySNDs, autoRemDeadEntry, ColorDepthDithering, countItemz, currentFileIndex, CurrentSLD, defMenuRefreshItm, doSlidesTransitions
@@ -79,7 +79,6 @@ BuildGUI() {
    TouchScreenMode := MainExe.ahkgetvar.TouchScreenMode
    MinGUISize := "+MinSize" A_ScreenWidth//4 "x" A_ScreenHeight//4
    initialWh := "w" A_ScreenWidth//3 " h" A_ScreenHeight//3
-
    Gui, 1: Color, %WindowBgrColor%
    Gui, 1: Margin, 0, 0
    GUI, 1: -DPIScale +Resize %MinGUISize% +hwndPVhwnd +LastFound +OwnDialogs
@@ -354,7 +353,7 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
     }
     If (imgEditPanelOpened=1)
     {
-       MainExe.ahkPostFunction("CloseWindow")
+       MainExe.ahkPostFunction("toggleImgEditPanelWindow")
     } Else If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
     {
        If (mustAbandonCurrentOperations!=1)
@@ -416,7 +415,7 @@ WM_RBUTTONUP(wP, lP, msg, hwnd) {
      canCancelImageLoad := 4
      MainExe.ahkPostFunction("WinClickAction", "rclick", A_GuiControl)
      Return
-  } Else If (AnyWindowOpen=10 || imgEditPanelOpened=1)
+  } Else If (AnyWindowOpen=10)
   {
      MainExe.ahkPostFunction("toggleImgEditPanelWindow")
      Return
@@ -705,7 +704,7 @@ byeByeRoutine() {
             mustAbandonCurrentOperations := 1
       } Else lastCloseInvoked++
       Return
-   } Else If (AnyWindowOpen || thumbsDisplaying=1 || slideShowRunning=1) && (imageLoading!=1 && runningLongOperation!=1) || (animGIFplaying=1)
+   } Else If ((AnyWindowOpen || thumbsDisplaying=1 || slideShowRunning=1) && (imageLoading!=1 && runningLongOperation!=1)) || (animGIFplaying=1)
    {
       lastInvokedThis := A_TickCount
       lastInvoked := A_TickCount
@@ -728,6 +727,19 @@ byeByeRoutine() {
          MainExe.ahkPostFunction("MenuReturnIMGedit")
       } Else lastCloseInvoked++
       Return
+   } Else If (StrLen(UserMemBMP)>3 && undoLevelsRecorded>2)
+   {
+      msgResult := msgBoxWrapper(appTitle ": Save image", "The edited image is about to be discarded...`n`nDo you want to save current image? By answering NO, the image will be discarded and the application will exit.", 3, 0, "question")
+      If (msgResult="Yes")
+      {
+         UserMemBMP := undoLevelsRecorded := 0
+         MainExe.ahkPostFunction("SaveClipboardImage", "yay")
+         Return
+      } Else If (msgResult="No")
+      {
+         lastCloseInvoked := 10
+      } Else If (msgResult="Cancel")
+         Return 
    } Else lastCloseInvoked := 10
 
    If (lastCloseInvoked>2)
@@ -827,16 +839,20 @@ turnOffSlideshow() {
    MainExe.ahkPostFunction("dummyInfoToggleSlideShowu", "stop")
 }
 
+#If, (imgEditPanelOpened=1)
+  F8::
+     A := WinActive("A")
+     hSetWinGui := MainExe.ahkgetvar.hSetWinGui
+     If (A=hSetWinGui || A=PVhwnd)
+        MainExe.ahkPostFunction("toggleImgEditPanelWindow")
+  Return
+#If
+
 #If, (identifyThisWin()=1)
   ~Esc::
   ~!F4::
      canCancelImageLoad := 4
      byeByeRoutine()
-  Return
-
-  ~F11::
-     If (imgEditPanelOpened=1)
-        MainExe.ahkPostFunction("toggleImgEditPanelWindow")
   Return
 
   !Space::
@@ -873,55 +889,31 @@ turnOffSlideshow() {
   Return
 #If
 
+BuildFakeMenuBar() {
+   ; main menu
+   If (imgEditPanelOpened=1)
+   {
+      Menu, PVmenu, Add, HIDE PANEL, toggleImgEditPanelWindow
+      Menu, PVmenu, Add, 
+      Menu, PVmenu, Add, APPLY, applyIMGeditFunction
+      Menu, PVmenu, Add, CANCEL, tlbrCloseWindow
+      Menu, PVmenu, Add, 
+      Menu, PVmenu, Add, UNDO, ImgUndoAction
+      Menu, PVmenu, Add, REDO, ImgRedoAction
+      Menu, PVmenu, Add, 
+      Menu, PVmenu, Add, SELECT ALL, MenuSelectAllAction
+      Menu, PVmenu, Add, SQUARE, makeSquareSelection
+      Menu, PVmenu, Add, FLIP, flipSelectionWH
+      Menu, PVmenu, Add, IMAGE LIMITS, toggleLimitSelection
+      Menu, PVmenu, Add, 
+      Menu, PVmenu, Add, ROTATE 45°, MenuSelRotation
+      Menu, PVmenu, Add, RESET, resetSelectionRotation
+      Menu, PVmenu, Add, 
+      Menu, PVmenu, Add, ADAPT IMAGE, ToggleImageSizingMode
+      Menu, PVmenu, Add, HIDE OBJECT, livePreviewsImageEditing
+      Return
+   }
 
-
-
-
-
-
-
-
-
-
-
-MenuCopyAction() {
-   If (thumbsDisplaying=1)
-      InvokeCopyFiles()
-   Else
-      CopyImage2clip()
-}
-
-MenuSelectAction() {
-   If (thumbsDisplaying=1)
-      MenuMarkThisFileNow()
-   Else
-      ToggleEditImgSelection()
-}
-
-MenuSelectAllAction() {
-   If (thumbsDisplaying=1)
-      MenuMarkThisFileNow()
-   Else
-      ToggleEditImgSelection()
-}
-
-MenuRefreshAction() {
-   If (thumbsDisplaying=1)
-      RefreshFilesList()
-   Else
-      RefreshImageFileAction()
-}
-
-MenuSaveAction() {
-   If (thumbsDisplaying=1)
-      SaveFilesList()
-   Else
-      SaveClipboardImage("yay")
-}
-
-BuildFakeMenu() {
-
-; main menu
    infoThumbsMode := (thumbsDisplaying=1) ? "IMAGE VIEW" : "LIST VIEW"
    Menu, PVmenu, Add, MENU, InitGuiContextMenu
    Menu, PVmenu, Add, 
@@ -932,12 +924,14 @@ BuildFakeMenu() {
    Menu, PVmenu, Add, %infoThumbsMode%, MenuDummyToggleThumbsMode
    Menu, PVmenu, Add, 
    Menu, PVmenu, Add, SELECT, MenuSelectAction
-   Menu, PVmenu, Add, ALL/NONE, dummy
+   Menu, PVmenu, Add, ALL/NONE, MenuSelectAllAction
    Menu, PVmenu, Add, 
    Menu, PVmenu, Add, COPY, MenuCopyAction
    If (thumbsDisplaying!=1)
-      Menu, PVmenu, Add, PASTE, MenuCopyAction
-   Menu, PVmenu, Add, ERASE, MenuCopyAction
+      Menu, PVmenu, Add, PASTE, tlbrPasteClipboardIMG
+   Else
+      Menu, PVmenu, Add, MOVE, PanelMoveCopyFiles
+   Menu, PVmenu, Add, ERASE, deleteKeyAction
    Menu, PVmenu, Add, 
    Menu, PVmenu, Add, SEARCH, PanelSearchIndex
    Menu, PVmenu, Add, JUMP TO, PanelJump2index
@@ -945,114 +939,282 @@ BuildFakeMenu() {
    If (thumbsDisplaying=1)
    {
       Menu, PVmenu, Add, 
-      Menu, PVmenu, Add, [ + ], dummy
+      Menu, PVmenu, Add, MODES, toggleListViewModeThumbs
       Menu, PVmenu, Add, 
-      Menu, PVmenu, Add, [ - ], dummy
+      Menu, PVmenu, Add, [ + ], changeZoomPlus
+      Menu, PVmenu, Add, [ - ], changeZoomMinus
       Menu, PVmenu, Add, 
    } Else
    {
       Menu, PVmenu, Add, 
       Menu, PVmenu, Add, PLAY, dummyInfoToggleSlideShowu
-      Menu, PVmenu, Add, 
       Menu, PVmenu, Add, INFO, ToggleHistoInfoBoxu
-      Menu, PVmenu, Add, 
       Menu, PVmenu, Add, PREV. PANEL, openPreviousPanel
-      Menu, PVmenu, Add, 
    }
-}
-
-CopyImage2clip() {
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-CopyImagePath() {
-  MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 dummy() {
    Sleep, -1
 }
 
+MenuSelRotation() {
+  If !determineMenuBTNsOKAY()
+     Return
+  VPselRotation := MainExe.ahkgetvar.VPselRotation
+  VPselRotation := Round(VPselRotation) + 45
+  If (VPselRotation>350)
+     VPselRotation := 0
+  MainExe.ahkassign("VPselRotation", VPselRotation)
+  MainExe.ahkPostFunction("dummyRefreshImgSelectionWindow")
+}
+
+ToggleImageSizingMode() {
+  If !determineMenuBTNsOKAY()
+     Return
+
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+applyIMGeditFunction() {
+  If !determineMenuBTNsOKAY()
+     Return
+
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+livePreviewsImageEditing() {
+  Static prevState := 0
+  If !determineMenuBTNsOKAY()
+     Return
+  thisState := prevState + 1
+  MainExe.ahkPostFunction(A_ThisFunc, 1, thisState)
+  prevState := !prevState
+}
+
+tlbrCloseWindow() {
+  If !determineMenuBTNsOKAY()
+     Return
+
+  MainExe.ahkPostFunction("CloseWindow")
+}
+
+makeSquareSelection() {
+  If !determineMenuBTNsOKAY()
+     Return
+
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+toggleLimitSelection() {
+  If !determineMenuBTNsOKAY()
+     Return
+
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+flipSelectionWH() {
+  If !determineMenuBTNsOKAY()
+     Return
+
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+changeZoomMinus() {
+  If !determineMenuBTNsOKAY()
+     Return
+  MainExe.ahkPostFunction("changeZoom", -1)
+}
+
+changeZoomPlus() {
+  If !determineMenuBTNsOKAY()
+     Return
+  MainExe.ahkPostFunction("changeZoom", 1)
+}
+
+CopyImage2clip() {
+  If !determineMenuBTNsOKAY()
+     Return
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+CopyImagePath() {
+  If !determineMenuBTNsOKAY()
+     Return
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
 dummyInfoToggleSlideShowu() {
+  If !determineMenuBTNsOKAY()
+     Return
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+PanelMoveCopyFiles() {
+  If !determineMenuBTNsOKAY()
+     Return
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 MenuMarkThisFileNow() {
+  If !determineMenuBTNsOKAY()
+     Return
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 OpenDialogFiles() {
+  If !determineMenuBTNsOKAY()
+     Return
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 PanelJump2index() {
+  If !determineMenuBTNsOKAY()
+     Return
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 InvokeCopyFiles() {
+  If !determineMenuBTNsOKAY()
+     Return
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+deleteKeyAction() {
+  If !determineMenuBTNsOKAY()
+     Return
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 PanelPasteInPlace() {
+  If !determineMenuBTNsOKAY()
+     Return
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 PanelSearchIndex() {
+  If !determineMenuBTNsOKAY()
+     Return
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
-PasteClipboardIMG() {
+tlbrPasteClipboardIMG() {
+  If !determineMenuBTNsOKAY()
+     Return
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 RefreshFilesList() {
+  If !determineMenuBTNsOKAY()
+     Return
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 RefreshImageFileAction() {
+  If !determineMenuBTNsOKAY()
+     Return
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 RegenerateEntireList() {
+  If !determineMenuBTNsOKAY()
+     Return
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 SaveClipboardImage(arg) {
+  If !determineMenuBTNsOKAY()
+     Return
   MainExe.ahkPostFunction(A_ThisFunc, arg)
 }
 
 SaveFilesList() {
+  If !determineMenuBTNsOKAY()
+     Return
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 selectAllFiles() {
+  If !determineMenuBTNsOKAY()
+     Return
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 ResetImageView() {
+  If !determineMenuBTNsOKAY()
+     Return
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 toggleListViewModeThumbs() {
+  If !determineMenuBTNsOKAY()
+     Return
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 MenuDummyToggleThumbsMode() {
+  If !determineMenuBTNsOKAY()
+     Return
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 openPreviousPanel() {
+  If !determineMenuBTNsOKAY()
+     Return
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 ToggleHistoInfoBoxu() {
+  If !determineMenuBTNsOKAY()
+     Return
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
-ToggleEditImgSelection() {
+tlbrToggleImgSelection() {
+  If !determineMenuBTNsOKAY()
+     Return
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
+selectEntireImage(arg) {
+   If !determineMenuBTNsOKAY()
+      Return
+   MainExe.ahkPostFunction(A_ThisFunc, arg)
+}
+
+dropFilesSelection() {
+  If !determineMenuBTNsOKAY()
+     Return
+
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+ImgUndoAction() {
+  If !determineMenuBTNsOKAY()
+     Return
+
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+ImgRedoAction() {
+  If !determineMenuBTNsOKAY()
+     Return
+
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+resetSelectionRotation() {
+  If !determineMenuBTNsOKAY()
+     Return
+
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+toggleImgEditPanelWindow() {
+  If !determineMenuBTNsOKAY()
+     Return
+
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
 
 deleteMenus() {
     Static menusList := "PVmenu|"
@@ -1065,8 +1227,72 @@ UpdateMenuBar() {
    deleteMenus()
    If (showMainMenuBar!=1)
       Return
-   Sleep, 1
-   BuildFakeMenu()
+   Sleep, 0
+   BuildFakeMenuBar()
    Sleep, 0
    Gui, 1: Menu, PVmenu
 }
+
+determineMenuBTNsOKAY() {
+   If (imageLoading=1 || runningLongOperation=1) || (AnyWindowOpen && imgEditPanelOpened!=1)
+      Return 0
+   Else
+      Return 1
+}
+
+MenuCopyAction() {
+   If !determineMenuBTNsOKAY()
+      Return
+
+   If (thumbsDisplaying=1)
+      InvokeCopyFiles()
+   Else
+      CopyImage2clip()
+}
+
+MenuSelectAction() {
+   If !determineMenuBTNsOKAY()
+      Return
+
+   If (thumbsDisplaying=1)
+      MenuMarkThisFileNow()
+   Else
+      tlbrToggleImgSelection()
+}
+
+MenuSelectAllAction() {
+   Static prevState := 0
+   If !determineMenuBTNsOKAY()
+      Return
+
+   If (thumbsDisplaying=1)
+   {
+      If prevState
+         dropFilesSelection()
+      Else
+         selectAllFiles()
+      prevState := !prevState
+   } Else
+      selectEntireImage("r")
+}
+
+MenuRefreshAction() {
+   If !determineMenuBTNsOKAY()
+      Return
+
+   If (thumbsDisplaying=1)
+      RefreshFilesList()
+   Else
+      RefreshImageFileAction()
+}
+
+MenuSaveAction() {
+   If !determineMenuBTNsOKAY()
+      Return
+
+   If (thumbsDisplaying=1)
+      SaveFilesList()
+   Else
+      SaveClipboardImage("yay")
+}
+

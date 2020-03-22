@@ -3,7 +3,7 @@
 ; a fork from: https://github.com/mmikeww/AHKv2-Gdip
 ; based on https://github.com/tariqporter/Gdip
 ; Supports: AHK_L / AHK_H Unicode/ANSI x86/x64 and AHK v2 alpha
-
+;
 ; NOTES: The drawing of GDI+ Bitmaps is limited to a size
 ; of 32767 pixels in either direction (width, height).
 ; To calculate the largest bitmap you can create:
@@ -13,6 +13,7 @@
 ;
 ; Gdip standard library versions:
 ; by Marius Șucan - gathered user-contributed functions and implemented hundreds of new functions
+; - v1.82 on 11/03/2020
 ; - v1.81 on 25/02/2020
 ; - v1.80 on 11/01/2019
 ; - v1.79 on 10/28/2019
@@ -58,6 +59,7 @@
 ; - v1.01 on 31/05/2008
 ;
 ; Detailed history:
+; - 11/02/2020 = Imported updated MDMF functions from mmikeww, and AHK v2 examples, and other minor changes
 ; - 25/02/2020 = Added several new functions, including for color conversions [from Tidbit], improved/fixed several functions
 ; - 11/01/2019 = Implemented support for a private font file for Gdip_AddPathStringSimplified()
 ; - 10/28/2019 = Added 7 new GDI+ functions and fixes related to Gdip_CreateFontFamilyFromFile()
@@ -937,7 +939,7 @@ Gdip_DrawRoundedRectangle(pGraphics, pPen, x, y, w, h, r) {
    return _E
 }
 
-Gdip_DrawRoundedRectangle2(pGraphics, pPen, x, y, w, h, r, angle:=0) {
+Gdip_DrawRoundedRectangle2(pGraphics, pPen, x, y, w, h, r, Angle:=0) {
 ; extracted from: https://github.com/tariqporter/Gdip2/blob/master/lib/Object.ahk
 ; and adapted by Marius Șucan
 
@@ -965,8 +967,8 @@ Gdip_DrawRoundedRectangle2(pGraphics, pPen, x, y, w, h, r, angle:=0) {
    Gdip_AddPathArc(path1, x + pw, y + h - r2 - pw, r2, r2, 90, 90)
    Gdip_AddPathLine(path1, x + pw, y + h - r - pw, x + pw, y + r + pw)
    Gdip_ClosePathFigure(path1)
-   If (angle>0)
-      Gdip_RotatePathAtCenter(path1, angle)
+   If (Angle>0)
+      Gdip_RotatePathAtCenter(path1, Angle)
    _E := Gdip_DrawPath(pGraphics, pPen, path1)
    Gdip_DeletePath(path1)
    return _E
@@ -2346,24 +2348,6 @@ Gdip_CreateBitmapFromFile(sFile, IconNumber:=1, IconSize:="", useICM:=0) {
    return pBitmap
 }
 
-Gdip_CreateBitmapFromFileSimplified(sFile, useICM, ByRef errCode) {
-   Ptr := A_PtrSize ? "UPtr" : "UInt"
-   PtrA := A_PtrSize ? "UPtr*" : "UInt*"
-   pBitmap := 0
-   pBitmapOld := 0
-
-   function2call := (useICM=1) ? "GdipCreateBitmapFromFileICM" : "GdipCreateBitmapFromFile"
-   if (!A_IsUnicode)
-   {
-      VarSetCapacity(wFile, 1024)
-      DllCall("kernel32\MultiByteToWideChar", "uint", 0, "uint", 0, Ptr, &sFile, "int", -1, Ptr, &wFile, "int", 512)
-      errCode := DllCall("gdiplus\" function2call, Ptr, &wFile, PtrA, pBitmap)
-   } else
-      errCode := DllCall("gdiplus\" function2call, Ptr, &sFile, PtrA, pBitmap)
-
-   return pBitmap
-}
-
 Gdip_CreateBitmapFromHBITMAPalpha(hImage) {
 ; function by iseahound found on:
 ; https://www.autohotkey.com/boards/viewtopic.php?f=6&t=63345
@@ -2606,8 +2590,8 @@ Gdip_BitmapSelectActiveFrame(pBitmap, FrameIndex) {
 }
 
 Gdip_GetBitmapFramesCount(pBitmap) {
-; The function returns the number of frames or pages a given pBitmap has
-; For GDI+ only GIFs and TIFFs can have multiple frames/pages.
+; The function returns the number of frames or pages a given pBitmap has.
+; GDI+ only supports multi-frames/pages for GIFs and TIFFs.
 ; Function written by SBC in September 2010 and
 ; extracted from his «Picture Viewer» script.
 ; https://autohotkey.com/board/topic/58226-ahk-picture-viewer/
@@ -5186,11 +5170,16 @@ Gdip_GetRotatedEllipseDimensions(Width, Height, Angle, ByRef RWidth, ByRef RHeig
 
    pPath := Gdip_CreatePath()
    Gdip_AddPathEllipse(pPath, 0, 0, Width, Height)
-   Gdip_RotatePathAtCenter(pPath, Angle)
+   ; testAngle := Mod(Angle, 30)
+   pMatrix := Gdip_CreateMatrix()
+   Gdip_RotateMatrix(pMatrix, Angle, MatrixOrder)
+   E := Gdip_TransformPath(pPath, pMatrix)
+   Gdip_DeleteMatrix(pMatrix)
    pathBounds := Gdip_GetPathWorldBounds(pPath)
    Gdip_DeletePath(pPath)
    RWidth := pathBounds.w
    RHeight := pathBounds.h
+   Return E
 }
 
 Gdip_GetWorldTransform(pGraphics) {
@@ -5725,12 +5714,16 @@ StrGetB(Address, Length:=-1, Encoding:=0) {
    return String
 }
 
-Gdip_Startup() {
+Gdip_Startup(multipleInstances:=0) {
    Ptr := A_PtrSize ? "UPtr" : "UInt"
    pToken := 0
 
-   if !DllCall("GetModuleHandle", "str", "gdiplus", Ptr)
-      DllCall("LoadLibrary", "str", "gdiplus")
+   If (multipleInstances=0)
+   {
+      if !DllCall("GetModuleHandle", "str", "gdiplus", Ptr)
+         DllCall("LoadLibrary", "str", "gdiplus")
+   } Else DllCall("LoadLibrary", "str", "gdiplus")
+
    VarSetCapacity(si, A_PtrSize = 8 ? 24 : 16, 0), si := Chr(1)
    DllCall("gdiplus\GdiplusStartup", A_PtrSize ? "UPtr*" : "uint*", pToken, Ptr, &si, Ptr, 0)
    return pToken
@@ -5740,7 +5733,8 @@ Gdip_Shutdown(pToken) {
    Ptr := A_PtrSize ? "UPtr" : "UInt"
 
    DllCall("gdiplus\GdiplusShutdown", Ptr, pToken)
-   if hModule := DllCall("GetModuleHandle", "str", "gdiplus", Ptr)
+   hModule := DllCall("GetModuleHandle", "str", "gdiplus", Ptr)
+   if hModule
       DllCall("FreeLibrary", Ptr, hModule)
    return 0
 }
@@ -6176,7 +6170,9 @@ Gdip_GetPropertyItemValue(ByRef PropVal, PropLen, PropType, PropAddr) {
 ; The Matrix order has to be "Append" for the transformations to be applied 
 ; in the correct order - instead of the default "Prepend"
 
-Gdip_RotatePathAtCenter(pPath, Angle, MatrixOrder:=1) {
+Gdip_RotatePathAtCenter(pPath, Angle, MatrixOrder:=1, withinBounds:=0, withinBkeepRatio:=1) {
+; modified by Marius Șucan - added withinBounds option
+
   ; Gets the bounding rectangle of the GraphicsPath
   ; returns array x, y, w, h
   Rect := Gdip_GetPathWorldBounds(pPath)
@@ -6199,9 +6195,30 @@ Gdip_RotatePathAtCenter(pPath, Angle, MatrixOrder:=1) {
 
   ; Apply the transformations
   E := Gdip_TransformPath(pPath, pMatrix)
-  
+
   ; Delete Matrix
   Gdip_DeleteMatrix(pMatrix)
+
+  If (withinBounds=1 && !E && Angle!=0)
+  {
+     nRect := Gdip_GetPathWorldBounds(pPath)
+     ncX := nRect.x + (nRect.w / 2)
+     ncY := nRect.y + (nRect.h / 2)
+     pMatrix := Gdip_CreateMatrix()
+     Gdip_TranslateMatrix(pMatrix, -ncX , -ncY)
+     sX := Rect.w / nRect.w
+     sY := Rect.h / nRect.h
+     If (withinBkeepRatio=1)
+     {
+        sX := min(sX, sY)
+        sY := min(sX, sY)
+     }
+     Gdip_ScaleMatrix(pMatrix, sX, sY, MatrixOrder)
+     Gdip_TranslateMatrix(pMatrix, ncX, ncY, MatrixOrder)
+     If (sX!=0 && sY!=0)
+        E := Gdip_TransformPath(pPath, pMatrix)
+     Gdip_DeleteMatrix(pMatrix)
+  }
   Return E
 }
 
@@ -6370,7 +6387,7 @@ Gdip_ClonePath(pPath) {
 }
 
 ;######################################################################################################################################
-; The following PathGradient brush functions were written by Just Me in March 2012
+; The following PathGradient brush functions were written by 'Just Me' in March 2012
 ; source: https://autohotkey.com/board/topic/29449-gdi-standard-library-145-by-tic/page-65
 ;######################################################################################################################################
 
@@ -7570,6 +7587,9 @@ Gdip_BitmapConvertFormat(pBitmap, PixelFormat, DitherType, DitherPaletteType, Pa
 }
 
 Gdip_GetImageThumbnail(pBitmap, W, H) {
+; by jballi, source
+; https://www.autohotkey.com/boards/viewtopic.php?style=7&t=70508
+
     DllCall("gdiplus\GdipGetImageThumbnail"
         ,"UPtr",pBitmap                         ;-- *image
         ,"UInt",W                               ;-- thumbWidth
@@ -7580,6 +7600,11 @@ Gdip_GetImageThumbnail(pBitmap, W, H) {
 
    Return pThumbnail
 }
+
+; =================================================
+; The following functions were written by Tidbit
+; handed to me by himself to be included here.
+; =================================================
 
 ConvertRGBtoHSL(R, G, B) {
 ; http://www.easyrgb.com/index.php?X=MATH&H=18#text18
@@ -7598,7 +7623,7 @@ ConvertRGBtoHSL(R, G, B) {
    if (del_Max = 0)
    {
       H := S := 0
-   }else
+   } else
    {
       if (L < 0.5)
          S := del_Max / (Max + Min)
@@ -7663,7 +7688,6 @@ ConvertHueToRGB(v1, v2, vH) {
          : ((3 * vH) < 2) ? (v1 + (v2 - v1) * ((2 / 3) - vH) * 6)
          : v1
 }
-
 
 Gdip_ErrrorHandler(errCode, throwErrorMsg, additionalInfo:="") {
    Static errList := {1:"Generic_Error", 2:"Invalid_Parameter"
