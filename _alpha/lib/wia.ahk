@@ -136,17 +136,21 @@ WIA_FilterDescriptions(FilterName := "") {
                      . "========================================`r`n"
    Description := Delimiter
    ImgProc := WIA_ImageProcess()
-   For FilterInfo In ImgProc.FilterInfos {
-      If (Filtername <> "") {
-         If (FilterInfo.Name = FilterName) {
+   For FilterInfo In ImgProc.FilterInfos
+   {
+      If (Filtername <> "")
+      {
+         If (FilterInfo.Name = FilterName)
+         {
             Description .= FilterInfo.Name . "     (ID: " . FilterInfo.FilterId . ")`r`n`r`n"
                          . FilterInfo.Description . "`r`n" . Delimiter
             Break
          }
-      }
-      Else
+      } Else
+      {
          Description .= FilterInfo.Name . "     (ID: " . FilterInfo.FilterId . ")`r`n`r`n"
                       . FilterInfo.Description . "`r`n" . Delimiter
+      }
    }
    Return (Description <> Delimiter ? RTrim(Description) : "")
 }
@@ -224,11 +228,11 @@ WIA_LoadImage(ImgPath) {
 ; ======================================================================================================================
 ; Rotates an image in steps of 90°.
 ; Parameters:
-;     Mode        -  Direction: "Left" or "Right"
+;     Mode        -  Direction: "Left" or "Right" or angle [0, 90, 180, 270]
 ; ======================================================================================================================
 WIA_RotateImage(ImgObj, Mode := "Right") {
    Static Modes := {"Left": 270, "Right": 90}
-   If !(Mode := Modes[Mode]) || (ComObjType(ImgObj, "Name") <> "IImageFile")
+   If (ComObjType(ImgObj, "Name") <> "IImageFile")
       Return False
    ImgProc := WIA_ImageProcess()
    ImgProc.Filters.Add(ImgProc.FilterInfos("RotateFlip").FilterID)

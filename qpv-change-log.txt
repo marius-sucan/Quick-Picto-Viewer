@@ -12,6 +12,7 @@
   - [new] ability to change OSD font sizes with Ctrl [+] / [-]
   - [new] toggle true full-screen mode with F11 shortcut key
   - [new] create new image panel
+  - [new] blur with soft edges, according to the rotated selection
   - [new] easy to crop image or adjust canvas size according to the selection area using Shift + Enter
   - [new] fill image selected area with a rectangle, triangle, ellipse or other shapes in the orientation, color and opacity of your choosing
   - [new] transform tool for selected area with options to rotate, flip, crop, fade, adjust colors or blur, live in the viewport
@@ -54,6 +55,7 @@
   - [improvement] various HUD histogram box calculations fixes
   - [improvement] many improvements to the touch screen usability
   - fixed a bug when resizing Quick Picto Viewer window that caused frequent hanging/freezing
+  - fixed various other bugs
 
 - v3.9.8 (2019-11-21)
   - [new] advanced auto-crop image option; applicable on multiple images at once

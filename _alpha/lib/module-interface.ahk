@@ -8,12 +8,12 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3
      , winGDIcreated := 0, ThumbsWinGDIcreated := 0, MainExe := AhkExported()
      , RegExFilesPattern, AnyWindowOpen := 0, easySlideStoppage
      , slideShowRunning := 0, toolTipGuiCreated, editDummy, LbtnDwn := 0
-     , mustAbandonCurrentOperations := 0, lastCloseInvoked := 0
+     , mustAbandonCurrentOperations := 0, lastCloseInvoked := 0 , allowGIFsPlayEntirely := 0
      , hCursBusy := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32514, "Ptr")  ; IDC_WAIT
      , hCursN := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32512, "Ptr")  ; IDC_ARROW
      , hCursMove := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32646, "Ptr")  ; IDC_Hand
      , hCursFinger := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32649, "Ptr")
-     , SlideHowMode := 1, lastWinDrag := 1, TouchScreenMode := 0
+     , SlideHowMode := 1, lastWinDrag := 1, TouchScreenMode := 0, allowNextSlide := 1
      , isTitleBarHidden := 0, imageLoading := 0, hPicOnGui1, hotkeysSuspended := 0
      , slideShowDelay := 9000, scriptStartZeit := A_TickCount, prevFullIMGload := 1
      , maxFilesIndex := 0, thumbsDisplaying := 0, executingCanceableOperation := 1
@@ -21,7 +21,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3
      , canCancelImageLoad := 0, hGDIinfosWin, hGDIselectWin, hasAdvancedSlide := 1
      , imgEditPanelOpened := 0, showMainMenuBar := 1, undoLevelsRecorded := 0, UserMemBMP := 0
 
-Global activateImgSelection, allowGIFsPlayEntirely, allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, AnyWindowOpen, askDeleteFiles
+Global activateImgSelection, allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, askDeleteFiles
 , AutoDownScaleIMGs, autoPlaySNDs, autoRemDeadEntry, ColorDepthDithering, countItemz, currentFileIndex, CurrentSLD, defMenuRefreshItm, doSlidesTransitions
 , DynamicFoldersList, easySlideStoppage, editingSelectionNow, EllipseSelectMode, enableThumbsCaching, filesFilter, FlipImgH, FlipImgV, hSNDmedia, imgFxMode
 , IMGresizingMode, imgSelX2, imgSelY2, LimitSelectBoundsImg, markedSelectFile, maxFilesIndex, minimizeMemUsage, mustGenerateStaticFolders, MustLoadSLDprefs
@@ -415,11 +415,7 @@ WM_RBUTTONUP(wP, lP, msg, hwnd) {
      canCancelImageLoad := 4
      MainExe.ahkPostFunction("WinClickAction", "rclick", A_GuiControl)
      Return
-  } Else If (AnyWindowOpen=10)
-  {
-     MainExe.ahkPostFunction("toggleImgEditPanelWindow")
-     Return
-  }
+  } 
 
   delayu := (thumbsDisplaying=1) ? 90 : 2
   SetTimer, InitGuiContextMenu, % -delayu
@@ -446,7 +442,8 @@ slideshowsHandler(thisSlideSpeed, act, how) {
 
 dummySlideshow() {
    ; hasAdvancedSlide := (modus="gif") ? hasAdvancedSlide : 1
-   If (slideShowRunning=1 && hasAdvancedSlide=1)
+   ; preventChange := (allowGIFsPlayEntirely=1 && animGIFplaying=1) ? 1 : 0
+   If (slideShowRunning=1 && allowNextSlide=1)
    {
       hasAdvancedSlide := 0
       SetTimer, theSlideShowCore, % -slideShowDelay
@@ -456,7 +453,7 @@ dummySlideshow() {
 theSlideShowCore() {
   thisZeit :=  A_TickCount - prevFullIMGload
   ; MsgBox, % thisZeit "--" slideShowDelay
-  If (thisZeit < slideShowDelay//1.25)
+  If (thisZeit < slideShowDelay//1.25) || (allowNextSlide!=1) ; || (allowGIFsPlayEntirely=1 && animGIFplaying=1)
      Return
 
   If (SlideHowMode=1)
@@ -727,7 +724,7 @@ byeByeRoutine() {
          MainExe.ahkPostFunction("MenuReturnIMGedit")
       } Else lastCloseInvoked++
       Return
-   } Else If (StrLen(UserMemBMP)>3 && undoLevelsRecorded>2)
+   } Else If (StrLen(UserMemBMP)>3 && undoLevelsRecorded>1)
    {
       msgResult := msgBoxWrapper(appTitle ": Save image", "The edited image is about to be discarded...`n`nDo you want to save current image? By answering NO, the image will be discarded and the application will exit.", 3, 0, "question")
       If (msgResult="Yes")
@@ -868,6 +865,8 @@ turnOffSlideshow() {
   ~Down::
   ~PgDn::
   ~Home::
+  ~BackSpace::
+  ~Delete::
   ~End::
      alterFilesIndex++
      canCancelImageLoad := 4
@@ -895,22 +894,35 @@ BuildFakeMenuBar() {
    {
       Menu, PVmenu, Add, HIDE PANEL, toggleImgEditPanelWindow
       Menu, PVmenu, Add, 
-      Menu, PVmenu, Add, APPLY, applyIMGeditFunction
-      Menu, PVmenu, Add, CANCEL, tlbrCloseWindow
+      If (AnyWindowOpen=10)
+         Menu, PVmenu, Add, APPLY TO SELECTION, ApplyColorAdjustsSelectedArea
+      Else
+         Menu, PVmenu, Add, APPLY, applyIMGeditFunction
+      Menu, PVmenu, Add, % (AnyWindowOpen=10) ? "CLOSE" : "CANCEL", tlbrCloseWindow
       Menu, PVmenu, Add, 
       Menu, PVmenu, Add, UNDO, ImgUndoAction
       Menu, PVmenu, Add, REDO, ImgRedoAction
       Menu, PVmenu, Add, 
-      Menu, PVmenu, Add, SELECT ALL, MenuSelectAllAction
+      If (AnyWindowOpen=10)
+         Menu, PVmenu, Add, SELECT, tlbrToggleImgSelection
+      Else
+         Menu, PVmenu, Add, SELECT ALL, MenuSelectAllAction
       Menu, PVmenu, Add, SQUARE, makeSquareSelection
       Menu, PVmenu, Add, FLIP, flipSelectionWH
       Menu, PVmenu, Add, IMAGE LIMITS, toggleLimitSelection
       Menu, PVmenu, Add, 
-      Menu, PVmenu, Add, ROTATE 45°, MenuSelRotation
-      Menu, PVmenu, Add, RESET, resetSelectionRotation
+      If (AnyWindowOpen!=10)
+         Menu, PVmenu, Add, ROTATE 45°, MenuSelRotation
+      If (AnyWindowOpen=10)
+         Menu, PVmenu, Add, RESET VIEW, BtnResetImageView
+      Else
+         Menu, PVmenu, Add, RESET, resetSelectionRotation
       Menu, PVmenu, Add, 
       Menu, PVmenu, Add, ADAPT IMAGE, ToggleImageSizingMode
-      Menu, PVmenu, Add, HIDE OBJECT, livePreviewsImageEditing
+      If (AnyWindowOpen=10)
+         Menu, PVmenu, Add, TOGGLE FX, MenuToggleColorAdjustments
+      Else
+         Menu, PVmenu, Add, HIDE OBJECT, livePreviewsImageEditing
       Return
    }
 
@@ -975,7 +987,28 @@ ToggleImageSizingMode() {
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
+BtnResetImageView() {
+  If !determineMenuBTNsOKAY()
+     Return
+
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+ApplyColorAdjustsSelectedArea() {
+  If !determineMenuBTNsOKAY()
+     Return
+
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
 applyIMGeditFunction() {
+  If !determineMenuBTNsOKAY()
+     Return
+
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+MenuToggleColorAdjustments() {
   If !determineMenuBTNsOKAY()
      Return
 

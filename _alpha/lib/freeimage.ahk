@@ -133,7 +133,8 @@ FreeImage_Load(ImPath, GFT:=-1, flag:=0, ByRef dGFT:=0) {
 }
 
 FreeImage_Save(hImage, ImPath, ImgArg:=0) {
-   ; FIMfrmt := {"BMP":0, "JPG":2, "JPEG":2, "PNG":13, "TIF":18, "TIFF":18, "GIF":25}
+; Return 0 = failed; 1 = success
+; FIMfrmt := {"BMP":0, "JPG":2, "JPEG":2, "PNG":13, "TIF":18, "TIFF":18, "GIF":25}
    OutExt := FreeImage_GetFIFFromFilename(ImPath)
    Return DllCall(getFIMfunc("SaveU"), "Int", OutExt, "Int", hImage, "WStr", ImPath, "int", ImgArg)
 }
