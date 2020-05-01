@@ -1,4 +1,4 @@
-#NoEnv
+﻿#NoEnv
 #NoTrayIcon
 #MaxHotkeysPerInterval, 500
 #MaxThreads, 1
@@ -8,8 +8,10 @@
 #SingleInstance, force
 #Persistent
 #UseHook, Off
-; #Include E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\Lib\gdip_all.ahk
-; #Include E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\Lib\wia.ahk
+SetWorkingDir, %A_ScriptDir%
+; #Include Lib\gdip_all.ahk
+; #Include Lib\freeimage.ahk
+; #Include Lib\wia.ahk
 SetWinDelay, 1
 Global GDIPToken, MainExe := AhkExported()
      , mainCompiledPath := "", wasInitFIMlib := 0, listBitmaps := ""
@@ -81,7 +83,9 @@ MonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerIm
    }
  
    imgBPP := Trim(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
-   If (imgBPP>32)
+   ColorsType := FreeImage_GetColorType(hFIFimgA)
+   mustApplyToneMapping := (imgBPP>32 && !InStr(ColorsType, "rgba")) || (imgBPP>64) ? 1 : 0
+   If (mustApplyToneMapping=1)
    {
       hFIFimgB := FreeImage_ToneMapping(hFIFimgA, 0, 1.85, 0)
       FreeImage_UnLoad(hFIFimgA)
@@ -289,7 +293,8 @@ ConvertFimObj2pBitmap(hFIFimgD, imgW, imgH) {
 
 
 ; ================
-; Includes
+; Included FreeImage.ahk
+
 
 FreeImage_GetBits(hImage) {
    Return DllCall(getFIMfunc("GetBits"), "Int", hImage)
@@ -306,6 +311,23 @@ FreeImage_ConvertTo(hImage, MODE) {
 ; ATTENTION: these are case sensitive!
 
    Return DllCall(getFIMfunc("ConvertTo" MODE), "int", hImage)
+}
+
+
+FreeImage_GetColorType(hImage, humanReadable:=1) {
+; 0 = MINISWHITE  - Monochrome bitmap (1-bit) : first palette entry is white. Palletised bitmap (4 or 8-bit) - the bitmap has an inverted greyscale palette
+; 1 = MINISBLACK - Monochrome bitmap (1-bit) : first palette entry is black. Palletised bitmap (4 or 8-bit) and single - channel non-standard bitmap: the bitmap has a greyscale palette
+; 2 = RGB  - High-color bitmap (16, 24 or 32 bit), RGB16 or RGBF
+; 3 = PALETTE - Palettized bitmap (1, 4 or 8 bit)
+; 4 = RGBALPHA - High-color bitmap with an alpha channel (32 bit bitmap, RGBA16 or RGBAF)
+; 5 = CMYK - CMYK bitmap (32 bit only)
+
+   Static ColorsTypes := {1:"MINISBLACK", 0:"MINISWHITE", 3:"PALETTIZED", 2:"RGB", 4:"RGBA", 5:"CMYK"}
+   r := DllCall(getFIMfunc("GetColorType"), "Int", hImage)
+   If (ColorsTypes.HasKey(r) && humanReadable=1)
+      r := ColorsTypes[r]
+
+   Return r
 }
 
 FreeImage_FoxInit(isInit:=1) {
@@ -449,161 +471,9 @@ FreeImage_Rescale(hImage, w, h, filter:=3) {
 }
 
 
+
 ; include gdip_all.ahk
 
-; Gdip_All.ahk - GDI+ library compilation of user contributed GDI+ functions
-; made by Marius Șucan: https://github.com/marius-sucan/AHK-GDIp-Library-Compilation
-; a fork from: https://github.com/mmikeww/AHKv2-Gdip
-; based on https://github.com/tariqporter/Gdip
-; Supports: AHK_L / AHK_H Unicode/ANSI x86/x64 and AHK v2 alpha
-;
-; NOTES: The drawing of GDI+ Bitmaps is limited to a size
-; of 32767 pixels in either direction (width, height).
-; To calculate the largest bitmap you can create:
-;    The maximum object size is 2GB = 2,147,483,648 bytes
-;    Default bitmap is 32bpp (4 bytes), the largest area we can have is 2GB / 4 = 536,870,912 bytes
-;    If we want a square, the largest we can get is sqrt(2GB/4) = 23,170 pixels
-;
-; Gdip standard library versions:
-; by Marius Șucan - gathered user-contributed functions and implemented hundreds of new functions
-; - v1.82 on 11/03/2020
-; - v1.81 on 25/02/2020
-; - v1.80 on 11/01/2019
-; - v1.79 on 10/28/2019
-; - v1.78 on 10/27/2019
-; - v1.77 on 10/06/2019
-; - v1.76 on 09/27/2019
-; - v1.75 on 09/23/2019
-; - v1.74 on 09/19/2019
-; - v1.73 on 09/17/2019
-; - v1.72 on 09/16/2019
-; - v1.71 on 09/15/2019
-; - v1.70 on 09/13/2019
-; - v1.69 on 09/12/2019
-; - v1.68 on 09/11/2019
-; - v1.67 on 09/10/2019
-; - v1.66 on 09/09/2019
-; - v1.65 on 09/08/2019
-; - v1.64 on 09/07/2019
-; - v1.63 on 09/06/2019
-; - v1.62 on 09/05/2019
-; - v1.61 on 09/04/2019
-; - v1.60 on 09/03/2019
-; - v1.59 on 09/01/2019
-; - v1.58 on 08/29/2019
-; - v1.57 on 08/23/2019
-; - v1.56 on 08/21/2019
-; - v1.55 on 08/14/2019
-;
-; bug fixes and AHK v2 compatibility by mmikeww and others
-; - v1.54 on 11/15/2017
-; - v1.53 on 06/19/2017
-; - v1.52 on 06/11/2017
-; - v1.51 on 01/27/2017
-; - v1.50 on 11/20/2016
-;
-; - v1.47 on 02/20/2014 [?]
-;
-; modified by Rseding91 using fincs 64 bit compatible
-; - v1.45 on 05/01/2013 
-;
-; by tic (Tariq Porter)
-; - v1.45 on 07/09/2011 
-; - v1.01 on 31/05/2008
-;
-; Detailed history:
-; - 11/02/2020 = Imported updated MDMF functions from mmikeww, and AHK v2 examples, and other minor changes
-; - 25/02/2020 = Added several new functions, including for color conversions [from Tidbit], improved/fixed several functions
-; - 11/01/2019 = Implemented support for a private font file for Gdip_AddPathStringSimplified()
-; - 10/28/2019 = Added 7 new GDI+ functions and fixes related to Gdip_CreateFontFamilyFromFile()
-; - 10/27/2019 = Added 5 new GDI+ functions and bug fixes for Gdip_TestBitmapUniformity(), Gdip_RotateBitmapAtCenter() and Gdip_ResizeBitmap()
-; - 10/06/2019 = Added more parameters to Gdip_GraphicsFromImage/HDC/HWND and added Gdip_GetPixelColor()
-; - 09/27/2019 = bug fixes...
-; - 09/23/2019 = Added 4 new functions and improved Gdip_CreateBitmap() [ Marius Șucan ]
-; - 09/19/2019 = Added 4 new functions and improved Gdip_RotateBitmapAtCenter() [ Marius Șucan ]
-; - 09/17/2019 = Added 6 new GDI+ functions and renamed curve related functions [ Marius Șucan ]
-; - 09/16/2019 = Added 10 new GDI+ functions [ Marius Șucan ]
-; - 09/15/2019 = Added 3 new GDI+ functions and improved Gdip_DrawStringAlongPolygon() [ Marius Șucan ]
-; - 09/13/2019 = Added 10 new GDI+ functions [ Marius Șucan ]
-; - 09/12/2019 = Added 6 new GDI+ functions [ Marius Șucan ]
-; - 09/11/2019 = Added 10 new GDI+ functions [ Marius Șucan ]
-; - 09/10/2019 = Added 17 new GDI+ functions [ Marius Șucan ]
-; - 09/09/2019 = Added 14 new GDI+ functions [ Marius Șucan ]
-; - 09/08/2019 = Added 3 new functions and fixed Gdip_SetPenDashArray() [ Marius Șucan ]
-; - 09/07/2019 = Added 12 new functions [ Marius Șucan ]
-; - 09/06/2019 = Added 14 new GDI+ functions [ Marius Șucan ]
-; - 09/05/2019 = Added 27 new GDI+ functions [ Marius Șucan ]
-; - 09/04/2019 = Added 36 new GDI+ functions [ Marius Șucan ]
-; - 09/03/2019 = Added about 37 new GDI+ functions [ Marius Șucan ]
-; - 08/29/2019 = Fixed Gdip_GetPropertyTagName() [on AHK v2], Gdip_GetPenColor() and Gdip_GetSolidFillColor(), added Gdip_LoadImageFromFile()
-; - 08/23/2019 = Added Gdip_FillRoundedRectangle2() and Gdip_DrawRoundedRectangle2(); extracted from Gdip2 by Tariq [tic] and corrected functions names
-; - 08/21/2019 = Added GenerateColorMatrix() by Marius Șucan
-; - 08/19/2019 = Added 12 functions. Extracted from a class wrapper for GDI+ written by nnnik in 2017.
-; - 08/18/2019 = Added Gdip_AddPathRectangle() and eight PathGradient related functions by JustMe
-; - 08/16/2019 = Added Gdip_DrawImageFX(), Gdip_CreateEffect() and other related functions [ Marius Șucan ]
-; - 08/15/2019 = Added Gdip_DrawRoundedLine() by DevX and Rabiator
-; - 08/15/2019 = Added 11 GraphicsPath related functions by "Learning one" and updated by Marius Șucan
-; - 08/14/2019 = Added Gdip_IsVisiblePathPoint() and RotateAtCenter() by RazorHalo
-; - 08/08/2019 = Added Gdi_GetDIBits() and Gdi_CreateDIBitmap() by Marius Șucan
-; - 07/19/2019 = Added Gdip_GetHistogram() by swagfag and GetProperty GDI+ functions by JustMe
-; - 11/15/2017 = compatibility with both AHK v2 and v1, restored by nnnik
-; - 06/19/2017 = Fixed few bugs from old syntax by Bartlomiej Uliasz
-; - 06/11/2017 = made code compatible with new AHK v2.0-a079-be5df98 by Bartlomiej Uliasz
-; - 01/27/2017 = fixed some bugs and made #Warn All compatible by Bartlomiej Uliasz
-; - 11/20/2016 = fixed Gdip_BitmapFromBRA() by 'just me'
-; - 11/18/2016 = backward compatible support for both AHK v1.1 and AHK v2
-; - 11/15/2016 = initial AHK v2 support by guest3456
-; - 02/20/2014 = fixed Gdip_CreateRegion() and Gdip_GetClipRegion() on AHK Unicode x86
-; - 05/13/2013 = fixed Gdip_SetBitmapToClipboard() on AHK Unicode x64
-; - 07/09/2011 = v1.45 release by tic (Tariq Porter)
-; - 31/05/2008 = v1.01 release by tic (Tariq Porter)
-;
-;#####################################################################################
-; STATUS ENUMERATION
-; Return values for functions specified to have status enumerated return type
-;#####################################################################################
-;
-; Ok =                  = 0
-; GenericError          = 1
-; InvalidParameter      = 2
-; OutOfMemory           = 3
-; ObjectBusy            = 4
-; InsufficientBuffer    = 5
-; NotImplemented        = 6
-; Win32Error            = 7
-; WrongState            = 8
-; Aborted               = 9
-; FileNotFound          = 10
-; ValueOverflow         = 11
-; AccessDenied          = 12
-; UnknownImageFormat    = 13
-; FontFamilyNotFound    = 14
-; FontStyleNotFound     = 15
-; NotTrueTypeFont       = 16
-; UnsupportedGdiplusVersion= 17
-; GdiplusNotInitialized    = 18
-; PropertyNotFound         = 19
-; PropertyNotSupported     = 20
-; ProfileNotFound          = 21
-;
-;#####################################################################################
-; FUNCTIONS LIST
-; See functions-list.txt file.
-;#####################################################################################
-
-; Function:             UpdateLayeredWindow
-; Description:          Updates a layered window with the handle to the DC of a gdi bitmap
-;
-; hwnd                  Handle of the layered window to update
-; hdc                   Handle to the DC of the GDI bitmap to update the window with
-; x, y                  x, y coordinates to place the window
-; w, h                  Width and height of the window
-; Alpha                 Default = 255 : The transparency (0-255) to set the window transparency
-;
-; return                If the function succeeds, the return value is nonzero
-;
-; notes                 If x or y are omitted, the layered window will use its current coordinates
-;                       If w or h are omitted, the current width and height will be used
 
 UpdateLayeredWindow(hwnd, hdc, x:="", y:="", w:="", h:="", Alpha:=255) {
    Ptr := A_PtrSize ? "UPtr" : "UInt"

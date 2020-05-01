@@ -101,6 +101,20 @@ WIA_ConvertImage(ImgObj, NewFormat, Quality := 100, Compression := "LZW") {
    ImgProc.Filters[1].Properties("Compression") := Compression
    Return ImgProc.Apply(ImgObj)
 }
+
+WIA_GetImageFormatID(ImgObj) {
+   Static FormatIDs := {"{B96B3CAB-0728-11D3-9D7B-0000F81EF32E}":"BMP"
+                     , "{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}":"JPEG"
+                     , "{B96B3CB0-0728-11D3-9D7B-0000F81EF32E}":"GIF"
+                     , "{B96B3CAF-0728-11D3-9D7B-0000F81EF32E}":"PNG"
+                     , "{B96B3CB1-0728-11D3-9D7B-0000F81EF32E}":"TIFF"}
+
+   info := FormatIDs[ImgObj.FormatID]
+   If !info
+      info := ImgObj.FormatID
+   Return info
+}
+
 ; ======================================================================================================================
 ; Crops an image.
 ; Parameters:

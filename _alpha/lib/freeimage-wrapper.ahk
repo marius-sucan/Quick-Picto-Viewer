@@ -71,7 +71,7 @@ FreeImage_FoxGetPallete(hImage) { ; GetPaletteList
    return, PalleteList
 }
 
-FreeImage_FoxGetRGBi(StartAdress=2222, ColorIndexNum=1, GetColor="R") {
+FreeImage_FoxGetRGBi(StartAdress:=2222, ColorIndexNum:=1, GetColor:="R") {
    If ( GetColor = "R" )
       return, Numget(StartAdress+0, 4*(ColorIndexNum-1)+0, "Uchar")
    If ( GetColor = "G" )
@@ -82,7 +82,7 @@ FreeImage_FoxGetRGBi(StartAdress=2222, ColorIndexNum=1, GetColor="R") {
       return, Numget(StartAdress+0, 4*(ColorIndexNum-1)+3, "Uchar")
 }
 
-FreeImage_FoxSetRGBi(StartAdress=2222, ColorIndexNum=1, SetColor="R", Value=255) {
+FreeImage_FoxSetRGBi(StartAdress:=2222, ColorIndexNum:=1, SetColor:="R", Value:=255) {
    If ( SetColor = "R" )
       NumPut(Value, StartAdress+0, 4*(ColorIndexNum-1)+0, "Uchar")
    If ( SetColor = "G" )

@@ -2,13 +2,13 @@
 #NoTrayIcon
 SetWinDelay, 1
 SetBatchLines, -1
-
+SetWorkingDir, %A_ScriptDir%
 Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3
-     , PVhwnd, hGDIwin, hGDIthumbsWin, appTitle, WindowBgrColor
+     , PVhwnd, hGDIwin, hGDIthumbsWin, appTitle, WindowBgrColor, mainCompiledPath
      , winGDIcreated := 0, ThumbsWinGDIcreated := 0, MainExe := AhkExported()
-     , RegExFilesPattern, AnyWindowOpen := 0, easySlideStoppage
+     , RegExFilesPattern, AnyWindowOpen := 0, easySlideStoppage := 0, lastOtherWinClose := 1
      , slideShowRunning := 0, toolTipGuiCreated, editDummy, LbtnDwn := 0
-     , mustAbandonCurrentOperations := 0, lastCloseInvoked := 0 , allowGIFsPlayEntirely := 0
+     , mustAbandonCurrentOperations := 0, lastCloseInvoked := -1, allowGIFsPlayEntirely := 0
      , hCursBusy := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32514, "Ptr")  ; IDC_WAIT
      , hCursN := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32512, "Ptr")  ; IDC_ARROW
      , hCursMove := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32646, "Ptr")  ; IDC_Hand
@@ -17,7 +17,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3
      , isTitleBarHidden := 0, imageLoading := 0, hPicOnGui1, hotkeysSuspended := 0
      , slideShowDelay := 9000, scriptStartZeit := A_TickCount, prevFullIMGload := 1
      , maxFilesIndex := 0, thumbsDisplaying := 0, executingCanceableOperation := 1
-     , runningLongOperation := 0, alterFilesIndex := 0, animGIFplaying := 0
+     , runningLongOperation := 0, alterFilesIndex := 0, animGIFplaying := 0, prevOpenedFile := 0
      , canCancelImageLoad := 0, hGDIinfosWin, hGDIselectWin, hasAdvancedSlide := 1
      , imgEditPanelOpened := 0, showMainMenuBar := 1, undoLevelsRecorded := 0, UserMemBMP := 0
 
@@ -74,6 +74,7 @@ BuildGUI() {
    appTitle := MainExe.ahkgetvar.appTitle
    WindowBgrColor := MainExe.ahkgetvar.WindowBgrColor
    isAlwaysOnTop := MainExe.ahkgetvar.isAlwaysOnTop
+   mainCompiledPath := MainExe.ahkgetvar.mainCompiledPath
    isTitleBarHidden := MainExe.ahkgetvar.isTitleBarHidden
    RegExFilesPattern := MainExe.ahkgetvar.RegExFilesPattern
    TouchScreenMode := MainExe.ahkgetvar.TouchScreenMode
@@ -233,43 +234,51 @@ detectLongOperation(timer) {
 }
 
 openFileDialogWrapper(optionz, startPath, msg, pattern) {
+   prevOpenedFile := 0
    Gui, 1: +OwnDialogs
    FileSelectFile, file2save, % optionz, % startPath, % msg, % pattern
    If (!ErrorLevel && StrLen(file2save)>2)
       r := file2save
    ; WinActivate, ahk_id %PVhwnd%
+   If !AnyWindowOpen
+      lastOtherWinClose := A_TickCount
+   prevOpenedFile := r ? r : 1
    Return r
 }
 
 openFoldersDialogWrapper(optionz, startPath, msg) {
+   prevOpenedFile := 0
    Gui, 1: +OwnDialogs
    FileSelectFolder, SelectedDir, % startPath, % optionz, % msg
    If (!ErrorLevel && StrLen(SelectedDir)>2)
       r := SelectedDir
    ; WinActivate, ahk_id %PVhwnd%
+   If !AnyWindowOpen
+      lastOtherWinClose := A_TickCount
+   prevOpenedFile := r ? r : 1
    Return r
 }
 
 msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, modality:=0, optionz:=0) {
-; Buttonz options:
-; 0 = OK (that is, only an OK button is displayed)
-; 1 = OK/Cancel
-; 2 = Abort/Retry/Ignore
-; 3 - Yes/No/Cancel
-; 4 = Yes/No
-; 5 = Retry/Cancel
-; 6 = Cancel/Try Again/Continue
+   ; Buttonz options:
+   ; 0 = OK (that is, only an OK button is displayed)
+   ; 1 = OK/Cancel
+   ; 2 = Abort/Retry/Ignore
+   ; 3 - Yes/No/Cancel
+   ; 4 = Yes/No
+   ; 5 = Retry/Cancel
+   ; 6 = Cancel/Try Again/Continue
 
-; Iconz options:
-; 16 = Icon Hand (stop/error)
-; 32 = Icon Question
-; 48 = Icon Exclamation
-; 64 = Icon Asterisk (info)
+   ; Iconz options:
+   ; 16 = Icon Hand (stop/error)
+   ; 32 = Icon Question
+   ; 48 = Icon Exclamation
+   ; 64 = Icon Asterisk (info)
 
-; Modality options:
-; 4096 = System Modal (always on top)
-; 8192 = Task Modal
-; 262144 = Always-on-top (style WS_EX_TOPMOST - like System Modal but omits title bar icon)
+   ; Modality options:
+   ; 4096 = System Modal (always on top)
+   ; 8192 = Task Modal
+   ; 262144 = Always-on-top (style WS_EX_TOPMOST - like System Modal but omits title bar icon)
 
    If (defaultBTN=2)
       defaultBTN := 255
@@ -296,25 +305,33 @@ msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, modality:=0, o
    Gui, 1: +OwnDialogs
    MsgBox, % theseOptionz, % winTitle, % msg
    IfMsgBox, Yes
-        Return "Yes"
+        r := "Yes"
    IfMsgBox, No
-        Return "No"
+        r := "No"
    IfMsgBox, OK
-        Return "OK"
+        r := "OK"
    IfMsgBox, Cancel
-        Return "Cancel"
+        r := "Cancel"
    IfMsgBox, Abort
-        Return "Abort"
+        r := "Abort"
    IfMsgBox, Ignore
-        Return "Ignore"
+        r := "Ignore"
    IfMsgBox, Retry
-        Return "Retry"
+        r := "Retry"
    IfMsgBox, Continue
-        Return "Continue"
+        r := "Continue"
    IfMsgBox, TryAgain
-        Return "TryAgain"
-   Else
-        Return 0
+        r := "TryAgain"
+   If (!AnyWindowOpen && !InStr(msg, "quit") && !InStr(msg, "exit"))
+      lastOtherWinClose := A_TickCount
+
+   addJournalEntry("DIALOG BOX: " msg "`n`nUser answered: " r)
+   Return r
+}
+
+addJournalEntry(msg) {
+   If (!runningLongOperation && !imageLoading)
+      MainExe.ahkPostFunction(A_ThisFunc, msg)
 }
 
 WM_LBUTTONDOWN(wP, lP, msg, hwnd) {
@@ -326,15 +343,7 @@ WM_LBUTTONDOWN(wP, lP, msg, hwnd) {
        UnlockKeys()
 
     If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900) && slideShowRunning!=1 && animGIFplaying!=1)
-    {
-       If (mustAbandonCurrentOperations!=1)
-       {
-          lastCloseInvoked := 0
-          msgResult := msgBoxWrapper(appTitle, "Do you want to stop the currently executing operation ?", 4, 0, "question")
-          If (msgResult="yes")
-             mustAbandonCurrentOperations := 1
-       } ; Else SoundBeep , % 250 + 100*lastCloseInvoked, 100
-    }
+       askAboutStoppingOperations()
 
     SetTimer, ResetLbtn, -55
 }
@@ -356,13 +365,7 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
        MainExe.ahkPostFunction("toggleImgEditPanelWindow")
     } Else If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
     {
-       If (mustAbandonCurrentOperations!=1)
-       {
-          lastCloseInvoked := 0
-          msgResult := msgBoxWrapper(appTitle, "Do you want to stop the currently executing operation ?", 4, 0, "question")
-          If (msgResult="yes")
-             mustAbandonCurrentOperations := 1
-       } Else SoundBeep , % 250 + 100*lastCloseInvoked, 100
+       askAboutStoppingOperations()
        Return
     } Else If !AnyWindowOpen
        MainExe.ahkPostFunction("ToggleThumbsMode")
@@ -377,11 +380,21 @@ WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
     MainExe.ahkPostFunction("WinClickAction", "double-click", A_GuiControl)
 }
 
+askAboutStoppingOperations() {
+     If (mustAbandonCurrentOperations!=1)
+     {
+        lastCloseInvoked := 0
+        msgResult := msgBoxWrapper(appTitle, "Do you want to stop the currently executing operation ?", 4, 0, "question")
+        If (msgResult="yes")
+           mustAbandonCurrentOperations := 1
+     } ; Else SoundBeep , % 250 + 100*lastCloseInvoked, 100
+}
+
 WM_RBUTTONUP(wP, lP, msg, hwnd) {
+  Static lastState := 0
   If (A_TickCount - scriptStartZeit<500)
      Return
 
-  Static lastState := 0
   If (slideShowRunning=1 || animGIFplaying=1)
   {
      turnOffSlideshow()
@@ -399,13 +412,7 @@ WM_RBUTTONUP(wP, lP, msg, hwnd) {
 
   If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
   {
-     If (mustAbandonCurrentOperations!=1)
-     {
-        lastCloseInvoked := 0
-        msgResult := msgBoxWrapper(appTitle, "Do you want to stop the currently executing operation ?", 4, 0, "question")
-        If (msgResult="yes")
-           mustAbandonCurrentOperations := 1
-     } ; Else SoundBeep , % 250 + 100*lastCloseInvoked, 100
+     askAboutStoppingOperations()
      Return
   }
 
@@ -456,6 +463,7 @@ theSlideShowCore() {
   If (thisZeit < slideShowDelay//1.25) || (allowNextSlide!=1) ; || (allowGIFsPlayEntirely=1 && animGIFplaying=1)
      Return
 
+  prevFullIMGload := A_TickCount
   If (SlideHowMode=1)
      MainExe.ahkPostFunction("RandomPicture")
   Else If (SlideHowMode=2)
@@ -502,8 +510,8 @@ JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
 
 WinClickAction(param:=0) {
     canCancelImageLoad := 4
-    If (A_GuiControlEvent="DoubleClick")
-       turnOffSlideshow()
+    ; If (A_GuiControlEvent="DoubleClick")
+    ;    turnOffSlideshow()
 
     ; ToolTip, % param "--" A_GuiControl "--" A_GuiControlEvent , , , 2
     If (slideShowRunning=1)
@@ -527,13 +535,23 @@ WM_MOVING() {
 
 changeMcursor(whichCursor) {
   Static lastInvoked := 1
-  If (whichCursor="normal")
-     SetTimer, ResetLoadStatus, -20
+  ; If (whichCursor="normal")
+  ;    SetTimer, ResetLoadStatus, -20
 
   If (slideShowRunning=1 || animGIFplaying=1)
      Return
 
-  If (whichCursor="busy" && LbtnDwn!=1)
+  If (whichCursor="normal-extra")
+  {
+     imageLoading := mustAbandonCurrentOperations := 0
+     runningLongOperation := lastCloseInvoked := 0
+     thisCursor := hCursN
+  } Else If (whichCursor="busy-img")
+  {
+     imageLoading := 1
+     lastCloseInvoked := 0
+     thisCursor := hCursBusy
+  } Else If (whichCursor="busy" && LbtnDwn!=1)
      thisCursor := hCursBusy
   Else If (whichCursor="normal")
      thisCursor := hCursN
@@ -542,7 +560,6 @@ changeMcursor(whichCursor) {
   Else If (whichCursor="move")
      thisCursor := hCursMove
   Else Return
-
 
   Try DllCall("user32\SetCursor", "Ptr", thisCursor)
   lastInvoked := A_TickCount
@@ -572,7 +589,7 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   If ((runningLongOperation=1 || imageLoading=1) && slideShowRunning!=1)
   {
      changeMcursor("busy")
-     SetTimer, ResetLoadStatus, -500
+     ; SetTimer, ResetLoadStatus, -500
   }
 
   ; A := WinActive("A")
@@ -601,6 +618,7 @@ trackMouseDragging() {
 WM_MOUSELEAVE() {
   SoundBeep 
 }
+
 activateMainWin() {
    Static lastInvoked := 1
    LbtnDwn := 0
@@ -678,29 +696,24 @@ Return
 byeByeRoutine() {
    Static lastInvoked := 1, lastInvokedThis := 1
 
-   If (A_TickCount - lastInvokedThis < 350)
+   If (A_TickCount - lastInvokedThis < 250)
       Return
 
    If (runningLongOperation!=1 && imageLoading=1 && animGIFplaying!=1)
    {
       ; SoundBeep , % 250 + 100*lastCloseInvoked, 100
       canCancelImageLoad := 4
-      msgResult := msgBoxWrapper(appTitle, "The main window is busy at the moment, do you want to force exit?", 4, 0, "question")
+      msgResult := msgBoxWrapper(appTitle, "The main window seems to be busy at the moment. Do you want to force exit this application ?", 4, 0, "question")
       If (msgResult="yes")
          SetTimer, TimerExit, -10
-      Else lastCloseInvoked := 0
+      Else lastCloseInvoked := -1
       lastCloseInvoked++
-      Return
    } Else If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
    {
       If (mustAbandonCurrentOperations!=1)
-      {
-         lastCloseInvoked := 0
-         msgResult := msgBoxWrapper(appTitle, "Do you want to stop the currently executing operation ?", 4, 0, "question")
-         If (msgResult="yes")
-            mustAbandonCurrentOperations := 1
-      } Else lastCloseInvoked++
-      Return
+         askAboutStoppingOperations()
+      Else
+         lastCloseInvoked++
    } Else If ((AnyWindowOpen || thumbsDisplaying=1 || slideShowRunning=1) && (imageLoading!=1 && runningLongOperation!=1)) || (animGIFplaying=1)
    {
       lastInvokedThis := A_TickCount
@@ -723,24 +736,18 @@ byeByeRoutine() {
          thumbsDisplaying := 0
          MainExe.ahkPostFunction("MenuReturnIMGedit")
       } Else lastCloseInvoked++
-      Return
    } Else If (StrLen(UserMemBMP)>3 && undoLevelsRecorded>1)
    {
-      msgResult := msgBoxWrapper(appTitle ": Save image", "The edited image is about to be discarded...`n`nDo you want to save current image? By answering NO, the image will be discarded and the application will exit.", 3, 0, "question")
-      If (msgResult="Yes")
-      {
-         UserMemBMP := undoLevelsRecorded := 0
-         MainExe.ahkPostFunction("SaveClipboardImage", "yay")
-         Return
-      } Else If (msgResult="No")
-      {
-         lastCloseInvoked := 10
-      } Else If (msgResult="Cancel")
-         Return 
+      MainExe.ahkPostFunction("exitAppu")
+      ;  lastCloseInvoked++
    } Else lastCloseInvoked := 10
 
-   If (lastCloseInvoked>2)
+   If (A_TickCount - lastOtherWinClose < 450)
+      Return
+
+   If (lastCloseInvoked>3)
    {
+      ; SoundBeep , 500, 2000
       SetTimer, TimerExit, % (lastCloseInvoked=10) ? -950 : -10
       MainExe.ahkPostFunction("TrueCleanup", 1)
    }
@@ -748,7 +755,7 @@ byeByeRoutine() {
 }
 
 TimerExit() {
-   ; SoundBeep 
+   ; SoundBeep , 900, 2000
    thisPID := GetCurrentProcessId()
    Process, Close, % thisPID
    ExitApp
@@ -831,62 +838,19 @@ turnOffSlideshow() {
 
    slideShowRunning := 0
    SetTimer, theSlideShowCore, Off
+   MainExe.ahkPostFunction("dummyInfoToggleSlideShowu", "stop")
    If (slideShowDelay<950)
       SoundBeep , 900, 100
-   MainExe.ahkPostFunction("dummyInfoToggleSlideShowu", "stop")
 }
 
-#If, (imgEditPanelOpened=1)
-  F8::
+identifySettingsWindow() {
      A := WinActive("A")
      hSetWinGui := MainExe.ahkgetvar.hSetWinGui
      If (A=hSetWinGui || A=PVhwnd)
-        MainExe.ahkPostFunction("toggleImgEditPanelWindow")
-  Return
-#If
-
-#If, (identifyThisWin()=1)
-  ~Esc::
-  ~!F4::
-     canCancelImageLoad := 4
-     byeByeRoutine()
-  Return
-
-  !Space::
-     Win_ShowSysMenu(PVhwnd)
-  Return
-#If
-
-#If, (((animGIFplaying=1) || (canCancelImageLoad=1) || (thumbsDisplaying=1 && imageLoading=1)) && identifyThisWin()=1)
-  ~Left::
-  ~Up::
-  ~PgUp::
-  ~Right::
-  ~Down::
-  ~PgDn::
-  ~Home::
-  ~BackSpace::
-  ~Delete::
-  ~End::
-     alterFilesIndex++
-     canCancelImageLoad := 4
-     If (animGIFplaying=1)
-        animGIFplaying := 0
-  Return
-#If
-
-#If, (thumbsDisplaying=1 && imageLoading=1 && identifyThisWin()=1)
-  ~vkBB::   ; plus
-  ~vkBD::   ; minus
-     alterFilesIndex++
-  Return
-#If
-
-#If, ((animGIFplaying=1 || slideShowRunning=1) && (identifyThisWin()=1))
-  ~Space::
-     turnOffSlideshow()
-  Return
-#If
+        Return 1
+     Else
+        Return 0
+}
 
 BuildFakeMenuBar() {
    ; main menu
@@ -1154,13 +1118,13 @@ RegenerateEntireList() {
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
-SaveClipboardImage(arg) {
+PanelSaveImg() {
   If !determineMenuBTNsOKAY()
      Return
-  MainExe.ahkPostFunction(A_ThisFunc, arg)
+  MainExe.ahkPostFunction(A_ThisFunc)
 }
 
-SaveFilesList() {
+PanelSaveSlideShowu() {
   If !determineMenuBTNsOKAY()
      Return
   MainExe.ahkPostFunction(A_ThisFunc)
@@ -1324,8 +1288,68 @@ MenuSaveAction() {
       Return
 
    If (thumbsDisplaying=1)
-      SaveFilesList()
+      PanelSaveSlideShowu()
    Else
-      SaveClipboardImage("yay")
+      PanelSaveImg()
 }
+
+#If, (imgEditPanelOpened=1 || AnyWindowOpen>0) && (identifySettingsWindow()=1)
+  ^F4::
+     ; If (identifySettingsWindow()=1)
+        MainExe.ahkPostFunction("CloseWindow")
+  Return
+
+  ~F8::
+     If (imgEditPanelOpened=1)
+     {
+        If (identifySettingsWindow()=1)
+           MainExe.ahkPostFunction("toggleImgEditPanelWindow")
+     }
+  Return
+#If
+
+#If, (identifyThisWin()=1)
+  ~Esc::
+  ~!F4::
+     canCancelImageLoad := 4
+     If (AnyWindowOpen || animGIFplaying=1 || slideShowRunning=1)
+        lastOtherWinClose := A_TickCount
+     byeByeRoutine()
+  Return
+
+  !Space::
+     Win_ShowSysMenu(PVhwnd)
+  Return
+#If
+
+#If, (((animGIFplaying=1) || (canCancelImageLoad=1) || (thumbsDisplaying=1 && imageLoading=1)) && identifyThisWin()=1)
+  ~Left::
+  ~Up::
+  ~PgUp::
+  ~Right::
+  ~Down::
+  ~PgDn::
+  ~Home::
+  ~BackSpace::
+  ~Delete::
+  ~End::
+     alterFilesIndex++
+     canCancelImageLoad := 4
+     If (animGIFplaying=1)
+        animGIFplaying := 0
+  Return
+#If
+
+#If, (thumbsDisplaying=1 && imageLoading=1 && identifyThisWin()=1)
+  ~vkBB::   ; plus
+  ~vkBD::   ; minus
+     alterFilesIndex++
+  Return
+#If
+
+#If, ((animGIFplaying=1 || slideShowRunning=1) && (identifyThisWin()=1))
+  ~Space::
+     turnOffSlideshow()
+  Return
+#If
 

@@ -11,7 +11,7 @@
   - [new] quick shortcuts toolbar [F10]; to further facilitate the usage of QPV
   - [new] ability to change OSD font sizes with Ctrl [+] / [-]
   - [new] toggle true full-screen mode with F11 shortcut key
-  - [new] create new image panel
+  - [new] create new image panel; save image panel
   - [new] blur with soft edges, according to the rotated selection
   - [new] easy to crop image or adjust canvas size according to the selection area using Shift + Enter
   - [new] fill image selected area with a rectangle, triangle, ellipse or other shapes in the orientation, color and opacity of your choosing
@@ -23,7 +23,8 @@
   - [new] selection grid - highlighting thirds and ellipse inscribed in the rectangular selection
   - [new] selection adjustable with Ctrl+Shift+ / Alt + arrow keys
   - [new] Shift/Alt modifier keys as constraints when adjusting the image selection
-  - [new] copy/move panel supports relative paths: .\new-folder [to create a new folder in the parent folder] or \new-folder [to create a new sub-folder]... or just .\ to copy/move up in hierachy
+  - [new] copy/move panel supports relative paths: .\new-folder [to create a new folder in the parent folder] or \new-folder [to create a new sub-folder]... or just .\ to copy/move one level upwards
+  - [new] new token for multi-rename : parent folder name
   - [new] journal/session logging; this gives the opportunity for users to see OSD messages they perhaps missed reading in time ;-)
   - [new] option to record a list of seen images, and to have these skipped during slideshows
   - [new] acquire images from WIA enabled devices [e.g., scanners]
@@ -40,7 +41,7 @@
   - [new] insert to the current file list or create a new files list on drag-n-drop from explorer
   - [new] limit memory consumption; this can drastically reduce the performance of Quick Picto Viewer 
   - [new] automatically downscale images larger than the screen resolution prior to applying computationally intensive image effects
-  - [new - not yet done] SQLlite database format for storing slideshow files list; in this format, various file details are cached, which enables much faster files list resorting later on in different user sessions
+  - [new] SQLlite database format for storing slideshow files list; in this format, various file details are cached, which enables much faster files list resorting later on in different user sessions
   - [new] invert files selection, filter list to selected files, jump to first/last selected file
   - [improvement] when QPV starts with an image file as argument, the folder's files list is ignored; it is loaded only if the user attempts to navigate between files
   - [improvement] a single thumbnail cannot be bigger than half of the main window size
