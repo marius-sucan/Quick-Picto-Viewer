@@ -2,12 +2,7 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
-- known issues
-  - loading images larger than 300 MPx through FreeImage library, causes crash on coversion to GDI+ object
-  - panning/zooming large images on 32 bits edition ... is very slow
-  - high memory consumption; all operations need a lot of RAM [zoom/pan, etc]
-
-- v4.0.0 (2020-03-22) [alpha, work in progress - to be released...]
+- v4.1.0 (2020-05-24)
   - [new] quick shortcuts toolbar [F10]; to further facilitate the usage of QPV
   - [new] ability to change OSD font sizes with Ctrl [+] / [-]
   - [new] toggle true full-screen mode with F11 shortcut key
@@ -30,7 +25,11 @@
   - [new] acquire images from WIA enabled devices [e.g., scanners]
   - [new] support for EXIF orientation in JPEGs; images will be rotated for display accordingly to the stored metadata
   - [new] search through indexed files
+  - [new] option to set current image as a desktop wallpaper in the active monitor
+  - [new] ability to paste files from Explorer into the Quick Picto Viewer files list index
+  - [new] ability to mark files as copied or cut in Quick Picto Viewer and then paste files in Explorer
   - [new] sort files list by folder path or file name
+  - [new] ability to import plain-text SLD files through «insert file» option
   - [new] besides the thumbnails list, now the user can choose to see just list of file entries, without thumbnails
   - [new] display and/or create text captions/annotations associated to image files
   - [new] option to allow GIFs to play entirely during slideshows before going to the next slide
@@ -41,8 +40,12 @@
   - [new] insert to the current file list or create a new files list on drag-n-drop from explorer
   - [new] limit memory consumption; this can drastically reduce the performance of Quick Picto Viewer 
   - [new] automatically downscale images larger than the screen resolution prior to applying computationally intensive image effects
+  - [new] image captions / annotations can be stored in SQLite slideshow databases
+  - [new] when using SQL slideshow databases, one can associate any audio file with any given image
   - [new] SQLlite database format for storing slideshow files list; in this format, various file details are cached, which enables much faster files list resorting later on in different user sessions
   - [new] invert files selection, filter list to selected files, jump to first/last selected file
+  - [new] context menu for any window / panel
+  - [new] ability to right-click on controls in windows/panels to see as a tooltip the control's text with a larger font size
   - [improvement] when QPV starts with an image file as argument, the folder's files list is ignored; it is loaded only if the user attempts to navigate between files
   - [improvement] a single thumbnail cannot be bigger than half of the main window size
   - [improvement] ability to cancel/prevent real-time image effects being applied on a currently loading image by clicking or pressing navigation keys
@@ -55,6 +58,8 @@
   - [improvement] Quick Picto Viewer interface is now separated from the core, to allow for a more responsive user interface 
   - [improvement] various HUD histogram box calculations fixes
   - [improvement] many improvements to the touch screen usability
+  - [improvement] multi-monitor support
+  - [improvement] compatibility with Windows XP and Windows 7
   - fixed a bug when resizing Quick Picto Viewer window that caused frequent hanging/freezing
   - fixed various other bugs
 
@@ -246,3 +251,9 @@
 - v1.2.0 (2019-05-29)
 - v1.1.0 (2019-05-22) 
 - v1.0.0 (2010-10-04) by SBC
+
+- known issues [24/05/2020]
+  - loading images larger than 300 MPx through FreeImage library, causes crash on coversion to GDI+ object
+  - panning/zooming large images on 32 bits edition ... is very slow
+  - high memory consumption; all operations need a lot of RAM [zoom/pan, etc]
+
