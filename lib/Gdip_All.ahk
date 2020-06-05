@@ -14,6 +14,7 @@
 ;
 ; Gdip standard library versions:
 ; by Marius Șucan - gathered user-contributed functions and implemented hundreds of new functions
+; - v1.84 on 05/06/2020
 ; - v1.83 on 24/05/2020
 ; - v1.82 on 11/03/2020
 ; - v1.81 on 25/02/2020
@@ -61,6 +62,7 @@
 ; - v1.01 on 31/05/2008
 ;
 ; Detailed history:
+; - 05/06/2020 = Synchronized with mmikeww's repository and fixed a few bugs
 ; - 24/05/2020 = Added a few more functions and fixed or improved already exiting functions
 ; - 11/02/2020 = Imported updated MDMF functions from mmikeww, and AHK v2 examples, and other minor changes
 ; - 25/02/2020 = Added several new functions, including for color conversions [from Tidbit], improved/fixed several functions
@@ -815,7 +817,7 @@ Gdip_LibraryVersion() {
 ;                 Updated by Marius Șucan reflecting the work on Gdip_all extended compilation
 
 Gdip_LibrarySubVersion() {
-   return 1.83
+   return 1.84
 }
 
 ;#####################################################################################
@@ -2441,7 +2443,7 @@ Gdip_CreateBitmapFromFile(sFile, IconNumber:=1, IconSize:="", useICM:=0) {
    return pBitmap
 }
 
-Gdip_CreateBitmapFromHBITMAPalpha(hImage) {
+Gdip_CreateARGBBitmapFromHBITMAP(hImage) {
 ; function by iseahound found on:
 ; https://www.autohotkey.com/boards/viewtopic.php?f=6&t=63345
 ; part of https://github.com/iseahound/Graphics/blob/master/lib/Graphics.ahk
@@ -2473,9 +2475,7 @@ Gdip_CreateBitmapFromHBITMAPalpha(hImage) {
    pBitmap := Gdip_CreateBitmap(width, height)
 
    ; Create a Scan0 buffer pointing to pBits. The buffer has pixel format pARGB.
-   VarSetCapacity(Rect, 16, 0)
-      , NumPut( width, Rect,  8,  "uint")
-      , NumPut(height, Rect, 12,  "uint")
+   CreateRect(Rect, 0, 0, width, height)
    VarSetCapacity(BitmapData, 16+2*A_PtrSize, 0)
       , NumPut(       width, BitmapData,  0,  "uint") ; Width
       , NumPut(      height, BitmapData,  4,  "uint") ; Height
@@ -2485,7 +2485,7 @@ Gdip_CreateBitmapFromHBITMAPalpha(hImage) {
    DllCall("gdiplus\GdipBitmapLockBits"
             ,   "ptr", pBitmap
             ,   "ptr", &Rect
-            ,  "uint", 7            ; hImageLockMode.UserInputBuffer | hImageLockMode.ReadWrite
+            ,  "uint", 6            ; ImageLockMode.UserInputBuffer | ImageLockMode.WriteOnly
             ,   "int", 0xE200B      ; Format32bppPArgb
             ,   "ptr", &BitmapData)
 
@@ -2515,10 +2515,47 @@ Gdip_CreateBitmapFromHBITMAP(hBitmap, hPalette:=0) {
 }
 
 Gdip_CreateHBITMAPFromBitmap(pBitmap, Background:=0xffffffff) {
-; background should be zero, to not alter the semi-transparent areas of the image
+; background should be zero, to not alter alpha channel of the image
    hBitmap := 0
    DllCall("gdiplus\GdipCreateHBITMAPFromBitmap", "UPtr", pBitmap, "UPtr*", hBitmap, "int", Background)
    return hBitmap
+}
+
+Gdip_CreateARGBHBITMAPFromBitmap(ByRef pBitmap) {
+  ; function by iseahound ; source: https://github.com/mmikeww/AHKv2-Gdip
+  ; modified to rely on already present functions [within the library]
+
+  ; This version is about 25% faster than Gdip_CreateHBITMAPFromBitmap().
+  ; Get Bitmap width and height.
+
+  Gdip_GetImageDimensions(pBitmap, Width, Height)
+
+  ; Convert the source pBitmap into a hBitmap manually.
+  ; struct BITMAPINFOHEADER - https://docs.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-bitmapinfoheader
+  hdc := CreateCompatibleDC()
+  hbm := CreateDIBSection(width, -height, hdc, 32, pBits)
+  obm := SelectObject(hdc, hbm)
+
+  ; Transfer data from source pBitmap to an hBitmap manually.
+  CreateRect(Rect, 0, 0, width, height)
+  VarSetCapacity(BitmapData, 16+2*A_PtrSize, 0)     ; sizeof(BitmapData) = 24, 32
+    , NumPut(     width, BitmapData,  0,   "uint") ; Width
+    , NumPut(    height, BitmapData,  4,   "uint") ; Height
+    , NumPut( 4 * width, BitmapData,  8,    "int") ; Stride
+    , NumPut(   0xE200B, BitmapData, 12,    "int") ; PixelFormat
+    , NumPut(     pBits, BitmapData, 16,    "ptr") ; Scan0
+  DllCall("gdiplus\GdipBitmapLockBits"
+        ,    "ptr", pBitmap
+        ,    "ptr", &Rect
+        ,   "uint", 5            ; ImageLockMode.UserInputBuffer | ImageLockMode.ReadOnly
+        ,    "int", 0xE200B      ; Format32bppPArgb
+        ,    "ptr", &BitmapData) ; Contains the pointer (pBits) to the hbm.
+  DllCall("gdiplus\GdipBitmapUnlockBits", "ptr", pBitmap, "ptr", &BitmapData)
+
+  ; Cleanup the hBitmap and device contexts.
+  SelectObject(hdc, obm)
+  DeleteObject(hdc)
+  return hbm
 }
 
 Gdip_CreateBitmapFromHICON(hIcon) {
@@ -2583,7 +2620,7 @@ Gdip_CreateBitmapFromClipboard() {
    }
 
    DllCall("CloseClipboard")
-   pBitmap := Gdip_CreateBitmapFromHBITMAPalpha(hBitmap)
+   pBitmap := Gdip_CreateARGBBitmapFromHBITMAP(hBitmap)
    If hBitmap
       DeleteObject(hBitmap)
 
@@ -3937,7 +3974,7 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
    If (width && height && !NoWrap) || (Iwidth && Iheight && !NoWrap)
       mustTrimText := Measure=1 ? 0 : 1
 
-   if Colour && !Gdip_DeleteBrush(Gdip_CloneBrush(Colour[2]))
+   if Colour && IsInteger(Colour[2]) && !Gdip_DeleteBrush(Gdip_CloneBrush(Colour[2]))
    {
       PassBrush := 1
       pBrush := Colour[2]
@@ -7155,7 +7192,7 @@ Gdip_CreateEffect(whichFX, paramA, paramB, paramC:=0) {
    4 - ! ColorLUT
    5 - BrightnessContrast
           paramA - brightness [-255, 255]
-          paramB - contrast [-255, 255]
+          paramB - contrast [-100, 100]
    6 - HueSaturationLightness
           paramA - hue [-180, 180]
           paramB - saturation [-100, 100]
@@ -7165,7 +7202,7 @@ Gdip_CreateEffect(whichFX, paramA, paramB, paramC:=0) {
           paramB - midtones [-100, 100]
           paramC - shadows [0, 100]
    8 - Tint
-          paramA - hue [180, 180]
+          paramA - hue [-180, 180]
           paramB - amount [0, 100]
    9 - ColorBalance
           paramA - Cyan / Red [-100, 100]
@@ -7184,10 +7221,10 @@ Gdip_CreateEffect(whichFX, paramA, paramB, paramC:=0) {
                    7 - AdjustBlackSaturation  [0, 255]
 
          paramB - Apply ColorCurve on channels [1, 4]
-                   1 - All   
-                   2 - Red   
-                   3 - Green 
-                   4 - Blue  
+                   1 - Red
+                   2 - Green
+                   3 - Blue
+                   4 - All channels
 
          paramC - An adjust value within range according to paramA
 
@@ -7235,7 +7272,7 @@ Gdip_CreateEffect(whichFX, paramA, paramB, paramC:=0) {
     } Else If (whichFX=5)   ; Brightness / Contrast
     {
        NumPut(paramA, FXparams, 0, "Int")     ; brightness [-255, 255]
-       NumPut(paramB, FXparams, 4, "Int")     ; contrast [-255, 255]
+       NumPut(paramB, FXparams, 4, "Int")     ; contrast [-100, 100]
     } Else If (whichFX=6)   ; Hue / Saturation / Lightness
     {
        NumPut(paramA, FXparams, 0, "Int")     ; hue [-180, 180]
@@ -7255,7 +7292,7 @@ Gdip_CreateEffect(whichFX, paramA, paramB, paramC:=0) {
        NumPut(paramA, FXparams, 0, "Int")     ; Cyan / Red [-100, 100]
        NumPut(paramB, FXparams, 4, "Int")     ; Magenta / Green [-100, 100]
        NumPut(paramC, FXparams, 8, "Int")     ; Yellow / Blue [-100, 100]
-    } Else If (whichFX=12)   ; ColorCurve
+    } Else If (whichFX=11)   ; ColorCurve
     {
        NumPut(paramA, FXparams, 0, "Int")     ; Type of adjustment [0, 7]
        NumPut(paramB, FXparams, 4, "Int")     ; Channels to affect [1, 4]

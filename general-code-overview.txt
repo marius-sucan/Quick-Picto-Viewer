@@ -1,0 +1,267 @@
+Table of contents:
+a) How Quick Picto Viewer initializes:
+b) How a files list index is created
+c) Files index filtering
+d) How an image is loaded and displayed on screen [simplified]
+e) How slideshows happen [soon]
+f) Image live editing [soon]
+
+Deniere mise à jour: vendredi 5 juin 2020.
+==========================================
+
+a) How Quick Picto Viewer initializes:
+  QPV checks in the registry if another instance started before,
+  if it did less than 600 miliseconds ago, it exits; this is meant
+  to prevent excessive spawn of multiple instances.
+
+  It first loads settings or stores default settings [if first start].
+   - loadMainSettings() or writeMainSettings()
+  These two functions load/write only the core settings.
+  Each panel within Quick Picto Viewer loads and stores settings
+  of its own only.
+
+  If "Running" registry flag is set 2 by, supposedly, another
+  QPV instance, it will start as an aid for batch processing
+  image files. When it finishes, it exits.
+
+  If "Running" flag is not 2, it continues the auto-exec part.
+
+  QPV initializes the external UI thread and various GDI+ objects
+  related to it. If this fails, QPV will exit.
+
+  If an image file is given as command line argument, it is opened
+  with OpenArgFile(). If a .SLD or a .SLDB file is fed,
+  OpenSLD() function is used to load the files index.
+
+  If no argument given, it draws a random pattern image using
+  drawWelcomeImg(); this function can generate up to 7 distinct
+  patterns, each randomized in its own way.
+
+b) How a files list index is created
+  If a single file is loaded, QPV will set internally the variable
+  "mustOpenStartFolder" to the folder path where the image is from.
+
+  If the aforementioned variable is set, various user actions will
+  trigger automatic loading / indexing of the files found within
+  the folder using doOpenStartFolder(). Examples of such actions:
+  toggle thumbnails mode, search, attempt to go to the next
+  or previous image, and so on.
+
+  Once the folder is indexed, "mustOpenStartFolder" is set empty.
+
+  Users can open a folder using the open file/folder dialogs:
+  OpenDialogFiles() or OpenFolders(). Both functions, and 
+  doOpenStartFolder(), rely internally on coreOpenFolder().
+
+  coreOpenFolder() takes as argument the folder to index files
+  from. If the folder string contains a pipe "|", the files will
+  not be indexed recursively. The function renews / clears 
+  previous files list with renewCurrentFilesList() and then
+  it proceeds to scan for the files using GetFilesList().
+
+  In essence, coreOpenFolder() is a wrapper for GetFilesList(),
+  which uses a regular expression held in "RegExFilesPattern"
+  to match supported file types.
+
+  QPV internally relies on resultedFilesList[] array. 
+  Each file entry is defined by:
+  resultedFilesList[Index_number] := [full_file_path, isSelected, isSeen]
+
+  When [de]selecting a file, resultedFilesList[Index_number, 2]
+  is set to 1 or 0.
+
+  If "skipSeenImagesSlider" is set to 1, when an image is displayed
+  resultedFilesList[Index_number, 3] is set to 1. By default,
+  this feature is not enabled.
+
+  When GetFilesList() and coreOpenFolder() finish, in most cases,
+  a random image is chosen to be opened. However, when a file is
+  already loaded, detectFileID(imgPath) is used to identify and
+  set the initial file index to the image already loaded.
+
+  If a slideshow database is already opened, GetFilesList() will
+  automatically add the files into the database using addSQLdbEntry().
+
+  GenerateRandyList() is called to generate a randomized array
+  of file index numbers from 1 to "maxFilesIndex", non-repetitive.
+  RandyIMGids[] array is used whenever the user navigates randomly
+  through the indexed files.
+
+  The current position within the index list is held by
+  "currentFileIndex" and the total indexed files
+  in "maxFilesIndex".
+  The current «random» position is "RandyIMGnow".
+
+  Internally, "CurrentSLD" holds what folder or slideshow file 
+  the user has opened, while "SLDtypeLoaded" indicates the type:
+    1 - folder
+    2 - slideshow plain-text
+    3 - SQLite slideshow database
+
+  If the user opens a slideshow file [a cached index], OpenSLD()
+  is invoked. This is a wrapper for sldGenerateFilesList() and
+  sldDataBaseOpen().
+
+  sldGenerateFilesList() parses plain-text files and it loads
+  INI-like saved settings using readSlideSettings().
+
+  sldDataBaseOpen() opens SQLlite databases and reads the 
+  settings using IniSLDBreadAll().
+
+c) Files index filtering
+   Users can apply a filter on the indexed file list through
+   PanelEnableFilesFilter(). It can be a RegEx or a string
+   that allows "|" to act as the OR operator.
+
+   coreEnableFiltru() processes the string given by the user in 
+   "usrFilesFilteru". The internal filter is held in "filesFilter".
+
+   FilterFilesIndex() is the core function that generates the
+   filtered new list. However, it creates a backup of the main list:
+     bckpResultedFilesList := resultedFilesList.Clone()
+     bkcpMaxFilesIndex := maxFilesIndex
+
+   And it also creates a map of the indexes between the two arrays.
+   filteredMap2mainList[Index_number] := Index_number_main_list
+
+   filteredMap2mainList[] array is used when the user performs
+   actions that change the index and have to be propagated.
+   For example: file rename, index entry removal and so on.
+
+   When the new resultedFilesList[] array is created,
+   "isSelected" and "isSeen" states are ignored.
+
+   The function FilterFilesIndex() ends by invoking
+   GenerateRandyList().
+
+d) How an image is loaded and displayed on screen [simplified]
+   To display an image, one can invoke IDshowImage(given_file_index)
+   or ShowTheImage(imgPath).
+
+   IDshowImage() retrieves the image file path based on a given
+   number from resultedFilesList[] array and can filter dead
+   files, if "skipDeadFiles" is set to 1. It can also reset
+   viewport viewing conditions if "resetImageViewOnChange" is
+   set to 1.
+
+   ShowTheImage() is called with the full file path by IDshowImage().
+   This function is a wrapper for coreShowTheImage() to allow the user 
+   quickly skim through indexed files without loading and displaying
+   each of them. It takes into account how fast the user changes
+   between images and fast they are rendered on screen. If the 
+   system permits, all images will be displayed. If load times are 
+   high then they will be skipped. To this end, there are additional
+   functions and timers meant to delay image loading, to allow for 
+   interruptions.
+
+   IDshowImage(), ShowTheImage() and coreShowTheImage() are invoked
+   even if the user is in list mode [thumbnails view].
+
+   coreShowTheImage() ends abruptly by setting the window title
+   and invoking UpdateThumbsScreen() if the user is in thumbnails
+   mode. Otherwise, it continues by invoking ResizeImageGDIwin().
+
+   coreShowTheImage() also checks for file existence and can throw
+   message errors to users.
+
+   ResizeImageGDIwin() and coreShowTheImage() keep track of the 
+   currently loaded image file and previous one, to help decide 
+   if cached GDI bitmaps must be used or not. They can discard
+   all cached image data.
+
+   Images are cached as GDI+ bitmap objects by Quick Picto Viewer.
+   This occurs at different levels or stages.
+
+   If no cached GDI bitmaps are available or a different image
+   file is loaded, ResizeImageGDIwin() will call CloneMainBMP().
+
+   CloneMainBMP() manages «original» image caching and pre-processes
+   images for display: rotate, convert depth modes or remove 
+   alpha channel. It can hold only two images. This function can 
+   abort image processing if the user attempts to change image 
+   before it finishes. It communicates with the interface thread
+   by retrieving "canCancelImageLoad". When it is set to 4,
+   it means abort.
+
+   CloneMainBMP() is called only by ResizeImageGDIwin().
+   coreShowTheImage() is the only function that can invoke
+   ResizeImageGDIwin().
+
+   LoadBitmapFromFileu() is called by CloneMainBMP(). This is
+   the very function that accesses files and it is invoked 
+   many times, in many different functions. It is also a wrapper
+   for three functions:
+      - Gdip_CreateBitmapFromFile() used to load GDI+ supported files
+      - LoadFileWithWIA() fallback function for very large images
+      - LoadFimFile() used to load FreeImage supported files
+
+   LoadBitmapFromFileu() returns a GDI+ bitmap handle on success.
+   When it is invoked by CloneMainBMP(), it has as argument
+   "allowCaching" set to 1 which allows this function to hold 
+   in cache the previously opened file, unprocessed by CloneMainBMP().
+   And it also fills-in properties for currIMGdetails[], which
+   holds various details about the image about to be displayed.
+
+   When CloneMainBMP() finishes loading and processing the image,
+   in ResizeImageGDIwin() the GDI+ bitmap dimensions and user 
+   viewing options are used to calculate the dimensions of the image
+   in the viewport and the selection area, if present.
+
+   QPV_ShowImgonGui() is then invoked with multiple parameters.
+   This is the function that will render the image on screen.
+   It can also generate new sets of viewport caches.
+     - "gdiBMPvPsize" - handle of a viewport sized image
+     - "gdiBitmapSmall" - handle of a low-res sized image;
+       - dimensions determined by determineGDIsmallCacheSize()
+
+   These are obtained by resizing "gdiBitmap", the bitmap returned 
+   by CloneMainBMP().
+   
+   QPV_ShowImgonGui() reuses parts of the previously rendered image
+   on screen when the user pans the image. This cache is
+   "ViewPortBMPcache".
+
+   decideGDIPimageFX() is used to obtain GDI+ objects that alter 
+   colors display.
+
+   drawHUDelements() is the function that renders selection area,
+   histogram box or the info-box on the viewport. These UI elements
+   are rendered on a different GDI window.
+
+   On zooming in or out, on GIF playback, QPV_ShowImgonGuiPrev()
+   is invoked by QPV_ShowImgonGui(). Both functions track how 
+   fast the render on screen is and adaptively choose between 
+   the available caches. They both rely on Gdip_DrawImage() or 
+   Gdip_DrawImageFX() - when color effects are used.
+
+
+e) General considerations
+   When actions are performed or somehow the main core is about 
+   to get busy, changeMcursor() and/or setImageLoading() are called.
+   These set variables in the user interface thread that the 
+   main thread is busy and change the mouse cursor and set the 
+   busy task bar progress animation.
+
+   For operations that can be aborted, doStartLongOpDance()
+   is called.
+
+   The interface thread can register various keyboard shortcuts
+   to «listen» when the user wants to do something.
+
+   The main thread regularly checks the other thread for specific
+   variables to see if the state changed, to abort current
+   operation[s] or not.
+
+   One cannot have the interface thread ping the main thread
+   too often because it leads to «hangs». Therefore, in most 
+   cases, I have the main thread ping the UI thread.
+
+   The panels one can invoke in Quick Picto Viewer are not
+   in the auxiliary UI thread, they are in the main one.
+   Only the main window is an external thread.
+
+
+
+
+
+

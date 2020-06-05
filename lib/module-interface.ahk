@@ -360,10 +360,9 @@ WM_LBUTTONDOWN(wP, lP, msg, hwnd) {
     If (hotkeysSuspended=1)
        UnlockKeys()
 
+    SetTimer, ResetLbtn, -55
     If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900) && slideShowRunning!=1 && animGIFplaying!=1)
        askAboutStoppingOperations()
-
-    SetTimer, ResetLbtn, -55
 }
 
 WM_LBUTTONUP(wP, lP, msg, hwnd) {
@@ -382,6 +381,7 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
        turnOffSlideshow()
        Return
     }
+
     If (imgEditPanelOpened=1)
     {
        MainExe.ahkPostFunction("toggleImgEditPanelWindow")
@@ -396,8 +396,15 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
 WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
     If (A_TickCount - scriptStartZeit<500)
        Return
+
     If (hotkeysSuspended=1)
        UnlockKeys()
+
+    If (slideShowRunning=1)
+    {
+       turnOffSlideshow()
+       Return
+    }
 
     MainExe.ahkPostFunction("WinClickAction", "double-click", A_GuiControl)
 }
@@ -843,11 +850,14 @@ PreventKeyPressBeep() {
 }
 
 identifyThisWin() {
-  A := WinActive("A")
-  If (A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin)
-     Return 1
-  Else
-     Return 0
+  Static prevR, lastInvoked := 1
+  If (A_TickCount - lastInvoked < 150)
+     Return prevR
+
+  Az := WinActive("A")
+  prevR := (Az=PVhwnd || Az=hGDIwin || Az=hGDIthumbsWin) ? 1 : 0
+  lastInvoked := A_TickCount
+  Return prevR
 }
 
 WM_ENTERMENULOOP() {
@@ -1376,6 +1386,7 @@ MenuSaveAction() {
   Return
 
   ~F8::
+  ~F11::
      If (identifySettingsWindow()=1)
         MainExe.ahkPostFunction("toggleImgEditPanelWindow")
   Return

@@ -2,6 +2,18 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.2.0 (2020-06-05)
+  - [new] print image, with page preview
+  - [new] statistics panel for recorded seen images list
+  - [new] added the possibility to view the list of images already seen in the current session and the list of recorded seen images in the database [options in the journal panel]
+  - [new] added more color adjustments possibilities for the viewport, including blur and sharpen
+  - [improvement] both viewport image alignments [centered, or top-left corner] can be used when zooming in/out or panning an image
+  - [improvement] any viewport color effect will be applied now on animated GIFs as well
+  - [improvement] QPV is now more informative when it refuses to perform toolbar actions
+  - [improvement] thumbnails caching is now checking for memory , to help avoid excessive memory usage
+  - [improvement] image blur, invert, grayscale can now be invoked without a selection area
+  - other minor improvements in usability
+
 - v4.1.0 (2020-05-24)
   - [new] quick shortcuts toolbar [F10]; to further facilitate the usage of QPV
   - [new] ability to change OSD font sizes with Ctrl [+] / [-]

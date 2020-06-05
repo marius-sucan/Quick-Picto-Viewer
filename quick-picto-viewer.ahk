@@ -41,7 +41,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 4.1.0
+;@Ahk2Exe-SetVersion 4.2.0
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon quick-picto-viewer.ico
@@ -59,6 +59,8 @@
 #UseHook, Off
 SetWorkingDir, %A_ScriptDir%
 #Include Lib\Gdip_All.ahk           ; graphics display interface
+#Include Lib\SGdiPrint.ahk
+; #Include Lib\guicontroltips.ahk
 #Include Lib\freeimage-wrapper.ahk  ; used to load exotic file formats
 #Include Lib\MCI.ahk                ; media controller interface [ used for audio annotations/files associated with images ]
 #Include Lib\wia.ahk                ; windows image acquisition [ used for acquiring images from scanners ]
@@ -106,7 +108,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4, pPen5
    , PasteFntSize := 35, OSDfntSize := 25, OSDFontName := "Arial", prevOpenFolderPath := ""
    , mustGenerateStaticFolders := 1, lastWinDrag := 1, img2resizePath := "", colorPickerModeNow := 0
    , prevFileMovePath := "", lastGIFdestroy := 1, prevAnimGIFwas := "", prevFilesSortMode
-   , thumbsW := 300, thumbsH := 300, thumbsDisplaying := 0, scrollAxis := 0
+   , thumbsW := 300, thumbsH := 300, thumbsDisplaying := 0, scrollAxis := 0, userSeenSessionImagesArray := []
    , othumbsW := 300, othumbsH := 300, ForceRegenStaticFolders := 0, vPselRotation := 0
    , CountFilesFolderzList := 0, RecursiveStaticRescan := 0, imgSelLargerViewPort := 0
    , UsrMustInvertFilter := 0, userActionConflictingFile := 0, LastPrevFastDisplay := 0
@@ -116,8 +118,8 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4, pPen5
    , imgSelX1 := 0, imgSelY1 := 0, imgSelX2 := -1, imgSelY2 := -1, adjustNowSel := 0
    , prevImgSelX1 := 0, prevImgSelY1 := 0, prevImgSelX2 := -1, prevImgSelY2 := -1, prevSelDotX, prevSelDotY, prevSelDotAx, prevSelDotAy
    , selDotX, selDotY, selDotAx, selDotAy, selDotBx, selDotBy, selDotCx, selDotCy, selDotDx, selDotDy
-   , prcSelX1, prcSelX2, prcSelY1, prcSelY2, PannedFastDisplay := 1, pBrushF
-   , SelDotsSize := imgHUDbaseUnit//4, ViewPortBMPcache, startZeitIMGload
+   , prcSelX1 := 0, prcSelX2 := 0.5, prcSelY1 := 0, prcSelY2 := 0.5, PannedFastDisplay := 1, pBrushF
+   , SelDotsSize := imgHUDbaseUnit//4, ViewPortBMPcache, startZeitIMGload, cachedAllSessionsSeen := []
    , imageLoading := 0, PrevGuiSizeEvent := 0, imgSelOutViewPort := 0, prevGUIresize := 1
    , imgEditPanelOpened := 0, jpegDoCrop := 0, jpegDesiredOperation := 1, copyMoveDoLastOption := 0
    , rDesireWriteFMT := "jpg", FIMfailed2init := 0, prevMaxSelX, prevMaxSelY, prevDestPosX, prevDestPosY
@@ -132,7 +134,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4, pPen5
    , GDIfadeVPcache, executingCanceableOperation := 1, hCropCornersPic, UserMemBMP, userSearchString
    , systemCores := 1, realSystemCores := 1, hasInitSpecialMode := 0, CountGIFframes := 0, prevSlideShowStop := 1
    , prevTryThumbsUpdate := 1, thumbsSizeQuality := 245, prevFullIndexThumbsUpdate := -1, userClipBMPpaste
-   , UserNewWidth := 0, UserNewHeight := 0, UserNewDPI := 0, userSeenSlideImages := 0, viewportStampBMP
+   , UserNewWidth := 0, UserNewHeight := 0, UserNewDPI := 0, viewportStampBMP
    , ThumbsStatusBarH := 0, activeSQLdb, SLDtypeLoaded := 0, sldsPattern := "i)(.\.(sld|sldb))$"
    , imgThumbsCacheIDsArray := [], imgThumbsCacheArray := [], prevRealThumbsIndex := 1, viewportIDstampBMP := 0
    , prevVPselRotation, prevrotateSelBoundsKeepRatio, prevEllipseSelectMode, currentSelUndoLevel := 0
@@ -142,13 +144,14 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4, pPen5
    , runningLongOperation := 0, hasReachedMaxUndoLevels := 0, GIFframesPlayied := 0, allImagesWereSeen := 0
    , 2NDglHbitmap, 2NDglHDC, 2NDglOBM, 2NDglPG, mainThreadHwnd, imgDecLX, imgDecLY, hGDIinfosWin
    , undoLevelsArray := [], currentUndoLevel := 0, maxUndoLevels := 50, undoLevelsRecorded := 1
-   , zeitSillyPrevent := 1
+   , zeitSillyPrevent := 1, PrintPosX, PrintPosY, PrintPosW, PrintPosH
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "4.1.0", vReleaseDate := "24/05/2020"
+   , appVersion := "4.2.0", vReleaseDate := "05/06/2020"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
-   , thumbsAratio := 3, thumbsZoomLevel := 1, zatAdjust := 0
+   , thumbsAratio := 3, thumbsZoomLevel := 1, zatAdjust := 0, lummyAdjust := 0
+   , specialColorFXmode := 1, uiColorCurveFXmode := 2, uiColorCurveFXchannel := 4
    , WindowBgrColor := "010101", slideShowDelay := 3000, userMultiDelChoice := 2
    , IMGresizingMode := 1, SlideHowMode := 1, TouchScreenMode := 1
    , lumosAdjust := 1, GammosAdjust := 0, userimgQuality := 0
@@ -161,8 +164,8 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4, pPen5
    , easySlideStoppage := 1, ResizeInPercentage := 0, usrAdaptiveThreshold := 1
    , ResizeKeepAratio := 1, ResizeQualityHigh := 1, ResizeRotationUser := "Rotate: 0°"
    , ResizeApplyEffects := 1, autoAdjustMode := 1, doSatAdjusts := 1, SimpleOperationsScaleXImgFactor := "100 %"
-   , ResizeDestFolder, ResizeUseDestDir := 0, chnRdecalage := 0, chnGdecalage := 0
-   , chnBdecalage := 0, alwaysOpenwithFIM := 0, bwDithering := 0, showHistogram := 0
+   , ResizeDestFolder, ResizeUseDestDir := 0, chnRdecalage := 0.0, chnGdecalage := 0.0
+   , chnBdecalage := 0.0, alwaysOpenwithFIM := 0, bwDithering := 0, showHistogram := 0
    , userUnsprtWriteFMT := 1, userDesireWriteFMT := 9, hueAdjust := 0, syncSlideShow2Audios := 0
    , DisplayTimeUser := 3, FontBolded := 1, FontItalica := 0, showInfoBoxHUD := 0, usrAutoCropGenerateSelection := 0
    , usrTextureBGR := 0, realGammos := 1, imgThreshold := 0, relativeImgSelCoords := 1, usrAutoCropDeviation := 0
@@ -176,9 +179,9 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4, pPen5
    , maxUserThreads := 30, maxMemThumbsCache := 300, resetImageViewOnChange := 0, FillAreaRemBGR := 0
    , FillAreaDoContour := 0, FillAreaContourThickness := 20, EraseAreaFader := 0, EraseAreaOpacity := 190
    , FillAreaOpacity := 250, FillAreaColor := OSDbgrColor, FillAreaShape := 1, FillAreaInverted := 0
-   , FillAreaRoundedCaps := 1, FillAreaDoubleLine := 0, postSharpenAmount := 95, postSharpenRadius := 10
+   , FillAreaRoundedCaps := 1, FillAreaDoubleLine := 0
    , PasteInPlaceCentered := 3, PasteInPlaceOpacity := 255, PasteInPlaceAdaptMode := 1, PasteInPlaceQuality := 1
-   , PasteInPlaceOrientation := 1, showImgAnnotations := 0, mustApplySharpen := 0, blurAreaSoftEdges := 1, blurAreaInverted := 0
+   , PasteInPlaceOrientation := 1, showImgAnnotations := 0, blurAreaSoftEdges := 1, blurAreaInverted := 0
    , PasteInPlaceBlurAmount := 0, PasteInPlaceCropSel := 0, blurAreaOpacity := 250, blurAreaAmount := 10
 
 Global PasteInPlaceGamma := 100, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0, PasteInPlaceLight := 0
@@ -198,7 +201,8 @@ Global PasteInPlaceGamma := 100, PasteInPlaceSaturation := 0, PasteInPlaceHue :=
    , TextInAreaBgrColor := "229933", TextInAreaBgrOpacity := 100, TextInAreaOnlyBorder := 0, TextInAreaBlurAmount := 0
    , TextInAreaLivePreview := 1, showMainMenuBar := 1, markSearchMatches := 1, showSelectionGrid := 0, blurAreaTwice := 0
    , allowRecordHistory := 1, FillAreaLivePreview := 1, TextInAreaPaintBgr := 1, rotateSelBoundsKeepRatio := 1
-   , highlightAlreadySeenImages := 1, useCachedSLDdata := 1, PreserveDateTimeOnSave := 0
+   , highlightAlreadySeenImages := 1, useCachedSLDdata := 1, PreserveDateTimeOnSave := 0, PrintAdaptToFit := 1
+   , PrintDimensionsXYWH := "0|0|50|50", PrintColorMode := 1, PrintOrientation := 0, PrintUseViewportColors := 1
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started.`nCPU cores identified: " realSystemCores ".")
@@ -229,9 +233,9 @@ Else mainCompiledPath := A_ScriptDir
 
 thisGDIPversion := Gdip_LibrarySubVersion()
 GDIPToken := Gdip_Startup()
-If (!GDIPToken || thisGDIPversion<1.82)
+If (!GDIPToken || thisGDIPversion<1.84)
 {
-   MsgBox, 48, %appTitle%, ERROR: Unable to initialize GDI+...`n`nThe program will now exit.`n`nRequired GDI+ library wrapper: v1.82 - extended compilation edition.
+   MsgBox, 48, %appTitle%, ERROR: Unable to initialize GDI+...`n`nThe program will now exit.`n`nRequired GDI+ library wrapper: v1.84 - extended compilation edition.
    hasInitSpecialMode := 1
    ForceExitNow()
    ExitApp
@@ -263,6 +267,10 @@ If !A_IsCompiled
 Else If (sz := GetRes(data, 0, "MODULE-INTERFACE.AHK", "LIB"))
    interfaceThread := ahkThread(StrGet(&data, sz, "utf-8"))
 
+; the interface is a separate thread to allow users 
+; enjoy a more responsive user interface when the main thread
+; is busy processing
+
 initGUI := interfaceThread.ahkFunction("BuildGUI")
 If !initGUI
 {
@@ -274,7 +282,7 @@ If !initGUI
 
 ; BuildTray()
 ; BuildGUI()
-InitStuff()
+InitGDIpStuff()
 
 Global multiCoreThumbsInitGood := "n", thumbThread1,thumbThread2,thumbThread3,thumbThread4,thumbThread5,thumbThread6,thumbThread7,thumbThread8,thumbThread9,thumbThread10,thumbThread11
 ,thumbThread12,thumbThread13,thumbThread14,thumbThread15,thumbThread16,thumbThread17,thumbThread18,thumbThread19,thumbThread20,thumbThread21
@@ -299,7 +307,7 @@ TriggerMenuBarUpdate()
 addJournalEntry("Finished initialization of " appTitle " v" appVersion ".")
 Loop, 6
 {
-   If (A_Index=6)
+   If (A_Index>=6)
    {
       doWelcomeNow := 1
    } Else If RegExMatch(A_Args[A_Index], sldsPattern)
@@ -322,27 +330,41 @@ Return
 
 ;_____________________________________ Hotkeys _________________
 
-identifyThisWin(noReact:=0) {
+identifyThisWin() {
   Static prevR, lastInvoked := 1
-  If (A_TickCount - lastInvoked < 60)
+  If (A_TickCount - lastInvoked < 150)
      Return prevR
 
   prevR := WinActive("ahk_class AutoHotkeyGUI ahk_group QPVwindows") ? 1 : 0
-  ; A := WinExist("A")
-  ; If (A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin || A=hGDIinfosWin)
-  ;    prevR := 1
-  ; Else prevR := 0
-
+  lastInvoked := A_TickCount
   Return prevR
+}
+
+HKifs(q:=0) {
+   If (q="imgEditSolo")
+      r := (!AnyWindowOpen && currentFileIndex=0 && !CurrentSLD && thumbsDisplaying!=1 && StrLen(gdiBitmap)>3) ? 1 : 0
+   Else If (q="imgsLoaded")
+      r := (!AnyWindowOpen && CurrentSLD && maxFilesIndex>0) ? 1 : 0
+   Else If (q="liveEdit")
+      r := (AnyWindowOpen && imgEditPanelOpened=1 && StrLen(gdiBitmap)>3) ? 1 : 0
+   Return r
 }
 
 #If (identifyThisWin()=1)
     ^vk4F::    ; Ctrl+O
-    If !AnyWindowOpen
-       OpenDialogFiles()
+       If !AnyWindowOpen
+          OpenDialogFiles()
+    Return
+
+    vk4F::    ; O
+       If !AnyWindowOpen && (!CurrentSLD || StrLen(gdiBitmap)<3)
+          OpenDialogFiles()
+       Else If HKifs("imgsLoaded")
+          OpenThisFileMenu()
     Return
 
     ; w::   ; to-do  to do
+    ; printImageNow()
    ; ; testwhatever()
    ; ; moreTesting()
    ; ; testWICresizeSpeed()
@@ -372,12 +394,16 @@ identifyThisWin(noReact:=0) {
     Return
 
     F12::
-    ^vk50::    ; Ctrl+P
        If AnyWindowOpen
           Return
 
        If (imageLoading!=1)
           openPrefsPanelWindow()
+    Return
+
+    ^vk50::    ; Ctrl+P
+       If (!AnyWindowOpen && imageLoading!=1 && (HKifs("imgEditSolo") || HKifs("imgsLoaded")))
+          PanelPrintImage()
     Return
 
     ^NumpadAdd::
@@ -454,1418 +480,952 @@ identifyThisWin(noReact:=0) {
     Esc::
        escRoutine()
     Return
-#If
 
-#If (identifyThisWin()=1 && !AnyWindowOpen && currentFileIndex=0 && !CurrentSLD && thumbsDisplaying!=1)
-    ~vk44 Up::   ; D
-      toggleImgSelection()
-    Return
-
-    ~vk4C::     ; L
-       If (activateImgSelection=1)
-          toggleLimitSelection()
-    Return
-
-    +^vk56 Up::   ; Ctrl+Shift+V
-       If (imageLoading!=1)
-          PanelPasteInPlace()
-    Return
-
-    ~^vk44 Up::   ; Ctrl+D
-       resetImgSelection()
-    Return
-
-    ~^vk43 Up::    ; Ctrl+C
-       CopyImage2clip()
-    Return
-
-    ~^vk58 Up::    ; Ctrl+X
-       CutSelectedArea()
-    Return
-
-    ~vk45::   ; E
-      ToggleEditImgSelection()
-    Return
-
-    ^vk5A::    ; Ctrl+Z
-       ImgUndoAction()
-    Return
-
-    ^vk59::    ; Ctrl+Y
-       ImgRedoAction()
-    Return
-
-    ^+vk5A::    ; Ctrl+Shift+Z
-       ImgSelUndoAct()
-    Return
-
-    ^+vk59::    ; Ctrl+Shift+Y
-       ImgSelRedoAct()
-    Return
-
-    ^!vk5A::    ; Ctrl+Alt+Z
-       ImgUndoAction("j")
-    Return
-
-    ^!vk59::    ; Ctrl+Alt+Y
-       ImgRedoAction("j")
-    Return
-
-    ~+vk45 Up::   ; Shift+E
-      toggleEllipseSelection()
-    Return
-
-    !vk45::   ; Alt+E
-      PanelIMGselProperties()
-    Return
-
-    ~^vk53 Up::   ; Ctrl+S
-       PanelSaveImg()
-    Return
-
-    +Enter::
-       CropImageViewPort()
-    Return
-
-    ~+vk4C::     ; Shift+L
-       PanelDrawLines()
-    Return
-
-    ~!BackSpace::
-       PanelFillSelectedArea()
-    Return
-
-    !vk59::   ; Alt+Y
-      PanelImgAutoCrop()
-    Return
-
-    ~vk49::   ; I
-      If (thumbsDisplaying!=1)
-         ToggleInfoBoxu()
-      Else
-         PanelImageInfos()
-    Return
-
-    vkDB::   ; [
-      ChangeLumos(-1)
-    Return
-
-    vkDD::   ; ]
-      ChangeLumos(1)
-    Return
-
-    +vkDB::   ; Shift + [
-      ChangeGammos(-1)
-    Return
-
-    +vkDD::   ; Shift + ]
-      ChangeGammos(1)
-    Return
-
-    ^vkDB::   ; Ctrl + [
-      ChangeSaturation(-1)
-    Return
-
-    ^vkDD::   ; Ctrl + ]
-      ChangeSaturation(1)
-    Return
-
-    !vkDB::   ; Alt + [
-      ChangeRealGamma(-1)
-    Return
-
-    !vkDD::   ; Alt + ]
-      ChangeRealGamma(1)
-    Return
-
-    vkDC Up::   ; \
-      ResetImageView()
-    Return
-
-    ^vkDC Up::   ; Ctrl+\
-      HardResetImageView()
-    Return
-
-    +vkDC Up::   ; Shift+\
-      If (activateImgSelection=1 && vPselRotation>0)
-         resetSelectionRotation()
-      Else
-         toggleColorAdjustments()
-    Return
-
-    ~vkBF Up::   ; /
-    ~NumpadDiv Up::
-       IMGresizingMode := 0
-       ToggleImageSizingMode()
-    Return
-
-    ~NumpadMult Up::
-       IMGresizingMode := 3
-       IMGdecalageX := IMGdecalageY := zoomLevel := 1
-       ToggleImageSizingMode()
-    Return
-
-    +NumpadAdd::
-    +vkBB::    ; [=]
-       changeSelectZoom(1)
-    Return
-
-    +NumpadSub::
-    +vkBD::   ; [-]
-       changeSelectZoom(-1)
-    Return
-
-    NumpadAdd::
-    vkBB::    ; [=]
-       ChangeZoom(1)
-    Return
-
-    NumpadSub::
-    vkBD::   ; [-]
-       ChangeZoom(-1)
-    Return
-
-    vk47::    ; G
-       ToggleImgHistogram(1)
-    Return
-
-    +vk47::    ; Shift+G
-       ToggleImgHistogram(-1)
-    Return
-
-    ~vk52 Up::     ; R
-       makeSquareSelection()
-    Return
-
-    +vk42 Up::     ; Shift+B
-       PanelBlurSelectedArea()
-    Return
-
-    ^vk54 Up::     ; Ctrl+T
-       PanelTransformSelectedArea()
-    Return
-
-    +vk54 Up::     ; Shift+T
-       PanelInsertTextArea()
-    Return
-
-    +vk49 Up::     ; Shift+I
-       InvertSelectedArea()
-    Return
-
-    ^vk47 Up::     ; Ctrl+G
-       GraySelectedArea()
-    Return
-
-    ~vk48::    ; H
-       TransformIMGh()
-    Return
-
-   ~vk56::    ; V
-       TransformIMGv()
-    Return
-
-    ~+vk48::    ; Shift+H
-       If (activateImgSelection=1) || (StrLen(UserMemBMP)>4 && activateImgSelection=1)
-          FlipSelectedArea("h")
-    Return
-
-   ~+vk56::    ; Shift+V
-       If (activateImgSelection=1) || (StrLen(UserMemBMP)>4 && activateImgSelection=1)
-          FlipSelectedArea("v")
-    Return
-
-    ~vk55 Up::  ;  U
-       ColorsAdjusterPanelWindow()
-    Return
-
-    vk46::     ; F
-       ToggleImgFX(-1)
-    Return
-
-    +vk46::     ; Shift+F
-       ToggleImgFX(1)
-    Return
-
-    +vk51::  ;  Shift+Q-
-       ToggleImgColorDepth(1)
-    Return
-
-    ~+vk55 Up::    ; Shift+U
-       ApplyColorAdjustsSelectedArea()
-    Return
-
-    vk51::  ;   Q
-       ToggleImgColorDepth(-1)
-    Return
-
-    Delete Up::
-       If (thumbsDisplaying!=1 && activateImgSelection=1 && editingSelectionNow=1)
-          PanelEraseSelectedArea()
-    Return
-
-    vk41::     ; A
-       ToggleIMGalign()
-    Return
-
-    !vk41::     ; Alt+a
-       PanelAdjustImageCanvasSize()
-    Return
-
-    ^vk41 Up::     ; Ctrl+A
-       selectEntireImage()
-    Return
-
-    vk39::    ; 9
-       If (activateImgSelection=1 && editingSelectionNow=1)
-          changeSelRotation(-1)
-       Else
-          changeImgRotationInVP(-1)
-    Return
-
-    vk30::    ; 0
-       If (activateImgSelection=1 && editingSelectionNow=1)
-          changeSelRotation(1)
-       Else
-          changeImgRotationInVP(1)
-    Return
-
-    Up::
-       If (IMGlargerViewPort=1 && IMGresizingMode=4)
-          PanIMGonScreen("U")
-    Return
-
-    Down::
-       If (IMGlargerViewPort=1 && IMGresizingMode=4)
-          PanIMGonScreen("D")
-    Return
-
-    ^WheelUp::
-       IMGresizingMode := 4
-       ChangeZoom(1, "WheelUp")
-    Return
-
-    ^WheelDown::
-       IMGresizingMode := 4
-       ChangeZoom(-1, "WheelDown")
-    Return
-
-    WheelUp::
-    Right::
-       If (InStr(A_ThisHotkey, "wheel") && IMGresizingMode=4 && thumbsDisplaying!=1)
-       {
-          ChangeZoom(1, "WheelUp")
-          Return
-       } Else If (IMGlargerViewPort=1 && IMGresizingMode=4)
-          PanIMGonScreen("R")
-    Return
-
-    WheelDown::
-    Left::
-       If (InStr(A_ThisHotkey, "wheel") && IMGresizingMode=4 && thumbsDisplaying!=1)
-       {
-          ChangeZoom(-1, "WheelDown")
-          Return
-       } Else If (IMGlargerViewPort=1 && IMGresizingMode=4)
-          PanIMGonScreen("L")
-    Return
-
-    !Left::
-       arrowKeysAdjustSelectionArea(-1, 1)
-    Return
-
-    !Right::
-       arrowKeysAdjustSelectionArea(1, 1)
-    Return
-
-    !Up::
-       arrowKeysAdjustSelectionArea(-2, 1)
-    Return
-
-    !Down::
-       arrowKeysAdjustSelectionArea(2, 1)
-    Return
-
-    ^+Left::
-       arrowKeysAdjustSelectionArea(-1, 2)
-    Return
-
-    ^+Right::
-       arrowKeysAdjustSelectionArea(1, 2)
-    Return
-
-    ^+Up::
-       arrowKeysAdjustSelectionArea(-2, 2)
-    Return
-
-    ^+Down::
-       arrowKeysAdjustSelectionArea(2, 2)
-    Return
-
-    F8::
-       openPreviousPanel()
-    Return
-#If
-
-#If (identifyThisWin()=1 && AnyWindowOpen && imgEditPanelOpened=1)
-    Enter::
-       applyIMGeditFunction()
-    Return
-
-    ^vk5A::    ; Ctrl+Z
-       ImgUndoAction()
-    Return
-
-    ^vk59::    ; Ctrl+Y
-       ImgRedoAction()
-    Return
-
-    ^+vk5A::    ; Ctrl+Shift+Z
-       ImgSelUndoAct()
-    Return
-
-    ^+vk59::    ; Ctrl+Shift+Y
-       ImgSelRedoAct()
-    Return
-
-    ^!vk5A::    ; Ctrl+Alt+Z
-       ImgUndoAction("j")
-    Return
-
-    ^!vk59::    ; Ctrl+Alt+Y
-       ImgRedoAction("j")
-    Return
-
-    +NumpadAdd::
-    +vkBB::    ; [=]
-       changeSelectZoom(1)
-    Return
-
-    +NumpadSub::
-    +vkBD::   ; [-]
-       changeSelectZoom(-1)
+    vk44 Up::   ; D
+      If (HKifs("liveEdit") && AnyWindowOpen!=10)
+         livePreviewsImageEditing(1, 2)
+      Else If (HKifs("liveEdit") && AnyWindowOpen=10)
+         tlbrToggleImgSelection()
+      Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+         toggleImgSelection()
     Return
 
     vk4C::     ; L
-       toggleLimitSelection()
+      If ((HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && activateImgSelection=1 && thumbsDisplaying!=1)
+         toggleLimitSelection()
+      Else If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+         toggleListViewModeThumbs()
     Return
 
-    vk39::    ; 9
-       changeSelRotation(-1)
+    +^vk56 Up::   ; Ctrl+Shift+V
+      If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+         PanelPasteInPlace()
     Return
 
-    vk30::    ; 0
-       changeSelRotation(1)
+    ~^vk44 Up::   ; Ctrl+D
+      If (HKifs("imgsLoaded") && ((thumbsDisplaying=1) || (activateImgSelection!=1 && markedSelectFile)))
+         dropFilesSelection()
+      Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+         resetImgSelection()
     Return
 
-    ~vk52 Up::  ; R
-       makeSquareSelection()
+    ~^vk43 Up::    ; Ctrl+C
+      If (thumbsDisplaying=1 && HKifs("imgsLoaded"))
+         MenuExplorerCopyFiles()
+      Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+         CopyImage2clip()
     Return
 
-    vk47::    ; G
-       ToggleImgHistogram(1)
+    ~^vk58 Up::    ; Ctrl+X
+      If (thumbsDisplaying=1 && HKifs("imgsLoaded"))
+         MenuExplorerCutFiles()
+      Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+         CutSelectedArea()
     Return
 
-    +vk47::    ; Shift+G
-       ToggleImgHistogram(-1)
+    ^vk5A::    ; Ctrl+Z
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         ImgUndoAction()
     Return
 
-    vk44 Up::   ; D
-       If (AnyWindowOpen!=10)
-          livePreviewsImageEditing(1, 2)
+    ^vk59::    ; Ctrl+Y
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         ImgRedoAction()
     Return
 
-    vk45 Up::   ; E
-       If (AnyWindowOpen!=10)
-          livePreviewsImageEditing(1, 1)
+    ^+vk5A::    ; Ctrl+Shift+Z
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         ImgSelUndoAct()
     Return
 
-    vk46 Up::   ; F
-       flipSelectionWH()
+    ^+vk59::    ; Ctrl+Shift+Y
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         ImgSelRedoAct()
     Return
 
-    +vkDC Up::   ; Shift+\
-       resetSelectionRotation()
+    ^!vk5A::    ; Ctrl+Alt+Z
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         ImgUndoAction("j")
     Return
 
-    ^vk41 Up::     ; Ctrl+A
-       selectEntireImage()
+    ^!vk59::    ; Ctrl+Alt+Y
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         ImgRedoAction("j")
     Return
 
-    ~+vk45 Up::   ; Shift+E
-       If (AnyWindowOpen=24 || AnyWindowOpen=25 || AnyWindowOpen=31 || AnyWindowOpen=10)
-          toggleEllipseSelection()
+    vk45::   ; E
+      If (HKifs("liveEdit") && AnyWindowOpen!=10)
+         livePreviewsImageEditing(1, 1)
+      Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+         ToggleEditImgSelection()
     Return
 
-    +vk49::     ; Shift+I
-       InvertSelectedArea()
+    +vk45::   ; Shift+E
+      imgLiveEdit := (HKifs("liveEdit") && (AnyWindowOpen=24 || AnyWindowOpen=25 || AnyWindowOpen=31 || AnyWindowOpen=10)) ? 1 : 0
+      If (HKifs("imgEditSolo") || imgLiveEdit=1 || HKifs("imgsLoaded"))
+         toggleEllipseSelection()
     Return
 
-    vk49::     ; I
-      If (thumbsDisplaying!=1)
-         ToggleInfoBoxu()
+    !vk45::   ; Alt+E
+      If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+         PanelIMGselProperties()
     Return
 
-    ^vk47 Up::     ; Ctrl+G
-       GraySelectedArea()
+    ~^vk53 Up::   ; Ctrl+S
+      If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+         PanelSaveImg()
     Return
 
-    ~vk48::    ; H
-       TransformIMGh()
+    +vk4C::     ; Shift+L
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         PanelDrawLines()
     Return
 
-   ~vk56::    ; V
-       TransformIMGv()
+    !BackSpace::
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         PanelFillSelectedArea()
     Return
 
-    ~+vk48::    ; H
-       If (activateImgSelection=1) || (StrLen(UserMemBMP)>4 && activateImgSelection=1)
-          FlipSelectedArea("h")
+    !vk59::   ; Alt+Y
+      If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+         PanelImgAutoCrop()
     Return
 
-   ~+vk56::    ; V
-       If (activateImgSelection=1) || (StrLen(UserMemBMP)>4 && activateImgSelection=1)
-          FlipSelectedArea("v")
-    Return
-
-    +vk54 Up::     ; Shift+T
-       PanelInsertTextArea()
-    Return
-
-    ~+vk4C::     ; Shift+L
-       PanelDrawLines()
-    Return
-
-    ~!BackSpace::
-       PanelFillSelectedArea()
-    Return
-
-    Delete Up::
-       If (thumbsDisplaying!=1 && activateImgSelection=1 && editingSelectionNow=1)
-          PanelEraseSelectedArea()
-    Return
-
-    vk41::     ; A
-       ToggleIMGalign()
-    Return
-
-    ~+vk55 Up::    ; Shift+U
-       ApplyColorAdjustsSelectedArea()
-    Return
-
-    vk55::    ; U
-       ColorsAdjusterPanelWindow()
+    ~vk49::   ; I
+      If HKifs("liveEdit")
+      {
+         flipSelectionWH()
+      } Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+      {
+         If (thumbsDisplaying!=1)
+            ToggleInfoBoxu()
+         Else
+            PanelImageInfos()
+      }
     Return
 
     vkDB::   ; [
-      If (AnyWindowOpen!=10)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
          ChangeLumos(-1)
     Return
 
     vkDD::   ; ]
-      If (AnyWindowOpen!=10)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
          ChangeLumos(1)
     Return
 
     +vkDB::   ; Shift + [
-      If (AnyWindowOpen!=10)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
          ChangeGammos(-1)
     Return
 
     +vkDD::   ; Shift + ]
-      If (AnyWindowOpen!=10)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
          ChangeGammos(1)
     Return
 
     ^vkDB::   ; Ctrl + [
-      If (AnyWindowOpen!=10)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
          ChangeSaturation(-1)
     Return
 
     ^vkDD::   ; Ctrl + ]
-      If (AnyWindowOpen!=10)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
          ChangeSaturation(1)
     Return
 
     !vkDB::   ; Alt + [
-      If (AnyWindowOpen!=10)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
          ChangeRealGamma(-1)
     Return
 
     !vkDD::   ; Alt + ]
-      If (AnyWindowOpen!=10)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
          ChangeRealGamma(1)
     Return
 
     vkDC Up::   ; \
-      If (AnyWindowOpen!=10)
-         ResetImageView()
-      Else
+      If (HKifs("liveEdit") && AnyWindowOpen=10)
          MenuToggleColorAdjustments()
+      Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         ResetImageView()
     Return
 
     ^vkDC Up::   ; Ctrl+\
-      If (AnyWindowOpen!=10)
-         HardResetImageView()
-      Else
+      If (HKifs("liveEdit") && AnyWindowOpen=10)
          btnResetImageView()
-    Return
-
-    !Left::
-       arrowKeysAdjustSelectionArea(-1, 1)
-    Return
-
-    !Right::
-       arrowKeysAdjustSelectionArea(1, 1)
-    Return
-
-    !Up::
-       arrowKeysAdjustSelectionArea(-2, 1)
-    Return
-
-    !Down::
-       arrowKeysAdjustSelectionArea(2, 1)
-    Return
-
-    ^+Left::
-       arrowKeysAdjustSelectionArea(-1, 2)
-    Return
-
-    ^+Right::
-       arrowKeysAdjustSelectionArea(1, 2)
-    Return
-
-    ^+Up::
-       arrowKeysAdjustSelectionArea(-2, 2)
-    Return
-
-    ^+Down::
-       arrowKeysAdjustSelectionArea(2, 2)
-    Return
-
-    WheelDown::
-    Left::
-       If (InStr(A_ThisHotkey, "wheel") && thumbsDisplaying!=1)
-       {
-          ChangeZoom(-1, "WheelDown")
-       } Else If (IMGlargerViewPort=1 && IMGresizingMode=4)
-       {
-          PanIMGonScreen("L")
-       } Else
-       {
-          arrowKeysAdjustSelectionArea(-1, 1)
-          arrowKeysAdjustSelectionArea(-1, 2)
-       }
-    Return
-
-    WheelUp::
-    Right::
-       If (InStr(A_ThisHotkey, "wheel") && thumbsDisplaying!=1)
-       {
-          ChangeZoom(1, "WheelUp")
-       } Else If (IMGlargerViewPort=1 && IMGresizingMode=4)
-       {
-          PanIMGonScreen("R")
-       } Else
-       {
-          arrowKeysAdjustSelectionArea(1, 1)
-          arrowKeysAdjustSelectionArea(1, 2)
-       }
-    Return
-
-    vkBF Up::     ; /
-    NumpadDiv Up::
-       IMGresizingMode := 0
-       ToggleImageSizingMode()
-    Return
-
-    NumpadMult Up::
-       IMGresizingMode := 3
-       IMGdecalageX := IMGdecalageY := zoomLevel := 1
-       ToggleImageSizingMode()
-    Return
-
-    NumpadAdd::
-    vkBB::    ; [=]
-       ChangeZoom(1)
-    Return
-
-    NumpadSub::
-    vkBD::   ; [-]
-       ChangeZoom(-1)
-    Return
-
-    Up::
-       If (IMGlargerViewPort=1 && IMGresizingMode=4)
-       {
-          PanIMGonScreen("U")
-       } Else
-       {
-          arrowKeysAdjustSelectionArea(-2, 1)
-          arrowKeysAdjustSelectionArea(-2, 2)
-       }
-    Return
-
-    Down::
-       If (IMGlargerViewPort=1 && IMGresizingMode=4)
-       {
-          PanIMGonScreen("D")
-       } Else
-       {
-          arrowKeysAdjustSelectionArea(2, 1)
-          arrowKeysAdjustSelectionArea(2, 2)
-       }
-    Return
-
-    ^WheelUp::
-       IMGresizingMode := 4
-       ChangeZoom(1, "WheelUp")
-    Return
-
-    ^WheelDown::
-       IMGresizingMode := 4
-       ChangeZoom(-1, "WheelDown")
-    Return
-#If
-
-#If (identifyThisWin()=1 && !AnyWindowOpen && CurrentSLD && maxFilesIndex>0)
-    F8::
-       openPreviousPanel()
-    Return
-
-    Space::
-       If (thumbsDisplaying=1 || markedSelectFile)
-          markThisFileNow()
-       Else If (imageLoading!=1 && IMGlargerViewPort=1 && IMGresizingMode=4 && slideShowRunning!=1)
-          changeMcursor("move")
-       Else If (slideShowRunning=1)
-           dummyInfoToggleSlideShowu("stop")
-       Else If (A_TickCount - lastOtherWinClose>350) && (A_TickCount - prevSlideShowStop>950)
-           InfoToggleSlideShowu()
-    Return 
-
-    +^vk56 Up::   ; Ctrl+Shift+V
-       If (imageLoading!=1)
-          PanelPasteInPlace()
-    Return
-
-    ^vk57::    ; Ctrl+W
-       setImageWallpaper()
-    Return
-
-    +vk4E::    ; Shift+N
-       PanelEditImgCaption()
-    Return
-
-    vk4E::    ; N
-       If (thumbsDisplaying!=1)
-          ToggleImgCaptions()
-    Return
-
-    +vk49 Up::     ; Shift+I
-       InvertSelectedArea()
-    Return
-
-    ^vk47 Up::     ; Ctrl+G
-       GraySelectedArea()
-    Return
-
-    +vk42 Up::     ; Shift+B
-       PanelBlurSelectedArea()
-    Return
-
-    ^vk31::   ; Ctrl+1
-      SetTimer, ActSortName, -150
-    Return
-
-    ^vk32::   ; Ctrl+2
-      SetTimer, ActSortPath, -150
-    Return
-
-    ^vk33::   ; Ctrl+3
-      SetTimer, ActSortFileName, -150
-    Return
-
-    ^vk34::   ; Ctrl+4
-      SetTimer, ActSortSize, -150
-    Return
-
-    ^vk35::   ; Ctrl+5
-      SetTimer, ActSortModified, -150
-    Return
-
-    ^vk36::   ; Ctrl+6
-      SetTimer, ActSortCreated, -150
-    Return
-
-    ^vk30::   ; Ctrl+0
-      SetTimer, ReverseListNow, -150
-    Return
-
-    vk39::    ; 9
-       If (activateImgSelection=1 && editingSelectionNow=1)
-          changeSelRotation(-1)
-       Else
-          changeImgRotationInVP(-1)
-    Return
-
-    vk30::    ; 0
-       If (activateImgSelection=1 && editingSelectionNow=1)
-          changeSelRotation(1)
-       Else
-          changeImgRotationInVP(1)
-    Return
-
-    !vk59::   ; Alt+Y
-      PanelImgAutoCrop()
-    Return
-
-    ~vk4A Up::    ; J
-       PanelJump2index()
-    Return
-
-    ~+Insert Up::
-       addNewFolder2list()
-    Return
-
-    ~Tab Up::
-       markThisFileNow()
-    Return
-
-    ~+Tab Up::
-    ~^Tab Up::
-       dropFilesSelection()
-    Return
-
-    ~F11::
-       ToggleFullScreenMode()
-    Return
-
-    ~vk4C::     ; L
-       If (activateImgSelection=1 && thumbsDisplaying!=1)
-          toggleLimitSelection()
-       Else
-          toggleListViewModeThumbs()
-    Return
-
-    ~+vk4C::     ; Shift+L
-       PanelDrawLines()
-    Return
-
-    ~Enter::
-       If (A_TickCount - lastOtherWinClose>250)
-          ToggleThumbsMode()
-    Return
-
-    !Enter::
-       PanelImageInfos()
-    Return
-
-    +Enter::
-       CropImageViewPort()
-    Return
-
-    ~^vk43 Up::    ; Ctrl+C
-       If (thumbsDisplaying=1)
-          CopyImagePath()
-       Else
-          CopyImage2clip()
-    Return
-
-    ~!vk43 Up::    ; Alt+C
-       CopyMoveFilesExplorer("copy")
-    Return
-
-    ~vk43 Up::    ; C
-       InvokeCopyFiles()
-    Return
-
-    ^vk5A::    ; Ctrl+Z
-       ImgUndoAction()
-    Return
-
-    ^vk59::    ; Ctrl+Y
-       ImgRedoAction()
-    Return
-
-    ^+vk5A::    ; Ctrl+Shift+Z
-       ImgSelUndoAct()
-    Return
-
-    ^+vk59::    ; Ctrl+Shift+Y
-       ImgSelRedoAct()
-    Return
-
-    ^!vk5A::    ; Ctrl+Alt+Z
-       ImgUndoAction("j")
-    Return
-
-    ^!vk59::    ; Ctrl+Alt+Y
-       ImgRedoAction("j")
-    Return
-
-    ~^vk58 Up::    ; Ctrl+X
-       If (thumbsDisplaying!=1)
-          CutSelectedArea()
-    Return
-
-    ~!vk58 Up::    ; Alt+X
-       CopyMoveFilesExplorer("cut")
-    Return
-
-    ~^vk55 Up::    ; Ctrl+U
-       If (RegExMatch(CurrentSLD, sldsPattern) && mustGenerateStaticFolders!=1 && SLDcacheFilesList=1)
-          PanelStaticFolderzManager()
-    Return
-
-    ~+vk55 Up::    ; Shift+U
-       ApplyColorAdjustsSelectedArea()
-    Return
-
-    ~!vk55 Up::    ; Alt+U
-       PanelDynamicFolderzWindow()
-    Return
-
-    ~^vk4B Up::    ; Ctrl+K
-       PanelFileFormatConverter()
-    Return
-
-    ~vk4B Up::    ; K
-       imgPath := getIDimage(currentFileIndex)
-       If RegExMatch(imgPath, "i)(.\.(jpg|jpeg))$") || markedSelectFile
-          PanelJpegPerformOperation()
-    Return
-
-    ~^+vk43 Up::    ; Ctrl+Shift+C
-    ~+vk43 Up::     ; Shift+C
-       CopyImagePath()
-    Return
-
-    vk4F::   ; O
-      OpenThisFileMenu()
-    Return
-
-    ~vk49::   ; I
-      If (thumbsDisplaying!=1)
-         ToggleInfoBoxu()
-    Return
-
-    vkDB::   ; [
-      ChangeLumos(-1)
-    Return
-
-    vkDD::   ; ]
-      ChangeLumos(1)
-    Return
-
-    ^vkDB::   ; Ctrl + [
-      ChangeSaturation(-1)
-    Return
-
-    ^vkDD::   ; Ctrl + ]
-      ChangeSaturation(1)
-    Return
-
-    !vkDB::   ; Alt + [
-      ChangeRealGamma(-1)
-    Return
-
-    !vkDD::   ; Alt + ]
-      ChangeRealGamma(1)
-    Return
-
-    +vkDB::   ; Shift + [
-      ChangeGammos(-1)
-    Return
-
-    +vkDD::   ; Shift + ]
-      ChangeGammos(1)
-    Return
-
-    vkDC Up::   ; \
-      ResetImageView()
-    Return
-
-
-    ^vkDC Up::   ; Ctrl+\
-      HardResetImageView()
+      Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         HardResetImageView()
     Return
 
     +vkDC Up::   ; Shift+\
-      If (activateImgSelection=1 && vPselRotation>0)
+      If HKifs("liveEdit")
+      {
          resetSelectionRotation()
-      Else
-         toggleColorAdjustments()
+      } Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+      {
+         If (activateImgSelection=1 && vPselRotation>0)
+            resetSelectionRotation()
+         Else
+            toggleColorAdjustments()
+      }
     Return
 
-    ~^vk45 Up::   ; Ctrl+E
-      OpenThisFileFolder()
-    Return
-
-    +vk45::   ; Shift+E
-      toggleEllipseSelection()
-    Return
-
-    !vk45::   ; Alt+E
-      PanelIMGselProperties()
-    Return
-
-    vk45 Up::   ; E
-      ToggleEditImgSelection()
-    Return
-
-    ~vk44 Up::   ; D
-      toggleImgSelection()
-    Return
-
-    ~^vk44 Up::   ; Ctrl+D
-      If (thumbsDisplaying=1) || (activateImgSelection!=1 && markedSelectFile)
-         dropFilesSelection()
-      Else
-         resetImgSelection()
-    Return
-
-    ~^vk46 Up::   ; Ctrl+F
-       PanelEnableFilesFilter()
-    Return
-
-    ~vk53::   ; S
-       If (skipSeenImagesSlider=1 && thumbsDisplaying=1)
-          ToggleSeenIMGstatus()
-       Else
-          SwitchSlideModes()
-    Return
-
-    ~^vk53 Up::   ; Ctrl+S
-       PanelSaveImg()
-    Return
-
-    ~+^vk53 Up::   ; Ctrl+Shift+S
-       PanelSaveSlideShowu()
-    Return
-
-    vk54 Up::   ; T
-       If (thumbsDisplaying=1)
-          ChangeThumbsAratio()
-       Else
-          ToggleImageSizingMode()
-    Return
-
-    vkBF Up::     ; /
+    vkBF Up::   ; /
     NumpadDiv Up::
-       IMGresizingMode := 0
-       ToggleImageSizingMode()
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+      {
+         IMGresizingMode := 0
+         ToggleImageSizingMode()
+      }
     Return
 
     NumpadMult Up::
-       IMGresizingMode := 3
-       IMGdecalageX := IMGdecalageY := zoomLevel := 1
-       ToggleImageSizingMode()
-    Return
-
-    ~+Space::
-       If (thumbsDisplaying=1 || markedSelectFile)
-          dropFilesSelection()
-       Else If (slideShowRunning=1)
-          dummyInfoToggleSlideShowu("stop")
-       Else If (A_TickCount - prevSlideShowStop>950)
-          dummyInfoToggleSlideShowu()
-    Return
-
-    ~^Space Up::
-       If (slideShowRunning=1)
-       {
-          dummyInfoToggleSlideShowu("stop")
-       } Else If StrLen(filesFilter)>1
-       {
-          ; filesFilter := usrFilesFilteru := ""
-          coreEnableFiltru("")
-          Return
-       } Else If (markedSelectFile>1)
-       {
-          coreEnableFiltru("||Prev-Files-Selection||")
-       } Else
-       {
-          r := getIDimage(currentFileIndex)
-          zPlitPath(r, 0, OutFileName, OutDir)
-          thisFilter := SubStr(OutDir, 3) "\"
-          coreEnableFiltru(thisFilter)
-       }
-    Return
-
-    ~!BackSpace::
-       PanelFillSelectedArea()
-    Return
-
-    ~BackSpace::
-       PrevRandyPicture()
-    Return
-
-    ~+BackSpace::
-       resetSlideshowTimer(0)
-       RandomPicture()
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+      {
+         IMGresizingMode := 3
+         IMGdecalageX := IMGdecalageY := zoomLevel := 1
+         ToggleImageSizingMode()
+      }
     Return
 
     +NumpadAdd::
     +vkBB::    ; [=]
-       changeSelectZoom(1)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         changeSelectZoom(1)
     Return
 
     +NumpadSub::
     +vkBD::   ; [-]
-       changeSelectZoom(-1)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         changeSelectZoom(-1)
     Return
 
     NumpadAdd::
     vkBB::    ; [=]
-       ChangeZoom(1)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         ChangeZoom(1)
     Return
 
     NumpadSub::
     vkBD::   ; [-]
-       ChangeZoom(-1)
-    Return
-
-    !Delete::
-       InListMultiEntriesRemover()
-    Return
-
-    vkBE::    ; [,]
-       IncreaseSlideSpeed()
-    Return
-
-    vkBC::   ; [.]
-       DecreaseSlideSpeed()
-    Return
-
-    +vkBF Up::   ; Shift + /
-       PanelDefineEntireSlideshowLength()
-    Return
-
-    ~F5 Up::
-       RefreshImageFileAction()
-    Return
-
-    ~+F5 Up::
-       RefreshFilesList()
-    Return
-
-    ~^F5 Up::
-       invertRecursiveness()
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         ChangeZoom(-1)
     Return
 
     vk47::    ; G
-       ToggleImgHistogram(1)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         ToggleImgHistogram(1)
     Return
 
     +vk47::    ; Shift+G
-       ToggleImgHistogram(-1)
-    Return
-
-    ~vk48::    ; H
-       TransformIMGh()
-    Return
-
-   ~vk56::    ; V
-       TransformIMGv()
-    Return
-
-    ~+vk48::    ; Shift+H
-       If (activateImgSelection=1 && editingSelectionNow=1) || (StrLen(UserMemBMP)>4 && activateImgSelection=1)
-          FlipSelectedArea("h")
-    Return
-
-   ~+vk56::    ; Shift+V
-       If (activateImgSelection=1 && editingSelectionNow=1) || (StrLen(UserMemBMP)>4 && activateImgSelection=1)
-          FlipSelectedArea("v")
-    Return
-
-    ~vk52 Up::     ; R
-       makeSquareSelection()
-    Return
-
-    ^vk54 Up::     ; Ctrl+T
-       PanelTransformSelectedArea()
-    Return
-
-    +vk54 Up::     ; Shift+T
-       PanelInsertTextArea()
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         ToggleImgHistogram(-1)
     Return
 
     ~^vk52 Up::     ; Ctrl+R
-       PanelSimpleResizeRotate()
+      If HKifs("imgsLoaded")
+         PanelSimpleResizeRotate()
     Return
 
-    ~F2 Up::
-       PanelRenameThisFile()
+    vk52::     ; R
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         makeSquareSelection()
     Return
 
-    ~+F2 Up::
-       SingularRenameFile()
+    +vk52::     ; Shift+R
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         MenuSelRotation()
     Return
 
-    ~^F2 Up::
-       PanelUpdateThisFileIndex()
+    ^vk54 Up::     ; Ctrl+T
+      If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+         PanelTransformSelectedArea()
     Return
 
-    ~vk4D Up::     ; M
-       PanelMoveCopyFiles()
+    +vk54 Up::     ; Shift+T
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         PanelInsertTextArea()
+    Return
+
+    +vk49 Up::     ; Shift+I
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         InvertSelectedArea()
+    Return
+
+    ^vk47 Up::     ; Ctrl+G
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         GraySelectedArea()
+    Return
+
+    +vk42 Up::     ; Shift+B
+      If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+         PanelBlurSelectedArea()
+    Return
+
+    ~vk48::    ; H
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         TransformIMGh()
+    Return
+
+    ~vk56::    ; V
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         TransformIMGv()
+    Return
+
+    ~+vk48::    ; Shift+H
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         FlipSelectedArea("h")
+    Return
+
+    ~+vk56::    ; Shift+V
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         FlipSelectedArea("v")
     Return
 
     ~vk55 Up::  ;  U
-       ColorsAdjusterPanelWindow()
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         PanelColorsAdjusterWindow()
     Return
 
-    ^vk51::  ;  Ctrl+Q-
-       ToggleImgDownScaling()
-    Return
-
-    +vk51::  ;  Shift+Q-
-       ToggleImgColorDepth(1)
-    Return
-
-    vk51::  ;   Q
-       ToggleImgColorDepth(-1)
+    ~+vk55 Up::    ; Shift+U
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         ApplyColorAdjustsSelectedArea()
     Return
 
     vk46::     ; F
-       ToggleImgFX(-1)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         ToggleImgFX(-1)
     Return
 
     +vk46::     ; Shift+F
-       ToggleImgFX(1)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         ToggleImgFX(1)
     Return
 
-    vk41::     ; A
-       ToggleIMGalign()
+    +vk51::  ;  Shift+Q-
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         ToggleImgColorDepth(1)
     Return
 
-    !vk41::     ; Alt+a
-       PanelAdjustImageCanvasSize()
-    Return
-
-    vk58 Up::   ; X
-       PlayAudioFileAssociatedNow()
-    Return
-
-    +vk58 Up::   ; Shift+X
-       StopMediaPlaying()
-    Return
-
-    vk31::   ; 1
-       ChangeVolume(-1)
-    Return
-
-    vk32::   ; 1
-       ChangeVolume(1)
-    Return
-
-    ^vk41::     ; Ctrl+A
-       If (thumbsDisplaying=1)
-          selectAllFiles()
-       Else
-          selectEntireImage()
+    vk51::  ;   Q
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         ToggleImgColorDepth(-1)
     Return
 
     ~Delete Up::
-       deleteKeyAction()
+      If ((HKifs("imgEditSolo") || HKifs("liveEdit")) && thumbsDisplaying!=1 && activateImgSelection=1 && editingSelectionNow=1)
+         PanelEraseSelectedArea()
+      Else If HKifs("imgsLoaded")
+         deleteKeyAction()
     Return
 
     ~+Delete Up::
-       If !markedSelectFile
-       {
-          DeletePicture()
-          Sleep, 350
-          InListMultiEntriesRemover()
-       } Else DeletePicture("single")
+      If HKifs("imgsLoaded")
+      {
+         If !markedSelectFile
+         {
+            DeletePicture()
+            Sleep, 350
+            InListMultiEntriesRemover()
+         } Else DeletePicture("single")
+      }
+    Return
+
+    vk41::     ; A
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         ToggleIMGalign()
+    Return
+
+    !vk41::     ; Alt+A
+      If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+         PanelAdjustImageCanvasSize()
+    Return
+
+    ^vk41::     ; Ctrl+A
+      If HKifs("liveEdit")
+         selectEntireImage()
+      Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+      {
+         If (thumbsDisplaying=1 && HKifs("imgsLoaded"))
+            selectAllFiles()
+         Else
+            selectEntireImage()
+      }
+    Return
+
+    vk39::    ; 9
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+      {
+         If (activateImgSelection=1 && editingSelectionNow=1)
+            changeSelRotation(-1)
+         Else
+            changeImgRotationInVP(-1)
+      }
+    Return
+
+    vk30::    ; 0
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+      {
+         If (activateImgSelection=1 && editingSelectionNow=1)
+            changeSelRotation(1)
+         Else
+            changeImgRotationInVP(1)
+      }
     Return
 
     Up::
     +Up::
-       If (IMGlargerViewPort=1 && IMGresizingMode=4)
-          PanIMGonScreen("U")
-       Else ; If (thumbsDisplaying=1)
-          ThumbsNavigator("Upu", A_ThisHotkey)
+      If ((HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && IMGlargerViewPort=1 && IMGresizingMode=4)
+         PanIMGonScreen("U")
+      Else If HKifs("imgsLoaded")
+         ThumbsNavigator("Upu", A_ThisHotkey)
     Return
 
     Down::
     +Down::
-       If (IMGlargerViewPort=1 && IMGresizingMode=4)
-          PanIMGonScreen("D")
-       Else ; If (thumbsDisplaying=1)
-          ThumbsNavigator("Down", A_ThisHotkey)
+      If ((HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && IMGlargerViewPort=1 && IMGresizingMode=4)
+         PanIMGonScreen("D")
+      Else If HKifs("imgsLoaded")
+         ThumbsNavigator("Down", A_ThisHotkey)
     Return
 
     ^WheelUp::
-       IMGresizingMode := 4
-       ChangeZoom(1, "WheelUp")
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+      {
+         IMGresizingMode := 4
+         ChangeZoom(1, "WheelUp")
+      }
     Return
 
     ^WheelDown::
-       IMGresizingMode := 4
-       ChangeZoom(-1, "WheelDown")
-    Return
-
-    WheelUp::
-    Right::
-    +Right::
-       If (InStr(A_ThisHotkey, "wheel") && thumbsDisplaying=1)
-       {
-          ThumbsNavigator("Upu", A_ThisHotkey)
-          ThumbsNavigator("Upu", A_ThisHotkey)
-          Return
-       }
-       If (InStr(A_ThisHotkey, "wheel") && IMGresizingMode=4 && thumbsDisplaying!=1)
-       {
-          ChangeZoom(1, "WheelUp")
-          Return
-       }
-       If (IMGlargerViewPort=1 && IMGresizingMode=4)
-       {
-          PanIMGonScreen("R")
-       } Else
-       {
-          resetSlideshowTimer(0)
-          If (thumbsDisplaying=1)
-             ThumbsNavigator("Right", A_ThisHotkey)
-          Else
-             NextPicture("key-" A_ThisHotkey)
-       }
-    Return
-
-    ^Left::
-       navSelectedFiles(-1)
-    Return
-
-    ^Right::
-       navSelectedFiles(1)
-    Return
-
-    F3::
-       searchNextIndex(1)
-    Return
-
-    +F3::
-       searchNextIndex(-1)
-    Return
-
-    ^F3::
-       PanelSearchIndex()
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+      {
+         IMGresizingMode := 4
+         ChangeZoom(-1, "WheelDown")
+      }
     Return
 
     !Left::
-       arrowKeysAdjustSelectionArea(-1, 1)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         arrowKeysAdjustSelectionArea(-1, 1)
     Return
 
     !Right::
-       arrowKeysAdjustSelectionArea(1, 1)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         arrowKeysAdjustSelectionArea(1, 1)
     Return
 
     !Up::
-       arrowKeysAdjustSelectionArea(-2, 1)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         arrowKeysAdjustSelectionArea(-2, 1)
     Return
 
     !Down::
-       arrowKeysAdjustSelectionArea(2, 1)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         arrowKeysAdjustSelectionArea(2, 1)
     Return
 
     ^+Left::
-       arrowKeysAdjustSelectionArea(-1, 2)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         arrowKeysAdjustSelectionArea(-1, 2)
     Return
 
     ^+Right::
-       arrowKeysAdjustSelectionArea(1, 2)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         arrowKeysAdjustSelectionArea(1, 2)
     Return
 
     ^+Up::
-       arrowKeysAdjustSelectionArea(-2, 2)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         arrowKeysAdjustSelectionArea(-2, 2)
     Return
 
     ^+Down::
-       arrowKeysAdjustSelectionArea(2, 2)
+      If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+         arrowKeysAdjustSelectionArea(2, 2)
+    Return
+
+    F8::
+      If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+         openPreviousPanel()
+    Return
+
+    Space::
+      If HKifs("imgsLoaded")
+      {
+         If (thumbsDisplaying=1 || markedSelectFile)
+            markThisFileNow()
+         Else If (imageLoading!=1 && IMGlargerViewPort=1 && IMGresizingMode=4 && slideShowRunning!=1)
+            changeMcursor("move")
+         Else If (slideShowRunning=1)
+            dummyInfoToggleSlideShowu("stop")
+         Else If (A_TickCount - lastOtherWinClose>350) && (A_TickCount - prevSlideShowStop>950)
+            InfoToggleSlideShowu()
+      }
+    Return 
+
+    ^vk57::    ; Ctrl+W
+      If HKifs("imgsLoaded")
+         setImageWallpaper()
+    Return
+
+    +vk4E::    ; Shift+N
+      If HKifs("imgsLoaded")
+         PanelEditImgCaption()
+    Return
+
+    vk4E::    ; N
+      If (HKifs("imgsLoaded") && thumbsDisplaying!=1)
+         ToggleImgCaptions()
+    Return
+
+    ^vk31::   ; Ctrl+1
+      If HKifs("imgsLoaded")
+         SetTimer, ActSortName, -150
+    Return
+
+    ^vk32::   ; Ctrl+2
+      If HKifs("imgsLoaded")
+         SetTimer, ActSortPath, -150
+    Return
+
+    ^vk33::   ; Ctrl+3
+      If HKifs("imgsLoaded")
+         SetTimer, ActSortFileName, -150
+    Return
+
+    ^vk34::   ; Ctrl+4
+      If HKifs("imgsLoaded")
+         SetTimer, ActSortSize, -150
+    Return
+
+    ^vk35::   ; Ctrl+5
+      If HKifs("imgsLoaded")
+         SetTimer, ActSortModified, -150
+    Return
+
+    ^vk36::   ; Ctrl+6
+      If HKifs("imgsLoaded")
+         SetTimer, ActSortCreated, -150
+    Return
+
+    ^vk30::   ; Ctrl+0
+      If HKifs("imgsLoaded")
+         SetTimer, ReverseListNow, -150
+    Return
+
+    ~vk4A Up::    ; J
+      If HKifs("imgsLoaded")
+         PanelJump2index()
+    Return
+
+    ~+Insert Up::
+      If HKifs("imgsLoaded")
+         addNewFolder2list()
+    Return
+
+    ~Tab Up::
+      If HKifs("liveEdit")
+         toggleImgEditPanelWindow()
+      Else If HKifs("imgsLoaded")
+         markThisFileNow()
+    Return
+
+    ~+Tab Up::
+    ~^Tab Up::
+      If HKifs("imgsLoaded")
+         dropFilesSelection()
+    Return
+
+    ~F11::
+      If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+         ToggleFullScreenMode()
+    Return
+
+    +Enter::
+      If HKifs("liveEdit")
+         applyIMGeditFunction()
+      Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+         CropImageViewPort()
+    Return
+
+    Enter::
+      If HKifs("liveEdit")
+         applyIMGeditFunctionClose()
+      Else If (HKifs("imgsLoaded") && (A_TickCount - lastOtherWinClose>250))
+         ToggleThumbsMode()
+    Return
+
+    !Enter::
+      If HKifs("imgsLoaded")
+         PanelImageInfos()
+    Return
+
+    ~vk43 Up::    ; C
+      If HKifs("imgsLoaded")
+         InvokeCopyFiles()
+    Return
+
+    ~^vk55 Up::    ; Ctrl+U
+      If (HKifs("imgsLoaded") && RegExMatch(CurrentSLD, sldsPattern) && mustGenerateStaticFolders!=1 && SLDcacheFilesList=1)
+         PanelStaticFolderzManager()
+    Return
+
+    ~!vk55 Up::    ; Alt+U
+      If HKifs("imgsLoaded")
+         PanelDynamicFolderzWindow()
+    Return
+
+    ~^vk4B Up::    ; Ctrl+K
+      If HKifs("imgsLoaded")
+         PanelFileFormatConverter()
+    Return
+
+    ~vk4B Up::    ; K
+      If HKifs("imgsLoaded")
+      {
+         imgPath := getIDimage(currentFileIndex)
+         If RegExMatch(imgPath, "i)(.\.(jpg|jpeg))$") || markedSelectFile
+            PanelJpegPerformOperation()
+      }
+    Return
+
+    ~+vk43 Up::     ; Shift+C
+      If HKifs("imgsLoaded")
+         CopyImagePath()
+    Return
+
+    ~^vk45 Up::   ; Ctrl+E
+      If HKifs("imgsLoaded")
+         OpenThisFileFolder()
+    Return
+
+    ~^vk46 Up::   ; Ctrl+F
+      If HKifs("imgsLoaded")
+         PanelEnableFilesFilter()
+    Return
+
+    ~vk53::   ; S
+      If HKifs("imgsLoaded")
+      {
+         If (skipSeenImagesSlider=1 && thumbsDisplaying=1)
+            ToggleSeenIMGstatus()
+         Else
+            SwitchSlideModes()
+      }
+    Return
+
+    ~+^vk53 Up::   ; Ctrl+Shift+S
+      If HKifs("imgsLoaded")
+         PanelSaveSlideShowu()
+    Return
+
+    vk54 Up::   ; T
+      If HKifs("imgsLoaded")
+      {
+         If (thumbsDisplaying=1)
+            ChangeThumbsAratio()
+         Else
+            ToggleImageSizingMode()
+      }
+    Return
+
+    ~+Space::
+      If HKifs("imgsLoaded")
+      {
+         If (thumbsDisplaying=1 || markedSelectFile)
+            dropFilesSelection()
+         Else If (slideShowRunning=1)
+            dummyInfoToggleSlideShowu("stop")
+         Else If (A_TickCount - prevSlideShowStop>950)
+            dummyInfoToggleSlideShowu()
+     }
+    Return
+
+    ~^Space Up::
+      If HKifs("imgsLoaded")
+      {
+         If (slideShowRunning=1)
+         {
+            dummyInfoToggleSlideShowu("stop")
+         } Else If StrLen(filesFilter)>1
+         {
+            ; filesFilter := usrFilesFilteru := ""
+            coreEnableFiltru("")
+            Return
+         } Else If (markedSelectFile>1)
+         {
+            coreEnableFiltru("||Prev-Files-Selection||")
+         } Else
+         {
+            r := getIDimage(currentFileIndex)
+            zPlitPath(r, 0, OutFileName, OutDir)
+            thisFilter := SubStr(OutDir, 3) "\"
+            coreEnableFiltru(thisFilter)
+         }
+      }
+    Return
+
+    ~BackSpace::
+      If HKifs("imgsLoaded")
+         PrevRandyPicture()
+    Return
+
+    ~+BackSpace::
+      If HKifs("imgsLoaded")
+      {
+         resetSlideshowTimer(0)
+         RandomPicture()
+      }
+    Return
+
+    vkBE::    ; [,]
+      If HKifs("imgsLoaded")
+         IncreaseSlideSpeed()
+    Return
+
+    vkBC::   ; [.]
+      If HKifs("imgsLoaded")
+         DecreaseSlideSpeed()
+    Return
+
+    +vkBF Up::   ; Shift + /
+      If HKifs("imgsLoaded")
+         PanelDefineEntireSlideshowLength()
+    Return
+
+    ~F5 Up::
+      If HKifs("imgsLoaded")
+         RefreshImageFileAction()
+    Return
+
+    ~+F5 Up::
+      If HKifs("imgsLoaded")
+         RefreshFilesList()
+    Return
+
+    ~^F5 Up::
+      If HKifs("imgsLoaded")
+         invertRecursiveness()
+    Return
+
+    ~F2 Up::
+      If HKifs("imgsLoaded")
+         PanelRenameThisFile()
+    Return
+
+    ~+F2 Up::
+      If HKifs("imgsLoaded")
+         SingularRenameFile()
+    Return
+
+    ~^F2 Up::
+      If HKifs("imgsLoaded")
+         PanelUpdateThisFileIndex()
+    Return
+
+    ~vk4D Up::     ; M
+      If HKifs("imgsLoaded")
+         PanelMoveCopyFiles()
+    Return
+
+    ^vk51::  ;  Ctrl+Q-
+      If HKifs("imgsLoaded")
+         ToggleImgDownScaling()
+    Return
+
+    vk58 Up::   ; X
+      If HKifs("imgsLoaded")
+         PlayAudioFileAssociatedNow()
+    Return
+
+    +vk58 Up::   ; Shift+X
+      If HKifs("imgsLoaded")
+         StopMediaPlaying()
+    Return
+
+    vk31::   ; 1
+      If HKifs("imgsLoaded")
+         ChangeVolume(-1)
+    Return
+
+    vk32::   ; 1
+      If HKifs("imgsLoaded")
+         ChangeVolume(1)
+    Return
+
+    ^Left::
+      If HKifs("imgsLoaded")
+         navSelectedFiles(-1)
+    Return
+
+    ^Right::
+      If HKifs("imgsLoaded")
+         navSelectedFiles(1)
+    Return
+
+    F3::
+      If HKifs("imgsLoaded")
+         searchNextIndex(1)
+    Return
+
+    +F3::
+      If HKifs("imgsLoaded")
+         searchNextIndex(-1)
+    Return
+
+    ^F3::
+      If HKifs("imgsLoaded")
+         PanelSearchIndex()
+    Return
+
+    WheelUp::
+      If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+         ThumbsNavigator("Upu", A_ThisHotkey)
+      Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (IMGresizingMode=4 && thumbsDisplaying!=1)
+         ChangeZoom(1, "WheelUp")
+      Else If (HKifs("imgsLoaded"))
+         PreviousPicture("key-" A_ThisHotkey)
     Return
 
     WheelDown::
+      If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+         ThumbsNavigator("Down", A_ThisHotkey)
+      Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (IMGresizingMode=4 && thumbsDisplaying!=1)
+         ChangeZoom(-1, "WheelDown")
+      Else If (HKifs("imgsLoaded"))
+         NextPicture("key-" A_ThisHotkey)
+    Return
+
+    Right::
+    +Right::
+      If HKifs("imgsLoaded")
+      {
+         If (IMGlargerViewPort=1 && IMGresizingMode=4)
+         {
+            PanIMGonScreen("R")
+         } Else
+         {
+            resetSlideshowTimer(0)
+            If (thumbsDisplaying=1)
+               ThumbsNavigator("Right", A_ThisHotkey)
+            Else
+               NextPicture("key-" A_ThisHotkey)
+         }
+      } Else If ((HKifs("imgEditSolo") || HKifs("liveEdit")) && IMGlargerViewPort=1 && IMGresizingMode=4)
+         PanIMGonScreen("R")
+    Return
+
     Left::
     +Left::
-       If (InStr(A_ThisHotkey, "wheel") && thumbsDisplaying=1)
-       {
-          ThumbsNavigator("Down", A_ThisHotkey)
-          ThumbsNavigator("Down", A_ThisHotkey)
-          Return
-       } Else If (InStr(A_ThisHotkey, "wheel") && IMGresizingMode=4 && thumbsDisplaying!=1)
-       {
-          ChangeZoom(-1, "WheelDown")
-          Return
-       }
-
-       If (IMGlargerViewPort=1 && IMGresizingMode=4)
-       {
-          PanIMGonScreen("L")
-       } Else
-       {
-          resetSlideshowTimer(0)
-          If (thumbsDisplaying=1)
-             ThumbsNavigator("Left", A_ThisHotkey)
-          Else
-             PreviousPicture("key-" A_ThisHotkey)
-       }
+      If HKifs("imgsLoaded")
+      {
+         If (IMGlargerViewPort=1 && IMGresizingMode=4)
+         {
+            PanIMGonScreen("L")
+         } Else
+         {
+            resetSlideshowTimer(0)
+            If (thumbsDisplaying=1)
+               ThumbsNavigator("Left", A_ThisHotkey)
+            Else
+               PreviousPicture("key-" A_ThisHotkey)
+         }
+      } Else If ((HKifs("imgEditSolo") || HKifs("liveEdit")) && IMGlargerViewPort=1 && IMGresizingMode=4)
+         PanIMGonScreen("L")
     Return
 
     PgDn::
-       resetSlideshowTimer(0)
-       If (thumbsDisplaying=1)
-          ThumbsNavigator("PgDn", A_ThisHotkey)
-       Else
-          NextPicture()
+      If (HKifs("liveEdit") && activateImgSelection=1)
+      {
+         arrowKeysAdjustSelectionArea(-1, 1)
+         arrowKeysAdjustSelectionArea(-1, 2)
+      } Else If HKifs("imgsLoaded")
+      {
+         resetSlideshowTimer(0)
+         If (thumbsDisplaying=1)
+            ThumbsNavigator("PgDn", A_ThisHotkey)
+         Else
+            NextPicture()
+      }
     Return
 
     PgUp::
-       resetSlideshowTimer(0)
-       If (thumbsDisplaying=1)
-          ThumbsNavigator("PgUp", A_ThisHotkey)
-       Else
-          PreviousPicture()
+      If (HKifs("liveEdit") && activateImgSelection=1)
+      {
+         arrowKeysAdjustSelectionArea(1, 1)
+         arrowKeysAdjustSelectionArea(1, 2)
+      } Else If HKifs("imgsLoaded")
+      {
+         resetSlideshowTimer(0)
+         If (thumbsDisplaying=1)
+            ThumbsNavigator("PgUp", A_ThisHotkey)
+         Else
+            PreviousPicture()
+      }
     Return
 
     +PgDn::
-       resetSlideshowTimer(0)
-       If (thumbsDisplaying=1)
-          ThumbsNavigator("PgDn", A_ThisHotkey)
-       Else If (totalFramesIndex>0 && thumbsDisplaying!=1)
-          changeDesiredFrame(-1)
+      If HKifs("imgsLoaded")
+      {
+         resetSlideshowTimer(0)
+         If (thumbsDisplaying=1)
+            ThumbsNavigator("PgDn", A_ThisHotkey)
+         Else If (totalFramesIndex>0 && thumbsDisplaying!=1)
+            changeDesiredFrame(-1)
+      }
     Return
 
     +PgUp::
-       resetSlideshowTimer(0)
-       If (thumbsDisplaying=1)
-          ThumbsNavigator("PgUp", A_ThisHotkey)
-       Else If (totalFramesIndex>0 && thumbsDisplaying!=1)
-          changeDesiredFrame(1)
+      If HKifs("imgsLoaded")
+      {
+         resetSlideshowTimer(0)
+         If (thumbsDisplaying=1)
+            ThumbsNavigator("PgUp", A_ThisHotkey)
+         Else If (totalFramesIndex>0 && thumbsDisplaying!=1)
+            changeDesiredFrame(1)
+      }
     Return
 
     ~^Home Up::
-       jumpToFilesSelBorder(-1)
+      If HKifs("imgsLoaded")
+         jumpToFilesSelBorder(-1)
     Return
 
     ~^End Up::
-       jumpToFilesSelBorder(1)
+      If HKifs("imgsLoaded")
+         jumpToFilesSelBorder(1)
     Return
 
-    ~Home Up::
+    ~Home::
     ~+Home::
-       If (thumbsDisplaying=1)
-          ThumbsNavigator("Home", A_ThisHotkey)
-       Else
-          FirstPicture()
+      If (HKifs("liveEdit") && activateImgSelection=1)
+      {
+         arrowKeysAdjustSelectionArea(-2, 1)
+         arrowKeysAdjustSelectionArea(-2, 2)
+      } Else If HKifs("imgsLoaded")
+      {
+         If (thumbsDisplaying=1)
+            ThumbsNavigator("Home", A_ThisHotkey)
+         Else
+            FirstPicture()
+      }
     Return
 
-    ~End Up::
+    ~End::
     ~+End::
-       If (thumbsDisplaying=1)
-          ThumbsNavigator("End", A_ThisHotkey)
-       Else
-          LastPicture()
+      If (HKifs("liveEdit") && activateImgSelection=1)
+      {
+         arrowKeysAdjustSelectionArea(2, 1)
+         arrowKeysAdjustSelectionArea(2, 2)
+      } Else If HKifs("imgsLoaded")
+      {
+         If (thumbsDisplaying=1)
+            ThumbsNavigator("End", A_ThisHotkey)
+         Else
+            LastPicture()
+      }
     Return
 #If
 
@@ -1981,6 +1541,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
 }
 
 resetMainWin2Welcome() {
+     userSeenSlideImages := userSeenSessionImagesArray.Count()
      If (maxFilesIndex>1 && userSeenSlideImages>1 && skipSeenImagesSlider=1)
      { 
         seenImagesDB.Exec("COMMIT TRANSACTION;")
@@ -1991,6 +1552,8 @@ resetMainWin2Welcome() {
      ForceRegenStaticFolders := SLDhasFiles := SLDtypeLoaded := 0
      activateImgSelection := editingSelectionNow := thumbsDisplaying := 0
      renewCurrentFilesList()
+     bckpResultedFilesList := []
+     filteredMap2mainList := []
      newStaticFoldersListCache := DynamicFoldersList := CurrentSLD := ""
      filesFilter := usrFilesFilteru := mustOpenStartFolder := ""
      ToggleVisibilityWindow("show", hGDIwin)
@@ -2001,7 +1564,10 @@ resetMainWin2Welcome() {
      clearGivenGDIwin(glPG, glHDC, hGDIwin)
      clearGivenGDIwin(2NDglPG, 2NDglHDC, hGDIinfosWin)
      clearGivenGDIwin(2NDglPG, 2NDglHDC, hGDIselectWin)
+     gdiBitmap := Gdip_DisposeImage(gdiBitmap, 1)
+     UserMemBMP := Gdip_DisposeImage(UserMemBMP, 1)
      ForceRefreshNowThumbsList()
+     prevOpenedWindow := ""
      drawWelcomeImg()
      SetTimer, ResetImgLoadStatus, -50
 }
@@ -2177,6 +1743,7 @@ resetSlideshowTimer(showMsg, ignoreEasyStop:=0) {
       delayu := DefineSlidesRate()
       etaTime := "Estimated time: " EstimateSlideShowLength()
       showTOOLtip("Slideshow speed: " delayu "`nTotal files: " groupDigits(maxFilesIndex) "`n" etaTime "`nSlideshow: " friendly)
+      SetTimer, ResetImgLoadStatus, -50
       SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 }
@@ -2329,6 +1896,7 @@ MenuExplorerCopyFiles() {
 }
 
 MenuExplorerCutFiles() {
+    destroyGDIfileCache()
     CopyMoveFilesExplorer("cut")
 }
 
@@ -2382,10 +1950,11 @@ CopyMoveFilesExplorer(userOption:="copy") {
 }
 
 CopyImage2clip() {
-  If (thumbsDisplaying=1)
-     Return
+   If (thumbsDisplaying=1)
+      Return
 
-   If (StrLen(UserMemBMP)<4 && StrLen(gdiBitmap)<4)
+   imgPath := getIDimage(currentFileIndex)
+   If (StrLen(UserMemBMP)<4 && StrLen(gdiBitmap)<4) || !imgPath
    {
       showTOOLtip("WARNING: No image file is currently loaded...")
       SoundBeep , 300, 100
@@ -2397,7 +1966,17 @@ CopyImage2clip() {
   If (slideShowRunning=1)
      ToggleSlideShowu()
 
-  friendly := (activateImgSelection=1) ? " selected area" : ""
+  friendly := (activateImgSelection=1) ? "selected area" : ""
+  If (activateImgSelection=1)
+  {
+     If testSelectOutsideImgEntirely(gdiBitmap)
+     {
+        showTOOLtip("WARNING: Invalid image selection area...")
+        SoundBeep , 300, 100
+        SetTimer, RemoveTooltip, % -msgDisplayTime
+        Return 1
+     }
+  }
   setImageLoading()
   imgPath := getIDimage(currentFileIndex)
   If gdiBitmap
@@ -2580,6 +2159,7 @@ TrueCleanup(mustExit:=1) {
    If (A_TickCount - lastInvoked < 900) || (hasInitSpecialMode=1)
       Return
 
+   userSeenSlideImages := userSeenSessionImagesArray.Count()
    If (maxFilesIndex>1 && userSeenSlideImages>1 && skipSeenImagesSlider=1)
       seenImagesDB.Exec("COMMIT TRANSACTION;")
 
@@ -2667,14 +2247,34 @@ ForceExitNow() {
    ExitApp
 }
 
-setWindowTitle(msg, forceThis:=0) {
-    If (A_TickCount - zeitSillyPrevent<300)
+dummySetWindowTitle() {
+    setWindowTitle("lol", 0, 1)
+}
+
+setWindowTitle(msg, forceThis:=0, useLast:=0) {
+    Static prevMsg, lastInvoked := 1
+    If (A_TickCount - zeitSillyPrevent<200)
        Return
 
-    addJournalEntry(msg)
+    If (useLast!=1)
+       addJournalEntry(msg)
+
     infoSlideDelay := (slideShowRunning=1 && slideShowDelay<2950) ? 1 : 0
+    thisMsg := (useLast=1 && StrLen(prevMsg)>3) ? prevMsg : msg
+    If (useLast!=1)
+       prevMsg := msg
+
+    If (A_TickCount - lastInvoked<200) && (useLast!=1 && forceThis!=1)
+    {
+       SetTimer, dummySetWindowTitle, -350
+       Return
+    }
+
     If (runningLongOperation!=1 && infoSlideDelay=0 && animGIFplaying!=1 && hasInitSpecialMode!=1) || (forceThis=1)
-       WinSetTitle, ahk_id %PVhwnd%,, % msg
+    {
+       WinSetTitle, ahk_id %PVhwnd%,, % thisMsg
+       lastInvoked := A_TickCount
+    }
 }
 
 MenuDummyToggleThumbsMode() {
@@ -2756,7 +2356,12 @@ ToggleThumbsMode() {
 
    lastInvoked := A_TickCount
    If (maxFilesIndex<2 && thumbsDisplaying!=1)
+   {
+      showTOOLtip("WARNING: Insufficient files for list view mode...")
+      SoundBeep, 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
+   }
 
    interfaceThread.ahkassign("lastCloseInvoked", 0)
    thisIndexu := resultedFilesList[currentFileIndex, 1] currentFileIndex
@@ -2782,7 +2387,7 @@ ToggleThumbsMode() {
          TooltipCreator("Generating thumbnails, please wait...", 0, 1)
 
       prevIndexu := resultedFilesList[currentFileIndex, 1] currentFileIndex
-      If (thumbnailsListMode!=1)
+      If (thumbnailsListMode!=1 && A_OSVersion!="WIN_XP")
          initAHKhThumbThreads()
 
       If (getCaptionStyle(PVhwnd)=1)
@@ -3024,16 +2629,20 @@ panIMGonScrollBar() {
       GetMouseCoord2wind(PVhwnd, mX, mY)
       prcW := mX/mainWidth
       prcH := mY/mainHeight
-      prcW := (prcW>0.5) ? prcW - 0.5 : 0.5 - prcW
-      prcH := (prcH>0.5) ? prcH - 0.5 : 0.5 - prcH
+      If (imageAligned=5)
+      {
+         prcW := (prcW>0.5) ? prcW - 0.5 : 0.5 - prcW
+         prcH := (prcH>0.5) ? prcH - 0.5 : 0.5 - prcH
+      }
       decX := Round(((imgW)*prcW) * zoomLevel)
       decY := Round(((imgH)*prcH) * zoomLevel)
       prcW := mX/mainWidth
       prcH := mY/mainHeight
-      If (prcW>0.5)
+      If (prcW>0.5 || imageAligned=1)
          decX := -decX
-      If (prcH>0.5)
+      If (prcH>0.5 || imageAligned=1)
          decY := -decY
+
       If (scrollAxis=1)
       {
          newDecX := (FlipImgH=1) ? -decX : decX
@@ -3089,7 +2698,7 @@ simplePanIMGonClick() {
    GetPhysicalCursorPos(oX, oY)
    oDx := IMGdecalageX
    oDy := IMGdecalageY
-
+   lastInvoked := A_TickCount
    While, (GetKeyState("LButton", "P") || LbtnDwn=1)
    {
       GetPhysicalCursorPos(mX, mY)
@@ -3097,6 +2706,7 @@ simplePanIMGonClick() {
       diffIMGdecY := Dy := mY - oY + 2
       IMGdecalageX := (FlipImgH=1) ? oDx - Dx : oDx + Dx
       IMGdecalageY := (FlipImgV=1) ? oDy - Dy : oDy + Dy
+      limitPanningDist(oDx, oDy)
       If (LastPrevFastDisplay=1 || PannedFastDisplay=1)
          coreReloadThisPicture()
       Else
@@ -3105,10 +2715,39 @@ simplePanIMGonClick() {
       thisZeit := A_TickCount
       MouseGetPos,,, OutputVarWin
       If (OutputVarWin!=PVhwnd)
-         Break
+      {
+         If (A_TickCount - lastInvoked>1550)
+            Break
+      } Else lastInvoked := A_TickCount
    }
    diffIMGdecX := diffIMGdecY := 0
    ResetImgLoadStatus()
+}
+
+limitPanningDist(ByRef oDx, ByRef oDy) {
+   If (imageAligned=5)
+   {
+      If (oDx>0 && Abs(oDx)>Abs(imgDecLX//2))
+         oDx := -imgDecLX//2
+      Else If (oDx<0 && Abs(oDx)>Abs(imgDecLX//2))
+         oDx := imgDecLX//2
+
+      If (oDy>0 && Abs(oDy)>Abs(imgDecLY//2))
+         oDy := -imgDecLY//2
+      Else If (oDy<0 && Abs(oDy)>Abs(imgDecLY//2))
+         oDy := imgDecLY//2
+   } Else
+   {
+      If (oDx>=0)
+         oDx := 0
+      Else If (oDx<imgDecLX)
+         oDx := imgDecLX
+
+      If (oDy>=0)
+         oDy := 0
+      Else If (oDy<imgDecLY)
+         oDy := imgDecLY
+   }
 }
 
 panIMGonClick() {
@@ -3133,7 +2772,6 @@ panIMGonClick() {
    thisZeit := A_TickCount
    While, (determineLClickstate()=1)
    {
-      zeitSillyPrevent := A_TickCount
       Sleep, 2
       GetPhysicalCursorPos(mX, mY)
       skipLoop := (isInRange(mX, zX - 5, zX + 5) && isInRange(mY, zY - 5, zY + 5)) ? 1 : 0
@@ -3153,18 +2791,11 @@ panIMGonClick() {
 
       MouseMove, % oX, % oY, 0
       oDx := IMGdecalageX, oDy := IMGdecalageY
-      If (oDx>0 && Abs(oDx)>Abs(imgDecLX//2))
-         oDx := -imgDecLX//2
-      Else If (oDx<0 && Abs(oDx)>Abs(imgDecLX//2))
-         oDx := imgDecLX//2
-
-      If (oDy>0 && Abs(oDy)>Abs(imgDecLY//2))
-         oDy := -imgDecLY//2
-      Else If (oDy<0 && Abs(oDy)>Abs(imgDecLY//2))
-         oDy := imgDecLY//2
-
+      limitPanningDist(oDx, oDy)
       If (A_TickCount - thisZeit>15) || (drawModeAzeit<100) || (drawModeBzeit<100)
       {
+         ; If (A_TickCount - thisZeit>95)
+         zeitSillyPrevent := A_TickCount
          If (LastPrevFastDisplay=1 || PannedFastDisplay=1)
             coreReloadThisPicture()
          Else
@@ -3187,13 +2818,12 @@ winSwipeAction(thisCtrlClicked) {
    If (IMGlargerViewPort=1 && thumbsDisplaying!=1 && thisCtrlClicked="PicOnGUI2b")
    {
       SetTimer, panIMGonClick, -15
-      Return
+      Return 0
    }
 
    lowerLimitRatio := (IMGresizingMode=4) ? 0.4 : 0.2
    While, (determineLClickstate()=1)
    {
-      zeitSillyPrevent := A_TickCount
       GetPhysicalCursorPos(mX, mY)
       diffx := Abs(mX - oX)
       diffy := Abs(mY - oY)
@@ -3203,6 +2833,7 @@ winSwipeAction(thisCtrlClicked) {
       If (diffx>45 || diffy>45) && (ratioDiffs<lowerLimitRatio || ratioDiffs>3)
       {
          Sleep, 5
+         zeitSillyPrevent := A_TickCount
          swipeAct := (ratioDiffs<lowerLimitRatio) ? 1 : 2
          If (ratioDiffs="")
             swipeAct := 0
@@ -3213,6 +2844,7 @@ winSwipeAction(thisCtrlClicked) {
    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
    If !swipeAct
    {
+      zeitSillyPrevent := 1
       If (thisCtrlClicked="PicOnGUI3")
       {
          If (imgEditPanelOpened=1)
@@ -3247,6 +2879,10 @@ winSwipeAction(thisCtrlClicked) {
          GoPrevSlide()
       Else didSomething := 0
    } Else didSomething := 0
+
+   If !didSomething
+      zeitSillyPrevent := 1
+
    Return didSomething
 }
 
@@ -3321,6 +2957,12 @@ MouseMoveResponder() {
   }
 }
 
+applyIMGeditFunctionClose() {
+   applyIMGeditFunction()
+   Sleep, 2
+   CloseWindow()
+}
+
 applyIMGeditFunction() {
     If (AnyWindowOpen=24 || AnyWindowOpen=31)
        BtnPasteInSelectedArea()
@@ -3332,6 +2974,8 @@ applyIMGeditFunction() {
        BtnFillSelectedArea()
     Else If (AnyWindowOpen=25)
        BtnEraseSelectedArea()
+    Else If (AnyWindowOpen=10)
+       BtnCloseWindow()
     SetTimer, RemoveTooltip, -300
 }
 
@@ -3401,7 +3045,7 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0) {
    If (A_TickCount - lastLongOperationAbort < 550) || (A_TickCount - executingCanceableOperation < 550)
       Return
 
-   If (AnyWindowOpen=1)
+   If (AnyWindowOpen=1 || AnyWindowOpen=33 || AnyWindowOpen=38)
    {
       CloseWindow()
       Return
@@ -3679,7 +3323,6 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0) {
       ctrlState := (GetKeyState("Ctrl", "P") && dotActive=9) ? 1 : 0
       While, (determineLClickstate()=1 && o_imageLoading!=1 && dotActive && ctrlState=0)
       {
-          zeitSillyPrevent := A_TickCount
           MouseGetPos, mX, mY, thisWind
           skipLoop := (isInRange(mX, zX - 5, zX + 5) && isInRange(mY, zY - 5, zY + 5)) ? 1 : 0
           If (A_TickCount - newPosZeit>950) ; || (mX=oX && mY=oY)
@@ -3691,6 +3334,7 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0) {
           } Else If (skipLoop=1)
              Continue
 
+          zeitSillyPrevent := A_TickCount
           changePosX := (zoomLevel>1) ? Round((mX - mXo)/zL) : Round((mX - mXo)*zL)
           changePosY := (zoomLevel>1) ? Round((mY - mYo)/zL) : Round((mY - mYo)*zL)
           If (dotActive=10)
@@ -3871,7 +3515,7 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0) {
          Return
    }
 
-   If (mainParam="doubleclick" && thumbsDisplaying!=1 && displayingImageNow=1 && spaceState!=1 && imageLoading!=1) && (A_TickCount - lastInvokedSwipe>600) && (A_TickCount - anotherZeit>600)
+   If (mainParam="doubleclick" && thumbsDisplaying!=1 && displayingImageNow=1 && spaceState!=1) && (A_TickCount - lastInvokedSwipe>500) && (A_TickCount - anotherZeit>600)
    {
       ; handle double clicks in the viewport when an image is being displayed
       If (activateImgSelection=1 && imgEditPanelOpened!=1)
@@ -3881,28 +3525,20 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0) {
          Return
       }
 
-      If (TouchScreenMode=0)
-      {
-         If (slideShowRunning=1)
-            InfoToggleSlideShowu()
-         Else
-            ToggleViewModeTouch()
-         lastInvoked := A_TickCount
-         Return
-      }
       lastInvoked := A_TickCount
       If (slideShowRunning=1)
          ToggleSlideShowu()
       Sleep, 1
       ToggleViewModeTouch()
-   } Else If ((maxFilesIndex>1 || mustOpenStartFolder) && CurrentSLD) && (A_TickCount - thisZeit>950)
+   } Else If ((maxFilesIndex>1 || mustOpenStartFolder) && CurrentSLD && mainParam!="DoubleClick") && (A_TickCount - thisZeit>950)
    {
       ; handle single clicks in the viewport when multiple files are loaded
-      didSomething := 1
+      didSomething := 0
       If (TouchScreenMode=0 || spaceState=1) && (IMGlargerViewPort=1 && thumbsDisplaying!=1)
          SetTimer, panIMGonClick, -25
       Else If (TouchScreenMode=1)
          didSomething := winSwipeAction(thisCtrlClicked)
+      Else didSomething := 0
 
       lastInvoked := A_TickCount
       If didSomething
@@ -3969,6 +3605,12 @@ ToggleImageSizingMode() {
     SetTimer, RemoveTooltip, % -msgDisplayTime
     INIaction(1, "IMGresizingMode", "General")
     dummyTimerDelayiedImageDisplay(50)
+    If (AnyWindowOpen=10 && imgEditPanelOpened=1)
+    {
+       GuiControl, SettingsGUIA: Choose, IMGresizingMode, % IMGresizingMode
+       updatePanelColorsInfo()
+       updatePanelColorSliderz()
+    }
 }
 
 DefineImgSizing() {
@@ -3993,8 +3635,9 @@ dummyInfoToggleSlideShowu(actu:=0) {
 
   If (slideShowRunning!=1 || actu="stop")
   {
-     userSeenSlideImages := (userSeenSlideImages>maxFilesIndex - 1) ? maxFilesIndex : userSeenSlideImages
-     showTOOLtip("Slideshow stopped`nSeen images: " groupDigits(userSeenSlideImages))
+     userSeenSlideImages := userSeenSessionImagesArray.Count()
+     ; userSeenSlideImages := (userSeenSlideImages>maxFilesIndex - 1) ? maxFilesIndex : userSeenSlideImages
+     showTOOLtip("Slideshow stopped`nImages seen in this session: " groupDigits(userSeenSlideImages))
      SetTimer, RemoveTooltip, % -msgDisplayTime
      lastInvoked := A_TickCount
   } Else ;  If (A_TickCount - lastInvoked > 450)
@@ -4045,7 +3688,12 @@ preventScreenOff() {
 
 ToggleSlideShowu(actu:=0) {
   If (maxFilesIndex<3 && slideShowRunning!=1)
+  {
+     showTOOLtip("WARNING: Insufficient files to start slideshow...")
+     SoundBeep, 300, 100
+     SetTimer, RemoveTooltip, % -msgDisplayTime
      Return "lulz"
+  }
 
   If askAboutFileSave(" and the slideshow will begin")
      Return "lulz"
@@ -4055,10 +3703,11 @@ ToggleSlideShowu(actu:=0) {
   If (slideShowRunning=1 || actu="stop") && (actu!="start")
   {
      slideShowRunning := 0
-     ResetImgLoadStatus()
+     ; ResetImgLoadStatus()
      ; SetTimer, theSlideShowCore, Off
      prevSlideShowStop := A_TickCount
      interfaceThread.ahkFunction("slideshowsHandler", 0, "stop", SlideHowMode)
+     SetTimer, ResetImgLoadStatus, -150
   } Else If (thumbsDisplaying!=1 || actu="start")
   {
      If (A_TickCount - prevSlideShowStop<500) && (actu!="start")
@@ -4230,6 +3879,13 @@ ToggleImgColorDepth(dir:=0) {
    INIaction(1, "usrColorDepth", "General")
    INIaction(1, "imgFxMode", "General")
    SetTimer, RefreshImageFile, -50
+
+   If (AnyWindowOpen=10 && imgEditPanelOpened=1)
+   {
+      GuiControl, SettingsGUIA: Choose, usrColorDepth, % usrColorDepth
+      updatePanelColorsInfo()
+      updatePanelColorSliderz()
+   }
 }
 
 defineColorDepth() {
@@ -4246,7 +3902,10 @@ defineColorDepth() {
 }
 
 ToggleImgFX(dir:=0) {
-   Static lastInvoked := 1
+   Static lastInvoked := 1, moreFX := {1:"None", 2:"Blur", 3:"Sharpen", 4:"Brightness / Contrast", 5:"Hue / Saturation / Lightness", 6:"Levels adjust [High / Mid / Low]", 7:"Color tint [Hue / Amount]", 8:"Colors balance", 9:"Color curve per channel"}
+        , curvesFX := {1:"Brightness (density)", 2:"Contrast", 3:"Highlights", 4:"Shadows", 5:"Midtones", 6:"White saturation", 7:"Black saturation"}
+        , curvesChannels := {1:"Red", 2:"Green", 3:"Blue", 4:"All"}
+
    If (A_TickCount - lastInvoked < 50) || (thumbsDisplaying=1 && thumbnailsListMode=1)
       Return
 
@@ -4270,11 +3929,22 @@ ToggleImgFX(dir:=0) {
    imgFxMode := clampInRange(imgFxMode, 1, 9, 1)
    friendly := DefineFXmodes()
    If (imgFxMode=4)
-      friendly .= "`nBrightness: " Round(lumosGrayAdjust, 3) "`nContrast: " Round(GammosGrayAdjust, 3) "`nVibrance: " Round(zatAdjust) "%" "`nHue: " Round(hueAdjust) "°"
+      friendly .= "`nBrightness: " Round(lumosGrayAdjust, 3) "`nContrast: " Round(GammosGrayAdjust, 3)
    Else If (imgFxMode=2)
-      friendly .= "`nBrightness: " Round(lumosAdjust, 3) "`nContrast: " Round(GammosAdjust, 3) "`nSaturation: " Round(satAdjust*100) "%" "`nVibrance: " Round(zatAdjust) "%" "`nHue: " Round(hueAdjust) "°"
-   Else If (imgFxMode=3 || imgFxMode=9)
-      friendly .= "`nVibrance: " Round(zatAdjust) "%" "`nHue: " Round(hueAdjust) "°"
+      friendly .= "`nBrightness: " Round(lumosAdjust, 3) "`nContrast: " Round(GammosAdjust, 3) "`nSaturation: " Round(satAdjust*100) "%"
+
+   If (imgFxMode=2 || imgFxMode=4 || imgFxMode=9)
+      friendly .= "`nGamma: " Round(realGammos, 3)
+
+   If (specialColorFXmode>1) && (imgFxMode=2 || imgFxMode=3 || imgFxMode=4 || imgFxMode=9)
+   {
+      friendly .= "`n" moreFX[specialColorFXmode]
+      If (specialColorFXmode=9)
+         friendly .= " [" curvesFX[uiColorCurveFXmode] "]: "  Round(lummyAdjust) " - " curvesChannels[uiColorCurveFXchannel]
+      Else
+         friendly .= ":`n" Round(hueAdjust) " / " Round(zatAdjust) " / " Round(lummyAdjust)
+   }
+
    If (usrColorDepth>1 && imgFxMode=1)
       friendly .= "`nSimulated color depth: " defineColorDepth()
 
@@ -4298,12 +3968,19 @@ ToggleImgFX(dir:=0) {
       RefreshImageFile()
    Else
       dummyTimerDelayiedImageDisplay(10)
+
+   If (AnyWindowOpen=10 && imgEditPanelOpened=1)
+   {
+      GuiControl, SettingsGUIA: Choose, imgFxMode, % imgFxMode
+      updatePanelColorsInfo()
+      updatePanelColorSliderz()
+   }
 }
 
 defineImgAlign() {
    modes := {1:"Top-left corner", 2:"Top-center", 3:"Top-right corner", 4:"Left-center", 5:"Center", 6:"Right-center", 7:"Bottom-left corner", 8:"Bottom-center", 9:"Bottom-right corner"}
-   thisAlign := (IMGresizingMode=4) ? 5 : imageAligned
-   r := modes[thisAlign]
+   ; thisAlign := (IMGresizingMode=4) ? 5 : imageAligned
+   r := modes[imageAligned]
    StringUpper, r, r
    Return r
 }
@@ -4314,7 +3991,7 @@ ToggleIMGalign() {
       Return
 
    lastInvoked := A_TickCount
-   If (thumbsDisplaying=1 || IMGresizingMode=4)
+   If (thumbsDisplaying=1)
       Return
 
    resetSlideshowTimer(0)
@@ -4327,6 +4004,11 @@ ToggleIMGalign() {
    SetTimer, RemoveTooltip, % -msgDisplayTime
    INIaction(1, "imageAligned", "General")
    dummyTimerDelayiedImageDisplay(50)
+   If (AnyWindowOpen=10 && imgEditPanelOpened=1)
+   {
+      updatePanelColorsInfo()
+      updatePanelColorSliderz()
+   }
 }
 
 toggleColorAdjustments(noReturn:=0) {
@@ -4359,8 +4041,14 @@ resetClrMatrix() {
 
 ResetImageView() {
    Critical, on
-   If (StrLen(UserMemBMP)<3 && StrLen(gdiBitmap)<3 && !CurrentSLD)
+   imgPath := getIDimage(currentFileIndex)
+   If (StrLen(UserMemBMP)<3 && StrLen(gdiBitmap)<3 && !CurrentSLD) || !imgPath
+   {
+      showTOOLtip("WARNING: No image file is currently loaded reset view for...")
+      SoundBeep , 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
+   }
 
    ChangeLumos(2)
 }
@@ -4377,37 +4065,44 @@ coreResetIMGview(dummy:=0) {
   If (imgFxMode=4 && lumosGrayAdjust=1 && GammosGrayAdjust=0)
      mustResetFxMode := 1
 
-  otherFX := (vpIMGrotation>0 && thumbsDisplaying!=1) || (usrColorDepth>1 && dummy="k") ? 1 : 0
-  If (dummy="k" && imgFxMode>1)
+  If (dummy="k")
   {
-     chnRdecalage := chnGdecalage := chnBdecalage := 0
-     imgThreshold := bwDithering := hueAdjust := zatAdjust := 0
+     chnRdecalage := chnGdecalage := chnBdecalage := 0.0
+     imgThreshold := bwDithering := hueAdjust := zatAdjust := lummyAdjust := 0
+     specialColorFXmode := 1
   }
 
-  If (imgFxMode=4 || dummy="k")
+  If (imgFxMode=4)
   {
-     ; bwDithering := 0
      GammosGrayAdjust := 0
      lumosGrayAdjust := 1
-  } Else If (imgFxMode=2 || dummy="k")
+  } Else If (imgFxMode=2)
   {
      satAdjust := lumosAdjust := 1
      GammosAdjust := 0
   }
 
-  If (imgFxMode=2 || imgFxMode=3)
-     chnRdecalage := chnGdecalage := chnBdecalage := 0
+  If (imgFxMode=2 || imgFxMode=3 || dummy="k")
+     chnRdecalage := chnGdecalage := chnBdecalage := 0.0
 
   realGammos := 1
-  If (imgFxMode=1)
+  If (imgFxMode=1 || dummy="k")
   {
      zoomLevel := 1
      FlipImgH := FlipImgV := 0
      If (thumbsDisplaying!=1)
        vpIMGrotation := 0
   }
+
   If (dummy="k")
+  {
+     ; bwDithering := 0
+     GammosGrayAdjust := 0
+     lumosGrayAdjust := 1
+     satAdjust := lumosAdjust := 1
+     GammosAdjust := 0
      vpIMGrotation := 0
+  }
 
   If (imgFxMode=2 || imgFxMode=3 || imgFxMode>4 || mustResetFxMode=1)
      imgFxMode := 1
@@ -4491,6 +4186,12 @@ ChangeLumos(dir, dummy:=0) {
       SetTimer, RefreshImageFile, -50
    Else
       dummyTimerDelayiedImageDisplay(10)
+
+   If (AnyWindowOpen=10 && imgEditPanelOpened=1)
+   {
+      updatePanelColorsInfo()
+      updatePanelColorSliderz()
+   }
 }
 
 WriteSettingsColorAdjustments() {
@@ -4521,6 +4222,10 @@ WriteSettingsColorAdjustments() {
     INIaction(1, "satAdjust", "General")
     INIaction(1, "vpIMGrotation", "General")
     INIaction(1, "zatAdjust", "General")
+    INIaction(1, "lummyAdjust", "General")
+    INIaction(1, "specialColorFXmode", "General")
+    INIaction(1, "uiColorCurveFXmode", "General")
+    INIaction(1, "uiColorCurveFXchannel", "General")
 }
 
 defineIMGmirroring() {
@@ -4593,7 +4298,7 @@ ChangeZoom(dir, key:=0, stepFactor:=1) {
 
    o_IMGresizingMode := IMGresizingMode
    IMGresizingMode := 4
-   imageAligned := 5
+   ; imageAligned := 5
    zoomLevel := clampInRange(zoomLevel, 0.01, 20)
    prevGDIvpCache := Gdip_DisposeImage(prevGDIvpCache, 1)
 
@@ -4622,9 +4327,9 @@ ChangeZoom(dir, key:=0, stepFactor:=1) {
       decY := Round(((imgH)*prcH) * zoomLevel)
       prcW := mX/mainWidth
       prcH := mY/mainHeight
-      If (prcW>0.5)
+      If (prcW>0.5 || imageAligned=1)
          decX := -decX
-      If (prcH>0.5)
+      If (prcH>0.5 || imageAligned=1)
          decY := -decY
       IMGdecalageX := IMGdecalageX + decX//10
       IMGdecalageY := IMGdecalageY + decY//10
@@ -4653,6 +4358,13 @@ ChangeZoom(dir, key:=0, stepFactor:=1) {
       SetTimer, coreReloadThisPicture, -10
    Else
       dummyTimerDelayiedImageDisplay(10)
+
+   If (AnyWindowOpen=10 && imgEditPanelOpened=1)
+   {
+      GuiControl, SettingsGUIA: Choose, IMGresizingMode, % IMGresizingMode
+      updatePanelColorsInfo()
+      updatePanelColorSliderz()
+   }
 }
 
 setTexHatchScale(zL, forceIT:=0) {
@@ -4720,6 +4432,12 @@ ChangeGammos(dir) {
       SetTimer, RefreshImageFile, -50
    Else
       dummyTimerDelayiedImageDisplay(10)
+
+   If (AnyWindowOpen=10 && imgEditPanelOpened=1)
+   {
+      updatePanelColorsInfo()
+      updatePanelColorSliderz()
+   }
 }
 
 dummySaveLumGammos() {
@@ -4758,6 +4476,12 @@ ChangeSaturation(dir) {
    INIaction(1, "satAdjust", "General")
    prevValues := newValues
    dummyTimerDelayiedImageDisplay(10)
+
+   If (AnyWindowOpen=10 && imgEditPanelOpened=1)
+   {
+      updatePanelColorsInfo()
+      updatePanelColorSliderz()
+   }
 }
 
 ChangeRealGamma(dir) {
@@ -4792,6 +4516,12 @@ ChangeRealGamma(dir) {
    INIaction(1, "realGammos", "General")
    prevValues := newValues
    dummyTimerDelayiedImageDisplay(10)
+
+   If (AnyWindowOpen=10 && imgEditPanelOpened=1)
+   {
+      updatePanelColorsInfo()
+      updatePanelColorSliderz()
+   }
 }
 
 ChangeVolume(dir) {
@@ -4877,6 +4607,12 @@ dummyChangeVProtation() {
    SetTimer, RemoveTooltip, % -msgDisplayTime
    INIaction(1, "vpIMGrotation", "General")
    GdipCleanMain(4)
+   If (AnyWindowOpen=10 && imgEditPanelOpened=1)
+   {
+      GuiControl, SettingsGUIA:, vpIMGrotation, % vpIMGrotation
+      updatePanelColorsInfo()
+      updatePanelColorSliderz()
+   }
 }
 
 nextDesiredFrame() {
@@ -5032,6 +4768,12 @@ TransformIMGv() {
    SetTimer, RemoveTooltip, % -msgDisplayTime
    INIaction(1, "FlipImgV", "General")
    dummyTimerDelayiedImageDisplay(50)
+   If (AnyWindowOpen=10 && imgEditPanelOpened=1)
+   {
+      GuiControl, SettingsGUIA:, FlipImgV, % FlipImgV
+      updatePanelColorsInfo()
+      updatePanelColorSliderz()
+   }
 }
 
 setMainCanvasTransform(W, H, G:=0) {
@@ -5068,6 +4810,12 @@ TransformIMGh() {
    SetTimer, RemoveTooltip, % -msgDisplayTime
    INIaction(1, "FlipImgH", "General")
    dummyTimerDelayiedImageDisplay(50)
+   If (AnyWindowOpen=10 && imgEditPanelOpened=1)
+   {
+      GuiControl, SettingsGUIA:, FlipImgH, % FlipImgH
+      updatePanelColorsInfo()
+      updatePanelColorSliderz()
+   }
 }
 
 doOpenStartFolder() {
@@ -5169,6 +4917,9 @@ PreviousPicture(dummy:=0, inLoop:=0, selForbidden:=0) {
    If (StrLen(UserMemBMP)>2 && activateImgSelection=1 && InStr(dummy, "key-wheel"))
       Return
 
+   If (InStr(dummy, "key-") && slideShowRunning=1 && easySlideStoppage=1)
+      ToggleSlideShowu()
+
    prevFileIndex := currentFileIndex
    If (GetKeyState("Shift", "P") && thumbsDisplaying!=1 && slideShowRunning!=1 && selForbidden!=1)
       shiftPressed := 1
@@ -5183,6 +4934,9 @@ PreviousPicture(dummy:=0, inLoop:=0, selForbidden:=0) {
 NextPicture(dummy:=0, inLoop:=0, selForbidden:=0) {
    If (StrLen(UserMemBMP)>2 && activateImgSelection=1 && InStr(dummy, "key-wheel"))
       Return
+
+   If (InStr(dummy, "key-") && slideShowRunning=1 && easySlideStoppage=1)
+      ToggleSlideShowu()
 
    prevFileIndex := currentFileIndex
    If (GetKeyState("Shift", "P") && slideShowRunning!=1 && thumbsDisplaying!=1 && selForbidden!=1)
@@ -5988,7 +5742,7 @@ mergeViewPortEffectsImgEditing() {
 
     If testSelectOutsideImgEntirely(whichBitmap)
     {
-       showTOOLtip("WARNING: You cannot draw outside the image...")
+       showTOOLtip("WARNING: Invalid image selection area...")
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
        Return 1
@@ -6139,7 +5893,7 @@ ApplyColorAdjustsSelectedArea() {
 
     If testSelectOutsideImgEntirely(whichBitmap)
     {
-       showTOOLtip("WARNING: You cannot draw outside the image...")
+       showTOOLtip("WARNING: Invalid image selection area...")
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
        Return
@@ -6712,6 +6466,10 @@ carvePathFromBitmap(pBitmap, pPath, cX, cY, modus) {
 }
 
 FlipSelectedArea(flipAxis) {
+    stopNow := (activateImgSelection=1 && editingSelectionNow=1 && StrLen(gdiBitmap)>4) ? 0 : 1
+    If (stopNow=1)
+       Return 
+
     stopNow := mergeViewPortEffectsImgEditing()
     whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
     If (stopNow=1 ||!whichBitmap || thumbsDisplaying=1 || activateImgSelection!=1)
@@ -7311,13 +7069,15 @@ SetBitmapAlphaChannel(pBitmap, AlphaMaskBitmap, limitus, noOptimisations) {
        }
    }
 
-
    Gdip_UnlockBits(pBitmap, BitmapData1)
    Gdip_UnlockBits(AlphaMaskBitmap, BitmapData2)
    Return pBitmap
 }
 
 GraySelectedArea() {
+    If (activateImgSelection!=1 && thumbsDisplaying!=1)
+       selectEntireImage("r")
+
     stopNow := mergeViewPortEffectsImgEditing()
     whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !whichBitmap || thumbsDisplaying=1 || activateImgSelection!=1)
@@ -7359,6 +7119,9 @@ GraySelectedArea() {
 }
 
 InvertSelectedArea() {
+    If (activateImgSelection!=1 && thumbsDisplaying!=1)
+       selectEntireImage("r")
+
     stopNow := mergeViewPortEffectsImgEditing()
     whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !whichBitmap || thumbsDisplaying=1 || activateImgSelection!=1)
@@ -7399,7 +7162,7 @@ CropImageViewPort() {
 
     If testSelectOutsideImgEntirely(whichBitmap)
     {
-       showTOOLtip("WARNING: You cannot crop outside the image...")
+       showTOOLtip("WARNING: Invalid image selection area...")
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
        Return
@@ -7823,7 +7586,7 @@ openSettingsDir() {
 
 DeleteAllSettings() {
     SoundBeep, 300, 300
-    msgResult := msgBoxWrapper(appTitle ": Confirmation", "Are you sure you want to delete ALL personalized settings?`n`n" appTitle " will automatically restart if you choose to do so.", "&Restore defaults|&Cancel", 2, "exclamation")
+    msgResult := msgBoxWrapper(appTitle ": Confirmation", "Are you sure you want to delete ALL personalized settings?`n`n" appTitle " will automatically restart if you choose to do so. This action is irreversible.", "&Restore defaults|&Cancel", 2, "exclamation")
     If (msgResult="restore defaults")
     {
        FileSetAttrib, -R, % mainSettingsFile
@@ -7835,7 +7598,7 @@ DeleteAllSettings() {
 
 SettingsGUIAGuiContextMenu(GuiHwnd, CtrlHwnd, EventInfo, IsRightClick, X, Y) {
     Static lastInvoked := 1
-    If (CtrlHwnd && IsRightClick=1) || ((A_TickCount-lastInvoked>250) && IsRightClick=0) || (mouseToolTipWinCreated=1)
+    If (CtrlHwnd && IsRightClick=1) || ((A_TickCount - lastInvoked>250) && IsRightClick=0) || (mouseToolTipWinCreated=1)
     {
        lastInvoked := A_TickCount
        Return
@@ -7867,7 +7630,7 @@ SettingsGUIAGuiContextMenu(GuiHwnd, CtrlHwnd, EventInfo, IsRightClick, X, Y) {
 
 WinMsgBoxGuiContextMenu(GuiHwnd, CtrlHwnd, EventInfo, IsRightClick, X, Y) {
     Static lastInvoked := 1
-    If (CtrlHwnd && IsRightClick=1) || ((A_TickCount-lastInvoked>250) && IsRightClick=0) || (mouseToolTipWinCreated=1)
+    If (CtrlHwnd && IsRightClick=1) || ((A_TickCount - lastInvoked>250) && IsRightClick=0) || (mouseToolTipWinCreated=1)
     {
        lastInvoked := A_TickCount
        Return
@@ -7896,7 +7659,6 @@ WinMsgBoxGuiContextMenu(GuiHwnd, CtrlHwnd, EventInfo, IsRightClick, X, Y) {
     showThisMenu("ContextMenu")
     Return
 }
-
 
 WM_RBUTTONUP() {
     ; Tooltip, %A_GuiControl%
@@ -7984,12 +7746,17 @@ ST_Count(string, searchFor="`n") {
    Return ErrorLevel
 }
 
-
 openPreviousPanel(mode:="") {
    thisFunc := prevOpenedWindow[2]
    allowReopen := prevOpenedWindow[3]
    If (thisFunc && allowReopen=1) || (thisFunc && mode="forced")
+   {
       %thisFunc%()
+   } Else
+   {
+      showTOOLtip("No previously opened panel...")
+      SetTimer, RemoveTooltip, % -msgDisplayTime//2
+   }
 }
 
 mouseTurnOFFtooltip() {
@@ -8003,7 +7770,7 @@ mouseToolTipCreator(msg:=0, largus:=0) {
     Global TippyMsg
 
     thisHwnd := (AnyWindowOpen>0 && prevOpenedWindow[5]!=1) ? hSetWinGui : MsgBox2hwnd
-    If (StrLen(msg)<3) || (prevMsg=msg && mouseToolTipWinCreated=1) || (A_TickCount-lastInvoked<100) || !thisHwnd
+    If (StrLen(msg)<3) || (prevMsg=msg && mouseToolTipWinCreated=1) || (A_TickCount - lastInvoked<100) || !thisHwnd
        Return
 
     lastInvoked := A_TickCount
@@ -8123,6 +7890,174 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1) {
     prevOpenedWindow := [AnyWindowOpen, thisCaller, allowReopen, activateImgSelection, 0]
     addJournalEntry("Window opened: " thisCaller "() [ " AnyWindowOpen " ]")
     Return thisBtnHeight
+}
+
+PanelSeenStats() {
+    Global LViewMetaD, LViewMetaM, LViewMetaH
+    showTOOLtip("Generating statistics, please wait...")
+    thisBtnHeight := createSettingsGUI(38, A_ThisFunc)
+    btnWid := 105
+    txtWid := 360
+    lstWid := 175
+    If (PrefsLargeFonts=1)
+    {
+       lstWid := lstWid + 130
+       btnWid := btnWid + 75
+       txtWid := txtWid + 105
+       Gui, Font, s%LargeUIfontValue%
+    }
+
+    changeMcursor()
+    Gui, Add, Tab3,, Daily|Monthly|Hourly
+    Gui, Tab, 1 ; daily
+    Gui, Add, ListView, x+15 y+15 w%lstWid% r12 Grid vLViewMetaD, #|Date|Images
+    Gui, Tab, 2 ; Monthly
+    Gui, Add, ListView, x+15 y+15 w%lstWid% r12 Grid vLViewMetaM, #|Date|Images
+    Gui, Tab, 3 ; Hourly
+    Gui, Add, ListView, x+15 y+15 w%lstWid% r12 Grid vLViewMetaH, #|Date|Images
+    Gui, Tab
+    Gui, Add, Button, xs y+20 h%thisBtnHeight% w90 gBtnCopySeenStats, &Copy
+    Gui, Add, Button, x+5 hp wp Default gBtnCloseWindow, C&lose
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Images seen statistics: " appTitle)
+    PopulateSeenStatsInfos()
+    SetTimer, RemoveTooltip, -500
+    SetTimer, ResetImgLoadStatus, -500
+}
+
+BtnCopySeenStats() {
+   textu .= "`nMONTHLY SEEN IMAGES:`n"
+   Gui, SettingsGUIA: ListView, LViewMetaM
+   aR := aC := 0
+   Loop
+   {
+       aC++
+       If (aC>3)
+       {
+          aR++
+          aC := 1
+       }
+       LV_GetText(valu, aR, aC)
+       delimu := (aC=1 || aC=2) ? " | " : "`n"
+       If valu
+          textu .= valu delimu
+       Sleep, -1
+       ; ToolTip, %valu% -- %aC% -- %aR%
+       If (valu="" && A_Index>950)
+          Break
+   }
+
+   textu .= "`nDAILY SEEN IMAGES:`n"
+   Gui, SettingsGUIA: ListView, LViewMetaD
+   aR := aC := 0
+   Loop
+   {
+       aC++
+       If (aC>3)
+       {
+          aR++
+          aC := 1
+       }
+       LV_GetText(valu, aR, aC)
+       delimu := (aC=1 || aC=2) ? " | " : "`n"
+       If valu
+          textu .= valu delimu
+       Sleep, -1
+       ; ToolTip, %valu% -- %aC% -- %aR%
+       If (valu="" && A_Index>950)
+          Break
+   }
+
+   textu .= "`nHOURLY SEEN IMAGES:`n"
+   Gui, SettingsGUIA: ListView, LViewMetaH
+   aR := aC := 0
+   Loop
+   {
+       aC++
+       If (aC>3)
+       {
+          aR++
+          aC := 1
+       }
+       LV_GetText(valu, aR, aC)
+       delimu := (aC=1 || aC=2) ? " | " : "`n"
+       If valu
+          textu .= valu delimu
+       Sleep, -1
+       ; ToolTip, %valu% -- %aC% -- %aR%
+       If (valu="" && A_Index>950)
+          Break
+   }
+
+   If StrLen(textu)>10
+   {
+      Try Clipboard := Trimmer(textu)
+      Catch wasError
+          Sleep, 1
+
+      If wasError
+      {
+         showTOOLtip("ERROR: Failed to copy to clipboard...")
+         SoundBeep , 300, 100
+      } Else showTOOLtip("Images seen statistics copied to the clipboard...")
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+   }
+}
+
+PopulateSeenStatsInfos() {
+  initSeenImagesListDB()
+  If (sqlFailedInit=1)
+     Return 0
+
+  entriesCount := 0
+  RecordSet := ""
+  SQL := "SELECT * FROM images;"
+  If !seenImagesDB.Query(SQL, RecordSet)
+     Return 0
+
+  entriesD := []
+  entriesM := []
+  entriesH := []
+  Loop
+  {
+      ; entries[CalcStringHash(Row[1], 0x8003)] := Row[1]
+      If RegExMatch(Row[1], RegExFilesPattern)
+      {
+         dateuD := "z" StrReplace(SubStr(Row[2], 1, 10), "-")
+         dateuM := "z" StrReplace(SubStr(Row[2], 1, 7), "-")
+         dateuH := "z" StrReplace(SubStr(Row[2], 12, 2), "-")
+         entriez%dateuD%++
+         entriez%dateuM%++
+         entriez%dateuH%++
+         entriesD[dateuD] := [entriez%dateuD%, SubStr(Row[2], 1, 10)]
+         entriesM[dateuM] := [entriez%dateuM%, SubStr(Row[2], 1, 7)]
+         entriesH[dateuH] := [entriez%dateuH%, SubStr(Row[2], 12, 2)]
+      }
+      RC := RecordSet.Next(Row)
+  } Until (RC<1)
+
+  Gui, SettingsGUIA: ListView, LViewMetaD
+  LV_ModifyCol(1, "Integer")
+  LV_ModifyCol(3, "Integer")
+  For Key, Value in entriesD
+      LV_Add(A_Index, A_Index, Value[2], Value[1])
+  Loop, 3
+      LV_ModifyCol(A_Index, "AutoHdr Center")
+
+  Gui, SettingsGUIA: ListView, LViewMetaM
+  LV_ModifyCol(1, "Integer")
+  LV_ModifyCol(3, "Integer")
+  For Key, Value in entriesM
+      LV_Add(A_Index, A_Index, Value[2], Value[1])
+  Loop, 3
+      LV_ModifyCol(A_Index, "AutoHdr Center")
+
+  Gui, SettingsGUIA: ListView, LViewMetaH
+  LV_ModifyCol(1, "Integer")
+  LV_ModifyCol(3, "Integer")
+  For Key, Value in entriesH
+      LV_Add(A_Index, A_Index, Value[2] ":00", Value[1])
+  Loop, 3
+      LV_ModifyCol(A_Index, "AutoHdr Center")
 }
 
 PanelImageInfos() {
@@ -9027,7 +8962,7 @@ updateSQLdbEntryCaption(imgPath, txtData, whatSet) {
    activeSQLdb.EscapeStr(txtData)
    SQLstr := "INSERT INTO imagesData (imgfile) VALUES (" imgPath ");"
    activeSQLdb.Exec(SQLStr)
-   SQLstr := "UPDATE imagesData SET " whatSet "=" txtData " WHERE imgfile LIKE " imgPath ";"
+   SQLstr := "UPDATE imagesData SET " whatSet "=" txtData " WHERE imgfile=" imgPath ";"
    If !activeSQLdb.Exec(SQLStr)
       Return -1
 }
@@ -9038,7 +8973,7 @@ retrieveSQLdbEntryCaption(imgPath, whatRetrieve) {
 
   RecordSet := ""
   activeSQLdb.EscapeStr(imgPath)
-  SQL := "SELECT " whatRetrieve " FROM imagesData WHERE imgfile LIKE " imgPath ";"
+  SQL := "SELECT " whatRetrieve " FROM imagesData WHERE imgfile=" imgPath ";"
   If !activeSQLdb.Query(SQL, RecordSet)
      Return
 
@@ -9399,6 +9334,7 @@ SaveDBfilesList() {
          SQLdbGenerateStaticFolders()
       }
       saveSlideSettingsInDB()
+      activeSQLdb.Exec("VACUUM main;")
       showTOOLtip("Slideshow database saved.")
       SetTimer, RemoveTooltip, % -msgDisplayTime
    } Else If (CurrentSLD!=file2save && SLDtypeLoaded=3)
@@ -9422,6 +9358,7 @@ SaveDBfilesList() {
          SQLdbGenerateStaticFolders()
       }
       saveSlideSettingsInDB()
+      activeSQLdb.Exec("VACUUM main;")
       CurrentSLD := file2save
       showTOOLtip("Slideshow database saved.")
       SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -9792,13 +9729,16 @@ removeFilesListSeenImages() {
       setWindowTitle("Removing already seen images, please wait", 1)
       showTOOLtip("Gathering data, please wait")
       setImageLoading()
-      seenEntries := retrieveEntireSeenImagesDB(totalSeenIMGs)
+      cachedAllSessionsSeen := []
+      seenEntries := retrieveEntireSeenImagesDB(totalSeenIMGs, 0)
+      cachedAllSessionsSeen := seenEntries.Clone()
       If (totalSeenIMGs<3)
       {
          SetTimer, ResetImgLoadStatus, -50
          SoundBeep, 900, 100
          CurrentSLD := backCurrentSLD
-         activeSQLdb.Exec("COMMIT TRANSACTION;")
+         If (SLDtypeLoaded=3)
+            activeSQLdb.Exec("COMMIT TRANSACTION;")
          dummyTimerDelayiedImageDisplay(50)
          showTOOLtip("Finished removing already seen images...`nNo image was removed from the files list." etaTime)
          SetTimer, RemoveTooltip, % -msgDisplayTime//2
@@ -9818,7 +9758,6 @@ removeFilesListSeenImages() {
 
       zeitOperation := A_TickCount - startOperation
       etaTime .= "`nElapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3))
-
       showTOOLtip("Removing already seen images, please wait" etaTime)
       prevMSGdisplay := A_TickCount
       doStartLongOpDance()
@@ -9845,7 +9784,8 @@ removeFilesListSeenImages() {
           }
           ; If retrieveSeenImageDBentry(r, A_Index)           ; InStr(seenEntries, r)
           ; If seenEntries[CalcStringHash(r, 0x8003)]
-          If (seenEntries["z" StringToASC(r)]=r)
+          checkThis := "z" StringToASC(r)
+          If (seenEntries[checkThis]=r)
           {
              If (SLDtypeLoaded=3 && remFromDb=1)
              {
@@ -9854,10 +9794,10 @@ removeFilesListSeenImages() {
              }
              countSeen++
              Continue
-          }
+          } ; Else cachedAllSessionsSeen[checkThis] := 0 ; commented because it gets too slow with many images
 
           newFilesIndex++
-          newArrayu[newFilesIndex, 1] := r
+          newArrayu[newFilesIndex] := [r,,0]
           executingCanceableOperation := A_TickCount
           changeMcursor()
           If (determineTerminateOperation()=1)
@@ -9867,6 +9807,7 @@ removeFilesListSeenImages() {
           }
       }
 
+      seenEntries := []
       activeSQLdb.Exec("COMMIT TRANSACTION;")
       If (abandonAll=1)
       {
@@ -9892,7 +9833,6 @@ removeFilesListSeenImages() {
          SetTimer, ResetImgLoadStatus, -50
          Return
       }
-
       renewCurrentFilesList()
       maxFilesIndex := newFilesIndex
       resultedFilesList := newArrayu.Clone()
@@ -11657,6 +11597,10 @@ readSlideSettings(readThisFile) {
      IniRead, tstautoAdjustMode, %readThisFile%, General, autoAdjustMode, @
      IniRead, tstdoSatAdjusts, %readThisFile%, General, doSatAdjusts, @
      IniRead, tstrealGammos, %readThisFile%, General, realGammos, @
+     IniRead, tstLummyAdjust, %readThisFile%, General, lummyAdjust, @
+     IniRead, tstspecialColorFXmode, %readThisFile%, General, specialColorFXmode, @
+     IniRead, tstuiColorCurveFXchannel, %readThisFile%, General, uiColorCurveFXchannel, @
+     IniRead, tstuiColorCurveFXmode, %readThisFile%, General, uiColorCurveFXmode, @
      IniRead, tstimgThreshold, %readThisFile%, General, imgThreshold, @
      IniRead, tstchnRdecalage, %readThisFile%, General, chnRdecalage, @
      IniRead, tstchnGdecalage, %readThisFile%, General, chnGdecalage, @
@@ -11724,6 +11668,12 @@ readSlideSettings(readThisFile) {
         imageAligned := Trimmer(tstimageAligned)
      If (IsNumber(tstthumbsAratio) && isInRange(tstthumbsAratio, 1, 3))
         thumbsAratio := Trimmer(tstthumbsAratio)
+     If (IsNumber(tstspecialColorFXmode) && isInRange(tstspecialColorFXmode, 1, 9))
+        specialColorFXmode := Trimmer(tstspecialColorFXmode)
+     If (IsNumber(tstuiColorCurveFXmode) && isInRange(tstuiColorCurveFXmode, 1, 7))
+        uiColorCurveFXmode := Trimmer(tstuiColorCurveFXmode)
+     If (IsNumber(tstuiColorCurveFXchannel) && isInRange(tstuiColorCurveFXchannel, 1, 4))
+        uiColorCurveFXchannel := Trimmer(tstuiColorCurveFXchannel)
      If (IsNumber(tstslideShowDelay) && tstslideShowDelay>90)
         slideShowDelay := Trimmer(tstslideShowDelay)
      If (IsNumber(tstIMGresizingMode) && isInRange(tstIMGresizingMode, 1, 4))
@@ -11762,6 +11712,8 @@ readSlideSettings(readThisFile) {
         zatAdjust := Trimmer(tstzatAdjust)
      If isNumber(tsthueAdjust)
         hueAdjust := Trimmer(tsthueAdjust)
+     If isNumber(tstLummyAdjust)
+        lummyAdjust := Trimmer(tstLummyAdjust)
      If isNumber(tstusrAdaptiveThreshold)
         usrAdaptiveThreshold := Trimmer(tstusrAdaptiveThreshold)
      If isNumber(tstlumosGrAdjust)
@@ -12017,6 +11969,10 @@ writeSlideSettings(file2save) {
     IniWrite, % lumosGrayAdjust, %file2save%, General, lumosGrayAdjust
     IniWrite, % GammosGrayAdjust, %file2save%, General, GammosGrayAdjust
     IniWrite, % satAdjust, %file2save%, General, satAdjust
+    IniWrite, % lummyAdjust, %file2save%, General, lummyAdjust
+    IniWrite, % uiColorCurveFXmode, %file2save%, General, uiColorCurveFXmode
+    IniWrite, % uiColorCurveFXchannel, %file2save%, General, uiColorCurveFXchannel
+    IniWrite, % specialColorFXmode, %file2save%, General, specialColorFXmode
     IniWrite, % imageAligned, %file2save%, General, imageAligned
     IniWrite, % doSatAdjusts, % mainSettingsFile, General, doSatAdjusts
     IniWrite, % autoAdjustMode, % mainSettingsFile, General, autoAdjustMode
@@ -13286,11 +13242,12 @@ PanelSaveImg() {
        Return
     }
 
-    If (StrLen(UserMemBMP)<4 && StrLen(gdiBitmap)<4)
+    imgPath := getIDimage(currentFileIndex)
+    If (StrLen(UserMemBMP)<4 && StrLen(gdiBitmap)<4) || !imgPath
     {
-       showTOOLtip("No image file is currently loaded...")
+       showTOOLtip("WARNING: No image file is currently loaded...")
        SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime//2
+       SetTimer, RemoveTooltip, % -msgDisplayTime
        Return
     }
 
@@ -13421,7 +13378,15 @@ PanelSearchIndex() {
    If StrLen(mustOpenStartFolder)>3
       currentFileIndex := doOpenStartFolder()
 
-   If (maxFilesIndex<4 || AnyWindowOpen)
+   If (maxFilesIndex<3)
+   {
+      showTOOLtip("WARNING: Insufficient files to search for...")
+      SoundBeep, 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   If AnyWindowOpen
       Return
    
    fakeWinCreator(29, A_ThisFunc, 1)
@@ -13805,7 +13770,8 @@ importGivenFile() {
 PanelPasteInPlace(dummy:="") {
     calcScreenLimits()
     userClipBMPpaste := Gdip_DisposeImage(userClipBMPpaste, 1)
-    If (thumbsDisplaying=1 || activateImgSelection!=1)
+    imgPath := getIDimage(currentFileIndex)
+    If (thumbsDisplaying=1 || activateImgSelection!=1) || !imgPath
        Return
 
     If (slideShowRunning=1)
@@ -14367,9 +14333,10 @@ PasteInPlaceEraseArea(G2, mode) {
 }
 
 PanelBlurSelectedArea() {
-    If (activateImgSelection!=1 || thumbsDisplaying=1)
+    If (thumbsDisplaying=1)
        Return
 
+    wasSelect := activateImgSelection
     thisBtnHeight := createSettingsGUI(26, A_ThisFunc)
     INIaction(0, "blurAreaAmount", "General")
     INIaction(0, "blurAreaInverted", "General")
@@ -14387,8 +14354,17 @@ PanelBlurSelectedArea() {
        Gui, Font, s%LargeUIfontValue%
     }
 
+    If (activateImgSelection!=1)
+       selectEntireImage("r")
+
     thisOpacity := Round((blurAreaOpacity / 255) * 100)
     Global infoBlurOpacity, infoBlurAmount
+    If (wasSelect!=1)
+    {
+       blurAreaSoftEdges := 0
+       blurAreaInverted := 0
+    }
+
     Gui, Add, Checkbox, x15 y15 Section Checked%blurAreaSoftEdges% vblurAreaSoftEdges gupdateUIblurPanel, &Soft edges
     Gui, Add, Checkbox, xs y+10 Checked%blurAreaInverted% vblurAreaInverted gupdateUIblurPanel, &Invert selection area
     Gui, Add, Checkbox, xs y+10 hp Checked%blurAreaTwice% vblurAreaTwice gupdateUIblurPanel, &Blur twice in one go [for very large images]
@@ -14396,6 +14372,11 @@ PanelBlurSelectedArea() {
     Gui, Add, Slider, xp y+5 gupdateUIblurPanel ToolTip w%txtWid% vblurAreaAmount Range1-255, % blurAreaAmount
     Gui, Add, Text, xs y+10 wp vinfoBlurOpacity, Opacity: %thisOpacity%`%
     Gui, Add, Slider, xp y+5 gupdateUIblurPanel ToolTip w%txtWid% vblurAreaOpacity Range5-255, % blurAreaOpacity
+    If (wasSelect!=1)
+    {
+       GuiControl, Disable, blurAreaSoftEdges
+       GuiControl, Disable, blurAreaInverted
+    }
 
     Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% gBtnBlurSelectedArea, &Blur area
     Gui, Add, Button, x+5 hp w90 gBtnCloseWindow, &Cancel
@@ -14453,6 +14434,169 @@ PanelNewImage() {
     Gui, Add, Button, x+25 hp w%btnWid% gOpenNewQPVinstance, &New instance
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "New image: " appTitle)
     SetTimer, updateUInewImagePanel, -150
+}
+
+PanelPrintImage() {
+    Global PrintPosEditX, PrintPosEditY, PrintPosEditW, PrintPosEditH, PrintPosTxtX, PrintPosTxtY, PrintPosTxtW, PrintPosTxtH
+         , PrintCopies, SelectedPrinteru, PrintDoFlipuH, PrintDoFlipuV, PrinterPageInfos
+
+    If (thumbsDisplaying=1)
+       ToggleThumbsMode()
+
+    thisBtnHeight := createSettingsGUI(37, A_ThisFunc)
+    INIaction(0, "PrintDimensionsXYWH", "General")
+    INIaction(0, "PrintColorMode", "General")
+    INIaction(0, "PrintAdaptToFit", "General")
+    INIaction(0, "PrintUseViewportColors", "General")
+
+    printDims := StrSplit(PrintDimensionsXYWH, "|")
+    PrintPosX := printDims[1]
+    PrintPosY := printDims[2]
+    PrintPosW := printDims[3]
+    PrintPosH := printDims[4]
+    PrintDoFlipuV := FlipImgV
+    PrintDoFlipuH := FlipImgH
+    PrintOrientation := vpIMGrotation
+    
+    btnWid := 70
+    txtWid := 350
+    EditWid := 50
+    If (PrefsLargeFonts=1)
+    {
+       EditWid := EditWid + 50
+       btnWid := btnWid + 85
+       txtWid := txtWid + 105
+       Gui, Font, s%LargeUIfontValue%
+    }
+
+    printerlist := SGDIPrint_GetDefaultPrinter() "||" SGDIPrint_EnumPrinters("|") 
+    Gui, -DPIScale
+    Gui, Add, Text, x20 y20 w248 h351 Section +0x1000 +0xE +hwndhCropCornersPic, -
+    Gui, Add, Text, xp y+10 wp vPrinterPageInfos, -`n-`n-`n-
+    Gui, +DPIScale
+    Gui, Add, Text, x+20 ys Section, Please choose printer:
+    Gui, Add, DropDownList, y+7 wp+90 gupdatePrintPreview vSelectedPrinteru, %printerlist%
+    Gui, Add, Button, x+5 hp gBtnSetPrinterDefault, Set as &default
+    Gui, Add, Edit, xs y+10 w50 r1 limit3 +number -multi -wantTab -wrap vPrintCopies, 1
+    Gui, Add, Text, x+5 hp +0x200, copies to print
+    Gui, Add, Text, xs y+10 vPrintPosTxtY w%EditWid%, Top
+    Gui, Add, Text, x+1 vPrintPosTxtX wp, Left
+    Gui, Add, Text, x+1 vPrintPosTxtW wp, Width
+    Gui, Add, Text, x+1 vPrintPosTxtH wp, Height
+    Gui, Add, Text, x+1 wp, Angle
+    Gui, Add, Edit, xs y+7 wp gupdatePrintPreview vPrintPosEditY number -multi limit3, % PrintPosY
+    Gui, Add, UpDown, vPrintPosY Range0-98, % PrintPosY
+    Gui, Add, Edit, x+2 wp gupdatePrintPreview vPrintPosEditX number -multi limit3, % PrintPosX
+    Gui, Add, UpDown, vPrintPosX Range0-98, % PrintPosX
+    Gui, Add, Edit, x+2 wp gupdatePrintPreview vPrintPosEditW number -multi limit3, % PrintPosW
+    Gui, Add, UpDown, vPrintPosW Range2-100, % PrintPosW
+    Gui, Add, Edit, x+2 wp gupdatePrintPreview vPrintPosEditH number -multi limit3, % PrintPosH
+    Gui, Add, UpDown, vPrintPosH Range2-100, % PrintPosH
+    Gui, Add, Edit, x+2 wp gupdatePrintPreview number -multi limit3, % PrintOrientation
+    Gui, Add, UpDown, vPrintOrientation Range0-360, % PrintOrientation
+    Gui, Add, Text, xs y+10 hp +0x200, Flip image:
+    Gui, Add, Checkbox, x+10 hp gupdatePrintPreview Checked%PrintDoFlipuH% vPrintDoFlipuH, vertically
+    Gui, Add, Checkbox, x+10 hp gupdatePrintPreview Checked%PrintDoFlipuV% vPrintDoFlipuV, horizontally
+    Gui, Add, Checkbox, xs y+10 gupdatePrintPreview Checked%PrintAdaptToFit% vPrintAdaptToFit, Automatically adapt image to cover page
+    Gui, Add, Checkbox, xs y+10 gupdatePrintPreview Checked%PrintColorMode% vPrintColorMode, Print using colors
+    Gui, Add, Checkbox, xs y+10 gupdatePrintPreview Checked%PrintUseViewportColors% vPrintUseViewportColors, Apply viewport color adjustments
+
+    Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% gBtnStartPrintingNow, &Print now
+    ; Gui, Add, Button, x+5 hp gupdatePrintPreview, &Preview
+    Gui, Add, Button, x+5 hp w85 gBtnCloseWindow, &Cancel
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Print image: " appTitle)
+    ; SetTimer, updatePrintPreview, -500
+}
+
+BtnSetPrinterDefault() {
+   GuiControlGet, SelectedPrinteru
+   If !SGDIPrint_SetDefaultPrinter(SelectedPrinteru)
+      msgBoxWrapper(appTitle ": ERROR", "Failed to set " SelectedPrinteru " as default.", 0, 0, "error")
+}
+
+printSettingsObj() {
+   GuiControlGet, PrintAdaptToFit
+   GuiControlGet, PrintPosX
+   GuiControlGet, PrintPosY
+   GuiControlGet, PrintPosW
+   GuiControlGet, PrintPosH
+   GuiControlGet, PrintColorMode
+   GuiControlGet, PrintCopies
+   GuiControlGet, SelectedPrinteru
+   GuiControlGet, PrintOrientation
+   GuiControlGet, PrintDoFlipuH
+   GuiControlGet, PrintDoFlipuV
+   GuiControlGet, PrintUseViewportColors
+
+   PrintOptions := []
+   PrintOptions.pPrinterName := SelectedPrinteru
+   PrintOptions.adaptFit := PrintAdaptToFit
+   PrintOptions.userImgX := PrintPosX
+   PrintOptions.userImgY := PrintPosY
+   PrintOptions.userImgW := PrintPosW
+   PrintOptions.userImgH := PrintPosH
+   PrintOptions.colorsMode := PrintColorMode
+   PrintOptions.imgOrient := PrintOrientation
+   PrintOptions.copiez := PrintCopies
+   PrintOptions.flipuV := PrintDoFlipuH
+   PrintOptions.flipuH := PrintDoFlipuV
+   PrintOptions.applyFX := PrintUseViewportColors
+   PrintDimensionsXYWH := PrintPosX "|" PrintPosY "|" PrintPosW "|" PrintPosH
+   SetTimer, WriteSettingsPrintPanel, -200
+
+   If (PrintAdaptToFit=1)
+   {
+      GuiControl, SettingsGUIA: Disable, PrintPosX
+      GuiControl, SettingsGUIA: Disable, PrintPosY
+      GuiControl, SettingsGUIA: Disable, PrintPosW
+      GuiControl, SettingsGUIA: Disable, PrintPosH
+      GuiControl, SettingsGUIA: Disable, PrintPosEditX
+      GuiControl, SettingsGUIA: Disable, PrintPosEditY
+      GuiControl, SettingsGUIA: Disable, PrintPosEditW
+      GuiControl, SettingsGUIA: Disable, PrintPosEditH
+      GuiControl, SettingsGUIA: Disable, PrintPosTxtX
+      GuiControl, SettingsGUIA: Disable, PrintPosTxtY
+      GuiControl, SettingsGUIA: Disable, PrintPosTxtW
+      GuiControl, SettingsGUIA: Disable, PrintPosTxtH
+   } Else
+   {
+      GuiControl, SettingsGUIA: Enable, PrintPosX
+      GuiControl, SettingsGUIA: Enable, PrintPosY
+      GuiControl, SettingsGUIA: Enable, PrintPosW
+      GuiControl, SettingsGUIA: Enable, PrintPosH
+      GuiControl, SettingsGUIA: Enable, PrintPosEditX
+      GuiControl, SettingsGUIA: Enable, PrintPosEditY
+      GuiControl, SettingsGUIA: Enable, PrintPosEditW
+      GuiControl, SettingsGUIA: Enable, PrintPosEditH
+      GuiControl, SettingsGUIA: Enable, PrintPosTxtX
+      GuiControl, SettingsGUIA: Enable, PrintPosTxtY
+      GuiControl, SettingsGUIA: Enable, PrintPosTxtW
+      GuiControl, SettingsGUIA: Enable, PrintPosTxtH
+   }
+   Return PrintOptions
+}
+
+WriteSettingsPrintPanel() {
+    INIaction(1, "PrintDimensionsXYWH", "General")
+    INIaction(1, "PrintColorMode", "General")
+    INIaction(1, "PrintAdaptToFit", "General")
+    INIaction(1, "PrintUseViewportColors", "General")
+}
+
+updatePrintPreview() {
+   PrintOptions := printSettingsObj()
+   printImageNow(PrintOptions, 1)
+}
+
+BtnStartPrintingNow() {
+   PrintOptions := printSettingsObj()
+   CloseWindow("yes")
+   Sleep, 2
+   showTOOLtip("Please wait, preparing to print image...")
+   Sleep, 2
+   printImageNow(PrintOptions, 0)
+   Sleep, 2
+   RemoveTooltip()
 }
 
 PanelIMGselProperties() {
@@ -15041,6 +15185,71 @@ BtnInsertTextSelectedArea() {
     SetTimer, RemoveTooltip, -250
 }
 
+BtnViewedImages2List() {
+   userSeenSlideImages := userSeenSessionImagesArray.Count()
+   If (userSeenSlideImages<3)
+      Return
+
+   If askAboutFileSave(". The current files list will be discarded as well")
+      Return
+
+   CloseWindow("yes")
+   AnyWindowOpen := 100
+   resetMainWin2Welcome()
+   AnyWindowOpen := 0
+   CurrentSLD := mainCompiledPath "\viewed-images-session.SLD"
+   For Key, Value in userSeenSessionImagesArray
+       resultedFilesList[A_Index] := [Value]
+   SLDtypeLoaded := 1
+   maxFilesIndex := resultedFilesList.Count()
+   GenerateRandyList()
+   RandomPicture()
+}
+
+BtnALLviewedImages2List() {
+   initSeenImagesListDB()
+   If (sqlFailedInit=1)
+      Return 0
+
+   If askAboutFileSave(". The current files list will be discarded as well")
+      Return
+
+   CloseWindow("yes")
+   startOperation := A_TickCount
+   backCurrentSLD := CurrentSLD
+   CurrentSLD := ""
+   showTOOLtip("Gathering seen images list, please wait")
+   setImageLoading()
+   seenEntries := retrieveEntireSeenImagesDB(totalSeenIMGs, 1)
+   If (totalSeenIMGs<3)
+   {
+      SetTimer, ResetImgLoadStatus, -50
+      CurrentSLD := backCurrentSLD
+      If (SLDtypeLoaded=3)
+         activeSQLdb.Exec("COMMIT TRANSACTION;")
+      showTOOLtip("Found no already seen images in the database...")
+      SetTimer, RemoveTooltip, % -msgDisplayTime//2
+      Return
+   }
+
+   If (SLDtypeLoaded=3)
+      activeSQLdb.CloseDB()
+
+   AnyWindowOpen := 100
+   resetMainWin2Welcome()
+   AnyWindowOpen := 0
+   CurrentSLD := mainCompiledPath "\viewed-images-all-sessions.SLD"
+   Loop, % seenEntries.Count()
+       resultedFilesList[A_Index] := [seenEntries[A_Index],,1]
+   SLDtypeLoaded := 1
+   seenEntries := []
+   maxFilesIndex := resultedFilesList.Count()
+   GenerateRandyList()
+   etaTime := "Elapsed time to retrieve seen images list from the database:`n" SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: " maxFilesIndex
+   addJournalEntry(etaTime)
+   RandomPicture()
+}
+
 PanelJournalWindow() {
 
     thisBtnHeight := createSettingsGUI(33, A_ThisFunc)
@@ -15061,8 +15270,18 @@ PanelJournalWindow() {
            textList .= "(" currentEntry ") " Trimmer(line) "`n`n"
     }
 
+    userSeenSlideImages := userSeenSessionImagesArray.Count()
     Gui, Add, Button, x10 y10 w1 h1 gBtnCloseWindow Default, Clo&se
-    Gui, Add, Edit, x+1 y+1 ReadOnly w%txtWid% r15, % textList
+    Gui, Add, Edit, x+1 y+1 Section ReadOnly w%txtWid% r15, % textList
+    Gui, Add, Button, xp y+2 h%thisBtnHeight% gBtnViewedImages2List, &View list
+    Gui, Add, Text, x+5 yp hp +0x200, Images viewed in this session: %userSeenSlideImages%.
+    If (skipSeenImagesSlider=1)
+    {
+       Gui, Add, Button, xs y+2 h%thisBtnHeight% gBtnALLviewedImages2List, View all recorded &seen images
+       Gui, Add, Button, x+5 h%thisBtnHeight% geraseSeenIMGsDB, &Erase the entire list
+       Gui, Add, Button, xs y+2 h%thisBtnHeight% gCleanDeadFilesSeenImagesDB, &Purge inexistent files from the list
+       Gui, Add, Button, x+5 h%thisBtnHeight% gPanelSeenStats, &Statistics
+    }
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Application journal: " appTitle)
 }
 
@@ -15607,7 +15826,12 @@ PanelJump2index() {
       currentFileIndex := doOpenStartFolder()
 
    If (maxFilesIndex<3)
+   {
+      showTOOLtip("WARNING: Insufficient files indexed...")
+      SoundBeep, 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
+   }
 
    imgPath := getIDimage(currentFileIndex)
    isAnim := (RegExMatch(imgPath, "i)(.\.(gif))$") && totalFramesIndex>1) ? "`fSkip to given frame index" : ""
@@ -15833,14 +16057,20 @@ zPlitPath(inputu, fastMode, ByRef fileNamu, ByRef folderu, ByRef fileNamuNoEXT:=
     Return fileParentFolder
 }
 
-StringToASC(String) {
-  If !String
-     Return
-  
-  Loop, Parse, String 
-    AscString .= Asc(A_LoopField)
-  
-  Return AscString
+StringToASC(string) {
+   Static lastInvoked, lastAsc
+   If !String
+      Return
+
+   If (string=lastInvoked)
+      Return lastAsc
+
+   Loop, Parse, string 
+      AscString .= Asc(A_LoopField)
+ 
+   lastInvoked := string
+   lastAsc := AscString
+   Return AscString
 }
 
 readRecentFileDesties(modus:=0) {
@@ -15882,12 +16112,14 @@ CopyMovePanelWindow() {
 
     thisBtnHeight := createSettingsGUI(9, A_ThisFunc)
     btnWid := 125
+    btnWid2 := 60
     txtWid := 360
     EditWid := 395
     If (PrefsLargeFonts=1)
     {
        EditWid := EditWid + 220
        btnWid := btnWid + 70
+       btnWid2 += 60
        txtWid := txtWid + 105
        Gui, Font, s%LargeUIfontValue%
     }
@@ -15968,13 +16200,14 @@ CopyMovePanelWindow() {
     ToolTip,,,,2
     SetTimer, ResetImgLoadStatus, -50
     btnName := (UsrCopyMoveOperation=2) ? "Move" : "Copy"
-    Gui, Add, DropDownList, xs y+20 w%btnWid% gchangeCopyMoveAction AltSubmit Choose%UsrCopyMoveOperation% vUsrCopyMoveOperation, Action...`nMove file(s)`nCopy file(s)
+    Gui, Add, DropDownList, xs y+20 w%btnWid% gchangeCopyMoveAction AltSubmit Choose%UsrCopyMoveOperation% vUsrCopyMoveOperation, Action to perform...`nMove file(s)`nCopy file(s)
     Gui, Add, Button, x+5 hp w%btnWid% gBtnCpyMvChooseFilesDest, &Choose a new folder
     Gui, Add, Button, x+5 hp w90 gBtnHelpCopyMovePanel, Hel&p
 
-    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid% Default gBtnCopyMoveAction vBtnCpyMv, &Proceed...
-    Gui, Add, Button, x+5 hp w%btnWid% gEraseCopyMoveHisto, Erase &history
-    Gui, Add, Button, x+5 hp w80 gBtnCloseWindow, C&ancel
+    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid2% Default gBtnCopyMoveAction vBtnCpyMv, &Proceed
+    Gui, Add, Button, x+5 hp wp+30 gEraseCopyMoveHisto, Erase &history
+    Gui, Add, Button, x+5 hp wp+60 gBtnMarkFilesExplorer, &Mark file(s) (Explorer)
+    Gui, Add, Button, x+5 hp w70 gBtnCloseWindow, C&ancel
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, btnName " file(s) to...: " appTitle)
 }
 
@@ -15982,7 +16215,7 @@ BtnHelpCopyMovePanel() {
   imgPath := getIDimage(currentFileIndex)
   zPlitPath(imgPath, 0, OutFileName, OutDir)
   btnName := (UsrCopyMoveOperation=2) ? "Move" : "Copy"
-  msgBoxWrapper(appTitle ": HELP", "Recognized patterns:`n`na) " btnName " files to parent folder: .\`n`nb) " btnName " files to a new or existing sub-folder: \given-folder`n`nc) " btnName " files into a new or exiting folder within the parent folder: .\given-folder.`n`nThe destination folder for all files will be calculated relative to the currently active file index entry: " currentFileIndex ".`n" OutDir, -1, 0, 0)
+  msgBoxWrapper(appTitle ": HELP", "Recognized patterns:`n`na) " btnName " files to parent folder: .\`n`nb) " btnName " files to a new or existing sub-folder: \given-folder`n`nc) " btnName " files into a new or exiting folder within the parent folder: .\given-folder.`n`nThe destination folder for all files will be calculated relative to the currently active file index entry: " currentFileIndex ".`n" OutDir "`n`nIf you click on «Mark files (Explorer)» button, the selected file(s) will be marked as «COPY» or «CUT» and you can paste them in any file manager, or in another session of " appTitle ".", -1, 0, 0)
 }
 
 changeCopyMoveAction() {
@@ -16014,6 +16247,25 @@ EraseCopyMoveHisto() {
   IniDelete, % mainSettingsFile, RecentFDestinations
   CloseWindow()
   CopyMovePanelWindow()
+}
+
+BtnMarkFilesExplorer() {
+  GuiControlGet, UsrEditFileDestination, SettingsGUIA:, UsrEditFileDestination
+  GuiControlGet, UsrCopyMoveOperation, SettingsGUIA:, UsrCopyMoveOperation
+  GuiControlGet, copyMoveDoLastOption, SettingsGUIA:, copyMoveDoLastOption
+  If (UsrCopyMoveOperation=1)
+  {
+     SoundBeep, 300, 100
+     msgBoxWrapper(appTitle ": WARNING", "Please choose an action to perform: copy or move.`n`nThe selected file(s) will be marked as «COPY» or «CUT» and you can paste them in any file manager, or in another session of " appTitle ".", 0, 0, "exclamation")
+     SetTimer, RemoveTooltip, % -msgDisplayTime
+     Return
+  }
+
+  CloseWindow("yes")
+  If (UsrCopyMoveOperation=3)
+     MenuExplorerCopyFiles()
+  Else
+     MenuExplorerCutFiles()
 }
 
 BtnCopyMoveAction() {
@@ -16777,6 +17029,7 @@ openFoldersDialogWrapper(optionz, startPath, msg:="") {
 }
 
 renewCurrentFilesList() {
+   userSeenSlideImages := userSeenSessionImagesArray.Count()
    If (maxFilesIndex>1 && userSeenSlideImages>1 && skipSeenImagesSlider=1)
    {
       seenImagesDB.Exec("COMMIT TRANSACTION;")
@@ -16785,9 +17038,9 @@ renewCurrentFilesList() {
    }
 
    prevRandyIMGs := []
-   markedSelectFile := maxFilesIndex := userSeenSlideImages := 0
-   activateImgSelection := editingSelectionNow := prevRandyIMGnow := 0
    resultedFilesList := []
+   markedSelectFile := maxFilesIndex := 0
+   activateImgSelection := editingSelectionNow := prevRandyIMGnow := 0
    ForceRefreshNowThumbsList()
    currentFileIndex := 1
    prevLoadedImageIndex := ""
@@ -16896,8 +17149,22 @@ addStaticFolderSQLdb(whichFolder, fileMdate, renewList) {
 }
 
 RefreshImageFileAction() {
-   If (maxFilesIndex<1 || currentFileIndex=0)
+   imgPath := getIDimage(currentFileIndex)
+   If (StrLen(UserMemBMP)<4 && StrLen(gdiBitmap)<4) || !imgPath
+   {
+      showTOOLtip("WARNING: No image file is currently loaded...")
+      SoundBeep , 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
+   }
+
+   If InStr(imgPath, "\temporary memory object\")
+   {
+      showTOOLtip("WARNING: This image is currently unsaved. Unable to perform action.")
+      SoundBeep , 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
 
    If (slideShowRunning=1)
       ToggleSlideShowu()
@@ -16953,6 +17220,13 @@ RefreshFilesList() {
   } Else If StrLen(CurrentSLD)>3
      RegenerateEntireList()
      ; coreOpenFolder(CurrentSLD)
+
+   If (maxFilesIndex<1 && FolderExist(CurrentSLD))
+   {
+      FadeMainWindow()
+      msgBoxWrapper(appTitle ": WARNING", "No files left in the index of " appTitle ", please open a file or folder...", 0, 0, "info")
+      resetMainWin2Welcome()
+   }
 }
 
 OpenDialogFiles(dummy:=0) {
@@ -17679,7 +17953,7 @@ InitGuiContextMenu() {
    ; WinActivate, ahk_id %PVhwnd%
 }
 
-Win_SetMenu(Hwnd, hMenu=0){
+Win_SetMenu(Hwnd, hMenu=0) {
    hPrevMenu := DllCall("GetMenu", "uint", hwnd, "Uint")
    DllCall("SetMenu", "uint", hwnd, "uint", hMenu)
    return hPrevMenu
@@ -17700,8 +17974,8 @@ PathCompact(givenPath, CharMax) {
 
 createMenuCurrentFile() {
    Menu, PVtFile, Add, Cop&y file path(s) to clipboard`tShift+C, CopyImagePath
-   Menu, PVtFile, Add, Copy file(s) (for Explorer)`tAlt+C, MenuExplorerCopyFiles
-   Menu, PVtFile, Add, C&ut file(s) (for Explorer)`tAlt+X, MenuExplorerCutFiles
+   Menu, PVtFile, Add, Copy file(s) (for Explorer)`tCtrl+C, MenuExplorerCopyFiles
+   Menu, PVtFile, Add, C&ut file(s) (for Explorer)`tCtrl+X, MenuExplorerCutFiles
    Menu, PVtFile, Add, 
    Menu, PVtFile, Add, &Open with external app`tO, OpenThisFileMenu
    Menu, PVtFile, Add, &Explore containing folder`tCtrl+E, OpenThisFileFolder
@@ -17770,7 +18044,7 @@ BuildImgLiveEditMenu() {
       Menu, PVedit, Add, &Fill area / draw shapes`tAlt+Bksp, PanelFillSelectedArea
       Menu, PVedit, Add, &Draw lines / arcs / selection borders`tShift+L, PanelDrawLines
       Menu, PVedit, Add, &Insert te&xt`tShift+T, PanelInsertTextArea
-      Menu, PVedit, Add, &Adjust image vie&w`tU, ColorsAdjusterPanelWindow
+      Menu, PVedit, Add, &Adjust image vie&w`tU, PanelColorsAdjusterWindow
       If (AnyWindowOpen=10)
          Menu, PVedit, Check, &Adjust image vie&w`tU
       If (AnyWindowOpen=23)
@@ -17816,7 +18090,8 @@ BuildImgLiveEditMenu() {
       If (imgEditPanelOpened=1 && AnyWindowOpen && AnyWindowOpen!=10)
       {
          Menu, PVmenu, Add, 
-         Menu, PVmenu, Add, &Apply to image`tEnter, applyIMGeditFunction
+         Menu, PVmenu, Add, &Apply tool`tShift+Enter, applyIMGeditFunction
+         Menu, PVmenu, Add, &Apply and close panel`tEnter, applyIMGeditFunctionClose
          Menu, PVmenu, Add, &Cancel (close panel)`tEsc, CloseWindow
       }
 
@@ -17860,10 +18135,10 @@ BuildImgLiveEditMenu() {
                Menu, PVselv, Check, Elli&pse selection`tShift+E
          }
 
-         Menu, PVselv, Add, &Flip selection W/H`tF, flipSelectionWH
+         Menu, PVselv, Add, &Flip selection W/H`tI, flipSelectionWH
          Menu, PVselv, Add, &Limit selection to image area`tL, toggleLimitSelection
          Menu, PVselv, Add, 
-         Menu, PVselv, Add, R&otate by 45°, MenuSelRotation
+         Menu, PVselv, Add, R&otate by 45°`tShift+R, MenuSelRotation
          Menu, PVselv, Add, &Keep aspect ratio on rotation, ToggleSelKeepRatioRotation
          Menu, PVselv, Add, R&eset rotation`tShift+\, resetSelectionRotation
          If (rotateSelBoundsKeepRatio=1)
@@ -17928,6 +18203,7 @@ BuildMenu() {
    SetTimer, drawWelcomeImg, Off
    deleteMenus()
    createMenuCurrentFile()
+   ResetImgLoadStatus()
    Global lastWinDrag := A_TickCount
    sliSpeed := Round(slideShowDelay/1000, 2) " sec."
    Menu, PVslide, Add, &Start slideshow`tSpace, dummyInfoToggleSlideShowu
@@ -17979,17 +18255,16 @@ BuildMenu() {
       Menu, PVview, Disable, % infoThumbZoom
    } Else
    {
-      Menu, PVview, Add, Viewport image view panel`tU, ColorsAdjusterPanelWindow
+      thisAlignInfo := defineImgAlign()
+      Menu, PVview, Add, Viewport image view panel`tU, PanelColorsAdjusterWindow
       If (activateImgSelection!=1)
          Menu, PVview, Add, &Show selection`tD, ToggleEditImgSelection
       ; If (activateImgSelection=1)
       ;    Menu, PVview, Check, &Show selection`tD
       Menu, PVview, Add,
       Menu, PVview, Add, Remove alpha channel, ToggleRenderOpaque
+      Menu, PVview, Add, Image &alignment: %thisAlignInfo%`tA, ToggleIMGalign
       Menu, PVview, Add, Image &rotation: %vpIMGrotation%°`t9`, 0, MenuChangeImgRotationInVP
-      Menu, PVview, Add, Image &alignment: %imageAligned%`tA, ToggleIMGalign
-      Menu, PVview, Add, % defineImgAlign(), ToggleIMGalign
-      Try Menu, PVview, Disable, % defineImgAlign()
       Menu, PVview, Add,
       Menu, PVview, Add, &Toggle color depth`tQ, ToggleImgColorDepth
       Menu, PVview, Add, % defineColorDepth(), ToggleImgColorDepth
@@ -17999,9 +18274,6 @@ BuildMenu() {
       Menu, PVview, Disable, % DefineImgSizing()
       If (RenderOpaqueIMG=1)
          Menu, PVview, Check, Remove alpha channel
-
-      If (IMGresizingMode=4)
-         Menu, PVview, Disable, Image &alignment: %imageAligned%`tA
    }
 
    Menu, PVview, Add,
@@ -18084,7 +18356,7 @@ BuildMenu() {
    Menu, PVselv, Add, Ell&ipse selection`tShift+E, toggleEllipseSelection
    Menu, PVselv, Add, Limit selection to image bo&undaries`tL, toggleLimitSelection
    Menu, PVselv, Add, 
-   Menu, PVselv, Add, R&otate by 45°, MenuSelRotation
+   Menu, PVselv, Add, R&otate by 45°`tShift+R, MenuSelRotation
    Menu, PVselv, Add, &Keep aspect ratio on rotation, ToggleSelKeepRatioRotation
    Menu, PVselv, Add, R&eset rotation`tShift+\, resetSelectionRotation
    Menu, PVselv, Add, 
@@ -18108,6 +18380,7 @@ BuildMenu() {
          Menu, PVedit, Add, Cut selected area`tCtrl+X, CutSelectedArea
       Menu, PVedit, Add, &Copy to clipboard`tCtrl+C, CopyImage2clip
    }
+   Menu, PVedit, Add, Print image`tCtrl+P, PanelPrintImage
    Menu, PVedit, Add, Paste clipboard`tCtrl+V, PasteClipboardIMG
    If (thumbsDisplaying!=1 && activateImgSelection=1 && (CurrentSLD || StrLen(UserMemBMP)>2))
       Menu, PVedit, Add, &Paste in place`tCtrl+Shift+V, PanelPasteInPlace
@@ -18124,7 +18397,12 @@ BuildMenu() {
    }
 
    If (thumbsDisplaying!=1 && (CurrentSLD || StrLen(UserMemBMP)>2))
+   {
       Menu, PVedit, Add, &Adjust canvas size`tAlt+A, PanelAdjustImageCanvasSize
+      Menu, PVedit, Add, &Blur`tShift+B, PanelBlurSelectedArea
+      Menu, PVedit, Add, &Invert colors`tShift+I, InvertSelectedArea
+      Menu, PVedit, Add, Desaturate color&s`tCtrl+G, GraySelectedArea
+   }
 
    If (!markedSelectFile && StrLen(UserMemBMP)<3 && currentFileIndex>0)
    {
@@ -18140,16 +18418,13 @@ BuildMenu() {
    If (thumbsDisplaying!=1 && activateImgSelection=1 && (CurrentSLD || StrLen(UserMemBMP)>2))
    {
       Menu, PVedit, Add, &Erase / fade area`tDelete, PanelEraseSelectedArea
-      Menu, PVedit, Add, &Blur area`tShift+B, PanelBlurSelectedArea
       Menu, PVedit, Add, &Fill area / draw shapes`tAlt+Bksp, PanelFillSelectedArea
       Menu, PVedit, Add, &Draw lines / arcs / selection borders`tShift+L, PanelDrawLines
-      Menu, PVedit, Add, Flip selected &horizontally`tShift+H, MenuFlipSelectedAreaH
-      Menu, PVedit, Add, Flip selected &vertically`tShift+V, MenuFlipSelectedAreaV
       Menu, PVedit, Add, &Transform selected area`tCtrl+T, PanelTransformSelectedArea
       Menu, PVedit, Add, Insert te&xt`tShift+T, PanelInsertTextArea
       Menu, PVedit, Add, 
-      Menu, PVedit, Add, &Invert colors`tShift+I, InvertSelectedArea
-      Menu, PVedit, Add, Desaturate color&s`tCtrl+G, GraySelectedArea
+      Menu, PVedit, Add, Flip selected &horizontally`tShift+H, MenuFlipSelectedAreaH
+      Menu, PVedit, Add, Flip selected &vertically`tShift+V, MenuFlipSelectedAreaV
       Menu, PVedit, Add, &Limit color effects to selection`tShift+U, ApplyColorAdjustsSelectedArea
       Menu, PVedit, Add, &Crop image to selection`tShift+Enter, CropImageViewPort
    }
@@ -18300,8 +18575,8 @@ BuildMenu() {
    Menu, PVprefs, Add, 
    If (skipSeenImagesSlider=1)
    {
-      Menu, PVprefs, Add, Erase entirely seen images list, eraseSeenIMGsDB
-      Menu, PVprefs, Add, Purge seen images list no longer existing, CleanDeadFilesSeenImagesDB
+      Menu, PVprefs, Add, Erase the list of seen images, eraseSeenIMGsDB
+      Menu, PVprefs, Add, Purge list of seen images no longer existing, CleanDeadFilesSeenImagesDB
    }
    If FolderExist(thumbsCacheFolder)
       Menu, PVprefs, Add, Erase cached thumbnails, PanelOlderThanEraseThumbsCache
@@ -18668,6 +18943,13 @@ ToggleFullScreenMode() {
   prevState := !prevState
   If (prevState=0)
   {
+     If (showMainMenuBar=1)
+     {
+        showMainMenuBar := 0
+        interfaceThread.ahkassign("showMainMenuBar", showMainMenuBar)
+        Win_SetMenu(PVhwnd, 0)
+        TriggerMenuBarUpdate()
+     }
      o_TouchScreenMode := TouchScreenMode
      TouchScreenMode := 0
      isTitleBarHidden := 0
@@ -18682,14 +18964,18 @@ ToggleFullScreenMode() {
      isTitleBarHidden := 1
      WinSet, Style, +0xC00000, ahk_id %PVhwnd%
      WinRestore, ahk_id %PVhwnd%
+     INIaction(0, "showMainMenuBar", "General")
+     If (showMainMenuBar=1)
+     {
+        interfaceThread.ahkassign("showMainMenuBar", showMainMenuBar)
+        TriggerMenuBarUpdate()
+     }
   }
 
   interfaceThread.ahkassign("isTitleBarHidden", isTitleBarHidden)
   interfaceThread.ahkassign("TouchScreenMode", TouchScreenMode)
   INIaction(1, "isTitleBarHidden", "General")
   INIaction(1, "TouchScreenMode", "General")
-
-
 }
 
 ToggleAllonTop() {
@@ -18730,7 +19016,11 @@ ToggleSkipSeenIMGs() {
 }
 
 ToggleAutoResetImageView() {
-   resetImageViewOnChange := !resetImageViewOnChange
+   If (AnyWindowOpen=10)
+      GuiControlGet, resetImageViewOnChange, SettingsGUIA:, resetImageViewOnChange
+   Else
+      resetImageViewOnChange := !resetImageViewOnChange
+
    INIaction(1, "resetImageViewOnChange", "General")
 }
 
@@ -18811,10 +19101,14 @@ TglUseCacheSLDinfo() {
 }
 
 ToggleHistoInfoBoxu() {
-   If (thumbsDisplaying=1) || (StrLen(UserMemBMP)<3 && StrLen(gdiBitmap)<3 && !CurrentSLD)
-      Return
-
    prevState := (showHistogram>1 || showInfoBoxHUD>=1) ? 1 : 0
+   imgPath := getIDimage(currentFileIndex)
+   If (prevState!=1)
+   {
+      If (thumbsDisplaying=1) || (StrLen(UserMemBMP)<3 && StrLen(gdiBitmap)<3 && !CurrentSLD) || !imgPath
+         Return
+   }
+
    showHistogram := (prevState=0) ? 1 : 0
    showInfoBoxHUD := (prevState=0) ? 1 : 2
    ToggleImgHistogram(1)
@@ -19037,6 +19331,12 @@ ToggleImgHistogram(direction) {
     showTOOLtip("Histogram: " defineHistogramType())
     SetTimer, RemoveTooltip, % -msgDisplayTime
     dummyTimerDelayiedImageDisplay(50)
+    If (AnyWindowOpen=10 && imgEditPanelOpened=1)
+    {
+       GuiControl, SettingsGUIA: Choose, showHistogram, % showHistogram
+       updatePanelColorsInfo()
+       updatePanelColorSliderz()
+    }
 }
 
 defineHistogramType() {
@@ -19394,7 +19694,7 @@ coredrawWelcomeImg(G, bgrBrush, overBrush, modelu, iterations, mainWidth, mainHe
     Gdip_DeleteBrush(pBr5)
 }
 
-CalculateSweep(InputValue, Petals, w, h){
+CalculateSweep(InputValue, Petals, w, h) {
    r:=((w+h)//2)*Sin(Petals*InputValue)
    x:=r*cos(InputValue)+w
    y:=r*sin(InputValue)+h
@@ -19469,7 +19769,7 @@ createGDIPcanvas(W:=0, H:=0) {
    }
 }
 
-InitStuff() {
+InitGDIpStuff() {
 ; the main canvas
    createGDIPcanvas()
 
@@ -19509,6 +19809,7 @@ ToggleSeenIMGstatus() {
 
    mustRem := 0 
    imgPath := getIDimage(currentFileIndex)
+   cachedAllSessionsSeen["z" StringToASC(imgPath)] := ""
    resultedFilesList[currentFileIndex, 3] := ""
    seenImagesDB.Exec("COMMIT TRANSACTION;")
    If retrieveSeenImageDBentry(imgPath, currentFileIndex)
@@ -19551,6 +19852,7 @@ ToggleSeenIMGstatus() {
 
          countFilez++
          resultedFilesList[A_Index, 3] := ""
+         cachedAllSessionsSeen["z" StringToASC(imgPath)] := ""
          imgPath := getIDimage(A_Index)
          If (mustRem=1)
             deleteSQLseenEntry(imgPath, A_Index)
@@ -19581,12 +19883,15 @@ ToggleSeenIMGstatus() {
 }
 
 CleanDeadFilesSeenImagesDB() {
-   initSeenImagesListDB()
-   If (sqlFailedInit=1)
-      Return
+  initSeenImagesListDB()
+  If (sqlFailedInit=1)
+     Return
 
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
+  If (slideShowRunning=1)
+     ToggleSlideShowu()
+
+  If AnyWindowOpen
+     CloseWindow("yes")
 
   startOperation := A_TickCount
   showTOOLtip("Removing entries of inexistent files from the already seen images database, please wait...")
@@ -19603,8 +19908,11 @@ CleanDeadFilesSeenImagesDB() {
   entries := []
   Loop
   {
-      entriesCount++
-      entries[entriesCount] := Row[1]
+      If (RegExMatch(Row[1], RegExFilesPattern))
+      {
+         entriesCount++
+         entries[entriesCount] := Row[1]
+      }
       RC := RecordSet.Next(Row)
   } Until (RC<1)
   RecordSet.Free()
@@ -19640,6 +19948,8 @@ CleanDeadFilesSeenImagesDB() {
   }
 
   seenImagesDB.Exec("COMMIT TRANSACTION;")
+  seenImagesDB.Exec("VACUUM main;")
+
   zeitOperation := A_TickCount - startOperation
   etaTime := "`nElapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3))
   If (abandonAll=1)
@@ -19651,11 +19961,11 @@ CleanDeadFilesSeenImagesDB() {
   Return entries
 }
 
-
-retrieveEntireSeenImagesDB(ByRef entriesCount) {
+retrieveEntireSeenImagesDB(ByRef entriesCount, doSorting) {
   entriesCount := 0
   RecordSet := ""
-  SQL := "SELECT imgfile FROM images;"
+  orderu := (doSorting=1) ? " ORDER BY imgViewDate;" : ";"
+  SQL := "SELECT imgfile FROM images" orderu
   If !seenImagesDB.Query(SQL, RecordSet)
      Return 0
 
@@ -19663,8 +19973,14 @@ retrieveEntireSeenImagesDB(ByRef entriesCount) {
   Loop
   {
       ; entries[CalcStringHash(Row[1], 0x8003)] := Row[1]
-      entries["z" StringToASC(Row[1])] := Row[1]
-      entriesCount++
+      If RegExMatch(Row[1], RegExFilesPattern)
+      {
+         entriesCount++
+         If (doSorting=1)
+            entries[entriesCount] := Row[1]
+         Else
+            entries["z" StringToASC(Row[1])] := Row[1]
+      }
       RC := RecordSet.Next(Row)
   } Until (RC<1)
 
@@ -19686,11 +20002,20 @@ deleteSQLseenEntry(imgPath, thisIndex) {
 }
 
 retrieveSeenImageDBentry(imgPath, thisIndex, listMode:=0) {
-  If (resultedFilesList[thisIndex, 3]=1)
-     Return 1
-  Else If (resultedFilesList[thisIndex, 3]=0)
+  If !imgPath
      Return 0
 
+  If (resultedFilesList[thisIndex, 3]=1)
+     Return 1
+  Else If (resultedFilesList[thisIndex, 3]=0 && thumbsDisplaying=1)
+     Return 0
+
+  zu := cachedAllSessionsSeen["z" StringToASC(imgPath)]
+  If (zu=imgPath && imgPath)
+     Return 1
+  Else If (thumbsDisplaying=1 && zu=0)
+     Return 0
+ 
   initSeenImagesListDB()
   If (sqlFailedInit=1)
      Return 0
@@ -19698,37 +20023,46 @@ retrieveSeenImageDBentry(imgPath, thisIndex, listMode:=0) {
   RecordSet := ""
   stringA := imgPath
   seenImagesDB.EscapeStr(stringA)
-  SQL := "SELECT imgViewDate FROM images WHERE imgfile LIKE " stringA ";"
+  SQL := "SELECT imgfile FROM images WHERE imgfile=" stringA " COLLATE NOCASE;"
   If !seenImagesDB.Query(SQL, RecordSet)
      Return 0
 
   Loop
   {
-      entries .= Row[1]
+      entries .= Row[1] "`n"
       RC := RecordSet.Next(Row)
   } Until (RC<1)
 
   RecordSet.Free()
   entries := Trimmer(entries)
   If StrLen(entries)>5
+  {
+     cachedAllSessionsSeen["z" StringToASC(imgPath)] := imgPath
+     resultedFilesList[thisIndex, 3] := 1
      Return 1
-  Else
+  } Else
+  {
+     cachedAllSessionsSeen["z" StringToASC(imgPath)] := 0
+     resultedFilesList[thisIndex, 3] := 0
      Return 0
+  }
 }
 
 recordSeenIMGdbEntry(imgPath, thisIndex, doCommits:=1) {
    Static invoked := 0
-   If (resultedFilesList[thisIndex, 3]!="")
+   If (resultedFilesList[thisIndex, 3]=1)
       Return
 
    If (doCommits=1)
       initSeenImagesListDB()
+
    If (sqlFailedInit=1)
       Return
 
    FormatTime, currDate, , yyyy-MM-dd@HH
    MD5name := currDate
    resultedFilesList[thisIndex, 3] := 1
+   cachedAllSessionsSeen["z" StringToASC(imgPath)] := imgPath
    ; If (thumbsDisplaying!=1)
    ;    userSeenSlideImages++
 
@@ -19756,8 +20090,19 @@ recordSeenIMGdbEntry(imgPath, thisIndex, doCommits:=1) {
 }
 
 eraseSeenIMGsDB() {
+   initSeenImagesListDB()
+   If (sqlFailedInit=1)
+      Return 0
+
    If !seenImagesDB
       Return
+
+   msgResult := msgBoxWrapper(appTitle ": Confirmation", "Are you sure you want to delete the list of seen images?`n`nThis action is irreversible.The actual files will be untouched, only the list of seen images is going to be erased.", "&Erase list|&Cancel", 2, "exclamation")
+   If !InStr(msgResult, "erase list")
+      Return
+
+   If AnyWindowOpen
+      CloseWindow("yes")
 
    seenImagesDB.Close()
    FileDelete, % mainCompiledPath "\seenImagesList.db"
@@ -19784,7 +20129,7 @@ initSeenImagesListDB() {
       sqlFailedInit := 1
    } Else If (alreadyExisting!=1)
    {
-      SQL := "CREATE TABLE images (imgfile TEXT, imgViewDate TEXT, PRIMARY KEY(imgfile ASC));"
+      SQL := "CREATE TABLE images (imgfile TEXT COLLATE NOCASE, imgViewDate TEXT, PRIMARY KEY(imgfile ASC)); CREATE INDEX imgsIndex ON images (imgfile COLLATE NOCASE);"
       If !seenImagesDB.Exec(SQL)
       {
          skipSeenImagesSlider := 0
@@ -19808,11 +20153,11 @@ SLDinitSQLdb(fileNamu) {
    activeSQLdb.OpenDB(fileNamu)
       ; Return -1
 
-   SQL := "CREATE TABLE images (imgfile TEXT, imgfolder TEXT, fsize NUMERIC, fmodified NUMERIC, fcreated NUMERIC, imgwidth NUMERIC, imgheight NUMERIC, imgavg NUMERIC, imgmedian NUMERIC, imgCaption TEXT, imgAudio TEXT, PRIMARY KEY(imgfolder ASC, imgfile ASC));"
-   SQL .= "CREATE TABLE imagesData (imgfile TEXT, imgCaption TEXT, imgAudio TEXT, PRIMARY KEY(imgfile ASC));"
-   SQL .= "CREATE TABLE dynamicfolders (imgfolder TEXT, fmodified NUMERIC, PRIMARY KEY(imgfolder ASC));"
-   SQL .= "CREATE TABLE staticfolders (imgfolder TEXT, fmodified NUMERIC, PRIMARY KEY(imgfolder ASC));"
-   SQL .= "CREATE TABLE settings (paramz TEXT, valuez TEXT, PRIMARY KEY(paramz ASC, valuez ASC));"
+   SQL := "CREATE TABLE images (imgfile TEXT COLLATE NOCASE, imgfolder TEXT COLLATE NOCASE, fsize NUMERIC, fmodified NUMERIC, fcreated NUMERIC, imgwidth NUMERIC, imgheight NUMERIC, imgavg NUMERIC, imgmedian NUMERIC, imgCaption TEXT, imgAudio TEXT, PRIMARY KEY(imgfolder ASC, imgfile ASC));"
+   SQL .= "CREATE TABLE imagesData (imgfile TEXT COLLATE NOCASE, imgCaption TEXT, imgAudio TEXT COLLATE NOCASE, PRIMARY KEY(imgfile ASC));"
+   SQL .= "CREATE TABLE dynamicfolders (imgfolder TEXT COLLATE NOCASE, fmodified NUMERIC, PRIMARY KEY(imgfolder ASC));"
+   SQL .= "CREATE TABLE staticfolders (imgfolder TEXT COLLATE NOCASE, fmodified NUMERIC, PRIMARY KEY(imgfolder ASC));"
+   SQL .= "CREATE TABLE settings (paramz TEXT COLLATE NOCASE, valuez TEXT COLLATE NOCASE, PRIMARY KEY(paramz ASC, valuez ASC));"
    If !activeSQLdb.Exec(SQL)
       Return activeSQLdb.ErrorMsg
 }
@@ -19858,7 +20203,11 @@ setImageLoading() {
 
 ResetImgLoadStatus() {
   If (slideShowRunning=1 || animGIFplaying=1) && (imageLoading!=1 && runningLongOperation!=1)
+  {
+     If (imageLoading=1)
+        SetTimer, ResetImgLoadStatus, -90
      Return
+  }
 
   If !GetKeyState("LButton")
   {
@@ -20638,7 +20987,7 @@ LoadFileWithWIA(imgPath, fastMode) {
       setWindowTitle("Converting WIA image format to GDI+ bitmap...")
       changeMcursor()
       If wiaImg.IsAlphaPixelFormat
-         oBitmap := Gdip_CreateBitmapFromHBITMAPalpha(PicObj.Handle)
+         oBitmap := Gdip_CreateARGBBitmapFromHBITMAP(PicObj.Handle)
       Else
          oBitmap := Gdip_CreateBitmapFromHBITMAP(PicObj.Handle)
       DeleteObject(PicObj.Handle)
@@ -20692,15 +21041,10 @@ LoadBitmapFromFileu(imgPath, noBPPconv:=0, forceGDIp:=0, allowCaching:=0, allowM
      If (thumbsDisplaying!=1)
         addJournalEntry("Image loaded with FreeImage:`n" imgPath)
      GDIbmpFileConnected := 0
-     If (allowCaching=1)
-        userSeenSlideImages++
   } Else
   {
      changeMcursor()
      oBitmap := Gdip_CreateBitmapFromFile(imgPath)
-     If (allowCaching=1)
-        userSeenSlideImages++
-
      capMaxGDIbmpSize32bits()
      If StrLen(oBitmap)>2
      {
@@ -20763,8 +21107,9 @@ LoadBitmapFromFileu(imgPath, noBPPconv:=0, forceGDIp:=0, allowCaching:=0, allowM
      }
   }
 
-  If (allowCaching=1 && oBitmap)
+  If (allowCaching=1 && StrLen(oBitmap)>2)
   {
+     userSeenSessionImagesArray["z" StringToASC(imgPath)] := imgPath
      prevMD5nameB := prevMD5nameA
      prevMD5nameA := thisMD5name
      idGDIcacheSRCfileB := idGDIcacheSRCfileA
@@ -20775,6 +21120,7 @@ LoadBitmapFromFileu(imgPath, noBPPconv:=0, forceGDIp:=0, allowCaching:=0, allowM
      BbackupIMGdetails := AbackupIMGdetails.Clone()
      AbackupIMGdetails := mainLoadedIMGdetails.Clone()
   }
+
   If (allowMemBMP=1)
      currIMGdetails := mainLoadedIMGdetails.Clone()
   Return oBitmap
@@ -21366,12 +21712,12 @@ capSelectionRelativeCoords() {
    If (prcSelX1<0)
       prcSelX1 := 0
    Else If (prcSelX1>=1)
-      prcSelX1 := 0.9
+      prcSelX1 := 0.99
 
    If (prcSelY1<0)
       prcSelY1 := 0
    Else If (prcSelY1>=1)
-      prcSelY1 := 0.9
+      prcSelY1 := 0.99
 
    If (prcSelX2<0.001)
       prcSelX2 := 0.001
@@ -21917,7 +22263,7 @@ getColorMatrix() {
        Return matrix
 
     If (imgFxMode=4 && bwDithering=0)       ; grayscale
-       matrix := GenerateColorMatrix(2, lumosGrayAdjust, GammosGrayAdjust)
+       matrix := GenerateColorMatrix(2, lumosGrayAdjust, GammosGrayAdjust + 0.0001)
     Else If (imgFxMode=5)       ; grayscale R
        matrix := GenerateColorMatrix(3)
     Else If (imgFxMode=6)       ; grayscale G
@@ -21929,13 +22275,13 @@ getColorMatrix() {
     Else If (imgFxMode=9)  ; negative / invert
        matrix := GenerateColorMatrix(6)
     Else If (imgFxMode=2 || imgFxMode=3) ; personalized
-       matrix := GenerateColorMatrix(1, lumosAdjust, GammosAdjust, satAdjust, 1, chnRdecalage, chnGdecalage, chnBdecalage)
+       matrix := GenerateColorMatrix(1, lumosAdjust, GammosAdjust + 0.0001, satAdjust, 1, chnRdecalage, chnGdecalage, chnBdecalage)
     Return matrix
 }
 
 decideGDIPimageFX(ByRef matrix, ByRef imageAttribs, ByRef pEffect) {
+    Static colorzFX := {1:0, 2:1, 3:2, 4:5, 5:6, 6:7, 7:8, 8:9, 9:11}
     matrix := imageAttribs := pEffect := ""
-
     matrix := getColorMatrix()
     If (thumbsDisplaying=1 && (imgFxMode=3 || imgFxMode=8))
        matrix := ""
@@ -21958,13 +22304,16 @@ decideGDIPimageFX(ByRef matrix, ByRef imageAttribs, ByRef pEffect) {
     o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
     applyAdjusts := (ForceNoColorMatrix=1) ? 0 : 1
     thisZatAdjust := (imgFxMode=4 && bwDithering=0 && zatAdjust=0) ? -40 : zatAdjust
-    If (thisZatAdjust=0 && hueAdjust=0)
+    If (thisZatAdjust=0 && hueAdjust=0 && lummyAdjust=0) || !colorzFX[specialColorFXmode]
        applyAdjusts := 0
 
-    ; If (imgFxMode>1)
-    ;   pEffect := Gdip_CreateEffect(2, postSharpenRadius, postSharpenAmount, 0)
+    paramA := colorzFX[specialColorFXmode]=11 ? uiColorCurveFXmode : hueAdjust
+    paramB := colorzFX[specialColorFXmode]=11 ? uiColorCurveFXchannel : thisZatAdjust
+    If (colorzFX[specialColorFXmode]=1)
+       paramB := 0
+
     If (thisFXapplies=1 && applyAdjusts=1 && o_bwDithering=0)
-       pEffect := Gdip_CreateEffect(6, hueAdjust, thisZatAdjust, 0)
+       pEffect := Gdip_CreateEffect(colorzFX[specialColorFXmode], paramA, paramB, lummyAdjust)
 }
 
 QPV_ShowImgonGuiPrev(whichBitmap, newW, newH, mainWidth, mainHeight, usePrevious, imgPath) {
@@ -21985,14 +22334,13 @@ QPV_ShowImgonGuiPrev(whichBitmap, newW, newH, mainWidth, mainHeight, usePrevious
     thisIMGres := imgW + imgH
     thisWinRes := mainWidth + mainHeight
     interpoImgQuality := (userimgQuality=1) ? 7 : 5
-    If (displayFastWas=0 && userimgQuality=1) || (usePrevious=3 && slideShowRunning!=1)
+    If ((pEffect || displayFastWas=0) && userimgQuality=1) || (usePrevious=3 && slideShowRunning!=1)
     {
        thisLowMode := 1
        Gdip_SetInterpolationMode(glPG, 5)
     }
 
     zL := (zoomLevel<1) ? 1 : zoomLevel*2
-    whichBrush := 
     Gdip_SetClipRect(glPG, 0, 0, mainWidth, mainHeight)
     If (imgFxMode!=8 && animGIFplaying!=1)
     {
@@ -22034,7 +22382,20 @@ QPV_ShowImgonGuiPrev(whichBitmap, newW, newH, mainWidth, mainHeight, usePrevious
     sH := (newH>mainHeight) ? PointY2 - PointY1 : imgH
     ; ToolTip, % mainHeight "--" dH "--" sH ,,,2
 
-    r1 := Gdip_DrawImage(glPG, whichBitmap, dPosX, dPosY, dW, dH, sPosX, sPosY, sW, sH, matrix, 2, imageAttribs)
+    thisScalarX := (newW>mainWidth) ? 1 : 0
+    thisScalarY := (newH>mainHeight) ? 1 : 0
+    If (pEffect && A_OSVersion!="WIN_XP")
+    {
+       dhMatrix := Gdip_CreateMatrix()
+       Gdip_TranslateMatrix(dhMatrix, dPosX - sPosX, dPosY - sPosY, 1)
+       Gdip_ScaleMatrix(dhMatrix, dW/sW, 1, thisScalarX)
+       Gdip_ScaleMatrix(dhMatrix, 1, dH/sH, thisScalarY)
+    }
+
+    If (pEffect && dhMatrix && A_OSVersion!="WIN_XP")
+       r1 := Gdip_DrawImageFX(glPG, whichBitmap,,, sPosX, sPosY, sW, sH, matrix, pEffect, imageAttribs, dhMatrix)
+    Else ; If (pEffect || imageAttribs)
+       r1 := Gdip_DrawImage(glPG, whichBitmap, dPosX, dPosY, dW, dH, sPosX, sPosY, sW, sH, matrix, 2, imageAttribs)
 
     newW -= bonus, newH -= bonus
     mainWidth -= bonus, mainHeight -= bonus
@@ -22049,10 +22410,12 @@ QPV_ShowImgonGuiPrev(whichBitmap, newW, newH, mainWidth, mainHeight, usePrevious
        Gdip_ResetClip(glPG)
     }
 
-    diffIMGdecX := diffIMGdecY := 0
+    If dhMatrix
+       Gdip_DeleteMatrix(dhMatrix)
     If (thisLowMode=1)
        Gdip_SetInterpolationMode(glPG, interpoImgQuality)
 
+    diffIMGdecX := diffIMGdecY := 0
     ; ToolTip, %imgW% -- %imgH% == %newW% -- %newH%
     If (usePrevious!=3)
     {
@@ -22117,7 +22480,7 @@ testSelectOutsideImgEntirely(pBitmap) {
      isOutside := 0
      imgSelW := max(nImgSelX1, nImgSelX2) - min(nImgSelX1, nImgSelX2)
      imgSelH := max(nImgSelY1, nImgSelY2) - min(nImgSelY1, nImgSelY2)
-     If (imgSelW<5 || imgSelH<5)
+     If (imgSelW<3 || imgSelH<3)
         isOutside := 1
 
      ; If (nimgSelX1<2 && nimgSelY1<2 && nimgSelX2<5 && nimgSelY2<5)
@@ -22816,12 +23179,10 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
 
     setMainCanvasTransform(mainWidth, mainHeight)
     decideGDIPimageFX(matrix, imageAttribs, pEffect)
-    If (!pEffect && imageAttribs)
+    If !pEffect ; && imageAttribs)
        r4 := Gdip_DrawImage(glPG, ViewPortBMPcache,,,,,,,,,,, imageAttribs)
-    Else If (pEffect || imageAttribs)
+    Else ; If (pEffect || imageAttribs)
        r4 := Gdip_DrawImageFX(glPG, ViewPortBMPcache, 0, 0, 0, 0, mainWidth, mainHeight, matrix, pEffect, imageAttribs)
-    Else
-       r4 := Gdip_DrawImage(glPG, ViewPortBMPcache)
 
     Gdip_SetClipRect(glPG, DestPosX, DestPosY, newW, newH, 4)
     confirmTexBGR := (vpIMGrotation=0 || vpIMGrotation=90 || vpIMGrotation=180 || vpIMGrotation=270) ? 1 : 0
@@ -22934,6 +23295,9 @@ updateUIctrl() {
 
 selectAllFiles() {
     Static selMode := 0
+    If (maxFilesIndex<3)
+       Return
+
     selMode := !selMode
     selectFilesRange(1, maxFilesIndex, selMode)
     markedSelectFile := (selMode=1) ? maxFilesIndex : 0
@@ -22942,7 +23306,8 @@ selectAllFiles() {
 
 ToggleEditImgSelection() {
   Critical, on
-  If (thumbsDisplaying=1) || (StrLen(UserMemBMP)<3 && StrLen(gdiBitmap)<3 && !CurrentSLD)
+  imgPath := getIDimage(currentFileIndex)
+  If (thumbsDisplaying=1) || (StrLen(UserMemBMP)<3 && StrLen(gdiBitmap)<3 && !CurrentSLD) || !imgPath
      Return
 
   If (slideShowRunning=1)
@@ -22967,7 +23332,8 @@ ToggleEditImgSelection() {
 }
 
 selectEntireImage(act:=0) {
-   If (thumbsDisplaying=1) || (StrLen(UserMemBMP)<3 && StrLen(gdiBitmap)<3 && !CurrentSLD)
+   imgPath := getIDimage(currentFileIndex)
+   If (thumbsDisplaying=1) || (StrLen(UserMemBMP)<3 && StrLen(gdiBitmap)<3 && !CurrentSLD) || !imgPath
       Return
 
    If (getCaptionStyle(PVhwnd)=1)
@@ -22980,7 +23346,7 @@ selectEntireImage(act:=0) {
    vpr := vPselRotation
    Gdip_GetImageDimensions(gdiBitmap, imgW, imgH)
    If (ImgSelX2=imgW && imgSelY2=imgH
-   && imgSelX1=0 && imgSelY1=0)
+   && imgSelX1=0 && imgSelY1=0 && activateImgSelection=1)
    {
       resetImgSelection()
       If (act="r" && imgEditPanelOpened!=1)
@@ -23235,6 +23601,9 @@ resetSelectionRotation() {
 }
 
 MenuSelRotation() {
+   If (activateImgSelection!=1 || editingSelectionNow!=1)
+      Return
+
    VPselRotation := Round(VPselRotation) + 45
    If (VPselRotation>350)
       VPselRotation := 0
@@ -23832,6 +24201,7 @@ QPV_ShowThumbnails(startIndex) {
        QPV_listThumbnailsGridMode(startIndex)
        Return
     }
+
     thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, ignoreVaru, mainWidth, mainHeight)
     setImageLoading()
     thumbsBitmap := Gdip_CreateBitmap(mainWidth, mainHeight)
@@ -23908,10 +24278,20 @@ QPV_ShowThumbnails(startIndex) {
       systemCores := imgsNotCached//2
       filesPerCore := imgsNotCached//systemCores
    } Else systemCores := limitCores
+
+   thisPID := GetCurrentProcessId()
    mustDoMultiCore := (allowMultiCoreMode=1 && systemCores>1 && filesPerCore>1 && multiCoreThumbsInitGood=1) ? 1 : 0
+
+   mamUsage := GetProcessMemoryUsage(thisPID)
+   systemMemInfo := GlobalMemoryStatusEx()
+   thisMemoryLoad := (A_PtrSize=4) ? Round((mamUsage[1]/2104763598)*100, 1) : Round((max(mamUsage[1], mamUsage[8])/systemMemInfo.TotalPhys)*100, 1)
+   If (thisMemoryLoad>70 || A_OSVersion="WIN_XP")
+      mustDoMultiCore := 0
+
+   ; how much time in miliseconds can an image take to load and not be cached
    timePerImg := 1550//imgsNotCached
-   If (timePerImg<22)
-      timePerImg := 22
+   If (timePerImg<25)
+      timePerImg := 25
    Else If (timePerImg>300)
       timePerImg := 300
    timePerImgMultiCore := timePerImg*2 + limitCores*2
@@ -23925,8 +24305,9 @@ QPV_ShowThumbnails(startIndex) {
    }
 
    thisFileIndex := MD5name := Bindex := hasUpdated := rowIndex := imgsListed := 0
-   thisNonCachedImg := coreIndex := threadIndex := memCached := lapsOccured := 0
+   thisNonCachedImg := coreIndex := threadIndex := memCached := lapsOccured := totalLoops := 0
    maxImgSize := maxZeit := columnIndex := -1
+   prevNewCoreStarted := 1
    doStartLongOpDance()
     ; MsgBox, % filesPerCore "--" imgsMustPaint "--" imgsNotCached "--" imgsListArrayThumbs.Length()
    interfaceThread.ahkassign("alterFilesIndex", 0)
@@ -23980,6 +24361,12 @@ QPV_ShowThumbnails(startIndex) {
           thisCoreDoneLine := ""
           thisCoreDoneArr := ""
           whichCoreBusy := imgsListArrayThumbs[thisFileIndex, 2]
+          mamUsage := GetProcessMemoryUsage(thisPID)
+          systemMemInfo := GlobalMemoryStatusEx()
+          thisMemoryLoad := (A_PtrSize=4) ? Round((mamUsage[1]/2104763598)*100, 1) : Round((max(mamUsage[1], mamUsage[8])/systemMemInfo.TotalPhys)*100, 1)
+          If (A_TickCount - prevNewCoreStarted>9500 && innerLoops>2 && lapsOccured>2 && totalLoops>2)
+             Break
+
           If (whichCoreBusy>0)
           {
              hasThumbFailed := thumbThread%whichCoreBusy%.AHKgetvar.operationFailed
@@ -24012,7 +24399,7 @@ QPV_ShowThumbnails(startIndex) {
                    imgsListArrayThumbs[thisFileIndex, 1] := "x"
                 }
              } Else Continue
-          } Else If (preventNewThreads!=1)
+          } Else
           {
              coreIndex++
              If (coreIndex>limitCores)
@@ -24020,8 +24407,9 @@ QPV_ShowThumbnails(startIndex) {
              thisCoreDone := thumbThread%coreIndex%.AHKgetvar.operationDone
              waitDataCollect := thumbThread%coreIndex%.AHKgetvar.waitDataCollect
              hasThumbFailed := thumbThread%coreIndex%.AHKgetvar.operationFailed
-             If (thisCoreDone=1 && waitDataCollect<1 && hasThumbFailed=0)
+             If (thisMemoryLoad<90 && thisCoreDone=1 && waitDataCollect<1 && hasThumbFailed=0)
              {
+                prevNewCoreStarted := A_TickCount
                 thumbThread%coreIndex%.ahkassign("operationDone", 0)
                 thumbThread%coreIndex%.ahkassign("waitDataCollect", 0)
                 thisPath := imgsListArrayThumbs[thisFileIndex, 3]
@@ -24246,7 +24634,7 @@ cloneGDItoMem(pBitmap, W:=0, H:=0) {
     thisImgQuality := (userimgQuality=1) ? 3 : 5
     newBitmap := Gdip_CreateBitmap(W, H)
     G := Gdip_GraphicsFromImage(newBitmap, thisImgQuality)
-    Gdip_DrawImageRect(G, pBitmap, 0, 0, W, H)
+    Gdip_DrawImage(G, pBitmap, 0, 0, W, H)
     Gdip_DeleteGraphics(G)
     Return newBitmap
 }
@@ -24260,7 +24648,7 @@ calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, ByRef DestPosX, ByR
     CX := mainWidth//2 - newW//2
     CY := mainHeight//2 - newH//2
     modus := orderu[imageAligned]
-    If (IMGresizingMode=4) || (thumbsDisplaying=1)
+    If (thumbsDisplaying=1)
        modus := 5
 
     If (modus=1)
@@ -24307,22 +24695,23 @@ calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, ByRef DestPosX, ByR
     {
        If (prevZoom!=zoomLevel && prevZoom!=0)
        {
-          scaleu := newH/prevH ; prevH/newH
+          scaleu := newH/prevH
           IMGdecalageX := Round(IMGdecalageX*scaleu)
           IMGdecalageY := Round(IMGdecalageY*scaleu)
        } 
 
-       If (IMGdecalageX<LX//2) && (newW>mainWidth)
-          IMGdecalageX := LX//2
-       If (IMGdecalageY<LY//2) && (newH>mainHeight)
-          IMGdecalageY := LY//2
+       factoru := (imageAligned=5) ? 2 : 1
+       If (IMGdecalageX<LX//factoru) && (newW>mainWidth)
+          IMGdecalageX := LX//factoru
+       If (IMGdecalageY<LY//factoru) && (newH>mainHeight)
+          IMGdecalageY := LY//factoru
 
        If (newW-5>mainWidth)
           DestPosX := DestPosX + IMGdecalageX
        Else
           IMGdecalageX := 0
 
-        If (newH-5>mainHeight)
+       If (newH-5>mainHeight)
           DestPosY := DestPosY + IMGdecalageY
        Else
           IMGdecalageY := 0
@@ -24330,13 +24719,13 @@ calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, ByRef DestPosX, ByR
        If (DestPosX>0) && (newW>mainWidth)
        {
           DestPosX := 0
-          IMGdecalageX := - LX//2
+          IMGdecalageX := (imageAligned=5) ? - LX//2 : 0
        }
 
        If (DestPosY>0) && (newH>mainHeight)
        {
           DestPosY := 0
-          IMGdecalageY := - LY//2
+          IMGdecalageY := (imageAligned=5) ? - LY//2 : 0
        }
     }
 
@@ -25208,11 +25597,10 @@ AboutWindow() {
     Gui, Add, Edit, xp y+10 wp -multi -wantTab gfilterListViewKbdsAbout +hwndhEditField vlistViewFilteru,
 
     Gui, Tab
+    Gui, Add, Button, xs y+5 h%thisBtnHeight% w105 Default gBtnCloseWindow, &Close
+    Gui, Add, Button, x+5 hp wp gPanelJournalWindow, &Journal
     If !A_IsAdmin
-    {
-       Gui, Add, Button, xs y+5 h%thisBtnHeight% w105 Default gBtnCloseWindow, &Close
-       Gui, Add, Button, x+15 hp gRunAdminMode, &Run in admin mode
-    }
+       Gui, Add, Button, x+5 hp gRunAdminMode, &Run in admin mode
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "About " appTitle " v" appVersion)
     PopulateAboutKbdShortcutsList()
 }
@@ -25251,38 +25639,26 @@ filterListViewKbdsAbout() {
 
 BtnChangeSatPlus() {
   ChangeSaturation(1)
-  updatePanelColorsInfo()
-  updatePanelColorSliderz()
 }
 
 BtnChangeSatMin() {
   ChangeSaturation(-1)
-  updatePanelColorsInfo()
-  updatePanelColorSliderz()
 }
 
 BtnChangeLumPlus() {
   ChangeLumos(1)
-  updatePanelColorsInfo()
-  updatePanelColorSliderz()
 }
 
 BtnChangeLumMin() {
   ChangeLumos(-1)
-  updatePanelColorsInfo()
-  updatePanelColorSliderz()
 }
 
 BtnChangeGammPlus() {
   ChangeGammos(1)
-  updatePanelColorsInfo()
-  updatePanelColorSliderz()
 }
 
 BtnChangeGammMin() {
   ChangeGammos(-1)
-  updatePanelColorsInfo()
-  updatePanelColorSliderz()
 }
 
 PanelsCheckFileExists() {
@@ -25614,14 +25990,14 @@ toggleImgEditPanelWindow(dummy:="") {
    interfaceThread.ahkassign("panelWinCollapsed", panelWinCollapsed)
 }
 
-ColorsAdjusterPanelWindow() {
-    Global sliderBright, sliderContrst, sliderSatu, realTimePreview, CustomZoomCB, infoImgZoom
+PanelColorsAdjusterWindow() {
+    Global sliderBright, sliderContrst, sliderSatu, realTimePreview, CustomZoomCB, infoImgZoom, infolummyAdjust
          , infoBright, infoContrst, infoSatu, BtnLumPlus, BtnLumMin, BtnFlipH, infoZatAdjust, UIvpImgAlignCenter
          , BtnGammPlus, BtnGammMin, BtnSatPlus, BtnSatMin, ResizeModeDL, BtnFlipV, infohueAdjust
          , infoRGBchnls, RGBcbList := "-3.0|-2.0|-1.5|-1.0|-0.9|-0.8|-0.7|-0.6|-0.5|-0.4|-0.3|-0.2|-0.1|0.0|0.1|0.2|0.3|0.4|0.5|0.6|0.7|0.8|0.9|1.0|1.5|2.0|3.0"
          , infoRealGammos, infoThreshold, UIimgThreshold, UIrealGammos, infoImgRotation, UIdoubleZoom
 
-    If (thumbsDisplaying=1)
+    If (thumbsDisplaying=1 || StrLen(gdiBitmap)<4)
        Return
 
     ; If (activateImgSelection=1)
@@ -25652,7 +26028,7 @@ ColorsAdjusterPanelWindow() {
     UIimgThreshold := imgThreshold*100
     UIrealGammos := realGammos*100
     UIvpImgAlignCenter := (imageAligned=5) ? 1 : 0
-    Gui, Add, Tab3,, Main|Others
+    Gui, Add, Tab3,, Color matrix|More adjustments|Other options
 
     Gui, Tab, 1 ; general
     Gui, Add, DropDownList, x+15 y+15 Section w%txtWid% gColorPanelTriggerImageUpdate AltSubmit Choose%imgFxMode% vimgFxMode, Original image colors|Personalized colors|Auto-adjusted colors|Grayscale|Red channel|Green channel|Blue channel|Alpha channel|Inverted colors
@@ -25672,10 +26048,6 @@ ColorsAdjusterPanelWindow() {
     Gui, Add, Slider, y+5 AltSubmit ToolTip NoTicks w%slideWid% gColorPanelTriggerImageUpdate vsliderSatu Range-100-100, 1
     Gui, Add, Button, x+1 hp w45 gBtnChangeSatPlus vBtnSatPlus, +
     Gui, Add, Button, x+1 hp w45 gBtnChangeSatMin vBtnSatMin, -
-    Gui, Add, Text, xs y+2 w%slide2Wid% gBtnResetVibrance vinfoZatAdjust, Vibrance: ----
-    Gui, Add, Text, x+5 w%slide2Wid% gBtnResetHue vinfohueAdjust, Hue: ----
-    Gui, Add, Slider, xs y+5 AltSubmit NoTicks ToolTip w%slide2Wid% gColorPanelTriggerImageUpdate vzatAdjust Range-100-100, % zatAdjust
-    Gui, Add, Slider, x+5 AltSubmit NoTicks ToolTip w%slide2Wid% gColorPanelTriggerImageUpdate vhueAdjust Range-180-180, % hueAdjust
     Gui, Add, Text, xs y+2 w%slide2Wid% gBtnResetRealGamma vinfoRealGammos, Gamma: ----
     Gui, Add, Text, x+5 w%slide2Wid% gBtnResetThreshold vinfoThreshold, Threshold: ----
     Gui, Add, Slider, xs y+2 AltSubmit NoTicks ToolTip w%slide2Wid% gColorPanelTriggerImageUpdate vUIrealGammos Range0-800, % UIrealGammos
@@ -25686,7 +26058,21 @@ ColorsAdjusterPanelWindow() {
     Gui, Add, ComboBox, x+5 wp gColorPanelTriggerImageUpdate vchnGdecalage, %RGBcbList%|%chnGdecalage%||
     Gui, Add, ComboBox, x+5 wp gColorPanelTriggerImageUpdate vchnBdecalage, %RGBcbList%|%chnBdecalage%||
 
-    Gui, Tab, 2 ; others
+
+    slide3wid := slide2wid - 42
+    Gui, Tab, 2 ; more
+    Gui, Add, DropDownList, x+15 y+15 Section w%txtWid% gColorPanelTriggerImageUpdate AltSubmit Choose%specialColorFXmode% vspecialColorFXmode, None|Blur|Sharpen|Brightness / Contrast|Hue / Saturation / Lightness|Levels adjust|Color tint|Colors balance|Color curve per channel
+    Gui, Add, DropDownList, xs y+2 w%slide3Wid% gColorPanelTriggerImageUpdate AltSubmit Choose%uiColorCurveFXmode% vuiColorCurveFXmode, Brightness (density)|Contrast|Highlights|Shadows|Mid-tones|White saturation|Black saturation
+    Gui, Add, DropDownList, x+2 wp gColorPanelTriggerImageUpdate AltSubmit Choose%uiColorCurveFXchannel% vuiColorCurveFXchannel, Red|Green|Blue|Apply on all channels
+
+    Gui, Add, Text, xs y+10 w%slideWid% gBtnResetHue vinfohueAdjust, Hue: ----
+    Gui, Add, Slider, xs y+2 wp AltSubmit NoTicks ToolTip gColorPanelTriggerImageUpdate vhueAdjust Range-300-300, % hueAdjust
+    Gui, Add, Text, xs y+10 wp gBtnResetVibrance vinfoZatAdjust, Vibrance: ----
+    Gui, Add, Slider, xs y+2 wp AltSubmit NoTicks ToolTip gColorPanelTriggerImageUpdate vzatAdjust Range-300-300, % zatAdjust
+    Gui, Add, Text, xs y+10 wp gBtnResetLummy vinfolummyAdjust, Lightness: ----
+    Gui, Add, Slider, xs y+2 wp AltSubmit NoTicks ToolTip gColorPanelTriggerImageUpdate vlummyAdjust Range-300-300, % lummyAdjust
+
+    Gui, Tab, 3 ; others
     Gui, Add, DropDownList, x+15 y+15 Section w%txtWid% gColorPanelTriggerImageUpdate AltSubmit Choose%IMGresizingMode% vIMGresizingMode, Adapt all images into view|Adapt only large images into view|Original resolution (100`%)|Custom zoom level
     Gui, Add, Checkbox, x+5 gColorPanelTriggerImageUpdate Checked%UIvpImgAlignCenter% vUIvpImgAlignCenter, Centered
     Gui, Add, DropDownList, xs y+5 w%txtWid% gColorPanelTriggerImageUpdate AltSubmit Choose%usrColorDepth% vusrColorDepth, Simulate color depth|2 bits [4 colors]|3 bits [8 colors]|4 bits [16 colors]|5 bits [32 colors]|6 bits [64 colors]|7 bits [128 colors]|8 bits [256 colors]|16 bits [65536 colors]
@@ -25696,23 +26082,24 @@ ColorsAdjusterPanelWindow() {
     Gui, Add, Text, x+1 w%slide2Wid% gBtnResetZoom vinfoImgZoom, Image zoom: ----
     Gui, Add, Slider, xs y+10 ToolTip w%slide2Wid% gColorPanelTriggerImageUpdate vvpIMGrotation Range0-360, % Round(vpIMGrotation)
     Gui, Add, Slider, x+5 ToolTip w%slide2Wid% gColorPanelTriggerImageUpdate vCustomZoomCB Range1-500, % thisZL
-    Gui, Add, Text, xs y+10, Flip image:
-    Gui, Add, Checkbox, x+10 gColorPanelTriggerImageUpdate Checked%FlipImgV% vFlipImgV, vertically
-    Gui, Add, Checkbox, x+10 gColorPanelTriggerImageUpdate Checked%FlipImgH% vFlipImgH, horizontally
+    Gui, Add, Text, xs y+10 h%thisBtnHeight% +0x200, Flip viewport:
+    Gui, Add, Checkbox, x+10 +0x1000 hp gColorPanelTriggerImageUpdate Checked%FlipImgV% vFlipImgV, vertically
+    Gui, Add, Checkbox, x+5 +0x1000 hp gColorPanelTriggerImageUpdate Checked%FlipImgH% vFlipImgH, horizontally
+    Gui, Add, Text, xs y+10, Display histogram:
+    Gui, Add, DropDownList, x+10 w%btnWid% gColorPanelTriggerImageUpdate AltSubmit Choose%showHistogram% vshowHistogram, None|Luminance|Red|Green|Blue|All mixed
     Gui, Add, Checkbox, xs y+10 gColorPanelTriggerImageUpdate Checked%RenderOpaqueIMG% vRenderOpaqueIMG, Remove alpha channel [for RGBA images]
     Gui, Add, Checkbox, xs y+10 gColorPanelTriggerImageUpdate Checked%userimgQuality% vuserimgQuality, High quality image resampling
     Gui, Add, Checkbox, xs y+10 gColorPanelTriggerImageUpdate Checked%usrTextureBGR% vusrTextureBGR, Auto-generated ambiental textured viewport background
+    Gui, Add, Checkbox, xs y+10 gToggleAutoResetImageView Checked%resetImageViewOnChange% vresetImageViewOnChange, Deactivate and reset image adjustments on image file change
     ; Gui, Add, Checkbox, xs y+10 gColorPanelTriggerImageUpdate Checked%showHistogram% vshowHistogram, Display the image luminance histogram
-    Gui, Add, Text, xs y+10, Display histogram:
-    Gui, Add, DropDownList, x+10 w%btnWid% gColorPanelTriggerImageUpdate AltSubmit Choose%showHistogram% vshowHistogram, None|Luminance|Red|Green|Blue|All mixed
     Gui, Add, Text, xs y+10, TIP: right click on the viewport for more options.
 
     Gui, Tab
     Gui, Add, Button, xs-10 y+15 h%thisBtnHeight% w35 gBtnPrevImg, <<
     Gui, Add, Button, x+5 hp wp gBtnNextImg, >>
-    Gui, Add, Button, x+5 hp wp gBtnResetImageView, [R]
     Gui, Add, Button, x+5 hp w%btnWid% gCopyImage2clip, &Copy to clipboard
-    Gui, Add, Button, x+5 hp w%btnWid% gBtnSaveIMGadjustPanel, &Save image as
+    Gui, Add, Button, x+5 hp wp-25 gBtnSaveIMGadjustPanel, &Save image
+    Gui, Add, Button, x+5 hp wp-25 gBtnResetImageView, &Reset all
     ; Gui, Add, Button, x+5 hp w80 Default gBtnCloseWindow, C&lose
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Adjust viewport image view: " appTitle, winPos)
@@ -25751,16 +26138,25 @@ BtnResetSaturation() {
 
 BtnResetVibrance() {
   zatAdjust := 0
-  GuiControl, SettingsGUIA:, infoZatAdjust, Vibrance: 0`%
+  GuiControl, SettingsGUIA:, infoZatAdjust, 0
   GuiControl, SettingsGUIA:, zatAdjust, 0
   INIaction(1, "zatAdjust", "General")
   dummyTimerDelayiedImageDisplay(50)
 }
 
+BtnResetLummy() {
+  lummyAdjust := 0
+  GuiControl, SettingsGUIA:, infoLummyAdjust, 0
+  GuiControl, SettingsGUIA:, lummyAdjust, 0
+  INIaction(1, "lummyAdjust", "General")
+  dummyTimerDelayiedImageDisplay(50)
+}
+
 BtnResetHue() {
-  hueAdjust := 0
-  GuiControl, SettingsGUIA:, infohueAdjust, Hue: 0° 
-  GuiControl, SettingsGUIA:, hueAdjust, 0
+  thisValue := (specialColorFXmode=6) ? 100 : 0
+  hueAdjust := thisValue
+  GuiControl, SettingsGUIA:, infohueAdjust, % thisValue
+  GuiControl, SettingsGUIA:, hueAdjust, % thisValue
   INIaction(1, "hueAdjust", "General")
   dummyTimerDelayiedImageDisplay(50)
 }
@@ -25782,7 +26178,7 @@ BtnResetThreshold() {
 }
 
 BtnResetCHNdec() {
-  chnRdecalage := chnGdecalage := chnBdecalage := 0
+  chnRdecalage := chnGdecalage := chnBdecalage := 0.0
   GuiControl, SettingsGUIA: Choose, chnRdecalage, 14
   GuiControl, SettingsGUIA: Choose, chnGdecalage, 14
   GuiControl, SettingsGUIA: Choose, chnBdecalage, 14
@@ -25846,6 +26242,16 @@ BtnPrevImg() {
 }
 
 updatePanelColorSliderz() {
+   Static lastInvoked := 1
+   If (A_TickCount - lastInvoked < 100)
+   {
+      SetTimer, % A_ThisFunc, -110
+      Return
+   }
+   If (AnyWindowOpen!=10)
+      Return
+
+   ; GuiControlGet, specialColorFXmode, SettingsGUIA:, specialColorFXmode
    If (imgFxMode=1 || imgFxMode=2 || imgFxMode=3)
    {
       infoSliderBright := (lumosAdjust>1) ? Floor((lumosAdjust - 1)/14*100) : - Floor((1 - lumosAdjust)*100)
@@ -25864,12 +26270,80 @@ updatePanelColorSliderz() {
       GuiControl, SettingsGUIA:, sliderContrst, % infoSliderContrst
       GuiControl, SettingsGUIA:, sliderSatu, 0
    }
+
+   GuiControl, SettingsGUIA:, UIvpImgAlignCenter, % (imageAligned=5) ? 1 : 0
+   lastInvoked := A_TickCount
 }
 
 updatePanelColorsInfo() {
-   GuiControlGet, imgFxMode
-   GuiControlGet, IMGresizingMode
-   GuiControlGet, bwDithering
+   Static colorzFXinfoz := 0, colorzFXminz := 0, colorzFXmaxz := 0
+   Static lastInvoked := 1
+   If (A_TickCount - lastInvoked < 100)
+   {
+      SetTimer, % A_ThisFunc, -110
+      Return
+   }
+
+   If (AnyWindowOpen!=10)
+      Return
+
+   If !IsObject(colorzFXinfoz)
+   {
+      colorzFXinfoz := []
+      colorzFXinfoz[1] := ["-", "-", "-"]
+      colorzFXinfoz[2] := ["Blur radius", "-", "-"]
+      colorzFXinfoz[3] := ["Sharpen radius", "Sharpen amount", "-"]
+      colorzFXinfoz[4] := ["Brightness", "Contrast", "-"]
+      colorzFXinfoz[5] := ["Hue", "Saturation", "Lightness"]
+      colorzFXinfoz[6] := ["Highlights", "Midtones", "Shadows"]
+      colorzFXinfoz[7] := ["Hue", "Amount", "-"]
+      colorzFXinfoz[8] := ["Cyan / Red", "Magenta / Green", "Yellow / Blue"]
+      colorzFXinfoz[9] := ["-", "-", "Amount"]
+      colorzFXminz := []
+      colorzFXminz[1] := [-300, -300, -300]
+      colorzFXminz[2] := [0, -300, -300]
+      colorzFXminz[3] := [0, 0, -300]
+      colorzFXminz[4] := [-255, -100, -300]
+      colorzFXminz[5] := [-180, -100, -100]
+      colorzFXminz[6] := [0, -100, 0]
+      colorzFXminz[7] := [-180, 0, -300]
+      colorzFXminz[8] := [-100, -100, -100]
+      colorzFXminz[9] := [-300, -300, -100]
+      colorzFXmaxz := []
+      colorzFXmaxz[1] := [300, 300, 300]
+      colorzFXmaxz[2] := [255, 300, 300]
+      colorzFXmaxz[3] := [255, 100, 300]
+      colorzFXmaxz[4] := [255, 100, 300]
+      colorzFXmaxz[5] := [180, 100, 100]
+      colorzFXmaxz[6] := [100, 100, 100]
+      colorzFXmaxz[7] := [180, 100, 300]
+      colorzFXmaxz[8] := [100, 100, 100]
+      colorzFXmaxz[9] := [300, 300, 100]
+   }
+
+   GuiControlGet, specialColorFXmode, SettingsGUIA:, specialColorFXmode
+   GuiControlGet, imgFxMode, SettingsGUIA:, imgFxMode
+   GuiControlGet, IMGresizingMode, SettingsGUIA:, IMGresizingMode
+   GuiControlGet, bwDithering, SettingsGUIA:, bwDithering
+   thisMinA := colorzFXminz[specialColorFXmode, 1]
+   thisMinB := colorzFXminz[specialColorFXmode, 2]
+   thisMinC := colorzFXminz[specialColorFXmode, 3]
+   thisMaxA := colorzFXmaxz[specialColorFXmode, 1]
+   thisMaxB := colorzFXmaxz[specialColorFXmode, 2]
+   thisMaxC := colorzFXmaxz[specialColorFXmode, 3]
+   If (specialColorFXmode=9 && uiColorCurveFXmode=1)
+   {
+      thisMaxC := 255
+      thisMinC := -255
+   } Else If (specialColorFXmode=9 && uiColorCurveFXmode>=6)
+   {
+      thisMaxC := 255
+      thisMinC := 0
+   }
+
+   GuiControl, SettingsGUIA: +Range%thisMinA%-%thisMaxA%, hueAdjust
+   GuiControl, SettingsGUIA: +Range%thisMinB%-%thisMaxB%, zatAdjust
+   GuiControl, SettingsGUIA: +Range%thisMinC%-%thisMaxC%, lummyAdjust
 
    infolumosAdjust := (imgFxMode=4) ? Round(lumosGrayAdjust, 3) : Round(lumosAdjust, 3)
    infoGammosAdjust := (imgFxMode=4) ? Round(GammosGrayAdjust, 3) : Round(GammosAdjust, 3)
@@ -25878,12 +26352,14 @@ updatePanelColorsInfo() {
    GuiControl, SettingsGUIA:, infoBright, % "Brightness: " infolumosAdjust
    GuiControl, SettingsGUIA:, infoContrst, % "Contrast: " infoGammosAdjust
    GuiControl, SettingsGUIA:, infoSatu, % "Saturation: " infoSatAdjust
-   GuiControl, SettingsGUIA:, infoZatAdjust, % "Vibrance: " zatAdjust "%"
-   GuiControl, SettingsGUIA:, infohueAdjust, % "Hue: " hueAdjust "°"
    GuiControl, SettingsGUIA:, infoRealGammos, % "Gamma: " realGammos
    GuiControl, SettingsGUIA:, infoThreshold, % "Threshold: " imgThreshold
    GuiControl, SettingsGUIA:, infoImgZoom, % "Image zoom: " infoZoom " %"
    GuiControl, SettingsGUIA:, infoImgRotation, % "Image rotation: " vpIMGrotation "° "
+
+   GuiControl, SettingsGUIA:, infohueAdjust, % colorzFXinfoz[specialColorFXmode, 1] ": " hueAdjust
+   GuiControl, SettingsGUIA:, infoZatAdjust, % colorzFXinfoz[specialColorFXmode, 2] ": " zatAdjust
+   GuiControl, SettingsGUIA:, infoLummyAdjust, % colorzFXinfoz[specialColorFXmode, 3] ": " lummyAdjust
 
    If (vpIMGrotation=0 || vpIMGrotation=90 || vpIMGrotation=180 || vpIMGrotation=270)
       GuiControl, SettingsGUIA: Enable, usrTextureBGR
@@ -25961,6 +26437,7 @@ updatePanelColorsInfo() {
       GuiControl, SettingsGUIA: Disable, infoBright
       GuiControl, SettingsGUIA: Disable, infoContrst
       GuiControl, SettingsGUIA: Disable, infoSatu
+      GuiControl, SettingsGUIA: Disable, infoSatu
       GuiControl, SettingsGUIA: Disable, BtnLumPlus
       GuiControl, SettingsGUIA: Disable, BtnLumMin
       GuiControl, SettingsGUIA: Disable, BtnGammPlus
@@ -25983,16 +26460,33 @@ updatePanelColorsInfo() {
       GuiControl, SettingsGUIA: Enable, infoZatAdjust
       GuiControl, SettingsGUIA: Enable, hueAdjust
       GuiControl, SettingsGUIA: Enable, infohueAdjust
+      GuiControl, SettingsGUIA: Enable, lummyAdjust
+      GuiControl, SettingsGUIA: Enable, infoLummyAdjust
+      GuiControl, SettingsGUIA: Enable, specialColorFXmode
       GuiControl, SettingsGUIA: Enable, UIimgThreshold
       GuiControl, SettingsGUIA: Enable, infoThreshold
+      canEnableThese := 1
    } Else
    {
+      canEnableThese := 0
       GuiControl, SettingsGUIA: Disable, zatAdjust
       GuiControl, SettingsGUIA: Disable, infoZatAdjust
       GuiControl, SettingsGUIA: Disable, hueAdjust
       GuiControl, SettingsGUIA: Disable, infohueAdjust
+      GuiControl, SettingsGUIA: Disable, lummyAdjust
+      GuiControl, SettingsGUIA: Disable, infoLummyAdjust
+      GuiControl, SettingsGUIA: Disable, specialColorFXmode
       GuiControl, SettingsGUIA: Disable, UIimgThreshold
       GuiControl, SettingsGUIA: Disable, infoThreshold
+   }
+   If (specialColorFXmode=9 && canEnableThese=1)
+   {
+      GuiControl, SettingsGUIA: Enable, uiColorCurveFXmode
+      GuiControl, SettingsGUIA: Enable, uiColorCurveFXchannel
+   } Else
+   {
+      GuiControl, SettingsGUIA: Disable, uiColorCurveFXmode
+      GuiControl, SettingsGUIA: Disable, uiColorCurveFXchannel
    }
 
    If (imgFxMode=2 || imgFxMode=3)
@@ -26020,6 +26514,38 @@ updatePanelColorsInfo() {
       GuiControl, SettingsGUIA: Disable, usrAdaptiveThreshold
       GuiControl, SettingsGUIA: Disable, doSatAdjusts
    }
+
+   If (colorzFXinfoz[specialColorFXmode, 1]="-")
+   {
+      GuiControl, SettingsGUIA: Disable, infohueAdjust
+      GuiControl, SettingsGUIA: Disable, hueAdjust
+   } Else If (canEnableThese=1)
+   {
+      GuiControl, SettingsGUIA: Enable, infohueAdjust
+      GuiControl, SettingsGUIA: Enable, hueAdjust
+   }
+
+   If (colorzFXinfoz[specialColorFXmode, 2]="-")
+   {
+      GuiControl, SettingsGUIA: Disable, infoZatAdjust
+      GuiControl, SettingsGUIA: Disable, zatAdjust
+   } Else If (canEnableThese=1)
+   {
+      GuiControl, SettingsGUIA: Enable, infoZatAdjust
+      GuiControl, SettingsGUIA: Enable, zatAdjust
+   }
+
+   If (colorzFXinfoz[specialColorFXmode, 3]="-")
+   {
+      GuiControl, SettingsGUIA: Disable, infoLummyAdjust
+      GuiControl, SettingsGUIA: Disable, lummyAdjust
+   } Else If (canEnableThese=1)
+   {
+      GuiControl, SettingsGUIA: Enable, infoLummyAdjust
+      GuiControl, SettingsGUIA: Enable, lummyAdjust
+   }
+
+   lastInvoked := A_TickCount
 }
 
 btnResetImageView() {
@@ -26032,9 +26558,11 @@ btnResetImageView() {
   GuiControl, SettingsGUIA: Choose, chnGdecalage, 14
   GuiControl, SettingsGUIA: Choose, chnBdecalage, 14
   GuiControl, SettingsGUIA: Choose, IMGresizingMode, 1
+  GuiControl, SettingsGUIA: Choose, specialColorFXmode, 1
   GuiControl, SettingsGUIA:, bwDithering, 0
-  ColorDepthDithering := usrColorDepth := IMGresizingMode := imgFxMode := satAdjust := lumosAdjust := lumosGrayAdjust := 1
-  vpIMGrotation := zatAdjust := hueAdjust := chnRdecalage := chnGdecalage := chnBdecalage := GammosAdjust := GammosGrayAdjust := 0
+  ColorDepthDithering := usrColorDepth := IMGresizingMode := imgFxMode := satAdjust := lumosAdjust := lumosGrayAdjust := specialColorFXmode := 1
+  vpIMGrotation := zatAdjust := hueAdjust := GammosAdjust := GammosGrayAdjust := 0
+  chnRdecalage := chnGdecalage := chnBdecalage := 0.0
   updatePanelColorsInfo()
   UIrealGammos := realGammos := usrAdaptiveThreshold := infoBright := infoSatu := 1
   bwDithering := infoContrst := sliderSatu := sliderBright := sliderContrst := 0
@@ -26084,6 +26612,10 @@ ColorPanelTriggerImageUpdate(dummy:=0) {
    GuiControlGet, chnBdecalage, SettingsGUIA:, chnBdecalage
    GuiControlGet, zatAdjust, SettingsGUIA:, zatAdjust
    GuiControlGet, hueAdjust, SettingsGUIA:, hueAdjust
+   GuiControlGet, lummyAdjust, SettingsGUIA:, lummyAdjust
+   GuiControlGet, uiColorCurveFXchannel, SettingsGUIA:, uiColorCurveFXchannel
+   GuiControlGet, uiColorCurveFXmode, SettingsGUIA:, uiColorCurveFXmode
+   GuiControlGet, specialColorFXmode, SettingsGUIA:, specialColorFXmode
    GuiControlGet, UIimgThreshold, SettingsGUIA:, UIimgThreshold
    GuiControlGet, UIrealGammos, SettingsGUIA:, UIrealGammos
    GuiControlGet, userimgQuality, SettingsGUIA:, userimgQuality
@@ -26502,7 +27034,6 @@ PanelResizeImageWindow() {
 
     If (resetImageViewOnChange=1)
        ResizeApplyEffects := 0
-
 
     Gui, Add, Tab3, , General|File(s) destination
     Gui, Tab, 1
@@ -27654,6 +28185,7 @@ updateCachedStaticFolders(mainFolderu, onlyMainFolder) {
 remFilesFromList(SelectedDir, silentus:=0) {
     If (silentus=0)
        showTOOLtip("Removing files from the list pertaining to...`n" SelectedDir "\`n")
+
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
     markedSelectFile := 0
@@ -28176,7 +28708,7 @@ BlackedCreator(thisOpacity, killWin:=0) {
        Return
     }
 
-    If (A_TickCount-lastInvoked<250)
+    If (A_TickCount - lastInvoked<250)
        Return
 
     lastInvoked := A_TickCount
@@ -28810,10 +29342,8 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode:=0, forceNoSel:=0) {
       Return
    }
    selCoords := StrSplit(selCoords, ",")
-   X1 := selCoords[1]
-   Y1 := selCoords[2]
-   X2 := selCoords[3]
-   Y2 := selCoords[4]
+   X1 := selCoords[1], Y1 := selCoords[2]
+   X2 := selCoords[3], Y2 := selCoords[4]
 
    If (silentMode=0)
    {
@@ -28830,10 +29360,8 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode:=0, forceNoSel:=0) {
    } Else
    {
       vPselRotation := EllipseSelectMode := 0
-      ImgSelX1 := X1
-      ImgSelY1 := Y1
-      ImgSelX2 := X2
-      ImgSelY2 := Y2
+      ImgSelX1 := X1, ImgSelY1 := Y1
+      ImgSelX2 := X2, ImgSelY2 := Y2
       prcSelX1 := X1/Width
       prcSelY1 := Y1/Height
       prcSelX2 := X2/Width
@@ -30343,7 +30871,7 @@ LoadFimFile(imgPath, noBPPconv) {
      hBITMAP := Gdi_CreateDIBitmap(hDC, bmpInfoHeader, 4, pBits, bitmapInfo, 0)
      If alphaBitmap
      {
-        pBitmap := Gdip_CreateBitmapFromHBITMAPalpha(hBitmap)
+        pBitmap := Gdip_CreateARGBBitmapFromHBITMAP(hBitmap)
      } Else
      {
         pBitmap := Gdip_CreateBitmapFromHBITMAP(hBitmap)
@@ -30943,6 +31471,147 @@ GetInstalledPrinters(Delimiter="|",Default=True) {
   }
   StringTrimRight, printerlist, printerlist, StrLen(Delimiter)
   return %printerlist%
+}
+
+
+printImageNow(PrintOptions, previewMode) {
+   pPrinterName := PrintOptions.pPrinterName
+   adaptFit := PrintOptions.adaptFit
+   userImgX := PrintOptions.userImgX
+   userImgY := PrintOptions.userImgY
+   userImgW := PrintOptions.userImgW
+   userImgH := PrintOptions.userImgH
+   colorsMode := PrintOptions.colorsMode
+   imgOrient := PrintOptions.imgOrient
+   copiez := PrintOptions.copiez
+   flipuV := PrintOptions.flipuV
+   flipuH := PrintOptions.flipuH
+   applyFX := PrintOptions.applyFX
+
+   ; pPrinterName := SGDIPrint_GetDefaultPrinter()
+   ; hdcObj := SGDIPrint_GetHDCfromPrintDlg(PVhwnd)
+   hdcObj := SGDIPrint_GetHDCfromPrinterName(pPrinterName, 1, Round(colorsMode + 1), copiez, PVhwnd)
+   If (previewMode=1)
+   {
+      calcIMGdimensions(hdcObj.HDC_Width, hdcObj.HDC_Height, 248, 351, ResizedW, ResizedH)
+   } Else
+   {
+      ResizedW := hdcObj.HDC_Width
+      ResizedH := hdcObj.HDC_Height
+   }
+
+   ; - "print" to bitmap -
+   pBitmap := SGDIPrint_GetMatchingBitmap(ResizedW, ResizedH)
+   gPrint := SGDIPrint_GraphicsFromBitmap(pBitmap)
+   If (applyFX=1)
+      decideGDIPimageFX(matrix, imageAttribs, pEffect)
+
+   Gdip_GetImageDimensions(pBitmap, pageW, pageH)
+   imgPosX := Round(pageW*(userImgX/100))
+   imgPosY := Round(pageH*(userImgY/100))
+   imgNewW := Round(pageW*(userImgW/100))
+   imgNewH := Round(pageH*(userImgH/100))
+   If (adaptFit=1)
+   {
+      imgNewH := pageH
+      imgNewW := pageW
+      imgPosX := imgPosY := 0
+   }
+
+   If isInRange(imgOrient, 1, 359)
+   {
+      If (previewMode=1)
+         imgToPrint := Gdip_ResizeBitmap(gdiBitmap, 600, 600, 1)
+      whichBitmap := StrLen(imgToPrint)>3 ? imgToPrint : gdiBitmap
+      newBitmap := Gdip_RotateBitmapAtCenter(whichBitmap, imgOrient, 1)
+      If StrLen(imgToPrint)>3
+         imgToPrint := Gdip_DisposeImage(imgToPrint, 1)
+
+      If StrLen(newBitmap)>3
+      {
+         hasRotated := 1
+         imgToPrint := newBitmap
+      }
+   } 
+
+   whichBitmap := (hasRotated=1) ? imgToPrint : gdiBitmap
+   Gdip_GetImageDimensions(whichBitmap, realImgW, realImgH)
+   calcIMGdimensions(realImgW, realImgH, imgNewW, imgNewH, imgNewW, imgNewH)
+   ; Gdip_GetRotatedDimensions(imgNewW, imgNewH, imgOrient, rotImgW, rotImgH)
+   newBitmap := Gdip_ResizeBitmap(whichBitmap, imgNewW, imgNewH, 1)
+   If StrLen(imgToPrint)>3
+      Gdip_DisposeImage(imgToPrint, 1)
+
+   If StrLen(newBitmap)>3
+      imgToPrint := newBitmap
+
+   If pEffect
+   {
+      Gdip_BitmapApplyEffect(imgToPrint, pEffect)
+      Gdip_DisposeEffect(pEffect)
+   }
+
+   If (colorsMode!=1)
+   {
+      newBitmap := Gdip_BitmapConvertGray(imgToPrint)
+      If StrLen(newBitmap)>3
+      {
+         Gdip_DisposeImage(imgToPrint, 1)
+         imgToPrint := newBitmap
+      }
+   }
+   If (flipuV=1)
+      Gdip_ImageRotateFlip(imgToPrint, 6)
+   If (flipuH=1)
+      Gdip_ImageRotateFlip(imgToPrint, 4)
+
+   If (adaptFit=1)
+   {
+      Gdip_GetImageDimensions(imgToPrint, imgNewW, imgNewH)
+      imgPosX := (pageW - imgNewW)//2
+      imgPosY := (pageH - imgNewH)//2
+   }
+
+   r4 := Gdip_DrawImage(gPrint, imgToPrint, imgPosX, imgPosY,,,,,,,,, imageAttribs)
+   If (previewMode!=1)
+   {
+      r := SGDIPrint_BeginDocument(hdcObj.HDC_ptr, appTitle " image file")
+      If r
+      {
+         SGDIPrint_CopyBitmapToPrinterHDC(pBitmap, hdcObj.HDC_ptr, hdcObj.HDC_Width, hdcObj.HDC_Height)
+         SGDIPrint_EndDocument(hdcObj.HDC_ptr) ; starts printing
+      }
+   } Else If (previewMode=1)
+   {
+      marginuX := hdcObj.HDC_PHYSICALOFFSETX/hdcObj.HDC_PHYSICALWIDTH
+      marginuY := hdcObj.HDC_PHYSICALOFFSETY/hdcObj.HDC_PHYSICALHEIGHT
+      marginuX := Ceil(ResizedW * marginuX)
+      marginuY := Ceil(ResizedH * marginuY)
+      newBitmap := SGDIPrint_GetMatchingBitmap(ResizedW + marginuX*2, ResizedH + marginuY*2)
+      gU := Gdip_GraphicsFromImage(newBitmap)
+      r4 := Gdip_DrawImage(gU, pBitmap, marginuX, marginuY)
+      hBitmap := Gdip_CreateHBITMAPFromBitmap(newBitmap)
+      SetImage(hCropCornersPic, hBitmap)
+      Gdip_DeleteGraphics(gU)
+      Gdip_DisposeImage(newBitmap, 1)
+      DeleteObject(hBitmap)
+      pageDPI := Round((hdcObj.hdc_xdpi + hdcObj.hdc_ydpi)/2)
+      pageWr := Round(hdcObj.HDC_Width/hdcObj.hdc_xdpi, 1)
+      pageHr := Round(hdcObj.HDC_Height/hdcObj.hdc_ydpi, 1)
+      MMpageWr := Round(hdcObj.HDC_Width/hdcObj.hdc_xdpi * 25.4)
+      MMpageHr := Round(hdcObj.HDC_Height/hdcObj.hdc_ydpi * 25.4)
+      GuiControl, SettingsGUIA:, PrinterPageInfos, % "Page details:`n" pageWr " x " pageHr " in`n" MMpageWr " x " MMpageHr " mm`n" pageDPI " DPI"
+   }
+
+   If gPrint
+      Gdip_DeleteGraphics(gPrint)
+
+   If pBitmap
+      Gdip_DisposeImage(pBitmap, 1)
+   If imageAttribs
+      Gdip_DisposeImageAttributes(imageAttribs)
+   If imgToPrint
+      Gdip_DisposeImage(imgToPrint, 1)
 }
 
 AcquireWIAimage() {

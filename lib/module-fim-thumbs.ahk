@@ -181,7 +181,7 @@ wiaMonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePe
         If (PicObj.Handle)
         {
            ; If wiaImg.IsAlphaPixelFormat
-           ;    finalBitmap := Gdip_CreateBitmapFromHBITMAPalpha(PicObj.Handle)
+           ;    finalBitmap := Gdip_CreateARGBBitmapFromHBITMAP(PicObj.Handle)
            ; Else
               finalBitmap := Gdip_CreateBitmapFromHBITMAP(PicObj.Handle)
            DeleteObject(PicObj.Handle)
@@ -2670,7 +2670,7 @@ Gdip_CreateBitmapFromFile(sFile, IconNumber:=1, IconSize:="", useICM:=0) {
    return pBitmap
 }
 
-Gdip_CreateBitmapFromHBITMAPalpha(hImage) {
+Gdip_CreateARGBBitmapFromHBITMAP(hImage) {
 ; function by iseahound found on:
 ; https://www.autohotkey.com/boards/viewtopic.php?f=6&t=63345
 ; part of https://github.com/iseahound/Graphics/blob/master/lib/Graphics.ahk
@@ -2702,10 +2702,8 @@ Gdip_CreateBitmapFromHBITMAPalpha(hImage) {
    pBitmap := Gdip_CreateBitmap(width, height)
 
    ; Create a Scan0 buffer pointing to pBits. The buffer has pixel format pARGB.
-   VarSetCapacity(Rect, 16, 0)
-      , NumPut( width, Rect,  8,  "uint")
-      , NumPut(height, Rect, 12,  "uint")
-   VarSetCapacity(BitmapData, 16+2*(A_PtrSize ? A_PtrSize : 4), 0)
+   CreateRect(Rect, 0, 0, width, height)
+   VarSetCapacity(BitmapData, 16+2*A_PtrSize, 0)
       , NumPut(       width, BitmapData,  0,  "uint") ; Width
       , NumPut(      height, BitmapData,  4,  "uint") ; Height
       , NumPut(   4 * width, BitmapData,  8,   "int") ; Stride
@@ -2714,7 +2712,7 @@ Gdip_CreateBitmapFromHBITMAPalpha(hImage) {
    DllCall("gdiplus\GdipBitmapLockBits"
             ,   "ptr", pBitmap
             ,   "ptr", &Rect
-            ,  "uint", 7            ; hImageLockMode.UserInputBuffer | hImageLockMode.ReadWrite
+            ,  "uint", 6            ; hImageLockMode.UserInputBuffer | hImageLockMode.ReadWrite
             ,   "int", 0xE200B      ; Format32bppPArgb
             ,   "ptr", &BitmapData)
 
@@ -2798,7 +2796,7 @@ Gdip_CreateBitmapFromClipboard() {
    }
 
    DllCall("CloseClipboard")
-   pBitmap := Gdip_CreateBitmapFromHBITMAPalpha(hBitmap)
+   pBitmap := Gdip_CreateARGBBitmapFromHBITMAP(hBitmap)
    If hBitmap
       DeleteObject(hBitmap)
 

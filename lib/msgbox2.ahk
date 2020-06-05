@@ -444,6 +444,7 @@ GetMsgDimensions(sString, FaceName, FontSize, maxW, maxH, btnMode:=0, bBold:=0) 
     ctlSizeH := dims.h
     ctlSizeMax := dims.maxCharW
 
+    thisFontSize := !fontSize ? 8 : fontSize
     r := []
     r.l := ctlSizeH ; line height
     modifiedW := 0
@@ -465,7 +466,6 @@ GetMsgDimensions(sString, FaceName, FontSize, maxW, maxH, btnMode:=0, bBold:=0) 
        r.w := Round(maxW*0.8)
     }
 
-    thisFontSize := !fontSize ? 8 : fontSize
     minChars := thisFontSize*42
     newPossibleW := r.w//2
     If ((r.w>ctlSizeH*3.1) && maxLineLength>118 && newPossibleW>=minChars)
@@ -491,7 +491,9 @@ GetMsgDimensions(sString, FaceName, FontSize, maxW, maxH, btnMode:=0, bBold:=0) 
     } Else If (ctlSizeH>maxH*0.9 && modifiedW=1)
        r.w := maxW
 
-    If !btnMode
+    If (btnMode=1 && A_OSVersion="WIN_XP")
+       r.h := Round(thisFontSize * 2.2)
+    Else If (btnMode!=1)
        dimz := Fnt_GetStringSize(FaceName, FntSize, bBold, sString, r.w)
 
     scaledH := Round((ctlSizeW / r.w) * ctlSizeH)
