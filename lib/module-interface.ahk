@@ -12,6 +12,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3
      , hCursBusy := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32514, "Ptr")  ; IDC_WAIT
      , hCursN := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32512, "Ptr")  ; IDC_ARROW
      , hCursMove := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32646, "Ptr")  ; IDC_Hand
+     , hCursCross := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32515, "Ptr")  ; IDC_Cross
      , hCursFinger := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32649, "Ptr")
      , SlideHowMode := 1, lastWinDrag := 1, TouchScreenMode := 0, allowNextSlide := 1
      , isTitleBarHidden := 0, imageLoading := 0, hPicOnGui1, hotkeysSuspended := 0
@@ -20,7 +21,8 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3
      , runningLongOperation := 0, alterFilesIndex := 0, animGIFplaying := 0, prevOpenedFile := 0
      , canCancelImageLoad := 0, hGDIinfosWin, hGDIselectWin, hasAdvancedSlide := 1
      , imgEditPanelOpened := 0, showMainMenuBar := 1, undoLevelsRecorded := 0, UserMemBMP := 0
-     , taskBarUI, hSetWinGui, panelWinCollapsed, groppedFiles
+     , taskBarUI, hSetWinGui, panelWinCollapsed, groppedFiles, tempBtnVisible := "null"
+     , userAllowWindowDrag := 0, drawingShapeNow := 0, isAlwaysOnTop
 
 Global activateImgSelection, allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, askDeleteFiles
 , AutoDownScaleIMGs, autoPlaySNDs, autoRemDeadEntry, ColorDepthDithering, countItemz, currentFileIndex, CurrentSLD, defMenuRefreshItm, doSlidesTransitions
@@ -52,7 +54,6 @@ OnMessage(0x08, "activateMainWin")   ; WM_KILLFOCUS
 Loop, 9
     OnMessage(255+A_Index, "PreventKeyPressBeep")   ; 0x100 to 0x108
 
-
 setPriorityThread(2)
 ; OnExit, doCleanup
 Return
@@ -77,8 +78,10 @@ BuildGUI() {
    isTitleBarHidden := MainExe.ahkgetvar.isTitleBarHidden
    RegExFilesPattern := MainExe.ahkgetvar.RegExFilesPattern
    TouchScreenMode := MainExe.ahkgetvar.TouchScreenMode
+   userAllowWindowDrag := MainExe.ahkgetvar.userAllowWindowDrag
+
    MinGUISize := "+MinSize" A_ScreenWidth//4 "x" A_ScreenHeight//4
-   initialWh := "w" A_ScreenWidth//3 " h" A_ScreenHeight//3
+   initialWh := "w" A_ScreenWidth//1.7 " h" A_ScreenHeight//1.5
    ; If !A_IsCompiled
      Try Menu, Tray, Icon, %mainCompiledPath%\quick-picto-viewer.ico
 
@@ -160,8 +163,8 @@ updateUIctrl(forceThis:=0) {
       editingSelectionNow := MainExe.ahkgetvar.editingSelectionNow
       activateImgSelection := MainExe.ahkgetvar.activateImgSelection
       isAlwaysOnTop := MainExe.ahkgetvar.isAlwaysOnTop
-      WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%   
    }
+   WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%   
    ctrlW := (editingSelectionNow=1 && activateImgSelection=1) ? GuiW//8 : GuiW//7
    ctrlH2 := (editingSelectionNow=1 && activateImgSelection=1) ? GuiH//6 : GuiH//5
    ctrlH3 := GuiH - ctrlH2*2
@@ -543,10 +546,13 @@ JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
 }
 
 WinClickAction(param:=0) {
-    canCancelImageLoad := 4
-    ; If (A_GuiControlEvent="DoubleClick")
-    ;    turnOffSlideshow()
+    If (A_GuiControlEvent="DoubleClick" && drawingShapeNow=1)
+    {
+       MainExe.ahkPostFunction("stopDrawingShape")
+       Return
+    }
 
+    canCancelImageLoad := 4
     ; ToolTip, % param "--" A_GuiControl "--" A_GuiControlEvent , , , 2
     If (slideShowRunning=1)
        turnOffSlideshow()
@@ -561,6 +567,8 @@ ResetLbtn() {
 WM_MOVING() {
   If (toolTipGuiCreated=1)
      MainExe.ahkPostFunction("TooltipCreator", 1, 1)
+  If (tempBtnVisible!="null")
+     MainExe.ahkPostFunction("DestroyTempBtnGui", "now")
 
   Global lastWinDrag := A_TickCount
   If (A_OSVersion="WIN_7" || A_OSVersion="WIN_XP")
@@ -600,6 +608,8 @@ changeMcursor(whichCursor) {
      thisCursor := hCursFinger
   Else If (whichCursor="move")
      thisCursor := hCursMove
+  Else If (whichCursor="cross")
+     thisCursor := hCursCross
   Else Return
 
   Try DllCall("user32\SetCursor", "Ptr", thisCursor)
@@ -618,7 +628,7 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
 
   MouseGetPos, mX, mY
   thisPos := mX "-" mY
-  If (A_TickCount - lastInvoked > 55) && (thisPos!=prevPos)
+  If (A_TickCount - lastInvoked > 55) && (thisPos!=prevPos && drawingShapeNow!=1)
   {
      thisPrefsWinOpen := (imgEditPanelOpened=1) ? 0 : AnyWindowOpen
      lastInvoked := A_TickCount
@@ -628,10 +638,9 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   }
 
   If ((runningLongOperation=1 || imageLoading=1) && slideShowRunning!=1)
-  {
      changeMcursor("busy")
-     ; SetTimer, ResetLoadStatus, -500
-  }
+  Else If (drawingShapeNow=1)
+     changeMcursor("cross")
 
   ; A := WinActive("A")
   ; okay := (A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin) ? 1 : 0
@@ -642,7 +651,7 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   }
 
   ; ToolTip, % isTitleBarHidden " - " TouchScreenMode
-  If (isTitleBarHidden=0 && TouchScreenMode=0 && (wP&0x1))
+  If (isTitleBarHidden=0 && userAllowWindowDrag=1 && TouchScreenMode=0 && (wP&0x1))
   && (A_TickCount - lastWinDrag>45) 
   {
      PostMessage, 0xA1, 2,,, ahk_id %PVhwnd%
@@ -794,6 +803,11 @@ byeByeRoutine() {
          askAboutStoppingOperations()
       Else
          lastCloseInvoked++
+   } Else If (drawingShapeNow=1)
+   {
+       drawingShapeNow := 0
+       lastInvokedThis := A_TickCount
+       MainExe.ahkPostFunction("stopDrawingShape")
    } Else If ((AnyWindowOpen || thumbsDisplaying=1 || slideShowRunning=1) && (imageLoading!=1 && runningLongOperation!=1)) || (animGIFplaying=1)
    {
       lastInvokedThis := A_TickCount
@@ -1383,6 +1397,11 @@ MenuSaveAction() {
   ~^F4::
      If (identifySettingsWindow()=1)
         MainExe.ahkPostFunction("CloseWindow")
+  Return
+
+  ~AppsKey::
+     If (AnyWindowOpen>0)
+        MainExe.ahkPostFunction("externalinvokedSettingsContextMenu")
   Return
 
   ~F8::
@@ -2870,6 +2889,7 @@ class taskbarInterface {
    freeBitmap(hbm){
       return DllCall("Gdi32.dll\DeleteObject", "Ptr", hbm)
    }
+
    ; Misc:
    GetClientRect(hwnd,ByRef X2, ByRef Y2){
       local rc
@@ -2878,120 +2898,6 @@ class taskbarInterface {
       X2:=NumGet(rc,8,"Int")
       Y2:=NumGet(rc,12,"Int")
    }
-
-   min(x,y){
-      return (x<y)*x+(y<=x)*y
-   }
-   ; Additional reference:
-   ; ShObjIdl.h:
-   /*
-    typedef struct ITaskbarList3Vtbl
-    {
-        BEGIN_INTERFACE
-        
-        HRESULT ( STDMETHODCALLTYPE *QueryInterface )(                            (0)
-            __RPC__in ITaskbarList3 * This,
-             [in]  __RPC__in REFIID riid,
-             [annotation][iid_is][out]  
-            _COM_Outptr_  void **ppvObject);
-        
-        ULONG ( STDMETHODCALLTYPE *AddRef )(                                  (1)
-            __RPC__in ITaskbarList3 * This);
-        
-        ULONG ( STDMETHODCALLTYPE *Release )(                                 (2) 
-            __RPC__in ITaskbarList3 * This);
-        
-        HRESULT ( STDMETHODCALLTYPE *HrInit )(                                  (3)
-            __RPC__in ITaskbarList3 * This);
-        
-        HRESULT ( STDMETHODCALLTYPE *AddTab )(                                  (4)
-            __RPC__in ITaskbarList3 * This,
-             [in]  __RPC__in HWND hwnd);
-        
-        HRESULT ( STDMETHODCALLTYPE *DeleteTab )(                               (5)
-            __RPC__in ITaskbarList3 * This,
-             [in]  __RPC__in HWND hwnd);
-        
-        HRESULT ( STDMETHODCALLTYPE *ActivateTab )(                            (6)
-            __RPC__in ITaskbarList3 * This,
-             [in]  __RPC__in HWND hwnd);
-        
-        HRESULT ( STDMETHODCALLTYPE *SetActiveAlt )(                           (7)
-            __RPC__in ITaskbarList3 * This,
-             [in]  __RPC__in HWND hwnd);
-        
-        HRESULT ( STDMETHODCALLTYPE *MarkFullscreenWindow )(                      (8)
-            __RPC__in ITaskbarList3 * This,
-             [in]  __RPC__in HWND hwnd,
-             [in]  BOOL fFullscreen);
-        
-        HRESULT ( STDMETHODCALLTYPE *SetProgressValue )(                         (9)
-            __RPC__in ITaskbarList3 * This,
-             [in]  __RPC__in HWND hwnd,
-             [in]  ULONGLONG ullCompleted,
-             [in]  ULONGLONG ullTotal);
-        
-        HRESULT ( STDMETHODCALLTYPE *SetProgressState )(                         (10)
-            __RPC__in ITaskbarList3 * This,
-             [in]  __RPC__in HWND hwnd,
-             [in]  TBPFLAG tbpFlags);
-        
-        HRESULT ( STDMETHODCALLTYPE *RegisterTab )(                            (11)
-            __RPC__in ITaskbarList3 * This,
-             [in]  __RPC__in HWND hwndTab,
-             [in]  __RPC__in HWND hwndMDI);
-        
-        HRESULT ( STDMETHODCALLTYPE *UnregisterTab )(                            (12)
-            __RPC__in ITaskbarList3 * This,
-             [in]  __RPC__in HWND hwndTab);
-        
-        HRESULT ( STDMETHODCALLTYPE *SetTabOrder )(                            (13)
-            __RPC__in ITaskbarList3 * This,
-             [in]  __RPC__in HWND hwndTab,
-             [in]  __RPC__in HWND hwndInsertBefore);
-        
-        HRESULT ( STDMETHODCALLTYPE *SetTabActive )(                            (14)
-            __RPC__in ITaskbarList3 * This,
-             [in]  __RPC__in HWND hwndTab,
-             [in]  __RPC__in HWND hwndMDI,
-             [in]  DWORD dwReserved);
-        
-        HRESULT ( STDMETHODCALLTYPE *ThumbBarAddButtons )(                         (15)
-            __RPC__in ITaskbarList3 * This,
-             [in]  __RPC__in HWND hwnd,
-             [in]  UINT cButtons,
-             [size_is][in]  __RPC__in_ecount_full(cButtons) LPTHUMBBUTTON pButton);    
-        
-        HRESULT ( STDMETHODCALLTYPE *ThumbBarUpdateButtons )(                      (16)
-            __RPC__in ITaskbarList3 * This,
-             [in]  __RPC__in HWND hwnd,
-             [in]  UINT cButtons,
-             [size_is][in]  __RPC__in_ecount_full(cButtons) LPTHUMBBUTTON pButton);
-        
-        HRESULT ( STDMETHODCALLTYPE *ThumbBarSetImageList )(                      (17)
-            __RPC__in ITaskbarList3 * This,
-             [in]  __RPC__in HWND hwnd,
-             [in]  __RPC__in_opt HIMAGELIST himl);
-        
-        HRESULT ( STDMETHODCALLTYPE *SetOverlayIcon )(                            (18)
-            __RPC__in ITaskbarList3 * This,
-             [in]  __RPC__in HWND hwnd,
-             [in]  __RPC__in HICON hIcon,
-             [string][unique][in]  __RPC__in_opt_string LPCWSTR pszDescription);
-        
-        HRESULT ( STDMETHODCALLTYPE *SetThumbnailTooltip )(                      (19)
-            __RPC__in ITaskbarList3 * This,
-             [in]  __RPC__in HWND hwnd,
-             [string][unique][in]  __RPC__in_opt_string LPCWSTR pszTip);
-        
-        HRESULT ( STDMETHODCALLTYPE *SetThumbnailClip )(                         (20)
-            __RPC__in ITaskbarList3 * This,
-             [in]  __RPC__in HWND hwnd,
-             [in]  __RPC__in RECT *prcClip);
-        
-        END_INTERFACE
-    } ITaskbarList3Vtbl;
-   */
 }
 
 

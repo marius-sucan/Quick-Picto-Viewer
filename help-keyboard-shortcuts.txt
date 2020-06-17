@@ -23,7 +23,7 @@ Ctrl + ]|Increase image saturation by 5%|Anywhere|Nothing
 Ctrl + \|Hard reset color adjustments|Anywhere|Nothing
 A|Toggle image alignment: centered or top-left corner|Image view|Nothing
 Alt + A|Adjust image canvas size|Image view|Panel
-Alt + BackSpace|Fill area / draw shapes|Image selection|Panel
+Alt + BackSpace|Fill area orf draw shapes|Image selection|Panel
 Alt + Delete|Remove active file index entry|Files list|Nothing
 Alt + E|Selection properties|Image selection|Panel
 Alt + Enter|File information window|Image view|Panel
@@ -129,13 +129,15 @@ Wheel Down|Previous image or two lines of images|Anywhere|Nothing
 Wheel Up|Next image or two lines of images|Anywhere|Nothing
 Page Down|Previous image or jump forwards one page of images|Anywhere|Nothing
 Page Up|Next image or jump backwards one page of images|Anywhere|Nothing
-BackSpace|Previous random image|Anywhere|Nothing
+Backspace|Previous random image|Anywhere|Nothing
+Backspace|Undo added point|Freeform drawing|Nothing
 Shift + BackSpace|Next random image|Anywhere|Nothing
 Ctrl + Home|Jump to the first selected file in index|Anywhere|Nothing
 Ctrl + End|Jump to the last selected file in index|Anywhere|Nothing
 Ctrl + Arrow keys|Navigate between selected files|Anywhere|Nothing
 Space|Start or stop slideshow|Image view|Nothing
 Space|Select or deselect files [if files selection already exists]|Files list|Nothing
+Space|Toggle cardinal curve path|Freeform drawing|Nothing
 Tab|Select or deselect file|Anywhere|Nothing
 Shift + /|Define slideshow duration|Files list|Panel
 Shift + -|Decrease selection area|Image selection|Nothing
@@ -156,7 +158,9 @@ Shift + F5|Reload slideshow file or refresh opened folder|Files list|Nothing
 Shift + H|Flip horizontally image selected area|Image selection|Nothing
 Shift + V|Flip vertically image selected area|Image selection|Nothing
 Shift + I|Invert colors in image selected area|Image selection|Nothing
-Shift + L|Draw lines, arcs or selection borders|Image selection|Panel
+Shift + L|Draw predefined lines, arcs or selection borders|Image selection|Panel
+Shift + P|Draw freeform filled shape|Image view|Panel
+P|Draw freeform outline (path)|Image view|Panel
 Shift + Home|Select files to the first in index|Files list|Nothing
 Shift + End|Select files to the last one in index|Files list|Nothing
 Shift + Page Up/Down|Select files in pages of visible items|Files list|Nothing

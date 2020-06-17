@@ -29,10 +29,12 @@
 <li>Touch screen friendly hot-areas on the UI to navigate or zoom into images.</li>
 <li>Sort images by histogram average or median point, resolution, aspect ratio, or by similarity.</li>
 <li>Options to control brightness, contrast, saturation and RGB color channels balance/intensity.</li>
-<li>Advanced yet easy to use auto-crop for images.</li>
 <li>Elliptical and rectangular selections, rotated at any angle.</li>
 <li>Image editing: soft edges blur, insert text, paste in place, draw arcs, lines and shapes, transform selected area, rotate, flip, crop and more</li>
+<li>Draw free-form curved paths or polygonal lines; options to use fill with color or gradients, or use as alpha masks.</li>
+<li>Alpha masks support when pasting images in place or when using the transform tool. The mask can be a gradient [linear, box, radial], an image file or a previously drawn path.</li>
 <li>Adaptive auto-adjustment of brightness, contrast and saturation of displayed images.</li>
+<li>Advanced yet easy to use auto-crop for images.</li>
 <li>Display images in grayscale, inverted or personalized colors. Option to save adjusted image, or apply adjusments on multiple images in one go.</li>
 <li>Real-time histogram for any image color channel of the image displayed.</li>
 <li>Various modes to adapt images to window.</li>

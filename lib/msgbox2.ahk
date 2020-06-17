@@ -22,7 +22,7 @@
 ; Thanks to [just me] for creating TaskDialog that gave me ideas and inspiration.
 ; https://github.com/AHK-just-me/TaskDialog/blob/master/Sources/TaskDialog.ahk
 ; ================================================================================
-; Current version: mardi 19 mai 2020
+; Current version: mardi 16 juin 2020
 ;
 ; Usage example:
 ; msgResultArray := MsgBox2("Please confirm you want to delete this file", "confirmation box", "&Delete|&Cancel", 2, "question", "Arial", 0, 12, ,, "Do not prompt again before file delete", 1)
@@ -274,6 +274,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   yPos := iconFile ? "" : "y+" marginsGui
   xPos := iconFile ? "x+" marginsGui : "x" marginsGui
   If (btnCount>0)
+     ; Gui, Add, Text, %xPos% %yPos% w%msgW% %msgH% vprompt, %sMsg%
      Gui, Add, Edit, %xPos% %yPos% w%msgW% %msgH% ReadOnly -WantReturn vprompt -Tabstop -E0x200 -HScroll -VScroll, %sMsg%
   Else
      Gui, Add, Text, %xPos% %yPos% w%msgW% %msgH% vprompt gKillMsgbox2Win, %sMsg%
@@ -439,10 +440,10 @@ MsgBox2InputHookKeyDown(iHook, VK, SC) {
 }
 
 GetMsgDimensions(sString, FaceName, FontSize, maxW, maxH, btnMode:=0, bBold:=0) {
-    dims := Fnt_GetStringSize(FaceName, FontSize, bBold, sString, maxW + 100)
+    mustWrap := (btnMode=1) ? 0 : 1
+    dims := GetStringSize(FaceName, FontSize, bBold, sString, mustWrap, maxW + 100)
     ctlSizeW := dims.w
     ctlSizeH := dims.h
-    ctlSizeMax := dims.maxCharW
 
     thisFontSize := !fontSize ? 8 : fontSize
     r := []
@@ -470,7 +471,6 @@ GetMsgDimensions(sString, FaceName, FontSize, maxW, maxH, btnMode:=0, bBold:=0) 
     newPossibleW := r.w//2
     If ((r.w>ctlSizeH*3.1) && maxLineLength>118 && newPossibleW>=minChars)
     {
-       SoundBeep 
        modifiedW := 1
        r.w := r.w//2
     }
@@ -480,7 +480,6 @@ GetMsgDimensions(sString, FaceName, FontSize, maxW, maxH, btnMode:=0, bBold:=0) 
        modifiedW := 1
        r.w := Round(maxW*0.8)
     }
-
 
     r.h := ctlSizeH
     If (btnMode=1)
@@ -494,7 +493,7 @@ GetMsgDimensions(sString, FaceName, FontSize, maxW, maxH, btnMode:=0, bBold:=0) 
     If (btnMode=1 && A_OSVersion="WIN_XP")
        r.h := Round(thisFontSize * 2.2)
     Else If (btnMode!=1)
-       dimz := Fnt_GetStringSize(FaceName, FntSize, bBold, sString, r.w)
+       dimz := GetStringSize(FaceName, FntSize, bBold, sString, mustWrap, r.w)
 
     scaledH := Round((ctlSizeW / r.w) * ctlSizeH)
     If (scaledH>maxH*0.9) || (dimz.h>maxH*0.9)
@@ -508,7 +507,6 @@ GetMsgDimensions(sString, FaceName, FontSize, maxW, maxH, btnMode:=0, bBold:=0) 
     ;    MsgBox, % r.w " | " r.h "`n" scaledH "`n" maxW " | " maxH "`n" ctlSizeW " | " ctlSizeH
     Return r
 }
-
 
 GuiDefaultFont(byRef fontName, byRef fontSize, byRef dpi) {
     ; By SKAN https://autohotkey.com/board/topic/7984-ahk-functions-incache-cache-list-of-recent-items/page-10#entry443622
@@ -531,20 +529,25 @@ GuiDefaultFont(byRef fontName, byRef fontSize, byRef dpi) {
     Fnt_DeleteFont(hFont)
 }
 
-Fnt_GetStringSize(FontFace, fontSize, doBold, p_String, l_Width:=0) {
-; ======================================================================
-; functions from Fnt_Library v3 posted by jballi
-; https://www.autohotkey.com/boards/viewtopic.php?f=6&t=4379
-; modified by Marius Șucan
-; ======================================================================
-
-    Static Dummy88611714
+Fnt_GetSizeForEdit(hFont,p_Text,p_MaxW:=0,mustWrap:=1,ByRef r_Width:="",ByRef r_Height:="") {
+    Static Dummy13373556
           ,DEFAULT_GUI_FONT:=17
           ,HWND_DESKTOP    :=0
+          ,MAXINT          :=0x7FFFFFFF
           ,OBJ_FONT        :=6
           ,SIZE
 
-          ;-- DrawText format
+          ;-- DrawText formats
+          ,DT_WORDBREAK:=0x10
+                ;-- Breaks words.  Lines are automatically broken between words
+                ;   if a word extends past the edge of the rectangle specified
+                ;   by the lprc parameter.  A carriage return line feed sequence
+                ;   also breaks the line.
+
+          ,DT_EXPANDTABS:=0x40
+                ;-- Expands tab characters. The default number of characters per
+                ;   tab is eight.
+
           ,DT_NOCLIP:=0x100
                 ;-- Draws without clipping.  DrawText is somewhat faster when
                 ;   DT_NOCLIP is used.
@@ -556,13 +559,79 @@ Fnt_GetStringSize(FontFace, fontSize, doBold, p_String, l_Width:=0) {
           ,DT_NOPREFIX:=0x800
                 ;-- Turns off processing of prefix characters.
 
-          ,s_DTFormat:=DT_NOCLIP|DT_CALCRECT|DT_NOPREFIX
+          ,DT_EDITCONTROL:=0x2000
+                ;-- Duplicates the text-displaying characteristics of a
+                ;   multiline edit control.  Specifically, the average character
+                ;   width is calculated in the same manner as for an Edit
+                ;   control, and the function does not display a partially
+                ;   visible last line.
+
+          ,s_DTFormat:=DT_EXPANDTABS|DT_CALCRECT|DT_NOPREFIX|DT_EDITCONTROL|DT_NOCLIP
+
+    If (mustWrap=1)
+       s_DTFormat |= DT_WORDBREAK
 
     ;-- Initialize
-    r_Width :=0
-    r_Height:=0
     VarSetCapacity(SIZE,8,0)
+    r_Width := r_Height := 0
+    l_Width := MAXINT
+    if p_MaxW is Integer
+        if (p_MaxW>0)
+            l_Width:=p_MaxW
 
+    ;-- Bounce if p_Text is null.  All output and return values are zero.
+    if not StrLen(p_Text)
+        Return &SIZE
+
+    ;-- If needed, get the handle to the default GUI font
+    if (DllCall("GetObjectType","Ptr",hFont)<>OBJ_FONT)
+        hFont:=DllCall("GetStockObject","Int",DEFAULT_GUI_FONT)
+
+    ;-- Create and populate the RECT structure
+    VarSetCapacity(RECT,16,0)
+    NumPut(l_Width,RECT,8,"Int")                       ;-- right
+
+    ;-- Select the font into the device context for the desktop
+    hDC      :=DllCall("GetDC","Ptr",HWND_DESKTOP)
+    old_hFont:=DllCall("SelectObject","Ptr",hDC,"Ptr",hFont)
+
+    ;-- DrawText
+    DllCall("DrawText"
+        ,"Ptr",hDC                                      ;-- hdc [in]
+        ,"Str",p_Text                                   ;-- lpchText [in, out]
+        ,"Int",-1                                       ;-- cchText [in]
+        ,"Ptr",&RECT                                    ;-- lprc [in, out]
+        ,"UInt",s_DTFormat)                             ;-- uFormat [in]
+
+    ;-- Release the objects needed by the DrawText function
+    DllCall("SelectObject","Ptr",hDC,"Ptr",old_hFont)
+        ;-- Necessary to avoid memory leak
+
+    DllCall("ReleaseDC","Ptr",HWND_DESKTOP,"Ptr",hDC)
+
+    ;-- Update output variables and populate SIZE structure
+    NumPut(r_Width:=NumGet(RECT,8,"Int"),SIZE,0,"Int")
+        ;-- right, cx
+
+    NumPut(r_Height:=NumGet(RECT,12,"Int"),SIZE,4,"Int")
+        ;-- bottom, cy
+
+    Return &SIZE
+}
+
+
+GetStringSize(FontFace, fontSize, doBold, p_String, mustWrap, l_Width:=0) {
+; ======================================================================
+; functions from Fnt_Library v3 posted by jballi
+; https://www.autohotkey.com/boards/viewtopic.php?f=6&t=4379
+; modified by Marius Șucan
+; ======================================================================
+
+    Static DEFAULT_GUI_FONT:=17
+          ,HWND_DESKTOP    :=0
+          ,OBJ_FONT        :=6
+
+    r_Width := r_Height := 0
     thisBold := (doBold=1) ? " bold " : ""
     If (!fontFace || !fontSize)
        GuiDefaultFont(defFontFace, defFontSize, dpi)
@@ -575,45 +644,15 @@ Fnt_GetStringSize(FontFace, fontSize, doBold, p_String, l_Width:=0) {
        fontFace := "Tahoma"
 
     hFont := Fnt_CreateFont(fontFace, "s" fontSize thisBold)
-    If (DllCall("GetObjectType","Ptr",hFont)<>OBJ_FONT)
-       hFont:=DllCall("GetStockObject","Int",DEFAULT_GUI_FONT)
+    If (DllCall("GetObjectType","Ptr",hFont)!=OBJ_FONT)
+       hFont := DllCall("GetStockObject","Int",DEFAULT_GUI_FONT)
 
-    ;-- Select the font into the device context for the desktop
-    hDC      :=DllCall("GetDC","Ptr",HWND_DESKTOP)
-    old_hFont:=DllCall("SelectObject","Ptr",hDC,"Ptr",hFont)
 
-    ;-- Calculate the size of the string
-    VarSetCapacity(RECT,16,0)
-    NumPut(l_Width,RECT,8,"Int")                        ;-- right
-    DllCall("DrawText"
-        ,"Ptr",hDC                                      ;-- hdc [in]
-        ,"Str",p_String                                 ;-- lpchText [in, out]
-        ,"Int",StrLen(p_String)                         ;-- cchText [in]
-        ,"Ptr",&RECT                                    ;-- lprc [in, out]
-        ,"UInt",s_DTFormat)                             ;-- uFormat [in]
-
-    VarSetCapacity(TEXTMETRIC,A_IsUnicode ? 60:56,0)
-    DllCall("GetTextMetrics","Ptr",hDC,"Ptr",&TEXTMETRIC)
-
-    ;-- Release the objects needed by the DrawText function
-    DllCall("SelectObject","Ptr",hDC,"Ptr",old_hFont)
-        ;-- Necessary to avoid memory leak
-
-    DllCall("ReleaseDC","Ptr",HWND_DESKTOP,"Ptr",hDC)
-
-    ;-- Update the output variables and populate the SIZE structure
-    r_Width:=NumGet(RECT,8,"Int")
-        ;-- right, cx
-
-    r_Height:=NumGet(RECT,12,"Int")
-        ;-- bottom, cy
-
+    Fnt_GetSizeForEdit(hFont, p_String, mustWrap, l_Width, r_Width, r_Height)
     Fnt_DeleteFont(hFont)
-    ;-- Return width and height
     result := []
-    result.w := r_Width
-    result.h := r_Height
-    result.maxCharW := NumGet(TEXTMETRIC, 24, "Int")
+    result.w := (mustWrap=1) ? r_Width + Round(fontSize*1.5) : r_Width
+    result.h := r_Height ? r_Height : fontSize * 2
     Return result
 }
 
@@ -881,6 +920,9 @@ repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:=
           Final_y := mCoordTop + 1
        Gui, %whichGUI%: Show, x%Final_x% y%Final_y%, % Chr(160) winTitle
     } Else Gui, %whichGUI%: Show, AutoSize %winPos%, % Chr(160) winTitle
+
+    If (imgEditPanelOpened=1 && AnyWindowOpen)
+       CreateGuiButton("Collapse panel,,toggleImgEditPanelWindow", 0, msgDisplayTime//2 + 500)
 }
 
 MWAGetMonitorMouseIsIn(coordX:=0,coordY:=0) {

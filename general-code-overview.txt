@@ -3,8 +3,9 @@ a) How Quick Picto Viewer initializes:
 b) How a files list index is created
 c) Files index filtering
 d) How an image is loaded and displayed on screen [simplified]
-e) How slideshows happen [soon]
-f) Image live editing [soon]
+e) General considerations
+f) How slideshows happen
+g) Image live editing [soon]
 
 Deniere mise à jour: vendredi 5 juin 2020.
 ==========================================
@@ -170,7 +171,9 @@ d) How an image is loaded and displayed on screen [simplified]
    all cached image data.
 
    Images are cached as GDI+ bitmap objects by Quick Picto Viewer.
-   This occurs at different levels or stages.
+   This occurs at different levels or stages. This enables users
+   to delete an image file, go to the next one and, if they choose,
+   return to the deleted one and find the cached image, and resave it.
 
    If no cached GDI bitmaps are available or a different image
    file is loaded, ResizeImageGDIwin() will call CloneMainBMP().
@@ -190,10 +193,13 @@ d) How an image is loaded and displayed on screen [simplified]
    LoadBitmapFromFileu() is called by CloneMainBMP(). This is
    the very function that accesses files and it is invoked 
    many times, in many different functions. It is also a wrapper
-   for three functions:
-      - Gdip_CreateBitmapFromFile() used to load GDI+ supported files
-      - LoadFileWithWIA() fallback function for very large images
-      - LoadFimFile() used to load FreeImage supported files
+   for three functions that return a GDI+ bitmap:
+      - Gdip_CreateBitmapFromFile() it loads GDI+ supported files
+      - LoadFileWithWIA(), the fallback function for very large images
+        - WIA stands for Windows Image Acquisition
+      - LoadFimFile() is used to load FreeImage supported files
+        - this function converts any image to 24 or 32 bits depth
+          and then into a GDI+ bitmap object.
 
    LoadBitmapFromFileu() returns a GDI+ bitmap handle on success.
    When it is invoked by CloneMainBMP(), it has as argument
@@ -256,12 +262,62 @@ e) General considerations
    too often because it leads to «hangs». Therefore, in most 
    cases, I have the main thread ping the UI thread.
 
-   The panels one can invoke in Quick Picto Viewer are not
-   in the auxiliary UI thread, they are in the main one.
-   Only the main window is an external thread.
+   The settings panels one can invoke in Quick Picto Viewer
+   are not in the auxiliary UI thread, they are in the main one.
+   These panels are desroyed and recreated whenever needed.
+   Only the main window is in the external thread.
 
+   In most cases, if not all, I use "ahkPostFunction" to call 
+   functions from the main thread, because I want to avoid locking
+   the UI.
 
+f) How slideshows happen
+   When the user starts a slideshow, dummyInfoToggleSlideShowu()
+   is called. It gives the user information about the slideshow.
+   This is a wrapper for ToggleSlideShowu() which is responsible
+   for toggling the slideshow.
 
+   The whole slideshow «business» is convoluted. The purpose 
+   was to obtain an easy to stop slideshow in any circumstance,
+   even if it is running very fast or the user loads very large 
+   images and applies all the possible real-time effects.
 
+   To this end, it relies on the interfaceThread[] object,
+   however not entirely. The main thread checks if the UI thread 
+   is still game for slideshows, and if it is, it invokes a timer
+   in the UI thread: invokeExternalSlideshowHandler().
+   This happens after every image. In the UI thread, the script
+   can decide the slideshow must end [based on user activity]
+   and the timer never executes. When another image is loaded,
+   the main thread learns it ended.
+
+   On start, ToggleSlideShowu() calls slideshowsHandler() found
+   in the interfaceThread[] object. For each slide, through
+   invokeExternalSlideshowHandler() the function
+   dummySlideshow() in the UI thread is called and a timer is set
+   for theSlideShowCore(). This last function, when invoked, calls
+   in the main thread one of these functions: RandomPicture(),
+   PreviousPicture() or NextPicture() - based on user preference.
+
+   [ side note: notice the ping-pongs between the threads ^_^ ]
+
+   "SlideHowMode" is the variable desginating the slideshow mode
+   and "slideShowDelay" is the delay used for the aforementioned
+   timer, in miliseconds. "slideShowRunning" is a boolean. These 
+   variables and additional ones are used in both threads and 
+   often synchronized...
+
+   Things get even uglier with GIF animations...
+   autoChangeDesiredFrame() is used for animated GIFs and it is 
+   run with the first parameter set to "start" only from 
+   QPV_ShowImgonGuiPrev(). And it is also invoked as a timer.
+
+   Because I wanted users to be able to choose to allow GIFs to 
+   play entirely before going to the next slide, the main thread
+   sets "allowNextSlide" to 0 while the GIF plays and when the 
+   first loop is done, it is set to 1 and theSlideShowCore()
+   function is called from the UI thread, and
+   invokeExternalSlideshowHandler() to set there the timer
+   for the next slide.
 
 

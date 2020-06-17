@@ -81,7 +81,17 @@ MonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerIm
       resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
       Return -1
    }
+   FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
+   calcIMGdimensions(imgW, imgH, thumbsSizeQuality, thumbsSizeQuality, ResizedW, ResizedH)
+   resizeFilter := 0 ; (ResizeQualityHigh=1) ? 3 : 0
  
+   hFIFimgX := FreeImage_Rescale(hFIFimgA, ResizedW, ResizedH, resizeFilter)
+   If hFIFimgX
+   {
+      FreeImage_UnLoad(hFIFimgA)
+      hFIFimgA := hFIFimgX
+   }
+
    imgBPP := Trim(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
    ColorsType := FreeImage_GetColorType(hFIFimgA)
    mustApplyToneMapping := (imgBPP>32 && !InStr(ColorsType, "rgba")) || (imgBPP>64) ? 1 : 0
@@ -100,9 +110,6 @@ MonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerIm
       hFIFimgA := hFIFimgB
    }
 
-   FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
-   calcIMGdimensions(imgW, imgH, thumbsSizeQuality, thumbsSizeQuality, ResizedW, ResizedH)
-   resizeFilter := 0 ; (ResizeQualityHigh=1) ? 3 : 0
    ; hFIFimgB := FreeImage_MakeThumbnail(hFIFimgA, thumbsSizeQuality, 0)
    hFIFimgB := FreeImage_Rescale(hFIFimgA, ResizedW, ResizedH, resizeFilter)
    If hFIFimgB
@@ -119,7 +126,7 @@ MonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerIm
       Return -1
    }
 
-   If (hFIFimgA)
+   If hFIFimgA
    {
       imgBPP := Trim(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
       thisZeit := A_TickCount - startZeit

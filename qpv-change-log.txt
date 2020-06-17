@@ -2,6 +2,20 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.3.0 (2020-06-17)
+  - [new] free-form curves or polygonal lines drawing, with option to fill as shapes
+  - [new] alpha masks when pasting images or transforming a selected area; the alpha mask for the image object can be a gradient [linear, radial or box], or another image file, or a previously drawn curved/polygonal shape
+  - [new] preview area for the blur panel with viewport controlled position
+  - [new] «stretched to window» mode for viewing images
+  - [new] option to open containing folder in QPV for selected image
+  - [new] option to undo single file rename
+  - [new] quick actions; buttons meant to help users access common actions; useful for touch screen or mouse users
+  - [new] options to offset/move current selection in «selection properties» panel
+  - [new] ability to retrieve seen images for a specific date [via statistics panel]
+  - [improvement] one can now use touch-screen friendly user interface even if QPV is in full-screen mode
+  - [improvement] context menus for folder manager panels
+  - various bug fixes
+  
 - v4.2.0 (2020-06-05)
   - [new] print image, with page preview
   - [new] statistics panel for recorded seen images list
