@@ -2,6 +2,14 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.3.1 (2020-06-25)
+  - fixed broken control sizes in various panels on certain systems, including Windows 10 and Windows XP
+  - fixed performance regression since v3.8.5 noticeable on large screens [high resolutions]
+  - further improved overall performance of the viewport by switching to 32-PARGB and by implementing other optimisations
+  - fixed flip, invert colors, grayscale and other tools that were breaking the alpha channel in images
+  - fixed bugs specific to transform and paste in place tools that led to undesired outcomes
+  - fixed other small things and hopefully broke not other stuff ^_^ 
+
 - v4.3.0 (2020-06-17)
   - [new] free-form curves or polygonal lines drawing, with option to fill as shapes
   - [new] alpha masks when pasting images or transforming a selected area; the alpha mask for the image object can be a gradient [linear, radial or box], or another image file, or a previously drawn curved/polygonal shape

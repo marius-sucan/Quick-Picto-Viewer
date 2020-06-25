@@ -240,6 +240,8 @@ d) How an image is loaded and displayed on screen [simplified]
    the available caches. They both rely on Gdip_DrawImage() or 
    Gdip_DrawImageFX() - when color effects are used.
 
+   Internally, I use the 32-PARGB pixel format, because
+   Gdip_DrawImage() and other functions perform faster.
 
 e) General considerations
    When actions are performed or somehow the main core is about 

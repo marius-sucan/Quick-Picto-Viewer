@@ -14,11 +14,14 @@
 
 <p width="600" height="410"><img width="600" height="410" alt="Quick Picture Viewer - image view screenshot" src="http://marius.sucan.ro/media/files/blog/ahk-scripts/images/quick-picto-viewer-screenshot2.jpg"></p>
 
+
 <h2><a href="http://marius.sucan.ro/media/files/blog/ahk-scripts/quick-picto-viewer-compiled.zip">Download latest version</a> (compiled for x64/x32, Windows binary)</h2>
 
 <p>It runs on Windows XP*, Windows 7 and Windows 10.</p>
 
 <p>Source code available on <a href="https://github.com/marius-sucan/Quick-Picto-Viewer">Github</a>.</p>
+
+<p>Required DLL files are included in the ZIP file, except for those needed to run on Windows XP.</p>
 
 <h1>Features</h1>
 

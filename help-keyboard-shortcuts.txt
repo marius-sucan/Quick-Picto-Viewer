@@ -78,7 +78,9 @@ D|Hide image selection area|Image view|Nothing
 E|Toggle edit image selection area|Image view|Nothing
 Delete|Delete file or fade/erase image selected area|Anywhere|Panel
 Enter|Switch between image list and image view|Anywhere|Mode switch
-Enter|Apply live edit and close panel|Image editing|Close window
+Enter|Apply tool during live editing|Image editing|Nothing
+Shift + Enter|Apply tool during live edit and close panel|Image editing|Close window
+Shift + Enter|Crop image to selected area|Image selection|Nothing
 Esc|Quit or close panel window|Anywhere|Close window
 F|Toggle between color modes/filters|Anywhere|Nothing
 Shift + F|Toggle between color modes/filters|Anywhere|Nothing
@@ -147,8 +149,6 @@ Shift + B|Blur selected area|Image selection|Panel
 Shift + C|Copy file path(s) to clipboard|Anywhere|Nothing
 Shift + Delete|Delete active file and its index entry|Files list|Nothing
 Shift + E|Toggle ellipse image selection area|Image selection|Nothing
-Shift + Enter|Crop image to selected area|Image selection|Nothing
-Shift + Enter|Apply live edit tool|Image editing|Nothing
 Shift + Esc|Restart Quick Picto Viewer|Anywhere|Close window
 Shift + F2|Rename active file|Anywhere|Panel
 Ctrl + F3|Search in files index|Files list|Panel

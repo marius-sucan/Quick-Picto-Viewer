@@ -22,7 +22,7 @@
 ; Thanks to [just me] for creating TaskDialog that gave me ideas and inspiration.
 ; https://github.com/AHK-just-me/TaskDialog/blob/master/Sources/TaskDialog.ahk
 ; ================================================================================
-; Current version: mardi 16 juin 2020
+; Current version: jeudi 18 juin 2020
 ;
 ; Usage example:
 ; msgResultArray := MsgBox2("Please confirm you want to delete this file", "confirmation box", "&Delete|&Cancel", 2, "question", "Arial", 0, 12, ,, "Do not prompt again before file delete", 1)
@@ -89,7 +89,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   btnDim := GetMsgDimensions("Again?!", fontFace, fontSize, rMaxW, rMaxH, 1, doBold)
   bH := btnDim.h
   bH += Round(bH*0.8)
-  If (!bH || bH>6*thisFontSize)
+  If !bH
      bH:= Round(thisFontSize*2.5)
 
   minBW := Round(bH*2.5)
@@ -313,8 +313,6 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
       thisBW := btnDimensions[A_Index].w + bH
       If (thisBW<minBW)
          thisBW := minBW
-      Else If (Floor(thisBW*1.35)>Floor(1.2*thisFontSize*StrLen(btnText))) && (A_OSVersion="WIN_XP")
-         thisBW := Floor(1.2*thisFontSize*StrLen(btnText))
 
       If (A_Index=1)
          Gui, Add, Button, gMsgBox2event xp y+%marginz% w%thisBW% h%bH% %def% -wrap, %btnText%
@@ -483,16 +481,11 @@ GetMsgDimensions(sString, FaceName, FontSize, maxW, maxH, btnMode:=0, bBold:=0) 
 
     r.h := ctlSizeH
     If (btnMode=1)
-    {
-       If (Floor(ctlSizeW*1.35)>Floor(1.2*thisFontSize*StrLen(sString))) && (A_OSVersion="WIN_XP")
-          ctlSizeW := Floor(1.2*thisFontSize*StrLen(sString))
        r.w := ctlSizeW
-    } Else If (ctlSizeH>maxH*0.9 && modifiedW=1)
+    Else If (ctlSizeH>maxH*0.9 && modifiedW=1)
        r.w := maxW
 
-    If (btnMode=1 && A_OSVersion="WIN_XP")
-       r.h := Round(thisFontSize * 2.2)
-    Else If (btnMode!=1)
+    If (btnMode!=1)
        dimz := GetStringSize(FaceName, FntSize, bBold, sString, mustWrap, r.w)
 
     scaledH := Round((ctlSizeW / r.w) * ctlSizeH)
@@ -501,32 +494,20 @@ GetMsgDimensions(sString, FaceName, FontSize, maxW, maxH, btnMode:=0, bBold:=0) 
        r.w := Round(maxW * 0.95)
        r.h := Round(maxH * 0.9)
     }
-    If (r.w>(maxLineLength*thisFontSize)*1.3) && (A_OSVersion="WIN_XP")
-       r.w := Round((maxLineLength*thisFontSize)*1.3)
     ; If !btnMode
     ;    MsgBox, % r.w " | " r.h "`n" scaledH "`n" maxW " | " maxH "`n" ctlSizeW " | " ctlSizeH
     Return r
 }
 
-GuiDefaultFont(byRef fontName, byRef fontSize, byRef dpi) {
-    ; By SKAN https://autohotkey.com/board/topic/7984-ahk-functions-incache-cache-list-of-recent-items/page-10#entry443622
-    Static prevfontName, prevfontSize
-    If prevfontName
-    {
-       fontName := prevfontName
-       fontSize := prevfontSize
-       Return
-    }
-
-    hFont := DllCall( "GetStockObject", UInt, 17) ; DEFAULT_GUI_FONT
-    VarSetCapacity( LF, szLF := 60*( A_IsUnicode ? 2:1 ) )
-    DllCall("GetObject", UInt,hFont, Int,szLF, UInt,&LF )
-    hDC := DllCall( "GetDC", UInt,hwnd )
-    DPI := DllCall( "GetDeviceCaps", UInt,hDC, Int,90 )
-    DllCall( "ReleaseDC", Int,0, UInt,hDC ), S := Round( ( -NumGet( LF,0,"Int" )*72 ) / DPI )
-    prevfontName := fontName := DllCall( "MulDiv",Int,&LF+28, Int,1,Int,1, Str )
-    prevfontSize := fontSize := DllCall( "SetLastError", UInt,S )
-    Fnt_DeleteFont(hFont)
+GuiDefaultFont() {
+   ; by SKAN (modified by just me)
+   ; https://www.autohotkey.com/boards/viewtopic.php?t=6750
+   ; By SKAN https://autohotkey.com/board/topic/7984-ahk-functions-incache-cache-list-of-recent-items/page-10#entry443622
+   VarSetCapacity(LF, szLF := 28 + (A_IsUnicode ? 64 : 32), 0) ; LOGFONT structure
+   If DllCall("GetObject", "Ptr", DllCall("GetStockObject", "Int", 17, "Ptr"), "Int", szLF, "Ptr", &LF)
+      Return {Name: StrGet(&LF + 28, 32), Size: Round(Abs(NumGet(LF, 0, "Int")) * (72 / A_ScreenDPI), 1)
+            , Weight: NumGet(LF, 16, "Int"), Quality: NumGet(LF, 26, "UChar")}
+   Return False
 }
 
 Fnt_GetSizeForEdit(hFont,p_Text,p_MaxW:=0,mustWrap:=1,ByRef r_Width:="",ByRef r_Height:="") {
@@ -630,11 +611,18 @@ GetStringSize(FontFace, fontSize, doBold, p_String, mustWrap, l_Width:=0) {
     Static DEFAULT_GUI_FONT:=17
           ,HWND_DESKTOP    :=0
           ,OBJ_FONT        :=6
+          ,defObjDetected  :=0
+          ,defFontFace, defFontSize
 
     r_Width := r_Height := 0
     thisBold := (doBold=1) ? " bold " : ""
-    If (!fontFace || !fontSize)
-       GuiDefaultFont(defFontFace, defFontSize, dpi)
+    If (defObjDetected=0)
+    {
+       defObjDetected := 1
+       obju := GuiDefaultFont()
+       defFontFace := Trim(obju.name), defFontSize := Round(obju.size)
+       ; msgbox, % defFontFace "=" defFontSize "`n" fontFace "=" fontSize
+    }
 
     fontFace := !fontFace ? defFontFace : fontFace
     fontSize := !fontSize ? defFontSize : FontSize
@@ -647,9 +635,11 @@ GetStringSize(FontFace, fontSize, doBold, p_String, mustWrap, l_Width:=0) {
     If (DllCall("GetObjectType","Ptr",hFont)!=OBJ_FONT)
        hFont := DllCall("GetStockObject","Int",DEFAULT_GUI_FONT)
 
-
     Fnt_GetSizeForEdit(hFont, p_String, mustWrap, l_Width, r_Width, r_Height)
     Fnt_DeleteFont(hFont)
+    ; If (r_Height>15*fontSize && mustWrap!=1)
+    ;    r_Height := fontSize * 3
+
     result := []
     result.w := (mustWrap=1) ? r_Width + Round(fontSize*1.5) : r_Width
     result.h := r_Height ? r_Height : fontSize * 2

@@ -279,7 +279,7 @@ ConvertFimObj2pBitmap(hFIFimgD, imgW, imgH) {
   pBits := FreeImage_GetBits(hFIFimgD)
 
   nBitmap := Gdip_CreateBitmapFromGdiDib(bitmapInfo, pBits)
-  pBitmap := Gdip_CreateBitmap(imgW, imgH, 0x21808)    ; 24-RGB
+  pBitmap := Gdip_CreateBitmap(imgW, imgH, 0xE200B)    ; 24-RGB
 
   G := Gdip_GraphicsFromImage(pBitmap)
   Gdip_DrawImageFast(G, nBitmap)

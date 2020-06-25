@@ -1793,7 +1793,7 @@ Gdip_GraphicsFromImage(pBitmap, InterpolationMode:="", SmoothingMode:="", PageUn
       If (PageUnit!="")
          Gdip_SetPageUnit(pGraphics, PageUnit)
       If (CompositingQuality!="")
-         Gdip_SetCompositingMode(pGraphics, CompositingQuality)
+         Gdip_SetCompositingQuality(pGraphics, CompositingQuality)
    }
    return pGraphics
 }
@@ -1826,7 +1826,7 @@ Gdip_GraphicsFromHDC(hDC, hDevice:="", InterpolationMode:="", SmoothingMode:="",
       If (PageUnit!="")
          Gdip_SetPageUnit(pGraphics, PageUnit)
       If (CompositingQuality!="")
-         Gdip_SetCompositingMode(pGraphics, CompositingQuality)
+         Gdip_SetCompositingQuality(pGraphics, CompositingQuality)
    }
 
    return pGraphics
@@ -1848,7 +1848,7 @@ Gdip_GraphicsFromHWND(HWND, useICM:=0, InterpolationMode:="", SmoothingMode:="",
       If (PageUnit!="")
          Gdip_SetPageUnit(pGraphics, PageUnit)
       If (CompositingQuality!="")
-         Gdip_SetCompositingMode(pGraphics, CompositingQuality)
+         Gdip_SetCompositingQuality(pGraphics, CompositingQuality)
    }
    return pGraphics
 }
@@ -2806,6 +2806,9 @@ Gdip_RotateBitmapAtCenter(pBitmap, Angle, pBrush:=0, InterpolationMode:=7, Pixel
        indexedMode := 1
     } Else
     {
+       If (PixelFormat=-1)
+          PixelFormat := "0xE200B"
+
        newBitmap := Gdip_CreateBitmap(RWidth, RHeight, PixelFormat)
        G := Gdip_GraphicsFromImage(newBitmap)
     }
@@ -2836,7 +2839,8 @@ Gdip_RotateBitmapAtCenter(pBitmap, Angle, pBrush:=0, InterpolationMode:=7, Pixel
 Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", KeepPixelFormat:=0, checkTooLarge:=0) {
 ; KeepPixelFormat can receive a specific PixelFormat.
 ; The function returns a pointer to a new pBitmap.
-; Default is 0 = 32-ARGB
+; Default is 0 = 32-ARGB.
+; For maximum speed, use 0xE200B - 32-PARGB pixel format.
 
     Gdip_GetImageDimensions(pBitmap, Width, Height)
     If (KeepRatio=1)
@@ -2854,7 +2858,9 @@ Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", Kee
     PixelFormatReadable := Gdip_GetImagePixelFormat(pBitmap, 2)
     If (KeepPixelFormat=1)
        PixelFormat := Gdip_GetImagePixelFormat(pBitmap, 1)
-    If Strlen(KeepPixelFormat)>3
+    Else If (KeepPixelFormat=-1)
+       PixelFormat := "0xE200B"
+    Else If Strlen(KeepPixelFormat)>3
        PixelFormat := KeepPixelFormat
 
     If InStr(PixelFormatReadable, "indexed")
@@ -3947,9 +3953,6 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
    RegExMatch(Options, pattern_opts "R(\d)", Rendering)
    RegExMatch(Options, pattern_opts "S(\d+)(p*)", Size)
 
-   If (width && height && !NoWrap) || (Iwidth && Iheight && !NoWrap)
-      mustTrimText := Measure=1 ? 0 : 1
-
    if Colour && IsInteger(Colour[2]) && !Gdip_DeleteBrush(Gdip_CloneBrush(Colour[2]))
    {
       PassBrush := 1
@@ -4015,8 +4018,9 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
 
    CreateRectF(RC, xpos, ypos, Width, Height)
    Gdip_SetStringFormatAlign(hStringFormat, Align)
-   If (mustTrimText=1)
+   If InStr(Options, "autotrim")
       Gdip_SetStringFormatTrimming(hStringFormat, 3)
+
    Gdip_SetTextRenderingHint(pGraphics, Rendering)
    ReturnRC := Gdip_MeasureString(pGraphics, Text, hFont, hStringFormat, RC)
    ReturnRCtest := StrSplit(ReturnRC, "|")
@@ -7117,7 +7121,7 @@ Gdi_GetDIBits(hDC, hBitmap, start, cLines, pBits, BITMAPINFO, DIB_COLORS) {
             , Ptr, hBitmap
             , "uint", start
             , "uint", cLines
-            , Ptr, pBits
+            , "Ptr", pBits
             , Ptr, BITMAPINFO
             , "uint", DIB_COLORS, Ptr)    ; PAL=1 ; RGB=2
 }
@@ -7763,6 +7767,7 @@ int function(int *imageData, int *maskData, int w, int h, int invert) {
   return r
 }
 
+
 Gdip_BoxBlurBitmap(pBitmap, passes) {
 /*
 C/C++ function by Tic:
@@ -8006,7 +8011,7 @@ Gdip_BitmapConvertGray(pBitmap, hue:=0, vibrance:=-40, brightness:=1, contrast:=
     newBitmap := Gdip_CreateBitmap(Width, Height, PixelFormat)
     G := Gdip_GraphicsFromImage(newBitmap)
     Gdip_SetInterpolationMode(G, InterpolationMode)
-    If (hue!=0 && vibrance!=0)
+    If (hue!=0 || vibrance!=0)
        pEffect := Gdip_CreateEffect(6, hue, vibrance, 0)
     matrix := GenerateColorMatrix(2, brightness, contrast)
     r1 := Gdip_DrawImageFX(G, pBitmap, 0, 0, 0, 0, Width, Height, matrix, pEffect)

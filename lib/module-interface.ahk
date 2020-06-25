@@ -83,7 +83,7 @@ BuildGUI() {
    MinGUISize := "+MinSize" A_ScreenWidth//4 "x" A_ScreenHeight//4
    initialWh := "w" A_ScreenWidth//1.7 " h" A_ScreenHeight//1.5
    ; If !A_IsCompiled
-     Try Menu, Tray, Icon, %mainCompiledPath%\quick-picto-viewer.ico
+     Try Menu, Tray, Icon, %mainCompiledPath%\qpv-icon.ico
 
    Gui, 1: Color, %WindowBgrColor%
    Gui, 1: Margin, 0, 0
@@ -671,9 +671,12 @@ WM_MOUSELEAVE() {
 
 dummyCheckWin() {
    thisHwnd := WinActive("A")
+   drawingOkay := (thisHwnd=PVhwnd || thisHwnd=tempBtnVisible || thisHwnd=hSetWinGui) ? 1 : 0
    ; ToolTip, % hSetWinGui "`n" thisHwnd , , , 2
    If (imgEditPanelOpened=1 && AnyWindowOpen>0 && panelWinCollapsed=1 && thisHwnd=hSetWinGui)
       MainExe.ahkPostFunction("toggleImgEditPanelWindow")
+   If (drawingShapeNow=1 && drawingOkay!=1)
+      MainExe.ahkPostFunction("stopDrawingShape")
 }
 
 activateMainWin() {
@@ -683,7 +686,7 @@ activateMainWin() {
    If (A_TickCount - lastInvoked > 530)
       GuiControl, 1:, editDummy, -
 
-   If (imgEditPanelOpened=1 && AnyWindowOpen>0 && panelWinCollapsed=1)
+   If (drawingShapeNow=1) || (imgEditPanelOpened=1 && AnyWindowOpen>0 && panelWinCollapsed=1)
       SetTimer, dummyCheckWin, -100
 
    lastInvoked := A_TickCount
@@ -713,7 +716,7 @@ GuiSize(GuiHwnd, EventInfo, Width, Height) {
 
 GuiDropFiles(GuiHwnd, FileArray, CtrlHwnd, X, Y) {
    Static lastInvoked := 1
-   If (AnyWindowOpen>0 || runningLongOperation=1 || groppedFiles) || (A_TickCount - lastInvoked<300)
+   If (AnyWindowOpen>0 || drawingShapeNow=1 || imageLoading=1 || runningLongOperation=1 || groppedFiles) || (A_TickCount - lastInvoked<300)
       Return
 
    lastInvoked := A_TickCount
@@ -751,7 +754,7 @@ dummyTimerProccessDroppedFiles() {
    Loop, Parse, groppedFiles, `n,`r
    {
       changeMcursor("busy")
-      MainExe.ahkPostFunction("showTOOLtip", "Scanning for images...")
+      ToolTip, % Please wait - processing dropped files list , , , 2
       line := Trimmer(A_LoopField)
       ; MsgBox, % A_LoopField
       If (A_Index>9900)
@@ -770,7 +773,7 @@ dummyTimerProccessDroppedFiles() {
          imgFiles .= line "`n"
       }
    }
-
+   ToolTip, , , , 2
    MainExe.ahkPostFunction("GuiDroppedFiles", imgFiles, foldersList, sldFile, countFiles)
    groppedFiles := ""
    lastInvoked := A_TickCount
@@ -1036,6 +1039,7 @@ dummy() {
 MenuSelRotation() {
   If !determineMenuBTNsOKAY()
      Return
+
   VPselRotation := MainExe.ahkgetvar.VPselRotation
   VPselRotation := Round(VPselRotation) + 45
   If (VPselRotation>350)
