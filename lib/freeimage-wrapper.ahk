@@ -5,16 +5,19 @@
 
 ; Change log:
 ; =============================
-; 21th of September 2019 by Marius Șucan
+; 30 June 2020 by Marius Șucan
 ; - Implemented additional functions.
 ;
-; 11th of August 2019 by Marius Șucan
+; 21 September 2019 by Marius Șucan
+; - Implemented additional functions.
+;
+; 11 August 2019 by Marius Șucan
 ; - Added ConvertFIMtoPBITMAP() and ConvertPBITMAPtoFIM() functions
 ; - Implemented 32 bits support for AHK_L 32 bits and FreeImage 32 bits.
 ; - FreeImage_Save() now relies on FreeImage_GetFIFFromFilename() to get the file format code
 ; - Bug fixes and more in-line comments/information
 ;
-; 6th of August 2019 by Marius Șucan
+; 6 August 2019 by Marius Șucan
 ; - It now works with FreeImage v3.18 and AHK_L v1.1.30.
 ; - Added many new functions and cleaned up the code. Fixed bugs.
 
@@ -178,6 +181,29 @@ FreeImage_GetColorsUsed(hImage) {
    Return DllCall(getFIMfunc("GetColorsUsed"), "int", hImage)
 }
 
+FreeImage_GetHistogram(hImage, channel, ByRef histoArray) {
+   ; RGB    = 0 ; red, green and blue channels
+   ; RED    = 1 ; red channel
+   ; GREEN  = 2 ; green channel
+   ; BLUE   = 3 ; blue channel
+   ; ALPHA  = 4 ; alpha channel
+   ; BLACK  = 5 ; black channel
+   ; the function works only on 8, 24 and 32 bits images
+
+
+   VarSetCapacity(histo, 1024, 0)
+   E := DllCall(getFIMfunc("GetHistogram"), "int", hImage, "ptr", &histo, "int", channel)
+   histoArray := []
+   Loop 256
+   {
+      i := A_Index - 1
+      r := NumGet(&histo+0, i * 4, "UInt")
+      histoArray[i] := r
+   }
+
+   Return E
+}
+
 FreeImage_GetBPP(hImage) {
    Return DllCall(getFIMfunc("GetBPP"), "int", hImage)
 }
@@ -213,6 +239,11 @@ FreeImage_GetMemorySize(hImage) {
 
 FreeImage_GetPalette(hImage) {
    Return DllCall(getFIMfunc("GetPalette"), "Int", hImage)
+}
+
+FreeImage_GetDPIresolution(hImage, ByRef dpiX, ByRef dpiY) {
+   dpiX := FreeImage_GetDotsPerMeterX(hImage)
+   dpiY := FreeImage_GetDotsPerMeterY(hImage)
 }
 
 FreeImage_GetDotsPerMeterX(hImage) {
@@ -403,7 +434,7 @@ FreeImage_SetPixelColor(hImage, xPos, yPos, RGBArray="255,255,255,0") {
 
 ; === Conversion functions ===
 ; missing functions: ColorQuantizeEx, ConvertToType,
-; ConvertToRawBits, ConvertFromRawBitsEx, ConvertFromRawBits
+; ConvertFromRawBitsEx
 
 FreeImage_ConvertTo(hImage, MODE) {
 ; This is a wrapper for multiple FreeImage functions.
@@ -412,6 +443,17 @@ FreeImage_ConvertTo(hImage, MODE) {
 ; ATTENTION: these are case sensitive!
 
    Return DllCall(getFIMfunc("ConvertTo" MODE), "int", hImage)
+}
+
+FreeImage_ConvertToRawBits(pBits, hImage, scan_width, BPP, redMASK, greenMASK, blueMASK, topDown:=1) {
+   ; thanks to TheArkive for the help
+   r := DllCall(getFIMfunc("ConvertToRawBits"), "ptr", pBits, "uint", hImage, "Int", scan_width, "Int", BPP, "uInt", redMASK, "uInt", greenMASK, "uInt", blueMASK, "int", topDown)
+   Return r
+}
+
+FreeImage_ConvertFromRawBits(pBits, imgW, imgH, PitchStride, BPP, redMASK, greenMASK, blueMASK, topDown:=1) {
+   r := DllCall(getFIMfunc("ConvertFromRawBits"), "ptr", pBits, "Int", imgW, "Int", imgH, "uInt", PitchStride, "Int", BPP, "uInt", redMASK, "uInt", greenMASK, "uInt", blueMASK, "int", topDown)
+   Return r
 }
 
 FreeImage_ConvertToStandardType(hImage, bScaleLinear=True) {
@@ -467,26 +509,40 @@ FreeImage_GetICCProfile(hImage) {
 ; 12 functions available in the FreeImage Library
 
 ; === Memory I/O functions ===
-; missing functions: LoadFromMemory, SeekMemory, ReadMemory,
-; WriteMemory, LoadMultiBitmapFromMemory, SaveMultiBitmapFromMemory
+; missing functions: LoadFromMemory, ReadMemory, WriteMemory,
+; LoadMultiBitmapFromMemory, SaveMultiBitmapFromMemory
 
 FreeImage_OpenMemory(hMemory, size) {
    Return DllCall(getFIMfunc("OpenMemory"), "int", hMemory, "int", size)
 }
 
 FreeImage_CloseMemory(hMemory) {
-   Return DllCall(getFIMfunc("CloseMemory") , "int", hMemory, "int", size)
+   Return DllCall(getFIMfunc("CloseMemory"), "int", hMemory)
 }
 
 FreeImage_TellMemory(hMemory) {
    Return DllCall(getFIMfunc("TellMemory"), "int", hMemory)
 }
 
-FreeImage_AcquireMemory(hMemory, byref BufAdr, byref BufSize) {
+FreeImage_SeekMemory(hMemory, offset, origin) {
+   ; Moves the memory pointer to a specified location. A description of parameters follows:
+   ; hMemory - Pointer to the target memory stream
+   ; offset - Number of bytes from origin
+   ; origin - Initial position
+         ; 0 - SEEK_SET - Beginning of file.
+         ; 1 - SEEK_CUR - Current position of file pointer.
+         ; 2 - SEEK_END - End of file.
+   ; The function returns TRUE if successful, returns FALSE otherwise
+
+   Return DllCall(getFIMfunc("SeekMemory"), "int", hMemory, "int", offset, "int", origin)
+}
+
+FreeImage_AcquireMemory(hMemory, ByRef BufAdr, ByRef BufSize) {
    DataAddr := 0 , DataSizeAddr := 0
-   bSucess := DllCall(getFIMfunc("AcquireMemory") , "int", hMemory, "Uint", &DataAddr, "Uint", &DataSizeAddr)
-   BufAdr := numget(DataAddr, 0, "int") , BufSize := numget(DataSizeAddr, 0, "int")
-   return, bSucess
+   bSucess := DllCall(getFIMfunc("AcquireMemory"), "int", hMemory, "Uint*", DataAddr, "Uint*", DataSizeAddr)
+   BufAdr := NumGet(DataAddr, 0, "uint")
+   BufSize := NumGet(DataSizeAddr, 0, "uint")
+   Return bSucess
 }
 
 FreeImage_SaveToMemory(FIF,hImage, hMemory, Flags) { ; 0:BMP 2:JPG 13:PNG 18:TIF 25:GIF
@@ -678,91 +734,102 @@ getFIMfunc(funct) {
 }
 
 ConvertFIMtoPBITMAP(hFIFimgA) {
-; destWin parameter is the window you intend to display it in required for GetDC()
-; this function relies on GDI+ AHK library v1.75 [the edition modified by Marius Șucan]
+; hFIFimgA - provide a 32 bits Standard RGBA FBITMAP.
+; this function relies on GDI+ AHK library 
 ; If succesful, the function returns a 32-bit RGBA pBitmap.
 
-  imgW := FreeImage_GetWidth(hFIFimgA)
-  imgH := FreeImage_GetHeight(hFIFimgA)
-  imgBPP := Trim(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
-  If (imgBPP>32)
-     hFIFimgB := FreeImage_ToneMapping(hFIFimgA, 0, 1.85, 0)
-
-  hFIFimgC := hFIFimgB ? hFIFimgB : hFIFimgA
-  hFIFimgD := FreeImage_ConvertTo(hFIFimgC, "32Bits")
-  pBits := FreeImage_GetBits(hFIFimgD)
-
-  nBitmap := Gdip_CreateBitmap(imgW, imgH, 0, imgW*4, pBits)
-  Gdip_ImageRotateFlip(nBitmap, 6)
+  FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
+  Pitch := FreeImage_GetPitch(hFIFimgA)
   pBitmap := Gdip_CreateBitmap(imgW, imgH)
-  G := Gdip_GraphicsFromImage(pBitmap)
-  E := Gdip_DrawImageFast(G, nBitmap, 0, 0)
-  Gdip_DeleteGraphics(G)
-  Gdip_DisposeImage(nBitmap)
-
-  imgIDs := hFIFimgA "|" hFIFimgB "|" hFIFimgC "|" hFIFimgD
-  Sort, imgIDs, UD|
-  Loop, Parse, imgIDs, |
-  {
-      If A_LoopField
-         FreeImage_UnLoad(A_LoopField)
-  }
+  redMASK := FreeImage_GetRedMask(hFIFimgA)
+  greenMASK := FreeImage_GetGreenMask(hFIFimgA)
+  blueMASK := FreeImage_GetBlueMask(hFIFimgA)
+  E := Gdip_LockBits(pBitmap, 0, 0, imgW, imgH, Stride, Scan0, BitmapData)
+  R := FreeImage_ConvertToRawBits(Scan0, hFIFimgA, pitch, 32, redMASK, greenMASK, blueMASK, 1)
+  Gdip_UnlockBits(pBitmap, BitmapData)
+  FreeImage_GetDPIresolution(hFIFimgA, dpiX, dpiY)
+  Gdip_BitmapSetResolution(pBitmap, dpiX, dpiY)
   Return pBitmap
 }
 
-ConvertPBITMAPtoFIM(pBitmap, destWin) {
-; this function relies on GDI+ AHK library v1.75 [the edition modified by Marius Șucan]
-  hBitmap := Gdip_CreateHBITMAPFromBitmap(pBitmap)
-  If !hBitmap
-     Return
+ConvertPBITMAPtoFIM(pBitmap) {
+; please provide a 32 RGBA image format GDI+ object.
+; this function relies on GDI+ AHK library 
+
+   Static redMASK := "0x00FF0000" ; FI_RGBA_RED_MASK;
+        , greenMASK := "0x0000FF00" ; FI_RGBA_GREEN_MASK;
+        , blueMASK := "0x000000FF" ; FI_RGBA_BLUE_MASK;
 
   Gdip_GetImageDimensions(pBitmap, imgW, imgH)
-  hFIFimgA := FreeImage_Allocate(imgW, imgH, 32)
-  If !hFIFimgA
-     Return
-
-  pBits := FreeImage_GetBits(hFIFimgA)
-  bitmapInfo := FreeImage_GetInfo(hFIFimgA)
-  hdc := GetDC(destWin)
-  bmpInfoHeader := FreeImage_GetInfoHeader(hFIFimgA)
-  E := Gdi_GetDIBits(hdc, hBitmap, 0, imgH, pBits, bitmapInfo, 0)
-  SelectObject(hdc, hBitmap)
-  DeleteObject(hBitmap)
-  DeleteDC(hdc)
-  If !E
-  {
-     FreeImage_UnLoad(hFIFimgA)
-     Return
-  }
+  E := Gdip_LockBits(pBitmap, 0, 0, imgW, imgH, Stride, Scan0, BitmapData)
+  hFIFimgA := FreeImage_ConvertFromRawBits(Scan0, imgW, imgH, Stride, 32, redMASK, greenMASK, blueMASK, 1)
+  Gdip_UnlockBits(pBitmap, BitmapData)
+  Gdip_BitmapGetDPIresolution(pBitmap, dpiX, dpiY)
+  FreeImage_SetDotsPerMeterX(hFIFimgA, dpiX)
+  FreeImage_SetDotsPerMeterY(hFIFimgA, dpiY)
   Return hFIFimgA
 }
 
-SimpleConvertFimToPBitmap(hFIFimgA) {
-   imgBPP := Trim(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
-   If (imgBPP!=32 && imgBPP)
+/*
+   public void SelectActiveFrame(int frameIndex)
    {
-      hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "32Bits")
-      If hFIFimgB
+      EnsureNotDisposed();
+      if ((frameIndex < 0) || (frameIndex >= frameCount))
       {
-         FreeImage_UnLoad(hFIFimgA)
-         hFIFimgA := hFIFimgB
+         throw new ArgumentOutOfRangeException("frameIndex");
+      }
+
+      if (frameIndex != this.frameIndex)
+      {
+         if (stream == null)
+         {
+            throw new InvalidOperationException("No source available.");
+         }
+
+         FREE_IMAGE_FORMAT format = originalFormat;
+         FIMULTIBITMAP mdib = FreeImage.OpenMultiBitmapFromStream(stream, ref format, saveInformation.loadFlags);
+         if (mdib.IsNull)
+            throw new Exception(ErrorLoadingBitmap);
+
+         try
+         {
+            if (frameIndex >= FreeImage.GetPageCount(mdib))
+            {
+               throw new ArgumentOutOfRangeException("frameIndex");
+            }
+
+            FIBITMAP newDib = FreeImage.LockPage(mdib, frameIndex);
+            if (newDib.IsNull)
+            {
+               throw new Exception(ErrorLoadingFrame);
+            }
+
+            try
+            {
+               FIBITMAP clone = FreeImage.Clone(newDib);
+               if (clone.IsNull)
+               {
+                  throw new Exception(ErrorCreatingBitmap);
+               }
+               ReplaceDib(clone);
+            }
+            finally
+            {
+               if (!newDib.IsNull)
+               {
+                  FreeImage.UnlockPage(mdib, newDib, false);
+               }
+            }
+         }
+         finally
+         {
+            if (!FreeImage.CloseMultiBitmapEx(ref mdib))
+            {
+               throw new Exception(ErrorUnloadBitmap);
+            }
+         }
+
+         this.frameIndex = frameIndex;
       }
    }
-   If !imgBPP
-      Return
-
-  FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
-  bitmapInfo := FreeImage_GetInfo(hFIFimgA)
-  pBits := FreeImage_GetBits(hFIFimgA)
-  nBitmap := Gdip_CreateBitmap(imgW, imgH, 0, imgW*4, pBits)
-  Gdip_ImageRotateFlip(nBitmap, 6)
-  ; nBitmap := Gdip_CreateBitmapFromGdiDib(bitmapInfo, pBits)
-
-  pBitmap := Gdip_CreateBitmap(imgW, imgH)    ; 32-RGB
-  G := Gdip_GraphicsFromImage(pBitmap)
-  Gdip_DrawImageFast(G, nBitmap)
-  Gdip_DeleteGraphics(G)
-  Gdip_DisposeImage(nBitmap)
-  Return pBitmap
-}
-
+*/

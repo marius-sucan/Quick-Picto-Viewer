@@ -817,7 +817,7 @@ Gdip_LibraryVersion() {
 ;                 Updated by Marius Șucan reflecting the work on Gdip_all extended compilation
 
 Gdip_LibrarySubVersion() {
-   return 1.84
+   return 1.85
 }
 
 ;#####################################################################################
@@ -865,7 +865,7 @@ Gdip_BitmapFromBRA(ByRef BRAFromMemIn, File, Alternate := 0) {
    DllCall("RtlMoveMemory", "Ptr", pData, "Ptr", &BRAFromMemIn + Offset, "Ptr", Size)
    DllCall("GlobalUnlock", "Ptr", hData)
    DllCall("Ole32.dll\CreateStreamOnHGlobal", "Ptr", hData, "Int", 1, "PtrP", pStream)
-   DllCall("gdiplus\GdipCreateBitmapFromStream", "Ptr", pStream, "PtrP", pBitmap)
+   pBitmap := Gdip_CreateBitmapFromStream(pStream)
    ObjRelease(pStream)
    Return pBitmap
 }
@@ -901,12 +901,20 @@ Gdip_BitmapFromBase64(ByRef Base64) {
    if !(pStream := DllCall("shlwapi\SHCreateMemStream", Ptr, &Dec, "UInt", DecLen, "UPtr"))
       return -3
 
-   DllCall("gdiplus\GdipCreateBitmapFromStreamICM", Ptr, pStream, "PtrP", pBitmap)
+   pBitmap := Gdip_CreateBitmapFromStream(pStream, 1)
    ObjRelease(pStream)
 
    return pBitmap
 }
 
+Gdip_CreateBitmapFromStream(pStream, ICM:=0) {
+   pBitmap := 0
+   If (ICM=1)
+      DllCall("gdiplus\GdipCreateBitmapFromStreamICM", "UPtr", pStream, "PtrP", pBitmap)
+   Else
+      DllCall("gdiplus\GdipCreateBitmapFromStream", "UPtr", pStream, "PtrP", pBitmap)
+   Return pBitmap
+}
 ;#####################################################################################
 
 ; Function           Gdip_DrawRectangle
@@ -1921,23 +1929,30 @@ Gdip_GraphicsFlush(pGraphics, intent) {
 ;
 ; notes              This function will not dispose of the original bitmap
 
-Gdip_BlurBitmap(pBitmap, BlurAmount) {
-   if (BlurAmount > 100) || (BlurAmount < 1)
-      return -1
+Gdip_BlurBitmap(pBitmap, BlurAmount, usePARGB:=0, quality:=7) {
+   ; suggested quality is 6;
+   ; quality 7 creates sharpening effect
+   ; for higher speed set usePARGB to 1
 
+   If (BlurAmount>100)
+      BlurAmount := 100
+   Else If (BlurAmount<1)
+      BlurAmount := 1
+
+   PixelFormat := (usePARGB=1) ? "0xE200B" : "0x26200A"
    Gdip_GetImageDimensions(pBitmap, sWidth, sHeight)
    dWidth := sWidth//BlurAmount
    dHeight := sHeight//BlurAmount
 
-   pBitmap1 := Gdip_CreateBitmap(dWidth, dHeight)
+   pBitmap1 := Gdip_CreateBitmap(dWidth, dHeight, PixelFormat)
    G1 := Gdip_GraphicsFromImage(pBitmap1)
-   Gdip_SetInterpolationMode(G1, 7)
+   Gdip_SetInterpolationMode(G1, quality)
    Gdip_DrawImage(G1, pBitmap, 0, 0, dWidth, dHeight, 0, 0, sWidth, sHeight)
 
    Gdip_DeleteGraphics(G1)
-   pBitmap2 := Gdip_CreateBitmap(sWidth, sHeight)
+   pBitmap2 := Gdip_CreateBitmap(sWidth, sHeight, PixelFormat)
    G2 := Gdip_GraphicsFromImage(pBitmap2)
-   Gdip_SetInterpolationMode(G2, 7)
+   Gdip_SetInterpolationMode(G2, quality)
    Gdip_DrawImage(G2, pBitmap1, 0, 0, sWidth, sHeight, 0, 0, dWidth, dHeight)
 
    Gdip_DeleteGraphics(G2)
@@ -4037,11 +4052,11 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
    {
       ReturnRC := StrSplit(ReturnRC, "|")
       if (vPos[0] = "vCentre") || (vPos[0] = "vCenter")
-         ypos := (Height-ReturnRC[4])//2
+         ypos += (Height-ReturnRC[4])//2
       else if (vPos[0] = "Top") || (vPos[0] = "Up")
-         ypos := 0
+         ypos += 0
       else if (vPos[0] = "Bottom") || (vPos[0] = "Down")
-         ypos := Height-ReturnRC[4]
+         ypos += Height-ReturnRC[4]
 
       CreateRectF(RC, xpos, ypos, Width, ReturnRC[4])
       ReturnRC := Gdip_MeasureString(pGraphics, Text, hFont, hStringFormat, RC)
@@ -5854,7 +5869,6 @@ int __stdcall Gdip_PixelateBitmap(unsigned char * sBitmap, unsigned char * dBitm
     return 0;
 }
 
-
 */
 
    static PixelateBitmap
@@ -6997,9 +7011,9 @@ Gdip_GetHistogram(pBitmap, whichFormat, ByRef newArrayA, ByRef newArrayB, ByRef 
    z := DllCall("gdiplus\GdipBitmapGetHistogramSize", "UInt", whichFormat, "UInt*", numEntries)
 
    newArrayA := [], newArrayB := [], newArrayC := []
-   VarSetCapacity(ch0, numEntries * sizeofUInt)
-   VarSetCapacity(ch1, numEntries * sizeofUInt)
-   VarSetCapacity(ch2, numEntries * sizeofUInt)
+   VarSetCapacity(ch0, numEntries * sizeofUInt, 0)
+   VarSetCapacity(ch1, numEntries * sizeofUInt, 0)
+   VarSetCapacity(ch2, numEntries * sizeofUInt, 0)
    If (whichFormat=2)
       r := DllCall("gdiplus\GdipBitmapGetHistogram", "Ptr", pBitmap, "UInt", whichFormat, "UInt", numEntries, "Ptr", &ch0, "Ptr", &ch1, "Ptr", &ch2, "Ptr", 0)
    Else If (whichFormat>2)
@@ -7200,7 +7214,7 @@ Gdip_DrawImageFX(pGraphics, pBitmap, dX:="", dY:="", sX:="", sY:="", sW:="", sH:
       , Ptr, pBitmap
       , Ptr, &sourceRect
       , Ptr, hMatrix ? hMatrix : 0        ; transformation matrix
-      , Ptr, pEffect
+      , Ptr, pEffect ? pEffect : 0
       , Ptr, ImageAttr ? ImageAttr : 0
       , "Uint", Unit)            ; srcUnit
     ; r4 := GetStatus(A_LineNumber ":GdipDrawImageFX",r4)
@@ -7717,16 +7731,18 @@ Gdip_TestBitmapUniformity(pBitmap, HistogramFormat:=3, ByRef maxLevelIndex:=0, B
       Return 0
 }
 
-Gdip_SetBitmapAlphaChannelMcode(pBitmap, pBitmapMask, invertAlphaMask:=0) {
+Gdip_SetAlphaChannel(pBitmap, pBitmapMask, invertAlphaMask:=0, replaceSourceAlphaChannel:=0) {
 /*
-Function provided by Spawnova. Thank you very much.
+Function written with help provided by Spawnova. Thank you very much.
 pBitmap and pBitmapMask must be the same width and height
 and in 32-ARGB format: PXF32ARGB - 0x26200A.
+
+The alpha channel will be applied directly on the pBitmap provided.
 
 For best results, pBitmapMask should be grayscale.
 
 Original code:
-int function(int *imageData, int *maskData, int w, int h, int invert) {
+int SetAlphaChannel(int *imageData, int *maskData, int w, int h, int invert, int replaceAlpha) {
    for(int x = 0; x < w; x++) {
       for(int y = 0; y < h; y++) {
          unsigned int color = imageData[x+(y*w)];
@@ -7736,7 +7752,7 @@ int function(int *imageData, int *maskData, int w, int h, int invert) {
             unsigned char r = color >> 16;
             unsigned char g = color >> 8;
             unsigned char b = color;
-            int alpha2 = alpha - (255-a); //handles bitmaps that already have alpha
+            int alpha2 = replaceAlpha==1 ? alpha : alpha - (255-a); //handles bitmaps that already have alpha
             alpha2 = alpha2 < 0 ? 0 : alpha2;
             if (invert==1) {
                alpha2 = 255 - alpha2;
@@ -7753,27 +7769,222 @@ int function(int *imageData, int *maskData, int w, int h, int invert) {
   if (mCodeFunc=0)
   {
      If (A_PtrSize=8)
-        mCodeFunc := Gdip_RunMCode("2,x64:QVZBVUFUVVdWU0SLbCRgSInTRYXAD47fAAAASWPQRY1g/zH/vf8AAABIweICMfaQRYXJfltMjQS9AAAAAEGD/QF0XUUx22YuDx+EAAAAAABCiwQBhcB0LEYPtnQDAkGJwiX///8AQcHqGEeNlBYB////RYXSRA9I1kHB4hhECdBCiQQBQYPDAUkB0EU52XXASI1HAUw553RhSInH65JmkEUx0g8fRAAAQosEAYXAdDVGD7Z0AwJBicNBwesYR42cHgH///9Bie5FhdtED0jeJf///wBFKd5FifNBweMYRAnYQokEAUGDwgFJAdBFOdF1t0iNRwFMOed1n7gBAAAAW15fXUFcQV1BXsM=")
+        mCodeFunc := Gdip_RunMCode("2,x64:QVdBVkFVQVRVV1ZTRIt0JGhEi3wkcEiJ00WFwA+O7wAAAEWNYP9NY8Ax9kG9/wAAAE6NHIUAAAAAMe0PH0QAAEWFyX5cQYP+AXRlQYP/AQ+E0wAAAEiNBLUAAAAARTHSRIsEAUWFwHQsD7Z8AwJEicJBwegYgeL///8ARo2EBwH///9FhcBED0jFQcHgGEEJ0ESJBAFBg8IBTAHYRTnRdb9IjUYBTDnmdGdIicbrkZBBg/8BD4TGAAAATI0EtQAAAABFMdIPHwBCiwQBhcB0LEIPtnwDAonCweoYjZQXAf///0SJ74XSD0jVJf///wAp14n6weIYCdBCiQQBQYPCAU0B2EU50XXASI1GAUw55nWZuAEAAABbXl9dQVxBXUFeQV/DDx9EAABIjRS1AAAAAEUxwA8fRAAARIsUEUWF0nQniwQTQQ+2+sH4EMHgGAn4RInXQYHiAP8AAIHnAAD/AAn4RAnQiQQRQYPAAUwB2kU5yHXE6Sj///8PH4AAAAAASI0UtQAAAABFMcAPH0QAAESLFBFFhdJ0KYsEE0SJ14HnAAD/AMH4EPfQweAYCfhBD7b6QYHiAP8AAAn4RAnQiQQRQYPAAUwB2kU5wXXC6c7+//8=")
      Else
-        mCodeFunc := Gdip_RunMCode("2,x86:VVdWU4PsCItEJCSLXCQci2wkKIXAD46BAAAAi0QkJMdEJAQAAAAAweACiQQkjXYAhe1+WYtEJAQxyYN8JCwBjRSFAAAAAHRojbQmAAAAAJCLBBOFwHQsi3wkIInGJf///wDB7hgPtnwXAo20NwH///+/AAAAAIX2D0j3weYYCfCJBBODwQEDFCQ5zXXDg0QkBAGLRCQEOUQkJHWUg8QIuAEAAABbXl9dw420JgAAAACLBBOFwHQ1i3wkIInGwe4YD7Z8FwKNtDcB////vwAAAACF9g9I97//AAAAJf///wAp94n+weYYCfCJBBODwQEDFCQ5zXW6g0QkBAGLRCQEOUQkJA+FJ////+uR")
+        mCodeFunc := Gdip_RunMCode("2,x86:VVdWU4PsCItEJCSLfCQohcAPjqIAAACLRCQkxwQkAAAAAI0shQAAAACNtCYAAAAAhf9+dIN8JCwBiwQkD4SOAAAAg3wkMAEPhPMAAACLVCQcjRyFAAAAADHJif4B2gNcJCCNtgAAAACLAoXAdC2Jx8HoGIHn////AIl8JAQPtnsCjYQHAf///78AAAAAhcAPSMfB4BgLRCQEiQKDwQEB6gHrOc51won3gwQkAYsEJDlEJCQPhXf///+DxAi4AQAAAFteX13DjbQmAAAAAI12AIN8JDABD4TFAAAAiXwkKIt0JByNFIUAAAAAMcmNdCYAiwQWhcB0NYt8JCAPtlwXAonHwe8YjZw7Af///78AAAAAhdsPSN+//wAAACX///8AKd+J+8HjGAnYiQQWg8EBAeo5TCQodbmLfCQo6Wj///+JfCQoi3wkHI0UhQAAAAAxyY20JgAAAACLBBeFwHQsi3QkIIs0FonziXQkBA+28MH7EMHjGAneicMlAP8AAIHjAAD/AAnzCcOJHBeDwQEB6jtMJCh1wot8JCjpCf///5CLTCQcweACiXwkKDHbAcEDRCQgicaNdgCLAYXAdCKLFonHgecAAP8AwfoQ99LB4hgJ+g+2+CUA/wAACfoJwokRg8MBAekB7jlcJCh1y4t8JCjpsv7//w==")
   }
 
-  Gdip_GetImageDimensions(pBitmap,w,h)
-  Gdip_LockBits(pBitmap,0,0,w,h,stride,iScan,iData)
-  Gdip_LockBits(pBitmapMask,0,0,w,h,stride,mScan,mData)
-  r := DllCall(mCodeFunc, "UPtr",iScan, "UPtr", mScan, "Int",w, "Int",h, "Int", invertAlphaMask)
-  Gdip_UnlockBits(pBitmapMask,mData)
-  Gdip_UnlockBits(pBitmap,iData)
+  Gdip_GetImageDimensions(pBitmap, w, h)
+  Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData)
+  Gdip_LockBits(pBitmapMask, 0, 0, w, h, stride, mScan, mData)
+  r := DllCall(mCodeFunc, "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", invertAlphaMask, "Int", replaceSourceAlphaChannel)
+  Gdip_UnlockBits(pBitmapMask, mData)
+  Gdip_UnlockBits(pBitmap, iData)
+  return r
+}
+
+
+Gdip_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode) {
+/*
+pBitmap and pBitmap2Blend must be the same width and height
+and in 32-ARGB format: PXF32ARGB - 0x26200A.
+
+Original code:
+int blendBitmaps(int *bgrImageData, int *otherData, int w, int h, int blendMode) {
+   float rT, gT, bT;
+   int rO, gO, bO, rB, gB, bB;
+   unsigned char rF, gF, bF, aB, aO, aX;
+   for(int x = 0; x < w; x++)
+   {
+      for(int y = 0; y < h; y++)
+      {
+         unsigned int BGRcolor = bgrImageData[x+(y*w)];
+         if (BGRcolor!=0x0)
+         {
+            unsigned int colorO = otherData[x+(y*w)];
+            aO = (colorO >> 24) & 0xFF;
+            aB = (BGRcolor >> 24) & 0xFF;
+            aX = (aO<aB) ? aO : aB;
+            if (aX<2)
+            {
+               bgrImageData[x+(y*w)] = (0 << 24) | (0 << 16) | (0 << 8) | 0;
+               continue;
+            }
+
+            rO = (colorO >> 16) & 0xFF;
+            gO = (colorO >> 8) & 0xFF;
+            bO = colorO & 0xFF;
+
+            rB = (BGRcolor >> 16) & 0xFF;
+            gB = (BGRcolor >> 8) & 0xFF;
+            bB = BGRcolor & 0xFF;
+
+            if (blendMode==1) { // darken
+               rT = (rO < rB) ? rO : rB;
+               gT = (gO < gB) ? gO : gB;
+               bT = (bO < bB) ? bO : bB;
+            } else if (blendMode==2) { // multiply
+               rT = (rO * rB)/255;
+               gT = (gO * gB)/255;
+               bT = (bO * bB)/255;
+            } else if (blendMode==3) { // linear burn
+               rT = ((rO + rB - 255) < 0) ? 0 : rO + rB - 255;
+               gT = ((gO + gB - 255) < 0) ? 0 : gO + gB - 255;
+               bT = ((bO + bB - 255) < 0) ? 0 : bO + bB - 255;
+            } else if (blendMode==4) { // color burn
+               rT = (255 - ((255 - rB) * 255) / (1 + rO) < 1) ? 0 : 255 - ((255 - rB) * 255) / (1 + rO);
+               gT = (255 - ((255 - gB) * 255) / (1 + gO) < 1) ? 0 : 255 - ((255 - gB) * 255) / (1 + gO);
+               bT = (255 - ((255 - bB) * 255) / (1 + bO) < 1) ? 0 : 255 - ((255 - bB) * 255) / (1 + bO);
+            } else if (blendMode==5) { // lighten
+               rT = (rO > rB) ? rO : rB;
+               gT = (gO > gB) ? gO : gB;
+               bT = (bO > bB) ? bO : bB;
+            } else if (blendMode==6) { // screen
+               rT = 255 - (((255 - rO) * (255 - rB))/255);
+               gT = 255 - (((255 - gO) * (255 - gB))/255);
+               bT = 255 - (((255 - bO) * (255 - bB))/255);
+            } else if (blendMode==7) { // linear dodge [add]
+               rT = ((rO + rB) > 255) ? 255 : rO + rB;
+               gT = ((gO + gB) > 255) ? 255 : gO + gB;
+               bT = ((bO + bB) > 255) ? 255 : bO + bB;
+            } else if (blendMode==8) { // hard light
+               rT = (rO < 127) ? (2 * rO * rB)/255 : 255 - ((2 * (255 - rO) * (255 - rB))/255);
+               gT = (gO < 127) ? (2 * gO * gB)/255 : 255 - ((2 * (255 - gO) * (255 - gB))/255);
+               bT = (bO < 127) ? (2 * bO * bB)/255 : 255 - ((2 * (255 - bO) * (255 - bB))/255);
+            } else if (blendMode==9) { // overlay
+               rT = (rB < 127) ? (2 * rO * rB)/255 : 255 - ((2 * (255 - rO) * (255 - rB))/255);
+               gT = (gB < 127) ? (2 * gO * gB)/255 : 255 - ((2 * (255 - gO) * (255 - gB))/255);
+               bT = (bB < 127) ? (2 * bO * bB)/255 : 255 - ((2 * (255 - bO) * (255 - bB))/255);
+            } else if (blendMode==10) { // hard mix
+               rT = (rO <= (255 - rB)) ? 0 : 255;
+               gT = (gO <= (255 - gB)) ? 0 : 255;
+               bT = (bO <= (255 - bB)) ? 0 : 255;
+            } else if (blendMode==11) { // linear light
+               rT = ((rB + (2*rO) - 255) > 254) ? 255 : rB + (2*rO) - 255;
+               gT = ((gB + (2*gO) - 255) > 254) ? 255 : gB + (2*gO) - 255;
+               bT = ((bB + (2*bO) - 255) > 254) ? 255 : bB + (2*bO) - 255;
+            } else if (blendMode==12) { // color dodge
+               rT = ((rB * 255) / (256 - rO) > 255) ? 255 : (rB * 255) / (256 - rO);
+               gT = ((gB * 255) / (256 - gO) > 255) ? 255 : (gB * 255) / (256 - gO);
+               bT = ((bB * 255) / (256 - bO) > 255) ? 255 : (bB * 255) / (256 - bO);
+            } else if (blendMode==13) { // vivid light 
+               if (rO < 128)
+                  rT = (255 - ((255 - rB) * 255) / (1 + 2*rO) < 1) ? 0 : 255 - ((255 - rB) * 255) / (1 + 2*rO);
+               else
+                  rT = ((rB * 255) / (2*(256 - rO)) > 255) ? 255 : (rB * 255) / (2*(256 - rO));
+
+               if (gO < 128)
+                  gT = (255 - ((255 - gB) * 255) / (1 + 2*gO) < 1) ? 0 : 255 - ((255 - gB) * 255) / (1 + 2*gO);
+               else
+                  gT = ((gB * 255) / (2*(256 - gO)) > 255) ? 255 : (gB * 255) / (2*(256 - gO));
+
+               if (bO < 128)
+                  bT = (255 - ((255 - bB) * 255) / (1 + 2*bO) < 1) ? 0 : 255 - ((255 - bB) * 255) / (1 + 2*bO);
+               else
+                  bT = ((bB * 255) / (2*(256 - bO)) > 255) ? 255 : (bB * 255) / (2*(256 - bO));
+
+            } else if (blendMode==14) { // division
+               rT = ((rB * 255) / (1 + rO) > 255) ? 255 : (rB * 255) / (1 + rO);
+               gT = ((gB * 255) / (1 + gO) > 255) ? 255 : (gB * 255) / (1 + gO);
+               bT = ((bB * 255) / (1 + bO) > 255) ? 255 : (bB * 255) / (1 + bO);
+            } else if (blendMode==15) { // exclusion
+               rT = rO + rB - 2*((rO * rB)/255);
+               gT = gO + gB - 2*((gO * gB)/255);
+               bT = bO + bB - 2*((bO * bB)/255);
+            } else if (blendMode==16) { // difference
+               rT = (rO > rB) ? rO - rB : rB - rO;
+               gT = (gO > gB) ? gO - gB : gB - gO;
+               bT = (bO > bB) ? bO - bB : bB - bO;
+            } else if (blendMode==17) { // substract
+               rT = ((rB - rO) <= 0) ? 0 : rB - rO;
+               gT = ((gB - gO) <= 0) ? 0 : gB - gO;
+               bT = ((bB - bO) <= 0) ? 0 : bB - bO;
+            } else if (blendMode==18) { // inverted difference
+               rT = (rO > rB) ? 255 - rO - rB : 255 - rB - rO;
+               gT = (gO > gB) ? 255 - gO - gB : 255 - gB - gO;
+               bT = (bO > bB) ? 255 - bO - bB : 255 - bB - bO;
+            }
+
+            if (blendMode!=10) {
+               if (rT<0)
+                  rT += 255;
+               if (gT<0)
+                  gT += 255;
+               if (bT<0)
+                  bT += 255;
+
+               if (rT<0)
+                  rT = 0;
+               if (gT<0)
+                  gT = 0;
+               if (bT<0)
+                  bT = 0;
+            }
+
+            rF = rT;
+            gF = gT;
+            bF = bT;
+            bgrImageData[x+(y*w)] = (aX << 24) | ((rF & 0xFF) << 16) | ((gF & 0xFF) << 8) | (bF & 0xFF);
+         }
+      }
+   }
+   return 1;
+}
+*/
+
+  static mCodeFunc := 0
+  if (mCodeFunc=0)
+  {
+      ; FileRead, base64enc, E:\Sucan twins\_small-apps\AutoHotkey\other scripts\MCode4GCC-master\temp.mcode
+      if (A_PtrSize=8)
+      base64enc := "
+      (LTrim Join
+      2,x64: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
+      )"
+      else
+      base64enc := "
+      (LTrim Join
+      2,x32:2QUEAAAA2QUEAAAA2QUEAAAAVVdWU4PsLItUJEiF0g+OKQMAAItEJEyFwA+OJQMAAItEJEjHRCQcAAAAAMHgAokEJI10JgCQi0QkHItsJEAx9sHgAgHFA0QkRInHjXYAi00AhckPhLQCAACLH4nKweoYidjB6Bg4wg9CwohEJAQ8AQ+G6AIAAInYwegQD7bQiUQkIA+2xYlUJAiJ2sHqCIlEJBQPtsGJVCQkD7bXiVQkEA+204lUJAyJysHqEIN8JFABiUQkGA+20g+EKAEAAIN8JFACD4QNAwAAg3wkUAMPhKoDAACDfCRQBA+EDwQAAIN8JFAFD4SkBAAAg3wkUAYPhNkEAACDfCRQBw+EjwUAAIN8JFAID4TaBQAAg3wkUAkPhIYGAACDfCRQCg+EfAcAAIN8JFALD4TGCAAAg3wkUAwPhDQIAACDfCRQDQ+EPQkAAIN8JFAOD4ShCgAAg3wkUA8PhCMKAACDfCRQEA+EbAsAAIN8JF
+      ARD4SuCwAAg3wkUBIPhawCAADd2N3Y3diLXCQIuP8AAAA50w+OMgwAACnYKdCJRCQI20QkCItcJBCLTCQUuP8AAAA5yw+O/AsAACnYKciJRCQI20QkCItcJAyLTCQYuP8AAAA5yw+OxgsAACnYKciJRCQI20QkCOlCAgAAjXYA3djd2N3YOVQkCHwEiVQkCNtEJAiLXCQUOVwkEA+NZgIAANtEJBCLXCQYOVwkDA+NRAIAANtEJAzZytnJ6wrZyY20JgAAAACQ2e7f83YK2crYBQAAAADZytnu2/IPhzYBAADd2NnJ2XwkKg+3RCQqgMwMZolEJCjZbCQo31QkCNlsJCoPt1QkCA+20sHiENnu2/IPhyABAADd2NnJ6w6NtCYAAAAAjXYA3djZydl8JCoPt0QkKoDMDGaJRCQo2WwkKN9UJAjZbCQqD7dMJAgPtsnB4QjZ7tvzD4f6AAAA3djZyusIjXQmAN3Y2crZfCQqD7dEJCqAzAxmiUQkKN
+      lsJCjfVCQI2WwkKg+3RCQID7bA2cnZytnJi1wkBAnQweMYCdgJwYlNAIsEJIPGAQHFAcc5dCRMD4Ut/f//g0QkHAGLRCQcOUQkSA+FAv3//93Y3djd2OsO3djd2N3Y6wbd2N3Y3diDxCy4AQAAAFteX13DjbQmAAAAAIsEJMdFAAAAAACDxgEBxQHHOXQkTA+F1fz//+umjXYA3drZyTHS2e7b8g+GAP///93a2cnrDo20JgAAAACNdgDd2tnJMcnZ7tvzD4Yg////3dvZydnK6w6NtCYAAAAAkN3b2cnZytnJ2crZyTHA6Sb///+NdCYAkN3Y3djd2A+vVCQIu4GAgICLTCQMD69MJBiJ0PfjweoHiVQkCItUJBAPr1QkFNtEJAiJ0PfjicjB6geJVCQI9+PbRCQIweoHiVQkCNtEJAjZ7t/zdgrZytgFAAAAAOsJ2cqNtCYAAAAA2e7f8g+G3P3//9nJ2AUAAAAA6dn9//+NtCYAAAAAZpDbRC
+      QY2crZyenD/f//jXYA20QkFOmV/f//jbQmAAAAAN3Y3djd2ANUJAi7/wAAAItEJBCB+v8AAACLTCQMD0zTA0QkFIHq/wAAAD3/AAAAD0zDA0wkGIlUJAjbRCQILf8AAACB+f8AAAAPTMuJRCQI20QkCIHp/wAAAIlMJAjbRCQI6UD///+NtCYAAAAAZpDd2N3Y3di4/wAAAItMJAi7/wAAACnQicLB4AiDwQEp0Jn3+YtMJBC6/wAAACnDidi7AAAAAA9IwytUJBSDwQGJRCQIidDbRCQIweAIKdCZ9/m5/wAAALr/AAAAKcGJyItMJAwPSMMrVCQYg8EBiUQkCInQ20QkCMHgCCnQmff5uf8AAAApwYnID0jDiUQkCNtEJAjZyunE/P//jbYAAAAA3djd2N3YOVQkCH8EiVQkCNtEJAiLXCQUOVwkEA+O1gAAANtEJBCLXCQYOVwkDA+OtAAAANtEJAzZyulx/v//kN3Y3djd2Lj/AAAAuf8AAA
+      ArTCQIu4GAgIAp0A+vyInI9+sBysH5H8H6BynRjYH/AAAAuf8AAAArTCQQiUQkCLj/AAAAK0QkFA+vyNtEJAiJyPfrAcrB+R/B+gcp0Y2B/wAAALn/AAAAK0wkDIlEJAi4/wAAACtEJBgPr8jbRCQIicj36wHKwfkfwfoHKdGNgf8AAACJRCQI20QkCOm2/f//jbQmAAAAANtEJBjZyum9/f//jXQmAJDbRCQU6SX////d2N3Y3dgDVCQIu/8AAACLRCQQgfr/AAAAi0wkDA9P0wNEJBQ9/wAAAA9PwwNMJBiJVCQIgfn/AAAA20QkCA9Py4lEJAjbRCQIiUwkCNtEJAjpQP3//93Y3djd2ItEJAiD+H4Pj2kBAAAPr9CNBBK6gYCAgPfiweoHiVQkCNtEJAiLRCQQg/h+D48GAQAAD69EJBS6gYCAgAHA9+LB6geJVCQI20QkCItMJAyD+X5/Hw+vTCQYjQQJuoGAgID34sHqB4lUJAjbRCQI6c
+      f8//+5/wAAALj/AAAAK0wkDCtEJBgPr8i6gYCAgAHJicj36onIwfgfAcrB+gcp0AX/AAAAiUQkCNtEJAjpifz//93Y3djd2IP6fg+OWwEAALj/AAAAuf8AAAArTCQIi1wkFCnQuoGAgIAPr8gByYnI9+qJyMH4HwHKwfoHKdAF/wAAAIlEJAjbRCQIg/t+D48+AQAAi0QkELqBgICAD6/DAcD34sHqB4lUJAjbRCQIi0QkGIP4fg+PR////4tMJAwPr8jpIf///7n/AAAAuP8AAAArTCQQK0QkFA+vyLqBgICAAcmJyPfqicjB+B8BysH6BynQBf8AAACJRCQI20QkCOnV/v//uP8AAAC5/wAAACtMJAgp0LqBgICAD6/IAcmJyPfqicjB+B8BysH6BynQBf8AAACJRCQI20QkCOlz/v//3djd2N3YuP8AAAAp0DtEJAgPjcIBAADZBQAAAAC6AAD/ALj/AAAAK0QkFDtEJBAPjZsBAADZBQAAAA
+      C5AP8AALj/AAAAK0QkGDtEJAwPjW4BAADZBQAAAADZydnK2cm4/wAAAOnx+f//D69UJAiLXCQUjQQSuoGAgID34sHqB4lUJAjbRCQIg/t+D47C/v//uf8AAAC4/wAAACtMJBArRCQUD6/IuoGAgIAByYnI9+qJyMH4HwHKwfoHKdAF/wAAAIlEJAjbRCQI6Z/+///d2N3Y3diJ0LsAAQAAweAIidkrTCQIKdCZ9/mLVCQUuf8AAAA9/wAAAA9PwYlEJAiJ0NtEJAjB4Agp0InaK1QkEInRmff5i1QkGLn/AAAAPf8AAAAPT8ErXCQMuf8AAACJRCQIidDbRCQIweAIKdCZ9/s9/wAAAA9PwYlEJAjbRCQI6TP6///d2N3Y3diLRCQIi1wkEI0EQrr+AQAAPf4BAAAPT8It/wAAAIlEJAiLRCQU20QkCI0EWItcJAw9/gEAAA9Pwi3/AAAAiUQkCItEJBjbRCQIjQRYPf4BAAAPT8It/wAAAIlEJA
+      jbRCQI6cf5//8xwNnu2cnZytnJ6Yr4//8xydnu6Wf+//8x0tnu6UD+///d2N3Y3diBZCQggAAAAA+EsgAAAInQweAIKdCJwrgAAQAAK0QkCI0MAInQmff5uf8AAAA9/wAAAA9PwYlEJAjbRCQIi0QkJCWAAAAAiUQkCA+FxwEAALr/AAAAK1QkFInQweAIKdAPtteNTBIBmff5uv8AAAApwonQD0hEJAiJRCQI20QkCIHjgAAAAA+FWAEAALr/AAAAK1QkGItMJAyJ0MHgCI1MCQEp0Jn3+bn/AAAAKcGJyA9Iw4lEJAjbRCQI6eD4//+4/wAAACnQicLB4ggpwotEJAiNTAABidCZ9/m6/wAAACnCidAPSEQkIIlEJAjbRCQI6Uf////d2N3Y3diLRCQIu4GAgICNDBAPr9CJ0PfjidCLVCQUwegHAcApwYtEJBCJTCQI20QkCInBD6/CAdH344nQi1QkGMHoBwHAKcGLRCQMiUwkCNtEJAiJwQ
+      +vwgHR9+OJ0MHoBwHAKcGJTCQI20QkCOk3+P//3djd2N3YidCLTCQIu/8AAADB4Agp0IPBAZn3+YtMJBQ9/wAAAA9Pw4lEJAiJyNtEJAjB4AgpyItMJBCZg8EB9/mLTCQYPf8AAAAPT8OJRCQIicjbRCQIweAIKciLTCQMmYPBAff5Pf8AAAAPT8OJRCQI20QkCOm89///i1wkGLkAAQAAK0wkDAHJidjB4Agp2Lv/AAAAmff5Pf8AAAAPT8OJRCQI20QkCOmJ9///i0wkFInIweAIKci5AAEAACtMJBAByZn3+bn/AAAAPf8AAAAPT8GJRCQI20QkCOk2/v//3djd2N3Yi0QkCDnQD46mAAAAKdCJRCQI20QkCItEJBCLXCQUOdh+fSnYiUQkCNtEJAiLTCQMi0QkGDnBflQpwYlMJAjbRCQI6Qn3///d2N3Y3dgrVCQIuwAAAACJwYtEJBQPSNMrRCQQD0jDK0wkDA9Iy4lUJAjbRCQIiUQkCN
+      tEJAiJTCQI20QkCNnK6ev0//+JwStMJAyJTCQI20QkCOmx9v//idgrRCQQiUQkCNtEJAjpev///ytUJAiJVCQI20QkCOlT////K0QkGCtEJAyJRCQI20QkCOl49v//K0QkFCtEJBCJRCQI20QkCOn78///KdArRCQIiUQkCNtEJAjpx/P//wAAf0MAAMB/
+      )"
+
+      mCodeFunc := Gdip_RunMCode(base64enc)
+  }
+
+  Gdip_GetImageDimensions(pBitmap, w, h)
+  Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData)
+  Gdip_LockBits(pBitmap2Blend, 0, 0, w, h, stride, mScan, mData)
+  r := DllCall(mCodeFunc, "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", blendMode)
+  ; ToolTip, % r " = r" , , , 2
+  Gdip_UnlockBits(pBitmap2Blend, mData)
+  Gdip_UnlockBits(pBitmap, iData)
   return r
 }
 
 
 Gdip_BoxBlurBitmap(pBitmap, passes) {
+; the blur will be applied on the provided pBitmap
 /*
 C/C++ function by Tic:
 https://autohotkey.com/board/topic/29449-gdi-standard-library-145-by-tic/page-30
 
-void Gdip_BoxBlurBitmap(unsigned char * Bitmap, int w, int h, int Stride, int Passes)
+void BoxBlurBitmap(unsigned char * Bitmap, int w, int h, int Stride, int Passes)
 {
   int A1, R1, G1, B1, A2, R2, G2, B2, A3, R3, G3, B3;
   for (int i = 0; i < Passes; ++i)
@@ -7888,62 +8099,13 @@ Gdip_RunMCode(mcode) {
   DllCall("GlobalFree", "ptr", p)
 }
 
-Gdip_SetBitmapAlphaChannel(pBitmap, AlphaMaskBitmap) {
-; Replaces the alpha channel of the given pBitmap
-; based on the red channel of AlphaMaskBitmap.
-; AlphaMaskBitmap must be grayscale for optimal results.
-; Both pBitmap and AlphaMaskBitmap must be in 32-ARGB PixelFormat.
-
-   Gdip_GetImageDimensions(pBitmap, Width1, Height1)
-   Gdip_GetImageDimensions(AlphaMaskBitmap, Width2, Height2)
-   if (!Width1 || !Height1 || !Width2 || !Height2
-   || Width1 != Width2 || Height1 != Height2)
-      Return -1
-
-   newBitmap := Gdip_RenderPixelsOpaque(pBitmap)
-   alphaUniform := Gdip_TestBitmapUniformity(AlphaMaskBitmap, 3, maxLevelIndex, maxLevelPixels)
-   If (alphaUniform=1)
-   {
-      ; if the given AlphaMaskBitmap is only in a single shade,
-      ; the opacity of the pixels in the given pBitmap is set
-      ; using a ColorMatrix.
-      newAlpha := Round(maxLevelIndex/255, 2)
-      If (newAlpha<0.1)
-         newAlpha := 0.1
-
-      nBitmap := Gdip_RenderPixelsOpaque(pBitmap, 0 , newAlpha)
-      Gdip_DisposeImage(newBitmap)
-      Return nBitmap
-   }
-
-   E1 := Gdip_LockBits(newBitmap, 0, 0, Width1, Height1, Stride1, Scan01, BitmapData1)
-   E2 := Gdip_LockBits(AlphaMaskBitmap, 0, 0, Width2, Height2, Stride2, Scan02, BitmapData2)
-   Loop %Height1%
-   {
-      y++
-      Loop %Width1%
-      {
-         pX := A_Index-1, pY := y-1
-         R2 := Gdip_RFromARGB(NumGet(Scan02+0, (pX*4)+(pY*Stride2), "UInt"))       ; Gdip_GetLockBitPixel()
-         If (R2>254)
-            Continue
-         Gdip_FromARGB(NumGet(Scan01+0, (pX*4)+(pY*Stride1), "UInt"), A1, R1, G1, B1)
-         NumPut(Gdip_ToARGB(R2, R1, G1, B1), Scan01+0, (pX*4)+(pY*Stride1), "UInt")    ; Gdip_SetLockBitPixel()
-      }
-   }
-
-   Gdip_UnlockBits(newBitmap, BitmapData1)
-   Gdip_UnlockBits(AlphaMaskBitmap, BitmapData2)
-   return newBitmap
-}
-
 calcIMGdimensions(imgW, imgH, givenW, givenH, ByRef ResizedW, ByRef ResizedH) {
 ; This function calculates from original imgW and imgH 
 ; new image dimensions that maintain the aspect ratio
 ; and are within the boundaries of givenW and givenH.
 ;
-; imgW, imgH         - original image width and height
-; givenW, givenH     - the width and height [in pixels] to adapt to
+; imgW, imgH         - original image width and height [in pixels] 
+; givenW, givenH     - the width and height to adapt to [in pixels] 
 ; ResizedW, ResizedH - the width and height resulted from adapting imgW, imgH to givenW, givenH
 ;                      by keeping the aspect ratio
 

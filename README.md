@@ -35,7 +35,7 @@
 <li>Elliptical and rectangular selections, rotated at any angle.</li>
 <li>Image editing: soft edges blur, insert text, paste in place, draw arcs, lines and shapes, transform selected area, rotate, flip, crop and more</li>
 <li>Draw free-form curved paths or polygonal lines; options to use fill with color or gradients, or use as alpha masks.</li>
-<li>Alpha masks support when pasting images in place or when using the transform tool. The mask can be a gradient [linear, box, radial], an image file or a previously drawn path.</li>
+<li>18 blending modes and alpha masking support on paste in place or when using the transform tool on a selected area. The mask can be a gradient [linear, box, radial], an image file or a previously drawn path.</li>
 <li>Adaptive auto-adjustment of brightness, contrast and saturation of displayed images.</li>
 <li>Advanced yet easy to use auto-crop for images.</li>
 <li>Display images in grayscale, inverted or personalized colors. Option to save adjusted image, or apply adjusments on multiple images in one go.</li>

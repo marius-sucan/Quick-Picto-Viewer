@@ -2,6 +2,15 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.4.0 (2020-07-23)
+  - [new] 18 blending modes available now on image pasting or when using the transform tool
+  - [new] by clicking within the selection area, when the gradient [or alpha mask] options tab is active, you can adjust the gradient center
+  - [new] alpha mask can now replace the alpha channel of the source image
+  - [new] added two new blur modes in the panel «Blur selected area»; these modes are supported on Windows XP
+  - fixed crash related to FreeImage loading very large images
+  - more fixes to proper alpha channel retention on image editing
+  - fixes and improvements related to gradient fill
+
 - v4.3.1 (2020-06-25)
   - fixed broken control sizes in various panels on certain systems, including Windows 10 and Windows XP
   - fixed performance regression since v3.8.5 noticeable on large screens [high resolutions]
@@ -286,8 +295,8 @@
 - v1.1.0 (2019-05-22) 
 - v1.0.0 (2010-10-04) by SBC
 
-- known issues [24/05/2020]
-  - loading images larger than 300 MPx through FreeImage library, causes crash on coversion to GDI+ object
+- known issues [jeudi 2 juillet 2020]
+  - it cannot offer correct viewport previewing of blending modes when the background image has an alpha channel
   - panning/zooming large images on 32 bits edition ... is very slow
   - high memory consumption; all operations need a lot of RAM [zoom/pan, etc]
 

@@ -22,7 +22,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3
      , canCancelImageLoad := 0, hGDIinfosWin, hGDIselectWin, hasAdvancedSlide := 1
      , imgEditPanelOpened := 0, showMainMenuBar := 1, undoLevelsRecorded := 0, UserMemBMP := 0
      , taskBarUI, hSetWinGui, panelWinCollapsed, groppedFiles, tempBtnVisible := "null"
-     , userAllowWindowDrag := 0, drawingShapeNow := 0, isAlwaysOnTop
+     , userAllowWindowDrag := 0, drawingShapeNow := 0, isAlwaysOnTop, lastMenuBarUpdate := 1
 
 Global activateImgSelection, allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, askDeleteFiles
 , AutoDownScaleIMGs, autoPlaySNDs, autoRemDeadEntry, ColorDepthDithering, countItemz, currentFileIndex, CurrentSLD, defMenuRefreshItm, doSlidesTransitions
@@ -706,11 +706,13 @@ activateMainWin() {
 }
 
 GuiSize(GuiHwnd, EventInfo, Width, Height) {
+    If (A_TickCount - lastMenuBarUpdate < 150)
+       Return
     PrevGuiSizeEvent := EventInfo
     prevGUIresize := A_TickCount
     turnOffSlideshow()
     canCancelImageLoad := 4
-    delayu := (A_OSVersion="WIN_XP") ? -15 : -5
+    delayu := (A_OSVersion="WIN_XP" || thumbsDisplaying=1) ? -15 : -5
     SetTimer, miniGDIupdater, % delayu
 }
 
@@ -1324,6 +1326,7 @@ deleteMenus() {
 }
 
 UpdateMenuBar() {
+   lastMenuBarUpdate := A_TickCount
    Gui, 1: Menu
    deleteMenus()
    If (showMainMenuBar!=1)
@@ -1332,6 +1335,7 @@ UpdateMenuBar() {
    BuildFakeMenuBar()
    Sleep, 0
    Gui, 1: Menu, PVmenu
+   lastMenuBarUpdate := A_TickCount
 }
 
 determineMenuBTNsOKAY() {
@@ -1404,7 +1408,7 @@ MenuSaveAction() {
   Return
 
   ~AppsKey::
-     If (AnyWindowOpen>0)
+     If (AnyWindowOpen>0 && identifySettingsWindow()=1)
         MainExe.ahkPostFunction("externalinvokedSettingsContextMenu")
   Return
 

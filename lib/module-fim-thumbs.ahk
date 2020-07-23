@@ -42,10 +42,13 @@ cleanupThread() {
 
 cleanMess() {
    waitDataCollect := 1
+   OutputDebug, QPV: Thumbnails generator core. Clean GDIs mess...
+
    Sort, listBitmaps, UD|
    Loop, Parse, listBitmaps, |
        Gdip_DisposeImage(A_LoopField, 1)
 
+   OutputDebug, QPV: Thumbnails generator core. Clean GDIs mess. DONE
    listBitmaps := ""
    waitDataCollect := 0
    operationFailed := 0
