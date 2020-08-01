@@ -773,14 +773,14 @@ calcScreenLimits(whichHwnd:="main") {
        Return prevActiveMon
 
     whichHwnd := (whichHwnd="main") ? PVhwnd : whichHwnd
-    If whichHwnd
-    {
-       hMon := MDMF_FromHWND(whichHwnd, 2)
-       WinGetPos, mainX, mainY,, , ahk_id %whichHwnd%
-    } Else If (whichHwnd="mouse")
+    If (whichHwnd="mouse")
     {
        GetPhysicalCursorPos(mainX, mainY)
        hMon := MDMF_FromPoint(mainX, mainY, 2)
+    } Else If 
+    {
+       hMon := MDMF_FromHWND(whichHwnd, 2)
+       WinGetPos, mainX, mainY,, , ahk_id %whichHwnd%
     }
 
     If hMon
