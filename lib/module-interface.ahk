@@ -99,7 +99,7 @@ BuildGUI() {
    Else
       Gui, 1: -Caption
 
-   Gui, 1: Show, Maximize Center %initialwh%, %appTitle%
+   Gui, 1: Show, Maximize Hide Center %initialwh%, %appTitle%
    Try taskBarUI := new taskbarInterface(PVhwnd)
    Sleep, 1
    createGDIwinThumbs()
@@ -122,6 +122,9 @@ BuildGUI() {
    WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%
    Sleep, 1
    WinActivate, ahk_id %PVhwnd%
+   repositionWindowCenter(1, PVhwnd, "mouse", appTitle)
+   Sleep, 50
+   Gui, 1: Show, Maximize
    Return 1
 }
 
@@ -2908,4 +2911,243 @@ class taskbarInterface {
    }
 }
 
+
+
+
+
+repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:="") {
+    Static lastAsked := 1
+    If !winPos
+    {
+       SysGet, MonitorCount, 80
+       ActiveMonDetails := calcScreenLimits(referencePoint)
+       ActiveMon := ActiveMonDetails.m
+       ResWidth := ActiveMonDetails.w, ResHeight:= ActiveMonDetails.h
+       mCoordRight := ActiveMonDetails.mCRight, mCoordLeft := ActiveMonDetails.mCLeft
+       mCoordTop := ActiveMonDetails.mCTop, mCoordBottom := ActiveMonDetails.mCBottom
+    }
+
+    If (MonitorCount>1 && !winPos && A_OSVersion!="WIN_XP")
+    {
+       ; center window on the monitor/screen where the mouse cursor is
+       semiFinal_x := mCoordLeft + 2
+       semiFinal_y := mCoordTop + 2
+       If !semiFinal_y
+          semiFinal_y := 1
+       If !semiFinal_x
+          semiFinal_x := 1
+
+       Gui, %whichGUI%: Show, Hide AutoSize x%semiFinal_x% y%semiFinal_y%, % winTitle
+       Sleep, 25
+       GetWinClientSize(msgWidth, msgHeight, hwndGUI, 1)
+       If !msgWidth
+          msgWidth := 1
+       If !msgHeight
+          msgHeight := 1
+
+       Final_x := Round(mCoordLeft + ResWidth/2 - msgWidth/2)
+       Final_y := Round(mCoordTop + ResHeight/2 - msgHeight/2)
+       If (!Final_x) || (Final_x + 1<mCoordLeft)
+          Final_x := mCoordLeft + 1
+       If (!Final_y) || (Final_y + 1<mCoordTop)
+          Final_y := mCoordTop + 1
+       Gui, %whichGUI%: Show, x%Final_x% y%Final_y%, % Chr(160) winTitle
+    } Else Gui, %whichGUI%: Show, AutoSize %winPos%, % Chr(160) winTitle
+
+}
+
+MWAGetMonitorMouseIsIn(coordX:=0,coordY:=0) {
+; function from: https://autohotkey.com/boards/viewtopic.php?f=6&t=54557
+; by Maestr0
+
+  ; get the mouse coordinates first
+  If (coordX && coordY)
+  {
+     Mx := coordX
+     My := coordY
+  } Else GetPhysicalCursorPos(mX, mY)
+
+  SysGet, MonitorCount, 80  ; monitorcount, so we know how many monitors there are, and the number of loops we need to do
+  Loop, %MonitorCount%
+  {
+    SysGet, mon%A_Index%, Monitor, %A_Index%  ; "Monitor" will get the total desktop space of the monitor, including taskbars
+    If (Mx>=mon%A_Index%left) && (Mx<mon%A_Index%right)
+    && (My>=mon%A_Index%top) && (My<mon%A_Index%bottom)
+    {
+       ActiveMon := A_Index
+       Break
+    }
+  }
+  Return ActiveMon
+}
+
+GetPhysicalCursorPos(ByRef mX, ByRef mY) {
+; function from: https://github.com/jNizM/AHK_DllCall_WinAPI/blob/master/src/Cursor%20Functions/GetPhysicalCursorPos.ahk
+; by jNizM, modified by Marius Șucan
+    Static lastMx, lastMy, lastInvoked := 1
+    If (A_TickCount - lastInvoked<70)
+    {
+       mX := lastMx
+       mY := lastMy
+       Return
+    }
+
+    lastInvoked := A_TickCount
+    Static POINT
+         , init := VarSetCapacity(POINT, 8, 0) && NumPut(8, POINT, "Int")
+    GPC := DllCall("user32.dll\GetPhysicalCursorPos", "Ptr", &POINT)
+    If (!GPC || A_OSVersion="WIN_XP")
+    {
+       MouseGetPos, mX, mY
+       lastMx := mX
+       lastMy := mY
+       Return
+     ; Return DllCall("kernel32.dll\GetLastError")
+    }
+
+    lastMx := mX := NumGet(POINT, 0, "Int")
+    lastMy := mY := NumGet(POINT, 4, "Int")
+    Return
+}
+
+
+calcScreenLimits(whichHwnd:="main") {
+    Static lastInvoked := 1, prevHwnd, prevActiveMon := []
+
+    ; the function calculates screen boundaries for the user given X/Y position for the OSD
+    If (A_TickCount - lastInvoked<350) && (prevHwnd=whichHwnd)
+       Return prevActiveMon
+
+    whichHwnd := (whichHwnd="main") ? PVhwnd : whichHwnd
+    If whichHwnd
+    {
+       hMon := MDMF_FromHWND(whichHwnd, 2)
+       WinGetPos, mainX, mainY,, , ahk_id %whichHwnd%
+    } Else If (whichHwnd="mouse")
+    {
+       GetPhysicalCursorPos(mainX, mainY)
+       hMon := MDMF_FromPoint(mainX, mainY, 2)
+    }
+
+    If hMon
+       MonitorInfos := MDMF_GetInfo(hMon)
+
+    If !IsObject(MonitorInfos)
+    {
+       ActiveMon := MWAGetMonitorMouseIsIn(mainX, mainY)
+       If !ActiveMon
+       {
+          ActiveMon := MWAGetMonitorMouseIsIn()
+          If !ActiveMon
+             Return prevActiveMon
+       }
+       SysGet, mCoord, MonitorWorkArea, %ActiveMon%
+       prevActiveMon.mCRight := mCoordRight, prevActiveMon.mCLeft := mCoordLeft
+       prevActiveMon.mCTop := mCoordTop, prevActiveMon.mCBottom := mCoordBottom
+    } Else
+    {
+       ActiveMon := MonitorInfos.Num
+       mCoordRight := MonitorInfos.WARight, mCoordLeft := MonitorInfos.WALeft
+       mCoordTop := MonitorInfos.WATop, mCoordBottom := MonitorInfos.WABottom
+       prevActiveMon.mCRight := MonitorInfos.WARight, prevActiveMon.mCLeft := MonitorInfos.WALeft
+       prevActiveMon.mCTop := MonitorInfos.WATop, prevActiveMon.mCBottom := MonitorInfos.WABottom
+    }
+
+    prevActiveMon.w := ResolutionWidth := Abs(max(mCoordRight, mCoordLeft) - min(mCoordRight, mCoordLeft))
+    prevActiveMon.h := ResolutionHeight := Abs(max(mCoordTop, mCoordBottom) - min(mCoordTop, mCoordBottom)) 
+    If !ResolutionWidth
+       prevActiveMon.w := ResolutionWidth := 800
+    If !ResolutionHeight
+       prevActiveMon.h := ResolutionHeight := 600
+
+    prevActiveMon.m := ActiveMon
+    prevActiveMon.hMon := hMon
+    lastInvoked := A_TickCount
+    prevHwnd := whichHwnd
+    ; ToolTip, % ActiveMon "`n" pActiveMon "`n" hMon , , , 2
+    Return prevActiveMon
+}
+
+GetWindowBounds(hWnd) {
+   ; function by GeekDude: https://gist.github.com/G33kDude/5b7ba418e685e52c3e6507e5c6972959
+   ; W10 compatible function to find a window's visible boundaries
+   ; modified by Marius Șucanto return an array
+   size := VarSetCapacity(rect, 16, 0)
+   er := DllCall("dwmapi\DwmGetWindowAttribute"
+      , "UPtr", hWnd  ; HWND  hwnd
+      , "UInt", 9     ; DWORD dwAttribute (DWMWA_EXTENDED_FRAME_BOUNDS)
+      , "UPtr", &rect ; PVOID pvAttribute
+      , "UInt", size  ; DWORD cbAttribute
+      , "UInt")       ; HRESULT
+
+   If er
+      DllCall("GetWindowRect", "UPtr", hwnd, "UPtr", &rect, "UInt")
+
+   r := []
+   r.x1 := NumGet(rect, 0, "Int"), r.y1 := NumGet(rect, 4, "Int")
+   r.x2 := NumGet(rect, 8, "Int"), r.y2 := NumGet(rect, 12, "Int")
+   r.w := Abs(max(r.x1, r.x2) - min(r.x1, r.x2))
+   r.h := Abs(max(r.y1, r.y2) - min(r.y1, r.y2))
+   ; ToolTip, % r.w " --- " r.h , , , 2
+   Return r
+}
+
+GetWinClientSize(ByRef w, ByRef h, hwnd, mode) {
+; by Lexikos http://www.autohotkey.com/forum/post-170475.html
+; modified by Marius Șucan
+    Static prevW, prevH, prevHwnd, lastInvoked := 1
+    If (A_TickCount - lastInvoked<95) && (prevHwnd=hwnd)
+    {
+       W := prevW, H := prevH
+       Return
+    }
+
+    prevHwnd := hwnd
+    VarSetCapacity(rc, 16, 0)
+    If (mode=1)
+    {
+       r := GetWindowBounds(hwnd)
+       prevW := W := r.w
+       prevH := H := r.h
+       lastInvoked := A_TickCount
+       Return
+    } Else DllCall("GetClientRect", "uint", hwnd, "uint", &rc)
+
+    prevW := W := NumGet(rc, 8, "int")
+    prevH := H := NumGet(rc, 12, "int")
+    lastInvoked := A_TickCount
+} 
+
+MDMF_FromHWND(HWND, Flag := 0) {
+   Return DllCall("User32.dll\MonitorFromWindow", "Ptr", HWND, "UInt", Flag, "Ptr")
+}
+
+MDMF_FromPoint(ByRef X := "", ByRef Y := "", Flag := 0) {
+   If (X = "") || (Y = "") {
+      VarSetCapacity(PT, 8, 0)
+      DllCall("User32.dll\GetCursorPos", "Ptr", &PT, "Int")
+      If (X = "")
+         X := NumGet(PT, 0, "Int")
+      If (Y = "")
+         Y := NumGet(PT, 4, "Int")
+   }
+   Return DllCall("User32.dll\MonitorFromPoint", "Int64", (X & 0xFFFFFFFF) | (Y << 32), "UInt", Flag, "Ptr")
+}
+
+MDMF_GetInfo(HMON) {
+   NumPut(VarSetCapacity(MIEX, 40 + (32 << !!A_IsUnicode)), MIEX, 0, "UInt")
+   If DllCall("User32.dll\GetMonitorInfo", "Ptr", HMON, "Ptr", &MIEX, "Int")
+      Return {Name:      (Name := StrGet(&MIEX + 40, 32))  ; CCHDEVICENAME = 32
+            , Num:       RegExReplace(Name, ".*(\d+)$", "$1")
+            , Left:      NumGet(MIEX, 4, "Int")    ; display rectangle
+            , Top:       NumGet(MIEX, 8, "Int")    ; "
+            , Right:     NumGet(MIEX, 12, "Int")   ; "
+            , Bottom:    NumGet(MIEX, 16, "Int")   ; "
+            , WALeft:    NumGet(MIEX, 20, "Int")   ; work area
+            , WATop:     NumGet(MIEX, 24, "Int")   ; "
+            , WARight:   NumGet(MIEX, 28, "Int")   ; "
+            , WABottom:  NumGet(MIEX, 32, "Int")   ; "
+            , Primary:   NumGet(MIEX, 36, "UInt")} ; contains a non-zero value for the primary monitor.
+   Return False
+}
 

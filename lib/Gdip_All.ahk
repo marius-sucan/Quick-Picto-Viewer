@@ -5951,7 +5951,8 @@ int __stdcall Gdip_PixelateBitmap(unsigned char * sBitmap, unsigned char * dBitm
 
    ; E := - unused exit code
    DllCall(&PixelateBitmap, Ptr, Scan01, Ptr, Scan02, "int", Width, "int", Height, "int", Stride1, "int", BlockSize)
-   Gdip_UnlockBits(pBitmap, BitmapData1), Gdip_UnlockBits(pBitmapOut, BitmapData2)
+   Gdip_UnlockBits(pBitmap, BitmapData1)
+   Gdip_UnlockBits(pBitmapOut, BitmapData2)
    return 0
 }
 
@@ -7635,30 +7636,28 @@ Gdip_RetrieveBitmapChannel(pBitmap, channel) {
 ; in 32-ARGB PixelFormat containing a grayscale
 ; rendition of the retrieved channel.
 
-    If (channel="1")
-       matrix := GenerateColorMatrix(3)
-    Else If (channel="2")
-       matrix := GenerateColorMatrix(4)
-    Else If (channel="3")
-       matrix := GenerateColorMatrix(5)
-    Else If (channel="4")
-       matrix := GenerateColorMatrix(7)
-    Else Return
 
     Gdip_GetImageDimensions(pBitmap, imgW, imgH)
     If (!imgW || !imgH)
        Return
 
-    pBrush := Gdip_BrushCreateSolid(0xff000000)
+    If (channel=1)
+       matrix := GenerateColorMatrix(3)
+    Else If (channel=2)
+       matrix := GenerateColorMatrix(4)
+    Else If (channel=3)
+       matrix := GenerateColorMatrix(5)
+    Else If (channel=4)
+       matrix := GenerateColorMatrix(7)
+    Else Return
+
     newBitmap := Gdip_CreateBitmap(imgW, imgH)
     If !newBitmap
        Return
 
-    G := Gdip_GraphicsFromImage(newBitmap)
-    Gdip_SetInterpolationMode(G, 7)
-    Gdip_FillRectangle(G, pBrush, 0, 0, imgW, imgH)
+    G := Gdip_GraphicsFromImage(newBitmap, 7)
+    Gdip_GraphicsClear(G, "0xff000000")
     Gdip_DrawImage(G, pBitmap, 0, 0, imgW, imgH, 0, 0, imgW, imgH, matrix)
-    Gdip_DeleteBrush(pBrush)
     Gdip_DeleteGraphics(G)
     Return newBitmap
 }
@@ -7731,7 +7730,7 @@ Gdip_TestBitmapUniformity(pBitmap, HistogramFormat:=3, ByRef maxLevelIndex:=0, B
       Return 0
 }
 
-Gdip_SetAlphaChannel(pBitmap, pBitmapMask, invertAlphaMask:=0, replaceSourceAlphaChannel:=0) {
+Gdip_SetAlphaChannel(pBitmap, pBitmapMask, invertAlphaMask:=0, replaceSourceAlphaChannel:=0, whichChannel:=1) {
 /*
 Function written with help provided by Spawnova. Thank you very much.
 pBitmap and pBitmapMask must be the same width and height
@@ -7742,24 +7741,43 @@ The alpha channel will be applied directly on the pBitmap provided.
 For best results, pBitmapMask should be grayscale.
 
 Original code:
-int SetAlphaChannel(int *imageData, int *maskData, int w, int h, int invert, int replaceAlpha) {
-   for(int x = 0; x < w; x++) {
-      for(int y = 0; y < h; y++) {
-         unsigned int color = imageData[x+(y*w)];
-         if (color != 0x0) {
-            unsigned char alpha = maskData[x+(y*w)] >> 16;
-            unsigned char a = color >> 24;
-            unsigned char r = color >> 16;
-            unsigned char g = color >> 8;
-            unsigned char b = color;
-            int alpha2 = replaceAlpha==1 ? alpha : alpha - (255-a); //handles bitmaps that already have alpha
-            alpha2 = alpha2 < 0 ? 0 : alpha2;
-            if (invert==1) {
-               alpha2 = 255 - alpha2;
-            }
-            imageData[x+(y*w)] = (alpha2 << 24) | ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF);
-         }
-      }
+int SetAlphaChannel(int *imageData, int *maskData, int w, int h, int invert, int replaceAlpha, int whichChannel) {
+   if (whichChannel==1)          // red
+      whichChannel = 16;
+   else if (whichChannel==2)     // green
+      whichChannel = 8;
+   else if (whichChannel==3)     // blue
+      whichChannel = 0;
+   else if (whichChannel==4)     // alpha
+      whichChannel = 24;
+
+   int px;
+   if (replaceAlpha==1) {
+       for (int x = 0; x < w; x++) {
+          for (int y = 0; y < h; y++) {
+              px = x+y*w;
+              unsigned char alpha = maskData[px] >> whichChannel;
+              int alpha2 = (invert==1) ? 255 - alpha : alpha;
+              imageData[px] = (alpha2 << 24) | (imageData[px] & 0x00ffffff);
+          }
+       }
+   } else {
+       for (int x = 0; x < w; x++) {
+          for (int y = 0; y < h; y++) {
+              px = x+y*w;
+              unsigned char a = imageData[px] >> 24;
+              unsigned char alpha = maskData[px] >> whichChannel;
+              int alpha2 = alpha - (255-a); // handles bitmaps that already have alpha
+              if (alpha2<0) {
+                 alpha2 = 0;
+              }
+
+              if (invert==1) {
+                 alpha2 = 255 - alpha2;
+              }
+              imageData[px] = (alpha2 << 24) | (imageData[px] & 0x00ffffff);
+          }
+       }
    }
    return 1;
 }
@@ -7768,18 +7786,35 @@ int SetAlphaChannel(int *imageData, int *maskData, int w, int h, int invert, int
   static mCodeFunc := 0
   if (mCodeFunc=0)
   {
-     If (A_PtrSize=8)
-        mCodeFunc := Gdip_RunMCode("2,x64:QVdBVkFVQVRVV1ZTRIt0JGhEi3wkcEiJ00WFwA+O7wAAAEWNYP9NY8Ax9kG9/wAAAE6NHIUAAAAAMe0PH0QAAEWFyX5cQYP+AXRlQYP/AQ+E0wAAAEiNBLUAAAAARTHSRIsEAUWFwHQsD7Z8AwJEicJBwegYgeL///8ARo2EBwH///9FhcBED0jFQcHgGEEJ0ESJBAFBg8IBTAHYRTnRdb9IjUYBTDnmdGdIicbrkZBBg/8BD4TGAAAATI0EtQAAAABFMdIPHwBCiwQBhcB0LEIPtnwDAonCweoYjZQXAf///0SJ74XSD0jVJf///wAp14n6weIYCdBCiQQBQYPCAU0B2EU50XXASI1GAUw55nWZuAEAAABbXl9dQVxBXUFeQV/DDx9EAABIjRS1AAAAAEUxwA8fRAAARIsUEUWF0nQniwQTQQ+2+sH4EMHgGAn4RInXQYHiAP8AAIHnAAD/AAn4RAnQiQQRQYPAAUwB2kU5yHXE6Sj///8PH4AAAAAASI0UtQAAAABFMcAPH0QAAESLFBFFhdJ0KYsEE0SJ14HnAAD/AMH4EPfQweAYCfhBD7b6QYHiAP8AAAn4RAnQiQQRQYPAAUwB2kU5wXXC6c7+//8=")
-     Else
-        mCodeFunc := Gdip_RunMCode("2,x86:VVdWU4PsCItEJCSLfCQohcAPjqIAAACLRCQkxwQkAAAAAI0shQAAAACNtCYAAAAAhf9+dIN8JCwBiwQkD4SOAAAAg3wkMAEPhPMAAACLVCQcjRyFAAAAADHJif4B2gNcJCCNtgAAAACLAoXAdC2Jx8HoGIHn////AIl8JAQPtnsCjYQHAf///78AAAAAhcAPSMfB4BgLRCQEiQKDwQEB6gHrOc51won3gwQkAYsEJDlEJCQPhXf///+DxAi4AQAAAFteX13DjbQmAAAAAI12AIN8JDABD4TFAAAAiXwkKIt0JByNFIUAAAAAMcmNdCYAiwQWhcB0NYt8JCAPtlwXAonHwe8YjZw7Af///78AAAAAhdsPSN+//wAAACX///8AKd+J+8HjGAnYiQQWg8EBAeo5TCQodbmLfCQo6Wj///+JfCQoi3wkHI0UhQAAAAAxyY20JgAAAACLBBeFwHQsi3QkIIs0FonziXQkBA+28MH7EMHjGAneicMlAP8AAIHjAAD/AAnzCcOJHBeDwQEB6jtMJCh1wot8JCjpCf///5CLTCQcweACiXwkKDHbAcEDRCQgicaNdgCLAYXAdCKLFonHgecAAP8AwfoQ99LB4hgJ+g+2+CUA/wAACfoJwokRg8MBAekB7jlcJCh1y4t8JCjpsv7//w==")
+      if (A_PtrSize=8)
+      base64enc := "
+      (LTrim Join
+      2,x64:QVdBVkFVQVRVV1ZTRItsJGhJicuLTCR4SInWg/kBD4TZAQAAg/kCD4SyAAAAg/kDD4TRAQAAg/kEuBgAAAAPRMiDfCRwAQ+EowAAAEWFwA+OZgEAAEWNcP9NY8Ax7UG8/wAAAEqNHIUAAAAAMf9mkEWFyX5YQYP9AQ+E2QAAAEyNB
+      K0AAAAAMdIPH4AAAAAAR4sUA0KLBAZFidfT+EHB7xgPtsBCjYQ4Af///4XAD0jHQYHi////AIPCAcHgGEQJ0EOJBANJAdhBOdF1w0iNRQFMOfUPhOEAAABIicXrkYN8JHABuQgAAAAPhV3///9FhcAPjsMAAABBjXj/TWPAMdtOjRSFAAAA
+      AA8fgAAAAABFhcl+MUGD/QEPhLEAAABIjQSdAAAAAEUxwGYPH0QAAIsUBkGDwAHT+kGIVAMDTAHQRTnBdepIjUMBSDnfdGxIicPrvA8fQABIjRStAAAAAEUxwA8fRAAARYsUE4sEFkWJ19P4QcHvGA+2wEKNhDgB////RYnnhcAPSMdBgeL
+      ///8AQYPAAUEpx0SJ+MHgGEQJ0EGJBBNIAdpFOcF1ukiNRQFMOfUPhR////+4AQAAAFteX11BXEFdQV5BX8MPHwBIjRSdAAAAAEUxwA8fRAAAiwQWQYPAAdP499BBiEQTA0wB0kU5wXXo6Un///+5EAAAAOk6/v//McnpM/7//w==
+      )"
+      else
+      base64enc := "
+      (LTrim Join
+      2,x86:VVdWU4PsBIN8JDABD4T1AQAAg3wkMAIPhBwBAACDfCQwAw+E7AEAAIN8JDAEuBgAAAAPRUQkMIlEJDCDfCQsAQ+EBgEAAItUJCCF0g+OiQAAAItEJCDHBCQAAAAAjSyFAAAAAI10JgCLRCQkhcB+XosEJItcJBgx/400hQAAAAAB8wN0JByDfCQ
+      oAXRjjXYAixOLBg+2TCQw0/iJ0cHpGA+2wI2ECAH///+5AAAAAIXAD0jBgeL///8Ag8cBAe7B4BgJwokTAes5fCQkdcKDBCQBiwQkOUQkIHWNg8QEuAEAAABbXl9dw420JgAAAACQixOLBg+2TCQw0/iJ0cHpGA+2wI2ECAH///+5AAAAAIXAD0jBuf8A
+      AACB4v///wAB7oPHASnBicjB4BgJwokTAes5fCQkdbnrlYN8JCwBx0QkMAgAAAAPhfr+//+LTCQghcl+hzH/i0QkIItsJCSJPCSLTCQwjTSFAAAAAI10JgCF7X42g3wkKAGLBCR0Sot8JByNFIUAAAAAMdsB1wNUJBiNtCYAAAAAiweDwwEB99P4iEIDA
+      fI53XXugwQkAYsEJDlEJCB1uYPEBLgBAAAAW15fXcONdCYAi1wkHMHgAjHSAcMDRCQYiceNtCYAAAAAiwODwgEB89P499CIRwMB9znVdeyDBCQBiwQkOUQkIA+Fa////+uwx0QkMBAAAADpJ/7//8dEJDAAAAAA6Rr+//8=
+      )"
+
+      ; FileRead, base64enc, E:\Sucan twins\_small-apps\AutoHotkey\other scripts\MCode4GCC-master\temp-mcode.txt
+      mCodeFunc := Gdip_RunMCode(base64enc)
   }
 
+  ; thisStartZeit := A_TickCount
   Gdip_GetImageDimensions(pBitmap, w, h)
   Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData)
   Gdip_LockBits(pBitmapMask, 0, 0, w, h, stride, mScan, mData)
-  r := DllCall(mCodeFunc, "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", invertAlphaMask, "Int", replaceSourceAlphaChannel)
+  r := DllCall(mCodeFunc, "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", invertAlphaMask, "Int", replaceSourceAlphaChannel, "Int", whichChannel)
   Gdip_UnlockBits(pBitmapMask, mData)
   Gdip_UnlockBits(pBitmap, iData)
+  ; ToolTip, % A_TickCount - thisStartZeit, , , 2
   return r
 }
 
@@ -7791,12 +7826,12 @@ and in 32-ARGB format: PXF32ARGB - 0x26200A.
 
 Original code:
 int blendBitmaps(int *bgrImageData, int *otherData, int w, int h, int blendMode) {
-   float rT, gT, bT;
+   float rT, gT, bT; // these must be INT for x32, to not crashes
    int rO, gO, bO, rB, gB, bB;
    unsigned char rF, gF, bF, aB, aO, aX;
-   for(int x = 0; x < w; x++)
+   for (int x = 0; x < w; x++)
    {
-      for(int y = 0; y < h; y++)
+      for (int y = 0; y < h; y++)
       {
          unsigned int BGRcolor = bgrImageData[x+(y*w)];
          if (BGRcolor!=0x0)
@@ -7805,9 +7840,9 @@ int blendBitmaps(int *bgrImageData, int *otherData, int w, int h, int blendMode)
             aO = (colorO >> 24) & 0xFF;
             aB = (BGRcolor >> 24) & 0xFF;
             aX = (aO<aB) ? aO : aB;
-            if (aX<2)
+            if (aX<1)
             {
-               bgrImageData[x+(y*w)] = (0 << 24) | (0 << 16) | (0 << 8) | 0;
+               bgrImageData[x+(y*w)] = 0;
                continue;
             }
 
@@ -7935,34 +7970,42 @@ int blendBitmaps(int *bgrImageData, int *otherData, int w, int h, int blendMode)
   static mCodeFunc := 0
   if (mCodeFunc=0)
   {
-      ; FileRead, base64enc, E:\Sucan twins\_small-apps\AutoHotkey\other scripts\MCode4GCC-master\temp.mcode
       if (A_PtrSize=8)
       base64enc := "
       (LTrim Join
-      2,x64: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
+      2,x64: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
       )"
       else
       base64enc := "
       (LTrim Join
-      2,x32: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
+      2,x86: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
+      QkDOkJ9///
       )"
+      ; FileRead, base64enc, E:\Sucan twins\_small-apps\AutoHotkey\other scripts\MCode4GCC-master\temp-mcode.txt
 
       mCodeFunc := Gdip_RunMCode(base64enc)
   }
@@ -7970,7 +8013,9 @@ int blendBitmaps(int *bgrImageData, int *otherData, int w, int h, int blendMode)
   Gdip_GetImageDimensions(pBitmap, w, h)
   Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData)
   Gdip_LockBits(pBitmap2Blend, 0, 0, w, h, stride, mScan, mData)
+  ; thisStartZeit := A_TickCount
   r := DllCall(mCodeFunc, "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", blendMode)
+  ; ToolTip, % A_TickCount - thisStartZeit, , , 2
   ; ToolTip, % r " = r" , , , 2
   Gdip_UnlockBits(pBitmap2Blend, mData)
   Gdip_UnlockBits(pBitmap, iData)
@@ -8066,10 +8111,26 @@ void BoxBlurBitmap(unsigned char * Bitmap, int w, int h, int Stride, int Passes)
   static mCodeFunc := 0
   if (mCodeFunc=0)
   {
-     If (A_PtrSize=8)
-        mCodeFunc := Gdip_RunMCode("2,x64:QVdBVkFVQVRVV1ZTSIPsWESLnCTAAAAASImMJKAAAABEicCJlCSoAAAARImMJLgAAABFhdsPjtoDAABEiceD6AHHRCQ8AAAAAEG+q6qqqkEPr/lBD6/BiXwkBInXg+8BiUQkJIn4iXwkOEiNdIEESPfYSIl0JEBIjTSFAAAAAI0EvQAAAABJY/lImEiJdCRISI1EBvxIiXwkCEiJRCQwRInI99hImEiJRCQQDx9EAABIi0QkQMdEJCAAAAAASIlEJBhIi0QkSEiD6ARIiUQkKItEJASFwA+OegEAAA8fQABEi4wkqAAAAEWFyQ+OPwMAAEiLRCQoTIt8JBgx9jHbRTHbRTHSRTHJRTHATAH4Mckx0mYPH0QAAEWJ1UQPtlADRYncRA+2WAJEAepEAeGJ3Q+2WAFEAdJBAeiJ9w+2MEkPr9ZBAflIg8AESMHqIYhQ/0KNFBlEieFJD6/WSMHqIYhQ/kGNFBhBiehJD6/WSMHqIYhQ/UGNFDFBiflJD6/WSMHqIYhQ/ESJ6kw5+HWJi3wkOEiLRCQwMfYx20gDRCQYRTHbRTHSRTHJRTHAMckx0g8fgAAAAABFiddED7ZQA0WJ3UQPtlgCRAH6RAHpQYncD7ZYAUQB0kUB4In1D7YwSQ+v1kEB6YPvAUiD6ARIweohiFAHQo0UGUSJ6UkPr9ZIweohiFAGQY0UGEWJ4EkPr9ZIweohiFAFQY0UMUGJ6UkPr9ZIweohiFAERIn6g///dYWLvCS4AAAASItcJAgBfCQgi0QkIEgBXCQYO0QkBA+Miv7//0SLhCSoAAAAx0QkGAMAAADHRCQgAAAAAEWFwA+OiAEAAGYPH4QAAAAAAItUJASF0g+OpAAAAEhjRCQYMf8x9jHbSAOEJKAAAABFMdtFMdIxyUUxyUUxwDHSkEWJ10QPthBFid1ED7ZY/0QB+kQB6UGJ3A+2WP5EAdJFAeCJ9Q+2cP1JD6/WQQHpA7wkuAAAAEjB6iGIEEKNFBlEielJD6/WSMHqIYhQ/0GNFBhFieBJD6/WSMHqIYhQ/kGNFDFBielJD6/WSMHqIYhQ/UgDRCQIRIn6O3wkBHyAi0wkJIXJD4ioAAAATGNUJCRIY0QkGDH/MfYx20Ux20UxyUUxwEwB0DHJSAOEJKAAAAAx0g8fQABFid9ED7YYQYndD7ZY/0QB+kQB6UGJ9A+2cP5EAdpFAeCJ/Q+2eP1JD6/WQQHpSMHqIYgQjRQZSItMJBBJD6/WSQHKSMHqIYhQ/0GNFDBFieBJD6/WSMHqIYhQ/kGNFDlBielJD6/WSMHqIYhQ/UgByESJ+kSJ6UWF0nmEg0QkIAGLRCQgg0QkGAQ5hCSoAAAAD4WB/v//g0QkPAGLRCQ8OYQkwAAAAA+Fm/z//0iDxFhbXl9dQVxBXUFeQV/DZi4PH4QAAAAAAESLVCQ4RYXSD4j1/f//6Uz9//8=")
-     Else
-        mCodeFunc := Gdip_RunMCode("2,x86:VVdWU4PsPItsJGCLRCRYhe0PjncEAACLfCRcx0QkNAAAAAAPr/iD6AEPr0QkXIl8JCSLfCRUiUQkLItEJFCD7wGJfCQwi3wkVI0EuIlEJDiLRCQ4x0QkKAAAAACJRCQgi0QkJIXAD47pAQAAjXQmAIt0JFSF9g+OJAQAAMdEJAwAAAAAi0wkKDHtMf/HRCQYAAAAAANMJFAx9jHAx0QkFAAAAADHRCQQAAAAAI10JgCLVCQMD7ZZA4k0JIPBBA+2cf6JfCQEiVQkHAHCD7Z5/QHaiVwkDLurqqqqidCJbCQID7Zp/Pfji1wkEAMcJNHqiFH/idq7q6qqqgHyidD344tcJBQDXCQE0eqIUf6J2rurqqqqAfqJ0Pfj0eqIUf2LVCQYA1QkCAHqidD344scJItEJByJXCQQi1wkBNHqiVwkFItcJAiIUfyJXCQYO0wkIA+FWf///4tEJDDHBCQAAAAAMe0x/8dEJBwAAAAAi0wkIDH2x0QkGAAAAADHRCQUAAAAAIlEJAQxwI22AAAAAIscJA+2Uf+JdCQIg+kED7ZxAol8JAyJFCSNFBgDFCSJ0LqrqqqqD7Z5AYlsJBD34g+2KYNsJAQB0eqIUQOLVCQUA1QkCAHyidC6q6qqqvfi0eqIUQKLVCQYA1QkDAH6idC6q6qqqvfi0eqIUQGLVCQcA1QkEAHqidC6q6qqqvfiidiLXCQIiVwkFItcJAzR6ogRi1QkBIlcJBiLXCQQiVwkHIP6/w+FVf///4t8JFwBfCQoAXwkIItEJCg7RCQkD4wb/v//i0QkUItcJFTHRCQoAAAAAPfYiUQkDIXbD44IAgAAjXQmAJCLVCQkhdIPjugAAAAx9otMJAzHRCQIAAAAADHtx0QkGAAAAAAx/zHAx0QkFAAAAAD32cdEJBAAAAAAiTQkjXYAi1QkCA+2cQOJfCQEixwkD7Z5AYlUJCABwgHyiXQkCL6rqqqqidCJXCQcD7ZZAvfmi3QkHItEJBCJHCSJ6w+2KQHwiXQkEIt0JAzR6ohRA4sUJAHCidC6q6qqqvfii0QkFANEJATR6ohRAonCAfqJ0Lqrqqqq9+KLRCQYiVwkGAHY0eqIUQGJwgHqidC6q6qqqvfii0QkINHqiBGLVCQEA0wkXIlUJBSNFDE5VCQkD49M////i0wkLIXJD4jrAAAAMfbHRCQQAAAAAItMJCwx7cdEJBwAAAAAK0wkDDH/McDHRCQYAAAAAMdEJBQAAAAAiTQkjXQmAJCLHCSLVCQQiXwkBA+2cQMPtnkBiWwkCIlcJCAPtlkCiXQkEA+2KYkcJInTAcIB8r6rqqqqidD35ot0JCCLRCQUAfCJdCQUi3QkDNHqiFEDixQkAcKJ0Lqrqqqq9+KLRCQYA0QkBNHqiFECicIB+onQuquqqqr34otEJBwDRCQI0eqIUQGJwgHqidC6q6qqqvfiidjR6ogRi1QkBCtMJFyJVCQYi1QkCAHOiVQkHA+JTf///4NEJCgBi0QkKINsJAwEOUQkVA+F/f3//4NEJDQBi0QkNDlEJGAPhcL7//+DxDxbXl9dw420JgAAAACNdgCLfCQwhf8PiI/9///ppvz//w==")
+
+      if (A_PtrSize=8)
+      base64enc := "
+      (LTrim Join
+      2,x64:QVdBVkFVQVRVV1ZTSIPsWESLnCTAAAAASImMJKAAAABEicCJlCSoAAAARImMJLgAAABFhdsPjtoDAABEiceD6AHHRCQ8AAAAAEG+q6qqqkEPr/lBD6/BiXwkBInXg+8BiUQkJIn4iXwkOEiNdIEESPfYSIl0JEBIjTSFAAAAAI0EvQAAAABJY/lImEiJdCRISI1EBvxIiXwkCEiJRCQwRInI99hImEiJRCQQDx9EAABIi0QkQMdEJCAAAAAASIlEJBhIi0QkSEiD6ARIiUQkKItEJASFwA+OegEAAA8fQABEi4wkqAAAAEWFyQ+OPwMAAEiLRCQoTIt8JBgx9jHbRTHbRTHSRTHJRTHATAH4Mckx0mYPH0QAAEWJ1UQPtlADRYn
+      cRA+2WAJEAepEAeGJ3Q+2WAFEAdJBAeiJ9w+2MEkPr9ZBAflIg8AESMHqIYhQ/0KNFBlEieFJD6/WSMHqIYhQ/kGNFBhBiehJD6/WSMHqIYhQ/UGNFDFBiflJD6/WSMHqIYhQ/ESJ6kw5+HWJi3wkOEiLRCQwMfYx20gDRCQYRTHbRTHSRTHJRTHAMckx0g8fgAAAAABFiddED7ZQA0WJ3UQPtlgCRAH6RAHpQYncD7ZYAUQB0kUB4In1D7YwSQ+v1kEB6YPvAUiD6ARIweohiFAHQo0UGUSJ6UkPr9ZIweohiFAGQY0UGEWJ4EkPr9ZIweohiFAFQY0UMUGJ6UkPr9ZIweohiFAERIn6g///dYWLvCS4AAAASItcJAgBfCQgi0QkIEgB
+      XCQYO0QkBA+Miv7//0SLhCSoAAAAx0QkGAMAAADHRCQgAAAAAEWFwA+OiAEAAGYPH4QAAAAAAItUJASF0g+OpAAAAEhjRCQYMf8x9jHbSAOEJKAAAABFMdtFMdIxyUUxyUUxwDHSkEWJ10QPthBFid1ED7ZY/0QB+kQB6UGJ3A+2WP5EAdJFAeCJ9Q+2cP1JD6/WQQHpA7wkuAAAAEjB6iGIEEKNFBlEielJD6/WSMHqIYhQ/0GNFBhFieBJD6/WSMHqIYhQ/kGNFDFBielJD6/WSMHqIYhQ/UgDRCQIRIn6O3wkBHyAi0wkJIXJD4ioAAAATGNUJCRIY0QkGDH/MfYx20Ux20UxyUUxwEwB0DHJSAOEJKAAAAAx0g8fQABFid9ED7YYQ
+      YndD7ZY/0QB+kQB6UGJ9A+2cP5EAdpFAeCJ/Q+2eP1JD6/WQQHpSMHqIYgQjRQZSItMJBBJD6/WSQHKSMHqIYhQ/0GNFDBFieBJD6/WSMHqIYhQ/kGNFDlBielJD6/WSMHqIYhQ/UgByESJ+kSJ6UWF0nmEg0QkIAGLRCQgg0QkGAQ5hCSoAAAAD4WB/v//g0QkPAGLRCQ8OYQkwAAAAA+Fm/z//0iDxFhbXl9dQVxBXUFeQV/DZi4PH4QAAAAAAESLVCQ4RYXSD4j1/f//6Uz9//8=
+      )"
+      else
+      base64enc := "
+      (LTrim Join
+      2,x86:VVdWU4PsPItsJGCLRCRYhe0PjncEAACLfCRcx0QkNAAAAAAPr/iD6AEPr0QkXIl8JCSLfCRUiUQkLItEJFCD7wGJfCQwi3wkVI0EuIlEJDiLRCQ4x0QkKAAAAACJRCQgi0QkJIXAD47pAQAAjXQmAIt0JFSF9g+OJAQAAMdEJAwAAAAAi0wkKDHtMf/HRCQYAAAAAANMJFAx9jHAx0QkFAAAAADHRCQQAAAAAI10JgCLVCQMD7ZZA4k0JIPBBA+2cf6JfCQEiVQkHAHCD7Z5/QHaiVwkDLurqqqqidCJbCQID7Zp/Pfji1wkEAMcJNHqiFH/idq7q6qqqgHyidD344tcJBQDXCQE0eqIUf6J2rurqqqqAfqJ0Pfj0eqIUf2LVCQ
+      YA1QkCAHqidD344scJItEJByJXCQQi1wkBNHqiVwkFItcJAiIUfyJXCQYO0wkIA+FWf///4tEJDDHBCQAAAAAMe0x/8dEJBwAAAAAi0wkIDH2x0QkGAAAAADHRCQUAAAAAIlEJAQxwI22AAAAAIscJA+2Uf+JdCQIg+kED7ZxAol8JAyJFCSNFBgDFCSJ0LqrqqqqD7Z5AYlsJBD34g+2KYNsJAQB0eqIUQOLVCQUA1QkCAHyidC6q6qqqvfi0eqIUQKLVCQYA1QkDAH6idC6q6qqqvfi0eqIUQGLVCQcA1QkEAHqidC6q6qqqvfiidiLXCQIiVwkFItcJAzR6ogRi1QkBIlcJBiLXCQQiVwkHIP6/w+FVf///4t8JFwBfCQoAXwkIItE
+      JCg7RCQkD4wb/v//i0QkUItcJFTHRCQoAAAAAPfYiUQkDIXbD44IAgAAjXQmAJCLVCQkhdIPjugAAAAx9otMJAzHRCQIAAAAADHtx0QkGAAAAAAx/zHAx0QkFAAAAAD32cdEJBAAAAAAiTQkjXYAi1QkCA+2cQOJfCQEixwkD7Z5AYlUJCABwgHyiXQkCL6rqqqqidCJXCQcD7ZZAvfmi3QkHItEJBCJHCSJ6w+2KQHwiXQkEIt0JAzR6ohRA4sUJAHCidC6q6qqqvfii0QkFANEJATR6ohRAonCAfqJ0Lqrqqqq9+KLRCQYiVwkGAHY0eqIUQGJwgHqidC6q6qqqvfii0QkINHqiBGLVCQEA0wkXIlUJBSNFDE5VCQkD49M////i0wkL
+      IXJD4jrAAAAMfbHRCQQAAAAAItMJCwx7cdEJBwAAAAAK0wkDDH/McDHRCQYAAAAAMdEJBQAAAAAiTQkjXQmAJCLHCSLVCQQiXwkBA+2cQMPtnkBiWwkCIlcJCAPtlkCiXQkEA+2KYkcJInTAcIB8r6rqqqqidD35ot0JCCLRCQUAfCJdCQUi3QkDNHqiFEDixQkAcKJ0Lqrqqqq9+KLRCQYA0QkBNHqiFECicIB+onQuquqqqr34otEJBwDRCQI0eqIUQGJwgHqidC6q6qqqvfiidjR6ogRi1QkBCtMJFyJVCQYi1QkCAHOiVQkHA+JTf///4NEJCgBi0QkKINsJAwEOUQkVA+F/f3//4NEJDQBi0QkNDlEJGAPhcL7//+DxDxbXl9dw4
+      20JgAAAACNdgCLfCQwhf8PiI/9///ppvz//w==
+      )"
+
+      mCodeFunc := Gdip_RunMCode(base64enc)
   }
 
   Gdip_GetImageDimensions(pBitmap,w,h)
@@ -8085,16 +8146,17 @@ Gdip_RunMCode(mcode) {
        , c := (A_PtrSize=8) ? "x64" : "x86"
 
   if (!regexmatch(mcode, "^([0-9]+),(" c ":|.*?," c ":)([^,]+)", m))
-    return
-  if (!DllCall("crypt32\CryptStringToBinary", "str", m3, "uint", 0, "uint", e[m1], "ptr", 0, "uint*", s, "ptr", 0, "ptr", 0))
-    return
+     return
+
+  if (!DllCall("crypt32\CryptStringToBinary", "str", m3, "uint", StrLen(m3), "uint", e[m1], "ptr", 0, "uintp", s, "ptr", 0, "ptr", 0))
+     return
 
   p := DllCall("GlobalAlloc", "uint", 0, "ptr", s, "ptr")
   ; if (c="x64")
-    DllCall("VirtualProtect", "ptr", p, "ptr", s, "uint", 0x40, "uint*", op)
+     DllCall("VirtualProtect", "ptr", p, "ptr", s, "uint", 0x40, "uint*", op)
 
-  if (DllCall("crypt32\CryptStringToBinary", "str", m3, "uint", 0, "uint", e[m1], "ptr", p, "uint*", s, "ptr", 0, "ptr", 0))
-    return p
+  if (DllCall("crypt32\CryptStringToBinary", "str", m3, "uint", StrLen(m3), "uint", e[m1], "ptr", p, "uint*", s, "ptr", 0, "ptr", 0))
+     return p
 
   DllCall("GlobalFree", "ptr", p)
 }
@@ -8171,14 +8233,18 @@ Gdip_BitmapConvertGray(pBitmap, hue:=0, vibrance:=-40, brightness:=1, contrast:=
        PixelFormat := KeepPixelFormat
 
     newBitmap := Gdip_CreateBitmap(Width, Height, PixelFormat)
-    G := Gdip_GraphicsFromImage(newBitmap)
-    Gdip_SetInterpolationMode(G, InterpolationMode)
+    G := Gdip_GraphicsFromImage(newBitmap, InterpolationMode)
     If (hue!=0 || vibrance!=0)
        pEffect := Gdip_CreateEffect(6, hue, vibrance, 0)
+
     matrix := GenerateColorMatrix(2, brightness, contrast)
-    r1 := Gdip_DrawImageFX(G, pBitmap, 0, 0, 0, 0, Width, Height, matrix, pEffect)
     If pEffect
+    {
+       E := Gdip_DrawImageFX(G, pBitmap, 0, 0, 0, 0, Width, Height, matrix, pEffect)
        Gdip_DisposeEffect(pEffect)
+    } Else
+       E := Gdip_DrawImage(G, pBitmap, 0, 0, Width, Height, 0, 0, Width, Height, matrix)
+
     Gdip_DeleteGraphics(G)
     Return newBitmap
 }

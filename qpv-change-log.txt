@@ -2,6 +2,13 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.4.2 (2020-08-01)
+  - [new] one can choose what channel to extract from an image when using it as an alpha mask
+  - [new] option to pixelize images [available in the «Blur selected area» panel]
+  - [new] option to set a fixed number of thumbnail columns, regardless of window size [thx to TheArkive for the suggestion]
+  - the main window will now open on the screen where the mouse cursor is currently in [thx to TheArkive]
+  - various small bug fixes
+
 - v4.4.0 (2020-07-23)
   - [new] 18 blending modes available now on image pasting or when using the transform tool
   - [new] by clicking within the selection area, when the gradient [or alpha mask] options tab is active, you can adjust the gradient center
