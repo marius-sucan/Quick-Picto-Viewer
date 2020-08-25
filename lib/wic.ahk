@@ -180,7 +180,7 @@ IWICFormatConverter_Initialize(thisObj, pISource, dstFormat, dither, pIPalette, 
    ; COM_CLSIDfromString(pDstFormat, "{" moreWIC_GUIDs(dstFormat) "}" )
 
    pDstFormat := WIC_GUID(pGUID, dstFormat)
- msgbox, % dstFormat "`n" pDstFormat
+   ; msgbox, % dstFormat "`n" pDstFormat
    hr := DllCall(vtable(thisObj, 20), "ptr", thisObj, "ptr", pISource, "ptr", pDstFormat, "uint", dither, "ptr", pIPalette, "double", alphaThresholdPercent, "uint", paletteTranslate)
    WIC_hr(hr, ErrorLevel, A_ThisFunc)
    Return hr

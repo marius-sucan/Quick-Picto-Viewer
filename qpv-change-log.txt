@@ -2,11 +2,20 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.5.0 (2020-08-25)
+  - [new] option to refresh thumbnails [ thanks for the suggestion to TheArkive ]
+  - [new] strikeout text style option and text cutout mode
+  - [new] line angle, letter spacing, and line spacing adjustment options for text insertion
+  - improved rendering of text blurring and text contours drawing; the entire Insert Text tool was recoded using GDI APIs
+  - [new] option to set how many system cores to use whne generating thumbnails and for batch file processing [requested by TheArkive]
+  - bug fixes related to batch processing of images [ thanks to TheArkive ]
+  - bug fixes and improvements to scrolling of thumbnails [ thanks to the efforts of TheArkive ]
+
 - v4.4.2 (2020-08-01)
   - [new] one can choose what channel to extract from an image when using it as an alpha mask
   - [new] option to pixelize images [available in the «Blur selected area» panel]
   - [new] option to set a fixed number of thumbnail columns, regardless of window size [thx to TheArkive for the suggestion]
-  - the main window will now open on the screen where the mouse cursor is currently in [thx to TheArkive]
+  - the main window will now open on the screen where the mouse cursor is currently in [thanks to TheArkive]
   - various small bug fixes
 
 - v4.4.0 (2020-07-23)

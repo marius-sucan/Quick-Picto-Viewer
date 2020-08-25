@@ -168,7 +168,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   If fontFace
      Gui, Font, %thisBold% Q4, %fontFace% 
 
-  If fontSize
+  If (fontSize>0)
      Gui, Font, s%fontSize% %thisBold% Q4
 
   iconFile := 0
@@ -323,8 +323,8 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
      Gui, Add, Button, gMsgBox2event x+0 w1 h1 Default, --
 
   Gui, Add, Text, xp yp w1 h1 BackgroundTrans,% A_Space
-  If ownerHwnd
-     Gui, +Owner%ownerHwnd%
+  If StrLen(ownerHwnd)>1
+     Try Gui, +Owner%ownerHwnd%
 
   If modalHwnd
      WinSet, Disable,, ahk_id %modalHwnd%
@@ -646,6 +646,76 @@ GetStringSize(FontFace, fontSize, doBold, p_String, mustWrap, l_Width:=0) {
     Return result
 }
 
+Fnt_GetFontName(hFont:="") {
+    Static Dummy87890484
+          ,DEFAULT_GUI_FONT    :=17
+          ,HWND_DESKTOP        :=0
+          ,OBJ_FONT            :=6
+          ,MAX_FONT_NAME_LENGTH:=32     ;-- In TCHARS
+
+    ;-- If needed, get the handle to the default GUI font
+    if (DllCall("GetObjectType","Ptr",hFont)<>OBJ_FONT)
+        hFont:=DllCall("GetStockObject","Int",DEFAULT_GUI_FONT)
+
+    ;-- Select the font into the device context for the desktop
+    hDC      :=DllCall("GetDC","Ptr",HWND_DESKTOP)
+    old_hFont:=DllCall("SelectObject","Ptr",hDC,"Ptr",hFont)
+
+    ;-- Get the font name
+    VarSetCapacity(l_FontName,MAX_FONT_NAME_LENGTH*(A_IsUnicode ? 2:1))
+    DllCall("GetTextFace","Ptr",hDC,"Int",MAX_FONT_NAME_LENGTH,"Str",l_FontName)
+
+    ;-- Release the objects needed by the GetTextFace function
+    DllCall("SelectObject","Ptr",hDC,"Ptr",old_hFont)
+        ;-- Necessary to avoid memory leak
+
+    DllCall("ReleaseDC","Ptr",HWND_DESKTOP,"Ptr",hDC)
+
+    ;-- Return to sender
+    Return l_FontName
+}
+
+Fnt_GetFontSize(hFont:="") {
+    Static Dummy64998752
+
+          ;-- Device constants
+          ,HWND_DESKTOP:=0
+          ,LOGPIXELSY  :=90
+
+          ;-- Misc.
+          ,DEFAULT_GUI_FONT:=17
+          ,OBJ_FONT        :=6
+
+    ;-- If needed, get the handle to the default GUI font
+    if (DllCall("GetObjectType","Ptr",hFont)<>OBJ_FONT)
+        hFont:=DllCall("GetStockObject","Int",DEFAULT_GUI_FONT)
+
+    ;-- Select the font into the device context for the desktop
+    hDC      :=DllCall("GetDC","Ptr",HWND_DESKTOP)
+    old_hFont:=DllCall("SelectObject","Ptr",hDC,"Ptr",hFont)
+
+    ;-- Collect the number of pixels per logical inch along the screen height
+    l_LogPixelsY:=DllCall("GetDeviceCaps","Ptr",hDC,"Int",LOGPIXELSY)
+
+    ;-- Get text metrics for the font
+    VarSetCapacity(TEXTMETRIC,A_IsUnicode ? 60:56,0)
+    DllCall("GetTextMetrics","Ptr",hDC,"Ptr",&TEXTMETRIC)
+
+    ;-- Convert em height to point size
+    l_Size:=Round((NumGet(TEXTMETRIC,0,"Int")-NumGet(TEXTMETRIC,12,"Int"))*72/l_LogPixelsY)
+        ;-- (Height - Internal Leading) * 72 / LogPixelsY
+
+    ;-- Release the objects needed by the GetTextMetrics function
+    DllCall("SelectObject","Ptr",hDC,"Ptr",old_hFont)
+        ;-- Necessary to avoid memory leak
+
+    DllCall("ReleaseDC","Ptr",HWND_DESKTOP,"Ptr",hDC)
+
+    ;-- Return to sender
+    Return l_Size
+}
+
+
 Fnt_CreateFont(p_Name:="",p_Options:="") {
     Static Dummy34361446
 
@@ -660,6 +730,11 @@ Fnt_CreateFont(p_Name:="",p_Options:="") {
 
           ;-- Font family
           ,FF_DONTCARE  :=0x0
+          ,FF_ROMAN     :=0x1
+          ,FF_SWISS     :=0x2
+          ,FF_MODERN    :=0x3
+          ,FF_SCRIPT    :=0x4
+          ,FF_DECORATIVE:=0x5
 
           ;-- Font pitch
           ,DEFAULT_PITCH :=0
@@ -686,8 +761,8 @@ Fnt_CreateFont(p_Name:="",p_Options:="") {
 
     ;-- If both parameters are null or unspecified, return the handle to the
     ;   default GUI font.
-    if (p_Name="")
-       Return DllCall("GetStockObject","Int",DEFAULT_GUI_FONT)
+    if (p_Name="" and p_Options="")
+        Return DllCall("GetStockObject","Int",DEFAULT_GUI_FONT)
 
     ;-- Initialize options
     o_Height   :=""             ;-- Undefined
@@ -700,40 +775,76 @@ Fnt_CreateFont(p_Name:="",p_Options:="") {
 
     ;-- Extract options (if any) from p_Options
     Loop Parse,p_Options,%A_Space%
-    {
+        {
         if A_LoopField is Space
             Continue
 
         if (SubStr(A_LoopField,1,4)="bold")
             o_Weight:=1000
+        else if (SubStr(A_LoopField,1,6)="italic")
+            o_Italic:=True
+        else if (SubStr(A_LoopField,1,4)="norm")
+            {
+            o_Italic   :=False
+            o_Strikeout:=False
+            o_Underline:=False
+            o_Weight   :=FW_DONTCARE
+            }
+        else if (A_LoopField="-s")
+            o_Size:=0
+        else if (SubStr(A_LoopField,1,6)="strike")
+            o_Strikeout:=True
+        else if (SubStr(A_LoopField,1,9)="underline")
+            o_Underline:=True
+        else if (SubStr(A_LoopField,1,1)="h")
+            {
+            o_Height:=SubStr(A_LoopField,2)
+            o_Size  :=""  ;-- Undefined
+            }
         else if (SubStr(A_LoopField,1,1)="q")
             o_Quality:=SubStr(A_LoopField,2)
         else if (SubStr(A_LoopField,1,1)="s")
+            {
             o_Size  :=SubStr(A_LoopField,2)
+            o_Height:=""  ;-- Undefined
+            }
         else if (SubStr(A_LoopField,1,1)="w")
             o_Weight:=SubStr(A_LoopField,2)
-    }
+        }
 
     ;----------------------------------
     ;-- Convert/Fix invalid or
     ;-- unspecified parameters/options
     ;----------------------------------
     if p_Name is Space
-        p_Name:="Arial"   ;-- Font name of the default GUI font
+        p_Name:=Fnt_GetFontName()   ;-- Font name of the default GUI font
+
+    if o_Height is not Integer
+        o_Height:=""                ;-- Undefined
 
     if o_Quality is not Integer
         o_Quality:=PROOF_QUALITY    ;-- AutoHotkey default
+
+    if o_Size is Space              ;-- Undefined
+        o_Size:=Fnt_GetFontSize()   ;-- Font size of the default GUI font
+     else
+        if o_Size is not Integer
+            o_Size:=""              ;-- Undefined
+         else
+            if (o_Size=0)
+                o_Size:=""          ;-- Undefined
 
     if o_Weight is not Integer
         o_Weight:=FW_DONTCARE       ;-- A font with a default weight is created
 
     ;-- If needed, convert point size to em height
-    if o_Size is Integer    ;-- Allows for a negative size (emulates AutoHotkey)
-    {
-        hDC:=DllCall("CreateDC","Str","DISPLAY","Ptr",0,"Ptr",0,"Ptr",0)
-        o_Height:=-Round(o_Size*DllCall("GetDeviceCaps","Ptr",hDC,"Int",LOGPIXELSY)/72)
-        DllCall("DeleteDC","Ptr",hDC)
-    } Else o_Size:=""              ;-- Undefined
+    if o_Height is Space        ;-- Undefined
+        if o_Size is Integer    ;-- Allows for a negative size (emulates AutoHotkey)
+            {
+            hDC:=DllCall("CreateDC","Str","DISPLAY","Ptr",0,"Ptr",0,"Ptr",0)
+            o_Height:=-Round(o_Size*DllCall("GetDeviceCaps","Ptr",hDC,"Int",LOGPIXELSY)/72)
+            DllCall("DeleteDC","Ptr",hDC)
+            }
 
     if o_Height is not Integer
         o_Height:=0                 ;-- A font with a default height is created
@@ -755,8 +866,9 @@ Fnt_CreateFont(p_Name:="",p_Options:="") {
         ,"UInt",(FF_DONTCARE<<4)|DEFAULT_PITCH          ;-- fdwPitchAndFamily
         ,"Str",SubStr(p_Name,1,31))                     ;-- lpszFace
 
-    Return hFont
+  Return hFont
 }
+
 
 Fnt_DeleteFont(hFont) {
     If !hFont  ;-- Zero or null

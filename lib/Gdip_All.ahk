@@ -2593,10 +2593,12 @@ Gdip_CreateBitmapFromClipboard() {
          if !DllCall("OpenClipboard", Ptr, hwnd)
             return -1
 
-         hData := DllCall("User32.dll\GetClipboardData", "UInt", 2, "UPtr")
-         hBitmap := DllCall("User32.dll\CopyImage", "UPtr", hData, "UInt", 0, "Int", 0, "Int", 0, "UInt", 0x2000, "Ptr")
+         hData := DllCall("User32.dll\GetClipboardData", "UInt", 0x0002, "UPtr")
+         hBitmap := DllCall("User32.dll\CopyImage", "UPtr", hData, "UInt", 0, "Int", 0, "Int", 0, "UInt", 0x2004, "Ptr")
          DllCall("CloseClipboard")
-         return hBitmap
+         pBitmap := Gdip_CreateBitmapFromHBITMAP(hBitmap)
+         DeleteObject(hBitmap)
+         return pBitmap
       }
       return -2
    }
@@ -2612,9 +2614,19 @@ Gdip_CreateBitmapFromClipboard() {
    }
 
    DllCall("CloseClipboard")
-   pBitmap := Gdip_CreateARGBBitmapFromHBITMAP(hBitmap)
    If hBitmap
+   {
+      pBitmap := Gdip_CreateARGBBitmapFromHBITMAP(hBitmap) ; this function can return a completely empty/transparent bitmap
+      If pBitmap
+         isUniform := Gdip_TestBitmapUniformity(pBitmap, 7, maxLevelIndex)
+
+      If (pBitmap && isUniform=1 && maxLevelIndex<=2)
+      {
+         Gdip_DisposeImage(pBitmap)
+         pBitmap := Gdip_CreateBitmapFromHBITMAP(hBitmap)
+      }
       DeleteObject(hBitmap)
+   }
 
    if !pBitmap
       return -4
@@ -7052,93 +7064,11 @@ Gdip_DrawRoundedLine(G, x1, y1, x2, y2, LineWidth, LineColor) {
   Gdip_DeletePen(pPen) 
 }
 
-Gdi_CreateBitmap(hDC:="", w:=1, h:=1, BitCount:=32, Planes:=1, pBits:=0) {
-; Creates a GDI bitmap; it can be a DIB or DDB.
-; https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-createcompatiblebitmap
-    If (hDC="")
-       Return DllCall("Gdi32\CreateBitmap", "Int", w, "Int", h, "UInt", Planes, "UInt", BitCount, "Ptr", pBits, "UPtr")
-    Else
-       Return DllCall("gdi32\CreateCompatibleBitmap", "UPtr", hdc, "int", w, "int", h)
-}
-
-Gdi_CreateDIBitmap(hdc, bmpInfoHeader, CBM_INIT, pBits, BITMAPINFO, DIB_COLORS) {
-; This function creates a hBitmap, a device-dependent bitmap [DDB]
-; from a pointer of data-bits [pBits].
-;
-; The hBitmap is created according to the information found in
-; the BITMAPINFO and bmpInfoHeader pointers.
-;
-; If the function fails, the return value is NULL,
-; otherwise a handle to the hBitmap
-;
-; Function written by Marius Șucan.
-; Many thanks to Drugwash for the help offered.
-
-   Static Ptr := "UPtr"
-   hBitmap := DllCall("CreateDIBitmap"
-            , Ptr, hdc
-            , Ptr, bmpInfoHeader
-            , "uint", CBM_INIT    ; =4
-            , Ptr, pBits
-            , Ptr, BITMAPINFO
-            , "uint", DIB_COLORS, Ptr)    ; PAL=1 ; RGB=2
-
-   Return hBitmap
-}
-
 Gdip_CreateBitmapFromGdiDib(BITMAPINFO, BitmapData) {
    Static Ptr := "UPtr"
    pBitmap := 0
    E := DllCall("gdiplus\GdipCreateBitmapFromGdiDib", Ptr, BITMAPINFO, Ptr, BitmapData, "UPtr*", pBitmap)
    Return pBitmap
-}
-
-Gdi_StretchDIBits(hDestDC, dX, dY, dW, dH, sX, sY, sW, sH, tBITMAPINFO, DIB_COLORS, pBits, RasterOper) {
-   Static Ptr := "UPtr"
-   Return DllCall("StretchDIBits"
-      , Ptr, hDestDC, "int", dX, "int", dY
-      , "int", dW, "int", dH, "int", sX, "int", sY
-      , "int", sW, "int", sH, Ptr, pBits, Ptr, tBITMAPINFO
-      , "int", DIB_COLORS, "uint", RasterOper)
-}
-
-Gdi_SetDIBitsToDevice(hDC, dX, dY, Width, Height, sX, sY, StartScan, ScanLines, pBits, BITMAPINFO, DIB_COLORS) {
-   Static Ptr := "UPtr"
-   Return DllCall("SetDIBitsToDevice", Ptr, hDC
-         , "int", dX, "int", dY
-         , "uint", Width, "uint", Height
-         , "int", sX, "int", sY
-         , "uint", StartScan, "uint", ScanLines
-         , Ptr, pBits, Ptr, BITMAPINFO, "uint", DIB_COLORS)
-}
-
-Gdi_GetDIBits(hDC, hBitmap, start, cLines, pBits, BITMAPINFO, DIB_COLORS) {
-; hDC     - A handle to the device context.
-; hBitmap - A handle to the GDI bitmap. This must be a compatible bitmap (DDB).
-; pbits   --A pointer to a buffer to receive the bitmap data.
-;           If this parameter is NULL, the function passes the dimensions
-;           and format of the bitmap to the BITMAPINFO structure pointed to 
-;           by the BITMAPINFO parameter.
-; A DDB is a Device-Dependent Bitmap, (as opposed to a DIB, or Device-Independent Bitmap).
-; That means: a DDB does not contain color values; instead, the colors are in a
-; device-dependent format. Therefore, it requires a hDC.
-; 
-; This function returns the data-bits as device-independent bitmap
-; from a hBitmap into the pBits pointer.
-;
-; Return: if the function fails, the return value is zero.
-; It can also return ERROR_INVALID_PARAMETER.
-; Function written by Marius Șucan.
-
-   Static Ptr := "UPtr"
-   Return DllCall("GetDIBits"
-            , Ptr, hDC
-            , Ptr, hBitmap
-            , "uint", start
-            , "uint", cLines
-            , "Ptr", pBits
-            , Ptr, BITMAPINFO
-            , "uint", DIB_COLORS, Ptr)    ; PAL=1 ; RGB=2
 }
 
 ;#####################################################################################
@@ -7809,6 +7739,10 @@ int SetAlphaChannel(int *imageData, int *maskData, int w, int h, int invert, int
 
   ; thisStartZeit := A_TickCount
   Gdip_GetImageDimensions(pBitmap, w, h)
+  Gdip_GetImageDimensions(pBitmapMask, w2, h2)
+  If (w2!=w || h2!=h || !pBitmap || !pBitmapMask)
+     Return 0
+
   Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData)
   Gdip_LockBits(pBitmapMask, 0, 0, w, h, stride, mScan, mData)
   r := DllCall(mCodeFunc, "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", invertAlphaMask, "Int", replaceSourceAlphaChannel, "Int", whichChannel)
@@ -8011,6 +7945,10 @@ int blendBitmaps(int *bgrImageData, int *otherData, int w, int h, int blendMode)
   }
 
   Gdip_GetImageDimensions(pBitmap, w, h)
+  Gdip_GetImageDimensions(pBitmap2Blend, w2, h2)
+  If (w2!=w || h2!=h || !pBitmap || !pBitmap2Blend)
+     Return 0
+
   Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData)
   Gdip_LockBits(pBitmap2Blend, 0, 0, w, h, stride, mScan, mData)
   ; thisStartZeit := A_TickCount

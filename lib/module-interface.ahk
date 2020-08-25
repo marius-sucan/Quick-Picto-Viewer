@@ -2951,6 +2951,10 @@ repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:=
           Final_x := mCoordLeft + 1
        If (!Final_y) || (Final_y + 1<mCoordTop)
           Final_y := mCoordTop + 1
+       If !Final_y
+          Final_y := A_ScreenHeight//3
+       If !Final_x
+          Final_x := A_ScreenWidth//3
        Gui, %whichGUI%: Show, x%Final_x% y%Final_y%, % Chr(160) winTitle
     } Else Gui, %whichGUI%: Show, AutoSize %winPos%, % Chr(160) winTitle
 
@@ -3021,7 +3025,12 @@ calcScreenLimits(whichHwnd:="main") {
     whichHwnd := (whichHwnd="main") ? PVhwnd : whichHwnd
     If (whichHwnd="mouse")
     {
+       MouseGetPos, OutputVarX, OutputVarY
        GetPhysicalCursorPos(mainX, mainY)
+       If !mainX
+          mainX := OutputVarX
+       If !mainY
+          mainY := OutputVarY
        hMon := MDMF_FromPoint(mainX, mainY, 2)
     } Else 
     {

@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 4.4.2
+;@Ahk2Exe-SetVersion 4.5.0
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2020)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -60,7 +60,8 @@
 #SingleInstance, off
 #UseHook, Off
 SetWorkingDir, %A_ScriptDir%
-#Include Lib\Gdip_All.ahk           ; graphics display interface
+#Include Lib\Gdip_All.ahk           ; graphics display interface plus v1.1
+#Include Lib\Gdi.ahk                ; graphics display interface
 #Include Lib\SGdiPrint.ahk
 ; #Include Lib\guicontroltips.ahk
 #Include Lib\freeimage-wrapper.ahk  ; used to load exotic file formats
@@ -74,14 +75,14 @@ SetWorkingDir, %A_ScriptDir%
 SetWinDelay, 1
 SetBatchLines, -1
 
-Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", pPen6 := ""
+Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", pPen6 := "", unCompiledExePath := ""
    , glPG := "", glOBM := "", glHbitmap := "", glHDC := "", pPen1 := "", pPen1d, pPen2 := "", pPen3 := "", AmbientalTexBrush := ""
    , pBrushHatch := "", pBrushWinBGR := "", pBrushA := "", pBrushB := "", pBrushC := "", pBrushD := "", currentPixFmt := ""
    , pBrushE := "", pBrushHatchLow, hGuiTip := 1, hSetWinGui := 1, undoSelLevelsArray := []
    , prevFullThumbsUpdate := 1, winGDIcreated := 0, ThumbsWinGDIcreated := 0
    , hPicOnGui1 := "", scriptStartTime := A_TickCount, lastEditRHChange :=1, doubleBlurPreviewArea := 0
    , newStaticFoldersListCache := "", lastEditRWChange := 1, QPVjournal := []
-   , mainCompiledPath := "", wasInitFIMlib := 0, hGDIselectWin, allowNextSlide := 1
+   , mainCompiledExe := "", mainCompiledPath := "", wasInitFIMlib := 0, hGDIselectWin, allowNextSlide := 1
    , filteredMap2mainList := [], thumbsCacheFolder := A_ScriptDir "\thumbs-cache"
    , resultedFilesList := [], currentFileIndex := "", maxFilesIndex := 0, gdiBitmapIDentire := 0
    , appTitle := "Quick Picto Viewer", FirstRun := 1, hSNDmediaFile := "", mouseToolTipWinCreated := 0
@@ -113,7 +114,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , thumbsW := 300, thumbsH := 300, thumbsDisplaying := 0, scrollAxis := 0, userSeenSessionImagesArray := []
    , othumbsW := 300, othumbsH := 300, ForceRegenStaticFolders := 0, vPselRotation := 0
    , CountFilesFolderzList := 0, RecursiveStaticRescan := 0, imgSelLargerViewPort := 0
-   , UsrMustInvertFilter := 0, userActionConflictingFile := 0, LastPrevFastDisplay := 0
+   , UsrMustInvertFilter := 0, userActionConflictingFile := 1, LastPrevFastDisplay := 0
    , prevFileSavePath := "", imgHUDbaseUnit := Round(OSDfntSize*2.5), lastLongOperationAbort := 1
    , lastOtherWinClose := 1, UsrCopyMoveOperation := 2, editingSelectionNow := 0
    , ForceNoColorMatrix := 0, activateImgSelection := 0, prevFastDisplay := 1, hSNDmediaDuration
@@ -138,7 +139,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , prevTryThumbsUpdate := 1, thumbsSizeQuality := 245, prevFullIndexThumbsUpdate := -1, userClipBMPpaste
    , UserNewWidth := 0, UserNewHeight := 0, UserNewDPI := 0, viewportStampBMP := "", tinyPrevAreaCoordY := 1
    , ThumbsStatusBarH := 0, activeSQLdb := "", SLDtypeLoaded := 0, sldsPattern := "i)(.\.(sld|sldb))$"
-   , imgThumbsCacheIDsArray := [], imgThumbsCacheArray := [], prevRealThumbsIndex := 1, viewportIDstampBMP := 0
+   , imgThumbsCacheIDsArray := [], imgThumbsCacheArray := [], viewportIDstampBMP := 0
    , prevVPselRotation, prevrotateSelBoundsKeepRatio, prevEllipseSelectMode, currentSelUndoLevel := 1
    , seenImagesDB := "", skipSeenImagesSlider := 0, hEditField := "", gdiBMPvPsize := "", maxGDIbmpSize := 533654021
    , GDIcacheSRCfileA := "", idGDIcacheSRCfileA := "", GDIcacheSRCfileB := "", idGDIcacheSRCfileB := "", prevOpenedWindow := []
@@ -147,14 +148,14 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , 2NDglHbitmap := "", 2NDglHDC := "", 2NDglOBM := "", 2NDglPG := "", mainThreadHwnd := "", imgDecLX := "", imgDecLY := ""
    , undoLevelsArray := [], currentUndoLevel := 0, maxUndoLevels := 50, undoLevelsRecorded := 1, hGDIinfosWin := ""
    , zeitSillyPrevent := 1, PrintPosX, PrintPosY, PrintPosW, PrintPosH, tinyPrevAreaCoordX := 1
-   , hLVmainu := 0, tempBtnVisible := "null", tempBtnGuiBtnArray := [], lastRenameUndo := []
+   , hLVmainu := 0, tempBtnVisible := "null", tempBtnGuiBtnArray := [], lastRenameUndo := [], userMultiCoresLimit := 100
    , drawingShapeNow := 0, customShapePoints := "", prevResizedVPimgW := "", prevResizedVPimgH := "", PenuDrawLive := ""
-   , initialDrawingStartCoords := [], drawingLiveMode := 0, cardinalCurveCustomShape := 0
+   , initialDrawingStartCoords := [], drawingLiveMode := 0, cardinalCurveCustomShape := 0, openingPanelNow := 0
    , closedLineCustomShape := 1, tensionCurveCustomShape := 0.5, PanelDefineSelectionCoords := 0
    , SelectionCoordsType := 1, PasteInPlaceAlphaFile := "", infoBoxGdiCached := "", watchFolderDetails := ""
    , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := [], countGDIobjects := 0
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "4.4.2", vReleaseDate := "01/08/2020"
+   , appVersion := "4.5.0", vReleaseDate := "25/08/2020"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -204,9 +205,12 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , FillAreaColorMode := 1, FillAreaColorReversed := 0, FillArea2ndColor := "FF2211", FillArea2ndOpacity := 200, FillAreaGradientAngle := 0
    , FillAreaGradientSigma := 5, FillAreaGradientBlend := 100, FillAreaGradientScale := 100, FillAreaGradientWrapped := 1
    , thumbnailsListMode := 0, TextInAreaFontName := "Arial", TextInAreaFontSize := 15, TextInAreaBorderSize := 5
-   , TextInAreaFontBold := 0, TextInAreaFontItalic := 0, TextInAreaFontUline := 0, TextInAreaAlign := 1
+   , TextInAreaFontBold := 0, TextInAreaFontItalic := 0, TextInAreaFontUline := 0, TextInAreaAlign := 1, TextInAreaBgrUnified := 0
    , TextInAreaFontColor := "eeFFaa", TextInAreaFontOpacity := 250, TextInAreaRoundBoxBgr := 1, TextInAreaValign := 1
    , TextInAreaBgrColor := "229933", TextInAreaBgrOpacity := 100, TextInAreaOnlyBorder := 0, TextInAreaBlurAmount := 0
+   , TextInAreaBorderOut := 1, TextInAreaBorderColor := "334400", TextInAreaBorderOpacity := "200", TextInAreaCharSpacing := 0
+   , TextInAreaUsrMarginz := 0, TextInAreaBlurBorderAmount := 0, TextInAreaDoBlurs := 0, TextInAreaLineAngle := 0
+   , TextInAreaFontLineSpacing := 0, TextInAreaCutOutMode := 0, TextInAreaBgrEntire := 0, TextInAreaFontStrike := 0
    , TextInAreaLivePreview := 1, showMainMenuBar := 1, markSearchMatches := 1, showSelectionGrid := 0, blurAreaTwice := 0
    , allowRecordHistory := 1, FillAreaLivePreview := 1, TextInAreaPaintBgr := 1, rotateSelBoundsKeepRatio := 1
    , highlightAlreadySeenImages := 1, useCachedSLDdata := 1, PreserveDateTimeOnSave := 0, PrintAdaptToFit := 1
@@ -215,7 +219,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , PasteInPlaceAlphaMaskClrA := 0, PasteInPlaceAlphaMaskClrB := 255, closeEditPanelOnApply := 1, FillAreaCurveTension := 2
    , alphaMaskOffsetX := 0, alphaMaskOffsetY := 0, alphaMaskReplaceMode := 0, PasteInPlaceAlphaChannelFile := 5
    , blurAreaMode := 1, FillAreaBlendMode := 1, PasteInPlaceApplyColorFX := 0, blurAreaPixelizeAmount := 0
-   , dynamicThumbsColumns := 1, thumbsColumns := 10
+   , dynamicThumbsColumns := 1, thumbsColumns := 10, TextInAreaAutoWrap := 1
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started.`nCPU cores identified: " realSystemCores ".")
@@ -240,10 +244,7 @@ CoordMode, Mouse, Screen
 CoordMode, ToolTip, Screen
 OnExit, doCleanup
 
-If A_IsCompiled
-   initCompiled()
-Else mainCompiledPath := A_ScriptDir
-
+initCompiled(A_IsCompiled)
 thisGDIPversion := Gdip_LibrarySubVersion()
 GDIPToken := Gdip_Startup()
 If (!GDIPToken || thisGDIPversion<1.85)
@@ -356,11 +357,11 @@ identifyThisWin() {
 HKifs(q:=0) {
    whichBitmap := useGdiBitmap() ? 1 : 0
    If (q="imgEditSolo")
-      r := (!AnyWindowOpen && currentFileIndex=0 && !CurrentSLD && thumbsDisplaying!=1 && whichBitmap=1) ? 1 : 0
+      r := (!AnyWindowOpen && openingPanelNow!=1 && currentFileIndex=0 && !CurrentSLD && thumbsDisplaying!=1 && whichBitmap=1) ? 1 : 0
    Else If (q="imgsLoaded")
-      r := (!AnyWindowOpen && CurrentSLD && maxFilesIndex>0) ? 1 : 0
+      r := (!AnyWindowOpen && openingPanelNow!=1 && CurrentSLD && maxFilesIndex>0) ? 1 : 0
    Else If (q="liveEdit")
-      r := (AnyWindowOpen && imgEditPanelOpened=1 && whichBitmap=1) ? 1 : 0
+      r := (AnyWindowOpen && openingPanelNow!=1 && imgEditPanelOpened=1 && whichBitmap=1) ? 1 : 0
    Else If (q="general")
       r := (!AnyWindowOpen && imgEditPanelOpened!=1) ? 1 : 0
 
@@ -383,14 +384,14 @@ HKifs(q:=0) {
           OpenThisFileMenu()
     Return
 
-    ; w::   ; to-do  to do
-    ; gdiObjectsStats()
-   ; testwhatever()
+    w::   ; to-do  to do
+    mergeViewPortEffectsImgEditing()
+    ; testWICwhatever()
    ; ; moreTesting()
    ; ; testWICresizeSpeed()
    ;    SoundBeep 
    ;     testArkive()
-    ; Return
+    Return
 
     ^+vk4E::    ; Ctrl+Shift+N
        If HKifs("general")
@@ -714,9 +715,9 @@ HKifs(q:=0) {
     NumpadMult Up::
       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
       {
-         IMGresizingMode := 3
+         ; IMGresizingMode := 3
          IMGdecalageX := IMGdecalageY := zoomLevel := 1
-         ToggleImageSizingMode()
+         ToggleImageSizingMode("custom")
       }
     Return
 
@@ -1224,6 +1225,11 @@ HKifs(q:=0) {
     ~F5 Up::
       If HKifs("imgsLoaded")
          RefreshImageFileAction()
+    Return
+
+    ~!F5 Up::
+      If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+         DeepRefreshThumbsNow()
     Return
 
     ~+F5 Up::
@@ -1742,8 +1748,8 @@ OpenNewQPVinstance(imgPath:="") {
    If !FileRexists(imgPath)
       imgPath := ""
 
-   thisPath := A_IsCompiled ? fullPath2exe : A_ScriptFullPath
-   Try Run, "%thisPath%" "%imgPath%"
+   thisPath := A_IsCompiled ? Chr(34) fullPath2exe Chr(34) : unCompiledExePath
+   Try Run, %thisPath% "%imgPath%"
    Catch wasError
          msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening a new instance of " appTitle "...", 0, 0, "error")
 }
@@ -1777,12 +1783,18 @@ OpenFileProperties() {
 }
 
 InvokeOpenWithMenu(imgPath, newInstanceOption) {
+    zPlitPath(imgPath, 0, OutFileName, OutDir)
+    CurrentSLD := Trimmer(StrReplace(CurrentSLD, "|"))
+
     CreateOpenWithMenu(imgPath)
     Menu, OpenWithMenu, Add,
     If (newInstanceOption=1)
-       Menu, OpenWithMenu, Add, &0. Open file in a new instance, OpenWithNewQPVinstance
+       Menu, OpenWithMenu, Add, &0. Open file in a new QPV instance, OpenWithNewQPVinstance
     Menu, OpenWithMenu, Add, &1. Open with default application, OpenWithDefaultApp
     Menu, OpenWithMenu, Add, &2. «Open with» dialog, invokeSHopenWith
+    Menu, OpenWithMenu, Add, &4. Explore containing folder`tCtrl+E, OpenThisFileFolder
+    If (CurrentSLD!=OutDir)
+       Menu, OpenWithMenu, Add, &5. Open containing folder in QPV, OpenQPVfileFolder
     Menu, OpenWithMenu, Add,
     Menu, OpenWithMenu, Add, &Cancel, dummy
     showThisMenu("OpenWithMenu")
@@ -2368,8 +2380,16 @@ setWindowTitle(msg, forceThis:=0, useLast:=0) {
 }
 
 fnOutputDebug(msg) {
+   Static prevMsg
+
    If (debugModa=1)
-      OutputDebug, % "QPV: " Trim(msg)
+   {
+      If (prevMsg!=msg)
+      {
+         prevMsg := msg
+         OutputDebug, % "QPV: " Trim(msg)
+      }
+   }
 }
 
 MenuDummyToggleThumbsMode() {
@@ -2655,32 +2675,114 @@ ChangeThumbsAratio() {
 }
 
 thumbsInfoYielder(ByRef maxItemsW, ByRef maxItemsH, ByRef maxItemsPage, ByRef maxPages, ByRef startIndex, ByRef mainWidth, ByRef mainHeight) {
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
-   maxItemsW := (mainWidth+15)//thumbsW
-   maxItemsH := (mainHeight+15)//thumbsH
-   If (maxItemsW<2)
+   Static prevRealThumbsIndex := -1
+   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0) ; global vars:
+   maxItemsW := (mainWidth+15)//thumbsW               ;    prevStartIndex
+   maxItemsH := (mainHeight+15)//thumbsH              ;    startPageIndex
+   If (maxItemsW<2)                                   ;    currentFileIndex ---
       maxItemsW := 1
    If (maxItemsH<2)
       maxItemsH := 1
-
+ 
    maxItemsPage := maxItemsW*maxItemsH
    maxPages := Ceil(maxFilesIndex/maxItemsPage)
-   maxItemsLine := maxItemsW ; *maxItemsH
-   startIndex := Floor(currentFileIndex/maxItemsLine) * maxItemsLine
-   If (startIndex<2)
-      startIndex := 1
-
-   ; ToolTip, % startIndex  " -- " prevRealThumbsIndex " || " maxItemsW " -- " maxItemsH , , , 2
-   If isInRange(startIndex, prevRealThumbsIndex + maxItemsPage + maxItemsW*maxItemsH, prevRealThumbsIndex - maxItemsW*maxItemsH)
+   If (maxItemsH=1 && maxItemsW>1)
    {
-      If isInRange(startIndex, prevRealThumbsIndex, prevRealThumbsIndex + maxItemsPage - maxItemsW)
-         startIndex := prevRealThumbsIndex
-      Else
-         startIndex := (startIndex<prevRealThumbsIndex) ? startIndex : startIndex - maxItemsW*maxItemsH + maxItemsW
-   } Else startIndex := Floor(currentFileIndex/maxItemsPage) * maxItemsPage
+      hasReversed := 1
+      tempu := maxItemsW
+      maxItemsW := maxItemsH
+      maxItemsH := tempu
+   }
 
-   startIndex := clampInRange(startIndex, 1, maxFilesIndex - 1)
-   Return startIndex maxItemsW maxItemsH maxItemsPage
+   maxItemsLine := maxItemsW ; *maxItemsH
+   maxTotalLines := Ceil(maxFilesIndex/maxItemsW)
+   If (maxItemsW=1)
+   {
+      startIndex := Floor(currentFileIndex/maxItemsLine) * maxItemsLine
+      If (startIndex<2)
+         startIndex := 1
+
+      ; ToolTip, % startIndex  " -- " prevRealThumbsIndex " || " maxItemsW " -- " maxItemsH , , , 2
+      If isInRange(startIndex, prevRealThumbsIndex + maxItemsPage*2, prevRealThumbsIndex - maxItemsPage)
+      {
+         If isInRange(startIndex, prevRealThumbsIndex, prevRealThumbsIndex + maxItemsPage - maxItemsW)
+            startIndex := prevRealThumbsIndex
+         Else
+            startIndex := (startIndex<prevRealThumbsIndex) ? startIndex : startIndex - maxItemsPage + maxItemsW
+      } Else startIndex := Floor(currentFileIndex/maxItemsPage) * maxItemsPage
+
+      maxTotalLines := Ceil(maxFilesIndex/maxItemsW)
+      maxuStartIndex := (maxTotalLines - maxItemsH + 1)*maxItemsW - maxItemsW + 1
+      maxuStartIndex := clampInRange(maxuStartIndex, maxItemsPage, maxFilesIndex - 1)
+      startIndex := clampInRange(startIndex, 1, maxuStartIndex)
+      prevRealThumbsIndex := startIndex
+   } Else
+   {
+      If (prevRealThumbsIndex=-1)
+         prevRealThumbsIndex := currentFileIndex - maxItemsPage//2
+
+      minIndex := prevRealThumbsIndex
+      minIndex := ((minIndex//maxItemsLine) * maxItemsLine) + 1
+      If (prevRealThumbsIndex != minIndex)
+         prevRealThumbsIndex := minIndex
+      
+      maxIndex := prevRealThumbsIndex + maxItemsPage - 1
+      ; DebugMsg("prevRealThumbsIndex: " prevRealThumbsIndex)
+      ; DebugMsg("diff check: " Abs(currentFileIndex-minIndex) " / " maxItemsLine " -------- " Abs(currentFileIndex-maxIndex) " / " maxItemsLine)
+      fnOutputDebug("min/max Index: " minIndex " / " maxIndex)
+      fnOutputDebug("prevRealThumbsIndex: " prevRealThumbsIndex)
+      fnOutputDebug("diff check: " Abs(currentFileIndex-minIndex) " / " maxItemsLine " -------- " Abs(currentFileIndex-maxIndex) " / " maxItemsLine)
+      If (Abs(currentFileIndex-minIndex) <= maxItemsLine) || (Abs(currentFileIndex-maxIndex) <= maxItemsLine) || (currentFileIndex>=minIndex && currentFileIndex<=maxIndex)
+      { ; just scrolling
+          If (currentFileIndex< minIndex)     ; scrolling up
+          {
+             startIndex := prevRealThumbsIndex-maxItemsLine
+             prevRealThumbsIndex := startIndex
+             fnOutputDebug("1: startIndex: " startIndex)
+          } Else If (currentFileIndex>maxIndex) ; scrolling down
+          {
+             startIndex := prevRealThumbsIndex+maxItemsLine
+             prevRealThumbsIndex := startIndex
+             fnOutputDebug("2: startIndex: " startIndex)
+          } Else  ; when changing img index but not changing pages
+          {
+             startIndex := prevRealThumbsIndex
+             fnOutputDebug("3: startIndex: " startIndex)
+          }
+      } Else ; this is for a jump
+      {
+         thisIndexu := currentFileIndex/maxFilesIndex
+         startIndex := Floor(maxTotalLines*thisIndexu)*maxItemsW
+         ; startIndex := ((currentFileIndex//maxItemsLine) * maxItemsLine) + 1
+         prevRealThumbsIndex := startIndex
+         fnOutputDebug("4: startIndex: " startIndex)
+      }
+
+      maxuStartIndex := (maxTotalLines - maxItemsH + 1)*maxItemsW - maxItemsW + 1
+      maxuStartIndex := clampInRange(maxuStartIndex, maxItemsPage, maxFilesIndex - 1)
+      ; maxuStartIndex := (maxFilesIndex>maxItemsPage) ? maxFilesIndex - maxItemsPage + 1 : maxFilesIndex - 1
+      fnOutputDebug(startIndex  "s -- " prevRealThumbsIndex "p -- " maxuStartIndex " || " maxItemsW "w -- h" maxItemsH)
+      startIndex := clampInRange(startIndex, 1, maxuStartIndex)
+      prevRealThumbsIndex := clampInRange(prevRealThumbsIndex, 1, maxuStartIndex)
+   }
+   If (hasReversed=1)
+   {
+      tempu := maxItemsW
+      maxItemsW := maxItemsH
+      maxItemsH := tempu
+   }
+
+   ; DebugMsg("basics:`r`nmaxItemsPage: " maxItemsPage "`r`nmaxItemsLine: " maxItemsLine "`r`nmin: " minIndex "`r`nmax: " maxIndex "`r`ncurrentFileIndex : " currentFileIndex "`r`n")
+   Return "a" startIndex maxItemsW maxItemsH maxItemsPage
+}
+
+DeepRefreshThumbsNow() {
+   If (markedSelectFile>1)
+      setForceRefreshThumbsFilesIndex(1)
+   Else
+      setForceRefreshThumbsFilesIndex(0)
+
+   dummyTimerDelayiedImageDisplay(50)
 }
 
 RefreshThumbsList() {
@@ -2720,13 +2822,13 @@ UpdateThumbsScreen(forceReload:=0) {
       SetTimer, RefreshThumbsList, -300
    } Else If (prevStartIndex!=startPageIndex || mustReloadThumbsList=1 || forceReload=1)
    {
-      r := QPV_ShowThumbnails(startIndex)
+      r := QPV_ShowThumbnails()
       If r
          prevFullIndexThumbsUpdate := startPageIndex
       mustReloadThumbsList := 0
    } Else r := 1
    prevStartIndex := startPageIndex
-   prevRealThumbsIndex := startIndex
+   ; prevRealThumbsIndex := startIndex
    mainGdipWinThumbsGrid(0, mustShowNames)
    lastInvoked := A_TickCount
 }
@@ -2988,16 +3090,16 @@ winSwipeAction(thisCtrlClicked) {
       zeitSillyPrevent := 1
       If (thisCtrlClicked="PicOnGUI3")
       {
-         If (imgEditPanelOpened=1)
-            ImgRedoAction()
-         Else If (infoImgEditingMode!=1)
+         ; If (imgEditPanelOpened=1)
+         ;    ImgRedoAction()
+         If (infoImgEditingMode!=1)
             GoNextSlide()
          Else didSomething := 0
       } Else If (thisCtrlClicked="PicOnGUI1" )
       {
-         If (imgEditPanelOpened=1)
-            ImgUndoAction()
-         Else If (infoImgEditingMode!=1)
+         ; If (imgEditPanelOpened=1)
+         ;    ImgUndoAction()
+         If (infoImgEditingMode!=1)
             GoPrevSlide()
          Else didSomething := 0
       } Else If (thisCtrlClicked="PicOnGUI2a" || thisCtrlClicked="PicOnGUI2c")
@@ -3154,31 +3256,12 @@ livePreviewsImageEditing(directCall:=0, hideHUD:=0) {
    Else If (AnyWindowOpen=23)
       coreFillSelectedArea()
    Else If (AnyWindowOpen=32)
-      coreInsertTextSelectedArea()
+      livePreviewInsertTextinArea()
    Else If (AnyWindowOpen=25)
       liveEraserPreview()
 
-   If (hideHUD!=1)
-   {
-      dotsSize := SelDotsSize
-      Gdip_FillRectangle(2NDglPG, pBrushD, selDotX, selDotY, dotsSize, dotsSize)
-      Gdip_FillRectangle(2NDglPG, pBrushD, SelDotAx, SelDotAy, dotsSize, dotsSize)
-      Gdip_FillRectangle(2NDglPG, pBrushD, SelDotBx, SelDotBy, dotsSize, dotsSize)
-      Gdip_FillRectangle(2NDglPG, pBrushD, SelDotCx, SelDotCy, dotsSize, dotsSize)
-      If (imgEditPanelOpened=1)
-      {
-         Gdip_FillEllipse(2NDglPG, pBrushD, SelDotDx, SelDotDy, dotsSize, dotsSize)
-         Gdip_FillEllipse(2NDglPG, pBrushA, SelDotDx + 5, SelDotDy + 5, dotsSize, dotsSize)
-      }
-
-      Gdip_SetPenWidth(pPen1d, SelDotsSize//5 + 1)
-      ImgSelPath := createImgSelPath(selDotX + dotsSize//2, selDotY + dotsSize//2, selDotAx - selDotX, selDotAy - selDotY, EllipseSelectMode)
-      If (imgEditPanelOpened!=1 || AnyWindowOpen=10 || AnyWindowOpen=25 || AnyWindowOpen=31 || AnyWindowOpen=24)
-         Gdip_RotatePathAtCenter(ImgSelPath, vPselRotation, 1, 1, rotateSelBoundsKeepRatio)
-
-      Gdip_DrawPath(2NDglPG, pPen1d, ImgSelPath)
-      Gdip_DeletePath(ImgSelPath)
-   }
+   If (hideHUD!=1 && AnyWindowOpen!=32)
+      livePreviewsImageEditingDrawSelectionBox()
 
    If (directCall=1)
    {
@@ -3187,11 +3270,35 @@ livePreviewsImageEditing(directCall:=0, hideHUD:=0) {
    }
 }
 
-selectFileLongTap() {
-   If determineLClickstate()
-      markThisFileNow(currentFileIndex)
+livePreviewsImageEditingDrawSelectionBox() {
+   dotsSize := SelDotsSize
+   whichFunc := (vPselRotation!=0) ? "Ellipse" : "Rectangle"
+   Gdip_Fill%whichFunc%(2NDglPG, pBrushD, selDotX, selDotY, dotsSize, dotsSize)
+   Gdip_Fill%whichFunc%(2NDglPG, pBrushD, SelDotAx, SelDotAy, dotsSize, dotsSize)
+   Gdip_Fill%whichFunc%(2NDglPG, pBrushD, SelDotBx, SelDotBy, dotsSize, dotsSize)
+   Gdip_Fill%whichFunc%(2NDglPG, pBrushD, SelDotCx, SelDotCy, dotsSize, dotsSize)
+   If (vPselRotation!=0)
+      Gdip_FillEllipse(2NDglPG, pBrushD, SelDotDx - dotsSize/3.5, SelDotDy - dotsSize/3.5, dotsSize*1.5, dotsSize*1.5)
+
+   If (imgEditPanelOpened=1)
+   {
+      Gdip_FillEllipse(2NDglPG, pBrushD, SelDotDx, SelDotDy, dotsSize, dotsSize)
+      Gdip_FillEllipse(2NDglPG, pBrushA, SelDotDx + 5, SelDotDy + 5, dotsSize, dotsSize)
+   }
+
+   Gdip_SetPenWidth(pPen1d, SelDotsSize//5 + 1)
+   ImgSelPath := createImgSelPath(selDotX + dotsSize//2, selDotY + dotsSize//2, selDotAx - selDotX, selDotAy - selDotY, EllipseSelectMode)
+   If (imgEditPanelOpened!=1 || AnyWindowOpen=10 || AnyWindowOpen=25 || AnyWindowOpen=31 || AnyWindowOpen=24)
+      Gdip_RotatePathAtCenter(ImgSelPath, vPselRotation, 1, 1, rotateSelBoundsKeepRatio)
+
+   Gdip_DrawPath(2NDglPG, pPen1d, ImgSelPath)
+   Gdip_DeletePath(ImgSelPath)
 }
 
+selectFileLongTap() {
+   If (determineLClickstate() && (A_TickCount - lastOtherWinClose>350))
+      markThisFileNow(currentFileIndex)
+}
 
 WinClickAction(mainParam:=0, thisCtrlClicked:=0) {
    Critical, on
@@ -3800,7 +3907,7 @@ JEE_ScreenToClient(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
   vPosY2 := NumGet(&POINT, 4, "Int")
 }
 
-ToggleImageSizingMode() {
+ToggleImageSizingMode(dummy:=0) {
     Static lastInvoked := 1
     If (A_TickCount - lastInvoked < 50)
        Return
@@ -3824,6 +3931,12 @@ ToggleImageSizingMode() {
        IMGresizingMode := (IMGresizingMode=1) ? 4 : 1
        If (IMGresizingMode=4)
           zoomLevel := 1
+    }
+
+    If (dummy="custom")
+    {
+       IMGresizingMode := 4
+       zoomLevel := 1
     }
 
     friendly := DefineImgSizing()
@@ -3926,6 +4039,8 @@ ToggleSlideShowu(actu:=0) {
 
   If askAboutFileSave(" and the slideshow will begin")
      Return "lulz"
+  Else
+     terminateIMGediting()
 
   interfaceThread.ahkassign("animGIFplaying", animGIFplaying)
   interfaceThread.ahkassign("allowNextSlide", allowNextSlide)
@@ -4224,7 +4339,7 @@ ToggleIMGalign() {
    If (thumbsDisplaying=1)
       Return
 
-   resetSlideshowTimer(0)
+   resetSlideshowTimer(1, 1)
    imageAligned := (imageAligned=5) ? 1 : 5
    ; imageAligned++
    ; If (imageAligned>9)
@@ -4233,7 +4348,7 @@ ToggleIMGalign() {
    showTOOLtip("Image alignment: " defineImgAlign())
    SetTimer, RemoveTooltip, % -msgDisplayTime
    INIaction(1, "imageAligned", "General")
-   dummyTimerDelayiedImageDisplay(50)
+   dummyTimerReloadThisPicture(50)
    If (AnyWindowOpen=10 && imgEditPanelOpened=1)
    {
       updatePanelColorsInfo()
@@ -4516,13 +4631,15 @@ ChangeZoom(dir, key:=0, stepFactor:=1) {
       }
 
       thumbsZoomLevel := clampInRange(thumbsZoomLevel, 0.35, 3)
-      thumbsColumns := clampInRange(thumbsColumns, 1, 100)
+      thumbsColumns := clampInRange(thumbsColumns, 2, 100)
       ForceRefreshNowThumbsList()
       recalculateThumbsSizes()
       ; setTexHatchScale(thumbsZoomLevel/2)
       If (thumbnailsListMode=1)
          ForceRefreshNowThumbsList()
       INIaction(1, "thumbsZoomLevel", "General")
+      INIaction(1, "thumbsColumns", "General")
+      INIaction(1, "dynamicThumbsColumns", "General")
       If (dynamicThumbsColumns=1)
          showTOOLtip("Thumbnails zoom level: " Round(thumbsZoomLevel*100) "%`nDisplay size: " thumbsW " x " thumbsH " px`nThumbnails caching at: " thumbsSizeQuality " px")
       Else
@@ -5247,30 +5364,27 @@ Fnt_GetMultilineStringSizeDT(hFont, p_String, NoWrap, l_Width, ByRef r_Width, By
 
           ,DT_WORDBREAK:=0x10
 
-    If (NoWrap!=1)
-       s_DTFormat:=DT_NOCLIP|DT_CALCRECT|DT_NOPREFIX|DT_WORDBREAK
-    Else
+    If (NoWrap=1)
        s_DTFormat:=DT_NOCLIP|DT_CALCRECT|DT_NOPREFIX
+    Else
+       s_DTFormat:=DT_NOCLIP|DT_CALCRECT|DT_NOPREFIX|DT_WORDBREAK
 
-    ;-- Initialize
     r_Width := r_Height := 0
-    VarSetCapacity(SIZE,8,0)
-
     ;-- If needed, get the handle to the default GUI font
-    if (DllCall("GetObjectType","Ptr",hFont)<>OBJ_FONT)
-       hFont:=DllCall("GetStockObject","Int",DEFAULT_GUI_FONT)
+    if (Gdi_GetObjectType(hFont)!="FONT")
+       hFont := Gdi_GetStockObject(DEFAULT_GUI_FONT)
 
     ;-- Select the font into the device context for the desktop
-    hDC      :=DllCall("GetDC","Ptr",HWND_DESKTOP)
-    old_hFont:=DllCall("SelectObject","Ptr",hDC,"Ptr",hFont)
+    hDC      := Gdi_GetDC(HWND_DESKTOP)
+    old_hFont:= Gdi_SelectObject(hDC, hFont)
     If !l_Width
        l_Width := 0
 
     ;-- Calculate the size of the string
     VarSetCapacity(RECT,16,0)
     NumPut(l_Width,RECT,8,"Int")                       ;-- right
-
-    DllCall("DrawText"
+    ; Gdi_SetTextCharSpacing(hDC, TextInAreaCharSpacing)
+    E := DllCall("DrawText"
         ,"Ptr",hDC                                      ;-- hdc [in]
         ,"Str",p_String                                 ;-- lpchText [in, out]
         ,"Int",StrLen(p_String)                         ;-- cchText [in]
@@ -5278,85 +5392,13 @@ Fnt_GetMultilineStringSizeDT(hFont, p_String, NoWrap, l_Width, ByRef r_Width, By
         ,"UInt",s_DTFormat)                             ;-- uFormat [in]
 
     ;-- Release the objects needed by the DrawText function
-    DllCall("SelectObject","Ptr",hDC,"Ptr",old_hFont)
+    Gdi_SelectObject(hDC, old_hFont)
         ;-- Necessary to avoid memory leak
 
-    DllCall("ReleaseDC","Ptr",HWND_DESKTOP,"Ptr",hDC)
-
-    ;-- Update the output variables and populate the SIZE structure
-    NumPut(r_Width:=NumGet(RECT,8,"Int"),SIZE,0,"Int")
-        ;-- right, cx
-
-    NumPut(r_Height:=NumGet(RECT,12,"Int"),SIZE,4,"Int")
-        ;-- bottom, cy
-
-    Return &SIZE
-}
-
-GDI_DrawText(hDC, hFont, Text, x, y, w, h, txtColor, bgrColor:=0, Alignment:="LT") {
-      Static AlignH := {"L": 0x00, "C": 0x01, "R": 0x02}
-           , AlignV := {"C": 0x24, "B": 0x28, "T": 0x00}
-
-      Align := StrSplit(Alignment)
-      ; Transparent background, no color needed
-      If (!bgrColor)
-         DllCall("SetBkMode", "UPtr", hDC, "Int", 1)
-      Else
-         DllCall("SetBkColor", "UPtr", hDC, "UInt", bgrColor)
-      
-      DllCall("SetTextColor", "UPtr", hDC, "UInt", txtColor)
-      hOriginalFont := DllCall("SelectObject", "UPtr", hDC, "UPtr", hFont, "UPtr")
-      
-      CreateRectF(RectF, x, y, x + w, y + h)
-      DllCall("DrawText", "UPtr", hDC, "Str", Text, "Int", -1, "UPtr", &RectF, "UInt", AlignH[Align[1]] | AlignV[Align[2]])
-      DllCall("SelectObject", "UPtr", hDC, "UPtr", hOriginalFont, "UPtr")
-}
-
-rgb2bgr(rgbHex) {
-   r := SubStr(rgbHex, 1, 2)
-   g := SubStr(rgbHex, 3, 2)
-   b := SubStr(rgbHex, 5, 2)
-   Return b . g . r
-}
-
-gdi_drawTextInBox(theString, fntName, theFntSize, maxW, maxH, txtColor, bgrColor, NoWrap, flippable:=0, thisTextAlign:=0) {
-    startZeit := A_TickCount
-    borderSize := (NoWrap=1) ? Floor(theFntSize*1.15) : Floor(theFntSize*1.45)
-    borderSize := borderSize//3
-    ; dimsu := otherGetStringSize(fntName, theFntSize, 0, theString, NoWrap, maxW)
-    ; ToolTip, % dimsu.w "--" dimsu.h " == " NoWrap "`n" theString , , , 2
-
-    Static DEFAULT_GUI_FONT:=17
-          ,HWND_DESKTOP    :=0
-          ,OBJ_FONT        :=6
-
-    txtStyle := "s" theFntSize " q1"
-    If (FontBolded=1)
-       txtStyle .= " Bold"
-    If (FontItalica=1 && NoWrap=0)
-       txtStyle .= " Italic"
-    Else If (NoWrap=1)
-       txtStyle .= " NoWrap"
-
-    If !thisTextAlign
-       thisTextAlign := (flippable=1 && FlipImgH=1) ? "Right" : "Left"
-    Else
-       thisTextAlign := Trimmer(thisTextAlign)
-
-    hFont := Fnt_CreateFont(fntName, txtStyle A_Space thisTextAlign)
-    If (DllCall("GetObjectType","Ptr",hFont)!=OBJ_FONT)
-       hFont := DllCall("GetStockObject","Int",DEFAULT_GUI_FONT)
-
-    Fnt_GetMultilineStringSizeDT(hFont, theString, NoWrap, maxW, r_Width, r_Height)
-    hbm := CreateDIBSection(r_Width, r_Height)
-    hdc := CreateCompatibleDC(), obm := SelectObject(hdc, hbm)
-
-    GDI_DrawText(hDC, hFont, theString, 0, 0, r_Width, r_height, "0x" rgb2bgr(txtColor), "0x" rgb2bgr(bgrColor), SubStr(thisTextAlign, 1, 1) "T")
-    pBitmap := trGdip_CreateBitmapFromHBITMAP(hbm)
-    SelectObject(hdc, obm), DeleteObject(hbm), DeleteDC(hdc)
-    Fnt_DeleteFont(hFont)
-    fnOutputDebug("draw text in box with GDI: " A_TickCount - startZeit " ms")
-    Return pBitmap
+    Gdi_ReleaseDC(hDC, HWND_DESKTOP)
+    r_Width := NumGet(RECT,8,"Int")
+    r_Height := NumGet(RECT,12,"Int")
+    Return E
 }
 
 drawTextInBox(theString, fntName, theFntSize, maxW, maxH, txtColor, bgrColor, NoWrap, flippable:=0, thisTextAlign:=0, BGRopacity:="0xDD") {
@@ -5515,93 +5557,374 @@ TextToGraphics(pGraphics, Text, OptionsObj, Font:="Arial", initMode:=0, Unit:=0,
    return _E ? _E : ReturnRC
 }
 
+HardWrapTextFontBased(TextToWrap, hFont, maxW, maxH, lineHeight) {
+   ; Critical, on
+   Static RegExDelimiters := "(\||\*|\!|\]|\[|\\|\/|\.|\=|\:|\;|\?|\@|\-|\_|\)|\(|\{|\}|\s)"
+        , maxCharsInWidth := 2048
 
+   if (StrLen(TextToWrap)<=2)
+      return TextToWrap
 
-coreInsertTextInAreaBox(theString, maxW, maxH, thisFntSize, thisBorderu) {
+   TextToWrap := Trimmer(TextToWrap)
+   thisIndex := thisH := linez := hasMatchedRegEx := offsetu := 0
+   whereHasMatched := newLinez := ""
+   hDC := Gdi_GetDC()
+   old_hFont := Gdi_SelectObject(hDC, hFont)
+   maxLinez := Round(maxH/lineHeight) - 1
+   thisCharSpacing := (TextInAreaCharSpacing>0) ? TextInAreaCharSpacing : 0
+   Loop, Parse, TextToWrap
+   {
+       If (maxLinez<linez && linez>1)
+          Break
+
+       thisIndex++
+       thisLineu .= A_LoopField
+       newLinez .= A_LoopField
+       If (A_LoopField="`r" || A_LoopField="`n")
+       {
+          linez++
+          thisLineu := ""
+          thisIndex := hasMatchedRegEx := 0
+          Continue
+       }
+
+       If RegExMatch(A_LoopField, RegExDelimiters)
+       {
+          hasMatchedRegEx := 1
+          whereHasMatched := A_Index
+          whereHasMatchedinLine := thisIndex
+       }
+
+       ; thisObj := Gdi_TruncateStringToFitWidth(hFont, A_Space thisLineu A_Space, maxW - TextInAreaCharSpacing * (StrLen(thisLineu) + 1))
+       E := Gdi_GetTextExtentExPoint(hDC, A_Space thisLineu A_Space, maxW - thisCharSpacing * (StrLen(thisLineu) + 1), fitLength, w, h)
+       ; ToolTip, % thisObj.fitLength "==" thisObj.width "==" thisObj.height "==" thisObj.stringLength "`n" thisLineu, , , 2
+       stringLength := StrLen(thisLineu) + 1
+       If (hasMatchedRegEx=1 && (stringLength>fitLength || stringLength>maxCharsInWidth))
+       {
+          linez++
+          offsetu++
+          newLinez := ST_Insert("`n", newLinez, whereHasMatched + offsetu)
+          hasMatchedRegEx := 0
+          If (thisLineu=A_Space)
+             thisLineu := ""
+          thisLineu := SubStr(thisLineu, whereHasMatchedinLine)
+          thisIndex := StrLen(thisLineu)
+       } Else If (stringLength>fitLength || stringLength>maxCharsInWidth)
+       {
+          linez++
+          thisLineu := ""
+          newLinez .= "`n"
+          thisIndex := hasMatchedRegEx := 0
+       }
+   }
+   w := Gdi_SelectObject(hDC, old_hFont)
+   g := Gdi_ReleaseDC(hDC, 0)
+   ; ToolTip, % w "|" g "." foundPos "==" startPos, , , 2
+   return newLinez
+}
+
+SimpleHardWrapText(TextToWrap, LengthLim) {
+   Static RegExDelimiters := "(\||\*|\!|\]|\[|\\|\/|\.|\=|\:|\;|\?|\@|\-|\_|\)|\(|\{|\}|\s)"
+   LengthLim := Round(LengthLim)
+   if (LengthLim<2)
+      return TextToWrap
+   if (StrLen(TextToWrap) <= LengthLim + 1)
+      return TextToWrap
+
+   thisIndex := hasMatchedRegEx := offsetu := 0
+   whereHasMatched := newLinez := ""
+   
+   Loop, Parse, TextToWrap
+   {
+       thisIndex++
+       newLinez .= A_LoopField
+       If (A_LoopField="`r" || A_LoopField="`n")
+          thisIndex := hasMatchedRegEx := 0
+
+       If RegExMatch(A_LoopField, RegExDelimiters)
+       {
+          hasMatchedRegEx := 1
+          whereHasMatched := A_Index
+       }
+
+       If (thisIndex=LengthLim && hasMatchedRegEx=1)
+       {
+          newLinez := ST_Insert("`n", newLinez, whereHasMatched + offsetu)
+          offsetu++
+          thisIndex := hasMatchedRegEx := 0
+       } Else If (thisIndex=LengthLim)
+       {
+          newLinez .= "`n"
+          thisIndex := hasMatchedRegEx := 0
+       }
+   }
+
+   ; ToolTip, % foundPos "==" startPos, , , 2
+   return newLinez
+}
+
+Gdi_DrawTextInBox(theString, hFont, maxW, maxH, txtColor, bgrColor, borderSize:=0, NoWrap:=1, scaleuPreview:=1) {
+    startZeit := A_TickCount
+    ; dimsu := otherGetStringSize(fntName, theFntSize, 0, theString, NoWrap, maxW)
+    ; ToolTip, % dimsu.w "--" dimsu.h " == " NoWrap "`n" theString , , , 2
+    thisCharSpacing := Round(TextInAreaCharSpacing / scaleuPreview)
+    Gdi_MeasureString(hFont, theString, 1, oW, oH)
+    ; Fnt_GetMultilineStringSizeDT(hFont, theString, 1, 0, oW, oH)
+    reAdjustWtxtspacing := (Abs(thisCharSpacing)//2) * StrLen(theString)
+    reAdjustWtxtspacing := clampInRange(reAdjustWtxtspacing, 1, oW - 5)
+    If (thisCharSpacing<0)
+       oW := oW - reAdjustWtxtspacing
+    Else
+       oW := oW + thisCharSpacing * StrLen(theString)
+    ; ToolTip, % oW "==" reAdjustWtxtspacing , , , 2
+    Gdip_GetRotatedDimensions(oW, oH, TextInAreaLineAngle/10, rWidth, rHeight)
+    scaleu := Abs(TextInAreaLineAngle/900)
+    scaleu2 := Abs((TextInAreaLineAngle*scaleu)/900)
+    r_Width := rWidth + borderSize*2
+    r_Height := rHeight + borderSize*2
+    offsetY := (TextInAreaLineAngle<0) ? r_Width//2 - rWidth//2 : r_Height//2 - rHeight//2 + clampValue(Floor(rHeight*(scaleu*1.9)), "-", rHeight)
+    offsetX := (TextInAreaLineAngle<0) ? r_Height//2 - rHeight//2 + Floor(rWidth*scaleu2)  : r_Width//2 - rWidth//2
+    If (offsetY<(rHeight - oH + borderSize) && TextInAreaLineAngle>0)
+       offsetY := Abs(rHeight - oH + borderSize)
+
+    If (offsetX<borderSize)
+       offsetX := borderSize
+
+    If (TextInAreaOnlyBorder!=1 || TextInAreaBorderOut=1)
+    {
+       hbm := Gdi_CreateDIBSection(r_Width, r_Height)
+       hDC := Gdi_CreateCompatibleDC()
+       obm := Gdi_SelectObject(hDc, hbm)
+       Gdi_SetMapMode(hDC, 1)
+       Gdi_SetTextCharSpacing(hDC, thisCharSpacing)
+       Gdi_DrawTextHelper(hDC, hFont, theString, offsetX, offsetY, "0x" rgb2bgr(txtColor), "0x" rgb2bgr(bgrColor))
+       pBitmap := trGdip_CreateBitmapFromHBITMAP(hbm)
+       Gdi_SelectObject(hDc, obm)
+       Gdi_DeleteObject(hbm)
+       Gdi_DeleteDC(hdc)
+    }
+
+    If (TextInAreaBorderSize>0 && TextInAreaBorderOut>1)
+    {
+       hbm := Gdi_CreateDIBSection(r_Width, r_Height)
+       hDC := Gdi_CreateCompatibleDC()
+       obm := Gdi_SelectObject(hDC, hbm)
+       Gdi_SetMapMode(hDC, 1)
+       Gdi_SetTextCharSpacing(hDC, thisCharSpacing)
+       Gdi_DrawTextOutline(hDC, hFont, theString, offsetX, offsetY, "0x" rgb2bgr(txtColor), Round(TextInAreaBorderSize/scaleuPreview))
+       If (TextInAreaBorderOut=3)
+          Gdi_DrawTextHelper(hDC, hFont, theString, offsetX, offsetY, "0x000000")
+       pBitmap2 := trGdip_CreateBitmapFromHBITMAP(hbm)
+       Gdi_SelectObject(hDC, obm)
+       Gdi_DeleteObject(hbm)
+       Gdi_DeleteDC(hDC)
+    }
+
+    ; Gdip_GetImageDimensions(pBitmap, imgW, imgH)
+    ;  ToolTip, % r_width "=" r_height "`n" hbm "==" hdc "==" obm "`n" imgW "==" imgH, , , 2
+    ; fnOutputDebug("draw text in box with GDI: " A_TickCount - startZeit " ms")
+    Return [pBitmap, pBitmap2, r_Width, r_Height]
+}
+
+coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
+    Static OBJ_FONT := 6, testString := "This is going to a test"
 
     Gdip_FromARGB("0xFF" TextInAreaFontColor, A, R, G, B)
     txtColor := Gdip_ToARGB(TextInAreaFontOpacity, R, G, B)
     Gdip_FromARGB("0xFF" TextInAreaBgrColor, A, R, G, B)
     bgrColor := Gdip_ToARGB(TextInAreaBgrOpacity, R, G, B)
+    Gdip_FromARGB("0xFF" TextInAreaBorderColor, A, R, G, B)
+    borderColor := Gdip_ToARGB(TextInAreaBorderOpacity, R, G, B)
 
-    allowedBorderSize := (thisBorderu>thisFntSize//3+1) ? thisFntSize//3 + 1 : thisBorderu
-    textBrush := Gdip_BrushCreateSolid(txtColor)
+    fntQuality := (previewMode=1) ? 1 : 4
+    fntWeight := (TextInAreaFontBold=1) ? 800 : 400
+    thisFactor := (zoomLevel<0.45 || TextInAreaFontSize>300) ? 10 : 5
+    If (TextInAreaFontSize>650)
+       thisFactor := 15
+
+    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+    thisFactor := ((mainWidth + mainHeight)//150 + thisFactor)//2 + TextInAreaFontSize//200
+    If (zoomLevel>0.8 && thisFactor>3)
+       thisFactor := 3
+    If (TextInAreaFontSize<35)
+       thisFactor := 1
+
+    thisLineAngle := (TextInAreaLineAngle<0) ? 3600 + TextInAreaLineAngle : TextInAreaLineAngle
+    If !isNumber(thisLineAngle)
+       thisLineAngle := 0
+
+    hFontPreview := Gdi_CreateFontByName(TextInAreaFontName, TextInAreaFontSize//thisFactor, fntWeight, TextInAreaFontItalic, TextInAreaFontStrike, TextInAreaFontUline, fntQuality, thisLineAngle)
+    hFont := Gdi_CreateFontByName(TextInAreaFontName, TextInAreaFontSize, fntWeight, TextInAreaFontItalic, TextInAreaFontStrike, TextInAreaFontUline, fntQuality, thisLineAngle)
+    If (Gdi_GetObjectType(hFont)!="FONT")
+       Return
+
+    thisBlurAmount := max(TextInAreaBlurAmount, TextInAreaBlurBorderAmount) // 2
+    borderSize := (TextInAreaUsrMarginz>0) ? TextInAreaUsrMarginz : TextInAreaBorderSize//2 + thisBlurAmount
+    Gdi_MeasureString(hFont, testString, 1, testWa, testHa)
+    Gdi_MeasureString(hFontPreview, testString, 1, testWb, testHb)
+    If (TextInAreaAutoWrap=1)
+       theString := Trimmer(HardWrapTextFontBased(theString, hFont, maxW - borderSize * 2, maxH + 2, clampInRange(testHa + TextInAreaFontLineSpacing, 2, maxH + 10)))
+    Else
+       theString := Trimmer(theString)
+
+    scaleuPreview := (previewMode=1) ? testWa/testWb : 1
+    ; ToolTip, % thisFactor "==" scaleuPreview , , , 2
+    ; ToolTip, % testWa "==" testHa "`n" testWb "==" testHb "`n" testWa/testWb , , , 2
+    maxW := Round(maxW / scaleuPreview) ; + Round(5*TextInAreaFontSize*scaleuPreview)
+    maxH := Round(maxH / scaleuPreview) ; + TextInAreaFontSize*2
+    thisBlur := Round(TextInAreaBlurAmount / scaleuPreview)
+    If (thisBlur>0 && TextInAreaDoBlurs=1)
+       pEffect := Gdip_CreateEffect(1, thisBlur, 0, 0)
+
+    thisBorderBlur := Round(TextInAreaBlurBorderAmount / scaleuPreview)
+    If (thisBorderBlur>0 && TextInAreaDoBlurs=1)
+       zEffect := Gdip_CreateEffect(1, thisBorderBlur, 0, 0)
+
     zBrush := Gdip_BrushCreateSolid(bgrColor)
-    If (allowedBorderSize>1)
-       sPen := Gdip_CreatePen(bgrColor, allowedBorderSize)
+    mainBMP := trGdip_CreateBitmap(maxW, maxH, "0xE200B")
+    thisQuality := (previewMode=1) ? 5 : 7
+    G := Gdip_GraphicsFromImage(mainBMP, thisQuality)
+    ; If (TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1)
+    ;    Gdip_GraphicsClear(G, "0xFF000000")
 
-    txtStyle := 0
-    If (TextInAreaFontBold=1)
-       txtStyle |= 1
-    If (TextInAreaFontItalic=1)
-       txtStyle |= 2
-    If (TextInAreaFontUline=1)
-       txtStyle |= 4
+    thisY := thisX := 0
+    maxedW := maxedH := 0
+    minedX := maxW, minedY := maxH
+    doConturDraw := (TextInAreaBorderSize>0 && TextInAreaBorderOut>1) ? 1 : 0
+    If (previewMode=1)
+       borderSize := Round(borderSize/scaleuPreview)
 
-    borderSize := Round(thisFntSize*1.5)//2.5
-    borderSize := thisBorderu//2 + borderSize//2
-
-    pPath := Gdip_CreatePath()
-    E := Gdip_AddPathStringSimplified(pPath, theString, TextInAreaFontName, thisFntSize, txtStyle, borderSize, borderSize, maxW - borderSize*2, maxH - borderSize*2, TextInAreaAlign - 1)
-    txtSize := Gdip_GetPathWorldBounds(pPath)
-    txtResW := Ceil(txtSize.w) + borderSize*2
-    txtResH := Ceil(txtSize.h) + borderSize*2.5
-    If (TextInAreaAlign=1)
-       txtResW += borderSize
-
-    testX := Floor(txtSize.x) - 3
-    If (testX>borderSize && TextInAreaAlign>1) ; error correction for different text alignments
+    thisHFont := (previewMode=1) ? hFontPreview : hFont
+    rescaleWidthCharSpacing := (TextInAreaCharSpacing<0) ? (100 - Abs(TextInAreaCharSpacing))/90 : 1
+    Loop, Parse, theString, `n
     {
-       nxpos := -testX + borderSize
-       dhMatrix := Gdip_CreateMatrix()
-       Gdip_TranslateMatrix(dhMatrix, nxpos, 1, 1)
-       Gdip_TransformPath(pPath, dhMatrix)
-       Gdip_DeleteMatrix(dhMatrix)
+       ; If !Trimmer(A_LoopField)
+       ;    Continue
+
+       objBMPs := Gdi_DrawTextInBox(A_Space A_LoopField A_Space, thisHFont, maxW, maxH, "FFffFF", "000000", borderSize, 1, scaleuPreview)
+       imgW := objBMPs[3], imgH := objBMPs[4]
+       pBitmap := (doConturDraw=1 && TextInAreaOnlyBorder=1 && objBMPs[2]) ? objBMPs[2] : objBMPs[1]
+       If (doConturDraw=1 && objBMPs[1] && TextInAreaOnlyBorder=1)
+          trGdip_DisposeImage(objBMPs[1])
+
+       pBitmapContours := objBMPs[2]
+       If (TextInAreaAlign=2)
+          thisX := maxW//2 - imgW//2
+       If (TextInAreaAlign=3)
+          thisX := maxW - imgW
+
+       If (pEffect && (TextInAreaBgrUnified!=1 || TextInAreaPaintBgr!=1))
+          Gdip_BitmapApplyEffect(pBitmap, pEffect)
+
+       thisBMP := trGdip_CreateBitmap(imgW, imgH, "0xE200B")
+       G2 := Gdip_GraphicsFromImage(thisBMP)
+       If (TextInAreaCutOutMode=1 && TextInAreaPaintBgr=1 && TextInAreaBgrUnified!=1)
+       {
+          ; Gdip_GraphicsClear(G2)
+          Gdip_FillRectangle(G2, zBrush, 0, 0, imgW, imgH)
+          Gdip_SetAlphaChannel(thisBMP, pBitmap, 1, 1)
+          thisOpacity := TextInAreaBgrOpacity/255
+       } Else
+       {
+          thisColor := (TextInAreaOnlyBorder=1) ? borderColor : txtColor
+          Gdip_GraphicsClear(G2, thisColor)
+          Gdip_SetAlphaChannel(thisBMP, pBitmap)
+          thisOpacity := 1
+       }
+
+       If (TextInAreaBgrUnified!=1 && TextInAreaPaintBgr=1)
+       {
+          If (TextInAreaCutOutMode!=1)
+             Gdip_FillRectangle(G, zBrush, thisX, thisY, imgW, imgH)
+
+          If (TextInAreaBgrEntire=1)
+          {
+             Gdip_SetClipRect(G, 0, thisY, maxW, imgH)
+             Gdip_SetClipRect(G, thisX, thisY, imgW, imgH, 4)
+             Gdip_FillRectangle(G, zBrush, 0, thisY, maxW, imgH)
+             Gdip_ResetClip(G)
+          }
+       }
+
+       forceW := (imgW>=maxW) ? maxW : imgW
+       If (rescaleWidthCharSpacing<1)
+       {
+          phorceW := Round(forceW*rescaleWidthCharSpacing)
+          forceW -= (forceW - phorceW)//2.5
+       }
+
+       If (doConturDraw=1 && TextInAreaOnlyBorder!=1 && pBitmapContours)
+       {
+          If zEffect
+             Gdip_BitmapApplyEffect(pBitmapContours, zEffect)
+          thizBMP := trGdip_CreateBitmap(imgW, imgH, "0xE200B")
+          G5 := Gdip_GraphicsFromImage(thizBMP)
+          Gdip_GraphicsClear(G5, borderColor)
+          Gdip_SetAlphaChannel(thizBMP, pBitmapContours)
+          Gdip_DrawImage(G, thizBMP, thisX, thisY,forceW,imgH,,,,, thisOpacity)
+          trGdip_DisposeImage(pBitmapContours)
+          trGdip_DisposeImage(thizBMP)
+          Gdip_DeleteGraphics(G5)
+       }
+
+       maxedW := max(forceW, maxedW)
+       maxedH := max(thisY + imgH, maxedH)
+       minedX := min(thisX, minedX)
+       minedY := min(thisY, minedY)
+       Gdip_DrawImage(G, thisBMP, thisX, thisY,forceW,imgH,,,,, thisOpacity)
+       If (previewMode=1)
+          thisY += imgH + Round(TextInAreaFontLineSpacing / scaleuPreview)
+       Else
+          thisY += imgH + TextInAreaFontLineSpacing
+       trGdip_DisposeImage(pBitmap)
+       trGdip_DisposeImage(thisBMP)
+       Gdip_DeleteGraphics(G2)
     }
 
-    clipBMP := trGdip_CreateBitmap(txtResW, txtResH, 0xE200B)
-    G := Gdip_GraphicsFromImage(clipBMP, 7, 4)
-    If (TextInAreaPaintBgr=1)
-       Gdip_GraphicsClear(G, bgrColor)
-
-    If (!E && textBrush && TextInAreaOnlyBorder!=1) || (!E && !sPen) || (!E && textBrush && TextInAreaPaintBgr=1)
-       E := Gdip_FillPath(G, textBrush, pPath)
-
-    If (!E && sPen && TextInAreaPaintBgr!=1)
+    Gdi_DeleteObject(hFont)
+    Gdi_DeleteObject(hFontPreview)
+    minedX := clampInRange(minedX, 0, maxW)
+    minedY := clampInRange(minedY, 0, maxH)
+    maxedW := clampInRange(maxedW, 1, maxW)
+    maxedH := clampInRange(maxedH, 1, maxH)
+    ; ToolTip, % maxedW "==" maxedH " = " minedX "==" minedY , , , 2
+    If (TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1)
     {
-       Gdip_SetClipPath(G, pPath, 4)
-       E := Gdip_DrawPath(G, sPen, pPath)
-       Gdip_DeleteMatrix(dhMatrix)
-    }
+       If pEffect
+          Gdip_BitmapApplyEffect(mainBMP, pEffect)
 
-    If (TextInAreaBlurAmount>1)
-    {
-       pEffect := Gdip_CreateEffect(1, TextInAreaBlurAmount, 0, 0)
-       Gdip_BitmapApplyEffect(clipBmp, pEffect)
-       Gdip_DisposeEffect(pEffect)
-    }
-
-    radius := Round(((txtResW + borderSize*2 + txtResH)//2)*0.1) + 1
-    If (TextInAreaRoundBoxBgr=1)
-    {
-       kPath := Gdip_CreatePath()
-       Gdip_AddPathRoundedRectangle(kPath, 0, 0, txtResW, txtResH, radius)
-       Gdip_SetClipPath(G, kPath, 4)
-       Gdip_GraphicsClear(G)
-       Gdip_ResetClip(G)
+       newBMP := trGdip_CreateBitmap(maxW, maxH, "0xE200B")
+       G3 := Gdip_GraphicsFromImage(newBMP)
+       If (TextInAreaRoundBoxBgr=1)
+       {
+          radius := Round(((maxedW + borderSize*2 + maxedH)//2.5)*0.1) + 1
+          kPath := Gdip_CreatePath()
+          Gdip_AddPathRoundedRectangle(kPath, minedX, minedY, maxedW, maxedH, radius)
+          Gdip_SetClipPath(G3, kPath)
+          Gdip_GraphicsClear(G3, bgrColor)
+          Gdip_DeletePath(kPath)
+       } Else
+       {
+          Gdip_SetClipRect(G3, minedX, minedY, maxedW, maxedH)
+          Gdip_GraphicsClear(G3, bgrColor)
+       }
+       Gdip_ResetClip(G3)
+       Gdip_DrawImage(G3, mainBMP, 0, 0)
+       ; Gdip_SetAlphaChannel(newBMP, mainBMP, TextInAreaCutOutMode)
+       trGdip_DisposeImage(mainBMP, 1)
+       mainBMP := newBMP
+       Gdip_DeleteGraphics(G3)
     }
 
     Gdip_DeleteGraphics(G)
-    If kPath
-       Gdip_DeletePath(kPath)
-    If zBrush
-       Gdip_DeleteBrush(zBrush)
-    If textBrush
-       Gdip_DeleteBrush(textBrush)
-    If sPen
-       Gdip_DeletePen(sPen)
+    If pEffect
+       Gdip_DisposeEffect(pEffect)
+    If zEffect
+       Gdip_DisposeEffect(zEffect)
 
-    Return clipBMP
+    Gdip_DeleteBrush(zBrush)
+    obju := [mainBMP, minedX, minedY, maxedW, maxedH, scaleuPreview]
+    Return obju
 }
 
 drawHistogram(dataArray, maxYlimit, LengthX, Scale, fgrColor, bgrColor, borderSize, infoBoxBMP) {
@@ -5672,12 +5995,13 @@ PasteInPlaceNow() {
     If (stopNow=1 || !whichBitmap || thumbsDisplaying=1 || activateImgSelection!=1)
     {
        corePasteInPlaceActNow("kill")
+       fnOutputDebug("error - operation abandoned: " whichBitmap "--" stopNow "--" thumbsDisplaying "--" activateImgSelection)
+       SetTimer, ResetImgLoadStatus, -300
        Return
     }
 
     If (slideShowRunning=1)
        ToggleSlideShowu()
-
     startZeit := A_TickCount
     If (UserMemBMP!=whichBitmap)
        whichBitmap := Gdip_CloneBmpPargbArea(whichBitmap)
@@ -6151,8 +6475,9 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0) {
        G2 := 2NDglPG
        thisImgQuality := 5
        previewMode := 1
-       Gdip_SetInterpolationMode(2NDglPG, thisImgQuality)
-       Gdip_GraphicsClear(2NDglPG, "0x00" WindowBGRcolor)
+       Gdip_ResetClip(G2)
+       Gdip_SetInterpolationMode(G2, thisImgQuality)
+       Gdip_GraphicsClear(G2, "0x00" WindowBGRcolor)
        ; Gdip_GetImageDimensions(gdiBitmap, imgW, imgH)
        ; calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
        imgSelPx := x1 := selDotX + SelDotsSize//2, x2 := selDotAx + SelDotsSize//2
@@ -6171,7 +6496,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0) {
           clipBMP := trGdip_CloneBitmap(viewportStampBMP)
        }
     }
-
+ 
     thisHasRan := 1
     If (hasCached!=1)
     {
@@ -6372,8 +6697,8 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0) {
     r1 := Gdip_DrawImage(G2, thisBMP, imgSelPx, imgSelPy, ResizedW, ResizedH, 0, 0, oImgW, oImgH, PasteInPlaceOpacity/255)
     If bgrBMP
        trGdip_DisposeImage(bgrBMP, 1)
-    Gdip_ResetClip(G2)
 
+    Gdip_ResetClip(G2)
     ; for debugging purposes
     ; Gdip_FillRectangle(G2, pBrushD, 0, 0, pathBounds.w, pathBounds.h)
     ; Gdip_FillRectangle(G2, pBrushE, 0, 0, eImgW, eImgH)
@@ -6393,7 +6718,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0) {
        prevImgCall := thisImgCall
        prevClipBMP := clipBMP
        ; trGdip_DisposeImage(clipBmp, 1)
-       GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+       ; GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
        r2 := LrydWinUpdt(hGDIselectWin, 2NDglHDC)
     } Else
     {
@@ -6418,7 +6743,10 @@ getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, oImgW, oImgH, imgSel
        whichBitmap := useGdiBitmap()
 
     If !whichBitmap
+    {
+       SoundBeep , 300, 100
        Return
+    }
 
     Gdip_GetImageDimensions(whichBitmap, aimgW, aimgH)
     MouseCoords2Image(imgSelPx, imgSelPy, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, imgX1, imgY1)
@@ -6877,7 +7205,11 @@ alertReduceSaveColorDepth() {
 mergeViewPortEffectsImgEditing(NOresetFX:=0) {
     whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
     If (!whichBitmap || thumbsDisplaying=1 || activateImgSelection!=1)
+    {
+       fnOutputDebug("error - operation abandoned: " whichBitmap "--" stopNow "--" thumbsDisplaying "--" activateImgSelection)
+       SetTimer, ResetImgLoadStatus, -300
        Return 1
+    }
 
     If testSelectOutsideImgEntirely(whichBitmap)
     {
@@ -6906,8 +7238,13 @@ mergeViewPortEffectsImgEditing(NOresetFX:=0) {
        dropFilesSelection()
 
     discardViewPortCaches()
-    UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
-    UserMemBMP := Gdip_CloneBmpPargbArea(gdiBitmap)
+    ; msgbox % UserMemBMP "---" gdiBitmap
+    If StrLen(gdiBitmap)>2
+    {
+       UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
+       UserMemBMP := Gdip_CloneBmpPargbArea(gdiBitmap)
+    } 
+
     decideGDIPimageFX(matrix, imageAttribs, pEffect)
     If (pEffect || imageAttribs)
        recordUndoLevelNow("init", 0)
@@ -6934,7 +7271,7 @@ mergeViewPortEffectsImgEditing(NOresetFX:=0) {
     {
        recordUndoLevelNow(0, UserMemBMP)
        disposeCacheIMGs()
-       gdiBitmap := trGdip_CloneBitmap(UserMemBMP)
+       ; gdiBitmap := trGdip_CloneBitmap(UserMemBMP)
     }
 
     SetTimer, RemoveTooltip, % -msgDisplayTime//2
@@ -6950,7 +7287,11 @@ EraseSelectedArea(cutMode:=0) {
     stopNow := mergeViewPortEffectsImgEditing()
     whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !whichBitmap || thumbsDisplaying=1 || activateImgSelection!=1)
+    {
+       fnOutputDebug("error - operation abandoned: " whichBitmap "--" stopNow "--" thumbsDisplaying "--" activateImgSelection)
+       SetTimer, ResetImgLoadStatus, -300
        Return
+    }
 
     If (slideShowRunning=1)
        ToggleSlideShowu()
@@ -6984,6 +7325,7 @@ EraseSelectedArea(cutMode:=0) {
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % msgDisplayTime
        SetTimer, RefreshImageFile, -25
+       SetTimer, ResetImgLoadStatus, -300
        Return
     }
 
@@ -7019,13 +7361,18 @@ ApplyColorAdjustsSelectedArea() {
     Static prevFXmode := 2
     whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
     If (!whichBitmap || thumbsDisplaying=1 || activateImgSelection!=1)
+    {
+       fnOutputDebug("error - operation abandoned: " whichBitmap "--" stopNow "--" thumbsDisplaying "--" activateImgSelection)
+       SetTimer, ResetImgLoadStatus, -300
        Return
+    }
 
     If testSelectOutsideImgEntirely(whichBitmap)
     {
        showTOOLtip("WARNING: Invalid image selection area...")
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
+       SetTimer, ResetImgLoadStatus, -300
        Return
     }
     If (imgFxMode=1)
@@ -7041,6 +7388,7 @@ ApplyColorAdjustsSelectedArea() {
     } Else
     {
        imgFxMode := 1
+       SetTimer, ResetImgLoadStatus, -300
        Return
     }
 
@@ -7082,7 +7430,11 @@ InsertTextSelectedArea() {
     stopNow := mergeViewPortEffectsImgEditing()
     whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
     If (stopNow=1 ||!whichBitmap || thumbsDisplaying=1 || activateImgSelection!=1)
+    {
+       fnOutputDebug("error - operation abandoned: " whichBitmap "--" stopNow "--" thumbsDisplaying "--" activateImgSelection)
+       SetTimer, ResetImgLoadStatus, -300
        Return
+    }
 
     recordUndoLevelNow("init", 0)
     If (UserMemBMP!=whichBitmap)
@@ -7094,7 +7446,13 @@ InsertTextSelectedArea() {
     Gdip_GetImageDimensions(whichBitmap, imgW, imgH)
     calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
     G2 := Gdip_GraphicsFromImage(whichBitmap, 7, 4)
-    textBoxu := coreInsertTextInAreaBox(UserTextArea, imgSelW, imgSelH, TextInAreaFontSize, TextInAreaBorderSize)
+    obju := coreInsertTextInAreaBox(UserTextArea, imgSelW, imgSelH, 0)
+    If obju[1]
+    {
+       textBoxu := Gdip_CloneBmpPargbArea(obju[1], obju[2], obju[3], obju[4], obju[5],,, 1)
+       trGdip_DisposeImage(obju[1], 1)
+    }
+
     Gdip_GetImageDimensions(textBoxu, nImgW, nImgH)
     Gdip_GetRotatedDimensions(nImgW, nImgH, vPselRotation, rnImgW, rnImgH)
     If (TextInAreaAlign=3)
@@ -7119,6 +7477,7 @@ InsertTextSelectedArea() {
     }
 
     r1 := Gdip_DrawImage(G2, textBoxu, imgSelPx, imgSelPy, nimgW, nimgH, 0, 0, nimgW, nimgH)
+    livePreviewInsertTextinArea("kill")
     trGdip_DisposeImage(textBoxu, 1)
     Gdip_DeleteGraphics(G2)
     UserMemBMP := whichBitmap
@@ -7126,25 +7485,54 @@ InsertTextSelectedArea() {
     SetTimer, RefreshImageFile, -25
 }
 
-coreInsertTextSelectedArea(G2:=0) {
-    If (TextInAreaLivePreview!=1)
+livePreviewInsertTextinArea(actionu:=0) {
+    Static lastInvoked := 1, prevBMPu, prevState, scaleuPreview := 1
+    If (actionu="kill")
+    {
+       prevState := 0
+       If StrLen(prevBMPu)>2
+          prevBMPu := trGdip_DisposeImage(prevBMPu, 1)
+       Return
+    }
+
+    If (TextInAreaLivePreview!=1 || !AnyWindowOpen)
        Return
 
+    ; setImageLoading()
     G2 := 2NDglPG
-    Gdip_ResetClip(2NDglPG)
-    Gdip_GraphicsClear(2NDglPG, "0x00" WindowBGRcolor)
+    Gdip_ResetClip(G2)
+    Gdip_GraphicsClear(G2, "0x00" WindowBGRcolor)
     GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
     calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-    textBoxu := coreInsertTextInAreaBox(UserTextArea, imgSelW, imgSelH, TextInAreaFontSize, TextInAreaBorderSize)
-
+    thisState := "a" UserTextArea TextInAreaAlign TextInAreaValign TextInAreaDoBlurs TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr imgSelW imgSelH mainWidth mainHeight TextInAreaLineAngle TextInAreaCharSpacing TextInAreaAutoWrap
+    If (A_TickCount - lastInvoked < 50) || (thisState=prevState)
+    {
+       textBoxu := trGdip_CloneBitmap(prevBMPu)
+       If (thisState!=prevState)
+          mustGoTimer := 1
+    } Else
+    {
+       obju := coreInsertTextInAreaBox(UserTextArea, imgSelW, imgSelH, 1)
+       If obju[1]
+       {
+          prevState := thisState
+          trGdip_DisposeImage(prevBMPu, 1)
+          textBoxu := Gdip_CloneBmpPargbArea(obju[1], obju[2], obju[3], obju[4], obju[5],,, 1)
+          trGdip_DisposeImage(obju[1], 1)
+          scaleuPreview := obju[6]
+          prevBMPu := textBoxu
+          textBoxu := trGdip_CloneBitmap(prevBMPu)
+       }
+    }
+    startZeit := A_TickCount
     imgSelPx := x1 := selDotX + SelDotsSize//2, x2 := selDotAx + SelDotsSize//2
     imgSelPy := y1 := selDotY + SelDotsSize//2, y2 := selDotAy + SelDotsSize//2
     imgSelW := max(X1, X2) - min(X1, X2)
     imgSelH := max(Y1, Y2) - min(Y1, Y2)
 
     Gdip_GetImageDimensions(textBoxu, nimgW, nimgH)
-    zImgW := Round(nImgW*zoomLevel)
-    zImgH := Round(nImgH*zoomLevel)
+    zImgW := Round((nImgW*zoomLevel)*scaleuPreview)
+    zImgH := Round((nImgH*zoomLevel)*scaleuPreview)
 
     Gdip_GetRotatedDimensions(zImgW, zImgH, vPselRotation, rnImgW, rnImgH)
     If (TextInAreaAlign=3)
@@ -7161,28 +7549,43 @@ coreInsertTextSelectedArea(G2:=0) {
     If (vPselRotation>0)
     {
        xBitmap := trGdip_RotateBitmapAtCenter(textBoxu, vPselRotation, "-", 5)
-       trGdip_DisposeImage(textBoxu, 1)
-       textBoxu := xBitmap
+       If StrLen(xBitmap)>2
+       {
+          trGdip_DisposeImage(textBoxu, 1)
+          textBoxu := xBitmap
+       }
        Gdip_GetImageDimensions(textBoxu, nimgW, nimgH)
-       zImgW := Round(nImgW*zoomLevel)
-       zImgH := Round(nImgH*zoomLevel)
+       zImgW := Round((nImgW*zoomLevel)*scaleuPreview)
+       zImgH := Round((nImgH*zoomLevel)*scaleuPreview)
     }
 
+    Gdip_SetClipRect(G2, 0, 0, mainWidth, mainHeight)
     r1 := Gdip_DrawImage(G2, textBoxu, imgSelPx, imgSelPy, zimgW, zimgH, 0, 0, nimgW, nimgH)
     trGdip_DisposeImage(textBoxu, 1)
-
+    Gdip_ResetClip(G2)
+    livePreviewsImageEditingDrawSelectionBox()
     thisImgQuality := (userimgQuality=1) ? 7 : 5
     Gdip_SetInterpolationMode(G2, thisImgQuality)
     Gdip_SetSmoothingMode(G2, 4)
-    Gdip_ResetClip(G2)
     r2 := LrydWinUpdt(hGDIselectWin, 2NDglHDC)
+    If (A_TickCount - startZeit<65) && (mustGoTimer=1)
+       livePreviewsImageEditing()
+    Else If (mustGoTimer=1)
+       SetTimer, livePreviewInsertTextinArea, -100
+    ; Else
+       ; SetTimer, ResetImgLoadStatus, -200
+    lastInvoked := A_TickCount
 }
 
 FillSelectedArea() {
     stopNow := mergeViewPortEffectsImgEditing()
     whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !whichBitmap || thumbsDisplaying=1 || activateImgSelection!=1)
+    {
+       fnOutputDebug("error - operation abandoned: " whichBitmap "--" stopNow "--" thumbsDisplaying "--" activateImgSelection)
+       SetTimer, ResetImgLoadStatus, -300
        Return
+    }
 
     startZeit := A_TickCount
     If (slideShowRunning=1)
@@ -7458,8 +7861,8 @@ coreFillSelectedArea(G2:=0, whichBitmap:=0) {
     If !G2
     {
        G2 := 2NDglPG
-       Gdip_ResetClip(2NDglPG)
-       Gdip_GraphicsClear(2NDglPG, "0x00" WindowBGRcolor)
+       Gdip_ResetClip(G2)
+       Gdip_GraphicsClear(G2, "0x00" WindowBGRcolor)
        GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
        thisThick := thisThick*zoomLevel
        imgSelPx := x1 := selDotX + SelDotsSize//2, x2 := selDotAx + SelDotsSize//2
@@ -7938,7 +8341,11 @@ BlurSelectedArea() {
     stopNow := mergeViewPortEffectsImgEditing()
     whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !whichBitmap || thumbsDisplaying=1 || activateImgSelection!=1)
+    {
+       fnOutputDebug("error - operation abandoned: " whichBitmap "--" stopNow "--" thumbsDisplaying "--" activateImgSelection)
+       SetTimer, ResetImgLoadStatus, -300
        Return
+    }
 
     If (slideShowRunning=1)
        ToggleSlideShowu()
@@ -11800,7 +12207,7 @@ WorkLoadMultiCoresJpegLL(maxList) {
       thisList := filesListu[A_Index]
       argsToGive := "batch-jpegll||" jpegDesiredOperation "=" jpegDoCrop "=" relativeImgSelCoords "=" imgSelX1 "=" imgSelX2 "=" imgSelY1 "=" imgSelY2 "=" prcSelX1 "=" prcSelX2 "=" prcSelY1 "=" prcSelY2
       pidThread%A_Index% := OpenNewExternalCoreThread(A_Index, argsToGive, thisList)
-      If !pidThread%A_Index%
+      If StrLen(pidThread%A_Index%)<2
       {
          fatalError := 1
          Break
@@ -11808,53 +12215,51 @@ WorkLoadMultiCoresJpegLL(maxList) {
       Sleep, 1
   }
 
-  RegWrite, REG_SZ, %QPVregEntry%, Running, 1
   If (fatalError=1)
   {
      CurrentSLD := backCurrentSLD
+     RegWrite, REG_SZ, %QPVregEntry%, Running, 1
      Return "single-core"
   }
 
   Sleep, 500
+  RegWrite, REG_SZ, %QPVregEntry%, Running, 1
   thisZeit := A_TickCount
   doStartLongOpDance()
+  setForceRefreshThumbsFilesIndex(1)
   Loop
   {
       Loop, % systemCores
       {
-         thisPIDdead := 0
-         InitCheckReg := 1
-         RegRead, InitCheckReg, %QPVregEntry%\multicore, ThreadRunning%A_Index%
+         thisThreadStatus := 1
+         RegRead, thisThreadStatus, %QPVregEntry%\multicore, ThreadRunning%A_Index%
          thisPIDcheck := pidThread%A_Index%
-         Process, Exist, % thisPIDcheck
-         thisPIDdead := ((!ErrorLevel && thisPIDcheck) && (A_TickCount - thisZeit > 2500)) || !thisPIDcheck ? 1 : 0
-         If (InitCheckReg=1 && thisPIDdead!=1)
+         isPIDalive := (A_TickCount - thisZeit > 2500) ? testProcessExists(thisPIDcheck) : 1
+         If (thisThreadStatus=1 && isPIDalive=1)
             jobsRunning++
-         Else If (InitCheckReg=2)
+         Else If (thisThreadStatus=2)
             jobDone++
          Else ; If (thisPIDdead=1)
             threadsCrashed++
+
+         totalEnded := jobDone + threadsCrashed
       }
 
       If (threadsCrashed>systemCores//2)
-      {
          fatalError := abandonAll := 1
-         Break
-      }
 
-      If (jobDone>systemCores-1)
+      If (jobDone>=systemCores) || (totalEnded>=systemCores)
       {
          Break
       } Else
       {
-         Sleep, 300
+         Sleep, 200
          processedFiles := skippedFiles := failedFiles := 0
          executingCanceableOperation := A_TickCount
-         If (A_TickCount - prevMSGdisplay>2000)
+         If (A_TickCount - prevMSGdisplay>1500)
          {
             Loop, % systemCores
             {
-               InitCheckReg := 1
                RegRead, filesStatus, %QPVregEntry%\multicore, ThreadJob%A_Index%
                filesStatusArr := StrSplit(filesStatus, "/")
                If (filesStatusArr[1]>0)
@@ -11879,7 +12284,12 @@ WorkLoadMultiCoresJpegLL(maxList) {
             If (skippedFiles>0)
                etaTime .= "`n" skippedFiles " files were skipped"
 
-            showTOOLtip("Performing JPEG lossless operations on " processedFiles "/" countTFilez " files, please wait..." etaTime)
+            If (abandonAll=1)
+            {
+               etaTime := "`nRunning threads " jobsRunning " / " systemCores
+               etaTime .= "`n" threadsCrashed " threads have crashed..."
+               showTOOLtip("Abandoning image files processing, please wait..." etaTime)
+            } Else showTOOLtip("Performing JPEG lossless operations on " processedFiles "/" countTFilez " files, please wait..." etaTime)
             prevMSGdisplay := A_TickCount
          }
       }
@@ -11889,23 +12299,19 @@ WorkLoadMultiCoresJpegLL(maxList) {
       {
          RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 1
          abandonAll := 1
-         fatalError := 0
          lastLongOperationAbort := A_TickCount
-         Break
+         ; fatalError := 0
+         ; Break
       }
       jobDone := threadsCrashed := jobsRunning := 0
   }
 
-  Loop, % systemCores
-  {
-      RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%A_Index%, 0
-      Try FileDelete, %thumbsCacheFolder%\tempList%A_Index%.txt
-  }
+   Loop, % systemCores
+       FileDelete, %thumbsCacheFolder%\tempList%A_Index%.txt
 
    processedFiles := skippedFiles := failedFiles := 0
    Loop, % systemCores
    {
-      InitCheckReg := 1
       RegRead, filesStatus, %QPVregEntry%\multicore, ThreadJob%A_Index%
       filesStatusArr := StrSplit(filesStatus, "/")
       If (filesStatusArr[1]>0)
@@ -11925,10 +12331,10 @@ WorkLoadMultiCoresJpegLL(maxList) {
     
   If (fatalError=1)
   {
-     RemoveTooltip()
+     ; RemoveTooltip()
      SoundBeep, 300, 100
-     r := "error"
      msgBoxWrapper(appTitle ": ERROR", "Most execution threads have crashed. JPEG lossless processing aborted... `n`nPlease try again with multi-threading disabled.`n`n" processedFiles " out of " countFilez " selected files were processed until now..." someErrors, 0, 0, "error")
+     r := "error"
   }
 
   ForceRefreshNowThumbsList()
@@ -11948,6 +12354,15 @@ WorkLoadMultiCoresJpegLL(maxList) {
 
   CurrentSLD := backCurrentSLD
   Return r
+}
+
+testProcessExists(pid) {
+   If StrLen(pid)<2
+      Return 0
+
+   Process, Exist, % pid
+   R := (ErrorLevel=pid) ? 1 : 0
+   Return R
 }
 
 WorkLoadMultiCoresConvertFormat(maxList) {
@@ -11972,7 +12387,7 @@ WorkLoadMultiCoresConvertFormat(maxList) {
       thisList := filesListu[A_Index]
       argsToGive := "batch-fmtconv"
       pidThread%A_Index% := OpenNewExternalCoreThread(A_Index, argsToGive, thisList)
-      If !pidThread%A_Index%
+      If StrLen(pidThread%A_Index%)<2
       {
          fatalError := 1
          Break
@@ -11980,53 +12395,50 @@ WorkLoadMultiCoresConvertFormat(maxList) {
       Sleep, 1
   }
 
-  RegWrite, REG_SZ, %QPVregEntry%, Running, 1
   If (fatalError=1)
   {
      CurrentSLD := backCurrentSLD
+     RegWrite, REG_SZ, %QPVregEntry%, Running, 1
      Return "single-core"
   }
 
   Sleep, 500
+  RegWrite, REG_SZ, %QPVregEntry%, Running, 1
   thisZeit := A_TickCount
   doStartLongOpDance()
   Loop
   {
       Loop, % systemCores
       {
-         thisPIDdead := 0
-         InitCheckReg := 1
-         RegRead, InitCheckReg, %QPVregEntry%\multicore, ThreadRunning%A_Index%
+         thisThreadStatus := 1
+         RegRead, thisThreadStatus, %QPVregEntry%\multicore, ThreadRunning%A_Index%
          thisPIDcheck := pidThread%A_Index%
-         Process, Exist, % thisPIDcheck
-         thisPIDdead := ((!ErrorLevel && thisPIDcheck) && (A_TickCount - thisZeit > 2500)) || !thisPIDcheck ? 1 : 0
-         If (InitCheckReg=1 && thisPIDdead!=1)
+         isPIDalive := (A_TickCount - thisZeit > 2500) ? testProcessExists(thisPIDcheck) : 1
+         If (thisThreadStatus=1 && isPIDalive=1)
             jobsRunning++
-         Else If (InitCheckReg=2)
+         Else If (thisThreadStatus=2)
             jobDone++
          Else ; If (thisPIDdead=1)
             threadsCrashed++
+
+         totalEnded := jobDone + threadsCrashed
       }
 
       If (threadsCrashed>systemCores//2)
-      {
          fatalError := abandonAll := 1
-         Break
-      }
 
-      If (jobDone>systemCores-1)
+      If (jobDone>=systemCores) || (totalEnded>=systemCores)
       {
          Break
       } Else
       {
-         Sleep, 100
+         Sleep, 200
          processedFiles := skippedFiles := failedFiles := theseFailures := 0
          executingCanceableOperation := A_TickCount
-         If (A_TickCount - prevMSGdisplay>2000)
+         If (A_TickCount - prevMSGdisplay>1500)
          {
             Loop, % systemCores
             {
-               InitCheckReg := 1
                RegRead, filesStatus, %QPVregEntry%\multicore, ThreadJob%A_Index%
                filesStatusArr := StrSplit(filesStatus, "/")
                If (filesStatusArr[1]>0)
@@ -12056,7 +12468,12 @@ WorkLoadMultiCoresConvertFormat(maxList) {
             If (skippedFiles>0)
                etaTime .= "`n" skippedFiles " files were skipped..."
 
-            showTOOLtip("Converting to ." rDesireWriteFMT A_Space processedFiles "/" countTFilez " files, please wait..." etaTime)
+            If (abandonAll=1)
+            {
+               etaTime := "`nRunning threads " jobsRunning " / " systemCores
+               etaTime .= "`n" threadsCrashed " threads have crashed..."
+               showTOOLtip("Abandoning image file formats conversion, please wait..." etaTime)
+            } Else showTOOLtip("Converting to ." rDesireWriteFMT A_Space processedFiles "/" countTFilez " files, please wait..." etaTime)
             prevMSGdisplay := A_TickCount
          }
       }
@@ -12066,30 +12483,11 @@ WorkLoadMultiCoresConvertFormat(maxList) {
       {
          RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 1
          abandonAll := 1
-         fatalError := 0
          lastLongOperationAbort := A_TickCount
-         Break
+         ; fatalError := 0
+         ; Break
       }
       jobDone := threadsCrashed := jobsRunning := 0
-  }
-
-  thisZeit := A_TickCount
-  Loop
-  {
-      Loop, % systemCores
-      {
-         InitCheckReg := 1
-         RegRead, InitCheckReg, %QPVregEntry%\multicore, ThreadRunning%A_Index%
-         thisPIDcheck := pidThread%A_Index%
-         Process, Exist, % thisPIDcheck
-         thisPIDdead := ((!ErrorLevel && thisPIDcheck) && (A_TickCount - thisZeit > 2500)) || !thisPIDcheck ? 1 : 0
-         If (InitCheckReg=2 || thisPIDdead=1)
-            jobDone++
-      }
-      If (jobDone>systemCores-1) || (A_TickCount - thisZeit > 12500)
-         Break
-
-      jobDone := 0
   }
 
   processedFiles := failedFiles := theseFailures := 0
@@ -12107,7 +12505,7 @@ WorkLoadMultiCoresConvertFormat(maxList) {
 
   Loop, % systemCores
   {
-        RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%A_Index%, 0
+        ; RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%A_Index%, 0
         If (fatalError!=1)
            Try FileRead, results, %thumbsCacheFolder%\tempList%A_Index%.txt
         theFinalList .= results
@@ -12138,10 +12536,10 @@ WorkLoadMultiCoresConvertFormat(maxList) {
 
   If (fatalError=1)
   {
+     ; RemoveTooltip()
      SoundBeep, 300, 100
+     msgBoxWrapper(appTitle ": ERROR", "Most execution threads have crashed. Image file formats conversion aborted... `n`nPlease try again with multi-threading disabled.`n`n" processedFiles " out of " countFilez " selected files were processed until now..." someErrors, 0, 0, "error")
      r := "error"
-     RemoveTooltip()
-     msgBoxWrapper(appTitle ": ERROR", "Most execution threads have crashed. JPEG lossless processing aborted... `n`nPlease try again with multi-threading disabled.`n`n" processedFiles " out of " countFilez " selected files were processed until now..." someErrors, 0, 0, "error")
   }
 
   ForceRefreshNowThumbsList()
@@ -12185,7 +12583,7 @@ WorkLoadMultiCoresSimpleImgProcessing(maxList) {
       thisList := filesListu[A_Index]
       argsToGive := "batch-simpleimgproc||" imgSelX1 "=" imgSelX2 "=" imgSelY1 "=" imgSelY2 "=" prcSelX1 "=" prcSelX2 "=" prcSelY1 "=" prcSelY2 "=" activateImgSelection "=" simpleOpRotationAngle
       pidThread%A_Index% := OpenNewExternalCoreThread(A_Index, argsToGive, thisList)
-      If !pidThread%A_Index%
+      If StrLen(pidThread%A_Index%)<2
       {
          fatalError := 1
          Break
@@ -12193,53 +12591,53 @@ WorkLoadMultiCoresSimpleImgProcessing(maxList) {
       Sleep, 1
   }
 
-  RegWrite, REG_SZ, %QPVregEntry%, Running, 1
   If (fatalError=1)
   {
      CurrentSLD := backCurrentSLD
+     RegWrite, REG_SZ, %QPVregEntry%, Running, 1
      Return "single-core"
   }
 
   Sleep, 500
+  RegWrite, REG_SZ, %QPVregEntry%, Running, 1
   thisZeit := A_TickCount
   doStartLongOpDance()
   Loop
   {
       Loop, % systemCores
       {
-         thisPIDdead := 0
-         InitCheckReg := 1
-         RegRead, InitCheckReg, %QPVregEntry%\multicore, ThreadRunning%A_Index%
+         thisThreadStatus := 1
+         RegRead, thisThreadStatus, %QPVregEntry%\multicore, ThreadRunning%A_Index%
          thisPIDcheck := pidThread%A_Index%
-         Process, Exist, % thisPIDcheck
-         thisPIDdead := ((!ErrorLevel && thisPIDcheck) && (A_TickCount - thisZeit > 2500)) || !thisPIDcheck ? 1 : 0
-         If (InitCheckReg=1 && thisPIDdead!=1)
+         isPIDalive := (A_TickCount - thisZeit > 2500) ? testProcessExists(thisPIDcheck) : 1
+         If (thisThreadStatus=1 && isPIDalive=1)
             jobsRunning++
-         Else If (InitCheckReg=2)
+         Else If (thisThreadStatus=2)
             jobDone++
          Else ; If (thisPIDdead=1)
             threadsCrashed++
+
+         totalEnded := jobDone + threadsCrashed
+         ; sleep, 450
+         ; ToolTip, % jobsRunning "//" jobDone "//" threadsCrashed "//" totalEnded , , , 2
+         ; ToolTip, % thisThreadStatus " // " isPIDalive , , , 2
       }
 
       If (threadsCrashed>systemCores//2)
-      {
          fatalError := abandonAll := 1
-         Break
-      }
 
-      If (jobDone>systemCores-1)
+      If (jobDone>=systemCores) || (totalEnded>=systemCores)
       {
          Break
       } Else
       {
-         Sleep, 100
+         Sleep, 200
          processedFiles := skippedFiles := failedFiles := 0
          executingCanceableOperation := A_TickCount
-         If (A_TickCount - prevMSGdisplay>2000)
+         If (A_TickCount - prevMSGdisplay>1500)
          {
             Loop, % systemCores
             {
-               InitCheckReg := 1
                RegRead, filesStatus, %QPVregEntry%\multicore, ThreadJob%A_Index%
                filesStatusArr := StrSplit(filesStatus, "/")
                If (filesStatusArr[1]>0)
@@ -12264,7 +12662,12 @@ WorkLoadMultiCoresSimpleImgProcessing(maxList) {
             If (skippedFiles>0)
                etaTime .= "`n" skippedFiles " files were skipped..."
 
-            showTOOLtip("Processing " processedFiles "/" countTFilez " files, please wait..." etaTime)
+            If (abandonAll=1)
+            {
+               etaTime := "`nRunning threads " jobsRunning " / " systemCores
+               etaTime .= "`n" threadsCrashed " threads have crashed..."
+               showTOOLtip("Abandoning image files processing, please wait..." etaTime)
+            } Else showTOOLtip("Processing " processedFiles "/" countTFilez " files, please wait..." etaTime)
             prevMSGdisplay := A_TickCount
          }
       }
@@ -12274,30 +12677,11 @@ WorkLoadMultiCoresSimpleImgProcessing(maxList) {
       {
          RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 1
          abandonAll := 1
-         fatalError := 0
          lastLongOperationAbort := A_TickCount
-         Break
+         ; fatalError := 0
+         ; Break
       }
       jobDone := threadsCrashed := jobsRunning := 0
-  }
-
-  thisZeit := A_TickCount
-  Loop
-  {
-      Loop, % systemCores
-      {
-         InitCheckReg := 1
-         RegRead, InitCheckReg, %QPVregEntry%\multicore, ThreadRunning%A_Index%
-         thisPIDcheck := pidThread%A_Index%
-         Process, Exist, % thisPIDcheck
-         thisPIDdead := ((!ErrorLevel && thisPIDcheck) && (A_TickCount - thisZeit > 2500)) || !thisPIDcheck ? 1 : 0
-         If (InitCheckReg=2 || thisPIDdead=1)
-            jobDone++
-      }
-      If (jobDone>systemCores-1) || (A_TickCount - thisZeit > 12500)
-         Break
-
-      jobDone := 0
   }
 
   processedFiles := failedFiles := skippedFiles := 0
@@ -12315,7 +12699,7 @@ WorkLoadMultiCoresSimpleImgProcessing(maxList) {
 
   Loop, % systemCores
   {
-        RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%A_Index%, 0
+        ; RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%A_Index%, 0
         If (fatalError!=1)
            Try FileRead, results, %thumbsCacheFolder%\tempList%A_Index%.txt
         theFinalList .= results
@@ -12323,6 +12707,7 @@ WorkLoadMultiCoresSimpleImgProcessing(maxList) {
         Try FileDelete, %thumbsCacheFolder%\tempList%A_Index%.txt
   }
 
+  percDone := " ( " Round((processedFiles / countTFilez) * 100) "% )"
   zeitOperation := A_TickCount - startOperation
   someErrors := "`nElapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)) percDone
   If (failedFiles>0)
@@ -12332,10 +12717,10 @@ WorkLoadMultiCoresSimpleImgProcessing(maxList) {
 
   If (fatalError=1)
   {
+     ; RemoveTooltip()
      SoundBeep, 300, 100
+     msgBoxWrapper(appTitle ": ERROR", "Most execution threads have crashed. Image processing aborted... `n`nPlease try again with multi-threading disabled.`n`n" processedFiles " out of " countTFilez " selected files were processed until now..." someErrors, 0, 0, "error")
      r := "error"
-     RemoveTooltip()
-     msgBoxWrapper(appTitle ": ERROR", "Most execution threads have crashed. Image processing aborted... `n`nPlease try again with multi-threading disabled.`n`n" processedFiles " out of " countFilez " selected files were processed until now..." someErrors, 0, 0, "error")
   }
 
   ForceRefreshNowThumbsList()
@@ -12747,8 +13132,11 @@ multiCoresSimpleImgProcessing(coreThread, arguments, filesList) {
        zPlitPath(imgPath, 0, OutFileName, OutDir)
        destImgPath := (ResizeUseDestDir=1) ? ResizeDestFolder : OutDir
        file2save := destImgPath "\" OutFileName
-       If (FileExist(file2save) && !FolderExist(file2save))
-          file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
+       If (ResizeUseDestDir=1)
+       {
+          If (FileExist(file2save) && !FolderExist(file2save))
+             file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
+       }
 
        If !file2save
        {
@@ -13210,6 +13598,7 @@ loadMainSettings() {
     IniRead, tstuserAllowWindowDrag, % mainSettingsFile, General, userAllowWindowDrag, @
     IniRead, tstdynamicThumbsColumns, % mainSettingsFile, General, dynamicThumbsColumns, @
     IniRead, tstthumbsColumns, % mainSettingsFile, General, thumbsColumns, @
+    IniRead, tstuserMultiCoresLimit, % mainSettingsFile, General, userMultiCoresLimit, @
 
     If (tstuserimgQuality=1 || tstuserimgQuality=0)
        userimgQuality := tstuserimgQuality
@@ -13251,14 +13640,16 @@ loadMainSettings() {
        AutoDownScaleIMGs := tstAutoDownScaleIMGs
     If (tstusrTextAlign="Left" || tstusrTextAlign="Right" || tstusrTextAlign="Center")
        usrTextAlign := tstusrTextAlign
-    If IsNumber(tstDisplayTimeUser) && tstDisplayTimeUser>0
+    If (IsNumber(tstDisplayTimeUser) && tstDisplayTimeUser>0)
        DisplayTimeUser := Trimmer(tstDisplayTimeUser)
-    If IsNumber(tstOSDfntSize) && tstOSDfntSize>15
+    If (IsNumber(tstOSDfntSize) && tstOSDfntSize>15)
        OSDfntSize := Trimmer(tstOSDfntSize)
-    If IsNumber(tstPasteFntSize) && tstPasteFntSize>15
+    If (IsNumber(tstPasteFntSize) && tstPasteFntSize>15)
        PasteFntSize := Trimmer(tstPasteFntSize)
-    If IsNumber(tstmediaSNDvolume) && tstmediaSNDvolume>2
+    If (IsNumber(tstmediaSNDvolume) && tstmediaSNDvolume>2)
        mediaSNDvolume := Trimmer(tstmediaSNDvolume)
+    If (IsNumber(tstuserMultiCoresLimit) && tstuserMultiCoresLimit>1)
+       userMultiCoresLimit := Trimmer(tstuserMultiCoresLimit)
     If IsNumber(tstmaxMemThumbsCache) && tstmaxMemThumbsCache>10
        maxMemThumbsCache := Trimmer(tstmaxMemThumbsCache)
     If IsNumber(maxUserThreads) && maxUserThreads>2
@@ -13325,6 +13716,9 @@ loadMainSettings() {
     If (OSDfntSize<9)
        OSDfntSize := 9
 
+    EnvGet, thisSystemCores, NUMBER_OF_PROCESSORS
+    userMultiCoresLimit := clampInRange(userMultiCoresLimit, 2, thisSystemCores)
+    realSystemCores := userMultiCoresLimit
     SetVolume(mediaSNDvolume)
     calcHUDsize()
     msgDisplayTime := DisplayTimeUser*1000
@@ -13552,10 +13946,10 @@ markThisFileNow(thisFileIndex:=0) {
   If !thisFileIndex
      thisFileIndex := currentFileIndex
 
-  osel := resultedFilesList[thisFileIndex, 2]
-  sel := osel ? 0 : 1
+  oSel := resultedFilesList[thisFileIndex, 2]
+  sel := oSel ? 0 : 1
   resultedFilesList[thisFileIndex, 2] := sel
-  sel := (osel && !sel) ? 0 : 1
+  sel := (oSel && !sel) ? 0 : 1
 
   If sel
      markedSelectFile++
@@ -14553,17 +14947,35 @@ PanelRenameThisFile(dummy:=0) {
 
 PanelSetThumbCols() {
    fakeWinCreator(40, A_ThisFunc, 1)
-   msgResult := msgBoxWrapper("panelu|Set thumbnails columns: " appTitle, "Please type how many columns you want to have for the thumbnails list.`nYou can adjust the number with -/+ keys in the viewport.", "&Apply|&Cancel", 1, 0, "Dynamic number of thumbnail columns", dynamicThumbsColumns, 0, "limit9050 number", thumbsColumns)
+   msgResult := msgBoxWrapper("panelu|Set thumbnails columns: " appTitle, "Please type how many columns you want to have for the thumbnails list.`nYou can adjust this number with -/+ keys in the viewport.`n`nFor a fixed amount of columns, please deactivate «dynamic columns» option.", "&Apply|&Cancel", 1, 0, "Dynamic number of thumbnail columns", dynamicThumbsColumns, 0, "limit9050 number", thumbsColumns)
    If InStr(msgResult.btn, "apply")
    {
       dynamicThumbsColumns := msgResult.check
       thumbsColumns := Trimmer(msgResult.edit)
-      thumbsColumns := clampInRange(thumbsColumns, 1, 100)
+      thumbsColumns := clampInRange(thumbsColumns, 2, 100)
       recalculateThumbsSizes()
       ForceRefreshNowThumbsList()
       IniAction(1, "dynamicThumbsColumns", "General")
       IniAction(1, "thumbsColumns", "General")
       dummyTimerDelayiedImageDisplay(50)
+   }
+}
+
+PanelSetSystemCores() {
+   EnvGet, thisSystemCores, NUMBER_OF_PROCESSORS
+   fakeWinCreator(41, A_ThisFunc, 1)
+   msgResult := msgBoxWrapper("panelu|Multi-threading options: " appTitle, "Please specify the number of threads to use when generating thumbnails or batch processing files. Maximum allowed threads on this system is " thisSystemCores ".`n`nAfter changing this value, a restart of QPV might be necessary.", "&Apply|&Cancel", 1, 0, "Allow multi-threaded processing", allowMultiCoreMode, 0, "limit2 number", userMultiCoresLimit)
+   If InStr(msgResult.btn, "apply")
+   {
+      allowMultiCoreMode := msgResult.check
+      userMultiCoresLimit := Trimmer(msgResult.edit)
+      userMultiCoresLimit := clampInRange(userMultiCoresLimit, 2, thisSystemCores)
+      INIaction(1, "allowMultiCoreMode", "General")
+      INIaction(1, "userMultiCoresLimit", "General")
+      realSystemCores := userMultiCoresLimit
+      If (thumbsDisplaying=1 && thumbnailsListMode!=1 && multiCoreThumbsInitGood="n")
+         initAHKhThumbThreads()
+      ; dummyTimerDelayiedImageDisplay(50)
    }
 }
 
@@ -15305,9 +15717,10 @@ PanelPasteInPlace(dummy:="") {
     calcScreenLimits()
     userClipBMPpaste := trGdip_DisposeImage(userClipBMPpaste, 1)
     imgPath := getIDimage(currentFileIndex)
-    If (thumbsDisplaying=1 || activateImgSelection!=1) || !imgPath
+    If (thumbsDisplaying=1 || activateImgSelection!=1 || openingPanelNow=1) || !imgPath
        Return
 
+    openingPanelNow := 1
     If (slideShowRunning=1)
        ToggleSlideShowu()
 
@@ -15325,6 +15738,7 @@ PanelPasteInPlace(dummy:="") {
 
     If StrLen(userClipBMPpaste)<3
     {
+       SetTimer, resetOpeningPanel, -200
        showTOOLtip("ERROR: Failed to retrieve image...")
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -15428,6 +15842,7 @@ PanelPasteInPlace(dummy:="") {
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Paste in place: " appTitle, winPos)
     ToolTip
     SetTimer, updateUIpastePanel, -350
+    SetTimer, resetOpeningPanel, -300
 }
 
 ReadSettingsPasteInPlace() {
@@ -15469,9 +15884,10 @@ ReadSettingsPasteInPlace() {
 }
 
 PanelTransformSelectedArea() {
-    If (thumbsDisplaying=1 || activateImgSelection!=1)
+    If (thumbsDisplaying=1 || activateImgSelection!=1 || openingPanelNow=1)
        Return
 
+    openingPanelNow := 1
     If (slideShowRunning=1)
        ToggleSlideShowu()
 
@@ -15483,6 +15899,7 @@ PanelTransformSelectedArea() {
     userClipBMPpaste := getTransformToolSelectedArea(0)
     If StrLen(userClipBMPpaste)<3
     {
+       SetTimer, resetOpeningPanel, -200
        showTOOLtip("ERROR: Failed to retrieve image...")
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -15592,6 +16009,7 @@ PanelTransformSelectedArea() {
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Transform selected area: " appTitle, winPos)
     SetTimer, updateUIpastePanel, -350
+    SetTimer, resetOpeningPanel, -300
 }
 
 BtnResetPanelsSpecificControl(CtrlHwnd, b, c) {
@@ -16013,11 +16431,11 @@ PanelFillSelectedArea() {
     Gui, Tab, 2
     Gui, Add, DropDownList, x+10 y+10 Section w200 AltSubmit Choose%FillAreaColorMode% vFillAreaColorMode gupdateUIfillPanel, Solid color|Linear gradient|Radial gradient|Box gradient ; |Random patterns
     Gui, Add, Checkbox, x+5 hp Checked%FillAreaGradientWrapped% vFillAreaGradientWrapped gupdateUIfillPanel, &Tiling pattern
-    Gui, Add, Slider, xs y+10 NoTicks w%slideWid% gupdateUIfillPanel ToolTip AltSubmit vFillAreaOpacity Range3-255, % FillAreaOpacity
+    Gui, Add, Slider, xs y+10 NoTicks w%slideWid% gupdateUIfillPanel ToolTip AltSubmit vFillAreaOpacity Range2-255, % FillAreaOpacity
     Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuFillAreaColor, P
     Gui, Add, ListView, x+5 hp w60 %CCLVO% Background%FillAreaColor% vFillAreaColor hwndhLVfillColor,
     Gui, Add, Text, x+5 hp wp +0x200 vinfoFillAreaOpacity, %thisOpacity%`%
-    Gui, Add, Slider, xs y+1 NoTicks w%slideWid% gupdateUIfillPanel ToolTip AltSubmit vFillArea2ndOpacity Range3-255, % FillArea2ndOpacity
+    Gui, Add, Slider, xs y+1 NoTicks w%slideWid% gupdateUIfillPanel ToolTip AltSubmit vFillArea2ndOpacity Range2-255, % FillArea2ndOpacity
     Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuFillArea2ndColor, P
     Gui, Add, ListView, x+5 hp w60%CCLVO% Background%FillArea2ndColor% vFillArea2ndColor hwndhLVfill2ndColor,
     Gui, Add, Text, x+5 hp wp +0x200 vinfoFillArea2ndOpacity, Opacity: %this2ndOpacity%00`%
@@ -17115,7 +17533,7 @@ updateUIblurPreview() {
     r1 := Gdip_DrawImage(G, yBitmap, 0, 0, uiboxSize, uiboxSize, 0, 0, uiboxSize // sF, uiboxSize // sF, thisOpacity)
     hBitmap := Gdip_CreateHBITMAPFromBitmap(cornersBMP)
     SetImage(hCropCornersPic, hBitmap)
-    DeleteObject(hBitmap)
+    Gdi_DeleteObject(hBitmap)
     Gdip_DeleteGraphics(G)
     trGdip_DisposeImage(zBitmap, 1)
     trGdip_DisposeImage(yBitmap, 1)
@@ -17424,33 +17842,76 @@ PanelJournalWindow() {
     Gui, Add, Button, xp y+2 h%thisBtnHeight% gBtnViewedImages2List, &View list
     Gui, Add, Text, x+5 yp hp +0x200, Images viewed in this session: %userSeenSlideImages%.
     If (skipSeenImagesSlider=1)
-    {
-       Gui, Add, Button, xs y+2 h%thisBtnHeight% gPanelSeenStats, &Seen images statistics
-       Gui, Add, Button, x+5 hp geraseSeenIMGsDB, &Erase the entire list
-       Gui, Add, Button, xs y+2 hp gCleanDeadFilesSeenImagesDB, &Purge inexistent files from the list
-    }
+       Gui, Add, Button, xs y+2 h%thisBtnHeight% gPanelSeenIMGsOptions, &Seen images database options
+
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Application journal: " appTitle)
     SetTimer, ResetImgLoadStatus, -100
 }
 
+PanelSeenIMGsOptions() {
+    thisBtnHeight := createSettingsGUI(42, A_ThisFunc)
+    EditWid := 60
+    If (PrefsLargeFonts=1)
+    {
+       EditWid := EditWid + 40
+       Gui, Font, s%LargeUIfontValue%
+    }
+
+    txtWid := Round(editWid*6.25)
+    totalIndex := QPVjournal.Count()
+    For Key, Value in QPVjournal
+    {
+        currentEntry := totalIndex - A_Index
+        line := Trimmer(Value)
+        If line
+           textList .= "(" currentEntry ") " Trimmer(line) "`n`n"
+    }
+
+    userSeenSlideImages := userSeenSessionImagesArray.Count()
+    Gui, Add, Button, x15 y15 Section h%thisBtnHeight% gBtnViewedImages2List, &View list
+    Gui, Add, Text, x+5 yp hp +0x200, Images viewed in this session: %userSeenSlideImages%.
+
+    Gui, Add, Button, xs y+15 h%thisBtnHeight% gBtnALLviewedImages2List, &Retrieve list of all recorded seen images
+    Gui, Add, Button, y+5 hp wp gCleanDeadFilesSeenImagesDB, &Purge inexistent files from the list
+    Gui, Add, Button, y+5 hp wp geraseSeenIMGsDB, &Erase the entire list
+    Gui, Add, Button, y+5 hp wp gPanelSeenStats, &Seen images statistics
+    Gui, Add, Text, y+5 wp, TIP: To retrieve the images seen on a given day or month, open the statistics panel.
+
+    Gui, Add, Button, y+25 h%thisBtnHeight% gBtnCloseWindow, C&ancel
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Seen images database options: " appTitle)
+}
+
 ReadSettingsTextInArea() {
     INIaction(0, "TextInAreaAlign", "General")
+    INIaction(0, "TextInAreaLineAngle", "General")
+    INIaction(0, "TextInAreaCharSpacing", "General")
     INIaction(0, "TextInAreaValign", "General")
     INIaction(0, "TextInAreaBlurAmount", "General")
+    INIaction(0, "TextInAreaBlurBorderAmount", "General")
+    INIaction(0, "TextInAreaUsrMarginz", "General")
     INIaction(0, "TextInAreaBgrColor", "General")
+    INIaction(0, "TextInAreaBgrEntire", "General")
+    INIaction(0, "TextInAreaBgrUnified", "General")
+    INIaction(0, "TextInAreaCutOutMode", "General")
     INIaction(0, "TextInAreaBgrOpacity", "General")
     INIaction(0, "TextInAreaBorderSize", "General")
+    INIaction(0, "TextInAreaBorderOut", "General")
+    INIaction(0, "TextInAreaBorderColor", "General")
+    INIaction(0, "TextInAreaBorderOpacity", "General")
     INIaction(0, "TextInAreaFontBold", "General")
     INIaction(0, "TextInAreaFontColor", "General")
     INIaction(0, "TextInAreaFontItalic", "General")
     INIaction(0, "TextInAreaFontName", "General")
+    INIaction(0, "TextInAreaFontLineSpacing", "General")
     INIaction(0, "TextInAreaFontOpacity", "General")
     INIaction(0, "TextInAreaFontSize", "General")
+    INIaction(0, "TextInAreaFontStrike", "General")
     INIaction(0, "TextInAreaFontUline", "General")
     INIaction(0, "TextInAreaOnlyBorder", "General")
     INIaction(0, "TextInAreaPaintBgr", "General")
     INIaction(0, "TextInAreaRoundBoxBgr", "General")
     INIaction(0, "TextInAreaLivePreview", "General")
+    INIaction(0, "TextInAreaAutoWrap", "General")
 }
 
 PanelInsertTextArea() {
@@ -17462,11 +17923,13 @@ PanelInsertTextArea() {
     ReadSettingsTextInArea()
     btnWid := 100
     txtWid := 350
-    columnBpos := 180
+    columnBpos := 190
+    slideWid := 150
     EditWid := 60
     If (PrefsLargeFonts=1)
     {
-       columnBpos := columnBpos + 80
+       columnBpos := columnBpos + 85
+       slideWid := slideWid + 55
        EditWid := EditWid + 40
        btnWid := btnWid + 70
        txtWid := txtWid + 105
@@ -17476,45 +17939,73 @@ PanelInsertTextArea() {
     txtWid := Round(editWid*6.25)
     EllipseSelectMode := 0
 
-    Global editF1, editF2, editF3, editF4, editF5, infoTextBlur
-         , PickuTextInAreaFontColor, PickuTextInAreaBgrColor
+    Global editF1, editF2, editF3, editF4, editF5, editF6,  editF7, editF8, editF9, editF10, editF11
+         , editF12, PickuTextInAreaFontColor, PickuTextInAreaBgrColor, PickuTextInAreaBorderColor
 
-    Gui, Add, Tab3,, Text|Styling
+    Gui, Add, Tab3,, Text|Styling|Colors
     Gui, Tab, 1
-    Gui, Add, Edit, x+15 y+15 w%txtWid% r10 gupdateUIInsertTextPanel vUserTextArea, % UserTextArea
+    Gui, Add, Edit, x+15 y+15 Section w%txtWid% r10 gupdateUIInsertTextPanel vUserTextArea, % UserTextArea
+    Gui, Add, text, , Font name:
+    Gui, Add, DropDownList, x+5 w%ddWid% Sort Choose1 gupdateUIInsertTextPanel vTextInAreaFontName, % TextInAreaFontName
+    Gui, Add, Checkbox, x+5 gupdateUIInsertTextPanel Checked%TextInAreaAutoWrap% vTextInAreaAutoWrap, Auto line wrapping
 
     Gui, Tab, 2
-    Gui, Add, Text, x+15 y+15 Section, Font name
-    Gui, Add, Text, xs yp+30, Font size / border thickness
+    Gui, Add, Text, x+15 y+15 Section, Line angle / letter spacing
+    Gui, Add, Text, xs yp+30, Font size / leading / margins
     Gui, Add, Text, xs yp+30, Text alignment and style 
-    Gui, Add, Text, xs yp+30, Text opacity / color
-    Gui, Add, Checkbox, xs yp+30 gupdateUIInsertTextPanel Checked%TextInAreaPaintBgr% vTextInAreaPaintBgr, Background opacity / color
-    Gui, Add, Text, xs y+8 w%txtWid% vinfoTextBlur, Blur amount: %TextInAreaBlurAmount%
-    Gui, Add, Slider, xs y+1 gupdateUIInsertTextPanel AltSubmit ToolTip w%txtWid% vTextInAreaBlurAmount Range0-255, % TextInAreaBlurAmount
+    Gui, Add, Text, xs yp+30, Border style / thickness
+    Gui, Add, Checkbox, xs yp+30 gupdateUIInsertTextPanel Checked%TextInAreaDoBlurs% vTextInAreaDoBlurs, Blur amount for text / outline
+    Gui, Add, Checkbox, xs yp+30 gupdateUIInsertTextPanel Checked%TextInAreaPaintBgr% vTextInAreaPaintBgr, Draw background
 
-    Gui, Add, DropDownList, xs+%columnBpos% ys+0 Section w%ddWid% Sort Choose1 gupdateUIInsertTextPanel vTextInAreaFontName, % TextInAreaFontName
+    Gui, Add, Edit, xs+%columnBpos% ys+0 Section w%editWid% r1 gupdateUIInsertTextPanel limit4 -multi -wantCtrlA -wantTab -wrap veditF11, % TextInAreaLineAngle
+    Gui, Add, UpDown, vTextInAreaLineAngle Range-900-900, % TextInAreaLineAngle
+    Gui, Add, Edit, x+2 w%editWid% r1 gupdateUIInsertTextPanel limit4 -multi -wantCtrlA -wantTab -wrap veditF12, % TextInAreaCharSpacing
+    Gui, Add, UpDown, vTextInAreaCharSpacing Range-100-255, % TextInAreaCharSpacing
+
     Gui, Add, Edit, xs+0 yp+30 w%editWid% r1 gupdateUIInsertTextPanel limit3 -multi number -wantCtrlA -wantTab -wrap veditF1 , % TextInAreaFontSize
     Gui, Add, UpDown, vTextInAreaFontSize Range5-950, % TextInAreaFontSize
-    Gui, Add, Edit, x+2 w%editWid% r1 gupdateUIInsertTextPanel limit3 -multi number -wantCtrlA -wantTab -wrap veditF2, % TextInAreaBorderSize
-    Gui, Add, UpDown, vTextInAreaBorderSize Range0-350, % TextInAreaBorderSize
-    Gui, Add, Checkbox, x+2 hp gupdateUIInsertTextPanel Checked%TextInAreaOnlyBorder% vTextInAreaOnlyBorder, Only outline
+    Gui, Add, Edit, x+2 w%editWid% gupdateUIInsertTextPanel r1 limit4 -multi -wantCtrlA -wantTab -wrap veditF9, % TextInAreaFontLineSpacing
+    Gui, Add, UpDown, vTextInAreaFontLineSpacing Range-950-950, % TextInAreaFontLineSpacing
+    Gui, Add, Edit, x+2 w%editWid% gupdateUIInsertTextPanel r1 limit3 -multi number -wantCtrlA -wantTab -wrap veditF10, % TextInAreaUsrMarginz
+    Gui, Add, UpDown, vTextInAreaUsrMarginz Range0-500, % TextInAreaUsrMarginz
 
     Gui, Add, DropDownList, xs yp+30 w%editWid% gupdateUIInsertTextPanel Choose%TextInAreaAlign% AltSubmit vTextInAreaAlign, Left|Center|Right
     Gui, Add, DropDownList, x+2 wp gupdateUIInsertTextPanel Choose%TextInAreaValign% AltSubmit vTextInAreaValign, Top|Center|Bottom
     Gui, Add, Checkbox, x+2 yp hp w27 +0x1000 gupdateUIInsertTextPanel Checked%TextInAreaFontBold% vTextInAreaFontBold, B
     Gui, Add, Checkbox, x+2 yp hp w27 +0x1000 gupdateUIInsertTextPanel Checked%TextInAreaFontItalic% vTextInAreaFontItalic, I
     Gui, Add, Checkbox, x+2 yp hp w27 +0x1000 gupdateUIInsertTextPanel Checked%TextInAreaFontUline% vTextInAreaFontUline, U
+    Gui, Add, Checkbox, x+2 yp hp w27 +0x1000 gupdateUIInsertTextPanel Checked%TextInAreaFontStrike% vTextInAreaFontStrike, S
 
-    Gui, Add, Edit,  xs+0 yp+30 w%editWid% hp gupdateUIInsertTextPanel r1 limit3 -multi number -wantCtrlA -wantTab -wrap veditF3, % TextInAreaFontOpacity
-    Gui, Add, UpDown, vTextInAreaFontOpacity Range0-255, % TextInAreaFontOpacity
+    Gui, Add, DropDownList, xs yp+30 w%editWid% gupdateUIInsertTextPanel Altsubmit Choose%TextInAreaBorderOut% vTextInAreaBorderOut, None|Center|Outset
+    Gui, Add, Edit, x+2 w%editWid% r1 gupdateUIInsertTextPanel limit3 -multi number -wantCtrlA -wantTab -wrap veditF2, % TextInAreaBorderSize
+    Gui, Add, UpDown, vTextInAreaBorderSize Range1-650, % TextInAreaBorderSize
+    Gui, Add, Checkbox, x+2 hp gupdateUIInsertTextPanel Checked%TextInAreaOnlyBorder% vTextInAreaOnlyBorder, Only outline
+
+    Gui, Add, Edit, xs yp+30 w%editWid% gupdateUIInsertTextPanel r1 limit3 -multi number -wantCtrlA -wantTab -wrap veditF6, % TextInAreaBlurAmount
+    Gui, Add, UpDown, vTextInAreaBlurAmount Range1-255, % TextInAreaBlurAmount
+    Gui, Add, Edit, x+2 w%editWid% gupdateUIInsertTextPanel r1 limit3 -multi number -wantCtrlA -wantTab -wrap veditF8, % TextInAreaBlurBorderAmount
+    Gui, Add, UpDown, vTextInAreaBlurBorderAmount Range1-255, % TextInAreaBlurBorderAmount
+
+    Gui, Add, Checkbox, xs yp+30 gupdateUIInsertTextPanel Checked%TextInAreaBgrUnified% vTextInAreaBgrUnified, Unified
+    Gui, Add, Checkbox, x+3 yp hp gupdateUIInsertTextPanel Checked%TextInAreaRoundBoxBgr% vTextInAreaRoundBoxBgr, Rounded
+    Gui, Add, Checkbox, xs yp+30 gupdateUIInsertTextPanel Checked%TextInAreaCutOutMode% vTextInAreaCutOutMode, Cut-out mode
+    Gui, Add, Checkbox, x+3 gupdateUIInsertTextPanel Checked%TextInAreaBgrEntire% vTextInAreaBgrEntire, Fill entire line(s)
+
+    Gui, Tab, 3
+    Gui, Add, Text, x+15 y+15 Section, Text opacity / color
+    Gui, Add, Slider, xs+20 y+10 NoTicks w%slideWid% gupdateUIInsertTextPanel ToolTip AltSubmit vTextInAreaFontOpacity Range1-255, % TextInAreaFontOpacity
     Gui, Add, ListView, x+2 w%editWid% hp gupdateUIInsertTextPanel %CCLVO% Background%TextInAreaFontColor% vTextInAreaFontColor hwndhLV3,
     Gui, Add, Button, x+2 hp w27 gStartPickingColor vPickuTextInAreaFontColor, P
 
-    Gui, Add, Edit, xs yp+30 w%editWid% gupdateUIInsertTextPanel r1 limit3 -multi number -wantCtrlA -wantTab -wrap veditF5, % TextInAreaBgrOpacity
-    Gui, Add, UpDown, vTextInAreaBgrOpacity Range0-255, % TextInAreaBgrOpacity
+    Gui, Add, Text, xs y+20, Border opacity / color
+    Gui, Add, Slider, xs+20 y+10 NoTicks w%slideWid% gupdateUIInsertTextPanel ToolTip AltSubmit vTextInAreaBorderOpacity Range1-255, % TextInAreaBorderOpacity
+    Gui, Add, ListView, x+2 w%editWid% hp gupdateUIInsertTextPanel %CCLVO% Background%TextInAreaBorderColor% vTextInAreaBorderColor hwndhLV45,
+    Gui, Add, Button, x+2 hp w27 gStartPickingColor vPickuTextInAreaBorderColor, P
+
+    Gui, Add, Text, xs y+20, Background opacity / color
+    Gui, Add, Slider, xs+20 y+10 NoTicks w%slideWid% gupdateUIInsertTextPanel ToolTip AltSubmit vTextInAreaBgrOpacity Range1-255, % TextInAreaBgrOpacity
     Gui, Add, ListView, x+2 w%editWid% hp gupdateUIInsertTextPanel %CCLVO% Background%TextInAreaBgrColor% vTextInAreaBgrColor hwndhLV2,
     Gui, Add, Button, x+2 hp w27 gStartPickingColor vPickuTextInAreaBgrColor, P
-    Gui, Add, Checkbox, x+2 yp hp gupdateUIInsertTextPanel Checked%TextInAreaRoundBoxBgr% vTextInAreaRoundBoxBgr, Rounded
 
     If !FontList._NewEnum()[k, v]
     {
@@ -17534,7 +18025,7 @@ PanelInsertTextArea() {
     Gui, Add, Button, xm+0 y+15 h%thisBtnHeight% w35 gtoggleImgEditPanelWindow, ▲
     Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 hp w90 gBtnCloseWindow, &Cancel
-    Gui, Add, Checkbox, x+5 hp Checked%TextInAreaLivePreview% vTextInAreaLivePreview gupdateUIInsertTextPanel, Live preview
+    Gui, Add, Checkbox, x+5 hp Checked%TextInAreaLivePreview% vTextInAreaLivePreview gupdateUIInsertTextPanel, Live preview (low quality)
     Gui, Add, Checkbox, xm+0 y+5 Checked%closeEditPanelOnApply% vcloseEditPanelOnApply gToggleClosePanelApply, Close window after «Apply»
 
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
@@ -17544,38 +18035,96 @@ PanelInsertTextArea() {
 
 updateUIInsertTextPanel(actionu:=0) {
     GuiControlGet, TextInAreaAlign
+    GuiControlGet, TextInAreaAutoWrap
     GuiControlGet, TextInAreaValign
     GuiControlGet, TextInAreaBlurAmount
+    GuiControlGet, TextInAreaBlurBorderAmount
+    GuiControlGet, TextInAreaDoBlurs
+    GuiControlGet, TextInAreaUsrMarginz
     GuiControlGet, TextInAreaBgrOpacity
+    GuiControlGet, TextInAreaBgrEntire
+    GuiControlGet, TextInAreaBgrUnified
+    GuiControlGet, TextInAreaFontLineSpacing
+    GuiControlGet, TextInAreaCharSpacing
+    GuiControlGet, TextInAreaCutOutMode
     GuiControlGet, TextInAreaBorderSize
+    GuiControlGet, TextInAreaBorderOut
+    GuiControlGet, TextInAreaBorderOpacity
     GuiControlGet, TextInAreaFontBold
     GuiControlGet, TextInAreaFontItalic
     GuiControlGet, TextInAreaFontName
     GuiControlGet, TextInAreaFontOpacity
     GuiControlGet, TextInAreaFontSize
     GuiControlGet, TextInAreaFontUline
+    GuiControlGet, TextInAreaFontStrike
     GuiControlGet, TextInAreaOnlyBorder
     GuiControlGet, TextInAreaPaintBgr
+    GuiControlGet, TextInAreaLineAngle
     GuiControlGet, TextInAreaRoundBoxBgr
     GuiControlGet, TextInAreaLivePreview
     GuiControlGet, UserTextArea
+
+    If !isNumber(TextInAreaFontLineSpacing)
+       TextInAreaFontLineSpacing := 0
+
+    If (TextInAreaBorderSize>=TextInAreaFontSize*2)
+       TextInAreaBorderSize := TextInAreaFontSize*2
 
     GuiControl, SettingsGUIA:, infoTextBlur, Blur amount: %TextInAreaBlurAmount%
     If (TextInAreaPaintBgr=1)
     {
        GuiControl, SettingsGUIA: Enable, TextInAreaBgrOpacity
        GuiControl, SettingsGUIA: Enable, TextInAreaBgrColor
-       GuiControl, SettingsGUIA: Enable, TextInAreaRoundBoxBgr
        GuiControl, SettingsGUIA: Enable, PickuTextInAreaBgrColor
-       GuiControl, SettingsGUIA: Disable, TextInAreaOnlyBorder
+       GuiControl, SettingsGUIA: Enable, TextInAreaBgrUnified
+       GuiControl, SettingsGUIA: Enable, TextInAreaBgrEntire
+       GuiControl, SettingsGUIA: Enable, TextInAreaCutOutMode
     } Else
     {
+       GuiControl, SettingsGUIA: Disable, TextInAreaBgrUnified
+       GuiControl, SettingsGUIA: Disable, TextInAreaBgrEntire
+       GuiControl, SettingsGUIA: Disable, TextInAreaCutOutMode
        GuiControl, SettingsGUIA: Disable, TextInAreaBgrOpacity
        GuiControl, SettingsGUIA: Disable, TextInAreaBgrColor
-       GuiControl, SettingsGUIA: Disable, TextInAreaRoundBoxBgr
        GuiControl, SettingsGUIA: Disable, PickuTextInAreaBgrColor
-       GuiControl, SettingsGUIA: Enable, TextInAreaOnlyBorder
     }
+
+    If (TextInAreaPaintBgr=1 && TextInAreaBgrUnified!=1)
+    {
+       GuiControl, SettingsGUIA: Enable, TextInAreaBgrEntire
+       GuiControl, SettingsGUIA: Enable, TextInAreaCutOutMode
+    } Else
+    {
+       GuiControl, SettingsGUIA: Disable, TextInAreaBgrEntire
+       GuiControl, SettingsGUIA: Disable, TextInAreaCutOutMode
+    }
+
+    If (TextInAreaBorderOut>1)
+    {
+       GuiControl, SettingsGUIA: Enable, editF7
+       GuiControl, SettingsGUIA: Enable, editF2
+       GuiControl, SettingsGUIA: Enable, TextInAreaBorderSize
+       GuiControl, SettingsGUIA: Enable, TextInAreaBorderColor
+       GuiControl, SettingsGUIA: Enable, TextInAreaBorderOpacity
+       GuiControl, SettingsGUIA: Enable, TextInAreaBlurBorderAmount
+       GuiControl, SettingsGUIA: Enable, PickuTextInAreaBorderColor
+       GuiControl, SettingsGUIA: Enable, TextInAreaOnlyBorder
+    } Else
+    {
+       GuiControl, SettingsGUIA: Disable, editF7
+       GuiControl, SettingsGUIA: Disable, editF2
+       GuiControl, SettingsGUIA: Disable, TextInAreaBorderSize
+       GuiControl, SettingsGUIA: Disable, TextInAreaBorderColor
+       GuiControl, SettingsGUIA: Disable, TextInAreaBorderOpacity
+       GuiControl, SettingsGUIA: Disable, TextInAreaBlurBorderAmount
+       GuiControl, SettingsGUIA: Disable, PickuTextInAreaBorderColor
+       GuiControl, SettingsGUIA: Disable, TextInAreaOnlyBorder
+    }
+
+    If (TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1)
+       GuiControl, SettingsGUIA: Enable, TextInAreaRoundBoxBgr
+    Else
+       GuiControl, SettingsGUIA: Disable, TextInAreaRoundBoxBgr
 
     SetTimer, WriteSettingsTextAreaPanel, -300
     If (actionu!="noPreview" && TextInAreaLivePreview=1)
@@ -17584,18 +18133,31 @@ updateUIInsertTextPanel(actionu:=0) {
 
 WriteSettingsTextAreaPanel() {
     INIaction(1, "TextInAreaAlign", "General")
+    INIaction(1, "TextInAreaAutoWrap", "General")
+    INIaction(1, "TextInAreaLineAngle", "General")
+    INIaction(1, "TextInAreaCharSpacing", "General")
     INIaction(1, "TextInAreaValign", "General")
     INIaction(1, "TextInAreaBlurAmount", "General")
+    INIaction(1, "TextInAreaBlurBorderAmount", "General")
+    INIaction(1, "TextInAreaUsrMarginz", "General")
     INIaction(1, "TextInAreaBgrColor", "General")
+    INIaction(1, "TextInAreaBgrEntire", "General")
+    INIaction(1, "TextInAreaBgrUnified", "General")
+    INIaction(1, "TextInAreaCutOutMode", "General")
     INIaction(1, "TextInAreaBgrOpacity", "General")
     INIaction(1, "TextInAreaBorderSize", "General")
+    INIaction(1, "TextInAreaBorderOut", "General")
+    INIaction(1, "TextInAreaBorderColor", "General")
+    INIaction(1, "TextInAreaBorderOpacity", "General")
     INIaction(1, "TextInAreaFontBold", "General")
     INIaction(1, "TextInAreaFontColor", "General")
     INIaction(1, "TextInAreaFontItalic", "General")
     INIaction(1, "TextInAreaFontName", "General")
     INIaction(1, "TextInAreaFontOpacity", "General")
     INIaction(1, "TextInAreaFontSize", "General")
+    INIaction(1, "TextInAreaFontStrike", "General")
     INIaction(1, "TextInAreaFontUline", "General")
+    INIaction(1, "TextInAreaFontLineSpacing", "General")
     INIaction(1, "TextInAreaOnlyBorder", "General")
     INIaction(1, "TextInAreaPaintBgr", "General")
     INIaction(1, "TextInAreaRoundBoxBgr", "General")
@@ -18255,9 +18817,10 @@ InvokeCopyFiles() {
 }
 
 CopyMovePanelWindow() {
-    Global UsrEditFileDestination, BtnCpyMv
-    Static prevmainDynaFoldersListu, prevCurrentSLD, lastInvoked := 1
+    Global UsrEditFileDestination, BtnCpyMv, lastInvoked := 1
+    ; Static prevmainDynaFoldersListu, prevCurrentSLD
 
+    openingPanelNow := 1
     thisBtnHeight := createSettingsGUI(9, A_ThisFunc)
     btnWid := 125
     btnWid2 := 60
@@ -18293,17 +18856,19 @@ CopyMovePanelWindow() {
        listu .= OutDir "`n"
     } 
 
-    If (prevmainDynaFoldersListu && prevCurrentSLD=CurrentSLD) && (A_TickCount - lastInvoked<45670)
-    {
-       mainDynaFoldersListu := prevmainDynaFoldersListu
-    } Else
-    {
-       prevmainDynaFoldersListu := mainDynaFoldersListu := InStr(DynamicFoldersList, "|hexists|") ? coreLoadDynaFolders(CurrentSLD) : DynamicFoldersList
+    ; If (prevmainDynaFoldersListu && prevCurrentSLD=CurrentSLD) && (A_TickCount - lastInvoked<45670)
+    ; {
+    ;    mainDynaFoldersListu := prevmainDynaFoldersListu
+    ; } Else
+    ; {
+       ; prevmainDynaFoldersListu := mainDynaFoldersListu := InStr(DynamicFoldersList, "|hexists|") ? coreLoadDynaFolders(CurrentSLD) : DynamicFoldersList
+       DynamicFoldersList := InStr(DynamicFoldersList, "|hexists|") ? coreLoadDynaFolders(CurrentSLD) : DynamicFoldersList
+       ; DynamicFoldersList := mainDynaFoldersListu
        prevCurrentSLD := CurrentSLD
        lastInvoked := A_TickCount
-    }
+    ; }
 
-    Loop, Parse, mainDynaFoldersListu, `n
+    Loop, Parse, DynamicFoldersList, `n
     {
         If (A_Index>15)
            Break
@@ -18357,6 +18922,7 @@ CopyMovePanelWindow() {
     Gui, Add, Button, x+5 hp wp+60 gBtnMarkFilesExplorer, &Mark file(s) (Explorer)
     Gui, Add, Button, x+5 hp w70 gBtnCloseWindow, C&ancel
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, btnName " file(s) to...: " appTitle)
+    SetTimer, resetOpeningPanel, -300
 }
 
 BtnHelpCopyMovePanel() {
@@ -19302,8 +19868,9 @@ addStaticFolderSQLdb(whichFolder, fileMdate, renewList) {
 }
 
 RefreshImageFileAction() {
+   isThumbMode := (thumbsDisplaying=1 && maxFilesIndex>1) ? 1 : 0
    imgPath := getIDimage(currentFileIndex)
-   If (!useGdiBitmap() || !imgPath)
+   If (!useGdiBitmap() || !imgPath) && (isThumbMode!=1)
    {
       showTOOLtip("WARNING: No image file is currently loaded...")
       SoundBeep , 300, 100
@@ -20076,14 +20643,9 @@ restartAppu() {
 
    ; writeMainSettings()
    If A_IsCompiled
-   {
-      Run, "%fullPath2exe%"
-   } Else
-   {
-      Current_PID := GetCurrentProcessId()
-      fullPath2exe := GetModuleFileNameEx(Current_PID)
-      Run, "%fullPath2exe%" "%A_ScriptFullPath%"
-   }
+      Try Run, "%fullPath2exe%"
+   Else
+      Try Run, %unCompiledExePath%
 
    TrueCleanup(0)
    Sleep, 5
@@ -20523,22 +21085,22 @@ BuildMenu() {
    ;    Menu, PVselv, Check, &Relative coordinates
    If (undoLevelsRecorded>1 && undoLevelsRecorded!="")
    {
-      Menu, PVselv, Add, &Undo selection`tCtrl+Shift+Z, ImgSelUndoAct
-      Menu, PVselv, Add, &Redo selection`tCtrl+Shift+Y, ImgSelRedoAct
+      Menu, PVselv, Add, &Undo`tCtrl+Shift+Z, ImgSelUndoAct
+      Menu, PVselv, Add, &Redo`tCtrl+Shift+Y, ImgSelRedoAct
       Menu, PVselv, Add,
    }
-   Menu, PVselv, Add, &Show selection`tD, toggleImgSelection
+   Menu, PVselv, Add, &Show`tD, toggleImgSelection
    If (activateImgSelection=1)
-      Menu, PVselv, Check, &Show selection`tD
-   Menu, PVselv, Add, &Edit selection`tE, ToggleEditImgSelection
+      Menu, PVselv, Check, &Show`tD
+   Menu, PVselv, Add, &Edit selection area`tE, ToggleEditImgSelection
    If (editingSelectionNow=1)
-      Menu, PVselv, Check, &Edit selection`tE
-   Menu, PVselv, Add, &Drop selection`tCtrl+D, resetImgSelection
-   Menu, PVselv, Add, &Reset selection, newImgSelection
+      Menu, PVselv, Check, &Edit selection area`tE
+   Menu, PVselv, Add, &Drop`tCtrl+D, resetImgSelection
+   Menu, PVselv, Add, &Reset, newImgSelection
    Menu, PVselv, Add, &Select all`tCtrl+A, selectEntireImage
    Menu, PVselv, Add, 
    Menu, PVselv, Add, Transform to s&quare ratio (1:1)`tR, makeSquareSelection
-   Menu, PVselv, Add, &Flip selection W/H, flipSelectionWH
+   Menu, PVselv, Add, &Flip width / height, flipSelectionWH
    Menu, PVselv, Add, Ell&ipse selection`tShift+E, toggleEllipseSelection
    Menu, PVselv, Add, Limit selection to image bo&undaries`tL, toggleLimitSelection
    Menu, PVselv, Add, 
@@ -20700,12 +21262,12 @@ BuildMenu() {
    }
 
    Menu, PVperfs, Add, &Limit memory usage, ToggleLimitMemUsage
-   Menu, PVperfs, Add, &Allow multi-threaded processing, ToggleMultiCoreSupport
+   Menu, PVperfs, Add, &Allow multi-threaded processing (%realSystemCores%), PanelSetSystemCores
    If (minimizeMemUsage=1)
-      Menu, PVperfs, Disable, &Allow multi-threaded processing
+      Menu, PVperfs, Disable, &Allow multi-threaded processing (%realSystemCores%)
    If (A_PtrSize=4)
    {
-      Menu, PVperfs, Disable, &Allow multi-threaded processing
+      Menu, PVperfs, Disable, &Allow multi-threaded processing (%realSystemCores%)
       Menu, PVperfs, Disable, &Limit memory usage
       Menu, PVperfs, Check, &Limit memory usage
    }
@@ -20722,14 +21284,13 @@ BuildMenu() {
    If (minimizeMemUsage=1)
       Menu, PVperfs, Check, &Limit memory usage
    If (allowMultiCoreMode=1)
-      Menu, PVperfs, Check, &Allow multi-threaded processing
+      Menu, PVperfs, Check, &Allow multi-threaded processing (%realSystemCores%)
    If (ColorDepthDithering=1)
       Menu, PVperfs, Check, &Perform dithering on color depth changes
    If (userimgQuality=1)
       Menu, PVperfs, Check, &High quality image resampling
    If (userHQraw=1)
       Menu, PVperfs, Check, &Load Camera RAW files in high quality
-
 
    Menu, PVprefs, Add, Save settings into a .SLD file, WritePrefsIntoSLD
    Menu, PVprefs, Add, &Never load settings from a .SLD, ToggleIgnoreSLDprefs
@@ -20762,14 +21323,19 @@ BuildMenu() {
 
    Menu, PVprefs, Add, 
    If (skipSeenImagesSlider=1)
-      Menu, PVprefs, Add, Seen images database options, PanelJournalWindow
+      Menu, PVprefs, Add, Seen images database options, PanelSeenIMGsOptions
    If FolderExist(thumbsCacheFolder)
       Menu, PVprefs, Add, Erase cached thumbnails, PanelOlderThanEraseThumbsCache
    Menu, PVprefs, Add, Cache / store generated thumbnails, ToggleThumbsCaching
    If (alwaysOpenwithFIM=1)
       Menu, PVprefs, Check, Load an&y image format using FreeImage
    If (enableThumbsCaching=1)
+   {
       Menu, PVprefs, Check, Cache / store generated thumbnails
+      friendly := (markedSelectFile>1) ? "selected" : "all"
+      If (thumbsDisplaying=1 && thumbnailsListMode!=1)
+         Menu, PVprefs, Add, Regenerate on-demand %friendly% thumbnails`tAlt+F5, DeepRefreshThumbsNow
+   }
 
    Menu, PVopenF, Add, &Image or slideshow`tCtrl+O, OpenDialogFiles
    Menu, PVopenF, Add, &Folder recursively`tShift+O, OpenFolders
@@ -21012,7 +21578,7 @@ createMenuInterfaceOptions() {
       Menu, PvUIprefs, Add, &Hide title bar, ToggleTitleBaru
       If (getCaptionStyle(PVhwnd)=1)
          Menu, PvUIprefs, Check, &Hide title bar
-   } Else If (thumbnailsListMode!=1 && thumbsDisplaying=1) 
+   } Else If (thumbnailsListMode!=1 && thumbsDisplaying=1 && !AnyWindowOpen)
       Menu, PvUIprefs, Add, &Set thumbnails columns, PanelSetThumbCols
 
    Menu, PvUIprefs, Add,
@@ -21042,8 +21608,10 @@ createMenuInterfaceOptions() {
 
    Menu, PvUIprefs, Add, 
    If !AnyWindowOpen
+   {
       Menu, PvUIprefs, Add, Additional settings`tF12, openPrefsPanelWindow
-   Menu, PvUIprefs, Add, Journal / session log`tShift + [``], PanelJournalWindow
+      Menu, PvUIprefs, Add, Journal / session log`tShift + [``], PanelJournalWindow
+   }
 
    If (PrefsLargeFonts=1)
       Menu, PvUIprefs, Check, &Large UI fonts
@@ -22021,14 +22589,14 @@ getCurrentDate() {
 }
 
 destroyGDIPcanvas() {
-    SelectObject(glHDC, glOBM)
-    DeleteObject(glHbitmap)
-    DeleteDC(glHDC)
+    Gdi_SelectObject(glHDC, glOBM)
+    Gdi_DeleteObject(glHbitmap)
+    Gdi_DeleteDC(glHDC)
     Gdip_DeleteGraphics(glPG)
 
-    SelectObject(2NDglHDC, 2NDglOBM)
-    DeleteObject(2NDglHbitmap)
-    DeleteDC(2NDglHDC)
+    Gdi_SelectObject(2NDglHDC, 2NDglOBM)
+    Gdi_DeleteObject(2NDglHbitmap)
+    Gdi_DeleteDC(2NDglHDC)
     Gdip_DeleteGraphics(2NDglPG)
 }
 
@@ -22052,15 +22620,15 @@ createGDIPcanvas(W:=0, H:=0) {
       PixelMode := (userimgQuality=1) ? 2 : 0
       smoothMode := (userimgQuality=1) ? 4 : 1
       compositingQuality := (userimgQuality=1) ? 0 : 1
-      glHDC := CreateCompatibleDC()
-      glHbitmap := CreateDIBSection(W, H)
-      glOBM := SelectObject(glHDC, glHbitmap)
+      glHDC := Gdi_CreateCompatibleDC()
+      glHbitmap := Gdi_CreateDIBSection(W, H)
+      glOBM := Gdi_SelectObject(glHDC, glHbitmap)
       glPG := Gdip_GraphicsFromHDC(glHDC, 0, imgQuality, smoothMode,, compositingQuality)
       Gdip_SetPixelOffsetMode(glPG, PixelMode)
 
-      2NDglHDC := CreateCompatibleDC()
-      2NDglHbitmap := CreateDIBSection(W, H)
-      2NDglOBM := SelectObject(2NDglHDC, 2NDglHbitmap)
+      2NDglHDC := Gdi_CreateCompatibleDC()
+      2NDglHbitmap := Gdi_CreateDIBSection(W, H)
+      2NDglOBM := Gdi_SelectObject(2NDglHDC, 2NDglHbitmap)
       2NDglPG := Gdip_GraphicsFromHDC(2NDglHDC, 0, imgQuality, smoothMode,, compositingQuality)
       Gdip_SetPixelOffsetMode(2NDglPG, PixelMode)
 
@@ -23151,6 +23719,15 @@ clampInRange(value, min, max, reverse:=0) {
    Return value
 }
 
+clampValue(value, min, max) {
+   If (value>max && max!="-")
+      value := max
+   Else If (value<min && min!="-")
+      value := min
+
+   Return value
+}
+
 changeOSDfontSize(direction) {
   stepu := (OSDfntSize>30) ? 5 : 2
   If (direction=1)
@@ -23338,7 +23915,7 @@ LoadFileWithWIA(imgPath, fastMode) {
          oBitmap := trGdip_CreateARGBBitmapFromHBITMAP(PicObj.Handle)
       Else
          oBitmap := trGdip_CreateBitmapFromHBITMAP(PicObj.Handle)
-      DeleteObject(PicObj.Handle)
+      Gdi_DeleteObject(PicObj.Handle)
    }
 
    wiaImg := ""
@@ -24059,9 +24636,12 @@ createHistogramBMP(whichBitmap) {
    infoAvg := " | Avg: " avgBrLvlK avgPrc " | Min: " minBrLvlK2[2] - 1 minPrc
    infoMin := "`nMedian: " medianValue medianPrc meanValueK
    entireString := infoRange infoPeak infoAvg infoMin "`nTotal pixels: " TotalPixelzSpaced
-   infoBoxBMP := drawTextInBox(entireString, OSDFontName, OSDfntSize//1.5, mainWidth//1.3, mainHeight//1.3, OSDtextColor, OSDbgrColor, 1, 0)
+   If (slideShowRunning=1)
+      infoBoxBMP := trGdip_CreateBitmap(5, 5)
+   Else
+      infoBoxBMP := drawTextInBox(entireString, OSDFontName, OSDfntSize//1.5, mainWidth//1.3, mainHeight//1.3, OSDtextColor, OSDbgrColor, 1, 0)
    ; tooltip, % "|" TotalPixelz "|" modePointV ", " 2ndMaxV ", " avgBrLvlV " || "  maxW "," maxH  ;  `n" PointsList
-   Scale := imgHUDbaseUnit/40
+   Scale := (slideShowRunning=1) ? imgHUDbaseUnit/50 : imgHUDbaseUnit/40
    If (rangeC<2)
       f2ndMaxV := modePointK2[1] - 1
 
@@ -24082,16 +24662,15 @@ createHistogramBMP(whichBitmap) {
 }
 
 groupDigits(nrIn, delim:=" ") {
-   nrOut := nrIn
-   If StrLen(nrOut)>3
-      nrOut := ST_Insert(delim, nrOut, StrLen(nrOut) - 2)
-   If StrLen(nrOut)>7
-      nrOut := ST_Insert(delim, nrOut, StrLen(nrOut) - 6)
-   If StrLen(nrOut)>11
-      nrOut := ST_Insert(delim, nrOut, StrLen(nrOut) - 10)
-   If StrLen(nrOut)>15
-      nrOut := ST_Insert(delim, nrOut, StrLen(nrOut) - 14)
-   Return nrOut
+   If StrLen(nrin)>3
+      nrIn := ST_Insert(delim, nrIn, StrLen(nrIn) - 2)
+   If StrLen(nrin)>7
+      nrIn := ST_Insert(delim, nrIn, StrLen(nrIn) - 6)
+   If StrLen(nrin)>11
+      nrIn := ST_Insert(delim, nrIn, StrLen(nrIn) - 10)
+   If StrLen(nrin)>15
+      nrIn := ST_Insert(delim, nrIn, StrLen(nrIn) - 14)
+   Return nrIn
 }
 
 defineRelativeSelCoords(maxSelX, maxSelY) {
@@ -25366,17 +25945,15 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
               hitTestSelectionPath := Gdip_CreatePath()
               Gdip_AddPathRectangle(hitTestSelectionPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
            }
-
+           whichFunc := (vPselRotation!=0) ? "Ellipse" : "Rectangle"
            ; Gdip_RotatePathAtCenter(hitTestSelectionPath, vPselRotation)
-           Gdip_FillRectangle(2NDglPG, pBrushD, selDotX, selDotY, dotsSize, dotsSize)
-           Gdip_FillRectangle(2NDglPG, pBrushD, SelDotAx, SelDotAy, dotsSize, dotsSize)
-           Gdip_FillRectangle(2NDglPG, pBrushD, SelDotBx, SelDotBy, dotsSize, dotsSize)
-           Gdip_FillRectangle(2NDglPG, pBrushD, SelDotCx, SelDotCy, dotsSize, dotsSize)
-           ; If (imgEditPanelOpened=1)
-           ; {
-              ; Gdip_FillEllipse(2NDglPG, pBrushD, SelDotDx, SelDotDy, dotsSize*2, dotsSize*2)
-              Gdip_FillEllipse(2NDglPG, pBrushE, SelDotDx, SelDotDy, dotsSize, dotsSize)
-           ; }
+           Gdip_Fill%whichFunc%(2NDglPG, pBrushD, selDotX, selDotY, dotsSize, dotsSize)
+           Gdip_Fill%whichFunc%(2NDglPG, pBrushD, SelDotAx, SelDotAy, dotsSize, dotsSize)
+           Gdip_Fill%whichFunc%(2NDglPG, pBrushD, SelDotBx, SelDotBy, dotsSize, dotsSize)
+           Gdip_Fill%whichFunc%(2NDglPG, pBrushD, SelDotCx, SelDotCy, dotsSize, dotsSize)
+           If (vPselRotation!=0)
+              Gdip_FillEllipse(2NDglPG, pBrushD, SelDotDx - dotsSize/3.5, SelDotDy - dotsSize/3.5, dotsSize*1.5, dotsSize*1.5)
+           Gdip_FillEllipse(2NDglPG, pBrushE, SelDotDx, SelDotDy, dotsSize, dotsSize)
         }
         If StrLen(ImgSelPath)>2
            Gdip_DeletePath(ImgSelPath)
@@ -25554,7 +26131,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
 
     prevLoadedImageIndex := currentFileIndex
     createGDIPcanvas(mainWidth, mainHeight)
-    testIDvPcache := imgPath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight desiredFrameIndex
+    testIDvPcache := imgPath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight desiredFrameIndex gdiBitmap
     If (CountGIFframes>1 && !AnyWindowOpen && animGIFsSupport=1 && prevAnimGIFwas!=imgPath)
        mustPlayAnim := 1
     Else
@@ -25659,8 +26236,8 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
        diffIMGdecX := diffIMGdecY := 0
 
     If !(currIMGdetails.HasAlpha=1 && RenderOpaqueIMG=1)
+       zL := (zoomLevel<1) ? 1 : zoomLevel*2
 
-    zL := (zoomLevel<1) ? 1 : zoomLevel*2
     If (imgFxMode!=8)
     {
        dpX := clampInRange(DestPosX + 1, 0, mainWidth)
@@ -25675,7 +26252,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
        Gdip_ResetClip(glPG)
     }
 
-    thisIDviewPortCache := imgPath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight usePrevious desiredFrameIndex
+    thisIDviewPortCache := imgPath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight usePrevious desiredFrameIndex gdiBitmap whichBitmap
     If (thisIDviewPortCache!=IDviewPortCache || !ViewPortBMPcache || CountGIFframes>1) && (usePrevious!=1)
     {
        prevDestPosX := DestPosX
@@ -25743,7 +26320,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
           Gdip_ResetClip(glPG)
 
        ; ToolTip, %imgW% -- %imgH% == %newW% -- %newH%
-       mustDisplay := 1
+       ; mustDisplay := 1
        If (usePrevious!=1)
        {
           If (IMGresizingMode=4 && canvasClipped=1 && ViewPortBMPcache)
@@ -25753,11 +26330,11 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
           }
 
           ViewPortBMPcache := trGdip_DisposeImage(ViewPortBMPcache, 1)
-          IDviewPortCache := imgPath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight usePrevious desiredFrameIndex
-          PREVtestIDvPcache := imgPath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight desiredFrameIndex
+          IDviewPortCache := thisIDviewPortCache
+          PREVtestIDvPcache := testIDvPcache
           ViewPortBMPcache := trGdip_CreateBitmapFromHBITMAP(glHbitmap)
        }
-    } Else mustDisplay := 1
+    } ; Else mustDisplay := 1
     ; tooltip, % dontMove " - " diffIMGdecX " - " diffIMGdecY " - " r3
 
     If (diffIMGdecX || diffIMGdecY) && (prevGDIvpCache && canvasClipped=1)
@@ -25774,7 +26351,6 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     } Else prevGDIvpCache := trGdip_DisposeImage(prevGDIvpCache, 1)
 
     setMainCanvasTransform(mainWidth, mainHeight)
-
     confirmTexBGR := (vpIMGrotation=0 || vpIMGrotation=90 || vpIMGrotation=180 || vpIMGrotation=270) ? 1 : 0
     If (usrTextureBGR=1 && confirmTexBGR=1)
     {
@@ -25796,7 +26372,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
 
     drawHUDelements(1, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, imgPath)
     Gdip_ResetWorldTransform(glPG)
-    If (minimizeMemUsage!=1 && mustDisplay=1 && slideShowRunning=1 && doSlidesTransitions=1 && slideShowDelay>950 && GDIfadeVPcache && animGIFplaying!=1)
+    If (minimizeMemUsage!=1 && slideShowRunning=1 && doSlidesTransitions=1 && slideShowDelay>950 && GDIfadeVPcache && animGIFplaying!=1)
     {
        setWindowTitle(pVwinTitle, 1)
        ForceRefreshNowThumbsList()
@@ -25823,9 +26399,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
        imageHasFaded := 1
     }
 
-    If (mustDisplay=1)
-       r2 := LrydWinUpdt(hGDIwin, glHDC)
-
+    r2 := LrydWinUpdt(hGDIwin, glHDC)
     If (imageHasFaded=1)
        r2 := LrydWinUpdt(hGDIthumbsWin, 2NDglHDC)
 
@@ -26389,7 +26963,7 @@ clearGivenGDIwin(Gu, DCu, hwnd) {
     Return r
 }
 
-QPV_listThumbnailsGridMode(startIndex) {
+QPV_listThumbnailsGridMode() {
     setImageLoading()
     Gdip_GraphicsClear(2NDglPG, "0xFF" WindowBgrColor)
     thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, startIndex, mainWidth, mainHeight)
@@ -26837,24 +27411,24 @@ StrToObject(stringu) {
   Return newArrayu
 }
 
-QPV_ShowThumbnails(startIndex) {
+QPV_ShowThumbnails() {
     Critical, on
 
     prevFullThumbsUpdate := A_TickCount
     mainStartZeit := A_TickCount
+    thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, startIndex, mainWidth, mainHeight)
     If (thumbnailsListMode=1)
     {
-       QPV_listThumbnailsGridMode(startIndex)
+       QPV_listThumbnailsGridMode()
        Return
     }
 
-    thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, ignoreVaru, mainWidth, mainHeight)
     setImageLoading()
     thumbsBitmap := trGdip_CreateBitmap(mainWidth, mainHeight, 0xE200B)
     G2 := Gdip_GraphicsFromImage(thumbsBitmap, 5, 1)
     hasUpdated := rowIndex := imgsListed := 0
     maxImgSize := maxZeit := columnIndex := -1
-
+    fnOutputDebug("begin show " maxItemsPage " thumbs from index " startIndex)
     setPriorityThread(-2)
     DestroyGIFuWin()
     createThumbsFolder()
@@ -26886,6 +27460,7 @@ QPV_ShowThumbnails(startIndex) {
         DestPosY := thumbsH//2 + thumbsH*rowIndex
         memCached := wasThumbCached := 0
         MD5name := generateThumbName(imgPath, 1, 1)
+        isForceRefresh := resultedFilesList[thisFileIndex, 4]
         If (thisFileDead=1)
         {
            imgsListArrayThumbs[thisFileIndex] := ["x", 0, imgPath, MD5name, DestPosX, DestPosY, MD5name]
@@ -26907,12 +27482,17 @@ QPV_ShowThumbnails(startIndex) {
         }
 
         imgsMustPaint++
-        If (memCached=1 || wasThumbCached=1 || thisFileDead=1)
+        If (memCached=1 || wasThumbCached=1 || thisFileDead=1) && (isForceRefresh!=1)
            Continue
 
         imgsNotCached++
         ; Gdip_FillRectangle(glPG, pBrushE, DestPosX - 10, DestPosY - 10, 20, 20)
         file2save := thumbsCacheFolder "\" thumbsSizeQuality "-" MD5name ".jpg"
+        If (isForceRefresh=1)
+        {
+           FileDelete, % file2save
+           resultedFilesList[thisFileIndex, 4] := 0
+        }
         thisW := imgPath ? "w" : "x"
         imgsListArrayThumbs[thisFileIndex] := [thisW, 0, imgPath, file2save, DestPosX, DestPosY, MD5name]
         ;    fnoutputdebug("thumbs prepare " imgPath "|" thisFileIndex "|" MD5name)
@@ -27541,6 +28121,8 @@ coreLoadDynaFolders(fileNamu) {
        If (countFails>3)
           Break
    }
+
+   DynamicFoldersList := StrReplace(DynamicFoldersList, "|hexists|")
    listu := listu "`n" Trimmer(DynamicFoldersList) "`n"
    changeMcursor()
    Sort, listu, UD`n
@@ -27610,12 +28192,15 @@ RegenerateEntireList() {
        SetTimer, RemoveTooltip, % -msgDisplayTime
     } Else
     {
+       thisFolder := StrReplace(CurrentSLD, "|")
        If (SLDtypeLoaded=3)
           SQLdbGenerateStaticFolders()
+       Else If (SLDtypeLoaded=1 && FolderExist(thisFolder))
+          watchFolderDetails := getFolderDetails(thisFolder)
+
        GenerateRandyList()
        SoundBeep, 900, 100
        currentFileIndex := clampInRange(thisIndex, 1, maxFilesIndex)
-       thisFolder := StrReplace(CurrentSLD, "|")
        If (maxFilesIndex<1)
        {
           friendly := (SLDtypeLoaded=1 && FolderExist(thisFolder)) ? "No image files found in the folder:`n" thisFolder "\`n`n" : "Error refreshing files list... found nothing.`n`n"
@@ -28341,7 +28926,6 @@ PopulateAboutKbdShortcutsList(listFilter:=0) {
     startZeit := A_TickCount
  
     FileRead, fileData, % mainCompiledPath "\help-keyboard-shortcuts.txt"
-
     startOperation := A_TickCount
     Loop, Parse, fileData, `n, `r
     {
@@ -28520,6 +29104,7 @@ BtnPerformJpegOp() {
     SetTimer, reactivateMainBtnACT, -800
     If r
     {
+       resultedFilesList[currentFileIndex, 4] := 1
        FlipImgV := FlipImgH := vpIMGrotation := 0
        showTOOLtip("JPEG operation completed succesfully.")
        RefreshImageFile()
@@ -28629,9 +29214,10 @@ batchJpegLLoperations() {
 
       r := coreJpegLossLessAction(file2rem, jpegDesiredOperation, jpegDoCrop)
       If r
+      {
+         resultedFilesList[thisFileIndex, 4] := 1
          countFilez++
-      Else
-         failedFiles++
+      } Else failedFiles++
    }
 
    If (failedFiles>0)
@@ -28686,8 +29272,8 @@ coreJpegLossLessAction(imgPath, jpegOperation, mustCrop) {
 }
 
 toggleImgEditPanelWindow(dummy:="") {
-   Static Width := 0, Height := 0
-   If (AnyWindowOpen!=10 && imgEditPanelOpened!=1 && dummy!="forced")
+   Static Width := 0, Height := 0, lastInvoked := A_TickCount
+   If (AnyWindowOpen!=10 && imgEditPanelOpened!=1 && dummy!="forced") || (A_TickCount - lastInvoked<350)
       Return
 
    ; WinGetPos, , , nWidth, nHeight, ahk_id %hSetWinGui%
@@ -28715,6 +29301,7 @@ toggleImgEditPanelWindow(dummy:="") {
       ; WinSet, Enable,, ahk_id %hSetWinGui%
       panelWinCollapsed := 0
    }
+   lastInvoked := A_TickCount
    interfaceThread.ahkassign("panelWinCollapsed", panelWinCollapsed)
 }
 
@@ -28725,12 +29312,12 @@ PanelColorsAdjusterWindow() {
          , infoRGBchnls, RGBcbList := "-3.0|-2.0|-1.5|-1.0|-0.9|-0.8|-0.7|-0.6|-0.5|-0.4|-0.3|-0.2|-0.1|0.0|0.1|0.2|0.3|0.4|0.5|0.6|0.7|0.8|0.9|1.0|1.5|2.0|3.0"
          , infoRealGammos, infoThreshold, UIimgThreshold, UIrealGammos, infoImgRotation, UIdoubleZoom
 
-    If (thumbsDisplaying=1 || StrLen(gdiBitmap)<4)
+    If (thumbsDisplaying=1 || StrLen(gdiBitmap)<4 || openingPanelNow=1)
        Return
 
     ; If (activateImgSelection=1)
     ;    toggleImgSelection()
-
+    openingPanelNow := 1
     setImageLoading()
     showTOOLtip("Opening colors adjustments panel, please wait...")
     imgEditPanelOpened := 1
@@ -28834,8 +29421,13 @@ PanelColorsAdjusterWindow() {
     Sleep, 1
     updatePanelColorsInfo()
     updatePanelColorSliderz()
+    SetTimer, resetOpeningPanel, -300
     SetTimer, RemoveTooltip, -100
     SetTimer, ResetImgLoadStatus, -50
+}
+
+resetOpeningPanel() {
+    openingPanelNow := 0
 }
 
 BtnResetBrightness() {
@@ -29873,6 +30465,18 @@ BTNchangeResizeDestFolder() {
    }
 }
 
+setForceRefreshThumbsFilesIndex(onlySelected) {
+   Loop, % maxFilesIndex
+   {
+      isSelected := resultedFilesList[A_Index, 2]
+      If (isSelected!=1 && onlySelected=1)
+         Continue
+
+      resultedFilesList[A_Index, 4] := 1
+   }
+   ForceRefreshNowThumbsList()
+}
+
 batchIMGresizer(desiredW, desiredH, isPercntg) {
    cleanResizeUserOptionsVars()
    If (!desiredH || !desiredW
@@ -29963,8 +30567,11 @@ batchIMGresizer(desiredW, desiredH, isPercntg) {
       Else
          destImgPath := fOutDir "\" OutFileName
 
-      If (FileExist(destImgPath) && !FolderExist(destImgPath))
-         destImgPath := askAboutFileCollision(imgPath, destImgPath, 1, 0, userActionConflictingFile, performOverwrite)
+      If (userUnsprtWriteFMT!=1 || ResizeUseDestDir=1)
+      {
+         If (FileExist(destImgPath) && !FolderExist(destImgPath))
+            destImgPath := askAboutFileCollision(imgPath, destImgPath, 1, 0, userActionConflictingFile, performOverwrite)
+      }
 
       If !destImgPath
       {
@@ -31431,9 +32038,11 @@ StrPutVar(string, ByRef var, encoding) {
 }
 
 PopulateDynamicFolderzList() {
-    foldersListu := InStr(DynamicFoldersList, "|hexists|") ? coreLoadDynaFolders(CurrentSLD) : DynamicFoldersList
+    If InStr(DynamicFoldersList, "|hexists|")
+       DynamicFoldersList := coreLoadDynaFolders(CurrentSLD)
+
     Gui, SettingsGUIA: ListView, LViewDynas
-    Loop, Parse, foldersListu, `n
+    Loop, Parse, DynamicFoldersList, `n
     {
         line := Trimmer(A_LoopField)
         If (StrLen(line)<2 || line="|hexists|")
@@ -31489,12 +32098,12 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
     {
        activateImgSelection := editingSelectionNow := prevOpenedWindow[4]
        TriggerMenuBarUpdate()
+       livePreviewInsertTextinArea("kill")
        If (cleanCaches!=0)
        {
           coreFillSelectedArea("kill")
           corePasteInPlaceActNow("kill")
        }
-
        SetTimer, dummyRefreshImgSelectionWindow, -200
     }
 
@@ -31647,7 +32256,7 @@ Fnt_GetListOfFonts() {
 
     ;-- Enumerate fonts
     EFFEP := RegisterCallback("Fnt_EnumFontFamExProc","F")
-    hDC := GetDC(HWND_DESKTOP)
+    hDC := Gdi_GetDC(HWND_DESKTOP)
     DllCall("gdi32\EnumFontFamiliesExW"
        ,"Ptr", hDC                                      ;-- hdc
        ,"Ptr", &LOGFONT                                 ;-- lpLogfont
@@ -31687,13 +32296,21 @@ SetVolume(val:=100, r:="") {
   Try DllCall("winmm\waveOutSetVolume", "UInt", 0, "UInt", (v|vr<<16))
 }
 
-initCompiled() {
+initCompiled(mode) {
    Current_PID := GetCurrentProcessId()
    fullPath2exe := GetModuleFileNameEx(Current_PID)
-   zPlitPath(fullPath2exe, 0, OutFileName, OutDir)
-   mainCompiledPath := OutDir
-   thumbsCacheFolder := OutDir "\thumbs-cache"
-   mainSettingsFile := OutDir "\" mainSettingsFile
+   If (mode=1)
+   {
+      zPlitPath(fullPath2exe, 0, OutFileName, OutDir)
+      mainCompiledExe := OutFileName
+      mainCompiledPath := OutDir
+      thumbsCacheFolder := OutDir "\thumbs-cache"
+      mainSettingsFile := OutDir "\" mainSettingsFile
+   } Else
+   {
+      mainCompiledPath := A_ScriptDir
+      unCompiledExePath := Chr(34) fullPath2exe Chr(34) A_Space Chr(34) A_ScriptFullPath Chr(34)
+   }
 }
 
 RunAdminMode() {
@@ -32054,7 +32671,7 @@ PanelImgAutoCrop() {
     If (filesElected>1)
     {
        Gui, Font, Bold
-       Gui, Add, Text, xs y+15 Section, Files selected to process: %filesElected%.`nMulti-threaded processing not yet implemented.
+       Gui, Add, Text, xs y+15 Section, Files selected to process: %filesElected%.`nMulti-threaded processing not yet implemented.`nFiles in unsupported write formats will be skipped.
        Gui, Font, Normal
     } 
     If !ResizeUseDestDir
@@ -32143,7 +32760,7 @@ captureImgCorners(whichBmp) {
    hBitmap := Gdip_CreateHBITMAPFromBitmap(cornersBMP2)
    SetImage(hCropCornersPic, hBitmap)
    trGdip_DisposeImage(cornersBMP2, 1)
-   DeleteObject(hBitmap)
+   Gdi_DeleteObject(hBitmap)
 }
 
 coreCaptureImgCorners(whichBmp, thisSize:=0, thisBoxSize:=0) {
@@ -32587,8 +33204,11 @@ batchAutoCropFiles() {
          destImgPath := ResizeDestFolder "\" OutFileName
       } Else destImgPath := imgPath
 
-      If (FileExist(destImgPath) && !FolderExist(destImgPath))
-         destImgPath := askAboutFileCollision(imgPath, destImgPath, 1, 0, userActionConflictingFile, performOverwrite)
+      If (ResizeUseDestDir=1)
+      {
+         If (FileExist(destImgPath) && !FolderExist(destImgPath))
+            destImgPath := askAboutFileCollision(imgPath, destImgPath, 1, 0, userActionConflictingFile, performOverwrite)
+      }
 
       countTFilez++
       If !destImgPath
@@ -32973,13 +33593,13 @@ PanelSimpleResizeRotate(modus:="") {
     Gui, Add, Edit, xs+15 y+5 w100 r1 limit9 -multi number -wantCtrlA -wantReturn -wantTab -wrap vSimpleOperationsScaleXimgFactor, % (ResizeInPercentage=1) ? 100 : oImgW
     Gui, Add, Edit, x+5 wp r1 limit9 -multi number -wantCtrlA -wantReturn -wantTab -wrap vSimpleOperationsScaleYimgFactor, % (ResizeInPercentage=1) ? 100 : oImgH
     Gui, Add, Checkbox, x+5 wp+30 hp gTglRszInPercentage Checked%ResizeInPercentage% vResizeInPercentage, in `% perc.
-    Gui, Add, Checkbox, xs y+10 Checked%SimpleOperationsDoCrop% vSimpleOperationsDoCrop, Crop image(s) to selected area
+    Gui, Add, Checkbox, xs y+10 Checked%SimpleOperationsDoCrop% vSimpleOperationsDoCrop, Crop image(s) to selected area in viewport
     Gui, Add, Checkbox, xs y+10 Checked%ResizeQualityHigh% vResizeQualityHigh, High quality image resampling
     Gui, Add, Checkbox, xs y+15 gTglRszDestFoldr Checked%ResizeUseDestDir% vResizeUseDestDir, Save file(s) in the specified destination folder:
     Gui, Add, Edit, xp+15 y+5 wp r1 +0x0800 -wrap vResizeDestFolder, % ResizeDestFolder
     Gui, Add, Button, x+5 hp w90 gBTNchangeResizeDestFolder vbtnFldr, C&hoose
-    Gui, Add, Text, xs y+7 , On file name conflicts
-    Gui, Add, DropDownList, x+5 w150 gTglOverwriteFiles AltSubmit Choose%userActionConflictingFile% vuserActionConflictingFile, Skip files|Auto-rename|Overwrite
+    Gui, Add, Text, xs+15 y+7 , In destination folder, on file name conflicts
+    Gui, Add, DropDownList, x+5 w140 gTglOverwriteFiles AltSubmit Choose%userActionConflictingFile% vuserActionConflictingFile, Skip files|Auto-rename|Overwrite
 
     Gui, Add, Text, xs y+10, Quality (1`% - 100`%):
     Gui, Add, Edit, x+5 w70 number -multi limit3 veditF5, % userJpegQuality
@@ -33274,8 +33894,12 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor) {
       zPlitPath(imgPath, 0, OutFileName, OutDir)
       destImgPath := (ResizeUseDestDir=1) ? ResizeDestFolder : OutDir
       file2save := destImgPath "\" OutFileName
-      If (FileExist(file2save) && !FolderExist(file2save))
-         file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
+
+      If (ResizeUseDestDir=1)
+      {
+         If (FileExist(file2save) && !FolderExist(file2save))
+            file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
+      }
 
       If !file2save
       {
@@ -34149,8 +34773,9 @@ OpenNewExternalCoreThread(thisIndex, args, thisList) {
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadJob%thisIndex%, 0
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%thisIndex%, 0
    RegWrite, REG_SZ, %QPVregEntry%\multicore, threadParams, %thisIndex%||%args%
-   thisPath := A_IsCompiled ? fullPath2exe : A_ScriptFullPath
-   Try Run, "%thisPath%",,, pidThread
+
+   thisPath := A_IsCompiled ? Chr(34) fullPath2exe Chr(34) : unCompiledExePath
+   Try Run, %thisPath%,,, pidThread
    Catch wasErrorB
        Sleep, 0
 
@@ -34169,7 +34794,7 @@ OpenNewExternalCoreThread(thisIndex, args, thisList) {
           If (thisThreadStarted=1 || thisThreadStarted=2 || thisThreadStarted=-1)
              Break
           Else
-             Sleep, 10
+             Sleep, 15
       }
 
       allGood := (thisThreadStarted=1 || thisThreadStarted=2) ? 1 : 0
@@ -34418,7 +35043,7 @@ printImageNow(PrintOptions, previewMode) {
       SetImage(hCropCornersPic, hBitmap)
       Gdip_DeleteGraphics(gU)
       trGdip_DisposeImage(newBitmap, 1)
-      DeleteObject(hBitmap)
+      Gdi_DeleteObject(hBitmap)
       pageDPI := Round((hdcObj.hdc_xdpi + hdcObj.hdc_ydpi)/2)
       pageWr := Round(hdcObj.HDC_Width/hdcObj.hdc_xdpi, 1)
       pageHr := Round(hdcObj.HDC_Height/hdcObj.hdc_ydpi, 1)
@@ -34486,7 +35111,7 @@ AcquireWIAimage() {
     vpIMGrotation := FlipImgH := FlipImgV := 0
     dropFilesSelection(1)
     RemoveTooltip()
-    DeleteObject(hbmp)
+    Gdi_DeleteObject(hbmp)
     SetTimer, ResetImgLoadStatus, -50
     SetTimer, RefreshImageFile, -50
 }
@@ -34504,9 +35129,8 @@ AcquireWIAimage() {
 
 
 
-testwhatever() {
+testWICwhatever() {
 /*
-
    destroyGDIfileCache()
    imgPath := getIDimage(currentFileIndex)
    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
@@ -34519,9 +35143,10 @@ testwhatever() {
    IWICBitmapDecoder_GetFrameCount(ppIDecoder, fCount)
    IWICBitmapDecoder_GetFrame(ppIDecoder, 0, ppIBitmapSourceFrame)
    IWICBitmapScaler_Initialize(ppIBitmapScaler, ppIBitmapSourceFrame, mainWidth, mainHeight)
-   IWICFormatConverter_Initialize(ppIFormatConverter, ppIBitmapScaler, "GUID_WICPixelFormat32bppBGR", 0, NULL, 0.1, 0)
+   ; IWICFormatConverter_Initialize(ppIFormatConverter, ppIBitmapScaler, "GUID_WICPixelFormat32bppBGR", 0, NULL, 0.1, 0)
 */
-   MsgBox, % pWICimgFactory "`n" ppIDecoder "`n" fcount "`n" ppIBitmapSourceFrame "`n" ppIBitmapScaler "`n" ppIFormatConverter "`n" 
+
+   MsgBox, % pWICimgFactory "`n" ppIDecoder "`n" fcount "`n" ppIBitmapSourceFrame "`nBMPscale" ppIBitmapScaler "`nFmtConv" ppIFormatConverter "`n" 
 }
 
 xxtestwhatever() {
@@ -35561,78 +36186,6 @@ Class IDesktopWallpaper
 } ; https://msdn.microsoft.com/en-us/library/windows/desktop/hh706946(v=vs.85).aspx
 
 
-Gdi_CreatePen(Color, Width:=1, Style:=0) {
-/*
-   Styles:
-   PS_SOLID - The pen is solid.
-   PS_DASH - The pen is dashed. This style is valid only when the pen width is one or less in device units.
-   PS_DOT - The pen is dotted. This style is valid only when the pen width is one or less in device units.
-   PS_DASHDOT - The pen has alternating dashes and dots. This style is valid only when the pen width is one or less in device units.
-   PS_DASHDOTDOT - The pen has alternating dashes and double dots. This style is valid only when the pen width is one or less in device units.
-   PS_NULL - The pen is invisible.
-   PS_INSIDEFRAME - The pen is solid. When this pen is used in any GDI drawing function that takes a bounding rectangle, the dimensions of the figure are shrunk so that it fits entirely in the bounding rectangle, taking into account the width of the pen. This applies only to geometric pens. 
-*/
-
-   Return DllCall("CreatePen", "Int", Style, "Int", Width, "UInt", "0x" rgb2bgr(Color), "UPtr")
-}
-
-Gdi_CreateSolidBrush(Color) {
-   Return DllCall("CreateSolidBrush", "UInt", "0x" rgb2bgr(Color), "UPtr")
-}
-
-Gdi_ExtFloodFill(X, Y, Color, Type) {
-; Types:
-; FLOODFILLBORDER -The fill area is bounded by the color specified by the crColor parameter. This style is identical to the filling performed by the FloodFill function.
-; FLOODFILLSURFACE - The fill area is defined by the color that is specified by crColor. Filling continues outward in all directions as long as the color is encountered. This style is useful for filling areas with multicolored boundaries. 
-; If the function fails, the return value is zero.
-
-   Return DllCall("ExtFloodFill", "Int", x, "Int", y, "UInt", "0x" rgb2bgr(Color), "Int", Type)
-}
-
-Gdi_FillShape(hDC, x, y, w, h, Color, Shape, BorderColor:=0, BorderWidth:=0) {
-      If (BorderColor && BorderWidth)
-         Pen := Gdi_CreatePen(BorderColor, BorderWidth)
-
-      Brush := Gdi_CreateSolidBrush(Color)
-      
-      ; Replace the original pen and brush with our own
-      hOriginalPen := DllCall("SelectObject", "UPtr", hDC, "UPtr", Pen, "UPtr")
-      hOriginalBrush := DllCall("SelectObject", "UPtr", hDC, "UPtr", Brush, "UPtr")
-
-      func2call := (Shape=1) ? "Rectangle" : "Ellipse"
-      DllCall(func2call, "UPtr", hDC
-      , "Int", x1, "Int", y1
-      , "Int", x1 + w, "Int", y1 + h)
-      
-      ; Reselect the original pen and brush
-      DllCall("SelectObject", "UPtr", hDC, "UPtr", hOriginalPen, "UPtr")
-      DllCall("SelectObject", "UPtr", hDC, "UPtr", hOriginalBrush, "UPtr")
-      DeleteObject(Pen)
-      DeleteObject(Brush)
-}
-
-
-Gdi_FillRoundedRect(hDC, x, y, w, h, Color, Radius, BorderColor:=0, BorderWidth:=0) {
-      If (BorderColor && BorderWidth)
-         Pen := Gdi_CreatePen(BorderColor, BorderWidth)
-
-      Brush := Gdi_CreateSolidBrush(Color)
-      
-      ; Replace the original pen and brush with our own
-      hOriginalPen := DllCall("SelectObject", "UPtr", hDC, "UPtr", Pen, "UPtr")
-      hOriginalBrush := DllCall("SelectObject", "UPtr", hDC, "UPtr", Brush, "UPtr")
-
-      DllCall("RoundRect", "UPtr", hDC
-      , "Int", x1, "Int", y1
-      , "Int", x1 + w, "Int", y1 + h
-      , "Int", Radius, "Int", Radius)
-
-      ; Reselect the original pen and brush
-      DllCall("SelectObject", "UPtr", hDC, "UPtr", hOriginalPen, "UPtr")
-      DllCall("SelectObject", "UPtr", hDC, "UPtr", hOriginalBrush, "UPtr")
-      DeleteObject(Pen)
-      DeleteObject(Brush)
-}
 
 
 testeGDIspeed() {
@@ -35660,41 +36213,6 @@ isFileLocked(imgPath) {
       Return 0
    } Else Return 1
 }
-
-Gdi_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, StretchMode:=4) {
-; function unfinished
-
-    Gdip_GetImageDimensions(pBitmap, Width, Height)
-    If (KeepRatio=1)
-    {
-       calcIMGdimensions(Width, Height, givenW, givenH, ResizedW, ResizedH)
-    } Else
-    {
-       ResizedW := givenW
-       ResizedH := givenH
-    }
-
-   hhdc := CreateCompatibleDC()
-   hbmGiven := Gdip_CreateHBITMAPFromBitmap(pBitmap)
-   obmGiven := SelectObject(hhdc, hbmGiven)
-
-   chdc := CreateCompatibleDC()
-   hbm := CreateCompatibleBitmap(chdc, ResizedW, ResizedH)
-   obm := SelectObject(chdc, hbm)
-   SetStretchBltMode(hhdc, 4)
-   SetStretchBltMode(chdc, 4)
-
-   r := StretchBlt(chdc, 0, 0, ResizedW, ResizedH, hhdc, 0, 0, Width, Height)
-
-   zBitmap := trGdip_CreateBitmapFromHBITMAP(hbm)
-   Gdip_GetImageDimensions(zBitmap, imgW, imgH)
-   ToolTip, % "lol " ra " = " hbmGiven "`n"  imgW "=" imgH , , , 2
-   ReleaseDC(hhdc)
-   SelectObject(chdc, obm), DeleteObject(hbm), DeleteDC(hhdc), DeleteDC(chdc)
-   SelectObject(hhdc, obmGiven), DeleteObject(hbmGiven), DeleteDC(hhdc), DeleteDC(hhdc)
-   Return zBitmap
-}
-
 
 trGdip_CreateBitmap(Width, Height, PixelFormat:=0, Stride:=0, Scan0:=0) {
     r := Gdip_CreateBitmap(Width, Height, PixelFormat, Stride, Scan0)

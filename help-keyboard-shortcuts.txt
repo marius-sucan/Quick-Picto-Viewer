@@ -155,6 +155,7 @@ Ctrl + F3|Search in files index|Files list|Panel
 Shift + F3|Search previous occurance|Files list|Nothing
 F3|Search next occurance|Files list|Nothing
 Shift + F5|Reload slideshow file or refresh opened folder|Files list|Nothing
+Alt + F5|Regenerate on demand all thumbnails in the list|Files list|Nothing
 Shift + H|Flip horizontally image selected area|Image selection|Nothing
 Shift + V|Flip vertically image selected area|Image selection|Nothing
 Shift + I|Invert colors in image selected area|Image selection|Nothing
