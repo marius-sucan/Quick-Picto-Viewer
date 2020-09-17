@@ -2,6 +2,18 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.5.5 (2020-08-25)
+  - [new] image navigator for easy panning of very large images
+  - [new] added new multiple files rename options: replace characters, regular expressions support, file name trimming and more [see Help]
+  - [new] real-time preview for multiple files renaming
+  - [new] option to set the graph focus for histograms: lows, mids or peaks; the histogram is now clickable
+  - [new] add/remove images to favourites and manager
+  - [new] batch file processing option: apply viewport colors adjustments
+  - [new] options to add text on page when printing images
+  - [new] option to generate thumbnails for all the files currently indexed
+  - [new] progress bars for batch processing and others
+  - various important bug fixes
+
 - v4.5.0 (2020-08-25)
   - [new] option to refresh thumbnails [ thanks for the suggestion to TheArkive ]
   - [new] strikeout text style option and text cutout mode

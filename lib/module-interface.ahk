@@ -478,6 +478,7 @@ slideshowsHandler(thisSlideSpeed, act, how) {
       SetTimer, theSlideShowCore, % -slideShowDelay
    } Else If (act="stop")
    {
+      allowNextSlide := 1
       slideShowRunning := 0
       SetTimer, theSlideShowCore, Off
    }

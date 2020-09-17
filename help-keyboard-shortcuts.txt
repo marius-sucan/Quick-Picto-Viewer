@@ -93,15 +93,18 @@ F5|Reload files list or image file|Anywhere|Nothing
 F8|Open previous panel|Anywhere|Panel
 G|Toggle histogram modes|Image view|Nothing
 Shift + G|Toggle histogram modes|Image view|Nothing
+Alt + G|Toggle histogram graph focus|Image view|Nothing
 H|Flip viewport horizontally|Image view|Nothing
 V|Flip viewport vertically|Image view|Nothing
 I|Flip selection W/H [image live editing only]|Image selection|Nothing
+Z|Image navigator|Image view|Nothing
 I|Toggle information viewport box|Image view|Nothing
 Insert|Insert file(s) into list|Files list|Files selector
 J|Jump to given file index or frame|Files list|Panel
 K|Perform JPEG lossless operations|Anywhere|Panel
 L|Toggle limit selection area to image boundaries|Image selection|Nothing
 L|Toggle list view modes|Files list|Nothing
+B|Add/remove image to favourites|Anywhere|Nothing
 N|Toggle display of image captions|Image view|Nothing
 Shift + N|Edit image caption|Image view|Panel
 O|Open image with external application|Anywhere|Menu

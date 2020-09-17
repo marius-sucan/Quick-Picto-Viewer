@@ -180,17 +180,308 @@ Gdi_DrawText(hDC, Text, x, y, w, h, flags:=0) {
       }
 
       obju := []
-      CreateRectF(RectF, x, y, x + w, y + h)
-      E := DllCall("user32\DrawText", "UPtr", hDC, "Str", Text, "Int", -1, "UPtr", &RectF, "UInt", DT_Format)
-      obju.w := NumGet(RectF, 8, "Int")
-      obju.h := NumGet(RectF, 12, "Int")
+      VarSetCapacity(Rect, 16, 0)
+      NumPut(x, Rect, 0, "uint"), NumPut(y, Rect, 4, "uint")
+      NumPut(x + w, Rect, 8, "uint"), NumPut(y + h, Rect, 12, "uint")
+
+      E := DllCall("user32\DrawText", "UPtr", hDC, "Str", Text, "Int", -1, "UPtr", &Rect, "UInt", DT_Format)
+      obju.w := NumGet(Rect, 8, "Int")
+      obju.h := NumGet(Rect, 12, "Int")
       obju.dll := E
       ; ToolTip, % DT_Format " === " E " == " obju.w "===" obju.h " ===`n" flags , , , 2
       Return obju
 }
 
 Gdi_CreateRectRegion(x, y, x2, y2) {
-      Return DllCall("gdi32\CreateRectRgn", "Int", x, "Int", y, "Int", x2, "Int", y2, "Ptr")
+   Return DllCall("gdi32\CreateRectRgn", "Int", x, "Int", y, "Int", x2, "Int", y2, "Ptr")
+}
+
+Gdi_CreateRoundRectRegion(x, y, x2, y2, w, h) {
+   ; w, h - width and height of the ellipse used to create the rounded corners in device units.
+   Return DllCall("gdi32\CreateRoundRectRgn", "Int", x, "Int", y, "Int", x2, "Int", y2, "Int", w, "Int", h, "Ptr")
+}
+
+Gdi_CreateEllipticRegion(x, y, x2, y2) {
+   Return DllCall("gdi32\CreateEllipticRgn", "Int", x, "Int", y, "Int", x2, "Int", y2, "Ptr")
+}
+
+Gdi_CombineRegion(hRgnDst, hRgn1, hRgn2, mode) {
+   ; The CombineRgn function combines two regions and stores the result
+   ; in a third region. The two regions are combined according to
+   ; the specified mode. 
+
+   ; Mode options:
+   ; RGN_AND = 1
+   ; RGN_OR = 2
+   ; RGN_XOR = 3
+   ; RGN_DIFF = 4
+   ; RGN_COPY = 5
+
+   Return DllCall("gdi32\CombineRgn", "Ptr", hRgnDst, "Ptr", hRgn1, "Ptr", hRgn2, "UInt", mode)
+}
+
+Gdi_EqualRegions(hRgn1, hRgn2) {
+   ; The EqualRgn function checks the two specified regions to determine
+   ; whether they are identical. The function considers two regions
+   ; identical if they are equal in size and shape.
+
+   ; Return value
+   ; If the two regions are equal, the return value is nonzero.
+   ; If the two regions are not equal, the return value is zero.
+   ; A return value of ERROR means at least one of the region
+   ; handles is invalid.
+
+   Return DllCall("gdi32\EqualRgn", "Ptr", hRgn1, "Ptr", hRgn2)
+}
+
+Gdi_FillRegion(hDC, hRgn, hBrush) {
+   ; Return value
+   ; If the function succeeds, the return value is nonzero.
+   ; If the function fails, the return value is zero.
+
+   Return DllCall("gdi32\FillRgn", "UPtr", hDC, "UPtr", hRgn, "UPtr", hBrush)
+}
+
+Gdi_PaintRegion(hDC, hRgn) {
+   ; The function paints the specified region by using the brush 
+   ; currently selected into the device context.
+
+   ; Return value
+   ; If the function succeeds, the return value is nonzero.
+   ; If the function fails, the return value is zero.
+
+   Return DllCall("gdi32\PaintRgn", "UPtr", hDC, "UPtr", hRgn)
+}
+
+Gdi_FrameRegion(hDC, hRgn, hBrush, w, h) {
+   ; w = specifies the width, in logical units, of vertical brush strokes.
+   ; h = specifies the height, in logical units, of horizontal brush strokes.
+
+   ; Return value
+   ; If the function succeeds, the return value is nonzero.
+   ; If the function fails, the return value is zero.
+   Return DllCall("gdi32\FillRgn", "UPtr", hDC, "UPtr", hRgn, "UPtr", hBrush, "Int", w, "Int", h)
+}
+
+Gdi_GetPolyFillMode(hDC) {
+   ; Return value
+   ; If the function succeeds, the return value specifies the polygon fill mode,
+   ; which can be one of the following values.
+   ; 1 = ALTERNATE
+   ; Selects alternate mode (fills area between odd-numbered and even
+   ;-numbered polygon sides on each scan line).
+
+   ; 2 = WINDING
+   ; Selects winding mode (fills any region with a nonzero winding value).
+ 
+   ; If an error occurs, the return value is zero.
+
+   Return DllCall("gdi32\GetPolyFillMode", "UPtr", hDC)
+}
+
+Gdi_SetPolyFillMode(hDC, mode) {
+   ; Mode options:
+   ; 1 = ALTERNATE
+   ; Selects alternate mode (fills area between odd-numbered and even
+   ;-numbered polygon sides on each scan line).
+
+   ; 2 = WINDING
+   ; Selects winding mode (fills any region with a nonzero winding value).
+
+   ; Return value
+   ; The return value specifies the previous filling mode. If an error 
+   ; occurs, the return value is zero.
+
+   ; Remarks
+   ; In general, the modes differ only in cases where a complex, overlapping 
+   ; polygon must be filled (for example, a five-sided polygon that forms a five-
+   ; pointed star with a pentagon in the center). In such cases, ALTERNATE mode 
+   ; fills every other enclosed region within the polygon (that is, the points of the 
+   ; star), but WINDING mode fills all regions (that is, the points and the pentagon).
+
+   ; When the fill mode is ALTERNATE, GDI fills the area between odd-numbered and
+   ; even-numbered polygon sides on each scan line. That is, GDI fills the area
+   ; between the first and second side, between the third and fourth side, and so on.
+
+   ; When the fill mode is WINDING, GDI fills any region that has a nonzero winding
+   ; value. This value is defined as the number of times a pen used to draw the
+   ; polygon would go around the region. The direction of each edge of the polygon is important.
+
+   Return DllCall("gdi32\SetPolyFillMode", "UPtr", hDC, "Int", mode)
+}
+
+Gdi_GetRandomRegion(hDC, hRgn) {
+   ; hrgn - A handle to a pre-existing region. After the function returns,
+   ; this identifies a copy of the current system region. 
+   ; The old region identified by hrgn is overwritten.
+
+   ; Return value
+   ; If the function succeeds, the return value is 1. If the function fails,
+   ; the return value is -1. If the region to be retrieved is NULL,
+   ; the return value is 0. If the function fails or the region to be
+   ; retrieved is NULL, hrgn is not initialized.
+   ; The region returned is in screen coordinates.
+
+   ; Remarks
+   ; Note that the system clipping region might not be current because of
+   ; window movements. Nonetheless, it is safe to retrieve and use the system
+   ; clipping region within the BeginPaint - EndPaint block during WM_PAINT
+   ; processing. In this case, the system region is the intersection of the
+   ; update region and the current visible area of the window. Any window
+   ; movement following the return of GetRandomRgn and before EndPaint will
+   ; result in a new WM_PAINT message. Any other use of the SYSRGN flag
+   ; may result in painting errors in your application.
+
+
+   Return DllCall("gdi32\GetRandomRgn", "UPtr", hDC, "UPtr", hRgn, "Int", 4)
+}
+
+
+Gdi_GetMetaRegion(hDC, hRgn) {
+   ; The function retrieves the current metaregion for the specified hDC.
+
+   ; hrgn - A handle to a pre-existing region. After the function returns,
+   ; this parameter is a handle to a copy of the current metaregion.
+
+   ; Return value
+   ; If the function succeeds, the return value is nonzero.
+   ; If the function fails, the return value is zero.
+
+   ; Remarks
+   ; If the function succeeds, hrgn is a handle to a copy of the current
+   ; metaregion. Subsequent changes to this copy will not affect the
+   ; current metaregion.
+
+   ; The current clipping region of a device context is defined by the
+   ; intersection of its clipping region and its metaregion.
+   Return DllCall("gdi32\GetMetaRgn", "UPtr", hDC, "UPtr", hRgn)
+}
+
+Gdi_SetMetaRegion(hDC) {
+   ; The function intersects the current clipping region for the specified
+   ; device context with the current metaregion and saves the combined
+   ; region as the new metaregion for the specified device context.
+   ; The clipping region is reset to a null region.
+
+   ; Return value
+   ; The return value specifies the new clipping region's complexity and can
+   ; be one of the following values:
+        ; 1 = NULLREGION -  Region is empty.
+        ; 2 = SIMPLEREGION - Region is a single rectangle.
+        ; 3 = COMPLEXREGION - Region is more than one rectangle.
+        ; 0 = An error occurred. The previous clipping region is unaffected.
+
+   ; Remarks
+   ; The function should only be called after an application's original
+   ; device context was saved by calling the SaveDC function.
+
+   Return DllCall("gdi32\SetMetaRgn", "UPtr", hDC)
+}
+
+Gdi_GetRegionBox(hRgn) {
+   ; The function retrieves the bounding box of the given hRgn [region handle]
+   ; The function will return an object.
+     ; obju.x1, obju.y1, obju.x2, obju.y2 - the coordinates of two points representing the bounding box
+        ; x1, y1 - top, left corner
+        ; x2, y2 - bottom, right corner
+     ; obj.E - the value returned by the internal API. It defines the region complexity.
+        ; 1 = NULLREGION -  Region is empty.
+        ; 2 = SIMPLEREGION - Region is a single rectangle.
+        ; 3 = COMPLEXREGION - Region is more than one rectangle.
+        ; 0 = An error occurred.
+
+   VarSetCapacity(Rect, 16, 0)
+   obju.E := DllCall("gdi32\GetRgnBox", "UPtr", hRgn, "UPtr", &Rect)
+   obju.x1 := NumGet(Rect, 0, "uint")
+   obju.y1 := NumGet(Rect, 4, "uint")
+   obju.x2 := NumGet(Rect, 8, "uint")
+   obju.y2 := NumGet(Rect, 12, "uint")
+   Return obju
+}
+
+Gdi_InvertColorsRegion(hDC, hRgn) {
+   ; The function inverts the colors in the specified region.
+
+   ; Return value
+   ; If the function succeeds, the return value is nonzero.
+   ; If the function fails, the return value is zero.
+
+   Return DllCall("gdi32\InvertRgn", "UPtr", hDC, "UPtr", hRgn)
+}
+
+Gdi_InvertColorsRect(hDC, x, y, w, h) {
+   ; The function inverts the colors in the specified region.
+
+   ; Return value
+   ; If the function succeeds, the return value is nonzero.
+   ; If the function fails, the return value is zero.
+   VarSetCapacity(Rect, 16, 0)
+   NumPut(x, Rect, 0, "uint"), NumPut(y, Rect, 4, "uint")
+   NumPut(x + w, Rect, 8, "uint"), NumPut(y + h, Rect, 12, "uint")
+   Return DllCall("gdi32\InvertRect", "UPtr", hDC, "UPtr", &Rect)
+}
+
+Gdi_PatBlt(hDC, x, y, w, h, mRop) {
+   ; The function paints the specified rectangle using the brush that
+   ; is currently selected into the specified hDC. The brush color and
+   ; the surface color or colors are combined by using the specified
+   ; raster operation [mRop].
+
+   ; mRop options:
+   ; PATCOPY   = 0x00F00021
+   ; PATINVERT = 0x005A0049
+   ; DSTINVERT = 0x00550009
+   ; BLACKNESS = 0x00000042
+   ; WHITENESS = 0x00FF0062
+
+   ; Return value
+   ; If the function succeeds, the return value is nonzero.
+   ; If the function fails, the return value is zero.
+
+   Return DllCall("gdi32\PatBlt", "UPtr", hDC, "Int", x, "Int", y, "Int", w, "Int", h, "uInt", mRop)
+}
+
+Gdi_OffsetRegion(hRgn, x, y) {
+   ; Return value defines the region complexity.
+   ; 1 = NULLREGION -  Region is empty.
+   ; 2 = SIMPLEREGION - Region is a single rectangle.
+   ; 3 = COMPLEXREGION - Region is more than one rectangle.
+   ; 0 = An error occurred.
+
+   Return DllCall("gdi32\OffsetRgn", "UPtr", hRgn, "Int", x, "Int", y)
+}
+
+Gdi_SetRectRegion(hRgn, x, y, w, h) {
+   ; The function converts a region into a rectangular region with the specified coordinates.
+   ; Return value
+   ; If the specified point is in the region, the return value is nonzero.
+   ; If the specified point is not in the region, the return value is zero.
+
+   Return DllCall("gdi32\SetRectRgn", "UPtr", hRgn, "Int", x, "Int", y, "Int", x + w, "Int", y + h)
+}
+
+Gdi_IsPointInRegion(hRgn, x, y) {
+   ; The function determines whether the specified point is inside the specified region.
+
+   ; Return value
+   ; If the specified point is in the region, the return value is nonzero.
+   ; If the specified point is not in the region, the return value is zero.
+
+   Return DllCall("gdi32\PtInRegion", "UPtr", hRgn, "Int", x, "Int", y)
+}
+
+Gdi_IsRectInRegion(hRgn, x, y, w, h) {
+   ; The function determines whether any part of the specified rectangle
+   ; is within the boundaries of a region.
+
+   ; Return value
+   ; If any part of the specified rectangle lies within the boundaries of the 
+   ; region, the return value is nonzero. Otherwise, the value is zero.
+
+   VarSetCapacity(Rect, 16, 0)
+   NumPut(x, Rect, 0, "uint"), NumPut(y, Rect, 4, "uint")
+   NumPut(x + w, Rect, 8, "uint"), NumPut(y + h, Rect, 12, "uint")
+   Return DllCall("gdi32\RectInRegion", "UPtr", hRgn, "UPtr", &Rect)
 }
 
 Gdi_DrawTextOutline(hDC, hFont, Text, x, y, BorderColor, BorderWidth) {
@@ -229,7 +520,6 @@ Gdi_MeasureString(hFont, string, precision, ByRef w, ByRef h) {
     ; precision = 0 ; uses GetTextExtentExPoint()
     ; precision = 1 ; uses DrawText()
 
-
     hDC := Gdi_GetDC()
     old_hFont := Gdi_SelectObject(hDC, hFont)
 
@@ -249,8 +539,8 @@ Gdi_MeasureString(hFont, string, precision, ByRef w, ByRef h) {
     Return E
 }
 
-Gdi_SelectClipRgn(hDC, hRgn) {
-     ; The SelectClipRgn function selects a region as the current clipping 
+Gdi_SelectClipRegion(hDC, hRgn) {
+     ; The function selects a region as the current clipping 
      ; region for the specified device context.
      ; Return values:
      ; 1 = NULLREGION -  Region is empty.
@@ -259,6 +549,124 @@ Gdi_SelectClipRgn(hDC, hRgn) {
      ; 0 = An error occurred. The previous clipping region is unaffected.
 
      Return DllCall("gdi32\SelectClipRgn", "UPtr", hDC, "UPtr", hRgn)
+}
+
+
+Gdi_GetClipBox(hDC) {
+   ; The function  retrieves the dimensions of the tightest bounding rectangle
+   ; that can be drawn around the current visible area on the device.
+   ; The visible area is defined by the current clipping region or clip path,
+   ; as well as any overlapping windows.
+   ; GetClipBox returns logical coordinates based on the given device context.
+
+   ; The function will return an object.
+     ; obju.x1, obju.y1, obju.x2, obju.y2 - the coordinates of two points representing the bounding box
+        ; x1, y1 - top, left corner
+        ; x2, y2 - bottom, right corner
+     ; obj.E - the value returned by the internal API. It defines the region complexity.
+        ; 1 = NULLREGION -  Region is empty.
+        ; 2 = SIMPLEREGION - Region is a single rectangle.
+        ; 3 = COMPLEXREGION - Region is more than one rectangle.
+        ; 0 = An error occurred.
+
+   VarSetCapacity(Rect, 16, 0)
+   obju.E := DllCall("gdi32\GetClipBox", "UPtr", hDC, "UPtr", &Rect)
+   obju.x1 := NumGet(Rect, 0, "uint")
+   obju.y1 := NumGet(Rect, 4, "uint")
+   obju.x2 := NumGet(Rect, 8, "uint")
+   obju.y2 := NumGet(Rect, 12, "uint")
+   Return obju
+}
+
+Gdi_ExtSelectClipRgn(hDC, hRgn, mode) {
+   ; Parameters:
+   ; hrgn - A handle to the region to be selected. This handle must not be 
+   ; NULL unless the RGN_COPY mode is specified.
+
+   ; Modes:
+   ; RGN_AND = 1
+   ;   The new clipping region includes the intersection (overlapping areas) of the current clipping region and the current path.
+   ; RGN_OR = 2
+   ;   The new clipping region includes the union (combined areas) of the current clipping region and the current path.
+   ; RGN_XOR = 3
+   ;   The new clipping region includes the union of the current clipping region and the current path but without the overlapping areas. 
+   ; RGN_DIFF = 4
+   ;   The new clipping region includes the areas of the current clipping region with those of the current path excluded.
+   ; RGN_COPY = 5
+   ;   The new clipping region is the current path.
+
+   ; Return value
+   ; The return value specifies the new clipping region's complexity; it can
+   ; be one of the following values:
+      ; 1 = NULLREGION -  Region is empty.
+      ; 2 = SIMPLEREGION - Region is a single rectangle.
+      ; 3 = COMPLEXREGION - Region is more than one rectangle.
+      ; 0 = An error occurred.
+
+
+   ; Remarks
+   ; If an error occurs when this function is called, the previous clipping
+   ; region for the specified device context is not affected.
+
+   ; This function assumes that the coordinates for the specified region
+   ; are specified in device units.
+
+   ; Only a copy of the region identified by the hRgn parameter is used.
+   ; The region itself can be reused after this call or it can be deleted.
+
+   Return DllCall("gdi32\ExtSelectClipRgn", "UPtr", hDC, "UPtr", hRgn, "Int", mode)
+}
+
+Gdi_ClipPointVisible(hDC, x, y) {
+   ; The function determines whether the specified point is within the
+   ; clipping region of a device context.
+
+   ; Return value
+   ; If the specified point is within the clipping region of the hDC,
+   ; the return value is TRUE (1).
+
+   ; If the specified point is not within the clipping region of the hDC,
+   ; the return value is FALSE (0).
+
+   ; If the hDC is not valid, the return value is -1.
+   Return DllCall("gdi32\PtVisible", "UPtr", hDC, "Int", x, "Int", y)
+}
+
+Gdi_ClipRectVisible(hDC, x, y, w, h) {
+   ; The function determines whether any part of the specified rectangle
+   ; lies within the clipping region of a device context.
+
+   VarSetCapacity(Rect, 16, 0)
+   NumPut(x, Rect, 0, "uint"), NumPut(y, Rect, 4, "uint")
+   NumPut(x + w, Rect, 8, "uint"), NumPut(y + h, Rect, 12, "uint")
+
+   Return DllCall("gdi32\RectVisible", "UPtr", hDC, "UPtr", &Rect)
+}
+
+Gdi_GetClipRegion(hDC, hRgn) {
+   ; The function retrieves a handle identifying the current application
+   ;-defined clipping region for the specified device context.
+
+   ; hrgn - A handle to an existing region before the function is called.
+   ; After the function returns, this parameter is a handle to a copy of
+   ; the current clipping region.
+
+   ; Return value
+   ; If the function succeeds and there is no clipping region for the given
+   ; device context, the return value is zero. If the function succeeds and
+   ; there is a clipping region for the given DC, the return value is 1. 
+   ; If an error occurs, the return value is -1.
+
+   ; Remarks
+   ; An application-defined clipping region is a clipping region identified
+   ; by the SelectClipRgn function. It is not a clipping region created when
+   ; the application calls the BeginPaint function.
+
+   ; If the function succeeds, the hRgn parameter is a handle to a copy of
+   ; the current clipping region. Subsequent changes to this copy will
+   ; not affect the current clipping region.
+
+   Return DllCall("gdi32\GetClipRgn", "UPtr", hDC, "UPtr", hRgn)
 }
 
 Gdi_SelectClipPath(hDC, mode) {
@@ -294,7 +702,7 @@ Gdi_IntersectClipRect(hDC, x, y, x2, y2) {
      Return DllCall("gdi32\IntersectClipRect", "UPtr", hDC, "Int", x, "Int", y, "Int", x2, "Int", y2)
 }
 
-Gdi_OffsetClipRgn(hDC, x, y) {
+Gdi_OffsetClipRegion(hDC, x, y) {
      ; The OffsetClipRgn function moves the clipping region of a
      ; device context by the specified offsets.
 
@@ -302,7 +710,7 @@ Gdi_OffsetClipRgn(hDC, x, y) {
      ; 1 = NULLREGION -  Region is empty.
      ; 2 = SIMPLEREGION - Region is a single rectangle.
      ; 3 = COMPLEXREGION - Region is more than one rectangle.
-     ; 0 = An error occurred. The previous clipping region is unaffected.
+     ; 0 = An error occurred.
 
      Return DllCall("gdi32\OffsetClipRgn", "UPtr", hDC, "Int", x, "Int", y)
 }
@@ -505,7 +913,7 @@ Gdi_CreatePen(Color, Width:=1, Style:=0) {
 }
 
 Gdi_CreateSolidBrush(Color) {
-   Return DllCall("gdi32\CreateSolidBrush", "UInt", "0x" rgb2bgr(Color), "UPtr")
+   Return DllCall("gdi32\CreateSolidBrush", "UInt", Color, "UPtr")
 }
 
 Gdi_CreatePatternBrush(hBitmap) {
@@ -529,7 +937,7 @@ Gdi_CreateHatchBrush(iHatch, color) {
    ; HS_CROSS = 4       ; Horizontal and vertical crosshatch
    ; HS_DIAGCROSS = 5   ; 45-degree crosshatch
 
-   Return DllCall("gdi32\CreateHatchBrush", "Int", iHatch, "UInt", "0x" rgb2bgr(Color), "UPtr")
+   Return DllCall("gdi32\CreateHatchBrush", "Int", iHatch, "UInt", Color, "UPtr")
 }
 
 Gdi_ExtFloodFill(X, Y, Color, Type) {
@@ -538,7 +946,7 @@ Gdi_ExtFloodFill(X, Y, Color, Type) {
    ; 1 = FLOODFILLSURFACE - The fill area is defined by the color that is specified by crColor. Filling continues outward in all directions as long as the color is encountered. This style is useful for filling areas with multicolored boundaries. 
    ; If the function fails, the return value is zero.
 
-   Return DllCall("gdi32\ExtFloodFill", "Int", x, "Int", y, "UInt", "0x" rgb2bgr(Color), "Int", Type)
+   Return DllCall("gdi32\ExtFloodFill", "Int", x, "Int", y, "UInt", Color, "Int", Type)
 }
 
 Gdi_SetBrushOrgEx(hDC, X, Y) {
@@ -546,11 +954,11 @@ Gdi_SetBrushOrgEx(hDC, X, Y) {
 }
 
 Gdi_SetDCBrushColor(hDC, Color) {
-   Return DllCall("gdi32\SetDCBrushColor", "UPtr", hDC, "UInt", "0x" rgb2bgr(Color), "UPtr")
+   Return DllCall("gdi32\SetDCBrushColor", "UPtr", hDC, "UInt", Color, "UPtr")
 }
 
 Gdi_SetDCPenColor(hDC, Color) {
-   Return DllCall("gdi32\SetDCPenColor", "UPtr", hDC, "UInt", "0x" rgb2bgr(Color), "UPtr")
+   Return DllCall("gdi32\SetDCPenColor", "UPtr", hDC, "UInt", Color, "UPtr")
 }
 
 Gdi_FillShape(hDC, x, y, w, h, Color, Shape, BorderColor:=0, BorderWidth:=0) {
@@ -572,15 +980,64 @@ Gdi_FillShape(hDC, x, y, w, h, Color, Shape, BorderColor:=0, BorderWidth:=0) {
       Return E
 }
 
-Gdi_Rectangle(hDC, x, y, x2, y2) {
+Gdi_Rectangle(hDC, x1, y1, x2, y2) {
    Return DllCall("gdi32\Rectangle", "UPtr", hDC
-          , "Int", x, "Int", y
+          , "Int", x1, "Int", y1
           , "Int", x2, "Int", y2)
 }
 
-Gdi_Ellipse(hDC, x, y, x2, y2) {
+Gdi_FillRectangle(hDC, x, y, w, h, hBrush) {
+   ; Return value
+   ; If the function succeeds, the return value is nonzero.
+   ; If the function fails, the return value is zero.
+
+   VarSetCapacity(Rect, 16, 0)
+   NumPut(x, Rect, 0, "uint"), NumPut(y, Rect, 4, "uint")
+   NumPut(x + w, Rect, 8, "uint"), NumPut(y + h, Rect, 12, "uint")
+
+   Return DllCall("gdi32\FillRect", "UPtr", hDC, "UPtr", &Rect, "UPtr", hBrush)
+}
+
+Gdi_FrameRectangle(hDC, x, y, w, h, hBrush) {
+   ; Return value
+   ; If the function succeeds, the return value is nonzero.
+   ; If the function fails, the return value is zero.
+   ; If the bottom member of the RECT structure is less than the top member,
+   ; or if the right member is less than the left member, the function
+   ; does not draw the rectangle.
+
+   VarSetCapacity(Rect, 16, 0)
+   NumPut(x, Rect, 0, "uint"), NumPut(y, Rect, 4, "uint")
+   NumPut(x + w, Rect, 8, "uint"), NumPut(y + h, Rect, 12, "uint")
+   Return DllCall("gdi32\FrameRect", "UPtr", hDC, "UPtr", &Rect, "UPtr", hBrush)
+}
+
+Gdi_Chord(hDC, x1, y1, x2, y2, x3, y3, x4, y4) {
+   ; The Chord function draws a chord (a region bounded by the intersection
+   ; of an ellipse and a line segment, called a secant). The chord is outlined
+   ; and filled by using the currently selected pen and brush in DC.
+
+   Return DllCall("gdi32\Chord", "UPtr", hDC
+          , "Int", x1, "Int", y1
+          , "Int", x2, "Int", y2
+          , "Int", x3, "Int", y3
+          , "Int", x4, "Int", y4)
+}
+
+Gdi_Pie(hDC, x1, y1, x2, y2, xr1, yr1, xr2, yr2) {
+   ; The Pie function draws a pie-shaped wedge bounded by the intersection of an ellipse and two radials. 
+   ; The pie is outlined and filled by using the currently selected pen and brush in DC.
+
+   Return DllCall("gdi32\Pie", "UPtr", hDC
+          , "Int", x1, "Int", y1
+          , "Int", x2, "Int", y2
+          , "Int", xr1, "Int", yr1
+          , "Int", xr2, "Int", yr2)
+}
+
+Gdi_Ellipse(hDC, x1, y1, x2, y2) {
    Return DllCall("gdi32\Ellipse", "UPtr", hDC
-          , "Int", x, "Int", y
+          , "Int", x1, "Int", y1
           , "Int", x2, "Int", y2)
 }
 
@@ -757,22 +1214,22 @@ Gdi_SetDIBitsToDevice(hDC, dX, dY, Width, Height, sX, sY, StartScan, ScanLines, 
 }
 
 Gdi_GetDIBits(hDC, hBitmap, start, cLines, pBits, BITMAPINFO, DIB_COLORS) {
-; hDC     - A handle to the device context.
-; hBitmap - A handle to the GDI bitmap. This must be a compatible bitmap (DDB).
-; pBits   --A pointer to a buffer to receive the bitmap data.
-;           If this parameter is NULL, the function passes the dimensions
-;           and format of the bitmap to the BITMAPINFO structure pointed to 
-;           by the BITMAPINFO parameter.
-
-; A DDB is a Device-Dependent Bitmap, (as opposed to a DIB, or Device-Independent Bitmap).
-; That means: a DDB does not contain color values; instead, the colors are in a
-; device-dependent format. Therefore, it requires a hDC.
-; 
-; This function returns the data-bits as device-independent bitmap
-; from a hBitmap into the pBits pointer.
-;
-; Return: if the function fails, the return value is zero.
-; It can also return ERROR_INVALID_PARAMETER.
+   ; hDC     - A handle to the device context.
+   ; hBitmap - A handle to the GDI bitmap. This must be a compatible bitmap (DDB).
+   ; pBits   --A pointer to a buffer to receive the bitmap data.
+   ;           If this parameter is NULL, the function passes the dimensions
+   ;           and format of the bitmap to the BITMAPINFO structure pointed to 
+   ;           by the BITMAPINFO parameter.
+   ;
+   ; A DDB is a Device-Dependent Bitmap, (as opposed to a DIB, or Device-Independent Bitmap).
+   ; That means: a DDB does not contain color values; instead, the colors are in a
+   ; device-dependent format. Therefore, it requires a hDC.
+   ; 
+   ; This function returns the data-bits as device-independent bitmap
+   ; from a hBitmap into the pBits pointer.
+   ;
+   ; Return: if the function fails, the return value is zero.
+   ; It can also return ERROR_INVALID_PARAMETER.
 
    Return DllCall("gdi32\GetDIBits"
             , "UPtr", hDC
@@ -972,7 +1429,7 @@ Gdi_UpdateLayeredWindow(hwnd, hDC, x:="", y:="", w:="", h:="", Alpha:=255) {
 
 ;#####################################################################################
 ; Function        Gdi_BitBlt
-; Description     The BitBlt function performs a bit-block transfer of the color data corresponding to a rectangle
+; Description     The function performs a bit-block transfer of the color data corresponding to a rectangle
 ;                 of pixels from the specified source device context into a destination device context.
 ;
 ; dDC             handle to destination DC
@@ -980,12 +1437,15 @@ Gdi_UpdateLayeredWindow(hwnd, hDC, x:="", y:="", w:="", h:="", Alpha:=255) {
 ; dW, dH          width and height of the area to copy
 ; sDC             handle to source DC
 ; sX, sY          x, y coordinates of the source upper-left corner
-; Raster          raster operation code
+; raster          raster operation code
 ;
 ; return          If the function succeeds, the return value is nonzero
 ;
 ; notes           If no raster operation is specified, then SRCCOPY is used, which copies the source directly to the destination rectangle
 ;
+;                 BitBlt only does clipping on the destination DC. If the color formats of the source and destination device contexts do
+;                 not match, the BitBlt function converts the source color format to match the destination format.
+
 ; Raster operation codes:
 ; BLACKNESS          = 0x00000042
 ; NOTSRCERASE        = 0x001100A6
@@ -1005,7 +1465,7 @@ Gdi_UpdateLayeredWindow(hwnd, hDC, x:="", y:="", w:="", h:="", Alpha:=255) {
 ; CAPTUREBLT         = 0x40000000
 ; NOMIRRORBITMAP     = 0x80000000
 
-Gdi_BitBlt(dDC, dx, dy, dw, dh, sDC, sx, sy, raster:="") {
+Gdi_BitBlt(dDC, dX, dY, dW, dH, sDC, sX, sY, raster:="") {
    ; This function works only with GDI hBitmaps that are Device-Dependent Bitmaps [DDB].
    return DllCall("gdi32\BitBlt"
                , "UPtr", dDC
@@ -1014,6 +1474,133 @@ Gdi_BitBlt(dDC, dx, dy, dw, dh, sDC, sx, sy, raster:="") {
                , "UPtr", sDC
                , "int", sX, "int", sY
                , "uint", Raster ? Raster : 0x00CC0020)
+}
+
+
+Gdi_TransparentBlt(dDC, dX, dY, dW, dH, sDC, sX, sY, sW, sH, Color) {
+   ; The TransparentBlt function performs a bit-block transfer of the color
+   ; data corresponding to a rectangle of pixels from the specified source
+   ; device context into a destination device context.
+
+   ; Color parameter designates the RGB color in the source bitmap to treat as transparent.
+
+   ; Return value
+   ; If the function succeeds, the return value is 1. Otherwise, the return value is 0.
+
+   ; Remarks
+   ; The function works with compatible bitmaps (DDBs) and supports all formats
+   ; of source bitmaps. However, for 32 bpp bitmaps, it just copies the alpha
+   ; value over. Use AlphaBlend to specify 32 bits-per-pixel bitmaps
+   ; with transparency.
+
+   ; If the source and destination rectangles are not the same size, the source
+   ; bitmap is stretched to match the destination rectangle. When the
+   ; SetStretchBltMode function is used, the iStretchMode modes of BLACKONWHITE
+   ; and WHITEONBLACK are converted to COLORONCOLOR for the TransparentBlt function.
+
+   ; The destination device context specifies the transformation type for the
+   ; destination coordinates. The source device context specifies the
+   ; transformation type for the source coordinates.
+
+   ; TransparentBlt does not mirror a bitmap if either the width or height,
+   ; of either the source or destination, is negative.
+
+   return DllCall("Msimg32\TransparentBlt"
+               , "UPtr", dDC
+               , "int", dX, "int", dY
+               , "int", dW, "int", dH
+               , "UPtr", sDC
+               , "int", sX, "int", sY
+               , "int", sW, "int", sH
+               , "uint", Color)
+}
+
+Gdi_MaskBlt(dDC, dX, dY, dW, dH, sDC, sX, sY, hbmpMask, mX, mY, raster) {
+   ; The MaskBlt function uses device-dependent bitmaps.
+
+   ; sDC
+   ; A handle to the device context from which the bitmap is to be copied.
+   ; It must be zero if the dwRop parameter specifies a raster operation that
+   ; does not include a source.
+
+   ; sX
+   ; The x-coordinate, in logical units, of the upper-left corner of the 
+   ; source bitmap.
+
+   ; sY
+   ; The y-coordinate, in logical units, of the upper-left corner of the
+   ; source bitmap.
+
+   ; hbmpMask
+   ; A handle to the monochrome mask bitmap combined with the color bitmap
+   ; in the source device context.
+   ; If the mask bitmap is not a monochrome bitmap, an error occurs.
+
+   ; mX
+   ; The horizontal pixel offset for the mask bitmap specified by the hbmpMask parameter.
+
+   ; mY
+   ; The vertical pixel offset for the mask bitmap specified by the hbmpMask parameter.
+
+   ; raster
+   ; The foreground and background ternary raster operation codes (ROPs) that
+   ; the function uses to control the combination of source and destination data.
+   ; The background raster operation code is stored in the high-order byte of
+   ; the high-order word of this value; the foreground raster operation code is
+   ; stored in the low-order byte of the high-order word of this value; the
+   ; low-order word of this value is ignored, and should be zero. 
+
+   ; For a discussion of foreground and background in the context of this function,
+   ; see the following Remarks section.
+
+   ; Remarks
+
+   ; A value of 1 in the mask specified by hbmpMask indicates that the
+   ; foreground raster operation code specified by dwRop should be applied
+   ; at that location. A value of 0 in the mask indicates that the
+   ; background raster operation code specified by dwRop should be applied
+   ; at that location.
+
+   ; If the raster operations require a source, the mask rectangle must cover
+   ; the source rectangle. If it does not, the function will fail. If the
+   ; raster operations do not require a source, the mask rectangle must
+   ; cover the destination rectangle. If it does not, the function will fail.
+
+   ; If a rotation or shear transformation is in effect for the source device
+   ; context when this function is called, an error occurs. However, other
+   ; types of transformation are allowed.
+
+   ; If the color formats of the source, pattern, and destination bitmaps
+   ; differ, this function converts the pattern or source format, or both,
+   ; to match the destination format.
+
+   ; When an enhanced metafile is being recorded, an error occurs (and the
+   ; function returns FALSE) if the source device context identifies an
+   ; enhanced-metafile device context.
+
+   ; Not all devices support the MaskBlt function. An application should
+   ; call the GetDeviceCaps function with the nIndex parameter as RC_BITBLT
+   ; to determine whether a device supports this function.
+
+   ; If no mask bitmap is supplied, this function behaves exactly like BitBlt,
+   ; using the foreground raster operation code.
+
+   ; ICM: No color management is performed when blits occur.
+   ; When used in a multiple monitor system, both hdcSrc and hdcDest must
+   ; refer to the same device or the function will fail. To transfer data
+   ; between DCs for different devices, convert the memory bitmap
+   ; (compatible bitmap, or DDB) to a DIB by calling GetDIBits. To display
+   ; the DIB to the second device, call SetDIBits or StretchDIBits.
+
+   return DllCall("gdi32\MaskBlt"
+               , "UPtr", dDC
+               , "int", dX, "int", dY
+               , "int", dW, "int", dH
+               , "UPtr", sDC
+               , "int", sX, "int", sY
+               , "UPtr", hbmpMask
+               , "int", mX, "int", mY
+               , "uint", raster)
 }
 
 ;#####################################################################################
@@ -1758,7 +2345,7 @@ Gdi_ScreenToClient(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
   VarSetCapacity(POINT, 8)
   NumPut(vPosX, &POINT, 0, "Int")
   NumPut(vPosY, &POINT, 4, "Int")
-  DllCall("user32\ScreenToClient", Ptr,hWnd, Ptr,&POINT)
+  DllCall("user32\ScreenToClient", "Ptr", hWnd, "Ptr", &POINT)
   vPosX2 := NumGet(&POINT, 0, "Int")
   vPosY2 := NumGet(&POINT, 4, "Int")
 }

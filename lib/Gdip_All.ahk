@@ -14,6 +14,7 @@
 ;
 ; Gdip standard library versions:
 ; by Marius Șucan - gathered user-contributed functions and implemented hundreds of new functions
+; - v1.85 on 24/08/2020
 ; - v1.84 on 05/06/2020
 ; - v1.83 on 24/05/2020
 ; - v1.82 on 11/03/2020
@@ -62,6 +63,7 @@
 ; - v1.01 on 31/05/2008
 ;
 ; Detailed history:
+; - 24/08/2020 = Bug fixes and added Gdip_BlendBitmaps() and Gdip_SetAlphaChannel()
 ; - 05/06/2020 = Synchronized with mmikeww's repository and fixed a few bugs
 ; - 24/05/2020 = Added a few more functions and fixed or improved already exiting functions
 ; - 11/02/2020 = Imported updated MDMF functions from mmikeww, and AHK v2 examples, and other minor changes
@@ -3968,17 +3970,19 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
    Static Styles := "Regular|Bold|Italic|BoldItalic|Underline|Strikeout"
         , Alignments := "Near|Left|Centre|Center|Far|Right"
 
+   OWidth := Width
    IWidth := Width, IHeight:= Height
    pattern_opts := (A_AhkVersion < "2") ? "iO)" : "i)"
    RegExMatch(Options, pattern_opts "X([\-\d\.]+)(p*)", xpos)
    RegExMatch(Options, pattern_opts "Y([\-\d\.]+)(p*)", ypos)
-   RegExMatch(Options, pattern_opts "W([\-\d\.]+)(p*)", Width)
+   RegExMatch(Options, pattern_opts "W([\-\d\.]+)(p*)", PWidth)
    RegExMatch(Options, pattern_opts "H([\-\d\.]+)(p*)", Height)
    RegExMatch(Options, pattern_opts "C(?!(entre|enter))([a-f\d]+)", Colour)
    RegExMatch(Options, pattern_opts "Top|Up|Bottom|Down|vCentre|vCenter", vPos)
    RegExMatch(Options, pattern_opts "NoWrap", NoWrap)
    RegExMatch(Options, pattern_opts "R(\d)", Rendering)
    RegExMatch(Options, pattern_opts "S(\d+)(p*)", Size)
+   Width := PWidth
 
    if Colour && IsInteger(Colour[2]) && !Gdip_DeleteBrush(Gdip_CloneBrush(Colour[2]))
    {
@@ -4052,8 +4056,10 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
    ReturnRC := Gdip_MeasureString(pGraphics, Text, hFont, hStringFormat, RC)
    ReturnRCtest := StrSplit(ReturnRC, "|")
    testX := Floor(ReturnRCtest[1]) - 2
-   If (testX>xpos) ; error correction for different text alignments
+   If (testX>xpos && NoWrap && (PWidth>2 || OWidth>2))
    {
+      ; error correction of posX for different text alignments
+      ; when width is given, but no text wrap
       nxpos := Floor(xpos - (testX - xpos))
       CreateRectF(RC, nxpos, ypos, Width, Height)
       ReturnRC := Gdip_MeasureString(pGraphics, Text, hFont, hStringFormat, RC)

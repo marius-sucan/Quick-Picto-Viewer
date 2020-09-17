@@ -45,6 +45,7 @@
 <li>Multiple list view modes. Display the indexed files as an easy to scroll list with or without details.</li>
 <li>Multiple slideshow directions available and easy to change speed between images: random order, backwards or forwads.</li>
 <li>Option to keep a record of seen images and have these skipped during slideshows or erased from the index list</li>
+<li>Add/remove or manage favourite images</li>
 <li>Perform JPEG lossless operations in batch: flip or crop images.</li>
 <li>Perform actions on image files: resize, rotate [at any degree], crop, change/adjust colors, rename, convert to different file formats, rename, delete, copy or move.</li>
 <li>Batch processing. You can apply any of the previously mentioned action or operation on multiple files at once.</li>
