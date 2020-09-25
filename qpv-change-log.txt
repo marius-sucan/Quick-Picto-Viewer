@@ -2,15 +2,25 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
-- v4.5.5 (2020-08-25)
+- v4.6.0 (2020-09-25)
+  - [new] copy/move panel now allows users to group files in automatically created sub-folders, based on file modification date [by month or year] and by file types
+  - [new] live HDR tone-mapping options panel for adjusting how HDR images are displayed
+  - [new] it will now remember window size and position between different Quick Picto Viewer sessions [thanks to Yak's suggestion]
+  - [new] viewport info-graphic on how to use it when users press F1 [thanks to Tidbit's suggestion]
+  - [new] option to choose external applications for opening images [thanks to TheArkive's suggestion]
+  - one can now open multiple images in one go from Quick Picto Viewer with QPV; in other words, multiple new instances of QPV can be spawned to open the selected files from the main window [thanks to Yak's suggestion]
+  - bug fixes related to how Quick Picto Viewer handles situations where all images were seen in a files list
+  - various bug fixes and improvements
+
+- v4.5.5 (2020-09-18)
   - [new] image navigator for easy panning of very large images
   - [new] added new multiple files rename options: replace characters, regular expressions support, file name trimming and more [see Help]
   - [new] real-time preview for multiple files renaming
   - [new] option to set the graph focus for histograms: lows, mids or peaks; the histogram is now clickable
-  - [new] add/remove images to favourites and manager
+  - [new] add/remove images to favourites and manager [ thanks to Cinemike's suggestion]
   - [new] batch file processing option: apply viewport colors adjustments
   - [new] options to add text on page when printing images
-  - [new] option to generate thumbnails for all the files currently indexed
+  - [new] option to generate thumbnails for all the files currently indexed [thanks to TheArkive's suggestion]
   - [new] progress bars for batch processing and others
   - various important bug fixes
 

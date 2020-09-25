@@ -23,6 +23,8 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3
      , imgEditPanelOpened := 0, showMainMenuBar := 1, undoLevelsRecorded := 0, UserMemBMP := 0
      , taskBarUI, hSetWinGui, panelWinCollapsed, groppedFiles, tempBtnVisible := "null"
      , userAllowWindowDrag := 0, drawingShapeNow := 0, isAlwaysOnTop, lastMenuBarUpdate := 1
+     , mainWinPos := 0, mainWinMaximized := 1, mainWinSize := 0, PrevGuiSizeEvent := 0
+
 
 Global activateImgSelection, allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, askDeleteFiles
 , AutoDownScaleIMGs, autoPlaySNDs, autoRemDeadEntry, ColorDepthDithering, countItemz, currentFileIndex, CurrentSLD, defMenuRefreshItm, doSlidesTransitions
@@ -79,6 +81,9 @@ BuildGUI() {
    RegExFilesPattern := MainExe.ahkgetvar.RegExFilesPattern
    TouchScreenMode := MainExe.ahkgetvar.TouchScreenMode
    userAllowWindowDrag := MainExe.ahkgetvar.userAllowWindowDrag
+   mainWinPos := MainExe.ahkgetvar.mainWinPos
+   mainWinSize := MainExe.ahkgetvar.mainWinSize
+   mainWinMaximized := MainExe.ahkgetvar.mainWinMaximized
 
    MinGUISize := "+MinSize" A_ScreenWidth//4 "x" A_ScreenHeight//4
    initialWh := "w" A_ScreenWidth//1.7 " h" A_ScreenHeight//1.5
@@ -122,9 +127,20 @@ BuildGUI() {
    WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%
    Sleep, 1
    WinActivate, ahk_id %PVhwnd%
-   repositionWindowCenter(1, PVhwnd, "mouse", appTitle)
-   Sleep, 50
-   Gui, 1: Show, Maximize
+   posu := StrSplit(mainWinPos, "|")
+   sizeu := StrSplit(mainWinSize, "|")
+   pX := posu[1], pY := posu[2]
+   sW := sizeu[1], sH := sizeu[2]
+   ; ToolTip, % mainWinPos "==" mainWinSize "==" mainWinMaximized , , , 2
+   If (mainWinMaximized=2 || pX="" || pY="" || sW="" || sH="")
+   {
+      repositionWindowCenter(1, PVhwnd, "mouse", appTitle)
+      Sleep, 50
+      Gui, 1: Show, Maximize
+   } Else
+   {
+      Gui, 1: Show, x%pX% y%pY% w%sW% h%sH%
+   }
    Return 1
 }
 
@@ -234,7 +250,7 @@ SetParentID(Window_ID, theOther) {
 
 miniGDIupdater() {
    updateUIctrl(0)
-   r := MainExe.ahkPostFunction("GDIupdater")
+   r := MainExe.ahkPostFunction("GDIupdaterResize", PrevGuiSizeEvent)
 }
 
 detectLongOperation(timer) {
@@ -712,7 +728,9 @@ activateMainWin() {
 GuiSize(GuiHwnd, EventInfo, Width, Height) {
     If (A_TickCount - lastMenuBarUpdate < 150)
        Return
+
     PrevGuiSizeEvent := EventInfo
+    ; ToolTip, % "l=" EventInfo , , , 2
     prevGUIresize := A_TickCount
     turnOffSlideshow()
     canCancelImageLoad := 4

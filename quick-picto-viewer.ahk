@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 4.5.5
+;@Ahk2Exe-SetVersion 4.6.0
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2020)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -154,10 +154,10 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , initialDrawingStartCoords := [], drawingLiveMode := 0, cardinalCurveCustomShape := 0, openingPanelNow := 0
    , closedLineCustomShape := 1, tensionCurveCustomShape := 0.5, PanelDefineSelectionCoords := 0
    , SelectionCoordsType := 1, PasteInPlaceAlphaFile := "", infoBoxGdiCached := "", watchFolderDetails := ""
-   , HUDobjNavBoxu := [], HUDobjHistoBoxu := []
+   , HUDobjNavBoxu := [], HUDobjHistoBoxu := [], globalhFIFimg := 0, userAddedFavesCount := 0
    , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := [], countGDIobjects := 0
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "4.5.5", vReleaseDate := "18/09/2020"
+   , appVersion := "4.6.0", vReleaseDate := "25/09/2020"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -221,8 +221,9 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , PasteInPlaceAlphaMaskClrA := 0, PasteInPlaceAlphaMaskClrB := 255, closeEditPanelOnApply := 1, FillAreaCurveTension := 2
    , alphaMaskOffsetX := 0, alphaMaskOffsetY := 0, alphaMaskReplaceMode := 0, PasteInPlaceAlphaChannelFile := 5
    , blurAreaMode := 1, FillAreaBlendMode := 1, PasteInPlaceApplyColorFX := 0, blurAreaPixelizeAmount := 0
-   , dynamicThumbsColumns := 1, thumbsColumns := 10, TextInAreaAutoWrap := 1, histogramMode := 2
-   , showHUDnavIMG := 0, HUDnavBoxSize := 75, PrintTxtSize
+   , dynamicThumbsColumns := 1, thumbsColumns := 10, TextInAreaAutoWrap := 1, histogramMode := 2, cmrRAWtoneMapParamB := 0
+   , showHUDnavIMG := 0, HUDnavBoxSize := 75, PrintTxtSize := 300, cmrRAWtoneMapAlgo := 1, cmrRAWtoneMapParamA := 1.85
+   , mainWinPos := 0, mainWinMaximized := 2, mainWinSize := 0, UserExternalApp := "", UserExternalEditApp := ""
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started.`nCPU cores identified: " realSystemCores ".")
@@ -381,20 +382,20 @@ HKifs(q:=0) {
     Return
 
     vk4F::    ; O
-       If HKifs("general") && (!CurrentSLD || StrLen(gdiBitmap)<3)
-          OpenDialogFiles()
-       Else If HKifs("imgsLoaded")
+       imgPath := getIDimage(currentFileIndex)
+       If HKifs("imgsLoaded")
           OpenThisFileMenu()
+       Else If ((HKifs("general") && (!CurrentSLD || StrLen(gdiBitmap)<3)) && !FileRexists(imgPath))
+          OpenDialogFiles()
     Return
 
-    ; w::   ; to-do  to do
-    ; generateAllThumbsNow()
+    w::   ; to-do  to do
     ; testWICwhatever()
-   ; ; moreTesting()
    ; ; testWICresizeSpeed()
    ;    SoundBeep 
    ;     testArkive()
-    ; Return
+   Sleep, 1
+    Return
 
     ^+vk4E::    ; Ctrl+Shift+N
        If HKifs("general")
@@ -810,7 +811,7 @@ HKifs(q:=0) {
 
     vk42 Up::     ; B
       If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
-         ToggleImgFavourites()
+         ToggleImgFavourites(0, 0, 1)
     Return
 
     ~vk48::    ; H
@@ -883,7 +884,7 @@ HKifs(q:=0) {
             DeletePicture()
             Sleep, 350
             InListMultiEntriesRemover()
-         } Else DeletePicture("single")
+         } Else DeleteActivePicture()
       }
     Return
 
@@ -1490,7 +1491,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
   mustOpenStartFolder := ""
   If !FileExist(fileNamu)
   {
-     showTOOLtip("ERROR: Failed to load file...")
+     showTOOLtip("ERROR: Failed to load files list...")
      SoundBeep, 300, 100
      SetTimer, RemoveTooltip, % -msgDisplayTime
      Return
@@ -1709,6 +1710,7 @@ OpenQPVfileFolder() {
 
 setImageWallpaper() {
    imgPath := getIDimage(currentFileIndex)
+   imgPath := StrReplace(imgPath, "||")
    zPlitPath(imgPath, 0, fileNamu, folderu, OutNameNoExt)
    If !FileRexists(imgPath)
    {
@@ -1765,12 +1767,51 @@ OpenThisFileMenu() {
   InvokeOpenWithMenu(imgPath, newInstanceOption)
 }
 
-OpenWithNewQPVinstance() {
-   imgPath := getIDimage(currentFileIndex)
-   OpenNewQPVinstance(imgPath)
+SoloOpenWithNewQPVinstance(dummy:=0) {
+   OpenWithNewQPVinstance("single")
+}
+
+OpenWithNewQPVinstance(dummy:=0) {
+   filesElected := getSelectedFiles(0, 1)
+   markedSelectFile := filesElected
+   If (filesElected>5 && dummy!="single")
+   {
+      msgBoxWrapper(appTitle ": WARNING", "You are not allowed to spawn in one go more than 25 instances of " appTitle ".", 0, 0, "error")
+      Return
+   }
+
+   If (filesElected>5 && dummy!="single")
+   {
+      msgResult := msgBoxWrapper(appTitle ": Confirmation", "You have selected " filesElected ". Please confirm you want to spawn so many new instances of " appTitle ".", 4, 0, "question")
+      If (msgResult="Yes")
+         allGood := 1
+   } Else allGood := 1
+
+   If (markedSelectFile && filesElected>1 && dummy!="single" && allGood=1)
+   {
+      Loop, % maxFilesIndex
+      {
+         isSelected := resultedFilesList[A_Index, 2]
+         If (isSelected!=1)
+            Continue
+
+            ; ToolTip, % A_Index , , , 2
+         imgPath := resultedFilesList[A_Index, 1]
+         If imgPath
+         {
+            Sleep, 700
+            OpenNewQPVinstance(imgPath)
+         }
+      }
+   } Else If (!markedSelectFile || dummy="single")
+   {
+      imgPath := getIDimage(currentFileIndex)
+      OpenNewQPVinstance(imgPath)
+   }
 }
 
 OpenNewQPVinstance(imgPath:="") {
+   imgPath := StrReplace(imgPath, "||")
    If !FileRexists(imgPath)
       imgPath := ""
 
@@ -1811,19 +1852,91 @@ OpenFileProperties() {
 InvokeOpenWithMenu(imgPath, newInstanceOption) {
     zPlitPath(imgPath, 0, OutFileName, OutDir)
     CurrentSLD := Trimmer(StrReplace(CurrentSLD, "|"))
+    IniAction(0, "UserExternalApp", "General")
+    pathu := "&X. " PathCompact(UserExternalApp, 28)
+    If StrLen(Trimmer(UserExternalApp))<6
+       pathu := "NONE CHOSEN"
 
+    IniAction(0, "UserExternalEditApp", "General")
+    pathu2 := "&Y. " PathCompact(UserExternalEditApp, 28)
+    If StrLen(Trimmer(UserExternalEditApp))<6
+       pathu2 := "NONE CHOSEN"
     CreateOpenWithMenu(imgPath)
     Menu, OpenWithMenu, Add,
-    If (newInstanceOption=1)
-       Menu, OpenWithMenu, Add, &0. Open file in a new QPV instance, OpenWithNewQPVinstance
+    If (newInstanceOption=1 && !markedSelectFile)
+       Menu, OpenWithMenu, Add, &0. Open file(s) in a new QPV instance, OpenWithNewQPVinstance
     Menu, OpenWithMenu, Add, &1. Open with default application, OpenWithDefaultApp
-    Menu, OpenWithMenu, Add, &2. «Open with» dialog, invokeSHopenWith
+    Menu, OpenWithMenu, Add, &2. System «Open with» dialog, invokeSHopenWith
     Menu, OpenWithMenu, Add, &4. Explore containing folder`tCtrl+E, OpenThisFileFolder
     If (CurrentSLD!=OutDir)
        Menu, OpenWithMenu, Add, &5. Open containing folder in QPV, OpenQPVfileFolder
     Menu, OpenWithMenu, Add,
+    Menu, OpenWithMenu, Add, &Choose external application, browseExternalApp
+    Menu, OpenWithMenu, Add, %pathu%, OpenImgWithUserExternApp
+    Menu, OpenWithMenu, Add, &Choose external editor application, browseExternalEditApp
+    Menu, OpenWithMenu, Add, %pathu2%, OpenImgWithUserEditExternApp
+    If (!pathu || pathu="none chosen")
+       Menu, OpenWithMenu, Disable, %pathu%
+    If (!pathu2 || pathu2="none chosen")
+       Menu, OpenWithMenu, Disable, %pathu2%
+    Menu, OpenWithMenu, Add,
     Menu, OpenWithMenu, Add, &Cancel, dummy
     showThisMenu("OpenWithMenu")
+}
+
+browseExternalApp() {
+   pattern := "Executable files (*.exe)"
+   FileSelectFile, imgPath, 3, % prevOpenFolderPath, Choose EXE application file, % pattern
+   If FileExist(imgPath)
+   {
+      UserExternalApp := imgPath
+      IniAction(1, "UserExternalApp", "General")
+      OpenImgWithUserExternApp()
+   }
+}
+
+browseExternalEditApp() {
+   pattern := "Executable files (*.exe)"
+   FileSelectFile, imgPath, 3, % prevOpenFolderPath, Choose EXE application file, % pattern
+   If FileExist(imgPath)
+   {
+      UserExternalEditApp := imgPath
+      IniAction(1, "UserExternalEditApp", "General")
+      OpenImgWithUserEditExternApp()
+   }
+}
+
+OpenImgWithUserEditExternApp() {
+   destroyGDIfileCache()
+   OpenImgWithUserExternApp("editor")
+}
+
+OpenImgWithUserExternApp(dummy:=0) {
+   ; IniAction(0, "UserExternalApp", "General")
+   imgPath := getIDimage(currentFileIndex)
+   imgPath := StrReplace(imgPath, "||")
+   zPlitPath(imgPath, 0, fileNamu, folderu, OutNameNoExt)
+   If !FileRexists(imgPath)
+   {
+      showTOOLtip("ERROR: File not found or access denied...`n" fileNamu "`n" folderu "\")
+      SoundBeep, 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   thisAPPpath := (dummy="editor") ? UserExternalEditApp : UserExternalApp
+   If !FileExist(thisAPPpath)
+   {
+      zPlitPath(thisAPPpath, 0, fileNamu, folderu, OutNameNoExt)
+      showTOOLtip("ERROR: The file of the external application does not seem to exist anymore...`n" fileNamu "`n" folderu "\")
+      SoundBeep, 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   Try Run, %thisAPPpath% "%imgPath%"
+   Catch wasError
+         msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening the external application...", 0, 0, "error")
 }
 
 resetSlideshowTimer(showMsg, ignoreEasyStop:=0) {
@@ -3961,7 +4074,8 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0) {
 
       SetTimer, drawWelcomeImg, Off
       Sleep, 5
-      OpenDialogFiles()
+      If (A_TickCount - lastWinDrag>300)
+         OpenDialogFiles()
    }
    lastInvoked := A_TickCount
 }
@@ -4025,6 +4139,7 @@ ToggleImageSizingMode(dummy:=0) {
     showTOOLtip("Rescaling mode:`n" friendly)
     SetTimer, RemoveTooltip, % -msgDisplayTime
     INIaction(1, "IMGresizingMode", "General")
+    INIaction(1, "zoomLevel", "General")
     SetTimer, coreReloadThisPicture, -50
     ; dummyTimerDelayiedImageDisplay(50)
     If (AnyWindowOpen=10 && imgEditPanelOpened=1)
@@ -4664,6 +4779,7 @@ WriteSettingsColorAdjustments() {
     INIaction(1, "vpIMGrotation", "General")
     INIaction(1, "zatAdjust", "General")
     INIaction(1, "lummyAdjust", "General")
+    INIaction(1, "zoomLevel", "General")
     INIaction(1, "specialColorFXmode", "General")
     INIaction(1, "uiColorCurveFXmode", "General")
     INIaction(1, "uiColorCurveFXchannel", "General")
@@ -4803,6 +4919,10 @@ ChangeZoom(dir, key:=0, stepFactor:=1) {
       lastInvoked2 := A_TickCount
    }
 
+   INIaction(1, "IMGresizingMode", "General")
+   If (IMGresizingMode=4)
+      INIaction(1, "zoomLevel", "General")
+
    newValues := "a" zoomLevel thumbsZoomLevel IMGresizingMode imageAligned getIDimage(currentFileIndex)
    If (prevValues=newValues && hasThisChangedYo!=1)
       Return
@@ -4923,6 +5043,9 @@ dummySaveLumGammos() {
    INIaction(1, "lumosAdjust", "General")
    INIaction(1, "lumosGrayAdjust", "General")
    INIaction(1, "imgFxMode", "General")
+   INIaction(1, "IMGresizingMode", "General")
+   If (IMGresizingMode=4)
+      INIaction(1, "zoomLevel", "General")
 }
 
 ChangeSaturation(dir) {
@@ -5317,6 +5440,7 @@ doOpenStartFolder() {
 }
 
 coreNextPrevImage(direction, startIndex, randomMode) {
+   Static countSeen, prevStatus
    If (thumbsDisplaying!=1 && maxFilesIndex>1)
    {
       If askAboutFileSave(" and another image will be loaded")
@@ -5326,6 +5450,11 @@ coreNextPrevImage(direction, startIndex, randomMode) {
    If StrLen(mustOpenStartFolder)>3
       startIndex := currentFileIndex := doOpenStartFolder()
 
+   thisState := "a" maxFilesIndex CurrentSLD SLDtypeLoaded
+   If (thisState!=prevStatus || countSeen>maxFilesIndex)
+      countSeen := 0
+
+   prevStatus := thisState
    If (startIndex>=maxFilesIndex && direction=1 && thumbsDisplaying=1 && randomMode!=1)
       Return maxFilesIndex
    Else If (startIndex<2 && direction=-1 && thumbsDisplaying=1 && randomMode!=1)
@@ -5337,9 +5466,16 @@ coreNextPrevImage(direction, startIndex, randomMode) {
    Else If (startIndex=maxFilesIndex && direction=1)
       startIndex := 0
 
+   delayu := (slideShowDelay>3500) ? Round(slideShowDelay*0.25) : Round(slideShowDelay*0.5)
+   ; canResetSeen := 0
    Loop, % maxFilesIndex + 1
    {
         thisIndex := (direction=-1) ? startIndex - A_Index : startIndex + A_Index
+        If (thisIndex>maxFilesIndex)
+           thisIndex -= maxFilesIndex
+        Else If (thisIndex<1)
+           thisIndex := startIndex + Abs(thisIndex)
+
         newIndex := thisIndex
         If (randomMode=1)
         {
@@ -5349,7 +5485,7 @@ coreNextPrevImage(direction, startIndex, randomMode) {
         If !r
            Continue
 
-        If (A_TickCount - startZeit>1950)
+        If (A_TickCount - startZeit>delayu)
            Break
 
         r := StrReplace(r, "||")
@@ -5357,7 +5493,6 @@ coreNextPrevImage(direction, startIndex, randomMode) {
         {
            If retrieveSeenImageDBentry(r, thisIndex)
            {
-              resultedFilesList[thisIndex, 3] := 1
               countSeen++
               Continue
            }
@@ -5373,10 +5508,11 @@ coreNextPrevImage(direction, startIndex, randomMode) {
         } Else Break
    }
 
+   ; ToolTip, % thisIndex "==" countSeen "==" delayu , , , 2
    If newIndex
       newIndex := clampInRange(newIndex, 1, maxFilesIndex, 1)
 
-   If (countSeen >= maxFilesIndex - 2) || (!newIndex) ; || (allImagesWereSeen=1)
+   If (countSeen >= maxFilesIndex - 1) || (!newIndex) ; || (allImagesWereSeen=1)
    {
       allImagesWereSeen := 1
       newIndex := (direction=-1) ? startIndex - 1 : startIndex + 1
@@ -9866,7 +10002,7 @@ PopulateSeenStatsInfos() {
 
   entriesCount := 0
   RecordSet := ""
-  SQL := "SELECT * FROM images;"
+  SQL := "SELECT imgViewDate, COUNT(*) FROM images GROUP BY imgViewDate;"
   If !seenImagesDB.Query(SQL, RecordSet)
      Return 0
 
@@ -9875,19 +10011,22 @@ PopulateSeenStatsInfos() {
   entriesH := []
   Loop
   {
+      ; sleep, 50
+      ; ToolTip, % Row[1] "a`nb" Row[2] , , , 2
       ; entries[CalcStringHash(Row[1], 0x8003)] := Row[1]
-      If RegExMatch(Row[1], RegExFilesPattern)
+      ; If RegExMatch(Row[1], RegExFilesPattern)
+      If Row[1]
       {
-         dateuD := "z" StrReplace(SubStr(Row[2], 1, 10), "-")
-         dateuM := "z" StrReplace(SubStr(Row[2], 1, 7), "-")
-         dateuH := "z" StrReplace(SubStr(Row[2], 12, 2), "-")
-         entriez%dateuD%++
-         entriez%dateuM%++
-         entriez%dateuH%++
-         entriesCount++
-         entriesD[dateuD] := [entriez%dateuD%, SubStr(Row[2], 1, 10)]
-         entriesM[dateuM] := [entriez%dateuM%, SubStr(Row[2], 1, 7)]
-         entriesH[dateuH] := [entriez%dateuH%, SubStr(Row[2], 12, 2)]
+         dateuD := "z" StrReplace(SubStr(Row[1], 1, 10), "-")
+         dateuM := "z" StrReplace(SubStr(Row[1], 1, 7), "-")
+         dateuH := "z" StrReplace(SubStr(Row[1], 12, 2), "-")
+         entriez%dateuD% += Row[2]
+         entriez%dateuM% += Row[2]
+         entriez%dateuH% += Row[2]
+         entriesCount += Row[2]
+         entriesD[dateuD] := [entriez%dateuD%, SubStr(Row[1], 1, 10)]
+         entriesM[dateuM] := [entriez%dateuM%, SubStr(Row[1], 1, 7)]
+         entriesH[dateuH] := [entriez%dateuH%, SubStr(Row[1], 12, 2)]
       }
       RC := RecordSet.Next(Row)
   } Until (RC<1)
@@ -10554,6 +10693,7 @@ FilterFilesIndex(thereWasFilter:=0, doExactFolderMatch:=0) {
    newFilesList := []
    newMappingList := []
    filterBehaviour := InStr(usrFilesFilteru, "&") ? 1 : 2
+   mustFaveAll := InStr(CurrentSLD, "\favourite-images-list.SLD") ? 1 : 0
    If (filesFilter="||Prev-Files-Selection||")
    {
        Loop, % maxFilesIndex + 1
@@ -10565,8 +10705,14 @@ FilterFilesIndex(thereWasFilter:=0, doExactFolderMatch:=0) {
             If (resultedFilesList[A_Index, 2]!=1)
                Continue
 
+            If (resultedFilesList[A_Index, 5]!=1 && mustFaveAll=1)
+               Continue
+
             newFilesIndex++
             newFilesList[newFilesIndex] := [r]
+            If (mustFaveAll=1)
+               newFilesList[newFilesIndex, 5] := 1
+
             If (thereWasFilter=1)
             {
                oldIndex := filteredMap2mainList[A_Index]
@@ -10581,6 +10727,9 @@ FilterFilesIndex(thereWasFilter:=0, doExactFolderMatch:=0) {
             If (InStr(r, "||") || !r)
                Continue
 
+            If (bckpResultedFilesList[A_Index, 5]!=1 && mustFaveAll=1)
+               Continue
+
             thisIndex++
             If StrLen(filesFilter)>1
             {
@@ -10590,6 +10739,9 @@ FilterFilesIndex(thereWasFilter:=0, doExactFolderMatch:=0) {
 
             newFilesIndex++
             newFilesList[newFilesIndex] := [r]
+            If (mustFaveAll=1)
+               newFilesList[newFilesIndex, 5] := 1
+
             If StrLen(filesFilter)>1
                newMappingList[newFilesIndex] := A_Index
        }
@@ -10983,7 +11135,7 @@ saveSlideSettingsInDB() {
    IniSLDBWrite("chnGdecalage", chnGdecalage)
    IniSLDBWrite("chnBdecalage", chnBdecalage)
    IniSLDBWrite("usrAdaptiveThreshold", usrAdaptiveThreshold)
-   IniSLDBWrite("noTooltipMSGs", noTooltipMSGs)
+   ; IniSLDBWrite("noTooltipMSGs", noTooltipMSGs)
    IniSLDBWrite("TouchScreenMode", TouchScreenMode)
    IniSLDBWrite("skipDeadFiles", skipDeadFiles)
    IniSLDBWrite("isAlwaysOnTop", isAlwaysOnTop)
@@ -11301,11 +11453,11 @@ SaveFilesList() {
       setImageLoading()
       Sleep, 10
       writeSlideSettings(file2save)
-      setWindowTitle("Saving slideshow, please wait", 1)
+      setWindowTitle("Saving files list index, please wait", 1)
       If (SLDcacheFilesList=1)
          showTOOLtip("Saving list of " maxFilesIndex " entries into...`n" file2save "`nPlease wait...")
       Else
-         showTOOLtip("Saving slideshow`n" file2save "`nPlease wait...")
+         showTOOLtip("Saving folders index in...`n" file2save "`nPlease wait...")
 
       thisTmpFile := !newTmpFile ? backCurrentSLD : newTmpFile
       saveDynaFolders := InStr(DynamicFoldersList, "|hexists|") ? coreLoadDynaFolders(thisTmpFile) : DynamicFoldersList
@@ -11388,7 +11540,7 @@ SaveFilesList() {
       SetTimer, ResetImgLoadStatus, -50
       SoundBeep, % wasErrorC ? 300 : 900, 100
       If wasErrorC
-         msgBoxWrapper(appTitle ": ERROR", "There were errors writing the slideshow file to disk. Permission denied or not enough disk space...", 0, 0, "error")
+         msgBoxWrapper(appTitle ": ERROR", "Errors occured when writing the files list to disk. Permission denied or not enough disk space...", 0, 0, "error")
       dummyTimerDelayiedImageDisplay(50)
    }
 }
@@ -13444,7 +13596,7 @@ readSlideSettings(readThisFile) {
      IniRead, tstGammosGrAdjust, %readThisFile%, General, GammosGrayAdjust, @
      IniRead, tstsatAdjust, %readThisFile%, General, satAdjust, @
      IniRead, tstimageAligned, %readThisFile%, General, imageAligned, @
-     IniRead, tstnoTooltipMSGs, %readThisFile%, General, noTooltipMSGs, @
+     ; IniRead, tstnoTooltipMSGs, %readThisFile%, General, noTooltipMSGs, @
      IniRead, tstTouchScreenMode, %readThisFile%, General, TouchScreenMode, @
      IniRead, tstskipDeadFiles, %readThisFile%, General, skipDeadFiles, @
      IniRead, tstisAlwaysOnTop, %readThisFile%, General, isAlwaysOnTop, @
@@ -13503,8 +13655,8 @@ readSlideSettings(readThisFile) {
         usrColorDepth := tstusrColorDepth
      If (tstRenderOpaqueIMG=1 || tstRenderOpaqueIMG=0)
         RenderOpaqueIMG := tstRenderOpaqueIMG
-     If (tstnoTooltipMSGs=1 || tstnoTooltipMSGs=0)
-        noTooltipMSGs := tstnoTooltipMSGs
+     ; If (tstnoTooltipMSGs=1 || tstnoTooltipMSGs=0)
+     ;    noTooltipMSGs := tstnoTooltipMSGs
      If (tstSLDcacheFilesList=1 || tstSLDcacheFilesList=0)
         SLDcacheFilesList := tstSLDcacheFilesList
      If (tstbwDithering=1 || tstbwDithering=0)
@@ -13709,7 +13861,43 @@ loadMainSettings() {
     IniRead, tstthumbsColumns, % mainSettingsFile, General, thumbsColumns, @
     IniRead, tstuserMultiCoresLimit, % mainSettingsFile, General, userMultiCoresLimit, @
     IniRead, tsthistogramMode, % mainSettingsFile, General, histogramMode, @
+    IniRead, tstmainWinSize, % mainSettingsFile, General, mainWinSize, @
+    IniRead, tstmainWinPos, % mainSettingsFile, General, mainWinPos, @
+    IniRead, tstmainWinMaximized, % mainSettingsFile, General, mainWinMaximized, @
+    IniRead, tstzoomLevel, % mainSettingsFile, General, zoomLevel, @
+    IniRead, tstcmrRAWtoneMapAlgo, % mainSettingsFile, General, cmrRAWtoneMapAlgo, @
+    IniRead, tstcmrRAWtoneMapParamA, % mainSettingsFile, General, cmrRAWtoneMapParamA, @
+    IniRead, tstcmrRAWtoneMapParamB, % mainSettingsFile, General, cmrRAWtoneMapParamB, @
 
+    If isInRange(tstcmrRAWtoneMapAlgo, 1, 3)
+       cmrRAWtoneMapAlgo := tstcmrRAWtoneMapAlgo
+
+    If (cmrRAWtoneMapAlgo=1)
+    {
+       If isNumber(tstcmrRAWtoneMapParamA)
+          cmrRAWtoneMapParamA := clampInRange(tstcmrRAWtoneMapParamA, 0, 9.9)
+       If isNumber(tstcmrRAWtoneMapParamB)
+          cmrRAWtoneMapParamB := clampInRange(tstcmrRAWtoneMapParamB, -8, 8)
+    } Else If (cmrRAWtoneMapAlgo=2)
+    {
+       If isNumber(tstcmrRAWtoneMapParamA)
+          cmrRAWtoneMapParamA := clampInRange(tstcmrRAWtoneMapParamA, -8, 8)
+       If isNumber(tstcmrRAWtoneMapParamB)
+          cmrRAWtoneMapParamB := clampInRange(tstcmrRAWtoneMapParamB, 0, 1)
+    } Else If (cmrRAWtoneMapAlgo=3)
+    {
+       If isNumber(tstcmrRAWtoneMapParamA)
+          cmrRAWtoneMapParamA := clampInRange(tstcmrRAWtoneMapParamA, 0, 1)
+       If isNumber(tstcmrRAWtoneMapParamB)
+          cmrRAWtoneMapParamB := clampInRange(tstcmrRAWtoneMapParamB, 0, 1)
+    }
+
+    If (tstmainWinMaximized=1 || tstmainWinMaximized=2)
+       mainWinMaximized := tstmainWinMaximized
+    If InStr(tstmainWinPos, "|")
+       mainWinPos := tstmainWinPos
+    If InStr(tstmainWinSize, "|")
+       mainWinSize := tstmainWinSize
     If (tsthistogramMode=1 || tsthistogramMode=2 || tsthistogramMode=3)
        histogramMode := tsthistogramMode
     If (tstuserimgQuality=1 || tstuserimgQuality=0)
@@ -13718,6 +13906,8 @@ loadMainSettings() {
        userAllowWindowDrag := tstuserAllowWindowDrag
     If (tstuseCachedSLDdata=1 || tstuseCachedSLDdata=0)
        useCachedSLDdata := tstuseCachedSLDdata
+    If (isInRange(tstzoomLevel, 0.01, 20) && tstzoomLevel!="@" && isNumber(tstzoomLevel))
+       zoomLevel := tstzoomLevel
 
     imgQuality := (userimgQuality=1) ? 7 : 5
     If (tstrotateSelBoundsKeepRatio=1 || tstrotateSelBoundsKeepRatio=0)
@@ -13867,7 +14057,7 @@ writeSlideSettings(file2save) {
     IniWrite, % chnGdecalage, % mainSettingsFile, General, chnGdecalage
     IniWrite, % chnBdecalage, % mainSettingsFile, General, chnBdecalage
     IniWrite, % usrAdaptiveThreshold, % mainSettingsFile, General, usrAdaptiveThreshold
-    IniWrite, % noTooltipMSGs, %file2save%, General, noTooltipMSGs
+    ; IniWrite, % noTooltipMSGs, %file2save%, General, noTooltipMSGs
     IniWrite, % TouchScreenMode, %file2save%, General, TouchScreenMode
     IniWrite, % skipDeadFiles, %file2save%, General, skipDeadFiles
     IniWrite, % isAlwaysOnTop, %file2save%, General, isAlwaysOnTop
@@ -13990,7 +14180,11 @@ RecentFilesManager(entry2add) {
   readRecentEntries(newHistoryList)
 }
 
-ToggleImgFavourites(thisImg:=0, actu:=0) {
+ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
+  Static lastInvoked := 1
+  If (A_TickCount - lastInvoked<350) && (directCall=1)
+     Return
+
   imgPath := thisImg ? thisImg : getIDimage(currentFileIndex)
   If (!FileRexists(imgPath) && actu!="rem")
      Return
@@ -13998,19 +14192,54 @@ ToggleImgFavourites(thisImg:=0, actu:=0) {
   isFaved := resultedFilesList[currentFileIndex, 5]
   If (!isFaved && actu!="rem")
   {
+     If !userAddedFavesCount
+     {
+        IniAction(0, "userAddedFavesCount", "General")
+        If !isNumber(userAddedFavesCount)
+           userAddedFavesCount := 0
+     }
+
+     If (userAddedFavesCount>9875)
+     {
+        showTOOLtip("WARNING: You have reached the maximum allowed favourite images: 9876 entries.")
+        SoundBeep , 300, 100
+        SetTimer, RemoveTooltip, % -msgDisplayTime//2
+        Return
+     }
+
      FileAppend, % imgPath "`n", % mainFavesFile, UTF-8
-     showTOOLtip("Image added to favourites")
+     If ErrorLevel
+     {
+        showTOOLtip("Failed to update the favourites list...`nThe image was not added to favourites.")
+        SoundBeep , 300, 100
+        SetTimer, RemoveTooltip, % -msgDisplayTime//2
+        Return
+     }
+     userAddedFavesCount++
+     IniAction(1, "userAddedFavesCount", "General")
+     zPlitPath(imgPath, 0, OutFileName, OutDir)
+     showTOOLtip("Image added to favourites:`n" OutFileName "`n" OutDir "\`nTotal entries: " userAddedFavesCount, 0, 0, userAddedFavesCount/9876)
      resultedFilesList[currentFileIndex, 5] := 1
      SetTimer, RemoveTooltip, % -msgDisplayTime//2
+     lastInvoked := A_TickCount
   } Else
   {
+     ToolTip, Please wait...
+     FileRead, historyList, % mainFavesFile
+     If ErrorLevel
+     {
+        Tooltip
+        showTOOLtip("Failed to read favourites list...`nUnable to remove image from favourites.")
+        SoundBeep , 300, 100
+        SetTimer, RemoveTooltip, % -msgDisplayTime//2
+        Return
+     }
      If !thisImg
         resultedFilesList[currentFileIndex, 5] := 0
 
-     FileRead, historyList, % mainFavesFile
      historyList := StrReplace(historyList, imgPath)
      realCount := ST_Count(historyList, "`n")
-     If (realCount>9000)
+     If (realCount>9876)
      {
         realCount := 0
         Loop, Parse, historyList, `n
@@ -14030,10 +14259,21 @@ ToggleImgFavourites(thisImg:=0, actu:=0) {
      FileDelete, % mainFavesFile
      Sleep, 25
      realCount := List_MakeUnique(historyList, "`n", 0, 0)
-     FileAppend, % historyList, % mainFavesFile, UTF-8
-
-     showTOOLtip("Image removed from favourites")
+     userAddedFavesCount := realCount
+     IniAction(1, "userAddedFavesCount", "General")
+     FileAppend, % historyList "`n", % mainFavesFile, UTF-8
+     Tooltip
+     If ErrorLevel
+     {
+        showTOOLtip("Failed to update the favourites list file...`nThe image was not succesfully removed from favourites.")
+        SoundBeep , 300, 100
+        SetTimer, RemoveTooltip, % -msgDisplayTime//2
+        Return
+     }
+     zPlitPath(imgPath, 0, OutFileName, OutDir)
+     showTOOLtip("Image removed from favourites:`n" OutFileName "`n" OutDir "\`nTotal entries: " realCount, 0, 0, realCount/9876)
      SetTimer, RemoveTooltip, % -msgDisplayTime//2
+     lastInvoked := A_TickCount
   }
 }
 
@@ -14058,12 +14298,23 @@ retrieveFavesAsList() {
              mustRenewList := 1
           Continue
        }
-
+       posu := InStr(imgu, ":\", 0, -1)
+       If (posu>4)
+       {
+          oimgu := imgu
+          imgu := SubStr(imgu, 1, posu - 2)
+          bonus := SubStr(oimgu, posu - 1)
+          thisIndexu++
+          thisList[thisIndexu] := [bonus]
+          thisList[thisIndexu, 5] := 1
+       }
        thisIndexu++
        thisList[thisIndexu] := [imgu]
        thisList[thisIndexu, 5] := 1
     }
  
+   userAddedFavesCount := thisIndexu
+   IniAction(1, "userAddedFavesCount", "General")
    If (thisIndexu<2)
    {
       SoundBeep , 300, 100
@@ -14078,7 +14329,7 @@ retrieveFavesAsList() {
    CurrentSLD := mainCompiledPath "\favourite-images-list.SLD"
    resultedFilesList := thisList.Clone()
    SetTimer, RemoveTooltip, % -msgDisplayTime
-   SLDtypeLoaded := 1
+   SLDtypeLoaded := 2
    maxFilesIndex := thisList.Count()
    seenEntries := []
    If (mustRenewList=1)
@@ -14097,7 +14348,11 @@ renewFavesListBasedOnIndexList() {
    newListu := ""
    Loop, % maxFilesIndex
    {
-       If (A_Index>9500)
+       isFaved := resultedFilesList[currentFileIndex, 5]
+       If !isFaved
+          Continue
+
+       If (A_Index>9876)
           Break
 
        If StrLen(filesFilter)>1
@@ -14112,7 +14367,9 @@ renewFavesListBasedOnIndexList() {
    FileDelete, % mainFavesFile
    Sleep, 25
    realCount := List_MakeUnique(newListu, "`n", 0, 0)
-   FileAppend, % newListu, % mainFavesFile, UTF-8
+   userAddedFavesCount := realCount
+   IniAction(1, "userAddedFavesCount", "General")
+   FileAppend, % newListu "`n", % mainFavesFile, UTF-8
 }
 
 eraseAllFavedIMGs() {
@@ -14172,7 +14429,8 @@ getSelectedFiles(getItem:=0, forceSort:=0) {
       {
          markedSelectFile := 0
          resultedFilesList[firstItem, 2] := 0
-         mainGdipWinThumbsGrid()
+         If (thumbsDisplaying=1)
+            mainGdipWinThumbsGrid()
       }
       changeMcursor("normal")
       Return markedSelectFile
@@ -14456,8 +14714,12 @@ PanelMultiFileDelete() {
 
 BTNactiveFileDel() {
    CloseWindow()
-   DeletePicture("single")
+   DeleteActivePicture()
    getSelectedFiles(0, 1)
+}
+
+DeleteActivePicture() {
+   DeletePicture("single")
 }
 
 BTNmultiDel() {
@@ -15514,7 +15776,7 @@ PanelSaveSlideShowu() {
     Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w%btnWid% Default gBTNsaveSlideshowPanel, &Save slideshow
     Gui, Add, Button, x+5 hp wp gPanelDynamicFolderzWindow, &Dynamic folders
     Gui, Add, Button, x+5 hp w90 gBtnCloseWindow, C&ancel
-    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Save slideshow: " appTitle)
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Save indexed files list: " appTitle)
 }
 
 UItoggleSLDformat() {
@@ -15936,8 +16198,6 @@ RenameBTNaction(newFileName, file2rem, doLastOption) {
      FileSetAttrib, -R, %file2rem%
      Sleep, 2
      FileMove, %file2rem%, %file2save%, 1
-     If (SLDtypeLoaded=1)
-        watchFolderDetails := getFolderDetails(StrReplace(CurrentSLD, "|"))
      If ErrorLevel
      {
         showTOOLtip("ERROR: Access denied... The file could not be renamed.`n" OutFileName "`n" OutDir "\")
@@ -15953,8 +16213,6 @@ RenameBTNaction(newFileName, file2rem, doLastOption) {
            FileSetTime, % originalCtime, % file2save, C
         }
 
-        If InStr(CurrentSLD, "\favourite-images-list.SLD")
-           renewFavesListBasedOnIndexList()
 
         lastRenameUndo := []
         lastRenameUndo := [OutFileName, file2save]
@@ -15963,6 +16221,12 @@ RenameBTNaction(newFileName, file2rem, doLastOption) {
         resultedFilesList[currentFileIndex, 1] := file2save
         If StrLen(filesFilter)>1
            bckpResultedFilesList[filteredMap2mainList[currentFileIndex]] := [file2save]
+
+        If InStr(CurrentSLD, "\favourite-images-list.SLD")
+           renewFavesListBasedOnIndexList()
+
+        If (SLDtypeLoaded=1)
+           watchFolderDetails := getFolderDetails(StrReplace(CurrentSLD, "|"))
         dummyTimerDelayiedImageDisplay(50)
         showTOOLtip("File renamed succesfully to:`n" newFileName "`n" OutDir "\")
         Return 1
@@ -17328,8 +17592,8 @@ PanelPrintImage() {
 
     printerlist := SGDIPrint_GetDefaultPrinter() "||" SGDIPrint_EnumPrinters("|") 
     Gui, -DPIScale
-    Gui, Add, Text, x20 y20 w248 h351 Section +0x1000 +0xE +hwndhCropCornersPic, -
-    Gui, Add, Text, xp y+10 wp vPrinterPageInfos, -`n-`n-`n-
+    Gui, Add, Text, x20 y20 w248 h351 Section +0x1000 +0xE +hwndhCropCornersPic, Print preview
+    Gui, Add, Text, xp y+10 wp Center vPrinterPageInfos, -`n-`n-`n-
     Gui, +DPIScale
 
     Gui, Add, Tab3, x+20 ys Section, General|Text line
@@ -18328,10 +18592,10 @@ BtnViewedImages2List() {
    AnyWindowOpen := 100
    resetMainWin2Welcome()
    AnyWindowOpen := 0
-   CurrentSLD := mainCompiledPath "\viewed-images-session.SLD"
+   CurrentSLD := mainCompiledPath "\viewed-images-history-current-session.SLD"
    For Key, Value in userSeenSessionImagesArray
        resultedFilesList[A_Index] := [Value]
-   SLDtypeLoaded := 1
+   SLDtypeLoaded := 2
    maxFilesIndex := resultedFilesList.Count()
    GenerateRandyList()
    RandomPicture()
@@ -18351,6 +18615,7 @@ BtnALLviewedImages2List(dummy:=0) {
    CurrentSLD := ""
    showTOOLtip("Gathering seen images list, please wait")
    setImageLoading()
+   friendly := InStr(dummy, "|filteru|") ? StrReplace(dummy, "|filteru|") : "ALL"
    dummy := InStr(dummy, "|filteru|") ? StrReplace(dummy, "|filteru|") : ""
    seenEntries := retrieveEntireSeenImagesDB(totalSeenIMGs, 1, dummy)
    If (totalSeenIMGs<3)
@@ -18370,10 +18635,10 @@ BtnALLviewedImages2List(dummy:=0) {
    AnyWindowOpen := 100
    resetMainWin2Welcome()
    AnyWindowOpen := 0
-   CurrentSLD := mainCompiledPath "\viewed-images-all-sessions.SLD"
+   CurrentSLD := mainCompiledPath "\viewed-images-history-" friendly ".SLD"
    Loop, % seenEntries.Count()
        resultedFilesList[A_Index] := [seenEntries[A_Index],,1]
-   SLDtypeLoaded := 1
+   SLDtypeLoaded := 2
    seenEntries := []
    maxFilesIndex := resultedFilesList.Count()
    GenerateRandyList()
@@ -18780,23 +19045,207 @@ openPrefsPanelWindow() {
     Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuWindowBGRcolor, P
     Gui, Add, Checkbox, x15 y+10 gupdateUIsettings Checked%borderAroundImage% vborderAroundImage, Highlight image borders in the viewport
 
-    If !FontList._NewEnum()[k, v]
-    {
-       Fnt_GetListOfFonts()
-       FontList := trimArray(FontList)
-    }
-
-    Loop, % FontList.Count()
-    {
-        fontNameInstalled := FontList[A_Index]
-        If (fontNameInstalled ~= "i)(@|biz ud|ud digi kyo|oem|extb|symbol|marlett|wst_|glyph|reference specialty|system|terminal|mt extra|small fonts|cambria math|this font is not|fixedsys|emoji|hksc| mdl|wingdings|webdings)") || (fontNameInstalled=OSDFontName)
-           Continue
-        GuiControl, SettingsGUIA:, OSDFontName, %fontNameInstalled%
-    }
-
+    PopulateFontsList("OSDFontName", "SettingsGUIA")
     Gui, Add, Button, xm+0 y+20 h%thisBtnHeight% w%btnWid% gOpenUImenu, &More options
     Gui, Add, Button, x+5 hp w90 gPrefsCloseBTN Default, Clo&se
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Interface settings: " appTitle)
+}
+
+PanelAdjustToneMapping() {
+    If AnyWindowOpen
+       Return
+
+    IniAction(0, "cmrRAWtoneMapAlgo", "General")
+    IniAction(0, "cmrRAWtoneMapParamA", "General")
+    IniAction(0, "cmrRAWtoneMapParamB", "General")
+    thisBtnHeight := createSettingsGUI(42, A_ThisFunc)
+    btnWid := 100
+    txtWid := 500
+    columnBpos2 := 205
+    EditWid := 60
+    If (PrefsLargeFonts=1)
+    {
+       columnBpos2 := columnBpos2 + 50
+       EditWid := EditWid + 50
+       btnWid := btnWid + 70
+       txtWid := txtWid + 20
+       Gui, Font, s%LargeUIfontValue%
+    }
+
+   If (cmrRAWtoneMapAlgo=1)
+   {
+      prcA := cmrRAWtoneMapParamA/9.9
+      paramA := Round(200*prcA)
+      prcB := (cmrRAWtoneMapParamB + 8)/16
+      paramB := Round(200*prcB)
+   } Else If (cmrRAWtoneMapAlgo=2)
+   {
+      prcA := (cmrRAWtoneMapParamA + 8)/16
+      paramA := Round(200*prcA)
+      paramB := 200*cmrRAWtoneMapParamB
+   } Else If (cmrRAWtoneMapAlgo=3)
+   {
+      paramA := 200*cmrRAWtoneMapParamA
+      paramB := 200*cmrRAWtoneMapParamB
+   }
+
+    showTOOLtip("Initializing tone-mapping panel, please wait...")
+    Global SliderA, SliderB, infoSliderA, infoSliderB
+    Gui, -DPIScale
+    Gui, Add, Text, x15 y15 w460 h320 +0x1000 +0xE +hwndhLVmainu, Image before 
+    Gui, Add, Text, x480 y15 w460 h320 +0x1000 +0xE +hwndhCropCornersPic, Image after
+    ; Gui, Add, Text, xp-480 y+1 w2 h2 +0x1000 +0xE, -
+    Gui, +DPIScale
+    Gui, Add, Text, x15 y+10 Section w%txtWid%, High-dynamic range images (HDRIs) must be converted to 32 bits to be displayed on screen. You can choose the algorithm to use for this and also configure it.
+    Gui, Add, DropDownList, xs y+10 w%txtWid% AltSubmit gupdateUItoneMappingPanel Choose%cmrRAWtoneMapAlgo% vcmrRAWtoneMapAlgo, Adaptive logarithmic mapping (F. Drago, 2003)|HDR reduction inspired by photoreceptors physiology (E. Reinhard, 2005)|Gradient domain HDR compression (R. Fattal, 2002)
+    Gui, Add, Text, xs y+10 wp vinfoSliderA, ParamA
+    Gui, Add, Slider, xs y+5 wp gupdateUItoneMappingPanel AltSubmit ToolTip NoTicks vsliderA Range1-200, % ParamA
+    Gui, Add, Text, xs y+10 wp vinfoSliderB, ParamB
+    Gui, Add, Slider, xs y+5 wp gupdateUItoneMappingPanel AltSubmit ToolTip NoTicks vsliderB Range1-200, % ParamB
+    friendly := (PrefsLargeFonts=1) ? "`n" : ""
+    Gui, Add, Checkbox, xs y+10 gupdateUItoneMappingPanel Checked%userHQraw% vuserHQraw, Load camera RAW images at high quality`nEnable this to have tone-mapping apply%friendly%on RAW images as well
+
+    initializeFimPreviewIMG(getIDimage(currentFileIndex))
+    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid% gBTNtoneMapRefresh Default, &Update viewport
+    Gui, Add, Button, x+5 hp w90 gBTNresetToneMap, &Reset
+    Gui, Add, Button, x+5 hp wp gBtnCloseWindow, Clo&se
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "HDR tone-mapping options: " appTitle)
+    RemoveTooltip()
+    SetTimer, updateUItoneMappingPanel, -350
+}
+
+initializeFimPreviewIMG(imgPath) {
+  Static uiBoxW := 460, uiBoxH := 320
+  initFIMGmodule()
+  If !wasInitFIMlib
+     Return
+
+  tempBMP := trGdip_CreateBitmap(uiBoxW, uiBoxH)
+  Gu := Gdip_GraphicsFromImage(tempBMP, 3)
+  Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+  calcIMGdimensions(imgW, imgH, uiBoxW, uiBoxH, thisW, thisH)
+  thisX := uiBoxW//2 - thisW//2
+  thisY := uiBoxH//2 - thisH//2
+  Gdip_FillRectangle(Gu, pBrushHatchLow, -2, -2, uiBoxW + 3, uiBoxH + 3)
+  r1 := Gdip_DrawImage(Gu, useGdiBitmap(), thisX, thisY, thisW, thisH)
+  hBitmap := Gdip_CreateHBITMAPFromBitmap(tempBMP)
+  SetImage(hLVmainu, hBitmap)
+  Gdi_DeleteObject(hBitmap)
+  trGdip_DisposeImage(tempBMP, 1)
+  Gdip_DeleteGraphics(Gu)
+
+  If globalhFIFimg
+  {
+     FreeImage_UnLoad(globalhFIFimg)
+     globalhFIFimg := ""
+  }
+
+  loadArgs := 0
+  GFT := FreeImage_GetFileType(imgPath)
+  If (GFT=34 && loadArgs=0)
+     loadArgs := 0
+  Else If (GFT=2 && loadArgs=0)
+     loadArgs := 8
+
+  hFIFimgA := FreeImage_Load(imgPath, -1, loadArgs)
+  If hFIFimgA
+  {
+     FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
+     calcIMGdimensions(imgW, imgH, uiBoxW, uiBoxH, thisW, thisH)
+     hFIFimgB := FreeImage_Rescale(hFIFimgA, thisW, thisH, 0)
+  }
+
+  globalhFIFimg := hFIFimgB ? hFIFimgB : 0
+  If !globalhFIFimg
+     Return 0
+  Else
+     Return 1
+}
+
+updateUIfimToneMappedIMG() {
+   Static uiBoxW := 460, uiBoxH := 320
+   hFIFimgE := FreeImage_ToneMapping(globalhFIFimg, cmrRAWtoneMapAlgo - 1, cmrRAWtoneMapParamA, cmrRAWtoneMapParamB)
+   imgBPPc := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgE), "-"))
+   If (imgBPPc!=32)
+      hFIFimgD := FreeImage_ConvertTo(hFIFimgE, "32Bits")
+
+   hFIFimgZ := hFIFimgD ? hFIFimgD : hFIFimgE
+   pBitmap := ConvertFIMtoPBITMAP(hFIFimgZ)
+
+   tempBMP := trGdip_CreateBitmap(uiBoxW, uiBoxH)
+   Gu := Gdip_GraphicsFromImage(tempBMP, 3)
+   Gdip_GetImageDimensions(pBitmap, imgW, imgH)
+   calcIMGdimensions(imgW, imgH, uiBoxW, uiBoxH, thisW, thisH)
+   thisX := uiBoxW//2 - thisW//2
+   thisY := uiBoxH//2 - thisH//2
+   Gdip_FillRectangle(Gu, pBrushHatchLow, -2, -2, uiBoxW + 3, uiBoxH + 3)
+   r1 := Gdip_DrawImage(Gu, pBitmap, thisX, thisY, thisW, thisH)
+   hBitmap := Gdip_CreateHBITMAPFromBitmap(tempBMP)
+   SetImage(hCropCornersPic, hBitmap)
+   Gdi_DeleteObject(hBitmap)
+   trGdip_DisposeImage(tempBMP, 1)
+   Gdip_DeleteGraphics(Gu)
+   trGdip_DisposeImage(pBitmap, 1)
+
+   FreeImage_UnLoad(hFIFimgE)
+   If hFIFimgD
+      FreeImage_UnLoad(hFIFimgD)
+}
+
+BTNtoneMapRefresh() {
+   updateUItoneMappingPanel()
+   discardViewPortCaches()
+   disposeCacheIMGs()
+   RefreshImageFileAction()
+}
+
+BTNresetToneMap() {
+   GuiControl, SettingsGUIA: Choose, cmrRAWtoneMapAlgo, 1
+   GuiControl, SettingsGUIA:, SliderA, 38
+   GuiControl, SettingsGUIA:, SliderB, 100
+   Sleep, 1
+   updateUItoneMappingPanel()
+}
+
+updateUItoneMappingPanel() {
+   Static lastInvoked := 1
+   If (A_TickCount - lastInvoked<100)
+   {
+      SetTimer, updateUItoneMappingPanel, -350
+      Return
+   }
+
+   Gui, SettingsGUIA: Default
+   GuiControlGet, cmrRAWtoneMapAlgo
+   GuiControlGet, SliderA
+   GuiControlGet, SliderB
+   GuiControlGet, userHQraw
+   prcA := SliderA/200
+   prcB := SliderB/200
+   If (cmrRAWtoneMapAlgo=1)
+   {
+      cmrRAWtoneMapParamA := 9.9*prcA
+      GuiControl, SettingsGUIA:, infoSliderA, Gamma: %cmrRAWtoneMapParamA%
+      cmrRAWtoneMapParamB := 16*prcB - 8
+      GuiControl, SettingsGUIA:, infoSliderB, Exposure: %cmrRAWtoneMapParamB%
+   } Else If (cmrRAWtoneMapAlgo=2)
+   {
+      cmrRAWtoneMapParamA := 16*prcA - 8
+      GuiControl, SettingsGUIA:, infoSliderA, Intensity: %cmrRAWtoneMapParamA%
+      cmrRAWtoneMapParamB := prcB
+      GuiControl, SettingsGUIA:, infoSliderB, Contrast: %cmrRAWtoneMapParamB%
+   } Else If (cmrRAWtoneMapAlgo=3)
+   {
+      cmrRAWtoneMapParamA := prcA
+      GuiControl, SettingsGUIA:, infoSliderA, Saturation: %cmrRAWtoneMapParamA%
+      cmrRAWtoneMapParamB := prcB
+      GuiControl, SettingsGUIA:, infoSliderB, Attenuation: %cmrRAWtoneMapParamB%
+   }
+   updateUIfimToneMappedIMG()
+   IniAction(1, "cmrRAWtoneMapAlgo", "General")
+   IniAction(1, "cmrRAWtoneMapParamA", "General")
+   IniAction(1, "cmrRAWtoneMapParamB", "General")
+   lastInvoked := A_TickCount
 }
 
 updateUIsettings() {
@@ -19470,6 +19919,7 @@ CopyMovePanelWindow() {
     getSelectedFiles(0, 1)
     If (markedSelectFile>1)
     {
+       finalListu .= "[group-by-month-year]`n[group-by-years]`n[group-by-file-types]"
        copyMoveDoLastOption := 0
        infoSelection := "Selected files: " markedSelectFile ". "
     }
@@ -19500,7 +19950,7 @@ BtnHelpCopyMovePanel() {
   imgPath := getIDimage(currentFileIndex)
   zPlitPath(imgPath, 0, OutFileName, OutDir)
   btnName := (UsrCopyMoveOperation=2) ? "Move" : "Copy"
-  msgBoxWrapper(appTitle ": HELP", "Recognized patterns:`n`na) " btnName " files to parent folder: .\`n`nb) " btnName " files to a new or existing sub-folder: \given-folder`n`nc) " btnName " files into a new or exiting folder within the parent folder: .\given-folder.`n`nThe destination folder for all files will be calculated relative to the currently active file index entry: " currentFileIndex ".`n" OutDir "`n`nIf you click on «Mark files (Explorer)» button, the selected file(s) will be marked as «COPY» or «CUT» and you can paste them in any file manager, or in another session of " appTitle ".", -1, 0, 0)
+  msgBoxWrapper(appTitle ": HELP", "Recognized patterns:`n`na) " btnName " files to parent folder: .\`n`nb) " btnName " files to a new or existing sub-folder: \given-folder`n`nc) " btnName " files into a new or exiting folder within the parent folder: .\given-folder.`n`nThe destination folder for all files will be calculated relative to the currently active file index entry: " currentFileIndex ".`n" OutDir "`n`nUse [group-by-month-year], [group-by-years] or [group-by-file-types] as folder name to automatically group files in newly created folders named based on files' modification date or file types.`n`nIf you click on «Mark files (Explorer)» button, the selected file(s) will be marked as «COPY» or «CUT» and you can paste them in any file manager, or in another session of " appTitle ".", -1, 0, 0)
 }
 
 changeCopyMoveAction() {
@@ -19570,7 +20020,12 @@ BtnCopyMoveAction() {
   folderu := Trimmer(UsrEditFileDestination)
   folderu := StrReplace(folderu, "/", "\")
   folderu := RegExReplace(folderu, "\\{2,}", "\")
-  If (folderu=".\")   ; move files one level up
+  groupingMode := 0
+  If (folderu="[group-by-month-year]" || folderu="[group-by-years]" || folderu="[group-by-file-types]")   ; group files
+  {
+     groupingMode := 1
+     folderu := OutDir "\" folderu
+  } Else If (folderu=".\")   ; move files one level up
   {
      folderu := SubStr(OutDir, 1, InStr(OutDir, "\", 0, -1) - 1)
   } Else If RegExMatch(folderu, "^(\\.)") ; move files to a given sub-folder
@@ -19598,7 +20053,18 @@ BtnCopyMoveAction() {
   If (b := InStr(folderu, "; "))
      folderu := SubStr(folderu, b+2)
 
-  If !RegExMatch(folderu, "^(.\:\\.)")
+  wrongNames := 0
+  testFolderu := SubStr(folderu, 4)
+  Loop, Parse, testFolderu, \
+  {
+      IF (!filterFileName(A_LoopField) && A_LoopField)
+         wrongNames := 1
+  }
+
+  If (InStr(folderu, "[group-by-month-year]") || InStr(folderu, "[group-by-file-types]") || InStr(folderu, "[group-by-years]"))
+     groupingMode := 1
+
+  If (!RegExMatch(folderu, "^(.\:\\.)") || wrongNames=1)
   {
      showTOOLtip("WARNING: Incorrect file path given...")
      SoundBeep, 300, 100
@@ -19606,10 +20072,10 @@ BtnCopyMoveAction() {
      Return
   }
 
-  If FolderExist(folderu)
+  If (FolderExist(folderu) || groupingMode=1)
   {
      Sleep, 2
-     QuickMoveFile2Dest(folderu, copyMoveDoLastOption)
+     QuickMoveFile2Dest(folderu, copyMoveDoLastOption, groupingMode)
   } Else If (StrLen(folderu)>4)
   {
      msgResult := msgBoxWrapper(appTitle, "Destination folder does not seem to exist:`n" folderu "\`n`nDo you want to create the folder?", 4, 0, "question")
@@ -19624,7 +20090,7 @@ BtnCopyMoveAction() {
         } Else
         {
            Sleep, 2
-           QuickMoveFile2Dest(folderu, copyMoveDoLastOption)
+           QuickMoveFile2Dest(folderu, copyMoveDoLastOption, 0)
         }
      }
   }
@@ -19666,14 +20132,18 @@ RecentCopyMoveManager(entry2add) {
   }
 }
 
-QuickMoveFile2Dest(finalDest, goLastOption) {
+QuickMoveFile2Dest(finalDest, goLastOption, groupingMode:=0) {
     If (slideShowRunning=1)
        ToggleSlideShowu()
  
     getSelectedFiles(0, 1)
     If (markedSelectFile>1)
     {
-       batchCopyMoveFile(finalDest)
+       batchCopyMoveFile(finalDest, groupingMode)
+       Return
+    } Else If (groupingMode=1)
+    {
+       msgBoxWrapper(appTitle ": ERROR", "You cannot group files into folders when only one file is selected. In this case, please provide a destination path without any [group-by-*] token.", 0, 0, "error")
        Return
     }
 
@@ -19782,7 +20252,7 @@ QuickMoveFile2Dest(finalDest, goLastOption) {
     SetTimer, ResetImgLoadStatus, -25
 }
 
-batchCopyMoveFile(finalDest) {
+batchCopyMoveFile(finalDest, groupingMode:=0) {
    Static lastInvoked := 1
    filesElected := getSelectedFiles(0, 1)
    If (A_TickCount - lastInvoked > 29500) || (filesElected>100)
@@ -19805,6 +20275,7 @@ batchCopyMoveFile(finalDest) {
    doStartLongOpDance()
    nullvara := askAboutFileCollision(file2rem, file2save, 1, 3, 0, nullvar)
    countTFilez := filezMoved := failedFiles := skippedFiles := 0
+   oFinalDest := finalDest
    Loop, % maxFilesIndex
    {
       isSelected := resultedFilesList[A_Index, 2]
@@ -19814,7 +20285,8 @@ batchCopyMoveFile(finalDest) {
       changeMcursor()
       thisFileIndex := A_Index
       file2rem := getIDimage(thisFileIndex)
-      zPlitPath(file2rem, 0, OldOutFileName, OldOutDir)
+      zPlitPath(file2rem, 0, OldOutFileName, OldOutDir, OutFileNameNoExt, OutFileExt)
+      countTFilez++
       If !FileExist(file2rem)
       {
          failedFiles++
@@ -19827,11 +20299,10 @@ batchCopyMoveFile(finalDest) {
          Continue
       }
 
-      countTFilez++
       FileGetTime, originalMtime, % file2rem, M
       FileGetTime, originalCtime, % file2rem, C
       executingCanceableOperation := A_TickCount
-      If (A_TickCount - prevMSGdisplay>3000)
+      If (A_TickCount - prevMSGdisplay>2000)
       {
          If (skippedFiles>0)
             someErrors := "`n" skippedFiles " files were skipped"
@@ -19841,6 +20312,26 @@ batchCopyMoveFile(finalDest) {
          showTOOLtip(friendly countTFilez "/" filesElected " files to`n" finalDest "\`nPlease wait..." someErrors, 0, 0, countTFilez/filesElected)
          prevMSGdisplay := A_TickCount
          someErrors := ""
+      }
+
+      grouper := ""
+      If (groupingMode=1)
+      {
+         If ((InStr(oFinalDest, "[group-by-month-year]") && originalMtime)
+         || (InStr(oFinalDest, "[group-by-file-types]") && OutFileExt)
+         || (InStr(oFinalDest, "[group-by-years]") && originalMtime))
+         {
+            FormatTime, grouper, % originalMtime, yyyy-MM-MMMM
+            FormatTime, groupery, % originalMtime, yyyy
+            finalDest := StrReplace(oFinalDest, "[group-by-month-year]", grouper)
+            finalDest := StrReplace(finalDest, "[group-by-file-types]", OutFileExt)
+            finalDest := StrReplace(finalDest, "[group-by-years]", groupery)
+            If !FolderExist(finalDest)
+            {
+               FileCreateDir, % finalDest
+               Sleep, 2
+            }
+         }
       }
 
       file2save := finalDest "\" OldOutFileName
@@ -19895,6 +20386,7 @@ batchCopyMoveFile(finalDest) {
             FileSetTime, % originalMtime, % file2save, M
             FileSetTime, % originalCtime, % file2save, C
          }
+
          filezMoved++
          zPlitPath(file2save, 0, OldOutFileName, OldOutDir)
          If (UsrCopyMoveOperation=2)
@@ -20444,7 +20936,7 @@ addStaticFolderSQLdb(whichFolder, fileMdate, renewList) {
 RefreshImageFileAction() {
    isThumbMode := (thumbsDisplaying=1 && maxFilesIndex>1) ? 1 : 0
    imgPath := getIDimage(currentFileIndex)
-   If (!useGdiBitmap() || !imgPath) && (isThumbMode!=1)
+   If (!useGdiBitmap() && !imgPath && isThumbMode!=1) || !imgPath
    {
       showTOOLtip("WARNING: No image file is currently loaded...")
       SoundBeep , 300, 100
@@ -20480,7 +20972,8 @@ RefreshImageFileAction() {
          showTOOLtip("Image file reloaded...")
       thisIMGisDownScaled := 0
       SetTimer, RemoveTooltip, % -msgDisplayTime
-   } Else RefreshFilesList()
+   } Else If (thumbsDisplaying=1)
+      RefreshFilesList()
 }
 
 RefreshImageFile() {
@@ -20493,7 +20986,7 @@ RefreshImageFile() {
 RefreshFilesList() {
   If !CurrentSLD
   {
-     showTOOLtip("WARNING: No folder or slideshow file currently opened...")
+     showTOOLtip("WARNING: No folder or files list index currently opened...")
      SoundBeep , 300, 100
      SetTimer, RemoveTooltip, % -msgDisplayTime//2
      Return
@@ -20501,6 +20994,13 @@ RefreshFilesList() {
 
   If (slideShowRunning=1)
      ToggleSlideShowu()
+
+  If InStr(CurrentSLD, "\favourite-images-list.SLD")
+  {
+     retrieveFavesAsList()
+     Return
+  } Else If InStr(CurrentSLD, "\viewed-images-history-")
+     Return
 
   If RegExMatch(CurrentSLD, sldsPattern)
   {
@@ -20517,7 +21017,8 @@ RefreshFilesList() {
 }
 
 OpenDialogFiles(dummy:=0) {
-    If (AnyWindowOpen || imageLoading=1)
+    Static lastInvoked := A_TickCount
+    If (AnyWindowOpen || imageLoading=1) || (A_TickCount - lastInvoked<150)
        Return
 
     If (slideShowRunning=1)
@@ -20537,6 +21038,7 @@ OpenDialogFiles(dummy:=0) {
     Else
        imgPath := openFileDialogWrapper("O1", "FileMustExist", prevOpenFolderPath, "Open image or slideshow...", patternObj, chosenOption, 3)
 
+    lastInvoked := A_TickCount
     If !imgPath
        Return
 
@@ -20549,6 +21051,7 @@ OpenDialogFiles(dummy:=0) {
       newStaticFoldersListCache := ""
       prevOpenFolderPath := SelectedDir
       INIaction(1, "prevOpenFolderPath", "General")
+      lastInvoked := A_TickCount
       If RegExMatch(imgPath, sldsPattern)
       {
          OpenSLD(imgPath)
@@ -20592,6 +21095,7 @@ OpenDialogFiles(dummy:=0) {
          RandomPicture()
       } ; Else resetMainWin2Welcome()
    }
+   lastInvoked := A_TickCount
 }
 
 askAboutFileSave(msg:="", lvls:=2, dummy:=0) {
@@ -20658,7 +21162,7 @@ MenuOpenLastImg(forceOpenGiven:=0) {
       zoomu := " [" Round(zoomLevel * 100) "%" zoomu "]"
       winPrefix := defineWinTitlePrefix()
   
-      SetTimer, GDIupdater, Off
+      SetTimer, GDIupdaterResize, Off
       mustOpenStartFolder := OutDir
       currentFileIndex := detectFileID(LastOpenedImg)
       winTitle := winPrefix currentFileIndex "/" maxFilesIndex zoomu " | " OutFileName " | " OutDir "\"
@@ -20691,7 +21195,7 @@ OpenArgFile(inputu) {
     zoomu := " [" Round(zoomLevel * 100) "%" zoomu "]"
     winPrefix := defineWinTitlePrefix()
 
-    SetTimer, GDIupdater, Off
+    SetTimer, GDIupdaterResize, Off
     mustOpenStartFolder := OutDir
     ; coreOpenFolder("|" OutDir, 0)
     Global scriptStartTime := A_TickCount
@@ -21264,7 +21768,7 @@ InitGuiContextMenu() {
       ToggleSlideShowu()
 
    DestroyGIFuWin()
-   SetTimer, BuildMenu, -5
+   SetTimer, BuildMainMenu, -5
    ; WinActivate, ahk_id %PVhwnd%
 }
 
@@ -21292,22 +21796,31 @@ createMenuCurrentFile() {
    Menu, PVtFile, Add, Copy file(s) (for Explorer)`tCtrl+C, MenuExplorerCopyFiles
    Menu, PVtFile, Add, C&ut file(s) (for Explorer)`tCtrl+X, MenuExplorerCutFiles
    Menu, PVtFile, Add, 
-   Menu, PVtFile, Add, &Open with external app`tO, OpenThisFileMenu
-   If RegExMatch(CurrentSLD, sldsPattern)
-      Menu, PVtFile, Add, &Open in QPV containing folder, OpenQPVfileFolder
-   Menu, PVtFile, Add, &Explore containing folder`tCtrl+E, OpenThisFileFolder
    If !markedSelectFile
-      Menu, PVtFile, Add, Set as &Wallpaper`tCtrl+W, setImageWallpaper
+      Menu, PVtFile, Add, &Open with external app`tO, OpenThisFileMenu
+
+   ; If (thumbsDisplaying=1)
+   friendly := markedSelectFile ? "Open files in new &QPV instances" : "Open file in a new &QPV instance"
+   Menu, PVtFile, Add, % friendly, OpenWithNewQPVinstance
+   If (!markedSelectFile && RegExMatch(CurrentSLD, sldsPattern))
+      Menu, PVtFile, Add, &Open in QPV containing folder, OpenQPVfileFolder
+
+   If !markedSelectFile
+      Menu, PVtFile, Add, &Explore containing folder`tCtrl+E, OpenThisFileFolder
+
+   If !markedSelectFile
+      Menu, PVtFile, Add, Set as &wallpaper`tCtrl+W, setImageWallpaper
 
    Menu, PVtFile, Add, 
    If (thumbsDisplaying=1 && !markedSelectFile)
       Menu, PVtFile, Add, &Import into currently loaded image, importGivenFile
 
-   Menu, PVtFile, Add, &Select / deselect file`tTab, MenuMarkThisFileNow
+   If !markedSelectFile
+      Menu, PVtFile, Add, &Select / deselect file`tTab, MenuMarkThisFileNow
    If (skipSeenImagesSlider=1 && thumbsDisplaying=1)
       Menu, PVtFile, Add, &Toggle SEEN status`tS, ToggleSeenIMGstatus
-   Menu, PVtFile, Add, Con&vert file format(s) to...`tCtrl+K, PanelFileFormatConverter
 
+   Menu, PVtFile, Add, Con&vert file format(s) to...`tCtrl+K, PanelFileFormatConverter
    If markedSelectFile
    {
       file2rem := getIDimage(currentFileIndex)
@@ -21320,13 +21833,35 @@ createMenuCurrentFile() {
    }
    Menu, PVtFile, Add, &Delete file(s)`tDelete, DeletePicture
    Menu, PVtFile, Add, &Rename file(s)`tF2, PanelRenameThisFile
-   If markedSelectFile
-      Menu, PVtFile, Add, &Rename active file`tShift+F2, SingularRenameFile
    Menu, PVtFile, Add,
    Menu, PVtFile, Add, &Move file(s) to...`tM, PanelMoveCopyFiles
    Menu, PVtFile, Add, &Copy file(s) to...`tC, InvokeCopyFiles
    Menu, PVtFile, Add,
-   Menu, PVtFile, Add, &Information`tAlt+Enter, PanelImageInfos
+   If !markedSelectFile
+      Menu, PVtFile, Add, &File information`tAlt+Enter, PanelImageInfos
+}
+
+createMenuSoloFile() {
+   Menu, PVtActFile, Add, &Open with external app`tO, OpenThisFileMenu
+   Menu, PVtActFile, Add, Open file in a new &QPV instance, SoloOpenWithNewQPVinstance
+   If RegExMatch(CurrentSLD, sldsPattern)
+      Menu, PVtActFile, Add, &Open in QPV containing folder, OpenQPVfileFolder
+
+   Menu, PVtActFile, Add, &Explore containing folder`tCtrl+E, OpenThisFileFolder
+   Menu, PVtActFile, Add, Set as &wallpaper`tCtrl+W, setImageWallpaper
+
+   If (thumbsDisplaying=1)
+      Menu, PVtActFile, Add, &Import into currently loaded image, importGivenFile
+
+   Menu, PVtActFile, Add, 
+   If !markedSelectFile
+      Menu, PVtActFile, Add, &Select / deselect file`tTab, MenuMarkThisFileNow
+   Menu, PVtActFile, Add, Remove index entry`tAlt+Delete, InListMultiEntriesRemover
+   Menu, PVtActFile, Add, Modify index entry`tCtrl+F2, PanelUpdateThisFileIndex
+   Menu, PVtActFile, Add, 
+   Menu, PVtActFile, Add, &Delete file`tDelete, DeleteActivePicture
+   Menu, PVtActFile, Add, &Rename file`tShift+F2, SingularRenameFile
+   Menu, PVtActFile, Add, &File information`tAlt+Enter, PanelImageInfos
 }
 
 MenuSelectAllAction() {
@@ -21501,7 +22036,7 @@ hideLivePreviewObject() {
    livePreviewsImageEditing(1, 2)
 }
 
-BuildMenu() {
+BuildMainMenu() {
    Static lastInvoked := 1
    If (drawingShapeNow=1)
    {
@@ -21550,7 +22085,7 @@ BuildMenu() {
    Menu, PVslide, Add, &Wait for GIFs to play once, ToggleGIFsPlayEntirely
    If (animGIFsSupport!=1 || alwaysOpenwithFIM=1)
       Menu, PVslide, Disable, &Wait for GIFs to play once
-   Menu, PVslide, Add, S&kip over already seen images, ToggleSkipSeenIMGs
+   Menu, PVslide, Add, S&kip already seen images, ToggleSkipSeenIMGs
    Menu, PVslide, Add, 
    Menu, PVslide, Add, De&fine slideshow duration`tShift+/, PanelDefineEntireSlideshowLength
    Menu, PVslide, Add, % EstimateSlideShowLength(1), dummy
@@ -21565,7 +22100,7 @@ BuildMenu() {
    Menu, PVslide, Add, Current speed: %sliSpeed%, DecreaseSlideSpeed
    Menu, PVslide, Disable, Current speed: %sliSpeed%
    If (skipSeenImagesSlider=1)
-      Menu, PVslide, Check, S&kip over already seen images
+      Menu, PVslide, Check, S&kip already seen images
    If (allowGIFsPlayEntirely=1)
       Menu, PVslide, Check, &Wait for GIFs to play once
    If (doSlidesTransitions=1)
@@ -21594,6 +22129,8 @@ BuildMenu() {
    } Else
    {
       thisAlignInfo := defineImgAlign()
+      If InStr(currIMGdetails.PixelFormat, "TONE-MAPPED")
+         Menu, PVview, Add, &HDR tone-mapping, PanelAdjustToneMapping
       Menu, PVview, Add, Viewport image view panel`tU, PanelColorsAdjusterWindow
       If (activateImgSelection!=1)
          Menu, PVview, Add, &Show selection`tD, ToggleEditImgSelection
@@ -21816,10 +22353,14 @@ BuildMenu() {
 
    If (maxFilesIndex>2)
    {
-      Menu, PVfList, Add, Save list as slideshow (.SLD)`tCtrl+Shift+S, PanelSaveSlideShowu
+      Menu, PVfList, Add, Save files list as .SLD`tCtrl+Shift+S, PanelSaveSlideShowu
       Menu, PVfList, Add,
-      Menu, PVfList, Add, Remove active index entry`tAlt+Delete, InListMultiEntriesRemover
-      Menu, PVfList, Add, Modify active index entry`tCtrl+F2, PanelUpdateThisFileIndex
+      If !markedSelectFile
+      {
+         Menu, PVfList, Add, Remove active index entry`tAlt+Delete, InListMultiEntriesRemover
+         Menu, PVfList, Add, Modify active index entry`tCtrl+F2, PanelUpdateThisFileIndex
+      }
+
       Menu, PVfList, Add, Auto-remove entries of dead files, ToggleAutoRemEntries
       If (autoRemDeadEntry=1)
          Menu, PVfList, Check, Auto-remove entries of dead files
@@ -21952,6 +22493,11 @@ BuildMenu() {
    {
       Menu, PVfaves, Add, No image added to favourites, dummy
       Menu, PVfaves, Disable, No image added to favourites
+   } Else If (userAddedFavesCount>15)
+   {
+      moru := userAddedFavesCount - 15
+      Menu, PVfaves, Add, ... and another %moru% images, dummy
+      Menu, PVfaves, Disable, ... and another %moru% images
    }
 
    Menu, PVfaves, Add
@@ -22095,6 +22641,7 @@ BuildMenu() {
    If (thumbsDisplaying!=1)
       Menu, PVmenu, Add, &Edit image, :PVedit
 
+   createMenuSoloFile()
    If (maxFilesIndex>0 && CurrentSLD)
    {
       infoThisFile := markedSelectFile ? "S&elected files" : "C&urrent file"
@@ -22102,6 +22649,9 @@ BuildMenu() {
          Menu, PVmenu, Add, Selec&tion area, :PVselv
 
       Menu, PVmenu, Add, % infoThisFile, :PVtFile
+      If markedSelectFile
+         Menu, PVmenu, Add, &Active file, :PVtActFile
+
       If (thumbsDisplaying=1) || (thumbsDisplaying!=1 && activateImgSelection!=1)
          Menu, PVmenu, Add, Files index/l&ist, :PVfList
 
@@ -22173,7 +22723,7 @@ dummyUnSuspendu() {
 }
 
 deleteMenus() {
-    Static menusList := "PVmenu|PVperfs|PVfileSel|PVslide|PVnav|PVview|PVfList|PVtFile|PVprefs|PvUIprefs|PVfaves|PVopenF|PVsort|PVedit|PVselv|PVsounds"
+    Static menusList := "PVmenu|PVperfs|PVfileSel|PVslide|PVnav|PVview|PVfList|PVtActFile|PVtFile|PVprefs|PvUIprefs|PVfaves|PVopenF|PVsort|PVedit|PVselv|PVsounds"
     Loop, Parse, menusList, |
         Try Menu, % A_LoopField, Delete
 }
@@ -22223,19 +22773,19 @@ createMenuInterfaceOptions() {
 
    If (maxFilesIndex>0 && CurrentSLD && thumbsDisplaying!=1)
    {
-      Menu, PvUIprefs, Add, &OSD image info-box`tI, ToggleInfoBoxu
-      Menu, PvUIprefs, Add, No OSD messages, ToggleInfoToolTips
+      Menu, PvUIprefs, Add, &Viewport and image details`tI, ToggleInfoBoxu
+      ; Menu, PvUIprefs, Add, No OSD messages, ToggleInfoToolTips
       Menu, PvUIprefs, Add, I&mage histogram`tShift+G, ToggleImgHistogram
       Menu, PvUIprefs, Add, Auto-display image navi&gator`tZ, ToggleImgNavBox
       Menu, PvUIprefs, Add, &Ambiental textured background, ToggleTexyBGR
       If (showHUDnavIMG=1)
          Menu, PvUIprefs, Check, Auto-display image navi&gator`tZ
-      If (noTooltipMSGs=1)
-         Menu, PvUIprefs, Check, No OSD messages
+      ; If (noTooltipMSGs=1)
+      ;    Menu, PvUIprefs, Check, No OSD messages
       If (showHistogram>1)
          Menu, PvUIprefs, Check, I&mage histogram`tShift+G
       If (showInfoBoxHUD>=1)
-         Menu, PvUIprefs, Check, &OSD image info-box`tI
+         Menu, PvUIprefs, Check, &Viewport and image details`tI
  
       If (usrTextureBGR=1)
          Menu, PvUIprefs, Check, &Ambiental textured background
@@ -22335,7 +22885,7 @@ OpenFavesEntry() {
   } Else If (newEntry!="@" && StrLen(newEntry)>2)
   {
      MenuOpenLastImg(newEntry)
-     resultedFilesList[1, 5] := 1
+     resultedFilesList[currentFileIndex, 5] := 1
   }
 
   ; ToolTip, % (A_TickCount - startZeit) - (A_TickCount - startZeitIMGload) , , , 2
@@ -23086,6 +23636,14 @@ defineWinTitlePrefix() {
    Return winPrefix
 }
 
+calculateTouchMargins(ByRef thisX, ByRef thisY, ByRef thisW, ByRef thisH) {
+   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   thisX := (editingSelectionNow=1 && activateImgSelection=1) ? mainWidth//8 : mainWidth//7
+   thisY := (editingSelectionNow=1 && activateImgSelection=1) ? mainHeight//6 : mainHeight//5
+   thisW := mainWidth - thisX*2
+   thisH := mainHeight - thisY*2
+}
+
 drawWelcomeImg() {
     Critical, on
     If StrLen(UserMemBMP)>2
@@ -23122,6 +23680,42 @@ drawWelcomeImg() {
 
     Gdip_DrawImage(glPG, BMPcache, 0, 0, mainWidth, mainHeight, 0, 0, mainWidth, mainHeight,,, imageAttribs)
     Gdip_AddPathGradient(glPG, 0, 0, mainWidth, mainHeight, mainWidth//2, mainHeight//2, "0x00000000", "0x55000000", 1, 0, 0, 1)
+
+    If (TouchScreenMode=1)
+    {
+       calculateTouchMargins(thisX, thisY, thisW, thisH)
+       thisThick := imgHUDbaseUnit//11
+       Penuha := Gdip_CreatePen("0x34334433", thisThick)
+       BrushAa := Gdip_BrushCreateSolid(0x05EEeeEE)
+       BrushBb := Gdip_BrushCreateSolid(0x10778877)
+       Gdip_FillRectangle(glPG, BrushAa, thisX, thisY, thisW, thisH)
+       Gdip_FillRectangle(glPG, BrushBb, -thisThick, -thisThick, thisX + thisThick, mainHeight + thisThick*2)
+       Gdip_FillRectangle(glPG, BrushBb, thisW + thisX, -thisThick, thisX + thisThick*2, mainHeight + thisThick*2)
+
+       Gdip_SetClipRect(glPG, thisX, thisY + thisThick, thisW, thisH - thisThick*2, 4)
+       Gdip_DrawRectangle(glPG, Penuha, thisX + thisThick, thisY, thisW - thisThick*2, thisH)
+       Gdip_ResetClip(glPG)
+       Gdip_DrawRectangle(glPG, Penuha, -thisThick, -thisThick, thisX + thisThick, mainHeight + thisThick*2)
+       Gdip_DrawRectangle(glPG, Penuha, thisW + thisX, -thisThick, thisX + thisThick*2, mainHeight + thisThick*2)
+       Gdip_DeletePen(Penuha)
+       Gdip_DeleteBrush(BrushAa)
+       Gdip_DeleteBrush(BrushBb)
+    }
+
+
+/*
+      thisStylu := "Bold Center vCenter x" thisX " y1"
+      ERR := Gdip_TextToGraphics(glPG, "Zoom in", thisStylu " s20 cAAeeFFee" , "Arial", thisW, thisY)
+      thisStylu := "Bold Center vCenter x" thisX " y" thisY
+      ERR := Gdip_TextToGraphics(glPG, "Image panning area`n`nDouble click in this area to change how the image is adapted to the viewport`n`nOne-finger swipe gestures allowed when nothing to pan - outside this rectangle they are always allowed", thisStylu " s20 cAAeeFFee" , "Arial", thisW, thisH)
+      thisStylu := "Bold Center vCenter x" thisX " y" thisY + thisH
+      ERR := Gdip_TextToGraphics(glPG, "Zoom out", thisStylu " s20 cAAeeFFee" , "Arial", thisW, thisY)
+      thisStylu := "Bold Center vCenter x1 y1"
+      ERR := Gdip_TextToGraphics(glPG, "Previous`nimage", thisStylu " s20 cAAeeFFee" , "Arial", thisX, mainHeight)
+      thisStylu := "Bold Center vCenter x" thisW + thisX " y1"
+      ERR := Gdip_TextToGraphics(glPG, "Next`nimage", thisStylu " s20 cAAeeFFee" , "Arial", thisX, mainHeight)
+*/
+
     r2 := LrydWinUpdt(hGDIwin, glHDC)
     Gdip_DeleteBrush(pBr4)
     trGdip_DisposeImage(BMPcache, 1)
@@ -23619,7 +24213,7 @@ deleteSQLseenEntry(imgPath, thisIndex) {
 retrieveSeenImageDBentry(imgPath, thisIndex, listMode:=0) {
   Static lastInvoked := 1
 
-  If (!imgPath || (A_TickCount - lastInvoked<450) && (slideShowRunning!=1))
+  If (!imgPath || (A_TickCount - lastInvoked<350) && (slideShowRunning!=1))
      Return 0
 
   If (resultedFilesList[thisIndex, 3]=1)
@@ -23629,8 +24223,10 @@ retrieveSeenImageDBentry(imgPath, thisIndex, listMode:=0) {
 
   zu := cachedAllSessionsSeen["z" StringToASC(imgPath)]
   If (zu=imgPath && imgPath)
+  {
+     resultedFilesList[thisIndex, 3] := 1
      Return 1
-  Else If (thumbsDisplaying=1 && zu=0)
+  } Else If (thumbsDisplaying=1 && zu=0)
      Return 0
  
   initSeenImagesListDB()
@@ -23982,6 +24578,7 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
    {
        lastInvoked := A_TickCount
        r2 := ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload)
+       ; msgbox, % r2
        If InStr(r2, "error")
        {
           DestroyGIFuWin()
@@ -23998,14 +24595,15 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
              SetTimer, RemoveTooltip, % -msgDisplayTime
           } Else
           {
-             Sleep, 500
              setWindowTitle("ERROR: Unable to display the image...`nPossibly malformed image file format." friendly "`n" r2)
+             Sleep, 500
           }
           winTitle := "[*] " winTitle
           pVwinTitle := winTitle
           setWindowTitle(pVwinTitle, 1)
           SetTimer, ResetImgLoadStatus, -15
-          SoundBeep, 300, 100
+          If (slideShowRunning!=1)
+             SoundBeep, 300, 100
           Return "fail"
        } Else prevImgPath := imgPath
        lastInvoked := A_TickCount
@@ -24148,7 +24746,8 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
        interfaceThread.ahkassign("canCancelImageLoad", 0)
        FadeMainWindow()
        SetTimer, ResetImgLoadStatus, -15
-       Return 0
+       r := (r1="error") ? r1 : 0
+       Return r
     }
 
    prevImgPath := imgPath
@@ -24317,9 +24916,9 @@ drawinfoBox(mainWidth, mainHeight, directRefresh:=0) {
        infoSelection := "`n `n" friendlySelectionType " selection coordinates:`nX / Y: " ImgSelX1 ", " ImgSelY1 x1 y1 "`nW / H: " imgSelW ", " imgSelH wP hP moreSelInfo "`nRotation: " vPselRotation "°"
     }
     If (SLDtypeLoaded=2)
-       infoThisSLD := "`nSlideshow file opened:`n" CurrentSLD
+       infoThisSLD := "`nFiles list opened:`n" PathCompact(CurrentSLD, 40)
     Else If (SLDtypeLoaded=3)
-       infoThisSLD := "`nSlideshow SQL database opened:`n" CurrentSLD
+       infoThisSLD := "`nFiles list SQL database opened:`n" PathCompact(CurrentSLD, 40)
 
     If (usrColorDepth>1)
        infoColorDepth := "`nSimulated color depth: " defineColorDepth()
@@ -24363,8 +24962,10 @@ drawinfoBox(mainWidth, mainHeight, directRefresh:=0) {
     If (imgFxMode>1 || usrColorDepth>1)
        infoColors := "`nColors display mode: " DefineFXmodes()
     infoPixFmt := "`nImage format: " currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat
+    If (resultedFilesList[currentFileIndex, 5]=1)
+       infoFaved := "`nImage in favourites list"
 
-    entireString := infoEditing fileRelatedInfos infoRes infoPixFmt memUsage infoSizing infoMirroring infoColors infoColorDepth infoFrames infoAnim InfoLoadTime infoThisSLD infoFilesSel infoAudio infoSlider infoFilteru infoSelection 
+    entireString := infoEditing fileRelatedInfos infoFaved infoRes infoPixFmt memUsage infoSizing infoMirroring infoColors infoColorDepth infoFrames infoAnim InfoLoadTime infoThisSLD infoFilesSel infoAudio infoSlider infoFilteru infoSelection 
     thisOSDfnt := OSDFontName FlipImgH FlipImgV OSDfntSize OSDbgrColor OSDtextColor
     If (prevMsg!=entireString || prevOSDfnt!=thisOSDfnt)
     {
@@ -24682,7 +25283,7 @@ LoadBitmapFromFileu(imgPath, noBPPconv:=0, forceGDIp:=0, allowCaching:=0, allowM
   If (allowCaching=1)
   {
      MD5name := generateThumbName(imgPath, 1)
-     thisMD5name := MD5name imgPath userHQraw alwaysOpenwithFIM
+     thisMD5name := MD5name imgPath userHQraw alwaysOpenwithFIM cmrRAWtoneMapAlgo cmrRAWtoneMapParamA cmrRAWtoneMapParamB
      If (thisMD5name=prevMD5nameA && StrLen(GDIcacheSRCfileA)>2 && StrLen(prevMD5nameA)>2)
      {
         addJournalEntry("Used unprocessed cached GDI bitmap ID: " GDIcacheSRCfileA "`n" imgPath)
@@ -24898,6 +25499,7 @@ CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReload
      thisIMGisDownScaled := allowCaching := 0
 
   oBitmap := LoadBitmapFromFileu(thisImgPath, 0, 0, allowCaching, 1)
+  ; MsgBox, % obitmap
   If !oBitmap
      Return "error"
 
@@ -25956,11 +26558,8 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
 
     If (mode=2 && IMGresizingMode=4 && IMGlargerViewPort=1)
     {
-       thisX := (editingSelectionNow=1 && activateImgSelection=1) ? mainWidth//8 : mainWidth//7
-       thisY := (editingSelectionNow=1 && activateImgSelection=1) ? mainHeight//6 : mainHeight//5
-       thisW := mainWidth - thisX*2
-       thisH := mainHeight - thisY*2
-       thisThick := imgHUDbaseUnit/9.7
+       calculateTouchMargins(thisX, thisY, thisW, thisH)
+       thisThick := imgHUDbaseUnit//10
        Gdip_SetPenWidth(pPen1d, thisThick)
        Gdip_DrawRectangle(glPG, pPen1d, thisX, thisY, thisW, thisH)
     } Else If (mode=1)
@@ -28147,6 +28746,9 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, mustShowNames:=0) {
        theMsg := markedSelectFile " selected | " theMsg
     }
 
+    If StrLen(filesFilter)>1
+       theMsg .= "`nFiles list filtered: " usrFilesFilteru
+
     scrollYpos := startIndex/maxFilesIndex
     scrollYpos := Round(mainHeight*scrollYpos)
     thisFileIndex := currentFileIndex
@@ -29023,7 +29625,13 @@ calcIMGcoord(usePrevious, mainWidth, mainHeight, newW, newH, ByRef DestPosX, ByR
     prevZoom := zoomLevel
 }
 
-GDIupdater() {
+writeMainWindowPos() {
+   IniAction(1, "mainWinPos", "General")
+   IniAction(1, "mainWinSize", "General")
+   IniAction(1, "mainWinMaximized", "General")
+}
+
+GDIupdaterResize(eventu:=0) {
    If (A_TickCount - scriptStartTime<450)
       Return
 
@@ -29034,6 +29642,25 @@ GDIupdater() {
    If (tempBtnVisible!="null")
       DestroyTempBtnGui("now")
 
+   If (eventu=2)
+   {
+      WinGet, Stylu, Style, ahk_id %PVhwnd%
+      mainWinMaximized := (Stylu & 0x1000000) ? 2 : 1
+      IniAction(1, "mainWinMaximized", "General")
+      ; ToolTip, % mainWinPos "==" mainWinSize "==" mainWinMaximized , , , 2
+   } Else If (eventu!=1)
+   {
+      WinGetPos, winX, winY, winWidth, winHeight, A
+      If (winWidth && winHeight)
+      {
+         mainWinPos := winX "|" winY
+         mainWinSize := winWidth "|" winHeight
+         WinGet, Stylu, Style, ahk_id %PVhwnd%
+         mainWinMaximized := (Stylu & 0x1000000) ? 2 : 1
+         ; ToolTip, % mainWinPos "==" mainWinSize "==" mainWinMaximized , , , 2
+         SetTimer, writeMainWindowPos, -300
+      }
+   }
    SetTimer, dummyTimerReloadThisPicture, Off
    SetTimer, dummyTimerDelayiedImageDisplay, Off
    DestroyGIFuWin()
@@ -29146,6 +29773,14 @@ coreLoadDynaFolders(fileNamu) {
 RegenerateEntireList() {
     If (AnyWindowOpen>0)
        CloseWindow("yes")
+
+
+    If InStr(CurrentSLD, "\favourite-images-list.SLD")
+    {
+       retrieveFavesAsList()
+       Return
+    } Else If InStr(CurrentSLD, "\viewed-images-history-.SLD")
+       Return
 
     If askAboutFileSave(" and the files list will be reloaded")
        Return
@@ -29882,6 +30517,47 @@ OpenGitHub() {
      msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening the URL...`n" %thisURL%, 0, 0, "error")
 }
 
+drawViewportHelpMap() {
+    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+    If (TouchScreenMode=1)
+    {
+       SetTimer, RemoveTooltip, Off
+       Gdip_GraphicsClear(2NDglPG, "0xEE121212")
+       calculateTouchMargins(thisX, thisY, thisW, thisH)
+       thisThick := imgHUDbaseUnit//10
+       Penuha := Gdip_CreatePen("0x99334433", thisThick)
+       BrushAa := Gdip_BrushCreateSolid(0x15EEeeEE)
+       BrushBb := Gdip_BrushCreateSolid(0x20778877)
+       Gdip_FillRectangle(2NDglPG, BrushAa, thisX, thisY, thisW, thisH)
+       Gdip_FillRectangle(2NDglPG, BrushBb, -thisThick, -thisThick, thisX + thisThick, mainHeight + thisThick*2)
+       Gdip_FillRectangle(2NDglPG, BrushBb, thisW + thisX, -thisThick, thisX + thisThick*2, mainHeight + thisThick*2)
+       Gdip_SetClipRect(2NDglPG, thisX, thisY + thisThick, thisW, thisH - thisThick*2, 4)
+       Gdip_DrawRectangle(2NDglPG, Penuha, thisX + thisThick, thisY, thisW - thisThick*2, thisH)
+       Gdip_ResetClip(2NDglPG)
+       Gdip_DrawRectangle(2NDglPG, Penuha, -thisThick, -thisThick, thisX + thisThick, mainHeight + thisThick*2)
+       Gdip_DrawRectangle(2NDglPG, Penuha, thisW + thisX, -thisThick, thisX + thisThick*2, mainHeight + thisThick*2)
+       Gdip_DeletePen(Penuha)
+       Gdip_DeleteBrush(BrushAa)
+       Gdip_DeleteBrush(BrushBb)
+
+       thisFntSize := "Bold Center vCenter cFFeeEEee s" Round(OSDfntSize*0.77)
+       thisStylu := " x" thisX " y" thisY
+       ERR := Gdip_TextToGraphics(2NDglPG, "Image panning area.`n`nDouble click in this area to change how the image is adapted to the viewport.`n`nShift + Left-click to create a new selection area.`n`nOne-finger swipe gestures allowed when nothing to pan - outside this rectangle they are always allowed.", thisFntSize thisStylu , "Arial", thisW, thisH)
+
+       thisFntSize := "Bold Center vCenter cFFeeEEee s" Round(OSDfntSize*0.9)
+       thisStylu := " x" thisX " y1"
+       ERR := Gdip_TextToGraphics(2NDglPG, "Zoom in", thisFntSize thisStylu, "Arial", thisW, thisY)
+       thisStylu := " x" thisX " y" thisY + thisH
+       ERR := Gdip_TextToGraphics(2NDglPG, "Zoom out", thisFntSize thisStylu, "Arial", thisW, thisY)
+       thisStylu := " x1 y1"
+       ERR := Gdip_TextToGraphics(2NDglPG, "Previous`nimage", thisFntSize thisStylu, "Arial", thisX, mainHeight)
+       thisStylu := " x" thisW + thisX " y1"
+       ERR := Gdip_TextToGraphics(2NDglPG, "Next`nimage", thisFntSize thisStylu, "Arial", thisX, mainHeight)
+       r2 := LrydWinUpdt(hGDIinfosWin, 2NDglHDC)
+    }
+
+}
+
 AboutWindow() {
     Global LViewOthers, listViewFilteru
     If AnyWindowOpen
@@ -29907,7 +30583,7 @@ AboutWindow() {
        txtWid := txtWid + 190
        Gui, Font, s%LargeUIfontValue%
     }
-
+    drawViewportHelpMap()
     IniAction(1, "appVersion", "General")
     Gui, +DPIScale
     Gui, Add, Tab3, xs, General|Keyboard shortcuts
@@ -32910,6 +33586,7 @@ PopulateStaticSQLfolderzList(listFilter:=0) {
     SQL := "SELECT imgfolder, fmodified FROM staticfolders;"
     If !activeSQLdb.Query(SQL, RecordSet)
        Return 0
+
     Loop
     {
         foldersDatesArray[CalcStringHash(Row[1], 0x8003)] := [Row[2], Row[1]]
@@ -33110,6 +33787,12 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
     Gui, SettingsGUIA: Destroy
     WinActivate, ahk_id %PVhwnd%
     interfaceThread.ahkassign("imgEditPanelOpened", 0)
+    If globalhFIFimg
+    {
+       FreeImage_UnLoad(globalhFIFimg)
+       globalhFIFimg := ""
+    }
+
     If (imgEditPanelOpened=1)
     {
        activateImgSelection := editingSelectionNow := prevOpenedWindow[4]
@@ -35294,31 +35977,30 @@ LoadFimFile(imgPath, noBPPconv) {
 
   capMaxGDIbmpSize32bits()
   mustApplyToneMapping := (imgBPP>32 && !InStr(ColorsType, "rgba")) || (imgBPP>64) ? 1 : 0
+  toneMapped := ""
   If (mustApplyToneMapping=1 && noBPPconv=0)
   {
      setWindowTitle("Applying adaptive logarithmic tone mapping to display high color depth image")
      changeMcursor()
-     hFIFimgB := FreeImage_ToneMapping(hFIFimgA, 0, 1.85, 0)
+     hFIFimgB := FreeImage_ToneMapping(hFIFimgA, cmrRAWtoneMapAlgo - 1, cmrRAWtoneMapParamA, cmrRAWtoneMapParamB)
+     toneMapped := " (TONE-MAPPED)"
   }
 
-  ; If (noBPPconv=0) || (thumbsDisplaying=1 && thumbsListViewMode=3)
-  ; {
-     fileType := FreeImage_GetFileType(imgPath, 1)
-     If (fileType="raw" && userHQraw!=1)
-        fileType .= " [LOW QUALITY]"
+  fileType := FreeImage_GetFileType(imgPath, 1)
+  If (fileType="raw" && userHQraw!=1)
+     fileType .= " [LOW QUALITY]"
 
-     imgType := FreeImage_GetImageType(hFIFimgA, 1)
-     FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
-     mainLoadedIMGdetails.File := imgPath
-     mainLoadedIMGdetails.Width := imgW
-     mainLoadedIMGdetails.Height := imgH
-     mainLoadedIMGdetails.Frames := FreeImage_GetPageCount(hFIFimgA) - 1
-     mainLoadedIMGdetails.HasAlpha := InStr(ColorsType, "rgba") ? 1 : 0
-     mainLoadedIMGdetails.RawFormat := fileType " | " imgType
-     mainLoadedIMGdetails.PixelFormat := imgBPP "-" ColorsType
-     mainLoadedIMGdetails.OpenedWith := "FreeImage library v" FreeImage_GetVersion()
-     mainLoadedIMGdetails.TooLargeGDI := 0
-  ; }
+  imgType := FreeImage_GetImageType(hFIFimgA, 1)
+  FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
+  mainLoadedIMGdetails.File := imgPath
+  mainLoadedIMGdetails.Width := imgW
+  mainLoadedIMGdetails.Height := imgH
+  mainLoadedIMGdetails.Frames := FreeImage_GetPageCount(hFIFimgA) - 1
+  mainLoadedIMGdetails.HasAlpha := InStr(ColorsType, "rgba") ? 1 : 0
+  mainLoadedIMGdetails.RawFormat := fileType " | " imgType
+  mainLoadedIMGdetails.PixelFormat := imgBPP "-" ColorsType toneMapped
+  mainLoadedIMGdetails.OpenedWith := "FreeImage library v" FreeImage_GetVersion()
+  mainLoadedIMGdetails.TooLargeGDI := 0
 
   hFIFimgZ := hFIFimgB ? hFIFimgB : hFIFimgA
   hFIFimgC := hFIFimgZ ? hFIFimgZ : hFIFimgA
@@ -35912,8 +36594,6 @@ testResourcesMemoryLeaks() {
        G3 := Gdip_GraphicsFromImage(pBitmap, 7, 4)
        txtOptions := "x30 y30 center cEEff0099 r4 s10 Bold" 
        dimensions := Gdip_TextToGraphics(G3, "loooool", txtOptions, "Arial", 400, 400, 0, 0, 2)
-
-
        Gdip_DeleteGraphics(G3)
        trGdip_DisposeImage(pBitmap)
        trGdip_DisposeImage(lola)
@@ -37392,4 +38072,3 @@ gdipObjectsStats(killAll:=0) {
    If (killAll!=1)
       msgbox, % totalBMPs " // " UnremovedBMPs
 }
-
