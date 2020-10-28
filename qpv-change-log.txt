@@ -2,6 +2,30 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.6.5 (2020-10-28)
+  - [new] option to lock aspect ratio of image selection area to predefined ratios; you can also click and hold Shift on selection's corners to have QPV preserve its aspect ratio - when it is not locked to a predefined ratio [thanks to CyberKlabauter's suggestion]
+  - [new] blending modes now available in the «fill area/draw shape» panel; blending modes can be used with gradients and the glass effect
+  - [new] you can now activate the glass effect in the transform tool as well, when using any blending mode; it will blur what is behind
+  - [major improvement] much improved performance for blending modes and alpha masking in real-time
+  - [new] implemented «luminosity» blending mode and fixed other blending modes
+  - [new] option to resize image in viewport according to image selection area dimensions [Alt+R]
+  - [new] option to open favourites list when opening a favourited image from the menu
+  - [new] users can now set the index of an entry in the «modify index entry panel»; this allows users to manually reorder the files list [this works for the favourites list as well]
+  - [new] users can now set QPV settings through command line options; eg., set_IMGresizingMode=3. Open the QPV settings file [the .INI file] and almost any setting listed in there can be changed via command line using the "set_" prefix.
+  - QPV now accepts being given as command line arguments a folder or multiple image files by providing their complete file paths  [thanks to CyberKlabauter's suggestion]
+  - users can now choose to work in a 24-RGB or a 32-RGBA space [from Main menu > Image view]; 24-RGB is chosen automatically for 32 bits edition of Quick Picto Viewer, for lower memory usage.
+  - added a shortcut for opening image files in a new QPV instance: Ctrl+Enter
+  - you can now drag-n-drop files onto the main window while holding Ctrl key, to spawn new instances of QPV [thanks to Yak's suggestion]
+  - cleaning/removing the dead files from the indexed files list does not resort the files list anymore
+  - greatly improved performance with a large favourites list; increased maximum limit to 54321 entries
+  - loading static folders list is much faster [the panel is available when a SLD file is opened]
+  - simplified the handling of image selection area; users can no longer have the selection visible and non-editable
+  - open file dialog is now open to people selecting a folder to open ;-)
+  - option to disable undo levels recording
+  - MUCH BETTER error handling on x32 editions when the memory limit is exceeded; fixed all known and identified memory leaks
+  - reduced memory usage for basic image editing when using a selection area for the following tools: crop, invert, grayscale/desaturate, apply viewport color adjustments, erase or flip H/V area
+  - various bug fixes
+
 - v4.6.0 (2020-09-25)
   - [new] copy/move panel now allows users to group files in automatically created sub-folders, based on file modification date [by month or year] and by file types
   - [new] live HDR tone-mapping options panel for adjusting how HDR images are displayed
@@ -13,7 +37,7 @@
   - various bug fixes and improvements
 
 - v4.5.5 (2020-09-18)
-  - [new] image navigator for easy panning of very large images
+  - [new] image navigator for easy panning of very large images [Z]
   - [new] added new multiple files rename options: replace characters, regular expressions support, file name trimming and more [see Help]
   - [new] real-time preview for multiple files renaming
   - [new] option to set the graph focus for histograms: lows, mids or peaks; the histogram is now clickable

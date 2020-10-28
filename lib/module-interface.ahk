@@ -24,9 +24,10 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3
      , taskBarUI, hSetWinGui, panelWinCollapsed, groppedFiles, tempBtnVisible := "null"
      , userAllowWindowDrag := 0, drawingShapeNow := 0, isAlwaysOnTop, lastMenuBarUpdate := 1
      , mainWinPos := 0, mainWinMaximized := 1, mainWinSize := 0, PrevGuiSizeEvent := 0
+     , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0
 
 
-Global activateImgSelection, allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, askDeleteFiles
+Global allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, askDeleteFiles
 , AutoDownScaleIMGs, autoPlaySNDs, autoRemDeadEntry, ColorDepthDithering, countItemz, currentFileIndex, CurrentSLD, defMenuRefreshItm, doSlidesTransitions
 , DynamicFoldersList, easySlideStoppage, editingSelectionNow, EllipseSelectMode, enableThumbsCaching, filesFilter, FlipImgH, FlipImgV, hSNDmedia, imgFxMode
 , IMGresizingMode, imgSelX2, imgSelY2, LimitSelectBoundsImg, markedSelectFile, maxFilesIndex, minimizeMemUsage, mustGenerateStaticFolders, MustLoadSLDprefs
@@ -180,12 +181,11 @@ updateUIctrl(forceThis:=0) {
    If (forceThis=1)
    {
       editingSelectionNow := MainExe.ahkgetvar.editingSelectionNow
-      activateImgSelection := MainExe.ahkgetvar.activateImgSelection
       isAlwaysOnTop := MainExe.ahkgetvar.isAlwaysOnTop
    }
    WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%   
-   ctrlW := (editingSelectionNow=1 && activateImgSelection=1) ? GuiW//8 : GuiW//7
-   ctrlH2 := (editingSelectionNow=1 && activateImgSelection=1) ? GuiH//6 : GuiH//5
+   ctrlW := (editingSelectionNow=1) ? GuiW//8 : GuiW//7
+   ctrlH2 := (editingSelectionNow=1) ? GuiH//6 : GuiH//5
    ctrlH3 := GuiH - ctrlH2*2
    ctrlW2 := GuiW - ctrlW*2
    ctrlY1 := ctrlH2
@@ -362,10 +362,11 @@ msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, modality:=0, o
         r := "Continue"
    IfMsgBox, TryAgain
         r := "TryAgain"
+
    If (!AnyWindowOpen && !InStr(msg, "quit") && !InStr(msg, "exit"))
       lastOtherWinClose := A_TickCount
 
-   addJournalEntry("DIALOG BOX: " msg "`n`nUser answered: " r)
+   ; addJournalEntry("DIALOG BOX: " msg "`n`nUser answered: " r)
    Return r
 }
 
@@ -585,14 +586,19 @@ ResetLbtn() {
 }
 
 WM_MOVING() {
-  If (toolTipGuiCreated=1)
-     MainExe.ahkPostFunction("TooltipCreator", 1, 1)
+  ; If (toolTipGuiCreated=1)
+  ;    MainExe.ahkPostFunction("TooltipCreator", 1, 1)
   If (tempBtnVisible!="null")
      MainExe.ahkPostFunction("DestroyTempBtnGui", "now")
 
+  SetTimer, saveMainWinPos, -35
   Global lastWinDrag := A_TickCount
-  If (A_OSVersion="WIN_7" || A_OSVersion="WIN_XP")
+  If (A_OSVersion="WIN_7" || isWinXP=1)
      SetTimer, updateGDIwinPos, -5
+}
+
+saveMainWinPos() {
+     MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 changeMcursor(whichCursor) {
@@ -734,7 +740,7 @@ GuiSize(GuiHwnd, EventInfo, Width, Height) {
     prevGUIresize := A_TickCount
     turnOffSlideshow()
     canCancelImageLoad := 4
-    delayu := (A_OSVersion="WIN_XP" || thumbsDisplaying=1) ? -15 : -5
+    delayu := (isWinXP=1 || thumbsDisplaying=1) ? -15 : -5
     SetTimer, miniGDIupdater, % delayu
 }
 
@@ -769,6 +775,7 @@ dummyTimerProccessDroppedFiles() {
    If (!groppedFiles || (A_TickCount - lastInvoked<400))
       Return
 
+   isCtrlDown := GetKeyState("Ctrl", "P")
    lastInvoked := A_TickCount
    imgFiles := foldersList := sldFile := ""
    turnOffSlideshow()
@@ -798,7 +805,9 @@ dummyTimerProccessDroppedFiles() {
       }
    }
    ToolTip, , , , 2
-   MainExe.ahkPostFunction("GuiDroppedFiles", imgFiles, foldersList, sldFile, countFiles)
+   If !isCtrlDown
+      isCtrlDown := GetKeyState("Ctrl", "P")
+   MainExe.ahkPostFunction("GuiDroppedFiles", imgFiles, foldersList, sldFile, countFiles, isCtrlDown)
    groppedFiles := ""
    lastInvoked := A_TickCount
 }
@@ -882,6 +891,7 @@ dummyTimerExit() {
 TimerExit() {
    ; SoundBeep , 900, 2000
    thisPID := GetCurrentProcessId()
+   OutputDebug, QPV: forced exit. Secondary thread. PID=%thisPID%
    Process, Close, % thisPID
    ExitApp
 }
@@ -3018,8 +3028,10 @@ GetPhysicalCursorPos(ByRef mX, ByRef mY) {
     lastInvoked := A_TickCount
     Static POINT
          , init := VarSetCapacity(POINT, 8, 0) && NumPut(8, POINT, "Int")
-    GPC := DllCall("user32.dll\GetPhysicalCursorPos", "Ptr", &POINT)
-    If (!GPC || A_OSVersion="WIN_XP")
+    If !isWinXP
+       GPC := DllCall("user32.dll\GetPhysicalCursorPos", "Ptr", &POINT)
+
+    If (!GPC || isWinXP=1)
     {
        MouseGetPos, mX, mY
        lastMx := mX

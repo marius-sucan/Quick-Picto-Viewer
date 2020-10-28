@@ -281,15 +281,13 @@ SGDIPrint_GetHDCfromPrintDlg(hwndOwner) {
 ; SGDIPrint_GetMatchingBitmap returns a GDI+ Bitmap matching the current printers page-size with white background
 ; you need to call SGDIPrint_GetHDCfromPrintDlg or SGDIPrint_GetHDCfromPrinterName first to
 ; retrieve width and height values
-SGDIPrint_GetMatchingBitmap(width, height, color:="0xFFFFFF") {
+SGDIPrint_GetMatchingBitmap(width, height, color:="0xffFFffFF") {
   ; set background-color (default is white)
   pBitmap := Gdip_CreateBitmap(width, height)
   G := Gdip_GraphicsFromImage(pBitmap)
   Gdip_SetPageUnit(G, 2)
   Gdip_SetSmoothingMode(G, 4) 
-  pBrush := Gdip_BrushCreateSolid(0xffffffff)
-  Gdip_FillRectangle(G, pBrush, 0, 0, width, height) 
-  Gdip_DeleteBrush(pBrush)  
+  Gdip_GraphicsClear(G, color)
   Gdip_DeleteGraphics(G)
   return pBitmap
 }

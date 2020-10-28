@@ -1022,9 +1022,6 @@ repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:=
           Final_y := mCoordTop + 1
        Gui, %whichGUI%: Show, x%Final_x% y%Final_y%, % Chr(160) winTitle
     } Else Gui, %whichGUI%: Show, AutoSize %winPos%, % Chr(160) winTitle
-
-    If (imgEditPanelOpened=1 && AnyWindowOpen)
-       CreateGuiButton("Collapse panel,,toggleImgEditPanelWindow", 0, msgDisplayTime//2 + 500)
 }
 
 MWAGetMonitorMouseIsIn(coordX:=0,coordY:=0) {

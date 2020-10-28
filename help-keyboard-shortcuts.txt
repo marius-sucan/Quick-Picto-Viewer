@@ -1,181 +1,185 @@
-,|Decrease slideshow speed|image view|Nothing
-.|Increase slideshow speed|image view|Nothing
--|Zoom out [image or thumbnails]|Anywhere|Nothing
-=|Zoom in [image or thumbnails]|Anywhere|Nothing
-NumPad +|Zoom in [image or thumbnails]|Anywhere|Nothing
-NumPad -|Zoom out [image or thumbnails]|Anywhere|Nothing
-NumPad *|100% image zoom [original size]|Image view|Nothing
-NumPad /|Adjust image to window|Image view|Nothing
-/|Adjust image to window|Image view|Nothing
-Ctrl + -|Increase OSD font sizes|Anywhere|Nothing
-Ctrl + =|Decrease OSD font sizes|Anywhere|Nothing
-0|Rotate image by +15° or selection by +2°|Image view|Nothing
-9|Rotate image by -15° or selection by -2°|Image view|Nothing
-[|Decrease image brightness|Anywhere|Nothing
-]|Increase image brightness|Anywhere|Nothing
-Alt + [|Decrease image gamma|Anywhere|Nothing
-Alt + ]|Increase image gamma|Anywhere|Nothing
-Shift + [|Decrease image contrast|Anywhere|Nothing
-Shift + ]|Increase image contrast|Anywhere|Nothing
-Ctrl + [|Decrease image saturation by 5%|Anywhere|Nothing
-Ctrl + ]|Increase image saturation by 5%|Anywhere|Nothing
-\|Reset color adjustments|Anywhere|Nothing
-Ctrl + \|Hard reset color adjustments|Anywhere|Nothing
-A|Toggle image alignment: centered or top-left corner|Image view|Nothing
+,|Decrease slideshow speed|image view|-
+.|Increase slideshow speed|image view|-
+-|Zoom out [image or thumbnails]|Anywhere|-
+=|Zoom in [image or thumbnails]|Anywhere|-
+NumPad +|Zoom in [image or thumbnails]|Anywhere|-
+NumPad -|Zoom out [image or thumbnails]|Anywhere|-
+NumPad *|100% image zoom [original size]|Image view|-
+NumPad /|Adjust image to window|Image view|-
+/|Adjust image to window|Image view|-
+Ctrl + -|Increase OSD font sizes|Anywhere|-
+Ctrl + =|Decrease OSD font sizes|Anywhere|-
+0|Rotate image by +15° or selection by +2°|Image view|-
+9|Rotate image by -15° or selection by -2°|Image view|-
+[|Decrease image brightness|Anywhere|-
+]|Increase image brightness|Anywhere|-
+Alt + [|Decrease image gamma|Anywhere|-
+Alt + ]|Increase image gamma|Anywhere|-
+Shift + [|Decrease image contrast|Anywhere|-
+Shift + ]|Increase image contrast|Anywhere|-
+Ctrl + [|Decrease image saturation by 5%|Anywhere|-
+Ctrl + ]|Increase image saturation by 5%|Anywhere|-
+\|Reset color adjustments|Anywhere|-
+Ctrl + \|Hard reset color adjustments|Anywhere|-
+A|Toggle image alignment: centered or top-left corner|Image view|-
 Alt + A|Adjust image canvas size|Image view|Panel
 Alt + BackSpace|Fill area orf draw shapes|Image selection|Panel
-Alt + Delete|Remove active file index entry|Files list|Nothing
+Alt + Delete|Remove active file index entry|Files list|-
 Alt + E|Selection properties|Image selection|Panel
-Alt + Enter|File information window|Image view|Panel
 Alt + U|Manage dynamic folder(s) list|Files list|Panel
 Alt + Y|Automatic image crop|Image view|Panel
-Alt + Arrow keys|Adjust image selection: top-left corner position|Image selection|Nothing
-Ctrl + Shift + Arrow keys|Adjust image selection: bottom-right corner position|Image selection|Nothing
-Ctrl + 0|Reverse files list|Files list|Nothing
-Ctrl + 1|Sort list by path and name|Files list|Nothing
-Ctrl + 2|Sort list by folder path|Files list|Nothing
-Ctrl + 3|Sort list by file name|Files list|Nothing
-Ctrl + 4|Sort list by file size|Files list|Nothing
-Ctrl + 5|Sort list by file modiefied date|Files list|Nothing
-Ctrl + 6|Sort list by file created date|Files list|Nothing
-Ctrl + A|Select all [files or image canvas]|Anywhere|Nothing
-Ctrl + X|Cut file(s) (for Explorer)|Files list|Nothing
-Ctrl + C|Copy file(s) (for Explorer)|Files list|Nothing
-Ctrl + C|Copy image to clipboard or selected area|Image view|Nothing
+Alt + Arrow keys|Adjust image selection: top-left corner position|Image selection|-
+Ctrl + Shift + Arrow keys|Adjust image selection: bottom-right corner position|Image selection|-
+Ctrl + 0|Reverse files list|Files list|-
+Ctrl + 1|Sort list by path and name|Files list|-
+Ctrl + 2|Sort list by folder path|Files list|-
+Ctrl + 3|Sort list by file name|Files list|-
+Ctrl + 4|Sort list by file size|Files list|-
+Ctrl + 5|Sort list by file modified date|Files list|-
+Ctrl + 6|Sort list by file created date|Files list|-
+Ctrl + A|Select all [files or image canvas]|Anywhere|-
+Ctrl + X|Cut file(s) (for Explorer)|Files list|-
+Ctrl + C|Copy file(s) (for Explorer)|Files list|-
+Ctrl + C|Copy image to clipboard or selected area|Image view|-
 C|Copy file(s) to...|Files list|Panel
 M|Move file(s) to...|Files list|Panel
-Ctrl + D|Drop selected area or files selection [select none]|Anywhere|Nothing
-Ctrl + E|Open in Explorer containing folder of active file|Image view|External window
-Ctrl + F|Filter files list|Files list|Nothing
-Ctrl + Space|Deactivate files filter [if any] or activate filtering by file path of active file|Files list|Nothing
+Ctrl + D|Drop selected area or files selection [select none]|Anywhere|-
+Ctrl + E|Open in Explorer containing folder of active file|Image view|External app
+Ctrl + F|Filter files list|Files list|-
+Ctrl + Space|Deactivate files list filter [if any] or filter list by active's file path|Files list|-
 Ctrl + F2|Modify active index entry|Files list|Panel
-Ctrl + F4|Close document, window or panel|Anywhere|Nothing
-Ctrl + F5|Toggle recursive scan of an opened folder|Files list|Nothing
-Ctrl + G|Desaturate colors in selected area|Image selection|Nothing
+Ctrl + F4|Close document, window or panel|Anywhere|-
+Ctrl + F5|Toggle recursive scan of an opened folder|Files list|-
+Ctrl + G|Desaturate colors in selected area|Image selection|-
 Ctrl + K|Convert file format(s) to...|Anywhere|Panel
 Ctrl + N|Create new image|Anywhere|Panel
 Ctrl + S|Save image panel|Image view|Panel
-Ctrl + O|Open file(s)|Anywhere||Files selector
-Ctrl + Q|Toggle image down-scaling|Image view|Nothing
+Ctrl + O|Open file(s)|Anywhere|Files selector
+Ctrl + Q|Toggle image down-scaling|Image view|-
 Ctrl + R|Resize, rotate or crop image(s)|Anywhere|Panel
-Ctrl + Shift + N|Open new QPV instance|Anywhere|External window
+Alt + R|Resize image to viewport selection area|Image view|-
+Ctrl + Shift + N|Open new QPV instance|Anywhere|External app
 Ctrl + Shift + S|Save list as slideshow (.SLD)|Files list|Panel
 Ctrl + Shift + V|Paste in place [selected area]|Image selection|Panel
-Ctrl + Shift + Y|Redo image selection|Image selection|Nothing
-Ctrl + Shift + Z|Undo image selection|Image selection|Nothing
-Ctrl + Alt + Y|Redo image [jump 4 steps]|Image view|Nothing
-Ctrl + Alt + Z|Undo image [jump 4 steps]|Image view|Nothing
-Ctrl + Y|Redo image|Image view|Nothing
-Ctrl + Z|Undo image|Image view|Nothing
+Ctrl + Shift + Y|Redo image selection|Image selection|-
+Ctrl + Shift + Z|Undo image selection|Image selection|-
+Ctrl + Alt + Y|Redo image [jump 4 steps]|Image view|-
+Ctrl + Alt + Z|Undo image [jump 4 steps]|Image view|-
+Ctrl + Y|Redo image|Image view|-
+Ctrl + Z|Undo image|Image view|-
 Ctrl + T|Transform selected image area|Image selection|Panel
 Ctrl + U|Static folders manager - update files list selectively|Files list|Panel
-Ctrl + V|Paste text, clipboard image or files list|Anywhere|Nothing
-Ctrl + W|Set image as wallpaper|Image view|Nothing
-Ctrl + X|Cut selected image area|Image selection|Nothing
-Ctrl + Wheel Down|Zoom out|Anywhere|Nothing
-Ctrl + Wheel Up|Zoom in|Anywhere|Nothing
-D|Hide image selection area|Image view|Nothing
-E|Toggle edit image selection area|Image view|Nothing
+Ctrl + V|Render text from clipboard as image or paste clipboard image|Image view|-
+Ctrl + V|Paste text files list from clipboard or files from Explorer|Files list|-
+Ctrl + W|Set image as wallpaper|Image view|-
+Ctrl + X|Cut selected image area|Image selection|-
+Ctrl + Wheel Down|Zoom out|Anywhere|-
+Ctrl + Wheel Up|Zoom in|Anywhere|-
+D|Hide live previewed dynamic object|Live editing|-
+E|Toggle edit image selection area|Image view|-
 Delete|Delete file or fade/erase image selected area|Anywhere|Panel
 Enter|Switch between image list and image view|Anywhere|Mode switch
-Enter|Apply tool during live editing|Image editing|Nothing
-Shift + Enter|Apply tool during live edit and close panel|Image editing|Close window
-Shift + Enter|Crop image to selected area|Image selection|Nothing
+Enter|Apply tool during live editing|Live editing|-
+Shift + Enter|Apply tool during live edit and close panel|Live editing|Close window
+Shift + Enter|Crop image to selected area|Image selection|-
+Alt + Enter|File information window|Image view|Panel
+Ctrl + Enter|Open file(s) in a new QPV instance|Anywhere|External app
 Esc|Quit or close panel window|Anywhere|Close window
-F|Toggle between color modes/filters|Anywhere|Nothing
-Shift + F|Toggle between color modes/filters|Anywhere|Nothing
+F|Toggle between color modes/filters|Anywhere|-
+Shift + F|Toggle between color modes/filters|Anywhere|-
 F1|Help / About|Anywhere|Panel
-F10|Toggle toolbar|Anywhere|Nothing
+F10|Toggle toolbar / menu bar|Anywhere|-
 F11|Toggle full-screen|Image view|Mode switch
+F11|Collapse/expand panel for current tool|Live editing|-
 F12|Preferences|Anywhere|Panel
 F2|Rename file(s)|Files list|Panel
-F5|Reload files list or image file|Anywhere|Nothing
+F5|Reload files list or image file|Anywhere|-
 F8|Open previous panel|Anywhere|Panel
-G|Toggle histogram modes|Image view|Nothing
-Shift + G|Toggle histogram modes|Image view|Nothing
-Alt + G|Toggle histogram graph focus|Image view|Nothing
-H|Flip viewport horizontally|Image view|Nothing
-V|Flip viewport vertically|Image view|Nothing
-I|Flip selection W/H [image live editing only]|Image selection|Nothing
-Z|Image navigator|Image view|Nothing
-I|Toggle information viewport box|Image view|Nothing
+G|Toggle histogram modes|Image view|-
+Shift + G|Toggle histogram modes|Image view|-
+Alt + G|Toggle histogram graph focus|Image view|-
+H|Flip viewport horizontally|Image view|-
+V|Flip viewport vertically|Image view|-
+I|Flip selection W/H|Live editing|-
+Z|Image navigator|Image view|-
+I|Toggle information viewport box|Image view|-
 Insert|Insert file(s) into list|Files list|Files selector
 J|Jump to given file index or frame|Files list|Panel
 K|Perform JPEG lossless operations|Anywhere|Panel
-L|Toggle limit selection area to image boundaries|Image selection|Nothing
-L|Toggle list view modes|Files list|Nothing
-B|Add/remove image to favourites|Anywhere|Nothing
-N|Toggle display of image captions|Image view|Nothing
+L|Toggle limit selection area to image boundaries|Image selection|-
+L|Toggle list view modes|Files list|-
+B|Add/remove image to favourites|Anywhere|-
+N|Toggle display of image captions|Image view|-
 Shift + N|Edit image caption|Image view|Panel
 O|Open image with external application|Anywhere|Menu
-Q|Toggle simulated color depth|Image view|Nothing
-Shift + Q|Toggle simulated color depth|Image view|Nothing
-R|Transform selection into a square [1:1]|Image selection|Nothing
-Shift + R|Rotate selection by 45°|Image selection|None
-S|Toggle slideshow modes|Image view|Nothing
-T|Toggle image rescaling/adapting modes|Image view|Nothing
+Q|Toggle simulated color depth|Image view|-
+Shift + Q|Toggle simulated color depth|Image view|-
+R|Transform selection into a square [1:1]|Image selection|-
+Shift + R|Rotate selection by 45°|Image selection|-
+S|Toggle slideshow modes|Image view|-
+T|Toggle image rescaling/adapting modes|Image view|-
 U|Viewport colors and image adjustments|Image view|Panel
-X|Play associated audio file|Image view|Nothing
-Shift + X|Stop audio playback|Image view|Nothing
-1|Decrease audio volume by 5%|Image view|Nothing
-2|Increase audio volume by 5%|Image view|Nothing
+X|Play associated audio file|Image view|-
+Shift + X|Stop audio playback|Image view|-
+1|Decrease audio volume by 5%|Image view|-
+2|Increase audio volume by 5%|Image view|-
 Middle Click|Switch between image list and image view|Anywhere|Mode switch
 Middle Click|Collapse/expand live edit panel|Anywhere|Undefined
-Double Click|Toggle between image view modes|Anywhere|Nothing
+Double Click|Toggle between image view modes|Anywhere|-
 Right Click|Open main menu or context menu|Anywhere|Menu
 Apps key|Open main menu or context menu|Anywhere|Menu
-Left|Previous image|Anywhere|Nothing
-Right|Next image|Anywhere|Nothing
-Down|Next line of images [according to the list view mode]|Anywhere|Nothing
-Up|Previous line of images [according to the list view mode]|Anywhere|Nothing
-Home|Jump to the first image in index|Anywhere|Nothing
-End|Jump to the last image in index|Anywhere|Nothing
-Wheel Down|Previous image or two lines of images|Anywhere|Nothing
-Wheel Up|Next image or two lines of images|Anywhere|Nothing
-Page Down|Previous image or jump forwards one page of images|Anywhere|Nothing
-Page Up|Next image or jump backwards one page of images|Anywhere|Nothing
-Backspace|Previous random image|Anywhere|Nothing
-Backspace|Undo added point|Freeform drawing|Nothing
-Shift + BackSpace|Next random image|Anywhere|Nothing
-Ctrl + Home|Jump to the first selected file in index|Anywhere|Nothing
-Ctrl + End|Jump to the last selected file in index|Anywhere|Nothing
-Ctrl + Arrow keys|Navigate between selected files|Anywhere|Nothing
-Space|Start or stop slideshow|Image view|Nothing
-Space|Select or deselect files [if files selection already exists]|Files list|Nothing
-Space|Toggle cardinal curve path|Freeform drawing|Nothing
-Tab|Select or deselect file|Anywhere|Nothing
+Left|Previous image|Anywhere|-
+Right|Next image|Anywhere|-
+Down|Next line of images [according to the list view mode]|Anywhere|-
+Up|Previous line of images [according to the list view mode]|Anywhere|-
+Home|Jump to the first image in index|Anywhere|-
+End|Jump to the last image in index|Anywhere|-
+Wheel Down|Previous image or two lines of images|Anywhere|-
+Wheel Up|Next image or two lines of images|Anywhere|-
+Page Down|Previous image or jump forwards one page of images|Anywhere|-
+Page Up|Next image or jump backwards one page of images|Anywhere|-
+Backspace|Previous random image|Anywhere|-
+Backspace|Undo added point|Freeform drawing|-
+Shift + BackSpace|Next random image|Anywhere|-
+Ctrl + Home|Jump to the first selected file in index|Anywhere|-
+Ctrl + End|Jump to the last selected file in index|Anywhere|-
+Ctrl + Arrow keys|Navigate between selected files|Anywhere|-
+Space|Start or stop slideshow|Image view|-
+Space|Select or deselect files [if files selection already exists]|Files list|-
+Space|Toggle cardinal curve path|Freeform drawing|-
+Tab|Select or deselect file|Anywhere|-
 Shift + /|Define slideshow duration|Files list|Panel
-Shift + -|Decrease selection area|Image selection|Nothing
-Shift + =|Increase selection area|Image selection|Nothing
-Shift + \|Preview image without color adjustments|Image view|Nothing
+Shift + -|Decrease selection area|Image selection|-
+Shift + =|Increase selection area|Image selection|-
+Shift + \|Preview image without color adjustments|Image view|-
 Shift + B|Blur selected area|Image selection|Panel
-Shift + C|Copy file path(s) to clipboard|Anywhere|Nothing
-Shift + Delete|Delete active file and its index entry|Files list|Nothing
-Shift + E|Toggle ellipse image selection area|Image selection|Nothing
+Shift + C|Copy file path(s) to clipboard|Anywhere|-
+Shift + Delete|Delete active file and its index entry|Files list|-
+Shift + E|Toggle ellipse image selection area|Image selection|-
 Shift + Esc|Restart Quick Picto Viewer|Anywhere|Close window
 Shift + F2|Rename active file|Anywhere|Panel
 Ctrl + F3|Search in files index|Files list|Panel
-Shift + F3|Search previous occurance|Files list|Nothing
-F3|Search next occurance|Files list|Nothing
-Shift + F5|Reload slideshow file or refresh opened folder|Files list|Nothing
-Alt + F5|Regenerate on demand all thumbnails in the list|Files list|Nothing
-Shift + H|Flip horizontally image selected area|Image selection|Nothing
-Shift + V|Flip vertically image selected area|Image selection|Nothing
-Shift + I|Invert colors in image selected area|Image selection|Nothing
+Shift + F3|Search previous occurance|Files list|-
+F3|Search next occurance|Files list|-
+Shift + F5|Reload slideshow file or refresh opened folder|Files list|-
+Alt + F5|Regenerate on demand all thumbnails in the list|Files list|-
+Shift + H|Flip horizontally image selected area|Image selection|-
+Shift + V|Flip vertically image selected area|Image selection|-
+Shift + I|Invert colors in image selected area|Image selection|-
 Shift + L|Draw predefined lines, arcs or selection borders|Image selection|Panel
 Shift + P|Draw freeform filled shape|Image view|Panel
 P|Draw freeform outline (path)|Image view|Panel
-Shift + Home|Select files to the first in index|Files list|Nothing
-Shift + End|Select files to the last one in index|Files list|Nothing
-Shift + Page Up/Down|Select files in pages of visible items|Files list|Nothing
-Shift + Arrow keys|Select files|Files list|Nothing
+Shift + Home|Select files to the first in index|Files list|-
+Shift + End|Select files to the last one in index|Files list|-
+Shift + Page Up / Down|Select files in pages of visible items|Files list|-
+Shift + Arrow keys|Select files|Files list|-
 Shift + Insert|Add folder(s) to files index list|Files list|Folder selector
 Shift + O|Open folder recursively|Anywhere|Folder selector
-Shift + Space|Drop files selection [if any], stop or start slideshow|Anywhere|Nothing
+Shift + Space|Drop files selection [if any], stop or start slideshow|Anywhere|-
 Shift + T|Insert text into selected area|Image selection|Panel
-Shift + Tab|Drop files selection [select none]|Files list|Nothing
-Shift + U|Apply viewport color adjustments or effects to selected area|Image selection|Nothing
+Shift + Tab|Drop files selection [select none]|Files list|-
+Shift + U|Apply viewport color adjustments or effects to selected area|Image selection|-
 Shift + ~|Open Quick Picto Viewer session events journal|Anywhere|Panel
-Page up / down|Move selection area [in live preview editing only]|Image selection|Nothing
-Home / end|Move selection area [in live preview editing only]|Image selection|Nothing
-Arrow keys|Navigate between indexed files|Anywhere|Nothing
+Page Up / Down|Move selection area on X axis|Live editing|-
+Home / End|Move selection area on Y axis|Live editing|-
+Arrow keys|Navigate between indexed files|Anywhere|-

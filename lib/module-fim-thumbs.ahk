@@ -40,19 +40,28 @@ cleanupThread() {
    wasInitFIMlib := GDIPToken := 0
 }
 
-cleanMess() {
+cleanMess(thisID:=0) {
+   Critical, on
    waitDataCollect := 1
-   OutputDebug, QPV: Thumbnails generator core. Clean GDIs mess...
+   ; OutputDebug, QPV: ThumbsMode. Script thread. Clean GDIs mess...
 
+   cleaned := 0
    Sort, listBitmaps, UD|
    Loop, Parse, listBitmaps, |
+   {
+       cleaned++
        Gdip_DisposeImage(A_LoopField, 1)
+   }
 
-   OutputDebug, QPV: Thumbnails generator core. Clean GDIs mess. DONE
+   OutputDebug, QPV: ThumbsMode. External thread. Clean GDIs mess core %thisID%: %cleaned% bitmaps disposed.
    listBitmaps := ""
    waitDataCollect := 0
    operationFailed := 0
    operationDone := 1
+}
+
+fnOutputDebug(msg) {
+      OutputDebug, QPV: %msg%
 }
 
 MonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerImg, coreIndex, thisfileIndex, thisBindex) {
@@ -84,15 +93,24 @@ MonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerIm
       resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
       Return -1
    }
+
    FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
    calcIMGdimensions(imgW, imgH, thumbsSizeQuality, thumbsSizeQuality, ResizedW, ResizedH)
    resizeFilter := 0 ; (ResizeQualityHigh=1) ? 3 : 0
  
    hFIFimgX := FreeImage_Rescale(hFIFimgA, ResizedW, ResizedH, resizeFilter)
+   FreeImage_UnLoad(hFIFimgA)
    If hFIFimgX
    {
-      FreeImage_UnLoad(hFIFimgA)
       hFIFimgA := hFIFimgX
+   } Else
+   {
+      fnOutputDebug(mustSaveFile " - " thumbsSizeQuality "px - " timePerImg "ms - core" coreIndex " - file" thisfileIndex " - loopIndex" thisBindex " - " imgPath)
+      operationDone := 1
+      waitDataCollect := 1
+      operationFailed := 1
+      resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
+      Return -1
    }
 
    imgBPP := Trim(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
@@ -104,6 +122,7 @@ MonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerIm
       FreeImage_UnLoad(hFIFimgA)
       If !hFIFimgB
       {
+         fnOutputDebug(mustSaveFile " - " thumbsSizeQuality "px - " timePerImg "ms - core" coreIndex " - file" thisfileIndex " - loopIndex" thisBindex " - " imgPath)
          operationDone := 1
          waitDataCollect := 1
          operationFailed := 1
@@ -113,20 +132,24 @@ MonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerIm
       hFIFimgA := hFIFimgB
    }
 
-   ; hFIFimgB := FreeImage_MakeThumbnail(hFIFimgA, thumbsSizeQuality, 0)
-   hFIFimgB := FreeImage_Rescale(hFIFimgA, ResizedW, ResizedH, resizeFilter)
-   If hFIFimgB
+   FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
+   If (imgW!=ResizedW || imgH!=ResizedH)
    {
+      ; hFIFimgB := FreeImage_MakeThumbnail(hFIFimgA, thumbsSizeQuality, 0)
+      hFIFimgB := FreeImage_Rescale(hFIFimgA, ResizedW, ResizedH, resizeFilter)
       FreeImage_UnLoad(hFIFimgA)
-      hFIFimgA := hFIFimgB
-   } Else
-   {
-      FreeImage_UnLoad(hFIFimgA)
-      operationDone := 1
-      operationFailed := 1
-      waitDataCollect := 1
-      resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
-      Return -1
+      If hFIFimgB
+      {
+         hFIFimgA := hFIFimgB
+      } Else
+      {
+         fnOutputDebug(mustSaveFile " - " thumbsSizeQuality "px - " timePerImg "ms - core" coreIndex " - file" thisfileIndex " - loopIndex" thisBindex " - " imgPath)
+         operationDone := 1
+         operationFailed := 1
+         waitDataCollect := 1
+         resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
+         Return -1
+      }
    }
 
    If hFIFimgA
@@ -159,6 +182,7 @@ MonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerIm
          finalBitmap := Gdip_CreateBitmapFromFile(file2save)
       }
    }
+
    listBitmaps .=  finalBitmap "|"
    ; Sleep, 0
    waitDataCollect := 1
@@ -453,6 +477,9 @@ FreeImage_FoxGetDllPath(DllName) {
 
 
 FreeImage_Load(ImPath, GFT:=-1, flag:=0, ByRef dGFT:=0) {
+   If !ImPath
+      Return
+
    If (GFT=-1 || GFT="")
       dGFT := GFT := FreeImage_GetFileType(ImPath)
    If (GFT="" || !ImPath)
@@ -461,6 +488,8 @@ FreeImage_Load(ImPath, GFT:=-1, flag:=0, ByRef dGFT:=0) {
 }
 
 FreeImage_Save(hImage, ImPath, ImgArg:=0) {
+   If (!ImPath || !hImage)
+      Return
    ; FIMfrmt := {"BMP":0, "JPG":2, "JPEG":2, "PNG":13, "TIF":18, "TIFF":18, "GIF":25}
    OutExt := FreeImage_GetFIFFromFilename(ImPath)
    Return DllCall(getFIMfunc("SaveU"), "Int", OutExt, "Int", hImage, "WStr", ImPath, "int", ImgArg)
@@ -468,8 +497,9 @@ FreeImage_Save(hImage, ImPath, ImgArg:=0) {
 
 
 FreeImage_UnLoad(hImage) {
-   If StrLen(hImage)<4
+   If StrLen(hImage)<3
       Return
+
    Return DllCall(getFIMfunc("Unload"), "Int", hImage)
 }
 

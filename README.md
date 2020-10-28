@@ -17,11 +17,11 @@
 
 <h2><a href="http://marius.sucan.ro/media/files/blog/ahk-scripts/quick-picto-viewer-compiled.zip">Download latest version</a> (compiled for x64/x32, Windows binary)</h2>
 
-<p>It runs on Windows XP*, Windows 7 and Windows 10.</p>
+<p>QPV runs on Windows XP*, Windows 7 and Windows 10.</p>
 
 <p>Source code available on <a href="https://github.com/marius-sucan/Quick-Picto-Viewer">Github</a>.</p>
 
-<p>Required DLL files are included in the ZIP file, except for those needed to run on Windows XP.</p>
+<p><em>To run the uncompiled edition, download the ZIP file.</em> Required DLL files are included in the ZIP file, except for those needed to run on Windows XP.</p>
 
 <h1>Features</h1>
 
@@ -72,7 +72,7 @@
 
 <p>Developed by <a href="http://marius.sucan.ro/">Marius Șucan</a> with special attention for people with disabilities.</p>
 
-<p>I coded the application as an <a href="https://autohotkey.com/">AHK script</a> for AutoHotkey_H v1.1.32. To execute or compile the source code one needs AHK_H. The required DLL files are found in the provided ZIP compiled script package.</p>
+<p>I coded the application as an <a href="https://autohotkey.com/">AHK script</a> for AutoHotkey_H v1.1.32. To execute or compile the source code one needs AHK_H. <em>The required DLL files are found in the provided ZIP compiled script package</em>.</p>
 
 <p>(*) Quick Picto Viewer can run on Windows XP, but various features might not work well. However, if you choose to do so, you must provide it with files found in Windows 10 (and possibly other Windows versions) installations. You must choose the ones that suit your Windows XP installation: DLLs for x32 or x64. These must be placed in the same folder with the QPV .EXE binary. The DLL files required are:</p>
 <ul>
