@@ -2,6 +2,16 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.6.6 (2020-10-30)
+  - [new] option to invert selection area when erasing a given area from the image
+  - reduced excessive redraws in some panels [fill area, insert text and paste in place/transform area]
+  - various important bug fixes
+    - using an image as alpha mask did not work
+    - setting opacity levels for text colours did not work
+    - spawning new QPV instances gave a bogus error message and failed
+    - choosing to open in QPV the containing folder of a given image, in some cases, would have led to an error
+    - some error messages displayed in the OSD vanished quicker than they could have ever been read :-)
+
 - v4.6.5 (2020-10-28)
   - [new] option to lock aspect ratio of image selection area to predefined ratios; you can also click and hold Shift on selection's corners to have QPV preserve its aspect ratio - when it is not locked to a predefined ratio [thanks to CyberKlabauter's suggestion]
   - [new] blending modes now available in the «fill area/draw shape» panel; blending modes can be used with gradients and the glass effect
@@ -358,7 +368,6 @@
 - v1.0.0 (2010-10-04) by SBC
 
 - known issues [jeudi 2 juillet 2020]
-  - it cannot offer correct viewport previewing of blending modes when the background image has an alpha channel
   - panning/zooming large images on 32 bits edition ... is very slow
   - high memory consumption; all operations need a lot of RAM [zoom/pan, etc]
 
