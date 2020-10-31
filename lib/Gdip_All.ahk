@@ -939,9 +939,9 @@ Gdip_BitmapFromBase64(ByRef Base64) {
    return pBitmap
 }
 
-Gdip_CreateBitmapFromStream(pStream, ICM:=0) {
+Gdip_CreateBitmapFromStream(pStream, useICM:=0) {
    pBitmap := 0
-   function2call := (ICM=1) ? "ICM" : ""
+   function2call := (useICM=1) ? "ICM" : ""
    gdipLastError := DllCall("gdiplus\GdipCreateBitmapFromStream" function2call, "UPtr", pStream, "PtrP", pBitmap)
    Return pBitmap
 }
@@ -1138,8 +1138,10 @@ Gdip_DrawClosedCurve(pGraphics, pPen, Points, Tension:="") {
       Return 2
 
    iCount := CreatePointsF(PointsF, Points)
-   function2call := IsNumber(Tension) ? "GdipDrawClosedCurve2" : "GdipDrawClosedCurve"
-   Return DllCall("gdiplus\" function2call, "UPtr", pGraphics, "UPtr", pPen, "UPtr", &PointsF, "UInt", iCount, "float", Tension)
+   If IsNumber(Tension)
+      Return DllCall("gdiplus\GdipDrawClosedCurve2", "UPtr", pGraphics, "UPtr", pPen, "UPtr", &PointsF, "UInt", iCount, "float", Tension)
+   Else
+      Return DllCall("gdiplus\GdipDrawClosedCurve", "UPtr", pGraphics, "UPtr", pPen, "UPtr", &PointsF, "UInt", iCount)
 }
 
 Gdip_DrawCurve(pGraphics, pPen, Points, Tension:="") {
@@ -1157,8 +1159,10 @@ Gdip_DrawCurve(pGraphics, pPen, Points, Tension:="") {
       Return 2
 
    iCount := CreatePointsF(PointsF, Points)
-   function2call := IsNumber(Tension) ? "GdipDrawCurve2" : "GdipDrawCurve"
-   Return DllCall("gdiplus\GdipDrawCurve", "UPtr", pGraphics, "UPtr", pPen, "UPtr", &PointsF, "UInt", iCount)
+   If IsNumber(Tension)
+      Return DllCall("gdiplus\GdipDrawCurve2", "UPtr", pGraphics, "UPtr", pPen, "UPtr", &PointsF, "UInt", iCount, "float", Tension)
+   Else
+      Return DllCall("gdiplus\GdipDrawCurve", "UPtr", pGraphics, "UPtr", pPen, "UPtr", &PointsF, "UInt", iCount)
 }
 
 Gdip_DrawPolygon(pGraphics, pPen, Points) {
@@ -1476,8 +1480,10 @@ Gdip_FillClosedCurve(pGraphics, pBrush, Points, Tension:="", FillMode:=0) {
       Return 2
 
    iCount := CreatePointsF(PointsF, Points)
-   function2call := IsNumber(Tension) ? "GdipFillClosedCurve2" : "GdipFillClosedCurve"
-   Return DllCall("gdiplus\" function2call, "UPtr", pGraphics, "UPtr", pBrush, "UPtr", &PointsF, "int", iCount)
+   If IsNumber(Tension)
+      Return DllCall("gdiplus\GdipFillClosedCurve2", "UPtr", pGraphics, "UPtr", pBrush, "UPtr", &PointsF, "int", iCount, "float", Tension, "int", FillMode)
+   Else
+      Return DllCall("gdiplus\GdipFillClosedCurve", "UPtr", pGraphics, "UPtr", pBrush, "UPtr", &PointsF, "int", iCount)
 }
 
 ;#####################################################################################
@@ -1696,6 +1702,7 @@ Gdip_DrawImageRect(pGraphics, pBitmap, X, Y, W, H) {
 ;                 MatrixNegative = -1|0|0|0|0|0|-1|0|0|0|0|0|-1|0|0|0|0|0|1|0|1|1|1|0|1
 ;                 To generate a color matrix using user-friendly parameters,
 ;                 use GenerateColorMatrix()
+;
 ; additional remarks:
 ; In my tests, it seems that the grayscale matrix is not functioning properly.
 ; Grayscale images are rendered invisible [with zero opacity] for some reason...
@@ -1914,8 +1921,8 @@ Gdip_GraphicsFromHWND(HWND, useICM:=0, InterpolationMode:="", SmoothingMode:="",
 ; Creates a pGraphics object that is associated with a specified window handle [HWND]
 ; If useICM=1, the created graphics uses ICM [color management - (International Color Consortium = ICC)].
    pGraphics := 0
-   function2call := (useICM=1) ? "GdipCreateFromHWNDICM" : "GdipCreateFromHWND"
-   gdipLastError := DllCall("gdiplus\" function2call, "UPtr", HWND, "UPtr*", pGraphics)
+   function2call := (useICM=1) ? "ICM" : ""
+   gdipLastError := DllCall("gdiplus\GdipCreateFromHWND" function2call, "UPtr", HWND, "UPtr*", pGraphics)
    If (gdipLastError=1 && A_LastError=8) ; out of memory
       gdipLastError := 3
 
@@ -2584,8 +2591,8 @@ Gdip_CreateBitmapFromFile(sFile, IconNumber:=1, IconSize:="", useICM:=0) {
       DestroyIcon(hIcon)
    } else
    {
-      function2call := (useICM=1) ? "GdipCreateBitmapFromFileICM" : "GdipCreateBitmapFromFile"
-      gdipLastError := DllCall("gdiplus\" function2call, "WStr", sFile, "UPtr*", pBitmap)
+      function2call := (useICM=1) ? "ICM" : ""
+      gdipLastError := DllCall("gdiplus\GdipCreateBitmapFromFile" function2call, "WStr", sFile, "UPtr*", pBitmap)
    }
 
    return pBitmap
@@ -6532,8 +6539,8 @@ MDMF_GetInfo(HMON) {
 Gdip_LoadImageFromFile(sFile, useICM:=0) {
 ; An Image object encapsulates a bitmap or a metafile and stores attributes that you can retrieve.
    pImage := 0
-   function2call := (useICM=1) ? "GdipLoadImageFromFileICM" : "GdipLoadImageFromFile"
-   R := DllCall("gdiplus\" function2call, "WStr", sFile, "UPtrP", pImage)
+   function2call := (useICM=1) ? "ICM" : ""
+   R := DllCall("gdiplus\GdipLoadImageFromFile" function2call, "WStr", sFile, "UPtrP", pImage)
    ErrorLevel := R
    Return pImage
 }
@@ -7800,7 +7807,15 @@ GenerateColorMatrix(modus, bright:=1, contrast:=0, saturation:=1, alph:=1, chnRd
        matrix := "0.39|0.34|0.27|0|0"
               . "|0.76|0.58|0.33|0|0"
               . "|0.19|0.16|0.13|0|0"
-              . "|0|0|0|1|0"
+              . "|0|0|0|" alph "|0"
+              . "|0|0|0|0|1"
+       ; matrix := StrReplace(mtrx, A_Space)
+    } Else If (modus=9) ; partial alpha channel remover
+    {
+       matrix := "1|0|0|0|0"
+              . "|0|1|0|0|0"
+              . "|0|0|1|0|0"
+              . "|0|0|0|" alph "|0"
               . "|0|0|0|0|1"
        ; matrix := StrReplace(mtrx, A_Space)
     }

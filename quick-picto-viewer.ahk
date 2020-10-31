@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 4.6.5
+;@Ahk2Exe-SetVersion 4.6.7
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2020)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -152,7 +152,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , hLVmainu := 0, tempBtnVisible := "null", tempBtnGuiBtnArray := [], lastRenameUndo := [], userMultiCoresLimit := 100
    , drawingShapeNow := 0, customShapePoints := "", prevResizedVPimgW := "", prevResizedVPimgH := "", PenuDrawLive := ""
    , initialDrawingStartCoords := [], drawingLiveMode := 0, cardinalCurveCustomShape := 0, openingPanelNow := 0
-   , closedLineCustomShape := 1, tensionCurveCustomShape := 0.5, PanelDefineSelectionCoords := 0
+   , closedLineCustomShape := 1, tensionCurveCustomShape := 0.5, userDefinedSelCoords := 0
    , SelectionCoordsType := 1, PasteInPlaceAlphaFile := "", infoBoxGdiCached := "", watchFolderDetails := ""
    , HUDobjNavBoxu := [], HUDobjHistoBoxu := [], globalhFIFimg := 0, userAddedFavesCount := 0, qpvCanvasHasInit := 0
    , maxFavesEntries := 54321, gdipLastError := 0, hasDrawnImageMap := 0, hasDrawnHistoMap := 0, coreDesiredPixFmt := "0xE200B"
@@ -161,7 +161,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , delayiedHUDperc := 0
    , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := [], countGDIobjects := 0
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "4.6.6", vReleaseDate := "30/10/2020"
+   , appVersion := "4.6.7", vReleaseDate := "31/10/2020"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -169,9 +169,9 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , specialColorFXmode := 1, uiColorCurveFXmode := 2, uiColorCurveFXchannel := 4
    , WindowBgrColor := "010101", slideShowDelay := 3000, userMultiDelChoice := 2
    , IMGresizingMode := 1, SlideHowMode := 1, TouchScreenMode := 1
-   , lumosAdjust := 1, GammosAdjust := 0, userimgQuality := 0
+   , lumosAdjust := 1, GammosAdjust := 0, userimgQuality := 0, userCustomImgSelRatio := 0
    , imgFxMode := 1, FlipImgH := 0, FlipImgV := 0, satAdjust := 1
-   , imageAligned := 5, filesFilter := "", isAlwaysOnTop := 0
+   , imageAligned := 5, filesFilter := "", isAlwaysOnTop := 0, IntensityAlphaChannel := 1
    , noTooltipMSGs := 0, zoomLevel := 1, skipDeadFiles := 0, userHQraw  := 0
    , isTitleBarHidden := 1, lumosGrayAdjust := 0, GammosGrayAdjust := 0
    , MustLoadSLDprefs := 0, animGIFsSupport := 1, move2recycler := 1
@@ -184,7 +184,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , userUnsprtWriteFMT := 1, userDesireWriteFMT := 9, hueAdjust := 0, syncSlideShow2Audios := 0
    , DisplayTimeUser := 3, FontBolded := 1, FontItalica := 0, showInfoBoxHUD := 0, usrAutoCropGenerateSelection := 0
    , usrTextureBGR := 0, realGammos := 1, imgThreshold := 0, relativeImgSelCoords := 1, usrAutoCropDeviation := 0
-   , RenderOpaqueIMG := 0, vpIMGrotation := 0, usrTextAlign := "Left", autoPlaySNDs := 0, usrAutoCropDeviationSnap := 1
+   , vpIMGrotation := 0, usrTextAlign := "Left", autoPlaySNDs := 0, usrAutoCropDeviationSnap := 1
    , ResizeCropAfterRotation := 1, usrColorDepth := 1, ColorDepthDithering := 1, mediaSNDvolume := 80
    , borderAroundImage := 0, performAutoCropNow := 0, usrAutoCropColorTolerance := 5, usrAutoCropImgThreshold := 0.005 
    , SimpleOperationsDoCrop := 0, SimpleOperationsRotateAngle := 1, SimpleOperationsScaleYImgFactor := "100 %"
@@ -228,7 +228,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , dynamicThumbsColumns := 1, thumbsColumns := 10, TextInAreaAutoWrap := 1, histogramMode := 2, cmrRAWtoneMapParamB := 0
    , showHUDnavIMG := 0, HUDnavBoxSize := 75, PrintTxtSize := 300, cmrRAWtoneMapAlgo := 1, cmrRAWtoneMapParamA := 1.85
    , mainWinPos := 0, mainWinMaximized := 2, mainWinSize := 0, UserExternalApp := "", UserExternalEditApp := ""
-   , lockSelectionAspectRatio := 0, desiredSelAspectRatio := 0, adjustingSelDotNow := 0, cycleFavesOpenIMG := 0
+   , lockSelectionAspectRatio := 1, desiredSelAspectRatio := 0, adjustingSelDotNow := 0, cycleFavesOpenIMG := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started.`nCPU cores identified: " realSystemCores ".")
@@ -323,9 +323,8 @@ If (A_PtrSize=4)
    allowMultiCoreMode := 0
    minimizeMemUsage := 1
    maxUndoLevels := 2
-
+   coreDesiredPixFmt := "0x21808"
 }
-coreDesiredPixFmt := (minimizeMemUsage=1) ? "0x21808" : "0xE200B"
 
 ; OnMessage(0x205, "WM_RBUTTONUP")
 TriggerMenuBarUpdate()
@@ -3947,7 +3946,7 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0) {
       ctrlState := (GetKeyState("Ctrl", "P") && dotActive=9) ? 1 : 0
       shiftState := GetKeyState("Shift", "P") ? 1 : 0
       altState := GetKeyState("Alt", "P") ? 1 : 0
-      If (lockSelectionAspectRatio>0 && desiredSelAspectRatio && adjustGradientOffset!=1 && !altState && isInRange(dotActive, 1, 8) && !ctrlState)
+      If (lockSelectionAspectRatio>1 && desiredSelAspectRatio && adjustGradientOffset!=1 && !altState && isInRange(dotActive, 1, 8) && !ctrlState)
          shiftState := 1
 
       If dotActive
@@ -4202,7 +4201,7 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0) {
                 addMsg := "`n `nCorner coordinates:`nX / Y: " newSelDotX ", " newSelDotY "`nColor: " pixelColor
              }
 
-             theRatio := (lockSelectionAspectRatio>0) ? "`nLocked aspect ratio: " Round(desiredSelAspectRatio, 2) : "`nRatio: " Round(imgSelW/imgSelH, 2)
+             theRatio := (lockSelectionAspectRatio>1) ? "`nLocked aspect ratio: " Round(desiredSelAspectRatio, 2) : "`nRatio: " Round(imgSelW/imgSelH, 2)
              ; If (imgEditPanelOpened=1)
                 theRatio .= "`nRotation: " Round(vPselRotation, 2) "° "
              theMsg := "X / Y: " ImgSelX1 ", " ImgSelY1 "`nW / H: " imgSelW ", " imgSelH theRatio addMsg
@@ -4582,9 +4581,6 @@ DefineFXmodes() {
    If (imgFxMode=1 && isInRange(usrColorDepth, 2, 10))
       friendly := "ALTERED COLOR DEPTH"
 
-   If (imgFxMode=1 && RenderOpaqueIMG=1 && currIMGdetails.HasAlpha=1)
-      friendly .= "`nAlpha channel: REMOVED"
-
    Return friendly
 }
 
@@ -4674,6 +4670,9 @@ ToggleImgFX(dir:=0) {
 
    If (imgFxMode=2 || imgFxMode=4 || imgFxMode=9)
       friendly .= "`nGamma: " Round(realGammos, 3)
+   
+   If (imgFxMode=2 || imgFxMode=3 || (imgFxMode=4 && bwDithering=0) || imgFxMode=9 || imgFxMode=10) && (IntensityAlphaChannel!=1)
+      friendly .= "`nAlpha channel: ALTERED"
 
    If (specialColorFXmode>1) && (imgFxMode=2 || imgFxMode=3 || imgFxMode=4 || imgFxMode=9)
    {
@@ -4809,7 +4808,7 @@ coreResetIMGview(dummy:=0) {
   {
      chnRdecalage := chnGdecalage := chnBdecalage := 0.0
      imgThreshold := bwDithering := hueAdjust := zatAdjust := lummyAdjust := 0
-     specialColorFXmode := 1
+     IntensityAlphaChannel := specialColorFXmode := 1
   }
 
   If (imgFxMode=4)
@@ -4870,7 +4869,7 @@ ChangeLumos(dir, dummy:=0) {
       imgFxMode := 2
 
    showHardReset := 0
-   If (FlipImgH=1 || FlipImgV=1 || vpIMGrotation>0 || imgFxMode>1 || usrColorDepth>1 || RenderOpaqueIMG=1)
+   If (FlipImgH=1 || FlipImgV=1 || vpIMGrotation>0 || imgFxMode>1 || usrColorDepth>1)
       showHardReset := 1
 
    prevColorAdjustZeit := A_TickCount
@@ -4904,8 +4903,6 @@ ChangeLumos(dir, dummy:=0) {
    {
       If (imgFxMode=4)
          addMsg := DefineFXmodes()
-      If (imgFxMode=1 && RenderOpaqueIMG=1 && currIMGdetails.HasAlpha=1)
-         addMsg .= "`nAlpha channel: REMOVED"
       If (imgFxMode=1 && usrColorDepth>1)
          addMsg .= "`nImage color depth: ALTERED [ " defineColorDepth() " ]"
       If (vpIMGrotation>0)
@@ -4960,6 +4957,7 @@ WriteSettingsColorAdjustments() {
     INIaction(1, "usrColorDepth", "General")
     INIaction(1, "ColorDepthDithering", "General")
     INIaction(1, "imgFxMode", "General")
+    INIaction(1, "IntensityAlphaChannel", "General")
     INIaction(1, "chnBdecalage", "General")
     INIaction(1, "chnGdecalage", "General")
     INIaction(1, "chnRdecalage", "General")
@@ -4971,7 +4969,6 @@ WriteSettingsColorAdjustments() {
     INIaction(1, "lumosAdjust", "General")
     INIaction(1, "lumosGrayAdjust", "General")
     INIaction(1, "realGammos", "General")
-    INIaction(1, "RenderOpaqueIMG", "General")
     INIaction(1, "satAdjust", "General")
     INIaction(1, "vpIMGrotation", "General")
     INIaction(1, "zatAdjust", "General")
@@ -8037,7 +8034,7 @@ mergeViewPortEffectsImgEditing(funcu:=0, recordUndoAfter:=1, applyOnArea:=0) {
 
     SetTimer, RemoveTooltip, % -msgDisplayTime//2
     usrColorDepth := imgFxMode := 1
-    RenderOpaqueIMG := vpIMGrotation := 0 ; FlipImgH := FlipImgV := 0
+    vpIMGrotation := 0 ; FlipImgH := FlipImgV := 0
 }
 
 CutSelectedArea() {
@@ -8529,7 +8526,6 @@ coreFillGlassFX(whichBitmap, dimgSelPx, dimgSelPy, dimgSelW, dimgSelH, thisQuali
        {
           trGdip_DisposeImage(zBitmap, 1)
           zBitmap := thisBMP
-
           setWindowTitle("Blurring image, please wait...")
           afterVPresize := (AnyWindowOpen && G2=2NDglPG) ? Round(dimgSelW*zoomLevel) * Round(dimgSelH*zoomLevel) : 1
           preVPresize := dimgSelW//2 * dimgSelH//2
@@ -10911,7 +10907,7 @@ adjustWin2MonLimits(winHwnd, winX, winY, ByRef rX, ByRef rY, ByRef Wid, ByRef He
 
 createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1) {
     Static btnHeightBig, btnHeightSmall
-    If (isWinXP=1 || A_OSVersion="WIN_7")
+    If A_OSVersion ; (isWinXP=1 || A_OSVersion="WIN_7")
     {
        btnHeightBig := 33
        btnHeightSmall := 23
@@ -12237,13 +12233,13 @@ saveSlideSettingsInDB() {
    IniSLDBWrite("chnRdecalage", chnRdecalage)
    IniSLDBWrite("chnGdecalage", chnGdecalage)
    IniSLDBWrite("chnBdecalage", chnBdecalage)
+   IniSLDBWrite("IntensityAlphaChannel", IntensityAlphaChannel)
    IniSLDBWrite("usrAdaptiveThreshold", usrAdaptiveThreshold)
    ; IniSLDBWrite("noTooltipMSGs", noTooltipMSGs)
    IniSLDBWrite("TouchScreenMode", TouchScreenMode)
    IniSLDBWrite("skipDeadFiles", skipDeadFiles)
    IniSLDBWrite("isAlwaysOnTop", isAlwaysOnTop)
    IniSLDBWrite("bwDithering", bwDithering)
-   IniSLDBWrite("RenderOpaqueIMG", RenderOpaqueIMG)
    IniSLDBWrite("zatAdjust", zatAdjust)
    IniSLDBWrite("hueAdjust", hueAdjust)
    IniSLDBWrite("realGammos", realGammos)
@@ -14781,9 +14777,9 @@ readSlideSettings(readThisFile) {
      IniRead, tstchnRdecalage, %readThisFile%, General, chnRdecalage, @
      IniRead, tstchnGdecalage, %readThisFile%, General, chnGdecalage, @
      IniRead, tstchnBdecalage, %readThisFile%, General, chnBdecalage, @
+     IniRead, tstIntensityAlphaChannel, %readThisFile%, General, IntensityAlphaChannel, @
      IniRead, tstusrAdaptiveThreshold, %readThisFile%, General, usrAdaptiveThreshold, @
      IniRead, tstbwDithering, %readThisFile%, General, bwDithering, @
-     IniRead, tstRenderOpaqueIMG, %readThisFile%, General, RenderOpaqueIMG, @
      IniRead, tstusrTextureBGR, %readThisFile%, General, usrTextureBGR, @
      IniRead, tstusrColorDepth, %readThisFile%, General, usrColorDepth, @
      IniRead, tstColorDepthDithering, %readThisFile%, General, ColorDepthDithering, @
@@ -14815,10 +14811,6 @@ readSlideSettings(readThisFile) {
         ColorDepthDithering := tstColorDepthDithering
      If isInRange(tstusrColorDepth, 0, 9)
         usrColorDepth := tstusrColorDepth
-     If (tstRenderOpaqueIMG=1 || tstRenderOpaqueIMG=0)
-        RenderOpaqueIMG := tstRenderOpaqueIMG
-     ; If (tstnoTooltipMSGs=1 || tstnoTooltipMSGs=0)
-     ;    noTooltipMSGs := tstnoTooltipMSGs
      If (tstSLDcacheFilesList=1 || tstSLDcacheFilesList=0)
         SLDcacheFilesList := tstSLDcacheFilesList
      If (tstbwDithering=1 || tstbwDithering=0)
@@ -14877,6 +14869,8 @@ readSlideSettings(readThisFile) {
         chnGdecalage := Trimmer(tstchnGdecalage)
      If isNumber(tstchnBdecalage)
         chnBdecalage := Trimmer(tstchnBdecalage)
+     If isNumber(tstIntensityAlphaChannel)
+        IntensityAlphaChannel := Trimmer(tstIntensityAlphaChannel)
      If isNumber(tstlumosAdjust)
         lumosAdjust := Trimmer(tstlumosAdjust)
      If isNumber(tstGammosAdjust)
@@ -15222,13 +15216,13 @@ writeSlideSettings(file2save) {
     IniWrite, % chnRdecalage, % mainSettingsFile, General, chnRdecalage
     IniWrite, % chnGdecalage, % mainSettingsFile, General, chnGdecalage
     IniWrite, % chnBdecalage, % mainSettingsFile, General, chnBdecalage
+    IniWrite, % IntensityAlphaChannel, % mainSettingsFile, General, IntensityAlphaChannel
     IniWrite, % usrAdaptiveThreshold, % mainSettingsFile, General, usrAdaptiveThreshold
     ; IniWrite, % noTooltipMSGs, %file2save%, General, noTooltipMSGs
     IniWrite, % TouchScreenMode, %file2save%, General, TouchScreenMode
     IniWrite, % skipDeadFiles, %file2save%, General, skipDeadFiles
     IniWrite, % isAlwaysOnTop, %file2save%, General, isAlwaysOnTop
     IniWrite, % bwDithering, %file2save%, General, bwDithering
-    IniWrite, % RenderOpaqueIMG, %file2save%, General, RenderOpaqueIMG
     IniWrite, % zatAdjust, %file2save%, General, zatAdjust
     IniWrite, % hueAdjust, %file2save%, General, hueAdjust
     IniWrite, % realGammos, %file2save%, General, realGammos
@@ -18284,9 +18278,11 @@ startDrawingShape(modus) {
      }
      If (AnyWindowOpen && imgEditPanelOpened=1)
         CloseWindow("yes")
+
      Sleep, 5
      If (editingSelectionNow=1)
         recordSelUndoLevelNow()
+
      drawingShapeNow := 1
      interfaceThread.ahkassign("drawingShapeNow", 1)
      ToggleEditImgSelection("show-edit")
@@ -19070,20 +19066,24 @@ PanelIMGselProperties() {
          , BtnPosX1m, BtnPosX1p, BtnPosY1m, BtnPosY1p, BtnPosX2m, BtnPosX2p, BtnPosY2m, BtnPosY2p
          , BtnPosXm, BtnPosXp, BtnPosYm, BtnPosYp, BtnPosZm, BtnPosZp
 
+    If !userCustomImgSelRatio
+       INIaction(0, "userCustomImgSelRatio", "General")
+
+    INIaction(0, "lockSelectionAspectRatio", "General")
     Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
     Gui, Add, Text, x15 y15 Section, Current image size: %imgW% x %imgH% px.
-    Gui, Add, Checkbox, y+7 gupdateUIselectionPropertiesPanel Checked%PanelDefineSelectionCoords% vPanelDefineSelectionCoords, Define image selection coordinates in...
+    Gui, Add, Checkbox, y+7 gupdateUIselPropPanel Checked%userDefinedSelCoords% vuserDefinedSelCoords, Define image selection coordinates in...
     Gui, Add, DropDownList, x+2 w150 AltSubmit gupdateUIchangeSelectionType vSelectionCoordsType, Pixels||Percentages
     Gui, Add, Text, xs y+10 w%EditWid%, X1
     Gui, Add, Text, x+3 wp, Y1
     Gui, Add, Text, x+3 wp, X2
     Gui, Add, Text, x+3 wp, Y2
     Gui, Add, Text, x+3 wp, Rotation
-    Gui, Add, Edit, xs y+7 wp r1 limit9 -multi -wantTab -wrap gupdateUIselectionPropertiesPanel vNewPosX1, % imgSelX1
-    Gui, Add, Edit, x+3 wp r1 limit9 -multi -wantTab -wrap gupdateUIselectionPropertiesPanel vNewPosY1, % imgSelY1
-    Gui, Add, Edit, x+3 wp r1 limit9 -multi -wantTab -wrap gupdateUIselectionPropertiesPanel vNewPosX2, % imgSelX2
-    Gui, Add, Edit, x+3 wp r1 limit9 -multi -wantTab -wrap gupdateUIselectionPropertiesPanel vNewPosY2, % imgSelY2
-    Gui, Add, ComboBox, x+3 wp limit9 -multi -wrap gupdateUIselectionPropertiesPanel vNewVProt, 0|45|90|105|135|150|180|200|225|250|270|300|315|%vPselRotation%||
+    Gui, Add, Edit, xs y+7 wp r1 limit9 -multi -wantTab -wrap gupdateUIselPropPanel vNewPosX1, % imgSelX1
+    Gui, Add, Edit, x+3 wp r1 limit9 -multi -wantTab -wrap gupdateUIselPropPanel vNewPosY1, % imgSelY1
+    Gui, Add, Edit, x+3 wp r1 limit9 -multi -wantTab -wrap gupdateUIselPropPanel vNewPosX2, % imgSelX2
+    Gui, Add, Edit, x+3 wp r1 limit9 -multi -wantTab -wrap gupdateUIselPropPanel vNewPosY2, % imgSelY2
+    Gui, Add, ComboBox, x+3 wp limit9 -multi -wrap gupdateUIselPropPanel vNewVProt, 0|45|90|105|135|150|180|200|225|250|270|300|315|%vPselRotation%||
     Gui, Add, Text, xs y+10, Adjust current selection coordinates:
     Gui, Add, Text, xs y+5 w%EditWid%, X1
     Gui, Add, Text, x+3 wp, Y1
@@ -19103,16 +19103,18 @@ PanelIMGselProperties() {
     Gui, Add, Button, x+3 wp gOffsetSelProperPanel vBtnPosYp, Right
     Gui, Add, Button, x+3 wp gOffsetSelProperPanel vBtnPosZm, Contract
     Gui, Add, Button, x+3 wp gOffsetSelProperPanel vBtnPosZp, Enlarge
-    Gui, Add, Checkbox, xs y+15 gupdateUIselectionPropertiesPanel Checked%LimitSelectBoundsImg% vLimitSelectBoundsImg, &Limit selection to image boundaries
-    Gui, Add, Checkbox, xs y+10 gupdateUIselectionPropertiesPanel Checked%rotateSelBoundsKeepRatio% vrotateSelBoundsKeepRatio, &Keep aspect ratio on rotation
-    ToggleEditImgSelection("show-edit")
-    dummyTimerDelayiedImageDisplay(50)
+    Gui, Add, Checkbox, xs y+15 gupdateUIselPropPanel Checked%LimitSelectBoundsImg% vLimitSelectBoundsImg, &Limit selection to image boundaries
+    Gui, Add, Checkbox, xs y+10 gupdateUIselPropPanel Checked%rotateSelBoundsKeepRatio% vrotateSelBoundsKeepRatio, &Keep aspect ratio on rotation
+    Gui, Add, DropDownList, xs y+10 wp gupdateUIselPropPanel AltSubmit Choose%lockSelectionAspectRatio% vlockSelectionAspectRatio, Aspect ratio is not locked|Aspect ratio: 1:1|Aspect ratio: 4:3|Aspect ratio: 3:2|Aspect ratio: 15:9|Aspect ratio: 16:10|Custom aspect ratio
+    Gui, Add, Edit, x+5 gupdateUIselPropPanel vuserCustomImgSelRatio, % userCustomImgSelRatio
+    ; ToggleEditImgSelection("show-edit")
+    ; dummyTimerDelayiedImageDisplay(50)
     Gui, Add, Button, xs y+20 w100 h%thisBtnHeight% gBTNselectEntireImg, &Select all
     Gui, Add, Button, x+10 w125 hp gBTNselectNoneImg, &Select none
     Gui, Add, Button, x+10 w90 hp gBtnCloseWindow Default, &Close
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Selection properties: " appTitle, winPos)
-    SetTimer, updateUIselectionPropertiesPanel, -350
+    SetTimer, updateUIselPropPanel, -350
 }
 
 BTNselectNoneImg() {
@@ -19186,7 +19188,7 @@ OffsetSelProperPanel(dummy:=0) {
 
 updateUIchangeSelectionType() {
    GuiControlGet, SelectionCoordsType
-   GuiControlGet, PanelDefineSelectionCoords
+   GuiControlGet, userDefinedSelCoords
    Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
    GuiControl, SettingsGUIA:, NewPosX1, 0
    GuiControl, SettingsGUIA:, NewPosY1, 0
@@ -19199,7 +19201,7 @@ updateUIchangeSelectionType() {
       GuiControl, SettingsGUIA:, NewPosX2, 50
       GuiControl, SettingsGUIA:, NewPosY2, 50
    }
-   updateUIselectionPropertiesPanel()
+   updateUIselPropPanel()
 }
 
 BTNselectEntireImg() {
@@ -19207,29 +19209,56 @@ BTNselectEntireImg() {
    selectEntireImage()
 }
 
-updateUIselectionPropertiesPanel() {
+updateUIselPropPanel() {
    GuiControlGet, NewPosX1, SettingsGUIA:, NewPosX1
    GuiControlGet, NewPosY1, SettingsGUIA:, NewPosY1
    GuiControlGet, NewPosX2, SettingsGUIA:, NewPosX2
    GuiControlGet, NewPosY2, SettingsGUIA:, NewPosY2
    GuiControlGet, NewVProt, SettingsGUIA:, NewVProt
-   GuiControlGet, PanelDefineSelectionCoords, SettingsGUIA:, PanelDefineSelectionCoords
+   GuiControlGet, lockSelectionAspectRatio, SettingsGUIA:, lockSelectionAspectRatio
+   GuiControlGet, userCustomImgSelRatio, SettingsGUIA:, userCustomImgSelRatio
+   GuiControlGet, userDefinedSelCoords, SettingsGUIA:, userDefinedSelCoords
    GuiControlGet, SelectionCoordsType, SettingsGUIA:, SelectionCoordsType
    GuiControlGet, LimitSelectBoundsImg, SettingsGUIA:, LimitSelectBoundsImg
    GuiControlGet, rotateSelBoundsKeepRatio, SettingsGUIA:, rotateSelBoundsKeepRatio
-   ToggleEditImgSelection("show-edit")
-   Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
-   actuA := (PanelDefineSelectionCoords=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
-   actuB := (PanelDefineSelectionCoords=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
-   If (PanelDefineSelectionCoords=1)
-      lockSelectionAspectRatio := 0
+   If (lockSelectionAspectRatio>1)
+   {
+      userDefinedSelCoords := 0
+      GuiControl, SettingsGUIA:, userDefinedSelCoords, 0
+      GuiControl, SettingsGUIA: Disable, userDefinedSelCoords
+   } Else
+      GuiControl, SettingsGUIA: Enable, userDefinedSelCoords
 
-   GuiControl, % actuA, BtnPosX1m
-   GuiControl, % actuA, BtnPosX1p
+   defineSelectionAspectRatios()
+   If (lockSelectionAspectRatio=7)
+      GuiControl, SettingsGUIA: Enable, userCustomImgSelRatio
+   Else
+      GuiControl, SettingsGUIA: Disable, userCustomImgSelRatio
+
+   ; ToggleEditImgSelection("show-edit")
+   Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+   actuA := (userDefinedSelCoords=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
+   actuB := (userDefinedSelCoords=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   INIaction(1, "userCustomImgSelRatio", "General")
+   INIaction(1, "lockSelectionAspectRatio", "General")
+   ; If (userDefinedSelCoords=1)
+   ;    lockSelectionAspectRatio := 0
+
+   If (lockSelectionAspectRatio>1)
+   {
+      GuiControl, SettingsGUIA: Disable, BtnPosX1m
+      GuiControl, SettingsGUIA: Disable, BtnPosX1p
+      GuiControl, SettingsGUIA: Disable, BtnPosX2m
+      GuiControl, SettingsGUIA: Disable, BtnPosX2p
+   } Else
+   {
+      GuiControl, % actuA, BtnPosX1m
+      GuiControl, % actuA, BtnPosX1p
+      GuiControl, % actuA, BtnPosX2m
+      GuiControl, % actuA, BtnPosX2p
+   }
    GuiControl, % actuA, BtnPosY1m
    GuiControl, % actuA, BtnPosY1p
-   GuiControl, % actuA, BtnPosX2m
-   GuiControl, % actuA, BtnPosX2p
    GuiControl, % actuA, BtnPosY2m
    GuiControl, % actuA, BtnPosY2p
    GuiControl, % actuA, BtnPosXm
@@ -19243,7 +19272,7 @@ updateUIselectionPropertiesPanel() {
    GuiControl, % actuB, NewPosX2
    GuiControl, % actuB, NewPosY2
    GuiControl, % actuB, SelectionCoordsType
-   If (PanelDefineSelectionCoords=1)
+   If (userDefinedSelCoords=1)
    {
       If (SelectionCoordsType=1)
       {
@@ -22341,7 +22370,11 @@ RefreshFilesList() {
      retrieveFavesAsList()
      Return
   } Else If InStr(CurrentSLD, "\viewed-images-history-")
+  {
+     showTOOLtip("The current files list index is: `n" CurrentSLD)
+     SetTimer, RemoveTooltip, % -msgDisplayTime//2
      Return
+  }
 
   If RegExMatch(CurrentSLD, sldsPattern)
   {
@@ -22547,7 +22580,7 @@ OpenArgFile(inputu) {
     Global scriptStartTime := A_TickCount
     currentFileIndex := maxFilesIndex := 1
     ; usrColorDepth := imgFxMode := 1
-    ; RenderOpaqueIMG := vpIMGrotation := FlipImgH := FlipImgV := 0
+    ; vpIMGrotation := FlipImgH := FlipImgV := 0
     resultedFilesList[1, 1] := inputu
     IDshowImage(currentFileIndex)
     Global scriptStartTime := A_TickCount
@@ -23376,7 +23409,7 @@ BuildImgLiveEditMenu() {
       {
          Menu, PVselv, Add, 
          Menu, PVselv, Add, &Select all`tCtrl+A, MenuSelectAllAction
-         If (lockSelectionAspectRatio=0)
+         If (lockSelectionAspectRatio<2)
             Menu, PVselv, Add, S&quare ratio selection [1:1]`tR, makeSquareSelection
          If (imgEditPanelOpened!=1 || AnyWindowOpen=10 || AnyWindowOpen=24 || AnyWindowOpen=25 || AnyWindowOpen=31 || AnyWindowOpen=10)
          {
@@ -23397,7 +23430,7 @@ BuildImgLiveEditMenu() {
          Menu, PVselv, Add, %defiSelAR%, dummy
          Menu, PVselv, Disable, %defiSelAR%
 
-         If (lockSelectionAspectRatio>0)
+         If (lockSelectionAspectRatio>1)
             Menu, PVselv, Check, Toggle loc&k aspect ratio`tShift+A
          If (rotateSelBoundsKeepRatio=1)
             Menu, PVselv, Check, &Keep aspect ratio on rotation
@@ -23533,7 +23566,6 @@ BuildMainMenu() {
       friendlyPix := (coreDesiredPixFmt="0x21808") ? "24-RGB" : "32-RGBA"
       Menu, PVview, Add,
       Menu, PVview, Add, Pixel format mode: %friendlyPix%, ToggleCorePixFmt
-      Menu, PVview, Add, Remove alpha channel, ToggleRenderOpaque
       Menu, PVview, Add, Image &alignment: %thisAlignInfo%`tA, ToggleIMGalign
       Menu, PVview, Add, Image &rotation: %vpIMGrotation%°`t9`, 0, MenuChangeImgRotationInVP
       Menu, PVview, Add,
@@ -23543,8 +23575,6 @@ BuildMainMenu() {
       Menu, PVview, Add, &Toggle resizing mode`tT, ToggleImageSizingMode
       Menu, PVview, Add, % DefineImgSizing(), ToggleImageSizingMode
       Menu, PVview, Disable, % DefineImgSizing()
-      If (RenderOpaqueIMG=1)
-         Menu, PVview, Check, Remove alpha channel
    }
 
    Menu, PVview, Add,
@@ -23621,7 +23651,7 @@ BuildMainMenu() {
    Menu, PVselv, Add, &Reset, newImgSelection
    Menu, PVselv, Add, &Select all`tCtrl+A, selectEntireImage
    Menu, PVselv, Add, 
-   If (lockSelectionAspectRatio=0)
+   If (lockSelectionAspectRatio<2)
       Menu, PVselv, Add, Transform to s&quare ratio (1:1)`tR, makeSquareSelection
    Menu, PVselv, Add, &Flip width / height, flipSelectionWH
    Menu, PVselv, Add, Ell&ipse selection`tShift+E, toggleEllipseSelection
@@ -23635,7 +23665,7 @@ BuildMainMenu() {
    Menu, PVselv, Add, %defiSelAR%, dummy
    Menu, PVselv, Disable, %defiSelAR%
 
-   If (lockSelectionAspectRatio>0)
+   If (lockSelectionAspectRatio>1)
       Menu, PVselv, Check, Toggle loc&k aspect ratio`tShift+A
 
    Menu, PVselv, Add, 
@@ -24276,18 +24306,27 @@ OpenRecentEntry() {
 }
 
 OpenFavesEntry() {
+  testOs := A_ThisMenuItem
+  openThisu := SubStr(testOs, 2, InStr(testOs, ". ")-2)
+  If (InStr(CurrentSLD, "\favourite-images-list.SLD") && maxFilesIndex>500)
+  {
+     currentFileIndex := openThisu
+     dummyTimerDelayiedImageDisplay(50)
+     Return
+  }
+
   If askAboutFileSave(" and the selected image from favourites will be loaded")
      Return
 
   startZeit := A_TickCount
-  testOs := A_ThisMenuItem
   If (SLDtypeLoaded=3)
   {
      SLDtypeLoaded := 0
      activeSQLdb.CloseDB()
   }
 
-  openThisu := SubStr(testOs, 2, InStr(testOs, ". ")-2)
+
+
 
   FileReadLine, newEntry, % mainFavesFile, % openThisu
   ; IniRead, newEntry, % mainRecentsFile, favourites, E%openThisu%, @
@@ -24627,13 +24666,6 @@ toggleImgSelCoords() {
    INIaction(1, "relativeImgSelCoords", "General")
 }
 
-ToggleRenderOpaque() {
-   RenderOpaqueIMG := !RenderOpaqueIMG
-   INIaction(1, "RenderOpaqueIMG", "General")
-   If (currIMGdetails.HasAlpha=1 && thumbsDisplaying!=1)
-      RefreshImageFile()
-}
-
 ToggleSelectGrid() {
    showSelectionGrid := !showSelectionGrid
    INIaction(1, "showSelectionGrid", "General")
@@ -24657,29 +24689,41 @@ toggleImgSelectionAspectRatio() {
    If (editingSelectionNow!=1 || thumbsDisplaying=1)
       Return
 
+   If !userCustomImgSelRatio
+      INIaction(0, "userCustomImgSelRatio", "General")
+
    lockSelectionAspectRatio++
-   If (lockSelectionAspectRatio>5)
-      lockSelectionAspectRatio := 0
+   If (lockSelectionAspectRatio>7)
+      lockSelectionAspectRatio := 1
+
    friendly := defineSelectionAspectRatios()
-   INIaction(1, "desiredSelAspectRatio", "General")
+   If (lockSelectionAspectRatio=7)
+      friendly .= " [" userCustomImgSelRatio "]"
+
+   ; INIaction(1, "desiredSelAspectRatio", "General")
    INIaction(1, "lockSelectionAspectRatio", "General")
-   showTOOLtip("Lock selection aspect ratio: " friendly)
+   showTOOLtip("Selection area aspect ratio locked to:`n" friendly)
    SetTimer, RemoveTooltip, % -msgDisplayTime
    dummyRefreshImgSelectionWindow()
 }
 
 defineSelectionAspectRatios() {
-   Static types := {0:"NONE", 1:"SQUARE [1:1]", 2:"SDTV [4:3]", 3:"35mm film [3:2]", 4:"HDTV [16:9]", 5:"Wide screens [16:10]"}
-   If (lockSelectionAspectRatio=1)
+   Static types := {0:"NONE", 1:"NONE", 2:"SQUARE [1:1]", 3:"SDTV [4:3]", 4:"35MM FILM [3:2]", 5:"HDTV [16:9]", 6:"WIDE SCREENS [16:10]", 7:"CUSTOM"}
+   If (!lockSelectionAspectRatio || !isNumber(lockSelectionAspectRatio))
+      lockSelectionAspectRatio := 1
+
+   If (lockSelectionAspectRatio=2)
       desiredSelAspectRatio := 1
-   Else If (lockSelectionAspectRatio=2)
-      desiredSelAspectRatio := 4/3
    Else If (lockSelectionAspectRatio=3)
-      desiredSelAspectRatio := 3/2
+      desiredSelAspectRatio := 4/3
    Else If (lockSelectionAspectRatio=4)
-      desiredSelAspectRatio := 16/9
+      desiredSelAspectRatio := 3/2
    Else If (lockSelectionAspectRatio=5)
+      desiredSelAspectRatio := 16/9
+   Else If (lockSelectionAspectRatio=6)
       desiredSelAspectRatio := 16/10
+   Else If (lockSelectionAspectRatio=7)
+      desiredSelAspectRatio := userCustomImgSelRatio
    Else
       desiredSelAspectRatio := 0
 
@@ -25442,13 +25486,13 @@ createGDIPcanvas(W:=0, H:=0) {
       glHDC := Gdi_CreateCompatibleDC()
       glHbitmap := Gdi_CreateDIBSection(W, H)
       glOBM := Gdi_SelectObject(glHDC, glHbitmap)
-      glPG := Gdip_GraphicsFromHDC(glHDC, 0, imgQuality, smoothMode,, compositingQuality)
+      glPG := Gdip_GraphicsFromHDC(glHDC, 0, imgQuality, smoothMode, 2, compositingQuality)
       Gdip_SetPixelOffsetMode(glPG, PixelMode)
 
       2NDglHDC := Gdi_CreateCompatibleDC()
       2NDglHbitmap := Gdi_CreateDIBSection(W, H)
       2NDglOBM := Gdi_SelectObject(2NDglHDC, 2NDglHbitmap)
-      2NDglPG := Gdip_GraphicsFromHDC(2NDglHDC, 0, imgQuality, smoothMode,, compositingQuality)
+      2NDglPG := Gdip_GraphicsFromHDC(2NDglHDC, 0, imgQuality, smoothMode, 2, compositingQuality)
       Gdip_SetPixelOffsetMode(2NDglPG, PixelMode)
 
       hasInit := 1
@@ -26206,7 +26250,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
     ;   createGDIwin()
     ; o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
     o_AutoDownScaleIMGs := (AutoDownScaleIMGs>0) ? 1 : 0
-    extraID := ColorDepthDithering o_AutoDownScaleIMGs vpIMGrotation RenderOpaqueIMG usrTextureBGR usrColorDepth bwDithering
+    extraID := ColorDepthDithering o_AutoDownScaleIMGs vpIMGrotation usrTextureBGR usrColorDepth bwDithering
     IDthisImgPath := imgPath "-" userHQraw extraID
     If (imgPath!=prevImgPath || IDthisImgPath!=IDprevImgPath || !gdiBitmap || ForceIMGload=1)
     {
@@ -26430,7 +26474,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh:=0) {
           ; moreSelInfo := "`nCoordinates relative to image size"
        }
        friendlySelectionType := (EllipseSelectMode=1) ? "Ellipse" : "Rectangular"
-       infoLocked := (lockSelectionAspectRatio>0) ? "`n  Locked aspect ratio: " defineSelectionAspectRatios() : "`n  Aspect ratio: " Round(imgSelW/imgSelH, 2)
+       infoLocked := (lockSelectionAspectRatio>1) ? "`n  Locked aspect ratio: " defineSelectionAspectRatios() : "`n  Aspect ratio: " Round(imgSelW/imgSelH, 2)
        infoLocked .= (LimitSelectBoundsImg=1) ? "`n  Selection area limited to image boundaries" : ""
        infoSelection := "`n `n" friendlySelectionType " selection coordinates:`n  X / Y: " ImgSelX1 ", " ImgSelY1 x1 y1 "`n  W / H: " imgSelW ", " imgSelH wP hP moreSelInfo "`n  Rotation: " vPselRotation "°" infoLocked
     }
@@ -27011,7 +27055,7 @@ CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReload
   MD5name := generateThumbName(imgPath, 1)
   o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
   o_AutoDownScaleIMGs := (AutoDownScaleIMGs>0) ? 1 : 0
-  thisImgCall := MD5name imgPath o_bwDithering ColorDepthDithering o_AutoDownScaleIMGs vpIMGrotation RenderOpaqueIMG
+  thisImgCall := MD5name imgPath o_bwDithering ColorDepthDithering o_AutoDownScaleIMGs vpIMGrotation
   If !FileRexists(imgPath) && (InStr(AprevImgCall, imgPath) || InStr(BprevImgCall, imgPath))
      thisImgCall := InStr(AprevImgCall, imgPath) ? SubStr(AprevImgCall, 2) : SubStr(BprevImgCall, 2)
 
@@ -27175,21 +27219,6 @@ CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReload
   }
 
   abortImgLoad := interfaceThread.ahkgetvar.canCancelImageLoad
-  If (abortImgLoad<3 && currIMGdetails.HasAlpha=1 && RenderOpaqueIMG=1 && gifLoaded!=1)
-  {
-     GDIbmpFileConnected := 0
-     setWindowTitle("Removing alpha-channel")
-     changeMcursor()
-     nBitmap := trGdip_RenderPixelsOpaque(rBitmap, pBrushWinBGR)
-     If StrLen(nBitmap)>2
-     {
-        trGdip_DisposeImage(rBitmap, 1)
-        rBitmap := nBitmap
-     }
-     brushRequired := 1
-  }
-
-  abortImgLoad := interfaceThread.ahkgetvar.canCancelImageLoad
   If (abortImgLoad<3 && vpIMGrotation>0)
   {
      setWindowTitle("Rotating image at " vpIMGrotation "°...")
@@ -27228,7 +27257,7 @@ CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReload
   }
 
   BprevImgCall := AprevImgCall
-  AprevImgCall := GDIbmpFileConnected MD5name imgPath o_bwDithering ColorDepthDithering o_AutoDownScaleIMGs vpIMGrotation RenderOpaqueIMG
+  AprevImgCall := GDIbmpFileConnected MD5name imgPath o_bwDithering ColorDepthDithering o_AutoDownScaleIMGs vpIMGrotation
   gdiBitmapIDcall := AprevImgCall
   gdiBitmapIDentire := AprevImgCall rBitmap
   gdiBitmap := rBitmap
@@ -28378,6 +28407,7 @@ drawLiveCreateShape() {
     {
        If !A_LoopField
           Continue
+
        splitu := StrSplit(A_LoopField, ",")
        xu := splitu[1] - (initialDrawingStartCoords[1] - prevDestPosX)
        yu := splitu[2] - (initialDrawingStartCoords[2] - prevDestPosY)
@@ -28393,7 +28423,8 @@ drawLiveCreateShape() {
     MouseGetPos, , , OutputVarWin,,3
     If (OutputVarWin!=tempBtnVisible)
        PointsList := PointsList gmX "," gmY "|"
-
+    ; ToolTip, % gmX "--" gmY , , , 2
+    ; ToolTip, % tensionCurveCustomShape "=t" , , , 2
     PointsList := Trimmer(PointsList, "|")
     If (PenuDrawLive && ST_Count(PointsList, "|")<=1)
     {
@@ -28545,12 +28576,19 @@ dummyLivePreviewsImageEditing() {
 }
 
 getColorMatrix() {
+    Static prevMatrix, prevState
+
+    thisState := "a" ForceNoColorMatrix AnyWindowOpen imgFxMode bwDithering lumosGrayAdjust GammosGrayAdjust lumosAdjust GammosAdjust satAdjust IntensityAlphaChannel chnRdecalage  chnGdecalage chnBdecalage
+    If (thisState=prevState)
+       Return prevMatrix
+
     matrix := ""
+    fraction := (isWinXP=1) ? 0.0001 : 0
     If (ForceNoColorMatrix=1 && AnyWindowOpen=10) || (imgFxMode=1)
        Return matrix
 
     If (imgFxMode=4 && bwDithering=0)       ; grayscale
-       matrix := GenerateColorMatrix(2, lumosGrayAdjust, GammosGrayAdjust + 0.0001)
+       matrix := GenerateColorMatrix(2, lumosGrayAdjust, GammosGrayAdjust + fraction, , IntensityAlphaChannel)
     Else If (imgFxMode=5)       ; grayscale R
        matrix := GenerateColorMatrix(3)
     Else If (imgFxMode=6)       ; grayscale G
@@ -28560,11 +28598,14 @@ getColorMatrix() {
     Else If (imgFxMode=8)  ; alpha channel
        matrix := GenerateColorMatrix(7)
     Else If (imgFxMode=9)  ; negative / invert
-       matrix := GenerateColorMatrix(6)
+       matrix := GenerateColorMatrix(6, , , , IntensityAlphaChannel)
     Else If (imgFxMode=10)  ; sepia
-       matrix := GenerateColorMatrix(8)
+       matrix := GenerateColorMatrix(8, , , , IntensityAlphaChannel)
     Else If (imgFxMode=2 || imgFxMode=3) ; personalized
-       matrix := GenerateColorMatrix(1, lumosAdjust, GammosAdjust + 0.0001, satAdjust, 1, chnRdecalage, chnGdecalage, chnBdecalage)
+       matrix := GenerateColorMatrix(1, lumosAdjust, GammosAdjust + fraction, satAdjust, IntensityAlphaChannel, chnRdecalage, chnGdecalage, chnBdecalage)
+
+    prevMatrix := matrix
+    prevState := thisState
     Return matrix
 }
 
@@ -28580,15 +28621,15 @@ decideGDIPimageFX(ByRef matrix, ByRef imageAttribs, ByRef pEffect) {
     If (mustCreateAttribs=1)
     {
        imageAttribs := Gdip_CreateImageAttributes()
-       Gdip_SetImageAttributesColorMatrix(Matrix, imageAttribs)
+       Gdip_SetImageAttributesColorMatrix(matrix, imageAttribs)
        If (imgThreshold>0 && thisFXapplies=1 && ForceNoColorMatrix=0)
           Gdip_SetImageAttributesThreshold(imageAttribs, imgThreshold)
        If (realGammos!=1 && thisFXapplies=1 && ForceNoColorMatrix=0)
           Gdip_SetImageAttributesGamma(imageAttribs, realGammos)
     }
 
-    If isWinXP
-       Return "a" paramA paramB thisFXapplies applyAdjusts o_bwDithering specialColorFXmode uiColorCurveFXchannel uiColorCurveFXmode lummyAdjust lumosAdjust lumosGrayAdjust GammosAdjust GammosGrayAdjust realGammos imgThreshold thisZatAdjust mustCreateAttribs imgFxMode ForceNoColorMatrix matrix zatAdjust
+    If (isWinXP=1)
+       Return "a" thisFXapplies applyAdjusts o_bwDithering lummyAdjust lumosAdjust lumosGrayAdjust GammosAdjust GammosGrayAdjust realGammos imgThreshold thisZatAdjust mustCreateAttribs imgFxMode ForceNoColorMatrix matrix zatAdjust
 
     o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
     applyAdjusts := (ForceNoColorMatrix=1) ? 0 : 1
@@ -28596,13 +28637,15 @@ decideGDIPimageFX(ByRef matrix, ByRef imageAttribs, ByRef pEffect) {
     If (thisZatAdjust=0 && hueAdjust=0 && lummyAdjust=0) || !colorzFX[specialColorFXmode]
        applyAdjusts := 0
 
-    paramA := colorzFX[specialColorFXmode]=11 ? uiColorCurveFXmode : hueAdjust
-    paramB := colorzFX[specialColorFXmode]=11 ? uiColorCurveFXchannel : thisZatAdjust
-    If (colorzFX[specialColorFXmode]=1)
-       paramB := 0
+    If (thisFXapplies=1 && applyAdjusts=1 && o_bwDithering=0 && specialColorFXmode>1)
+    {
+       paramA := colorzFX[specialColorFXmode]=11 ? uiColorCurveFXmode : hueAdjust
+       paramB := colorzFX[specialColorFXmode]=11 ? uiColorCurveFXchannel : thisZatAdjust
+       If (colorzFX[specialColorFXmode]=1)
+          paramB := 0
 
-    If (thisFXapplies=1 && applyAdjusts=1 && o_bwDithering=0)
        pEffect := Gdip_CreateEffect(colorzFX[specialColorFXmode], paramA, paramB, lummyAdjust)
+    }
 
     Return "a" paramA paramB thisFXapplies applyAdjusts o_bwDithering specialColorFXmode uiColorCurveFXchannel uiColorCurveFXmode lummyAdjust lumosAdjust lumosGrayAdjust GammosAdjust GammosGrayAdjust realGammos imgThreshold thisZatAdjust mustCreateAttribs imgFxMode ForceNoColorMatrix matrix zatAdjust
 }
@@ -28641,8 +28684,8 @@ QPV_ShowImgonGuiPrev(whichBitmap, newW, newH, mainWidth, mainHeight, usePrevious
     zL := (zoomLevel<1) ? 1 : zoomLevel*2
     Gdip_SetClipRect(glPG, 0, 0, mainWidth, mainHeight)
     trGdip_GraphicsClear(A_ThisFunc, glPG, "0xFF" WindowBgrColor)
-    If (imgFxMode!=8 && animGIFplaying!=1 && currIMGdetails.HasAlpha=1 && RenderOpaqueIMG!=1)
-    || (currIMGdetails.HasAlpha=1 && RenderOpaqueIMG!=1 && imgFxMode=8)
+    If (imgFxMode!=8 && animGIFplaying!=1 && currIMGdetails.HasAlpha=1)
+    || (currIMGdetails.HasAlpha=1 && imgFxMode=8)
        Gdip_FillRectangle(glPG, useHatchedBrush("vp"), dpX, dpY, kW, kH)
 
     If (newW>mainWidth || newH>mainHeight)
@@ -28665,6 +28708,7 @@ QPV_ShowImgonGuiPrev(whichBitmap, newW, newH, mainWidth, mainHeight, usePrevious
           PointY2 := imgH
        ; tooltip, % PointX1 "," pointY1 " | " PointX2 "," PointY2 " | " thisW "," thisH
     } ; Else r1 := trGdip_DrawImage(A_ThisFunc, glPG, whichBitmap, DestPosX, DestPosY, newW, newH, 0, 0, imgW, imgH, matrix, 2, imageAttribs)
+
     dPosX := (newW>mainWidth) ? 0 : DestPosX
     dPosY := (newH>mainHeight) ? 0 : DestPosY
     dW := (newW>mainWidth) ? mainWidth : newW
@@ -28822,7 +28866,7 @@ ViewPortSelectionManageCoords(mainWidth, mainHeight, dpX, dpY, maxSelX, maxSelY,
      kimgSelH := max(nImgSelY1, nImgSelY2) - min(nImgSelY1, nImgSelY2)
      kimgSelRatio := Round(kimgSelW/kimgSelH, 2)
 
-     If (lockSelectionAspectRatio>0 && kimgSelRatio!=Round(desiredSelAspectRatio, 2) && desiredSelAspectRatio && !adjustingSelDotNow)
+     If (lockSelectionAspectRatio>1 && kimgSelRatio!=Round(desiredSelAspectRatio, 2) && desiredSelAspectRatio && !adjustingSelDotNow)
      {
         If (nimgSelX1<=2 && (nimgSelX2 > maxSelX - 3) && LimitSelectBoundsImg=1)
         {
@@ -29293,14 +29337,14 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
 }
 
 dummyRefreshImgSelectionWindow() {
-     Static prevStatus
+     Static prevStatus, loopsOccured := 0
      If (editingSelectionNow=1 && IMGresizingMode=5)
      {
         thisu := 1
         IMGresizingMode := 1
      }
 
-     If (imgSelX2=-1 && imgSelY2=-1 && editingSelectionNow=1) || (thisu=1)
+     If (drawingShapeNow!=1 && imgSelX2=-1 && imgSelY2=-1 && editingSelectionNow=1) || (thisu=1)
      {
         dummyTimerDelayiedImageDisplay(25)
         Return
@@ -29310,10 +29354,11 @@ dummyRefreshImgSelectionWindow() {
      If (drawingShapeNow=1)
         GetMouseCoord2wind(PVhwnd, mX, mY)
 
-     thisState := "a" mX mY mainWidth mainHeight closedLineCustomShape tensionCurveCustomShape cardinalCurveCustomShape
+     thisState := "a" mX mY mainWidth mainHeight closedLineCustomShape tensionCurveCustomShape cardinalCurveCustomShape customShapePoints
      If (thisState!=prevStatus) || (drawingShapeNow!=1)
      {
-        ; ToolTip, % thisState " -- " A_TickCount , , , 2
+        loopsOccured++
+        ; ToolTip, % loopsOccured "==" thisState " -- " A_TickCount , , , 2
         additionalHUDelements(3, mainWidth, mainHeight)
         prevStatus := thisState
      }
@@ -29321,7 +29366,7 @@ dummyRefreshImgSelectionWindow() {
 
 QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceIMGload, hasFullReloaded, gdiBMPchanged, ByRef wasPrevious) {
     Critical, on
-    Static IDviewPortCache, PREVtestIDvPcache
+    Static IDviewPortCache, PREVtestIDvPcache, prevImgAlphaChn
     If (ForceIMGload=1)
        IDviewPortCache := PREVtestIDvPcache := ""
 
@@ -29401,7 +29446,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
 
     ; Gdip_GetImageDimensions(whichBitmap, imgW, imgH)
     ; ToolTip, % "lol " mustGenerate "`n" imgW "--" imgH , , , 2
-    If (usePrevious=1 && testIDvPcache!=PREVtestIDvPcache) || (mustPlayAnim=1) || (imgFxMode=8 && currIMGdetails.HasAlpha=1 && RenderOpaqueIMG!=1)
+    If (usePrevious=1 && testIDvPcache!=PREVtestIDvPcache) || (mustPlayAnim=1) || (imgFxMode=8 && currIMGdetails.HasAlpha=1)
     {
        ; SoundBeep , 900, 100
        If (skipSeenImagesSlider=1 && gdiBMPchanged=1)
@@ -29431,24 +29476,27 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     If (minimizeMemUsage=1)
        diffIMGdecX := diffIMGdecY := 0
 
-    If !(currIMGdetails.HasAlpha=1 && RenderOpaqueIMG=1)
-       zL := (zoomLevel<1) ? 1 : zoomLevel*2
-
     dpX := clampInRange(DestPosX + 1, 0, mainWidth)
     dpY := clampInRange(DestPosY + 1, 0, mainHeight)
     kW := clampInRange(newW - 2, 0, mainWidth)
     kH := clampInRange(newH - 2, 0, mainHeight)
     Gdip_ResetClip(glPG)
-    If (imgFxMode!=8)
+    If (imgFxMode!=8 && currIMGdetails.HasAlpha=1)
+       Gdip_FillRectangle(glPG, useHatchedBrush("vp"), dpX, dpY, kW, kH)
+
+    thisThingMatrix := (IntensityAlphaChannel!=1 && (imgFxMode=2 || imgFxMode=3 || (imgFxMode=4 && bwDithering=0) || imgFxMode=9 || imgFxMode=10)) ? 1 : 0
+    thisIDviewPortCache := "a" IntensityAlphaChannel thisThingMatrix imgPath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight usePrevious desiredFrameIndex gdiBitmap whichBitmap
+    thisImgAlphaChn := "a" IntensityAlphaChannel thisThingMatrix
+    ; ToolTip, % thisIDviewPortCache "==" zr "rr==" gdipLastError "==" currIMGdetails.HasAlpha "==" undoLevelsArray[currentUndoLevel, 5] "==" pBrushHatchLow, , , 2
+    If (prevImgAlphaChn!=thisImgAlphaChn)
     {
-       If (currIMGdetails.HasAlpha=1 && RenderOpaqueIMG!=1)
-          zr := Gdip_FillRectangle(glPG, useHatchedBrush("vp"), dpX, dpY, kW, kH)
+       usePrevious := IDviewPortCache := diffIMGdecX := diffIMGdecY := 0
+       ViewPortBMPcache := trGdip_DisposeImage(ViewPortBMPcache, 1)
     }
 
-    ; ToolTip, % zr "rr==" gdipLastError "==" currIMGdetails.HasAlpha "==" undoLevelsArray[currentUndoLevel, 5] "==" pBrushHatchLow, , , 2
-    thisIDviewPortCache := imgPath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight usePrevious desiredFrameIndex gdiBitmap whichBitmap
     If (thisIDviewPortCache!=IDviewPortCache || !ViewPortBMPcache || CountGIFframes>1) && (usePrevious!=1)
     {
+       prevImgAlphaChn := thisImgAlphaChn
        prevDestPosX := DestPosX
        prevDestPosY := DestPosY
        canvasClipped := (diffIMGdecX || diffIMGdecY) && (IMGresizingMode=4) ? 1 : 0
@@ -29505,10 +29553,12 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
        If (canvasClipped=1 && ignoreSomeOptimizations=1)
        {
           If ViewPortBMPcache
-             r0 := trGdip_DrawImage(A_ThisFunc, glPG, ViewPortBMPcache)
+             r0 := trGdip_DrawImage(A_ThisFunc, glPG, ViewPortBMPcache, 0, 0, mainWidth, mainHeight, 0, 0, mainWidth, mainHeight, matrix, 2, imageAttribs)
+
           Gdip_SetClipRect(glPG, diffIMGdecX, diffIMGdecY, mainWidth, mainHeight, 4)
        }
-       r1 := trGdip_DrawImage(A_ThisFunc, glPG, whichBitmap, dPosX, dPosY, dW, dH, sPosX, sPosY, sW, sH,,2)
+       thisMatrix := (thisThingMatrix=1) ? GenerateColorMatrix(9,,,, IntensityAlphaChannel) : 1
+       r1 := trGdip_DrawImage(A_ThisFunc, glPG, whichBitmap, dPosX, dPosY, dW, dH, sPosX, sPosY, sW, sH,thisMatrix,2)
        ; Tooltip, % dPosX "," dPosY "|" dW "," dH "`n" sPosX "," sPosY "|" sW "," sH "`n" newW "," newH "|" thisMainWidth "," thisMainHeight "|" mainWidth "," mainHeight "`n" diffIMGdecX "," diffIMGdecY " || " canvasClipped "," ignoreSomeOptimizations
        If (canvasClipped=1 && ignoreSomeOptimizations=1)
           Gdip_ResetClip(glPG)
@@ -29544,18 +29594,19 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
        ViewPortBMPcache := trGdip_CreateBitmapFromHBITMAP(glHbitmap)
     } Else prevGDIvpCache := trGdip_DisposeImage(prevGDIvpCache, 1)
 
-    setMainCanvasTransform(mainWidth, mainHeight)
-    confirmTexBGR := (vpIMGrotation=0 || vpIMGrotation=90 || vpIMGrotation=180 || vpIMGrotation=270) ? 1 : 0
-
     ; Gdip_SetClipRect(glPG, DestPosX, DestPosY, newW, newH)
+    setMainCanvasTransform(mainWidth, mainHeight)
     Gdip_SetClipRect(glPG, 0, 0, mainWidth, mainHeight, 0)
     decideGDIPimageFX(matrix, imageAttribs, pEffect)
-    If !pEffect ; && imageAttribs)
-       r4 := trGdip_DrawImage(A_ThisFunc, glPG, ViewPortBMPcache,,,,,,,,,,, imageAttribs)
-    Else ; If (pEffect || imageAttribs)
+   ; gp := Gdip_GetImagePixelFormat(ViewPortBMPcache, 2) 
+   ; ToolTip, % gp , , , 2
+    If pEffect
        r4 := trGdip_DrawImageFX(A_ThisFunc, glPG, ViewPortBMPcache, 0, 0, 0, 0, mainWidth, mainHeight, matrix, pEffect, imageAttribs)
+    Else
+       r4 := trGdip_DrawImage(A_ThisFunc, glPG, ViewPortBMPcache, 0, 0, mainWidth, mainHeight, 0, 0, mainWidth, mainHeight, matrix, 2, imageAttribs)
 
     Gdip_SetClipRect(glPG, DestPosX + 1, DestPosY + 1, newW - 2, newH - 2, 4)
+    confirmTexBGR := (vpIMGrotation=0 || vpIMGrotation=90 || vpIMGrotation=180 || vpIMGrotation=270) ? 1 : 0
     If (usrTextureBGR=1 && confirmTexBGR=1)
     {
        Gdip_FillRectangle(glPG, AmbientalTexBrush, 0, 0, mainWidth, mainHeight)
@@ -29598,11 +29649,8 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     If (imageHasFaded=1)
        r2 := LrydWinUpdt(hGDIthumbsWin, 2NDglHDC)
 
-    If pEffect
-       Gdip_DisposeEffect(pEffect)
-
-    If imageAttribs
-       Gdip_DisposeImageAttributes(imageAttribs)
+    Gdip_DisposeEffect(pEffect)
+    Gdip_DisposeImageAttributes(imageAttribs)
 
     if (r0!=0)
        fR := r0
@@ -29958,7 +30006,7 @@ coremakeSquareSelection(imgW, imgH) {
 }
 
 makeSquareSelection() {
-    If (thumbsDisplaying=1 || editingSelectionNow!=1 || lockSelectionAspectRatio>0)
+    If (thumbsDisplaying=1 || editingSelectionNow!=1 || lockSelectionAspectRatio>1)
        Return
 
     Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
@@ -31838,7 +31886,7 @@ IDshowImage(imgID, opentehFile:=0) {
        {
           prevIMGid := newIMGid
           usrColorDepth := imgFxMode := 1
-          RenderOpaqueIMG := vpIMGrotation := FlipImgH := FlipImgV := 0
+          vpIMGrotation := FlipImgH := FlipImgV := 0
        }
     }
 
@@ -32010,17 +32058,6 @@ coreResizeIMG(imgPath, newW, newH, file2save, goFX, toClippy, rotateAngle, soloM
        oPixFmt := (currIMGdetails.HasAlpha=1) ? "32-PARGB" : "24-RGB"
 
     brushRequired := !InStr(oPixFmt, "argb") ? 1 : 0
-    If (InStr(oPixFmt, "argb") && RenderOpaqueIMG=1 && (goFX=1 || ResizeApplyEffects=1))
-    {
-       nBitmap := trGdip_RenderPixelsOpaque(oBitmap, pBrushWinBGR)
-       If nBitmap
-       {
-          trGdip_DisposeImage(oBitmap, 1)
-          oBitmap := nBitmap
-          brushRequired := must24bits := 1
-       }
-    }
-
     pixFmt := (must24bits=1) ? "0x21808" : "0x26200A"     ; 24-RGB  //  32-ARGB
     thisImgQuality := (ResizeQualityHigh=1) ? 7 : 5
     If (editingSelectionNow=1 && ResizeCropAfterRotation=1 && ResizeWithCrop=1 && rotateAngle>0)
@@ -32859,11 +32896,11 @@ PanelColorsAdjusterWindow() {
     Gui, Add, Slider, xs y+2 AltSubmit NoTicks ToolTip w%slide2Wid% gColorPanelTriggerImageUpdate vUIrealGammos Range0-800, % UIrealGammos
     Gui, Add, Slider, x+5 AltSubmit NoTicks ToolTip w%slide2Wid% gColorPanelTriggerImageUpdate vUIimgThreshold Range0-100, % UIimgThreshold
     ; Gui, Add, Checkbox, xs y+15 gColorPanelTriggerImageUpdate Checked%realTimePreview% vrealTimePreview, Update image in real time
-    Gui, Add, Text, xs y+8 gBtnResetCHNdec vinfoRGBchnls, RGB channels balance:
+    Gui, Add, Text, xs y+8 gBtnResetCHNdec vinfoRGBchnls, RGBA channels balance:
     Gui, Add, ComboBox, x+5 w65 gColorPanelTriggerImageUpdate vchnRdecalage, %RGBcbList%|%chnRdecalage%||
     Gui, Add, ComboBox, x+5 wp gColorPanelTriggerImageUpdate vchnGdecalage, %RGBcbList%|%chnGdecalage%||
     Gui, Add, ComboBox, x+5 wp gColorPanelTriggerImageUpdate vchnBdecalage, %RGBcbList%|%chnBdecalage%||
-
+    Gui, Add, ComboBox, x+5 wp gColorPanelTriggerImageUpdate vIntensityAlphaChannel, -1|0|0.25|0.5|0.75|1|2|5|10|25|%IntensityAlphaChannel%||
 
     slide3wid := slide2wid - 42
     Gui, Tab, 2 ; more
@@ -32894,7 +32931,6 @@ PanelColorsAdjusterWindow() {
     Gui, Add, Text, xs y+10, Display histogram:
     Gui, Add, DropDownList, x+10 w%btnWid% gColorPanelTriggerImageUpdate AltSubmit Choose%showHistogram% vshowHistogram, None|Luminance|Red|Green|Blue|All mixed
     Gui, Add, DropDownList, x+6 w%btnWid% gColorPanelTriggerImageUpdate AltSubmit Choose%histogramMode% vhistogramMode, Lows|Balanced|Peaks
-    Gui, Add, Checkbox, xs y+10 gColorPanelTriggerImageUpdate Checked%RenderOpaqueIMG% vRenderOpaqueIMG, Remove alpha channel [for RGBA images]
     Gui, Add, Checkbox, xs y+10 gColorPanelTriggerImageUpdate Checked%userimgQuality% vuserimgQuality, High quality image resampling
     Gui, Add, Checkbox, xs y+10 gColorPanelTriggerImageUpdate Checked%usrTextureBGR% vusrTextureBGR, Auto-generated ambiental textured viewport background
     Gui, Add, Checkbox, xs y+10 gToggleAutoResetImageView Checked%resetImageViewOnChange% vresetImageViewOnChange, Deactivate and reset image adjustments on image file change
@@ -32992,12 +33028,15 @@ BtnResetThreshold() {
 
 BtnResetCHNdec() {
   chnRdecalage := chnGdecalage := chnBdecalage := 0.0
+  IntensityAlphaChannel := 1
   GuiControl, SettingsGUIA: Choose, chnRdecalage, 14
   GuiControl, SettingsGUIA: Choose, chnGdecalage, 14
   GuiControl, SettingsGUIA: Choose, chnBdecalage, 14
+  GuiControl, SettingsGUIA: Choose, IntensityAlphaChannel, 6
   INIaction(1, "chnRdecalage", "General")
   INIaction(1, "chnGdecalage", "General")
   INIaction(1, "chnBdecalage", "General")
+  INIaction(1, "IntensityAlphaChannel", "General")
   dummyTimerDelayiedImageDisplay(50)
 }
 
@@ -33180,14 +33219,9 @@ updatePanelColorsInfo() {
       GuiControl, SettingsGUIA: Disable, usrTextureBGR
 
    If (usrColorDepth>1)
-   {
-      GuiControl, SettingsGUIA: Disable, RenderOpaqueIMG
       GuiControl, SettingsGUIA: Enable, ColorDepthDithering
-   } Else
-   {
-      GuiControl, SettingsGUIA: Enable, RenderOpaqueIMG
+   Else
       GuiControl, SettingsGUIA: Disable, ColorDepthDithering
-   }
 
    If (IMGresizingMode=4)
    {
@@ -33283,10 +33317,12 @@ updatePanelColorsInfo() {
       GuiControl, SettingsGUIA: Enable, specialColorFXmode
       GuiControl, SettingsGUIA: Enable, UIimgThreshold
       GuiControl, SettingsGUIA: Enable, infoThreshold
+      GuiControl, SettingsGUIA: Enable, IntensityAlphaChannel
       canEnableThese := 1
    } Else
    {
       canEnableThese := 0
+      GuiControl, SettingsGUIA: Disable, IntensityAlphaChannel
       GuiControl, SettingsGUIA: Disable, zatAdjust
       GuiControl, SettingsGUIA: Disable, infoZatAdjust
       GuiControl, SettingsGUIA: Disable, hueAdjust
@@ -33376,10 +33412,11 @@ btnResetImageView() {
   GuiControl, SettingsGUIA: Choose, chnRdecalage, 14
   GuiControl, SettingsGUIA: Choose, chnGdecalage, 14
   GuiControl, SettingsGUIA: Choose, chnBdecalage, 14
+  GuiControl, SettingsGUIA: Choose, IntensityAlphaChannel, 6
   GuiControl, SettingsGUIA: Choose, IMGresizingMode, 1
   GuiControl, SettingsGUIA: Choose, specialColorFXmode, 1
   GuiControl, SettingsGUIA:, bwDithering, 0
-  ColorDepthDithering := usrColorDepth := IMGresizingMode := imgFxMode := satAdjust := lumosAdjust := lumosGrayAdjust := specialColorFXmode := 1
+  ColorDepthDithering := usrColorDepth := IMGresizingMode := imgFxMode := satAdjust := lumosAdjust := lumosGrayAdjust := specialColorFXmode := IntensityAlphaChannel := 1
   vpIMGrotation := zatAdjust := hueAdjust := GammosAdjust := GammosGrayAdjust := 0
   chnRdecalage := chnGdecalage := chnBdecalage := 0.0
   updatePanelColorsInfo()
@@ -33401,7 +33438,6 @@ btnResetImageView() {
   GuiControl, SettingsGUIA:, sliderContrst, 0
   GuiControl, SettingsGUIA:, vpIMGrotation, 0
   GuiControl, SettingsGUIA:, usrTextureBGR, 0
-  GuiControl, SettingsGUIA:, RenderOpaqueIMG, 0
   GuiControl, SettingsGUIA:, FlipImgV, 0
   GuiControl, SettingsGUIA:, FlipImgH, 0
   GuiControl, SettingsGUIA:, ColorDepthDithering, 1
@@ -33421,7 +33457,6 @@ ColorPanelTriggerImageUpdate(dummy:=0) {
    GuiControlGet, sliderContrst, SettingsGUIA:, sliderContrst
    GuiControlGet, sliderSatu, SettingsGUIA:, sliderSatu
    GuiControlGet, bwDithering, SettingsGUIA:, bwDithering
-   GuiControlGet, RenderOpaqueIMG, SettingsGUIA:, RenderOpaqueIMG
    GuiControlGet, UIvpImgAlignCenter, SettingsGUIA:, UIvpImgAlignCenter
    GuiControlGet, FlipImgV, SettingsGUIA:, FlipImgV
    GuiControlGet, FlipImgH, SettingsGUIA:, FlipImgH
@@ -33429,6 +33464,7 @@ ColorPanelTriggerImageUpdate(dummy:=0) {
    GuiControlGet, chnRdecalage, SettingsGUIA:, chnRdecalage
    GuiControlGet, chnGdecalage, SettingsGUIA:, chnGdecalage
    GuiControlGet, chnBdecalage, SettingsGUIA:, chnBdecalage
+   GuiControlGet, IntensityAlphaChannel, SettingsGUIA:, IntensityAlphaChannel
    GuiControlGet, zatAdjust, SettingsGUIA:, zatAdjust
    GuiControlGet, hueAdjust, SettingsGUIA:, hueAdjust
    GuiControlGet, lummyAdjust, SettingsGUIA:, lummyAdjust
@@ -34596,8 +34632,6 @@ TglRszApplyEffects() {
          infoColorDepth := "`nSimulated color depth: " defineColorDepth()
       If (imgFxMode>1)
          infoColors := "`nColors display mode: " DefineFXmodes() " [" currIMGdetails.PixelFormat "]"
-      If (RenderOpaqueIMG=1)
-         infoRenderOpaque .= "`nAlpha channel: REMOVED"
  
       entireString := infoMirroring infoColors infoColorDepth infoRenderOpaque
       entireString := (entireString) ?  "Effects currently activated: " entireString : "No effects currently activated."
@@ -40024,6 +40058,16 @@ trGdip_CreateBitmapFromHBITMAP(hBitmap, hPalette:=0) {
     If (gdipLastError && r)
        addJournalEntry(A_ThisFunc "() has created possibly a faulty object: " Gdip_ErrorHandler(gdipLastError, 0))
 
+    ; If (r && coreDesiredPixFmt="0xE200B")
+    ; {
+    ;    z := Gdip_CloneBmpPargbArea(A_ThisFunc, r)
+    ;    If z
+    ;    {
+    ;       ; SoundBeep 
+    ;       trGdip_DisposeImage(r, 1)
+    ;       r := z
+    ;    }
+    ; }
     If r
        createdGDIobjsArray["x" r] := [r, "bmp", 1, A_ThisFunc]
     Else

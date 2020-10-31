@@ -2,6 +2,13 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.6.7 (2020-10-31)
+  - [new] option to set alpha channel intensity in the viewport colours adjustments panel
+  - [new] option to set image selection area aspect ratio to user defined in «selection properties» panel
+  - removed option to «remove alpha channel» , because setting the alpha intensity does the same thing, but with fine-grained control over it
+  - [fixed bug] drawing freeform lines and curves had bugs related to setting the tension level for the curve
+  - fixed performance regression introduced in v4.2.0 related to viewport color adjustments
+
 - v4.6.6 (2020-10-30)
   - [new] option to invert selection area when erasing a given area from the image
   - reduced excessive redraws in some panels [fill area, insert text and paste in place/transform area]
@@ -113,7 +120,7 @@
   - [improvement] both viewport image alignments [centered, or top-left corner] can be used when zooming in/out or panning an image
   - [improvement] any viewport color effect will be applied now on animated GIFs as well
   - [improvement] QPV is now more informative when it refuses to perform toolbar actions
-  - [improvement] thumbnails caching is now checking for memory , to help avoid excessive memory usage
+  - [improvement] thumbnails caching is now checking for the available memory, to help avoid excessive memory usage
   - [improvement] image blur, invert, grayscale can now be invoked without a selection area
   - other minor improvements in usability
 
