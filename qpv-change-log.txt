@@ -2,6 +2,15 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.7.0 (2020-11-06)
+  - [new] add noise filter with options to blur and pixelize the noise
+  - [new] detect edges filter with options to create bevel/emboss effect
+  - [new] option to have Quick Picto Viewer randomize viewport colour effects and adjustments during slideshows
+  - [new] option in command line to call a specific function
+  - [new] when using the transform tool or pasting images in place, the user can increase the object opacity above 100%, to render any partially visible pixels more visible
+  - implemented error checking when loading settings from the INI file
+  - QPV no longer allows for the image selection area to be constrained simultaneously by image boundaries and aspect ratio; it is one or the other, or no constraints ;-)
+
 - v4.6.7 (2020-10-31)
   - [new] option to set alpha channel intensity in the viewport colours adjustments panel
   - [new] option to set image selection area aspect ratio to user defined in «selection properties» panel

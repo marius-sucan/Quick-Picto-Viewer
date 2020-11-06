@@ -6,6 +6,7 @@
 #include "qpv-main.h"
 #include "omp.h"
 #include "math.h"
+#include "time.h"
 #include <string>
 #include <sstream>
 
@@ -330,6 +331,45 @@ DLL_API int DLL_CALLCONV BlendBitmaps(int* bgrImageData, int* otherData, int w, 
                 }
 
                 bgrImageData[x + (y * w)] = (aX << 24) | ((rT & 0xFF) << 16) | ((gT & 0xFF) << 8) | (bT & 0xFF);
+            }
+        }
+    }
+    return 1;
+}
+
+
+/*
+pBitmap will be filled with a random generated noise
+It must be in 32-ARGB format: PXF32ARGB - 0x26200A.
+*/
+
+DLL_API int DLL_CALLCONV RandomNoise(int* bgrImageData, int w, int h, int intensity, int mode, int threadz) {
+    
+    // srand (time(NULL));
+    #pragma omp parallel for default(none) num_threads(threadz)
+    for (int x = 0; x < w; x++)
+    {
+        for (int y = 0; y < h; y++)
+        {
+            unsigned char aT = 255;
+            unsigned char z = rand() % 101;
+            if (z<intensity)
+            {
+               // unsigned char rT = 0;
+               bgrImageData[x + (y * w)] = 0;
+               continue;
+            }
+
+            if (mode!=1)
+            {
+               unsigned char rT = rand() % 256;
+               unsigned char gT = rand() % 256;
+               unsigned char bT = rand() % 256;
+               bgrImageData[x + (y * w)] = (aT << 24) | (rT << 16) | (gT << 8) | bT;
+            } else
+            {
+               unsigned char rT = rand() % 256;
+               bgrImageData[x + (y * w)] = (aT << 24) | (rT << 16) | (rT << 8) | rT;
             }
         }
     }

@@ -27,7 +27,8 @@ initThisThread() {
   ; GDIPToken := Gdip_Startup(1)
 
   mainCompiledPath := MainExe.ahkGetVar.mainCompiledPath
-  r := FreeImage_FoxInit(1) ; Load the FreeImage Dll
+  If !wasInitFIMlib
+     r := FreeImage_FoxInit(1) ; Load the FreeImage Dll
   wasInitFIMlib := r ? 1 : 0
   ; MsgBox, % r "`n" wasInitFIMlib "`n" GDIPToken "`n" mainCompiledPath
   Return r

@@ -33,7 +33,7 @@ Global allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSuppor
 , IMGresizingMode, imgSelX2, imgSelY2, LimitSelectBoundsImg, markedSelectFile, maxFilesIndex, minimizeMemUsage, mustGenerateStaticFolders, MustLoadSLDprefs
 , noTooltipMSGs, PrefsLargeFonts, RenderOpaqueIMG, resetImageViewOnChange, showHistogram, showImgAnnotations, showInfoBoxHUD, showSelectionGrid, skipDeadFiles
 , skipSeenImagesSlider, SLDcacheFilesList, SLDhasFiles, sldsPattern, syncSlideShow2Audios, thumbnailsListMode, thumbsCacheFolder, thumbsDisplaying, totalFramesIndex
-, TouchScreenMode, userHQraw, userimgQuality, UserMemBMP, usrTextureBGR, 
+, TouchScreenMode, userHQraw, userimgQuality, UserMemBMP, usrTextureBGR, slidesFXrandomize
 
 ; OnMessage(0x388, "WM_PENEVENT")
 ; OnMessage(0x2a3, "ResetLbtn") ; WM_MOUSELEAVE
@@ -520,6 +520,9 @@ theSlideShowCore(paramu:=0) {
      Return
 
   prevFullIMGload := A_TickCount
+  If (slideShowRunning=1 && slidesFXrandomize=1)
+     MainExe.ahkPostFunction("VPimgFXrandomizer")
+
   If (SlideHowMode=1)
      MainExe.ahkPostFunction("RandomPicture")
   Else If (SlideHowMode=2)
@@ -1467,15 +1470,16 @@ MenuSaveAction() {
 
 #If, (((animGIFplaying=1) || (canCancelImageLoad=1) || (thumbsDisplaying=1 && imageLoading=1)) && identifyThisWin()=1)
   ~Left::
-  ~Up::
-  ~PgUp::
   ~Right::
+  ~Up::
   ~Down::
+  ~PgUp::
   ~PgDn::
   ~Home::
+  ~End::
   ~BackSpace::
   ~Delete::
-  ~End::
+  ~Enter::
      alterFilesIndex++
      canCancelImageLoad := 4
      If (animGIFplaying=1)
