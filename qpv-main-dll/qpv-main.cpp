@@ -7,6 +7,7 @@
 #include "omp.h"
 #include "math.h"
 #include "time.h"
+#include "windows.h"
 #include <string>
 #include <sstream>
 
@@ -52,26 +53,6 @@ DLL_API int DLL_CALLCONV SetAlphaChannel(int *imageData, int *maskData, int w, i
             }
 
             imageData[px] = (alpha2 << 24) | (imageData[px] & 0x00ffffff);
-        }
-    }
-    return 1;
-}
-
-
-DLL_API int DLL_CALLCONV ResizePixels(int* pixelsData, int* destData, int w1, int h1, int w2, int h2) {
-// source https://tech-algorithm.com/articles/nearest-neighbor-image-scaling/
-// https://www.researchgate.net/figure/Nearest-neighbour-image-scaling-algorithm_fig2_272092207
-
-    //double x_ratio = (double)(w1)/w2;
-    //double y_ratio = (double)(h1)/h2;
-    //#pragma omp simd simdlen(30) // schedule(dynamic) default(none)
-    for (int i=0; i < h2; i++)
-    {
-        unsigned int py = i*(h1/h2);
-        for (int j=0; j < w2; j++)
-        {
-            unsigned int px = j*(w1/w2);
-            destData[(i*w2) + j] = pixelsData[(py*w1) + px];
         }
     }
     return 1;
@@ -343,10 +324,10 @@ pBitmap will be filled with a random generated noise
 It must be in 32-ARGB format: PXF32ARGB - 0x26200A.
 */
 
+
 DLL_API int DLL_CALLCONV RandomNoise(int* bgrImageData, int w, int h, int intensity, int mode, int threadz) {
-    
     // srand (time(NULL));
-    #pragma omp parallel for default(none) num_threads(threadz)
+    // #pragma omp parallel for default(none) num_threads(threadz)
     for (int x = 0; x < w; x++)
     {
         for (int y = 0; y < h; y++)
@@ -629,7 +610,24 @@ DLL_API unsigned int DLL_CALLCONV isInString(const wchar_t *mainStr, const wchar
 
     return occurrences; //  occurrences;
 }
+
+DLL_API int DLL_CALLCONV ResizePixels(int* pixelsData, int* destData, int w1, int h1, int w2, int h2) {
+// source https://tech-algorithm.com/articles/nearest-neighbor-image-scaling/
+// https://www.researchgate.net/figure/Nearest-neighbour-image-scaling-algorithm_fig2_272092207
+
+    //double x_ratio = (double)(w1)/w2;
+    //double y_ratio = (double)(h1)/h2;
+    //#pragma omp simd simdlen(30) // schedule(dynamic) default(none)
+    for (int i=0; i < h2; i++)
+    {
+        unsigned int py = i*(h1/h2);
+        for (int j=0; j < w2; j++)
+        {
+            unsigned int px = j*(w1/w2);
+            destData[(i*w2) + j] = pixelsData[(py*w1) + px];
+        }
+    }
+    return 1;
+}
+
 */
-
-
-

@@ -3,10 +3,11 @@
 SetWinDelay, 1
 SetBatchLines, -1
 SetWorkingDir, %A_ScriptDir%
-Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3
-     , PVhwnd, hGDIwin, hGDIthumbsWin, appTitle, WindowBgrColor, mainCompiledPath
+Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Quick Picto Viewer"
+     , RegExFilesPattern := "i)^(.\:\\).*(\.(ico|dib|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif))$"
+     , PVhwnd, hGDIwin, hGDIthumbsWin, WindowBgrColor, mainCompiledPath
      , winGDIcreated := 0, ThumbsWinGDIcreated := 0, MainExe := AhkExported()
-     , RegExFilesPattern, AnyWindowOpen := 0, easySlideStoppage := 0, lastOtherWinClose := 1
+     , AnyWindowOpen := 0, easySlideStoppage := 0, lastOtherWinClose := 1
      , slideShowRunning := 0, toolTipGuiCreated, editDummy, LbtnDwn := 0
      , mustAbandonCurrentOperations := 0, lastCloseInvoked := -1, allowGIFsPlayEntirely := 0
      , hCursBusy := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32514, "Ptr")  ; IDC_WAIT
@@ -72,19 +73,43 @@ updateWindowColor() {
      Gui, 1: Color, %WindowBgrColor%
 }
 
-BuildGUI() {
+destroyAllGUIs() {
+   Gui, 1: Destroy
+   Gui, 2: Destroy
+   Gui, 3: Destroy
+   Gui, 4: Destroy
+   Gui, 5: Destroy
+   taskBarUI.clearAll()
+   Sleep, 50
+}
+
+BuildGUI(params:=0) {
    Critical, on
-   appTitle := MainExe.ahkgetvar.appTitle
-   WindowBgrColor := MainExe.ahkgetvar.WindowBgrColor
-   isAlwaysOnTop := MainExe.ahkgetvar.isAlwaysOnTop
-   mainCompiledPath := MainExe.ahkgetvar.mainCompiledPath
-   isTitleBarHidden := MainExe.ahkgetvar.isTitleBarHidden
-   RegExFilesPattern := MainExe.ahkgetvar.RegExFilesPattern
-   TouchScreenMode := MainExe.ahkgetvar.TouchScreenMode
-   userAllowWindowDrag := MainExe.ahkgetvar.userAllowWindowDrag
-   mainWinPos := MainExe.ahkgetvar.mainWinPos
-   mainWinSize := MainExe.ahkgetvar.mainWinSize
-   mainWinMaximized := MainExe.ahkgetvar.mainWinMaximized
+   If !InStr(params, "$")
+   {
+      mustAssignVarz := 1
+      WindowBgrColor := MainExe.ahkgetvar.WindowBgrColor
+      isAlwaysOnTop := MainExe.ahkgetvar.isAlwaysOnTop
+      mainCompiledPath := MainExe.ahkgetvar.mainCompiledPath
+      isTitleBarHidden := MainExe.ahkgetvar.isTitleBarHidden
+      TouchScreenMode := MainExe.ahkgetvar.TouchScreenMode
+      userAllowWindowDrag := MainExe.ahkgetvar.userAllowWindowDrag
+      mainWinPos := MainExe.ahkgetvar.mainWinPos
+      mainWinSize := MainExe.ahkgetvar.mainWinSize
+      mainWinMaximized := MainExe.ahkgetvar.mainWinMaximized
+   } Else
+   {
+      externObj := StrSplit(params, "$")
+      WindowBgrColor := externObj[1]
+      isAlwaysOnTop := externObj[2]
+      mainCompiledPath := externObj[3]
+      isTitleBarHidden := externObj[4]
+      TouchScreenMode := externObj[5]
+      userAllowWindowDrag := externObj[6]
+      mainWinPos := externObj[7]
+      mainWinSize := externObj[8]
+      mainWinMaximized := externObj[9]
+   }
 
    MinGUISize := "+MinSize" A_ScreenWidth//4 "x" A_ScreenHeight//4
    initialWh := "w" A_ScreenWidth//1.7 " h" A_ScreenHeight//1.5
@@ -117,14 +142,18 @@ BuildGUI() {
    createGDIinfosWin()
    Sleep, 2
    updateUIctrl(1)
-   MainExe.ahkassign("PVhwnd", PVhwnd)
-   MainExe.ahkassign("hGDIinfosWin", hGDIinfosWin)
-   MainExe.ahkassign("hGDIwin", hGDIwin)
-   MainExe.ahkassign("hGDIthumbsWin", hGDIthumbsWin)
-   MainExe.ahkassign("hGDIselectWin", hGDIselectWin)
-   MainExe.ahkassign("hPicOnGui1", hPicOnGui1)
-   MainExe.ahkassign("winGDIcreated", winGDIcreated)
-   MainExe.ahkassign("ThumbsWinGDIcreated", ThumbsWinGDIcreated)
+   If (mustAssignVarz=1)
+   {
+      MainExe.ahkassign("PVhwnd", PVhwnd)
+      MainExe.ahkassign("hGDIinfosWin", hGDIinfosWin)
+      MainExe.ahkassign("hGDIwin", hGDIwin)
+      MainExe.ahkassign("hGDIthumbsWin", hGDIthumbsWin)
+      MainExe.ahkassign("hGDIselectWin", hGDIselectWin)
+      MainExe.ahkassign("hPicOnGui1", hPicOnGui1)
+      MainExe.ahkassign("winGDIcreated", winGDIcreated)
+      MainExe.ahkassign("ThumbsWinGDIcreated", ThumbsWinGDIcreated)
+   }
+
    WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%
    Sleep, 1
    WinActivate, ahk_id %PVhwnd%
@@ -141,8 +170,11 @@ BuildGUI() {
    } Else
    {
       Gui, 1: Show, x%pX% y%pY% w%sW% h%sH%
+      Sleep, 25
    }
-   Return 1
+
+   r := PVhwnd "|" hGDIinfosWin "|" hGDIwin "|" hGDIthumbsWin "|" hGDIselectWin "|" hPicOnGui1 "|" winGDIcreated "|" ThumbsWinGDIcreated
+   Return r
 }
 
 setTaskbarIconState(mode) {
@@ -2508,7 +2540,6 @@ class taskbarInterface {
    ;static min:=0x00000001, max:=0x7FFFFFFF
    */
    SetWinEventHook(){
-      
       static EVENT_OBJECT_DESTROY:=0x8001
       static EVENT_OBJECT_SHOW:=0x8002
       static idThread := DllCall("User32.dll\GetWindowThreadProcessId", "Ptr", A_ScriptHwnd, "Ptr", 0) ; Url: - https://msdn.microsoft.com/en-us/library/windows/desktop/ms633522(v=vs.85).aspx

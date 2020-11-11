@@ -7,8 +7,8 @@ e) General considerations
 f) How slideshows happen
 g) Image live editing [soon]
 
-Deniere mise à jour: vendredi 5 juin 2020.
-==========================================
+Deniere mise à jour: mercredi 11 novembre 2020.
+================================================
 
 a) How Quick Picto Viewer initializes:
   QPV checks in the registry if another instance started before,
@@ -28,15 +28,27 @@ a) How Quick Picto Viewer initializes:
   If "Running" flag is not 2, it continues the auto-exec part.
 
   QPV initializes the external UI thread and various GDI+ objects
-  related to it. If this fails, QPV will exit.
+  related to it. If something fails, QPV will ask the user to
+  attempt again to initialise or exit.
 
-  If an image file is given as command line argument, it is opened
-  with OpenArgFile(). If a .SLD or a .SLDB file is fed,
-  OpenSLD() function is used to load the files index.
+  intializeWithGivenArguments() function processes all the command
+  line given arguments.
+
+  If an image file is given as command line argument, it is
+  opened with OpenArgFile(). If a .SLD or a .SLDB file is fed,
+  OpenSLD() function is used to load the files index. Folders 
+  are opened using OpenFolders().
 
   If no argument given, it draws a random pattern image using
-  drawWelcomeImg(); this function can generate up to 7 distinct
+  drawWelcomeImg(). This function can generate up to 10 distinct
   patterns, each randomized in its own way.
+
+  On 32 bits, the following settings are in effect by default:
+     allowMultiCoreMode := 0
+     minimizeMemUsage := 1
+     maxUndoLevels := 2
+     coreDesiredPixFmt := "0x21808" ;  24-RGB
+     These are meant to limit memory usage as much as possible.
 
 b) How a files list index is created
   If a single file is loaded, QPV will set internally the variable
@@ -67,7 +79,7 @@ b) How a files list index is created
   QPV internally relies on resultedFilesList[] array. 
   Each file entry is defined by:
 
-  resultedFilesList[index_number] := [full_file_path, isSelected, isSeen, forceThumbRefresh, isFavourite]
+  resultedFilesList[index_number] := [full_file_path, isSelected, isSeen, forceThumbRefresh, isFavourite, fileSize, fileDateModified, fileDateCreated, imgInfosObject]
 
   When [de]selecting a file, resultedFilesList[Index_number, 2]
   is set to 1 or 0.
@@ -84,14 +96,21 @@ b) How a files list index is created
   If a slideshow database is already opened, GetFilesList() will
   automatically add the files into the database using addSQLdbEntry().
 
+  The variables "fileSize", "fileDateModified", "fileDateCreated" are
+  also optional. They are filled by GetFilesList() and are used as caches
+  by SortFilesList() and QPV_listThumbnailsGridMode(). The same functions
+  also use "imgInfosObject" in the same manner, which is an object with
+  image properties: width, height, pixel format and frames. This object
+  and its properties are filled by GetImgFileDetails() invoked by the
+  aforementioned functions that rely on these cached details.
+
   GenerateRandyList() is called to generate a randomized array
   of file index numbers from 1 to "maxFilesIndex", non-repetitive.
   RandyIMGids[] array is used whenever the user navigates randomly
   through the indexed files.
 
   The current position within the index list is held by
-  "currentFileIndex" and the total indexed files
-  in "maxFilesIndex".
+  "currentFileIndex" and the total indexed files in "maxFilesIndex".
   The current «random» position is "RandyIMGnow".
 
   Internally, "CurrentSLD" holds what folder or slideshow file 
@@ -315,7 +334,7 @@ f) How slideshows happen
    run with the first parameter set to "start" only from 
    QPV_ShowImgonGuiPrev(). And it is also invoked as a timer.
 
-   Because I wanted users to be able to choose to allow GIFs to 
+   Because I wanted users to have the option to allow GIFs to 
    play entirely before going to the next slide, the main thread
    sets "allowNextSlide" to 0 while the GIF plays and when the 
    first loop is done, it is set to 1 and theSlideShowCore()

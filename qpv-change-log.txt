@@ -2,14 +2,27 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.7.1 (2020-11-11)
+  - [new] option to fill selected area with patterns found in the welcome screen
+  - [new] transform area tool and paste in place tool now offer the possibility to crop the image object to basic shapes: triangle, (rounded) rectangle, ellipse and rhombus
+  - [new] blur/pixelize panel offers users three methods to choose from for pixelizing the image
+  - improved how the noise is pixelized; much better results; increased the pixelize maximum limit
+  - welcome screen also varies the angle of objects and added a new pattern: noise
+  - improvements for live preview area provided by detect edges, noise and blur filters; it now allows users to shift/ctrl the area to turn off the effect
+  - reorganized «Edit image» menu into multiple subsections
+  - implemented caching for file details in list view mode
+  - improvements related to how the user interface is initialized and implemented the possibility, on failure, to attempt to reinitialize it
+  - various bug fixes  
+
 - v4.7.0 (2020-11-06)
-  - [new] add noise filter with options to blur and pixelize the noise
-  - [new] detect edges filter with options to create bevel/emboss effect
+  - [new] "noise" filter with options to blur and pixelize the noise
+  - [new] "detect edges“ filter with the ability to achieve the bevel/emboss effect by increasing iterations and using blending modes. 
   - [new] option to have Quick Picto Viewer randomize viewport colour effects and adjustments during slideshows
   - [new] option in command line to call a specific function
   - [new] when using the transform tool or pasting images in place, the user can increase the object opacity above 100%, to render any partially visible pixels more visible
   - implemented error checking when loading settings from the INI file
   - QPV no longer allows for the image selection area to be constrained simultaneously by image boundaries and aspect ratio; it is one or the other, or no constraints ;-)
+  - some minor bug fixes
 
 - v4.6.7 (2020-10-31)
   - [new] option to set alpha channel intensity in the viewport colours adjustments panel
@@ -79,7 +92,7 @@
   - [new] strikeout text style option and text cutout mode
   - [new] line angle, letter spacing, and line spacing adjustment options for text insertion
   - improved rendering of text blurring and text contours drawing; the entire Insert Text tool was recoded using GDI APIs
-  - [new] option to set how many system cores to use whne generating thumbnails and for batch file processing [requested by TheArkive]
+  - [new] option to set how many system cores to use when generating thumbnails and for batch file processing [requested by TheArkive]
   - bug fixes related to batch processing of images [ thanks to TheArkive ]
   - bug fixes and improvements to scrolling of thumbnails [ thanks to the efforts of TheArkive ]
 
@@ -161,7 +174,7 @@
   - [new] ability to mark files as copied or cut in Quick Picto Viewer and then paste files in Explorer
   - [new] sort files list by folder path or file name
   - [new] ability to import plain-text SLD files through «insert file» option
-  - [new] besides the thumbnails list, now the user can choose to see just list of file entries, without thumbnails
+  - [new] more list modes; the user can choose to see the indexed files as just a list of entries, without thumbnails; press L to toggle between modes
   - [new] display and/or create text captions/annotations associated to image files
   - [new] option to allow GIFs to play entirely during slideshows before going to the next slide
   - [new] ability to pan zoomed image avoiding the limit imposed by screen boundaries
@@ -183,7 +196,7 @@
   - [improvement] multi-threaded enabled processing for batch operations: file format conversion, jpeg lossless operations
   - [improvement] multi-threaded thumbnails loading and generation for images, in-memory caching and various optimizations
   - [improvement] sort by histogram and image similarity uses multiple cores; this makes the operations much faster
-  - [improvement] animated GIFs are now fully supported; they can now be color adjusted as well 
+  - [improvement] animated GIFs are now fully supported; they can now be color adjusted as well; it no longer relies on the ActiveX IE control
   - [improvement] files counting in the static folders panel is now much faster
   - [improvement] SLD saving, sorting by file path and name, and removing multiple entries from the list ... are now much faster
   - [improvement] Quick Picto Viewer interface is now separated from the core, to allow for a more responsive user interface 
@@ -271,8 +284,8 @@
   - replaced the inputbox I used for the Jump to Index window with my own GUI, for consistency
 
 - v3.6.8 (2019-08-25)
+  - added the ability to start Quick Picto Viewer with an image file as an argument
   - various bug fixes
-  - added the ability to start Quick Picto Viewer with a file as an argument
   - added vcomp140.dll in the ZIP package, required by FreeImage.dll, to properly initialise
   - removed MS Visual Studio 2013 runtime DLL installers from the main ZIP
 
@@ -307,24 +320,27 @@
 
 - v3.5.0 (2019-07-28)
   - [new] the ability to make a selection in the viewport [and copy it to clipboard]
-  - [new] option to crop image[s] to the selected  area, in batch as well  
+  - [new] option to crop image[s] to the selected area [in Image Resize panel]
   - [new] option to control the threshold of automatic color adjustments
-  - [new] option to randomize files list
+  - [new] option to randomize the indexed files list
+  - [new] drop files selection option in main menu
+  - [new] option to choose a destination folder for image resizing panel
   - implemented a new level of caching for image display
-  - in thumbnails mode/list, it is now possible to start/initiate image files selection with shift + arrow keys or ctrl + click
+  - in thumbnails mode, it is now possible to start/initiate image files selection with shift + arrow keys or ctrl + click
   - further optimized the Reverse files list option; it is now much faster with thousands of files
-  - improvements to touch screen devices support; panning and selections editing should both work
+  - improvements to touch screen devices support; image panning and selections editing should both work
   - small bug fixes
 
 - v3.4.0 (2019-07-19)
-  - [new] option to control image saturation level
+  - [new] a panel dedicated to adjusting image colors; i made this to facilitate Quick Picto Viewer usage with touch screens; accessible by pressing U key
+  - [new] option to control image saturation level, from the panel or keyboard with Ctrl + [ / ]
   - [new] added image color modes to display R, G and B channels, individually
   - [new] option to choose in which mode the image colors should be auto-adjusted
   - [new] option to control RGB channels intensity; this is useful for tinting images [only available through the colors adjustment panel]
-  - [new] a panel dedicated to adjusting iuage colors; i made this to facilitate Quick Picto Viewer usage with touch screens
   - [new] welcome screen images, randomly generated patterns [inspired by @flyingDman from AHK forums]
   - improved formula for auto-adjust image brightness and contrast
   - further reduced the time to calculate image color adjustments, by 98% compared to v3.3.5; thanks to @swagFag on AHK forums! THANK YOU VERY MUCH !
+  - other small improvements and fixes
 
 - v3.3.5 (2019-07-10)
   - reduced by 40-45% the time required to calculate image brightness/contrast adjustments in automatic mode; further optimisations.... still possible...
@@ -334,53 +350,186 @@
 
 - v3.3.0 (2019-07-09)
   - [new] option to copy file[s] to a specified destination
-  - [new] option for automatic brightness and contrast calibration of images
+  - [new] option for automatic brightness and contrast calibration of images; press F key to change colour adjustment modes for the viewport
   - [new] option to paste and save image from the clipboard
   - [new] option to rotate images [in image resize panel]
   - [new] it now maintains a history of filters; the filtering dialog window is no longer using InputBox
-  - [new] it also maintains a history of multi-rename patterns; the dialog window is no longer using InputBox and it now includes a Help section
+  - [new] multi-rename files abilities revamped; QPV maintains a history of multi-rename patterns; the dialog window is no longer using InputBox and it now includes a Help section
   - [new] a new window for copy/move file[s] that improves access to different folder destination; it also records a history of folder destinations
-  - improved file information panel; making use of JustMe's GDI+ GetProperty implementation
+  - [new] ability to use RegEx to filter files list
+  - [improved] file information is now a panel that displays more details and offers the ability to copy details to the clipboard; it is now making use of JustMe's GDI+ GetProperty implementation
+  - the scrollbar in thumbnails view is now clickable ;-)
   - bug fixes to how folders list are updated
   - better handling of some errors
 
 - v3.2.0 (2019-06-28)
   - [new] option to resize image; this operation can be performed on multiple files at once, in batch
   - using the image resizer, one can convert images colors to grayscale, flip images or adjust gamma and brightness, keeping intact the image dimensions
+  - [new] option to reverse files list
   - [new] Heads-Up Display elements to indicate when multiple files are selected, or when the image is displayed with altered colors, flipped; or when you can pan the image
-  - when you copy the image to the clipboard, it is now copied as seen in the picture viewer, with effects or color alterations applied
+  - scrollbar in thumbnails mode - not clickable
+  - when you copy the image to the clipboard, it is now copied as seen in the picture viewer, with viewport effects and/or color alterations applied
   - other small fixes or improvements
 
 - v3.1.0 (2019-06-25)
-  - [new] option to have QPV immediately stop the slideshow when the user performs actions, eg. presses keys or changes the window focus
-  - the UI is now visually highlighting selected or removed files in real time, when the thumbnails list is displayed 
+  - [new] option to have QPV immediately stop the slideshow when the user performs actions, eg. presses keys or changes the window focus; «easy slideshow stoppage»
+  - [new] the UI is now visually highlighting selected or removed files in real time, when the thumbnails list is displayed 
   - improved performance for updating very large static folders lists and immense files lists
-  - improved the performance for counting files in folders [in a cached files list] ;-)
+  - improved the performance for counting files in folders [in a cached files list; «Update files list selectively» panel] ;-)
 
 - v3.0.0 (2019-06-23)
+  - [new] keyboard shortcut: Ctrl+Space; this will filter the indexed files based on the current image containing folder
+  - [new] ability to abort deleting thumbnails cached
   - it now caches images at screen resolution if they are three times larger than the current screen resolution, when images are adapted to fit-to-window
-  - bug fixes and minor improvements
+  - various bug fixes and minor improvements
 
 - v2.9.0 (2019-06-21)
+  - [new] added keyboard shortcuts for Save files list as SLD, «Dynamic folders manager» panel and «Update files list selectively» panel
   - now it is possible to rescan for new files in the "Manage folders" panel, and in "Update files list selectively" panel; the user also can choose to perform a recursive scan
+  - various improvements related to how QPV handles  the list of "dynamic" folders [that is, the folders added to the inmdex by users]
 
 - v2.8.0 (2019-06-20) - first public release
+  - [new] option to set use large fonts in panels
+  - [new] option to count indexed files in static folders list panel [ «Update files list selectively» panel]
+  - [new] ability to filter folders listed in the «Update files list selectively» panel
+  - improvements and fixes related to dynamic folders list handling
+  - this is the first version to be branded as « Quick Picto Viewer » at About and reference its GitHub repository ;-)
+  - various improvements and fixes
+
 - v2.7.0 (2019-06-19)
+  - [new] dynamic folders list manager panel; easily add/remove folders to be indexed recursively or not
+  - [new] «Update files list selectively» panel, which allows users to update the files list index by selecting only sub-folders they want to rescan; it relies on the static folders list, generated when the SLD is saved;
+  - [new] multiple files rename
+  - [new] support for image panning via mouse click and drag
+  - [new] support for dropping folders onto the main window, not just SLD files or single images
+  - [new] ability to associate QPV with SLD files
+  - panels and message boxes no longer allow you to interact with the main window, thus preventing unwanted behaviour to occur
+  - scanning for dead files in the list, to have them removed, can now be aborted with Escape
+  - move, delete files in batch, files list sorting operations can be cancelled at any time as well 
+  - support for opening a SLD file, when compiled, via a command line argument
+  - more improvements related to thumbnails caching
+  - bug fixes related to having unescaped characters in files list filter provided by user
+
 - v2.6.0 (2019-06-15)
+  - [new] ability to "select" files in thumbnails list mode using Tab key; the selected files are not marked, only the end of it
+  - [new] option to automatically remove from the files index entries of dead files
+  - [new] options to add a new file or a folder to the files list, using Insert, or Shift+Insert
+  - [new] option to compare active index entry with selected/marked index entry; option is named «compare images A/B»
+  - [new] option to remove current or selected index entry/entries with Alt+Delete
+  - [new] option to save current QPV settings into an already existing SLD file
+  - [new] implemented history list for quick move option; press M key to open a menu with recent folder destinations
+  - [new] option to choose if you want to save into SLD the cached files list, or just the dynamic folders list
+  - copy file path to clipboard will now copy the paths to clipboard of all selected files
+  - deleted files are now moved to recycle bin; and it can also delete in one go selected files
+  - batch convert of images to jpeg is now possible
+  - improvements related to recently opened folders history list
+  - improvements related to thumbnails caching and for how QPV handles the files list index
+  - it is now possible to abandon thumbnails generation
+
 - v2.5.5 (2019-06-13)
+  - [new] option to prompt user before deleting file; enabled by default
+  - [new] option to convert images to jpeg
+  - [new] option to invert files list filter
+  - [new] implemented thumbnails mode with support for changing thumbnails size by -/+ keys and their aspect ratio with T key... or from Right-Click menu > View
+  - [new] option to enable/disable thumbnails caching and to erase the cached thumbnails
+  - improved support for animated GIFs
+
 - v2.5.0 (2019-06-10)
+  - [new] rudimentary animated GIFs support; option to activate/deactivate support for these; it relies on embedding an ActiveX Internet Explorer control
+
 - v2.4.0 (2019-06-09)
+  - [new] QPV now maintains an opened folders history
+  - [new] option to move file to selected folder destination
+  - [new] option to prevent Quick Picto Viewer from loading SLD settings
+  - [new] ability to have a list of dynamic folders in the SLD file; this is the folders based on which the cached files list was generated; if no cached files list is found, the folders will be scanned for files
+  - [new] when a SLD is opened, option to regenerate the entire files list by rescanning the dyanmic folders list
+  - storing settings in the INI file more frequently; eg., when changing a setting
+
 - v2.3.0 (2019-06-08)
+  - [new] ability to adjust brightness and contrast for grayscale viewport colour mode
+  - [new] about window panel
+  - [new] option to toggle window title bar
+  - [new] QPV messages are now displayed inside the viewport as OSD, no longer as tooltips
+  - on slideshow files list save, it now generates and saves a folders list based on the index files ; this is known as the «static folders» list
+
 - v2.2.0 (2019-06-06)
+  - made all files list operations aware of the current filter applied on the files list
+  - various improvements and fixes related to files list filtering
+
 - v2.1.0 (2019-06-05)
+  - made some files list operations aware of the current filter applied on the files list
+  - all tool tip messages no longer have now a hard-coded expiry time
+
 - v2.0.0 (2019-06-04)
+  - [new] touch screen mode ; the viewport is now split into different areas that respond distinctively to touches/clicks
+  - [new] file information dialog box
+  - [new] preferences menu
+    - options to toggle image resizing interpolation quality
+    - option to skip missing files when navigating through the files list
+    - option to deactivate info-tool tips
+    - option to set window always on top
+  - more improvements related to viewport image caches
+  - more improvements to errors handling
+
 - v1.9.0 (2019-06-03)
+  - improvements to image viewport caching of resized images; when panning a large image, it displays a down-scaled image, to improve performance
+
 - v1.7.0 (2019-06-02)
+  - [new] option to reload/restart script
+  - [new] option to reset viewport colour adjustments
+  - improvements to image panning
+  - increased memory limit for the script
+
 - v1.6.0 (2019-06-01)
+  - bug fixes and improvements related to image zooming and panning
+  - implemented caching of viewport resized image, to improve performance
+
+- v1.5.0 (2019-06-01)
+  - [new] ability to zoom in/out images
+  - [new] ability to pan images with the keyboard arrows
+  - [new] option to sort the files list by file name, modified date, created date, file size, and resolution
+  - [new] ability to load/save settings from a slideshow file
+  - improvements related to how the random list index is generated
+  - changed some keyboard shortcuts and added more
+
 - v1.4.0 (2019-05-31)
+  - [new] viewport gamma adjustment
+  - [new] option to remove dead files and duplicate entries from the files list
+  - [new] option to change image alignment in the viewport
+  - better error handling on image loading, on copying images to clipboard and others
+  - more tooltip messages to show what happens in the application 
+  - no longer flickers when images are changed
+  - viewport gamma and luminosity adjustments now rely on a GDI+ color matrix 
+  - implemented support for an INI settings file, to store preferences between different sessions
+
 - v1.3.0 (2019-05-30)
+  - [new] personalized viewport color adjustment: luminosity
+  - [new] ability to recall previous random images
+  - [new] support for Alt+Space combo to open main window menu
+  - [new] option to change window background color [internally only]
+  - [new] click anywhere in the viewport when no image is loaded to open the files dialog
+  - improvements related to window resizing and auto-adjusting the image to it
+
 - v1.2.0 (2019-05-29)
-- v1.1.0 (2019-05-22) 
+  - [new] option to delete, rename current image file
+  - [new] option to open image file with external app, or open containing folder
+  - [new] viewport color adjustments: grayscale, inverted
+  - [new] option to toggle adapt images to window size or display them at original size
+  - [new] options to change slideshow speed and type: random, forward or backward
+  - [new] open/save files list option
+  - [new] option to flip H/V image view
+  - [new] option to filter files list by a given string
+  - [new] option to jump at specific index in the files list
+  - [new] option to copy image to clipboard
+  - [new] option to copy image file path to clipboard with Shift+C
+  - [new] added option to open folders recursively
+  - changed open file to use the common open file dialog
+
+- v1.1.0 (2019-05-20)
+  - [new] slideshow option
+  - replaced menu bar with a right click menu
+  - changed keyboard shortcuts and added a few more related to files list navigation
+
 - v1.0.0 (2010-10-04) by SBC
 
 - known issues [jeudi 2 juillet 2020]

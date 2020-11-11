@@ -22,16 +22,23 @@ Global GDIPToken, MainExe := AhkExported(), runningGDIPoperation := 0
 ; E := initThisThread()
 Return
 
-initThisThread() {
-  GDIPToken := MainExe.ahkGetVar.GDIPToken
-  ; GDIPToken := Gdip_Startup(1)
+initThisThread(params:=0) {
+  If !InStr(params, "|")
+  {
+     GDIPToken := MainExe.ahkGetVar.GDIPToken
+     mainCompiledPath := MainExe.ahkGetVar.mainCompiledPath
+  } Else
+  {
+     externObj := StrSplit(params, "|")
+     GDIPToken := externObj[1]
+     mainCompiledPath := externObj[2]
+  }
 
-  mainCompiledPath := MainExe.ahkGetVar.mainCompiledPath
   If !wasInitFIMlib
      r := FreeImage_FoxInit(1) ; Load the FreeImage Dll
   wasInitFIMlib := r ? 1 : 0
   ; MsgBox, % r "`n" wasInitFIMlib "`n" GDIPToken "`n" mainCompiledPath
-  Return r
+  Return wasInitFIMlib
 }
 
 cleanupThread() {

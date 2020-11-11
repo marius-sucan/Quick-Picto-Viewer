@@ -3159,7 +3159,7 @@ Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", Kee
        If !hbm
           Return
 
-       hDc := CreateCompatibleDC()
+       hDC := CreateCompatibleDC()
        If !hDC
        {
           DeleteDC(hdc)
@@ -3168,6 +3168,7 @@ Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", Kee
 
        obm := SelectObject(hDC, hbm)
        G := Gdip_GraphicsFromHDC(hDC, InterpolationMode, 4)
+       Gdip_SetPixelOffsetMode(G, 2)
        If G
           r := Gdip_DrawImage(G, pBitmap, 0, 0, ResizedW, ResizedH)
        newBitmap := !r ? Gdip_CreateBitmapFromHBITMAP(hbm) : ""
@@ -3182,7 +3183,8 @@ Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", Kee
        newBitmap := Gdip_CreateBitmap(ResizedW, ResizedH, PixelFormat)
        If StrLen(newBitmap)>2
        {
-          G := Gdip_GraphicsFromImage(newBitmap, InterpolationMode)
+          G := Gdip_GraphicsFromImage(newBitmap, InterpolationMode, 4)
+          Gdip_SetPixelOffsetMode(G, 2)
           If G
              r := Gdip_DrawImage(G, pBitmap, 0, 0, ResizedW, ResizedH)
 
@@ -5378,7 +5380,10 @@ Gdip_SetTextRenderingHint(pGraphics, RenderingHint) {
 ; SingleBitPerPixel = 2
 ; AntiAliasGridFit = 3
 ; AntiAlias = 4
-   return DllCall("gdiplus\GdipSetTextRenderingHint", "UPtr", pGraphics, "int", RenderingHint)
+   If !pGraphics
+      Return 2
+
+   Return DllCall("gdiplus\GdipSetTextRenderingHint", "UPtr", pGraphics, "int", RenderingHint)
 }
 
 Gdip_SetInterpolationMode(pGraphics, InterpolationMode) {
@@ -5391,8 +5396,9 @@ Gdip_SetInterpolationMode(pGraphics, InterpolationMode) {
 ; NearestNeighbor = 5
 ; HighQualityBilinear = 6
 ; HighQualityBicubic = 7
-   If pGraphics
-      return DllCall("gdiplus\GdipSetInterpolationMode", "UPtr", pGraphics, "int", InterpolationMode)
+   If !pGraphics
+      Return 2
+   Return DllCall("gdiplus\GdipSetInterpolationMode", "UPtr", pGraphics, "int", InterpolationMode)
 }
 
 Gdip_SetSmoothingMode(pGraphics, SmoothingMode) {
@@ -5404,16 +5410,19 @@ Gdip_SetSmoothingMode(pGraphics, SmoothingMode) {
 ; AntiAlias = 4
 ; AntiAlias8x4 = 5
 ; AntiAlias8x8 = 6
-   If pGraphics
-      return DllCall("gdiplus\GdipSetSmoothingMode", "UPtr", pGraphics, "int", SmoothingMode)
+   If !pGraphics
+      Return 2
+
+   Return DllCall("gdiplus\GdipSetSmoothingMode", "UPtr", pGraphics, "int", SmoothingMode)
 }
 
 Gdip_SetCompositingMode(pGraphics, CompositingMode) {
 ; CompositingMode_SourceOver = 0 (blended / default)
 ; CompositingMode_SourceCopy = 1 (overwrite)
+   If !pGraphics
+      Return 2
 
-   If pGraphics
-      return DllCall("gdiplus\GdipSetCompositingMode", "UPtr", pGraphics, "int", CompositingMode)
+   return DllCall("gdiplus\GdipSetCompositingMode", "UPtr", pGraphics, "int", CompositingMode)
 }
 
 Gdip_SetCompositingQuality(pGraphics, CompositionQuality) {
@@ -5423,17 +5432,20 @@ Gdip_SetCompositingQuality(pGraphics, CompositionQuality) {
 ; 2 - Gamma correction is applied. Composition of high quality and speed.
 ; 3 - Gamma correction is applied.
 ; 4 - Gamma correction is not applied. Linear values are used.
+   If !pGraphics
+      Return 2
 
-   If pGraphics
-      return DllCall("gdiplus\GdipSetCompositingQuality", "UPtr", pGraphics, "int", CompositionQuality)
+   Return DllCall("gdiplus\GdipSetCompositingQuality", "UPtr", pGraphics, "int", CompositionQuality)
 } 
 
 Gdip_SetPageScale(pGraphics, Scale) {
 ; Sets the scaling factor for the page transformation of a pGraphics object.
 ; The page transformation converts page coordinates to device coordinates.
 
-   Static Ptr := "UPtr"
-   return DllCall("gdiplus\GdipSetPageScale", Ptr, pGraphics, "float", Scale)
+   If !pGraphics
+      Return 2
+
+   Return DllCall("gdiplus\GdipSetPageScale", "UPtr", pGraphics, "float", Scale)
 }
 
 Gdip_SetPageUnit(pGraphics, Unit) {
@@ -5446,9 +5458,10 @@ Gdip_SetPageUnit(pGraphics, Unit) {
 ; 4 - A unit is 1 inch
 ; 5 - A unit is 1/300 inch
 ; 6 - A unit is 1 millimeter
+   If !pGraphics
+      Return 2
 
-   Static Ptr := "UPtr"
-   return DllCall("gdiplus\GdipSetPageUnit", Ptr, pGraphics, "int", Unit)
+   Return DllCall("gdiplus\GdipSetPageUnit", "UPtr", pGraphics, "int", Unit)
 }
 
 Gdip_SetPixelOffsetMode(pGraphics, PixelOffsetMode) {
@@ -5458,23 +5471,27 @@ Gdip_SetPixelOffsetMode(pGraphics, PixelOffsetMode) {
 ;             0, 1, 3 - Pixel centers have integer coordinates
 ; ModeHalf - ModeHighQuality
 ;             2, 4    - Pixel centers have coordinates that are half way between integer values (i.e. 0.5, 20, 105.5, etc...)
+   If !pGraphics
+      Return 2
 
-   Static Ptr := "UPtr"
-   return DllCall("gdiplus\GdipSetPixelOffsetMode", Ptr, pGraphics, "int", PixelOffsetMode)
+   Return DllCall("gdiplus\GdipSetPixelOffsetMode", "UPtr", pGraphics, "int", PixelOffsetMode)
 }
 
 Gdip_SetRenderingOrigin(pGraphics, X, Y) {
 ; The rendering origin is used to set the dither origin for 8-bits-per-pixel and 16-bits-per-pixel dithering
 ; and is also used to set the origin for hatch brushes
-   Static Ptr := "UPtr"
-   return DllCall("gdiplus\GdipSetRenderingOrigin", Ptr, pGraphics, "int", X, "int", Y)
+   If !pGraphics
+      Return 2
+
+   Return DllCall("gdiplus\GdipSetRenderingOrigin", "UPtr", pGraphics, "int", X, "int", Y)
 }
 
 Gdip_SetTextContrast(pGraphics, Contrast) {
 ; Contrast - A number between 0 and 12, which defines the value of contrast used for antialiasing text
+   If !pGraphics
+      Return 2
 
-   Static Ptr := "UPtr"
-   return DllCall("gdiplus\GdipSetTextContrast", Ptr, pGraphics, "uint", Contrast)
+   Return DllCall("gdiplus\GdipSetTextContrast", "UPtr", pGraphics, "uint", Contrast)
 }
 
 Gdip_RestoreGraphics(pGraphics, State) {
