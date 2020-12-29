@@ -51,11 +51,13 @@
    ;                   - 3 = to use a ListBox to display the options as a list that allows multiple options to be selected; the rows selected numbers are returned in Array.list , each separated by `f
    ;                   - in any case dropListu parameter must be given;
    ; - setWidth        - sets the desired width for the prompt message, checkbox edit field
+   ; - 2ndDropListu
+   ; - 2ndDropListMode
 
 Global MsgBox2InputHook, MsgBox2Result, MsgBox2hwnd
 
-MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=0, fontSize:=0, modalHwnd:="", ownerHwnd:="", checkBoxCaption:="", checkBoxState:=0, dropListu:="", editOptions:="", editDefaultLine:="", DropListMode:=0, setWidth:=0) {
-  Global UsrCheckBoxu, DropListuChoice, EditUserMsg, prompt, BoxIcon
+MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=0, fontSize:=0, modalHwnd:="", ownerHwnd:="", checkBoxCaption:="", checkBoxState:=0, dropListu:="", editOptions:="", editDefaultLine:="", DropListMode:=0, setWidth:=0, 2ndDropListu:=0, 2ndDropListMode:=0) {
+  Global UsrCheckBoxu, 2ndDropListuChoice, DropListuChoice, EditUserMsg, prompt, BoxIcon
   oCritic := A_IsCritical 
   Critical, off
 
@@ -138,7 +140,30 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   Else If (listRows>10)
      listRows := 10
 
-  btnTotalWidth := max(btnTotalWidth, listWidth, setWidth)
+
+  2ndlistWidth := 1
+  2ndlistRows := 0
+  If 2ndDropListu
+  {
+     Loop, Parse, 2ndDropListu, `f
+     {
+        If A_LoopField
+        {
+           2ndlistRows++
+           listDim := GetMsgDimensions(A_LoopField, fontFace, fontSize, rMaxW, rMaxH, 1, doBold)
+           2ndlistWidth := max(listDim.w, listWidth, btnDim.w)
+        }
+     }
+     2ndlistWidth += bH
+  }
+  If (2ndlistRows=0 && 2ndDropListMode!=1)
+     2ndDropListu := ""
+  Else If (2ndlistRows=0 && 2ndDropListMode=1)
+     2ndlistRows := 10
+  Else If (2ndlistRows>10)
+     2ndlistRows := 10
+
+  btnTotalWidth := max(btnTotalWidth, listWidth, 2ndlistWidth, setWidth)
   If (btnCount=0 && StrLen(btnList)>0)
      btnCount := 1
 
@@ -155,9 +180,9 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
      msgW := Abs(setWidth)
 
   If (DropListMode=1)
-     listWidth := msgW
+     2ndlistWidth := listWidth := msgW
   Else
-     listWidth := max(listWidth, btnTotalWidth)
+     2ndlistWidth := listWidth := max(listWidth, 2ndlistWidth, btnTotalWidth)
 
   msgH := msg.h - bH//2
   msgH := (msgH>rMaxH) ? "h" maxH : ""
@@ -182,7 +207,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
      {
        iconFile := "imageres.dll", iconNum := 95
        SoundPlay, *32
-     } Else If (icon="warning" || icon="exclamation")
+     } Else If (icon="warning" || icon="alert" || icon="exclamation")
      {
        iconFile := "imageres.dll", iconNum := 80
        SoundPlay, *48
@@ -217,10 +242,10 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
      } Else If (icon="file")
      {
        iconFile := "imageres.dll", iconNum := 15
-     } Else If (icon="audio-file")
+     } Else If (icon="audio-file" || icon="audio")
      {
        iconFile := "imageres.dll", iconNum := 126
-     } Else If (icon="image-file")
+     } Else If (icon="image-file" || icon="image")
      {
        iconFile := "imageres.dll", iconNum := 68
      } Else If (icon="folder")
@@ -287,7 +312,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
      Gui, Add, Checkbox, xp y+%marginz% wp Checked%checkBoxState% vUsrCheckBoxu, %checkBoxCaption%
 
   multiSel := (DropListMode=3) ? 8 : " gMsgBox2ListBoxEvent "
-  If dropListu
+  If (dropListu || 2ndDropListu)
      Gui, +Delimiter`f
 
   If (dropListu && (DropListMode=2 || DropListMode=3))
@@ -302,6 +327,19 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
      Gui, Add, ComboBox, xp y+%marginz% w%listWidth% vDropListuChoice, % dropListu
   Else If (dropListu && (DropListMode=2 || DropListMode=3))
      Gui, Add, ListBox, xp y+%marginz% r%listRows% w%listWidth% AltSubmit %multisel% vDropListuChoice, % dropListu
+
+  If (2ndDropListu && (2ndDropListMode=2 || 2ndDropListMode=3))
+  {
+     2ndDropListu := Chr(160) StrReplace(2ndDropListu, "`f", "`f" Chr(160))
+     2ndDropListu := StrReplace(2ndDropListu, "`f" Chr(160) "`f", "`f`f")
+  }
+
+  If (2ndDropListu && 2ndDropListMode=0)
+     Gui, Add, DropDownList, xp y+%marginz% w%2ndlistWidth% AltSubmit v2ndDropListuChoice, % 2ndDropListu
+  Else If (2ndDropListu && 2ndDropListMode=1)
+     Gui, Add, ComboBox, xp y+%marginz% w%2ndlistWidth% v2ndDropListuChoice, % 2ndDropListu
+  Else If (2ndDropListu && (2ndDropListMode=2 || 2ndDropListMode=3))
+     Gui, Add, ListBox, xp y+%marginz% r%2ndlistRows% w%2ndlistWidth% AltSubmit %2ndmultisel% v2ndDropListuChoice, % 2ndDropListu
 
   Loop, Parse, btnList, | ; list specified buttons
   {
@@ -352,6 +390,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   Sleep, 1
   GuiControlGet, UsrCheckBoxu
   GuiControlGet, DropListuChoice
+  GuiControlGet, 2ndDropListuChoice
   GuiControlGet, EditUserMsg
   r.btn := StrReplace(MsgBox2Result, "&")
   If (MsgBox2Result="usr-dbl-clk")
@@ -359,6 +398,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
 
   r.check := !checkBoxCaption ? 0 : UsrCheckboxu
   r.list := !dropListu ? 0 : DropListuChoice
+  r.2ndlist := !2ndDropListu ? 0 : 2ndDropListuChoice
   r.edit := !editOptions ? 0 : EditUserMsg
   If modalHwnd
      WinSet, Enable,, ahk_id %modalHwnd%

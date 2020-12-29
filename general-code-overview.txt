@@ -7,7 +7,7 @@ e) General considerations
 f) How slideshows happen
 g) Image live editing [soon]
 
-Deniere mise à jour: mercredi 11 novembre 2020.
+Deniere mise à jour: dimanche 22 novembre 2020.
 ================================================
 
 a) How Quick Picto Viewer initializes:
@@ -32,8 +32,17 @@ a) How Quick Picto Viewer initializes:
   attempt again to initialise or exit.
 
   intializeWithGivenArguments() function processes all the command
-  line given arguments.
+  line given arguments. The user can set global variables using
+  set_GlobalVar and invoke functions that take no parameters with
+  call_funcName(). Examples:
 
+      qpv.exe "fd=C:\example folder\tempus"
+      Add a pipe "|" after equal "=" to have images loaded recursively.
+
+      qpv.exe call_ToggleThumbsMode() "fd=C:\folder\tempus"
+
+      qpv.exe set_IMGresizingMode=3 set_vpIMGrotation=45 "C:\folder\this-image.png"
+  
   If an image file is given as command line argument, it is
   opened with OpenArgFile(). If a .SLD or a .SLDB file is fed,
   OpenSLD() function is used to load the files index. Folders 
@@ -77,9 +86,16 @@ b) How a files list index is created
   to match supported file types.
 
   QPV internally relies on resultedFilesList[] array. 
-  Each file entry is defined by:
+  Each file entry is defined by various properties:
 
-  resultedFilesList[index_number] := [full_file_path, isSelected, isSeen, forceThumbRefresh, isFavourite, fileSize, fileDateModified, fileDateCreated, imgInfosObject]
+  resultedFilesList[index_number] :=
+  [ 1_full_file_path, 2_isSelected, 3_isSeen, 4_forceThumbRefresh
+  , 5_isFavourite, 6_fileSize, 7_fileDateModified
+  , 8_fileDateCreated, 9_imgFrames, 10_doSort, 11_IsImgHisto
+  , 12_dbRowIndex, 13_imgW, 14_imgH, 15_imgPixFmt, 16_imgWHratio
+  , 17_imgMGPX, 18_imgHAvg, 19_imgHmedian, 20_imgHpeak, 21_imgHlow
+  , 22_imgDPI, 23_dupeID, 24_imghRMS, 25_imghRange, 26_imghMode
+  , 27_imghMin, 28_innerPixels, 29_pixelsBorder]
 
   When [de]selecting a file, resultedFilesList[Index_number, 2]
   is set to 1 or 0.
@@ -96,13 +112,13 @@ b) How a files list index is created
   If a slideshow database is already opened, GetFilesList() will
   automatically add the files into the database using addSQLdbEntry().
 
-  The variables "fileSize", "fileDateModified", "fileDateCreated" are
-  also optional. They are filled by GetFilesList() and are used as caches
-  by SortFilesList() and QPV_listThumbnailsGridMode(). The same functions
-  also use "imgInfosObject" in the same manner, which is an object with
-  image properties: width, height, pixel format and frames. This object
-  and its properties are filled by GetImgFileDetails() invoked by the
-  aforementioned functions that rely on these cached details.
+  The file details related members of the object are also optional.
+  They are filled by GetFilesList() or collectFileInfosNow() and are used
+  as caches by SortFilesList(), files statistics panel and
+  QPV_listThumbnailsGridMode(). The collectImageInfosNow() function fills
+  the members of the object with details about images and their main 
+  histogram points. These details, once cached are used for files sorting
+  file statistics panel and finding image duplicates.
 
   GenerateRandyList() is called to generate a randomized array
   of file index numbers from 1 to "maxFilesIndex", non-repetitive.
@@ -126,7 +142,7 @@ b) How a files list index is created
   sldGenerateFilesList() parses plain-text files and it loads
   INI-like saved settings using readSlideSettings().
 
-  sldDataBaseOpen() opens SQLlite databases and reads the 
+  sldDataBaseOpen() opens SQLlite3 databases and reads the 
   settings using IniSLDBreadAll().
 
 c) Files index filtering
@@ -138,20 +154,39 @@ c) Files index filtering
    "usrFilesFilteru". The internal filter is held in "filesFilter".
 
    FilterFilesIndex() is the core function that generates the
-   filtered new list. However, it creates a backup of the main list:
+   filtered new list. A backup of the main list is created:
      bckpResultedFilesList := resultedFilesList.Clone()
      bkcpMaxFilesIndex := maxFilesIndex
 
-   And it also creates a map of the indexes between the two arrays.
+   A map of the indexes between the two arrays is created:
    filteredMap2mainList[Index_number] := Index_number_main_list
 
    filteredMap2mainList[] array is used when the user performs
-   actions that change the index and have to be propagated.
-   For example: file rename, index entry removal and so on.
+   actions that change the index and have to be propagated in 
+   the main list [the backup]. For example: file rename, index
+   entry removal and so on.
 
-   When the new resultedFilesList[] array is created,
-   "isSelected" and "isSeen" states are ignored.
+   When the new resultedFilesList[] array is created, all entry 
+   properties are maintained.
 
+   FilterFilesIndex() can take Regular Expressions or «queries».
+   Strings that begin with: «SQL:query:» will be parsed and used
+   to perform a SELECT in the currently loaded SQL database. For
+   example: SQL:query:WHERE fmodified LIKE '20200607%' .
+
+   If the user does not work with an SQL database, another type
+   of queries can be used to filter the files list: «QPV:query:»
+   These are structured as follows:
+   QPV:query:what:minRange:maxRange:optionalString
+
+   Example: QPV:query:fsize:100002:250001:string
+
+   When such queries are performed, Quick Picto Viewer uses cached
+   data when available, otherwise it will extract image or file
+   details. The collected data is cached in memory for subsequent
+   queries or index sort operations. If an SQL database is opened, 
+   the data will be stored in the database as well.
+   
    The function FilterFilesIndex() ends by invoking
    GenerateRandyList().
 
@@ -341,5 +376,3 @@ f) How slideshows happen
    function is called from the UI thread, and
    invokeExternalSlideshowHandler() to set there the timer
    for the next slide.
-
-

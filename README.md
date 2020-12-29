@@ -6,6 +6,8 @@
 
 <p>QPV is able to create image slideshows and cache very large dynamic lists of files. Unlike other applications of this kind, it can load, on my system, a list of 500000 files in under 10 seconds, while XnView Classic or Irfan View need more than 15 minutes. The index of files can be saved as plain-text or as an SQLite database.</p>
 
+<p>With Quick Picto Viewer you can generate file statistics over huge image libraries which can help identify very small images, very low key, or washed out images. You can also identify image duplicates and auto-select files by given criteria.</p>
+
 <p>Quick Picto Viewer is also able to play sound files associated with images, automatically or on demand, and even generate slideshows that are in synch with the audio files duration. Supported audio formats: WAV, MP3 and WMA. It can also display image captions / notes for image.</p>
 
 <p>Since Quick Picto Viewer v4, users can also edit images by using freely rotated elliptical or rectangular selections. Common functions provided: paste in place, color adjustments, draw arcs, lines or shapes, insert text, soft edges blur area and so on.</p>
@@ -51,6 +53,8 @@
 <li>Batch processing. You can apply any of the previously mentioned action or operation on multiple files at once.</li>
 <li>Multi-rename allows adding a prefix and/or suffix to renamed files, or to count them, or search and replace strings in file names.</li>
 <li>Acquire images from scanners.</li>
+<li>File statistics panel with categories for: file sizes, file types, modified dates, image size, image histogram data and much more.</li>
+<li>Identify image duplicates by customizable image properties, histogram details or image content similarity.</li>
 <li>Copy files from Explorer and paste in Quick Picto Viewer, or from QPV to Explorer.</li>
 <li>Paste texts from clipboard and render them as images. Text and background colors, font style, alignment and size can be personalized.</li>
 <li>Quick Picto Viewer has its own slideshow formats to store list of folders and cache files lists: plain-text and SQLite database.</li>

@@ -360,8 +360,8 @@ FGP_Init() {
  *      PropList.Num[PropNum]   := PropVal
  */
 FGP_List(FilePath) {
-  static PropTable
-  If !PropTable
+  ; static PropTable
+  ; If !PropTable
      PropTable := FGP_Init()
   SplitPath, FilePath, FileName, DirPath
   Try oShell := ComObjCreate("Shell.Application")
@@ -378,6 +378,7 @@ FGP_List(FilePath) {
     }
   }
   PropList.CSV := Trim(PropList.CSV, "`n")
+  objRelease(oShell)
   return PropList
 }
 
@@ -391,9 +392,9 @@ FGP_List(FilePath) {
  *    -1      - The property number does not have an associated name.
  */
 FGP_Name(PropNum) {
-  static PropTable
-  If !PropTable
-     PropTable := FGP_Init()
+  ; static PropTable
+  ; If !PropTable
+  ;    PropTable := FGP_Init()
 
   if (PropTable.Num[PropNum] != "")
      return PropTable.Num[PropNum]
@@ -410,8 +411,8 @@ FGP_Name(PropNum) {
  *    -1      - The property name does not have an associated number.
  */
 FGP_Num(PropName) {
-  static PropTable
-  If !PropTable
+  ; static PropTable
+  ; If !PropTable
      PropTable := FGP_Init()
 
   if (PropTable.Name[PropName] != "")
@@ -430,11 +431,9 @@ FGP_Num(PropName) {
  *    0     - The property is blank.
  *    -1      - The property name or number is not valid.
  */
-FGP_Value(FilePath, Property) {
-  static PropTable
-  If !PropTable
-     PropTable := FGP_Init()
 
+FGP_Value(FilePath, Property) {
+  PropTable := FGP_Init()
   if ((PropNum := PropTable.Name[Property] != "" ? PropTable.Name[Property]
      : PropTable.Num[Property] ? Property : "") != "")
   {
@@ -442,6 +441,7 @@ FGP_Value(FilePath, Property) {
     Try oShell := ComObjCreate("Shell.Application")
     oFolder := oShell.NameSpace(DirPath)
     oFolderItem := oFolder.ParseName(FileName)
+    objRelease(oShell)
     if (PropVal := oFolder.GetDetailsOf(oFolderItem, PropNum))
       return PropVal
     return 0

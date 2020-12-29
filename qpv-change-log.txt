@@ -2,6 +2,26 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.7.6 (2020-12-29)
+  - [new] panel to help identify image duplicates, by multiple criteria or visual similarity
+  - [new] indexed files list statistics panel; offers a detailed breakdown of the files and it can be used to filter the files based on file dates, file sizes, resolution, histogram data and more
+  - [new] files list filter panel allows users to create custom filters that can match files by image or file properties, such as resolution, histogram data, file size and so on
+  - [new] the keys from 1 to 6 can now be associated with preset folders, to copy/move files
+  - [new] shift+right-click menu; this is a selection of common functions
+  - [new] option to reverse order on sort
+  - [new] option to calculate total file sizes of selected files
+  - [new] option to purge image properties cached data [when files list svaed as a database]
+  - [new] option to remove or not inexistent files from files list index on sort
+  - [new] option to search and replace in files list records
+  - [new] option to sort images based on more properties; e.g., histogram minimum and maximum/peak and other details; helpful to identify washed-out or low key images
+  - [new] option to select / deselect files by given search criteria
+  - [new] options to match only the beginning or end of strings when searching indexed files; options to match only paths or file names
+  - [new] users will now be asked to save modified files lists [when they are saved in plain-text format]
+  - changed how the favourites list is handled [ hoping for no regressions ]; it relies on two files now
+  - fixed regressions: sort by resolution did not work, batch image convert was failing as well 
+  - I have set as default the option to have a fixed number of thumbnails columns... and it no longer can be deactivated
+
+
 - v4.7.1 (2020-11-11)
   - [new] option to fill selected area with patterns found in the welcome screen
   - [new] transform area tool and paste in place tool now offer the possibility to crop the image object to basic shapes: triangle, (rounded) rectangle, ellipse and rhombus

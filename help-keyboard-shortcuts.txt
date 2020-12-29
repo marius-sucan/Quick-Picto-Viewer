@@ -46,7 +46,8 @@ M|Move file(s) to...|Files list|Panel
 Ctrl + D|Drop selected area or files selection [select none]|Anywhere|-
 Ctrl + E|Open in Explorer containing folder of active file|Image view|External app
 Ctrl + F|Filter files list|Files list|-
-Ctrl + Space|Deactivate files list filter [if any] or filter list by active's file path|Files list|-
+Ctrl + Space|Deactivate files list filter [if any] or filter list by active's file path|Anywhere|-
+Shift + E|Filter list by the file path of the current file|Files list|-
 Ctrl + F2|Modify active index entry|Files list|Panel
 Ctrl + F4|Close document, window or panel|Anywhere|-
 Ctrl + F5|Toggle recursive scan of an opened folder|Files list|-
@@ -121,8 +122,8 @@ T|Toggle image rescaling/adapting modes|Image view|-
 U|Viewport colors and image adjustments|Image view|Panel
 X|Play associated audio file|Image view|-
 Shift + X|Stop audio playback|Image view|-
-1|Decrease audio volume by 5%|Image view|-
-2|Increase audio volume by 5%|Image view|-
+8|Decrease audio volume by 5%|Image view|-
+Shift + 8|Increase audio volume by 5%|Image view|-
 Middle Click|Switch between image list and image view|Anywhere|Mode switch
 Middle Click|Collapse/expand live edit panel|Anywhere|Undefined
 Double Click|Toggle between image view modes|Anywhere|-
@@ -176,8 +177,10 @@ Shift + Arrow keys|Select files|Files list|-
 Shift + Insert|Add folder(s) to files index list|Files list|Folder selector
 Shift + O|Open folder recursively|Anywhere|Folder selector
 Shift + Space|Drop files selection [if any], stop or start slideshow|Anywhere|-
+Shift + S|Calculate file sizes for selected files|Anywhere|-
 Shift + T|Insert text into selected area|Image selection|Panel
 Shift + Tab|Drop files selection [select none]|Files list|-
+Ctrl + Tab|Filter files list to selected files|Files list|-
 Shift + U|Apply viewport color adjustments or effects to selected area|Image selection|-
 Shift + ~|Open Quick Picto Viewer session events journal|Anywhere|Panel
 Page Up / Down|Move selection area on X axis|Live editing|-

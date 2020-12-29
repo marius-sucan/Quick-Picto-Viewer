@@ -101,7 +101,18 @@ Class SQLiteDB {
          This._CurrentRow := 0
          Return True
       }
-   }  
+
+      Free() {
+         This.ColumnCount := 0
+         This.RowCount := 0
+         This.ColumnNames := []
+         This.Rows := []
+         This.HasNames := False
+         This.HasRows := False
+         This._CurrentRow := 0
+         Return True
+      }
+   }
    ; ===================================================================================================================
    ; CLASS _RecordSet
    ; Object returned from method Query()
@@ -254,12 +265,14 @@ Class SQLiteDB {
          This.ErrorCode := 0
          If !(This._Handle)
             Return True
-         RC := DllCall("SQlite3.dll\sqlite3_finalize", "Ptr", This._Handle, "Cdecl Int")
+
+         RC := DllCall("SQlite3.dll\sqlite3_finalize", "UPtr", This._Handle, "Cdecl Int")
          If (ErrorLevel) {
             This.ErrorMsg := "DllCall sqlite3_finalize failed!"
             This.ErrorCode := ErrorLevel
             Return False
          }
+
          If (RC) {
             This.ErrorMsg := This._DB._ErrMsg()
             This.ErrorCode := RC
@@ -517,6 +530,8 @@ Class SQLiteDB {
    __New() {
       This._Path := ""                  ; Database path                                 (String)
       This._Handle := 0                 ; Database handle                               (Pointer)
+      This.Base.Version := 0
+      This.Base.hasFailedInit := 0
       This._Queries := {}               ; Valid queries                                 (Object)
       This._Stmts := {}                 ; Valid prepared statements                     (Object)
       If (This.Base._RefCount = 0) {
@@ -529,21 +544,23 @@ Class SQLiteDB {
          }
          If !(DLL := DllCall("LoadLibrary", "Str", This.Base._SQLiteDLL, "UPtr")) {
             This.Base.hasFailedInit := 1
-            addJournalEntry("DLL " . SQLiteDLL . " does not exist! Failed to initialize SQlite3.")
+            addJournalEntry("ERROR: DLL "SQLiteDLL " does not exist! Failed to initialize SQlite3.")
             ; MsgBox, 16, SQLiteDB Error, % "DLL " . SQLiteDLL . " does not exist!"
             ; ExitApp
          }
          If (This.Base.hasFailedInit!=1)
          {
             This.Base.Version := StrGet(DllCall("SQlite3.dll\sqlite3_libversion", "Cdecl UPtr"), "UTF-8")
+            multiThread := DllCall("SQlite3.dll\sqlite3_threadsafe", "Cdecl Int")
             SQLVersion := StrSplit(This.Base.Version, ".")
             MinVersion := StrSplit(This.Base._MinVersion, ".")
             If (SQLVersion[1] < MinVersion[1]) || ((SQLVersion[1] = MinVersion[1]) && (SQLVersion[2] < MinVersion[2])){
                This.Base.hasFailedInit := 1
                DllCall("FreeLibrary", "Ptr", DLL)
-               addJournalEntry("Version " . This.Base.Version .  " of SQLite3.dll is not supported!`n`nYou can download the current version from www.sqlite.org!")
+               addJournalEntry("ERROR: version " This.Base.Version " of SQLite3.dll is not supported!`n`nYou can download the current version from www.sqlite.org!")
                ; ExitApp
-            }
+            } Else
+               addJournalEntry("Version " This.Base.Version " of SQLite3 has initialized. ThreadSafe = " multiThread)
          }
       }
       This.Base._RefCount += 1
@@ -652,9 +669,10 @@ Class SQLiteDB {
    ;                       and deletet on call of CloseDB.
    ; ===================================================================================================================
    OpenDB(DBPath, Access := "W", Create := True) {
-      Static SQLITE_OPEN_READONLY  := 0x01 ; Database opened as read-only
-      Static SQLITE_OPEN_READWRITE := 0x02 ; Database opened as read-write
-      Static SQLITE_OPEN_CREATE    := 0x04 ; Database will be created if not exists
+      Static SQLITE_OPEN_READONLY  := 0x00000001   ; Database opened as read-only
+      Static SQLITE_OPEN_READWRITE := 0x00000002   ; Database opened as read-write
+      Static SQLITE_OPEN_CREATE    := 0x00000004   ; Database will be created if not exists
+      Static SQLITE_OPEN_FULLMUTEX := 0x00010000
       Static MEMDB := ":memory:"
       This.ErrorMsg := ""
       This.ErrorCode := 0
@@ -679,6 +697,8 @@ Class SQLiteDB {
          If (Create)
             Flags |= SQLITE_OPEN_CREATE
       }
+
+      Flags |= SQLITE_OPEN_FULLMUTEX
       This._Path := DBPath
       This._StrToUTF8(DBPath, UTF8)
       RC := DllCall("SQlite3.dll\sqlite3_open_v2", "Ptr", &UTF8, "PtrP", HDB, "Int", Flags, "Ptr", 0, "Cdecl Int")
@@ -809,7 +829,7 @@ Class SQLiteDB {
    ; Return values:        On success  - True, TB contains the result object
    ;                       On failure  - False, ErrorMsg / ErrorCode contain additional information
    ; ===================================================================================================================
-   GetTable(SQL, ByRef TB, MaxResult := 0) {
+   GetTable(SQL, ByRef TB, MaxResult:=0, getColumnNames:=0) {
       TB := ""
       This.ErrorMsg := ""
       This.ErrorCode := 0
@@ -818,10 +838,12 @@ Class SQLiteDB {
          This.ErrorMsg := "Invalid database handle!"
          Return False
       }
-      If !RegExMatch(SQL, "i)^\s*(SELECT|PRAGMA)\s") {
-         This.ErrorMsg := A_ThisFunc . " requires a query statement!"
-         Return False
-      }
+
+      ; If !RegExMatch(SQL, "i)^\s*(SELECT|PRAGMA)\s") {
+      ;    This.ErrorMsg := A_ThisFunc . " requires a query statement!"
+      ;    Return False
+      ; }
+
       Names := ""
       Err := 0, RC := 0, GetRows := 0
       I := 0, Rows := Cols := 0
@@ -839,7 +861,7 @@ Class SQLiteDB {
          Return False
       }
       If (RC) {
-         This.ErrorMsg := StrGet(Err, "UTF-8")
+         This.ErrorMsg := StrGet(Err, "UTF-8") "`n" This.SQL
          This.ErrorCode := RC
          DllCall("SQLite3.dll\sqlite3_free", "Ptr", Err, "Cdecl")
          Return False
@@ -862,19 +884,24 @@ Class SQLiteDB {
          GetRows := MaxResult
       Else
          GetRows := Rows
+
       Offset := 0
-      Names := Array()
-      Loop, %Cols% {
-         Names[A_Index] := StrGet(NumGet(Table+0, Offset, "UPtr"), "UTF-8")
-         Offset += A_PtrSize
-      }
-      TB.ColumnNames := Names
-      TB.HasNames := True
+      If (getColumnNames=1)
+      {
+         Names := Array()
+         Loop, %Cols% {
+            Names[A_Index] := StrGet(NumGet(Table+0, Offset, "UPtr"), "UTF-8")
+            Offset += A_PtrSize
+         }
+         TB.ColumnNames := Names
+         TB.HasNames := True
+      } Else Offset := A_PtrSize * Cols
+
       Loop, %GetRows% {
          I := A_Index
          TB.Rows[I] := []
          Loop, %Cols% {
-            TB.Rows[I][A_Index] := StrGet(NumGet(Table+0, Offset, "UPtr"), "UTF-8")
+            TB.Rows[I, A_Index] := StrGet(NumGet(Table+0, Offset, "UPtr"), "UTF-8")
             Offset += A_PtrSize
          }
       }
@@ -970,7 +997,8 @@ Class SQLiteDB {
          Return False
       }
       If (RC) {
-         This.ErrorMsg := This._ErrMsg()
+         This.ErrorMsg := This._ErrMsg() . "`n" SQL
+         This.ErrorMsg .= "`n" This.SQL
          This.ErrorCode := RC
          Return False
       }

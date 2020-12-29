@@ -26,6 +26,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , userAllowWindowDrag := 0, drawingShapeNow := 0, isAlwaysOnTop, lastMenuBarUpdate := 1
      , mainWinPos := 0, mainWinMaximized := 1, mainWinSize := 0, PrevGuiSizeEvent := 0
      , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0
+     , currentFilesListModified := 0
 
 
 Global allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, askDeleteFiles
@@ -477,12 +478,12 @@ askAboutStoppingOperations() {
 WM_RBUTTONUP(wP, lP, msg, hwnd) {
   Static lastState := 0
   If (A_TickCount - scriptStartZeit<500)
-     Return
+     Return 0
 
   If (slideShowRunning=1 || animGIFplaying=1)
   {
      turnOffSlideshow()
-     Return
+     Return 0
   }
 
   UnlockKeys()
@@ -494,26 +495,27 @@ WM_RBUTTONUP(wP, lP, msg, hwnd) {
   If (okay!=1)
      Return
 
+  GuiControl, 1:, editDummy, -
   If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
   {
      askAboutStoppingOperations()
-     Return
+     Return 0
   }
 
-  GuiControl, 1:, editDummy, -
-  If (thumbsDisplaying=1 && maxFilesIndex>0)
-  {
-     canCancelImageLoad := 4
-     MainExe.ahkPostFunction("WinClickAction", "rclick", A_GuiControl)
-     Return
-  } 
+  ; If (thumbsDisplaying=1 && maxFilesIndex>0)
+  ; {
+  ;    canCancelImageLoad := 4
+  ;    MainExe.ahkPostFunction("WinClickAction", "rclick", A_GuiControl)
+  ;    Return
+  ; } 
 
-  delayu := (thumbsDisplaying=1) ? 90 : 2
-  SetTimer, InitGuiContextMenu, % -delayu
+  ; delayu := (thumbsDisplaying=1) ? 90 : 2
+  SetTimer, InitGuiContextMenu, -25
+  Return 0
 }
 
 InitGuiContextMenu() {
-    MainExe.ahkPostFunction(A_ThisFunc)
+    MainExe.ahkPostFunction(A_ThisFunc, "extern")
 }
 
 slideshowsHandler(thisSlideSpeed, act, how) {
@@ -901,7 +903,7 @@ byeByeRoutine() {
          thumbsDisplaying := 0
          MainExe.ahkPostFunction("MenuReturnIMGedit")
       } Else lastCloseInvoked++
-   } Else If (StrLen(UserMemBMP)>3 && undoLevelsRecorded>1)
+   } Else If (StrLen(UserMemBMP)>3 && undoLevelsRecorded>1) || (currentFilesListModified=1)
    {
       MainExe.ahkPostFunction("exitAppu", "external")
       ;  lastCloseInvoked++
@@ -1066,8 +1068,8 @@ BuildFakeMenuBar() {
    Menu, PVmenu, Add, MENU, InitGuiContextMenu
    Menu, PVmenu, Add, 
    Menu, PVmenu, Add, OPEN, OpenDialogFiles
-   Menu, PVmenu, Add, SAVE, MenuSaveAction
-   Menu, PVmenu, Add, REFRESH, MenuRefreshAction
+   Menu, PVmenu, Add, SAVE, PanelSaveImg
+   Menu, PVmenu, Add, REFRESH, RefreshImageFileAction
    Menu, PVmenu, Add, 
    Menu, PVmenu, Add, %infoThumbsMode%, MenuDummyToggleThumbsMode
    Menu, PVmenu, Add, 
@@ -1109,12 +1111,7 @@ MenuSelRotation() {
   If !determineMenuBTNsOKAY()
      Return
 
-  VPselRotation := MainExe.ahkgetvar.VPselRotation
-  VPselRotation := Round(VPselRotation) + 45
-  If (VPselRotation>350)
-     VPselRotation := 0
-  MainExe.ahkassign("VPselRotation", VPselRotation)
-  MainExe.ahkPostFunction("dummyRefreshImgSelectionWindow")
+  MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 ToggleImageSizingMode() {
@@ -1198,6 +1195,7 @@ changeZoomMinus() {
 changeZoomPlus() {
   If !determineMenuBTNsOKAY()
      Return
+
   MainExe.ahkPostFunction("changeZoom", 1)
 }
 
@@ -1416,20 +1414,14 @@ MenuCopyAction() {
    If !determineMenuBTNsOKAY()
       Return
 
-   If (thumbsDisplaying=1)
-      InvokeCopyFiles()
-   Else
-      CopyImage2clip()
+   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 MenuSelectAction() {
    If !determineMenuBTNsOKAY()
       Return
 
-   If (thumbsDisplaying=1)
-      MenuMarkThisFileNow()
-   Else
-      tlbrToggleImgSelection()
+   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 MenuSelectAllAction() {
@@ -1446,26 +1438,6 @@ MenuSelectAllAction() {
       prevState := !prevState
    } Else
       selectEntireImage("r")
-}
-
-MenuRefreshAction() {
-   If !determineMenuBTNsOKAY()
-      Return
-
-   If (thumbsDisplaying=1)
-      RefreshFilesList()
-   Else
-      RefreshImageFileAction()
-}
-
-MenuSaveAction() {
-   If !determineMenuBTNsOKAY()
-      Return
-
-   If (thumbsDisplaying=1)
-      PanelSaveSlideShowu()
-   Else
-      PanelSaveImg()
 }
 
 #If, (imgEditPanelOpened=1 || AnyWindowOpen>0) ; && (identifySettingsWindow()=1)

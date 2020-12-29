@@ -69,7 +69,7 @@ cleanMess(thisID:=0) {
 }
 
 fnOutputDebug(msg) {
-      OutputDebug, QPV: %msg%
+   OutputDebug, QPV: %msg%
 }
 
 MonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerImg, coreIndex, thisfileIndex, thisBindex) {

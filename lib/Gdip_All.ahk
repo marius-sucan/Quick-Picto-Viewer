@@ -1589,7 +1589,6 @@ Gdip_DrawImagePointsRect(pGraphics, pBitmap, Points, sx:="", sy:="", sw:="", sh:
 ;                 use GenerateColorMatrix()
 
 Gdip_DrawImage(pGraphics, pBitmap, dx:="", dy:="", dw:="", dh:="", sx:="", sy:="", sw:="", sh:="", Matrix:=1, Unit:=2, ImageAttr:=0) {
-   Static Ptr := "UPtr"
    If (!pGraphics || !pBitmap)
       Return 2
 
@@ -1621,15 +1620,15 @@ Gdip_DrawImage(pGraphics, pBitmap, dx:="", dy:="", dw:="", dh:="", sx:="", sy:="
    }
 
    E := DllCall("gdiplus\GdipDrawImageRectRect"
-            , Ptr, pGraphics
-            , Ptr, pBitmap
+            , "UPtr", pGraphics
+            , "UPtr", pBitmap
             , "float", dX, "float", dY
             , "float", dW, "float", dH
             , "float", sX, "float", sY
             , "float", sW, "float", sH
             , "int", Unit
-            , Ptr, ImageAttr ? ImageAttr : 0
-            , Ptr, 0, Ptr, 0)
+            , "UPtr", ImageAttr ? ImageAttr : 0
+            , "UPtr", 0, "UPtr", 0)
 
    If (E=1 && A_LastError=8) ; out of memory
       E := 3
@@ -1645,7 +1644,7 @@ Gdip_DrawImageFast(pGraphics, pBitmap, X:=0, Y:=0) {
 ; X, Y - the coordinates of the destination upper-left corner
 ; where the pBitmap will be drawn.
 
-   return := DllCall("gdiplus\GdipDrawImage"
+   return DllCall("gdiplus\GdipDrawImage"
             , "UPtr", pGraphics
             , "UPtr", pBitmap
             , "float", X
@@ -1984,6 +1983,9 @@ Gdip_ReleaseDC(pGraphics, hdc) {
 ;                    Using clipping regions you can clear a particular area on the graphics rather than clearing the entire graphics
 
 Gdip_GraphicsClear(pGraphics, ARGB:=0x00ffffff) {
+   If !pGraphics
+      return 2
+
    return DllCall("gdiplus\GdipGraphicsClear", "UPtr", pGraphics, "int", ARGB)
 }
 
@@ -1991,6 +1993,8 @@ Gdip_GraphicsFlush(pGraphics, intent) {
 ; intent - Specifies whether the method returns immediately or waits for any existing operations to finish:
 ; 0 - Flush all batched rendering operations and return immediately
 ; 1 - Flush all batched rendering operations and wait for them to complete
+   If !pGraphics
+      return 2
 
    return DllCall("gdiplus\GdipFlush", "UPtr", pGraphics, "int", intent)
 }
@@ -2015,7 +2019,7 @@ Gdip_BlurBitmap(pBitmap, BlurAmount, usePARGB:=0, quality:=7, softEdges:=1) {
    ; quality 7 creates sharpening effect
    ; for higher speed set usePARGB to 1
 
-   If pBitmap1
+   If (!pBitmap || !IsNumber(BlurAmount))
       Return
 
    If (BlurAmount>100)
@@ -2354,30 +2358,31 @@ Gdip_GetImageDimensions(pBitmap, ByRef Width, ByRef Height) {
 }
 
 Gdip_GetImageDimension(pBitmap, ByRef w, ByRef h) {
+   Width := 0, Height := 0
    If !pBitmap
-   {
-      gdipLastError := 2
-      Return
-   }
+      Return 2
 
    return DllCall("gdiplus\GdipGetImageDimension", "UPtr", pBitmap, "float*", w, "float*", h)
 }
 
 Gdip_GetImageBounds(pBitmap) {
-  rData := {}
-  VarSetCapacity(RectF, 16, 0)
-  E := DllCall("gdiplus\GdipGetImageBounds", "UPtr", pBitmap, "UPtr", &RectF, "Int*", 0)
+   If !pBitmap
+      Return 2
 
-  If (!E) {
+   rData := {}
+   VarSetCapacity(RectF, 16, 0)
+   E := DllCall("gdiplus\GdipGetImageBounds", "UPtr", pBitmap, "UPtr", &RectF, "Int*", 0)
+
+   If (!E) {
         rData.x := NumGet(&RectF, 0, "float")
       , rData.y := NumGet(&RectF, 4, "float")
       , rData.w := NumGet(&RectF, 8, "float")
       , rData.h := NumGet(&RectF, 12, "float")
-  } Else {
+   } Else {
     Return E
-  }
+   }
 
-  return rData
+   return rData
 }
 
 Gdip_GetImageFlags(pBitmap) {
@@ -2444,6 +2449,7 @@ Gdip_GetImagePixelFormat(pBitmap, mode:=0) {
 ; PXF48RGB = 0x0010300C   ; 48 bpp; 16 bits for each RGB
 ; PXF64ARGB = 0x0034400D  ; 64 bpp; 16 bits for each RGB and alpha
 ; PXF64PARGB = 0x001A400E ; 64 bpp; 16 bits for each RGB and alpha, pre-multiplied
+; PXF32CMYK = 0x200F ; 32 bpp; CMYK
 
 ; INDEXED [1-bits, 4-bits and 8-bits] pixel formats rely on color palettes.
 ; The color information for the pixels is stored in palettes.
@@ -2454,10 +2460,10 @@ Gdip_GetImagePixelFormat(pBitmap, mode:=0) {
 
 ; modified by Marius Șucan
 
-   Static PixelFormatsList := {0x30101:"1-INDEXED", 0x30402:"4-INDEXED", 0x30803:"8-INDEXED", 0x101004:"16-GRAYSCALE", 0x021005:"16-RGB555", 0x21006:"16-RGB565", 0x61007:"16-ARGB1555", 0x21808:"24-RGB", 0x22009:"32-RGB", 0x26200A:"32-ARGB", 0xE200B:"32-PARGB", 0x10300C:"48-RGB", 0x34400D:"64-ARGB", 0x1A400E:"64-PARGB"}
+   Static PixelFormatsList := {0x30101:"1-INDEXED", 0x30402:"4-INDEXED", 0x30803:"8-INDEXED", 0x101004:"16-GRAYSCALE", 0x021005:"16-RGB555", 0x21006:"16-RGB565", 0x61007:"16-ARGB1555", 0x21808:"24-RGB", 0x22009:"32-RGB", 0x26200A:"32-ARGB", 0xE200B:"32-PARGB", 0x10300C:"48-RGB", 0x34400D:"64-ARGB", 0x1A400E:"64-PARGB", 0x200f:"32-CMYK"}
    PixelFormat := 0
-   E := DllCall("gdiplus\GdipGetImagePixelFormat", "UPtr", pBitmap, "UPtr*", PixelFormat)
-   If E
+   gdipLastError := DllCall("gdiplus\GdipGetImagePixelFormat", "UPtr", pBitmap, "UPtr*", PixelFormat)
+   If gdipLastError
       Return -1
 
    If (mode=0)
@@ -2477,6 +2483,7 @@ Gdip_GetImageType(pBitmap) {
 ; BITMAP = 1
 ; METAFILE = 2
 ; ERROR = -1
+
    result := 0
    gdipLastError := DllCall("gdiplus\GdipGetImageType", Ptr, pBitmap, "int*", result)
    If gdipLastError
@@ -2520,7 +2527,7 @@ Gdip_BitmapSetResolution(pBitmap, dpix, dpiy) {
 Gdip_BitmapGetDPIResolution(pBitmap, ByRef dpix, ByRef dpiy) {
    dpix := dpiy := 0
    If StrLen(pBitmap)<3
-      Return
+      Return 2
 
    dpix := Gdip_GetImageHorizontalResolution(pBitmap)
    dpiy := Gdip_GetImageVerticalResolution(pBitmap)
@@ -2595,6 +2602,12 @@ Gdip_CreateBitmapFromFile(sFile, IconNumber:=1, IconSize:="", useICM:=0) {
       gdipLastError := DllCall("gdiplus\GdipCreateBitmapFromFile" function2call, "WStr", sFile, "UPtr*", pBitmap)
    }
 
+   return pBitmap
+}
+
+Gdip_CreateBitmapFromFileSimplified(sFile, useICM:=0) {
+   function2call := (useICM=1) ? "ICM" : ""
+   gdipLastError := DllCall("gdiplus\GdipCreateBitmapFromFile" function2call, "WStr", sFile, "UPtr*", pBitmap)
    return pBitmap
 }
 
@@ -2690,26 +2703,26 @@ Gdip_CreateBitmapFromHBITMAP(hBitmap, hPalette:=0) {
 ; hPalette - Handle to a GDI palette used to define the bitmap colors
 ; if the hBitmap is a device-dependent bitmap [DDB].
 
+   pBitmap := 0
    If !hBitmap
    {
       gdipLastError := 2
       Return
    }
 
-   pBitmap := 0
    gdipLastError := DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", "UPtr", hBitmap, "UPtr", hPalette, "UPtr*", pBitmap)
    return pBitmap
 }
 
 Gdip_CreateHBITMAPFromBitmap(pBitmap, Background:=0xffffffff) {
 ; background should be zero, to not alter alpha channel of the image
+   hBitmap := 0
    If !pBitmap
    {
       gdipLastError := 2
       Return
    }
 
-   hBitmap := 0
    gdipLastError := DllCall("gdiplus\GdipCreateHBITMAPFromBitmap", "UPtr", pBitmap, "UPtr*", hBitmap, "int", Background)
    return hBitmap
 }
@@ -2946,8 +2959,7 @@ Gdip_CloneBitmap(pBitmap) {
 
    pBitmapDest := 0
    gdipLastError := DllCall("gdiplus\GdipCloneImage"
-               , "UPtr", pBitmap
-               , "UPtr*", pBitmapDest)
+               , "UPtr", pBitmap, "UPtr*", pBitmapDest)
 
    return pBitmapDest
 }
@@ -3223,7 +3235,7 @@ Gdip_CreatePenFromBrush(pBrush, w, Unit:=2) {
 ; 6 - A unit is 1 millimeter
 
    pPen := 0
-   dipLastError := DllCall("gdiplus\GdipCreatePen2", "UPtr", pBrush, "float", w, "int", 2, "UPtr*", pPen, "int", Unit)
+   gdipLastError := DllCall("gdiplus\GdipCreatePen2", "UPtr", pBrush, "float", w, "int", 2, "UPtr*", pPen, "int", Unit)
    return pPen
 }
 
@@ -3897,12 +3909,12 @@ Gdip_SetLinearGrBrushColors(pLinearGradientBrush, ARGB1, ARGB2) {
 Gdip_GetLinearGrBrushColors(pLinearGradientBrush, ByRef ARGB1, ByRef ARGB2) {
    Static Ptr := "UPtr"
    VarSetCapacity(colors, 8, 0)
-   gdipLastError := DllCall("gdiplus\GdipGetLineColors", Ptr, pLinearGradientBrush, "Ptr", &colors)
+   E := DllCall("gdiplus\GdipGetLineColors", Ptr, pLinearGradientBrush, "Ptr", &colors)
    ARGB1 := NumGet(colors, 0, "UInt")
    ARGB2 := NumGet(colors, 4, "UInt")
    ARGB1 := Format("{1:#x}", ARGB1)
    ARGB2 := Format("{1:#x}", ARGB2)
-   return gdipLastError
+   return E
 }
 
 Gdip_CreateLineBrushFromRect(x, y, w, h, ARGB1, ARGB2, LinearGradientMode:=1, WrapMode:=1) {
@@ -6557,8 +6569,7 @@ Gdip_LoadImageFromFile(sFile, useICM:=0) {
 ; An Image object encapsulates a bitmap or a metafile and stores attributes that you can retrieve.
    pImage := 0
    function2call := (useICM=1) ? "ICM" : ""
-   R := DllCall("gdiplus\GdipLoadImageFromFile" function2call, "WStr", sFile, "UPtrP", pImage)
-   ErrorLevel := R
+   gdipLastError := DllCall("gdiplus\GdipLoadImageFromFile" function2call, "WStr", sFile, "UPtrP", pImage)
    Return pImage
 }
 
@@ -7044,16 +7055,14 @@ Gdip_PathGradientSetCenterPoint(pBrush, X, Y) {
    VarSetCapacity(POINTF, 8)
    NumPut(X, POINTF, 0, "Float")
    NumPut(Y, POINTF, 4, "Float")
-   gdipLastError := DllCall("gdiplus\GdipSetPathGradientCenterPoint", "UPtr", pBrush, "Ptr", &POINTF)
-   Return gdipLastError
+   Return DllCall("gdiplus\GdipSetPathGradientCenterPoint", "UPtr", pBrush, "Ptr", &POINTF)
 }
 
 Gdip_PathGradientSetCenterColor(pBrush, CenterColor) {
    ; Sets the center color of this path gradient brush.
    ; pBrush             Brush object returned from Gdip_PathGradientCreateFromPath().
    ; CenterColor        ARGB color value: A(lpha)R(ed)G(reen)B(lue).
-   gdipLastError := DllCall("gdiplus\GdipSetPathGradientCenterColor", "UPtr", pBrush, "UInt", CenterColor)   
-   Return gdipLastError
+   Return DllCall("gdiplus\GdipSetPathGradientCenterColor", "UPtr", pBrush, "UInt", CenterColor)   
 }
 
 Gdip_PathGradientSetSurroundColors(pBrush, SurroundColors) {
@@ -7337,24 +7346,32 @@ Gdip_GetPathGradientSurroundColors(pPathGradientBrush) {
 ; Function written by swagfag in July 2019
 ; source https://www.autohotkey.com/boards/viewtopic.php?f=6&t=62550
 ; modified by Marius Șucan
-; whichFormat = 2;  histogram for each channel: R, G, B
-; whichFormat = 3;  histogram of the luminance/brightness of the image
+
+; whichFormat parameter defines what channels to extract the histogram from:
+   ; choose as a parameter the number based on the channel[s] that interest you
+   ; ARGB: 0, PARGB: 1, RGB: 2, Gray: 3, B: 4, G: 5, R: 6, A: 7
+
 ; Return: Status enumerated return type; 0 = OK/Success
 
-Gdip_GetHistogram(pBitmap, whichFormat, ByRef newArrayA, ByRef newArrayB, ByRef newArrayC) {
+Gdip_GetHistogram(pBitmap, whichFormat, ByRef newArrayA, ByRef newArrayB, ByRef newArrayC, ByRef newArrayD:=0) {
    Static sizeofUInt := 4
 
-   ; HistogramFormats := {ARGB: 0, PARGB: 1, RGB: 2, Gray: 3, B: 4, G: 5, R: 6, A: 7}
    z := DllCall("gdiplus\GdipBitmapGetHistogramSize", "UInt", whichFormat, "UInt*", numEntries)
-   ; msgbox, % "lol = " z
-   newArrayA := [], newArrayB := [], newArrayC := []
+   newArrayA := []
    VarSetCapacity(ch0, numEntries * sizeofUInt, 0)
-   VarSetCapacity(ch1, numEntries * sizeofUInt, 0)
-   VarSetCapacity(ch2, numEntries * sizeofUInt, 0)
-   If (whichFormat=2)
-      E := DllCall("gdiplus\GdipBitmapGetHistogram", "Ptr", pBitmap, "UInt", whichFormat, "UInt", numEntries, "Ptr", &ch0, "Ptr", &ch1, "Ptr", &ch2, "Ptr", 0)
-   Else If (whichFormat>2)
-      E := DllCall("gdiplus\GdipBitmapGetHistogram", "Ptr", pBitmap, "UInt", whichFormat, "UInt", numEntries, "Ptr", &ch0, "Ptr", 0, "Ptr", 0, "Ptr", 0)
+   If (whichFormat<=2)
+   {
+      newArrayB := [], newArrayC := [], newArrayD := []
+      VarSetCapacity(ch1, numEntries * sizeofUInt, 0)
+      VarSetCapacity(ch2, numEntries * sizeofUInt, 0)
+      If (whichFormat<2)
+         VarSetCapacity(ch3, numEntries * sizeofUInt, 0)
+   }
+     
+   E := DllCall("gdiplus\GdipBitmapGetHistogram", "Ptr", pBitmap, "UInt", whichFormat, "UInt", numEntries, "Ptr", &ch0
+      , "Ptr", (whichFormat<=2) ? &ch1 : 0
+      , "Ptr", (whichFormat<=2) ? &ch2 : 0
+      , "Ptr", (whichFormat<2) ?  &ch3 : 0)
 
    If (E=1 && A_LastError=8)
       E := 3
@@ -7362,17 +7379,16 @@ Gdip_GetHistogram(pBitmap, whichFormat, ByRef newArrayA, ByRef newArrayB, ByRef 
    Loop %numEntries%
    {
       i := A_Index - 1
-      r := NumGet(&ch0+0, i * sizeofUInt, "UInt")
-      newArrayA[i] := r
-
-      If (whichFormat=2)
+      newArrayA[i] := NumGet(&ch0+0, i * sizeofUInt, "UInt")
+      If (whichFormat<=2)
       {
-         g := NumGet(&ch1+0, i * sizeofUInt, "UInt")
-         b := NumGet(&ch2+0, i * sizeofUInt, "UInt")
-         newArrayB[i] := g
-         newArrayC[i] := b
+         newArrayB[i] := NumGet(&ch1+0, i * sizeofUInt, "UInt")
+         newArrayC[i] := NumGet(&ch2+0, i * sizeofUInt, "UInt")
+         If (whichFormat<2)
+            newArrayD[i] := NumGet(&ch3+0, i * sizeofUInt, "UInt")
       }
    }
+
    Return E
 }
 
@@ -7853,7 +7869,7 @@ Gdip_CompareBitmaps(pBitmapA, pBitmapB, accuracy:=25) {
 ; Added accuracy factor.
 
    If (!pBitmapA || !pBitmapB)
-      Return
+      Return -1
 
    If (accuracy>99)
       accuracy := 100

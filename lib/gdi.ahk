@@ -1,6 +1,6 @@
 ﻿; GDI library for AHK v1.1.
 ; made by Marius Șucan
-; License: none.
+; License: NONE
 ; Contains trace amounts from:
 ; GDI class by GeekDuede https://www.autohotkey.com/boards/viewtopic.php?t=5820
 
