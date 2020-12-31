@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 4.7.6
+;@Ahk2Exe-SetVersion 4.7.7
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2020)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -116,7 +116,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , CountFilesFolderzList := 0, RecursiveStaticRescan := 0, imgSelLargerViewPort := 0
    , UsrMustInvertFilter := 0, userActionConflictingFile := 1, LastPrevFastDisplay := 0
    , prevFileSavePath := "", imgHUDbaseUnit := Round(OSDfntSize*2.5), lastLongOperationAbort := 1
-   , lastOtherWinClose := 1, UsrCopyMoveOperation := 2, editingSelectionNow := 0
+   , lastOtherWinClose := 1, UsrCopyMoveOperation := 2, editingSelectionNow := 0, EntryMarkedMoveIndex := 0
    , ForceNoColorMatrix := 0, prevFastDisplay := 1, hSNDmediaDuration, lastMenuBarUpdated := 1
    , imgSelX1 := 0, imgSelY1 := 0, imgSelX2 := -1, imgSelY2 := -1, adjustNowSel := 0
    , prevImgSelX1 := 0, prevImgSelY1 := 0, prevImgSelX2 := -1, prevImgSelY2 := -1, prevSelDotX := "", prevSelDotY := "", prevSelDotAx := "", prevSelDotAy := ""
@@ -155,14 +155,14 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , SelectionCoordsType := 1, PasteInPlaceAlphaFile := "", infoBoxGdiCached := "", watchFolderDetails := ""
    , FilteruMinRange, FilteruMaxRange, userFilterSizeProperty := 1, qpvCanvasHasInit := 0, coreDesiredPixFmt := "0xE200B"
    , FilteruDateMinRange, FilteruDateMaxRange, InternalFilterString, userFilterProperty := 1, userFindDupePresets := 1
-   , HUDobjNavBoxu := [], HUDobjHistoBoxu := [], globalhFIFimg := 0, userAddedFavesCount := 0
+   , HUDobjNavBoxu := [], HUDobjHistoBoxu := [], globalhFIFimg := 0, userAddedFavesCount := 0, bckpCurrentFileIndex := 0
    , maxFavesEntries := 54321, gdipLastError := 0, hasDrawnImageMap := 0, hasDrawnHistoMap := 0
    , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0
    , QPVpid := GetCurrentProcessId(), preventUndoLevels := 0, maxMemUndoLevels := 979394, delayiedHUDmsg := ""
    , delayiedHUDperc := 0, delayedfunc2exec := 0, lastOSDtooltipInvoked := 1, lastTimeToggleThumbs := 1
    , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := [], countGDIobjects := 0
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "4.7.6", vReleaseDate := "29/12/2020"
+   , appVersion := "4.7.7", vReleaseDate := "31/12/2020"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -1370,7 +1370,12 @@ HKifs(q:=0) {
 
     vk58 Up::   ; X
       If HKifs("imgsLoaded")
-         PlayAudioFileAssociatedNow()
+      {
+         If (thumbsDisplaying=1 && maxFilesIndex>1 && currentFileIndex>0)
+            moveMarkedEntryNow(currentFileIndex)
+         Else
+            PlayAudioFileAssociatedNow()
+      }
     Return
 
     +vk58 Up::   ; Shift+X
@@ -1833,6 +1838,7 @@ activateFilesListFilterBasedOnFolder(thisIndex) {
    coreEnableFiltru(thisFilter)
    showDelayedTooltip("Files list filtered to current image file path:`n" OutDir "\", 0, 325)
    SetTimer, RemoveTooltip, % -msgDisplayTime
+   dummyTimerDelayiedImageDisplay(100)
 }
 
 escRoutine() {
@@ -2605,7 +2611,8 @@ invertRecursiveness() {
 
 MenuRemFilesListFilter() {
    remFilesListFilter()
-   SetTimer, RandomPicture, -150
+   ; SetTimer, RandomPicture, -150
+   dummyTimerDelayiedImageDisplay(50)
 }
 
 remFilesListFilter(dummy:=0) {
@@ -2615,6 +2622,7 @@ remFilesListFilter(dummy:=0) {
       prevFilter := filesFilter
       filesFilter := ""
       FilterFilesIndex(0, 0, prevFilter)
+      currentFileIndex := clampInRange(bckpCurrentFileIndex, 1, maxFilesIndex)
    } Else coreEnableFiltru("")
 }
 
@@ -2728,11 +2736,9 @@ TrueCleanup(mustExit:=1) {
    activeSQLdb.Close()
    seenImagesDB.Close()
    If AnyWindowOpen
-   {
-      CloseWindow()
-      Sleep, 10
-   }
+      BtnCloseWindow()
 
+   Sleep, 10
    WinSet, Region, 0-0 w1 h1, ahk_id %PVhwnd%
    RegWrite, REG_SZ, %QPVregEntry%, Running, 0
    If StrLen(hitTestSelectionPath)>1
@@ -3907,7 +3913,7 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0) {
       ; handle clicks on thumbnails and the vertical scrollbar
       GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
       scrollXpos := mainWidth - imgHUDbaseUnit//2
-      statusBarYpos := mainHeight - ThumbsStatusBarH
+      statusBarYpos := Round(mainHeight - ThumbsStatusBarH)
       If (mX>scrollXpos)
       {
          If (mainParam!="rclick")
@@ -3943,20 +3949,31 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0) {
 
       maxWidu := maxItemsW*thumbsW - 1
       maxHeitu := maxItemsH*thumbsH  - 1
-      If (mainParam!="rClick" && newIndex=currentFileIndex) && (A_TickCount - lastInvoked>350)
-      {
-         ToggleThumbsMode()
-         Return
-      }
 
       If newIndex
       {
-         newIndex := clampInRange(newIndex, 1, maxFilesIndex)
          If (GetKeyState("Ctrl", "P") && mainParam!="rClick")
+            clickAct := "C"
+         Else If (GetKeyState("Alt", "P") && mainParam!="rClick")
+            clickAct := "A"
+         Else If (GetKeyState("Shift", "P") && mainParam!="rClick")
+            clickAct := "S"
+         Else If (mainParam!="rClick" && newIndex=currentFileIndex) && (A_TickCount - lastInvoked>350)
+         {
+            ToggleThumbsMode()
+            Return
+         }
+
+         newIndex := clampInRange(newIndex, 1, maxFilesIndex)
+         If (clickAct="C")
          {
             disAllowLongTap := 1
             markThisFileNow(newIndex)
-         } Else If (GetKeyState("Shift", "P") && mainParam!="rClick")
+         } Else If (clickAct="A")
+         {
+            disAllowLongTap := 1
+            moveMarkedEntryNow(newIndex)
+         } Else If (clickAct="S")
          {
             disAllowLongTap := 1
             keyu := (newIndex>currentFileIndex) ? "Down" : "Upu"
@@ -13637,7 +13654,10 @@ PanelImageInfos() {
 }
 
 BtnCloseWindow() {
+   Critical, on
    CloseWindow("yes")
+   If AnyWindowOpen
+      BtnCloseWindow()
 }
 
 InfoBtnNextImg() {
@@ -14421,7 +14441,7 @@ simpleMsgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, modality
 
 coreEnableFiltru(stringu, noStringProcessing:=0) {
   If (stringu="\>")
-     filesFilter := ""
+     stringu := filesFilter := ""
 
   prevFilter := filesFilter
   backCurrentSLD := CurrentSLD
@@ -14434,6 +14454,7 @@ coreEnableFiltru(stringu, noStringProcessing:=0) {
      thereWasFilter := 0
      bckpResultedFilesList := []
      bckpResultedFilesList := resultedFilesList.Clone()
+     bckpCurrentFileIndex := currentFileIndex
      bckpMaxFilesIndex := maxFilesIndex
   } Else thereWasFilter := 1
 
@@ -14458,10 +14479,21 @@ coreEnableFiltru(stringu, noStringProcessing:=0) {
   } Else SoundBeep, 900, 100
 
   CurrentSLD := backCurrentSLD
-  SetTimer, ResetImgLoadStatus, -50
-  If (maxFilesIndex>0 && doRandom=1)
-     RandomPicture()
+  If !filesFilter
+  {
+     ; ToolTip, haha , , , 2
+     currentFileIndex := clampInRange(bckpCurrentFileIndex, 1, maxFilesIndex)
+     If (maxFilesIndex>0 && doRandom=1)
+        dummyTimerDelayiedImageDisplay(50)
+  } Else If (maxFilesIndex>0 && doRandom=1)
+  {
+     ; SoundBeep 1200, 100
+     currentFileIndex := 1
+     dummyTimerDelayiedImageDisplay(50)
+     ; RandomPicture()
+  }
 
+  SetTimer, ResetImgLoadStatus, -50
   SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -14778,7 +14810,7 @@ InListMultiEntriesRemover(dummy:=0) {
          changeMcursor()
          showTOOLtip("Removing files list index filter, please wait")
          remFilesListFilter("simple")
-         RandomPicture()
+         dummyTimerDelayiedImageDisplay(50)
       } Else
       {
          msgBoxWrapper(appTitle ": WARNING", "No files left in the index of " appTitle ", please (re)open a file or folder.", 0, 0, "info")
@@ -14806,9 +14838,9 @@ remCurrentEntry(dummy, silentus:=0, whichIndex:=0) {
    If StrLen(filesFilter)>1
    {
       ; oldIndex :=  filteredMap2mainList[thisFileIndex]
+      updateMainUnfilteredList(thisFileIndex, 1, "")
       file2remC := filteredMap2mainList.RemoveAt(thisFileIndex)
       ; file2remB := bckpResultedFilesList[oldIndex, 1]
-      updateMainUnfilteredList(thisFileIndex, 1, "")
       ; Sleep, 200
       ; ToolTip, % file2remC " b " oldIndex " a " file2remB "`n" file2remA, , , 2
    }
@@ -14838,7 +14870,8 @@ remCurrentEntry(dummy, silentus:=0, whichIndex:=0) {
       {
          showTOOLtip("Removing files list index filter, please wait")
          remFilesListFilter("simple")
-         RandomPicture()
+         dummyTimerDelayiedImageDisplay(50)
+         ; RandomPicture()
       } Else
       {
          msgBoxWrapper(appTitle, "No files left in the index of " appTitle ", please (re)open a file or folder.", 0, 0, "info")
@@ -15326,8 +15359,9 @@ SQLdbGenerateStaticFolders() {
 
 getDynamicFoldersList(fileu:=0) {
    If !fileu
-      fileu := CurrentSLD
-   listu := (RegExMatch(fileu, sldsPattern) && FileExist(fileu) && InStr(DynamicFoldersList, "|hexists|")) ? coreLoadDynaFolders(fileu) : DynamicFoldersList
+      fileu := RegExMatch(CurrentSLD, sldsPattern) ? CurrentSLD : ""
+
+   listu := (fileu && FileExist(fileu) && InStr(DynamicFoldersList, "|hexists|")) ? coreLoadDynaFolders(fileu) : DynamicFoldersList
    listu := StrReplace(listu, "|hexists|")
    Sort, listu, UD`n
    Return listu
@@ -15610,9 +15644,7 @@ SaveFilesList(enforceFile:=0) {
       }
 
       Sleep, 2
-      If AnyWindowOpen
-         CloseWindow("yes")
-
+      BtnCloseWindow()
       startOperation := A_TickCount
       backCurrentSLD := CurrentSLD
       CurrentSLD := ""
@@ -15626,6 +15658,7 @@ SaveFilesList(enforceFile:=0) {
          showTOOLtip("Saving folders index in`n" file2save "`nPlease wait")
 
       thisTmpFile := !newTmpFile ? backCurrentSLD : newTmpFile
+      ; ToolTip, % thisTmpFile "=" , , , 2
       saveDynaFolders := getDynamicFoldersList(thisTmpFile)
       dynaFolderListu := "`n[DynamicFolderz]`n"
       Loop, Parse, saveDynaFolders, `n
@@ -18629,7 +18662,7 @@ dropFilesSelection(silentMode:=0) {
    If (!markedSelectFile && silentMode=1)
       Return
 
-   markedSelectFile := 0
+   EntryMarkedMoveIndex := markedSelectFile := 0
    startZeit := A_TickCount
    Loop, % maxFilesIndex
        resultedFilesList[A_Index, 2] := 0
@@ -18940,7 +18973,7 @@ DeleteActivePicture() {
 BTNmultiDel() {
    Critical, on
    GuiControlGet, preventDBentryRemoval
-   Sleep, 100
+   Sleep, 10
    TglOptionMove2recycler()
    BtnCloseWindow()
    If (userMultiDelChoice=3 || userMultiDelChoice=1)
@@ -19748,6 +19781,26 @@ defineSQLdbSort() {
    Return defaultSort
 }
 
+moveMarkedEntryNow(indexu) {
+   If (thumbsDisplaying!=1 || maxFilesIndex<2)
+      Return
+
+   If !EntryMarkedMoveIndex
+   {
+      EntryMarkedMoveIndex := indexu
+   } Else If (EntryMarkedMoveIndex=indexu)
+   {
+      EntryMarkedMoveIndex := 0
+   } Else If isNumber(EntryMarkedMoveIndex)
+   {
+      moveIndexEntry(EntryMarkedMoveIndex, indexu)
+      currentFileIndex := EntryMarkedMoveIndex
+      EntryMarkedMoveIndex := 0
+   }
+
+   mainGdipWinThumbsGrid()
+}
+
 moveIndexEntry(newFileIndex, oldIndex) {
    If (SLDtypeLoaded=3)
    {
@@ -19779,6 +19832,8 @@ moveIndexEntry(newFileIndex, oldIndex) {
       bckpResultedFilesList[filteredMap2mainList[oldIndex], 1] := tempB
       bckpResultedFilesList[filteredMap2mainList[newFileIndex], 1] := tempA
    }
+
+   currentFilesListModified := 1
    ForceRefreshNowThumbsList()
    currentFileIndex := newFileIndex
    dummyTimerDelayiedImageDisplay(125)
@@ -20170,12 +20225,8 @@ BTNopenPanelDynamicFolderzWindow() {
 }
 
 BTNsaveCurrentSlideshow() {
-    If AnyWindowOpen
-    {
-       Sleep, 100
-       BtnCloseWindow()
-       Sleep, 100
-    }
+    BtnCloseWindow()
+    Sleep, 50
 
     If InStr(CurrentSLD, "\QPV\favourite-images-list.SLD")
        renewFavesListBasedOnIndexList()
@@ -25008,9 +25059,11 @@ StringToASC(string) {
    If (string=lastInvoked)
       Return lastAsc
 
+   ; AscString := StrLen(string)
    Loop, Parse, string 
-      AscString .= Ord(A_LoopField)
- 
+      AscString .= RegExMatch(A_LoopField, "[[:alnum:]]") ? A_LoopField : Ord(A_LoopField)
+
+   ; ToolTip, % AscString , , , 2 
    lastInvoked := string
    lastAsc := AscString
    Return AscString
@@ -26102,7 +26155,7 @@ renewCurrentFilesList() {
    resultedFilesList := []
    lastRenameUndo := []
    prevLastImg := []
-   markedSelectFile := maxFilesIndex := 0
+   markedSelectFile := EntryMarkedMoveIndex := maxFilesIndex := 0
    editingSelectionNow := prevRandyIMGnow := 0
    ForceRefreshNowThumbsList()
    updateUIctrl()
@@ -35129,6 +35182,8 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, mustShowNames:=0) {
            Gdip_DrawRectangle(2NDglPG, pPen3, DestPosX, DestPosY, thumbsW, thumbsH)
            Gdip_FillRectangle(2NDglPG, pBrush3, DestPosX, DestPosY, thumbsW, thumbsH)
         }
+        If (thisFileIndex=EntryMarkedMoveIndex)
+           Gdip_FillRectangle(2NDglPG, pBrushC, DestPosX, DestPosY, thumbsW, thumbsH)
     }
 
     If (countSel>markedSelectFile && countSel>1 && markedSelectFile>1)
@@ -37621,7 +37676,7 @@ AboutWindow() {
 
     Gui, Tab, 2 ; keyboard 
     Gui, Add, ListView, x+15 y+15 w%lstWid% r10 Grid vLViewOthers, Keys|Action|Context|Opens
-    Gui, Add, Edit, xp y+10 wp -multi -wantTab gfilterListViewKbdsAbout +hwndhEditField vlistViewFilteru,
+    Gui, Add, Combobox, xp y+10 wp gfilterListViewKbdsAbout +hwndhEditField vlistViewFilteru, \Files list|\Image view|\Live editing|\Anywhere|\Panel
 
     cmdHelp := "QPV can be invoked with command line arguments. Examples:`n`n1. Open a folder:`nqpv.exe ""fd=C:\example folder\tempus""`n`nAdd a pipe ""|"" after equal ""="" to have images loaded recursively."
     cmdHelp .= "`n`n2. Call an internal function:`nqpv.exe call_ToggleThumbsMode() ""fd=C:\folder\tempus""`n`nThis will index all the images in the given folder and switch to thumbnails mode.`n`nOnly functions that need no parameters can be invoked. If multiple call_ are used, only the last valid one will be considered."
@@ -37669,6 +37724,9 @@ PopulateAboutKbdShortcutsList(listFilter:=0) {
 
 filterListViewKbdsAbout() {
    GuiControlGet, listViewFilteru
+   If (SubStr(listViewFilteru, 1, 1)="\" && StrLen(listViewFilteru)>3) 
+      listViewFilteru := StrReplace(listViewFilteru, "\", "|")
+
    PopulateAboutKbdShortcutsList(listViewFilteru)
 }
 
@@ -40633,6 +40691,7 @@ BTNpasteDynaFoldersList() {
     If (SLDtypeLoaded=3)
        recreateDynaFoldersSQLdbList(newFoldersList)
 
+    currentFilesListModified := 1
     Sleep, 50
     ResetImgLoadStatus()
     PanelDynamicFolderzWindow()
@@ -40649,6 +40708,7 @@ RemDynaSelFolder() {
     Sleep, 50
     mustOpenStartFolder := ""
     foldersListu := getDynamicFoldersList()
+    currentFilesListModified := 1
     Loop, Parse, foldersListu, `n
     {
         line := Trimmer(A_LoopField)
@@ -41038,10 +41098,13 @@ remFilesFromList(SelectedDir, silentus:=0, forReal:=1) {
 
     If (filesRemoved<1)
        filesRemoved := 0
+    Else
+       currentFilesListModified := 1
+
+    CurrentSLD := backCurrentSLD
     If (silentus=0)
        showTOOLtip("Finished removing " filesRemoved " files from the list")
 
-    CurrentSLD := backCurrentSLD
     Sleep, 25
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
@@ -41517,6 +41580,7 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
           Return
     }
 
+    Sleep, 5
     If (imgEditPanelOpened!=1)
        ResetImgLoadStatus()
 

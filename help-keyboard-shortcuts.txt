@@ -120,6 +120,8 @@ Shift + R|Rotate selection by 45°|Image selection|-
 S|Toggle slideshow modes|Image view|-
 T|Toggle image rescaling/adapting modes|Image view|-
 U|Viewport colors and image adjustments|Image view|Panel
+X|Mark active index to move to a different index|Files list|-
+X|Move active index to a different index|Files list|-
 X|Play associated audio file|Image view|-
 Shift + X|Stop audio playback|Image view|-
 8|Decrease audio volume by 5%|Image view|-
@@ -131,8 +133,8 @@ Right Click|Open main menu or context menu|Anywhere|Menu
 Apps key|Open main menu or context menu|Anywhere|Menu
 Left|Previous image|Anywhere|-
 Right|Next image|Anywhere|-
-Down|Next line of images [according to the list view mode]|Anywhere|-
-Up|Previous line of images [according to the list view mode]|Anywhere|-
+Down|Next line of images [based on list view mode]|Anywhere|-
+Up|Previous line of images [based on list view mode]|Anywhere|-
 Home|Jump to the first image in index|Anywhere|-
 End|Jump to the last image in index|Anywhere|-
 Wheel Down|Previous image or two lines of images|Anywhere|-

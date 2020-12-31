@@ -2,6 +2,12 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.7.7 (2020-12-31)
+  - [new] the ability to move index entries using X key or Alt+Click in list view/thumbnails mode
+  - important bug fixes
+    - removing index entries when the files list was filtered resulted in files list corruption
+    - on files list resave, the main folders list got lost sometimes
+
 - v4.7.6 (2020-12-29)
   - [new] panel to help identify image duplicates, by multiple criteria or visual similarity
   - [new] indexed files list statistics panel; offers a detailed breakdown of the files and it can be used to filter the files based on file dates, file sizes, resolution, histogram data and more
@@ -10,7 +16,7 @@
   - [new] shift+right-click menu; this is a selection of common functions
   - [new] option to reverse order on sort
   - [new] option to calculate total file sizes of selected files
-  - [new] option to purge image properties cached data [when files list svaed as a database]
+  - [new] option to purge image properties cached data [when files list saved as a database]
   - [new] option to remove or not inexistent files from files list index on sort
   - [new] option to search and replace in files list records
   - [new] option to sort images based on more properties; e.g., histogram minimum and maximum/peak and other details; helpful to identify washed-out or low key images
