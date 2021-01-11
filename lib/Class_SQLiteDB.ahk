@@ -723,6 +723,10 @@ Class SQLiteDB {
    ; Return values:        On success  - True
    ;                       On failure  - False, ErrorMsg / ErrorCode contain additional information
    ; ===================================================================================================================
+   Close() {
+      This.CloseDB()
+   }
+
    CloseDB() {
       This.ErrorMsg := ""
       This.ErrorCode := 0

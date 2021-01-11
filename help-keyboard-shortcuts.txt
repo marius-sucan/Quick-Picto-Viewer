@@ -37,6 +37,8 @@ Ctrl + 3|Sort list by file name|Files list|-
 Ctrl + 4|Sort list by file size|Files list|-
 Ctrl + 5|Sort list by file modified date|Files list|-
 Ctrl + 6|Sort list by file created date|Files list|-
+Ctrl + 7|Sort list by image properties|Files list|Panel
+Ctrl + 8|Sort list by image histogram data|Files list|Panel
 Ctrl + A|Select all [files or image canvas]|Anywhere|-
 Ctrl + X|Cut file(s) (for Explorer)|Files list|-
 Ctrl + C|Copy file(s) (for Explorer)|Files list|-
@@ -91,7 +93,7 @@ Shift + F|Toggle between color modes/filters|Anywhere|-
 F1|Help / About|Anywhere|Panel
 F10|Toggle toolbar / menu bar|Anywhere|-
 F11|Toggle full-screen|Image view|Mode switch
-F11|Collapse/expand panel for current tool|Live editing|-
+F11|Collapse / expand panel for current tool|Live editing|Panel
 F12|Preferences|Anywhere|Panel
 F2|Rename file(s)|Files list|Panel
 F5|Reload files list or image file|Anywhere|-
@@ -127,7 +129,7 @@ Shift + X|Stop audio playback|Image view|-
 8|Decrease audio volume by 5%|Image view|-
 Shift + 8|Increase audio volume by 5%|Image view|-
 Middle Click|Switch between image list and image view|Anywhere|Mode switch
-Middle Click|Collapse/expand live edit panel|Anywhere|Undefined
+Middle Click|Collapse / expand live edit panel|Live editing|Panel
 Double Click|Toggle between image view modes|Anywhere|-
 Right Click|Open main menu or context menu|Anywhere|Menu
 Apps key|Open main menu or context menu|Anywhere|Menu
@@ -179,7 +181,7 @@ Shift + Arrow keys|Select files|Files list|-
 Shift + Insert|Add folder(s) to files index list|Files list|Folder selector
 Shift + O|Open folder recursively|Anywhere|Folder selector
 Shift + Space|Drop files selection [if any], stop or start slideshow|Anywhere|-
-Shift + S|Calculate file sizes for selected files|Anywhere|-
+Ctrl + L|Calculate file sizes for selected files|Anywhere|-
 Shift + T|Insert text into selected area|Image selection|Panel
 Shift + Tab|Drop files selection [select none]|Files list|-
 Ctrl + Tab|Filter files list to selected files|Files list|-
@@ -187,4 +189,19 @@ Shift + U|Apply viewport color adjustments or effects to selected area|Image sel
 Shift + ~|Open Quick Picto Viewer session events journal|Anywhere|Panel
 Page Up / Down|Move selection area on X axis|Live editing|-
 Home / End|Move selection area on Y axis|Live editing|-
+Ctrl + Page Up / Down|Move up/down the hierarchy of folders (as in a breadcrumb)|Files list|-
+Alt + Page Up / Down|Open next or previous sibling folder (in the hierarchy of folders)|Files list|-
+Shift + F4|Current folder navigation options|Anywhere|Menu
+F4|Switch to or open folders tree view|Anywhere|Panel
+F9|Populate tree view with active file path|Folder tree|-
+F5|Regenerate tree view|Folder tree|-
+F3|Append images from selected folder to current files list|Folder tree|-
+F7|Create new folder in the selected one|Folder tree|-
+F2|Rename selected folder|Folder tree|-
+Ctrl + Enter|Open selected folder in Explorer|Folder tree|-
+Shift + Enter|Open selected folder in a new QPV instance|Folder tree|-
+Delete|Delete folder|Folder tree|-
+Space|Scan for sub-folders in the selected folder|Folder tree|-
+7|Copy selected or active file(s) into...|Folder tree|-
+Shift+7|Move selected or active file(s) into...|Folder tree|-
 Arrow keys|Navigate between indexed files|Anywhere|-

@@ -26,8 +26,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , userAllowWindowDrag := 0, drawingShapeNow := 0, isAlwaysOnTop, lastMenuBarUpdate := 1
      , mainWinPos := 0, mainWinMaximized := 1, mainWinSize := 0, PrevGuiSizeEvent := 0
      , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0
-     , currentFilesListModified := 0
-
+     , currentFilesListModified := 0, folderTreeWinOpen := 0
 
 Global allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, askDeleteFiles
 , AutoDownScaleIMGs, autoPlaySNDs, autoRemDeadEntry, ColorDepthDithering, countItemz, currentFileIndex, CurrentSLD, defMenuRefreshItm, doSlidesTransitions
@@ -880,27 +879,38 @@ byeByeRoutine() {
    {
        drawingShapeNow := 0
        lastInvokedThis := A_TickCount
+       lastOtherWinClose := A_TickCount
        MainExe.ahkPostFunction("stopDrawingShape")
+   } Else If (folderTreeWinOpen=1)
+   {
+       lastOtherWinClose := A_TickCount
+       folderTreeWinOpen := 0
+       lastInvokedThis := A_TickCount
+       MainExe.ahkPostFunction("fdTreeClose")
    } Else If ((AnyWindowOpen || thumbsDisplaying=1 || slideShowRunning=1) && (imageLoading!=1 && runningLongOperation!=1)) || (animGIFplaying=1)
    {
       lastInvokedThis := A_TickCount
       lastInvoked := A_TickCount
       If AnyWindowOpen
       {
+         lastOtherWinClose := A_TickCount
          AnyWindowOpen := 0
          MainExe.ahkPostFunction("CloseWindow")
       } Else If (animGIFplaying=1)
       {
+         lastOtherWinClose := A_TickCount
          If (slideShowRunning=1)
             turnOffSlideshow()
          animGIFplaying := 0
          MainExe.ahkPostFunction("autoChangeDesiredFrame", "stop")
       } Else If (slideShowRunning=1)
       {
+         lastOtherWinClose := A_TickCount
          turnOffSlideshow()
       } Else If (thumbsDisplaying=1)
       {
          thumbsDisplaying := 0
+         lastOtherWinClose := A_TickCount
          MainExe.ahkPostFunction("MenuReturnIMGedit")
       } Else lastCloseInvoked++
    } Else If (StrLen(UserMemBMP)>3 && undoLevelsRecorded>1) || (currentFilesListModified=1)

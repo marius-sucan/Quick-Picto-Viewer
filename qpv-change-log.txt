@@ -2,6 +2,14 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.8.0 (2021-01-11)
+  - [new] folder tree view - options to facilitate the copy and movement of files and to open, delete, rename folders
+  - [new] keyboard shortcuts to go up or down the hierarchy of folders; ctrl + page up/down
+  - [new] keyboard shortcuts to go to the next or previous sibling folder of the currently opened folder; alt + page up/down
+  - [new] menu where users can jump to different folders related to the currently opened folder: siblings, subfolders or parent folders - keyboard shortcut [Shift+F4]
+  - major performance improvements related to plain-text files list saving, files list deduplication, and other actions
+  - fixed regression: files collision dialog box never showed up [bug introduced in v4.7.6]
+
 - v4.7.7 (2020-12-31)
   - [new] the ability to move index entries using X key or Alt+Click in list view/thumbnails mode
   - important bug fixes

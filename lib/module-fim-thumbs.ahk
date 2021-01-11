@@ -108,7 +108,7 @@ MonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerIm
  
    hFIFimgX := FreeImage_Rescale(hFIFimgA, ResizedW, ResizedH, resizeFilter)
    FreeImage_UnLoad(hFIFimgA)
-   If hFIFimgX
+   If StrLen(hFIFimgX)>1
    {
       hFIFimgA := hFIFimgX
    } Else
@@ -146,7 +146,7 @@ MonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerIm
       ; hFIFimgB := FreeImage_MakeThumbnail(hFIFimgA, thumbsSizeQuality, 0)
       hFIFimgB := FreeImage_Rescale(hFIFimgA, ResizedW, ResizedH, resizeFilter)
       FreeImage_UnLoad(hFIFimgA)
-      If hFIFimgB
+      If StrLen(hFIFimgB)>1
       {
          hFIFimgA := hFIFimgB
       } Else
@@ -160,7 +160,7 @@ MonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerIm
       }
    }
 
-   If hFIFimgA
+   If StrLen(hFIFimgA)>1
    {
       imgBPP := Trim(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
       thisZeit := A_TickCount - startZeit
@@ -307,11 +307,15 @@ gdipMonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, resiz
    ; cleanupThread()
 }
 
-
 ConvertFimObj2pBitmap(hFIFimgD, imgW, imgH) {
   ; hFIFimgD := FreeImage_ConvertTo(hFIFimgC, "24Bits")
+  If StrLen(hFIFimgD)<3
+     Return
+
   bitmapInfo := FreeImage_GetInfo(hFIFimgD)
   pBits := FreeImage_GetBits(hFIFimgD)
+  If (!bitmapInfo || !pBits)
+     Return
 
   nBitmap := Gdip_CreateBitmapFromGdiDib(bitmapInfo, pBits)
   pBitmap := Gdip_CreateBitmap(imgW, imgH, 0xE200B)    ; 24-RGB
@@ -512,6 +516,9 @@ FreeImage_UnLoad(hImage) {
 }
 
 FreeImage_GetBPP(hImage) {
+   If StrLen(hImage)<3
+      Return
+
    Return DllCall(getFIMfunc("GetBPP"), "int", hImage)
 }
 

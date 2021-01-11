@@ -388,6 +388,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   MsgBox2InputHook.Wait()
   r := []
   Sleep, 1
+  Gui, WinMsgBox: Default
   GuiControlGet, UsrCheckBoxu
   GuiControlGet, DropListuChoice
   GuiControlGet, 2ndDropListuChoice
@@ -443,6 +444,7 @@ WatchMsgBox2Win() {
 }
 
 MsgBox2event(CtrlHwnd, GuiEvent, EventInfo) {
+  Gui, WinMsgBox: Default
   GuiControlGet, btnFocused, WinMsgBox: FocusV
   ControlGetText, btnText, , ahk_id %CtrlHwnd%
   If btnFocused
@@ -467,6 +469,7 @@ MsgBox2InputHookKeyDown(iHook, VK, SC) {
   If (hwnd!=MsgBox2hwnd)
      Return
 
+  Gui, WinMsgBox: Default
   GuiControlGet, btnText, WinMsgBox: FocusV
   keyPressed := GetKeyName(Format("vk{:x}sc{:x}", VK, SC))
   If (keyPressed="Escape" || keyPressed="f4")
