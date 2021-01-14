@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 4.8.0
+;@Ahk2Exe-SetVersion 4.8.1
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2020)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -157,14 +157,14 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , FilteruMinRange, FilteruMaxRange, userFilterSizeProperty := 1, qpvCanvasHasInit := 0, coreDesiredPixFmt := "0xE200B"
    , FilteruDateMinRange, FilteruDateMaxRange, InternalFilterString, userFilterProperty := 1, userFindDupePresets := 1
    , HUDobjNavBoxu := [], HUDobjHistoBoxu := [], globalhFIFimg := 0, userAddedFavesCount := 0, bckpCurrentFileIndex := 0
-   , maxFavesEntries := 54321, gdipLastError := 0, hasDrawnImageMap := 0, hasDrawnHistoMap := 0
+   , maxFavesEntries := 54321, gdipLastError := 0, hasDrawnImageMap := 0, hasDrawnHistoMap := 0, lastZeitFileSelect := 1
    , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0
    , QPVpid := GetCurrentProcessId(), preventUndoLevels := 0, maxMemUndoLevels := 979394, delayiedHUDmsg := ""
    , delayiedHUDperc := 0, delayedfunc2exec := 0, lastOSDtooltipInvoked := 1, lastTimeToggleThumbs := 1
    , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := [], countGDIobjects := 0
    , TVlistFolders, hfdTreeWinGui, folderTreeWinOpen := 0
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "4.8.0", vReleaseDate := "11/01/2021"
+   , appVersion := "4.8.1", vReleaseDate := "14/01/2021"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -400,7 +400,7 @@ HKifs(q:=0) {
     Return
 
     w::   ; to-do  to do
-    ; testMemCrash()
+       ;  testMemCrash()
     ; MsgBox, % "122+5"
      ; a := "0x" ConvertBase(2, 16, "0100110110010110010010010010110010100010001000011111110101110101")
      ; b := "0x" ConvertBase(2, 16, "0101110110010110010010010010110010100010001000011011110101110111")
@@ -1317,6 +1317,11 @@ HKifs(q:=0) {
       }
     Return
 
+    ^BackSpace::
+      If HKifs("imgsLoaded")
+         jumpPreviousImage()
+    Return
+
     vkBE::    ; [,]
       If HKifs("imgsLoaded")
          IncreaseSlideSpeed()
@@ -1446,7 +1451,7 @@ HKifs(q:=0) {
     Return
     
     F4::
-      If HKifs("imgsLoaded")
+      ; If HKifs("imgsLoaded")
          PanelFoldersTree()
     Return
 
@@ -11067,6 +11072,7 @@ thumbsSelector(keyu, aKey, prevFileIndex) {
      }
 
      markedSelectFile++
+     lastZeitFileSelect := A_TickCount
   } Else If InStr(aKey, "+") ; && (keyu="Upu" || keyu="Down"))
   {
      direction := (keyu="Down" || keyu="PgDn" || keyu="End") ? 1 : 0
@@ -11079,15 +11085,18 @@ thumbsSelector(keyu, aKey, prevFileIndex) {
      {
         selA := selB := 0
         dropFilesSelection(1)
+        lastZeitFileSelect := A_TickCount
      }
 
      If (selA!=1 && selB!=1) || (selA!=1 && selB=1) || (selA=1 && selB!=1)
      {
         selectFilesRange(currentFileIndex, prevFileIndex, 1)
+        lastZeitFileSelect := A_TickCount
      } Else If (selA=1 && selB=1)
      {
         selectFilesRange(currentFileIndex, prevFileIndex, 0)
         resultedFilesList[currentFileIndex, 2] := 1
+        lastZeitFileSelect := A_TickCount
         markedSelectFile++
      }
   }
@@ -11095,6 +11104,7 @@ thumbsSelector(keyu, aKey, prevFileIndex) {
   If (markedSelectFile=1 && InStr(aKey, "+"))
   {
      markedSelectFile := 0
+     lastZeitFileSelect := A_TickCount
      resultedFilesList[currentFileIndex, 2] := 0
   }
 }
@@ -11122,7 +11132,7 @@ selectFilesRange(pA, pB, sel) {
         Else If (sel!=1 && oSel=1)
            markedSelectFile--
     }
-
+    lastZeitFileSelect := A_TickCount
     Return rangeC
 }
 
@@ -11153,6 +11163,7 @@ jumpSelectRangeGiven(pA, pB) {
    Loop, % rangeC
       resultedFilesList[mA + A_Index - 1, 2] := (msgResult="add" || !msgResult) ? 1 : 0
 
+   lastZeitFileSelect := A_TickCount
    getSelectedFiles(0, 1)
    ResetImgLoadStatus()
    ForceRefreshNowThumbsList()
@@ -11745,6 +11756,9 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1) {
     interfaceThread.ahkassign("imgEditPanelOpened", imgEditPanelOpened)
     If (imgEditPanelOpened=1)
     {
+       If (folderTreeWinOpen=1)
+          fdTreeClose()
+
        o_ImgQuality := userimgQuality
        If (userimgQuality=1)
          ToggleImgQuality("lowu")
@@ -13744,7 +13758,7 @@ PanelFoldersTree() {
     folderTreeWinOpen := 1
     interfaceThread.ahkassign("folderTreeWinOpen", folderTreeWinOpen)
     hasRan := 1
-    FolderTreeRepopulate()
+    SetTimer, FolderTreeRepopulate, -100
 }
 
 folderTreeCopyPath() {
@@ -13896,12 +13910,25 @@ folderTreeInfoLineUpdater() {
     Gui, fdTreeGuia: Default
     Gui, fdTreeGuia: TreeView, TVlistFolders
     c := TV_GetSelection()
-    If !c
-       Return
-    thisFolder := folderTreeGetSelectedPath(c)
+
+    If c
+       thisFolder := folderTreeGetSelectedPath(c)
+
     thisfolder := SubStr(thisFolder, 1, InStr(thisFolder, "\", 0, -1))
-    If !thisFolder
-       thisFolder := "Folder tree: " TV_GetCount() " elements"
+    If (!thisFolder && c)
+       TV_GetText(OutputVar, c)
+    Else If !thisFolder
+       thisFolder := driveInfo "Folder tree: " TV_GetCount() " elements"
+
+    If InStr(OutputVar, ":\")
+    {
+       Try DriveGet, info, Label, %OutputVar%
+       Try DriveGet, size, Capacity, %OutputVar%
+       Try DriveSpaceFree, FreeSpace, %OutputVar%
+       perc := Round((FreeSpace/size)*100, 1) "%"
+       driveInfo .= info " - " perc " free | "
+       thisFolder := driveInfo "Folder tree: " TV_GetCount() " elements"
+    }
 
     GuiControl, fdTreeGuia:, fdTreeInfoLine, % thisFolder
 }
@@ -13928,16 +13955,23 @@ folderTreeGetSelectedPath(c) {
    Return folderPath
 }
 
-FolderTreeFindActiveFile() {
+FolderTreeFindActiveFile(givenPath:=0) {
     Gui, fdTreeGuia: Default
     Gui, fdTreeGuia: TreeView, TVlistFolders
+    showTOOLtip("Scanning folders, please wait")
     z := 0 ; TV_GetNext()
     oimgPath := resultedFilesList[currentFileIndex, 1]
     imgPath := SubStr(oimgPath, 1, InStr(oimgPath, "\", 0, -1) - 1)
-    sliced := StrSplit(imgPath, "\")
-    GuiControl, SettingsGUIA: -Redraw, TVlistFolders
+    If FolderExist(givenPath)
+    {
+       imgPath := givenPath
+       wasGiven := 1
+    }
 
-    showTOOLtip("Scanning folders, please wait")
+    sliced := StrSplit(imgPath, "\")
+    GuiControl, fdTreeGuia: -Redraw, TVlistFolders
+    GuiControl, fdTreeGuia:, fdTreeInfoLine, Please wait...
+
     g := iterateFDtreeView(1, 0, sliced)
     lvl := g[1]
     z := g[2] ? g[2] : 0
@@ -13959,14 +13993,13 @@ FolderTreeFindActiveFile() {
     If (hasAdded!=1 && z)
        TV_Modify(z, "Expand Select VisFirst")
 
-
     initialSibling := SubStr(imgPath, InStr(imgPath, "\", 0, -1) + 1)
     If z
        w := TV_GetParent(z)
     ; ToolTip, % initialSibling , , , 2
     mustSkip := new hashtable()
     mustDelete := new hashtable()
-    If w
+    If (w && !wasGiven)
     {
        r := w
        r := TV_GetChild(w)
@@ -13997,12 +14030,16 @@ FolderTreeFindActiveFile() {
           mustDelete[r] := 1
        }
     }
-    For Key, Value in mustDelete
-       TV_Delete(Key)
+
+    If !wasGiven
+    {
+       For Key, Value in mustDelete
+          TV_Delete(Key)
+    }
 
     mustDelete := ""
     subPath := SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1)
-    If (FolderExist(subPath) && w)
+    If (FolderExist(subPath) && w && !wasGiven)
     {
        Loop, Files, % subPath "\*", D
        {
@@ -14019,14 +14056,19 @@ FolderTreeFindActiveFile() {
     }
 
     mustSkip := ""
-    If subsParent
+    If (subsParent && !wasGiven)
     {
        TV_Modify(subsParent, "Select VisFirst")
        folderTreeScanSubbies()
     }
+
     TV_Modify(w, "Sort")
-    GuiControl, SettingsGUIA: +Redraw, TVlistFolders
-    RemoveTooltip()
+    If !wasGiven
+    {
+       GuiControl, fdTreeGuia: +Redraw, TVlistFolders
+       SetTimer, folderTreeInfoLineUpdater, -100
+       SetTimer, RemoveTooltip, -100
+    }
 }
 
 iterateFDtreeView(lvl, z, sliced) {
@@ -14065,7 +14107,48 @@ iterateFDtreeView(lvl, z, sliced) {
 FolderTreeRepopulate() {
     Gui, fdTreeGuia: Default
     Gui, fdTreeGuia: TreeView, TVlistFolders
-    GuiControl, SettingsGUIA: -Redraw, TVlistFolders
+    GuiControl, fdTreeGuia: -Redraw, TVlistFolders
+    GuiControl, fdTreeGuia:, fdTreeInfoLine, Please wait...
+
+    If !HKifs("imgsLoaded")
+    {
+       aListu := readRecentEntries(0, 0)
+       aListu .= readRecentFileDesties()
+
+       If FolderExist(prevFileSavePath)
+          aListu .= "`n" prevFileSavePath "`n"
+       If FolderExist(prevFileMovePath)
+          aListu .= "`n" prevFileMovePath "`n"
+       If FolderExist(prevOpenFolderPath)
+          aListu .= "`n" prevOpenFolderPath "`n"
+ 
+       Sort, aListu, UD`n
+       Loop, Parse, aListu, `n
+       {
+          countItemz++
+          testThis := StrReplace(A_LoopField, "|")
+          If (StrLen(A_LoopField)<4 || !FileExist(testThis))
+             Continue
+ 
+          If RegExMatch(testThis, sldsPattern)
+             testThis := SubStr(testThis, 1, InStr(testThis, "\", 0, -1) - 1)
+ 
+          bListu .= testThis "`n"
+       }
+ 
+       Loop, Parse, bListu, `n
+       {
+          If A_LoopField
+             FolderTreeFindActiveFile(A_LoopField)
+       }
+       TV_Modify(0, "Select VisFirst")
+       folderTreeExpandCollapseAll("collapse")
+       GuiControl, fdTreeGuia: +Redraw, TVlistFolders
+       SetTimer, folderTreeInfoLineUpdater, -100
+       SetTimer, RemoveTooltip, -100
+       Return
+    }
+
     z := TV_GetNext()
     If z
        TV_Delete(z)
@@ -14128,9 +14211,9 @@ FolderTreeRepopulate() {
     If !countu
        FolderTreeFindActiveFile()
 
-    RemoveTooltip()
-    GuiControl, SettingsGUIA: +Redraw, TVlistFolders
-    folderTreeInfoLineUpdater()
+    GuiControl, fdTreeGuia: +Redraw, TVlistFolders
+    SetTimer, folderTreeInfoLineUpdater, -100
+    SetTimer, RemoveTooltip, -100
 }
 
 folderTreeContextMenu() {
@@ -14220,7 +14303,7 @@ folderTreeCreateFolder() {
          Gui, fdTreeGuia: TreeView, TVlistFolders
          TV_Add("\" newFileName, c)
          TV_Add(c, "Expand Sort")
-         GuiControl, SettingsGUIA: +Redraw, TVlistFolders
+         GuiControl, fdTreeGuia: +Redraw, TVlistFolders
       } Else
       {
          showTOOLtip("ERROR: An unknown error occured creating the new folder in:`n" thisFolder "\")
@@ -14252,7 +14335,7 @@ folderTreeDeleteFolder() {
             SoundBeep , 900, 100
             RemoveTooltip()
             TV_Delete(c)
-            GuiControl, SettingsGUIA: +Redraw, TVlistFolders
+            GuiControl, fdTreeGuia: +Redraw, TVlistFolders
          } Else
          {
             showTOOLtip("Failed to delete selected folder:`n" thisFolder "\")
@@ -14304,7 +14387,7 @@ folderTreeRenameFolder() {
          Gui, fdTreeGuia: Default
          Gui, fdTreeGuia: TreeView, TVlistFolders
          TV_Modify(c, "Select Vis Sort", newFileName)
-         GuiControl, SettingsGUIA: +Redraw, TVlistFolders
+         GuiControl, fdTreeGuia: +Redraw, TVlistFolders
       } Else
       {
          showTOOLtip("ERROR: An unknown error occured renaming the folder:`n" thisFolder "\")
@@ -14336,7 +14419,7 @@ folderTreeAppendFiles() {
    dummyTimerDelayiedImageDisplay(50)
 }
 
-folderTreeExpandCollapseAll() {
+folderTreeExpandCollapseAll(forceMode:=0) {
    Static prevState := 1
    Gui, fdTreeGuia: Default
    Gui, fdTreeGuia: TreeView, TVlistFolders
@@ -14344,8 +14427,13 @@ folderTreeExpandCollapseAll() {
    If !c
       Return
 
-   act := prevState ? "-Expand" : "Expand"
-   friendly := prevState ? "COLLAPSED" : "EXPANDED"
+   If (forceMode="collapse")
+      prevState := 1
+   Else If (forceMode="expand")
+      prevState := 0
+
+   act := (prevState=1) ? "-Expand" : "Expand"
+   friendly := (prevState=1) ? "COLLAPSED" : "EXPANDED"
    c := TV_Modify(c, act)
    Loop
    {
@@ -14382,6 +14470,8 @@ folderTreeScanSubbies() {
       Return
 
     showTOOLtip("Scanning folders, please wait")
+    GuiControl, fdTreeGuia: -Redraw, TVlistFolders
+    GuiControl, fdTreeGuia:, fdTreeInfoLine, Please wait...
     ; ToolTip, % A_DefaultTreeView "==" A_DefaultGUI "==" c , , , 2
     changeMcursor()
     mustSkip := new hashtable()
@@ -14420,7 +14510,6 @@ folderTreeScanSubbies() {
        TV_Delete(Key)
 
    mustDelete := ""
-   GuiControl, SettingsGUIA: -Redraw, TVlistFolders
    If FolderExist(thisFolder)
    || (StrLen(thisFolder)=2 && InStr(thisFolder, ":"))
    {
@@ -14440,7 +14529,8 @@ folderTreeScanSubbies() {
    mustSkip := ""
    RemoveTooltip()
    TV_Modify(c, "Expand Vis Select Sort")
-   GuiControl, SettingsGUIA: +Redraw, TVlistFolders
+   GuiControl, fdTreeGuia: +Redraw, TVlistFolders
+   SetTimer, folderTreeInfoLineUpdater, -100
    SetTimer, ResetImgLoadStatus, -125
 }
 
@@ -16803,7 +16893,7 @@ doStartLongOpDance() {
      interfaceThread.ahkPostFunction("setTaskbarIconState", "anim")
 }
 
-cleanDeadFilesList() {
+cleanDeadFilesList(dummy:=0) {
    Critical, on
    If (slideShowRunning=1)
       ToggleSlideShowu()
@@ -16813,8 +16903,9 @@ cleanDeadFilesList() {
       backCurrentSLD := CurrentSLD
       CurrentSLD := ""
       startOperation := A_TickCount
-      setWindowTitle("Checking for missing files, please wait", 1)
-      showTOOLtip("Checking for missing files, please wait")
+      friendlyLabel := (dummy="noFilesCheck") ? "Removing duplicate entries" : "Scanning for missing files"
+      setWindowTitle(friendlyLabel ", please wait", 1)
+      showTOOLtip(friendlyLabel ", please wait")
       prevMSGdisplay := A_TickCount
       doStartLongOpDance()
       If (InStr(backCurrentSLD, mainCompiledPath "\viewed-images-history-") && !InStr(backCurrentSLD, "-viewed-images-history-current-session"))
@@ -16845,7 +16936,7 @@ cleanDeadFilesList() {
             If (A_TickCount - prevMSGdisplay>1500)
             {
                etaTime := ETAinfos(countTFilez + deadFiles, maxFilesIndex, startOperation)
-               showTOOLtip("Checking for missing files, please wait" etaTime "`nFound " groupDigits(deadFiles) " dead files", 0, 0, (countTFilez+deadFiles)/maxFilesIndex)
+               showTOOLtip(friendlyLabel ", please wait" etaTime "`nFound " groupDigits(deadFiles) " dead files", 0, 0, (countTFilez+deadFiles)/maxFilesIndex)
                prevMSGdisplay := A_TickCount
             }
 
@@ -16860,7 +16951,11 @@ cleanDeadFilesList() {
                If (skipDuplicatesCheck!=1 && w!=1)
                   hash[z] := 1
 
-               okayu := (abandonAll=1) ? -2 : FileRexists(imgPath)
+               If (dummy="noFilesCheck")
+                  okayu := 1
+               Else
+                  okayu := (abandonAll=1) ? -2 : FileRexists(imgPath)
+
                If (okayu=-2 || okayu=1)
                {
                   countTFilez++
@@ -16924,7 +17019,8 @@ cleanDeadFilesList() {
 
       ForceRefreshNowThumbsList()
       getSelectedFiles(0, 1)
-      currentFilesListModified := 1
+      If deadFiles
+         currentFilesListModified := 1
       SetTimer, ResetImgLoadStatus, -50
       SoundBeep, 900, 100
       CurrentSLD := backCurrentSLD
@@ -19285,7 +19381,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
      {
         showTOOLtip("Failed to update the favourites list`nThe image was not added to favourites")
         SoundBeep , 300, 100
-        SetTimer, RemoveTooltip, % -msgDisplayTime//2
+        SetTimer, RemoveTooltip, % -msgDisplayTime
         Return
      }
 
@@ -19301,10 +19397,24 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
         updateMainUnfilteredList(currentFileIndex, 1, imgPath)
      }
 
-     SetTimer, RemoveTooltip, % -msgDisplayTime//2
+     SetTimer, RemoveTooltip, % -msgDisplayTime
      lastInvoked := A_TickCount
   } Else
   {
+     If (!thisImg && InStr(CurrentSLD, "\QPV\favourite-images-list.SLD"))
+     {
+        resultedFilesList[currentFileIndex, 5] := 0
+        resultedFilesList[currentFileIndex, 1] := "||" imgPath
+        updateMainUnfilteredList(currentFileIndex, 5, 0)
+        zPlitPath(imgPath, 0, OutFileName, OutDir)
+        showTOOLtip("Image REMOVED from favourites:`n" OutFileName "`n" OutDir "\`nTotal entries: " realCount, 0, 0, realCount/maxFavesEntries)
+        currentFilesListModified := 1
+        dummyTimerDelayiedImageDisplay(50)
+        lastInvoked := A_TickCount
+        SetTimer, RemoveTooltip, % -msgDisplayTime
+        Return
+     }
+
      startZeit := A_TickCount
      ToolTip, Please wait...
      lastInvoked := A_TickCount
@@ -19316,7 +19426,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
         Tooltip
         showTOOLtip("Failed to read the favourites list file`nUnable to remove image from favourites")
         SoundBeep , 300, 100
-        SetTimer, RemoveTooltip, % -msgDisplayTime//2
+        SetTimer, RemoveTooltip, % -msgDisplayTime
         Return
      }
 
@@ -19333,7 +19443,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
         Tooltip
         showTOOLtip("Failed to read and write the favourites list file`nUnable to remove image from favourites")
         SoundBeep , 300, 100
-        SetTimer, RemoveTooltip, % -msgDisplayTime//2
+        SetTimer, RemoveTooltip, % -msgDisplayTime
         Return
      }
 
@@ -19386,7 +19496,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
      {
         showTOOLtip("Failed to update the favourites list file`nThe image was not succesfully removed from favourites")
         SoundBeep , 300, 100
-        SetTimer, RemoveTooltip, % -msgDisplayTime//2
+        SetTimer, RemoveTooltip, % -msgDisplayTime
         Return
      }
 
@@ -19394,7 +19504,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
         prevRemSpeed := A_TickCount - startZeit
      zPlitPath(imgPath, 0, OutFileName, OutDir)
      showTOOLtip("Image REMOVED from favourites:`n" OutFileName "`n" OutDir "\`nTotal entries: " realCount, 0, 0, realCount/maxFavesEntries)
-     SetTimer, RemoveTooltip, % -msgDisplayTime//2
+     SetTimer, RemoveTooltip, % -msgDisplayTime
      lastInvoked := A_TickCount
   }
 
@@ -19588,7 +19698,7 @@ PrevRandyPicture(dummy:=0, inLoop:=0) {
 }
 
 getSelectedFiles(getItem:=0, forceSort:=0) {
-   Static firstItem, lastItem
+   Static firstItem, lastItem, lastIDcount := 0
 
    If (getItem=0 && forceSort=0)
       Return markedSelectFile
@@ -19601,6 +19711,12 @@ getSelectedFiles(getItem:=0, forceSort:=0) {
 
    If (forceSort=1 && getItem=0)
    {
+      thisIDcount := CurrentSLD maxFilesIndex bckpMaxFilesIndex markedSelectFile lastZeitFileSelect
+      If (lastIDcount=thisIDcount)
+         Return markedSelectFile
+
+      ; ToolTip, % thisIDcount "`n" lastIDcount , , , 2
+      lastIDcount := thisIDcount
       firstItem := lastItem := markedSelectFile := 0
       changeMcursor()
       startZeit := A_TickCount
@@ -19619,6 +19735,7 @@ getSelectedFiles(getItem:=0, forceSort:=0) {
       {
          markedSelectFile := 0
          resultedFilesList[firstItem, 2] := 0
+         lastZeitFileSelect := A_TickCount
          If (thumbsDisplaying=1)
             mainGdipWinThumbsGrid()
       }
@@ -19644,9 +19761,11 @@ invertFilesSelection(silentMode:=0) {
    {
        sel := resultedFilesList[A_Index, 2]
        resultedFilesList[A_Index, 2] := !sel
-       If (!sel=1)
+       If (sel=1)
           markedSelectFile++
    }
+
+   lastZeitFileSelect := A_TickCount
    If (thumbsDisplaying=1)
       mainGdipWinThumbsGrid()
    Else
@@ -19661,10 +19780,12 @@ dropFilesSelection(silentMode:=0) {
       Return
 
    EntryMarkedMoveIndex := markedSelectFile := 0
-   startZeit := A_TickCount
+
    Loop, % maxFilesIndex
        resultedFilesList[A_Index, 2] := 0
 
+   lastZeitFileSelect := A_TickCount
+   selectAllFiles("none")
    ; ToolTip, % A_TickCount - startZeit, , , 2
    If (silentMode!=1)
    {
@@ -19698,6 +19819,7 @@ markThisFileNow(thisFileIndex:=0) {
   Else
      markedSelectFile--
 
+  lastZeitFileSelect := A_TickCount
   If (markedSelectFile<0)
      getSelectedFiles(0, 1)
   Else If (thumbsDisplaying=1)
@@ -20070,7 +20192,7 @@ batchFileDelete() {
       {
          filesRemoved++
          resultedFilesList[thisFileIndex, 1] := "||" file2rem
-         resultedFilesList[thisFileIndex, 2] := 1
+         ; resultedFilesList[thisFileIndex, 2] := 1
          updateMainUnfilteredList(thisFileIndex, 1, "||" file2rem)
       } Else failedFiles++
    }
@@ -20634,7 +20756,7 @@ coreBatchMultiRenameFiles() {
                updateSQLdbEntry(file2rem, file2save, updateDates, resultedFilesList[thisFileIndex, 12])
 
             resultedFilesList[thisFileIndex, 1] := file2save
-            resultedFilesList[thisFileIndex, 2] := 1
+            ; resultedFilesList[thisFileIndex, 2] := 1
             updateMainUnfilteredList(thisFileIndex, 1, file2save)
          }
 
@@ -21739,6 +21861,7 @@ SearchIndexSelectAll() {
          resultedFilesList[A_Index, 2] := (msgResult="add" || !msgResult) ? 1 : 0
    }
 
+   lastZeitFileSelect := A_TickCount
    getSelectedFiles(0, 1)
    ForceRefreshNowThumbsList()
    If !markedSelectFile
@@ -25871,6 +25994,17 @@ EstimateSlideShowLength(noPrecision:=0) {
     Return etaTime
 }
 
+jumpPreviousImage() {
+    If (slideShowRunning=1)
+       ToggleSlideShowu()
+
+    If askAboutFileSave(" and another image will be loaded")
+       Return
+
+    currentFileIndex := clampInRange(prevLastImg[2, 1], 1, maxFilesIndex)
+    dummyTimerDelayiedImageDisplay(50)
+}
+
 PanelJump2index() {
    If StrLen(mustOpenStartFolder)>3
       currentFileIndex := doOpenStartFolder()
@@ -26784,7 +26918,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0) {
          If (UsrCopyMoveOperation=2)
          {
             resultedFilesList[thisFileIndex, 1] := file2save
-            resultedFilesList[thisFileIndex, 2] := 1
+            ; resultedFilesList[thisFileIndex, 2] := 1
             If (SLDtypeLoaded=3)
                updateSQLdbEntry(file2rem, file2save, updateDates, resultedFilesList[thisFileIndex, 12])
 
@@ -26956,7 +27090,7 @@ batchConvert2format() {
             theseFailures++
 
          resultedFilesList[thisFileIndex, 1] := file2save
-         resultedFilesList[thisFileIndex, 2] := 1
+         ; resultedFilesList[thisFileIndex, 2] := 1
          updateMainUnfilteredList(thisFileIndex, 1, file2save)
          If (SLDtypeLoaded=3)
             updateSQLdbEntry(imgPath, file2save, 1, resultedFilesList[thisFileIndex, 12])
@@ -26998,7 +27132,8 @@ coreConvertImgFormat(imgPath, file2save) {
       FileGetTime, originalCtime, % imgPath, C
    }
 
-   If (FIMfailed2init=1)
+   maxLimitReached := (maxFilesIndex>654321 || bckpMaxFilesIndex>654321) ? 1 : 0
+   If (FIMfailed2init=1 || maxLimitReached=1)
    {
       If FileExist(file2save)
          FileSetAttrib, -R, %file2save%
@@ -27232,7 +27367,7 @@ renewCurrentFilesList() {
    lastRenameUndo := []
    prevLastImg := []
    markedSelectFile := EntryMarkedMoveIndex := maxFilesIndex := 0
-   editingSelectionNow := prevRandyIMGnow := 0
+   lastZeitFileSelect := editingSelectionNow := prevRandyIMGnow := 0
    ForceRefreshNowThumbsList()
    updateUIctrl()
    currentFileIndex := 1
@@ -34315,9 +34450,7 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
           }
        }
 
-       imgPathArray := resultedFilesList[currentFileIndex]
-       imgPathSelected := imgPathArray[2]
-       If (imgPathSelected=1)
+       If resultedFilesList[currentFileIndex, 2]
        {
           thisThick := (mode=2) ? lineThickns//2.5 : lineThickns//4.2
           Gdip_SetPenWidth(pPen1d, thisThick)
@@ -35458,6 +35591,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     Else
        whichBitmap := gdiBitmap
 
+    prevLastImg[2] := prevLastImg[1]
     prevLastImg[1] := [currentFileIndex, resultedFilesList[currentFileIndex, 1]]
     ; Gdip_GetImageDimensions(whichBitmap, imgW, imgH)
     ; ToolTip, % "lol " mustGenerate "`n" imgW "--" imgH , , , 2
@@ -35722,13 +35856,22 @@ updateUIctrl() {
     interfaceThread.ahkPostFunction("updateUIctrl")
 }
 
-selectAllFiles() {
+selectAllFiles(dummy:=0) {
     Static selMode := 0
+    If (dummy="none")
+    {
+       selMode := 0
+       Return
+    }
+
     If (maxFilesIndex<3)
        Return
 
-    selMode := !selMode
-    selectFilesRange(1, maxFilesIndex, selMode)
+    selMode := selMode ? 0 : 1
+    Loop, % maxFilesIndex
+        resultedFilesList[A_Index, 2] := selMode
+
+    lastZeitFileSelect := A_TickCount
     markedSelectFile := (selMode=1) ? maxFilesIndex : 0
     SetTimer, mainGdipWinThumbsGrid, -10
 }
@@ -36446,7 +36589,7 @@ QPV_listThumbnailsGridMode() {
               mgpx := resultedFilesList[thisFileIndex, 17] " MPx | "
               ofileSizu := Round(QPV_FileGetSizeTime(imgPath, "S", thisFileIndex) / 1024) ; kilobytes
               fileSizu := (ofileSizu>1023) ? Round(ofileSizu/1024, 1) " MB" : ofileSizu " KB"
-              fileMsg := groupDigits(Width) " x " groupDigits(Height) " | " resultedFilesList[thisFileIndex, 9, "pixFmt"] CountFrames " | " fileSizu
+              fileMsg := groupDigits(Width) " x " groupDigits(Height) " | " resultedFilesList[thisFileIndex, 9] CountFrames " | " fileSizu
            } Else fileMsg := "Error gathering data..."
 
            entireString := mgpx fileNamu "`n" folderu "\`n" fileMsg
@@ -37035,7 +37178,8 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
    } Else systemCores := limitCores
 
    thisPID := QPVpid
-   mustDoMultiCore := (allowMultiCoreMode=1 && maxFilesIndex<654210 && systemCores>1 && filesPerCore>1 && multiCoreThumbsInitGood=1) ? 1 : 0
+   maxLimitReached := 0 ; (maxFilesIndex>654321 || bckpMaxFilesIndex>654321) ? 1 : 0
+   mustDoMultiCore := (allowMultiCoreMode=1 && maxLimitReached!=1 && systemCores>1 && filesPerCore>1 && multiCoreThumbsInitGood=1) ? 1 : 0
    fnOutputDebug("ThumbsMode. Init. doMultiCore:" mustDoMultiCore ", cores:" systemCores ", filesPerCore:" filesPerCore ", imgsNotCached:" imgsNotCached ", imgsMustPaint:" imgsMustPaint)
    mamUsage := GetProcessMemoryUsage(thisPID)
    systemMemInfo := GlobalMemoryStatusEx()
@@ -37847,22 +37991,27 @@ RegenerateEntireList() {
           Break
     }
 
-    If (r="abandoned" && SLDtypeLoaded!=3)
-    {
-       resetMainWin2Welcome()
-       showTOOLtip("Operation aborted. The files list is now empty.")
-       SoundBeep, 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-    } Else
-    {
+    ; If (r="abandoned" && SLDtypeLoaded!=3)
+    ; {
+    ;    resetMainWin2Welcome()
+    ;    showTOOLtip("Operation aborted. The files list is now empty.")
+    ;    SoundBeep, 300, 100
+    ;    SetTimer, RemoveTooltip, % -msgDisplayTime
+    ; } Else
+    ; {
        thisFolder := StrReplace(CurrentSLD, "|")
-       If (SLDtypeLoaded=3)
+       If (SLDtypeLoaded=3 && r!="abandoned")
           SQLdbGenerateStaticFolders()
        Else If (SLDtypeLoaded=1 && FolderExist(thisFolder))
           watchFolderDetails := getFolderDetails(thisFolder)
 
        GenerateRandyList()
-       SoundBeep, 900, 100
+       If (r="abandoned" && SLDtypeLoaded!=3)
+       {
+          showDelayedTooltip("Operation aborted - regenerate files list. The files list is now incomplete.")
+          SoundBeep, 300, 100
+       } Else SoundBeep, 900, 100
+
        currentFileIndex := clampInRange(thisIndex, 1, maxFilesIndex)
        If (maxFilesIndex<1)
        {
@@ -37872,7 +38021,7 @@ RegenerateEntireList() {
           resetMainWin2Welcome()
        } Else dummyTimerDelayiedImageDisplay(50)
        ; RandomPicture()
-    }
+    ; }
     etaTime := "Elapsed time to regenerate files list: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: " maxFilesIndex
     addJournalEntry(etaTime)
 }
@@ -38385,7 +38534,7 @@ autoSelectDupesInGroups(mode, givenRegEx:=0) {
          }
       }
    }
-
+   lastZeitFileSelect := A_TickCount
    getSelectedFiles(0, 1)
    ForceRefreshNowThumbsList()
    If (thumbsDisplaying=1)
@@ -39284,10 +39433,11 @@ PanelFindDupes() {
 
     If (SLDtypeLoaded!=3)
     {
-       msgResult := msgBoxWrapper(appTitle ": Confirmation", "The files list is currently not saved as a SQLite database. Would you like to save it in the specified format?", 4, 0, "question")
+       msgResult := msgBoxWrapper(appTitle ": Confirmation", "The files list is currently not saved as a SQLite database. Would you like to save it in the specified format?", "&Yes|&Remove duplicate entries|&Cancel", 2, "question")
        If (msgResult="Yes")
           PanelSaveSlideShowu()
-
+       Else If InStr(msgResult, "remove")
+          cleanDeadFilesList("noFilesCheck")
        Return
     }
 
@@ -44508,7 +44658,8 @@ coreGdipSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, Y
 }
 
 coreSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, YscaleImgFactor) {
-  If (RegExMatch(imgPath, RegExFIMformPtrn) || (RegExMatch(imgPath, "i)(.\.(png|tiff|tif))$") && (wasInitFIMlib=1)))
+  maxLimitReached := (maxFilesIndex>654321 || bckpMaxFilesIndex>654321) ? 1 : 0
+  If (RegExMatch(imgPath, RegExFIMformPtrn) || (RegExMatch(imgPath, "i)(.\.(png|tiff|tif))$") && (maxLimitReached!=1 && wasInitFIMlib=1)))
      r := coreFreeImageSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, YscaleImgFactor)
   Else
      r := coreGdipSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, YscaleImgFactor)
@@ -45468,7 +45619,7 @@ initFIMGmodule() {
   If (wasInitFIMlib!=1)
   {
      r := FreeImage_FoxInit(1) ; Load the FreeImage Dll
-     wasInitFIMlib := r ? 1 : 0
+     wasInitFIMlib := (r && !InStr(r, "err")) ? 1 : 0
      If wasInitFIMlib
         addJournalEntry("FreeImage library initialized: v" FreeImage_GetVersion())
   }
@@ -45481,6 +45632,7 @@ initFIMGmodule() {
         friendly := "`n`nPlease install the Runtime Redistributable Packages of Visual Studio 2013."
      Else If InStr(r, "err - 404")
         friendly := "`n`nThe FreeImage.dll file seems to be missing..."
+
      If (firstTimer=1 && hasInitSpecialMode!=1)
      {
         SoundBeep, 300, 100
@@ -47881,7 +48033,8 @@ gdipObjectsStats(killAll:=0, filteru:=0) {
 }
 
 testMemCrash() {
-   imgPath := "E:\Sucan twins\photos test\SLDs\really-all-images-cached.sld"
+   Global sillyArray := []
+   imgPath := "E:\Sucan twins\photos test\SLDs\really-all-images-cached-mega-test.sld"
    SoundBeep 
    FileRead, OutputVar, % imgPath
    Loop, Parse, OutputVar, `n,`r
@@ -47889,7 +48042,12 @@ testMemCrash() {
       If A_LoopField
       {
          loopsOccured++
-         sillyArray[A_Index] := A_LoopField "==" SubStr(A_LoopField, 4) "|=|" A_LoopField "||" SubStr(A_LoopField, 4) A_LoopField "==" SubStr(A_LoopField, 4) "|=|" A_LoopField "||" SubStr(A_LoopField, 4)
+         ; If (loopsOccured<510100)
+            sillyArray[A_Index] := [A_LoopField, "z" A_LoopField] ; "|=|" A_LoopField "||" SubStr(A_LoopField, 4) A_LoopField "==" SubStr(A_LoopField, 4) "|=|" A_LoopField "||" SubStr(A_LoopField, 4)
+         ; Else If (loopsOccured<990100)
+         ;    sillyArrayC[A_Index] := A_LoopField "==" SubStr(A_LoopField, 4) "|=|" A_LoopField "||" SubStr(A_LoopField, 4) A_LoopField "==" SubStr(A_LoopField, 4) "|=|" A_LoopField "||" SubStr(A_LoopField, 4)
+         ; Else
+         ;    sillyArrayB[A_Index] := A_LoopField "==" SubStr(A_LoopField, 4) "|=|" A_LoopField "||" SubStr(A_LoopField, 4) A_LoopField "==" SubStr(A_LoopField, 4) "|=|" A_LoopField "||" SubStr(A_LoopField, 4)
          ; sillyArray[A_loopField] := A_LoopField "-" SubStr(A_LoopField, 4) "=====" A_LoopField "|||" SubStr(A_LoopField, 4)
          ; sillyArray[A_Index] := A_LoopField "-" SubStr(A_LoopField, 2) "==" A_LoopField "|" SubStr(A_LoopField, 2)
       }

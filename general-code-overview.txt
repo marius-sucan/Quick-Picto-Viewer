@@ -89,9 +89,9 @@ b) How a files list index is created
   Each file entry is defined by various properties:
 
   resultedFilesList[index_number] :=
-  [ 1_full_file_path, 2_isSelected, 3_isSeen, 4_forceThumbRefresh
+  [ 1_filePath, 2_isSelected, 3_isSeen, 4_forceThumbRefresh
   , 5_isFavourite, 6_fileSize, 7_fileDateModified
-  , 8_fileDateCreated, 9_imgFrames, 10_doSort, 11_IsImgHisto
+  , 8_fileDateCreated, 9_imgFrames, 10_mustDoSort, 11_IsImgHisto
   , 12_dbRowIndex, 13_imgW, 14_imgH, 15_imgPixFmt, 16_imgWHratio
   , 17_imgMGPX, 18_imgHAvg, 19_imgHmedian, 20_imgHpeak, 21_imgHlow
   , 22_imgDPI, 23_dupeID, 24_imghRMS, 25_imghRange, 26_imghMode

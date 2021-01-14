@@ -2,6 +2,12 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.8.1 (2021-01-14)
+  - the folder tree panel can now be invoked even with no folder or image loaded/opened
+  - find duplicate images option offers user the option to remove duplicate index entries when the files list is plain-text only
+  - important bug fix related to high memory usage and FreeImage; many thanks to TheArkive!
+  - various bug fixes
+
 - v4.8.0 (2021-01-11)
   - [new] folder tree view - options to facilitate the copy and movement of files and to open, delete, rename folders
   - [new] keyboard shortcuts to go up or down the hierarchy of folders; ctrl + page up/down

@@ -36,7 +36,8 @@ initThisThread(params:=0) {
 
   If !wasInitFIMlib
      r := FreeImage_FoxInit(1) ; Load the FreeImage Dll
-  wasInitFIMlib := r ? 1 : 0
+
+  wasInitFIMlib := (r && !InStr(r, "err")) ? 1 : 0
   ; MsgBox, % r "`n" wasInitFIMlib "`n" GDIPToken "`n" mainCompiledPath
   Return wasInitFIMlib
 }
@@ -425,11 +426,11 @@ Sleep, 2
 
 
 FreeImage_GetBits(hImage) {
-   Return DllCall(getFIMfunc("GetBits"), "Int", hImage)
+   Return DllCall(getFIMfunc("GetBits"), "uptr", hImage, "uptr")
 }
 
 FreeImage_GetInfo(hImage) {
-   Return DllCall(getFIMfunc("GetInfo"), "Int", hImage)
+   Return DllCall(getFIMfunc("GetInfo"), "uptr", hImage, "uptr")
 }
 
 FreeImage_ConvertTo(hImage, MODE) {
@@ -438,7 +439,7 @@ FreeImage_ConvertTo(hImage, MODE) {
 ; "32Bits", "Greyscale", "Float", "RGBF", "RGBAF", "UINT16", "RGB16", "RGBA16"
 ; ATTENTION: these are case sensitive!
 
-   Return DllCall(getFIMfunc("ConvertTo" MODE), "int", hImage)
+   Return DllCall(getFIMfunc("ConvertTo" MODE), "uptr", hImage, "uptr")
 }
 
 
@@ -451,7 +452,7 @@ FreeImage_GetColorType(hImage, humanReadable:=1) {
 ; 5 = CMYK - CMYK bitmap (32 bit only)
 
    Static ColorsTypes := {1:"MINISBLACK", 0:"MINISWHITE", 3:"PALETTIZED", 2:"RGB", 4:"RGBA", 5:"CMYK"}
-   r := DllCall(getFIMfunc("GetColorType"), "Int", hImage)
+   r := DllCall(getFIMfunc("GetColorType"), "uptr", hImage)
    If (ColorsTypes.HasKey(r) && humanReadable=1)
       r := ColorsTypes[r]
 
@@ -496,7 +497,8 @@ FreeImage_Load(ImPath, GFT:=-1, flag:=0, ByRef dGFT:=0) {
       dGFT := GFT := FreeImage_GetFileType(ImPath)
    If (GFT="" || !ImPath)
       Return
-   Return DllCall(getFIMfunc("LoadU"), "Int", GFT, "WStr", ImPath, "int", flag)
+
+   Return DllCall(getFIMfunc("LoadU"), "Int", GFT, "WStr", ImPath, "int", flag, "uptr")
 }
 
 FreeImage_Save(hImage, ImPath, ImgArg:=0) {
@@ -504,7 +506,7 @@ FreeImage_Save(hImage, ImPath, ImgArg:=0) {
       Return
    ; FIMfrmt := {"BMP":0, "JPG":2, "JPEG":2, "PNG":13, "TIF":18, "TIFF":18, "GIF":25}
    OutExt := FreeImage_GetFIFFromFilename(ImPath)
-   Return DllCall(getFIMfunc("SaveU"), "Int", OutExt, "Int", hImage, "WStr", ImPath, "int", ImgArg)
+   Return DllCall(getFIMfunc("SaveU"), "Int", OutExt, "uptr", hImage, "WStr", ImPath, "int", ImgArg)
 }
 
 
@@ -512,22 +514,22 @@ FreeImage_UnLoad(hImage) {
    If StrLen(hImage)<3
       Return
 
-   Return DllCall(getFIMfunc("Unload"), "Int", hImage)
+   Return DllCall(getFIMfunc("Unload"), "uptr", hImage)
 }
 
 FreeImage_GetBPP(hImage) {
    If StrLen(hImage)<3
       Return
 
-   Return DllCall(getFIMfunc("GetBPP"), "int", hImage)
+   Return DllCall(getFIMfunc("GetBPP"), "uptr", hImage)
 }
 
 FreeImage_GetWidth(hImage) {
-   Return DllCall(getFIMfunc("GetWidth"), "Int", hImage)
+   Return DllCall(getFIMfunc("GetWidth"), "uptr", hImage)
 }
 
 FreeImage_GetHeight(hImage) {
-   Return DllCall(getFIMfunc("GetHeight"), "Int", hImage)
+   Return DllCall(getFIMfunc("GetHeight"), "uptr", hImage)
 }
 
 FreeImage_GetImageDimensions(hImage, ByRef imgW, ByRef imgH) {
@@ -599,11 +601,11 @@ FreeImage_GetFIFFromFilename(file) {
 }
 
 FreeImage_ToneMapping(hImage, algo:=0, p1:=0, p2:=0) {
-   Return DllCall(getFIMfunc("ToneMapping"), "int", hImage, "int", algo, "Double", p1, "Double", p2)
+   Return DllCall(getFIMfunc("ToneMapping"), "uptr", hImage, "int", algo, "Double", p1, "Double", p2, "uptr")
 }
 
 FreeImage_Rescale(hImage, w, h, filter:=3) {
-   Return DllCall(getFIMfunc("Rescale"), "Int", hImage, "Int", w, "Int", h, "Int", filter)
+   Return DllCall(getFIMfunc("Rescale"), "uptr", hImage, "Int", w, "Int", h, "Int", filter, "uptr")
 }
 
 
@@ -7209,9 +7211,8 @@ Gdi_CreateDIBitmap(hdc, bmpInfoHeader, CBM_INIT, pBits, BITMAPINFO, DIB_COLORS) 
 }
 
 Gdip_CreateBitmapFromGdiDib(BITMAPINFO, BitmapData) {
-   Ptr := A_PtrSize ? "UPtr" : "UInt"
    pBitmap := 0
-   E := DllCall("gdiplus\GdipCreateBitmapFromGdiDib", Ptr, BITMAPINFO, Ptr, BitmapData, "UPtr*", pBitmap)
+   E := DllCall("gdiplus\GdipCreateBitmapFromGdiDib", "UPtr", BITMAPINFO, "UPtr", BitmapData, "UPtr*", pBitmap)
    Return pBitmap
 }
 
