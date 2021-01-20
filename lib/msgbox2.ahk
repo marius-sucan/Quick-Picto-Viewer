@@ -471,8 +471,9 @@ MsgBox2InputHookKeyDown(iHook, VK, SC) {
 
   Gui, WinMsgBox: Default
   GuiControlGet, btnText, WinMsgBox: FocusV
+  ctrlState := GetKeyState("Ctrl", "P")
   keyPressed := GetKeyName(Format("vk{:x}sc{:x}", VK, SC))
-  If (keyPressed="Escape" || keyPressed="f4")
+  If (keyPressed="Escape") || (ctrlState && keyPressed="f4")
   {
      MsgBox2Result := "win_close_" keyPressed
      MsgBox2InputHook.Stop()
@@ -980,7 +981,7 @@ calcScreenLimits(whichHwnd:="main") {
 GetWindowBounds(hWnd) {
    ; function by GeekDude: https://gist.github.com/G33kDude/5b7ba418e685e52c3e6507e5c6972959
    ; W10 compatible function to find a window's visible boundaries
-   ; modified by Marius Șucanto return an array
+   ; modified by Marius Șucan to return an array
    size := VarSetCapacity(rect, 16, 0)
    er := DllCall("dwmapi\DwmGetWindowAttribute"
       , "UPtr", hWnd  ; HWND  hwnd

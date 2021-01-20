@@ -164,7 +164,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := [], countGDIobjects := 0
    , TVlistFolders, hfdTreeWinGui, folderTreeWinOpen := 0
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "4.8.1", vReleaseDate := "14/01/2021"
+   , appVersion := "4.8.2", vReleaseDate := "20/01/2021"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -490,9 +490,9 @@ HKifs(q:=0) {
        InitGuiContextMenu(A_ThisHotkey)
     Return
 
-    RButton::
-    ^RButton::
-    +RButton::
+    ~RButton::
+    ~^RButton::
+    ~+RButton::
        Suspend, Permit
        InitGuiContextMenu(A_ThisHotkey)
     Return
@@ -2415,11 +2415,11 @@ ClipboardSetFiles(PathToCopy, Method:="copy") {
    pid := DllCall("GetCurrentProcessId","uint")
    hwnd := WinExist("ahk_pid " . pid)
    ; 0x42 = GMEM_MOVEABLE(0x2) | GMEM_ZEROINIT(0x40)
-   hPath := DllCall("GlobalAlloc","uint",0x42,"uint",20 + (PathLength + FileCount + 1) * 2,"UPtr")
+   hPath := DllCall("GlobalAlloc","uint",0x42,"uint",20 + (PathLength + FileCount + 1) * 2, "UPtr")
    If !hPath
       Return
 
-   pPath := DllCall("GlobalLock","UPtr",hPath)
+   pPath := DllCall("GlobalLock","UPtr", hPath)
    NumPut(20, pPath+0), pPath += 16 ; DROPFILES.pFiles = offset of file list
    NumPut(1, pPath+0), pPath += 4 ; fWide = 0 -->ANSI,fWide = 1 -->Unicode
 
@@ -2440,7 +2440,7 @@ ClipboardSetFiles(PathToCopy, Method:="copy") {
    mem := DllCall("GlobalAlloc","uint",0x42,"uint",4,"UPtr")
    If mem
    {
-      str := DllCall("GlobalLock","UPtr",mem)
+      str := DllCall("GlobalLock","UPtr",mem, "uptr")
    } Else
    {
       DllCall("CloseClipboard")
@@ -3039,6 +3039,7 @@ ToggleThumbsMode() {
       ToggleVisibilityWindow("hide", hGDIthumbsWin)
       fnOutputDebug("Image view initialized")
       dummyTimerDelayiedImageDisplay(50)
+      interfaceThread.ahkPostFunction("UpdateUiStatusBar", 0, 0, "image")
       If hSNDmediaFile
          MCI_Resume(hSNDmedia)
       lastTimeToggleThumbs := A_TickCount
@@ -3068,6 +3069,7 @@ ToggleThumbsMode() {
       UpdateThumbsScreen()
       fnOutputDebug("hGDIinfosWin cleaned...  " hGDIinfosWin "  -- G= " 2NDglPG "  -- hDC= " 2NDglHDC " ")
       clearGivenGDIwin(2NDglPG, 2NDglHDC, hGDIinfosWin)
+      interfaceThread.ahkPostFunction("UpdateUiStatusBar", 0, 0, "list")
       RemoveTooltip()
       lastTimeToggleThumbs := A_TickCount
    }
@@ -7975,7 +7977,7 @@ recordUndoLevelNow(actionu, recordedBitmap, dX:=0, dY:=0, forceAlpha:="x") {
    If (A_PtrSize=8 && undoLevelsRecorded>3)
    {
       systemMemInfo := GlobalMemoryStatusEx()
-      mamUsage := GetProcessMemoryUsage(thisPID)
+      mamUsage := GetProcessMemoryUsage(QPVpid)
       thisMemoryLoad := Round((max(mamUsage[1], mamUsage[8])/systemMemInfo.TotalPhys)*100, 1)
       If isWinXP
          thisMemoryLoad := 99
@@ -13714,6 +13716,8 @@ MenuPanelFoldersTree() {
 PanelFoldersTree() {
     Static hasRan, prevSize := 0
     Global fdTreeInfoLine
+    If MsgBox2hwnd
+       Return
 
     If (hasRan=1 && prevSize!=PrefsLargeFonts)
     {
@@ -14104,25 +14108,38 @@ iterateFDtreeView(lvl, z, sliced) {
     Return [lvl, gu]
 }
 
-FolderTreeRepopulate() {
+FolderTreeRepopulate(dummy:=0, listuGiven:=0) {
+    If (dummy="given" && listuGiven)
+    {
+       PanelFoldersTree()
+       Try SetTimer, FolderTreeRepopulate, Off
+    }
+
     Gui, fdTreeGuia: Default
     Gui, fdTreeGuia: TreeView, TVlistFolders
     GuiControl, fdTreeGuia: -Redraw, TVlistFolders
     GuiControl, fdTreeGuia:, fdTreeInfoLine, Please wait...
 
-    If !HKifs("imgsLoaded")
+    If (!HKifs("imgsLoaded") || (dummy="given" && listuGiven))
     {
-       aListu := readRecentEntries(0, 0)
-       aListu .= readRecentFileDesties()
+       If (dummy="given" && listuGiven)
+       {
+          aListu := listuGiven
+          TV_Delete()
+       } Else
+       {
+          aListu := readRecentEntries(0, 0)
+          aListu .= readRecentFileDesties()
+          If FolderExist(prevFileSavePath)
+             aListu .= "`n" prevFileSavePath "`n"
+          If FolderExist(prevFileMovePath)
+             aListu .= "`n" prevFileMovePath "`n"
+          If FolderExist(prevOpenFolderPath)
+             aListu .= "`n" prevOpenFolderPath "`n"
+    
+          Sort, aListu, UD`n
+       }
 
-       If FolderExist(prevFileSavePath)
-          aListu .= "`n" prevFileSavePath "`n"
-       If FolderExist(prevFileMovePath)
-          aListu .= "`n" prevFileMovePath "`n"
-       If FolderExist(prevOpenFolderPath)
-          aListu .= "`n" prevOpenFolderPath "`n"
- 
-       Sort, aListu, UD`n
        Loop, Parse, aListu, `n
        {
           countItemz++
@@ -14386,7 +14403,7 @@ folderTreeRenameFolder() {
       {
          Gui, fdTreeGuia: Default
          Gui, fdTreeGuia: TreeView, TVlistFolders
-         TV_Modify(c, "Select Vis Sort", newFileName)
+         TV_Modify(c, "Select Vis Sort", "\" newFileName)
          GuiControl, fdTreeGuia: +Redraw, TVlistFolders
       } Else
       {
@@ -19403,11 +19420,16 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
   {
      If (!thisImg && InStr(CurrentSLD, "\QPV\favourite-images-list.SLD"))
      {
+        If !userAddedFavesCount
+           IniAction(0, "userAddedFavesCount", "General", 2, 0, 987654321)
+
+        userAddedFavesCount--
         resultedFilesList[currentFileIndex, 5] := 0
         resultedFilesList[currentFileIndex, 1] := "||" imgPath
         updateMainUnfilteredList(currentFileIndex, 5, 0)
         zPlitPath(imgPath, 0, OutFileName, OutDir)
-        showTOOLtip("Image REMOVED from favourites:`n" OutFileName "`n" OutDir "\`nTotal entries: " realCount, 0, 0, realCount/maxFavesEntries)
+        IniAction(1, "userAddedFavesCount", "General")
+        showTOOLtip("Image REMOVED from favourites:`n" OutFileName "`n" OutDir "\`nTotal entries: " userAddedFavesCount, 0, 0, userAddedFavesCount/maxFavesEntries)
         currentFilesListModified := 1
         dummyTimerDelayiedImageDisplay(50)
         lastInvoked := A_TickCount
@@ -27132,7 +27154,7 @@ coreConvertImgFormat(imgPath, file2save) {
       FileGetTime, originalCtime, % imgPath, C
    }
 
-   maxLimitReached := (maxFilesIndex>654321 || bckpMaxFilesIndex>654321) ? 1 : 0
+   maxLimitReached := 0 ; (maxFilesIndex>654321 || bckpMaxFilesIndex>654321) ? 1 : 0
    If (FIMfailed2init=1 || maxLimitReached=1)
    {
       If FileExist(file2save)
@@ -27997,6 +28019,11 @@ OpenArgFile(inputu) {
     SetTimer, RemoveTooltip, -250
     SetTimer, ResetImgLoadStatus, -50
     CurrentSLD := "|" OutDir
+    prevOpenFolderPath := OutDir
+    INIaction(1, "prevOpenFolderPath", "General")
+    If (allowRecordHistory=1 && FileRexists(inputu))
+       IniWrite, % inputu, % mainSettingsFile, General, LastOpenedImg
+
     SLDtypeLoaded := 1
     If (FlipImgH=1 || FlipImgV=1 || vpIMGrotation>0 || imgFxMode>1 || usrColorDepth>1)
        CreateGuiButton("Display unaltered image,,HardResetImageView", 0, msgDisplayTime//1.5 + 500)
@@ -28585,26 +28612,30 @@ InitGuiContextMenu(keyu:=0) {
    If (A_TickCount - lastInvoked<250) && (keyu="extern")
       Return
 
+   Au := WinActive("A")
+   If !InStr(keyu, "appsk")
+      MouseGetPos, , , Bu
+   Else
+      Bu := Au
+
    If (AnyWindowOpen=2 || AnyWindowOpen=3)
    {
-      hwndu := WinActive("A")
       GuiControlGet, varu, SettingsGUIA: FocusV
-      If (InStr(varu, "LView") && hwndu=hSetWinGui)
+      If (InStr(varu, "LView") && Au=hSetWinGui && Bu=hSetWinGui)
       {
          MenuFolderzFilterList()
          Return
       }
    }
 
+   okay := (Au=PVhwnd || Au=hGDIwin || Au=hGDIthumbsWin) && (Bu=PVhwnd || Bu=hGDIwin || Bu=hGDIthumbsWin) ? 1 : 0
+   If (okay!=1)
+      Return 1
+
    If (slideShowRunning=1)
       ToggleSlideShowu()
 
-  DestroyGIFuWin()
-  A := WinActive("A")
-  okay := (A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin) ? 1 : 0
-  If (okay!=1)
-     Return
-
+   DestroyGIFuWin()
    delayu := 1
    If (thumbsDisplaying=1 && maxFilesIndex>1 && !InStr(keyu, "appskey"))
    {
@@ -30555,9 +30586,10 @@ tryOpenGivenFolder(thisFolder, oldFolder) {
    currentFileIndex := clampInRange(oldIndex, 1, maxFilesIndex)
    dummyTimerDelayiedImageDisplay(50)
    If (hasFailed=1)
+   {
       showDelayedTooltip("WARNING: No image files found in the folder:`n" initially)
-   Else
-      RemoveTooltip()
+      SoundBeep , 300, 100
+   } Else RemoveTooltip()
    Return hasFailed
 }
 
@@ -31020,6 +31052,7 @@ ToggleImgDownScaling() {
 ToggleTouchMode() {
     DestroyTempBtnGui("now")
     TouchScreenMode := !TouchScreenMode
+    updateUIctrl()
     interfaceThread.ahkassign("isTitleBarHidden", isTitleBarHidden)
     interfaceThread.ahkassign("TouchScreenMode", TouchScreenMode)
     INIaction(1, "TouchScreenMode", "General")
@@ -31137,7 +31170,6 @@ drawWelcomeImg() {
 
     r1 := trGdip_DrawImage(A_ThisFunc, glPG, BMPcache, 0, 0, mainWidth, mainHeight, 0, 0, mainWidth, mainHeight,,, imageAttribs)
     Gdip_AddPathGradient(glPG, 0, 0, mainWidth, mainHeight, mainWidth//2, mainHeight//2, "0x00000000", "0x65010101", 1, 0, 0, 1)
-
     If (TouchScreenMode=1 && screenSaverMode!=1)
     {
        calculateTouchMargins(thisX, thisY, thisW, thisH)
@@ -33240,6 +33272,8 @@ CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReload
   If !FileRexists(imgPath) && (InStr(AprevImgCall, imgPath) || InStr(BprevImgCall, imgPath))
      thisImgCall := InStr(AprevImgCall, imgPath) ? SubStr(AprevImgCall, 2) : SubStr(BprevImgCall, 2)
 
+  prevLastImg[2] := prevLastImg[1]
+  prevLastImg[1] := [currentFileIndex, resultedFilesList[currentFileIndex, 1]]
   gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
   file2load := thumbsCacheFolder "\big-" alwaysOpenwithFIM userHQraw MD5name ".png"
   ignoreCache := (RegExMatch(imgPath, "i)(.\.gif)$") && animGIFsSupport=1) || (minimizeMemUsage=1) || StrLen(UserMemBMP)>2 ? 1 : mustReloadIMG
@@ -35591,8 +35625,6 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     Else
        whichBitmap := gdiBitmap
 
-    prevLastImg[2] := prevLastImg[1]
-    prevLastImg[1] := [currentFileIndex, resultedFilesList[currentFileIndex, 1]]
     ; Gdip_GetImageDimensions(whichBitmap, imgW, imgH)
     ; ToolTip, % "lol " mustGenerate "`n" imgW "--" imgH , , , 2
     If (usePrevious=1 && testIDvPcache!=PREVtestIDvPcache) || (mustPlayAnim=1) || (imgFxMode=8 && currIMGdetails.HasAlpha=1)
@@ -36821,17 +36853,32 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, mustShowNames:=0) {
        Gdip_GetImageDimensions(infoBoxBMP, ThumbsStatusBarW, ThumbsStatusBarH)
        ThumbsStatusBarW := clampInRange(ThumbsStatusBarW, 1, mainWidth - imgHUDbaseUnit//3.3)
        trGdip_DrawImage(A_ThisFunc, 2NDglPG, infoBoxBMP, -1, mainHeight - ThumbsStatusBarH)
+       theMSG2 := theMSG
        If (markSearchMatches=1 && userSearchString && modus!="all")
        {
           If coreSearchIndex(getIDimage(currentFileIndex), thisSearchString, userSearchWhat)
+          {
              Gdip_FillRectangle(2NDglPG, pBrushD, -1, mainHeight - ThumbsStatusBarH, OSDfntSize//2.5+1, ThumbsStatusBarH)
+             theMSG2 .=  " | Matched search: " thisSearchString 
+          }
        }
 
        If (resultedFilesList[currentFileIndex, 3]=1)
+       {
           Gdip_DrawRectangle(2NDglPG, pPen5, -1, mainHeight - ThumbsStatusBarH, ThumbsStatusBarW, ThumbsStatusBarH)
-       If (resultedFilesList[currentFileIndex, 5]=1)
-          Gdip_DrawRectangle(2NDglPG, pPen1d, -1, mainHeight - ThumbsStatusBarH, ThumbsStatusBarW, ThumbsStatusBarH)
+          theMSG2 .=  " | Image already seen"
+       }
 
+       If (resultedFilesList[currentFileIndex, 5]=1)
+       {
+          Gdip_DrawRectangle(2NDglPG, pPen1d, -1, mainHeight - ThumbsStatusBarH, ThumbsStatusBarW, ThumbsStatusBarH)
+          theMSG2 .=  " | Added to favourites"
+       }
+
+       If (bgrTXT!=OSDbgrColor)
+          theMSG2 .=  " | File selected"
+
+       interfaceThread.ahkPostFunction("UpdateUiStatusBar", theMSG2, ThumbsStatusBarH, 0, maxItemsPage)
        trGdip_DisposeImage(infoBoxBMP, 1)
     }
 
@@ -37177,11 +37224,10 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
       filesPerCore := imgsNotCached//systemCores
    } Else systemCores := limitCores
 
-   thisPID := QPVpid
-   maxLimitReached := 0 ; (maxFilesIndex>654321 || bckpMaxFilesIndex>654321) ? 1 : 0
+   maxLimitReached := (minimizeMemUsage=1) && (maxFilesIndex>654321 || bckpMaxFilesIndex>654321) ? 1 : 0
    mustDoMultiCore := (allowMultiCoreMode=1 && maxLimitReached!=1 && systemCores>1 && filesPerCore>1 && multiCoreThumbsInitGood=1) ? 1 : 0
    fnOutputDebug("ThumbsMode. Init. doMultiCore:" mustDoMultiCore ", cores:" systemCores ", filesPerCore:" filesPerCore ", imgsNotCached:" imgsNotCached ", imgsMustPaint:" imgsMustPaint)
-   mamUsage := GetProcessMemoryUsage(thisPID)
+   mamUsage := GetProcessMemoryUsage(QPVpid)
    systemMemInfo := GlobalMemoryStatusEx()
    thisMemoryLoad := (A_PtrSize=4) ? Round((mamUsage[1]/2104763598)*100, 1) : Round((max(mamUsage[1], mamUsage[8])/Round(systemMemInfo.TotalPhys*0.9))*100, 1)
    fnOutputDebug("ThumbsMode. Memory usage: " thisMemoryLoad "%")
@@ -37287,7 +37333,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
              thisCoreDoneLine := ""
              thisCoreDoneArr := ""
              whichCoreBusy := imgsListArrayThumbs[thisFileIndex, 2]
-             mamUsage := GetProcessMemoryUsage(thisPID)
+             mamUsage := GetProcessMemoryUsage(QPVpid)
              systemMemInfo := GlobalMemoryStatusEx()
              thisMemoryLoad := (A_PtrSize=4) ? Round((mamUsage[1]/2104763598)*100, 1) : Round((max(mamUsage[1], mamUsage[8])/Round(systemMemInfo.TotalPhys*0.9))*100, 1)
              If (A_TickCount - prevCoreEventZeit>69500 && innerLoops>2 && lapsOccured>2 && totalLoops>2)
@@ -42035,6 +42081,7 @@ invokePanelStaticFoldersContextMenu() {
    Menu, PanelStaticMenu, Add, &Filter list to selected folder, MenuFolderzFilterList
    Menu, PanelStaticMenu, Add,
    Menu, PanelStaticMenu, Add, &Copy entire list, BTNcopyAllStaticFolderPaths
+   Menu, PanelStaticMenu, Add, &View list as a folders tree, BTNshowStaticFoldersInTreeView
    showThisMenu("PanelStaticMenu")
 }
 
@@ -42049,6 +42096,8 @@ invokePanelDynaFoldersContextMenu() {
    Menu, PanelDynaMenu, Add, &Copy folder path, BTNcopyStaticFolderPath
    Menu, PanelDynaMenu, Add, &Toggle recursive folder scan, InvertRecurseDynaFolder
    Menu, PanelDynaMenu, Add, &Filter list to selected folder, MenuFolderzFilterList
+   Menu, PanelDynaMenu, Add
+   Menu, PanelDynaMenu, Add, &View list as a folders tree, BTNshowDynamicFoldersInTreeView
    showThisMenu("PanelDynaMenu")
 }
 
@@ -42209,7 +42258,6 @@ BTNignoreSelFolder(dummy:=0) {
     PanelStaticFolderzManager()
 }
 
-
 BTNcopyStaticFolderPath() {
     Gui, SettingsGUIA: ListView, LViewOthers
     RowNumber := LV_EX_GetNextItem(hLVmainu, -1)
@@ -42223,8 +42271,10 @@ BTNcopyStaticFolderPath() {
     Catch wasError
 
     If wasError
+    {
        showTOOLtip("Failed to copy path to clipboard:`n" folderu)
-    Else
+       SoundBeep , 300, 100
+    } Else
        showTOOLtip("Folder path copied to clipboard:`n" folderu)
 
     SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -42239,11 +42289,41 @@ BTNcopyAllStaticFolderPaths() {
     Catch wasError
 
     If wasError
+    {
        showTOOLtip("Failed to copy folder paths to clipboard")
-    Else
+       SoundBeep , 300, 100
+    } Else
        showTOOLtip("Folder paths copied to clipboard")
 
     SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+BTNshowStaticFoldersInTreeView() {
+    arrayList := LoadStaticFoldersCached(CurrentSLD, countStaticFolders, 1)
+    Loop, % countStaticFolders
+          finalListu .= arrayList[A_Index, 1] "`n"
+
+    BtnCloseWindow()
+    ; PanelFoldersTree()
+    FolderTreeRepopulate("given", finalListu)
+}
+
+BTNshowDynamicFoldersInTreeView() {
+    foldersListu := getDynamicFoldersList()
+    Loop, Parse, foldersListu, `n
+    {
+        fileTest := StrReplace(Trimmer(A_LoopField), "|")
+        If (!FolderExist(fileTest) || !RegExMatch(fileTest, "i)^(.\:\\.)"))
+           Continue
+
+        newFoldersList .= fileTest "`n"
+    }
+    If !newFoldersList
+       Return
+
+    BtnCloseWindow()
+    ; PanelFoldersTree()
+    FolderTreeRepopulate("given", newFoldersList)
 }
 
 BTNremFilesStaticFolder() {
@@ -42298,12 +42378,21 @@ BTNcopyDynaFoldersList() {
         newFoldersList .= line "`n"
     }
 
+    ResetImgLoadStatus()
+    If !newFoldersList
+       Return
+
     Try Clipboard := newFoldersList
     Catch wasError
 
-    ResetImgLoadStatus()
     If !wasError
+    {
        showTOOLtip("Dynamic folders list copied to clipboard")
+    } Else
+    {
+       showTOOLtip("Failed to copy to clipboard the dynamic folders list")
+       SoundBeep , 300, 100
+    }
 
     SetTimer, RemoveTooltip, % msgDisplayTime
 }
@@ -44658,7 +44747,7 @@ coreGdipSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, Y
 }
 
 coreSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, YscaleImgFactor) {
-  maxLimitReached := (maxFilesIndex>654321 || bckpMaxFilesIndex>654321) ? 1 : 0
+  maxLimitReached := 0 ; (maxFilesIndex>654321 || bckpMaxFilesIndex>654321) ? 1 : 0
   If (RegExMatch(imgPath, RegExFIMformPtrn) || (RegExMatch(imgPath, "i)(.\.(png|tiff|tif))$") && (maxLimitReached!=1 && wasInitFIMlib=1)))
      r := coreFreeImageSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, YscaleImgFactor)
   Else

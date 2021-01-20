@@ -59,8 +59,30 @@ Loop, 9
     OnMessage(255+A_Index, "PreventKeyPressBeep")   ; 0x100 to 0x108
 
 setPriorityThread(2)
+OnMessage(0x203, "OnLButtonDblClk")
+
 ; OnExit, doCleanup
 Return
+
+
+OnLButtonDblClk(wParam, lParam, msg, hwnd) {
+; function by Lexikos; work-around for double-click on Gui Picture Controls
+; from https://autohotkey.com/board/topic/94962-doubleclick-on-gui-pictures-puts-their-path-in-your-clipboard/
+    Critical, On
+    WinGetClass, WinClass, ahk_id %hwnd%
+    If (WinClass="Static")
+    {
+        If !A_Gui
+           Return 0  ; Just prevent Clipboard change.
+        ; Send a WM_COMMAND message to the Gui to trigger the control's g-label.
+        Gui, +LastFound
+        gID := DllCall("GetDlgCtrlID", "ptr", hwnd) ; Requires AutoHotkey v1.1.
+        Static STN_DBLCLK := 1
+        PostMessage, 0x111, gID | (STN_DBLCLK << 16), hwnd
+        ; Return a value to prevent the default handling of this message.
+        Return 0
+    }
+}
 
 setPriorityThread(level, handle:="A") {
   If (handle="A" || !handle)
@@ -119,12 +141,12 @@ BuildGUI(params:=0) {
    Gui, 1: Color, %WindowBgrColor%
    Gui, 1: Margin, 0, 0
    Gui, 1: -DPIScale +Resize %MinGUISize% +hwndPVhwnd +LastFound +OwnDialogs
-   Gui, 1: Add, Text, x0 y0 w1 h1 BackgroundTrans gWinClickAction vPicOnGui1 hwndhPicOnGui1,
+   Gui, 1: Add, Text, x0 y0 w1 h1 BackgroundTrans gWinClickAction vPicOnGui1 hwndhPicOnGui1, Previous image
    Gui, 1: Add, Edit, xp-100 yp-100 gUnlockKeys w1 h1 veditDummy,
-   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans gWinClickAction vPicOnGui2a,
-   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans gWinClickAction vPicOnGui2b,
-   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans gWinClickAction vPicOnGui2c,
-   Gui, 1: Add, Text, x3 y3 w3 h3 BackgroundTrans gWinClickAction vPicOnGui3,
+   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans gWinClickAction vPicOnGui2a, Zoom in
+   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans gWinClickAction vPicOnGui2b, Double-click to toggle view mode | Swipe to make gestures | Left-click and drag to pan image
+   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans gWinClickAction vPicOnGui2c, Zoom out
+   Gui, 1: Add, Text, x3 y3 w3 h3 BackgroundTrans gWinClickAction vPicOnGui3, Next image
    If (isTitleBarHidden=1)
       Gui, 1: +Caption
    Else
@@ -201,6 +223,7 @@ GetClientSize(ByRef w, ByRef h, hwnd) {
        H := prevH
        Return
     }
+
     VarSetCapacity(rc, 16, 0)
     DllCall("GetClientRect", "uint", hwnd, "uint", &rc)
     prevW := W := NumGet(rc, 8, "int")
@@ -225,11 +248,49 @@ updateUIctrl(forceThis:=0) {
    ctrlY3 := ctrlH2 + ctrlH3
    ctrlX1 := ctrlW
    ctrlX2 := ctrlW + ctrlW2
-   GuiControl, 1: Move, PicOnGUI1, % "w" ctrlW " h" GuiH
-   GuiControl, 1: Move, PicOnGUI2a, % "w" ctrlW2 " h" ctrlH2 " x" ctrlX1
+   GuiControl, 1: Move, PicOnGUI1, % "w" ctrlW " h" GuiH " x0 y0"
+   GuiControl, 1: Move, PicOnGUI2a, % "w" ctrlW2 " h" ctrlH2 " x" ctrlX1 " y0"
    GuiControl, 1: Move, PicOnGUI2b, % "w" ctrlW2 " h" ctrlH3 " x" ctrlX1 " y" ctrlY1
    GuiControl, 1: Move, PicOnGUI2c, % "w" ctrlW2 " h" ctrlH2 " x" ctrlX1 " y" ctrlY3
    GuiControl, 1: Move, PicOnGUI3, % "w" ctrlW " h" GuiH " x" ctrlX2 " y0"
+   setUIlabels()
+}
+
+setUIlabels() {
+   GuiControl, 1:, PicOnGUI1, % (editingSelectionNow=1 || TouchScreenMode!=1) ? "Image view" : "Previous image"
+   GuiControl, 1:, PicOnGUI2a, % (TouchScreenMode!=1) ? "Image view" : "Zoom in"
+   GuiControl, 1:, PicOnGUI2b, % (editingSelectionNow=1 || TouchScreenMode!=1) ? "Image view | Double-click anywhere to toggle view mode" : "Double-click to toggle view mode | Swipe to make gestures | Left-click and drag to pan image"
+   GuiControl, 1:, PicOnGUI2c, % (TouchScreenMode!=1) ? "Image view" : "Zoom out"
+   GuiControl, 1:, PicOnGUI3, % (editingSelectionNow=1 || TouchScreenMode!=1) ? "Image view" : "Next image"
+}
+
+UpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0) {
+   ; Static mustResize := 1
+   GetClientSize(GuiW, GuiH, PVhwnd)
+   If (mustResize="list")
+   {
+      GuiControl, 1: Move, PicOnGUI1, % "w" GuiW " h" GuiH - heightu
+      GuiControl, 1: Move, PicOnGUI2a, % "w" GuiW " h" heightu " x1 y" GuiH - heightu
+      GuiControl, 1: Move, PicOnGUI2b, % "w1 h1 x1 y1"
+      GuiControl, 1: Move, PicOnGUI2c, % "w1 h1 x1 y1"
+      GuiControl, 1: Move, PicOnGUI3, % "w1 h1 x1 y1"
+      GuiControl, 1:, PicOnGUI1, Files list container
+      GuiControl, 1:, PicOnGUI2a, Status bar
+      Return
+   } Else If (mustResize="image")
+   {
+      updateUIctrl()
+      Return
+   }
+
+   If (stringu && heightu)
+   {
+      GuiControl, 1: Move, PicOnGUI1, % "w" GuiW " h" GuiH - heightu
+      GuiControl, 1: Move, PicOnGUI2a, % "w" GuiW " h" heightu " x1 y" GuiH - heightu
+      GuiControl, 1:, PicOnGUI2a, % stringu
+      If infos
+         GuiControl, 1:, PicOnGUI1, % "Files list container: " infos " elements in view"
+   }
 }
 
 createGDIwin() {

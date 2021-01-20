@@ -805,7 +805,7 @@ ConvertPBITMAPtoFIM(pBitmap) {
 }
 
 /*
-   ; inspiration for multi-paged bitmaps
+   ; inspiration for adding multi-paged bitmaps support
    public void SelectActiveFrame(int frameIndex)
    {
       EnsureNotDisposed();

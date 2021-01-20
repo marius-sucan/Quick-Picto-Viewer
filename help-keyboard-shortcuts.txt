@@ -145,7 +145,8 @@ Page Down|Previous image or jump forwards one page of images|Anywhere|-
 Page Up|Next image or jump backwards one page of images|Anywhere|-
 Backspace|Previous random image|Anywhere|-
 Backspace|Undo added point|Freeform drawing|-
-Shift + BackSpace|Next random image|Anywhere|-
+Ctrl + Backspace|Jump to previously displayed image|Anywhere|-
+Shift + Backspace|Next random image|Anywhere|-
 Ctrl + Home|Jump to the first selected file in index|Anywhere|-
 Ctrl + End|Jump to the last selected file in index|Anywhere|-
 Ctrl + Arrow keys|Navigate between selected files|Anywhere|-

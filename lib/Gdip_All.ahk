@@ -1712,30 +1712,12 @@ Gdip_SetImageAttributesColorMatrix(clrMatrix, ImageAttr:=0, grayMatrix:=0, Color
    If (StrLen(clrMatrix)<5 && ImageAttr)
       Return -1
 
-   If StrLen(clrMatrix)<5
+   If (StrLen(clrMatrix)<5) || (ColorMatrixFlag=2 && StrLen(grayMatrix)<5)
       Return
 
-   VarSetCapacity(ColourMatrix, 100, 0)
-   Matrix := RegExReplace(RegExReplace(clrMatrix, "^[^\d-\.]+([\d\.])", "$1", , 1), "[^\d-\.]+", "|")
-   Matrix := StrSplit(Matrix, "|")
-   Loop 25
-   {
-      M := (Matrix[A_Index] != "") ? Matrix[A_Index] : Mod(A_Index-1, 6) ? 0 : 1
-      NumPut(M, ColourMatrix, (A_Index-1)*4, "float")
-   }
-
-   Matrix := ""
-   Matrix := RegExReplace(RegExReplace(grayMatrix, "^[^\d-\.]+([\d\.])", "$1", , 1), "[^\d-\.]+", "|")
-   Matrix := StrSplit(Matrix, "|")
-   If (StrLen(Matrix)>2 && ColorMatrixFlag=2)
-   {
-      VarSetCapacity(GrayscaleMatrix, 100, 0)
-      Loop 25
-      {
-         M := (Matrix[A_Index] != "") ? Matrix[A_Index] : Mod(A_Index-1, 6) ? 0 : 1
-         NumPut(M, GrayscaleMatrix, (A_Index-1)*4, "float")
-      }
-   }
+   CreateColourMatrix(clrMatrix, ColourMatrix)
+   If (ColorMatrixFlag=2)
+      CreateColourMatrix(grayMatrix, GrayscaleMatrix)
 
    If !ImageAttr
    {
@@ -1751,8 +1733,20 @@ Gdip_SetImageAttributesColorMatrix(clrMatrix, ImageAttr:=0, grayMatrix:=0, Color
          , Ptr, &GrayscaleMatrix
          , "int", ColorMatrixFlag)
 
+   gdipLastError := E
    E := created=1 ? ImageAttr : E
    return E
+}
+
+CreateColourMatrix(clrMatrix, ByRef ColourMatrix) {
+   VarSetCapacity(ColourMatrix, 100, 0)
+   Matrix := RegExReplace(RegExReplace(clrMatrix, "^[^\d-\.]+([\d\.])", "$1", , 1), "[^\d-\.]+", "|")
+   Matrix := StrSplit(Matrix, "|")
+   Loop 25
+   {
+      M := (Matrix[A_Index] != "") ? Matrix[A_Index] : Mod(A_Index-1, 6) ? 0 : 1
+      NumPut(M, ColourMatrix, (A_Index-1)*4, "float")
+   }
 }
 
 Gdip_CreateImageAttributes() {
@@ -7541,7 +7535,9 @@ Gdip_CreateEffect(whichFX, paramA, paramB, paramC:=0) {
    2 - Sharpen
           paramA - radius [0, 255]
           paramB - amount [0, 100]
-   3 - ! ColorMatrix
+   3 - ColorMatrix
+          paramA - color matrix example:
+                   matrixBright := "1.5|0|0|0|0|0|1.5|0|0|0|0|0|1.5|0|0|0|0|0|1|0|0.05|0.05|0.05|0|1"
    4 - ! ColorLUT
    5 - BrightnessContrast
           paramA - brightness [-255, 255]
@@ -7612,47 +7608,61 @@ Gdip_CreateEffect(whichFX, paramA, paramB, paramC:=0) {
        Return "err-" r2
 
     ; r2 := GetStatus(A_LineNumber ":GdipCreateEffect", r2)
+    If (whichFX=3)  ; Color matrix
+       GenerateColorMatrix(paramA, FXparams)
+    Else
+       VarSetCapacity(FXparams, 12, 0)
 
-    VarSetCapacity(FXparams, 16, 0)
     If (whichFX=1)   ; Blur FX
     {
+       FXsize := 8
        NumPut(paramA, FXparams, 0, "Float")   ; radius [0, 255]
        NumPut(paramB, FXparams, 4, "Uchar")   ; bool 0, 1
+    } Else If (whichFX=3)   ; Color matrix
+    {
+       FXsize := 100
     } Else If (whichFX=2)   ; Sharpen FX
     {
+       FXsize := 8
        NumPut(paramA, FXparams, 0, "Float")   ; radius [0, 255]
        NumPut(paramB, FXparams, 4, "Float")   ; amount [0, 100]
     } Else If (whichFX=5)   ; Brightness / Contrast
     {
+       FXsize := 8
        NumPut(paramA, FXparams, 0, "Int")     ; brightness [-255, 255]
        NumPut(paramB, FXparams, 4, "Int")     ; contrast [-100, 100]
     } Else If (whichFX=6)   ; Hue / Saturation / Lightness
     {
+       FXsize := 12
        NumPut(paramA, FXparams, 0, "Int")     ; hue [-180, 180]
        NumPut(paramB, FXparams, 4, "Int")     ; saturation [-100, 100]
        NumPut(paramC, FXparams, 8, "Int")     ; light [-100, 100]
     } Else If (whichFX=7)   ; Levels adjust
     {
+       FXsize := 12
        NumPut(paramA, FXparams, 0, "Int")     ; highlights [0, 100]
        NumPut(paramB, FXparams, 4, "Int")     ; midtones [-100, 100]
        NumPut(paramC, FXparams, 8, "Int")     ; shadows [0, 100]
     } Else If (whichFX=8)   ; Tint adjust
     {
+       FXsize := 8
        NumPut(paramA, FXparams, 0, "Int")     ; hue [180, 180]
        NumPut(paramB, FXparams, 4, "Int")     ; amount [0, 100]
     } Else If (whichFX=9)   ; Colors balance
     {
+       FXsize := 12
        NumPut(paramA, FXparams, 0, "Int")     ; Cyan / Red [-100, 100]
        NumPut(paramB, FXparams, 4, "Int")     ; Magenta / Green [-100, 100]
        NumPut(paramC, FXparams, 8, "Int")     ; Yellow / Blue [-100, 100]
     } Else If (whichFX=11)   ; ColorCurve
     {
+       FXsize := 12
        NumPut(paramA, FXparams, 0, "Int")     ; Type of adjustment [0, 7]
        NumPut(paramB, FXparams, 4, "Int")     ; Channels to affect [1, 4]
        NumPut(paramC, FXparams, 8, "Int")     ; Adjustment value [based on the type of adjustment]
     }
 
-    DllCall("gdiplus\GdipGetEffectParameterSize", Ptr, pEffect, "uint*", FXsize)
+    ; DllCall("gdiplus\GdipGetEffectParameterSize", Ptr, pEffect, "uint*", FXsize)
     r3 := DllCall("gdiplus\GdipSetEffectParameters", Ptr, pEffect, Ptr, &FXparams, "UInt", FXsize)
     If r3
     {
