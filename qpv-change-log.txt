@@ -2,6 +2,11 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.8.3 (2021-01-22)
+  - [new] option to integrate with file Explorer context menu [many thanks to TheArkive]
+  - improvements to files associations
+  - more bug fixes; error corrections in Help panel
+
 - v4.8.2 (2021-01-20)
   - [new] option to have the folders list from «Manage folders list» populate the folders tree view; same option available also in «Update selectively»...
   - more friendlier with screen readers

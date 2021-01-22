@@ -24,9 +24,9 @@ Ctrl + \|Hard reset color adjustments|Anywhere|-
 A|Toggle image alignment: centered or top-left corner|Image view|-
 Alt + A|Adjust image canvas size|Image view|Panel
 Alt + BackSpace|Fill area orf draw shapes|Image selection|Panel
-Alt + Delete|Remove active file index entry|Files list|-
+Alt + Delete|Remove active file index entry|Anywhere|-
 Alt + E|Selection properties|Image selection|Panel
-Alt + U|Manage dynamic folder(s) list|Files list|Panel
+Alt + U|Manage dynamic folder(s) list|Anywhere|Panel
 Alt + Y|Automatic image crop|Image view|Panel
 Alt + Arrow keys|Adjust image selection: top-left corner position|Image selection|-
 Ctrl + Shift + Arrow keys|Adjust image selection: bottom-right corner position|Image selection|-
@@ -43,26 +43,27 @@ Ctrl + A|Select all [files or image canvas]|Anywhere|-
 Ctrl + X|Cut file(s) (for Explorer)|Files list|-
 Ctrl + C|Copy file(s) (for Explorer)|Files list|-
 Ctrl + C|Copy image to clipboard or selected area|Image view|-
-C|Copy file(s) to...|Files list|Panel
-M|Move file(s) to...|Files list|Panel
+C|Copy file(s) to...|Anywhere|Panel
+M|Move file(s) to...|Anywhere|Panel
 Ctrl + D|Drop selected area or files selection [select none]|Anywhere|-
-Ctrl + E|Open in Explorer containing folder of active file|Image view|External app
-Ctrl + F|Filter files list|Files list|-
-Ctrl + Space|Deactivate files list filter [if any] or filter list by active's file path|Anywhere|-
+Ctrl + E|Open in Explorer containing folder of active file|Anywhere|External app
+Ctrl + F|Filter files list|Anywhere|-
+Ctrl + Space|Deactivate files list filter [if any]|Anywhere|-
 Shift + E|Filter list by the file path of the current file|Files list|-
-Ctrl + F2|Modify active index entry|Files list|Panel
+Ctrl + F2|Modify active index entry|Anywhere|Panel
 Ctrl + F4|Close document, window or panel|Anywhere|-
 Ctrl + F5|Toggle recursive scan of an opened folder|Files list|-
 Ctrl + G|Desaturate colors in selected area|Image selection|-
 Ctrl + K|Convert file format(s) to...|Anywhere|Panel
 Ctrl + N|Create new image|Anywhere|Panel
 Ctrl + S|Save image panel|Image view|Panel
+Ctrl + S|Save files list as slideshow (.SLD)|Files list|Panel
 Ctrl + O|Open file(s)|Anywhere|Files selector
 Ctrl + Q|Toggle image down-scaling|Image view|-
 Ctrl + R|Resize, rotate or crop image(s)|Anywhere|Panel
 Alt + R|Resize image to viewport selection area|Image view|-
 Ctrl + Shift + N|Open new QPV instance|Anywhere|External app
-Ctrl + Shift + S|Save list as slideshow (.SLD)|Files list|Panel
+Ctrl + Shift + S|Save files list as slideshow (.SLD)|Anywhere|Panel
 Ctrl + Shift + V|Paste in place [selected area]|Image selection|Panel
 Ctrl + Shift + Y|Redo image selection|Image selection|-
 Ctrl + Shift + Z|Undo image selection|Image selection|-
@@ -71,7 +72,7 @@ Ctrl + Alt + Z|Undo image [jump 4 steps]|Image view|-
 Ctrl + Y|Redo image|Image view|-
 Ctrl + Z|Undo image|Image view|-
 Ctrl + T|Transform selected image area|Image selection|Panel
-Ctrl + U|Static folders manager - update files list selectively|Files list|Panel
+Ctrl + U|Static folders manager - update files list selectively|Anywhere|Panel
 Ctrl + V|Render text from clipboard as image or paste clipboard image|Image view|-
 Ctrl + V|Paste text files list from clipboard or files from Explorer|Files list|-
 Ctrl + W|Set image as wallpaper|Image view|-
@@ -95,19 +96,19 @@ F10|Toggle toolbar / menu bar|Anywhere|-
 F11|Toggle full-screen|Image view|Mode switch
 F11|Collapse / expand panel for current tool|Live editing|Panel
 F12|Preferences|Anywhere|Panel
-F2|Rename file(s)|Files list|Panel
+F2|Rename file(s)|Anywhere|Panel
 F5|Reload files list or image file|Anywhere|-
 F8|Open previous panel|Anywhere|Panel
 G|Toggle histogram modes|Image view|-
 Shift + G|Toggle histogram modes|Image view|-
 Alt + G|Toggle histogram graph focus|Image view|-
-H|Flip viewport horizontally|Image view|-
-V|Flip viewport vertically|Image view|-
+H|Flip viewport horizontally|Anywhere|-
+V|Flip viewport vertically|Anywhere|-
 I|Flip selection W/H|Live editing|-
 Z|Image navigator|Image view|-
 I|Toggle information viewport box|Image view|-
-Insert|Insert file(s) into list|Files list|Files selector
-J|Jump to given file index or frame|Files list|Panel
+Insert|Insert file(s) into list|Anywhere|Files selector
+J|Jump to given file index or frame|Anywhere|Panel
 K|Perform JPEG lossless operations|Anywhere|Panel
 L|Toggle limit selection area to image boundaries|Image selection|-
 L|Toggle list view modes|Files list|-
@@ -132,7 +133,9 @@ Middle Click|Switch between image list and image view|Anywhere|Mode switch
 Middle Click|Collapse / expand live edit panel|Live editing|Panel
 Double Click|Toggle between image view modes|Anywhere|-
 Right Click|Open main menu or context menu|Anywhere|Menu
+Shift + Right Click|Open quick menu|Anywhere|Menu
 Apps key|Open main menu or context menu|Anywhere|Menu
+Shift + Apps key|Open quick menu|Anywhere|Menu
 Left|Previous image|Anywhere|-
 Right|Next image|Anywhere|-
 Down|Next line of images [based on list view mode]|Anywhere|-
@@ -153,25 +156,26 @@ Ctrl + Arrow keys|Navigate between selected files|Anywhere|-
 Space|Start or stop slideshow|Image view|-
 Space|Select or deselect files [if files selection already exists]|Files list|-
 Space|Toggle cardinal curve path|Freeform drawing|-
-Tab|Select or deselect file|Anywhere|-
-Shift + /|Define slideshow duration|Files list|Panel
+Tab|Select or deselect active file|Anywhere|-
+Shift + /|Define slideshow duration|Image view|Panel
 Shift + -|Decrease selection area|Image selection|-
 Shift + =|Increase selection area|Image selection|-
 Shift + \|Preview image without color adjustments|Image view|-
 Shift + B|Blur selected area|Image selection|Panel
 Shift + C|Copy file path(s) to clipboard|Anywhere|-
-Shift + Delete|Delete active file and its index entry|Files list|-
+Shift + Delete|Delete active file and its index entry|Anywhere|-
 Shift + E|Toggle ellipse image selection area|Image selection|-
 Shift + Esc|Restart Quick Picto Viewer|Anywhere|Close window
 Shift + F2|Rename active file|Anywhere|Panel
-Ctrl + F3|Search in files index|Files list|Panel
-Shift + F3|Search previous occurance|Files list|-
-F3|Search next occurance|Files list|-
-Shift + F5|Reload slideshow file or refresh opened folder|Files list|-
+Ctrl + F3|Search in files index|Anywhere|Panel
+Shift + F3|Search previous occurance|Anywhere|-
+F3|Search next occurance|Anywhere|-
+Shift + F5|Reload slideshow file or refresh opened folder|Anywhere|-
 Alt + F5|Regenerate on demand all thumbnails in the list|Files list|-
 Shift + H|Flip horizontally image selected area|Image selection|-
 Shift + V|Flip vertically image selected area|Image selection|-
 Shift + I|Invert colors in image selected area|Image selection|-
+Shift + I|Invert files selection|Files list|-
 Shift + L|Draw predefined lines, arcs or selection borders|Image selection|Panel
 Shift + P|Draw freeform filled shape|Image view|Panel
 P|Draw freeform outline (path)|Image view|Panel
@@ -179,17 +183,19 @@ Shift + Home|Select files to the first in index|Files list|-
 Shift + End|Select files to the last one in index|Files list|-
 Shift + Page Up / Down|Select files in pages of visible items|Files list|-
 Shift + Arrow keys|Select files|Files list|-
-Shift + Insert|Add folder(s) to files index list|Files list|Folder selector
+Shift + Insert|Add new folder(s) to files index list|Anywhere|Folder selector
 Shift + O|Open folder recursively|Anywhere|Folder selector
-Shift + Space|Drop files selection [if any], stop or start slideshow|Anywhere|-
+Shift + Space|Stop or start slideshow|Image view|-
+Shift + Space|Drop files selection [if any]|Files list|-
 Ctrl + L|Calculate file sizes for selected files|Anywhere|-
 Shift + T|Insert text into selected area|Image selection|Panel
-Shift + Tab|Drop files selection [select none]|Files list|-
+Shift + Tab|Drop files selection [select none]|Anywhere|-
 Ctrl + Tab|Filter files list to selected files|Files list|-
 Shift + U|Apply viewport color adjustments or effects to selected area|Image selection|-
 Shift + ~|Open Quick Picto Viewer session events journal|Anywhere|Panel
 Page Up / Down|Move selection area on X axis|Live editing|-
 Home / End|Move selection area on Y axis|Live editing|-
+Arrow keys|Navigate between indexed files|Anywhere|-
 Ctrl + Page Up / Down|Move up/down the hierarchy of folders (as in a breadcrumb)|Files list|-
 Alt + Page Up / Down|Open next or previous sibling folder (in the hierarchy of folders)|Files list|-
 Shift + F4|Current folder navigation options|Anywhere|Menu
@@ -197,12 +203,11 @@ F4|Switch to or open folders tree view|Anywhere|Panel
 F9|Populate tree view with active file path|Folder tree|-
 F5|Regenerate tree view|Folder tree|-
 F3|Append images from selected folder to current files list|Folder tree|-
-F7|Create new folder in the selected one|Folder tree|-
-F2|Rename selected folder|Folder tree|-
-Ctrl + Enter|Open selected folder in Explorer|Folder tree|-
-Shift + Enter|Open selected folder in a new QPV instance|Folder tree|-
-Delete|Delete folder|Folder tree|-
+F7|Create new folder in the selected one|Folder tree|Panel
+F2|Rename selected folder|Folder tree|Panel
+Ctrl + Enter|Open selected folder in Explorer|Folder tree|External app
+Shift + Enter|Open selected folder in a new QPV instance|Folder tree|External app
+Delete|Delete folder|Folder tree|Panel
 Space|Scan for sub-folders in the selected folder|Folder tree|-
 7|Copy selected or active file(s) into...|Folder tree|-
-Shift+7|Move selected or active file(s) into...|Folder tree|-
-Arrow keys|Navigate between indexed files|Anywhere|-
+Shift + 7|Move selected or active file(s) into...|Folder tree|-

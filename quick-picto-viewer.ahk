@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 4.8.1
+;@Ahk2Exe-SetVersion 4.8.3
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2020)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -164,7 +164,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := [], countGDIobjects := 0
    , TVlistFolders, hfdTreeWinGui, folderTreeWinOpen := 0
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "4.8.2", vReleaseDate := "20/01/2021"
+   , appVersion := "4.8.3", vReleaseDate := "22/01/2021"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -531,10 +531,7 @@ HKifs(q:=0) {
           Return
        } Else If (thumbsDisplaying=1)
        {
-          If StrLen(UserMemBMP)>3
-             MenuReturnIMGedit()
-          Else
-             ToggleThumbsMode()
+          MenuReturnIMGedit()
           Return
        }
 
@@ -940,13 +937,10 @@ HKifs(q:=0) {
     ~+Delete Up::
       If HKifs("imgsLoaded")
       {
-         If !markedSelectFile
-         {
-            DeletePicture()
-            Sleep, 350
-            If (maxFilesIndex>1 && currentFileIndex>0)
-               singleInListEntriesRemover()
-         } Else DeleteActivePicture()
+         DeleteActivePicture()
+         Sleep, 350
+         If (maxFilesIndex>1 && currentFileIndex>0)
+            singleInListEntriesRemover()
       }
     Return
 
@@ -1108,47 +1102,47 @@ HKifs(q:=0) {
     Return
 
     ^vk31::   ; Ctrl+1
-      If HKifs("imgsLoaded")
+      If (HKifs("imgsLoaded") && thumbsDisplaying=1)
          SetTimer, ActSortName, -150
     Return
 
     ^vk32::   ; Ctrl+2
-      If HKifs("imgsLoaded")
+      If (HKifs("imgsLoaded") && thumbsDisplaying=1)
          SetTimer, ActSortPath, -150
     Return
 
     ^vk33::   ; Ctrl+3
-      If HKifs("imgsLoaded")
+      If (HKifs("imgsLoaded") && thumbsDisplaying=1)
          SetTimer, ActSortFileName, -150
     Return
 
     ^vk34::   ; Ctrl+4
-      If HKifs("imgsLoaded")
+      If (HKifs("imgsLoaded") && thumbsDisplaying=1)
          SetTimer, ActSortSize, -150
     Return
 
     ^vk35::   ; Ctrl+5
-      If HKifs("imgsLoaded")
+      If (HKifs("imgsLoaded") && thumbsDisplaying=1)
          SetTimer, ActSortModified, -150
     Return
 
     ^vk36::   ; Ctrl+6
-      If HKifs("imgsLoaded")
+      If (HKifs("imgsLoaded") && thumbsDisplaying=1)
          SetTimer, ActSortCreated, -150
     Return
 
     ^vk37::   ; Ctrl+7
-      If HKifs("imgsLoaded")
+      If (HKifs("imgsLoaded") && thumbsDisplaying=1)
          SetTimer, PanelResolutionSorting, -50
     Return
 
     ^vk38::   ; Ctrl+8
-      If HKifs("imgsLoaded")
+      If (HKifs("imgsLoaded") && thumbsDisplaying=1)
          SetTimer, PanelHistogramSorting, -50
     Return
 
     ^vk30::   ; Ctrl+0
-      If HKifs("imgsLoaded")
+      If (HKifs("imgsLoaded") && thumbsDisplaying=1)
          SetTimer, ReverseListNow, -150
     Return
 
@@ -1683,10 +1677,15 @@ intializeWithGivenArguments() {
    }
    ; ToolTip, % "l=" disCount , , , 2
    If sldOpened
+   {
       OpenSLD(sldOpened)
-   Else If folderOpened
-      OpenFolders(folderOpened)
-   Else If (thisCounter=1 && !sldOpened && !folderOpened)
+   } Else If folderOpened
+   {
+      If InStr(folderOpened, "|")
+         tryOpenGivenFolder(folderOpened, 0)
+      Else
+         OpenFolders(folderOpened)
+   } Else If (thisCounter=1 && !sldOpened && !folderOpened)
       OpenArgFile(Trimmer(filesListu))
    Else If (thisCounter>1 && !sldOpened && !folderOpened)
       GuiDroppedFiles(filesListu, nona, none, thisCounter, 0)
@@ -13820,7 +13819,12 @@ folderTreeDefaultAction() {
    WinActivate, ahk_id %hfdTreeWinGui%
 }
 
-fdTreeGuiaGuiSize(GuiHwnd, EventInfo, Width, Height) {
+fdTreeGuiaGuiSize() {     
+   ; (GuiHwnd, EventInfo, Width, Height) {
+   GetWinClientSize(Width, Height, hfdTreeWinGui, 0)
+   If (!width || !height || folderTreeWinOpen!=1)
+      Return
+
    thisBtnHeight := (PrefsLargeFonts=1) ? 45 : 35
    height -= thisBtnHeight
    GuiControl, fdTreeGuia: Move, TVlistFolders, w%width% h%height%
@@ -13829,6 +13833,7 @@ fdTreeGuiaGuiSize(GuiHwnd, EventInfo, Width, Height) {
    GuiControl, fdTreeGuia: Move, fdTreeInfoLine, y%yPos% w%width% 
    GuiControl, fdTreeGuia: Move, btnFldr, y%yPos% 
    ; SoundBeep , 900, 100
+   SetTimer, fdTreeGuiaGuiSize, -100
 }
 
 fdTreeClose() {
@@ -13935,6 +13940,7 @@ folderTreeInfoLineUpdater() {
     }
 
     GuiControl, fdTreeGuia:, fdTreeInfoLine, % thisFolder
+    SetTimer, fdTreeGuiaGuiSize, -50
 }
 
 folderTreeGetSelectedPath(c) {
@@ -14343,6 +14349,7 @@ folderTreeDeleteFolder() {
       msgResult := msgBoxWrapper(appTitle ": Confirmation", "You have selected:`n`n" thisFolder "\`n`nPlease confirm you want to DELETE entirely this folder.", "&Delete|&Cancel", 2, "question")
       If (msgResult="delete")
       {
+         destroyGDIfileCache()
          showTOOLtip("Deleting folder, please wait`n" thisFolder "\*")
          FileRemoveDir, % thisFolder, 1
          If !ErrorLevel
@@ -19045,7 +19052,7 @@ multiCoresFormatConvert(coreThread, filesList) {
 
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadJob%coreThread%, % countFilez "/" failedFiles "/" theseFailures "/" skippedFiles
    If resultsList
-      Try FileAppend, % resultsList, %thumbsCacheFolder%\tempList%coreThread%.txt, utf-16
+      Try FileAppend, % resultsList, %thumbsCacheFolder%\tempList%coreThread%.txt, UTF-16
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%coreThread%, 2
    operationDone := 1
    ; cleanupThread()
@@ -19783,7 +19790,7 @@ invertFilesSelection(silentMode:=0) {
    {
        sel := resultedFilesList[A_Index, 2]
        resultedFilesList[A_Index, 2] := !sel
-       If (sel=1)
+       If (sel!=1)
           markedSelectFile++
    }
 
@@ -19802,7 +19809,6 @@ dropFilesSelection(silentMode:=0) {
       Return
 
    EntryMarkedMoveIndex := markedSelectFile := 0
-
    Loop, % maxFilesIndex
        resultedFilesList[A_Index, 2] := 0
 
@@ -20100,9 +20106,10 @@ PanelMultiFileDelete() {
 }
 
 BTNactiveFileDel() {
+   Gui, SettingsGUIA: Default
    GuiControlGet, preventDBentryRemoval
 
-   CloseWindow()
+   BtnCloseWindow()
    DeleteActivePicture()
    getSelectedFiles(0, 1)
    preventDBentryRemoval := 0
@@ -20110,6 +20117,7 @@ BTNactiveFileDel() {
 
 DeleteActivePicture() {
    DeletePicture("single")
+   getSelectedFiles(0, 1)
 }
 
 BTNmultiDel() {
@@ -21309,7 +21317,7 @@ PanelSaveSlideShowu() {
        Return
     }
 
-    thisBtnHeight := createSettingsGUI(36, A_ThisFunc, 0)
+    thisBtnHeight := createSettingsGUI(36, A_ThisFunc)
     btnWid := 100
     txtWid := 360
     EditWid := 360
@@ -21349,12 +21357,15 @@ PanelSaveSlideShowu() {
     If (SLDtypeLoaded>1 && FileRexists(CurrentSLD)) || InStr(CurrentSLD, "\QPV\favourite-images-list.SLD")
     {
        thisDefault := ""
-       Gui, Add, Button, x+5 hp w%btnWid2% Default gBTNsaveCurrentSlideshow, &Save
-    } Else  thisDefault := "Default"
+       Gui, Add, Button, x+5 hp w%btnWid2% Default gBTNsaveCurrentSlideshow, &Save...
+       Gui, Add, Button, x+0 hp w35 gBTNsaveSlideshowPanel, &AS
+    } Else
+    {
+       Gui, Add, Button, x+5 hp w%btnWid2% Default gBTNsaveSlideshowPanel, Save &as
+    }
 
-    Gui, Add, Button, x+5 hp w%btnWid2% %thisDefault% gBTNsaveSlideshowPanel, Save &as
-    Gui, Add, Button, x+5 hp wp-5 gBTNhelpSlideshows, &Help
-    Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
+    Gui, Add, Button, x+15 hp w%btnWid2% gBTNhelpSlideshows, &Help
+    Gui, Add, Button, x+5 hp wp-5 gBtnCloseWindow, &Cancel
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Save indexed files list: " appTitle)
 }
 
@@ -21439,6 +21450,7 @@ PanelSaveImg() {
        Gui, Font, s%LargeUIfontValue%
     }
 
+    btnWid2 := (PrefsLargeFonts=1) ?  btnWid - 40 : btnWid - 25
     INIaction(0, "userDesireWriteFMT", "General", 2, 1, 16)
     imgPath := getIDimage(currentFileIndex)
     imgPath := StrReplace(imgPath, "||")
@@ -21476,10 +21488,10 @@ PanelSaveImg() {
     If !usePrevSaveFolder
        GuiControl, Disable, userDestinationFolder
 
-    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid% Default gBTNsaveImgPanel, &Save image
-    Gui, Add, Button, x+5 h%thisBtnHeight% w%btnWid% gBTNsaveBrowseImgPanel, &Browse / Save as
-    Gui, Add, Button, x+5 hp w%btnWid% gBtnCopyImageClip, &Copy to clipboard
-    Gui, Add, Button, x+5 hp w90 gBtnCloseWindow, C&ancel
+    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid2% Default gBTNsaveImgPanel, &Save image
+    Gui, Add, Button, x+0 h%thisBtnHeight% w35 gBTNsaveBrowseImgPanel, &AS
+    Gui, Add, Button, x+15 hp w%btnWid% gBtnCopyImageClip, &Copy to clipboard
+    Gui, Add, Button, x+5 hp w%btnWid2% gBtnCloseWindow, C&ancel
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Save image file: " appTitle)
 }
 
@@ -23925,6 +23937,7 @@ PanelPrintImage() {
 }
 
 BtnSetPrinterDefault() {
+   Gui, SettingsGUIA: Default
    GuiControlGet, SelectedPrinteru
    If !SGDIPrint_SetDefaultPrinter(SelectedPrinteru)
       msgBoxWrapper(appTitle ": ERROR", "Failed to set " SelectedPrinteru " as default.", 0, 0, "error")
@@ -27349,6 +27362,9 @@ OpenFolders(dummy:=0) {
       If askAboutFileSave(" and another image will be loaded")
          Return
 
+      If askAboutSlidesListSave()
+         Return
+
       newStaticFoldersListCache := []
       prevOpenFolderPath := StrReplace(SelectedDir, "|")
       INIaction(1, "prevOpenFolderPath", "General")
@@ -27699,16 +27715,19 @@ RefreshImageFileAction() {
    {
       If askAboutFileSave(" and the original file will be reloaded")
          Return
+
       currentImgModified := 0
       discardViewPortCaches()
       terminateIMGediting()
       If (AutoDownScaleIMGs=1)
          AutoDownScaleIMGs := 2
+
       r := IDshowImage(currentFileIndex, 3)
       If !r
          informUserFileMissing()
       Else If (toolTipGuiCreated!=1)
          showTOOLtip("Image file reloaded")
+
       thisIMGisDownScaled := 0
       SetTimer, RemoveTooltip, % -msgDisplayTime
       If (FlipImgH=1 || FlipImgV=1 || vpIMGrotation>0 || imgFxMode>1 || usrColorDepth>1)
@@ -28496,44 +28515,181 @@ RemoveTooltip() {
    }
 }
 
-associateSLDsNow() {
-    FileAssociate("QPVslideshow",".sld", fullPath2exe)
-    FileAssociate("QPVslideshow",".sldb", fullPath2exe)
+PanelAssociateQPV() {
+   fakeWinCreator(52, A_ThisFunc, 1)
+   msgResult := msgBoxWrapper("panelu|Associate " appTitle, "Please choose what to associate " appTitle " with.", "&Proceed|C&ancel", 1, "settings", "Add file explorer context menu entry for folders: Open in QPV", 0, "Associate with common image formats`f`fAssociate with all supported image formats`fAssociate with QPV slideshow / files list formats`fRemove QPV files associations`fDo not change files associations", 0, 0)
+   If InStr(msgResult.btn, "Proceed")
+   {
+      If !A_IsCompiled
+      {
+         msgBoxWrapper(appTitle ": ERROR", "This feature is only available when this application is compiled.", 0, 0, "error")
+         Return
+      }
+
+      associateWithImages(msgResult.list)
+      If (msgResult.check=1)
+         associateWithExplorer(1)
+      Else
+         associateWithExplorer(3)
+   }
 }
 
-associateWithImages() {
-  Static FileFormatsCommon := "png|bmp|gif|jpg|tif|tga|webp|jpeg|tiff|exr|hdr|psd"
-       , allFormats := "dib|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif"
+associateWithExplorer(modus) {
+   Static q := Chr(34)
+   zPlitPath(fullPath2exe, 0, OutFileName, OutDir)
+   Cmd := q fullPath2exe q A_Space q "%1" q
+   Cmd := StrReplace(Cmd, "\", "\\")
+   Cmd := StrReplace(Cmd, """", "\""")
+
+   regFile := "Windows Registry Editor Version 5.00`n`n"
+   If (modus=1)
+   {
+      regFile .= "[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Directory\shell\QuickPictoViewer]`n""Icon""=" q StrReplace(fullPath2exe, "\", "\\") q "`n"
+      regFile .= "@=""Open in QPV""`n"
+      regFile .= "[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Directory\shell\QuickPictoViewer\Command]`n"
+      regFile .= "@=""\" q StrReplace(fullPath2exe, "\", "\\") "\"" fd=|\""%1\" q q "`n"
+   } Else If (modus=3) ; remove explorer context menu
+   {
+      regFile .= "[-HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Directory\shell\QuickPictoViewer]`n"
+   } Else If (modus=4) ; remove file associations
+   {
+      regFile .= "[-HKEY_LOCAL_MACHINE\Software\Classes\Applications\" OutFileName "]`n"
+      regFile .= "[-HKEY_CLASSES_ROOT\QPVslideshow]`n"
+      regFile .= "[-HKEY_LOCAL_MACHINE\Software\Classes\QPVslideshow]`n"
+      allFormats := StrReplace(SubStr(RegExFilesPattern, 17), "))$")
+      Loop, Parse, allFormats, |
+      {
+         If !A_LoopField
+            Continue
+
+         regFile .= "[-HKEY_CLASSES_ROOT\QPVimage." A_LoopField "]`n"
+         regFile .= "[-HKEY_LOCAL_MACHINE\SOFTWARE\Classes\QPVimage." A_LoopField "]`n"
+      }
+   } Else
+   {
+      regFile .= "[HKEY_LOCAL_MACHINE\Software\Classes\Applications\" OutFileName "]`n" q "FriendlyAppName""=" q appTitle q "`n"
+      regFile .= "[HKEY_LOCAL_MACHINE\Software\Classes\Applications\" OutFileName "\shell]`n"
+      regFile .= "[HKEY_LOCAL_MACHINE\Software\Classes\Applications\" OutFileName "\shell\open]`n" q "FriendlyAppName""=" q appTitle q "`n"
+      regFile .= "[HKEY_LOCAL_MACHINE\Software\Classes\Applications\" OutFileName "\shell\open\command]`n@=" q Cmd q "`n"
+      regFile .= "[HKEY_LOCAL_MACHINE\Software\Classes\Applications\" OutFileName "\SupportedTypes]`n"
+      allFormats := StrReplace(SubStr(RegExFilesPattern, 17), "))$")
+      Loop, Parse, allFormats, |
+      {
+         If !A_LoopField
+            Continue
+
+         regFile .= q "." A_LoopField q "=" q q "`n"
+      }
+   }
+
+   If !FolderExist(mainCompiledPath "\regFiles")
+   {
+      FileCreateDir, %mainCompiledPath%\regFiles
+      If ErrorLevel
+         errorOccured := 1
+
+      Sleep, 1
+   }
+
+   FileDelete, %mainCompiledPath%\regFiles\RegExplGeneral.reg
+   FileDelete, %mainCompiledPath%\regFiles\runThis.bat
+   Sleep, 1
+   FileAppend, % regFile, %mainCompiledPath%\regFiles\RegExplGeneral.reg, UTF-16
+   If ErrorLevel
+      errorOccured := 1
+
+   runTarget := "Reg Import " q mainCompiledPath "\regFiles\RegExplGeneral.reg" q "`n"
+   FileAppend, % runTarget, %mainCompiledPath%\regFiles\runThis.bat
+   If ErrorLevel
+      errorOccured := 1
+
+   ;  msgbox, % "loool=" A_ThisFunc "==" modus
+   If !errorOccured
+      Try RunWait, *RunAs "%mainCompiledPath%\regFiles\runThis.bat"
+   Sleep, 1
+   FileDelete, %mainCompiledPath%\regFiles\RegExplGeneral.reg
+   FileDelete, %mainCompiledPath%\regFiles\runThis.bat
+   If (errorOccured && modus!=2)
+      msgBoxWrapper(appTitle ": ERROR", "An unknown error occured while associating " appTitle " with Explorer context menu options.", 0, 0, "error")
+}
+
+associateSLDsNow() {
+    z := FileAssociate("QPVslideshow",".sld", fullPath2exe)
+    If z
+       FileAssociate("QPVslideshow",".sldb", fullPath2exe)
+    Else
+       msgBoxWrapper(appTitle ": ERROR", "An unknown error occured when associating " appTitle " with slideshow / files list formats.", 0, 0, "error")
+}
+
+associateWithImages(modus) {
+  Static FileFormatsCommon := "|png|bmp|gif|jpg|tif|tga|webp|jpeg|tiff|exr|hdr|psd|"
+       , allFormats := 0 ; "dib|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif"
+
+  If !allFormats
+     allFormats := StrReplace(SubStr(RegExFilesPattern, 17), "))$")
+
+  If (modus=3)
+  {
+     associateSLDsNow()
+     Return
+  } Else If (modus=4)
+  {
+     associateWithExplorer(4)
+     Return
+  } Else Return
 
   Loop, Parse, FileFormatsCommon, |
   {
       If !A_LoopField
          Continue
 
-      FileAssociate("QPVimage." A_LoopField,"." A_LoopField, fullPath2exe,,1)
+      z := FileAssociate("QPVimage." A_LoopField,"." A_LoopField, fullPath2exe,,1)
+      If !z
+      {
+         errorOccured := 1
+         Break
+      }
+
   }
+
   Sleep, 25
-  RunWait, *RunAs "%mainCompiledPath%\regFiles\runThis.bat"
+  If !errorOccured
+     Try RunWait, *RunAs "%mainCompiledPath%\regFiles\runThis.bat"
   Sleep, 5
   FileDelete, %mainCompiledPath%\regFiles\*.reg
   FileDelete, %mainCompiledPath%\regFiles\*.bat
-  msgResult := msgBoxWrapper(appTitle, appTitle " was now associated with common image file formats. Would you like to associate it with all the 85 supported file formats?", 4, 0, "question")
-  If (msgResult="yes")
+
+  ; msgResult := msgBoxWrapper(appTitle, appTitle " was now associated with common image file formats. Would you like to associate it with all the 85 supported file formats?", 4, 0, "question")
+  ; If (msgResult="yes")
+  If (modus=2 && !errorOccured)
   {
      Loop, Parse, allFormats, |
      {
-         If !A_LoopField
+         If (!A_LoopField || InStr(FileFormatsCommon, "|" A_LoopField "|"))
             Continue
  
-         FileAssociate("QPVimage." A_LoopField,"." A_LoopField, fullPath2exe,,1)
+         z := FileAssociate("QPVimage." A_LoopField,"." A_LoopField, fullPath2exe,,1)
+         If !z
+         {
+            errorOccured := 1
+            Break
+         }
      }
  
      Sleep, 25
-     RunWait, *RunAs "%mainCompiledPath%\regFiles\runThis.bat"
+     If !errorOccured
+        Try RunWait, *RunAs "%mainCompiledPath%\regFiles\runThis.bat"
      Sleep, 5
      FileDelete, %mainCompiledPath%\regFiles\*.reg
      FileDelete, %mainCompiledPath%\regFiles\*.bat
   }
+
+  If errorOccured
+  {
+     msgBoxWrapper(appTitle ": ERROR", "An unknown error occured during associating " appTitle " with image file formats.", 0, 0, "error")
+     Return
+  } Else associateWithExplorer(2)
+
   addJournalEntry(appTitle " has been associated with image file formats")
 }
 
@@ -29484,11 +29640,11 @@ BuildMainMenu() {
       If StrLen(filesFilter)>1
          Menu, PVfList, Check, &Index filters`tCtrl+F
 
-      If (thumbsDisplaying!=1)
-      {
-         Menu, PVfList, Add,
-         Menu, PVfList, Add, &Sort by, :PVsort
-      }
+      ; If (thumbsDisplaying!=1)
+      ; {
+      ;    Menu, PVfList, Add,
+      ;    Menu, PVfList, Add, &Sort by, :PVsort
+      ; }
    }
 
    Menu, PVperfs, Add, &Limit memory usage, ToggleLimitMemUsage
@@ -29528,12 +29684,7 @@ BuildMainMenu() {
 
    Menu, PVprefs, Add, Save settings into a .SLD file, WritePrefsIntoSLD
    Menu, PVprefs, Add, &Never load settings from a .SLD, ToggleIgnoreSLDprefs
-   If A_IsCompiled
-   {
-      Menu, PVprefs, Add, 
-      Menu, PVprefs, Add, Associate with .SLD files, associateSLDsNow
-      Menu, PVprefs, Add, Associate with image files, associateWithImages
-   }
+   Menu, PVprefs, Add, Associate QPV with image formats, PanelAssociateQPV
 
    Menu, PVprefs, Add, 
    Menu, PVprefs, Add, Load an&y image format using FreeImage, ToggleAlwaysFIMus
@@ -30554,6 +30705,8 @@ folderzNavInvokeSubs(menuItem) {
 }
 
 tryOpenGivenFolder(thisFolder, oldFolder) {
+   oldFolderu := StrReplace(oldFolder, "|")
+   thisFolder := StrReplace(thisFolder, "|")
    thisFolder := StrReplace(Trimmer(thisFolder, "\"), "\\", "\")
    If !FolderExist(thisFolder)
    {
@@ -30565,27 +30718,39 @@ tryOpenGivenFolder(thisFolder, oldFolder) {
    If (SLDtypeLoaded=3)
       activeSQLdb.CloseDB()
 
+   maxFilesIndex := 0
    initially := thisFolder
    SLDtypeLoaded := 1
    coreOpenFolder("|" thisFolder, 0, 0, 0, 1)
    If (maxFilesIndex<1)
    {
-      coreOpenFolder(thisFolder, 0, 0, 0, 1)
-      CurrentSLD := thisFolder
+      If !FolderExist(oldFolderu)
+         msgResult := msgBoxWrapper(appTitle ": Confirmation", "You have attempted to open: " thisFolder "\. QPV found no supported image files in the folder.`n`nWould you like to recursively scan the given folder for supported image files?", 4, 0, "question")
+      If (msgResult="Yes" || !FolderExist(oldFolderu))
+      {
+         coreOpenFolder(thisFolder, 0, 0, 0, 1)
+         CurrentSLD := thisFolder
+      }
    } Else CurrentSLD := "|" thisFolder
 
    hasFailed := 0
-   If (maxFilesIndex<1)
+   If (maxFilesIndex<1 && FolderExist(oldFolderu))
    {
       coreOpenFolder(oldFolder, 0, 0, 0, 1)
       CurrentSLD := oldFolder
       hasFailed := 1
-   }
+   } Else If (maxFilesIndex<1)
+      resetMainWin2Welcome()
+
+   If (maxFilesIndex>1)
+      prevOpenFolderPath := StrReplace(CurrentSLD, "|")
 
    currentFilesListModified := 0
    currentFileIndex := clampInRange(oldIndex, 1, maxFilesIndex)
-   dummyTimerDelayiedImageDisplay(50)
-   If (hasFailed=1)
+   If maxFilesIndex
+      dummyTimerDelayiedImageDisplay(50)
+
+   If (hasFailed=1 || maxFilesIndex<1)
    {
       showDelayedTooltip("WARNING: No image files found in the folder:`n" initially)
       SoundBeep , 300, 100
@@ -39297,6 +39462,7 @@ AboutWindow() {
        txtWid := txtWid + 190
        Gui, Font, s%LargeUIfontValue%
     }
+
     drawViewportHelpMap()
     IniAction(1, "appVersion", "General")
     If wasInitFIMlib
@@ -39319,9 +39485,9 @@ AboutWindow() {
 
     Gui, Tab, 2 ; keyboard 
     Gui, Add, ListView, x+15 y+15 w%lstWid% r10 Grid vLViewOthers, Keys|Action|Context|Opens
-    Gui, Add, Combobox, xp y+10 wp gfilterListViewKbdsAbout +hwndhEditField vlistViewFilteru, \Files list|\Image view|\Live editing|\Folder tree|\Anywhere|\Panel
+    Gui, Add, Combobox, xp y+10 wp gfilterListViewKbdsAbout +hwndhEditField vlistViewFilteru, \Files list|\Image view|\Live editing|\Folder tree|\Anywhere|\Panel|\Menu
 
-    cmdHelp := "QPV can be invoked with command line arguments. Examples:`n`n1. Open a folder:`nqpv.exe ""fd=C:\example folder\tempus""`n`nAdd a pipe ""|"" after equal ""="" to have images loaded recursively."
+    cmdHelp := "QPV can be invoked with command line arguments. Examples:`n`n1. Open a folder:`nqpv.exe ""fd=C:\example folder\tempus""`n`nAdd a pipe ""|"" after equal ""="" to NOT have images loaded recursively."
     cmdHelp .= "`n`n2. Call an internal function:`nqpv.exe call_ToggleThumbsMode() ""fd=C:\folder\tempus""`n`nThis will index all the images in the given folder and switch to thumbnails mode.`n`nOnly functions that need no parameters can be invoked. If multiple call_ are used, only the last valid one will be considered."
     cmdHelp .= "`n`nTo learn what functions you can call, check the Journal window in QPV. It names functions when opening panels or when errors occur. You can also enable debug mode, to gather more intel, or study the source code."
     cmdHelp .= "`n`n3. Specify user settings:`n`nqpv.exe set_IMGresizingMode=3 set_vpIMGrotation=45 ""C:\folder\this-image.png""`n"
@@ -43575,15 +43741,15 @@ RunAdminMode() {
 }
 
 FileAssociate(Label,Ext,Cmd,Icon:="", batchMode:=0) {
-; by Ħakito: https://autohotkey.com/boards/viewtopic.php?f=6&t=55638 
-; modified by Marius Șucan to AHK v1.1
-
+  Static q := Chr(34)
+  ; by Ħakito: https://autohotkey.com/boards/viewtopic.php?f=6&t=55638 
+  ; modified by Marius Șucan to AHK v1.1
   ; Weeds out faulty extensions, which must start with a period, and contain more than 1 character
-  iF (SubStr(Ext,1,1)!="." || StrLen(Ext)<=1)
+  IF (SubStr(Ext,1,1)!="." || StrLen(Ext)<=1)
      Return 0
 
   ; Weeds out faulty labels such as ".exe" which is an extension and not a label
-  iF (SubStr(Label,1,1)=".")
+  IF (SubStr(Label,1,1)=".")
      Return 0
 
   If Label
@@ -43597,46 +43763,63 @@ FileAssociate(Label,Ext,Cmd,Icon:="", batchMode:=0) {
   ; Note that "HKEY_CLASSES_ROOT" actually writes to "HKEY_LOCAL_MACHINE\SOFTWARE\Classes"
   ; If the command is just a simple path, then convert it into a proper run command
   iF (SubStr(Cmd,2,2)=":\" && FileExist(Cmd))
-     Cmd := """" Cmd """" A_Space """" "%1" """"
+     Cmd := q Cmd q A_Space q "%1" q
   Else
      Return 0
 
   Cmd := StrReplace(Cmd, "\", "\\")
   Cmd := StrReplace(Cmd, """", "\""")
-  regFile .= "[HKEY_CLASSES_ROOT\" Ext "]`n@=" """" Label """" "`n"
-  regFile .= "`n[HKEY_CLASSES_ROOT\" Label "]`n@=" """" Label """" "`n"
-  regFile .= "`n[HKEY_CLASSES_ROOT\" Label "\Shell\Open\Command]`n@=" """" Cmd """" "`n"
-  regFile .= "`n[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\" Ext "\UserChoice]`n""ProgId""=" """" Label """" "`n"
+  typeInfo := "`n""ContentType""=" q "image/" Ext q "`n""PerceivedType""=" q "image" q "`n"
+  regFile .= "[HKEY_CLASSES_ROOT\" Ext "]`n@=" q Label q typeInfo
+  regFile .= "`n[HKEY_CLASSES_ROOT\" Label "]`n@=" q Label q "`n"
+  regFile .= "`n[HKEY_CLASSES_ROOT\" Label "\Shell\Open\Command]`n@=" q Cmd q "`n"
+
+  regFile .= "`n[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\" Ext "]`n@=" q Label q typeInfo
+  regFile .= "`n[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\" Label "]`n@=" q Label q "`n"
+  regFile .= "`n[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\" Label "\Shell\Open\Command]`n@=" q Cmd q "`n"
+
+  regFile .= "`n[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\" Ext "\UserChoice]`n""ProgId""=" q Label q "`n"
   regFile .= "`n[-HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FileExts\" Ext "\OpenWithProgids]`n"
   regFile .= "`n[-HKEY_CLASSES_ROOT\" Ext "\OpenWithProgids]`n`n"
 
-  If Icon
-     regFile .= "`n[HKEY_CLASSES_ROOT\" QPVslideshow "\DefaultIcon]`n@=" Icon "`n`n"
-
+  ; If Icon
+  ;    regFile .= "`n[HKEY_CLASSES_ROOT\" QPVslideshow "\DefaultIcon]`n@=" Icon "`n`n"
   If !FolderExist(mainCompiledPath "\regFiles")
   {
      FileCreateDir, %mainCompiledPath%\regFiles
+     If ErrorLevel
+        Return 0
+
      Sleep, 1
   }
 
   iExt := StrReplace(Ext, ".")
   FileDelete, %mainCompiledPath%\regFiles\RegFormat%iExt%.reg
   Sleep, 1
-  FileAppend, % regFile, %mainCompiledPath%\regFiles\RegFormat%iExt%.reg
-  runTarget := "Reg Import """ mainCompiledPath "\regFiles\RegFormat" iExt ".reg" """" "`n"
+  FileAppend, % regFile, %mainCompiledPath%\regFiles\RegFormat%iExt%.reg, UTF-16
+  If ErrorLevel
+     Return 0
+
+  runTarget := "Reg Import " q mainCompiledPath "\regFiles\RegFormat" iExt ".reg" q "`n"
   If !InStr("|WIN_7|WIN_8|WIN_8.1|WIN_VISTA|WIN_2003|WIN_XP|WIN_2000|", "|" A_OSVersion "|")
-     runTarget .= """" mainCompiledPath "\SetUserFTA.exe""" A_Space Ext A_Space Label "`n"
+     runTarget .= q mainCompiledPath "\SetUserFTA.exe" q A_Space Ext A_Space Label "`n"
+
   FileAppend, % runTarget, %mainCompiledPath%\regFiles\runThis.bat
+  If ErrorLevel
+     Return 0
+
   If (batchMode!=1)
   {
      Sleep, 1
-     RunWait, *RunAs "%mainCompiledPath%\regFiles\runThis.bat"
+     Try RunWait, *RunAs "%mainCompiledPath%\regFiles\runThis.bat"
+     Sleep, 1
      FileDelete, %mainCompiledPath%\regFiles\RegFormat%iExt%.reg
      FileDelete, %mainCompiledPath%\regFiles\runThis.bat
   }
 
-  return 1
+  Return 1
 }
+
 
 ; ==================================================================================================================================
 ; function by «just me», source https://www.autohotkey.com/boards/viewtopic.php?t=18081
