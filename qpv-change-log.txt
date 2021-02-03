@@ -2,6 +2,23 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.8.6 (2021-02-03)
+  - [new] freeform polygonal and curved/spline-based selection areas support [ Shift + L ]
+  - [new] edit freeform polygonal shape or selection after finalising it
+  - [new] by holding long left-click during freeform shape drawing, one can draw the path freely
+  - [new] keyboard shortcuts to adjust the overall position of the freeform shape during editing, and to adjust the X/Y coordinates of the first or last point of the path: Alt + arrow keys, PgUp/PgDn, Home/End
+  - [new] option to apply viewport colour adjustments/effects outside the selected area [ Ctrl+Shift+U ]
+  - [new] information box [ I ] can be displayed in the thumbnails list mode as well ; it will show image and thumbnails list information
+  - [new] keyboard shortcuts and menu options for quick image adjustments straight in the list/thumbs mode: flip, rotate or apply colour adjustments, with no prompts
+  - [new] option to randomly select files in the list ;-)
+  - improvements to image editing; more tools allow for selection area to extend beyond the image boundaries
+  - improvements related to the folders tree view
+  - reorganized menus: «selection area», «current file», and «image view» when in thumbnails mode
+  - bug fixes related to «add noise» and «detect edges» filters that caused crashes
+  - bug fixes related to crashes occuring in the «Fill shape» panel and improvements to real-time glass preview
+  - bug fixes related to multi-rename search and replace; it was trimming spaces from the beginning and end
+  - bug fixes related to files list filters panel
+
 - v4.8.3 (2021-01-22)
   - [new] option to integrate with file Explorer context menu [many thanks to TheArkive]
   - improvements to files associations

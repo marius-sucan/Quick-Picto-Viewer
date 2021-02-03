@@ -5294,11 +5294,10 @@ Gdip_GetPathPointsCount(pPath) {
 Gdip_GetPathPoints(pPath) {
    PointsCount := Gdip_GetPathPointsCount(pPath)
    If (PointsCount=-1)
-      Return 0
+      Return
 
-   Static Ptr := "UPtr"
    VarSetCapacity(PointsF, 8 * PointsCount, 0)
-   DllCall("gdiplus\GdipGetPathPoints", Ptr, pPath, Ptr, &PointsF, "intP", PointsCount)
+   gdipLastError := DllCall("gdiplus\GdipGetPathPoints", "UPtr", pPath, "UPtr", &PointsF, "intP", PointsCount)
    Loop %PointsCount%
    {
        A := NumGet(&PointsF, 8*(A_Index-1), "float")

@@ -26,12 +26,12 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , userAllowWindowDrag := 0, drawingShapeNow := 0, isAlwaysOnTop, lastMenuBarUpdate := 1
      , mainWinPos := 0, mainWinMaximized := 1, mainWinSize := 0, PrevGuiSizeEvent := 0
      , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0
-     , currentFilesListModified := 0, folderTreeWinOpen := 0
+     , currentFilesListModified := 0, folderTreeWinOpen := 0, hStatusBaru
 
 Global allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, askDeleteFiles
 , AutoDownScaleIMGs, autoPlaySNDs, autoRemDeadEntry, ColorDepthDithering, countItemz, currentFileIndex, CurrentSLD, defMenuRefreshItm, doSlidesTransitions
 , DynamicFoldersList, easySlideStoppage, editingSelectionNow, EllipseSelectMode, enableThumbsCaching, filesFilter, FlipImgH, FlipImgV, hSNDmedia, imgFxMode
-, IMGresizingMode, imgSelX2, imgSelY2, LimitSelectBoundsImg, markedSelectFile, maxFilesIndex, minimizeMemUsage, mustGenerateStaticFolders, MustLoadSLDprefs
+, IMGresizingMode, imgSelX2, imgSelY2, LimitSelectBoundsImg, markedSelectFile, minimizeMemUsage, mustGenerateStaticFolders, MustLoadSLDprefs
 , noTooltipMSGs, PrefsLargeFonts, RenderOpaqueIMG, resetImageViewOnChange, showHistogram, showImgAnnotations, showInfoBoxHUD, showSelectionGrid, skipDeadFiles
 , skipSeenImagesSlider, SLDcacheFilesList, SLDhasFiles, sldsPattern, syncSlideShow2Audios, thumbnailsListMode, thumbsCacheFolder, thumbsDisplaying, totalFramesIndex
 , TouchScreenMode, userHQraw, userimgQuality, UserMemBMP, usrTextureBGR, slidesFXrandomize
@@ -131,6 +131,7 @@ BuildGUI(params:=0) {
       mainWinPos := externObj[7]
       mainWinSize := externObj[8]
       mainWinMaximized := externObj[9]
+      IMGresizingMode := externObj[10]
    }
 
    MinGUISize := "+MinSize" A_ScreenWidth//4 "x" A_ScreenHeight//4
@@ -498,14 +499,13 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
        Return
     }
 
-    If (imgEditPanelOpened=1)
-    {
+    If (drawingShapeNow=1)
+       MainExe.ahkPostFunction("stopDrawingShape")
+    Else If (imgEditPanelOpened=1)
        MainExe.ahkPostFunction("toggleImgEditPanelWindow")
-    } Else If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
-    {
+    Else If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
        askAboutStoppingOperations()
-       Return
-    } Else If !AnyWindowOpen
+    Else If !AnyWindowOpen
        MainExe.ahkPostFunction("ToggleThumbsMode")
 }
 
@@ -664,11 +664,11 @@ JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
 }
 
 WinClickAction(param:=0) {
-    If (A_GuiControlEvent="DoubleClick" && drawingShapeNow=1)
-    {
-       MainExe.ahkPostFunction("stopDrawingShape")
-       Return
-    }
+    ; If (A_GuiControlEvent="DoubleClick" && drawingShapeNow=1)
+    ; {
+       ; MainExe.ahkPostFunction("stopDrawingShape")
+       ; Return
+    ; }
 
     canCancelImageLoad := 4
     ; ToolTip, % param "--" A_GuiControl "--" A_GuiControlEvent , , , 2
@@ -746,6 +746,11 @@ ResetLoadStatus() {
 
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   Static lastInvoked := 1, prevPos
+  if (slideShowRunning=1)
+     Try DllCall("user32\SetCursor", "Ptr", 0)
+  Else If (drawingShapeNow=1)
+     changeMcursor("cross")
+
   If (A_TickCount - scriptStartZeit < 900)
      Return
 
@@ -762,8 +767,7 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
 
   If ((runningLongOperation=1 || imageLoading=1) && slideShowRunning!=1)
      changeMcursor("busy")
-  Else If (drawingShapeNow=1)
-     changeMcursor("cross")
+  Else 
 
   ; A := WinActive("A")
   ; okay := (A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin) ? 1 : 0
@@ -941,7 +945,7 @@ byeByeRoutine() {
        drawingShapeNow := 0
        lastInvokedThis := A_TickCount
        lastOtherWinClose := A_TickCount
-       MainExe.ahkPostFunction("stopDrawingShape")
+       MainExe.ahkPostFunction("stopDrawingShape", "cancel")
    } Else If (folderTreeWinOpen=1)
    {
        lastOtherWinClose := A_TickCount
@@ -1507,8 +1511,7 @@ MenuSelectAllAction() {
       Else
          selectAllFiles()
       prevState := !prevState
-   } Else
-      selectEntireImage("r")
+   } Else selectEntireImage("rm")
 }
 
 #If, (imgEditPanelOpened=1 || AnyWindowOpen>0) ; && (identifySettingsWindow()=1)
@@ -1540,6 +1543,14 @@ MenuSelectAllAction() {
 
   !Space::
      Win_ShowSysMenu(PVhwnd)
+  Return
+  
+  ~Space::
+     isOkay := AnyWindowOpen ? 0 : 1
+     If (AnyWindowOpen && imgEditPanelOpened=1)
+        isOkay := 1
+     If (thumbsDisplaying!=1 && isOkay && maxFilesIndex>0 && slideShowRunning!=1 && IMGresizingMode=4)
+        changeMcursor("move")
   Return
 #If
 
@@ -3268,4 +3279,61 @@ MDMF_GetInfo(HMON) {
             , Primary:   NumGet(MIEX, 36, "UInt")} ; contains a non-zero value for the primary monitor.
    Return False
 }
+
+
+menuReader(mode) {
+   If (mode="go")
+      SetTimer, constantMenuReader, 200
+   Else
+      SetTimer, constantMenuReader, Off
+}
+
+constantMenuReader() {
+   Static prevLabel := "z"
+   GetPhysicalCursorPos(x, y)
+   winID := WinExist("A")
+   AccInfoUnderMouse(x, y, winID, accFocusValue, accFocusName, accIRole, accRole)
+   goodText := accFocusValue ? accFocusValue : accFocusName
+   goodRoles := (accIRole=41 || accIRole=42 || accIRole=46) ? 1 : 0
+   If (accIRole=12 && accFocusName && prevLabel!=accFocusName)
+   {
+      prevLabel := accFocusName
+      accFocusName := StrReplace(accFocusName, "`t", " | ")
+      ToolTip, % accIRole "==" accFocusName , , , 2
+      ; MainExe.ahkPostFunction("showtooltip", accFocusName)
+   }
+}
+
+
+Acc_ObjectFromPoint(ByRef idChild:="", mx:="", my:="") {
+    Try z := DllCall("oleacc\AccessibleObjectFromPoint", "Int64", mx & 0xFFFFFFFF | my << 32, "Ptr*", pacc, "Ptr", VarSetCapacity(varChild,8+2*A_PtrSize,0)*0+&varChild)
+    If (z=0)
+    {
+       Try g := ComObjEnwrap(9,pacc,1)
+       idChild := NumGet(varChild,8,"UInt")
+    }
+    Return g
+}
+
+AccInfoUnderMouse(mx, my, WinID, byref val, byref name, byref RoleChild, byref RoleParent) {
+  Static hLibrary, WM_GETOBJECT := 0x003D  
+  If !hLibrary
+     hLibrary := DllCall("LoadLibrary", "Str", "oleacc", "Ptr")
+
+  AccObj := Acc_ObjectFromPoint(child, mx, my)
+  If !IsObject(AccObj)
+     Return
+
+  ; SendMessage, WM_GETOBJECT, 0, 1, Chrome_RenderWidgetHostHWND1, % "ahk_id " WinID
+  Try
+  {
+     ChildCount := AccObj.accChildCount
+     Name := AccObj.accName(child)
+     Val := AccObj.accValue(child)
+     RoleChild := AccObj.accRole(child)
+  }
+  ; RoleParent := AccObj.accRole()
+  Return ; ChildCount name val RoleChild RoleParent
+}
+
 
