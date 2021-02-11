@@ -1744,8 +1744,8 @@ CreateColourMatrix(clrMatrix, ByRef ColourMatrix) {
    Matrix := StrSplit(Matrix, "|")
    Loop 25
    {
-      M := (Matrix[A_Index] != "") ? Matrix[A_Index] : Mod(A_Index-1, 6) ? 0 : 1
-      NumPut(M, ColourMatrix, (A_Index-1)*4, "float")
+      M := (Matrix[A_Index] != "") ? Matrix[A_Index] : Mod(A_Index - 1, 6) ? 0 : 1
+      NumPut(M, ColourMatrix, (A_Index - 1)*4, "float")
    }
 }
 

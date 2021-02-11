@@ -35,7 +35,7 @@ Alt + Y|Automatic image crop|Image view|Panel
 Alt + Arrow keys|Adjust image selection: top-left corner position|Image selection area|-
 Alt + Shift + Arrow keys|Adjust image selection: bottom-right corner position|Image selection area|-
 Alt + Arrow keys|Adjust the X/Y coordinates of the last point in the path|Freeform drawing|-
-Alt + Shift = Arrow keys|Adjust the X/Y coordinates of the first point in the path|Freeform drawing|-
+Alt + Shift + Arrow keys|Adjust the X/Y coordinates of the first point in the path|Freeform drawing|-
 Ctrl + 0|Reverse files list|Files list|-
 Ctrl + 1|Sort list by path and name|Files list|-
 Ctrl + 2|Sort list by folder path|Files list|-
@@ -60,7 +60,7 @@ Shift + E|Filter list by the file path of the current file|Files list|-
 Ctrl + F2|Modify active index entry|Anywhere|Panel
 Ctrl + F4|Close document, window or panel|Anywhere|-
 Ctrl + F5|Toggle recursive scan of an opened folder|Files list|-
-Ctrl + G|Desaturate colors in selected area|Image selection area|-
+Ctrl + G|Desaturate colors in selected area|Image selection area|Panel
 Ctrl + K|Convert file format(s) to...|Anywhere|Panel
 Ctrl + N|Create new image|Anywhere|Panel
 Ctrl + S|Save image panel|Image view|Panel
@@ -129,12 +129,14 @@ Shift + Q|Toggle simulated color depth|Image view|-
 R|Transform selection into a square [1:1]|Image selection area|-
 Shift + R|Rotate selection by 45°|Image selection area|-
 S|Toggle slideshow modes|Image view|-
+T|Toggle thumbnails aspect ratios: square, tall or wide|Files list|-
 T|Toggle image rescaling/adapting modes|Image view|-
 T|Toggle between different levels of points tension in the freeform path|Freeform drawing|-
 U|Viewport colors and image adjustments|Image view|Panel
-X|Mark active index to move to a different index|Files list|-
-X|Move active index to a different index|Files list|-
 X|Play associated audio file|Image view|-
+X|Mark active index to switch to a different index|Files list|-
+X|Switch active index with the already marked index|Files list|-
+Shift + X|Move active index at the already marked index|Files list|-
 Shift + X|Stop audio playback|Image view|-
 8|Decrease audio volume by 5%|Image view|-
 Shift + 8|Increase audio volume by 5%|Image view|-
@@ -181,7 +183,7 @@ Ctrl + F3|Search in files index|Anywhere|Panel
 Shift + F3|Search previous occurence in files index|Anywhere|-
 F3|Search next occurence in files index|Anywhere|-
 Shift + F5|Reload slideshow file or refresh opened folder|Anywhere|-
-Alt + F5|Regenerate on demand all thumbnails in the list|Files list|-
+Alt + F5|Regenerate on scroll selected or all thumbnails|Files list|-
 Shift + A|Toggle between image selection area aspect ratios|Image selection area|-
 Shift + H|Flip horizontally image selected area|Image view|-
 Shift + V|Flip vertically image selected area|Image view|-
@@ -227,3 +229,12 @@ Delete|Delete folder|Folder tree|Panel
 Space|Scan for sub-folders in the selected folder|Folder tree|-
 7|Copy selected or active file(s) into...|Folder tree|-
 Shift + 7|Move selected or active file(s) into...|Folder tree|-
+Double Left-Click on dot|Insert a new dot next to the double-clicked one|Freeform drawing|-
+Ctrl + Left-Click on dot|Remove the dot clicked on|Freeform drawing|-
+Shift + Left-Click|Add new dot in the path constrained every 45 degrees|Freeform drawing|-
+Right-Click|Stop drawing the freeform path|Freeform drawing|-
+Esc|Cancel drawing the freeform path|Freeform drawing|-
+Shift + Left-Click on edges or dots|Resize selection area maintaing initial aspect ratio|Image selected area|-
+Shift + Left-Click inside area|Move selection area constrained on X or Y axis|Image selected area|-
+Alt + Left-Click inside area|Resize selection area relative to its center and transform to 1:1 ratio [square]|Image selected area|-
+Double Left-Click outside area|Drop image selection area|Image selected area|-

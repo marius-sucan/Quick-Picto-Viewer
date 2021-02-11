@@ -24,11 +24,12 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , imgEditPanelOpened := 0, showMainMenuBar := 1, undoLevelsRecorded := 0, UserMemBMP := 0
      , taskBarUI, hSetWinGui, panelWinCollapsed, groppedFiles, tempBtnVisible := "null"
      , userAllowWindowDrag := 0, drawingShapeNow := 0, isAlwaysOnTop, lastMenuBarUpdate := 1
-     , mainWinPos := 0, mainWinMaximized := 1, mainWinSize := 0, PrevGuiSizeEvent := 0
+     , mainWinPos := 0, mainWinMaximized := 1, mainWinSize := 0, PrevGuiSizeEvent := 0, FontBolded := 1
      , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0
-     , currentFilesListModified := 0, folderTreeWinOpen := 0, hStatusBaru
+     , currentFilesListModified := 0, folderTreeWinOpen := 0, hStatusBaru, OSDFontName := "Arial"
+     , OSDbgrColor := "001100", OSDtextColor := "FFeeFF", LargeUIfontValue := 14, allowMenuReader := 0
 
-Global allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, askDeleteFiles
+Global allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, askDeleteFiles, mouseToolTipWinCreated := 0
 , AutoDownScaleIMGs, autoPlaySNDs, autoRemDeadEntry, ColorDepthDithering, countItemz, currentFileIndex, CurrentSLD, defMenuRefreshItm, doSlidesTransitions
 , DynamicFoldersList, easySlideStoppage, editingSelectionNow, EllipseSelectMode, enableThumbsCaching, filesFilter, FlipImgH, FlipImgV, hSNDmedia, imgFxMode
 , IMGresizingMode, imgSelX2, imgSelY2, LimitSelectBoundsImg, markedSelectFile, minimizeMemUsage, mustGenerateStaticFolders, MustLoadSLDprefs
@@ -132,6 +133,12 @@ BuildGUI(params:=0) {
       mainWinSize := externObj[8]
       mainWinMaximized := externObj[9]
       IMGresizingMode := externObj[10]
+      OSDbgrColor := externObj[11]
+      OSDtextColor := externObj[12]
+      LargeUIfontValue := externObj[13]
+      PrefsLargeFonts := externObj[14]
+      OSDFontName := externObj[15]
+      FontBolded := externObj[16]
    }
 
    MinGUISize := "+MinSize" A_ScreenWidth//4 "x" A_ScreenHeight//4
@@ -744,9 +751,18 @@ ResetLoadStatus() {
    Try DllCall("user32\SetCursor", "Ptr", hCursN)
 }
 
+isInRange(value, inputA, inputB) {
+    If (value=inputA || value=inputB)
+       Return 1
+
+    Return (value>=min(inputA, inputB) && value<=max(inputA, inputB)) ? 1 : 0
+}
+
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
-  Static lastInvoked := 1, prevPos
-  if (slideShowRunning=1)
+  Static lastInvoked := 1, prevPos, prevArrayPos := [], prevState
+  MouseGetPos, mX, mY
+  isSamePos := (isInRange(mX, prevArrayPos[1] + 3, prevArrayPos[1] - 3) && isInRange(mY, prevArrayPos[2] + 3, prevArrayPos[2] - 3)) ? 1 : 0
+  If (slideShowRunning=1 && isSamePos=1)
      Try DllCall("user32\SetCursor", "Ptr", 0)
   Else If (drawingShapeNow=1)
      changeMcursor("cross")
@@ -754,8 +770,8 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   If (A_TickCount - scriptStartZeit < 900)
      Return
 
-  MouseGetPos, mX, mY
   thisPos := mX "-" mY
+  prevArrayPos := [mX, mY]
   If (A_TickCount - lastInvoked > 55) && (thisPos!=prevPos && drawingShapeNow!=1)
   {
      thisPrefsWinOpen := (imgEditPanelOpened=1) ? 0 : AnyWindowOpen
@@ -767,7 +783,7 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
 
   If ((runningLongOperation=1 || imageLoading=1) && slideShowRunning!=1)
      changeMcursor("busy")
-  Else 
+  ; Else 
 
   ; A := WinActive("A")
   ; okay := (A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin) ? 1 : 0
@@ -1228,6 +1244,7 @@ livePreviewsImageEditing() {
   Static prevState := 0
   If !determineMenuBTNsOKAY()
      Return
+
   thisState := prevState + 1
   MainExe.ahkPostFunction(A_ThisFunc, 1, thisState)
   prevState := !prevState
@@ -1512,6 +1529,43 @@ MenuSelectAllAction() {
          selectAllFiles()
       prevState := !prevState
    } Else selectEntireImage("rm")
+}
+
+#If, (allowMenuReader="yes")
+   ~RButton::
+      constantMenuReader()
+   Return
+
+   ; ~+Space::
+   ;    constantMenuReader("focused")
+   ; Return
+
+   ~PgDn::
+      SendInput, {Down 3}
+   Return
+
+   ~Space::
+      SendInput, {Enter}
+   Return
+
+   ~BackSpace::
+      SendInput, {Left}
+   Return
+
+   ~Tab::
+      SendMenuTabKey()
+   Return
+
+   ~PgUp::
+      SendInput, {Up 3}
+   Return
+#If
+
+SendMenuTabKey() {
+   Static prevState := 0
+   prevState := !prevState
+   keyu := prevState ? "{Right}" : "{Left}"
+   SendInput, % keyu
 }
 
 #If, (imgEditPanelOpened=1 || AnyWindowOpen>0) ; && (identifySettingsWindow()=1)
@@ -3134,7 +3188,6 @@ GetPhysicalCursorPos(ByRef mX, ByRef mY) {
     Return
 }
 
-
 calcScreenLimits(whichHwnd:="main") {
     Static lastInvoked := 1, prevHwnd, prevActiveMon := []
 
@@ -3280,30 +3333,70 @@ MDMF_GetInfo(HMON) {
    Return False
 }
 
-
-menuReader(mode) {
-   If (mode="go")
-      SetTimer, constantMenuReader, 200
-   Else
-      SetTimer, constantMenuReader, Off
-}
-
-constantMenuReader() {
+constantMenuReader(modus:=0) {
    Static prevLabel := "z"
    GetPhysicalCursorPos(x, y)
-   winID := WinExist("A")
-   AccInfoUnderMouse(x, y, winID, accFocusValue, accFocusName, accIRole, accRole)
+   ; winID := WinActive("A")
+   MouseGetPos, ,, WinID
+   ; ToolTip, % winID "`n" OutputVarWin , , , 2
+   If (modus="focused")
+      AccAccFocus(OutputVarWin, accFocusName, accFocusValue, accRole, accIRole)
+   Else
+      AccInfoUnderMouse(x, y, winID, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut)
+
    goodText := accFocusValue ? accFocusValue : accFocusName
    goodRoles := (accIRole=41 || accIRole=42 || accIRole=46) ? 1 : 0
-   If (accIRole=12 && accFocusName && prevLabel!=accFocusName)
+   If (accIRole=12 && accFocusName && (prevLabel!=accFocusName || mouseToolTipWinCreated!=1))
    {
       prevLabel := accFocusName
-      accFocusName := StrReplace(accFocusName, "`t", " | ")
-      ToolTip, % accIRole "==" accFocusName , , , 2
+      msgu := StrReplace(accFocusName, "`t", "`n[ ")
+      If InStr(accFocusName, "`t")
+         msgu .= " ]"
+
+      If InStr(strstyles, "0x00000001")
+         msgu .= "`nITEM DISABLED"
+      Else If shortcut
+         msgu := Format("{:U}", shortcut) ": " msgu
+
+      If InStr(strstyles, "0x00000010")
+         msgu .= "`nITEM CHECKED"
+      If InStr(strstyles, "0x40000000")
+         msgu .= "`nSUBMENU CONTAINER"
+
+      mouseCreateOSDinfoLine(msgu, PrefsLargeFonts)
+      ; ToolTip, % accFocusName , , , 2
       ; MainExe.ahkPostFunction("showtooltip", accFocusName)
    }
 }
 
+Acc_ObjectFromWindow(hWnd, idObject = 0) {
+  SendMessage, WM_GETOBJECT, 0, 1, Chrome_RenderWidgetHostHWND1, % "ahk_id " hwnd
+  If DllCall("oleacc\AccessibleObjectFromWindow", "Ptr", hWnd, "UInt", idObject&=0xFFFFFFFF
+    , "Ptr", -VarSetCapacity(IID,16)+NumPut(idObject==0xFFFFFFF0?0x46000000000000C0:0x719B3800AA000C81
+    ,NumPut(idObject==0xFFFFFFF0?0x0000000000020400:0x11CF3C3D618736E0,IID,"Int64"),"Int64"), "Ptr*", pacc)=0
+    Return ComObjEnwrap(9,pacc,1)
+}
+
+AccAccFocus(hwnd, byref name, byref value, byref role, byref irole) {
+  Static WM_GETOBJECT := 0x003D  
+  SendMessage, WM_GETOBJECT, 0, 1, Chrome_RenderWidgetHostHWND1, % "ahk_id " hwnd
+  Acc := Acc_ObjectFromWindow(hwnd)
+  Try While IsObject(Acc.accFocus)
+  {
+    Acc := Acc.accFocus
+  }
+
+  Try 
+  {
+    child := Acc.accFocus
+    name := Acc.accName(child)
+    value := Acc.accValue(child)
+    ; role := AccRole(Acc, child) 
+    irole := Acc.accRole(0) 
+    shortcut := Acc.accKeyboardShortCut(child)
+    AccState(Acc, child, styleu, strstyles)
+  }
+}
 
 Acc_ObjectFromPoint(ByRef idChild:="", mx:="", my:="") {
     Try z := DllCall("oleacc\AccessibleObjectFromPoint", "Int64", mx & 0xFFFFFFFF | my << 32, "Ptr*", pacc, "Ptr", VarSetCapacity(varChild,8+2*A_PtrSize,0)*0+&varChild)
@@ -3315,7 +3408,7 @@ Acc_ObjectFromPoint(ByRef idChild:="", mx:="", my:="") {
     Return g
 }
 
-AccInfoUnderMouse(mx, my, WinID, byref val, byref name, byref RoleChild, byref RoleParent) {
+AccInfoUnderMouse(mx, my, WinID, byref val, byref name, byref RoleChild, byref RoleParent, byref styleu, byref strstyles, byref shortcut) {
   Static hLibrary, WM_GETOBJECT := 0x003D  
   If !hLibrary
      hLibrary := DllCall("LoadLibrary", "Str", "oleacc", "Ptr")
@@ -3331,9 +3424,108 @@ AccInfoUnderMouse(mx, my, WinID, byref val, byref name, byref RoleChild, byref R
      Name := AccObj.accName(child)
      Val := AccObj.accValue(child)
      RoleChild := AccObj.accRole(child)
+     shortcut := AccObj.accKeyboardShortCut(child)
+     AccState(AccObj, child, styleu, strstyles)
   }
   ; RoleParent := AccObj.accRole()
   Return ; ChildCount name val RoleChild RoleParent
 }
 
+AccState(Acc, child, byref style, byref str, i := 1) {
+  ;;  https://docs.microsoft.com/ru-ru/windows/desktop/WinAuto/object-state-constants
+  ;;  http://forum.script-coding.com/viewtopic.php?pid=130762#p130762
+  style := Format("0x{1:08X}", Acc.accState(child))
+  If (style=0)
+     Return AccGetStateText(0)
+
+  While (i <= style)
+  {
+    if (i & style)
+      str .= AccGetStateText(i) "=" Format("0x{1:08X}", i) "`n"
+    i <<= 1
+  }
+}
+
+AccGetStateText(nState) {
+  nSize := DllCall("oleacc\GetStateText", "UInt", nState, "Ptr", 0, "UInt", 0)
+  VarSetCapacity(sState, (A_IsUnicode?2:1)*nSize)
+  DllCall("oleacc\GetStateText", "UInt", nState, "str", sState, "UInt", nSize+1)
+  Return sState
+}
+
+mouseTurnOFFtooltip() {
+   Sleep, 100
+   Gui, mouseToolTipGuia: Destroy
+   Global mouseToolTipWinCreated := 0
+}
+
+mouseCreateOSDinfoLine(msg:=0, largus:=0) {
+    Critical, On
+    Static prevMsg, lastInvoked := 1
+    Global TippyMsg, hGuiTip
+
+    thisHwnd := PVhwnd
+    If (StrLen(msg)<3) || (prevMsg=msg && mouseToolTipWinCreated=1) || (A_TickCount - lastInvoked<100) || !thisHwnd
+       Return
+
+    lastInvoked := A_TickCount
+    Gui, mouseToolTipGuia: Destroy
+    thisFntSize := (largus=1) ? Round(LargeUIfontValue*1.55) : LargeUIfontValue
+    If (thisFntSize<12)
+       thisFntSize := 12
+    bgrColor := OSDbgrColor
+    txtColor := OSDtextColor
+    isBold := (FontBolded=1) ? " Bold" : ""
+    Sleep, 25
+
+    Gui, mouseToolTipGuia: -DPIScale -Caption +Owner%thisHwnd% +ToolWindow +hwndhGuiTip
+    Gui, mouseToolTipGuia: Margin, % thisFntSize, % thisFntSize
+    Gui, mouseToolTipGuia: Color, c%bgrColor%
+    Gui, mouseToolTipGuia: Font, s%thisFntSize% %isBold% Q5, %OSDFontName%
+    Gui, mouseToolTipGuia: Add, Text, c%txtColor% gmouseTurnOFFtooltip vTippyMsg, %msg%
+    Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPVOguiTipsWin
+
+    GetPhysicalCursorPos(mX, mY)
+    tipX := mX + 15
+    tipY := mY + 15
+    ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
+    MaxWidth := Floor(ResWidth*0.85)
+    If (MaxWidth<Wid && MaxWidth>10)
+    {
+       GuiControl, mouseToolTipGuia: Move, TippyMsg, w1 h1
+       GuiControl, mouseToolTipGuia:, TippyMsg,
+       Gui, mouseToolTipGuia: Add, Text, xp yp c%txtColor% gmouseTurnOFFtooltip w%MaxWidth%, %msg%
+       Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPVguiTipsWin
+       ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
+    }
+
+    prevMsg := msg
+    mouseToolTipWinCreated := 1
+    Gui, mouseToolTipGuia: Show, NoActivate AutoSize x%Final_x% y%Final_y%, QPVguiTipsWin
+    WinSet, Transparent, 225, ahk_id %hGuiTip%
+    delayu := StrLen(msg) * 75 + 950
+    If (delayu<msgDisplayTime/2)
+       delayu := msgDisplayTime//2 + 1
+    WinSet, AlwaysOnTop, On, ahk_id %hGuiTip%
+    SetTimer, mouseTurnOFFtooltip, % -delayu
+}
+
+adjustWin2MonLimits(winHwnd, winX, winY, ByRef rX, ByRef rY, ByRef Wid, ByRef Heig) {
+   GetWinClientSize(Wid, Heig, winHwnd, 1)
+   ActiveMon := MWAGetMonitorMouseIsIn(winX, winY)
+   If ActiveMon
+   {
+      SysGet, bCoord, Monitor, %ActiveMon%
+      rX := max(bCoordLeft, min(winX, bCoordRight - Wid))
+      rY := max(bCoordTop, min(winY, bCoordBottom - Heig*1.2))
+      ResWidth := Abs(max(bCoordRight, bCoordLeft) - min(bCoordRight, bCoordLeft))
+      ; ResHeight := Abs(max(bCoordTop, bCoordBottom) - min(bCoordTop, bCoordBottom))
+   } Else
+   {
+      rX := winX
+      rY := winY
+   }
+
+   Return ResWidth
+}
 

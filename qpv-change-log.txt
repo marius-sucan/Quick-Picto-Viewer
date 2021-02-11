@@ -2,6 +2,21 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.8.9 (2021-02-11)
+  - [new] image preview in files list view mode
+  - [new] desature colours option now brings a panel with live previewing, where users are given finer control over how to desaturate colours in the image selected area
+  - [new] «blur selected area» panel allows users to pixelize area when soft edges is activated; previously, this was not possible
+  - [new] blending modes are now available in «blur selected area» panel
+  - [new] multiple files delete dialog offers two new options: do not delete files matching search criteria, or in «protected folder»
+  - [new] option to set a folder as «protected»; when deleting files in batch, those found in the protected folder are skipped
+  - [new] the search and replace dialog allows users to perform such actions in the seen images database as well 
+  - [new] right-click on menu items to have the text displayed large [for people with poor eye sight], this was already possible in settings or tool panels
+  - [improvement] there are now two distinct options: «skip already seen images during slideshows» and and the other option is: «record seen images»
+  - fixed bugs related to the «Blur selected area» and «Transform» tools when used with large images and rotated selections; the results were not matching the user selected area
+  - fixed image navigator not responding properly to clicks when images in the viewport were aligned to the top-left corner
+  - improvements to shift+right-click menu [i made it more context aware]
+
+
 - v4.8.6 (2021-02-03)
   - [new] freeform polygonal and curved/spline-based selection areas support [ Shift + L ]
   - [new] edit freeform polygonal shape or selection after finalising it

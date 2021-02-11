@@ -10,6 +10,10 @@
 #include "windows.h"
 #include <string>
 #include <sstream>
+#include <vector>
+#include <cstdint>
+#include <cstdio>
+#include <algorithm>
 
 using namespace std;
 
@@ -53,6 +57,52 @@ DLL_API int DLL_CALLCONV SetAlphaChannel(int *imageData, int *maskData, int w, i
             }
 
             imageData[px] = (alpha2 << 24) | (imageData[px] & 0x00ffffff);
+        }
+    }
+    return 1;
+}
+
+DLL_API int DLL_CALLCONV SetGivenAlphaLevel(int *imageData, int w, int h, int givenLevel, int fillMissingOnly, int threadz) {
+    #pragma omp parallel for schedule(dynamic) default(none) num_threads(threadz)
+    for (int x = 0; x < w; x++)
+    {
+        int px, y = 0;
+        int defaultColor;
+        unsigned int BGRcolor = imageData[x + y * w];
+        if (BGRcolor!=0x0)
+           defaultColor = BGRcolor & 0x00ffffff;
+
+        for (y = 0; y < h; y++)
+        {
+            px = x + y * w;
+            BGRcolor = imageData[px];
+            if (BGRcolor==0x0 && defaultColor)
+               imageData[px] = (givenLevel << 24) | defaultColor;
+            else
+               defaultColor = BGRcolor & 0x00ffffff;
+
+            if (fillMissingOnly==0)
+               imageData[px] = (givenLevel << 24) | (imageData[px] & 0x00ffffff);
+        }
+    }
+
+    #pragma omp parallel for schedule(dynamic) default(none) num_threads(threadz)
+    for (int x = w - 1; x >= 0; x--)
+    {
+        int px, y = h - 1;
+        int defaultColor;
+        unsigned int BGRcolor = imageData[x + y * w];
+        if (BGRcolor!=0x0)
+           defaultColor = BGRcolor & 0x00ffffff;
+
+        for (y = h - 1; y >= 0; y--)
+        {
+            px = x + y * w;
+            BGRcolor = imageData[px];
+            if (BGRcolor==0x0 && defaultColor)
+               imageData[px] = (givenLevel << 24) | defaultColor;
+            else
+               defaultColor = BGRcolor & 0x00ffffff;
         }
     }
     return 1;
@@ -628,6 +678,129 @@ DLL_API int DLL_CALLCONV ResizePixels(int* pixelsData, int* destData, int w1, in
         }
     }
     return 1;
+}
+
+
+DLL_API int DLL_CALLCONV hammingDistance(char str1[], char str2[])
+{
+    int i = 0, count = 0;
+    while(str1[i]!='\0')
+    {
+        if (str1[i] != str2[i])
+            count++;
+        i++;
+    }
+    return count;
+}
+
+
+
+DLL_API int DLL_CALLCONV hamming_distance(int* a, int*b, int n) {
+    int dist = 0;
+    std::stringstream ss;
+    ss << "qpv: a " << a;
+    ss << "qpv: b " << b;
+
+    for(int i=0; i<n; i++) {
+        if (a[i] != b[i])
+           dist++;
+    }
+    return dist;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// For every integer on 8bits (from 0 to 255), keep track of how many
+// bits are set in the binary representation of that integer.
+// Note, the only 8bit integer that has all 8 bits set is 255 (last element here)
+// and 0 is the only element with no bits set.
+const std::vector<int> globalNumberOfBits = {
+0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
+1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
+};
+
+// Used once, to populate the variable above.
+void GenerateCodeFor_globalNumberOfBits() {
+  printf("const std::vector<int> globalNumberOfBits = {\n");
+  for (int i = 0; i < 256; ++i) {
+    int count = 0;
+    for (int bit = 0; bit < 8; ++bit) {
+      if (i & (1 << bit)) count++;
+    }
+    printf("%d, ", count);
+    if (i % 16 == 15) printf("\n");
+  }
+  printf("};\n");
+}
+
+int CountDifferentBits(int64_t a, int64_t b) {
+  int nr_diff_bits = 0;
+  int64_t diffs = a ^ b;
+  for (int i = 0; i < sizeof(int64_t); ++i) {
+    const int last_8_bits = diffs & 0xFF;
+    diffs = diffs >> 8;
+    nr_diff_bits += globalNumberOfBits[last_8_bits];
+  }
+  return nr_diff_bits;
+}
+
+int CountDifferentBits(int64_t *img1, int64_t *img2, int nr_values) {
+  int n_diff = 0;
+  for (int i = 0; i < nr_values; ++i) {
+    n_diff += CountDifferentBits(img1[i], img2[i]);
+  }
+  return n_diff;
+}
+
+DLL_API int DLL_CALLCONV hammingDistanceOverArray(int argc, char **argv) {
+  //  GenerateCodeFor_globalNumberOfBits();   return 0;
+  int result;
+
+  std::vector<int64_t> values1;
+  values1.push_back(713232);
+  values1.push_back(212);
+
+  std::vector<int64_t> values2;
+  values2.push_back(73232);
+  values2.push_back(2121);
+  result = CountDifferentBits(&values1[0], &values2[0], min(values1.size(), values2.size()));
+  printf("final = %d\n", result);
+
+  std::stringstream ss;
+  ss << "qpv: " << result;
+  OutputDebugStringA(ss.str().data());
+
+  return 1;
 }
 
 */
