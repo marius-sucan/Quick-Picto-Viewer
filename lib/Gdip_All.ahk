@@ -1041,6 +1041,39 @@ Gdip_DrawRoundedRectangle2(pGraphics, pPen, x, y, w, h, r, Angle:=0) {
 }
 
 ;#####################################################################################
+; function by just me found on:
+; https://www.autohotkey.com/boards/viewtopic.php?t=46250
+; Function           Gdip_DrawRoundedRectanglePath
+; Description        This function uses a pen to draw a rounded rectangle in the Graphics of a bitmap
+;
+; pGraphics          Pointer to the Graphics of a bitmap
+; pPen               Pointer to a pPen
+; x                  x-coordinate of the top left of the rounded rectangle
+; y                  y-coordinate of the top left of the rounded rectangle
+; w                  width of the rectanlge
+; h                  height of the rectangle
+; r                  radius of the rounded corners
+;
+; return             status enumeration. 0 = success
+
+Gdip_DrawRoundedRectanglePath(pGraphics, pPen, X, Y, W, H, R) {
+   ; Create a GraphicsPath
+   DllCall("Gdiplus.dll\GdipCreatePath", "UInt", 0, "PtrP", pPath)
+   ; Create a rounded rectabgle
+   D := (R * 2), W -= D, H -= D
+   DllCall("Gdiplus.dll\GdipAddPathArc", "Ptr", pPath, "Float", X, "Float", Y, "Float", D, "Float", D, "Float", 180, "Float", 90)
+   DllCall("Gdiplus.dll\GdipAddPathArc", "Ptr", pPath, "Float", X + W, "Float", Y, "Float", D, "Float", D, "Float", 270, "Float", 90)
+   DllCall("Gdiplus.dll\GdipAddPathArc", "Ptr", pPath, "Float", X + W, "Float", Y + H, "Float", D, "Float", D, "Float", 0, "Float", 90)
+   DllCall("Gdiplus.dll\GdipAddPathArc", "Ptr", pPath, "Float", X, "Float", Y + H, "Float", D, "Float", D, "Float", 90, "Float", 90)
+   DllCall("Gdiplus.dll\GdipClosePathFigure", "Ptr", pPath)
+   ; Draw the path
+   RS := DllCall("Gdiplus.dll\GdipDrawPath", "Ptr", pGraphics, "Ptr", pPen, "Ptr", pPath)
+   ; Free resources
+   DllCall("Gdiplus.dll\GdipDeletePath", "Ptr", pPath)
+   Return RS
+}
+
+;#####################################################################################
 
 ; Function           Gdip_DrawEllipse
 ; Description        This function uses a pen to draw the outline of an ellipse into the Graphics of a bitmap
@@ -1344,6 +1377,39 @@ Gdip_FillRoundedRectangle(pGraphics, pBrush, x, y, w, h, r) {
    Gdip_SetClipRegion(pGraphics, Region, 0)
    Gdip_DeleteRegion(Region)
    return _E
+}
+
+;#####################################################################################
+; function by just me found on:
+; https://www.autohotkey.com/boards/viewtopic.php?t=46250
+; Function           Gdip_FillRoundedRectanglePath
+; Description        This function uses a brush to fill a rounded rectangle in the Graphics of a bitmap
+;
+; pGraphics          Pointer to the Graphics of a bitmap
+; pBrush             Pointer to a brush
+; x                  x-coordinate of the top left of the rounded rectangle
+; y                  y-coordinate of the top left of the rounded rectangle
+; w                  width of the rectanlge
+; h                  height of the rectangle
+; r                  radius of the rounded corners
+;
+; return             status enumeration. 0 = success
+
+Gdip_FillRoundedRectanglePath(pGraphics, pBrush, X, Y, W, H, R) {
+   ; Create a GraphicsPath
+   DllCall("Gdiplus.dll\GdipCreatePath", "UInt", 0, "PtrP", pPath)
+   ; Create a rounded rectabgle
+   D := (R * 2), W -= D, H -= D
+   DllCall("Gdiplus.dll\GdipAddPathArc", "Ptr", pPath, "Float", X, "Float", Y, "Float", D, "Float", D, "Float", 180, "Float", 90)
+   DllCall("Gdiplus.dll\GdipAddPathArc", "Ptr", pPath, "Float", X + W, "Float", Y, "Float", D, "Float", D, "Float", 270, "Float", 90)
+   DllCall("Gdiplus.dll\GdipAddPathArc", "Ptr", pPath, "Float", X + W, "Float", Y + H, "Float", D, "Float", D, "Float", 0, "Float", 90)
+   DllCall("Gdiplus.dll\GdipAddPathArc", "Ptr", pPath, "Float", X, "Float", Y + H, "Float", D, "Float", D, "Float", 90, "Float", 90)
+   DllCall("Gdiplus.dll\GdipClosePathFigure", "Ptr", pPath)
+   ; Fill the path
+   RS := DllCall("Gdiplus.dll\GdipFillPath", "Ptr", pGraphics, "Ptr", pBrush, "Ptr", pPath)
+   ; Free resources
+   DllCall("Gdiplus.dll\GdipDeletePath", "Ptr", pPath)
+   Return RS
 }
 
 ;#####################################################################################
@@ -7671,6 +7737,50 @@ Gdip_CreateEffect(whichFX, paramA, paramB, paramC:=0) {
     ; r3 := GetStatus(A_LineNumber ":GdipSetEffectParameters", r3)
     ; ToolTip, % r1 " -- " r2 " -- " r3 " -- " r4,,, 2
     Return pEffect
+}
+
+Gdip_ApplySpecialFixedBlur(zBitmap, radius, pEffect, previewMode:=0) {
+    If (!pEffect || !zBitmap)
+    {
+       Return
+    }
+
+    If (radius>19 || previewMode=1)
+    {
+       Gdip_BitmapApplyEffect(zBitmap, pEffect)
+       Return
+    }
+
+    If (radius=19)
+       radius += 18
+    Else If (radius=18)
+       radius += 15
+    Else If (radius=17)
+       radius += 12
+    Else If (radius=16)
+       radius += 10
+    Else If (radius=15)
+       radius += 8
+    Else If (radius=14)
+       radius += 6
+    Else If (radius=13)
+       radius += 4
+    Else If (radius=12)
+       radius += 2
+    Else If (radius=11)
+       radius += 1
+
+    If (radius<=1)
+       radius := 2
+
+    zA := Gdip_CreateEffect(1, radius//2, 0, 0)
+    zB := Gdip_CreateEffect(1, radius//2, 0, 0)
+    Gdip_ImageRotateFlip(zBitmap, 1)
+    Gdip_BitmapApplyEffect(zBitmap, zA)
+    Gdip_ImageRotateFlip(zBitmap, 3)
+    Gdip_BitmapApplyEffect(zBitmap, zB)
+    Gdip_DisposeEffect(zA)
+    Gdip_DisposeEffect(zB)
 }
 
 Gdip_DisposeEffect(pEffect) {
