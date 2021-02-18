@@ -2,6 +2,17 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.9.1 (2021-02-18)
+  - [new] QPV will now highlight the groups of duplicate images in thumbnails view
+  - [new] panel to review the list of selected files [useful in the context of finding dupes and auto-select]
+  - [new] keyboard shortcut [S] to select the other images from the active duplicates group
+  - [new] option in «find duplicates» panel to filter the results with a user given string
+  - [new] users can now merge/import different Quick Picto Viewer cached files lists into each other; when two databases are merged, QPV attempts to preserved already image details and histogram cached data from both databases
+  - [new] option to extend the protected folder to its sub-folders
+  - [new] option to remove favourited images from the current files list; useful when both lists are huge ;-)
+  - improved help panel
+  - various bug fixes
+
 - v4.8.9 (2021-02-11)
   - [new] image preview in files list view mode
   - [new] desature colours option now brings a panel with live previewing, where users are given finer control over how to desaturate colours in the image selected area
@@ -15,7 +26,6 @@
   - fixed bugs related to the «Blur selected area» and «Transform» tools when used with large images and rotated selections; the results were not matching the user selected area
   - fixed image navigator not responding properly to clicks when images in the viewport were aligned to the top-left corner
   - improvements to shift+right-click menu [i made it more context aware]
-
 
 - v4.8.6 (2021-02-03)
   - [new] freeform polygonal and curved/spline-based selection areas support [ Shift + L ]

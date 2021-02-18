@@ -13,8 +13,8 @@ Ctrl + =|Decrease OSD font sizes|Anywhere|-
 9|Rotate image by -15°|Image view|-
 0|Rotate selection area by +2°|Image selection area|-
 9|Rotate selection area by -2°|Image selection area|-
-0|Apply rotate image by +90° on selected file(s)|Files list|-
-9|Apply rotate image by -90° on selected file(s)|Files list|-
+Shift + 0|Apply rotate image by +90° on selected file(s)|Files list|-
+Shift + 9|Apply rotate image by -90° on selected file(s)|Files list|-
 [|Decrease image brightness|Anywhere|-
 ]|Increase image brightness|Anywhere|-
 Alt + [|Decrease image gamma|Anywhere|-
@@ -80,6 +80,8 @@ Ctrl + Y|Redo image|Image view|-
 Ctrl + Z|Undo image|Image view|-
 Ctrl + T|Transform selected image area|Image selection area|Panel
 Ctrl + U|Static folders manager - update files list selectively|Anywhere|Panel
+S|Select the other images in the duplicate images group|Files list|-
+Shift + S|Toggle «already seen» image status|Files list|-
 Ctrl + V|Render text from clipboard as image or paste clipboard image|Image view|-
 Ctrl + V|Paste text files list from clipboard or files from Explorer|Files list|-
 Ctrl + W|Set image as wallpaper|Image view|-
@@ -128,6 +130,7 @@ Q|Toggle simulated color depth|Image view|-
 Shift + Q|Toggle simulated color depth|Image view|-
 R|Transform selection into a square [1:1]|Image selection area|-
 Shift + R|Rotate selection by 45°|Image selection area|-
+R|Review selected files list|Files list|Panel
 S|Toggle slideshow modes|Image view|-
 T|Toggle thumbnails aspect ratios: square, tall or wide|Files list|-
 T|Toggle image rescaling/adapting modes|Image view|-

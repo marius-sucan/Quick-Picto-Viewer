@@ -908,7 +908,7 @@ dummyTimerProccessDroppedFiles() {
       If (A_Index>9900)
       {
          Break
-      } Else If RegExMatch(line, "i)(.\.sld)$")
+      } Else If RegExMatch(line, "i)(.\.sld|.\.sldb)$")
       {
          sldFile := line
          Break
@@ -3356,7 +3356,7 @@ constantMenuReader(modus:=0) {
       If InStr(strstyles, "0x00000001")
          msgu .= "`nITEM DISABLED"
       Else If shortcut
-         msgu := Format("{:U}", shortcut) ": " msgu
+         msgu := "&" Format("{:U}", shortcut) ": " msgu
 
       If InStr(strstyles, "0x00000010")
          msgu .= "`nITEM CHECKED"
