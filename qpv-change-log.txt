@@ -2,12 +2,18 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.9.2 (2021-02-22)
+  - considerably optimized disk usage [and performance] when rescanning the folders [in the context of a SQLite database files list]
+  - now one can abort safely a merger of databases or «regenerate entire list» when a database is opened
+  - optimizations for «search index» [F3 keyboard key]
+  - minor fixes or changes; folders named «0» are now opened; 
+
 - v4.9.1 (2021-02-18)
   - [new] QPV will now highlight the groups of duplicate images in thumbnails view
   - [new] panel to review the list of selected files [useful in the context of finding dupes and auto-select]
   - [new] keyboard shortcut [S] to select the other images from the active duplicates group
   - [new] option in «find duplicates» panel to filter the results with a user given string
-  - [new] users can now merge/import different Quick Picto Viewer cached files lists into each other; when two databases are merged, QPV attempts to preserved already image details and histogram cached data from both databases
+  - [new] users can now merge/import different Quick Picto Viewer cached files lists into each other; when two databases are merged, QPV attempts to preserve the already indexed image details and histogram data from both databases
   - [new] option to extend the protected folder to its sub-folders
   - [new] option to remove favourited images from the current files list; useful when both lists are huge ;-)
   - improved help panel

@@ -1,4 +1,4 @@
-﻿; Original script details:
+; Original script details:
 ;   Name:     AHK Picture Viewer
 ;   Version:  1.0.0 on Oct 4, 2010 by SBC
 ;   Platform: Windows XP or later
@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 4.8.9
+;@Ahk2Exe-SetVersion 4.9.2
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2020)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -163,9 +163,9 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , delayiedHUDperc := 0, delayedfunc2exec := 0, lastOSDtooltipInvoked := 1, lastTimeToggleThumbs := 1, dupesStringFilter := ""
    , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := [], countGDIobjects := 0, uiPasteInPlaceAlphaFile
    , oldCustomShape := [], TVlistFolders, hfdTreeWinGui, folderTreeWinOpen := 0, VPstampBMPx := 0, VPstampBMPy := 0
-   , reviewSelectedIndexes := []
+   , reviewSelectedIndexes := [], toBeExcludedIndexes := []
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "4.9.1", vReleaseDate := "18/02/2021"
+   , appVersion := "4.9.2", vReleaseDate := "22/02/2021"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -247,6 +247,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , DesatureAreaHue := 0, DesatureAreaAlternate := 0, skipSeenImageSlides := 0, blurAreaSoftLevel := 2
    , BlurAreaBlendMode := 1, PasteInPlaceBlurEdgesSoft := 0, preventDeleteMatchingSearch := 0
    , protectedFolderPath := "", preventDeleteFromProtectedPath := 0, preventDeleteFromProtectedSubPaths := 0
+   , excludePreviousDupesFromList := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -1887,6 +1888,7 @@ resetMainWin2Welcome() {
      activeSQLdb.CloseDB()
      bckpResultedFilesList := []
      filteredMap2mainList := []
+     toBeExcludedIndexes := []
      RandyIMGids := []
      updateUIctrl()
      newStaticFoldersListCache := []
@@ -2481,7 +2483,7 @@ ClipboardSetFiles(PathToCopy, Method:="copy") {
    If !hPath
       Return
 
-   pPath := DllCall("GlobalLock","UPtr", hPath)
+   pPath := DllCall("GlobalLock","UPtr", hPath, "UPtr")
    NumPut(20, pPath+0), pPath += 16 ; DROPFILES.pFiles = offset of file list
    NumPut(1, pPath+0), pPath += 4 ; fWide = 0 -->ANSI,fWide = 1 -->Unicode
 
@@ -16121,7 +16123,7 @@ InListMultiEntriesRemover(dummy:=0, dontAsk:=0) {
    }
 
    startOperation := A_TickCount
-   showTOOLtip("Removing " filesElected " index entries, please wait")
+   showTOOLtip("Removing " groupDigits(filesElected) " index entries, please wait")
    prevMSGdisplay := A_TickCount
    ForceRefreshNowThumbsList()
    countTFilez := 0
@@ -16306,7 +16308,8 @@ addSQLdbEntry(fileNamu, imgPath, fileSizu, fileMdate, fileCdate, simple:=0) {
  
       If activeSQLdb.Exec(SQLStr)
          sqlDBrowID++
-      Else Return "err"
+      Else
+         Return "err"
    } Else sqlDBrowID++
 }
 
@@ -18129,7 +18132,7 @@ dbSortingCached(SortCriterion) {
       prevFilesSortMode := SortCriterion
       IniSLDBWrite("prevFilesSortMode", SortCriterion)
       setWindowTitle("Sorting files list by " SortCriterion ", please wait", 1)
-      If (InStr(filesFilter, "SQL:query:JOIN") && resultedFilesList[currentFileIndex, 23] && SLDtypeLoaded=3)
+      If testIsDupesList()
       {
          retrieveDupesByProperties(0, 0, SortCriterion)
          Return
@@ -18242,7 +18245,7 @@ ActSortPath() {
 
 ActSortDupeGroups() {
    startOperation := A_TickCount
-   If (InStr(filesFilter, "SQL:query:JOIN") && resultedFilesList[currentFileIndex, 23] && SLDtypeLoaded=3)
+   If testIsDupesList()
       retrieveDupesByProperties(0, 0, 1)
 
    etaTime := "Elapsed time to sort files list by duplicates image group IDs: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: " maxFilesIndex
@@ -20447,7 +20450,7 @@ coreSearchIndex(imgPath, givenRegEx, whatu, invertu:=0) {
    {
       parentu := zPlitPath(imgPath, 1, OutFileName, OutDir)
       If (whatu=2)
-        stringu := OutDir
+         stringu := OutDir
       Else If (whatu=3)
          stringu := OutFileName
       Else If (whatu=4)
@@ -20497,13 +20500,24 @@ searchNextIndex(direction, inLoop:=0) {
    backCurrentSLD := CurrentSLD
    CurrentSLD := ""
    originalIndex := startIndex := currentFileIndex
-   If (inLoop=1)
-      startIndex := (direction=1) ? 0 : maxFilesIndex
 
    newIndex := 0
    setImageLoading()
-   Loop, % maxFilesIndex
+   prevMSGdisplay := A_TickCount
+   startOperation := A_TickCount
+   totalLoops := (direction=1 && inLoop!=1) ? maxFilesIndex - startIndex + 1 : startIndex + 1
+   If (inLoop=1)
+      startIndex := (direction=1) ? 0 : maxFilesIndex + 1
+
+   Loop, % totalLoops
    {
+        If (A_TickCount - prevMSGdisplay>1000)
+        {
+           etaTime := ETAinfos(A_Index, totalLoops, startOperation)
+           showTOOLtip("Searching in index, please wait" etaTime, 0, 0, A_Index/totalLoops)
+           prevMSGdisplay := A_TickCount
+        }
+
         thisIndex := (direction=-1) ? startIndex - A_Index : startIndex + A_Index
         imgPath := getIDimage(thisIndex)
         If (!coreSearchIndex(imgPath, thisSearchString, userSearchWhat) || !imgPath)
@@ -20777,7 +20791,7 @@ batchFileDelete(dontAlterIndex:=0) {
       If (preventDeleteFromProtectedPath=1 && protectedFolderPath)
       {
          If (preventDeleteFromProtectedSubPaths=1)
-            OutDir := InStr(file2rem, protectedFolderPath "\") ? protectedFolderPath : 0
+            OutDir := InStr(file2rem, protectedFolderPath "\") ? protectedFolderPath : ""
          Else
             zPlitPath(file2rem, 0, OutFileName, OutDir)
 
@@ -21230,12 +21244,14 @@ coreBatchMultiRenameFiles() {
 
   INIaction(1, "PreserveDateTimeOnSave", "General")
   OriginalNewFileName := Trimmer(UsrEditNewFileName)
-  If (OriginalNewFileName="[this]" || OriginalNewFileName="trim{" || OriginalNewFileName="\\" || OriginalNewFileName="//")
-     Return
-
   objuTemp := decideMultiRename(OriginalNewFileName)
-  If (objuTemp="err")
+  If (objuTemp="err" || OriginalNewFileName="[this]" || OriginalNewFileName="trim{" || OriginalNewFileName="\\" || OriginalNewFileName="//")
+  {
+     showTOOLtip("WARNING: Incorrect multi-rename pattern provided")
+     SoundBeep 300, 100
+     SetTimer, RemoveTooltip, % -msgDisplayTime
      Return
+  }
 
   If (objuTemp.newName)
      OriginalNewFileName := objuTemp.newName
@@ -21528,6 +21544,9 @@ defineSQLdbSort() {
 moveMarkedEntryNow(indexu, modus:=0) {
    If (thumbsDisplaying!=1 || maxFilesIndex<2)
       Return
+
+   If !isNumber(indexu)
+      indexu := currentFileIndex
 
    If !EntryMarkedMoveIndex
    {
@@ -22491,10 +22510,7 @@ PanelAutoSelectDupes() {
       Return
    }
 
-   If (InStr(filesFilter, "SQL:query:JOIN") && resultedFilesList[currentFileIndex, 23] && SLDtypeLoaded=3)
-   {
-      Sleep, 1
-   } Else
+   If !testIsDupesList()
    {
       showTOOLtip("WARNING: The files list does not seem to contain pairs of images identified as duplicates")
       SoundBeep 300, 100
@@ -22593,7 +22609,7 @@ PanelSearchIndex() {
    SearchedStringz := Trimmer(SearchedStringz) "`f"
    prevSearchString := Trimmer(userSearchString) ? userSearchString : Chr(160)
    widthu := (PrefsLargeFonts=1) ? 1160 : 660
-   msgResult := msgBoxWrapper("panelu|Search indexed files: " appTitle, "Please type the string to search for in the indexed files. Use | as the OR operator. Wildcards ? and * are supported as well.`n`nUse one of the following tokens to...`n   / match strings that begin with given string`n   > match strings that end with given string.`n`nBegin with \> to use Regular Expressions.", "&Search next|Select &all matches|&Filter list panel|&Close", 1, "search", "&Highlight matching files in list view mode", markSearchMatches, SearchedStringz prevSearchString "`f`f", nullEdit,nullEdit, 1, widthu, "Full path`f`fFolder path`fFile name`fParent folder", 2)
+   msgResult := msgBoxWrapper("panelu|Search indexed files: " appTitle, "Please type the string to search for in the indexed files. Use | as the OR operator. Wildcards ? and * are supported as well.`n`nUse one of the following tokens to...`n   / match strings that begin with given string`n   > match strings that end with given string.`n`nBegin with \> to use Regular Expressions.", "&Search next|Select &matches|&Filter list panel|&Close", 1, "search", "&Highlight matching files in list view mode", markSearchMatches, SearchedStringz prevSearchString "`f`f", nullEdit,nullEdit, 1, widthu, "Full path`f`fFolder path`fFile name`fParent folder", 2)
    If InStr(msgResult.btn, "filter list")
    {
       OpenFilterPanelBTNaction()
@@ -22623,7 +22639,7 @@ PanelSearchIndex() {
 
 OpenFilterPanelBTNaction() {
    userSearchString := ""
-   CloseWindow()
+   BtnCloseWindow()
    PanelEnableFilesFilter()
 }
 
@@ -27378,7 +27394,7 @@ zPlitPath(inputu, fastMode, ByRef fileNamu, ByRef folderu, ByRef fileNamuNoEXT:=
        If fileEXTpos
           fileEXT := Trimmer(SubStr(fileNamu, fileEXTpos+1))
 
-       If (!fileExt || StrLen(fileExt)>4)
+       If (fileExt="" || StrLen(fileExt)>4)
        {
           fileNamu := fileEXTpos := ""
           folderu := Trim(Trimmer(inputu), "\")
@@ -27387,21 +27403,21 @@ zPlitPath(inputu, fastMode, ByRef fileNamu, ByRef folderu, ByRef fileNamuNoEXT:=
           folderu := ""
           Loop, % maxuIndex - 1
           {
-             If lineArr[A_Index]
+             If (lineArr[A_Index]!="")
                 folderu .= lineArr[A_Index] "\"
           }
           folderu := Trim(folderu, "\")
        }
 
        ; fileNamuNoEXT := fileEXTpos ? RegExReplace(fileNamu, "\.[^\^.\\/:*?<>|\r\n]+$") : fileNamu
-       fileNamuNoEXT := fileEXTpos ? SubStr(fileNamu, 1, fileEXTpos - 1) : fileNamu
+       fileNamuNoEXT := fileEXTpos!="" ? SubStr(fileNamu, 1, fileEXTpos - 1) : fileNamu
     }
     Return fileParentFolder
 }
 
 StringToASC(string) {
    Static lastInvoked, lastAsc
-   If !String
+   If (String="")
       Return
 
    If (string=lastInvoked)
@@ -28978,9 +28994,8 @@ OpenDialogFiles(dummy:=0) {
                IniWrite, % imgPath, % mainSettingsFile, General, LastOpenedImg
 
             IDshowImage(currentFileIndex)
-         } Else If OutFileName
+         } Else If OutFileName!=""
          {
-
             FriendlyName := FileExist(imgPath) ? "malformed" : "inexistent"
             msgBoxWrapper(appTitle ": ERROR", "Error opening file: " OutFileName ". It seems to be " FriendlyName " .`n`nAnother file from the folder will be displayed now. Files indexed: " groupDigits(maxFilesIndex) ".", 0, 0, "error")
             RandomPicture()
@@ -29229,8 +29244,16 @@ addNewFile2list() {
 }
 
 importSLDplainText(whichFile) {
-   If !RegExMatch(whichFile, "i)(.\.sld)$")
+   If (!RegExMatch(whichFile, "i)(.\.sld)$") || !RegExMatch(CurrentSLD, "i)(.\.sld)$"))
       Return
+
+   If (whichFile=CurrentSLD)
+   {
+      showTOOLtip("WARNING: Illegal operation. You cannot import the already opened files list`nNo one likes duplicates :-)")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
 
    If StrLen(filesFilter)>1
    {
@@ -29288,6 +29311,14 @@ importSLDBintoSLDB(whichFile) {
       RemoveTooltip()
    }
 
+   If (whichFile=CurrentSLD)
+   {
+      showTOOLtip("WARNING: Illegal operation. You cannot import the already opened database")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
    startZeit := A_TickCount
    mustOpenStartFolder := ""
    zPlitPath(CurrentSLD, 0, OutFileName, SelectedDir)
@@ -29295,7 +29326,10 @@ importSLDBintoSLDB(whichFile) {
 
    SQLa := "SELECT imgfile, imgfolder, fsize, fmodified, fcreated, imgwidth, imgheight, imgframes, imgdpi, imgpixfmt, imgavg, imghpeak, imghlow, imghmode, imghrms, imghminu, imghrange, innerpixelz, outerpixelz, entireHush, pixelzHash, imgmedian FROM images"
    If !activeSQLdb.GetTable(SQLa, mainRecordSet)
+   {
+      throwSQLqueryDBerror(A_ThisFunc)
       Return
+   }
 
    startOperation := A_TickCount
    prevMSGdisplay := A_TickCount
@@ -29324,13 +29358,19 @@ importSLDBintoSLDB(whichFile) {
    otherSQLdb := new SQLiteDB
    If !otherSQLdb.OpenDB(whichFile)
    {
+      mainArrayu := ""
+      totalArrayu := ""
       throwSQLqueryDBerror(A_ThisFunc)
-      Return -1
+      Return
    }
 
    If !otherSQLdb.GetTable(SQLa, otherRecordSet)
    {
+      mainArrayu := ""
+      totalArrayu := ""
+      mainRecordSet.Free()
       throwSQLqueryDBerror(A_ThisFunc)
+      otherSQLdb.CloseDB()
       Return
    }
 
@@ -29340,6 +29380,12 @@ importSLDBintoSLDB(whichFile) {
    otherArrayu := new hashtable()
    Loop, % otherRecordSet.RowCount
    {
+        If (determineTerminateOperation()=1)
+        {
+           abandonAll := 1
+           Break
+        }
+
         If (A_TickCount - prevMSGdisplay>1500)
         {
            etaTime := ETAinfos(A_Index, countFiles, startOperation)
@@ -29358,6 +29404,21 @@ importSLDBintoSLDB(whichFile) {
         }
    }
 
+   If (abandonAll=1)
+   {
+      showTOOLtip("Database import operation aborted by user")
+      SoundBeep 300, 100
+      totalArrayu := []
+      mainArrayu := []
+      otherArrayu := []
+      otherRecordSet.Free()
+      mainRecordSet.Free()
+      otherSQLdb.CloseDB()
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      SetTimer, ResetImgLoadStatus, -200
+      Return
+   }
+
    showTOOLtip("Merging databases contents, please wait")
    activeSQLdb.Exec("BEGIN TRANSACTION;")
    activeSQLdb.Exec("DELETE FROM images;")
@@ -29366,13 +29427,19 @@ importSLDBintoSLDB(whichFile) {
    baseSQLstr := "INSERT INTO images (imgidu, imgfile, imgfolder, fsize, fmodified, fcreated, imgwidth, imgheight, imgframes, imgdpi, imgpixfmt, imgavg, imghpeak, imghlow, imghmode, imghrms, imghminu, imghrange, innerpixelz, outerpixelz, entireHush, pixelzHash, imgmedian) VALUES ("
    k1 := k2 := k3 := k4 := k5 := k6 := k7 := k8 := k9 := k10 := k11 := k12 := k13 := k14 := k15 := k16 := k17 := k18 := k19 := k20 := k21 := k22 := ""
 
-   resultedFilesList := []
-   maxFilesIndex := 0
+   newIndex := 0
+   newArrayu := []
    startOperation := A_TickCount
    prevMSGdisplay := A_TickCount
    countFiles := totalArrayu.Count()
    For Key, Value in totalArrayu
    {
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
       If (A_TickCount - prevMSGdisplay>1500)
       {
          etaTime := ETAinfos(A_Index, countFiles, startOperation)
@@ -29413,13 +29480,31 @@ importSLDBintoSLDB(whichFile) {
          errorsOccured++
       } Else
       {
-         maxFilesIndex++
-         resultedFilesList[maxFilesIndex, 1] := k2 "\" k1
-         resultedFilesList[maxFilesIndex, 12] := sqlDBrowID
+         newIndex++
+         ; newArrayu[newIndex, 1] := k2 "\" k1
+         ; newArrayu[newIndex, 12] := sqlDBrowID
          sqlDBrowID++
       }
    }
 
+   If (abandonAll=1)
+   {
+      showTOOLtip("Database import operation aborted by user")
+      SoundBeep 300, 100
+      activeSQLdb.Exec("ROLLBACK TRANSACTION;")
+      totalArrayu := []
+      mainArrayu := []
+      otherArrayu := []
+      newArrayu := []
+      otherRecordSet.Free()
+      mainRecordSet.Free()
+      otherSQLdb.CloseDB()
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      SetTimer, ResetImgLoadStatus, -200
+      Return
+   }
+
+   showTOOLtip("Finalising database import operations, please wait")
    Static cols := "fsize,fmodified,fcreated,imgwidth,imgheight,imgframes,imgdpi,imgpixfmt,imgavg,imghpeak,imghlow,imghmode,imghrms,imghminu,imghrange,innerpixelz,outerpixelz,entireHush,pixelzHash,imgmedian"
    Loop, Parse, cols, CSV
    {
@@ -29439,6 +29524,10 @@ importSLDBintoSLDB(whichFile) {
           DynamicFoldersList .= Rowu[1] "`n"
    }
 
+   maxFilesIndex := newIndex
+   resultedFilesList := []
+   ; resultedFilesList := newArrayu.Clone()
+   newArrayu := []
    totalArrayu := []
    mainArrayu := []
    otherArrayu := []
@@ -29446,7 +29535,6 @@ importSLDBintoSLDB(whichFile) {
    otherRecordSet.Free()
    mainRecordSet.Free()
    otherSQLdb.CloseDB()
-   mainSQLdb.CloseDB()
    Sort, DynamicFoldersList, UD`n
    recreateDynaFoldersSQLdbList(DynamicFoldersList)
    If errorsOccured
@@ -29454,11 +29542,12 @@ importSLDBintoSLDB(whichFile) {
 
    zeitOperation := A_TickCount - startZeit
    etaTime := SecToHHMMSS(Round(zeitOperation/1000, 3))
-   showTOOLtip("Databases merger has finished in " etaTime someErrors)
+   OpenSLD(CurrentSLD, 1)
+   showDelayedTooltip("Databases merger has finished in " etaTime someErrors "`nTotal files: " groupDigits(maxFilesIndex))
    ; res := sldGenerateFilesList(whichFile, 0, mustRemQuotes, 0)
    SoundBeep , % errorsOccured ? 300 : 900, 100
-   GenerateRandyList()
-   RandomPicture()
+   ; GenerateRandyList()
+   ; RandomPicture()
    SetTimer, ResetImgLoadStatus, -200
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
@@ -29787,7 +29876,7 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
    {
       imgPath := Trimmer(imgsListu)
       zPlitPath(imgPath, 0, OutFileName, OutDir)
-      If !OutDir
+      If (OutDir="")
       {
          lastInvoked := A_TickCount
          Return
@@ -30111,6 +30200,7 @@ closeDocuments() {
 
    interfaceThread.ahkassign("currentFilesListModified", currentFilesListModified)
    PopulateIndexFilesStatsInfos("kill")
+   SLDtypeLoaded := 1
    resetMainWin2Welcome()
    addJournalEntry("All images/documents closed.")
    ResetImgLoadStatus()
@@ -30516,20 +30606,27 @@ createMenuSoloFile() {
    Menu, PVtActFile, Add, &Open with external app`tO, OpenThisFileMenu
    Menu, PVtActFile, Add, Open file in a new &QPV instance, SoloNewQPVinstance
    If RegExMatch(CurrentSLD, sldsPattern)
-      Menu, PVtActFile, Add, &Open in QPV containing folder, OpenQPVfileFolder
+      Menu, PVtActFile, Add, Open in QPV containin&g folder, OpenQPVfileFolder
 
    Menu, PVtActFile, Add, &Explore containing folder`tCtrl+E, OpenThisFileFolder
-   Menu, PVtActFile, Add, Set containing folder as the protected folder, setContaintFolderAsProtected
+   Menu, PVtActFile, Add, Set containing folder as the &protected folder, setContaintFolderAsProtected
    Menu, PVtActFile, Add, Set as &wallpaper`tCtrl+W, setImageWallpaper
+   Menu, PVtActFile, Add, 
 
    If (thumbsDisplaying=1)
+   {
       Menu, PVtActFile, Add, &Import into currently loaded image, importGivenFile
+      If !EntryMarkedMoveIndex
+         Menu, PVtActFile, Add, Mar&k entry to reorder`tX, moveMarkedEntryNow
+      Else
+         Menu, PVtActFile, Add, Move mar&ked entry to active index`tX, moveMarkedEntryNow
+   }
 
-   Menu, PVtActFile, Add, 
    If !markedSelectFile
       Menu, PVtActFile, Add, &Select / deselect file`tTab, MenuMarkThisFileNow
-   Menu, PVtActFile, Add, Remove index entry`tAlt+Delete, singleInListEntriesRemover
-   Menu, PVtActFile, Add, Modify index entry`tCtrl+F2, PanelUpdateThisFileIndex
+
+   Menu, PVtActFile, Add, Remove inde&x entry`tAlt+Delete, singleInListEntriesRemover
+   Menu, PVtActFile, Add, &Modify index entry`tCtrl+F2, PanelUpdateThisFileIndex
    Menu, PVtActFile, Add, 
    Menu, PVtActFile, Add, &Delete file`tDelete, DeleteActivePicture
    Menu, PVtActFile, Add, &Rename file`tShift+F2, SingularRenameFile
@@ -31066,7 +31163,7 @@ BuildMainMenu() {
    Menu, PVsort, Add, File si&ze`tCtrl+4, ActSortSize
    Menu, PVsort, Add, &Modified date`tCtrl+5, ActSortModified
    Menu, PVsort, Add, &Created date`tCtrl+6, ActSortCreated
-   If (InStr(filesFilter, "SQL:query:JOIN") && resultedFilesList[currentFileIndex, 23] && SLDtypeLoaded=3)
+   If testIsDupesList()
    {
       Menu, PVsort, Add
       Menu, PVsort, Add, &Duplicates ID group, ActSortDupeGroups
@@ -31107,7 +31204,7 @@ BuildMainMenu() {
    Menu, PVsort, Add, R&everse list`tCtrl+0, ReverseListNow
    Menu, PVsort, Add, R&andomize list, RandomizeListNow
 
-   defMenuRefresh := RegExMatch(CurrentSLD, sldsPattern) ? "&Reload .SLD file" : "&Refresh opened folder(s)"
+   defMenuRefresh := RegExMatch(CurrentSLD, sldsPattern) ? "Reload .SLD file" : "Refresh opened folder(s)"
    StringRight, defMenuRefreshItm, CurrentSLD, 30
    If defMenuRefreshItm
    {
@@ -31122,7 +31219,7 @@ BuildMainMenu() {
    Menu, PVfList, Add,
    ; If (maxFilesIndex>1)
    ; {
-      Menu, PVfList, Add, Insert file(s)`tInsert, addNewFile2list
+      Menu, PVfList, Add, Import list / insert file(s)`tInsert, addNewFile2list
       Menu, PVfList, Add, Add folder(s)`tShift+Insert, addNewFolder2list
       Menu, PVfList, Add, Manage folder(s) list`tAlt+U, PanelDynamicFolderzWindow
    ; }
@@ -31131,10 +31228,18 @@ BuildMainMenu() {
    {
       Menu, PVfList, Add, Save files list as .SLD`tCtrl+Shift+S, PanelSaveSlideShowu
       Menu, PVfList, Add,
+      If (thumbsDisplaying=1 && !markedSelectFile)
+      {
+         If !EntryMarkedMoveIndex
+            Menu, PVfList, Add, Mar&k entry to reorder`tX, moveMarkedEntryNow
+         Else
+            Menu, PVfList, Add, Move mar&ked entry to active index`tX, moveMarkedEntryNow
+      }
+
       If !markedSelectFile
       {
-         Menu, PVfList, Add, Remove active index entry`tAlt+Delete, singleInListEntriesRemover
-         Menu, PVfList, Add, Modify active index entry`tCtrl+F2, PanelUpdateThisFileIndex
+         Menu, PVfList, Add, &Modify active index entry`tCtrl+F2, PanelUpdateThisFileIndex
+         Menu, PVfList, Add, Remove active inde&x entry`tAlt+Delete, singleInListEntriesRemover
       }
 
       Menu, PVfList, Add, Auto-remove entries of dead files, ToggleAutoRemEntries
@@ -31402,7 +31507,7 @@ BuildMainMenu() {
       Menu, PVfileSel, Add, Revie&w selected files`tR, filterToFilesSelection
 
    Menu, PVfileSel, Add, Filter files list to selected`tCtrl+Tab, filterToFilesSelection
-   If (InStr(filesFilter, "SQL:query:JOIN") && resultedFilesList[currentFileIndex, 23] && SLDtypeLoaded=3 && thumbsDisplaying=1)
+   If (testIsDupesList()=1 && thumbsDisplaying=1)
       Menu, PVfileSel, Add, Select the other images in dupes group`tS, keepSelectedDupeInGroup
 
 ; main menu
@@ -31443,10 +31548,10 @@ BuildMainMenu() {
          Menu, PVmenu, Add, &Active file, :PVtActFile
 
       If (thumbsDisplaying=1) || (thumbsDisplaying!=1 && editingSelectionNow!=1)
-         Menu, PVmenu, Add, Files &index/list, :PVfList
+         Menu, PVmenu, Add, Files inde&x/list, :PVfList
 
       If (thumbsDisplaying=1 && maxFilesIndex>1)
-         Menu, PVmenu, Add, &Sort list by..., :PVsort
+         Menu, PVmenu, Add, Sort list b&y..., :PVsort
 
       friendly := (thumbsDisplaying=1) ? "&Thumbnails view" : "Image vie&w"
       If (thumbsDisplaying!=1) || (thumbsDisplaying=1 && thumbnailsListMode!=1)
@@ -31484,8 +31589,8 @@ BuildMainMenu() {
    {
       Menu, PVmenu, Add,
       Menu, PVmenu, Add, Remove files list filter`tCtrl+Space, MenuRemFilesListFilter
-      If (InStr(filesFilter, "SQL:query:JOIN") && resultedFilesList[currentFileIndex, 23] && SLDtypeLoaded=3)
-         Menu, PVmenu, Add, Auto-select duplicates, PanelAutoSelectDupes
+      If testIsDupesList()
+         Menu, PVmenu, Add, Auto-select &duplicates, PanelAutoSelectDupes
       Menu, PVmenu, Add,
    } Else If (SLDtypeLoaded=2 && currentFilesListModified=1 && CurrentSLD && maxFilesIndex>1)
    {
@@ -34146,7 +34251,7 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
              invokeExternalSlideshowHandler()
 
           friendly := (A_PtrSize=4) ? "`nOr, insufficient memory." : ""
-          errMsg := "ERROR: Unable to display the image: " groupDigits(currentFileIndex) "`nPossibly malformed image file format." friendly "`n" r2 "`n" OutFileName "`n" OutDir "\"
+          errMsg := "ERROR: Unable to display the image: " groupDigits(currentFileIndex) "`nPossibly malformed image file format or access denied." friendly "`n" r2 "`n" OutFileName "`n" OutDir "\"
 
           If (WinActive("A")=PVhwnd)
           {
@@ -36244,6 +36349,7 @@ coreCreateVPnavBox(modus:=0) {
    whichBitmap := useGdiBitmap()
    If (thumbsDisplaying=1)
    {
+      whichBitmap := ""
       imgPath := StrReplace(getIDimage(currentFileIndex), "||")
       If !FileRexists(imgPath)
          Return
@@ -36257,12 +36363,16 @@ coreCreateVPnavBox(modus:=0) {
       {
          changeMcursor()
          oBitmap := LoadBitmapFromFileu(imgPath)
-         whichBitmap := trGdip_ResizeBitmap(A_ThisFunc, oBitmap, 500, 500, 1, 7)
-         trGdip_DisposeImage(oBitmap, 1)
-         Gdip_SaveBitmapToFile(whichBitmap, file2save, 94)
+         If StrLen(oBitmap)>1
+         {
+            whichBitmap := trGdip_ResizeBitmap(A_ThisFunc, oBitmap, 500, 500, 1, 7)
+            trGdip_DisposeImage(oBitmap, 1)
+            Gdip_SaveBitmapToFile(whichBitmap, file2save, 94)
+         }
          ResetImgLoadStatus()
       }
-      whichBitmap := flipBitmapAccordingToViewPort(applyVPeffectsOnBMP(whichBitmap))
+      If StrLen(whichBitmap)>1
+         whichBitmap := flipBitmapAccordingToViewPort(applyVPeffectsOnBMP(whichBitmap))
    }
 
    thisCall := "a" whichBitmap MD5name imgPath thumbsDisplaying gdiBitmapIDcall currentFileIndex getIDimage(currentFileIndex) currentUndoLevel undoLevelsRecorded UserMemBMP imgHUDbaseUnit OSDfntSize HUDnavBoxSize FlipImgH FlipImgV imgFxMode
@@ -36270,7 +36380,11 @@ coreCreateVPnavBox(modus:=0) {
       Return prevBMP
 
    If !whichBitmap
+   {
+      prevBMP := trGdip_DisposeImage(prevBMP, 1)
+      prevBMP := lastCall := ""
       Return
+   }
 
    prevBMP := trGdip_DisposeImage(prevBMP, 1)
    imgW := imgH := Ceil(HUDnavBoxSize * imgHUDbaseUnit/20)
@@ -38931,7 +39045,7 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, mustShowNames:=0) {
     thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, startIndex, mainWidth, mainHeight)
     rowIndex := 0
     currentDupeID := columnIndex := -1
-    If (InStr(filesFilter, "SQL:query:JOIN") && resultedFilesList[currentFileIndex, 23] && SLDtypeLoaded=3)
+    If testIsDupesList()
     {
        Gdip_SetPenWidth(pPen2, imgHUDbaseUnit//9 + 1)
        currentDupeID := resultedFilesList[currentFileIndex, 23]
@@ -39072,7 +39186,7 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, mustShowNames:=0) {
     If ((mustShowNames=1 || noTooltipMSGs=0) && StrLen(theMsg)>1)
     {
        bgrTXT := (resultedFilesList[currentFileIndex, 2]=1) ? SubStr(MixARGB("0xFF0188FF", "0xFF" WindowBgrColor, 0.65), 5) : OSDbgrColor
-       If (InStr(filesFilter, "SQL:query:JOIN") && resultedFilesList[currentFileIndex, 23] && SLDtypeLoaded=3)
+       If testIsDupesList()
        {
           theMSG := "DUPE ID: " currentDupeID " | " theMSG
           mpxu := " | " Round(resultedFilesList[currentFileIndex, 17], 2) " MPx"
@@ -40252,6 +40366,7 @@ RegenerateEntireList() {
        recreateDynaFoldersSQLdbList(listu)
        saveSlideSettingsInDB()
        getMaxRowIDsqlDB()
+       activeSQLdb.Exec("BEGIN TRANSACTION;")
     }
 
     countFolders := ST_Count(listu, "`n") + 1
@@ -40271,7 +40386,7 @@ RegenerateEntireList() {
           activeSQLdb.Exec(SQLstr)
        }
 
-       r := GetFilesList(line "\*", A_Index / countFolders)
+       r := GetFilesList(line "\*", A_Index / countFolders, 0)
        If (SLDtypeLoaded=3)
           SQLdeleteEntriesMarked()
 
@@ -40279,38 +40394,49 @@ RegenerateEntireList() {
           Break
     }
 
-    ; If (r="abandoned" && SLDtypeLoaded!=3)
-    ; {
-    ;    resetMainWin2Welcome()
-    ;    showTOOLtip("Operation aborted. The files list is now empty.")
-    ;    SoundBeep, 300, 100
-    ;    SetTimer, RemoveTooltip, % -msgDisplayTime
-    ; } Else
-    ; {
-       thisFolder := StrReplace(CurrentSLD, "|")
-       If (SLDtypeLoaded=3 && r!="abandoned")
-          SQLdbGenerateStaticFolders()
-       Else If (SLDtypeLoaded=1 && FolderExist(thisFolder))
-          watchFolderDetails := getFolderDetails(thisFolder)
-
-       GenerateRandyList()
-       If (r="abandoned" && SLDtypeLoaded!=3)
+    If (SLDtypeLoaded=3 && RegExMatch(fileNamu, "i)(.\.sldb)$"))
+    {
+       If (r="abandoned")
        {
-          showDelayedTooltip("Operation aborted - regenerate files list. The files list is now incomplete.")
-          SoundBeep, 300, 100
-       } Else SoundBeep, 900, 100
+          showTOOLtip("Operation aboorted: regenerate files list. The files list is unchanged.`nReopening now the database")
+          activeSQLdb.Exec("ROLLBACK TRANSACTION;")
+          Sleep, 250
+          OpenSLD(CurrentSLD, 1)
+          Return
+       }
 
-       currentFileIndex := clampInRange(thisIndex, 1, maxFilesIndex)
-       If (maxFilesIndex<1)
-       {
-          friendly := (SLDtypeLoaded=1 && FolderExist(thisFolder)) ? "No image files found in the folder:`n" thisFolder "\`n`n" : "Error refreshing files list... found nothing.`n`n"
-          FadeMainWindow()
-          msgBoxWrapper(appTitle ": WARNING", friendly "No indexed files found, please open a file or folder.", 0, 0, "info")
-          resetMainWin2Welcome()
-       } Else dummyTimerDelayiedImageDisplay(50)
-       ; RandomPicture()
-    ; }
-    etaTime := "Elapsed time to regenerate files list: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: " maxFilesIndex
+       showTOOLtip("Finalising database operations, please wait")
+       If !activeSQLdb.Exec("COMMIT TRANSACTION;")
+          throwSQLqueryDBerror(A_ThisFunc)
+    }
+
+    thisFolder := StrReplace(CurrentSLD, "|")
+    If (SLDtypeLoaded=3 && r!="abandoned")
+    {
+       etaTime := "Elapsed time to regenerate files list [ database mode ]: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
+       SQLdbGenerateStaticFolders()
+       OpenSLD(CurrentSLD, 1)
+       addJournalEntry(etaTime ". Files: " groupDigits(maxFilesIndex))
+       Return
+    } Else If (SLDtypeLoaded=1 && FolderExist(thisFolder))
+       watchFolderDetails := getFolderDetails(thisFolder)
+
+    GenerateRandyList()
+    If (r="abandoned" && SLDtypeLoaded!=3)
+    {
+       SoundBeep, 300, 100
+    } Else SoundBeep, 900, 100
+
+    currentFileIndex := clampInRange(thisIndex, 1, maxFilesIndex)
+    If (maxFilesIndex<1)
+    {
+       friendly := (SLDtypeLoaded=1 && FolderExist(thisFolder)) ? "No image files found in the folder:`n" thisFolder "\`n`n" : "Error refreshing files list... found nothing.`n`n"
+       FadeMainWindow()
+       msgBoxWrapper(appTitle ": WARNING", friendly "No indexed files found, please open a file or folder.", 0, 0, "info")
+       resetMainWin2Welcome()
+    } Else dummyTimerDelayiedImageDisplay(50)
+
+    etaTime := "Elapsed time to regenerate files list: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: " groupDigits(maxFilesIndex)
     addJournalEntry(etaTime)
 }
 
@@ -40786,6 +40912,9 @@ retrieveDupesByProperties(theseCols, fsCmp, SortCriterion:=0) {
       Rowu := RecordSet.Rows[A_Index]
       If Rowu[2]
       {
+         If (toBeExcludedIndexes[Rowu[1]]=1)
+            Continue
+
          maxFilesIndex++
          resultedFilesList[maxFilesIndex, 1] := Rowu[2]
          resultedFilesList[maxFilesIndex, 12] := Rowu[1]
@@ -40794,7 +40923,7 @@ retrieveDupesByProperties(theseCols, fsCmp, SortCriterion:=0) {
          resultedFilesList[maxFilesIndex, 23] := Rowu[5]
          If givenRegEx
          {
-            If coreSearchIndex(Rowu[2], givenRegEx, 2)
+            If coreSearchIndex(Rowu[2], givenRegEx, 2, userFilterStringIsNot)
                groupies[Rowu[5]] := 1
          } Else groupies[Rowu[5]] := 1
       }
@@ -40825,9 +40954,19 @@ retrieveDupesByProperties(theseCols, fsCmp, SortCriterion:=0) {
    ; ToolTip, % filesFilter , , , 2
    etaTime := "Elapsed time to identify possible image duplicates: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: " maxFilesIndex
    addJournalEntry(etaTime)
-   showDelayedTooltip("Found " groupDigits(groupies.Count()) " groups of duplicate images`nTotal images: " groupDigits(maxFilesIndex))
-   ; SetTimer, RemoveTooltip, % -msgDisplayTime
    SetTimer, ResetImgLoadStatus, -100
+   If (maxFilesIndex<2)
+   {
+      showTOOLtip("Found no image duplicates after filtering dupes list")
+      SoundBeep , 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      If !SortCriterion
+         SetTimer, PanelFindDupes, -250
+      Return
+   }
+
+   ; SetTimer, RemoveTooltip, % -msgDisplayTime
+   showDelayedTooltip("Found " groupDigits(groupies.Count()) " groups of duplicate images`nTotal images: " groupDigits(maxFilesIndex))
    dummyTimerDelayiedImageDisplay(90)
    ; RandomPicture()
 }
@@ -41055,7 +41194,7 @@ filterCoreString(stringu, behave, thisFilter, doExactFolderMatch:=0) {
   Return (behave=2) ? !z : z
 }
 
-GetFilesList(strDir, progressInfo:=0) {
+GetFilesList(strDir, progressInfo:=0, doCommits:=1) {
   showTOOLtip("Loading files from`n" strDir "`n", 0, 0, progressInfo)
   If InStr(strDir, "|")
   {
@@ -41067,50 +41206,108 @@ GetFilesList(strDir, progressInfo:=0) {
   startOperation := A_TickCount
   prevMSGdisplay := A_TickCount
   prevDisplay := A_TickCount
-  If (SLDtypeLoaded=3)
-     activeSQLdb.Exec("BEGIN TRANSACTION;")
-
   doStartLongOpDance()
-  Loop, Files, %strDir%, %doRecursive%
+  abandonAll := 0
+  If (SLDtypeLoaded=3)
   {
-      fullPath := Trimmer(A_LoopFileFullPath)
-      If (RegExMatch(fullPath, RegExFilesPattern) && A_LoopFileSize>120)
-      {
-         If (SLDtypeLoaded=3) ; SQLite database 
-            erru := addSQLdbEntry(A_LoopFileName, A_LoopFileDir, A_LoopFileSize, A_LoopFileTimeModified, A_LoopFileTimeCreated)
+     newArrayu := []
+     If (doCommits=1)
+        activeSQLdb.Exec("BEGIN TRANSACTION;")
 
+     Loop, Files, %strDir%, %doRecursive%
+     {
+         fullPath := Trimmer(A_LoopFileFullPath)
+         If (RegExMatch(fullPath, RegExFilesPattern) && A_LoopFileSize>120)
+         {
+            thisCounter++
+            newArrayu[thisCounter] := [A_LoopFileName, A_LoopFileDir, A_LoopFileSize, A_LoopFileTimeModified, A_LoopFileTimeCreated]
+         }
+
+         If (A_TickCount - prevMSGdisplay>2000)
+         {
+            showTOOLtip("Loading files from`n" strDir "`nFound " groupDigits(thisCounter) " files...`nTotal indexed files: " groupDigits(maxFilesIndex), 0, 0, progressInfo)
+            prevMSGdisplay := A_TickCount
+         }
+
+         If (determineTerminateOperation()=1)
+         {
+            abandonAll := 1
+            Break
+         }
+     }
+
+     Loop, % newArrayu.Count()
+     {
+         If (determineTerminateOperation()=1 || abandonAll=1)
+         {
+            abandonAll := 1
+            Break
+         }
+
+         erru := addSQLdbEntry(newArrayu[A_Index, 1], newArrayu[A_Index, 2], newArrayu[A_Index, 3], newArrayu[A_Index, 4], newArrayu[A_Index, 5])
          If !erru
          {
             addedNow++
             maxFilesIndex++
+            fullPath := newArrayu[A_Index, 2] "\" newArrayu[A_Index, 1]
             If (A_PtrSize=8 && minimizeMemUsage!=1)
-               resultedFilesList[maxFilesIndex] := [fullPath,,,,, A_LoopFileSize, A_LoopFileTimeModified, A_LoopFileTimeCreated]
+               resultedFilesList[maxFilesIndex] := [fullPath,,,,, newArrayu[A_Index, 3], newArrayu[A_Index, 4], newArrayu[A_Index, 5]]
             Else
                resultedFilesList[maxFilesIndex] := [fullPath]
 
-            If (SLDtypeLoaded=3)
-               resultedFilesList[maxFilesIndex, 12] := sqlDBrowID
+            resultedFilesList[maxFilesIndex, 12] := sqlDBrowID
          }
-      }
 
-      If (A_TickCount - prevMSGdisplay>2000)
-      {
-         showTOOLtip("Loading files from`n" strDir "`nFound " groupDigits(addedNow) " files...`nTotal indexed files: " groupDigits(maxFilesIndex), 0, 0, progressInfo)
-         prevMSGdisplay := A_TickCount
-      }
+         If (A_TickCount - prevMSGdisplay>2000)
+         {
+            etaTime := ETAinfos(A_Index, thisCounter, startOperation)
+            showTOOLtip("Inserting records into the database for`n" strDir etaTime, 0, 0, A_Index / thisCounter)
+            prevMSGdisplay := A_TickCount
+         }
 
-      changeMcursor()
-      If (determineTerminateOperation()=1)
-      {
-         abandonAll := 1
-         Break
-      }
-  }
+     }
 
-  If (SLDtypeLoaded=3)
+     If (doCommits=1)
+     {
+        If !activeSQLdb.Exec("COMMIT TRANSACTION;")
+           throwSQLqueryDBerror(A_ThisFunc)
+     }
+  } Else
   {
-     If !activeSQLdb.Exec("COMMIT TRANSACTION;")
-        throwSQLqueryDBerror(A_ThisFunc)
+     Loop, Files, %strDir%, %doRecursive%
+     {
+         fullPath := Trimmer(A_LoopFileFullPath)
+         If (RegExMatch(fullPath, RegExFilesPattern) && A_LoopFileSize>120)
+         {
+            If (SLDtypeLoaded=3) ; SQLite database 
+               erru := addSQLdbEntry(A_LoopFileName, A_LoopFileDir, A_LoopFileSize, A_LoopFileTimeModified, A_LoopFileTimeCreated)
+
+            If !erru
+            {
+               addedNow++
+               maxFilesIndex++
+               If (A_PtrSize=8 && minimizeMemUsage!=1)
+                  resultedFilesList[maxFilesIndex] := [fullPath,,,,, A_LoopFileSize, A_LoopFileTimeModified, A_LoopFileTimeCreated]
+               Else
+                  resultedFilesList[maxFilesIndex] := [fullPath]
+
+               If (SLDtypeLoaded=3)
+                  resultedFilesList[maxFilesIndex, 12] := sqlDBrowID
+            }
+         }
+
+         If (A_TickCount - prevMSGdisplay>2000)
+         {
+            showTOOLtip("Loading files from`n" strDir "`nFound " groupDigits(addedNow) " files...`nTotal indexed files: " groupDigits(maxFilesIndex), 0, 0, progressInfo)
+            prevMSGdisplay := A_TickCount
+         }
+
+         If (determineTerminateOperation()=1)
+         {
+            abandonAll := 1
+            Break
+         }
+     }
   }
 
   currentFilesListModified := 1
@@ -41792,14 +41989,14 @@ HelpWindow() {
     }
 
     drawViewportHelpMap()
-    Gui, Add, Tab3, x15 y15, General|Keyboard shortcuts|Command line
+    Gui, Add, Tab3, x15 y15 Choose2, General|Keyboard shortcuts|Command line
     Gui, Tab, 1 ; general
     cmdHelp := appTitle " is made to gracefully manage large image libraries, e.g., a million images, or more. It is made to help organize and view such libraries. It is also developed to cater keyboard users by providing many keyboard shortcuts, and to the needs of people with poor eye-sight. To this end, users can adjust the zoom level (Ctrl + -/+) in the viewport, and right-click on menu items or panel controls to display larger the associated text."
     cmdHelp .= "`n`nThe files list.`nThe files list is an index, a list of records pointing to files on the disk. "
     cmdHelp .= "When users open a folder, a files list index is automatically generated and one can add more files, from elsewhere, to this index. "
     cmdHelp .= "Given that it is just an index, the files added are not inserted (or pasted) into the initially opened folder. "
     cmdHelp .= "The files list index can be saved and reopened in later sessions. QPV allows users to save the files list in two formats: plain-text and as a SQLite database. For more details, see the Help provided in the Save panel (Ctrl+Shift+S)."
-    cmdHelp .= "`n`nThe viewport`nIn QPV, unlike in other image viewers, there is a clear distinction between how images are displayed on the screen and the pixel/image data. QPV allows users to alter the viewing conditions without affecting the images themselves. The color adjustments, image rotation and flip (available in the «Viewport adjustments» panel), are applied in real-time for each image when loaded, before displaying it on screen. However, this will not affect the images themselves. There are distinct options and tools in QPV to edit and adjust images or to apply the viewport conditions. QPV will seamlessly «merge» / apply the viewport viewing conditions onto the image itself when users choose to save the image or when an image editing tool is used."
+    cmdHelp .= "`n`nThe viewport`nIn QPV, unlike in other image viewers, there is a clear distinction between how images are displayed on the screen and the pixel/image data. QPV allows users to alter the viewing conditions without affecting the images themselves. The color adjustments, image rotation and flip (available in the ""Viewport adjustments"" panel), are applied in real-time for each image when loaded, before displaying it on screen. However, this will not affect the images themselves. There are distinct options and tools in QPV to edit and adjust images or to apply the viewport conditions. QPV will seamlessly apply the viewport viewing conditions onto the image itself when users choose to save the image or when an image editing tool is used."
     cmdHelp .= "`n`nBy using QPV, people can observe that many similar tools are provided, which may achieve the exact same thing. QPV was thought like this, to allow users perform basic tasks by different means, because each mean is suited for specific use-case scenarios."
 
     Gui, Add, Edit, x+15 y+15 w%lstWid% r13 ReadOnly, %cmdHelp%
@@ -41951,6 +42148,13 @@ PanelHistogramSorting() {
       PanelResolutionSorting()
 }
 
+testIsDupesList() {
+   If (InStr(filesFilter, "SQL:query:JOIN") && resultedFilesList[currentFileIndex, 23] && SLDtypeLoaded=3)
+      Return 1
+   Else
+      Return 0
+}
+
 PanelFindDupes() {
     Global userFindDupesSelectAllDummy := 0
     userFindDupesSelectAllDummy := 0
@@ -42042,12 +42246,14 @@ PanelFindDupes() {
     Gui, Add, UpDown, vhashSimpleTrimLeft gBTNchangeDupesPreset Range0-9, % hashSimpleTrimLeft
     Gui, Add, Edit, x+5 w%fingEdt% gBTNchangeDupesPreset number -multi limit1 veditF10, % hashSimpleTrimRight
     Gui, Add, UpDown, vhashSimpleTrimRight gBTNchangeDupesPreset Range0-9, % hashSimpleTrimRight
-    Gui, Add, Text, xm+15 y+20, Filter the results with given string - applies to folder paths:
+    Gui, Add, Text, xm+15 y+14 Section, Filter the results with given string - applies to folder paths:
     Gui, Add, Edit, xp+15 y+7 wp-30 -multi limit12345 vdupesStringFilter , % dupesStringFilter
+    Gui, Add, Checkbox, xp y+7 Checked%userFilterStringIsNot% vuserFilterStringIsNot, &Must not contain it
+    Gui, Add, Checkbox, xs y+14 Checked%excludePreviousDupesFromList% vexcludePreviousDupesFromList, E&xclude current list
 
     Gui, Tab
     Gui, Add, Button, xm+15 y+20 h%thisBtnHeight% w%btnWid% Default gBTNfindDupesNow, &Find duplicates
-    If (InStr(filesFilter, "SQL:query:JOIN") && resultedFilesList[currentFileIndex, 23] && SLDtypeLoaded=3)
+    If testIsDupesList()
        Gui, Add, Button, x+5 hp wp gBTNautoselectDupes, &Auto-select dupes
     Else
        Gui, Add, Button, x+5 hp wp gBtnCollectHistoInfos, Collect files &data
@@ -42242,6 +42448,8 @@ BTNfindDupesNow() {
    GuiControlGet, hashSimpleTrimLeft
    GuiControlGet, hashSimpleTrimRight
    GuiControlGet, dupesStringFilter
+   GuiControlGet, userFilterStringIsNot
+   GuiControlGet, excludePreviousDupesFromList
 
    If GuiCtrlGet("UIcheckimgfile")
       columnus .= "imgfile,"
@@ -42343,6 +42551,13 @@ BTNfindDupesNow() {
    }
 
    BtnCloseWindow()
+   toBeExcludedIndexes := []
+   If (excludePreviousDupesFromList=1)
+   {
+      Loop, % maxFilesIndex
+         toBeExcludedIndexes[resultedFilesList[A_Index, 12]] := 1
+   }
+
    retrieveDupesByProperties(columnus, 0)
 }
 
@@ -44876,8 +45091,16 @@ BTNreviewDropFilesSelection() {
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: ListView, LViewOthers
    RowNumber := 0
+   GuiControlGet, listViewFilteru
    modus := markedSelectFile ? 0 : 1
-   modusa := markedSelectFile ? "-" : "S"
+   If listViewFilteru
+   {
+      LV_GetText(thisFileIndex, RowNumber + 1, 3)
+      modus := resultedFilesList[thisFileIndex, 2] ? 0 : 1
+      ; ToolTip, % thisFileIndex "===" isSelected "===" modus , , , 2
+   }
+
+   modusa := !modus ? "_" : "S"
    Loop
    {
        RowNumber++
@@ -46355,6 +46578,8 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
        }
        SetTimer, dummyRefreshImgSelectionWindow, -200
     }
+    If !testIsDupesList()
+       toBeExcludedIndexes := []
 
     imgEditPanelOpened := AnyWindowOpen := 0
 }
@@ -51230,3 +51455,11 @@ giveWarningX64() {
    Else
       exitAppu()
 }
+
+
+; y::
+; SoundBeep 
+; SendInput, ^{vk41}
+; Return
+
+; progress bar for searching
