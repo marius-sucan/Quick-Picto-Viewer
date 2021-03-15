@@ -2,6 +2,19 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v4.9.6 (2021-03-15)
+  - [new] files list filter panel now has the option to invert filter for chosen image property; eg. file size not between 300 and 900 kb;
+  - [new] hamming distance image duplicates filtering mode, with multi-threaded execution and caching; this allows users to find dupes previously not possible to identify [option only available on the x64 edition]
+  - [new] implemented support for multipage formats in Freeimage: gif and tiff; previously, such formats were supported only through gdi+
+  - [new] option to quickly select files in same folder [press E in list view]
+  - when more than 50 files are selected, QPV will prompt users before exit
+  - improved databases merger function; it will use less memory and it will no longer royally mess-up the order of files
+  - improved performance for the image statistics panel when a database is opened; from 2.5 minutes to generate the stats, down to 25 seconds; for 1.45 million records;
+  - improved performance when opening file list databases
+  - improved mechanisms to prevent users from adding to the index the same folders
+  - important bug fixes related to inserting or rescaning folders when an SQL database is opened
+  - various other fixes and minor improvements
+
 - v4.9.2 (2021-02-22)
   - considerably optimized disk usage [and performance] when rescanning the folders [in the context of a SQLite database files list]
   - now one can abort safely a merger of databases or «regenerate entire list» when a database is opened

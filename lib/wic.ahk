@@ -107,6 +107,40 @@ IWICBitmapEncoder_Initialize(thisObj, pIStream, cacheOption) {
    Return hr
 }
 
+IWICBitmapSource_GetSize(thisObj, ByRef puiWidth, ByRef puiHeight) {
+   ; thisObj must bbe ppIDecoder // bitmap source
+   hr := DllCall(vtable(thisObj, 3),"ptr", thisObj, "uint*", puiWidth,"uint*", puiHeight)
+   WIC_hr(hr, ErrorLevel, A_ThisFunc)
+   return hr
+}
+
+IWICBitmapSource_CopyPixels(thisObj, prcRectIn, cbStride, cbBufferSize, pbBufferOut) {
+   ; thisObj must bbe ppIDecoder // bitmap source
+   ; VarSetCapacity(prcRect, 16)
+   ; For i, val in prcRectIn
+   ;        NumPut(val, thisObj+(4*(A_Index-1)), "Int")
+
+   hr := DllCall(vtable(thisObj, 7), "ptr", thisObj, "ptr", prcRectIn, "uint", cbStride, "uint", cbBufferSize, "ptr*", pbBufferOut)
+   WIC_hr(hr, ErrorLevel, A_ThisFunc)
+   return hr
+  }   
+
+IWICBitmapSource_GetPixelFormat(thisObj, ByRef pPixelFormat){
+   VarSetCapacity(pPixelFormat, 96)
+   hr := DllCall(vtable(thisObj, 4), "ptr", thisObj, "ptr*", pPixelFormat)
+   WIC_hr(hr, ErrorLevel, A_ThisFunc)
+   VA_GUIDOut(pPixelFormat)
+   return hr
+}
+
+VA_GUIDOut(ByRef guid) {
+    ; Convert binary GUID structure to string.
+    ; thanks to lexikos - from VA.ahk
+    VarSetCapacity(buf, 78)
+    DllCall("ole32\StringFromGUID2", "ptr", &guid, "ptr", &buf, "int", 39)
+    guid := StrGet(&buf, "UTF-16")
+}
+
 IWICBitmapEncoder_CreateNewFrame(thisObj, ByRef ppIFrameEncode, ppIEncoderOptions := 0) {
    ; thisObj must bbe ppIEncoder
    hr := DllCall(vtable(thisObj, 10), "ptr", thisObj, "ptr*", ppIFrameEncode, "ptr*", ppIEncoderOptions)
@@ -181,16 +215,18 @@ IWICFormatConverter_Initialize(thisObj, pISource, dstFormat, dither, pIPalette, 
 
    pDstFormat := WIC_GUID(pGUID, dstFormat)
    ; msgbox, % dstFormat "`n" pDstFormat
-   hr := DllCall(vtable(thisObj, 20), "ptr", thisObj, "ptr", pISource, "ptr", pDstFormat, "uint", dither, "ptr", pIPalette, "double", alphaThresholdPercent, "uint", paletteTranslate)
+   hr := DllCall(vtable(thisObj, 8), "ptr", thisObj, "ptr", pISource, "ptr", pDstFormat, "uint", dither, "ptr", pIPalette, "double", alphaThresholdPercent, "uint", paletteTranslate)
    WIC_hr(hr, ErrorLevel, A_ThisFunc)
    Return hr
 }
 
-IWICFormatConverter_CanConvert(thisObj, srcPixelFormat, dstPixelFormat) {
+IWICFormatConverter_CanConvert(thisObj, srcPixelFormat, dstPixelFormat, ByRef pfCanConvert) {
    ; thisObj must be ppIFormatConverter
 
-   hr := DllCall(vtable(thisObj, 9), "ptr", thisObj, "ptr", srcPixelFormat, "ptr", dstPixelFormat, "ptr*", pfCanConvert)
-   WIC_hr(hr, ErrorLevel, A_ThisFunc "`npfCanConvert=0")
+   srcPixelFormat := WIC_GUID(pGUID, srcPixelFormat)
+   dstPixelFormat := WIC_GUID(pGUID, dstPixelFormat)
+   hr := DllCall(vtable(thisObj, 9), "ptr", thisObj, "ptr", srcPixelFormat, "ptr", dstPixelFormat, "int*", pfCanConvert)
+   WIC_hr(hr, ErrorLevel, A_ThisFunc "`npfCanConvert=" pfCanConvert)
    Return hr
 }
 
@@ -726,7 +762,7 @@ WIC_GUID(ByRef GUID, name) {
    if _.haskey(name)
    {
       p:=_[name]
-      VarSetCapacity(GUID,16)
+      VarSetCapacity(GUID,16, 0)
       ,NumPut(p.1+(p.2<<32)+(p.3<<48),GUID,0,"int64")
       ,NumPut(p.4+(p.5<<8)+(p.6<<16)+(p.7<<24)+(p.8<<32)+(p.9<<40)+(p.10<<48)+(p.11<<56),GUID,8,"int64")
       return &GUID

@@ -1,11 +1,14 @@
-﻿; Last update on: jeudi 14 janvier 2021 by Marius Șucan
+﻿; Last update on: vendredi 26 février 2021 by Marius Șucan
 ; Original Date: 2012-03-29
 ; Original Author: linpinger
 ; Original URL : http://www.autohotkey.net/~linpinger/index.html
-; This version available on Github: https://github.com/marius-sucan/Quick-Picto-Viewer
+; This version is available on Github: https://github.com/marius-sucan/Quick-Picto-Viewer
 
 ; Change log:
 ; =============================
+; 26 February 2021 by Marius Șucan
+; - implemented the multi-page functions
+
 ; 14 January 2021 by Marius Șucan
 ; - bug fixes - many thanks to TheArkive
 ;
@@ -22,7 +25,7 @@
 ; - Bug fixes and more in-line comments/information
 ;
 ; 6 August 2019 by Marius Șucan
-; - It now works with FreeImage v3.18 and AHK_L v1.1.30.
+; - It now works with FreeImage v3.18 and AHK_L v1.1.30+.
 ; - Added many new functions and cleaned up the code. Fixed bugs.
 
 FreeImage_FoxInit(isInit:=1) {
@@ -298,10 +301,6 @@ FreeImage_GetInfo(hImage) {
    Return DllCall(getFIMfunc("GetInfo"), "Uptr", hImage, "uptr")
 }
 
-FreeImage_GetPageCount(hImage) {
-   Return DllCall(getFIMfunc("FreeImage_GetPageCount"), "Uptr", hImage)
-}
-
 FreeImage_GetColorType(hImage, humanReadable:=1) {
 ; 0 = MINISWHITE  - Monochrome bitmap (1-bit) : first palette entry is white. Palletised bitmap (4 or 8-bit) - the bitmap has an inverted greyscale palette
 ; 1 = MINISBLACK - Monochrome bitmap (1-bit) : first palette entry is black. Palletised bitmap (4 or 8-bit) and single - channel non-standard bitmap: the bitmap has a greyscale palette
@@ -338,12 +337,12 @@ FreeImage_GetTransparencyTable(hImage) {
    Return DllCall(getFIMfunc("GetTransparencyTable"), "Uptr", hImage)
 }
 
-FreeImage_SetTransparencyTable(hImage, hTransTable, count=256) {
+FreeImage_SetTransparencyTable(hImage, hTransTable, count:=256) {
    Return DllCall(getFIMfunc("SetTransparencyTable"), "Uptr", hImage, "UintP", hTransTable, "Uint", count)
 } ; Untested
 
-FreeImage_SetTransparent(hImage, isEnable=1) {
-   Return DllCall(getFIMfunc("SetTransparent"), "Uptr", hImage, "Int", isEnable)
+FreeImage_SetTransparent(hImage, isEnabled) {
+   Return DllCall(getFIMfunc("SetTransparent"), "Uptr", hImage, "Int", isEnabled)
 }
 
 FreeImage_GetTransparentIndex(hImage) {
@@ -392,11 +391,11 @@ FreeImage_SetBackgroundColor(hImage, RGBArray:="255,255,255,0") {
 ; missing functions: GetFileTypeFromHandle, GetFileTypeFromMemory,
 ; and ValidateFromHandle, ValidateFromMemory
 
-FreeImage_GetFileType(ImPath, humanReadable:=0) {
+FreeImage_GetFileType(ImgPath, humanReadable:=0) {
    Static fileTypes := {0:"BMP", 1:"ICO", 2:"JPEG", 3:"JNG", 4:"KOALA", 5:"LBM", 5:"IFF", 6:"MNG", 7:"PBM", 8:"PBMRAW", 9:"PCD", 10:"PCX", 11:"PGM", 12:"PGMRAW", 13:"PNG", 14:"PPM", 15:"PPMRAW", 16:"RAS", 17:"TARGA", 18:"TIFF", 19:"WBMP", 20:"PSD", 21:"CUT", 22:"XBM", 23:"XPM", 24:"DDS", 25:"GIF", 26:"HDR", 27:"FAXG3", 28:"SGI", 29:"EXR", 30:"J2K", 31:"JP2", 32:"PFM", 33:"PICT", 34:"RAW", 35:"WEBP", 36:"JXR"}
-   r := DllCall(getFIMfunc("GetFileTypeU"), "WStr", ImPath, "Int", 0)
+   r := DllCall(getFIMfunc("GetFileTypeU"), "WStr", ImgPath, "Int", 0)
    If (r=-1)
-      r := FreeImage_GetFIFFromFilename(ImPath)
+      r := FreeImage_GetFIFFromFilename(ImgPath)
    If (humanReadable=1 && fileTypes.HasKey(r))
       r := fileTypes[r]
 
@@ -534,8 +533,60 @@ FreeImage_GetICCProfile(hImage) {
 ; 21 functions available in the FreeImage Library
 
 ; === Multipage bitmap functions ===
-; none implemented
-; 12 functions available in the FreeImage Library
+; Missing functions: FreeImage_GetLockedPageNumbers()
+
+FreeImage_OpenMultiBitmap(ImgPath, imgFormat, create_new:=0, read_only:=1, keep_cache:=1, flags:=0) {
+   Return DllCall(getFIMfunc("OpenMultiBitmap"), "int", imgFormat, "aStr", ImgPath, "int", create_new, "int", read_only, "int", keep_cache, "int", flags, "uptr")
+}
+
+FreeImage_CloseMultiBitmap(hFIMULTIBITMAP, flags:=0) {
+   Return DllCall(getFIMfunc("CloseMultiBitmap"), "UPtr", hFIMULTIBITMAP, "int", flags)
+}
+
+FreeImage_GetPageCount(hFIMULTIBITMAP) {
+   Return DllCall(getFIMfunc("GetPageCount"), "UPtr", hFIMULTIBITMAP)
+}
+
+FreeImage_SimpleGetPageCount(hImage) {
+   Return DllCall(getFIMfunc("FreeImage_GetPageCount"), "UPtr", hImage)
+}
+
+FreeImage_AppendPage(hFIMULTIBITMAP, hImage) {
+   Return DllCall(getFIMfunc("AppendPage"), "UPtr", hFIMULTIBITMAP, "UPtr", hImage)
+}
+
+FreeImage_InsertPage(hFIMULTIBITMAP, PageNumber, hImage) {
+   Return DllCall(getFIMfunc("InsertPage"), "UPtr", hFIMULTIBITMAP, "Int", PageNumber, "UPtr", hImage)
+}
+
+FreeImage_DeletePage(hFIMULTIBITMAP, PageNumber) {
+   Return DllCall(getFIMfunc("DeletePage"), "UPtr", hFIMULTIBITMAP, "Int", PageNumber)
+}
+
+FreeImage_MovePage(hFIMULTIBITMAP, Target, PageNumber) {
+   ; Moves the source page to the position of the target page. Returns TRUE on success, FALSE on failure.
+   Return DllCall(getFIMfunc("MovePage"), "UPtr", hFIMULTIBITMAP, "Int", Target, "Int", PageNumber)
+}
+
+FreeImage_LockPage(hFIMULTIBITMAP, PageNumber) {
+   ; Locks a page in memory for editing. The page can now be saved to a different file or inserted
+   ; into another multi-page bitmap. When you are done with the bitmap you have to call
+   ; FreeImage_UnlockPage to give the page back to the bitmap and/or apply any changes made
+   ; in the page. It is forbidden to use FreeImage_Unload on a locked page: you must use
+   ; FreeImage_UnlockPage instead
+
+   ; On succes, the function returns a common FIBITMAP.
+   Return DllCall(getFIMfunc("LockPage"), "UPtr", hFIMULTIBITMAP, "Int", PageNumber)
+}
+
+FreeImage_UnlockPage(hFIMULTIBITMAP, hImage, changed) {
+   ; Unlocks a previously locked page and gives it back to the multi-page engine. When the last
+   ; parameter is TRUE, the page is marked changed and the new page data is applied in the
+   ; multi-page bitmap.
+
+   Return DllCall(getFIMfunc("UnlockPage"), "UPtr", hFIMULTIBITMAP, "UPtr", hImage, "Int", changed)
+}
+
 
 ; === Memory I/O functions ===
 ; missing functions: LoadFromMemory, ReadMemory, WriteMemory,

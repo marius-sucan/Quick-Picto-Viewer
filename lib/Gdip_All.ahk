@@ -6034,6 +6034,15 @@ Gdip_CloneRegion(Region) {
 ;#####################################################################################
 
 Gdip_LockBits(pBitmap, x, y, w, h, ByRef Stride, ByRef Scan0, ByRef BitmapData, LockMode := 3, PixelFormat := 0x26200a) {
+/*
+BitmapData structure
+Width     UINT          Number of pixels in one scan line of the bitmap.
+Height    UINT          Number of scan lines in the bitmap.
+Stride    INT           Offset, in bytes, between consecutive scan lines of the bitmap. If the stride is positive, the bitmap is top-down. If the stride is negative, the bitmap is bottom-up.
+PixFmt    PixelFormat   Integer that specifies the pixel format of the bitmap.
+Scan0     void*         Pointer to the first (index 0) scan line of the bitmap.
+*/
+
    Static Ptr := "UPtr"
 
    CreateRect(_Rect, x, y, w, h)

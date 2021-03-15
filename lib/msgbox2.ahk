@@ -319,6 +319,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   {
      dropListu := Chr(160) StrReplace(dropListu, "`f", "`f" Chr(160))
      dropListu := StrReplace(dropListu, "`f" Chr(160) "`f", "`f`f")
+     dropListu := StrReplace(RTrim(dropListu, Chr(160)), "`f`f`f", "`f`f")
   }
 
   If (dropListu && DropListMode=0)
@@ -332,6 +333,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   {
      2ndDropListu := Chr(160) StrReplace(2ndDropListu, "`f", "`f" Chr(160))
      2ndDropListu := StrReplace(2ndDropListu, "`f" Chr(160) "`f", "`f`f")
+     2ndDropListu := StrReplace(RTrim(2ndDropListu, Chr(160)), "`f`f`f", "`f`f")
   }
 
   If (2ndDropListu && 2ndDropListMode=0)

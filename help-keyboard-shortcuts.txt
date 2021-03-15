@@ -90,6 +90,7 @@ Ctrl + Wheel Down|Zoom out|Anywhere|-
 Ctrl + Wheel Up|Zoom in|Anywhere|-
 D|Hide live previewed dynamic object|Live editing|-
 E|Toggle edit image selection area|Image view|-
+E|Select files in same folder|Files list|-
 Delete|Delete file(s)|Anywhere|Panel
 Delete|Fade/erase image selected area|Image selection area|Panel
 Enter|Switch between image list and image view|Anywhere|Mode switch

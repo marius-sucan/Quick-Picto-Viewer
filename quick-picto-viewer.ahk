@@ -1,4 +1,4 @@
-; Original script details:
+﻿; Original script details:
 ;   Name:     AHK Picture Viewer
 ;   Version:  1.0.0 on Oct 4, 2010 by SBC
 ;   Platform: Windows XP or later
@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 4.9.2
+;@Ahk2Exe-SetVersion 4.9.6
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2020)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -119,7 +119,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , prevFileSavePath := "", imgHUDbaseUnit := Round(OSDfntSize*2.5), lastLongOperationAbort := 1
    , lastOtherWinClose := 1, UsrCopyMoveOperation := 2, editingSelectionNow := 0, EntryMarkedMoveIndex := 0
    , ForceNoColorMatrix := 0, prevFastDisplay := 1, hSNDmediaDuration, lastMenuBarUpdated := 1
-   , imgSelX1 := 0, imgSelY1 := 0, imgSelX2 := -1, imgSelY2 := -1, adjustNowSel := 0
+   , imgSelX1 := 0, imgSelY1 := 0, imgSelX2 := -1, imgSelY2 := -1, adjustNowSel := 0, hasHamDistCached := 0
    , prevImgSelX1 := 0, prevImgSelY1 := 0, prevImgSelX2 := -1, prevImgSelY2 := -1, prevSelDotX := "", prevSelDotY := "", prevSelDotAx := "", prevSelDotAy := ""
    , selDotX := "", selDotY := "", selDotAx := "", selDotAy := "", selDotBx := "", selDotBy := "", selDotCx := "", selDotCy := "", selDotDx := "", selDotDy := ""
    , prcSelX1 := 0, prcSelX2 := 0.5, prcSelY1 := 0, prcSelY2 := 0.5, PannedFastDisplay := 1, pBrushF := ""
@@ -159,13 +159,14 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , HUDobjNavBoxu := [], HUDobjHistoBoxu := [], globalhFIFimg := 0, userAddedFavesCount := 0, bckpCurrentFileIndex := 0
    , maxFavesEntries := 98765, gdipLastError := 0, hasDrawnImageMap := 0, hasDrawnHistoMap := 0, lastZeitFileSelect := 1
    , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0, mustSnapLiveDrawPoints := 0
-   , QPVpid := GetCurrentProcessId(), preventUndoLevels := 0, maxMemUndoLevels := 979394, delayiedHUDmsg := ""
+   , QPVpid := GetCurrentProcessId(), preventUndoLevels := 0, maxMemUndoLevels := 979394, delayiedHUDmsg := "", hamLowLim := 0, hamUppLim := 0
    , delayiedHUDperc := 0, delayedfunc2exec := 0, lastOSDtooltipInvoked := 1, lastTimeToggleThumbs := 1, dupesStringFilter := ""
    , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := [], countGDIobjects := 0, uiPasteInPlaceAlphaFile
    , oldCustomShape := [], TVlistFolders, hfdTreeWinGui, folderTreeWinOpen := 0, VPstampBMPx := 0, VPstampBMPy := 0
-   , reviewSelectedIndexes := [], toBeExcludedIndexes := []
+   , reviewSelectedIndexes := [], toBeExcludedIndexes := [], fimMultiPage := 0, fimMultiBMP := 0, staticlistViewFilteru
+   , listViewReviewFilteru := ""
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "4.9.2", vReleaseDate := "22/02/2021"
+   , appVersion := "4.9.6", vReleaseDate := "15/03/2021"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -247,7 +248,9 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , DesatureAreaHue := 0, DesatureAreaAlternate := 0, skipSeenImageSlides := 0, blurAreaSoftLevel := 2
    , BlurAreaBlendMode := 1, PasteInPlaceBlurEdgesSoft := 0, preventDeleteMatchingSearch := 0
    , protectedFolderPath := "", preventDeleteFromProtectedPath := 0, preventDeleteFromProtectedSubPaths := 0
-   , excludePreviousDupesFromList := 0
+   , excludePreviousDupesFromList := 0, userFindDupesHamDistLvl := 1, userFindDupesFilterHamDist := 0
+   , userFilterInvertThis := 0, UserHamDistStringFilter := "", UserHamDistCacheFilterMonoGroups := 1
+   , UserHamDistStringInvert := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -409,21 +412,15 @@ HKifs(q:=0) {
     Return
 
     w::   ; to-do  to do
-       ;  testMemCrash()
-     ; a := "0x" ConvertBase(2, 16, "0100110110010110010010010010110010100010001000011111110101110101")
-     ; b := "0x" ConvertBase(2, 16, "0101110110010110010010010010110010100010001000011011110101110111")
-   ; x:= HammingDistanceNew2020dec(a, b)
-   ; x:= HammingDistanceNew2020dec("0x4D96492CA221FD75","0x6D96493CA221BD75")
-   ; ToolTip, % a "`n" b "`n" d "`n" g "`n" z "`n" x , , , 2
-     ; crapBIGcrap()
+; msgbox, % calculateNCR2(10201) ; OSD: looping... 10 202......0... combin=52025101
      ; reorderStoredHash("010110000010101011111001111101010111", "1001011011111111010010010101")
     ; If !activeSQLdb.Exec("ALTER TABLE images ADD entireHush TEXT;")
        ; TEMPgenerateHush()
     ; ToolTip, % extractSQLqueryFromFilter() , , , 2
-            ; SoundBeep 
+            ; PanelChangeHamDistThreshold()
+            ; testWicArkive()
     ; testWICwhatever()
    ; ; testWICresizeSpeed()
-   ;     testArkive()
     Sleep, 1
     Return
 
@@ -620,7 +617,9 @@ HKifs(q:=0) {
     Return
 
     vk45::   ; E
-      If (HKifs("liveEdit") && AnyWindowOpen!=10)
+      If (thumbsDisplaying=1)
+         QuickSelectFilesSameFolder()
+      Else If (HKifs("liveEdit") && AnyWindowOpen!=10)
          livePreviewsImageEditing(1, 1)
       Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
       {
@@ -1684,10 +1683,13 @@ initQPVmainDLL() {
       Return
 
    DllPath := FreeImage_FoxGetDllPath("qpvmain.dll")
-   ; If (A_PtrSize=8)
-   ;    DllPath := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\cPlusPlus\qpv-main\x64\Release\qpvmain.dll"
-   ; Else
-   ;    DllPath := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\cPlusPlus\qpv-main\Release\qpvmain.dll"
+   If (InStr(A_ScriptDir, "sucan twins") && !A_IsCompiled)
+   {
+      If (A_PtrSize=8)
+         DllPath := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\cPlusPlus\qpv-main\x64\Release\qpvmain.dll"
+      Else
+         DllPath := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\cPlusPlus\qpv-main\Release\qpvmain.dll"
+   }
    qpvMainDll := DllCall("LoadLibraryW", "WStr", DllPath, "UPtr")
 }
 
@@ -1938,7 +1940,7 @@ activateFilesListFilterBasedOnFolder(thisIndex) {
    userFilterProperty := userFilterDoString := 1
    userFilterWhat := 2
    userFilterStringPos := 3
-   userFilterStringIsNot := 0
+   userFilterInvertThis := userFilterStringIsNot := 0
    UsrEditFilter := OutDir
    thisFilter := updateUIFiltersPanel("external")
    coreEnableFiltru(thisFilter)
@@ -1978,7 +1980,7 @@ OpenThisFileFolder() {
        Catch wasError
        {
           If !AnyWindowOpen
-             msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening the folder:`n" folderu, 0, 0, "error")
+             msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening the folder:`n" folderu "\", 0, 0, "error")
        }
     }
 }
@@ -4850,7 +4852,11 @@ dummyInfoToggleSlideShowu(actu:=0) {
      etaTime := "`nEstimated time: " EstimateSlideShowLength()
      If (slidesFXrandomize=1)
         infosFX := "`nViewport colour effects are randomized for each image."
-     showTOOLtip("Started " friendly " slideshow`nSpeed: " delayu "`nTotal files: " groupDigits(maxFilesIndex) etaTime infosFX)
+
+     If (skipSeenImageSlides=1)
+        skippy := "`nAlready seen images will be skipped"
+
+     showTOOLtip("Started " friendly " slideshow`nSpeed: " delayu "`nTotal files: " groupDigits(maxFilesIndex) etaTime infosFX skippy)
      SetTimer, RemoveTooltip, % -msgDisplayTime, 900
      If (slideShowDelay < 900)
      {
@@ -5936,16 +5942,20 @@ changeDesiredFrame(dir:=1) {
 
    value2Adjust := clampInRange(value2Adjust, 0, totalFramesIndex, 1)
    desiredFrameIndex := value2Adjust
-   If (A_TickCount - lastInvoked > 350) || (dir=-1)
+   If (A_TickCount - lastInvoked > 350) || (dir=-1 || drawModeCzeit>450)
    {
       showCurrentFrameIndex()
       lastInvoked := A_TickCount
    } Else SetTimer, showCurrentFrameIndex, -400
 
-   newValues := value2Adjust currentFileIndex
+   newValues := "a" value2Adjust currentFileIndex totalFramesIndex
    If (prevValues!=newValues)
    {
-      SetTimer, RefreshImageFile, % (dir=-1) ? -95 : -5
+      ; ToolTip, % drawModeCzeit "==" drawModeAzeit "==" drawModeBzeit , , , 2
+      If (drawModeCzeit>450)
+         SetTimer, RefreshImageFile, -450
+      Else
+         SetTimer, RefreshImageFile, % (dir=-1) ? -95 : -5
       prevValues := newValues
    }
 }
@@ -5970,6 +5980,8 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
       }
       Return
    }
+   If (alwaysOpenwithFIM=1)
+      Return
 
    If (prevImgPath!=imgPath && StrLen(imgPath)>2)
       lastInvoked := A_TickCount
@@ -7347,7 +7359,7 @@ QPV_SetGivenAlphaLevel(pBitmap, givenLevel, fillMissingOnly, threads:=0) {
   }
 
   E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData)
-  func2exec := (A_PtrSize=8) ? "SetGivenAlphaLevel" : "_SetGivenAlphaLevel@32"
+  func2exec := (A_PtrSize=8) ? "SetGivenAlphaLevel" : "_SetGivenAlphaLevel@24"
   If !E1
      r := DllCall("qpvmain.dll\" func2exec, "UPtr", iScan, "Int", w, "Int", h, "Int", givenLevel, "Int", fillMissingOnly, "Int", threads)
 
@@ -7382,7 +7394,7 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, threads) {
      Gdip_UnlockBits(pBitmap, iData)
   If !E2
      Gdip_UnlockBits(pBitmap2Blend, mData)
-  ; ToolTip, % "r=" r " ; qpv == " A_TickCount - thisStartZeit, , , 2
+  ; ToolTip, % "r=" r " =qpv= " A_TickCount - thisStartZeit, , , 2
   return r
 }
 
@@ -11745,6 +11757,13 @@ SettingsToolTips() {
    If !hwnd
       ControlGetText, info, , ahk_id %controla%
 
+   If !hotkeyu
+   {
+      If (posuk := InStr(info, "&"))
+         hotkeyu := "`nAlt+" SubStr(info, posuk + 1, 1)
+   }
+
+   info := StrReplace(info, "&")
    WinGetClass, OutputVar, ahk_id %hwnd%
    If OutputVar
    {
@@ -11776,7 +11795,7 @@ SettingsToolTips() {
          controlType := "`n[" OutputVar "]"
    }
 
-   msg2show := info value A_GuiControl controlType hotkeyu
+   msg2show := info value ctrlu controlType hotkeyu
    ; ToolTip, % A_DefaultGUI "===" msg2show , , , 2
    ; If (ctrlActiveState!=1 && StrLen(msg2show)>2 && btnType)
    ;    msg2show .= "`n[CONTROL DISABLED]"
@@ -11974,7 +11993,7 @@ mouseCreateOSDinfoLine(msg:=0, largus:=0) {
     Gui, mouseToolTipGuia: Margin, % thisFntSize, % thisFntSize
     Gui, mouseToolTipGuia: Color, c%bgrColor%
     Gui, mouseToolTipGuia: Font, s%thisFntSize% %isBold% Q5, %OSDFontName%
-    Gui, mouseToolTipGuia: Add, Text, c%txtColor% gmouseTurnOFFtooltip vTippyMsg, %msg%
+    Gui, mouseToolTipGuia: Add, Text, 0x80 c%txtColor% gmouseTurnOFFtooltip vTippyMsg, %msg%
     Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPVOguiTipsWin
 
     GetPhysicalCursorPos(mX, mY)
@@ -11986,7 +12005,7 @@ mouseCreateOSDinfoLine(msg:=0, largus:=0) {
     {
        GuiControl, mouseToolTipGuia: Move, TippyMsg, w1 h1
        GuiControl, mouseToolTipGuia:, TippyMsg,
-       Gui, mouseToolTipGuia: Add, Text, xp yp c%txtColor% gmouseTurnOFFtooltip w%MaxWidth%, %msg%
+       Gui, mouseToolTipGuia: Add, Text, 0x80 xp yp c%txtColor% gmouseTurnOFFtooltip w%MaxWidth%, %msg%
        Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPVguiTipsWin
        ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
     }
@@ -12275,12 +12294,18 @@ PanelWrapperFilesStats() {
     Gui, Add, Text, y+5, Image fingerprints and properties are collected as well.
 
     Gui, Tab
-    Gui, Add, Button, xs y+35 w90 h%thisBtnHeight% gBtnCloseWindow, C&lose
-    Gui, Add, Button, x+5 h%thisBtnHeight% gPanelEnableFilesFilter, &Create custom filter
+    Gui, Add, Button, xs y+35 h%thisBtnHeight% gPanelEnableFilesFilter, C&reate custom filter
     If (SLDtypeLoaded=3)
-       Gui, Add, Button, x+5 hp gPanelPurgeCachedSQLdata, Purge cached data
+       Gui, Add, Button, x+5 hp gBtnPurgeCachedSQLdata, Pur&ge cached data
+    Gui, Add, Button, x+5 w90 hp gBtnCloseWindow, C&lose
 
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Statistics: " appTitle)
+}
+
+BtnPurgeCachedSQLdata() {
+   BtnCloseWindow()
+   AnyWindowOpen := 49
+   PanelPurgeCachedSQLdata()
 }
 
 SeenStatsLVaction(CtrlHwnd:=0) {
@@ -12349,8 +12374,9 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
             } Else
             {
                UsrEditFilter := "(\." dateu ")$"
-               userFilterProperty := userFilterWhat := userFilterDoString := 1
+               userFilterInvertThis := 0
                userFilterStringPos := 4
+               userFilterProperty := userFilterWhat := userFilterDoString := 1
                coreEnableFiltru("\>" UsrEditFilter)
                Return
             }
@@ -12384,7 +12410,7 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
          If InStr(LVvaru, "metaM")
          {
             userFilterProperty := 9
-            userFilterDoString := 0
+            userFilterInvertThis := userFilterDoString := 0
             FilteruMinRange := FilteruMaxRange := Round(dateu)
             theQuery := "WHERE imgframes='" dateu "'"
             theQueryNonDB := "QPV::query::imgframes::" dateu ":: " dateu
@@ -12396,7 +12422,7 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
          } Else If InStr(LVvaru, "metaD")
          {
             userFilterProperty := 5
-            userFilterDoString := 0
+            userFilterInvertThis := userFilterDoString := 0
             FilteruMinRange := Floor(dateu)
             FilteruMAxRange := Ceil(dateu)
             theQuery := "WHERE Round(imgmegapix, 1) BETWEEN " dateu " AND " dateu
@@ -12404,13 +12430,13 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
          } Else If InStr(LVvaru, "metaU")
          {
             userFilterProperty := 10
-            userFilterDoString := 0
+            userFilterInvertThis := userFilterDoString := 0
             FilteruMinRange := FilteruMAxRange := Round(dateu)
             theQuery := "WHERE imgdpi='" dateu "'"
             theQueryNonDB := "QPV::query::imgdpi::" dateu "::" dateu
          } Else If InStr(LVvaru, "metaY")
          {
-            userFilterProperty := 8
+            userFilterInvertThis := userFilterProperty := 8
             FilteruMinRange := Round(dateu*10)
             FilteruMAxRange := Round(dateu*10)
             theQuery := "WHERE Round(imgwhratio, 1) BETWEEN " dateu " AND " dateu
@@ -12439,7 +12465,7 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
                dataColumn := "imgmedian"
             }
 
-            userFilterDoString := 0
+            userFilterInvertThis := userFilterDoString := 0
             FilteruMinRange := Round(minRange)
             FilteruMaxRange := Round(maxRange)
             minRange := Round((minRange + 1)/256, 3)
@@ -12452,7 +12478,7 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
          If (InStr(LVvaru, "metaD") || InStr(LVvaru, "metaM") || InStr(LVvaru, "metaY") || InStr(LVvaru, "LIKE"))
          {
             userFilterProperty := 3
-            userFilterDoString := 0
+            userFilterInvertThis := userFilterDoString := 0
             FilteruDateMaxRange := FilteruDateMinRange := Format("{1}{2:" k "}", dateu, 0)
             theQuery := "WHERE " dataColumn " LIKE '" dateu "%'"
             theQueryNonDB := "QPV::query::" dataColumn "::" FilteruDateMinRange "::" FilteruDateMaxRange
@@ -12461,7 +12487,7 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
          {
             userFilterProperty := 2
             userFilterSizeProperty := 1
-            userFilterDoString := 0
+            userFilterInvertThis := userFilterDoString := 0
             FilteruMinRange := Round(minRange/1024)
             FilteruMaxRange := Round(maxRange/1024)
             theQuery := "WHERE " dataColumn " BETWEEN " minRange " AND " maxRange
@@ -12806,19 +12832,19 @@ ETAinfos(countTFilez, filesElected, startOperation) {
    theSum := 0
    loops := prevTimes.Count()
    Loop, % loops
-       theSum += prevTimes[A_Index, 1]
+       theSum += Round(prevTimes[A_Index, 1])
 
    theAvg := Round(theSum/loops, 6)
    If prevAvg
       theAvg := Round((prevAvg+theAvg)/2, 6)
 
    prevAvg := theAvg
-   intervalA := prevTimes[2, 2] - prevTimes[1, 2]
-   intervalB := prevTimes[3, 2] - prevTimes[2, 2]
-   intervalC := prevTimes[4, 2] - prevTimes[3, 2]
+   prevTotal := filesElected
+   intervalA := Round(prevTimes[2, 2] - prevTimes[1, 2])
+   intervalB := Round(prevTimes[3, 2] - prevTimes[2, 2])
+   intervalC := Round(prevTimes[4, 2] - prevTimes[3, 2])
    interval := Round((1 + intervalA + intervalB + intervalC)/3, 6)
    zeitLeftA := Round(((filesElected - countTFilez)/theAvg)*interval)
-   prevTotal := filesElected
    ; ToolTip, % loops " == " prevTick " == " theSum " == " theAvg , , , 2
 
    prevTick := clampInRange(prevTick, 1, 4)
@@ -12838,7 +12864,9 @@ ETAinfos(countTFilez, filesElected, startOperation) {
    Else
       zeitC := zeitLeftA
 
-   zeitF := prevZeit ? (zeitC + prevZeit)/2 : zeitC
+   zeitF := prevZeit ? (Round(zeitC) + Round(prevZeit))/2 : zeitC
+   If !zeitF
+      zeitF := zeitLeftB
    prevZeit := zeitC
    etaTime .= "`nEstimated time left: " SecToHHMMSS(Round(zeitF/1000, 3))
    ; etaTime .= "`nEstimated B time left: " SecToHHMMSS(Round(zeitLeft2/1000, 3))
@@ -13216,7 +13244,8 @@ PopulateIndexFilesStatsInfos(dummy:=0) {
   {
       stringu := ST_Insert("-", SubStr(Value[2], 2), 5)
       stringu := ST_Insert("-", stringu, 8)
-      LV_Add(A_Index, A_Index, stringu, Value[1], Round((Value[1]/thisMaxCount)*100, 1))
+      If (Value[1]>1)
+         LV_Add(A_Index, A_Index, stringu, Value[1], Round((Value[1]/thisMaxCount)*100, 1))
   }
 
   Loop, 4
@@ -13292,6 +13321,66 @@ PopulateIndexFilesStatsInfos(dummy:=0) {
   SetTimer, ResetImgLoadStatus, -200
 }
 
+retrieveGroupSQLimgInfos(which, thisGroup, totalgroups, constrain:="imgwidth") {
+   showTOOLtip("Retrieving statistics from the database, please wait`n" thisGroup " / " totalgroups " ( " which " )", 0, 0, thisGroup/totalgroups)
+   SQL := "SELECT " which ", Count(*) FROM images WHERE " constrain " IS NOT NULL GROUP BY " which ";"
+   If activeSQLdb.GetTable(SQL, RecordSet)
+   {
+      newArrayu := []
+      Loop, % RecordSet.RowCount
+      {
+         Rowu := RecordSet.Rows[A_Index]
+         If (Rowu[1]!="")
+            newArrayu[A_Index] := [Rowu[2], Rowu[1]]
+      }
+
+      RecordSet.Free()
+      Return newArrayu
+   }
+}
+
+retrieveHistoGroupSQLimgInfos(which, thisGroup, totalgroups, constrain:="imgavg") {
+   showTOOLtip("Retrieving statistics from the database, please wait`n" thisGroup " / " totalgroups " ( " which " )", 0, 0, thisGroup/totalgroups)
+   SQL := "SELECT Round(" which "*256), Count(*) FROM images WHERE " constrain " IS NOT NULL GROUP BY " which ";"
+   entriezHM1 := entriezHM2 := entriezHM3 := entriezHM4 := entriezHM5 := 0
+   If activeSQLdb.GetTable(SQL, RecordSet)
+   {
+      entriesG := []
+      Loop, % RecordSet.RowCount
+      {
+         Rowu := RecordSet.Rows[A_Index]
+         If (Rowu[1]!="")
+         {
+            hmed := Rowu[1]
+            If isInRange(hmed, 0, 50)
+            {
+               entriezHM1 := entriezHM1 + Rowu[2]
+               entriesG[1] := [entriezHM1, "0-50"]
+            } Else If isInRange(hmed, 50, 100)
+            {
+               entriezHM2 := entriezHM2 + Rowu[2]
+               entriesG[2] := [entriezHM2, "50-100"]
+            } Else If isInRange(hmed, 100, 150)
+            {
+               entriezHM3 := entriezHM3 + Rowu[2]
+               entriesG[3] := [entriezHM3, "100-150"]
+            } Else If isInRange(hmed, 150, 200)
+            {
+               entriezHM4 := entriezHM4 + Rowu[2]
+               entriesG[4] := [entriezHM4, "150-200"]
+            } Else If isInRange(hmed, 200, 256)
+            {
+               entriezHM5 := entriezHM5 + Rowu[2]
+               entriesG[5] := [entriezHM5, "200-255"]
+            }
+         }
+      }
+
+      RecordSet.Free()
+      Return entriesG
+   }
+}
+
 PopulateImagesIndexStatsInfos(dummy:=0) {
   Static entriesR, entriesD, entriesS, entriesU, entriesM, entriesY, entriesT, entriesA, entriesI, entriesG, prevState, entriesCount, prevMaxu
 
@@ -13301,7 +13390,7 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
   If (dummy!="kill")
   {
      doStartLongOpDance()
-     showTOOLtip("Generating statistics, please wait`n0/" groupDigits(thisMaxCount))
+     showTOOLtip("Generating statistics on images details, please wait`n0/" groupDigits(thisMaxCount))
      setImageLoading()
      thisState := "z" CurrentSLD DynamicFoldersList SLDtypeLoaded thisMaxCount
   } Else prevState := ""
@@ -13326,23 +13415,30 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
 
      If (SLDtypeLoaded=3)
      {
-        SQL := "SELECT imgframes, imgpixfmt, Round(imgmegapix, 1), Round(imgwhratio, 1), imgavg, imgmedian, imghpeak, imghlow, imghrange, imgdpi FROM images WHERE imgwidth IS NOT NULL;"
-        yay := RecordSet := ""
-        If !activeSQLdb.GetTable(SQL, RecordSet)
-        {
-           fnOutputDebug(A_ThisFunc "() - failed query in database: " fullPath)
+        prevMaxu := getTotalIMGsSQLdb()
+        ; prevMaxu := getTotalIMGsSQLdb("WHERE imgwidth IS NOT NULL")
+        thisMaxCount := prevMaxu
+        If !prevMaxu
            Return 0
-        }
-        ; ToolTip, % "l= " RecordSet.RowCount , , , 2
-        thisMaxCount := RecordSet.RowCount
-        prevMaxu := thisMaxCount
-        If !thisMaxCount
-           Return 0
+
+        entriesS := retrieveGroupSQLimgInfos("imgpixfmt", 2, 12)
+        entriesM := retrieveGroupSQLimgInfos("imgframes", 3, 12)
+        entriesU := retrieveGroupSQLimgInfos("imgdpi", 4, 12)
+        entriesD := retrieveGroupSQLimgInfos("Round(imgmegapix, 1)", 5, 12)
+        entriesY := retrieveGroupSQLimgInfos("Round(imgwhratio, 1)", 6, 12)
+        entriesT := retrieveHistoGroupSQLimgInfos("imgavg", 7, 12)
+        entriesG := retrieveHistoGroupSQLimgInfos("imgmedian", 8, 12)
+        entriesA := retrieveHistoGroupSQLimgInfos("imghpeak", 9, 12)
+        entriesI := retrieveHistoGroupSQLimgInfos("imghlow", 10, 12)
+        entriesR := retrieveHistoGroupSQLimgInfos("imghrange", 11, 12)
      }
 
      prevMSGdisplay := A_TickCount
      Loop, % thisMaxCount
      {
+         If (SLDtypeLoaded=3)
+            Break
+
          If (A_TickCount - prevMSGdisplay>1000)
          {
             etaTime := ETAinfos(A_Index, thisMaxCount, startZeit)
@@ -13351,20 +13447,7 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
          }
 
          entriesCount++
-         If (SLDtypeLoaded=3)
-         {
-            Rowu := RecordSet.Rows[A_Index]
-            mgpx := Rowu[3]
-            frames := Rowu[1]
-            ratio := Rowu[4]
-            pixfmt := Rowu[2]
-            havg := Rowu[5]
-            hmed := Rowu[6]
-            hpeak := Rowu[7]
-            hlow := Rowu[8]
-            hrange := Rowu[9]
-            dpiu := Rowu[10]
-         } Else If (isFilter=1)
+         If (isFilter=1)
          {
             mgpx := bckpResultedFilesList[A_Index, 17]
             frames := bckpResultedFilesList[A_Index, 9]
@@ -13390,8 +13473,6 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
             hrange := resultedFilesList[A_Index, 25]
          }
 
-         mgpx := Round(mgpx, 1)
-         ratio := Round(ratio, 1)
          havg := Round(256*havg)
          hmed := Round(256*hmed)
          hpeak := Round(256*hpeak)
@@ -13507,6 +13588,8 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
             entriesR[5] := [entriezHR5, "200-255"]
          }
 
+         mgpx := Round(mgpx, 1)
+         ratio := Round(ratio, 1)
          pixu := "z" StringToASC(pixfmt)
          ratiou := StrReplace(ratio, ".", "q")
          mgpxu := StrReplace(mgpx, ".", "q")
@@ -13537,6 +13620,13 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
 
   If (SLDtypeLoaded=3 && prevMaxu)
      thisMaxCount := prevMaxu
+
+  If (SLDtypeLoaded=3)
+  {
+     entriesCount := 0
+     Loop, % entriesD.Count()
+        entriesCount += entriesD[A_Index, 1]
+  }
 
   entriesCount := StrReplace(entriesCount, A_Space)
   If (abandonAll=1)
@@ -13662,10 +13752,10 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
   ; LV_ModifyCol(3, "SortDesc")
 
   thisMaxCount := StrLen(filesFilter)>2 ? bckpMaxFilesIndex : maxFilesIndex
-  percDone := " ( " Round((entriesCount / thisMaxCount) * 100, 1) "% )"
+  percDone := " (" Round((entriesCount / thisMaxCount) * 100, 1) "%)"
   entriesCount := groupDigits(entriesCount)
   thisMaxCount := groupDigits(thisMaxCount)
-  GuiControl, SettingsGUIA:, infoLine, Total indexed images: %entriesCount% / %thisMaxCount%%percDone%
+  GuiControl, SettingsGUIA:, infoLine, Indexed images: %entriesCount% / %thisMaxCount%%percDone%
   zeitOperation := A_TickCount - startZeit
   addJournalEntry(A_ThisFunc "() operation elapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)))
   SetTimer, ResetImgLoadStatus, -200
@@ -13754,7 +13844,8 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
   {
       stringu := ST_Insert("-", Value[2], 5)
       stringu := ST_Insert("-", stringu, 8)
-      LV_Add(A_Index, A_Index, stringu, Value[1], Round((Value[1]/thisMaxCount)*100, 1))
+      If (Value[1]>1)
+         LV_Add(A_Index, A_Index, stringu, Value[1], Round((Value[1]/thisMaxCount)*100, 1))
   }
 
   Loop, 4
@@ -14107,9 +14198,13 @@ folderTreeDefaultAction() {
             msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening the folder:`n" folderu, 0, 0, "error")
       }
    } Else If (z=2 && folderPath)
+   {
       OpenNewQPVinstance(folderPath)
-   Else If folderPath
+   } Else If folderPath
+   {
       tryOpenGivenFolder(folderPath, CurrentSLD)
+      FileExploreSiblingsNav("reset")
+   }
 
    Sleep, 1
    WinActivate, ahk_id %hfdTreeWinGui%
@@ -15215,7 +15310,7 @@ Trimmer(string, whatTrim:="") {
    If (whatTrim!="")
       string := Trim(string, whatTrim)
    Else
-      string := Trim(string, "`r `n `t`f`v`b")
+      string := Trim(string, "`r`n `t`f`v`b")
    Return string
 }
 
@@ -15413,6 +15508,7 @@ PanelEnableFilesFilter() {
     Gui, Add, DropDownList, x+5 wp gupdateUIFiltersPanel AltSubmit Choose%userFilterSizeProperty% vuserFilterSizeProperty, Kilobytes`nMegabytes
     Gui, Add, DateTime, xs y+7 wp gupdateUIFiltersPanel vFilteruDateMinRange, yyyy/MM/dd
     Gui, Add, DateTime, x+5 wp gupdateUIFiltersPanel vFilteruDateMaxRange, yyyy/MM/dd
+    Gui, Add, Checkbox, xs y+7 gupdateUIFiltersPanel Checked%userFilterInvertThis% vuserFilterInvertThis, &Invert filter
     Gui, Tab
     Gui, Add, Edit, xs y+10 w%EditWid% r2 +0x0800 vInternalFilterString, % filesFilter
     ; Gui, Add, Text, y+7 w%txtWid%, Tip: you can begin the string with \> to use RegEx.
@@ -15466,6 +15562,7 @@ updateUIFiltersPanel(dummy:=0) {
       GuiControlGet, userFilterWhat
       GuiControlGet, userFilterProperty
       GuiControlGet, userFilterSizeProperty
+      GuiControlGet, userFilterInvertThis
       GuiControlGet, FilteruMinRange
       GuiControlGet, FilteruMaxRange
       GuiControlGet, FilteruDateMaxRange
@@ -15491,6 +15588,11 @@ updateUIFiltersPanel(dummy:=0) {
       GuiControl, % actu, UsrEditFilter
       GuiControl, % actu, btnFldr
       GuiControl, % actu, btnFldr2
+
+      If (userFilterProperty=1 || userFilterProperty=19)
+         GuiControl, SettingsGUIA: Disable,  userFilterInvertThis
+      Else
+         GuiControl, SettingsGUIA: Enable,  userFilterInvertThis
 
       If (userFilterProperty=2)
          GuiControl, SettingsGUIA: Enable,  userFilterSizeProperty
@@ -15599,7 +15701,11 @@ updateUIFiltersPanel(dummy:=0) {
 
          If (userFilterWhat=3)
             2ndColumn := "imgfile"
-         finalFilteru := "SQL:query:WHERE " columnu " BETWEEN " minRange " AND " maxRange
+
+         If (userFilterInvertThis=1)
+            invertor := " NOT "
+
+         finalFilteru := "SQL:query:WHERE " columnu invertor " BETWEEN " minRange " AND " maxRange
          If thisStringFilter
             finalFilteru .= " AND " 2ndColumn isOrNot " LIKE '" thisStringFilter "' ESCAPE '>'"
       } Else
@@ -15638,6 +15744,7 @@ updateUIFiltersPanel(dummy:=0) {
 BtnApplyFilesFilter() {
    Gui, SettingsGUIA: Default
    GuiControlGet, UsrEditFilter
+   GuiControlGet, userFilterInvertThis
    newFilter := updateUIFiltersPanel()
    Gui, SettingsGUIA: Submit, NoHide
    If !newFilter
@@ -15864,7 +15971,7 @@ coreEnableFiltru(stringu, noStringProcessing:=0) {
   If (maxFilesIndex<1)
   {
      SoundBeep, 300, 100
-     msgBoxWrapper(appTitle ": WARNING", "No files matched your filtering criteria:`n" stringu "`n`nThe application will now restore the complete list of files.", 0, 1, "exclamation")
+     msgBoxWrapper(appTitle ": WARNING", "No files matched your filtering criteria:`n" stringu "`n`nQPV will now restore the complete list of files.", 0, 1, "exclamation")
      filesFilter := ""
      FilterFilesIndex(0, 0, 0)
   } Else SoundBeep, 900, 100
@@ -15993,6 +16100,7 @@ FilterFilesIndex(thereWasFilter:=0, doExactFolderMatch:=0, prevFilter:="") {
       }
    } Else
    {
+      isStrFilter := StrLen(filesFilter)>1 ? 1 : 0
       Loop, % bckpMaxFilesIndex + 1
       {
             r := bckpResultedFilesList[A_Index, 1]
@@ -16048,9 +16156,13 @@ FilterFilesIndex(thereWasFilter:=0, doExactFolderMatch:=0, prevFilter:="") {
                      valu := bckpResultedFilesList[A_Index, 27]
                }
 
-               If !isInRange(valu, queryMin, queryMax)
+               zuza := isInRange(valu, queryMin, queryMax)
+               If (userFilterInvertThis=1)
+                  zuza := !zuza
+
+               If !zuza
                   Continue
-            } Else If StrLen(filesFilter)>1
+            } Else If (isStrFilter=1)
             {
                If !coreSearchIndex(r, filesFilter, userFilterWhat, userFilterStringIsNot)
                   Continue
@@ -16061,7 +16173,7 @@ FilterFilesIndex(thereWasFilter:=0, doExactFolderMatch:=0, prevFilter:="") {
             If bckpResultedFilesList[A_Index, 2]
                selectedFiles++
 
-            If StrLen(filesFilter)>1
+            If (isStrFilter=1)
                newMappingList[newFilesIndex] := A_Index
       }
    }
@@ -16090,7 +16202,7 @@ throwMSGwriteError() {
 }
 
 updateMainUnfilteredList(indexu, indexProperty, value) {
-   If (SLDtypeLoaded=3)
+   If (SLDtypeLoaded=3 && hasHamDistCached!=1)
    {
       If InStr(filesFilter, "SQL:query:")
          Return
@@ -16134,7 +16246,7 @@ InListMultiEntriesRemover(dummy:=0, dontAsk:=0) {
    newFilesIndex := 0
    newFilesList := []
    newMappingList := []
-   updateMainu := (StrLen(filesFilter)>1 && !InStr(filesFilter, "SQL:query:")) ? 1 : 0
+   updateMainu := (StrLen(filesFilter)>1 && (!InStr(filesFilter, "SQL:query:") || hasHamDistCached=1)) ? 1 : 0
    Loop, % maxFilesIndex + 1
    {
       thisFileIndex := A_Index ; - countTFilez
@@ -16285,7 +16397,8 @@ remCurrentEntry(dummy, silentus:=0, whichIndex:=0) {
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
-addSQLdbEntry(fileNamu, imgPath, fileSizu, fileMdate, fileCdate, simple:=0) {
+addSQLdbEntry(fileNamu, imgPath, fileSizu, fileMdate, fileCdate, simple:=0, factCheck:=1) {
+   Static prevIDu := 0
    fileMdate := SubStr(fileMdate, 1, 12)
    fileCdate := SubStr(fileCdate, 1, 12)
    If (simple=1)
@@ -16306,10 +16419,20 @@ addSQLdbEntry(fileNamu, imgPath, fileSizu, fileMdate, fileCdate, simple:=0) {
       Else
          SQLstr := "INSERT INTO images (imgidu, isDeleted, imgfile, imgfolder, fsize, fmodified, fcreated) VALUES (" sqlDBrowID ", 0, " fileNamu ", " imgPath ", '" fileSizu "', '" fileMdate "', '" fileCdate "') ON CONFLICT(fullPath) DO UPDATE SET isDeleted=0;"
  
-      If activeSQLdb.Exec(SQLStr)
-         sqlDBrowID++
-      Else
+      If !activeSQLdb.Exec(SQLStr)
          Return "err"
+   }
+
+   If (factCheck=1)
+   {
+      activeSQLdb.LastInsertRowID(alolu)
+      thisIDu := alolu CurrentSLD
+      ; ToolTip, % prevIDu "==" thisIDu "==" sqlDBrowID , , , 2
+      If (thisIDu!=prevIDu && alolu)
+      {
+         prevIDu := thisIDu
+         sqlDBrowID++
+      } Else Return "err"
    } Else sqlDBrowID++
 }
 
@@ -16768,6 +16891,7 @@ getDynamicFoldersList(fileu:=0) {
    listu := (fileu && FileExist(fileu) && InStr(DynamicFoldersList, "|hexists|")) ? coreLoadDynaFolders(fileu) : DynamicFoldersList
    listu := StrReplace(listu, "|hexists|")
    Sort, listu, UD`n
+   listu := cleanDynamicFoldersList(listu "`n")
    Return listu
 }
 
@@ -16783,6 +16907,7 @@ SaveDBfilesList(enforceFile:=0) {
          If (msgResult="cancel")
             Return
       }
+
       If !FileRexists(enforceFile)
       {
          fileWasGiven := 0
@@ -16869,6 +16994,7 @@ SaveDBfilesList(enforceFile:=0) {
       activeSQLdb.Exec("BEGIN TRANSACTION;")
       prevMSGdisplay := A_TickCount
       sqlDBrowID := 1
+      failedFiles := 0
       Loop, % maxFilesIndex
       {
          imgPath := resultedFilesList[A_Index, 1]
@@ -16876,9 +17002,12 @@ SaveDBfilesList(enforceFile:=0) {
          
          ; fileInfos := GetFileAttributesEx(imgPath)
          If (resultedFilesList[A_Index, 6] && resultedFilesList[A_Index, 7])
-            addSQLdbEntry(OutFileName, OutDir, resultedFilesList[A_Index, 6], resultedFilesList[A_Index, 7], resultedFilesList[A_Index, 8])
+            z := addSQLdbEntry(OutFileName, OutDir, resultedFilesList[A_Index, 6], resultedFilesList[A_Index, 7], resultedFilesList[A_Index, 8], 0)
          Else
-            addSQLdbEntry(OutFileName, OutDir, 0, 0, 0, 1)
+            z := addSQLdbEntry(OutFileName, OutDir, 0, 0, 0, 1, 0)
+
+         If z
+            failedFiles++
 
          resultedFilesList[A_Index, 12] := sqlDBrowID
          If (resultedFilesList[A_Index, 11] && resultedFilesList[A_Index, 13])
@@ -16895,7 +17024,10 @@ SaveDBfilesList(enforceFile:=0) {
          If (A_TickCount - prevMSGdisplay>1500)
          {
             etaTime := ETAinfos(A_Index, maxFilesIndex, startOperation)
-            showTOOLtip("Inserting entries into the SQL database`n" file2save etaTime, 0, 0, A_Index/maxFilesIndex)
+            If failedFiles
+               someErrors := "`nFailed to insert " groupDigits(failedFiles) " entries"
+
+            showTOOLtip("Inserting entries into the SQL database`n" file2save someErrors etaTime, 0, 0, A_Index/maxFilesIndex)
             prevMSGdisplay := A_TickCount
          }
 
@@ -17290,7 +17422,8 @@ cleanDeadFilesList(dummy:=0) {
             If (A_TickCount - prevMSGdisplay>1500)
             {
                etaTime := ETAinfos(countTFilez + deadFiles, maxFilesIndex, startOperation)
-               showTOOLtip(friendlyLabel ", please wait" etaTime "`nFound " groupDigits(deadFiles) " dead files", 0, 0, (countTFilez+deadFiles)/maxFilesIndex)
+               thisPath := PathCompact(SubStr(imgPath, 1, InStr(imgPath, "\", 0, 0) - 1), 45)
+               showTOOLtip(friendlyLabel ", please wait`n" thisPath etaTime "`nFound " groupDigits(deadFiles) " dead files", 0, 0, (countTFilez+deadFiles)/maxFilesIndex)
                prevMSGdisplay := A_TickCount
             }
 
@@ -17609,7 +17742,7 @@ retrieveAlreadySeenImageFromCurrentList() {
          Return
       }
 
-      If (StrLen(filesFilter)>1 && filesFilter!="||Already-Seen-Images||")
+      If (StrLen(filesFilter)>1) ; && filesFilter!="||Already-Seen-Images||") I do not know why i had this extra condition...
          remFilesListFilter("simple")
 
       zeitOperation := A_TickCount - startOperation
@@ -17631,7 +17764,11 @@ retrieveAlreadySeenImageFromCurrentList() {
              prevMSGdisplay := A_TickCount
           }
 
-          If (seenEntries[Format("{:L}", r)]=1)
+          zuza := seenEntries[Format("{:L}", r)]
+          If (userFilterInvertThis=1)
+             zuza := !zuza
+
+          If (zuza=1)
           {
              newFilesIndex++
              newFilesList[newFilesIndex] := resultedFilesList[A_Index]
@@ -17709,7 +17846,7 @@ extractSQLqueryFromFilter() {
     }
 }
 
-collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1) {
+collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1) {
    Static noQuestion := 0
    If (asku=1 && noQuestion=1)
    {
@@ -17726,7 +17863,8 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1) {
       extraFilter := extractSQLqueryFromFilter()
 
    friendly := extraFilter ? "`nCurrent files list filter:`n" extraFilter : ""
-   showTOOLtip("Gathering information for " groupDigits(maxFilesIndex) " files, please wait" friendly)
+   If showInfos
+      showTOOLtip("Gathering information for " groupDigits(maxFilesIndex) " files, please wait" friendly)
 
    If RegExMatch(scu, "i)(imgmedian|imgavg|imghpeak|imghlow|imghmode|imghminu|imghrange|imghrms|innerpixelz|outerpixelz|pixelzHash)")
       adaptedSortCriteria := 3
@@ -17822,12 +17960,13 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1) {
           If (A_TickCount - prevMSGdisplay>2000)
           {
              etaTime := ETAinfos(countTFilez, filesToBeSorted, startOperation)
+             thisPath := PathCompact(SubStr(Row[2], 1, InStr(Row[2], "\", 0, 0) - 1), 45)
              If (failedFiles>0)
                 etaTime .= "`nFailed to collect data for " groupDigits(failedFiles) " files"
              If (failedSQLfiles>0)
                 etaTime .= "`nFailed to commit data to database for " groupDigits(failedSQLfiles) " files"
 
-             showTOOLtip("Gathering files information, please wait" etaTime, 0, 0, countTFilez / filesToBeSorted)
+             showTOOLtip("Gathering files information, please wait`n" thisPath etaTime, 0, 0, countTFilez / filesToBeSorted)
              prevMSGdisplay := A_TickCount
           }
 
@@ -17870,7 +18009,7 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1) {
       Return 1
    }
 
-   If (modus!=1)
+   If (modus!=1 && filesToBeSorted>1)
    {
       showTOOLtip(ErrorMsg "Finished collecting data for " groupDigits(filesToBeSorted) " files`nFor " groupDigits(alreadySorted) " files the data was already collected" someErrors)
       SoundBeep 900, 100
@@ -18115,6 +18254,9 @@ BtnCollectHistoInfos() {
 dbSortingCached(SortCriterion) {
    If (maxFilesIndex>0)
    {
+      If (testIsDupesList() && InStr(resultedFilesList[currentFileIndex, 23], "_"))
+         Return
+
       If AnyWindowOpen
          BtnCloseWindow()
 
@@ -19831,6 +19973,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
      Return
   }
 
+  resetSlideshowTimer(0, 1)
   prevImg := imgPath
   isFaved := isPipe ? 0 : resultedFilesList[currentFileIndex, 5]
   If (!isFaved && actu!="rem")
@@ -20256,7 +20399,7 @@ getSelectedFiles(getItem:=0, forceSort:=0) {
 
 filterToFilesSelection() {
    userFilterProperty := 19
-   userFilterDoString := 0
+   userFilterInvertThis := userFilterDoString := 0
    thisFilter := updateUIFiltersPanel("external")
    coreEnableFiltru(thisFilter)
    dummyTimerDelayiedImageDisplay(50)
@@ -20294,6 +20437,8 @@ dropFilesSelection(silentMode:=0) {
        resultedFilesList[A_Index, 2] := 0
 
    lastZeitFileSelect := A_TickCount
+   interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
+   interfaceThread.ahkassign("markedSelectFile", markedSelectFile)
    ; selectAllFiles("none")
    ; ToolTip, % A_TickCount - startZeit, , , 2
    If (silentMode!=1)
@@ -20337,6 +20482,9 @@ markThisFileNow(thisFileIndex:=0) {
      mainGdipWinThumbsGrid()
   Else
      dummyTimerDelayiedImageDisplay(25)
+
+  interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
+  interfaceThread.ahkassign("markedSelectFile", markedSelectFile)
 }
 
 jumpToFilesSelBorderFirst() {
@@ -20367,6 +20515,8 @@ jumpToFilesSelBorder(destination) {
   FriendlyName := (destination=-1) ? "First" : "Last"
   dummyTimerDelayiedImageDisplay(50)
   showTOOLtip(FriendlyName " selected element index: " currentFileIndex "`n" markedSelectFile " total images selected")
+  interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
+  interfaceThread.ahkassign("markedSelectFile", markedSelectFile)
   SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -20502,7 +20652,7 @@ searchNextIndex(direction, inLoop:=0) {
    originalIndex := startIndex := currentFileIndex
 
    newIndex := 0
-   setImageLoading()
+   doStartLongOpDance()
    prevMSGdisplay := A_TickCount
    startOperation := A_TickCount
    totalLoops := (direction=1 && inLoop!=1) ? maxFilesIndex - startIndex + 1 : startIndex + 1
@@ -20511,6 +20661,12 @@ searchNextIndex(direction, inLoop:=0) {
 
    Loop, % totalLoops
    {
+        If (determineTerminateOperation()=1)
+        {
+           abandonAll := 1
+           Break
+        }
+
         If (A_TickCount - prevMSGdisplay>1000)
         {
            etaTime := ETAinfos(A_Index, totalLoops, startOperation)
@@ -20542,6 +20698,14 @@ searchNextIndex(direction, inLoop:=0) {
 
    ResetImgLoadStatus()
    CurrentSLD := backCurrentSLD
+   If (abandonAll=1)
+   {
+      showTOOLtip("Search abandoned by user")
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      SoundBeep , 300, 100
+      Return
+   }
+
    If (!newIndex && inLoop!=1)
    {
       searchNextIndex(direction, 1)
@@ -20708,13 +20872,15 @@ BTNmultiDel() {
 
    If (userMultiDelChoice=3 || userMultiDelChoice=2) && (r=0)
    {
-      BtnCloseWindow()
+      If AnyWindowOpen
+         BtnCloseWindow()
       Sleep, 500
       InListMultiEntriesRemover(0, "y")
    }
 
    preventDBentryRemoval := 0
-   BtnCloseWindow()
+   If AnyWindowOpen
+      BtnCloseWindow()
 }
 
 TglMultiDelChoice() {
@@ -21541,6 +21707,11 @@ defineSQLdbSort() {
    Return defaultSort
 }
 
+MenuMoveMarkedEntries() {
+    EntryMarkedMoveIndex := 1
+    moveMarkedEntryNow(currentFileIndex, "move")
+}
+
 moveMarkedEntryNow(indexu, modus:=0) {
    If (thumbsDisplaying!=1 || maxFilesIndex<2)
       Return
@@ -21559,9 +21730,9 @@ moveMarkedEntryNow(indexu, modus:=0) {
       If (modus="move")
          reorderIndexEntryManually(EntryMarkedMoveIndex, indexu)
       Else
-         moveIndexEntry(EntryMarkedMoveIndex, indexu)
+         switchIndexEntries(EntryMarkedMoveIndex, indexu)
 
-      currentFileIndex := EntryMarkedMoveIndex
+      ; currentFileIndex := EntryMarkedMoveIndex
       EntryMarkedMoveIndex := 0
    }
 
@@ -21569,13 +21740,58 @@ moveMarkedEntryNow(indexu, modus:=0) {
 }
 
 reorderIndexEntryManually(oldIndex, newFileIndex)  {
-   Static countu :=0 
+   Static countu := 0
+   getSelectedFiles(0, 1)
+   If markedSelectFile
+   {
+      newArrayu := []
+      Loop, % maxFilesIndex
+      {
+          If resultedFilesList[A_Index, 2]
+          {
+             thisCounter++
+             newArrayu[thisCounter] := resultedFilesList[A_Index]
+          }
+      }
 
-   old := resultedFilesList.RemoveAt(oldIndex)
-   resultedFilesList.InsertAt(newFileIndex, old)
+      finalArrayu := []
+      mainIndex := thisIndex := firstu := 0
+      Loop, % maxFilesIndex
+      {
+          If (A_Index=newFileIndex)
+          {
+             Loop, % newArrayu.Count()
+             {
+
+                thisIndex++
+                mainIndex++
+                finalArrayu[mainIndex] := newArrayu[thisIndex]
+                If !firstu
+                   firstu := mainIndex
+             }
+          }
+
+          If !resultedFilesList[A_Index, 2]
+          {
+             mainIndex++
+             finalArrayu[mainIndex] := resultedFilesList[A_Index]
+          }
+      }
+
+      resultedFilesList := []
+      resultedFilesList := finalArrayu.Clone()
+      currentFileIndex := firstu ? firstu : newFileIndex
+   } Else
+   {
+      old := resultedFilesList.RemoveAt(oldIndex)
+      resultedFilesList.InsertAt(newFileIndex, old)
+      currentFileIndex := newFileIndex
+   }
+
+   ; prevLastImg[2] := prevLastImg[1]
+   prevLastImg[2] := [oldIndex, resultedFilesList[oldIndex, 1]]
    currentFilesListModified := 1
    ForceRefreshNowThumbsList()
-   currentFileIndex := newFileIndex
    dummyTimerDelayiedImageDisplay(100)
    If (SLDtypeLoaded=3 && countu<5)
    {
@@ -21585,7 +21801,7 @@ reorderIndexEntryManually(oldIndex, newFileIndex)  {
    }
 }
 
-moveIndexEntry(newFileIndex, oldIndex) {
+switchIndexEntries(newFileIndex, oldIndex) {
    If (SLDtypeLoaded=3)
    {
       SQLstr := "UPDATE images SET imgidu=999999999 WHERE imgidu=" newFileIndex ";"
@@ -21619,7 +21835,9 @@ moveIndexEntry(newFileIndex, oldIndex) {
 
    currentFilesListModified := 1
    ForceRefreshNowThumbsList()
-   currentFileIndex := newFileIndex
+   currentFileIndex := oldIndex
+   ; prevLastImg[2] := prevLastImg[1]
+   prevLastImg[2] := [newFileIndex, resultedFilesList[newFileIndex, 1]]
    dummyTimerDelayiedImageDisplay(100)
 }
 
@@ -21677,7 +21895,7 @@ PanelUpdateThisFileIndex(dummy:=0) {
          Sleep, 150
          SetTimer, PanelUpdateThisFileIndex, -150
       } Else If (newFileIndex!=currentFileIndex && newFileIndex && friendlyIndex)
-         moveIndexEntry(newFileIndex, currentFileIndex)
+         switchIndexEntries(newFileIndex, currentFileIndex)
    } Else If (InStr(msgResult.btn, "erase") && maxFilesIndex>1)
    {
       If askAboutFileSave(" and the current index entry will be erased")
@@ -22127,6 +22345,81 @@ PanelSaveImg() {
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Save image file: " appTitle)
 }
 
+PanelChangeHamDistThreshold() {
+
+   If !testIsDupesList()
+   {
+      showTOOLtip("WARNING: The files list does not seem to contain pairs of images identified as duplicates")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      If (SLDtypeLoaded=3)
+         SetTimer, PanelFindDupes, -200
+      Return
+   }
+
+   If !InStr(resultedFilesList[currentFileIndex, 23], "_")
+   {
+      showTOOLtip("WARNING: The files list does not seem to contain pairs of images filtered by Hamming distance")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      If (SLDtypeLoaded=3)
+         SetTimer, PanelFindDupes, -200
+      Return
+   }
+
+
+    thisBtnHeight := createSettingsGUI(62, A_ThisFunc)
+    btnWid := 70
+    txtWid := 260
+    If (PrefsLargeFonts=1)
+    {
+       btnWid := btnWid + 80
+       txtWid := txtWid + 155
+       Gui, Font, s%LargeUIfontValue%
+    }
+
+    EditWid := Round(btnWid*2.5)
+    If !hamUppLim
+       hamUppLim := userFindDupesHamDistLvl
+
+    Gui, Add, Text, x15 y15 w%txtWid% Section, Please set the range for the Hamming distance threshold. Lower ranges equate to a stricter criteria - more closely looking images. Cached threshold range: 0 - %userFindDupesHamDistLvl%.
+
+    Gui, Add, Text, y+15 w%btnWid%, Lower limit:
+    Gui, Add, Text, x+15 wp, Upper limit:
+    Gui, Add, Edit, xs y+5 wp number -multi limit2 veditF5, % hamLowLim
+    Gui, Add, UpDown, vhamLowLim Range0-%userFindDupesHamDistLvl%, % hamLowLim
+
+    Gui, Add, Edit, x+15 wp number -multi limit2 veditF6, % hamUppLim
+    Gui, Add, UpDown, vhamUppLim Range0-%userFindDupesHamDistLvl%, % hamUppLim
+    Gui, Add, Text, xs y+15 wp, String filter:
+    Gui, Add, Checkbox, x+5 Checked%UserHamDistStringInvert% vUserHamDistStringInvert, &Must not contain it
+    Gui, Add, Edit, xs y+5 w%EditWid% -multi vUserHamDistStringFilter, % UserHamDistStringFilter
+    Gui, Add, Checkbox, xs y+25 Checked%UserHamDistCacheFilterMonoGroups%  vUserHamDistCacheFilterMonoGroups, &Filter out matches without pairs
+
+    Gui, Add, Button, xs y+25 w%btnWid% h%thisBtnHeight% Default gBtnChangeHamDistThreshold, &Update
+    Gui, Add, Button, x+5 hp w90 gBtnCloseWindow, C&ancel
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Change Hamming distance threshold: " appTitle)
+}
+
+BtnChangeHamDistThreshold() {
+   Gui, SettingsGUIA: Default
+   GuiControlGet, hamUppLim
+   GuiControlGet, hamLowLim
+   GuiControlGet, UserHamDistStringFilter
+   GuiControlGet, UserHamDistStringInvert
+   GuiControlGet, UserHamDistCacheFilterMonoGroups
+
+   BtnCloseWindow()
+   r := changeHdistLevelCached(0, hamLowLim, hamUppLim)
+   If (r<1)
+   {
+      showTOOLtip("Found no duplicate images in the specified Hamming distance range.`nFiles list unchanged.")
+      SoundBeep 300, 100
+      SetTimer, PanelChangeHamDistThreshold, -350
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+   }
+}
+
 PanelSearchAndReplaceIndex() {
     Global editF5, editF6, performInSeenDB, performInDynas
 
@@ -22193,10 +22486,10 @@ BTNperformIndexSearchReplace() {
    BtnCloseWindow()
    If (mustRecordSeenImgs=1 && performInSeenDB=1)
    {
-      SearchAndReplaceSeenDB(Trimmer(editF5), Trimmer(editF6))
+      SearchAndReplaceSeenDB(editF5, editF6)
    } Else
    {
-      SearchAndReplaceThroughIndex(Trimmer(editF5), Trimmer(editF6), 0, 0)
+      SearchAndReplaceThroughIndex(editF5, editF6, 0, 0)
       If (performInDynas=1)
       {
          listu := getDynamicFoldersList()
@@ -22204,7 +22497,7 @@ BTNperformIndexSearchReplace() {
          listu := StrReplace(listu, Trimmer(editF5), Trimmer(editF6))
          listu := StrReplace(listu, "\\", "\")
          DynamicFoldersList := StrReplace(listu, "\`n", "`n")
-         If (SLDtypeLoaded=3)
+         If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
             recreateDynaFoldersSQLdbList(DynamicFoldersList)
       }
    }
@@ -22384,6 +22677,7 @@ triggerQuickFileAction(keyu) {
    copyMoveDoLastOption := 1
    nullvara := askAboutFileCollision(file2rem, file2save, 1, 3, 0, nullvar)
    afterAct := QuickFileActAfter%thisVar%
+   ForceRefreshNowThumbsList()
    r := BtnCopyMoveAction("quick-actu")
    lastInvoked := A_TickCount
    If (afterAct=2 && StrLen(UserMemBMP)<3 && r=1)
@@ -22537,7 +22831,7 @@ PanelAutoSelectDupes() {
       PanelFindDupes()
 }
 
-SearchIndexSelectAll() {
+SearchIndexSelectAll(modus:="") {
    thisFilter := processSearchIndexString(userSearchString)
    If !thisFilter
    {
@@ -22560,8 +22854,11 @@ SearchIndexSelectAll() {
       }
    }
 
+   wasReplace := 0
+   doStartLongOpDance()
    If (msgResult="replace" || !msgResult)
    {
+      wasReplace := 1
       If (msgResult="replace")
          msgResult := ""
 
@@ -22570,21 +22867,50 @@ SearchIndexSelectAll() {
 
    Loop, % maxFilesIndex
    {
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
       imgPath := resultedFilesList[A_Index, 1]
       If coreSearchIndex(imgPath, thisSearchString, userSearchWhat)
+      {
+         thisIndex++
          resultedFilesList[A_Index, 2] := (msgResult="add" || !msgResult) ? 1 : 0
+      }
    }
 
+   friendly := thisIndex ? "The files selection was altered." : "The files selection is unchanged."
+   ResetImgLoadStatus()
    lastZeitFileSelect := A_TickCount
    getSelectedFiles(0, 1)
    ForceRefreshNowThumbsList()
-   If !markedSelectFile
-      showDelayedTooltip("No matches found. No files were selected.")
-   Else
+   If (abandonAll=1)
+      showDelayedTooltip("User abandoned the search.`n" friendly)
+   Else If !thisIndex
+      showDelayedTooltip("No matches found for:`n" userSearchString "`n" friendly)
+   Else If (modus!="quick" && wasReplace=1)
       navSelectedFiles(1)
 
    dummyTimerDelayiedImageDisplay(50)
    SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+QuickSelectFilesSameFolder() {
+    imgPath := getIDimage(currentFileIndex)
+    zPlitPath(imgPath, 0, OutFileName, OutDir)
+    If (!OutDir || !currentFileIndex || maxFilesIndex<3)
+       Return
+
+    o := markSearchMatches
+    markSearchMatches := 0
+    userSearchWhat := 1
+    userSearchString := OutDir "\"
+    SearchIndexSelectAll("quick")
+    userSearchString := ""
+    markSearchMatches := o
+    dummyTimerDelayiedImageDisplay(50)
 }
 
 PanelSearchIndex() {
@@ -23141,7 +23467,7 @@ BtnPasteInSelectedArea() {
     PasteInPlaceNow()
 }
 
-importGivenFile() {
+importEditGivenImageFile() {
    If !prevLoadedImageIndex
       Return
 
@@ -24763,7 +25089,7 @@ PanelNewImage() {
     ; Gui, Add, Text, xs y+10, Resulted dimensions:
     ; Gui, Add, Text, xs y+10 w%txtWid% vinfoResultRes, --`n--
 
-    Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% gBtnNewImage, &Create new image
+    Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% gBtnCreateNewImage, &Create new image
     Gui, Add, Button, x+5 hp w90 gBtnCloseWindow, &Cancel
     Gui, Add, Button, x+25 hp w%btnWid% gOpenNewQPVinstance, &New instance
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "New image: " appTitle)
@@ -25401,7 +25727,7 @@ NewImageEditResponder() {
    }
 }
 
-BtnNewImage() {
+BtnCreateNewImage() {
     Static clippyCount
     If (AnyWindowOpen=27)
        Gui, SettingsGUIA: Default
@@ -28526,6 +28852,7 @@ renewCurrentFilesList() {
    lastRenameUndo := []
    prevLastImg := []
    reviewSelectedIndexes := []
+   hasHamDistCached := 0
    markedSelectFile := EntryMarkedMoveIndex := maxFilesIndex := 0
    lastZeitFileSelect := editingSelectionNow := prevRandyIMGnow := 0
    ForceRefreshNowThumbsList()
@@ -28635,6 +28962,13 @@ FileExploreUpDownLevel(direction, returnObj:=0, ByRef iLevel:=0, forceLevel:=0) 
 
 FileExploreSiblingsNav(direction, isInLoop:=0, returnObj:=0, ByRef iLevel:=0, forceLevel:=0) {
    Static thisLevel, prevFolder, subFoldersArray := []
+   If (direction="reset")
+   {
+      prevFolder := thisLevel := ""
+      subFoldersArray := []
+      Return
+   }
+
    baseFolder := (SLDtypeLoaded=1) ? CurrentSLD : resultedFilesList[currentFileIndex, 1]
    If (SLDtypeLoaded!=1)
       baseFolder := SubStr(baseFolder, 1, InStr(baseFolder, "\", 0, -1) - 1)
@@ -29024,14 +29358,12 @@ askAboutSlidesListSave() {
       msgResult := msgBoxWrapper(appTitle ": Save files list", "The currently opened files list has been modified and the changes have not been saved. To continue with the action you chose, select the Discard button.`n`nWould like to save the currently opened files list?", "&Save|&Discard|&Cancel", 0, "question")
       If (msgResult="Save")
       {
-         ; If InStr(CurrentSLD, "\QPV\favourite-images-list.SLD")
-         ;    renewFavesListBasedOnIndexList()
-         ; Else
-            SetTimer, PanelSaveSlideShowu, -150
+         SetTimer, PanelSaveSlideShowu, -150
          r := 1
       } Else If (msgResult="Discard")
+      {
          r := 0
-      Else ; If (msgResult="Ok")
+      } Else ; If (msgResult="Ok")
          r := 1
 
       lastInvoked := A_TickCount
@@ -29284,7 +29616,8 @@ importSLDplainText(whichFile) {
    }
 
    Sort, DynamicFoldersList, UD`n
-   If (SLDtypeLoaded=3)
+   DynamicFoldersList := cleanDynamicFoldersList(DynamicFoldersList)
+   If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
       recreateDynaFoldersSQLdbList(DynamicFoldersList)
 
    countFiles := ST_Count(tehFileVar, "`n") + 1
@@ -29323,10 +29656,11 @@ importSLDBintoSLDB(whichFile) {
    mustOpenStartFolder := ""
    zPlitPath(CurrentSLD, 0, OutFileName, SelectedDir)
    showTOOLtip("Preparing main database content, please wait`n" OutFileName "`n" SelectedDir "\")
-
+   setImageLoading()
    SQLa := "SELECT imgfile, imgfolder, fsize, fmodified, fcreated, imgwidth, imgheight, imgframes, imgdpi, imgpixfmt, imgavg, imghpeak, imghlow, imghmode, imghrms, imghminu, imghrange, innerpixelz, outerpixelz, entireHush, pixelzHash, imgmedian FROM images"
    If !activeSQLdb.GetTable(SQLa, mainRecordSet)
    {
+      ResetImgLoadStatus()
       throwSQLqueryDBerror(A_ThisFunc)
       Return
    }
@@ -29334,10 +29668,19 @@ importSLDBintoSLDB(whichFile) {
    startOperation := A_TickCount
    prevMSGdisplay := A_TickCount
    countFiles := mainRecordSet.RowCount
-   totalArrayu := new hashtable()
-   mainArrayu := new hashtable()
+   totalArrayu := []
+   mainArrayu := []
+   uniqueArrayu := new hashtable()
+   doStartLongOpDance()
+   allIndex := 0
    Loop, % mainRecordSet.RowCount
    {
+        If (determineTerminateOperation()=1)
+        {
+           abandonAll := 1
+           Break
+        }
+
         If (A_TickCount - prevMSGdisplay>1500)
         {
            etaTime := ETAinfos(A_Index, countFiles, startOperation)
@@ -29348,36 +29691,56 @@ importSLDBintoSLDB(whichFile) {
         Rowu := mainRecordSet.Rows[A_Index]
         If Rowu[2]
         {
-           mainArrayu[Rowu[2] "\" Rowu[1]] := A_Index
-           totalArrayu[Rowu[2] "\" Rowu[1]] := "m"
+           allIndex++
+           mainArrayu[allIndex] := A_Index
+           totalArrayu[allIndex] := "m"
+           uniqueArrayu[Rowu[2] "\" Rowu[1]] := 1
         }
    }
 
+   If (abandonAll=1)
+   {
+      showTOOLtip("Database import operation aborted by user")
+      mainArrayu := ""
+      totalArrayu := ""
+      uniqueArrayu := ""
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      ResetImgLoadStatus()
+      Return
+   }
+
    zPlitPath(whichFile, 0, OutFileName, SelectedDir)
-   showTOOLtip("Retrieving imported database content, please wait`n" OutFileName "`n" SelectedDir "\")
    otherSQLdb := new SQLiteDB
    If !otherSQLdb.OpenDB(whichFile)
    {
       mainArrayu := ""
       totalArrayu := ""
+      uniqueArrayu := ""
       throwSQLqueryDBerror(A_ThisFunc)
+      ResetImgLoadStatus()
+      SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
    }
 
+   showTOOLtip("Retrieving imported database content, please wait`n" OutFileName "`n" SelectedDir "\")
    If !otherSQLdb.GetTable(SQLa, otherRecordSet)
    {
       mainArrayu := ""
       totalArrayu := ""
+      uniqueArrayu := ""
       mainRecordSet.Free()
       throwSQLqueryDBerror(A_ThisFunc)
       otherSQLdb.CloseDB()
+      ResetImgLoadStatus()
+      SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
    }
 
    startOperation := A_TickCount
    prevMSGdisplay := A_TickCount
    countFiles := otherRecordSet.RowCount
-   otherArrayu := new hashtable()
+   otherArrayu := []
    Loop, % otherRecordSet.RowCount
    {
         If (determineTerminateOperation()=1)
@@ -29396,11 +29759,9 @@ importSLDBintoSLDB(whichFile) {
         Rowu := otherRecordSet.Rows[A_Index]
         If Rowu[2]
         {
-           otherArrayu[Rowu[2] "\" Rowu[1]] := A_Index
-           If totalArrayu.hasKey(Rowu[2] "\" Rowu[1])
-              totalArrayu[Rowu[2] "\" Rowu[1]] := "b"
-           Else
-              totalArrayu[Rowu[2] "\" Rowu[1]] := "o"
+           allIndex++
+           otherArrayu[allIndex] := A_Index
+           totalArrayu[allIndex] := uniqueArrayu.hasKey(Rowu[2] "\" Rowu[1]) ? "b" : "o"
         }
    }
 
@@ -29408,9 +29769,10 @@ importSLDBintoSLDB(whichFile) {
    {
       showTOOLtip("Database import operation aborted by user")
       SoundBeep 300, 100
-      totalArrayu := []
-      mainArrayu := []
-      otherArrayu := []
+      totalArrayu := ""
+      mainArrayu := ""
+      uniqueArrayu := ""
+      otherArrayu := ""
       otherRecordSet.Free()
       mainRecordSet.Free()
       otherSQLdb.CloseDB()
@@ -29431,9 +29793,12 @@ importSLDBintoSLDB(whichFile) {
    newArrayu := []
    startOperation := A_TickCount
    prevMSGdisplay := A_TickCount
-   countFiles := totalArrayu.Count()
-   For Key, Value in totalArrayu
+   countFiles := allIndex ; totalArrayu.Count()
+   ; For Key, Value in totalArrayu
+   Loop, % allIndex
    {
+      key := A_Index
+      value := totalArrayu[key]
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
@@ -29474,15 +29839,15 @@ importSLDBintoSLDB(whichFile) {
             k%A_Index% := Rowu[A_Index]
       }
 
-      moreSQL := baseSQLstr "'" sqlDBrowID "', '" k1 "', '" k2 "', '" k3 "', '" k4 "', '" k5 "', '" k6 "', '" k7 "', '" k8 "', '" k9 "', '" k10 "', '" k11 "', '" k12 "', '" k13 "', '" k14 "', '" k15 "', '" k16 "', '" k17 "', '" k18 "', '" k19 "', '" k20 "', '" k21 "', '" k22 "');"
+      activeSQLdb.EscapeStr(k1)
+      activeSQLdb.EscapeStr(k2)
+      moreSQL := baseSQLstr "'" sqlDBrowID "', " k1 ", " k2 ", '" k3 "', '" k4 "', '" k5 "', '" k6 "', '" k7 "', '" k8 "', '" k9 "', '" k10 "', '" k11 "', '" k12 "', '" k13 "', '" k14 "', '" k15 "', '" k16 "', '" k17 "', '" k18 "', '" k19 "', '" k20 "', '" k21 "', '" k22 "');"
       If !activeSQLdb.Exec(moreSQL)
       {
          errorsOccured++
       } Else
       {
          newIndex++
-         ; newArrayu[newIndex, 1] := k2 "\" k1
-         ; newArrayu[newIndex, 12] := sqlDBrowID
          sqlDBrowID++
       }
    }
@@ -29492,10 +29857,11 @@ importSLDBintoSLDB(whichFile) {
       showTOOLtip("Database import operation aborted by user")
       SoundBeep 300, 100
       activeSQLdb.Exec("ROLLBACK TRANSACTION;")
-      totalArrayu := []
-      mainArrayu := []
-      otherArrayu := []
-      newArrayu := []
+      totalArrayu := ""
+      mainArrayu := ""
+      otherArrayu := ""
+      newArrayu := ""
+      uniqueArrayu := ""
       otherRecordSet.Free()
       mainRecordSet.Free()
       otherSQLdb.CloseDB()
@@ -29531,12 +29897,14 @@ importSLDBintoSLDB(whichFile) {
    totalArrayu := []
    mainArrayu := []
    otherArrayu := []
+   uniqueArrayu := []
    gRecordSet.Free()
    otherRecordSet.Free()
    mainRecordSet.Free()
    otherSQLdb.CloseDB()
    Sort, DynamicFoldersList, UD`n
-   recreateDynaFoldersSQLdbList(DynamicFoldersList)
+   newListu := cleanDynamicFoldersList(DynamicFoldersList)
+   recreateDynaFoldersSQLdbList(newListu)
    If errorsOccured
       someErrors := "`n" groupDigits(errorsOccured) " errors occured during merger."
 
@@ -29567,8 +29935,8 @@ importSLDBintoPlainText(whichFile) {
 
     OpenSLDBdataBase(whichFile, 1)
     currentFilesListModified := 1
-
     Sort, DynamicFoldersList, UD`n
+    DynamicFoldersList := cleanDynamicFoldersList(DynamicFoldersList)
     If (!CurrentSLD && maxFilesIndex>0)
        CurrentSLD := SelectedDir "\newFile.SLD"
 
@@ -29656,6 +30024,35 @@ coreAddNewFiles(imgsListu, countFiles, SelectedDir, selectNewOnes:=0) {
     SetTimer, ResetImgLoadStatus, -150
 }
 
+wrapperAddNewFolderToList(folderu, forceRemAll, isInLoop:=0) {
+    showTOOLtip("Preparing files list, please wait`n" folderu "\")
+    z := coreAddNewFolder(folderu, forceRemAll, 0, 0, 0)
+    If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=2 && isInLoop!=1)
+    {
+       FileReadLine, firstLine, % CurrentSLD, 1
+       IniRead, tstSLDcacheFilesList, % CurrentSLD, General, SLDcacheFilesList, @
+       If (!InStr(firstLine, "[General]") || tstSLDcacheFilesList!=1 || InStr(folderu, "|"))
+          good2go := "null"
+    } Else good2go := "null"
+
+    If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
+    {
+       good2go := 0
+       SQLdeleteEntriesMarked()
+       isPipe := InStr(folderu, "|") ? 1 : 0
+       folderuz := StrReplace(folderu, "|")
+       SQLdbRetrieveGivenFolder(folderuz, !isPipe)
+       getMaxRowIDsqlDB()
+    }
+
+    If (isInLoop=1)
+       Return z
+    Else
+       GenerateRandyList()
+
+    Return good2go
+}
+
 addNewFolder2list() {
    If (slideShowRunning=1)
       ToggleSlideShowu()
@@ -29663,6 +30060,7 @@ addNewFolder2list() {
    SelectImg := openFoldersDialogWrapper("S2", prevOpenFolderPath, "Add new folder(s) to the list")
    If !Trim(SelectImg)
       Return "cancel"
+
    SelectedDir := Trimmer(SelectImg)
    If SelectedDir
    {
@@ -29678,65 +30076,73 @@ addNewFolder2list() {
 
       msgResult := msgBoxWrapper(appTitle, "Do you want to scan for image files recursively, through all its subfolders?`n`n" SelectedDir "\", 3, 0, "question")
       If (msgResult="no")
-         isRecursive := "|"
+         isNotRecursive := "|"
       Else If (msgResult="cancel")
          Return "cancel"
 
       BtnCloseWindow()
-      mustOpenStartFolder := ""
       Sleep, 1
       prevOpenFolderPath := SelectedDir
       INIaction(1, "prevOpenFolderPath", "General")
-      coreAddNewFolder(isRecursive SelectedDir, 1)
-      If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=2)
+      newListA := compareFoldersList(DynamicFoldersList, "`n" isNotRecursive SelectedDir "`n")
+      newListB := cleanDynamicFoldersList(newListA.newListu)
+      newListC := compareFoldersList(DynamicFoldersList, newListB)
+      toAdd := newListC.newEntries
+      If StrLen(toAdd)<3
       {
-         FileReadLine, firstLine, % CurrentSLD, 1
-         If (!InStr(firstLine, "[General]") || SLDcacheFilesList!=1)
-            good2go := "null"
-      } Else good2go := "null"
-      If (SLDtypeLoaded=3)
-         good2go := 0
+         msgBoxWrapper(appTitle ": WARNING", "The folder seems to be already in the list or it is contained in another folder already indexed.`n`n" SelectedDir "\", 0, 0, "exclamation")
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return "cancel"
+      }
 
-      modus := isRecursive ? 1 : 0
-      If (mustGenerateStaticFolders=0 && good2go!="null" && RegExMatch(CurrentSLD, sldsPattern))
+      mustOpenStartFolder := ""
+      modus := isNotRecursive ? 1 : 0
+      z := wrapperAddNewFolderToList(isNotRecursive SelectedDir, !modus)
+      If (mustGenerateStaticFolders=0 && z!="null" && RegExMatch(CurrentSLD, sldsPattern))
          updateCachedStaticFolders(SelectedDir, modus)
       Else mustGenerateStaticFolders := 1
 
-      listu := DynamicFoldersList "`n" isRecursive SelectedDir "`n"
+      listu := DynamicFoldersList "`n" isNotRecursive SelectedDir "`n"
       Sort, listu, UD`n
-      DynamicFoldersList := listu
-      If (SLDtypeLoaded=3)
-         recreateDynaFoldersSQLdbList(listu)
+      DynamicFoldersList := cleanDynamicFoldersList(listu)
+      If (SLDtypeLoaded=3 && RegExMatch(CurrentSLD, sldsPattern))
+         recreateDynaFoldersSQLdbList(DynamicFoldersList)
 
       If !CurrentSLD
       {
+         SLDtypeLoaded := 2
          CurrentSLD := SelectedDir "\newFile.SLD"
          RandomPicture()
       }
    }
 }
 
-coreAddNewFolder(SelectedDir, remAll, noRandom:=0, forReal:=1) {
+coreAddNewFolder(SelectedDir, forceRemAll, noRandom:=0, forReal:=1, factCheck:=1) {
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
-    markedSelectFile := 0
+    ; markedSelectFile := 0
     If StrLen(filesFilter)>1
        remFilesListFilter("simple")
 
-    thisFolder := (remAll=1) ? StrReplace(SelectedDir, "|") : SelectedDir
+    thisFolder := (forceRemAll=1) ? StrReplace(SelectedDir, "|") : SelectedDir
     If (forReal=0 && SLDtypeLoaded=3)
        getMaxRowIDsqlDB()
 
     remFilesFromList(thisFolder, 1, forReal)
-    GetFilesList(SelectedDir "\*")
-    GenerateRandyList()
-    SoundBeep, 900, 100
+    z := GetFilesList(SelectedDir "\*", 0, 1, factCheck)
+    If (factCheck=1)
+    {
+       GenerateRandyList()
+       SoundBeep, 900, 100
+    }
+
     CurrentSLD := backCurrentSLD
     If (noRandom=1)
     {
        currentFileIndex := maxFilesIndex - 1
-       IDshowImage(currentFileIndex)
+       dummyTimerDelayiedImageDisplay(150)
     } Else RandomPicture()
+    Return z
 }
 
 detectFileID(imgPath) {
@@ -29819,38 +30225,32 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
       If StrLen(filesFilter)>1
          remFilesListFilter("simple")
 
-      Loop, Parse, foldersListu,`n
+      newListA := compareFoldersList(mainFoldersListu, foldersListu)
+      newListB := cleanDynamicFoldersList(newListA.newListu)
+      newListC := compareFoldersList(mainFoldersListu, newListB)
+      toAdd := newListC.newEntries
+      Loop, Parse, toAdd,`n
       {
           linea := Trimmer(A_LoopField)
           If StrLen(linea)<4
              Continue
 
           changeMcursor()
-          warningMsg := 0
-          Loop, Parse, mainFoldersListu, `n
-          {
-              line := Trimmer(A_LoopField)
-              If StrLen(line)<4
-                 Continue
-
-              If (line=linea)
-                 warningMsg := 1
-          }
-
-          If (warningMsg=1)
-             Continue
+          r := wrapperAddNewFolderToList(linea, 1, 1)
+          ; r := GetFilesList(linea "\*")
+          If (r="abandoned")
+             Break
 
           stuffAdded := 1
-          GetFilesList(linea "\*")
-          DynamicFoldersList .= linea "`n"
           lastOne := linea
-          If (SLDtypeLoaded=3)
-             addDynamicFolderSQLdb(linea, 0, "dynamicfolders")
       }
+
+      DynamicFoldersList := cleanDynamicFoldersList(newListC.newListu)
+      If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
+         recreateDynaFoldersSQLdbList(DynamicFoldersList)
 
       If (stuffAdded=1)
       {
-         Sort, DynamicFoldersList, UD`n
          newStaticFoldersListCache := []
          mustGenerateStaticFolders := 1
          GenerateRandyList()
@@ -29868,6 +30268,7 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
             CurrentSLD := lastOne "\newFile.SLD"
          }
       }
+
       SetTimer, ResetImgLoadStatus, -50
       SoundBeep, 900, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -29941,6 +30342,7 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
       mustOpenStartFolder := ""
       coreAddNewFiles(imgsListu, countFiles, prevOpenFolderPath)
       mustGenerateStaticFolders := 1
+      ForceRefreshNowThumbsList()
       GenerateRandyList()
       SetTimer, ResetImgLoadStatus, -50
       If (A_TickCount - lastInvoked>2000)
@@ -30217,6 +30619,9 @@ restartAppu() {
    If askAboutSlidesListSave()
       Return
 
+   If askAboutFilesSelect("restart")
+      Return
+
    ; writeMainSettings()
    If A_IsCompiled
       Try Run, "%fullPath2exe%"
@@ -30229,7 +30634,7 @@ restartAppu() {
 }
 
 exitAppu(dummy:=0) {
-   If (A_IsSuspended && MsgBox2hwnd && dummy="external")
+   If (A_IsSuspended && MsgBox2hwnd && InStr(dummy, "external"))
    {
       interfaceThread.ahkPostFunction("dummyTimerExit")
       terminateIMGediting()
@@ -30247,8 +30652,20 @@ exitAppu(dummy:=0) {
    If askAboutSlidesListSave()
       Return
 
+   If askAboutFilesSelect("exit")
+      Return
+
    terminateIMGediting()
    TrueCleanup()
+}
+
+askAboutFilesSelect(act) {
+   If (markedSelectFile>50 && maxFilesIndex>100)
+   {
+      msgResult := msgBoxWrapper(appTitle ": " act " confirmation", "The current opened files list has " groupDigits(markedSelectFile) " files selected. Are you sure you want to " act " ?", "&Yes|&No", 0, "question")
+      If (msgResult!="Yes")
+         Return 1
+   }
 }
 
 InitGuiContextForcedMenu() {
@@ -30328,12 +30745,11 @@ Win_SetMenu(Hwnd, hMenu=0) {
 PathCompact(givenPath, CharMax) {
     If (StrLen(givenPath)>CharMax+3)
     {
-       lastSlash := InStr(givenPath, "\", 0, 0)
-       partB := SubStr(givenPath, lastSlash)
-       If (StrLen(partB)>CharMax+2)
-          partB := SubStr(givenPath, -CharMax)
-
-       partA := SubStr(givenPath, 1, Max(CharMax - StrLen(partB), 3)) "..."
+       partB := SubStr(givenPath, InStr(givenPath, "\", 0, 0))
+       If (StrLen(partB)>CharMax)
+          partB := SubStr(givenPath, 1, 3) "[...]" SubStr(givenPath, -CharMax + 3)
+       Else
+          partA := SubStr(givenPath, 1, max(CharMax - StrLen(partB), 3)) "..."
        Return partA partB
     } Else Return givenPath
 }
@@ -30546,7 +30962,7 @@ createMenuCurrentFile() {
       Menu, PVtFileOpen, Add, &Explore the containing folder`tCtrl+E, OpenThisFileFolder
 
    If (thumbsDisplaying=1 && !markedSelectFile)
-      Menu, PVtFileOpen, Add, &Import into currently loaded image, importGivenFile
+      Menu, PVtFileOpen, Add, &Import into currently loaded image, importEditGivenImageFile
 
    If !markedSelectFile
    {
@@ -30615,7 +31031,7 @@ createMenuSoloFile() {
 
    If (thumbsDisplaying=1)
    {
-      Menu, PVtActFile, Add, &Import into currently loaded image, importGivenFile
+      Menu, PVtActFile, Add, &Import into currently loaded image, importEditGivenImageFile
       If !EntryMarkedMoveIndex
          Menu, PVtActFile, Add, Mar&k entry to reorder`tX, moveMarkedEntryNow
       Else
@@ -31220,13 +31636,13 @@ BuildMainMenu() {
    ; If (maxFilesIndex>1)
    ; {
       Menu, PVfList, Add, Import list / insert file(s)`tInsert, addNewFile2list
-      Menu, PVfList, Add, Add folder(s)`tShift+Insert, addNewFolder2list
-      Menu, PVfList, Add, Manage folder(s) list`tAlt+U, PanelDynamicFolderzWindow
+      Menu, PVfList, Add, &Add folder(s)`tShift+Insert, addNewFolder2list
+      Menu, PVfList, Add, Mana&ge folder(s) list`tAlt+U, PanelDynamicFolderzWindow
    ; }
 
    If (maxFilesIndex>2)
    {
-      Menu, PVfList, Add, Save files list as .SLD`tCtrl+Shift+S, PanelSaveSlideShowu
+      Menu, PVfList, Add, Save files list as &.SLD`tCtrl+Shift+S, PanelSaveSlideShowu
       Menu, PVfList, Add,
       If (thumbsDisplaying=1 && !markedSelectFile)
       {
@@ -31234,7 +31650,8 @@ BuildMainMenu() {
             Menu, PVfList, Add, Mar&k entry to reorder`tX, moveMarkedEntryNow
          Else
             Menu, PVfList, Add, Move mar&ked entry to active index`tX, moveMarkedEntryNow
-      }
+      } Else If (thumbsDisplaying=1 && markedSelectFile>1)
+            Menu, PVfList, Add, Move sele&cted entries to active index`tShift+X, MenuMoveMarkedEntries
 
       If !markedSelectFile
       {
@@ -31248,13 +31665,13 @@ BuildMainMenu() {
 
       Menu, PVfList, Add,
       ; If RegExMatch(CurrentSLD, sldsPattern)
-      Menu, PVfList, Add, &Clean duplicate/inexistent entries, cleanDeadFilesList
+      Menu, PVfList, Add, Clean &duplicate/inexistent entries, cleanDeadFilesList
       If StrLen(DynamicFoldersList)>6
          Menu, PVfList, Add, &Regenerate the entire list, RegenerateEntireList
       If (RegExMatch(CurrentSLD, sldsPattern) && mustGenerateStaticFolders!=1 && SLDcacheFilesList=1)
          Menu, PVfList, Add, &Update files list selectively`tCtrl+U, PanelStaticFolderzManager
       If (mustRecordSeenImgs=1)
-         Menu, PVfList, Add, Remove already seen ima&ges, removeFilesListSeenImages
+         Menu, PVfList, Add, Remove alread&y seen images, removeFilesListSeenImages
       If !InStr(CurrentSLD, "\QPV\favourite-images-list.SLD")
          Menu, PVfList, Add, Remove images added to fa&vourites, removeFilesListFavouritedImages
 
@@ -31262,16 +31679,10 @@ BuildMainMenu() {
       Menu, PVfList, Add, &Find duplicate images, PanelFindDupes
       Menu, PVfList, Add, &Statistics, PanelWrapperFilesStats
       Menu, PVfList, Add, Searc&h index`tCtrl+F3, PanelSearchIndex
-      Menu, PVfList, Add, Search and replace`tCtrl+H, PanelSearchAndReplaceIndex
+      Menu, PVfList, Add, Search and re&place`tCtrl+H, PanelSearchAndReplaceIndex
       Menu, PVfList, Add, &Index filters`tCtrl+F, PanelEnableFilesFilter
       If StrLen(filesFilter)>1
          Menu, PVfList, Check, &Index filters`tCtrl+F
-
-      ; If (thumbsDisplaying!=1)
-      ; {
-      ;    Menu, PVfList, Add,
-      ;    Menu, PVfList, Add, &Sort by, :PVsort
-      ; }
    }
 
    Menu, PVperfs, Add, &Limit memory usage, ToggleLimitMemUsage
@@ -31492,22 +31903,28 @@ BuildMainMenu() {
    Menu, PVsounds, Add, Audio volume: %mediaSNDvolume%`%, dummy
    Menu, PVsounds, Disable, Audio volume: %mediaSNDvolume%`%
 
-   Menu, PVfileSel, Add, &First`tCtrl+Home, jumpToFilesSelBorderFirst
-   Menu, PVfileSel, Add, &Previous`tCtrl+Left, navSelectedFilesPrev
-   Menu, PVfileSel, Add, &Next`tCtrl+Right, navSelectedFilesNext
-   Menu, PVfileSel, Add, &Last`tCtrl+End, jumpToFilesSelBorderLast
-   Menu, PVfileSel, Add, 
-   Menu, PVfileSel, Add, Select/deselect file`tTab / Space, MenuMarkThisFileNow
-   Menu, PVfileSel, Add, Select all`tCtrl+A, selectAllFiles
-   Menu, PVfileSel, Add, Select none`tCtrl+D, dropFilesSelection
-   Menu, PVfileSel, Add, Select random, PanelSelectRandomFiles
-   Menu, PVfileSel, Add, Invert selection`tShift+I, invertFilesSelection
-   Menu, PVfileSel, Add, 
-   If (thumbsDisplaying=1)
-      Menu, PVfileSel, Add, Revie&w selected files`tR, filterToFilesSelection
+   If (markedSelectFile>1)
+   {
+      Menu, PVfileSel, Add, &First`tCtrl+Home, jumpToFilesSelBorderFirst
+      Menu, PVfileSel, Add, &Previous`tCtrl+Left, navSelectedFilesPrev
+      Menu, PVfileSel, Add, &Next`tCtrl+Right, navSelectedFilesNext
+      Menu, PVfileSel, Add, &Last`tCtrl+End, jumpToFilesSelBorderLast
+      Menu, PVfileSel, Add, 
+      Menu, PVfileSel, Add, Invert selection`tShift+I, invertFilesSelection
+      Menu, PVfileSel, Add, Select none`tCtrl+D, dropFilesSelection
+   }
 
-   Menu, PVfileSel, Add, Filter files list to selected`tCtrl+Tab, filterToFilesSelection
-   If (testIsDupesList()=1 && thumbsDisplaying=1)
+   Menu, PVfileSel, Add, Select all`tCtrl+A, selectAllFiles
+   Menu, PVfileSel, Add, Select/deselect file`tTab / Space, MenuMarkThisFileNow
+   Menu, PVfileSel, Add, Select random, PanelSelectRandomFiles
+   Menu, PVfileSel, Add, Select all in same folder`tE, QuickSelectFilesSameFolder
+   Menu, PVfileSel, Add, 
+   If (markedSelectFile>1)
+   {
+      Menu, PVfileSel, Add, Revie&w selected files`tR, filterToFilesSelection
+      Menu, PVfileSel, Add, Filter files list to selection`tCtrl+Tab, filterToFilesSelection
+   }
+   If (testIsDupesList()=1)
       Menu, PVfileSel, Add, Select the other images in dupes group`tS, keepSelectedDupeInGroup
 
 ; main menu
@@ -31551,7 +31968,11 @@ BuildMainMenu() {
          Menu, PVmenu, Add, Files inde&x/list, :PVfList
 
       If (thumbsDisplaying=1 && maxFilesIndex>1)
-         Menu, PVmenu, Add, Sort list b&y..., :PVsort
+      {
+         okay := (testIsDupesList() && InStr(resultedFilesList[currentFileIndex, 23], "_")) ? 0 : 1
+         If okay
+            Menu, PVmenu, Add, Sort list b&y..., :PVsort
+      }
 
       friendly := (thumbsDisplaying=1) ? "&Thumbnails view" : "Image vie&w"
       If (thumbsDisplaying!=1) || (thumbsDisplaying=1 && thumbnailsListMode!=1)
@@ -31580,17 +32001,20 @@ BuildMainMenu() {
 
    If (markedSelectFile && thumbsDisplaying!=1)
       Menu, PVmenu, Add, Dro&p files selection`tShift+Tab, dropFilesSelection
-   Else If (markedSelectFile && thumbsDisplaying=1)
+   Else If (thumbsDisplaying=1)
       Menu, PVmenu, Add, F&iles selection, :PVfileSel
 
    createMenuInterfaceOptions()
-
    If StrLen(filesFilter)>1
    {
       Menu, PVmenu, Add,
       Menu, PVmenu, Add, Remove files list filter`tCtrl+Space, MenuRemFilesListFilter
       If testIsDupesList()
+      {
          Menu, PVmenu, Add, Auto-select &duplicates, PanelAutoSelectDupes
+         If InStr(resultedFilesList[currentFileIndex, 23], "_")
+            Menu, PVmenu, Add, Change filter threshold, PanelChangeHamDistThreshold
+      }
       Menu, PVmenu, Add,
    } Else If (SLDtypeLoaded=2 && currentFilesListModified=1 && CurrentSLD && maxFilesIndex>1)
    {
@@ -32054,6 +32478,9 @@ ToggleRecordSeenImages() {
 ToggleSkipSeenIMGs() {
    skipSeenImageSlides := !skipSeenImageSlides
    INIaction(1, "skipSeenImageSlides", "General")
+   friendly := (skipSeenImageSlides=1) ? "ACTIVATED" : "DEACTIVATED"
+   showTOOLtip("Skip already seen images: " friendly)
+   SetTimer, RemoveTooltip, % -msgDisplayTime + 1500
 }
 
 ToggleAutoResetImageView() {
@@ -34033,6 +34460,7 @@ SLDBinitSQLdb(fileNamu) {
    SQL .= "CREATE TABLE dynamicfolders (imgfolder TEXT COLLATE NOCASE NOT NULL ON CONFLICT IGNORE, fmodified INT, PRIMARY KEY(imgfolder ASC));"
    SQL .= "CREATE TABLE staticfolders (imgfolder TEXT COLLATE NOCASE NOT NULL ON CONFLICT IGNORE, fmodified INT, PRIMARY KEY(imgfolder ASC));"
    SQL .= "CREATE TABLE settings (paramz TEXT COLLATE NOCASE NOT NULL ON CONFLICT IGNORE, valuez TEXT COLLATE NOCASE, PRIMARY KEY(paramz ASC, valuez ASC));"
+   SQL .= "CREATE INDEX imgsIndex ON images(imgidu, imgfolder, imgfile);"
    If !activeSQLdb.Exec(SQL)
       Return activeSQLdb.ErrorMsg
 }
@@ -34894,7 +35322,7 @@ setGIFframesDelay() {
 multiPageFileManaging(oBitmap) {
    rawFmt := Gdip_GetImageRawFormat(oBitmap)
    totalFramesIndex := Gdip_GetBitmapFramesCount(oBitmap) - 1
-   If (totalFramesIndex<0)
+   If (totalFramesIndex<0 || !totalFramesIndex)
       totalFramesIndex := 0
 
    If (desiredFrameIndex>=totalFramesIndex)
@@ -35014,8 +35442,9 @@ LoadBitmapFromFileu(imgPath, noBPPconv:=0, forceGDIp:=0, allowCaching:=0, allowM
 
   If (allowCaching=1)
   {
+     fimStuff := (alwaysOpenwithFIM=1) ? 1 desiredFrameIndex totalFramesIndex : 0
      MD5name := generateThumbName(imgPath, 1)
-     thisMD5name := MD5name imgPath userHQraw alwaysOpenwithFIM cmrRAWtoneMapAlgo cmrRAWtoneMapParamA cmrRAWtoneMapParamB
+     thisMD5name := MD5name imgPath userHQraw fimStuff cmrRAWtoneMapAlgo cmrRAWtoneMapParamA cmrRAWtoneMapParamB
      If (thisMD5name=prevMD5nameA && StrLen(GDIcacheSRCfileA)>2 && StrLen(prevMD5nameA)>2)
      {
         addJournalEntry("Used unprocessed cached GDI bitmap ID: " GDIcacheSRCfileA "`n" imgPath)
@@ -35241,7 +35670,7 @@ generalInternalErrorMsgBox(err, baseMsg, silentMode:=0) {
 
 CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReloaded) {
   Critical, on
-  Static AprevImgDownScaled := 0, BprevImgDownScaled := 0, lastInvoked := 1
+  Static prevFrame := -1, AprevImgDownScaled := 0, BprevImgDownScaled := 0, lastInvoked := 1
 
   totalFramesIndex := 0
   GDIbmpFileConnected := 1
@@ -35257,7 +35686,7 @@ CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReload
   prevLastImg[1] := [currentFileIndex, resultedFilesList[currentFileIndex, 1]]
   gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
   file2load := thumbsCacheFolder "\big-" alwaysOpenwithFIM userHQraw MD5name ".png"
-  ignoreCache := (RegExMatch(imgPath, "i)(.\.gif)$") && animGIFsSupport=1) || (minimizeMemUsage=1) || StrLen(UserMemBMP)>2 ? 1 : mustReloadIMG
+  ignoreCache := (prevFrame!=desiredFrameIndex || minimizeMemUsage=1 || StrLen(UserMemBMP)>2) ? 1 : mustReloadIMG
   ; MsgBox, % imgPath "`n" AbackupIMGdetails.File "`n" BbackupIMGdetails.File "`n" CbackupIMGdetails.File
   If (SubStr(AprevImgCall, 2)=thisImgCall && StrLen(AprevGdiBitmap)>2 && ignoreCache=0)
   {
@@ -35273,7 +35702,8 @@ CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReload
      Else If (imgPath=BbackupIMGdetails.File)
         currIMGdetails := BbackupIMGdetails.Clone()
      extractAmbientalTexture()
-     Return 
+     totalFramesIndex := currIMGdetails.Frames
+     Return
   } Else If (SubStr(BprevImgCall, 2)=thisImgCall && StrLen(BprevGdiBitmap)>2 && ignoreCache=0)
   {
      UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
@@ -35287,6 +35717,7 @@ CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReload
         currIMGdetails := AbackupIMGdetails.Clone()
      Else If (imgPath=BbackupIMGdetails.File)
         currIMGdetails := BbackupIMGdetails.Clone()
+     totalFramesIndex := currIMGdetails.Frames
      extractAmbientalTexture()
      Return
   }
@@ -35311,8 +35742,8 @@ CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReload
   lastInvoked := A_TickCount
   slowFileLoad := (A_TickCount - coreIMGzeitLoad > 450) ? 1 : 0
   hasFullReloaded := 1
-
   rawFmt := Gdip_GetImageRawFormat(oBitmap)
+  rawFmt := (rawFmt="MEMORYBMP" && fimMultiPage) ? fimMultiPage : rawFmt
   abortImgLoad := interfaceThread.ahkgetvar.canCancelImageLoad
   If (RegExMatch(rawFmt, "i)(bmp|png|tiff)$") && currIMGdetails.HasAlpha=1 && StrLen(UserMemBMP)<3)
   {
@@ -35453,13 +35884,14 @@ CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReload
   }
 
   BprevImgCall := AprevImgCall
-  AprevImgCall := GDIbmpFileConnected MD5name imgPath o_bwDithering ColorDepthDithering o_AutoDownScaleIMGs vpIMGrotation
+  AprevImgCall := GDIbmpFileConnected MD5name imgPath o_bwDithering ColorDepthDithering o_AutoDownScaleIMGs vpIMGrotation desiredFrameIndex
   gdiBitmapIDcall := AprevImgCall
   gdiBitmapIDentire := AprevImgCall rBitmap
   gdiBitmap := rBitmap
   abortImgLoad := interfaceThread.ahkgetvar.canCancelImageLoad
   extractAmbientalTexture(abortImgLoad)
   BprevGdiBitmap := trGdip_DisposeImage(BprevGdiBitmap, 1)
+  prevFrame := desiredFrameIndex
   If (allowCaching=1)
   {
      BprevGdiBitmap := AprevGdiBitmap
@@ -37781,7 +38213,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     prevLoadedImageIndex := currentFileIndex
     createGDIPcanvas(mainWidth, mainHeight)
     testIDvPcache := imgPath zoomLevel IMGresizingMode imageAligned IMGdecalageX IMGdecalageY mainWidth mainHeight desiredFrameIndex gdiBitmap
-    If (CountGIFframes>1 && !AnyWindowOpen && animGIFsSupport=1 && prevAnimGIFwas!=imgPath)
+    If (CountGIFframes>1 && !AnyWindowOpen && animGIFsSupport=1 && prevAnimGIFwas!=imgPath && alwaysOpenwithFIM!=1)
        mustPlayAnim := 1
     Else
        DestroyGIFuWin()
@@ -38007,8 +38439,8 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     setMainCanvasTransform(mainWidth, mainHeight)
     Gdip_SetClipRect(glPG, 0, 0, mainWidth, mainHeight, 0)
     decideGDIPimageFX(matrix, imageAttribs, pEffect)
-   ; gp := Gdip_GetImagePixelFormat(ViewPortBMPcache, 2) 
-   ; ToolTip, % gp , , , 2
+    ; gp := Gdip_GetImagePixelFormat(ViewPortBMPcache, 2) 
+    ; ToolTip, % gp , , , 2
     If pEffect
        r4 := trGdip_DrawImageFX(A_ThisFunc, glPG, ViewPortBMPcache, 0, 0, 0, 0, mainWidth, mainHeight, matrix, pEffect, imageAttribs)
     Else
@@ -38093,7 +38525,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     If (mustRecordSeenImgs=1 && gdiBMPchanged=1 && !InStr(r, "error"))
        recordSeenIMGdbEntry(imgPath, currentFileIndex)
 
-    ; ToolTip, % thisZeit ", " totalZeit ", " drawModeCzeit "==" prevGDIvpCache ,,,2
+    ; ToolTip, % fullLoadZeit ", "  thisZeit ", " totalZeit ", " drawModeCzeit "==" prevGDIvpCache ,,,2
     Return r
 }
 
@@ -38152,6 +38584,8 @@ selectRandomFiles(howMany, replaceAll, modus) {
 
    lastZeitFileSelect := A_TickCount
    getSelectedFiles(0, 1)
+   interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
+   interfaceThread.ahkassign("markedSelectFile", markedSelectFile)
    dummyTimerReloadThisPicture(50)
 }
 
@@ -38183,6 +38617,8 @@ selectAllFiles(dummy:=0) {
 
     lastZeitFileSelect := A_TickCount
     markedSelectFile := (selMode=1) ? maxFilesIndex : 0
+    interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
+    interfaceThread.ahkassign("markedSelectFile", markedSelectFile)
     SetTimer, mainGdipWinThumbsGrid, -10
 }
 
@@ -40319,8 +40755,75 @@ coreLoadDynaFolders(fileNamu) {
     listu .= "`n" Trimmer(DynamicFoldersList) "`n"
     changeMcursor()
     Sort, listu, UD`n
+    listu := cleanDynamicFoldersList(listu)
     DynamicFoldersList := listu
     Return listu
+}
+
+cleanDynamicFoldersList(listu) {
+    newArrayu := []
+    thisIndex := 0
+    Loop, Parse, listu, `n
+    {
+       If (!InStr(A_LoopField, "|") && A_LoopField)
+       {
+          thisIndex++
+          newArrayu[thisIndex] := A_LoopField
+       }
+    }
+
+    For Key, Value in newArrayu
+    {
+       If !Value
+          Continue
+       listu := StrReplace(listu, "`n|" Value "\", "`n")
+       ; MsgBox, % value
+       listu := StrReplace(listu, "`n|" Value, "`n")
+       listu := StrReplace(listu, "`n" Value "\", "`n")
+    }
+
+    newListu := ""
+    Loop, Parse, listu, `n
+    {
+       If RegExMatch(A_LoopField, "^(.?.\:\\.)")
+          newListu .= A_LoopField "`n"
+    }
+
+    newArrayu := ""
+    Return newListu
+}
+
+compareFoldersList(mainFoldersListu, foldersListu) {
+   obju := []
+   stuffAdded := 0
+   Loop, Parse, foldersListu,`n
+   {
+       linea := Trimmer(A_LoopField)
+       If StrLen(linea)<4
+          Continue
+
+       skipThis := 0
+       Loop, Parse, mainFoldersListu, `n
+       {
+           line := Trimmer(A_LoopField)
+           If StrLen(line)<4
+              Continue
+
+           If (line=linea)
+              skipThis := 1
+       }
+
+       If (skipThis=1)
+          Continue
+
+       obju.newEntries .= linea "`n"
+   }
+
+   mainFoldersListu .= "`n" obju.newEntries
+   Sort, mainFoldersListu, UD`n
+   obju.newListu := mainFoldersListu
+
+   Return obju
 }
 
 RegenerateEntireList() {
@@ -40340,7 +40843,7 @@ RegenerateEntireList() {
     thisIndex := currentFileIndex
     newStaticFoldersListCache := []
     startOperation := A_TickCount
-    showTOOLtip("Refreshing files list, please wait")
+    showTOOLtip("Preparing to refresh the files list, please wait")
     listu := getDynamicFoldersList()
     If StrLen(listu)<4
     {
@@ -40358,13 +40861,8 @@ RegenerateEntireList() {
     bckpMaxFilesIndex := 0
     renewCurrentFilesList()
     mustGenerateStaticFolders := (SLDtypeLoaded=3) ? 0 : 1
-    Sort, listu, UD`n
     If (SLDtypeLoaded=3)
     {
-       ; activeSQLdb.Exec("UPDATE images SET isDeleted=1;")
-       ; activeSQLdb.Exec("DELETE FROM images;")
-       recreateDynaFoldersSQLdbList(listu)
-       saveSlideSettingsInDB()
        getMaxRowIDsqlDB()
        activeSQLdb.Exec("BEGIN TRANSACTION;")
     }
@@ -40380,53 +40878,55 @@ RegenerateEntireList() {
 
        If (SLDtypeLoaded=3)
        {
+          getMaxRowIDsqlDB()
           thisR := SQLescapeStr(fileTest, 1)
           thisR := (isPipe=1) ? thisR : thisR "%"
           SQLstr := "UPDATE images SET isDeleted=1 WHERE imgfolder LIKE '" thisR "' ESCAPE '>';"
           activeSQLdb.Exec(SQLstr)
        }
 
-       r := GetFilesList(line "\*", A_Index / countFolders, 0)
+       r := GetFilesList(line "\*", A_Index / countFolders, 0, 0)
        If (SLDtypeLoaded=3)
-          SQLdeleteEntriesMarked()
+          maxFilesIndex := getTotalIMGsSQLdb("WHERE isDeleted=0")
 
        If (r="abandoned")
           Break
     }
 
-    If (SLDtypeLoaded=3 && RegExMatch(fileNamu, "i)(.\.sldb)$"))
+    If (SLDtypeLoaded=3 && RegExMatch(CurrentSLD, "i)(.\.sldb)$"))
     {
        If (r="abandoned")
        {
-          showTOOLtip("Operation aboorted: regenerate files list. The files list is unchanged.`nReopening now the database")
+          showTOOLtip("Operation aborted: regenerate files list. The files list is unchanged.`nReopening now the database, please wait")
           activeSQLdb.Exec("ROLLBACK TRANSACTION;")
           Sleep, 250
-          OpenSLD(CurrentSLD, 1)
-          Return
+       } Else
+       {
+          showTOOLtip("Finalising database operations, please wait", 0, 0, 1/5)
+          SQLdeleteEntriesMarked()
+          showTOOLtip("Finalising database operations, please wait", 0, 0, 2/5)
+          If !activeSQLdb.Exec("COMMIT TRANSACTION;")
+             throwSQLqueryDBerror(A_ThisFunc)
+
+          showTOOLtip("Regenerating main folders list, please wait", 0, 0, 3/5)
+          recreateDynaFoldersSQLdbList(listu)
+          showTOOLtip("Regenerating secondary folders list, please wait", 0, 0, 4/5)
+          SQLdbGenerateStaticFolders()
+          saveSlideSettingsInDB()
+          etaTime := "Elapsed time to regenerate files list, database mode: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
+          addJournalEntry(etaTime)
        }
 
-       showTOOLtip("Finalising database operations, please wait")
-       If !activeSQLdb.Exec("COMMIT TRANSACTION;")
-          throwSQLqueryDBerror(A_ThisFunc)
+       OpenSLD(CurrentSLD, 1)
+       Return
     }
 
     thisFolder := StrReplace(CurrentSLD, "|")
-    If (SLDtypeLoaded=3 && r!="abandoned")
-    {
-       etaTime := "Elapsed time to regenerate files list [ database mode ]: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
-       SQLdbGenerateStaticFolders()
-       OpenSLD(CurrentSLD, 1)
-       addJournalEntry(etaTime ". Files: " groupDigits(maxFilesIndex))
-       Return
-    } Else If (SLDtypeLoaded=1 && FolderExist(thisFolder))
+    If (SLDtypeLoaded=1 && FolderExist(thisFolder))
        watchFolderDetails := getFolderDetails(thisFolder)
 
     GenerateRandyList()
-    If (r="abandoned" && SLDtypeLoaded!=3)
-    {
-       SoundBeep, 300, 100
-    } Else SoundBeep, 900, 100
-
+    SoundBeep, % (r="abandoned" && SLDtypeLoaded!=3) ? 300 : 900, 100
     currentFileIndex := clampInRange(thisIndex, 1, maxFilesIndex)
     If (maxFilesIndex<1)
     {
@@ -40466,6 +40966,25 @@ getMaxRowIDsqlDB() {
   Return sqlDBrowID
 }
 
+getTotalIMGsSQLdb(morus:="") {
+  SQL := "SELECT COUNT(*) FROM images " morus ";"
+  If !activeSQLdb.GetTable(SQL, RecordSet)
+  {
+     addJournalEntry(A_ThisFunc "() " activeSQLdb.ErrorMsg)
+     Return
+  }
+
+  Loop, % RecordSet.RowCount
+  {
+      Rowu := RecordSet.Rows[A_Index]
+      If IsNumber(Rowu[1])
+         value := Rowu[1]
+  }
+
+  RecordSet.Free()
+  Return value
+}
+
 OpenSLDBdataBase(fileNamu, importMode:=0) {
   activeSQLdb.CloseDB()
   activeSQLdb := new SQLiteDB
@@ -40481,8 +41000,8 @@ OpenSLDBdataBase(fileNamu, importMode:=0) {
      IniSLDBreadAll() ; read slideshow settings
   } Else
   {
-     IniSLDBreadAll("prevFilesSortMode")
-     IniSLDBreadAll("reverseOrderOnSort")
+     ; IniSLDBreadAll("prevFilesSortMode")
+     ; IniSLDBreadAll("reverseOrderOnSort")
   }
 
   RecordSet := ""
@@ -40491,7 +41010,7 @@ OpenSLDBdataBase(fileNamu, importMode:=0) {
   reorder := StrLen(prevFilesSortMode)>3 ? " ORDER BY " prevFilesSortMode sortMode ";" : " ORDER BY imgidu;"
  
   startOperation := A_TickCount
-  SQL := "SELECT imgidu, fullPath FROM images" reorder
+  SQL := "SELECT imgidu, imgfolder||'\'||imgfile FROM images" ; reorder
   If !activeSQLdb.GetTable(SQL, RecordSet)
   {
      throwSQLqueryDBerror(A_ThisFunc)
@@ -40543,254 +41062,365 @@ OpenSLDBdataBase(fileNamu, importMode:=0) {
   ; MsgBox, % ("Files: " maxFilesIndex "Query: " . SQL . " done in " . (A_TickCount - Start) . " ms`n`n" resultedFilesList[10])
 }
 
-crapBIGcrap() {
-   ; collectSQLFileInfosNow(thisNOTnullCol, 0, 1, 0)
-   ; If InStr(theseCols, "pixelzHash")
-   ;    generateSQLimagesExtraHash()
-
-   showTOOLtip("Identifying image duplicates, please wait")
-   ; SQLstr := "SELECT imgidu, fullPath, a.imgmegapix, a.fsize, a.innerpixelz||a.outerpixelz, b.groupID FROM images AS a`n"
-   ; SQLstr .= " JOIN (SELECT substr(pixelzHash, 4, 32) AS pixelzHash, ROWID AS groupID`n"
-   ; SQLstr .= " FROM images WHERE pixelzHash IS NOT NULL`n"
-   ; SQLstr .= " GROUP BY substr(pixelzHash, 4, 32) HAVING count(*)>1) AS b`n"
-   ; SQLstr .= " ON (substr(a.pixelzHash, 4, 32) = b.pixelzHash)"
-   ; SQLstr .= " ORDER BY b.groupID;"
-
-   SQLstr := "SELECT imgidu, fullPath, imgmegapix, fsize, entireHush`n"
-   SQLstr .= " FROM images WHERE pixelzHash IS NOT NULL`n"
-   SQLstr .= " ORDER BY imgidu LIMIT 10201;"
-
-   startOperation := A_TickCount
-   If !activeSQLdb.GetTable(SQLstr, RecordSet)
+SQLdbRetrieveGivenFolder(pathu, isRecursive) {
+   rec := (isRecursive=1) ? "%" : ""
+   pathu := SQLescapeStr(pathu, 1)
+   SQL := "SELECT imgidu, fullPath FROM images WHERE imgfolder LIKE '%" pathu rec "' ESCAPE '>'" ; reorder
+   If !activeSQLdb.GetTable(SQL, RecordSet)
    {
       throwSQLqueryDBerror(A_ThisFunc)
       Return -1
    }
 
-   If (RecordSet.RowCount<2)
-   {
-      showTOOLtip("Found no image duplicates")
-      addJournalEntry("SQL query used:`n" SQLstr)
-      SoundBeep , 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      If !SortCriterion
-         SetTimer, PanelFindDupes, -250
-      Return
-   }
-
-   doStartLongOpDance()
-   showTOOLtip("Found " groupDigits(RecordSet.RowCount) " duplicate images`nGenerating files, please wait")
-   groupies := []
-   currIDs := []
-   Roza := []
-   hashesListArray := new hashtable()
-   prevMSGdisplay := A_TickCount
    Loop, % RecordSet.RowCount
    {
-      Roxa := RecordSet.Rows[A_Index]
-      ; Roza[A_Index] := [Roxa[1], Roxa[2], Roxa[3], Roxa[4], "0x" ConvertBase(2, 16, reorderStoredHash(Roxa[5], Roxa[6]))]
-      Roza[A_Index] := [Roxa[1], Roxa[2], Roxa[3], Roxa[4]]
-      hashesList[A_Index] := Roxa[5]
-      ; Roza[A_Index] := [Roxa[1], Roxa[2], Roxa[3], Roxa[4], Roxa[5]]
+       Rowu := RecordSet.Rows[A_Index]
+       If Rowu[2]
+       {
+          maxFilesIndex++
+          resultedFilesList[maxFilesIndex, 1] := Rowu[2]
+          If (importMode!=1)
+             resultedFilesList[maxFilesIndex, 12] := Rowu[1]
+       }
    }
-
-   oneLap := RecordSet.RowCount
-   totalLoops := Round((RecordSet.RowCount * RecordSet.RowCount)*0.49686)
-   totalu := Round((RecordSet.RowCount * RecordSet.RowCount)*0.5)
-   mainIndex := secondIndex := 1
-   newTempList := []
-   VarSetCapacity(bigArray, 8*elements)
-   Loop, % elements
-   {
-      NumPut(mainArray[A_Index], bigArray,8*(A_Index - 1), "uint64")
-   }
-   DllCall("DllFile\Function", "Ptr", &bigArray, "Ptr*", resultsArray)
-
-
-   Loop, % totalu
-   {
-      secondIndex++
-      If (secondIndex>oneLap)
-      {
-         mainIndex++
-         If (mainIndex>oneLap)
-            Break
-         Else
-            secondIndex := mainIndex + 1
-
-         ; cu := StrSplit(Roza[mainIndex, 5])
-      }
-      If (secondIndex=mainIndex) ; || IsObject(newTempList[Roza[secondIndex, 1]])
-      {
-         skippedFiles++
-         Continue
-      }
-
-      ; If (determineTerminateOperation()=1)
-      ; {
-      ;    abandonAll := 1
-      ;    Break
-      ; }
-
-         If (A_TickCount - prevMSGdisplay>2000)
-         {
-            etaTime := ETAinfos(A_Index, totalLoops, startOperation)
-            showTOOLtip("looping... " groupDigits(mainIndex) "..." groupDigits(foundDupes) "..." newTempList.Count()  "..." skippedFiles "`n" etaTime)
-            prevMSGdisplay := A_TickCount
-         }
-
-            If (HammingDistanceNew2020dec(hashesListArray[mainIndex], hashesListArray[secondIndex])<2)
-            {
-               ; HammingDistanceNew2020dec(Roza[mainIndex, 5], Roza[secondIndex, 5], 0)
-
-               ; ToolTip, %  Roza[mainIndex, 5] "`n" Roza[secondIndex, 5], , , 2
-               ; Sleep, , 200
-               foundDupes++
-               ; newTempList[Roza[secondIndex, 1]] := Roza
-            }
-
-   }
-
-
-
-
-
-/*
-
-   method 1
-
-   Loop, % totalu
-   {
-      secondIndex++
-      If (secondIndex>oneLap)
-      {
-         mainIndex++
-         If (mainIndex>oneLap)
-            Break
-         Else
-            secondIndex := mainIndex + 1
-
-         ; cu := StrSplit(Roza[mainIndex, 5])
-      }
-      If (secondIndex=mainIndex) || IsObject(newTempList[Roza[secondIndex, 1]])
-      {
-         skippedFiles++
-         Continue
-      }
-
-      If (determineTerminateOperation()=1)
-      {
-         abandonAll := 1
-         Break
-      }
-
-         If (A_TickCount - prevMSGdisplay>2000)
-         {
-            etaTime := ETAinfos(A_Index, totalLoops, startOperation)
-            showTOOLtip("looping... " groupDigits(mainIndex) "..." groupDigits(foundDupes) "..." newTempList.Count()  "..." skippedFiles "`n" etaTime)
-            prevMSGdisplay := A_TickCount
-         }
-
-            If (HammingDistanceNew2020dec(Roza[mainIndex, 5], Roza[secondIndex, 5])<2)
-            {
-               ; HammingDistanceNew2020dec(Roza[mainIndex, 5], Roza[secondIndex, 5], 0)
-
-               ; ToolTip, %  Roza[mainIndex, 5] "`n" Roza[secondIndex, 5], , , 2
-               ; Sleep, , 200
-               foundDupes++
-               newTempList[Roza[secondIndex, 1]] := Roza
-
-               ; If (groupies[Rowu[6]]!=1)
-               ; {
-               ;    resultedFilesList[maxFilesIndex, 1] := Rowu[2]
-               ;    resultedFilesList[maxFilesIndex, 12] := Rowu[1]
-               ;    resultedFilesList[maxFilesIndex, 17] := Rowu[3]
-               ;    resultedFilesList[maxFilesIndex, 6] := Rowu[4]
-               ;    resultedFilesList[maxFilesIndex, 23] := Rowu[6]
-               ; } Else
-               ; {
-               ;    resultedFilesList[maxFilesIndex, 1] := Row[2]
-               ;    resultedFilesList[maxFilesIndex, 12] := Row[1]
-               ;    resultedFilesList[maxFilesIndex, 17] := Row[3]
-               ;    resultedFilesList[maxFilesIndex, 6] := Row[4]
-               ;    resultedFilesList[maxFilesIndex, 23] := Rowu[6]
-               ; }
-               ; groupies[Rowu[6]] := 1
-            }
-
-   }
-
-*/
-
-/*
-
-   method 0
-
-   totalLoops := RecordSet.RowCount
-   Loop, % RecordSet.RowCount
-   {
-      If (determineTerminateOperation()=1)
-      {
-         abandonAll := 1
-         Break
-      }
-
-      ; Rowu := RecordSet.Rows[A_Index]
-
-         If (A_TickCount - prevMSGdisplay>2000)
-         {
-            etaTime := ETAinfos(A_Index, totalLoops, startOperation)
-            showTOOLtip("looping... " groupDigits(A_Index) "`n" etaTime)
-            prevMSGdisplay := A_TickCount
-         }
-
-         Loop, % RecordSet.RowCount
-         {
-            ; Row := RecordSet.Rows[A_Index]
-            If (currIDs[Roza[A_Index, 1]]=1)
-            {
-            ;    ; thisu++
-            ;    ; ToolTip, % thisu "=" , , , 2
-               Continue
-            }
-            If (HammingDistance3(Rowu[5], Row[5])<2)
-            {
-               maxFilesIndex++
-               If (groupies[Rowu[6]]!=1)
-               {
-                  resultedFilesList[maxFilesIndex, 1] := Rowu[2]
-                  resultedFilesList[maxFilesIndex, 12] := Rowu[1]
-                  resultedFilesList[maxFilesIndex, 17] := Rowu[3]
-                  resultedFilesList[maxFilesIndex, 6] := Rowu[4]
-                  resultedFilesList[maxFilesIndex, 23] := Rowu[6]
-               } Else
-               {
-                  resultedFilesList[maxFilesIndex, 1] := Row[2]
-                  resultedFilesList[maxFilesIndex, 12] := Row[1]
-                  resultedFilesList[maxFilesIndex, 17] := Row[3]
-                  resultedFilesList[maxFilesIndex, 6] := Row[4]
-                  resultedFilesList[maxFilesIndex, 23] := Rowu[6]
-               }
-               groupies[Rowu[6]] := 1
-            }
-         }
-         currIDs[Roza[A_Index, 1]] := 1
-      ; }
-   }
-*/
-
+ 
    RecordSet.Free()
-   ; userFilterDoString := 0
-   ; currentFileIndex := userFilterProperty := 1
-   ; filesFilter := "SQL:query:" StrReplace(SubStr(SQLstr, Round(InStr(SQLstr, "JOIN (")), InStr(SQLstr, " ORDER BY") - InStr(SQLstr, "JOIN (")), "`n", A_Space)
-   ; ToolTip, % filesFilter , , , 2
-   etaTime := "Elapsed time to identify possible image duplicates: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: " maxFilesIndex
-   addJournalEntry(etaTime)
-   showDelayedTooltip("Found " groupDigits(groupies.Count()) " groups of duplicates`nTotal images: " groupDigits(maxFilesIndex))
-   ; SetTimer, RemoveTooltip, % -msgDisplayTime
-   SetTimer, ResetImgLoadStatus, -100
-   dummyTimerDelayiedImageDisplay(90)
-   ; RandomPicture()
+}
+
+filterDupeResultsByHdist(threshold, mustConvertHash) {
+   doStartLongOpDance()
+   showTOOLtip("Preparing list for Hamming distance calculations, please wait")
+   groupies := []
+   prevMSGdisplay := A_TickCount
+   startOperation := A_TickCount
+   Loop, % maxFilesIndex
+   {
+       If (determineTerminateOperation()=1)
+       {
+          abandonAll := 1
+          Break
+       }
+
+       If (A_TickCount - prevMSGdisplay>1000)
+       {
+          etaTime := ETAinfos(A_Index, maxFilesIndex, startOperation)
+          showTOOLtip("Preparing list for Hamming distance calculations, please wait" etaTime, 0, 0, A_index/maxFilesIndex)
+          prevMSGdisplay := A_TickCount
+       }
+
+       grpIDu := resultedFilesList[A_Index, 23]
+       If grpIDu
+       {
+          grpIDv%grpIDu%++
+          hash := (mustConvertHash=1) ? ConvertBase(2, 16, resultedFilesList[A_Index, 28]) : resultedFilesList[A_Index, 28]
+          groupies[grpIDu, grpIDv%grpIDu%] := [A_Index, hash]
+          ; groupies[grpID] := [A_Index, hash, grpIDv%grpIDu%]
+       }
+   }
+
+   If (abandonAll=1)
+      Return
+
+   ; prevMSGdisplay := A_TickCount
+   startOperation := A_TickCount
+   totalLoops := groupies.Count()
+   rtotalLoops := 0
+   For Key, Value in groupies
+         rtotalLoops += Value.Count()
+
+   ; MsgBox, % "groups=" totalLoops
+
+   prevMSGdisplay := A_TickCount
+   startOperation := A_TickCount
+   thisLoop := 0
+   For Key, Value in groupies
+   {
+       If (determineTerminateOperation()=1)
+       {
+          abandonAll := 1
+          Break
+       }
+
+       If (A_TickCount - prevMSGdisplay>1000)
+       {
+          etaTime := ETAinfos(thisLoop, rtotalLoops, startOperation)
+          showTOOLtip("Calculating Hamming distance between image pairs`nImage groups: " A_Index " / " groupDigits(totalLoops) etaTime, 0, 0, thisLoop/rtotalLoops)
+          prevMSGdisplay := A_TickCount
+       }
+
+       thisLoop += value.Count()
+       If corefilterDupeResultsByHdist(value, threshold, thisLoop, rtotalLoops)
+       {
+          abandonAll := 1
+          Break
+       }
+   }
+
+   groupies := []
+   If (abandonAll=1)
+      Return
+ 
+   showTOOLtip("Finishing the duplicate images filtered list, please wait")
+   finalArray := degroupMonoGroups(resultedFilesList)
+   maxFilesIndex := finalArray.Count()
+   resultedFilesList := []
+   resultedFilesList := finalArray.Clone()
+   changeHdistLevelCached("kill")
+   ResetImgLoadStatus()
+}
+
+degroupMonoGroups(givenArray, oldMap:=0) {
+   groupies := []
+   listuGroupies := "|"
+   Loop, % givenArray.Count()
+   {
+       grpIDu := givenArray[A_Index, 23]
+       If grpIDu
+       {
+          grpIDv%grpIDu%++
+          If (grpIDv%grpIDu%>1)
+             groupies[grpIDu] := 1
+
+          listuGroupies .= grpIDu "z" A_Index "|"
+       }
+   }
+
+   listuGroupies := Trimmer(listuGroupies, "|")
+   Sort, listuGroupies, D|
+   newIndex := 0
+   newArrayu := []
+   newMappingList := []
+   ; ToolTip, % listuGroupies , , , 2
+   Loop, Parse, listuGroupies, |
+   {
+       If A_LoopField
+       {
+          zu := StrSplit(A_LoopField, "z")
+          If groupies[zu[1]]
+          {
+             newIndex++
+             newArrayu[newIndex] := givenArray[zu[2]]
+             newArrayu[newIndex, 28] := ""
+             If (hasHamDistCached=1 && IsObject(oldMap))
+                newMappingList[newIndex] := oldMap[zu[2]]
+          }
+       }
+   }
+
+   If (hasHamDistCached=1 && IsObject(oldMap) && newIndex>1)
+   {
+      filteredMap2mainList := []
+      filteredMap2mainList := newMappingList.Clone()
+   }
+ 
+   Return newArrayu
+}
+
+calculateNCR2(n){
+; n (objects)
+; r (sample size) [default r=2]
+; formula: n! / ( r! * (n-r)! )
+
+   initQPVmainDLL()
+   func2exec := (A_PtrSize=8) ? "dumbcalculateNCR" : "_dumbcalculateNCR@4"
+   z := DllCall("qpvmain.dll\" func2exec, "int", n, "uint")
+   ; ToolTip, % z "=l=" n , , , 2
+   Return z
+}
+
+changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0) {
+   Static cachedListu := []
+   If (modus="kill")
+   {
+      hasHamDistCached := 0
+      bckpResultedFilesList := []
+      filteredMap2mainList := []
+      Return -1
+   }
+
+   ; mustRenew := (newLvl=userFindDupesHamDistLvl && resultedFilesList.Count() != cachedListu.Count()) ? 1 : 0
+   If (bckpResultedFilesList.Count()<3) ; || mustRenew=1)
+   {
+      hasHamDistCached := 1
+      If markedSelectFile
+         dropFilesSelection()
+
+      bckpResultedFilesList := []
+      bckpResultedFilesList := resultedFilesList.Clone()
+      bckpMaxFilesIndex := maxFilesIndex
+   }
+
+   newArrayu := []
+   thisString := StrReplace(Trimmer(UserHamDistStringFilter), "||", "|")
+   thisString := Trimmer(thisString, "|")
+   thisFilter := processSearchIndexString(thisString)
+   isStrFilter := StrLen(thisString)>1 ? 1 : 0
+   newMappingList := []
+   Loop, % bckpResultedFilesList.Count()
+   {
+       grpIDu := bckpResultedFilesList[A_Index, 23]
+       imgPath := bckpResultedFilesList[A_Index, 1]
+       If (grpIDu && imgPath && !InStr(imgPath, "||"))
+       {
+          posu := InStr(grpIDu, "_", 0, 0) + 1
+          lvl := SubStr(grpIDu, posu)
+          If isInRange(lvl, newLvlA, newLvlB)
+          {
+             If (isStrFilter=1)
+             {
+                If !coreSearchIndex(imgPath, thisFilter, 1, UserHamDistStringInvert)
+                   Continue
+             }
+
+             newIndex++
+             newArrayu[newIndex] := bckpResultedFilesList[A_Index]
+             newArrayu[newIndex, 2] := 0
+             newMappingList[newIndex] := A_Index
+          }
+       }
+   }
+
+   If (UserHamDistCacheFilterMonoGroups=1 && newIndex>1)
+   {
+      hasThis := 1
+      hasHamDistCached := 1
+      finalArray := degroupMonoGroups(newArrayu, newMappingList)
+      newIndex := finalArray.Count()
+      newArrayu := []
+      newArrayu := finalArray.Clone()
+   }
+
+   ; ToolTip, % lvl "=" newLvlA "=" newLvlB "=" newIndex , , , 2
+   If (newIndex>1)
+   {
+      If !hasThis
+      {
+         filteredMap2mainList := []
+         filteredMap2mainList := newMappingList.Clone()
+      }
+
+      hasHamDistCached := 1
+      ForceRefreshNowThumbsList()
+      maxFilesIndex := newIndex
+      resultedFilesList := []
+      resultedFilesList := newArrayu.Clone()
+      lastZeitFileSelect := A_TickCount
+      ; dropFilesSelection(1)
+      SetTimer, RandomPicture, -350
+      Return 1
+   } Else Return 0
+}
+
+corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups) {
+   startOperation := A_TickCount
+   prevMSGdisplay := A_TickCount
+   totalLoops := dupeIDsArray.Count()
+   VarSetCapacity(HbigArray, 8 * totalLoops + 1)
+   VarSetCapacity(IDsbigArray, 8 * totalLoops + 1)
+   combinations := (totalLoops>10101) ? totalLoops*15 : calculateNCR2(totalLoops)
+   ; one cannot allocate too much memory; so I chose to cap the number of possible dupe results
+
+   VarSetCapacity(resultsArrayA, 4 * combinations + 1) ; Lpair
+   VarSetCapacity(resultsArrayB, 4 * combinations + 1) ; Rpair
+   VarSetCapacity(resultsArrayC, 4 * combinations + 1) ; hamming distance
+   etaTime := ""
+   ; ToolTip, % totalLoops "==" combinations , , , 2
+   Loop, % totalLoops
+   {
+       If (determineTerminateOperation()=1)
+       {
+          abandonAll := 1
+          Break
+       }
+
+       If (A_TickCount - prevMSGdisplay>1000)
+       {
+          etaTime := ETAinfos(A_Index, totalLoops, startOperation)
+          showTOOLtip("Hamming distance image duplicates group " groupDigits(grupu) " preparations" etaTime, 0, 0, A_Index/totalLoops)
+          prevMSGdisplay := A_TickCount
+       }
+
+       offset := (A_Index-1) * 8
+       hash := "0x" dupeIDsArray[A_Index, 2]
+       NumPut(hash, HbigArray, offset, "uint64")
+
+       offset := (A_Index-1) * 4
+       idu := dupeIDsArray[A_Index, 1]
+       NumPut(idu, IDsbigArray, offset, "uint")
+       ; stringu .= A_Index "|" idu "=" hash "`n"
+       ; msgResult := msgBoxWrapper(appTitle ": Confirmation", "You have. " stringu, 4, 0, "question")
+       ; If (msgResult="Yes")
+       ;    Break
+   }
+
+   If (abandonAll=1)
+   {
+      IDsbigArray := ""
+      HbigArray := ""
+      resultsArrayA := ""
+      resultsArrayB := ""
+      resultsArrayC := ""
+      Return 1
+   }
+
+   If etaTime
+      showTOOLtip("Calculating Hamming distance between " groupDigits(totalLoops) " images`n" groupDigits(grupu) " / " groupDigits(totalgroups) "`nPlease wait", 0, 0, grupu/totalgroups)
+
+   ; initQPVmainDLL()
+   prevMSGdisplay := A_TickCount
+   totalResults := DllCall("qpvmain.dll\hammingDistanceOverArray", "UPtr", &HbigArray, "UPtr", &IDsbigArray, "int", totalLoops, "UPtr", &resultsArrayA, "UPtr", &resultsArrayB, "UPtr", &resultsArrayC, "Int", threshold + 1, "int", combinations - 1)
+
+   If etaTime
+      prevMSGdisplay := A_TickCount
+
+   startOperation := A_TickCount
+   newArrayu := []
+   Loop, % totalResults
+   {
+       If (determineTerminateOperation()=1)
+       {
+          abandonAll := 1
+          Break
+       }
+
+       If (A_TickCount - prevMSGdisplay>2000)
+       {
+          etaTime := ETAinfos(A_Index, totalResults, startOperation)
+          showTOOLtip("Integrating Hamming distance results for specific group of found image duplicates" etaTime, 0, 0, A_Index/totalResults)
+          prevMSGdisplay := A_TickCount
+       }
+
+       idRa := NumGet(resultsArrayA, 4 * (A_Index - 1), "uInt")
+       If (idRa<0)
+          idRa := Abs(idRa)
+
+       idRb := NumGet(resultsArrayB, 4 * (A_Index - 1), "uInt")
+       If (idRb<0)
+          idRb := Abs(idRb)
+
+       idRc := NumGet(resultsArrayC, 4 * (A_Index - 1), "uInt")
+       If idRa
+          newArrayu[idRa] := idRa "_" idRc
+       If idRb
+          newArrayu[idRb] := idRa "_" idRc
+
+       ; stringu .= idRa "=" idRb "|" idRc "`n"
+   }
+
+   Loop, % totalLoops
+   {
+       idu := dupeIDsArray[A_Index, 1]
+       If !newArrayu[idu]
+          resultedFilesList[idu, 23] := ""
+       Else
+          resultedFilesList[idu, 23] .= "_" newArrayu[idu]
+   }
+
+   IDsbigArray := ""
+   HbigArray := ""
+   resultsArrayA := ""
+   resultsArrayB := ""
+   resultsArrayC := ""
 }
 
 retrieveDupesByProperties(theseCols, fsCmp, SortCriterion:=0) {
@@ -40799,7 +41429,6 @@ retrieveDupesByProperties(theseCols, fsCmp, SortCriterion:=0) {
    If SortCriterion
       mode := prevMode
 
-   prevMode := theseCols
    If RegExMatch(theseCols, "i)(innerpixelz|outerpixelz|pixelzHash)")
       thisNOTnullCol := "innerpixelz"
    Else If RegExMatch(theseCols, "i)(imgmedian|imgavg|imghpeak|imghlow|imghmode|imghminu|imghrange|imghrms)")
@@ -40811,11 +41440,24 @@ retrieveDupesByProperties(theseCols, fsCmp, SortCriterion:=0) {
    Else
       thisNOTnullCol := "imgfile"
    ; ToolTip, % theseCols "`n" thisNOTnullCol , , , 2
-   collectSQLFileInfosNow(thisNOTnullCol, 0, 1, 0)
+
+   showTOOLtip("Identifying image duplicates, please wait")
+   collectSQLFileInfosNow(thisNOTnullCol, 0, 1, 0, 0)
    If InStr(theseCols, "pixelzHash")
       generateSQLimagesExtraHash()
 
-   showTOOLtip("Identifying image duplicates, please wait")
+   If (InStr(theseCols, "innerpixelz") && userFindDupesFilterHamDist=1)
+   {
+      hashuStrA := "innerpixelz"
+      If InStr(theseCols, "outerpixelz")
+         hashuStrB := "outerpixelz"
+      theseCols := StrReplace(theseCols, hashuStrA)
+      theseCols := StrReplace(theseCols, hashuStrB)
+      theseCols := StrReplace(theseCols, ",,", ",")
+      theseCols := StrReplace(theseCols, ", ,", ",")
+   }
+
+   prevMode := theseCols
    innerTrimL := hashInnerTrimLeft + 1
    innerTrimR := 36 - hashInnerTrimRight - hashInnerTrimLeft
    outerTrimL := hashOuterTrimLeft + 1
@@ -40832,6 +41474,9 @@ retrieveDupesByProperties(theseCols, fsCmp, SortCriterion:=0) {
    ONlist := "ON ("
    Loop, Parse, % theseCols, CSV
    {
+      If !A_LoopField
+         Continue
+
       If (InStr(A_LoopField, "inner") && mustDoSubStr=1)
          ONlist .= " AND substr(a.innerpixelz," innerTrimL "," innerTrimR ") = b.innerpixelz"
       Else If (InStr(A_LoopField, "outer") && mustDoSubStr=1)
@@ -40869,37 +41514,59 @@ retrieveDupesByProperties(theseCols, fsCmp, SortCriterion:=0) {
       }
    }
 
+   mustConvertHash := 0
    theseCols := Trimmer(newCols, ",")
    selectuCols := Trimmer(selectuCols, ",")
-   SQLstr := "SELECT imgidu, fullPath, a.imgmegapix, a.fsize, b.groupID FROM images AS a`n"
+   includeHash := (userFindDupesFilterHamDist=1) ? ", entireHush" : ""
+   If (userFindDupesFilterHamDist=1 && (hashuStrA || hashuStrB))
+   {
+      If (hashuStrA && hashuStrB)
+         includeHash := ", " hashuStrA "||" hashuStrB
+      Else
+         includeHash := hashuStrA ? ", " hashuStrA : ", " hashuStrB
+      mustConvertHash := 1
+   }
+
+   doStartLongOpDance()
+   startOperation := A_TickCount
+   SQLstr := "SELECT imgidu, fullPath, a.imgmegapix, a.fsize, b.groupID" includeHash " FROM images AS a`n"
    SQLstr .= " JOIN (SELECT " selectuCols ", ROWID AS groupID`n"
    SQLstr .= " FROM images WHERE " thisNOTnullCol " IS NOT NULL`n"
    SQLstr .= " GROUP BY " theseCols " HAVING count(*)>1) AS b`n"
    SQLstr .= StrReplace(ONlist, "ON ( AND ", "ON (") ") "
    SQLstr .= StrLen(SortCriterion)>1 ? "ORDER BY a." SortCriterion ";" : "ORDER BY b.groupID," orderCol ";"
-
-   startOperation := A_TickCount
    If !activeSQLdb.GetTable(SQLstr, RecordSet)
    {
+      userFindDupesFilterHamDist := 0
       throwSQLqueryDBerror(A_ThisFunc)
       Return -1
    }
 
-   addJournalEntry("SQL query used to identify dupes:`n" SQLstr)
-   If (RecordSet.RowCount<2)
+   addJournalEntry("SQL query used to identify the dupes:`n" SQLstr)
+   If (determineTerminateOperation()=1)
+      abandonAll := 1
+
+   If (RecordSet.RowCount<2 || abandonAll=1)
    {
-      showTOOLtip("Found no image duplicates")
+      RecordSet.Free()
+      If (abandonAll=1)
+         showTOOLtip("Operation aborted by user")
+      Else
+         showTOOLtip("Found no image duplicates")
       SoundBeep , 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
+      SetTimer, ResetImgLoadStatus, -150
       If !SortCriterion
          SetTimer, PanelFindDupes, -250
       Return
    }
 
-   showTOOLtip("Found " groupDigits(RecordSet.RowCount) " duplicate images`nGenerating files, please wait")
+   showTOOLtip("Found " groupDigits(RecordSet.RowCount) " duplicate images`nGenerating the files list, please wait")
    If !filesFilter
       bckpMaxFilesIndex := maxFilesIndex   
 
+   backupArray := resultedFilesList.Clone()
+   backupFilter := filesFilter
    renewCurrentFilesList()
    groupies := []
    thisString := StrReplace(dupesStringFilter, "||", "|")
@@ -40921,6 +41588,9 @@ retrieveDupesByProperties(theseCols, fsCmp, SortCriterion:=0) {
          resultedFilesList[maxFilesIndex, 17] := Rowu[3]
          resultedFilesList[maxFilesIndex, 6] := Rowu[4]
          resultedFilesList[maxFilesIndex, 23] := Rowu[5]
+         If includeHash
+            resultedFilesList[maxFilesIndex, 28] := Rowu[6]
+
          If givenRegEx
          {
             If coreSearchIndex(Rowu[2], givenRegEx, 2, userFilterStringIsNot)
@@ -40929,6 +41599,7 @@ retrieveDupesByProperties(theseCols, fsCmp, SortCriterion:=0) {
       }
    }
 
+   thisCounter := 0
    If givenRegEx
    {
       ; filter results
@@ -40948,7 +41619,10 @@ retrieveDupesByProperties(theseCols, fsCmp, SortCriterion:=0) {
    }
 
    RecordSet.Free()
-   userFilterDoString := 0
+   If (userFindDupesFilterHamDist=1 && maxFilesIndex>6 && includeHash)
+      filterDupeResultsByHdist(userFindDupesHamDistLvl, mustConvertHash)
+
+   userFilterInvertThis := userFilterDoString := 0
    currentFileIndex := userFilterProperty := 1
    filesFilter := "SQL:query:" StrReplace(SubStr(SQLstr, Round(InStr(SQLstr, "JOIN (")), InStr(SQLstr, " ORDER BY") - InStr(SQLstr, "JOIN (")), "`n", A_Space)
    ; ToolTip, % filesFilter , , , 2
@@ -40957,15 +41631,22 @@ retrieveDupesByProperties(theseCols, fsCmp, SortCriterion:=0) {
    SetTimer, ResetImgLoadStatus, -100
    If (maxFilesIndex<2)
    {
-      showTOOLtip("Found no image duplicates after filtering dupes list")
+      maxFilesIndex := backupArray.Count()
+      filesFilter := backupFilter
+      resultedFilesList := []
+      resultedFilesList := backupArray.Clone()
+      backupArray := ""
+      showTOOLtip("Found no image duplicates after filtering the duplicates list")
       SoundBeep , 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       If !SortCriterion
          SetTimer, PanelFindDupes, -250
       Return
-   }
+   } Else
+      SoundBeep , 900, 100
 
    ; SetTimer, RemoveTooltip, % -msgDisplayTime
+   backupArray := ""
    showDelayedTooltip("Found " groupDigits(groupies.Count()) " groups of duplicate images`nTotal images: " groupDigits(maxFilesIndex))
    dummyTimerDelayiedImageDisplay(90)
    ; RandomPicture()
@@ -40981,9 +41662,18 @@ keepSelectedDupeInGroup() {
    {
       grpID := resultedFilesList[A_Index, 23]
       If (grpID=thisGrpID)
-         resultedFilesList[A_Index, 2] := (desiredImgID!=A_Index) ? 1 : 0
+      {
+         osel := resultedFilesList[A_Index, 2] ? 1 : 0
+         nsel := (desiredImgID!=A_Index) ? 1 : 0
+         resultedFilesList[A_Index, 2] := nsel
+         If (nsel!=osel && nsel=1)
+            markedSelectFile++
+         Else If (nsel!=osel && nsel=0)
+            markedSelectFile--
+      }
    }
 
+   lastZeitFileSelect := A_TickCount
    dummyTimerDelayiedImageDisplay(90)
 }
 
@@ -41194,7 +41884,7 @@ filterCoreString(stringu, behave, thisFilter, doExactFolderMatch:=0) {
   Return (behave=2) ? !z : z
 }
 
-GetFilesList(strDir, progressInfo:=0, doCommits:=1) {
+GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
   showTOOLtip("Loading files from`n" strDir "`n", 0, 0, progressInfo)
   If InStr(strDir, "|")
   {
@@ -41202,12 +41892,11 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1) {
      strDir := StrReplace(strDir, "|")
   } Else doRecursive := "R"
 
-  addedNow := 0
+  abandonAll := thisCounter := addedNow := 0
   startOperation := A_TickCount
   prevMSGdisplay := A_TickCount
   prevDisplay := A_TickCount
   doStartLongOpDance()
-  abandonAll := 0
   If (SLDtypeLoaded=3)
   {
      newArrayu := []
@@ -41236,7 +41925,7 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1) {
          }
      }
 
-     Loop, % newArrayu.Count()
+     Loop, % thisCounter
      {
          If (determineTerminateOperation()=1 || abandonAll=1)
          {
@@ -41244,18 +41933,21 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1) {
             Break
          }
 
-         erru := addSQLdbEntry(newArrayu[A_Index, 1], newArrayu[A_Index, 2], newArrayu[A_Index, 3], newArrayu[A_Index, 4], newArrayu[A_Index, 5])
+         erru := addSQLdbEntry(newArrayu[A_Index, 1], newArrayu[A_Index, 2], newArrayu[A_Index, 3], newArrayu[A_Index, 4], newArrayu[A_Index, 5], 0, factCheck)
          If !erru
          {
             addedNow++
-            maxFilesIndex++
-            fullPath := newArrayu[A_Index, 2] "\" newArrayu[A_Index, 1]
-            If (A_PtrSize=8 && minimizeMemUsage!=1)
-               resultedFilesList[maxFilesIndex] := [fullPath,,,,, newArrayu[A_Index, 3], newArrayu[A_Index, 4], newArrayu[A_Index, 5]]
-            Else
-               resultedFilesList[maxFilesIndex] := [fullPath]
+            If (factCheck!=0)
+            {
+               maxFilesIndex++
+               fullPath := newArrayu[A_Index, 2] "\" newArrayu[A_Index, 1]
+               If (A_PtrSize=8 && minimizeMemUsage!=1)
+                  resultedFilesList[maxFilesIndex] := [fullPath,,,,, newArrayu[A_Index, 3], newArrayu[A_Index, 4], newArrayu[A_Index, 5]]
+               Else
+                  resultedFilesList[maxFilesIndex] := [fullPath]
 
-            resultedFilesList[maxFilesIndex, 12] := sqlDBrowID
+               resultedFilesList[maxFilesIndex, 12] := sqlDBrowID
+            }
          }
 
          If (A_TickCount - prevMSGdisplay>2000)
@@ -42162,7 +42854,7 @@ PanelFindDupes() {
     If !hasOpened
     {
        Global UIcheckimgfile := 0, UIcheckfcreated := 0, UIcheckfmodified := 0, UIcheckfsize := 0, UIcheckkbfsize := 0, UIcheckimgpixfmt := 0, UIcheckimgwidth := 0, UIcheckimgheight := 0, UIcheckimgmegapix := 0, UIcheckimgwhratio := 0, UIcheckimgframes := 0, UIcheckimghpeak := 0, UIcheckimghlow := 0
-            , UIcheckimghrange := 0, UIcheckimgavg := 0, UIcheckimgmedian := 0, UIcheckimghrms := 0, UIcheckimghmode := 0, UIcheckimghminu := 0
+            , UIcheckimghrange := 0, UIcheckimgavg := 0, UIcheckimgmedian := 0, UIcheckimghrms := 0, UIcheckimghmode := 0, UIcheckimghminu := 0, editFE
        hasOpened := 1
     }
 
@@ -42195,6 +42887,9 @@ PanelFindDupes() {
        txtWid := txtWid + 175
        Gui, Font, s%LargeUIfontValue%
     }
+
+    If (A_PtrSize!=8)
+       userFindDupesFilterHamDist := 0
 
     col := (PrefsLargeFonts=1) ? 285 : 190
     Gui, Add, Tab3, gBtnTabsInfoUpdate AltSubmit vCurrentPanelTab Choose%CurrentPanelTab%, General|Image fingerprints
@@ -42249,7 +42944,10 @@ PanelFindDupes() {
     Gui, Add, Text, xm+15 y+14 Section, Filter the results with given string - applies to folder paths:
     Gui, Add, Edit, xp+15 y+7 wp-30 -multi limit12345 vdupesStringFilter , % dupesStringFilter
     Gui, Add, Checkbox, xp y+7 Checked%userFilterStringIsNot% vuserFilterStringIsNot, &Must not contain it
-    Gui, Add, Checkbox, xs y+14 Checked%excludePreviousDupesFromList% vexcludePreviousDupesFromList, E&xclude current list
+    Gui, Add, Checkbox, x+35 Checked%excludePreviousDupesFromList% vexcludePreviousDupesFromList, E&xclude current list
+    Gui, Add, Checkbox, xs y+15 gBTNchangeDupesPreset Checked%userFindDupesFilterHamDist% vuserFindDupesFilterHamDist, Filter results by Hamming distance threshold:
+    Gui, Add, Edit, x+2 w60 number -multi limit2 veditFE, % userFindDupesHamDistLvl
+    Gui, Add, UpDown, vuserFindDupesHamDistLvl Range1-15, % userFindDupesHamDistLvl
 
     Gui, Tab
     Gui, Add, Button, xm+15 y+20 h%thisBtnHeight% w%btnWid% Default gBTNfindDupesNow, &Find duplicates
@@ -42264,7 +42962,7 @@ PanelFindDupes() {
     SetTimer, BTNchangeDupesPreset, -300
 }
 
-UIimageHashPreview() {
+updateUIimageHashPreview() {
     Static uiboxSize := 122, dotu := 12
     If (AnyWindowOpen!=49)
        Return
@@ -42280,6 +42978,8 @@ UIimageHashPreview() {
     GuiControlGet, hashSimpleTrimLeft
     GuiControlGet, hashSimpleTrimRight
     GuiControlGet, userFindDupePresets
+    GuiControlGet, userFindDupesHamDistLvl
+    GuiControlGet, userFindDupesFilterHamDist
 
     cornersBMP := trGdip_CreateBitmap(A_ThisFunc, uiboxSize, uiboxSize, "0xE200B")
     If !cornersBMP
@@ -42302,7 +43002,7 @@ UIimageHashPreview() {
 
     red := Gdip_BrushCreateSolid(opacityBr "22FFAA")
     Gdip_GetImageDimensions(cornersBMP, imgW, imgH)
-    If (UIcheckpixelzHash=1 || UIcheckinnerpixelz=1 || UIcheckouterpixelz=1) && (userFindDupePresets=7)
+    If (UIcheckpixelzHash=1 || UIcheckinnerpixelz=1 || UIcheckouterpixelz=1) && (userFindDupePresets=7) || (userFindDupesFilterHamDist=1)
     {
        Gdip_FillRectangle(G, pBrushZ, 0, 0, imgW, imgH)
     } Else
@@ -42324,6 +43024,9 @@ UIimageHashPreview() {
           If (pY=0 || pY=7 || pX=0 || pX=7)
           {
              outLoops++
+             If (userFindDupesFilterHamDist=1)
+                Gdip_FillEllipse(G, pBrushC, pX*(dotu + 3) + 2, pY*(dotu + 3) + 2, dotu, dotu)
+
              If (isInRange(outLoops, outerTrimL, outerTrimR + outerTrimL - 1) && UIcheckouterpixelz=1)
                 Gdip_FillRectangle(G, pBrushD, pX*(dotu + 3) + 2, pY*(dotu + 3) + 2, dotu, dotu)
    
@@ -42332,6 +43035,9 @@ UIimageHashPreview() {
           } Else
           {
              inLoops++
+             If (userFindDupesFilterHamDist=1)
+                Gdip_FillEllipse(G, pBrushC, pX*(dotu + 3) + 2, pY*(dotu + 3) + 2, dotu, dotu)
+
              If (isInRange(inLoops, innerTrimL, innerTrimR + innerTrimL - 1) && UIcheckinnerpixelz=1)
                 Gdip_FillRectangle(G, pBrushD, pX*(dotu + 3) + 2, pY*(dotu + 3) + 2, dotu, dotu)
 
@@ -42378,6 +43084,8 @@ BTNchangeDupesPreset() {
    GuiControl, % actu2, editF5
    GuiControl, % actu2, btnFldr
    UIfindDupesCheckboxes(actu)
+   If (A_PtrSize!=8)
+      GuiControl, SettingsGUIA: Disable, userFindDupesFilterHamDist
 }
 
 BTNselectAllFindDupesProperties() {
@@ -42418,6 +43126,7 @@ UIfindDupesCheckboxes(hactu, v:="") {
    GuiControlGet, UIcheckinnerpixelz
    GuiControlGet, UIcheckouterpixelz
    GuiControlGet, userFindDupePresets
+   GuiControlGet, userFindDupesFilterHamDist
    actu := (UIcheckinnerpixelz=1 && userFindDupePresets=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, hashInnerTrimLeft
    GuiControl, % actu, hashInnerTrimRight
@@ -42434,8 +43143,13 @@ UIfindDupesCheckboxes(hactu, v:="") {
    GuiControl, % actu, editF9
    GuiControl, % actu, editF10
    If InStr(hactu, "able")
-      UIimageHashPreview()
+      updateUIimageHashPreview()
+
+   actu := (userFindDupesFilterHamDist=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   GuiControl, % actu, userFindDupesHamDistLvl
+   GuiControl, % actu, editFE
 }
+
 
 BTNfindDupesNow() {
    columnus := ""
@@ -42450,6 +43164,8 @@ BTNfindDupesNow() {
    GuiControlGet, dupesStringFilter
    GuiControlGet, userFilterStringIsNot
    GuiControlGet, excludePreviousDupesFromList
+   GuiControlGet, userFindDupesHamDistLvl
+   GuiControlGet, userFindDupesFilterHamDist
 
    If GuiCtrlGet("UIcheckimgfile")
       columnus .= "imgfile,"
@@ -42542,7 +43258,15 @@ BTNfindDupesNow() {
    ; Gui, SettingsGUIA: Submit, NoHide
    ; ToolTip, % userFindDupePresets "==" columnus , , , 2
    columnus := Trimmer(columnus, ",")
-   If !columnus
+   If (InStr(columnus, "innerpixelz") && userFindDupesFilterHamDist=1)
+   {
+      theseCols := StrReplace(columnus, "innerpixelz")
+      theseCols := StrReplace(theseCols, "outerpixelz")
+      theseCols := StrReplace(theseCols, ",,", ",")
+      theseCols := StrReplace(theseCols, ", ,", ",")
+   } Else theseCols := columnus
+
+   If StrLen(theseCols)<3
    {
       showTOOLtip("WARNING: No properties selected by which to identify duplicates.")
       SoundBeep , 300, 100
@@ -42562,7 +43286,9 @@ BTNfindDupesNow() {
 }
 
 BTNhelpFindDupes() {
-    msgBoxWrapper(appTitle ": HELP", "This panel offers you the possibility to identify duplicated images based on the collected file, image properties, fingerprints and histogram data points.`n`nPlease choose based on what criteria to identify possible image duplicates. The more properties you select the stricter the criteria for identifying image duplicates will be.`n`nThis functionality relies on collected data, please ensure you allow " appTitle " to scan the files.", -1, 0, 0)
+   friendly := (A_PtrSize=8) ? "For the Hamming distance, a low threshold means stricter matching. Increase it for looser matches." : "Hamming distance filtering is not available on the 32 bits edition of QPV."
+
+    msgBoxWrapper(appTitle ": HELP", "This panel offers you the possibility to identify duplicate images based on the collected file and image properties, fingerprints and histogram data points.`n`nPlease choose based on what criteria to identify the possible duplicates. The more properties you select the stricter the criteria for identifying image duplicates will be.`n`nPrecision factor does not apply for file names, size in bytes, file dates and image width, height, frames and pixel format properties.`n`nThe functionality provided in this panel relies on collected data, please ensure you allow " appTitle " to scan the files.`n`nFor optimal results activate aspect ratio, precision 3 and variations on the options in the fingerprints tab.`n`n" friendly, -1, 0, 0)
 }
 
 GuiCtrlGet(varu) {
@@ -44957,7 +45683,8 @@ invokePanelStaticFoldersContextMenu() {
    Menu, PanelStaticMenu, Add, &Open folder in Explorer`tF4, BTNopenDynaFolder
    Menu, PanelStaticMenu, Add, &Copy folder path, BTNcopyStaticFolderPath
    Menu, PanelStaticMenu, Add, &Ignore date change, BTNignoreSelFolder
-   Menu, PanelStaticMenu, Add, Rename inde&x entry`tF2, PanelRenameStaticFolder
+   If (SLDtypeLoaded!=3)
+      Menu, PanelStaticMenu, Add, Rename inde&x entry`tF2, PanelRenameStaticFolder
    Menu, PanelStaticMenu, Add, &Filter list to selected folder`tF3, MenuFilterListSelectedFolder
    Menu, PanelStaticMenu, Add,
    Menu, PanelStaticMenu, Add, &Copy entire list, BTNcopyAllStaticFolderPaths
@@ -45008,7 +45735,7 @@ PanelStaticFolderzManager() {
     widthu := (SLDtypeLoaded=3) ? "w1" : ""
     Gui, Add, Text, x15 y15, This folders list was generated based on the indexed files.
     Gui, Add, ListView, xp y+10 w%lstWid% -multi AltSubmit gFolderzFilterListBTN r12 Grid vLViewOthers +hwndhLVmainu, #|Date|(?)|Folder path|Files
-    Gui, Add, Edit, xs y+10 wp-50 -multi -wantTab gUIfilterListViewStaticFoldersList +hwndhEditField vlistViewFilteru,
+    Gui, Add, Edit, xs y+10 wp-50 -multi -wantTab gUIfilterListViewStaticFoldersList +hwndhEditField vStaticlistViewFilteru, % staticlistViewFilteru
     Gui, Add, Button, x+1 hp w50 gBTNhelpStaticFolderz, [ ? ]
     Gui, Add, Checkbox, xs y+10 gToggleRecursiveStaticRescan vRecursiveStaticRescan Checked%RecursiveStaticRescan%, &Perform recursive (in sub-folders) rescan
 
@@ -45020,13 +45747,13 @@ PanelStaticFolderzManager() {
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Cached folders list updater: " appTitle)
     Sleep, 25
     If (SLDtypeLoaded=3)
-       PopulateStaticSQLfolderzList()
+       PopulateStaticSQLfolderzList(staticlistViewFilteru)
     Else
-       PopulateStaticFolderzList()
+       PopulateStaticFolderzList(staticlistViewFilteru)
 }
 
 PanelReviewSelectedFiles() {
-    Global LViewOthers, listViewFilteru
+    Global LViewOthers
 
     getSelectedFiles(0, 1)
     If !markedSelectFile
@@ -45058,15 +45785,16 @@ PanelReviewSelectedFiles() {
 
     edithu := lstWid - btnWid - 35
     Gui, Add, ListView, x15 y15 w%lstWid% AltSubmit Count%markedSelectFile% gBTNreviewPaneLV r12 Grid vLViewOthers +hwndhLVmainu, S|Complete path|#|Dupe ID
-    Gui, Add, Edit, xs y+10 w%edithu% -multi -wantTab +hwndhEditField vlistViewFilteru,
+    Gui, Add, Edit, xs y+10 w%edithu% -multi -wantTab +hwndhEditField vlistViewReviewFilteru, % listViewReviewFilteru
     Gui, Add, Button, x+1 hp w%btnWid% gUIfilterReviewPanelList Default, &Apply
     Gui, Add, Button, x+1 hp w35 gUIfilterEraseReviewPanelList, &X
     Gui, Add, Button, xs+0 y+15 h%thisBtnHeight% w%btnWid% gBTNreviewApplySelection, &Select
     Gui, Add, Button, x+5 hp wp gBTNreviewRemSelection , &Deselect
     Gui, Add, Button, x+5 hp wp gBTNreviewDropFilesSelection, &None
     Gui, Add, Button, x+5 hp wp gBTNrefreshReviewPanel , &Refresh
-    Gui, Add, Button, x+5 hp wp gBtnReviewSelClose, &Close
-    Gui, Add, Text, x+5 hp vinfoLine +0x200, Listing items`, please wait...
+    Gui, Add, Button, x+5 hp wp gBTNreviewCopyPanel , &Copy
+    Gui, Add, Button, x+5 hp wp gBtnReviewSelClose, C&lose
+    Gui, Add, Text, xs y+10 vinfoLine +0x200, Listing items`, please wait . . .
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Review selected files: " appTitle)
     Sleep, 25
     reviewSelectedIndexes := []
@@ -45091,9 +45819,9 @@ BTNreviewDropFilesSelection() {
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: ListView, LViewOthers
    RowNumber := 0
-   GuiControlGet, listViewFilteru
+   GuiControlGet, listViewReviewFilteru
    modus := markedSelectFile ? 0 : 1
-   If listViewFilteru
+   If listViewReviewFilteru
    {
       LV_GetText(thisFileIndex, RowNumber + 1, 3)
       modus := resultedFilesList[thisFileIndex, 2] ? 0 : 1
@@ -45124,6 +45852,34 @@ BTNreviewApplySelection() {
 
 BTNreviewRemSelection() {
    BTNreviewToggleSelection(0)
+}
+
+BTNreviewCopyPanel() {
+   Gui, SettingsGUIA: Default
+   Gui, SettingsGUIA: ListView, LViewOthers
+   RowNumber := 0
+   listu := ""
+   Loop
+   {
+       RowNumber := LV_GetNext(RowNumber)
+       If !RowNumber
+          Break
+
+       LV_GetText(imgPath, RowNumber, 2)
+       listu .= imgPath "`n"
+    }
+
+    Try Clipboard := listu
+    Catch wasError
+
+    If wasError
+    {
+       showTOOLtip("Failed to copy file paths to clipboard")
+       SoundBeep , 300, 100
+    } Else
+       showTOOLtip("File paths copied to clipboard")
+
+    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
 BTNreviewToggleSelection(modus:=0) {
@@ -45160,7 +45916,8 @@ BTNreviewToggleSelection(modus:=0) {
 }
 
 UIfilterEraseReviewPanelList() {
-   GuiControl, SettingsGUIA:, listViewFilteru, 
+   listViewReviewFilteru := ""
+   GuiControl, SettingsGUIA:, listViewReviewFilteru, 
    PopulateReviewSelectedFiles()
 }
 
@@ -45211,9 +45968,13 @@ PopulateReviewSelectedFiles() {
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: ListView, LViewOthers
     LV_Delete()
-    GuiControlGet, listViewFilteru
+    GuiControlGet, listViewReviewFilteru
     GuiControl, SettingsGUIA:, infoLine, Listing items`, please wait...
-    filteru := Trimmer(listViewFilteru)
+
+    thisString := StrReplace(Trimmer(listViewReviewFilteru), "||", "|")
+    thisString := Trimmer(thisString, "|")
+    thisFilter := processSearchIndexString(thisString)
+    isStrFilter := StrLen(thisString)>1 ? 1 : 0
     EM_SETCUEBANNER(hEditField, "Populating the list view - please wait", 0)
     totalSelected := reviewSelectedIndexes.Count()
     listedEntries := 0
@@ -45226,8 +45987,11 @@ PopulateReviewSelectedFiles() {
         }
 
         thisIndex := reviewSelectedIndexes[A_Index]
-        If (!InStr(resultedFilesList[thisIndex, 1], filteru) && filteru)
-           Continue
+        If (isStrFilter=1)
+        {
+           If !coreSearchIndex(resultedFilesList[thisIndex, 1], thisFilter, 1, 0)
+              Continue
+        }
 
         isSelected := resultedFilesList[thisIndex, 2] ? "S" : "_"
         listedEntries++
@@ -45244,7 +46008,7 @@ PopulateReviewSelectedFiles() {
     SetTimer, ResetImgLoadStatus, -100
     listedEntries := groupDigits(listedEntries)
     EM_SETCUEBANNER(hEditField, "Filter files list", 0)
-    GuiControl, SettingsGUIA:, infoLine, Entries: %listedEntries%
+    GuiControl, SettingsGUIA:, infoLine, Entries listed: %listedEntries%
     Loop, 4
         LV_ModifyCol(A_Index, "AutoHdr Left")
 }
@@ -45344,13 +46108,12 @@ BTNignoreSelFolder(dummy:=0) {
     {
        FileReadLine, firstLine, % CurrentSLD, 1
        IniRead, tstSLDcacheFilesList, % CurrentSLD, General, SLDcacheFilesList, @
-    }
-
-    If (!InStr(firstLine, "[General]") || tstSLDcacheFilesList!=1) && (SLDtypeLoaded!=3)
-    {
-       SoundBeep, 300, 100
-       msgBoxWrapper(appTitle ": ERROR", "The loaded .SLD file does not seem to be in the correct format. Operation aborted.`n`n" CurrentSLD, 0, 0, "error")
-       Return
+       If (!InStr(firstLine, "[General]") || tstSLDcacheFilesList!=1)
+       {
+          SoundBeep, 300, 100
+          msgBoxWrapper(appTitle ": ERROR", "The loaded .SLD file does not seem to be in the correct format. Operation aborted.`n`n" CurrentSLD, 0, 0, "error")
+          Return
+       }
     }
 
     BtnCloseWindow()
@@ -45431,6 +46194,7 @@ BTNshowDynamicFoldersInTreeView() {
 }
 
 BTNremFilesStaticFolder() {
+    Gui, SettingsGUIA: Default
     GuiControlGet, RecursiveStaticRescan
     Gui, SettingsGUIA: ListView, LViewOthers
     RowNumber := LV_EX_GetNextItem(hLVmainu, -1)
@@ -45518,9 +46282,9 @@ BTNpasteDynaFoldersList() {
 
     mustOpenStartFolder := ""
     Sort, newFoldersList, UD`n
-    DynamicFoldersList := newFoldersList
+    DynamicFoldersList := cleanDynamicFoldersList(newFoldersList)
     If (SLDtypeLoaded=3)
-       recreateDynaFoldersSQLdbList(newFoldersList)
+       recreateDynaFoldersSQLdbList(DynamicFoldersList)
 
     currentFilesListModified := 1
     Sleep, 50
@@ -45544,14 +46308,14 @@ BTNremDynaSelFolder() {
     {
         line := Trimmer(A_LoopField)
         fileTest := StrReplace(line, "|")
-        If (!FolderExist(fileTest) || !RegExMatch(fileTest, "i)^(.\:\\.)") || folderu=line)
+        If (!RegExMatch(fileTest, "i)^(.\:\\.)") || folderu=line)
            Continue
 
         newFoldersList .= line "`n"
     }
 
     DynamicFoldersList := newFoldersList
-    If (SLDtypeLoaded=3)
+    If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
        recreateDynaFoldersSQLdbList(newFoldersList)
 
     msgResult := msgBoxWrapper(appTitle ": Remove dynamic folder", "Would you like to remove the files from the index/list pertaining to the removed dynamic folder as well ?`n`n" folderu "\", 4, 0, "question")
@@ -45751,7 +46515,7 @@ uiFilterListDynaFolder(folderu, modus) {
     }
 
     userFilterProperty := userFilterDoString := 1
-    userFilterStringIsNot := 0
+    userFilterInvertThis := userFilterStringIsNot := 0
     thisFilter := updateUIFiltersPanel("external")
     coreEnableFiltru(thisFilter)
     dummyTimerDelayiedImageDisplay(50)
@@ -45770,25 +46534,18 @@ InvertRecurseDynaFolder() {
 
     BtnCloseWindow()
     Sleep, 25
-    foldersListu := getDynamicFoldersList()
-    Loop, Parse, foldersListu, `n
-    {
-        line := Trimmer(A_LoopField)
-        fileTest := StrReplace(line, "|")
-        If (!FolderExist(fileTest) || line="|hexists|" || !RegExMatch(fileTest, "i)^(.\:\\.)") || folderu=line)
-           Continue
-
-        newFoldersList .= line "`n"
-    }
+    foldersListu := "`n" getDynamicFoldersList() "`n"
 
     isPipe := InStr(folderu, "|") ? 1 : 0
-    folderu := StrReplace(folderu, "|")
-    If (isPipe!=1)
-       folderu := "|" folderu
-
-    newFoldersList .= folderu "`n"
+    folderuz := StrReplace(folderu, "|")
+    newfolderu := (isPipe!=1) ? "`n|" folderuz "`n" : "`n" folderuz "`n"
+    newFoldersList := StrReplace(foldersListu, "`n" folderu "`n", newFolderu)
     Sort, newFoldersList, UD`n
     DynamicFoldersList := newFoldersList
+    If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
+       recreateDynaFoldersSQLdbList(newFoldersList)
+
+    ; ToolTip, % newFoldersList , , , 2
     Sleep, 15
     PanelDynamicFolderzWindow()
     Sleep, 15
@@ -45807,24 +46564,12 @@ BTNrescanDynaFolder() {
     Sleep, 25
     ; msgbox, % folderu
     mustOpenStartFolder := ""
-    showTOOLtip("Preparing files list, please wait.`n" folderu "\")
-
-    coreAddNewFolder(folderu, 1, 0, 0)
-    SQLdeleteEntriesMarked()
-    If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=2)
-    {
-       FileReadLine, firstLine, % CurrentSLD, 1
-       IniRead, tstSLDcacheFilesList, % CurrentSLD, General, SLDcacheFilesList, @
-       If (!InStr(firstLine, "[General]") || tstSLDcacheFilesList!=1 || InStr(folderu, "|"))
-          good2go := "null"
-    } Else good2go := "null"
-    If (SLDtypeLoaded=3)
-       good2go := 0
-
-    If (mustGenerateStaticFolders=0 && good2go!="null" && RegExMatch(CurrentSLD, sldsPattern))
+    z := wrapperAddNewFolderToList(folderu, 1)
+    ; modus := InStr(folderu, "|") ? 1 : 0
+    If (mustGenerateStaticFolders=0 && z!="null" && RegExMatch(CurrentSLD, sldsPattern))
        updateCachedStaticFolders(folderu, 0)
 
-    Sleep, 250
+    Sleep, 150
     PanelDynamicFolderzWindow()
 }
 
@@ -46075,13 +46820,16 @@ PanelRenameStaticFolder() {
                finalListu .= StrReplace(A_LoopField, folderu "\", newName "\") "`n"
          }
 
-         DynamicFoldersList := finalListu
-         If (SLDtypeLoaded=3)
-            recreateDynaFoldersSQLdbList(finalListu)
+         DynamicFoldersList := cleanDynamicFoldersList(finalListu)
+         If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
+            recreateDynaFoldersSQLdbList(DynamicFoldersList)
       }
 
       currentFilesListModified := 1
-      SearchAndReplaceThroughIndex(folderu "\", newName "\", 0, 1)
+      msgResult := msgBoxWrapper(appTitle ": Update files list", "You have renamed a folder entry. Would you like to perform a search and replace in the files list to update the corresponding records?", 4, 0, "question")
+      If (msgResult="Yes")
+         SearchAndReplaceThroughIndex(folderu "\", newName "\", 0, 1)
+
       SetTimer, RemoveTooltip, % -msgDisplayTime
       ; MsgBox, % firstPart "`n" newName "`n" indexSelected
       If (winOpen=2)
@@ -46121,7 +46869,7 @@ SearchAndReplaceThroughIndex(what, replacer, silentus:=0, folderMode:=0) {
           If (folderMode=1)
              SQLstr := "SELECT imgidu, imgfolder FROM images WHERE imgfolder LIKE '" Trimmer(SQLescapeStr(what, 1), "\") "\%' ESCAPE '>';"
           Else
-             SQLstr := "SELECT imgidu, imgfolder FROM images WHERE imgfolder LIKE '%" Trimmer(SQLescapeStr(what, 1)) "%' ESCAPE '>';"
+             SQLstr := "SELECT imgidu, imgfolder FROM images WHERE imgfolder LIKE '%" SQLescapeStr(what, 1) "%' ESCAPE '>';"
 
           If !activeSQLdb.GetTable(SQLstr, RecordSet)
              errorOccured := activeSQLdb.ErrorMsg
@@ -46149,6 +46897,8 @@ SearchAndReplaceThroughIndex(what, replacer, silentus:=0, folderMode:=0) {
           }
           RecordSet.Free()
        } Else errorOccured := activeSQLdb.ErrorMsg
+
+       showTOOLtip("Finishing search and replace in the files list, please wait")
        activeSQLdb.Exec("COMMIT TRANSACTION;")
     }
 
@@ -46291,30 +47041,35 @@ BTNupdateSelectedStaticFolder() {
     }
 
     If (RecursiveStaticRescan!=1)
-       isRecursive := "|"
+       isNotRecursive := "|"
 
     BtnCloseWindow()
     Sleep, 5
-    showTOOLtip("Preparing files list, please wait.`n" isRecursive folderu "\")
-    coreAddNewFolder(isRecursive folderu, 0, 1, 0)
-    SQLdeleteEntriesMarked()
-    modus := isRecursive ? 1 : 0
+    modus := isNotRecursive ? 1 : 0
+    wrapperAddNewFolderToList(isNotRecursive folderu, !modus)
     updateCachedStaticFolders(folderu, modus)
     Sleep, 5
     SetTimer, RemoveTooltip, % -msgDisplayTime
     PanelStaticFolderzManager()
 }
 
-
 UIfilterListViewStaticFoldersList() {
-   GuiControlGet, listViewFilteru
+   SetTimer, UIfilterListViewStaticFoldersList, -400
+}
+
+UIfilterListViewStaticFolderzList() {
+   If (AnyWindowOpen!=2)
+      Return
+
+   Gui, SettingsGUIA: Default
+   GuiControlGet, staticlistViewFilteru
    If (imageLoading=1)
       Return
 
    If (SLDtypeLoaded=3)
-      PopulateStaticSQLfolderzList(listViewFilteru)
+      PopulateStaticSQLfolderzList(staticlistViewFilteru)
    Else
-      PopulateStaticFolderzList(listViewFilteru)
+      PopulateStaticFolderzList(staticlistViewFilteru)
 }
 
 PopulateStaticSQLfolderzList(listFilter:=0) {
@@ -49076,7 +49831,32 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, forceW:=0, forceH:=0, keepAratio:=0) {
      loadArgs := 8
 
   changeMcursor()
-  hFIFimgA := FreeImage_Load(imgPath, -1, loadArgs) ; load image
+  If ((GFT=18 || GFT=25) && loadArgs!=-1)
+  {
+     multiFlags := (GFT=25) ? 2 : 0
+     hMultiBMP := FreeImage_OpenMultiBitmap(ImgPath, GFT, 0, 1, 1, multiFlags)
+  }
+
+  fimMultiPage := ""
+  If StrLen(hMultiBMP)>1
+  {
+     totalFramesIndex := FreeImage_GetPageCount(hMultiBMP)
+     If (totalFramesIndex<0 || !totalFramesIndex)
+        totalFramesIndex := 0
+
+     If (totalFramesIndex>1)
+        fimMultiPage := (GFT=18) ? "tiff" : "gif"
+
+     desiredFrameIndex := clampInRange(desiredFrameIndex, 0, totalFramesIndex - 1, 1)
+     ; msgbox, % totalFramesIndex "==" desiredFrameIndex
+     hPage := FreeImage_LockPage(hMultiBMP, desiredFrameIndex)
+     hFIFimgA := FreeImage_Clone(hPage)
+     hasMultiTrans := FreeImage_GetTransparencyCount(hFIFimgA)
+     ; ToolTip, % hasMultiTrans "==" desiredFrameIndex "==" totalFramesIndex , , , 2
+     FreeImage_UnlockPage(hMultiBMP, hPage, 0)
+     FreeImage_CloseMultiBitmap(hMultiBMP, 0)
+  } Else hFIFimgA := FreeImage_Load(imgPath, -1, loadArgs) ; load image
+
   If !hFIFimgA
   {
      addJournalEntry("Failed to load image file using FreeImage library")
@@ -49128,8 +49908,8 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, forceW:=0, forceH:=0, keepAratio:=0) {
   mainLoadedIMGdetails.dpi := Round((dpix + dpiy)/2)
   mainLoadedIMGdetails.Width := imgW
   mainLoadedIMGdetails.Height := imgH
-  mainLoadedIMGdetails.Frames := FreeImage_GetPageCount(hFIFimgA) - 1
-  mainLoadedIMGdetails.HasAlpha := InStr(ColorsType, "rgba") ? 1 : 0
+  mainLoadedIMGdetails.Frames := FreeImage_SimpleGetPageCount(hFIFimgA) - 1
+  mainLoadedIMGdetails.HasAlpha := (InStr(ColorsType, "rgba") || hasMultiTrans) ? 1 : 0
   mainLoadedIMGdetails.RawFormat := fileType " | " imgType
   mainLoadedIMGdetails.PixelFormat := imgBPP "-" ColorsType toneMapped
   mainLoadedIMGdetails.OpenedWith := "FreeImage library"
@@ -49422,56 +50202,6 @@ CalcAddrHash(addr, length, algid, byref hash = 0, byref hashlength = 0) {
 
 
 
-
-
-
-
-
-
-HammingDistance(stringA, stringB) {
-    ; If (StrLen(stringA) != StrLen(stringB))
-    ;    Return -1
-
-    countDiffs := 0
-    Loop, % StrLen(stringA)
-    {
-       If (SubStr(stringA, A_Index, 1)!=SubStr(stringB, A_Index, 1))
-          countDiffs++
-    }
-    Return countDiffs
-}
-
-HammingDistanceBugz(a,b) {
-; by Bugz000
-    loop % 17
-      s.=(c:="0." substr(a,(A_index)*16-15,16))+(d:="0." substr(b,(A_index)*16-15,16))
-    z:=strsplit(s,"1")
-    return % z.count()-1
-}
-
-
-HammingDistance3(a,b) {
-; by Bugz000
-    Loop, Parse, a
-    {
-       If (A_loopfield!=SubStr(b, A_Index, 1))
-          i++
-    }
-    return i
-}
-
-HammingDistanceNew2020dec(a,b, silent:=1) {
-; by Bugz000
-    ; i := 20
-    ; x := a^b
-    ; g := ConvertBase(10, 2, a^b)
-    ; StrReplace(Haystack, SearchText [, ReplaceText, OutputVarCount, Limit := -1])
-    ; StrReplace(ConvertBase(10, 2, a^b), 1, , OutputVarCount)
-    ; If !silent
-       ; ToolTip, % a "`n" b "`n" g "`n" x "`n" OutputVarCount  , , , 2
-    return 5 ;  OutputVarCount ; ? OutputVarCount : 9
-}
-
 reorderStoredHashes(a, b) {
     outsideLoop := insideLoop := 0
     Loop, 8
@@ -49506,149 +50236,6 @@ ConvertBase(InputBase, OutputBase, nptr){
     DllCall("msvcrt.dll\" v, "Int64", value, "Str", s, "UInt", OutputBase, "CDECL")
     ; ToolTip, % s , , , 2
     return s
-}
-
-
-HammingDistanceRust(a, b) {
-     r := DllCall("hamming_distance.dll\harming_distance_bytes", "astr", a, "astr", b)
-     Return r
-}
-
-testAlgoSingle() {
-   imgPath := getIDimage(currentFileIndex)
-     hashA := Gdip_ImageDhash(imgPath)
- imgPath := getIDimage(currentFileIndex + 1)
-     hashB := Gdip_ImageDhash(imgPath)
-r1 := HammingDistanceRust(hashA, hashB)
-r2 := HammingDistance(hashA, hashB)
-
-MsgBox, % r1 "--" r2 "`n" hashA "`n" hashB
-
-}
-
-
-Gdip_ImageDhash(imgPath) {
-   Width := 9*2, Height := 8*2
-   oBitmap := LoadBitmapFromFileu(imgPath)
-   If oBitmap
-   {
-      xBitmap := trGdip_ResizeBitmap(A_ThisFunc, oBitmap, Width, Height, 0, 3)
-      lBitmap := trGdip_BitmapConvertGray(xBitmap, 0, -20)
-      trGdip_DisposeImage(oBitmap, 1)
-   }
-
-   E1 := Gdip_LockBits(lBitmap, 0, 0, Width, Height, Stride, Scan0, BitmapData)
-   dHash := z := 0
-   Loop %Height%
-   {
-      y++
-      Loop % Width - 1
-      {
-         pX := A_Index - 1, pY := y - 1
-         R1 := Gdip_RFromARGB(NumGet(Scan0+0, (pX*4)+(pY*Stride), "UInt"))
-         R2 := Gdip_RFromARGB(NumGet(Scan0+0, ((pX+1)*4)+(pY*Stride), "UInt"))
-         dHash .= (R1<R2) ? 1 : 0
-      }
-   }
-
-   Gdip_UnlockBits(lBitmap, BitmapData)
-   trGdip_DisposeImage(lBitmap, 1)
-   trGdip_DisposeImage(xBitmap, 1)
-   return dHash
-}
-
-testAlgo() {
-  SoundBeep 
-  thisCounter := 0
-  startZeit := A_TickCount
-  hashesListArray := []
-  ; create hashes for images in the resultedFilesList Array
-  Loop, % maxFilesIndex
-  {
-      imgPath := getIDimage(A_Index)
-      If !FileRexists(imgPath)
-         Continue
-
-      thisCounter++
-      newHash := (cachedHashes[imgPath]!="") ? cachedHashes[imgPath] : Gdip_ImageDhash(imgPath)
-      cachedHashes[imgPath] := newHash
-      ; hashesList .= newHash "`n"
-      hashesListArray[thisCounter] := newHash
-      hashesListIDsArray[newHash] := imgPath
-  }
-
-  thresholdu := 1   
-  countAll := countThese := newFilesIndex := 0
-  hashesList := Trimmer(hashesList)
-  newFilesList := []
-  distCombinationsA := []
-  distCombinationsB := []
-  distCombinations := []
-  ; hashesListArray := []
-  ; hashesListArray := StrSplit(hashesList, "`n")
-  ; MsgBox, % SecToHHMMSS((A_TickCount - startZeit)/1000) "`n" hashesListArray.count()
-  ; SoundBeep 
-
-  DllPath := FreeImage_FoxGetDllPath("hamming_distance.dll")
-  lalala := DllCall("LoadLibraryW", "WStr", DllPath, "UPtr")
-
-  Loop, % hashesListArray.Count()
-  {
-      thisHash := hashesListArray[A_Index]
-      If !thisHash
-         Continue
-      countAll++
-      thisIndex := A_Index
-      Loop, % thisIndex - 1
-      {
-          countThese++
-    ;      distCombinations[A_Index] := hashesListArray[A_Index]
-          hDistances := HammingDistanceRust(thisHash, hashesListArray[A_Index])
-      }
-  }
-
-/*
-
-  Loop, % hashesListArray.MaxIndex()
-  {
-    originalIndex := A_Index
-    startPoint := StrSplit(hashesListArray[originalIndex], "|:|")
-    startPointV := startPoint[1]
-
-
-  Loop, % hashesListArray.MaxIndex() ; - originalIndex
-  {
-      thisThing := hashesListArray[originalIndex + A_Index - thresholdu]
-      If !thisThing
-         Continue
-
-      thisIndex := StrSplit(thisThing, "|:|")
-      If isInRange(thisIndex[1], startPointV - thresholdu, startPointV + thresholdu)
-      {
-         newFilesIndex++
-         newFilesList[newFilesIndex] := thisIndex[2]
- ;        tooltip, % newFilesIndex "--" thisIndex[1] "--" thisIndex[2]
-      }
-  }
-}
-
-   newFilesList := trimArray(newFilesList)
-   filteredMap2mainList := []
-   resultedFilesList := newFilesList.Clone()
-   maxFilesIndex := newFilesIndex
-   newFilesList := []
-   newMappingList := []
-   GenerateRandyList()
-   ForceRefreshNowThumbsList()
-*/
-
-SoundBeep 
-  MsgBox, % SecToHHMMSS((A_TickCount - startZeit)/1000) "`n" countThese "--" countAll "`n" hashesListArray.count()
-
-
-  dummyTimerReloadThisPicture(50)
-  
- ; Clipboard := hashesList
 }
 
 OpenNewExternalCoreThread(thisIndex, args, thisList) {
@@ -50086,15 +50673,39 @@ testWICwhatever() {
    IWICImagingFactory_Initialize(pWICimgFactory, 1)
    IWICImagingFactory_CreateDecoderFromFilename(pWICimgFactory, imgPath,,,, ppIDecoder)
    IWICImagingFactory_CreateBitmapScaler(pWICimgFactory, ppIBitmapScaler)
-   IWICImagingFactory_CreateFormatConverter(pWICimgFactory, ppIFormatConverter)
 
    IWICBitmapDecoder_GetFrameCount(ppIDecoder, fCount)
    IWICBitmapDecoder_GetFrame(ppIDecoder, 0, ppIBitmapSourceFrame)
-   IWICBitmapScaler_Initialize(ppIBitmapScaler, ppIBitmapSourceFrame, mainWidth, mainHeight)
-   ; IWICFormatConverter_Initialize(ppIFormatConverter, ppIBitmapScaler, "GUID_WICPixelFormat32bppBGR", 0, NULL, 0.1, 0)
+   r := IWICBitmapScaler_Initialize(ppIBitmapScaler, ppIBitmapSourceFrame, mainWidth, mainHeight)
+   IWICBitmapSource_GetSize(ppIBitmapScaler, puiWidth, puiHeight)
+   IWICBitmapSource_GetPixelFormat(ppIBitmapSourceFrame, pPixelFormat)
+
+   IWICImagingFactory_CreateFormatConverter(pWICimgFactory, ppIFormatConverter)
+   zr := IWICFormatConverter_Initialize(ppIFormatConverter, ppIBitmapScaler, "GUID_WICPixelFormat32bppPBGRA", 0, NULL, 0.9, 0)
+
+; puiWidth := mainWidth
+; puiHeight := mainHeight
+
+   pBitmap := Gdip_CreateBitmap(puiWidth, puiHeight)
+   E1 := Gdip_LockBits(pBitmap, 0, 0, puiWidth, puiHeight, stride, scan0, data)
+stride := 4* puiWidth
+addJournalEntry("bmp created: " stride)
+   IWICBitmapSource_CopyPixels(ppIBitmapSourceFrame, NULL, abs(stride), abs(stride) * puiHeight + 7 * puiHeight, scan0)
+
+addJournalEntry("copy pixels executed")
+   Gdip_UnlockBits(pBitmap, data)
+
+addJournalEntry("bits unlocked")
+   trGdip_GraphicsClear(A_ThisFunc, 2NDglPG, "0x00" WindowBGRcolor)
+   Gdip_DrawImage(pBitmap, 30, 30)
+   r2 := LrydWinUpdt(hGDIselectWin, 2NDglHDC)
 */
 
-   MsgBox, % pWICimgFactory "`n" ppIDecoder "`n" fcount "`n" ppIBitmapSourceFrame "`nBMPscale" ppIBitmapScaler "`nFmtConv" ppIFormatConverter "`n" 
+   Gdip_DisposeImage(pBitmap, 1)
+
+   MsgBox, % pWICimgFactory "`n" ppIDecoder "`n" fcount "`n" ppIBitmapSourceFrame "`nBMPscale" ppIBitmapScaler "`nFmtConv" ppIFormatConverter "`n scaler=" r "`nw/h:" puiWidth " // " puiHeight "`nPixFmt" pPixelFormat "`nfmtConversion zr:" zr
+; https://stackoverflow.com/questions/8101203/wicbitmapsource-copypixels-to-gdi-bitmap-scan0
+; https://github.com/Microsoft/Windows-classic-samples/blob/master/Samples/Win7Samples/multimedia/wic/wicviewergdi/WicViewerGdi.cpp#L354
 }
 
 xxtestwhatever() {
@@ -51065,24 +51676,6 @@ processFlags(n, b:=32, d:="`n", f:="") {
    Return RTrim(f, d) 
 }
 
-testArkive() {
- 
-lola := Gdip_GetImageFlags(gdiBitmap)
-MsgBox, % lola "`n" processFlags(lola, 128)
-
-    ;     loop, files, E:\Sucan twins\_small-apps\AutoHotkey\other scripts\flipeador-Library-AutoHotkey-master\Library-AutoHotkey-master\graphics\Gdiplus\*, R
-;     {
-;           If (A_LoopFileExt="ahk")
-;           {
-;              FileRead, filecontent, % A_LoopFileLongPath
-;              concat .= filecontent "`n`n"
-;           }
-; }
-;           FileAppend, % concat, % mainCompiledPath "\mergedFiles.ahk"
-;     SoundBeep 
-}
-
-
 
 Class IDesktopWallpaper 
 {
@@ -51456,10 +52049,595 @@ giveWarningX64() {
       exitAppu()
 }
 
+/*
 
-; y::
-; SoundBeep 
-; SendInput, ^{vk41}
-; Return
+testWicArkive() {
 
-; progress bar for searching
+
+
+   ; AHK v1
+
+   wic_IDs.Initialize()
+   file_name := getIDimage(currentFileIndex)
+   ; file_name := "C:\Users\Jeb8\Desktop\external-content.duckduckgo.com.gif"
+
+   factory := IWICImagingFactory.New()
+
+   dbg("test.ptr: " factory.ptr " / type: " factory.__Class)
+
+   decoder := factory.CreateDecoderFromFilename(file_name)
+
+   count := decoder.GetFrameCount()
+
+   dbg( "frame_count: " count)
+
+   frame := decoder.GetFrame(0)
+
+   dbg("GetFrame() done : LA : " frame.LastError)
+
+   dbg("frame info: name: " frame.__Class " / ptr: " frame.ptr)
+
+   dims := frame.GetSize()
+
+   dbg("dims: " dims.w " / " dims.h)
+
+   dpi := frame.GetResolution()
+
+   dbg("dpi: " dpi.x " / " dpi.y)
+
+   pixFormat := frame.GetPixelFormat()
+   dbg("GUID str: " pixFormat " lastErr " frame.lasterror)
+
+   converter := factory.CreateFormatConverter()
+   dbg("converter ptr/type: " converter.ptr " / " converter.__Class)
+
+   r1 := converter.CanConvert(pixFormat, "GUID_WICPixelFormat32bppPBGRA")
+   dbg("CanConvert() : " r1)
+   ; [4780] AHK: GUID str: GUID_WICPixelFormat24bppBGR
+
+   r2 := converter.Initialize(frame, "GUID_WICPixelFormat32bppPBGRA")
+   dbg("convert result: " r2)
+
+; robo code begins here
+
+   pBitmap := Gdip_CreateBitmap(dims.w, dims.h)
+   E1 := Gdip_LockBits(pBitmap, 0, 0, dims.w, dims.h, stride, iScan, iData)
+
+
+   dbg("gdip bitmap created and locked, copy pixels now")
+   ; buf := BufferAlloc(dims.w * dims.h * 4) ; 32-bit, 4 bytes per pixel?
+   r3 := frame.CopyPixels(0, stride, stride* dims.h, iData) ; prc, cbStride, cbBufferSize, pbBuffer
+   dbg("CopyPixels(): LE: " frame.LastError " / r3: " r3)
+   Gdip_UnlockBits(pBitmap, iData)
+
+   trGdip_GraphicsClear(A_ThisFunc, 2NDglPG, "0x00" WindowBGRcolor)
+   Gdip_DrawImage(pBitmap, 30, 30)
+   r2 := LrydWinUpdt(hGDIselectWin, 2NDglHDC)
+
+   Gdip_DisposeImage(pBitmap, 1)
+
+}
+
+; ===========================================================================
+; Windows Imaging Component Library
+; ===========================================================================
+
+BufferAlloc(bSize, FillByte:="") { ; AHK v1 wrapper
+    If !FillByte
+        VarSetCapacity(DummyVar,bSize)
+    Else VarSetCapacity(DummyVar,bSize,FillByte)
+    return {ptr:&DummyVar, size:bSize, value:DummyVar}
+}
+
+dbg(in_str) {
+    ; OutputDebug "AHK: " in_str  ; AHK v2
+    OutputDebug qpv: %in_str%   ; AHK v1
+}
+
+class wic_IDs {
+    ; Access really_long_name by:  wic_IDs.really_long_name (ahk v1 and v2)
+    ; Leave this Static alone for AHK v1!
+    Static PixelFormats := Object("{6FDDC324-4E03-4BFE-B185-3D77768DC900}","GUID_WICPixelFormatDontCare" ; AHK v1 = Object() / AHK v2 = Map()
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC901}","GUID_WICPixelFormat1bppIndexed"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC902}","GUID_WICPixelFormat2bppIndexed"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC903}","GUID_WICPixelFormat4bppIndexed"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC904}","GUID_WICPixelFormat8bppIndexed"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC905}","GUID_WICPixelFormatBlackWhite"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC906}","GUID_WICPixelFormat2bppGray"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC907}","GUID_WICPixelFormat4bppGray"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC908}","GUID_WICPixelFormat8bppGray"
+                             , "{E6CD0116-EEBA-4161-AA85-27DD9FB3A895}","GUID_WICPixelFormat8bppAlpha"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC909}","GUID_WICPixelFormat16bppBGR555"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC90A}","GUID_WICPixelFormat16bppBGR565"
+                             , "{05EC7C2B-F1E6-4961-AD46-E1CC810A87D2}","GUID_WICPixelFormat16bppBGRA5551"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC90B}","GUID_WICPixelFormat16bppGray"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC90C}","GUID_WICPixelFormat24bppBGR"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC90D}","GUID_WICPixelFormat24bppRGB"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC90E}","GUID_WICPixelFormat32bppBGR"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC90F}","GUID_WICPixelFormat32bppBGRA"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC910}","GUID_WICPixelFormat32bppPBGRA"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC911}","GUID_WICPixelFormat32bppGrayFloat"
+                             , "{D98C6B95-3EFE-47D6-BB25-EB1748AB0CF1}","GUID_WICPixelFormat32bppRGB"
+                             , "{F5C7AD2D-6A8D-43DD-A7A8-A29935261AE9}","GUID_WICPixelFormat32bppRGBA"
+                             , "{3CC4A650-A527-4D37-A916-3142C7EBEDBA}","GUID_WICPixelFormat32bppPRGBA"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC915}","GUID_WICPixelFormat48bppRGB"
+                             , "{E605A384-B468-46CE-BB2E-36F180E64313}","GUID_WICPixelFormat48bppBGR"
+                             , "{A1182111-186D-4D42-BC6A-9C8303A8DFF9}","GUID_WICPixelFormat64bppRGB"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC916}","GUID_WICPixelFormat64bppRGBA"
+                             , "{1562FF7C-D352-46F9-979E-42976B792246}","GUID_WICPixelFormat64bppBGRA"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC917}","GUID_WICPixelFormat64bppPRGBA"
+                             , "{8C518E8E-A4EC-468B-AE70-C9A35A9C5530}","GUID_WICPixelFormat64bppPBGRA"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC913}","GUID_WICPixelFormat16bppGrayFixedPoint"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC914}","GUID_WICPixelFormat32bppBGR101010"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC912}","GUID_WICPixelFormat48bppRGBFixedPoint"
+                             , "{49CA140E-CAB6-493B-9DDF-60187C37532A}","GUID_WICPixelFormat48bppBGRFixedPoint"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC918}","GUID_WICPixelFormat96bppRGBFixedPoint"
+                             , "{E3FED78F-E8DB-4ACF-84C1-E97F6136B327}","GUID_WICPixelFormat96bppRGBFloat"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC919}","GUID_WICPixelFormat128bppRGBAFloat"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC91A}","GUID_WICPixelFormat128bppPRGBAFloat"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC91B}","GUID_WICPixelFormat128bppRGBFloat"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC91C}","GUID_WICPixelFormat32bppCMYK"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC91D}","GUID_WICPixelFormat64bppRGBAFixedPoint"
+                             , "{356DE33C-54D2-4A23-BB04-9B7BF9B1D42D}","GUID_WICPixelFormat64bppBGRAFixedPoint"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC940}","GUID_WICPixelFormat64bppRGBFixedPoint"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC91E}","GUID_WICPixelFormat128bppRGBAFixedPoint"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC941}","GUID_WICPixelFormat128bppRGBFixedPoint"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC93A}","GUID_WICPixelFormat64bppRGBAHalf"
+                             , "{58AD26C2-C623-4D9D-B320-387E49F8C442}","GUID_WICPixelFormat64bppPRGBAHalf"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC942}","GUID_WICPixelFormat64bppRGBHalf"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC93B}","GUID_WICPixelFormat48bppRGBHalf"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC93D}","GUID_WICPixelFormat32bppRGBE"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC93E}","GUID_WICPixelFormat16bppGrayHalf"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC93F}","GUID_WICPixelFormat32bppGrayFixedPoint"
+                             , "{25238D72-FCF9-4522-B514-5578E5AD55E0}","GUID_WICPixelFormat32bppRGBA1010102"
+                             , "{00DE6B9A-C101-434B-B502-D0165EE1122C}","GUID_WICPixelFormat32bppRGBA1010102XR"
+                             , "{604E1BB5-8A3C-4B65-B11C-BC0B8DD75B7F}","GUID_WICPixelFormat32bppR10G10B10A2"
+                             , "{9C215C5D-1ACC-4F0E-A4BC-70FB3AE8FD28}","GUID_WICPixelFormat32bppR10G10B10A2HDR10"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC91F}","GUID_WICPixelFormat64bppCMYK"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC920}","GUID_WICPixelFormat24bpp3Channels"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC921}","GUID_WICPixelFormat32bpp4Channels"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC922}","GUID_WICPixelFormat40bpp5Channels"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC923}","GUID_WICPixelFormat48bpp6Channels"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC924}","GUID_WICPixelFormat56bpp7Channels"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC925}","GUID_WICPixelFormat64bpp8Channels"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC926}","GUID_WICPixelFormat48bpp3Channels"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC927}","GUID_WICPixelFormat64bpp4Channels"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC928}","GUID_WICPixelFormat80bpp5Channels"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC929}","GUID_WICPixelFormat96bpp6Channels"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC92A}","GUID_WICPixelFormat112bpp7Channels"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC92B}","GUID_WICPixelFormat128bpp8Channels"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC92C}","GUID_WICPixelFormat40bppCMYKAlpha"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC92D}","GUID_WICPixelFormat80bppCMYKAlpha"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC92E}","GUID_WICPixelFormat32bpp3ChannelsAlpha"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC92F}","GUID_WICPixelFormat40bpp4ChannelsAlpha"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC930}","GUID_WICPixelFormat48bpp5ChannelsAlpha"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC931}","GUID_WICPixelFormat56bpp6ChannelsAlpha"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC932}","GUID_WICPixelFormat64bpp7ChannelsAlpha"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC933}","GUID_WICPixelFormat72bpp8ChannelsAlpha"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC934}","GUID_WICPixelFormat64bpp3ChannelsAlpha"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC935}","GUID_WICPixelFormat80bpp4ChannelsAlpha"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC936}","GUID_WICPixelFormat96bpp5ChannelsAlpha"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC937}","GUID_WICPixelFormat112bpp6ChannelsAlpha"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC938}","GUID_WICPixelFormat128bpp7ChannelsAlpha"
+                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC939}","GUID_WICPixelFormat144bpp8ChannelsAlpha"
+                             , "{91B4DB54-2DF9-42F0-B449-2909BB3DF88E}","GUID_WICPixelFormat8bppY"
+                             , "{1339F224-6BFE-4C3E-9302-E4F3A6D0CA2A}","GUID_WICPixelFormat8bppCb"
+                             , "{B8145053-2116-49F0-8835-ED844B205C51}","GUID_WICPixelFormat8bppCr"
+                             , "{FF95BA6E-11E0-4263-BB45-01721F3460A4}","GUID_WICPixelFormat16bppCbCr"
+                             , "{A355F433-48E8-4A42-84D8-E2AA26CA80A4}","GUID_WICPixelFormat16bppYQuantizedDctCoefficients"
+                             , "{D2C4FF61-56A5-49C2-8B5C-4C1925964837}","GUID_WICPixelFormat16bppCbQuantizedDctCoefficients"
+                             , "{2FE354F0-1680-42D8-9231-E73C0565BFC1}","GUID_WICPixelFormat16bppCrQuantizedDctCoefficients")
+    
+    ; Static __Item[key] { ; AHK v1 - comment these 3 liens out for AHK v1
+        ; get => this.%key%
+    ; }
+    ; AHK v1 - remove "Static" from all methods() / properties[] for AHK v1 compatibility
+    CLSIDFromString(obj_in) { ; thanks to lexikos - from VA.ahk - modded by TheArkive
+        DllCall("ole32\CLSIDFromString", "str", obj_in, "ptr", (obj_out := BufferAlloc(16,0)).ptr)
+        return obj_out
+    }
+    StringFromGUID2(guid) { ; thanks to lexikos - from VA.ahk - modded by TheArkive
+        Static _iu := StrLen(Chr(0xFFFF)), fnc := "ole32\StringFromGUID2"
+        DllCall(fnc, "ptr", guid.ptr, "ptr", (buf := BufferAlloc(_iu?78:39)).ptr, "int", 39)
+        return StrGet(buf.ptr)
+    }
+    Initialize() { ; run this on startup -> wic_IDs.Initialize()
+        For CLSID, friendly_name in this.PixelFormats {
+            DllCall("ole32\CLSIDFromString","Str",CLSID,"Ptr",(buf := BufferAlloc(16)).ptr)
+            ; wic_IDs.%friendly_name% := {str:CLSID, value:buf, name:friendly_name, ptr:buf.ptr}   ; AHK v2
+            wic_IDs[friendly_name] := {str:CLSID, value:buf, name:friendly_name, ptr:buf.ptr}    ; AHK v1
+        }
+    }
+}
+
+; These are the basic methods that need to apply to every COM instance.
+class Com_Base_Functions {
+    ; https://docs.microsoft.com/en-us/windows/win32/wic/-wic-codec-native-pixel-formats
+    ; Color context information is defined by the IWICColorContext interface for WIC. To retrieve the color context information for an image frame, use the GetColorContext method.
+
+    ; In the absence of color space information for an image, the general rule for color space inference is that UINT RGB and grayscale formats use the standard RGB color space (sRGB), while fixed-point and floating-point RGB and grayscale formats use the extended RGB color space (scRGB). The CMYK color model uses an RWOP color space.
+
+    static v := SubStr(A_AhkVersion,1,1)
+    obj := "", ptr := 0, _LastError := 0
+    
+    __New(inPtr:=0) {
+        If (Com_Base_Functions.v >= 2)
+            this.ptr := (this.obj := (!inPtr) ? ComObjCreate(this.CLSID, this.IID) : ComObject(13,inPtr)).ptr
+        Else this.ptr := this.obj := (!inPtr) ? ComObjCreate(this.CLSID, this.IID) : inPtr
+    }
+    __Delete() {
+        If Com_Base_Functions.v < 2
+            ObjRelease(this.ptr)
+    }
+    exec(index, p*) {
+        return DllCall(NumGet(NumGet(this.ptr+0,"Ptr")+(index*A_PtrSize), "Ptr"), "Ptr", this.ptr+0, p*) ; +0 for AHK v1
+    }
+    LastError[] {
+        get {
+            return (this._LastError) ? Format("0x{:X}",this._LastError & 0xFFFFFFFF) : 0
+        }
+        set {
+            this._LastError := value
+        }
+    }
+    New(inPtr:=0) { ; for AHK v1
+        n := this.__Class, new := "x", obj := New %n%(inPtr) ; [ new:="x" ] to make AHK v2 happy
+        return obj                                           ; for calling "New Class()" in AHK v1 style.
+    }
+    ; vtbl(addr, index) {
+        ; return NumGet(NumGet(addr+0,"Ptr")+(index*A_PtrSize), "Ptr") ; +0 for AHK v1
+    ; }
+    
+    
+}
+
+; https://docs.microsoft.com/en-us/windows/desktop/api/wincodec/nn-wincodec-iwicbitmapsource
+class IWICBitmapSource extends Com_Base_Functions {
+    IID := "{00000120-a8f2-4877-ba0a-fd2b6645fb94}"
+    
+    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicbitmapsource-getsize
+    ; Returns obj with {w, h} properties.
+    GetSize() { ; 3
+        this.LastError := this.exec(3
+        , "Ptr", (w:=BufferAlloc(4)).ptr, "Ptr", (h:=BufferAlloc(4)).ptr)
+        return (!this.LastError) ? {w:NumGet(w.ptr,"UInt"), h:NumGet(h.ptr,"UInt")} : ""
+    }
+    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicbitmapsource-getpixelformat
+    ; Returns friendly name string for GUID that represents the Pixel Format.
+    GetPixelFormat() { ; 4
+        this.LastError := this.exec(4
+        , "Ptr", (pPixelFormat:=BufferAlloc(16)).ptr) ; GUID return type (16 bytes)
+        UID_str := wic_IDs.StringFromGUID2(pPixelFormat)
+        return (!this.LastError) ? wic_IDs.PixelFormats[UID_str] : ""
+    }
+    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicbitmapsource-getresolution
+    GetResolution() { ; 5
+        this.LastError := this.exec(5
+        , "Ptr", (pDpiX:=BufferAlloc(8)).ptr, "Ptr", (pDpiY:=BufferAlloc(8)).ptr) ; "double" return type
+        return (!this.LastError) ? {x:NumGet(pDpiX.ptr,"Double"), y:NumGet(pDpiY.ptr,"Double")} : ""
+    }
+    CopyPalette() { ; 6
+        this.LastError := this.exec(6, "Ptr", (pIPalette:=BufferAlloc(A_PtrSize)).ptr)
+        return (!this.LastError) ? IWICPalette.New(NumGet(pIPalette.ptr,"Ptr")) : ""
+    }
+    CopyPixels(prc, cbStride, cbBufferSize, pbBuffer) { ; 7
+        If ((prc ? WI_ptr := (WIRect := BufferAlloc(16,0)).ptr : WI_ptr := 0)) { ; prc takes [x,y,w,h] as input
+            For i, val in prc
+                ; NumPut("Int", val, WI_ptr, 4*(A_Index-1)) ; AHK v2
+                NumPut(val, WI_ptr+(4*(A_Index-1)), "Int") ; AHK v1
+        }
+        this.LastError := this.exec(7
+        , "Ptr", WI_ptr, "UInt", cbStride, "UInt", cbBufferSize, "Ptr", pbBuffer)
+        return (!this.LastError) ? true : ""
+    }
+}
+    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwicbitmap
+    class IWICBitmap extends IWICBitmapSource { ; IWICBitmapSource -> this 
+        IID := "{00000121-a8f2-4877-ba0a-fd2b6645fb94}"
+        Lock() { ; 8
+        }
+        SetPalette() { ; 9
+        }
+        SetResolution() { ; 10
+        }
+    }
+    
+    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwicbitmapclipper
+    class IWICBitmapClipper extends IWICBitmapSource { ; IWICBitmapSource -> this
+        IID := "{E4FBCF03-223D-4e81-9333-D635556DD1B5}"
+        Initialize() { ; 8
+        }
+    }
+    
+    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwicbitmapfliprotator
+    class IWICBitmapFlipRotator extends IWICBitmapSource { ; IWICBitmapSource -> this
+        IID := "{5009834F-2D6A-41ce-9E1B-17C5AFF7A782}"
+        Initialize() { ; 8
+        }
+    }
+    
+    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwicbitmapframedecode
+    class IWICBitmapFrameDecode extends IWICBitmapSource { ; IWICBitmapSource -> this
+        IID := "{3B16811B-6A43-4ec9-A813-3D930C13B940}"
+        GetMetadataQueryReader() { ; 8
+        }
+        GetColorContexts() { ; 9
+        }
+        GetThumbnail() { ; 10
+        }
+    }
+
+        ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwicdevelopraw
+        class IWICDevelopRaw extends IWICBitmapFrameDecode { ; IWICBitmapSource -> IWICBitmapFrameDecode -> this
+            IID := "{fbec5e44-f7be-4b65-b7f8-c0c81fef026d}"
+            QueryRawCapabilitiesInfo() { ; 11
+            }
+            LoadParameterSet() { ; 12
+            }
+            GetCurrentParameterSet() { ; 13
+            }
+            SetExposureCompensation() { ; 14
+            }
+            GetExposureCompensation() { ; 15
+            }
+            SetWhitePointRGB() { ; 16
+            }
+            GetWhitePointRGB() { ; 17
+            }
+            SetNamedWhitePoint() { ; 18
+            }
+            GetNamedWhitePoint() { ; 19
+            }
+            SetWhitePointKelvin() { ; 20
+            }
+            GetWhitePointKelvin() { ; 21
+            }
+            GetKelvinRangeInfo() { ; 22
+            }
+            SetContrast() { ; 23
+            }
+            GetContrast() { ; 24
+            }
+            SetGamma() { ; 25
+            }
+            GetGamma() { ; 26
+            }
+            SetSharpness() { ; 27
+            }
+            GetSharpness() { ; 28
+            }
+            SetSaturation() { ; 29
+            }
+            GetSaturation() { ; 30
+            }
+            SetTint() { ; 31
+            }
+            GetTint() { ; 32
+            }
+            SetNoiseReduction() { ; 33
+            }
+            GetNoiseReduction() { ; 34
+            }
+            SetDestinationColorContext() { ; 35
+            }
+            SetToneCurve() { ; 36?
+            }
+            GetToneCurve() { ; 37?
+            }
+            SetRotation() { ; 38
+            }
+            GetRotation() { ; 39
+            }
+            SetRenderMode() { ; 40
+            }
+            GetRenderMode() { ; 41
+            }
+            SetNotificationCallback() { ; 42
+            }
+        }
+    
+    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwicbitmapscaler
+    class IWICBitmapScaler extends IWICBitmapSource { ; IWICBitmapSource -> this
+        IID := "{00000302-a8f2-4877-ba0a-fd2b6645fb94}"
+        Initialize() { ; 8
+        }
+    }
+    
+    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwiccolortransform
+    class IWICColorTransform extends IWICBitmapSource { ; IWICBitmapSource -> this
+        IID := "{B66F034F-D0E2-40ab-B436-6DE39E321A94}"
+        Initialize() { ; 8
+        }
+    }
+    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwicformatconverter
+    class IWICFormatConverter extends IWICBitmapSource { ; IWICBitmapSource -> this
+        IID := "{00000301-a8f2-4877-ba0a-fd2b6645fb94}"
+        
+        ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicformatconverter-initialize
+        ; Performs / preps conversion from one pixel format to another.
+        ; Dither options:                                      ; Palette options:
+        ; WICBitmapDitherTypeNone              = 0             ; WICBitmapPaletteTypeCustom              = 0 
+        ; WICBitmapDitherTypeSolid             = 1             ; WICBitmapPaletteTypeMedianCut           = 1 
+        ; WICBitmapDitherTypeOrdered4x4        = 2             ; WICBitmapPaletteTypeFixedBW             = 2 
+        ; WICBitmapDitherTypeOrdered8x8        = 3             ; WICBitmapPaletteTypeFixedHalftone8      = 3 
+        ; WICBitmapDitherTypeOrdered16x16      = 4             ; WICBitmapPaletteTypeFixedHalftone27     = 4 
+        ; WICBitmapDitherTypeSpiral4x4         = 5             ; WICBitmapPaletteTypeFixedHalftone64     = 5 
+        ; WICBitmapDitherTypeSpiral8x8         = 6             ; WICBitmapPaletteTypeFixedHalftone125    = 6 
+        ; WICBitmapDitherTypeDualSpiral4x4     = 7             ; WICBitmapPaletteTypeFixedHalftone216    = 7 
+        ; WICBitmapDitherTypeDualSpiral8x8     = 8             ; WICBitmapPaletteTypeFixedWebPalette     = 8 
+        ; WICBitmapDitherTypeErrorDiffusion    = 9             ; WICBitmapPaletteTypeFixedHalftone252    = 9 
+        ; WICBITMAPDITHERTYPE_FORCE_DWORD      = 10            ; WICBitmapPaletteTypeFixedHalftone256    = 10
+                                                               ; WICBitmapPaletteTypeFixedGray4          = 11
+        ; pISource  = input IWICBitmapSource                   ; WICBitmapPaletteTypeFixedGray16         = 12
+        ; dstFormat = destination format guid                  ; WICBitmapPaletteTypeFixedGray256        = 13
+        ; alphaThresholdPercent = float, 1.0 max               ; WICBITMAPPALETTETYPE_FORCE_DWORD        = 14
+        Initialize(pISource, dstFormat, dither:=0, pIPalette:=0, alphaThresholdPercent:=0, paletteTranslate:=0) { ; 8
+            this.LastError := this.exec(8
+            , "Ptr", pISource, "Ptr", wic_IDs[dstFormat].ptr, "Int", dither
+            , "Ptr", pIPalette, "Double", alphaThresholdPercent, "Int", paletteTranslate)
+            return (!this.LastError) ? true : "" ; return 1 on success
+        }
+        ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicformatconverter-canconvert
+        ; Returns bool (true/false) if conversion from specified source to destination palette can be done.
+        CanConvert(srcPixelFormat, dstPixelFormat) { ; 9
+            uid1 := wic_IDs[srcPixelFormat], uid2 := wic_IDs[dstPixelFormat]
+            this.LastError := this.exec(9
+            , "Ptr", uid1.ptr, "Ptr", uid2.ptr, "Ptr", (buf:=BufferAlloc(4)).ptr)
+            return (!this.LastError) ? NumGet(buf.ptr,"Int") : ""
+        }
+    }
+    
+    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwicplanarformatconverter
+    class IWICPlanarFormatConverter extends IWICBitmapSource { ; IWICPlanarFormatConverter -> this
+        IID := "{BEBEE9CB-83B0-4DCC-8132-B0AAA55EAC96}"
+        Initialize() { ; 8
+        }
+        CanConvert() { ; 9
+        }
+    }
+
+; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwicimagingfactory
+class IWICImagingFactory extends Com_Base_Functions { ; root obj
+    CLSID := "{CACAF262-9370-4615-A13B-9F5539DA4C0A}"
+    IID   := "{ec5ec8a9-c395-4314-9c77-54d7a935ff70}"
+    
+    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicimagingfactory-createdecoderfromfilename
+    ; Creates / returns IWICBitmapDecoder.      ; metadataOptions:
+    ; dwDesiredAccess:                          ; WICDecodeMetadataCacheOnDemand        = 0
+    ; GENERIC_READ  := 0x80000000               ; WICDecodeMetadataCacheOnLoad          = 1
+    ; GENERIC_WRITE := 0x40000000               ; WICMETADATACACHEOPTION_FORCE_DWORD    = 2
+    CreateDecoderFromFilename(wzFilename, pguidVendor:=0, dwDesiredAccess:=0x80000000, metadataOptions:=0) { ; 3
+        this.LastError := this.exec(3
+        , "Str", wzFilename, "Ptr", pguidVendor, "UInt", dwDesiredAccess, "Int", metadataOptions, "Ptr", (buf := BufferAlloc(A_PtrSize)).ptr)
+        return (!this.LastError) ? IWICBitmapDecoder.New(NumGet(buf.ptr,"Ptr")) : ""
+    }
+    CreateDecoderFromStream() { ; 4
+    }
+    CreateDecoderFromFileHandle() { ; 5
+    }
+    CreateComponentInfo() { ; 6
+    }
+    CreateDecoder() { ; 7
+    }
+    CreateEncoder() { ; 8
+    }
+    CreatePalette() { ; 9
+    }
+    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicimagingfactory-createformatconverter
+    ; Returns / creates IWICFormatConverter.
+    CreateFormatConverter() { ; 10
+        this.LastError := this.exec(10
+        , "Ptr", (buf:=BufferAlloc(A_PtrSize)).ptr)
+        return (!this.LastError) ? IWICFormatConverter.New(NumGet(buf.ptr,"Ptr")) : ""
+    }
+    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicimagingfactory-createbitmapscaler
+    ; Returns / creates IWICBitmapScaler.
+    CreateBitmapScaler() { ; 11
+        this.LastError := this.exec(11
+        , "Ptr", (buf:=BufferAlloc(A_PtrSize)).ptr)
+        return (!this.LastError) ? IWICBitmapScaler.New(NumGet(buf.ptr,"Ptr")) : ""
+    }
+    CreateBitmapClipper() { ; 12
+    }
+    CreateBitmapFlipRotator() { ; 13
+    }
+    CreateStream() { ; 14
+    }
+    CreateColorContext() { ; 15
+    }
+    CreateColorTransformer() { ; 16
+    }
+    CreateBitmap() { ; 17
+    }
+    CreateBitmapFromSource() { ; 18
+    }
+    CreateBitmapFromSourceRect() { ; 19
+    }
+    CreateBitmapFromMemory() { ; 20
+    }
+    CreateBitmapFromHBITMAP() { ; 21
+    }
+    CreateBitmapFromHICON() { ; 22
+    }
+    CreateComponentEnumerator() { ; 23
+    }
+    CreateFastMetadataEncoderFromDecoder() { ; 24
+    }
+    CreateFastMetadataEncoderFromFrameDecode() { ; 25
+    }
+    CreateQueryWriter() { ; 26
+    }
+    CreateQueryWriterFromReader() { ; 27
+    }
+}
+
+    class IWICImagingFactory2 extends IWICImagingFactory { ; IWICImagingFactory -> this
+        IID := "{7B816B45-1996-4476-B132-DE9E247C8AF0}"
+        CreateImageEncoder() { ; 28
+        }
+    }
+
+; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwicbitmapdecoder
+class IWICBitmapDecoder extends Com_Base_Functions { ; root obj
+    IID := "{9EDDE9E7-8DEE-47ea-99DF-E6FAF2ED44BF}"
+    QueryCapability() { ; 3
+    }
+    Initialize() { ; 4
+    }
+    GetContainerFormat() { ; 5
+    }
+    GetDecoderInfo() { ; 6
+    }
+    CopyPalette() { ; 7
+    }
+    GetMetadataQueryReader() { ; 8
+    }
+    GetPreview() { ; 9
+    } 
+    GetColorContexts() { ; 10
+    }
+    GetThumbnail() { ; 11
+    }
+    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicbitmapdecoder-getframecount
+    GetFrameCount() { ; 12
+        ; this.LastError := DllCall(this.vtbl(this.ptr,12), "Ptr", this.ptr, "UInt*", count:=0)
+        ; return (!this.LastError) ? count : ""
+
+        this.LastError := this.exec(12, "Ptr", (count := BufferAlloc(4)).ptr)
+        return (!this.LastError) ? NumGet(count.ptr,"UInt") : ""
+    }
+    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicbitmapdecoder-getframe
+    ; Returns / creates IWICBitmapFrameDecode.
+    GetFrame(index) { ; 13
+        this.LastError := this.exec(13, "UInt", index, "Ptr", (ppIBitmapFrame := BufferAlloc(A_PtrSize)).ptr)
+        return (!this.LastError) ? IWICBitmapFrameDecode.New(NumGet(ppIBitmapFrame.ptr,"Ptr")) : ""
+    }
+    
+}
+
+class IWICPalette extends Com_Base_Functions {
+    IID := "{00000040-a8f2-4877-ba0a-fd2b6645fb94}"
+    InitializePredefined() { ; 3
+    }
+    InitializeCustom() { ; 4
+    }
+    InitializeFromBitmap() { ; 5
+    }
+    InitializeFromPalette() { ; 6
+    }
+    GetType() { ; 7
+    }
+    GetColorCount() { ; 8
+    }
+    GetColors() { ; 9
+    }
+    IsBlackWhite() { ; 10
+    }
+    IsGrayscale() { ; 11
+    }
+    HasAlpha() { ; 12
+    }
+}
+
+
+*/

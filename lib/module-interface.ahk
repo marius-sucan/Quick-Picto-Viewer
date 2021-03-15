@@ -998,6 +998,10 @@ byeByeRoutine() {
    {
       MainExe.ahkPostFunction("exitAppu", "external")
       ;  lastCloseInvoked++
+   } Else If (markedSelectFile>50 && maxFilesIndex>100)
+   {
+      MainExe.ahkPostFunction("exitAppu", "select-external")
+      ;  lastCloseInvoked++
    } Else lastCloseInvoked := 10
 
    If (A_TickCount - lastOtherWinClose < 450)

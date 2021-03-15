@@ -2,11 +2,13 @@
 
 <h2>To keep the development going, <a href="https://www.paypal.me/MariusSucan/10">please donate</a> using PayPal.</h2>
 
-<p>This is an image viewer and [basic] editor based on the GDI+ and FreeImage libraries. It can open about 85 image file formats: .hdr, .raw, .tif, .emf, .wmf, .png, .bmp, .gif, .jpeg and many others.</p>
+<p>QPV is an image viewer, editor and a tool to organize image collections based on the GDI+ and FreeImage libraries. It can open about 85 image file formats: .hdr, .raw, .tif, .emf, .wmf, .png, .bmp, .gif, .jpeg and many others.</p>
 
-<p>QPV is able to create image slideshows and cache very large dynamic lists of files. Unlike other applications of this kind, it can load, on my system, a list of 500000 files in under 10 seconds, while XnView Classic or Irfan View need more than 15 minutes. The index of files can be saved as plain-text or as an SQLite database.</p>
+<p>QPV is able to create image slideshows and cache very large dynamic lists of files. Unlike other applications of this kind, it can load, on my system, a list of 900100 files in under 10 seconds, while XnView Classic or Irfan View need more than 15 minutes. The index of files can be saved as plain-text or as an SQLite database.</p>
 
 <p>With Quick Picto Viewer you can generate file statistics over huge image libraries which can help identify very small images, very low key, or washed out images. You can also identify image duplicates and auto-select files by given criteria.</p>
+
+<p>QPV also has specific tools to index image contents and identify image duplicates, based on similarity. It has been tested succesfully on 1.5 million images.</p>
 
 <p>Quick Picto Viewer is also able to play sound files associated with images, automatically or on demand, and even generate slideshows that are in synch with the audio files duration. Supported audio formats: WAV, MP3 and WMA. It can also display image captions / notes for image.</p>
 
@@ -32,10 +34,11 @@
 <li>List images as thumbnails with preset aspect ratios: square, wide or tall. Easy to adjust their size as well. Use T and +/- keys.</li>
 <li>Adaptive multi-threaded thumbnails caching to sizes ranging from 600 pixels to 125 pixels. On very fast PCs, no caching occurs.</li>
 <li>Touch screen friendly hot-areas on the UI to navigate or zoom into images.</li>
-<li>Sort images by histogram average or median point, resolution, aspect ratio, or by similarity.</li>
+<li>Sort images by histogram data points, such as the average or median point, resolution, aspect ratio.</li>
+<li>Sort images by their properties such as resolution, aspect ratisomn ușor and so on.</li>
 <li>Options to control brightness, contrast, saturation and RGB color channels balance/intensity.</li>
 <li>Elliptical and rectangular selections, rotated at any angle.</li>
-<li>Image editing: soft edges blur, insert text, paste in place, draw arcs, lines and shapes, transform selected area, rotate, flip, crop and more</li>
+<li>Image editing tools: soft edges blur, insert text, paste in place, draw arcs, lines and shapes, transform selected area, rotate, flip, crop and more</li>
 <li>Draw free-form curved paths or polygonal lines; options to use fill with color or gradients, or use as alpha masks.</li>
 <li>18 blending modes and alpha masking support on paste in place or when using the transform tool on a selected area. The mask can be a gradient [linear, box, radial], an image file or a previously drawn path.</li>
 <li>Adaptive auto-adjustment of brightness, contrast and saturation of displayed images.</li>
@@ -60,7 +63,8 @@
 <li>Quick Picto Viewer has its own slideshow formats to store list of folders and cache files lists: plain-text and SQLite database.</li>
 <li>Ability to selectively refresh the cached files list from selected folders.</li>
 <li>Option to filter the list of files using keywords. The operator | [or] is allowed.</li>
-<li>Very fast loading of cached or not cached lists of files. Tested with 700000 images and it loads in 10 seconds on my system.</li>
+<li>Folder tree view - meant to help navigate folders</li>
+<li>Very fast loading of cached or not cached lists of files. Tested with 900100 images and it loads in 10 seconds on my system.</li>
 <li>Resize and crop images preserving alpha-channel on save even when image colors are adjusted.</li>
 <li>Support for animated .GIFs in slideshows.. HD GIFs support as well.</li>
 <li>Support for multi-paged TIFFs and GIF frames. Ability to go through each image frame/page.</li>

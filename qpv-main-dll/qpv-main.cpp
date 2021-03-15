@@ -13,7 +13,9 @@
 #include <vector>
 #include <cstdint>
 #include <cstdio>
+#include <numeric>
 #include <algorithm>
+#include <bits/stdc++.h>
 
 using namespace std;
 
@@ -804,3 +806,80 @@ DLL_API int DLL_CALLCONV hammingDistanceOverArray(int argc, char **argv) {
 }
 
 */
+
+DLL_API unsigned int DLL_CALLCONV dumbcalculateNCR(int n) {
+// Calculates the number of combinations of N things taken r=2 at a time.
+
+   unsigned int combinations = 0;
+   for ( int secondIndex = 0 ; secondIndex<n+1 ; secondIndex++)
+   {
+       for ( int mainIndex = secondIndex + 1 ; mainIndex<n+1 ; mainIndex++)
+       {
+          if (secondIndex!=mainIndex && secondIndex<=n && mainIndex<=n) 
+             combinations++;
+       }
+   }
+
+   // std::stringstream ss;
+   // ss << "qpv: " << combinations;
+   // OutputDebugStringA(ss.str().data());
+   return combinations;
+}
+
+
+inline int hammingDistance(unsigned long long n1, unsigned long long n2) { 
+    unsigned long long x = n1 ^ n2; 
+    int setBits = 0; 
+  
+    while (x > 0) { 
+        setBits += x & 1; 
+        x >>= 1; 
+    } 
+  
+    return setBits; 
+} 
+
+DLL_API int DLL_CALLCONV hammingDistanceOverArray(unsigned long long *givenHashesArray, unsigned int *givenIDs, int arraySize, unsigned int *resultsArrayA, unsigned int *resultsArrayB, unsigned int *resultsArrayC, int threshold, int maxResults) {
+    int results = 0;
+    int n = arraySize;
+    bool done = false;
+    // int mainIndex = 1;
+    // int returnVal = 1;
+
+    #pragma omp parallel for schedule(dynamic) default(none) shared(results)
+    for ( int secondIndex = 0 ; secondIndex<n+1 ; secondIndex++)
+    {
+        if (done==1)
+           break;
+
+        for ( int mainIndex = secondIndex + 1 ; mainIndex<n+1 ; mainIndex++)
+        {
+            if (done==1)
+               break;
+
+            int diff = hammingDistance(givenHashesArray[mainIndex], givenHashesArray[secondIndex]);
+            if (diff<threshold)
+            {
+                #pragma omp critical
+                {
+                    results++;
+                    resultsArrayA[results] = givenIDs[mainIndex];
+                    resultsArrayB[results] = givenIDs[secondIndex];
+                    resultsArrayC[results] = diff;
+                    done = results > maxResults;
+                };
+            };
+        };
+    }
+
+   // int test = hammingDistance(givenHashesArray[5], givenHashesArray[7]);
+   // std::stringstream ss;
+   // ss << "qpv: hashes results " << results;
+   // ss << " hA " << givenHashesArray[5];
+   // ss << " hB " << givenHashesArray[7];
+   // ss << " idA " << givenIDs[5];
+   // ss << " idB " << givenIDs[7];
+   // ss << " diff " << test;
+   // OutputDebugStringA(ss.str().data());
+   return results;
+}
