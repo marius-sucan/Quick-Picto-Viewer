@@ -20,17 +20,25 @@
 ;     A new ImageFile object on success, otherwise False.
 ; ======================================================================================================================
 
-WIA_AcquireImage() {
+WIA_AcquireImage(deviceu:=0) {
    ; returns on success a GDI+ bitmap handle
 
    wiaDlg := ComObjCreate("WIA.CommonDialog")
    wiaImg := ComObjCreate("WIA.ImageFile")
 
-   dev := wiaDlg.ShowSelectDevice(0, 1)
-   If !dev.DeviceID
-      Return False
+   If !deviceu
+   {
+      dev := wiaDlg.ShowSelectDevice(0, 1)
+      If !dev.DeviceID
+         Return -1 ; probably the user canceled the dialog box
 
-   wiaimg := wiaDlg.ShowAcquireImage(dev.Type)
+      wiaimg := wiaDlg.ShowAcquireImage(dev.Type)
+   } Else
+      wiaimg := wiaDlg.ShowAcquireImage(deviceu)
+
+   If !wiaImg.FrameCount
+      Return -2 ; probably the user canceled the dialog box
+
    If (wiaImg.width*wiaImg.height>536848912)
       ScaledWiaIMG := WIA_ScaleImage(wiaImg, 23100, 23100, 1)
 
@@ -45,9 +53,9 @@ WIA_AcquireImage() {
    }
 
    If StrLen(pBitmap)>3
-      Return pBitmap
+      Return [pBitmap, dev.Type]
    Else
-      Return False
+      Return [0, 0]
 }
 
 ; ======================================================================================================================

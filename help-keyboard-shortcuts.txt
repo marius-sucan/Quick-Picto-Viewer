@@ -115,7 +115,7 @@ Shift + G|Toggle histogram modes|Image view|-
 Alt + G|Toggle histogram graph focus|Image view|-
 H|Flip viewport horizontally|Anywhere|-
 V|Flip viewport vertically|Anywhere|-
-I|Flip selection W/H|Live editing|-
+W|Flip selection W/H|Image selection area|-
 Z|Image navigator|Image view|-
 I|Toggle information viewport box|Anywhere|-
 Insert|Insert file(s) into list|Anywhere|Files selector
@@ -142,8 +142,8 @@ X|Mark active index to switch to a different index|Files list|-
 X|Switch active index with the already marked index|Files list|-
 Shift + X|Move active index at the already marked index|Files list|-
 Shift + X|Stop audio playback|Image view|-
-8|Decrease audio volume by 5%|Image view|-
-Shift + 8|Increase audio volume by 5%|Image view|-
+Shift + [ . ]|Increase audio volume by 5%|Anywhere|-
+Shift + [ , ]|Decrease audio volume by 5%|Anywhere|-
 Middle Click|Switch between image list and image view|Anywhere|Mode switch
 Middle Click|Collapse / expand live edit panel|Live editing|Panel
 Double Click|Toggle between image view modes|Anywhere|-

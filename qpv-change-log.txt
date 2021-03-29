@@ -2,6 +2,22 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.0.1 (2021-03-29)
+  - [new] highly customizable viewport grid
+  - [new] set background music for the entire slideshow; if audio annotations are associated with image files, they will be played alongside the slideshow music
+  - [new] option to have the canvas of the image automatically expand when pasting in place an image if the image object exceeds the boundaries; this applies for the Transform tool as well 
+  - [new] predefined custom selection shapes: stars, heart, callouts and so on
+  - [new] option to flip horizontally/vertically any custom selection shape
+  - [new] the ability to cut/copy/paste folders in the folder tree panel
+  - pasting clipboard contents or acquiring images through WIA now no longer erases undo levels in the currently edited image; the pasted [or acquired] image will instead be added as an undo level itself; the pasted [or acquired] images will be always added as undo levels, to the current image
+  - list views offer now real-time scrolling
+  - quick menu bar no longer causes flickers and unwanted reflows when switching from image view to thumbs list; it is also more dynamic now, based on the context
+  - [major] reorganized the menu structure and hopefully improved usability for new users; already existing features should be better exposed to people using the mouse
+  - fixed viewport performance regression since v4.9.1
+  - fixed image cropping bug
+  - fixed text insert low-quality rendition during live editing; it is should be bearable now
+  - various other bug fixes or improvements
+
 - v4.9.6 (2021-03-15)
   - [new] files list filter panel now has the option to invert filter for chosen image property; eg. file size not between 300 and 900 kb;
   - [new] hamming distance image duplicates filtering mode, with multi-threaded execution and caching; this allows users to find dupes previously not possible to identify [option only available on the x64 edition]

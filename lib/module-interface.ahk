@@ -202,7 +202,6 @@ BuildGUI(params:=0) {
       Gui, 1: Show, x%pX% y%pY% w%sW% h%sH%
       Sleep, 25
    }
-
    r := PVhwnd "|" hGDIinfosWin "|" hGDIwin "|" hGDIthumbsWin "|" hGDIselectWin "|" hPicOnGui1 "|" winGDIcreated "|" ThumbsWinGDIcreated
    Return r
 }
@@ -240,28 +239,42 @@ GetClientSize(ByRef w, ByRef h, hwnd) {
 } 
 
 updateUIctrl(forceThis:=0) {
+   Static prevState
+   If (forceThis="kill")
+   {
+      prevState := ""
+      Return
+   }
+
    GetClientSize(GuiW, GuiH, PVhwnd)
    If (forceThis=1)
    {
       editingSelectionNow := MainExe.ahkgetvar.editingSelectionNow
       isAlwaysOnTop := MainExe.ahkgetvar.isAlwaysOnTop
    }
-   WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%   
-   ctrlW := (editingSelectionNow=1) ? GuiW//8 : GuiW//7
-   ctrlH2 := (editingSelectionNow=1) ? GuiH//6 : GuiH//5
-   ctrlH3 := GuiH - ctrlH2*2
-   ctrlW2 := GuiW - ctrlW*2
-   ctrlY1 := ctrlH2
-   ctrlY2 := ctrlH2*2
-   ctrlY3 := ctrlH2 + ctrlH3
-   ctrlX1 := ctrlW
-   ctrlX2 := ctrlW + ctrlW2
-   GuiControl, 1: Move, PicOnGUI1, % "w" ctrlW " h" GuiH " x0 y0"
-   GuiControl, 1: Move, PicOnGUI2a, % "w" ctrlW2 " h" ctrlH2 " x" ctrlX1 " y0"
-   GuiControl, 1: Move, PicOnGUI2b, % "w" ctrlW2 " h" ctrlH3 " x" ctrlX1 " y" ctrlY1
-   GuiControl, 1: Move, PicOnGUI2c, % "w" ctrlW2 " h" ctrlH2 " x" ctrlX1 " y" ctrlY3
-   GuiControl, 1: Move, PicOnGUI3, % "w" ctrlW " h" GuiH " x" ctrlX2 " y0"
-   setUIlabels()
+
+   thisState := "a" GuiW GuiH editingSelectionNow isAlwaysOnTop TouchScreenMode
+   If (thisState!=prevState)
+   {
+      WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%   
+      ctrlW := (editingSelectionNow=1) ? GuiW//8 : GuiW//7
+      ctrlH2 := (editingSelectionNow=1) ? GuiH//6 : GuiH//5
+      ctrlH3 := GuiH - ctrlH2*2
+      ctrlW2 := GuiW - ctrlW*2
+      ctrlY1 := ctrlH2
+      ctrlY2 := ctrlH2*2
+      ctrlY3 := ctrlH2 + ctrlH3
+      ctrlX1 := ctrlW
+      ctrlX2 := ctrlW + ctrlW2
+      GuiControl, 1: Move, PicOnGUI1, % "w" ctrlW " h" GuiH " x0 y0"
+      GuiControl, 1: Move, PicOnGUI2a, % "w" ctrlW2 " h" ctrlH2 " x" ctrlX1 " y0"
+      GuiControl, 1: Move, PicOnGUI2b, % "w" ctrlW2 " h" ctrlH3 " x" ctrlX1 " y" ctrlY1
+      GuiControl, 1: Move, PicOnGUI2c, % "w" ctrlW2 " h" ctrlH2 " x" ctrlX1 " y" ctrlY3
+      GuiControl, 1: Move, PicOnGUI3, % "w" ctrlW " h" GuiH " x" ctrlX2 " y0"
+      setUIlabels()
+      prevState := thisState
+      UpdateUiStatusBar(0, 0, "kill", 0)
+   }
 }
 
 setUIlabels() {
@@ -273,26 +286,37 @@ setUIlabels() {
 }
 
 UpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0) {
-   ; Static mustResize := 1
-   GetClientSize(GuiW, GuiH, PVhwnd)
-   If (mustResize="list")
+   Static prevState
+
+   If (mustResize="kill")
    {
-      GuiControl, 1: Move, PicOnGUI1, % "w" GuiW " h" GuiH - heightu
-      GuiControl, 1: Move, PicOnGUI2a, % "w" GuiW " h" heightu " x1 y" GuiH - heightu
-      GuiControl, 1: Move, PicOnGUI2b, % "w1 h1 x1 y1"
-      GuiControl, 1: Move, PicOnGUI2c, % "w1 h1 x1 y1"
-      GuiControl, 1: Move, PicOnGUI3, % "w1 h1 x1 y1"
+      prevState := mustResize
+   } Else If (mustResize="list")
+   {
+      GetClientSize(GuiW, GuiH, PVhwnd)
+      thisState := "a" mustResize GuiW GuiH heightu
+      If (thisState!=prevState)
+      {
+         GuiControl, 1: Move, PicOnGUI1, % "w" GuiW " h" GuiH - heightu
+         GuiControl, 1: Move, PicOnGUI2a, % "w" GuiW " h" heightu " x1 y" GuiH - heightu
+         GuiControl, 1: Move, PicOnGUI2b, w1 h1 x1 y1
+         GuiControl, 1: Move, PicOnGUI2c, w1 h1 x1 y1
+         GuiControl, 1: Move, PicOnGUI3, w1 h1 x1 y1
+         prevState := thisState
+      }
+
       GuiControl, 1:, PicOnGUI1, Files list container
       GuiControl, 1:, PicOnGUI2a, Status bar
-      Return
+      updateUIctrl("kill")
    } Else If (mustResize="image")
    {
+      prevState := mustResize
       updateUIctrl()
-      Return
-   }
-
-   If (stringu && heightu)
+   } Else If (stringu && heightu)
    {
+      updateUIctrl("kill")
+      prevState := mustResize
+      GetClientSize(GuiW, GuiH, PVhwnd)
       GuiControl, 1: Move, PicOnGUI1, % "w" GuiW " h" GuiH - heightu
       GuiControl, 1: Move, PicOnGUI2a, % "w" GuiW " h" heightu " x1 y" GuiH - heightu
       GuiControl, 1:, PicOnGUI2a, % stringu
@@ -345,8 +369,7 @@ createGDIselectorWin() {
 }
 
 SetParentID(Window_ID, theOther) {
-  r := DllCall("SetParent", "uint", theOther, "uint", Window_ID) ; success = handle to previous parent, failure =null 
-  Return r
+  Return DllCall("SetParent", "uint", theOther, "uint", Window_ID) ; success = handle to previous parent, failure =null 
 }
 
 miniGDIupdater() {
@@ -1121,80 +1144,146 @@ identifySettingsWindow() {
         Return 0
 }
 
-BuildFakeMenuBar() {
+BuildFakeMenuBar(modus:=0) {
+
    ; main menu
-   If (imgEditPanelOpened=1)
+   If (modus="freeform" || drawingShapeNow=1)
    {
-      Menu, PVmenu, Add, HIDE PANEL, toggleImgEditPanelWindow
-      Menu, PVmenu, Add, 
-      If (AnyWindowOpen=10)
-         Menu, PVmenu, Add, APPLY TO SELECTION, ApplyColorAdjustsSelectedArea
-      Else
-         Menu, PVmenu, Add, APPLY, applyIMGeditFunction
-      Menu, PVmenu, Add, % (AnyWindowOpen=10) ? "CLOSE" : "CANCEL", tlbrCloseWindow
-      Menu, PVmenu, Add, 
-      Menu, PVmenu, Add, UNDO, ImgUndoAction
-      Menu, PVmenu, Add, REDO, ImgRedoAction
-      Menu, PVmenu, Add, 
-      If (AnyWindowOpen=10)
-         Menu, PVmenu, Add, SELECT, tlbrToggleImgSelection
-      Else
-         Menu, PVmenu, Add, SELECT ALL, MenuSelectAllAction
-      Menu, PVmenu, Add, SQUARE, makeSquareSelection
-      Menu, PVmenu, Add, FLIP, flipSelectionWH
-      Menu, PVmenu, Add, IMAGE LIMITS, toggleLimitSelection
-      Menu, PVmenu, Add, 
-      If (AnyWindowOpen!=10)
-         Menu, PVmenu, Add, ROTATE 45°, MenuSelRotation
-      If (AnyWindowOpen=10)
-         Menu, PVmenu, Add, RESET VIEW, BtnResetImageView
-      Else
-         Menu, PVmenu, Add, RESET, resetSelectionRotation
-      Menu, PVmenu, Add, 
-      Menu, PVmenu, Add, ADAPT IMAGE, ToggleImageSizingMode
-      If (AnyWindowOpen=10)
-         Menu, PVmenu, Add, TOGGLE FX, MenuToggleColorAdjustments
-      Else
-         Menu, PVmenu, Add, HIDE OBJECT, livePreviewsImageEditing
+      kMenu("CANCEL", "byeByeRoutine")
+      kMenu("-", "-")
+      kMenu("Freeform drawing mode", "dummy")
       Return
    }
 
-   infoThumbsMode := (thumbsDisplaying=1) ? "IMAGE VIEW" : "LIST VIEW"
-   Menu, PVmenu, Add, MENU, InitGuiContextMenu
-   Menu, PVmenu, Add, 
-   Menu, PVmenu, Add, OPEN, OpenDialogFiles
-   Menu, PVmenu, Add, SAVE, PanelSaveImg
-   Menu, PVmenu, Add, REFRESH, RefreshImageFileAction
-   Menu, PVmenu, Add, 
-   Menu, PVmenu, Add, %infoThumbsMode%, MenuDummyToggleThumbsMode
-   Menu, PVmenu, Add, 
-   Menu, PVmenu, Add, SELECT, MenuSelectAction
-   Menu, PVmenu, Add, ALL/NONE, MenuSelectAllAction
-   Menu, PVmenu, Add, 
-   Menu, PVmenu, Add, COPY, MenuCopyAction
-   If (thumbsDisplaying!=1)
-      Menu, PVmenu, Add, PASTE, tlbrPasteClipboardIMG
-   Else
-      Menu, PVmenu, Add, MOVE, PanelMoveCopyFiles
-   Menu, PVmenu, Add, ERASE, deleteKeyAction
-   Menu, PVmenu, Add, 
-   Menu, PVmenu, Add, SEARCH, PanelSearchIndex
-   Menu, PVmenu, Add, JUMP TO, PanelJump2index
-   Menu, PVmenu, Add, RESET, ResetImageView
-   If (thumbsDisplaying=1)
+   kMenu("MENU", "InitGuiContextMenu")
+   kMenu("-", "-")
+
+   If (modus="welcome")
    {
-      Menu, PVmenu, Add, 
-      Menu, PVmenu, Add, MODES, toggleListViewModeThumbs
-      Menu, PVmenu, Add, 
-      Menu, PVmenu, Add, [ + ], changeZoomPlus
-      Menu, PVmenu, Add, [ - ], changeZoomMinus
-      Menu, PVmenu, Add, 
+      kMenu("OPEN FILE", "OpenDialogFiles")
+      kMenu("OPEN FOLDER", "OpenFolders")
+      kMenu("RECENTS", "InvokeRecentMenu")
+      kMenu("FAVORITES", "invokeFavesMenu")
+      kMenu("-", "-")
+      kMenu("NEW IMAGE", "PanelNewImage")
+      kMenu("ACQUIRE", "AcquireWIAimage")
+      kMenu("PASTE CLIPBOARD", "tlbrPasteClipboardIMG")
+      Return
+   }
+
+   If (imgEditPanelOpened=1)
+   {
+      kMenu("HIDE PANEL", "toggleImgEditPanelWindow")
+      kMenu("-", "-")
+      If (AnyWindowOpen=10)
+         kMenu("APPLY TO SELECTION", "ApplyColorAdjustsSelectedArea")
+      Else
+         kMenu("APPLY", "applyIMGeditFunction")
+
+      If (AnyWindowOpen=10)
+         kMenu("CLOSE", "tlbrCloseWindow")
+      Else
+         kMenu("CANCEL", "tlbrCloseWindow")
+
+      kMenu("-", "-")
+      kMenu("UNDO", "ImgUndoAction")
+      kMenu("REDO", "ImgRedoAction")
+      kMenu("-", "-")
+      If (AnyWindowOpen=10)
+         kMenu("SELECT", "tlbrToggleImgSelection")
+      ; Else
+      ;    kMenu("SELECT ALL", "MenuSelectAllAction")
+      kMenu("SQUARE", "makeSquareSelection")
+      kMenu("FLIP", "flipSelectionWH")
+      kMenu("IMAGE LIMITS", "toggleLimitSelection")
+      kMenu("-", "-")
+      If (AnyWindowOpen!=10)
+         kMenu("ROTATE 45°", "MenuSelRotation")
+      If (AnyWindowOpen=10)
+         kMenu("RESET VIEW", "BtnResetImageView")
+      Else
+         kMenu("RESET", "resetSelectionRotation")
+      kMenu("-", "-")
+      kMenu("ADAPT IMAGE", "ToggleImageSizingMode")
+      If (AnyWindowOpen=10)
+         kMenu("TOGGLE FX", "MenuToggleColorAdjustments")
+      Else
+         kMenu("HIDE OBJECT", "toggleLiveEditObject")
+      Return
+   }
+
+   isImgEditMode := (thumbsDisplaying!=1 && StrLen(UserMemBMP)>3 && undoLevelsRecorded>1) ? 1 : 0
+   infoThumbsMode := (thumbsDisplaying=1) ? "IMAGE VIEW" : "LIST VIEW"
+   If (isImgEditMode=1)
+      kMenu("NEW", "PanelNewImage")
+
+   kMenu("OPEN", "OpenDialogFiles")
+   kMenu("SAVE", "PanelSaveImg")
+   If (isImgEditMode=1)
+   {
+      kMenu("-", "-")
+      kMenu("UNDO", "ImgUndoAction")
+      kMenu("REDO", "ImgRedoAction")
+      kMenu("-", "-")
    } Else
    {
-      Menu, PVmenu, Add, 
-      Menu, PVmenu, Add, PLAY, dummyInfoToggleSlideShowu
-      Menu, PVmenu, Add, INFO, ToggleHistoInfoBoxu
-      Menu, PVmenu, Add, PREV. PANEL, openPreviousPanel
+      kMenu("REFRESH", "RefreshImageFileAction")
+      kMenu("-", "-")
+   }
+
+   kMenu(infoThumbsMode, "MenuDummyToggleThumbsMode")
+   kMenu("-", "-")
+   kMenu("SELECT", "MenuSelectAction")
+   kMenu("ALL/NONE", "MenuSelectAllAction")
+   kMenu("-", "-")
+   kMenu("COPY", "MenuCopyAction")
+   If (thumbsDisplaying!=1)
+      kMenu("PASTE", "tlbrPasteClipboardIMG")
+   Else
+      kMenu("MOVE", "PanelMoveCopyFiles")
+   kMenu("ERASE", "deleteKeyAction")
+   kMenu("-", "-")
+
+   If (isImgEditMode=1)
+   {
+      kMenu("ACQUIRE", "AcquireWIAimage")
+      kMenu("PRINT", "PanelPrintImage")
+   } Else If (maxFilesIndex>1)
+   {
+      kMenu("SEARCH", "PanelSearchIndex")
+      kMenu("JUMP TO", "PanelJump2index")
+   }
+
+   kMenu("RESET", "ResetImageView")
+   If (thumbsDisplaying=1)
+   {
+      kMenu("-", "-")
+      kMenu("MODES", "toggleListViewModeThumbs")
+      kMenu("-", "-")
+      kMenu("[ + ]", "changeZoomPlus")
+      kMenu("[ - ]", "changeZoomMinus")
+      kMenu("-", "-")
+   } Else
+   {
+      kMenu("-", "-")
+      If (maxFilesIndex>1 && !isImgEditMode)
+         kMenu("PLAY", "dummyInfoToggleSlideShowu")
+      kMenu("INFO", "ToggleHistoInfoBoxu")
+      kMenu("PREV. PANEL", "openPreviousPanel")
+   }
+}
+
+kMenu(labelu, funcu, mena:="PVmenu", actu:="add") {
+   Static menuArray := [], indexu := 2
+   If (actu="add")
+   {
+      If (funcu="-")
+         Menu, % mena, % actu
+      Else
+         Menu, % mena, % actu, % labelu, % funcu
+
+      indexu++
+      menuArray[indexu] := labelu
    }
 }
 
@@ -1223,6 +1312,49 @@ BtnResetImageView() {
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
+PanelNewImage() {
+  If !determineMenuBTNsOKAY()
+     Return
+
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+
+PanelPrintImage() {
+  If !determineMenuBTNsOKAY()
+     Return
+
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+OpenFolders() {
+  If !determineMenuBTNsOKAY()
+     Return
+
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+AcquireWIAimage() {
+  If !determineMenuBTNsOKAY()
+     Return
+
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+invokeFavesMenu() {
+  If !determineMenuBTNsOKAY()
+     Return
+
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+InvokeRecentMenu() {
+  If !determineMenuBTNsOKAY()
+     Return
+
+  MainExe.ahkPostFunction(A_ThisFunc)
+}
+
 ApplyColorAdjustsSelectedArea() {
   If !determineMenuBTNsOKAY()
      Return
@@ -1244,14 +1376,11 @@ MenuToggleColorAdjustments() {
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
-livePreviewsImageEditing() {
-  Static prevState := 0
+toggleLiveEditObject() {
   If !determineMenuBTNsOKAY()
      Return
 
-  thisState := prevState + 1
-  MainExe.ahkPostFunction(A_ThisFunc, 1, thisState)
-  prevState := !prevState
+  MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 tlbrCloseWindow() {
@@ -1486,18 +1615,82 @@ deleteMenus() {
         Try Menu, % A_LoopField, Delete
 }
 
-UpdateMenuBar() {
+UpdateMenuBar(modus:=0) {
+   Static hasRan := 0, prevState
+   If !hasRan
+   {
+      Menu, PVmanu, Add, MENU, dummy
+      hasRan := 1
+   }
+
+   thisState := "a" imgEditPanelOpened AnyWindowOpen thumbsDisplaying maxFilesIndex drawingShapeNow modus UserMemBMP undoLevelsRecorded showMainMenuBar
+   If !showMainMenuBar
+      prevState := thisState
+
+   ; ToolTip, % thisState "`n" prevState , , , 2
+   If (prevState=thisState)
+      Return
+
+   ; ToolTip, % "l = " modus , , , 2
+   If (thumbsDisplaying=1)
+      UpdateUiStatusBar(0, 0, "list", 0)
+   Else 
+      updateUIctrl()
+
    lastMenuBarUpdate := A_TickCount
-   Gui, 1: Menu
+   Gui, 1: Menu, PVmanu
+   ; kMenu("-", "-", "PVmenu", "delete")
+
    deleteMenus()
    If (showMainMenuBar!=1)
+   {
+      Sleep, -1
+      Gui, 1: Menu
       Return
-   Sleep, 0
-   BuildFakeMenuBar()
-   Sleep, 0
+   }
+
+   Sleep, -1
+   BuildFakeMenuBar(modus)
+   ; SetMenuInfo(MenuGetHandle("PVmenu"), 2, 1, 0, 1)
+   Sleep, -1
+   Gui, 1: Menu, PVmanu
    Gui, 1: Menu, PVmenu
    lastMenuBarUpdate := A_TickCount
+   prevState := thisState
 }
+
+SetMenuInfo(hMenu, maxHeight:=0, autoDismiss:=0, modeLess:=0, noCheck:=0) {
+   cbSize := (A_PtrSize=8) ? 40 : 28
+   VarSetCapacity(MENUINFO, cbSize)
+   fMaskFlags := 0x80000000         ; MIM_APPLYTOSUBMENUS
+   cyMax := maxHeight ? maxHeight : 0
+   If maxHeight
+      fMaskFlags |= 0x00000001      ; MIM_MAXHEIGHT
+
+   If (autoDismiss=1 || modeLess=1 || noCheck=1)
+      fMaskFlags |= 0x00000010      ; MIM_STYLE
+
+   dwStyle := 0
+   If (autoDismiss=1)
+      dwStyle |= 0x10000000         ; MNS_AUTODISMISS
+
+   If (modeLess=1)
+      dwStyle |= 0x40000000         ; MNS_MODELESS
+
+   If (noCheck=1)
+      dwStyle |= 0x80000000         ; MNS_NOCHECK
+
+   NumPut(cbSize, MENUINFO, 0, "UInt") ; DWORD
+   NumPut(fMaskFlags, MENUINFO, 4, "UInt") ; DWORD
+   NumPut(dwStyle, MENUINFO, 8, "UInt") ; DWORD
+   NumPut(cyMax, MENUINFO, 12, "UInt") ; UINT
+   ; NumPut(hbrBack, MENUINFO, 16, "Ptr") ; HBRUSH
+   ; NumPut(dwContextHelpID, MENUINFO, 20, "UInt") ; DWORD
+   ; NumPut(dwMenuData, MENUINFO, 24, "UPtr") ; ULONG_PTR
+
+   Return DllCall("User32\SetMenuInfo","Ptr", hMenu, "Ptr", &MENUINFO)
+}
+
 
 determineMenuBTNsOKAY() {
    If (imageLoading=1 || runningLongOperation=1) || (AnyWindowOpen && imgEditPanelOpened!=1)

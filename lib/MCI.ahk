@@ -1286,7 +1286,7 @@ MCI_SetVolume(p_lpszDeviceID,p_Factor) {
 ;------------------------------------------------------------------------------
 MCI_Status(p_lpszDeviceID) {
     MCI_SendString("status " . p_lpszDeviceID . " mode",l_lpszReturnString)
-    Return l_lpszReturnString
+    Return Trim(l_lpszReturnString)
 }
 
 

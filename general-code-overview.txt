@@ -7,7 +7,7 @@ e) General considerations
 f) How slideshows happen
 g) Image live editing [soon]
 
-Deniere mise à jour: dimanche 22 novembre 2020.
+Deniere mise à jour: dimanche 28 mars 2021.
 ================================================
 
 a) How Quick Picto Viewer initializes:
@@ -289,7 +289,7 @@ d) How an image is loaded and displayed on screen [simplified]
    histogram box or the info-box on the viewport. These UI elements
    are rendered on a different GDI window.
 
-   On zooming in or out, on GIF playback, QPV_ShowImgonGuiPrev()
+   On zooming in or out, on GIF playback, QPV_ShowImgOther()
    is invoked by QPV_ShowImgonGui(). Both functions track how 
    fast the render on screen is and adaptively choose between 
    the available caches. They both rely on Gdip_DrawImage() or 
@@ -297,6 +297,55 @@ d) How an image is loaded and displayed on screen [simplified]
 
    Internally, I use the 32-PARGB pixel format, because
    Gdip_DrawImage() and other functions perform faster.
+
+   There are four EX_LAYERED windows: "hGDIthumbsWin", "hGDIwin"
+   "hGDIselectWin", "hGDIinfosWin". There are two global GDI+
+   Graphics, with their own HDCs and GDI hBitmaps: glPG / glHDC
+   and 2NDglPG / 2NDHDC. These are recreated upon window resize
+   events. These windows are created by BuildGUI() found in
+   "module-interface.ahk". The GDI+ canvases are created by
+   createGDIPcanvas() found in the main QPV.ahk file. Auxiliary
+   GDI+ are created in initGDIPstuff().
+
+   The following is a list, a summary, of what functions draw what and
+   on which window(s). All the windows are owned by "PVhwnd" window.
+   
+   1. hGDIthumbsWin - glPG
+      QPV_listThumbnailsGridMode() - thumbnails grid for the list mode
+      QPV_ShowThumbnails() - draws and generates thumbnails
+      During live image editing
+         QPV_ShowImgonGui() - image on screen
+         QPV_ShowImgOther() - image on screen
+         drawHUDelements() - histo box, ui markers [frames counter, scrollbars]
+
+   2. hGDIwin - glPG
+      livePreviewsImageEditing() - the live image editing tools
+         corePasteInPlaceActNow()
+         coreDrawLinesSelectionArea()
+         coreFillSelectedArea()
+         livePreviewInsertTextinArea()
+         livePreviewEraseArea()
+         livePreviewDesaturateArea()
+
+      When NOT live image editing
+         QPV_ShowImgonGui() - image on screen
+         QPV_ShowImgOther() - image on screen
+         drawVPgridsNow() - viewport grid
+         drawHUDelements() - histo box, ui markers [frames counter, scrollbars]
+
+   3. hGDIselectWin - 2NDglPG
+      mainGdipWinThumbsGrid() - thumbnails grid overlay, thumbs scrollbar and status bar
+      additionalHUDelements() - wrapper for the following functions
+         drawImgSelectionOnWindow() - selection area
+         drawinfoBox() - info box
+         VPnavBoxWrapper() - img nav/preview box
+         drawAnnotationBox() - notes box
+         drawLiveCreateShape() - live shape drawing
+
+   4. hGDIinfosWin - 2NDglPG
+      CreateOSDinfoLine() - user OSD messages
+      MouseMoveResponder() - hover selection area handler
+
 
 e) General considerations
    When actions are performed or somehow the main core is about 
@@ -376,3 +425,4 @@ f) How slideshows happen
    function is called from the UI thread, and
    invokeExternalSlideshowHandler() to set there the timer
    for the next slide.
+
