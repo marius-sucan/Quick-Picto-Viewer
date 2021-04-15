@@ -122,6 +122,7 @@ Insert|Insert file(s) into list|Anywhere|Files selector
 J|Jump to given file index or frame|Anywhere|Panel
 K|Perform JPEG lossless operations|Anywhere|Panel
 L|Toggle limit selection area to image boundaries|Image selection area|-
+L|Toggle limit viewport grid to image boundaries|Image view|-
 L|Toggle list view modes|Files list|-
 B|Add/remove image to favourites|Anywhere|-
 N|Toggle display of image captions|Image view|-
@@ -180,6 +181,8 @@ Shift + B|Blur selected area|Image view|Panel
 Shift + C|Copy file path(s) to clipboard|Anywhere|-
 Shift + Delete|Delete active file and its index entry|Anywhere|-
 Shift + E|Toggle image selection area modes: rect, ellipse, freeform|Image selection area|-
+Alt + [+]|Increase viewport grid size|Image view|-
+Alt + [-]|Decrease viewport grid size|Image view|-
 Shift + Esc|Restart Quick Picto Viewer|Anywhere|Close window
 Shift + F2|Rename active file|Anywhere|Panel
 Ctrl + H|Search and replace in files list index|Anywhere|Panel

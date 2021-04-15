@@ -1772,6 +1772,8 @@ Gdip_SetImageAttributesGamma(ImageAttr, Gamma, ColorAdjustType:=1, fEnable:=1) {
 Gdip_SetImageAttributesToggle(ImageAttr, ColorAdjustType, fEnable) {
 ; Turns on or off color adjustment for a specified category defined by ColorAdjustType
 ; fEnable - 0 or 1
+; ColorAdjustType - The category for which color adjustment is reset:
+; see Gdip_SetImageAttributesColorMatrix() for details.
 
    return DllCall("gdiplus\GdipSetImageAttributesNoOp", "UPtr", ImageAttr, "int", ColorAdjustType, "int", fEnable)
 }
@@ -1793,7 +1795,7 @@ Gdip_SetImageAttributesColorKeys(ImageAttr, ARGBLow, ARGBHigh, ColorAdjustType:=
    Return DllCall("gdiplus\GdipSetImageAttributesColorKeys", "UPtr", ImageAttr, "int", ColorAdjustType, "int", fEnable, "uint", ARGBLow, "uint", ARGBHigh)
 }
 
-Gdip_SetImageAttributesWrapMode(ImageAttr, WrapMode, ARGB) {
+Gdip_SetImageAttributesWrapMode(ImageAttr, WrapMode, ARGB:=0) {
 ; ImageAttr - Pointer to an ImageAttribute object
 ; WrapMode  - Specifies how repeated copies of an image are used to tile an area:
 ;             0 - Tile - Tiling without flipping
@@ -2668,9 +2670,11 @@ Gdip_CreateARGBBitmapFromHBITMAP(hImage) {
 }
 
 Gdip_CreateBitmapFromHBITMAP(hBitmap, hPalette:=0) {
-; Creates a Bitmap GDI+ object from a GDI bitmap handle.
+; Creates a Bitmap GDI+ object from a GDI [DIB] bitmap handle.
 ; hPalette - Handle to a GDI palette used to define the bitmap colors
-; if the hBitmap is a device-dependent bitmap [DDB].
+
+; Do not pass to this function a GDI bitmap or a GDI palette that is
+; currently is selected into a device context [hDC].
 
    pBitmap := 0
    If !hBitmap
@@ -2919,7 +2923,7 @@ Gdip_CloneBitmapArea(pBitmap, x:="", y:="", w:=0, h:=0, PixelFormat:=0, KeepPixe
 }
 
 Gdip_CloneBitmap(pBitmap) {
-; the new pBitmap will have the same PixelFormat, unchanged.
+   ; the new pBitmap will have the same PixelFormat, unchanged.
    If !pBitmap
    {
       gdipLastError := 2
@@ -2927,9 +2931,7 @@ Gdip_CloneBitmap(pBitmap) {
    }
 
    pBitmapDest := 0
-   gdipLastError := DllCall("gdiplus\GdipCloneImage"
-               , "UPtr", pBitmap, "UPtr*", pBitmapDest)
-
+   gdipLastError := DllCall("gdiplus\GdipCloneImage", "UPtr", pBitmap, "UPtr*", pBitmapDest)
    return pBitmapDest
 }
 
@@ -7247,9 +7249,8 @@ Gdip_PathGradientGetCenterColor(pPathGradientBrush) {
 }
 
 Gdip_PathGradientGetCenterPoint(pPathGradientBrush, ByRef X, ByRef Y) {
-   Static Ptr := "UPtr"
    VarSetCapacity(PointF, 8, 0)
-   E := DllCall("gdiplus\GdipGetPathGradientCenterPoint", Ptr, pPathGradientBrush, "UPtr", &PointF)
+   E := DllCall("gdiplus\GdipGetPathGradientCenterPoint", "UPtr", pPathGradientBrush, "UPtr", &PointF)
    If !E
    {
       x := NumGet(PointF, 0, "float")
@@ -7259,16 +7260,13 @@ Gdip_PathGradientGetCenterPoint(pPathGradientBrush, ByRef X, ByRef Y) {
 }
 
 Gdip_PathGradientGetFocusScales(pPathGradientBrush, ByRef X, ByRef Y) {
-   Static Ptr := "UPtr"
-   x := 0
-   y := 0
-   Return DllCall("gdiplus\GdipGetPathGradientFocusScales", Ptr, pPathGradientBrush, "float*", X, "float*", Y)
+   x := y := 0
+   Return DllCall("gdiplus\GdipGetPathGradientFocusScales", "UPtr", pPathGradientBrush, "float*", X, "float*", Y)
 }
 
 Gdip_PathGradientGetSurroundColorCount(pPathGradientBrush) {
-   Static Ptr := "UPtr"
    result := 0
-   E := DllCall("gdiplus\GdipGetPathGradientSurroundColorCount", Ptr, pPathGradientBrush, "int*", result)
+   E := DllCall("gdiplus\GdipGetPathGradientSurroundColorCount", "UPtr", pPathGradientBrush, "int*", result)
    If E
       return -1
    Return result
@@ -7279,10 +7277,8 @@ Gdip_GetPathGradientSurroundColors(pPathGradientBrush) {
    If (iCount=-1)
       Return 0
 
-
-   Static Ptr := "UPtr"
    VarSetCapacity(sColors, 8 * iCount, 0)
-   DllCall("gdiplus\GdipGetPathGradientSurroundColorsWithCount", Ptr, pPathGradientBrush, Ptr, &sColors, "intP", iCount)
+   gdipLastError := DllCall("gdiplus\GdipGetPathGradientSurroundColorsWithCount", "UPtr", pPathGradientBrush, "UPtr", &sColors, "intP", iCount)
    Loop %iCount%
    {
        A := NumGet(&sColors, 8*(A_Index-1), "uint")
@@ -7430,7 +7426,7 @@ Gdip_DrawImageFX(pGraphics, pBitmap, dX:="", dY:="", sX:="", sY:="", sW:="", sH:
     }
 
     CreateRectF(sourceRect, sX, sY, sW, sH)
-    E := DllCall("gdiplus\GdipDrawImageFX"
+    gdipLastError := DllCall("gdiplus\GdipDrawImageFX"
       , "UPtr", pGraphics
       , "UPtr", pBitmap
       , "UPtr", &sourceRect

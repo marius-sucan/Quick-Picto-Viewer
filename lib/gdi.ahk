@@ -11,6 +11,7 @@
 ; https://www.autohotkey.com/boards/viewtopic.php?f=6&t=4379
 
 ; Other functions added by Marius Șucan.
+; Last update on: mardi 6 avril 2021.
 
 Gdi_DrawTextHelper(hDC, hFont, Text, x, y, txtColor, bgrColor:="") {
       ; Transparent background, no color needed
@@ -32,7 +33,6 @@ Gdi_DrawTextHelper(hDC, hFont, Text, x, y, txtColor, bgrColor:="") {
 Gdi_TextOut(hDC, Text, x, y) {
       Return DllCall("gdi32\TextOut", "UPtr", hDC, "Int", x, "Int", y, "Str", Text, "Int", StrLen(Text))
 }
-
 
 Gdi_DrawText(hDC, Text, x, y, w, h, flags:=0) {
      ; For the «flags» parameter you can use any of the following
@@ -238,8 +238,8 @@ Gdi_FillRegion(hDC, hRgn, hBrush) {
    ; Return value
    ; If the function succeeds, the return value is nonzero.
    ; If the function fails, the return value is zero.
-
-   Return DllCall("gdi32\FillRgn", "UPtr", hDC, "UPtr", hRgn, "UPtr", hBrush)
+   If (hBrush && hRgn && hDC)
+     Return DllCall("gdi32\FillRgn", "UPtr", hDC, "UPtr", hRgn, "UPtr", hBrush)
 }
 
 Gdi_PaintRegion(hDC, hRgn) {
@@ -550,7 +550,6 @@ Gdi_SelectClipRegion(hDC, hRgn) {
 
      Return DllCall("gdi32\SelectClipRgn", "UPtr", hDC, "UPtr", hRgn)
 }
-
 
 Gdi_GetClipBox(hDC) {
    ; The function  retrieves the dimensions of the tightest bounding rectangle
@@ -888,10 +887,11 @@ Gdi_CloseFigure(hDC) {
 Gdi_SetBgrMode(hDC, mode) {
      ; mode = 1 ; transparent
      ; mode = 2 ; opaque
-     DllCall("gdi32\SetBkMode", "UPtr", hDC, "Int", mode)
+    Return DllCall("gdi32\SetBkMode", "UPtr", hDC, "Int", mode)
 }
 
 Gdi_SetBgrColor(hDC, color) {
+     ; The SetBkColor function sets the current background color to the specified color value, or to the nearest physical color if the device cannot represent the specified color value.
     Return DllCall("gdi32\SetBkColor", "UPtr", hDC, "UInt", color)
 }
 
@@ -912,8 +912,8 @@ Gdi_CreatePen(Color, Width:=1, Style:=0) {
    Return DllCall("gdi32\CreatePen", "Int", Style, "Int", Width, "UInt", Color, "UPtr")
 }
 
-Gdi_CreateSolidBrush(Color) {
-   Return DllCall("gdi32\CreateSolidBrush", "UInt", Color, "UPtr")
+Gdi_CreateSolidBrush(gColor) {
+   Return DllCall("gdi32\CreateSolidBrush", "UInt", gColor, "UPtr")
 }
 
 Gdi_CreatePatternBrush(hBitmap) {
@@ -1033,6 +1033,25 @@ Gdi_Pie(hDC, x1, y1, x2, y2, xr1, yr1, xr2, yr2) {
           , "Int", x2, "Int", y2
           , "Int", xr1, "Int", yr1
           , "Int", xr2, "Int", yr2)
+}
+
+Gdi_DrawLine(hDC, x, y, x2, y2, Pen:=0) {
+    Gdi_MoveToEx(HDC, x, y)
+    If Pen
+       hOriginalPen := Gdi_SelectObject(hDC, Pen)
+
+    E := Gdi_LineTo(hDC, x2, y2)
+    If hOriginalPen
+       hOriginalPen := Gdi_SelectObject(hDC, hOriginalPen)
+    Return E
+}
+
+Gdi_LineTo(hDC, x, y) {
+   Return DllCall("gdi32\LineTo", "UPtr", hDC, "Int", x, "Int", y)
+}
+
+Gdi_MoveToEx(hDC, x, y) {
+   Return DllCall("gdi32\MoveToEx", "UPtr", hDC, "Int", x, "Int", y, "UPtr", 0)
 }
 
 Gdi_Ellipse(hDC, x1, y1, x2, y2) {
@@ -1242,21 +1261,23 @@ Gdi_GetDIBits(hDC, hBitmap, start, cLines, pBits, BITMAPINFO, DIB_COLORS) {
 }
 
 
-;#####################################################################################
-; Function           Gdi_GetDC
+Gdi_GetDC(hwnd:=0) {
 ; Description        This function retrieves a handle to a display device context (DC) for the client area of the specified window.
 ;                    The display device context can be used in subsequent graphics display interface (GDI) functions to draw in the client area of the window.
 ;
 ; hwnd               Handle to the window whose device context is to be retrieved. If this value is NULL, GetDC retrieves the device context for the entire screen
 ;
+; remarks            this type of DC must be released with Gdi_ReleaseDC()
+;
 ; return             The handle the device context for the specified window's client area indicates success. NULL indicates failure
-;#####################################################################################
 
-Gdi_GetDC(hwnd:=0) {
    return DllCall("user32\GetDC", "UPtr", hwnd)
 }
 
 Gdi_CreateCompatibleDC(hDC:=0) {
+; REMARKS
+; this type of DC must be released with Gdi_DeleteDC()
+
    return DllCall("gdi32\CreateCompatibleDC", "UPtr", hDC)
 }
 
@@ -1384,12 +1405,48 @@ Gdi_WindowFromDC(hDC) {
    return DllCall("user32\WindowFromDC", "UPtr", hDC)
 }
 
+Gdi_CopyImage(hBitmap, type:=0, w:=0, h:=0, flags:=0) {
+   ; type options
+   ; IMAGE_BITMAP  = 0
+   ; IMAGE_CURSOR  = 2
+   ; IMAGE_ICON    = 1
+ 
+   ; w, h
+   ; The desired width and height, in pixels, of the image. If one of these is zero,
+   ; the returned image will have the same dimensions as the original hBitmap.
+
+   ; flag options:
+   ; LR_COPYDELETEORG = 0x00000008
+   ;    Deletes the original image after creating the copy.
+
+   ; LR_COPYFROMRESOURCE = 0x00004000
+   ;    Tries to reload an icon or cursor resource from the original resource file rather than simply copying the current image. This is useful for creating a different-sized copy when the resource file contains multiple sizes of the resource. Without this flag, CopyImage stretches the original image to the new size. If this flag is set, CopyImage uses the size in the resource file closest to the desired size. This will succeed only if hImage was loaded by LoadIcon or LoadCursor, or by LoadImage with the LR_SHARED flag.
+
+   ; LR_COPYRETURNORG = 0x00000004
+   ;    Returns the original hImage if it satisfies the criteria for the copy—that is, correct dimensions and color depth—in which case the LR_COPYDELETEORG flag is ignored. If this flag is not specified, a new object is always created.
+
+   ; LR_CREATEDIBSECTION = 0x00002000
+   ;    If this is set and a new bitmap is created, the bitmap is created as a DIB section. Otherwise, the bitmap image is created as a device-dependent bitmap. This flag is only valid if uType is IMAGE_BITMAP.
+
+   ; LR_DEFAULTSIZE = 0x00000040
+   ;    Uses the width or height specified by the system metric values for cursors or icons, if the cxDesired or cyDesired values are set to zero. If this flag is not specified and cxDesired and cyDesired are set to zero, the function uses the actual resource size. If the resource contains multiple images, the function uses the size of the first image.
+
+   ; LR_MONOCHROME = 0x00000001
+   ;    Creates a new monochrome image. 
+
+   ; Return value:
+   ; If the function succeeds, the return value is the handle to the newly created image.
+   ; f the function fails, the return value is NULL. To get extended error information, call GetLastError.
+
+   return DllCall("user32\CopyImage", "UPtr", hBitmap, "int", x, "int", y, "uint", flags)
+}
+
 Gdi_DeleteObject(hObject) {
    return DllCall("gdi32\DeleteObject", "UPtr", hObject)
 }
 
 Gdi_SelectObject(hDC, obj) {
-     Return DllCall("gdi32\SelectObject", "UPtr", hDC, "UPtr", obj, "UPtr")
+   return DllCall("gdi32\SelectObject", "UPtr", hDC, "UPtr", obj, "UPtr")
 }
 
 ; ===================================================================================
@@ -1473,7 +1530,7 @@ Gdi_BitBlt(dDC, dX, dY, dW, dH, sDC, sX, sY, raster:="") {
                , "int", dW, "int", dH
                , "UPtr", sDC
                , "int", sX, "int", sY
-               , "uint", Raster ? Raster : 0x00CC0020)
+               , "uint", Raster ? Raster : 0xCC0020) ; src_copy by defalut
 }
 
 
@@ -1730,8 +1787,8 @@ Gdi_CreateDIBSection(w, h, hDC:="", bpp:=32, ByRef ppvBits:=0, Usage:=0, hSectio
                , "UPtr", &bi    ; BITMAPINFO
                , "uint", Usage
                , "UPtr*", ppvBits
-               , Ptr, hSection
-               , "uint", OffSet, Ptr)
+               , "UPtr", hSection
+               , "uint", OffSet, "UPtr")
 
    if !hdc
       Gdi_ReleaseDC(hdc2)
@@ -2269,7 +2326,6 @@ Gdi_SetMapMode(hDC, mode) {
    ; context. The mapping mode defines the unit of measure used to transform
    ; page-space units into device-space units, and also defines the 
    ; orientation of the device's x and y axes.
-
  
    ; mode options:
    ; MM_TEXT = 1
@@ -2314,6 +2370,36 @@ Gdi_SetGraphicsMode(hDC, mode) {
    return DllCall("gdi32\SetGraphicsMode", "UPtr", hDC, "Int", mode)
 }
 
+Gdi_GetBitmapInfo(hBitmap) {
+   ; from TheArkive
+   ; to do to-do ; must return object
+   oi_size := DllCall("GetObject", "UPtr", hBitmap, "Int", 0, "UPtr", 0)  ; get size of struct
+   size := VarSetCapacity(oi, (A_PtrSize = 8) ? 104 : 84, 0)           ; always use max size of struct
+   DllCall("GetObject", "UPtr", hBitmap, "Int", size, "UPtr", &oi)        ; finally, call GetObject and get data
+   
+   ; Main BITMAP struct
+   msgbox % "Return Size: " oi_size "`n"
+        . "Type: " NumGet(oi,0,"UInt") "`n"
+        . "Width: " NumGet(oi, 4, "UInt") "`n"
+        . "Height: " NumGet(oi, 8, "UInt") "`n"
+        . "Stride: " NumGet(oi, 12, "UInt") "`n"
+        . "Planes: " NumGet(oi, 16, "UShort") "`n"
+        . "bpp: " NumGet(oi, 18, "UShort") "`n"
+        . "bPtr: " NumGet(oi, 24, "UPtr") "`n"
+        . "`n"
+        ; BITMAPINFOHEADER struct
+        . "DIBSECTION struct:`n"
+        . "Struct: " NumGet(oi,32,"UInt") "`n"
+        . "Width: " NumGet(oi, 36, "UInt") "`n"
+        . "Height: " NumGet(oi, 40, "UInt") "`n"
+        . "Planes: " NumGet(oi, 44, "UShort") "`n"
+        . "bpp: " NumGet(oi, 46, "UShort") "`n"
+        . "Comp: " NumGet(oi, 48, "UInt") "`n"
+        . "Size: " NumGet(oi, 52, "UInt") "`n"
+        . "ClrUsed: " NumGet(oi, 60, "UInt") "`n"
+        . "ClrImportant: " NumGet(oi, 64, "UInt")
+}
+
 Gdi_GetStockObject(stockIndex){
    ; If the function fails, NULL is returned.
    ; Stock Logical Objects
@@ -2336,6 +2422,8 @@ Gdi_GetStockObject(stockIndex){
      ; DEFAULT_GUI_FONT = 17
      ; DC_BRUSH = 18
      ; DC_PEN = 19
+     ; DC_COLORSPACE = 20
+     ; DC_BITMAP = 21
    Return DllCall("gdi32\GetStockObject", "Int", stockIndex)
 }
 

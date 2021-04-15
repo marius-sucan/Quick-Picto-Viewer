@@ -92,6 +92,7 @@ setPriorityThread(level, handle:="A") {
 }
 
 updateWindowColor() {
+     Sleep, 1
      ; WindowBgrColor := MainExe.ahkgetvar.WindowBgrColor
      Gui, 1: Color, %WindowBgrColor%
 }
@@ -149,6 +150,7 @@ BuildGUI(params:=0) {
    Gui, 1: Color, %WindowBgrColor%
    Gui, 1: Margin, 0, 0
    Gui, 1: -DPIScale +Resize %MinGUISize% +hwndPVhwnd +LastFound +OwnDialogs
+   Gui, 1: Font, s1
    Gui, 1: Add, Text, x0 y0 w1 h1 BackgroundTrans gWinClickAction vPicOnGui1 hwndhPicOnGui1, Previous image
    Gui, 1: Add, Edit, xp-100 yp-100 gUnlockKeys w1 h1 veditDummy,
    Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans gWinClickAction vPicOnGui2a, Zoom in

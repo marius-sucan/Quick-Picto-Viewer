@@ -2,6 +2,12 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.0.5 (2021-04-15)
+  - [new] option to stretch the image at given dimension [print image panel]
+  - [new] quick menu options search panel; users can now search through the myriad of menu options; only the options available in the given context are listed; fuzzy search implemented with the help of Tidbit;
+  - optimizations regarding list drawing; should be faster on large screens
+  - optimizations for the full image viewport display; should be faster on large screens under certain circumstances; it now performs partial redrawing on image panning and zoom out - only when needed
+
 - v5.0.1 (2021-03-29)
   - [new] highly customizable viewport grid
   - [new] set background music for the entire slideshow; if audio annotations are associated with image files, they will be played alongside the slideshow music
