@@ -315,7 +315,6 @@ d) How an image is loaded and displayed on screen [simplified]
       QPV_ShowThumbnails() - draws and generates thumbnails
       During live image editing
          QPV_ShowImgonGui() - image on screen
-         QPV_ShowImgOther() - image on screen
          drawHUDelements() - histo box, ui markers [frames counter, scrollbars]
 
    2. hGDIwin - glPG
@@ -329,7 +328,6 @@ d) How an image is loaded and displayed on screen [simplified]
 
       When NOT live image editing
          QPV_ShowImgonGui() - image on screen
-         QPV_ShowImgOther() - image on screen
          drawVPgridsNow() - viewport grid
          drawHUDelements() - histo box, ui markers [frames counter, scrollbars]
 

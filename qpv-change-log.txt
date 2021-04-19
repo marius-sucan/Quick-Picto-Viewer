@@ -2,11 +2,15 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.0.6 (2021-04-19)
+  - important bug fixes related to the viewport; these regressions were introduced in the previous two versions...
+
 - v5.0.5 (2021-04-15)
   - [new] option to stretch the image at given dimension [print image panel]
   - [new] quick menu options search panel; users can now search through the myriad of menu options; only the options available in the given context are listed; fuzzy search implemented with the help of Tidbit;
   - optimizations regarding list drawing; should be faster on large screens
   - optimizations for the full image viewport display; should be faster on large screens under certain circumstances; it now performs partial redrawing on image panning and zoom out - only when needed
+  - removed Blur and Sharpen effects as options for the viewport; Sharpen will return in future version as a filter
 
 - v5.0.1 (2021-03-29)
   - [new] highly customizable viewport grid
