@@ -201,7 +201,8 @@ Shift + I|Invert files selection|Files list|-
 Shift + L|New / modify current freeform selecion shape|Image view|Panel
 Ctrl + L|Draw predefined lines, arcs or selection borders|Image selection area|Panel
 Shift + P|Draw freeform filled shape|Image view|Panel
-P|Draw freeform outline (path)|Image view|Panel
+Alt + P|Draw freeform outline (path)|Image view|Panel
+P|Paint brushes: soft edges, cloner, eraser, deformers|Image view|Panel
 Shift + Home|Select files to the first in index|Files list|-
 Shift + End|Select files to the last one in index|Files list|-
 Shift + Page Up / Down|Select files in pages of visible items|Files list|-
@@ -245,3 +246,21 @@ Shift + Left-Click on edges or dots|Resize selection area maintaing initial aspe
 Shift + Left-Click inside area|Move selection area constrained on X or Y axis|Image selected area|-
 Alt + Left-Click inside area|Resize selection area relative to its center and transform to 1:1 ratio [square]|Image selected area|-
 Double Left-Click outside area|Drop image selection area|Image selected area|-
+[|Increase brush size|Painting mode|-
+]|Decrease brush size|Painting mode|-
+.|Increase brush opacity|Painting mode|-
+,|Decrease brush opacity|Painting mode|-
+Shift + .|Increase brush wetness or deform intensity|Painting mode|-
+Shift + ,|Decrease brush wetness or deform intensity|Painting mode|-
+0-9|Set brush opacity at level 5%..100%|Painting mode|-
+B|Toggle between simple and soft edges brush types|Painting mode|-
+T|Toggle airbrush mode|Painting mode|-
+R|Activate erase brush|Painting mode|-
+Q|Activate effects brush|Painting mode|-
+J|Activate cloner brush and toggle dynamic coordinates modes for the cloner|Painting mode|-
+D|Define cloner brush source|Painting mode|-
+X|Toggle between color A and color B|Painting mode|-
+S|Toggle between diameter and radius based brush size|Painting mode|-
+C|Pick brush color|Painting mode|-
+K|Toggle between draw inside, outside or ignore selection area|Painting mode|-
+Y|Toggle between bulge and pinch brushes|Painting mode|-

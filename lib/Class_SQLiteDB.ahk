@@ -535,7 +535,7 @@ Class SQLiteDB {
       This._Queries := {}               ; Valid queries                                 (Object)
       This._Stmts := {}                 ; Valid prepared statements                     (Object)
       If (This.Base._RefCount = 0) {
-         SQLiteDLL := mainCompiledPath "\SQLite3.dll"
+         SQLiteDLL := FreeImage_FoxGetDllPath("sqlite3.dll") ; mainCompiledPath "\SQLite3.dll"
          This.Base._SQLiteDLL := SQLiteDLL
          If !FileExist(SQLiteDLL)
             If FileExist(A_ScriptDir . "\SQLiteDB.ini") {

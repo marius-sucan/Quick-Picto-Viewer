@@ -2,6 +2,13 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.1.0 (2021-05-17)
+  - [new] paint brushes: simple, soft edges, cloner, eraser and deformer brushes: smudge, pinch, bulge; all brushes are customizable
+  = [new] option to paint alpha mask when using the transform tool or when pasting images in place
+  - fixed the rare circumstance of QPV crash when choosing to save an image
+  - fixed crash related to «transform tool» when selecting «erase initially selected area»; the underlying problem caused crashes in other tools as well 
+  - fixed various bugs
+
 - v5.0.6 (2021-04-19)
   - important bug fixes related to the viewport; these regressions were introduced in the previous two versions...
 

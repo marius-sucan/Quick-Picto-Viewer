@@ -3725,30 +3725,27 @@ Gdip_GetHatchStyle(pHatchBrush) {
 ; Function modified by Marius Șucan, to allow use of color matrix and ImageAttributes object.
 
 Gdip_CreateTextureBrush(pBitmap, WrapMode:=1, x:=0, y:=0, w:="", h:="", matrix:="", ScaleX:="", ScaleY:="", Angle:=0, ImageAttr:=0) {
-   Static Ptr := "UPtr"
-   PtrA := "UPtr*"
    pBrush := 0
-
-   if !(w && h)
+   If !(w && h)
    {
-      gdipLastError := DllCall("gdiplus\GdipCreateTexture", Ptr, pBitmap, "int", WrapMode, PtrA, pBrush)
-   } else
+      gdipLastError := DllCall("gdiplus\GdipCreateTexture", "UPtr", pBitmap, "int", WrapMode, "UPtr*", pBrush)
+   } Else
    {
       If !ImageAttr
       {
-         if !IsNumber(Matrix)
+         If !IsNumber(Matrix)
             ImageAttr := Gdip_SetImageAttributesColorMatrix(Matrix)
-         else if (Matrix != 1)
+         Else If (Matrix != 1)
             ImageAttr := Gdip_SetImageAttributesColorMatrix("1|0|0|0|0|0|1|0|0|0|0|0|1|0|0|0|0|0|" Matrix "|0|0|0|0|0|1")
       } Else usrImageAttr := 1
 
       If ImageAttr
       {
-         gdipLastError := DllCall("gdiplus\GdipCreateTextureIA", Ptr, pBitmap, Ptr, ImageAttr, "float", x, "float", y, "float", w, "float", h, PtrA, pBrush)
+         gdipLastError := DllCall("gdiplus\GdipCreateTextureIA", "UPtr", pBitmap, "UPtr", ImageAttr, "float", x, "float", y, "float", w, "float", h, "UPtr*", pBrush)
          If pBrush
             Gdip_SetTextureWrapMode(pBrush, WrapMode)
       } Else
-         gdipLastError := DllCall("gdiplus\GdipCreateTexture2", Ptr, pBitmap, "int", WrapMode, "float", x, "float", y, "float", w, "float", h, PtrA, pBrush)
+         gdipLastError := DllCall("gdiplus\GdipCreateTexture2", "UPtr", pBitmap, "int", WrapMode, "float", x, "float", y, "float", w, "float", h, "UPtr*", pBrush)
    }
 
    if (ImageAttr && usrImageAttr!=1)
@@ -3769,40 +3766,33 @@ Gdip_RotateTextureTransform(pTexBrush, Angle, MatrixOrder:=0) {
 ; Append = 1; The new operation is applied after the old operation.
 ; Order of matrices multiplication:.
 
-   Static Ptr := "UPtr"
-   return DllCall("gdiplus\GdipRotateTextureTransform", Ptr, pTexBrush, "float", Angle, "int", MatrixOrder)
+   return DllCall("gdiplus\GdipRotateTextureTransform", "UPtr", pTexBrush, "float", Angle, "int", MatrixOrder)
 }
 
 Gdip_ScaleTextureTransform(pTexBrush, ScaleX, ScaleY, MatrixOrder:=0) {
-   Static Ptr := "UPtr"
-   return DllCall("gdiplus\GdipScaleTextureTransform", Ptr, pTexBrush, "float", ScaleX, "float", ScaleY, "int", MatrixOrder)
+   return DllCall("gdiplus\GdipScaleTextureTransform", "UPtr", pTexBrush, "float", ScaleX, "float", ScaleY, "int", MatrixOrder)
 }
 
 Gdip_TranslateTextureTransform(pTexBrush, X, Y, MatrixOrder:=0) {
-   Static Ptr := "UPtr"
-   return DllCall("gdiplus\GdipTranslateTextureTransform", Ptr, pTexBrush, "float", X, "float", Y, "int", MatrixOrder)
+   return DllCall("gdiplus\GdipTranslateTextureTransform", "UPtr", pTexBrush, "float", X, "float", Y, "int", MatrixOrder)
 }
 
 Gdip_MultiplyTextureTransform(pTexBrush, hMatrix, matrixOrder:=0) {
-   Static Ptr := "UPtr"
-   Return DllCall("gdiplus\GdipMultiplyTextureTransform", Ptr, pTexBrush, Ptr, hMatrix, "int", matrixOrder)
+   Return DllCall("gdiplus\GdipMultiplyTextureTransform", "UPtr", pTexBrush, "UPtr", hMatrix, "int", matrixOrder)
 }
 
 Gdip_SetTextureTransform(pTexBrush, hMatrix) {
-   Static Ptr := "UPtr"
-   return DllCall("gdiplus\GdipSetTextureTransform", Ptr, pTexBrush, Ptr, hMatrix)
+   return DllCall("gdiplus\GdipSetTextureTransform", "UPtr", pTexBrush, "UPtr", hMatrix)
 }
 
 Gdip_GetTextureTransform(pTexBrush) {
    hMatrix := 0
-   Static Ptr := "UPtr"
-   gdipLastError := DllCall("gdiplus\GdipGetTextureTransform", Ptr, pTexBrush, "UPtr*", hMatrix)
+   gdipLastError := DllCall("gdiplus\GdipGetTextureTransform", "UPtr", pTexBrush, "UPtr*", hMatrix)
    Return hMatrix
 }
 
 Gdip_ResetTextureTransform(pTexBrush) {
-   Static Ptr := "UPtr"
-   return DllCall("gdiplus\GdipResetTextureTransform", Ptr, pTexBrush)
+   return DllCall("gdiplus\GdipResetTextureTransform", "UPtr", pTexBrush)
 }
 
 Gdip_SetTextureWrapMode(pTexBrush, WrapMode) {
@@ -3813,14 +3803,12 @@ Gdip_SetTextureWrapMode(pTexBrush, WrapMode) {
 ; 3 - TileFlipXY - Tiles are flipped horizontally as you move along a row and flipped vertically as you move along a column
 ; 4 - Clamp - No tiling takes place
 
-   Static Ptr := "UPtr"
-   return DllCall("gdiplus\GdipSetTextureWrapMode", Ptr, pTexBrush, "int", WrapMode)
+   return DllCall("gdiplus\GdipSetTextureWrapMode", "UPtr", pTexBrush, "int", WrapMode)
 }
 
 Gdip_GetTextureWrapMode(pTexBrush) {
    result := 0
-   Static Ptr := "UPtr"
-   E := DllCall("gdiplus\GdipGetTextureWrapMode", Ptr, pTexBrush, "int*", result)
+   E := DllCall("gdiplus\GdipGetTextureWrapMode", "UPtr", pTexBrush, "int*", result)
    If E
       return -1
    Return result
@@ -3829,8 +3817,7 @@ Gdip_GetTextureWrapMode(pTexBrush) {
 Gdip_GetTextureImage(pTexBrush) {
    Static Ptr := "UPtr"
    pBitmapDest := 0
-   gdipLastError := DllCall("gdiplus\GdipGetTextureImage", Ptr, pTexBrush
-               , "UPtr*", pBitmapDest)
+   gdipLastError := DllCall("gdiplus\GdipGetTextureImage", "UPtr", pTexBrush, "UPtr*", pBitmapDest)
    Return pBitmapDest
 }
 
@@ -5339,6 +5326,27 @@ Gdip_IsVisiblePathPoint(pPath, x, y, pGraphics) {
   return result
 }
 
+Gdip_IsVisiblePathRectEntirely(pGraphics, pPath, X, Y, Width, Height) {
+    ; Return values:
+    ; -2 - mixed state
+    ; -1 - error
+    ; 0 - rect is entirely not visible
+    ; 1 - rect is entirely visible
+
+    a := Gdip_IsVisiblePathPoint(pPath, X, Y, pGraphics)
+    b := Gdip_IsVisiblePathPoint(pPath, X + Width, Y, pGraphics)
+    c := Gdip_IsVisiblePathPoint(pPath, X + Width, Y + Height, pGraphics)
+    d := Gdip_IsVisiblePathPoint(pPath, X, Y + Height, pGraphics)
+    If (a=1 && b=1 && c=1 && d=1)
+       Return 1
+    Else If (a=-1 || b=-1 || c=-1 || d=-1)
+       Return -1
+    Else If (a=0 && b=0 && c=0 && d=0)
+       Return 0
+    Else
+       Return -2
+}
+
 Gdip_DeletePath(pPath) {
    If pPath
       return DllCall("gdiplus\GdipDeletePath", "UPtr", pPath)
@@ -5692,6 +5700,12 @@ Gdip_IsVisibleGraphRect(pGraphics, X, Y, Width, Height) {
 }
 
 Gdip_IsVisibleGraphRectEntirely(pGraphics, X, Y, Width, Height) {
+    ; Return values:
+    ; -2 - mixed state
+    ; -1 - error
+    ; 0 - rect is entirely not visible
+    ; 1 - rect is entirely visible
+
     a := Gdip_IsVisibleGraphPoint(pGraphics, X, Y)
     b := Gdip_IsVisibleGraphPoint(pGraphics, X + Width, Y)
     c := Gdip_IsVisibleGraphPoint(pGraphics, X + Width, Y + Height)
@@ -5700,8 +5714,10 @@ Gdip_IsVisibleGraphRectEntirely(pGraphics, X, Y, Width, Height) {
        Return 1
     Else If (a=-1 || b=-1 || c=-1 || d=-1)
        Return -1
-    Else
+    Else If (a=0 && b=0 && c=0 && d=0)
        Return 0
+    Else
+       Return -2
 }
 
 ;#####################################################################################
@@ -5916,7 +5932,13 @@ Gdip_IsVisibleRegionRect(pGraphics, hRegion, x, y, width, height) {
    Return result
 }
 
-Gdip_IsVisibleRegionRectEntirely(pGraphics, hRegion, x, y, width, height) {
+Gdip_IsVisibleRegionRectEntirely(pGraphics, hRegion, X, Y, Width, Height) {
+    ; Return values:
+    ; -2 - mixed state
+    ; -1 - error
+    ; 0 - rect is entirely not visible
+    ; 1 - rect is entirely visible
+
     a := Gdip_IsVisibleRegionPoint(pGraphics, hRegion, X, Y)
     b := Gdip_IsVisibleRegionPoint(pGraphics, hRegion, X + Width, Y)
     c := Gdip_IsVisibleRegionPoint(pGraphics, hRegion, X + Width, Y + Height)
@@ -5925,8 +5947,10 @@ Gdip_IsVisibleRegionRectEntirely(pGraphics, hRegion, x, y, width, height) {
        Return 1
     Else If (a=-1 || b=-1 || c=-1 || d=-1)
        Return -1
-    Else
+    Else If (a=0 && b=0 && c=0 && d=0)
        Return 0
+    Else
+       Return -2
 }
 
 Gdip_SetEmptyRegion(hRegion) {
@@ -5994,23 +6018,26 @@ BitmapData structure
 Width     UINT          Number of pixels in one scan line of the bitmap.
 Height    UINT          Number of scan lines in the bitmap.
 Stride    INT           Offset, in bytes, between consecutive scan lines of the bitmap. If the stride is positive, the bitmap is top-down. If the stride is negative, the bitmap is bottom-up.
-PixFmt    PixelFormat   Integer that specifies the pixel format of the bitmap.
+                        In other words, it is the amount of bytes to skip to get to the next line of pixels on the image. This is not always equal to "width * bytes per pixel".
+PixFmt    PixelFormat   Integer that specifies the pixel format to convert to when locking the bits data; for performance, should be the same as the bitmap's pixel format
+                        on repetitive pixel format conversions, colors might become visibly altered / affected
 Scan0     void*         Pointer to the first (index 0) scan line of the bitmap.
+LockModes:
+   1 - Read
+   2 - Write
+   3 - Read/Write
 */
 
-   Static Ptr := "UPtr"
-
-   CreateRect(_Rect, x, y, w, h)
+   CreateRect(Rect, x, y, w, h)
    VarSetCapacity(BitmapData, 16+2*A_PtrSize, 0)
-   _E := DllCall("Gdiplus\GdipBitmapLockBits", Ptr, pBitmap, Ptr, &_Rect, "uint", LockMode, "int", PixelFormat, Ptr, &BitmapData)
+   _E := DllCall("Gdiplus\GdipBitmapLockBits", "UPtr", pBitmap, "UPtr", &Rect, "uint", LockMode, "int", PixelFormat, "UPtr", &BitmapData)
    Stride := NumGet(BitmapData, 8, "Int")
-   Scan0 := NumGet(BitmapData, 16, Ptr)
+   Scan0 := NumGet(BitmapData, 16, "UPtr")
    return _E
 }
 
 Gdip_UnlockBits(pBitmap, ByRef BitmapData) {
-   Static Ptr := "UPtr"
-   return DllCall("Gdiplus\GdipBitmapUnlockBits", Ptr, pBitmap, Ptr, &BitmapData)
+   return DllCall("Gdiplus\GdipBitmapUnlockBits", "UPtr", pBitmap, "UPtr", &BitmapData)
 }
 
 Gdip_SetLockBitPixel(ARGB, Scan0, x, y, Stride) {

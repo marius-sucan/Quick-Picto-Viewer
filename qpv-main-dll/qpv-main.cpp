@@ -39,19 +39,19 @@ DLL_API int DLL_CALLCONV SetAlphaChannel(int *imageData, int *maskData, int w, i
         {
             px = x + y * w;
             if (whichChannel==2)
-               alpha = maskData[px] >> 8; // green
+               alpha = (maskData[px] >> 8) & 0xFF; // green
             else if (whichChannel==3)
-               alpha = maskData[px] >> 0; // blue
+               alpha = (maskData[px] >> 0) & 0xFF; // blue
             else if (whichChannel==4)
-               alpha = maskData[px] >> 24; // alpha
+               alpha = (maskData[px] >> 24) & 0xFF; // alpha
             else
-               alpha = maskData[px] >> 16; // red
+               alpha = (maskData[px] >> 16) & 0xFF; // red
 
             if (replaceAlpha!=1)
             {
                if (invert == 1)
                   alpha = 255 - alpha;
-               a = imageData[px] >> 24;
+               a = (imageData[px] >> 24) & 0xFF;
                alpha2 = min(alpha, a);    // handles bitmaps that already have alpha
             }
             else {
@@ -61,6 +61,213 @@ DLL_API int DLL_CALLCONV SetAlphaChannel(int *imageData, int *maskData, int w, i
             imageData[px] = (alpha2 << 24) | (imageData[px] & 0x00ffffff);
         }
     }
+    return 1;
+}
+
+DLL_API int DLL_CALLCONV blahErserBrush(int *imageData, int *maskData, int w, int h, int invert, int replaceMode, int levelAlpha, int stride, int dabugMode) {
+    int debug = 0;
+
+    if (debug==1) {
+      std::ofstream f("c:\\temp\bub.txt");
+      f << w << " " << h<< std::endl;
+      f << invert << " " << replaceMode << " " << levelAlpha << std::endl;
+      for (int i = 0, n = w*h ; i < n; ++i) {
+         f << imageData[i] << " " << maskData[i] <<std::endl;
+      }
+      f.close();  
+    }
+
+    // #pragma omp parallel for schedule(dynamic) default(none)
+    for (int y = 0; y < h * stride; y += stride)
+    {
+        // A1 = R1 = G1 = B1 = A2 = R2 = G2 = B2 = 0;
+        for (int x = 0; x < w; ++x)
+        {
+// https://www.graphicsmill.com/docs/gm/accessing-pixel-data.htm
+// https://stackoverflow.com/questions/42735499/lockbits-of-bitmap-as-different-format-in-c
+
+            int alpha2;
+            const int px = (4 * x) + y *4;
+            int a = imageData[3 + px];
+            unsigned char intensity = maskData[px] & 0xff; // blue
+            if (invert == 1)
+               intensity = 255 - intensity;
+
+            float fintensity = intensity/255.0f;
+            if (a==0)
+               continue;
+
+            if (replaceMode == 1)
+               alpha2 = min(levelAlpha, a);
+            else if (replaceMode == 2)
+               alpha2 = max(0, (int)a - levelAlpha);
+            else
+               alpha2 = levelAlpha;
+
+            alpha2 = 252;  // (alpha2==a) ? a : alpha2*fintensity + a*max(0, 1.0f - fintensity);  // Formula: A*w + B*(1 – w)
+            // int haha = (alpha2!=a) ? 1 : 0;
+            // if (haha==1)
+               imageData[3 + px] = alpha2;
+   // std::stringstream ss;
+   // ss << "qpv: alpha2 = " << alpha2;
+   // ss << " var a = " << a;
+   // ss << " var haha = " << haha;
+   // if (dabugMode>1)
+   //     OutputDebugStringA(ss.str().data());
+
+        }
+    }
+    return 1;
+}
+
+
+DLL_API int DLL_CALLCONV offsetsEraserBrush(int *imageData, int *maskData, int w3, int h3, int invertMask, int replaceMode, int levelAlpha, int maskOffX, int maskOffY, int offsetX, int offsetY, int w, int h, int mW, int mH, int Stride) {
+
+    // #pragma omp parallel for schedule(dynamic) default(none)
+    for (int x = offsetX; x < offsetX + w3; ++x)
+    {
+        int tX = 0;
+        tX++;
+        // int px;
+        for (int y = offsetY * Stride; y < (offsetY + h3) * Stride; y += Stride)
+        {
+            int tY = 0;
+            tY++;
+
+            const int px = x * 4 + y;
+            const int mpx = (tX + maskOffX) * mH + tY;
+            int alpha2;
+            int a = 254; // (imageData[px] >> 24) & 0xFF;
+            int intensity = (maskData[mpx] >> 8) & 0xff;
+            if (invertMask == 1)
+               intensity = 255 - intensity;
+
+            float fintensity = intensity/255.0f;
+            if (a==0)
+               continue;
+
+            if (replaceMode == 1)
+               alpha2 = min(levelAlpha, a);
+            else if (replaceMode == 2)
+               alpha2 = max(0, (int)a - levelAlpha);
+            else
+               alpha2 = levelAlpha;
+
+            alpha2 = (alpha2==a) ? a : alpha2*fintensity + a*max(0, 1.0f - fintensity);  // Formula: A*w + B*(1 – w)
+            int haha = (alpha2!=a) ? 1 : 0;
+            if (alpha2!=a)
+               imageData[px] = (alpha2 << 24) | (imageData[px] & 0x00ffffff);
+   // std::stringstream ss;
+   // ss << "qpv: alpha2 = " << alpha2;
+   // ss << " var a = " << a;
+   // ss << " var haha = " << haha;
+   // if (dabugMode>1)
+   //     OutputDebugStringA(ss.str().data());
+
+        }
+    }
+ 
+    std::stringstream ss;
+    ss << "qpv: eraser = " << levelAlpha;
+    OutputDebugStringA(ss.str().data());
+    return 1;
+}
+
+
+DLL_API int DLL_CALLCONV blahaaaaaaEraserBrush(int *imageData, int *maskData, int w, int h, int invertMask, int replaceMode, int levelAlpha) {
+
+    // #pragma omp parallel for schedule(dynamic) default(none)
+    for (int x = 0; x < w; x++)
+    {
+        // int px;
+        for (int y = 0; y < h; y++)
+        {
+            const int px = (x * h + y) * 4 - 4;
+            int alpha2;
+            int a = imageData[px + 3];
+            int intensity = maskData[px + 2];
+            if (invertMask == 1)
+               intensity = 255 - intensity;
+
+            float fintensity = intensity/255.0f;
+            if (a==0)
+               continue;
+
+            if (replaceMode == 1)
+               alpha2 = min(levelAlpha, a);
+            else if (replaceMode == 2)
+               alpha2 = max(0, (int)a - levelAlpha);
+            else
+               alpha2 = levelAlpha;
+
+            alpha2 = (alpha2==a) ? a : alpha2*fintensity + a*max(0, 1.0f - fintensity);  // Formula: A*w + B*(1 – w)
+            int haha = (alpha2!=a) ? 1 : 0;
+            if (alpha2!=a)
+               imageData[px + 3] = alpha2;
+   // std::stringstream ss;
+   // ss << "qpv: alpha2 = " << alpha2;
+   // ss << " var a = " << a;
+   // ss << " var haha = " << haha;
+   // if (dabugMode>1)
+   //     OutputDebugStringA(ss.str().data());
+
+        }
+    }
+ 
+    std::stringstream ss;
+    ss << "qpv: eraser = " << levelAlpha;
+    OutputDebugStringA(ss.str().data());
+    return 1;
+}
+
+DLL_API int DLL_CALLCONV EraserBrush(int *imageData, int *maskData, int w, int h, int invertMask, int replaceMode, int levelAlpha, int *clonedData, int useClone) {
+
+    // #pragma omp parallel for schedule(dynamic) default(none)
+    for (int x = 0; x < w; x++)
+    {
+        // int px;
+        for (int y = 0; y < h; y++)
+        {
+            const int px = x * h + y;
+            int alpha2;
+            int a = (imageData[px] >> 24) & 0xFF;
+            int intensity = (maskData[px] >> 8) & 0xff;
+            if (invertMask == 1)
+               intensity = 255 - intensity;
+
+            float fintensity = intensity/255.0f;
+            if (a==0)
+               continue;
+
+            if (replaceMode == 1)
+               alpha2 = min(levelAlpha, a);
+            else if (replaceMode == 2)
+               alpha2 = max(0, (int)a - levelAlpha);
+            else
+               alpha2 = levelAlpha;
+
+            alpha2 = (alpha2==a) ? a : ceil(alpha2*fintensity + a*max(0, 1.0f - fintensity));  // Formula: A*w + B*(1 – w)
+            int haha = (alpha2!=a) ? 1 : 0;
+            if (alpha2!=a)
+            {
+                if (useClone==1)
+                   imageData[px] = (alpha2 << 24) | (clonedData[px] & 0x00ffffff);
+                else
+                   imageData[px] = (alpha2 << 24) | (imageData[px] & 0x00ffffff);
+            }
+   // std::stringstream ss;
+   // ss << "qpv: alpha2 = " << alpha2;
+   // ss << " var a = " << a;
+   // ss << " var haha = " << haha;
+   // if (dabugMode>1)
+   //     OutputDebugStringA(ss.str().data());
+
+        }
+    }
+ 
+    std::stringstream ss;
+    ss << "qpv: eraser = " << levelAlpha;
+    OutputDebugStringA(ss.str().data());
     return 1;
 }
 
@@ -208,8 +415,8 @@ DLL_API int DLL_CALLCONV BlendBitmaps(int* bgrImageData, int* otherData, int w, 
     #pragma omp parallel for schedule(dynamic) default(none) num_threads(threadz)
     for (int x = 0; x < w; x++)
     {
-        int rT, gT, bT, aB, aO, aX;
-        int rO, gO, bO, rB, gB, bB;
+        int rT, gT, bT; // , aB, aO, aX;
+        //  int rO, gO, bO, rB, gB, bB;
 
         // #pragma omp parallel for schedule(static) default(none) num_threads(threadz)
         for (int y = 0; y < h; y++)
@@ -218,22 +425,22 @@ DLL_API int DLL_CALLCONV BlendBitmaps(int* bgrImageData, int* otherData, int w, 
             if (BGRcolor != 0x0)
             {
                 unsigned int colorO = otherData[x + (y * w)];
-                aO = (colorO >> 24) & 0xFF;
-                aB = (BGRcolor >> 24) & 0xFF;
-                aX = min(aO, aB);
+                int aO = (colorO >> 24) & 0xFF;
+                int aB = (BGRcolor >> 24) & 0xFF;
+                int aX = min(aO, aB);
                 if (aX < 1)
                 {
                     bgrImageData[x + (y * w)] = 0;
                     continue;
                 }
 
-                rO = (colorO >> 16) & 0xFF;
-                gO = (colorO >> 8) & 0xFF;
-                bO = colorO & 0xFF;
+                int rO = (colorO >> 16) & 0xFF;
+                int gO = (colorO >> 8) & 0xFF;
+                int bO = colorO & 0xFF;
 
-                rB = (BGRcolor >> 16) & 0xFF;
-                gB = (BGRcolor >> 8) & 0xFF;
-                bB = BGRcolor & 0xFF;
+                int rB = (BGRcolor >> 16) & 0xFF;
+                int gB = (BGRcolor >> 8) & 0xFF;
+                int bB = BGRcolor & 0xFF;
 
                 if (blendMode == 1) { // darken
                     rT = min(rO, rB);
@@ -825,7 +1032,6 @@ DLL_API unsigned int DLL_CALLCONV dumbcalculateNCR(int n) {
    // OutputDebugStringA(ss.str().data());
    return combinations;
 }
-
 
 inline int hammingDistance(unsigned long long n1, unsigned long long n2) { 
     unsigned long long x = n1 ^ n2; 

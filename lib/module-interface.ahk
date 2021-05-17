@@ -35,7 +35,7 @@ Global allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSuppor
 , IMGresizingMode, imgSelX2, imgSelY2, LimitSelectBoundsImg, markedSelectFile, minimizeMemUsage, mustGenerateStaticFolders, MustLoadSLDprefs
 , noTooltipMSGs, PrefsLargeFonts, RenderOpaqueIMG, resetImageViewOnChange, showHistogram, showImgAnnotations, showInfoBoxHUD, showSelectionGrid, skipDeadFiles
 , skipSeenImagesSlider, SLDcacheFilesList, SLDhasFiles, sldsPattern, syncSlideShow2Audios, thumbnailsListMode, thumbsCacheFolder, thumbsDisplaying, totalFramesIndex
-, TouchScreenMode, userHQraw, userimgQuality, UserMemBMP, usrTextureBGR, slidesFXrandomize
+, TouchScreenMode, userHQraw, userimgQuality, UserMemBMP, usrTextureBGR, slidesFXrandomize, liveDrawingBrushTool := 0
 
 ; OnMessage(0x388, "WM_PENEVENT")
 ; OnMessage(0x2a3, "ResetLbtn") ; WM_MOUSELEAVE
@@ -44,6 +44,7 @@ OnMessage(0x201, "WM_LBUTTONDOWN")
 OnMessage(0x202, "WM_LBUTTONUP")
 OnMessage(0x205, "WM_RBUTTONUP")
 OnMessage(0x207, "WM_MBUTTONDOWN")
+OnMessage(0x20, "WM_SETCURSOR")
 ; OnMessage(0x203, "WM_LBUTTON_DBL") ; WM_LBUTTONDOWN double click
 OnMessage(0x216, "WM_MOVING")
 ; OnMessage(0x211, "WM_ENTERMENULOOP")
@@ -783,14 +784,28 @@ isInRange(value, inputA, inputB) {
     Return (value>=min(inputA, inputB) && value<=max(inputA, inputB)) ? 1 : 0
 }
 
+WM_SETCURSOR() {
+  r := 0
+  If (slideShowRunning=1 && isSamePos=1)
+     r := 1
+  Else If (drawingShapeNow=1 || liveDrawingBrushTool=1)
+     r := 1
+  Else If ((runningLongOperation=1 || imageLoading=1) && slideShowRunning!=1)
+     r := 1
+
+  Return r
+}
+
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   Static lastInvoked := 1, prevPos, prevArrayPos := [], prevState
   MouseGetPos, mX, mY
   isSamePos := (isInRange(mX, prevArrayPos[1] + 3, prevArrayPos[1] - 3) && isInRange(mY, prevArrayPos[2] + 3, prevArrayPos[2] - 3)) ? 1 : 0
   If (slideShowRunning=1 && isSamePos=1)
      Try DllCall("user32\SetCursor", "Ptr", 0)
-  Else If (drawingShapeNow=1)
+  Else If (drawingShapeNow=1 || liveDrawingBrushTool=1)
      changeMcursor("cross")
+  Else If ((runningLongOperation=1 || imageLoading=1) && slideShowRunning!=1)
+     changeMcursor("busy")
 
   If (A_TickCount - scriptStartZeit < 900)
      Return
@@ -806,8 +821,6 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
      prevPos := mX "-" mY
   }
 
-  If ((runningLongOperation=1 || imageLoading=1) && slideShowRunning!=1)
-     changeMcursor("busy")
   ; Else 
 
   ; A := WinActive("A")
@@ -841,8 +854,8 @@ dummyCheckWin() {
    thisHwnd := WinActive("A")
    drawingOkay := (thisHwnd=PVhwnd || thisHwnd=tempBtnVisible || thisHwnd=hSetWinGui) ? 1 : 0
    ; ToolTip, % hSetWinGui "`n" thisHwnd , , , 2
-   If (imgEditPanelOpened=1 && AnyWindowOpen>0 && panelWinCollapsed=1 && thisHwnd=hSetWinGui)
-      MainExe.ahkPostFunction("toggleImgEditPanelWindow")
+   ; If (imgEditPanelOpened=1 && AnyWindowOpen>0 && panelWinCollapsed=1 && thisHwnd=hSetWinGui)
+   ;    MainExe.ahkPostFunction("toggleImgEditPanelWindow")
    If (drawingShapeNow=1 && drawingOkay!=1)
       MainExe.ahkPostFunction("stopDrawingShape")
 }
@@ -3536,7 +3549,7 @@ constantMenuReader(modus:=0) {
    Static prevLabel := "z"
    GetPhysicalCursorPos(x, y)
    ; winID := WinActive("A")
-   MouseGetPos, ,, WinID
+   Try MouseGetPos, ,, WinID
    ; ToolTip, % winID "`n" OutputVarWin , , , 2
    If (modus="focused")
       AccAccFocus(OutputVarWin, accFocusName, accFocusValue, accRole, accIRole)
@@ -3566,6 +3579,12 @@ constantMenuReader(modus:=0) {
       ; ToolTip, % accFocusName , , , 2
       ; MainExe.ahkPostFunction("showtooltip", accFocusName)
    }
+   SetTimer, repeatMenuInfosPopup, -150
+}
+
+repeatMenuInfosPopup() {
+   If GetKeyState("RButton", "P")
+      constantMenuReader()
 }
 
 Acc_ObjectFromWindow(hWnd, idObject = 0) {
