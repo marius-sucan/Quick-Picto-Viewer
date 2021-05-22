@@ -2,6 +2,16 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.1.2 (2021-05-22)
+  - when manipulating the image selection area, the dots [or edges] will snap to image boundaries and if selection grid activated, to image center as well ; selection rotation also snaps to 0, 90, 180 and so on.
+  - when drawing freeform polygonal or curved shapes, users can now change image zoom level, in addition to image panning
+  - considerable better touch screens support with
+    - immediate response on touch for scroll bars, path points and image selection area dots and edges
+    - viewport messages that describe the swipe action that will be performed; messages will be shown when "hot areas" are clicked , as well 
+    - changed behavior on image panning, «infinite panning» ability removed
+  - [important] fixed viewport image panning bug that broke image panning when high-quality resampling was activated
+  - other minor fixes
+
 - v5.1.0 (2021-05-17)
   - [new] paint brushes: simple, soft edges, cloner, eraser and deformer brushes: smudge, pinch, bulge; all brushes are customizable
   = [new] option to paint alpha mask when using the transform tool or when pasting images in place

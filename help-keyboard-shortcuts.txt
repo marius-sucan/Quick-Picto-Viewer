@@ -241,7 +241,8 @@ Double Left-Click on dot|Insert a new dot next to the double-clicked one|Freefor
 Ctrl + Left-Click on dot|Remove the dot clicked on|Freeform drawing|-
 Shift + Left-Click|Add new dot in the path constrained every 45 degrees|Freeform drawing|-
 Right-Click|Stop drawing the freeform path|Freeform drawing|-
-Esc|Cancel drawing the freeform path|Freeform drawing|-
+Right-Click on dot|Remove the dot clicked on|Freeform drawing|-
+Esc|Cancel freeform path drawing|Freeform drawing|-
 Shift + Left-Click on edges or dots|Resize selection area maintaing initial aspect ratio|Image selected area|-
 Shift + Left-Click inside area|Move selection area constrained on X or Y axis|Image selected area|-
 Alt + Left-Click inside area|Resize selection area relative to its center and transform to 1:1 ratio [square]|Image selected area|-
@@ -260,6 +261,7 @@ Q|Activate effects brush|Painting mode|-
 J|Activate cloner brush and toggle dynamic coordinates modes for the cloner|Painting mode|-
 D|Define cloner brush source|Painting mode|-
 X|Toggle between color A and color B|Painting mode|-
+Ctrl + Left-Click|Paint with the other color|Painting mode|-
 S|Toggle between diameter and radius based brush size|Painting mode|-
 C|Pick brush color|Painting mode|-
 K|Toggle between draw inside, outside or ignore selection area|Painting mode|-

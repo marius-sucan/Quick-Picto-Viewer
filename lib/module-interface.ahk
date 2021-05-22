@@ -1,6 +1,7 @@
 ﻿#Persistent
 #NoTrayIcon
 SetWinDelay, 1
+CoordMode, Mouse, Screen
 SetBatchLines, -1
 SetWorkingDir, %A_ScriptDir%
 Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Quick Picto Viewer"
@@ -8,7 +9,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , PVhwnd, hGDIwin, hGDIthumbsWin, WindowBgrColor, mainCompiledPath
      , winGDIcreated := 0, ThumbsWinGDIcreated := 0, MainExe := AhkExported()
      , AnyWindowOpen := 0, easySlideStoppage := 0, lastOtherWinClose := 1
-     , slideShowRunning := 0, toolTipGuiCreated, editDummy, LbtnDwn := 0
+     , slideShowRunning := 0, toolTipGuiCreated, editDummy, LbtnDwn := 0, winCtrlsCoords := []
      , mustAbandonCurrentOperations := 0, lastCloseInvoked := -1, allowGIFsPlayEntirely := 0
      , hCursBusy := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32514, "Ptr")  ; IDC_WAIT
      , hCursN := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32512, "Ptr")  ; IDC_ARROW
@@ -36,24 +37,26 @@ Global allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSuppor
 , noTooltipMSGs, PrefsLargeFonts, RenderOpaqueIMG, resetImageViewOnChange, showHistogram, showImgAnnotations, showInfoBoxHUD, showSelectionGrid, skipDeadFiles
 , skipSeenImagesSlider, SLDcacheFilesList, SLDhasFiles, sldsPattern, syncSlideShow2Audios, thumbnailsListMode, thumbsCacheFolder, thumbsDisplaying, totalFramesIndex
 , TouchScreenMode, userHQraw, userimgQuality, UserMemBMP, usrTextureBGR, slidesFXrandomize, liveDrawingBrushTool := 0
+, lastPointerUseZeit := 1
 
 ; OnMessage(0x388, "WM_PENEVENT")
-; OnMessage(0x2a3, "ResetLbtn") ; WM_MOUSELEAVE
+; OnMessage(0x2a3, "WM_MOUSELEAVE")
 OnMessage(0x112, "WM_SYSMENU")
 OnMessage(0x201, "WM_LBUTTONDOWN")
 OnMessage(0x202, "WM_LBUTTONUP")
 OnMessage(0x205, "WM_RBUTTONUP")
 OnMessage(0x207, "WM_MBUTTONDOWN")
-OnMessage(0x20, "WM_SETCURSOR")
+OnMessage(0x216, "WM_MOVING") ; window moving
+OnMessage(0x024B, "WM_POINTERACTIVATE") 
+; OnMessage(0x0247, "WM_POINTERUP") 
+; OnMessage(0x20, "WM_SETCURSOR")
 ; OnMessage(0x203, "WM_LBUTTON_DBL") ; WM_LBUTTONDOWN double click
-OnMessage(0x216, "WM_MOVING")
 ; OnMessage(0x211, "WM_ENTERMENULOOP")
 ; OnMessage(0x212, "WM_EXITMENULOOP")
 ; OnMessage(0x125, "WM_EXITMENULOOP")
 ; OnMessage(0x126, "WM_EXITMENULOOP")
 
 OnMessage(0x200, "WM_MOUSEMOVE")
-; OnMessage(0x2A3, "WM_MOUSELEAVE")
 OnMessage(0x06, "activateMainWin")   ; WM_ACTIVATE 
 OnMessage(0x08, "activateMainWin")   ; WM_KILLFOCUS 
 
@@ -205,6 +208,7 @@ BuildGUI(params:=0) {
       Gui, 1: Show, x%pX% y%pY% w%sW% h%sH%
       Sleep, 25
    }
+
    r := PVhwnd "|" hGDIinfosWin "|" hGDIwin "|" hGDIthumbsWin "|" hGDIselectWin "|" hPicOnGui1 "|" winGDIcreated "|" ThumbsWinGDIcreated
    Return r
 }
@@ -249,26 +253,31 @@ updateUIctrl(forceThis:=0) {
       Return
    }
 
-   GetClientSize(GuiW, GuiH, PVhwnd)
+   GetWinClientSize(GuiW, GuiH, PVhwnd, 0)
    If (forceThis=1)
    {
       editingSelectionNow := MainExe.ahkgetvar.editingSelectionNow
       isAlwaysOnTop := MainExe.ahkgetvar.isAlwaysOnTop
    }
 
-   thisState := "a" GuiW GuiH editingSelectionNow isAlwaysOnTop TouchScreenMode
+   ctrlW := (editingSelectionNow=1) ? GuiW//8 : GuiW//7
+   ctrlH2 := (editingSelectionNow=1) ? GuiH//6 : GuiH//5
+   ctrlH3 := GuiH - ctrlH2*2
+   ctrlW2 := GuiW - ctrlW*2
+   ctrlY1 := ctrlH2
+   ctrlY2 := ctrlH2*2
+   ctrlY3 := ctrlH2 + ctrlH3
+   ctrlX1 := ctrlW
+   ctrlX2 := ctrlW + ctrlW2
+   winCtrlsCoords[1] := [0, 0, ctrlW, GuiH, "PicOnGUI1"]
+   winCtrlsCoords[2] := [ctrlX1, 0, ctrlW2, ctrlH2, "PicOnGUI2a"]
+   winCtrlsCoords[3] := [ctrlX1, ctrlY1, ctrlW2, ctrlH3, "PicOnGUI2b"]
+   winCtrlsCoords[4] := [ctrlX1, ctrlY3, ctrlW2, ctrlH2, "PicOnGUI2c"]
+   winCtrlsCoords[5] := [ctrlX2, 0, ctrlW, GuiH, "PicOnGUI3"]
+   thisState := "a" GuiW GuiH ctrlW2 ctrlH2 ctrlY3 editingSelectionNow isAlwaysOnTop TouchScreenMode
    If (thisState!=prevState)
    {
       WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%   
-      ctrlW := (editingSelectionNow=1) ? GuiW//8 : GuiW//7
-      ctrlH2 := (editingSelectionNow=1) ? GuiH//6 : GuiH//5
-      ctrlH3 := GuiH - ctrlH2*2
-      ctrlW2 := GuiW - ctrlW*2
-      ctrlY1 := ctrlH2
-      ctrlY2 := ctrlH2*2
-      ctrlY3 := ctrlH2 + ctrlH3
-      ctrlX1 := ctrlW
-      ctrlX2 := ctrlW + ctrlW2
       GuiControl, 1: Move, PicOnGUI1, % "w" ctrlW " h" GuiH " x0 y0"
       GuiControl, 1: Move, PicOnGUI2a, % "w" ctrlW2 " h" ctrlH2 " x" ctrlX1 " y0"
       GuiControl, 1: Move, PicOnGUI2b, % "w" ctrlW2 " h" ctrlH3 " x" ctrlX1 " y" ctrlY1
@@ -305,6 +314,11 @@ UpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0) {
          GuiControl, 1: Move, PicOnGUI2b, w1 h1 x1 y1
          GuiControl, 1: Move, PicOnGUI2c, w1 h1 x1 y1
          GuiControl, 1: Move, PicOnGUI3, w1 h1 x1 y1
+         winCtrlsCoords[1] := [0, 0, GuiW, GuiH - heightu, "PicOnGUI1"]
+         winCtrlsCoords[2] := [1, GuiH - heightu, GuiW, heightu, "PicOnGUI2a"]
+         winCtrlsCoords[3] := [1, 1, 1, 1, "PicOnGUI2b"]
+         winCtrlsCoords[4] := [1, 3, 1, 1, "PicOnGUI2c"]
+         winCtrlsCoords[5] := [1, 1, 1, 1, "PicOnGUI3"]
          prevState := thisState
       }
 
@@ -323,6 +337,8 @@ UpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0) {
       GuiControl, 1: Move, PicOnGUI1, % "w" GuiW " h" GuiH - heightu
       GuiControl, 1: Move, PicOnGUI2a, % "w" GuiW " h" heightu " x1 y" GuiH - heightu
       GuiControl, 1:, PicOnGUI2a, % stringu
+      winCtrlsCoords[1] := [0, 0, GuiW, GuiH - heightu, "PicOnGUI1"]
+      winCtrlsCoords[2] := [1, GuiH - heightu, GuiW, heightu, "PicOnGUI2a"]
       If infos
          GuiControl, 1:, PicOnGUI1, % "Files list container: " infos " elements in view"
    }
@@ -546,6 +562,7 @@ WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
     If (A_TickCount - scriptStartZeit<500)
        Return
 
+    LbtnDwn := 0
     If (hotkeysSuspended=1)
        UnlockKeys()
 
@@ -555,7 +572,9 @@ WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
        Return
     }
 
-    MainExe.ahkPostFunction("WinClickAction", "double-click", A_GuiControl)
+    MouseGetPos, , , OutputVarWin
+    GetMouseCoord2wind(PVhwnd, mX, mY, mXo, mYo)
+    MainExe.ahkPostFunction("WinClickAction", "double-click", A_GuiControl, OutputVarWin, mX, mY, mXo, mYo)
 }
 
 askAboutStoppingOperations() {
@@ -570,13 +589,14 @@ askAboutStoppingOperations() {
 
 WM_RBUTTONUP(wP, lP, msg, hwnd) {
   Static lastState := 0
+  LbtnDwn := 0
   If (A_TickCount - scriptStartZeit<500)
-     Return 0
+     Return
 
   If (slideShowRunning=1 || animGIFplaying=1)
   {
      turnOffSlideshow()
-     Return 0
+     Return
   }
 
   UnlockKeys()
@@ -592,19 +612,13 @@ WM_RBUTTONUP(wP, lP, msg, hwnd) {
   If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
   {
      askAboutStoppingOperations()
-     Return 0
+     Return
   }
 
-  ; If (thumbsDisplaying=1 && maxFilesIndex>0)
-  ; {
-  ;    canCancelImageLoad := 4
-  ;    MainExe.ahkPostFunction("WinClickAction", "rclick", A_GuiControl)
-  ;    Return
-  ; } 
-
   ; delayu := (thumbsDisplaying=1) ? 90 : 2
-  SetTimer, InitGuiContextMenu, -25
-  Return 0
+  ; If (drawingShapeNow!=1)
+     SetTimer, InitGuiContextMenu, -25
+  Return
 }
 
 InitGuiContextMenu() {
@@ -659,6 +673,37 @@ theSlideShowCore(paramu:=0) {
   hasAdvancedSlide := 1
 }
 
+WM_POINTERACTIVATE() {
+    lastPointerUseZeit := A_TickCount
+    MouseGetPos, , , OutputVarWin
+    GetMouseCoord2wind(PVhwnd, mX, mY, mXo, mYo)
+    canCancelImageLoad := 4
+    LbtnDwn := 1
+    ctrlName := "unknown"
+    Loop, 5
+    {
+         xu := winCtrlsCoords[A_Index, 1]
+         yu := winCtrlsCoords[A_Index, 2]
+         wu := winCtrlsCoords[A_Index, 3]
+         hu := winCtrlsCoords[A_Index, 4]
+         ctrlName := winCtrlsCoords[A_Index, 5]
+         If isDotInRect(mX, mY, xu, xu + wu, yu, yu + hu)
+            Break
+    }
+    ; ToolTip, % mX "=" mY "==" ctrlName , , , 3
+    If (slideShowRunning=1)
+       turnOffSlideshow()
+    Else
+       sendWinClickAct("normal-pen-down", ctrlName, OutputVarWin, mX, mY, mXo, mYo)
+    lastPointerUseZeit := A_TickCount
+}
+
+WM_POINTERUP(wP, lP, msg, hwnd) {
+  SoundBeep, 400, 90 
+  ; Return DllCall("DefWindowProc", "Ptr", hwnd, "uint", msg, "UPtr", wP, "Ptr", lP, "Ptr")
+  ; ToolTip, % "r=" r , , , 2
+  Return 1
+}
 updateGDIwinPos() {
   ; thumbsDisplaying := MainExe.ahkgetvar.thumbsDisplaying
   ; If (A_OSVersion="WIN_7")
@@ -697,18 +742,57 @@ JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
 }
 
 WinClickAction(param:=0) {
-    ; If (A_GuiControlEvent="DoubleClick" && drawingShapeNow=1)
-    ; {
-       ; MainExe.ahkPostFunction("stopDrawingShape")
-       ; Return
-    ; }
-
+    MouseGetPos, , , OutputVarWin
+    GetMouseCoord2wind(PVhwnd, mX, mY, mXo, mYo)
     canCancelImageLoad := 4
-    ; ToolTip, % param "--" A_GuiControl "--" A_GuiControlEvent , , , 2
+    ctrlName := A_GuiControl
+    Loop, 5
+    {
+         xu := winCtrlsCoords[A_Index, 1]
+         yu := winCtrlsCoords[A_Index, 2]
+         wu := winCtrlsCoords[A_Index, 3]
+         hu := winCtrlsCoords[A_Index, 4]
+         ctrlName := winCtrlsCoords[A_Index, 5]
+         If isDotInRect(mX, mY, xu, xu + wu, yu, yu + hu)
+            Break
+    }
+    ; ToolTip, % mX "=" mY "=" param "==" ctrlName "--" A_GuiControl "--" A_GuiControlEvent , , , 2
     If (slideShowRunning=1)
        turnOffSlideshow()
     Else
-       MainExe.ahkPostFunction("WinClickAction", A_GuiControlEvent, A_GuiControl)
+       sendWinClickAct(A_GuiControlEvent, ctrlName, OutputVarWin, mX, mY, mXo, mYo)
+}
+
+sendWinClickAct(ctrlEvent, guiCtrl, hwnd, mX, mY, mXo, mYo) {
+     ; Static zctrlEvent, zguiCtrl, zhwnd, zmX, zmY, zmXo, zmYo
+
+     ; If (ctrlEvent="normal") && (A_TickCount - lastPointerUseZeit<500)
+     ; {
+     ;    MainExe.ahkPostFunction("WinClickAction", zctrlEvent, zguiCtrl, zhwnd, zmX, zmY, zmXo, zmYo)
+     ;    Return
+     ; }
+
+     ; zctrlEvent := ctrlEvent, zguiCtrl := guiCtrl, hwnd := zhwnd
+     zmX := mX, zmY := mY, zmXo := mXo, zmYo := mYo
+     MainExe.ahkPostFunction("WinClickAction", ctrlEvent, guiCtrl, hwnd, mX, mY, mXo, mYo)
+}
+
+GetMouseCoord2wind(hwnd, ByRef nx, ByRef ny, ByRef ox, ByRef oy) {
+    ; CoordMode, Mouse, Screen
+    MouseGetPos, ox, oy
+    JEE_ScreenToClient(hwnd, ox, oy, nx, ny)
+}
+
+JEE_ScreenToClient(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
+; function by jeeswg found on:
+; https://autohotkey.com/boards/viewtopic.php?t=38472
+  VarSetCapacity(POINT, 8)
+  NumPut(vPosX, &POINT, 0, "Int")
+  NumPut(vPosY, &POINT, 4, "Int")
+  DllCall("user32\ScreenToClient", "UPtr", hWnd, "UPtr", &POINT)
+  vPosX2 := NumGet(&POINT, 0, "Int")
+  vPosY2 := NumGet(&POINT, 4, "Int")
+  POINT := ""
 }
 
 ResetLbtn() {
@@ -796,9 +880,14 @@ WM_SETCURSOR() {
   Return r
 }
 
+isDotInRect(mX, mY, x1, x2, y1, y2) {
+   r := (isInRange(mX, x1, x2) && isInRange(mY, y1, y2)) ? 1 : 0
+   Return r
+}
+
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   Static lastInvoked := 1, prevPos, prevArrayPos := [], prevState
-  MouseGetPos, mX, mY
+  MouseGetPos, mX, mY, OutputVarWin
   isSamePos := (isInRange(mX, prevArrayPos[1] + 3, prevArrayPos[1] - 3) && isInRange(mY, prevArrayPos[2] + 3, prevArrayPos[2] - 3)) ? 1 : 0
   If (slideShowRunning=1 && isSamePos=1)
      Try DllCall("user32\SetCursor", "Ptr", 0)
@@ -812,8 +901,9 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
 
   thisPos := mX "-" mY
   prevArrayPos := [mX, mY]
-  If (A_TickCount - lastInvoked > 55) && (thisPos!=prevPos && drawingShapeNow!=1)
+  If (A_TickCount - lastInvoked > 55) && (thisPos!=prevPos)
   {
+     ; isThisWin :=(OutputVarWin=PVhwnd) ? 1 : 0
      thisPrefsWinOpen := (imgEditPanelOpened=1) ? 0 : AnyWindowOpen
      lastInvoked := A_TickCount
      If (slideShowRunning!=1 && !thisPrefsWinOpen && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1)
@@ -846,8 +936,16 @@ trackMouseDragging() {
     lastWinDrag := A_TickCount
 }
 
-WM_MOUSELEAVE() {
-  SoundBeep 
+WM_MOUSELEAVE(wP, lP, msg, hwnd) {
+  Static lastInvoked := 1
+  If (A_TickCount - lastInvoked > 55)
+  {
+    ToolTip, % wp "==" lp , , , 2
+     thisPrefsWinOpen := (imgEditPanelOpened=1) ? 0 : AnyWindowOpen
+     If (slideShowRunning!=1 && !thisPrefsWinOpen && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1)
+        MainExe.ahkPostFunction("MouseMoveResponder")
+     lastInvoked := A_TickCount
+  }
 }
 
 dummyCheckWin() {
