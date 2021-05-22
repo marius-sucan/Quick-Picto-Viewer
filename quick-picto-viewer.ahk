@@ -423,7 +423,7 @@ HKifs(q:=0) {
     vk57 up::   ; w to-do  to do
        If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1 && thumbsDisplaying!=1)
           flipSelectionWH()
-JusticeCombineTiles2colors()
+; JusticeCombineTiles2colors()
     ; MsgBox, % ClipboardGetDropEffect()
 ; msgbox, % calculateNCR2(10201) ; OSD: looping... 10 202......0... combin=52025101
      ; reorderStoredHash("010110000010101011111001111101010111", "1001011011111111010010010101")
@@ -57799,79 +57799,5 @@ checkDLLfiles() {
 
    If (msgResult="Download")
       Try Run, https://github.com/marius-sucan/Quick-Picto-Viewer
-}
-
-JusticeCombineTiles2colors() {
-   disposeCacheIMGs()
-   imgPath := getIDimage(currentFileIndex)
-   FileName := "E:\Sucan twins\_misc-work\Justice Frangipane\stylus-hotkeys\the-script\v4\ini-presets\Preset Rebelle.ini"
-   givenSection := "ArtistPad"
-   colorsList := JusticeExtractTinyColors(imgPath)
-   tilesList := JusticeSortTiles(fileName, givenSection)
-   tilesArray := StrSplit(tilesList, "`n")
-   colorsArray := StrSplit(colorsList, "`n")
-   newList := ""
-   Loop, % tilesArray.Count()
-   {
-       line := SubStr(tilesArray[A_Index], InStr(tilesArray[A_Index], "||") + 2)
-       lr := StrSplit(line, ",")
-       thisClr := SubStr(colorsArray[A_Index], InStr(colorsArray[A_Index], "||") + 2)
-       newList .= "tile" Format("{:03}", A_Index) "=" lr[1] "," lr[2] "," lr[3] "," lr[4] "," lr[5] "," lr[6] "," lr[7] "," thisClr "," lr[9] "`n"
-   }
-
-   Clipboard := newList
-}
-
-JusticeExtractTinyColors(imgPath) {
-   pBitmap := Gdip_CreateBitmapFromFileSimplified(imgPath)
-   smallBMP := Gdip_ResizeBitmap(pBitmap, 64, 64, 0, 7)
-
-   pX := 0, pY := 1
-   thisIndex := 0
-   colorsArray := []
-   Loop, 4096
-   {
-      thisIndex++
-      pX++
-      If (pX>64)
-      {
-         pX := 1
-         pY++
-         If (pY>64)
-            pY := 1
-      }
-
-      ARGBdec := Gdip_GetPixel(smallBMP, pX - 1, pY - 1)
-      Gdip_FromARGB(ARGBdec, A, R, G, B)
-      R := R * 0.308
-      G := G * 0.650
-      B := B * 0.095
-      Z := Round(snapToValues(R + G + B, 0, 255, 2, 1))
-
-      thisColor := Gdip_ToARGB("0xFF", R, G, B)
-      clr := SubStr(Format("{1:#x}", thisColor), 5)
-      colorsList .= z "||" clr "`n"
-   }
-   Gdip_DisposeImage(pBitmap)
-   Gdip_DisposeImage(smallBMP)
-   Sort, colorsList, ND`n
-   Return colorsList
-}
-
-JusticeSortTiles(fileName, givenSection) {
-   newList := ""
-   IniRead, OutputVarSection, % Filename, % givenSection
-   Loop, Parse, OutputVarSection, `n,`r
-   {
-      If InStr(A_LoopField, ",")
-      {
-         line := SubStr(A_LoopField, InStr(A_LoopField, "=") + 1)
-         lineArray := StrSplit(line, ",")
-         newList .= lineArray[3] "||" line "`n"
-      }
-   }
-
-   Sort, newList, ND`n
-   Return newList
 }
 
