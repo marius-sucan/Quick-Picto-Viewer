@@ -2,8 +2,12 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.1.5 (2021-05-27)
+  - [new] brush shape and color randomization options
+  - important bug fixes
+
 - v5.1.2 (2021-05-22)
-  - when manipulating the image selection area, the dots [or edges] will snap to image boundaries and if selection grid activated, to image center as well ; selection rotation also snaps to 0, 90, 180 and so on.
+  - when manipulating the image selection area, the dots [or edges] will snap to image boundaries and if selection grid is activated, to the image center as well ; selection rotation also snaps to 0, 90, 180 and so on.
   - when drawing freeform polygonal or curved shapes, users can now change image zoom level, in addition to image panning
   - considerable better touch screens support with
     - immediate response on touch for scroll bars, path points and image selection area dots and edges

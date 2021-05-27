@@ -8766,7 +8766,7 @@ ConvertRGBtoHSL(R, G, B) {
    }
    ; return round(h*360) "," s "," l
    ; return (h*360) "," s "," l
-   return [abs(round(h*360)), abs(s), abs(l)]
+   return [abs(round(h*360, 3)), abs(s), abs(l)]
 }
 
 ConvertHSLtoRGB(H, S, L) {
