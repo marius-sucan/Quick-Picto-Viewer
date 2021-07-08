@@ -3118,6 +3118,7 @@ Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", Kee
        ResizedH := givenH
     }
 
+
     If (((ResizedW*ResizedH>536848912) || (ResizedW>32100) || (ResizedH>32100)) && checkTooLarge=1)
        Return
 
@@ -3128,6 +3129,9 @@ Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", Kee
        PixelFormat := "0xE200B"
     Else If Strlen(KeepPixelFormat)>3
        PixelFormat := KeepPixelFormat
+
+    If (ResizedW=Width && ResizedH=Height)
+       InterpolationMode := 5
 
     If InStr(PixelFormatReadable, "indexed")
     {
@@ -3886,8 +3890,7 @@ Gdip_GetLinearGrBrushGammaCorrection(pLinearGradientBrush) {
 }
 
 Gdip_SetLinearGrBrushGammaCorrection(pLinearGradientBrush, UseGammaCorrection) {
-   Static Ptr := "UPtr"
-   Return DllCall("gdiplus\GdipSetLineGammaCorrection", Ptr, pLinearGradientBrush, "int", UseGammaCorrection)
+   Return DllCall("gdiplus\GdipSetLineGammaCorrection", "UPtr", pLinearGradientBrush, "int", UseGammaCorrection)
 }
 
 Gdip_GetLinearGrBrushRect(pLinearGradientBrush) {
@@ -8636,6 +8639,8 @@ Gdip_BitmapSetColorDepth(pBitmap, bitsDepth, useDithering:=1) {
       E := Gdip_BitmapConvertFormat(pBitmap, 0x21808, 2, 1, 0, 0, 0, 0, 0)
    Else If (bitsDepth=32)
       E := Gdip_BitmapConvertFormat(pBitmap, 0x26200A, 2, 1, 0, 0, 0, 0, 0)
+   Else If (bitsDepth=64)
+      E := Gdip_BitmapConvertFormat(pBitmap, 0x34400D, 2, 1, 0, 0, 0, 0, 0)
    Else
       E := -1
    Return E

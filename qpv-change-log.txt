@@ -2,6 +2,17 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.2.0 (2021-07-08)
+  - [new] «check for updates» mechanism implemented [Menu > Help > ...]; it only check for a newer version; the user must download and update the application
+  - [new] gamma correction option; when this is activated and images are edited, the colors are mixed using gamma correction; this improves colors mixing quality
+  - [new] draw shape contours panel
+  - [new] texture option fill for «fill shape» tool
+  - [new] brushes can have textures now - you can find a drop down with textures in the Paint Brush panel
+  - [new] brush automatic rotation based on mouse movements
+  - [new] option to set viewport ambiental texture size [Menu > Interface > Additional settings]
+  - reorganized the «fill shape» panel
+  - various important bug fixes
+
 - v5.1.5 (2021-05-27)
   - [new] brush shape and color randomization options
   - important bug fixes

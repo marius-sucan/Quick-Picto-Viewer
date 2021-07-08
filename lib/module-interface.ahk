@@ -29,6 +29,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0
      , currentFilesListModified := 0, folderTreeWinOpen := 0, hStatusBaru, OSDFontName := "Arial"
      , OSDbgrColor := "001100", OSDtextColor := "FFeeFF", LargeUIfontValue := 14, allowMenuReader := 0
+     , lastMenuInvoked := []
 
 Global allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, askDeleteFiles, mouseToolTipWinCreated := 0
 , AutoDownScaleIMGs, autoPlaySNDs, autoRemDeadEntry, ColorDepthDithering, countItemz, currentFileIndex, CurrentSLD, defMenuRefreshItm, doSlidesTransitions
@@ -621,6 +622,28 @@ WM_RBUTTONUP(wP, lP, msg, hwnd) {
   Return
 }
 
+InitMainContextMenu() {
+   GetPhysicalCursorPos(mX, mY)
+   thisTick := Round(lastMenuInvoked[1])
+   thisX := lastMenuInvoked[2]
+   thisY := lastMenuInvoked[3]
+
+   If ((A_TickCount - thisTick<350) && isDotInRect(mX, mY, 15, 15, thisX, thisY, 1))
+   {
+      SendInput, {Esc}
+      Sleep, 1
+      MainExe.ahkPostFunction("PanelQuickSearchMenuOptions")
+      Return
+   }
+   lastMenuInvoked := [A_TickCount, mX, mY]
+   InitGuiContextMenu()
+   SetTimer, TimerMouseMove, -25
+}
+
+TimerMouseMove() {
+   MouseMove, -2, -2, 1, R
+}
+
 InitGuiContextMenu() {
     MainExe.ahkPostFunction(A_ThisFunc, "extern")
 }
@@ -880,10 +903,14 @@ WM_SETCURSOR() {
   Return r
 }
 
-isDotInRect(mX, mY, x1, x2, y1, y2) {
-   r := (isInRange(mX, x1, x2) && isInRange(mY, y1, y2)) ? 1 : 0
+isDotInRect(mX, mY, x1, x2, y1, y2, modus:=0) {
+   If (modus=1)
+      r := (isInRange(mX, y1 - x1, y1 + x2) && isInRange(mY, y2 - x1, y2 + x2)) ? 1 : 0
+   Else
+      r := (isInRange(mX, x1, x2) && isInRange(mY, y1, y2)) ? 1 : 0
    Return r
 }
+
 
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   Static lastInvoked := 1, prevPos, prevArrayPos := [], prevState
@@ -1268,7 +1295,7 @@ BuildFakeMenuBar(modus:=0) {
       Return
    }
 
-   kMenu("MENU", "InitGuiContextMenu")
+   kMenu("MENU", "InitMainContextMenu")
    kMenu("-", "-")
 
    If (modus="welcome")
@@ -1357,14 +1384,14 @@ BuildFakeMenuBar(modus:=0) {
    kMenu("ERASE", "deleteKeyAction")
    kMenu("-", "-")
 
-   If (isImgEditMode=1)
-   {
-      kMenu("ACQUIRE", "AcquireWIAimage")
-      kMenu("PRINT", "PanelPrintImage")
-   } Else If (maxFilesIndex>1)
+   If (maxFilesIndex>1)
    {
       kMenu("SEARCH", "PanelSearchIndex")
       kMenu("JUMP TO", "PanelJump2index")
+   } Else If (thumbsDisplaying!=1)
+   {
+      kMenu("ACQUIRE", "AcquireWIAimage")
+      kMenu("PRINT", "PanelPrintImage")
    }
 
    kMenu("RESET", "ResetImageView")
@@ -1382,7 +1409,7 @@ BuildFakeMenuBar(modus:=0) {
       If (maxFilesIndex>1 && !isImgEditMode)
          kMenu("PLAY", "dummyInfoToggleSlideShowu")
       kMenu("INFO", "ToggleHistoInfoBoxu")
-      kMenu("PREV. PANEL", "openPreviousPanel")
+      kMenu("PREV PANEL", "openPreviousPanel")
    }
 }
 
