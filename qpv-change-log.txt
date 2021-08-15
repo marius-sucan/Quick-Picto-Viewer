@@ -2,8 +2,18 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.2.5 (2021-08-15)
+  - [new] proper toolbar; 
+    - left and right click actions for the icons; it also allows to click and drag to adjust values associated with the icon actions;
+    - it can be used with a keyboard - press Shift+Tab to acttivate it, and then the arrow keys to navigate the icons;
+    - the toolbar is dynamic - icons or their associated actions change on context; tooltips are updated to reflect this;
+    - the toolbar can be horizontal or vertical; two columns options also available;
+    - icon sizes can be changed
+  - the quick bar is now obsolete and is deactivated by default; the toolbar is now turned on by default
+  - various bug fixes and minore improvements
+
 - v5.2.0 (2021-07-08)
-  - [new] «check for updates» mechanism implemented [Menu > Help > ...]; it only check for a newer version; the user must download and update the application
+  - [new] «check for updates» mechanism implemented [Menu > Help > ...]; it only checks for a newer version; the user must download and update the application
   - [new] gamma correction option; when this is activated and images are edited, the colors are mixed using gamma correction; this improves colors mixing quality
   - [new] draw shape contours panel
   - [new] texture option fill for «fill shape» tool

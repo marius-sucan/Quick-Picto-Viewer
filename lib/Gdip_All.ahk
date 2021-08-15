@@ -3100,11 +3100,13 @@ Gdip_RotateBitmapAtCenter(pBitmap, Angle, pBrush:=0, InterpolationMode:=7, Pixel
     Return newBitmap
 }
 
-Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", KeepPixelFormat:=0, checkTooLarge:=0) {
+Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", KeepPixelFormat:=0, checkTooLarge:=0, bgrColor:=0) {
 ; KeepPixelFormat can receive a specific PixelFormat.
 ; The function returns a pointer to a new pBitmap.
 ; Default is 0 = 32-ARGB.
 ; For maximum speed, use 0xE200B - 32-PARGB pixel format.
+; Set bgrColor to have a background colour painted.
+
     If (!pBitmap || !givenW || !givenH)
        Return
 
@@ -3133,6 +3135,9 @@ Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", Kee
     If (ResizedW=Width && ResizedH=Height)
        InterpolationMode := 5
 
+    If bgrColor
+       pBrush := Gdip_BrushCreateSolid(bgrColor)
+
     If InStr(PixelFormatReadable, "indexed")
     {
        hbm := CreateDIBSection(ResizedW, ResizedH,,24)
@@ -3150,7 +3155,11 @@ Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", Kee
        G := Gdip_GraphicsFromHDC(hDC, InterpolationMode, 4)
        Gdip_SetPixelOffsetMode(G, 2)
        If G
+       {
+          If pBrush
+             Gdip_FillRectangle(G, pBrush, 0, 0, ResizedW, ResizedH)
           r := Gdip_DrawImage(G, pBitmap, 0, 0, ResizedW, ResizedH)
+       }
        newBitmap := !r ? Gdip_CreateBitmapFromHBITMAP(hbm) : ""
        If (KeepPixelFormat=1 && newBitmap)
           Gdip_BitmapSetColorDepth(newBitmap, SubStr(PixelFormatReadable, 1, 1), 1)
@@ -3166,7 +3175,11 @@ Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", Kee
           G := Gdip_GraphicsFromImage(newBitmap, InterpolationMode, 4)
           Gdip_SetPixelOffsetMode(G, 2)
           If G
+          {
+             If pBrush
+                Gdip_FillRectangle(G, pBrush, 0, 0, ResizedW, ResizedH)
              r := Gdip_DrawImage(G, pBitmap, 0, 0, ResizedW, ResizedH)
+          }
 
           Gdip_DeleteGraphics(G)
           If (r || !G)

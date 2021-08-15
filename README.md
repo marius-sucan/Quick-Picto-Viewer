@@ -16,9 +16,9 @@
 
 <p>Since Quick Picto Viewer v4, users can also edit images by using freely rotated elliptical or rectangular selections. Common functions provided: paste in place, color adjustments, draw arcs, lines or shapes, insert text, soft edges blur area and so on.</p>
 
-<p width="600" height="410"><img width="600" height="410" alt="Quick Picture Viewer - thumbnails list screenshot" src="http://marius.sucan.ro/media/files/blog/ahk-scripts/images/quick-picto-viewer-screenshot.jpg"></p>
+<p width="600" height="410"><img width="600" height="410" alt="Quick Picture Viewer - thumbnails list screenshot" src="http://marius.sucan.ro/media/files/blog/ahk-scripts/images/qpv-screenshot1.jpg"></p>
 
-<p width="600" height="410"><img width="600" height="410" alt="Quick Picture Viewer - image view screenshot" src="http://marius.sucan.ro/media/files/blog/ahk-scripts/images/quick-picto-viewer-screenshot2.jpg"></p>
+<p width="600" height="410"><img width="600" height="410" alt="Quick Picture Viewer - image view screenshot" src="http://marius.sucan.ro/media/files/blog/ahk-scripts/images/qpv-screenshot2.jpg"></p>
 
 
 

@@ -484,7 +484,7 @@ FreeImage_ConvertFromRawBits(pBits, imgW, imgH, PitchStride, BPP, redMASK, green
    Return r
 }
 
-FreeImage_ConvertToStandardType(hImage, bScaleLinear=True) {
+FreeImage_ConvertToStandardType(hImage, bScaleLinear:=1) {
    Return DllCall(getFIMfunc("ConvertToStandardType"), "Uptr", hImage, "int", bScaleLinear, "uptr")
 }
 

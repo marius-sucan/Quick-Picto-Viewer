@@ -18,7 +18,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , hCursFinger := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32649, "Ptr")
      , SlideHowMode := 1, lastWinDrag := 1, TouchScreenMode := 0, allowNextSlide := 1
      , isTitleBarHidden := 0, imageLoading := 0, hPicOnGui1, hotkeysSuspended := 0
-     , slideShowDelay := 9000, scriptStartZeit := A_TickCount, prevFullIMGload := 1
+     , slideShowDelay := 9000, scriptStartTime := A_TickCount, prevFullIMGload := 1
      , maxFilesIndex := 0, thumbsDisplaying := 0, executingCanceableOperation := 1
      , runningLongOperation := 0, alterFilesIndex := 0, animGIFplaying := 0, prevOpenedFile := 0
      , canCancelImageLoad := 0, hGDIinfosWin, hGDIselectWin, hasAdvancedSlide := 1
@@ -29,7 +29,8 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0
      , currentFilesListModified := 0, folderTreeWinOpen := 0, hStatusBaru, OSDFontName := "Arial"
      , OSDbgrColor := "001100", OSDtextColor := "FFeeFF", LargeUIfontValue := 14, allowMenuReader := 0
-     , lastMenuInvoked := []
+     , lastMenuInvoked := [], hQPVtoolbar := 0, ShowAdvToolbar := 0
+     , isToolbarActivated := 0
 
 Global allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, askDeleteFiles, mouseToolTipWinCreated := 0
 , AutoDownScaleIMGs, autoPlaySNDs, autoRemDeadEntry, ColorDepthDithering, countItemz, currentFileIndex, CurrentSLD, defMenuRefreshItm, doSlidesTransitions
@@ -520,7 +521,7 @@ addJournalEntry(msg) {
 }
 
 WM_LBUTTONDOWN(wP, lP, msg, hwnd) {
-    If (A_TickCount - scriptStartZeit<500)
+    If (A_TickCount - scriptStartTime<500)
        Return
 
     LbtnDwn := 1
@@ -537,7 +538,7 @@ WM_LBUTTONUP(wP, lP, msg, hwnd) {
 }
 
 WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
-    If (A_TickCount - scriptStartZeit<500)
+    If (A_TickCount - scriptStartTime<500)
        Return
 
     LbtnDwn := 0
@@ -560,7 +561,7 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
 }
 
 WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
-    If (A_TickCount - scriptStartZeit<500)
+    If (A_TickCount - scriptStartTime<500)
        Return
 
     LbtnDwn := 0
@@ -591,7 +592,7 @@ askAboutStoppingOperations() {
 WM_RBUTTONUP(wP, lP, msg, hwnd) {
   Static lastState := 0
   LbtnDwn := 0
-  If (A_TickCount - scriptStartZeit<500)
+  If (A_TickCount - scriptStartTime<500)
      Return
 
   If (slideShowRunning=1 || animGIFplaying=1)
@@ -683,6 +684,7 @@ theSlideShowCore(paramu:=0) {
   If (thisZeit < slideShowDelay//1.25) || (allowNextSlide!=1 && paramu!="force") ; || (allowGIFsPlayEntirely=1 && animGIFplaying=1)
      Return
 
+  mouseTurnOFFtooltip()
   prevFullIMGload := A_TickCount
   If (slideShowRunning=1 && slidesFXrandomize=1)
      MainExe.ahkPostFunction("VPimgFXrandomizer")
@@ -923,7 +925,20 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   Else If ((runningLongOperation=1 || imageLoading=1) && slideShowRunning!=1)
      changeMcursor("busy")
 
-  If (A_TickCount - scriptStartZeit < 900)
+;   If (OutputVarWin=hQPVtoolbar && isToolbarActivated=0)
+;   {
+;      isToolbarActivated := 1
+;      ; WinSet, ExStyle, -0x20, ahk_id %hQPVtoolbar%
+;      WinSet, Enable,, ahk_id %hQPVtoolbar%
+;   } Else If (isToolbarActivated=0)
+;   {
+;      isToolbarActivated := 0
+;      ; WinSet, ExStyle, +0x20, ahk_id %hQPVtoolbar%
+;      WinSet, Disable,, ahk_id %hQPVtoolbar%
+;    }
+; ToolTip, % "l=" isToolbarActivated , , , 2
+
+  If (A_TickCount - scriptStartTime < 900)
      Return
 
   thisPos := mX "-" mY
@@ -937,8 +952,6 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
         MainExe.ahkPostFunction("MouseMoveResponder")
      prevPos := mX "-" mY
   }
-
-  ; Else 
 
   ; A := WinActive("A")
   ; okay := (A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin) ? 1 : 0
@@ -1009,6 +1022,13 @@ activateMainWin() {
    If (toolTipGuiCreated=1)
       MainExe.ahkPostFunction("TooltipCreator", 1, 1)
 */
+  ; SetTimer, dummyCheckActiveWin, -20
+}
+
+dummyCheckActiveWin() {
+  hwndu := WinExist("A")
+  If (hwndu=hQPVtoolbar && ShowAdvToolbar=1)
+     WinActivate, ahk_id %PVhwnd%
 }
 
 GuiSize(GuiHwnd, EventInfo, Width, Height) {
@@ -1330,7 +1350,7 @@ BuildFakeMenuBar(modus:=0) {
       kMenu("REDO", "ImgRedoAction")
       kMenu("-", "-")
       If (AnyWindowOpen=10)
-         kMenu("SELECT", "tlbrToggleImgSelection")
+         kMenu("SELECT", "ToggleEditImgSelection")
       ; Else
       ;    kMenu("SELECT ALL", "MenuSelectAllAction")
       kMenu("SQUARE", "makeSquareSelection")
@@ -1702,7 +1722,7 @@ ToggleHistoInfoBoxu() {
   MainExe.ahkPostFunction(A_ThisFunc)
 }
 
-tlbrToggleImgSelection() {
+ToggleEditImgSelection() {
   If !determineMenuBTNsOKAY()
      Return
   MainExe.ahkPostFunction(A_ThisFunc)
@@ -3814,8 +3834,11 @@ mouseCreateOSDinfoLine(msg:=0, largus:=0) {
     lastInvoked := A_TickCount
     Gui, mouseToolTipGuia: Destroy
     thisFntSize := (largus=1) ? Round(LargeUIfontValue*1.55) : LargeUIfontValue
-    If (thisFntSize<12)
-       thisFntSize := 12
+    If (thisFntSize<5)
+       thisFntSize := 5
+    If (largus>5)
+       thisFntSize := largus
+
     bgrColor := OSDbgrColor
     txtColor := OSDtextColor
     isBold := (FontBolded=1) ? " Bold" : ""
