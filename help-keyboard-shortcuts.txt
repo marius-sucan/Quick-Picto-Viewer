@@ -259,10 +259,14 @@ T|Toggle airbrush mode|Painting mode|-
 R|Activate erase brush|Painting mode|-
 Q|Activate effects brush|Painting mode|-
 J|Activate cloner brush and toggle dynamic coordinates modes for the cloner|Painting mode|-
-D|Define cloner brush source|Painting mode|-
+D|Define cloner brush source [when cloner active]|Painting mode|-
+D|Set primary and secondary colors to black and white|Painting mode|-
 X|Toggle between color A and color B|Live editing|-
 Ctrl + Left-Click|Paint with the other color|Painting mode|-
 S|Toggle between diameter and radius based brush size|Painting mode|-
-C|Pick brush color|Live editing|-
-K|Toggle between draw inside, outside or ignore selection area|Painting mode|-
-Y|Toggle between bulge and pinch brushes|Painting mode|-
+C|Pick primary brush color|Live editing|-
+K|Cycle between draw inside, outside or ignore selection area|Painting mode|-
+P|Toggle between bulge and pinch brushes|Painting mode|-
+Shift + Y|Define symmetry painting coordinates|Painting mode|-
+Y|Cycle symmetry painting modes|Painting mode|-
+Y|Cycle shape symmetry modes|Freeform drawing|-

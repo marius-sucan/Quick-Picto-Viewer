@@ -2,6 +2,13 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.2.7 (2021-08-27)
+  - [new] option to paint using symmetry along X or Y, or both axis [available only for solid color, soft edges and cloner brush types]
+  - [new] option to draw freeform shapes using symmetry on X or Y axis
+  - [new] option to alter GIFs playback speed with alt + comma / dot
+  - [important] fixed brushes not applying brush texture properly [cloner, eraser, effects, smudge and so on]
+  - other bug fixes
+
 - v5.2.5 (2021-08-15)
   - [new] proper toolbar; 
     - left and right click actions for the icons; it also allows to click and drag to adjust values associated with the icon actions;

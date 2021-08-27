@@ -767,6 +767,7 @@ JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
 }
 
 WinClickAction(param:=0) {
+
     MouseGetPos, , , OutputVarWin
     GetMouseCoord2wind(PVhwnd, mX, mY, mXo, mYo)
     canCancelImageLoad := 4
@@ -781,6 +782,8 @@ WinClickAction(param:=0) {
          If isDotInRect(mX, mY, xu, xu + wu, yu, yu + hu)
             Break
     }
+    If (mouseToolTipWinCreated=1)
+       mouseTurnOFFtooltip()
     ; ToolTip, % mX "=" mY "=" param "==" ctrlName "--" A_GuiControl "--" A_GuiControlEvent , , , 2
     If (slideShowRunning=1)
        turnOffSlideshow()
@@ -925,19 +928,6 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   Else If ((runningLongOperation=1 || imageLoading=1) && slideShowRunning!=1)
      changeMcursor("busy")
 
-;   If (OutputVarWin=hQPVtoolbar && isToolbarActivated=0)
-;   {
-;      isToolbarActivated := 1
-;      ; WinSet, ExStyle, -0x20, ahk_id %hQPVtoolbar%
-;      WinSet, Enable,, ahk_id %hQPVtoolbar%
-;   } Else If (isToolbarActivated=0)
-;   {
-;      isToolbarActivated := 0
-;      ; WinSet, ExStyle, +0x20, ahk_id %hQPVtoolbar%
-;      WinSet, Disable,, ahk_id %hQPVtoolbar%
-;    }
-; ToolTip, % "l=" isToolbarActivated , , , 2
-
   If (A_TickCount - scriptStartTime < 900)
      Return
 
@@ -1002,6 +992,9 @@ activateMainWin() {
    Static lastInvoked := 1
    LbtnDwn := 0
    UnlockKeys()
+   If (mouseToolTipWinCreated=1)
+      mouseTurnOFFtooltip()
+
    If (A_TickCount - lastInvoked > 530)
       GuiControl, 1:, editDummy, -
 
@@ -3817,7 +3810,7 @@ AccGetStateText(nState) {
 }
 
 mouseTurnOFFtooltip() {
-   Sleep, 100
+   Sleep, 40
    Gui, mouseToolTipGuia: Destroy
    Global mouseToolTipWinCreated := 0
 }

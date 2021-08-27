@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.2.5
+;@Ahk2Exe-SetVersion 5.2.7
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2021)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -84,7 +84,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , hPicOnGui1 := "", scriptStartTime := A_TickCount, lastEditRHChange :=1, doubleBlurPreviewArea := 0
    , newStaticFoldersListCache := [], lastEditRWChange := 1, QPVjournal := [], pPen7 := "", hQPVtoolbar
    , mainCompiledExe := "", mainCompiledPath := "", wasInitFIMlib := 0, hGDIselectWin, allowNextSlide := 1
-   , filteredMap2mainList := [], thumbsCacheFolder := A_ScriptDir "\thumbs-cache", hSNDsong
+   , filteredMap2mainList := [], thumbsCacheFolder := A_ScriptDir "\thumbs-cache", hSNDsong, lastZeitOpenWin := 1
    , resultedFilesList := [], currentFileIndex := "", maxFilesIndex := 0, gdiBitmapIDentire := 0
    , appTitle := "Quick Picto Viewer", FirstRun := 1, hSNDmediaFile := "", mouseToolTipWinCreated := 0
    , bckpResultedFilesList := [], bckpMaxFilesIndex := 0, DynamicFoldersList := "", lastPointerUseZeit := 1
@@ -170,9 +170,11 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , mustCaptureCloneBrush := 0, hCropCornersPic2, globalWinStates := [], userAlphaMaskBmpPainted := "", lastPaintEventID := 1
    , prevImgEditZeit := 1, hudBTNfuncu, hudBTNtypeFuncu, hudBTNheightFuncu, hudBTNwidthFuncu, TouchToolbarGUIcreated := 0
    , tlbrIconzList := [], ToolBarBtnWidth := 45, UserToolbarY := 60, UserToolbarX := 200, currentKbdBTNtlbr := 1
-   , ToolbarWinW := 0, ToolbarWinH := 0, isToolbarKBDnav := 0
+   , ToolbarWinW := 0, ToolbarWinH := 0, isToolbarKBDnav := 0, lastZeitIMGsaved := [], lastZeitUndoRecorded := 0
+   , vpSymmetryPointX := 0, vpSymmetryPointY := 0, CustomShapeSymmetry := 0, CustomShapeLockedSymmetry := 0
+   , vpSymmetryPointXdp := 0, vpSymmetryPointYdp := 0
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.2.5", vReleaseDate := "15/08/2021"
+   , appVersion := "5.2.7", vReleaseDate := "27/08/2021"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1, usrAutoCropGenerateSelection := 0
@@ -265,8 +267,10 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , BrushToolRandomAspectRatio := 0, BrushToolRandomAngle := 0, BrushToolRandomPosX := 0, BrushToolRandomPosY := 0
    , BrushToolRandomHue := 0, BrushToolRandomSat := 0, BrushToolRandomLight := 0, BrushToolRandomDark := 0 
    , BrushToolTexture := 1, BrushToolAutoAngle := 1, ShowAdvToolbar := 1, ToolbarOpacity := 255
+   , BrushToolSymmetryX := 0, BrushToolSymmetryY := 0, BrushToolSymmetryPointX := 0.5, BrushToolSymmetryPointY := 0.5
    , BrushToolApplyColorFX := 0, PasteInPlaceBlendMode := 1, PasteInPlaceGlassy := 1, ToolbarScaleFactor := 1
    , ToolbarBgrColor := "212121", TLBRverticalAlign := 1, TLBRtwoColumns := 1, FillAreaApplyColorFX := 0
+   , UserGIFsDelayu := 30
 
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
@@ -537,7 +541,9 @@ HKifs(q:=0) {
     Return
 
     vk50::    ; P
-       If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+       If (liveDrawingBrushTool=1 && isImgEditingNow()=1 && AnyWindowOpen=64)
+          toggleBrushDeformers()
+       Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
           PanelBrushTool()
     Return
 
@@ -651,7 +657,7 @@ HKifs(q:=0) {
     Return
 
     ~vk44 Up::   ; D
-      If (liveDrawingBrushTool=1)
+      If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
          BtnSetClonerBrushSource()
       Else If (HKifs("liveEdit") && AnyWindowOpen!=10)
          toggleLiveEditObject()
@@ -793,8 +799,13 @@ HKifs(q:=0) {
     Return
 
     vk59::   ; Y
-      If (liveDrawingBrushTool=1)
-         toggleBrushDeformers()
+      If ((liveDrawingBrushTool=1 || drawingShapeNow=1) && isImgEditingNow()=1)
+         toggleBrushSymmetryModes()
+    Return
+
+    +vk59::   ; Shift+Y
+      If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
+         BtnSetSymmetryCoords()
     Return
 
     ~vk49::   ; I
@@ -950,7 +961,7 @@ HKifs(q:=0) {
     Return
 
     ~!vk52 Up::     ; Alt+R
-      If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+      If (HKifs("imgEditSolo") || HKifs("imgsLoaded")) && (!AnyWindowOpen)
          ResizeIMGviewportSelection()
     Return
 
@@ -1369,7 +1380,7 @@ HKifs(q:=0) {
     +Enter::
       If HKifs("liveEdit")
          applyIMGeditKeepWin()
-      Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+      Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded")) && (!AnyWindowOpen)
          CropImageInViewPortToSelection()
     Return
 
@@ -1520,6 +1531,11 @@ HKifs(q:=0) {
          jumpPreviousImage()
     Return
 
+    !vkBE::    ; alt + ,
+      If (HKifs("imgsLoaded") && animGIFsSupport=1)
+         changeGIFsDelayu(1)
+    Return
+
     +vkBE::    ; Shift + ,
       If (liveDrawingBrushTool=1)
          changeBrushWetness(1)
@@ -1539,6 +1555,11 @@ HKifs(q:=0) {
          changeBrushOpacity(1, 0)
       Else If HKifs("imgsLoaded")
          DecreaseSlideSpeed()
+    Return
+
+    !vkBC::   ; alt + .
+      If (HKifs("imgsLoaded") && animGIFsSupport=1)
+         changeGIFsDelayu(-1)
     Return
 
     +vkBC::   ; Shift + .
@@ -2170,7 +2191,8 @@ mainWinTabResponse() {
          markThisFileNow()
       lastInvoked := A_TickCount
    }
- }
+}
+
 GenerateRandyList() {
    interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
    startZeit := A_TickCount
@@ -2641,7 +2663,7 @@ CopyImagePath(dummy:=0) {
   friendly := (folderPathsOnly=1) ? "folder" : "file"
   showTOOLtip("Copying " friendly " path(s) to clipboard")
   getSelectedFiles(0, 1)
-  If (markedSelectFile>1)
+  If (markedSelectFile>1 && maxFilesIndex>1)
   {
      Loop, % maxFilesIndex
      {
@@ -2675,6 +2697,9 @@ CopyImagePath(dummy:=0) {
   }
 
   imgPath := getIDimage(currentFileIndex)
+  If !imgPath
+     Return
+
   zPlitPath(imgPath, 0, fileNamu, folderu)
   imgPath := StrReplace(imgPath, "||")
   If (folderPathsOnly=1)
@@ -4132,6 +4157,51 @@ doLayeredWinUpdate(funcu, hwnd, HDCu, opacity:=255) {
   Return UpdateLayeredWindow(hwnd, HDCu, xPos, yPos, mainWidth, mainHeight, opacity)
 }
 
+
+BtnSetSymmetryCoords() {
+   If (AnyWindowOpen!=64 || !isImgEditingNow() || BrushToolType>3)
+      Return
+
+   BrushToolSymmetryX .= "c"
+   liveDrawingBrushTool := 1
+   showTOOLtip("Please click inside the image area to set the symmetry axis")
+   ; SetTimer, RemoveTooltip, % -msgDisplayTime//2
+   mustCaptureCloneBrush := 1
+   If (panelWinCollapsed=0)
+      toggleImgEditPanelWindow()
+   dummyTimerDelayiedImageDisplay(50)
+}
+
+setNewSymmetryPoints() {
+   whichBitmap := useGdiBitmap()
+   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   Gdip_GetImageDimensions(whichBitmap, imgW, imgH)
+   thisZeit := kX := kY := 0
+   BrushToolSymmetryX := SubStr(BrushToolSymmetryX, 1, 1)
+   While, (determineLClickstate()=1)
+   {
+      GetMouseCoord2wind(PVhwnd, mX, mY)
+      mX := (FlipImgH=1) ? mainWidth - mX : mX
+      mY := (FlipImgV=1) ? mainHeight - mY : mY
+      MouseCoords2Image(mX, mY, 1, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kY)
+      ; tinyPrevAreaCoordX := kX, tinyPrevAreaCoordY := kY
+      showTOOLtip("Symmetry point coordinates set to`n" kX " / " kY)
+      BrushToolSymmetryPointX := Round(kX/imgW, 5)
+      BrushToolSymmetryPointY := Round(kY/imgH, 5)
+      If (A_TickCount - thisZeit>90)
+      {
+         dummyRefreshImgSelectionWindow()
+         thisZeit := A_TickCount
+      }
+   }
+   mustCaptureCloneBrush := 0
+   If (panelWinCollapsed=1)
+      toggleImgEditPanelWindow()
+   SoundBeep , 900, 100
+   dummyTimerDelayiedImageDisplay(50)
+   SetTimer, RemoveTooltip, % -msgDisplayTime//2
+}
+
 MouseDelta(X1,Y1,X2,Y2) {
    ; from Bugz000
    return round((dllcall("msvcrt\atan2", "Double", (y2 - y1), "Double", (x2-x1), "CDECL Double") * (180/3.14159265358979323846264338327950288419716939937)),3)
@@ -4623,11 +4693,11 @@ addNewCustomShapePoints(mX, mY, mainWidth, mainHeight, mainParam, ctrlState) {
    Static lastInvoked := A_TickCount
    ; If (A_tickcount - lastInvoked<50)
    ;    Return
+   If !IsObject(customShapePoints)
+      customShapePoints := []
 
-   ogmX := (FlipImgH=1) ? mainWidth - mX : mX
-   ogmY := (FlipImgV=1) ? mainHeight - mY : mY
-   gmX := ogmX ; + (initialDrawingStartCoords[1] - prevDestPosX)
-   gmY := ogmY ; + (initialDrawingStartCoords[2] - prevDestPosY)
+   gmX := (FlipImgH=1) ? mainWidth - mX : mX
+   gmY := (FlipImgV=1) ? mainHeight - mY : mY
    dontAddPoint := dotRemoved := 0
    Loop, % customShapePoints.Count()
    {
@@ -4635,7 +4705,7 @@ addNewCustomShapePoints(mX, mY, mainWidth, mainHeight, mainParam, ctrlState) {
        c := customShapePoints[A_Index]
        xu := c[1] - (initialDrawingStartCoords[A_Index, 1] - prevDestPosX)
        yu := c[2] - (initialDrawingStartCoords[A_Index, 2] - prevDestPosY)
-       If isDotInRect(ogmX, ogmY, xu - SelDotsSize//2, xu + SelDotsSize, yu - SelDotsSize//2, yu + SelDotsSize)
+       If isDotInRect(gmX, gmY, xu - SelDotsSize//2, xu + SelDotsSize, yu - SelDotsSize//2, yu + SelDotsSize)
        {
           dontAddPoint := 1
           If (mainParam="DoubleClick")
@@ -4689,6 +4759,30 @@ addNewCustomShapePoints(mX, mY, mainWidth, mainHeight, mainParam, ctrlState) {
       }
 
       mustSnapLiveDrawPoints := 0
+      If (CustomShapeSymmetry=1 && vpSymmetryPointX)
+      {
+          vpSymX := Round(vpSymmetryPointX) - (vpSymmetryPointXdp - prevDestPosX)
+          gmXa := vpSymX - (gmX - vpSymX)
+          If (gmX<vpSymX)
+          {
+             gmc := gmX,  gmd := gmXa
+             gmXa := gmX, gmX := gmd
+          }
+          customShapePoints.InsertAt(1, [gmXa, gmY])
+          initialDrawingStartCoords.InsertAt(1, [prevDestPosX, prevDestPosY])
+      } Else If (CustomShapeSymmetry=2 && vpSymmetryPointY)
+      {
+          vpSymY := Round(vpSymmetryPointY) - (vpSymmetryPointYdp - prevDestPosY)
+          gmYa := vpSymY - (gmY - vpSymY)
+          If (gmY<vpSymY)
+          {
+             gmc := gmY,  gmd := gmYa
+             gmYa := gmY, gmY := gmd
+          }
+          customShapePoints.InsertAt(1, [gmX, gmYa])
+          initialDrawingStartCoords.InsertAt(1, [prevDestPosX, prevDestPosY])
+      }
+
       customShapePoints.Push([gmX, gmY])
       thisIndex := customShapePoints.MaxIndex()
       initialDrawingStartCoords[thisIndex] := [prevDestPosX, prevDestPosY]
@@ -4825,8 +4919,14 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0, OutputVarWin:=0, mX:=0, mY:=0, 
       Return
    } Else If (AnyWindowOpen=64 && liveDrawingBrushTool=1`&& mustCaptureCloneBrush=1)
    {
-      tinyPrevAreaCoordX := tinyPrevAreaCoordY := "C"
-      createClonedBrushBitmap(mX, mY, 0, 0, 0)
+      If StrLen(BrushToolSymmetryX)>1
+      {
+         setNewSymmetryPoints()
+      } Else
+      {
+         tinyPrevAreaCoordX := tinyPrevAreaCoordY := "C"
+         createClonedBrushBitmap(mX, mY, 0, 0, 0)
+      }
       Return
    } Else If (AnyWindowOpen=23 && FillAreaColorMode=6`&& mustCaptureCloneBrush=1)
    {
@@ -5429,7 +5529,11 @@ ToggleImageSizingMode(dummy:=0) {
        Return
 
     If (drawingShapeNow=1)
+    {
+       If (CustomShapeSymmetry || CustomShapeLockedSymmetry) && (vpSymmetryPointX || vpSymmetryPointY)
+          MouseCoords2Image(vpSymmetryPointX, vpSymmetryPointY, 0, vpSymmetryPointXdp, vpSymmetryPointYdp, prevResizedVPimgW, prevResizedVPimgH, newVPx, newVPy, 0, 0)
        customShapePoints := convertCustomShape2relativeCoords(customShapePoints)
+    }
 
     lastInvoked := A_TickCount
     resetSlideshowTimer(0)
@@ -5470,6 +5574,12 @@ ToggleImageSizingMode(dummy:=0) {
     If (drawingShapeNow=1)
     {
        adaptCustomShapeNewZoomLevel(0)
+       If (newVPx!="" && newVPy!="")
+       {
+          ImageCoords2Window(newVPx, newVPy, prevDestPosX, prevDestPosY, 0, vpSymmetryPointX, vpSymmetryPointY, 0)
+          vpSymmetryPointXdp := prevDestPosX
+          vpSymmetryPointYdp := prevDestPosY
+       }
        Return
     }
 
@@ -5952,8 +6062,16 @@ ToggleIMGalign() {
    INIaction(1, "imageAligned", "General")
    If (drawingShapeNow=1)
    {
+      If (CustomShapeSymmetry || CustomShapeLockedSymmetry) && (vpSymmetryPointX || vpSymmetryPointY)
+         MouseCoords2Image(vpSymmetryPointX, vpSymmetryPointY, 0, vpSymmetryPointXdp, vpSymmetryPointYdp, prevResizedVPimgW, prevResizedVPimgH, newVPx, newVPy, 0, 0)
       customShapePoints := convertCustomShape2relativeCoords(customShapePoints)
       adaptCustomShapeNewZoomLevel(zoomLevel)
+      If (newVPx!="" && newVPy!="")
+      {
+         ImageCoords2Window(newVPx, newVPy, prevDestPosX, prevDestPosY, 0, vpSymmetryPointX, vpSymmetryPointY, 0)
+         vpSymmetryPointXdp := prevDestPosX
+         vpSymmetryPointYdp := prevDestPosY
+      }
       Return
    }
 
@@ -6298,7 +6416,11 @@ ChangeZoom(dir, key:=0, stepFactor:=1) {
    }
 
    If (drawingShapeNow=1)
+   {
+      If (CustomShapeSymmetry || CustomShapeLockedSymmetry) && (vpSymmetryPointX || vpSymmetryPointY)
+         MouseCoords2Image(vpSymmetryPointX, vpSymmetryPointY, 0, vpSymmetryPointXdp, vpSymmetryPointYdp, prevResizedVPimgW, prevResizedVPimgH, newVPx, newVPy, 0, 0)
       customShapePoints := convertCustomShape2relativeCoords(customShapePoints)
+   }
 
    oldZoomLevel := zoomLevel
    If (zoomLevel<=0.1 && dir!=1)
@@ -6390,6 +6512,13 @@ ChangeZoom(dir, key:=0, stepFactor:=1) {
    {
       newValues := "a"
       adaptCustomShapeNewZoomLevel(zoomLevel)
+      If (newVPx!="" && newVPy!="")
+      {
+         ImageCoords2Window(newVPx, newVPy, prevDestPosX, prevDestPosY, 0, vpSymmetryPointX, vpSymmetryPointY, 0)
+         vpSymmetryPointXdp := prevDestPosX
+         vpSymmetryPointYdp := prevDestPosY
+      }
+      ; ToolTip, % customShapePoints.Count() "=l=" drawingLiveMode , , , 2
       Return
    }
 
@@ -6417,10 +6546,14 @@ adaptCustomShapeNewZoomLevel(thisZL) {
    resumeCustomShapeSelection(thisZL)
    vPselRotation := 0
    initialDrawingStartCoords := []
+   If !IsObject(customShapePoints)
+      customShapePoints := []
    ;  ToolTip, % prevDestPosX "===" prevDestPosY "===" zoomLevel , , , 2
    lastZeitFileSelect := A_TickCount
    Loop, % customShapePoints.Count()
          initialDrawingStartCoords[A_Index] := [prevDestPosX, prevDestPosY]
+
+   decideCustomShapeStyle()
    SetTimer, dummyRefreshImgSelectionWindow, -150
 }
 
@@ -6641,6 +6774,30 @@ ChangeVolume(dir) {
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
+changeGIFsDelayu(dir) {
+   Static lastInvoked := 1
+   If (A_TickCount - lastInvoked < 50)
+      Return
+
+   lastInvoked := A_TickCount
+   If (thumbsDisplaying=1 || !isImgEditingNow() || animGIFsSupport!=1)
+      Return
+
+   resetSlideshowTimer(0, 1)
+   value2Adjust := UserGIFsDelayu
+   If (dir=1)
+      value2Adjust += 15
+   Else
+      value2Adjust -= 15
+
+   value2Adjust := clampInRange(value2Adjust, -300, 300, 1)
+   UserGIFsDelayu := value2Adjust
+   setGIFframesDelay()
+   ; INIaction(1, "UserGIFsDelayu", "General")
+   showTOOLtip("GIFs playback delay: " value2Adjust " ms", A_ThisFunc, 2, (value2Adjust+300)/600)
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
 MenuChangeImgRotationInVP() {
    changeImgRotationInVP(1, 45)
 }
@@ -6779,6 +6936,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
       }
       Return
    }
+
    If (alwaysOpenwithFIM=1)
       Return
 
@@ -6821,8 +6979,8 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
    If (allowGIFsPlayEntirely=1 && GIFframesPlayied>totalFramesIndex-1) || (totalFramesIndex<3) || (allowGIFsPlayEntirely!=1)
       allowNextSlide := 1
    ; ToolTip, % allowGIFsPlayEntirely "--" allowNextSlide , , , 2
-   desiredFrameIndex := clampInRange(desiredFrameIndex, 0, totalFramesIndex, 1)
    prevAnimGIFwas := ""
+   desiredFrameIndex := clampInRange(desiredFrameIndex, 0, totalFramesIndex, 1)
    totalZeit := A_TickCount - startZeitIMGload
    thisFrameDelay := (totalZeit>25 && totalFramesIndex>20) ? GIFspeedDelay//2 : GIFspeedDelay
    If (totalZeit>70 && totalFramesIndex>15) || (totalZeit>25 && totalFramesIndex>180)
@@ -6831,6 +6989,9 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
       thisFrameDelay := 11
    If (totalZeit>100 && totalFramesIndex>95)
       thisFrameDelay := 1
+
+   If (thumbsDisplaying=1 || liveDrawingBrushTool=1 || drawingShapeNow=1)
+      allowNextSlide := 0
 
    If (slideShowRunning=1 && (A_TickCount - lastInvoked>slideShowDelay + 1) && allowNextSlide=1)
    {
@@ -9430,6 +9591,7 @@ recordUndoLevelNow(actionu, recordedBitmap, dX:=0, dY:=0, forceAlpha:="x") {
 }
 
 terminateIMGediting() {
+   lastZeitIMGsaved := []
    If (StrLen(UserMemBMP)<3 && undoLevelsRecorded>0 && currentFileIndex!=imgIndexEditing && minimizeMemUsage=1)
    {
       UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
@@ -9479,10 +9641,14 @@ terminateIMGediting() {
    maxUndoLevels := (A_PtrSize=8) ? 100 : 2
 }
 
+isNowAlphaPainting() {
+  isAlphaPainting := (AnyWindowOpen=24 || AnyWindowOpen=31) && (liveDrawingBrushTool=1 && isImgEditingNow()=1) ? 1 : 0
+  Return isAlphaPainting
+}
+
 ImgUndoAction(dummy:=0) {
    Critical, on
-   isAlphaPainting := (AnyWindowOpen=24 || AnyWindowOpen=31) && (liveDrawingBrushTool=1) ? 1 : 0
-   If (StrLen(UserMemBMP)<3 || thumbsDisplaying=1 || isAlphaPainting=1)
+   If (StrLen(UserMemBMP)<3 || thumbsDisplaying=1 || isNowAlphaPainting()=1)
       Return
 
    If (StrLen(undoLevelsArray[currentUndoLevel - 1, 1])<3) || (imageLoading=1)
@@ -9574,8 +9740,7 @@ restorePreviousSelections(thisLevel) {
 
 ImgRedoAction(dummy:=0) {
    Critical, on
-   isAlphaPainting := (AnyWindowOpen=24 || AnyWindowOpen=31) && (liveDrawingBrushTool=1) ? 1 : 0
-   If (StrLen(UserMemBMP)<3 || thumbsDisplaying=1 || isAlphaPainting=1)
+   If (StrLen(UserMemBMP)<3 || thumbsDisplaying=1 || isNowAlphaPainting()=1)
       Return
 
    If (StrLen(undoLevelsArray[currentUndoLevel + 1, 1])<3) || (imageLoading=1)
@@ -13342,6 +13507,10 @@ tempGuiBtnCall5() {
     coretempGuiBtnCalls(5)
 }
 
+tempGuiBtnCall6() {
+    coretempGuiBtnCalls(6)
+}
+
 coretempGuiBtnCalls(indexu) {
     Static listu := ",reduceCustomShapelength,togglePathCurveTension,toggleOpenClosedLineCustomShape,ToggleCardinalCurveMode,"
     thisFunc := tempBtnGuiBtnArray[indexu]
@@ -13458,6 +13627,7 @@ adjustWin2MonLimits(winHwnd, winX, winY, ByRef rX, ByRef rY, ByRef Wid, ByRef He
 }
 
 createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1) {
+    lastZeitOpenWin := A_TickCount
     thisBtnHeight := (PrefsLargeFonts=1) ? 34 : 24
     If (slideShowRunning=1)
        ToggleSlideShowu()
@@ -13517,6 +13687,7 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1) {
     If (ShowAdvToolbar=1)
        decideIconBTNmainTooler()
     addJournalEntry("Window opened: " thisCaller "() [ " AnyWindowOpen " ]")
+    lastZeitOpenWin := A_TickCount
     Return thisBtnHeight
 }
 
@@ -17449,8 +17620,16 @@ RecentFiltersManager(entry2add) {
 
 msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, checkBoxuCaption:="", checkState:=0, dropListu:="",edithu:="", edithuDef:="", listEditMode:=0, setWidth:=0, 2ndDropListu:=0, 2ndlistEditMode:=0) {
     Static msgBoxed := 0
+    If (mouseToolTipWinCreated=1)
+    {
+       mouseTurnOFFtooltip()
+    }
+
     If (msgBoxed=1 && MsgBox2hwnd)
        Return
+
+    If (ShowAdvToolbar=1)
+       interfaceThread.ahkFunction("mouseTurnOFFtooltip")
 
     msgBoxed := 1
     SetTimer, dummyUnSuspendu, Delete
@@ -17844,7 +18023,10 @@ updateMainUnfilteredList(indexu, indexProperty, value) {
    }
 
    If StrLen(filesFilter)>1
+   {
+      currentFilesListModified := 1
       bckpResultedFilesList[filteredMap2mainList[indexu], indexProperty] := value
+   }
 }
 
 singleInListEntriesRemover() {
@@ -22475,7 +22657,7 @@ PanelMultiFileDelete() {
 
     filesElected := getSelectedFiles(0, 1)
     thisBtnHeight := createSettingsGUI(16, A_ThisFunc, 0)
-    btnWid := 120
+    btnWid := 130
     txtWid := 290
     If (PrefsLargeFonts=1)
     {
@@ -22844,6 +23026,7 @@ DeletePicture(dummy:=0) {
 
      resultedFilesList[currentFileIndex, 1] := "||" file2rem
      updateMainUnfilteredList(currentFileIndex, 1, "||" file2rem)
+     currentFilesListModified := 1
      If (msgResult.check=1) || (shiftState=1)
         showTOOLtip("File permanently deleted`n" OutFileName "`n" OutDir "\")
      Else
@@ -24423,8 +24606,9 @@ PanelSaveSlideShowu() {
        infoThisSLD .= "`nFiles list has been modified. The changes are unsaved."
 
     btnWid2 := (PrefsLargeFonts=1) ? 90 : 60
+    btnWid3 := InStr(CurrentSLD, "\QPV\favourite-images-list.SLD") ? 2 : btnWid
     Gui, Add, Text, xs y+20 w%EditWid%, % infoThisSLD
-    Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w%btnWid% gBTNopenPanelDynamicFolderzWindow, &Manage folders
+    Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w%btnWid3% gBTNopenPanelDynamicFolderzWindow, &Manage folders
     If (SLDtypeLoaded>1 && FileRexists(CurrentSLD)) || InStr(CurrentSLD, "\QPV\favourite-images-list.SLD")
     {
        thisDefault := ""
@@ -24558,6 +24742,10 @@ PanelSaveImg() {
        Else
           fileStatus .= "`n`nThe image has not been modified."
     }
+    oldTimes := lastZeitIMGsaved[1]
+    FormatTime, timea, % oldTimes , HH:mm
+    If oldTimes
+       InfosPreviousSave := "Last time saved: " timea "`n" PathCompact(lastZeitIMGsaved[5] "\" lastZeitIMGsaved[4], 47) "`nUndo levels state: " lastZeitIMGsaved[2] "/" lastZeitIMGsaved[3]
 
 
     ; Gui, Add, Checkbox, Checked%UserCropOnSave% vUserCropOnSave, C&rop image to selected area on save
@@ -24570,6 +24758,11 @@ PanelSaveImg() {
     Gui, Add, Text, xs+15 y+7, This applies only for JPG, JP2, J2K, JXR and WEBP files.
     Gui, Add, Text, xs y+10, Image file status:
     Gui, Add, Text, xp+15 y+7 w%txtWid% +wrap, % fileStatus
+    If oldTimes
+    {
+       Gui, Add, Text, xs y+10, Previous file saved:
+       Gui, Add, Text, xp+15 y+7 w%txtWid% +wrap, % InfosPreviousSave
+    }
 
     If (editingSelectionNow!=1 || testSelectOutsideImgEntirely(useGdiBitmap()))
        GuiControl, Disable, UserCropOnSave
@@ -24608,7 +24801,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
     , infoBrushStepping, UIbtnBrushColorA, UIbtnBrushColorB, uiBtnSetCloner, infoPasteHue, infoPasteSat
     , infoPasteLight, infoPasteGamma, infoBrushRandomSize, infoBrushRandomSoftness, infoBrushRandomAspectRatio
     , infoBrushRandomAngle, infoBrushRandomPosX, infoBrushRandomPosY, infoBrushRandomHue, infoBrushRandomSat
-    , infoBrushRandomLight, infoBrushRandomDark
+    , infoBrushRandomLight, infoBrushRandomDark, infoSymmetryLabel, BTNuiSetLabelSymmetry
 
     ReadSettingsBrushPanel()
     initQPVmainDLL()
@@ -24702,6 +24895,10 @@ PanelBrushTool(dummy:=0, modus:=0) {
     Gui, Add, Text, xs y+10 w100 h100 +0x1000 +0xE +hwndhCropCornersPic2 gPanelsLivePreviewResponder, Brush preview
     Gui, +DPIScale
     Gui, Add, Checkbox, x+10 gupdateUIbrushTool Checked%BrushToolApplyColorFX% vBrushToolApplyColorFX, Apply color adjustments
+    Gui, Add, Text, y+10 vinfoSymmetryLabel, Symmetry on: 
+    Gui, Add, Checkbox, x+5 w60 gupdateUIbrushTool Checked%BrushToolSymmetryX% vBrushToolSymmetryX, X
+    Gui, Add, Checkbox, x+5 wp gupdateUIbrushTool Checked%BrushToolSymmetryY% vBrushToolSymmetryY, Y
+    Gui, Add, Button, x+5 wp gBtnSetSymmetryCoords vBTNuiSetLabelSymmetry, Set
 
     Gui, Tab, 3 ; randomize
 
@@ -24845,8 +25042,31 @@ pointsOnCircle(radius, angle, cx, cy) {
 }
 
 BtnSetClonerBrushSource() {
-   isAlphaPainting := (AnyWindowOpen=24 || AnyWindowOpen=31) && (liveDrawingBrushTool=1) ? 1 : 0
-   If (isAlphaPainting=1 || AnyWindowOpen!=64 || !isImgEditingNow())
+   Static lastInvoked := 1
+   If (A_TickCount - lastInvoked<450)
+      Return
+
+   If (isNowAlphaPainting()=1 || BrushToolType!=3 && AnyWindowOpen=64)
+   {
+      showTOOLtip("Colors set to black and white")
+      SetTimer, RemoveTooltip, % -msgDisplayTime//1.5
+      If (BrushToolAcolor="ffFFff" && BrushToolBcolor="000000")
+      || (BrushToolBcolor="ffFFff" && BrushToolAcolor="000000")
+         Return
+
+      BrushToolAcolor := "ffFFff"
+      BrushToolBcolor := "000000"
+      GuiControl, SettingsGUIA: +Background%BrushToolAcolor%, BrushToolAcolor
+      GuiControl, SettingsGUIA: +Background%BrushToolBcolor%, BrushToolBcolor
+      INIaction(1, "BrushToolAcolor", "General")
+      INIaction(1, "BrushToolBcolor", "General")
+      If (ShowAdvToolbar=1)
+         updateTlbrColorsSwatch()
+      lastInvoked := A_TickCount
+      Return
+   }
+
+   If (AnyWindowOpen!=64 || !isImgEditingNow())
       Return
 
    If (BrushToolType!=3)
@@ -24858,6 +25078,7 @@ BtnSetClonerBrushSource() {
    mustCaptureCloneBrush := 1
    If (panelWinCollapsed=0)
       toggleImgEditPanelWindow()
+   lastInvoked := A_TickCount
 }
 
 BtnSetTextureSource() {
@@ -24868,7 +25089,6 @@ BtnSetTextureSource() {
       SetTimer, updateUIfillPanel, -150
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
-
    }
 
    showTOOLtip("Please click inside the image area to set the texture source coordinates")
@@ -25120,8 +25340,28 @@ updateUIbrushTool() {
       GuiControl, SettingsGUIA: Enable, infoBrushAspectRatio
    }
 
+   If (BrushToolType=1 && BrushToolSymmetryX=1 && BrushToolSymmetryY=1)
+      GuiControl, SettingsGUIA: Disable, BrushToolOverDraw
+   Else If (BrushToolType=1)
+      GuiControl, SettingsGUIA: Enable, BrushToolOverDraw
+
+   If (BrushToolType<4)
+   {
+      GuiControl, SettingsGUIA: Enable, infoSymmetryLabel
+      GuiControl, SettingsGUIA: Enable, BTNuiSetLabelSymmetry
+      GuiControl, SettingsGUIA: Enable, BrushToolSymmetryX
+      GuiControl, SettingsGUIA: Enable, BrushToolSymmetryY
+   } Else
+   {
+      GuiControl, SettingsGUIA: Disable, infoSymmetryLabel
+      GuiControl, SettingsGUIA: Disable, BTNuiSetLabelSymmetry
+      GuiControl, SettingsGUIA: Disable, BrushToolSymmetryX
+      GuiControl, SettingsGUIA: Disable, BrushToolSymmetryY
+   }
+    
    createLivePreviewBrush()
    SetTimer, WriteSettingsBrushPanel, -300
+   SetTimer, dummyRefreshImgSelectionWindow, -400
 }
 
 BTNresetBrushAngle() {
@@ -25620,6 +25860,9 @@ TglUsePrevSaveFoderu() {
 }
 
 BTNsaveImgPanel() {
+   If (AnyWindowOpen!=35)
+      Return
+
    Gui, SettingsGUIA: Default
    GuiControlGet, usePrevSaveFolder
    ; GuiControlGet, UserCropOnSave
@@ -26379,11 +26622,21 @@ importEditGivenImageFile() {
    If !prevLoadedImageIndex
       Return
 
-   imgPath := getIDimage(currentFileIndex)
+   imgPath := StrReplace(getIDimage(currentFileIndex), "||")
+   If !FileExist(imgPath)
+   {
+      showTOOLtip("ERROR: The selected image cannot be imported`nFile does not exist or access denied.")
+      SoundBeep , 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
    currentFileIndex := prevLoadedImageIndex
    MenuReturnIMGedit()
    Sleep, 2
-   ToggleEditImgSelection("show-edit")
+   If !editingSelectionNow
+      ToggleEditImgSelection()
+   ; ToggleEditImgSelection("show-edit")
    Sleep, 2
    PanelPasteInPlace(imgPath)
 }
@@ -26563,6 +26816,9 @@ MainPanelTransformArea(dummy:="", toolu:="") {
     ResetImgLoadStatus()
     ReadSettingsPasteInPlace()
     ReadSettingsBrushPanel()
+    If !isNumber(PasteInPlaceCropAngular)
+       PasteInPlaceCropAngular := 0
+
     If isWinXP
        PasteInPlaceBlendMode := 1
 
@@ -27153,8 +27409,7 @@ StartPickingColor(a:=0, b:=0, c:=0) {
    If (a="isGiven")
       BrushToolWetness := clampInRange(BrushToolWetness, 0, 19)
 
-   isAlphaPainting := (AnyWindowOpen=24 || AnyWindowOpen=31) && (liveDrawingBrushTool=1) ? 1 : 0
-   If (isAlphaPainting=1)
+   If (isNowAlphaPainting()=1)
       h := convertColorToGrayscale(h)
 
    ; https://autohotkey.com/board/topic/43945-fast-pixelgetcolor-workaround-for-aero-windows-7-and-vista/
@@ -27456,17 +27711,15 @@ resumeCustomShapeSelection(thisZL) {
    {
       pPath := createImgSelPath(vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 1)
       PointsList := Gdip_GetPathPoints(pPath)
-      customShapePoints := convertShapePointsStrToArray(PointsList)
       Gdip_DeletePath(pPath)
-   } Else
-   {
-      PointsList := convertCustomShape2givenArea(customShapePoints, vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH)
-      customShapePoints := convertShapePointsStrToArray(PointsList)
-   }
+   } Else PointsList := convertCustomShape2givenArea(customShapePoints, vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH)
+
+   customShapePoints := convertShapePointsStrToArray(PointsList)
    ; ToolTip, % customShapePoints.Count() "===" PointsList , , , 2
 }
 
 startDrawingShape(modus, dummy:=0, forcePanel:=0) {
+     vpSymmetryPointX := vpSymmetryPointY := 0
      If (thumbsDisplaying=1 || StrLen(gdiBitmap)<3)
         Return
 
@@ -27515,12 +27768,12 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0) {
         oldCustomShapePoints := customShapePoints.Clone()
 
      interfaceThread.ahkassign("drawingShapeNow", 1)
+     CustomShapeSymmetry := CustomShapeLockedSymmetry := 0
      If (dummy="resume")
      {
         resumeCustomShapeSelection(zoomLevel)
      } Else 
      {
-        customShapePoints := ""
         customShapePoints := []
         ToggleEditImgSelection("show-edit")
      }
@@ -27564,6 +27817,7 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0) {
         LabelOpenLine := "selection area"
         LabelCurve := LabelType := ""
      }
+
      If (showMainMenuBar=1)
         TriggerMenuBarUpdate()
 
@@ -27583,6 +27837,12 @@ reduceCustomShapelength() {
    ; foundPos := InStr(customShapePoints, "|", 0, -1)
    ; customShapePoints := SubStr(customShapePoints, 1, foundPos)
    customShapePoints.Pop()
+   If CustomShapeSymmetry
+      customShapePoints.RemoveAt(1)
+
+   If (customShapePoints.Count()<3)
+      CustomShapeLockedSymmetry := vpSymmetryPointX := vpSymmetryPointY := 0
+
    If (drawingShapeNow=1)
       showQuickActionButtonsDrawingShape()
 
@@ -27613,8 +27873,9 @@ showQuickActionButtonsDrawingShape() {
         btnOpenLine := "||" LabelOpenLine ",,toggleOpenClosedLineCustomShape"
      }
 
-     LabelTension := "||Points tension " FillAreaCurveTension ",,togglePathCurveTension"
-     CreateGuiButton("Undo,,reduceCustomShapelength||Cancel,,cancelDrawingShape||Done,,stopDrawingShape" btnOpenLine LabelTension, "Forced", msgDisplayTime*10000)
+     LabelTension := "||Tension " FillAreaCurveTension ",,togglePathCurveTension"
+     CreateGuiButton("Undo,,reduceCustomShapelength||Cancel,,cancelDrawingShape||Done,,stopDrawingShape||Symmetry,,toggleBrushSymmetryModes" btnOpenLine LabelTension, "Forced", msgDisplayTime*10000)
+     SetTimer, DestroyTempBtnGui, Off
 }
 
 decideCustomShapeStyle() {
@@ -31082,8 +31343,7 @@ InvokeStandardDialogColorPicker(hC, event, c, err:=0) {
   ; ToolTip, % event , , , 2
   g := A_Gui, ctrl := A_GuiControl
   theColor := hexRGB(Dlg_Color(%ctrl%, hC))
-  isAlphaPainting := (AnyWindowOpen=24 || AnyWindowOpen=31) && (liveDrawingBrushTool=1) ? 1 : 0
-  If (isAlphaPainting=1)
+  If (isNowAlphaPainting()=1)
      theColor := convertColorToGrayscale(theColor)
 
   r := %ctrl% := theColor
@@ -31148,8 +31408,7 @@ getCustomColorsFromImage(whichBitmap) {
 
 createStandardColorzDialog(hwnd, coloru) {
   theColor := hexRGB(Dlg_Color(coloru, hwnd))
-  isAlphaPainting := (AnyWindowOpen=24 || AnyWindowOpen=31) && (liveDrawingBrushTool=1) ? 1 : 0
-  If (isAlphaPainting=1)
+  If (isNowAlphaPainting()=1)
      theColor := convertColorToGrayscale(theColor)
 
   Return theColor
@@ -31598,6 +31857,7 @@ SaveClipboardImage(dummy:=0, allowCropping:=0, noDialog:=0) {
       {
          showTOOLtip("Image file succesfully saved`n" OutFileName "`n" OutDir "\")
          testMem := getIDimage(currentFileIndex)
+         lastZeitIMGsaved := [A_Now, currentUndoLevel, undoLevelsRecorded, OutFileName, OutDir, currentFileIndex]
 
          If (currentFileIndex=0) || (InStr(testMem, "\temporary memory object\") && maxFilesIndex<2)
          {
@@ -36016,7 +36276,7 @@ BuildImgLiveEditMenu() {
 MenuCopyAction() {
    If (thumbsDisplaying=1)
       InvokeCopyFiles()
-   Else
+   Else If isImgEditingNow()
       CopyImage2clip()
 }
 
@@ -36189,9 +36449,16 @@ BuildMainMenu(dummy:=0) {
    {
       stopDrawingShape()
       Return
-   }
-
-   If (imgEditPanelOpened=1)
+   } Else If (mustCaptureCloneBrush=1)
+   {
+      mustCaptureCloneBrush := 0
+      showTOOLtip("Operation abandoned: define source point")
+      SoundBeep , 300, 100
+      If (panelWinCollapsed=1 && imgEditPanelOpened=1 && AnyWindowOpen)
+         toggleImgEditPanelWindow()
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   } Else If (imgEditPanelOpened=1)
    {
       deleteMenus()
       BuildImgLiveEditMenu()
@@ -38234,7 +38501,12 @@ ToggleLargeUIfonts() {
     INIaction(1, "PrefsLargeFonts", "General")
     interfaceThread.ahkassign("PrefsLargeFonts", PrefsLargeFonts)
     thisFunc := prevOpenedWindow[2]
-    If (AnyWindowOpen && thisfunc)
+    If (AnyWindowOpen=16)
+    {
+       BtnCloseWindow()
+       Sleep, 5
+       PanelMultiFileDelete()
+    } Else If (AnyWindowOpen && thisfunc)
     {
        BtnCloseWindow()
        Sleep, 5
@@ -39581,7 +39853,9 @@ recordSeenIMGdbEntry(imgPath, thisIndex, doCommits:=1) {
       seenImagesDB.EscapeStr(stringB)
       ; MsgBox, % stringA "--" stringB 
       SQLstr := "REPLACE INTO images (imgfile, imgViewDate) VALUES (" stringA ", " stringB ");"
-      seenImagesDB.Exec(SQLStr)
+      err := seenImagesDB.Exec(SQLStr)
+      ; If !err
+      ; addJournalEntry(seenImagesDB.ErrorMsg " == " seenImagesDB.ErrorCode)
    }
 
    If (invoked>14 && doCommits=1)
@@ -40537,6 +40811,8 @@ setGIFframesDelay() {
 
    If (totalFramesIndex<8)
       GIFspeedDelay := 85
+
+   GIFspeedDelay := GIFspeedDelay + UserGIFsDelayu
 }
 
 multiPageFileManaging(oBitmap) {
@@ -42265,6 +42541,80 @@ toggleBrushAirMode() {
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
+toggleBrushSymmetryModes() {
+   Static hasRan := 0
+   If (drawingShapeNow=1)
+   {
+      If (customShapePoints.Count()>1)
+      {
+         CustomShapeSymmetry := CustomShapeSymmetry ? 0 : CustomShapeLockedSymmetry
+         If (CustomShapeSymmetry || CustomShapeLockedSymmetry=0)
+            moreInfo := "`nSymmetry mode is locked"
+      } Else CustomShapeSymmetry := clampInRange(CustomShapeSymmetry + 1, 0, 2, 1)
+
+      If (CustomShapeSymmetry=1)
+         friendly := "X"
+      Else If (CustomShapeSymmetry=2)
+         friendly := "Y"
+      Else
+         friendly := "NONE"
+      ; ToolTip, % CustomShapeSymmetry "==" CustomShapeLockedSymmetry , , , 2
+      showTOOLtip("Shape symmetry: " friendly moreInfo, A_ThisFunc, 1, CustomShapeSymmetry/3)
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      SetTimer, dummyRefreshImgSelectionWindow, -150
+      showQuickActionButtonsDrawingShape()
+      Return
+   }
+
+   If (BrushToolType>3)
+   {
+      showTOOLtip("WARNING: Symmetry painting not available for the current brush type")
+      SoundBeep , 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   If (BrushToolSymmetryX=0 && BrushToolSymmetryY=0)
+   {
+      levelu := 3
+      BrushToolSymmetryX := BrushToolSymmetryY := 1
+   } Else If (BrushToolSymmetryX=1 && BrushToolSymmetryY=1)
+   {
+      levelu := 2
+      BrushToolSymmetryX := 0
+      BrushToolSymmetryY := 1
+   } Else If (BrushToolSymmetryX=0 && BrushToolSymmetryY=1)
+   {
+      levelu := 1
+      BrushToolSymmetryX := 1
+      BrushToolSymmetryY := 0
+   } Else If (BrushToolSymmetryX=1 && BrushToolSymmetryY=0)
+   {
+      levelu := 0.0001
+      BrushToolSymmetryX := BrushToolSymmetryY := 0
+   }
+
+   friendly := (BrushToolSymmetryX=1) ? "X" : ""
+   friendly2 := friendly ? friendly ", " : ""
+   friendly3 := (BrushToolSymmetryY=1) ?  friendly2 "Y" : friendly
+   If !friendly3
+      friendly3 := "NONE"
+
+   If (AnyWindowOpen=64)
+   {
+      GuiControl, SettingsGUIA:, BrushToolSymmetryX, % BrushToolSymmetryX
+      GuiControl, SettingsGUIA:, BrushToolSymmetryY, % BrushToolSymmetryY
+   }
+
+   If (hasRan<4)
+      moreInfos := "`nPress Shift + Y to define the symmetry coordinates"
+
+   hasRan++
+   showTOOLtip( "Painting symmetry: " friendly3 moreInfos, A_ThisFunc, 1, levelu/3)
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+   SetTimer, dummyRefreshImgSelectionWindow, -200
+}
+
 togglePaintingMode() {
    ; alpha mask painting, transform tool
    liveDrawingBrushTool := !liveDrawingBrushTool
@@ -42274,6 +42624,10 @@ togglePaintingMode() {
    If ((AnyWindowOpen=24 || AnyWindowOpen=31) && liveDrawingBrushTool=1 && StrLen(userClipBMPpaste)>2)
    {
       showTOOLtip("Please wait, activating painting mode")
+      BrushToolAcolor := convertColorToGrayscale(BrushToolAcolor)
+      BrushToolBcolor := convertColorToGrayscale(BrushToolBcolor)
+      GuiControl, SettingsGUIA: +Background%BrushToolAcolor%, BrushToolAcolor
+      GuiControl, SettingsGUIA: +Background%BrushToolBcolor%, BrushToolBcolor
       BrushToolType := 2
       PasteInPlaceAlphaMaskMode := 5
       PasteInPlaceLivePreview := PasteInPlaceAlphaChannelFile := 1
@@ -42344,8 +42698,7 @@ toggleBrushTypes() {
 }
 
 toggleBrushDeformers() {
-   isAlphaPainting := (AnyWindowOpen=24 || AnyWindowOpen=31) && (liveDrawingBrushTool=1) ? 1 : 0
-   If (isAlphaPainting=1)
+   If (isNowAlphaPainting()=1) || (A_TickCount - lastZeitOpenWin<650)
       Return
 
    mustCaptureCloneBrush := 0
@@ -42365,8 +42718,7 @@ toggleBrushDeformers() {
 }
 
 toggleBrushTypeEraser() {
-   isAlphaPainting := (AnyWindowOpen=24 || AnyWindowOpen=31) && (liveDrawingBrushTool=1) ? 1 : 0
-   If (isAlphaPainting=1)
+   If (isNowAlphaPainting()=1)
       Return
 
    BrushToolType := 4
@@ -42386,8 +42738,7 @@ toggleBrushTypeEraser() {
 }
 
 toggleBrushTypeFX() {
-   isAlphaPainting := (AnyWindowOpen=24 || AnyWindowOpen=31) && (liveDrawingBrushTool=1) ? 1 : 0
-   If (isAlphaPainting=1)
+   If (isNowAlphaPainting()=1)
       Return
 
    BrushToolType := 5
@@ -42406,8 +42757,7 @@ toggleBrushTypeFX() {
 }
 
 togglePresetsBrushes(modus, dir:=1) {
-   isAlphaPainting := (AnyWindowOpen=24 || AnyWindowOpen=31) && (liveDrawingBrushTool=1) ? 1 : 0
-   If (isAlphaPainting=1)
+   If (isNowAlphaPainting()=1)
       Return
 
    BrushToolType := 5
@@ -42462,8 +42812,7 @@ togglePresetsBrushes(modus, dir:=1) {
 }
 
 toggleBrushDrawInOutModes() {
-   isAlphaPainting := (AnyWindowOpen=24 || AnyWindowOpen=31) && (liveDrawingBrushTool=1) ? 1 : 0
-   If (isAlphaPainting=1)
+   If (isNowAlphaPainting()=1)
       Return
 
    mustCaptureCloneBrush := 0
@@ -42486,8 +42835,7 @@ toggleBrushDrawInOutModes() {
 }
 
 toggleBrushTypeCloner() {
-   isAlphaPainting := (AnyWindowOpen=24 || AnyWindowOpen=31) && (liveDrawingBrushTool=1) ? 1 : 0
-   If (isAlphaPainting=1)
+   If (isNowAlphaPainting()=1)
       Return
 
    If (BrushToolType=3 && liveDrawingBrushTool=1)
@@ -42713,7 +43061,7 @@ createGradientBrushBitmap(brushColor, grPosA, brushSize, grAngle, bAR, opacity:=
        Return
     }
 
-    isAlphaPainting := (AnyWindowOpen=24 || AnyWindowOpen=31) && (liveDrawingBrushTool=1) ? 1 : 0
+    isAlphaPainting := isNowAlphaPainting()
     offsetX := (isAlphaPainting=1) ? 0 : alphaMaskOffsetX
     offsetY := (isAlphaPainting=1) ? 0 : alphaMaskOffsetY
     thisColorA := opacity ? opacity brushColor : "0xFF" brushColor
@@ -42733,7 +43081,8 @@ createGradientBrushBitmap(brushColor, grPosA, brushSize, grAngle, bAR, opacity:=
           Return
 
        prevBrushu := trGdip_DisposeImage(prevBrushu, 1)
-       Ga := trGdip_GraphicsFromImage(A_ThisFunc, brushBitmap, 5)
+       Ga := trGdip_GraphicsFromImage(A_ThisFunc, brushBitmap, 3)
+       Gdip_SetPixelOffsetMode(Ga, 2)
        If (BrushToolTexture=1)
        {
           grpPath := Gdip_CreatePath()
@@ -42758,7 +43107,6 @@ createGradientBrushBitmap(brushColor, grPosA, brushSize, grAngle, bAR, opacity:=
           Gdip_DeleteBrush(gradBrush)
        } Else
        {
-          Gdip_GraphicsClear(Ga, thisColorA)
           pBitmap := LoadCachableBitmapFromFile(mainCompiledPath "\resources\brush-texture-" BrushToolTexture - 1 ".png")
           If pBitmap
           {
@@ -42771,11 +43119,20 @@ createGradientBrushBitmap(brushColor, grPosA, brushSize, grAngle, bAR, opacity:=
                    pBitmap := pBitmap3
                 }
              }
-             pBitmap2 := trGdip_ResizeBitmap(A_ThisFunc, pBitmap, rImgW, rImgH, 0, 3)
-             trGdip_DisposeImage(pBitmap, 1)
-             ; QPV_BlendBitmaps(brushBitmap, pBitmap2, 2, 0)
-             QPV_SetAlphaChannel(brushBitmap, pBitmap2, 0, 1, 1, 0)
-             trGdip_DisposeImage(pBitmap2, 1)
+
+             If !bgr
+             {
+                Gdip_GraphicsClear(Ga, thisColorA)
+                pBitmap2 := trGdip_ResizeBitmap(A_ThisFunc, pBitmap, rImgW, rImgH, 0, 3)
+                trGdip_DisposeImage(pBitmap, 1)
+                ; QPV_BlendBitmaps(brushBitmap, pBitmap2, 2, 0)
+                QPV_SetAlphaChannel(brushBitmap, pBitmap2, 0, 1, 1, 0)
+                trGdip_DisposeImage(pBitmap2, 1)
+             } Else
+             {
+                Gdip_DrawImage(Ga, pBitmap, 0, 0, rImgW, rImgH)
+                trGdip_DisposeImage(pBitmap, 1)
+             }
           }
           ; Gdip_DrawImage(Ga, pBitmap, 0, 0, rImgW, rImgH)
        }
@@ -42851,7 +43208,7 @@ createClonedBrushBitmap(brushSize, brushSofty, brushAngle, thisAR, whichBitmap, 
       tkY := tkY - offsetY
    }
 
-   thisState := "a" brushSofty brushSize brushAngle BrushToolDynamicCloner thisAR offsetX offsetY tkX tkY BrushToolBlurStrength doBlur BrushToolApplyColorFX PasteInPlaceLight PasteInPlaceGamma PasteInPlaceHue PasteInPlaceSaturation noAlphaMask
+   thisState := "a" brushSofty brushSize brushAngle BrushToolDynamicCloner thisAR offsetX offsetY tkX tkY BrushToolBlurStrength doBlur BrushToolApplyColorFX PasteInPlaceLight PasteInPlaceGamma PasteInPlaceHue PasteInPlaceSaturation noAlphaMask BrushToolTexture
    If (thisState!=prevState || !prevBrushu)
    {
       prevBrushu := trGdip_DisposeImage(prevBrushu, 1)
@@ -43084,7 +43441,7 @@ Randomizer(minu, maxu, errMargin, idu) {
 
 ActPaintBrushNow() {
    Critical, on
-   Static lastInvoked := 1, prevMX, prevMY, countClicks
+   Static lastInvoked := 1, prevMX, prevMY, countClicks, HasTested
 
    Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
    If (!imgW || !imgH) || (A_TickCount - lastOtherWinClose<450)
@@ -43405,7 +43762,6 @@ ActPaintBrushNow() {
                brushu := trGdip_DisposeImage(brushu, 1)
                coloruY := getPixelColorAvg(whichBitmap, kX, kY, "0xFF" o_startToolColor, startToolColor)
                startToolColor := SubStr(MixARGB(coloruY, "0xFF" startToolColor, thisWet), 5)
-               ; startToolColor := RandomizeBrushColor(startToolColor)
                g_startToolColor := RandomizeBrushColor(startToolColor)
                brushu := createGradientBrushBitmap(g_startToolColor, 101 - thisToolSoftness, brushSize, thisToolAngle, thisToolAspectRatio)
             } Else If (BrushToolWetness>0 && BrushToolType=1)
@@ -43424,11 +43780,40 @@ ActPaintBrushNow() {
             If (BrushToolType=1)
             {
                ; draw simple brush
+               allowBrushOverDraw := (BrushToolSymmetryX=1 && BrushToolSymmetryY=1) ? 1 : BrushToolOverDraw
                tmpPath := createBrushShapePath(brushSize, tkX, tkY, thisToolAspectRatio, thisToolAngle)
                Gdip_FillPath(Gu, gdipbrushu, tmpPath)
-               If (BrushToolOverDraw=0)
+               If (allowBrushOverDraw=0)
                   Gdip_SetClipPath(Gu, tmpPath, 4)
+
                Gdip_DeletePath(tmpPath)
+               If (BrushToolSymmetryX=1 || BrushToolSymmetryY=1)
+               {
+                  ccX := Round(imgW * BrushToolSymmetryPointX)
+                  ccY := Round(imgH * BrushToolSymmetryPointY)
+                  skX := (tkX<ccX) ? ccX - tkX + ccX : ccX - (tkX - ccX)
+                  skY := (tkY<ccY) ? ccY - tkY + ccY : ccY - (tkY - ccY)
+                  If (BrushToolSymmetryX!=1)
+                     skX := tkX
+                  If (BrushToolSymmetryY!=1)
+                     skY := tkY
+
+                  tmpPath := createBrushShapePath(brushSize, skX, skY, thisToolAspectRatio, thisToolAngle)
+                  Gdip_FillPath(Gu, gdipbrushu, tmpPath)
+                  If (allowBrushOverDraw=0)
+                      Gdip_SetClipPath(Gu, tmpPath, 4)
+
+                  Gdip_DeletePath(tmpPath)
+                  If (BrushToolSymmetryX=1 && BrushToolSymmetryY=1)
+                  {
+                     tmpPath := createBrushShapePath(brushSize, tkX, skY, thisToolAspectRatio, thisToolAngle)
+                     Gdip_FillPath(Gu, gdipbrushu, tmpPath)
+                     Gdip_DeletePath(tmpPath)
+                     tmpPath := createBrushShapePath(brushSize, skX, tkY, thisToolAspectRatio, thisToolAngle)
+                     Gdip_FillPath(Gu, gdipbrushu, tmpPath)
+                     Gdip_DeletePath(tmpPath)
+                  }
+               }
             } Else If (BrushToolType=4)
             {
                If thisSelectionConstrain
@@ -43456,6 +43841,25 @@ ActPaintBrushNow() {
                      Gdip_DrawImage(Gu, thisBrushu, tkX - brushSize//2 - thisBulgePinchFactor//2, tkY - brushSize/2 - thisBulgePinchFactor/2, brushSize + thisBulgePinchFactor, brushSize + thisBulgePinchFactor, 0, 0, brushSize, brushSize, thisFloatOpacity)
                } Else
                   Gdip_DrawImage(Gu, thisBrushu, tkX - brushSize//2, tkY - brushSize//2, brushSize, brushSize, 0, 0, brushSize, brushSize, thisFloatOpacity)
+
+               If (BrushToolSymmetryX=1 || BrushToolSymmetryY=1) && (BrushToolType=2 || BrushToolType=3)
+               {
+                  ccX := Round(imgW * BrushToolSymmetryPointX)
+                  ccY := Round(imgH * BrushToolSymmetryPointY)
+                  skX := (tkX<ccX) ? ccX - tkX + ccX : ccX - (tkX - ccX)
+                  skY := (tkY<ccY) ? ccY - tkY + ccY : ccY - (tkY - ccY)
+                  If (BrushToolSymmetryX!=1)
+                     skX := tkX
+                  If (BrushToolSymmetryY!=1)
+                     skY := tkY
+
+                  Gdip_DrawImage(Gu, thisBrushu, skX - brushSize//2, skY - brushSize//2, brushSize, brushSize, 0, 0, brushSize, brushSize, thisFloatOpacity)
+                  If (BrushToolSymmetryX=1 && BrushToolSymmetryY=1)
+                  {
+                     Gdip_DrawImage(Gu, thisBrushu, tkX - brushSize//2, skY - brushSize//2, brushSize, brushSize, 0, 0, brushSize, brushSize, thisFloatOpacity)
+                     Gdip_DrawImage(Gu, thisBrushu, skX - brushSize//2, tkY - brushSize//2, brushSize, brushSize, 0, 0, brushSize, brushSize, thisFloatOpacity)
+                  }
+               }
 
                If (BrushToolType>=5)
                   brushImg := trGdip_DisposeImage(brushImg, 1)
@@ -44120,6 +44524,7 @@ APIatan2(y,x) {
 }
 
 drawLiveCreateShape(mainWidth, mainHeight, Gu) {
+    ; Related addNewCustomShapePoints()
     If StrLen(HistogramBMP)>2
        HistogramBMP := trGdip_DisposeImage(HistogramBMP, 1)
 
@@ -44131,15 +44536,25 @@ drawLiveCreateShape(mainWidth, mainHeight, Gu) {
        splitu := customShapePoints[A_Index]
        xu := splitu[1] - (initialDrawingStartCoords[A_Index, 1] - prevDestPosX)
        yu := splitu[2] - (initialDrawingStartCoords[A_Index, 2] - prevDestPosY)
+       If (A_Index=1 && !vpSymmetryPointX && !vpSymmetryPointY)
+       {
+          vpSymmetryPointX := splitu[1], vpSymmetryPointY := splitu[2]
+          vpSymmetryPointXdp := initialDrawingStartCoords[A_Index, 1]
+          vpSymmetryPointYdp := initialDrawingStartCoords[A_Index, 2]
+       }
        newArrayu[A_Index] := [xu, yu]
        newShape .= xu "," yu "|"
     }
 
-    SelDotsSize := dotsSize := (PrefsLargeFonts=1) ? imgHUDbaseUnit//3 : imgHUDbaseUnit//3.25
+    If (maxPoints<=2)
+       CustomShapeLockedSymmetry := CustomShapeSymmetry
+
     PointsList := newShape
+    SelDotsSize := dotsSize := (PrefsLargeFonts=1) ? imgHUDbaseUnit//3 : imgHUDbaseUnit//3.25
     GetMouseCoord2wind(PVhwnd, mX, mY)
     gmX := (FlipImgH=1) ? mainWidth - mX : mX
     gmY := (FlipImgV=1) ? mainHeight - mY : mY
+
     dontAddPoint := (mX<0 || mY<0) ? -1 : 0
     If (IMGlargerViewPort=1 && IMGresizingMode=4 && (scrollBarHy>1 || scrollBarVx>1))
     {
@@ -44186,7 +44601,37 @@ drawLiveCreateShape(mainWidth, mainHeight, Gu) {
     }
 
     If (dontAddPoint=0)
+    {
+       If (CustomShapeSymmetry=1 && vpSymmetryPointX)
+       {
+          maxPoints++
+          vpSymX := Round(vpSymmetryPointX) - (vpSymmetryPointXdp - prevDestPosX)
+          gmXa := vpSymX - (gmX - vpSymX)
+          If (gmX<vpSymX)
+          {
+             gmc := gmX,  gmd := gmXa
+             gmXa := gmX, gmX := gmd
+          }
+          mirrorBonus := gmXa "," gmY "|"
+          ; ToolTip, % mirrorBonus  "`n" gmX "==" gmXa "==" vpSymmetryPointX, , , 2
+       } Else If (CustomShapeSymmetry=2 && vpSymmetryPointY)
+       {
+          maxPoints++
+          vpSymY := Round(vpSymmetryPointY) - (vpSymmetryPointYdp - prevDestPosY)
+          gmYa := vpSymY - (gmY - vpSymY)
+          If (gmY<vpSymY)
+          {
+             gmc := gmY,  gmd := gmYa
+             gmYa := gmY, gmY := gmd
+          }
+          mirrorBonus := gmX "," gmYa "|"
+       }
+
+       If mirrorBonus
+          PointsList := mirrorBonus newShape
+
        PointsList .= gmX "," gmY "|"
+    }
     ; ToolTip, % gmX "--" gmY , , , 2
     ; ToolTip, % tensionCurveCustomShape "=t" , , , 2
     PointsList := Trimmer(PointsList, "|")
@@ -44422,6 +44867,16 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
 
     If (showHUDnavIMG=1 && IMGlargerViewPort=1 && slideShowRunning!=1)
        VPnavBoxWrapper(mainWidth, mainHeight, 2NDglPG)
+
+    thisThick := imgHUDbaseUnit//11
+    Gdip_SetPenWidth(pPen4, thisThick)
+    isSymmetryAllowed := (AnyWindowOpen=64 && BrushToolType<4 && liveDrawingBrushTool=1) || (drawingShapeNow=1) ? 1 : 0
+    ccX := (drawingShapeNow=1) ? Round(vpSymmetryPointX) - (vpSymmetryPointXdp - prevDestPosX) : prevDestPosX + Round(prevResizedVPimgW * BrushToolSymmetryPointX)
+    ccY := (drawingShapeNow=1) ? Round(vpSymmetryPointY) - (vpSymmetryPointYdp - prevDestPosY) : prevDestPosY + Round(prevResizedVPimgH * BrushToolSymmetryPointY)
+    If ((BrushToolSymmetryX=1 || CustomShapeSymmetry=1) && isSymmetryAllowed=1)
+       Gdip_DrawLine(2NDglPG, pPen4, ccX - thisThick//4, 0, ccX - thisThick//4, mainHeight)
+    If ((BrushToolSymmetryY=1 || CustomShapeSymmetry=2) && isSymmetryAllowed=1)
+       Gdip_DrawLine(2NDglPG, pPen4, 0, ccY - thisThick//4, mainWidth, ccY - thisThick//4)
 
     Gdip_ResetWorldTransform(2NDglPG)
     r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectwin, 2NDglHDC)
@@ -45081,7 +45536,7 @@ dummyRefreshImgSelectionWindow() {
      If (drawingShapeNow=1)
         GetMouseCoord2wind(PVhwnd, mX, mY)
 
-     thisState := "a" mX mY mainWidth mainHeight closedLineCustomShape tensionCurveCustomShape cardinalCurveCustomShape customShapePoints.Count() lastZeitFileSelect imgSelX1 imgSelY1 imgSelX2 imgSelY2
+     thisState := "a" mX mY mainWidth mainHeight closedLineCustomShape tensionCurveCustomShape cardinalCurveCustomShape customShapePoints.Count() lastZeitFileSelect imgSelX1 imgSelY1 imgSelX2 imgSelY2 BrushToolSymmetryX BrushToolSymmetryY BrushToolSymmetryPointX BrushToolSymmetryPointY
      If (thisState!=prevStatus) || (drawingShapeNow!=1)
      {
         loopsOccured++
@@ -45591,6 +46046,8 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
        setGIFframesDelay()
        autoChangeDesiredFrame("start", imgPath)
        SetTimer, autoChangeDesiredFrame, % GIFspeedDelay
+       If (mustRecordSeenImgs=1 && desiredFrameIndex=2 && gdiBMPchanged=1 && !InStr(r, "error"))
+          recordSeenIMGdbEntry(imgPath, currentFileIndex)
     } Else
     {
        autoChangeDesiredFrame("stop")
@@ -45995,11 +46452,15 @@ createImgSelection2Win(DestPosX, DestPosY, newW, newH, maxSelX, maxSelY, mainWid
 
 correctActiveSelectionAreaViewPort() {
     Static prevDimensions
-    If (imgSelX2=-1 && imgSelY2=-1)
-       Return
-
     Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
     theseDimensions := imgW "," imgH
+
+    If (imgSelX2=-1 && imgSelY2=-1)
+    {
+       prevDimensions := theseDimensions
+       Return
+    }
+
     If (theseDimensions=prevDimensions)
        Return
 
@@ -46008,7 +46469,7 @@ correctActiveSelectionAreaViewPort() {
     ; msgbox, % x1 "--" x2 "--" y1 "--" y2
     imgSelX1 := X1, imgSelY1 := Y1
     imgSelX2 := X2, imgSelY2 := Y2
-    prevDimensions := imgW "," imgH
+    prevDimensions := theseDimensions
 }
 
 coremakeSquareSelection(imgW, imgH) {
@@ -46094,7 +46555,7 @@ flipSelectionWH() {
 }
 
 ImageCoords2Window(inputX, inputY, DestPosX, DestPosY, dotSize, ByRef outX, ByRef outY, rounding:=1, limitBounds:=0, givenZL:=99) {
-   thisZL := givenZL!=99 ? givenZL : zoomLevel
+   thisZL := (givenZL!=99) ? givenZL : zoomLevel
    If (rounding=1)
    {
       outX := Round(inputX*thisZL) + DestPosX - dotSize//2
@@ -50123,8 +50584,8 @@ PanelFindDupes() {
     Gui, Add, Checkbox, x+7 gUIfindDupesChecksu Checked%UIcheckimgheight% vUIcheckimgheight, Height
     Gui, Add, Checkbox, xs y+7 w%col% gUIfindDupesChecksu Checked%UIcheckimgmegapix% vUIcheckimgmegapix, Megapixels
     Gui, Add, Checkbox, x+7 gUIfindDupesChecksu Checked%UIcheckimgwhratio% vUIcheckimgwhratio, Aspect ratio (W/H)
-    Gui, Add, Checkbox, xs y+17 w%col% gUIfindDupesChecksu Checked%UIcheckimghpeak% vUIcheckimghpeak, Histogram maximum (range)
-    Gui, Add, Checkbox, x+7 gUIfindDupesChecksu Checked%UIcheckimghlow% vUIcheckimghlow, Histogram minimum (range)
+    Gui, Add, Checkbox, xs y+17 w%col% gUIfindDupesChecksu Checked%UIcheckimghpeak% vUIcheckimghpeak, Histogram max. range
+    Gui, Add, Checkbox, x+7 gUIfindDupesChecksu Checked%UIcheckimghlow% vUIcheckimghlow, Histogram min. range
     Gui, Add, Checkbox, xs y+7 w%col% gUIfindDupesChecksu Checked%UIcheckimghrange% vUIcheckimghrange, Histogram total range
     Gui, Add, Checkbox, x+7 gUIfindDupesChecksu Checked%UIcheckimgavg% vUIcheckimgavg, Histogram average
     Gui, Add, Checkbox, xs y+7 w%col% gUIfindDupesChecksu Checked%UIcheckimgmedian% vUIcheckimgmedian, Histogram median
@@ -50365,6 +50826,9 @@ UIfindDupesCheckboxes(hactu, v:="") {
 
 
 BTNfindDupesNow() {
+   If (AnyWindowOpen!=49)
+      Return
+
    columnus := ""
    Gui, SettingsGUIA: Default
    GuiControlGet, findDupesPrecision
@@ -50481,7 +50945,7 @@ BTNfindDupesNow() {
 
    If StrLen(theseCols)<3
    {
-      showTOOLtip("WARNING: No properties selected by which to identify duplicates.")
+      showTOOLtip("WARNING: Insufficient properties selected by which to identify duplicates.")
       SoundBeep , 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
@@ -54701,9 +55165,11 @@ BlackedCreator(thisOpacity, killWin:=0) {
 }
 
 DestroyGIFuWin() {
+    Critical, on
     If (slideShowRunning=1 || animGIFplaying=1)
        SetTimer, ResetImgLoadStatus, -15
 
+    SetTimer, autoChangeDesiredFrame, Off
     autoChangeDesiredFrame("stop")
 }
 
@@ -60411,7 +60877,7 @@ tlbrCutImg() {
    {
       MenuExplorerCutFiles()
       Return "m"
-   } Else If (isImgEditingNow()=1 && editingSelectionNow=1)
+   } Else If (isImgEditingNow()=1 && editingSelectionNow=1 && !AnyWindowOpen)
       CutSelectedArea()
 }
 
@@ -60681,7 +61147,7 @@ tlbrCropImg() {
    If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
    {
       PanelSimpleResizeRotate()
-   } Else If isImgEditingNow()
+   } Else If (isImgEditingNow()=1 && !AnyWindowOpen)
    {
       If (editingSelectionNow=1)
          CropImageInViewPortToSelection()
@@ -60894,7 +61360,7 @@ tlbrZoomToggle() {
 tlbrPasteQuick() {
    If (thumbsDisplaying=1)
       MenuPasteHDropFiles()
-   Else If (isImgEditingNow()=1)
+   Else
       PasteClipboardIMG()
 }
 
@@ -61398,10 +61864,30 @@ tlbrDecideTooltips(hwnd) {
       msgu := (thumbsDisplaying=1) ? "Paste files from clipboard into current list [Ctrl + V]" : "L: Paste image from clipboard [Ctrl + V]`nR: Paste into selection area [Ctrl + Shift + V]"
    } Else If InStr(icoFile, "undo")
    {
-      msgu := "L: Undo image [Ctrl + Z]`nR: Undo selection area [Ctrl + Shift + Z]"
+      If (isImgEditingNow()=1)
+      {
+         If undoLevelsRecorded
+            infosA := ": " currentUndoLevel "/" undoLevelsRecorded
+         If (totalSelUndos := undoSelLevelsArray.Count()) && (editingSelectionNow=1)
+            infosB := ": " currentSelUndoLevel " / " totalSelUndos " ]"
+      }
+
+      msgu := "Undo image" infosA " [Ctrl + Z]"
+      If (editingSelectionNow=1)
+         msgu := "L: " msgu "`nR: Undo selection area" infosB " [Ctrl + Shift + Z]"
    } Else If InStr(icoFile, "redo")
    {
-      msgu := "L: Redo image [Ctrl + Y]`nR: Redo selection area [Ctrl + Shift + Y]"
+      If (isImgEditingNow()=1)
+      {
+         If undoLevelsRecorded
+            infosA := ": " currentUndoLevel "/" undoLevelsRecorded
+         If (totalSelUndos := undoSelLevelsArray.Count()) && (editingSelectionNow=1)
+            infosB := ": " currentSelUndoLevel " / " totalSelUndos " ]"
+      }
+
+      msgu := "Redo image" infosA " [Ctrl + Y]"
+      If (editingSelectionNow=1)
+         msgu := "L: " msgu "`nR: Redo selection area" infosB " [Ctrl + Shift + Y]"
    } Else If InStr(icoFile, "add-text")
    {
       msgu := (thumbsDisplaying=1) ? "Edit image caption [Shift + N]" : "L: Insert text into image [Shift + T]`nR: Edit image caption [Shift + N]"
@@ -61413,7 +61899,8 @@ tlbrDecideTooltips(hwnd) {
          msgu .= "`nR: Erase or fade image selected area [Delete]"
    } Else If InStr(icoFile, "brush-blur")
    {
-      msgu := "Blur - soft brush: " BrushToolBlurStrength "%"
+      friendly := (AnyWindowOpen=64) ? "brush: " BrushToolBlurStrength "%" : "brush"
+      msgu := "L: Blur - soft " friendly "`nR: Blur or pixelize selected area"
    } Else If InStr(icoFile, "brush-cloner")
    {
       keyu := (AnyWindowOpen=64) ? " [J]" : ""
@@ -61451,7 +61938,28 @@ tlbrDecideTooltips(hwnd) {
          msgu := (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) ? "Resize / crop / rotate image" f " [Ctrl + R]" : "Adjust image canvas size [Alt + A]"
    } Else If InStr(icoFile, "save-disk")
    {
-      msgu := (thumbsDisplaying=1) ? "Save files list [Ctrl + S]" : "L: Save image to disk [Ctrl + S]`nR: Save files list [Ctrl + Shift + S]"
+      imgPath := getIDimage(currentFileIndex)
+      If InStr(imgPath, "\temporary memory object\")
+      {
+         fileStatus := "`n `nImage bitmap UNSAVED to disk"
+      } Else If isImgEditingNow()
+      {
+         oldTimes := lastZeitIMGsaved[1]
+         FormatTime, timea, % oldTimes , HH:mm
+         If oldTimes
+            InfosPreviousSave := "`n `nLast time saved: " timea "`n" lastZeitIMGsaved[4] "`nUndo levels state: " lastZeitIMGsaved[2] "/" lastZeitIMGsaved[3]
+
+         If !FileExist(imgPath)
+            fileStatus := "`n `nImage bitmap UNSAVED to disk"
+         Else If (currentImgModified=1)
+            fileStatus := "`n `nThe image has been MODIFIED"
+         Else If (currentImgModified=2)
+            fileStatus := "`n `nThe image has just been SAVED"
+      }
+      If (currentFilesListModified=1 && maxFilesIndex>1 && thumbsDisplaying=1)
+         fileStatus := "`n `nThe files list has been MODIFIED"
+
+      msgu := (thumbsDisplaying=1) ? "Save files list [Ctrl + S]" fileStatus : "L: Save image to disk [Ctrl + S]`nR: Save files list [Ctrl + Shift + S]" fileStatus InfosPreviousSave
    } Else If InStr(icoFile, "open")
    {
       msgu := "L: Open image or folder dialog [Ctrl + O]`nR: Recents menu"
@@ -61540,7 +62048,13 @@ tlbrDecideTooltips(hwnd) {
    } Else If (btnID="BTNmainTooler")
    {
       friendly := (thumbsDisplaying=1) ? "image view [Enter]" : defineListViewModes() " list mode [Enter]"
-      msgu := !AnyWindowOpen ? "L: Open previous panel [F8]`nR: Switch to " friendly : "L: Apply current tool and deactivate it [Enter]`nR: Abandon current tool [Escape]"
+      winIDu := prevOpenedWindow[1]
+      thisFunc := prevOpenedWindow[2]
+      allowReopen := prevOpenedWindow[3]
+      If (IsFunc(thisfunc) && thisFunc && allowReopen=1 && winIDu)
+         keyu := ": " thisFunc "(" winIDU ")"
+
+      msgu := !AnyWindowOpen ? "L: Open previous panel" keyu " [F8]`nR: Switch to " friendly : "L: Apply current tool and deactivate it [Enter]`nR: Abandon current tool [Escape]"
    } Else If InStr(icoFile, "brush-set-soft")
    {
       msgu := "Change brush softness: " BrushToolSoftness "% [Shift + [, Shift + ]]"
@@ -61587,7 +62101,9 @@ tlbrDecideTooltips(hwnd) {
       msgu := "L: Rename file" f " [F2]`nR: Modify focused index entry [Ctrl + F2]"
    } Else If InStr(icoFile, "filter") 
    {
-      msgu := "L: Filter files list [Ctrl + F]`nR: Deactivate files list filter [Ctrl + Space]"
+      If StrLen(filesFilter)>2
+         friendly := "`n `nThe files list is filtered"
+      msgu := "L: Filter files list [Ctrl + F]`nR: Deactivate files list filter [Ctrl + Space]" friendly
    } Else If InStr(icoFile, "statistics") 
    {
       msgu := "L: Files list statistics`nR: Find image duplicates"
@@ -61817,5 +62333,4 @@ SoundBeep , 900, 100
 Return
 #If
 */
-
 
