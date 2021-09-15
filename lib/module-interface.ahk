@@ -3810,8 +3810,9 @@ AccGetStateText(nState) {
 }
 
 mouseTurnOFFtooltip() {
-   Sleep, 40
+   Sleep, 20
    Gui, mouseToolTipGuia: Destroy
+   ; WinActive("ahk_id" PVhwnd)
    Global mouseToolTipWinCreated := 0
 }
 
@@ -3857,7 +3858,6 @@ mouseCreateOSDinfoLine(msg:=0, largus:=0) {
        Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPVguiTipsWin
        ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
     }
-
     prevMsg := msg
     mouseToolTipWinCreated := 1
     Gui, mouseToolTipGuia: Show, NoActivate AutoSize x%Final_x% y%Final_y%, QPVguiTipsWin
@@ -3866,6 +3866,7 @@ mouseCreateOSDinfoLine(msg:=0, largus:=0) {
     If (delayu<msgDisplayTime/2)
        delayu := msgDisplayTime//2 + 1
     WinSet, AlwaysOnTop, On, ahk_id %hGuiTip%
+    WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
     SetTimer, mouseTurnOFFtooltip, % -delayu
 }
 
