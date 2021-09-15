@@ -2,6 +2,11 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.3.0 (2021-09-15)
+  - [new] flood fill tool with advanced features: blending modes, tolerance and more options
+  - quick menus search panel is now resizable
+  - many important bug fixes
+
 - v5.2.7 (2021-08-27)
   - [new] option to paint using symmetry along X or Y, or both axis [available only for solid color, soft edges and cloner brush types]
   - [new] option to draw freeform shapes using symmetry on X or Y axis

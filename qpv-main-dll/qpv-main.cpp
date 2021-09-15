@@ -6,16 +6,19 @@
 #include "qpv-main.h"
 #include "omp.h"
 #include "math.h"
-#include "time.h"
 #include "windows.h"
 #include <string>
 #include <sstream>
 #include <vector>
+#include <stack>
+#include <map>
+#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <numeric>
 #include <algorithm>
-#include <bits/stdc++.h>
+
+// #include <bits/stdc++.h>
 
 using namespace std;
 
@@ -30,7 +33,7 @@ For best results, pBitmapMask should be grayscale.
 */
 
 DLL_API int DLL_CALLCONV SetAlphaChannel(int *imageData, int *maskData, int w, int h, int invert, int replaceAlpha, int whichChannel, int threadz) {
-    #pragma omp parallel for schedule(dynamic) default(none) num_threads(threadz)
+    #pragma omp parallel for schedule(dynamic) default(none) num_threads(3)
     for (int x = 0; x < w; x++)
     {
         int px;
@@ -64,160 +67,847 @@ DLL_API int DLL_CALLCONV SetAlphaChannel(int *imageData, int *maskData, int w, i
     return 1;
 }
 
-DLL_API int DLL_CALLCONV blahErserBrush(int *imageData, int *maskData, int w, int h, int invert, int replaceMode, int levelAlpha, int stride, int dabugMode) {
-    int debug = 0;
+double inverseGamma(double X) {
+  // Inverse sRGB gamma correction
+  if (X>0.0404482362771076)
+     X = pow((X + 0.055)/1.055, 2.4);
+  else
+     X = X / 12.92;
 
-    if (debug==1) {
-      std::ofstream f("c:\\temp\bub.txt");
-      f << w << " " << h<< std::endl;
-      f << invert << " " << replaceMode << " " << levelAlpha << std::endl;
-      for (int i = 0, n = w*h ; i < n; ++i) {
-         f << imageData[i] << " " << maskData[i] <<std::endl;
+  return X;
+}
+
+double toLABf(double Y) {
+  if (Y >= 0.00885645167903563082e-3)
+     Y = pow(Y, 0.333333333333333);  // 1/3
+  else
+     Y = (841.0/108.0) * Y + (4.0/29.0);
+
+  return Y;
+}
+
+double toLABfx(double Y) {
+  if (Y >= 8.88564517)
+     Y = pow(Y, 0.3333333);  // 1/3
+  else
+     Y = 7.7870370 * Y + 0.1379310; // (841.0/108.0) * Y + ( 4.0 / 29.0 );
+
+  return Y;
+}
+
+double deg2rad(double degree) {
+    // convert degree to radian
+    return (degree * (M_PI / 180));
+}
+
+double rad2deg(double radian) {
+    // convert radian to degree
+    return (radian * (180 / M_PI));
+}
+
+int RGBtoGray(int sR, int sG, int sB, int alternateMode) {
+  // https://getreuer.info/posts/colorspace/index.html
+  // http://www.easyrgb.com/en/math.php
+  // sR, sG and sB (Standard RGB) input range = 0 ÷ 255
+  // X, Y and Z output refer to a D65/2° standard illuminant.
+  // return value is L* - Luminance from L*ab, based on D65 luminant
+
+  if (alternateMode==1)
+     return round((float)(sR*0.299 + sG*0.587 + sB*0.114)); // weighted grayscale conversion
+
+  // convert RGB to XYZ color space
+  double var_R = (float)sR/255;
+  double var_G = (float)sG/255;
+  double var_B = (float)sB/255;
+
+  // Inverse sRGB gamma correction
+  var_R = inverseGamma(var_R);
+  var_G = inverseGamma(var_G);
+  var_B = inverseGamma(var_B);
+
+  double Y = var_R * 0.2125862 + var_G * 0.7151704 + var_B * 0.0722005;
+  // if (alternateMode==2)
+  //    return round(Y); // return derived luminosity in XYZ color space
+
+  Y = toLABfx(Y);
+  double L = 116*Y - 16;
+  // https://zschuessler.github.io/DeltaE/demos/
+  return round(L/2); // return derived luminosity in pseudo-LAB color space
+}
+
+double CieLab2Hue(double var_a, double var_b ) {
+// Function returns CIE-H° value
+   double var_bias = 0;
+   if ( var_a >= 0 && var_b == 0 ) return 0;
+   if ( var_a <  0 && var_b == 0 ) return 180;
+   if ( var_a == 0 && var_b >  0 ) return 90;
+   if ( var_a == 0 && var_b <  0 ) return 270;
+   if ( var_a >  0 && var_b >  0 ) var_bias = 0;
+   if ( var_a <  0               ) var_bias = 180;
+   if ( var_a >  0 && var_b <  0 ) var_bias = 360;
+   return ( rad2deg( atan( var_b / var_a ) ) + var_bias );
+}
+
+float testCIEdeltaE2000(double Lab1_L, double Lab1_a, double Lab1_b, double Lab2_L, double Lab2_a, double Lab2_b, float k_L, float k_C, float k_H) {
+// Cl_1,  Ca_1,  Cb_1   - Color #1 CIE-L*ab values
+// Cl_2,  Ca_2,  Cb_2   - Color #2 CIE-L*ab values
+// WHT_L, WHT_C, WHT_H  - Weight factors: luminance, chroma and hue
+// https://github.com/tajmone/name-that-color/blob/master/ntc.color-funcs.pbi
+
+    double LBar, deltaLPrime, aPrime1, aPrime2;
+    double C1, C2, CPrime1, CPrime2, CBar, CBarPrime, deltaCPrime;
+    double hPrime1, hPrime2, HBarPrime, deltahPrime;
+    double SsubL, SsubC, SsubH, RsubC, RsubT;
+    double g, Tvar, deltaRO, deltaE00;
+
+    LBar      = (Lab1_L + Lab2_L) / 2;
+    C1        = sqrt(pow(Lab1_a, 2) + pow(Lab1_b, 2));
+    C2        = sqrt(pow(Lab2_a, 2) + pow(Lab2_b, 2));
+    CBar      = (C1 + C2) / 2;
+    g = (1 - sqrt(pow(CBar, 7) / (pow(CBar, 7) + pow(25, 7)))) / 2;
+    aPrime1   = Lab1_a * (1 + g);
+    aPrime2   = Lab2_a * (1 + g);
+    CPrime1   = sqrt(pow(aPrime1, 2) + pow(Lab1_b, 2));
+    CPrime2   = sqrt(pow(aPrime2, 2) + pow(Lab2_b, 2));
+    CBarPrime = (CPrime1 + CPrime2) / 2;
+
+    hPrime1 = rad2deg(atan2(aPrime1, Lab1_b));
+    if (hPrime1<0)
+       hPrime1 += 360;
+
+    hPrime2 = rad2deg(atan2(aPrime2, Lab2_b));
+    if (hPrime2 < 0)
+       hPrime2 += 360;
+
+    if (abs(hPrime1 - hPrime2) > 180)
+       HBarPrime = (hPrime1 + hPrime2 + 360) / 2;
+    else
+       HBarPrime = (hPrime1 + hPrime2) / 2;
+
+    Tvar = 1 - 0.17 * cos(deg2rad(HBarPrime - 30)) + 0.24 * cos(deg2rad(2 * HBarPrime)) + 0.32 * cos(deg2rad(3 * HBarPrime + 6)) - 0.2 * cos(deg2rad(4 * HBarPrime - 63));
+
+    deltahPrime = hPrime2 - hPrime1;
+    if (abs(deltahPrime) > 180)
+    {
+       if (hPrime2 <= hPrime1) 
+          deltahPrime += 360;
+       else 
+          deltahPrime -= 360;
+    }
+
+    deltaLPrime = Lab2_L - Lab1_L;
+    deltaCPrime = CPrime2 - CPrime1;
+    deltahPrime = 2 * sqrt(CPrime1 * CPrime2) * sin(deg2rad(deltahPrime) / 2);
+    SsubL = 1 + ((0.015 * pow(LBar - 50, 2)) / sqrt(20 + pow(LBar - 50, 2)));
+    SsubC = 1 + 0.045 * CBarPrime;
+    SsubH = 1 + 0.015 * CBarPrime * Tvar;
+
+    // compute R sub T (RT)
+    deltaRO = 30 * exp(-(pow((HBarPrime - 275) / 25, 2)));
+    RsubC = 2 * sqrt(pow(CBarPrime, 7) / (pow(CBarPrime, 7) + pow(25, 7)));
+    RsubT = -RsubC * sin(2 * deg2rad(deltaRO));
+
+    deltaE00 = sqrt(pow(deltaLPrime / (SsubL * k_L), 2) + pow(deltaCPrime / (SsubC * k_C), 2) + pow(deltahPrime / (SsubH * k_H), 2) + RsubT * (deltaCPrime / (SsubC * k_C)) * (deltahPrime / (SsubH * k_H)));
+
+
+    // std::stringstream ss;
+    // ss << "qpv: deltaE00=" << deltaE00;
+    // ss << " Lab1_L=" << Lab1_L;
+    // ss << " Lab1_a=" << Lab1_a;
+    // ss << " Lab1_b=" << Lab1_b;
+    // ss << " Lab2_L=" << Lab2_L;
+    // ss << " Lab2_a=" << Lab2_a;
+    // ss << " Lab2_b=" << Lab2_b;
+    // ss << " k_L=" << k_L;
+    // ss << " k_C=" << k_C;
+    // ss << " k_H=" << k_H;
+    // ss << " LBar=" << LBar;
+    // ss << " deltaLPrime=" << deltaLPrime;
+    // ss << " aPrime1=" << aPrime1;
+    // ss << " aPrime2=" << aPrime2;
+    // ss << " C1=" << C1;
+    // ss << " C2=" << C2;
+    // ss << " CPrime1=" << CPrime1;
+    // ss << " CPrime2=" << CPrime2;
+    // ss << " CBar=" << CBar;
+    // ss << " CBarPrime=" << CBarPrime;
+    // ss << " deltaCPrime=" << deltaCPrime;
+    // ss << " hPrime1=" << hPrime1;
+    // ss << " hPrime2=" << hPrime2;
+    // ss << " HBarPrime=" << HBarPrime;
+    // ss << " deltahPrime=" << deltahPrime;
+    // ss << " SsubL=" << SsubL;
+    // ss << " SsubC=" << SsubC;
+    // ss << " SsubH=" << SsubH;
+    // ss << " RsubC=" << RsubC;
+    // ss << " RsubT=" << RsubT;
+    // ss << " g=" << g;
+    // ss << " Tvar=" << Tvar;
+    // ss << " deltaRO=" << deltaRO;
+    // OutputDebugStringA(ss.str().data());
+
+    return deltaE00;
+}
+
+float CIEdeltaE2000(double Cl_1, double Ca_1, double Cb_1, double Cl_2, double Ca_2, double Cb_2, float WHT_L, float WHT_C, float WHT_H) {
+// Cl_1,  Ca_1,  Cb_1   - Color #1 CIE-L*ab values
+// Cl_2,  Ca_2,  Cb_2   - Color #2 CIE-L*ab values
+// WHT_L, WHT_C, WHT_H  - Weight factors: luminance, chroma and hue
+// tested against http://www.brucelindbloom.com/index.html?ColorDifferenceCalc.html
+// https://getreuer.info/posts/colorspace/index.html
+// http://www.easyrgb.com/en/math.php
+// https://zschuessler.github.io/DeltaE/demos/
+
+  double xC1 = sqrt( pow(Ca_1, 2) + pow(Cb_1, 2) );
+  double xC2 = sqrt( pow(Ca_2, 2) + pow(Cb_2, 2) );
+  double xCX = ( xC1 + xC2 ) / 2;   // C-bar
+
+  double xGX = 0.5 * ( 1 - sqrt( pow(xCX,7) / ( pow(xCX,7) + pow(25,7) ) ) );
+
+  double xNN = ( 1 + xGX ) * Ca_1;            // A-Prime 1
+  xC1 = sqrt( pow(xNN, 2) + pow(Cb_1, 2) );   // C-Prime 1
+  double xH1 = CieLab2Hue( xNN, Cb_1 );       // H-Prime 1
+ 
+  xNN = ( 1 + xGX ) * Ca_2;                   // A-Prime 2
+  xC2 = sqrt( pow(xNN, 2) + pow(Cb_2, 2) );   // C-Prime 2
+  double xH2 = CieLab2Hue( xNN, Cb_2 );       // H-Prime 2
+
+  // compute Delta H-Prime based on H-Primes
+  double xDH; 
+  if ( ( xC1 * xC2 ) == 0 ) {
+     xDH = 0;
+  }
+  else {
+     xNN = xH2 - xH1;   // the diff between the H-Primes
+     if ( abs( xNN ) <= 180 ) {
+        xDH = xNN;
+     }
+     else {
+        if ( xNN > 180 )         // if (hPrime2 <= hPrime1) ???
+           xDH = xNN - 360;
+        else
+           xDH = xNN + 360;
+     }
+  }
+
+  xDH = 2 * sqrt( xC1 * xC2 ) * sin( deg2rad( xDH / 2 ) ); // Delta H-Prime
+
+  double xHX;  // compute the H-Bar Prime
+  if ( ( xC1 *  xC2 ) == 0 ) {
+     xHX = xH1 + xH2;
+  }
+  else {
+     xNN = abs(xH1 - xH2);
+     if ( xNN > 180 ) {
+        if ( ( xH2 + xH1 ) < 360 )
+           xHX = xH1 + xH2 + 360;
+        else
+           xHX = xH1 + xH2 - 360;
+     }
+     else {
+        xHX = xH1 + xH2;
+     }
+     xHX /= 2; // the H-Bar Prime
+  }
+
+  // xTX, the T variable, based on H-Bar Prime
+  double xTX = 1 - 0.17 * cos( deg2rad(xHX - 30) )     + 0.24
+                        * cos( deg2rad(2 * xHX ) )     + 0.32
+                        * cos( deg2rad(3 * xHX + 6 ) ) - 0.20
+                        * cos( deg2rad(4 * xHX - 63) );
+
+  double xCY = ( xC1 + xC2 ) / 2;        // C-Bar Prime based on C-Primes
+
+  // compute R sub T
+  double xPH = 60 * exp( - ( pow( ( xHX  - 275 ) / 25, 2) ) );           // based on H-Bar Prime
+  double xRC = 2 * sqrt( pow(xCY, 7) / ( pow(xCY, 7) + pow(25, 7) ) );   // based on C-Bar Prime
+  double xRT = - sin( deg2rad(xPH) ) * xRC;  // R sub T
+
+  double xLX = ( Cl_1 + Cl_2 ) / 2 - 50; // L-Bar
+  double xSL = 1 + ( 0.015 * pow(xLX, 2) ) / sqrt( 20 + pow(xLX, 2) );   // S sub L based on L-Bar
+  double xSC = 1 + 0.045 * xCY;       // S sub C - based on C-Bar Prime
+  double xSH = 1 + 0.015 * xCY * xTX; // S sub H - based on C-Bar Prime and T-var
+
+  double xDL = Cl_2 - Cl_1;              // Delta L-Prime
+  double xDC = xC2 - xC1;                // Delta C-Prime based on C-Primes
+  xDL = xDL / ( WHT_L * xSL );
+  xDC = xDC / ( WHT_C * xSC );
+  xDH = xDH / ( WHT_H * xSH );
+
+  double DeltaE = sqrt(pow(xDL, 2) + pow(xDC, 2) + pow(xDH, 2) + xRT * xDC * xDH);
+  return DeltaE;
+}
+
+auto RGBtoLAB(int sR, int sG, int sB) {
+  // https://getreuer.info/posts/colorspace/index.html
+  // http://www.easyrgb.com/en/math.php
+  // sR, sG and sB (Standard RGB) input range = 0 ÷ 255
+  // X, Y and Z outputs refer to a D65/2° standard illuminant.
+  // https://zschuessler.github.io/DeltaE/demos/
+  // tested against ColorMine.org
+
+  // convert RGB to XYZ color space
+  double var_R = (double)sR/255.0;
+  double var_G = (double)sG/255.0;
+  double var_B = (double)sB/255.0;
+
+  // Inverse sRGB gamma correction
+  var_R = inverseGamma(var_R);
+  var_G = inverseGamma(var_G);
+  var_B = inverseGamma(var_B);
+
+  var_R = var_R * 100;
+  var_G = var_G * 100;
+  var_B = var_B * 100;
+
+    std::stringstream ss;
+  // compute XYZ color space values for given sRGB
+  double X = var_R * 0.4123955889674142161 + var_G * 0.3575834307637148171 + var_B * 0.1804926473817015735;
+  double Y = var_R * 0.2125862307855955516 + var_G * 0.7151703037034108499 + var_B * 0.07220049864333622685;
+  double Z = var_R * 0.01929721549174694484 + var_G * 0.1191838645808485318 + var_B * 0.9504971251315797660;
+  // ss << "qpv: color in XYZ - X=" << X;
+  // ss << " Y=" << Y;
+  // ss << " Z=" << Z;
+
+  // compute XYZ according to the D65 reference illuminant specific to Daylight, sRGB and Adobe-RGB
+  X /= 95.047;
+  Y /= 100.000;
+  Z /= 108.883;
+
+  X = toLABf(X);
+  Y = toLABf(Y);
+  Z = toLABf(Z);
+
+  std::array<double, 3> Lab;
+  Lab[0] = 116*Y - 16;
+  Lab[1] = 500*(X - Y);
+  Lab[2] = 200*(Y - Z);
+
+  // ss << " | in LAB - L=" << Lab[0];
+  // ss << " a=" << Lab[1];
+  // ss << " b=" << Lab[2];
+  // OutputDebugStringA(ss.str().data());
+
+  return Lab;
+}
+
+void calculateBlendModes(int rO, int gO, int bO, int rB, int gB, int bB, int blendMode, int *results) {
+    int rT = 0;
+    int gT = 0;
+    int bT = 0;
+
+    if (blendMode == 1) { // darken
+        rT = min(rO, rB);
+        gT = min(gO, gB);
+        bT = min(bO, bB);
+    }
+    else if (blendMode == 2) { // multiply
+        rT = (rO * rB) / 255;
+        gT = (gO * gB) / 255;
+        bT = (bO * bB) / 255;
+    }
+    else if (blendMode == 3) { // linear burn
+       rT = rO + rB - 255;
+       gT = gO + gB - 255;
+       bT = bO + bB - 255;
+    }
+    else if (blendMode == 4) { // color burn
+        rT = (255 - ((255 - rB) * 255) / (1 + rO) < 1) ? 0 : 255 - ((255 - rB) * 255) / (1 + rO);
+        gT = (255 - ((255 - gB) * 255) / (1 + gO) < 1) ? 0 : 255 - ((255 - gB) * 255) / (1 + gO);
+        bT = (255 - ((255 - bB) * 255) / (1 + bO) < 1) ? 0 : 255 - ((255 - bB) * 255) / (1 + bO);
+    }
+    else if (blendMode == 5) { // lighten
+        rT = max(rO, rB);
+        gT = max(gO, gB);
+        bT = max(bO, bB);
+    }
+    else if (blendMode == 6) { // screen
+        rT = 255 - (((255 - rO) * (255 - rB)) / 255);
+        gT = 255 - (((255 - gO) * (255 - gB)) / 255);
+        bT = 255 - (((255 - bO) * (255 - bB)) / 255);
+    }
+    else if (blendMode == 7) { // linear dodge [add]
+        rT = rO + rB;
+        gT = gO + gB;
+        bT = bO + bB;
+    }
+    else if (blendMode == 8) { // hard light
+        rT = (rO < 127) ? (2 * rO * rB) / 255 : 255 - ((2 * (255 - rO) * (255 - rB)) / 255);
+        gT = (gO < 127) ? (2 * gO * gB) / 255 : 255 - ((2 * (255 - gO) * (255 - gB)) / 255);
+        bT = (bO < 127) ? (2 * bO * bB) / 255 : 255 - ((2 * (255 - bO) * (255 - bB)) / 255);
+    }
+    else if (blendMode == 9) { // overlay
+        rT = (rB < 127) ? (2 * rO * rB) / 255 : 255 - ((2 * (255 - rO) * (255 - rB)) / 255);
+        gT = (gB < 127) ? (2 * gO * gB) / 255 : 255 - ((2 * (255 - gO) * (255 - gB)) / 255);
+        bT = (bB < 127) ? (2 * bO * bB) / 255 : 255 - ((2 * (255 - bO) * (255 - bB)) / 255);
+    }
+    else if (blendMode == 10) { // hard mix
+        rT = (rO <= (255 - rB)) ? 0 : 255;
+        gT = (gO <= (255 - gB)) ? 0 : 255;
+        bT = (bO <= (255 - bB)) ? 0 : 255;
+    }
+    else if (blendMode == 11) { // linear light
+        rT = rB + (2 * rO) - 255;
+        gT = gB + (2 * gO) - 255;
+        bT = bB + (2 * bO) - 255;
+    }
+    else if (blendMode == 12) { // color dodge
+        rT = (rB * 255) / (256 - rO);
+        gT = (gB * 255) / (256 - gO);
+        bT = (bB * 255) / (256 - bO);
+    }
+    else if (blendMode == 13) { // vivid light 
+        if (rO < 127)
+            rT = 255 - ((255 - rB) * 255) / (1 + 2 * rO);
+        else
+            rT = (rB * 255) / (2 * (256 - rO));
+
+        if (gO < 127)
+            gT = 255 - ((255 - gB) * 255) / (1 + 2 * gO);
+        else
+            gT = (gB * 255) / (2 * (256 - gO));
+
+        if (bO < 127)
+            bT = 255 - ((255 - bB) * 255) / (1 + 2 * bO);
+        else
+            bT = (bB * 255) / (2 * (256 - bO));
+    }
+    else if (blendMode == 14) { // division
+        rT = (rO * 255) / (1 + rB);
+        gT = (gO * 255) / (1 + gB);
+        bT = (bO * 255) / (1 + bB);
+    }
+    else if (blendMode == 15) { // exclusion
+        rT = rO + rB - 2 * ((rO * rB) / 255);
+        gT = gO + gB - 2 * ((gO * gB) / 255);
+        bT = bO + bB - 2 * ((bO * bB) / 255);
+    }
+    else if (blendMode == 16) { // difference
+        rT = (rO > rB) ? rO - rB : rB - rO;
+        gT = (gO > gB) ? gO - gB : gB - gO;
+        bT = (bO > bB) ? bO - bB : bB - bO;
+    }
+    else if (blendMode == 17) { // substract
+        rT = rO - rB;
+        gT = gO - gB;
+        bT = bO - bB;
+    }
+    else if (blendMode == 18) { // luminosity
+        int gray = RGBtoGray(rO, gO, bO, 1) - RGBtoGray(rB, gB, bB, 1);
+        rT = gray + rB;
+        gT = gray + gB;
+        bT = gray + bB;
+    }
+    else if (blendMode == 19) { // substract reverse
+        rT = rB - rO;
+        gT = gB - gO;
+        bT = bB - bO;
+    }
+    else if (blendMode == 20) { // inverted difference
+        rT = (rO > rB) ? 255 - rO - rB : 255 - rB - rO;
+        gT = (gO > gB) ? 255 - gO - gB : 255 - gB - gO;
+        bT = (bO > bB) ? 255 - bO - bB : 255 - bB - bO;
+    }
+
+    if (blendMode != 10) {
+        if (rT < 0)
+            rT = 0;
+        if (gT < 0)
+            gT = 0;
+        if (bT < 0)
+            bT = 0;
+
+        if (rT > 255)
+            rT = 255;
+        if (gT > 255)
+            gT = 255;
+        if (bT > 255)
+            bT = 255;
+    }
+
+    results[0] = rT;   
+    results[1] = gT;   
+    results[2] = bT;   
+}
+
+void toCMYK(float red, float green, float blue, float* cmyk) {
+  float k = min(255-red, min(255-green,255-blue));
+  float c = 255*(255-red-k)/(255-k); 
+  float m = 255*(255-green-k)/(255-k); 
+  float y = 255*(255-blue-k)/(255-k); 
+
+  cmyk[0] = c;
+  cmyk[1] = m;
+  cmyk[2] = y;
+  cmyk[3] = k;
+}
+
+void toRGB(float c, float m, float y, float k, float *rgb) {
+  rgb[0] = -((c * (255-k)) / 255 + k - 255);
+  rgb[1] = -((m * (255-k)) / 255 + k - 255);
+  rgb[2] = -((y * (255-k)) / 255 + k - 255);
+}
+
+int INTweighTwoValues(int A, int B, float w) {
+    return (float)(A * w + B * (1 - w));
+}
+
+float weighTwoValues(float A, float B, float w) {
+    return (A*w + B*(1-w));
+}
+
+int mixColors(int colorB, float *colorA, float f, int dynamicOpacity, int blendMode, float prevCLRindex, float tolerance, int alternateMode, float thisCLRindex) {
+// source https://stackoverflow.com/questions/10139833/adding-colours-colors-together-like-paint-blue-yellow-green-etc
+// http://www.easyrgb.com/en/math.php
+ 
+  int aB = (colorB >> 24) & 0xFF;
+  int rB = (colorB >> 16) & 0xFF;
+  int gB = (colorB >> 8) & 0xFF;
+  int bB = colorB & 0xFF;
+  int aO = colorA[0];
+  int rO = colorA[1];
+  int gO = colorA[2];
+  int bO = colorA[3];
+  float fz;
+  if (dynamicOpacity==1)
+  {
+     // int thisCLRindex = float(rB*0.299 + gB*0.587 + bB*0.115);
+     // float thisCLRindex = RGBtoGray(rB, gB, bB, alternateMode);
+     if (alternateMode==3)
+     {
+        fz = (float)thisCLRindex/tolerance;
+     } else 
+     {
+        float diffu = max(thisCLRindex, prevCLRindex) - min(thisCLRindex, prevCLRindex);
+        fz = (float)diffu/tolerance;
+     }
+     f = f - fz;
+     if (f<0)
+        f = 0;
+  }
+
+  if (blendMode>0)
+  {
+     int results[3];
+     calculateBlendModes(rO, gO, bO, rB, gB, bB, blendMode, results);
+     rO = results[0];
+     gO = results[1];
+     bO = results[2];
+  }
+
+  int aT = INTweighTwoValues(aO, aB, f);
+  int rT = INTweighTwoValues(rO, rB, f);
+  int gT = INTweighTwoValues(gO, gB, f);
+  int bT = INTweighTwoValues(bO, bB, f);
+
+    // std::stringstream ss;
+    // ss << "qpv: opacity = " << f;
+    // ss << " rA=" << rA;
+    // ss << "rB=" << rB;
+    // ss << "rT=" << rT;
+    // ss << " | gA=" << gA;
+    // ss << "gB=" << gB;
+    // ss << "gT=" << gT;
+    // // ss << " r = " << result;
+    // OutputDebugStringA(ss.str().data());
+
+  return (aT << 24) | ((rT & 0xFF) << 16) | ((gT & 0xFF) << 8) | (bT & 0xFF);
+}
+
+bool inRange(float low, float high, float x) {        
+    return (low <= x && x <= high);
+}
+
+bool decideColorsEqual(int newColor, int oldColor, float tolerance, float prevCLRindex, int alternateMode, float *nC, float& index) {
+    // should use , CIEDE2000
+    if (oldColor==newColor)
+       return 1;
+    else if (tolerance<1)
+       return 0;
+
+    // int aB = (newColor >> 24) & 0xFF;
+    int rB = (newColor >> 16) & 0xFF;
+    int gB = (newColor >> 8) & 0xFF;
+    int bB = newColor & 0xFF;
+    bool result;
+    // float index;
+    // int index = float(rB*0.299 + gB*0.587 + bB*0.115);
+    if (alternateMode==3)
+    {
+       // auto LabA = RGBtoLAB(nC[1], nC[2], nC[3]);
+       auto LabB = RGBtoLAB(rB, gB, bB);
+       index = CIEdeltaE2000(nC[4], nC[5], nC[6], LabB[0], LabB[1], LabB[2], 1, 1, 1);
+       result = (index<=tolerance) ? 1 : 0;
+    } else
+    {
+       index = RGBtoGray(rB, gB, bB, alternateMode);
+       result = inRange(index - tolerance, index + tolerance, prevCLRindex);
+    }
+    return result;
+}
+
+int FloodFill8Stack(int *imageData, int w, int h, int x, int y, int newColor, float *nC, int oldColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay) {
+// based on https://lodev.org/cgtutor/floodfill.html
+// by Lode Vandevenne
+
+  if (newColor==oldColor)
+     return 0; //avoid infinite loop
+
+  static const int dx[8] = {0, 1, 1, 1, 0, -1, -1, -1}; // relative neighbor x coordinates
+  static const int dy[8] = {-1, -1, 0, 1, 1, 1, 0, -1}; // relative neighbor y coordinates
+  static const int gx[4] = {0, 1, 0, -1}; // relative neighbor x coordinates
+  static const int gy[4] = {-1, 0, 1, 0}; // relative neighbor y coordinates
+
+  unsigned int maxPixels = w*h + 1;
+  unsigned int loopsOccured = 0;
+  unsigned int suchDeviations = 0;
+  int suchAppliedDeviations = 0;
+  std::vector<int> pixelzMap(maxPixels, 0);
+  std::vector<float> indexes(maxPixels, 0);
+  std::stack<int> starkX;
+  std::stack<int> starkY;
+
+  int px = y * w + x;
+  pixelzMap[px] = 1;
+  starkX.push(x);
+  starkY.push(y);
+  int k = (eightWay==1) ? 8 : 4;
+  float defIndex = (alternateMode==3) ? 0 : prevCLRindex;
+  float index;
+  while (starkX.size())
+  {
+     if (maxPixels<loopsOccured)
+        break;
+
+     loopsOccured++;
+     int x = starkX.top();
+     int y = starkY.top();
+     starkX.pop();
+     starkY.pop();
+     // #pragma omp parallel for schedule(static) default(none) num_threads(3)
+     for (int i = 0; i < k; i++)
+     {
+        int nx = (eightWay==1) ? x + dx[i] : x + gx[i] ;
+        int ny = (eightWay==1) ? y + dy[i] : y + gy[i];
+
+        if (nx>=0 && nx<w && ny>=0 && ny<h)
+        {
+           int tpx = ny * w + nx;
+           if (pixelzMap[tpx]==1)
+              continue;
+
+           int thisColor = imageData[tpx];
+           if (thisColor==oldColor)
+           {
+              pixelzMap[tpx] = 1;
+              indexes[tpx] = defIndex;
+              starkX.push(nx);
+              starkY.push(ny);
+           } else if (tolerance>0)
+           {
+              if (decideColorsEqual(thisColor, oldColor, tolerance, prevCLRindex, alternateMode, nC, index))
+              {
+                 pixelzMap[tpx] = 1;
+                 indexes[tpx] = index;
+                 // pixelzMap.insert( std::pair<int, bool>(tpx, 1) );
+                 starkX.push(nx);
+                 starkY.push(ny);
+                 suchDeviations++;
+              }
+           }
+        }
+     }
+  }
+
+    // std::stringstream ss;
+    // ss << "qpv: suchDeviations = " << suchDeviations;
+
+  int thisColor = 0;
+  for (std::size_t pix = 0; pix < pixelzMap.size(); ++pix)
+  {
+      if (pixelzMap[pix]!=1)
+         continue;
+
+      // std::cout << it->first << " => " << it->second << '\n';
+      suchAppliedDeviations++;
+      if (tolerance>0 && (opacity<1 || dynamicOpacity==1 || blendMode>0 || cartoonMode==1))
+      {
+         int prevColor = imageData[pix];
+         if (cartoonMode==1)
+            thisColor = oldColor;
+         else
+            thisColor = mixColors(prevColor, nC, opacity, dynamicOpacity, blendMode, prevCLRindex, tolerance, alternateMode, indexes[pix]);
+
+         imageData[pix] = thisColor;
+      } else
+      {
+         imageData[pix] = newColor;   // second element , the colour, will be used to mix colours; to-do
       }
-      f.close();  
-    }
-
-    // #pragma omp parallel for schedule(dynamic) default(none)
-    for (int y = 0; y < h * stride; y += stride)
-    {
-        // A1 = R1 = G1 = B1 = A2 = R2 = G2 = B2 = 0;
-        for (int x = 0; x < w; ++x)
-        {
-// https://www.graphicsmill.com/docs/gm/accessing-pixel-data.htm
-// https://stackoverflow.com/questions/42735499/lockbits-of-bitmap-as-different-format-in-c
-
-            int alpha2;
-            const int px = (4 * x) + y *4;
-            int a = imageData[3 + px];
-            unsigned char intensity = maskData[px] & 0xff; // blue
-            if (invert == 1)
-               intensity = 255 - intensity;
-
-            float fintensity = intensity/255.0f;
-            if (a==0)
-               continue;
-
-            if (replaceMode == 1)
-               alpha2 = min(levelAlpha, a);
-            else if (replaceMode == 2)
-               alpha2 = max(0, (int)a - levelAlpha);
-            else
-               alpha2 = levelAlpha;
-
-            alpha2 = 252;  // (alpha2==a) ? a : alpha2*fintensity + a*max(0, 1.0f - fintensity);  // Formula: A*w + B*(1 – w)
-            // int haha = (alpha2!=a) ? 1 : 0;
-            // if (haha==1)
-               imageData[3 + px] = alpha2;
-   // std::stringstream ss;
-   // ss << "qpv: alpha2 = " << alpha2;
-   // ss << " var a = " << a;
-   // ss << " var haha = " << haha;
-   // if (dabugMode>1)
-   //     OutputDebugStringA(ss.str().data());
-
-        }
-    }
-    return 1;
+  }
+  
+    // ss << " suchAppliedDeviations = " << suchAppliedDeviations;
+    // ss << " mapSize = " << pixelzMap.size();
+    // OutputDebugStringA(ss.str().data());
+  return suchAppliedDeviations;
 }
 
+int FloodFillScanlineStack(int *imageData, int w, int h, int x, int y, int newColor, int oldColor) {
+// based on https://lodev.org/cgtutor/floodfill.html
+// by Lode Vandevenne
+  if (oldColor == newColor)
+     return 0;
 
-DLL_API int DLL_CALLCONV offsetsEraserBrush(int *imageData, int *maskData, int w3, int h3, int invertMask, int replaceMode, int levelAlpha, int maskOffX, int maskOffY, int offsetX, int offsetY, int w, int h, int mW, int mH, int Stride) {
+  int x1;
+  bool spanAbove, spanBelow;
+  unsigned int maxPixels = w*h + w;
+  unsigned int loopsOccured = 0;
 
-    // #pragma omp parallel for schedule(dynamic) default(none)
-    for (int x = offsetX; x < offsetX + w3; ++x)
+  // std::vector<int> stack;
+  // push(stack, x, y);
+  std::stack<int> starkX;
+  std::stack<int> starkY;
+  // std::vector<int> stack;
+  starkX.push(x);
+  starkY.push(y);
+  while (starkX.size())
+  {
+    int x = starkX.top();
+    int y = starkY.top();
+    x1 = x;
+
+    while (x1 >= 0 && imageData[y * w + x1] == oldColor)
     {
-        int tX = 0;
-        tX++;
-        // int px;
-        for (int y = offsetY * Stride; y < (offsetY + h3) * Stride; y += Stride)
-        {
-            int tY = 0;
-            tY++;
-
-            const int px = x * 4 + y;
-            const int mpx = (tX + maskOffX) * mH + tY;
-            int alpha2;
-            int a = 254; // (imageData[px] >> 24) & 0xFF;
-            int intensity = (maskData[mpx] >> 8) & 0xff;
-            if (invertMask == 1)
-               intensity = 255 - intensity;
-
-            float fintensity = intensity/255.0f;
-            if (a==0)
-               continue;
-
-            if (replaceMode == 1)
-               alpha2 = min(levelAlpha, a);
-            else if (replaceMode == 2)
-               alpha2 = max(0, (int)a - levelAlpha);
-            else
-               alpha2 = levelAlpha;
-
-            alpha2 = (alpha2==a) ? a : alpha2*fintensity + a*max(0, 1.0f - fintensity);  // Formula: A*w + B*(1 – w)
-            int haha = (alpha2!=a) ? 1 : 0;
-            if (alpha2!=a)
-               imageData[px] = (alpha2 << 24) | (imageData[px] & 0x00ffffff);
-   // std::stringstream ss;
-   // ss << "qpv: alpha2 = " << alpha2;
-   // ss << " var a = " << a;
-   // ss << " var haha = " << haha;
-   // if (dabugMode>1)
-   //     OutputDebugStringA(ss.str().data());
-
-        }
+       x1--;
     }
- 
-    std::stringstream ss;
-    ss << "qpv: eraser = " << levelAlpha;
-    OutputDebugStringA(ss.str().data());
-    return 1;
+
+    x1++;
+    spanAbove = spanBelow = 0;
+    starkX.pop();
+    starkY.pop();
+
+    while (x1 < w && imageData[y * w + x1] == oldColor)
+    {
+       imageData[y * w + x1] = newColor;
+       if (maxPixels<loopsOccured)
+          break;
+
+       loopsOccured++;
+       // int clrA = imageData[(y - 1) * w + x1];
+       // int clrB = imageData[(y + 1) * w + x1];
+       if (!spanAbove && y > 0 && imageData[(y - 1) * w + x1] == oldColor)
+       // if (spanAbove==0 && y>0 && clrA==oldColor)
+       {
+          starkX.push(x1);
+          starkY.push(y - 1);
+          spanAbove = 1;
+       } else if (spanAbove && y > 0 && imageData[(y - 1) * w + x1] != oldColor)
+       // } else if (spanAbove==1 && y>0 && clrA!=oldColor)
+       {
+          spanAbove = 0;
+       }
+
+       if (!spanBelow && y < h - 1 && imageData[(y + 1) * w + x1] == oldColor)
+       // if (spanBelow==0 && y<(h-1) && clrB==oldColor)
+       {
+          starkX.push(x1);
+          starkY.push(y + 1);
+          spanBelow = 1;
+       // } else if (spanBelow==1 && y<(h-1) && clrB!=oldColor)
+       } else if (spanBelow && y < h - 1 && imageData[(y + 1) * w + x1] != oldColor)
+       {
+          spanBelow = 0;
+       }
+       x1++;
+    }
+  }
+  return loopsOccured;
 }
 
+int ReplaceGivenColor(int *imageData, int w, int h, int x, int y, int newColor, float *nC, int prevColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode) {
+    if ((x < 0) || (x >= (w-1)) || (y < 0) || (y >= (h-1)))  // out of bounds
+       return 0;
 
-DLL_API int DLL_CALLCONV blahaaaaaaEraserBrush(int *imageData, int *maskData, int w, int h, int invertMask, int replaceMode, int levelAlpha) {
-
-    // #pragma omp parallel for schedule(dynamic) default(none)
-    for (int x = 0; x < w; x++)
+    int loopsOccured = 0;
+    #pragma omp parallel for schedule(static) default(none) num_threads(3)
+    for (int zx = 0; zx < w; zx++)
     {
-        // int px;
-        for (int y = 0; y < h; y++)
+        int oldColor = prevColor;
+        float index;
+        int thisColor = 0;
+        for (int zy = 0; zy < h; zy++)
         {
-            const int px = (x * h + y) * 4 - 4;
-            int alpha2;
-            int a = imageData[px + 3];
-            int intensity = maskData[px + 2];
-            if (invertMask == 1)
-               intensity = 255 - intensity;
-
-            float fintensity = intensity/255.0f;
-            if (a==0)
-               continue;
-
-            if (replaceMode == 1)
-               alpha2 = min(levelAlpha, a);
-            else if (replaceMode == 2)
-               alpha2 = max(0, (int)a - levelAlpha);
-            else
-               alpha2 = levelAlpha;
-
-            alpha2 = (alpha2==a) ? a : alpha2*fintensity + a*max(0, 1.0f - fintensity);  // Formula: A*w + B*(1 – w)
-            int haha = (alpha2!=a) ? 1 : 0;
-            if (alpha2!=a)
-               imageData[px + 3] = alpha2;
-   // std::stringstream ss;
-   // ss << "qpv: alpha2 = " << alpha2;
-   // ss << " var a = " << a;
-   // ss << " var haha = " << haha;
-   // if (dabugMode>1)
-   //     OutputDebugStringA(ss.str().data());
-
+            if (decideColorsEqual(imageData[zx + zy * w], prevColor, tolerance, prevCLRindex, alternateMode, nC, index))
+            {
+               if (tolerance>0 && (opacity<1 || dynamicOpacity==1 || blendMode>0 || cartoonMode==1))
+               {
+                  int prevColor = imageData[zx + zy * w];
+                  if (cartoonMode==1)
+                     thisColor = oldColor;
+                  else
+                     thisColor = mixColors(prevColor, nC, opacity, dynamicOpacity, blendMode, prevCLRindex, tolerance, alternateMode, index);
+                  imageData[zx + zy * w] = thisColor;
+               } else
+               {
+                  imageData[zx + zy * w] = newColor;
+               }
+               loopsOccured++;
+            }
         }
     }
- 
-    std::stringstream ss;
-    ss << "qpv: eraser = " << levelAlpha;
-    OutputDebugStringA(ss.str().data());
-    return 1;
+    return loopsOccured;
+}
+
+DLL_API int DLL_CALLCONV FloodFyll(int *imageData, int modus, int w, int h, int x, int y, int newColor, int tolerance, int fillOpacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay) {
+    if ((x < 0) || (x >= (w-1)) || (y < 0) || (y >= (h-1)))  // out of bounds
+       return 0;
+
+    float toleranza = (alternateMode==3) ? (float)tolerance/10.0 + 1 : tolerance;
+    int prevColor = imageData[x + y * w];
+    int aB = (prevColor >> 24) & 0xFF;
+    int rB = (prevColor >> 16) & 0xFF;
+    int gB = (prevColor >> 8) & 0xFF;
+    int bB = prevColor & 0xFF;
+    float prevCLRindex = RGBtoGray(rB, gB, bB, alternateMode);
+
+    float nC[7];
+    nC[0] = (newColor >> 24) & 0xFF;
+    nC[1] = (newColor >> 16) & 0xFF;
+    nC[2] = (newColor >> 8) & 0xFF;
+    nC[3] = newColor & 0xFF;
+
+    auto LabA = RGBtoLAB(rB, gB, bB);
+    nC[4] = LabA[0];
+    nC[5] = LabA[1];
+    nC[6] = LabA[2];
+
+// auto LabB = RGBtoLAB(rB, gB, bB);
+// float CIE = CIEdeltaE2000(LabA[0], LabA[1], LabA[2], LabB[0], LabB[1], LabB[2], 1, 1, 1);
+// float CIE2 = testCIEdeltaE2000(LabA[0], LabA[1], LabA[2], LabB[0], LabB[1], LabB[2], 1, 1, 1);
+
+    float opacity = (float)fillOpacity / 255;
+    if (tolerance==0 && (opacity<1 || blendMode>0))
+       newColor = mixColors(prevColor, nC, opacity, 0, blendMode, 0, 0, 0, 0);
+
+    int r;
+    if (modus==1)
+       r = ReplaceGivenColor(imageData, w, h, x, y, newColor, nC, prevColor, toleranza, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode);
+    else if (toleranza>0)
+       r = FloodFill8Stack(imageData, w, h, x, y, newColor, nC, prevColor, toleranza, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, eightWay);
+    else
+       r = FloodFillScanlineStack(imageData, w, h, x, y, newColor, prevColor);
+
+    // std::stringstream ss;
+    // ss << "qpv: opacity = " << opacity;
+    // ss << " newColor = " << newColor;
+    // ss << " TolerMode = " << alternateMode;
+    // // ss << " | CIE=" << CIE;
+    // ss << " | L=" << nC[4];
+    // ss << " | pix affected=" << r;
+    // ss << " tolerance = " << toleranza;
+    // ss << " clrIndex = " << prevCLRindex;
+    // OutputDebugStringA(ss.str().data());
+
+    return r;
 }
 
 DLL_API int DLL_CALLCONV EraserBrush(int *imageData, int *maskData, int w, int h, int invertMask, int replaceMode, int levelAlpha, int *clonedData, int useClone) {
@@ -265,18 +955,18 @@ DLL_API int DLL_CALLCONV EraserBrush(int *imageData, int *maskData, int w, int h
         }
     }
  
-    std::stringstream ss;
-    ss << "qpv: eraser = " << levelAlpha;
-    OutputDebugStringA(ss.str().data());
+    // std::stringstream ss;
+    // ss << "qpv: eraser = " << levelAlpha;
+    // OutputDebugStringA(ss.str().data());
     return 1;
 }
 
 DLL_API int DLL_CALLCONV SetGivenAlphaLevel(int *imageData, int w, int h, int givenLevel, int fillMissingOnly, int threadz) {
-    #pragma omp parallel for schedule(dynamic) default(none) num_threads(threadz)
+    #pragma omp parallel for schedule(dynamic) default(none) num_threads(3)
     for (int x = 0; x < w; x++)
     {
         int px, y = 0;
-        int defaultColor;
+        int defaultColor = 0;
         unsigned int BGRcolor = imageData[x + y * w];
         if (BGRcolor!=0x0)
            defaultColor = BGRcolor & 0x00ffffff;
@@ -295,11 +985,11 @@ DLL_API int DLL_CALLCONV SetGivenAlphaLevel(int *imageData, int w, int h, int gi
         }
     }
 
-    #pragma omp parallel for schedule(dynamic) default(none) num_threads(threadz)
+    #pragma omp parallel for schedule(dynamic) default(none) num_threads(3)
     for (int x = w - 1; x >= 0; x--)
     {
         int px, y = h - 1;
-        int defaultColor;
+        int defaultColor = 0;
         unsigned int BGRcolor = imageData[x + y * w];
         if (BGRcolor!=0x0)
            defaultColor = BGRcolor & 0x00ffffff;
@@ -412,10 +1102,10 @@ and in 32-ARGB format: PXF32ARGB - 0x26200A.
 */
 
 DLL_API int DLL_CALLCONV BlendBitmaps(int* bgrImageData, int* otherData, int w, int h, int blendMode, int threadz) {
-    #pragma omp parallel for schedule(dynamic) default(none) num_threads(threadz)
+    #pragma omp parallel for schedule(dynamic) default(none) num_threads(3)
     for (int x = 0; x < w; x++)
     {
-        int rT, gT, bT; // , aB, aO, aX;
+        // int rT, gT, bT; // , aB, aO, aX;
         //  int rO, gO, bO, rB, gB, bB;
 
         // #pragma omp parallel for schedule(static) default(none) num_threads(threadz)
@@ -441,136 +1131,10 @@ DLL_API int DLL_CALLCONV BlendBitmaps(int* bgrImageData, int* otherData, int w, 
                 int rB = (BGRcolor >> 16) & 0xFF;
                 int gB = (BGRcolor >> 8) & 0xFF;
                 int bB = BGRcolor & 0xFF;
+                int results[3];
+                calculateBlendModes(rO, gO, bO, rB, gB, bB, blendMode, results);
 
-                if (blendMode == 1) { // darken
-                    rT = min(rO, rB);
-                    gT = min(gO, gB);
-                    bT = min(bO, bB);
-                }
-                else if (blendMode == 2) { // multiply
-                    rT = (rO * rB) / 255;
-                    gT = (gO * gB) / 255;
-                    bT = (bO * bB) / 255;
-                }
-                else if (blendMode == 3) { // linear burn
-                   rT = rO + rB - 255;
-                   gT = gO + gB - 255;
-                   bT = bO + bB - 255;
-                }
-                else if (blendMode == 4) { // color burn
-                    rT = (255 - ((255 - rB) * 255) / (1 + rO) < 1) ? 0 : 255 - ((255 - rB) * 255) / (1 + rO);
-                    gT = (255 - ((255 - gB) * 255) / (1 + gO) < 1) ? 0 : 255 - ((255 - gB) * 255) / (1 + gO);
-                    bT = (255 - ((255 - bB) * 255) / (1 + bO) < 1) ? 0 : 255 - ((255 - bB) * 255) / (1 + bO);
-                }
-                else if (blendMode == 5) { // lighten
-                    rT = max(rO, rB);
-                    gT = max(gO, gB);
-                    bT = max(bO, bB);
-                }
-                else if (blendMode == 6) { // screen
-                    rT = 255 - (((255 - rO) * (255 - rB)) / 255);
-                    gT = 255 - (((255 - gO) * (255 - gB)) / 255);
-                    bT = 255 - (((255 - bO) * (255 - bB)) / 255);
-                }
-                else if (blendMode == 7) { // linear dodge [add]
-                    rT = rO + rB;
-                    gT = gO + gB;
-                    bT = bO + bB;
-                }
-                else if (blendMode == 8) { // hard light
-                    rT = (rO < 127) ? (2 * rO * rB) / 255 : 255 - ((2 * (255 - rO) * (255 - rB)) / 255);
-                    gT = (gO < 127) ? (2 * gO * gB) / 255 : 255 - ((2 * (255 - gO) * (255 - gB)) / 255);
-                    bT = (bO < 127) ? (2 * bO * bB) / 255 : 255 - ((2 * (255 - bO) * (255 - bB)) / 255);
-                }
-                else if (blendMode == 9) { // overlay
-                    rT = (rB < 127) ? (2 * rO * rB) / 255 : 255 - ((2 * (255 - rO) * (255 - rB)) / 255);
-                    gT = (gB < 127) ? (2 * gO * gB) / 255 : 255 - ((2 * (255 - gO) * (255 - gB)) / 255);
-                    bT = (bB < 127) ? (2 * bO * bB) / 255 : 255 - ((2 * (255 - bO) * (255 - bB)) / 255);
-                }
-                else if (blendMode == 10) { // hard mix
-                    rT = (rO <= (255 - rB)) ? 0 : 255;
-                    gT = (gO <= (255 - gB)) ? 0 : 255;
-                    bT = (bO <= (255 - bB)) ? 0 : 255;
-                }
-                else if (blendMode == 11) { // linear light
-                    rT = rB + (2 * rO) - 255;
-                    gT = gB + (2 * gO) - 255;
-                    bT = bB + (2 * bO) - 255;
-                }
-                else if (blendMode == 12) { // color dodge
-                    rT = (rB * 255) / (256 - rO);
-                    gT = (gB * 255) / (256 - gO);
-                    bT = (bB * 255) / (256 - bO);
-                }
-                else if (blendMode == 13) { // vivid light 
-                    if (rO < 127)
-                        rT = 255 - ((255 - rB) * 255) / (1 + 2 * rO);
-                    else
-                        rT = (rB * 255) / (2 * (256 - rO));
-
-                    if (gO < 127)
-                        gT = 255 - ((255 - gB) * 255) / (1 + 2 * gO);
-                    else
-                        gT = (gB * 255) / (2 * (256 - gO));
-
-                    if (bO < 127)
-                        bT = 255 - ((255 - bB) * 255) / (1 + 2 * bO);
-                    else
-                        bT = (bB * 255) / (2 * (256 - bO));
-                }
-                else if (blendMode == 14) { // division
-                    rT = (rO * 255) / (1 + rB);
-                    gT = (gO * 255) / (1 + gB);
-                    bT = (bO * 255) / (1 + bB);
-                }
-                else if (blendMode == 15) { // exclusion
-                    rT = rO + rB - 2 * ((rO * rB) / 255);
-                    gT = gO + gB - 2 * ((gO * gB) / 255);
-                    bT = bO + bB - 2 * ((bO * bB) / 255);
-                }
-                else if (blendMode == 16) { // difference
-                    rT = (rO > rB) ? rO - rB : rB - rO;
-                    gT = (gO > gB) ? gO - gB : gB - gO;
-                    bT = (bO > bB) ? bO - bB : bB - bO;
-                }
-                else if (blendMode == 17) { // substract
-                    rT = rO - rB;
-                    gT = gO - gB;
-                    bT = bO - bB;
-                }
-                else if (blendMode == 18) { // luminosity
-                    rT = (float(rO*0.299+gO*0.587+bO*0.115) - float(rB*0.299+gB*0.587+bB*0.115)) + rB;
-                    gT = (float(rO*0.299+gO*0.587+bO*0.115) - float(rB*0.299+gB*0.587+bB*0.115)) + gB;
-                    bT = (float(rO*0.299+gO*0.587+bO*0.115) - float(rB*0.299+gB*0.587+bB*0.115)) + bB;
-                }
-                else if (blendMode == 19) { // substract revverse
-                    rT = rB - rO;
-                    gT = gB - gO;
-                    bT = bB - bO;
-                }
-                else if (blendMode == 20) { // inverted difference
-                    rT = (rO > rB) ? 255 - rO - rB : 255 - rB - rO;
-                    gT = (gO > gB) ? 255 - gO - gB : 255 - gB - gO;
-                    bT = (bO > bB) ? 255 - bO - bB : 255 - bB - bO;
-                }
-
-                if (blendMode != 10) {
-                    if (rT < 0)
-                        rT = 0;
-                    if (gT < 0)
-                        gT = 0;
-                    if (bT < 0)
-                        bT = 0;
-
-                    if (rT > 255)
-                        rT = 255;
-                    if (gT > 255)
-                        gT = 255;
-                    if (bT > 255)
-                        bT = 255;
-                }
-
-                bgrImageData[x + (y * w)] = (aX << 24) | ((rT & 0xFF) << 16) | ((gT & 0xFF) << 8) | (bT & 0xFF);
+                bgrImageData[x + (y * w)] = (aX << 24) | ((results[0] & 0xFF) << 16) | ((results[1] & 0xFF) << 8) | (results[2] & 0xFF);
             }
         }
     }
@@ -587,12 +1151,31 @@ It must be in 32-ARGB format: PXF32ARGB - 0x26200A.
 DLL_API int DLL_CALLCONV RandomNoise(int* bgrImageData, int w, int h, int intensity, int mode, int threadz) {
     // srand (time(NULL));
     // #pragma omp parallel for default(none) num_threads(threadz)
+
+    // std::stringstream ss;
+    // ss << "qpv: results w " << w;
+    // ss << " h " << h;
     for (int x = 0; x < w; x++)
     {
         for (int y = 0; y < h; y++)
         {
             unsigned char aT = 255;
             unsigned char z = rand() % 101;
+            // int px = x + (y * w);
+            // if (x<5 && y<5)
+            // {
+            //    ss << " x=" << x;
+            //    ss << " y=" << y;
+            //    ss << " PX=" << px;
+            // }
+
+            // if (x>(w-5) && y>(h-5))
+            // {
+            //    ss << " x " << x;
+            //    ss << " y " << y;
+            //    ss << " PX " << px;
+            // }
+
             if (z<intensity)
             {
                // unsigned char rT = 0;
@@ -613,6 +1196,7 @@ DLL_API int DLL_CALLCONV RandomNoise(int* bgrImageData, int w, int h, int intens
             }
         }
     }
+    // OutputDebugStringA(ss.str().data());
     return 1;
 }
 

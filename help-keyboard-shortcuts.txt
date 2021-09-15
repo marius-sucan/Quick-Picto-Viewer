@@ -30,6 +30,7 @@ Alt + A|Adjust image canvas size|Image view|Panel
 Alt + Backspace|Fill shapes or draw outlines of shapes|Image selection area|Panel
 Alt + Delete|Remove active file index entry|Anywhere|-
 Alt + E|Selection properties|Image view|Panel
+Alt + E|Open in QPV containing folder|Files list|-
 Alt + U|Manage dynamic folder(s) list|Anywhere|Panel
 Alt + Y|Automatic image crop|Image view|Panel
 Alt + Arrow keys|Adjust image selection: top-left corner position|Image selection area|-
@@ -121,7 +122,7 @@ Z|Image navigator|Image view|-
 I|Toggle information viewport box|Anywhere|-
 Insert|Insert file(s) into list|Anywhere|Files selector
 J|Jump to given file index or frame|Anywhere|Panel
-K|Perform JPEG lossless operations|Anywhere|Panel
+Shift + K|Perform JPEG lossless operations|Anywhere|Panel
 L|Toggle limit selection area to image boundaries|Image selection area|-
 L|Toggle limit viewport grid to image boundaries|Image view|-
 L|Toggle list view modes|Files list|-
@@ -265,7 +266,7 @@ X|Toggle between color A and color B|Live editing|-
 Ctrl + Left-Click|Paint with the other color|Painting mode|-
 S|Toggle between diameter and radius based brush size|Painting mode|-
 C|Pick primary brush color|Live editing|-
-K|Cycle between draw inside, outside or ignore selection area|Painting mode|-
+Shift + K|Cycle between draw inside, outside or ignore selection area|Painting mode|-
 P|Toggle between bulge and pinch brushes|Painting mode|-
 Shift + Y|Define symmetry painting coordinates|Painting mode|-
 Y|Cycle symmetry painting modes|Painting mode|-
