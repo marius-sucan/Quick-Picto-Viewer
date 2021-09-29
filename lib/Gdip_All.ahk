@@ -5840,7 +5840,7 @@ Gdip_ResetClip(pGraphics) {
 
 Gdip_GetClipRegion(pGraphics) {
    hRegion := Gdip_CreateRegion()
-   E := DllCall("gdiplus\GdipGetClip", "UPtr", pGraphics, "UPtr*", hRegion)
+   E := DllCall("gdiplus\GdipGetClip", "UPtr", pGraphics, "UPtr", hRegion)
    If E
       return -1
    return hRegion
@@ -5848,7 +5848,7 @@ Gdip_GetClipRegion(pGraphics) {
 
 Gdip_SetClipRegion(pGraphics, hRegion, CombineMode:=0) {
    ; see CombineMode options from Gdip_SetClipRect()
-   return DllCall("gdiplus\GdipSetClipRegion", "UPtr", pGraphics, "UPtr", hRegion, "int", CombineMode)
+   return DllCall("gdiplus\GdipSetClipRegion", "UPtr", pGraphics, "UPtr", hRegion, "Int", CombineMode)
 }
 
 Gdip_SetClipRect(pGraphics, x, y, w, h, CombineMode:=0) {
