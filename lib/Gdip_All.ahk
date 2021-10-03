@@ -4757,6 +4757,42 @@ Gdip_SetStringFormatTrimming(hStringFormat, TrimMode) {
    return DllCall("gdiplus\GdipSetStringFormatTrimming", Ptr, hStringFormat, "int", TrimMode)
 }
 
+Gdip_SetStringFormatTabStops(hStringFormat, aTabStops) {
+; aTabStops - an array like this [50, 100]
+   if (!aTabStops.Length())
+      return
+   
+   firstTabOffset := 0
+   count := aTabStops.MaxIndex()
+   VarSetCapacity(tabStops, count * 4)
+   
+   for k, v in aTabStops
+      NumPut(v, tabStops, (A_Index - 1) * 4, "float")
+   
+   return, DllCall("gdiplus\GdipSetStringFormatTabStops", "UPtr", hStringFormat, "float", firstTabOffset, "int", count, "ptr", &tabStops)
+}
+
+Gdip_GetStringFormatTabStopCount(hStringFormat) {
+   VarSetCapacity(count, 4)
+   DllCall("gdiplus\GdipGetStringFormatTabStopCount", "UPtr", hStringFormat, "ptr", &count)
+   return, NumGet(count, 0, "int")
+}
+
+Gdip_GetStringFormatTabStops(hStringFormat) {
+; Returns an array like this [50, 80, 100] .
+   count := Gdip_GetStringFormatTabStopCount(hStringFormat)
+   firstTabOffset := 0
+   VarSetCapacity(tabStops, count * 4)
+   
+   DllCall("gdiplus\GdipGetStringFormatTabStops", "UPtr", hStringFormat, "int", count, "ptr", &firstTabOffset, "ptr", &tabStops)
+   
+   ret := []
+   loop, % count
+      ret.Push(NumGet(tabStops, (A_Index - 1) * 4, "float"))
+   
+   return, ret
+}
+
 Gdip_FontCreate(hFontFamily, Size, Style:=0, Unit:=0) {
 ; Font style options:
 ; Regular = 0
