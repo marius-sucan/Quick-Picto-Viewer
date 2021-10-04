@@ -2,7 +2,13 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
-- v5.3.0 (2021-09-15)
+- v5.3.1 (2021-09-20) [unreleased yet - work in progress]
+  - [new] Quick Picto Viewer settings can be stored now in the registry
+  - users can now combine the string filtering abilities with the already seen images filter, for files lists
+  - users can now adjust image selection area in the «jpeg lossless operations»
+ panel
+
+- v5.3.0 (2021-09-20)
   - [new] flood fill tool with advanced features: blending modes, tolerance and more options
   - quick menus search panel is now resizable
   - many important bug fixes
