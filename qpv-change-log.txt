@@ -2,10 +2,12 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
-- v5.3.1 (2021-09-20) [unreleased yet - work in progress]
-  - [new] Quick Picto Viewer settings can be stored now in the registry
+- v5.3.5 (2021-10-07)
   - [new] context menu when drawing freeform vector shapes
+  - [new] ability to perform undo/redo while drawing vector shapes, persistent between vector editing sessions
+  - [new] now any point on the path can be set as the start point; this gives users more control over where new points are added
   - [new] users can now select multiple points in a vector path to move simultaneously, or just delete them
+  - [new] option to deactivate the constant preview of the to-be added point on path
   - users can now combine the string filtering abilities with the already seen images filter, for files lists
   - users can now adjust image selection area in the «jpeg lossless operations»
  panel

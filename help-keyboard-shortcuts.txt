@@ -138,7 +138,7 @@ R|Review selected files list|Files list|Panel
 S|Toggle slideshow modes|Image view|-
 T|Toggle thumbnails aspect ratios: square, tall or wide|Files list|-
 T|Toggle image rescaling/adapting modes|Image view|-
-T|Toggle between different levels of points tension in the freeform path|Freeform drawing|-
+T|Cycle different levels of points tension in the freeform path|Freeform drawing|-
 U|Viewport colors and image adjustments|Image view|Panel
 X|Play associated audio file|Image view|-
 X|Mark active index to switch to a different index|Files list|-
@@ -240,9 +240,18 @@ Space|Scan for sub-folders in the selected folder|Folder tree|-
 Shift + 7|Move selected or active file(s) into...|Folder tree|-
 Double Left-Click on dot|Insert a new dot next to the double-clicked one|Freeform drawing|-
 Ctrl + Left-Click on dot|Remove the dot clicked on|Freeform drawing|-
+Alt + Left-Click on dot|Set point as path's start point|Freeform drawing|-
 Shift + Left-Click|Add new dot in the path constrained every 45 degrees|Freeform drawing|-
-Right-Click|Stop drawing the freeform path|Freeform drawing|-
-Right-Click on dot|Remove the dot clicked on|Freeform drawing|-
+Shift + Left-Click on dot|Select dot|Freeform drawing|-
+Right-Click|Options menu|Freeform drawing|Menu
+Shift + I|Invert selection path points|Freeform drawing|-
+Ctrl + A|Select all points in the path|Freeform drawing|-
+Ctrl + D|Deselect all points in the path|Freeform drawing|-
+Delete|Remove selected points in the path|Freeform drawing|-
+Ctrl + Z|Undo last shape action|Freeform drawing|-
+Ctrl + Y|Redo last shape action|Freeform drawing|-
+Y|Cycle shape symmetry modes|Freeform drawing|-
+Enter|Finish freeform path drawing|Freeform drawing|-
 Esc|Cancel freeform path drawing|Freeform drawing|-
 Shift + Left-Click on edges or dots|Resize selection area maintaing initial aspect ratio|Image selected area|-
 Shift + Left-Click inside area|Move selection area constrained on X or Y axis|Image selected area|-
@@ -270,4 +279,3 @@ Shift + K|Cycle between draw inside, outside or ignore selection area|Painting m
 P|Toggle between bulge and pinch brushes|Painting mode|-
 Shift + Y|Define symmetry painting coordinates|Painting mode|-
 Y|Cycle symmetry painting modes|Painting mode|-
-Y|Cycle shape symmetry modes|Freeform drawing|-

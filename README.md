@@ -38,10 +38,10 @@
 <li>Sort images by histogram data points, such as the average or median point, resolution, aspect ratio.</li>
 <li>Sort images by their properties such as resolution, aspect ratisomn ușor and so on.</li>
 <li>Options to control brightness, contrast, saturation and RGB color channels balance/intensity.</li>
+<li>Paint brushes: soft edges, cloner, eraser, pinch, bulge, smudge and more; all are customizable; textured brushes.</li>
+<li>Image editing tools: soft edges blur, advanced flood fill [color bucket], insert text, paste in place, draw arcs, lines and shapes, transform selected area, rotate, flip, pixelize, noise, crop and more</li>
+<li>Draw free-form curved paths or polygonal lines; options to fill with color, textures or gradients.</li>
 <li>Free-form curved or polygonal selections, elliptical and rectangular selections, rotated at any angle.</li>
-<li>Paint brushes: soft edges, cloner, eraser, pinch, bulge, smudge and more; all customizable.</li>
-<li>Image editing tools: soft edges blur, insert text, paste in place, draw arcs, lines and shapes, transform selected area, rotate, flip, pixelize, noise, crop and more</li>
-<li>Draw free-form curved paths or polygonal lines; options to use fill with color or gradients.</li>
 <li>18 blending modes and alpha masking support on paste in place or when using the transform tool on a selected area. The mask can be a gradient [linear, box, radial], an image file or a previously drawn path.</li>
 <li>Adaptive auto-adjustment of brightness, contrast and saturation of displayed images.</li>
 <li>Advanced yet easy to use auto-crop for images.</li>
