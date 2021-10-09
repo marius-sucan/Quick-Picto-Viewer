@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.3.5
+;@Ahk2Exe-SetVersion 5.3.6
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2021)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -176,7 +176,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , createdQuickMenuSearchWin := 0, hamDistInterpolation := 7, lastUserRclickVPx := 0, lastUserRclickVPy := 0
    , customShapeHasSelectedPoints := 0, currentVectorUndoLevel := 1, undoVectorShapesLevelsArray := []
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", lastTlbrCliicked := 0
-   , appVersion := "5.3.5", vReleaseDate := "07/10/2021"
+   , appVersion := "5.3.6", vReleaseDate := "09/10/2021"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1, usrAutoCropGenerateSelection := 0
@@ -302,7 +302,7 @@ OnExit, doCleanup
 initCompiled(A_IsCompiled)
 thisGDIPversion := Gdip_LibrarySubVersion()
 GDIPToken := Gdip_Startup()
-If (!GDIPToken || thisGDIPversion<1.88)
+If (!GDIPToken || thisGDIPversion<1.90)
 {
    MsgBox, 48, %appTitle%, ERROR: Unable to initialize GDI+...`n`nThe program will now exit.`n`nRequired GDI+ library wrapper: v1.84 - extended compilation edition.
    hasInitSpecialMode := 1
@@ -505,6 +505,8 @@ HKifs(q:=0) {
     vk57 up::   ; w to-do  to do
        If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1 && thumbsDisplaying!=1)
           flipSelectionWH()
+
+    ; doSkewTest()
     ; MsgBox, % ClipboardGetDropEffect()
 ; msgbox, % calculateNCR2(10201) ; OSD: looping... 10 202......0... combin=52025101
      ; reorderStoredHash("010110000010101011111001111101010111", "1001011011111111010010010101")
@@ -1921,6 +1923,7 @@ initQPVmainDLL() {
          DllPath := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\cPlusPlus\qpv-main\Release\qpvmain.dll"
    }
    qpvMainDll := DllCall("LoadLibraryW", "WStr", DllPath, "UPtr")
+   ; ToolTip, % A_LastError "==" qpvMainDll "`n" DllPath , , , 2
 }
 
 intializeWithGivenArguments() {
@@ -8797,12 +8800,12 @@ QPV_FloodFill(pBitmap, x, y, newColor, fillOpacity) {
   func2exec := (A_PtrSize=8) ? "FloodFyll" : "_FloodFyll@56"
   If !E1
      r := DllCall("qpvmain.dll\" func2exec, "UPtr", iScan, "Int", FloodFillModus, "Int", w, "Int", h, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", fillOpacity, "int", FloodFillDynamicOpacity, "int", FillAreaBlendMode - 1, "int", FloodFillCartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays)
+  ; ToolTip, % A_PtrSize "=" A_LastError "==" r "=" func2exec "=" SecToHHMMSS(Round(zeitOperation/1000, 3)) , , , 2
 
   If !E1
      Gdip_UnlockBits(pBitmap, iData)
 
   zeitOperation := A_TickCount - thisStartZeit
-  ; ToolTip, % r " qpv_flood " SecToHHMMSS(Round(zeitOperation/1000, 3)) , , , 2
   return r
 }
 
@@ -8908,12 +8911,12 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, threads) {
   func2exec := (A_PtrSize=8) ? "BlendBitmaps" : "_BlendBitmaps@24"
   If (!E1 && !E2)
      r := DllCall("qpvmain.dll\" func2exec, "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", blendMode, "Int", threads)
+  ; ToolTip, % A_LastError " r=" r "=" func2exec "=" A_TickCount - thisStartZeit, , , 2
 
   If !E1
      Gdip_UnlockBits(pBitmap, iData)
   If !E2
      Gdip_UnlockBits(pBitmap2Blend, mData)
-  ; ToolTip, % "r=" r " =qpv= " A_TickCount - thisStartZeit, , , 2
   return r
 }
 
@@ -22384,7 +22387,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
 
      lastInvoked := A_TickCount
      whichFile := (userAddedFavesCount>19) ? mainFavesFile : miniFavesFile
-     FileAppend, % imgPath "`n", % mainFavesFile, UTF-8
+     FileAppend, % imgPath "`n", % whichFile, UTF-8
      If ErrorLevel
      {
         showTOOLtip("Failed to update the favourites list`nThe image was not added to favourites")
@@ -22393,6 +22396,9 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
         Return
      }
 
+     whichFiled := (userAddedFavesCount>19) ? miniFavesFile : mainFavesFile
+     If !FileExist(whichFiled)
+        FileAppend, % "`n", % whichFiled, UTF-8
      userAddedFavesCount++
      IniAction(1, "userAddedFavesCount", "General")
      zPlitPath(imgPath, 0, OutFileName, OutDir)
@@ -22627,7 +22633,7 @@ retrieveFavesAsList(dummy:=0) {
    If (thisIndexu<2)
    {
       SoundBeep , 300, 100
-      showTOOLtip("Found insufficient favourite images")
+      showTOOLtip("WARNING: Found insufficient favourite images")
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
       Return
    }
@@ -63483,3 +63489,27 @@ moveMouseToolbar(direction, stepu) {
 ; Return
 ; #If
 
+doSkewTest() {
+   mainX := 0
+   mainY := 0
+   mainW := 300
+   mainH := 600
+
+Random, OutputVarT1X, % mainX, % mainW
+Random, OutputVarT1Y, % mainY, % mainH
+Random, OutputVarT2Y, % mainY, % mainH
+Random, OutputVarBX, % mainX, % mainW
+
+PointsList := []
+PointsList[1] := OutputVarT1X
+PointsList[2] := OutputVarT1Y
+PointsList[3] := mainW
+PointsList[4] := OutputVarT2Y
+PointsList[5] := OutputVarBX
+PointsList[6] := mainH
+Gdip_GraphicsClear(2NDglPG)
+   Gdip_DrawImagePointsRect(2NDglPG, gdiBitmap, PointsList)
+r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+
+
+}

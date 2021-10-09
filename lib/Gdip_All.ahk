@@ -16,6 +16,7 @@
 ;
 ; Gdip standard library versions:
 ; by Marius Șucan - gathered user-contributed functions and implemented hundreds of new functions
+; - v1.90 [09/10/2021]
 ; - v1.89 [08/10/2021]
 ; - v1.88 [05/10/2021]
 ; - v1.87 [29/09/2021]
@@ -67,6 +68,7 @@
 ; - v1.01 [05/31/2008]
 ;
 ; Detailed history:
+; - 09/10/2021 = [important release] major bug fixes for regressions introduced in previous version
 ; - 08/10/2021 = added more functions
 ; - 05/10/2021 = all functions that rely on CreatePointsF() or AllocateBinArray() can now handle being given an array or a string [to maintain compatibility); added Gdip_GaussianBlur(), Gdip_FillRoundedRectanglePath(), Gdip_DrawRoundedRectanglePath()
 ; - 24/08/2020 = Bug fixes and added Gdip_BlendBitmaps() and Gdip_SetAlphaChannel()
@@ -481,8 +483,8 @@ Gdip_BitmapFromHWND(hwnd, clientOnly:=0) {
 
 CreateRectF(ByRef RectF, x, y, w, h, dtype:="float") {
    VarSetCapacity(RectF, 16)
-   NumPut(x, RectF, 0, "float"), NumPut(y, RectF, 4, "float")
-   NumPut(w, RectF, 8, "float"), NumPut(h, RectF, 12, "float")
+   NumPut(x, RectF, 0, dtype), NumPut(y, RectF, 4, dtype)
+   NumPut(w, RectF, 8, dtype), NumPut(h, RectF, 12, dtype)
 }
 
 ;#####################################################################################
@@ -811,7 +813,7 @@ Gdip_LibraryVersion() {
 ;                 Updated by Marius Șucan reflecting the work on Gdip_all extended compilation
 
 Gdip_LibrarySubVersion() {
-   return 1.89 ; 08/10/2021
+   return 1.90 ; 09/10/2021
 }
 
 ;#####################################################################################
@@ -947,7 +949,7 @@ Gdip_DrawRectangle(pGraphics, pPen, x, y, w, h:=0) {
    If (!pGraphics || !pPen || !w)
       Return 2
 
-   if (h<=0)
+   if (h<=0 || !h)
       h := w
 
    Return DllCall("gdiplus\GdipDrawRectangle", "UPtr", pGraphics, "UPtr", pPen, "float", x, "float", y, "float", w, "float", h)
@@ -1039,7 +1041,7 @@ Gdip_DrawEllipse(pGraphics, pPen, x, y, w, h:=0) {
    If (!pGraphics || !pPen || !w)
       Return 2
 
-   if (h<=0)
+   if (h<=0 || !h)
       h := w
 
    Return DllCall("gdiplus\GdipDrawEllipse", "UPtr", pGraphics, "UPtr", pPen, "float", x, "float", y, "float", w, "float", h)
@@ -1283,7 +1285,7 @@ Gdip_FillRectangle(pGraphics, pBrush, x, y, w, h:=0) {
    If (!pGraphics || !pBrush || !w)
       Return 2
 
-   if (h<=0)
+   if (h<=0 || !h)
       h := w
 
    Return DllCall("gdiplus\GdipFillRectangle"
@@ -1429,7 +1431,7 @@ Gdip_FillEllipse(pGraphics, pBrush, x, y, w, h:=0) {
    If (!pGraphics || !pBrush || !w)
       Return 2
 
-   if (h<=0)
+   if (h<=0 || !h)
       h := w
 
    Return DllCall("gdiplus\GdipFillEllipse", "UPtr", pGraphics, "UPtr", pBrush, "float", x, "float", y, "float", w, "float", h)
@@ -5229,7 +5231,7 @@ Gdip_CreatePath(BrushMode:=0) {
 }
 
 Gdip_AddPathEllipse(pPath, x, y, w, h:=0) {
-   if (h<=0)
+   if (h<=0 || !h)
       h := w
 
    return DllCall("gdiplus\GdipAddPathEllipse", "UPtr", pPath, "float", x, "float", y, "float", w, "float", h)
@@ -5243,7 +5245,7 @@ Gdip_AddPathEllipseC(pPath, cx, cy, rx, ry := "") {
 }
 
 Gdip_AddPathRectangle(pPath, x, y, w, h:=0) {
-   if (h<=0)
+   if (h<=0 || !h)
       h := w
 
    return DllCall("gdiplus\GdipAddPathRectangle", "UPtr", pPath, "float", x, "float", y, "float", w, "float", h)
@@ -7272,7 +7274,7 @@ Gdip_PathGradientCreateFromPath(pPath) {
    ; Creates and returns a path gradient brush.
    ; pPath              path object returned from Gdip_CreatePath()
    pBrush := 0
-   gdipLastError := DllCall("gdiplus\GdipCreatePathGradientFromPath", "Ptr", pPath, "PtrP", pBrush)
+   gdipLastError := DllCall("gdiplus\GdipCreatePathGradientFromPath", "UPtr", pPath, "UPtr*", pBrush)
    Return pBrush
 }
 
@@ -7483,8 +7485,7 @@ Gdip_RotatePathGradientAtCenter(pPathGradientBrush, Angle, MatrixOrder:=1) {
 Gdip_PathGradientSetGammaCorrection(pPathGradientBrush, UseGammaCorrection) {
 ; Specifies whether gamma correction is enabled for a path gradient brush
 ; UseGammaCorrection: 1 or 0.
-   Static Ptr := "UPtr"
-   return DllCall("gdiplus\GdipSetPathGradientGammaCorrection", Ptr, pPathGradientBrush, "int", UseGammaCorrection)
+   return DllCall("gdiplus\GdipSetPathGradientGammaCorrection", "UPtr", pPathGradientBrush, "int", UseGammaCorrection)
 }
 
 Gdip_PathGradientSetWrapMode(pPathGradientBrush, WrapMode) {
@@ -7495,14 +7496,12 @@ Gdip_PathGradientSetWrapMode(pPathGradientBrush, WrapMode) {
 ; 3 - TileFlipXY - Tiles are flipped horizontally as you move along a row and flipped vertically as you move along a column
 ; 4 - Clamp - No tiling
 
-   Static Ptr := "UPtr"
-   return DllCall("gdiplus\GdipSetPathGradientWrapMode", Ptr, pPathGradientBrush, "int", WrapMode)
+   return DllCall("gdiplus\GdipSetPathGradientWrapMode", "UPtr", pPathGradientBrush, "int", WrapMode)
 }
 
 Gdip_PathGradientGetCenterColor(pPathGradientBrush) {
-   Static Ptr := "UPtr"
    ARGB := 0
-   E := DllCall("gdiplus\GdipGetPathGradientCenterColor", Ptr, pPathGradientBrush, "uint*", ARGB)
+   E := DllCall("gdiplus\GdipGetPathGradientCenterColor", "UPtr", pPathGradientBrush, "uint*", ARGB)
    If E
       return -1
    Return Format("{1:#x}", ARGB)

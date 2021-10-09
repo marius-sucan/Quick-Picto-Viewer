@@ -2,6 +2,9 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.3.6 (2021-10-09)
+  - major bug fixes; previous release broke freeimage support and all the dll functions from «qpvmain.dll»
+
 - v5.3.5 (2021-10-07)
   - [new] context menu when drawing freeform vector shapes
   - [new] ability to perform undo/redo while drawing vector shapes, persistent between vector editing sessions

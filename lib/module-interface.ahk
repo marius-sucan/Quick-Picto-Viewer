@@ -551,13 +551,20 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
     }
 
     If (drawingShapeNow=1)
-       MainExe.ahkPostFunction("stopDrawingShape")
+       ; MainExe.ahkPostFunction("stopDrawingShape")
+       remCustomShapePoint()
     Else If (imgEditPanelOpened=1)
        MainExe.ahkPostFunction("toggleImgEditPanelWindow")
     Else If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
        askAboutStoppingOperations()
     Else If !AnyWindowOpen
        MainExe.ahkPostFunction("ToggleThumbsMode")
+}
+
+remCustomShapePoint() {
+    MouseGetPos, , , OutputVarWin
+    GetMouseCoord2wind(PVhwnd, mX, mY, mXo, mYo)
+    sendWinClickAct("remClick", "n", OutputVarWin, mX, mY, mXo, mYo)
 }
 
 WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
