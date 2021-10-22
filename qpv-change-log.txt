@@ -2,6 +2,13 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.3.7 (2021-10-22)
+  - [new] option to deactivate quick file actions entirely; this is useful to prevent accidental file actions
+  - [new] contextual menu option to toggle gradient center repositioning when dealing with gradients
+  - freeform paths are now centered into the main selection bounding box
+  - improvements for «draw lines» panels
+  - other bug fixes
+
 - v5.3.6 (2021-10-09)
   - major bug fixes; previous release broke freeimage support and all the dll functions from «qpvmain.dll»
 

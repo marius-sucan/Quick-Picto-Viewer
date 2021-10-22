@@ -2,7 +2,27 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
-- v5.3.0 (2021-09-15)
+- v5.3.7 (2021-10-22)
+  - [new] option to deactivate quick file actions entirely; this is useful to prevent accidental file actions
+  - [new] contextual menu option to toggle gradient center repositioning when dealing with gradients
+  - freeform paths are now centered into the main selection bounding box
+  - improvements for «draw lines» panels
+  - other bug fixes
+
+- v5.3.6 (2021-10-09)
+  - major bug fixes; previous release broke freeimage support and all the dll functions from «qpvmain.dll»
+
+- v5.3.5 (2021-10-07)
+  - [new] context menu when drawing freeform vector shapes
+  - [new] ability to perform undo/redo while drawing vector shapes, persistent between vector editing sessions
+  - [new] now any point on the path can be set as the start point; this gives users more control over where new points are added
+  - [new] users can now select multiple points in a vector path to move simultaneously, or just delete them
+  - [new] option to deactivate the constant preview of the to-be added point on path
+  - users can now combine the string filtering abilities with the already seen images filter, for files lists
+  - users can now adjust image selection area in the «jpeg lossless operations»
+ panel
+
+- v5.3.0 (2021-09-20)
   - [new] flood fill tool with advanced features: blending modes, tolerance and more options
   - quick menus search panel is now resizable
   - many important bug fixes
