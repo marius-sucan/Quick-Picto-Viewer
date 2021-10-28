@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.3.7
+;@Ahk2Exe-SetVersion 5.3.8
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2021)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -173,11 +173,11 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , ToolbarWinW := 0, ToolbarWinH := 0, isToolbarKBDnav := 0, lastZeitIMGsaved := [], lastZeitUndoRecorded := 0
    , vpSymmetryPointX := 0, vpSymmetryPointY := 0, CustomShapeSymmetry := 0, CustomShapeLockedSymmetry := 0
    , vpSymmetryPointXdp := 0, vpSymmetryPointYdp := 0, userSeenSessionImagesIndex := 0, FloodFillSelectionAdj := 0
-   , createdQuickMenuSearchWin := 0, hamDistInterpolation := 7, lastUserRclickVPx := 0, lastUserRclickVPy := 0
+   , createdQuickMenuSearchWin := 0, lastUserRclickVPx := 0, lastUserRclickVPy := 0, vpFreeformShapeOffset := []
    , customShapeHasSelectedPoints := 0, currentVectorUndoLevel := 1, undoVectorShapesLevelsArray := []
-   , thisBMPdummy := 0, dummyGu := 9, vpFreeformShapeOffset := []
+   , thisBMPdummy := 0, dummyGu := 9
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", lastTlbrCliicked := 0
-   , appVersion := "5.3.7", vReleaseDate := "22/10/2021"
+   , appVersion := "5.3.8", vReleaseDate := "28/10/2021"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1, usrAutoCropGenerateSelection := 0
@@ -274,8 +274,8 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , BrushToolApplyColorFX := 0, PasteInPlaceBlendMode := 1, PasteInPlaceGlassy := 1, ToolbarScaleFactor := 1
    , ToolbarBgrColor := "212121", TLBRverticalAlign := 1, TLBRtwoColumns := 1, FillAreaApplyColorFX := 0
    , UserGIFsDelayu := 30, FloodFillCartoonMode := 0, FloodFillDynamicOpacity := 0, FloodFillAltToler := 1
-   , FloodFillEightWays := 0, maxVectorUndoLevels := 30, showNewVectorPointPreview := 1
-   , allowUserQuickFileActions := 1, userAllowsGradientRecentering := 0
+   , FloodFillEightWays := 0, maxVectorUndoLevels := 30, showNewVectorPointPreview := 1, hamDistInterpolation := 7
+   , allowUserQuickFileActions := 1, userAllowsGradientRecentering := 0, TextInAreaCaseTransform := 1
 
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
@@ -304,7 +304,7 @@ OnExit, doCleanup
 initCompiled(A_IsCompiled)
 thisGDIPversion := Gdip_LibrarySubVersion()
 GDIPToken := Gdip_Startup()
-If (!GDIPToken || thisGDIPversion<1.90)
+If (!GDIPToken || thisGDIPversion<1.92)
 {
    MsgBox, 48, %appTitle%, ERROR: Unable to initialize GDI+...`n`nThe program will now exit.`n`nRequired GDI+ library wrapper: v1.84 - extended compilation edition.
    hasInitSpecialMode := 1
@@ -7889,6 +7889,8 @@ HardWrapTextFontBased(TextToWrap, hFont, maxW, maxH, lineHeight) {
 }
 
 SimpleHardWrapText(TextToWrap, LengthLim) {
+; function no longer used
+; superseded by HardWrapTextFontBased()
    Static RegExDelimiters := "(\||\*|\!|\]|\[|\\|\/|\.|\=|\:|\;|\?|\@|\-|\_|\)|\(|\{|\}|\s)"
    LengthLim := Round(LengthLim)
    if (LengthLim<2)
@@ -7994,6 +7996,13 @@ Gdi_DrawTextInBox(theString, hFont, maxW, maxH, txtColor, bgrColor, borderSize:=
 coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
     Static OBJ_FONT := 6, testString := "This is going to a test", klop := 0
 
+    If (TextInAreaCaseTransform=2)
+       StringUpper, theString, % theString
+    Else If (TextInAreaCaseTransform=3)
+       StringLower, theString, % theString
+    Else If (TextInAreaCaseTransform=4)
+       StringUpper, theString, % theString, T
+
     Gdip_FromARGB("0xFF" TextInAreaFontColor, A, R, G, B)
     txtColor := Gdip_ToARGB(TextInAreaFontOpacity, R, G, B)
     Gdip_FromARGB("0xFF" TextInAreaBgrColor, A, R, G, B)
@@ -8073,18 +8082,13 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
        ; If !Trimmer(A_LoopField)
        ;    Continue
 
-       objBMPs := Gdi_DrawTextInBox(A_Space A_LoopField A_Space, thisHFont, maxW, maxH, "FFffFF", "000000", borderSize, 1, scaleuPreview)
+       objBMPs := Gdi_DrawTextInBox(Trim(A_LoopField, A_Space), thisHFont, maxW, maxH, "FFffFF", "000000", borderSize, 1, scaleuPreview)
        imgW := objBMPs[3], imgH := objBMPs[4]
        pBitmap := (doConturDraw=1 && TextInAreaOnlyBorder=1 && objBMPs[2]) ? objBMPs[2] : objBMPs[1]
        If (doConturDraw=1 && objBMPs[1] && TextInAreaOnlyBorder=1)
           trGdip_DisposeImage(objBMPs[1])
 
        pBitmapContours := objBMPs[2]
-       If (TextInAreaAlign=2)
-          thisX := maxW//2 - imgW//2
-       If (TextInAreaAlign=3)
-          thisX := maxW - imgW
-
        If (pEffect && (TextInAreaBgrUnified!=1 || TextInAreaPaintBgr!=1))
        {
           If (previewMode!=1 || userimgQuality=1)
@@ -8119,6 +8123,19 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
           thisOpacity := 1
        }
 
+       forceW := (imgW>=maxW) ? maxW : imgW
+       thisXbonus := (imgW>maxW) ? imgW - maxW : 0
+       If (rescaleWidthCharSpacing<1)
+       {
+          phorceW := Round(forceW*rescaleWidthCharSpacing)
+          forceW -= (forceW - phorceW)//2.5
+       }
+
+       If (TextInAreaAlign=2)
+          thisX := Round(maxW/2 - imgW/2 + thisXbonus/2)
+       Else If (TextInAreaAlign=3)
+          thisX := maxW - imgW + thisXbonus
+
        If (TextInAreaBgrUnified!=1 && TextInAreaPaintBgr=1)
        {
           If (TextInAreaCutOutMode!=1)
@@ -8131,13 +8148,6 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
              Gdip_FillRectangle(G, zBrush, 0, thisY, maxW, imgH)
              Gdip_ResetClip(G)
           }
-       }
-
-       forceW := (imgW>=maxW) ? maxW : imgW
-       If (rescaleWidthCharSpacing<1)
-       {
-          phorceW := Round(forceW*rescaleWidthCharSpacing)
-          forceW -= (forceW - phorceW)//2.5
        }
 
        If (doConturDraw=1 && TextInAreaOnlyBorder!=1 && pBitmapContours)
@@ -8157,7 +8167,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
 
           trGdip_GraphicsClear(A_ThisFunc, G5, borderColor)
           QPV_SetAlphaChannel(thizBMP, pBitmapContours, 0, 0, 1, threads)
-          trGdip_DrawImage(A_ThisFunc, G, thizBMP, thisX, thisY,forceW,imgH,,,,, thisOpacity)
+          trGdip_DrawImage(A_ThisFunc, G, thizBMP, thisX, thisY, forceW, imgH,,,,, thisOpacity)
           trGdip_DisposeImage(pBitmapContours, 1)
           trGdip_DisposeImage(thizBMP, 1)
           Gdip_DeleteGraphics(G5)
@@ -8167,11 +8177,12 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
        maxedH := max(thisY + imgH, maxedH)
        minedX := min(thisX, minedX)
        minedY := min(thisY, minedY)
-       drawFail := trGdip_DrawImage(A_ThisFunc, G, thisBMP, thisX, thisY,forceW,imgH,,,,, thisOpacity)
+       drawFail := trGdip_DrawImage(A_ThisFunc, G, thisBMP, thisX, thisY, forceW, imgH,,,,, thisOpacity)
        If (previewMode=1)
           thisY += imgH + Round(TextInAreaFontLineSpacing / scaleuPreview)
        Else
           thisY += imgH + TextInAreaFontLineSpacing
+
        trGdip_DisposeImage(pBitmap, 1)
        trGdip_DisposeImage(thisBMP, 1)
        Gdip_DeleteGraphics(G2)
@@ -10567,7 +10578,7 @@ livePreviewInsertTextinArea(actionu:=0) {
     GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
     calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
 
-    thisState := "a" UserTextArea TextInAreaAlign TextInAreaValign TextInAreaDoBlurs TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr imgSelW imgSelH mainWidth mainHeight TextInAreaLineAngle TextInAreaCharSpacing TextInAreaAutoWrap
+    thisState := "a" UserTextArea TextInAreaAlign TextInAreaValign TextInAreaDoBlurs TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr imgSelW imgSelH mainWidth mainHeight TextInAreaLineAngle TextInAreaCharSpacing TextInAreaAutoWrap TextInAreaCaseTransform
     o_coreFmt := coreDesiredPixFmt
     coreDesiredPixFmt := "0xE200B"
     If (A_TickCount - lastInvoked < 50) || (thisState=prevState)
@@ -14265,6 +14276,14 @@ PanelIndexedFilesStats() {
     SetTimer, ResetImgLoadStatus, -500, 900
 }
 
+UIeditHammingInterpolation() {
+    Gui, SettingsGUIA: Default
+    GuiControlGet, hamDistInterpolation
+    hamDistInterpolation := clampInRange(hamDistInterpolation, 0, 7)
+    IniAction(1, "hamDistInterpolation", "General")
+}
+
+
 PanelWrapperFilesStats() {
     thisBtnHeight := createSettingsGUI(58, A_ThisFunc)
     btnWid := 105
@@ -14287,7 +14306,8 @@ PanelWrapperFilesStats() {
     Gui, Add, Button, xp+15 y+5 hp gBtnCollectImageInfos, Collect image &properties
     Gui, Add, Text, y+5, File details are collected as well.
     Gui, Add, Button, y+15 h%thisBtnHeight% gBtnCollectHistoInfos, Collect image &histograms properties
-    Gui, Add, Text, y+5, Image fingerprints and properties are collected as well.
+    Gui, Add, Edit, x+5 hp w20 number limit1 vhamDistInterpolation gUIeditHammingInterpolation, % hamDistInterpolation
+    Gui, Add, Text, xs y+5, Image fingerprints and properties are collected as well.
 
     Gui, Tab
     Gui, Add, Button, xs y+35 h%thisBtnHeight% gPanelEnableFilesFilter, C&reate custom filter
@@ -21987,6 +22007,7 @@ readSlideSettings(readThisFile, act) {
      IniAction(act, "zoomLevel", "General", 2,0.01,20,, readThisFile)
      IniAction(act, "SlidesMusicSong", "General", 0,0,0,, readThisFile)
      IniAction(act, "autoPlaySlidesAudio", "General", 1,0,0,, readThisFile)
+     IniAction(act, "hamDistInterpolation", "General", 2,0,7,, readThisFile)
 
      If (act=0)
      {
@@ -31570,6 +31591,7 @@ ReadSettingsTextInArea(act:=0) {
     INIaction(act, "TextInAreaPaintBgr", "General", 1)
     INIaction(act, "TextInAreaRoundBoxBgr", "General", 1)
     INIaction(act, "TextInAreaAutoWrap", "General", 1)
+    INIaction(act, "TextInAreaCaseTransform", "General", 2, 1, 4)
     INIaction(act, "TextInAreaLivePreview", "General", 1)
 }
 
@@ -31621,7 +31643,7 @@ PanelInsertTextArea() {
     Gui, Add, Tab3,, Text|Styling|Colors
     Gui, Tab, 1
     Gui, Add, Edit, x+15 y+15 Section w%txtWid% r10 gupdateUIInsertTextPanel vUserTextArea, % UserTextArea
-    Gui, Add, Text, , Font name:
+    Gui, Add, Text, , Font:
     Gui, Add, DropDownList, x+5 w%ddWid% Sort Choose1 gupdateUIInsertTextPanel vTextInAreaFontName, % TextInAreaFontName
     Gui, Add, Checkbox, x+5 gupdateUIInsertTextPanel Checked%TextInAreaAutoWrap% vTextInAreaAutoWrap, Auto line wrapping
 
@@ -31632,6 +31654,7 @@ PanelInsertTextArea() {
     Gui, Add, Text, xs yp+30, Border style / thickness
     Gui, Add, Checkbox, xs yp+30 gupdateUIInsertTextPanel Checked%TextInAreaDoBlurs% vTextInAreaDoBlurs, Blur amount for text / outline
     Gui, Add, Checkbox, xs yp+30 gupdateUIInsertTextPanel Checked%TextInAreaPaintBgr% vTextInAreaPaintBgr, Draw background
+    Gui, Add, DropDownList, xs yp+30 wp gupdateUIInsertTextPanel Choose%TextInAreaCaseTransform% AltSubmit vTextInAreaCaseTransform, Transform case|CAPITALIZED|lowercase|Title Case
 
     Gui, Add, Edit, xs+%columnBpos% ys+0 Section w%editWid% r1 gupdateUIInsertTextPanel limit4 -multi -wantCtrlA -wantTab -wrap veditF11, % TextInAreaLineAngle
     Gui, Add, UpDown, vTextInAreaLineAngle Range-900-900, % TextInAreaLineAngle
@@ -31692,7 +31715,7 @@ PanelInsertTextArea() {
 
     PopulateFontsList("TextInAreaFontName", "SettingsGUIA")
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
-    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Insert text into selected area: " appTitle, winPos)
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Insert text in image: " appTitle, winPos)
     SetTimer, updateUIInsertTextPanel, -250
 }
 
@@ -31745,6 +31768,7 @@ updateUIInsertTextPanel(actionu:=0) {
     GuiControlGet, TextInAreaPaintBgr
     GuiControlGet, TextInAreaLineAngle
     GuiControlGet, TextInAreaRoundBoxBgr
+    GuiControlGet, TextInAreaCaseTransform
     GuiControlGet, TextInAreaLivePreview
     GuiControlGet, UserTextArea
 
@@ -31760,7 +31784,6 @@ updateUIInsertTextPanel(actionu:=0) {
        Return
     }
 
-    GuiControl, SettingsGUIA:, infoTextBlur, Blur amount: %TextInAreaBlurAmount%
     actu := (TextInAreaPaintBgr=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu, TextInAreaBgrOpacity
     GuiControl, % actu, TextInAreaBgrColor
@@ -31780,14 +31803,22 @@ updateUIInsertTextPanel(actionu:=0) {
     }
 
     actu2 := (TextInAreaBorderOut>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
-    GuiControl, % actu2, editF7
     GuiControl, % actu2, editF2
+    GuiControl, % actu2, editF7
     GuiControl, % actu2, TextInAreaBorderSize
     GuiControl, % actu2, TextInAreaBorderColor
     GuiControl, % actu2, TextInAreaBorderOpacity
-    GuiControl, % actu2, TextInAreaBlurBorderAmount
     GuiControl, % actu2, PickuTextInAreaBorderColor
     GuiControl, % actu2, TextInAreaOnlyBorder
+
+
+    actu2 := (TextInAreaDoBlurs=1 &&TextInAreaBorderOut>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    GuiControl, % actu2, TextInAreaBlurBorderAmount
+    GuiControl, % actu2, editF8
+
+    actu2 := (TextInAreaDoBlurs=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    GuiControl, % actu2, TextInAreaBlurAmount
+    GuiControl, % actu2, editF6
 
     If (TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1)
        GuiControl, SettingsGUIA: Enable, TextInAreaRoundBoxBgr
@@ -36026,7 +36057,7 @@ createMenuImageEditSubMenus() {
       kMenu("PVimgDraw", "Add", "&Flood fill / color bucket`tK", "PanelFloodFillTool")
       kMenu("PVimgDraw", "Add", "Draw s&hape contours", "PanelDrawShapesInArea", "lines")
       kMenu("PVimgDraw", "Add", "&Draw simple lines or arcs`tCtrl+L", "PanelDrawLines")
-      kMenu("PVimgDraw", "Add", "Insert te&xt into selection`tShift+T", "PanelInsertTextArea", "write")
+      kMenu("PVimgDraw", "Add", "Insert te&xt`tShift+T", "PanelInsertTextArea", "write")
       kMenu("PVimgTransform", "Add", "&Advanced live transform`tCtrl+T", "PanelTransformSelectedArea", "crop rotate resize clone blend alpha-masking flip blur glass effects adjust colors")
       Menu, PVimgTransform, Add, 
       kMenu("PVimgTransform", "Add", "Flip selected &horizontally`tShift+H", "FlipSelectedAreaH")
@@ -49895,6 +49926,7 @@ OpenSLDBdataBase(fileNamu, importMode:=0) {
      SlidesMusicSong := ""
      IniSLDBreadAll("autoPlaySlidesAudio")
      IniSLDBreadAll("SlidesMusicSong")
+     IniSLDBreadAll("hamDistInterpolation")
   }
 
   RecordSet := ""
@@ -51743,9 +51775,8 @@ testIsDupesList() {
 }
 
 PanelFindDupes() {
-    Global userFindDupesSelectAllDummy := 0
+    Global userFindDupesSelectAllDummy := 0, hasOpened
     userFindDupesSelectAllDummy := 0
-    Static hasOpened
     If !hasOpened
     {
        Global UIcheckimgfile := 0, UIcheckfcreated := 0, UIcheckfmodified := 0, UIcheckfsize := 0, UIcheckkbfsize := 0, UIcheckimgpixfmt := 0, UIcheckimgwidth := 0, UIcheckimgheight := 0, UIcheckimgmegapix := 0, UIcheckimgwhratio := 0, UIcheckimgframes := 0, UIcheckimghpeak := 0, UIcheckimghlow := 0
@@ -52045,7 +52076,6 @@ UIfindDupesCheckboxes(hactu, v:="") {
    GuiControl, % actu, editFE
 }
 
-
 BTNfindDupesNow() {
    If (AnyWindowOpen!=49)
       Return
@@ -52156,12 +52186,18 @@ BTNfindDupesNow() {
    ; Gui, SettingsGUIA: Submit, NoHide
    ; ToolTip, % userFindDupePresets "==" columnus , , , 2
    columnus := Trimmer(columnus, ",")
-   If (InStr(columnus, "innerpixelz") && userFindDupesFilterHamDist=1)
+   If (StrLen(theseCols)<3 && userFindDupesFilterHamDist=1)
+   {
+      findDupesPrecision := 1
+      columnus := theseCols := "imgwhratio"
+   } Else If (InStr(columnus, "innerpixelz") && userFindDupesFilterHamDist=1)
    {
       theseCols := StrReplace(columnus, "innerpixelz")
       theseCols := StrReplace(theseCols, "outerpixelz")
       theseCols := StrReplace(theseCols, ",,", ",")
       theseCols := StrReplace(theseCols, ", ,", ",")
+      If StrLen(theseCols)<3
+         columnus := theseCols := "imgwhratio"
    } Else theseCols := columnus
 
    If StrLen(theseCols)<3
@@ -52926,8 +52962,8 @@ updatePanelColorSliderz() {
 }
 
 updatePanelColorsInfo() {
-   Static colorzFXinfoz := 0, colorzFXminz := 0, colorzFXmaxz := 0
-   Static lastInvoked := 1
+   Static colorzFXinfoz := 0, colorzFXminz := 0, colorzFXmaxz := 0, lastInvoked := 1
+
    If (A_TickCount - lastInvoked < 100)
    {
       SetTimer, % A_ThisFunc, -110

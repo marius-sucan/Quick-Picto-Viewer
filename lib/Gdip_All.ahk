@@ -16,6 +16,7 @@
 ;
 ; Gdip standard library versions:
 ; by Marius Șucan - gathered user-contributed functions and implemented hundreds of new functions
+; - v1.92 [28/10/2021]
 ; - v1.91 [11/10/2021]
 ; - v1.90 [09/10/2021]
 ; - v1.89 [08/10/2021]
@@ -69,6 +70,7 @@
 ; - v1.01 [05/31/2008]
 ;
 ; Detailed history:
+; - 28/10/2021 = Added Gdip_TranslatePath(), Gdip_ScalePath() and Gdip_RotatePath(). Improved Gdip_RotatePathAtCenter()
 ; - 11/10/2021 = more bug fixes; Gdip_CreatePath() now accepts passing a flat array object that defines the new path; some functions will now return values separated by pipe | instead of a comma [for better consistency across functions]
 ; - 09/10/2021 = [important release] major bug fixes for regressions introduced in previous version
 ; - 08/10/2021 = added more functions
@@ -835,7 +837,7 @@ Gdip_LibraryVersion() {
 ;                 Updated by Marius Șucan reflecting the work on Gdip_all extended compilation
 
 Gdip_LibrarySubVersion() {
-   return 1.91 ; 11/10/2021
+   return 1.92 ; 28/10/2021
 }
 
 ;#####################################################################################
@@ -7194,7 +7196,7 @@ Gdip_GetPathWorldBounds(pPath, hMatrix:=0, pPen:=0) {
 ; hMatrix to use for calculating the boundaries
 ; pPen to use for calculating the boundaries
 ; Both will not affect the actual GraphicsPath.
-; Please note: his function yields inaccurate bounds even for mildly complex paths.
+; Please note: this function yields inaccurate bounds even for mildly complex paths.
 ; Proposed solution:
 ; Set the path you want measured as a clip for a given pGraphics and use Gdip_GetClipBounds() for accurate results.
 
