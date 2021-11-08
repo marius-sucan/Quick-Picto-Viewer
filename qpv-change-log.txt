@@ -2,6 +2,15 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.3.9 (2021-11-08)
+  - [new] ability to pan images out of viewport
+  - [new] right-click context menus for the histogram box and image navigator box
+  - [new] adapt image to window width or height options implemented
+  - [new] option to attach/detach toolbar to the main window
+  - viewport scrollbars no longer change their positions when the viewport is flipped
+  - HUD elements [histogram, info box and image navigator] will no longer appear beneath the toolbar if the toolbar is attached to the main window [top, left corner]
+  - bug fixes
+
 - v5.3.8 (2021-10-28)
   - [new] option to change text case in «Insert text» panel
   - bug fixes related to «insert text»

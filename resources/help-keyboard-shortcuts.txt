@@ -67,7 +67,6 @@ Ctrl + N|Create new image|Anywhere|Panel
 Ctrl + S|Save image panel|Image view|Panel
 Ctrl + S|Save files list as slideshow (.SLD)|Files list|Panel
 Ctrl + O|Open file(s)|Anywhere|Files selector
-Ctrl + Q|Toggle image down-scaling|Image view|-
 Ctrl + R|Resize, rotate or crop image(s)|Anywhere|Panel
 Alt + R|Resize image to viewport selection area|Image view|-
 Ctrl + Shift + N|Open new QPV instance|Anywhere|External app

@@ -1,9 +1,15 @@
 ﻿#Persistent
 #NoTrayIcon
+#MaxHotkeysPerInterval, 950
+#HotkeyInterval, 50
+#MaxThreads, 255
+#MaxThreadsPerHotkey, 1
+#MaxThreadsBuffer, Off
 SetWinDelay, 1
 CoordMode, Mouse, Screen
 SetBatchLines, -1
 SetWorkingDir, %A_ScriptDir%
+
 Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Quick Picto Viewer"
      , RegExFilesPattern := "i)^(.\:\\).*(\.(ico|dib|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif))$"
      , PVhwnd, hGDIwin, hGDIthumbsWin, WindowBgrColor, mainCompiledPath
@@ -30,7 +36,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , currentFilesListModified := 0, folderTreeWinOpen := 0, hStatusBaru, OSDFontName := "Arial"
      , OSDbgrColor := "001100", OSDtextColor := "FFeeFF", LargeUIfontValue := 14, allowMenuReader := 0
      , lastMenuInvoked := [], hQPVtoolbar := 0, ShowAdvToolbar := 0
-     , isToolbarActivated := 0
+     , isToolbarActivated := 0, lockToolbar2Win := 1
 
 Global allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, askDeleteFiles, mouseToolTipWinCreated := 0
 , AutoDownScaleIMGs, autoPlaySNDs, autoRemDeadEntry, ColorDepthDithering, countItemz, currentFileIndex, CurrentSLD, defMenuRefreshItm, doSlidesTransitions
@@ -48,8 +54,9 @@ OnMessage(0x201, "WM_LBUTTONDOWN")
 OnMessage(0x202, "WM_LBUTTONUP")
 OnMessage(0x205, "WM_RBUTTONUP")
 OnMessage(0x207, "WM_MBUTTONDOWN")
-OnMessage(0x216, "WM_MOVING") ; window moving
-OnMessage(0x024B, "WM_POINTERACTIVATE") 
+; OnMessage(0x216, "WM_MOVING") ; window moving
+OnMessage(0x047, "WM_WINDOWPOSCHANGED") ; window moving
+OnMessage(0x24B, "WM_POINTERACTIVATE") 
 ; OnMessage(0x0247, "WM_POINTERUP") 
 ; OnMessage(0x20, "WM_SETCURSOR")
 ; OnMessage(0x203, "WM_LBUTTON_DBL") ; WM_LBUTTONDOWN double click
@@ -837,16 +844,37 @@ ResetLbtn() {
 WM_MOVING() {
   ; If (toolTipGuiCreated=1)
   ;    MainExe.ahkPostFunction("TooltipCreator", 1, 1)
-  If (tempBtnVisible!="null")
-     MainExe.ahkPostFunction("DestroyTempBtnGui", "now")
+}
 
-  SetTimer, saveMainWinPos, -35
-  Global lastWinDrag := A_TickCount
-  If (A_OSVersion="WIN_7" || isWinXP=1)
-     SetTimer, updateGDIwinPos, -5
+WM_WINDOWPOSCHANGED() {
+   Static b
+   WinGet, winStateu, MinMax, ahk_id %PVhwnd%
+   If (winStateu=-1)
+      Return
+
+   WinGetPos, winX, winY, winWidth, winHeight, ahk_id %PVhwnd%
+   a := "a" winX winY winWidth winHeight
+   If (a!=b)
+   {
+      ; Random, z, -900, 900
+      ; ToolTip, % z , , , 2
+      If (tempBtnVisible!="null")
+         MainExe.ahkPostFunction("DestroyTempBtnGui", "now")
+      SetTimer, saveMainWinPos, -35
+      Global lastWinDrag := A_TickCount
+      If (A_OSVersion="WIN_7" || isWinXP=1)
+         SetTimer, updateGDIwinPos, -5
+      If (ShowAdvToolbar=1 && lockToolbar2Win=1)
+         SetTimer, tlbrResetPosition, -90
+      b := a
+  }
 }
 
 saveMainWinPos() {
+     MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+tlbrResetPosition() {
      MainExe.ahkPostFunction(A_ThisFunc)
 }
 
