@@ -4642,17 +4642,17 @@ isDotInRect(mX, mY, x1, x2, y1, y2, modus:=0) {
    Return r
 }
 
-determineSelAreaClickRect(mXoT, mYoT, dotsSize, mainWidth, mainHeight, doFlips) {
+determineSelAreaClickRect(mX, mY, dotsSize, mainWidth, mainHeight, doFlips) {
    If (showHUDnavIMG=1 && hasDrawnImageMap=1 && IMGlargerViewPort=1
-   && isDotInRect(mXoT, mYoT, HUDobjNavBoxu[7], HUDobjNavBoxu[5] + HUDobjNavBoxu[7], HUDobjNavBoxu[8], HUDobjNavBoxu[6] + HUDobjNavBoxu[8]))
+   && isDotInRect(mX, mY, HUDobjNavBoxu[7], HUDobjNavBoxu[5] + HUDobjNavBoxu[7], HUDobjNavBoxu[8], HUDobjNavBoxu[6] + HUDobjNavBoxu[8]))
       Return
 
    If ((IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && (scrollBarHy>1 || scrollBarVx>1) && thumbsDisplaying!=1)
    {
       ; handle clicks on the H/V scrollbars for images larger than the viewport
       knobSize := imgHUDbaseUnit//3
-      If (scrollBarHy>1 && mYoT>(mainHeight - knobSize))
-      || (scrollBarVx>1 && mXoT>(mainWidth - knobSize))
+      If (scrollBarHy>1 && mY>(mainHeight - knobSize))
+      || (scrollBarVx>1 && mX>(mainWidth - knobSize))
          Return
    }
 
@@ -4682,106 +4682,107 @@ determineSelAreaClickRect(mXoT, mYoT, dotsSize, mainWidth, mainHeight, doFlips) 
    }
 
    d := dotsSize//2
-   If isDotInRect(mXoT, mYoT, nselDotX, nselDotX + dotsSize, nselDotY, nselDotY + dotsSize)
+   If isDotInRect(mX, mY, nSelDotX, nSelDotX + dotsSize, nSelDotY, nSelDotY + dotsSize)
    {
       ; top-left corner
-      cX1 := nselDotBx + d "," nselDotBy + d "|"
-      cX1 .= nselDotX + d "," nselDotY + d "|"
-      cX1 .= nselDotCx + d "," nselDotCy + d
-      cX2 := nselDotX
-      cY2 := nselDotY
+      cX1 := nSelDotBx + d "," nSelDotBy + d "|"
+      cX1 .= nSelDotX + d "," nSelDotY + d "|"
+      cX1 .= nSelDotCx + d "," nSelDotCy + d
+      cX2 := nSelDotX
+      cY2 := nSelDotY
       dotActive := 1
       DotPosX := imgSelX1
       DotPosY := imgSelY1
-   } Else If isDotInRect(mXoT, mYoT, nselDotAx, nselDotAx + dotsSize, nselDotAy, nselDotAy + dotsSize)
+   } Else If isDotInRect(mX, mY, nSelDotAx, nSelDotAx + dotsSize, nSelDotAy, nSelDotAy + dotsSize)
    {
       ; bottom-right corner
-      cX1 := nselDotBx + d "," nselDotBy + d "|"
-      cX1 .= nselDotAx + d "," nselDotAy + d "|"
-      cX1 .= nselDotCx + d "," nselDotCy + d
-      cX2 := nselDotAx
-      cY2 := nselDotAy
+      cX1 := nSelDotBx + d "," nSelDotBy + d "|"
+      cX1 .= nSelDotAx + d "," nSelDotAy + d "|"
+      cX1 .= nSelDotCx + d "," nSelDotCy + d
+      cX2 := nSelDotAx
+      cY2 := nSelDotAy
       dotActive := 2
       DotPosX := imgSelX2
       DotPosY := imgSelY2
-   } Else If isDotInRect(mXoT, mYoT, nselDotCx, nselDotCx + dotsSize, nselDotCy, nselDotCy + dotsSize)
+   } Else If isDotInRect(mX, mY, nSelDotCx, nSelDotCx + dotsSize, nSelDotCy, nSelDotCy + dotsSize)
    {
-      cX1 := nselDotX + d "," nselDotY + d "|"
-      cX1 .= nselDotCx + d "," nselDotCy + d "|"
-      cX1 .= nselDotAx + d "," nselDotAy + d
-      cX2 := nselDotCx
-      cY2 := nselDotCy
+      cX1 := nSelDotX + d "," nSelDotY + d "|"
+      cX1 .= nSelDotCx + d "," nSelDotCy + d "|"
+      cX1 .= nSelDotAx + d "," nSelDotAy + d
+      cX2 := nSelDotCx
+      cY2 := nSelDotCy
       dotActive := 4
       DotPosX := imgSelX1
       DotPosY := imgSelY2
-   } Else If isDotInRect(mXoT, mYoT, nselDotBx, nselDotBx + dotsSize, nselDotBy, nselDotAy)
+   } Else If isDotInRect(mX, mY, nSelDotBx, nSelDotBx + dotsSize, nSelDotBy, nSelDotBy + dotsSize)
    {
-      cX1 := nselDotX + d "," nselDotY + d "|"
-      cX1 .= nselDotBx + d "," nselDotBy + d "|"
-      cX1 .= nselDotAx + d "," nselDotAy + d 
-      cX2 := nselDotBx
-      cY2 := nselDotBy
+      cX1 := nSelDotX + d "," nSelDotY + d "|"
+      cX1 .= nSelDotBx + d "," nSelDotBy + d "|"
+      cX1 .= nSelDotAx + d "," nSelDotAy + d 
+      cX2 := nSelDotBx
+      cY2 := nSelDotBy
       dotActive := 3
       DotPosX := imgSelX2
       DotPosY := imgSelY1
-   } Else If isDotInRect(mXoT, mYoT, nselDotX, nselDotBx, nselDotY, nselDotY + dotsSize)
+   } Else If isDotInRect(mX, mY, nSelDotX, nSelDotBx, nSelDotY, nSelDotY + dotsSize)
    {
-      cX1 := nselDotX
-      cX2 := nselDotBx
-      cY1 := nselDotY + dotsSize//2
-      cY2 := nselDotY + dotsSize//2
+      cX1 := nSelDotX
+      cX2 := nSelDotBx
+      cY1 := nSelDotY + dotsSize//2
+      cY2 := nSelDotY + dotsSize//2
       dotActive := 5
       DotPosX := imgSelX1
       DotPosY := imgSelY1
-   } Else If isDotInRect(mXoT, mYoT, nselDotCx, nselDotBx, nselDotCy, nselDotCy + dotsSize)
+   } Else If isDotInRect(mX, mY, nSelDotCx, nSelDotBx, nSelDotCy, nSelDotCy + dotsSize)
    {
-      cX1 := nselDotCx
-      cX2 := nselDotBx
-      cY1 := nselDotCy + dotsSize//2
-      cY2 := nselDotCy + dotsSize//2
+      cX1 := nSelDotCx
+      cX2 := nSelDotBx
+      cY1 := nSelDotCy + dotsSize//2
+      cY2 := nSelDotCy + dotsSize//2
       dotActive := 6
       DotPosX := imgSelX1
       DotPosY := imgSelY2
-   } Else If isDotInRect(mXoT, mYoT, nselDotX, nselDotX + dotsSize, nselDotY, nselDotCy)
+   } Else If isDotInRect(mX, mY, nSelDotX, nSelDotX + dotsSize, nSelDotY, nSelDotCy)
    {
-      cX1 := nselDotX + dotsSize//2
-      cX2 := nselDotX + dotsSize//2
-      cY1 := nselDotY
-      cY2 := nselDotCy
+      cX1 := nSelDotX + dotsSize//2
+      cX2 := nSelDotX + dotsSize//2
+      cY1 := nSelDotY
+      cY2 := nSelDotCy
       dotActive := 7
       DotPosX := imgSelX1
       DotPosY := imgSelY1
-   } Else If isDotInRect(mXoT, mYoT, nselDotBx, nselDotBx + dotsSize, nselDotAy, nselDotBy + dotsSize)
+   } Else If isDotInRect(mX, mY, nSelDotBx, nSelDotBx + dotsSize, nSelDotAy, nSelDotBy + dotsSize)
    {
-      cX1 := nselDotBx + dotsSize//2
-      cX2 := nselDotBx + dotsSize//2
-      cY1 := nselDotAy
-      cY2 := nselDotBy
+      cX1 := nSelDotBx + dotsSize//2
+      cX2 := nSelDotBx + dotsSize//2
+      cY1 := nSelDotAy
+      cY2 := nSelDotBy
       dotActive := 8
       DotPosX := imgSelX2
       DotPosY := imgSelY1
-   } Else If isDotInRect(mXoT, mYoT, nselDotDx, nselDotDx + dotsSize, nselDotDy, nselDotDy + dotsSize)
+   } Else If isDotInRect(mX, mY, nSelDotDx, nSelDotDx + dotsSize, nSelDotDy, nSelDotDy + dotsSize)
    {
       ; click the center dot of the selection area
-      cX1 := nselDotDx
-      cX2 := nselDotDx + dotsSize
-      cY1 := nselDotDy
-      cY2 := nselDotDy + dotsSize
+      cX1 := nSelDotDx
+      cX2 := nSelDotDx + dotsSize
+      cY1 := nSelDotDy
+      cY2 := nSelDotDy + dotsSize
       dotActive := 10
       DotPosX := imgSelX1
       DotPosY := imgSelY1
-   } Else If isDotInRect(mXoT, mYoT, nselDotX, nselDotBx, nselDotBy, nselDotAy)
+   } Else If isDotInRect(mX, mY, nSelDotX, nSelDotBx, nSelDotBy, nSelDotAy)
    {
       ; click anywhere within the selection
-      cX1 := nselDotX
-      cX2 := nselDotBx
-      cY1 := nselDotBy
-      cY2 := nselDotAy
+      cX1 := nSelDotX
+      cX2 := nSelDotBx
+      cY1 := nSelDotBy
+      cY2 := nSelDotAy
       dotActive := 9
       DotPosX := imgSelX1
       DotPosY := imgSelY1
    }
-   ; ToolTip, % "l=" dotActive , , , 2
+   ; z := nSelDotX "=" nSelDotY "`n" nSelDotAx "=" nSelDotAy "`n" nSelDotBx "=" nSelDotBy
+   ; ToolTip, % "d=" y "=l=" dotActive "`n" z "`n" mX "=" mY , , , 2
    obju := []
    obju.n := dotActive
    obju.x := DotPosX
@@ -4797,6 +4798,8 @@ determineSelAreaClickRect(mXoT, mYoT, dotsSize, mainWidth, mainHeight, doFlips) 
 
    Return obju
 }
+
+
 
 createMenuCustomShapeDrawing(mX, mY, dontAddPoint) {
    deleteMenus()
