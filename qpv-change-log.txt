@@ -2,8 +2,18 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.4.0 (2021-11-19)
+  - [new] options to select files added to favourites and already seen images
+  - [new] files list map; helps see at a glance what files are selected; this is useful for large files lists
+  - [new] option to show folder details in the folders tree panel
+  - bug fixes related to duplicates detection; it no longer crashes under some circumstances
+  - fixes related to image panning using the scrollbars when free image panning is activated
+  - fixes related to files list image details mode
+  - improved performance for opening SLDB files list
+  - other bug fixes and improvements
+
 - v5.3.9 (2021-11-08)
-  - [new] ability to pan images out of viewport
+  - [new] ability to pan images out of viewport [by default turned off]
   - [new] right-click context menus for the histogram box and image navigator box
   - [new] adapt image to window width or height options implemented
   - [new] option to attach/detach toolbar to the main window

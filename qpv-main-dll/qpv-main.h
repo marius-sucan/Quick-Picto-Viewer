@@ -8,3 +8,9 @@
 #define DLL_API extern "C" __declspec(dllexport)
 #define M_PI           3.14159265358979323846  /* pi */
 #define DLL_CALLCONV __stdcall
+
+// IWICImagingFactory *m_pIWICFactory;
+// IWICBitmapSource   *m_pOriginalBitmapSource;
+// IWICBitmapSource   *pToRenderBitmapSource;
+// BYTE               *m_pbBuffer;
+

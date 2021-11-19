@@ -833,6 +833,96 @@ Class SQLiteDB {
    ; Return values:        On success  - True, TB contains the result object
    ;                       On failure  - False, ErrorMsg / ErrorCode contain additional information
    ; ===================================================================================================================
+
+   GetTablePersonalizedSLDBopen(SQL, importMode, ByRef resultedFilesList, MaxResult:=0) {
+      TB := ""
+      This.ErrorMsg := ""
+      This.ErrorCode := 0
+      This.SQL := SQL
+      If !(This._Handle) {
+         This.ErrorMsg := "Invalid database handle!"
+         Return False
+      }
+
+      ; If !RegExMatch(SQL, "i)^\s*(SELECT|PRAGMA)\s") {
+      ;    This.ErrorMsg := A_ThisFunc . " requires a query statement!"
+      ;    Return False
+      ; }
+
+      Names := ""
+      Err := 0, RC := 0, GetRows := 0
+      I := 0, Rows := Cols := 0
+      Table := 0
+      If MaxResult Is Not Integer
+         MaxResult := 0
+      If (MaxResult < -2)
+         MaxResult := 0
+      This._StrToUTF8(SQL, UTF8)
+      RC := DllCall("SQlite3.dll\sqlite3_get_table", "Ptr", This._Handle, "Ptr", &UTF8, "PtrP", Table
+                  , "IntP", Rows, "IntP", Cols, "PtrP", Err, "Cdecl Int")
+      If (ErrorLevel) {
+         This.ErrorMsg := "DLLCall sqlite3_get_table failed!"
+         This.ErrorCode := ErrorLevel
+         Return False
+      }
+      If (RC) {
+         This.ErrorMsg := StrGet(Err, "UTF-8") "`n" This.SQL
+         This.ErrorCode := RC
+         DllCall("SQLite3.dll\sqlite3_free", "Ptr", Err, "Cdecl")
+         Return False
+      }
+      TB := new This._Table
+      TB.ColumnCount := Cols
+      TB.RowCount := Rows
+      If (MaxResult = -1) {
+         DllCall("SQLite3.dll\sqlite3_free_table", "Ptr", Table, "Cdecl")
+         If (ErrorLevel) {
+            This.ErrorMsg := "DLLCall sqlite3_free_table failed!"
+            This.ErrorCode := ErrorLevel
+            Return False
+         }
+         Return True
+      }
+      If (MaxResult = -2)
+         GetRows := 0
+      Else If (MaxResult > 0) && (MaxResult <= Rows)
+         GetRows := MaxResult
+      Else
+         GetRows := Rows
+
+      Offset := A_PtrSize * Cols
+      If (importMode!=1 && GetRows>0)
+      {
+         SLDcacheFilesList := 1
+         resultedFilesList := []
+         maxFilesIndex := 0
+      }
+
+      Loop, %GetRows% {
+         maxFilesIndex++
+         ; TB.Rows[I] := []
+         Loop, %Cols% {
+            thisIndex := (A_Index=1) ? 1 : 12
+            z := StrGet(NumGet(Table+0, Offset, "UPtr"), "UTF-8")
+            If (thisIndex=1)
+               resultedFilesList[maxFilesIndex, 12] := z
+            Else
+               resultedFilesList[maxFilesIndex] := [z]
+            Offset += A_PtrSize
+         }
+      }
+      If (GetRows)
+         TB.HasRows := True
+      DllCall("SQLite3.dll\sqlite3_free_table", "Ptr", Table, "Cdecl")
+      If (ErrorLevel) {
+         TB := ""
+         This.ErrorMsg := "DLLCall sqlite3_free_table failed!"
+         This.ErrorCode := ErrorLevel
+         Return False
+      }
+      Return True
+   }
+
    GetTable(SQL, ByRef TB, MaxResult:=0, getColumnNames:=0) {
       TB := ""
       This.ErrorMsg := ""

@@ -1,0 +1,1444 @@
+﻿
+SelectFolderEx(StartingFolder:="", DlgTitle:="", OwnerHwnd:=0, OkBtnLabel:="", comboList:="", desiredDefault:=1, comboLabel:="", CustomPlaces:="", pickFoldersOnly:=1, usrFilters:="", defIndexFilter:=1, FileMustExist:=1, defaultEditField:="") {
+; ==================================================================================================================================
+; Shows a dialog to select a folder.
+; Depending on the OS version the function will use either the built-in FileSelectFolder command (XP and previous)
+; or the Common Item Dialog (Vista and later).
+;
+; Parameter:
+;     StartingFolder -  the full path of a folder which will be preselected.
+;     DlgTitle       -  a text used as window title (Common Item Dialog) or as text displayed withing the dialog.
+;     FileMustExist  -  [bool] to allow or not opening files that do not exist
+;     ----------------  Common Item Dialog only:
+;     OwnerHwnd      -  HWND of the Gui which owns the dialog. If you pass a valid HWND the dialog will become modal.
+;     BtnLabel       -  a text to be used as caption for the apply button.
+;     comboList      -  a string with possible drop-down options, separated by `n [new line]
+;     desiredDefault -  the default selected drop-down row
+;     comboLabel     -  the drop-down label to display
+;     CustomPlaces   -  custom directories that will be displayed in the left pane of the dialog; missing directories will be omitted; a string separated by `n [newline]
+;     pickFoldersOnly - boolean option [0, 1]
+;     defaultEditField - the text to display in the edit field by default when the open dialog shows up
+;
+;  Return values:
+;     On success the function returns an object with the full path of the selected/file folder
+;     and combobox selected [if any]; otherwise it returns an empty string.
+;
+; MSDN:
+;     Common Item Dialog -> msdn.microsoft.com/en-us/library/bb776913%28v=vs.85%29.aspx
+;     IFileDialog        -> msdn.microsoft.com/en-us/library/bb775966%28v=vs.85%29.aspx
+;     IShellItem         -> msdn.microsoft.com/en-us/library/bb761140%28v=vs.85%29.aspx
+; ==================================================================================================================================
+; Source https://www.autohotkey.com/boards/viewtopic.php?f=6&t=18939
+; by «just me»
+; modified by Marius Șucan on jeudi 7 mai 2020
+; to allow ComboBox and CustomPlaces
+;
+; options flags
+; FOS_OVERWRITEPROMPT  = 0x2,
+; FOS_STRICTFILETYPES  = 0x4,
+; FOS_NOCHANGEDIR  = 0x8,
+; FOS_PICKFOLDERS  = 0x20,
+; FOS_FORCEFILESYSTEM  = 0x40,
+; FOS_ALLNONSTORAGEITEMS  = 0x80,
+; FOS_NOVALIDATE  = 0x100,
+; FOS_ALLOWMULTISELECT  = 0x200,
+; FOS_PATHMUSTEXIST  = 0x800,
+; FOS_FILEMUSTEXIST  = 0x1000,
+; FOS_CREATEPROMPT  = 0x2000,
+; FOS_SHAREAWARE  = 0x4000,
+; FOS_NOREADONLYRETURN  = 0x8000,
+; FOS_NOTESTFILECREATE  = 0x10000,
+; FOS_HIDEMRUPLACES  = 0x20000,
+; FOS_HIDEPINNEDPLACES  = 0x40000,
+; FOS_NODEREFERENCELINKS  = 0x100000,
+; FOS_OKBUTTONNEEDSINTERACTION  = 0x200000,
+; FOS_DONTADDTORECENT  = 0x2000000,
+; FOS_FORCESHOWHIDDEN  = 0x10000000,
+; FOS_DEFAULTNOMINIMODE  = 0x20000000,
+; FOS_FORCEPREVIEWPANEON  = 0x40000000,
+; FOS_SUPPORTSTREAMABLEITEMS  = 0x80000000
+
+; IFileDialog vtable offsets
+; 0   QueryInterface
+; 1   AddRef 
+; 2   Release 
+; 3   Show 
+; 4   SetFileTypes 
+; 5   SetFileTypeIndex 
+; 6   GetFileTypeIndex 
+; 7   Advise 
+; 8   Unadvise 
+; 9   SetOptions 
+; 10  GetOptions 
+; 11  SetDefaultFolder 
+; 12  SetFolder 
+; 13  GetFolder 
+; 14  GetCurrentSelection 
+; 15  SetFileName 
+; 16  GetFileName 
+; 17  SetTitle 
+; 18  SetOkButtonLabel 
+; 19  SetFileNameLabel 
+; 20  GetResult 
+; 21  AddPlace 
+; 22  SetDefaultExtension 
+; 23  Close 
+; 24  SetClientGuid 
+; 25  ClearClientData 
+; 26  SetFilter
+
+
+   Static OsVersion := DllCall("GetVersion", "UChar")
+        , IID_IShellItem := 0
+        , InitIID := VarSetCapacity(IID_IShellItem, 16, 0)
+                  & DllCall("Ole32.dll\IIDFromString", "WStr", "{43826d1e-e718-42ee-bc55-a1e261c37bfe}", "Ptr", &IID_IShellItem)
+        , ShowDialog := A_PtrSize * 3
+        , SetFileTypes := A_PtrSize * 4
+        , SetFileTypeIndex := A_PtrSize * 5
+        , SetOptions := A_PtrSize * 9
+        , SetFolder := A_PtrSize * 12
+        , SetDefaultEdit := A_PtrSize * 15 ; SetFileName
+        , SetWinTitle := A_PtrSize * 17
+        , SetOkButtonLabel := A_PtrSize * 18
+        , GetResult := A_PtrSize * 20
+        , AddPlaces := A_PtrSize * 21
+        , ComDlgObj := {COMDLG_FILTERSPEC: ""}
+
+   SelectedFolder := ""
+   OwnerHwnd := DllCall("IsWindow", "Ptr", OwnerHwnd, "UInt") ? OwnerHwnd : 0
+   Try FileDialog := ComObjCreate("{DC1C5A9C-E88A-4dde-A5A1-60F82A20AEF7}", "{42f85136-db7e-439c-85f1-e4075d135fc8}")
+   If !FileDialog
+   {
+      thisOption := (FileMustExist=1) ? 3 : 2
+      FileSelectFolder, SelectedFolder, *%StartingFolder%, % thisOption, % DlgTitle
+      Return SelectedFolder
+   }
+
+   VTBL := NumGet(FileDialog + 0, "UPtr") ; virtual table addresses
+   dialogOptions := 0x8 | 0x800  ;  FOS_NOCHANGEDIR | FOS_PATHMUSTEXIST
+   If (pickFoldersOnly=1)
+      dialogOptions |= 0x20      ; FOS_PICKFOLDERS
+
+   If (FileMustExist=1)
+      dialogOptions |=  0x1000   ; FOS_FILEMUSTEXIST
+
+   DllCall(NumGet(VTBL + SetOptions, "UPtr"), "Ptr", FileDialog, "UInt", dialogOptions, "UInt")
+   If StartingFolder
+   {
+      If !DllCall("Shell32.dll\SHCreateItemFromParsingName", "WStr", StartingFolder, "Ptr", 0, "Ptr", &IID_IShellItem, "PtrP", FolderItem)
+         DllCall(NumGet(VTBL + SetFolder, "UPtr"), "Ptr", FileDialog, "Ptr", FolderItem, "UInt")
+   }
+
+   If DlgTitle
+      DllCall(NumGet(VTBL + SetWinTitle, "UPtr"), "Ptr", FileDialog, "WStr", DlgTitle, "UInt")
+   If OkBtnLabel
+      DllCall(NumGet(VTBL + SetOkButtonLabel, "UPtr"), "Ptr", FileDialog, "WStr", OkBtnLabel, "UInt")
+
+   If (pickFoldersOnly!=1)
+   {
+       Filters := IsObject(usrFilters) ? usrFilters : {"All files": "*.*"}
+       ObjSetCapacity(ComDlgObj, "COMDLG_FILTERSPEC", 2*Filters.Count() * A_PtrSize)
+       for Description, FileTypes in Filters
+       {
+           ObjRawSet(ComDlgObj, "#" . A_Index, Trimmer(Description))
+           , ObjRawSet(ComDlgObj, "@" . A_Index, Trimmer(StrReplace(FileTypes,"`n")))
+           , NumPut(ObjGetAddress(ComDlgObj,"#" . A_Index)
+           , ObjGetAddress(ComDlgObj,"COMDLG_FILTERSPEC") + A_PtrSize * 2*(A_Index-1))        ; COMDLG_FILTERSPEC.pszName
+           , NumPut(ObjGetAddress(ComDlgObj,"@" . A_Index)
+           , ObjGetAddress(ComDlgObj,"COMDLG_FILTERSPEC") + A_PtrSize * (2*(A_Index-1)+1))    ; COMDLG_FILTERSPEC.pszSpec
+       }
+
+       ; IFileDialog::SetFileName method 
+       ; https://docs.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ifiledialog-setfilename
+       If defaultEditField
+          DllCall(NumGet(VTBL + SetDefaultEdit), "UPtr", FileDialog, "WStr", defaultEditField)
+
+       ; IFileDialog::SetFileTypes method
+       ; https://msdn.microsoft.com/en-us/library/windows/desktop/bb775980(v=vs.85).aspx
+       DllCall(NumGet(VTBL + SetFileTypes), "UPtr", FileDialog, "UInt", Filters.Count(), "UPtr", ObjGetAddress(ComDlgObj,"COMDLG_FILTERSPEC"))
+
+       ; IFileDialog::SetFileTypeIndex method
+       ; https://msdn.microsoft.com/en-us/library/windows/desktop/bb775978(v=vs.85).aspx
+       If defIndexFilter
+          DllCall(NumGet(VTBL + SetFileTypeIndex), "UPtr", FileDialog, "UInt", defIndexFilter)
+   }
+
+   If CustomPlaces
+   {
+      Loop, Parse, CustomPlaces, `n
+      {
+          Directory := Trim(A_LoopField, "`r `n `t`f`v`b")
+          If FolderExist(Directory)
+          {
+             foo := 1
+             DllCall("Shell32.dll\SHParseDisplayName", "UPtr", &Directory, "Ptr", 0, "UPtrP", PIDL, "UInt", 0, "UInt", 0)
+             DllCall("Shell32.dll\SHCreateShellItem", "Ptr", 0, "Ptr", 0, "UPtr", PIDL, "UPtrP", IShellItem)
+             ObjRawSet(ComDlgObj, IShellItem, PIDL)
+             ; IFileDialog::AddPlace method
+             ; https://msdn.microsoft.com/en-us/library/windows/desktop/bb775946(v=vs.85).aspx
+             DllCall(NumGet(VTBL + AddPlaces), "UPtr", FileDialog, "UPtr", IShellItem, "UInt", foo)
+          }
+      }
+   }
+
+   If (comboList && comboLabel)
+   {
+      Try If ((FileDialogCustomize := ComObjQuery(FileDialog, "{e6fdd21a-163f-4975-9c8c-a69f1ba37034}")))
+      {
+         groupId := 616 ; arbitrarily chosen IDs
+         comboboxId := 93270
+         DllCall(NumGet(NumGet(FileDialogCustomize+0)+26*A_PtrSize), "Ptr", FileDialogCustomize, "UInt", groupId, "WStr", comboLabel) ; IFileDialogCustomize::StartVisualGroup
+         DllCall(NumGet(NumGet(FileDialogCustomize+0)+6*A_PtrSize), "Ptr", FileDialogCustomize, "UInt", comboboxId) ; IFileDialogCustomize::AddComboBox
+         ; DllCall(NumGet(NumGet(FileDialogCustomize+0)+19*A_PtrSize), "Ptr", FileDialogCustomize, "UInt", comboboxId, "UInt", itemOneId, "WStr", "Current folder") ; IFileDialogCustomize::AddControlItem
+         
+         entriesArray := []
+         Loop, Parse, comboList,`n
+         {
+             elementu := Trim(A_LoopField, "`r `n `t`f`v`b")
+             If elementu
+             {
+                Random, varA, 2, 900
+                Random, varB, 2, 900
+                thisID := varA varB
+                If (A_Index=desiredDefault)
+                   desiredIDdefault := thisID
+
+                entriesArray[thisId] := elementu
+                DllCall(NumGet(NumGet(FileDialogCustomize+0)+19*A_PtrSize), "Ptr", FileDialogCustomize, "UInt", comboboxId, "UInt", thisID, "WStr", elementu)
+             }
+         }
+
+         DllCall(NumGet(NumGet(FileDialogCustomize+0)+25*A_PtrSize), "Ptr", FileDialogCustomize, "UInt", comboboxId, "UInt", desiredIDdefault) ; IFileDialogCustomize::SetSelectedControlItem
+         DllCall(NumGet(NumGet(FileDialogCustomize+0)+27*A_PtrSize), "Ptr", FileDialogCustomize) ; IFileDialogCustomize::EndVisualGroup
+      }
+
+   }
+
+   If !DllCall(NumGet(VTBL + ShowDialog, "UPtr"), "Ptr", FileDialog, "Ptr", OwnerHwnd, "UInt")
+   {
+      If !DllCall(NumGet(VTBL + GetResult, "UPtr"), "Ptr", FileDialog, "PtrP", ShellItem, "UInt")
+      {
+         GetDisplayName := NumGet(NumGet(ShellItem + 0, "UPtr"), A_PtrSize * 5, "UPtr")
+         If !DllCall(GetDisplayName, "Ptr", ShellItem, "UInt", 0x80028000, "PtrP", StrPtr) ; SIGDN_DESKTOPABSOLUTEPARSING
+         {
+            SelectedFolder := StrGet(StrPtr, "UTF-16")
+            DllCall("Ole32.dll\CoTaskMemFree", "Ptr", StrPtr)
+         }
+
+         ObjRelease(ShellItem)
+         if (FileDialogCustomize && entriesArray.Count())
+         {
+            if (DllCall(NumGet(NumGet(FileDialogCustomize+0)+24*A_PtrSize), "Ptr", FileDialogCustomize, "UInt", comboboxId, "UInt*", selectedItemId) == 0)
+            { ; IFileDialogCustomize::GetSelectedControlItem
+               if selectedItemId
+                  thisComboSelected := entriesArray[selectedItemId]
+            }   
+         }
+      }
+   }
+   If (FolderItem)
+      ObjRelease(FolderItem)
+
+   if (FileDialogCustomize)
+      ObjRelease(FileDialogCustomize)
+
+   ObjRelease(FileDialog)
+   r := []
+   r.SelectedDir := SelectedFolder
+   r.SelectedCombo := thisComboSelected
+   Return r
+}
+
+;------------------------------
+;
+; Function: Dlg_OpenSaveFile
+;
+; Description:
+;
+;   Internal function used by <Dlg_OpenFile> and <Dlg_SaveFile> to create an
+;   Open or Save dialog.
+;
+; Type:
+;
+;   Internal function.  Subject to change.  Do not call directly.
+;
+; Parameters:
+;
+;   p_Type - [Internal function only] Set to "O" or "Open" to create a Open
+;       dialog.  Set to "S" or "Save" to create a Save dialog.
+;
+;   hOwner - A handle to the window that owns the dialog box.  This parameter
+;       can be any valid window handle or it can be set to 0 or null if the
+;       dialog box has no owner.  Note: A valid window handle must be specified
+;       if the OFN_SHOWHELP flag is included (explicitly or implicitly).
+;
+;   p_Title - A string to be placed in the title bar of the dialog box.  If set
+;       to null (the default), the system uses the default title (that is,
+;       "Open" or "Save As").
+;
+;   p_Filter - One or more filter strings that determine which files are
+;       displayed. [Optional] Each filter string is composed of two parts.
+;       The first part describes the filter.  For example: "Text Files".  The
+;       second part specifies the filter pattern and must be enclosed in
+;       parenthesis.  For example "(*.txt)".  To specify multiple filter
+;       patterns for a single display string, use a semicolon to separate the
+;       patterns.  For example: "(*.txt;*.doc;*.bak)".  A pattern string can be
+;       a combination of valid file name characters and the asterisk ("*")
+;       wildcard character.  Do not include spaces in the pattern string.
+;       Multiple filter strings are delimited by the "|" character.  For
+;       example: "Text Files (*.txt)|Backup Files (*.bak)".
+;
+;   p_FilterIndex - 1-based filter index.  If set to null (the default), 1 is
+;       used.  The index determines which filter string is pre-selected in the
+;       "File Types" control.
+;
+;   p_Root - Root (startup) directory and/or default file name.  To specify a
+;       root directory only, include the full path of the directory with a
+;       trailing "\" character.  Ex: "C:\Program Files\".  To specify a startup
+;       directory and a default file, include the full path of the default file.
+;       Ex: "C:\My Stuff\My Program.html".  To specify a default file only,
+;       include the file name without the path.  Ex: "My Program.html".  If a
+;       default file name is included, the file name (sans the path) is shown in
+;       the dialog's "File name:" edit field. If this parameter is set to null
+;       (the default), the startup directory will be set using the OS default
+;       for this dialog.  See the documentation for the OPENFILENAME structure
+;       (lpstrInitialDir member) for more information.
+;
+;   p_DfltExt - Extension to append when none is given.  Ex: "txt".  The string
+;       should not contain a period (".").  If this parameter is null (the
+;       default) and the user fails to type an extension, no extension is
+;       appended.
+;
+;   r_Flags - Flags used to initialize the dialog. [Optional, Input/Output] See
+;       the *Flags* section for the details.
+;
+;   p_HelpHandler - Name of a developer-created function that is called when the
+;       the user presses the Help button on the dialog. [Optional] See the *Help
+;       Handler* section for the details.  Note: The OFN_SHOWHELP flag is
+;       automatically added if this parameter contains a valid function name.
+;
+; Flags:
+;
+;   On input, the r_Flags parameter contains flags that are used to initialize
+;   and/or determine the behavior of the dialog.  If set to 0 or null and
+;   p_Type="O" (Open dialog), the OFN_FILEMUSTEXIST and OFN_HIDEREADONLY flags
+;   are added automatically.  If r_Flag contains an interger value, the
+;   parameter is assumed to contain bit flags.  See the function's static
+;   variables for a list a valid bit flags.  Otherwise, text flags are assumed.
+;   The following space-delimited text flags can be used.
+;
+;   AllowMultiSelect - Specifies that the File Name list box allows multiple
+;       selections.
+;
+;   CreatePrompt - [Open dialog only] If the user specifies a file that does not
+;       exist, this flag causes the dialog to prompt the user for permission to
+;       create the file.
+;
+;   DontAddToRecent - Prevents the system from adding a link to the selected
+;       file in the file system directory that contains the user's most recently
+;       used documents.
+;
+;   Ex_NoPlacesBar - If specified, the places bar is not displayed.  If not
+;       specified, Explorer-style dialog boxes include a places bar containing
+;       icons for commonly-used folders, such as Favorites and Desktop.
+;
+;   FileMustExist - [Open dialog only (with implicit exceptions)] This flag
+;       ensures that the user can only type names of existing files in the File
+;       Name entry.  A message box is generated if an invalid file is entered.
+;       Opinion: This flag should be specified in most circumstances.
+;       IMPORTANT: If this flag is specified (explicitly or implicitly), the
+;       PathMustExist flag is also used.  See the PathMustExist flag for the
+;       rules that are enforced for both the Open and Save dialogs.
+;
+;   ForceShowHidden - Forces the showing of system and hidden files, thus
+;       overriding the user setting to show or not show hidden files.  However,
+;       a file that is marked both system and hidden is not shown.  Observation:
+;       This flag does not work as expected on Windows XP (may also occur on
+;       other (or all) versions of Windows).  When a directory that includes a
+;       hidden file is first displayed (including the initial directory), hidden
+;       files are not shown.  Clicking on the "Open" or "Save" button without
+;       selecting a file will redisplay the list of files to include the hidden
+;       file(s).
+;
+;   HideReadOnly - [Open dialog only] Hides the Read Only check box.  This flag
+;       should be specified in most circumstances.
+;
+;   NoChangeDir - Restores the current directory to its original value if the
+;       user changed the directory while searching for files.
+;
+;   NoDereferenceLinks - Directs the dialog box to return the path and file name
+;       of the selected shortcut (.LNK) file.  If this value is not specified,
+;       the dialog box returns the path and file name of the file referenced by
+;       the shortcut.  Observation: For shortcuts to OS files, this works as
+;       expected.  However, for other types of shortcuts, Ex: shortcuts to a web
+;       site, the return value may not be what is expected.  Test thoroughly
+;       before using.
+;
+;   NoReadOnlyReturn - [Save dialog only] Prevents the dialog from returning
+;       names of existing files that have the read-only attribute.  If a
+;       read-only file is selected, a message dialog is generated.  The dialog
+;       will persist until the selection does not include a file with read-only
+;       attribute.
+;
+;   NoTestFileCreate - By default, the dialog box creates a zero-length test
+;       file to determine whether a new file can be created in the selected
+;       directory.  Set this flag to prevent the creation of this test file.
+;       This flag should be specified if the application saves the file on a
+;       network drive with Create but no Modify privileges.
+;
+;   NoValidate - Specifies that the common dialog boxes allow invalid characters
+;       in the returned file name.
+;
+;   OverwritePrompt - [Save dialog only] Causes the dialog to generate a message
+;       box if the selected file already exists.  The user must confirm whether
+;       to overwrite the file.
+;
+;   PathMustExist - Specifies that the user can type only existing paths in the
+;       File Name entry.  A message box is generated if an invalid path is
+;       entered.  Note: This flag is automatically added if the FileMustExist
+;       flag is used.
+;
+;   ReadOnly - [Open dialog only] Causes the Read Only check box to be selected
+;       initially when the dialog box is created.
+;
+;   ShowHelp - Causes the dialog to display the Help button.
+;
+;   On output, the r_Flag parameter may contain bit flags that inform the
+;   developer of conditions of the dialog at the time the dialog was closed.
+;   The following bit flags can be set.
+;
+;   OFN_READONLY (0x1) - [Open dialog only] This flag is set if the Read Only
+;       check box was checked when the dialog was closed.
+;
+;   OFN_EXTENSIONDIFFERENT (0x400) - This flag is set if the p_DfltExt parameter
+;       is not null and the user selected or typed a file name extension that
+;       differs from the p_DfltExt parameter.  Exception: This flag is not set
+;       if multiple files are selected.
+;
+; Returns:
+;
+;   Selected file name(s) or null if cancelled.  If more then one file is
+;   selected, each file is delimited by a new line ("`n") character.
+;
+; Remarks:
+;
+;   If the user changes the directory while using the Open or Save dialog, the
+;   script's working directory will also be changed.  If desired, use the
+;   "NoChangeDir" flag (r_Flags parameter) to prevent this from occurring or use
+;   the *SetWorkingDir* command to restore the working directory after calling
+;   this function.
+;
+; Help Handler:
+;
+;   The "Help Handler" is an optional developer-created function that is called
+;   when the user presses the Help button on the dialog.
+;
+;   The handler function must have at least 2 parameters.  Additional parameters
+;   are allowed but must be optional (defined with a default value).  The
+;   required parameters are defined/used as follows, and in the following order:
+;
+;       hDialog - The handle to the dialog window.
+;
+;       lpInitStructure - A pointer to the initialization structure for the
+;           common dialog box. For this handler, the pointer is to a
+;           OPENFILENAME structure.
+;
+;   It's up to the developer to determine what commands are performed in this
+;   function but displaying some sort of help message/document is what is
+;   expected.
+;
+;   To avoid interference with the operation of the dialog, the handler should
+;   either 1) finish quickly or 2) any dialogs displayed via the handler should
+;   be modal.  See the scripts included with this project for an example.
+;
+;-------------------------------------------------------------------------------
+Dlg_OpenSaveFile(p_Type,hOwner:=0,p_Title:="",p_Filter:="",p_FilterIndex:="",p_Root:="",p_DfltExt:="",ByRef r_Flags:=0,p_HelpHandler:="") {
+; function source: https://www.autohotkey.com/boards/viewtopic.php?f=6&t=462
+; by jballi
+
+    Static Dummy16963733
+          ,s_strFileMaxSize:=32768
+                ;-- This is the ANSI byte limit.  For consistency, this value
+                ;   is also used to set the the maximum number characters that
+                ;   used in Unicode.  Note: Only the first entry contains the
+                ;   folder name so 32K characters can hold a very large number
+                ;   of file names.
+
+          ,HELPMSGSTRING:="commdlg_help"
+                ;-- Registered message string for the Help button on common
+                ;   dialogs
+
+          ,OPENFILENAME
+                ;-- Static OPENFILENAME structure.  Also used by the hook
+                ;   callback and the help message.
+
+          ;-- Open File Name flags
+          ,OFN_ALLOWMULTISELECT    :=0x200
+          ,OFN_CREATEPROMPT        :=0x2000
+          ,OFN_DONTADDTORECENT     :=0x2000000
+          ,OFN_ENABLEHOOK          :=0x20
+
+          ,OFN_EXPLORER            :=0x80000
+                ;-- This flag is set by default.  This function does not work
+                ;   with the old-style dialog box.
+
+          ,OFN_EXTENSIONDIFFERENT  :=0x400
+                ;-- Output flag only.
+
+          ,OFN_FILEMUSTEXIST       :=0x1000
+          ,OFN_FORCESHOWHIDDEN     :=0x10000000
+          ,OFN_HIDEREADONLY        :=0x4
+
+          ,OFN_NOCHANGEDIR         :=0x8
+          ,OFN_NODEREFERENCELINKS  :=0x100000
+
+          ,OFN_NOREADONLYRETURN    :=0x8000
+          ,OFN_NOTESTFILECREATE    :=0x10000
+          ,OFN_NOVALIDATE          :=0x100
+          ,OFN_OVERWRITEPROMPT     :=0x2
+          ,OFN_PATHMUSTEXIST       :=0x800
+          ,OFN_READONLY            :=0x1
+          ,OFN_SHOWHELP            :=0x10
+
+          ;-- Open File Name extended flags
+          ,OFN_EX_NOPLACESBAR      :=0x1
+                ;-- Note: This flag is only available as a text flag, i.e.
+                ;   "NoPlacesBar".
+
+          ;-- Misc.
+          ,TCharSize:=A_IsUnicode ? 2:1
+
+    ;[==============]
+    ;[  Parameters  ]
+    ;[==============]
+    ;-- Type
+    p_Type:=SubStr(p_Type,1,1)
+    StringUpper p_Type,p_Type
+        ;-- Convert to uppercase to simplify processing
+
+    if p_Type not in O,S
+        p_Type:="O"
+
+    ;-- Filter
+    if p_Filter is Space
+        p_Filter:="All Files (*.*)"
+
+    ;-- Flags
+    l_Flags  :=OFN_EXPLORER
+    l_FlagsEx:=0
+    if not r_Flags  ;-- Zero, blank, or null
+    {
+        if (p_Type="O")  ;-- Open dialog only
+            l_Flags|=OFN_FILEMUSTEXIST|OFN_HIDEREADONLY
+    } else
+    {
+        ;-- Bit flags
+        if r_Flags is Integer
+        {
+            l_Flags|=r_Flags
+        } else
+        {
+            ;-- Convert text flags into bit flags
+            Loop Parse,r_Flags,%A_Tab%%A_Space%,%A_Tab%%A_Space%
+            {
+                if A_LoopField is not Space
+                {
+                    if OFN_%A_LoopField% is Integer
+                    {
+                        if InStr(A_LoopField,"ex_")
+                            l_FlagsEx|=OFN_%A_LoopField%
+                        else
+                            l_Flags|=OFN_%A_LoopField%
+                    }
+                }
+            }
+        }
+    }
+
+    if IsFunc(p_HelpHandler)
+        l_Flags|=OFN_SHOWHELP
+
+    ; if (p_Type="O") and (l_Flags & OFN_ALLOWMULTISELECT)
+    ;     l_Flags|=OFN_ENABLEHOOK
+
+    ;-- Create and, if needed, populate the buffer used to initialize the
+    ;   File Name Edit control.  The dialog will also use this buffer to return
+    ;   the file(s) selected.
+    VarSetCapacity(strFile,s_strFileMaxSize*TCharSize,0)
+    SplitPath p_Root,l_RootFileName,l_RootDir
+    if l_RootFileName is not Space
+    {
+        DllCall("RtlMoveMemory"
+            ,"Str",strFile
+            ,"Str",l_RootFileName
+            ,"UInt",(StrLen(l_RootFileName)+1)*TCharSize)
+    }
+
+    ;-- Convert p_Filter into the format required by the API
+    VarSetCapacity(strFilter,StrLen(p_Filter)*(A_IsUnicode ? 5:3),0)
+        ;-- Enough space for the full description _and_ file pattern(s) of all
+        ;   filter strings (ANSI and Unicode) plus null characters between all
+        ;   of the pieces and a double null at the end.
+
+    l_Offset:=&strFilter
+    Loop Parse,p_Filter,|
+    {
+        ;-- Break the filter string into 2 parts
+        l_LoopField:=Trim(A_LoopField," `f`n`r`t`v")
+            ;-- Assign and remove all leading/trailing white space
+
+        l_Part1:=l_LoopField
+            ;-- Part 1: The entire filter string which includes the description
+            ;   and the file pattern(s) in parenthesis.  This is what is
+            ;   displayed in  the "File Of Types" or the "Save As Type"
+            ;   drop-down.
+
+        l_Part2:=SubStr(l_LoopField,InStr(l_LoopField,"(")+1,-1)
+            ;-- Part 2: File pattern(s) sans parenthesis.  The dialog uses this
+            ;   to filter the files that are displayed.
+
+        ;-- Calculate the length of the pieces
+        l_lenPart1:=(StrLen(l_LoopField)+1)*TCharSize
+            ;-- Size includes terminating null
+
+        l_lenPart2:=(StrLen(l_Part2)+1)*TCharSize
+            ;-- Size includes terminating null
+
+        ;-- Copy the pieces to the filter string.  Each piece includes a
+        ;   terminating null character.
+        DllCall("RtlMoveMemory","Ptr",l_Offset,"Str",l_Part1,"UInt",l_lenPart1)
+        DllCall("RtlMoveMemory","Ptr",l_Offset+l_lenPart1,"Str",l_Part2,"UInt",l_lenPart2)                          ;-- Length
+
+        ;-- Calculate the offset of the next filter string
+        l_Offset+=l_lenPart1+l_lenPart2
+    }
+
+    ;[==================]
+    ;[  Pre-Processing  ]
+    ;[==================]
+    ;-- Create and populate the OPENFILENAME structure
+    lStructSize:=VarSetCapacity(OPENFILENAME,(A_PtrSize=8) ? 152:88,0)
+    NumPut(lStructSize,OPENFILENAME,0,"UInt")
+        ;-- lStructSize
+    NumPut(hOwner,OPENFILENAME,(A_PtrSize=8) ? 8:4,"Ptr")
+        ;-- hwndOwner
+    NumPut(&strFilter,OPENFILENAME,(A_PtrSize=8) ? 24:12,"Ptr")
+        ;-- lpstrFilter
+    NumPut(p_FilterIndex,OPENFILENAME,(A_PtrSize=8) ? 44:24,"UInt")
+        ;-- nFilterIndex
+    NumPut(&strFile,OPENFILENAME,(A_PtrSize=8) ? 48:28,"Ptr")
+        ;-- lpstrFile
+    NumPut(s_strFileMaxSize,OPENFILENAME,(A_PtrSize=8) ? 56:32,"UInt")
+        ;-- nMaxFile
+    NumPut(&l_RootDir,OPENFILENAME,(A_PtrSize=8) ? 80:44,"Ptr")
+        ;-- lpstrInitialDir
+    NumPut(&p_Title,OPENFILENAME,(A_PtrSize=8) ? 88:48,"Ptr")
+        ;-- lpstrTitle
+    NumPut(l_Flags,OPENFILENAME,(A_PtrSize=8) ? 96:52,"UInt")
+        ;-- Flags
+    NumPut(&p_DfltExt,OPENFILENAME,(A_PtrSize=8) ? 104:60,"Ptr")
+        ;-- lpstrDefExt
+    NumPut(l_FlagsEx,OPENFILENAME,(A_PtrSize=8) ? 148:84,"UInt")
+        ;-- FlagsEx
+
+    ;[===============]
+    ;[  Show dialog  ]
+    ;[===============]
+    if (p_type="O")
+        RC:=DllCall("comdlg32\GetOpenFileName" . (A_IsUnicode ? "W":"A"),"Ptr",&OPENFILENAME)
+    else
+        RC:=DllCall("comdlg32\GetSaveFileName" . (A_IsUnicode ? "W":"A"),"Ptr",&OPENFILENAME)
+
+    ;[===================]
+    ;[  Post-Processing  ]
+    ;[===================]
+    ;-- If needed, turn off monitoring of help message
+    if l_HelpMsg
+        OnMessage(l_HelpMsg,"")  ;-- Turn off monitoring
+
+    ;-- Dialog canceled?
+    if (RC=0)
+        Return
+
+    ;-- Rebuild r_Flags for output
+    r_Flags  :=0
+    l_Flags:=NumGet(OPENFILENAME,(A_PtrSize=8) ? 96:52,"UInt")
+    n_FilterIndex := NumGet(OPENFILENAME,(A_PtrSize=8) ? 44:24,"UInt")
+    ;-- Flags
+
+    if p_DfltExt is not Space  ;-- Flag is ignored unless p_DfltExt contains a value
+    {
+        if l_Flags & OFN_EXTENSIONDIFFERENT
+            r_Flags|=OFN_EXTENSIONDIFFERENT
+    }
+
+    if (p_Type="O")  ;-- i.e. flag is ignored if using the Save dialog
+    {
+        if l_Flags & OFN_ALLOWMULTISELECT
+        {
+            ; Hook was used to collect ReadOnly status.  Collect the ReadOnly
+            ; status from the hook function.
+            Sleep, 1
+            ; if Dlg_OFNHookCallback("GetReadOnly","","","")
+            ; r_Flags|=OFN_READONLY
+        } else
+        {
+            ;-- Hook was NOT used to collect ReadOnly status.  Determine status from l_Flags
+            if l_Flags & OFN_READONLY
+                r_Flags|=OFN_READONLY
+        }
+    }
+
+    ;-- Extract file(s) from the buffer
+    l_FileList:=""
+    l_Offset  :=&strFile
+    Loop
+    {
+        ;-- Get next
+        l_Next:=StrGet(l_Offset,-1)
+
+        ;-- End of list?
+        if not StrLen(l_Next)
+        {
+            ;-- If end-of-list occurs on the 2nd iteration, it means that only
+            ;   one file was selected
+            if (A_Index=2)
+                l_FileList:=l_FileName
+            Break
+        }
+
+        ;-- Assign to working variable
+        l_FileName:=l_Next
+
+        ;-- Update the offset for the next iteration
+        l_Offset+=(StrLen(l_FileName)+1)*TCharSize
+
+        ;-- If this is the first iteration, we have to wait until the next loop
+        ;   before we can determine if this is a directory or file and if a
+        ;   file, if it is the only file selected.
+        if (A_Index=1)
+        {
+            l_Dir:=l_FileName
+            ;-- Windows adds "\" character when in root of the drive but doesn't
+            ;   add it otherwise.  Adjust if needed.
+            if (StrLen(l_Dir)<>3)
+                l_Dir.="\"
+
+            ;-- Continue to next
+            Continue
+        }
+
+        ;-- Add the file to the list
+        l_FileList.=(StrLen(l_FileList) ? "`n":"") . l_Dir . l_FileName
+    }
+    ; ToolTip, % n_FilterIndex , , , 2
+    ;-Return to sender
+    Return l_FileList
+}
+
+SHGetKnownFolderPath(FOLDERID, KF_FLAG:=0) {                  ;   By SKAN on D356 @ tiny.cc/t-75602 
+   ; FOLDERID_AccountPictures         := "{008ca0b1-55b4-4c56-b8a8-4de4b299d3be}" ; Windows  8
+   ; FOLDERID_AddNewPrograms          := "{de61d971-5ebc-4f02-a3a9-6c82895e5c04}"  
+   ; FOLDERID_AdminTools              := "{724EF170-A42D-4FEF-9F26-B60E846FBA4F}"  
+   ; FOLDERID_AppDataDesktop          := "{B2C5E279-7ADD-439F-B28C-C41FE1BBF672}" ; Windows  10, version 1709
+   ; FOLDERID_AppDataDocuments        := "{7BE16610-1F7F-44AC-BFF0-83E15F2FFCA1}" ; Windows  10, version 1709
+   ; FOLDERID_AppDataFavorites        := "{7CFBEFBC-DE1F-45AA-B843-A542AC536CC9}" ; Windows  10, version 1709
+   ; FOLDERID_AppDataProgramData      := "{559D40A3-A036-40FA-AF61-84CB430A4D34}" ; Windows  10, version 1709
+   ; FOLDERID_ApplicationShortcuts    := "{A3918781-E5F2-4890-B3D9-A7E54332328C}" ; Windows  8
+   ; FOLDERID_AppsFolder              := "{1e87508d-89c2-42f0-8a7e-645a0f50ca58}" ; Windows  8
+   ; FOLDERID_AppUpdates              := "{a305ce99-f527-492b-8b1a-7e76fa98d6e4}"  
+   ; FOLDERID_CameraRoll              := "{AB5FB87B-7CE2-4F83-915D-550846C9537B}" ; Windows  8.1
+   ; FOLDERID_CDBurning               := "{9E52AB10-F80D-49DF-ACB8-4330F5687855}"  
+   ; FOLDERID_ChangeRemovePrograms    := "{df7266ac-9274-4867-8d55-3bd661de872d}"  
+   ; FOLDERID_CommonAdminTools        := "{D0384E7D-BAC3-4797-8F14-CBA229B392B5}"  
+   ; FOLDERID_CommonOEMLinks          := "{C1BAE2D0-10DF-4334-BEDD-7AA20B227A9D}"  
+   ; FOLDERID_CommonPrograms          := "{0139D44E-6AFE-49F2-8690-3DAFCAE6FFB8}"  
+   ; FOLDERID_CommonStartMenu         := "{A4115719-D62E-491D-AA7C-E74B8BE3B067}"  
+   ; FOLDERID_CommonStartup           := "{82A5EA35-D9CD-47C5-9629-E15D2F714E6E}"  
+   ; FOLDERID_CommonTemplates         := "{B94237E7-57AC-4347-9151-B08C6C32D1F7}"  
+   ; FOLDERID_ComputerFolder          := "{0AC0837C-BBF8-452A-850D-79D08E667CA7}"  
+   ; FOLDERID_ConflictFolder          := "{4bfefb45-347d-4006-a5be-ac0cb0567192}" ; Windows  Vista
+   ; FOLDERID_ConnectionsFolder       := "{6F0CD92B-2E97-45D1-88FF-B0D186B8DEDD}"  
+   ; FOLDERID_Contacts                := "{56784854-C6CB-462b-8169-88E350ACB882}" ; Windows  Vista
+   ; FOLDERID_ControlPanelFolder      := "{82A74AEB-AEB4-465C-A014-D097EE346D63}"  
+   ; FOLDERID_Cookies                 := "{2B0F765D-C0E9-4171-908E-08A611B84FF6}"  
+   ; FOLDERID_Desktop                 := "{B4BFCC3A-DB2C-424C-B029-7FE99A87C641}"  
+   ; FOLDERID_DeviceMetadataStore     := "{5CE4A5E9-E4EB-479D-B89F-130C02886155}" ; Windows  7
+   ; FOLDERID_Documents               := "{FDD39AD0-238F-46AF-ADB4-6C85480369C7}"  
+   ; FOLDERID_DocumentsLibrary        := "{7B0DB17D-9CD2-4A93-9733-46CC89022E7C}" ; Windows  7
+   ; FOLDERID_Downloads               := "{374DE290-123F-4565-9164-39C4925E467B}"  
+   ; FOLDERID_Favorites               := "{1777F761-68AD-4D8A-87BD-30B759FA33DD}"  
+   ; FOLDERID_Fonts                   := "{FD228CB7-AE11-4AE3-864C-16F3910AB8FE}"  
+   ; FOLDERID_Games                   := "{CAC52C1A-B53D-4edc-92D7-6B2E8AC19434}"  
+   ; FOLDERID_GameTasks               := "{054FAE61-4DD8-4787-80B6-090220C4B700}" ; Windows  Vista
+   ; FOLDERID_History                 := "{D9DC8A3B-B784-432E-A781-5A1130A75963}"  
+   ; FOLDERID_HomeGroup               := "{52528A6B-B9E3-4ADD-B60D-588C2DBA842D}" ; Windows  7
+   ; FOLDERID_HomeGroupCurrentUser    := "{9B74B6A3-0DFD-4f11-9E78-5F7800F2E772}" ; Windows  8
+   ; FOLDERID_ImplicitAppShortcuts    := "{BCB5256F-79F6-4CEE-B725-DC34E402FD46}" ; Windows  7
+   ; FOLDERID_InternetCache           := "{352481E8-33BE-4251-BA85-6007CAEDCF9D}"  
+   ; FOLDERID_InternetFolder          := "{4D9F7874-4E0C-4904-967B-40B0D20C3E4B}"  
+   ; FOLDERID_Libraries               := "{1B3EA5DC-B587-4786-B4EF-BD1DC332AEAE}" ; Windows  7
+   ; FOLDERID_Links                   := "{bfb9d5e0-c6a9-404c-b2b2-ae6db6af4968}"  
+   ; FOLDERID_LocalAppData            := "{F1B32785-6FBA-4FCF-9D55-7B8E7F157091}"  
+   ; FOLDERID_LocalAppDataLow         := "{A520A1A4-1780-4FF6-BD18-167343C5AF16}"  
+   ; FOLDERID_LocalizedResourcesDir   := "{2A00375E-224C-49DE-B8D1-440DF7EF3DDC}"  
+   ; FOLDERID_Music                   := "{4BD8D571-6D19-48D3-BE97-422220080E43}"  
+   ; FOLDERID_MusicLibrary            := "{2112AB0A-C86A-4FFE-A368-0DE96E47012E}" ; Windows  7
+   ; FOLDERID_NetHood                 := "{C5ABBF53-E17F-4121-8900-86626FC2C973}"  
+   ; FOLDERID_NetworkFolder           := "{D20BEEC4-5CA8-4905-AE3B-BF251EA09B53}"  
+   ; FOLDERID_Objects3D               := "{31C0DD25-9439-4F12-BF41-7FF4EDA38722}" ; Windows  10, version 1703
+   ; FOLDERID_OriginalImages          := "{2C36C0AA-5812-4b87-BFD0-4CD0DFB19B39}" ; Windows  Vista
+   ; FOLDERID_PhotoAlbums             := "{69D2CF90-FC33-4FB7-9A0C-EBB0F0FCB43C}" ; Windows  Vista
+   ; FOLDERID_PicturesLibrary         := "{A990AE9F-A03B-4E80-94BC-9912D7504104}" ; Windows  7
+   ; FOLDERID_Pictures                := "{33E28130-4E1E-4676-835A-98395C3BC3BB}"  
+   ; FOLDERID_Playlists               := "{DE92C1C7-837F-4F69-A3BB-86E631204A23}"  
+   ; FOLDERID_PrintersFolder          := "{76FC4E2D-D6AD-4519-A663-37BD56068185}"  
+   ; FOLDERID_PrintHood               := "{9274BD8D-CFD1-41C3-B35E-B13F55A758F4}"  
+   ; FOLDERID_Profile                 := "{5E6C858F-0E22-4760-9AFE-EA3317B67173}"  
+   ; FOLDERID_ProgramData             := "{62AB5D82-FDC1-4DC3-A9DD-070D1D495D97}"  
+   ; FOLDERID_ProgramFiles            := "{905e63b6-c1bf-494e-b29c-65b732d3d21a}"  
+   ; FOLDERID_ProgramFilesX64         := "{6D809377-6AF0-444b-8957-A3773F02200E}"  
+   ; FOLDERID_ProgramFilesX86         := "{7C5A40EF-A0FB-4BFC-874A-C0F2E0B9FA8E}"  
+   ; FOLDERID_ProgramFilesCommon      := "{F7F1ED05-9F6D-47A2-AAAE-29D317C6F066}"  
+   ; FOLDERID_ProgramFilesCommonX64   := "{6365D5A7-0F0D-45E5-87F6-0DA56B6A4F7D}"  
+   ; FOLDERID_ProgramFilesCommonX86   := "{DE974D24-D9C6-4D3E-BF91-F4455120B917}"  
+   ; FOLDERID_Programs                := "{A77F5D77-2E2B-44C3-A6A2-ABA601054A51}"  
+   ; FOLDERID_Public                  := "{DFDF76A2-C82A-4D63-906A-5644AC457385}"  
+   ; FOLDERID_PublicDesktop           := "{C4AA340D-F20F-4863-AFEF-F87EF2E6BA25}"  
+   ; FOLDERID_PublicDocuments         := "{ED4824AF-DCE4-45A8-81E2-FC7965083634}"  
+   ; FOLDERID_PublicDownloads         := "{3D644C9B-1FB8-4f30-9B45-F670235F79C0}" ; Windows  Vista
+   ; FOLDERID_PublicGameTasks         := "{DEBF2536-E1A8-4c59-B6A2-414586476AEA}" ; Windows  Vista
+   ; FOLDERID_PublicLibraries         := "{48DAF80B-E6CF-4F4E-B800-0E69D84EE384}" ; Windows  7
+   ; FOLDERID_PublicMusic             := "{3214FAB5-9757-4298-BB61-92A9DEAA44FF}"  
+   ; FOLDERID_PublicPictures          := "{B6EBFB86-6907-413C-9AF7-4FC2ABF07CC5}"  
+   ; FOLDERID_PublicRingtones         := "{E555AB60-153B-4D17-9F04-A5FE99FC15EC}" ; Windows  7
+   ; FOLDERID_PublicUserTiles         := "{0482af6c-08f1-4c34-8c90-e17ec98b1e17}" ; Windows  8
+   ; FOLDERID_PublicVideos            := "{2400183A-6185-49FB-A2D8-4A392A602BA3}"  
+   ; FOLDERID_QuickLaunch             := "{52a4f021-7b75-48a9-9f6b-4b87a210bc8f}"  
+   ; FOLDERID_Recent                  := "{AE50C081-EBD2-438A-8655-8A092E34987A}"  
+   ; FOLDERID_RecordedTV              := "{1A6FDBA2-F42D-4358-A798-B74D745926C5}" ; Windows  7
+   ; FOLDERID_RecycleBinFolder        := "{B7534046-3ECB-4C18-BE4E-64CD4CB7D6AC}"  
+   ; FOLDERID_ResourceDir             := "{8AD10C31-2ADB-4296-A8F7-E4701232C972}"  
+   ; FOLDERID_Ringtones               := "{C870044B-F49E-4126-A9C3-B52A1FF411E8}" ; Windows  7
+   ; FOLDERID_RoamingAppData          := "{3EB685DB-65F9-4CF6-A03A-E3EF65729F3D}"  
+   ; FOLDERID_RoamedTileImages        := "{AAA8D5A5-F1D6-4259-BAA8-78E7EF60835E}" ; Windows  8
+   ; FOLDERID_RoamingTiles            := "{00BCFC5A-ED94-4e48-96A1-3F6217F21990}" ; Windows  8
+   ; FOLDERID_SampleMusic             := "{B250C668-F57D-4EE1-A63C-290EE7D1AA1F}"  
+   ; FOLDERID_SamplePictures          := "{C4900540-2379-4C75-844B-64E6FAF8716B}"  
+   ; FOLDERID_SamplePlaylists         := "{15CA69B3-30EE-49C1-ACE1-6B5EC372AFB5}" ; Windows  Vista
+   ; FOLDERID_SampleVideos            := "{859EAD94-2E85-48AD-A71A-0969CB56A6CD}"  
+   ; FOLDERID_SavedGames              := "{4C5C32FF-BB9D-43b0-B5B4-2D72E54EAAA4}" ; Windows  Vista
+   ; FOLDERID_SavedPictures           := "{3B193882-D3AD-4eab-965A-69829D1FB59F}"  
+   ; FOLDERID_SavedPicturesLibrary    := "{E25B5812-BE88-4bd9-94B0-29233477B6C3}"  
+   ; FOLDERID_SavedSearches           := "{7d1d3a04-debb-4115-95cf-2f29da2920da}"  
+   ; FOLDERID_Screenshots             := "{b7bede81-df94-4682-a7d8-57a52620b86f}" ; Windows  8
+   ; FOLDERID_SEARCH_CSC              := "{ee32e446-31ca-4aba-814f-a5ebd2fd6d5e}"  
+   ; FOLDERID_SearchHistory           := "{0D4C3DB6-03A3-462F-A0E6-08924C41B5D4}" ; Windows  8.1
+   ; FOLDERID_SearchHome              := "{190337d1-b8ca-4121-a639-6d472d16972a}"  
+   ; FOLDERID_SEARCH_MAPI             := "{98ec0e18-2098-4d44-8644-66979315a281}"  
+   ; FOLDERID_SearchTemplates         := "{7E636BFE-DFA9-4D5E-B456-D7B39851D8A9}" ; Windows  8.1
+   ; FOLDERID_SendTo                  := "{8983036C-27C0-404B-8F08-102D10DCFD74}"  
+   ; FOLDERID_SidebarDefaultParts     := "{7B396E54-9EC5-4300-BE0A-2482EBAE1A26}"  
+   ; FOLDERID_SidebarParts            := "{A75D362E-50FC-4fb7-AC2C-A8BEAA314493}"  
+   ; FOLDERID_SkyDrive                := "{A52BBA46-E9E1-435f-B3D9-28DAA648C0F6}" ; Windows  8.1
+   ; FOLDERID_SkyDriveCameraRoll      := "{767E6811-49CB-4273-87C2-20F355E1085B}" ; Windows  8.1
+   ; FOLDERID_SkyDriveDocuments       := "{24D89E24-2F19-4534-9DDE-6A6671FBB8FE}" ; Windows  8.1
+   ; FOLDERID_SkyDrivePictures        := "{339719B5-8C47-4894-94C2-D8F77ADD44A6}" ; Windows  8.1
+   ; FOLDERID_StartMenu               := "{625B53C3-AB48-4EC1-BA1F-A1EF4146FC19}"  
+   ; FOLDERID_Startup                 := "{B97D20BB-F46A-4C97-BA10-5E3608430854}"  
+   ; FOLDERID_SyncManagerFolder       := "{43668BF8-C14E-49B2-97C9-747784D784B7}" ; Windows  Vista
+   ; FOLDERID_SyncResultsFolder       := "{289a9a43-be44-4057-a41b-587a76d7e7f9}" ; Windows  Vista
+   ; FOLDERID_SyncSetupFolder         := "{0F214138-B1D3-4a90-BBA9-27CBC0C5389A}" ; Windows  Vista
+   ; FOLDERID_System                  := "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}"  
+   ; FOLDERID_SystemX86               := "{D65231B0-B2F1-4857-A4CE-A8E7C6EA7D27}"  
+   ; FOLDERID_Templates               := "{A63293E8-664E-48DB-A079-DF759E0509F7}"  
+   ; FOLDERID_TreeProperties          := "{9E3995AB-1F9C-4F13-B827-48B24B6C7174}" ; Windows  7
+   ; FOLDERID_UserProfiles            := "{0762D272-C50A-4BB0-A382-697DCD729B80}"  
+   ; FOLDERID_UserProgramFiles        := "{5CD7AEE2-2219-4A67-B85D-6C9CE15660CB}" ; Windows  7
+   ; FOLDERID_UserProgramFilesCommon  := "{BCBD3057-CA5C-4622-B42D-BC56DB0AE516}" ; Windows  7
+   ; FOLDERID_UsersFiles              := "{f3ce0f7c-4901-4acc-8648-d5d44b04ef8f}"  
+   ; FOLDERID_UsersLibraries          := "{A302545D-DEFF-464b-ABE8-61C8648D939B}" ; Windows  7
+   ; FOLDERID_Videos                  := "{18989B1D-99B5-455B-841C-AB7C74E4DDFC}"  
+   ; FOLDERID_VideosLibrary           := "{491E922F-5643-4AF4-A7EB-4E7A138D8174}" ; Windows  7
+   ; FOLDERID_Windows                 := "{F38BF404-1D43-42F2-9305-67DE0B28FC23}"  
+   ; function by Skan: https://www.autohotkey.com/boards/viewtopic.php?f=6&t=75602&sid=f29192e2e8a74e847f62a152afa55aa1
+   Local CLSID, pPath:=""                                        ; Thanks teadrinker @ tiny.cc/p286094
+   Return Format("{4:}", VarSetCapacity(CLSID, 16, 0)
+        , DllCall("ole32\CLSIDFromString", "Str",FOLDERID, "Ptr",&CLSID)
+        , DllCall("shell32\SHGetKnownFolderPath", "Ptr",&CLSID, "UInt",KF_FLAG, "Ptr",0, "PtrP",pPath)
+        , StrGet(pPath, "utf-16")
+        , DllCall("ole32\CoTaskMemFree", "Ptr",pPath))
+
+}
+
+Class IDesktopWallpaper 
+{
+; class created by Flipeador
+; source https://github.com/flipeador/Library-AutoHotkey/blob/master/device/IDesktopWallpaper.ahk
+
+    ; ===================================================================================================================
+    ; CONSTRUCTOR
+    ; ===================================================================================================================
+    __New() {
+        this.IDesktopWallpaper := ComObjCreate("{C2CF3110-460E-4fc1-B9D0-8A1C0C9CC4BD}", "{B92B56A9-8B55-4E14-9A89-0199BBB6F93B}")
+
+        For Each, Method in ["SetWallpaper","GetWallpaper","GetMonitorDevicePathAt","GetMonitorDevicePathCount","GetMonitorRECT","SetBackgroundColor","GetBackgroundColor","SetPosition","GetPosition","SetSlideshow", "GetSlideshow","SetSlideshowOptions","GetSlideshowOptions","AdvanceSlideshow","GetStatus","Enable"]
+            ObjRawSet(this, "p" . Method, NumGet(NumGet(this.IDesktopWallpaper), (2 + A_Index) * A_PtrSize))
+    } ; https://msdn.microsoft.com/en-us/library/windows/desktop/bb775771(v=vs.85).aspx
+
+    ; ===================================================================================================================
+    ; DESTRUCTOR
+    ; ===================================================================================================================
+    __Delete() {
+        Return ObjRelease(this.IDesktopWallpaper)
+    }
+
+    ; ===================================================================================================================
+    ; PRIVATE METHODS
+    ; ===================================================================================================================
+    _R(R, pBuffer, ByRef Var := "", Error := "") {
+        If (R == 0)
+        {
+            If (IsByRef(Var))
+                Var := StrGet(pBuffer, "UTF-16")
+            DllCall("Kernel32.dll\GlobalFree", "UPtr", pBuffer, "UPtr")
+        }
+        Else If (IsByRef(Var))
+            Var := Error
+        Return R
+    }
+
+    ; ===================================================================================================================
+    ; PUBLIC METHODS
+    ; ===================================================================================================================
+    /*
+        Establece el fondo de escritorio.
+        Parámetros:
+            MonitorID: El identificador del monitor. Este valor se puede obtener a través de GetMonitorDevicePathAt. Establezca este valor en NULL para establecer la imagen en todos los monitores.
+            Wallpaper: La ruta completa del archivo de imagen de fondo de pantalla.
+    */
+    SetWallpaper(MonitorID, Wallpaper) {
+        Return DllCall(this.pSetWallpaper, "UPtr", this.IDesktopWallpaper, "Ptr", MonitorID, "UPtr", &Wallpaper, "UInt")
+    } ; https://msdn.microsoft.com/en-us/library/windows/desktop/hh706962(v=vs.85).aspx
+
+    /*
+        Recupera el identificador de uno de los monitores del sistema.
+        Parámetros:
+            MonitorIndex: El número del monitor. LLame a GetMonitorDevicePathCount para determinar el número total de monitores.
+            MonitorID   : Recibe el identificador del monitor.
+    */
+    GetMonitorDevicePathAt(MonitorIndex, ByRef MonitorID) {
+        Return this._R(DllCall(this.pGetMonitorDevicePathAt, "UPtr", this.IDesktopWallpaper, "UInt", MonitorIndex, "UPtrP", pBuffer, "UInt"), pBuffer, MonitorID)
+    } ; https://msdn.microsoft.com/en-us/library/windows/desktop/hh706950(v=vs.85).aspx
+
+    /*
+        Recupera la cantidad de monitores que están asociados con el sistema.
+        Parámetros:
+            Count: Recibe la cantidad de monitores.
+    */
+    GetMonitorDevicePathCount(ByRef Count) {
+        Return DllCall(this.pGetMonitorDevicePathCount, "UPtr", this.IDesktopWallpaper, "UIntP", Count, "UInt")
+    } ; https://msdn.microsoft.com/en-us/library/windows/desktop/hh706951(v=vs.85).aspx
+
+} ; https://msdn.microsoft.com/en-us/library/windows/desktop/hh706946(v=vs.85).aspx
+
+
+ShellFileOperation(fileO, fSource, fTarget, flags, ghwnd:=0x0) {
+/*
+   Provides access to Windows built-in file operation system 
+   (move / copy / rename / delete files or folders with the standard Windows dialog and error UI).  
+   Utilizes the SHFileOperation shell function in Windows.
+
+   For online documentation [broken link]
+   See http://www.autohotkey.net/~Rapte_Of_Suzaku/Documentation/files/ShellFileOperation-ahk.html
+
+   Function found on: https://github.com/denolfe/AutoHotkey/blob/master/lib/ShellFileOperation.ahk
+   Release #3
+   Joshua A. Kinnison
+   2010-09-29, 15:12
+*/
+; modified by Marius Șucan
+
+   ; AVAILABLE OPERATIONS [fileO]
+   static FO_MOVE                   := 0x1
+   static FO_COPY                   := 0x2
+   static FO_DELETE                 := 0x3
+   static FO_RENAME                 := 0x4
+
+   ; AVAILABLE FLAGS
+   static FOF_MULTIDESTFILES        := 0x1     ; Indicates that the to member specifies multiple destination files (one for each source file) rather than one directory where all source files are to be deposited.
+   static FOF_CONFIRMMOUSE          := 0x2     ; ???
+   static FOF_SILENT                := 0x4     ; Does not display a progress dialog box.
+   static FOF_RENAMEONCOLLISION     := 0x8     ; Gives the file being operated on a new name (such as "Copy #1 of...") in a move, copy, or rename operation if a file of the target name already exists.
+   static FOF_NOCONFIRMATION        := 0x10    ; Responds with "yes to all" for any dialog box that is displayed.
+   static FOF_WANTMAPPINGHANDLE     := 0x20    ; returns info about the actual result of the operation
+   static FOF_ALLOWUNDO             := 0x40    ; Preserves undo information, if possible. With del, uses recycle bin.
+   static FOF_FILESONLY             := 0x80    ; Performs the operation only on files if a wildcard filename (*.*) is specified.
+   static FOF_SIMPLEPROGRESS        := 0x100   ; Displays a progress dialog box, but does not show the filenames.
+   static FOF_NOCONFIRMMKDIR        := 0x200   ; Does not confirm the creation of a new directory if the operation requires one to be created.
+   static FOF_NOERRORUI             := 0x400   ; don't put up error UI
+   static FOF_NOCOPYSECURITYATTRIBS := 0x800   ; dont copy file security attributes
+   static FOF_NORECURSION           := 0x1000  ; Only operate in the specified directory. Don't operate recursively into subdirectories.
+   static FOF_NO_CONNECTED_ELEMENTS := 0x2000  ; Do not move connected files as a group (e.g. html file together with images). Only move the specified files.
+   static FOF_WANTNUKEWARNING       := 0x4000  ; Send a warning if a file is being destroyed during a delete operation rather than recycled. This flag partially overrides FOF_NOCONFIRMATION.
+   static FOF_NORECURSEREPARSE      := 0x8000  ; treat reparse points as objects, not containers ?
+
+   If !fSource
+   {
+      ret := []
+      Return ret["error"] := -1
+   }
+
+   fileO := %fileO% ? %fileO% : fileO
+   If (SubStr(flags, 0)="|")
+      flags := SubStr(flags,1,-1)
+
+   _flags := 0
+   Loop Parse, flags, |
+      _flags |= %A_LoopField%   
+
+   flags := _flags ? _flags : (%flags% ? %flags% : flags)
+   If (SubStr(fSource, 0)!= "|" )
+      fSource := fSource . "|"
+
+   If (SubStr(fTarget, 0)!="|")
+      fTarget := fTarget . "|"
+   
+   char_size := A_IsUnicode ? 2 : 1
+   char_type := A_IsUnicode ? "UShort" : "Char"
+   
+   fsPtr := &fSource
+   Loop % StrLen(fSource)
+   {
+      if (NumGet(fSource, (A_Index-1)*char_size, char_type) = 124)
+         NumPut(0, fSource, (A_Index-1)*char_size, char_type)
+   }
+
+   ftPtr := &fTarget
+   Loop % StrLen(fTarget)
+   {
+      if (NumGet(fTarget, (A_Index-1)*char_size, char_type) = 124)
+         NumPut(0, fTarget, (A_Index-1)*char_size, char_type)
+   }
+   
+   VarSetCapacity(SHFILEOPSTRUCT, 60, 0 )                 ; Encoding SHFILEOPSTRUCT
+   NextOffset := NumPut(ghwnd, &SHFILEOPSTRUCT )          ; hWnd of calling GUI
+   NextOffset := NumPut(fileO, NextOffset+0    )          ; File operation
+   NextOffset := NumPut(fsPtr, NextOffset+0    )          ; Source file / pattern
+   NextOffset := NumPut(ftPtr, NextOffset+0    )          ; Target file / folder
+   NextOffset := NumPut(flags, NextOffset+0, 0, "Short" ) ; options
+
+   code    := DllCall("Shell32\SHFileOperationW", "UPtr", &SHFILEOPSTRUCT)
+   aborted := NumGet(NextOffset+0)
+   H2M_ptr := NumGet(NextOffset+4)
+   
+   ret              := []
+   ret["mappings"]  := []
+   ret["error"]     := code
+   ret["aborted"]   := aborted
+
+   if (FOF_WANTMAPPINGHANDLE & flags)
+   {
+      ; HANDLETOMAPPINGS 
+      ret["num_mappings"]  := NumGet(H2M_ptr+0)
+      map_ptr              := NumGet(H2M_ptr+4)
+      
+      Loop % ret["num_mappings"]
+      {
+         ; _SHNAMEMAPPING
+         addr := map_ptr+(A_Index-1)*16 ;
+         old  := StrGet(NumGet(addr+0))
+         new  := StrGet(NumGet(addr+4))
+         
+         ret["mappings"][old] := new
+      }
+   }
+   
+   ; free mappings handle if it was requested
+   if (FOF_WANTMAPPINGHANDLE & flags)
+      DllCall("Shell32\SHFreeNameMappings", int, H2M_ptr)
+   
+   Return ret
+}
+
+invokeSHopenWith(givenFile) {
+; function by zcooler
+; source:  https://www.autohotkey.com/boards/viewtopic.php?t=17850
+
+  ; msdn.microsoft.com/en-us/library/windows/desktop/bb762234(v=vs.85).aspx
+  ; OAIF_ALLOW_REGISTRATION   0x00000001 - Enable the "always use this program" checkbox. If not passed, it will be disabled.
+  ; OAIF_REGISTER_EXT         0x00000002 - Do the registration after the user hits the OK button.
+  ; OAIF_EXEC                 0x00000004 - Execute file after registering.
+  VarSetCapacity(OPENASINFO, A_PtrSize * 3, 0)
+  NumPut(&givenFile, OPENASINFO, 0, "Ptr")
+  NumPut(0x04, OPENASINFO, A_PtrSize * 2, "UInt") ; OAIF_EXEC
+  DllCall("Shell32.dll\SHOpenWithDialog", "Ptr", 0, "Ptr", &OPENASINFO)
+}
+
+; ==================================================================================================================================
+; function by «just me», source https://www.autohotkey.com/boards/viewtopic.php?t=18081
+;
+; Creates an 'open with' menu for the passed file.
+; Parameters:
+;     FilePath    -  Fully qualified path of a single file.
+;     Recommended -  Show only recommended apps (True/False).
+;                    Default: True
+;     ShowMenu    -  Immediately show the menu (True/False).
+;                    Default: False
+;     MenuName    -  The name of the menu.
+;                    Default: OpenWithMenu
+;     Others      -  Name of the submenu holding not recommended apps (if Recommended has been set to False).
+;                    Default: Others
+; Return values:
+;     On success the function returns the menu's name unless ShowMenu has been set to True.
+;     If the menu couldn't be created, the function returns False.
+; Remarks:
+;     Requires AHK 1.1.23.07+ and Win Vista+!!!
+;     The function registers itself as the menu handler.
+; Credits:
+;     Based on code by querty12 -> autohotkey.com/boards/viewtopic.php?p=86709#p86709.
+;     I hadn't even heard anything about the related API functions before.
+; MSDN:
+;     SHAssocEnumHandlers -> msdn.microsoft.com/en-us/library/bb762109%28v=vs.85%29.aspx
+;     SHCreateItemFromParsingName -> msdn.microsoft.com/en-us/library/bb762134%28v=vs.85%29.aspx
+; ==================================================================================================================================
+CreateOpenWithMenu(FilePath, Recommended := 1, ShowMenu := 0, MenuName := "OpenWithMenu", Others := "Others") {
+   Static RecommendedHandlers := []
+        , OtherHandlers := []
+        , HandlerID := A_TickCount
+        , HandlerFunc := 0
+        , ThisMenuName := ""
+        , ThisOthers := ""
+   ; -------------------------------------------------------------------------------------------------------------------------------
+   Static IID_IShellItem := 0, BHID_DataObject := 0, IID_IDataObject := 0
+        , Init := VarSetCapacity(IID_IShellItem, 16, 0) . VarSetCapacity(BHID_DataObject, 16, 0)
+          . VarSetCapacity(IID_IDataObject, 16, 0)
+          . DllCall("Ole32.dll\IIDFromString", "WStr", "{43826d1e-e718-42ee-bc55-a1e261c37bfe}", "Ptr", &IID_IShellItem)
+          . DllCall("Ole32.dll\IIDFromString", "WStr", "{B8C0BD9F-ED24-455c-83E6-D5390C4FE8C4}", "Ptr", &BHID_DataObject)
+          . DllCall("Ole32.dll\IIDFromString", "WStr", "{0000010e-0000-0000-C000-000000000046}", "Ptr", &IID_IDataObject)
+   ; -------------------------------------------------------------------------------------------------------------------------------
+   ; Handler call
+   If (Recommended = HandlerID) {
+      AssocHandlers := A_ThisMenu = ThisMenuName ? RecommendedHandlers : OtherHandlers
+      If (AssocHandler := AssocHandlers[A_ThisMenuItemPos]) && FileExist(FilePath) {
+         AssocHandlerInvoke := NumGet(NumGet(AssocHandler + 0, "UPtr"), A_PtrSize * 8, "UPtr")
+         If !DllCall("Shell32.dll\SHCreateItemFromParsingName", "WStr", FilePath, "Ptr", 0, "Ptr", &IID_IShellItem, "PtrP", Item) {
+            BindToHandler := NumGet(NumGet(Item + 0, "UPtr"), A_PtrSize * 3, "UPtr")
+            If !DllCall(BindToHandler, "Ptr", Item, "Ptr", 0, "Ptr", &BHID_DataObject, "Ptr", &IID_IDataObject, "PtrP", DataObj) {
+               DllCall(AssocHandlerInvoke, "Ptr", AssocHandler, "Ptr", DataObj)
+               ObjRelease(DataObj)
+            }
+            ObjRelease(Item)
+         }
+      }
+      Try Menu, %ThisMenuName%, DeleteAll
+      For Each, AssocHandler In RecommendedHandlers
+         ObjRelease(AssocHandler)
+      For Each, AssocHandler In OtherHandlers
+         ObjRelease(AssocHandler)
+      RecommendedHandlers := []
+      OtherHandlers := []
+      Return
+   }
+   ; -------------------------------------------------------------------------------------------------------------------------------
+   ; User call
+   If !FileExist(FilePath)
+      Return 0
+
+   ThisMenuName := MenuName
+   ThisOthers := Others
+   SplitPath, FilePath, , , Ext
+   For Each, AssocHandler In RecommendedHandlers
+      ObjRelease(AssocHandler)
+   For Each, AssocHandler In OtherHandlers
+      ObjRelease(AssocHandler)
+   RecommendedHandlers:= []
+   OtherHandlers:= []
+   Try Menu, %ThisMenuName%, DeleteAll
+   Try Menu, %ThisOthers%, DeleteAll
+   ; Try to get the default association
+   Size := VarSetCapacity(FriendlyName, 520, 0) // 2
+   DllCall("Shlwapi.dll\AssocQueryString", "UInt", 0, "UInt", 4, "Str", "." . Ext, "Ptr", 0, "Str", FriendlyName, "UIntP", Size)
+   HandlerID := A_TickCount
+   HandlerFunc := Func(A_ThisFunc).Bind(FilePath, HandlerID)
+   Filter := !!Recommended ; ASSOC_FILTER_NONE = 0, ASSOC_FILTER_RECOMMENDED = 1
+   ; Enumerate the apps and build the menu
+   If DllCall("Shell32.dll\SHAssocEnumHandlers", "WStr", "." . Ext, "UInt", Filter, "PtrP", EnumHandler)
+      Return 0
+
+   EnumHandlerNext := NumGet(NumGet(EnumHandler + 0, "UPtr"), A_PtrSize * 3, "UPtr")
+   While (!DllCall(EnumHandlerNext, "Ptr", EnumHandler, "UInt", 1, "PtrP", AssocHandler, "UIntP", Fetched) && Fetched)
+   {
+      VTBL := NumGet(AssocHandler + 0, "UPtr")
+      AssocHandlerGetUIName := NumGet(VTBL + 0, A_PtrSize * 4, "UPtr")
+      AssocHandlerGetIconLocation := NumGet(VTBL + 0, A_PtrSize * 5, "UPtr")
+      AssocHandlerIsRecommended := NumGet(VTBL + 0, A_PtrSize * 6, "UPtr")
+      UIName := ""
+      If !DllCall(AssocHandlerGetUIName, "Ptr", AssocHandler, "PtrP", StrPtr, "UInt")
+      {
+         UIName := StrGet(StrPtr, "UTF-16")
+         DllCall("Ole32.dll\CoTaskMemFree", "Ptr", StrPtr)
+      } Else UIName := AssocHandler
+
+      If (UIName!="")
+      {
+         If !DllCall(AssocHandlerGetIconLocation, "Ptr", AssocHandler, "PtrP", StrPtr, "IntP", IconIndex := 0, "UInt")
+         {
+            IconPath := StrGet(StrPtr, "UTF-16")
+            DllCall("Ole32.dll\CoTaskMemFree", "Ptr", StrPtr)
+         }
+
+         If (SubStr(IconPath, 1, 1) = "@")
+         {
+            VarSetCapacity(Resource, 4096, 0)
+            If !DllCall("Shlwapi.dll\SHLoadIndirectString", "WStr", IconPath, "Ptr", &Resource, "UInt", 2048, "PtrP", 0)
+               IconPath := StrGet(&Resource, "UTF-16")
+         }
+         ItemName := StrReplace(UIName, "&", "&&")
+         If (Recommended || !DllCall(AssocHandlerIsRecommended, "Ptr", AssocHandler, "UInt"))
+         {
+            If (UIName=FriendlyName)
+            {
+               If RecommendedHandlers.Count()
+               {
+                  Menu, %ThisMenuName%, Insert, 1&, %ItemName%, % HandlerFunc
+                  RecommendedHandlers.InsertAt(1, AssocHandler)
+               } Else
+               {
+                  Menu, %ThisMenuName%, Add, %ItemName%, % HandlerFunc
+                  RecommendedHandlers.Push(AssocHandler)
+               }
+         ;      Menu, %ThisMenuName%, Default, %ItemName%
+            } Else
+            {
+               Menu, %ThisMenuName%, Add, %ItemName%, % HandlerFunc
+               RecommendedHandlers.Push(AssocHandler)
+            }
+            Try Menu, %ThisMenuName%, Icon, %ItemName%, %IconPath%, %IconIndex%
+         } Else
+         {
+            Menu, %ThisOthers%, Add, %ItemName%, % HandlerFunc
+            OtherHandlers.Push(AssocHandler)
+            Try Menu, %ThisOthers%, Icon, %ItemName%, %IconPath%, %IconIndex%
+         }
+      } Else ObjRelease(AssocHandler)
+   }
+
+   ObjRelease(EnumHandler)
+   ; All done
+   If !RecommendedHandlers.Count() && !OtherHandlers.Count()
+      Return 0
+
+   If OtherHandlers.Count()
+      Menu, %ThisMenuName%, Add, %ThisOthers%, :%ThisOthers%
+
+   If (ShowMenu=1)
+      Menu, %ThisMenuName%, Show
+   Else
+      Return ThisMenuName
+}
+
+; =================================================================================================
+; Function......: GetModuleFileNameEx
+; DLL...........: Kernel32.dll / Psapi.dll
+; Library.......: Kernel32.lib / Psapi.lib
+; U/ANSI........: GetModuleFileNameExW (Unicode) and GetModuleFileNameExA (ANSI)
+; Author........: jNizM
+; Modified......:
+; Links.........: http://msdn.microsoft.com/en-us/library/windows/desktop/ms683198(v=vs.85).aspx
+; =================================================================================================
+
+GetModuleFileNameEx(PID) {
+; found on: https://autohotkey.com/board/topic/109557-processid-a-scriptfullpath/
+
+    hProcess := DllCall("Kernel32.dll\OpenProcess", "UInt", 0x001F0FFF, "UInt", 0, "UInt", PID)
+    If (ErrorLevel || hProcess = 0)
+       Return
+    Static lpFilename, nSize := 260, int := VarSetCapacity(lpFilename, nSize, 0)
+    DllCall("Psapi.dll\GetModuleFileNameEx", "Ptr", hProcess, "Ptr", 0, "Str", lpFilename, "UInt", nSize)
+    DllCall("Kernel32.dll\CloseHandle", "Ptr", hProcess)
+    Return lpFilename
+}
+
+GetCurrentProcessId() {
+    Return DllCall("Kernel32.dll\GetCurrentProcessId")
+}
+
+RunAdminMode() {
+  If !A_IsAdmin
+  {
+      pid :=GetCurrentProcessId()
+      path2exe := GetModuleFileNameEx(pid)
+      Try {
+         If A_IsCompiled
+            Run *RunAs "%path2exe%" /restart
+         Else
+            Run *RunAs "%A_AhkPath%" /restart "%A_ScriptFullPath%"
+
+         ExitApp
+      } Catch, err
+
+      If (err && !AnyWindowOpen)
+         msgBoxWrapper(appTitle ": ERROR", "An unknown error occured trying to restart in admin mode.`n" err, 0, 0, "error")
+   }
+}
+
+
+SetVolume(val:=100, r:="") {
+; Function by Drugwash
+  v := Round(val*655.35)
+  vr := r="" ? v : Round(r*655.35)
+  Try DllCall("winmm\waveOutSetVolume", "UInt", 0, "UInt", (v|vr<<16))
+}
+
+ShellFileAssociate(Label,Ext,Cmd,Icon, batchMode,storePath) {
+  Static q := Chr(34)  ; the quotes symbol
+  ; by Ħakito: https://autohotkey.com/boards/viewtopic.php?f=6&t=55638 
+  ; modified by Marius Șucan
+
+  ; Weeds out faulty extensions, which must start with a period, and contain more than 1 character
+  IF (SubStr(Ext,1,1)!="." || StrLen(Ext)<=1)
+     Return 0
+
+  ; Weeds out faulty labels such as ".exe" which is an extension and not a label
+  IF (SubStr(Label,1,1)=".")
+     Return 0
+
+  If Label
+     RegRead, CheckLabel, HKEY_CLASSES_ROOT\%Label%, FriendlyTypeName
+
+  ; Do not allow the modification of some important registry labels
+  iF (Cmd!="" && CheckLabel)
+     Return 0
+
+  regFile := "Windows Registry Editor Version 5.00`n`n"
+  ; Note that "HKEY_CLASSES_ROOT" actually writes to "HKEY_LOCAL_MACHINE\SOFTWARE\Classes"
+  ; If the command is just a simple path, then convert it into a proper run command
+  iF (SubStr(Cmd,2,2)=":\" && FileExist(Cmd))
+     Cmd := q Cmd q A_Space q "%1" q
+  Else
+     Return 0
+
+  Cmd := StrReplace(Cmd, "\", "\\")
+  Cmd := StrReplace(Cmd, """", "\""")
+  typeInfo := "`n""ContentType""=" q "image/" Ext q "`n""PerceivedType""=" q "image" q "`n"
+  regFile .= "[HKEY_CLASSES_ROOT\" Ext "]`n@=" q Label q typeInfo
+  regFile .= "`n[HKEY_CLASSES_ROOT\" Label "]`n@=" q Label q "`n"
+  regFile .= "`n[HKEY_CLASSES_ROOT\" Label "\Shell\Open\Command]`n@=" q Cmd q "`n"
+
+  regFile .= "`n[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\" Ext "]`n@=" q Label q typeInfo
+  regFile .= "`n[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\" Label "]`n@=" q Label q "`n"
+  regFile .= "`n[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\" Label "\Shell\Open\Command]`n@=" q Cmd q "`n"
+
+  regFile .= "`n[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\" Ext "\UserChoice]`n""ProgId""=" q Label q "`n"
+  regFile .= "`n[-HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FileExts\" Ext "\OpenWithProgids]`n"
+  regFile .= "`n[-HKEY_CLASSES_ROOT\" Ext "\OpenWithProgids]`n`n"
+
+  ; If Icon
+  ;    regFile .= "`n[HKEY_CLASSES_ROOT\" QPVslideshow "\DefaultIcon]`n@=" Icon "`n`n"
+  If !FolderExist(storePath "\regFiles")
+  {
+     FileCreateDir, %storePath%\regFiles
+     If ErrorLevel
+        Return 0
+
+     Sleep, 1
+  }
+
+  iExt := StrReplace(Ext, ".")
+  FileDelete, %storePath%\regFiles\RegFormat%iExt%.reg
+  Sleep, 1
+  FileAppend, % regFile, %storePath%\regFiles\RegFormat%iExt%.reg, UTF-16
+  If ErrorLevel
+     Return 0
+
+  runTarget := "Reg Import " q storePath "\regFiles\RegFormat" iExt ".reg" q "`n"
+  If !InStr("|WIN_7|WIN_8|WIN_8.1|WIN_VISTA|WIN_2003|WIN_XP|WIN_2000|", "|" A_OSVersion "|")
+     runTarget .= q storePath "\SetUserFTA.exe" q A_Space Ext A_Space Label "`n"
+
+  FileAppend, % runTarget, %storePath%\regFiles\runThis.bat
+  If ErrorLevel
+     Return 0
+
+  If (batchMode!=1)
+  {
+     Sleep, 1
+     Try RunWait, *RunAs "%storePath%\regFiles\runThis.bat"
+     Sleep, 1
+     FileDelete, %storePath%\regFiles\RegFormat%iExt%.reg
+     FileDelete, %storePath%\regFiles\runThis.bat
+  }
+
+  Return 1
+}
+
+GlobalMemoryStatusEx() {
+; https://msdn.microsoft.com/en-us/library/aa366589(v=vs.85).aspx 
+; by jNizM
+; https://github.com/jNizM/MemoryInfo/blob/master/src/MemoryInfo.ahk
+    static MSEX, init := NumPut(VarSetCapacity(MSEX, 64, 0), MSEX, "uint")
+    if !(DllCall("GlobalMemoryStatusEx", "ptr", &MSEX))
+       Return 0
+       ;  throw Exception("Call to GlobalMemoryStatusEx failed: " A_LastError, -1)
+    return { MemoryLoad: NumGet(MSEX, 4, "uint"), TotalPhys: NumGet(MSEX, 8, "uint64"), AvailPhys: NumGet(MSEX, 16, "uint64") }
+}
+
+GetProcessMemoryUsage(ProcessID) {
+; by jNizM
+; https://www.autohotkey.com/boards/viewtopic.php?t=62848
+; modified by Marius Șucan
+
+   static PMC_EX, size := NumPut(VarSetCapacity(PMC_EX, 8 + A_PtrSize * 9, 0), PMC_EX, "uint")
+
+   if (hProcess := DllCall("OpenProcess", "uint", 0x1000, "int", 0, "uint", ProcessID))
+   {
+      if !(DllCall("GetProcessMemoryInfo", "ptr", hProcess, "ptr", &PMC_EX, "uint", size))
+      {
+         if !(DllCall("psapi\GetProcessMemoryInfo", "ptr", hProcess, "ptr", &PMC_EX, "uint", size))
+            return (ErrorLevel := 2) & 0, DllCall("CloseHandle", "ptr", hProcess)
+      }
+      DllCall("CloseHandle", "ptr", hProcess)
+      infos := []
+      infos[0] := NumGet(PMC_EX, A_PtrSize, "uptr")   ; peak working set bytes
+      infos[1] := NumGet(PMC_EX, 8 + A_PtrSize, "uptr")   ; working set bytes
+      infos[8] := NumGet(PMC_EX, 8 + A_PtrSize*8, "uptr") ; private bytes
+      Return infos
+   }
+   return (ErrorLevel := 1) & 0
+}
+
+Dlg_Color(Color,hwnd) {
+; Function by maestrith 
+; from: [AHK 1.1] Font and Color Dialogs 
+; https://autohotkey.com/board/topic/94083-ahk-11-font-and-color-dialogs/
+; Modified by Marius Șucan and Drugwash
+
+
+  VarSetCapacity(CUSTOM,64,0)
+  size := VarSetCapacity(CHOOSECOLOR,9*A_PtrSize,0)
+  cclrs := getCustomColorsFromImage(useGdiBitmap())
+  Loop, 16
+  {
+     ; BGR HEX
+     ; thisColor := "0x" SubStr(cclrs[A_Index], -1) SubStr(cclrs[A_Index], 7, 2) SubStr(cclrs[A_Index], 5, 2)
+     NumPut(cclrs[A_Index], &CUSTOM, (A_Index-1)*4, "UInt")
+  }
+
+  oldColor := Color
+  Color := "0x" hexRGB(InStr(Color, "0x") ? Color : Color ? "0x" Color : 0x0)
+  NumPut(size,CHOOSECOLOR,0,"UInt")
+  NumPut(hwnd,CHOOSECOLOR,A_PtrSize,"Ptr")
+  NumPut(Color,CHOOSECOLOR,3*A_PtrSize,"UInt")
+  NumPut(0x3,CHOOSECOLOR,5*A_PtrSize,"UInt")
+  NumPut(&CUSTOM,CHOOSECOLOR,4*A_PtrSize,"Ptr")
+  If !ret := DllCall("comdlg32\ChooseColorW","Ptr",&CHOOSECOLOR,"UInt")
+     Return
+
+  SetFormat, Integer, H
+  Color := NumGet(CHOOSECOLOR,3*A_PtrSize,"UInt")
+  SetFormat, Integer, D
+  CHOOSECOLOR := ""
+  CUSTOM := ""
+  Return Color
+}
+

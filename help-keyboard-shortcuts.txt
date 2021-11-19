@@ -117,6 +117,7 @@ Alt + G|Toggle histogram graph focus|Image view|-
 H|Flip viewport horizontally|Anywhere|-
 V|Flip viewport vertically|Anywhere|-
 W|Flip selection W/H|Image selection area|-
+W|Show files list map|Files list|-
 Z|Image navigator|Image view|-
 I|Toggle information viewport box|Anywhere|-
 Insert|Insert file(s) into list|Anywhere|Files selector

@@ -1,9 +1,9 @@
 // qpv-main.cpp : Définit les fonctions exportées de la DLL.
 
+
 #include "pch.h"
 #include "framework.h"
 #include <wchar.h>
-#include "qpv-main.h"
 #include "omp.h"
 #include "math.h"
 #include "windows.h"
@@ -17,6 +17,12 @@
 #include <cstdio>
 #include <numeric>
 #include <algorithm>
+// #include <wincodec.h>
+// #include <gdiplus.h>
+// #include <gdiplusflat.h>
+#include <locale.h>
+#include <codecvt>
+#include "qpv-main.h"
 
 // #include <bits/stdc++.h>
 
@@ -658,9 +664,9 @@ int FloodFill8Stack(int *imageData, int w, int h, int x, int y, int newColor, fl
   static const int gx[4] = {0, 1, 0, -1}; // relative neighbor x coordinates
   static const int gy[4] = {-1, 0, 1, 0}; // relative neighbor y coordinates
 
-  unsigned int maxPixels = w*h + 1;
-  unsigned int loopsOccured = 0;
-  unsigned int suchDeviations = 0;
+  UINT maxPixels = w*h + 1;
+  UINT loopsOccured = 0;
+  UINT suchDeviations = 0;
   int suchAppliedDeviations = 0;
   std::vector<int> pixelzMap(maxPixels, 0);
   std::vector<float> indexes(maxPixels, 0);
@@ -759,8 +765,8 @@ int FloodFillScanlineStack(int *imageData, int w, int h, int x, int y, int newCo
 
   int x1;
   bool spanAbove, spanBelow;
-  unsigned int maxPixels = w*h + w;
-  unsigned int loopsOccured = 0;
+  UINT maxPixels = w*h + w;
+  UINT loopsOccured = 0;
 
   // std::vector<int> stack;
   // push(stack, x, y);
@@ -967,7 +973,7 @@ DLL_API int DLL_CALLCONV SetGivenAlphaLevel(int *imageData, int w, int h, int gi
     {
         int px, y = 0;
         int defaultColor = 0;
-        unsigned int BGRcolor = imageData[x + y * w];
+        UINT BGRcolor = imageData[x + y * w];
         if (BGRcolor!=0x0)
            defaultColor = BGRcolor & 0x00ffffff;
 
@@ -990,7 +996,7 @@ DLL_API int DLL_CALLCONV SetGivenAlphaLevel(int *imageData, int w, int h, int gi
     {
         int px, y = h - 1;
         int defaultColor = 0;
-        unsigned int BGRcolor = imageData[x + y * w];
+        UINT BGRcolor = imageData[x + y * w];
         if (BGRcolor!=0x0)
            defaultColor = BGRcolor & 0x00ffffff;
 
@@ -1111,10 +1117,10 @@ DLL_API int DLL_CALLCONV BlendBitmaps(int* bgrImageData, int* otherData, int w, 
         // #pragma omp parallel for schedule(static) default(none) num_threads(threadz)
         for (int y = 0; y < h; y++)
         {
-            unsigned int BGRcolor = bgrImageData[x + (y * w)];
+            UINT BGRcolor = bgrImageData[x + (y * w)];
             if (BGRcolor != 0x0)
             {
-                unsigned int colorO = otherData[x + (y * w)];
+                UINT colorO = otherData[x + (y * w)];
                 int aO = (colorO >> 24) & 0xFF;
                 int aB = (BGRcolor >> 24) & 0xFF;
                 int aX = min(aO, aB);
@@ -1369,7 +1375,6 @@ DLL_API int newBoxBlurBitmap(unsigned char* Bitmap, unsigned char* BitmapOut, in
 
 }
 
-
 DLL_API int DLL_CALLCONV BlurImage(unsigned char *Bitmap, int width, int height, int Stride, int radius) {
 // https://stackoverflow.com/questions/47209262/c-blur-effect-on-bit-map-is-working-but-colors-are-changed
 
@@ -1423,37 +1428,6 @@ DLL_API int DLL_CALLCONV BlurImage(unsigned char *Bitmap, int width, int height,
     return 1;
 }
 
-DLL_API int countStringOccurences(const wchar_t *mainStr, const wchar_t *toFind) {
-
-    std::wstring base_string(mainStr);
-    std::wstring str_to_find(toFind);
-
-    int occurrences = 0;
-    string::size_type start = 0;
-
-    //std::stringstream ss;
-    //ss << "qpv: ";
-    //ss << "txt: " << str_to_find;
-    //ss << "the other: " << base_string;
-    //LPCWSTR stru = str_to_find.c_str();
-
-    //OutputDebugStringW(stru);
-    while ((start = base_string.find(str_to_find, start)) != string::npos) {
-        ++occurrences;
-        start += str_to_find.length();
-    }
-    return occurrences;
-}
-
-DLL_API unsigned int DLL_CALLCONV isInString(const wchar_t *mainStr, const wchar_t *toFind) {
-    unsigned int occurrences = 0;
-
-    if (wcsstr(mainStr, toFind))
-       occurrences = 1;
-
-    return occurrences; //  occurrences;
-}
-
 DLL_API int DLL_CALLCONV ResizePixels(int* pixelsData, int* destData, int w1, int h1, int w2, int h2) {
 // source https://tech-algorithm.com/articles/nearest-neighbor-image-scaling/
 // https://www.researchgate.net/figure/Nearest-neighbour-image-scaling-algorithm_fig2_272092207
@@ -1463,10 +1437,10 @@ DLL_API int DLL_CALLCONV ResizePixels(int* pixelsData, int* destData, int w1, in
     //#pragma omp simd simdlen(30) // schedule(dynamic) default(none)
     for (int i=0; i < h2; i++)
     {
-        unsigned int py = i*(h1/h2);
+        UINT py = i*(h1/h2);
         for (int j=0; j < w2; j++)
         {
-            unsigned int px = j*(w1/w2);
+            UINT px = j*(w1/w2);
             destData[(i*w2) + j] = pixelsData[(py*w1) + px];
         }
     }
@@ -1500,23 +1474,6 @@ DLL_API int DLL_CALLCONV hamming_distance(int* a, int*b, int n) {
     }
     return dist;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 // For every integer on 8bits (from 0 to 255), keep track of how many
@@ -1598,21 +1555,42 @@ DLL_API int DLL_CALLCONV hammingDistanceOverArray(int argc, char **argv) {
 
 */
 
-DLL_API unsigned int DLL_CALLCONV dumbcalculateNCR(int n) {
+unsigned long long int fact(UINT n) {
+   if (n == 0 || n == 1)
+      return 1;
+
+   unsigned long long int r = n;
+   for (unsigned long long int i = 1; i < n; i++)
+   {
+       r *= i;
+   }
+   return r;
+}
+
+DLL_API unsigned long long int DLL_CALLCONV dumbcalculateNCR(UINT n) {
 // Calculates the number of combinations of N things taken r=2 at a time.
 
-   unsigned int combinations = 0;
-   for ( int secondIndex = 0 ; secondIndex<n+1 ; secondIndex++)
+   // std::stringstream ss;
+   // ss << "qpv: n=" << n;
+ 
+   unsigned long long int combinations = 0;
+   for ( unsigned long long int secondIndex = 0 ; secondIndex<n+1 ; secondIndex++)
    {
-       for ( int mainIndex = secondIndex + 1 ; mainIndex<n+1 ; mainIndex++)
+       for ( unsigned long long int mainIndex = secondIndex + 1 ; mainIndex<n ; mainIndex++)
        {
-          if (secondIndex!=mainIndex && secondIndex<=n && mainIndex<=n) 
+          // if (secondIndex!=mainIndex && secondIndex<n && mainIndex<n) 
+          // {
+             // std::stringstream ss;
+             // ss << "qpv: sI=" << secondIndex;
+             // ss << " mI=" << mainIndex;
+             // OutputDebugStringA(ss.str().data());
              combinations++;
+          // }
        }
    }
 
    // std::stringstream ss;
-   // ss << "qpv: " << combinations;
+   // ss << " combos=" << combinations;
    // OutputDebugStringA(ss.str().data());
    return combinations;
 }
@@ -1629,20 +1607,24 @@ inline int hammingDistance(unsigned long long n1, unsigned long long n2) {
     return setBits; 
 } 
 
-DLL_API int DLL_CALLCONV hammingDistanceOverArray(unsigned long long *givenHashesArray, unsigned int *givenIDs, int arraySize, unsigned int *resultsArrayA, unsigned int *resultsArrayB, unsigned int *resultsArrayC, int threshold, int maxResults) {
-    int results = 0;
-    int n = arraySize;
+DLL_API UINT DLL_CALLCONV hammingDistanceOverArray(unsigned long long *givenHashesArray, unsigned int *givenIDs, UINT arraySize, UINT *resultsArrayA, UINT *resultsArrayB, UINT *resultsArrayC, int threshold, UINT maxResults) {
+    UINT results = 0;
+    UINT n = arraySize;
     bool done = false;
     // int mainIndex = 1;
     // int returnVal = 1;
+   // std::stringstream ss;
+   // ss << "qpv: arraySize " << n;
+   // ss << " maxResults " << maxResults;
+   // OutputDebugStringA(ss.str().data());
 
     #pragma omp parallel for schedule(dynamic) default(none) shared(results)
-    for ( int secondIndex = 0 ; secondIndex<n+1 ; secondIndex++)
+    for ( long secondIndex = 0 ; secondIndex<n+1 ; secondIndex++)
     {
         if (done==1)
            break;
 
-        for ( int mainIndex = secondIndex + 1 ; mainIndex<n+1 ; mainIndex++)
+        for ( long mainIndex = secondIndex + 1 ; mainIndex<n ; mainIndex++)
         {
             if (done==1)
                break;
@@ -1650,14 +1632,14 @@ DLL_API int DLL_CALLCONV hammingDistanceOverArray(unsigned long long *givenHashe
             int diff = hammingDistance(givenHashesArray[mainIndex], givenHashesArray[secondIndex]);
             if (diff<threshold)
             {
-                #pragma omp critical
-                {
-                    results++;
-                    resultsArrayA[results] = givenIDs[mainIndex];
-                    resultsArrayB[results] = givenIDs[secondIndex];
-                    resultsArrayC[results] = diff;
-                    done = results > maxResults;
-                };
+               #pragma omp critical
+               {
+                  results++;
+                  resultsArrayA[results] = givenIDs[mainIndex];
+                  resultsArrayB[results] = givenIDs[secondIndex];
+                  resultsArrayC[results] = diff;
+                  done = results > maxResults;
+               };
             };
         };
     }
@@ -1673,3 +1655,287 @@ DLL_API int DLL_CALLCONV hammingDistanceOverArray(unsigned long long *givenHashe
    // OutputDebugStringA(ss.str().data());
    return results;
 }
+
+
+/*
+
+template <typename T>
+inline void SafeRelease(T *&p)
+{
+    if (NULL != p)
+    {
+        p->Release();
+        p = NULL;
+    }
+}
+
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testFuncNew(UINT width, UINT height, const wchar_t *szFileName) {
+    Gdiplus::GpBitmap* myBitmap = NULL;
+
+    std::stringstream ss;
+    if (szFileName)
+    {
+        HRESULT hr = S_OK;
+        // Create WIC factory
+        hr = CoCreateInstance(
+            CLSID_WICImagingFactory,
+            NULL,
+            CLSCTX_INPROC_SERVER,
+            IID_PPV_ARGS(&m_pIWICFactory)
+            );
+
+        // Decode the source image to IWICBitmapSource
+        // Create a decoder
+        IWICBitmapDecoder *pDecoder = NULL;
+        hr = m_pIWICFactory->CreateDecoderFromFilename(
+            szFileName,                      // Image to be decoded
+            NULL,                            // Do not prefer a particular vendor
+            GENERIC_READ,                    // Desired read access to the file
+            WICDecodeMetadataCacheOnDemand,  // Cache metadata when needed
+            &pDecoder                        // Pointer to the decoder
+            );
+
+        // Retrieve the first frame of the image from the decoder
+        IWICBitmapFrameDecode *pFrame = NULL;
+        if (SUCCEEDED(hr))
+        {
+            hr = pDecoder->GetFrame(0, &pFrame);
+            std::stringstream ss;
+            ss << "qpv: decoder " << hr;
+            OutputDebugStringA(ss.str().data());
+        }
+
+        // Retrieve IWICBitmapSource from the frame
+        // m_pOriginalBitmapSource contains the original bitmap and acts as an intermediate
+        if (SUCCEEDED(hr))
+        {
+            // SafeRelease(m_pOriginalBitmapSource);
+            hr = pFrame->QueryInterface(
+                IID_IWICBitmapSource, 
+                reinterpret_cast<void **>(&m_pOriginalBitmapSource));
+            std::stringstream ss;
+            ss << "qpv: get frame image " << hr;
+            OutputDebugStringA(ss.str().data());
+        }
+
+        // Step 3: Scale the original IWICBitmapSource to the given size
+        // and convert the pixel format
+        // IWICBitmapSource *pToRenderBitmapSource = NULL;
+
+        if (SUCCEEDED(hr))
+        {
+
+            std::stringstream ss;
+            ss << "qpv: scale image " << hr;
+            OutputDebugStringA(ss.str().data());
+            hr = S_OK;
+            // IWICBitmapSource** ppToRenderBitmapSource = NULL;
+            // *ppToRenderBitmapSource = NULL;
+
+            UINT owidth = 0;
+            UINT oheight = 0;
+            // hr = m_pOriginalBitmapSource->GetSize(&owidth, &oheight); 
+
+            if (SUCCEEDED(hr))
+            {
+                // Create a BitmapScaler
+                IWICBitmapScaler* pScaler = NULL;
+                    hr = m_pIWICFactory->CreateBitmapScaler(&pScaler);
+
+                    // Initialize the bitmap scaler from the original bitmap map bits
+                    if (SUCCEEDED(hr))
+                    {
+                        hr = pScaler->Initialize(
+                            m_pOriginalBitmapSource,
+                            width, height,
+                            WICBitmapInterpolationModeFant);
+            std::stringstream ss;
+            ss << "qpv: scale image to " << width;
+            OutputDebugStringA(ss.str().data());
+                    }
+
+                // Format convert the bitmap into 32bppBGR, a convenient 
+                // pixel format for GDI+ rendering 
+                if (SUCCEEDED(hr))
+                {
+                    IWICFormatConverter* pConverter = NULL;
+                    hr = m_pIWICFactory->CreateFormatConverter(&pConverter);
+
+                    // Format convert to 32bppBGR 
+                    if (SUCCEEDED(hr))
+                    {
+                        hr = pConverter->Initialize(
+                            pScaler,                         // Input bitmap to convert
+                            GUID_WICPixelFormat32bppBGR,     // Destination pixel format
+                            WICBitmapDitherTypeNone,         // Specified dither patterm
+                            NULL,                            // Specify a particular palette 
+                            0.f,                             // Alpha threshold
+                            WICBitmapPaletteTypeCustom       // Palette translation type
+                        );
+
+            std::stringstream ss;
+            ss << "qpv: convert pix format h=" << height;
+            OutputDebugStringA(ss.str().data());
+                        // Store the converted bitmap as ppToRenderBitmapSource 
+                        if (SUCCEEDED(hr))
+                        {
+                            hr = pConverter->QueryInterface(
+                IID_IWICBitmapSource, 
+                reinterpret_cast<void **>(&pToRenderBitmapSource));
+                               // IID_PPV_ARGS(ppToRenderBitmapSource));
+            std::stringstream ss;
+            ss << "qpv: get bitmap converted format w=" << width;
+            OutputDebugStringA(ss.str().data());
+
+                        };
+                    };
+
+                    SafeRelease(pConverter);
+                };
+
+                SafeRelease(pScaler);
+            };
+
+        };
+
+
+
+
+        // Step 4: Create a DIB from the converted IWICBitmapSource
+        if (SUCCEEDED(hr))
+        {
+
+
+            HRESULT hr = S_OK;
+            UINT width = 0;
+            UINT height = 0;
+
+            // Check BitmapSource format
+            WICPixelFormatGUID pixelFormat;
+            hr = pToRenderBitmapSource->GetPixelFormat(&pixelFormat);
+
+            if (SUCCEEDED(hr))
+            {
+                hr = (pixelFormat == GUID_WICPixelFormat32bppBGR) ? S_OK : E_FAIL;
+            }
+
+            if (SUCCEEDED(hr))
+            {
+                hr = pToRenderBitmapSource->GetSize(&width, &height); 
+            }
+
+            UINT cbStride = 0;
+            if (SUCCEEDED(hr))
+            {
+                // Size of a scan line represented in bytes: 4 bytes each pixel
+                hr = UIntMult(width, sizeof(Gdiplus::ARGB), &cbStride);
+            }
+
+            UINT cbBufferSize = 0;
+            if (SUCCEEDED(hr))
+            {
+                // Size of the image, represented in bytes
+                hr = UIntMult(cbStride, height, &cbBufferSize);
+            }
+            std::stringstream ss;
+            ss << "qpv: convert to dib format stride=" << cbStride;
+            OutputDebugStringA(ss.str().data());
+
+            if (SUCCEEDED(hr))
+            {
+                m_pbBuffer = new BYTE[cbBufferSize];
+                hr = (m_pbBuffer) ? S_OK : E_FAIL;
+                if (SUCCEEDED(hr))
+                {
+                    WICRect rc = { 0, 0, width, height };
+                    // Extract the image into the GDI+ Bitmap
+                    hr = pToRenderBitmapSource->CopyPixels(
+                        &rc,
+                        cbStride,
+                        cbBufferSize,
+                        m_pbBuffer
+                        );
+
+            std::stringstream ss;
+            ss << "qpv: convert to dib format copy pixels " << hr;
+            OutputDebugStringA(ss.str().data());
+                    if (SUCCEEDED(hr))
+                    {
+                       // Gdiplus::GpBitmap* myBitmap = NULL;
+                       Gdiplus::DllExports::GdipCreateBitmapFromScan0(width, height, cbStride, PixelFormat32bppRGB, m_pbBuffer, &myBitmap);
+
+                        // m_pGdiPlusBitmap = new Gdiplus::Bitmap(
+                        //     width,
+                        //     height,
+                        //     cbStride,
+                        //     PixelFormat32bppRGB,
+                        //     m_pbBuffer
+                        //     );
+                         
+                        hr = myBitmap ? S_OK : E_FAIL;
+                        // if !(SUCCEEDED(hr))
+                        // { 
+                        // delete[] m_pbBuffer;
+                        // m_pbBuffer = NULL;
+                        // }
+            std::stringstream ss;
+            ss << "qpv: create gdip image " << hr;
+            OutputDebugStringA(ss.str().data());
+                    }
+
+                }
+            }
+
+
+
+        }
+
+        SafeRelease(pToRenderBitmapSource);
+        SafeRelease(pDecoder);
+        SafeRelease(pFrame);
+        SafeRelease(m_pOriginalBitmapSource);
+        SafeRelease(m_pIWICFactory);
+    }
+
+
+    std::wstring string_to_convert(szFileName);
+
+    //setup converter
+    using convert_type = std::codecvt_utf8<wchar_t>;
+    std::wstring_convert<convert_type, wchar_t> converter;
+
+    //use converter (.to_bytes: wstr->str, .from_bytes: str->wstr)
+    std::string converted_str = converter.to_bytes( string_to_convert );
+
+    // std::stringstream ss;
+    ss << "qpv: bmp file " << converted_str;
+    OutputDebugStringA(ss.str().data());
+    
+    return myBitmap;
+}
+
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testFunc(UINT width, UINT height, const wchar_t *szFileName) {
+    Gdiplus::GpBitmap* myBitmap = NULL;
+    Gdiplus::DllExports::GdipCreateBitmapFromFile(szFileName, &myBitmap);
+    // Gdiplus::DllExports::GdipCreateBitmapFromScan0(width, height, 0, PixelFormat32bppRGB, NULL, &myBitmap);
+
+    std::wstring string_to_convert(szFileName);
+
+    //setup converter
+    using convert_type = std::codecvt_utf8<wchar_t>;
+    std::wstring_convert<convert_type, wchar_t> converter;
+
+    //use converter (.to_bytes: wstr->str, .from_bytes: str->wstr)
+    std::string converted_str = converter.to_bytes( string_to_convert );
+
+    std::stringstream ss;
+    ss << "qpv: bmp file " << converted_str;
+    OutputDebugStringA(ss.str().data());
+
+    return myBitmap;
+}
+
+
+
+
+*/

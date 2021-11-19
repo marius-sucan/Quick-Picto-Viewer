@@ -3252,7 +3252,6 @@ Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", Kee
        ResizedH := givenH
     }
 
-
     If (((ResizedW*ResizedH>536848912) || (ResizedW>32100) || (ResizedH>32100)) && checkTooLarge=1)
        Return
 
@@ -8909,7 +8908,7 @@ calcIMGdimensions(imgW, imgH, givenW, givenH, ByRef ResizedW, ByRef ResizedH) {
       ResizedH := Round(ResizedW / PicRatio)
    } Else
    {
-      ResizedH := (imgH >= givenH) ? givenH : imgH         ;set the maximum picture height to the original height
+      ResizedH := (imgH >= givenH) ? givenH : imgH
       ResizedW := Round(ResizedH * PicRatio)
    }
 }
