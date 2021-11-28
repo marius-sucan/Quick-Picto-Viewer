@@ -2,6 +2,13 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.4.1 (2021-11-28)
+  - [new] option to choose color depth on image save
+  - the files list map will be «blown out» for large file lists, when users click the scrollbar
+  - by pressing the Tab key, in panels, the focused control, will now be highlighted; useful for people with poor eyesight
+  - important bug fixes related to image editing, finding dupes and the HDR tone mapping panel
+  - other fixes and improvements
+
 - v5.4.0 (2021-11-19)
   - [new] options to select files added to favourites and already seen images
   - [new] files list map; helps see at a glance what files are selected; this is useful for large files lists

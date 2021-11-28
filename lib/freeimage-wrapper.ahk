@@ -448,7 +448,7 @@ FreeImage_GetPixelColor(hImage, xPos, yPos) {
       return RetValue
 }
 
-FreeImage_SetPixelColor(hImage, xPos, yPos, RGBArray="255,255,255,0") {
+FreeImage_SetPixelColor(hImage, xPos, yPos, RGBArray:="255,255,255,0") {
 ; It works only with 16, 24 and 32 bit images.
    RGBA := StrSplit(RGBArray, ",")
    VarSetCapacity(RGBQUAD, 4)
@@ -470,6 +470,10 @@ FreeImage_ConvertTo(hImage, MODE) {
 ; ATTENTION: these are case sensitive!
    If !hImage
       Return
+
+   If (mode="16bits")
+      mode := "16Bits565"
+
    Return DllCall(getFIMfunc("ConvertTo" MODE), "Uptr", hImage, "uptr")
 }
 
@@ -488,16 +492,22 @@ FreeImage_ConvertToStandardType(hImage, bScaleLinear:=1) {
    Return DllCall(getFIMfunc("ConvertToStandardType"), "Uptr", hImage, "int", bScaleLinear, "uptr")
 }
 
-FreeImage_ColorQuantize(hImage, quantize:=0) {
-   Return DllCall(getFIMfunc("ColorQuantize"), "Uptr", hImage, "int", quantize, "uptr")
+FreeImage_ColorQuantize(hImage, quantizeAlgo:=0) {
+; hImage - a 24 or 32 bits image
+; quantizeAlgo:
+   ; 0 = FIQ_WUQUANT - Xiaolin Wu color quantization algorithm
+   ; 1 = FIQ_NNQUANT - NeuQuant neural-net quantization algorithm by Anthony Dekker (24-bit only)
+   ; 2 = FIQ_LFPQUANT - Lossless Fast Pseudo-Quantization Algorithm by Carsten Klein
+; it returns an 8 bit image
+   Return DllCall(getFIMfunc("ColorQuantize"), "Uptr", hImage, "int", quantizeAlgo, "uptr")
 }
 
 FreeImage_Threshold(hImage, TT:=0) { ; TT: 0 - 255
    Return DllCall(getFIMfunc("Threshold"), "Uptr", hImage, "int", TT, "uptr")
 }
 
-FreeImage_Dither(hImage, algo:=0) {
-; ALGO parameter: dithering method
+FreeImage_Dither(hImage, ditherAlgo:=0) {
+; ditherAlgo parameter: dithering method
 ; FID_FS           = 0   //! Floyd & Steinberg error diffusion
 ; FID_BAYER4x4     = 1   //! Bayer ordered dispersed dot dithering (order 2 dithering matrix)
 ; FID_BAYER8x8     = 2   //! Bayer ordered dispersed dot dithering (order 3 dithering matrix)
@@ -505,12 +515,15 @@ FreeImage_Dither(hImage, algo:=0) {
 ; FID_CLUSTER8x8   = 4   //! Ordered clustered dot dithering (order 4 - 8x8 matrix)
 ; FID_CLUSTER16x16 = 5   //! Ordered clustered dot dithering (order 8 - 16x16 matrix)
 ; FID_BAYER16x16   = 6   //! Bayer ordered dispersed dot dithering (order 4 dithering matrix)
+; it returns an 1-bit image
 
-   Return DllCall(getFIMfunc("Dither"), "Uptr", hImage, "int", algo, "uptr")
+   Return DllCall(getFIMfunc("Dither"), "Uptr", hImage, "int", ditherAlgo, "uptr")
 }
 
 FreeImage_ToneMapping(hImage, algo:=0, p1:=0, p2:=0) {
+; Converts a High Dynamic Range image (48-bit RGB or 96-bit RGBF) to a 24-bit RGB image, suitable for display.
 ; function required to display HDR and RAW images
+
 ; algo parameter and p1/p2 intervals and meaning 
 ; 0 = FITMO_DRAGO03    ; Adaptive logarithmic mapping (F. Drago, 2003)
       ; p1 = gamma [0.0, 9.9]; p2 = exposure [-8, 8]
@@ -783,6 +796,7 @@ getFIMfunc(funct) {
         , fList28 := "|AllocateHeader|AllocateT|EnlargeCanvas|"
         , fList32 := "|AdjustColors|AllocateHeaderT|ConvertToRawBits|GetAdjustColorsLookupTable|JPEGTransformCombined|JPEGTransformCombinedFromMemory|JPEGTransformCombinedU|"
         , fList36 := "|AllocateEx|AllocateHeaderForBits|ConvertFromRawBits|RescaleRect|TmoReinhard05Ex|"
+
    fPrefix := (A_PtrSize=8) ? "FreeImage_" : "_FreeImage_"
    fSuffix := ""
    If (A_PtrSize!=8)
@@ -825,7 +839,7 @@ ConvertFIMtoPBITMAP(hFIFimgA) {
 
   FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
   Pitch := FreeImage_GetPitch(hFIFimgA)
-  pBitmap := Gdip_CreateBitmap(imgW, imgH)
+  pBitmap := Gdip_CreateBitmap(imgW, imgH, "0xE200B")
   redMASK := FreeImage_GetRedMask(hFIFimgA)
   greenMASK := FreeImage_GetGreenMask(hFIFimgA)
   blueMASK := FreeImage_GetBlueMask(hFIFimgA)

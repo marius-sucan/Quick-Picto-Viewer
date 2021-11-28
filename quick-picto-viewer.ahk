@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.4.0
+;@Ahk2Exe-SetVersion 5.4.1
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2021)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -100,15 +100,16 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , RegExFilesPattern := "i)^(.\:\\).*(\.(ico|dib|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif))$"
    , RegExFIMformPtrn := "i)(.\\*\.(DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
    , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|jng|jif|jfif|jpg|jpe|jpeg|ppm|xpm))$"
-   , saveTypesFriendly := ".BMP, .GIF, .HDP, .J2K, .JFIF, .JIF, .JNG, .JP2, .JPE, .JPG, .JXR, .PNG, .PPM, .TGA, .TIF, ..WDP, .WEBP or .XPM"
+   , saveTypesFriendly := ".BMP, .GIF, .HDP, .J2K, .JFIF, .JIF, .JNG, .JP2, .JPE, .JPG, .JXR, .PNG, .PPM, .TGA, .TIF, .WDP, .WEBP or .XPM"
    , saveAlphaTypesRegEX := "i)(.\.(j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp))$"
    , openFptrn1 := "*.png;*.bmp;*.gif;*.jpg;*.tif;*.tga;*.webp;*.jpeg", prevLoadedImageIndex := 0
    , openFptrn2 := "*.dds;*.emf;*.exr;*.g3;*.hdp;*.iff;*.j2c;*.j2k;*.jbg;*.jif;*.jng;*.jp2;*.jxr;*.koa;*.lbm;*.mng;*.pbm;*.pcd;*.pct;*.pcx;*.pfm;*.pgm;*.pic;*.ppm;*.psd;*.ras;*.sgi;*.wap;*.wbm;*.wbmp;*.wdp;*.wmf;*.xbm;*.xpm"
    , openFptrn3 := "*.3fr;*.arw;*.bay;*.bmq;*.cap;*.cine;*.cr2;*.crw;*.cs1;*.dc2;*.dcr;*.drf;*.dsc;*.erf;*.fff;*.hdr;*.ia;*.iiq;*.k25;*.kc2;*.kdc;*.mdc;*.mef;*.mos;*.mrw;*.nef;*.nrw;*.orf;*.pef;*.ptx;*.pxn;*.qtk;*.raf;*.raw;*.rdc;*.rw2;*.rwz;*.sr2;*.srf;*.x3f"
    , openFptrn4 := "*.tiff;*.targa;*.jpe;*.dib;*.pict;*.rle", userJpegQuality := 90
+   , dialogSaveFptrn := "HD Photo (*.hdp)|JNG Jpeg (*.jng)|JPEG Common (*.jpg;*.jpeg)|JPEG 2000 (*.jp2;*.j2k)|JPEG File Interchange Format (*.jfif)|JPEG-XR (*.jxr)|Non-animated Compuserve GIF (*.gif)|Portable Network Graphics (*.png)|Portable PixelMap (*.ppm)|Tagged Image File Format (*.tif;*.tiff)|TrueVision Targa (*.tga)|WDP (*.wdp)|WebP (*.webp)|Windows Bitmap (*.bmp)|XPM (*.xpm)"
+   , dialogSaveIndexes := {1:"hdp", 2:"jng", 3:"jpg", 4:"jp2", 5:"jfif", 6:"jxr", 7:"gif", 8:"png", 9:"ppm", 10:"tif", 11:"tga", 12:"wdp", 13:"webp", 14:"bmp", 15:"xpm"}
+   , userPossibleWriteFMTs := ".BMP|.GIF|.HDP|.J2K|.JFIF|.JNG|.JP2|.JPG|.JXR|.PNG|.PPM|.TGA|.TIF|.WDP|.WEBP|.XPM"
    , saveImgFormatsList := {1:"bmp", 2:"gif", 3:"hdp", 4:"j2k", 5:"jfif", 6:"jng", 7:"jp2", 8:"jpg", 9:"jxr", 10:"png", 11:"ppm", 12:"tga", 13:"tif", 14:"wdp", 15:"webp", 16:"xpm"}
-   , dialogSaveFptrn := "Portable Network Graphics (*.png)|WebP (*.webp)|Common JPEG (*.jpg;*.jpeg)|TrueVision Targa (*.tga)|Tagged Image File Format (*.tif;*.tiff)|Non-animated Compuserve GIF (*.gif)|Windows Bitmap (*.bmp)|HD Photo (*.hdp)|JPEG File Interchange Format (*.jfif)|JNG (*.jng)|JPEG 2000 (*.jp2;*.j2k)|JPEG-XR (*.jxr)|Portable PixelMap (*.ppm)|WDP (*.wdp)|XPM (*.xpm)"
-   , dialogSaveIndexes := {1:"png", 2:"webp", 3:"jpg", 4:"tga", 5:"tif", 6:"gif", 7:"bmp", 8:"hdp", 9:"jfif", 10:"jng", 11:"jp2", 12:"jxr", 13:"ppm", 14:"wdp", 15:"xpm"}
    , LargeUIfontValue := 14, AnyWindowOpen := 0, toolTipGuiCreated := 0, panelWinCollapsed :=0 
    , PrefsLargeFonts := 0, OSDbgrColor := "252525", OSDtextColor := "FEFDFC", initialCustomShapeCoords := ""
    , PasteFntSize := 35, OSDfntSize := 23, OSDFontName := "Arial", prevOpenFolderPath := ""
@@ -179,7 +180,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , customShapeHasSelectedPoints := 0, currentVectorUndoLevel := 1, undoVectorShapesLevelsArray := []
    , thisBMPdummy := 0, dummyGu := 9
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", lastTlbrCliicked := 0
-   , appVersion := "5.4.0", vReleaseDate := "19/11/2021"
+   , appVersion := "5.4.1", vReleaseDate := "28/11/2021"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1, usrAutoCropGenerateSelection := 0
@@ -279,7 +280,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , FloodFillEightWays := 0, maxVectorUndoLevels := 30, showNewVectorPointPreview := 1, hamDistInterpolation := 7
    , allowUserQuickFileActions := 1, userAllowsGradientRecentering := 0, TextInAreaCaseTransform := 1
    , customZoomAdaptMode := 0, allowFreeIMGpanning := 0, lockToolbar2Win := 1, showFilesListMap := 0
-   , showFolderTreeDetails := 0
+   , showFolderTreeDetails := 0, userSaveBitsDepth := 1
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -423,6 +424,19 @@ HKifs(q:=0) {
 
    Return r
 }
+
+#If (WinActive("ahk_id " hSetWinGui) && AnyWindowOpen>0)
+   ; ~LButton::
+   ~Tab::
+   ~+Tab::
+      SetTimer, highlightActiveCtrl, -100
+   Return
+
+   ~Enter::
+   ~Space::
+      highlightActiveCtrl("enter")
+   Return
+#If
 
 #If (WinActive("ahk_id " hQPVtoolbar) && ShowAdvToolbar=1)
     +Tab::
@@ -2893,10 +2907,11 @@ CopyMoveFilesExplorer(userOption:="copy") {
   SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
-throwErrorNoImageLoaded(noMSG:=0) {
+throwErrorNoImageLoaded(noMSG:=0, stringent:=1) {
    imgPath := getIDimage(currentFileIndex)
    whichBitmap := useGdiBitmap()
-   If (StrLen(whichBitmap)<3 || !imgPath)
+   stringent := (stringent=1) ? 0 : FileRexists(imgPath)
+   If (StrLen(whichBitmap)<3 && !stringent || !imgPath)
    {
       If (noMSG=0)
       {
@@ -3825,6 +3840,7 @@ panIMGonScrollBar(doX, doY) {
    If (thisIndex>10) || (lastWasLowQuality=1)
       SetTimer, wrapResizeImageGDIwin, -60
 }
+
 invokeFilesListMapNow() {
    ToolTip, Please wait - generating list map
    listMap := generateFilesListMap("auto")
@@ -3859,13 +3875,9 @@ ThumbsScrollbar() {
    {
       zeitSillyPrevent := A_TickCount
       GetMouseCoord2wind(PVhwnd, mX, mY)
-      newIndex := ((mY-15)/mainHeight)*100
-      newIndex := Ceil((maxFilesIndex/100)*newIndex)
-      If (newIndex<1)
-         newIndex := 1
-      Else If (newIndex>maxFilesIndex)
-         newIndex := maxFilesIndex-1
-
+      mYperc := ((mY-15)/mainHeight)*100
+      newIndex := clampInRange(Ceil((maxFilesIndex/100)*mYperc), 1, maxFilesIndex)
+      ; mapOffset := - clampInRange(mY * 2, 0, mainHeight*2 - 1)
       If (lastu!=newIndex)
       {
          lastu := newIndex
@@ -3881,7 +3893,7 @@ ThumbsScrollbar() {
             Else
                filterDelayiedImageDisplay()
          }
-         mainGdipWinThumbsGrid(0, modus, listMap[1], "scroll")
+         mainGdipWinThumbsGrid(0, modus, listMap[1], "scroll", listMap[3])
       }
    }
 
@@ -3910,7 +3922,10 @@ simplePanIMGonClick(dummy:=0,doX:=1,doY:=1) {
    ; ToolTip, % "l=" thisZL , , , 2
    While, (determineLClickstate()=1)
    {
-      GetMouseCoord2wind(PVhwnd, mX, mY)
+      If (allowFreeIMGpanning=1 && dummy="scroll")
+         GetMouseCoord2wind(PVhwnd, mX, mY)
+      Else
+         GetPhysicalCursorPos(mX, mY)
       moX := (FlipImgH=1) ? mainWidth - mX : mX
       moY := (FlipImgV=1) ? mainHeight - mY : mY
       calculateScrollBars(prevResizedVPimgW, prevResizedVPimgH, prevDestPosX, prevDestPosY, mainWidth, mainHeight, knobW, knobH, knobX, knobY)
@@ -4607,13 +4622,13 @@ livePreviewsImageEditing(modus:=0, hideHUD:=0) {
 
    If (scrollBarHy>0)
    {
-      Gdip_SetClipRect(2NDglPG, 0, scrollBarHy, mainWidth, mainHeight - scrollBarHy)
+      Gdip_SetClipRect(2NDglPG, 0, mainHeight - scrollBarHy, mainWidth, scrollBarHy)
       Gdip_GraphicsClear(2NDglPG)
    }
 
    If (scrollBarVx>0)
    {
-      Gdip_SetClipRect(2NDglPG, scrollBarVx, 0, mainWidth - scrollBarVx, mainHeight)
+      Gdip_SetClipRect(2NDglPG, mainWidth - scrollBarVx, 0, scrollBarVx, mainHeight)
       Gdip_GraphicsClear(2NDglPG)
    }
 
@@ -5827,7 +5842,7 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0, OutputVarWin:=0, mX:=0, mY:=0, 
                 addMsg := "`n `nCorner coordinates:`nX / Y: " Round(newSelDotX) ", " Round(newSelDotY) "`nColor: " pixelColor
              }
 
-             theRatio := (lockSelectionAspectRatio>1) ? "`nLocked aspect ratio: " Round(desiredSelAspectRatio, 2) : "`nRatio: " Round(imgSelW/imgSelH, 2)
+             theRatio := (lockSelectionAspectRatio>1) ? "`nLocked aspect ratio: " Round(desiredSelAspectRatio, 2) : " (" Round(imgSelW/imgSelH, 2) ")"
              ; If (imgEditPanelOpened=1)
                 theRatio .= "`nRotation: " Round(vPselRotation, 2) "° "
 
@@ -9060,7 +9075,7 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, threads) {
   return r
 }
 
-QPV_CreateBitmapNoise(W, H, intensity, mode, threads) {
+QPV_CreateBitmapNoise(W, H, intensity, doGray, threads) {
   initQPVmainDLL()
   If (!qpvMainDll || isWinXP=1)
   {
@@ -9076,7 +9091,7 @@ QPV_CreateBitmapNoise(W, H, intensity, mode, threads) {
   E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData)
   func2exec := (A_PtrSize=8) ? "RandomNoise" : "_RandomNoise@24"
   If !E1
-     r := DllCall("qpvmain.dll\" func2exec, "UPtr", iScan, "Int", w, "Int", h, "Int", intensity, "Int", mode, "Int", threads)
+     r := DllCall("qpvmain.dll\" func2exec, "UPtr", iScan, "Int", w, "Int", h, "Int", intensity, "Int", doGray, "Int", threads)
 
   ; ToolTip, % E1 "==" r " == " pBitmap "==" W "x" H, , , 2
   If !E1
@@ -11158,7 +11173,15 @@ trGdip_GraphicsClear(funcu, pGraphics, coloru:=0x00ffFFff, silentMode:=0) {
   }
 }
 
-QPV_SaveImageFile(funcu, pBitmap, file2save, jpegQuality) {
+QPV_SaveImageFile(funcu, pBitmap, file2save, jpegQuality, depthLevel:=1) {
+   Static dephtus := {1:32, 2:24, 3:16, 4:8}
+   fileEXTpos := InStr(file2save, ".", 0, -1) ; RegExMatch(fileNamu, "\.[^\^.\\/:*?<>|\r\n]+$")
+   If fileEXTpos
+      fileEXT := SubStr(file2save, fileEXTpos + 1)
+
+   If (dephtus[depthLevel]>1 && depthLevel!=1 && RegExMatch(fileEXT, "^(?i:BMP|DIB|RLE|TIF|TIFF|PNG)$"))
+      Gdip_BitmapSetColorDepth(pBitmap, dephtus[depthLevel], 1)
+
    r := Gdip_SaveBitmapToFile(pBitmap, file2save, jpegQuality)
    If (r=-5)
       r := Gdip_ErrorHandler(gdipLastError, 0)
@@ -11168,7 +11191,7 @@ QPV_SaveImageFile(funcu, pBitmap, file2save, jpegQuality) {
    If r
    {
       addJournalEntry(A_ThisFunc "() invoked by " funcu "() failed to save image with GDI+: " file2save "`nError code: " r)
-      zr := SaveFIMfile(file2save, pBitmap)
+      zr := SaveFIMfile(file2save, pBitmap, dephtus[depthLevel], fileEXT)
       If (!zr && wasInitFIMlib=1)
          r := zr
       Else If (wasInitFIMlib=1)
@@ -11936,28 +11959,12 @@ ResizeIMGviewportSelection() {
 dummyInfoImgResizeVP() {
    Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
    mpx := Round((imgW*imgH)/1000000, 2)
-   showTOOLtip("Image resized to:`n" groupDigits(imgW) " x " groupDigits(imgH) " px ("  mpx " MPx)" )
+   showTOOLtip("Image resized to:`n" groupDigits(imgW) " x " groupDigits(imgH) " px | " Round(imgW/imgH, 2) " | " mpx " MPx" )
    SetTimer, RemoveTooltip, % - msgDisplayTime
 }
 
 getTransformToolSelectedArea(applyVPfx, doCarving, fakeBGR) {
     Return getSelectedImageArea(useGdiBitmap(), doCarving, 0, applyVPfx, fakeBGR)
-/*
-    If (applyVPfx=1)
-    {
-       stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc)
-       whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
-       If (stopNow=1 || !whichBitmap || thumbsDisplaying=1 || editingSelectionNow!=1)
-          Return
-    } Else whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
-
-    Gdip_GetImageDimensions(whichBitmap, imgW, imgH)
-    calcImgSelection2bmp(-1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-    extendedClone := testSelectionLargerThanGiven(imgW, imgH)
-    zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
-    Return zBitmap
-*/
-
 }
 
 DrawLinesInSelectedArea(modus) {
@@ -13092,7 +13099,7 @@ CropImageInViewPortToSelection(modus:=0) {
 dummyInfoImgCropVP() {
    Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
    mpx := Round((imgW*imgH)/1000000, 2)
-   showTOOLtip("Image canvas size set to:`n" groupDigits(imgW) " x " groupDigits(imgH) " px ("  mpx " MPx)" )
+   showTOOLtip("Image canvas size set to:`n" groupDigits(imgW) " x " groupDigits(imgH) " px | " Round(imgW/imgH, 2) " | " mpx " MPx" )
    SetTimer, RemoveTooltip, % - msgDisplayTime
 }
 
@@ -14258,7 +14265,7 @@ PanelSeenStats() {
     Gui, Add, Button, y+5 hp geraseSeenIMGsDB, &Erase the entire list
     Gui, Add, Button, y+5 hp gBtnCopySeenStats, &Copy statistics to clipboard
     Gui, Add, Button, y+5 hp gBtnALLviewedImages2List, &Retrieve list of recorded seen images
-    Gui, Add, Text, y+10 w%lstWid%, TIP: To retrieve the images seen on a given day or month, double click on the date in the list.
+    Gui, Add, Text, y+10 w%lstWid%, TIP: To retrieve the images seen on a given day or month`, double click on the date in the list.
     Gui, Add, Text, y+10 h%thisBtnHeight% +0x200 w%lstWid% vinfoLine, Please wait...
 
     Gui, Tab
@@ -16282,7 +16289,7 @@ PanelFoldersTree() {
 
     Gui, Add, TreeView, r10 vTVlistFolders AltSubmit +hwndhTVlistFolders gFolderTreeResponder
     Gui, Add, Button, xp y+1 w%thisBtnHeight% h%thisBtnHeight% gfolderTreeMiniBtn vbtnFldr, \\
-    Gui, Add, Text, x+2 vfdTreeInfoLine +0x200 h%thisBtnHeight% gfolderTreeCopyPath -wrap, Folder tree status bar...
+    Gui, Add, Text, x+2 vfdTreeInfoLine +0x200 h%thisBtnHeight% gfolderTreeCopyPath -wrap +TabStop, Folder tree status bar...
     Gui, Add, Button, x+1 y+1 w1 h1 -wantTab -TabStop Default gfolderTreeDefaultAction, &Default
 
     winPos := (prevSetWinPosY && prevSetWinPosX) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
@@ -16334,8 +16341,6 @@ folderTreeDefaultAction() {
    If askAboutFileSave(" and another folder will be operned")
       Return
 
-   If askAboutSlidesListSave()
-      Return
 
    z := 0
    If GetKeyState("Shift", "P")
@@ -16360,6 +16365,15 @@ folderTreeDefaultAction() {
       OpenNewQPVinstance(folderPath)
    } Else If folderPath
    {
+      If askAboutFileSave(" and the selected folder will be opened")
+         Return
+
+      If askAboutSlidesListSave()
+         Return
+
+      If askAboutFilesSelect("discard it")
+         Return
+
       tryOpenGivenFolder(folderPath, CurrentSLD)
       FileExploreSiblingsNav("reset")
    }
@@ -17859,8 +17873,43 @@ EraseFilterzHisto() {
   PanelEnableFilesFilter()
 }
 
+InitialFilterSettingsPanel(modus) {
+    Static o_userFilterDoString, o_userFilterStringPos
+         , o_userFilterStringIsNot, o_userFilterInvertThis
+         , o_userFilterProperty, o_userFilterWhat
+         , o_UsrEditFilter, o_FilteruMaxRange
+         , o_FilteruMinRange, o_userFilterSizeProperty
+
+    If (modus=1)
+    {
+       o_userFilterDoString := userFilterDoString
+       o_userFilterStringPos := userFilterStringPos
+       o_userFilterStringIsNot := userFilterStringIsNot
+       o_userFilterInvertThis := userFilterInvertThis
+       o_userFilterProperty := userFilterProperty
+       o_userFilterWhat := userFilterWhat
+       o_UsrEditFilter := UsrEditFilter
+       o_FilteruMaxRange := FilteruMaxRange
+       o_FilteruMinRange := FilteruMinRange
+       o_userFilterSizeProperty := userFilterSizeProperty
+    } Else
+    {
+       userFilterDoString := o_userFilterDoString
+       userFilterStringPos := o_userFilterStringPos
+       userFilterStringIsNot := o_userFilterStringIsNot
+       userFilterInvertThis := o_userFilterInvertThis
+       userFilterProperty := o_userFilterProperty
+       userFilterWhat := o_userFilterWhat
+       UsrEditFilter := o_UsrEditFilter
+       FilteruMaxRange := o_FilteruMaxRange
+       FilteruMinRange := o_FilteruMinRange
+       userFilterSizeProperty := o_userFilterSizeProperty
+    }
+}
+
 PanelEnableFilesFilter() {
     Global FilterTypeu := 0
+
     If (maxFilesIndex<3 && !filesFilter)
        Return
 
@@ -17891,6 +17940,7 @@ PanelEnableFilesFilter() {
        userFilterDoString := 0
     }
 
+    InitialFilterSettingsPanel(1)
     listu := readRecentFiltersEntries()
     If (!InStr(listu, "`n`n") && StrLen(UsrEditFilter)>0 && userFilterDoString=1 && StrLen(filesFilter)>1)
        listu := UsrEditFilter "`n`n" listu
@@ -17935,6 +17985,7 @@ PanelEnableFilesFilter() {
 }
 
 BTNuiremFilesListFilter() {
+   InitialFilterSettingsPanel(1)
    BtnCloseWindow()
    remFilesListFilter()
    SetTimer, RandomPicture, -90
@@ -18154,10 +18205,11 @@ quickFindUnseenImages(dummy:=0) {
 quickFindSeenImages(dummy:=0) {
    UsrEditFilter := "||Already-Seen-Images||"
    userFilterDoString := 0
-   userFilterWhat := 20
+   userFilterProperty := 20
    userFilterInvertThis := (dummy="unseen") ? 1 : 0
    updateUIFiltersPanel("external")
    retrieveAlreadySeenImageFromCurrentList()
+   InitialFilterSettingsPanel(1)
 }
 
 BtnApplyFilesFilter() {
@@ -18184,14 +18236,18 @@ BtnApplyFilesFilter() {
       } Else userFilterDoString := 0
    } Else If (userFilterProperty=20)
    {
+      InitialFilterSettingsPanel(1)
       BtnCloseWindow()
       retrieveAlreadySeenImageFromCurrentList()
       Return
    }
 
+   InitialFilterSettingsPanel(1)
    BtnCloseWindow()
    If askAboutFileSave(" and the files list will be renewed based on the provided filter criteria")
    {
+      userFilterDoString := 0
+      userFilterProperty := 1
       UsrEditFilter := ""
       Return
    }
@@ -20482,6 +20538,7 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1) {
    failedFiles := failedSQLfiles := 0
    If adaptedSortCriteria
    {
+      addJournalEntry("Must collect files data in mode: " adaptedSortCriteria " | " scu)
       If !getMaxRowIDsqlDB()
       {
          CurrentSLD := backCurrentSLD
@@ -22818,7 +22875,10 @@ retrieveFavesAsList(dummy:=0) {
 
     If askAboutSlidesListSave()
        Return
- 
+
+    If askAboutFilesSelect("discard it")
+       Return
+
     showTOOLtip("Loading favourites list, please wait")
     FileRead, historyList, % mainFavesFile
     FileRead, miniList, % miniFavesFile
@@ -22927,6 +22987,7 @@ renewFavesListBasedOnIndexList() {
    showTOOLtip("Saving favourites list, please wait")
    If StrLen(filesFilter)>1
    {
+      lastInvoked := A_TickCount
       msgResult := msgBoxWrapper(appTitle ": Confirmation", "The current files list has " groupDigits(maxFilesIndex) " images indexed. It is the result of a filter applied on the favourite images list.`n`nPlease confirm you want to save the favourites list as is, filtered. The total of " groupdigits(bckpMaxFilesIndex) " favourited images will no longer be retrievable.", "&Deactivate filter|&Save list|&Cancel", 0, "question")
       If InStr(msgResult, "deactivate")
       {
@@ -22935,6 +22996,13 @@ renewFavesListBasedOnIndexList() {
          Return
       } Else If InStr(msgResult, "save")
       {
+         If (A_TickCount - lastInvoked<950)
+         {
+            showTOOLtip("WARNING: The destructive option was chosen too fast.`nPlease elaborate allow yourself at least one second to read the message box.")
+            SoundBeep , 300, 100
+            SetTimer, RemoveTooltip, % -msgDisplayTime
+            Return
+         }
          Sleep, 100
       } Else
       {
@@ -23775,6 +23843,17 @@ DeletePicture(dummy:=0) {
   }
 
   destroyGDIfileCache(0, 1)
+  FileGetSize, OutputVar, % file2rem
+  If (OutputVar>2)
+  {
+     fileMsg := "`nFile size: " fileSizeFrienly(OutputVar)
+     FileDateM := QPV_FileGetSizeTime(file2rem, "M", thisFileIndex)
+     FileDateC := QPV_FileGetSizeTime(file2rem, "C", thisFileIndex)
+     Try FormatTime, FileDateM, % FileDateM, dd/MM/yyyy, HH:mm
+     Try FormatTime, FileDateC, % FileDateC, dd/MM/yyyy, HH:mm
+     fileMsg .= "`nDate created: " FileDateC "`nDate modified: " FileDateM
+  }
+
   Try FileSetAttrib, -R, %file2rem%
   Sleep, 1
 
@@ -23812,10 +23891,11 @@ DeletePicture(dummy:=0) {
      resultedFilesList[currentFileIndex, 1] := "||" file2rem
      updateMainUnfilteredList(currentFileIndex, 1, "||" file2rem)
      currentFilesListModified := 1
+     fileMsg := "`n" groupDigits(currentFileIndex) " | " OutFileName "`n" OutDir "\" fileMsg
      If (msgResult.check=1) || (shiftState=1)
-        showTOOLtip("File permanently deleted`n" OutFileName "`n" OutDir "\")
+        showTOOLtip("File permanently deleted" fileMsg)
      Else
-        showTOOLtip("File moved to recycle bin`n" OutFileName "`n" OutDir "\")
+        showTOOLtip("File moved to recycle bin" fileMsg)
 
      If (deleteFileActAfter=2)
         NextPicture(0, 0, 1)
@@ -25421,13 +25501,19 @@ PanelSaveSlideShowu() {
        Gui, Font, s%LargeUIfontValue%
     }
 
+    btnWid2 := (PrefsLargeFonts=1) ? 90 : 60
+    showSave := (SLDtypeLoaded>1 && FileRexists(CurrentSLD)) || InStr(CurrentSLD, "\QPV\favourite-images-list.SLD") ? 1 : 0
     INIaction(0, "prevFileSavePath", "General", 5)
     userDesiredSlideFMT := (SLDtypeLoaded=3) ? 2 : 1
     If (SLDtypeLoaded=3)
        SLDcacheFilesList := 1
 
-    Gui, Add, Text, x15 y15 Section, Slideshow format:
-    Gui, Add, DropDownList, xs y+5 w%EditWid% gUItoggleSLDformat AltSubmit Choose%userDesiredSlideFMT% vuserDesiredSlideFMT, .SLD - Plain-text format|.SLDB - SQLite Database format (file details cached)
+    dlWid := editWid - btnWid2
+    Gui, Add, Text, x15 y15 Section, Slideshow format for save as:
+    Gui, Add, DropDownList, xs y+5 w%dlWid% gUItoggleSLDformat AltSubmit Choose%userDesiredSlideFMT% vuserDesiredSlideFMT, .SLD - Plain-text format|.SLDB - SQLite Database format (file details cached)
+    If (showSave=1)
+       Gui, Add, Button, x+1 hp w%btnWid2% gBTNsaveSlideshowPanel, Save &as
+
     Gui, Add, Checkbox, xs y+10 Checked%SLDcacheFilesList% vSLDcacheFilesList, Cache files list (ensures rapid slideshow loading)`nIf this is left unchecked, only the dynamic folders list will be saved.
     If (SLDtypeLoaded=3)
        GuiControl, SettingsGUIA: Disable, SLDcacheFilesList
@@ -25435,7 +25521,7 @@ PanelSaveSlideShowu() {
     Gui, Add, Checkbox, xs y+10 Checked%ForceRegenStaticFolders% vForceRegenStaticFolders, Regenerate static folders list`nThe static folders list enables partial files list later updates
     Gui, Add, Text, xs y+10 w%EditWid%, Regardless of the chosen format, the current %appTitle% settings will be stored.
     If InStr(CurrentSLD, "\QPV\favourite-images-list.SLD")
-       infoThisSLD := "Currently opened: «Favourite images list»."
+       infoThisSLD := "Currently opened: «Favourite images list» (plain-text)."
     Else If (SLDtypeLoaded=2)
        infoThisSLD := "Currently opened: plain-text files list`n" CurrentSLD
     Else If (SLDtypeLoaded=3)
@@ -25446,19 +25532,13 @@ PanelSaveSlideShowu() {
     If (SLDtypeLoaded=2 && currentFilesListModified=1)
        infoThisSLD .= "`nFiles list has been modified. The changes are unsaved."
 
-    btnWid2 := (PrefsLargeFonts=1) ? 90 : 60
     btnWid3 := InStr(CurrentSLD, "\QPV\favourite-images-list.SLD") ? 2 : btnWid
     Gui, Add, Text, xs y+20 w%EditWid%, % infoThisSLD
     Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w%btnWid3% gBTNopenPanelDynamicFolderzWindow, &Manage folders
-    If (SLDtypeLoaded>1 && FileRexists(CurrentSLD)) || InStr(CurrentSLD, "\QPV\favourite-images-list.SLD")
-    {
-       thisDefault := ""
+    If (showSave=1)
        Gui, Add, Button, x+5 hp w%btnWid2% Default gBTNsaveCurrentSlideshow, &Save...
-       Gui, Add, Button, x+0 hp w35 gBTNsaveSlideshowPanel, &AS
-    } Else
-    {
+    Else
        Gui, Add, Button, x+5 hp w%btnWid2% Default gBTNsaveSlideshowPanel, Save &as
-    }
 
     Gui, Add, Button, x+15 hp w%btnWid2% gBTNhelpSlideshows, &Help
     Gui, Add, Button, x+5 hp wp-5 gBtnCloseWindow, &Cancel
@@ -25557,7 +25637,7 @@ PanelSaveImg() {
     INIaction(0, "userJpegQuality", "General", 2, 1, 100)
 
     ; Gui, Add, Text,, Default destination format:
-    ; Gui, Add, DropDownList, x+10 w85 gTglDesiredSaveFormat AltSubmit Choose%userDesireWriteFMT% vuserDesireWriteFMT, .BMP|.GIF|.HDP|.J2K|.JFIF|.JNG|.JP2|.JPG|.JXR|.PNG|.PPM|.TGA|.TIF|.WDP|.WEBP|.XPM
+    ; Gui, Add, DropDownList, x+10 w85 gTglDesiredSaveFormat AltSubmit Choose%userDesireWriteFMT% vuserDesireWriteFMT, % userPossibleWriteFMTs
     entriesList := StrReplace(recentOpenedFolders(), "`n", "|")
     delim := InStr(entriesList, prevFileSavePath "|") ? "|" : ""
     entriesList := StrReplace(entriesList, prevFileSavePath delim, prevFileSavePath "||")
@@ -25579,28 +25659,31 @@ PanelSaveImg() {
        If !FileExist(imgPath)
           fileStatus .= "`n`nThe image file no longer seems to exist. It will be recreated on save."
        Else If (currentImgModified=1)
-          fileStatus .= "`n`nThe image has been modified. The changes should be saved."
+          fileStatus .= "`n`nThe image has been modified."
        Else If (currentImgModified=2)
           fileStatus .= "`n`nThe image changes have been saved."
        Else
           fileStatus .= "`n`nThe image has not been modified."
     }
+
     oldTimes := lastZeitIMGsaved[1]
     FormatTime, timea, % oldTimes , HH:mm
     If oldTimes
        InfosPreviousSave := "Last time saved: " timea "`n" PathCompact(lastZeitIMGsaved[5] "\" lastZeitIMGsaved[4], 47) "`nUndo levels state: " lastZeitIMGsaved[2] "/" lastZeitIMGsaved[3]
 
-
+    depthChoice := (currIMGdetails.HasAlpha=1) ? 1 : 2
+    thisWid := (PrefsLargeFonts=1) ? 70 : 45
     ; Gui, Add, Checkbox, Checked%UserCropOnSave% vUserCropOnSave, C&rop image to selected area on save
     Gui, Add, Checkbox, x15 y15 Section Checked%PreserveDateTimeOnSave% vPreserveDateTimeOnSave, &Preserve original file date and time
     Gui, Add, Checkbox, y+7 gTglUsePrevSaveFoderu Checked%usePrevSaveFolder% vusePrevSaveFolder, &Open file dialog in a previous location
     Gui, Add, DropDownList, xp+15 y+7 wp+135 vuserDestinationFolder, % entriesList
     Gui, Add, Text, xs y+15, Quality (1`% - 100`%):
-    Gui, Add, Edit, x+5 w70 number -multi limit3 veditF5, % userJpegQuality
+    Gui, Add, Edit, x+5 w%thisWid% number -multi limit3 veditF5, % userJpegQuality
     Gui, Add, UpDown, vuserJpegQuality Range1-100, % userJpegQuality
-    Gui, Add, Text, xs+15 y+7, This applies only for JPG, JP2, J2K, JXR and WEBP files.
+    Gui, Add, DropDownList, x+10 wp+139 AltSubmit Choose%depthChoice% vuserSaveBitsDepth, 32 bits RGBA|24 bits RGB|16 bits RGB|8 bits RGB [256 colors]
+    Gui, Add, Text, xs+15 y+7, Quality level applies only for JPG, JP2, J2K, JXR and WEBP files.`nThe color depth option is not applicable to any file format.
     Gui, Add, Text, xs y+10, Image file status:
-    Gui, Add, Text, xp+15 y+7 w%txtWid% +wrap, % fileStatus
+    Gui, Add, Text, xp+15 y+7 w%txtWid% -wrap, % fileStatus
     If oldTimes
     {
        Gui, Add, Text, xs y+10, Previous file saved:
@@ -25685,12 +25768,12 @@ PanelBrushTool(dummy:=0, modus:=0) {
     ; Gui, Add, Checkbox, x+5 hp gupdateUIbrushTool Checked%BrushToolUseSecondaryColor% vBrushToolUseSecondaryColor , &Use secondary color
     Gui, Add, Checkbox, x+5 hp gupdateUIbrushTool Checked%BrushToolEraserRestore% vBrushToolEraserRestore , Restore pixels opacity
     Gui, Add, Button, xp yp hp wp gBtnSetClonerBrushSource vuiBtnSetCloner, &Define cloner source
-    Gui, Add, Text, xs y+10 w35 gBtnToggleBrushColors vUIbtnBrushColorA, [X]
+    Gui, Add, Text, xs y+10 w35 gBtnToggleBrushColors vUIbtnBrushColorA +TabStop, [X]
     Gui, Add, Slider, x+5 w%slideWid% gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolAopacity Range1-255, % BrushToolAopacity
     Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuBrushToolAcolor, P
     Gui, Add, ListView, x+5 hp w60 %CCLVO% Background%BrushToolAcolor% vBrushToolAcolor hwndhLVfillColor,
     Gui, Add, Text, x+5 hp wp +0x200 vinfoBrushAopacity, %thisOpacity%`%
-    Gui, Add, Text, xs y+10 w35 gBtnToggleBrushColors vUIbtnBrushColorB, [X]
+    Gui, Add, Text, xs y+10 w35 gBtnToggleBrushColors vUIbtnBrushColorB +TabStop, [X]
     Gui, Add, Slider, x+5 w%slideWid% gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolBopacity Range1-255, % BrushToolBopacity
     Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuBrushToolBcolor, P
     Gui, Add, ListView, x+5 hp w60%CCLVO% Background%BrushToolBcolor% vBrushToolBcolor hwndhLVfill2ndColor,
@@ -25698,45 +25781,45 @@ PanelBrushTool(dummy:=0, modus:=0) {
 
     ; Gui, Add, Text, xs y+15 w%slideWid2% vinfoBrushSize, Size: %BrushToolSize%
     Gui, Add, Checkbox, xs y+15 w%slideWid% gupdateUIbrushTool Checked%brushToolDoubleSize% vbrushToolDoubleSize, Diameter: 2000 px
-    Gui, Add, Text, x+5 wp vinfoBrushStepping gBTNresetBrushStepu, Stepping: %BrushToolStepping%
+    Gui, Add, Text, x+5 wp vinfoBrushStepping gBTNresetBrushStepu +TabStop, Stepping: %BrushToolStepping%
     Gui, Add, Slider, xs y+1 wp gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolSize Range2-950, % BrushToolSize
     Gui, Add, Slider, x+5 wp gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolStepping Range0-251, % brushToolStepping
 
-    Gui, Add, Text, xs y+10 wp vinfoBrushAspectRatio gBTNresetBrushAspectRatio , Aspect ratio: %BrushToolAspectRatio%
-    ; Gui, Add, Text, x+5 wp vinfoBrushAngle gBTNresetBrushAngle, Angle: %BrushToolAngle%° 
+    Gui, Add, Text, xs y+10 wp vinfoBrushAspectRatio gBTNresetBrushAspectRatio  +TabStop, Aspect ratio: %BrushToolAspectRatio%
+    ; Gui, Add, Text, x+5 wp vinfoBrushAngle gBTNresetBrushAngle +TabStop, Angle: %BrushToolAngle%° 
     Gui, Add, Checkbox, x+5 wp Checked%BrushToolAutoAngle% vBrushToolAutoAngle gupdateUIbrushTool, Angle: %BrushToolAngle%00° 
     Gui, Add, Slider, xs y+1 wp gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolAspectRatio Range-100-100, % BrushToolAspectRatio
     Gui, Add, Slider, x+5 wp gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolAngle Range0-359, % BrushToolAngle
 
     Gui, Add, DropDownList, xs y+10 wp AltSubmit gupdateUIbrushTool Choose%BrushToolTexture% vBrushToolTexture, Soft circle|Texture 1|Texture 2|Texture 3|Texture 4|Texture 5|Texture 6|Texture 7|Texture 8
     ; Gui, Add, Text, xp yp wp vinfoBrushSoftness, Softness: %BrushToolSoftness%
-    Gui, Add, Text, x+5 wp hp vinfoBrushDrying gBTNresetBrushDryer, Dry-out rate: %BrushToolDryingRate%
+    Gui, Add, Text, x+5 wp hp vinfoBrushDrying gBTNresetBrushDryer +TabStop, Dry-out rate: %BrushToolDryingRate%
     Gui, Add, Slider, xs y+2 wp gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolSoftness Range1-100, % BrushToolSoftness
     Gui, Add, Slider, x+5 wp gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolDryingRate Range0-20, % BrushToolDryingRate
 
     Gui, -DPIScale
-    Gui, Add, Text, xs y+10 w100 h100 +0x1000 +0xE +hwndhCropCornersPic gPanelsLivePreviewResponder, Brush preview
+    Gui, Add, Text, xs y+10 w100 h100 +0x1000 +0xE +hwndhCropCornersPic gPanelsLivePreviewResponder +TabStop, Brush preview
     Gui, +DPIScale
     Gui, Add, Checkbox, x+10 gupdateUIbrushTool Checked%BrushToolOverDraw% vBrushToolOverDraw , &Airbrush mode / deformer option
     Gui, Add, Checkbox, y+10 gupdateUIbrushTool Checked%BrushToolDynamicCloner% vBrushToolDynamicCloner , D&ynamic X/Y source coordinates
 
     Gui, Tab, 2 ; FX
-    Gui, Add, Text, x+15 y+15 Section w%slideWid% gBTNresetBrushBluru vinfoBrushBlurel, Blur intensity: %BrushToolBlurStrength%
-    Gui, Add, Text, x+5 wp vinfoBrushWetness gBTNresetBrushWet, Wetness: %BrushToolWetness%
+    Gui, Add, Text, x+15 y+15 Section w%slideWid% gBTNresetBrushBluru vinfoBrushBlurel +TabStop, Blur intensity: %BrushToolBlurStrength%
+    Gui, Add, Text, x+5 wp vinfoBrushWetness gBTNresetBrushWet +TabStop, Wetness: %BrushToolWetness%
     Gui, Add, Slider, xs y+5 wp gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolBlurStrength Range0-99, % BrushToolBlurStrength
     Gui, Add, Slider, x+5 wp gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolWetness Range0-22, % BrushToolWetness
 
     ; Gui, Add, Checkbox, xs y+10 gupdateUIbrushTool Checked%PasteInPlaceApplyColorFX% vPasteInPlaceApplyColorFX, Apply color adjustments
-    Gui, Add, Text, xs y+10 w%txtWid% gBtnResetPanelsSpecificControl vinfoPasteHue, Hue: %PasteInPlaceHue%°
+    Gui, Add, Text, xs y+10 w%txtWid% gBtnResetPanelsSpecificControl vinfoPasteHue +TabStop, Hue: %PasteInPlaceHue%°
     Gui, Add, Slider, y+1 wp AltSubmit NoTicks ToolTip gupdateUIbrushTool vPasteInPlaceHue Range-180-180, % PasteInPlaceHue
-    Gui, Add, Text, y+6 wp gBtnResetPanelsSpecificControl vinfoPasteSat, Saturation: %PasteInPlaceSaturation%`%
+    Gui, Add, Text, y+6 wp gBtnResetPanelsSpecificControl vinfoPasteSat +TabStop, Saturation: %PasteInPlaceSaturation%`%
     Gui, Add, Slider, y+1 wp AltSubmit NoTicks ToolTip gupdateUIbrushTool vPasteInPlaceSaturation Range-100-100, % PasteInPlaceSaturation
-    Gui, Add, Text, y+6 wp gBtnResetPanelsSpecificControl vinfoPasteLight, Brightness: %PasteInPlaceLight%
+    Gui, Add, Text, y+6 wp gBtnResetPanelsSpecificControl vinfoPasteLight +TabStop, Brightness: %PasteInPlaceLight%
     Gui, Add, Slider, y+1 wp AltSubmit NoTicks ToolTip gupdateUIbrushTool vPasteInPlaceLight Range-255-255, % PasteInPlaceLight
-    Gui, Add, Text, y+6 wp gBtnResetPanelsSpecificControl vinfoPasteGamma, Contrast: %PasteInPlaceGamma%`%
+    Gui, Add, Text, y+6 wp gBtnResetPanelsSpecificControl vinfoPasteGamma +TabStop, Contrast: %PasteInPlaceGamma%`%
     Gui, Add, Slider, y+1 wp AltSubmit NoTicks ToolTip gupdateUIbrushTool vPasteInPlaceGamma Range-100-100, % PasteInPlaceGamma
     Gui, -DPIScale
-    Gui, Add, Text, xs y+10 w100 h100 +0x1000 +0xE +hwndhCropCornersPic2 gPanelsLivePreviewResponder, Brush preview
+    Gui, Add, Text, xs y+10 w100 h100 +0x1000 +0xE +hwndhCropCornersPic2 gPanelsLivePreviewResponder +TabStop, Brush preview
     Gui, +DPIScale
     Gui, Add, Checkbox, x+10 gupdateUIbrushTool Checked%BrushToolApplyColorFX% vBrushToolApplyColorFX, Apply color adjustments
     Gui, Add, Text, y+10 vinfoSymmetryLabel, Symmetry on: 
@@ -25746,28 +25829,28 @@ PanelBrushTool(dummy:=0, modus:=0) {
 
     Gui, Tab, 3 ; randomize
 
-    Gui, Add, Text, x+15 y+15 w%slideWid% vinfoBrushRandomSize gBtnResetBrushRandomSize, Size: %BrushToolRandomSize%
-    Gui, Add, Text, x+5 wp vinfoBrushRandomSoftness gBtnResetBrushRandomSoftness, Softness: %BrushToolRandomSoftness%
+    Gui, Add, Text, x+15 y+15 w%slideWid% vinfoBrushRandomSize gBtnResetBrushRandomSize +TabStop, Size: %BrushToolRandomSize%
+    Gui, Add, Text, x+5 wp vinfoBrushRandomSoftness gBtnResetBrushRandomSoftness +TabStop, Softness: %BrushToolRandomSoftness%
     Gui, Add, Slider, xs y+1 wp gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolRandomSize Range0-200, % BrushToolRandomSize
     Gui, Add, Slider, x+5 wp gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolRandomSoftness Range0-80, % BrushToolRandomSoftness
 
-    Gui, Add, Text, xs y+10 wp vinfoBrushRandomAspectRatio gBtnResetBrushRandomAspectRatio, Aspect ratio: %BrushToolRandomAspectRatio%
-    Gui, Add, Text, x+5 wp vinfoBrushRandomAngle gBtnResetBrushRandomAngle, Angle: %BrushToolRandomAngle%° 
+    Gui, Add, Text, xs y+10 wp vinfoBrushRandomAspectRatio gBtnResetBrushRandomAspectRatio +TabStop, Aspect ratio: %BrushToolRandomAspectRatio%
+    Gui, Add, Text, x+5 wp vinfoBrushRandomAngle gBtnResetBrushRandomAngle +TabStop, Angle: %BrushToolRandomAngle%° 
     Gui, Add, Slider, xs y+1 wp gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolRandomAspectRatio Range0-80, % BrushToolRandomAspectRatio
     Gui, Add, Slider, x+5 wp gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolRandomAngle Range0-150, % BrushToolRandomAngle
 
-    Gui, Add, Text, xs y+10 wp vinfoBrushRandomPosX gBtnResetBrushRandomPosX, Offset X: %BrushToolRandomPosX%
-    Gui, Add, Text, x+5 wp vinfoBrushRandomPosY gBtnResetBrushRandomPosY, Offset Y: %BrushToolRandomPosY%
+    Gui, Add, Text, xs y+10 wp vinfoBrushRandomPosX gBtnResetBrushRandomPosX +TabStop, Offset X: %BrushToolRandomPosX%
+    Gui, Add, Text, x+5 wp vinfoBrushRandomPosY gBtnResetBrushRandomPosY +TabStop, Offset Y: %BrushToolRandomPosY%
     Gui, Add, Slider, xs y+1 wp gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolRandomPosX Range0-200, % BrushToolRandomPosX
     Gui, Add, Slider, x+5 wp gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolRandomPosY Range0-200, % BrushToolRandomPosY
 
-    Gui, Add, Text, xs y+10 wp vinfoBrushRandomHue gBtnResetBrushRandomHue, Hue: %BrushToolRandomHue%
-    Gui, Add, Text, x+5 wp vinfoBrushRandomSat gBtnResetBrushRandomSat, Saturation: %BrushToolRandomSat%
+    Gui, Add, Text, xs y+10 wp vinfoBrushRandomHue gBtnResetBrushRandomHue +TabStop, Hue: %BrushToolRandomHue%
+    Gui, Add, Text, x+5 wp vinfoBrushRandomSat gBtnResetBrushRandomSat +TabStop, Saturation: %BrushToolRandomSat%
     Gui, Add, Slider, xs y+1 wp gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolRandomHue Range0-180, % BrushToolRandomHue
     Gui, Add, Slider, x+5 wp gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolRandomSat Range0-90, % BrushToolRandomSat
 
-    Gui, Add, Text, xs y+10 wp vinfoBrushRandomLight gBtnResetBrushRandomLight, Lightness: %BrushToolRandomLight%
-    Gui, Add, Text, x+5 wp vinfoBrushRandomDark gBtnResetBrushRandomDark, Darkness: %BrushToolRandomDark%
+    Gui, Add, Text, xs y+10 wp vinfoBrushRandomLight gBtnResetBrushRandomLight +TabStop, Lightness: %BrushToolRandomLight%
+    Gui, Add, Text, x+5 wp vinfoBrushRandomDark gBtnResetBrushRandomDark +TabStop, Darkness: %BrushToolRandomDark%
     Gui, Add, Slider, xs y+1 wp gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolRandomLight Range0-90, % BrushToolRandomLight
     Gui, Add, Slider, x+5 wp gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolRandomDark Range0-90, % BrushToolRandomDark
     Gui, Add, Text, xs y+10, Please read the help section for more details.
@@ -26838,6 +26921,7 @@ BTNsaveImgPanel() {
    GuiControlGet, PreserveDateTimeOnSave
    GuiControlGet, userJpegQuality
    GuiControlGet, userDestinationFolder
+   GuiControlGet, userSaveBitsDepth
    userJpegQuality := clampInRange(userJpegQuality, 1, 100)
    INIaction(1, "userJpegQuality", "General")
    INIaction(1, "usePrevSaveFolder", "General")
@@ -26862,6 +26946,7 @@ BTNsaveBrowseImgPanel() {
    GuiControlGet, PreserveDateTimeOnSave
    GuiControlGet, userJpegQuality
    GuiControlGet, userDestinationFolder
+   GuiControlGet, userSaveBitsDepth
    userJpegQuality := clampInRange(userJpegQuality, 1, 100)
    INIaction(1, "userJpegQuality", "General")
    INIaction(1, "usePrevSaveFolder", "General")
@@ -27839,14 +27924,14 @@ MainPanelTransformArea(dummy:="", toolu:="") {
     Gui, Add, DropDownList, xs y+7 gupdateUIpastePanel w%txtWid2% AltSubmit Choose%PasteInPlaceOrientation% vPasteInPlaceOrientation, No mirroring|Flip horizontal|Flip vertical|Flip horizontal and vertical
     Gui, Add, DropDownList, x+2 gupdateUIpastePanel wp AltSubmit Choose%PasteInPlaceAlignment% vPasteInPlaceAlignment, Top-left|Top-right|Centered|Bottom-left|Bottom-right
     Gui, Add, DropDownList, xs y+7 wp AltSubmit Choose%PasteInPlaceCropSel% vPasteInPlaceCropSel gupdateUIpastePanel, No cropping|Rectangle|Rounded rectangle|Ellipse|Triangle|Right triangle|Rhombus|Custom shape
-    Gui, Add, Text, x+2 hp +0x200 vinfoAngleu gBTNresetPasteInPlaceCropAngle, Angle:
+    Gui, Add, Text, x+2 hp +0x200 vinfoAngleu gBTNresetPasteInPlaceCropAngle +TabStop, Angle:
     Gui, Add, Edit, x+2 w70 number -multi limit3 veditF5, % PasteInPlaceCropAngular
     Gui, Add, UpDown, vPasteInPlaceCropAngular Range0-359 gupdateUIpastePanel, % PasteInPlaceCropAngular
     ; If (toolu="transform")
        Gui, Add, Checkbox, xs y+7 hp gupdateUIpastePanel Checked%PasteInPlaceEraseInitial% vPasteInPlaceEraseInitial, &Erase initially selected area
     Gui, Add, Checkbox, xs y+7 hp gupdateUIpastePanel Checked%PasteInPlaceQuality% vPasteInPlaceQuality, &High quality image resampling
     Gui, Add, Checkbox, xs y+7 hp gupdateUIpastePanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit image object
-    Gui, Add, Text, xs y+10 w%txtWid2% gBtnResetPanelsSpecificControl vinfoPasteBlur, Image blur level: %PasteInPlaceBlurAmount% ; (inaccurate live preview)
+    Gui, Add, Text, xs y+10 w%txtWid2% gBtnResetPanelsSpecificControl vinfoPasteBlur +TabStop, Image blur level: %PasteInPlaceBlurAmount% ; (inaccurate live preview)
     Gui, Add, Checkbox, x+5 hp gupdateUIpastePanel Checked%PasteInPlaceBlurEdgesSoft% vPasteInPlaceBlurEdgesSoft, &Soft edges
     Gui, Add, Slider, xs y+1 gupdateUIpastePanel AltSubmit ToolTip w%txtWid% vPasteInPlaceBlurAmount Range0-255, % PasteInPlaceBlurAmount
     If (coreDesiredPixFmt="0x21808")
@@ -27859,15 +27944,15 @@ MainPanelTransformArea(dummy:="", toolu:="") {
     Gui, Tab, 2 ; colors
     Gui, Add, Checkbox, x+15 y+15 Section gupdateUIpastePanel Checked%PasteInPlaceApplyColorFX% vPasteInPlaceApplyColorFX, Apply color adjustments
     Gui, Add, DropDownList, x+10 wp-40 gupdateUIpastePanel AltSubmit Choose%PasteInPlaceBlendMode% vPasteInPlaceBlendMode, No blending|Darken|Multiply|Linear burn|Color burn|Lighten|Screen|Linear dodge [Add]|Hard light|Overlay|Hard mix|Linear light|Color dodge|Vivid light|Division|Exclusion|Difference|Substract|Luminosity|Substract reversed|Inverted difference
-    Gui, Add, Text, xs y+5 w%txtWid% gBtnResetPanelsSpecificControl vinfoPasteHue, Hue: %PasteInPlaceHue%°
+    Gui, Add, Text, xs y+5 w%txtWid% gBtnResetPanelsSpecificControl vinfoPasteHue +TabStop, Hue: %PasteInPlaceHue%°
     Gui, Add, Slider, y+1 wp AltSubmit NoTicks ToolTip gupdateUIpastePanel vPasteInPlaceHue Range-180-180, % PasteInPlaceHue
-    Gui, Add, Text, y+4 wp gBtnResetPanelsSpecificControl vinfoPasteSat, Saturation: %PasteInPlaceSaturation%`%
+    Gui, Add, Text, y+4 wp gBtnResetPanelsSpecificControl vinfoPasteSat +TabStop, Saturation: %PasteInPlaceSaturation%`%
     Gui, Add, Slider, y+1 wp AltSubmit NoTicks ToolTip gupdateUIpastePanel vPasteInPlaceSaturation Range-100-100, % PasteInPlaceSaturation
-    Gui, Add, Text, y+4 wp gBtnResetPanelsSpecificControl vinfoPasteLight, Brightness: %PasteInPlaceLight%
+    Gui, Add, Text, y+4 wp gBtnResetPanelsSpecificControl vinfoPasteLight +TabStop, Brightness: %PasteInPlaceLight%
     Gui, Add, Slider, y+1 wp AltSubmit NoTicks ToolTip gupdateUIpastePanel vPasteInPlaceLight Range-255-255, % PasteInPlaceLight
-    Gui, Add, Text, y+4 wp gBtnResetPanelsSpecificControl vinfoPasteGamma, Contrast: %PasteInPlaceGamma%`%
+    Gui, Add, Text, y+4 wp gBtnResetPanelsSpecificControl vinfoPasteGamma +TabStop, Contrast: %PasteInPlaceGamma%`%
     Gui, Add, Slider, y+1 wp AltSubmit NoTicks ToolTip gupdateUIpastePanel vPasteInPlaceGamma Range-100-100, % PasteInPlaceGamma
-    Gui, Add, Text, y+4 gBtnResetPanelsSpecificControl vinfoPasteOpacity , Image opacity: 100`% - ; %thisOpacity%
+    Gui, Add, Text, y+4 gBtnResetPanelsSpecificControl vinfoPasteOpacity  +TabStop, Image opacity: 100`% - ; %thisOpacity%
     Gui, Add, DropDownList, x+25 wp AltSubmit Choose%PasteInPlaceGlassy% vPasteInPlaceGlassy gupdateUIpastePanel, No glass effect|Weak|Mild|Moderate|Strong|Extreme
     Gui, Add, Slider, xs y+1 w%txtWid% AltSubmit NoTicks ToolTip gupdateUIpastePanel vPasteInPlaceOpacity Range1-256, % PasteInPlaceOpacity
 
@@ -27877,18 +27962,18 @@ MainPanelTransformArea(dummy:="", toolu:="") {
     Gui, Add, Checkbox, x+2 hp Checked%FillAreaColorReversed% vFillAreaColorReversed gupdateUIpastePanel, &Invert
     Gui, Add, Checkbox, x+2 hp Checked%FillAreaGradientWrapped% vFillAreaGradientWrapped gupdateUIpastePanel, &Tiled
     Gui, Add, Checkbox, x+2 hp Checked%alphaMaskReplaceMode% valphaMaskReplaceMode gupdateUIpastePanel, &Replace
-    Gui, Add, Text, xs y+10 w%slideWid% +0x200 gBtnResetPanelsSpecificControl vinfoPasteAlphaClrA, Intensity A: 0
-    Gui, Add, Text, x+5 hp wp +0x200 gBtnResetPanelsSpecificControl vinfoPasteAlphaClrB, Intensity B: 0
+    Gui, Add, Text, xs y+10 w%slideWid% +0x200 gBtnResetPanelsSpecificControl vinfoPasteAlphaClrA +TabStop, Intensity A: 0
+    Gui, Add, Text, x+5 hp wp +0x200 gBtnResetPanelsSpecificControl vinfoPasteAlphaClrB +TabStop, Intensity B: 0
     Gui, Add, Slider, xs y+1 NoTicks wp gupdateUIpastePanel ToolTip AltSubmit vPasteInPlaceAlphaMaskClrA Range0-255, % PasteInPlaceAlphaMaskClrA
     Gui, Add, Slider, x+5 NoTicks wp gupdateUIpastePanel ToolTip AltSubmit vPasteInPlaceAlphaMaskClrB Range0-255, % PasteInPlaceAlphaMaskClrB
 
-    Gui, Add, Text, xs y+15 w%slideWid% gBtnResetPanelsSpecificControl vinfoFillAreaGradientAngle, Angle: %FillAreaGradientAngle%° 
-    Gui, Add, Text, x+5 wp gBtnResetPanelsSpecificControl vinfoFillAreaGradientScale, Scale: %FillAreaGradientScale%`%
+    Gui, Add, Text, xs y+15 w%slideWid% gBtnResetPanelsSpecificControl vinfoFillAreaGradientAngle +TabStop, Angle: %FillAreaGradientAngle%° 
+    Gui, Add, Text, x+5 wp gBtnResetPanelsSpecificControl vinfoFillAreaGradientScale +TabStop, Scale: %FillAreaGradientScale%`%
     Gui, Add, Slider, xs y+1 wp NoTicks gupdateUIpastePanel ToolTip AltSubmit vFillAreaGradientAngle Range0-360, % FillAreaGradientAngle
     Gui, Add, Slider, x+5 wp NoTicks gupdateUIpastePanel ToolTip AltSubmit vFillAreaGradientScale Range1-300, % FillAreaGradientScale
 
-    Gui, Add, Text, xs y+10 wp gBtnResetPanelsSpecificControl vinfoFillAreaSigma, Sigma: %FillAreaGradientPosA%`%
-    Gui, Add, Text, x+5 wp gBtnResetPanelsSpecificControl vinfoFillAreaBlend, Blend: %FillAreaGradientPosB%`%
+    Gui, Add, Text, xs y+10 wp gBtnResetPanelsSpecificControl vinfoFillAreaSigma +TabStop, Sigma: %FillAreaGradientPosA%`%
+    Gui, Add, Text, x+5 wp gBtnResetPanelsSpecificControl vinfoFillAreaBlend +TabStop, Blend: %FillAreaGradientPosB%`%
     Gui, Add, Slider, xs y+1 wp NoTicks gupdateUIpastePanel ToolTip AltSubmit vFillAreaGradientPosA Range0-100, % FillAreaGradientPosA
     Gui, Add, Slider, x+5 wp NoTicks gupdateUIpastePanel ToolTip AltSubmit vFillAreaGradientPosB Range0-100, % FillAreaGradientPosB
     Gui, Add, Text, xs y+10 wp vinfoAlphaFile, Image file path or list index number:
@@ -27901,12 +27986,12 @@ MainPanelTransformArea(dummy:="", toolu:="") {
     Gui, Add, Checkbox, x+15 y+15 Section gBTNtoggleAlphaPainting Choose%uiPasteInPlaceAlphaDrawMode% vuiPasteInPlaceAlphaDrawMode, Enable alpha mask painting mode
     Gui, Add, DropDownList, xs y+10 Section AltSubmit gupdateUIpasteInPlacebrushTool Choose%BrushToolType% vBrushToolType, Simple solid color|Soft edges brush
     Gui, Add, Checkbox, x+5 gupdateUIbrushTool Checked%BrushToolOverDraw% vBrushToolOverDraw , &Airbrush mode
-    Gui, Add, Text, xs y+10 w35 gBtnToggleBrushColors vUIbtnBrushColorA, [X]
+    Gui, Add, Text, xs y+10 w35 gBtnToggleBrushColors vUIbtnBrushColorA +TabStop, [X]
     Gui, Add, Slider, x+5 w%slideWid% gupdateUIpasteInPlacebrushTool NoTicks ToolTip AltSubmit vBrushToolAopacity Range1-255, % BrushToolAopacity
     Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuBrushToolAcolor, P
     Gui, Add, ListView, x+5 hp w60 %CCLVO% Background%BrushToolAcolor% vBrushToolAcolor hwndhLVfillColor,
     Gui, Add, Text, x+5 hp wp +0x200 vinfoBrushAopacity, %thisOpacity%`%
-    Gui, Add, Text, xs y+10 w35 gBtnToggleBrushColors vUIbtnBrushColorB, [X]
+    Gui, Add, Text, xs y+10 w35 gBtnToggleBrushColors vUIbtnBrushColorB +TabStop, [X]
     Gui, Add, Slider, x+5 w%slideWid% gupdateUIpasteInPlacebrushTool NoTicks ToolTip AltSubmit vBrushToolBopacity Range1-255, % BrushToolBopacity
     Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuBrushToolBcolor, P
     Gui, Add, ListView, x+5 hp w60%CCLVO% Background%BrushToolBcolor% vBrushToolBcolor hwndhLVfill2ndColor,
@@ -27914,17 +27999,17 @@ MainPanelTransformArea(dummy:="", toolu:="") {
 
     ; Gui, Add, Text, xs y+15 w%slideWid2% vinfoBrushSize, Size: %BrushToolSize%
     Gui, Add, Checkbox, xs y+15 w%slideWid% gupdateUIpasteInPlacebrushTool Checked%brushToolDoubleSize% vbrushToolDoubleSize, Diameter: 2000 px
-    Gui, Add, Text, x+5 wp vinfoBrushStepping gBTNresetBrushStepu, Stepping: %BrushToolStepping%
+    Gui, Add, Text, x+5 wp vinfoBrushStepping gBTNresetBrushStepu +TabStop, Stepping: %BrushToolStepping%
     Gui, Add, Slider, xs y+1 wp gupdateUIpasteInPlacebrushTool NoTicks ToolTip AltSubmit vBrushToolSize Range2-950, % BrushToolSize
     Gui, Add, Slider, x+5 wp gupdateUIpasteInPlacebrushTool NoTicks ToolTip AltSubmit vBrushToolStepping Range0-251, % brushToolStepping
 
-    Gui, Add, Text, xs y+10 wp vinfoBrushAspectRatio gBTNresetBrushAspectRatio , Aspect ratio: %BrushToolAspectRatio%
-    Gui, Add, Text, x+5 wp vinfoBrushAngle gBTNresetBrushAngle, Angle: %BrushToolAngle%° 
+    Gui, Add, Text, xs y+10 wp vinfoBrushAspectRatio gBTNresetBrushAspectRatio  +TabStop, Aspect ratio: %BrushToolAspectRatio%
+    Gui, Add, Text, x+5 wp vinfoBrushAngle gBTNresetBrushAngle +TabStop, Angle: %BrushToolAngle%° 
     Gui, Add, Slider, xs y+1 wp gupdateUIpasteInPlacebrushTool NoTicks ToolTip AltSubmit vBrushToolAspectRatio Range-100-100, % BrushToolAspectRatio
     Gui, Add, Slider, x+5 wp gupdateUIpasteInPlacebrushTool NoTicks ToolTip AltSubmit vBrushToolAngle Range0-180, % BrushToolAngle
 
     Gui, Add, Text, xs y+10 wp vinfoBrushSoftness, Softness: %BrushToolSoftness%
-    Gui, Add, Text, x+5 wp vinfoBrushDrying gBTNresetBrushDryer, Dry-out rate: %BrushToolDryingRate%
+    Gui, Add, Text, x+5 wp vinfoBrushDrying gBTNresetBrushDryer +TabStop, Dry-out rate: %BrushToolDryingRate%
     Gui, Add, Slider, xs y+1 wp gupdateUIpasteInPlacebrushTool NoTicks ToolTip AltSubmit vBrushToolSoftness Range1-100, % BrushToolSoftness
     Gui, Add, Slider, x+5 wp gupdateUIpasteInPlacebrushTool NoTicks ToolTip AltSubmit vBrushToolDryingRate Range0-20, % BrushToolDryingRate
 
@@ -29092,13 +29177,13 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     Gui, Add, ListView, x+5 hp w60%CCLVO% Background%FillArea2ndColor% vFillArea2ndColor hwndhLVfill2ndColor,
     Gui, Add, Text, x+5 hp wp +0x200 vinfoFillArea2ndOpacity, Opacity: %this2ndOpacity%00`%
 
-    Gui, Add, Text, xs y+15 w%slideWid% gBtnResetPanelsSpecificControl vinfoFillAreaGradientAngle, Angle: %FillAreaGradientAngle%° 
-    Gui, Add, Text, x+5 wp gBtnResetPanelsSpecificControl vinfoFillAreaGradientScale, Scale: %FillAreaGradientScale%`%
+    Gui, Add, Text, xs y+15 w%slideWid% gBtnResetPanelsSpecificControl vinfoFillAreaGradientAngle +TabStop, Angle: %FillAreaGradientAngle%° 
+    Gui, Add, Text, x+5 wp gBtnResetPanelsSpecificControl vinfoFillAreaGradientScale +TabStop, Scale: %FillAreaGradientScale%`%
     Gui, Add, Slider, xs y+1 wp NoTicks gupdateUIfillPanel ToolTip AltSubmit vFillAreaGradientAngle Range0-360, % FillAreaGradientAngle
     Gui, Add, Slider, x+5 wp NoTicks gupdateUIfillPanel ToolTip AltSubmit vFillAreaGradientScale Range1-300, % FillAreaGradientScale
 
-    Gui, Add, Text, xs y+10 wp gBtnResetPanelsSpecificControl vinfoFillAreaSigma, Sigma: %FillAreaGradientPosA%`%
-    Gui, Add, Text, x+5 wp gBtnResetPanelsSpecificControl vinfoFillAreaBlend, Blend: %FillAreaGradientPosB%`%
+    Gui, Add, Text, xs y+10 wp gBtnResetPanelsSpecificControl vinfoFillAreaSigma +TabStop, Sigma: %FillAreaGradientPosA%`%
+    Gui, Add, Text, x+5 wp gBtnResetPanelsSpecificControl vinfoFillAreaBlend +TabStop, Blend: %FillAreaGradientPosB%`%
     Gui, Add, Slider, xs y+1 wp NoTicks gupdateUIfillPanel ToolTip AltSubmit vFillAreaGradientPosA Range0-100, % FillAreaGradientPosA
     Gui, Add, Slider, x+5 wp NoTicks gupdateUIfillPanel ToolTip AltSubmit vFillAreaGradientPosB Range0-100, % FillAreaGradientPosB
     Gui, Add, Checkbox, xs y+5 w%slideWid% Checked%FillAreaColorReversed% vFillAreaColorReversed gupdateUIfillPanel, &Reverse colors
@@ -29122,13 +29207,13 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
 
     Gui, Tab, 4
     Gui, Add, Checkbox, x+10 y+10 Section Checked%FillAreaApplyColorFX% vFillAreaApplyColorFX gupdateUIfillPanel, &Apply color adjustments
-    Gui, Add, Text, xs y+10 w%txtWid% gBtnResetPanelsSpecificControl vinfoPasteHue, Hue: %PasteInPlaceHue%°
+    Gui, Add, Text, xs y+10 w%txtWid% gBtnResetPanelsSpecificControl vinfoPasteHue +TabStop, Hue: %PasteInPlaceHue%°
     Gui, Add, Slider, y+1 wp AltSubmit NoTicks ToolTip gupdateUIfillPanel vPasteInPlaceHue Range-180-180, % PasteInPlaceHue
-    Gui, Add, Text, y+6 wp gBtnResetPanelsSpecificControl vinfoPasteSat, Saturation: %PasteInPlaceSaturation%`%
+    Gui, Add, Text, y+6 wp gBtnResetPanelsSpecificControl vinfoPasteSat +TabStop, Saturation: %PasteInPlaceSaturation%`%
     Gui, Add, Slider, y+1 wp AltSubmit NoTicks ToolTip gupdateUIfillPanel vPasteInPlaceSaturation Range-100-100, % PasteInPlaceSaturation
-    Gui, Add, Text, y+6 wp gBtnResetPanelsSpecificControl vinfoPasteLight, Brightness: %PasteInPlaceLight%
+    Gui, Add, Text, y+6 wp gBtnResetPanelsSpecificControl vinfoPasteLight +TabStop, Brightness: %PasteInPlaceLight%
     Gui, Add, Slider, y+1 wp AltSubmit NoTicks ToolTip gupdateUIfillPanel vPasteInPlaceLight Range-255-255, % PasteInPlaceLight
-    Gui, Add, Text, y+6 wp gBtnResetPanelsSpecificControl vinfoPasteGamma, Contrast: %PasteInPlaceGamma%`%
+    Gui, Add, Text, y+6 wp gBtnResetPanelsSpecificControl vinfoPasteGamma +TabStop, Contrast: %PasteInPlaceGamma%`%
     Gui, Add, Slider, y+1 wp AltSubmit NoTicks ToolTip gupdateUIfillPanel vPasteInPlaceGamma Range-100-100, % PasteInPlaceGamma
     Gui, Add, Text, xs y+10 Section, These apply only for blending modes and textures.
 
@@ -29484,9 +29569,9 @@ PanelDesatureSelectedArea(dummy:=0) {
     Global infoAmount, infohueAdjust
     Gui, Add, Text, x15 y15 Section w%txtWid%, Please decide the intensity and mode of image desaturation.
     ; Gui, Add, Checkbox, x+10 hp Checked%EraseAreaInvert% vEraseAreaInvert gupdateUIdesaturatePanel, &Invert selection area
-    Gui, Add, Text, xs+15 y+10 wp gBtnResetAmountDesature vinfoAmount, intensity: %thisOpacity%`%
+    Gui, Add, Text, xs+15 y+10 wp gBtnResetAmountDesature vinfoAmount +TabStop, intensity: %thisOpacity%`%
     Gui, Add, Slider, xp y+5 AltSubmit gupdateUIdesaturatePanel ToolTip w%txtWid% vDesatureAreaAmount Range1-100, % DesatureAreaAmount
-    Gui, Add, Text, xs+15 y+10 wp gBtnResetDesatureHue vinfohueAdjust, Relight: %DesatureAreaHue%°
+    Gui, Add, Text, xs+15 y+10 wp gBtnResetDesatureHue vinfohueAdjust +TabStop, Relight: %DesatureAreaHue%°
     Gui, Add, Slider, xp y+5 AltSubmit gupdateUIdesaturatePanel ToolTip w%txtWid% vDesatureAreaHue Range-180-180, % DesatureAreaHue
 
     Gui, Add, Button, xm+0 y+15 h%thisBtnHeight% w35 gtoggleImgEditPanelWindow, ▲
@@ -29538,15 +29623,15 @@ PanelFloodFillTool() {
     Global infoEraseOpacity, infoFloodFillTolerance
     Gui, Add, Text, x15 y15 Section, Color options:
     Gui, Add, Checkbox, x+5 gupdateUIfloodFillPanel Checked%FloodFillCartoonMode% vFloodFillCartoonMode, Auto
-    Gui, Add, Text, x+5 hp +0x200 vinfoFillAreaOpacity gBTNresetFillOpacity , Alpha: %thisOpacity2%0`%
+    Gui, Add, Text, x+5 hp +0x200 vinfoFillAreaOpacity gBTNresetFillOpacity  +TabStop, Alpha: %thisOpacity2%0`%
     Gui, Add, ListView, x+8 h30 w%editWid% %CCLVO% Background%FillAreaColor% vFillAreaColor hwndhLVfillColor,
     Gui, Add, Button, x+2 hp w25 gStartPickingColor vPickuFillAreaColor, P
     Gui, Add, Slider, xs y+10 w%txtWid% ToolTip AltSubmit gupdateUIfloodFillPanel vFillAreaOpacity Range3-255, % FillAreaOpacity
     ; Gui, Add, Checkbox, xs y+10 hp, &Overlay flood fill
-    Gui, Add, Text, xs y+15 hp vinfoEraseOpacity gBTNresetEraseOpacity, Flood opacity: %thisOpacity%00`%
+    Gui, Add, Text, xs y+15 hp vinfoEraseOpacity gBTNresetEraseOpacity +TabStop, Flood opacity: %thisOpacity%00`%
     Gui, Add, DropDownList, x+5 wp gupdateUIfloodFillPanel AltSubmit Choose%FillAreaBlendMode% vFillAreaBlendMode, No blending mode|Darken|Multiply|Linear burn|Color burn|Lighten|Screen|Linear dodge [Add]|Hard light|Overlay|Hard mix|Linear light|Color dodge|Vivid light|Division|Exclusion|Difference|Substract|Luminosity|Substract reversed|Inverted difference
     Gui, Add, Slider, xs y+5 ToolTip AltSubmit w%txtWid% gupdateUIfloodFillPanel vEraseAreaOpacity Range3-255, % EraseAreaOpacity
-    Gui, Add, Text, xs y+10 vinfoFloodFillTolerance gBTNresetFloodColorTolerance, Color flood tolerance: %FloodFillTolerance%00l
+    Gui, Add, Text, xs y+10 vinfoFloodFillTolerance gBTNresetFloodColorTolerance +TabStop, Color flood tolerance: %FloodFillTolerance%00l
     Gui, Add, Checkbox, x+10 hp gupdateUIfloodFillPanel Checked%FloodFillDynamicOpacity% vFloodFillDynamicOpacity, Dynamic opacity
     Gui, Add, Slider, xs y+10 ToolTip AltSubmit w%txtWid% gupdateUIfloodFillPanel vFloodFillTolerance Range0-256, % FloodFillTolerance
     Gui, Add, DropDownList, xs y+5 gupdateUIfloodFillPanel AltSubmit Choose%FloodFillAltToler% vFloodFillAltToler, Grayscale [fast]|L*a'b' based grayscale|CIE 2000 Delta E [accurate]
@@ -29591,7 +29676,7 @@ PanelEraseSelectedArea() {
     Gui, Add, Text, x15 y15 Section w%txtWid%, Please decide how to erase or fade selected area:
     Gui, Add, Checkbox, xs y+10 hp Checked%EraseAreaFader% vEraseAreaFader gupdateUIerasePanel, &Fade selected area
     Gui, Add, Checkbox, x+10 hp Checked%EraseAreaInvert% vEraseAreaInvert gupdateUIerasePanel, &Invert selection area
-    Gui, Add, Text, xs+15 y+10 wp hp vinfoEraseOpacity gBTNresetEraseOpacity , Opacity: %thisOpacity%`%
+    Gui, Add, Text, xs+15 y+10 wp hp vinfoEraseOpacity gBTNresetEraseOpacity  +TabStop, Opacity: %thisOpacity%`%
     Gui, Add, Slider, xp y+5 AltSubmit gupdateUIerasePanel ToolTip w%txtWid% vEraseAreaOpacity Range5-250, % EraseAreaOpacity
 
     Gui, Add, Button, xm+0 y+15 h%thisBtnHeight% w35 gtoggleImgEditPanelWindow, ▲
@@ -29732,7 +29817,7 @@ PanelBlurSelectedArea() {
     friendly := (isWinXP=1) ? " (unsupported)" : ""
     Gui, -DPIScale
     Gui, Font, 
-    Gui, Add, Text, x20 y20 w325 h325 Section +0x1000 +0xE gPanelsLivePreviewResponder +hwndhCropCornersPic, Preview area
+    Gui, Add, Text, x20 y20 w325 h325 Section +0x1000 +0xE gPanelsLivePreviewResponder +hwndhCropCornersPic +TabStop, Preview area
     Gui, Add, Text, xp y+10 wp Center vPrinterPageInfos, Click and drag, or in the viewport, to change the preview area.
     If (PrefsLargeFonts=1)
        Gui, Font, s%LargeUIfontValue%
@@ -29745,13 +29830,13 @@ PanelBlurSelectedArea() {
     Gui, Add, Checkbox, x+20 ys Section Checked%blurAreaSoftEdges% vblurAreaSoftEdges gupdateUIblurPanel, &Soft edges%friendly%
     Gui, Add, DropDownList, x+5 w50 AltSubmit Choose%blurAreaSoftLevel% gupdateUIblurPanel vblurAreaSoftLevel, 0.3x|0.6x|1x|2x|3x|4x|5x
     Gui, Add, Checkbox, xs y+10 hp Checked%blurAreaTwice% vblurAreaTwice gupdateUIblurPanel, &Blur twice in one go (for large images)
-    Gui, Add, Text, xs y+10 w%thisW% gBTNresetBlurAmount vinfoBlurAmount, Blur amount: %blurAreaAmount%
+    Gui, Add, Text, xs y+10 w%thisW% gBTNresetBlurAmount vinfoBlurAmount +TabStop, Blur amount: %blurAreaAmount%
     Gui, Add, DropDownList, x+5 wp AltSubmit Choose%blurAreaMode% gupdateUIblurPanel vblurAreaMode, High quality%friendly%|Alternate blur|Box blur (slow)
     Gui, Add, Slider, xs y+5 gupdateUIblurPanel AltSubmit ToolTip w%txtWid% vblurAreaAmount Range0-255, % blurAreaAmount
-    Gui, Add, Text, xs y+10 w%thisW% gBTNresetPixelizationAmount vinfoPixelize, Pixelize level: %blurAreaPixelizeAmount%
+    Gui, Add, Text, xs y+10 w%thisW% gBTNresetPixelizationAmount vinfoPixelize +TabStop, Pixelize level: %blurAreaPixelizeAmount%
     Gui, Add, DropDownList, x+5 wp AltSubmit Choose%blurAreaPixelizeMethod% gupdateUIblurPanel vblurAreaPixelizeMethod, Method 1|Method 2|Method 3
     Gui, Add, Slider, xs y+5 gupdateUIblurPanel AltSubmit ToolTip w%txtWid% vblurAreaPixelizeAmount Range0-1024, %blurAreaPixelizeAmount%
-    Gui, Add, Text, xs y+10 w%thisW% gBTNresetBlurOpacity vinfoBlurOpacity, Opacity: %thisOpacity%`%
+    Gui, Add, Text, xs y+10 w%thisW% gBTNresetBlurOpacity vinfoBlurOpacity +TabStop, Opacity: %thisOpacity%`%
     Gui, Add, DropDownList, x+5 wp gupdateUIblurPanel AltSubmit Choose%BlurAreaBlendMode% vBlurAreaBlendMode, %infoBlend%|Darken|Multiply|Linear burn|Color burn|Lighten|Screen|Linear dodge [Add]|Hard light|Overlay|Hard mix|Linear light|Color dodge|Vivid light|Division|Exclusion|Difference|Substract|Luminosity|Substract reversed|Inverted difference
 
     Gui, Add, Slider, xs y+5 gupdateUIblurPanel AltSubmit ToolTip w%txtWid% vblurAreaOpacity Range5-255, % blurAreaOpacity
@@ -29860,7 +29945,7 @@ PanelDetectEdgesImage() {
 
     Gui, -DPIScale
     Gui, Font, 
-    Gui, Add, Text, x20 y20 w325 h325 Section +0x1000 +0xE gPanelsLivePreviewResponder +hwndhCropCornersPic, Preview area
+    Gui, Add, Text, x20 y20 w325 h325 Section +0x1000 +0xE gPanelsLivePreviewResponder +hwndhCropCornersPic +TabStop, Preview area
     Gui, Add, Text, xp y+10 wp Center vPrinterPageInfos, Click and drag, or in the viewport, to change the preview area.
     If (PrefsLargeFonts=1)
        Gui, Font, s%LargeUIfontValue%
@@ -29875,13 +29960,13 @@ PanelDetectEdgesImage() {
     Gui, Add, DropDownList, x+3 wp gupdateUIedgesPanel vIDedgesYuAmount, -3|-2|-1|0|1|2|3|%IDedgesYuAmount%||
     Gui, Add, DropDownList, x+3 wp gupdateUIedgesPanel AltSubmit Choose%IDedgesCenterAmount% vIDedgesCenterAmount, 0|1|2|3|4|5
 
-    Gui, Add, Text, xs y+10 w%2ndcol% gBTNresetEdgesBright vinfoBright, Brightness: %IDedgesEmphasis%
+    Gui, Add, Text, xs y+10 w%2ndcol% gBTNresetEdgesBright vinfoBright +TabStop, Brightness: %IDedgesEmphasis%
     Gui, Add, Checkbox, x+7 gupdateUIedgesPanel Checked%IDedgesInvert% vIDedgesInvert, &Invert image
     Gui, Add, Slider, xs y+2 ToolTip AltSubmit w%txtWid% gupdateUIedgesPanel vIDedgesEmphasis Range-255-255, % IDedgesEmphasis
-    Gui, Add, Text, xs y+7 w%2ndcol% gBTNresetEdgesContrast vinfoContrst, Contrast: %IDedgesContrast%
+    Gui, Add, Text, xs y+7 w%2ndcol% gBTNresetEdgesContrast vinfoContrst +TabStop, Contrast: %IDedgesContrast%
     Gui, Add, DropDownList, x+7 wp AltSubmit gupdateUIedgesPanel Choose%IDedgesAfterBlur% vIDedgesAfterBlur, After blur|4|6|8|10
     Gui, Add, Slider, xs y+2 ToolTip AltSubmit w%txtWid% gupdateUIedgesPanel vIDedgesContrast Range-100-100, % IDedgesContrast
-    Gui, Add, Text, xs y+7 w%2ndcol% gBTNresetEdgesOpacity vinfoEdgesOpacity, Opacity: %thisOpacity%`%
+    Gui, Add, Text, xs y+7 w%2ndcol% gBTNresetEdgesOpacity vinfoEdgesOpacity +TabStop, Opacity: %thisOpacity%`%
     Gui, Add, DropDownList, x+7 wp gupdateUIedgesPanel AltSubmit Choose%IDedgesBlendMode% vIDedgesBlendMode, No blending|Darken|Multiply|Linear burn|Color burn|Lighten|Screen|Linear dodge [Add]|Hard light|Overlay|Hard mix|Linear light|Color dodge|Vivid light|Division|Exclusion|Difference|Substract|Luminosity|Substract reversed|Inverted difference
     Gui, Add, Slider, xs y+2 ToolTip AltSubmit w%txtWid% gupdateUIedgesPanel vIDedgesOpacity Range5-255, % IDedgesOpacity
 
@@ -29924,28 +30009,28 @@ PanelAddNoiserImage() {
 
     Gui, -DPIScale
     Gui, Font, 
-    Gui, Add, Text, x20 y20 w325 h325 Section +0x1000 +0xE gPanelsLivePreviewResponder +hwndhCropCornersPic, Preview area
+    Gui, Add, Text, x20 y20 w325 h325 Section +0x1000 +0xE gPanelsLivePreviewResponder +hwndhCropCornersPic +TabStop, Preview area
     Gui, Add, Text, xp y+10 wp Center vPrinterPageInfos, Click and drag, or in the viewport, to change the preview area.
     If (PrefsLargeFonts=1)
        Gui, Font, s%LargeUIfontValue%
 
     Gui, +DPIScale
     Gui, Add, Checkbox, x+20 ys Section gupdateUIaddNoisePanel Checked%UserAddNoiseMode% vUserAddNoiseMode, &Grayscale noise
-    Gui, Add, Text, x+5 hp gBTNresetNoiseLevel vinfoNoiseLvl -wrap, Noise cut-off: 1000
+    Gui, Add, Text, x+5 hp gBTNresetNoiseLevel vinfoNoiseLvl -wrap +TabStop, Noise cut-off: 1000
     Gui, Add, Slider, xs y+5 AltSubmit ToolTip NoTicks w%txtWid% gupdateUIaddNoisePanel vUserAddNoiseIntensity Range1-100, % UserAddNoiseIntensity
     
-    Gui, Add, Text, xs y+10 w%2ndcol% gBTNresetEdgesBright vinfoBright, Brightness: %IDedgesEmphasis%
+    Gui, Add, Text, xs y+10 w%2ndcol% gBTNresetEdgesBright vinfoBright +TabStop, Brightness: %IDedgesEmphasis%
     Gui, Add, Checkbox, x+7 gupdateUIaddNoisePanel Checked%IDedgesInvert% vIDedgesInvert, &Invert noise
     Gui, Add, Slider, xs y+2 AltSubmit ToolTip NoTicks w%txtWid% gupdateUIaddNoisePanel vIDedgesEmphasis Range-255-255, % IDedgesEmphasis
-    Gui, Add, Text, xs y+7 w%txtWid% gBTNresetEdgesContrast vinfoContrst, Contrast: %IDedgesContrast%
+    Gui, Add, Text, xs y+7 w%txtWid% gBTNresetEdgesContrast vinfoContrst +TabStop, Contrast: %IDedgesContrast%
     Gui, Add, Slider, xs y+2 AltSubmit ToolTip NoTicks w%txtWid% gupdateUIaddNoisePanel vIDedgesContrast Range-100-100, % IDedgesContrast
 
-    Gui, Add, Text, xs y+7 wp gBTNresetPixelizationAmount vinfoPixelize, Pixelize: %blurAreaPixelizeAmount%
+    Gui, Add, Text, xs y+7 wp gBTNresetPixelizationAmount vinfoPixelize +TabStop, Pixelize: %blurAreaPixelizeAmount%
     Gui, Add, Slider, xs y+2 AltSubmit gupdateUIaddNoisePanel ToolTip NoTicks w%txtWid% vblurAreaPixelizeAmount Range0-100, %blurAreaPixelizeAmount%
-    Gui, Add, Text, xs y+7 w%txtWid% gBTNresetBlurAmount vinfoBlurAmount, Blur: %blurAreaAmount%
+    Gui, Add, Text, xs y+7 w%txtWid% gBTNresetBlurAmount vinfoBlurAmount +TabStop, Blur: %blurAreaAmount%
     Gui, Add, Slider, xs y+2 AltSubmit gupdateUIaddNoisePanel ToolTip NoTicks w%txtWid% vblurAreaAmount Range0-200, % blurAreaAmount
 
-    Gui, Add, Text, xs y+7 w%2ndcol% gBTNresetEdgesOpacity vinfoEdgesOpacity, Opacity: %thisOpacity%`%
+    Gui, Add, Text, xs y+7 w%2ndcol% gBTNresetEdgesOpacity vinfoEdgesOpacity +TabStop, Opacity: %thisOpacity%`%
     Gui, Add, DropDownList, x+7 wp gupdateUIaddNoisePanel AltSubmit Choose%IDedgesBlendMode% vIDedgesBlendMode, No blending|Darken|Multiply|Linear burn|Color burn|Lighten|Screen|Linear dodge [Add]|Hard light|Overlay|Hard mix|Linear light|Color dodge|Vivid light|Division|Exclusion|Difference|Substract|Luminosity|Substract reversed|Inverted difference
     Gui, Add, Slider, xs y+2 AltSubmit ToolTip NoTicks w%txtWid% gupdateUIaddNoisePanel vIDedgesOpacity Range5-255, % IDedgesOpacity
 
@@ -30139,7 +30224,7 @@ PanelNewImage() {
     Gui, Add, Checkbox, xs y+10 gupdateUInewImagePanel Checked%NewDocUseColor% vNewDocUseColor, Fill background with color
     Gui, Add, ListView, xs y+10 h30 w%editWid% %CCLVO% Background%FillAreaColor% vFillAreaColor hwndhLVfillColor,
     Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuFillAreaColor, P
-    Gui, Add, Text, x+5 hp +0x200 vinfoFillAreaOpacity gBTNresetFillOpacity , Opacity: %thisOpacity%00`%
+    Gui, Add, Text, x+5 hp +0x200 vinfoFillAreaOpacity gBTNresetFillOpacity  +TabStop, Opacity: %thisOpacity%00`%
     Gui, Add, Slider, xs y+1 hp w%txtWid% gupdateUInewImagePanel ToolTip AltSubmit vFillAreaOpacity Range3-255, % FillAreaOpacity
     ; Gui, Add, Text, xs y+10, Resulted dimensions:
     ; Gui, Add, Text, xs y+10 w%txtWid% vinfoResultRes, --`n--
@@ -31889,7 +31974,7 @@ PanelJournalWindow(tabu:=1) {
        Gui, Add, Button, y+5 hp wp gCleanDeadFilesSeenImagesDB, &Purge records of inexistent files
        Gui, Add, Button, y+5 hp wp geraseSeenIMGsDB, &Erase the entire list
        Gui, Add, Button, y+5 hp wp gPanelSeenStats, &Seen images statistics
-       Gui, Add, Text, y+5 wp, TIP: To retrieve the images seen on a given day or month, open the statistics panel.
+       Gui, Add, Text, y+5 wp, TIP: To retrieve the images seen on a given day or month`, open the statistics panel.
     } Else
     {
        Gui, Add, Button, xp y+2 h%thisBtnHeight% gBtnViewedImages2List, &View list
@@ -32304,7 +32389,9 @@ PanelAdjustToneMapping() {
     Gui, Add, Checkbox, xs y+10 gupdateUItoneMappingPanel Checked%userHQraw% vuserHQraw, Load camera RAW images at high quality`nEnable this to have tone-mapping apply%friendly%on RAW images as well
 
     initializeFimPreviewIMG(getIDimage(currentFileIndex))
-    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid% gBTNtoneMapRefresh Default, &Update viewport
+    Gui, Add, Button, xs+0 y+25 h%thisBtnHeight% w35 gBtnPrevToneMapPic, <<
+    Gui, Add, Button, x+5 hp wp gBtnNextToneMapPic, >>
+    Gui, Add, Button, x+5 h%thisBtnHeight% w%btnWid% gBTNtoneMapRefresh Default, &Update viewport
     Gui, Add, Button, x+5 hp w90 gBTNresetToneMap, &Reset
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, Clo&se
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "HDR tone-mapping options: " appTitle)
@@ -32312,34 +32399,36 @@ PanelAdjustToneMapping() {
     SetTimer, updateUItoneMappingPanel, -350
 }
 
+BtnNextToneMapPic() {
+    If globalhFIFimg
+    {
+       ; related to PanelAdjustToneMapping()
+       FreeImage_UnLoad(globalhFIFimg)
+       globalhFIFimg := ""
+    }
+    BtnNextImg()
+    updateUIfimBeforeIMG("r")
+    initializeFimPreviewIMG(getIDimage(currentFileIndex))
+}
+
+BtnPrevToneMapPic() {
+    If globalhFIFimg
+    {
+       ; related to PanelAdjustToneMapping()
+       FreeImage_UnLoad(globalhFIFimg)
+       globalhFIFimg := ""
+    }
+
+    BtnPrevImg()
+    updateUIfimBeforeIMG("r")
+    initializeFimPreviewIMG(getIDimage(currentFileIndex))
+}
+
 initializeFimPreviewIMG(imgPath) {
   Static uiBoxW := 460, uiBoxH := 320
   initFIMGmodule()
   If !wasInitFIMlib
      Return 0
-
-  tempBMP := trGdip_CreateBitmap(A_ThisFunc, uiBoxW, uiBoxH, coreDesiredPixFmt)
-  If !tempBMP
-     Return 0
-
-  Gu := trGdip_GraphicsFromImage(A_ThisFunc, tempBMP, 3)
-  If !Gu
-  {
-     trGdip_DisposeImage(tempBMP, 1)
-     Return 0
-  }
-
-  Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
-  calcIMGdimensions(imgW, imgH, uiBoxW, uiBoxH, thisW, thisH)
-  thisX := uiBoxW//2 - thisW//2
-  thisY := uiBoxH//2 - thisH//2
-  Gdip_FillRectangle(Gu, pBrushHatchLow, -2, -2, uiBoxW + 3, uiBoxH + 3)
-  r1 := trGdip_DrawImage(A_ThisFunc, Gu, useGdiBitmap(), thisX, thisY, thisW, thisH)
-  hBitmap := trGdip_CreateHBITMAPFromBitmap(A_ThisFunc, tempBMP)
-  SetImage(hLVmainu, hBitmap)
-  Gdi_DeleteObject(hBitmap)
-  trGdip_DisposeImage(tempBMP, 1)
-  Gdip_DeleteGraphics(Gu)
 
   If globalhFIFimg
   {
@@ -32359,7 +32448,11 @@ initializeFimPreviewIMG(imgPath) {
   {
      FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
      calcIMGdimensions(imgW, imgH, uiBoxW, uiBoxH, thisW, thisH)
-     hFIFimgB := FreeImage_Rescale(hFIFimgA, thisW, thisH, 0)
+     imgBPP := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
+     ColorsType := FreeImage_GetColorType(hFIFimgA)
+     mustApplyToneMapping := (imgBPP>32 && !InStr(ColorsType, "rgba")) || (imgBPP>64) ? 1 : 0
+     If (mustApplyToneMapping=1)
+        hFIFimgB := FreeImage_Rescale(hFIFimgA, thisW, thisH, 0)
   }
 
   If !hFIFimgB
@@ -32376,8 +32469,59 @@ initializeFimPreviewIMG(imgPath) {
      Return 1
 }
 
+updateUIfimBeforeIMG(modus:=0) {
+   Static prevImg := 0
+   Static uiBoxW := 460, uiBoxH := 320
+   If (modus="r")
+   {
+      prevImg := 0
+      Return
+   }
+
+   thisImg := getIDimage(currentFileIndex) "|" currentFileIndex "|" maxFilesIndex "|" globalhFIFimg
+   If (prevImg!=thisImg)
+   {
+      tempBMP := trGdip_CreateBitmap(A_ThisFunc, uiBoxW, uiBoxH, coreDesiredPixFmt)
+      If !tempBMP
+      {
+         prevImg := 0
+         Return 0
+      }
+ 
+      Gu := trGdip_GraphicsFromImage(A_ThisFunc, tempBMP, 3)
+      If !Gu
+      {
+         prevImg := 0
+         trGdip_DisposeImage(tempBMP, 1)
+         Return 0
+      }
+ 
+      Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+      calcIMGdimensions(imgW, imgH, uiBoxW, uiBoxH, thisW, thisH)
+      thisX := uiBoxW//2 - thisW//2
+      thisY := uiBoxH//2 - thisH//2
+      Gdip_FillRectangle(Gu, pBrushHatchLow, -2, -2, uiBoxW + 3, uiBoxH + 3)
+      r1 := trGdip_DrawImage(A_ThisFunc, Gu, useGdiBitmap(), thisX, thisY, thisW, thisH)
+      hBitmap := trGdip_CreateHBITMAPFromBitmap(A_ThisFunc, tempBMP)
+      SetImage(hLVmainu, hBitmap)
+      Gdi_DeleteObject(hBitmap)
+      trGdip_DisposeImage(tempBMP, 1)
+      Gdip_DeleteGraphics(Gu)
+      prevImg := thisImg
+   }
+}
+
 updateUIfimToneMappedIMG() {
    Static uiBoxW := 460, uiBoxH := 320
+   If !globalhFIFimg
+   {
+      showTOOLtip("ERROR: The image loaded does not have high color depth required for tone mapping.")
+      SoundBeep , 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   updateUIfimBeforeIMG()
    hFIFimgE := FreeImage_ToneMapping(globalhFIFimg, cmrRAWtoneMapAlgo - 1, cmrRAWtoneMapParamA, cmrRAWtoneMapParamB)
    imgBPPc := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgE), "-"))
    If (imgBPPc!=32)
@@ -32893,7 +33037,7 @@ PanelJump2index() {
    imgPath := getIDimage(currentFileIndex)
    isAnim := (RegExMatch(imgPath, "i)(.\.(gif))$") && totalFramesIndex>1) ? "`fSkip to given frame index" : ""
    fakeWinCreator(13, A_ThisFunc, 1)
-   msgResult := msgBoxWrapper("panelu|Skip to given index: " appTitle, "Please type a number to skip at in the files list and choose the action. Total entries: " groupDigits(maxFilesIndex) ".", "&Skip to...|C&ancel", 1, "fast-forward", 0, 0, "Skip to given file index`f`fSelect from current file index to given index" isAnim, "limit9050 +number", currentFileIndex, 2)
+   msgResult := msgBoxWrapper("panelu|Skip to given index: " appTitle, "Please type a number to skip at in the files list`nand choose the action.`n`nTotal entries: " groupDigits(maxFilesIndex) "`nCurrent random index: " groupDigits(RandyIMGnow), "&Skip to...|C&ancel", 1, "fast-forward", 0, 0, "Skip to the given file index`f`fSkip to the given index in the random list`fSelect from the current file index to the given index" isAnim, "limit9050 +number", currentFileIndex, 2)
    If InStr(msgResult.btn, "skip")
    {
       usrJumpIndex := Trimmer(msgResult.edit)
@@ -32901,7 +33045,7 @@ PanelJump2index() {
          Return
 
       newJumpIndex := clampInRange(usrJumpIndex, 1, maxFilesIndex)
-      If (newJumpIndex=currentFileIndex && newJumpIndex>0 && msgResult.list!=3)
+      If (newJumpIndex=currentFileIndex && newJumpIndex>0 && msgResult.list!=4)
          Return
 
       If askAboutFileSave(" and another image will be loaded")
@@ -32909,12 +33053,19 @@ PanelJump2index() {
 
       If (IsNumber(newJumpIndex) && newJumpIndex>=1)
       {
-         If (msgResult.list=3)
+         If (msgResult.list=4)
          {
             desiredFrameIndex := clampInRange(usrJumpIndex, 1, totalFramesIndex)
             RefreshImageFile()
             Return
          } Else If (msgResult.list=2)
+         {
+            RandyIMGnow := newJumpIndex
+            currentFileIndex := clampInRange(RandyIMGids[newJumpIndex], 1, maxFilesIndex)
+            ; ToolTip, % RandyIMGids "==" newJumpIndex "==" currentFileIndex , , , 2
+            RefreshImageFile()
+            Return
+         } Else If (msgResult.list=3)
             jumpSelectRangeGiven(currentFileIndex, newJumpIndex)
 
          currentFileIndex := newJumpIndex
@@ -32924,7 +33075,7 @@ PanelJump2index() {
 }
 
 SaveClipboardImage(dummy:=0, allowCropping:=0, noDialog:=0) {
-   Static lastInvoked := 1
+   Static lastInvoked := 1, dephtus := {1:32, 2:24, 3:16, 4:8}
 
    If throwErrorNoImageLoaded()
       Return
@@ -33008,7 +33159,7 @@ SaveClipboardImage(dummy:=0, allowCropping:=0, noDialog:=0) {
          BtnCloseWindow()
 
       prevFileSavePath := OutDir
-      showTOOLtip("Saving image, please wait`n" OutFileName)
+      showTOOLtip("Saving image, please wait`n" OutFileName "`nIntended color format: " dephtus[userSaveBitsDepth] "-bits")
       newBitmap := flipBitmapAccordingToViewPort(applyVPeffectsOnBMP(trGdip_CloneBitmap(A_ThisFunc, useGdiBitmap())))
       INIaction(1, "prevFileSavePath", "General")
       lastInvoked := A_TickCount
@@ -33016,7 +33167,7 @@ SaveClipboardImage(dummy:=0, allowCropping:=0, noDialog:=0) {
       {
          destroyGDIfileCache(1, 1)
          changeMcursor()
-         r := QPV_SaveImageFile(A_ThisFunc, newBitmap, file2save, userJpegQuality)
+         r := QPV_SaveImageFile(A_ThisFunc, newBitmap, file2save, userJpegQuality, userSaveBitsDepth)
          trGdip_DisposeImage(newBitmap, 1)
       } Else r := "err-no-main-bmp"
 
@@ -33033,10 +33184,13 @@ SaveClipboardImage(dummy:=0, allowCropping:=0, noDialog:=0) {
          showTOOLtip("Failed to save image file`n" OutFileName "`n" OutDir "\")
       } Else
       {
-         showTOOLtip("Image file succesfully saved`n" OutFileName "`n" OutDir "\")
+         FileGetSize, OutputVar, % OutDir "\" OutFileName
+         If (OutputVar>2)
+            friendly := "`nFile size: " fileSizeFrienly(OutputVar)
+
+         showTOOLtip("Image file succesfully saved`n" OutFileName "`n" OutDir "\" friendly)
          testMem := getIDimage(currentFileIndex)
          lastZeitIMGsaved := [A_Now, currentUndoLevel, undoLevelsRecorded, OutFileName, OutDir, currentFileIndex]
-
          If (currentFileIndex=0) || (InStr(testMem, "\temporary memory object\") && maxFilesIndex<2)
          {
             currentFileIndex := maxFilesIndex := 1
@@ -33112,7 +33266,7 @@ zPlitPath(inputu, fastMode, ByRef fileNamu, ByRef folderu, ByRef fileNamuNoEXT:=
        ; fileEXTpos := RegExMatch(fileNamu, "\.[^\^.\\/:*?<>|\r\n]+$")
        fileEXTpos := InStr(fileNamu, ".", 0, -1) ; RegExMatch(fileNamu, "\.[^\^.\\/:*?<>|\r\n]+$")
        If fileEXTpos
-          fileEXT := Trimmer(SubStr(fileNamu, fileEXTpos+1))
+          fileEXT := Trimmer(SubStr(fileNamu, fileEXTpos + 1))
 
        If (fileExt="" || StrLen(fileExt)>4)
        {
@@ -34082,6 +34236,7 @@ coreConvertImgFormat(imgPath, file2save) {
          FreeImage_UnLoad(hFIFimgD)
       } Else If hFIFimgC
       {
+         changeMcursor()
          r := FreeImage_Save(hFIFimgC, file2save, saveArg)
          If (!r && imgBPP!=32)
          {
@@ -34117,15 +34272,15 @@ coreConvertImgFormat(imgPath, file2save) {
    Return r
 }
 
-convert2format() {
+convert2format(givenIndex) {
   Critical, on
-  If (currentFileIndex=0)
+  If (givenIndex=0)
      Return "err"
 
   If (slideShowRunning=1)
      ToggleSlideShowu()
 
-  file2rem := getIDimage(currentFileIndex)
+  file2rem := getIDimage(givenIndex)
   If RegExMatch(file2rem, "i)(.\.(" rDesireWriteFMT "))$")
   {
      SoundBeep, 300, 100
@@ -34144,12 +34299,16 @@ convert2format() {
      msgResult := msgBoxWrapper(appTitle ": Confirmation", "A file with the same name already exists in the destination folder... Do you want to overwrite the file?`n`n" OutFileName "`n`n" OutDir "\", 4, 0, "question")
      forceOverwrite := (msgResult="Yes") ? 1 : 0
      If !forceOverwrite
+     {
+        SetTimer, ResetImgLoadStatus, -150
         Return
+     }
   }
 
   BtnCloseWindow()
   destroyGDIfileCache()
   Sleep, 1
+  changeMcursor()
   setImageLoading()
   showTOOLtip("Converting image file, please wait")
   If (!FolderExist(ResizeDestFolder) && ResizeUseDestDir=1)
@@ -34160,12 +34319,17 @@ convert2format() {
   If FileExist(file2save)
      FileSetAttrib, -R, %file2save%
 
+  changeMcursor()
   r := coreConvertImgFormat(file2rem, file2save)
   SetTimer, ResetImgLoadStatus, -50
+  FileGetSize, OutputVar, % file2save
+  If (OutputVar>2 && !r)
+     friendly := "`nFile size: " fileSizeFrienly(OutputVar)
+ 
   If r
      showTOOLtip("Failed to convert file`n" OutFileName "`n" OutDir "\")
   Else
-     showTOOLtip("File converted succesfully to ." rDesireWriteFMT "`n" OutNameNoExt "." rDesireWriteFMT "`n" destImgPath "\")
+     showTOOLtip("File converted succesfully to ." rDesireWriteFMT "`n" OutNameNoExt "." rDesireWriteFMT "`n" destImgPath "\" friendly)
 
   SoundBeep, % r ? 300 : 900, 100
   If (OnConvertKeepOriginals!=1 && !r)
@@ -34177,14 +34341,15 @@ convert2format() {
      If ErrorLevel
         showTOOLtip("Failed to remove original file, however the file was converted succesfully to ." rDesireWriteFMT "`n" OutNameNoExt "." rDesireWriteFMT "`n" destImgPath "\")
 
-     resultedFilesList[currentFileIndex, 1] := file2save
-     resultedFilesList[currentFileIndex, 4] := 1
+     resultedFilesList[givenIndex, 1] := file2save
+     resultedFilesList[givenIndex, 4] := 1
      If (SLDtypeLoaded=3)
-        updateSQLdbEntry(file2rem, file2save, 1, resultedFilesList[currentFileIndex, 12])
+        updateSQLdbEntry(file2rem, file2save, 1, resultedFilesList[givenIndex, 12])
 
-     updateMainUnfilteredList(currentFileIndex, 1, file2save)
+     updateMainUnfilteredList(givenIndex, 1, file2save)
   }
   SetTimer, RemoveTooltip, % -msgDisplayTime
+  SetTimer, ResetImgLoadStatus, -150
 }
 
 OpenFolders(dummy:=0) {
@@ -34550,7 +34715,7 @@ RefreshImageFileAction() {
 
    If (thumbsDisplaying!=1)
    {
-      If throwErrorNoImageLoaded()
+      If throwErrorNoImageLoaded(0, 0)
          Return
 
       If InStr(imgPath, "\temporary memory object\")
@@ -36007,6 +36172,9 @@ closeDocuments() {
    If askAboutSlidesListSave()
       Return
 
+   If askAboutFilesSelect("discard it")
+      Return
+
    interfaceThread.ahkassign("currentFilesListModified", currentFilesListModified)
    PopulateIndexFilesStatsInfos("kill")
    SLDtypeLoaded := 1
@@ -36067,11 +36235,14 @@ exitAppu(dummy:=0) {
 }
 
 askAboutFilesSelect(act) {
-   If (markedSelectFile>50 && maxFilesIndex>100)
+   Static doNotAskAgain := 0
+   If (markedSelectFile>50 && maxFilesIndex>250 && doNotAskAgain=0)
    {
-      msgResult := msgBoxWrapper(appTitle ": " act " confirmation", "The current opened files list has " groupDigits(markedSelectFile) " files selected. Are you sure you want to " act " ?", "&Yes|&No", 0, "question")
-      If (msgResult!="Yes")
+      msgResult := msgBoxWrapper(appTitle ": " act " confirmation", "The current opened files list has " groupDigits(markedSelectFile) " files selected. Are you sure you want to " act " ?", "&Yes|&No", 2, "question", "Do not ask this again")
+      If !InStr(msgResult.btn, "Yes")
          Return 1
+      Else
+         doNotaskAgain := msgResult.check
    }
 }
 
@@ -36424,11 +36595,12 @@ createMenuNavigation() {
       Menu, PVnav, Add,
    } Else 
    {
-      kMenu("PVnav", "Add", "&Show files list map on click`tW", "ToggleFilesMap")
+      kMenu("PVnav", "Add", "&Display the files list map now`tW", "invokeFilesListMapNow")
+      kMenu("PVnav", "Add", "&Show files list map on scrollbar click", "ToggleFilesMap")
       If (showFilesListMap=1)
-         kMenu("PVnav", "Check", "&Show files list map on click`tW")
+         kMenu("PVnav", "Check", "&Show files list map on scrollbar click")
       If !(maxFilesIndex>10 && markedSelectFile>1)
-         kMenu("PVnav", "Disable", "&Show files list map on click`tW")
+         kMenu("PVnav", "Disable", "&Show files list map on scrollbar click")
       Menu, PVnav, Add,
    }
 
@@ -36455,8 +36627,8 @@ createMenuNavigation() {
    thisFolder := StrReplace(Trimmer(CurrentSLD), "|")
    Menu, PVnav, Add,
    kMenu("PVnav", "Add", "&Skip to index`tJ", "PanelJump2index", "frames")
-   kMenu("PVnav", "Add", "&Random`tShift+Bksp", "RandomPicture")
-   kMenu("PVnav", "Add", "Pre&v. random image`tBksp", "PrevRandyPicture", "previous")
+   kMenu("PVnav", "Add", "Next &random image`tShift+Bksp", "RandomPicture")
+   kMenu("PVnav", "Add", "Pre&vious random image`tBksp", "PrevRandyPicture", "previous")
    If (SLDtypeLoaded=1 && FolderExist(thisFolder))
    {
       Menu, PVnav, Add,
@@ -36926,14 +37098,15 @@ createMenuMainView() {
    kMenu("PVview", "Add", "Mirror &horizontally`tH", "VPflipImgH", "viewport flip image")
    kMenu("PVview", "Add", "Mirror &vertically`tV", "VPflipImgV", "viewport flip image")
    Menu, PVview, Add,
-   If (thumbsDisplaying!=1 && !AnyWindowOpen)
+   If (thumbsDisplaying!=1)
    {
       kMenu("PVview", "Add", "Allo&w outside viewport image panning", "toggleFreePanning")
       If (allowFreeIMGpanning=1)
          kMenu("PVview", "Check", "Allo&w outside viewport image panning")
-
-      kMenu("PVview", "Add", "Configure viewport &grid", "PanelConfigVPgrid")
    }
+
+   If (thumbsDisplaying!=1 && !AnyWindowOpen)
+      kMenu("PVview", "Add", "Configure viewport &grid", "PanelConfigVPgrid")
 
    kMenu("PVview", "Add", "Reset vie&wport adjustments`t\", "ResetImageView", "image")
    If (FlipImgV=1)
@@ -38856,6 +39029,9 @@ OpenRecentEntry(menuItem) {
   If askAboutSlidesListSave()
      Return
 
+  If askAboutFilesSelect("discard it")
+     Return
+
   startZeit := A_TickCount
   If RegExMatch(testOs, "i)^(o1\. )")
      openThisu := prevFileSavePath
@@ -38934,6 +39110,9 @@ OpenFavesEntry(menuItem) {
      Return
 
   If askAboutSlidesListSave()
+     Return
+
+  If askAboutFilesSelect("discard it")
      Return
 
   startZeit := A_TickCount
@@ -40545,6 +40724,7 @@ coredrawWelcomeImg(modelu, iterations, moduz, sweepRand, mainWidth, mainHeight, 
 
     If (modelu=1)
     {
+       ; rects
        Loop, % iterations
        {
           If (usePrevious!=1)
@@ -40570,6 +40750,7 @@ coredrawWelcomeImg(modelu, iterations, moduz, sweepRand, mainWidth, mainHeight, 
        }
     } Else If (modelu=2)
     {
+       ; ellipses
        Loop, % iterations
        {
           If (usePrevious!=1)
@@ -40593,6 +40774,7 @@ coredrawWelcomeImg(modelu, iterations, moduz, sweepRand, mainWidth, mainHeight, 
        }
     } Else If (modelu=3 || modelu=5)
     {
+       ; ellipses snapped to corners
        ; Random, moduz, 1, 9
        Loop, % iterations
        {  
@@ -40657,7 +40839,7 @@ coredrawWelcomeImg(modelu, iterations, moduz, sweepRand, mainWidth, mainHeight, 
        }
     } Else If (modelu=6)
     {
-       ; maurer rose; based on the implemention by hellbent found on AHK Forums
+       ; Maurer Rose; based on the implemention by Hellbent - found on AHK Forums
        If (startMode!=1)
           iterations := Ceil(iterations/10)
        Else
@@ -40740,12 +40922,15 @@ coredrawWelcomeImg(modelu, iterations, moduz, sweepRand, mainWidth, mainHeight, 
        }
     } Else If (modelu=8)
     {
+       ; noise
        Random, z, 0.02, 0.09 ; scale
        Random, l, 0.1, 0.45 ; opacity
+       Random, kl, 0, 10
+       doGray := (kl<3) ? 1 : 0
        Gdip_SetInterpolationMode(G, 5)
        Gdip_SetPixelOffsetMode(G, 2)
        Gdip_ResetWorldTransform(G)
-       noiseBMP := QPV_CreateBitmapNoise(Ceil(mainWidth*z), Ceil(mainHeight*z), 1, 0, 1)
+       noiseBMP := QPV_CreateBitmapNoise(Ceil(mainWidth*z), Ceil(mainHeight*z), 1, doGray, 1)
        trGdip_DrawImage(A_ThisFunc, G, noiseBMP, 0, 0, mainWidth, mainHeight,,,,, l)
        trGdip_DisposeImage(noiseBMP, 1)
     } Else ; If (modelu=6)
@@ -41485,8 +41670,9 @@ ShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
   If (A_TickCount - prevColorAdjustZeit<90) || (animGIFplaying=1 || slideShowRunning=1)
      doIT := 0
 
+  thisModus := (allowFreeIMGpanning=1 && IMGresizingMode=4) ? 1 : 0
   If (usePrevious=0 && ForceIMGload=0 && AnyWindowOpen!=10 && vpImgPanningNow=0
-  && doIT=1 && !diffIMGdecX && !diffIMGdecY && thumbsDisplaying!=1)
+  && doIT=1 && !diffIMGdecX && !diffIMGdecY && thumbsDisplaying!=1 && thisModus!=1)
   {
      ; ToolTip, % Exception("", -1).Line "`n" Exception("", -1).What, , , 2
      zPlitPath(imgPath, 1, OutFileName, OutDir)
@@ -41615,6 +41801,7 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
       }
    }
 
+   thisModus := (allowFreeIMGpanning=1 && IMGresizingMode=4) ? 1 : 0
    If (A_TickCount - lastInvoked>85) && (A_TickCount - lastInvoked2>85)
    || (slideShowRunning=1 || animGIFplaying=1 || usePrevious=1 || oldZoomLevel || ForceIMGload=1 || diffIMGdecX || diffIMGdecY || LastWasFastDisplay=1)
    {
@@ -41647,7 +41834,7 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
           Return "fail"
        } Else prevImgPath := imgPath
        lastInvoked := A_TickCount
-   } Else If (vpImgPanningNow=0)
+   } Else If (vpImgPanningNow=0 && thisModus!=1)
    {
       winPrefix := defineWinTitlePrefix()
       pVwinTitle := winPrefix winTitle
@@ -41865,7 +42052,6 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
    If (editingSelectionNow=1 && relativeImgSelCoords=1 && gdiBMPchanged=1)
       calcRelativeSelCoords(0, prevMaxSelX, prevMaxSelY)
 
-
    GDIfadeVPcache := trGdip_DisposeImage(GDIfadeVPcache, 1)
    If (minimizeMemUsage!=1 && slideShowRunning=1 && doSlidesTransitions=1 && (animGIFplaying!=1 || desiredFrameIndex=0) && slideShowDelay>950)
       GDIfadeVPcache := trGdip_CreateBitmapFromHBITMAP(glHbitmap)
@@ -41874,7 +42060,8 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
    pVwinTitle := infoFilesSel infoFrames winTitle
    r := QPV_ShowImgonGui(ResizedW, ResizedH, GuiW, GuiH, usePrevious, imgPath, ForceIMGload, hasFullReloaded, gdiBMPchanged, wasPrevious)
    delayu := (A_TickCount - prevFastDisplay < 300) ? 90 : 550
-   If (wasPrevious=1 && animGIFplaying!=1)
+   thisModus := (allowFreeIMGpanning=1 && IMGresizingMode=4) ? 1 : 0
+   If (wasPrevious=1 && animGIFplaying!=1 && vpImgPanningNow=0 && thisModus!=1)
       dummyTimerReloadThisPicture(delayu)
 
    infoFilesSel := (markedSelectFile>0) ? "[ " markedSelectFile " ] " : ""
@@ -41895,7 +42082,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
     maxSelX := prevMaxSelX, maxSelY := prevMaxSelY
     imgPath := getIDimage(currentFileIndex)
     imgPath := StrReplace(imgPath, "||")
-    infoFilesSel := (markedSelectFile>0) ? "`nFiles selected: " groupDigits(markedSelectFile) : ""
+    infoFilesSel := (markedSelectFile>0) ? "`nFiles selected: " groupDigits(markedSelectFile) " ( " Round(markedSelectFile/maxFilesIndex*100, 2) "% )" : ""
     If (totalFramesIndex>0 || currIMGdetails.Frames>1) && (thumbsDisplaying!=1)
     {
        thisFramesInfo := (totalFramesIndex>0) ? totalFramesIndex : currIMGdetails.Frames
@@ -41938,7 +42125,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
        thisFileIndex := currentFileIndex
        If (showInfoBoxHUD=2)
        {
-          infoSizing := "`nThumbnails alignment: " defineImgAlign() "`nThumbnails size: " thumbsW " x " thumbsH " px (" Round(thumbsW/thumbsH, 2) ") | Intended " defineThumbsAratio()
+          infoSizing := "`nThumbnails alignment: " defineImgAlign() "`nThumbnails size: " thumbsW " x " thumbsH " px (" Round(thumbsW/thumbsH, 2) ") | Intended: " defineThumbsAratio()
           thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, startIndex, mainWidth, mainHeight)
           infoSizing .= "`nThumbnails grid: " maxItemsW " x " maxItemsH " = " maxItemsPage
        }
@@ -42019,8 +42206,8 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
     infoMirroring := defineIMGmirroring()
     If (editingSelectionNow=1 && thumbsDisplaying!=1)
     {
-       imgSelW := groupDigits(max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2))
-       imgSelH := groupDigits(max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2))
+       imgSelW := Round(max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2))
+       imgSelH := Round(max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2))
        If (relativeImgSelCoords=1)
        {
           x1 := " [ " Round(prcSelX1 * 100) "%, "
@@ -42032,7 +42219,9 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
 
        infoLocked := (lockSelectionAspectRatio>1) ? "`n  Locked aspect ratio: " defineSelectionAspectRatios() : "`n  Aspect ratio: " Round(imgSelW/imgSelH, 2)
        infoLocked .= (LimitSelectBoundsImg=1) ? "`n  Selection area limited to image boundaries" : ""
-       infoSelection := "`n `n" DefineVPselAreaMode() " selection coordinates:`n  X / Y: " Round(ImgSelX1) ", " Round(ImgSelY1) x1 y1 "`n  W / H: " Round(imgSelW) ", " Round(imgSelH) wP hP moreSelInfo "`n  Rotation: " Round(vPselRotation, 2) "°" infoLocked
+       imgSelW := groupDigits(imgSelW)
+       imgSelH := groupDigits(imgSelH)
+       infoSelection := "`n `n" DefineVPselAreaMode() " selection coordinates:`n  X / Y: " Round(ImgSelX1) ", " Round(ImgSelY1) x1 y1 "`n  W / H: " imgSelW ", " imgSelH wP hP moreSelInfo "`n  Rotation: " Round(vPselRotation, 2) "°" infoLocked
     } Else If (editingSelectionNow=1)
        infoSelection := "`nSelection area activated in image view"
 
@@ -42053,7 +42242,8 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
 
     If StrLen(filesFilter)>1
     {
-       infoFilteru := "`nFiles list filtered from " groupDigits(bckpMaxFilesIndex) " down to " groupDigits(maxFilesIndex) ".`nFilter pattern used:`n" SubStr(filesFilter, 1, 45)
+       modus := (userFilterInvertThis=1) ? ": (inverted)`n" : ":`n"
+       infoFilteru := "`nFiles list filtered from " groupDigits(bckpMaxFilesIndex) " down to " groupDigits(maxFilesIndex) " ( " Round(maxFilesIndex/bckpMaxFilesIndex*100, 2) "% ).`nFilter pattern used" modus SubStr(filesFilter, 1, 45)
        If (userFilterDoString=1 && UsrEditFilter!="")
           infoFilteru .= UsrEditFilter
     }
@@ -42348,6 +42538,7 @@ multiPageFileManaging(oBitmap) {
 
 LoadFileWithWIA(imgPath, fastMode, noBMP:=0, forceW:=0, forceH:=0, keepAratio:=0) {
    oBitmap := 0
+   thisZeit := A_TickCount
    Try wiaImg := WIA_LoadImage(imgPath)
    If IsObject(wiaImg)
    {
@@ -42379,7 +42570,7 @@ LoadFileWithWIA(imgPath, fastMode, noBMP:=0, forceW:=0, forceH:=0, keepAratio:=0
    {
       If (forceW && forceH)
       {
-         If (imgW>forceW || imgH>forceH)
+         If (wiaImg.Width>forceW || wiaImg.Height>forceH)
             Try ScaledWiaIMG := WIA_ScaleImage(wiaImg, forceW, forceH, keepAratio)
       } Else
       {
@@ -42410,7 +42601,6 @@ LoadFileWithWIA(imgPath, fastMode, noBMP:=0, forceW:=0, forceH:=0, keepAratio:=0
    If (IsObject(wiaImg) && noBMP=0)
    {
       Try PicObj := ScaledWiaIMG.Height ? WIA_GetImageBitmap(ScaledWiaIMG) : WIA_GetImageBitmap(wiaImg)
-
       If (PicObj.Handle)
       {
          setWindowTitle("Converting WIA image format to GDI+ bitmap")
@@ -42501,7 +42691,7 @@ LoadBitmapFromFileu(imgPath, noBPPconv:=0, forceGDIp:=0, allowCaching:=0, allowM
         mainLoadedIMGdetails.TooLargeGDI := 0
         ; ToolTip, % imgW "-" imgH "-" pixFmt , , , 2
         If (InStr(pixFmt, "CMYK") || InStr(pixFmt, "48-") || InStr(pixFmt, "64-"))
-           ER := Gdip_BitmapConvertFormat(oBitmap, 0x26200A, 2, 1, 0, 0, 0, 0, 0)
+           ER := Gdip_BitmapSetColorDepth(oBitmap, 32, 1)
 
         If (!imgW || !imgH || ER || InStr(pixFmt, "0x"))
         {
@@ -42694,6 +42884,53 @@ generalInternalErrorMsgBox(err, baseMsg, silentMode:=0) {
    }
 }
 
+highlightActiveCtrl(modus:=0) {
+   Static prevCtrl
+   ; GuiControlGet, varu, SettingsGUIA: FocusV
+   ; GuiControlGet, value, , %A_GuiControl%
+   ; GuiControlGet, hwnd, hwnd, %varu%
+   If (modus="click")
+   {
+      GuiControlGet, whichHwnd, hwnd, %A_GuiControl%
+      WinGetClass, ctrlClassNN, ahk_id %whichHwnd%
+      ; MouseGetPos, , , WhichWindow, whichHwnd
+      If InStr(ctrlClassNN, "static")
+      {
+         prevCtrl := 0
+         ControlFocus, , ahk_id %whichHwnd%
+         highlightActiveCtrl()
+      }
+      Return
+   }
+
+   ControlGetFocus, ctrlClassNN, ahk_id %hSetWinGui%
+   ControlGet, ctrlHwnd, Hwnd,, % ctrlClassNN, ahk_id %hSetWinGui%
+   ControlGetPos, x, y, w, h, % ctrlClassNN, ahk_id %hSetWinGui%
+   thisCtrl := ctrlClassNN ctrlHwnd x y w h modus
+   If (thisCtrl=prevCtrl)
+      Return
+
+   prevCtrl := thisCtrl
+   JEE_ClientToScreen(hSetWinGui, 1, 1, aX, aY)
+   WinGetPos, zX, zY, ,, ahk_id %hSetWinGui%
+   kX := aX - zX
+   kY := aY - zY
+
+   JEE_ClientToScreen(hSetWinGui, x, y, X2, Y2)
+   x2 -= kX,   y2 -= kY
+   x2 += 3,    y2 += 3
+   interfaceThread.ahkPostFunction("ShowClickHalo", x2, y2, w, h, 1)
+   If (modus="enter" && InStr(ctrlClassNN, "static"))
+   {
+      MouseMove, x2, y2, 1
+      Click
+   }
+
+
+   ; ToolTip, % x "--" y "--" w "--" h "`n" ctrlClassNN "||" ctrlHwnd , , , 2
+
+}
+
 CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReloaded) {
   Critical, on
   Static prevFrame := -1, AprevImgDownScaled := 0, BprevImgDownScaled := 0, lastInvoked := 1
@@ -42772,6 +43009,7 @@ CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReload
   rawFmt := Gdip_GetImageRawFormat(oBitmap)
   rawFmt := (rawFmt="MEMORYBMP" && fimMultiPage) ? fimMultiPage : rawFmt
   abortImgLoad := interfaceThread.ahkgetvar.canCancelImageLoad
+/*
   If (RegExMatch(rawFmt, "i)(bmp|png|tiff)$") && currIMGdetails.HasAlpha=1 && StrLen(UserMemBMP)<3)
   {
      ERR := Gdip_GetHistogram(oBitmap, 7, histoArray, 0, 0)
@@ -42788,6 +43026,7 @@ CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReload
      }
      ; ToolTip, % ERR " = " HasAlpha " = " rawFmt , , , 2
   }
+*/
 
   If (RegExMatch(rawFmt, "i)(gif|tiff)$") && totalFramesIndex>0)
      multiFrameImg := 1
@@ -48950,7 +49189,7 @@ QPV_listThumbnailsGridMode(forceMode, thisGu, thisHDC, thisHwnd) {
     } Else prevTryThumbsUpdate := A_TickCount
 }
 
-mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:="") {
+mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:="", mapOffset:=0) {
     Critical, on
     Static pBrush1, pBrush2, pBrush3, pBrush4, pBrush5
          , brushesCreated, prevIndexu
@@ -49198,8 +49437,11 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
     }
 
     lineThickns := imgHUDbaseUnit//3
+    If mapOffset
+       mapOffset := scrollYpos - scrollYpos*2
+
     If StrLen(listMap)>2
-       Gdip_DrawImage(2NDglPG, listMap, mainWidth - lineThickns - imgHUDbaseUnit//2, 0)
+       Gdip_DrawImage(2NDglPG, listMap, mainWidth - lineThickns - imgHUDbaseUnit//2, mapOffset)
 
     If (scrollHeight<mainHeight)
     {
@@ -49232,7 +49474,8 @@ generateFilesListMap(dummy:=0) {
    G1 := trGdip_GraphicsFromImage(A_ThisFunc, mainBMP)
    Gdip_GraphicsClear(G1, "0xFF" WindowBgrColor)
    thisColor := (thisVal=2) ? "33EEFF" : "FF9922"
-   selPen := Gdip_CreatePen("0xFF" thisColor, 2)
+   thisThick := (maxFilesIndex - 10<mainHeight) ? 1 : 2
+   selPen := Gdip_CreatePen("0xFF" thisColor, thisThick)
    countThese := 0
    Loop, % maxFilesIndex
    {
@@ -49254,6 +49497,13 @@ generateFilesListMap(dummy:=0) {
    If (thisVal=2)
       markedSelectFile := countThese
 
+   doubled := 0
+   If (maxFilesIndex//3>mainHeight && dummy!="auto")
+   {
+      doubled := 1
+      mainHeight *= 2
+   }
+
    knobSize := imgHUDbaseUnit//2
    finalBMP := trGdip_ResizeBitmap(A_ThisFunc, mainBMP, knobSize, mainHeight, 0, 7)
    trGdip_DisposeImage(mainBMP)
@@ -49265,7 +49515,7 @@ generateFilesListMap(dummy:=0) {
    Gdip_DeleteGraphics(G1)
    trGdip_DisposeImage(finalBMP)
 
-   Return [sFinal, thisVal]
+   Return [sFinal, thisVal, doubled]
 }
 
 dummyRecountSelectedFiles() {
@@ -51005,7 +51255,7 @@ corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups) {
    resultsArrayC := ""
 }
 
-retrieveDupesByProperties(theseCols, fsCmp, SortCriterion:=0) {
+retrieveDupesByProperties(theseCols, fsCmp, SortCriterion:=0, mustForceHashes:=0) {
    Static prevMode, notFloatsRegEX := "i)(fcreated|fmodified|fsize|imgfile|innerpixelz|outerpixelz|imgwidth|imgheight|imgframes|imgdpi|imgpixfmt|pixelzHash)"
 
    If SortCriterion
@@ -51024,7 +51274,11 @@ retrieveDupesByProperties(theseCols, fsCmp, SortCriterion:=0) {
    ; ToolTip, % theseCols "`n" thisNOTnullCol , , , 2
 
    showTOOLtip("Identifying image duplicates, please wait")
-   collectSQLFileInfosNow(thisNOTnullCol, 0, 1, 0, 0)
+   If (mustForceHashes=1)
+      collectSQLFileInfosNow("imgmedian", 0, 1, 0, 0)
+   Else
+      collectSQLFileInfosNow(thisNOTnullCol, 0, 1, 0, 0)
+
    If InStr(theseCols, "pixelzHash")
       generateSQLimagesExtraHash()
 
@@ -52222,7 +52476,7 @@ AboutWindow() {
     Gui, Font, Normal
     Gui, Add, Text, y+10 w%txtWid%, Dedicated to people with really large image collections and slideshow needs :-).
     Gui, Add, Text, y+10 w%txtWid%, This application contains code from various entities. You can find more details in the source code.
-    Gui, Add, Text, y+10 w%txtWid%, QPV uses GDI+ [Windows APIs] to display images and FreeImage%thisVersion% to load exotic file formats. FreeImage is licensed under the GNU General Public License, v2.0 (GPLv2) or v3.0 (GPLv3), and the FreeImage Public License (FIPL)
+    Gui, Add, Text, y+10 w%txtWid%, QPV uses GDI+ [Windows APIs] to display images and FreeImage%thisVersion% to load exotic file formats. FreeImage is licensed under the GNU General Public License, v2.0 (GPLv2) or v3.0 (GPLv3)`, and the FreeImage Public License (FIPL)
 
     Gui, Add, Link, y+10 w%txtWid%, To keep the development going, <a href="https://www.paypal.me/MariusSucan/10">please donate</a> or <a href="mailto:marius.sucan@gmail.com?subject=%appTitle% v%appVersion%">send me feedback</a>.
     Gui, Add, Link, y+10 w%txtWid%, New and previous versions are available on <a href="https://github.com/marius-sucan/Quick-Picto-Viewer">GitHub</a>.
@@ -52452,7 +52706,7 @@ PanelFindDupes() {
 
     If (SLDtypeLoaded!=3)
     {
-       msgResult := msgBoxWrapper(appTitle ": Confirmation", "The files list is currently not saved as a SQLite database. Would you like to save it in the specified format?", "&Yes|&Remove duplicate entries|&Cancel", 2, "question")
+       msgResult := msgBoxWrapper(appTitle ": Confirmation", "The files list is currently not saved as an SQLite database. This format is required to store the collected image details and hashes needed for identifying similar or identical images.`n`nWould you like to save it in the specified format?", "&Yes|&Remove duplicate entries|&Cancel", 2, "question")
        If (msgResult="Yes")
           PanelSaveSlideShowu()
        Else If InStr(msgResult, "remove")
@@ -52506,7 +52760,7 @@ PanelFindDupes() {
     fingWid := (PrefsLargeFonts=1) ? 170 : 100
     fingEdt := (PrefsLargeFonts=1) ? 70 : 50
     Gui, Tab, 2
-    Gui, Add, Text, x+15 y+15 w%txtWid% Section vbtnFldr6, Image fingerprints are image 8x8 distance hashes. Below you can configure what sections of the image hashes to compare. The blue dots in the preview area highlight the areas of the images that will be compared. The less the 8x8 grid is complete, the more false-positives may be identified.
+    Gui, Add, Text, x+15 y+15 w%txtWid% Section vbtnFldr6, Image fingerprints are image 8x8 distance hashes. Below you can configure what sections of the image hashes to compare. The blue dots in the preview area highlight the areas of the images that will be compared. The less the 8x8 grid is complete`, the more false-positives may be identified.
     Gui, -DPIScale
     Gui, Add, Text, xp y+15 Section w122 h122 +0x1000 +0xE +hwndhCropCornersPic, Image hashing preview
     Gui, +DPIScale
@@ -52874,7 +53128,7 @@ BTNfindDupesNow() {
          toBeExcludedIndexes[resultedFilesList[A_Index, 12]] := 1
    }
 
-   retrieveDupesByProperties(columnus, 0)
+   retrieveDupesByProperties(columnus, 0, 0, userFindDupesFilterHamDist)
 }
 
 BTNhelpFindDupes() {
@@ -53386,24 +53640,24 @@ PanelColorsAdjusterWindow() {
     Gui, Add, ComboBox, x+1 w90 gUpdateUIadjustVPcolors vusrAdaptiveThreshold, -2000|-100|-50|-2|1|2|50|1000|2000|%usrAdaptiveThreshold%||
     Gui, Add, Checkbox, xs y+2 w%txtWid% gUpdateUIadjustVPcolors Checked%doSatAdjusts% vdoSatAdjusts, Auto-adjust image saturation level
     Gui, Add, Checkbox, x+5 w90 gUpdateUIadjustVPcolors Checked%bwDithering% vbwDithering, B/W
-    Gui, Add, Text, xs y+8 w%txtWid% gBtnResetBrightness vinfoBright, Brightness: ----
+    Gui, Add, Text, xs y+8 w%txtWid% gBtnResetBrightness vinfoBright +TabStop, Brightness: ----
     Gui, Add, Slider, y+5 AltSubmit ToolTip NoTicks w%slideWid% gUpdateUIadjustVPcolors vsliderBright Range-100-100, 1
     Gui, Add, Button, x+1 hp w45 gBtnChangeLumPlus vBtnLumPlus, +
     Gui, Add, Button, x+1 hp wp gBtnChangeLumMin vBtnLumMin, -
-    Gui, Add, Text, xs y+2 w%txtWid% gBtnResetContrast vinfoContrst, Contrast: ----
+    Gui, Add, Text, xs y+2 w%txtWid% gBtnResetContrast vinfoContrst +TabStop, Contrast: ----
     Gui, Add, Slider, y+1 AltSubmit ToolTip NoTicks w%slideWid% gUpdateUIadjustVPcolors vsliderContrst Range-100-100, 1
     Gui, Add, Button, x+1 hp w45 gBtnChangeGammPlus vBtnGammPlus, -
     Gui, Add, Button, x+1 hp wp gBtnChangeGammMin vBtnGammMin, +
-    Gui, Add, Text, xs y+2 w%txtWid% gBtnResetSaturation vinfoSatu, Saturation: ----
+    Gui, Add, Text, xs y+2 w%txtWid% gBtnResetSaturation vinfoSatu +TabStop, Saturation: ----
     Gui, Add, Slider, y+5 AltSubmit ToolTip NoTicks w%slideWid% gUpdateUIadjustVPcolors vsliderSatu Range-100-100, 1
     Gui, Add, Button, x+1 hp w45 gBtnChangeSatPlus vBtnSatPlus, +
     Gui, Add, Button, x+1 hp w45 gBtnChangeSatMin vBtnSatMin, -
-    Gui, Add, Text, xs y+2 w%slide2Wid% gBtnResetRealGamma vinfoRealGammos, Gamma: ----
-    Gui, Add, Text, x+5 w%slide2Wid% gBtnResetThreshold vinfoThreshold, Threshold: ----
+    Gui, Add, Text, xs y+2 w%slide2Wid% gBtnResetRealGamma vinfoRealGammos +TabStop, Gamma: ----
+    Gui, Add, Text, x+5 w%slide2Wid% gBtnResetThreshold vinfoThreshold +TabStop, Threshold: ----
     Gui, Add, Slider, xs y+2 AltSubmit NoTicks ToolTip w%slide2Wid% gUpdateUIadjustVPcolors vUIrealGammos Range1-500, % UIrealGammos
     Gui, Add, Slider, x+5 AltSubmit NoTicks ToolTip w%slide2Wid% gUpdateUIadjustVPcolors vUIimgThreshold Range0-100, % UIimgThreshold
     ; Gui, Add, Checkbox, xs y+15 gUpdateUIadjustVPcolors Checked%realTimePreview% vrealTimePreview, Update image in real time
-    Gui, Add, Text, xs y+8 gBtnResetCHNdec vinfoRGBchnls, RGBA channels balance:
+    Gui, Add, Text, xs y+8 gBtnResetCHNdec vinfoRGBchnls +TabStop, RGBA channels balance:
     Gui, Add, ComboBox, x+5 w65 gUpdateUIadjustVPcolors vchnRdecalage, %RGBcbList%|%chnRdecalage%||
     Gui, Add, ComboBox, x+5 wp gUpdateUIadjustVPcolors vchnGdecalage, %RGBcbList%|%chnGdecalage%||
     Gui, Add, ComboBox, x+5 wp gUpdateUIadjustVPcolors vchnBdecalage, %RGBcbList%|%chnBdecalage%||
@@ -53415,11 +53669,11 @@ PanelColorsAdjusterWindow() {
     Gui, Add, DropDownList, xs y+2 w%slide3Wid% gUpdateUIadjustVPcolors AltSubmit Choose%uiColorCurveFXmode% vuiColorCurveFXmode, Brightness (density)|Contrast|Highlights|Shadows|Mid-tones|White saturation|Black saturation
     Gui, Add, DropDownList, x+2 wp gUpdateUIadjustVPcolors AltSubmit Choose%uiColorCurveFXchannel% vuiColorCurveFXchannel, Red|Green|Blue|Apply on all channels
 
-    Gui, Add, Text, xs y+10 w%slideWid% gBtnResetHue vinfohueAdjust, Hue: ----
+    Gui, Add, Text, xs y+10 w%slideWid% gBtnResetHue vinfohueAdjust +TabStop, Hue: ----
     Gui, Add, Slider, xs y+2 wp AltSubmit ToolTip gUpdateUIadjustVPcolors vhueAdjust Range-300-300, % hueAdjust
-    Gui, Add, Text, xs y+10 wp gBtnResetVibrance vinfoZatAdjust, Vibrance: ----
+    Gui, Add, Text, xs y+10 wp gBtnResetVibrance vinfoZatAdjust +TabStop, Vibrance: ----
     Gui, Add, Slider, xs y+2 wp AltSubmit ToolTip gUpdateUIadjustVPcolors vzatAdjust Range-300-300, % zatAdjust
-    Gui, Add, Text, xs y+10 wp gBtnResetLummy vinfolummyAdjust, Lightness: ----
+    Gui, Add, Text, xs y+10 wp gBtnResetLummy vinfolummyAdjust +TabStop, Lightness: ----
     Gui, Add, Slider, xs y+2 wp AltSubmit ToolTip gUpdateUIadjustVPcolors vlummyAdjust Range-300-300, % lummyAdjust
 
     uiIMGresizingMode := (customZoomAdaptMode>0 && IMGresizingMode=4) ? 5 + customZoomAdaptMode : IMGresizingMode
@@ -53428,7 +53682,7 @@ PanelColorsAdjusterWindow() {
     Gui, Add, Checkbox, x+5 gUpdateUIadjustVPcolors Checked%UIvpImgAlignCenter% vUIvpImgAlignCenter, Centered
     Gui, Add, DropDownList, xs y+5 w%txtWid% gUpdateUIadjustVPcolors AltSubmit Choose%usrColorDepth% vusrColorDepth, Simulate color depth|2 bits [4 colors]|3 bits [8 colors]|4 bits [16 colors]|5 bits [32 colors]|6 bits [64 colors]|7 bits [128 colors]|8 bits [256 colors]|16 bits [65536 colors]
     Gui, Add, Checkbox, x+5 gUpdateUIadjustVPcolors Checked%ColorDepthDithering% vColorDepthDithering, Dithering
-    Gui, Add, Text, xs y+10 w%slide2Wid% gBtnResetRotation vinfoImgRotation, Image rotation: ----
+    Gui, Add, Text, xs y+10 w%slide2Wid% gBtnResetRotation vinfoImgRotation +TabStop, Image rotation: ----
     Gui, Add, Slider, xs y+10 ToolTip w%slide2Wid% gUpdateUIadjustVPcolors vvpIMGrotation Range0-360, % Round(vpIMGrotation)
     Gui, Add, Text, xs y+10 h%thisBtnHeight% +0x200, Flip viewport:
     Gui, Add, Checkbox, x+10 +0x1000 hp gUpdateUIadjustVPcolors Checked%FlipImgV% vFlipImgV, vertically
@@ -53570,7 +53824,7 @@ BtnNextImg() {
 
   ForceNoColorMatrix := 0
   NextPicture()
-  If (imgFxMode=3)
+  If (imgFxMode=3 && AnyWindowOpen=10)
   {
      updatePanelColorsInfo()
      updatePanelColorSliderz()
@@ -53583,7 +53837,7 @@ BtnPrevImg() {
 
   ForceNoColorMatrix := 0
   PreviousPicture()
-  If (imgFxMode=3)
+  If (imgFxMode=3 && AnyWindowOpen=10)
   {
      updatePanelColorsInfo()
      updatePanelColorSliderz()
@@ -54021,7 +54275,7 @@ PanelFileFormatConverter() {
     initFIMGmodule()
     ReadSettingsFormatConvert()
     Gui, Add, Text, x15 y15 Section, Destination format:
-    Gui, Add, DropDownList, x+10 w85 gTglDesiredSaveFormat AltSubmit Choose%userDesireWriteFMT% vuserDesireWriteFMT, .BMP|.GIF|.HDP|.J2K|.JFIF|.JNG|.JP2|.JPG|.JXR|.PNG|.PPM|.TGA|.TIF|.WDP|.WEBP|.XPM
+    Gui, Add, DropDownList, x+10 w85 gTglDesiredSaveFormat AltSubmit Choose%userDesireWriteFMT% vuserDesireWriteFMT, % userPossibleWriteFMTs
     Gui, Add, Text, xs y+10, On file name conflicts
     Gui, Add, DropDownList, x+5 w150 AltSubmit gTglOverwriteFiles Choose%userActionConflictingFile% vuserActionConflictingFile, Skip files|Auto-rename|Overwrite
     Gui, Add, Text, xs y+10, Quality (1`% - 100`%):
@@ -54102,7 +54356,7 @@ BTNconvertNow() {
    {
       CloseWindow()
       batchConvert2format()
-   } Else convert2format()
+   } Else convert2format(currentFileIndex)
 }
 
 PanelAdjustImageCanvasSize() {
@@ -54429,7 +54683,7 @@ PanelResizeImageWindow() {
     If (multipleFilesMode=1)
     {
        Gui, Add, DropDownList, xs y+10 w%txtWid% gTglRszUnsprtFrmt AltSubmit Choose%userUnsprtWriteFMT% vuserUnsprtWriteFMT, Skip files in unsupported write formats|Try to preserve file formats, convert unsupported to...|Convert all the files to...
-       Gui, Add, DropDownList, xs y+5 w85 AltSubmit Choose%userDesireWriteFMT% vuserDesireWriteFMT, .BMP|.GIF|.HDP|.J2K|.JFIF|.JNG|.JP2|.JPG|.JXR|.PNG|.PPM|.TGA|.TIF|.WDP|.WEBP|.XPM
+       Gui, Add, DropDownList, xs y+5 w85 AltSubmit Choose%userDesireWriteFMT% vuserDesireWriteFMT, % userPossibleWriteFMTs
        Gui, Add, Button, x+5 hp w85 gResizePanelHelpBoxInfo, Help
     }
 
@@ -56909,6 +57163,7 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
     interfaceThread.ahkassign("imgEditPanelOpened", 0)
     If globalhFIFimg
     {
+       ; related to PanelAdjustToneMapping()
        FreeImage_UnLoad(globalhFIFimg)
        globalhFIFimg := ""
     }
@@ -56947,8 +57202,12 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
        ; If (AnyWindowOpen=64)
        ; SetTimer, dummyRefreshImgSelectionWindow, -200
     }
+
     If !testIsDupesList()
        toBeExcludedIndexes := []
+
+    If (AnyWindowOpen=6)
+       InitialFilterSettingsPanel(0)
 
     imgEditPanelOpened := AnyWindowOpen := 0
     createGUItoolbar()
@@ -57080,6 +57339,9 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
     prevMsg := msg
     If (prevMsg!=msg)
        lastInvoked := A_TickCount
+
+    If ((perc || hudBTNfuncu) && InStr(mainCompiledPath, "sucan twins") && !InStr(msg, "zoom level"))
+       interfaceThread.ahkPostFunction("sndBeep", 1654, 100)
 
     lastOSDtooltipInvoked := A_TickCount
     If (forceDarker!=1)
@@ -57251,12 +57513,12 @@ PanelImgAutoCrop() {
     Gui, Add, Text, xs y+8 w%slide2Wid% vinfoCropTolerance, Color variation tolerance: %usrAutoCropColorTolerance%
     Gui, Add, Text, x+1 yp, Image corners preview
     Gui, -DPIScale
-    Gui, Add, Text, xp+1 y+1 w220 h220 +0xE gTglAutoCropBorderzSize +hwndhCropCornersPic, -
+    Gui, Add, Text, xp+1 y+1 w220 h220 +0xE gTglAutoCropBorderzSize +hwndhCropCornersPic +TabStop, -
     Gui, +DPIScale
     Gui, Add, Slider, xs yp+1 AltSubmit NoTicks gUpdateAutoCropParams ToolTip w%slide2Wid% vusrAutoCropColorTolerance Range0-254, % usrAutoCropColorTolerance
     Gui, Add, Text, xs y+8 w%slide2Wid% vinfoCropThreshold, Image threshold: %UIcropThreshold%
     Gui, Add, Slider, xs y+5 AltSubmit NoTicks gUpdateAutoCropParams ToolTip w%slide2Wid% vUIcropThreshold Range0-99, % UIcropThreshold
-    Gui, Add, Text, xs y+8 w%slide2Wid% gresetAutoCropDeviation vinfoCropDeviation, Margins deviation factor: %usrAutoCropDeviation%%measureUnit%
+    Gui, Add, Text, xs y+8 w%slide2Wid% gresetAutoCropDeviation vinfoCropDeviation +TabStop, Margins deviation factor: %usrAutoCropDeviation%%measureUnit%
     Gui, Add, Slider, xs y+5 AltSubmit NoTicks gUpdateAutoCropParams ToolTip w%slide2Wid% vusrAutoCropDeviation Range-50-50, %usrAutoCropDeviation%
 
     Gui, Add, Checkbox, y+10 w%slide2Wid% gUpdateAutoCropParams Checked%usrAutoCropDeviationSnap% vusrAutoCropDeviationSnap, Snap to original image edges
@@ -58024,7 +58286,7 @@ coreGdipSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, Y
        Gdip_GetImageDimensions(oBitmap, imgW, imgH)
        pixFmt := Gdip_GetImagePixelFormat(oBitmap, 2)
        If (InStr(pixFmt, "CMYK") || InStr(pixFmt, "48-") || InStr(pixFmt, "64-"))
-          ER := Gdip_BitmapConvertFormat(oBitmap, 0x26200A, 2, 1, 0, 0, 0, 0, 0)
+          ER := Gdip_BitmapSetColorDepth(oBitmap, 32, 1)
     } Else mustOpenWithWia := 1
 
     capMaxGDIbmpSize32bits()
@@ -59021,7 +59283,7 @@ GetCachableHistogramFile(imgPath, imgIndex, thumbBMP:=0, returnObj:=0, noFileInf
            If (mainLoadedIMGdetails.OpenedWith="GDI+")
               zBitmap := trGdip_ResizeBitmap(A_ThisFunc, thumbBMP, 350, 350, 0, hamDistInterpolation, "0x21808")
            Else
-              Gdip_BitmapConvertFormat(thumbBMP, "0x21808", 2, 1, 0, 0, 0, 0, 0)
+              Gdip_BitmapSetColorDepth(thumbBMP, 24, 1)
 
            If zBitmap
            {
@@ -59066,7 +59328,16 @@ GetCachableHistogramFile(imgPath, imgIndex, thumbBMP:=0, returnObj:=0, noFileInf
      ; } Else fnOutputDebug(A_ThisFunc "() - failed to generate histogram: " imgIndex " = " imgPath)
 }
 
-SaveFIMfile(file2save, pBitmap) {
+SaveFIMfile(file2save, pBitmap, givenDepth:=32, fileEXT:=0) {
+  Static gifbitDp := "-8-",          ppmbitDp := "-24-"
+       , jngbitDp := "-24-",         xpmbitDp := "-24-"
+       , jpgbitDp := "-8-24-",       jp2bitDp := "-8-24-32-"
+       , jfifbitDp := "-8-24-32-",   pngbitDp := "-8-24-32-"
+       , tifbitDp := "-8-24-32-",    hdpbitDp := "-8-16-24-32-"
+       , jxrbitDp := "-8-16-24-32-", tgabitDp := "-8-16-24-32-"
+       , wdpbitDp := "-8-16-24-32-", bmpbitDp := "-8-16-24-32-"
+       , webpbitDp := "-24-32-"
+
   initFIMGmodule()
   If !wasInitFIMlib
      Return 1
@@ -59090,6 +59361,13 @@ SaveFIMfile(file2save, pBitmap) {
 
      Sleep, 0
   }
+  
+  If !fileEXT
+  {
+     fileEXTpos := InStr(file2save, ".", 0, -1) ; RegExMatch(fileNamu, "\.[^\^.\\/:*?<>|\r\n]+$")
+     If fileEXTpos
+        fileEXT := SubStr(file2save, fileEXTpos + 1)
+  }
 
   saveArg := 0
   If RegExMatch(file2save, "i)(.\.(jp2|j2c|j2k))$")
@@ -59097,7 +59375,31 @@ SaveFIMfile(file2save, pBitmap) {
   Else If RegExMatch(file2save, "i)(.\.(jpg|jpeg|jxr|webp))$")
      saveArg :=  clampInRange(Round(userJpegQuality), 1, 100)
 
-  If RegExMatch(file2save, "i)(.\.(gif|jng|jif|jfif|jpg|jpe|jpeg|ppm|wbm|xpm))$")
+  ;   MsgBox, lol = %fileEXT% = %givenDepth%
+  If (givenDepth>4 && givenDepth!=32 && InStr(%fileExt%bitDp, "-" givenDepth "-"))
+  {
+     changeMcursor()
+     hFIFimgZZ := FreeImage_ConvertTo(hFIFimgA, "24Bits")
+     If (givenDepth=8 && !RegExMatch(file2save, "i)(.\.(jp2|j2c|j2k|hdp|wdp|jxr))$"))
+     {
+        changeMcursor()
+        hFIFimgB := FreeImage_ColorQuantize(hFIFimgZZ, 1)
+        ; hFIFimgB := FreeImage_ConvertTo(hFIFimgCC, givenDepth "Bits")
+     } Else If (givenDepth!=24)
+     {
+        hFIFimgB := FreeImage_ConvertTo(hFIFimgZZ, givenDepth "Bits")
+     } Else ; If (givenDepth!=24)
+     {
+        hFIFimgB := hFIFimgZZ
+        hFIFimgZZ := 0
+     }
+
+     FreeImage_UnLoad(hFIFimgZZ)
+     ; ToolTip, % hFIFimgB "=l=" givenDepth "=" fileEXT , , , 2
+     changeMcursor()
+     r := FreeImage_Save(hFIFimgB, file2save, saveArg)
+     FreeImage_UnLoad(hFIFimgB)
+  } Else If RegExMatch(file2save, "i)(.\.(gif|jng|jif|jfif|jpg|jpe|jpeg|ppm|wbm|xpm))$")
   {
      hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "24Bits")
      changeMcursor()
@@ -59344,7 +59646,7 @@ changeMcursor(whichCursor:=0) {
   {
      prevCursor := whichCursor
      interfaceThread.ahkPostFunction("changeMcursor", whichCursor)
-  } Else If (A_TickCount - lastInvoked > 500) ; && (imageLoading!=1)
+  } Else If (A_TickCount - lastInvoked > 400) ; && (imageLoading!=1)
   {
      interfaceThread.ahkPostFunction("changeMcursor", "busy")
      ; interfaceThread.ahkassign("imageLoading", 1)
@@ -59594,6 +59896,9 @@ dummyDecideWinReactivation() {
 
 WM_LBUTTONUP(wP, lP, msg, hwnd) {
     thisWin := WinActive("A")
+    If (thisWin=hSetWinGui && AnyWindowOpen)
+       highlightActiveCtrl("click")
+
     If (ShowAdvToolbar=1 && thisWin=hQPVtoolbar)
        decideWinReactivation()
     Else If (imgEditPanelOpened=1 && thisWin=hSetWinGui && panelWinCollapsed=1)
@@ -60034,45 +60339,61 @@ AcquireWIAimage() {
 }
 
 testWICwhatever() {
-   Static lastEdition := 1
+   Return
+   Static lastEdition := 1, hasRan := 0
    startZeit := A_TickCount
+  ; lastEdition := !lastEdition
+
+
 GetWinClientSize(w, h, PVhwnd, 0) 
 initQPVmainDLL()
-  func2exec := (A_PtrSize=8) ? "testFuncNew" : "_BoxBlurBitmap@20"
-  lastEdition := !lastEdition
+imgPath := getIDimage(currentFileIndex)
+imgPath := "F:\temp\torrents\The.Blacklist.S08.WEBRip.x264-ION10\images\713337a.bmp"
   If (lastEdition=1)
   {
-     r := DllCall("qpvmain.dll\" func2exec, "Int", w, "Int", h, "Str", getIDimage(currentFileIndex), "Ptr")
+     if !hasRan
+     {
+        g := DllCall("qpvmain.dll\initWICnow")
+        hasRan := 1
+        ; MsgBox, % "lol = " g
+     }
+
+     func2exec := (A_PtrSize=8) ? "testFuncNew" : "_BoxBlurBitmap@20"
+     r := DllCall("qpvmain.dll\" func2exec, "Int", 4, "Int", w, "Int", h, "Str", imgPath, "Ptr")
+  } Else If (lastEdition=2)
+  {
+     r := LoadFileWithWIA(imgPath, 0, 0, w, h, 0)
   } Else
   {
-     zr := Gdip_CreateBitmapFromFileSimplified(getIDimage(currentFileIndex))
+     zr := Gdip_CreateBitmapFromFileSimplified(imgPath)
      ; Gdip_GetImageDimensions(zr, ZW, ZH)
 
      r := Gdip_CreateBitmap(W, H)
-     G := Gdip_GraphicsFromImage(r, 7)
+     G := Gdip_GraphicsFromImage(r, 5, 3)
      E := Gdip_DrawImage(G, zr, 0, 0, W, H)
      Gdip_DisposeImage(zr)
      Gdip_DeleteGraphics(G)
   }
 
-; r := NumGet(&r)
-Gdip_GetImageDimensions(r, sw, sh)
+   ; r := NumGet(&r)
+   Gdip_GetImageDimensions(r, sw, sh)
 
 
-       clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
+          clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
 
-Gdip_DrawImageFast(2NDglPG, r)
+   Gdip_DrawImageFast(2NDglPG, r)
 
-pixfmt := Gdip_GetImagePixelFormat(r, 2)
-rawFmt := Gdip_GetImageRawFormat(r)
+   pixfmt := Gdip_GetImagePixelFormat(r, 2)
+   rawFmt := Gdip_GetImageRawFormat(r)
 
 
-    r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+       r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+Gdip_DisposeImage(r)
+dummyTimerDelayiedImageDisplay(450)
+
+
 zeitu := A_TickCount - startZeit
 ToolTip, % sw " = " sh " = " lastEdition " `n" r "`n" gdiBitmap "`n" ViewPortBMPcache "`n" zeitu " = " pixfmt "=" rawFmt , , , 3
-Gdip_DisposeImage(r)
-; dummyTimerDelayiedImageDisplay(50)
-
 Return A_PtrSize
 /*
    destroyGDIfileCache()
@@ -62988,4 +63309,3 @@ Gdip_DeleteMatrix(matrix)
 
 ; to do
 ; - keyboard shortcuts for opacity ; tools
-

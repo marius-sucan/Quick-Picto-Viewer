@@ -837,6 +837,10 @@ JEE_ScreenToClient(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
   POINT := ""
 }
 
+sndBeep(freq,dur) {
+  SoundBeep , % freq, % dur
+}
+
 ResetLbtn() {
   LbtnDwn := 0
 }
@@ -3923,4 +3927,40 @@ adjustWin2MonLimits(winHwnd, winX, winY, ByRef rX, ByRef rY, ByRef Wid, ByRef He
 
    Return ResWidth
 }
+
+ShowClickHalo(mX, mY, BoxW, BoxH, boxMode) {
+    Static
+    Static lastInvoked := 1
+    Critical, On
+    If (A_TickCount - lastInvoked < 100)
+       Return
+
+    lastInvoked := A_TickCount
+    If (!mX && !mY)
+       GetPhysicalCursorPos(mX, mY)
+
+    If (boxMode=0)
+    {
+       mX := mX - BoxW//2
+       mY := mY - BoxW//2
+    }
+
+    Gui, MclickH: Destroy
+    Sleep, 30
+    Gui, MclickH: +AlwaysOnTop -DPIScale -Caption +ToolWindow +Owner +E0x20 +E0x8000000 +hwndhClickHalo
+    Gui, MclickH: Color, 0099FF
+    ; Gui, MclickH: Show, NoActivate Hide x%mX% y%mY% w%BoxW% h%BoxH%, WinMouseClick
+    ; WinSet, ExStyle, 0x20, WinMouseClick
+    Gui, MclickH: Show, NoActivate x%mX% y%mY% w%BoxW% h%BoxH%, ahk_id %hClickHalo%
+    If (boxMode=0)
+       WinSet, Region, 0-0 W%BoxW% H%BoxH% E, ahk_id %hClickHalo%
+    WinSet, Transparent, 128, ahk_id %hClickHalo%
+    WinSet, AlwaysOnTop, On, ahk_id %hClickHalo%
+    SetTimer, DestroyClickHalo, -300
+}
+
+DestroyClickHalo() {
+    Gui, MclickH: Destroy
+}
+
 
