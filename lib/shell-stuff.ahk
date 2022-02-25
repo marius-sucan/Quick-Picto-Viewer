@@ -1,4 +1,4 @@
-﻿
+
 SelectFolderEx(StartingFolder:="", DlgTitle:="", OwnerHwnd:=0, OkBtnLabel:="", comboList:="", desiredDefault:=1, comboLabel:="", CustomPlaces:="", pickFoldersOnly:=1, usrFilters:="", defIndexFilter:=1, FileMustExist:=1, defaultEditField:="") {
 ; ==================================================================================================================================
 ; Shows a dialog to select a folder.
@@ -90,8 +90,7 @@ SelectFolderEx(StartingFolder:="", DlgTitle:="", OwnerHwnd:=0, OkBtnLabel:="", c
 
    Static OsVersion := DllCall("GetVersion", "UChar")
         , IID_IShellItem := 0
-        , InitIID := VarSetCapacity(IID_IShellItem, 16, 0)
-                  & DllCall("Ole32.dll\IIDFromString", "WStr", "{43826d1e-e718-42ee-bc55-a1e261c37bfe}", "Ptr", &IID_IShellItem)
+        , InitIID := 0
         , ShowDialog := A_PtrSize * 3
         , SetFileTypes := A_PtrSize * 4
         , SetFileTypeIndex := A_PtrSize * 5
@@ -103,6 +102,13 @@ SelectFolderEx(StartingFolder:="", DlgTitle:="", OwnerHwnd:=0, OkBtnLabel:="", c
         , GetResult := A_PtrSize * 20
         , AddPlaces := A_PtrSize * 21
         , ComDlgObj := {COMDLG_FILTERSPEC: ""}
+
+   If !InitIID
+   {
+      InitIID := 1
+      VarSetCapacity(IID_IShellItem, 16, 0)
+      DllCall("Ole32.dll\IIDFromString", "WStr", "{43826d1e-e718-42ee-bc55-a1e261c37bfe}", "Ptr", &IID_IShellItem)
+   }
 
    SelectedFolder := ""
    OwnerHwnd := DllCall("IsWindow", "Ptr", OwnerHwnd, "UInt") ? OwnerHwnd : 0
@@ -1021,12 +1027,12 @@ ShellFileOperation(fileO, fSource, fTarget, flags, ghwnd:=0x0) {
          NumPut(0, fTarget, (A_Index-1)*char_size, char_type)
    }
    
-   VarSetCapacity(SHFILEOPSTRUCT, 60, 0 )                 ; Encoding SHFILEOPSTRUCT
+   VarSetCapacity(SHFILEOPSTRUCT, 60, 0)                  ; Encoding SHFILEOPSTRUCT
    NextOffset := NumPut(ghwnd, &SHFILEOPSTRUCT )          ; hWnd of calling GUI
    NextOffset := NumPut(fileO, NextOffset+0    )          ; File operation
    NextOffset := NumPut(fsPtr, NextOffset+0    )          ; Source file / pattern
    NextOffset := NumPut(ftPtr, NextOffset+0    )          ; Target file / folder
-   NextOffset := NumPut(flags, NextOffset+0, 0, "Short" ) ; options
+   NextOffset := NumPut(flags, NextOffset+0, 0, "Short")  ; options
 
    code    := DllCall("Shell32\SHFileOperationW", "UPtr", &SHFILEOPSTRUCT)
    aborted := NumGet(NextOffset+0)
@@ -1111,11 +1117,19 @@ CreateOpenWithMenu(FilePath, Recommended := 1, ShowMenu := 0, MenuName := "OpenW
         , ThisOthers := ""
    ; -------------------------------------------------------------------------------------------------------------------------------
    Static IID_IShellItem := 0, BHID_DataObject := 0, IID_IDataObject := 0
-        , Init := VarSetCapacity(IID_IShellItem, 16, 0) . VarSetCapacity(BHID_DataObject, 16, 0)
-          . VarSetCapacity(IID_IDataObject, 16, 0)
-          . DllCall("Ole32.dll\IIDFromString", "WStr", "{43826d1e-e718-42ee-bc55-a1e261c37bfe}", "Ptr", &IID_IShellItem)
-          . DllCall("Ole32.dll\IIDFromString", "WStr", "{B8C0BD9F-ED24-455c-83E6-D5390C4FE8C4}", "Ptr", &BHID_DataObject)
-          . DllCall("Ole32.dll\IIDFromString", "WStr", "{0000010e-0000-0000-C000-000000000046}", "Ptr", &IID_IDataObject)
+        , Init := 0
+
+   If !init
+   {
+      init := 1
+      VarSetCapacity(IID_IShellItem, 16, 0)
+      VarSetCapacity(BHID_DataObject, 16, 0)
+      VarSetCapacity(IID_IDataObject, 16, 0)
+      DllCall("Ole32.dll\IIDFromString", "WStr", "{43826d1e-e718-42ee-bc55-a1e261c37bfe}", "Ptr", &IID_IShellItem)
+      DllCall("Ole32.dll\IIDFromString", "WStr", "{B8C0BD9F-ED24-455c-83E6-D5390C4FE8C4}", "Ptr", &BHID_DataObject)
+      DllCall("Ole32.dll\IIDFromString", "WStr", "{0000010e-0000-0000-C000-000000000046}", "Ptr", &IID_IDataObject)
+   }
+
    ; -------------------------------------------------------------------------------------------------------------------------------
    ; Handler call
    If (Recommended = HandlerID) {
@@ -1372,6 +1386,87 @@ ShellFileAssociate(Label,Ext,Cmd,Icon, batchMode,storePath) {
   Return 1
 }
 
+GetRes(ByRef bin, lib, res, type) {
+  If !A_IsCompiled
+     Return 0
+
+  hL := 0
+  If lib
+     hM := DllCall("kernel32\GetModuleHandleW", "Str", lib, "Ptr")
+
+  If !lib
+  {
+     hM := 0  ; current module
+  } Else If !hM
+  {
+     If (!hL := hM := DllCall("kernel32\LoadLibraryW", "Str", lib, "Ptr"))
+        Return
+  }
+
+  dt := (type+0 != "") ? "UInt" : "Str"
+  hR := DllCall("kernel32\FindResourceW"
+      , "Ptr" , hM
+      , "Str" , res
+      , dt , type
+      , "Ptr")
+
+  If !hR
+  {
+     fnOutputDebug("GetRes() ERR " FormatMessage(A_ThisFunc "(" lib ", " res ", " type ", " l ")", A_LastError))
+     Return
+  }
+
+  hD := DllCall("kernel32\LoadResource"
+      , "Ptr" , hM
+      , "Ptr" , hR
+      , "Ptr")
+  hB := DllCall("kernel32\LockResource"
+      , "Ptr" , hD
+      , "Ptr")
+  sz := DllCall("kernel32\SizeofResource"
+      , "Ptr" , hM
+      , "Ptr" , hR
+      , "UInt")
+  If !sz
+  {
+     fnOutputDebug("Error: resource size 0 in  " A_ThisFunc " ( " lib " ,  " res " ,  " type " )")
+     DllCall("kernel32\FreeResource", "Ptr" , hD)
+     If hL
+        DllCall("kernel32\FreeLibrary", "Ptr", hL)
+     Return
+  }
+
+  VarSetCapacity(bin, 0),     VarSetCapacity(bin, sz, 0)
+  DllCall("ntdll\RtlMoveMemory", "Ptr", &bin, "Ptr", hB, "UInt", sz)
+  DllCall("kernel32\FreeResource", "Ptr" , hD)
+
+  If hL
+     DllCall("kernel32\FreeLibrary", "Ptr", hL)
+
+  Return sz
+}
+
+FormatMessage(ctx, msg, arg="") {
+  Global
+  Local txt, buf
+  SetFormat, Integer, H
+  msg+=0
+  SetFormat, Integer, D
+  frmMsg := DllCall("kernel32\FormatMessageW"
+          , "UInt" , 0x1100 ; FORMAT_MESSAGE_FROM_SYSTEM/ALLOCATE_BUFFER
+          , "Ptr"  , 0      ; lpSource
+          , "UInt" , msg    ; dwMessageId
+          , "UInt" , 0      ; dwLanguageId (0x0418=RO)
+          , "PtrP" , buf    ; lpBuffer
+          , "UInt" , 0      ; nSize
+          , "Str"  , arg)   ; Arguments
+
+  txt := StrGet(buf, "UTF-16")
+  lF := DllCall("kernel32\LocalFree", "Ptr", buf)
+  Result := "Error " msg " in " ctx ":`n" txt
+  Return Result
+}
+
 GlobalMemoryStatusEx() {
 ; https://msdn.microsoft.com/en-us/library/aa366589(v=vs.85).aspx 
 ; by jNizM
@@ -1413,9 +1508,8 @@ Dlg_Color(Color,hwnd) {
 ; https://autohotkey.com/board/topic/94083-ahk-11-font-and-color-dialogs/
 ; Modified by Marius Șucan and Drugwash
 
-
-  VarSetCapacity(CUSTOM,64,0)
-  size := VarSetCapacity(CHOOSECOLOR,9*A_PtrSize,0)
+  VarSetCapacity(CUSTOM, 64, 0)
+  size := VarSetCapacity(CHOOSECOLOR, 9*A_PtrSize, 0)
   cclrs := getCustomColorsFromImage(useGdiBitmap())
   Loop, 16
   {
@@ -1431,14 +1525,430 @@ Dlg_Color(Color,hwnd) {
   NumPut(Color,CHOOSECOLOR,3*A_PtrSize,"UInt")
   NumPut(0x3,CHOOSECOLOR,5*A_PtrSize,"UInt")
   NumPut(&CUSTOM,CHOOSECOLOR,4*A_PtrSize,"Ptr")
-  If !ret := DllCall("comdlg32\ChooseColorW","Ptr",&CHOOSECOLOR,"UInt")
-     Return
+  If (!ret := DllCall("comdlg32\ChooseColorW","Ptr",&CHOOSECOLOR,"UInt"))
+     Return "-"
 
   SetFormat, Integer, H
-  Color := NumGet(CHOOSECOLOR,3*A_PtrSize,"UInt")
+  Coloru := NumGet(CHOOSECOLOR,3*A_PtrSize,"UInt")
   SetFormat, Integer, D
   CHOOSECOLOR := ""
   CUSTOM := ""
-  Return Color
+  Return Coloru
 }
 
+Win_SetMenu(Hwnd, hMenu=0) {
+   hPrevMenu := DllCall("GetMenu", "uint", hwnd, "Uint")
+   DllCall("SetMenu", "uint", hwnd, "uint", hMenu)
+   return hPrevMenu
+}
+
+SetMenuInfo(hMenu, maxHeight:=0, autoDismiss:=0, modeLess:=0, noCheck:=0) {
+   cbSize := (A_PtrSize=8) ? 40 : 28
+   VarSetCapacity(MENUINFO, cbSize, 0)
+   fMaskFlags := 0x80000000         ; MIM_APPLYTOSUBMENUS
+   cyMax := maxHeight ? maxHeight : 0
+   If maxHeight
+      fMaskFlags |= 0x00000001      ; MIM_MAXHEIGHT
+
+   If (autoDismiss=1 || modeLess=1 || noCheck=1)
+      fMaskFlags |= 0x00000010      ; MIM_STYLE
+
+   dwStyle := 0
+   If (autoDismiss=1)
+      dwStyle |= 0x10000000         ; MNS_AUTODISMISS
+
+   If (modeLess=1)
+      dwStyle |= 0x40000000         ; MNS_MODELESS
+
+   If (noCheck=1)
+      dwStyle |= 0x80000000         ; MNS_NOCHECK
+
+   NumPut(cbSize, MENUINFO, 0, "UInt") ; DWORD
+   NumPut(fMaskFlags, MENUINFO, 4, "UInt") ; DWORD
+   NumPut(dwStyle, MENUINFO, 8, "UInt") ; DWORD
+   NumPut(cyMax, MENUINFO, 12, "UInt") ; UINT
+   ; NumPut(hbrBack, MENUINFO, 16, "Ptr") ; HBRUSH
+   ; NumPut(dwContextHelpID, MENUINFO, 20, "UInt") ; DWORD
+   ; NumPut(dwMenuData, MENUINFO, 24, "UPtr") ; ULONG_PTR
+
+   Return DllCall("User32\SetMenuInfo","Ptr", hMenu, "Ptr", &MENUINFO)
+}
+
+
+
+
+
+
+
+; ==================================================================
+; Dlg_FontSelect() by TheArkive
+; Parameters:
+; fObj       = Initialize the dialog with specified values.
+; hwnd       = Parent gui hwnd for modal, leave blank for not modal
+; effects    = Allow selection of underline / strike out / italic
+; ==================================================================
+; fontObj output:
+;
+;    fontObj.str        = string to use with AutoHotkey to set GUI values - see examples
+;    fontObj.size       = size of font
+;    fontObj.name       = font name
+;    fontObj.bold       = true/false
+;    fontObj.italic     = true/false
+;    fontObj.strike     = true/false
+;    fontObj.underline  = true/false
+;    fontObj.color      = RRGGBB
+; ==================================================================
+Dlg_FontSelect(fObj:="", hwnd:=0, Effects:=1) {
+    Static _temp := {name:"", size:10, color:0, strike:0, underline:0, italic:0, bold:0}
+    Static p := A_PtrSize, u := StrLen(Chr(0xFFFF)) ; u = IsUnicode
+    
+    fObj := (fObj="") ? _temp : fObj
+    If (StrLen(fObj.name) > 31)
+       return 0 ; throw Exception("Font name length exceeds 31 characters.")
+    
+    sz := (!u) ? 60 : (p=4) ? 92 : 96
+    sz := VarSetCapacity(LOGFONT, sz, 0) ; LOGFONT size based on IsUnicode, not A_PtrSize
+    hDC := Gdi_GetDC(0)
+    LogPixels := Gdi_GetDeviceCaps(hDC, 90)
+    Gdi_ReleaseDC(hDC)
+  
+    flags := 0x41 + (Effects ? 0x100 : 0) ; 0x41
+    flags |= 0x1000     ; CF_NOSIMULATIONS
+    flags |= 0x01000000 ; CF_NOVERTFONTS
+    flags |= 0x1        ; CF_SCREENFONTS
+    flags |= 0x40000    ; CF_TTONLY
+
+    fObj.bold := fObj.bold ? 700 : 400
+    fObj.size := Floor(fObj.size * LogPixels/72)
+
+    NumPut(fObj.size,      LOGFONT,     "uint")
+    NumPut(fObj.bold,      LOGFONT, 16, "uint")
+    NumPut(fObj.italic,    LOGFONT, 20, "char")
+    NumPut(fObj.underline, LOGFONT, 21, "char")
+    NumPut(fObj.strike,    LOGFONT, 22, "char")
+    StrPut(fObj.name,      &LOGFONT+28)
+
+    color_convert := ((fObj.color & 0xFF) << 16 | fObj.color & 0xFF00 | fObj.color >> 16)
+    sz := VarSetCapacity( CHOOSEFONT, (p=8) ? 104 : 60, 0)
+    NumPut(sz,            CHOOSEFONT, 0,       "UInt")
+    NumPut(hwnd+0,        CHOOSEFONT, p,       "UPtr")
+    NumPut(&LOGFONT,      CHOOSEFONT, (p*3),   "UPtr")
+    NumPut(flags,        CHOOSEFONT,  (p*4)+4, "UInt")
+    NumPut(color_convert, CHOOSEFONT, (p*4)+8, "UInt")
+    
+    if !(r := DllCall("comdlg32\ChooseFont", "UPtr", &CHOOSEFONT)) ; Font Select Dialog opens
+       return 0
+
+    fObj.Name := StrGet(&LOGFONT+28)
+    fObj.bold := ((b := NumGet(LOGFONT, 16, "UInt")) <= 400) ? 0 : 1
+    fObj.italic := !!NumGet(LOGFONT, 20, "Char")
+    fObj.underline := NumGet(LOGFONT, 21, "Char")
+    fObj.strike := NumGet(LOGFONT, 22, "Char")
+    fObj.size := Round(NumGet(CHOOSEFONT, p*4, "UInt") / 10)
+    
+    c := NumGet(CHOOSEFONT, (p=4) ? 6*p : 5*p, "UInt") ; convert from BGR to RBG for output
+    fObj.color := Format("{:06X}", ((c & 0xFF) << 16 | c & 0xFF00 | c >> 16))
+
+    str := ""
+    str .= fObj.bold      ? "bold" : ""
+    str .= fObj.italic    ? " italic" : ""
+    str .= fObj.strike    ? " strike" : ""
+    str .= fObj.color     ? " c" fObj.color : ""
+    str .= fObj.size      ? " s" fObj.size : ""
+    str .= fObj.underline ? " underline" : ""
+    fObj.str := "norm " Trim(str)
+    return fObj
+}
+
+CalcStringHash(string, algid, encoding = "UTF-8", byref hash = 0, byref hashlength = 0) {
+; function by jNizM and Bentschi
+; taken from https://github.com/jNizM/HashCalc
+; this calculates the MD5 hash
+; function under MIT License: https://raw.githubusercontent.com/jNizM/AHK_Network_Management/master/LICENSE
+
+    chrlength := (encoding = "CP1200" || encoding = "UTF-16") ? 2 : 1
+    length := (StrPut(string, encoding) - 1) * chrlength
+    VarSetCapacity(data, length, 0)
+    StrPut(string, &data, floor(length / chrlength), encoding)
+    Result := CalcAddrHash(&data, length, algid, hash, hashlength)
+    Return Result
+}
+
+CalcAddrHash(addr, length, algid, byref hash = 0, byref hashlength = 0) {
+; function by jNizM and Bentschi
+; taken from https://github.com/jNizM/HashCalc
+; function under MIT License: https://raw.githubusercontent.com/jNizM/AHK_Network_Management/master/LICENSE
+
+    Static h := [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, "a", "b", "c", "d", "e", "f"]
+         , b := h.minIndex()
+    hProv := hHash := o := ""
+    CAC := DllCall("advapi32\CryptAcquireContext", "Ptr*", hProv, "Ptr", 0, "Ptr", 0, "UInt", 24, "UInt", 0xf0000000)
+    If CAC
+    {
+       CCH := DllCall("advapi32\CryptCreateHash", "Ptr", hProv, "UInt", algid, "UInt", 0, "UInt", 0, "Ptr*", hHash)
+       If CCH
+       {
+          CHD := DllCall("advapi32\CryptHashData", "Ptr", hHash, "Ptr", addr, "UInt", length, "UInt", 0)
+          If CHD
+          {
+             CGP := DllCall("advapi32\CryptGetHashParam", "Ptr", hHash, "UInt", 2, "Ptr", 0, "UInt*", hashlength, "UInt", 0)
+             If CGP
+             {
+                VarSetCapacity(hash, hashlength, 0)
+                CGHP := DllCall("advapi32\CryptGetHashParam", "Ptr", hHash, "UInt", 2, "Ptr", &hash, "UInt*", hashlength, "UInt", 0)
+                If CGHP
+                {
+                   Loop, %hashlength%
+                   {
+                      v := NumGet(hash, A_Index - 1, "UChar")
+                      o .= h[(v >> 4) + b] h[(v & 0xf) + b]
+                   }
+                }
+             }
+          }
+          CDH := DllCall("advapi32\CryptDestroyHash", "Ptr", hHash)
+       }
+       CRC := DllCall("advapi32\CryptReleaseContext", "Ptr", hProv, "UInt", 0)
+    }
+    Return o
+}
+
+setMenusTheme(modus) {
+   uxtheme := DllCall("GetModuleHandle", "str", "uxtheme", "ptr")
+   SetPreferredAppMode := DllCall("GetProcAddress", "ptr", uxtheme, "ptr", 135, "ptr")
+   global AllowDarkModeForWindow := DllCall("GetProcAddress", "ptr", uxtheme, "ptr", 133, "ptr")
+   FlushMenuThemes := DllCall("GetProcAddress", "ptr", uxtheme, "ptr", 136, "ptr")
+   DllCall(SetPreferredAppMode, "int", modus) ; Dark
+   DllCall(FlushMenuThemes)
+   interfaceThread.ahkPostFunction("setMenusTheme", modus)
+}
+
+setDarkWinAttribs(hwndGUI, modus:=1) {
+   if (A_OSVersion >= "10.0.17763" && SubStr(A_OSVersion, 1, 3) = "10.")
+   {
+       attr := 19
+       if (A_OSVersion >= "10.0.18985") {
+           attr := 20
+       }
+       DllCall("dwmapi\DwmSetWindowAttribute", "ptr", hwndGUI, "int", attr, "int*", modus, "int", 4)
+   }
+   DllCall(AllowDarkModeForWindow, "UPtr", hwndGUI, "int", modus) ; Dark
+}
+
+setPriorityThread(level, handle:="A") {
+  If (handle="A" || !handle)
+     handle := DllCall("GetCurrentThread")
+  Return DllCall("SetThreadPriority", "UPtr", handle, "Int", level)
+}
+
+ConvertBase(InputBase, OutputBase, nptr){
+    ; source https://www.autohotkey.com/boards/viewtopic.php?t=3925
+    static u := A_IsUnicode ? "_wcstoui64" : "_strtoui64"
+    static v := A_IsUnicode ? "_i64tow"    : "_i64toa"
+    VarSetCapacity(s, 1024, 0)
+    value := DllCall("msvcrt.dll\" u, "Str", nptr, "UInt", 0, "UInt", InputBase, "CDECL UInt64")
+    DllCall("msvcrt.dll\" v, "UInt64", value, "Str", s, "UInt", OutputBase, "CDECL")
+    ; ToolTip, % s , , , 2
+    return s
+}
+
+ChangeDisplaySettings(cD, sW, sH, rR, Perm="")   {
+   ; By "just me" and "lexicos".
+   ; Use 1 for Perm parameter to make the screen resolution change permanent so it stays after ExitApp.
+   ; Otherwise the screen resolution will revert back when the program exits. The dafault.
+
+   Static DM := {BITSPERPEL: 0x040000, PELSWIDTH: 0x080000, PELSHEIGHT: 0x100000, DISPLAYFREQUENCY: 0x400000}
+   ; Calculate offset of DEVMODE fields:
+   Static size := A_IsUnicode ? 220 : 156
+   Static dmSize := A_IsUnicode ? 68 : 36 ; <<< has to be dmSize, not smSize
+   Static dmFields := dmSize + 4
+   Static dmBitsPerPel := A_IsUnicode ? 168 : 104
+   Static dmPelsWidth := dmBitsPerPel + 4
+   Static dmPelsHeight := dmPelsWidth + 4
+   Static dmDisplayFrequency := dmPelsHeight + 8
+
+   dmAddr := 0
+   VarSetCapacity(DEVMODE, size, 0)
+   NumPut(size, DEVMODE, dmSize, "UShort")
+   fields := 0
+   If (cD <> "") {
+      NumPut(cD, DEVMODE, dmBitsPerPel, "UInt")
+      fields |= DM.BITSPERPEL
+   }
+   If (sW <> "") {
+      NumPut(sW, DEVMODE, dmPelsWidth, "UInt")
+      fields |= DM.PELSWIDTH
+   }
+   If (sH <> "") {
+      NumPut(sH, DEVMODE, dmPelsHeight, "UInt")
+      fields |= DM.PELSHEIGHT
+   }
+   If (rR <> "") {
+      NumPut(rR, DEVMODE, dmDisplayFrequency, "UInt")
+      fields |= DM.DISPLAYFREQUENCY
+   }
+   If (fields > 0) {
+      NumPut(fields, DEVMODE, dmFields, "UInt")
+      dmAddr := &DEVMODE
+   }
+   
+   If (Perm=1) ;Resolution change will continue after exiting program.
+      Return DllCall("User32.dll\ChangeDisplaySettings", "Ptr", dmAddr, "UInt", 0, "Int")
+   else ;Resolution change will revert to original after exiting program. 
+      Return DllCall("User32.dll\ChangeDisplaySettings", "Ptr", dmAddr, "UInt", 4, "Int")
+}
+
+
+ClipboardGetDropEffect() {
+/*
+    Retrieves the preferred method of data transfer (preferred drop effect set by source).
+    Return value:
+        If the function succeeds, the return value is one of the following.
+        1  DROPEFFECT_COPY      The source should copy the data. The original data is untouched.
+        2  DROPEFFECT_MOVE      The source should remove the data.
+        5                       This value also indicates copy (DROPEFFECT_COPY).
+        ---------------------------------------------------
+        Any other value is considered an error.
+        -1        No data transfer operation found.
+        -2        The clipboard could not be opened.
+    Windows Clipboard Formats:
+        https://www.codeproject.com/Reference/1091137/Windows-Clipboard-Formats
+*/
+; to-do ; fix this
+
+   If !IsClipboardFormatAvailable(15)
+      Return -1
+
+   If !DllCall("OpenClipboard", "UPtr", A_ScriptHwnd)
+      Return -2
+
+   h := DllCall("User32.dll\GetClipboardData", "UInt", 15, "UPtr") ; CF_HDROP = 15
+   z := DllCall("Kernel32.dll\GlobalLock", "Ptr", h, "Ptr")
+   If z
+      r := NumGet(z, 0, "Int")
+   g := DllCall("Kernel32.dll\GlobalUnlock", "Ptr", h, "Ptr")
+   DllCall("CloseClipboard")
+   Return r
+}
+
+IsClipboardFormatAvailable(typeu) {
+/*
+    Values for typeu     Description
+    CF_TEXT = 1          Text format. Each line ends with a carriage return/linefeed (CR-LF) combination. A null character signals the end of the data. Use this format for ANSI text.
+    CF_BITMAP = 2        A handle to a bitmap (HBITMAP).
+    CF_METAFILEPICT = 3  Handle to a metafile picture format as defined by the METAFILEPICT structure. When passing a CF_METAFILEPICT handle by means of DDE, the application responsible for deleting hMem should also free the metafile referred to by the CF_METAFILEPICT handle.
+    CF_SYLK =  4         Microsoft Symbolic Link (SYLK) format.
+    CF_DIF = 5           Software Arts' Data Interchange Format.
+    CF_TIFF = 6          Tagged-image file format.
+    CF_OEMTEXT = 7       Text format containing characters in the OEM character set. Each line ends with a carriage return/linefeed (CR-LF) combination. A null character signals the end of the data.
+    CF_DIB = 8           A memory object containing a BITMAPINFO structure followed by the bitmap bits.
+    CF_PENDATA = 10      Data for the pen extensions to the Microsoft Windows for Pen Computing.
+    CF_RIFF = 11         Represents audio data more complex than can be represented in a CF_WAVE standard wave format.
+    CF_WAVE = 12         Represents audio data in one of the standard wave formats, such as 11 kHz or 22 kHz PCM.
+    CF_UNICODETEXT = 13  Unicode text format. Each line ends with a carriage return/linefeed (CR-LF) combination. A null character signals the end of the data.
+    CF_ENHMETAFILE = 14  A handle to an enhanced metafile (HENHMETAFILE).
+    CF_HDROP = 15        A handle to type HDROP that identifies a list of files. An application can retrieve information about the files by passing the handle to the DragQueryFile function.
+    CF_DIBV5 = 17        A memory object containing a BITMAPV5HEADER structure followed by the bitmap color space information and the bitmap bits.
+    CF_DSPBITMAP = 0x0082
+        Bitmap display format associated with a private format. The hMem parameter must be a handle to data that can be displayed in bitmap format in lieu of the privately formatted data.
+    CF_DSPENHMETAFILE = 0x008E
+        Enhanced metafile display format associated with a private format. The hMem parameter must be a handle to data that can be displayed in enhanced metafile format in lieu of the privately formatted data.
+    CF_DSPMETAFILEPICT = 0x0083
+        Metafile-picture display format associated with a private format. The hMem parameter must be a handle to data that can be displayed in metafile-picture format in lieu of the privately formatted data.
+    CF_DSPTEXT = 0x0081
+        Text display format associated with a private format. The hMem parameter must be a handle to data that can be displayed in text format in lieu of the privately formatted data.
+    CF_GDIOBJFIRST = 0x0300
+        Start of a range of integer values for application-defined GDI object clipboard formats. The end of the range is CF_GDIOBJLAST.
+    Handles associated with clipboard formats in this range are not automatically deleted using the GlobalFree function when the clipboard is emptied. Also, when using values in this range, the hMem parameter is not a handle to a GDI object, but is a handle allocated by the GlobalAlloc function with the GMEM_MOVEABLE flag.
+    CF_GDIOBJLAST = 0x03FF
+        See CF_GDIOBJFIRST.
+    CF_LOCALE =  16
+        The data is a handle (HGLOBAL) to the locale identifier (LCID) associated with text in the clipboard. When you close the clipboard, if it contains CF_TEXT data but no CF_LOCALE data, the system automatically sets the CF_LOCALE format to the current input language. You can use the CF_LOCALE format to associate a different locale with the clipboard text.
+        An application that pastes text from the clipboard can retrieve this format to determine which character set was used to generate the text.
+        Note that the clipboard does not support plain text in multiple character sets. To achieve this, use a formatted text data type such as RTF instead.
+        The system uses the code page associated with CF_LOCALE to implicitly convert from CF_TEXT to CF_UNICODETEXT. Therefore, the correct code page table is used for the conversion.
+    CF_OWNERDISPLAY =  0x0080
+        Owner-display format. The clipboard owner must display and update the clipboard viewer window, and receive the WM_ASKCBFORMATNAME, WM_HSCROLLCLIPBOARD, WM_PAINTCLIPBOARD, WM_SIZECLIPBOARD, and WM_VSCROLLCLIPBOARD messages. The hMem parameter must be NULL.
+    CF_PALETTE = 9
+        Handle to a color palette. Whenever an application places data in the clipboard that depends on or assumes a color palette, it should place the palette on the clipboard as well.
+        If the clipboard contains data in the CF_PALETTE (logical color palette) format, the application should use the SelectPalette and RealizePalette functions to realize (compare) any other data in the clipboard against that logical palette.
+        When displaying clipboard data, the clipboard always uses as its current palette any object on the clipboard that is in the CF_PALETTE format.
+    CF_PRIVATEFIRST = 0x0200
+        Start of a range of integer values for private clipboard formats. The range ends with CF_PRIVATELAST. Handles associated with private clipboard formats are not freed automatically; the clipboard owner must free such handles, typically in response to the WM_DESTROYCLIPBOARD message.
+    CF_PRIVATELAST = 0x02FF
+        See CF_PRIVATEFIRST.
+*/ 
+
+   Return DllCall("IsClipboardFormatAvailable", "uint", typeu)
+}
+
+ShowTrackPopupMenu(HMENU, X, Y, HWND, Flags:=0) {
+   ; http://msdn.microsoft.com/en-us/library/ms648002(v=vs.85).aspx
+   ; X-position: TPM_CENTERALIGN := 0x0004, TPM_LEFTALIGN := 0x0000, TPM_RIGHTALIGN := 0x0008
+   ; Y-position: TPM_BOTTOMALIGN := 0x0020, TPM_TOPALIGN := 0x0000, TPM_VCENTERALIGN := 0x0010
+  
+   ; Retrieve the number of items in a menu.
+   item_count := DllCall("GetMenuItemCount", "ptr", MenuGetHandle("MyMenu"))
+
+   ; Retrieve the ID of the last item.
+   last_id := DllCall("GetMenuItemID", "ptr", MenuGetHandle("MyMenu"), "int", item_count-1)
+   Return DllCall("User32.dll\TrackPopupMenu", "UPtr", HMENU, "UInt", Flags, "Int", X, "Int", Y, "Int", 0
+                                             , "UPtr", HWND, "Ptr", 0, "UInt")
+} 
+
+GetWinHwndAtPoint(nX, nY) {
+    a := DllCall("WindowFromPhysicalPoint", "Uint64", nX|(nY << 32), "Ptr")
+    a := Format("{1:#x}", a)
+    WinGetClass, h, ahk_id %a%
+    Return [a, h]
+}
+
+
+TabCtrl_GetCurSel(HWND) {
+   ; by just me 
+   ; source: https://www.autohotkey.com/board/topic/79783-how-to-get-the-current-tab-name/
+   ; Returns the 1-based index of the currently selected tab
+   Static TCM_GETCURSEL := 0x130B
+   SendMessage, TCM_GETCURSEL, 0, 0, , ahk_id %HWND%
+   Return (ErrorLevel + 1)
+}
+
+TabCtrl_GetItemText(HWND, Index:=0) {
+   ; by just me ; modified and fixed by Marius Șucan
+   ; source: https://www.autohotkey.com/board/topic/79783-how-to-get-the-current-tab-name/
+   Static TCM_GETITEM  := A_IsUnicode ? 0x133C : 0x1305 ; TCM_GETITEMW : TCM_GETITEMA
+   Static TCIF_TEXT := 0x0001
+   Static TCTXTP := (3 * 4) + (A_PtrSize - 4)
+   Static TCTXLP := TCTXTP + A_PtrSize
+   ErrorLevel := 0
+   If (Index = 0)
+      Index := TabCtrl_GetCurSel(HWND)
+   If (Index = 0)
+      Return 0
+
+   VarSetCapacity(TCTEXT, 256 * 4, 0)
+   ; typedef struct {
+   ;   UINT   mask;           4
+   ;   DWORD  dwState;        4
+   ;   DWORD  dwStateMask;    4 + 4 bytes padding on 64-bit systems
+   ;   LPTSTR pszText;        4 / 8 (32-bit / 64-bit)
+   ;   int    cchTextMax;     4
+   ;   int    iImage;         4
+   ;   LPARAM lParam;         4 / 8
+   ; } TCITEM, *LPTCITEM;
+
+   VarSetCapacity(TCITEM, (5 * 4) + (2 * A_PtrSize) + (A_PtrSize - 4), 0)
+   NumPut(TCIF_TEXT, TCITEM, 0, "UInt")
+   NumPut(&TCTEXT, TCITEM, TCTXTP, "Ptr")
+   NumPut(256, TCITEM, TCTXLP, "Int")
+
+   SendMessage, % TCM_GETITEM, % Index - 1, &TCITEM, , ahk_id %HWND%
+   If !ErrorLevel
+      Return 
+
+   name := StrGet(NumGet(TCITEM, TCTXTP, "UPtr"))
+   TCITEM :=  ""
+   TCTEXT := ""
+   ; ToolTip, % name , , , 2
+   Return name
+}

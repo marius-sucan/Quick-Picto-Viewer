@@ -6,11 +6,16 @@
 // définis avec cette macro comme étant exportés.
 
 #define DLL_API extern "C" __declspec(dllexport)
-#define M_PI           3.14159265358979323846  /* pi */
 #define DLL_CALLCONV __stdcall
+#define GDIPVER 0x110
 
-// IWICImagingFactory *m_pIWICFactory;
-// IWICBitmapSource   *m_pOriginalBitmapSource;
-// IWICBitmapSource   *pToRenderBitmapSource;
-// BYTE               *m_pbBuffer;
+const double M_PI = 3.14159265358979323846;  // PI
+const double div2sz = sqrt(2.0 / 32.0);      // used in calculateDCT()
+const double div2sq = 1 / sqrt(2.0);         // used in calculateDCT()
+
+IWICImagingFactory *m_pIWICFactory;
+std::vector<UINT>  dupesListIDsA(1);
+std::vector<UINT>  dupesListIDsB(1);
+std::vector<UINT>  dupesListIDsC(1);
+std::array<double, 1025>  DCTcoeffs;
 

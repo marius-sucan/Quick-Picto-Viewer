@@ -1,4 +1,4 @@
-﻿; GDI library for AHK v1.1.
+; GDI library for AHK v1.1.
 ; made by Marius Șucan
 ; License: NONE
 ; Contains trace amounts from:
@@ -11,7 +11,7 @@
 ; https://www.autohotkey.com/boards/viewtopic.php?f=6&t=4379
 
 ; Other functions added by Marius Șucan.
-; Last update on: mardi 6 avril 2021.
+; Last update on: mardi 30 novembre 2021.
 
 Gdi_DrawTextHelper(hDC, hFont, Text, x, y, txtColor, bgrColor:="") {
       ; Transparent background, no color needed
@@ -961,6 +961,42 @@ Gdi_SetDCPenColor(hDC, Color) {
    Return DllCall("gdi32\SetDCPenColor", "UPtr", hDC, "UInt", Color, "UPtr")
 }
 
+Gdi_GetROP2(hDC) {
+; The function retrieves the foreground mix mode of the specified device
+; context. The mix mode specifies how the pen or interior color and 
+; the color already on the screen are combined to yield a new color.
+
+; Return value
+; If the function succeeds, the return value specifies the foreground mix mode.
+; otherwise, the return value is zero.
+
+   Return DllCall("gdi32\GetROP2", "UPtr", hDC)
+}
+
+Gdi_SetROP2(hDC, rop2) {
+; The function sets the current foreground mix mode. GDI uses the foreground 
+; mix mode to combine pens and interiors of filled objects with the
+; colors already on the screen. The foreground mix mode defines how colors
+; from the brush or pen and the colors in the existing image are to be combined.
+
+; The mix modes define how GDI combines source and destination colors when
+; drawing with the current pen. The mix modes are binary raster operation
+; codes, representing all possible Boolean functions of two variables, using
+; the binary operations AND, OR, and XOR (exclusive OR), and the unary operation
+; NOT. The mix mode is for raster devices only; it is not available
+; for vector devices.
+
+; Parameters
+;   hdc  - A handle to the device context.
+;   rop2 - The mix mode.
+
+; Return value
+; If the function succeeds, the return value specifies the previous mix mode.
+; otherwise, the return value is zero.
+
+   Return DllCall("gdi32\SetROP2", "UPtr", hDC, "Int", rop2)
+}
+
 Gdi_FillShape(hDC, x, y, w, h, Color, Shape, BorderColor:=0, BorderWidth:=0) {
       If (BorderColor && BorderWidth)
          Pen := Gdi_CreatePen(BorderColor, BorderWidth)
@@ -1054,7 +1090,61 @@ Gdi_MoveToEx(hDC, x, y) {
    Return DllCall("gdi32\MoveToEx", "UPtr", hDC, "Int", x, "Int", y, "UPtr", 0)
 }
 
+Gdi_AngleArc(hDC, x, y, radius, StartAngle, SweepAngle) {
+; Return value:
+; If the function succeeds, the return value is nonzero.
+
+; Remarks:
+; The AngleArc function moves the current position to the ending point
+; of the arc.
+
+; The arc drawn by this function may appear to be elliptical,
+; depending on the current transformation and mapping mode.
+; Before drawing the arc, AngleArc draws the line segment from
+; the current position to the beginning of the arc.
+
+; The arc is drawn by constructing an imaginary circle around
+; the specified center point with the specified radius.
+; The starting point of the arc is determined by measuring
+; counterclockwise from the x-axis of the circle by the number
+; of degrees in the start angle. The ending point is similarly
+; located by measuring counterclockwise from the starting point
+; by the number of degrees in the sweep angle.
+
+; If the sweep angle is greater than 360 degrees, the arc is
+; swept multiple times.
+
+; This function draws lines by using the current pen.
+; The figure is not filled.
+
+   Return DllCall("gdi32\AngleArc", "UPtr", hDC
+                   , "int", x        , "int", y
+                   , "uint", radius  , "float", StartAngle
+                   , "float", SweepAngle)
+}
+
+Gdi_ArcTo(hDC, left, top, right, bottom, xr1, yr1, xr2, yr2) {
+; The ArcTo function draws an elliptical arc.
+; Return: If the arc is drawn, the return value is nonzero.
+   Return DllCall("gdi32\ArcTo", "UPtr", hDC
+                   , "int", left     , "int", top
+                   , "int", right    , "int", bottom
+                   , "int", xr1      , "int", yr1
+                   , "int", xr2      , "int", yr2)
+}
+
+Gdi_Arc(hDC, x1, y1, x2, y2, x3, y3, x4, y4) {
+; The Arc function draws an elliptical arc.
+; Return: If the arc is drawn, the return value is nonzero.
+   Return DllCall("gdi32\ArcTo", "UPtr", hDC
+                   , "int", x1     , "int", y1
+                   , "int", x2     , "int", y2
+                   , "int", x3     , "int", y3
+                   , "int", x4     , "int", y4)
+}
+
 Gdi_Ellipse(hDC, x1, y1, x2, y2) {
+; Return: If the ellipse is drawn, the return value is nonzero.
    Return DllCall("gdi32\Ellipse", "UPtr", hDC
           , "Int", x1, "Int", y1
           , "Int", x2, "Int", y2)
@@ -1106,13 +1196,10 @@ Gdi_GetObjectType(obj) {
    Return R ? R : E
 }
 
-Gdi_CreateBitmap(hDC:="", w:=1, h:=1, BitCount:=32, Planes:=1, pBits:=0) {
+Gdi_CreateBitmap(hDC, w, h, BitCount:=32, Planes:=1, pBits:=0) {
    ; Creates a GDI bitmap; it can be a DIB or DDB.
    ; https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-createcompatiblebitmap
-   If (hDC="")
-      Return DllCall("gdi32\CreateBitmap", "Int", w, "Int", h, "UInt", Planes, "UInt", BitCount, "Ptr", pBits, "UPtr")
-   Else
-      Return DllCall("gdi32\CreateCompatibleBitmap", "UPtr", hdc, "int", w, "int", h)
+   Return DllCall("gdi32\CreateBitmap", "Int", w, "Int", h, "UInt", Planes, "UInt", BitCount, "Ptr", pBits, "UPtr")
 }
 
 Gdi_CreateDIBitmap(hDC, bmpInfoHeader, CBM_INIT, pBits, BITMAPINFO, DIB_COLORS) {
@@ -1261,24 +1348,157 @@ Gdi_GetDIBits(hDC, hBitmap, start, cLines, pBits, BITMAPINFO, DIB_COLORS) {
 }
 
 
+Gdi_GetWindowDC(hwnd) {
+  ; The GetWindowDC function retrieves the device context (DC) for the entire window,
+  ; including title bar, menus, and scroll bars. A window DC permits painting anywhere
+  ; in a window, because the origin of the DC is the upper-left corner of the window
+  ; instead of the client area. This DC is a display DC.
+
+  ; GetWindowDC assigns default attributes to the window DC each time it is retrieved.
+  ; Previous attributes are lost.
+
+   return DllCall("user32\GetWindowDC", "UPtr", hwnd)
+}
+
+; == Device Contexts (DCs) ==
+; There are four types of DCs: display, printer, memory (or compatible),
+; and information. Each type serves a specific purpose, as described
+; in the following:
+;   Display == Supports drawing operations on a video display.
+;   Printer == Supports drawing operations on a printer or plotter.
+;   Memory  == Supports drawing operations on a bitmap; it is a compatible DC.
+;   Info    == Supports the retrieval of device data.
+
+; == DCs - Display ==
+; An application obtains a display DC by calling the BeginPaint,
+; GetDC, or GetDCEx function and identifying the window in which
+; the corresponding output will appear. Typically, an application
+; obtains a display DC only when it must draw in the client area.
+; However, one may obtain a window DC by calling the GetWindowDC
+; function. When the application is finished drawing, it must
+; release the DC by calling the EndPaint or ReleaseDC function.
+
+; There are five types of DCs for video displays:
+    ; Class (obsolete), Common, Private, Window, Parent
+
+; == DCs - Memory ==
+; To enable applications to place output in memory rather than sending
+; it to an actual device, use a special device context for bitmap
+; operations called a memory device context. A memory DC enables the
+; system to treat a portion of memory as a virtual device. It is an
+; array of bits in memory that an application can use temporarily to
+; store the color data for bitmaps created on a normal drawing surface.
+; Because the bitmap is compatible with the device, a memory DC is
+; also sometimes referred to as a compatible device context.
+
+; The memory DC stores bitmap images for a particular device.
+; An application can create a memory DC by calling the
+; CreateCompatibleDC() function.
+
+; The original bitmap in a memory DC is simply a placeholder.
+; Its dimensions are one pixel by one pixel. Before an application
+; can begin drawing, it must select a bitmap with the appropriate
+; width and height into the DC by calling the SelectObject() function.
+; To create a bitmap of the appropriate dimensions, use the 
+; CreateBitmap(), CreateBitmapIndirect(), or CreateCompatibleBitmap()
+; function. After the bitmap is selected into the memory DC, the
+; system replaces the single-bit array with an array large enough
+; to store color information for the specified rectangle of pixels.
+
+; When an application passes the handle returned by CreateCompatibleDC()
+; to one of the drawing functions, the requested output does not appear
+; on a device's drawing surface. Instead, the system stores the color
+; information for the resultant line, curve, text, or region in the
+; array of bits. The application can copy the image stored in memory
+; back onto a drawing surface by calling the BitBlt() function,
+; identifying the memory DC as the source device context and a window
+; or screen DC as the target DC.
+
 Gdi_GetDC(hwnd:=0) {
-; Description        This function retrieves a handle to a display device context (DC) for the client area of the specified window.
-;                    The display device context can be used in subsequent graphics display interface (GDI) functions to draw in the client area of the window.
-;
-; hwnd               Handle to the window whose device context is to be retrieved. If this value is NULL, GetDC retrieves the device context for the entire screen
-;
-; remarks            this type of DC must be released with Gdi_ReleaseDC()
-;
-; return             The handle the device context for the specified window's client area indicates success. NULL indicates failure
+  ; Description
+  ; This function retrieves a handle to a display device context (DC)
+  ; for the client area of the specified window.
+  ; The display DC can be used in subsequent GDI
+  ; functions to draw in the client area of the window.
+  ;
+  ; hwnd
+  ; Handle to the window whose device context is to be retrieved.
+  ; If this value is NULL, GetDC retrieves the DC for the entire screen.
+  ;
+  ; Remarks
+  ; this type of DC must be released with Gdi_ReleaseDC()
+  ;
+  ; Return
+  ; The handle of the DC of the specified window's client area
+  ; indicates success. NULL indicates failure,
 
    return DllCall("user32\GetDC", "UPtr", hwnd)
 }
 
 Gdi_CreateCompatibleDC(hDC:=0) {
-; REMARKS
-; this type of DC must be released with Gdi_DeleteDC()
+  ; this type of DC must be released with Gdi_DeleteDC()
+   return DllCall("gdi32\CreateCompatibleDC", "UPtr", hDC, "UPtr")
+}
 
-   return DllCall("gdi32\CreateCompatibleDC", "UPtr", hDC)
+Gdi_SetDIBcolorTable(hDC, iStart, entries, RGBQUADs) {
+    ; hDC
+    ; A device context. A DIB must be selected into this device context.
+
+    ; iStart
+    ; A zero-based color table index that specifies the first color table entry to set.
+
+    ; entries
+    ; The number of color table entries to set.
+
+    ; RGBQUADs
+    ; A pointer to an array of RGBQUAD structures containing new color information for the DIB's color table.
+
+    ; Return value
+    ; If the function succeeds, the return value is the number of color table entries that the function sets.
+    ; If the function fails, the return value is zero.
+
+    ; Remarks
+    ; This function should be called to set the color table for DIBs that use 1, 4, or 8 bpp. The BitCoun
+    ; member of a bitmap's associated bitmap information header structure.
+
+   Return DllCall("SetDIBColorTable", "Ptr",hDC, "Int", iStart, "Int", entries, "Ptr",&RGBQUADs)
+}
+
+
+Gdi_CreateCompatibleBitmap(hDC, w, h) {
+
+  ; The CreateCompatibleBitmap function creates a DDB bitmap compatible
+  ; with the device that is associated with the specified device context.
+
+  ; Remarks:
+  ; The color format of the bitmap created by the CreateCompatibleBitmap
+  ; function matches the color format of the device identified by the hdc
+  ; parameter. This bitmap can be selected into any memory device context
+  ; that is compatible with the original device.
+
+  ; Because memory device contexts allow both color and monochrome bitmaps, 
+  ; the format of the bitmap returned by the CreateCompatibleBitmap
+  ; function differs when the specified device context is a memory device
+  ; context. However, a compatible bitmap that was created for a nonmemory 
+  ; device context always possesses the same color format and uses the same
+  ; color palette as the specified device context.
+
+  ; Note: When a memory device context is created, it initially has a
+  ; 1-by-1 monochrome bitmap selected into it. If this memory device 
+  ; context is used in CreateCompatibleBitmap, the bitmap that is created
+  ; is a monochrome bitmap. To create a color bitmap, use the HDC that
+  ; was used to create the memory device context.
+
+  ; If an application sets the nWidth or nHeight parameters to zero,
+  ; CreateCompatibleBitmap returns the handle to a 1-by-1 pixel,
+  ; monochrome bitmap.
+
+  ; If a DIB section, which is a bitmap created by the CreateDIBSection
+  ; function, is selected into the device context identified by the hdc
+  ; parameter, CreateCompatibleBitmap creates a DIB section.
+
+
+   return DllCall("gdi32\CreateCompatibleBitmap", "UPtr", hDC, "Int", w, "Int", h)
 }
 
 Gdi_GetDCEx(hwnd, flags:=0, hrgnClip:=0) {
@@ -1417,26 +1637,41 @@ Gdi_CopyImage(hBitmap, type:=0, w:=0, h:=0, flags:=0) {
 
    ; flag options:
    ; LR_COPYDELETEORG = 0x00000008
-   ;    Deletes the original image after creating the copy.
+   ; Deletes the original image after creating the copy.
 
    ; LR_COPYFROMRESOURCE = 0x00004000
-   ;    Tries to reload an icon or cursor resource from the original resource file rather than simply copying the current image. This is useful for creating a different-sized copy when the resource file contains multiple sizes of the resource. Without this flag, CopyImage stretches the original image to the new size. If this flag is set, CopyImage uses the size in the resource file closest to the desired size. This will succeed only if hImage was loaded by LoadIcon or LoadCursor, or by LoadImage with the LR_SHARED flag.
+   ; Tries to reload an icon or cursor resource from the original resource file
+   ; rather than simply copying the current image. This is useful for creating a
+   ; different-sized copy when the resource file contains multiple sizes of the
+   ; resource. Without this flag, CopyImage stretches the original image to the
+   ; new size. If this flag is set, CopyImage uses the size in the resource file
+   ; closest to the desired size. This will succeed only if hImage was loaded by 
+   ; LoadIcon or LoadCursor, or by LoadImage with the LR_SHARED flag.
 
    ; LR_COPYRETURNORG = 0x00000004
-   ;    Returns the original hImage if it satisfies the criteria for the copy—that is, correct dimensions and color depth—in which case the LR_COPYDELETEORG flag is ignored. If this flag is not specified, a new object is always created.
+   ; Returns the original hImage if it satisfies the criteria for the copy—that is,
+   ; correct dimensions and color depth—in which case the LR_COPYDELETEORG flag is
+   ; ignored. If this flag is not specified, a new object is always created.
 
    ; LR_CREATEDIBSECTION = 0x00002000
-   ;    If this is set and a new bitmap is created, the bitmap is created as a DIB section. Otherwise, the bitmap image is created as a device-dependent bitmap. This flag is only valid if uType is IMAGE_BITMAP.
+   ; If this is set and a new bitmap is created, the bitmap is created as a DIB
+   ; section. Otherwise, the bitmap image is created as a device-dependent bitmap.
+   ; This flag is only valid if Type is IMAGE_BITMAP.
 
    ; LR_DEFAULTSIZE = 0x00000040
-   ;    Uses the width or height specified by the system metric values for cursors or icons, if the cxDesired or cyDesired values are set to zero. If this flag is not specified and cxDesired and cyDesired are set to zero, the function uses the actual resource size. If the resource contains multiple images, the function uses the size of the first image.
+   ; Uses the width or height specified by the system metric values for cursors
+   ; or icons, if the cxDesired or cyDesired values are set to zero. If this flag
+   ; is not specified and cxDesired and cyDesired are set to zero, the function
+   ; uses the actual resource size. If the resource contains multiple images, the
+   ; function uses the size of the first image.
 
    ; LR_MONOCHROME = 0x00000001
-   ;    Creates a new monochrome image. 
+   ; Creates a new monochrome image. 
 
    ; Return value:
    ; If the function succeeds, the return value is the handle to the newly created image.
-   ; f the function fails, the return value is NULL. To get extended error information, call GetLastError.
+   ; If the function fails, the return value is NULL. To get extended error information,
+   ; call GetLastError.
 
    return DllCall("user32\CopyImage", "UPtr", hBitmap, "int", x, "int", y, "uint", flags)
 }
@@ -1467,10 +1702,10 @@ Gdi_SelectObject(hDC, obj) {
 
 Gdi_UpdateLayeredWindow(hwnd, hDC, x:="", y:="", w:="", h:="", Alpha:=255) {
    if ((x != "") && (y != ""))
-      VarSetCapacity(pt, 8), NumPut(x, pt, 0, "UInt"), NumPut(y, pt, 4, "UInt")
+      VarSetCapacity(pt, 8, 0), NumPut(x, pt, 0, "UInt"), NumPut(y, pt, 4, "UInt")
 
    if (w = "") || (h = "")
-      GetWindowRect(hwnd, W, H)
+      Gdi_GetWindowRect(hwnd, W, H)
 
    return DllCall("user32\UpdateLayeredWindow"
                , "UPtr", hwnd
@@ -1482,6 +1717,235 @@ Gdi_UpdateLayeredWindow(hwnd, hDC, x:="", y:="", w:="", h:="", Alpha:=255) {
                , "uint", 0
                , "UInt*", Alpha<<16|1<<24
                , "uint", 2)
+}
+
+Gdi_GetWindowRect(hwnd, ByRef W, ByRef H) {
+   ; function by GeekDude: https://gist.github.com/G33kDude/5b7ba418e685e52c3e6507e5c6972959
+   ; W10 compatible function to find a window's visible boundaries
+   ; modified by Marius Șucanto return an array
+   If !hwnd
+      Return
+
+   size := VarSetCapacity(rect, 16, 0)
+   er := DllCall("dwmapi\DwmGetWindowAttribute"
+      , "UPtr", hWnd  ; HWND  hwnd
+      , "UInt", 9     ; DWORD dwAttribute (DWMWA_EXTENDED_FRAME_BOUNDS)
+      , "UPtr", &rect ; PVOID pvAttribute
+      , "UInt", size  ; DWORD cbAttribute
+      , "UInt")       ; HRESULT
+
+   If er
+      DllCall("GetWindowRect", "UPtr", hwnd, "UPtr", &rect, "UInt")
+
+   r := []
+   r.x1 := NumGet(rect, 0, "Int"), r.y1 := NumGet(rect, 4, "Int")
+   r.x2 := NumGet(rect, 8, "Int"), r.y2 := NumGet(rect, 12, "Int")
+   r.w := Abs(max(r.x1, r.x2) - min(r.x1, r.x2))
+   r.h := Abs(max(r.y1, r.y2) - min(r.y1, r.y2))
+   W := r.w
+   H := r.h
+   ; ToolTip, % r.w " --- " r.h , , , 2
+   Return r
+}
+
+
+Gdi_UpdateWindow(hwnd) {
+; The UpdateWindow function updates the client area of the specified
+; window by sending a WM_PAINT message to the window if the window's
+; update region is not empty. The function sends a WM_PAINT message
+; directly to the window procedure of the specified window,
+; bypassing the application queue. If the update region is empty,
+; no message is sent.
+; If the function succeeds, the return value is nonzero.
+
+   return DllCall("user32\UpdateWindow", "UPtr", hwnd)
+}
+
+Gdi_GetWindowRegionBox(hwnd) {
+   ; The GetWindowRgnBox function retrieves the dimensions of the
+   ; tightest bounding rectangle for the window region of a window.
+
+   ; The function will return an object.
+     ; obju.x1, obju.y1, obju.x2, obju.y2 - the coordinates of two points representing the bounding box
+        ; x1, y1 - top, left corner
+        ; x2, y2 - bottom, right corner
+     ; obj.E - the value returned by the internal API. It defines the region complexity.
+        ; 1 = NULLREGION -  Region is empty.
+        ; 2 = SIMPLEREGION - Region is a single rectangle.
+        ; 3 = COMPLEXREGION - Region is more than one rectangle.
+        ; 0 = An error occurred.
+
+   VarSetCapacity(Rect, 16, 0)
+   obju.E := DllCall("gdi32\GetWindowRgnBox", "UPtr", hwnd, "UPtr", &Rect)
+   obju.x1 := NumGet(Rect, 0, "uint")
+   obju.y1 := NumGet(Rect, 4, "uint")
+   obju.x2 := NumGet(Rect, 8, "uint")
+   obju.y2 := NumGet(Rect, 12, "uint")
+   Return obju
+}
+
+Gdi_GetWindowRegion(hwnd, ByRef regionType:=0) {
+   ; Return value: the handle of the region of the window given [hwnd]
+
+   ; The regionType value specifies the region's complexity and can
+   ; be one of the following values:
+        ; 1 = NULLREGION -  Region is empty.
+        ; 2 = SIMPLEREGION - Region is a single rectangle.
+        ; 3 = COMPLEXREGION - Region is more than one rectangle.
+        ; 0 = An error occurred.
+
+    hRgn := Gdi_CreateRectRegion(0, 0, 0, 0)
+    If hRgn
+       regionType := DllCall("GetWindowRgn", "UPtr", hwnd, "UPtr*", hRgn)
+    return hRgn
+}
+
+Gdi_GetUpdateRegion(hwnd, bErase, ByRef regionType:=0) {
+    hRgn := Gdi_CreateRectRegion(0, 0, 0, 0)
+    If hRgn
+       regionType := DllCall("GetUpdateRgn", "UPtr", hwnd, "UPtr*", hRgn)
+    return hRgn
+}
+
+Gdi_SetWindowRegion(hwnd, hRgn, bRedraw) {
+; Return value: if the function succeeds, the return value is nonzero.
+
+; The SetWindowRgn function sets the window region of a window.
+; The window region determines the area within the window where
+; the system permits drawing. The system does not display any
+; portion of a window that lies outside of the window region.
+
+; The coordinates of a window's window region are relative to
+; the upper-left corner of the window, not the client area of
+; the window.
+
+; Note:
+; If the window layout is right-to-left (RTL), the coordinates are relative to the upper-right corner of the window. See Window Layout and Mirroring.
+ 
+; After a successful call to SetWindowRgn, the system owns the region
+; specified by the region handle hRgn. The system does not make a
+; copy of the region. Thus, you should not make any further function
+; calls with this region handle. In particular, do not delete this
+; region handle. The system deletes the region handle when it 
+; no longer needed.
+
+; To obtain the window region of a window,
+; call the Gdi_GetWindowRegion function.
+
+    return DllCall("SetWindowRgn", "UPtr", hwnd, "UPtr", hRgn, "uint", bRedraw)
+}
+
+Gdi_ValidateRegion(hwnd, hRgn) {
+; Return value: if the function succeeds, the return value is nonzero.
+
+; The ValidateRgn function validates the client area within a
+; region by removing the region from the current update region
+; of the specified window.
+
+    return DllCall("ValidateRgn", "UPtr", hwnd, "UPtr", hRgn)
+}
+
+Gdi_InvalidateRegion(hwnd, hRgn, bErase:=0) {
+; Return value: The return value is always nonzero. [how sad]
+
+; The InvalidateRgn function invalidates the client area within
+; the specified region by adding it to the current update region
+; of a window. The invalidated region, along with all other areas
+; in the update region, is marked for painting when the next
+; WM_PAINT message occurs.
+    return DllCall("InvalidateRgn", "UPtr", hwnd, "UPtr", hRgn, "UInt", bErase)
+}
+
+Gdi_InvalidateRect(hwnd, x, y, w, h, bErase:=0) {
+; The InvalidateRect function adds a rectangle to the specified
+; window's update region. The update region represents 
+; the portion of the window's client area that must be redrawn.
+; If the function succeeds, the return value is nonzero.
+
+; Remarks
+; The invalidated areas accumulate in the update region until
+; the region is processed when the next WM_PAINT message occurs
+; or until the region is validated by using the ValidateRect or
+; ValidateRgn function.
+
+; The system sends a WM_PAINT message to a window whenever its
+; update region is not empty and there are no other messages in
+; the application queue for that window.
+
+; If the bErase parameter is TRUE for any part of the update
+; region, the background is erased in the entire region, not
+; just in the specified part.
+
+    VarSetCapacity(Rect, 16, 0)
+    NumPut(X, Rect, 0, "UInt")
+    NumPut(Y, Rect, 4, "UInt")
+    NumPut(X + W, Rect, 8, "UInt")
+    NumPut(Y + H, Rect, 12, "UInt")
+
+    return DllCall("InvalidateRect", "UPtr", hwnd, "UPtr", &Rect, "UInt", bErase)
+}
+
+Gdi_ValidateRect(hwnd, x, y, w, h) {
+; The ValidateRect function validates the client area within a rectangle by
+; removing the rectangle from the update region of the specified window.
+; If the function succeeds, the return value is nonzero.
+
+; Remarks
+; The BeginPaint function automatically validates the entire client area.
+; Neither the ValidateRect nor ValidateRgn function should be called 
+; if a portion of the update region must be validated before the next
+; WM_PAINT message is generated.
+
+; The system continues to generate WM_PAINT messages until the current 
+; update region is validated.
+
+    VarSetCapacity(Rect, 16, 0)
+    NumPut(X, Rect, 0, "UInt")
+    NumPut(Y, Rect, 4, "UInt")
+    NumPut(X + W, Rect, 8, "UInt")
+    NumPut(Y + H, Rect, 12, "UInt")
+
+    return DllCall("ValidateRect", "UPtr", hwnd, "UPtr", &Rect)
+}
+
+Gdi_BeginPaint(hwnd, ByRef PaintStruct, ByRef X, ByRef Y, ByRef W, ByRef H) {
+; The BeginPaint function prepares the specified window for painting and
+; fills a PAINTSTRUCT structure with information about the painting.
+
+; Return value
+; If the function succeeds, the return value is the handle to a display device
+; context for the specified window.
+
+; If the function fails, the return value is NULL, indicating that no display
+; device context is available.
+
+; Remarks
+; The BeginPaint function automatically sets the clipping region of the device
+; context to exclude any area outside the update region. The update region 
+; is set by the InvalidateRect or InvalidateRgn function and by the system after
+; sizing, moving, creating, scrolling, or any other operation that affects the 
+; client area. If the update region is marked for erasing, BeginPaint sends
+; a WM_ERASEBKGND message to the window.
+
+; An application should not call BeginPaint except in response to a WM_PAINT
+; message. Each call to BeginPaint must have a corresponding call to the EndPaint function.
+
+    VarSetCapacity(PaintStruct, A_PtrSize + 60, 0)
+    hWindowDC := DllCall("BeginPaint", "UPtr", hwnd, "UPtr", &PaintStruct, "UPtr")
+    ;obtain dimensions of update region
+    If hWindowDC
+    {
+       X := NumGet(PaintStruct,A_PtrSize + 4,"UInt")
+       Y := NumGet(PaintStruct,A_PtrSize + 8,"UInt")
+       W := NumGet(PaintStruct,A_PtrSize + 12,"UInt") - X
+       H := NumGet(PaintStruct,A_PtrSize + 16,"UInt") - Y
+    } Else PaintStruct := ""
+
+    return hWindowDC
+}
+
+Gdi_EndPaint(hwnd, PaintStruct) {
+    return DllCall("EndPaint", "UPtr", Hwnd, "UPtr", &PaintStruct)
 }
 
 ;#####################################################################################
@@ -1532,7 +1996,6 @@ Gdi_BitBlt(dDC, dX, dY, dW, dH, sDC, sX, sY, raster:="") {
                , "int", sX, "int", sY
                , "uint", Raster ? Raster : 0xCC0020) ; src_copy by defalut
 }
-
 
 Gdi_TransparentBlt(dDC, dX, dY, dW, dH, sDC, sX, sY, sW, sH, Color) {
    ; The TransparentBlt function performs a bit-block transfer of the color
@@ -1739,7 +2202,7 @@ Gdi_BitmapFromHWND(hwnd, clientOnly:=0) {
       Width := NumGet(rc, 8, "int")
       Height := NumGet(rc, 12, "int")
       thisFlag := 1
-   } Else GetWindowRect(hwnd, Width, Height)
+   } Else Gdi_GetWindowRect(hwnd, Width, Height)
 
    hbm := Gdi_CreateDIBSection(Width, Height)
    hDC := Gdi_CreateCompatibleDC()
@@ -2175,7 +2638,7 @@ Gdi_GetTextFace(hFont) {
     hDC := Gdi_GetDC()
     old_hFont := Gdi_SelectObject(hDC, hFont)
 
-    VarSetCapacity(pFontName, MAX_LENGTH * (A_IsUnicode ? 2:1))
+    VarSetCapacity(pFontName, MAX_LENGTH * (A_IsUnicode ? 2:1), 0)
     DllCall("gdi32\GetTextFace", "UPtr", hDC, "Int", MAX_LENGTH, "Str", pFontName)
 
     Gdi_SelectObject(hDC, old_hFont)
@@ -2430,7 +2893,7 @@ Gdi_GetStockObject(stockIndex){
 Gdi_ScreenToClient(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
 ; function by jeeswg found on:
 ; https://autohotkey.com/boards/viewtopic.php?t=38472
-  VarSetCapacity(POINT, 8)
+  VarSetCapacity(POINT, 8, 0)
   NumPut(vPosX, &POINT, 0, "Int")
   NumPut(vPosY, &POINT, 4, "Int")
   DllCall("user32\ScreenToClient", "Ptr", hWnd, "Ptr", &POINT)
@@ -2443,7 +2906,7 @@ Gdi_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
 ; function by jeeswg found on:
 ; https://autohotkey.com/boards/viewtopic.php?t=38472
 
-  VarSetCapacity(POINT, 8)
+  VarSetCapacity(POINT, 8, 0)
   NumPut(vPosX, &POINT, 0, "Int")
   NumPut(vPosY, &POINT, 4, "Int")
   DllCall("user32\ClientToScreen", "Ptr", hWnd, "Ptr", &POINT)
@@ -2468,3 +2931,205 @@ calcFntHeightFromPtsSize(ptsSize) {
    Return fntHeight
 }
 
+Gdi_GetLibVersion() {
+  return 1.2 ; 30/11/2021 / mardi 30 novembre 2021 
+}
+
+
+/*
+A selection of API functions left to implement from GDI,
+===========================================================
+
+6 Region functions:
+  CreateEllipticRgnIndirect
+  CreatePolygonRgn [priority]
+  CreatePolyPolygonRgn
+  CreateRectRgnIndirect
+  ExtCreateRegion
+  GetRegionData
+
+11 Rectangle functions:
+  CopyRect
+  EqualRect
+  InflateRect
+  IsRectEmpty
+  OffsetRect
+  SetRect
+  SetRectEmpty
+  PtInRect
+  IntersectRect
+  SubtractRect
+  UnionRect
+
+4 Pen, Path functions:
+  CreatePenIndirect
+  ExtCreatePen
+  GetMiterLimit
+  GetPath
+
+2 Filled shapes functions:
+  Polygon [priority]
+  PolyPolygon
+
+4 Brush functions:
+  CreateBrushIndirect
+  CreateDIBPatternBrushPt
+  GetBrushOrgEx
+  GetSysColorBrush
+
+17 Color functions:
+  AnimatePalette
+  CreateHalftonePalette
+  CreatePalette
+  GetColorAdjustment
+  GetNearestColor
+  GetNearestPaletteIndex
+  GetPaletteEntries
+  GetSystemPaletteEntries
+  GetSystemPaletteUse
+  RealizePalette
+  ResizePalette
+  SelectPalette
+  SetColorAdjustment
+  SetPaletteEntries
+  SetSystemPaletteUse
+  UnrealizeObject
+  UpdateColors
+
+12 Bitmap functions:
+  CreateBitmapIndirect
+  GetBitmapDimensionEx
+  GetDIBColorTable
+  GetStretchBltMode
+  GradientFill
+  LoadBitmap / LoadImage [priority]
+  PlgBlt
+  SetBitmapDimensionEx
+  SetDIBits [priority]
+  *GetDIBits
+  *CreateDIBitmap
+  AlphaBlend [priority]
+  GetPixel
+ 
+10 Line and curve functions:
+  GetArcDirection
+  LineDDA
+  LineDDAProc
+  PolyBezier
+  PolyBezierTo
+  PolyDraw
+  Polyline [priority]
+  PolylineTo
+  PolyPolyline
+  SetArcDirection
+
+32 Fonts and text functions:
+  AddFontMemResourceEx
+  AddFontResource
+  CreateFontIndirectEx
+  DrawTextEx
+  EnumFontFamExProc
+  EnumFontFamiliesEx
+  ExtTextOut
+  GetAspectRatioFilterEx
+  GetCharABCWidths
+  GetCharABCWidthsFloat
+  GetCharABCWidthsI
+  GetCharacterPlacement
+  GetCharWidth32
+  GetCharWidthFloat
+  GetCharWidthI
+  GetFontData
+  GetFontLanguageInfo
+  GetFontUnicodeRanges
+  GetGlyphIndices
+  GetGlyphOutline
+  GetKerningPairs
+  GetOutlineTextMetrics
+  GetRasterizerCaps
+  GetTabbedTextExtent
+  GetTextAlign
+  GetTextCharacterExtra
+  GetTextColor
+  PolyTextOut
+  RemoveFontMemResourceEx
+  RemoveFontResource
+  SetMapperFlags
+  TabbedTextOut
+
+18 Device context functions:
+  ChangeDisplaySettings
+  ChangeDisplaySettingsEx
+  CreateIC
+  DeviceCapabilities
+  DrawEscape
+  EnumDisplayDevices
+  EnumDisplaySettings
+  EnumDisplaySettingsEx
+  EnumObjects
+  EnumObjectsProc
+  GetCurrentObject
+  GetDCBrushColor
+  GetDCOrgEx
+  GetDCPenColor
+  GetLayout
+  GetObject
+  ResetDC
+  SetLayout
+
+24 Coordinate space and transformation functions:
+  CombineTransform
+  DPtoLP
+  GetCurrentPositionEx
+  GetDisplayAutoRotationPreferences
+  GetGraphicsMode
+  GetMapMode
+  GetViewportExtEx
+  GetViewportOrgEx
+  GetWindowExtEx
+  GetWindowOrgEx
+  GetWorldTransform
+  SetDisplayAutoRotationPreferences
+  LPtoDP
+  MapWindowPoints
+  ModifyWorldTransform
+  OffsetViewportOrgEx
+  OffsetWindowOrgEx
+  ScaleViewportExtEx
+  ScaleWindowExtEx
+  SetWorldTransform
+  SetViewportExtEx
+  SetViewportOrgEx
+  SetWindowExtEx
+  SetWindowOrgEx
+        
+18 Painting and drawing functions:
+  DrawAnimatedRects
+  DrawCaption
+  DrawEdge
+  DrawFocusRect
+  DrawFrameControl
+  DrawState
+  DrawStateProc
+  ExcludeUpdateRgn
+  GdiFlush
+  GdiGetBatchLimit
+  GdiSetBatchLimit
+  GetBkColor
+  GetBkMode
+  GrayString
+  LockWindowUpdate
+  OutputProc
+  PaintDesktop
+  RedrawWindow
+
+  - priority
+  SetBoundsRect
+  GetBoundsRect
+  GetUpdateRect
+  
+
+              
+
+  https://docs.microsoft.com/en-us/windows/win32/gdi/about-bitmaps
+*/

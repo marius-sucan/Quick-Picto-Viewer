@@ -1,6 +1,6 @@
 // qpv-main.cpp : Définit les fonctions exportées de la DLL.
 
-
+#define GDIPVER 0x110
 #include "pch.h"
 #include "framework.h"
 #include <wchar.h>
@@ -17,16 +17,24 @@
 #include <cstdio>
 #include <numeric>
 #include <algorithm>
-// #include <wincodec.h>
-// #include <gdiplus.h>
-// #include <gdiplusflat.h>
+#include <wincodec.h>
+#include "qpv-main.h"
+#include <gdiplus.h>
+#include <gdiplusflat.h>
 #include <locale.h>
 #include <codecvt>
-#include "qpv-main.h"
+// #include <Magick++.h>
+// #include <include\vips\vips8>
 
 // #include <bits/stdc++.h>
 
 using namespace std;
+
+void fnOutputDebug(std::string input) {
+    std::stringstream ss;
+    ss << "qpv: " << input;
+    OutputDebugStringA(ss.str().data());
+}
 
 /*
 Function written with help provided by Spawnova. Thank you very much.
@@ -39,7 +47,7 @@ For best results, pBitmapMask should be grayscale.
 */
 
 DLL_API int DLL_CALLCONV SetAlphaChannel(int *imageData, int *maskData, int w, int h, int invert, int replaceAlpha, int whichChannel, int threadz) {
-    #pragma omp parallel for schedule(dynamic) default(none) num_threads(3)
+    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int x = 0; x < w; x++)
     {
         int px;
@@ -111,6 +119,11 @@ double rad2deg(double radian) {
     return (radian * (180 / M_PI));
 }
 
+int fastRGBtoGray(int n) {
+   return (((n&0xf0f0f0)*0x20a05)>>20)&255;
+   // return (n&0xf0f0f0)*133637>>20&255;
+}
+
 int RGBtoGray(int sR, int sG, int sB, int alternateMode) {
   // https://getreuer.info/posts/colorspace/index.html
   // http://www.easyrgb.com/en/math.php
@@ -137,6 +150,10 @@ int RGBtoGray(int sR, int sG, int sB, int alternateMode) {
 
   Y = toLABfx(Y);
   double L = 116*Y - 16;
+  // if (L>499)
+  //     L = 499;
+  // else if (L<0)
+  //     L = 1;
   // https://zschuessler.github.io/DeltaE/demos/
   return round(L/2); // return derived luminosity in pseudo-LAB color space
 }
@@ -366,11 +383,11 @@ auto RGBtoLAB(int sR, int sG, int sB) {
   var_G = var_G * 100;
   var_B = var_B * 100;
 
-    std::stringstream ss;
   // compute XYZ color space values for given sRGB
   double X = var_R * 0.4123955889674142161 + var_G * 0.3575834307637148171 + var_B * 0.1804926473817015735;
   double Y = var_R * 0.2125862307855955516 + var_G * 0.7151703037034108499 + var_B * 0.07220049864333622685;
   double Z = var_R * 0.01929721549174694484 + var_G * 0.1191838645808485318 + var_B * 0.9504971251315797660;
+  // std::stringstream ss;
   // ss << "qpv: color in XYZ - X=" << X;
   // ss << " Y=" << Y;
   // ss << " Z=" << Z;
@@ -554,11 +571,11 @@ void toRGB(float c, float m, float y, float k, float *rgb) {
   rgb[2] = -((y * (255-k)) / 255 + k - 255);
 }
 
-int INTweighTwoValues(int A, int B, float w) {
+int inline INTweighTwoValues(int A, int B, float w) {
     return (float)(A * w + B * (1 - w));
 }
 
-float weighTwoValues(float A, float B, float w) {
+float inline weighTwoValues(float A, float B, float w) {
     return (A*w + B*(1-w));
 }
 
@@ -620,7 +637,7 @@ int mixColors(int colorB, float *colorA, float f, int dynamicOpacity, int blendM
   return (aT << 24) | ((rT & 0xFF) << 16) | ((gT & 0xFF) << 8) | (bT & 0xFF);
 }
 
-bool inRange(float low, float high, float x) {        
+bool inline inRange(float low, float high, float x) {        
     return (low <= x && x <= high);
 }
 
@@ -725,8 +742,8 @@ int FloodFill8Stack(int *imageData, int w, int h, int x, int y, int newColor, fl
      }
   }
 
-    // std::stringstream ss;
-    // ss << "qpv: suchDeviations = " << suchDeviations;
+  // std::stringstream ss;
+  // ss << "qpv: suchDeviations = " << suchDeviations;
 
   int thisColor = 0;
   for (std::size_t pix = 0; pix < pixelzMap.size(); ++pix)
@@ -751,9 +768,9 @@ int FloodFill8Stack(int *imageData, int w, int h, int x, int y, int newColor, fl
       }
   }
   
-    // ss << " suchAppliedDeviations = " << suchAppliedDeviations;
-    // ss << " mapSize = " << pixelzMap.size();
-    // OutputDebugStringA(ss.str().data());
+  // ss << " suchAppliedDeviations = " << suchAppliedDeviations;
+  // ss << " mapSize = " << pixelzMap.size();
+  // OutputDebugStringA(ss.str().data());
   return suchAppliedDeviations;
 }
 
@@ -834,7 +851,7 @@ int ReplaceGivenColor(int *imageData, int w, int h, int x, int y, int newColor, 
        return 0;
 
     int loopsOccured = 0;
-    #pragma omp parallel for schedule(static) default(none) num_threads(3)
+    #pragma omp parallel for schedule(static) default(none) // num_threads(3)
     for (int zx = 0; zx < w; zx++)
     {
         int oldColor = prevColor;
@@ -951,24 +968,36 @@ DLL_API int DLL_CALLCONV EraserBrush(int *imageData, int *maskData, int w, int h
                 else
                    imageData[px] = (alpha2 << 24) | (imageData[px] & 0x00ffffff);
             }
-   // std::stringstream ss;
-   // ss << "qpv: alpha2 = " << alpha2;
-   // ss << " var a = " << a;
-   // ss << " var haha = " << haha;
-   // if (dabugMode>1)
-   //     OutputDebugStringA(ss.str().data());
+            // std::stringstream ss;
+            // ss << "qpv: alpha2 = " << alpha2;
+            // ss << " var a = " << a;
+            // ss << " var haha = " << haha;
+            // OutputDebugStringA(ss.str().data());
 
         }
     }
  
-    // std::stringstream ss;
-    // ss << "qpv: eraser = " << levelAlpha;
-    // OutputDebugStringA(ss.str().data());
+    // fnOutputDebug("eraser alpha = " + std::to_string(levelAlpha))
+    return 1;
+}
+
+DLL_API int DLL_CALLCONV FillImageHoles(int *imageData, int w, int h, int newColor) {
+    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+    for (int x = 0; x < w; x++)
+    {
+        for (int y = 0; y < h; y++)
+        {
+            const int px = x * h + y;
+            int a = (imageData[px] >> 24) & 0xFF;
+            if (a<2)
+               imageData[px] = newColor;
+        }
+    }
     return 1;
 }
 
 DLL_API int DLL_CALLCONV SetGivenAlphaLevel(int *imageData, int w, int h, int givenLevel, int fillMissingOnly, int threadz) {
-    #pragma omp parallel for schedule(dynamic) default(none) num_threads(3)
+    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int x = 0; x < w; x++)
     {
         int px, y = 0;
@@ -991,7 +1020,7 @@ DLL_API int DLL_CALLCONV SetGivenAlphaLevel(int *imageData, int w, int h, int gi
         }
     }
 
-    #pragma omp parallel for schedule(dynamic) default(none) num_threads(3)
+    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int x = w - 1; x >= 0; x--)
     {
         int px, y = h - 1;
@@ -1108,7 +1137,7 @@ and in 32-ARGB format: PXF32ARGB - 0x26200A.
 */
 
 DLL_API int DLL_CALLCONV BlendBitmaps(int* bgrImageData, int* otherData, int w, int h, int blendMode, int threadz) {
-    #pragma omp parallel for schedule(dynamic) default(none) num_threads(3)
+    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int x = 0; x < w; x++)
     {
         // int rT, gT, bT; // , aB, aO, aX;
@@ -1138,8 +1167,12 @@ DLL_API int DLL_CALLCONV BlendBitmaps(int* bgrImageData, int* otherData, int w, 
                 int gB = (BGRcolor >> 8) & 0xFF;
                 int bB = BGRcolor & 0xFF;
                 int results[3];
+                // int theGray = RGBtoGray(rO, gO, bO, 0);
+                // int theGray = fastRGBtoGray(colorO);
+                // results[0] = theGray;
+                // results[1] = theGray;
+                // results[2] = theGray;
                 calculateBlendModes(rO, gO, bO, rB, gB, bB, blendMode, results);
-
                 bgrImageData[x + (y * w)] = (aX << 24) | ((results[0] & 0xFF) << 16) | ((results[1] & 0xFF) << 8) | (results[2] & 0xFF);
             }
         }
@@ -1158,30 +1191,13 @@ DLL_API int DLL_CALLCONV RandomNoise(int* bgrImageData, int w, int h, int intens
     // srand (time(NULL));
     // #pragma omp parallel for default(none) num_threads(threadz)
 
-    // std::stringstream ss;
-    // ss << "qpv: results w " << w;
-    // ss << " h " << h;
     for (int x = 0; x < w; x++)
     {
         for (int y = 0; y < h; y++)
         {
             unsigned char aT = 255;
             unsigned char z = rand() % 101;
-            // int px = x + (y * w);
-            // if (x<5 && y<5)
-            // {
-            //    ss << " x=" << x;
-            //    ss << " y=" << y;
-            //    ss << " PX=" << px;
-            // }
-
-            // if (x>(w-5) && y>(h-5))
-            // {
-            //    ss << " x " << x;
-            //    ss << " y " << y;
-            //    ss << " PX " << px;
-            // }
-
+ 
             if (z<intensity)
             {
                // unsigned char rT = 0;
@@ -1202,8 +1218,80 @@ DLL_API int DLL_CALLCONV RandomNoise(int* bgrImageData, int w, int h, int intens
             }
         }
     }
-    // OutputDebugStringA(ss.str().data());
+
     return 1;
+}
+
+DLL_API int DLL_CALLCONV getPBitmapistoInfos(Gdiplus::GpBitmap* pBitmap, int w, int h, UINT* resultsArray) {
+     UINT entries = 256;
+     UINT elements[256];
+     // Gdiplus::DllExports::GetHistogramSize(3, entries);
+     Gdiplus::DllExports::GdipBitmapGetHistogram(pBitmap, Gdiplus::HistogramFormatR, entries, elements, NULL, NULL, NULL);
+     
+     int medianValue = -1;
+     int peakPointK = -1;
+     int minBrLvlK = -1;
+     UINT minPointK = 0;
+     UINT modePointV = 0;
+     UINT modePointK = 0;
+     UINT thisSum = 0;
+     UINT sumTotalBr = 0;
+     UINT pixRms = 0;
+     UINT TotalPixelz = w*h;
+     UINT pixMinu = TotalPixelz;
+
+     for (int thisIndex = 0; thisIndex < 256; thisIndex++)
+     {
+        // fnOutputDebug("histo [" + to_string(i) +  "] = " + to_string(elements[i])) ;
+        int nrPixelz = elements[thisIndex];
+        if (nrPixelz>modePointV)
+        {
+           modePointV = nrPixelz;
+           modePointK = thisIndex;
+        }
+
+        if (nrPixelz>0)
+        {
+           if (medianValue == -1)
+           {
+              thisSum += nrPixelz;
+              if (thisSum>TotalPixelz/2)
+                 medianValue = thisIndex;
+           }
+
+           sumTotalBr += nrPixelz * thisIndex;
+           peakPointK = thisIndex;     // max range in histogram
+           if (minBrLvlK == -1)
+              minBrLvlK = thisIndex;   // min range in histogram
+       
+           if (nrPixelz<pixMinu)
+           {
+              pixMinu = nrPixelz;
+              minPointK = thisIndex;
+           }
+        }
+
+        pixRms += pow(nrPixelz, 2);       // root-mean square
+     }
+
+     UINT avgu = round((sumTotalBr/TotalPixelz - 1)/2);
+     UINT rmsu = round(sqrt(pixRms / (peakPointK - minBrLvlK)));
+
+     resultsArray[0] = avgu;
+     resultsArray[1] = medianValue;
+     resultsArray[2] = peakPointK;
+     resultsArray[3] = minBrLvlK;
+     resultsArray[4] = rmsu;
+     resultsArray[5] = modePointK;
+     resultsArray[6] = minPointK;
+// fnOutputDebug("histo avgu=" + to_string(avgu));
+// fnOutputDebug("histo medianValue=" + to_string(medianValue));
+// fnOutputDebug("histo peakPointK=" + to_string(peakPointK));
+// fnOutputDebug("histo minBrLvlK=" + to_string(minBrLvlK));
+// fnOutputDebug("histo rms=" + to_string(rmsu));
+// fnOutputDebug("histo modePointK=" + to_string(modePointK));
+// fnOutputDebug("histo minPointK=" + to_string(minPointK));
+     return 1;
 }
 
 /*
@@ -1531,28 +1619,6 @@ int CountDifferentBits(int64_t *img1, int64_t *img2, int nr_values) {
   }
   return n_diff;
 }
-
-DLL_API int DLL_CALLCONV hammingDistanceOverArray(int argc, char **argv) {
-  //  GenerateCodeFor_globalNumberOfBits();   return 0;
-  int result;
-
-  std::vector<int64_t> values1;
-  values1.push_back(713232);
-  values1.push_back(212);
-
-  std::vector<int64_t> values2;
-  values2.push_back(73232);
-  values2.push_back(2121);
-  result = CountDifferentBits(&values1[0], &values2[0], min(values1.size(), values2.size()));
-  printf("final = %d\n", result);
-
-  std::stringstream ss;
-  ss << "qpv: " << result;
-  OutputDebugStringA(ss.str().data());
-
-  return 1;
-}
-
 */
 
 unsigned long long int fact(UINT n) {
@@ -1595,54 +1661,274 @@ DLL_API unsigned long long int DLL_CALLCONV dumbcalculateNCR(UINT n) {
    return combinations;
 }
 
-inline int hammingDistance(unsigned long long n1, unsigned long long n2) { 
-    unsigned long long x = n1 ^ n2; 
+DLL_API int DLL_CALLCONV ConvertToGrayScale(int *BitmapData, int w, int h, int modus) {
+// NTSC RGB weights: r := 0.29970, g := 0.587130, b := 0.114180
+
+    #pragma omp parallel for schedule(dynamic) default(none)
+    for (int x = 0; x < w; x++)
+    {
+        for (int y = 0; y < h; y++)
+        {
+            int G;
+            UINT colorO = BitmapData[x + (y * w)];
+            int aO = (colorO >> 24) & 0xFF;
+            if (modus==1)
+            {
+               G = (colorO >> 16) & 0xFF;
+            } else if (modus==2)
+            {
+               G = (colorO >> 8) & 0xFF;
+            } else if (modus==3)
+            {
+               G = colorO & 0xFF;
+            } else if (modus==4)
+            {
+               G = aO;
+            } else if (modus==5)
+            {
+               float rO = ((colorO >> 16) & 0xFF)*0.29970f;
+               float gO = ((colorO >> 8) & 0xFF)*0.587130f;
+               float bO = (colorO & 0xFF)*0.114180f;
+               G = round(rO + gO + bO);
+            }
+
+            BitmapData[x + (y * w)] = (aO << 24) | (G << 16) | (G << 8) | G;
+        }
+    }
+    return 1;
+}
+
+UINT64 reverse_8bits(UINT64 n) {
+  for (int i = 0, bytes = sizeof(n); i < bytes; ++i) {
+    const int bit_offset = i * 8;
+    for (int j = 0; j < 4; ++j) {
+      // Calculam care e bit de schimbat, in cadrul la byte current (situat
+      // la bit_offset, pe spatiu de 8 bits, numerotati de la 0 la 7.
+      const int bit = bit_offset + j;
+      const int sym_bit = bit_offset + 7 - j;
+
+      // testam daca e setat bit
+      // 1 << i face shift to left la bitul 1 cu i bits.
+      const bool bit_s = (n & (1 << bit)) ? 1 : 0;
+
+      // testam daca e setat bit sym_bit
+      const bool bit_sym_s = (n & (1 << sym_bit)) ? 1 : 0;
+
+      // Daca bit e setat, seteaza sym_i in loc (sau sterge)
+      if (bit_s) {
+        // bitwise or pe bit sym_i
+        n |= 1 << sym_bit;
+      } else {
+        // bitwise and cu un numar care e
+        // doar 1, si un singur 0 pe pozitia sym_bit (~ face negare)
+        n &= ~(1 << sym_bit);
+      }
+
+      // La fel ca mai sus, la bit.
+      if (bit_sym_s) {
+        n |= 1 << bit;
+      } else {
+        n &= ~(1 << bit);
+      }
+    }
+  }
+  return n;
+}
+
+UINT64 revBits(UINT64 n){
+  return (
+     n    &0x0101010101010101 |  n>>5&0x0202020202020202 |  n>>3&0x0404040404040404 | n>>1&0x0808080808080808
+  & ~n<< 1&0x1010101010101010 & ~n<<3&0x2020202020202020 & ~n<<5&0x4040404040404040 | n   &0x8080808080808080
+  );
+}
+
+UINT64 revBits_entire(UINT64 n){
+  return (
+    n>> 7&0x0101010101010101 | n>>5&0x0202020202020202 | n>>3&0x0404040404040404 | n>>1&0x0808080808080808
+  | n<< 1&0x1010101010101010 | n<<3&0x2020202020202020 | n<<5&0x4040404040404040 | n<<7&0x8080808080808080
+  );
+}
+
+
+int reverse_bits(int n) {
+  for (int i = 0, bits = sizeof(n) * 8; i < bits / 2; ++i)
+  {
+      // punctul simetric la i
+      const int sym_i = bits - i - 1;
+
+      // testam daca e setat bit i
+      // 1 << i face shift to left la bitul 1 cu i bits.
+      const bool bit_i = (n & (1 << i)) ? 1 : 0;
+
+      // testam daca e setat bit sym_i
+      const bool bit_sym_i = (n & (1 << sym_i)) ? 1 : 0;
+
+      // Daca i e setat, seteaza sym_i in loc (sau sterge)
+      if (bit_i)
+      {
+         // bitwise or pe bit sym_i
+         n |= 1 << sym_i;
+      } else
+      {
+         // bitwise and cu un numar care e
+         // doar 1, si un singur 0 pe pozitia sym_i (~ face negare)
+         n &= ~(1 << sym_i);
+      }
+
+      // La fel ca mai sus, la bit i.
+      if (bit_sym_i)
+      {
+         n |= 1 << i;
+      } else {
+         n &= ~(1 << i);
+      }
+  }
+  return n;
+}
+
+inline int hammingDistance(UINT64 n1, UINT64 n2, UINT hamDistLBorderCrop, UINT hamDistRBorderCrop, bool doRange) { 
+    UINT64 x = n1 ^ n2; 
     int setBits = 0; 
-  
-    while (x > 0) { 
-        setBits += x & 1; 
-        x >>= 1; 
-    } 
-  
+    if (doRange==0)
+    {
+        while (x > 0)
+        { 
+           setBits += x & 1; 
+           x >>= 1; 
+        }
+    } else
+    {
+        int loopsOccured = 0;
+        while (x > 0)
+        { 
+           loopsOccured++;
+           if (inRange(hamDistLBorderCrop, 64 - hamDistRBorderCrop, loopsOccured))
+              setBits += x & 1; 
+           x >>= 1; 
+        }
+    }  
+
     return setBits; 
 } 
 
-DLL_API UINT DLL_CALLCONV hammingDistanceOverArray(unsigned long long *givenHashesArray, unsigned int *givenIDs, UINT arraySize, UINT *resultsArrayA, UINT *resultsArrayB, UINT *resultsArrayC, int threshold, UINT maxResults) {
-    UINT results = 0;
-    UINT n = arraySize;
-    bool done = false;
-    // int mainIndex = 1;
-    // int returnVal = 1;
+DLL_API UINT DLL_CALLCONV retrieveHammingDistanceResults(UINT *resultsArray, UINT whichArray, UINT results) {
+   for ( int index = 0 ; index <= results ; index++)
+   {
+        if (whichArray==1)
+           resultsArray[index] = dupesListIDsA[index];
+        else if (whichArray==2)
+           resultsArray[index] = dupesListIDsB[index];
+        else if (whichArray==3)
+           resultsArray[index] = dupesListIDsC[index];
+   }
+
+   if (whichArray==1)
+   {
+      // dupesListIDsA.clear();
+      dupesListIDsA.resize(1);
+   } else if (whichArray==2)
+   {
+      // dupesListIDsB.clear();
+      dupesListIDsB.resize(1);
+   } else if (whichArray==3)
+   {
+      // dupesListIDsC.clear();
+      dupesListIDsC.resize(1);
+   }
+
+   return 1;
+}
+
+DLL_API UINT DLL_CALLCONV clearHammingDistanceResults() {
+    // dupesListIDsA.clear();
+    dupesListIDsA.resize(1);
+    // dupesListIDsB.clear();
+    dupesListIDsB.resize(1);
+    // dupesListIDsC.clear();
+    dupesListIDsC.resize(1);
+    dupesListIDsA.shrink_to_fit();
+    dupesListIDsB.shrink_to_fit();
+    dupesListIDsC.shrink_to_fit();
+
+    return 1;
+}
+
+DLL_API UINT DLL_CALLCONV hammingDistanceOverArray(UINT64 *givenHashesArray, UINT64 *givenFlippedHashesArray, UINT *givenIDs, UINT arraySize, int threshold, UINT hamDistLBorderCrop, UINT hamDistRBorderCrop, int checkInverted, int checkFlipped) {
+   UINT results = 0;
+   UINT n = arraySize;
+   bool done = false;
+   bool doRange = (hamDistLBorderCrop==0 && hamDistRBorderCrop==0) ? 0 : 1;
+   // int mainIndex = 1;
+   // int returnVal = 1;
    // std::stringstream ss;
    // ss << "qpv: arraySize " << n;
    // ss << " maxResults " << maxResults;
    // OutputDebugStringA(ss.str().data());
 
     #pragma omp parallel for schedule(dynamic) default(none) shared(results)
-    for ( long secondIndex = 0 ; secondIndex<n+1 ; secondIndex++)
+    for ( INT secondIndex = 0 ; secondIndex<n+1 ; secondIndex++)
     {
-        if (done==1)
-           break;
-
-        for ( long mainIndex = secondIndex + 1 ; mainIndex<n ; mainIndex++)
+        UINT64 invert2ndindex = 0;
+        // UINT64 reversed2ndindex = 0;
+        if (checkInverted==1)
         {
-            if (done==1)
-               break;
+           invert2ndindex = ~(givenHashesArray[secondIndex]);
+        }
+        // if (checkFlipped==1)
+        // {
+        //    reversed2ndindex = revBits_entire(givenHashesArray[secondIndex]);
+        //    // fnOutputDebug("reverso " + to_string(givenHashesArray[secondIndex]) + " -- " + to_string(reversed2ndindex));
+        // }
 
-            int diff = hammingDistance(givenHashesArray[mainIndex], givenHashesArray[secondIndex]);
-            if (diff<threshold)
+        for ( INT mainIndex = secondIndex + 1 ; mainIndex<n ; mainIndex++)
+        {
+            int diff2 = 900;
+            int diff3 = 900;
+            // if (done==1)
+            //    break;
+
+            int diff = hammingDistance(givenHashesArray[mainIndex], givenHashesArray[secondIndex], hamDistLBorderCrop, hamDistRBorderCrop, doRange);
+            if (checkInverted==1)
+               diff2 = hammingDistance(givenHashesArray[mainIndex], invert2ndindex, hamDistLBorderCrop, hamDistRBorderCrop, doRange);
+            if (checkFlipped==1)
+               diff3 = hammingDistance(givenHashesArray[mainIndex], givenFlippedHashesArray[secondIndex], hamDistLBorderCrop, hamDistRBorderCrop, doRange);
+
+            // if (threshold>2 && diff>=threshold)
+            //    diff = hammingDistance(givenHashesArray[mainIndex], reversed2ndindex, hamDistLBorderCrop, hamDistRBorderCrop);
+
+            #pragma omp critical
             {
-               #pragma omp critical
+               if (diff<threshold)
                {
-                  results++;
-                  resultsArrayA[results] = givenIDs[mainIndex];
-                  resultsArrayB[results] = givenIDs[secondIndex];
-                  resultsArrayC[results] = diff;
-                  done = results > maxResults;
+        
+                   dupesListIDsA.push_back(givenIDs[mainIndex]);
+                   dupesListIDsB.push_back(givenIDs[secondIndex]);
+                   dupesListIDsC.push_back(diff);
+                   results++;
+                   // done = results > maxResults;
                };
-            };
-        };
+
+               if (diff2<threshold)
+               {
+                   dupesListIDsA.push_back(givenIDs[mainIndex]);
+                   dupesListIDsB.push_back(givenIDs[secondIndex]);
+                   dupesListIDsC.push_back(diff2);
+                   results++;
+               }
+
+               if (diff3<threshold)
+               {
+                   // fnOutputDebug("c++ dupe pair:" + to_string(givenHashesArray[mainIndex]) + "/" + to_string(givenFlippedHashesArray[secondIndex]));
+                   dupesListIDsA.push_back(givenIDs[mainIndex]);
+                   dupesListIDsB.push_back(givenIDs[secondIndex]);
+                   dupesListIDsC.push_back(diff3);
+                   results++;
+               }
+            }
+        }
     }
+
+    // fnOutputDebug("hamDist results=" + to_string(results));
 
    // int test = hammingDistance(givenHashesArray[5], givenHashesArray[7]);
    // std::stringstream ss;
@@ -1656,8 +1942,150 @@ DLL_API UINT DLL_CALLCONV hammingDistanceOverArray(unsigned long long *givenHash
    return results;
 }
 
+double calcArrayAvgMedian(std::array<double, 64> givenArray, int modus) {
+    int size = givenArray.size() - 1;
+    if (modus==1) // median
+    {
+        std::sort(givenArray.begin(), givenArray.end());
+        if (size % 2 == 0) {
+            return (givenArray[round(size / 2 - 1)] + givenArray[round(size / 2)]) / 2;
+        }
 
-/*
+        return givenArray[floor(size / 2)];
+    } else
+    {
+        // Calculate the average value from top 8x8 pixels, except for the first one.
+        double thisSum = 0;
+        for (int i = 0; i < size; i++)
+        {
+            if (i > 0)
+            {
+                thisSum += givenArray[i];
+            }
+        }
+
+        return (thisSum / size);
+    }
+}
+
+DLL_API int DLL_CALLCONV calculateDCTcoeffs(int size) {
+    int thisIndex = 0;
+    for (int i = 0; i < size; i++)
+    {
+        for (int j = 0; j < size; j++) {
+            thisIndex++;
+            DCTcoeffs[thisIndex] = cos(i * M_PI * (j + 0.5) / size);
+        }
+    }
+
+    return 1;
+}
+
+auto calculateDCT(const std::array<double, 32> &matrix, int col, int loopu) {
+    // int size = 32;
+    std::array<double, 32> transformed;
+    // double div2sz = sqrt(2.0 / size);
+    // double div2sq = 1 / sqrt(2.0);
+
+    int thisIndex = 0;
+    for (int i = 0; i < 32; i++)
+    {
+        double sum = 0.0;
+        for (int j = 0; j < 32; j++) {
+            thisIndex++;
+            sum += matrix[j] * DCTcoeffs[thisIndex];
+            // sum += matrix[j] * cos(i * M_PI * (j + 0.5) / 32);
+        }
+
+        sum *= div2sz;
+        if (i == 0) {
+            sum *= div2sq;
+        }
+
+        transformed[i] = sum;
+        // fnOutputDebug("calcPHashAlgo: col=" + to_string(col) + " loopu=" + to_string(loopu) + " matrix[" + to_string(i) + "] DCT=" + to_string(matrix[i]));
+    }
+
+    return transformed;
+}
+
+
+DLL_API INT64 DLL_CALLCONV calcPHashAlgo(char *givenArray, UINT size, int compareMethod) {
+// based on the PHP implementation found on https://github.com/jenssegers/imagehash
+
+    // givenArray is the pixels fingerprint
+    // calculte DCT for rows
+
+    double rows[32][32];
+    std::array<double, 32>  trow;
+    // fnOutputDebug("calcPHashAlgo: init before loop" + to_string(size));
+    for ( int y = 0; y < size; y++)
+    {
+        for (int x = 0; x < size; x++) 
+        {
+            trow[x] = abs(givenArray[x + size*y]);
+        }
+
+        auto transformed = calculateDCT(trow, y, 1);
+        for (int x = 0; x < size; x++) 
+        {
+            rows[y][x] = transformed[x];
+            // fnOutputDebug("calcPHashAlgo: row DCT=" + to_string(rows[y][x]));
+        }
+    }
+
+    // fnOutputDebug("calcPHashAlgo: first for-loop" + to_string(rows[12][13]));
+    // fnOutputDebug("calcPHashAlgo: trow" + to_string(trow[12]));
+    // fnOutputDebug("calcPHashAlgo: givenArray" + to_string(givenArray[12]));
+
+    // calculte DCT for columns
+    double matrix[32][32];
+    std::array<double, 32>  col;
+    for (int x = 0; x < size; x++)
+    {
+        for (int y = 0; y < size; y++)
+        {
+            col[y] = rows[y][x];
+        }
+
+        auto transformed = calculateDCT(col, x, 2);
+        for (int y = 0; y < size; y++)
+        {
+            matrix[x][y] = transformed[y];
+        }
+    }
+    // fnOutputDebug("calcPHashAlgo: second for-loop" + to_string(matrix[12][13]));
+
+    // extract the top 8x8 pixels from the DCT matrix
+    int thisIndex = -1;
+    std::array<double, 64>   fpexels;
+    for (int y = 0; y < 8; y++)
+    {
+        for (int x = 0; x < 8; x++)
+        {
+            thisIndex++;
+            fpexels[thisIndex] = matrix[y][x];
+        }
+    }
+    // fnOutputDebug("calcPHashAlgo: third for-loop" + to_string(fpexels[13]));
+
+    INT64 one = 0x0000000000000001;
+    INT64 hash = 0x0000000000000000;
+
+    // Calculate hash
+    double compareTerm = calcArrayAvgMedian(fpexels, compareMethod);
+    // fnOutputDebug("calcPHashAlgo: compareTerm =" + to_string(compareTerm));
+    for (int x = 0; x < 64; x++)
+    {
+        // resultsArray[x] = (fpexels[x] > compareTerm) ? 1 : 0;
+        if (fpexels[x] > compareTerm)
+           hash |= one;
+        one = one << 1;
+    }
+
+    // fnOutputDebug("calcPHashAlgo: ended=" + to_string(hash));
+    return hash;
+}
 
 template <typename T>
 inline void SafeRelease(T *&p)
@@ -1669,53 +2097,379 @@ inline void SafeRelease(T *&p)
     }
 }
 
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testFuncNew(UINT width, UINT height, const wchar_t *szFileName) {
-    Gdiplus::GpBitmap* myBitmap = NULL;
+/*
+DLL_API int DLL_CALLCONV testFuncNow(int givenQuality, UINT width, UINT height, const wchar_t *szFileName, const wchar_t *szFileNameOut) {
+  //  VImage in = VImage::new_from_file (szFileName,
+  //   VImage::option ()->set ("access", VIPS_ACCESS_SEQUENTIAL));
+
+  // double avg = in.avg ();
+
+  // printf ("avg = %g\n", avg);
+  // printf ("width = %d\n", in.width ());
+  in = VImage::new_from_file (szFileName,
+    VImage::option ()->set ("access", VIPS_ACCESS_SEQUENTIAL));
+
+  VImage out = in.embed (10, 10, 1000, 1000,
+    VImage::option ()->
+      set ("extend", "background")->
+      set ("background", 128));
+
+  out.write_to_file (szFileNameOut);
+
+  vips_shutdown ();
+  return 1
+}
+*/
+
+INT indexedPixelFmts(WICPixelFormatGUID oPixFmt) {
+    INT uPixFmt = 0;
+    if (oPixFmt==GUID_WICPixelFormatDontCare)
+       uPixFmt = 1;
+    else if (oPixFmt==GUID_WICPixelFormat1bppIndexed)
+       uPixFmt = 2;
+    else if (oPixFmt==GUID_WICPixelFormat2bppIndexed)
+       uPixFmt = 3;
+    else if (oPixFmt==GUID_WICPixelFormat4bppIndexed)
+       uPixFmt = 4;
+    else if (oPixFmt==GUID_WICPixelFormat8bppIndexed)
+       uPixFmt = 5;
+    else if (oPixFmt==GUID_WICPixelFormatBlackWhite)
+       uPixFmt = 6;
+    else if (oPixFmt==GUID_WICPixelFormat2bppGray)
+       uPixFmt = 7;
+    else if (oPixFmt==GUID_WICPixelFormat4bppGray)
+       uPixFmt = 8;
+    else if (oPixFmt==GUID_WICPixelFormat8bppGray)
+       uPixFmt = 9;
+    else if (oPixFmt==GUID_WICPixelFormat8bppAlpha)
+       uPixFmt = 10;
+    else if (oPixFmt==GUID_WICPixelFormat16bppBGR555)
+       uPixFmt = 11;
+    else if (oPixFmt==GUID_WICPixelFormat16bppBGR565)
+       uPixFmt = 12;
+    else if (oPixFmt==GUID_WICPixelFormat16bppBGRA5551)
+       uPixFmt = 13;
+    else if (oPixFmt==GUID_WICPixelFormat16bppGray)
+       uPixFmt = 14;
+    else if (oPixFmt==GUID_WICPixelFormat24bppBGR)
+       uPixFmt = 15;
+    else if (oPixFmt==GUID_WICPixelFormat24bppRGB)
+       uPixFmt = 16;
+    else if (oPixFmt==GUID_WICPixelFormat32bppBGR)
+       uPixFmt = 17;
+    else if (oPixFmt==GUID_WICPixelFormat32bppBGRA)
+       uPixFmt = 18;
+    else if (oPixFmt==GUID_WICPixelFormat32bppPBGRA)
+       uPixFmt = 19;
+    else if (oPixFmt==GUID_WICPixelFormat32bppGrayFloat)
+       uPixFmt = 20;
+    else if (oPixFmt==GUID_WICPixelFormat32bppRGB)
+       uPixFmt = 21;
+    else if (oPixFmt==GUID_WICPixelFormat32bppRGBA)
+       uPixFmt = 22;
+    else if (oPixFmt==GUID_WICPixelFormat32bppPRGBA)
+       uPixFmt = 23;
+    else if (oPixFmt==GUID_WICPixelFormat48bppRGB)
+       uPixFmt = 24;
+    else if (oPixFmt==GUID_WICPixelFormat48bppBGR)
+       uPixFmt = 25;
+    else if (oPixFmt==GUID_WICPixelFormat64bppRGB)
+       uPixFmt = 26;
+    else if (oPixFmt==GUID_WICPixelFormat64bppRGBA)
+       uPixFmt = 27;
+    else if (oPixFmt==GUID_WICPixelFormat64bppBGRA)
+       uPixFmt = 28;
+    else if (oPixFmt==GUID_WICPixelFormat64bppPRGBA)
+       uPixFmt = 29;
+    else if (oPixFmt==GUID_WICPixelFormat64bppPBGRA)
+       uPixFmt = 30;
+    else if (oPixFmt==GUID_WICPixelFormat16bppGrayFixedPoint)
+       uPixFmt = 31;
+    else if (oPixFmt==GUID_WICPixelFormat32bppBGR101010)
+       uPixFmt = 32;
+    else if (oPixFmt==GUID_WICPixelFormat48bppRGBFixedPoint)
+       uPixFmt = 33;
+    else if (oPixFmt==GUID_WICPixelFormat48bppBGRFixedPoint)
+       uPixFmt = 34;
+    else if (oPixFmt==GUID_WICPixelFormat96bppRGBFixedPoint)
+       uPixFmt = 35;
+    else if (oPixFmt==GUID_WICPixelFormat96bppRGBFloat)
+       uPixFmt = 36;
+    else if (oPixFmt==GUID_WICPixelFormat128bppRGBAFloat)
+       uPixFmt = 37;
+    else if (oPixFmt==GUID_WICPixelFormat128bppPRGBAFloat)
+       uPixFmt = 38;
+    else if (oPixFmt==GUID_WICPixelFormat128bppRGBFloat)
+       uPixFmt = 39;
+    else if (oPixFmt==GUID_WICPixelFormat32bppCMYK)
+       uPixFmt = 40;
+    else if (oPixFmt==GUID_WICPixelFormat64bppRGBAFixedPoint)
+       uPixFmt = 41;
+    else if (oPixFmt==GUID_WICPixelFormat64bppBGRAFixedPoint)
+       uPixFmt = 42;
+    else if (oPixFmt==GUID_WICPixelFormat64bppRGBFixedPoint)
+       uPixFmt = 43;
+    else if (oPixFmt==GUID_WICPixelFormat128bppRGBAFixedPoint)
+       uPixFmt = 44;
+    else if (oPixFmt==GUID_WICPixelFormat128bppRGBFixedPoint)
+       uPixFmt = 45;
+    else if (oPixFmt==GUID_WICPixelFormat64bppRGBAHalf)
+       uPixFmt = 46;
+    else if (oPixFmt==GUID_WICPixelFormat64bppPRGBAHalf)
+       uPixFmt = 47;
+    else if (oPixFmt==GUID_WICPixelFormat64bppRGBHalf)
+       uPixFmt = 48;
+    else if (oPixFmt==GUID_WICPixelFormat48bppRGBHalf)
+       uPixFmt = 49;
+    else if (oPixFmt==GUID_WICPixelFormat32bppRGBE)
+       uPixFmt = 50;
+    else if (oPixFmt==GUID_WICPixelFormat16bppGrayHalf)
+       uPixFmt = 51;
+    else if (oPixFmt==GUID_WICPixelFormat32bppGrayFixedPoint)
+       uPixFmt = 52;
+    else if (oPixFmt==GUID_WICPixelFormat32bppRGBA1010102)
+       uPixFmt = 53;
+    else if (oPixFmt==GUID_WICPixelFormat32bppRGBA1010102XR)
+       uPixFmt = 54;
+    else if (oPixFmt==GUID_WICPixelFormat32bppR10G10B10A2)
+       uPixFmt = 55;
+    else if (oPixFmt==GUID_WICPixelFormat32bppR10G10B10A2HDR10)
+       uPixFmt = 56;
+    else if (oPixFmt==GUID_WICPixelFormat64bppCMYK)
+       uPixFmt = 57;
+    else if (oPixFmt==GUID_WICPixelFormat24bpp3Channels)
+       uPixFmt = 58;
+    else if (oPixFmt==GUID_WICPixelFormat32bpp4Channels)
+       uPixFmt = 59;
+    else if (oPixFmt==GUID_WICPixelFormat40bpp5Channels)
+       uPixFmt = 60;
+    else if (oPixFmt==GUID_WICPixelFormat48bpp6Channels)
+       uPixFmt = 61;
+    else if (oPixFmt==GUID_WICPixelFormat56bpp7Channels)
+       uPixFmt = 62;
+    else if (oPixFmt==GUID_WICPixelFormat64bpp8Channels)
+       uPixFmt = 63;
+    else if (oPixFmt==GUID_WICPixelFormat48bpp3Channels)
+       uPixFmt = 64;
+    else if (oPixFmt==GUID_WICPixelFormat64bpp4Channels)
+       uPixFmt = 65;
+    else if (oPixFmt==GUID_WICPixelFormat80bpp5Channels)
+       uPixFmt = 66;
+    else if (oPixFmt==GUID_WICPixelFormat96bpp6Channels)
+       uPixFmt = 67;
+    else if (oPixFmt==GUID_WICPixelFormat112bpp7Channels)
+       uPixFmt = 68;
+    else if (oPixFmt==GUID_WICPixelFormat128bpp8Channels)
+       uPixFmt = 69;
+    else if (oPixFmt==GUID_WICPixelFormat40bppCMYKAlpha)
+       uPixFmt = 70;
+    else if (oPixFmt==GUID_WICPixelFormat80bppCMYKAlpha)
+       uPixFmt = 71;
+    else if (oPixFmt==GUID_WICPixelFormat32bpp3ChannelsAlpha)
+       uPixFmt = 72;
+    else if (oPixFmt==GUID_WICPixelFormat40bpp4ChannelsAlpha)
+       uPixFmt = 73;
+    else if (oPixFmt==GUID_WICPixelFormat48bpp5ChannelsAlpha)
+       uPixFmt = 74;
+    else if (oPixFmt==GUID_WICPixelFormat56bpp6ChannelsAlpha)
+       uPixFmt = 75;
+    else if (oPixFmt==GUID_WICPixelFormat64bpp7ChannelsAlpha)
+       uPixFmt = 76;
+    else if (oPixFmt==GUID_WICPixelFormat72bpp8ChannelsAlpha)
+       uPixFmt = 77;
+    else if (oPixFmt==GUID_WICPixelFormat64bpp3ChannelsAlpha)
+       uPixFmt = 78;
+    else if (oPixFmt==GUID_WICPixelFormat80bpp4ChannelsAlpha)
+       uPixFmt = 79;
+    else if (oPixFmt==GUID_WICPixelFormat96bpp5ChannelsAlpha)
+       uPixFmt = 80;
+    else if (oPixFmt==GUID_WICPixelFormat112bpp6ChannelsAlpha)
+       uPixFmt = 81;
+    else if (oPixFmt==GUID_WICPixelFormat128bpp7ChannelsAlpha)
+       uPixFmt = 82;
+    else if (oPixFmt==GUID_WICPixelFormat144bpp8ChannelsAlpha)
+       uPixFmt = 83;
+    else if (oPixFmt==GUID_WICPixelFormat8bppY)
+       uPixFmt = 84;
+    else if (oPixFmt==GUID_WICPixelFormat8bppCb)
+       uPixFmt = 85;
+    else if (oPixFmt==GUID_WICPixelFormat8bppCr)
+       uPixFmt = 86;
+    else if (oPixFmt==GUID_WICPixelFormat16bppCbCr)
+       uPixFmt = 87;
+    else if (oPixFmt==GUID_WICPixelFormat16bppYQuantizedDctCoefficients)
+       uPixFmt = 88;
+    else if (oPixFmt==GUID_WICPixelFormat16bppCbQuantizedDctCoefficients)
+       uPixFmt = 89;
+    else if (oPixFmt==GUID_WICPixelFormat16bppCrQuantizedDctCoefficients)
+       uPixFmt = 90;
+    return uPixFmt;
+}
+
+INT indexedContainerFmts(GUID containerFmt) {
+    INT ucontainerFmt = 0;
+    if (containerFmt == GUID_ContainerFormatBmp)
+       ucontainerFmt = 1;
+    else if (containerFmt == GUID_ContainerFormatPng)
+       ucontainerFmt = 2;
+    else if (containerFmt == GUID_ContainerFormatIco)
+       ucontainerFmt = 3;
+    else if (containerFmt == GUID_ContainerFormatJpeg)
+       ucontainerFmt = 4;
+    else if (containerFmt == GUID_ContainerFormatTiff)
+       ucontainerFmt = 5;
+    else if (containerFmt == GUID_ContainerFormatGif)
+       ucontainerFmt = 6;
+    else if (containerFmt == GUID_ContainerFormatWmp)
+       ucontainerFmt = 7;
+    else if (containerFmt == GUID_ContainerFormatDds)
+       ucontainerFmt = 8;
+    else if (containerFmt == GUID_ContainerFormatAdng)
+       ucontainerFmt = 9;
+    else if (containerFmt == GUID_ContainerFormatHeif)
+       ucontainerFmt = 10;
+    else if (containerFmt == GUID_ContainerFormatWebp)
+       ucontainerFmt = 11;
+    else if (containerFmt == GUID_ContainerFormatRaw)
+       ucontainerFmt = 12;
+    return ucontainerFmt;
+}
+
+auto adaptImageGivenSize(UINT keepAratio, UINT ScaleAnySize, UINT imgW, UINT imgH, UINT givenW, UINT givenH) {
+  std::array<UINT, 3> size;
+  size[0] = 0;
+  size[1] = 0;
+  size[2] = 0;
+
+  if (keepAratio==2)
+  {
+     size[0] = imgW;
+     size[1] = imgH;
+     size[2] = 1;
+  } else if (keepAratio==1) 
+  {
+     if (imgW>givenW || imgH>givenH || ScaleAnySize==1)
+     {
+         double PicRatio = (float)(imgW)/imgH;
+         double givenRatio = (float)(givenW)/givenH;
+         if (imgW<=givenW && imgH<=givenH)
+         {
+            size[0] = givenW;
+            size[1] = round(size[0] / PicRatio);
+            if (size[1]>givenH)
+            {
+               size[1] = (imgH <= givenH) ? givenH : imgH;
+               size[0] = round(size[1] * PicRatio);
+            }
+         } else if (PicRatio>givenRatio)
+         {
+            size[0] = givenW;
+            size[1] = round(size[0] / PicRatio);
+         } else
+         {
+            size[1] = (imgH >= givenH) ? givenH : imgH;
+            size[0] = round(size[1] * PicRatio);
+         }
+     } else
+     {
+         size[0] = imgW;
+         size[1] = imgH;
+         size[2] = 1;
+     }
+  } else
+  {
+     size[0] = givenW;
+     size[1] = givenH;
+  }
+
+  return size;
+}
+
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPconv, int givenQuality, UINT givenW, UINT givenH, UINT keepAratio, UINT ScaleAnySize, UINT givenFrame, int doFlip, int doGrayScale, const wchar_t *szFileName, UINT *resultsArray) {
+    Gdiplus::GpBitmap  *myBitmap = NULL;
+
+    WICBitmapInterpolationMode wicScaleQuality;
+    if (givenQuality==5)
+       wicScaleQuality = WICBitmapInterpolationModeNearestNeighbor;
+    else if (givenQuality==2)
+       wicScaleQuality = WICBitmapInterpolationModeLinear;
+    else if (givenQuality==3)
+       wicScaleQuality = WICBitmapInterpolationModeCubic;
+    else if (givenQuality==7)
+       wicScaleQuality = WICBitmapInterpolationModeHighQualityCubic;
+    else
+       wicScaleQuality = WICBitmapInterpolationModeFant;
 
     std::stringstream ss;
     if (szFileName)
     {
+        IWICBitmapSource   *m_pOriginalBitmapSource = NULL;
+        IWICBitmapSource   *pToRenderBitmapSource = NULL;
+        // IWICBitmapSource   *gToRenderBitmapSource = NULL;
         HRESULT hr = S_OK;
-        // Create WIC factory
-        hr = CoCreateInstance(
-            CLSID_WICImagingFactory,
-            NULL,
-            CLSCTX_INPROC_SERVER,
-            IID_PPV_ARGS(&m_pIWICFactory)
-            );
+        HRESULT hr2 = S_OK;
+        HRESULT hrFlip = S_SERDDR;
+        HRESULT hrGray = S_SERDDR;
+        IWICBitmapFlipRotator* pIFlipRotator = NULL;
+        IWICFormatConverter* pConverterGray = NULL;
 
+        // Step 0: Create WIC factory [ see initWICnow() ]
+        // Step 1: Create a decoder
         // Decode the source image to IWICBitmapSource
-        // Create a decoder
         IWICBitmapDecoder *pDecoder = NULL;
-        hr = m_pIWICFactory->CreateDecoderFromFilename(
-            szFileName,                      // Image to be decoded
-            NULL,                            // Do not prefer a particular vendor
-            GENERIC_READ,                    // Desired read access to the file
-            WICDecodeMetadataCacheOnDemand,  // Cache metadata when needed
-            &pDecoder                        // Pointer to the decoder
-            );
+        try {
+            hr = m_pIWICFactory->CreateDecoderFromFilename(szFileName,                   // Image to be decoded
+                                                        NULL,                            // Do not prefer a particular vendor
+                                                        GENERIC_READ,                    // Desired read access to the file
+                                                        WICDecodeMetadataCacheOnDemand,  // Cache metadata when needed
+                                                        &pDecoder);                      // Pointer to the decoder
+        } catch (const char* message) {
+            std::stringstream ss;
+            ss << "qpv: threadu - " << threadIDu << " WIC decoder error on file " << szFileName;
+            ss << " WIC error " << message;
+            OutputDebugStringA(ss.str().data());
+            return myBitmap;
+        }
 
-        // Retrieve the first frame of the image from the decoder
+        // Step 2: Retrieve the first frame of the image from the decoder
         IWICBitmapFrameDecode *pFrame = NULL;
         if (SUCCEEDED(hr))
         {
-            hr = pDecoder->GetFrame(0, &pFrame);
+            UINT tFrames = 0;
+            hr2 = pDecoder->GetFrameCount(&tFrames);
+            resultsArray[2] = tFrames;
+            if (givenFrame > tFrames - 1)
+               givenFrame = tFrames - 1;
+
+            hr = pDecoder->GetFrame(givenFrame, &pFrame);
+            // std::stringstream ss;
+            // ss << "qpv: threadu - " << threadIDu << " decoder tFrames " << tFrames;
+            // ss << " givenFrame " << givenFrame;
+            // OutputDebugStringA(ss.str().data());
+        } else
+        {
             std::stringstream ss;
-            ss << "qpv: decoder " << hr;
+            ss << "qpv: threadu - " << threadIDu << " WIC decoder error on file " << szFileName;
             OutputDebugStringA(ss.str().data());
-        }
+            return myBitmap;
+        };
 
         // Retrieve IWICBitmapSource from the frame
         // m_pOriginalBitmapSource contains the original bitmap and acts as an intermediate
         if (SUCCEEDED(hr))
         {
             // SafeRelease(m_pOriginalBitmapSource);
-            hr = pFrame->QueryInterface(
-                IID_IWICBitmapSource, 
-                reinterpret_cast<void **>(&m_pOriginalBitmapSource));
-            std::stringstream ss;
-            ss << "qpv: get frame image " << hr;
-            OutputDebugStringA(ss.str().data());
+            GUID containerFmt;
+            hr2 = pDecoder->GetContainerFormat(&containerFmt);
+            UINT ucontainerFmt = indexedContainerFmts(containerFmt);
+            resultsArray[5] = ucontainerFmt;
+
+            hr = pFrame->QueryInterface(IID_IWICBitmapSource, 
+                         reinterpret_cast<void **>(&m_pOriginalBitmapSource));
+
+            // std::stringstream ss;
+            // ss << "qpv: threadu - " << threadIDu << " get WIC frame image " << hr;
+            // OutputDebugStringA(ss.str().data());
         }
 
         // Step 3: Scale the original IWICBitmapSource to the given size
@@ -1724,35 +2478,163 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testFuncNew(UINT width, UINT height, con
 
         if (SUCCEEDED(hr))
         {
-
-            std::stringstream ss;
-            ss << "qpv: scale image " << hr;
-            OutputDebugStringA(ss.str().data());
+            // std::stringstream ss;
+            // ss << "qpv: threadu - " << threadIDu << " collect image infos ";
+            // OutputDebugStringA(ss.str().data());
             hr = S_OK;
             // IWICBitmapSource** ppToRenderBitmapSource = NULL;
             // *ppToRenderBitmapSource = NULL;
 
             UINT owidth = 0;
             UINT oheight = 0;
-            // hr = m_pOriginalBitmapSource->GetSize(&owidth, &oheight); 
+            hr2 = m_pOriginalBitmapSource->GetSize(&owidth, &oheight); 
+            resultsArray[0] = owidth;
+            resultsArray[1] = oheight;
+
+            double dpix = 0;
+            double dpiy = 0;
+            hr2 = m_pOriginalBitmapSource->GetResolution(&dpix, &dpiy); 
+            resultsArray[4] = round((dpix + dpiy)/2);
+
+            WICPixelFormatGUID opixelFormat;
+            hr2 = m_pOriginalBitmapSource->GetPixelFormat(&opixelFormat);
+            UINT uPixFmt = indexedPixelFmts(opixelFormat);
+
+            resultsArray[3] = uPixFmt;
+            if (noBPPconv==1)
+            {
+               resultsArray[6] = 1;
+               SafeRelease(pToRenderBitmapSource);
+               SafeRelease(pDecoder);
+               SafeRelease(pFrame);
+               SafeRelease(m_pOriginalBitmapSource);
+               return myBitmap;
+            }
+
+            if (SUCCEEDED(hr) && doGrayScale==1)
+            {
+               hrGray = m_pIWICFactory->CreateFormatConverter(&pConverterGray);
+               if (SUCCEEDED(hr))
+               {
+                   hrGray = pConverterGray->Initialize(m_pOriginalBitmapSource,
+                                     GUID_WICPixelFormat8bppGray,
+                                     WICBitmapDitherTypeNone, NULL, 0.f,
+                                     WICBitmapPaletteTypeCustom);
+   
+                   // if (SUCCEEDED(hrGray))
+                   // {
+                   //    hrGray = pConverterGray->QueryInterface(IID_IWICBitmapSource, 
+                   //                  reinterpret_cast<void **>(&gToRenderBitmapSource));
+                   // }
+
+               }
+            }
+
 
             if (SUCCEEDED(hr))
             {
+
+
+                if (doFlip==4)
+                {
+                   hrFlip = m_pIWICFactory->CreateBitmapFlipRotator(&pIFlipRotator);
+                   if (SUCCEEDED(hrFlip))
+                   {
+                      if (SUCCEEDED(hrGray))
+                         pIFlipRotator->Initialize(pConverterGray, WICBitmapTransformFlipHorizontal);
+                      else
+                         pIFlipRotator->Initialize(m_pOriginalBitmapSource, WICBitmapTransformFlipHorizontal);
+                   }
+                }
+
                 // Create a BitmapScaler
                 IWICBitmapScaler* pScaler = NULL;
-                    hr = m_pIWICFactory->CreateBitmapScaler(&pScaler);
+                hr = m_pIWICFactory->CreateBitmapScaler(&pScaler);
+                // std::stringstream ss;
+                // ss << "qpv: threadu - " << threadIDu << " scale image " << hr;
+                // OutputDebugStringA(ss.str().data());
 
-                    // Initialize the bitmap scaler from the original bitmap map bits
-                    if (SUCCEEDED(hr))
+                // Initialize the bitmap scaler from the original bitmap map bits
+                if (SUCCEEDED(hr))
+                {
+                    auto nSize = adaptImageGivenSize(keepAratio, ScaleAnySize, owidth, oheight, givenW, givenH);
+                    if (nSize[2]==1)
+                       wicScaleQuality = WICBitmapInterpolationModeNearestNeighbor;
+
+                    if (SUCCEEDED(hrFlip))
                     {
-                        hr = pScaler->Initialize(
-                            m_pOriginalBitmapSource,
-                            width, height,
-                            WICBitmapInterpolationModeFant);
-            std::stringstream ss;
-            ss << "qpv: scale image to " << width;
-            OutputDebugStringA(ss.str().data());
+                       hr = pScaler->Initialize(pIFlipRotator, nSize[0], nSize[1], wicScaleQuality);
+                    } else
+                    {
+                       if (SUCCEEDED(hrGray))
+                       {
+                          hr = pScaler->Initialize(pConverterGray, nSize[0], nSize[1], wicScaleQuality);
+                       } else
+                       {
+                          hr = pScaler->Initialize(m_pOriginalBitmapSource, nSize[0], nSize[1], wicScaleQuality);
+                       }
                     }
+
+/*
+                    if (SUCCEEDED(hr) && doGrayScale==1)
+                    {
+                       IWICFormatConverter* pConverter = NULL;
+                       hr = m_pIWICFactory->CreateFormatConverter(&pConverter);
+                       if (SUCCEEDED(hr))
+                       {
+                           hr = pConverter->Initialize(pScaler,             // Input bitmap to convert
+                                             GUID_WICPixelFormat8bppGray,  // Destination pixel format
+                                             WICBitmapDitherTypeNone,      // Specified dither patterm
+                                             NULL,                         // Specify a particular palette 
+                                             0.f,                          // Alpha threshold
+                                             WICBitmapPaletteTypeCustom);  // Palette translation type
+                           if (SUCCEEDED(hr))
+                           {
+                               hr = pConverter->QueryInterface(IID_IWICBitmapSource, 
+                                                reinterpret_cast<void **>(&pToRenderBitmapSource));
+                               if (SUCCEEDED(hr))
+                               {
+                                   WICRect rcLock = { 0, 0, nSize[0], nSize[1]};
+                                   IWICBitmapLock *pLock = NULL;
+                                   hr = pToRenderBitmapSource->Lock(&rcLock, WICBitmapLockRead, &pLock);
+ 
+                                   if (SUCCEEDED(hr))
+                                   {
+                                       UINT cbBufferSize = 0;
+                                       UINT cbStride = 0;
+                                       BYTE *pv = NULL;
+ 
+                                       // Retrieve the stride.
+                                       hr = pLock->GetStride(&cbStride);
+ 
+                                       if (SUCCEEDED(hr))
+                                       {
+                                           hr = pLock->GetDataPointer(&cbBufferSize, &pv);
+                                       }
+                                       if (SUCCEEDED(hr))
+                                       {
+                                           // Access the bitmap memory starting at pv, where
+                                           // each row begins cbStride bytes after the start
+                                           // of the preceding row.
+                                       }
+ 
+                                       // Release the bitmap lock.
+                                       pLock->Release();
+                                   }
+                               }
+                           }
+                           SafeRelease(pConverter);
+                       }
+                    }
+*/
+
+                    // std::stringstream ss;
+                    // ss << "qpv: threadu - " << threadIDu << " scaled image to W/H " << nSize[0] << "," << nSize[1];
+                    // ss << " - quality " << wicScaleQuality;
+                    // ss << " - oW/H " << owidth << "," << oheight;
+                    // ss << " - gW/H " << givenW << "," << givenH;
+                    // OutputDebugStringA(ss.str().data());
+                }
 
                 // Format convert the bitmap into 32bppBGR, a convenient 
                 // pixel format for GDI+ rendering 
@@ -1760,33 +2642,32 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testFuncNew(UINT width, UINT height, con
                 {
                     IWICFormatConverter* pConverter = NULL;
                     hr = m_pIWICFactory->CreateFormatConverter(&pConverter);
+                    // std::stringstream ss;
+                    // ss << "qpv: threadu - " << threadIDu << " do convert pix format h=" << oheight;
+                    // OutputDebugStringA(ss.str().data());
 
                     // Format convert to 32bppBGR 
                     if (SUCCEEDED(hr))
                     {
-                        hr = pConverter->Initialize(
-                            pScaler,                         // Input bitmap to convert
-                            GUID_WICPixelFormat32bppBGR,     // Destination pixel format
-                            WICBitmapDitherTypeNone,         // Specified dither patterm
-                            NULL,                            // Specify a particular palette 
-                            0.f,                             // Alpha threshold
-                            WICBitmapPaletteTypeCustom       // Palette translation type
-                        );
+                        hr = pConverter->Initialize(pScaler,            // Input bitmap to convert
+                                          GUID_WICPixelFormat32bppPBGRA,// Destination pixel format
+                                          WICBitmapDitherTypeNone,      // Specified dither patterm
+                                          NULL,                         // Specify a particular palette 
+                                          0.f,                          // Alpha threshold
+                                          WICBitmapPaletteTypeCustom);  // Palette translation type
 
-            std::stringstream ss;
-            ss << "qpv: convert pix format h=" << height;
-            OutputDebugStringA(ss.str().data());
-                        // Store the converted bitmap as ppToRenderBitmapSource 
+                        // std::stringstream ss;
+                        // ss << "qpv: threadu - " << threadIDu << " converted pix format h=" << oheight;
+                        // OutputDebugStringA(ss.str().data());
+                        // Store the converted bitmap as pToRenderBitmapSource 
                         if (SUCCEEDED(hr))
                         {
-                            hr = pConverter->QueryInterface(
-                IID_IWICBitmapSource, 
-                reinterpret_cast<void **>(&pToRenderBitmapSource));
-                               // IID_PPV_ARGS(ppToRenderBitmapSource));
-            std::stringstream ss;
-            ss << "qpv: get bitmap converted format w=" << width;
-            OutputDebugStringA(ss.str().data());
-
+                           hr = pConverter->QueryInterface(IID_IWICBitmapSource, 
+                                            reinterpret_cast<void **>(&pToRenderBitmapSource));
+                                            // IID_PPV_ARGS(ppToRenderBitmapSource));
+                           // std::stringstream ss;
+                           // ss << "qpv: threadu - " << threadIDu << " get bitmap converted format w=" << owidth;
+                           // OutputDebugStringA(ss.str().data());
                         };
                     };
 
@@ -1798,14 +2679,9 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testFuncNew(UINT width, UINT height, con
 
         };
 
-
-
-
         // Step 4: Create a DIB from the converted IWICBitmapSource
         if (SUCCEEDED(hr))
         {
-
-
             HRESULT hr = S_OK;
             UINT width = 0;
             UINT height = 0;
@@ -1816,7 +2692,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testFuncNew(UINT width, UINT height, con
 
             if (SUCCEEDED(hr))
             {
-                hr = (pixelFormat == GUID_WICPixelFormat32bppBGR) ? S_OK : E_FAIL;
+                hr = (pixelFormat == GUID_WICPixelFormat32bppPBGRA) ? S_OK : E_FAIL;
             }
 
             if (SUCCEEDED(hr))
@@ -1837,67 +2713,73 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testFuncNew(UINT width, UINT height, con
                 // Size of the image, represented in bytes
                 hr = UIntMult(cbStride, height, &cbBufferSize);
             }
-            std::stringstream ss;
-            ss << "qpv: convert to dib format stride=" << cbStride;
-            OutputDebugStringA(ss.str().data());
+
+            // std::stringstream ss;
+            // ss << "qpv: threadu - " << threadIDu << " convert to dib format stride=" << cbStride;
+            // OutputDebugStringA(ss.str().data());
 
             if (SUCCEEDED(hr))
             {
+                BYTE *m_pbBuffer = NULL;  // the GDI+ bitmap buffer
                 m_pbBuffer = new BYTE[cbBufferSize];
                 hr = (m_pbBuffer) ? S_OK : E_FAIL;
+
+                // std::stringstream ss;
+                // ss << "qpv: threadu - " << threadIDu << " prepared dib format buffer ";
+                // OutputDebugStringA(ss.str().data());
+
                 if (SUCCEEDED(hr))
                 {
-                    WICRect rc = { 0, 0, width, height };
+                    // WICRect rc = { 0, 0, width, height };
                     // Extract the image into the GDI+ Bitmap
-                    hr = pToRenderBitmapSource->CopyPixels(
-                        &rc,
-                        cbStride,
-                        cbBufferSize,
-                        m_pbBuffer
-                        );
+                    hr = pToRenderBitmapSource->CopyPixels(NULL, cbStride, cbBufferSize, m_pbBuffer);
 
-            std::stringstream ss;
-            ss << "qpv: convert to dib format copy pixels " << hr;
-            OutputDebugStringA(ss.str().data());
+                    // std::stringstream ss;
+                    // ss << "qpv: threadu - " << threadIDu << " convert to dib format copied pixels " << hr;
+                    // OutputDebugStringA(ss.str().data());
                     if (SUCCEEDED(hr))
                     {
-                       // Gdiplus::GpBitmap* myBitmap = NULL;
-                       Gdiplus::DllExports::GdipCreateBitmapFromScan0(width, height, cbStride, PixelFormat32bppRGB, m_pbBuffer, &myBitmap);
+                       Gdiplus::DllExports::GdipCreateBitmapFromScan0(width, height, cbStride, PixelFormat32bppPARGB, NULL, &myBitmap);
+                       // std::stringstream ss;
+                       // ss << "qpv: threadu - " << threadIDu << " created gdip image " << hr;
+                       // OutputDebugStringA(ss.str().data());
+                       Gdiplus::Rect rectu(0, 0, width, height);
+                       Gdiplus::BitmapData bitmapDatu;
+                       bitmapDatu.Width = width;
+                       bitmapDatu.Height = height;
+                       bitmapDatu.Stride = cbStride;
+                       bitmapDatu.PixelFormat = PixelFormat32bppPARGB;
+                       bitmapDatu.Scan0 = m_pbBuffer;
 
-                        // m_pGdiPlusBitmap = new Gdiplus::Bitmap(
-                        //     width,
-                        //     height,
-                        //     cbStride,
-                        //     PixelFormat32bppRGB,
-                        //     m_pbBuffer
-                        //     );
-                         
-                        hr = myBitmap ? S_OK : E_FAIL;
-                        // if !(SUCCEEDED(hr))
-                        // { 
-                        // delete[] m_pbBuffer;
-                        // m_pbBuffer = NULL;
-                        // }
-            std::stringstream ss;
-            ss << "qpv: create gdip image " << hr;
-            OutputDebugStringA(ss.str().data());
-                    }
+                       Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rectu, 6, PixelFormat32bppPARGB, &bitmapDatu);
+                       Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu);
+                       hr = myBitmap ? S_OK : E_FAIL;
 
-                }
-            }
+                       // std::stringstream sb;
+                       // sb << "qpv: threadu - " << threadIDu << " filled gdip image " << hr;
+                       // OutputDebugStringA(sb.str().data());
+                    };
+                };
+                delete[] m_pbBuffer;
+                m_pbBuffer = NULL; 
+            };
+        };
 
-
-
-        }
-
+        // std::stringstream ss;
+        // ss << "qpv: threadu - " << threadIDu << " do safe releases";
+        // OutputDebugStringA(ss.str().data());
         SafeRelease(pToRenderBitmapSource);
+        // SafeRelease(gToRenderBitmapSource);
         SafeRelease(pDecoder);
+        SafeRelease(pConverterGray);
+        SafeRelease(pIFlipRotator);
         SafeRelease(pFrame);
         SafeRelease(m_pOriginalBitmapSource);
-        SafeRelease(m_pIWICFactory);
-    }
+        // SafeRelease(m_pIWICFactory);
+        // CoUninitialize();
+    };
 
-
+/*
     std::wstring string_to_convert(szFileName);
 
     //setup converter
@@ -1908,10 +2790,35 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testFuncNew(UINT width, UINT height, con
     std::string converted_str = converter.to_bytes( string_to_convert );
 
     // std::stringstream ss;
-    ss << "qpv: bmp file " << converted_str;
+    ss << "qpv: threadu - " << threadIDu << " bmp file " << converted_str;
     OutputDebugStringA(ss.str().data());
-    
+*/
     return myBitmap;
+}
+
+DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
+    HRESULT hr = S_OK;
+    // if (modus==1)
+    // {
+    //    CoUninitialize();
+    //    hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_SPEED_OVER_MEMORY | COINIT_DISABLE_OLE1DDE);
+    // }
+
+    if (SUCCEEDED(hr))
+    {
+       hr = CoCreateInstance(CLSID_WICImagingFactory,
+                    NULL, CLSCTX_INPROC_SERVER,
+                    IID_PPV_ARGS(&m_pIWICFactory));
+    }
+
+    std::stringstream ss;
+    ss << "qpv: threadu - " << threadIDu << " HRESULT " << hr;
+    OutputDebugStringA(ss.str().data());
+
+   if (SUCCEEDED(hr))
+      return 1;
+   else 
+      return 0;
 }
 
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testFunc(UINT width, UINT height, const wchar_t *szFileName) {
@@ -1938,4 +2845,3 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testFunc(UINT width, UINT height, const 
 
 
 
-*/

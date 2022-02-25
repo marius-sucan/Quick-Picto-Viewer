@@ -278,11 +278,11 @@ FreeImage_GetDPIresolution(hImage, ByRef dpiX, ByRef dpiY) {
 }
 
 FreeImage_GetDotsPerMeterX(hImage) {
-   Return DllCall(getFIMfunc("GetDotsPerMeterX"), "Uptr", hImage, "uint")
+   Return DllCall(getFIMfunc("GetDotsPerMeterX"), "Uptr", hImage, "int")
 }
 
 FreeImage_GetDotsPerMeterY(hImage) {
-   Return DllCall(getFIMfunc("GetDotsPerMeterY"), "Uptr", hImage, "uint")
+   Return DllCall(getFIMfunc("GetDotsPerMeterY"), "Uptr", hImage, "int")
 }
 
 FreeImage_SetDotsPerMeterX(hImage, dpiX) {
@@ -366,7 +366,7 @@ FreeImage_HasBackgroundColor(hImage) {
 }
 
 FreeImage_GetBackgroundColor(hImage) {
-   VarSetCapacity(RGBQUAD, 4)
+   VarSetCapacity(RGBQUAD, 4, 0)
    RetValue := DllCall(getFIMfunc("GetBackgroundColor"), "Uptr", hImage, "UInt", &RGBQUAD)
    If RetValue
       return NumGet(RGBQUAD, 2, "Uchar") "," NumGet(RGBQUAD, 1, "Uchar") "," NumGet(RGBQUAD, 0, "Uchar") "," NumGet(RGBQUAD, 3, "Uchar")
@@ -378,7 +378,7 @@ FreeImage_SetBackgroundColor(hImage, RGBArray:="255,255,255,0") {
    If (RGBArray!="")
    {
       RGBA := StrSplit(RGBArray, ",")
-      VarSetCapacity(RGBQUAD, 4)
+      VarSetCapacity(RGBQUAD, 4, 0)
       NumPut(RGBA[3], RGBQUAD, 0, "UChar")
       NumPut(RGBA[2], RGBQUAD, 1, "UChar")
       NumPut(RGBA[1], RGBQUAD, 2, "UChar")
@@ -422,7 +422,7 @@ FreeImage_GetScanLine(hImage, iScanline) { ; Base 0
 
 FreeImage_GetPixelIndex(hImage, xPos, yPos) {
 ; It works only with 1, 4 and 8 bit images.
-   VarSetCapacity(IndexNum, 1)
+   VarSetCapacity(IndexNum, 1, 0)
    RetValue := DllCall(getFIMfunc("GetPixelIndex"), "Uptr", hImage, "Uint", xPos, "Uint", yPos, "Uint", &IndexNum)
    If RetValue
       return NumGet(IndexNum, 0, "Uchar")
@@ -432,7 +432,7 @@ FreeImage_GetPixelIndex(hImage, xPos, yPos) {
 
 FreeImage_SetPixelIndex(hImage, xPos, yPos, nIndex) {
 ; It works only with 1, 4 and 8 bit images.
-   VarSetCapacity(IndexNum, 1)
+   VarSetCapacity(IndexNum, 1, 0)
    NumPut(nIndex, IndexNum, 0, "Uchar")
    Return DllCall(getFIMfunc("SetPixelIndex"), "Uptr", hImage, "Uint", xPos, "Uint", yPos, "Uint", &IndexNum)
 }
@@ -440,7 +440,7 @@ FreeImage_SetPixelIndex(hImage, xPos, yPos, nIndex) {
 FreeImage_GetPixelColor(hImage, xPos, yPos) {
 ; It works only with 16, 24 and 32 bit images.
 
-   VarSetCapacity(RGBQUAD, 4)
+   VarSetCapacity(RGBQUAD, 4, 0)
    RetValue := DllCall(getFIMfunc("GetPixelColor") , "Uptr", hImage, "Uint", xPos, "Uint", yPos, "Uint", &RGBQUAD)
    If RetValue
       return NumGet(RGBQUAD, 2, "Uchar") "," NumGet(RGBQUAD, 1, "Uchar") "," NumGet(RGBQUAD, 0, "Uchar") "," NumGet(RGBQUAD, 3, "Uchar")
@@ -451,7 +451,7 @@ FreeImage_GetPixelColor(hImage, xPos, yPos) {
 FreeImage_SetPixelColor(hImage, xPos, yPos, RGBArray:="255,255,255,0") {
 ; It works only with 16, 24 and 32 bit images.
    RGBA := StrSplit(RGBArray, ",")
-   VarSetCapacity(RGBQUAD, 4)
+   VarSetCapacity(RGBQUAD, 4, 0)
    NumPut(RGBA[3], RGBQUAD, 0, "UChar")
    NumPut(RGBA[2], RGBQUAD, 1, "UChar")
    NumPut(RGBA[1], RGBQUAD, 2, "UChar")
@@ -561,7 +561,10 @@ FreeImage_GetPageCount(hFIMULTIBITMAP) {
 }
 
 FreeImage_SimpleGetPageCount(hImage) {
-   Return DllCall(getFIMfunc("FreeImage_GetPageCount"), "UPtr", hImage)
+   r := DllCall(getFIMfunc("FreeImage_GetPageCount"), "UPtr", hImage)
+   If !r
+      r := 1
+   Return r
 }
 
 FreeImage_AppendPage(hFIMULTIBITMAP, hImage) {
@@ -656,14 +659,17 @@ FreeImage_SaveToMemory(FIF, hImage, hMemory, Flags) { ; 0:BMP 2:JPG 13:PNG 18:TI
 
 FreeImage_Rotate(hImage, angle) {
    ; missing color parameter
+   ; returns a new hImage
    Return DllCall(getFIMfunc("Rotate"), "Uptr", hImage, "Double", angle, "uptr")
 }
 
 FreeImage_FlipHorizontal(hImage) {
+   ; returns 1 if success
    Return DllCall(getFIMfunc("FlipHorizontal"), "Uptr", hImage)
 }
 
 FreeImage_FlipVertical(hImage) {
+   ; returns 1 if success
    Return DllCall(getFIMfunc("FlipVertical"), "Uptr", hImage)
 }
 
@@ -714,7 +720,7 @@ FreeImage_Paste(hImageDst, hImageSrc, nLeft, nTop, nAlpha) {
 
 FreeImage_Composite(hImage, useFileBkg:=0, RGBArray:="255,255,255", hImageBkg:=0) {
    RGBA := StrSplit(RGBArray, ",")
-   VarSetCapacity(RGBQUAD, 4)
+   VarSetCapacity(RGBQUAD, 4, 0)
    NumPut(RGBA[3], RGBQUAD, 0, "UChar")
    NumPut(RGBA[2], RGBQUAD, 1, "UChar")
    NumPut(RGBA[1], RGBQUAD, 2, "UChar")

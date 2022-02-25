@@ -60,7 +60,6 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   Global UsrCheckBoxu, 2ndDropListuChoice, DropListuChoice, EditUserMsg, prompt, BoxIcon
   oCritic := A_IsCritical 
   Critical, off
-
   thisHwnd := ownerHwnd ? ownerHwnd : modalHwnd
   If !thisHwnd
      thisHwnd := "mouse"
@@ -69,6 +68,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   rMaxW := Floor(ActiveMon.w*0.95)
   rMaxH := Floor(ActiveMon.h*0.95)
 
+  MsgBox2hwnd := 0
   MsgBox2Result := ""
   If (btnList=-1)
      btnList := ""
@@ -190,6 +190,14 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   Gui, WinMsgBox: Default
   Gui, WinMsgBox: -MinimizeBox -DPIScale +HwndMsgBox2hwnd
   Gui, WinMsgBox: Margin, %marginsGui%, %marginsGui%
+
+  If (uiUseDarkMode=1)
+  {
+     Gui, Color, % darkWindowColor, % darkWindowColor
+     Gui, Font, c%darkControlColor%
+     setDarkWinAttribs(MsgBox2hwnd)
+  }
+
   If fontFace
      Gui, Font, %thisBold% Q4, %fontFace% 
 
@@ -708,7 +716,7 @@ Fnt_GetFontName(hFont:="") {
     old_hFont:=DllCall("SelectObject","Ptr",hDC,"Ptr",hFont)
 
     ;-- Get the font name
-    VarSetCapacity(l_FontName,MAX_FONT_NAME_LENGTH*(A_IsUnicode ? 2:1))
+    VarSetCapacity(l_FontName,MAX_FONT_NAME_LENGTH*(A_IsUnicode ? 2:1), 0)
     DllCall("GetTextFace","Ptr",hDC,"Int",MAX_FONT_NAME_LENGTH,"Str",l_FontName)
 
     ;-- Release the objects needed by the GetTextFace function
@@ -1032,6 +1040,8 @@ GetWinClientSize(ByRef w, ByRef h, hwnd, mode) {
 
 repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:="") {
     Static lastAsked := 1
+         , BS_CHECKBOX := 0x2, BS_RADIOBUTTON := 0x8
+
     If !winPos
     {
        SysGet, MonitorCount, 80
@@ -1040,6 +1050,60 @@ repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:=
        ResWidth := ActiveMonDetails.w, ResHeight:= ActiveMonDetails.h
        mCoordRight := ActiveMonDetails.mCRight, mCoordLeft := ActiveMonDetails.mCLeft
        mCoordTop := ActiveMonDetails.mCTop, mCoordBottom := ActiveMonDetails.mCBottom
+    }
+
+    If (uiUseDarkMode=1)
+    {
+       setDarkWinAttribs(hwndGUI)
+       WinGet,strControlList, ControlList, ahk_id %hwndGUI%
+       Gui, %whichGUI%: Color, %intWindowColor%, %intControlColor%
+       for strKey, strControl in StrSplit(strControlList,"`n","`r`n")
+       {
+         ControlGet, strControlHwnd, HWND, , %strControl%, ahk_id %hwndGUI%
+         WinGetClass, CtrlClass, ahk_id %strControlhwnd%
+         ControlGet, CtrlStyle, Style, , , ahk_id %strControlhwnd%
+         doAttachCtlColor := 0
+         ; MsgBox, % CtrlClass
+         If InStr(CtrlClass, "systab")
+         {
+            GuiControl, %whichGUI%:-Border +Buttons cFFFFaa, %strControl%
+            doAttachCtlColor := -2
+         } Else If InStr(CtrlClass, "Button")
+         {
+            IF (CtrlStyle & BS_RADIOBUTTON) || (CtrlStyle & BS_CHECKBOX)
+               doAttachCtlColor := 2
+            IF (CtrlStyle & 0x1000)
+               doAttachCtlColor := 1
+         } Else If InStr(CtrlClass, "ComboBox")
+            doAttachCtlColor := 1
+         Else If InStr(CtrlClass, "Edit")
+            doAttachCtlColor := -1
+         Else If InStr(CtrlClass, "Static")
+            doAttachCtlColor := -2
+
+         ; If (doAttachCtlColor!=-2 && doAttachCtlColor!=-1 && doAttachCtlColor>!=2)
+         ; {
+         ;    GuiControl, %whichGUI%: +Background%darkWindowColor%, %strControl%
+         ;    Gui, %whichGUI%: Font, c%darkControlColor%
+         ;    GuiControl, %whichGUI%: Font, %strControl%
+         ; }
+
+         If (doAttachCtlColor=1)
+            CtlColors.Attach(strControlHwnd, SubStr(darkWindowColor, 3), SubStr(darkControlColor, 3))
+
+         ; WinSet, Style, -0x800000, ahk_id %strControlhwnd%
+         ; WinSet, Style, -0x400000, ahk_id %strControlhwnd%
+         ; WinSet, Style, -0x40000, ahk_id %strControlhwnd%
+         If (doAttachCtlColor!=2 && doAttachCtlColor!=-2)
+            DllCall("uxtheme\SetWindowTheme", "ptr", strControlHwnd, "str", "DarkMode_Explorer", "ptr", 0)
+       }
+    }
+
+    If (ShowAdvToolbar=1)
+    {
+       createGUItoolbar()
+       decideIconBTNmainTooler()
+       fromCurrentPanelToColorsSwatch()
     }
 
     If (MonitorCount>1 && !winPos && A_OSVersion!="WIN_XP")
@@ -1068,6 +1132,7 @@ repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:=
           Final_y := mCoordTop + 1
        Gui, %whichGUI%: Show, x%Final_x% y%Final_y%, % Chr(160) winTitle
     } Else Gui, %whichGUI%: Show, AutoSize %winPos%, % Chr(160) winTitle
+    SetTimer, highlightActiveCtrl, -100
 }
 
 MWAGetMonitorMouseIsIn(coordX:=0,coordY:=0) {

@@ -35,8 +35,8 @@ Alt + U|Manage dynamic folder(s) list|Anywhere|Panel
 Alt + Y|Automatic image crop|Image view|Panel
 Alt + Arrow keys|Adjust image selection: top-left corner position|Image selection area|-
 Alt + Shift + Arrow keys|Adjust image selection: bottom-right corner position|Image selection area|-
-Alt + Arrow keys|Adjust the X/Y coordinates of the last point in the path|Freeform drawing|-
-Alt + Shift + Arrow keys|Adjust the X/Y coordinates of the first point in the path|Freeform drawing|-
+Alt + Arrow keys|Adjust the X/Y coordinates of the last point in the path|Vector drawing|-
+Alt + Shift + Arrow keys|Adjust the X/Y coordinates of the first point in the path|Vector drawing|-
 Ctrl + 0|Reverse files list|Files list|-
 Ctrl + 1|Sort list by path and name|Files list|-
 Ctrl + 2|Sort list by folder path|Files list|-
@@ -103,8 +103,8 @@ Esc|Quit or close panel window|Anywhere|Close window
 F|Toggle between color modes/filters|Anywhere|-
 Shift + F|Toggle between color modes/filters|Anywhere|-
 F1|Help / About|Anywhere|Panel
-F10|Toggle quick bar|Anywhere|-
-Shift + F10|Toggle toolbar|Anywhere|-
+F10|Toggle toolbar|Anywhere|-
+Shift + F10|Toggle quick bar|Anywhere|-
 F11|Toggle full-screen|Image view|Mode switch
 F11|Collapse / expand panel for current tool|Live editing|Panel
 F12|Preferences|Anywhere|Panel
@@ -138,7 +138,7 @@ R|Review selected files list|Files list|Panel
 S|Toggle slideshow modes|Image view|-
 T|Toggle thumbnails aspect ratios: square, tall or wide|Files list|-
 T|Toggle image rescaling/adapting modes|Image view|-
-T|Cycle different levels of points tension in the freeform path|Freeform drawing|-
+T|Cycle different levels of points tension in the freeform path|Vector drawing|-
 U|Viewport colors and image adjustments|Image view|Panel
 X|Play associated audio file|Image view|-
 X|Mark active index to switch to a different index|Files list|-
@@ -165,7 +165,7 @@ Wheel Up|Next image or two lines of images|Anywhere|-
 Page Down|Previous image or jump forwards one page of images|Anywhere|-
 Page Up|Next image or jump backwards one page of images|Anywhere|-
 Backspace|Previous random image|Anywhere|-
-Backspace|Remove last added point in the path|Freeform drawing|-
+Backspace|Remove last added point in the path|Vector drawing|-
 Ctrl + Backspace|Jump to previously displayed image|Anywhere|-
 Shift + Backspace|Next random image|Anywhere|-
 Ctrl + Home|Jump to the first selected file in index|Anywhere|-
@@ -183,6 +183,7 @@ Shift + B|Blur selected area|Image view|Panel
 Shift + C|Copy file path(s) to clipboard|Anywhere|-
 Shift + Delete|Delete active file and its index entry|Anywhere|-
 Shift + E|Toggle image selection area modes: rect, ellipse, freeform|Image selection area|-
+Ctrl + NumPad keys|Align image selection area: top, bottom, left, right, more|Image selection area|-
 Alt + [+]|Increase viewport grid size|Image view|-
 Alt + [-]|Decrease viewport grid size|Image view|-
 Shift + Esc|Restart Quick Picto Viewer|Anywhere|Close window
@@ -201,7 +202,7 @@ Shift + V|Apply flip image vertically on selected file(s)|Files list|-
 Shift + I|Invert colors in image selected area|Image view|-
 Shift + I|Invert files selection|Files list|-
 Shift + L|New / modify current freeform selecion shape|Image view|Panel
-Ctrl + L|Draw predefined lines, arcs or selection borders|Image selection area|Panel
+Ctrl + L|Draw shape contours, arcs or other lines|Image selection area|Panel
 Shift + P|Draw freeform filled shape|Image view|Panel
 Alt + P|Draw freeform outline (path)|Image view|Panel
 P|Paint brushes: soft edges, cloner, eraser, deformers|Image view|Panel
@@ -238,21 +239,21 @@ Delete|Delete folder|Folder tree|Panel
 Space|Scan for sub-folders in the selected folder|Folder tree|-
 7|Copy selected or active file(s) into...|Folder tree|-
 Shift + 7|Move selected or active file(s) into...|Folder tree|-
-Double Left-Click on dot|Insert a new dot next to the double-clicked one|Freeform drawing|-
-Ctrl + Left-Click on dot|Remove the dot clicked on|Freeform drawing|-
-Alt + Left-Click on dot|Set point as path's start point|Freeform drawing|-
-Shift + Left-Click|Add new dot in the path constrained every 45 degrees|Freeform drawing|-
-Shift + Left-Click on dot|Select dot|Freeform drawing|-
-Right-Click|Options menu|Freeform drawing|Menu
-Shift + I|Invert selection path points|Freeform drawing|-
-Ctrl + A|Select all points in the path|Freeform drawing|-
-Ctrl + D|Deselect all points in the path|Freeform drawing|-
-Delete|Remove selected points in the path|Freeform drawing|-
-Ctrl + Z|Undo last shape action|Freeform drawing|-
-Ctrl + Y|Redo last shape action|Freeform drawing|-
-Y|Cycle shape symmetry modes|Freeform drawing|-
-Enter|Finish freeform path drawing|Freeform drawing|-
-Esc|Cancel freeform path drawing|Freeform drawing|-
+Double Left-Click on dot|Insert a new dot next to the double-clicked one|Vector drawing|-
+Ctrl + Left-Click on dot|Remove the dot clicked on|Vector drawing|-
+Alt + Left-Click on dot|Move dot ignoring symmetry|Vector drawing|-
+Shift + Left-Click|Add new dot in the path constrained every 45 degrees|Vector drawing|-
+Shift + Left-Click on dot|Select dot|Vector drawing|-
+Right-Click|Options menu|Vector drawing|Menu
+Shift + I|Invert selection path points|Vector drawing|-
+Ctrl + A|Select all points in the path|Vector drawing|-
+Ctrl + D|Deselect all points in the path|Vector drawing|-
+Delete|Remove selected points in the path|Vector drawing|-
+Ctrl + Z|Undo last shape action|Vector drawing|-
+Ctrl + Y|Redo last shape action|Vector drawing|-
+Y|Cycle shape symmetry modes|Vector drawing|-
+Enter|Finish freeform path drawing|Vector drawing|-
+Esc|Cancel freeform path drawing|Vector drawing|-
 Shift + Left-Click on edges or dots|Resize selection area maintaing initial aspect ratio|Image selected area|-
 Shift + Left-Click inside area|Move selection area constrained on X or Y axis|Image selected area|-
 Alt + Left-Click inside area|Resize selection area relative to its center and transform to 1:1 ratio [square]|Image selected area|-
@@ -265,6 +266,10 @@ Shift + .|Increase brush wetness or deform intensity|Painting mode|-
 Shift + ,|Decrease brush wetness or deform intensity|Painting mode|-
 0-9|Set brush opacity at level 5%..100%|Painting mode|-
 B|Toggle between simple and soft edges brush types|Painting mode|-
+Ctrl + K|Paint alpha mask|Live editing|-
+M|Toggle alpha mask preview|Live editing|-
+M|Toggle alpha mask preview|Live editing|-
+N|Invert alpha mask|Live editing|-
 T|Toggle airbrush mode|Painting mode|-
 R|Activate erase brush|Painting mode|-
 Q|Activate effects brush|Painting mode|-

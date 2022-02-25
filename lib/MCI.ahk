@@ -1536,7 +1536,7 @@ MCI_SendString(p_lpszCommand,ByRef r_lpszReturnString="",p_hwndCallback=0) {
     ;-- Return code?
     if l_Return
         {
-        VarSetCapacity(l_MCIErrorString,2048)
+        VarSetCapacity(l_MCIErrorString,2048, 0)
         DllCall("winmm.dll\mciGetErrorString" . (A_IsUnicode ? "W":"A")
                ,"UInt",l_Return                             ;-- MCI error number
                ,"Str",l_MCIErrorString                      ;-- MCI error text

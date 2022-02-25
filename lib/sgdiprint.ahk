@@ -2,7 +2,7 @@
 ; Simple GDI-Printing library for AHK_L (32bit & 64bit compatible)
 ; found on : https://www.autohotkey.com/boards/viewtopic.php?f=6&t=68403
 ; by Zed_Gecko
-; updated by Marius Șucan on vendredi 5 juin 2020.
+; updated by Marius Șucan on mercredi 22 décembre 2021.
 ;
 ; this edition relies on GDI+ library compilation
 ; https://github.com/marius-sucan/AHK-GDIp-Library-Compilation
@@ -20,6 +20,7 @@
 ; SGDIPrint_SetDefaultPrinter()       Sets default printer by name
 ; SGDIPrint_GetDefaultPrinter()       Get default-Printer Name
 ; SGDIPrint_GetHDCfromPrinterName()   Get GDI DC based on Printer Name
+; SGDIPrint_OpenPrintingOptions()     Modify DEVMODE struct using Printer Standard dialog printing options
 ; SGDIPrint_GetHDCfromPrintDlg()      Get GDI DC from user-dialog
 ; SGDIPrint_GetMatchingBitmap()       Get a GDI+ Bitmap matching to print-out size
 ; SGDIPrint_BeginDocument()           starts the GDI-print-session
@@ -39,7 +40,7 @@
 ; return an object with the following properties:
 ;  SGDIPrint.HDC_Orientation  Page Orientation:  PORTRAIT = 1  LANDSCAPE = 2
 ;  SGDIPrint.HDC_Color        Color-Printing.Mode:  B/W = 1  COLOR = 2
-;  SGDIPrint.HDC_Copies       the number of copies you or user selected [integer]
+;  SGDIPrint.HDC_Copies       the number of copies user selected [integer]
 ;  SGDIPrint.HDC_Width        Width in pixel
 ;  SGDIPrint.HDC_Height       Height in pixel
 ;  SGDIPrint.HDC_xdpi         X resolution in DPI
@@ -125,9 +126,9 @@ SGDIPrint_EnumPrinters(delim:="`n", flags:=0, returnArray:=0) {
 SGDIPrint_GetDefaultPrinter() {
   DllCall("winspool.drv\GetDefaultPrinter", "Ptr", 0, "Uint*", nSize)
   if A_IsUnicode
-     nSize := VarSetCapacity(gPrinter, nSize*2)
+     nSize := VarSetCapacity(gPrinter, nSize*2, 0)
   else
-     nSize := VarSetCapacity(gPrinter, nSize)
+     nSize := VarSetCapacity(gPrinter, nSize, 0)
 
   r := DllCall("winspool.drv\GetDefaultPrinter", "Str", gPrinter, "Uint*", nSize)
   If !r
@@ -142,45 +143,97 @@ SGDIPrint_GetDefaultPrinter() {
 ; Orientation: PORTRAIT = 1  LANDSCAPE = 2
 ; Color: B/W = 1  COLOR = 2
 ; Copies: any number of copies you want [integer]
+; #define DM_UPDATE           1
+; #define DM_COPY             2
+; #define DM_PROMPT           4
+; #define DM_MODIFY           8
 
-SGDIPrint_GetHDCfromPrinterName(pPrinterName, dmOrientation:=0, dmColor:=0, dmCopies:=0, MainhWnd:=0) {
+; #define DM_IN_BUFFER        DM_MODIFY
+; #define DM_IN_PROMPT        DM_PROMPT
+; #define DM_OUT_BUFFER       DM_COPY
+; #define DM_OUT_DEFAULT      DM_UPDATE
+
+SGDIPrint_OpenPrintingOptions(pPrinterName, ByRef pDevModeOutput, MainhWnd) {
+  ; this function uses ByRef for pDevModeOutput
+  ; this struct should be passed to SGDIPrint_GetHDCfromPrinterName()
+  ; the struct holds the settings chosen by user in the printer panel options
+
+  If !MainhWnd
+     MainhWnd := A_ScriptHwnd
+
+  pPrinterName := Trim(pPrinterName)
+  VarSetCapacity(pPrinter , A_PtrSize, 0)
+  out := DllCall("Winspool.drv\OpenPrinter", "UPtr", &pPrinterName, "UPtr*", pPrinter, "Ptr", 0, "Ptr")
+  If !out
+     Return 0
+ 
+  If !pDevModeOutput
+  {
+     sizeDevMode := DllCall("Winspool.drv\DocumentProperties", "Ptr", MainhWnd, "Ptr", pPrinter, "Ptr", &pPrinterName, "Ptr", 0, "Ptr", 0, "UInt", 0, "Int")
+     VarSetCapacity(pDevModeOutput, sizeDevMode, 0)
+  }
+
+  ; out := DllCall("Winspool.drv\DocumentProperties", "UPtr", MainhWnd, "Ptr", pPrinter, "Ptr", &pPrinterName, "UPtr", &pDevModeOutput, "UPtr", &pDevModeOutput, "UInt", 4|8, "Int") 
+  out := DllCall("Winspool.drv\AdvancedDocumentProperties", "UPtr", MainhWnd, "Ptr", pPrinter, "Ptr", &pPrinterName, "UPtr", &pDevModeOutput, "UPtr", &pDevModeOutput, "Int") 
+
+  DllCall("ClosePrinter", "Ptr", pPrinter)
+  return out
+}
+
+SGDIPrint_GetHDCfromPrinterName(pPrinterName, dmOrientation:=0, dmColor:=0, dmCopies:=0, MainhWnd:=0, printDevMode:=0) {
+  Static dmSize := A_IsUnicode ? 68 : 36
+  Static dmFields := dmSize + 4
+       , DM_COPIES := "0x100"
+       , DM_COLOR := "0x800"
+       , DM_ORIENTATION := "0x1"
+
   SGDIPrint := []
   If !MainhWnd
      MainhWnd := A_ScriptHwnd
 
   pPrinterName := Trim(pPrinterName)
   VarSetCapacity(pPrinter , A_PtrSize, 0)
-  out := DllCall("Winspool.drv\OpenPrinter", "Ptr", &pPrinterName, "Ptr*", pPrinter, "Ptr", 0, "Ptr")
+  out := DllCall("Winspool.drv\OpenPrinter", "UPtr", &pPrinterName, "UPtr*", pPrinter, "Ptr", 0, "Ptr")
   If !out
      Return 0
 
-  sizeDevMode := DllCall("Winspool.drv\DocumentProperties", "Ptr", MainhWnd, "Ptr", pPrinter, "Ptr", &pPrinterName, "Ptr", 0, "Ptr", 0, "UInt", 0, "Int")
-  VarSetCapacity(pDevModeOutput, sizeDevMode, 0)
-  out2 := DllCall("Winspool.drv\DocumentProperties", "Ptr", MainhWnd, "Ptr", pPrinter, "Ptr", &pPrinterName, "Ptr", &pDevModeOutput, "Ptr", 0, "UInt", 2, "Int")
-
-  ansiUnicodeOffSet := (A_IsUnicode=1) ? 32 : 0
-  if (dmOrientation=1 || dmOrientation=2)
-     NumPut(dmOrientation, pDevModeOutput, 44 + ansiUnicodeOffSet, "Short")
-
-  if dmCopies is integer
+  givenDevMode := 1
+  If (!printDevMode)
   {
-     if (dmCopies>0)
-        NumPut(dmCopies, pDevModeOutput, 54 + ansiUnicodeOffSet, "Short")
-  }
+      givenDevMode := 0
+      sizeDevMode := DllCall("Winspool.drv\DocumentProperties", "Ptr", MainhWnd, "Ptr", pPrinter, "Ptr", &pPrinterName, "Ptr", 0, "Ptr", 0, "UInt", 0, "Int")
+      VarSetCapacity(pDevModeOutput, sizeDevMode, 0)
+      out2 := DllCall("Winspool.drv\DocumentProperties", "Ptr", MainhWnd, "Ptr", pPrinter, "Ptr", &pPrinterName, "UPtr", &pDevModeOutput, "Ptr", 0, "UInt", 2, "Int")
 
-  if (dmColor=1 || dmColor=2)
-     NumPut(dmColor, pDevModeOutput, 60 + ansiUnicodeOffSet, "Short")
+      ansiUnicodeOffSet := (A_IsUnicode=1) ? 32 : 0
+      if (dmOrientation=1 || dmOrientation=2)
+         NumPut(dmOrientation, pDevModeOutput, 44 + ansiUnicodeOffSet, "Short")
 
-  out3 := DllCall("Winspool.drv\DocumentProperties", "UPtr", MainhWnd, "Ptr", pPrinter, "Ptr", &pPrinterName, "Ptr", &pDevModeOutput, "Ptr", &pDevModeOutput, "UInt", 10, "Int") 
+      if dmCopies is integer
+      {
+         if (dmCopies>0)
+            NumPut(dmCopies, pDevModeOutput, 54 + ansiUnicodeOffSet, "Short")
+      }
+
+      if (dmColor=1 || dmColor=2)
+         NumPut(dmColor, pDevModeOutput, 60 + ansiUnicodeOffSet, "Short")
+
+      updateFields := 0 | DM_COLOR | DM_ORIENTATION | DM_COPIES
+      NumPut(updateFields, pDevModeOutput, dmFields, "UInt")
+
+      out3 := DllCall("Winspool.drv\DocumentProperties", "UPtr", MainhWnd, "Ptr", pPrinter, "Ptr", &pPrinterName, "UPtr", &pDevModeOutput, "UPtr", &pDevModeOutput, "UInt", 10, "Int") 
+  } else pDevModeOutput := printDevMode
+
   SGDIPrint.HDC_PrinterName := pPrinterName
   SGDIPrint.HDC_Orientation := NumGet(pDevModeOutput, 44 + ansiUnicodeOffSet, "Short")
-  SGDIPrint.HDC_Color := NumGet(pDevModeOutput, 54 + ansiUnicodeOffSet, "Short")
-  SGDIPrint.HDC_Copies := NumGet(pDevModeOutput, 60 + ansiUnicodeOffSet , "Short")
-  hDC := DllCall("Gdi32.dll\CreateDC", "Ptr", 0, "WStr", pPrinterName, "Ptr", 0, "Ptr", &pDevModeOutput, "UPtr")
-  ; DllCall("ClosePrinter", "Ptr", pPrinter)
+  SGDIPrint.HDC_Color := NumGet(pDevModeOutput, 60 + ansiUnicodeOffSet, "Short")
+  SGDIPrint.HDC_Copies := NumGet(pDevModeOutput, 54 + ansiUnicodeOffSet , "Short")
+  hDC := DllCall("Gdi32.dll\CreateDC", "Ptr", 0, "WStr", pPrinterName, "Ptr", 0, "UPtr", &pDevModeOutput, "UPtr")
 
-  VarSetCapacity(pDevModeOutput, 0)
-  VarSetCapacity(pPrinter, 0)
+  ; MsgBox, % dmColor "=" SGDIPrint.HDC_Color "|" SGDIPrint.HDC_Orientation
+  If !givenDevMode
+     VarSetCapacity(pDevModeOutput, 0)
+
   ; Retrieve the size of the printable area in pixels:
   SGDIPrint.HDC_Width  := DllCall("Gdi32.dll\GetDeviceCaps", "Ptr", hDC, "UInt", 8)    ; HORZRES
   SGDIPrint.HDC_Height := DllCall("Gdi32.dll\GetDeviceCaps", "Ptr", hDC, "UInt", 10)  ; VERTRES
@@ -195,6 +248,7 @@ SGDIPrint_GetHDCfromPrinterName(pPrinterName, dmOrientation:=0, dmColor:=0, dmCo
   SGDIPrint.HDC_PHYSICALOFFSETX := DllCall("GetDeviceCaps", "Ptr", hDC, "UInt", 0x70)
   SGDIPrint.HDC_PHYSICALOFFSETY := DllCall("GetDeviceCaps", "Ptr", hDC, "UInt", 0x71)
   SGDIPrint.HDC_ptr := hDC
+  DllCall("ClosePrinter", "Ptr", pPrinter)
   return SGDIPrint
 }
 
@@ -250,8 +304,8 @@ SGDIPrint_GetHDCfromPrintDlg(hwndOwner) {
      pDevModeOutput := DllCall("GlobalLock", "Ptr", hDevModeOutput)
      SGDIPrint.HDC_PrinterName := StrGet(NumGet(hDevModeOutput + 0, 0, "ptr"))
      SGDIPrint.HDC_Orientation := NumGet(pDevModeOutput + 0, 44 + ansiUnicodeOffSet, "Short")
-     SGDIPrint.HDC_Color := NumGet(pDevModeOutput + 0, 54 + ansiUnicodeOffSet, "Short")
-     SGDIPrint.HDC_Copies := NumGet(pDevModeOutput + 0, 60 + ansiUnicodeOffSet, "Short")
+     SGDIPrint.HDC_Color := NumGet(pDevModeOutput + 0, 60 + ansiUnicodeOffSet, "Short")
+     SGDIPrint.HDC_Copies := NumGet(pDevModeOutput + 0, 54 + ansiUnicodeOffSet, "Short")
      DllCall("GlobalFree","Ptr",hDevModeOutput)
   }
 
@@ -295,11 +349,11 @@ SGDIPrint_GetMatchingBitmap(width, height, color:="0xffFFffFF") {
 ; SGDIPrint_BeginDocument starts the GDI-print-session and the first page
 ; returns a value>0 on success
 SGDIPrint_BeginDocument(hDC, Document_Name) {
-  VarSetCapacity(DOCUMENTINFO_STRUCT,(A_PtrSize * 4) + 4,0), 
-  NumPut((A_PtrSize * 4) + 4, DOCUMENTINFO_STRUCT) 
-  NumPut(&Document_Name,DOCUMENTINFO_STRUCT,A_PtrSize)
+  VarSetCapacity(DOCINFO_STRUCT,(A_PtrSize * 4) + 4,0), 
+  NumPut((A_PtrSize * 4) + 4, DOCINFO_STRUCT) 
+  NumPut(&Document_Name,DOCINFO_STRUCT,A_PtrSize)
 
-  r := DllCall("Gdi32.dll\StartDoc","Ptr", hDC, "Ptr", &DOCUMENTINFO_STRUCT, "int")
+  r := DllCall("Gdi32.dll\StartDoc","Ptr", hDC, "Ptr", &DOCINFO_STRUCT, "int")
   if (r>0)
      out := DllCall("Gdi32.dll\StartPage","Ptr",hDC,"int")
  
@@ -339,8 +393,8 @@ SGDIPrint_NextPage(hDC) {
   return r
 }  
 
-; SGDIPrint_EndDocument ends the printing session and deletes the DC
-; if return value not 0, then an error occured
+; SGDIPrint_EndDocument ends the printing session and deletes the DC.
+; If the return value is not 0, an error occured.
 SGDIPrint_EndDocument(hDC) {
   r := DllCall("Gdi32.dll\EndPage","Ptr",hDC,"int")
   DllCall("Gdi32.dll\EndDoc","Ptr",hDC)
@@ -368,6 +422,8 @@ SGDIPrint_OpenPrinterProperties(pPrinterName, hwndParent) {
 
    if !(DllCall("winspool.drv\PrinterProperties", "Ptr", hwndParent, "Ptr", pPrinter))
       return 0
+   
+   DllCall("Winspool.drv\ClosePrinter", "Ptr", pPrinterName)
    return 1
 }
 
@@ -378,6 +434,8 @@ SGDIPrint_AbortPrinter(pPrinterName) {
 
    if !(DllCall("winspool.drv\AbortPrinter", "Ptr", pPrinter))
       return 0
+
+   DllCall("Winspool.drv\ClosePrinter", "Ptr", pPrinterName)
    return 1
 }
 

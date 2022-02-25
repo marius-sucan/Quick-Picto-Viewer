@@ -2,6 +2,55 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.6.0 (2022-02-25)
+General stuff:
+  - [new] ability to load images through WIC - Windows Imaging Component; the newly supported formats are listed in the open dialog
+  - [new] animated webp support [with WIC]; experimental
+  - [new] dark mode for panels and menus
+  - [new] option to change page orientation [and more] on image printing; bug fixes related to printing
+  - [new] the journal panel has a dedicated section for errors
+  - [new] databases saved by Quick Picto Viewer have a version number; QPV will now warn users when different [older] formats are opened and are no longer supported
+  - [new] option to capture a screen shot of QPV when users are in list view / thumbnails view
+  - [important] beginning with this version, Quick Picto Viewer will store about 210 settings [variables] in the registry, related to image editing panels; another 140 will be stored in the main QPV INI file
+  - [important] moved all keyboard hotkeys binding into the interface thread, in order to allow the AHK core finish processing the hotkeys registered hooks [messages and notifications] in reasonable time, in any circumstance; QPV now no longer causes the system to freeeze while holding space to pan an image and clicking to pan it
+  - redesigned image «selection area properties», «file search» and «flood fill» panels
+  - fixed bugs related to clicking on tooltips that could have led to crashes
+  - many various bug fixes and improvements
+
+Image editing:
+  - [new] option to generate and apply an alpha mask in the «Fill selected area» tool; users can also paint alpha masks
+  - [new] ability to use alpha masks and blending modes with the «Insert text» tool; real time alpha masking also possible
+  - [new] ability to apply the alpha mask when using the «add noise» and «blur selected area» filters
+  - [new] ability to apply alpha mask when using the «flood fill», «erase selected area» and «desaturate selected area» tools
+  - [new] a specialized panel / tool to generate or paint in real time alpha masks
+  - [new] a specialized tool to fill with colour behind images
+  - [new] ability to auto expand the canvas when using «draw shape contours», «fill selected area» and «insert text» panels; this was possible only with the transform tool
+  - [new] automated selection alignment option
+  - [new] option to invert selection area in «desature image» panel, and to output the R, G or B channel as a gray image
+  - [new] option to discard or keep the user painted alpha mask bitmap between tool sessions
+  - [new] options to rasterize [pixelize] generated alpha masks; this will automatically occur when users choose to paint inside the alpha mask
+  - [new] options to view and copy to clipboard the alpha mask bitmap
+  - [new] ability to perform a one level undo in alpha mask painting mode
+  - [new] option to fill selection area box in the «Insert Text» panel
+  - [new] options to convert text to «leet speak» and to flip the text vertically or horizontally, in «Insert text» panel
+  - [new] specific toolbar icons for the transform tool; previously, the toolbar was deactivated when this tool was activated
+  - [new] proper font dialog to choose the font, in the «Insert Text» panel, thanks to TheArkive
+  - many improvements related to drawing vector shapes with symmetry activated
+  - QPV will now highlight the reference point when users hold Shift to snap new point , when drawing vector shapes
+  - fixed the undo/redo mechanism for image selection area states and others
+
+Files organization:
+  - [new] implemented the pHash DCT and Mean-Squared Difference algorithms for similar images duplicates detection; simplified options related to image fingerprints duplicates detection
+  - [new] dupes detection: ability to detect images horizontally flipped and color inverted images
+  - [new] option to have images faded if they do not belong to the same group of duplicates
+  - [new] option to generate stats based on file created date; until now, only file modified date was possible
+  - [new] ability to collect histogram and image fingerprints filtered by a given string
+  - [new] option to purge cached data only for modified files
+  - [new] panel with detailed overview of the cached data in the database
+  - [new] ability to drag-n-drop folders in the tree view folders panel [F4]; folders can be moved or copied into other folders, or dropped into the main window to add the containing image files
+  - when sorting images, files selection is retained, even if a database is opened
+  - fixed bugs related to finding image duplicates that lead to omissions and high memory usage
+
 - v5.4.1 (2021-11-28)
   - [new] option to choose color depth on image save
   - the files list map will be «blown out» for large file lists, when users click the scrollbar

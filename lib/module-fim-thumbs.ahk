@@ -13,10 +13,10 @@ SetWorkingDir, %A_ScriptDir%
 ; #Include Lib\freeimage.ahk
 ; #Include Lib\wia.ahk
 SetWinDelay, 1
-Global GDIPToken, MainExe := AhkExported(), runningGDIPoperation := 0
-     , mainCompiledPath := "", wasInitFIMlib := 0, listBitmaps := ""
-     , operationDone := 1, resultsList := "", FIMfailed2init := 0
-     , waitDataCollect := 1, operationFailed := 0
+Global GDIPToken, MainExe := AhkExported(), runningGDIPoperation := 0, WICmoduleHasInit := 0
+     , mainCompiledPath := "", wasInitFIMlib := 0, listBitmaps := "", imgQuality := 0
+     , operationDone := 1, resultsList := "", FIMfailed2init := 0, thisThreadID := -1
+     , waitDataCollect := 1, operationFailed := 0, RegExWICfmtPtrn
      , RegExFIMformPtrn := "i)(.\\*\.(DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
 
 ; E := initThisThread()
@@ -32,14 +32,20 @@ initThisThread(params:=0) {
      externObj := StrSplit(params, "|")
      GDIPToken := externObj[1]
      mainCompiledPath := externObj[2]
+     imgQuality := externObj[3]
+     thisThreadID := externObj[4]
+     WICmoduleHasInit := externObj[5]
+     RegExWICfmtPtrn := MainExe.ahkGetVar.RegExWICfmtPtrn
   }
 
+  initQPVmainDLL()
   If !wasInitFIMlib
      r := FreeImage_FoxInit(1) ; Load the FreeImage Dll
 
   wasInitFIMlib := (r && !InStr(r, "err")) ? 1 : 0
-  ; MsgBox, % r "`n" wasInitFIMlib "`n" GDIPToken "`n" mainCompiledPath
-  Return wasInitFIMlib
+  r := (WICmoduleHasInit=1 || wasInitFIMlib=1) ? 1 : 0
+   ; MsgBox, % r "`n" wasInitFIMlib "`n" GDIPToken "`n" mainCompiledPath
+  Return r
 }
 
 cleanupThread() {
@@ -47,6 +53,57 @@ cleanupThread() {
       FreeImage_FoxInit(0) ; Unload Dll
 
    wasInitFIMlib := GDIPToken := 0
+}
+
+LoadWICimage(imgPath, w:=0, h:=0, keepAratio:=1, thisImgQuality:=0, frameu:=0, ScaleAnySize:=0, noBPPconv:=0, doFlipu:=0, doGray:=0) {
+   ; Return
+   Static lastEdition := 1, hasRan := 0
+   ; startZeit := A_TickCount
+   ; lastEdition := !lastEdition
+   VarSetCapacity(resultsArray, 8 * 6, 0)
+   ; If (!w || !h)
+   ;    GetWinClientSize(w, h, PVhwnd, 0) 
+
+   ; If !imgPath
+   ;    imgPath := getIDimage(currentFileIndex)
+   ; fnOutputDebug("wic-load " imgPath)
+   func2exec := (A_PtrSize=8) ? "LoadWICimage" : "_BoxBlurBitmap@20"
+   r := DllCall("qpvmain.dll\" func2exec, "Int", thisThreadID, "Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", doFlipu, "int", doGray, "Str", imgPath, "UPtr", &resultsArray, "Ptr")
+   ; mainLoadedIMGdetails.imgW := NumGet(resultsArray, 4 * 0, "uInt")
+   ; mainLoadedIMGdetails.imgH := NumGet(resultsArray, 4 * 1, "uInt")
+   ; mainLoadedIMGdetails.Frames := NumGet(resultsArray, 4 * 2, "uInt")
+   ; mainLoadedIMGdetails.pixFmt := NumGet(resultsArray, 4 * 3, "uInt")
+   ; mainLoadedIMGdetails.DPI := NumGet(resultsArray, 4 * 4, "uInt")
+   ; mainLoadedIMGdetails.RawFormat := NumGet(resultsArray, 4 * 5, "uInt")
+   ; mainLoadedIMGdetails.TooLargeGDI := (imgW>32500 || imgH>32500) ? 1 : 0
+   ; mainLoadedIMGdetails.HasAlpha := InStr(mainLoadedIMGdetails.pixFmt, "argb") || InStr(mainLoadedIMGdetails.pixFmt, "bgra") || InStr(mainLoadedIMGdetails.pixFmt, "alpha") ? 1 : 0
+   ; mainLoadedIMGdetails.OpenedWith := "WIC"
+   resultsArray := ""
+   zeitu := A_TickCount - startZeit
+   ; msgbox, % r "==" zeitu " = " pixfmt "=" rawFmt
+   ; ToolTip, % WICmoduleHasInit " | " r "==" zeitu " = " mainLoadedIMGdetails.pixfmt "=" mainGdipWinThumbsGrid.RawFormat , , , 3
+   ; https://stackoverflow.com/questions/8101203/wicbitmapsource-copypixels-to-gdi-bitmap-scan0
+   ; https://github.com/Microsoft/Windows-classic-samples/blob/master/Samples/Win7Samples/multimedia/wic/wicviewergdi/WicViewerGdi.cpp#L354
+   Return r
+}
+
+initQPVmainDLL() {
+   If qpvMainDll
+      Return
+
+   DllPath := FreeImage_FoxGetDllPath("qpvmain.dll")
+   If (InStr(A_ScriptDir, "sucan twins") && !A_IsCompiled)
+   {
+      If (A_PtrSize=8)
+         DllPath := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\cPlusPlus\qpv-main\x64\Release\qpvmain.dll"
+      Else
+         DllPath := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\cPlusPlus\qpv-main\Release\qpvmain.dll"
+   }
+
+   ; qpvMainDll := DllCall("LoadLibraryW", "WStr", DllPath, "UPtr")
+   ; WICmoduleHasInit := DllCall("qpvmain.dll\initWICnow", "Int", 0, "int", thisThreadID)
+   ; MsgBox, % qpvMainDll "==" WICmoduleHasInit
+   ; ToolTip, % WICmoduleHasInit " | " A_LastError "==" qpvMainDll "`n" DllPath , , , 2
 }
 
 cleanMess(thisID:=0) {
@@ -70,7 +127,7 @@ cleanMess(thisID:=0) {
 }
 
 fnOutputDebug(msg) {
-   OutputDebug, QPV: %msg%
+   OutputDebug, QPV: threadex %thisThreadID% - %msg%
 }
 
 MonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerImg, coreIndex, thisfileIndex, thisBindex) {
@@ -90,107 +147,119 @@ MonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerIm
    startZeit := A_TickCount
    resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
    ; RegWrite, REG_SZ, %QPVregEntry%, thumbThreadDone%coreIndex%, 0
-   r := imgPath
-   GFT := FreeImage_GetFileType(r)
-   loadOption := (GFT=34) ? 5 : 0
-   hFIFimgA := FreeImage_Load(r, -1, loadOption)
-   If !hFIFimgA
+   If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1)
    {
-      operationDone := 1
-      waitDataCollect := 1
-      operationFailed := 1
-      resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
-      Return -1
+      thisImgQuality := (imgQuality=1) ? 6 : 5
+      finalBitmap := LoadWICimage(imgPath, thumbsSizeQuality, thumbsSizeQuality, 1, thisImgQuality, 3, 0)
+      thisZeit := A_TickCount - startZeit
+      If (mustSaveFile=1 && thisZeit>timePerImg && finalBitmap)
+         r := Gdip_SaveBitmapToFile(finalBitmap, file2save)
    }
 
-   FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
-   calcIMGdimensions(imgW, imgH, thumbsSizeQuality, thumbsSizeQuality, ResizedW, ResizedH)
-   resizeFilter := 0 ; (ResizeQualityHigh=1) ? 3 : 0
- 
-   hFIFimgX := FreeImage_Rescale(hFIFimgA, ResizedW, ResizedH, resizeFilter)
-   FreeImage_UnLoad(hFIFimgA)
-   If StrLen(hFIFimgX)>1
+   If (StrLen(finalBitmap)<3 && wasInitFIMlib=1)
    {
-      hFIFimgA := hFIFimgX
-   } Else
-   {
-      fnOutputDebug(mustSaveFile " - " thumbsSizeQuality "px - " timePerImg "ms - core" coreIndex " - file" thisfileIndex " - loopIndex" thisBindex " - " imgPath)
-      operationDone := 1
-      waitDataCollect := 1
-      operationFailed := 1
-      resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
-      Return -1
-   }
-
-   imgBPP := Trim(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
-   ColorsType := FreeImage_GetColorType(hFIFimgA)
-   mustApplyToneMapping := (imgBPP>32 && !InStr(ColorsType, "rgba")) || (imgBPP>64) ? 1 : 0
-   If (mustApplyToneMapping=1)
-   {
-      hFIFimgB := FreeImage_ToneMapping(hFIFimgA, 0, 1.85, 0)
-      FreeImage_UnLoad(hFIFimgA)
-      If !hFIFimgB
+      r := imgPath
+      GFT := FreeImage_GetFileType(r)
+      loadOption := (GFT=34) ? 5 : 0
+      hFIFimgA := FreeImage_Load(r, -1, loadOption)
+      If !hFIFimgA
       {
-         fnOutputDebug(mustSaveFile " - " thumbsSizeQuality "px - " timePerImg "ms - core" coreIndex " - file" thisfileIndex " - loopIndex" thisBindex " - " imgPath)
          operationDone := 1
          waitDataCollect := 1
          operationFailed := 1
          resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
          Return -1
       }
-      hFIFimgA := hFIFimgB
-   }
 
-   FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
-   If (imgW!=ResizedW || imgH!=ResizedH)
-   {
-      ; hFIFimgB := FreeImage_MakeThumbnail(hFIFimgA, thumbsSizeQuality, 0)
-      hFIFimgB := FreeImage_Rescale(hFIFimgA, ResizedW, ResizedH, resizeFilter)
+      FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
+      calcIMGdimensions(imgW, imgH, thumbsSizeQuality, thumbsSizeQuality, ResizedW, ResizedH)
+      resizeFilter := 0 ; (ResizeQualityHigh=1) ? 3 : 0
+    
+      hFIFimgX := FreeImage_Rescale(hFIFimgA, ResizedW, ResizedH, resizeFilter)
       FreeImage_UnLoad(hFIFimgA)
-      If StrLen(hFIFimgB)>1
+      If StrLen(hFIFimgX)>1
       {
-         hFIFimgA := hFIFimgB
+         hFIFimgA := hFIFimgX
       } Else
       {
          fnOutputDebug(mustSaveFile " - " thumbsSizeQuality "px - " timePerImg "ms - core" coreIndex " - file" thisfileIndex " - loopIndex" thisBindex " - " imgPath)
          operationDone := 1
-         operationFailed := 1
          waitDataCollect := 1
+         operationFailed := 1
          resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
          Return -1
       }
-   }
 
-   If StrLen(hFIFimgA)>1
-   {
       imgBPP := Trim(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
-      thisZeit := A_TickCount - startZeit
-      If (imgBPP!=24)
+      ColorsType := FreeImage_GetColorType(hFIFimgA)
+      mustApplyToneMapping := (imgBPP>32 && !InStr(ColorsType, "rgba")) || (imgBPP>64) ? 1 : 0
+      If (mustApplyToneMapping=1)
       {
-         hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "24Bits")
-         If hFIFimgB
+         hFIFimgB := FreeImage_ToneMapping(hFIFimgA, 0, 1.85, 0)
+         FreeImage_UnLoad(hFIFimgA)
+         If !hFIFimgB
          {
-            FreeImage_UnLoad(hFIFimgA)
+            fnOutputDebug(mustSaveFile " - " thumbsSizeQuality "px - " timePerImg "ms - core" coreIndex " - file" thisfileIndex " - loopIndex" thisBindex " - " imgPath)
+            operationDone := 1
+            waitDataCollect := 1
+            operationFailed := 1
+            resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
+            Return -1
+         }
+         hFIFimgA := hFIFimgB
+      }
+
+      FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
+      If (imgW!=ResizedW || imgH!=ResizedH)
+      {
+         ; hFIFimgB := FreeImage_MakeThumbnail(hFIFimgA, thumbsSizeQuality, 0)
+         hFIFimgB := FreeImage_Rescale(hFIFimgA, ResizedW, ResizedH, resizeFilter)
+         FreeImage_UnLoad(hFIFimgA)
+         If StrLen(hFIFimgB)>1
+         {
             hFIFimgA := hFIFimgB
+         } Else
+         {
+            fnOutputDebug(mustSaveFile " - " thumbsSizeQuality "px - " timePerImg "ms - core" coreIndex " - file" thisfileIndex " - loopIndex" thisBindex " - " imgPath)
+            operationDone := 1
+            operationFailed := 1
+            waitDataCollect := 1
+            resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
+            Return -1
          }
       }
 
-      If (mustSaveFile=1 && thisZeit>timePerImg)
-         savedFile := FreeImage_Save(hFIFimgA, file2save)
-      Else savedFile := "yeah"
+      If StrLen(hFIFimgA)>1
+      {
+         imgBPP := Trim(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
+         thisZeit := A_TickCount - startZeit
+         If (imgBPP!=24)
+         {
+            hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "24Bits")
+            If hFIFimgB
+            {
+               FreeImage_UnLoad(hFIFimgA)
+               hFIFimgA := hFIFimgB
+            }
+         }
 
-      finalBitmap := ConvertFimObj2pBitmap(hFIFimgA, ResizedW, ResizedH)
-      FreeImage_UnLoad(hFIFimgA)
-      If (finalBitmap && thisZeit>timePerImg && mustSaveFile=1 && !savedFile)
-      {
-         r := Gdip_SaveBitmapToFile(finalBitmap, file2save)
-         ; SoundBeep , 900, 100
-      } Else If (!finalBitmap && mustSaveFile=1 && savedFile)
-      {
-         ; SoundBeep , 900, 100
-         finalBitmap := Gdip_CreateBitmapFromFile(file2save)
+         If (mustSaveFile=1 && thisZeit>timePerImg)
+            savedFile := FreeImage_Save(hFIFimgA, file2save)
+         Else savedFile := "yeah"
+
+         finalBitmap := ConvertFimObj2pBitmap(hFIFimgA, ResizedW, ResizedH)
+         FreeImage_UnLoad(hFIFimgA)
+         If (finalBitmap && thisZeit>timePerImg && mustSaveFile=1 && !savedFile)
+         {
+            r := Gdip_SaveBitmapToFile(finalBitmap, file2save)
+            ; SoundBeep , 900, 100
+         } Else If (!finalBitmap && mustSaveFile=1 && savedFile)
+         {
+            ; SoundBeep , 900, 100
+            finalBitmap := Gdip_CreateBitmapFromFile(file2save)
+         }
       }
-   }
+   } ; // fim loader
 
    listBitmaps .=  finalBitmap "|"
    ; Sleep, 0
@@ -616,7 +685,7 @@ FreeImage_Rescale(hImage, w, h, filter:=3) {
 UpdateLayeredWindow(hwnd, hdc, x:="", y:="", w:="", h:="", Alpha:=255) {
    Ptr := A_PtrSize ? "UPtr" : "UInt"
    if ((x != "") && (y != ""))
-      VarSetCapacity(pt, 8), NumPut(x, pt, 0, "UInt"), NumPut(y, pt, 4, "UInt")
+      VarSetCapacity(pt, 8, 0), NumPut(x, pt, 0, "UInt"), NumPut(y, pt, 4, "UInt")
 
    if (w = "") || (h = "")
       GetWindowRect(hwnd, W, H)
@@ -917,7 +986,7 @@ Gdip_BitmapFromHWND(hwnd) {
 ; return             No return value
 
 CreateRectF(ByRef RectF, x, y, w, h) {
-   VarSetCapacity(RectF, 16)
+   VarSetCapacity(RectF, 16, 0)
    NumPut(x, RectF, 0, "float"), NumPut(y, RectF, 4, "float")
    NumPut(w, RectF, 8, "float"), NumPut(h, RectF, 12, "float")
 }
@@ -937,7 +1006,7 @@ CreateRect(ByRef Rect, x, y, x2, y2) {
 ; modified by Marius Șucan according to dangerdogL2121
 ; found on https://autohotkey.com/board/topic/29449-gdi-standard-library-145-by-tic/page-93
 
-   VarSetCapacity(Rect, 16)
+   VarSetCapacity(Rect, 16, 0)
    NumPut(x, Rect, 0, "uint"), NumPut(y, Rect, 4, "uint")
    NumPut(x2, Rect, 8, "uint"), NumPut(y2, Rect, 12, "uint")
 }
@@ -952,7 +1021,7 @@ CreateRect(ByRef Rect, x, y, x2, y2) {
 ; return             No Return value
 
 CreateSizeF(ByRef SizeF, w, h) {
-   VarSetCapacity(SizeF, 8)
+   VarSetCapacity(SizeF, 8, 0)
    NumPut(w, SizeF, 0, "float")
    NumPut(h, SizeF, 4, "float")
 }
@@ -968,7 +1037,7 @@ CreateSizeF(ByRef SizeF, w, h) {
 ; return             No Return value
 
 CreatePointF(ByRef PointF, x, y) {
-   VarSetCapacity(PointF, 8)
+   VarSetCapacity(PointF, 8, 0)
    NumPut(x, PointF, 0, "float")
    NumPut(y, PointF, 4, "float")
 }
@@ -2413,7 +2482,7 @@ Gdip_SaveBitmapToFile(pBitmap, sOutput, Quality:=75) {
 
    Extension := "." Extension
    DllCall("gdiplus\GdipGetImageEncodersSize", "uint*", nCount, "uint*", nSize)
-   VarSetCapacity(ci, nSize)
+   VarSetCapacity(ci, nSize, 0)
    DllCall("gdiplus\GdipGetImageEncoders", "uint", nCount, "uint", nSize, Ptr, &ci)
    If !(nCount && nSize)
       Return -2
@@ -2438,7 +2507,7 @@ Gdip_SaveBitmapToFile(pBitmap, sOutput, Quality:=75) {
       {
          Location := NumGet(ci, 76*(A_Index-1)+44)
          nSize := DllCall("WideCharToMultiByte", "uint", 0, "uint", 0, "uint", Location, "int", -1, "uint", 0, "int",  0, "uint", 0, "uint", 0)
-         VarSetCapacity(sString, nSize)
+         VarSetCapacity(sString, nSize, 0)
          DllCall("WideCharToMultiByte", "uint", 0, "uint", 0, "uint", Location, "int", -1, "str", sString, "int", nSize, "uint", 0, "uint", 0)
          If !InStr(sString, "*" Extension)
             Continue
@@ -2477,7 +2546,7 @@ Gdip_SaveBitmapToFile(pBitmap, sOutput, Quality:=75) {
    If (!A_IsUnicode)
    {
       nSize := DllCall("MultiByteToWideChar", "uint", 0, "uint", 0, Ptr, &sOutput, "int", -1, Ptr, 0, "int", 0)
-      VarSetCapacity(wOutput, nSize*2)
+      VarSetCapacity(wOutput, nSize*2, 0)
       DllCall("MultiByteToWideChar", "uint", 0, "uint", 0, Ptr, &sOutput, "int", -1, Ptr, &wOutput, "int", nSize)
       VarSetCapacity(wOutput, -1)
       If !VarSetCapacity(wOutput)
@@ -2783,7 +2852,7 @@ Gdip_CreateBitmapFromFile(sFile, IconNumber:=1, IconSize:="", useICM:=0) {
          return -2
       }
 
-      VarSetCapacity(dib, 104)
+      VarSetCapacity(dib, 104, 0)
       DllCall("GetObject", Ptr, hbm, "int", A_PtrSize = 8 ? 104 : 84, Ptr, &dib) ; sizeof(DIBSECTION) = 76+2*(A_PtrSize=8?4:0)+2*A_PtrSize
       Stride := NumGet(dib, 12, "Int")
       Bits := NumGet(dib, 20 + (A_PtrSize = 8 ? 4 : 0)) ; padding
@@ -2799,7 +2868,7 @@ Gdip_CreateBitmapFromFile(sFile, IconNumber:=1, IconSize:="", useICM:=0) {
       function2call := (useICM=1) ? "GdipCreateBitmapFromFileICM" : "GdipCreateBitmapFromFile"
       if (!A_IsUnicode)
       {
-         VarSetCapacity(wFile, 1024)
+         VarSetCapacity(wFile, 1024, 0)
          DllCall("kernel32\MultiByteToWideChar", "uint", 0, "uint", 0, Ptr, &sFile, "int", -1, Ptr, &wFile, "int", 512)
          DllCall("gdiplus\" function2call, Ptr, &wFile, PtrA, pBitmap)
       } else
@@ -2817,7 +2886,7 @@ Gdip_CreateARGBBitmapFromHBITMAP(hImage) {
    ; struct BITMAP - https://docs.microsoft.com/en-us/windows/desktop/api/wingdi/ns-wingdi-tagbitmap
    DllCall("GetObject"
             , "ptr", hImage
-            , "int", VarSetCapacity(dib, 76+2*(A_PtrSize=8?4:0)+2*A_PtrSize)
+            , "int", VarSetCapacity(dib, 76+2*(A_PtrSize=8?4:0)+2*A_PtrSize, 0)
             , "ptr", &dib) ; sizeof(DIBSECTION) = x86:84, x64:104
    width  := NumGet(dib, 4, "uint")
    height := NumGet(dib, 8, "uint")
@@ -4398,7 +4467,7 @@ Gdip_DrawString(pGraphics, sString, hFont, hStringFormat, pBrush, ByRef RectF) {
    if (!A_IsUnicode)
    {
       nSize := DllCall("MultiByteToWideChar", "uint", 0, "uint", 0, Ptr, &sString, "int", -1, Ptr, 0, "int", 0)
-      VarSetCapacity(wString, nSize*2)
+      VarSetCapacity(wString, nSize*2, 0)
       DllCall("MultiByteToWideChar", "uint", 0, "uint", 0, Ptr, &sString, "int", -1, Ptr, &wString, "int", nSize)
    }
 
@@ -4418,7 +4487,7 @@ Gdip_MeasureString(pGraphics, sString, hFont, hStringFormat, ByRef RectF) {
 ; The first four elements represent the boundaries of the text
 
    Ptr := A_PtrSize ? "UPtr" : "UInt"
-   VarSetCapacity(RC, 16)
+   VarSetCapacity(RC, 16, 0)
    if !A_IsUnicode
    {
       nSize := DllCall("MultiByteToWideChar", "uint", 0, "uint", 0, Ptr, &sString, "int", -1, "uint", 0, "int", 0)
@@ -4792,7 +4861,7 @@ Gdip_FontFamilyCreate(FontName) {
    if (!A_IsUnicode)
    {
       nSize := DllCall("MultiByteToWideChar", "uint", 0, "uint", 0, Ptr, &FontName, "int", -1, "uint", 0, "int", 0)
-      VarSetCapacity(wFontName, nSize*2)
+      VarSetCapacity(wFontName, nSize*2, 0)
       DllCall("MultiByteToWideChar", "uint", 0, "uint", 0, Ptr, &FontName, "int", -1, Ptr, &wFontName, "int", nSize)
    }
    hFontFamily := 0
@@ -4830,7 +4899,7 @@ Gdip_CreateFontFamilyFromFile(FontFile, hFontCollection, FontName:="") {
       VarSetCapacity(pFontFamily, 10, 0)
       DllCall("gdiplus\GdipGetFontCollectionFamilyList", "ptr", hFontCollection, "int", 1, "ptr", &pFontFamily, "int*", found)
 
-      VarSetCapacity(FontName, 100)
+      VarSetCapacity(FontName, 100, 0)
       DllCall("gdiplus\GdipGetFamilyName", "ptr", NumGet(pFontFamily, 0, "ptr"), "str", FontName, "ushort", 1033)
    }
 
@@ -4977,7 +5046,7 @@ Gdip_GetFontFamilyLineSpacing(hFontFamily, Style:=0) {
 
 Gdip_GetFontFamilyName(hFontFamily) {
    Ptr := A_PtrSize ? "UPtr" : "UInt"
-   VarSetCapacity(FontName, 90)
+   VarSetCapacity(FontName, 100, 0)
    DllCall("gdiplus\GdipGetFamilyName", Ptr, hFontFamily, "Ptr", &FontName, "ushort", 0)
    Return FontName
 }
@@ -6067,7 +6136,7 @@ Gdip_PixelateBitmap(pBitmap, ByRef pBitmapOut, BlockSize) {
       413BD77CB233C04883C428415F415E415D415C5F5E5D5BC3
       )"
 
-      VarSetCapacity(PixelateBitmap, StrLen(MCode_PixelateBitmap)//2)
+      VarSetCapacity(PixelateBitmap, StrLen(MCode_PixelateBitmap)//2, 0)
       nCount := StrLen(MCode_PixelateBitmap)//2
       N := (A_AhkVersion < 2) ? nCount : "nCount"
       Loop %N%
@@ -6147,20 +6216,20 @@ StrGetB(Address, Length:=-1, Encoding:=0) {
       ; No conversion necessary, but we might not want the whole string.
       if (Length == -1)
          Length := DllCall("lstrlen", "uint", Address)
-      VarSetCapacity(String, Length)
+      VarSetCapacity(String, Length, 0)
       DllCall("lstrcpyn", "str", String, "uint", Address, "int", Length + 1)
    }
    else if (Encoding = 1200) ; UTF-16
    {
       char_count := DllCall("WideCharToMultiByte", "uint", 0, "uint", 0x400, "uint", Address, "int", Length, "uint", 0, "uint", 0, "uint", 0, "uint", 0)
-      VarSetCapacity(String, char_count)
+      VarSetCapacity(String, char_count, 0)
       DllCall("WideCharToMultiByte", "uint", 0, "uint", 0x400, "uint", Address, "int", Length, "str", String, "int", char_count, "uint", 0, "uint", 0)
    }
    else if IsInteger(Encoding)
    {
       ; Convert from target encoding to UTF-16 then to the active code page.
       char_count := DllCall("MultiByteToWideChar", "uint", Encoding, "uint", 0, "uint", Address, "int", Length, "uint", 0, "int", 0)
-      VarSetCapacity(String, char_count * 2)
+      VarSetCapacity(String, char_count * 2, 0)
       char_count := DllCall("MultiByteToWideChar", "uint", Encoding, "uint", 0, "uint", Address, "int", Length, "uint", &String, "int", char_count * 2)
       String := StrGetB(&String, char_count, 1200)
    }
@@ -6832,7 +6901,7 @@ Gdip_PathGradientSetCenterPoint(pBrush, X, Y) {
    ; Sets the center point of this path gradient brush.
    ; pBrush             Brush object returned from Gdip_PathGradientCreateFromPath().
    ; X, Y               X, y coordinates in pixels
-   VarSetCapacity(POINTF, 8)
+   VarSetCapacity(POINTF, 8, 0)
    NumPut(X, POINTF, 0, "Float")
    NumPut(Y, POINTF, 4, "Float")
    Return DllCall("gdiplus\GdipSetPathGradientCenterPoint", "Ptr", pBrush, "Ptr", &POINTF)
@@ -7140,9 +7209,9 @@ Gdip_GetHistogram(pBitmap, whichFormat, ByRef newArrayA, ByRef newArrayB, ByRef 
    z := DllCall("gdiplus\GdipBitmapGetHistogramSize", "UInt", whichFormat, "UInt*", numEntries)
 
    newArrayA := [], newArrayB := [], newArrayC := []
-   VarSetCapacity(ch0, numEntries * sizeofUInt)
-   VarSetCapacity(ch1, numEntries * sizeofUInt)
-   VarSetCapacity(ch2, numEntries * sizeofUInt)
+   VarSetCapacity(ch0, numEntries * sizeofUInt, 0)
+   VarSetCapacity(ch1, numEntries * sizeofUInt, 0)
+   VarSetCapacity(ch2, numEntries * sizeofUInt, 0)
    If (whichFormat=2)
       r := DllCall("gdiplus\GdipBitmapGetHistogram", "Ptr", pBitmap, "UInt", whichFormat, "UInt", numEntries, "Ptr", &ch0, "Ptr", &ch1, "Ptr", &ch2, "Ptr", 0)
    Else If (whichFormat>2)

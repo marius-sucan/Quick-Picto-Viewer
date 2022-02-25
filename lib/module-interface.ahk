@@ -12,9 +12,9 @@ SetWorkingDir, %A_ScriptDir%
 
 Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Quick Picto Viewer"
      , RegExFilesPattern := "i)^(.\:\\).*(\.(ico|dib|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif))$"
-     , PVhwnd, hGDIwin, hGDIthumbsWin, WindowBgrColor, mainCompiledPath
+     , PVhwnd, hGDIwin, hGDIthumbsWin, WindowBgrColor, mainCompiledPath, hfdTreeWinGui
      , winGDIcreated := 0, ThumbsWinGDIcreated := 0, MainExe := AhkExported()
-     , AnyWindowOpen := 0, easySlideStoppage := 0, lastOtherWinClose := 1
+     , AnyWindowOpen := 0, easySlideStoppage := 0, lastOtherWinClose := 1, wasMenuFlierCreated := 0
      , slideShowRunning := 0, toolTipGuiCreated, editDummy, LbtnDwn := 0, winCtrlsCoords := []
      , mustAbandonCurrentOperations := 0, lastCloseInvoked := -1, allowGIFsPlayEntirely := 0
      , hCursBusy := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32514, "Ptr")  ; IDC_WAIT
@@ -23,7 +23,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , hCursCross := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32515, "Ptr")  ; IDC_Cross
      , hCursFinger := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32649, "Ptr")
      , SlideHowMode := 1, lastWinDrag := 1, TouchScreenMode := 0, allowNextSlide := 1
-     , isTitleBarHidden := 0, imageLoading := 0, hPicOnGui1, hotkeysSuspended := 0
+     , isTitleBarVisible := 0, imageLoading := 0, hPicOnGui1, hotkeysSuspended := 0
      , slideShowDelay := 9000, scriptStartTime := A_TickCount, prevFullIMGload := 1
      , maxFilesIndex := 0, thumbsDisplaying := 0, executingCanceableOperation := 1
      , runningLongOperation := 0, alterFilesIndex := 0, animGIFplaying := 0, prevOpenedFile := 0
@@ -35,8 +35,10 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0
      , currentFilesListModified := 0, folderTreeWinOpen := 0, hStatusBaru, OSDFontName := "Arial"
      , OSDbgrColor := "001100", OSDtextColor := "FFeeFF", LargeUIfontValue := 14, allowMenuReader := 0
-     , lastMenuInvoked := [], hQPVtoolbar := 0, ShowAdvToolbar := 0
-     , isToolbarActivated := 0, lockToolbar2Win := 1
+     , lastMenuInvoked := [], hQPVtoolbar := 0, ShowAdvToolbar := 0, whileLoopExec := 0
+     , isToolbarActivated := 0, lockToolbar2Win := 1, lastZeitPanCursor := 1, VisibleQuickMenuSearchWin :=0
+     , hquickMenuSearchWin, hGuiTip, lastTippyWin, lastMouseLeave := 1, colorPickerModeNow := 0
+     , mustCaptureCloneBrush := 0, doNormalCursor := 1
 
 Global allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, askDeleteFiles, mouseToolTipWinCreated := 0
 , AutoDownScaleIMGs, autoPlaySNDs, autoRemDeadEntry, ColorDepthDithering, countItemz, currentFileIndex, CurrentSLD, defMenuRefreshItm, doSlidesTransitions
@@ -48,7 +50,7 @@ Global allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSuppor
 , lastPointerUseZeit := 1
 
 ; OnMessage(0x388, "WM_PENEVENT")
-; OnMessage(0x2a3, "WM_MOUSELEAVE")
+OnMessage(0x2a3, "WM_MOUSELEAVE")
 OnMessage(0x112, "WM_SYSMENU")
 OnMessage(0x201, "WM_LBUTTONDOWN")
 OnMessage(0x202, "WM_LBUTTONUP")
@@ -75,12 +77,13 @@ Loop, 9
 setPriorityThread(2)
 OnMessage(0x203, "OnLButtonDblClk")
 
+lastMenuInvoked[1] := A_TickCount
 ; OnExit, doCleanup
 Return
 
 
 OnLButtonDblClk(wParam, lParam, msg, hwnd) {
-; function by Lexikos; work-around for double-click on Gui Picture Controls
+; function by Lexikos; work-around for DoubleClick on Gui Picture Controls
 ; from https://autohotkey.com/board/topic/94962-doubleclick-on-gui-pictures-puts-their-path-in-your-clipboard/
     Critical, On
     WinGetClass, WinClass, ahk_id %hwnd%
@@ -128,7 +131,7 @@ BuildGUI(params:=0) {
       WindowBgrColor := MainExe.ahkgetvar.WindowBgrColor
       isAlwaysOnTop := MainExe.ahkgetvar.isAlwaysOnTop
       mainCompiledPath := MainExe.ahkgetvar.mainCompiledPath
-      isTitleBarHidden := MainExe.ahkgetvar.isTitleBarHidden
+      isTitleBarVisible := MainExe.ahkgetvar.isTitleBarVisible
       TouchScreenMode := MainExe.ahkgetvar.TouchScreenMode
       userAllowWindowDrag := MainExe.ahkgetvar.userAllowWindowDrag
       mainWinPos := MainExe.ahkgetvar.mainWinPos
@@ -140,7 +143,7 @@ BuildGUI(params:=0) {
       WindowBgrColor := externObj[1]
       isAlwaysOnTop := externObj[2]
       mainCompiledPath := externObj[3]
-      isTitleBarHidden := externObj[4]
+      isTitleBarVisible := externObj[4]
       TouchScreenMode := externObj[5]
       userAllowWindowDrag := externObj[6]
       mainWinPos := externObj[7]
@@ -165,12 +168,13 @@ BuildGUI(params:=0) {
    Gui, 1: -DPIScale +Resize %MinGUISize% +hwndPVhwnd +LastFound +OwnDialogs
    Gui, 1: Font, s1
    Gui, 1: Add, Text, x0 y0 w1 h1 BackgroundTrans gWinClickAction vPicOnGui1 hwndhPicOnGui1, Previous image
-   Gui, 1: Add, Edit, xp-100 yp-100 gUnlockKeys w1 h1 veditDummy,
+   ; Gui, 1: Add, Edit, xp-100 yp-100 gUnlockKeys w1 h1 veditDummy,
+   Gui, 1: Add, Button, xp-100 yp-100 gUnlockKeys w1 h1 Default,a
    Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans gWinClickAction vPicOnGui2a, Zoom in
    Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans gWinClickAction vPicOnGui2b, Double-click to toggle view mode | Swipe to make gestures | Left-click and drag to pan image
    Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans gWinClickAction vPicOnGui2c, Zoom out
    Gui, 1: Add, Text, x3 y3 w3 h3 BackgroundTrans gWinClickAction vPicOnGui3, Next image
-   If (isTitleBarHidden=1)
+   If (isTitleBarVisible=1)
       Gui, 1: +Caption
    Else
       Gui, 1: -Caption
@@ -356,7 +360,7 @@ UpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0) {
 createGDIwin() {
    Critical, on
    ; WinGetPos, , , mainW, mainH, ahk_id %PVhwnd%
-   Gui, 2: -DPIScale +E0x20 -Caption +E0x80000 +hwndhGDIwin +Owner1
+   Gui, 2: -DPIScale +E0x20 +Disabled -Caption +E0x80000 +hwndhGDIwin +Owner1
    Gui, 2: Show, NoActivate, %appTitle%: Picture container
    If (A_OSVersion!="WIN_7")
       SetParentID(PVhwnd, hGDIwin)
@@ -366,7 +370,7 @@ createGDIwin() {
 createGDIwinThumbs() {
    Critical, on
 
-   Gui, 3: -DPIScale +E0x20 -Caption +E0x80000 +hwndhGDIthumbsWin +Owner1
+   Gui, 3: -DPIScale +E0x20 +Disabled -Caption +E0x80000 +hwndhGDIthumbsWin +Owner1
    Gui, 3: Show, NoActivate, %appTitle%: Thumbnails container
    If (A_OSVersion!="WIN_7")
       SetParentID(PVhwnd, hGDIthumbsWin)
@@ -377,7 +381,7 @@ createGDIwinThumbs() {
 createGDIinfosWin() {
    Critical, on
 
-   Gui, 4: -DPIScale +E0x20 -Caption +E0x80000 +hwndhGDIinfosWin +Owner1
+   Gui, 4: -DPIScale +E0x20 +Disabled -Caption +E0x80000 +hwndhGDIinfosWin +Owner1
    Gui, 4: Show, NoActivate, %appTitle%: Infos container
    If (A_OSVersion!="WIN_7")
       SetParentID(PVhwnd, hGDIinfosWin)
@@ -388,7 +392,7 @@ createGDIinfosWin() {
 createGDIselectorWin() {
    Critical, on
 
-   Gui, 5: -DPIScale +E0x20 -Caption +E0x80000 +hwndhGDIselectWin +Owner1
+   Gui, 5: -DPIScale +E0x20 +Disabled -Caption +E0x80000 +hwndhGDIselectWin +Owner1
    Gui, 5: Show, NoActivate, %appTitle%: Selector container
    If (A_OSVersion!="WIN_7")
       SetParentID(PVhwnd, hGDIselectWin)
@@ -532,6 +536,9 @@ WM_LBUTTONDOWN(wP, lP, msg, hwnd) {
        Return
 
     LbtnDwn := 1
+    If (mouseToolTipWinCreated=1)
+       mouseTurnOFFtooltip()
+
     If (hotkeysSuspended=1)
        UnlockKeys()
 
@@ -547,6 +554,9 @@ WM_LBUTTONUP(wP, lP, msg, hwnd) {
 WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
     If (A_TickCount - scriptStartTime<500)
        Return
+
+    If (mouseToolTipWinCreated=1)
+       mouseTurnOFFtooltip()
 
     LbtnDwn := 0
     UnlockKeys()
@@ -590,13 +600,14 @@ WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
 
     MouseGetPos, , , OutputVarWin
     GetMouseCoord2wind(PVhwnd, mX, mY, mXo, mYo)
-    MainExe.ahkPostFunction("WinClickAction", "double-click", A_GuiControl, OutputVarWin, mX, mY, mXo, mYo)
+    MainExe.ahkPostFunction("WinClickAction", "DoubleClick", A_GuiControl, OutputVarWin, mX, mY, mXo, mYo)
 }
 
 askAboutStoppingOperations() {
      If (mustAbandonCurrentOperations!=1)
      {
         lastCloseInvoked := 0
+        WinSet, Enable,, ahk_id %PVhwnd%
         msgResult := msgBoxWrapper(appTitle, "Do you want to stop the currently executing operation ?", 4, 0, "question")
         If (msgResult="yes")
            mustAbandonCurrentOperations := 1
@@ -614,17 +625,17 @@ WM_RBUTTONUP(wP, lP, msg, hwnd) {
      turnOffSlideshow()
      Return
   }
+  If (mouseToolTipWinCreated=1)
+     mouseTurnOFFtooltip()
 
   UnlockKeys()
-  A := WinActive("A")
   ; thumbsDisplaying := MainExe.ahkgetvar.thumbsDisplaying
   ; AnyWindowOpen := MainExe.ahkgetvar.AnyWindowOpen
   ; maxFilesIndex := MainExe.ahkgetvar.maxFilesIndex
-  okay := (A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin) ? 1 : 0
-  If (okay!=1)
+  If !identifyThisWin()
      Return
 
-  GuiControl, 1:, editDummy, -
+  ; GuiControl, 1:, editDummy, -
   If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
   {
      askAboutStoppingOperations()
@@ -647,7 +658,7 @@ InitMainContextMenu() {
    {
       SendInput, {Esc}
       Sleep, 1
-      MainExe.ahkPostFunction("PanelQuickSearchMenuOptions")
+      PanelQuickSearchMenuOptions()
       Return
    }
    lastMenuInvoked := [A_TickCount, mX, mY]
@@ -657,6 +668,24 @@ InitMainContextMenu() {
 
 TimerMouseMove() {
    MouseMove, -2, -2, 1, R
+}
+
+PanelQuickSearchMenuOptions() {
+    Static lastInvoked := 1
+    If (A_TickCount - lastInvoked<300)
+       Return
+
+    MainExe.ahkPostFunction(A_ThisFunc)
+    lastInvoked := A_TickCount
+}
+
+toggleAppToolbar() {
+    Static lastInvoked := 1
+    If (A_TickCount - lastInvoked<300)
+       Return
+
+    MainExe.ahkPostFunction(A_ThisFunc)
+    lastInvoked := A_TickCount
 }
 
 InitGuiContextMenu() {
@@ -781,6 +810,16 @@ JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
 }
 
 WinClickAction(param:=0) {
+    Static lastInvoked := 1, lastEvent
+
+    If (A_TickCount - lastMouseLeave<400) && (A_GuiControlEvent="DoubleClick" && imgEditPanelOpened=1) || (!isQPVactive())
+    {
+       lastInvoked := A_TickCount
+       Return
+    }
+
+    If (A_TickCount - lastInvoked<25)
+       Return
 
     MouseGetPos, , , OutputVarWin
     GetMouseCoord2wind(PVhwnd, mX, mY, mXo, mYo)
@@ -796,13 +835,20 @@ WinClickAction(param:=0) {
          If isDotInRect(mX, mY, xu, xu + wu, yu, yu + hu)
             Break
     }
+
     If (mouseToolTipWinCreated=1)
        mouseTurnOFFtooltip()
     ; ToolTip, % mX "=" mY "=" param "==" ctrlName "--" A_GuiControl "--" A_GuiControlEvent , , , 2
+    thisEvent := A_GuiControlEvent
+    lastEvent := thisEvent
+    lastInvoked := A_TickCount
+
     If (slideShowRunning=1)
        turnOffSlideshow()
+    Else If (A_TickCount - lastZeitPanCursor<350) && (thumbsDisplaying=0)
+       MainExe.ahkPostFunction("simplePanIMGonClick", 0, 1, 1)
     Else
-       sendWinClickAct(A_GuiControlEvent, ctrlName, OutputVarWin, mX, mY, mXo, mYo)
+       sendWinClickAct(thisEvent, ctrlName, OutputVarWin, mX, mY, mXo, mYo)
 }
 
 sendWinClickAct(ctrlEvent, guiCtrl, hwnd, mX, mY, mXo, mYo) {
@@ -890,6 +936,9 @@ changeMcursor(whichCursor) {
   If (slideShowRunning=1 || animGIFplaying=1)
      Return
 
+  If (A_TickCount - lastZeitPanCursor<50)
+     thisCursor := hCursMove
+
   If (whichCursor="normal-extra")
   {
      imageLoading := mustAbandonCurrentOperations := 0
@@ -912,12 +961,16 @@ changeMcursor(whichCursor) {
      setTaskbarIconState("normal")
      thisCursor := hCursN
   } Else If (whichCursor="finger")
+  {
      thisCursor := hCursFinger
-  Else If (whichCursor="move")
+  } Else If (whichCursor="move")
+  {
+     lastZeitPanCursor := A_TickCount
      thisCursor := hCursMove
-  Else If (whichCursor="cross")
+  } Else If (whichCursor="cross")
+  {
      thisCursor := hCursCross
-  Else Return
+  } Else Return
 
   Try DllCall("user32\SetCursor", "Ptr", thisCursor)
   lastInvoked := A_TickCount
@@ -955,14 +1008,27 @@ isDotInRect(mX, mY, x1, x2, y1, y2, modus:=0) {
    Return r
 }
 
+isQPVactive() {
+    Static lastInvoked := 1, last := 1
+    If (A_TickCount - lastInvoked<450) && (last=0)
+       Return last
+
+    A := WinActive("A")
+    lastInvoked := A_TickCount
+    last := (A=hSetWinGui && AnyWindowOpen || A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin || A=hGDIinfosWin || A=hGuiTip && mouseToolTipWinCreated=1 || A=hquickMenuSearchWin && VisibleQuickMenuSearchWin=1 || A=hQPVtoolbar && ShowAdvToolbar=1 || A=hfdTreeWinGui && folderTreeWinOpen=1) ? 1 : 0
+    Return last
+}
 
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   Static lastInvoked := 1, prevPos, prevArrayPos := [], prevState
+  If ((A_TickCount - lastZeitPanCursor < 300) || !isQPVactive())
+     Return
+
   MouseGetPos, mX, mY, OutputVarWin
   isSamePos := (isInRange(mX, prevArrayPos[1] + 3, prevArrayPos[1] - 3) && isInRange(mY, prevArrayPos[2] + 3, prevArrayPos[2] - 3)) ? 1 : 0
   If (slideShowRunning=1 && isSamePos=1)
      Try DllCall("user32\SetCursor", "Ptr", 0)
-  Else If (drawingShapeNow=1 || liveDrawingBrushTool=1)
+  Else If (drawingShapeNow=1 && doNormalCursor=0 || liveDrawingBrushTool=1) && (OutputVarWin=PVhwnd)
      changeMcursor("cross")
   Else If ((runningLongOperation=1 || imageLoading=1) && slideShowRunning!=1)
      changeMcursor("busy")
@@ -981,17 +1047,20 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
         MainExe.ahkPostFunction("MouseMoveResponder")
      prevPos := mX "-" mY
   }
+  ; actif := WinActive("A")
+  ; WinGetTitle, title, ahk_id %actif%
+  ; WinShow, ahk_id %actif%
 
-  ; A := WinActive("A")
-  ; okay := (A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin) ? 1 : 0
   If (wP&0x1)
   {
      LbtnDwn := 1
      SetTimer, ResetLbtn, -55
+     ; DllCall("DestroyWindow", "uptr", actif)
+     ; SoundBeep 
   }
 
-  ; ToolTip, % isTitleBarHidden " - " TouchScreenMode
-  If (isTitleBarHidden=0 && userAllowWindowDrag=1 && TouchScreenMode=0 && (wP&0x1))
+  ; ToolTip, % title "= " isTitleBarVisible " - " TouchScreenMode " = " OutputVarWin " = " actif
+  If (isTitleBarVisible=0 && userAllowWindowDrag=1 && TouchScreenMode=0 && (wP&0x1))
   && (A_TickCount - lastWinDrag>45) 
   {
      PostMessage, 0xA1, 2,,, ahk_id %PVhwnd%
@@ -1006,15 +1075,7 @@ trackMouseDragging() {
 }
 
 WM_MOUSELEAVE(wP, lP, msg, hwnd) {
-  Static lastInvoked := 1
-  If (A_TickCount - lastInvoked > 55)
-  {
-    ToolTip, % wp "==" lp , , , 2
-     thisPrefsWinOpen := (imgEditPanelOpened=1) ? 0 : AnyWindowOpen
-     If (slideShowRunning!=1 && !thisPrefsWinOpen && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1)
-        MainExe.ahkPostFunction("MouseMoveResponder")
-     lastInvoked := A_TickCount
-  }
+    lastMouseLeave := A_TickCount
 }
 
 dummyCheckWin() {
@@ -1029,16 +1090,26 @@ dummyCheckWin() {
 
 activateMainWin() {
    Static lastInvoked := 1
+   If (A_TickCount - scriptStartTime<2000)
+      Return
+
+   lastMouseLeave := A_TickCount
    LbtnDwn := 0
    UnlockKeys()
-   If (mouseToolTipWinCreated=1)
-      mouseTurnOFFtooltip()
+   Sleep, -1
+   z := identifyThisWin()
+   If (editingSelectionNow=1 && slideShowRunning!=1 && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1)
+      MainExe.ahkPostFunction("MouseMoveResponder", "krill")
 
-   If (A_TickCount - lastInvoked > 530)
-      GuiControl, 1:, editDummy, -
+   ; If (mouseToolTipWinCreated=1 && !z && !identifyParentWind())
+   If (mouseToolTipWinCreated=1)
+      SetTimer, mouseTurnOFFtooltip, -150
+
+   ; If (A_TickCount - lastInvoked > 530)
+   ;    GuiControl, 1:, editDummy, -
 
    If (drawingShapeNow=1) || (imgEditPanelOpened=1 && AnyWindowOpen>0 && panelWinCollapsed=1)
-      SetTimer, dummyCheckWin, -100
+      SetTimer, dummyCheckWin, -150
 
    lastInvoked := A_TickCount
 /*
@@ -1058,7 +1129,7 @@ activateMainWin() {
 }
 
 dummyCheckActiveWin() {
-  hwndu := WinExist("A")
+  hwndu := WinActive("A")
   If (hwndu=hQPVtoolbar && ShowAdvToolbar=1)
      WinActivate, ahk_id %PVhwnd%
 }
@@ -1160,6 +1231,7 @@ byeByeRoutine() {
    {
       ; SoundBeep , % 250 + 100*lastCloseInvoked, 100
       canCancelImageLoad := 4
+      WinSet, Enable,, ahk_id %PVhwnd%
       msgResult := msgBoxWrapper(appTitle, "The main window seems to be busy at the moment. Do you want to force exit this application ?", 4, 0, "question")
       If (msgResult="yes")
          SetTimer, TimerExit, -10
@@ -1177,11 +1249,23 @@ byeByeRoutine() {
        lastInvokedThis := A_TickCount
        lastOtherWinClose := A_TickCount
        MainExe.ahkPostFunction("stopDrawingShape", "cancel")
+   } Else If (colorPickerModeNow=1)
+   {
+       colorPickerModeNow := 0
+       lastInvokedThis := A_TickCount
+       lastOtherWinClose := A_TickCount
+       MainExe.ahkPostFunction("StopColorPicker")
+   } Else If (mustCaptureCloneBrush=1)
+   {
+       mustCaptureCloneBrush := 0
+       lastInvokedThis := A_TickCount
+       lastOtherWinClose := A_TickCount
+       MainExe.ahkPostFunction("StopCaptureClickStuff", "escape")
    } Else If (folderTreeWinOpen=1)
    {
-       lastOtherWinClose := A_TickCount
        folderTreeWinOpen := 0
        lastInvokedThis := A_TickCount
+       lastOtherWinClose := A_TickCount
        MainExe.ahkPostFunction("fdTreeClose")
    } Else If ((AnyWindowOpen || thumbsDisplaying=1 || slideShowRunning=1) && (imageLoading!=1 && runningLongOperation!=1)) || (animGIFplaying=1)
    {
@@ -1247,15 +1331,156 @@ PreventKeyPressBeep() {
    IfEqual,A_Gui,1,Return 0 ; prevent keystrokes for GUI 1 only
 }
 
+identifyPanelWin() {
+    r := (WinActive("A")=hSetWinGui) ? 1 : 0
+    Return r
+}
+
+identifyOtherPanelsWin() {
+    A := WinActive("A")
+    r := (A=hGuiTip && mouseToolTipWinCreated=1 || A=hquickMenuSearchWin && VisibleQuickMenuSearchWin=1 || A=hQPVtoolbar && ShowAdvToolbar=1 || A=hfdTreeWinGui && folderTreeWinOpen=1) ? 1 : 0
+    Return r
+}
+
+identifyParentWind() {
+    uz := WinActive("A")
+    Az := DllCall("GetParent", "UPtr", uz, "UPtr")
+    r := (Az=hSetWinGui || Az=PVhwnd || Az=hGDIwin || Az=hGDIthumbsWin || Az=hGDIinfosWin) ? 1 : 0
+    If (uz=PVhwnd || uz=hQPVtoolbar && ShowAdvToolbar=1)
+       r := 0
+    Return r
+}
+
 identifyThisWin() {
   Static prevR, lastInvoked := 1
-  If (A_TickCount - lastInvoked < 150)
+  If (A_TickCount - lastInvoked < 50)
      Return prevR
 
   Az := WinActive("A")
-  prevR := (Az=PVhwnd || Az=hGDIwin || Az=hGDIthumbsWin) ? 1 : 0
+  prevR := (Az=PVhwnd || Az=hGDIwin || Az=hGDIthumbsWin || Az=hGDIinfosWin || Az=hGDIselectWin) ? 1 : 0
   lastInvoked := A_TickCount
   Return prevR
+}
+
+kbdkeybcallKeysResponder(givenKey, thisWin) {
+   Static lastInvoked := 1, counter := 0, prevKey
+
+   If (A_TickCount - lastInvoked>350)
+      counter := 0
+
+   If (animGIFplaying=1)
+      animGIFplaying := -1
+
+   If (A_TickCount - lastInvoked>50) && (whileLoopExec=0 && runningLongOperation=0)
+   {
+      lastInvoked := A_TickCount
+      abusive := (counter>25) ? 1 : 0
+      MainExe.ahkPostFunction("KeyboardResponder", givenKey, thisWin, abusive)
+      If (givenKey=prevKey)
+         counter++
+      Else 
+         counter := 0
+
+      prevKey := givenKey
+   } Else If (givenKey=prevKey)
+      counter++
+   Else 
+      counter := 0
+}
+
+guiCreateMenuFlyout() {
+   m := LargeUIfontValue // 2 + 1
+   h := LargeUIfontValue * 2 + 1
+   Gui, menuFlier: +AlwaysOnTop -MinimizeBox -SysMenu -Caption
+   Gui, menuFlier: Color, %OSDbgrColor%
+   Gui, menuFlier: Font, s%LargeUIfontValue% Bold c%OSDtextColor%
+   Gui, menuFlier: Margin, 0, 0
+   Gui, menuFlier: Add, Text, Border Center +0x200 x0 y0 w%h% h%h% gPanelQuickSearchMenuOptions, S
+   Gui, menuFlier: Add, Text, Border Center +0x200 x+%m% yp+0 w%h% h%h% gtoggleAppToolbar, T
+   wasMenuFlierCreated := 1
+}
+
+menuFlyoutDisplay(actu, mX, mY, isOkay) {
+   lastOtherWinClose := A_TickCount
+   allowMenuReader := actu
+   If (!isOkay && actu="yes")
+      Return
+
+   If (wasMenuFlierCreated!=1)
+      guiCreateMenuFlyout()
+
+   ; GetPhysicalCursorPos(mX, mY)
+   fn := Func("dummymenuFlyoutDisplay").Bind(actu, mX, mY)
+   SetTimer, % fn, -50
+}
+
+dummymenuFlyoutDisplay(actu, mX, mY) {
+   If (actu="yes" && allowMenuReader="yes")
+   {
+      ; GetPhysicalCursorPos(mX, mY)
+
+      h := GetMenuWinHwnd(mX, mY, "32768")
+      a := h[1]
+      If !InStr(h[2], "32768")
+      {
+          Gui, menuFlier: Hide
+          Return
+      }
+
+      WinGetPos, mX, mY, Width, Height, ahk_id %a%
+      ; ToolTip, % z "=" a "=" mY " = " height "=" h , , , 2
+      x := mX
+      y := mY + Round(Height) + 2
+      Gui, menuFlier: Show, AutoSize x%x% y%y% NoActivate
+   } Else
+      Gui, menuFlier: Hide
+}
+
+GetMenuWinHwnd(mX, mY, n) {
+    ; side note; I know it is dumb but I do not know a better solution
+    h := GetWinHwndAtPoint(mX, mY)
+    If !InStr(h[2], n) ; menu window class
+    {
+       h := GetWinHwndAtPoint(mX + 2, mY)
+       If !InStr(h[2], n)
+       {          
+          h := GetWinHwndAtPoint(mX + 2, mY + 2)
+          If !InStr(h[2], n)
+          {
+             h := GetWinHwndAtPoint(mX, mY + 2)
+             If !InStr(h[2], n)
+             {
+                 h := GetWinHwndAtPoint(mX - 2, mY)
+                 If !InStr(h[2], n)
+                 {
+                     h := GetWinHwndAtPoint(mX - 2, mY - 2)
+                     If !InStr(h[2], n)
+                     {
+                        h := GetWinHwndAtPoint(mX, mY - 2)
+                        If !InStr(h[2], n)
+                        {
+                           h := GetWinHwndAtPoint(mX - 2, mY + 2)
+                           If !InStr(h[2], n)
+                           {
+                              h := GetWinHwndAtPoint(mX + 2, mY - 2)
+                              If !InStr(h[2], n)
+                                 Return
+                           }
+                        }
+                     }
+                 }
+             }
+          }
+       }
+    }
+    Return h
+}
+
+GetWinHwndAtPoint(nX, nY) {
+    a := DllCall("WindowFromPhysicalPoint", "Uint64", nX|(nY << 32), "Ptr")
+    a := Format("{1:#x}", a)
+    WinGetClass, h, ahk_id %a%
+    Return [a, h]
 }
 
 WM_ENTERMENULOOP() {
@@ -1326,14 +1551,6 @@ turnOffSlideshow() {
    MainExe.ahkPostFunction("dummyInfoToggleSlideShowu", "stop")
    If (slideShowDelay<950)
       SoundBeep , 900, 100
-}
-
-identifySettingsWindow() {
-     A := WinActive("A")
-     If (A=hSetWinGui || A=PVhwnd)
-        Return 1
-     Else
-        Return 0
 }
 
 BuildFakeMenuBar(modus:=0) {
@@ -1920,6 +2137,13 @@ MenuSelectAllAction() {
    } Else selectEntireImage("rm")
 }
 
+SendMenuTabKey() {
+   Static prevState := 0
+   prevState := !prevState
+   keyu := prevState ? "{Right}" : "{Left}"
+   SendInput, % keyu
+}
+
 #If, (allowMenuReader="yes")
    ~RButton::
       constantMenuReader()
@@ -1933,6 +2157,10 @@ MenuSelectAllAction() {
       SendInput, {Down 3}
    Return
 
+   ~PgUp::
+      SendInput, {Up 3}
+   Return
+
    ~Space::
       SendInput, {Enter}
    Return
@@ -1944,122 +2172,724 @@ MenuSelectAllAction() {
    ~Tab::
       SendMenuTabKey()
    Return
+#If
 
-   ~PgUp::
-      SendInput, {Up 3}
+#If, (identifyParentWind()=1 && allowMenuReader!="yes" && (A_TickCount - lastOtherWinClose>100))
+   ^F4::
+      If (imgEditPanelOpened=1 || AnyWindowOpen>0) && (identifyPanelWin()=1)
+         MainExe.ahkPostFunction("CloseWindow")
+   Return
+
+   ~AppsKey::
+      If (imgEditPanelOpened=1 || AnyWindowOpen>0) && (identifyPanelWin()=1)
+         MainExe.ahkPostFunction("externalinvokedSettingsContextMenu")
+   Return
+
+   ~F8::
+   ~F11::
+      If (imgEditPanelOpened=1 || AnyWindowOpen>0) && (identifyPanelWin()=1)
+         MainExe.ahkPostFunction("toggleImgEditPanelWindow")
+   Return
+
+   ~RButton::
+   ~Tab::
+   ~+Tab::
+   ~Up::
+   ~Down::
+   ~Left::
+   ~Right::
+   ~Space::
+      If ((identifyOtherPanelsWin()=1 || identifyPanelWin()=1) && InStr(A_ThisHotkey, "RButton"))
+         Return
+
+      kbdkeybcallKeysResponder(A_ThisHotkey, "parentu")
    Return
 #If
 
-SendMenuTabKey() {
-   Static prevState := 0
-   prevState := !prevState
-   keyu := prevState ? "{Right}" : "{Left}"
-   SendInput, % keyu
+#If, (WinActive("ahk_id " hQPVtoolbar) && ShowAdvToolbar=1 && allowMenuReader!="yes")
+    +Tab::
+    Tab::
+    Esc::
+    AppsKey::
+    vk48:: ; H
+    F1::
+    BackSpace::
+    Up::
+    Down::
+    Left::
+    Right::
+    Delete::
+    PgUp::
+    PgDn::
+    Home::
+    End::
+    Space::
+    Enter::
+    +Space::
+    +Enter::
+    vk30::
+    vk31::
+    vk32::
+    vk33::
+    vk34::
+    vk35::
+    vk36::
+    vk37::
+    vk38::
+    vk39::
+      kbdkeybcallKeysResponder(A_ThisHotkey, hQPVtoolbar)
+    Return
+#IF
+
+#If, (identifyThisWin()=1 && allowMenuReader!="yes" && (A_TickCount - lastOtherWinClose>100))
+    ^vk4F::     ; Ctrl+O
+    vk4F::      ; O
+    vk57 up::   ; W to-do  to do
+    ^+vk4E::    ; Ctrl+Shift+N
+    ^vk4E::     ; Ctrl+N
+    +vkC0::     ; Shift+[~]
+    F12::
+    vk50::      ; P
+    !vk50::     ; Alt+P
+    +vk50::     ; Shift+P
+    ^vk50::     ; Ctrl+P
+    ~vkBA up::  ; ;
+    ^NumpadAdd::
+    ^vkBB::     ; Ctrl+[=]
+    ^NumpadSub::
+    ^vkBD::     ; Ctrl+[-]
+    +vk4F::     ; Shift+O
+    ~+F10::
+    ~F10::
+    ~!F10::
+    ^AppsKey::
+    +AppsKey::
+    #AppsKey::
+    !AppsKey::
+    ~AppsKey::
+    ~^RButton::
+    ~+RButton::
+    ~Insert Up::
+    ^vk56 Up::    ; Ctrl+V
+    +Esc::
+    F1::
+    ~F9 Up::
+    ^F4::
+    ~vk44 Up::    ; D
+    vk4C::        ; L
+    +^vk56 Up::   ; Ctrl+Shift+V
+    ~^vk44 Up::   ; Ctrl+D
+    ~^vk43 Up::   ; Ctrl+C
+    ~^vk58 Up::   ; Ctrl+X
+    vk58 Up::     ; X
+    +vk58 Up::    ; Shift+X
+    ^vk5A::       ; Ctrl+Z
+    vk5A::        ; Z
+    ^vk59::       ; Ctrl+Y
+    ^+vk5A::      ; Ctrl+Shift+Z
+    ^+vk59::      ; Ctrl+Shift+Y
+    ^!vk5A::      ; Ctrl+Alt+Z
+    ^!vk59::      ; Ctrl+Alt+Y
+    vk45::        ; E
+    +vk45::       ; Shift+E
+    !vk45::       ; Alt+E
+    ~^vk53 Up::   ; Ctrl+S
+    ^vk4C::       ; Ctrl+L
+    +vk4C::       ; Shift+L
+    !vk4C Up::    ; Alt+L
+    !BackSpace::
+    !vk59::       ; Alt+Y
+    vk59::        ; Y
+    +vk59::       ; Shift+Y
+    ~vk49::       ; I
+    vkDB::        ; [
+    vkDD::        ; ]
+    +vkDB::       ; Shift+[
+    +vkDD::       ; Shift+]
+    ^vkDB::       ; Ctrl+[
+    ^vkDD::       ; Ctrl+]
+    !vkDB::       ; Alt+[
+    !vkDD::       ; Alt+]
+    vkDC Up::     ; \
+    ^vkDC Up::    ; Ctrl+\
+    +vkDC Up::    ; Shift+\
+    vkBF Up::     ; /
+    NumpadDiv Up::
+    NumpadMult Up::
+    +NumpadAdd::
+    +NumpadSub::
+    NumpadAdd::
+    NumpadSub::
+    ^Numpad0::
+    ^Numpad1::
+    ^Numpad2::
+    ^Numpad3::
+    ^Numpad4::
+    ^Numpad5::
+    ^Numpad6::
+    ^Numpad7::
+    ^Numpad8::
+    ^Numpad9::
+    ^NumpadLeft::
+    ^NumpadRight::
+    ^NumpadUp::
+    ^NumpadDown::
+    ^NumpadIns::
+    ^NumpadClear::
+    +vkBB::      ; Shift+[=]
+    +vkBD::      ; Shift+[-]
+    !vkBD::      ; Alt+[-]
+    !vkBB::      ; Alt+[=]
+    vk47::       ; G
+    +vk47::      ; Shift+G
+    !vk47::      ; Alt+G
+    ~^vk52 Up::  ; Ctrl+R
+    ~!vk52 Up::  ; Alt+R
+    vk52::       ; R
+    +vk52::      ; Shift+R
+    ^vk54 Up::   ; Ctrl+T
+    +vk54 Up::   ; Shift+T
+    +vk49 Up::   ; Shift+I
+    ^vk47 Up::   ; Ctrl+G
+    +vk42 Up::   ; Shift+B
+    vk42 Up::    ; B
+    ~vk4D Up::   ; M
+    ~^vk48::     ; Ctrl+H
+    ~vk48::      ; H
+    ~vk56::      ; V
+    ~+vk48::     ; Shift+H
+    ~+vk56::     ; Shift+V
+    ~vk55 Up::   ; U
+    ~+vk55 Up::  ; Shift+U
+    ~^+vk55 Up:: ; Ctrl+Shift+U
+    vk46::       ; F
+    +vk46::      ; Shift+F
+    ^vk51::      ; Ctrl+Q
+    +vk51::      ; Shift+Q
+    vk51::       ; Q
+    ~!Delete Up::
+    ~+Delete Up::
+    vk41::       ; A
+    +vk41::      ; Shift+A
+    !vk41::      ; Alt+A
+    ^vk41::      ; Ctrl+A
+    +vk39::      ; Shift+9
+    vk39::       ; 9
+    +vk30::      ; Shift+0
+    vk30::       ; 0
+    +Up::
+    +Down::
+    ^WheelUp::
+    ^WheelDown::
+    !Left::
+    !Right::
+    !Up::
+    !Down::
+    !+Left::
+    !+Right::
+    !+Up::
+    !+Down::
+    ~F8::
+    ^vk57::       ; Ctrl+W
+    +vk4E::       ; Shift+N
+    vk4E::        ; N
+    ^vk31::       ; Ctrl+1
+    ^vk32::       ; Ctrl+2
+    ^vk33::       ; Ctrl+3
+    ^vk34::       ; Ctrl+4
+    ^vk35::       ; Ctrl+5
+    ^vk36::       ; Ctrl+6
+    ^vk37::       ; Ctrl+7
+    ^vk38::       ; Ctrl+8
+    ^vk30::       ; Ctrl+0
+    ~vk4A Up::    ; J
+    ~+Insert Up::
+    ~Tab::
+    ~+Tab::
+    ~^Tab Up::
+    ~F11::
+    +Enter::
+    ^Enter::
+    !Enter::
+    ~vk43 Up::     ; C
+    ~^vk55 Up::    ; Ctrl+U
+    ~!vk55 Up::    ; Alt+U
+    ~^vk4B Up::    ; Ctrl+K
+    ~vk4B Up::     ; K
+    ~+vk4B Up::    ; Shift+K
+    ~+vk43 Up::    ; Shift+C
+    ~^vk45 Up::    ; Ctrl+E
+    ~^vk46 Up::    ; Ctrl+F
+    ~vk53::        ; S
+    ~+vk53::       ; Shift+S
+    ~+^vk53 Up::   ; Ctrl+Shift+S
+    vk54 Up::      ; T
+    ~+Space::
+    ~^Space Up::
+    ~+BackSpace::
+    ^BackSpace::
+    !vkBE::       ; Alt + ,
+    +vkBE::       ; Shift + ,
+    vkBE::        ; [,]
+    vkBC::        ; [.]
+    !vkBC::       ; Alt + .
+    +vkBC::       ; Shift + .
+    +vkBF Up::    ; Shift+/
+    ~F5 Up::
+    ~!F5 Up::
+    ~+F5 Up::
+    ~^F5 Up::
+    ~F2 Up::
+    ~+F2 Up::
+    ~^F2 Up::
+    vk38::
+    vk31::
+    vk32::
+    vk33::
+    vk34::
+    vk35::
+    vk36::
+    vk37::
+    +vk31::
+    +vk32::
+    +vk33::
+    +vk34::
+    +vk35::
+    +vk36::
+    +vk37::
+    ^Left::
+    ^Right::
+    F3::
+    +F3::
+    ^F3::
+    F4::
+    +F4::
+    WheelUp::
+    WheelDown::
+    +Right::
+    +Left::
+    +PgDn::
+    +PgUp::
+    ^PgUp::
+    ^PgDn::
+    !PgUp::
+    !PgDn::
+    ~^Home Up::
+    ~^End Up::
+    ~+Home::
+    ~+End::
+       kbdkeybcallKeysResponder(A_ThisHotkey, PVhwnd)
+    Return
+
+    ~Left::
+    ~Right::
+    ~Up::
+    ~Down::
+    ~PgUp::
+    ~PgDn::
+    ~Home::
+    ~End::
+    ~BackSpace::
+    ~Delete Up::
+    ~Enter::
+      thisKey := StrReplace(A_ThisHotkey, "~")
+      If (canCancelImageLoad=1) || (thumbsDisplaying=1 && imageLoading=1)
+      {
+         alterFilesIndex++
+         canCancelImageLoad := 4
+         animGIFplaying := 0
+      } Else
+         kbdkeybcallKeysResponder(thisKey, PVhwnd)
+    Return
+  
+    ~vkBB::   ; = plus
+    ~vkBD::   ; - minus
+       thisKey := StrReplace(A_ThisHotkey, "~")
+       If (thumbsDisplaying=1 && imageLoading=1)
+          alterFilesIndex++
+       Else If (slideShowRunning=1)
+         turnOffSlideshow()
+       Else
+         kbdkeybcallKeysResponder(thisKey, PVhwnd)
+    Return
+  
+    ~Esc::
+    ~!F4::
+       canCancelImageLoad := 4
+       If (AnyWindowOpen || animGIFplaying=1 || slideShowRunning=1)
+          lastOtherWinClose := A_TickCount
+       byeByeRoutine()
+    Return
+
+    !Space::
+       Win_ShowSysMenu(PVhwnd)
+    Return
+  
+    ~Space::
+       isOkay := AnyWindowOpen ? 0 : 1
+       If (AnyWindowOpen && imgEditPanelOpened=1)
+          isOkay := 1
+
+       thisKey := StrReplace(A_ThisHotkey, "~")
+       animGIFplaying := 0
+       If (slideShowRunning=1)
+          turnOffSlideshow()
+       Else If (thumbsDisplaying!=1 && isOkay && maxFilesIndex>0 && slideShowRunning!=1 && IMGresizingMode=4)
+          changeMcursor("move")
+       Else
+         kbdkeybcallKeysResponder(thisKey, PVhwnd)
+    Return
+#If
+
+GetPhysicalCursorPos(ByRef mX, ByRef mY) {
+; function from: https://github.com/jNizM/AHK_DllCall_WinAPI/blob/master/src/Cursor%20Functions/GetPhysicalCursorPos.ahk
+; by jNizM, modified by Marius Șucan
+    Static lastMx, lastMy, lastInvoked := 1
+    If (A_TickCount - lastInvoked<70)
+    {
+       mX := lastMx
+       mY := lastMy
+       Return
+    }
+
+    lastInvoked := A_TickCount
+    Static POINT
+         , init := VarSetCapacity(POINT, 8, 0) && NumPut(8, POINT, "Int")
+    If !isWinXP
+       GPC := DllCall("user32.dll\GetPhysicalCursorPos", "Ptr", &POINT)
+
+    If (!GPC || isWinXP=1)
+    {
+       MouseGetPos, mX, mY
+       lastMx := mX
+       lastMy := mY
+       Return
+     ; Return DllCall("kernel32.dll\GetLastError")
+    }
+
+    lastMx := mX := NumGet(POINT, 0, "Int")
+    lastMy := mY := NumGet(POINT, 4, "Int")
+    Return
 }
 
-#If, (imgEditPanelOpened=1 || AnyWindowOpen>0) ; && (identifySettingsWindow()=1)
-  ~^F4::
-     If (identifySettingsWindow()=1)
-        MainExe.ahkPostFunction("CloseWindow")
-  Return
+calcScreenLimits(whichHwnd:="main") {
+    Static lastInvoked := 1, prevHwnd, prevActiveMon := []
 
-  ~AppsKey::
-     If (AnyWindowOpen>0 && identifySettingsWindow()=1)
-        MainExe.ahkPostFunction("externalinvokedSettingsContextMenu")
-  Return
+    ; the function calculates screen boundaries for the user given X/Y position for the OSD
+    If (A_TickCount - lastInvoked<350) && (prevHwnd=whichHwnd)
+       Return prevActiveMon
 
-  ~F8::
-  ~F11::
-     If (identifySettingsWindow()=1)
-        MainExe.ahkPostFunction("toggleImgEditPanelWindow")
-  Return
-#If
+    whichHwnd := (whichHwnd="main") ? PVhwnd : whichHwnd
+    If (whichHwnd="mouse")
+    {
+       MouseGetPos, OutputVarX, OutputVarY
+       GetPhysicalCursorPos(mainX, mainY)
+       If !mainX
+          mainX := OutputVarX
+       If !mainY
+          mainY := OutputVarY
+       hMon := MDMF_FromPoint(mainX, mainY, 2)
+    } Else 
+    {
+       hMon := MDMF_FromHWND(whichHwnd, 2)
+       WinGetPos, mainX, mainY,, , ahk_id %whichHwnd%
+    }
 
-#If, (identifyThisWin()=1)
-  ~Esc::
-  ~!F4::
-     canCancelImageLoad := 4
-     If (AnyWindowOpen || animGIFplaying=1 || slideShowRunning=1)
-        lastOtherWinClose := A_TickCount
-     byeByeRoutine()
-  Return
+    If hMon
+       MonitorInfos := MDMF_GetInfo(hMon)
 
-  !Space::
-     Win_ShowSysMenu(PVhwnd)
-  Return
-  
-  ~Space::
-     isOkay := AnyWindowOpen ? 0 : 1
-     If (AnyWindowOpen && imgEditPanelOpened=1)
-        isOkay := 1
-     If (thumbsDisplaying!=1 && isOkay && maxFilesIndex>0 && slideShowRunning!=1 && IMGresizingMode=4)
-        changeMcursor("move")
-  Return
-#If
+    If !IsObject(MonitorInfos)
+    {
+       ActiveMon := MWAGetMonitorMouseIsIn(mainX, mainY)
+       If !ActiveMon
+       {
+          ActiveMon := MWAGetMonitorMouseIsIn()
+          If !ActiveMon
+             Return prevActiveMon
+       }
+       SysGet, mCoord, MonitorWorkArea, %ActiveMon%
+       prevActiveMon.mCRight := mCoordRight, prevActiveMon.mCLeft := mCoordLeft
+       prevActiveMon.mCTop := mCoordTop, prevActiveMon.mCBottom := mCoordBottom
+    } Else
+    {
+       ActiveMon := MonitorInfos.Num
+       mCoordRight := MonitorInfos.WARight, mCoordLeft := MonitorInfos.WALeft
+       mCoordTop := MonitorInfos.WATop, mCoordBottom := MonitorInfos.WABottom
+       prevActiveMon.mCRight := MonitorInfos.WARight, prevActiveMon.mCLeft := MonitorInfos.WALeft
+       prevActiveMon.mCTop := MonitorInfos.WATop, prevActiveMon.mCBottom := MonitorInfos.WABottom
+    }
 
-#If, (((animGIFplaying=1) || (canCancelImageLoad=1) || (thumbsDisplaying=1 && imageLoading=1)) && identifyThisWin()=1)
-  ~Left::
-  ~Right::
-  ~Up::
-  ~Down::
-  ~PgUp::
-  ~PgDn::
-  ~Home::
-  ~End::
-  ~BackSpace::
-  ~Delete::
-  ~Enter::
-     alterFilesIndex++
-     canCancelImageLoad := 4
-     If (animGIFplaying=1)
-        animGIFplaying := 0
-  Return
-#If
+    prevActiveMon.w := ResolutionWidth := Abs(max(mCoordRight, mCoordLeft) - min(mCoordRight, mCoordLeft))
+    prevActiveMon.h := ResolutionHeight := Abs(max(mCoordTop, mCoordBottom) - min(mCoordTop, mCoordBottom)) 
+    If !ResolutionWidth
+       prevActiveMon.w := ResolutionWidth := 800
+    If !ResolutionHeight
+       prevActiveMon.h := ResolutionHeight := 600
 
-#If, (thumbsDisplaying=1 && imageLoading=1 && identifyThisWin()=1)
-  ~vkBB::   ; plus
-  ~vkBD::   ; minus
-     alterFilesIndex++
-  Return
-#If
+    prevActiveMon.m := ActiveMon
+    prevActiveMon.hMon := hMon
+    lastInvoked := A_TickCount
+    prevHwnd := whichHwnd
+    ; ToolTip, % ActiveMon "`n" pActiveMon "`n" hMon , , , 2
+    Return prevActiveMon
+}
 
-#If, ((animGIFplaying=1 || slideShowRunning=1) && (identifyThisWin()=1))
-  ~Space::
-     turnOffSlideshow()
-  Return
-#If
+constantMenuReader(modus:=0) {
+   Static prevLabel := "z"
+   GetPhysicalCursorPos(x, y)
+   ; winID := WinActive("A")
+   Try MouseGetPos, ,, WinID
+   ; ToolTip, % winID "`n" OutputVarWin , , , 2
+   If (modus="focused")
+      AccAccFocus(OutputVarWin, accFocusName, accFocusValue, accRole, accIRole)
+   Else
+      AccInfoUnderMouse(x, y, winID, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut)
 
+   goodText := accFocusValue ? accFocusValue : accFocusName
+   goodRoles := (accIRole=41 || accIRole=42 || accIRole=46) ? 1 : 0
+   If (accIRole=12 && accFocusName && (prevLabel!=accFocusName || mouseToolTipWinCreated!=1))
+   {
+      prevLabel := accFocusName
+      msgu := StrReplace(accFocusName, "`t", "`n[ ")
+      If InStr(accFocusName, "`t")
+         msgu .= " ]"
 
+      If InStr(strstyles, "0x00000001")
+         msgu .= "`nITEM DISABLED"
+      Else If shortcut
+         msgu := "&" Format("{:U}", shortcut) ": " msgu
 
+      If InStr(strstyles, "0x00000010")
+         msgu .= "`nITEM CHECKED"
+      If InStr(strstyles, "0x40000000")
+         msgu .= "`nSUBMENU CONTAINER"
 
+      mouseCreateOSDinfoLine(msgu, PrefsLargeFonts)
+      ; ToolTip, % accFocusName , , , 2
+      ; MainExe.ahkPostFunction("showtooltip", accFocusName)
+   }
+   SetTimer, repeatMenuInfosPopup, -150
+}
 
+repeatMenuInfosPopup() {
+   If GetKeyState("RButton", "P")
+      constantMenuReader()
+}
 
+mouseClickTurnOFFtooltip(mode:=0) {
+    mouseTurnOFFtooltip(2)
+}
 
+mouseTurnOFFtooltip(mode:=0) {
+   Sleep, 10
+   If (mouseToolTipWinCreated!=1)
+      Return
 
+   Gui, mouseToolTipGuia: Destroy
+   ; WinActive("ahk_id" PVhwnd)
+   Global mouseToolTipWinCreated := 0
+   SetTimer, mouseTurnOFFtooltip, Off
+   ; ToolTip, % mode , , , 2
+   ; If (AnyWindowOpen && mode!=1 || mode=2)
+   ;    SetTimer, delayedWinActivateToolTipDeath, -150
+}
 
+delayedWinActivateToolTipDeath() {
+   WinActivate, ahk_id %lastTippyWin%
+}
 
+mouseCreateOSDinfoLine(msg:=0, largus:=0) {
+    Critical, On
+    Static prevMsg, lastInvoked := 1
+    Global TippyMsg
 
+    ; ToolTip, % largus "==" msg , , , 2
+    thisHwnd := PVhwnd
+    If (StrLen(msg)<3) || (prevMsg=msg && mouseToolTipWinCreated=1) || (A_TickCount - lastInvoked<100) || !thisHwnd
+       Return
 
+    lastInvoked := A_TickCount
+    Gui, mouseToolTipGuia: Destroy
+    thisFntSize := (largus=1) ? Round(LargeUIfontValue*1.55) : LargeUIfontValue
+    If (thisFntSize<5)
+       thisFntSize := 5
+    If (largus>5)
+       thisFntSize := largus
 
+    bgrColor := OSDbgrColor
+    txtColor := OSDtextColor
+    isBold := (FontBolded=1) ? " Bold" : ""
+    lastTippyWin := WinActive("A")
+    Sleep, 25
+    Gui, mouseToolTipGuia: -Caption -DPIScale +Owner%thisHwnd% +ToolWindow +hwndhGuiTip
+    Gui, mouseToolTipGuia: Margin, % thisFntSize, % thisFntSize
+    Gui, mouseToolTipGuia: Color, c%bgrColor%
+    Gui, mouseToolTipGuia: Font, s%thisFntSize% %isBold% Q5, %OSDFontName%
+    Gui, mouseToolTipGuia: Add, Text, c%txtColor% gmouseClickTurnOFFtooltip vTippyMsg, %msg%
+    Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPVOguiTipsWin
 
+    GetPhysicalCursorPos(mX, mY)
+    tipX := mX + 15
+    tipY := mY + 15
+    ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
+    MaxWidth := Floor(ResWidth*0.85)
+    If (MaxWidth<Wid && MaxWidth>10)
+    {
+       GuiControl, mouseToolTipGuia: Move, TippyMsg, w1 h1
+       GuiControl, mouseToolTipGuia:, TippyMsg,
+       Gui, mouseToolTipGuia: Add, Text, xp yp c%txtColor% gmouseClickTurnOFFtooltip w%MaxWidth%, %msg%
+       Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPVguiTipsWin
+       ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
+    }
 
+    prevMsg := msg
+    mouseToolTipWinCreated := 1
+    Gui, mouseToolTipGuia: Show, NoActivate AutoSize x%Final_x% y%Final_y%, QPVguiTipsWin
+    WinSet, Transparent, 225, ahk_id %hGuiTip%
+    delayu := StrLen(msg) * 75 + 950
+    If (delayu<msgDisplayTime/2)
+       delayu := msgDisplayTime//2 + 1
+    WinSet, AlwaysOnTop, On, ahk_id %hGuiTip%
+    ; WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
+    SetTimer, mouseTurnOFFtooltip, % -delayu
+}
 
+adjustWin2MonLimits(winHwnd, winX, winY, ByRef rX, ByRef rY, ByRef Wid, ByRef Heig) {
+   GetWinClientSize(Wid, Heig, winHwnd, 1)
+   ActiveMon := MWAGetMonitorMouseIsIn(winX, winY)
+   If ActiveMon
+   {
+      SysGet, bCoord, Monitor, %ActiveMon%
+      rX := max(bCoordLeft, min(winX, bCoordRight - Wid))
+      rY := max(bCoordTop, min(winY, bCoordBottom - Heig*1.2))
+      ResWidth := Abs(max(bCoordRight, bCoordLeft) - min(bCoordRight, bCoordLeft))
+      ; ResHeight := Abs(max(bCoordTop, bCoordBottom) - min(bCoordTop, bCoordBottom))
+   } Else
+   {
+      rX := winX
+      rY := winY
+   }
 
+   Return ResWidth
+}
 
+ShowClickHalo(mX, mY, BoxW, BoxH, boxMode) {
+    Static
+    Static lastInvoked := 1
+    Critical, On
+    If ((A_TickCount - lastInvoked < 100) || !BoxW || !BoxH)
+       Return
 
+    lastInvoked := A_TickCount
+    If (!mX && !mY)
+       GetPhysicalCursorPos(mX, mY)
 
+    If (boxMode=0)
+    {
+       mX := mX - BoxW//2
+       mY := mY - BoxW//2
+    }
 
+    Gui, MclickH: Destroy
+    Sleep, 30
+    Gui, MclickH: +AlwaysOnTop -DPIScale -Caption +ToolWindow +Owner +E0x20 +E0x8000000 +hwndhClickHalo
+    Gui, MclickH: Color, 0099FF
+    ; Gui, MclickH: Show, NoActivate Hide x%mX% y%mY% w%BoxW% h%BoxH%, WinMouseClick
+    ; WinSet, ExStyle, 0x20, WinMouseClick
+    Gui, MclickH: Show, NoActivate x%mX% y%mY% w%BoxW% h%BoxH%, ahk_id %hClickHalo%
+    If (boxMode=0)
+       WinSet, Region, 0-0 W%BoxW% H%BoxH% E, ahk_id %hClickHalo%
+    WinSet, Transparent, 128, ahk_id %hClickHalo%
+    WinSet, AlwaysOnTop, On, ahk_id %hClickHalo%
+    SetTimer, DestroyClickHalo, -300
+}
 
+DestroyClickHalo() {
+    Gui, MclickH: Destroy
+}
 
+clearGivenGDIwin(hwnd) {
+    HDC := Gdi_CreateCompatibleDC()
+    GetWinClientSize(w, h, PVhwnd, 0)
+    Hbitmap := Gdi_CreateDIBSection(w, h)
+    OBM := Gdi_SelectObject(HDC, Hbitmap)
+    Gdi_UpdateLayeredWindow(hwnd, HDC, 0, 0, w, h)
+    ; ToolTip, % "=" r "=" z "=" hdc "=" hBitmap "=" obm "=" pretty good , , , 2
+    Gdi_SelectObject(HDC, OBM)
+    If Hbitmap
+       Gdi_DeleteObject(Hbitmap)
+    If HDC
+       Gdi_DeleteDC(HDC)
+}
 
+/*
+Gdi_UpdateLayeredWindow(hwnd, hDC, x:="", y:="", w:="", h:="", Alpha:=255) {
+   if ((x != "") && (y != ""))
+      VarSetCapacity(pt, 8, 0), NumPut(x, pt, 0, "UInt"), NumPut(y, pt, 4, "UInt")
 
+   return DllCall("user32\UpdateLayeredWindow"
+               , "UPtr", hwnd
+               , "UPtr", 0
+               , "UPtr", ((x = "") && (y = "")) ? 0 : &pt
+               , "int64*", w|h<<32
+               , "UPtr", hDC
+               , "int64*", 0
+               , "uint", 0
+               , "UInt*", Alpha<<16|1<<24
+               , "uint", 2)
+}
 
+Gdi_CreateCompatibleDC(hDC:=0) {
+  ; Remarks:
+  ; this type of DC must be released with Gdi_DeleteDC()
 
+   return DllCall("gdi32\CreateCompatibleDC", "UPtr", hDC)
+}
 
+Gdi_DeleteDC(hDC) {
+  ; The DeleteDC function deletes the specified device context (DC)
+  ; If the function succeeds, the return value is nonzero
+  return DllCall("gdi32\DeleteDC", "UPtr", hDC)
+}
 
+Gdi_DeleteObject(hObject) {
+   return DllCall("gdi32\DeleteObject", "UPtr", hObject)
+}
 
+Gdi_SelectObject(hDC, obj) {
+   return DllCall("gdi32\SelectObject", "UPtr", hDC, "UPtr", obj, "UPtr")
+}
 
+Gdi_CreateDIBSection(w, h, hDC:="", bpp:=32, ByRef ppvBits:=0, Usage:=0, hSection:=0, Offset:=0) {
+; A GDI function that creates a new hBitmap,
+; a device-independent bitmap [DIB].
+; A DIB consists of two distinct parts:
+; a BITMAPINFO structure describing the dimensions
+; and colors of the bitmap, and an array of bytes
+; defining the pixels of the bitmap. 
 
+   hDC2 := hDC ? hDC : Gdi_GetDC()
+   VarSetCapacity(bi, 40, 0)
+   NumPut(40, bi, 0, "uint")
+   NumPut(w, bi, 4, "uint")
+   NumPut(h, bi, 8, "uint")
+   NumPut(1, bi, 12, "ushort")
+   NumPut(bpp, bi, 14, "ushort")
+   NumPut(0, bi, 16, "uInt")
+
+   hbm := DllCall("gdi32\CreateDIBSection"
+               , "UPtr", hDC2
+               , "UPtr", &bi    ; BITMAPINFO
+               , "uint", Usage
+               , "UPtr*", ppvBits
+               , "UPtr", hSection
+               , "uint", OffSet, "UPtr")
+
+   if !hdc
+      Gdi_ReleaseDC(hdc2)
+   return hbm
+}
+*/
 
 
 
@@ -2864,32 +3694,7 @@ class taskbarInterface {
    
    ; THUMBBUTTON  struct:
    static thumbButtonSize:=A_PtrSize=4?540:552      ; Size calculations according to:
-   /*
-   ; URL:
-   ;   - https://msdn.microsoft.com/en-us/library/windows/desktop/dd391559(v=vs.85).aspx (THUMBBUTTON structure)
-   ;
-   ;                           offsets:                     Contribution to size (bytes):   
-   THUMBBUTTONMASK  dwMask            0                  ...         4
-   UINT             iId            4                  ...         4
-   UINT             iBitmap         8                  ...         4
-   ;                                             ...         64-bit: add 4 bytes spacing, pointer address, adr, needs to be mod(adr,A_PtrSize)=0
-   HICON            hIcon            8+A_PtrSize            ...         A_PtrSize
-   WCHAR            szTip[260]         8+2*A_PtrSize         ...         260*2
-   THUMBBUTTONFLAGS dwFlags         8+2*A_PtrSize+260*2      ...         4
-   ;                                                      Sum: 32-bit: 4+4+4+0+A_PtrSize+260*2+4=540, 540/A_PtrSize=135, no spacing needed. EDIT: FIXED miscalculation thumbuttonSize = 540, not 544 ...
-   ;                                                      Sum: 64-bit: 4+4+4+4+A_PtrSize+260*2+4=548, 548/A_PtrSize=68.5 -> add 4 bytes, 552/A_PtrSize=69 (mod(552,A_Ptrsize)=0).
-   ;                                                      64-bit: add 4 bytes spacing to next struct in array
-   ;                                                      Summary: size:= A_PtrSize=4?544:552
-   
-   */
-   ;
-   ; NOTE:
-   ;
-   ;          <   >   <   >   <   >   <   >   <   >   <   >               Context:                  <   >   <   >   <   >   <   >   <   >   <   >
-   ;          <   >   <   >   <   >   <   >   <   >   <   >          this = taskbarInterface            <   >   <   >   <   >   <   >   <   >   <   >
-   ;          <   >   <   >   <   >   <   >   <   >   <   >                                       <   >   <   >   <   >   <   >   <   >   <   >
-   ;
-   ;
+
    initInterface(){
       ; Url:
       ;   -  https://msdn.microsoft.com/en-us/library/windows/desktop/bb774652(v=vs.85).aspx (ITaskbarList interface)
@@ -3473,9 +4278,6 @@ class taskbarInterface {
 }
 
 
-
-
-
 repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:="") {
     Static lastAsked := 1
     If !winPos
@@ -3544,99 +4346,6 @@ MWAGetMonitorMouseIsIn(coordX:=0,coordY:=0) {
     }
   }
   Return ActiveMon
-}
-
-GetPhysicalCursorPos(ByRef mX, ByRef mY) {
-; function from: https://github.com/jNizM/AHK_DllCall_WinAPI/blob/master/src/Cursor%20Functions/GetPhysicalCursorPos.ahk
-; by jNizM, modified by Marius Șucan
-    Static lastMx, lastMy, lastInvoked := 1
-    If (A_TickCount - lastInvoked<70)
-    {
-       mX := lastMx
-       mY := lastMy
-       Return
-    }
-
-    lastInvoked := A_TickCount
-    Static POINT
-         , init := VarSetCapacity(POINT, 8, 0) && NumPut(8, POINT, "Int")
-    If !isWinXP
-       GPC := DllCall("user32.dll\GetPhysicalCursorPos", "Ptr", &POINT)
-
-    If (!GPC || isWinXP=1)
-    {
-       MouseGetPos, mX, mY
-       lastMx := mX
-       lastMy := mY
-       Return
-     ; Return DllCall("kernel32.dll\GetLastError")
-    }
-
-    lastMx := mX := NumGet(POINT, 0, "Int")
-    lastMy := mY := NumGet(POINT, 4, "Int")
-    Return
-}
-
-calcScreenLimits(whichHwnd:="main") {
-    Static lastInvoked := 1, prevHwnd, prevActiveMon := []
-
-    ; the function calculates screen boundaries for the user given X/Y position for the OSD
-    If (A_TickCount - lastInvoked<350) && (prevHwnd=whichHwnd)
-       Return prevActiveMon
-
-    whichHwnd := (whichHwnd="main") ? PVhwnd : whichHwnd
-    If (whichHwnd="mouse")
-    {
-       MouseGetPos, OutputVarX, OutputVarY
-       GetPhysicalCursorPos(mainX, mainY)
-       If !mainX
-          mainX := OutputVarX
-       If !mainY
-          mainY := OutputVarY
-       hMon := MDMF_FromPoint(mainX, mainY, 2)
-    } Else 
-    {
-       hMon := MDMF_FromHWND(whichHwnd, 2)
-       WinGetPos, mainX, mainY,, , ahk_id %whichHwnd%
-    }
-
-    If hMon
-       MonitorInfos := MDMF_GetInfo(hMon)
-
-    If !IsObject(MonitorInfos)
-    {
-       ActiveMon := MWAGetMonitorMouseIsIn(mainX, mainY)
-       If !ActiveMon
-       {
-          ActiveMon := MWAGetMonitorMouseIsIn()
-          If !ActiveMon
-             Return prevActiveMon
-       }
-       SysGet, mCoord, MonitorWorkArea, %ActiveMon%
-       prevActiveMon.mCRight := mCoordRight, prevActiveMon.mCLeft := mCoordLeft
-       prevActiveMon.mCTop := mCoordTop, prevActiveMon.mCBottom := mCoordBottom
-    } Else
-    {
-       ActiveMon := MonitorInfos.Num
-       mCoordRight := MonitorInfos.WARight, mCoordLeft := MonitorInfos.WALeft
-       mCoordTop := MonitorInfos.WATop, mCoordBottom := MonitorInfos.WABottom
-       prevActiveMon.mCRight := MonitorInfos.WARight, prevActiveMon.mCLeft := MonitorInfos.WALeft
-       prevActiveMon.mCTop := MonitorInfos.WATop, prevActiveMon.mCBottom := MonitorInfos.WABottom
-    }
-
-    prevActiveMon.w := ResolutionWidth := Abs(max(mCoordRight, mCoordLeft) - min(mCoordRight, mCoordLeft))
-    prevActiveMon.h := ResolutionHeight := Abs(max(mCoordTop, mCoordBottom) - min(mCoordTop, mCoordBottom)) 
-    If !ResolutionWidth
-       prevActiveMon.w := ResolutionWidth := 800
-    If !ResolutionHeight
-       prevActiveMon.h := ResolutionHeight := 600
-
-    prevActiveMon.m := ActiveMon
-    prevActiveMon.hMon := hMon
-    lastInvoked := A_TickCount
-    prevHwnd := whichHwnd
-    ; ToolTip, % ActiveMon "`n" pActiveMon "`n" hMon , , , 2
-    Return prevActiveMon
 }
 
 GetWindowBounds(hWnd) {
@@ -3720,48 +4429,6 @@ MDMF_GetInfo(HMON) {
             , WABottom:  NumGet(MIEX, 32, "Int")   ; "
             , Primary:   NumGet(MIEX, 36, "UInt")} ; contains a non-zero value for the primary monitor.
    Return False
-}
-
-constantMenuReader(modus:=0) {
-   Static prevLabel := "z"
-   GetPhysicalCursorPos(x, y)
-   ; winID := WinActive("A")
-   Try MouseGetPos, ,, WinID
-   ; ToolTip, % winID "`n" OutputVarWin , , , 2
-   If (modus="focused")
-      AccAccFocus(OutputVarWin, accFocusName, accFocusValue, accRole, accIRole)
-   Else
-      AccInfoUnderMouse(x, y, winID, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut)
-
-   goodText := accFocusValue ? accFocusValue : accFocusName
-   goodRoles := (accIRole=41 || accIRole=42 || accIRole=46) ? 1 : 0
-   If (accIRole=12 && accFocusName && (prevLabel!=accFocusName || mouseToolTipWinCreated!=1))
-   {
-      prevLabel := accFocusName
-      msgu := StrReplace(accFocusName, "`t", "`n[ ")
-      If InStr(accFocusName, "`t")
-         msgu .= " ]"
-
-      If InStr(strstyles, "0x00000001")
-         msgu .= "`nITEM DISABLED"
-      Else If shortcut
-         msgu := "&" Format("{:U}", shortcut) ": " msgu
-
-      If InStr(strstyles, "0x00000010")
-         msgu .= "`nITEM CHECKED"
-      If InStr(strstyles, "0x40000000")
-         msgu .= "`nSUBMENU CONTAINER"
-
-      mouseCreateOSDinfoLine(msgu, PrefsLargeFonts)
-      ; ToolTip, % accFocusName , , , 2
-      ; MainExe.ahkPostFunction("showtooltip", accFocusName)
-   }
-   SetTimer, repeatMenuInfosPopup, -150
-}
-
-repeatMenuInfosPopup() {
-   If GetKeyState("RButton", "P")
-      constantMenuReader()
 }
 
 Acc_ObjectFromWindow(hWnd, idObject = 0) {
@@ -3848,119 +4515,12 @@ AccGetStateText(nState) {
   Return sState
 }
 
-mouseTurnOFFtooltip() {
-   Sleep, 20
-   Gui, mouseToolTipGuia: Destroy
-   ; WinActive("ahk_id" PVhwnd)
-   Global mouseToolTipWinCreated := 0
+setMenusTheme(modus) {
+   uxtheme := DllCall("GetModuleHandle", "str", "uxtheme", "ptr")
+   SetPreferredAppMode := DllCall("GetProcAddress", "ptr", uxtheme, "ptr", 135, "ptr")
+   ; AllowDarkModeForWindow := DllCall("GetProcAddress", "ptr", uxtheme, "ptr", 133, "ptr")
+   FlushMenuThemes := DllCall("GetProcAddress", "ptr", uxtheme, "ptr", 136, "ptr")
+   DllCall(SetPreferredAppMode, "int", modus) ; Dark
+   DllCall(FlushMenuThemes)
 }
-
-mouseCreateOSDinfoLine(msg:=0, largus:=0) {
-    Critical, On
-    Static prevMsg, lastInvoked := 1
-    Global TippyMsg, hGuiTip
-
-    thisHwnd := PVhwnd
-    If (StrLen(msg)<3) || (prevMsg=msg && mouseToolTipWinCreated=1) || (A_TickCount - lastInvoked<100) || !thisHwnd
-       Return
-
-    lastInvoked := A_TickCount
-    Gui, mouseToolTipGuia: Destroy
-    thisFntSize := (largus=1) ? Round(LargeUIfontValue*1.55) : LargeUIfontValue
-    If (thisFntSize<5)
-       thisFntSize := 5
-    If (largus>5)
-       thisFntSize := largus
-
-    bgrColor := OSDbgrColor
-    txtColor := OSDtextColor
-    isBold := (FontBolded=1) ? " Bold" : ""
-    Sleep, 25
-
-    Gui, mouseToolTipGuia: -DPIScale -Caption +Owner%thisHwnd% +ToolWindow +hwndhGuiTip
-    Gui, mouseToolTipGuia: Margin, % thisFntSize, % thisFntSize
-    Gui, mouseToolTipGuia: Color, c%bgrColor%
-    Gui, mouseToolTipGuia: Font, s%thisFntSize% %isBold% Q5, %OSDFontName%
-    Gui, mouseToolTipGuia: Add, Text, c%txtColor% gmouseTurnOFFtooltip vTippyMsg, %msg%
-    Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPVOguiTipsWin
-
-    GetPhysicalCursorPos(mX, mY)
-    tipX := mX + 15
-    tipY := mY + 15
-    ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
-    MaxWidth := Floor(ResWidth*0.85)
-    If (MaxWidth<Wid && MaxWidth>10)
-    {
-       GuiControl, mouseToolTipGuia: Move, TippyMsg, w1 h1
-       GuiControl, mouseToolTipGuia:, TippyMsg,
-       Gui, mouseToolTipGuia: Add, Text, xp yp c%txtColor% gmouseTurnOFFtooltip w%MaxWidth%, %msg%
-       Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPVguiTipsWin
-       ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
-    }
-    prevMsg := msg
-    mouseToolTipWinCreated := 1
-    Gui, mouseToolTipGuia: Show, NoActivate AutoSize x%Final_x% y%Final_y%, QPVguiTipsWin
-    WinSet, Transparent, 225, ahk_id %hGuiTip%
-    delayu := StrLen(msg) * 75 + 950
-    If (delayu<msgDisplayTime/2)
-       delayu := msgDisplayTime//2 + 1
-    WinSet, AlwaysOnTop, On, ahk_id %hGuiTip%
-    WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
-    SetTimer, mouseTurnOFFtooltip, % -delayu
-}
-
-adjustWin2MonLimits(winHwnd, winX, winY, ByRef rX, ByRef rY, ByRef Wid, ByRef Heig) {
-   GetWinClientSize(Wid, Heig, winHwnd, 1)
-   ActiveMon := MWAGetMonitorMouseIsIn(winX, winY)
-   If ActiveMon
-   {
-      SysGet, bCoord, Monitor, %ActiveMon%
-      rX := max(bCoordLeft, min(winX, bCoordRight - Wid))
-      rY := max(bCoordTop, min(winY, bCoordBottom - Heig*1.2))
-      ResWidth := Abs(max(bCoordRight, bCoordLeft) - min(bCoordRight, bCoordLeft))
-      ; ResHeight := Abs(max(bCoordTop, bCoordBottom) - min(bCoordTop, bCoordBottom))
-   } Else
-   {
-      rX := winX
-      rY := winY
-   }
-
-   Return ResWidth
-}
-
-ShowClickHalo(mX, mY, BoxW, BoxH, boxMode) {
-    Static
-    Static lastInvoked := 1
-    Critical, On
-    If (A_TickCount - lastInvoked < 100)
-       Return
-
-    lastInvoked := A_TickCount
-    If (!mX && !mY)
-       GetPhysicalCursorPos(mX, mY)
-
-    If (boxMode=0)
-    {
-       mX := mX - BoxW//2
-       mY := mY - BoxW//2
-    }
-
-    Gui, MclickH: Destroy
-    Sleep, 30
-    Gui, MclickH: +AlwaysOnTop -DPIScale -Caption +ToolWindow +Owner +E0x20 +E0x8000000 +hwndhClickHalo
-    Gui, MclickH: Color, 0099FF
-    ; Gui, MclickH: Show, NoActivate Hide x%mX% y%mY% w%BoxW% h%BoxH%, WinMouseClick
-    ; WinSet, ExStyle, 0x20, WinMouseClick
-    Gui, MclickH: Show, NoActivate x%mX% y%mY% w%BoxW% h%BoxH%, ahk_id %hClickHalo%
-    If (boxMode=0)
-       WinSet, Region, 0-0 W%BoxW% H%BoxH% E, ahk_id %hClickHalo%
-    WinSet, Transparent, 128, ahk_id %hClickHalo%
-    WinSet, AlwaysOnTop, On, ahk_id %hClickHalo%
-    SetTimer, DestroyClickHalo, -300
-}
-
-DestroyClickHalo() {
-    Gui, MclickH: Destroy
-}
-
 
