@@ -2,6 +2,9 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.6.1 (2022-02-26)
+  - silly bug prevented previous release from starting ;/
+
 - v5.6.0 (2022-02-25)
 General stuff:
   - [new] ability to load images through WIC - Windows Imaging Component; the newly supported formats are listed in the open dialog
