@@ -191,7 +191,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , darkWindowColor := 0x202020, darkControlColor := 0xEDedED, allowWICloader := 1, allowFIMloader := 1
    , postVectorWinOpen := 0, isWelcomeScreenu := 0, prevVectorShapeSymmetryMode := []
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", lastTlbrCliicked := 0
-   , appVersion := "5.6.1", vReleaseDate := "26/02/2022"
+   , appVersion := "5.6.2", vReleaseDate := "27/02/2022"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1, usrAutoCropGenerateSelection := 0
@@ -64364,7 +64364,7 @@ LoadWICimage(imgPath, noBPPconv, frameu, sizesDesired:=0, ByRef newBitmap:=0) {
       mainLoadedIMGdetails.DPI := NumGet(resultsArray, 4 * 4, "uInt")
       mainLoadedIMGdetails.RawFormat := WICcontainerFmts(NumGet(resultsArray, 4 * 5, "uInt"))
       mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(mainLoadedIMGdetails.Width, mainLoadedIMGdetails.Height)
-      mainLoadedIMGdetails.HasAlpha := InStr(mainLoadedIMGdetails.pixFmt, "argb") || InStr(mainLoadedIMGdetails.pixFmt, "bgra") || InStr(mainLoadedIMGdetails.pixFmt, "alpha") ? 1 : 0
+      mainLoadedIMGdetails.HasAlpha := InStr(mainLoadedIMGdetails.PixelFormat, "argb") || InStr(mainLoadedIMGdetails.PixelFormat, "bgra") || InStr(mainLoadedIMGdetails.PixelFormat, "alpha") ? 1 : 0
       mainLoadedIMGdetails.OpenedWith := "Windows Imaging Component [WIC]"
 
       ; fnOutputDebug("images desired = " sizesDesired.Count() " | f=" findFlippedDupes)

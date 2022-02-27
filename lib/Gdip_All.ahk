@@ -2672,7 +2672,7 @@ Gdip_CreateBitmapFromFile(sFile, IconNumber:=1, IconSize:="", useICM:=0) {
       VarSetCapacity(dib, 104, 0)
       DllCall("GetObject", "UPtr", hbm, "int", A_PtrSize = 8 ? 104 : 84, "UPtr", &dib) ; sizeof(DIBSECTION) = 76+2*(A_PtrSize=8?4:0)+2*A_PtrSize
       Stride := NumGet(dib, 12, "Int")
-      Bits := NumGet(dib, 20 + (A_PtrSize = 8 ? 4 : 0), 0) ; padding
+      Bits := NumGet(dib, 20 + (A_PtrSize = 8 ? 4 : 0), "Int") ; padding
       pBitmapOld := Gdip_CreateBitmap(Width, Height, 0, Stride, Bits)
       pBitmap := Gdip_CreateBitmap(Width, Height)
       _G := Gdip_GraphicsFromImage(pBitmap)
