@@ -11,8 +11,10 @@ Ctrl + -|Increase OSD font sizes|Anywhere|-
 Ctrl + =|Decrease OSD font sizes|Anywhere|-
 0|Rotate image by +15°|Image view|-
 9|Rotate image by -15°|Image view|-
-0|Rotate selection area by +2°|Image selection area|-
-9|Rotate selection area by -2°|Image selection area|-
+Alt + 0|Rotate image by +1°|Image view|-
+Alt + 9|Rotate image by -1°|Image view|-
+Shift + 0|Rotate selection area by +1°|Image selection area|-
+Shift + 9|Rotate selection area by -1°|Image selection area|-
 Shift + 0|Apply rotate image by +90° on selected file(s)|Files list|-
 Shift + 9|Apply rotate image by -90° on selected file(s)|Files list|-
 [|Decrease image brightness|Anywhere|-
@@ -23,7 +25,7 @@ Shift + [|Decrease image contrast|Anywhere|-
 Shift + ]|Increase image contrast|Anywhere|-
 Ctrl + [|Decrease image saturation by 5%|Anywhere|-
 Ctrl + ]|Increase image saturation by 5%|Anywhere|-
-\|Reset color adjustments|Anywhere|-
+\|Reset viewport color adjustments or rotation|Anywhere|-
 Ctrl + \|Hard reset color adjustments|Anywhere|-
 A|Toggle image alignment: centered or top-left corner|Anywhere|-
 Alt + A|Adjust image canvas size|Image view|Panel
@@ -67,7 +69,8 @@ Ctrl + N|Create new image|Anywhere|Panel
 Ctrl + S|Save image panel|Image view|Panel
 Ctrl + S|Save files list as slideshow (.SLD)|Files list|Panel
 Ctrl + O|Open file(s)|Anywhere|Files selector
-Ctrl + R|Resize, rotate or crop image(s)|Anywhere|Panel
+Ctrl + R|Resize image in viewport|Image view|Panel
+Ctrl + R|Resize, rotate or crop image(s)|Filess list|Panel
 Alt + R|Resize image to viewport selection area|Image view|-
 Ctrl + Shift + N|Open new QPV instance|Anywhere|External app
 Ctrl + Shift + S|Save files list as slideshow (.SLD)|Anywhere|Panel
@@ -194,7 +197,8 @@ Shift + F3|Search previous occurence in files index|Anywhere|-
 F3|Search next occurence in files index|Anywhere|-
 Shift + F5|Reload slideshow file or refresh opened folder|Anywhere|-
 Alt + F5|Regenerate on scroll selected or all thumbnails|Files list|-
-Shift + A|Toggle between image selection area aspect ratios|Image selection area|-
+Shift + A|Cycle selection area locked aspect ratios|Image selection area|-
+Ctrl + Shift + A|Lock selection area current aspect ratio|Image selection area|-
 Shift + H|Flip horizontally image selected area|Image view|-
 Shift + V|Flip vertically image selected area|Image view|-
 Shift + H|Apply flip image horizontally on selected file(s)|Files list|-

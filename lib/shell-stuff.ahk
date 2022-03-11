@@ -1735,6 +1735,17 @@ setDarkWinAttribs(hwndGUI, modus:=1) {
    DllCall(AllowDarkModeForWindow, "UPtr", hwndGUI, "int", modus) ; Dark
 }
 
+
+LinkUseDefaultColor(hLink, Use, whichGui) {
+   VarSetCapacity(LITEM, 4278, 0)            ; 16 + (MAX_LINKID_TEXT * 2) + (L_MAX_URL_LENGTH * 2)
+   NumPut(0x03, LITEM, "UInt")               ; LIF_ITEMINDEX (0x01) | LIF_STATE (0x02)
+   NumPut(Use ? 0x10 : 0, LITEM, 8, "UInt")  ; ? LIS_DEFAULTCOLORS : 0
+   NumPut(0x10, LITEM, 12, "UInt")           ; LIS_DEFAULTCOLORS
+   While DllCall("SendMessage", "Ptr", hLink, "UInt", 0x0702, "Ptr", 0, "Ptr", &LITEM, "UInt") ; LM_SETITEM
+         NumPut(A_Index, LITEM, 4, "Int")
+   GuiControl, %whichGUI%: +Redraw, %hLink%
+}
+
 setPriorityThread(level, handle:="A") {
   If (handle="A" || !handle)
      handle := DllCall("GetCurrentThread")
@@ -1952,3 +1963,119 @@ TabCtrl_GetItemText(HWND, Index:=0) {
    ; ToolTip, % name , , , 2
    Return name
 }
+
+BalloonTip(sText, sTitle:="BalloonTip", Options:="") {
+; Example: BalloonTip("how are you ?", "Mr.World says hello", "I=2 C=001100 T=2")
+; Source: https://www.autohotkey.com/board/topic/27670-add-tooltips-to-controls/
+; updated by Marius Șucan -- mardi 8 mars 2022
+
+  ;    BalloonTip  -  AHK, AHK_L compatible
+  ; *****************************************************************************************************************************
+  ;  Options: Space separated string of options bellow like (X=10 Y=10 I=1 T=2000 C=FFFFFF). ( Default Options in [] ).
+  ;  X= x position [mouse x]
+  ;  Y= y position [mouse y]
+  ;  T= Timeout in seconds [0]
+  ;  I= Icon 0:None, [1], 2:Warning, 3:Error, >3:assumed to be an hIcon.
+  ;  C= RGB color for background (like 0xFF00FF or FF00FF), text uses compliment color, [1]
+  ;  Q= Theme [1], Use 0 to disable Theme for colors to work in Vista, Win7.
+  ;  NOTE: To Close it before Timeout, use command (WinClose,  ahk_id %<Returned hWnd>%)
+  ; ******************************************************************************************************************************
+  STATIC hWnd, X, Y, T, W, I, C, Q  ; Options STATIC to force local variables
+  , prevHwnd, lastTimer, lastInvoked
+  If (prevHwnd && lastTimer && (A_TickCount - lastInvoked < lastTimer))
+  {
+     prevHwnd :=""
+     WinClose, ahk_id %prevHwnd%
+  }
+
+  X:=Y:="", T:=W:=0, I:=C:=Q:=1, Ptr:=(A_PtrSize ? "Ptr" : "UInt"), sTitle:=((StrLen(sTitle)<99) ? sTitle : (SubStr(sTitle,1,95) . " ..."))
+  Loop, Parse, Options, %A_Space%=, %A_Space%%A_Tab%`r`n
+      A_Index & 1  ? (Var:=A_LoopField) : (%Var%:=A_LoopField)
+
+  DllCall("GetCursorPos", "int64P", pt), X:=(!X ? pt << 32 >> 32 : X), Y:=(!Y ? pt >> 32 : Y)
+  a:=((C=1) ? ((hDC:=DllCall("GetDC","Uint",0)) (C:=DllCall("GetPixel","Uint",hDC,"int",X,"int",Y)) (DllCall("ReleaseDC","Uint",0,"Uint",hDC))) : ((C:=(StrLen(C)<8 ? "0x" : "") . C) (C:=((C&255)<<16)+(((C>>8)&255)<<8)+(C>>16)))) ; rgb -> bgr
+  VarSetCapacity(ti,(A_PtrSize ? 28+A_PtrSize*3 : 40),0), ti:=Chr((A_PtrSize ? 28+A_PtrSize*3 : 40)), NumPut(0x20,ti,4,"UInt"), NumPut(&sText,&ti,(A_PtrSize ? 24+A_PtrSize*3 : 36))
+  hWnd:=DllCall("CreateWindowEx",Ptr,0x8,"str","tooltips_class32","str","",Ptr,0xC3,"int",0,"int",0,"int",0,"int",0,Ptr,0,Ptr,0,Ptr,0,Ptr,0,Ptr)
+  a:=(Q ? DllCall("SendMessage","Uint",hWnd,Ptr,0x200b,Ptr,0,Ptr,"") : DllCall("uxtheme\SetWindowTheme","Uint",hWnd,Ptr,0,"UintP",0)) ; TTM_SETWINDOWTHEME
+
+  DllCall("SendMessage", Ptr, hWnd, "Uint", 1028, Ptr, 0, Ptr, &ti, Ptr)        ; TTM_ADDTOOL
+  DllCall("SendMessage", Ptr, hWnd, "Uint", 1041, Ptr, 1, Ptr, &ti, Ptr)        ; TTM_TRACKACTIVATE
+  DllCall("SendMessage", Ptr, hWnd, "Uint", 1042, Ptr, 0, Ptr, (X & 0xFFFF)|(Y & 0xFFFF)<<16,Ptr)  ; TTM_TRACKPOSITION
+  DllCall("SendMessage", Ptr, hWnd, "Uint", 1043, Ptr, C, Ptr,   0, Ptr)        ; TTM_SETTIPBKCOLOR
+  DllCall("SendMessage", Ptr, hWnd, "Uint", 1044, Ptr, ~C & 0xFFFFFF,  Ptr, 0,Ptr)    ; TTM_SETTIPTEXTCOLOR
+  DllCall("SendMessage", Ptr, hWnd, "Uint",(A_IsUnicode ? 1057 : 1056),Ptr, I,Ptr, &sTitle, Ptr)  ; TTM_SETTITLE 0:None, 1:Info, 2:Warning, 3:Error, >3:assumed to be an hIcon.
+  DllCall("SendMessage", Ptr, hWnd, "Uint", 1048, Ptr, 0, Ptr, A_ScreenWidth)      ; TTM_SETMAXTIPWIDTH
+  DllCall("SendMessage", Ptr, hWnd, "UInt",(A_IsUnicode ? 0x439 : 0x40c), Ptr, 0, Ptr, &ti, Ptr)  ; TTM_UPDATETIPTEXT (OLD_MSG=1036)
+  ; IfGreater, I, 0, SoundPlay, % "*" . (I=2 ? 48 : I=3 ? 16 : 64)
+  If (T>0)
+  {
+     prevHwnd := hwnd
+     lastTimer := T*1000
+     lastInvoked := A_TickCount
+     fn := Func("BalloonTip_TimeOut").Bind(hwnd)
+     SetTimer, % fn, % -T*1000
+  }
+  Return hWnd        ; Close it before TimeOut.
+}
+
+BalloonTip_TimeOut(hwnd) {
+  ; SetTimer, BalloonTip_TimeOut, Off
+  WinClose, ahk_id %hWnd%
+}
+
+
+LV_EX_GetNextItem(HLV, nRow, lParam:=0x0001) {
+; Description ..: Get the next item in the target ListView.
+; Parameters ...: HLV  - External ListView hwnd
+; ..............: nRow   - Row where to start the search for the next item (0-based index).
+; ..............: lParam - Status of the searched item. Common statuses are:
+; ..............:          LVNI_ALL         - 0x0000
+; ..............:          LVNI_FOCUSED     - 0x0001
+; ..............:          LVNI_SELECTED    - 0x0002
+; ..............:          LVNI_CUT         - 0x0004
+; ..............:          LVNI_DROPHILITED - 0x0008
+; Info .........: LVM_GETNEXTITEM - http://msdn.microsoft.com/en-us/library/windows/desktop/bb761057%28v=vs.85%29.aspx
+; Return .......: Item content as a string.
+
+    ; LVM_GETNEXTITEM = LVM_FIRST (0x1000) + 12 = 0x100C.
+    SendMessage, 0x100C, %nRow%, %lParam%,, % "ahk_id " HLV
+    Return ErrorLevel
+}
+
+LV_EX_GetItemsCount(HLV, ByRef rows, ByRef cols) {
+    ; LVM_GETITEMCOUNT = LVM_FIRST (0x1000) + 4 = 0x1004.
+    SendMessage, 0x1004, 0, 0,, % "ahk_id " hlv
+    rows := ErrorLevel
+
+    ; LVM_GETHEADER = LVM_FIRST (0x1000) + 31 = 0x101F.
+    SendMessage, 0x101F, 0, 0,, % "ahk_id " hlv
+    hhdr := ErrorLevel
+
+    ; HDM_GETITEMCOUNT = HDM_FIRST (0x1200) + 0 = 0x1200.
+    SendMessage, 0x1200, 0, 0,, % "ahk_id " hhdr
+    cols := ErrorLevel
+}
+
+LV_EX_LVITEM(ByRef LVITEM, Mask := 0, Row := 1, Col := 1) {
+   Static LVITEMSize := 48 + (A_PtrSize * 3)
+   VarSetCapacity(LVITEM, LVITEMSize, 0)
+   NumPut(Mask, LVITEM, 0, "UInt"), NumPut(Row - 1, LVITEM, 4, "Int"), NumPut(Col - 1, LVITEM, 8, "Int")
+}
+
+LV_EX_GetSubItemText(HLV, Row, Column := 1, MaxChars := 1024) {
+; function by «just me»
+; found on https://github.com/AHK-just-me/
+
+   ; LVM_GETITEMTEXT -> http://msdn.microsoft.com/en-us/library/bb761055(v=vs.85).aspx
+   Static LVM_GETITEMTEXT := A_IsUnicode ? 0x1073 : 0x102D ; LVM_GETITEMTEXTW : LVM_GETITEMTEXTA
+   Static OffText := 16 + A_PtrSize
+   Static OffTextMax := OffText + A_PtrSize
+   VarSetCapacity(ItemText, MaxChars << !!A_IsUnicode, 0)
+   LV_EX_LVITEM(LVITEM, , Row, Column)
+   NumPut(&ItemText, LVITEM, OffText, "Ptr")
+   NumPut(MaxChars, LVITEM, OffTextMax, "Int")
+   SendMessage, % LVM_GETITEMTEXT, % (Row - 1), % &LVITEM, , % "ahk_id " . HLV
+   VarSetCapacity(ItemText, -1)
+   Return ItemText
+}
+

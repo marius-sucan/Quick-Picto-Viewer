@@ -1057,45 +1057,38 @@ repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:=
        setDarkWinAttribs(hwndGUI)
        WinGet,strControlList, ControlList, ahk_id %hwndGUI%
        Gui, %whichGUI%: Color, %intWindowColor%, %intControlColor%
-       for strKey, strControl in StrSplit(strControlList,"`n","`r`n")
+       For strKey, strControl in StrSplit(strControlList,"`n","`r`n")
        {
-         ControlGet, strControlHwnd, HWND, , %strControl%, ahk_id %hwndGUI%
-         WinGetClass, CtrlClass, ahk_id %strControlhwnd%
-         ControlGet, CtrlStyle, Style, , , ahk_id %strControlhwnd%
-         doAttachCtlColor := 0
-         ; MsgBox, % CtrlClass
-         If InStr(CtrlClass, "systab")
-         {
-            GuiControl, %whichGUI%:-Border +Buttons cFFFFaa, %strControl%
-            doAttachCtlColor := -2
-         } Else If InStr(CtrlClass, "Button")
-         {
-            IF (CtrlStyle & BS_RADIOBUTTON) || (CtrlStyle & BS_CHECKBOX)
-               doAttachCtlColor := 2
-            IF (CtrlStyle & 0x1000)
-               doAttachCtlColor := 1
-         } Else If InStr(CtrlClass, "ComboBox")
-            doAttachCtlColor := 1
-         Else If InStr(CtrlClass, "Edit")
-            doAttachCtlColor := -1
-         Else If InStr(CtrlClass, "Static")
-            doAttachCtlColor := -2
-
-         ; If (doAttachCtlColor!=-2 && doAttachCtlColor!=-1 && doAttachCtlColor>!=2)
-         ; {
-         ;    GuiControl, %whichGUI%: +Background%darkWindowColor%, %strControl%
-         ;    Gui, %whichGUI%: Font, c%darkControlColor%
-         ;    GuiControl, %whichGUI%: Font, %strControl%
-         ; }
-
-         If (doAttachCtlColor=1)
-            CtlColors.Attach(strControlHwnd, SubStr(darkWindowColor, 3), SubStr(darkControlColor, 3))
-
-         ; WinSet, Style, -0x800000, ahk_id %strControlhwnd%
-         ; WinSet, Style, -0x400000, ahk_id %strControlhwnd%
-         ; WinSet, Style, -0x40000, ahk_id %strControlhwnd%
-         If (doAttachCtlColor!=2 && doAttachCtlColor!=-2)
-            DllCall("uxtheme\SetWindowTheme", "ptr", strControlHwnd, "str", "DarkMode_Explorer", "ptr", 0)
+           ControlGet, strControlHwnd, HWND, , %strControl%, ahk_id %hwndGUI%
+           WinGetClass, CtrlClass, ahk_id %strControlhwnd%
+           ControlGet, CtrlStyle, Style, , , ahk_id %strControlhwnd%
+           doAttachCtlColor := 0
+           ; MsgBox, % CtrlClass
+           If InStr(CtrlClass, "systab")
+           {
+              GuiControl, %whichGUI%:-Border +Buttons cFFFFaa, %strControl%
+              doAttachCtlColor := -2
+           } Else If InStr(CtrlClass, "Button")
+           {
+              IF (CtrlStyle & BS_RADIOBUTTON) || (CtrlStyle & BS_CHECKBOX)
+                 doAttachCtlColor := 2
+              IF (CtrlStyle & 0x1000)
+                 doAttachCtlColor := 1
+           } Else If InStr(CtrlClass, "ComboBox")
+              doAttachCtlColor := 1
+           Else If InStr(CtrlClass, "Edit")
+              doAttachCtlColor := -1
+           Else If (InStr(CtrlClass, "Static") || InStr(CtrlClass, "syslink"))
+              doAttachCtlColor := -2 
+  
+           If InStr(CtrlClass, "syslink")
+              LinkUseDefaultColor(strControlHwnd, 1, whichGUI)
+  
+           If (doAttachCtlColor=1)
+              CtlColors.Attach(strControlHwnd, SubStr(darkWindowColor, 3), SubStr(darkControlColor, 3))
+  
+           If (doAttachCtlColor!=2 && doAttachCtlColor!=-2)
+              DllCall("uxtheme\SetWindowTheme", "ptr", strControlHwnd, "str", "DarkMode_Explorer", "ptr", 0)
        }
     }
 

@@ -401,16 +401,16 @@ createGDIselectorWin() {
 }
 
 SetParentID(Window_ID, theOther) {
-  Return DllCall("SetParent", "uint", theOther, "uint", Window_ID) ; success = handle to previous parent, failure =null 
+   Return DllCall("SetParent", "uint", theOther, "uint", Window_ID) ; success = handle to previous parent, failure =null 
 }
 
 miniGDIupdater() {
    updateUIctrl(0)
-   r := MainExe.ahkPostFunction("GDIupdaterResize", PrevGuiSizeEvent)
+   r := MainExe.ahkPostFunction("GuiGDIupdaterResize", PrevGuiSizeEvent)
 }
 
 detectLongOperation(timer) {
-  if (mustAbandonCurrentOperations=1)
+  If (mustAbandonCurrentOperations=1)
      Return 1
 
   executingCanceableOperation := MainExe.ahkgetvar.executingCanceableOperation
@@ -1080,7 +1080,7 @@ WM_MOUSELEAVE(wP, lP, msg, hwnd) {
 
 dummyCheckWin() {
    thisHwnd := WinActive("A")
-   drawingOkay := (thisHwnd=PVhwnd || thisHwnd=tempBtnVisible || thisHwnd=hSetWinGui) ? 1 : 0
+   drawingOkay := (thisHwnd=hQPVtoolbar || thisHwnd=PVhwnd || thisHwnd=tempBtnVisible || thisHwnd=hSetWinGui) ? 1 : 0
    ; ToolTip, % hSetWinGui "`n" thisHwnd , , , 2
    ; If (imgEditPanelOpened=1 && AnyWindowOpen>0 && panelWinCollapsed=1 && thisHwnd=hSetWinGui)
    ;    MainExe.ahkPostFunction("toggleImgEditPanelWindow")
@@ -1149,7 +1149,7 @@ GuiSize(GuiHwnd, EventInfo, Width, Height) {
 
 GuiDropFiles(GuiHwnd, FileArray, CtrlHwnd, X, Y) {
    Static lastInvoked := 1
-   If (AnyWindowOpen>0 || drawingShapeNow=1 || imageLoading=1 || runningLongOperation=1 || groppedFiles) || (A_TickCount - lastInvoked<300)
+   If (AnyWindowOpen>0 || mustCaptureCloneBrush=1 || whileLoopExec=1 || drawingShapeNow=1 || imageLoading=1 || runningLongOperation=1 || groppedFiles) || (A_TickCount - lastInvoked<300)
       Return
 
    lastInvoked := A_TickCount
@@ -2371,10 +2371,13 @@ SendMenuTabKey() {
     ~+Delete Up::
     vk41::       ; A
     +vk41::      ; Shift+A
+    +^vk41::     ; Ctrl+Shift+A
     !vk41::      ; Alt+A
     ^vk41::      ; Ctrl+A
+    !vk39::      ; Alt+9
     +vk39::      ; Shift+9
     vk39::       ; 9
+    !vk30::      ; Alt+0
     +vk30::      ; Shift+0
     vk30::       ; 0
     +Up::

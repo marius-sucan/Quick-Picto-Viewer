@@ -4308,6 +4308,7 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
 ; with the texts rendered in GUIs with -DPIscale
 ;
 ; userBrush - if a pBrush object is passed, this will be used to draw the text
+;
 ; Remarks: by changing the alignment, the text will be rendered at a different X
 ; coordinate position; the position of the text is set relative to
 ; the given X position coordinate and the text width..
@@ -4335,14 +4336,15 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
    RegExMatch(Options, pattern_opts "S(\d+)(p*)", Size)
    Width := PWidth
 
-   if Colour && IsInteger(Colour[2]) && !Gdip_DeleteBrush(Gdip_CloneBrush(Colour[2]))
-   {
-      PassBrush := 1
-      pBrush := Colour[2]
-   }
-
    if !(IWidth && IHeight) && ((xpos && xpos[2]) || (ypos && ypos[2]) || (Width && Width[2]) || (Height && Height[2]) || (Size && Size[2]))
       return -1
+
+   fColor := (Colour && Colour[2]) ? Colour[2] : "ff000000"
+   If (StrLen(fColor)=6)
+      fColor := "ff" fColor
+
+   if (fColor && !userBrush)
+      pBrush := Gdip_BrushCreateSolid("0x" fColor)
 
    Style := 0
    For eachStyle, valStyle in StrSplit(Styles, "|")
@@ -4362,8 +4364,6 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
    ypos := (ypos && (ypos[1] != "")) ? ypos[2] ? IHeight*(ypos[1]/100) : ypos[1] : 0
    Width := (Width && Width[1]) ? Width[2] ? IWidth*(Width[1]/100) : Width[1] : IWidth
    Height := (Height && Height[1]) ? Height[2] ? IHeight*(Height[1]/100) : Height[1] : IHeight
-   If !PassBrush
-      Colour := "0x" (Colour && Colour[2] ? Colour[2] : "ff000000")
    Rendering := (Rendering && (Rendering[1] >= 0) && (Rendering[1] <= 5)) ? Rendering[1] : 4
    Size := (Size && (Size[1] > 0)) ? Size[2] ? IHeight*(Size[1]/100) : Size[1] : 12
    If RegExMatch(Font, "^(.\:\\.)")
@@ -4381,8 +4381,8 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
    If !hStringFormat
       hStringFormat := Gdip_StringFormatGetGeneric(1)
 
-   pBrush := PassBrush ? pBrush : Gdip_BrushCreateSolid(Colour)
-   if !(hFontFamily && hFont && hStringFormat && pBrush && pGraphics)
+   thisBrush := userBrush ? userBrush : pBrush
+   if !(hFontFamily && hFont && hStringFormat && thisBrush && pGraphics)
    {
       E := !pGraphics ? -2 : !hFontFamily ? -3 : !hFont ? -4 : !hStringFormat ? -5 : !pBrush ? -6 : 0
       If pBrush
@@ -4434,11 +4434,10 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
       ReturnRC := Gdip_MeasureString(pGraphics, Text, hFont, hStringFormat, RC)
    }
 
-   thisBrush := userBrush ? userBrush : pBrush
    if !Measure
       _E := Gdip_DrawString(pGraphics, Text, hFont, hStringFormat, thisBrush, RC)
 
-   if !PassBrush
+   If pBrush
       Gdip_DeleteBrush(pBrush)
    Gdip_DeleteStringFormat(hStringFormat)
    Gdip_DeleteFont(hFont)

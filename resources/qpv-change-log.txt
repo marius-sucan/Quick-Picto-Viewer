@@ -2,6 +2,22 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.6.5 (2022-03-11)
+  - [new] specialised tool to resize images in image editing mode
+  - [new] dedicated toolbar for vector shapes drawing mode
+  - [new] ability to load/save/delete created vector shapes
+  - [new] ability to scale selected vector points
+  - [new] copy/paste vector points
+  - [new] several new selection area aspect ratio locking modes
+  - [new] users can now do «Ctrl + Left click» inside an image selection area, and drag, to create and adjust how much of the selection area to be excluded
+  - [new] option to turn off tooltips in the toolbar
+  - [new] improvements to panel: «Update files list selectively» / «Folders containing indexed files»; it is now always accessible, regardless of the files list index opened, and it allows counting [selected and total] files per folder; it also allows users to select/deselect files for any of the listed folders
+  - viewport grid and rotation icons in the toolbar are now slider icons
+  - various bug fixes
+
+- v5.6.1 (2022-02-26)
+  - silly bug prevented previous release from starting ;/
+
 - v5.6.0 (2022-02-25)
 General stuff:
   - [new] ability to load images through WIC - Windows Imaging Component; the newly supported formats are listed in the open dialog
