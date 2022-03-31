@@ -22997,6 +22997,7 @@ findFavesInList(modus:=0, doSel:=0) {
    countSeen := 0
    setImageLoading()
    friendlyLabel := (modus="faves") ? "favourite" : "already seen"
+   friendly2 := (modus="faves") ? "added to favourites" : "seen"
    WnoFilesCheck := (noFilesCheck=2) ? 2 : 0
    If (maxFilesIndex>1)
    {
@@ -23005,14 +23006,13 @@ findFavesInList(modus:=0, doSel:=0) {
       backCurrentSLD := CurrentSLD
       CurrentSLD := ""
       setImageLoading()
+      showTOOLtip("Marking files already " friendly2 "`nGathering data, please wait")
       If (modus="seen")
       {
-         showTOOLtip("Marking already seen images`nGathering data, please wait")
             seenEntries := retrieveEntireSeenImagesDB(totalSeenIMGs, 0)
          idIndex := 3
       } Else
       {
-         showTOOLtip("Marking files already added to the favourites`nGathering data, please wait")
          seenEntries := retrieveFavesAsArray(totalSeenIMGs)
          idIndex := 5
       }
@@ -23030,7 +23030,7 @@ findFavesInList(modus:=0, doSel:=0) {
           If (A_TickCount - prevMSGdisplay>2000)
           {
              etaTime := ETAinfos(countTFilez, maxFilesIndex, startOperation)
-             showTOOLtip("Identifying files already added to the favourites`nGathering data, please wait" etaTime "`nFound " groupDigits(countSeen) " of " groupDigits(totalSeenIMGs) " recorded images", 0, 0, countTFilez / maxFilesIndex)
+             showTOOLtip("Identifying files already " friendly2 "`nGathering data, please wait" etaTime "`nFound " groupDigits(countSeen) " of " groupDigits(totalSeenIMGs) " recorded images", 0, 0, countTFilez / maxFilesIndex)
              prevMSGdisplay := A_TickCount
           }
 
@@ -59723,7 +59723,9 @@ HelpWindow(dummy:=0) {
 
     Gui, Tab, 4
     FileRead, cmdHelp, % mainCompiledPath "\resources\qpv-change-log.txt"
-    Gui, Add, Edit, x+15 y+15 w%lstWid% r%rz% ReadOnly, %cmdHelp%
+    ; cmdHelp := SubStr(cmdHelp, 1, 65200)
+    Gui, Add, Edit, x+15 y+15 w%lstWid% r%rz% ReadOnly vtxtLine1, a ; %cmdHelp%
+    GuiControl, SettingsGUIA:, txtLine1, % cmdHelp
 
     Gui, Tab, 5
     FileRead, cmdHelp, % mainCompiledPath "\resources\features-list.txt"
@@ -60014,7 +60016,9 @@ PanelFindDupes(dummy:=0) {
     Gui, Tab, 4
     Gui, Add, Text, x+15 y+15 Section, Filter the results and data collection with a given string:
     Gui, Add, Edit, xp+15 y+7 wp-30 -multi limit12345 gUIeditsGenericAllowCtrlBksp vdupesStringFilter, % dupesStringFilter
-    Gui, Add, Button, x+1 hp w35 gUIstringEditFilterErase, &X
+    Gui, Add, Button, x+1 hp w35 gUIstringEditFilterErase hwndhBtnFilterRem, &X
+    AddTooltip2Ctrl(hBtnFilterRem, "Remove list filter")
+
     Gui, Add, DropDownList, xs+15 y+7 w%btnWid% gupdateUIFiltersPanel AltSubmit Choose%userFilterStringPos% vuserFilterStringPos, Anywhere|Begins with|Ends with
     Gui, Add, DropDownList, x+2 w%btnWid% gupdateUIFiltersPanel AltSubmit Choose%userFilterWhat% vuserFilterWhat, Full path|Folder path|File name
     Gui, Add, Checkbox, xs+15 y+7 Checked%userFilterStringIsNot% vuserFilterStringIsNot, &Must not contain the given string
