@@ -7943,6 +7943,8 @@ Gdip_CreateEffect(whichFX, paramA, paramB, paramC:=0) {
 
     If (whichFX=1)   ; Blur FX
     {
+       If (paramA>255)
+          paramA := 255
        FXsize := 8
        NumPut(paramA, FXparams, 0, "Float")   ; radius [0, 255]
        NumPut(paramB, FXparams, 4, "Uchar")   ; bool 0, 1

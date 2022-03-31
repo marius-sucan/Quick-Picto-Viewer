@@ -313,8 +313,9 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
      Gui, Add, Text, %xPos% %yPos% w%msgW% %msgH% vprompt gKillMsgbox2Win, %sMsg%
 
   Gui, Add, Text, xp yp wp hp BackgroundTrans, %A_Space%
+  addLabelu := InStr(editOptions, "number") ? "" : " gUIeditsGenericAllowCtrlBksp "
   If editOptions
-     Gui, Add, Edit, xp y+%marginz% wp -WantReturn r1 -multi -HScroll -VScroll %editOptions% vEditUserMsg, %editDefaultLine%
+     Gui, Add, Edit, xp y+%marginz% wp %addLabelu% -WantReturn r1 -multi -HScroll -VScroll %editOptions% vEditUserMsg, %editDefaultLine%
 
   If checkBoxCaption
      Gui, Add, Checkbox, xp y+%marginz% wp Checked%checkBoxState% vUsrCheckBoxu, %checkBoxCaption%
@@ -333,7 +334,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   If (dropListu && DropListMode=0)
      Gui, Add, DropDownList, xp y+%marginz% w%listWidth% AltSubmit vDropListuChoice, % dropListu
   Else If (dropListu && DropListMode=1)
-     Gui, Add, ComboBox, xp y+%marginz% w%listWidth% vDropListuChoice, % dropListu
+     Gui, Add, ComboBox, xp y+%marginz% w%listWidth% gUIgenericComboAction vDropListuChoice, % dropListu
   Else If (dropListu && (DropListMode=2 || DropListMode=3))
      Gui, Add, ListBox, xp y+%marginz% r%listRows% w%listWidth% AltSubmit %multisel% vDropListuChoice, % dropListu
 
@@ -653,7 +654,6 @@ Fnt_GetSizeForEdit(hFont,p_Text,p_MaxW:=0,mustWrap:=1,ByRef r_Width:="",ByRef r_
 
     Return &SIZE
 }
-
 
 GetStringSize(FontFace, fontSize, doBold, p_String, mustWrap, l_Width:=0) {
 ; ======================================================================

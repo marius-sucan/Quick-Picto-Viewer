@@ -70,7 +70,7 @@ Ctrl + S|Save image panel|Image view|Panel
 Ctrl + S|Save files list as slideshow (.SLD)|Files list|Panel
 Ctrl + O|Open file(s)|Anywhere|Files selector
 Ctrl + R|Resize image in viewport|Image view|Panel
-Ctrl + R|Resize, rotate or crop image(s)|Filess list|Panel
+Ctrl + R|Resize, rotate or crop image(s)|Files list|Panel
 Alt + R|Resize image to viewport selection area|Image view|-
 Ctrl + Shift + N|Open new QPV instance|Anywhere|External app
 Ctrl + Shift + S|Save files list as slideshow (.SLD)|Anywhere|Panel
@@ -89,8 +89,7 @@ Ctrl + V|Render text from clipboard as image or paste clipboard image|Image view
 Ctrl + V|Paste text files list from clipboard or files from Explorer|Files list|-
 Ctrl + W|Set image as wallpaper|Image view|-
 Ctrl + X|Cut selected image area|Image selection area|-
-Ctrl + Wheel Down|Zoom out|Anywhere|-
-Ctrl + Wheel Up|Zoom in|Anywhere|-
+Ctrl + Wheel Up / Down|Zoom in/out|Anywhere|-
 D|Hide live previewed dynamic object|Live editing|-
 E|Toggle edit image selection area|Image view|-
 E|Select files in same folder|Files list|-
@@ -157,24 +156,21 @@ Right Click|Open main menu or context menu|Anywhere|Menu
 Shift + Right Click|Open quick menu|Anywhere|Menu
 Apps key|Open main menu or context menu|Anywhere|Menu
 Shift + Apps key|Open quick menu|Anywhere|Menu
-Left|Previous image|Anywhere|-
-Right|Next image|Anywhere|-
-Down|Next line of images [based on list view mode]|Anywhere|-
-Up|Previous line of images [based on list view mode]|Anywhere|-
-Home|Jump to the first image in index|Anywhere|-
-End|Jump to the last image in index|Anywhere|-
-Wheel Down|Previous image or two lines of images|Anywhere|-
-Wheel Up|Next image or two lines of images|Anywhere|-
-Page Down|Previous image or jump forwards one page of images|Anywhere|-
-Page Up|Next image or jump backwards one page of images|Anywhere|-
+Left / Right|Previous / Next image|Anywhere|-
+Down / Up|Next / Previous line of images [based on list view mode]|Anywhere|-
+Home / End|Jump to the first or last image in the index|Anywhere|-
+Wheel Up / Down|Next / Previous image [does not apply in custom zoom mode]|Image view|-
+Wheel Up / Down|Up/down two lines of images|Files list|-
+Page Up / Down|Next / Previous image|Image view|-
+Page Up / Down|Jump forwards or backwards one page of images|Files list|-
 Backspace|Previous random image|Anywhere|-
 Backspace|Remove last added point in the path|Vector drawing|-
 Ctrl + Backspace|Jump to previously displayed image|Anywhere|-
 Shift + Backspace|Next random image|Anywhere|-
-Ctrl + Home|Jump to the first selected file in index|Anywhere|-
-Ctrl + End|Jump to the last selected file in index|Anywhere|-
+Ctrl + Home / End|Jump to the first or last selected file in the index|Anywhere|-
 Ctrl + Arrow keys|Navigate between selected files|Anywhere|-
-Space|Start or stop slideshow|Image view|-
+Space + Left-Click|Pan image|Image view|-
+Space|Start or stop slideshow [if not in «Custom Zoom level» mode|Image view|-
 Space|Select or deselect files [if files selection already exists]|Files list|-
 Tab|Select or deselect active file|Anywhere|-
 Shift + /|Define slideshow duration|Image view|Panel
@@ -231,6 +227,7 @@ Arrow keys|Navigate between indexed files|Anywhere|-
 Ctrl + Page Up / Down|Move up/down the hierarchy of folders (as in a breadcrumb)|Files list|-
 Alt + Page Up / Down|Open next or previous sibling folder (in the hierarchy of folders)|Files list|-
 Shift + F4|Current folder navigation options|Anywhere|Menu
+Shift + ;|Explore with Omnibox the file location|Anywhere|Panel
 F4|Switch to or open folders tree view|Anywhere|Panel
 F9|Populate tree view with active file path|Folder tree|-
 F5|Regenerate tree view|Folder tree|-

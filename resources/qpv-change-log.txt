@@ -2,8 +2,25 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.6.7 (2022-03-31)
+  - [new] private mode; how dubious ^_^
+  - [new] context menu with many options in «Review selected files» panel and improvements; it can now handle a million of files, gradually listed in the panel - by user demand
+  - [new] «static» folders panel now allows multiple folders to be selected and filtering by file count; it also has more options related to files management
+  - [new] select missing files
+  - [new] copy to clipboard files and image properties generated statistics
+  - [new] option to increase list view rows found in panels; option at «Additional settings», found in the «Interface» menu
+  - [new] multi-rename panel can handle any number of image files; the list view is now paginated
+  - [new] status bar for quick menus search panel; it displays the shortcut and where it is found
+  - [new] QPV can now generate charts in the «seen images» statistics panel
+  - [new] the quick search box is now an omnibox: users can now paste folder or file paths to open or import; one can also type the index number of a file to jump to; users can navigate through folders in this panel
+  - users can perform drag and drop between the main window, folders tree panel and the omnibox
+  - overhauled how image histograms are plotted; they are now more accurately drawn on screen
+  - added help for several panels and made the main Help panel richer
+  - added the ability in more edit fields to press ctrl+bksp
+  - more bug fixes
+
 - v5.6.5 (2022-03-11)
-  - [new] specialised tool to resize images in image editing mode
+  - [new] specialised tool to resize images in image editing mode; it can fill the canvas by extending image margins or blurring the image in the backgrou
   - [new] dedicated toolbar for vector shapes drawing mode
   - [new] ability to load/save/delete created vector shapes
   - [new] ability to scale selected vector points

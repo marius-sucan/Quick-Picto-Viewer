@@ -1,18 +1,19 @@
 Table of contents:
-   a) How Quick Picto Viewer initializes:
+   a) How Quick Picto Viewer initializes
    b) How a files list index is created
    c) Files index filtering
    d) How an image is loaded and displayed on screen [simplified]
    e) General considerations
    f) How slideshows happen
-   g) Windows, AHK GUIs and input responses
-   h) Image live editing [soon]
+   g) Windows, AHK GUIs
+   h) Input responses
+   i) Image live editing [soon]
 
 
-Deniere mise à jour: vendredi 25 février 2022
+Deniere mise à jour: dimanche 13 mars 2022
 ================================================
 
-a) How Quick Picto Viewer initializes:
+a) How Quick Picto Viewer initializes
 =============================================
 
   QPV checks in the registry if another instance started before,
@@ -405,7 +406,7 @@ f) How slideshows happen
    invokeExternalSlideshowHandler() to set there the timer
    for the next slide.
 
-g) Windows, AHK GUIs and input responses
+g) Windows, AHK GUIs
 =============================================
 
    The application consists mainly of two threads. In the main
@@ -494,14 +495,32 @@ g) Windows, AHK GUIs and input responses
    The main thread shows messages in the viewport using
    CreateOSDinfoLine() wrapped by showTOOLtip().
 
-   ... it also responds to mouse input mainly through
-   WinClickAction() and MouseMoveResponder(), both invoked 
-   by the interface thread.
-
-   In the interface thread, all keyboard shortcuts [hotkeys] 
-   are registered, and most of them call KeyboardResponder(),
-   but also other functions, from the main thread.
-
-   The main thread displays all the context menus via
+   The main thread creates all the context menus via
    InitGuiContextMenu(), InitSecondMenu() and others. 
+   The menus are displayed with showThisMenu() from
+   the main thread.
 
+
+h) Input responses
+=============================================
+
+   All keyboard shortcuts [hotkeys] are registered in the
+   interface thread using #if conditions. Most of them are
+   calling kbdkeybcallKeysResponder() which, in turn, calls
+   from the main thread the function named: KeyboardResponder(),
+   This one executes functions based on the user context and
+   in-app conditions, and the actual key.
+
+   Mouse input is handled in the interface thread as well.
+   The main GUI is created in BuildGUI() containing several 
+   text controls. These controls on click call WinClickAction()
+   which then passes several parameters to the function with
+   the same name from the main thread. The function handles 
+   every imagined response to mouse clicks, based on user context.
+
+   WM_MOUSEMOVE message is registered in the interface thread 
+   and it is associated with the function WM_MOUSEMOVE().
+   This function changes mouse cursor to different states,
+   based on the user context and calls MouseMoveResponder()
+   from the main thread. MouseMoveResponder() handles live
+   viewport updates related to hover actions.

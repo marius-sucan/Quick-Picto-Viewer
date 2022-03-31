@@ -461,9 +461,10 @@ SelectFolderEx(StartingFolder:="", DlgTitle:="", OwnerHwnd:=0, OkBtnLabel:="", c
 Dlg_OpenSaveFile(p_Type,hOwner:=0,p_Title:="",p_Filter:="",p_FilterIndex:="",p_Root:="",p_DfltExt:="",ByRef r_Flags:=0,p_HelpHandler:="") {
 ; function source: https://www.autohotkey.com/boards/viewtopic.php?f=6&t=462
 ; by jballi
+; modified by Marius Șucan
 
     Static Dummy16963733
-          ,s_strFileMaxSize:=32768
+          ,s_strFileMaxSize:=932768 ; ansi limit 32768
                 ;-- This is the ANSI byte limit.  For consistency, this value
                 ;   is also used to set the the maximum number characters that
                 ;   used in Unicode.  Note: Only the first entry contains the
@@ -727,7 +728,7 @@ Dlg_OpenSaveFile(p_Type,hOwner:=0,p_Title:="",p_Filter:="",p_FilterIndex:="",p_R
             l_Dir:=l_FileName
             ;-- Windows adds "\" character when in root of the drive but doesn't
             ;   add it otherwise.  Adjust if needed.
-            if (StrLen(l_Dir)<>3)
+            if (StrLen(l_Dir)<>3 && p_Type="O")
                 l_Dir.="\"
 
             ;-- Continue to next
@@ -735,10 +736,12 @@ Dlg_OpenSaveFile(p_Type,hOwner:=0,p_Title:="",p_Filter:="",p_FilterIndex:="",p_R
         }
 
         ;-- Add the file to the list
-        l_FileList.=(StrLen(l_FileList) ? "`n":"") . l_Dir . l_FileName
+        if (p_Type="O")
+           l_FileList.=(StrLen(l_FileList) ? "`n":"") . l_Dir . l_FileName
+        else
+           l_FileList := Trim(Trim(l_Dir, "\"))
     }
-    ; ToolTip, % n_FilterIndex , , , 2
-    ;-Return to sender
+
     Return l_FileList
 }
 
@@ -1726,15 +1729,13 @@ setMenusTheme(modus) {
 setDarkWinAttribs(hwndGUI, modus:=1) {
    if (A_OSVersion >= "10.0.17763" && SubStr(A_OSVersion, 1, 3) = "10.")
    {
-       attr := 19
-       if (A_OSVersion >= "10.0.18985") {
-           attr := 20
-       }
-       DllCall("dwmapi\DwmSetWindowAttribute", "ptr", hwndGUI, "int", attr, "int*", modus, "int", 4)
+       DWMWA_USE_IMMERSIVE_DARK_MODE  := 19
+       if (A_OSVersion >= "10.0.18985")
+          DWMWA_USE_IMMERSIVE_DARK_MODE  := 20
+       DllCall("dwmapi\DwmSetWindowAttribute", "ptr", hwndGUI, "int", DWMWA_USE_IMMERSIVE_DARK_MODE, "int*", modus, "int", 4)
    }
    DllCall(AllowDarkModeForWindow, "UPtr", hwndGUI, "int", modus) ; Dark
 }
-
 
 LinkUseDefaultColor(hLink, Use, whichGui) {
    VarSetCapacity(LITEM, 4278, 0)            ; 16 + (MAX_LINKID_TEXT * 2) + (L_MAX_URL_LENGTH * 2)
@@ -2024,58 +2025,492 @@ BalloonTip_TimeOut(hwnd) {
 }
 
 
-LV_EX_GetNextItem(HLV, nRow, lParam:=0x0001) {
-; Description ..: Get the next item in the target ListView.
-; Parameters ...: HLV  - External ListView hwnd
-; ..............: nRow   - Row where to start the search for the next item (0-based index).
-; ..............: lParam - Status of the searched item. Common statuses are:
-; ..............:          LVNI_ALL         - 0x0000
-; ..............:          LVNI_FOCUSED     - 0x0001
-; ..............:          LVNI_SELECTED    - 0x0002
-; ..............:          LVNI_CUT         - 0x0004
-; ..............:          LVNI_DROPHILITED - 0x0008
-; Info .........: LVM_GETNEXTITEM - http://msdn.microsoft.com/en-us/library/windows/desktop/bb761057%28v=vs.85%29.aspx
-; Return .......: Item content as a string.
-
-    ; LVM_GETNEXTITEM = LVM_FIRST (0x1000) + 12 = 0x100C.
-    SendMessage, 0x100C, %nRow%, %lParam%,, % "ahk_id " HLV
-    Return ErrorLevel
+EM_ISIME(hCtrl) {
+  result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0x4F3, "Int", 0, "Int", 0)
+  Return result
 }
 
-LV_EX_GetItemsCount(HLV, ByRef rows, ByRef cols) {
-    ; LVM_GETITEMCOUNT = LVM_FIRST (0x1000) + 4 = 0x1004.
-    SendMessage, 0x1004, 0, 0,, % "ahk_id " hlv
-    rows := ErrorLevel
-
-    ; LVM_GETHEADER = LVM_FIRST (0x1000) + 31 = 0x101F.
-    SendMessage, 0x101F, 0, 0,, % "ahk_id " hlv
-    hhdr := ErrorLevel
-
-    ; HDM_GETITEMCOUNT = HDM_FIRST (0x1200) + 0 = 0x1200.
-    SendMessage, 0x1200, 0, 0,, % "ahk_id " hhdr
-    cols := ErrorLevel
+EM_CANREDO(hCtrl) {
+  result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0x0455, "Int", 0, "Int", 0)
+  Return result
 }
 
-LV_EX_LVITEM(ByRef LVITEM, Mask := 0, Row := 1, Col := 1) {
-   Static LVITEMSize := 48 + (A_PtrSize * 3)
-   VarSetCapacity(LVITEM, LVITEMSize, 0)
-   NumPut(Mask, LVITEM, 0, "UInt"), NumPut(Row - 1, LVITEM, 4, "Int"), NumPut(Col - 1, LVITEM, 8, "Int")
+EM_CANUNDO(hCtrl) {
+  result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0x00C6, "Int", 0, "Int", 0)
+  Return result
 }
 
-LV_EX_GetSubItemText(HLV, Row, Column := 1, MaxChars := 1024) {
-; function by «just me»
-; found on https://github.com/AHK-just-me/
-
-   ; LVM_GETITEMTEXT -> http://msdn.microsoft.com/en-us/library/bb761055(v=vs.85).aspx
-   Static LVM_GETITEMTEXT := A_IsUnicode ? 0x1073 : 0x102D ; LVM_GETITEMTEXTW : LVM_GETITEMTEXTA
-   Static OffText := 16 + A_PtrSize
-   Static OffTextMax := OffText + A_PtrSize
-   VarSetCapacity(ItemText, MaxChars << !!A_IsUnicode, 0)
-   LV_EX_LVITEM(LVITEM, , Row, Column)
-   NumPut(&ItemText, LVITEM, OffText, "Ptr")
-   NumPut(MaxChars, LVITEM, OffTextMax, "Int")
-   SendMessage, % LVM_GETITEMTEXT, % (Row - 1), % &LVITEM, , % "ahk_id " . HLV
-   VarSetCapacity(ItemText, -1)
-   Return ItemText
+EM_GETLINECOUNT(hCtrl) {
+  result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0x00BA, "Int", 0, "Int", 0)
+  Return result
 }
 
+EM_CHARFROMPOS(hEdit, X, Y, linePos:=0) {
+; from https://github.com/dufferzafar/Autohotkey-Scripts/blob/master/lib/RichEdit.ahk
+; modified by Marius Șucan
+
+  WinGetClass, classu, ahk_id %hEdit%
+  If InStr(classu, "RICHEDIT50W")
+  {
+     VarSetCapacity(POINTL, 8)
+     lParam := &POINTL
+     NumPut(X, POINTL)
+     NumPut(Y, POINTL)
+  } Else lParam := (Y<<16)|X
+
+  r := DllCall("SendMessage", "UInt", hEdit, "UInt", 0xD7, "Int", 0, "UInt", lParam)
+  If (linePos=1)
+     result := (r >> 16) & 0xffff      ; return the HIWORD
+  Else
+     result := r & 0xffff      ; return the LOWORD
+  Return result
+}
+
+EM_POSFROMCHAR(hCtrl, s1:=0, h:=0) {
+   x := result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0xD6, "Int", s1, "UInt", 0)  ; EM_POSFROMCHAR
+   If (h=1)
+      y := result := (result >> 16) & 0xffff   ; HIWORD
+   Return result
+}
+
+WM_GETTEXTLENGTH(hCtrl) {
+  result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0xE, "Ptr", 0, "Ptr", 0)  ; WM_GETTEXTLENGTH
+  Return result
+}
+
+EM_GETSEL(hCtrl, opt:="b") {
+; options: [s]tart, [e]nd, [b]oth
+   r := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0xB0, "IntP", s1, "IntP", s2)     ; EM_GETSEL
+   Return (opt="s" ? s1 : opt="e" ? s2 : s1|(s2<<32))
+}
+
+EM_SETSEL(hCtrl, s1:=0, s2:="") {
+   s2 := (s2="") ? s1 : s2
+   r:= DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0xB1, "Int", s1, "Int", s2)      ; EM_SETSEL
+   Return r
+}
+
+EM_SETCUEBANNER(handle, string, option := true) {
+; ===============================================================================================================================
+; Message ..................:  EM_SETCUEBANNER
+; Minimum supported client .:  Windows Vista
+; Minimum supported server .:  Windows Server 2003
+; Links ....................:  https://docs.microsoft.com/en-us/windows/win32/controls/em-setcuebanner
+; Description ..............:  Sets the textual cue, or tip, that is displayed by the edit control to prompt the user for information.
+; Options ..................:  True  -> if the cue banner should show even when the edit control has focus
+;                              False -> if the cue banner disappears when the user clicks in the control
+; ===============================================================================================================================
+   static ECM_FIRST       := 0x1500 
+        , EM_SETCUEBANNER := ECM_FIRST + 1
+   if (DllCall("user32\SendMessage", "ptr", handle, "uint", EM_SETCUEBANNER, "int", option, "str", string, "int"))
+      return 1
+   return 0
+}
+
+EM_UNDO(hCtrl) {
+  result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0xC7, "Int", 0, "Int", 0)
+  Return result
+}
+
+EM_REDO(hCtrl) {
+  result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0x454, "Int", 0, "Int", 0)
+  Return result
+}
+
+WM_COPY(hCtrl) {
+  result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0x301, "Int", 0, "Int", 0)
+  Return result
+}
+
+WM_CUT(hCtrl) {
+  result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0x300, "Int", 0, "Int", 0)
+  Return result
+}
+
+ClipboardSetFiles(PathsFilesArray, Method:="copy", foldersMode:=0) {
+; function from https://autohotkey.com/board/topic/23162-how-to-copy-a-file-to-the-clipboard/page-4
+; by maraskan_user and Lexikos
+; modified by Marius Șucan
+
+   FileCount := PathLength := 0
+   ; Count files and total string length from given array
+   For i, File in PathsFilesArray
+   {
+      FileCount++
+      PathLength += StrLen(File)
+   }
+
+   If (!FileCount || !PathLength)
+      Return
+
+   pid := DllCall("GetCurrentProcessId","uint")
+   hwnd := WinExist("ahk_pid " . pid)
+   ; 0x42 = GMEM_MOVEABLE(0x2) | GMEM_ZEROINIT(0x40)
+   hPath := DllCall("GlobalAlloc","uint",0x42,"uint",20 + (PathLength + FileCount + 1) * 2, "UPtr")
+   If !hPath
+      Return
+
+   pPath := DllCall("GlobalLock","UPtr", hPath, "UPtr")
+   NumPut(20, pPath+0), pPath += 16 ; DROPFILES.pFiles = offset of file list
+   NumPut(1, pPath+0), pPath += 4 ; fWide = 0 -->ANSI,fWide = 1 -->Unicode
+
+   Offset := 0
+   ; Rows are delimited by linefeeds (`r`n).
+   for i, File in PathsFilesArray
+       offset += StrPut(File, pPath + offset, StrLen(File)+1, "UTF-16") * 2
+
+   DllCall("GlobalUnlock","UPtr",hPath)
+   If !DllCall("OpenClipboard","UPtr", hwnd)
+      Return
+
+   DllCall("EmptyClipboard")
+   err := DllCall("SetClipboardData","uint",0xF,"UPtr",hPath) ; 0xF = CF_HDROP
+
+   ; Write Preferred DropEffect structure to clipboard to switch between copy/cut operations
+   ; 0x42 = GMEM_MOVEABLE(0x2) | GMEM_ZEROINIT(0x40)
+   mem := DllCall("GlobalAlloc","uint",0x42,"uint",4,"UPtr")
+   If mem
+   {
+      str := DllCall("GlobalLock","UPtr",mem, "uptr")
+   } Else
+   {
+      DllCall("CloseClipboard")
+      Return
+   }
+
+   if (Method="copy")
+   {
+      DllCall("RtlFillMemory","UPtr",str,"UPtr",1,"Int",0x05)
+   } else if (Method="cut")
+   {
+      DllCall("RtlFillMemory","UPtr",str,"UPtr",1,"Int",0x02)
+   } else
+   {
+      DllCall("CloseClipboard")
+      Return
+   }
+
+   DllCall("GlobalUnlock","UPtr",mem)
+   If (foldersMode=1)
+   {
+      cfFormat := DllCall("RegisterClipboardFormat","Str","DropEffectFolderList")
+      err := DllCall("SetClipboardData","uint",cfFormat,"UPtr",mem)
+   }   
+
+   cfFormat := DllCall("RegisterClipboardFormat","Str","Preferred DropEffect")
+   err := DllCall("SetClipboardData","uint",cfFormat,"UPtr",mem)
+   DllCall("CloseClipboard")
+   return err
+}
+
+GetComboBoxInfo(hwnd) {
+; based on https://www.autohotkey.com/boards/viewtopic.php?t=69158
+; updated by Marius Șucan
+
+   ; https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getcomboboxinfo
+   CBBISize := 40 + (3 * A_PtrSize)
+   VarSetCapacity(CBBInfo, CBBISize, 0)
+   NumPut(CBBISize, CBBInfo, 0, "UInt")
+   r := DllCall("User32.dll\GetComboBoxInfo", "UPtr", hwnd, "UPtr", &CBBInfo)
+   HCBBEDIT := NumGet(CBBInfo, 40 + A_PtrSize, "UPtr")
+   HCBBLIST := NumGet(CBBInfo, 40 + (2 * A_PtrSize), "UPtr")
+   CBBInfo := ""
+   Return [HCBBEDIT, HCBBLIST, r]
+}
+
+AddTooltip2Ctrl(p1, p2:="", p3="") {
+; Description: AddTooltip v2.0
+;   Add/Update tooltips to GUI controls.
+;
+; Parameters:
+;   p1 - Handle to a GUI control.  Alternatively, set to "Activate" to enable
+;       the tooltip control, "AutoPopDelay" to set the autopop delay time,
+;       "Deactivate" to disable the tooltip control, or "Title" to set the
+;       tooltip title.
+;
+;   p2 - If p1 contains the handle to a GUI control, this parameter should
+;       contain the tooltip text.  Ex: "My tooltip".  Set to null to delete the
+;       tooltip attached to the control.  If p1="AutoPopDelay", set to the
+;       desired autopop delay time, in seconds.  Ex: 10.  Note: The maximum
+;       autopop delay time is ~32 seconds.  If p1="Title", set to the title of
+;       the tooltip.  Ex: "Bob's Tooltips".  Set to null to remove the tooltip
+;       title.  See the *Title & Icon* section for more information.
+;
+;   p3 - Tooltip icon.  See the *Title & Icon* section for more information.
+;
+; RETURNS: The handle to the tooltip control.
+; REQUIREMENTS: AutoHotkey v1.1+ (all versions).
+;
+; TITLE AND ICON:
+;   To set the tooltip title, set the p1 parameter to "Title" and the p2
+;   parameter to the desired tooltip title.  Ex: AddTooltip("Title","Bob's
+;   Tooltips"). To remove the tooltip title, set the p2 parameter to null.  Ex:
+;   AddTooltip("Title","").
+;
+;   The p3 parameter determines the icon to be displayed along with the title,
+;   if any.  If not specified or if set to 0, no icon is shown.  To show a
+;   standard icon, specify one of the standard icon identifiers.  See the
+;   function's static variables for a list of possible values.  Ex:
+;   AddTooltip("Title","My Title",4).  To show a custom icon, specify a handle
+;   to an image (bitmap, cursor, or icon).  When a custom icon is specified, a
+;   copy of the icon is created by the tooltip window so if needed, the original
+;   icon can be destroyed any time after the title and icon are set.
+;
+;   Setting a tooltip title may not produce a desirable result in many cases.
+;   The title (and icon if specified) will be shown on every tooltip that is
+;   added by this function.
+;
+; REMARKS:
+;   The tooltip control is enabled by default.  There is no need to "Activate"
+;   the tooltip control unless it has been previously "Deactivated".
+;
+;   This function returns the handle to the tooltip control so that, if needed,
+;   additional actions can be performed on the Tooltip control outside of this
+;   function.  Once created, this function reuses the same tooltip control.
+;   If the tooltip control is destroyed outside of this function, subsequent
+;   calls to this function will fail.
+;
+; CREDIT AND HISTORY:
+;   Original author: Superfraggle
+;   * Post: <http://www.autohotkey.com/board/topic/27670-add-tooltips-to-controls/>
+;
+;   Updated to support Unicode: art
+;   * Post: <http://www.autohotkey.com/board/topic/27670-add-tooltips-to-controls/page-2#entry431059>
+;
+;   Additional: jballi.
+;   Bug fixes.  Added support for x64.  Removed Modify parameter.  Added
+;   additional functionality, constants, and documentation.
+
+    Static hTT
+          ;-- Misc. constants
+          ,CW_USEDEFAULT:=0x80000000
+          ,HWND_DESKTOP :=0
+
+          ;-- Tooltip delay time constants
+          ,TTDT_AUTOPOP:=2
+                ;-- Set the amount of time a tooltip window remains visible if
+                ;   the pointer is stationary within a tool's bounding
+                ;   rectangle.
+
+          ;-- Tooltip styles
+          ,TTS_ALWAYSTIP:=0x1
+                ;-- Indicates that the tooltip control appears when the cursor
+                ;   is on a tool, even if the tooltip control's owner window is
+                ;   inactive.  Without this style, the tooltip appears only when
+                ;   the tool's owner window is active.
+
+          ,TTS_NOPREFIX:=0x2
+                ;-- Prevents the system from stripping ampersand characters from
+                ;   a string or terminating a string at a tab character.
+                ;   Without this style, the system automatically strips
+                ;   ampersand characters and terminates a string at the first
+                ;   tab character.  This allows an application to use the same
+                ;   string as both a menu item and as text in a tooltip control.
+
+          ;-- TOOLINFO uFlags
+          ,TTF_IDISHWND:=0x1
+                ;-- Indicates that the uId member is the window handle to the
+                ;   tool.  If this flag is not set, uId is the identifier of the
+                ;   tool.
+
+          ,TTF_SUBCLASS:=0x10
+                ;-- Indicates that the tooltip control should subclass the
+                ;   window for the tool in order to intercept messages, such
+                ;   as WM_MOUSEMOVE.  If this flag is not used, use the
+                ;   TTM_RELAYEVENT message to forward messages to the tooltip
+                ;   control.  For a list of messages that a tooltip control
+                ;   processes, see TTM_RELAYEVENT.
+
+          ;-- Tooltip icons
+          ,TTI_NONE         :=0
+          ,TTI_INFO         :=1
+          ,TTI_WARNING      :=2
+          ,TTI_ERROR        :=3
+          ,TTI_INFO_LARGE   :=4
+          ,TTI_WARNING_LARGE:=5
+          ,TTI_ERROR_LARGE  :=6
+
+          ;-- Extended styles
+          ,WS_EX_TOPMOST:=0x8
+
+          ;-- Messages
+          ,TTM_ACTIVATE      :=0x401                    ;-- WM_USER + 1
+          ,TTM_ADDTOOLA      :=0x404                    ;-- WM_USER + 4
+          ,TTM_ADDTOOLW      :=0x432                    ;-- WM_USER + 50
+          ,TTM_DELTOOLA      :=0x405                    ;-- WM_USER + 5
+          ,TTM_DELTOOLW      :=0x433                    ;-- WM_USER + 51
+          ,TTM_GETTOOLINFOA  :=0x408                    ;-- WM_USER + 8
+          ,TTM_GETTOOLINFOW  :=0x435                    ;-- WM_USER + 53
+          ,TTM_SETDELAYTIME  :=0x403                    ;-- WM_USER + 3
+          ,TTM_SETMAXTIPWIDTH:=0x418                    ;-- WM_USER + 24
+          ,TTM_SETTITLEA     :=0x420                    ;-- WM_USER + 32
+          ,TTM_SETTITLEW     :=0x421                    ;-- WM_USER + 33
+          ,TTM_UPDATETIPTEXTA:=0x40C                    ;-- WM_USER + 12
+          ,TTM_UPDATETIPTEXTW:=0x439                    ;-- WM_USER + 57
+
+    if (DisableTooltips=1)
+       return 
+
+    ;-- Save/Set DetectHiddenWindows
+    l_DetectHiddenWindows:=A_DetectHiddenWindows
+    DetectHiddenWindows On
+
+    ;-- Tooltip control exists?
+    if not hTT
+    {
+        ;-- Create Tooltip window
+        hTT:=DllCall("CreateWindowEx"
+            ,"UInt",WS_EX_TOPMOST                       ;-- dwExStyle
+            ,"Str","TOOLTIPS_CLASS32"                   ;-- lpClassName
+            ,"Ptr",0                                    ;-- lpWindowName
+            ,"UInt",TTS_ALWAYSTIP|TTS_NOPREFIX          ;-- dwStyle
+            ,"UInt",CW_USEDEFAULT                       ;-- x
+            ,"UInt",CW_USEDEFAULT                       ;-- y
+            ,"UInt",CW_USEDEFAULT                       ;-- nWidth
+            ,"UInt",CW_USEDEFAULT                       ;-- nHeight
+            ,"Ptr",HWND_DESKTOP                         ;-- hWndParent
+            ,"Ptr",0                                    ;-- hMenu
+            ,"Ptr",0                                    ;-- hInstance
+            ,"Ptr",0                                    ;-- lpParam
+            ,"Ptr")                                     ;-- Return type
+
+        ;-- Disable visual style
+        ;   Note: Uncomment the following to disable the visual style, i.e.
+        ;   remove the window theme, from the tooltip control.  Since this
+        ;   function only uses one tooltip control, all tooltips created by this
+        ;   function will be affected.
+        ;   DllCall("uxtheme\SetWindowTheme","Ptr",hTT,"Ptr",0,"UIntP",0)
+
+        ;-- Set the maximum width for the tooltip window
+        ;   Note: This message makes multi-line tooltips possible
+        SendMessage, TTM_SETMAXTIPWIDTH, 0, A_ScreenWidth,, ahk_id %hTT%
+    }
+
+    ;-- Other commands
+    if p1 is not Integer
+    {
+        if (p1="Activate")
+            SendMessage, TTM_ACTIVATE, True, 0,, ahk_id %hTT%
+
+        if (p1="Deactivate")
+            SendMessage, TTM_ACTIVATE, False, 0,, ahk_id %hTT%
+
+        if (InStr(p1,"AutoPop")=1)  ;-- Starts with "AutoPop"
+            SendMessage, TTM_SETDELAYTIME, TTDT_AUTOPOP, p2*1000,, ahk_id %hTT%
+
+        if (p1="Title")
+        {
+            ;-- If needed, truncate the title
+            if (StrLen(p2)>99)
+                p2 := SubStr(p2,1,99)
+
+            ;-- Icon
+            if p3 is not Integer
+                p3 := TTI_NONE
+
+            ;-- Set title
+            SendMessage A_IsUnicode ? TTM_SETTITLEW : TTM_SETTITLEA, p3, &p2,, ahk_id %hTT%
+        }
+
+        ;-- Restore DetectHiddenWindows
+        DetectHiddenWindows %l_DetectHiddenWindows%
+    
+        ;-- Return the handle to the tooltip control
+        Return hTT
+    }
+
+    ;-- Create/Populate the TOOLINFO structure
+    uFlags := TTF_IDISHWND | TTF_SUBCLASS
+    cbSize := VarSetCapacity(TOOLINFO,(A_PtrSize=8) ? 64:44,0)
+    NumPut(cbSize,      TOOLINFO,0,"UInt")              ;-- cbSize
+    NumPut(uFlags,      TOOLINFO,4,"UInt")              ;-- uFlags
+    NumPut(HWND_DESKTOP,TOOLINFO,8,"Ptr")               ;-- hwnd
+    NumPut(p1,          TOOLINFO,(A_PtrSize=8) ? 16:12,"Ptr")
+        ;-- uId
+
+    ;-- Check to see if tool has already been registered for the control
+    SendMessage, A_IsUnicode ? TTM_GETTOOLINFOW : TTM_GETTOOLINFOA
+               , 0, &TOOLINFO,, ahk_id %hTT%
+
+    l_RegisteredTool := ErrorLevel
+
+    ;-- Update the TOOLTIP structure
+    NumPut(&p2, TOOLINFO, (A_PtrSize=8) ? 48 : 36,"Ptr")
+        ;-- lpszText
+
+    ;-- Add, Update, or Delete tool
+    if l_RegisteredTool
+    {
+        if StrLen(p2)
+        {
+            SendMessage, A_IsUnicode ? TTM_UPDATETIPTEXTW : TTM_UPDATETIPTEXTA
+                       , 0, &TOOLINFO,, ahk_id %hTT%
+        } else
+        {
+            SendMessage, A_IsUnicode ? TTM_DELTOOLW : TTM_DELTOOLA
+                       , 0, &TOOLINFO,, ahk_id %hTT%
+        }
+    } else if StrLen(p2)
+    {
+        SendMessage, A_IsUnicode ? TTM_ADDTOOLW : TTM_ADDTOOLA
+                   , 0, &TOOLINFO,, ahk_id %hTT%
+    }
+
+    ;-- Restore DetectHiddenWindows
+    DetectHiddenWindows %l_DetectHiddenWindows%
+
+    ;-- Return the handle to the tooltip control
+    Return hTT
+}
+
+WinEnumChild(hwnd:=0, lParam:=0) {
+/* Function: WinEnumChild
+ *     Wrapper for Enum(Child)Windows [http://goo.gl/5eCy9 | http://goo.gl/FMXit]
+ * Source: https://github.com/cocobelgica/AutoHotkey-Util/blob/master/WinEnum.ahk
+ * License: WTFPL [http://wtfpl.net/]
+ * Syntax: windows := WinEnum( [ hwnd ] )
+ * Parameter(s) / Return Value:
+ *     windows    [retval]  - an array of window handles
+ *     hwnd       [in, opt] - parent window. If specified, EnumChildWindows is
+ *                            called. Accepts a window handle or any string that
+ *                            match the WinTitle[http://goo.gl/NdhybZ] parameter.
+ *     lParam     [internal, used by callback]
+ *
+ * Example:
+ *     win := WinEnum() ; calls EnumWindows
+ *     children := WinEnum("A") ; enumerate child windows of the active window
+*/
+
+  static pWinEnum := "X"
+  if (A_EventInfo!=pWinEnum)
+  {
+     if (pWinEnum=="X")
+        pWinEnum := RegisterCallback(A_ThisFunc, "F", 2)
+
+     if hwnd
+     {
+       ;// not a window handle, could be a WinTitle parameter
+       if !DllCall("IsWindow", "Ptr", hwnd)
+       {
+          prev_DHW := A_DetectHiddenWindows
+          prev_TMM := A_TitleMatchMode
+          DetectHiddenWindows On
+          SetTitleMatchMode 2
+          hwnd := WinExist(hwnd)
+          DetectHiddenWindows %prev_DHW%
+          SetTitleMatchMode %prev_TMM%
+       }
+    }
+    out := []
+    if hwnd
+       DllCall("EnumChildWindows", "Ptr", hwnd, "Ptr", pWinEnum, "Ptr", &out)
+    else
+       DllCall("EnumWindows", "Ptr", pWinEnum, "Ptr", &out)
+    return out
+  }
+
+  ;// Callback - EnumWindowsProc / EnumChildProc
+  static ObjPush := Func(A_AhkVersion < "2" ? "ObjInsert" : "ObjPush")
+  %ObjPush%(Object(lParam + 0), hwnd)
+  return true
+}

@@ -1,0 +1,93 @@
+* Support for 85 image file formats, including various Camera RAW formats.
+
+* List images as thumbnails with preset aspect ratios: square, wide or tall. Easy to adjust their size as well. Use T and +/- keys.
+
+* Adaptive multi-threaded thumbnails caching to sizes ranging from 600 pixels to 125 pixels. On very fast PCs, no caching occurs.
+
+* Touch screen friendly hot-areas on the UI to navigate or zoom into images.
+
+* Sort images by histogram data points, such as the average or median point, resolution, aspect ratio.
+
+* Sort images by their properties such as resolution, aspect ratisomn ușor and so on.
+
+* Options to control brightness, contrast, saturation and RGB color channels balance/intensity.
+
+* Paint brushes: soft edges, cloner, eraser, pinch, bulge, smudge and more; all are customizable; textured brushes.
+
+* Image editing tools: soft edges blur, advanced flood fill [color bucket], insert text, paste in place, draw arcs, lines and shapes, transform selected area, rotate, flip, pixelize, noise, crop and more
+
+* Draw free-form curved paths or polygonal lines; options to fill with color, textures or gradients.
+
+* Free-form curved or polygonal selections, elliptical and rectangular selections, rotated at any angle.
+
+* 18 blending modes and alpha masking support implemented for various image editing tools. The mask can be user painted or generated: a gradient [linear, box, radial] or a previously drawn vector path.
+
+* Adaptive auto-adjustment of brightness, contrast and saturation of displayed images.
+
+* Advanced yet easy to use auto-crop for images.
+
+* Display images in grayscale, inverted or personalized colors. Option to save adjusted image, or apply adjusments on multiple images in one go.
+
+* Real-time histogram for any image color channel of the image displayed.
+
+* Various modes to adapt images to window.
+
+* Images can be rotated or mirrored horizontally and vertically in the viewport.
+
+* Multiple list view modes. Display the indexed files as an easy to scroll list with or without details.
+
+* Multiple slideshow directions available and easy to change speed between images: random order, backwards or forwads.
+
+* Option to keep a record of seen images and have these skipped during slideshows or erased from the index list
+
+* Add/remove or manage favourite images
+
+* Perform JPEG lossless operations in batch: flip or crop images.
+
+* Perform actions on image files: resize, rotate [at any degree], crop, change/adjust colors, rename, convert to different file formats, rename, delete, copy or move.
+
+* Batch processing. You can apply any of the previously mentioned action or operation on multiple files at once.
+
+* Multi-rename allows adding a prefix and/or suffix to renamed files, or to count them, or search and replace strings in file names.
+
+* Acquire images from scanners.
+
+* File statistics panel with categories for: file sizes, file types, modified dates, image size, image histogram data and much more.
+
+* Identify image duplicates by customizable image properties, histogram details or image content similarity using multiple algorithms.
+
+* Copy files from Explorer and paste in Quick Picto Viewer, or from QPV to Explorer.
+
+* Paste texts from clipboard and render them as images. Text and background colors, font style, alignment and size can be personalized.
+
+* Quick Picto Viewer has its own slideshow formats to store list of folders and cache files lists: plain-text and SQLite database.
+
+* Ability to selectively refresh the cached files list from selected folders.
+
+* Option to filter the list of files using keywords. The operator | [or] is allowed.
+
+* Folder tree view - meant to help navigate folders
+
+* Very fast loading of cached or not cached lists of files. Tested with 900100 images and it loads in 10 seconds on my system.
+
+* Resize and crop images preserving alpha-channel on save even when image colors are adjusted.
+
+* Support for animated .WEBP and .GIFs in slideshows - HD GIFs are support as well.
+
+* Support for multi-paged .WEBP, .TIFFs and .GIF frames. Ability to go through each image frame/page.
+
+* Support for drag 'n drop of folders or files onto main UI.
+
+* Paste image from clipboard and save it. 17 file formats supported for saving an image.
+
+* Copy to clipboard: the entire image or an area selected from it.
+
+* Adjustable user interface font sizes and colors.
+
+* Ambiental textured window background. Automatically generated background based on the current image displayed.
+
+* Multi-monitor support.
+
+* Dark mode for the user interface, and fancy welcome screen with random-generated images :-).
+
+ 

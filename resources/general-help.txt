@@ -1,0 +1,32 @@
+WHAT IS QUICK PICTO VIEWER?
+QPV is an image viewer, editor and a tool to organize image collections. It can open about 85 image file formats: .hdr, .raw, .tif, .emf, .wmf, .png, .bmp, .gif, .jpeg and many others.
+
+Quick Picto Viewer is made to gracefully manage large image libraries, e.g., a million images, or more. It is made to help organize and view such libraries. A particular attention is paid through-out development to the needs of people with poor eye-sight. To this end, users can activate large UI fonts, adjust the zoom level for texts (Ctrl + -/+) in the viewport, dark mode, and right-click on menu items or panel controls to display larger their associated texts. 
+
+QPV is able to create image slideshows and cache very large dynamic lists of files. The index of files can be saved as plain-text or as an SQLite database.
+
+With Quick Picto Viewer users can identify image duplicates (by similarity) and generate file statistics over huge image libraries which can help identify very small images, very low key, or washed out images.
+
+QPV is also able to play sound files associated with images, automatically or on demand, and even generate slideshows that are in synch with the audio files duration. Supported audio formats: WAV, MP3 and WMA. It can also display image captions / notes for image.
+
+Advanced image editing tools are also available: alpha masking, blending modes, paint brushes, paste in place, color adjustments, draw arcs, lines or shapes, insert text, soft edges blur area and so on. Selection areas can be freely rotated elliptical, rectangular or vector shapes. 
+
+
+KEYBOARD SHORTCUTS:
+QPV was developed having in mind keyboard users by providing many keyboard shortcuts or menu accelerators. At the moment, there is no way to customize these in QPV. They are all assigned based on the user context and in-app conditions. Therefore, in the «Keyboard shortcuts» list you will see the same keyboard shortcut listed several times, with different actions associated with it. Please pay attention to the indicated contexts. 
+
+
+KEY CONCEPTS IN QPV TO KNOW ABOUT:
+
+THE FILES LIST:
+The files list is an index, a list of records pointing to files on the disk.  
+When users open a folder, a files list index is automatically generated and one can add more files, from elsewhere, to this index.  
+Given that it is just an index, the files added are not inserted (or pasted) into the initially opened folder.  
+The files list index can be saved and reopened in later sessions. QPV allows users to save the files list in two formats: plain-text and as a SQLite database. For more details, see the Help provided in the Save panel (Ctrl+Shift+S). 
+
+
+THE VIEWPORT
+In QPV, unlike in other image viewers, there is a clear distinction between how images are displayed on the screen and the pixel/image data. QPV allows users to alter the viewing conditions without affecting the images themselves. The color adjustments, image rotation and flip options (available in the «Viewport adjustments» panel), are applied in real-time for each image when loaded, before displaying it on screen. There are distinct options and tools in QPV to edit and adjust images or to apply the viewport conditions. QPV will seamlessly apply the viewport viewing conditions onto the image itself when users choose to save the image or when image editing tools are used. 
+
+
+By using QPV, people can observe that many similar tools are provided, which may achieve the exact same thing. QPV was thought like this, to allow users perform basic tasks by different means, because each mean is suited for specific use-case scenarios. 

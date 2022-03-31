@@ -13,7 +13,7 @@ SetWorkingDir, %A_ScriptDir%
 Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Quick Picto Viewer"
      , RegExFilesPattern := "i)^(.\:\\).*(\.(ico|dib|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif))$"
      , PVhwnd, hGDIwin, hGDIthumbsWin, WindowBgrColor, mainCompiledPath, hfdTreeWinGui
-     , winGDIcreated := 0, ThumbsWinGDIcreated := 0, MainExe := AhkExported()
+     , winGDIcreated := 0, ThumbsWinGDIcreated := 0, MainExe := AhkExported(), omniBoxMode := 0
      , AnyWindowOpen := 0, easySlideStoppage := 0, lastOtherWinClose := 1, wasMenuFlierCreated := 0
      , slideShowRunning := 0, toolTipGuiCreated, editDummy, LbtnDwn := 0, winCtrlsCoords := []
      , mustAbandonCurrentOperations := 0, lastCloseInvoked := -1, allowGIFsPlayEntirely := 0
@@ -1255,6 +1255,12 @@ byeByeRoutine() {
        lastInvokedThis := A_TickCount
        lastOtherWinClose := A_TickCount
        MainExe.ahkPostFunction("StopColorPicker")
+   } Else If (omniBoxMode=1)
+   {
+       omniBoxMode := 0
+       lastInvokedThis := A_TickCount
+       lastOtherWinClose := A_TickCount
+       MainExe.ahkPostFunction("closeQuickSearch")
    } Else If (mustCaptureCloneBrush=1)
    {
        mustCaptureCloneBrush := 0
@@ -1371,6 +1377,7 @@ kbdkeybcallKeysResponder(givenKey, thisWin) {
    If (animGIFplaying=1)
       animGIFplaying := -1
 
+   ; addJournalEntry(A_ThisFunc "(): " thisWin "|" givenKey)
    If (A_TickCount - lastInvoked>50) && (whileLoopExec=0 && runningLongOperation=0)
    {
       lastInvoked := A_TickCount
@@ -1391,7 +1398,7 @@ kbdkeybcallKeysResponder(givenKey, thisWin) {
 guiCreateMenuFlyout() {
    m := LargeUIfontValue // 2 + 1
    h := LargeUIfontValue * 2 + 1
-   Gui, menuFlier: +AlwaysOnTop -MinimizeBox -SysMenu -Caption
+   Gui, menuFlier: +AlwaysOnTop -MinimizeBox -SysMenu -Caption +ToolWindow
    Gui, menuFlier: Color, %OSDbgrColor%
    Gui, menuFlier: Font, s%LargeUIfontValue% Bold c%OSDtextColor%
    Gui, menuFlier: Margin, 0, 0
@@ -2153,10 +2160,12 @@ SendMenuTabKey() {
    ;    constantMenuReader("focused")
    ; Return
 
+   WheelDown::
    ~PgDn::
       SendInput, {Down 3}
    Return
 
+   WheelUp::
    ~PgUp::
       SendInput, {Up 3}
    Return
@@ -2174,15 +2183,16 @@ SendMenuTabKey() {
    Return
 #If
 
-#If, (identifyParentWind()=1 && allowMenuReader!="yes" && (A_TickCount - lastOtherWinClose>100))
+#If, (identifyParentWind()=1 && runningLongOperation!=1 && allowMenuReader!="yes" && (A_TickCount - lastOtherWinClose>100))
    ^F4::
       If (imgEditPanelOpened=1 || AnyWindowOpen>0) && (identifyPanelWin()=1)
          MainExe.ahkPostFunction("CloseWindow")
    Return
 
    ~AppsKey::
+   ~Enter::
       If (imgEditPanelOpened=1 || AnyWindowOpen>0) && (identifyPanelWin()=1)
-         MainExe.ahkPostFunction("externalinvokedSettingsContextMenu")
+         MainExe.ahkPostFunction("externalinvokedSettingsContextMenu", A_ThisHotkey)
    Return
 
    ~F8::
@@ -2201,8 +2211,8 @@ SendMenuTabKey() {
    ~Space::
       If ((identifyOtherPanelsWin()=1 || identifyPanelWin()=1) && InStr(A_ThisHotkey, "RButton"))
          Return
-
-      kbdkeybcallKeysResponder(A_ThisHotkey, "parentu")
+      If (imageLoading!=1 && runningLongOperation!=1 && whileLoopExec!=1)
+         kbdkeybcallKeysResponder(A_ThisHotkey, "parentu")
    Return
 #If
 
@@ -2237,7 +2247,8 @@ SendMenuTabKey() {
     vk37::
     vk38::
     vk39::
-      kbdkeybcallKeysResponder(A_ThisHotkey, hQPVtoolbar)
+      If (imageLoading!=1 && runningLongOperation!=1 && whileLoopExec!=1)
+         kbdkeybcallKeysResponder(A_ThisHotkey, hQPVtoolbar)
     Return
 #IF
 
@@ -2253,7 +2264,8 @@ SendMenuTabKey() {
     !vk50::     ; Alt+P
     +vk50::     ; Shift+P
     ^vk50::     ; Ctrl+P
-    ~vkBA up::  ; ;
+    vkBA::      ; ;
+    +vkBA::     ; Shift+;
     ^NumpadAdd::
     ^vkBB::     ; Ctrl+[=]
     ^NumpadSub::
@@ -2274,7 +2286,7 @@ SendMenuTabKey() {
     +Esc::
     F1::
     ~F9 Up::
-    ^F4::
+    ^F4::         ; Ctrl+F4
     ~vk44 Up::    ; D
     vk4C::        ; L
     +^vk56 Up::   ; Ctrl+Shift+V
@@ -2477,11 +2489,12 @@ SendMenuTabKey() {
     ^PgDn::
     !PgUp::
     !PgDn::
-    ~^Home Up::
-    ~^End Up::
-    ~+Home::
-    ~+End::
-       kbdkeybcallKeysResponder(A_ThisHotkey, PVhwnd)
+    ^Home Up::
+    ^End Up::
+    +Home::
+    +End::
+      If (imageLoading!=1 && runningLongOperation!=1 && whileLoopExec!=1)
+         kbdkeybcallKeysResponder(A_ThisHotkey, PVhwnd)
     Return
 
     ~Left::
@@ -2501,7 +2514,7 @@ SendMenuTabKey() {
          alterFilesIndex++
          canCancelImageLoad := 4
          animGIFplaying := 0
-      } Else
+      } Else If (imageLoading!=1 && runningLongOperation!=1 && whileLoopExec!=1)
          kbdkeybcallKeysResponder(thisKey, PVhwnd)
     Return
   
@@ -2516,7 +2529,7 @@ SendMenuTabKey() {
          kbdkeybcallKeysResponder(thisKey, PVhwnd)
     Return
   
-    ~Esc::
+    Esc::
     ~!F4::
        canCancelImageLoad := 4
        If (AnyWindowOpen || animGIFplaying=1 || slideShowRunning=1)
@@ -2539,8 +2552,8 @@ SendMenuTabKey() {
           turnOffSlideshow()
        Else If (thumbsDisplaying!=1 && isOkay && maxFilesIndex>0 && slideShowRunning!=1 && IMGresizingMode=4)
           changeMcursor("move")
-       Else
-         kbdkeybcallKeysResponder(thisKey, PVhwnd)
+       Else If (imageLoading!=1 && runningLongOperation!=1 && whileLoopExec!=1)
+          kbdkeybcallKeysResponder(thisKey, PVhwnd)
     Return
 #If
 
@@ -2730,6 +2743,15 @@ mouseCreateOSDinfoLine(msg:=0, largus:=0) {
     Gui, mouseToolTipGuia: Font, s%thisFntSize% %isBold% Q5, %OSDFontName%
     Gui, mouseToolTipGuia: Add, Text, c%txtColor% gmouseClickTurnOFFtooltip vTippyMsg, %msg%
     Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPVOguiTipsWin
+    prevMsg := msg
+    mouseToolTipWinCreated := 1
+    delayu := StrLen(msg) * 75 + 950
+    showOSDinfoLineNow(delayu)
+}
+
+showOSDinfoLineNow(delayu) {
+    If !mouseToolTipWinCreated
+       Return
 
     GetPhysicalCursorPos(mX, mY)
     tipX := mX + 15
@@ -2745,11 +2767,8 @@ mouseCreateOSDinfoLine(msg:=0, largus:=0) {
        ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
     }
 
-    prevMsg := msg
-    mouseToolTipWinCreated := 1
     Gui, mouseToolTipGuia: Show, NoActivate AutoSize x%Final_x% y%Final_y%, QPVguiTipsWin
     WinSet, Transparent, 225, ahk_id %hGuiTip%
-    delayu := StrLen(msg) * 75 + 950
     If (delayu<msgDisplayTime/2)
        delayu := msgDisplayTime//2 + 1
     WinSet, AlwaysOnTop, On, ahk_id %hGuiTip%
