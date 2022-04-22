@@ -5,6 +5,7 @@
 #MaxThreads, 255
 #MaxThreadsPerHotkey, 1
 #MaxThreadsBuffer, Off
+#IfTimeout, 2000
 SetWinDelay, 1
 CoordMode, Mouse, Screen
 SetBatchLines, -1
@@ -38,7 +39,8 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , lastMenuInvoked := [], hQPVtoolbar := 0, ShowAdvToolbar := 0, whileLoopExec := 0
      , isToolbarActivated := 0, lockToolbar2Win := 1, lastZeitPanCursor := 1, VisibleQuickMenuSearchWin :=0
      , hquickMenuSearchWin, hGuiTip, lastTippyWin, lastMouseLeave := 1, colorPickerModeNow := 0
-     , mustCaptureCloneBrush := 0, doNormalCursor := 1
+     , mustCaptureCloneBrush := 0, doNormalCursor := 1, hotkate, uiUseDarkMode := 0
+     , menusflyOutVisible := 0, otherAscriptHwnd := ""
 
 Global allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, askDeleteFiles, mouseToolTipWinCreated := 0
 , AutoDownScaleIMGs, autoPlaySNDs, autoRemDeadEntry, ColorDepthDithering, countItemz, currentFileIndex, CurrentSLD, defMenuRefreshItm, doSlidesTransitions
@@ -51,55 +53,37 @@ Global allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSuppor
 
 ; OnMessage(0x388, "WM_PENEVENT")
 OnMessage(0x2a3, "WM_MOUSELEAVE")
-OnMessage(0x112, "WM_SYSMENU")
 OnMessage(0x201, "WM_LBUTTONDOWN")
+OnMessage(0x203, "WM_LBUTTON_DBL")
 OnMessage(0x202, "WM_LBUTTONUP")
 OnMessage(0x205, "WM_RBUTTONUP")
 OnMessage(0x207, "WM_MBUTTONDOWN")
-; OnMessage(0x216, "WM_MOVING") ; window moving
 OnMessage(0x047, "WM_WINDOWPOSCHANGED") ; window moving
 OnMessage(0x24B, "WM_POINTERACTIVATE") 
+OnMessage(0x20A, "WM_MOUSEWHEEL")
+; OnMessage(0x216, "WM_MOVING") ; window moving
+
+Loop, 9
+    OnMessage(255+A_Index, "PreventKeyPressBeep")   ; 0x100 to 0x108
+
+OnMessage(0x100, "WM_KEYDOWN")
+OnMessage(0x104, "WM_KEYDOWN")
 ; OnMessage(0x0247, "WM_POINTERUP") 
 ; OnMessage(0x20, "WM_SETCURSOR")
-; OnMessage(0x203, "WM_LBUTTON_DBL") ; WM_LBUTTONDOWN double click
 ; OnMessage(0x211, "WM_ENTERMENULOOP")
 ; OnMessage(0x212, "WM_EXITMENULOOP")
-; OnMessage(0x125, "WM_EXITMENULOOP")
-; OnMessage(0x126, "WM_EXITMENULOOP")
+; OnMessage(0x126, "WM_MENUCOMMAND")
+; OnMessage(0x120, "WM_MENUCHAR")
+; OnMessage(0x11Fb, "WM_MENUSELECT")
 
 OnMessage(0x200, "WM_MOUSEMOVE")
 OnMessage(0x06, "activateMainWin")   ; WM_ACTIVATE 
 OnMessage(0x08, "activateMainWin")   ; WM_KILLFOCUS 
 
-Loop, 9
-    OnMessage(255+A_Index, "PreventKeyPressBeep")   ; 0x100 to 0x108
-
 setPriorityThread(2)
-OnMessage(0x203, "OnLButtonDblClk")
-
 lastMenuInvoked[1] := A_TickCount
 ; OnExit, doCleanup
 Return
-
-
-OnLButtonDblClk(wParam, lParam, msg, hwnd) {
-; function by Lexikos; work-around for DoubleClick on Gui Picture Controls
-; from https://autohotkey.com/board/topic/94962-doubleclick-on-gui-pictures-puts-their-path-in-your-clipboard/
-    Critical, On
-    WinGetClass, WinClass, ahk_id %hwnd%
-    If (WinClass="Static")
-    {
-        If !A_Gui
-           Return 0  ; Just prevent Clipboard change.
-        ; Send a WM_COMMAND message to the Gui to trigger the control's g-label.
-        Gui, +LastFound
-        gID := DllCall("GetDlgCtrlID", "ptr", hwnd) ; Requires AutoHotkey v1.1.
-        Static STN_DBLCLK := 1
-        PostMessage, 0x111, gID | (STN_DBLCLK << 16), hwnd
-        ; Return a value to prevent the default handling of this message.
-        Return 0
-    }
-}
 
 setPriorityThread(level, handle:="A") {
   If (handle="A" || !handle)
@@ -167,13 +151,12 @@ BuildGUI(params:=0) {
    Gui, 1: Margin, 0, 0
    Gui, 1: -DPIScale +Resize %MinGUISize% +hwndPVhwnd +LastFound +OwnDialogs
    Gui, 1: Font, s1
-   Gui, 1: Add, Text, x0 y0 w1 h1 BackgroundTrans gWinClickAction vPicOnGui1 hwndhPicOnGui1, Previous image
-   ; Gui, 1: Add, Edit, xp-100 yp-100 gUnlockKeys w1 h1 veditDummy,
-   Gui, 1: Add, Button, xp-100 yp-100 gUnlockKeys w1 h1 Default,a
-   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans gWinClickAction vPicOnGui2a, Zoom in
-   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans gWinClickAction vPicOnGui2b, Double-click to toggle view mode | Swipe to make gestures | Left-click and drag to pan image
-   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans gWinClickAction vPicOnGui2c, Zoom out
-   Gui, 1: Add, Text, x3 y3 w3 h3 BackgroundTrans gWinClickAction vPicOnGui3, Next image
+   Gui, 1: Add, Text, x0 y0 w1 h1 BackgroundTrans vPicOnGui1 hwndhPicOnGui1, Previous image
+   Gui, 1: Add, Button, xp-100 yp-100 w1 h1 Default,a
+   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans vPicOnGui2a, Zoom in
+   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans vPicOnGui2b, Double-click to toggle view mode | Swipe to make gestures | Left-click and drag to pan image
+   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans vPicOnGui2c, Zoom out
+   Gui, 1: Add, Text, x3 y3 w3 h3 BackgroundTrans vPicOnGui3, Next image
    If (isTitleBarVisible=1)
       Gui, 1: +Caption
    Else
@@ -531,76 +514,120 @@ addJournalEntry(msg) {
       MainExe.ahkPostFunction(A_ThisFunc, msg)
 }
 
+WM_MOUSEWHEEL(wParam, lP, msg, hwnd) {
+   isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1 && animGIFplaying!=1) ? 0 : 1
+   If !isOkay
+      Return 0
+
+   If preventOwnGui(A_Gui)
+      Return
+
+   If (slideShowRunning=1 || animGIFplaying=1)
+   {
+      turnOffSlideshow()
+      Return 0
+   }
+
+   prefix := ""
+   prefix .= (wParam & 0xffff=4) ? "+" : "" ; shift
+   prefix .= (wParam & 0xffff=8) ? "^" : "" ; ctrl
+   prefix .= GetKeyState("Alt", "P") ? "!" : ""
+   ; HI := (Value >> 16) & 0xFFFF
+   ; LO := Value & 0xFFFF
+   result := (wParam >> 16)      ; return the HIWORD -  high-order word 
+   ; TulTip(1, " == ", result, resultA, resultB, resultC, resultD, resultE)
+   stepping := Round(Abs(result) / 120)
+   direction := (result<0) ? "WheelUp" : "WheelDown"
+   MainExe.ahkPostFunction("KeyboardResponder", prefix direction, PVhwnd, 0)
+   Return 0
+}
+
+preventOwnGui(thisGui) {
+  r := (thisGui="mouseToolTipGuia" || thisGui="menuFlier") ? 1 : 0
+  Return r
+}
+
 WM_LBUTTONDOWN(wP, lP, msg, hwnd) {
     If (A_TickCount - scriptStartTime<500)
+       Return 0
+
+    If preventOwnGui(A_Gui)
        Return
 
     LbtnDwn := 1
     If (mouseToolTipWinCreated=1)
        mouseTurnOFFtooltip()
 
-    If (hotkeysSuspended=1)
-       UnlockKeys()
-
     SetTimer, ResetLbtn, -55
+    isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1) ? 0 : 1
     If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900) && slideShowRunning!=1 && animGIFplaying!=1)
        askAboutStoppingOperations()
+    Else If (slideShowRunning=1 || animGIFplaying=1)
+       turnOffSlideshow()
+    Else If isOkay
+       WinClickAction()
+    Return 0
 }
 
 WM_LBUTTONUP(wP, lP, msg, hwnd) {
     LbtnDwn := 0
+    Return 0
 }
 
 WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
     If (A_TickCount - scriptStartTime<500)
+       Return 0
+
+    If preventOwnGui(A_Gui)
        Return
 
     If (mouseToolTipWinCreated=1)
        mouseTurnOFFtooltip()
 
     LbtnDwn := 0
-    UnlockKeys()
     canCancelImageLoad := 4
     If (slideShowRunning=1 || animGIFplaying=1)
     {
        turnOffSlideshow()
-       Return
+       Return 0
     }
 
+    isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1) ? 0 : 1
     If (drawingShapeNow=1)
-       ; MainExe.ahkPostFunction("stopDrawingShape")
        remCustomShapePoint()
-    Else If (imgEditPanelOpened=1)
+    Else If (imgEditPanelOpened=1 && AnyWindowOpen)
        MainExe.ahkPostFunction("toggleImgEditPanelWindow")
     Else If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
        askAboutStoppingOperations()
-    Else If !AnyWindowOpen
+    Else If (!AnyWindowOpen && isOkay)
        MainExe.ahkPostFunction("ToggleThumbsMode")
+    Return 0
 }
 
 remCustomShapePoint() {
-    MouseGetPos, , , OutputVarWin
     GetMouseCoord2wind(PVhwnd, mX, mY, mXo, mYo)
-    sendWinClickAct("remClick", "n", OutputVarWin, mX, mY, mXo, mYo)
+    sendWinClickAct("remClick", "n", mX, mY, mXo, mYo)
 }
 
 WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
-    If (A_TickCount - scriptStartTime<500)
-       Return
-
     LbtnDwn := 0
-    If (hotkeysSuspended=1)
-       UnlockKeys()
+    isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1 && animGIFplaying!=1) ? 0 : 1
+    If ((A_TickCount - scriptStartTime<500) || !isOkay)
+       Return 0
 
-    If (slideShowRunning=1)
+    If preventOwnGui(A_Gui)
+       Return 0
+
+    If (slideShowRunning=1 || animGIFplaying=1)
     {
        turnOffSlideshow()
-       Return
+       Return 0
     }
 
-    MouseGetPos, , , OutputVarWin
-    GetMouseCoord2wind(PVhwnd, mX, mY, mXo, mYo)
-    MainExe.ahkPostFunction("WinClickAction", "DoubleClick", A_GuiControl, OutputVarWin, mX, mY, mXo, mYo)
+    If (A_TickCount - lastMouseLeave>350)
+       WinClickAction("DoubleClick")
+
+    Return 0
 }
 
 askAboutStoppingOperations() {
@@ -614,38 +641,51 @@ askAboutStoppingOperations() {
      } ; Else SoundBeep , % 250 + 100*lastCloseInvoked, 100
 }
 
-WM_RBUTTONUP(wP, lP, msg, hwnd) {
+WM_RBUTTONUP(wParam, lP, msg, hwnd) {
   Static lastState := 0
   LbtnDwn := 0
   If (A_TickCount - scriptStartTime<500)
+     Return 0
+
+  If preventOwnGui(A_Gui)
      Return
 
   If (slideShowRunning=1 || animGIFplaying=1)
   {
      turnOffSlideshow()
-     Return
+     Return 0
   }
+
   If (mouseToolTipWinCreated=1)
      mouseTurnOFFtooltip()
 
-  UnlockKeys()
   ; thumbsDisplaying := MainExe.ahkgetvar.thumbsDisplaying
   ; AnyWindowOpen := MainExe.ahkgetvar.AnyWindowOpen
   ; maxFilesIndex := MainExe.ahkgetvar.maxFilesIndex
   If !identifyThisWin()
-     Return
+     Return 0
 
   ; GuiControl, 1:, editDummy, -
   If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
   {
      askAboutStoppingOperations()
-     Return
+     Return 0
   }
 
-  ; delayu := (thumbsDisplaying=1) ? 90 : 2
-  ; If (drawingShapeNow!=1)
-     SetTimer, InitGuiContextMenu, -25
-  Return
+  prefix := ""
+  prefix .= (wParam & 0xffff=4) ? "+" : "" ; shift
+  prefix .= (wParam & 0xffff=8) ? "^" : "" ; ctrl
+
+  If (whileLoopExec!=1 && runningLongOperation!=1)
+  {
+     If (prefix="^" && !AnyWindowOpen && drawingShapeNow!=1 && mustCaptureCloneBrush!=1 && thumbsDisplaying!=1)
+        MainExe.ahkPostFunction("restartGIFplayback")
+     Else If (prefix="+" && !AnyWindowOpen && drawingShapeNow!=1 && mustCaptureCloneBrush!=1)
+        MainExe.ahkPostFunction("BuildSecondMenu")
+     Else
+        SetTimer, InitGuiContextMenu, -5
+  }
+  Return 0
 }
 
 InitMainContextMenu() {
@@ -656,7 +696,7 @@ InitMainContextMenu() {
 
    If ((A_TickCount - thisTick<350) && isDotInRect(mX, mY, 15, 15, thisX, thisY, 1))
    {
-      SendInput, {Esc}
+      SendInput, {Escape}
       Sleep, 1
       PanelQuickSearchMenuOptions()
       Return
@@ -762,7 +802,7 @@ WM_POINTERACTIVATE() {
     If (slideShowRunning=1)
        turnOffSlideshow()
     Else
-       sendWinClickAct("normal-pen-down", ctrlName, OutputVarWin, mX, mY, mXo, mYo)
+       sendWinClickAct("normal-pen-down", ctrlName, mX, mY, mXo, mYo)
     lastPointerUseZeit := A_TickCount
 }
 
@@ -809,19 +849,11 @@ JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
   vPosY2 := NumGet(&POINT, 4, "Int")
 }
 
-WinClickAction(param:=0) {
+WinClickAction(thisEvent:="normal") {
     Static lastInvoked := 1, lastEvent
-
-    If (A_TickCount - lastMouseLeave<400) && (A_GuiControlEvent="DoubleClick" && imgEditPanelOpened=1) || (!isQPVactive())
-    {
-       lastInvoked := A_TickCount
-       Return
-    }
-
     If (A_TickCount - lastInvoked<25)
        Return
 
-    MouseGetPos, , , OutputVarWin
     GetMouseCoord2wind(PVhwnd, mX, mY, mXo, mYo)
     canCancelImageLoad := 4
     ctrlName := A_GuiControl
@@ -838,31 +870,19 @@ WinClickAction(param:=0) {
 
     If (mouseToolTipWinCreated=1)
        mouseTurnOFFtooltip()
-    ; ToolTip, % mX "=" mY "=" param "==" ctrlName "--" A_GuiControl "--" A_GuiControlEvent , , , 2
-    thisEvent := A_GuiControlEvent
-    lastEvent := thisEvent
-    lastInvoked := A_TickCount
 
+    ; ToolTip, % mX "=" mY "=" param "==" ctrlName "--" A_GuiControl "--" A_GuiControlEvent , , , 2
+    lastInvoked := A_TickCount
     If (slideShowRunning=1)
        turnOffSlideshow()
     Else If (A_TickCount - lastZeitPanCursor<350) && (thumbsDisplaying=0)
        MainExe.ahkPostFunction("simplePanIMGonClick", 0, 1, 1)
     Else
-       sendWinClickAct(thisEvent, ctrlName, OutputVarWin, mX, mY, mXo, mYo)
+       sendWinClickAct(thisEvent, ctrlName, mX, mY, mXo, mYo)
 }
 
-sendWinClickAct(ctrlEvent, guiCtrl, hwnd, mX, mY, mXo, mYo) {
-     ; Static zctrlEvent, zguiCtrl, zhwnd, zmX, zmY, zmXo, zmYo
-
-     ; If (ctrlEvent="normal") && (A_TickCount - lastPointerUseZeit<500)
-     ; {
-     ;    MainExe.ahkPostFunction("WinClickAction", zctrlEvent, zguiCtrl, zhwnd, zmX, zmY, zmXo, zmYo)
-     ;    Return
-     ; }
-
-     ; zctrlEvent := ctrlEvent, zguiCtrl := guiCtrl, hwnd := zhwnd
-     zmX := mX, zmY := mY, zmXo := mXo, zmYo := mYo
-     MainExe.ahkPostFunction("WinClickAction", ctrlEvent, guiCtrl, hwnd, mX, mY, mXo, mYo)
+sendWinClickAct(ctrlEvent, guiCtrl, mX, mY, mXo, mYo) {
+     MainExe.ahkPostFunction("WinClickAction", ctrlEvent, guiCtrl, mX, mY, mXo, mYo)
 }
 
 GetMouseCoord2wind(hwnd, ByRef nx, ByRef ny, ByRef ox, ByRef oy) {
@@ -909,7 +929,8 @@ WM_WINDOWPOSCHANGED() {
       ; Random, z, -900, 900
       ; ToolTip, % z , , , 2
       If (tempBtnVisible!="null")
-         MainExe.ahkPostFunction("DestroyTempBtnGui", "now")
+         SetTimer, RepositionTempBtnGui, -95
+
       SetTimer, saveMainWinPos, -35
       Global lastWinDrag := A_TickCount
       If (A_OSVersion="WIN_7" || isWinXP=1)
@@ -918,6 +939,10 @@ WM_WINDOWPOSCHANGED() {
          SetTimer, tlbrResetPosition, -90
       b := a
   }
+}
+
+RepositionTempBtnGui() {
+     MainExe.ahkPostFunction(A_ThisFunc)
 }
 
 saveMainWinPos() {
@@ -1080,7 +1105,7 @@ WM_MOUSELEAVE(wP, lP, msg, hwnd) {
 
 dummyCheckWin() {
    thisHwnd := WinActive("A")
-   drawingOkay := (thisHwnd=hQPVtoolbar || thisHwnd=PVhwnd || thisHwnd=tempBtnVisible || thisHwnd=hSetWinGui) ? 1 : 0
+   drawingOkay := (thisHwnd=hGuiTip && mouseToolTipWinCreated=1 || thisHwnd=hQPVtoolbar && ShowAdvToolbar=1 || thisHwnd=PVhwnd || thisHwnd=tempBtnVisible || thisHwnd=hSetWinGui) ? 1 : 0
    ; ToolTip, % hSetWinGui "`n" thisHwnd , , , 2
    ; If (imgEditPanelOpened=1 && AnyWindowOpen>0 && panelWinCollapsed=1 && thisHwnd=hSetWinGui)
    ;    MainExe.ahkPostFunction("toggleImgEditPanelWindow")
@@ -1095,7 +1120,6 @@ activateMainWin() {
 
    lastMouseLeave := A_TickCount
    LbtnDwn := 0
-   UnlockKeys()
    Sleep, -1
    z := identifyThisWin()
    If (editingSelectionNow=1 && slideShowRunning!=1 && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1)
@@ -1108,24 +1132,10 @@ activateMainWin() {
    ; If (A_TickCount - lastInvoked > 530)
    ;    GuiControl, 1:, editDummy, -
 
-   If (drawingShapeNow=1) || (imgEditPanelOpened=1 && AnyWindowOpen>0 && panelWinCollapsed=1)
-      SetTimer, dummyCheckWin, -150
+   ; If (drawingShapeNow=1) || (imgEditPanelOpened=1 && AnyWindowOpen>0 && panelWinCollapsed=1)
+   ;    SetTimer, dummyCheckWin, -150
 
    lastInvoked := A_TickCount
-/*
-   If (A_TickCount - lastInvoked < 30)
-      Return
-
-   ; easySlideStoppage := MainExe.ahkgetvar.easySlideStoppage
-   ; slideShowRunning := MainExe.ahkgetvar.slideShowRunning
-   ; toolTipGuiCreated := MainExe.ahkgetvar.toolTipGuiCreated
-   If (easySlideStoppage=1 && slideShowRunning=1)
-      MainExe.ahkPostFunction("ToggleSlideShowu")
-
-   If (toolTipGuiCreated=1)
-      MainExe.ahkPostFunction("TooltipCreator", 1, 1)
-*/
-  ; SetTimer, dummyCheckActiveWin, -20
 }
 
 dummyCheckActiveWin() {
@@ -1183,7 +1193,6 @@ dummyTimerProccessDroppedFiles() {
    imgFiles := foldersList := sldFile := ""
    turnOffSlideshow()
    canCancelImageLoad := 4
-   UnlockKeys()
    countFiles := 0
    Loop, Parse, groppedFiles, `n,`r
    {
@@ -1266,7 +1275,7 @@ byeByeRoutine() {
        mustCaptureCloneBrush := 0
        lastInvokedThis := A_TickCount
        lastOtherWinClose := A_TickCount
-       MainExe.ahkPostFunction("StopCaptureClickStuff", "escape")
+       MainExe.ahkPostFunction("StopCaptureClickStuff", "Escape")
    } Else If (folderTreeWinOpen=1)
    {
        folderTreeWinOpen := 0
@@ -1287,8 +1296,8 @@ byeByeRoutine() {
          lastOtherWinClose := A_TickCount
          If (slideShowRunning=1)
             turnOffSlideshow()
-         animGIFplaying := 0
-         MainExe.ahkPostFunction("autoChangeDesiredFrame", "stop")
+
+         stopGiFsPlayback()
       } Else If (slideShowRunning=1)
       {
          lastOtherWinClose := A_TickCount
@@ -1351,7 +1360,8 @@ identifyOtherPanelsWin() {
 identifyParentWind() {
     uz := WinActive("A")
     Az := DllCall("GetParent", "UPtr", uz, "UPtr")
-    r := (Az=hSetWinGui || Az=PVhwnd || Az=hGDIwin || Az=hGDIthumbsWin || Az=hGDIinfosWin) ? 1 : 0
+    r := (Az=A_ScriptHwnd || Az=otherAscriptHwnd || Az=hSetWinGui || Az=PVhwnd || Az=hGDIwin || Az=hGDIthumbsWin || Az=hGDIinfosWin) ? 1 : 0
+    ; ToolTip, % uz "=" A_ScriptHwnd "=" otherAscriptHwnd , , , 2
     If (uz=PVhwnd || uz=hQPVtoolbar && ShowAdvToolbar=1)
        r := 0
     Return r
@@ -1402,13 +1412,18 @@ guiCreateMenuFlyout() {
    Gui, menuFlier: Color, %OSDbgrColor%
    Gui, menuFlier: Font, s%LargeUIfontValue% Bold c%OSDtextColor%
    Gui, menuFlier: Margin, 0, 0
-   Gui, menuFlier: Add, Text, Border Center +0x200 x0 y0 w%h% h%h% gPanelQuickSearchMenuOptions, S
-   Gui, menuFlier: Add, Text, Border Center +0x200 x+%m% yp+0 w%h% h%h% gtoggleAppToolbar, T
+   Gui, menuFlier: Add, Text, Border Center +0x200 x0 y0 w%h% h%h% gPanelQuickSearchMenuOptions hwndhBtn1 +TabStop, S
+   Gui, menuFlier: Add, Text, Border Center +0x200 x+%m% yp+0 w%h% h%h% gtoggleAppToolbar hwndhBtn2 +TabStop, T
+   AddTooltip2Ctrl(hBtn1, "Search through menus [ `; ]",, uiUseDarkMode)
+   AddTooltip2Ctrl(hBtn2, "Toggle the toolbar [ F10 ]",, uiUseDarkMode)
+   ; AddTooltip2Ctrl("AutoPop", 0.5)
    wasMenuFlierCreated := 1
 }
 
-menuFlyoutDisplay(actu, mX, mY, isOkay) {
+menuFlyoutDisplay(actu, mX, mY, isOkay, darkMode:=0, thisHwnd:=0) {
    lastOtherWinClose := A_TickCount
+   uiUseDarkMode := darkMode
+   otherAscriptHwnd := thisHwnd
    allowMenuReader := actu
    If (!isOkay && actu="yes")
       Return
@@ -1417,19 +1432,20 @@ menuFlyoutDisplay(actu, mX, mY, isOkay) {
       guiCreateMenuFlyout()
 
    ; GetPhysicalCursorPos(mX, mY)
-   fn := Func("dummymenuFlyoutDisplay").Bind(actu, mX, mY)
+   fn := Func("dummyMenuFlyoutDisplay").Bind(actu, mX, mY)
    SetTimer, % fn, -50
 }
 
-dummymenuFlyoutDisplay(actu, mX, mY) {
+dummyMenuFlyoutDisplay(actu, mX, mY) {
    If (actu="yes" && allowMenuReader="yes")
    {
       ; GetPhysicalCursorPos(mX, mY)
-
+      menusflyOutVisible := 1
       h := GetMenuWinHwnd(mX, mY, "32768")
       a := h[1]
       If !InStr(h[2], "32768")
       {
+          menusflyOutVisible := 0
           Gui, menuFlier: Hide
           Return
       }
@@ -1440,7 +1456,10 @@ dummymenuFlyoutDisplay(actu, mX, mY) {
       y := mY + Round(Height) + 2
       Gui, menuFlier: Show, AutoSize x%x% y%y% NoActivate
    } Else
+   {
+      menusflyOutVisible := 0
       Gui, menuFlier: Hide
+   }
 }
 
 GetMenuWinHwnd(mX, mY, n) {
@@ -1490,19 +1509,6 @@ GetWinHwndAtPoint(nX, nY) {
     Return [a, h]
 }
 
-WM_ENTERMENULOOP() {
-  If (runningLongOperation!=1 && imageLoading!=1)
-  {
-     hotkeysSuspended := 1
-     MainExe.ahkPostFunction("doSuspendu", 1)
-  }
-}
-
-WM_EXITMENULOOP() {
-; it does not work; why ? ^_^ 
-  SetTimer, unSuspendu, -150
-}
-
 Win_ShowSysMenu(Hwnd) {
 ; Source: https://github.com/majkinetor/mm-autohotkey/blob/master/Appbar/Taskbar/Win.ahk
 ; modified by Marius Șucan
@@ -1512,7 +1518,6 @@ Win_ShowSysMenu(Hwnd) {
   MainExe.ahkPostFunction("doSuspendu", 1)
   h := WinExist("ahk_id " hwnd)
   JEE_ClientToScreen(hPicOnGui1, 1, 1, X, Y)
-  SetTimer, unSuspendu, -150
   hSysMenu := DllCall("GetSystemMenu", "Uint", Hwnd, "int", False) 
   r := DllCall("TrackPopupMenu", "uint", hSysMenu, "uint", TPM_RETURNCMD, "int", X, "int", Y, "int", 0, "uint", h, "uint", 0)
   If (r=0)
@@ -1522,34 +1527,17 @@ Win_ShowSysMenu(Hwnd) {
   Return 1
 }
 
-unSuspendu() {
-  MainExe.ahkPostFunction("doSuspendu", 0)
-}
-
-WM_SYSMENU(wParam, lParam, lol) {
-  If (wParam=61587)
-  {
-     hotkeysSuspended := 1
-     MainExe.ahkPostFunction("doSuspendu", 1)
-  } Else UnlockKeys()
-  ; ToolTip, % wParam "--" lParam "--" lol
-}
-
-UnlockKeys() {
-  If (hotkeysSuspended=1)
-  {
-     hotkeysSuspended := 0
-     MainExe.ahkPostFunction("doSuspendu", 0)
-  }
-}
-
-turnOffSlideshow() {
-   If (animGIFplaying=1)
+stopGiFsPlayback() {
+   If (animGIFplaying!=0)
    {
       animGIFplaying := 0
       MainExe.ahkPostFunction("autoChangeDesiredFrame", "stop")
+      changeMcursor("normal-extra")
    }
+}
 
+turnOffSlideshow() {
+   stopGiFsPlayback()
    If (slideShowRunning!=1)
       Return
 
@@ -2144,6 +2132,128 @@ MenuSelectAllAction() {
    } Else selectEntireImage("rm")
 }
 
+TulTip(debugger, sep, params*) {
+    str := ""
+    For index,param in params
+        str .= "[" A_Index "]" param . sep
+
+    Random, OutputVar, -220, 200
+    ; ToolTip, [ Text, X, Y, WhichToolTip]
+    ToolTip, % OutputVar "===" str , ,, 3
+}
+
+KeyboardResponder(givenKey, abusive) {
+    ; ToolTip, % givenKey "=" abusive "=" animGIFplaying , , , 2
+    If (givenKey="Left" || givenKey="Right" || givenKey="Up" || givenKey="Down" || givenKey="PgUp" || givenKey="PgDn" || givenKey="Home" || givenKey="End" || givenKey="BackSpace" || givenKey="Delete" || givenKey="Enter")
+    {
+       If (slideShowRunning=1)
+       {
+          turnOffSlideshow()
+       } Else If (animGIFplaying!=0 || canCancelImageLoad=1) || (thumbsDisplaying=1 && imageLoading=1)
+       {
+          alterFilesIndex++
+          canCancelImageLoad := 4
+          If (givenKey!="PLUS" && givenKey!="MINUS")   ; plus/minus
+             stopGiFsPlayback()
+
+       } Else callMain := 1
+    } Else If (givenKey="Escape" || givenKey="!F4")
+    {
+       canCancelImageLoad := 4
+       If (AnyWindowOpen || animGIFplaying=1 || slideShowRunning=1)
+          lastOtherWinClose := A_TickCount
+       byeByeRoutine()
+    } Else If (givenKey="!Space")
+    {
+       Win_ShowSysMenu(PVhwnd)
+    } Else If (givenKey="Space")
+    {
+       isOkay := AnyWindowOpen ? 0 : 1
+       If (AnyWindowOpen && imgEditPanelOpened=1)
+          isOkay := 1
+
+       stopGiFsPlayback()
+       If (slideShowRunning=1)
+          turnOffSlideshow()
+       Else If (thumbsDisplaying!=1 && isOkay && maxFilesIndex>0 && slideShowRunning!=1 && IMGresizingMode=4)
+          changeMcursor("move")
+       Else callMain := 1
+    } Else callMain := 1
+
+    isOkay := (imageLoading=1 && animGIFplaying!=1) ? 0 : 1
+    If (callMain=1 && isOkay=1 && runningLongOperation!=1 && whileLoopExec!=1 && givenKey)
+    {
+       ; addJournalEntry(A_ThisFunc "(): " WinActive("A") "==" givenKey)
+       MainExe.ahkPostFunction("KeyboardResponder", givenKey, PVhwnd, abusive)
+    }
+}
+
+PreProcessKbdKey() {
+   Static lastInvoked := 1, counter := 0, prevKey
+   If (!identifyThisWin() || (A_TickCount - lastOtherWinClose<300))
+      Return
+
+   ; ToolTip, % hotkate , , , 2
+   If (A_TickCount - lastInvoked>250)
+      counter := 0
+
+   ; addJournalEntry(A_ThisFunc "(): " thisWin "|" hotkate)
+   If (A_TickCount - lastInvoked>30) && (whileLoopExec=0 && runningLongOperation=0)
+   {
+      lastInvoked := A_TickCount
+      abusive := (counter>25) ? 1 : 0
+      KeyboardResponder(hotkate, abusive)
+      ; MainExe.ahkPostFunction("KeyboardResponder", hotkate, PVhwnd, abusive)
+      If (hotkate=prevKey)
+         counter++
+      Else 
+         counter := 0
+
+      prevKey := hotkate
+   } Else If (hotkate=prevKey)
+      counter++
+   Else 
+      counter := 0
+}
+
+constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code) {
+   Static vkList := {8:"BACKSPACE", 9:"TAB", C:"NUMPADCLEAR", D:"ENTER", 14:"CAPSLOCK", 1B:"ESCAPE", 20:"SPACE", 21:"PGUP", 22:"PGDN", 23:"END", 24:"HOME", 25:"LEFT", 26:"UP", 27:"RIGHT", 28:"DOWN", 2D:"INSERT", 2E:"DELETE", 5B:"SCROLLLOCK", 5D:"APPSKEY", 60:"NUMPAD0", 61:"NUMPAD1", 62:"NUMPAD2", 63:"NUMPAD3", 64:"NUMPAD4", 65:"NUMPAD5", 66:"NUMPAD6", 67:"NUMPAD7", 68:"NUMPAD8", 69:"NUMPAD9", 6A:"NUMPADMULT", 6B:"NUMPADADD", 6D:"NUMPADSUB", 6E:"NUMPADDOT", 6F:"NUMPADDIV", 70:"F1", 71:"F2", 72:"F3", 73:"F4", 74:"F5", 75:"F6", 76:"F7", 77:"F8", 78:"F9", 79:"F10", 7A:"F11", 7B:"F12", 90:"NUMLOCK", AD:"VOLUME_MUTE", AE:"VOLUME_DOWN", AF:"VOLUME_UP", B0:"MEDIA_NEXT", B1:"MEDIA_PREV", B2:"MEDIA_STOP", B3:"MEDIA_PLAY_PAUSE", FF:"PAUSE", 1:"LBUTTON", 2:"RBUTTON", 3:"BREAK", 4:"MBUTTON", 5:"XBUTTON1", 6:"XBUTTON2", 10:"SHIFT", 11:"CONTROL", 12:"ALT", 13:"PAUSE", 15:"KANA/HANGUL", 17:"JUNJA", 18:"IME_FINAL", 19:"HANJA/KANJI", 16:"IME_ON", 1A:"IME_OFF", 1C:"IME_CONVERT", 1D:"IME_NON_CONVERT", E5:"IME_PROCESSKEY", 1E:"IME_ACCEPT", 1F:"IME_MODECHANGE", 2F:"HELP", 29:"SELECT", 2A:"PRINT", 2B:"EXECUTE", 2C:"PRINT_SCREEN", 5F:"SLEEP", 7C:"F13", 7D:"F14", 7E:"F15", 7F:"F16", 80:"F17", 81:"F18", 82:"F19", 83:"F20", 84:"F21", 85:"F22", 86:"F23", 87:"F24", A6:"BROWSER_BACK", A7:"BROWSER_FORWARD", A8:"BROWSER_REFRESH", A9:"BROWSER_STOP", AA:"BROWSER_SEARCH", AB:"BROWSER_FAVORITES", AC:"BROWSER_HOME", B4:"LAUNCH_MAIL", B5:"LAUNCH_MEDIA_SELECT", B6:"LAUNCH_APP1", B7:"LAUNCH_APP2", F6:"ATTN", F7:"CrSEL", F8:"ExSEL", F9:"ERASE_EOF", FA:"PLAY", FB:"ZOOM", FD:"PA1", A0:"LSHIFT", A1:"RSHIFT", A2:"LCTRL", A3:"RCTRL", A4:"LALT", A5:"RALT", 5B:"LWIN", 5C:"RWIN"}
+        , vkExtraList := {30:"00.1", 31:"1", 32:"2", 33:"3", 34:"4", 35:"5", 36:"6", 37:"7", 38:"8", 39:"9", 41:"A", 42:"B", 43:"C", 44:"D", 45:"E", 46:"F", 47:"G", 48:"H", 49:"I", 4A:"J", 4B:"K", 4C:"L", 4D:"M", 4E:"N", 4F:"O", 50:"P", 51:"Q", 52:"R", 53:"S", 54:"T", 55:"U", 56:"V", 57:"W", 58:"X", 59:"Y", 5A:"Z", BB:"PLUS", BC:"COMMA", BD:"MINUS", BE:"PERIOD"}
+        ; , BA:"OEM_1", BF:"OEM_2", C0:"OEM_3", DB:"OEM_4", DC:"OEM_5", DD:"OEM_6", DE:"OEM_7", DF:"OEM_8", E2:"OEM_102", E1:"OEM_9", E3:"OEM_11", E4:"OEM_12", E6:"OEM_13", FE:"OEM_CLEAR", 92:"OEM_14", 93:"OEM_15", 94:"OEM_16", 95:"OEM_17", 96:"OEM_18"}
+   ; vk list based on https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
+
+   newkate := ""
+   If vk_shift
+      newkate .= "+"
+   If vk_ctrl
+      newkate .= "^"
+   If vk_alt
+      newkate .= "!"
+   If (vkExtraList[vk_code]!="")
+      newkate .= vkExtraList[vk_code]
+   Else
+      newkate .= vkList[vk_code] ? vkList[vk_code] : "vk" vk_code
+   Return newkate
+}
+
+WM_KEYDOWN(wParam, lParam, msg, hwnd) {
+    vk_code := Format("{1:x}", wParam)
+    If (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1 && animGIFplaying!=1) && (vk_code!="1B")
+    || (A_TickCount - lastOtherWinClose<300)
+       Return 0
+
+    vk_shift := DllCall("GetKeyState","Int", 0x10, "short") >> 16
+    vk_ctrl := DllCall("GetKeyState","Int", 0x11, "short") >> 16
+    vk_alt := (msg=260) ? -1 : DllCall("GetKeyState","Int", 0x12, "short") >> 16
+    hotkate := constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code)
+    If (vk_code!=10 && vk_code!=11 && vk_code!=12)
+    {
+       SetTimer, PreProcessKbdKey, -3
+       Return 0
+    }
+    ; TulTip(0, "|   ", wParam, vk_shift, vk_ctrl, vk_alt, msg, "ui thread")
+}
+
 SendMenuTabKey() {
    Static prevState := 0
    prevState := !prevState
@@ -2156,16 +2266,12 @@ SendMenuTabKey() {
       constantMenuReader()
    Return
 
-   ; ~+Space::
-   ;    constantMenuReader("focused")
-   ; Return
-
-   WheelDown::
+   ~WheelDown::
    ~PgDn::
       SendInput, {Down 3}
    Return
 
-   WheelUp::
+   ~WheelUp::
    ~PgUp::
       SendInput, {Up 3}
    Return
@@ -2178,383 +2284,33 @@ SendMenuTabKey() {
       SendInput, {Left}
    Return
 
+   F1::
+      If (!AnyWindowOpen && drawingShapeNow!=1)
+      {
+         SendInput, {F10}
+         MainExe.ahkPostFunction("HelpWindow")
+      }
+   Return
+
+   F10::
+      If (menusflyOutVisible=1 || drawingShapeNow=1)
+      {
+         SendInput, {F10}
+         toggleAppToolbar()
+      }
+   Return
+
+   vkBA::
+      If (menusflyOutVisible=1)
+      {
+         SendInput, {F10}
+         PanelQuickSearchMenuOptions()
+      }
+   Return
+
    ~Tab::
       SendMenuTabKey()
    Return
-#If
-
-#If, (identifyParentWind()=1 && runningLongOperation!=1 && allowMenuReader!="yes" && (A_TickCount - lastOtherWinClose>100))
-   ^F4::
-      If (imgEditPanelOpened=1 || AnyWindowOpen>0) && (identifyPanelWin()=1)
-         MainExe.ahkPostFunction("CloseWindow")
-   Return
-
-   ~AppsKey::
-   ~Enter::
-      If (imgEditPanelOpened=1 || AnyWindowOpen>0) && (identifyPanelWin()=1)
-         MainExe.ahkPostFunction("externalinvokedSettingsContextMenu", A_ThisHotkey)
-   Return
-
-   ~F8::
-   ~F11::
-      If (imgEditPanelOpened=1 || AnyWindowOpen>0) && (identifyPanelWin()=1)
-         MainExe.ahkPostFunction("toggleImgEditPanelWindow")
-   Return
-
-   ~RButton::
-   ~Tab::
-   ~+Tab::
-   ~Up::
-   ~Down::
-   ~Left::
-   ~Right::
-   ~Space::
-      If ((identifyOtherPanelsWin()=1 || identifyPanelWin()=1) && InStr(A_ThisHotkey, "RButton"))
-         Return
-      If (imageLoading!=1 && runningLongOperation!=1 && whileLoopExec!=1)
-         kbdkeybcallKeysResponder(A_ThisHotkey, "parentu")
-   Return
-#If
-
-#If, (WinActive("ahk_id " hQPVtoolbar) && ShowAdvToolbar=1 && allowMenuReader!="yes")
-    +Tab::
-    Tab::
-    Esc::
-    AppsKey::
-    vk48:: ; H
-    F1::
-    BackSpace::
-    Up::
-    Down::
-    Left::
-    Right::
-    Delete::
-    PgUp::
-    PgDn::
-    Home::
-    End::
-    Space::
-    Enter::
-    +Space::
-    +Enter::
-    vk30::
-    vk31::
-    vk32::
-    vk33::
-    vk34::
-    vk35::
-    vk36::
-    vk37::
-    vk38::
-    vk39::
-      If (imageLoading!=1 && runningLongOperation!=1 && whileLoopExec!=1)
-         kbdkeybcallKeysResponder(A_ThisHotkey, hQPVtoolbar)
-    Return
-#IF
-
-#If, (identifyThisWin()=1 && allowMenuReader!="yes" && (A_TickCount - lastOtherWinClose>100))
-    ^vk4F::     ; Ctrl+O
-    vk4F::      ; O
-    vk57 up::   ; W to-do  to do
-    ^+vk4E::    ; Ctrl+Shift+N
-    ^vk4E::     ; Ctrl+N
-    +vkC0::     ; Shift+[~]
-    F12::
-    vk50::      ; P
-    !vk50::     ; Alt+P
-    +vk50::     ; Shift+P
-    ^vk50::     ; Ctrl+P
-    vkBA::      ; ;
-    +vkBA::     ; Shift+;
-    ^NumpadAdd::
-    ^vkBB::     ; Ctrl+[=]
-    ^NumpadSub::
-    ^vkBD::     ; Ctrl+[-]
-    +vk4F::     ; Shift+O
-    ~+F10::
-    ~F10::
-    ~!F10::
-    ^AppsKey::
-    +AppsKey::
-    #AppsKey::
-    !AppsKey::
-    ~AppsKey::
-    ~^RButton::
-    ~+RButton::
-    ~Insert Up::
-    ^vk56 Up::    ; Ctrl+V
-    +Esc::
-    F1::
-    ~F9 Up::
-    ^F4::         ; Ctrl+F4
-    ~vk44 Up::    ; D
-    vk4C::        ; L
-    +^vk56 Up::   ; Ctrl+Shift+V
-    ~^vk44 Up::   ; Ctrl+D
-    ~^vk43 Up::   ; Ctrl+C
-    ~^vk58 Up::   ; Ctrl+X
-    vk58 Up::     ; X
-    +vk58 Up::    ; Shift+X
-    ^vk5A::       ; Ctrl+Z
-    vk5A::        ; Z
-    ^vk59::       ; Ctrl+Y
-    ^+vk5A::      ; Ctrl+Shift+Z
-    ^+vk59::      ; Ctrl+Shift+Y
-    ^!vk5A::      ; Ctrl+Alt+Z
-    ^!vk59::      ; Ctrl+Alt+Y
-    vk45::        ; E
-    +vk45::       ; Shift+E
-    !vk45::       ; Alt+E
-    ~^vk53 Up::   ; Ctrl+S
-    ^vk4C::       ; Ctrl+L
-    +vk4C::       ; Shift+L
-    !vk4C Up::    ; Alt+L
-    !BackSpace::
-    !vk59::       ; Alt+Y
-    vk59::        ; Y
-    +vk59::       ; Shift+Y
-    ~vk49::       ; I
-    vkDB::        ; [
-    vkDD::        ; ]
-    +vkDB::       ; Shift+[
-    +vkDD::       ; Shift+]
-    ^vkDB::       ; Ctrl+[
-    ^vkDD::       ; Ctrl+]
-    !vkDB::       ; Alt+[
-    !vkDD::       ; Alt+]
-    vkDC Up::     ; \
-    ^vkDC Up::    ; Ctrl+\
-    +vkDC Up::    ; Shift+\
-    vkBF Up::     ; /
-    NumpadDiv Up::
-    NumpadMult Up::
-    +NumpadAdd::
-    +NumpadSub::
-    NumpadAdd::
-    NumpadSub::
-    ^Numpad0::
-    ^Numpad1::
-    ^Numpad2::
-    ^Numpad3::
-    ^Numpad4::
-    ^Numpad5::
-    ^Numpad6::
-    ^Numpad7::
-    ^Numpad8::
-    ^Numpad9::
-    ^NumpadLeft::
-    ^NumpadRight::
-    ^NumpadUp::
-    ^NumpadDown::
-    ^NumpadIns::
-    ^NumpadClear::
-    +vkBB::      ; Shift+[=]
-    +vkBD::      ; Shift+[-]
-    !vkBD::      ; Alt+[-]
-    !vkBB::      ; Alt+[=]
-    vk47::       ; G
-    +vk47::      ; Shift+G
-    !vk47::      ; Alt+G
-    ~^vk52 Up::  ; Ctrl+R
-    ~!vk52 Up::  ; Alt+R
-    vk52::       ; R
-    +vk52::      ; Shift+R
-    ^vk54 Up::   ; Ctrl+T
-    +vk54 Up::   ; Shift+T
-    +vk49 Up::   ; Shift+I
-    ^vk47 Up::   ; Ctrl+G
-    +vk42 Up::   ; Shift+B
-    vk42 Up::    ; B
-    ~vk4D Up::   ; M
-    ~^vk48::     ; Ctrl+H
-    ~vk48::      ; H
-    ~vk56::      ; V
-    ~+vk48::     ; Shift+H
-    ~+vk56::     ; Shift+V
-    ~vk55 Up::   ; U
-    ~+vk55 Up::  ; Shift+U
-    ~^+vk55 Up:: ; Ctrl+Shift+U
-    vk46::       ; F
-    +vk46::      ; Shift+F
-    ^vk51::      ; Ctrl+Q
-    +vk51::      ; Shift+Q
-    vk51::       ; Q
-    ~!Delete Up::
-    ~+Delete Up::
-    vk41::       ; A
-    +vk41::      ; Shift+A
-    +^vk41::     ; Ctrl+Shift+A
-    !vk41::      ; Alt+A
-    ^vk41::      ; Ctrl+A
-    !vk39::      ; Alt+9
-    +vk39::      ; Shift+9
-    vk39::       ; 9
-    !vk30::      ; Alt+0
-    +vk30::      ; Shift+0
-    vk30::       ; 0
-    +Up::
-    +Down::
-    ^WheelUp::
-    ^WheelDown::
-    !Left::
-    !Right::
-    !Up::
-    !Down::
-    !+Left::
-    !+Right::
-    !+Up::
-    !+Down::
-    ~F8::
-    ^vk57::       ; Ctrl+W
-    +vk4E::       ; Shift+N
-    vk4E::        ; N
-    ^vk31::       ; Ctrl+1
-    ^vk32::       ; Ctrl+2
-    ^vk33::       ; Ctrl+3
-    ^vk34::       ; Ctrl+4
-    ^vk35::       ; Ctrl+5
-    ^vk36::       ; Ctrl+6
-    ^vk37::       ; Ctrl+7
-    ^vk38::       ; Ctrl+8
-    ^vk30::       ; Ctrl+0
-    ~vk4A Up::    ; J
-    ~+Insert Up::
-    ~Tab::
-    ~+Tab::
-    ~^Tab Up::
-    ~F11::
-    +Enter::
-    ^Enter::
-    !Enter::
-    ~vk43 Up::     ; C
-    ~^vk55 Up::    ; Ctrl+U
-    ~!vk55 Up::    ; Alt+U
-    ~^vk4B Up::    ; Ctrl+K
-    ~vk4B Up::     ; K
-    ~+vk4B Up::    ; Shift+K
-    ~+vk43 Up::    ; Shift+C
-    ~^vk45 Up::    ; Ctrl+E
-    ~^vk46 Up::    ; Ctrl+F
-    ~vk53::        ; S
-    ~+vk53::       ; Shift+S
-    ~+^vk53 Up::   ; Ctrl+Shift+S
-    vk54 Up::      ; T
-    ~+Space::
-    ~^Space Up::
-    ~+BackSpace::
-    ^BackSpace::
-    !vkBE::       ; Alt + ,
-    +vkBE::       ; Shift + ,
-    vkBE::        ; [,]
-    vkBC::        ; [.]
-    !vkBC::       ; Alt + .
-    +vkBC::       ; Shift + .
-    +vkBF Up::    ; Shift+/
-    ~F5 Up::
-    ~!F5 Up::
-    ~+F5 Up::
-    ~^F5 Up::
-    ~F2 Up::
-    ~+F2 Up::
-    ~^F2 Up::
-    vk38::
-    vk31::
-    vk32::
-    vk33::
-    vk34::
-    vk35::
-    vk36::
-    vk37::
-    +vk31::
-    +vk32::
-    +vk33::
-    +vk34::
-    +vk35::
-    +vk36::
-    +vk37::
-    ^Left::
-    ^Right::
-    F3::
-    +F3::
-    ^F3::
-    F4::
-    +F4::
-    WheelUp::
-    WheelDown::
-    +Right::
-    +Left::
-    +PgDn::
-    +PgUp::
-    ^PgUp::
-    ^PgDn::
-    !PgUp::
-    !PgDn::
-    ^Home Up::
-    ^End Up::
-    +Home::
-    +End::
-      If (imageLoading!=1 && runningLongOperation!=1 && whileLoopExec!=1)
-         kbdkeybcallKeysResponder(A_ThisHotkey, PVhwnd)
-    Return
-
-    ~Left::
-    ~Right::
-    ~Up::
-    ~Down::
-    ~PgUp::
-    ~PgDn::
-    ~Home::
-    ~End::
-    ~BackSpace::
-    ~Delete Up::
-    ~Enter::
-      thisKey := StrReplace(A_ThisHotkey, "~")
-      If (canCancelImageLoad=1) || (thumbsDisplaying=1 && imageLoading=1)
-      {
-         alterFilesIndex++
-         canCancelImageLoad := 4
-         animGIFplaying := 0
-      } Else If (imageLoading!=1 && runningLongOperation!=1 && whileLoopExec!=1)
-         kbdkeybcallKeysResponder(thisKey, PVhwnd)
-    Return
-  
-    ~vkBB::   ; = plus
-    ~vkBD::   ; - minus
-       thisKey := StrReplace(A_ThisHotkey, "~")
-       If (thumbsDisplaying=1 && imageLoading=1)
-          alterFilesIndex++
-       Else If (slideShowRunning=1)
-         turnOffSlideshow()
-       Else
-         kbdkeybcallKeysResponder(thisKey, PVhwnd)
-    Return
-  
-    Esc::
-    ~!F4::
-       canCancelImageLoad := 4
-       If (AnyWindowOpen || animGIFplaying=1 || slideShowRunning=1)
-          lastOtherWinClose := A_TickCount
-       byeByeRoutine()
-    Return
-
-    !Space::
-       Win_ShowSysMenu(PVhwnd)
-    Return
-  
-    ~Space::
-       isOkay := AnyWindowOpen ? 0 : 1
-       If (AnyWindowOpen && imgEditPanelOpened=1)
-          isOkay := 1
-
-       thisKey := StrReplace(A_ThisHotkey, "~")
-       animGIFplaying := 0
-       If (slideShowRunning=1)
-          turnOffSlideshow()
-       Else If (thumbsDisplaying!=1 && isOkay && maxFilesIndex>0 && slideShowRunning!=1 && IMGresizingMode=4)
-          changeMcursor("move")
-       Else If (imageLoading!=1 && runningLongOperation!=1 && whileLoopExec!=1)
-          kbdkeybcallKeysResponder(thisKey, PVhwnd)
-    Return
 #If
 
 GetPhysicalCursorPos(ByRef mX, ByRef mY) {
@@ -2714,7 +2470,7 @@ delayedWinActivateToolTipDeath() {
    WinActivate, ahk_id %lastTippyWin%
 }
 
-mouseCreateOSDinfoLine(msg:=0, largus:=0) {
+mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0) {
     Critical, On
     Static prevMsg, lastInvoked := 1
     Global TippyMsg
@@ -2744,6 +2500,9 @@ mouseCreateOSDinfoLine(msg:=0, largus:=0) {
     Gui, mouseToolTipGuia: Add, Text, c%txtColor% gmouseClickTurnOFFtooltip vTippyMsg, %msg%
     Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPVOguiTipsWin
     prevMsg := msg
+    MainExe.ahkassign("hGuiTip", hGuiTip)
+    If (unClickable=1)
+      WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
     mouseToolTipWinCreated := 1
     delayu := StrLen(msg) * 75 + 950
     showOSDinfoLineNow(delayu)
@@ -4460,3 +4219,244 @@ setMenusTheme(modus) {
    DllCall(FlushMenuThemes)
 }
 
+AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0) {
+; Description: AddTooltip v2.0
+;   Add/Update tooltips to GUI controls.
+;
+; Parameters:
+;   p1 - Handle to a GUI control.  Alternatively, set to "Activate" to enable
+;       the tooltip control, "AutoPopDelay" to set the autopop delay time,
+;       "Deactivate" to disable the tooltip control, or "Title" to set the
+;       tooltip title.
+;
+;   p2 - If p1 contains the handle to a GUI control, this parameter should
+;       contain the tooltip text.  Ex: "My tooltip".  Set to null to delete the
+;       tooltip attached to the control.  If p1="AutoPopDelay", set to the
+;       desired autopop delay time, in seconds.  Ex: 10.  Note: The maximum
+;       autopop delay time is ~32 seconds.  If p1="Title", set to the title of
+;       the tooltip.  Ex: "Bob's Tooltips".  Set to null to remove the tooltip
+;       title.  See the *Title & Icon* section for more information.
+;
+;   p3 - Tooltip icon.  See the *Title & Icon* section for more information.
+;
+; RETURNS: The handle to the tooltip control.
+; REQUIREMENTS: AutoHotkey v1.1+ (all versions).
+;
+; TITLE AND ICON:
+;   To set the tooltip title, set the p1 parameter to "Title" and the p2
+;   parameter to the desired tooltip title.  Ex: AddTooltip("Title","Bob's
+;   Tooltips"). To remove the tooltip title, set the p2 parameter to null.  Ex:
+;   AddTooltip("Title","").
+;
+;   The p3 parameter determines the icon to be displayed along with the title,
+;   if any.  If not specified or if set to 0, no icon is shown.  To show a
+;   standard icon, specify one of the standard icon identifiers.  See the
+;   function's static variables for a list of possible values.  Ex:
+;   AddTooltip("Title","My Title",4).  To show a custom icon, specify a handle
+;   to an image (bitmap, cursor, or icon).  When a custom icon is specified, a
+;   copy of the icon is created by the tooltip window so if needed, the original
+;   icon can be destroyed any time after the title and icon are set.
+;
+;   Setting a tooltip title may not produce a desirable result in many cases.
+;   The title (and icon if specified) will be shown on every tooltip that is
+;   added by this function.
+;
+; REMARKS:
+;   The tooltip control is enabled by default.  There is no need to "Activate"
+;   the tooltip control unless it has been previously "Deactivated".
+;
+;   This function returns the handle to the tooltip control so that, if needed,
+;   additional actions can be performed on the Tooltip control outside of this
+;   function.  Once created, this function reuses the same tooltip control.
+;   If the tooltip control is destroyed outside of this function, subsequent
+;   calls to this function will fail.
+;
+; CREDIT AND HISTORY:
+;   Original author: Superfraggle
+;   * Post: <http://www.autohotkey.com/board/topic/27670-add-tooltips-to-controls/>
+;
+;   Updated to support Unicode: art
+;   * Post: <http://www.autohotkey.com/board/topic/27670-add-tooltips-to-controls/page-2#entry431059>
+;
+;   Additional: jballi.
+;   Bug fixes.  Added support for x64.  Removed Modify parameter.  Added
+;   additional functionality, constants, and documentation.
+
+    Static hTT
+          ;-- Misc. constants
+          ,CW_USEDEFAULT:=0x80000000
+          ,HWND_DESKTOP :=0
+
+          ;-- Tooltip delay time constants
+          ,TTDT_AUTOPOP:=2
+                ;-- Set the amount of time a tooltip window remains visible if
+                ;   the pointer is stationary within a tool's bounding
+                ;   rectangle.
+
+          ;-- Tooltip styles
+          ,TTS_ALWAYSTIP:=0x1
+                ;-- Indicates that the tooltip control appears when the cursor
+                ;   is on a tool, even if the tooltip control's owner window is
+                ;   inactive.  Without this style, the tooltip appears only when
+                ;   the tool's owner window is active.
+
+          ,TTS_NOPREFIX:=0x2
+                ;-- Prevents the system from stripping ampersand characters from
+                ;   a string or terminating a string at a tab character.
+                ;   Without this style, the system automatically strips
+                ;   ampersand characters and terminates a string at the first
+                ;   tab character.  This allows an application to use the same
+                ;   string as both a menu item and as text in a tooltip control.
+
+          ;-- TOOLINFO uFlags
+          ,TTF_IDISHWND:=0x1
+                ;-- Indicates that the uId member is the window handle to the
+                ;   tool.  If this flag is not set, uId is the identifier of the
+                ;   tool.
+
+          ,TTF_SUBCLASS:=0x10
+                ;-- Indicates that the tooltip control should subclass the
+                ;   window for the tool in order to intercept messages, such
+                ;   as WM_MOUSEMOVE.  If this flag is not used, use the
+                ;   TTM_RELAYEVENT message to forward messages to the tooltip
+                ;   control.  For a list of messages that a tooltip control
+                ;   processes, see TTM_RELAYEVENT.
+
+          ;-- Tooltip icons
+          ,TTI_NONE         :=0
+          ,TTI_INFO         :=1
+          ,TTI_WARNING      :=2
+          ,TTI_ERROR        :=3
+          ,TTI_INFO_LARGE   :=4
+          ,TTI_WARNING_LARGE:=5
+          ,TTI_ERROR_LARGE  :=6
+
+          ;-- Extended styles
+          ,WS_EX_TOPMOST:=0x8
+
+          ;-- Messages
+          ,TTM_ACTIVATE      :=0x401                    ;-- WM_USER + 1
+          ,TTM_ADDTOOLA      :=0x404                    ;-- WM_USER + 4
+          ,TTM_ADDTOOLW      :=0x432                    ;-- WM_USER + 50
+          ,TTM_DELTOOLA      :=0x405                    ;-- WM_USER + 5
+          ,TTM_DELTOOLW      :=0x433                    ;-- WM_USER + 51
+          ,TTM_GETTOOLINFOA  :=0x408                    ;-- WM_USER + 8
+          ,TTM_GETTOOLINFOW  :=0x435                    ;-- WM_USER + 53
+          ,TTM_SETDELAYTIME  :=0x403                    ;-- WM_USER + 3
+          ,TTM_SETMAXTIPWIDTH:=0x418                    ;-- WM_USER + 24
+          ,TTM_SETTITLEA     :=0x420                    ;-- WM_USER + 32
+          ,TTM_SETTITLEW     :=0x421                    ;-- WM_USER + 33
+          ,TTM_UPDATETIPTEXTA:=0x40C                    ;-- WM_USER + 12
+          ,TTM_UPDATETIPTEXTW:=0x439                    ;-- WM_USER + 57
+
+    ; if (DisableTooltips=1)
+    ;    return 
+
+    ;-- Save/Set DetectHiddenWindows
+    l_DetectHiddenWindows:=A_DetectHiddenWindows
+    DetectHiddenWindows On
+
+    ;-- Tooltip control exists?
+    if !hTT
+    {
+        ;-- Create Tooltip window
+        hTT:=DllCall("CreateWindowEx"
+            ,"UInt",WS_EX_TOPMOST                       ;-- dwExStyle
+            ,"Str","TOOLTIPS_CLASS32"                   ;-- lpClassName
+            ,"Ptr",0                                    ;-- lpWindowName
+            ,"UInt",TTS_ALWAYSTIP|TTS_NOPREFIX          ;-- dwStyle
+            ,"UInt",CW_USEDEFAULT                       ;-- x
+            ,"UInt",CW_USEDEFAULT                       ;-- y
+            ,"UInt",CW_USEDEFAULT                       ;-- nWidth
+            ,"UInt",CW_USEDEFAULT                       ;-- nHeight
+            ,"Ptr",HWND_DESKTOP                         ;-- hWndParent
+            ,"Ptr",0                                    ;-- hMenu
+            ,"Ptr",0                                    ;-- hInstance
+            ,"Ptr",0                                    ;-- lpParam
+            ,"Ptr")                                     ;-- Return type
+
+        ;-- Disable visual style
+        ;   Note: Uncomment the following to disable the visual style, i.e.
+        ;   remove the window theme, from the tooltip control.  Since this
+        ;   function only uses one tooltip control, all tooltips created by this
+        ;   function will be affected.
+        ;   DllCall("uxtheme\SetWindowTheme","Ptr",hTT,"Ptr",0,"UIntP",0)
+
+        ;-- Set the maximum width for the tooltip window
+        ;   Note: This message makes multi-line tooltips possible
+        SendMessage, TTM_SETMAXTIPWIDTH, 0, A_ScreenWidth,, ahk_id %hTT%
+    }
+
+    ;-- Other commands
+    if p1 is not Integer
+    {
+        if (p1="Activate")
+            SendMessage, TTM_ACTIVATE, True, 0,, ahk_id %hTT%
+
+        if (p1="Deactivate")
+            SendMessage, TTM_ACTIVATE, False, 0,, ahk_id %hTT%
+
+        if (InStr(p1,"AutoPop")=1)  ;-- Starts with "AutoPop"
+            SendMessage, TTM_SETDELAYTIME, TTDT_AUTOPOP, p2*1000,, ahk_id %hTT%
+
+        if (p1="Title")
+        {
+            ;-- If needed, truncate the title
+            if (StrLen(p2)>99)
+                p2 := SubStr(p2,1,99)
+
+            ;-- Icon
+            if p3 is not Integer
+                p3 := TTI_NONE
+
+            ;-- Set title
+            SendMessage A_IsUnicode ? TTM_SETTITLEW : TTM_SETTITLEA, p3, &p2,, ahk_id %hTT%
+        }
+
+        ;-- Restore DetectHiddenWindows
+        DetectHiddenWindows %l_DetectHiddenWindows%
+    
+        ;-- Return the handle to the tooltip control
+        Return hTT
+    }
+
+    ;-- Create/Populate the TOOLINFO structure
+    uFlags := TTF_IDISHWND | TTF_SUBCLASS
+    cbSize := VarSetCapacity(TOOLINFO,(A_PtrSize=8) ? 64:44,0)
+    NumPut(cbSize,      TOOLINFO,0,"UInt")              ;-- cbSize
+    NumPut(uFlags,      TOOLINFO,4,"UInt")              ;-- uFlags
+    NumPut(HWND_DESKTOP,TOOLINFO,8,"Ptr")               ;-- hwnd
+    NumPut(p1,          TOOLINFO,(A_PtrSize=8) ? 16:12,"Ptr")
+        ;-- uId
+
+    ;-- Check to see if tool has already been registered for the control
+    SendMessage, A_IsUnicode ? TTM_GETTOOLINFOW : TTM_GETTOOLINFOA
+               , 0, &TOOLINFO,, ahk_id %hTT%
+
+    l_RegisteredTool := ErrorLevel
+
+    ;-- Update the TOOLTIP structure
+    NumPut(&p2, TOOLINFO, (A_PtrSize=8) ? 48 : 36,"Ptr")
+        ;-- lpszText
+
+    ;-- Add, Update, or Delete tool
+    if l_RegisteredTool
+    {
+        if StrLen(p2)
+            SendMessage, A_IsUnicode ? TTM_UPDATETIPTEXTW : TTM_UPDATETIPTEXTA, 0, &TOOLINFO,, ahk_id %hTT%
+        else
+            SendMessage, A_IsUnicode ? TTM_DELTOOLW : TTM_DELTOOLA, 0, &TOOLINFO,, ahk_id %hTT%
+    } else if StrLen(p2)
+    {
+        SendMessage, A_IsUnicode ? TTM_ADDTOOLW : TTM_ADDTOOLA, 0, &TOOLINFO,, ahk_id %hTT%
+    }
+
+    If (darkMode=1)
+       DllCall("uxtheme\SetWindowTheme", "ptr", HTT, "str", "DarkMode_Explorer", "ptr", 0)
+
+    ;-- Restore DetectHiddenWindows
+    DetectHiddenWindows %l_DetectHiddenWindows%
+
+    ;-- Return the handle to the tooltip control
+    Return hTT
+}

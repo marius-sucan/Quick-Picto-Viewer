@@ -1035,6 +1035,9 @@ Gdi_FillRectangle(hDC, x, y, w, h, hBrush) {
 }
 
 Gdi_FrameRectangle(hDC, x, y, w, h, hBrush) {
+   ; The FrameRect function draws a border around the specified rectangle by using the specified brush. 
+   ; The width and height of the border are always one logical unit.
+
    ; Return value
    ; If the function succeeds, the return value is nonzero.
    ; If the function fails, the return value is zero.

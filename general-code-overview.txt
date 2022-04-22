@@ -1,4 +1,4 @@
-Table of contents:
+﻿Table of contents:
    a) How Quick Picto Viewer initializes
    b) How a files list index is created
    c) Files index filtering
@@ -10,7 +10,7 @@ Table of contents:
    i) Image live editing [soon]
 
 
-Deniere mise à jour: dimanche 13 mars 2022
+Deniere mise à jour: mardi 5 avril 2022
 ================================================
 
 a) How Quick Picto Viewer initializes
@@ -504,23 +504,27 @@ g) Windows, AHK GUIs
 h) Input responses
 =============================================
 
-   All keyboard shortcuts [hotkeys] are registered in the
-   interface thread using #if conditions. Most of them are
-   calling kbdkeybcallKeysResponder() which, in turn, calls
-   from the main thread the function named: KeyboardResponder(),
-   This one executes functions based on the user context and
-   in-app conditions, and the actual key.
+   All keyboard shortcuts are «registered» through WM_KEYDOWN and WM_SYSKEYDOWN.
+   Both the main thread and the interface one, register these
+   Window Messages. The function invoked in both treads is
+   WM_KEYDOWN(). The function is meant to finish execution as
+   soon as possible. constructKbdKey() is called to convert the
+   virtual keys into readble form. In KeyboardResponder(), main thread,
+   is where each keyboard shortcut is actually registered, where the code 
+   gets to decide what functions to call based on the keyboard input,
+   and the user context, in-app conditions.
 
-   Mouse input is handled in the interface thread as well.
-   The main GUI is created in BuildGUI() containing several 
-   text controls. These controls on click call WinClickAction()
-   which then passes several parameters to the function with
-   the same name from the main thread. The function handles 
-   every imagined response to mouse clicks, based on user context.
+   Mouse input is mostly handled in the interface thread.
+   The Window Messages for mouse buttons (e.g., WM_LBUTTONUP)
+   are registered and, broadly speaking, invoke WinClickAction()
+   which is a wrapper to the function with the same name from
+   the main thread. The function handles most of the imagined
+   responses to mouse clicks, based on user context.
 
    WM_MOUSEMOVE message is registered in the interface thread 
    and it is associated with the function WM_MOUSEMOVE().
    This function changes mouse cursor to different states,
    based on the user context and calls MouseMoveResponder()
-   from the main thread. MouseMoveResponder() handles live
-   viewport updates related to hover actions.
+   from the main thread. which handles live viewport updates
+   related to hover actions.
+

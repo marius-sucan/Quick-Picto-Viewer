@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.6.7
+;@Ahk2Exe-SetVersion 5.7.0
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2021)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -119,14 +119,14 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , saveImgFormatsList := {1:"bmp", 2:"gif", 3:"hdp", 4:"j2k", 5:"jfif", 6:"jng", 7:"jp2", 8:"jpg", 9:"jxr", 10:"png", 11:"ppm", 12:"tga", 13:"tif", 14:"wdp", 15:"webp", 16:"xpm"}
    , LargeUIfontValue := 14, AnyWindowOpen := 0, toolTipGuiCreated := 0, panelWinCollapsed :=0, brushAclrAlpha := "ffFFff"
    , PrefsLargeFonts := 0, OSDbgrColor := "252525", OSDtextColor := "FEFDFC", initialCustomShapeCoords := ""
-   , PasteFntSize := 35, OSDfntSize := 23, OSDFontName := "Arial", prevOpenFolderPath := "", brushBclrAlpha := "010101"
+   , PasteFntSize := 35, OSDfontSize := 23, OSDFontName := "Arial", prevOpenFolderPath := "", brushBclrAlpha := "010101"
    , mustGenerateStaticFolders := 1, lastWinDrag := 1, img2resizePath := "", colorPickerModeNow := 0
    , prevFileMovePath := "", lastGIFdestroy := 1, prevAnimGIFwas := "", prevFilesSortMode, bruAchClrAlpha := ""
    , thumbsW := 300, thumbsH := 300, thumbsDisplaying := 0, userSeenSessionImagesArray := new hashtable()
    , othumbsW := 300, othumbsH := 300, vPselRotation := 0, hEditMenuSearch := "", prevOmniBoxFolder := ""
    , CountFilesFolderzList := 0, imgSelLargerViewPort := 0, dynamicLiveObjVisible := 1
    , UsrMustInvertFilter := 0, userActionConflictingFile := 1, LastWasFastDisplay := 0, hEditA := 0
-   , prevFileSavePath := "", imgHUDbaseUnit := Round(OSDfntSize*2.5), lastLongOperationAbort := 1
+   , prevFileSavePath := "", imgHUDbaseUnit := Round(OSDfontSize*2.5), lastLongOperationAbort := 1
    , lastOtherWinClose := 1, UsrCopyMoveOperation := 2, editingSelectionNow := 0, EntryMarkedMoveIndex := 0
    , ForceNoColorMatrix := 0, prevFastDisplay := 1, hSNDmediaDuration, lastMenuBarUpdated := 1
    , imgSelX1 := 0, imgSelY1 := 0, imgSelX2 := -1, imgSelY2 := -1, adjustNowSel := 0, hasHamDistCached := 0
@@ -160,7 +160,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , zeitSillyPrevent := 1, PrintPosX, PrintPosY, PrintPosW, PrintPosH, tinyPrevAreaCoordX := 1, UsrEditFileDestination := ""
    , hLVmainu := 0, tempBtnVisible := "null", tempBtnGuiBtnArray := [], lastRenameUndo := [], userMultiCoresLimit := 100
    , drawingShapeNow := 0, customShapePoints := [], prevResizedVPimgW := "", prevResizedVPimgH := "", PenuDrawLive := ""
-   , initialDrawingStartCoords := [], drawingLiveMode := 0, cardinalCurveCustomShape := 0, openingPanelNow := 0
+   , initialDrawingStartCoords := [], drawingVectorLiveMode := 0, cardinalCurveCustomShape := 0, openingPanelNow := 0
    , closedLineCustomShape := 1, tensionCurveCustomShape := 0.5, userDefinedSelCoords := 0, thisSearchString := ""
    , SelectionCoordsType := 1, alphaMaskRefBMP := 1, infoBoxGdiCached := "", watchFolderDetails := "", isNowFakeWinOpen := 0
    , FilteruMinRange, FilteruMaxRange, userFilterSizeProperty := 1, qpvCanvasHasInit := 0, coreDesiredPixFmt := "0xE200B"
@@ -194,9 +194,10 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
 Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameSavedVectorShape := ""
    , postVectorWinOpen := 0, isWelcomeScreenu := 0, prevVectorShapeSymmetryMode := [], AllowDarkModeForWindow := ""
    , iduStaticFoldersListCache := 0, lastFilterEditSearch := "", additionalLVrows := 1, uLVr := 12
-   , omniBoxMode := 0, hLVquickSearchMenus := ""
+   , omniBoxMode := 0, hLVquickSearchMenus := "", hotkate, vk_hwnd, lastInfoBoxBMP := []
+   , userFriendlyPrevImgSelAction, keywordsListArray := new hashtable(), keywrdLVfilter
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", lastTlbrCliicked := 0, uiLVoffset :=0 
-   , appVersion := "5.6.7", vReleaseDate := "31/03/2022"
+   , appVersion := "5.7.0", vReleaseDate := "22/04/2022"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1, usrAutoCropGenerateSelection := 0
@@ -215,7 +216,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , ResizeDestFolder, ResizeUseDestDir := 0, chnRdecalage := 0.0, chnGdecalage := 0.0
    , chnBdecalage := 0.0, alwaysOpenwithFIM := 0, bwDithering := 0, showHistogram := 0,  FloodFillModus := 0
    , userUnsprtWriteFMT := 1, userDesireWriteFMT := 9, hueAdjust := 0, syncSlideShow2Audios := 0
-   , DisplayTimeUser := 3, FontBolded := 1, FontItalica := 0, showInfoBoxHUD := 0, usrAutoCropDeviation := 0
+   , DisplayTimeUser := 3, OSDfontBolded := 1, OSDfontItalica := 0, showInfoBoxHUD := 0, usrAutoCropDeviation := 0
    , usrTextureBGR := 0, realGammos := 1, imgThreshold := 0, relativeImgSelCoords := 1, hCurrTab := ""
    , vpIMGrotation := 0, usrTextAlign := "Left", autoPlaySNDs := 0, usrAutoCropDeviationSnap := 1
    , ResizeCropAfterRotation := 1, usrColorDepth := 1, ColorDepthDithering := 1, mediaSNDvolume := 80
@@ -303,9 +304,11 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , alphaMaskGradientAngle := 0, DesaturateAreaChannel := 1, FloodFillClrOpacity := 255
    , FloodFillOpacity := 205, FloodFillBlendMode := 1, TextInAreaBlendMode := 1, BlurAreaAlphaMask := 0
    , UserAddNoiseBlurAmount := 0, UserAddNoIsePixelizeAmount := 2, FillBehindInvert := 0
-   , alphaMaskPreviewOpacity := 255, FloodFillUseAlpha := 0, EraseAreaUseAlpha := 0
+   , alphaMaskPreviewOpacity := 255, FloodFillUseAlpha := 0, EraseAreaUseAlpha := 0, bezierSplineCustomShape := 0
    , innerSelectionCavityX := 0, innerSelectionCavityY := 0, ResizeEnforceCanvas := 0
-   , ResizeFillCanvasMode := 1, ShowToolTipsToolbar := 1, userPrivateMode := 0
+   , ResizeFillCanvasMode := 1, ShowToolTipsToolbar := 1, userPrivateMode := 0, thresholdKeywords := 1
+   , minKeywordLength := 2, LangKeywordsFilter := 0, mergeKeywordRows := 1, limitSearchReplaceSelected := 0
+   , autoReflectVectorAnchors := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -331,7 +334,7 @@ thisGDIPversion := Gdip_LibrarySubVersion()
 GDIPToken := Gdip_Startup()
 If (!GDIPToken || thisGDIPversion<1.92)
 {
-   MsgBox, 48, %appTitle%, ERROR: Unable to initialize GDI+...`n`nThe program will now exit.`n`nRequired GDI+ library wrapper: v1.84 - extended compilation edition.
+   MsgBox, 48, %appTitle%, ERROR: Unable to initialize GDI+...`n`nThe program will now exit.`n`nRequired GDI+ library wrapper: v1.92 - extended compilation edition.
    hasInitSpecialMode := 1
    ForceExitNow()
    ExitApp
@@ -360,8 +363,10 @@ OnMessage(0x202, "WM_LBUTTONup")
 OnMessage(0x200, "WM_MOUSEMOVE")
 OnMessage(0x203, "OnLButtonDblClk")
 OnMessage(0x20A, "adjustWheelNumbersEditFields") ; WM_MOUSEWHEEL
-Loop, 9
-    OnMessage(255+A_Index, "PreventKeyPressBeep")   ; 0x100 to 0x108
+; Loop, 9
+;     OnMessage(255+A_Index, "PreventKeyPressBeep")   ; 0x100 to 0x108
+OnMessage(0x100, "WM_KEYDOWN")
+OnMessage(0x104, "WM_KEYDOWN")
 
 Global interfaceThread
 If !A_IsCompiled
@@ -373,7 +378,7 @@ Else If (sz := GetRes(data, 0, "MODULE-INTERFACE.AHK", "LIB"))
 ; enjoy a more responsive user interface when the main thread
 ; is busy processing
 externObj := WindowBgrColor "$" isAlwaysOnTop "$" mainCompiledPath "$" isTitleBarVisible "$" TouchScreenMode "$" userAllowWindowDrag "$" mainWinPos "$" mainWinSize "$" mainWinMaximized "$" IMGresizingMode
-externObj .= "$" OSDbgrColor "$" OSDtextColor "$" LargeUIfontValue "$" PrefsLargeFonts "$" OSDFontName "$" FontBolded
+externObj .= "$" OSDbgrColor "$" OSDtextColor "$" LargeUIfontValue "$" PrefsLargeFonts "$" OSDFontName "$" OSDfontBolded
 initGUI := interfaceThread.ahkFunction("BuildGUI", externObj)
 fnOutputDebug("extern UI HWNDs: " initGUI)
 If !InStr(initGUI, "|")
@@ -458,6 +463,130 @@ HKifs(q:=0, whichWin:=-1) {
    Return r
 }
 
+constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code) {
+   Static vkList := {8:"BACKSPACE", 9:"TAB", C:"NUMPADCLEAR", D:"ENTER", 14:"CAPSLOCK", 1B:"ESCAPE", 20:"SPACE", 21:"PGUP", 22:"PGDN", 23:"END", 24:"HOME", 25:"LEFT", 26:"UP", 27:"RIGHT", 28:"DOWN", 2D:"INSERT", 2E:"DELETE", 5B:"SCROLLLOCK", 5D:"APPSKEY", 60:"NUMPAD0", 61:"NUMPAD1", 62:"NUMPAD2", 63:"NUMPAD3", 64:"NUMPAD4", 65:"NUMPAD5", 66:"NUMPAD6", 67:"NUMPAD7", 68:"NUMPAD8", 69:"NUMPAD9", 6A:"NUMPADMULT", 6B:"NUMPADADD", 6D:"NUMPADSUB", 6E:"NUMPADDOT", 6F:"NUMPADDIV", 70:"F1", 71:"F2", 72:"F3", 73:"F4", 74:"F5", 75:"F6", 76:"F7", 77:"F8", 78:"F9", 79:"F10", 7A:"F11", 7B:"F12", 90:"NUMLOCK", AD:"VOLUME_MUTE", AE:"VOLUME_DOWN", AF:"VOLUME_UP", B0:"MEDIA_NEXT", B1:"MEDIA_PREV", B2:"MEDIA_STOP", B3:"MEDIA_PLAY_PAUSE", FF:"PAUSE", 1:"LBUTTON", 2:"RBUTTON", 3:"BREAK", 4:"MBUTTON", 5:"XBUTTON1", 6:"XBUTTON2", 10:"SHIFT", 11:"CONTROL", 12:"ALT", 13:"PAUSE", 15:"KANA/HANGUL", 17:"JUNJA", 18:"IME_FINAL", 19:"HANJA/KANJI", 16:"IME_ON", 1A:"IME_OFF", 1C:"IME_CONVERT", 1D:"IME_NON_CONVERT", E5:"IME_PROCESSKEY", 1E:"IME_ACCEPT", 1F:"IME_MODECHANGE", 2F:"HELP", 29:"SELECT", 2A:"PRINT", 2B:"EXECUTE", 2C:"PRINT_SCREEN", 5F:"SLEEP", 7C:"F13", 7D:"F14", 7E:"F15", 7F:"F16", 80:"F17", 81:"F18", 82:"F19", 83:"F20", 84:"F21", 85:"F22", 86:"F23", 87:"F24", A6:"BROWSER_BACK", A7:"BROWSER_FORWARD", A8:"BROWSER_REFRESH", A9:"BROWSER_STOP", AA:"BROWSER_SEARCH", AB:"BROWSER_FAVORITES", AC:"BROWSER_HOME", B4:"LAUNCH_MAIL", B5:"LAUNCH_MEDIA_SELECT", B6:"LAUNCH_APP1", B7:"LAUNCH_APP2", F6:"ATTN", F7:"CrSEL", F8:"ExSEL", F9:"ERASE_EOF", FA:"PLAY", FB:"ZOOM", FD:"PA1", A0:"LSHIFT", A1:"RSHIFT", A2:"LCTRL", A3:"RCTRL", A4:"LALT", A5:"RALT", 5B:"LWIN", 5C:"RWIN"}
+        , vkExtraList := {30:"00.1", 31:"1", 32:"2", 33:"3", 34:"4", 35:"5", 36:"6", 37:"7", 38:"8", 39:"9", 41:"A", 42:"B", 43:"C", 44:"D", 45:"E", 46:"F", 47:"G", 48:"H", 49:"I", 4A:"J", 4B:"K", 4C:"L", 4D:"M", 4E:"N", 4F:"O", 50:"P", 51:"Q", 52:"R", 53:"S", 54:"T", 55:"U", 56:"V", 57:"W", 58:"X", 59:"Y", 5A:"Z", BB:"PLUS", BC:"COMMA", BD:"MINUS", BE:"PERIOD"}
+        ; , BA:"OEM_1", BF:"OEM_2", C0:"OEM_3", DB:"OEM_4", DC:"OEM_5", DD:"OEM_6", DE:"OEM_7", DF:"OEM_8", E2:"OEM_102", E1:"OEM_9", E3:"OEM_11", E4:"OEM_12", E6:"OEM_13", FE:"OEM_CLEAR", 92:"OEM_14", 93:"OEM_15", 94:"OEM_16", 95:"OEM_17", 96:"OEM_18"}
+   ; vk list based on https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
+
+   newkate := ""
+   If vk_shift
+      newkate .= "+"
+   If vk_ctrl
+      newkate .= "^"
+   If vk_alt
+      newkate .= "!"
+   If (vkExtraList[vk_code]!="")
+      newkate .= vkExtraList[vk_code]
+   Else
+      newkate .= vkList[vk_code] ? vkList[vk_code] : "vk" vk_code
+   Return newkate
+}
+
+PreProcessKbdKey() {
+   Static lastInvoked := 1, counter := 0, prevKey
+
+   Awin := WinActive("A")
+   If (A_TickCount - lastOtherWinClose<300) || (Awin=PVhwnd) || (Awin!=vk_hwnd)
+   {
+      lastInvoked := 1, counter := 0, prevKey := 0
+      Return
+   }
+
+   ; ToolTip, % hotkate , , , 2
+   If (A_TickCount - lastInvoked>250)
+      counter := 0
+
+   ; addJournalEntry(A_ThisFunc "(): " thisWin "|" hotkate)
+   If (A_TickCount - lastInvoked>30) && (whileLoopExec=0 && runningLongOperation=0)
+   {
+      lastInvoked := A_TickCount
+      abusive := (counter>25) ? 1 : 0
+      thisHwnd := identifyParentWind() ? "parentu" : Awin
+      KeyboardResponder(hotkate, thisHwnd, abusive)
+      If (hotkate=prevKey)
+         counter++
+      Else 
+         counter := 0
+
+      prevKey := hotkate
+   } Else If (hotkate=prevKey)
+      counter++
+   Else 
+      counter := 0
+}
+
+decideBlockKbdKeys(Az, givenKey) {
+   blockKey := 0
+   If (Az=hQPVtoolbar)
+   {
+      blockKey := 1
+   } Else If (givenKey="^a" && Az=hSetWinGui && (AnyWindowOpen=2 || AnyWindowOpen=60))
+   {
+      GuiControlGet, OutputVar, SettingsGUIA: Focus
+      If InStr(OutputVar, "ListView")
+         blockKey := 1
+   } Else If (Az=hQuickMenuSearchWin && VisibleQuickMenuSearchWin=1 && givenKey!="Tab")
+   {
+      GuiControlGet, OutputVar, QuickMenuSearchGUIA: Focus
+      If (InStr(OutputVar, "edit") && (givenKey="Up" || givenKey="Down"))
+         blockKey := 1
+
+      If ((givenKey="^Up" || givenKey="!Up" || givenKey="!Left" || givenKey="!BackSpace") && omniBoxMode=1)
+      || (omniBoxMode=1 && (givenKey="^x" || givenKey="^c"))
+         blockKey := 1
+   } Else If (givenKey="Up" || givenKey="Down" || givenKey="Left" || givenKey="Right")
+   {
+      GuiControlGet, OutputVar, SettingsGUIA: Focus
+      If (Az=hSetWinGui && (givenKey="Up" || givenKey="Down"))
+      {
+         GuiControlGet, OutputVname, SettingsGUIA: FocusV
+         isOkay := (SubStr(OutputVname, 1, 5)!="editF" || StrLen(OutputVname)>6) ? 1 : 0
+         If isOkay
+         {
+            GuiControlGet, OutputVar, SettingsGUIA: Focus
+            GuiControlGet, OutputVal, SettingsGUIA:, % OutputVname
+            GuiControlGet, OutputEnable, SettingsGUIA: Enabled, % OutputVname
+            GuiControlGet, hVar, SettingsGUIA: hwnd, % OutputVname
+            If (isNumber(OutputVal) && InStr(OutputVar, "edit") && OutputEnable=1)
+               blockKey := 1
+         }
+      }
+   } Else If (givenKey="^F4")
+   {
+      If (imgEditPanelOpened=1 || AnyWindowOpen>0) && (Az=hSetWinGui) && (A_TickCount - lastOtherWinClose>150)
+         BtnCloseWindow()
+   } Else If (givenKey="AppsKey") || (givenKey="Enter" && (A_TickCount - lastOtherWinClose>300))
+   {
+      If (imgEditPanelOpened=1 || AnyWindowOpen>0) && (Az=hSetWinGui)
+         blockKey := externalinvokedSettingsContextMenu(givenKey, 1)
+   }
+   Return blockKey
+}
+
+WM_KEYDOWN(wParam, lParam, msg, ctrlHwnd) {
+    vk_code := Format("{1:x}", wParam)
+    Awin := WinActive("A")
+    If (whileLoopExec=1 || runningLongOperation=1) && (vk_code!="1B") 
+    || (A_TickCount - lastOtherWinClose<300) || (Awin=PVhwnd)
+       Return 0
+
+    vk_shift := DllCall("GetKeyState","Int", 0x10, "short") >> 16
+    vk_ctrl := DllCall("GetKeyState","Int", 0x11, "short") >> 16
+    vk_alt := (msg=260) ? -1 : DllCall("GetKeyState","Int", 0x12, "short") >> 16
+    hotkate := constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code)
+    vk_hwnd := Awin
+
+    If (vk_code!=10 && vk_code!=11 && vk_code!=12)
+    {
+       SetTimer, PreProcessKbdKey, -25
+       If decideBlockKbdKeys(Awin, hotkate)
+          Return 0
+    }
+
+    ; TulTip(0, "|   ", wParam, vk_shift, vk_ctrl, vk_alt, msg, "main thread", lParam>>16 & 0xffff)
+}
+
 KeyboardResponder(givenKey, thisWin, abusive) {
    ; SoundBeep 
    Az := WinActive("A")
@@ -467,26 +596,64 @@ KeyboardResponder(givenKey, thisWin, abusive) {
       lastTimeToggleThumbs := A_TickCount 
       closeQuickSearch()
       Return
-   } Else If (imgEditPanelOpened=1 && panelWinCollapsed=1 && Az=hSetWinGui )
+   } Else If (imgEditPanelOpened=1 && panelWinCollapsed=1 && Az=hSetWinGui)
    {
-      If (mustCaptureCloneBrush!=1 && colorPickerModeNow!=1) || InStr(givenKey, "esc") 
+      If (mustCaptureCloneBrush!=1 && colorPickerModeNow!=1) || (givenKey="Escape") 
          toggleImgEditPanelWindow()
       Return
    }
 
    If (thisWin="parentu")
    {
-      If (givenKey="~Tab" || givenKey="~+Tab")
-         SetTimer, highlightActiveCtrl, -50
-      Else If (givenKey="~Up" || givenKey="~Down" || givenKey="~Left" || givenKey="~Right")
+      If (givenKey="^a" && Az=hSetWinGui && (AnyWindowOpen=2 || AnyWindowOpen=60))
       {
-         Awin := WinActive("A")
-         If (Awin=hQuickMenuSearchWin) && (givenKey="~Up" || givenKey="~Down")
+         GuiControlGet, OutputVar, SettingsGUIA: Focus
+         If InStr(OutputVar, "ListView")
+            BTNreviewLVselAll()
+      } Else If (Az=hQuickMenuSearchWin && VisibleQuickMenuSearchWin=1 && givenKey!="Tab")
+      {
+         GuiControlGet, OutputVar, QuickMenuSearchGUIA: Focus
+         If (InStr(OutputVar, "edit") && (givenKey="Up" || givenKey="Down"))
          {
-            GuiControlGet, OutputVar, QuickMenuSearchGUIA: Focus
-            If InStr(OutputVar, "edit")
-               changeOptionQuickSearch(givenKey)
-         } Else If (Awin=hSetWinGui) && (givenKey="~Up" || givenKey="~Down")
+            changeOptionQuickSearch(givenKey)
+            SetTimer, highlightActiveArrowsCtrl, -50
+         } Else If (InStr(OutputVar, "edit") && omniBoxMode=1)
+         {
+            If (givenKey="F2")
+               omniBoxFolderRename()
+            Else If (givenKey="F3")
+               omniBoxFolderImport()
+            Else If (givenKey="F5")
+               SetTimer, PopulateQuickMenuSearch, -150
+            Else If (givenKey="F7")
+               omniBoxFolderCreateNew()
+            Else If (givenKey="F8")
+               omniBoxFolderDelete()
+            Else If (givenKey="F12")
+               omniBoxFolderProperties()
+         } Else If (InStr(OutputVar, "edit") && givenKey="F1")
+         {
+            btnHelpQuickSearchMenus()
+         } Else If (InStr(OutputVar, "edit") && givenKey="F8")
+         {
+            closeQuickSearch()
+            SetTimer, openPreviousPanel, -200
+         }
+
+         If ((givenKey="^Up" || givenKey="!Up" || givenKey="!Left" || givenKey="!BackSpace") && omniBoxMode=1)
+            GoQuickSearchAction(0, "yes", "!OmniNavigateUpFolder")
+   
+         If (omniBoxMode=1 && givenKey="^x")
+            omniBoxFolderCutCopy("cut")
+         Else If (omniBoxMode=1 && givenKey="^c")
+            omniBoxFolderCutCopy("copy")
+      } Else If (givenKey="Tab" || givenKey="+Tab")
+      {
+         SetTimer, highlightActiveCtrl, -50
+      } Else If (givenKey="Up" || givenKey="Down" || givenKey="Left" || givenKey="Right")
+      {
+         GuiControlGet, OutputVar, SettingsGUIA: Focus
+         If (Az=hSetWinGui && (givenKey="Up" || givenKey="Down"))
          {
             GuiControlGet, OutputVname, SettingsGUIA: FocusV
             isOkay := (SubStr(OutputVname, 1, 5)!="editF" || StrLen(OutputVname)>6) ? 1 : 0
@@ -497,79 +664,93 @@ KeyboardResponder(givenKey, thisWin, abusive) {
                GuiControlGet, OutputEnable, SettingsGUIA: Enabled, % OutputVname
                GuiControlGet, hVar, SettingsGUIA: hwnd, % OutputVname
                If (isNumber(OutputVal) && InStr(OutputVar, "edit") && OutputEnable=1)
-                  GuiControl, SettingsGUIA:, % OutputVname, % (givenKey="~Up") ? OutputVal + 1 : OutputVal - 1
+                  GuiControl, SettingsGUIA:, % OutputVname, % (givenKey="Up") ? OutputVal + 1 : OutputVal - 1
             }
          }
          SetTimer, highlightActiveArrowsCtrl, -50
-      } Else If (givenKey="~Space")
+      } Else If (givenKey="^F4")
+      {
+         If (imgEditPanelOpened=1 || AnyWindowOpen>0) && (Az=hSetWinGui) && (A_TickCount - lastOtherWinClose>150)
+            BtnCloseWindow()
+      } Else If (givenKey="AppsKey" || givenKey="Enter" && (A_TickCount - lastOtherWinClose>300))
+      {
+         If (imgEditPanelOpened=1 || AnyWindowOpen>0) && (Az=hSetWinGui)
+            externalinvokedSettingsContextMenu(givenKey)
+      } Else If (givenKey="F8" || givenKey="F11")
+      {
+         If (imgEditPanelOpened=1 || AnyWindowOpen>0) && (Az=hSetWinGui)
+            toggleImgEditPanelWindow()
+      } Else If (givenKey="Space")
          highlightActiveCtrl(givenKey)
-      Else If (givenKey="~RButton")
+      Else If (givenKey="RButton")
          highlightActiveCtrl(givenKey)
+   
+      If (folderTreeWinOpen=1 && Az=hfdTreeWinGui && givenKey="^x")
+         folderTreeCutCopyFolder("cut")
+      Else If (folderTreeWinOpen=1 && Az=hfdTreeWinGui && givenKey="^c")
+         folderTreeCutCopyFolder("copy")
    } Else If (thisWin=hQPVtoolbar && ShowAdvToolbar=1 && Az=thisWin)
    {
-       If (givenKey="~+Tab" || givenKey="~Tab" || givenKey="Esc" || givenKey="~AppsKey")
+       If (givenKey="+Tab" || givenKey="Tab" || givenKey="Escape" || givenKey="AppsKey")
        {
           ; currentKbdBTNtlbr := 0
           isToolbarKBDnav := 0
           WinActivate, ahk_id %PVhwnd%
           displayNowToolbarHelp(3)
-       } Else If (givenKey="vk48" || givenKey="F1")
+       } Else If (givenKey="h" || givenKey="F1")
        {
           displayNowToolbarHelp(1)
-       } Else If (givenKey="~Left" || givenKey="~BackSpace" || givenKey="~Up")
+       } Else If (givenKey="Left" || givenKey="BackSpace" || givenKey="Up")
        {
           moveMouseToolbar(-1, 1)
-       } Else If (givenKey="~Right" || givenKey="Delete" || givenKey="~Down")
+       } Else If (givenKey="Right" || givenKey="Delete" || givenKey="Down")
        {
           moveMouseToolbar(1, 1)
-       } Else If (givenKey="~PgUp")
+       } Else If (givenKey="PgUp")
        {
           moveMouseToolbar(-1, 4)
        } Else If (givenKey="Home")
        {
           currentKbdBTNtlbr := 0
           moveMouseToolbar(1, 1)
-       } Else If (givenKey="~PgDn" || givenKey="End")
+       } Else If (givenKey="PgDn" || givenKey="End")
        {
           moveMouseToolbar(1, 4)
-       } Else If (givenKey="~Space" || givenKey="Enter")
+       } Else If (givenKey="Space" || givenKey="Enter")
        {
           invokeKbdToolbarAct(0)
        } Else If (givenKey="+Space" || givenKey="+Enter")
        {
           invokeKbdToolbarAct("right")
-       } Else If (givenKey="vk30" || givenKey="vk31" || givenKey="vk32" || givenKey="vk33" || givenKey="vk34" || givenKey="vk35" || givenKey="vk36" || givenKey="vk37" || givenKey="vk38" || givenKey="vk39")
+       } Else If (isInRange(givenKey, 0, 9) && isNumber(givenKey))
        {
           currentKbdBTNtlbr := 0
-          v := SubStr(givenKey, 4, 1)
-          If !v
-             v := 10
+          v := givenKey ? givenKey : 10
           moveMouseToolbar(1, v)
        }
    } Else If (thisWin=PVhwnd && identifyThisWin()=1)
    {
        ; ToolTip, % givenKey "==" thisWin , , , 2
-       If (givenKey="^vk4F")
+       If (givenKey="^o")
        {
            If HKifs("general")
               OpenDialogFiles()
-       } Else If (givenKey="vk4F")
+       } Else If (givenKey="o")
        {
            imgPath := getIDimage(currentFileIndex)
-           If (drawingShapeNow=1 && drawingLiveMode=1)
-             toggleOpenClosedLineCustomShape()
+           If (isImgEditingNow()=1 && drawingShapeNow=1)
+              toggleOpenClosedLineCustomShape()
            Else If HKifs("imgsLoaded")
-             OpenThisFileMenu()
+              OpenThisFileMenu()
            Else If ((HKifs("general") && (!CurrentSLD || StrLen(gdiBitmap)<3)) && !FileRexists(imgPath))
-             OpenDialogFiles()
-       } Else If (givenKey="vk57 up")
+              OpenDialogFiles()
+       } Else If (givenKey="w")
        {
            ; w ; to-do
-
            If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1 && thumbsDisplaying!=1)
-             flipSelectionWH()
+              flipSelectionWH()
            Else If (thumbsDisplaying=1 && maxFilesIndex>10 && CurrentSLD && !z)
-             invokeFilesListMapNow()
+              invokeFilesListMapNow()
           ; testHistoDLL()
           ; testLhashalgo()
          ; z := testWICwhatever()
@@ -581,39 +762,39 @@ KeyboardResponder(givenKey, thisWin, abusive) {
                      ; testWicArkive()
             ; ; testWICresizeSpeed()
              Sleep, 1
-       } Else If (givenKey="^+vk4E")
+       } Else If (givenKey="+^n")
        {
            If HKifs("general")
-             OpenNewQPVinstance()
-       } Else If (givenKey="^vk4E")
+              OpenNewQPVinstance()
+       } Else If (givenKey="^n")
        {
            If HKifs("general")
-             PanelNewImage()
+              PanelNewImage()
        } Else If (givenKey="+vkC0")
        {
            If HKifs("general")
-             PanelJournalWindow()
+              PanelJournalWindow()
        } Else If (givenKey="F12")
        {
            If HKifs("general")
-             PanelPrefsWindow()
-       } Else If (givenKey="vk50")
+              PanelPrefsWindow()
+       } Else If (givenKey="p")
        {
-           If (drawingShapeNow=1)
+           If (isImgEditingNow()=1 && drawingShapeNow=1)
              togglePreviewVectorNewPoint()
            Else If (liveDrawingBrushTool=1 && isImgEditingNow()=1 && AnyWindowOpen=64)
              toggleBrushDeformers()
            Else If (HKifs("imgEditSolo") || HKifs("liveEdit", 64) || HKifs("imgsLoaded"))
              PanelBrushTool()
-       } Else If (givenKey="!vk50")
+       } Else If (givenKey="!p")
        {
            If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
               MenuStartDrawingLines()
-       } Else If (givenKey="+vk50")
+       } Else If (givenKey="+p")
        {
            If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
               MenuStartDrawingShapes()
-       } Else If (givenKey="^vk50")
+       } Else If (givenKey="^p")
        {
            If (imageLoading!=1 && (HKifs("imgEditSolo") || HKifs("imgsLoaded")))
               PanelPrintImage()
@@ -626,46 +807,43 @@ KeyboardResponder(givenKey, thisWin, abusive) {
        } Else If InStr(givenKey, "^Numpad")
        {
            alignImgSelection(givenKey)
-       } Else If (givenKey="^NumpadAdd" || givenKey="^vkBB")
+       } Else If (givenKey="^NumpadAdd" || givenKey="^plus")
        {
            changeOSDfontSize(1)
-       } Else If (givenKey="^NumpadSub" || givenKey="^vkBD")
+       } Else If (givenKey="^NumpadSub" || givenKey="^minus")
        {
            changeOSDfontSize(-1)
-       } Else If (givenKey="+vk4F")
+       } Else If (givenKey="+o")
        {
            If HKifs("general")
               OpenFolders()
-       } Else If (givenKey="~F10") && (drawingShapeNow!=1)
+       } Else If (givenKey="!F10" || givenKey="F10")
        {
            toggleAppToolbar()
-       } Else If (givenKey="~+F10") && (drawingShapeNow!=1)
+       } Else If (givenKey="+!F10" || givenKey="+F10") && (drawingShapeNow!=1)
        {
            ToggleQuickBaru()
-       } Else If (givenKey="^AppsKey" || givenKey="+AppsKey")
+       } Else If (givenKey="^AppsKey" || givenKey="+AppsKey") && (drawingShapeNow!=1)
        {
            InitSecondMenu()
-       } Else If (givenKey="#AppsKey" || givenKey="!AppsKey" || givenKey="~AppsKey")
+       } Else If (givenKey="#AppsKey" || givenKey="!AppsKey" || givenKey="AppsKey" || givenKey="RButton")
        {
            InitGuiContextMenu(givenKey)
-       } Else If (givenKey="~RButton" || givenKey="~^RButton" || givenKey="~+RButton")
-       {
-           InitGuiContextMenu(givenKey)
-       } Else If (givenKey="~Insert Up")
+       } Else If (givenKey="Insert")
        {
            If (HKifs("general") && imageLoading!=1)
               addNewFile2list()
-       } Else If (givenKey="^vk56 Up")
+       } Else If (givenKey="^v")
        {
            If (HKifs("general") && imageLoading!=1)
               PasteClipboardIMG()
-       } Else If (givenKey="+Esc")
+       } Else If (givenKey="+Escape")
        {
            restartAppu()
        } Else If (givenKey="F1")
        {
            showQuickHelp()
-       } Else If (givenKey="~F9 Up")
+       } Else If (givenKey="F9")
        {
           If (HKifs("imgsLoaded") && folderTreeWinOpen=1)
              FolderTreeFindActiveFile()
@@ -679,7 +857,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              MenuReturnIMGedit()
           Else
              closeDocuments()
-       } Else If (givenKey="~vk44 Up")
+       } Else If (givenKey="d")
        {
            If (HKifs("liveEdit") && liveDrawingBrushTool=1)
            {
@@ -691,75 +869,75 @@ KeyboardResponder(givenKey, thisWin, abusive) {
               toggleLiveEditObject()
            Else If (HKifs("liveEdit") && AnyWindowOpen=23 && FillAreaColorMode=6)
               BtnSetTextureSource()
-       } Else If (givenKey="vk4C")
+       } Else If (givenKey="l")
        {
            If ((HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1 || showViewPortGrid=1) && thumbsDisplaying!=1)
               toggleLimitSelection()
            Else If (HKifs("imgsLoaded") && thumbsDisplaying=1)
               toggleListViewModeThumbs()
-       } Else If (givenKey="+^vk56 Up")
+       } Else If (givenKey="+^v")
        {
            If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
               PanelPasteInPlace()
-       } Else If (givenKey="~^vk44 Up")
+       } Else If (givenKey="^d")
        {
-           If (drawingShapeNow=1)
+           If (isImgEditingNow()=1 && drawingShapeNow=1)
               MenuSelNoVectorPoints()
            Else If (HKifs("imgsLoaded") && ((thumbsDisplaying=1) || (editingSelectionNow!=1 && markedSelectFile)))
               dropFilesSelection()
            Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
               resetImgSelection()
-       } Else If (givenKey="~^vk43 Up")
+       } Else If (givenKey="^c")
        {
            If (thumbsDisplaying=1 && HKifs("imgsLoaded"))
               MenuExplorerCopyFiles()
            Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
               CopyImage2clip()
-       } Else If (givenKey="~^vk58 Up")
+       } Else If (givenKey="^x")
        {
            If (thumbsDisplaying=1 && HKifs("imgsLoaded"))
               MenuExplorerCutFiles()
            Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
               CutSelectedArea()
-       } Else If (givenKey="^vk5A")
+       } Else If (givenKey="^z")
        {
            allowLoop := 1
-           If (drawingShapeNow=1)
+           If (isImgEditingNow()=1 && drawingShapeNow=1)
               ImgVectorUndoAct()
            Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
               ImgUndoAction()
-       } Else If (givenKey="vk5A")
+       } Else If (givenKey="z")
        {
            If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ToggleImgNavBox()
-       } Else If (givenKey="^vk59")
+       } Else If (givenKey="^y")
        {
           allowLoop := 1
-          If (drawingShapeNow=1)
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
              ImgVectorRedoAct()
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ImgRedoAction()
-       } Else If (givenKey="^+vk5A")
+       } Else If (givenKey="+^z")
        {
           allowLoop := 1
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ImgSelUndoAct()
-       } Else If (givenKey="^+vk59")
+       } Else If (givenKey="+^y")
        {
           allowLoop := 1
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ImgSelRedoAct()
-       } Else If (givenKey="^!vk5A")
+       } Else If (givenKey="^!z")
        {
           allowLoop := 1
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ImgUndoAction("j")
-       } Else If (givenKey="^!vk59")
+       } Else If (givenKey="^!y")
        {
           allowLoop := 1
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ImgRedoAction("j")
-       } Else If (givenKey="vk45")
+       } Else If (givenKey="e")
        {
           If ((AnyWindowOpen=64 || AnyWindowOpen=66 || AnyWindowOpen=12) && imgEditPanelOpened=1) ; Brush, Fill and Jpeg Crop
              ToggleEditImgSelection()
@@ -773,7 +951,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              If (editingSelectionNow=1)
                 CreateGuiButton("Selection options,,invokeSelectionAreaMenu", 0, msgDisplayTime//1.5 + 500)
           }
-       } Else If (givenKey="+vk45")
+       } Else If (givenKey="+e")
        {
           If (HKifs("imgsLoaded") && thumbsDisplaying=1 && currentFileIndex>0 && maxFilesIndex>2)
           {
@@ -783,21 +961,21 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
                 MenuCycleSelectionShapes()
           }
-       } Else If (givenKey="!vk45")
+       } Else If (givenKey="!e")
        {
           If (HKifs("imgsLoaded") && thumbsDisplaying=1)
              OpenQPVfileFolder()
           Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
              PanelIMGselProperties()
-       } Else If (givenKey="~^vk53 Up")
+       } Else If (givenKey="^s")
        {
           If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
              PanelSaveImg()
-       } Else If (givenKey="^vk4C")
+       } Else If (givenKey="^l")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit", 65) || HKifs("imgsLoaded"))
              PanelDrawShapesInArea()
-       } Else If (givenKey="+vk4C")
+       } Else If (givenKey="+l")
        {
           If (HKifs("liveEdit") && EllipseSelectMode=2 && editingSelectionNow=1
           && (AnyWindowOpen=68 || AnyWindowOpen=66 || AnyWindowOpen=65 || AnyWindowOpen=64 || AnyWindowOpen=55 || AnyWindowOpen=25 || AnyWindowOpen=23 || AnyWindowOpen=10))
@@ -809,7 +987,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              Else
                 MenuResumeDrawingShapes()
           }
-       } Else If (givenKey="!vk4C Up")
+       } Else If (givenKey="!l")
        {
           If HKifs("imgsLoaded" && thumbsDisplaying=1)
              CalculateSelectedFilesSizes()
@@ -817,47 +995,47 @@ KeyboardResponder(givenKey, thisWin, abusive) {
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              tlbrFillShape()          ; PanelFillSelectedArea()
-       } Else If (givenKey="!vk59")
+       } Else If (givenKey="!y")
        {
           If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
             PanelImgAutoCrop()
-       } Else If (givenKey="vk59")
+       } Else If (givenKey="y")
        {
           If ((liveDrawingBrushTool=1 || drawingShapeNow=1) && isImgEditingNow()=1)
              toggleBrushSymmetryModes()
-       } Else If (givenKey="+vk59")
+       } Else If (givenKey="+y")
        {
           If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
              BtnSetBrushSymmetryCoords()
-       } Else If (givenKey="~vk49")
+       } Else If (givenKey="i")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ToggleInfoBoxu()
        } Else If (givenKey="vkDB")
        {
           allowLoop := 1 
-          If (liveDrawingBrushTool=1)
+          If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
              changeBrushSize(-1)
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ChangeLumos(-1)
        } Else If (givenKey="vkDD")
        {
           allowLoop := 1 
-          If (liveDrawingBrushTool=1)
+          If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
              changeBrushSize(1)
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ChangeLumos(1)
        } Else If (givenKey="+vkDB")
        {
           allowLoop := 1 
-          If (liveDrawingBrushTool=1)
+          If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
              changeBrushSoftness(-1)
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ChangeGammos(-1)
        } Else If (givenKey="+vkDD")
        {
           allowLoop := 1 
-          If (liveDrawingBrushTool=1)
+          If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
              changeBrushSoftness(1)
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ChangeGammos(1)
@@ -881,19 +1059,19 @@ KeyboardResponder(givenKey, thisWin, abusive) {
           allowLoop := 1 
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ChangeRealGamma(1)
-       } Else If (givenKey="vkDC Up")
+       } Else If (givenKey="vkDC")
        {
           If (HKifs("liveEdit") && AnyWindowOpen=10)
              MenuToggleColorAdjustments()
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ResetImageView()
-       } Else If (givenKey="^vkDC Up")
+       } Else If (givenKey="^vkDC")
        {
           If (HKifs("liveEdit") && AnyWindowOpen=10)
              btnResetImageView()
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              HardResetImageView()
-       } Else If (givenKey="+vkDC Up")
+       } Else If (givenKey="+vkDC")
        {
           If HKifs("liveEdit")
           {
@@ -910,114 +1088,118 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              Else
                 toggleColorAdjustments()
           }
-       } Else If (givenKey="vkBF Up" || givenKey="NumpadDiv Up")
+       } Else If (givenKey="vkBF" || givenKey="NumpadDiv") ; /
        {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1)
+          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow()) && (thumbsDisplaying!=1)
           {
              IMGresizingMode := 0
              ToggleImageSizingMode()
           }
-       } Else If (givenKey="NumpadMult Up")
+       } Else If (givenKey="NumpadMult" || givenKey="^vkBF") ; Ctrl+/
        {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1)
+          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow()) && (thumbsDisplaying!=1)
              toggleCustomZLmodes()
-       } Else If (givenKey="+NumpadAdd" || givenKey="+vkBB")
+       } Else If (givenKey="+NumpadAdd" || givenKey="+plus")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              changeSelectZoom(1)
-       } Else If (givenKey="+NumpadSub" || givenKey="+vkBD")
+       } Else If (givenKey="+NumpadSub" || givenKey="+minus")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              changeSelectZoom(-1)
-       } Else If (givenKey="!vkBD")
+       } Else If (givenKey="!minus")
        {
           allowLoop := 1
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1)
+          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
              changeGridSize(-1)
-       } Else If (givenKey="!vkBB")
+       } Else If (givenKey="!plus")
        {
           allowLoop := 1
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1)
+          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
              changeGridSize(1)
-       } Else If (givenKey="NumpadAdd" || givenKey="vkBB")
+       } Else If (givenKey="NumpadAdd" || givenKey="plus")
        {
           allowLoop := 1
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1)
+          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
              ChangeZoom(1)
-       } Else If (givenKey="NumpadSub" || givenKey="vkBD")
+       } Else If (givenKey="NumpadSub" || givenKey="minus")
        {
           allowLoop := 1
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1)
+          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
              ChangeZoom(-1)
-       } Else If (givenKey="vk47")
+       } Else If (givenKey="g")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ToggleImgHistogram(1)
-       } Else If (givenKey="+vk47")
+       } Else If (givenKey="+g")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ToggleImgHistogram(-1)
-       } Else If (givenKey="!vk47")
+       } Else If (givenKey="!g")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ToggleHistogramMode()
-       } Else If (givenKey="~^vk52 Up")
+       } Else If (givenKey="^r")
        {
           If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
              PanelEditorImgResize()
           Else If (HKifs("imgsLoaded") && thumbsDisplaying=1)
              PanelSimpleResizeRotate()
-       } Else If (givenKey="~!vk52 Up")
+       } Else If (givenKey="!r")
        {
           If (HKifs("imgEditSolo") || HKifs("imgsLoaded")) && (!AnyWindowOpen)
              ResizeIMGviewportSelection()
-       } Else If (givenKey="vk52")
+       } Else If (givenKey="r")
        {
-          If (HKifs("liveEdit") && (liveDrawingBrushTool=1 || AnyWindowOpen=64))
+          If (isImgEditingNow()=1 && drawingShapeNow=1 && bezierSplineCustomShape=1)
+             toggleAutoReflectAnchors()
+          Else If (HKifs("liveEdit") && (liveDrawingBrushTool=1 || AnyWindowOpen=64))
              toggleBrushTypeEraser()
           Else If (HKifs("imgsLoaded") && thumbsDisplaying=1 && markedSelectFile)
              PanelReviewSelectedFiles()
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              makeSquareSelection()
-       } Else If (givenKey="+vk52")
+       } Else If (givenKey="+r")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              MenuSelRotation()
-       } Else If (givenKey="^vk54 Up")
+       } Else If (givenKey="^t")
        {
           If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
              PanelTransformSelectedArea()
-       } Else If (givenKey="+vk54 Up")
+       } Else If (givenKey="+t")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit", 32) || HKifs("imgsLoaded"))
              PanelInsertTextArea()
-       } Else If (givenKey="+vk49 Up")
+       } Else If (givenKey="+i")
        {
-          If (drawingShapeNow=1)
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
              MenuSelInvertVectorPoints()
           Else If (HKifs("imgsLoaded") && thumbsDisplaying=1 && markedSelectFile>1)
              invertFilesSelection()
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              InvertSelectedArea()
-       } Else If (givenKey="^vk47 Up")
+       } Else If (givenKey="^g")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit", 55) || HKifs("imgsLoaded"))
              PanelDesatureSelectedArea()
-       } Else If (givenKey="+vk42 Up")
+       } Else If (givenKey="+b")
        {
           If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
              PanelBlurSelectedArea()
-       } Else If (givenKey="vk42 Up")
+       } Else If (givenKey="b")
        {
-          If (HKifs("liveEdit") && (liveDrawingBrushTool=1 || AnyWindowOpen=64))
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
+             MenuToggleBezierMode()
+          Else If (HKifs("liveEdit") && (liveDrawingBrushTool=1 || AnyWindowOpen=64))
              toggleBrushTypes()
           Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
              ToggleImgFavourites(0, 0, 1)
-       } Else If (givenKey="~^vk48")
+       } Else If (givenKey="^h")
        {
           If (HKifs("imgsLoaded") && maxFilesIndex>1)
              PanelSearchAndReplaceIndex()
-       } Else If (givenKey="vk48")
+       } Else If (givenKey="h")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
           {
@@ -1026,7 +1208,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              Else
                 VPflipImgH()
           }
-       } Else If (givenKey="~vk56")
+       } Else If (givenKey="v")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
           {
@@ -1035,7 +1217,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              Else
                 VPflipImgV()
           }
-       } Else If (givenKey="~+vk48")
+       } Else If (givenKey="+h")
        {
           If (HKifs("liveEdit") && isNowAlphaPainting()=1)
              FlipHalphaMask()
@@ -1045,7 +1227,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              filesListFlipHimage()
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              FlipSelectedAreaH()
-       } Else If (givenKey="~+vk56")
+       } Else If (givenKey="+v")
        {
           If (HKifs("liveEdit") && isNowAlphaPainting()=1)
              FlipValphaMask()
@@ -1055,7 +1237,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              filesListFlipVimage()
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              FlipSelectedAreaV()
-       } Else If (givenKey="~vk55 Up")
+       } Else If (givenKey="u")
        {
           If (HKifs("liveEdit") && (AnyWindowOpen=31 || AnyWindowOpen=24))
              togglePasteInPlaceColorsFX()
@@ -1063,47 +1245,47 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              PanelSetThumbColumnOptions()
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit", 10) || HKifs("imgsLoaded"))
              PanelColorsAdjusterWindow()
-       } Else If (givenKey="~+vk55 Up")
+       } Else If (givenKey="+u")
        {
           If (HKifs("imgsLoaded") && thumbsDisplaying=1)
              filesListApplyColors()
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ApplyColorAdjustsSelectedArea()
-       } Else If (givenKey="~^+vk55 Up")
+       } Else If (givenKey="+^u")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ApplyColorAdjustsSelectedArea("outside")
-       } Else If (givenKey="vk46")
+       } Else If (givenKey="f")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ToggleImgFX(1)
-       } Else If (givenKey="+vk46")
+       } Else If (givenKey="+f")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ToggleImgFX(-1)
-       } Else If (givenKey="+vk51")
+       } Else If (givenKey="+q")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (liveDrawingBrushTool!=1)
              ToggleImgColorDepth(-1)
-       } Else If (givenKey="vk51")
+       } Else If (givenKey="q")
        {
           If (HKifs("liveEdit") && (liveDrawingBrushTool=1 || AnyWindowOpen=64))
              toggleBrushTypeFX()
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ToggleImgColorDepth(1)
-       } Else If (givenKey="Delete Up")
+       } Else If (givenKey="Delete")
        {
-          If (drawingShapeNow=1)
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
              MenuRemSelVectorPoints()
           Else If ((HKifs("imgEditSolo") || HKifs("liveEdit", 25)) && thumbsDisplaying!=1 && editingSelectionNow=1)
              PanelEraseSelectedArea()
           Else If HKifs("imgsLoaded")
              deleteKeyAction()
-       } Else If (givenKey="~!Delete Up")
+       } Else If (givenKey="!Delete")
        {
           If (HKifs("imgsLoaded") && maxFilesIndex>1 && currentFileIndex>0)
              singleInListEntriesRemover()
-       } Else If (givenKey="~+Delete Up")
+       } Else If (givenKey="+Delete")
        {
           If HKifs("imgsLoaded")
           {
@@ -1112,25 +1294,25 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              If (maxFilesIndex>1 && currentFileIndex>0)
                 singleInListEntriesRemover()
           }
-       } Else If (givenKey="vk41")
+       } Else If (givenKey="a")
        {
-          If HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || (AnyWindowOpen>1) || (drawingShapeNow=1)
+          If HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || (AnyWindowOpen>1) || (isImgEditingNow()=1 && drawingShapeNow=1)
              ToggleIMGalign()
-       } Else If (givenKey="+vk41")
+       } Else If (givenKey="+a")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              toggleImgSelectionAspectRatio()
-       } Else If (givenKey="+^vk41")
+       } Else If (givenKey="+^a")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              toggleImgSelectLockedRatio()
-       } Else If (givenKey="!vk41")
+       } Else If (givenKey="!a")
        {
           If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
              PanelAdjustImageCanvasSize()
-       } Else If (givenKey="^vk41")
+       } Else If (givenKey="^a")
        {
-          If (drawingShapeNow=1)
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
              MenuSelAllVectorPoints()
           Else If HKifs("liveEdit")
              selectEntireImage()
@@ -1141,7 +1323,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              Else
                 selectEntireImage()
           }
-       } Else If (givenKey="+vk39")
+       } Else If (givenKey="+9")
        {
           If (HKifs("imgsLoaded") && thumbsDisplaying=1)
           {
@@ -1151,19 +1333,24 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              changeSelRotation(-1)
              allowLoop := 1
           }
-       } Else If (givenKey="vk39")
+       } Else If (givenKey="8")
+       {
+          allowLoop := 1
+          If (HKifs("liveEdit") && liveDrawingBrushTool=1)
+             changeBrushOpacity(givenKey, 1)
+       } Else If (givenKey="9")
        {
           allowLoop := 1
           If (HKifs("liveEdit") && liveDrawingBrushTool=1)
              changeBrushOpacity(givenKey, 1)
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              changeImgRotationInVP(-1)
-       } Else If (givenKey="!vk39")
+       } Else If (givenKey="!9")
        {
           allowLoop := 1
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              changeLittleImgRotationInVP(-1)
-       } Else If (givenKey="+vk30")
+       } Else If (givenKey="+00.1")
        {
           If (HKifs("imgsLoaded") && thumbsDisplaying=1)
           {
@@ -1173,96 +1360,96 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              changeSelRotation(1)
              allowLoop := 1
           }
-       } Else If (givenKey="vk30")
+       } Else If (givenKey="00.1")
        {
           allowLoop := 1
           If (HKifs("liveEdit") && liveDrawingBrushTool=1)
              changeBrushOpacity(givenKey, 1)
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              changeImgRotationInVP(1)
-       } Else If (givenKey="!vk30")
+       } Else If (givenKey="!00.1")
        {
           allowLoop := 1
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              changeLittleImgRotationInVP(1)
        } Else If (givenKey="Up" || givenKey="+Up")
        {
-          If ((drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
+          If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
              PanIMGonScreen("U", givenKey)
           Else If HKifs("imgsLoaded")
              ThumbsNavigator("Upu", givenKey)
        } Else If (givenKey="Down" || givenKey="+Down")
        {
-          If ((drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
+          If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
              PanIMGonScreen("D", givenKey)
           Else If HKifs("imgsLoaded")
              ThumbsNavigator("Down", givenKey)
        } Else If (givenKey="^WheelUp")
        {
           allowLoop := 1
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1)
+          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1)
              ChangeZoom(1, "WheelUp")
        } Else If (givenKey="^WheelDown")
        {
           allowLoop := 1
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1)
+          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1)
              ChangeZoom(-1, "WheelDown")
        } Else If (givenKey="!Left")
        {
           allowLoop := 1
-          If (drawingShapeNow=1)
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
              arrowKeysAdjustPrevPointPath(-1, 1)
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              arrowKeysAdjustSelectionArea(-1, 1)
        } Else If (givenKey="!Right")
        {
           allowLoop := 1
-          If (drawingShapeNow=1)
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
              arrowKeysAdjustPrevPointPath(1, 1)
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              arrowKeysAdjustSelectionArea(1, 1)
        } Else If (givenKey="!Up")
        {
           allowLoop := 1
-          If (drawingShapeNow=1)
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
              arrowKeysAdjustPrevPointPath(-2, 1)
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              arrowKeysAdjustSelectionArea(-2, 1)
        } Else If (givenKey="!Down")
        {
           allowLoop := 1
-          If (drawingShapeNow=1)
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
              arrowKeysAdjustPrevPointPath(2, 1)
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              arrowKeysAdjustSelectionArea(2, 1)
-       } Else If (givenKey="!+Left")
+       } Else If (givenKey="+!Left")
        {
-          If (drawingShapeNow=1)
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
              arrowKeysAdjustPrevPointPath(-1, 2)
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              arrowKeysAdjustSelectionArea(-1, 2)
-       } Else If (givenKey="!+Right")
+       } Else If (givenKey="+!Right")
        {
           allowLoop := 1
-          If (drawingShapeNow=1)
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
              arrowKeysAdjustPrevPointPath(1, 2)
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              arrowKeysAdjustSelectionArea(1, 2)
-       } Else If (givenKey="!+Up")
+       } Else If (givenKey="+!Up")
        {
           allowLoop := 1
-          If (drawingShapeNow=1)
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
              arrowKeysAdjustPrevPointPath(-2, 2)
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              arrowKeysAdjustSelectionArea(-2, 2)
-       } Else If (givenKey="!+Down")
+       } Else If (givenKey="+!Down")
        {
           allowLoop := 1
-          If (drawingShapeNow=1)
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
              arrowKeysAdjustPrevPointPath(2, 2)
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              arrowKeysAdjustSelectionArea(2, 2)
-       } Else If (givenKey="~F8")
+       } Else If (givenKey="F8")
        {
           If HKifs("liveEdit")
              toggleImgEditPanelWindow()
@@ -1280,88 +1467,71 @@ KeyboardResponder(givenKey, thisWin, abusive) {
                 InfoToggleSlideShowu()
           } Else if (!CurrentSLD && !maxFilesIndex && StrLen(UserMemBMP)<3)
              toggleScreenSaverMode()
-       } Else If (givenKey="^vk57")
+       } Else If (givenKey="^w")
        {
           If HKifs("imgsLoaded")
              setImageWallpaper()
-       } Else If (givenKey="+vk4E")
+       } Else If (givenKey="+n")
        {
           If HKifs("imgsLoaded")
              PanelEditImgCaption()
-       } Else If (givenKey="vk4E")
+       } Else If (givenKey="n")
        {
           If (HKifs("liveEdit") && (isAlphaMaskWindow()=1 || AnyWindowOpen=66 || AnyWindowOpen=55 || AnyWindowOpen=25))
              toggleInvertAlphaMask()
           Else If (HKifs("imgsLoaded") && thumbsDisplaying!=1)
              ToggleImgCaptions()
-       } Else If (givenKey="^vk31")
+       } Else If (SubStr(givenKey, 1, 1)="^" && isInRange(SubStr(givenKey, 2, 1), 0, 8))
        {
           If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-             SetTimer, ActSortName, -150
-       } Else If (givenKey="^vk32")
-       {
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-             SetTimer, ActSortPath, -150
-       } Else If (givenKey="^vk33")
-       {
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-             SetTimer, ActSortFileName, -150
-       } Else If (givenKey="^vk34")
-       {
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-             SetTimer, ActSortSize, -150
-       } Else If (givenKey="^vk35")
-       {
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-             SetTimer, ActSortModified, -150
-       } Else If (givenKey="^vk36")
-       {
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-             SetTimer, ActSortCreated, -150
-       } Else If (givenKey="^vk37")
-       {
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-             SetTimer, PanelResolutionSorting, -50
-       } Else If (givenKey="^vk38")
-       {
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-             SetTimer, PanelHistogramSorting, -50
-       } Else If (givenKey="^vk30")
-       {
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-             SetTimer, ReverseListNow, -150
-       } Else If (givenKey="~vk4A Up")
+          {
+             If (givenKey="^1")
+                SetTimer, ActSortName, -150
+             Else If (givenKey="^2")
+                SetTimer, ActSortPath, -150
+             Else If (givenKey="^3")
+                SetTimer, ActSortFileName, -150
+             Else If (givenKey="^4")
+                SetTimer, ActSortSize, -150
+             Else If (givenKey="^5")
+                SetTimer, ActSortModified, -150
+             Else If (givenKey="^6")
+                SetTimer, ActSortCreated, -150
+             Else If (givenKey="^7")
+                SetTimer, PanelResolutionSorting, -50
+             Else If (givenKey="^8")
+                SetTimer, PanelHistogramSorting, -50
+             Else If (givenKey="^00.1")
+                SetTimer, ReverseListNow, -150
+          }
+       } Else If (givenKey="j")
        {
           If (liveDrawingBrushTool=1 || AnyWindowOpen=64) && HKifs("liveEdit")
              toggleBrushTypeCloner()
           Else If HKifs("imgsLoaded")
              PanelJump2index()
-       } Else If (givenKey="~+Insert Up")
+       } Else If (givenKey="+Insert")
        {
           If HKifs("imgsLoaded")
              addNewFolder2list()
-       } Else If (givenKey="~Tab")
+       } Else If (givenKey="Tab")
        {
            mainWinTabResponse()
-       } Else If (givenKey="~+Tab")
+       } Else If (givenKey="+Tab")
        {
           ; currentKbdBTNtlbr := 0
-          If (AnyWindowOpen && imgEditPanelOpened!=1 || drawingShapeNow=1 || slideShowRunning=1 || AnyWindowOpen=24 || AnyWindowOpen=31)
-          {
-             If (slideShowRunning=1)
-                ToggleSlideShowu()
-          } Else If (ShowAdvToolbar=1 && hQPVtoolbar)
+          If (ShowAdvToolbar=1 && hQPVtoolbar)
           {
              isToolbarKBDnav := 1
              WinActivate, ahk_id %hQPVtoolbar%
              ; moveMouseToolbar(1, 1)
              displayNowToolbarHelp(2)
           }
-       } Else If (givenKey="~^Tab Up")
+       } Else If (givenKey="^Tab")
        {
           If (HKifs("imgsLoaded") && thumbsDisplaying=1 && markedSelectFile>1)
              filterToFilesSelection()
-       } Else If (givenKey="~F11")
+       } Else If (givenKey="F11")
        {
           If HKifs("liveEdit")
              toggleImgEditPanelWindow()
@@ -1381,7 +1551,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              SoloNewQPVinstance()
        } Else If (givenKey="Enter")
        {
-          If (drawingShapeNow=1)
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
              stopDrawingShape()
           Else If HKifs("liveEdit")
              applyIMGeditFunction()
@@ -1391,31 +1561,31 @@ KeyboardResponder(givenKey, thisWin, abusive) {
        {
           If HKifs("imgsLoaded")
              PanelImageInfos()
-       } Else If (givenKey="~vk43 Up")
+       } Else If (givenKey="c")
        {
           If HKifs("liveEdit")
              changeBrushColorPicker()
           Else If HKifs("imgsLoaded")
              InvokeCopyFiles()
-       } Else If (givenKey="~^vk55 Up")
+       } Else If (givenKey="^u")
        {
           If HKifs("imgsLoaded")
              PanelStaticFolderzManager()
-       } Else If (givenKey="~!vk55 Up")
+       } Else If (givenKey="!u")
        {
           If HKifs("imgsLoaded")
              PanelDynamicFolderzWindow()
-       } Else If (givenKey="~^vk4B Up")
+       } Else If (givenKey="^k")
        {
           If (HKifs("liveEdit") && (AnyWindowOpen=64 || AnyWindowOpen=66 || isAlphaMaskWindow()=1))
              toggleAlphaPaintingMode()
           Else If HKifs("imgsLoaded")
              PanelFileFormatConverter()
-       } Else If (givenKey="~vk4B Up")
+       } Else If (givenKey="k")
        {
           If (HKifs("imgsLoaded") || HKifs("liveEdit", 66) || HKifs("imgEditSolo"))
              PanelFloodFillTool()
-       } Else If (givenKey="~+vk4B Up")
+       } Else If (givenKey="+k")
        {
           If (imgEditPanelOpened=1 && liveDrawingBrushTool=1 || AnyWindowOpen=64 || AnyWindowOpen=66)
              toggleBrushDrawInOutModes()
@@ -1424,19 +1594,19 @@ KeyboardResponder(givenKey, thisWin, abusive) {
             If RegExMatch(getIDimage(currentFileIndex), "i)(.\.(jpg|jpeg))$") || markedSelectFile
                PanelJpegPerformOperation()
           }
-       } Else If (givenKey="~+vk43 Up")
+       } Else If (givenKey="+c")
        {
           If HKifs("imgsLoaded")
              CopyImagePath()
-       } Else If (givenKey="~^vk45 Up")
+       } Else If (givenKey="^e")
        {
           If HKifs("imgsLoaded")
              OpenThisFileFolder()
-       } Else If (givenKey="~^vk46 Up")
+       } Else If (givenKey="^f")
        {
           If HKifs("imgsLoaded")
              PanelEnableFilesFilter()
-       } Else If (givenKey="~vk53")
+       } Else If (givenKey="s")
        {
           If (liveDrawingBrushTool=1)
              toggleBrushDoubleSize()
@@ -1447,19 +1617,20 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              Else
                 ToggleSlideshowModes()
           }
-       } Else If (givenKey="~+vk53")
+       } Else If (givenKey="+s")
        {
           If (HKifs("imgsLoaded") && mustRecordSeenImgs=1 && thumbsDisplaying=1)
              ToggleSeenIMGstatus()
-       } Else If (givenKey="~+^vk53 Up")
+       } Else If (givenKey="+^s")
        {
           If HKifs("imgsLoaded")
              PanelSaveSlideShowu()
-       } Else If (givenKey="vk54 Up")
+       } Else If (givenKey="t")
        {
           If (liveDrawingBrushTool=1)
+          {
              toggleBrushAirMode()
-          Else If (drawingShapeNow=1)
+          } Else If (isImgEditingNow()=1 && drawingShapeNow=1)
           {
              togglePathCurveTension()
           } Else If HKifs("imgsLoaded")
@@ -1469,7 +1640,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              Else
                 ToggleImageSizingMode()
           }
-       } Else If (givenKey="~+Space")
+       } Else If (givenKey="+Space")
        {
           If HKifs("imgsLoaded")
           {
@@ -1480,7 +1651,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              Else If (A_TickCount - prevSlideShowStop>950)
                 dummyInfoToggleSlideShowu()
           }
-       } Else If (givenKey="~^Space Up")
+       } Else If (givenKey="^Space")
        {
           If HKifs("imgsLoaded")
           {
@@ -1491,11 +1662,11 @@ KeyboardResponder(givenKey, thisWin, abusive) {
           }
        } Else If (givenKey="BackSpace")
        {
-          If (drawingShapeNow=1)
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
             reduceCustomShapelength()
           Else If HKifs("imgsLoaded")
             PrevRandyPicture()
-       } Else If (givenKey="~+BackSpace")
+       } Else If (givenKey="+BackSpace")
        {
           If HKifs("imgsLoaded")
           {
@@ -1506,87 +1677,87 @@ KeyboardResponder(givenKey, thisWin, abusive) {
        {
           If HKifs("imgsLoaded")
              jumpPreviousImage()
-       } Else If (givenKey="!vkBE")
+       } Else If (givenKey="!period")
        {
           allowLoop := 1
           If (HKifs("imgsLoaded") && animGIFsSupport=1)
              changeGIFsDelayu(1)
-       } Else If (givenKey="+vkBE")
+       } Else If (givenKey="+period")
        {
           allowLoop := 1
           If (liveDrawingBrushTool=1)
              changeBrushWetness(1)
           Else
              ChangeVolume(1)
-       } Else If (givenKey="vkBE")
+       } Else If (givenKey="period")
        {
           allowLoop := 1
           If (liveDrawingBrushTool=1)
              changeBrushOpacity(-1, 0)
           Else If HKifs("imgsLoaded")
              IncreaseSlideSpeed()
-       } Else If (givenKey="vkBC")
+       } Else If (givenKey="comma")
        {
           allowLoop := 1
           If (liveDrawingBrushTool=1)
              changeBrushOpacity(1, 0)
           Else If HKifs("imgsLoaded")
              DecreaseSlideSpeed()
-       } Else If (givenKey="!vkBC")
+       } Else If (givenKey="!comma")
        {
           allowLoop := 1
           If (HKifs("imgsLoaded") && animGIFsSupport=1)
              changeGIFsDelayu(-1)
-       } Else If (givenKey="+vkBC")
+       } Else If (givenKey="+comma")
        {
           allowLoop := 1
           If (liveDrawingBrushTool=1)
              changeBrushWetness(-1)
           Else
              ChangeVolume(-1)
-       } Else If (givenKey="+vkBF Up")
+       } Else If (givenKey="+vkBF") ; Shift+/
        {
           If HKifs("imgsLoaded")
              PanelDefineEntireSlideshowLength()
-       } Else If (givenKey="~F5 Up")
+       } Else If (givenKey="F5")
        {
           If HKifs("imgsLoaded") || (liveDrawingBrushTool=1 && AnyWindowOpen=64)
              RefreshImageFileAction()
-       } Else If (givenKey="~!F5 Up")
+       } Else If (givenKey="!F5")
        {
           If (HKifs("imgsLoaded") && thumbsDisplaying=1)
              DeepRefreshThumbsNow()
-       } Else If (givenKey="~+F5 Up")
+       } Else If (givenKey="+F5")
        {
           If HKifs("imgsLoaded")
              RefreshFilesList()
-       } Else If (givenKey="~^F5 Up")
+       } Else If (givenKey="^F5")
        {
           If HKifs("imgsLoaded")
              invertCurrentFolderRecursiveness()
-       } Else If (givenKey="~F2 Up")
+       } Else If (givenKey="F2")
        {
           If HKifs("imgsLoaded")
              PanelRenameThisFile()
-       } Else If (givenKey="~+F2 Up")
+       } Else If (givenKey="+F2")
        {
           If HKifs("imgsLoaded")
              SingularRenameFile()
-       } Else If (givenKey="~^F2 Up")
+       } Else If (givenKey="^F2")
        {
           If HKifs("imgsLoaded")
              PanelUpdateThisFileIndex()
-       } Else If (givenKey="~vk4D Up")
+       } Else If (givenKey="m")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && ((editingSelectionNow=1 || AnyWindowOpen=66) && thumbsDisplaying!=1 && AnyWindowOpen!=70)
              ViewAlphaMaskNow()
           Else If HKifs("imgsLoaded")
              PanelMoveCopyFiles()
-       } Else If (givenKey="^vk51")
+       } Else If (givenKey="^q")
        {
           If (HKifs("imgsLoaded") && AutoDownScaleIMGs=1)
              ToggleImgDownScaling()
-       } Else If (givenKey="vk58 Up")
+       } Else If (givenKey="x")
        {
           If HKifs("liveEdit")
           {
@@ -1600,7 +1771,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              Else
                 PlayAudioFileAssociatedNow()
           }
-       } Else If (givenKey="+vk58 Up")
+       } Else If (givenKey="+x")
        {
           If HKifs("imgsLoaded")
           {
@@ -1613,20 +1784,14 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              Else
                 StopMediaPlaying()
           }
-       } Else If (givenKey="vk38")
+       } Else If ((isInRange(givenKey, 1, 7) && isNumber(givenKey))
+              || (SubStr(givenKey, 1, 1)="+" && isInRange(SubStr(givenKey, 2, 1), 1, 7)))
        {
           If (HKifs("liveEdit") && liveDrawingBrushTool=1)
           {
              allowLoop := 1
              changeBrushOpacity(givenKey, 1)
-          }
-       } Else If (givenKey="vk31" || givenKey="vk32" || givenKey="vk33" || givenKey="vk34" || givenKey="vk35" || givenKey="vk36" || givenKey="vk37" || givenKey="+vk31" || givenKey="+vk32" || givenKey="+vk33" || givenKey="+vk34" || givenKey="+vk35" || givenKey="+vk36" || givenKey="+vk37")
-       {
-          If (HKifs("liveEdit") && liveDrawingBrushTool=1)
-          {
-             allowLoop := 1
-             changeBrushOpacity(givenKey, 1)
-          } Else If HKifs("imgsLoaded")
+          } Else If (HKifs("imgsLoaded") && !InStr(givenKey, "8"))
              triggerQuickFileAction(givenKey)
        } Else If (givenKey="^Left")
        {
@@ -1660,7 +1825,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
        {
           If (HKifs("imgsLoaded") && thumbsDisplaying=1)
              ThumbsNavigator("Upu", givenKey)
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1) && (IMGresizingMode=4 && thumbsDisplaying!=1)
+          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1) && (IMGresizingMode=4 && thumbsDisplaying!=1)
              ChangeZoom(1, "WheelUp")
           Else If (HKifs("imgsLoaded"))
              PreviousPicture("key-" givenKey)
@@ -1668,7 +1833,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
        {
           If (HKifs("imgsLoaded") && thumbsDisplaying=1)
              ThumbsNavigator("Down", givenKey)
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1) && (IMGresizingMode=4 && thumbsDisplaying!=1)
+          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1) && (IMGresizingMode=4 && thumbsDisplaying!=1)
              ChangeZoom(-1, "WheelDown")
           Else If (HKifs("imgsLoaded"))
              NextPicture("key-" givenKey)
@@ -1687,7 +1852,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
                 Else
                    NextPicture("key-" givenKey)
             }
-          } Else If ((drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
+          } Else If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
             PanIMGonScreen("R", givenKey)
        } Else If (givenKey="Left" || givenKey="+Left")
        {
@@ -1704,11 +1869,11 @@ KeyboardResponder(givenKey, thisWin, abusive) {
                 Else
                    PreviousPicture("key-" givenKey)
             }
-          } Else If ((drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
+          } Else If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
             PanIMGonScreen("L", givenKey)
        } Else If (givenKey="PgDn")
        {
-          If (drawingShapeNow=1)
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
           {
              allowLoop := 1
              adjustCustomShapePositionLive(-1)
@@ -1728,7 +1893,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
           }
        } Else If (givenKey="PgUp")
        {
-          If (drawingShapeNow=1)
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
           {
              allowLoop := 1
              adjustCustomShapePositionLive(1)
@@ -1791,17 +1956,17 @@ KeyboardResponder(givenKey, thisWin, abusive) {
           allowLoop := 1
           If (HKifs("imgsLoaded") && thumbsDisplaying=1 && SLDtypeLoaded=1)
              FileExploreSiblingsNav(1)
-       } Else If (givenKey="^Home Up")
+       } Else If (givenKey="^Home")
        {
           If HKifs("imgsLoaded")
              jumpToFilesSelBorder(-1)
-       } Else If (givenKey="^End Up")
+       } Else If (givenKey="^End")
        {
           If HKifs("imgsLoaded")
              jumpToFilesSelBorder(1)
        } Else If (givenKey="Home" || givenKey="+Home")
        {
-          If (drawingShapeNow=1)
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
           {
              allowLoop := 1
              adjustCustomShapePositionLive(2)
@@ -1820,7 +1985,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
           }
        } Else If (givenKey="End" || givenKey="+End")
        {
-          If (drawingShapeNow=1)
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
           {
              allowLoop := 1
              adjustCustomShapePositionLive(-2)
@@ -2575,41 +2740,42 @@ incDecSlidesSpeed(direction) {
       DecreaseSlideSpeed()
 }
 
-resetSlideshowTimer(showMsg, ignoreEasyStop:=0, showProgress:=0) {
+resetSlideshowTimer(dummy:=0, ignoreEasyStop:=0) {
    ; DestroyGIFuWin()
-   If (slideShowRunning!=1 && showMsg!=1)
+   If (slideShowRunning!=1)
       Return
 
    If (easySlideStoppage=1 && slideShowRunning=1 && ignoreEasyStop=0)
       ToggleSlideShowu("stop", 0)
    Else If (slideShowRunning=1)
       ToggleSlideShowu("start", 1)
+}
 
-   If (showMsg=1)
-   {
-      friendly := (slideShowRunning=1) ? "RUNNING" : "STOPPED"
-      delayu := DefineSlidesRate()
-      etaTime := "Estimated time: " EstimateSlideShowLength()
-      proggy := (showProgress=1) ? slideShowDelay/59125 : 0
-      showTOOLtip("Slideshow speed: " delayu "`nTotal files: " groupDigits(maxFilesIndex) "`n" etaTime "`nSlideshow: " friendly, "incDecSlidesSpeed", 2, proggy)
-      SetTimer, ResetImgLoadStatus, -50
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-   }
+showSlideShowInfosNow(showProgress) {
+   friendly := (slideShowRunning=1) ? "RUNNING" : "STOPPED"
+   delayu := DefineSlidesRate()
+   etaTime := "Estimated time: " EstimateSlideShowLength()
+   proggy := (showProgress=1) ? slideShowDelay/59125 : 0
+   showTOOLtip("Slideshow speed: " delayu "`nTotal files: " groupDigits(maxFilesIndex) "`n" etaTime "`nSlideshow: " friendly, "incDecSlidesSpeed", 2, proggy)
+   SetTimer, ResetImgLoadStatus, -50
+   SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
 IncreaseSlideSpeed() {
    If (slideShowDelay<1000)
    {
       slideShowDelay += 300
-      SetTimer, dummyChangeSlideSpeed, -50
-      Return
+   } Else
+   {
+      slideShowDelay += 1000
+      If (slideShowDelay>59000)
+         slideShowDelay := 59000
    }
-   
-   slideShowDelay += 1000
-   If (slideShowDelay>59000)
-      slideShowDelay := 59000
 
-   SetTimer, dummyChangeSlideSpeed, -50
+   resetSlideshowTimer(0, 1)
+   showSlideShowInfosNow(1)
+   INIaction(1, "slideShowDelay", "General")
+   Sleep, 5
 }
 
 DecreaseSlideSpeed() {
@@ -2618,18 +2784,15 @@ DecreaseSlideSpeed() {
       slideShowDelay -= 300
       If (slideShowDelay<200)
          slideShowDelay := 100
-
-      SetTimer, dummyChangeSlideSpeed, -50
-      Return
+   } Else
+   {
+      slideShowDelay -= 1000
    }
 
-   slideShowDelay -= 1000
-   SetTimer, dummyChangeSlideSpeed, -50
-}
-
-dummyChangeSlideSpeed() {
-   resetSlideshowTimer(1, 1, 1)
+   resetSlideshowTimer(0, 1)
+   showSlideShowInfosNow(1)
    INIaction(1, "slideShowDelay", "General")
+   Sleep, 5
 }
 
 fileSizeFrienly(bytez) {
@@ -2753,11 +2916,15 @@ CopyImagePath(modus:=0, extras:=0) {
       Catch wasError
           Sleep, 1
  
+      folderu := PathCompact(folderu, "a", 1, OSDfontSize)
       thisu := (modus="dirs") ? folderu "\" : fileNamu "`n" folderu "\"
       If (modus="files")
          thisu := fileNamu
 
-      infoText := wasError ? "ERROR: Failed to copy to clipboard the active entry" : "The active entry was copied to clipboard"
+      If (userPrivateMode=1)
+         thisu := "****************"
+
+      infoText := wasError ? "ERROR: Failed to copy to clipboard as text the active entry" : "The active entry was copied to clipboard as text"
       showTOOLtip(infoText "`n" thisu)
       If InStr(infoText, "error: failed")
          SoundBeep 300, 100 
@@ -3897,8 +4064,8 @@ recalculateThumbsSizes() {
       If ResizedW
          thumbsW := ResizedW
 
-      thumbsW := clampInRange(thumbsW, 80 + Round(OSDfntSize/9), 2048)
-      thumbsH := clampInRange(thumbsH, 80 + Round(OSDfntSize/9), 2048)
+      thumbsW := clampInRange(thumbsW, 80 + Round(OSDfontSize/9), 2048)
+      thumbsH := clampInRange(thumbsH, 80 + Round(OSDfontSize/9), 2048)
    }
 
    If isInRange(max(thumbsW, thumbsH), 0, 150)
@@ -3912,23 +4079,19 @@ recalculateThumbsSizes() {
 
    If (thumbsListViewMode>1)
    {
-      theseDimensions := mainWidth "=" mainHeight "=" OSDfntSize "=" OSDFontName "=" imgHUDbaseUnit "=" thumbsListViewMode
+      theseDimensions := "a" mainWidth mainHeight OSDfontSize OSDFontName imgHUDbaseUnit thumbsListViewMode
       If (prevDimensions!=theseDimensions)
       {
-         xBitmap := trGdip_CreateBitmap(A_ThisFunc, 30, 30)
-         G := trGdip_GraphicsFromImage(A_ThisFunc, xBitmap)
          borderSize := imgHUDbaseUnit//5
-         txtOptions := "x" borderSize " y" borderSize A_Space " Left cEE090909 r1 s" OSDfntSize//1.25
+         txtOptions := "x" borderSize " y" borderSize A_Space " Left cEE090909 r1 s" OSDfontSize//1.25
          thisString := theString "`n" theString
          If (thumbsListViewMode>2)
             thisString .= "`n" theString
 
-         dimensions := Gdip_TextToGraphics(G, thisString, txtOptions, OSDFontName, mainWidth, mainHeight, 0, 0)
+         dimensions := Gdip_TextToGraphics(2NDglPG, thisString, txtOptions, OSDFontName, mainWidth, mainHeight, 1, 0)
          txtRes := StrSplit(dimensions, "|")
          txtResW := Ceil(txtRes[3]) + borderSize*2
          txtResH := Ceil(txtRes[4]) + borderSize*2.1
-         Gdip_DeleteGraphics(G)
-         trGdip_DisposeImage(xBitmap, 1)
          columnsPossible := Round(mainWidth/txtResW)
          prevDimensions := theseDimensions
       }
@@ -4693,10 +4856,10 @@ winSwipeAction(thisCtrlClicked, mainParam) {
    Return didSomething
 }
 
-GetMouseCoord2wind(hwnd, ByRef nx, ByRef ny) {
+GetMouseCoord2wind(hwnd, ByRef nX, ByRef nY) {
     ; CoordMode, Mouse, Screen
-    MouseGetPos, ox, oy
-    JEE_ScreenToClient(hwnd, ox, oy, nx, ny)
+    MouseGetPos, oX, oY
+    JEE_ScreenToClient(hwnd, oX, oY, nX, nY)
 }
 
 doLayeredWinUpdate(funcu, hwnd, HDCu, opacity:=255) {
@@ -4764,7 +4927,7 @@ BtnSetBrushSymmetryCoords() {
    dummyTimerDelayiedImageDisplay(50)
 }
 
-setNewSymmetryPoints() {
+setNewBrushSymmetryPoints() {
    whichBitmap := useGdiBitmap()
    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
    Gdip_GetImageDimensions(whichBitmap, imgW, imgH)
@@ -5454,13 +5617,15 @@ determineSelAreaClickRect(mX, mY, dotsSize, mainWidth, mainHeight, doFlips) {
    Return obju
 }
 
-createMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu) {
+createMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK) {
    deleteMenus()
    If (indexu)
    {
-      mX := Round(customShapePoints[indexu, 1]),    mY := Round(customShapePoints[indexu, 2])
-      kMenu("PVnav", "Add", "P[" indexu "] = X: " mX " Y: " mY, "dummy")
-      kMenu("PVnav", "Disable", "P[" indexu "] = X: " mX " Y: " mY, "dummy")
+      fr := (bK!=1 && bezierSplineCustomShape=1) ? "P'" : "P"
+      mX := Round(customShapePoints[indexu, 1]),
+      mY := Round(customShapePoints[indexu, 2])
+      kMenu("PVnav", "Add", fr "[" indexu "] = X: " mX " Y: " mY, "dummy")
+      kMenu("PVnav", "Disable", fr "[" indexu "] = X: " mX " Y: " mY, "dummy")
    } Else
    {
       kMenu("PVnav", "Add", "X: " mX " Y: " mY, "dummy")
@@ -5477,11 +5642,32 @@ createMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu) {
    If (dontAddPoint=1)
    {
       kMenu("PVnav", "Add", "&Divide point`tDbl-Click", "MenuSplitVectorPoint")
-      kMenu("PVnav", "Add", "&Remove point`tCtrl+Click", "MenuRemVectorPoint")
+      If (bk=1 && bezierSplineCustomShape=1)
+      {
+         kMenu("PVnav", "Add", "E&xpand anchors`tAlt-Click", "MenuExpandVectorPointAnchors")
+         kMenu("PVnav", "Add", "&Collapse anchors", "MenuCollapseVectorPoint")
+      } Else If (bk!=1 && bezierSplineCustomShape=1)
+         kMenu("PVnav", "Add", "Separate &fused anchors`tAlt-Click", "MenuExpandVectorPointAnchors")
+
+      canReflect := 0
+      If (k!=1 && isInRange(thisIndex, 3, totalCount - 3))
+      {
+         canReflect := 1
+         whichIndex := (k=2) ? thisIndex - 1 : thisIndex + 1
+         If (whichIndex=prevVectorShapeSymmetryMode[1, 1])
+            canReflect := 0
+      }
+
+      If (bk!=1 && bezierSplineCustomShape=1 && canReflect=1)
+         kMenu("PVnav", "Add", "&Reflect anchor", "MenuReflectAnchorVectorPoint")
+      labelu := (bk=1 && bezierSplineCustomShape=1 || bezierSplineCustomShape!=1) ? "&Remove point" : "Collapse &anchor"
+      kMenu("PVnav", "Add", labelu "`tCtrl+Click", "MenuRemVectorPoint")
       kMenu("PVnav", "Add", "S&elect point`tShift+Click", "MenuSelVectorPoint")
       If (!CustomShapeSymmetry && !CustomShapeLockedSymmetry)
       {
-         kMenu("PVnav", "Add", "Paste points here", "MenuPasteVectorPoints")
+         If (bezierSplineCustomShape!=1)
+            kMenu("PVnav", "Add", "Paste points here", "MenuPasteVectorPoints")
+
          kMenu("PVnav", "Add", "Set as sta&rt point", "MenuSetStartVectorPoint")
          kMenu("PVnav", "Add", "Set as symmetry on X axis", "MenuSetVectorShapeSymmetryXPoint")
          kMenu("PVnav", "Add", "Set as symmetry on Y axis", "MenuSetVectorShapeSymmetryYPoint")
@@ -5489,16 +5675,20 @@ createMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu) {
    }
 
    Menu, PVnav, Add
-   ; If CustomShapeSymmetry
-   ;    kMenu("PVnav", "Add", "Reverse points order", "MenuReverseVectorPoints")
-
    kMenu("PVnav", "Add", "Select all points`tCtrl+A", "MenuSelAllVectorPoints")
    If (customShapeHasSelectedPoints=1)
    {
-      kMenu("PVnav", "Add", "Cop&y points", "MenuCopyVectorPoints")
+      If (bezierSplineCustomShape!=1)
+         kMenu("PVnav", "Add", "Cop&y points", "MenuCopyVectorPoints")
+
       kMenu("PVnav", "Add", "Deselect points`tCtrl+D", "MenuSelNoVectorPoints")
-      kMenu("PVnav", "Add", "Invert selection points`tShift+I", "MenuSelInvertVectorPoints")
+      kMenu("PVnav", "Add", "In&vert points selection`tShift+I", "MenuSelInvertVectorPoints")
       kMenu("PVnav", "Add", "&Delete selected points`tDelete", "MenuRemSelVectorPoints")
+      If (bezierSplineCustomShape=1)
+      {
+         kMenu("PVnav", "Add", "&Collapse anchors for selected points", "MenuCollapseSelectedAnchorPoints")
+         kMenu("PVnav", "Add", "&Expand anchors for selected points", "MenuExpandSelectedAnchorPoints")
+      }
    }
 
    If (dontAddPoint!=1)
@@ -5520,27 +5710,32 @@ createMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu) {
 
       ; kMenu("PVnav", "Add", "Make the shape symmetrical", "MenuCreateShapeSymmetricalVectorShape")
       createMenuSelectShapeTension()
-      kMenu("PVnav", "Add", "&Smoothness level`tT", ":PVshapeTension")
-      kMenu("PVnav", "Add/Uncheck", "&Constant preview for new point`tP", "togglePreviewVectorNewPoint")
+      kMenu("PVnav", "Add", "&Smoothness level", ":PVshapeTension")
+      If (bezierSplineCustomShape!=1)
+      {
+         kMenu("PVnav", "Add/Uncheck", "&Preview new point`tP", "togglePreviewVectorNewPoint")
+         If (showNewVectorPointPreview=1)
+            kMenu("PVnav", "Check", "&Preview new point`tP")
+      }
+
+      kMenu("PVnav", "Add/Uncheck", "Auto-reflect anchors`tR", "toggleAutoReflectAnchors")
       kMenu("PVnav", "Add/Uncheck", "Show viewport &grid`tAlt+=", "toggleViewPortGridu")
 
+      If (autoReflectVectorAnchors=1)
+         kMenu("PVnav", "Check", "Auto-reflect anchors`tR")
       If (showViewPortGrid=1)
          kMenu("PVnav", "Check", "Show viewport &grid`tAlt+=")
-      If (showNewVectorPointPreview=1)
-         kMenu("PVnav", "Check", "&Constant preview for new point`tP")
 
-      If (drawingLiveMode=1)
-      {
-         kMenu("PVnav", "Add/Uncheck", "&Open path`tO", "toggleOpenClosedLineCustomShape")
-         If (closedLineCustomShape=1)
-            kMenu("PVnav", "Check", "&Open path`tO")
-      }
+      kMenu("PVnav", "Add/UnCheck", "&Show toolbar`tF10", "toggleAppToolbar")
+      If (ShowAdvToolbar=1)
+         kMenu("PVnav", "Check", "&Show toolbar`tF10")
 
-      If (ShowAdvToolbar!=1)
-      {
-         createMenuImgSizeAdapt("bonus")
-         kMenu("PVnav", "Add", "Vie&wport options", ":PvImgAdapt")
-      }
+      kMenu("PVnav", "Add/Uncheck", "&Open ended path`tO", "toggleOpenClosedLineCustomShape", "opened closed vector")
+      If (closedLineCustomShape=0)
+         kMenu("PVnav", "Check", "&Open ended path`tO")
+
+      createMenuImgSizeAdapt("bonus")
+      kMenu("PVnav", "Add", "Vie&wport options", ":PvImgAdapt")
    }
    showThisMenu("PVnav")
 }
@@ -5584,6 +5779,8 @@ MenuSetVectorShapeSymmetryYPoint() {
 }
 
 configVectorShapeSymmetryPoint(modus, silentu, givenIndex) {
+   If (bezierSplineCustomShape=1)
+      autoDeactivateClosedBezier()
 
    totalLoops := customShapePoints.Count()
    If (totalLoops<3)
@@ -5596,44 +5793,52 @@ configVectorShapeSymmetryPoint(modus, silentu, givenIndex) {
    Else
       thisIndex := addNewVectorShapePoints(lastUserRclickVPx, lastUserRclickVPy, mainWidth, mainHeight, "setStart", 0, 1)
 
-   kX := customShapePoints[thisIndex, 1]
-   kY := customShapePoints[thisIndex, 2]
-   fX := prevResizedVPimgW/initialDrawingStartCoords[thisIndex, 4]
-   fY := prevResizedVPimgH/initialDrawingStartCoords[thisIndex, 5]
+   getVPcoordsVectorPoint(thisIndex, gX, gY)
+   If (bezierSplineCustomShape=1)
+   {
+      ignorePoints := []
+      listuArray := getPointsSameCoordsVectorPath(totalLoops, thisIndex, gX, gY)
+      Loop, % listuArray.Count()
+      {
+         p := listuArray[A_Index, 1]
+         ignorePoints[p] := 1
+      }
+   }
+
    ; ToolTip, % totalLoops "=" modus "=" silentu "=" givenIndex , , , 2
-   gX := kX * fX,    gY := kY * fY
    uneven := (totalLoops//2 != totalLoops/2) ? 1 : 0
    leftSideXH := rightSideXH := 0
    topSideYV := bottomSideYV := 0
    Loop, % totalLoops
    {
-      If (uneven=1 && thisIndex=A_Index)
+      If (uneven=1 && thisIndex=A_Index) || (ignorePoints[A_Index]=1 && bezierSplineCustomShape=1)
          Continue
 
+      getVPcoordsVectorPoint(A_Index, xu, yu)
       If (modus="x")
       {
-         If (customShapePoints[A_Index, 1]<gX)
+         If (xu<gX)
             leftSideXH++
          Else
             rightSideXH++
       } Else
       {
-         If (customShapePoints[A_Index, 2]<gY)
+         If (yu<gY)
             topSideYV++
          Else
             bottomSideYV++
       }
    }
 
+   getVPcoordsVectorPoint(1, fxu, fyu)
+   getVPcoordsVectorPoint(totalLoops, exu, eyu)
    If (modus="x")
    {
-      If (customShapePoints[A_Index, 1]<gX) && (customShapePoints[totalLoops, 1]<gX)
-      || (customShapePoints[A_Index, 1]>gX) && (customShapePoints[totalLoops, 1]>gX)
+      If (fxu<gX && exu<gX) || (fxu>gX && exu>gX)
          errMsgNow := "ERROR: The start point and the end point are on the same side of the designated symmetry.`nPlease change the start point to have the X axis of symmetry split the end points."
    } Else
    {
-      If (customShapePoints[A_Index, 1]<gX) && (customShapePoints[totalLoops, 1]<gX)
-      || (customShapePoints[A_Index, 1]>gX) && (customShapePoints[totalLoops, 1]>gX)
+      If (fyu<gY && eyu<gY) || (fyu>gY && eyu>gY)
          errMsgNow := "ERROR: The start point and the end point are on the same side of the designated symmetry.`nPlease change the start point to have the Y axis of symmetry split the end points."
    }
 
@@ -5660,7 +5865,11 @@ configVectorShapeSymmetryPoint(modus, silentu, givenIndex) {
       Return
    }
 
-   vpSymmetryPointX := gX,    vpSymmetryPointY := gY
+   cA := customShapePoints[thisIndex]
+   fX := prevResizedVPimgW/initialDrawingStartCoords[thisIndex, 4]
+   fY := prevResizedVPimgH/initialDrawingStartCoords[thisIndex, 5]
+   vpSymmetryPointX := cA[1]*fX
+   vpSymmetryPointY := cA[2]*fY
    vpSymmetryPointXdp := initialDrawingStartCoords[thisIndex, 1]
    vpSymmetryPointYdp := initialDrawingStartCoords[thisIndex, 2]
    thisu := (modus="x") ? 1 : 2
@@ -5670,10 +5879,196 @@ configVectorShapeSymmetryPoint(modus, silentu, givenIndex) {
    SetTimer, dummyRefreshImgSelectionWindow, -10
 }
 
+MenuExpandSelectedAnchorPoints() {
+    k := 0
+    totalCount := customShapePoints.Count()
+    canDoSymmetry := isNowSymmetricVectorShape()
+    Loop, % totalCount
+    {
+        thisIndex := A_Index
+        selu := initialDrawingStartCoords[thisIndex, 3]
+        c := customShapePoints[thisIndex]
+        k := clampInRange(k + 1, 1, 3, 1)
+        If (c[1]="" || c[2]="" || selu!=1 || lol[thisIndex]=1 || k!=1)
+           Continue
+
+        oppoIndex := (canDoSymmetry=1) ? totalCount - thisIndex + 1 : -1
+        expandGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, c[1], c[2])
+    }
+    If (preventUndoLevels!=1)
+       recordVectorUndoLevels(customShapePoints.Clone(), initialDrawingStartCoords.Clone())
+
+    lastZeitFileSelect := A_TickCount
+    SetTimer, dummyRefreshImgSelectionWindow, -10
+}
+
+MenuCollapseSelectedAnchorPoints() {
+    k := hasFoundDot := 0
+    totalCount := customShapePoints.Count()
+    canDoSymmetry := isNowSymmetricVectorShape()
+    lol := []
+    Loop, % totalCount
+    {
+        thisIndex := A_Index
+        selu := initialDrawingStartCoords[thisIndex, 3]
+        c := customShapePoints[thisIndex]
+        k := clampInRange(k + 1, 1, 3, 1)
+        If (c[1]="" || c[2]="" || selu!=1 || lol[thisIndex]=1)
+           Continue
+
+        oppoIndex := (canDoSymmetry=1) ? totalCount - thisIndex + 1 : -1
+        collapseGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry)
+        lol[thisIndex] := 1
+        If (k!=1)
+        {
+           ; collapse anchors on «delete»
+           initialDrawingStartCoords[thisIndex, 3] := 0
+           If (oppoIndex!=thisIndex && canDoSymmetry=1)
+           {
+              lol[oppoIndex] := 1
+              initialDrawingStartCoords[oppoIndex, 3] := 0
+           }
+        } Else
+        {
+           A := B := 0
+           collapseGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry)
+           getAssociatedBezierPoints(k, totalCount, thisIndex, A, B)
+           If A
+           {
+              lol[a] := 1
+              initialDrawingStartCoords[A, 3] := 1
+           }
+
+           If B
+           {
+              lol[b] := 1
+              initialDrawingStartCoords[B, 3] := 1
+           }
+
+           If (oppoIndex!=thisIndex && canDoSymmetry=1 && a!=thisIndex && b!=thisIndex && a!=oppoIndex && b!=oppoIndex)
+           {
+              za := totalCount - a + 1
+              zb .= totalCount - b + 1
+              If (a!=za && za!=zb && a)
+              {
+                 initialDrawingStartCoords[za, 3] := 1
+                 lol[za] := 1
+              }
+
+              If (b!=zb && za!=zb && b)
+              {
+                 initialDrawingStartCoords[zb, 3] := 1
+                 lol[zb] := 1
+              }
+           }
+        }
+    }
+
+    customShapeHasSelectedPoints := 0
+    Loop, % totalCount
+    {
+        If initialDrawingStartCoords[A_Index, 3]
+        {
+           customShapeHasSelectedPoints := 1
+           Break
+        }
+    }
+    If (preventUndoLevels!=1)
+       recordVectorUndoLevels(customShapePoints.Clone(), initialDrawingStartCoords.Clone())
+
+    lastZeitFileSelect := A_TickCount
+    SetTimer, dummyRefreshImgSelectionWindow, -10
+}
+
+MenuReflectAnchorVectorPoint() {
+  lastOtherWinClose := 1
+  GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+  lastZeitFileSelect := A_TickCount
+  addNewVectorShapePoints(lastUserRclickVPx, lastUserRclickVPy, mainWidth, mainHeight, "reflectAnchor", 0, 0, 0)
+  SetTimer, dummyRefreshImgSelectionWindow, -10
+}
+
 MenuRemSelVectorPoints() {
+    If (bezierSplineCustomShape=1)
+    {
+       k := hasFoundDot := 0
+       totalCount := customShapePoints.Count()
+       canDoSymmetry := isNowSymmetricVectorShape()
+       lol := []
+       Loop, % totalCount
+       {
+           thisIndex := A_Index
+           selu := initialDrawingStartCoords[thisIndex, 3]
+           c := customShapePoints[thisIndex]
+           k := clampInRange(k + 1, 1, 3, 1)
+           If (c[1]="" || c[2]="" || selu!=1 || lol[thisIndex]=1)
+              Continue
+
+           oppoIndex := (canDoSymmetry=1) ? totalCount - thisIndex + 1 : -1
+           If (k!=1)
+           {
+              ; collapse anchors on «delete»
+              collapseGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry)
+              initialDrawingStartCoords[thisIndex, 3] := 0
+              lol[thisIndex] := 1
+              If (oppoIndex!=thisIndex && canDoSymmetry=1)
+              {
+                 lol[oppoIndex] := 1
+                 initialDrawingStartCoords[oppoIndex, 3] := 0
+              }
+           } Else
+           {
+              ; select anchors of selected main/key points and below, they all get removed
+              A := B := 0
+              hasFoundDot := 1
+              nextK := getAssociatedBezierPoints(k, totalCount, thisIndex, A, B)
+              If A
+              {
+                 lol[a] := 1
+                 initialDrawingStartCoords[A, 3] := 1
+              }
+
+              If B
+              {
+                 lol[b] := 1
+                 initialDrawingStartCoords[B, 3] := 1
+              }
+
+              If (oppoIndex!=thisIndex && canDoSymmetry=1 && a!=thisIndex && b!=thisIndex && a!=oppoIndex && b!=oppoIndex)
+              {
+                 za := totalCount - a + 1
+                 zb .= totalCount - b + 1
+                 If (a!=za && za!=zb && a)
+                 {
+                    initialDrawingStartCoords[za, 3] := 1
+                    lol[za] := 1
+                 }
+ 
+                 If (b!=zb && za!=zb && b)
+                 {
+                    initialDrawingStartCoords[zb, 3] := 1
+                    lol[zb] := 1
+                 }
+              }
+           }
+       }
+
+       If !hasFoundDot
+       {
+          ; if no main/key points were selected, collapsing anchors is sufficient
+          If (preventUndoLevels!=1)
+             recordVectorUndoLevels(customShapePoints.Clone(), initialDrawingStartCoords.Clone())
+
+          lastZeitFileSelect := A_TickCount
+          customShapeHasSelectedPoints := 0
+          SetTimer, dummyRefreshImgSelectionWindow, -10
+          Return
+       }
+    }
+
     newArrayu := []
     newuArrayu := []
-    thePoint := 0
+    thisIndex := thePoint := 0
     If CustomShapeSymmetry
     {
        hasSymmetry := 1
@@ -5711,6 +6106,7 @@ MenuRemSelVectorPoints() {
 
     If (preventUndoLevels!=1)
        recordVectorUndoLevels(customShapePoints.Clone(), initialDrawingStartCoords.Clone())
+
     lastZeitFileSelect := A_TickCount
     SetTimer, dummyRefreshImgSelectionWindow, -10
 }
@@ -5816,6 +6212,22 @@ MenuSelVectorPoint() {
   SetTimer, dummyRefreshImgSelectionWindow, -10
 }
 
+MenuCollapseVectorPoint() {
+  lastOtherWinClose := 1
+  GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+  lastZeitFileSelect := A_TickCount
+  addNewVectorShapePoints(lastUserRclickVPx, lastUserRclickVPy, mainWidth, mainHeight, "collapseClick", 0, 0, 0)
+  SetTimer, dummyRefreshImgSelectionWindow, -10
+}
+
+MenuExpandVectorPointAnchors() {
+  lastOtherWinClose := 1
+  GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+  lastZeitFileSelect := A_TickCount
+  addNewVectorShapePoints(lastUserRclickVPx, lastUserRclickVPy, mainWidth, mainHeight, "expandClick", 0, 0, 0)
+  SetTimer, dummyRefreshImgSelectionWindow, -10
+}
+
 MenuReverseVectorPoints() {
     MenuSetStartVectorPoint(initialDrawingStartCoords.Count() //2 + 1, "yes")
 }
@@ -5871,9 +6283,43 @@ MenuSetStartVectorPoint(given:=0, isGiven:=0) {
   SetTimer, dummyRefreshImgSelectionWindow, -10
 }
 
+MenuToggleBezierMode() {
+   bezierSplineCustomShape := !bezierSplineCustomShape
+   FillAreaCurveTension := (bezierSplineCustomShape=1) ? 5 : 3
+   friendly := (bezierSplineCustomShape=1) ? "ACTIVATED" : "DEACTIVATED"
+   showTOOLtip("Bézier path mode: " friendly, A_ThisFunc, 1)
+   performBezierAutoFixNow()
+   decideCustomShapeStyle()
+   RegAction(1, "FillAreaCurveTension")
+   If (drawingShapeNow=1)
+      showQuickActionButtonsDrawingShape()
+
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+   dummyTimerDelayiedImageDisplay(100)
+}
+
+performBezierAutoFixNow() {
+   PointsCount := customShapePoints.Count()
+   If (bezierSplineCustomShape=1 && PointsCount>0)
+   {
+      r := mod(PointsCount, 3)
+      ; ToolTip, % "r=" r, , , 2
+      c := customShapePoints[PointsCount]
+      d := initialDrawingStartCoords[PointsCount]
+      loops := (r=2) ? 2 : 1
+      If (r=1)
+         loops := 0
+
+      Loop, % loops
+      {
+         customShapePoints.Push(c.Clone())
+         initialDrawingStartCoords.Push(d.Clone())
+      }
+      ; ToolTip, % "l=" loops , , , 2
+   }
+}
+
 addNewVectorShapePoints(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, shiftState, altState:=0) {
-   Critical, on
-   Static lastInvoked := A_TickCount, lastIndex
 ; the following array is used when editing the vector shape to hold details about viewport conditions when user added/modified points:
    ; initialDrawingStartCoords[A_Index] := [prevDestPosX, prevDestPosY, isSelected, prevResizedVPimgW, prevResizedVPimgH]
 
@@ -5881,6 +6327,8 @@ addNewVectorShapePoints(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, shi
    ; customShapePoints[A_Index] := [x, y]
    ; it holds the actual coords of the points, the data is held in pixels units when user edits the shape; when not, the values are relative to a rect bound box [0 to 1]
 
+   Critical, on
+   Static lastInvoked := A_TickCount, lastIndex
    ; If (A_tickcount - lastInvoked<50)
    ;    Return
    If (mainParam="setStart") || (A_TickCount - lastOtherWinClose<250)
@@ -5898,129 +6346,95 @@ addNewVectorShapePoints(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, shi
 
    gmX := (FlipImgH=1) ? mainWidth - mX : mX
    gmY := (FlipImgV=1) ? mainHeight - mY : mY
-   doSpecialAct := dontAddPoint := dotRemoved := 0
-   thisIndex := thisState := prevState := 0
-   setwhileLoopExec(1)
+   selu := oppoIndex := doSpecialAct := dontAddPoint := dotRemoved := 0
+   hasFoundDot := k := thisIndex := thisState := prevState := 0
    totalCount := customShapePoints.Count()
    canDoSymmetry := isNowSymmetricVectorShape()
+   startOperation := A_TickCount
+   sl := SelDotsSize//2 + 1
    Loop, % totalCount
    {
+       ; determine user clicked point from the entire path
        thisIndex := A_Index
-       c := customShapePoints[A_Index]
-       oppoIndex := (canDoSymmetry=1) ? totalCount - A_Index + 1 : -1
-       fX := prevResizedVPimgW/initialDrawingStartCoords[A_Index, 4]
-       fY := prevResizedVPimgH/initialDrawingStartCoords[A_Index, 5]
-       xu := c[1]*fX - (initialDrawingStartCoords[A_Index, 1]*fX - prevDestPosX)
-       yu := c[2]*fY - (initialDrawingStartCoords[A_Index, 2]*fY - prevDestPosY)
-       If isDotInRect(gmX, gmY, xu - SelDotsSize//2, xu + SelDotsSize, yu - SelDotsSize//2, yu + SelDotsSize)
+       oppoIndex := (canDoSymmetry=1) ? totalCount - thisIndex + 1 : -1
+       c := customShapePoints[thisIndex]
+       selu := initialDrawingStartCoords[thisIndex, 3]
+       getVPcoordsVectorPoint(thisIndex, xu, yu)
+       If (bezierSplineCustomShape=1)
+          k := clampInRange(k + 1, 1, 3, 1)
+
+       If isDotInRect(gmX, gmY, SelDotsSize, SelDotsSize, xu, yu, 1)
        {
-          dontAddPoint := 1
-          If (mainParam="DoubleClick" && totalCount>2)
+          hasFoundDot := 1
+          If (k!=1 && bezierSplineCustomShape=1)
           {
-             selu := initialDrawingStartCoords[thisIndex, 3]
-             customShapePoints[thisIndex] := [gmX + SelDotsSize, gmY + SelDotsSize]
-             initialDrawingStartCoords[thisIndex] := [prevDestPosX, prevDestPosY, selu, prevResizedVPimgW, prevResizedVPimgH]
-             insertThis := [gmX - SelDotsSize, gmY - SelDotsSize]
-             customShapePoints.InsertAt(thisIndex, insertThis)
-             insertAThis := [prevDestPosX, prevDestPosY, selu, prevResizedVPimgW, prevResizedVPimgH]
-             initialDrawingStartCoords.InsertAt(thisIndex, insertAThis)
-             If (oppoIndex!=thisIndex && canDoSymmetry=1)
-             {
-                hasSymmetry := calculateSymmetricVectorPoint(gmX + SelDotsSize, gmY + SelDotsSize, nX, nY)
-                If (thisIndex < oppoIndex)
-                   oppoIndex++
-                customShapePoints[oppoIndex] := [nX, nY]
-                initialDrawingStartCoords[oppoIndex] := [prevDestPosX, prevDestPosY, selu, prevResizedVPimgW, prevResizedVPimgH]
+             ; if an anchor point, determine if other points in the array proximity share the same coordinates
+             ; if they do, then set the next key point [q point thats not an anchor] as the point that was clicked
+             ; this prevents users from clicking on anchors when they click on «key» points
 
-                prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] + 1
-                hasSymmetry := calculateSymmetricVectorPoint(gmX - SelDotsSize, gmY - SelDotsSize, nX, nY)
-                insertThis := [nX, nY]
-                customShapePoints.InSertAt(oppoIndex, insertThis)
-                initialDrawingStartCoords.InsertAt(oppoIndex, insertAThis)
-             } Else If (CustomShapeLockedSymmetry && oppoIndex=-1)
+             ; TulTip(0, "|    ", k, thisIndex, a, b, nextK)
+             nextK := getAssociatedBezierPoints(k, totalCount, thisIndex, A, B)
+             If (isDotInRect(c[1], c[2], sl, sl, customShapePoints[A, 1], customShapePoints[A, 2], 1)
+             || isDotInRect(c[1], c[2], sl, sl, customShapePoints[B, 1], customShapePoints[B, 2], 1)
+             || isDotInRect(c[1], c[2], sl, sl, customShapePoints[nextK, 1], customShapePoints[nextK, 2], 1))
              {
-                prevVectorShapeSymmetryMode[1, 2] := 0
-                CustomShapeLockedSymmetry := 0
-             }
-          } Else If (shiftState=1 || mainParam="selClick")
-          {
-             initialDrawingStartCoords[thisIndex, 3] := !initialDrawingStartCoords[thisIndex, 3]
-             If (oppoIndex!=thisIndex && canDoSymmetry=1)
-                initialDrawingStartCoords[oppoIndex, 3] := !initialDrawingStartCoords[oppoIndex, 3]
-             lastZeitFileSelect := A_TickCount
-          } Else If (ctrlState=1 || mainParam="remClick")
-          {
-             dotRemoved := 1
-             customShapePoints.RemoveAt(thisIndex)
-             initialDrawingStartCoords.RemoveAt(thisIndex)
-             ; ToolTip, % "l=" CustomShapeLockedSymmetry "=" thisIndex "=" oppoIndex , , , 2
-             If (oppoIndex!=thisIndex && canDoSymmetry=1)
-             {
-                If (thisIndex < oppoIndex)
-                   oppoIndex--
-
-                prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] - 1
-                customShapePoints.RemoveAt(oppoIndex)
-                initialDrawingStartCoords.RemoveAt(oppoIndex)
-             } Else If (CustomShapeLockedSymmetry && oppoIndex=-1)
-             {
-                prevVectorShapeSymmetryMode[1, 2] := 0
-                CustomShapeLockedSymmetry := 0
-             }
-          } Else If (mainParam!="remClick" && mainParam!="rClick" && ctrlState=0 && altState=0 && shiftState=0)
-          {
-             If (customShapeHasSelectedPoints=1)
-             {
-                doSpecialAct := 1
-             } Else
-             { 
-                mustSnapLiveDrawPoints := 0
-                initialDrawingStartCoords[thisIndex] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
-                If ((CustomShapeSymmetry=1 && vpSymmetryPointX) || (CustomShapeSymmetry=1 && vpSymmetryPointX)) && (altState=0)
-                   initialDrawingStartCoords[oppoIndex] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
-
-                While, (determineLClickstate()=1)
-                {
-                     zeitSillyPrevent := A_TickCount
-                     GetMouseCoord2wind(PVhwnd, mX, mY)
-                     gmX := (FlipImgH=1) ? mainWidth - mX : mX
-                     gmY := (FlipImgV=1) ? mainHeight - mY : mY
-                     If GetKeyState("Shift", "P")
-                     {
-                        snapPointsAtAngles(gmX, gmY, c[1], c[2], gmX, gmY)
-                        gmX := Round(gmX),  gmY := Round(gmY)
-                        VPstampBMPx := c[1], VPstampBMPy := c[2]
-                        mustSnapLiveDrawPoints := 2
-                     }
-
-                     mustRem := 1
-                     customShapePoints[thisIndex] := [gmX, gmY]
-                     If (oppoIndex!=thisIndex && canDoSymmetry=1)
-                     {
-                        hasSymmetry := calculateSymmetricVectorPoint(gmX, gmY, nX, nY)
-                        customShapePoints[oppoIndex] := [nX, nY]
-                        ; initialDrawingStartCoords[oppoIndex] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
-                     }
-
-                     thisState := "a" gmX gmY mX mY
-                     If (thisState!=prevState)
-                     {
-                        If (oppoIndex!=thisIndex && canDoSymmetry=1)
-                           otheru := ", " oppoIndex
-                        prevState := thisState
-                        showTOOLtip("P[" thisIndex otheru "] = (" gmX ", " gmY ")")
-                        dummyRefreshImgSelectionWindow()
-                     }
-                     Sleep, 5
-                }
+                thisIndex := nextK
+                oppoIndex := (canDoSymmetry=1) ? totalCount - thisIndex + 1 : -1
+                If !selu
+                   selu := initialDrawingStartCoords[thisIndex, 3]
+                getVPcoordsVectorPoint(thisIndex, xu, yu)
+                k := 1
              }
           }
+          dontAddPoint := 1
           Break
        }
    }
 
-   setwhileLoopExec(0)
-   If dontAddPoint
+   If hasFoundDot
+   {
+      ; perform action[s] on thisIndex point from customShapePoints
+      If (mainParam="DoubleClick" && totalCount>2 && shiftState=0 && ctrlState=0 && altState=0)
+      {
+         dontAddPoint := 1
+         splitPointGivenInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
+      } Else If (shiftState=1 || mainParam="selClick")
+      {
+         dontAddPoint := 1
+         lastZeitFileSelect := A_TickCount
+         selectGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, mainParam, gmX, gmY)
+      } Else If (mainParam="collapseClick")
+      {
+         doSpecialAct := dontAddPoint := 1
+         collapseGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry)
+      } Else If (mainParam="reflectAnchor")
+      {
+         doSpecialAct := dontAddPoint := 1
+         reflectGivenAnchorInPath(k, totalCount, thisIndex, canDoSymmetry)
+      } Else If (mainParam="expandClick") || (altState=1 && mainParam="DoubleClick" && bezierSplineCustomShape=1 && k=1)
+      {
+         doSpecialAct := dontAddPoint := 1
+         expandGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
+      } Else If (ctrlState=1 || mainParam="remClick")
+      {
+         dotRemoved := 1
+         removeGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
+      } Else If (mainParam!="remClick" && mainParam!="rClick" && ctrlState=0 && altState=0 && shiftState=0)
+      {
+         If (customShapeHasSelectedPoints=1 && selu=1)
+         {
+            ; drag/move selected points
+            moveSelectedPointsInVectorPath(gmX, gmY)
+            dontAddPoint := doSpecialAct := 1
+         } Else
+         { 
+            dontAddPoint := 1
+            mustRem := moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY, altState)
+         }
+      }
+   } Else thisIndex := 0
+
+   If (dontAddPoint && thisIndex)
       lastIndex := thisIndex
 
    If (mustRem=1)
@@ -6028,124 +6442,27 @@ addNewVectorShapePoints(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, shi
 
    If (mainParam="rClick" && dotRemoved!=1)
    {
-      createMenuCustomShapeDrawing(mX, mY, dontAddPoint, thisIndex)
+      createMenuCustomShapeDrawing(mX, mY, dontAddPoint, thisIndex, k)
       Return lastIndex
    }
 
-   If (customShapeHasSelectedPoints=1 && doSpecialAct!=1 && dotRemoved!=1 && dontAddPoint!=1 && mainParam!="DoubleClick" && !InStr(mainParam, "pen-") && ctrlState=0 && altState=0)
+   If (customShapeHasSelectedPoints=1 && doSpecialAct!=1 && dotRemoved!=1 && dontAddPoint!=1 && !InStr(mainParam, "pen-") && ctrlState=0 && altState=0)
    {
-      ; scale selected points
       dontAddPoint := 1
-      thisState := prevState := 0
-      GetMouseCoord2wind(PVhwnd, omX, omY)
-      newArrayu := customShapePoints.Clone()
-      setwhileLoopExec(1)
-      minX := minY := 8823893348934389
-      maxX := maxY := -8823893348934389
-      If GetKeyState("Shift", "P")
-         lockedAR := 1
-
-      Loop, % customShapePoints.Count()
-      {
-         c := newArrayu[A_Index]
-         selu := initialDrawingStartCoords[A_Index, 3]
-         If (c[1]="" || c[2]="" || selu!=1)
-            Continue
-
-         minX := min(minX, c[1])
-         minY := min(minY, c[2])
-         maxX := max(maxX, c[1])
-         maxY := max(maxY, c[2])
-      }
-      avgX := (minX + maxX)//2
-      avgY := (minY + maxY)//2
-      If GetKeyState("Shift", "P")
-         lockedAR := 1
-
-      While, (determineLClickstate()=1)
-      {
-         zeitSillyPrevent := A_TickCount
-         GetMouseCoord2wind(PVhwnd, mX, mY)
-         gmX := omX/mX
-         gmY := omY/mY
-         If (lockedAR=1)
-            gmX := gmY := max(gmX, gmY)
-
-         thisState := "a" gmX "=" gmY
-         If (thisState!=prevState)
-         {
-            prevState := thisState
-            Loop, % customShapePoints.Count()
-            {
-               c := newArrayu[A_Index]
-               selu := initialDrawingStartCoords[A_Index, 3]
-               If (c[1]="" || c[2]="" || selu!=1)
-                  Continue
-
-               diffX := avgX - avgX * gmX
-               diffY := avgY - avgY * gmY
-               xu := c[1] * gmX + diffX
-               yu := c[2] * gmY + diffY
-               customShapePoints[A_Index] := [xu, yu]
-            }
-            showTOOLtip("X=" Round(gmX, 3) ", Y=" Round(gmY, 3))
-            dummyRefreshImgSelectionWindow()
-         }
-         Sleep, 10
-      }
-
-      setwhileLoopExec(0)
-      RemoveTooltip()
-      newArrayu := []
-   } Else If (doSpecialAct=1)
-   {
-      ; move selected points
-      thisState := prevState := 0
-      GetMouseCoord2wind(PVhwnd, omX, omY)
-      newArrayu := customShapePoints.Clone()
-      setwhileLoopExec(1)
-      While, (determineLClickstate()=1)
-      {
-         zeitSillyPrevent := A_TickCount
-         GetMouseCoord2wind(PVhwnd, mX, mY)
-         gmX := omX - mX
-         gmY := omY - mY
-         thisState := "a" gmX "=" gmY
-         If (thisState!=prevState)
-         {
-            prevState := thisState
-            Loop, % customShapePoints.Count()
-            {
-               c := newArrayu[A_Index]
-               selu := initialDrawingStartCoords[A_Index, 3]
-               If (c[1]="" || c[2]="" || selu!=1)
-                  Continue
-
-               ; fX := prevResizedVPimgW/initialDrawingStartCoords[A_Index, 4]
-               ; fY := prevResizedVPimgH/initialDrawingStartCoords[A_Index, 5]
-               xu := c[1] - gmX ; *fX
-               yu := c[2] - gmY ; *fY
-               customShapePoints[A_Index] := [xu, yu]
-            }
-            showTOOLtip("X=" -1*gmX ", Y=" -1*gmY)
-            dummyRefreshImgSelectionWindow()
-         }
-         Sleep, 10
-      }
-
-      setwhileLoopExec(0)
-      RemoveTooltip()
-      newArrayu := []
+      If (mainParam="DoubleClick" && customShapeHasSelectedPoints=1)
+         SetTimer, MenuSelNoVectorPoints, -50
+      Else
+         rescaleSelectedVectorPoints()
    }
 
    ; If (FlipImgH=1 || FlipImgV=1)
       ; GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
    If (doSpecialAct!=1 && dotRemoved!=1 && dontAddPoint!=1 && mainParam!="DoubleClick" && !InStr(mainParam, "pen-") && ctrlState=0 && altState=0)
    {
+      ; actually add new point[s] to path, if nothing else happened before ^_^ 
       If (mustSnapLiveDrawPoints=1 && thisIndex)
       {
-         gmX := VPstampBMPx
-         gmY := VPstampBMPy
+         gmX := VPstampBMPx,   gmY := VPstampBMPy
       }
 
       hasSymmetry := 0
@@ -6161,8 +6478,7 @@ addNewVectorShapePoints(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, shi
              gmc := gmX,  gmd := gmXa
              gmXa := gmX, gmX := gmd
           }
-          customShapePoints.InsertAt(1, [gmXa, gmY])
-          initialDrawingStartCoords.InsertAt(1, [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH])
+          pushAtGivenVectorPoint(1, gmXa, gmY)
       } Else If (CustomShapeSymmetry=2 && vpSymmetryPointY)
       {
           hasSymmetry := 1
@@ -6174,22 +6490,851 @@ addNewVectorShapePoints(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, shi
              gmc := gmY,  gmd := gmYa
              gmYa := gmY, gmY := gmd
           }
-          customShapePoints.InsertAt(1, [gmX, gmYa])
-          initialDrawingStartCoords.InsertAt(1, [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH])
+          pushAtGivenVectorPoint(1, gmX, gmYa)
       } Else CustomShapeLockedSymmetry := 0
 
-      customShapePoints.Push([gmX, gmY])
-      prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] + 1
-      thisIndex := customShapePoints.MaxIndex()
-      initialDrawingStartCoords[thisIndex] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
-      If (hasSymmetry!=1 && shiftState=0)
+      thisIndex := pushEndNewVectorPoint(gmX, gmY)
+      If (customShapePoints.Count()=3 && CustomShapeSymmetry)
+         prevVectorShapeSymmetryMode[1, 1] := 2 
+      ; klp := prevVectorShapeSymmetryMode[1, 1]
+      ; ToolTip, % "klp =" klp , , , 2
+      If (bezierSplineCustomShape=1 && thisIndex>2)
+      {
+         fn := Func("adjustAnchorPointsCustomShape").Bind(thisIndex + 1)
+         SetTimer, % fn, -20
+      } Else If (hasSymmetry!=1 && shiftState=0 && bezierSplineCustomShape=0)
          SetTimer, addFluidPointsCustomShape, -200
    }
 
    If (preventUndoLevels!=1)
       recordVectorUndoLevels(customShapePoints.Clone(), initialDrawingStartCoords.Clone())
+
    lastInvoked := A_TickCount
    SetTimer, dummyRefreshImgSelectionWindow, -5
+}
+
+autoDeactivateClosedBezier() {
+   r := testIsBezierPathClosed()
+   If (r=1)
+   {
+      closedLineCustomShape := 0
+      reduceCustomShapelength()
+      If (testIsBezierPathClosed()=1)
+         reduceCustomShapelength()
+
+      RegAction(1, "closedLineCustomShape")
+      If (drawingShapeNow=1)
+         showQuickActionButtonsDrawingShape()
+   }
+}
+
+pushEndNewVectorPoint(gmX, gmY, noCloseTest:=0) {
+   If (bezierSplineCustomShape=1 && noCloseTest=0)
+      autoDeactivateClosedBezier()
+
+   customShapePoints.Push([gmX, gmY])
+   prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] + 1
+   thisIndex := customShapePoints.MaxIndex()
+   initialDrawingStartCoords[thisIndex] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH, 0]
+   If (bezierSplineCustomShape=1)
+   {
+      customShapePoints.Push([gmX, gmY])
+      initialDrawingStartCoords[thisIndex + 1] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH, 1]
+      prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] + 1
+      If (thisIndex>4)
+      {
+         customShapePoints.Push([gmX, gmY])
+         initialDrawingStartCoords[thisIndex + 2] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH, 1]
+         prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] + 1
+      }
+   }
+   Return thisIndex
+}
+
+pushAtGivenVectorPoint(givenIndex, gmX, gmY) {
+   pushed := 1
+   customShapePoints.InsertAt(givenIndex, [gmX, gmY])
+   initialDrawingStartCoords.InsertAt(givenIndex, [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH, 0])
+   thisIndex := customShapePoints.MaxIndex()
+   If (bezierSplineCustomShape=1)
+   {
+      customShapePoints.InsertAt(givenIndex, [gmX, gmY])
+      initialDrawingStartCoords.InsertAt(givenIndex, [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH, 1])
+      pushed++
+      If (thisIndex>4)
+      {
+         pushed++
+         customShapePoints.InsertAt(givenIndex, [gmX, gmY])
+         initialDrawingStartCoords.InsertAt(givenIndex, [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH, 1])
+      }
+   }
+   Return pushed
+}
+
+splitPointGivenInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY) {
+   If (bezierSplineCustomShape=1)
+   {
+      endsConnected := ((thisIndex<=2 || thisIndex>=(totalCount - 1)) && testIsBezierPathClosed()=1) ? 1 : 0
+      If endsConnected
+      {
+         expandGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
+         expandGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY, "no")
+         closedLineCustomShape := 0
+         RegAction(1, "closedLineCustomShape")
+         If (drawingShapeNow=1)
+            showQuickActionButtonsDrawingShape()
+         Return
+      }
+   }
+
+   Random, slx, % SelDotsSize//2 + 1, SelDotsSize*3
+   Random, sly, % SelDotsSize//2 + 1, SelDotsSize*3
+   Random, r1, -1, 1
+   Random, r2, -1, 1
+   slx := (r1<0) ? -1*slx : slx
+   sly := (r2<0) ? -1*sly : sly
+
+   selu := initialDrawingStartCoords[thisIndex, 3]
+   customShapePoints[thisIndex] := [gmX, gmY]
+   initialDrawingStartCoords[thisIndex] := [prevDestPosX, prevDestPosY, selu, prevResizedVPimgW, prevResizedVPimgH]
+   If (k=3 && bezierSplineCustomShape=1 || bezierSplineCustomShape!=1)
+      pushAtGivenVectorPoint(thisIndex, gmX - slx, gmY - sly)
+   Else If (k=1 && bezierSplineCustomShape=1 && thisIndex!=1)
+      pushAtGivenVectorPoint(thisIndex - 1, gmX - slx, gmY - sly)
+   Else If (k=2 && bezierSplineCustomShape=1)
+      pushAtGivenVectorPoint(thisIndex + 1, gmX - slx, gmY - sly)
+
+   If (oppoIndex!=thisIndex && canDoSymmetry=1)
+   {
+      hasSymmetry := calculateSymmetricVectorPoint(gmX, gmY, nX, nY)
+      If (thisIndex < oppoIndex)
+         oppoIndex++
+
+      customShapePoints[oppoIndex] := [nX, nY]
+      initialDrawingStartCoords[oppoIndex] := [prevDestPosX, prevDestPosY, selu, prevResizedVPimgW, prevResizedVPimgH]
+
+      hasSymmetry := calculateSymmetricVectorPoint(gmX - slx, gmY - sly, nX, nY)
+      If (k=3 && bezierSplineCustomShape=1 || bezierSplineCustomShape!=1)
+         pushed := pushAtGivenVectorPoint(oppoIndex, nX, nY)
+      Else If (k=1 && bezierSplineCustomShape=1 && thisIndex!=1)
+         pushed := pushAtGivenVectorPoint(oppoIndex - 1, nX, nY)
+      Else If (k=2 && bezierSplineCustomShape=1)
+         pushed := pushAtGivenVectorPoint(oppoIndex + 1, nX, nY)
+
+      prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] + pushed
+   } Else If (CustomShapeLockedSymmetry && oppoIndex=-1)
+   {
+      prevVectorShapeSymmetryMode[1, 2] := 0
+      CustomShapeLockedSymmetry := 0
+   }
+   dummyRefreshImgSelectionWindow()
+}
+
+expandGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY, dummy:=0) {
+   endsConnected := ((thisIndex=1 || thisIndex=totalCount) && testIsBezierPathClosed()=1) ? 1 : 0
+   If (endsConnected=1 && dummy!="no")
+   {
+      w := getPointsSameCoordsVectorPath(totalCount, 1, gmX, gmY)
+      g := getPointsSameCoordsVectorPath(totalCount, totalCount - 2, gmX, gmY)
+      Loop, % w.Count()
+         g.Push(w[A_Index])
+
+      auxiliaryPoints := []
+      Loop, % g.Count()
+      {
+         thisIndex := g[A_Index, 1]
+         If (thisIndex!=1 && thisIndex!=totalCount)
+            auxiliaryPoints.Push(g[A_Index])
+      }
+      nextK := totalCount
+   } Else
+   {
+      nextK := getAssociatedBezierPoints(k, totalCount, thisIndex, A, B)
+      auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, thisIndex, gmX, gmY)
+   }
+
+   If (auxiliaryPoints.Count()<1 && endsConnected=1 || !endsConnected || dummy="no")
+      auxiliaryPoints2 := getPointsSameCoordsVectorPath(totalCount, nextK, customShapePoints[nextK, 1], customShapePoints[nextK, 2])
+
+   initial := auxiliaryPoints.Count()
+   Loop, % auxiliaryPoints2.Count()
+      auxiliaryPoints.Push(auxiliaryPoints2[A_Index])
+
+   hasFoundDot := 0
+   Loop, % auxiliaryPoints.Count()
+   {
+      If (auxiliaryPoints[A_Index, 1]=thisIndex)
+         Continue
+
+      isOkay := (auxiliaryPoints[A_Index, 1]=A || auxiliaryPoints[A_Index, 1]=B) ? 1 : 0
+      If !isOkay
+         Continue
+
+      hasFoundDot := 1
+   }
+
+   Loop, % auxiliaryPoints.Count()
+   {
+      If (auxiliaryPoints[A_Index, 1]=thisIndex)
+         Continue
+
+      isOkay := (auxiliaryPoints[A_Index, 1]=A || auxiliaryPoints[A_Index, 1]=B) ? 1 : 0
+      If (!isOkay && hasFoundDot=1)
+      || (hasFoundDot=0 && A_Index>initial)
+         Continue
+
+      Random, slx, % SelDotsSize//1.5 + 1, SelDotsSize*3
+      Random, sly, % SelDotsSize//1.5 + 1, SelDotsSize*3
+      Random, r1, -1, 1
+      Random, r2, -1, 1
+      slx := (r1<0) ? -1*slx : slx
+      sly := (r2<0) ? -1*sly : sly
+      customShapePoints[auxiliaryPoints[A_Index, 1]] := [gmX + slx, gmY + sly]
+      initialDrawingStartCoords[auxiliaryPoints[A_Index, 1]] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
+      If (oppoIndex!=thisIndex && canDoSymmetry=1)
+      {
+         calculateSymmetricVectorPoint(gmX + slx, gmY + sly, nX, nY)
+         customShapePoints[auxiliaryPoints[A_Index, 2]] := [nX, nY]
+         initialDrawingStartCoords[auxiliaryPoints[A_Index, 2]] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
+      }
+   } 
+   lastZeitFileSelect := A_TickCount
+   SetTimer, dummyRefreshImgSelectionWindow, -50
+}
+
+reflectGivenAnchorInPath(k, totalCount, thisIndex, canDoSymmetry, forceIT:=0) {
+   ; this assumes drawingShapeNow = 1
+   If (k!=1 && isInRange(thisIndex, 2, totalCount - 1))
+   {
+      If (thisIndex=2 || thisIndex=(totalCount - 1))
+      {
+         r := testIsBezierPathClosed()
+         If (r!=1)
+            Return
+      }
+
+      whichIndex := (k=2) ? thisIndex - 1 : thisIndex + 1
+      If (whichIndex=prevVectorShapeSymmetryMode[1, 1] && canDoSymmetry && forceIT!=1)
+         Return
+
+      ; whichIndex = key point , to which the anchors belong to
+      getVPcoordsVectorPoint(whichIndex, xA, yA)
+
+      ; thisIndex = anchor to be reflected
+      getVPcoordsVectorPoint(thisIndex, xB, yB)
+      w := max(xA, xB) - min(xA, xB)
+      h := max(yA, yB) - min(yA, yB)
+      gmX := (xA<xB) ? xA - w : xA + w
+      gmY := (yA<yB) ? yA - h : yA + h
+
+      ; indexu = «destination» anchor for the reflected whichIndex anchor
+      indexu := (k=2) ? thisIndex - 2 : thisIndex + 2
+      If (r=1)
+         indexu := (k=2) ? totalCount - 1 : 2
+
+      customShapePoints[indexu] := [gmX, gmY]
+      customShapePoints[thisIndex] := [xB, yB]
+      ; ToolTip, % k "A[" whichIndex "]=" cA[1] "|" cA[2] "`nB[" thisIndex "]=" cB[1] "|" cB[2] "`nC[" indexu "]" gmX "|" gmY  , , , 2
+      
+      selu := initialDrawingStartCoords[thisIndex, 3]
+      z := [prevDestPosX, prevDestPosY, selu, prevResizedVPimgW, prevResizedVPimgH]
+      initialDrawingStartCoords[thisIndex] := z.Clone()
+      initialDrawingStartCoords[indexu] := z.Clone()
+
+      If (oppoIndex!=thisIndex && canDoSymmetry=1 && !r)
+      {
+         oppoIndex := totalCount - indexu + 1
+         calculateSymmetricVectorPoint(gmX, gmY, nX, nY)
+         customShapePoints[oppoIndex] := [nX, nY]
+         initialDrawingStartCoords[oppoIndex] := z.Clone()
+      
+         oppoIndex := totalCount - thisIndex + 1
+         calculateSymmetricVectorPoint(xB, yB, gX, gY)
+         initialDrawingStartCoords[oppoIndex] := z.Clone()
+         customShapePoints[oppoIndex] := [gX, gY]
+      }
+   }
+}
+
+reflectGivenAnchorInAltPath(ByRef PointsList, thisIndex, indexu, whichIndex) {
+   ; this assumes drawingShapeNow = 0
+   ; whichIndex = key point , to which the anchors belong to
+   xA := PointsList[whichIndex*2 - 1], yA := PointsList[whichIndex*2]
+
+   ; thisIndex = anchor to be reflected
+   xB := PointsList[thisIndex*2 - 1], yB := PointsList[thisIndex*2]
+
+   w := max(xA, xB) - min(xA, xB)
+   h := max(yA, yB) - min(yA, yB)
+   gmX := (xA<xB) ? xA - w : xA + w
+   gmY := (yA<yB) ? yA - h : yA + h
+
+   ; indexu = «destination» anchor for the reflected whichIndex anchor
+   PointsList[indexu*2 - 1] := gmX
+   PointsList[indexu*2] := gmY
+   ; ToolTip, % k "A[" whichIndex "]=" xA "|" yA "`nB[" thisIndex "]=" xB "|" yB "`nC[" indexu "]=" gmX "|" gmY  , , , 2
+}
+
+getVPcoordsVectorPoint(whichIndex, ByRef X, ByRef Y) {
+   cA := customShapePoints[whichIndex]
+   fX := prevResizedVPimgW/initialDrawingStartCoords[whichIndex, 4]
+   fY := prevResizedVPimgH/initialDrawingStartCoords[whichIndex, 5]
+   x := cA[1]*fX - (initialDrawingStartCoords[whichIndex, 1]*fX - prevDestPosX)
+   y := cA[2]*fY - (initialDrawingStartCoords[whichIndex, 2]*fY - prevDestPosY)
+}
+
+collapseGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry) {
+   If (k=2)
+   {
+      c := customShapePoints[thisIndex - 1]
+      customShapePoints[thisIndex] := [c[1], c[2]]
+      z := initialDrawingStartCoords[thisIndex - 1]
+      initialDrawingStartCoords[thisIndex] := z.Clone()
+      If (oppoIndex!=thisIndex && canDoSymmetry=1)
+      {
+         c := customShapePoints[totalCount - (thisIndex - 1) + 1]
+         customShapePoints[oppoIndex] := [c[1], c[2]]
+         z := initialDrawingStartCoords[totalCount - (thisIndex - 1) + 1]
+         initialDrawingStartCoords[oppoIndex] := z.Clone()
+      }
+   } Else If (k=3)
+   {
+      c := customShapePoints[thisIndex + 1]
+      customShapePoints[thisIndex] := [c[1], c[2]]
+      z := initialDrawingStartCoords[thisIndex + 1]
+      initialDrawingStartCoords[thisIndex] := z.Clone()
+      If (oppoIndex!=thisIndex && canDoSymmetry=1)
+      {
+         c := customShapePoints[totalCount - (thisIndex + 1) + 1]
+         customShapePoints[oppoIndex] := [c[1], c[2]]
+         z := initialDrawingStartCoords[totalCount - (thisIndex + 1) + 1]
+         initialDrawingStartCoords[oppoIndex] := z.Clone()
+      }
+   } Else If (k=1)
+   {
+      endsConnected := ((thisIndex=1 || thisIndex=totalCount) && testIsBezierPathClosed()=1) ? 1 : 0
+      If endsConnected
+      {
+         z := initialDrawingStartCoords[1]
+         c := customShapePoints[1]
+         customShapePoints[2] := [c[1], c[2]]
+         initialDrawingStartCoords[2] := z.Clone()
+         customShapePoints[totalCount - 1] := [c[1], c[2]]
+         initialDrawingStartCoords[totalCount - 1] := z.Clone()
+      } Else
+      {
+         z := initialDrawingStartCoords[thisIndex]
+         c := customShapePoints[thisIndex]
+         If (thisIndex + 1<=totalCount)
+         {
+            customShapePoints[thisIndex + 1] := [c[1], c[2]]
+            initialDrawingStartCoords[thisIndex + 1] := z.Clone()
+         }
+
+         If (thisIndex - 1>=1)
+         {
+            customShapePoints[thisIndex - 1] := [c[1], c[2]]
+            initialDrawingStartCoords[thisIndex - 1] := z.Clone()
+         }
+      }
+
+      oppoIndex := totalCount - thisIndex + 1
+      If (oppoIndex!=thisIndex && canDoSymmetry=1 && !endsConnected)
+      {
+         z := initialDrawingStartCoords[oppoIndex]
+         c := customShapePoints[oppoIndex]
+         If (oppoIndex + 1 <= totalCount)
+         {
+            customShapePoints[oppoIndex + 1] := [c[1], c[2]]
+            initialDrawingStartCoords[oppoIndex + 1] := z.Clone()
+         }
+
+         If (oppoIndex - 1>=1)
+         {
+            customShapePoints[oppoIndex - 1] := [c[1], c[2]]
+            initialDrawingStartCoords[oppoIndex - 1] := z.Clone()
+         }
+      }
+   }
+   lastZeitFileSelect := A_TickCount
+   SetTimer, dummyRefreshImgSelectionWindow, -50
+}
+
+rescaleSelectedVectorPoints() {
+   thisState := prevState := 0
+   GetMouseCoord2wind(PVhwnd, omX, omY)
+   newArrayu := customShapePoints.Clone()
+   setwhileLoopExec(1)
+   minX := minY := 8823893348934389
+   maxX := maxY := -8823893348934389
+   If GetKeyState("Shift", "P")
+      lockedAR := 1
+
+   Loop, % customShapePoints.Count()
+   {
+      c := newArrayu[A_Index]
+      selu := initialDrawingStartCoords[A_Index, 3]
+      If (c[1]="" || c[2]="" || selu!=1)
+         Continue
+
+      minX := min(minX, c[1])
+      minY := min(minY, c[2])
+      maxX := max(maxX, c[1])
+      maxY := max(maxY, c[2])
+   }
+
+   avgX := (minX + maxX)//2
+   avgY := (minY + maxY)//2
+
+   startOperation := A_TickCount
+   While, (determineLClickstate()=1)
+   {
+      If (A_TickCount - startOperation<125)
+         Continue
+
+      If (A_TickCount - startOperation<1025)
+      {
+         If GetKeyState("Shift", "P")
+            lockedAR := 1
+      }
+
+      zeitSillyPrevent := A_TickCount
+      GetMouseCoord2wind(PVhwnd, mX, mY)
+      gmX := omX/mX
+      gmY := omY/mY
+      If (lockedAR=1)
+         gmX := gmY := max(gmX, gmY)
+
+      thisState := "a" gmX "=" gmY
+      If (thisState!=prevState)
+      {
+         prevState := thisState
+         Loop, % customShapePoints.Count()
+         {
+            c := newArrayu[A_Index]
+            selu := initialDrawingStartCoords[A_Index, 3]
+            If (c[1]="" || c[2]="" || selu!=1)
+               Continue
+
+            diffX := avgX - avgX * gmX
+            diffY := avgY - avgY * gmY
+            xu := c[1] * gmX + diffX
+            yu := c[2] * gmY + diffY
+            customShapePoints[A_Index] := [xu, yu]
+         }
+         showTOOLtip("Scale selected points:`nX=" Round(gmX, 3) ", Y=" Round(gmY, 3))
+         dummyRefreshImgSelectionWindow()
+      }
+      Sleep, 5
+   }
+
+   setwhileLoopExec(0)
+   RemoveTooltip()
+   newArrayu := []
+   Return 1
+}
+
+moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY, altState) {
+   soX := soY := doX := doY := poX := poY := hasLooped := mustRem := 0
+   mustSnapLiveDrawPoints := 0
+   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   c := customShapePoints[thisIndex]
+   setwhileLoopExec(1)
+   startOperation := A_TickCount
+
+   While, (determineLClickstate()=1)
+   {
+        If (A_TickCount - startOperation<150)
+           Continue
+
+        If (hasLooped=0)
+        {
+           hasLooped := 1
+           If (k=1 && autoReflectVectorAnchors=1 && bezierSplineCustomShape=1)
+              endsConnected := ((thisIndex=1 || thisIndex=totalCount) && testIsBezierPathClosed()=1) ? 1 : 0
+
+           getVPcoordsVectorPoint(thisIndex, soX, soY)
+           If (endsConnected=1)
+           {
+              getVPcoordsVectorPoint(2, poX, poY)
+              getVPcoordsVectorPoint(totalCount - 1, doX, doY)
+           } Else
+           {
+              getVPcoordsVectorPoint(thisIndex + 1, poX, poY)
+              getVPcoordsVectorPoint(thisIndex - 1, doX, doY)
+           }
+
+           If (k=1 && autoReflectVectorAnchors=1 && bezierSplineCustomShape=1)
+           {
+              If (thisIndex + 1 <= totalCount)
+                 initialDrawingStartCoords[thisIndex + 1] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
+              If (thisIndex - 1 >= 1)
+                 initialDrawingStartCoords[thisIndex - 1] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
+           }
+
+           initialDrawingStartCoords[thisIndex] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
+           If ((CustomShapeSymmetry=1 && vpSymmetryPointX) || (CustomShapeSymmetry=1 && vpSymmetryPointX)) && (altState=0)
+              initialDrawingStartCoords[oppoIndex] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
+
+           If (bezierSplineCustomShape=1)
+           {
+              auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, thisIndex, gmX, gmY)
+              Loop, % auxiliaryPoints.Count()
+              {
+                  initialDrawingStartCoords[auxiliaryPoints[A_Index, 1]] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
+                  If (altState=0)
+                     initialDrawingStartCoords[auxiliaryPoints[A_Index, 2]] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
+              }
+           }
+        }
+
+        zeitSillyPrevent := A_TickCount
+        GetMouseCoord2wind(PVhwnd, mX, mY)
+        gmX := (FlipImgH=1) ? mainWidth - mX : mX
+        gmY := (FlipImgV=1) ? mainHeight - mY : mY
+        If GetKeyState("Shift", "P")
+        {
+           snapPointsAtAngles(gmX, gmY, c[1], c[2], gmX, gmY)
+           gmX := Round(gmX),  gmY := Round(gmY)
+           VPstampBMPx := c[1], VPstampBMPy := c[2]
+           mustSnapLiveDrawPoints := 2
+        }
+
+        diffX := gmX - soX, diffY := gmY - soY
+        If (k=1 && autoReflectVectorAnchors=1 && bezierSplineCustomShape=1)
+        {
+           ; drag anchors as well 
+           If (endsConnected=1)
+           {
+              customShapePoints[2] := [poX + diffX, poY + diffY]
+              customShapePoints[totalCount - 1] := [doX + diffX, doY + diffY]
+           } Else
+           {
+              If (thisIndex + 1 <= totalCount)
+                 customShapePoints[thisIndex + 1] := [poX + diffX, poY + diffY]
+
+              If (thisIndex - 1 >= 1)
+                 customShapePoints[thisIndex - 1] := [doX + diffX, doY + diffY]
+
+              thisu := (thisIndex + 1 <= totalCount) ? thisIndex + 1 : thisIndex - 1
+              tK := (thisIndex + 1 <= totalCount) ? 2 : 3
+              If ((thisu<totalCount || thisu>1) && canDoSymmetry
+              && thisu!=2 && thisu!=(totalCount - 1))
+                 reflectGivenAnchorInPath(tK, totalCount, thisu, canDoSymmetry)
+           }
+        }
+
+        mustRem := 1
+        customShapePoints[thisIndex] := [gmX, gmY]
+        If (bezierSplineCustomShape=1)
+        {
+           Loop, % auxiliaryPoints.Count()
+               customShapePoints[auxiliaryPoints[A_Index, 1]] := [gmX, gmY]
+        }
+
+        If (oppoIndex!=thisIndex && canDoSymmetry=1 && altState=0)
+        {
+
+           hasSymmetry := calculateSymmetricVectorPoint(gmX, gmY, nX, nY)
+           customShapePoints[oppoIndex] := [nX, nY]
+           Loop, % auxiliaryPoints.Count()
+               customShapePoints[auxiliaryPoints[A_Index, 2]] := [nX, nY]
+
+           ; initialDrawingStartCoords[oppoIndex] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
+           If (thisIndex=1)
+           {
+              hasSymmetry := calculateSymmetricVectorPoint(customShapePoints[2, 1], customShapePoints[2, 2], pnX, pnY)
+              customShapePoints[totalCount - 1] := [pnX, pnY]
+           } Else If (thisIndex=totalCount)
+           {
+              hasSymmetry := calculateSymmetricVectorPoint(customShapePoints[totalCount - 1, 1], customShapePoints[totalCount -1, 2], pnX, pnY)
+              customShapePoints[2] := [pnX, pnY]
+           }
+        }
+        If (autoReflectVectorAnchors=1 && k!=1 && bezierSplineCustomShape=1)
+           reflectGivenAnchorInPath(k, totalCount, thisIndex, canDoSymmetry)
+
+        thisState := "a" gmX gmY mX mY
+        If (thisState!=prevState)
+        {
+           If (oppoIndex!=thisIndex && canDoSymmetry=1)
+              otheru := ", " oppoIndex
+           prevState := thisState
+           fr := (k!=1 && bezierSplineCustomShape=1) ? "P'" : "P"
+           showTOOLtip(fr "[" thisIndex otheru "] = (" gmX ", " gmY ")")
+           dummyRefreshImgSelectionWindow()
+        }
+        Sleep, 2
+   }
+   setwhileLoopExec(0)
+   Return mustRem
+}
+
+removeGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY) {
+   If (k!=1 && bezierSplineCustomShape=1)
+   {
+      collapseGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry)
+      Return
+   }
+
+   listu := thisIndex "|"
+   If (bezierSplineCustomShape=1 && k=1 && thisIndex=1)
+   {
+      a := 3, b := 2
+      listu .= "2|3|"
+   } Else If (bezierSplineCustomShape=1 && k=1 && thisIndex=totalCount)
+   {
+      a := totalCount - 1, b := totalCount - 2
+      listu .= a "|" b "|"
+   } Else If (bezierSplineCustomShape=1 && k=1)
+   {
+      ; identify associated points to be deleted - the anchors
+      nextK := getAssociatedBezierPoints(k, totalCount, thisIndex, A, B)
+      If a
+         listu .= a "|"
+      If b
+         listu .= b "|"
+      ; ToolTip, % "nextK=" nextK, , , 2
+      nextKcoords := customShapePoints[nextK]
+   }
+
+   If (oppoIndex!=thisIndex && canDoSymmetry=1 && a!=thisIndex && b!=thisIndex && a!=oppoIndex && b!=oppoIndex)
+   {
+      listu .= oppoIndex "|"
+      If (bezierSplineCustomShape=1)
+      {
+         za := totalCount - a + 1
+         zb := totalCount - b + 1
+         If za
+            listu .= za "|"
+         If zb
+            listu .= zb "|"
+      }
+   }
+
+
+   lista := Trim(listu, "|")
+   Sort, lista, R U N D|
+   ; ToolTip, % listu "`n" lista , , , 2
+   ; ToolTip, % anchorPa "=" anchorPb "=" anchorPc , , , 2
+   Loop, Parse, lista, |
+   {
+      If !A_LoopField
+         Continue
+
+      customShapePoints.RemoveAt(A_LoopField)
+      initialDrawingStartCoords.RemoveAt(A_LoopField)
+      If (A_LoopField < prevVectorShapeSymmetryMode[1, 1])
+         prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] - 1
+   }
+
+   auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, thisIndex, gmX, gmY)
+   Loop, % auxiliaryPoints.Count()
+   {
+      If auxiliaryPoints[A_Index, 1]
+         customShapePoints[auxiliaryPoints[A_Index, 1]]  := [nextKcoords[1], nextKcoords[2]]
+   }
+
+   ; ToolTip, % "l=" CustomShapeLockedSymmetry "=" thisIndex "=" oppoIndex , , , 2
+   If (oppoIndex!=thisIndex && canDoSymmetry=1)
+   {
+      Sleep, 0
+   } Else If (CustomShapeLockedSymmetry && oppoIndex=-1)
+   {
+      prevVectorShapeSymmetryMode[1, 2] := 0
+      CustomShapeLockedSymmetry := 0
+   }
+}
+
+getPointsSameCoordsVectorPath(totalCount, givenIndex, gmX, gmY, mainParam:=0) {
+   newArrayu := []
+   loops := (mainParam="DoubleClick") ? totalCount : 7
+   If (mainParam="DoubleClick")
+      givenIndex := 6
+
+   Loop, % loops
+   {
+       ; determine user clicked point from the entire path
+       thisIndex := givenIndex - 6 +  A_Index
+       If !IsObject(customShapePoints[thisIndex])
+          Continue
+
+       oppoIndex := totalCount - thisIndex + 1
+       getVPcoordsVectorPoint(thisIndex, xu, yu)
+       If isDotInRect(gmX, gmY, SelDotsSize, SelDotsSize, xu, yu, 1)
+          newArrayu.Push([thisIndex, oppoIndex])
+    }
+
+    If (givenIndex<=2 || givenIndex>=(totalCount - 1))
+    {
+       Loop, 2
+       {
+           ; determine user clicked point from the entire path
+           thisIndex := A_Index
+           If !IsObject(customShapePoints[thisIndex])
+              Continue
+ 
+           oppoIndex := totalCount - thisIndex + 1
+           getVPcoordsVectorPoint(thisIndex, xu, yu)
+           If isDotInRect(gmX, gmY, SelDotsSize, SelDotsSize, xu, yu, 1)
+              newArrayu.Push([thisIndex, oppoIndex])
+       }
+
+       Loop, 3
+       {
+           ; determine user clicked point from the entire path
+           thisIndex := totalCount - 3 + A_Index
+           If !IsObject(customShapePoints[thisIndex])
+              Continue
+ 
+           oppoIndex := totalCount - thisIndex + 1
+           getVPcoordsVectorPoint(thisIndex, xu, yu)
+           If isDotInRect(gmX, gmY, SelDotsSize, SelDotsSize, xu, yu, 1)
+              newArrayu.Push([thisIndex, oppoIndex])
+       }
+    }
+
+    Return newArrayu
+}
+
+moveSelectedPointsInVectorPath(gmX, gmY) {
+   thisState := prevState := 0
+   GetMouseCoord2wind(PVhwnd, omX, omY)
+   newArrayu := customShapePoints.Clone()
+   setwhileLoopExec(1)
+   startOperation := A_TickCount
+   While, (determineLClickstate()=1)
+   {
+      If (A_TickCount - startOperation<150)
+         Continue
+
+      zeitSillyPrevent := A_TickCount
+      GetMouseCoord2wind(PVhwnd, mX, mY)
+      gmX := omX - mX
+      gmY := omY - mY
+      thisState := "a" gmX "=" gmY
+      If (thisState!=prevState)
+      {
+         prevState := thisState
+         Loop, % customShapePoints.Count()
+         {
+            c := newArrayu[A_Index]
+            selu := initialDrawingStartCoords[A_Index, 3]
+            If (c[1]="" || c[2]="" || selu!=1)
+               Continue
+
+            ; fX := prevResizedVPimgW/initialDrawingStartCoords[A_Index, 4]
+            ; fY := prevResizedVPimgH/initialDrawingStartCoords[A_Index, 5]
+            xu := c[1] - gmX ; *fX
+            yu := c[2] - gmY ; *fY
+            customShapePoints[A_Index] := [xu, yu]
+         }
+         showTOOLtip("Move selected points:`nX=" -1*gmX ", Y=" -1*gmY)
+         dummyRefreshImgSelectionWindow()
+      }
+      Sleep, 2
+   }
+   setwhileLoopExec(0)
+   RemoveTooltip()
+   newArrayu := []
+}
+
+selectGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, mainParam, gmX, gmY) {
+    Static lastAmount := 0
+    actu := !initialDrawingStartCoords[thisIndex, 3]
+    listu := thisIndex "|"
+    If (bezierSplineCustomShape=1 && (mainParam="selclickAnchors" || mainParam="DoubleClick"))
+    {
+       If (bezierSplineCustomShape=1)
+          endsConnected := ((thisIndex<=2 || thisIndex>=(totalCount - 1)) && testIsBezierPathClosed()=1) ? 1 : 0
+
+       If (endsConnected=1)
+          listu .= "1|2|" totalCount "|" totalCount - 1 "|"
+
+       nextK := getAssociatedBezierPoints(k, totalCount, thisIndex, A, B)
+       If a
+          listu .= a "|"
+       If b
+          listu .= b "|"
+       ; ToolTip, % "nextK=" nextK, , , 2
+    }
+
+    ; ToolTip, % " k = " k , , , 2
+    If (bezierSplineCustomShape=1 || mainParam="DoubleClick")
+       auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, thisIndex, gmX, gmY, mainParam)
+
+    If (oppoIndex!=thisIndex && canDoSymmetry=1 && a!=thisIndex && b!=thisIndex && a!=oppoIndex && b!=oppoIndex)
+    {
+       listu .= oppoIndex "|"
+       If (bezierSplineCustomShape=1)
+       {
+          za := totalCount - a + 1
+          zb .= totalCount - b + 1
+          If (a!=za && za!=zb && a)
+             listu .= za "|"
+          If (b!=zb && za!=zb && b)
+             listu .= zb "|"
+          Loop, % auxiliaryPoints.Count()
+             listu .= auxiliaryPoints[A_Index, 2] "|"
+       }
+    }
+
+    Loop, % auxiliaryPoints.Count()
+       listu .= auxiliaryPoints[A_Index, 1] "|"
+
+   lista := Trim(listu, "|")
+   ; ToolTip, % lista , , , 2
+   newArrayu := StrSplit(lista, "|")
+   If (bezierSplineCustomShape=1 && (mainParam="selclickAnchors" || mainParam="DoubleClick"))
+   {
+      If (newArrayu[2]!=thisIndex && newArrayu[2])
+         actu := !initialDrawingStartCoords[newArrayu[2], 3]
+      Else If (newArrayu[3]!=thisIndex && newArrayu[3])
+         actu := !initialDrawingStartCoords[newArrayu[3], 3]
+   }
+
+   If (lastAmount!=newArrayu.Count() && mainParam="DoubleClick")
+      actu := 1
+
+   Loop, % newArrayu.Count()
+   {
+      If !newArrayu[A_Index]
+         Continue
+
+      initialDrawingStartCoords[newArrayu[A_Index], 3] := actu
+   }
+
+   lastAmount := newArrayu.Count()
+   If (newArrayu.Count()>2)
+   {
+      fr := actu ? "" : "de"
+      showTOOLtip(newArrayu.Count() - 1 " points were " fr "selected")
+      SetTimer, RemoveTooltip, % -msgDisplayTime//2
+   }
+   dummyRefreshImgSelectionWindow()
+}
+
+getAssociatedBezierPoints(k, totalCount, thisIndex, ByRef A, ByRef B) {
+    If (k=1)
+    {
+       If (thisIndex<totalCount)
+          a := thisIndex + 1
+       If (thisIndex>1)
+          b := thisIndex - 1
+       Return thisIndex + 3
+    } Else If (k=2)
+    {
+       a := thisIndex - 1
+       If (thisIndex - 2>1)
+          b := thisIndex - 2
+       Return thisIndex + 2
+    } Else If (k=3)
+    {
+       a := thisIndex + 1
+       If (thisIndex + 2<totalCount)
+          b := thisIndex + 2
+       Return thisIndex + 1
+    }
 }
 
 calculateSymmetricVectorPoint(gmX, gmY, ByRef mX, ByRef mY) {
@@ -6225,7 +7370,7 @@ isNowSymmetricVectorShape() {
 }
 
 thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, shiftState, altState) {
-   Static lastInvoked := 1
+   Static lastInvoked := 1, doNotAskAgain := 0
    If (A_TickCount - lastInvoked<50)
       Return "none"
 
@@ -6233,12 +7378,21 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
    statusBarYpos := Round(mainHeight - ThumbsStatusBarH)
    If (mX>scrollXpos)
    {
-      If (mainParam!="rclick")
+      If (markedSelectFile>1 && maxFilesIndex>4 && altState=1 && mainParam="normal")
+      {
+         mYperc := ((mY - 15)/mainHeight)*100
+         newIndex := clampInRange(Ceil((maxFilesIndex/100)*mYperc), 1, maxFilesIndex)
+         currentFileIndex := newIndex
+         regroupSelectedFiles()
+         Return "none"
+      } Else If (mainParam!="rclick")
          SetTimer, ThumbsScrollbar, -25
       Return "scrollbar"
    } Else If (mY>statusBarYpos)
    {
-      If (mainParam="rclick")
+      If (markedSelectFile>1 && maxFilesIndex>4 && altState=1 && mainParam="normal")
+         filterToFilesSelection()
+      Else If (mainParam="rclick")
          Return "statusBar"
       Else If !InStr(mainParam, "pen-")
          ToggleMultiLineStatus()
@@ -6285,13 +7439,156 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
       startClick := A_TickCount
       longTapDelay := markedSelectFile ? 350 : 750
       newIndex := clampInRange(newIndex, 1, maxFilesIndex)
-      If (ctrlState)
+      If (ctrlState=1)
+      {
          markThisFileNow(newIndex)
-      Else If (altState=1)
+      } Else If (altState=1 && (omniBoxMode=1 && VisibleQuickMenuSearchWin=1 || folderTreeWinOpen=1))
+      {
+         If (omniBoxMode=1 && VisibleQuickMenuSearchWin=1)
+         {
+            Gui, QuickMenuSearchGUIA: Default
+            GuiControlGet, userQuickMenusEdit
+            edithu := Trimmer(userQuickMenusEdit)
+            edithu := Trimmer(StrReplace(edithu, "\\", "\"), "\")
+         }
+
+         func2exec := r := info := ""
+         prevMSGdisplay := 1
+         currentFileIndex := newIndex
+         UpdateThumbsScreen()
+         While, determineLClickstate()
+         {
+            ; drag and drop
+            info := defineWindowUnderMouse()
+            If InStr(info, "tooltip")
+            {
+               Continue
+            } Else If (InStr(info, "main") && markedSelectFile>1)
+            {
+               GetMouseCoord2wind(PVhwnd, nX, nY)
+               If (nY > statusBarYpos)
+                  friendly := "`nFilter the files list to selected items"
+               Else If (nX > scrollXpos - 50)
+                  friendly := "`nRegroup selected files at this scrollbar location"
+               Else
+                  friendly := "`nNo action associated to this pointer location"
+            
+               nc := nY
+               thisFolder := r := dc := ""
+               r := friendly
+            } Else If InStr(info, "tree")
+            {
+               thisFolder := r := dc := nc := ""
+               LV_Modify(initialRow, "select")
+               friendly := "`nMove or copy folder into another one. Hold SHIFT to MOVE."
+               GetMouseCoord2wind(hTVlistFolders, nX, nY)
+               nc := TVH_HitTest(hTVlistFolders, cr, nX, nY)
+               If nc
+               {
+                  Gui, fdTreeGuia: Default
+                  Gui, fdTreeGuia: TreeView, TVlistFolders
+                  TV_GetText(thisFolder, nc)
+                  TV_Modify(nc)
+               }
+               friendly .= "`nDestination: ." thisFolder "\"
+               r := GetKeyState("Shift", "P") ? "[_MOVE_]" : "[_COPY_]"
+               friendly .= A_Space r
+            } Else If InStr(info, "omnibox list")
+            {
+               thisFolder := r := dc := nc := ""
+               GetMouseCoord2wind(hLVquickSearchMenus, nX, nY)
+               dc := LV_EX_ItemHitTest(hLVquickSearchMenus, kp, nX, nY)
+               thisFolder := OmniBoxGetSelectedFolder(dc, "yes", edithu)
+               LV_Modify(dc, "select")
+               restu := SubStr(thisFolder, InStr(thisFolder, "\", 0, -1) + 1)
+               friendly := "`nMove or copy folder into another one. Hold SHIFT to MOVE."
+               r := GetKeyState("Shift", "P") ? "[_MOVE_]" : "[_COPY_]"
+               friendly2 := "`nDestination: ." restu "\ " r
+               friendly .= thisFolder ? friendly2 : "`nNo folder is currently underneath."
+               ; r := GetKeyState("Shift", "P") ? "[MOVE]" : "[COPY]"
+            } Else 
+            {
+               func2exec := r := dc := nc := ""
+               friendly := "No action associated to this pointer location"
+            }
+
+            If (A_TickCount - prevMSGdisplay>100)
+            {
+               externToolTiput(info friendly)
+               prevMSGdisplay := A_TickCount
+            }
+         }
+
+         If (InStr(info, "main") && r)
+         {
+            If InStr(r, "filter")
+            {
+               func2exec := "filterToFilesSelection"
+            } Else If InStr(r, "regroup")
+            {
+               mYperc := ((nc - 15)/mainHeight)*100
+               newIndex := clampInRange(Ceil((maxFilesIndex/100)*mYperc), 1, maxFilesIndex)
+               currentFileIndex := newIndex
+               func2exec := "regroupSelectedFiles"
+            }
+         } Else If (InStr(info, "omnibox") && dc && thisFolder)
+         {
+            externTooltiput("-hide-")
+            dest := OmniBoxGetSelectedFolder(dc, "yes", edithu)
+            rDest := SubStr(dest, InStr(dest, "\", 0, -1) + 1)
+            If (doNotAskAgain=0 && InStr(dest, ":\") && r)
+            {
+               msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action from the main window into the omnibox: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: selected files`nDestination: .\" rDest "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
+               If !InStr(msgResult.btn, "Yes")
+               {
+                  SetTimer, PopulateQuickMenuSearch, -200
+                  Return 1
+               } Else doNotaskAgain := msgResult.check
+            }
+
+            If (InStr(r, "_") && InStr(dest, ":\"))
+            {
+               externTooltiput("Please wait - performing action")
+               If InStr(r, "copy")
+                  func2exev := "omniBoxFolderCopyFiles"
+               Else If InStr(r, "move")
+                  func2exev := "omniBoxFolderMoveFiles"
+            }
+            externTooltiput("-hide-")
+         } Else If (InStr(info, "tree") && r && nc)
+         {
+            externTooltiput("-hide-")
+            dest := folderTreeGetSelectedPath(nc)
+            If (doNotAskAgain=0 && InStr(dest, ":\") && r)
+            {
+               msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action from the main window into the folders tree panel: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: selected files`nDestination: ." dest "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
+               If !InStr(msgResult.btn, "Yes")
+               {
+                  SetTimer, folderTreeInfoStatusLineUpdater, -125
+                  Return 1
+               } Else doNotaskAgain := msgResult.check
+            }
+
+            externTooltiput("Please wait - performing folder action")
+            If (InStr(r, "_") && InStr(dest, ":\"))
+            {
+               If InStr(r, "copy")
+                  func2exec := "FolderTreeMenuCopyFiles"
+               Else If InStr(r, "move")
+                  func2exec := "FolderTreeMenuMoveFiles"
+            }
+         }
+         externTooltiput("-hide-")
+         prevent := 1
+         If func2exec
+            SetTimer, % func2exec, -500
+      } Else If (altState=1)
+      {
          moveMarkedEntryNow(newIndex)
-      Else If (shiftState=1)
+      } Else If (shiftState=1)
+      {
          clickAct := "S"
-      Else
+      } Else
       {
          While, (determineLClickstate()=1 && (A_TickCount - startClick<longTapDelay+150))
          {
@@ -6320,7 +7617,7 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
    lastInvoked := A_TickCount
 }
 
-WinClickAction(mainParam:=0, thisCtrlClicked:=0, OutputVarWin:=0, mX:=0, mY:=0, mXo:=0, mYo:=0) {
+WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0, mXo:=0, mYo:=0) {
    Critical, on
    Static thisZeit := 1, prevTippu := 1, anotherZeit := 1, ignoreRclick := 0, ignoreNclick := 0
         , lastInvoked := 1, lastInvoked2 := 1, lastInvokedSwipe := 1
@@ -6360,7 +7657,7 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0, OutputVarWin:=0, mX:=0, mY:=0, 
    {
       If StrLen(BrushToolSymmetryX)>1
       {
-         setNewSymmetryPoints()
+         setNewBrushSymmetryPoints()
       } Else
       {
          tinyPrevAreaCoordX := tinyPrevAreaCoordY := "C"
@@ -6412,7 +7709,7 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0, OutputVarWin:=0, mX:=0, mY:=0, 
       Return
    }
 
-   ; ToolTip, % mainParam " -- " thisCtrlClicked,,,2
+   ; ToolTip, % winEventu " -- " thisCtrlClicked,,,2
    If (A_TickCount - lastLongOperationAbort < 550) || (A_TickCount - lastTimeToggleThumbs < 450) || (A_TickCount - executingCanceableOperation < 550)
    || (A_TickCount - lastWinDrag < 250) 
       Return "none"
@@ -6438,7 +7735,7 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0, OutputVarWin:=0, mX:=0, mY:=0, 
    If (showHUDnavIMG=1 && IMGlargerViewPort=1 && hasDrawnImageMap=1 && thumbsDisplaying!=1
    && isDotInRect(mX, mY, HUDobjNavBoxu[3], HUDobjNavBoxu[1] + HUDobjNavBoxu[3], HUDobjNavBoxu[4], HUDobjNavBoxu[2] + HUDobjNavBoxu[4]))
    {
-      If (mainParam="DoubleClick")
+      If (winEventu="DoubleClick")
          ToggleImgNavSizeBox()
       Else
          SetTimer, ImageNavBoxClickResponder, -25
@@ -6446,7 +7743,7 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0, OutputVarWin:=0, mX:=0, mY:=0, 
    } Else If (showHUDnavIMG=1 && IMGlargerViewPort=1 && hasDrawnImageMap=1
    && isDotInRect(mX, mY, HUDobjNavBoxu[7], HUDobjNavBoxu[5] + HUDobjNavBoxu[7], HUDobjNavBoxu[8], HUDobjNavBoxu[6] + HUDobjNavBoxu[8]))
    {
-      If (mainParam="DoubleClick")
+      If (winEventu="DoubleClick")
          ToggleImgNavSizeBox()
       Return
    }
@@ -6457,7 +7754,7 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0, OutputVarWin:=0, mX:=0, mY:=0, 
       If (editingSelectionNow=1 && adjustNowSel=0)
          dotActiveObj := determineSelAreaClickRect(mX, mY, SelDotsSize, mainWidth, mainHeight, 1)
 
-      If (mainParam="DoubleClick" && (dotActiveObj.n>0 || imgSelLargerViewPort=1) && editingSelectionNow=1 && adjustNowSel=0)
+      If (winEventu="DoubleClick" && (dotActiveObj.n>0 || imgSelLargerViewPort=1) && editingSelectionNow=1 && adjustNowSel=0)
       {
          ctrlState := GetKeyState("Ctrl", "P") ? 1 : 0
          shiftState := GetKeyState("Shift", "P") ? 1 : 0
@@ -6490,15 +7787,15 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0, OutputVarWin:=0, mX:=0, mY:=0, 
    ctrlState := GetKeyState("Ctrl", "P") ? 1 : 0
    shiftState := GetKeyState("Shift", "P") ? 1 : 0
    altState := GetKeyState("Alt", "P") ? 1 : 0
-   If (thumbsDisplaying=1 && maxFilesIndex>0 && mainParam!="doubleclick")
+   If (thumbsDisplaying=1 && maxFilesIndex>0 && winEventu!="DoubleClick")
    {
       ; handle clicks on thumbnails and the vertical scrollbar
-      r := thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, shiftState, altState)
+      r := thumbsListClickResponder(mX, mY, mainWidth, mainHeight, winEventu, ctrlState, shiftState, altState)
       Return r
    }
 
    displayingImageNow := (thumbsDisplaying!=1 && useGdiBitmap()) ? 1 : 0
-   If ((InStr(mainParam, "normal") || InStr(mainParam, "DoubleClick")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && displayingImageNow=1 && IMGresizingMode=4 && (scrollBarHy>1 || scrollBarVx>1) && thumbsDisplaying!=1)
+   If ((InStr(winEventu, "normal") || InStr(winEventu, "DoubleClick")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && displayingImageNow=1 && IMGresizingMode=4 && (scrollBarHy>1 || scrollBarVx>1) && thumbsDisplaying!=1)
    {
       ; handle clicks on the H/V scrollbars for images larger than the viewport
       knobSize := imgHUDbaseUnit//3
@@ -6535,12 +7832,12 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0, OutputVarWin:=0, mX:=0, mY:=0, 
    } Else If (drawingShapeNow=1 && spaceState!=1)
    {
       ; respond to clicks when drawing freeform polygonal shapes
-      addNewVectorShapePoints(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, shiftState, altState)
+      addNewVectorShapePoints(mX, mY, mainWidth, mainHeight, winEventu, ctrlState, shiftState, altState)
       Return
    }
 
    If ((editingSelectionNow!=1) || (imgSelOutViewPort=1 && editingSelectionNow=1) || (imgSelLargerViewPort=1 && editingSelectionNow=1))
-   && (displayingImageNow=1 && getCaptionStyle(PVhwnd)!=1 && InStr(mainParam,"normal") && shiftState=1)
+   && (displayingImageNow=1 && getCaptionStyle(PVhwnd)!=1 && InStr(winEventu,"normal") && shiftState=1)
    {
       ; activate selection on single click + shift
       MouseCoords2Image(mX - 200, mY - 200, 1, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, imgSelX1, imgSelY1)
@@ -6552,7 +7849,7 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0, OutputVarWin:=0, mX:=0, mY:=0, 
       Return
    }
 
-   If (InStr(mainParam, "normal") && editingSelectionNow=1 && spaceState!=1 && displayingImageNow=1)
+   If (InStr(winEventu, "normal") && editingSelectionNow=1 && spaceState!=1 && displayingImageNow=1)
    {
       ; handle clicks on the image selection rectangle in the viewport
       dotsSize := SelDotsSize
@@ -6573,7 +7870,7 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0, OutputVarWin:=0, mX:=0, mY:=0, 
          DotPosY := imgSelY1
       }
  
-      If (InStr(mainParam, "pen-") && (dotActive=9 || !dotActive))
+      If (InStr(winEventu, "pen-") && (dotActive=9 || !dotActive))
          Return
  
       ; ToolTip, % "l=" dotActive , , , 2
@@ -6943,7 +8240,7 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0, OutputVarWin:=0, mX:=0, mY:=0, 
          Return
    }
 
-   If (mainParam="DoubleClick" && thumbsDisplaying!=1 && displayingImageNow=1 && spaceState!=1) && (A_TickCount - lastInvokedSwipe>500) && (A_TickCount - anotherZeit>600)
+   If (winEventu="DoubleClick" && thumbsDisplaying!=1 && displayingImageNow=1 && spaceState!=1) && (A_TickCount - lastInvokedSwipe>500) && (A_TickCount - anotherZeit>600)
    {
       ; handle double clicks in the viewport when an image is being displayed
       If (editingSelectionNow=1 && imgEditPanelOpened!=1)
@@ -6958,15 +8255,15 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0, OutputVarWin:=0, mX:=0, mY:=0, 
          ToggleSlideShowu()
       Sleep, 1
       ToggleViewModeTouch()
-   } Else If ((displayingImageNow=1 || mustOpenStartFolder) && mainParam!="DoubleClick") && (A_TickCount - thisZeit>950)
-   ; } Else If ((maxFilesIndex>1 || mustOpenStartFolder) && CurrentSLD && mainParam!="DoubleClick") && (A_TickCount - thisZeit>950)
+   } Else If ((displayingImageNow=1 || mustOpenStartFolder) && winEventu!="DoubleClick") && (A_TickCount - thisZeit>950)
+   ; } Else If ((maxFilesIndex>1 || mustOpenStartFolder) && CurrentSLD && winEventu!="DoubleClick") && (A_TickCount - thisZeit>950)
    {
       ; handle single clicks in the viewport when multiple files are loaded
       didSomething := 0
       If (TouchScreenMode=0 || spaceState=1) && ((IMGlargerViewPort=1 || allowFreeIMGpanning=1 || spaceState=1) && IMGresizingMode=4 && thumbsDisplaying!=1)
          SetTimer, simplePanIMGonClick, -15
       Else If (TouchScreenMode=1 && drawingShapeNow!=1)
-         didSomething := winSwipeAction(thisCtrlClicked, mainParam)
+         didSomething := winSwipeAction(thisCtrlClicked, winEventu)
       Else didSomething := 0
 
       lastInvoked := A_TickCount
@@ -6985,7 +8282,7 @@ WinClickAction(mainParam:=0, thisCtrlClicked:=0, OutputVarWin:=0, mX:=0, mY:=0, 
          OpenDialogFiles()
    }
    lastInvoked := A_TickCount
-}
+} ; /// WinClickAction()
 
 JEE_ScreenToWindow(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
 ; function by jeeswg found on:
@@ -7388,7 +8685,7 @@ ToggleSlideshowModes() {
 
 DefineVPselAreaMode() {
    If (EllipseSelectMode=2)
-      friendly := "FREEFORM - T" FillAreaCurveTension
+      friendly := (bezierSplineCustomShape=1) ?  "FREEFORM BÉZIER" : "FREEFORM - T" FillAreaCurveTension
    Else If (EllipseSelectMode=1)
       friendly := "ELLIPTICAL"
    Else
@@ -8044,7 +9341,7 @@ ChangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
          vpSymmetryPointXdp := prevDestPosX
          vpSymmetryPointYdp := prevDestPosY
       }
-      ; ToolTip, % customShapePoints.Count() "=l=" drawingLiveMode , , , 2
+      ; ToolTip, % customShapePoints.Count() "=l=" drawingVectorLiveMode , , , 2
       Return
    }
 
@@ -8056,6 +9353,7 @@ ChangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
    ; If (drawModeBzeit>150 && (A_TickCount - lastInvoked < 10) && (LastWasFastDisplay!=1)) || (hasThisChangedYo=1)
    ;    GdipCleanMain(6)
 
+   Gdip_GraphicsClear(glPG, "0xFF" WindowBgrColor)
    lastInvoked := A_TickCount
    If (forceUpdate=1)
    {
@@ -8335,6 +9633,7 @@ changeSelRotation(dir, stepu:=1) {
    value2Adjust := clampInRange(value2Adjust, 0, 360 - 1, 1)
    vPselRotation := value2Adjust
    dummyRefreshImgSelectionWindow()
+   userFriendlyPrevImgSelAction := (dir=1) ? "SELECTION ROTATION +" stepu "°" : "SELECTION ROTATION -" stepu "°"
    dummyShowSelCoordsInfos()
 }
 
@@ -8455,6 +9754,17 @@ DestroyGIFuWin() {
     autoChangeDesiredFrame("stop")
 }
 
+restartGIFplayback() {
+   If (CountGIFframes>1 && !AnyWindowOpen && animGIFsSupport=1, totalFramesIndex>1 && thumbsDisplaying!=1)
+   {
+      autoChangeDesiredFrame("stop", 0)
+      Sleep, 5
+      setGIFframesDelay()
+      autoChangeDesiredFrame("start", getIDimage(currentFileIndex))
+      SetTimer, autoChangeDesiredFrame, % GIFspeedDelay
+   }
+}
+
 autoChangeDesiredFrame(act:=0, imgPath:=0) {
    Critical, on
    Static prevImgPath, lastInvoked := 1, lastFrameChange := 1
@@ -8463,7 +9773,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
       If (animGIFplaying=1)
       {
          SetTimer, autoChangeDesiredFrame, Off
-         SetTimer, ResetImgLoadStatus, -30
+         SetTimer, ResetImgLoadStatus, -50
          prevAnimGIFwas := prevImgPath
          prevImgPath := ""
          Global lastGIFdestroy := A_TickCount
@@ -8471,6 +9781,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
          animGIFplaying := 0
          ; lastInvoked := A_TickCount
          interfaceThread.ahkassign("animGIFplaying", 0)
+         ResetImgLoadStatus()
          ; dummyTimerDelayiedImageDisplay(50)
       }
       Return
@@ -8852,9 +10163,9 @@ drawInPlaceTextInBox(Gu, theString, txtOptions) {
 drawTextInBox(theString, fntName, theFntSize, maxW, maxH, txtColor, bgrColor, NoWrap, flippable:=0, thisTextAlign:=0, BGRopacity:="0xDD", borderu:=0) {
     startZeit := A_TickCount
     ; pBr0 := Gdip_BrushCreateSolid(bgrColor)
-    If (FontBolded=1)
+    If (OSDfontBolded=1)
        txtStyle .= " Bold"
-    If (FontItalica=1 && NoWrap=0)
+    If (OSDfontItalica=1 && NoWrap=0)
        txtStyle .= " Italic"
 
     If !thisTextAlign
@@ -9190,6 +10501,7 @@ Gdi_DrawTextInBox(theString, hFont, maxW, maxH, txtColor, bgrColor, borderSize:=
        oW := oW - reAdjustWtxtspacing
     Else
        oW := oW + thisCharSpacing * StrLen(theString)
+
     ; ToolTip, % oW "==" oH "==" reAdjustWtxtspacing , , , 2
     Gdip_GetRotatedDimensions(oW, oH, TextInAreaLineAngle/10, rWidth, rHeight)
     scaleu := Abs(TextInAreaLineAngle/900)
@@ -9296,6 +10608,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
     obs := borderSize := (TextInAreaUsrMarginz>0) ? TextInAreaUsrMarginz : TextInAreaBorderSize//2 + thisBlurAmount
     Gdi_MeasureString(hFont, testString, 1, testWa, testHa)
     Gdi_MeasureString(hFontPreview, testString, 1, testWb, testHb)
+    theString := StrReplace(theString, "`n`n", "`n┘")
     If (TextInAreaAutoWrap=1)
        theString := Trimmer(HardWrapTextFontBased(theString, hFont, maxW - borderSize * 2, maxH + 2, clampInRange(testHa + TextInAreaFontLineSpacing, 2, maxH + 10)))
     Else
@@ -9346,10 +10659,11 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
     threads := (previewMode=1) ? realSystemCores : 0
     Loop, Parse, theString, `n
     {
-       ; If !Trimmer(A_LoopField)
-       ;    Continue
+       If !Trimmer(A_LoopField)
+          Continue
 
-       objBMPs := Gdi_DrawTextInBox(Trim(A_LoopField, A_Space), thisHFont, maxW, maxH, "FFffFF", "000000", borderSize, 1, scaleuPreview, TextInAreaFlipH, TextInAreaFlipV)
+       thisuString := StrReplace(A_LoopField, "┘", " `n")
+       objBMPs := Gdi_DrawTextInBox(thisuString, thisHFont, maxW, maxH, "FFffFF", "000000", borderSize, 1, scaleuPreview, TextInAreaFlipH, TextInAreaFlipV)
        imgW := objBMPs[3], imgH := objBMPs[4]
        pBitmap := (doConturDraw=1 && TextInAreaOnlyBorder=1 && objBMPs[2]) ? objBMPs[2] : objBMPs[1]
        If (doConturDraw=1 && objBMPs[1] && TextInAreaOnlyBorder=1)
@@ -9381,7 +10695,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
           ; trGdip_GraphicsClear(A_ThisFunc, G2)
           Gdip_FillRectangle(G2, zBrush, 0, 0, imgW, imgH)
           QPV_SetAlphaChannel(thisBMP, pBitmap, 1, 0, 1, threads)
-          thisOpacity := TextInAreaBgrOpacity/255
+          thisOpacity := 1 ; TextInAreaBgrOpacity/255
        } Else
        {
           thisColor := (TextInAreaOnlyBorder=1) ? borderColor : txtColor
@@ -9403,9 +10717,10 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
        Else If (TextInAreaAlign=3)
           thisX := maxW - imgW + thisXbonus
 
+       isOkay := (thisuString=" `n" && TextInAreaPaintBgr=1 && TextInAreaBgrEntire=0 && TextInAreaBgrUnified=0) ? 0 : 1
        If (TextInAreaBgrUnified!=1 && TextInAreaPaintBgr=1)
        {
-          If (TextInAreaCutOutMode!=1)
+          If (TextInAreaCutOutMode!=1 && isOkay=1)
              Gdip_FillRectangle(G, zBrush, thisX, thisY, imgW, imgH)
 
           If (TextInAreaBgrEntire=1)
@@ -9444,7 +10759,9 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
        maxedH := max(thisY + imgH, maxedH)
        minedX := min(thisX, minedX)
        minedY := min(thisY, minedY)
-       drawFail := trGdip_DrawImage(A_ThisFunc, G, thisBMP, thisX, thisY, forceW, imgH,,,,, thisOpacity)
+       If isOkay
+          drawFail := trGdip_DrawImage(A_ThisFunc, G, thisBMP, thisX, thisY, forceW, imgH,,,,, thisOpacity)
+
        If (previewMode=1)
           thisY += imgH + Round(TextInAreaFontLineSpacing / scaleuPreview)
        Else
@@ -10349,9 +11666,12 @@ generateAlphaMaskBitmap(clipBMP, previewMode, offX:=0, offY:=0, offW:=0, offH:=0
        tRimgH := (tempArray[4]>1) ? Round(rH*fAgScal) : Round(rImgH*fAgScal)
        offX := rImgW - tRimgW + Round((rImgW*alphaMaskOffsetX)*(fAgScal+1))
        offY := rImgH - tRimgH + Round((rImgH*alphaMaskOffsetY)*(fAgScal+1))
-       PointsList := convertCustomShape2givenArea(customShapePoints, 1 + offX//2, 1 + offY//2, tRimgW - 2, tRimgH - 2)
+       doDeduping := (alphaMaskClrBintensity>250) ? 0 : 1
+       PointsList := convertCustomShape2givenArea(customShapePoints, 1 + offX//2, 1 + offY//2, tRimgW - 2, tRimgH - 2, 1, doDeduping)
        tensionLvl := Round(alphaMaskClrBintensity/255, 2)
-       If (alphaMaskClrBintensity<15 && alphaPath)
+       If (alphaMaskClrBintensity>250 && alphaPath)
+          Gdip_AddPathBeziers(alphaPath, PointsList)
+       Else If (alphaMaskClrBintensity<15 && alphaPath)
           Gdip_AddPathPolygon(alphaPath, PointsList)
        Else If alphaPath
           Gdip_AddPathClosedCurve(alphaPath, PointsList, tensionLvl)
@@ -11521,7 +12841,7 @@ recordVectorUndoLevels(mainArray, VPcoordsArray) {
       undoVectorShapesLevelsArray.RemoveAt(1)
 
    symmetryPointIndex := prevVectorShapeSymmetryMode[1, 1]
-   newArrayu := [mainArray, VPcoordsArray, zoomLevel, IMGdecalageX, IMGdecalageY, imageAligned, IMGresizingMode, CustomShapeSymmetry, vpSymmetryPointX, vpSymmetryPointXdp, vpSymmetryPointY, vpSymmetryPointYdp, CustomShapeLockedSymmetry, customShapeHasSelectedPoints, symmetryPointIndex]
+   newArrayu := [mainArray, VPcoordsArray, zoomLevel, IMGdecalageX, IMGdecalageY, imageAligned, IMGresizingMode, CustomShapeSymmetry, vpSymmetryPointX, vpSymmetryPointXdp, vpSymmetryPointY, vpSymmetryPointYdp, CustomShapeLockedSymmetry, customShapeHasSelectedPoints, symmetryPointIndex, bezierSplineCustomShape]
    undoVectorShapesLevelsArray.Push(newArrayu)
    currentVectorUndoLevel := undoVectorShapesLevelsArray.Count()
    ; ToolTip, % "l=" currentVectorUndoLevel , , , 2
@@ -11548,6 +12868,7 @@ restoreGivenVectorUndoLevel(levelu) {
    CustomShapeLockedSymmetry := undoVectorShapesLevelsArray[levelu, 13]
    customShapeHasSelectedPoints := undoVectorShapesLevelsArray[levelu, 14]
    prevVectorShapeSymmetryMode[1, 1] := undoVectorShapesLevelsArray[levelu, 15]
+   bezierSplineCustomShape := undoVectorShapesLevelsArray[levelu, 16]
    dummyTimerDelayiedImageDisplay(100)
    ; stuffu := undoVectorShapesLevelsVPdataArray[levelu]
    ; adaptCustomShapeNewZoomLevel(0)
@@ -12337,21 +13658,10 @@ dummyInnerCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, shape, pPath
        cX4 := imgSelPx + imgSelW
        cY4 := imgSelPy + imgSelH//2
        Gdip_AddPathPolygon(pPath, [cX1, cY1, cX2, cY2, cX3, cY3, cX4, cY4])
-    } Else If (shape=7 && FillAreaCurveTension=1)
-    {
-       PointsList := convertCustomShape2givenArea(customShapePoints, imgSelPx + 1, imgSelPy + 1, imgSelW, imgSelH)
-       ; ToolTip, % customShapePoints "`nLOL" PointsList , , , 2
-       If (FillAreaClosedPath=1)
-          Gdip_AddPathPolygon(pPath, PointsList)
-       Else
-          Gdip_AddPathLines(pPath, PointsList)
     } Else If (shape=7)
     {
-       PointsList := convertCustomShape2givenArea(customShapePoints, imgSelPx + 1, imgSelPy + 1, imgSelW, imgSelH)
-       If (FillAreaClosedPath=1)
-          Gdip_AddPathClosedCurve(pPath, PointsList, tensionCurveCustomShape)
-       Else
-          Gdip_AddPathCurve(pPath, PointsList, tensionCurveCustomShape)
+       PointsList := convertCustomShape2givenArea(customShapePoints, imgSelPx + 1, imgSelPy + 1, imgSelW, imgSelH, 1, !bezierSplineCustomShape)
+       createPathVectorCustomShape(pPath, PointsList, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape, 0)
     }
 }
 
@@ -15075,35 +16385,41 @@ DeleteAllSettings() {
     }
 }
 
-externalinvokedSettingsContextMenu(keyu:=0) {
+externalinvokedSettingsContextMenu(keyu:=0, simulated:=0) {
+    Static listu := {3:1,2:1,60:1,3:1,2:1,48:1,59:1,60:1,39:1,71:1}
     hwndA := WinActive("ahk_id " hSetWinGui)
     hwndB := WinActive("ahk_id " MsgBox2hwnd)
     hwnd := ((hwndA=hSetWinGui || hwndB=MsgBox2hwnd) && AnyWindowOpen) ? 1 : 0
     If (hwnd!=1)
-       Return
+       Return 0
 
     If (AnyWindowOpen && MsgBox2hwnd=hwndB && hwndB && MsgBox2InputHook)
        GuiControlGet, OutputVar, WinMsgBox: Focus
     Else If AnyWindowOpen
        GuiControlGet, OutputVar, SettingsGUIA: Focus
     ; ToolTip, % OutputVar , , , 2
-    If InStr(OutputVar, "edit")
-       Return
+    If !InStr(OutputVar, "listview")
+       Return 0
 
-    If (AnyWindowOpen=3 && InStr(OutputVar, "listview") && inStr(keyu, "appskey"))
+    If (simulated=1 && listu[AnyWindowOpen]=1)
+       Return 1
+
+    If (AnyWindowOpen=3 && inStr(keyu, "appskey"))
        invokePanelDynaFoldersContextMenu()
-    Else If (AnyWindowOpen=2 && InStr(OutputVar, "listview") && inStr(keyu, "appskey"))
+    Else If (AnyWindowOpen=2 && inStr(keyu, "appskey"))
        invokePanelStaticFoldersContextMenu()
-    Else If (AnyWindowOpen=60 && InStr(OutputVar, "listview") && inStr(keyu, "appskey"))
+    Else If (AnyWindowOpen=60 && inStr(keyu, "appskey"))
        invokePanelReviewSelContextMenu()
-    Else If ((AnyWindowOpen=3 || AnyWindowOpen=2) && InStr(OutputVar, "listview") && inStr(keyu, "enter"))
+    Else If ((AnyWindowOpen=3 || AnyWindowOpen=2) && inStr(keyu, "enter"))
        BtnPanelStaticJumpFirst()
-    Else If ((AnyWindowOpen=48 || AnyWindowOpen=59) && InStr(OutputVar, "listview") && inStr(keyu, "enter"))
+    Else If ((AnyWindowOpen=48 || AnyWindowOpen=59) && inStr(keyu, "enter"))
        IndexStatsLVaction(0, "DoubleClick")
-    Else If (AnyWindowOpen=60 && InStr(OutputVar, "listview") && inStr(keyu, "enter"))
+    Else If (AnyWindowOpen=60 && inStr(keyu, "enter"))
        BTNreviewPaneLV("menu-mode", "DoubleClick", 0)
-    Else If (AnyWindowOpen=39 && InStr(OutputVar, "listview") && inStr(keyu, "enter"))
+    Else If (AnyWindowOpen=39 && inStr(keyu, "enter"))
        SeenStatsLVaction(hwnd, "DoubleClick")
+    Else If (AnyWindowOpen=71 && inStr(keyu, "enter"))
+       LVkeywordResponder(hwnd, "RightClick", "enter")
     Else If (AnyWindowOpen && inStr(keyu, "AppsKey"))
        invokePrefsPanelsContextMenu()
 }
@@ -15189,13 +16505,17 @@ OmniBoxGetSelectedFolder(givenRow:=0, isGiven:=0, givenPath:=0) {
 }
 
 omniBoxFolderImport(dummy:=0, isGiven:=0) {
-   folderPath := OmniBoxGetSelectedFolder()
+   If (maxFilesIndex<1 || !CurrentSLD)
+      omniBoxFolderOpen()
+   Else
+      folderPath := OmniBoxGetSelectedFolder()
+
    If !folderPath
       Return
 
    prevOmniBoxFolder := SubStr(folderPath, InStr(folderPath, "\", 0, -1) + 1)
    changeMcursor()
-   If (dummy="not" || dummy="recursively") && isGiven="yes"
+   If ((dummy="not" || dummy="recursively") && isGiven="yes")
       addNewFolder2list(folderPath, "yes", dummy)
    Else If GetKeyState("Shift", "P")
       addNewFolder2list(folderPath, "yes", "recursive")
@@ -15207,6 +16527,8 @@ omniBoxFolderImport(dummy:=0, isGiven:=0) {
    dummyTimerDelayiedImageDisplay(50)
    If !VisibleQuickMenuSearchWin
       PanelQuickSearchMenuOptions()
+
+   WinActivate, ahk_id %hQuickMenuSearchWin%
 }
 
 omniBoxFolderExplorerOpen() {
@@ -15239,6 +16561,8 @@ omniBoxFolderOpen() {
    userQuickMenusEdit := folderPath
    If !VisibleQuickMenuSearchWin
       PanelQuickSearchMenuOptions()
+
+   WinActivate, ahk_id %hQuickMenuSearchWin%
 }
 
 omniBoxFolderNewInstance() {
@@ -15269,6 +16593,7 @@ omniBoxFolderCreateNew() {
    If !VisibleQuickMenuSearchWin
       PanelQuickSearchMenuOptions()
 
+   WinActivate, ahk_id %hQuickMenuSearchWin%
    If r
    {
       prevOmniBoxFolder := newFileName
@@ -15296,9 +16621,7 @@ omniBoxFoldersPaste() {
    If !VisibleQuickMenuSearchWin
       PanelQuickSearchMenuOptions()
 
-   If (r=1 || r=2)
-      WinActivate, ahk_id %hQuickMenuSearchWin%
-
+   WinActivate, ahk_id %hQuickMenuSearchWin%
    If (r=2)
       PopulateQuickMenuSearch("resel")
 }
@@ -15313,6 +16636,7 @@ omniBoxFolderRename() {
    If !VisibleQuickMenuSearchWin
       PanelQuickSearchMenuOptions()
 
+   WinActivate, ahk_id %hQuickMenuSearchWin%
    If r
    {
       prevOmniBoxFolder := newFileName
@@ -15323,7 +16647,7 @@ omniBoxFolderRename() {
 omniBoxFolderDelete() {
    folderPath := OmniBoxGetSelectedFolder()
    If !folderPath
-      Return
+      Return "-"
 
    Gui, QuickMenuSearchGUIA: Default
    Gui, QuickMenuSearchGUIA: ListView, LVsearchMenus
@@ -15343,6 +16667,7 @@ omniBoxFolderDelete() {
    If (r="deleted")
       SetTimer, PopulateQuickMenuSearch, -100
 
+   WinActivate, ahk_id %hQuickMenuSearchWin%
    SetTimer, ResetImgLoadStatus, -100
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
@@ -15357,8 +16682,7 @@ omniBoxFolderPasteClippy() {
    If !VisibleQuickMenuSearchWin
       PanelQuickSearchMenuOptions()
 
-   If r
-      WinActivate, ahk_id %hQuickMenuSearchWin%
+   WinActivate, ahk_id %hQuickMenuSearchWin%
 }
 
 omniBoxFolderCopyFiles() {
@@ -15401,8 +16725,8 @@ createOmniBoxFoldersContextMenu(folderPath) {
    kMenu("PVfomni", "Add", "&Import images into the list`tF3", "omniBoxFolderImport")
    Menu, PVfomni, Add
    kMenu("PVfomni", "Add", "&Create new folder`tF7", "omniBoxFolderCreateNew")
-   kMenu("PVfomni", "Add", "C&ut folder (Explorer mode)", "omniBoxFolderCutCopy")
-   kMenu("PVfomni", "Add", "C&opy folder (Explorer mode)", "omniBoxFolderCutCopy")
+   kMenu("PVfomni", "Add", "C&ut folder (Explorer mode)`tCtrl+X", "omniBoxFolderCutCopy")
+   kMenu("PVfomni", "Add", "C&opy folder (Explorer mode)`tCtrl+C", "omniBoxFolderCutCopy")
    kMenu("PVfomni", "Add", "Copy folder path as te&xt", "omniBoxFolderCopyPath")
    kMenu("PVfomni", "Add", "&Paste folder(s) into...", "omniBoxFoldersPaste")
    kMenu("PVfomni", "Add", "&Rename folder`tF2", "omniBoxFolderRename")
@@ -15465,6 +16789,7 @@ invokePrefsPanelsContextMenu(modus:=0, addBonus:=0) {
 
 btnHelpQuickSearchMenus() {
    msgBoxWrapper(appTitle ": HELP", "This panel allows users to search the available menu options based on the current context. It also allows users to:`n`n- navigate through folders; just type or paste a folder path`n`n- open or import folders and image files`n`n- manage folders using common actions: copy, paste, delete, rename, et cetera`n`n- jump to a given index in the list; type a number beginning with @`n `nDrag and drop is supported between listed folders, and between this panel and the main window or the folders tree panel.", -1, 0, 0)
+   WinActivate, ahk_id %hQuickMenuSearchWin%
 }
 
 WinMsgBoxGuiContextMenu(GuiHwnd, CtrlHwnd, EventInfo, IsRightClick, X, Y) {
@@ -15489,8 +16814,8 @@ WinMsgBoxGuiContextMenu(GuiHwnd, CtrlHwnd, EventInfo, IsRightClick, X, Y) {
 identifyParentWind() {
     uz := WinActive("A")
     Az := DllCall("GetParent", "UPtr", uz, "UPtr")
-    r := (Az=hSetWinGui || Az=PVhwnd || Az=hGDIwin || Az=hGDIthumbsWin || Az=hwndhGDIinfosWin) ? 1 : 0
-    If (uz=PVhwnd)
+    r := (Az=hSetWinGui || Az=PVhwnd || Az=hGDIwin || Az=hGDIthumbsWin || Az=hGDIinfosWin) ? 1 : 0
+    If (uz=PVhwnd || uz=hQPVtoolbar && ShowAdvToolbar=1)
        r := 0
     Return r
 }
@@ -15644,14 +16969,12 @@ CreateGuiButton(btnList, killWin:=0, delayu:=950) {
     If (TouchScreenMode!=1 && killWin!="force") ; || MsgBox2hwnd
        Return
  
-    thisFntSize := OSDfntSize
-    thisFntSize := Round(thisFntSize*0.45)
+    thisFntSize := Round(OSDfontSize*0.45)
     If (thisFntSize<9)
        thisFntSize := 9
+
     Gui, TempBtnGui: Destroy
     Sleep, 25
-
-    roundedCsize := Round(thisFntSize/1.7) + 15
     Gui, TempBtnGui: -DPIScale -Caption +ToolWindow +E0x8000000 +hwndhGuiBtn +Owner%PVhwnd%
     Gui, TempBtnGui: Margin, % thisFntSize + 10, % thisFntSize
     Gui, TempBtnGui: Color, c%bgrColor%
@@ -15665,12 +16988,31 @@ CreateGuiButton(btnList, killWin:=0, delayu:=950) {
         If (A_Index=1)
            Gui, TempBtnGui: Add, Text, c%txtColor% gtempGuiBtnCall%A_Index%, % thisBtnArr[1]
         Else If thisBtnArr[1]
-           Gui, TempBtnGui: Add, Text, x+%OSDfntSize% c%txtColor% gtempGuiBtnCall%A_Index%, % thisBtnArr[1]
+           Gui, TempBtnGui: Add, Text, x+%OSDfontSize% c%txtColor% gtempGuiBtnCall%A_Index%, % thisBtnArr[1]
  
         tempBtnGuiBtnArray[A_Index] := thisBtnArr[2]
     }
 
+    tempBtnVisible := hGuiBtn
+    RepositionTempBtnGui()
+    If InStr(btnList, ",,")
+       prevBtnList := btnList
+    interfaceThread.ahkassign("tempBtnVisible", tempBtnVisible)
+    SetTimer, DestroyTempBtnGui, % - delayu
+    lastCreated := A_TickCount
+}
+
+RepositionTempBtnGui() {
+    If (tempBtnVisible="null")
+       Return
+
+    thisFntSize := Round(OSDfontSize*0.45)
+    If (thisFntSize<9)
+       thisFntSize := 9
+
+    hGuiBtn := tempBtnVisible
     WinGetPos, winPosX, winPosY, Wid, Heig, ahk_id %PVhwnd%
+    Gui, TempBtnGui: Default
     Gui, TempBtnGui: Show, NoActivate AutoSize Hide x%winPosX% y%winPosY%, QPVGuiActionBtn
     WinGetPos,,, gWid, gHeig, ahk_id %hGuiBtn%
     If (gWid>Wid - thisFntSize*2.2)
@@ -15678,32 +17020,16 @@ CreateGuiButton(btnList, killWin:=0, delayu:=950) {
     If (gWid<5)
        gWid := 5
 
-    ; compatMode := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_7") ? 1 : 0
-    compatMode := 1
-    If (compatMode=0)
-       winPosX := winPosY := 1
-
     offsetuY := scrollBarHy ? scrollBarHy : 0
-    Final_x := winPosX + thisFntSize * 2
     Final_y := winPosY + Heig - thisFntSize * 2 - gHeig - offsetuY//2
-    If (compatMode=1)
-    {
-       WinSet, Transparent, %thisOpacity%, ahk_id %hGuiBtn%
-       WinSet, AlwaysOnTop, On, ahk_id %hGuiBtn%
-    }
-
+    hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+    tlbrBonusX := (hasTrans=1 && (winPosX + ToolbarWinH - 10 > Final_y)) ? ToolbarWinW : 0
+    Final_x := winPosX + thisFntSize * 2 + tlbrBonusX
+    WinSet, Transparent, 231, ahk_id %hGuiBtn%
+    ; WinSet, AlwaysOnTop, On, ahk_id %hGuiBtn%
+    roundedCsize := Round(thisFntSize/1.7) + 15
     WinSet, Region, 0-0 R%roundedCsize%-%roundedCsize% w%gWid% h%gHeig%, QPVGuiActionBtn
-    If (compatMode=0)
-       SetParentID(PVhwnd, hGuiBtn)
-
-    GroupAdd, QPVwindows, ahk_id %hGuiBtn%
     Gui, TempBtnGui: Show, NoActivate AutoSize x%Final_x% y%Final_y%, GuiActionBtn
-    tempBtnVisible := hGuiBtn
-    If InStr(btnList, ",,")
-       prevBtnList := btnList
-    interfaceThread.ahkassign("tempBtnVisible", tempBtnVisible)
-    SetTimer, DestroyTempBtnGui, % - delayu
-    lastCreated := A_TickCount
 }
 
 tempGuiBtnCall1() {
@@ -15731,7 +17057,7 @@ tempGuiBtnCall6() {
 }
 
 coretempGuiBtnCalls(indexu) {
-    Static listu := ",reduceCustomShapelength,ImgVectorUndoAct,togglePathCurveTension,toggleOpenClosedLineCustomShape,ToggleCardinalCurveMode,"
+    Static listu := ",reduceCustomShapelength,ImgVectorUndoAct,togglePathCurveTension,toggleOpenClosedLineCustomShape,"
     thisFunc := tempBtnGuiBtnArray[indexu]
     z := InStr(listu, "," thisFunc ",")
     If !z
@@ -15740,7 +17066,11 @@ coretempGuiBtnCalls(indexu) {
     If (WinActive("A")!=PVhwnd)
        WinActivate, ahk_id %PVhwnd%
     ; ToolTip, % thisfunc "===" indexu , , , 2
-    %thisFunc%()
+    If IsFunc(thisFunc)
+       %thisFunc%()
+    Else
+       addJournalEntry("ERROR " A_ThisFunc "(): no such function to call: " thisFunc)
+
     If (drawingShapeNow!=1 && !z)
        SetTimer, DestroyTempBtnGui, -950
 }
@@ -16473,16 +17803,21 @@ PlotSeenHourStatsNow() {
    GetWinClientSize(W, H, PVhwnd, 0)
    Gdip_GraphicsClear(2NDglPG)
    textu := "Seen images chart: HOURS.`nRange: 01:00 to 24:00.`nAverage: " avgu ". Peak at " maxKvalu "h: " groupDigits(maxValu)
-   infoBoxBMP := drawTextInBox(textu, OSDFontName, OSDfntSize, w, h, OSDtextColor, OSDbgrColor, 1, 0)
+   infoBoxBMP := drawTextInBox(textu, OSDFontName, OSDfontSize, w, h, OSDtextColor, OSDbgrColor, 1, 0)
    Scale := imgHUDbaseUnit/40
-   borderSize := imgHUDbaseUnit//10
-   plotBMP := BarChart(dataArray, namesLabel, Round(196*Scale), 385, "", "DiagonBlackGreen", "DisplayValues:2, BarHeight:" Scale*3.5 ",BarHeightFactor:1, BarSpacing:" Scale/2 ",BarRoundness:0,AutoCalculateHeight:1, BarColorDirection:2, BgrStyle:3, BarBorderColor:0,TextSize:" OSDfntSize//2+1 " BarTextColor:ff999999, BarColorA:ff" OSDtextColor ", ChartBackColorA:00" OSDbgrColor)
+
+   hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+   tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
+   tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
+   borderSizeX := imgHUDbaseUnit//10 + tlbrBonusX
+   borderSizeY := imgHUDbaseUnit//10 + tlbrBonusY
+   plotBMP := BarChart(dataArray, namesLabel, Round(196*Scale), 385, "", "DiagonBlackGreen", "DisplayValues:2, BarHeight:" Scale*3.5 ",BarHeightFactor:1, BarSpacing:" Scale/2 ",BarRoundness:0,AutoCalculateHeight:1, BarColorDirection:2, BgrStyle:3, BarBorderColor:0,TextSize:" OSDfontSize//2+1 " BarTextColor:ff999999, BarColorA:ff" OSDtextColor ", ChartBackColorA:00" OSDbgrColor)
    Gdip_GetImageDimensions(plotBMP, imgW, imgH)
    Gdip_GetImageDimensions(infoBoxBMP, boxW, boxH)
 
-   If (imgH>H - boxH - borderSize*2)
+   If (imgH>H - boxH - borderSizeY*2)
    {
-      newBitmap := trGdip_ResizeBitmap(A_ThisFunc, plotBMP, imgW, H - boxH - borderSize*2, 1, 7)
+      newBitmap := trGdip_ResizeBitmap(A_ThisFunc, plotBMP, imgW, H - boxH - borderSizeY*2, 1, 7)
       If StrLen(newBitmap)>2
       {
          trGdip_DisposeImage(plotBMP)
@@ -16492,10 +17827,9 @@ PlotSeenHourStatsNow() {
    }
 
    pBrush := Gdip_BrushCreateSolid("0xee" OSDbgrColor)
-   Gdip_FillRectangle(2NDglPG, pBrush, 0, 0, max(imgW, boxW) + borderSize, imgH + borderSize)
-
-   Gdip_DrawImage(2NDglPG, plotBMP, borderSize, borderSize)
-   Gdip_DrawImage(2NDglPG, infoBoxBMP, 0, imgH + borderSize)
+   Gdip_FillRectangle(2NDglPG, pBrush, 0, 0, max(imgW, boxW) + borderSizeX, imgH + borderSizeY)
+   Gdip_DrawImage(2NDglPG, plotBMP, borderSizeX, borderSizeY)
+   Gdip_DrawImage(2NDglPG, infoBoxBMP, tlbrBonusX, imgH + borderSizeY)
    trGdip_DisposeImage(infoBoxBMP, 1)
    trGdip_DisposeImage(plotBMP, 1)
    ResetImgLoadStatus()
@@ -16584,10 +17918,14 @@ PlotSeenMonthsStatsNow() {
    GetWinClientSize(W, H, PVhwnd, 0)
    Gdip_GraphicsClear(2NDglPG)
    textu := "Seen images chart: MONTHS`nTotal: " groupDigits(counter) " months. " lacking "`nRange: " startPeriod " - " endPeriod "`nAverage: " avgu ". Peak on " maxKvalu "=" groupDigits(maxValu)
-   infoBoxBMP := drawTextInBox(textu, OSDFontName, OSDfntSize, w, h, OSDtextColor, OSDbgrColor, 1, 0)
+   infoBoxBMP := drawTextInBox(textu, OSDFontName, OSDfontSize, w, h, OSDtextColor, OSDbgrColor, 1, 0)
    Scale := imgHUDbaseUnit/40
-   borderSize := imgHUDbaseUnit//10
 
+   hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+   tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
+   tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
+   borderSizeX := imgHUDbaseUnit//10 + tlbrBonusX
+   borderSizeY := imgHUDbaseUnit//10 + tlbrBonusY
    If (counter>20)
       plotBMP := BarChart(dataArray, namesLabel, Round(106*Scale), 385, "", "DiagonBlackGreen", "DisplayValues:0, BarHeight:" Scale*5 ",BarHeightFactor:1, BarSpacing:" Scale/2 ",BarRoundness:0,AutoCalculateHeight:1, BarColorDirection:2, BgrStyle:3, BarBorderColor:0,TextSize:0, BarColorA:ff" OSDtextColor ", ChartBackColorA:00" OSDbgrColor)
    Else
@@ -16596,9 +17934,9 @@ PlotSeenMonthsStatsNow() {
    Gdip_GetImageDimensions(plotBMP, imgW, imgH)
    Gdip_GetImageDimensions(infoBoxBMP, boxW, boxH)
 
-   If (imgH>H - boxH - borderSize*2)
+   If (imgH>H - boxH - borderSizeY*2)
    {
-      newBitmap := trGdip_ResizeBitmap(A_ThisFunc, plotBMP, imgW, H - boxH - borderSize*2, 0, 7)
+      newBitmap := trGdip_ResizeBitmap(A_ThisFunc, plotBMP, imgW, H - boxH - borderSizeY*2, 0, 7)
       If StrLen(newBitmap)>2
       {
          trGdip_DisposeImage(plotBMP)
@@ -16608,10 +17946,10 @@ PlotSeenMonthsStatsNow() {
    }
 
    pBrush := Gdip_BrushCreateSolid("0xee" OSDbgrColor)
-   Gdip_FillRectangle(2NDglPG, pBrush, 0, 0, max(imgW, boxW) + borderSize, imgH + borderSize)
+   Gdip_FillRectangle(2NDglPG, pBrush, 0, 0, max(imgW, boxW) + borderSizeX, imgH + borderSizeY)
 
-   Gdip_DrawImage(2NDglPG, plotBMP, borderSize, borderSize)
-   Gdip_DrawImage(2NDglPG, infoBoxBMP, 0, imgH + borderSize)
+   Gdip_DrawImage(2NDglPG, plotBMP, borderSizeX, borderSizeY)
+   Gdip_DrawImage(2NDglPG, infoBoxBMP, tlbrBonusX, imgH + borderSizeY)
    trGdip_DisposeImage(infoBoxBMP, 1)
    trGdip_DisposeImage(plotBMP, 1)
    ResetImgLoadStatus()
@@ -16752,9 +18090,15 @@ PlotSeenDaysStatsNow(modus:=0) {
    Gdip_GraphicsClear(2NDglPG)
    friendly := InStr(modus, "avg-") ? avgLevel " DAYS AVERAGED" : "DAYS"
    textu := "Seen images chart: " friendly "`nTotal: " groupDigits(counter) " days. " lacking "`nRange: " startPeriod " - " endPeriod "`nAverage: " avgu ". Peak on: " maxKvalu "=" groupDigits(maxValu)
-   infoBoxBMP := drawTextInBox(textu, OSDFontName, OSDfntSize, w, h, OSDtextColor, OSDbgrColor, 1, 0)
+   infoBoxBMP := drawTextInBox(textu, OSDFontName, OSDfontSize, w, h, OSDtextColor, OSDbgrColor, 1, 0)
    Scale := imgHUDbaseUnit/40
+   hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+   tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
+   tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
    borderSize := (counter>200) ? imgHUDbaseUnit/60 : imgHUDbaseUnit/10
+   borderSizeX := borderSize + tlbrBonusX
+   borderSizeY := borderSize + tlbrBonusY
+
    If (counter>(avgLevel*2 + 1) && InStr(modus, "avg-"))
       plotBMP := BarChart(dataAvg, namesLabel, Round(106*Scale), 385, "", "DiagonBlackGreen", "DisplayValues:0, BarHeight:" Scale*5 ",BarHeightFactor:1, BarSpacing:" Scale/2 ",BarRoundness:0,AutoCalculateHeight:1, BarColorDirection:2, BgrStyle:3, BarBorderColor:0,TextSize:0, BarColorA:ff" OSDtextColor ", ChartBackColorA:00" OSDbgrColor)
    Else If (counter>20)
@@ -16764,9 +18108,9 @@ PlotSeenDaysStatsNow(modus:=0) {
 
    Gdip_GetImageDimensions(plotBMP, imgW, imgH)
    Gdip_GetImageDimensions(infoBoxBMP, boxW, boxH)
-   If (imgH>H - boxH - borderSize*2)
+   If (imgH>H - boxH - borderSizeY*2)
    {
-      newBitmap := trGdip_ResizeBitmap(A_ThisFunc, plotBMP, imgW, H - boxH - borderSize*2, 0, 7)
+      newBitmap := trGdip_ResizeBitmap(A_ThisFunc, plotBMP, imgW, H - boxH - borderSizeY*2, 0, 7)
       If StrLen(newBitmap)>2
       {
          trGdip_DisposeImage(plotBMP)
@@ -16777,9 +18121,9 @@ PlotSeenDaysStatsNow(modus:=0) {
    }
 
    pBrush := Gdip_BrushCreateSolid("0xee" OSDbgrColor)
-   Gdip_FillRectangle(2NDglPG, pBrush, 0, 0, max(imgW, boxW) + borderSize, imgH + borderSize)
-   Gdip_DrawImage(2NDglPG, plotBMP, borderSize, borderSize)
-   Gdip_DrawImage(2NDglPG, infoBoxBMP, 0, imgH + borderSize)
+   Gdip_FillRectangle(2NDglPG, pBrush, 0, 0, max(imgW, boxW) + borderSizeX, imgH + borderSizeY)
+   Gdip_DrawImage(2NDglPG, plotBMP, borderSizeX, borderSizeY)
+   Gdip_DrawImage(2NDglPG, infoBoxBMP, tlbrBonusX, imgH + borderSizeY)
    trGdip_DisposeImage(infoBoxBMP, 1)
    trGdip_DisposeImage(plotBMP, 1)
    ResetImgLoadStatus()
@@ -18675,11 +20019,13 @@ FolderTreeResponder(a, b, c) {
          Gui, fdTreeGuia: TreeView, TVlistFolders
          info := defineWindowUnderMouse()
 
-         If InStr(info, "tree")
+         If InStr(info, "tooltip")
          {
-            MouseGetPos, ox, oy
+            Continue
+         } Else If InStr(info, "tree")
+         {
             friendly := "`nMove or copy folder into another one. Hold SHIFT to MOVE."
-            JEE_ScreenToClient(hTVlistFolders, ox, oy, nX, nY)
+            GetMouseCoord2wind(hTVlistFolders, nX, nY)
             nc := TVH_HitTest(hTVlistFolders, cr, nX, nY)
             If (nc=c)
                thisFolder := nc := ""
@@ -18709,8 +20055,7 @@ FolderTreeResponder(a, b, c) {
          {
             TV_Modify(c)
             r := dc := nc := ""
-            MouseGetPos, ox, oy
-            JEE_ScreenToClient(hLVquickSearchMenus, ox, oy, nX, nY)
+            GetMouseCoord2wind(hLVquickSearchMenus, nX, nY)
             dc := LV_EX_ItemHitTest(hLVquickSearchMenus, kp, nX, nY)
             Gui, QuickMenuSearchGUIA: Default
             Gui, QuickMenuSearchGUIA: ListView, LVsearchMenus
@@ -18757,7 +20102,7 @@ FolderTreeResponder(a, b, c) {
 
          If (doNotAskAgain=0 && src!=dest && InStr(src, ":\") && InStr(dest, ":\") && r)
          {
-            msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action between the folders tree panel and the omnibox: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: ." src "\`nDestination: ." dest "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
+            msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action from the folders tree panel into the omnibox: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: ." src "\`nDestination: ." dest "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
             If !InStr(msgResult.btn, "Yes")
             {
                SetTimer, PopulateQuickMenuSearch, -200
@@ -18767,7 +20112,7 @@ FolderTreeResponder(a, b, c) {
 
          If (InStr(r, "_") && src!=dest && InStr(src, ":\") && InStr(dest, ":\"))
          {
-            externTooltiput("Please wait - performng folder action")
+            externTooltiput("Please wait - performing folder action")
             r := UIcoreFolderPasteFoldersInto(0, "given", r, src, dest)
          }
          externToolTiput("-hide-")
@@ -18791,7 +20136,7 @@ FolderTreeResponder(a, b, c) {
 
          If (doNotAskAgain=0 && src!=dest && InStr(src, ":\") && InStr(dest, ":\") && r)
          {
-            msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action in the folders tree: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: ." sr "\`nDestination: ." dst "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
+            msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action inside the folders tree: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: ." sr "\`nDestination: ." dst "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
             If !InStr(msgResult.btn, "Yes")
             {
                SetTimer, folderTreeInfoStatusLineUpdater, -125
@@ -18801,7 +20146,7 @@ FolderTreeResponder(a, b, c) {
 
          If (InStr(r, "_") && src!=dest && InStr(src, ":\") && InStr(dest, ":\"))
          {
-            externTooltiput("Please wait - performng folder action")
+            externTooltiput("Please wait - performing folder action")
             r := UIcoreFolderPasteFoldersInto(0, "given", r, src, dest)
             If (r=2)
                folderTreeScanSubbies()
@@ -18820,13 +20165,15 @@ defineWindowUnderMouse() {
    MouseGetPos, OutputVarX, OutputVarY, OutputVarWin, hwnd, 2
    WinGetClass, OutputType, ahk_id %hwnd%
    If (OutputVarWin=hfdTreeWinGui && InStr(OutputType, "systree") && folderTreeWinOpen=1)
-      info := "Folders tree view"
+      info := "Folders tree list"
    Else If (OutputVarWin=PVhwnd)
       info := "Main window"
    Else If (OutputVarWin=hQuickMenuSearchWin && hwnd=hLVquickSearchMenus && VisibleQuickMenuSearchWin=1)
       info := "Omnibox list"
    Else If (OutputVarWin=hQuickMenuSearchWin && VisibleQuickMenuSearchWin=1)
       info := "Omnibox window"
+   Else If (OutputVarWin=hGuiTip)
+      info := "Tooltip"
    Return info
 }
 
@@ -19255,8 +20602,8 @@ folderTreeContextMenu() {
          kMenu("PVfdTree", "Add", "&Import images into the list`tF3", "folderTreeAppendFiles")
          Menu, PVfdTree, Add
          kMenu("PVfdTree", "Add", "&Create new folder`tF7", "folderTreeCreateFolder")
-         kMenu("PVfdTree", "Add", "C&ut folder (Explorer mode)", "folderTreeCutCopyFolder")
-         kMenu("PVfdTree", "Add", "C&opy folder (Explorer mode)", "folderTreeCutCopyFolder")
+         kMenu("PVfdTree", "Add", "C&ut folder (Explorer mode)`tCtrl+X", "folderTreeCutCopyFolder")
+         kMenu("PVfdTree", "Add", "C&opy folder (Explorer mode)`tCtrl+C", "folderTreeCutCopyFolder")
          kMenu("PVfdTree", "Add", "&Paste folder(s) into...", "folderTreePasteFoldersInto")
          kMenu("PVfdTree", "Add", "&Rename folder`tF2", "folderTreeRenameFolder")
          kMenu("PVfdTree", "Add", "&Delete folder`tDelete", "folderTreeDeleteFolder")
@@ -19693,6 +21040,12 @@ fromFolderTreeToOmniBox(modus:=0,imgPath:=0) {
 }
 
 folderTreeAppendFiles(modus:="") {
+   If (maxFilesIndex<1 || !CurrentSLD)
+   {
+      folderTreeDefaultAction()
+      Return
+   }
+
    Gui, fdTreeGuia: Default
    Gui, fdTreeGuia: TreeView, TVlistFolders
    c := TV_GetSelection()
@@ -25556,8 +26909,8 @@ readMainSettingsApp(act) {
     IniAction(act, "DisplayTimeUser", "General", 2, 1, 99)
     ; IniAction(act, "EllipseSelectMode", "General", 1)
     IniAction(act, "enableThumbsCaching", "General", 1)
-    IniAction(act, "FontBolded", "General", 1)
-    IniAction(act, "FontItalica", "General", 1)
+    IniAction(act, "OSDfontBolded", "General", 1)
+    IniAction(act, "OSDfontItalica", "General", 1)
     IniAction(act, "highlightAlreadySeenImages", "General", 1)
     IniAction(act, "histogramMode", "General", 2, 1, 3)
     IniAction(act, "LimitSelectBoundsImg", "General", 1)
@@ -25570,7 +26923,7 @@ readMainSettingsApp(act) {
     IniAction(act, "additionalLVrows", "General", 2, 0, 15)
     IniAction(act, "OnSortdoFilesCheck", "General", 1)
     IniAction(act, "OSDbgrColor", "General", 3)
-    IniAction(act, "OSDfntSize", "General", 2, 10, 350)
+    IniAction(act, "OSDfontSize", "General", 2, 10, 350)
     IniAction(act, "OSDFontName", "General", 5)
     IniAction(act, "OSDtextColor", "General", 3)
     IniAction(act, "PasteFntSize", "General", 2, 10, 350)
@@ -25654,7 +27007,7 @@ readMainSettingsApp(act) {
 }
 
 calcHUDsize() {
-   imgHUDbaseUnit := (PrefsLargeFonts=1) ? Round(OSDfntSize*2.5) : Round(OSDfntSize*2)
+   imgHUDbaseUnit := (PrefsLargeFonts=1) ? Round(OSDfontSize*2.5) : Round(OSDfontSize*2)
 }
 
 writeSlideSettings(file2save) {
@@ -25805,7 +27158,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
         {
            OutFileName := "*******.***"
            OutDir := "*:\******\*****"
-        }
+        } Else OutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
 
         IniAction(1, "userAddedFavesCount", "General")
         showTOOLtip("Image ADDED back to favourites:`n" OutFileName "`n" OutDir "\`nTotal entries: " groupDigits(userAddedFavesCount), 0, 0, userAddedFavesCount/maxFavesEntries)
@@ -25838,6 +27191,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
      whichFiled := (userAddedFavesCount>19) ? miniFavesFile : mainFavesFile
      If !FileExist(whichFiled)
         FileAppend, % "`n", % whichFiled, UTF-8
+
      userAddedFavesCount++
      IniAction(1, "userAddedFavesCount", "General")
      zPlitPath(imgPath, 0, OutFileName, OutDir)
@@ -25845,8 +27199,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
      {
         OutFileName := "*******.***"
         OutDir := "*:\******\*****"
-     }
-
+     } Else OutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
      showTOOLtip("Image ADDED to favourites:`n" OutFileName "`n" OutDir "\`nTotal entries: " groupDigits(userAddedFavesCount), 0, 0, userAddedFavesCount/maxFavesEntries)
      resultedFilesList[currentFileIndex, 5] := 1
      updateMainUnfilteredList(currentFileIndex, 5, 1)
@@ -25875,7 +27228,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
         {
            OutFileName := "*******.***"
            OutDir := "*:\******\*****"
-        }
+        } Else OutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
 
         showTOOLtip("Image REMOVED from favourites:`n" OutFileName "`n" OutDir "\`nTotal entries: " groupDigits(userAddedFavesCount), 0, 0, userAddedFavesCount/maxFavesEntries)
         currentFilesListModified := 1
@@ -25978,7 +27331,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
      {
         OutFileName := "*******.***"
         OutDir := "*:\******\*****"
-     }
+     } Else OutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
 
      showTOOLtip("Image REMOVED from favourites:`n" OutFileName "`n" OutDir "\`nTotal entries: " groupDigits(realCount), 0, 0, realCount/maxFavesEntries)
      SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -26427,7 +27780,7 @@ jumpToFilesSelBorder(destination) {
   currentFileIndex := (destination=-1) ? theFirst : theLast
   FriendlyName := (destination=-1) ? "First" : "Last"
   dummyTimerDelayiedImageDisplay(50)
-  showTOOLtip(FriendlyName " selected element index: " currentFileIndex "`n" markedSelectFile " total images selected")
+  showTOOLtip(FriendlyName " selected element index: " groupDigits(currentFileIndex) "`n" groupDigits(markedSelectFile) " total images selected")
   interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
   interfaceThread.ahkassign("markedSelectFile", markedSelectFile)
   SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -26541,9 +27894,9 @@ processSearchIndexString(inputu) {
    } Else If (InStr(inputu, "/") && StrLen(inputu)>1)
    {
       thisFilter := StrReplace(inputu, "/")
-      If thisFilter
+      If (thisFilter!="")
          thisFilter := "i)^(" JEE_StrRegExLiteral(thisFilter) ")"
-   } Else If inputu
+   } Else If (inputu!="")
       thisFilter := "i)(" JEE_StrRegExLiteral(inputu) ")"
 
    Return thisFilter
@@ -26580,7 +27933,7 @@ processSQLsearchIndexString(inputu, strPosu, ByRef whatu) {
 
 searchNextIndex(direction, inLoop:=0) {
    thisFilter := processSearchIndexString(userSearchString)
-   If !thisFilter
+   If (thisFilter="")
    {
       thisSearchString := userSearchString := ""
       SetTimer, PanelSearchIndex, -100
@@ -27084,6 +28437,9 @@ DeletePicture(dummy:=0) {
   Try FileSetAttrib, -R, %file2rem%
   Sleep, 1
 
+  If (userPrivateMode!=1)
+     OutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
+
   shiftState := (GetKeyState("Shift", "P") && askDeleteFiles!=1) ? 1 : 0
   If (msgResult.check=1) || (shiftState=1)
      FileDelete, %file2rem%
@@ -27125,6 +28481,7 @@ DeletePicture(dummy:=0) {
      Else
         showTOOLtip("File moved to recycle bin" fileMsg)
 
+     lastOSDtooltipInvoked := 1
      If (deleteFileActAfter=2)
         NextPicture(0, 0, 1)
      Else If (deleteFileActAfter=3)
@@ -27181,7 +28538,7 @@ PanelMultiRenameFiles() {
     Gui, +Delimiter`n
     Gui, Add, Text, x15 y15 w%txtWid% Section, Selected files: %thisu%. Type a pattern to rename the files.
     Gui, Add, ComboBox, y+10 w%EditWid% gUIgenericComboAction vUsrEditNewFileName, % listu
-    Gui, Add, ListView, xp y+1 wp -multi +LV0x10000 r%uLVr% Grid vLViewOthers, #`nOriginal file name`nNew file name`nFolder
+    Gui, Add, ListView, xp y+1 wp -multi +LV0x10000 +LV0x400 r%uLVr% Grid AltSubmit vLViewOthers gUIlvMultiRenameResponder, Original file name`nNew file name`nFolder path`n#
     ml := (PrefsLargeFonts=1) ? 40 : 30
     sml := (PrefsLargeFonts=1) ? 35 : 25
     Gui, Add, Button, y+5 h%thisBtnHeight% w%ml% gUImultiRenameChangeLVoffset, <<
@@ -27202,7 +28559,8 @@ UImultiRenameChangeLVoffset(a:=0, b:=0, c:=0) {
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: ListView, LViewOthers
    GuiControlGet, UsrEditNewFileName
-   ControlGetText, info, , ahk_id %a%
+   If (!InStr(a, ">") && !InStr(a, "<"))
+      ControlGetText, info, , ahk_id %a%
 
    totalListed := LV_GetCount()
    If (totalListed<1 || StrLen(UsrEditNewFileName)<1 || userPrivateMode=1)
@@ -27238,7 +28596,7 @@ UImultiRenameChangeLVoffset(a:=0, b:=0, c:=0) {
 BtnHelpMultiRename() {
     GuiControlGet, PreserveDateTimeOnSave
     RegAction(1, "PreserveDateTimeOnSave")
-    msgBoxWrapper(appTitle ": HELP", "File extensions remain unchanged regardless of the pattern used.`nPatterns available to rename the Files:`n`na) Whatever file prefix [this] or suffix with tokens`n[this] - file name`n[pfdname] - parent folder name`n[fDateM] or [fDateC] - file modified/created date`n[counter] - count all files, regardless of their location.`ntrim{X,Y} - a function usable only once in the pattern. X and Y designate how many letters to trim from the beginning and/or end of the original file name.`n`nb) Replace given string//with this one`nUse // to perform search and replace in file names. Begin with \> to use RegEx. Trim function and the tokens mentioned earlier can be used only after //.`n`nc) abcdefgh01234>>any string`nEvery enumerated character before >> will be replaced with a single character or a string specified after >>. The tokens from a) can be used after >>.`n`nd) any file name without tokens`nThe files will be counted according to their containing folder. This is to avoid naming conflicts and applies only if [this], >> and // are not used.", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "File extensions remain unchanged regardless of the pattern used.`nPatterns available to rename the Files:`n`na) Whatever file prefix [this] or suffix with tokens`n[this] - file name`n[pfdname] - parent folder name`n[fDateM] or [fDateC] - file modified/created date`n[counter] - count all files, regardless of their location`ntrim{X,Y} - X and Y designate how many letters to trim from the beginning and/or end of the original file name`ncase{U} - change letters to {U}pper, {L}ower or {T}itle case`n`nb) Replace given string//with this one`nUse // to perform search and replace in file names. Begin with \> to use RegEx. Trim function and the tokens mentioned earlier can be used only after //.`n`nc) abcdefgh01234>>any string`nEvery enumerated character before >> will be replaced with a single character or a string specified after >>. The tokens from a) can be used after >>.`n`nd) any file name without tokens`nThe files will be counted according to their containing folder. This is to avoid naming conflicts and applies only if [this], >> and // are not used.", -1, 0, 0)
 }
 
 UIgenericComboAction(a:=0, b:=0, c:=0) {
@@ -27260,87 +28618,117 @@ dummyPopulateAboutKbdShortcutsList() {
 }
 
 decideMultiRename(ByRef OriginalNewFileName) {
-  obju := []
-  obju.renamingCount := 0
-  obju.TrimmingMode := 0
-  obju.rechecherRemplaceMode := 0
-  obju.charsRemplaceMode := 0
-  obju.regExRemplaceMode := 0
-  obju.IndexModeCount := 0
-  If (Trimmer(OriginalNewFileName)="[counter]")
-     OriginalNewFileName := "[this] ([counter])"
+   obju := []
+   obju.renamingCount := 0
+   obju.TrimmingMode := 0
+   obju.rechecherRemplaceMode := 0
+   obju.charsRemplaceMode := 0
+   obju.regExRemplaceMode := 0
+   obju.caseChange := 0
+   obju.IndexModeCount := 0
+   obju.forceCaseChange := 0
 
-  matchFoundPosA := RegExMatch(OriginalNewFileName, "i)trim\{..?.?\, ?..?.?\}", matchedStringu)
-  If InStr(OriginalNewFileName, "//")
-     strArr := StrSplit(OriginalNewFileName, "//")
-  Else If InStr(OriginalNewFileName, "\\")
-     strArr := StrSplit(OriginalNewFileName, "\\")
-  Else If InStr(OriginalNewFileName, ">>")
-     chrStrArr := StrSplit(OriginalNewFileName, ">>")
-  Else If (!InStr(OriginalNewFileName, "[this]") && !matchedStringu)
-     obju.renamingCount := 1
+   If RegExMatch(OriginalNewFileName, "i)(case\{.\})")
+   {
+      If InStr(OriginalNewFileName, "case{U}")
+         obju.caseChange := 1
+      Else If InStr(OriginalNewFileName, "case{L}")
+         obju.caseChange := 2
+      Else If InStr(OriginalNewFileName, "case{T}")
+         obju.caseChange := 3
 
-  If (InStr(OriginalNewFileName, "[counter]") ) ; && obju.renamingCount!=1)
-  {
-     obju.IndexModeCount := 1
-     obju.renamingCount := 0
-  }
-
-  If (IsObject(strArr) && obju.renamingCount!=1)
-  {
-     testRegEx := SubStr(strArr[1], 1, 2)
-     If (testRegEx="\>")
-     {
-        obju.regExRemplaceMode := 1
-        obju.strArrA := SubStr(strArr[1], 3)
-        obju.strArrB := strArr[2]
-     } Else
-     {
-        obju.strArrA := filterFileName(strArr[1]) ? strArr[1] : ""
-        obju.strArrB := filterFileName(strArr[2]) ? strArr[2] : ""
-     }
-
-     If (obju.strArrA="")
-        Return "err"
-     ; If (obju.strArrB="" && StrLen(obju.strArr[2])>0)
-     ;    Return "err"
-
-     obju.rechecherRemplaceMode := 1 
-  } Else If (IsObject(chrStrArr) && obju.renamingCount!=1)
-  {
-     obju.strArrA := filterFileName(chrStrArr[1]) ? chrStrArr[1] : ""
-     obju.strArrB := filterFileName(chrStrArr[2]) ? chrStrArr[2] : ""
-     If (obju.strArrA="")
-        Return "err"
-
-     obju.charsRemplaceMode := 1 
-  } Else obju.newName := filterFileName(OriginalNewFileName)
-
-  If (obju.renamingCount!=1)
-  {
-     obju.origMatchedStringu := matchedStringu
-     matchedStringu := StrReplace(matchedStringu, A_Space)
-     matchedStringu := StrReplace(matchedStringu, A_Space)
-     matchedStringu := StrReplace(matchedStringu, .)
-     matchedStringu := StrReplace(matchedStringu, "trim{")
-     matchedStringu := StrReplace(matchedStringu, "}")
-     If InStr(matchedStringu, ",")
-     {
-        trimuObj := StrSplit(matchedStringu, ",")
-        obju.leftTrimu := trimuObj[1]
-        obju.righttTrimu := trimuObj[2]
-        obju.TrimmingMode := (isNumber(obju.leftTrimu) && isNumber(obju.righttTrimu)) ? 1 : 0
-     }
-     ; ToolTip, % obju.origMatchedStringu "`n" matchedStringu "`n" trimuObj[1] "==" trimuObj[2] , , , 2
-  }
-
-  Return obju
+      OriginalNewFileName := StrReplace(OriginalNewFileName, "case{U}")
+      OriginalNewFileName := StrReplace(OriginalNewFileName, "case{L}")
+      OriginalNewFileName := StrReplace(OriginalNewFileName, "case{T}")
+      If !Trimmer(OriginalNewFileName)
+         obju.forceCaseChange := 1
+   }
+ 
+   If (Trimmer(OriginalNewFileName)="[counter]")
+      OriginalNewFileName := "[this] ([counter])"
+   Else If (obju.forceCaseChange=1)
+      OriginalNewFileName := "[this]"
+ 
+   matchFoundPosA := RegExMatch(OriginalNewFileName, "i)trim\{..?.?\, ?..?.?\}", matchedStringu)
+   If InStr(OriginalNewFileName, "//")
+      strArr := StrSplit(OriginalNewFileName, "//")
+   Else If InStr(OriginalNewFileName, "\\")
+      strArr := StrSplit(OriginalNewFileName, "\\")
+   Else If InStr(OriginalNewFileName, ">>")
+      chrStrArr := StrSplit(OriginalNewFileName, ">>")
+   Else If (!InStr(OriginalNewFileName, "[this]") && !matchedStringu)
+      obju.renamingCount := 1
+ 
+   If (InStr(OriginalNewFileName, "[counter]") ) ; && obju.renamingCount!=1)
+   {
+      obju.IndexModeCount := 1
+      obju.renamingCount := 0
+   }
+ 
+   If (IsObject(strArr) && obju.renamingCount!=1)
+   {
+      testRegEx := SubStr(strArr[1], 1, 2)
+      If (testRegEx="\>")
+      {
+         obju.regExRemplaceMode := 1
+         obju.strArrA := SubStr(strArr[1], 3)
+         obju.strArrB := strArr[2]
+      } Else
+      {
+         obju.strArrA := strArr[1]
+         If (strArr[2]=A_Space || strArr[2]=0 || strArr[2]="  ")
+            obju.strArrB := strArr[2]
+         Else
+            obju.strArrB := (filterFileName(strArr[2])!="") ? strArr[2] : ""
+      }
+ 
+      If (obju.strArrA="")
+         Return "err"
+      ; If (obju.strArrB="" && StrLen(obju.strArr[2])>0)
+      ;    Return "err"
+ 
+      obju.rechecherRemplaceMode := 1 
+   } Else If (IsObject(chrStrArr) && obju.renamingCount!=1)
+   {
+      obju.strArrA := chrStrArr[1]
+      If (chrStrArr[2]=A_Space || chrStrArr[2]=0 || chrStrArr[2]=" ")
+         obju.strArrB := chrStrArr[2]
+      Else
+         obju.strArrB := filterFileName(chrStrArr[2]) ? chrStrArr[2] : ""
+ 
+      If (obju.strArrA="")
+         Return "err"
+ 
+      obju.charsRemplaceMode := 1 
+   } Else obju.newName := filterFileName(OriginalNewFileName)
+ 
+   If (obju.renamingCount!=1)
+   {
+      obju.origMatchedStringu := matchedStringu
+      matchedStringu := StrReplace(matchedStringu, A_Space)
+      matchedStringu := StrReplace(matchedStringu, A_Space)
+      matchedStringu := StrReplace(matchedStringu, .)
+      matchedStringu := StrReplace(matchedStringu, "trim{")
+      matchedStringu := StrReplace(matchedStringu, "}")
+      If InStr(matchedStringu, ",")
+      {
+         trimuObj := StrSplit(matchedStringu, ",")
+         obju.leftTrimu := trimuObj[1]
+         obju.righttTrimu := trimuObj[2]
+         obju.TrimmingMode := (isNumber(obju.leftTrimu) && isNumber(obju.righttTrimu)) ? 1 : 0
+      }
+      ; ToolTip, % obju.origMatchedStringu "`n" matchedStringu "`n" trimuObj[1] "==" trimuObj[2] , , , 2
+   }
+ 
+   Return obju
 }
 
 ChrReplace(string, chars, replacer) {
    If (chars!="")
+   {
       Loop, Parse, chars
            string := StrReplace(string, A_LoopField, replacer)
+   }
 
    Return string
 }
@@ -27392,30 +28780,92 @@ decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, countFilez, parentFol
    }
    ; ToolTip, % obju.TrimmingMode "==" obju.origMatchedStringu "==" obju.renamingCount , , , 2
 
+   If (obju.caseChange=1)
+      newFileName := Format("{:U}", StrReplace(newFileName, "case{U}"))
+   Else If (obju.caseChange=2)
+      newFileName := Format("{:L}", StrReplace(newFileName, "case{L}"))
+   Else If (obju.caseChange=3)
+      newFileName := Format("{:T}", StrReplace(newFileName, "case{T}"))
+
    Return newFileName
+}
+
+UIlvMultiRenameResponder(a, b, c) {
+   Gui, SettingsGUIA: Default
+   Gui, SettingsGUIA: ListView, LViewOthers
+   RowNumber := LV_GetNext(0, "F")
+   LV_GetText(indexu, RowNumber, 4)
+   If !indexu
+   {
+      If (b="RightClick")
+         invokePrefsPanelsContextMenu()
+      Return
+   }
+
+   ; If (b="k")
+   ;    ToolTip, % b "=" c , , , 2
+
+   focusEdit := (b="k" && (isInRange(c, 33, 40) || isInRange(c, 48, 59)  || isInRange(c, 65, 90))) ? 0 : 1
+   bfocusEdit := RegExMatch(b, "i)^(normal|s|f|i|c|d|a|colclick|right)") ? 1 : 0
+   If (b="k" && c=112) ; F1
+   {
+      BtnHelpMultiRename()
+   } Else If (b="k" && c=120) ; F9
+   {
+      UImultiRenameChangeLVoffset("<<")
+   } Else If (b="k" && c=121) ; F10
+   {
+      UImultiRenameChangeLVoffset("<")
+   } Else If (b="k" && c=122) ; F11
+   {
+      UImultiRenameChangeLVoffset(">")
+   } Else If (b="k" && c=123) ; F12
+   {
+      UImultiRenameChangeLVoffset(">>")
+   } Else If (b="DoubleClick")
+   {
+      currentFileIndex := indexu
+      dummyTimerDelayiedImageDisplay(50)
+   } Else If (b="RightClick")
+   {
+      invokePrefsPanelsContextMenu()
+   } Else If (bfocusEdit!=1 && focusEdit=1)
+   {
+      GuiControl, SettingsGUIA: Focus, UsrEditNewFileName
+      highlightActiveCtrl()
+   }
 }
 
 PopulateLVmultiRename() {
   Gui, SettingsGUIA: Default
   Gui, SettingsGUIA: ListView, LViewOthers
   GuiControlGet, UsrEditNewFileName
-  LV_Delete()
   OriginalNewFileName := Trimmer(UsrEditNewFileName)
-  If (OriginalNewFileName="[this]" || OriginalNewFileName="trim{" || OriginalNewFileName="\\" || OriginalNewFileName="//")
+  If (OriginalNewFileName="[this]" || OriginalNewFileName="")
+  {
+     LV_Delete()
+     GuiControl, +Redraw, LViewOthers
      Return
+  }
 
+  OriginalNewFileName := UsrEditNewFileName
   objuTemp := decideMultiRename(OriginalNewFileName)
-  If (objuTemp="err")
-     Return
-
   If (objuTemp.newName)
      OriginalNewFileName := objuTemp.newName
   
+  If (objuTemp="err" || StrLen(OriginalNewFileName)<2)
+  {
+     LV_Delete()
+     GuiControl, +Redraw, LViewOthers
+     Return
+  }
+
   loopzu := 0
   startOperation := A_TickCount
   If (StrLen(OriginalNewFileName)>1)
   {
      GuiControl, -Redraw, LViewOthers
+     LV_Delete()
      filesElected := getSelectedFiles(0, 1)
      If (objuTemp.IndexModeCount=1)
         OutDirAsc := "a"
@@ -27456,15 +28906,17 @@ PopulateLVmultiRename() {
          }
 
          file2save := OutDir "\" newFileName "." fileEXTu
-         If (file2save=imgPath || newFileName="" || newFileName=A_Space)
+         If (file2save==imgPath || newFileName="" || newFileName=A_Space || newFileName="  " || newFileName=".")
             Continue
 
          loopzu++
-         LV_Add(A_Index, A_Index, OutFileName, newFileName "." fileEXTu, OutDir "\")
+         LV_Add(A_Index, OutFileName, newFileName "." fileEXTu, OutDir "\", A_Index)
          ; ToolTip, % A_Index , , , 2
          If ((loopzu>=maxItems) || (loopzu>15 && (A_TickCount - startOperation>1000)))
             Break
      }
+     LV_ModifyCol(3, "AutoHdr Left")
+     LV_ModifyCol(4, "AutoHdr Left")
 
      counterFilez := ""
      GuiControl, +Redraw, LViewOthers
@@ -27479,8 +28931,7 @@ coreBatchMultiRenameFiles() {
 
   RegAction(1, "PreserveDateTimeOnSave")
   OriginalNewFileName := Trimmer(UsrEditNewFileName)
-  objuTemp := decideMultiRename(OriginalNewFileName)
-  If (objuTemp="err" || OriginalNewFileName="[this]" || OriginalNewFileName="trim{" || OriginalNewFileName="\\" || OriginalNewFileName="//")
+  If (OriginalNewFileName="[this]" || OriginalNewFileName="")
   {
      showTOOLtip("WARNING: Incorrect multi-rename pattern provided")
      SoundBeep 300, 100
@@ -27488,8 +28939,18 @@ coreBatchMultiRenameFiles() {
      Return
   }
 
+  OriginalNewFileName := UsrEditNewFileName
+  objuTemp := decideMultiRename(OriginalNewFileName)
   If (objuTemp.newName)
      OriginalNewFileName := objuTemp.newName
+  
+  If (objuTemp="err" || StrLen(OriginalNewFileName)<2)
+  {
+     showTOOLtip("WARNING: Incorrect multi-rename pattern provided")
+     SoundBeep 300, 100
+     SetTimer, RemoveTooltip, % -msgDisplayTime
+     Return
+  }
 
   If (StrLen(OriginalNewFileName)>1)
   {
@@ -27563,7 +29024,7 @@ coreBatchMultiRenameFiles() {
 
          newFileName := decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, counterFilez[OutDirAsc], parentFolderName, file2rem, objuTemp)
          file2save := OutDir "\" newFileName "." fileEXTu
-         If (file2save=file2rem || newFileName="" || newFileName=A_Space)
+         If (file2save==file2rem || newFileName="" || newFileName=A_Space || newFileName="." || newFileName="  ")
          {
             skippedFiles++
             Continue
@@ -28026,6 +29487,7 @@ PanelBrowseAudioAnnotation() {
       SetTimer, PanelBrowseAudioAnnotation, -150
    }
 }
+
 UIeditQuickMenuSearchTrigger() {
    delayu := (omniBoxMode=1) ? -250 : -50
    SetTimer, PopulateQuickMenuSearch, % delayu
@@ -28102,7 +29564,8 @@ PanelQuickSearchMenuOptions() {
 LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
    Critical, on
    Static lastInvoked := 1, doNotaskAgain := 0
-  
+
+   ; If (b="k")  
    ; ToolTip, % b "|" c , , , 2
    If (b="a" || b="i" || b="f") || (A_TickCount - zeitSillyPrevent<350) && (b!="DoubleClick" && b!="d")
       Return
@@ -28129,7 +29592,12 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
       omniBoxFolderOpen()
    } Else If (b="K" && c=119) ; F8
    {
-      omniBoxFolderDelete()
+      r := omniBoxFolderDelete()
+      If (r="-" && omniBoxMode!=1)
+      {
+         closeQuickSearch()
+         SetTimer, openPreviousPanel, -200
+      }
    } Else If (b="K" && c=32) || (b="DoubleClick") ; enter
    {
       actu := (b="DoubleClick") ? "forced" : ""
@@ -28150,12 +29618,14 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
       While, determineLClickstate()
       {
          info := defineWindowUnderMouse()
-         If InStr(info, "tree")
+         If InStr(info, "tooltip")
+         {
+            Continue
+         } Else If InStr(info, "tree")
          {
             LV_Modify(initialRow, "select")
-            MouseGetPos, ox, oy
             friendly := "`nMove or copy folder into another one. Hold SHIFT to MOVE."
-            JEE_ScreenToClient(hTVlistFolders, ox, oy, nX, nY)
+            GetMouseCoord2wind(hTVlistFolders, nX, nY)
             nc := TVH_HitTest(hTVlistFolders, cr, nX, nY)
             If nc
             {
@@ -28164,6 +29634,7 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
                TV_GetText(thisFolder, nc)
                TV_Modify(nc)
             }
+
             friendly .= "`nDestination: ." thisFolder "\"
             r := GetKeyState("Shift", "P") ? "[_MOVE_]" : "[_COPY_]"
             friendly .= A_Space r
@@ -28177,8 +29648,7 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
          } Else If InStr(info, "omnibox list")
          {
             thisFolder := r := dc := nc := ""
-            MouseGetPos, ox, oy
-            JEE_ScreenToClient(hLVquickSearchMenus, ox, oy, nX, nY)
+            GetMouseCoord2wind(hLVquickSearchMenus, nX, nY)
             dc := LV_EX_ItemHitTest(hLVquickSearchMenus, kp, nX, nY)
             thisFolder := OmniBoxGetSelectedFolder(dc, "yes", edithu)
             If (dc=initialRow || !thisFolder || thisFolder=initialFolder)
@@ -28226,7 +29696,7 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
 
          If (doNotAskAgain=0 && src!=dest && InStr(src, ":\") && InStr(dest, ":\") && r)
          {
-            msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action in the omnibox: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: .\" rSrc "\`nDestination: .\" rDest "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
+            msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action inside the omnibox: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: .\" rSrc "\`nDestination: .\" rDest "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
             If !InStr(msgResult.btn, "Yes")
             {
                SetTimer, PopulateQuickMenuSearch, -200
@@ -28236,7 +29706,7 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
 
          If (InStr(r, "_") && src!=dest && InStr(src, ":\") && InStr(dest, ":\"))
          {
-            externTooltiput("Please wait - performng folder action")
+            externTooltiput("Please wait - performing folder action")
             r := UIcoreFolderPasteFoldersInto(0, "given", r, src, dest)
          }
          externTooltiput("-hide-")
@@ -28247,7 +29717,7 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
          dest := folderTreeGetSelectedPath(nc)
          If (doNotAskAgain=0 && src!=dest && InStr(src, ":\") && InStr(dest, ":\") && r)
          {
-            msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action between the folders tree panel and the omnibox: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: ." src "\`nDestination: ." dest "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
+            msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action from the omnibox to the folders tree panel: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: ." src "\`nDestination: ." dest "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
             If !InStr(msgResult.btn, "Yes")
             {
                SetTimer, folderTreeInfoStatusLineUpdater, -125
@@ -28255,7 +29725,7 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
             } Else doNotaskAgain := msgResult.check
          }
 
-         externTooltiput("Please wait - performng folder action")
+         externTooltiput("Please wait - performing folder action")
          If (InStr(r, "_") && src!=dest && InStr(src, ":\") && InStr(dest, ":\"))
          {
             r := UIcoreFolderPasteFoldersInto(0, "given", r, src, dest)
@@ -28265,7 +29735,9 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
       }
       externTooltiput("-hide-")
       prevent := 1
-
+   } Else If (b="k" && c=8 && omniBoxMode=1) ; backspace
+   {
+      GoQuickSearchAction(0, "yes", "!OmniNavigateUpFolder")
    } Else If (bfocusEdit!=1 && focusEdit=1)
    {
       GuiControl, QuickMenuSearchGUIA: Focus, userQuickMenusEdit
@@ -28278,7 +29750,45 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
 }
 
 BTNquickSearchHidden(actu) {
-   If GetKeyState("Alt", "P")
+   Gui, QuickMenuSearchGUIA: Default
+   GuiControlGet, userQuickMenusEdit
+   userQuickMenusEdit := Trimmer(userQuickMenusEdit)
+   testu := SubStr(userQuickMenusEdit, 1, 1)
+
+   If (testu=":")
+   {
+      thisu := StrReplace(userQuickMenusEdit, ":")
+      If IsObject(thisu)
+      {
+         listu := ""
+         For Key, Value in %thisu%
+         {
+             If (A_Index>15)
+                Break
+             listu .= Key "," Value "`n"
+         }
+      } If IsFunc(thisu)
+      {
+         funcu := 1
+         %thisu%()
+      } Else 
+      {
+         listu := %thisu%
+         listu := thisu " = " listu
+      }
+
+      If !funcu
+      {
+         showTOOLtip("Result:`n" listu)
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+      }
+   } Else If ((userQuickMenusEdit=";o" || userQuickMenusEdit=".\o"))
+      fromFolderTreeToOmniBox("thisFile", prevOpenFolderPath)
+   Else If ((userQuickMenusEdit=";f" || userQuickMenusEdit=".\f") && folderTreeWinOpen=1)
+      fromFolderTreeToOmniBox()
+   Else If (userQuickMenusEdit=";" || userQuickMenusEdit=".\")
+      invokeOmniBoxCurrentFile()
+   Else If GetKeyState("Alt", "P")
       omniBoxFolderImport()
    Else If (GetKeyState("Shift", "P") || GetKeyState("Ctrl", "P"))
       omniBoxFolderOpen()
@@ -28340,7 +29850,7 @@ changeOptionQuickSearch(keyu) {
    SetTimer, updateUistatusLineQuickSearch, -50
 }
 
-GoQuickSearchAction(dummy:="") {
+GoQuickSearchAction(dummy:="", isGiven:=0, ef:=0) {
    If (A_TickCount - zeitSillyPrevent<350) && (dummy!="forced")
       Return
 
@@ -28355,6 +29865,9 @@ GoQuickSearchAction(dummy:="") {
       Return
 
    LV_GetText(funcu, RowNumber, 6)
+   If (isGiven="yes" && ef)
+      funcu := ef
+
    If InStr(funcu, "!")
    {
       If !InStr(funcu, "!OmniNavigate")
@@ -28455,7 +29968,7 @@ GoQuickSearchAction(dummy:="") {
          len := StrLen(newLabelu)
          ; ToolTip, % newLabelu "=" len "`n" userQuickMenusEdit , , , 2
          GuiControl, QuickMenuSearchGUIA:, userQuickMenusEdit, % newLabelu
-         GuiControl, QuickMenuSearchGUIA: Focus, userQuickMenusEdit
+         ; GuiControl, QuickMenuSearchGUIA: Focus, userQuickMenusEdit
          EM_SETSEL(hEditMenuSearch, len, len)
          SetTimer, PopulateQuickMenuSearch, -250
       }
@@ -28665,7 +30178,7 @@ PopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
       Loop, Files, % Trimmer(userQuickMenusEdit, "\") "\*", DF
       {
          executingCanceableOperation := A_TickCount
-         If ((A_TickCount - startOperation>9100) || determineTerminateOperation()=1)
+         If (determineTerminateOperation()=1)
          {
             abandonAll := 1
             Break
@@ -28697,7 +30210,7 @@ PopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
          Loop, Files, % Trimmer(OutDir, "\") "\*", DF
          {
             executingCanceableOperation := A_TickCount
-            If ((A_TickCount - startOperation>9100) || determineTerminateOperation()=1)
+            If (determineTerminateOperation()=1)
                Break
 
             If (InStr(A_LoopFileAttrib, "D") && InStr(A_LoopFileName, restu) && restu!=A_LoopFileName)
@@ -29798,7 +31311,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
     Gui, Tab 
     btnWid := (PrefsLargeFonts=1) ? 90 : 55
     Gui, Add, Button, xs-5 y+15 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]")
+    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
     Gui, Add, Button, x+5 hp w%btnWid% gBtnHelpBrushes, &Help
     Gui, Add, Button, x+5 hp wp-5 Default gBtnCloseWindow, C&lose
     Gui, Add, DropDownList, x+5 wp+60 gupdateUIbrushTool AltSubmit Choose%BrushToolOutsideSelection% vBrushToolOutsideSelection, Ignore selection|Paint inside|Paint outside
@@ -29973,6 +31486,10 @@ updateTlbrColorsSwatch() {
    tlbrSetImageIcon("colorz-swatch", thisHwnd, W, H)
 }
 
+distanceBetweenTwoPoints(x1, y1, x2, y2) {
+   Return Sqrt((x2 - x1)**2+(y2 - y1)**2)
+}
+
 pointsOnCircle(radius, angle, cx, cy) {
     Static pi := 3.14159265
     obj := []
@@ -29980,6 +31497,20 @@ pointsOnCircle(radius, angle, cx, cy) {
     obj.x := cx + radius * sin(angle)
     obj.y := cy + radius * cos(angle)
     return obj
+}
+
+getAngleBetweenTwoPoints(x1, y1, x2, y2, mode:=1) {
+   ; function from tidbit
+   ; based on http://stackoverflow.com/questions/2339487/calculate-angle-of-2-points
+   ; returns 0-359.999
+  angle := APIatan2(y1-y2, x1-x2)*(180/3.14159)*-1
+  if (mode=2)
+     angle += (angle<0) ? 360 : 0 ; or should it be 359? whatever.
+  return angle
+}
+
+APIatan2(y,x) { 
+   Return dllcall("msvcrt\atan2","Double",y, "Double",x, "CDECL Double")
 }
 
 ResetColorsToBW() {
@@ -30592,6 +32123,7 @@ BtnChangeHamDistThreshold() {
 PanelSearchAndReplaceIndex() {
     Global editF5, editF6, performInSeenDB, performInDynas
 
+    getSelectedFiles(0, 1)
     thisBtnHeight := createSettingsGUI(56, A_ThisFunc)
     btnWid := 100
     txtWid := 360
@@ -30612,17 +32144,25 @@ PanelSearchAndReplaceIndex() {
     If (performInSeenDB=1 || performInDynas="")
        performInDynas := 0
 
+    If (markedSelectFile<2 || SLDtypeLoaded=3 || performInSeenDB=1)
+       limitSearchReplaceSelected := 0
+
     imgPath := resultedFilesList[currentFileIndex, 1]
+    doPwd := (userPrivateMode=1) ? " password " : ""
     zPlitPath(imgPath, 0, OutFileName, OutDir)
     Gui, Add, Text, x15 y15 w%txtWid% Section, Please type what to search for and what to replace it with. This panel is meant to help you fix broken files lists. e.g., files moved to a different folder. RegEx, tokens or wildcards are not supported. %infos%
     Gui, Add, Text, y+15 wp, Search for:
-    Gui, Add, Edit, y+5 wp Password veditF5 r1 gUIeditsGenericAllowCtrlBksp, % OutDir
+    Gui, Add, Edit, y+5 wp %doPwd% veditF5 r1 gUIeditsGenericAllowCtrlBksp, % OutDir
     Gui, Add, Text, y+15 wp, Replace with:
-    Gui, Add, Edit, y+5 wp Password veditF6 r1 gUIeditsGenericAllowCtrlBksp,
+    Gui, Add, Edit, y+5 wp %doPwd% veditF6 r1 gUIeditsGenericAllowCtrlBksp,
     Gui, Add, Checkbox, y+15 Checked%performInSeenDB% vperformInSeenDB gUItogglePerformSearchSeenDB, Perform action in seen images database 
+    Gui, Add, Checkbox, y+15 Checked%limitSearchReplaceSelected% vlimitSearchReplaceSelected gUItogglePerformSearchSeenDB, Apply action only on the selected files
     Gui, Add, Checkbox, y+15 Checked%performInDynas% vperformInDynas , Perform action over the main folders list as well
     If (mustRecordSeenImgs!=1)
        GuiControl, Disable, performInSeenDB
+
+    If (markedSelectFile<2 || SLDtypeLoaded=3 || performInSeenDB=1)
+       GuiControl, Disable, limitSearchReplaceSelected
 
     Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid% Default gBTNperformIndexSearchReplace, &Perform
     Gui, Add, Button, x+5 hp w90 gBtnCloseWindow, C&ancel
@@ -30632,17 +32172,22 @@ PanelSearchAndReplaceIndex() {
 UItogglePerformSearchSeenDB() {
    Gui, SettingsGUIA: Default
    GuiControlGet, performInSeenDB
+   GuiControlGet, limitSearchReplaceSelected
    actu := (performInSeenDB=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
    GuiControl, % actu, performInDynas
+
+   actu := (performInSeenDB=1 || SLDtypeLoaded=3 || markedSelectFile<2) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
+   GuiControl, % actu, limitSearchReplaceSelected
 }
 
 BTNperformIndexSearchReplace() {
    Gui, SettingsGUIA: Default
    GuiControlGet, editF5
    GuiControlGet, editF6
+   GuiControlGet, limitSearchReplaceSelected
    GuiControlGet, performInSeenDB
    GuiControlGet, performInDynas
-   If !Trimmer(editF5)
+   If (editF5="")
    {
       showTOOLtip("WARNING: No search criteria given")
       SoundBeep , 300, 100
@@ -30661,7 +32206,7 @@ BTNperformIndexSearchReplace() {
       {
          listu := getDynamicFoldersList()
          listu := StrReplace(listu, "`n", "\`n")
-         listu := StrReplace(listu, Trimmer(editF5), Trimmer(editF6))
+         listu := StrReplace(listu, editF5, editF6)
          listu := StrReplace(listu, "\\", "\")
          DynamicFoldersList := StrReplace(listu, "\`n", "`n")
          If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
@@ -31258,6 +32803,7 @@ BtnPerformSearchNow(a, b, c) {
    If askAboutFileSave(" and the files index search will be performed")
       Return
 
+   Gui, SettingsGUIA: Default
    GuiControlGet, markSearchMatches
    GuiControlGet, userSearchWhat
    GuiControlGet, userSearchPos
@@ -31267,8 +32813,10 @@ BtnPerformSearchNow(a, b, c) {
    userSearchString := ""
    INIaction(1, "markSearchMatches", "General")
    thisString := StrReplace(UsrEditFilter, "||", "|")
-   thisString := Trimmer(Trimmer(thisString), "|")
-   If thisString
+   thisString := Trim(thisString, "|")
+
+   ; fnOutputDebug(A_ThisFunc "(1): " thisString)
+   If (thisString!="")
    {
       thisString := StrReplace(thisString, "\>")
       thisString := StrReplace(thisString, "/")
@@ -31283,7 +32831,8 @@ BtnPerformSearchNow(a, b, c) {
       ; givenRegEx := processSearchIndexString(thisString)
    }
 
-   If userSearchString
+   ; fnOutputDebug(A_ThisFunc "(2): " userSearchString)
+   If (userSearchString!="")
    {
       If !InStr(SearchedStringz, userSearchString "`n")
       {
@@ -31525,6 +33074,7 @@ RenameBTNaction(newFileName, file2rem, doLastOption) {
      FileMove, %file2rem%, %file2save%, 1
      If ErrorLevel
      {
+        OutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
         showTOOLtip("ERROR: Access denied... The file could not be renamed.`n" OutFileName "`n" OutDir "\")
         SoundBeep, 300, 100
         SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -31554,8 +33104,10 @@ RenameBTNaction(newFileName, file2rem, doLastOption) {
         {
            OutDir := "*:\*******\******"
            newFileName := "******.***"
-        }
+        } Else OutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
+
         showTOOLtip("File renamed succesfully to:`n" newFileName "`n" OutDir "\")
+        SetTimer, RemoveTooltip, % -msgDisplayTime
         Return 1
      }
   } Else Return 0
@@ -31600,7 +33152,7 @@ UpdateIndexBTNaction(newFileName, whichIndex) {
      ForceRefreshNowThumbsList()
      currentFilesListModified := 1
      dummyTimerDelayiedImageDisplay(150)
-     showTOOLtip("File index entry updated")
+     showTOOLtip("File index entry updated: " groupDigits(whichIndex))
      SetTimer, RemoveTooltip, % -msgDisplayTime//2
      Return 1
   } Else If (StrLen(newFileName)>2)
@@ -31718,13 +33270,17 @@ updateUIalphaMaskStuff(tabu) {
        GuiControl, % actu, alphaMaskRefBMP
        GuiControl, % actu, alphaMaskBMPchannel
        GuiControl, % actu, infoAlphaFile
-
        If (alphaMaskingMode=6)
        {
           brLvl := alphaMaskClrAintensity
-          contrLvl := Round(alphaMaskClrBintensity/255, 3)
+          contrLvl := "Curve tension: " Round(alphaMaskClrBintensity/255, 2)
+          If (alphaMaskClrBintensity<15)
+             contrLvl := "Polygonal path"
+          Else If (alphaMaskClrBintensity>250)
+             contrLvl := "Bézier path"
+
           GuiControl, SettingsGUIA:, infoAlphaClrAint, Blur amount: %brLvl%
-          GuiControl, SettingsGUIA:, infoAlphaClrBint, Curve tension: %contrLvl%
+          GuiControl, SettingsGUIA:, infoAlphaClrBint, %contrLvl%
        } Else If (alphaMaskingMode=5)
        {
           brLvl := Round(alphaMaskClrAintensity/255*510-255)
@@ -32176,7 +33732,7 @@ MainPanelTransformArea(dummy:="", toolu:="") {
     sml := (PrefsLargeFonts=1) ? 82 : 65
     friendlyTitle := (toolu="paste") ? "Paste in place image: " : "Transform selected area: "
     Gui, Add, Button, xm+0 y+15 Section h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]")
+    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
     Gui, Add, Button, x+5 w%sml% hp Default gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 hp wp vbtnReset gBtnPasteResetOptions, &Reset
     Gui, Add, Button, x+5 hp wp-5 gBtnHelpTransform, &Help
@@ -32303,7 +33859,7 @@ BtnPasteResetOptions() {
 ReadSettingsFillAreaPanel(act:=0) {
     If (act=1)
     {
-       RegAction(1, "FillAreaCurveTension",, 2, 1, 4)
+       RegAction(1, "FillAreaCurveTension",, 2, 1, 5)
        If InStr(FillAreaCustomShape, "|")
           RegAction(1, "FillAreaCustomShape")
     }
@@ -32351,10 +33907,10 @@ ReadSettingsDrawShapeAreaPanel(act:=0) {
           RegAction(0, "FillAreaCustomShape",, 5)
 
        If (drawingShapeNow!=1)
-          RegAction(0, "FillAreaCurveTension",, 2, 1, 4)
+          RegAction(0, "FillAreaCurveTension",, 2, 1, 5)
     } Else If (act=1)
     {
-       RegAction(1, "FillAreaCurveTension",, 2, 1, 4)
+       RegAction(1, "FillAreaCurveTension",, 2, 1, 5)
        If InStr(FillAreaCustomShape, "|")
           RegAction(1, "FillAreaCustomShape")
     }
@@ -32388,7 +33944,7 @@ ReadSettingsAlphaMaskPanel(act:=0) {
        RegAction(0, "initialCustomShapeCoords",, 5)
        customShapePoints := convertShapePointsStrToArray(FillAreaCustomShape)
        If (drawingShapeNow!=1)
-          RegAction(0, "FillAreaCurveTension",, 2, 1, 4)
+          RegAction(0, "FillAreaCurveTension",, 2, 1, 5)
     }
 
     RegAction(act, "alphaMaskReplaceMode",, 1)
@@ -32710,6 +34266,10 @@ stopDrawingShape(dummy:="") {
        innerSelectionCavityX := vpFreeformShapeOffset[5]
        innerSelectionCavityY := vpFreeformShapeOffset[6]
        EllipseSelectMode := vpFreeformShapeOffset[7]
+       If vpFreeformShapeOffset[8]
+          FillAreaCurveTension := vpFreeformShapeOffset[8]
+       closedLineCustomShape := vpFreeformShapeOffset[9]
+       bezierSplineCustomShape := vpFreeformShapeOffset[10]
        customShapePoints := oldCustomShapePoints.Clone()
     } Else
     {
@@ -32718,7 +34278,7 @@ stopDrawingShape(dummy:="") {
     }
 
     ; ToolTip, % "l=" postVectorWinOpen , , , 2
-    If (drawingLiveMode=1 || drawingLiveMode=3)
+    If (drawingVectorLiveMode=1 || drawingVectorLiveMode=3)
        Gdip_DeletePen(PenuDrawLive)
     Else
        Gdip_DeleteBrush(PenuDrawLive)
@@ -32745,7 +34305,7 @@ stopDrawingShape(dummy:="") {
        EllipseSelectMode := 2
        dummyTimerDelayiedImageDisplay(100)
        noOpen := (dummy="cancel" && InStr(postVectorWinOpen, "c")) ? 1 : 0
-       If (!AnyWindowOpen && drawingLiveMode!=3 && noOpen!=1)
+       If (!AnyWindowOpen && drawingVectorLiveMode!=3 && noOpen!=1)
           BTNopenPrevPanel(postVectorWinOpen, "yes", "n")
     }
 
@@ -32784,10 +34344,11 @@ predefinedVectorShapes(whichShape) {
         , shape7c := "0.35,0|0.35,0.20|0,0.20|0,0.35|0.35,0.35|0.35,1|0.65,1|0.65,0.35|1,0.35|1,0.20|0.65,0.20|0.65,0"
         , shape7t := 1
 
+     bezierSplineCustomShape := 0
      If (whichShape=9)
      {
         RegAction(0, "FillAreaCustomShape",, 5)
-        RegAction(0, "FillAreaCurveTension",, 2, 1, 4)
+        RegAction(0, "FillAreaCurveTension",, 2, 1, 5)
      } Else
      {
         thisTension := "shape" whichShape "t"
@@ -32873,6 +34434,92 @@ addFluidPointsCustomShape() {
    SetTimer, addFluidPointsCustomShape, Off
 }
 
+adjustAnchorPointsCustomShape(thisIndex:=0) {
+    If (drawingShapeNow!=1 || mustSnapLiveDrawPoints=1)
+       Return
+ 
+    lastInvoked := A_TickCount
+    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+ 
+    prevState := thisState := prevMX := prevMY := 0
+    setwhileLoopExec(1)
+    mustSnapLiveDrawPoints := 0
+    canDoSymmetry := isNowSymmetricVectorShape()
+    totalCount := customShapePoints.Count()
+    GetMouseCoord2wind(PVhwnd, mX, mY)
+    doFlippuX := (mX<vpSymmetryPointX && CustomShapeSymmetry=1) ? 1 : 0
+    doFlippuY := (mY<vpSymmetryPointY && CustomShapeSymmetry=2) ? 1 : 0
+    cB := customShapePoints[thisIndex]
+    t := (autoReflectVectorAnchors=1 && totalCount>4) ? thisIndex : thisIndex - 1
+    thisNode := (doFlippuX || doFlippuY) ? 5 : thisIndex - 3
+    thisK := (doFlippuX || doFlippuY) ? 2 : 3
+
+    If (autoReflectVectorAnchors=1 && totalCount=7 && canDoSymmetry)
+       reflectGivenAnchorInPath(3, totalCount, 3, canDoSymmetry, 1)
+    Else If (autoReflectVectorAnchors=1 && totalCount>3)
+       reflectGivenAnchorInPath(thisK, totalCount, thisNode, canDoSymmetry)
+
+    oppoIndex := totalCount - t + 1
+    While, (determineLClickstate()=1)
+    {
+         If (A_TickCount - lastInvoked<100)
+            Continue
+
+         zeitSillyPrevent := A_TickCount
+         GetMouseCoord2wind(PVhwnd, mX, mY)
+         gmX := (FlipImgH=1) ? mainWidth - mX : mX
+         gmY := (FlipImgV=1) ? mainHeight - mY : mY
+         If (canDoSymmetry && totalCount>2)
+            hasSymmetry := calculateSymmetricVectorPoint(gmX, gmY, nX, nY)
+
+         If (doFlippuX || doFlippuY)
+         {
+            customShapePoints[t] := [nX, nY]
+            If (autoReflectVectorAnchors=1)
+               customShapePoints[2] := [gmX, gmY]
+            Else
+               customShapePoints[3] := [gmX, gmY]
+
+            If (thisIndex>4 && autoReflectVectorAnchors=0)
+            {
+               customShapePoints[2] := [gmX + SelDotsSize, gmY + SelDotsSize]
+               calculateSymmetricVectorPoint(gmX + SelDotsSize, gmY + SelDotsSize, nX, nY)
+               customShapePoints[totalCount - 2 + 1] := [nX, nY]
+            }
+            ; ToolTip, % t "=lol" , , , 2
+         } Else 
+         {
+            ; ToolTip, % t "=looooooooool" , , , 2
+            customShapePoints[t] := [gmX, gmY]
+            If (canDoSymmetry && totalCount>2)
+               customShapePoints[oppoIndex] := [nX, nY]
+
+            If (thisIndex>4 && autoReflectVectorAnchors=0)
+            {
+               customShapePoints[thisIndex] := [gmX + SelDotsSize, gmY + SelDotsSize]
+               If (canDoSymmetry && totalCount>2)
+               {
+                  calculateSymmetricVectorPoint(gmX + SelDotsSize, gmY + SelDotsSize, nX, nY)
+                  customShapePoints[totalCount - thisindex + 1] := [nX, nY]
+               }
+            }
+         }
+
+         thisState := "a" gmX gmY mX mY
+         If (thisState!=prevState)
+         {
+            prevState := thisState
+            showTOOLtip("P'[" t "] = (" gmX ", " gmY ")")
+            dummyRefreshImgSelectionWindow()
+         }
+         Sleep, 2
+    }
+
+    RemoveTooltip()
+    setwhileLoopExec(0)
+    SetTimer, adjustAnchorPointsCustomShape, Off
+}
+
 resumeCustomShapeSelection(thisZL) {
    If !thisZL
       thisZL := zoomLevel
@@ -32893,11 +34540,15 @@ resumeCustomShapeSelection(thisZL) {
    {
       If (rotateSelBoundsKeepRatio=0 && FillAreaCurveTension>1)
       {
-         PointsListu := convertCustomShape2givenArea(customShapePoints, vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH)
+         doDeduping := (bezierSplineCustomShape=1) ? 0 : 1
+         PointsListu := convertCustomShape2givenArea(customShapePoints, vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, 1, doDeduping)
          pPathA := Gdip_CreatePath()
          pPathB := Gdip_CreatePath()
          Gdip_AddPathPolygon(pPathA, PointsListu)
-         Gdip_AddPathClosedCurve(pPathB, PointsListu, tensionCurveCustomShape)
+         If (bezierSplineCustomShape=1)
+            Gdip_AddPathBeziers(pPathB, PointsListu)
+         Else
+            Gdip_AddPathClosedCurve(pPathB, PointsListu, tensionCurveCustomShape)
          withinBounds := !rotateSelBoundsKeepRatio
          withinBkeepRatio := rotateSelBoundsKeepRatio
          scaleUniform := 0
@@ -32907,7 +34558,10 @@ resumeCustomShapeSelection(thisZL) {
          PointsList := Gdip_GetPathPoints(pPathA)
 
          pPathC := Gdip_CreatePath()
-         Gdip_AddPathClosedCurve(pPathC, PointsList, tensionCurveCustomShape)
+         If (bezierSplineCustomShape=1)
+            Gdip_AddPathBeziers(pPathC, PointsList)
+         Else
+            Gdip_AddPathClosedCurve(pPathC, PointsList, tensionCurveCustomShape)
          RectA := getAccuratePathBounds(pPathA, 1)
          RectC := getAccuratePathBounds(pPathC, 1)
          RectB := getAccuratePathBounds(pPathB, 1)
@@ -32917,7 +34571,10 @@ resumeCustomShapeSelection(thisZL) {
 
          PointsList := Gdip_GetPathPoints(pPathA)
          pPathD := Gdip_CreatePath()
-         Gdip_AddPathClosedCurve(pPathD, PointsList, tensionCurveCustomShape)
+         If (bezierSplineCustomShape=1)
+            Gdip_AddPathBeziers(pPathD, PointsList)
+         Else
+            Gdip_AddPathClosedCurve(pPathD, PointsList, tensionCurveCustomShape)
          RectD := getAccuratePathBounds(pPathD, 1)
          offX := vPimgSelPx - RectD.x
          offY := vPimgSelPy - RectD.y
@@ -32935,11 +34592,16 @@ resumeCustomShapeSelection(thisZL) {
          Gdip_DeletePath(pPathD)
       } Else If (FillAreaCurveTension>1)
       {
-         PointsListu := convertCustomShape2givenArea(customShapePoints, vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH)
+         doDeduping := (bezierSplineCustomShape=1) ? 0 : 1
+         PointsListu := convertCustomShape2givenArea(customShapePoints, vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, 1, doDeduping)
          pPathA := Gdip_CreatePath()
          pPathB := Gdip_CreatePath()
          Gdip_AddPathPolygon(pPathA, PointsListu)
-         Gdip_AddPathClosedCurve(pPathB, PointsListu, tensionCurveCustomShape)
+         If (bezierSplineCustomShape=1)
+            Gdip_AddPathBeziers(pPathB, PointsListu)
+         Else
+            Gdip_AddPathClosedCurve(pPathB, PointsListu, tensionCurveCustomShape)
+
          withinBounds := !rotateSelBoundsKeepRatio
          withinBkeepRatio := rotateSelBoundsKeepRatio
          scaleUniform := rotateSelBoundsKeepRatio
@@ -32949,7 +34611,10 @@ resumeCustomShapeSelection(thisZL) {
          PointsList := Gdip_GetPathPoints(pPathA)
 
          pPathC := Gdip_CreatePath()
-         Gdip_AddPathClosedCurve(pPathC, PointsList, tensionCurveCustomShape)
+         If (bezierSplineCustomShape=1)
+            Gdip_AddPathBeziers(pPathC, PointsList)
+         Else
+            Gdip_AddPathClosedCurve(pPathC, PointsList, tensionCurveCustomShape)
          RectC := getAccuratePathBounds(pPathC)
          RectB := getAccuratePathBounds(pPathB)
          offX := RectB.x - RectC.x
@@ -32976,6 +34641,9 @@ resumeCustomShapeSelection(thisZL) {
 }
 
 startDrawingShape(modus, dummy:=0, forcePanel:=0) {
+     If !CustomShapeSymmetry
+        CustomShapeLockedSymmetry := 0
+
      vpSymmetryPointX := vpSymmetryPointY := 0
      If (thumbsDisplaying=1 || StrLen(gdiBitmap)<3)
         Return
@@ -33030,39 +34698,45 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0) {
      If (dummy="resume")
      {
         resumeCustomShapeSelection(zoomLevel)
+        performBezierAutoFixNow()
      } Else 
      {
         vpFreeformShapeOffset := []
-        vpFreeformShapeOffset := [0, 0, 0, vPselRotation, innerSelectionCavityX, innerSelectionCavityY, EllipseSelectMode]
+        vpFreeformShapeOffset := [0, 0, 0, vPselRotation, innerSelectionCavityX, innerSelectionCavityY, EllipseSelectMode, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape]
         prevVectorShapeSymmetryMode := []
         customShapePoints := []
         ToggleEditImgSelection("show-edit")
      }
 
      RegAction(0, "FillAreaColor",, 3)
-     RegAction(0, "FillAreaCurveTension",, 2, 1, 4)
+     RegAction(0, "FillAreaCurveTension",, 2, 1, 5)
      RegAction(0, "closedLineCustomShape",, 1)
+     RegAction(0, "autoReflectVectorAnchors",, 1)
      RegAction(0, "showNewVectorPointPreview",, 1)
      decideCustomShapeStyle()
+     If (bezierSplineCustomShape=1)
+        closedLineCustomShape := 0
+
      thisColorA := (modus="line") ? "0xAA" FillAreaColor : "0x88" FillAreaColor
      If (modus="line")
      {
         PenuDrawLive := (isWinOpen=10) ? Gdip_CreatePen("0x99446644", imgHUDbaseUnit//10) : Gdip_CreatePen(thisColorA, imgHUDbaseUnit//7)
-        drawingLiveMode := 1
+        drawingVectorLiveMode := 1
      } Else If (modus="shape")
      {
         If (isWinOpen=55)
            PenuDrawLive := Gdip_CloneBrush(pBrushF)
         Else
            PenuDrawLive := (isWinOpen=25) ? Gdip_CloneBrush(useHatchedBrush()) : Gdip_BrushCreateSolid(thisColorA)
-        drawingLiveMode := 2
+        drawingVectorLiveMode := 2
      } Else If (modus="selection")
      {
         PenuDrawLive := Gdip_CreatePen("0x99446644", imgHUDbaseUnit//10)
-        drawingLiveMode := 3
+        drawingVectorLiveMode := 3
         EllipseSelectMode := 2
         LimitSelectBoundsImg := VPselRotation := innerSelectionCavityX := innerSelectionCavityY := 0
-        closedLineCustomShape := lockSelectionAspectRatio := 1
+        lockSelectionAspectRatio := 1
+        ; closedLineCustomShape :=  1
      }
 
      customShapeHasSelectedPoints := 0
@@ -33070,21 +34744,31 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0) {
      Loop, % customShapePoints.Count()
         initialDrawingStartCoords[A_Index] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
 
-     LabelCurve := (cardinalCurveCustomShape=1) ? "curved" : "polygonal"
-     LabelType := (drawingLiveMode=1) ? "path" : "filled shape"
-     If (drawingLiveMode=1)
+     LabelCurve := defineVectorPathType()
+     LabelType := (drawingVectorLiveMode=1) ? "path" : "filled shape"
+     If (drawingVectorLiveMode=1)
      {
         LabelOpenLine := (closedLineCustomShape=1) ? "closed " : "open "
-     } Else If (drawingLiveMode=3)
+     } Else If (drawingVectorLiveMode=3)
      {
-        LabelOpenLine := "selection area"
+        LabelOpenLine := LabelCurve " selection area"
         LabelCurve := LabelType := ""
      }
 
      If (showMainMenuBar=1)
         TriggerMenuBarUpdate()
 
-     showTOOLtip("Draw freeform " LabelOpenLine LabelCurve A_Space LabelType "`nPress Right Click to end.")
+     showTOOLtip("Draw freeform " LabelOpenLine LabelCurve A_Space LabelType "`nPress Right Click for the menu options")
+     If (dummy="resume")
+     {
+        If (customShapePoints.Count()>4 && bezierSplineCustomShape=1)
+           closedLineCustomShape := testIsBezierPathClosed()
+        Else If (bezierSplineCustomShape=1)
+           closedLineCustomShape := 0
+
+        recordVectorUndoLevels(customShapePoints.Clone(), initialDrawingStartCoords.Clone())
+     }
+
      showQuickActionButtonsDrawingShape()
      createGUItoolbar()
      If (showViewPortGrid=1)
@@ -33103,78 +34787,179 @@ reduceCustomShapelength() {
    If (preventUndoLevels!=1)
       recordVectorUndoLevels(customShapePoints.Clone(), initialDrawingStartCoords.Clone())
 
+   If (bezierSplineCustomShape=1)
+      r := testIsBezierPathClosed()
+
    customShapePoints.Pop()
    initialDrawingStartCoords.Pop()
+   If (bezierSplineCustomShape=1)
+   {
+      If (r=1)
+      {
+         closedLineCustomShape := 0
+         RegAction(1, "closedLineCustomShape")
+      }
+
+      customShapePoints.Pop()
+      initialDrawingStartCoords.Pop()
+      If (customShapePoints.Count()>=4)
+      {
+         customShapePoints.Pop()
+         initialDrawingStartCoords.Pop()
+      }
+   }
+
    If CustomShapeSymmetry
    {
       customShapePoints.RemoveAt(1)
       initialDrawingStartCoords.RemoveAt(1)
       prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] - 1
+      If (bezierSplineCustomShape=1)
+      {
+         customShapePoints.RemoveAt(1)
+         initialDrawingStartCoords.RemoveAt(1)
+         prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] - 1
+         If (customShapePoints.Count()>=4)
+         {
+            customShapePoints.RemoveAt(1)
+            initialDrawingStartCoords.RemoveAt(1)
+            prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] - 1
+         }
+      }
    } Else CustomShapeLockedSymmetry := 0
 
    If (customShapePoints.Count()<3)
       CustomShapeLockedSymmetry := vpSymmetryPointX := vpSymmetryPointY := 0
-   
+
    If (drawingShapeNow=1)
       showQuickActionButtonsDrawingShape()
 
    SetTimer, dummyRefreshImgSelectionWindow, -150
 }
 
-ToggleCardinalCurveMode() {
-   cardinalCurveCustomShape := !cardinalCurveCustomShape
-   INIaction(1, "cardinalCurveCustomShape", "General")
-   If (drawingShapeNow=1)
-      showQuickActionButtonsDrawingShape()
-   SetTimer, dummyRefreshImgSelectionWindow, -150
+toggleOpenClosedAnyCustomShape() {
+   closedLineCustomShape := !closedLineCustomShape
+   RegAction(1, "closedLineCustomShape")
+   SetTimer, dummyRefreshImgSelectionWindow, -100
 }
 
 toggleOpenClosedLineCustomShape() {
-   If (drawingLiveMode!=1)
+   closedLineCustomShape := !closedLineCustomShape
+   RegAction(1, "closedLineCustomShape")
+   If (drawingShapeNow=1)
+      showQuickActionButtonsDrawingShape()
+
+   handleOpenCloseBezier()
+   SetTimer, dummyRefreshImgSelectionWindow, -150
+}
+
+handleOpenCloseBezier() {
+   If (bezierSplineCustomShape!=1)
+      Return
+
+   If isNowSymmetricVectorShape()
+      toggleBrushSymmetryModes()
+
+   r := testIsBezierPathClosed()
+   If (closedLineCustomShape=1 && r=0)
    {
-      showTOOLtip("WARNING: You cannot have an open ended path in current mode")
+      thisIndex := customShapePoints.Count() - 1
+      ; ToolTip, % thisIndex "=l" , , , 2
+      getVPcoordsVectorPoint(1, mX, mY)
+      pushEndNewVectorPoint(mX, mY, 1)
+      reflectGivenAnchorInPath(2, customShapePoints.Count(), 2, 0, 0)
+      reflectGivenAnchorInPath(3, customShapePoints.Count(), thisIndex, 0, 0)
+   } Else If (closedLineCustomShape=0 && r=1)
+   {
+      reduceCustomShapelength()
+      If (testIsBezierPathClosed()=1)
+         reduceCustomShapelength()
+   }
+   If (preventUndoLevels!=1)
+      recordVectorUndoLevels(customShapePoints.Clone(), initialDrawingStartCoords.Clone())
+}
+
+testIsBezierPathClosed() {
+    ; this assumes drawingShapeNow = 1 ;
+    totalz := customShapePoints.Count()
+    If (totalz<4)
+       Return -1
+
+    getVPcoordsVectorPoint(1, mX, mY)
+    getVPcoordsVectorPoint(totalz, nX, nY)
+    ; r := isDotInRect(mX, nY, 3, 3, nX, nY, 1) ; too loose
+    r := (mX=nX && mY=nY) ? 1 : 0
+    Return r
+}
+
+testIsBezierAltPathClosed(ByRef PointsList) {
+    ; this assumes drawingShapeNow = 0 ;
+    totalz := PointsList.Count()//2
+    xA := PointsList[1],                  yA := PointsList[2]
+    xB := PointsList[totalz*2 - 1],       yB := PointsList[totalz*2]
+    ; ToolTip, % xA "==" yA "`n" xB "==" yB "`n" totalz, , , 2
+    r := (xA=xB && yA=yB) ? 1 : 0
+    Return r
+}
+
+toggleAutoReflectAnchors() {
+   autoReflectVectorAnchors := !autoReflectVectorAnchors
+   RegAction(1, "autoReflectVectorAnchors")
+   friendly := (autoReflectVectorAnchors=1) ? "ACTIVATED" : "DEACTIVATED"
+   showTOOLtip("Automatically reflect anchors: " friendly, A_ThisFunc, 1)
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+togglePreviewVectorNewPoint() {
+   If (bezierSplineCustomShape=1)
+   {
+      showTOOLtip("WARNING: This option does not apply for Bézier paths")
       SoundBeep 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
    }
 
-
-   closedLineCustomShape := !closedLineCustomShape
-   RegAction(1, "closedLineCustomShape")
-   If (drawingShapeNow=1)
-      showQuickActionButtonsDrawingShape()
-   SetTimer, dummyRefreshImgSelectionWindow, -150
-}
-
-togglePreviewVectorNewPoint() {
    showNewVectorPointPreview := !showNewVectorPointPreview
    RegAction(1, "showNewVectorPointPreview")
    friendly := (showNewVectorPointPreview=1) ? "ACTIVATED" : "DEACTIVATED"
-   showTOOLtip("Live preview for to-be added point: " friendly, A_ThisFunc, 1)
+   showTOOLtip("Live preview for new point: " friendly, A_ThisFunc, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
    If (drawingShapeNow=1)
       showQuickActionButtonsDrawingShape()
    SetTimer, dummyRefreshImgSelectionWindow, -150
 }
 
+defineVectorPathType() {
+   labelu := (cardinalCurveCustomShape=1) ? "Curved" : "Polygonal"
+   If (bezierSplineCustomShape=1 || FillAreaCurveTension=5)
+      labelu := "Bézier"
+   Return labelu
+}
+
 showQuickActionButtonsDrawingShape() {
-     If (ShowAdvToolbar=1)
-        Return
+  If (ShowAdvToolbar=1 && tempBtnVisible="null")
+     Return
 
-     LabelCurve := (cardinalCurveCustomShape=1) ? "Polygonal" : "Curve"
-     If (drawingLiveMode=1)
-     {
-        LabelOpenLine := (closedLineCustomShape=1) ? "Open path" : "Closed path"
-        btnOpenLine := "||" LabelOpenLine ",,toggleOpenClosedLineCustomShape"
-     }
+  LabelCurve := defineVectorPathType()
+  LabelOpenLine := (closedLineCustomShape=1) ? "Open path" : "Closed path"
+  btnOpenLine := "||" LabelOpenLine ",,toggleOpenClosedLineCustomShape"
+  If (FillAreaCurveTension=1)
+     ll := "Polygonal"
+  Else If (FillAreaCurveTension=5)
+     ll := "Bézier"
+  Else
+     ll := "Tension: " tensionCurveCustomShape
 
-     LabelTension := "||Tension " FillAreaCurveTension ",,togglePathCurveTension"
-     CreateGuiButton("Undo,,ImgVectorUndoAct||Cancel,,cancelDrawingShape||Done,,stopDrawingShape" btnOpenLine LabelTension, "Forced", msgDisplayTime*10000)
-     SetTimer, DestroyTempBtnGui, Off
+  LabelTension := "||" ll ",,togglePathCurveTension"
+  CreateGuiButton("Undo,,ImgVectorUndoAct||Cancel,,cancelDrawingShape||Done,,stopDrawingShape" btnOpenLine LabelTension, "Forced", msgDisplayTime*10000)
+  SetTimer, DestroyTempBtnGui, Off
 }
 
 decideCustomShapeStyle() {
-   If (FillAreaCurveTension=4)
+   bezierSplineCustomShape := 0
+   If (FillAreaCurveTension=5)
+      bezierSplineCustomShape := 1
+   Else If (FillAreaCurveTension=4)
       tensionCurveCustomShape := 0.95
    Else If (FillAreaCurveTension=3)
       tensionCurveCustomShape := 0.5
@@ -33187,11 +34972,24 @@ decideCustomShapeStyle() {
 }
 
 togglePathCurveTension() {
-   FillAreaCurveTension := clampInRange(FillAreaCurveTension + 1, 1, 4, 1)
+   FillAreaCurveTension := clampInRange(FillAreaCurveTension + 1, 1, 5, 1)
    decideCustomShapeStyle()
+   If (FillAreaCurveTension=1)
+     ll := "Polygonal"
+   Else If (FillAreaCurveTension=5)
+     ll := "Bézier"
+   Else
+     ll := "Tension: " tensionCurveCustomShape
+
+   showTOOLtip("Path: " ll)
+   SetTimer, RemoveTooltip, % -msgDisplayTime
    RegAction(1, "FillAreaCurveTension")
    If (drawingShapeNow=1)
+   {
+      performBezierAutoFixNow()
       showQuickActionButtonsDrawingShape()
+   }
+
    SetTimer, dummyRefreshImgSelectionWindow, -150
 }
 
@@ -33643,12 +35441,16 @@ saveVectorShapeInRegistry() {
     FillAreaCustomShape := convertShapePointsArrayToStr(customShapePoints)
     RegAction(1, "FillAreaCustomShape")
     RegAction(1, "FillAreaCurveTension")
+    RegAction(1, "closedLineCustomShape")
 }
 
 BTNloadCustomShape() {
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: ListView, LViewDynas
-   RowNumber := LV_GetNext(0, "F")
+   RowNumber := LV_GetNext(0)
+   If !RowNumber
+      Return
+
    LV_GetText(givenName, RowNumber, 2)
    LV_GetText(datu, RowNumber, 3)
    LV_GetText(whichShape, RowNumber, 1)
@@ -33673,6 +35475,8 @@ BTNloadCustomShape() {
       }
 
       EllipseSelectMode := 2
+      bezierSplineCustomShape := 0
+      closedLineCustomShape := 1
       vpFreeformShapeOffset := []
       prevVectorShapeSymmetryMode := []
       customShapePoints := []
@@ -33689,9 +35493,10 @@ BTNloadCustomShape() {
       Return
    }
 
+   OutDir := PathCompact(mainCompiledPath "\resources\vector-shapes", "a", 1, OSDfontSize)
    If (StrLen(givenName)<2 || !FileExist(mainCompiledPath "\resources\vector-shapes\" givenName ".vqpv"))
    {
-      showTOOLtip("ERROR: The file no longer seems to exist: " givenName ".vqpv`n" mainCompiledPath "\resources\vector-shapes\")
+      showTOOLtip("ERROR: The file no longer seems to exist: " givenName ".vqpv`n" OutDir)
       SoundBeep 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
@@ -33701,7 +35506,7 @@ BTNloadCustomShape() {
    FileRead, contentu, % mainCompiledPath "\resources\vector-shapes\" givenName ".vqpv"
    If StrLen(contentu)<5
    {
-      showTOOLtip("Failed to read file contents: " givenName ".vqpv`n" mainCompiledPath "\resources\vector-shapes\")
+      showTOOLtip("Failed to read file contents: " givenName ".vqpv`n" OutDir)
       SoundBeep 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       BTNopenPrevPanel(mustOpenWin, "yes")
@@ -33712,7 +35517,7 @@ BTNloadCustomShape() {
    newArrayu := convertShapePointsStrToArray(obju[1])
    If (newArrayu.Count()<3)
    {
-      showTOOLtip("ERROR: Incorrect file format. Found no point defining the vector shape.")
+      showTOOLtip("ERROR: Incorrect file format. Found no points defining the vector shape.")
       SoundBeep 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       BTNopenPrevPanel(mustOpenWin, "yes")
@@ -33733,10 +35538,11 @@ BTNloadCustomShape() {
    customShapePoints := []
    customShapePoints := newArrayu.Clone()
    vPselRotation := clampInRange(obju[2], 0, 360)
-   FillAreaCurveTension := clampInRange(obju[3], 1, 4)
+   FillAreaCurveTension := clampInRange(obju[3], 1, 5)
    innerSelectionCavityX := clampInRange(obju[4], 0, 0.49)
    innerSelectionCavityY := clampInRange(obju[5], 0, 0.49)
-   prevVectorShapeSymmetryMode[1] := [obju[6], obju[7]]
+   closedLineCustomShape := obju[6]
+   prevVectorShapeSymmetryMode[1] := [obju[7], obju[8]]
    prevNameSavedVectorShape := givenName
    decideCustomShapeStyle()
    saveVectorShapeInRegistry()
@@ -33771,7 +35577,6 @@ PopulateCustomVectorShapesList() {
 
 PanelSaveVectorShape() {
    Static forbiddenChars := "<`~@>:""/\|?*.,;"
-
    If (EllipseSelectMode!=2)
       Return
 
@@ -33783,7 +35588,6 @@ PanelSaveVectorShape() {
       LV_GetText(prevNameSavedVectorShape, RowNumber, 2)
    }
 
-   ; fakeWinCreator(71, A_ThisFunc, 0)
    widthu := (PrefsLargeFonts=1) ? 950 : 460
    msgResult := msgBoxWrapper("Save vector shape: " appTitle, "Please type a name for the vector shape to be saved.", "&Save|&Cancel", 1, "save", 0, 0, 0, "limit350", prevNameSavedVectorShape, 0, widthu)
    If InStr(msgResult.btn, "save")
@@ -33795,7 +35599,12 @@ PanelSaveVectorShape() {
       givenName := filterFileName(givenName)
       If StrLen(givenName)>1
       {
-         saveCurrentVectorShape(givenName)
+         r := saveCurrentVectorShape(givenName)
+         If (AnyWindowOpen=72 && !r)
+         {
+            BtnCloseWindow()
+            SetTimer, PanelManageVectorShapes, -250
+         }
       } Else
       {
          showTOOLtip("WARNING: Incorrect name provided for the vector shape")
@@ -33828,8 +35637,7 @@ saveCurrentVectorShape(givenName) {
    }
 
    contentu := convertShapePointsArrayToStr(customShapePoints) "`n"
-   contentu .= vPselRotation "`n" FillAreaCurveTension "`n" innerSelectionCavityX "`n" innerSelectionCavityY "`n" prevVectorShapeSymmetryMode[1, 1] "`n" prevVectorShapeSymmetryMode[1, 2] "`n"
-
+   contentu .= vPselRotation "`n" FillAreaCurveTension "`n" innerSelectionCavityX "`n" innerSelectionCavityY "`n" closedLineCustomShape "`n" Round(prevVectorShapeSymmetryMode[1, 1]) "`n" Round(prevVectorShapeSymmetryMode[1, 2]) "`n"
    FileDelete, % thisFile
    FileAppend, % contentu, % thisFile , UTF-8
    If ErrorLevel
@@ -33901,7 +35709,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     Gui, Add, Tab3, gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Main|Fill|Border|Adjust colors|Alpha mask|Paint mask
     Gui, Tab, 1
     Gui, Add, DropDownList, x+10 y+10 Section w%slideWid% AltSubmit Choose%FillAreaShape% vFillAreaShape gupdateUIfillPanel, Rectangle|Rounded rectangle|Ellipse|Triangle|Right triangle|Rhombus|Custom shape
-    Gui, Add, DropDownList, x+5 w%slideWid% AltSubmit Choose%FillAreaCurveTension% vFillAreaCurveTension gupdateUIfillPanel, Polygonal|Smooth corners|Curve|Round curve
+    Gui, Add, DropDownList, x+5 w%slideWid% AltSubmit Choose%FillAreaCurveTension% vFillAreaCurveTension gupdateUIfillPanel, Polygonal|Smooth corners|Curve|Round curve|Bézier
     Gui, Add, Checkbox, xs y+7 hp Checked%FillAreaRemBGR% vFillAreaRemBGR gupdateUIfillPanel, &Erase background behind the new object
     Gui, Add, Checkbox, xs y+7 hp Checked%FillAreaInverted% vFillAreaInverted gupdateUIfillPanel, &Invert selection area
     Gui, Add, Checkbox, xs y+7 hp gupdateUIfillPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas if outside
@@ -33967,7 +35775,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     Gui, Tab
     thisW := (PrefsLargeFonts=1) ? 80 : 60
     Gui, Add, Button, xm+0 y+15 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]")
+    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
     Gui, Add, Button, x+5 w%thisW% hp Default gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
     Gui, Add, Checkbox, x+5 hp Checked%doImgEditLivePreview% vdoImgEditLivePreview gupdateUIfillPanel, &Live preview
@@ -34021,7 +35829,7 @@ PanelSoloAlphaMasker() {
     Gui, Tab
     thisW := (PrefsLargeFonts=1) ? 85 : 65
     Gui, Add, Button, xm+0 y+15 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]")
+    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
     If postVectorWinOpen
        Gui, Add, Button, x+5 hp w%thisW% gBTNopenPrevPanel, &Back
     Gui, Add, Button, x+5 hp w%thisW% Default gBtnCloseWindow, &Close
@@ -34117,7 +35925,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
          , infoFillAreaSigma, PickuFillAreaColor, PickuFillArea2ndColor
 
     Gui, Add, DropDownList, x+5 y+15 Section w%slideWid% AltSubmit Choose%FillAreaShape% vFillAreaShape gupdateUIdrawShapesPanel, Rectangle|Rounded rectangle|Ellipse|Triangle|Right triangle|Rhombus|Custom shape
-    Gui, Add, DropDownList, x+5 wp-25 AltSubmit Choose%FillAreaCurveTension% vFillAreaCurveTension gupdateUIdrawShapesPanel, Polygonal|Smooth corners|Curve|Round curve
+    Gui, Add, DropDownList, x+5 wp-25 AltSubmit Choose%FillAreaCurveTension% vFillAreaCurveTension gupdateUIdrawShapesPanel, Polygonal|Smooth corners|Curve|Round curve|Bézier
     Gui, Add, Slider, Center xs y+10 NoTicks w%slideWid% gupdateUIdrawShapesPanel AltSubmit vDrawLineAreaOpacity Range1-255, % DrawLineAreaOpacity
     Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuDrawLineAreaColor, P
     Gui, Add, ListView, x+5 hp w60 %CCLVO% Background%DrawLineAreaColor% vDrawLineAreaColor hwndhLVfillColor,
@@ -34135,7 +35943,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
 
     btnWid := (PrefsLargeFonts=1) ? 105 : 65
     Gui, Add, Button, xs y+20 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]")
+    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
     Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 wp hp gBtnOpenPanelLines, &Lines
     Gui, Add, Button, x+5 wp hp gBtnCloseWindow, &Cancel
@@ -34373,7 +36181,7 @@ PanelDrawLines() {
     btnWid := (PrefsLargeFonts=1) ? 105 : 65
     sml := (PrefsLargeFonts=1) ? 35 : 15
     Gui, Add, Button, xm+0 y+%sml% h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]")
+    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
     Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 wp hp gBtnOpenPanelShapes, &Shapes
     Gui, Add, Button, x+5 wp hp gBtnCloseWindow, &Cancel
@@ -34434,7 +36242,7 @@ PanelDesatureSelectedArea(dummy:=0) {
     Gui, Add, Checkbox, xs y+5 Checked%EraseAreaUseAlpha% vEraseAreaUseAlpha gupdateUIdesaturatePanel, Apply alpha mas&k
 
     Gui, Add, Button, xm+0 y+15 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]")
+    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
     Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
     Gui, Add, Checkbox, x+5 hp Checked%DesatureAreaAlternate% vDesatureAreaAlternate gupdateUIdesaturatePanel, &Simple mode
@@ -34497,7 +36305,7 @@ PanelFloodFillTool() {
     Gui, Add, Checkbox, xs+15 y+10 gupdateUIfloodFillPanel Checked%FloodFillModus% vFloodFillModus, Replace the similar colors anywhere
 
     Gui, Add, Button, xm+0 y+25 h%thisBtnHeight% w45 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]")
+    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
     ; Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 hp wp+35 gBtnCloseWindow Default, &Close
 
@@ -34541,7 +36349,7 @@ PanelEraseSelectedArea() {
     Gui, Add, Slider, Center xp y+5 wp AltSubmit gupdateUIerasePanel vEraseAreaOpacity Range5-255, % EraseAreaOpacity
 
     Gui, Add, Button, xm+0 y+15 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]")
+    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
     Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction, &Apply
     ; Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
@@ -34589,7 +36397,7 @@ PanelFillBehindBgrImage() {
     Gui, Add, Slider, Center xs y+10 w%txtWid% AltSubmit NoTicks gupdateUIfillBehindPanel vFillBehindOpacity Range1-512, % FillBehindOpacity
 
     Gui, Add, Button, xm+0 y+25 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]")
+    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
     Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction, &Apply
     ; Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
@@ -34813,7 +36621,7 @@ livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
          Gdip_DeletePath(pPath)
       }
       Gdip_ResetWorldTransform(2NDglPG)
-      BoxBMP := drawTextInBox(msg, OSDFontName, OSDfntSize, mainWidth, mainHeight, OSDtextColor, OSDbgrColor, 0, 0)
+      BoxBMP := drawTextInBox(msg, OSDFontName, OSDfontSize, mainWidth, mainHeight, OSDtextColor, OSDbgrColor, 0, 0)
       trGdip_DrawImage(A_ThisFunc, 2NDglPG, BoxBMP, tlbrBonusX, tlbrBonusY)
       trGdip_DisposeImage(BoxBMP, 1)
    }
@@ -36351,11 +38159,12 @@ updateUIdrawShapesPanel(actionu:=0, b:=0) {
     GuiControl, % actu, FillAreaCurveTension
     If (FillAreaShape=3)
        EllipseSelectMode := 1
-    Else If (FillAreaShape=7 && FillAreaClosedPath=1)
+    Else If (FillAreaShape=7)
        EllipseSelectMode := 2
     Else
        EllipseSelectMode := 0
 
+    closedLineCustomShape := FillAreaClosedPath
     thisOpa := (BrushToolUseSecondaryColor=1) ? "BrushToolBopacity" : "BrushToolAopacity"
     %thisOpa% := DrawLineAreaOpacity
     ; ToggleEditImgSelection("show-edit")
@@ -36847,10 +38656,13 @@ updateUIfillPanel(actionu:=0) {
     If (FillAreaInverted=1 && FillAreaBlendMode>1)
        FillAreaGradientWrapped := 1
 
+    closedLineCustomShape := FillAreaClosedPath
     If (CurrentPanelTab=1)
     {
        actu := (FillAreaShape=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu, FillAreaCurveTension
+       GuiControl, % actu, FillAreaClosedPath
+
        actu := (FillAreaInverted!=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu, PasteInPlaceAutoExpandIMG
 
@@ -36956,8 +38768,6 @@ updateUIfillPanel(actionu:=0) {
        GuiControl, % actu2, DrawLineAreaContourThickness
        GuiControl, % actu2, txtLine3
        GuiControl, % actu2, txtLine4
-       actu2 := (FillAreaShape=7 && FillAreaDoContour=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
-       GuiControl, % actu2, FillAreaClosedPath
     } Else If (CurrentPanelTab=4)
     {
        actu := (FillAreaGlassy>1 || FillAreaColorMode>=5 || FillAreaBlendMode>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
@@ -37246,6 +39056,26 @@ PanelJournalWindow(tabu:=1) {
        Gui, Add, Text, xs y+10 hp +0x200, Seen images are not recorded in the database.
        Gui, Add, Button, xs+15 y+5 hp gBtnActivateRecordSeen, &Activate this
     }
+/*
+    Gui, Tab, 4
+    olistedVars := ListGlobalVars()
+    listedVars := "Global variables:`n"
+    Loop, Parse, olistedVars, `n,`r
+       listedVars .= A_LoopField " = " %A_loopField% "`n"
+
+    deleteMenus()
+    buildQuickSearchMenus()
+    objs := kMenu(0, "give", 0)
+    mainList := objs[1]
+    listedVars .= "`n`nFunctions: (min/max params)`n"
+    Loop, % mainList.Count()
+    {
+       fn := Func(mainList[A_Index, 2])
+       listedVars .= mainList[A_Index, 2] "(" fn.MinParams "/" fn.MaxParams ")`n"
+    }
+
+    Gui, Add, Edit, x+1 y+1 Section ReadOnly w%txtWid% r15, % listedVars
+*/
 
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Application journal: " appTitle)
     SetTimer, ResetImgLoadStatus, -100
@@ -37478,7 +39308,7 @@ PanelInsertTextArea() {
     Gui, Tab
     ml := (PrefsLargeFonts=1) ? 90 : 70
     Gui, Add, Button, xm+0 y+15 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]")
+    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
     Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 hp w%ml% gBtnCloseWindow, &Cancel
     Gui, Add, Checkbox, x+5 hp Checked%doImgEditLivePreview% vdoImgEditLivePreview gupdateUIInsertTextPanel, Live preview (low quality)
@@ -37764,15 +39594,15 @@ PanelPrefsWindow() {
     Gui, Add, Checkbox, xs yp+30 gupdateUIsettings Checked%usrTextureBGR% vusrTextureBGR, &Ambiental textured background
 
     Gui, Add, DropDownList, xs+%columnBpos2% ys+0 Section w190 gupdateUIsettings Sort Choose1 vOSDFontName, %OSDFontName%
-    Gui, Add, Edit, xs+0 yp+30 w%editWid% r1 gupdateUIsettings limit3 -multi number -wantCtrlA -wantReturn -wantTab -wrap veditF5, %OSDfntSize%
-    Gui, Add, UpDown, vOSDfntSize Range10-350, %OSDfntSize%
+    Gui, Add, Edit, xs+0 yp+30 w%editWid% r1 gupdateUIsettings limit3 -multi number -wantCtrlA -wantReturn -wantTab -wrap veditF5, %OSDfontSize%
+    Gui, Add, UpDown, vOSDfontSize Range10-350, %OSDfontSize%
     Gui, Add, Edit, x+2 w%editWid% r1 gupdateUIsettings limit3 -multi number -wantCtrlA -wantReturn -wantTab -wrap veditF4, %PasteFntSize%
     Gui, Add, UpDown, vPasteFntSize Range12-350, %PasteFntSize%
 
     Gui, Add, ListView, xs yp+30 w%editWid% h28 %CCLVO% Background%OSDtextColor% vOSDtextColor hwndhLV1,
     Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuOSDtextColor, P
-    Gui, Add, Checkbox, x+2 yp hp w27 +0x1000 gupdateUIsettings Checked%FontBolded% vFontBolded, B
-    Gui, Add, Checkbox, x+2 yp hp w27 +0x1000 gupdateUIsettings Checked%FontItalica% vFontItalica, I
+    Gui, Add, Checkbox, x+2 yp hp w27 +0x1000 gupdateUIsettings Checked%OSDfontBolded% vOSDfontBolded, B
+    Gui, Add, Checkbox, x+2 yp hp w27 +0x1000 gupdateUIsettings Checked%OSDfontItalica% vOSDfontItalica, I
     Gui, Add, DropDownList, xs yp+30 w%editWid% gupdateUIsettings vusrTextAlign, %usrTextAlign%||Left|Right|Center
     Gui, Add, ListView,  xs+0 yp+30 gupdateUIsettings w%editWid% hp %CCLVO% Background%OSDbgrColor% vOSDbgrColor hwndhLV2,
     Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuOSDbgrColor, P
@@ -38105,10 +39935,10 @@ WriteSettingsUI() {
   INIaction(1, "ambiTexBrushSize", "General")
   INIaction(1, "borderAroundImage", "General")
   INIaction(1, "DisplayTimeUser", "General")
-  INIaction(1, "FontBolded", "General")
-  INIaction(1, "FontItalica", "General")
+  INIaction(1, "OSDfontBolded", "General")
+  INIaction(1, "OSDfontItalica", "General")
   INIaction(1, "OSDbgrColor", "General")
-  INIaction(1, "OSDfntSize", "General")
+  INIaction(1, "OSDfontSize", "General")
   INIaction(1, "OSDFontName", "General")
   INIaction(1, "OSDtextColor", "General")
   INIaction(1, "PasteFntSize", "General")
@@ -38644,15 +40474,17 @@ SaveClipboardImage(dummy:=0, allowCropping:=0, noDialog:=0) {
 
       If r
       {
+         sOutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
+         showTOOLtip("Failed to save image file`n" OutFileName "`n" sOutDir "\")
          msgBoxWrapper(appTitle ": ERROR", appTitle " was unable to save the image file due to an undetermined cause.`n`n" OutFileName "`n" OutDir "\`nError code: " r, 0, 0, "error")
-         showTOOLtip("Failed to save image file`n" OutFileName "`n" OutDir "\")
       } Else
       {
          FileGetSize, OutputVar, % OutDir "\" OutFileName
          If (OutputVar>2)
             friendly := "`nFile size: " fileSizeFrienly(OutputVar)
 
-         showTOOLtip("Image file succesfully saved`n" OutFileName "`n" OutDir "\" friendly)
+         sOutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
+         showTOOLtip("Image file succesfully saved`n" OutFileName "`n" sOutDir "\" friendly)
          testMem := getIDimage(currentFileIndex)
          lastZeitIMGsaved := [A_Now, currentUndoLevel, undoLevelsRecorded, OutFileName, OutDir, currentFileIndex]
          If (currentFileIndex=0 && maxFilesIndex<1) || (InStr(testMem, "\temporary memory object\") && maxFilesIndex<1)
@@ -39126,9 +40958,10 @@ BtnCopyMoveAction(dummy:=0) {
         FileCreateDir, % folderu
         If ErrorLevel
         {
+           OutDir := PathCompact(folderu, "a", 1, OSDfontSize)
            SoundBeep , 300, 100
            If (dummy="quick-actu")
-              showTOOLtip("Failed to create the destination folder:`n" folderu "\")
+              showTOOLtip("Failed to create the destination folder:`n" OutDir "\")
            Else
               msgBoxWrapper(appTitle ": ERROR", "An unknown error occured while creating the folder:`n" folderu "\", 0, 0, "error")
            Return 0
@@ -39193,10 +41026,11 @@ QuickMoveFile2Dest(finalDest, goLastOption, groupingMode:=0, dummy:=0) {
     zPlitPath(file2rem, 0, OldOutFileName, OldOutDir, OutFileNameNoExt, OutFileExt)
     If !FileExist(file2rem)
     {
+       sOldOutDir := PathCompact(OldOutDir, "a", 1, OSDfontSize)
        ResetImgLoadStatus()
        SoundBeep, 300, 100 
        If (dummy="quick-actu")
-          showTOOLtip("Failed to perform action. File not found or access denied.`n" OldOutFileName "`n" OldOutDir "\")
+          showTOOLtip("Failed to perform action. File not found or access denied.`n" OldOutFileName "`n" sOldOutDir "\")
        Else
           msgBoxWrapper(appTitle ": ERROR", "Failed to perform action. File not found or access denied.`n`n" OldOutFileName "`n" OldOutDir "\", 0, 0, "error")
        Return 0
@@ -39210,10 +41044,11 @@ QuickMoveFile2Dest(finalDest, goLastOption, groupingMode:=0, dummy:=0) {
 
     If (OldOutDir=finalDest)
     {
+       sOldOutDir := PathCompact(OldOutDir, "a", 1, OSDfontSize)
        SetTimer, ResetImgLoadStatus, -200
        SoundBeep, 300, 100 
        If (dummy="quick-actu")
-          showTOOLtip("WARNING: Illegal operation. The destination folder is the same with the initial location:`n" finalDest "\")
+          showTOOLtip("WARNING: Illegal operation. The destination folder is the same with the initial location:`n" sOldOutDir "\")
        Else
           msgBoxWrapper(appTitle ": WARNING", "Illegal operation. The destination folder is the same with the initial location:`n" finalDest "\", 0, 0, "exclamation")
        Return 0
@@ -39233,7 +41068,8 @@ QuickMoveFile2Dest(finalDest, goLastOption, groupingMode:=0, dummy:=0) {
        file2save := askAboutFileCollision(file2rem, file2save, 0, goLastOption + 1, forceConflictOption, performOverwrite)
        If !file2save
        {
-          showTOOLtip("WARNING: Another file with the same file name already exists in the destination folder:`n" OldOutFileName "`n" finalDest "\`nOperation aborted.")
+          OutDir := PathCompact(finalDest, "a", 1, OSDfontSize)
+          showTOOLtip("WARNING: Another file with the same file name already exists in the destination folder:`n" OldOutFileName "`n" OutDir "\`nOperation aborted.")
           SoundBeep , 300, 100
           SetTimer, RemoveTooltip, % -msgDisplayTime
           SetTimer, ResetImgLoadStatus, -200
@@ -39261,7 +41097,8 @@ QuickMoveFile2Dest(finalDest, goLastOption, groupingMode:=0, dummy:=0) {
           mustPerformOperation := 1
        } Else If (performOverwrite!=2)
        {
-          showTOOLtip("Operation aborted. A file with the same name already exists in the destination folder.`n" OldOutFileName "`n" finalDest "\")
+          OutDir := PathCompact(finalDest, "a", 1, OSDfontSize)
+          showTOOLtip("Operation aborted. A file with the same name already exists in the destination folder.`n" OldOutFileName "`n" OutDir "\")
           SoundBeep, 300, 100
           SetTimer, RemoveTooltip, % -msgDisplayTime
           SetTimer, ResetImgLoadStatus, -25
@@ -39299,7 +41136,8 @@ QuickMoveFile2Dest(finalDest, goLastOption, groupingMode:=0, dummy:=0) {
 
        actName := (UsrCopyMoveOperation=2) ? "MOVED" : "COPIED"
        zPlitPath(file2save, 0, OldOutFileName, OldOutDir)
-       showTOOLtip("File " actName " to`n" OldOutFileName "`n" finalDest "\")
+       OutDir := PathCompact(finalDest, "a", 1, OSDfontSize)
+       showTOOLtip("File " actName " to`n" OldOutFileName "`n" OutDir "\")
        If (UsrCopyMoveOperation=2)
        {
           resultedFilesList[currentFileIndex, 1] := file2save
@@ -39314,7 +41152,8 @@ QuickMoveFile2Dest(finalDest, goLastOption, groupingMode:=0, dummy:=0) {
     } Else If (operationExecuted=1)
     {
        actName := (UsrCopyMoveOperation=2) ? "MOVE" : "COPY"
-       showTOOLtip("ERROR: Failed to " actName " file:`n" OldOutFileName "To destination:`n" finalDest "\")
+       OutDir := PathCompact(finalDest, "a", 1, OSDfontSize)
+       showTOOLtip("ERROR: Failed to " actName " file:`n" OldOutFileName "To destination:`n" OutDir "\")
        SoundBeep, 300, 100
     }
 
@@ -41596,8 +43435,8 @@ showTOOLtip(msg, funcu:=0, typeFuncu:=0, perc:=0) {
          {
             a := SubStr(msg, 1, z - 1)
             b := SubStr(msg, z + 1)
-            BalloonTip(b, a, "I=2 T=10")
-         } Else BalloonTip(appTitle, msg, "I=2 T=5")
+            BalloonTip(b, a, "I=2 T=10", uiUseDarkMode)
+         } Else BalloonTip(appTitle, msg, "I=2 T=5", uiUseDarkMode)
       } Else If !perc
          ToolTip, % msg, % mX + 25, % mY + 25
       Else
@@ -41960,9 +43799,9 @@ InitGuiContextMenu(keyu:=0) {
       If (thumbsDisplaying=1 && maxFilesIndex>1 && !InStr(keyu, "appskey"))
       {
          delayu := 10
-         MouseGetPos, ox, oy, OutputVarWin
+         MouseGetPos, ox, oy
          JEE_ScreenToClient(PVhwnd, ox, oy, nx, ny)
-         r := WinClickAction("rclick", "nona", OutputVarWin, nx, ny, ox, oy)
+         r := WinClickAction("rclick", "nona", nx, ny, ox, oy)
          dummyTimerDelayiedImageDisplay(50)
       }
    } Else If (drawingShapeNow=0)
@@ -41991,11 +43830,54 @@ InitGuiContextMenu(keyu:=0) {
    ; WinActivate, ahk_id %PVhwnd%
 }
 
-PathCompact(givenPath, CharMax) {
+MeasureStringGdipLight(stringu, fontName, isBold, Size, xpos, ypos, Width, Height, Unit:=0, NoWrap:=1) {
+   hFontFamily := Gdip_FontFamilyCreate(fontName)
+   If !hFontFamily
+      hFontFamily := Gdip_FontFamilyCreateGeneric(1)
+   If !hFontFamily
+      Return 0
+
+   hFont := Gdip_FontCreate(hFontFamily, Size, isBold, Unit)
+   If !hFont
+      Return 0
+
+   FormatStyle := NoWrap ? 0x4000 | 0x1000 : 0x4000
+   hStringFormat := Gdip_StringFormatCreate(FormatStyle)
+   If !hStringFormat
+      hStringFormat := Gdip_StringFormatGetGeneric(1)
+
+   CreateRectF(RC, xpos, ypos, Width, Height)
+   ReturnRC := Gdip_MeasureString(2NDglPG, stringu, hFont, hStringFormat, RC)
+   ReturnRCtest := StrSplit(ReturnRC, "|")
+   testW := Floor(ReturnRCtest[3])
+
+   Gdip_DeleteFont(hFont)
+   Gdip_DeleteFontFamily(hFontFamily)
+   Gdip_DeleteStringFormat(hStringFormat)
+   RC := ""
+   Return testW
+}
+
+PathCompact(givenPath, CharMax, allowOverflow:=0, fontSizeu:=0, givenWidth:=0, minChars:=0) {
+    If (CharMax="a")
+    {
+       GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+       mainWidth := givenWidth ? givenWidth : mainWidth//1.6 + 1
+       borderSize := imgHUDbaseUnit//5
+       txtResW := MeasureStringGdipLight(givenPath, OSDFontName, OSDfontBolded, fontSizeu, borderSize, 0, mainWidth*3, mainHeight)
+       If (txtResW>=mainWidth - borderSize)
+       {
+          CharMax := Round((mainWidth/(txtResW / StrLen(givenPath))) + mainWidth/fontSizeu)//2 + 1
+          If (CharMax<minChars)
+             CharMax := minChars
+       } Else CharMax := StrLen(givenPath)
+       ; ToolTip, % txtResW "=" mainWidth "==" CharMax , , , 2
+    }
+
     If (StrLen(givenPath)>CharMax+3)
     {
        partB := SubStr(givenPath, InStr(givenPath, "\", 0, 0))
-       If (StrLen(partB)>CharMax)
+       If (StrLen(partB)>CharMax && allowOverflow=0)
           partB := SubStr(givenPath, 1, 3) "[...]" SubStr(givenPath, -CharMax + 3)
        Else
           partA := SubStr(givenPath, 1, max(CharMax - StrLen(partB), 3)) "..."
@@ -42075,6 +43957,13 @@ createMenuSelectionAlign() {
 }
 
 createMenuSelectShapeTension() {
+   keyuA := (drawingShapeNow=1) ? "`tB" : ""
+   kMenu("PVshapeTension", "Add/Uncheck", "Bézier spline" keyuA, "MenuToggleBezierMode", "shape tension anchors")
+
+   Menu, PVshapeTension, Add
+   keyuB := (drawingShapeNow=1) ? "`tT" : ""
+   kMenu("PVshapeTension", "Add", "&Cycle smoothness levels" keyuB, "togglePathCurveTension", "shape tension")
+   Menu, PVshapeTension, Add
    kMenu("PVshapeTension", "Add/Uncheck", "&Polygonal", "MenuSetShapeTensionP", "shape tension")
    kMenu("PVshapeTension", "Add/Uncheck", "&Smooth corners", "MenuSetShapeTensionS", "shape tension")
    kMenu("PVshapeTension", "Add/Uncheck", "&Curve", "MenuSetShapeTensionC", "shape tension")
@@ -42087,6 +43976,10 @@ createMenuSelectShapeTension() {
       kMenu("PVshapeTension", "Check", "&Curve")
    Else If (FillAreaCurveTension=4)
       kMenu("PVshapeTension", "Check", "&Rounded curve")
+
+   kMenu("PVshapeTension", "Disable", "&Cycle smoothness levels" keyuB, "togglePathCurveTension", "shape tension")
+   If (bezierSplineCustomShape=1)
+      kMenu("PVshapeTension", "Check", "Bézier spline" keyuA)
 }
 
 createMenuSelectSizeShapes(dummy:=0) {
@@ -42120,7 +44013,10 @@ createMenuSelectSizeShapes(dummy:=0) {
       kMenu("PVselSize", "Add", "&Modify custom shape`tShift+L", "MenuResumeDrawingShapes", "edit draw freeform selection")
       kMenu("PVselSize", "Add", "Flip shape &horizontally`tH", "MenuSelectionFlipH")
       kMenu("PVselSize", "Add", "&Flip shape vertically`tV", "MenuSelectionFlipV")
+      kMenu("PVselSize", "Add/Uncheck", "&Open ended path", "toggleOpenClosedAnyCustomShape", "opened closed vector")
       kMenu("PVselSize", "Add", "Set &points tension", ":PVshapeTension")
+      If (closedLineCustomShape=0)
+         kMenu("PVselSize", "Check", "&Open ended path")
    }
 }
 
@@ -42586,16 +44482,18 @@ createMenuNavBox() {
    }
 
    kMenu("PvImgAdapt", "Add/Uncheck", "&Show image preview`tZ", "ToggleImgNavBox")
-   kMenu("PvImgAdapt", "Add/Uncheck", "&Large preview size", "ToggleImgNavSizeBox")
-   If (HUDnavBoxSize>=125)
-      kMenu("PvImgAdapt", "Check", "&Large preview size")
-
    If (showHUDnavIMG=1)
+   {
       kMenu("PvImgAdapt", "Check", "&Show image preview`tZ")
+      kMenu("PvImgAdapt", "Add/Uncheck", "&Large preview size", "ToggleImgNavSizeBox")
+      If (HUDnavBoxSize>=125)
+         kMenu("PvImgAdapt", "Check", "&Large preview size")
+   }
 }
 
 createMenuImgSizeAdapt(dummy:=0) {
-   kMenu("PvImgAdapt", "Add", "C&ycle adapt to window modes`tT", "ToggleImageSizingMode")
+   keyu := (drawingShapeNow=1) ? "" : "`tT"
+   kMenu("PvImgAdapt", "Add", "C&ycle adapt to window modes" keyu, "ToggleImageSizingMode")
    Menu, PvImgAdapt, Add
    kMenu("PvImgAdapt", "Add/Uncheck", "&Adapt all to fit window`t/", "MenuSetImageAdaptAll")
    kMenu("PvImgAdapt", "Add/Uncheck", "Adapt only &large images", "MenuSetImageAdaptLarge")
@@ -42654,11 +44552,13 @@ createMenuImgSizeAdapt(dummy:=0) {
    {
       Menu, PvImgAdapt, Add
       kMenu("PvImgAdapt", "Add/Uncheck", "&Show image navigator`tZ", "ToggleImgNavBox")
-      kMenu("PvImgAdapt", "Add/Uncheck", "&Large navigator size", "ToggleImgNavSizeBox")
-      If (HUDnavBoxSize>=125)
-         kMenu("PvImgAdapt", "Check", "&Large navigator size")
       If (showHUDnavIMG=1)
+      {
          kMenu("PvImgAdapt", "Check", "&Show image navigator`tZ")
+         kMenu("PvImgAdapt", "Add/Uncheck", "&Large navigator size", "ToggleImgNavSizeBox")
+         If (HUDnavBoxSize>=125)
+            kMenu("PvImgAdapt", "Check", "&Large navigator size")
+      }
 
       If (drawingShapeNow=0 && mustCaptureCloneBrush=0)
       {
@@ -43857,7 +45757,7 @@ BuildMainMenu(dummy:=0) {
    If (drawingShapeNow=1)
    {
       GetMouseCoord2wind(PVhwnd, mX, mY)
-      createMenuCustomShapeDrawing(mX, mY, 0, 0)
+      createMenuCustomShapeDrawing(mX, mY, 0, 0, 0)
       ; stopDrawingShape()
       Return
    } Else If (mustCaptureCloneBrush=1)
@@ -44203,7 +46103,7 @@ showThisMenu(menarg, forceIT:=0) {
    items := DllCall("GetMenuItemCount", "uptr", MenuGetHandle(menarg))
    GetPhysicalCursorPos(mX, mY)
    okay := (!AnyWindowOpen || imgEditPanelOpened=1) && (drawingShapeNow!=1) ? 1 : 0
-   interfaceThread.ahkPostFunction("menuFlyoutDisplay", "yes", mX, mY, okay)
+   interfaceThread.ahkPostFunction("menuFlyoutDisplay", "yes", mX, mY, okay, uiUseDarkMode, A_ScriptHwnd)
    Sleep, 0
    ; SetMenuInfo(MenuGetHandle(menarg), 0, 1)
    Menu, % menarg, Show, % mX, % mY
@@ -44760,6 +46660,7 @@ createMenuFilesIndexOptions() {
       } Else
          kMenu("PVfList", "Add", "&Statistics", "PanelWrapperFilesStats", "files index list")
 
+      kMenu("PVfList", "Add", "&Keywords indexer", "PanelKeywordsDetector")
       kMenu("PVfList", "Add", "Searc&h index`tCtrl+F3", "PanelSearchIndex", "files list")
       kMenu("PVfList", "Add", "Search and re&place`tCtrl+H", "PanelSearchAndReplaceIndex", "files index list")
       kMenu("PVfList", "Add", "&Index filters`tCtrl+F", "PanelEnableFilesFilter", "files list")
@@ -45782,7 +47683,8 @@ toggleEllipseSelection(modus:=-1) {
    If (customShapePoints.Count()<3 && EllipseSelectMode=2)
    {
       RegAction(0, "FillAreaCustomShape",, 5)
-      RegAction(0, "FillAreaCurveTension",, 2, 1, 4)
+      RegAction(0, "FillAreaCurveTension",, 2, 1, 5)
+      RegAction(0, "closedLineCustomShape",, 1)
       customShapePoints := convertShapePointsStrToArray(FillAreaCustomShape)
       decideCustomShapeStyle()
       If (customShapePoints.Count()<3)
@@ -45800,7 +47702,16 @@ toggleEllipseSelection(modus:=-1) {
    ; INIaction(1, "EllipseSelectMode", "General")
    showTOOLtip("Selection area: " DefineVPselAreaMode(), 0, 0, (EllipseSelectMode+1)/3)
    If (EllipseSelectMode=2)
-      dummy := "||Points tension " FillAreaCurveTension ",,togglePathCurveTension"
+   {
+     If (FillAreaCurveTension=1)
+        ll := "Polygonal path"
+     Else If (FillAreaCurveTension=5)
+        ll := "Bézier path"
+     Else
+        ll := "Points tension: " tensionCurveCustomShape
+
+      dummy := "||" ll ",,togglePathCurveTension"
+   }
 
    If (ShowAdvToolbar=1)
       decideIconBTNselectShape()
@@ -46401,6 +48312,9 @@ toggleCustomZLadaptW() {
 }
 
 toggleCustomZLmodes() {
+   If (thumbsDisplaying=1)
+      Return
+
    If (customZoomAdaptMode=2 || zoomLevel!=1 && customZoomAdaptMode=0)
       ToggleImageSizingMode("cus-tom")
    Else If (customZoomAdaptMode=1)
@@ -47364,7 +49278,7 @@ CleanDeadFilesSeenImagesDB(doPartial:=0, partu:=0) {
    }
 
   startOperation := A_TickCount
-  showTOOLtip("Removing entries of inexistent files from the already seen images database, please wait")
+  showTOOLtip("Removing entries of inexistent files`nfrom the already seen images database, please wait")
   doStartLongOpDance()
   prevMSGdisplay := A_TickCount
   startOperation := A_TickCount
@@ -47401,7 +49315,7 @@ CleanDeadFilesSeenImagesDB(doPartial:=0, partu:=0) {
       If (A_TickCount - prevMSGdisplay>2000)
       {
          etaTime := ETAinfos(entriesScanned, entriesCount, startOperation)
-         showTOOLtip("Removing entries of inexistent files from the seen images database, please wait" etaTime "`n" groupDigits(entriesDoneCount) " entries to inexistent files removed", 0, 0, entriesScanned / entriesCount)
+         showTOOLtip("Removing entries of inexistent files`nfrom the seen images database, please wait" etaTime "`n" groupDigits(entriesDoneCount) " entries to inexistent files removed", 0, 0, entriesScanned / entriesCount)
          prevMSGdisplay := A_TickCount
       }
 
@@ -48135,10 +50049,15 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
     } Else If (currentFileIndex!=0)
        fileMsg := "`nFile not found or access denied..."
 
+    fileIndexu := (maxFilesIndex>1) ? " | " groupDigits(currentFileIndex) " / " groupDigits(maxFilesIndex) " (" Round((currentFileIndex/maxFilesIndex)*100, 2) "%)" : ""
     If (userPrivateMode=1 && StrLen(folderu)>3)
-       fileRelatedInfos := "*:\******\*****\`n[ " groupDigits(currentFileIndex) " / " groupDigits(maxFilesIndex) " ] *****.***" fileMsg
-    Else
-       fileRelatedInfos := (StrLen(folderu)>3) ? folderu "\`n[ " groupDigits(currentFileIndex) " / " groupDigits(maxFilesIndex) " ] " fileNamu fileMsg : ""
+    {
+       fileRelatedInfos := "*****.***`n*:\******\*****\" fileMsg fileIndexu
+    } Else
+    {
+       OutDir := PathCompact(folderu, "a", 1, OSDfontSize//1.1, 0, 45)
+       fileRelatedInfos := (StrLen(folderu)>3) ? fileNamu "`n" OutDir "\" fileMsg fileIndexu : ""
+    }
 
     If (thumbsDisplaying!=1)
     {
@@ -48217,14 +50136,16 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
        }
 
        entireString := infoEditing fileRelatedInfos infoRes infoSizing infoFrames
-       thisOSDfnt := OSDFontName FlipImgH FlipImgV OSDfntSize OSDbgrColor OSDtextColor
+       thisOSDfnt := OSDFontName FlipImgH FlipImgV OSDfontSize OSDbgrColor OSDtextColor
        If (prevMsg!=entireString || prevOSDfnt!=thisOSDfnt)
        {
           prevOSDfnt := thisOSDfnt
           infoBoxGdiCached := trGdip_DisposeImage(infoBoxGdiCached, 1)
-          infoBoxGdiCached := drawTextInBox(entireString, OSDFontName, OSDfntSize//1.1, mainWidth, mainHeight, OSDtextColor, OSDbgrColor, 1, !thumbsDisplaying)
+          infoBoxGdiCached := drawTextInBox(entireString, OSDFontName, OSDfontSize//1.1, mainWidth, mainHeight, OSDtextColor, OSDbgrColor, 1, !thumbsDisplaying)
           prevMsg := entireString
        }
+       Gdip_GetImageDimensions(infoBoxGdiCached, imgW, imgH)
+       lastInfoBoxBMP[1] := [imgW, imgH]
        trGdip_DrawImage(A_ThisFunc, Gu, infoBoxGdiCached, tlbrBonusX, tlbrBonusY)
        Return
     }
@@ -48295,9 +50216,9 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
 
     totalZeit := A_TickCount - startZeitIMGload + 2
     InfoLoadTime := "`nViewport size: " groupDigits(mainWidth) " x " groupDigits(mainHeight) " px (" Round(mainWidth/mainHeight, 2) ")"
-    If (totalZeit>=10 && thumbsDisplaying!=1 && directRefresh=1)
+    If (thumbsDisplaying!=1 && directRefresh=1)
     {
-       InfoLoadTime .= "`nViewport refresh speed: ~" totalZeit " milisec."
+       InfoLoadTime .= "`nViewport refresh speed: ~" groupDigits(totalZeit) " milisec."
        If (currIMGdetails.HasAlpha=1)
           InfoLoadTime .= " (*)"
     }
@@ -48336,17 +50257,17 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
        infoPixFmt := "`nPixel format: " currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat
 
     If (resultedFilesList[currentFileIndex, 5]=1)
-       infoFaved := "`nImage in favourites list"
+       infoFaved := "`nImage: FAVOURITED"
+
+    If (resultedFilesList[currentFileIndex, 3]=1)
+       infoFaved := infoFaved ? infoFaved " and ALREADY SEEN" : "`nImage: ALREADY SEEN"
 
     If (thumbsDisplaying=1)
     {
-
        maxLimitReached := (minimizeMemUsage=1) && (maxFilesIndex>654321 || bckpMaxFilesIndex>654321) ? 1 : 0
        mustDoMultiCore := (allowMultiCoreMode=1 && maxLimitReached!=1 && multiCoreThumbsInitGood=1) ? 1 : 0
        friendlyCoreInfo := (mustDoMultiCore=1) ? "ACTIVATED" : "DEACTIVATED"
        memUsage .= "`nMulti-threaded mode: " friendlyCoreInfo
-       If (resultedFilesList[currentFileIndex, 3]=1)
-          memUsage .= "`nImage already seen"
    }
 
     hasTrans := adjustCanvas2Toolbar(Gu, 0)
@@ -48361,7 +50282,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
 
     borderSize := imgHUDbaseUnit//6
     thisTxtAlignu := (thumbsDisplaying=1) ? "Left" : 0
-    txtOptions := initInPlaceTextOptions(thisGu, FontBolded, 0, 1, thisTxtAlignu, OSDFontName, OSDfntSize//1.1, "0xEE" OSDtextColor, "0xEE" OSDbgrColor, borderSize)
+    txtOptions := initInPlaceTextOptions(thisGu, OSDfontBolded, 0, 1, thisTxtAlignu, OSDFontName, OSDfontSize//1.1, "0xEE" OSDtextColor, "0xEE" OSDbgrColor, borderSize)
     otherTxtObj := TextuToGraphics(thisGu, "initing", txtOptions, OSDFontName, "begin", 0, 0, 1)
     dims := TextuToGraphics(Gu, entireString, nul, OSDFontName, "measure", 0, otherTxtObj)
     dimsFw := clampInRange(dims.w + borderSize*2, 0, mainWidth)
@@ -48370,6 +50291,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
     txtOptions.y := (FlipImgV=1 && thumbsDisplaying!=1) ? mainHeight - dimsFh + borderSize - tlbrBonusY : borderSize + tlbrBonusY
     txtOptions.w := mainWidth - borderSize
     txtOptions.h := mainHeight - borderSize
+    lastInfoBoxBMP[1] := [dimsFw, dimsFh]
     Gdip_FillRectangle(Gu, OSDwinFadedBrushBGR, tlbrBonusX, tlbrBonusY, dimsFw, dimsFh)
     If (thumbsDisplaying!=1)
        Gdip_ResetWorldTransform(Gu)
@@ -48424,7 +50346,7 @@ drawAnnotationBox(mainWidth, mainHeight, Gu) {
     If !entireString
        Return
 
-    infoBoxBMP := drawTextInBox(entireString, OSDFontName, OSDfntSize//1.1, mainWidth, mainHeight, OSDtextColor, OSDbgrColor, 0, 1, usrTextAlign)
+    infoBoxBMP := drawTextInBox(entireString, OSDFontName, OSDfontSize//1.1, mainWidth, mainHeight, OSDtextColor, OSDbgrColor, 0, 1, usrTextAlign)
     Gdip_GetImageDimensions(infoBoxBMP, imgW, imgH)
     thisPosY := (scrollBarHy>0) ? scrollBarHy - imgH : mainHeight - imgH
     thisPosX := (scrollBarVx>0) ? scrollBarVx - imgW : mainWidth - imgW
@@ -48457,19 +50379,19 @@ clampInRange(value, min, max, reverse:=0) {
 }
 
 changeOSDfontSize(direction) {
-  stepu := (OSDfntSize>30) ? 5 : 2
+  stepu := (OSDfontSize>30) ? 5 : 2
   If (direction=1)
-     OSDfntSize += stepu
+     OSDfontSize += stepu
   Else
-     OSDfntSize -= stepu
+     OSDfontSize -= stepu
 
-  OSDfntSize := clampInRange(OSDfntSize, 15, 350)
-  INIaction(1, "OSDfntSize", "General")
-  showTOOLtip("OSD font size: " OSDfntSize, A_ThisFunc, 2, OSDfntSize/350)
+  OSDfontSize := clampInRange(OSDfontSize, 15, 350)
+  INIaction(1, "OSDfontSize", "General")
+  showTOOLtip("OSD font size: " OSDfontSize, A_ThisFunc, 2, OSDfontSize/350)
   SetTimer, RemoveTooltip, % -msgDisplayTime
   calcHUDsize()
   recalculateThumbsSizes()
-  interfaceThread.ahkassign("OSDfntSize", OSDfntSize)
+  interfaceThread.ahkassign("OSDfontSize", OSDfontSize)
   If (thumbsListViewMode>1 && thumbsDisplaying=1)
   {
      ForceRefreshNowThumbsList()
@@ -49038,7 +50960,7 @@ highlightActiveArrowsCtrl() {
 highlightActiveCtrl(modus:=0, givenHwnd:=0) {
    Static prevCtrl
 
-   If (modus="~rbutton")
+   If (modus="RButton")
    {
       A := WinActive("A")
       If (A=hfdTreeWinGui || A=hQuickMenuSearchWin || A=MsgBox2hwnd || A=hSetWinGui) && (isNowFakeWinOpen=1)
@@ -49514,6 +51436,7 @@ PlayAudioFileAssociatedNow() {
     If (thumbsDisplaying=1)
        Return
 
+    restartGIFplayback()
     ohSNDmediaFile := hSNDmediaFile
     ohSNDmedia := hSNDmedia
     StopMediaPlaying()
@@ -49781,7 +51704,7 @@ createHistogramBMP(whichBitmap) {
    If (slideShowRunning=1)
       infoBoxBMP := trGdip_CreateBitmap(A_ThisFunc, 5, 5)
    Else
-      infoBoxBMP := drawTextInBox(entireString, OSDFontName, OSDfntSize//1.5, mainWidth//1.3, mainHeight//1.3, OSDtextColor, OSDbgrColor, 1, 0)
+      infoBoxBMP := drawTextInBox(entireString, OSDFontName, OSDfontSize//1.5, mainWidth//1.3, mainHeight//1.3, OSDtextColor, OSDbgrColor, 1, 0)
    ; tooltip, % "|" TotalPixelz "|" modePointV ", " 2ndMaxV ", " avgBrLvlV " || "  maxW "," maxH  ;  `n" PointsList
    Scale := (slideShowRunning=1) ? imgHUDbaseUnit/100 : imgHUDbaseUnit/80
    thisData := (showHistogram=6) ? brLvlFakeArray : brLvlArray
@@ -50353,7 +52276,7 @@ coreCreateVPnavBox(modus:=0) {
          whichBitmap := flipBitmapAccordingToViewPort(applyVPeffectsOnBMP(whichBitmap))
    }
 
-   thisCall := "a" whichBitmap MD5name imgPath thumbsDisplaying gdiBitmapIDcall currentFileIndex getIDimage(currentFileIndex) currentUndoLevel undoLevelsRecorded UserMemBMP imgHUDbaseUnit OSDfntSize HUDnavBoxSize FlipImgH FlipImgV imgFxMode
+   thisCall := "a" whichBitmap MD5name imgPath thumbsDisplaying gdiBitmapIDcall currentFileIndex getIDimage(currentFileIndex) currentUndoLevel undoLevelsRecorded UserMemBMP imgHUDbaseUnit OSDfontSize HUDnavBoxSize FlipImgH FlipImgV imgFxMode
    If (thisCall=lastCall)
       Return prevBMP
 
@@ -51061,10 +52984,8 @@ changeBrushOpacity(keyu, isKeyu:=0) {
     {
        thisOpacity := (BrushToolUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
        keyu := StrReplace(keyu, "+")
-       okeyu := keyu
-       keyu := StrReplace(keyu, "vk3")
-       factoru := keyu ? "0." keyu : 1
-       If (okeyu="vk31" && isInRange(thisOpacity, 22, 27))
+       factoru := (keyu>0.2) ? "0." keyu : 1
+       If (keyu=1 && isInRange(thisOpacity, 22, 27))
           factoru := 0.05
 
        newOpacity := clampInRange(Round(255 * factoru), 1, 255)
@@ -52684,7 +54605,7 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
     lineThickns2 := lineThickns//4
     If (showHistogram>1 && drawingShapeNow!=1 && mode!=2)
     {
-       thisImgCall := imgPath currentFileIndex zoomLevel IMGresizingMode imgFxMode showHistogram gdiBitmap undoLevelsRecorded currentUndoLevel UserMemBMP OSDfntSize histogramMode
+       thisImgCall := imgPath currentFileIndex zoomLevel IMGresizingMode imgFxMode showHistogram gdiBitmap undoLevelsRecorded currentUndoLevel UserMemBMP OSDfontSize histogramMode
        thisSizingModes := (IMGresizingMode=1 || IMGresizingMode=2 || IMGresizingMode=5) || (IMGresizingMode=4 && IMGlargerViewPort!=1) ? 1 : 0
        If (imgFxMode!=1 || thisSizingModes!=1 || animGIFplaying=1 || desiredFrameIndex>0)
        {
@@ -52969,71 +54890,34 @@ snapPointsAtAngles(gmX, gmY, dulaX, dulaY, ByRef guX, ByRef guY) {
        guX := dulaX
 }
 
-getAngleBetweenTwoPoints(x1, y1, x2, y2, mode:=1) {
-   ; function from tidbit
-   ; based on http://stackoverflow.com/questions/2339487/calculate-angle-of-2-points
-   ; returns 0-359.999
-  angle := APIatan2(y1-y2, x1-x2)*(180/3.14159)*-1
-  if (mode=2)
-     angle += (angle<0) ? 360 : 0 ; or should it be 359? whatever.
-  return angle
+
+fAddPathLines(pPath, inPoints) {
+   PointsCount := inPoints.Length()
+   If !PointsCount
+      Return 1
+
+   VarSetCapacity(PointsF, 4 * PointsCount, 0)
+   Loop, % PointsCount
+       NumPut(inPoints[A_Index], &PointsF, 4 * (A_Index-1), "float")
+
+   iCount := PointsCount//2
+   return DllCall("gdiplus\GdipAddPathLine2", "UPtr", pPath, "UPtr", &PointsF, "int", iCount)
 }
 
-APIatan2(y,x) { 
-   Return dllcall("msvcrt\atan2","Double",y, "Double",x, "CDECL Double")
+fAddPathLine(pPath, x1, y1, x2, y2) {
+   If (x1=x2 && y1=y2)
+      Return 1
+   Return DllCall("gdiplus\GdipAddPathLine", "UPtr", pPath, "float", x1, "float", y1, "float", x2, "float", y2)
 }
 
 drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
+    Static pWhite
+    If !pWhite
+       pWhite := Gdip_BrushCreateSolid("0xDDeeFFaa")
+
     ; Related addNewVectorShapePoints()
     If StrLen(HistogramBMP)>2
        HistogramBMP := trGdip_DisposeImage(HistogramBMP, 1)
-
-    newArrayu := []
-    PointsListArray := [] ; flatten
-    customShapeHasSelectedPoints := 0
-    firstSelectedPoint := []
-    totalz := customShapePoints.Count()
-    Loop, % totalz
-    {
-       maxPoints := A_Index
-       c := customShapePoints[A_Index]
-       fX := prevResizedVPimgW/initialDrawingStartCoords[A_Index, 4]
-       fY := prevResizedVPimgH/initialDrawingStartCoords[A_Index, 5]
-       xu := c[1]*fX - (initialDrawingStartCoords[A_Index, 1]*fX - prevDestPosX)
-       yu := c[2]*fY - (initialDrawingStartCoords[A_Index, 2]*fY - prevDestPosY)
-       If (initialDrawingStartCoords[A_Index, 3])
-       {
-          firstSelectedPoint[1] := xu  ,  firstSelectedPoint[2] := yu
-          customShapeHasSelectedPoints := 1
-       }
-
-       If (A_Index=1 && !vpSymmetryPointX && !vpSymmetryPointY && totalz=1)
-       {
-          vpSymmetryPointX := c[1]*fX, vpSymmetryPointY := c[2]*fY
-          vpSymmetryPointXdp := initialDrawingStartCoords[A_Index, 1]
-          vpSymmetryPointYdp := initialDrawingStartCoords[A_Index, 2]
-          prevVectorShapeSymmetryMode[1] := [1, 0]
-       }
-       newArrayu[A_Index] := [xu, yu]
-       PointsListArray[A_Index*2 - 1] := xu
-       PointsListArray[A_Index*2 + 1 - 1] := yu
-    }
-
-    If (maxPoints<=2)
-    {
-       vpFreeformShapeOffset[1] := 0, vpFreeformShapeOffset[2] := 0, vpFreeformShapeOffset[3] := 0
-       CustomShapeLockedSymmetry := CustomShapeSymmetry
-    }
-
-    SelDotsSize := dotsSize := (PrefsLargeFonts=1) ? imgHUDbaseUnit//3 : imgHUDbaseUnit//3.25
-    thisThick := SelDotsSize//5 + 1
-    sz := SelDotsSize * 5
-    If (mustSnapLiveDrawPoints=2)
-    {
-       Gdip_SetPenWidth(pPen1d, thisThick)
-       Gdip_DrawLine(Gu, pPen1d, VPstampBMPx - sz, VPstampBMPy, VPstampBMPx + sz, VPstampBMPy)
-       Gdip_DrawLine(Gu, pPen1d, VPstampBMPx, VPstampBMPy - sz, VPstampBMPx, VPstampBMPy + sz)
-    }
 
     GetMouseCoord2wind(PVhwnd, mX, mY)
     gmX := (FlipImgH=1) ? mainWidth - mX : mX
@@ -53057,36 +54941,76 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
           dontAddPoint := -1
     }
 
-    If (dontAddPoint!=-1)
+    PointsListArray := [] ; flatten
+    customShapeHasSelectedPoints := 0
+    k := firstPx := firstPy := 0
+    totalz := customShapePoints.Count()
+    Loop, % totalz
     {
-       Loop, % newArrayu.Count()
+       ; convert and normalize points coordinates to current viewport conditions
+       getVPcoordsVectorPoint(A_Index, xu, yu)
+       If (initialDrawingStartCoords[A_Index, 3])
        {
-          If (A_Index=1 && drawingLiveMode=1)
-             Continue
+          firstPx := xu  ,  firstPy := yu
+          customShapeHasSelectedPoints := 1
+       }
 
-          xu := newArrayu[A_Index, 1]
-          yu := newArrayu[A_Index, 2]
-          If isDotInRect(gmX, gmY, xu - SelDotsSize//2, xu + SelDotsSize, yu - SelDotsSize//2, yu + SelDotsSize)
+       If (A_Index=1 && !vpSymmetryPointX && !vpSymmetryPointY && totalz=1 && bezierSplineCustomShape=0)
+       || (A_Index=2 && !vpSymmetryPointX && !vpSymmetryPointY && totalz=2 && bezierSplineCustomShape=1)
+       {
+          fX := prevResizedVPimgW/initialDrawingStartCoords[A_Index, 4]
+          fY := prevResizedVPimgH/initialDrawingStartCoords[A_Index, 5]
+          vpSymmetryPointX := customShapePoints[A_Index, 1]*fX
+          vpSymmetryPointY := customShapePoints[A_Index, 2]*fY
+          vpSymmetryPointXdp := initialDrawingStartCoords[A_Index, 1]
+          vpSymmetryPointYdp := initialDrawingStartCoords[A_Index, 2]
+          prevVectorShapeSymmetryMode[1] := [1, 0]
+       }
+
+       ; k := (bezierSplineCustomShape=1) ? clampInRange(k + 1, 1, 3, 1) : 1
+       ; newArrayu[A_Index] := [xu, yu, k]
+       PointsListArray[A_Index*2 - 1] := xu
+       PointsListArray[A_Index*2] := yu
+       ; test if mouse location is hovering one of the points in the vector path
+       If (dontAddPoint!=-1)
+       {
+          If isDotInRect(gmX, gmY, SelDotsSize, SelDotsSize, PointsListArray[A_Index*2 - 1], PointsListArray[A_Index*2], 1)
              dontAddPoint := A_Index
        }
     }
 
+    lastPx := xu,    lastPy := yu
+    If (totalz<=2 && bezierSplineCustomShape=0 || totalz=3 && bezierSplineCustomShape=1)
+    {
+       vpFreeformShapeOffset[1] := 0, vpFreeformShapeOffset[2] := 0, vpFreeformShapeOffset[3] := 0
+       CustomShapeLockedSymmetry := CustomShapeSymmetry
+    }
+
+    SelDotsSize := dotsSize := (PrefsLargeFonts=1) ? imgHUDbaseUnit//3 : imgHUDbaseUnit//3.25
+    thisThick := SelDotsSize//5 + 1
+    sz := SelDotsSize * 5
+    If (mustSnapLiveDrawPoints=2)
+    {
+       Gdip_SetPenWidth(pPen1d, thisThick)
+       Gdip_DrawLine(Gu, pPen1d, VPstampBMPx - sz, VPstampBMPy, VPstampBMPx + sz, VPstampBMPy)
+       Gdip_DrawLine(Gu, pPen1d, VPstampBMPx, VPstampBMPy - sz, VPstampBMPx, VPstampBMPy + sz)
+    }
+
     mustSnapLiveDrawPoints := 0
-    If (GetKeyState("Shift", "P") && dontAddPoint=0 && maxPoints)
+    If (GetKeyState("Shift", "P") && dontAddPoint=0 && totalz>0)
     {
        If (customShapeHasSelectedPoints=1)
-          snapPointsAtAngles(gmX, gmY, firstSelectedPoint[1], firstSelectedPoint[2], gmX, gmY)
+          snapPointsAtAngles(gmX, gmY, firstPx, firstPy, gmX, gmY)
        Else
-          snapPointsAtAngles(gmX, gmY, newArrayu[maxPoints, 1], newArrayu[maxPoints, 2], gmX, gmY)
+          snapPointsAtAngles(gmX, gmY, lastPx, lastPy, gmX, gmY)
        VPstampBMPx := gmX, VPstampBMPy := gmY
     }
 
     ; ToolTip, % CustomShapeLockedSymmetry "=" CustomShapeSymmetry "=" vpSymmetryPointX  , , , 2
-    If (dontAddPoint=0 && showNewVectorPointPreview=1 && vpImgPanningNow=0 && customShapeHasSelectedPoints=0)
+    If (dontAddPoint=0 && bezierSplineCustomShape=0 && showNewVectorPointPreview=1 && vpImgPanningNow=0 && customShapeHasSelectedPoints=0)
     {
        If (CustomShapeSymmetry=1 && vpSymmetryPointX)
        {
-          maxPoints++
           vpSymX := Round(vpSymmetryPointX) - (vpSymmetryPointXdp - prevDestPosX)
           gmXa := vpSymX - (gmX - vpSymX)
           If (gmX<vpSymX)
@@ -53100,7 +55024,6 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
           ; ToolTip, % mirrorBonus  "`n" gmX "==" gmXa "==" vpSymmetryPointX, , , 2
        } Else If (CustomShapeSymmetry=2 && vpSymmetryPointY)
        {
-          maxPoints++
           vpSymY := Round(vpSymmetryPointY) - (vpSymmetryPointYdp - prevDestPosY)
           gmYa := vpSymY - (gmY - vpSymY)
           If (gmY<vpSymY)
@@ -53123,28 +55046,13 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
        Gdip_DrawLines(Gu, pPen4, PointsListArray)
     } Else If (PenuDrawLive && PointsListArray.Count()>4)
     {
-       If (drawingLiveMode=1 || drawingLiveMode=3)
-       {
-          If (closedLineCustomShape=1)
-          {
-             If (cardinalCurveCustomShape=1)
-                Gdip_DrawClosedCurve(Gu, PenuDrawLive, PointsListArray, tensionCurveCustomShape)
-             Else
-                Gdip_DrawPolygon(Gu, PenuDrawLive, PointsListArray)
-          } Else
-          {
-             If (cardinalCurveCustomShape=1)
-                Gdip_DrawCurve(Gu, PenuDrawLive, PointsListArray, tensionCurveCustomShape)
-             Else
-                Gdip_DrawLines(Gu, PenuDrawLive, PointsListArray)
-          }
-       } Else
-       {
-          If (cardinalCurveCustomShape=1)
-             Gdip_FillClosedCurve(Gu, PenuDrawLive, PointsListArray, tensionCurveCustomShape)
-          Else
-             Gdip_FillPolygon(Gu, PenuDrawLive, PointsListArray)
-       }
+       thisPath := Gdip_CreatePath()
+       createPathVectorCustomShape(thisPath, PointsListArray, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape, 0, 0, 0)
+       If (drawingVectorLiveMode=1 || drawingVectorLiveMode=3)
+          Gdip_DrawPath(Gu, PenuDrawLive, thisPath)
+       Else
+          Gdip_FillPath(Gu, PenuDrawLive, thisPath)
+       Gdip_DeletePath(thisPath)
     }
 
     If (dontAddPoint!=-1 && vpImgPanningNow=0)
@@ -53154,50 +55062,82 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
 
        If (mustSnapLiveDrawPoints=1)
        {
+          ; draw snap indicator
           Gdip_SetPenWidth(pPen1d, thisThick)
-          If (customShapeHasSelectedPoints=1)
-          {
-             Gdip_DrawLine(Gu, pPen1d, firstSelectedPoint[1] - sz, firstSelectedPoint[2], firstSelectedPoint[1] + sz, firstSelectedPoint[2])
-             Gdip_DrawLine(Gu, pPen1d, firstSelectedPoint[1], firstSelectedPoint[2] - sz, firstSelectedPoint[1], firstSelectedPoint[2] + sz)
-          } Else
-          {
-             Gdip_DrawLine(Gu, pPen1d, newArrayu[maxPoints, 1] - sz, newArrayu[maxPoints, 2], newArrayu[maxPoints, 1] + sz, newArrayu[maxPoints, 2])
-             Gdip_DrawLine(Gu, pPen1d, newArrayu[maxPoints, 1], newArrayu[maxPoints, 2] - sz, newArrayu[maxPoints, 1], newArrayu[maxPoints, 2] + sz)
-          }
+          thisPx :=  (customShapeHasSelectedPoints=1) ? firstPx : lastPx
+          thisPy :=  (customShapeHasSelectedPoints=1) ? firstPy : lastPy
+          Gdip_DrawLine(Gu, pPen1d, thisPx - sz, thisPy, thisPx + sz, thisPy)
+          Gdip_DrawLine(Gu, pPen1d, thisPx, thisPy - sz, thisPx, thisPy + sz)
        }
 
-       If (mustSnapLiveDrawPoints=1)
-       {
-          thisThick := SelDotsSize//5 + 1
-          sz := SelDotsSize * 5
-          Gdip_SetPenWidth(pPen1d, thisThick)
-          If (customShapeHasSelectedPoints=1)
-          {
-             Gdip_DrawLine(Gu, pPen1d, firstSelectedPoint[1] - sz, firstSelectedPoint[2], firstSelectedPoint[1] + sz, firstSelectedPoint[2])
-             Gdip_DrawLine(Gu, pPen1d, firstSelectedPoint[1], firstSelectedPoint[2] - sz, firstSelectedPoint[1], firstSelectedPoint[2] + sz)
-          } Else
-          {
-             Gdip_DrawLine(Gu, pPen1d, newArrayu[maxPoints, 1] - sz, newArrayu[maxPoints, 2], newArrayu[maxPoints, 1] + sz, newArrayu[maxPoints, 2])
-             Gdip_DrawLine(Gu, pPen1d, newArrayu[maxPoints, 1], newArrayu[maxPoints, 2] - sz, newArrayu[maxPoints, 1], newArrayu[maxPoints, 2] + sz)
-          }
-       }
+       If (bezierSplineCustomShape=1)
+          thisPath := Gdip_CreatePath()
 
-       dotu := SelDotsSize//2
-       Loop, % newArrayu.Count()
+       k := 0
+       Loop, % totalz
        {
-           xu := newArrayu[A_Index, 1]
-           yu := newArrayu[A_Index, 2]
+           ; draw the vector points
+           xu := PointsListArray[A_Index*2 - 1], yu := PointsListArray[A_Index*2]
+           k := (bezierSplineCustomShape=1) ? clampInRange(k + 1, 1, 3, 1) : 1
+           sl := (k=1) ? SelDotsSize : SelDotsSize//2 + 1
+           slz := sl//2 + 1
+           If (k=1 && A_Index>1 && A_Index<totalz)
+           {
+              ; prepare the list of lines to draw formed by anchors connected to the main/key points
+              xA := PointsListArray[(A_Index + 1)*2 - 1], yA := PointsListArray[(A_Index + 1)*2]
+              xB := PointsListArray[(A_Index + 3)*2 - 1], yB := PointsListArray[(A_Index + 3)*2]
+              xC := PointsListArray[(A_Index - 1)*2 - 1], yC := PointsListArray[(A_Index - 1)*2]
+              If isDotInRect(xA, yA, slz, slz, xB, yB, 1)
+                 j := fAddPathLine(thisPath, xC, yC, xu, yu)
+              Else If isDotInRect(xC, yC, slz, slz, xu, yu, 1)
+                 j := fAddPathLine(thisPath, xu, yu, xA, yA)
+              Else
+                 j := fAddPathLines(thisPath, [xC, yC, xu, yu, xA, yA])
+
+              If !j
+                 Gdip_StartPathFigure(thisPath)
+           }
+
            selu := initialDrawingStartCoords[A_Index, 3]
-           If (A_Index=dontAddPoint)
-              Gdip_FillRectangle(Gu, pBrushE, xu - SelDotsSize, yu - SelDotsSize, SelDotsSize*2, SelDotsSize*2)
+           thisState := "a" xu yu
+           highl := 0
+           If (prevState=thisState)
+           {
+              highl := pselu
+              counter++
+           } else counter := 0
 
-           whichBrush := (selu=1) ? pBrushA : pBrushD
-           If (selu=1)
-              Gdip_DrawRectangle(Gu, pPen7, xu - SelDotsSize//2, yu - SelDotsSize//2, SelDotsSize, SelDotsSize)
+           If (prevState!=thisState || counter<3 && k=1)
+           {
+              pselu := (A_Index=dontAddPoint) ? 1 : 0
+              prevState := thisState
+              If (A_Index=dontAddPoint || highl=1)
+                 Gdip_FillRectangle(Gu, pBrushE, xu - sl, yu - sl, sl*2, sl*2)
 
-           Gdip_FillRectangle(Gu, whichBrush, xu - SelDotsSize//2, yu - SelDotsSize//2, SelDotsSize, SelDotsSize)
-           If (A_Index=1)
-              Gdip_FillEllipse(Gu, pBrushZ, xu - dotu//2, yu - dotu//2, dotu, dotu)
+              whichBrush := (selu=1) ? pBrushA : pBrushD
+              If (A_Index=dontAddPoint || highl=1)
+                 Gdip_FillRectangle(Gu, pWhite, xu - sl//2, yu - sl//2, sl, sl)
+              Else
+                 Gdip_FillRectangle(Gu, whichBrush, xu - sl//2, yu - sl//2, sl, sl)
+
+              If (A_Index=1)
+                 Gdip_FillEllipse(Gu, pBrushZ, xu - SelDotsSize//4, yu - SelDotsSize//4, SelDotsSize//2, SelDotsSize//2)
+
+              If (selu=1) ; || highl=1)
+                 Gdip_DrawRectangle(Gu, pPen7, xu - sl//2, yu - sl//2, sl, sl)
+           } ; else skipped++
+           ; ToolTip, % skipped "=" skopped , , , 2
+       }
+
+       If (thisPath!="" && bezierSplineCustomShape=1)
+       {
+          ; draw the lines formed by anchors and the main/key points
+          Gdip_SetPenWidth(pPen1d, SelDotsSize//5 + 1)
+          Gdip_AddPathLine(thisPath, PointsListArray[1*2 - 1], PointsListArray[1*2], PointsListArray[2*2 - 1], PointsListArray[2*2]) ; first anchor
+          Gdip_StartPathFigure(thisPath)
+          Gdip_AddPathLine(thisPath, PointsListArray[totalz * 2 - 3], PointsListArray[totalz * 2 - 2], PointsListArray[totalz * 2 - 1], PointsListArray[totalz * 2]) ; last anchor
+          Gdip_DrawPath(Gu, pPen1d, thisPath)
+          Gdip_DeletePath(thisPath)
        }
     } 
 
@@ -53214,9 +55154,9 @@ getVPcustomShapePath(PointsListArray) {
        If (c[1]="" || c[2]="")
           Continue
 
+       thisIndex++
        fX := prevResizedVPimgW/initialDrawingStartCoords[A_Index, 4]
        fY := prevResizedVPimgH/initialDrawingStartCoords[A_Index, 5]
-       thisIndex++
        xu := c[1]*fX - (initialDrawingStartCoords[A_Index, 1]*fX - prevDestPosX)
        newArrayu[thisIndex] := xu
 
@@ -53226,10 +55166,7 @@ getVPcustomShapePath(PointsListArray) {
     }
 
     pPath := Gdip_CreatePath()
-    If (FillAreaCurveTension=1)
-       Gdip_AddPathPolygon(pPath, newArrayu)
-    Else
-       Gdip_AddPathClosedCurve(pPath, newArrayu, tensionCurveCustomShape)
+    createPathVectorCustomShape(pPath, newArrayu, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape, 0, 0, 0)
     Return [pPath, newArrayu]
 }
 
@@ -53315,10 +55252,9 @@ adjustCustomShapePositionLive(dir:=0) {
     SetTimer, dummyRefreshImgSelectionWindow, -10
 }
 
-convertCustomShape2givenArea(PointsListArray, refX, refY, refW, refH, returnArray:=1) {
-    ; drawingShapeNow := 0
-    ; values must be in the rage of 0 to 1 for
-    ; the PointsListArray
+convertCustomShape2givenArea(PointsListArray, refX, refY, refW, refH, returnArray:=1, filterPointDupes:=0) {
+    ; this assumes drawingShapeNow=0
+    ; values must be in the range of 0 to 1 for the coord entries in PointsListArray
     If (PointsListArray.Count()<3)
        Return
 
@@ -53327,21 +55263,32 @@ convertCustomShape2givenArea(PointsListArray, refX, refY, refW, refH, returnArra
     Else
        newShape := ""
 
+    If (filterPointDupes=1)
+       deduper := new hashtable()
+
+    thisIndex := 0
     Loop, % PointsListArray.Count()
     {
        c := PointsListArray[A_Index]
        xu := refW * c[1] + refX
        yu := refH * c[2] + refY
-       If (xu="" || yu="")
+       puf := "a" Round(xu) Round(yu)
+       If (xu="" || yu="" || deduper[puf]=1)
           Continue
 
+       thisIndex++
+       If (filterPointDupes=1)
+          deduper[puf] := 1
+   
        If (returnArray=1)
        {
-          newArrayu[A_Index*2 - 1] := xu
-          newArrayu[A_Index*2 + 1 - 1] := yu
+          newArrayu[thisIndex*2 - 1] := xu
+          newArrayu[thisIndex*2 + 1 - 1] := yu
        } Else newShape .= xu "," yu "|"
        ; newShape .= Round(xu) "," Round(yu) "|"
     }
+
+    deduper := ""
     ; ToolTip, % newShape , , , 2
     If (returnArray=1)
        Return newArrayu
@@ -53371,22 +55318,22 @@ convertShapePointsStrToArray(PointsList, offX:=0, offY:=0) {
        Return
 
     newShape := []
-    newArrayu := new hashtable()
+    ; newArrayu := new hashtable()
     ogmX := ogmY := 0
     Loop, Parse, PointsList, "|"
     {
        c := StrSplit(A_LoopField, ",")
        ogmX := c[1]
        ogmY := c[2]
-       If (ogmX="" || ogmY="" || newArrayu[ogmX ogmY]=1)
+       If (ogmX="" || ogmY="") ; || newArrayu[ogmX ogmY]=1)
           Continue
 
        thisIndex++
-       newArrayu[ogmX ogmY] := 1
+       ; newArrayu[ogmX ogmY] := 1
        newShape[thisIndex] := [ogmX + offX, ogmY + offY]
     }
 
-    newArrayu := []
+    ; newArrayu := ""
     If (newShape.Count()<3)
        Return
     ; ToolTip, % A_ThisFunc "=" thisIndex "=" ogmX "=" ogmY "n" FillAreaCurveTension "=" tensionCurveCustomShape , , , 2
@@ -53597,10 +55544,6 @@ testSelectOutsideImgEntirely(pBitmap) {
      Return isOutside
 }
 
-distanceBetweenTwoPoints(x1,y1,x2,y2) {
-   Return Sqrt((x2 - x1)**2+(y2 - y1)**2)
-}
-
 ViewPortSelectionManageCoords(mainWidth, mainHeight, dpX, dpY, maxSelX, maxSelY, ByRef nImgSelX1, ByRef nImgSelY1, ByRef nImgSelX2, ByRef nImgSelY2, ByRef zImgSelX1, ByRef zImgSelY1, ByRef zImgSelX2, ByRef zImgSelY2, ByRef vPimgSelW, ByRef vPimgSelH, ByRef vPimgSelPx, ByRef vPimgSelPy) {
      If (LimitSelectBoundsImg=1)
      {
@@ -53780,6 +55723,73 @@ prevModeViewPortSelectionManager(dpX, dpY, maxSelX, maxSelY) {
      prevSelDotAy := vPimgSelPy + vPimgSelH - dotsSize//2
 }
 
+createPathVectorCustomShape(ImgSelPath, ByRef PointsList, tension, isClosed, isBezier, zeroTension:=0, allowAutoFix:=1, allowCloseOpenAuto:=1) {
+   If (allowAutoFix=1 && isBezier=1)
+   {
+      ; auto-fix uneven paths
+      PointsCount := PointsList.Count()
+      r := mod(PointsCount//2, 3)
+      ; ToolTip, % "r=" r, , , 2
+      xu := PointsList[PointsCount - 1], yu := PointsList[PointsCount]
+      loops := (r=2) ? 2 : 1
+      If (r=1)
+         loops := 0
+
+      Loop, % loops
+         PointsList.Push(xu, yu)
+   }
+
+   If (allowCloseOpenAuto=1)
+   {
+      r := testIsBezierAltPathClosed(PointsList)
+      If (isClosed=1 && r=0 && isBezier=1)
+      {
+         thisIndex := PointsList.Count()//2 - 1
+         xA := PointsList[1],            yA := PointsList[2]
+         PointsList.Push(xA, yA)
+         loops := (PointsList.Count()//2 > 4) ? 2 : 1
+         Loop, % loops
+            PointsList.Push(xA, yA)
+
+         ; ToolTip, %  thisIndex "=l=" PointsList.Count()//2 "`n" xA "==" yA , , , 2
+         reflectGivenAnchorInAltPath(PointsList, 2, PointsList.Count()//2 - 1, 1)
+         reflectGivenAnchorInAltPath(PointsList, thisIndex, thisIndex + 2, thisIndex + 1)
+      } Else If (isClosed=0 && r=1)
+      {
+         loops := ((PointsList.Count()//2 - 2) >= 4) ? 3 : 2
+         If (isBezier!=1)
+            loops := 1
+
+         Loop, % loops * 2
+            PointsList.Pop()
+
+         While, (testIsBezierAltPathClosed(PointsList)=1)
+         {
+            loops := ((PointsList.Count()//2 - 2) >= 4) ? 3 : 2
+            If (isBezier!=1)
+               loops := 1
+
+            Loop, % loops * 2
+               PointsList.Pop()
+
+            If (A_Index>10)
+               Break
+         }
+      }
+   }
+
+   If (isBezier=1)
+      Gdip_AddPathBeziers(ImgSelPath, PointsList)
+   Else If ((tension=1 || zeroTension=1) && isClosed=1)
+      Gdip_AddPathPolygon(ImgSelPath, PointsList)
+   Else If ((tension=1 || zeroTension=1) && isClosed=0)
+      Gdip_AddPathLines(ImgSelPath, PointsList)
+   Else If isClosed
+      Gdip_AddPathClosedCurve(ImgSelPath, PointsList, tensionCurveCustomShape)
+   Else
+      Gdip_AddPathCurve(ImgSelPath, PointsList, tensionCurveCustomShape)
+}
+
 createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepBounds:=0, zeroTension:=0, allowSelectionCenter:=1, allowCavity:=1, selCavityX:=0, selCavityY:=0) {
    ImgSelPath := Gdip_CreatePath()
    If (ImgSelPath="")
@@ -53787,11 +55797,8 @@ createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepB
 
    If (ellipse=2)
    {
-      PointsList := convertCustomShape2givenArea(customShapePoints, imgSelPx, imgSelPy, imgSelW, imgSelH)
-      If (FillAreaCurveTension=1 || zeroTension=1)
-         Gdip_AddPathPolygon(ImgSelPath, PointsList)
-      Else
-         Gdip_AddPathClosedCurve(ImgSelPath, PointsList, tensionCurveCustomShape)
+      PointsList := convertCustomShape2givenArea(customShapePoints, imgSelPx, imgSelPy, imgSelW, imgSelH, 1, !bezierSplineCustomShape)
+      createPathVectorCustomShape(ImgSelPath, PointsList, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape, zeroTension)
    } Else If (ellipse=1)
       Gdip_AddPathEllipse(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
    Else
@@ -53806,11 +55813,8 @@ createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepB
 
       If (ellipse=2)
       {
-         PointsList := convertCustomShape2givenArea(customShapePoints, nimgSelPx, nimgSelPy, nimgSelW, nimgSelH)
-         If (FillAreaCurveTension=1 || zeroTension=1)
-            Gdip_AddPathPolygon(ImgSelPath, PointsList)
-         Else
-            Gdip_AddPathClosedCurve(ImgSelPath, PointsList, tensionCurveCustomShape)
+         PointsList := convertCustomShape2givenArea(customShapePoints, nimgSelPx, nimgSelPy, nimgSelW, nimgSelH, 1, !bezierSplineCustomShape)
+         createPathVectorCustomShape(ImgSelPath, PointsList, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape, zeroTension)
       } Else If (ellipse=1)
          Gdip_AddPathEllipse(ImgSelPath, nimgSelPx, nimgSelPy, nimgSelW, nimgSelH)
       Else
@@ -53855,7 +55859,7 @@ centerPath2bounds(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH, destinationP
    ; ToolTip, % nX "=" nY , , , 2
    obju := []
    pMatrix := Gdip_CreateMatrix()
-   obju := [nX, nY, scaleu, vPselRotation, innerSelectionCavityX, innerSelectionCavityY, EllipseSelectMode]
+   obju := [nX, nY, scaleu, vPselRotation, innerSelectionCavityX, innerSelectionCavityY, EllipseSelectMode, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape]
    Gdip_TranslateMatrix(pMatrix, nX, nY)
    E := Gdip_TransformPath(ImgSelPath, pMatrix)
    If destinationPath
@@ -54085,7 +56089,7 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
                fScale := 0.9
             } Else fScale := 1.3
 
-           infoBoxBMP := drawTextInBox(theMsg, OSDFontName, OSDfntSize//fScale, mainWidth//2, mainHeight//2, OSDtextColor, OSDbgrColor, 1, 1)
+           infoBoxBMP := drawTextInBox(theMsg, OSDFontName, OSDfontSize//fScale, mainWidth//2, mainHeight//2, OSDtextColor, OSDbgrColor, 1, 1)
            colorBoxH := colorBox ? imgHUDbaseUnit//7 : 1
            Gdip_GetImageDimensions(infoBoxBMP, infoW, infoH)
            If (imgSelPy + imgSelH + 5 < mainHeight - infoH)
@@ -54198,7 +56202,7 @@ dummyRefreshImgSelectionWindow() {
         interfaceThread.ahkassign("IMGresizingMode", IMGresizingMode)
      }
 
-     ; ToolTip, % "l=" drawingShapeNow "==" editingSelectionNow "==" drawingLiveMode , , , 2
+     ; ToolTip, % "l=" drawingShapeNow "==" editingSelectionNow "==" drawingVectorLiveMode , , , 2
      If (drawingShapeNow!=1 && imgSelX2=-1 && imgSelY2=-1 && editingSelectionNow=1) || (thisu=1)
      {
         dummyTimerDelayiedImageDisplay(25)
@@ -54209,7 +56213,7 @@ dummyRefreshImgSelectionWindow() {
      If (drawingShapeNow=1)
         GetMouseCoord2wind(PVhwnd, mX, mY)
 
-     thisState := "a" mX mY mainWidth mainHeight closedLineCustomShape tensionCurveCustomShape cardinalCurveCustomShape customShapePoints.Count() lastZeitFileSelect imgSelX1 imgSelY1 imgSelX2 imgSelY2 BrushToolSymmetryX BrushToolSymmetryY BrushToolSymmetryPointX BrushToolSymmetryPointY customShapeHasSelectedPoints showNewVectorPointPreview vpGridSize showViewPortGrid
+     thisState := "a" mX mY mainWidth mainHeight closedLineCustomShape tensionCurveCustomShape cardinalCurveCustomShape customShapePoints.Count() lastZeitFileSelect imgSelX1 imgSelY1 imgSelX2 imgSelY2 BrushToolSymmetryX BrushToolSymmetryY BrushToolSymmetryPointX BrushToolSymmetryPointY customShapeHasSelectedPoints showNewVectorPointPreview vpGridSize showViewPortGrid bezierSplineCustomShape
      If (thisState!=prevStatus) || (drawingShapeNow!=1)
      {
         loopsOccured++
@@ -55033,6 +57037,7 @@ changeSelectZoom(direction, klop:=0) {
        dummyRefreshImgSelectionWindow()
     } Else
     {
+       userFriendlyPrevImgSelAction:= (direction=-1) ? "SHRINK SELECTION AREA" : "ENLARGE SELECTION AREA"
        SetTimer, dummyRefreshImgSelectionWindow, -10
        SetTimer, dummyShowSelCoordsInfos, -25
     }
@@ -55081,12 +57086,42 @@ alignImgSelectOutRight() {
 }
 
 alignImgSelection(keyu, outu:=0) {
-   static K := 0
-
+    static K := 0, listu := {0:"Center V.", 1:"Bottom-left", 2:"Bottom", 3:"Bottom-right", 4:"Left", 5:"Center H.", 6:"Right", 7:"Top-left", 8:"Top", 9:"Top-right"}
     If (thumbsDisplaying=1 || editingSelectionNow!=1 || liveDrawingBrushTool=1)
        Return
 
+    IF (keyu="^NumpadAdd")
+    {
+       changeSelectZoom(1)
+       Return
+    } Else IF (keyu="^NumpadSub")
+    {
+       changeSelectZoom(-1)
+       Return
+    } Else IF (keyu="^NumpadDiv")
+    {
+       changeSelectionAreaCavity(-1)
+       Return
+    } Else IF (keyu="^NumpadMult")
+    {
+       changeSelectionAreaCavity(1)
+       Return
+    } Else IF (keyu="^NumpadDot")
+    {
+       If (innerSelectionCavityX>0 && innerSelectionCavityY>0)
+          resetSelectionAreaCavity()
+       Else
+          resetSelectionRotation()
+       SetTimer, RemoveTooltip, % -msgDisplayTime//2
+       Return
+    }
+
     k := StrReplace(keyu, "^Numpad")
+    If isInRange(k, 0, 9)
+       userFriendlyPrevImgSelAction := "ALIGNMENT: " Format("{:U}", listu[k])
+    Else
+       userFriendlyPrevImgSelAction := Format("{:U}", listu[k])
+
     If (k=5)
     {
        k := 4
@@ -55096,6 +57131,7 @@ alignImgSelection(keyu, outu:=0) {
        k := 8
        cY := 1
     }
+
     If (outu=1)
     {
        PasteInPlaceAutoExpandIMG := 1
@@ -55230,6 +57266,7 @@ arrowKeysAdjustSelectionArea(direction, modus, extraUmphf:=1, klop:=0) {
        dummyRefreshImgSelectionWindow()
     } Else
     {
+       userFriendlyPrevImgSelAction := (modus=1) ? "ADJUST SELECTION POSITION" : "ADJUST SELECTION SIZE"
        SetTimer, dummyRefreshImgSelectionWindow, -10
        SetTimer, dummyShowSelCoordsInfos, -25
     }
@@ -55266,7 +57303,7 @@ dummyShowSelCoordsInfos() {
     imgSelH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
     theRatio := "`nRatio: " Round(imgSelW/imgSelH, 2)
     theRatio .= "`nRotation: " Round(vPselRotation, 2) "° "
-    theMsg := "X / Y: " Round(ImgSelX1) ", " Round(ImgSelY1) "`nW / H: " Round(imgSelW) ", " Round(imgSelH) theRatio
+    theMsg := userFriendlyPrevImgSelAction "`nX / Y: " Round(ImgSelX1) ", " Round(ImgSelY1) "`nW / H: " Round(imgSelW) ", " Round(imgSelH) theRatio "`nCavity: " Round(innerSelectionCavityX, 2)
     showTOOLtip(theMsg, 0, 0, vPselRotation/360)
     SetTimer, RemoveTooltip, -500
 }
@@ -55295,6 +57332,21 @@ resetSelectionAreaCavity() {
 
   innerSelectionCavityX := innerSelectionCavityY := 0
   SetTimer, dummyRefreshImgSelectionWindow, -25
+  userFriendlyPrevImgSelAction := "RESET SELECTION CAVITY"
+  SetTimer, dummyShowSelCoordsInfos, -50
+
+  ; dummyTimerDelayiedImageDisplay(50)
+}
+
+changeSelectionAreaCavity(dir:=1) {
+  If (thumbsDisplaying=1) || (slideShowRunning=1 && editingSelectionNow!=1)
+     Return
+
+  thisValue := (dir=1) ? innerSelectionCavityX + 0.01 : innerSelectionCavityX - 0.01
+  innerSelectionCavityX := innerSelectionCavityY := clampInRange(thisValue, 0, 0.48)
+  SetTimer, dummyRefreshImgSelectionWindow, -15
+  userFriendlyPrevImgSelAction := (dir=1) ? "INCREASE SELECTION CAVITY" : "DECREASE SELECTION CAVITY"
+  SetTimer, dummyShowSelCoordsInfos, -25
   ; dummyTimerDelayiedImageDisplay(50)
 }
 
@@ -55432,6 +57484,7 @@ resetSelectionRotation() {
 
    vPselRotation := 0
    SetTimer, dummyRefreshImgSelectionWindow, -10
+   userFriendlyPrevImgSelAction := "RESET SELECTION ROTATION"
    SetTimer, dummyShowSelCoordsInfos, -20
 }
 
@@ -55444,6 +57497,7 @@ MenuSelRotation() {
       VPselRotation := 0
 
    SetTimer, dummyRefreshImgSelectionWindow, -10
+   userFriendlyPrevImgSelAction := "SELECTION ROTATION +45°"
    SetTimer, dummyShowSelCoordsInfos, -20
 }
 
@@ -55646,7 +57700,7 @@ GdipCleanMain(modus:=0) {
 
           If thisInfo
           {
-             thisFntSize := (modus!=6) ? OSDfntSize*1.25 : OSDfntSize*0.75
+             thisFntSize := (modus!=6) ? OSDfontSize*1.25 : OSDfontSize*0.75
              infoBoxBMP := drawTextInBox(zoomu, OSDFontName, thisFntSize, mainWidth//1.25, mainHeight//1.25, OSDtextColor, OSDbgrColor, 1, 0)
              Gdip_GetImageDimensions(infoBoxBMP, Wi, He)
              If (modus=5)
@@ -55659,7 +57713,7 @@ GdipCleanMain(modus:=0) {
              imgPath := getIDimage(currentFileIndex)
              zPlitPath(imgPath, 0, OutFileName, OutDir)
              entireString := "[ " currentFileIndex " / " maxFilesIndex " ] " OutFileName "`n" OutDir "\"
-             infoBoxBMP := drawTextInBox(entireString, OSDFontName, OSDfntSize, mainWidth//1.25, mainHeight//1.25, OSDtextColor, OSDbgrColor, 1, 0)
+             infoBoxBMP := drawTextInBox(entireString, OSDFontName, OSDfontSize, mainWidth//1.25, mainHeight//1.25, OSDtextColor, OSDbgrColor, 1, 0)
              trGdip_DrawImage(A_ThisFunc, glPG, infoBoxBMP)
              trGdip_DisposeImage(infoBoxBMP, 1)
              oldZoomLevel := zoomLevel
@@ -55764,9 +57818,10 @@ MixARGB(color1, color2, t := 0.5, gamma := 1) {
 }
 
 initInPlaceTextOptions(Gu, boldu, italicu, NoWrap, thisTextAlign, face, theFntSize, txtColor, bgrColor, borderu) {
-    If (FontBolded=1)
+    If (OSDfontBolded=1)
        txtStyle .= " Bold"
-    If (FontItalica=1 && NoWrap=0)
+
+    If (OSDfontItalica=1 && NoWrap=0)
        txtStyle .= " Italic"
 
     If !thisTextAlign
@@ -55811,7 +57866,7 @@ QPV_listThumbnailsGridMode(forceMode, thisGu, thisHDC, thisHwnd) {
        activeSQLdb.Exec("BEGIN TRANSACTION;")
 
     borderSize := imgHUDbaseUnit//5
-    txtOptions := initInPlaceTextOptions(thisGu, FontBolded, 0, 1, 0, OSDFontName, OSDfntSize//1.25, "0xEE" OSDtextColor, "0xFF" WindowBGRcolor, borderSize)
+    txtOptions := initInPlaceTextOptions(thisGu, OSDFontBolded, 0, 1, 0, OSDFontName, OSDfontSize//1.25, "0xEE" OSDtextColor, "0xFF" WindowBGRcolor, borderSize)
     otherTxtObj := TextuToGraphics(thisGu, "initing", txtOptions, OSDFontName, "begin", 0, 0, 1)
     Loop, % maxItemsW*maxItemsH*2
     {
@@ -55829,12 +57884,15 @@ QPV_listThumbnailsGridMode(forceMode, thisGu, thisHDC, thisHwnd) {
 
         DestPosX := thumbsW*columnIndex
         DestPosY := thumbsH*rowIndex
+        zPlitPath(imgPath, 1, fileNamu, folderu)
+        If (userPrivateMode!=1)
+           sfolderu := PathCompact(folderu, "a", 1, OSDfontSize//1.25, thumbsW - borderSize)
+
         ; Gdip_FillRectangle(thisGu, pBrushWinBGR, DestPosX, DestPosY, thumbsW, thumbsH)
         If (StrLen(imgPath)>2 && (thumbsListViewMode=2 || forceMode=1))
         {
            ; no details mode
-           zPlitPath(imgPath, 1, fileNamu, folderu)
-           entireString := (userPrivateMode=1) ? "******.***`n*:\***\******\`n" : fileNamu "`n" folderu "\"
+           entireString := (userPrivateMode=1) ? "******.***`n*:\***\******\`n" : fileNamu "`n" sfolderu "\"
            If (userSearchString && markSearchMatches=1)
            {
               If coreSearchIndex(imgPath, thisSearchString, userSearchWhat)
@@ -55843,7 +57901,6 @@ QPV_listThumbnailsGridMode(forceMode, thisGu, thisHDC, thisHwnd) {
         } Else If (StrLen(imgPath)>1 && thumbsListViewMode=3)
         {
            ; file details mode
-           zPlitPath(imgPath, 1, fileNamu, folderu)
            ofileSizu := QPV_FileGetSizeTime(imgPath, "S", thisFileIndex)
            fileSizu := fileSizeFrienly(ofileSizu)
            FileDateM := QPV_FileGetSizeTime(imgPath, "M", thisFileIndex)
@@ -55851,7 +57908,7 @@ QPV_listThumbnailsGridMode(forceMode, thisGu, thisHDC, thisHwnd) {
            Try FormatTime, FileDateM, % FileDateM, dd/MM/yyyy, HH:mm
            Try FormatTime, FileDateC, % FileDateC, dd/MM/yyyy, HH:mm
            fileMsg := FileExist(imgPath) ? FileDateC " | " FileDateM " | " fileSizu : "Error gathering data..."
-           entireString := (userPrivateMode=1) ?  mgpx "******.***`n*:\***\******\`n" fileMsg : mgpx fileNamu "`n" folderu "\`n" fileMsg
+           entireString := (userPrivateMode=1) ?  mgpx "******.***`n*:\***\******\`n" fileMsg : mgpx fileNamu "`n" sfolderu "\`n" fileMsg
            If (ofileSizu<50 && !InStr(fileMsg, "error"))
            {
               Gdip_FillRectangle(thisGu, zBru, DestPosX + thumbsW - Ceil(thumbsW*0.05) - 4, DestPosY + 4, Ceil(thumbsW*0.05), thumbsH - 8)
@@ -55863,7 +57920,6 @@ QPV_listThumbnailsGridMode(forceMode, thisGu, thisHDC, thisHwnd) {
         } Else If (StrLen(imgPath)>1 && thumbsListViewMode=4)
         {
            ; image details mode
-           zPlitPath(imgPath, 1, fileNamu, folderu)
            If FileExist(imgPath)
            {
               If !resultedFilesList[thisFileIndex, 9]
@@ -55884,7 +57940,7 @@ QPV_listThumbnailsGridMode(forceMode, thisGu, thisHDC, thisHwnd) {
               fileMsg := groupDigits(Width) " x " groupDigits(Height) CountFrames mgpx fileSizu
            } Else fileMsg := "Error gathering data"
 
-           entireString := (userPrivateMode=1) ? "******.***`n*:\***\******\`n" fileMsg : fileNamu "`n" folderu "\`n" fileMsg
+           entireString := (userPrivateMode=1) ? "******.***`n*:\***\******\`n" fileMsg : fileNamu "`n" sfolderu "\`n" fileMsg
            If ((Width<2 || Height<2 || ofileSizu<50) && !InStr(fileMsg, "error"))
            {
               Gdip_FillRectangle(thisGu, zBru, DestPosX + thumbsW - Ceil(thumbsW*0.05) - 4, DestPosY + 4, Ceil(thumbsW*0.05), thumbsH - 8)
@@ -56034,7 +58090,7 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
         {
            If !FileExist(imgPath)
            {
-              infoBoxBMP2 := drawTextInBox("! " thisFileIndex, OSDFontName, OSDfntSize//1.5, thumbsW, thumbsH, OSDtextColor, OSDbgrColor, 0, 0)
+              infoBoxBMP2 := drawTextInBox("! " thisFileIndex, OSDFontName, OSDfontSize//1.5, thumbsW, thumbsH, OSDtextColor, OSDbgrColor, 0, 0)
               trGdip_DrawImage(A_ThisFunc, 2NDglPG, infoBoxBMP2, DestPosX, DestPosY)
               infoBoxBMP2 := trGdip_DisposeImage(infoBoxBMP2, 1)
            }
@@ -56073,8 +58129,12 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
               } Else fileMsg := "File access error"
 
               delim := (multilineStatusBar=1 || simpleMode>=1) ? "`n" : " | "
+              If (multilineStatusBar=1 && userPrivateMode!=1)
+                 folderu := PathCompact(folderu, "a", 1, Ceil(OSDfontSize*0.9), mainWidth - OSDfontSize//2)
+
               namu := (userPrivateMode=1) ? "******.***" delim "*:\***\******\" : fileNamu delim folderu "\"
-              theMsg := groupDigits(currentFileIndex) " / " groupDigits(maxFilesIndex) " | " fileMsg  " | " namu
+              fileIndexu := (multilineStatusBar=1) ? groupDigits(currentFileIndex) " / " groupDigits(maxFilesIndex) : groupDigits(currentFileIndex) 
+              theMsg := fileIndexu " | " fileMsg  " | " namu
            }
         }
 
@@ -56151,7 +58211,7 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
        hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
        tlbrBonusX := (hasTrans=1 && (ToolbarWinH - 3 > mainHeight - ThumbsStatusBarH)) ? ToolbarWinW + 5 : 0
        tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
-       infoBoxBMP := drawTextInBox(theMsg, OSDFontName, Round(OSDfntSize*0.9), mainWidth, mainHeight//3, OSDtextColor, bgrTXT, 1)
+       infoBoxBMP := drawTextInBox(theMsg, OSDFontName, Round(OSDfontSize*0.9), mainWidth, mainHeight//3, OSDtextColor, bgrTXT, 1)
        Gdip_GetImageDimensions(infoBoxBMP, ThumbsStatusBarW, ThumbsStatusBarH)
        statusPosX := -1 + tlbrBonusX
        ThumbsStatusBarW := clampInRange(ThumbsStatusBarW, 1, mainWidth - imgHUDbaseUnit//3.3)
@@ -56166,7 +58226,7 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
           {
              If coreSearchIndex(getIDimage(currentFileIndex), thisSearchString, userSearchWhat)
              {
-                Gdip_FillRectangle(2NDglPG, pBrushD, statusPosX, mainHeight - ThumbsStatusBarH, OSDfntSize//2.5+1, ThumbsStatusBarH)
+                Gdip_FillRectangle(2NDglPG, pBrushD, statusPosX, mainHeight - ThumbsStatusBarH, OSDfontSize//2.5+1, ThumbsStatusBarH)
                 theMSG2 .= " | Matched search: " thisSearchString 
              }
           }
@@ -58863,7 +60923,8 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
   performSQLgetTable(), dbSortingCached(), SortFilesList() and others.
 */
 
-  friendly := (userPrivateMode=1) ? "*:\********\****" : strDir
+  OutDir := PathCompact(Trim(StrReplace(strDir, "*"), "\"), "a", 1, OSDfontSize)
+  friendly := (userPrivateMode=1) ? "*:\********\****" : OutDir
   showTOOLtip("Loading files from`n" friendly "`n", 0, 0, progressInfo)
   If InStr(strDir, "|")
   {
@@ -59511,12 +61572,12 @@ drawViewportHelpMap() {
 
        Gdip_FillRectangle(2NDglPG, BrushAa, thisX, thisY, thisW, thisH)
        Gdip_DrawRectangle(2NDglPG, Penuha, thisX, thisY, thisW, thisH)
-       thisFntSize := "Bold Center vCenter cFFeeEEee s" Round(OSDfntSize*0.77)
+       thisFntSize := "Bold Center vCenter cFFeeEEee s" Round(OSDfontSize*0.77)
        thisStylu := " x" thisX " y" thisY
        ERR := Gdip_TextToGraphics(2NDglPG, "Image selected area", thisFntSize thisStylu , "Arial", thisW, thisH)
-       thisFntSize := "Bold cFFeeEEee s" Round(OSDfntSize*0.77)
-       thisStylu := " x" OSDfntSize*2 " y" OSDfntSize*2
-       ERR := Gdip_TextToGraphics(2NDglPG, "Current selection type: " DefineVPselAreaMode() ".`n `nDouble click on it to open a menu.`n `nDouble click outside to drop the selection.`n `nHold Space and click to pan image.`n `nCtrl + Wheel Up/Down to zoom in/out anywhere.", thisFntSize thisStylu , "Arial", mainWidth - OSDfntSize*2, mainHeight - OSDfntSize*2)
+       thisFntSize := "Bold cFFeeEEee s" Round(OSDfontSize*0.77)
+       thisStylu := " x" OSDfontSize*2 " y" OSDfontSize*2
+       ERR := Gdip_TextToGraphics(2NDglPG, "Current selection type: " DefineVPselAreaMode() ".`n `nDouble click on it to open a menu.`n `nDouble click outside to drop the selection.`n `nHold Space and click to pan image.`n `nCtrl + Wheel Up/Down to zoom in/out anywhere.", thisFntSize thisStylu , "Arial", mainWidth - OSDfontSize*2, mainHeight - OSDfontSize*2)
        Gdip_DeletePen(Penuha)
        Gdip_DeleteBrush(BrushAa)
        Gdip_DeleteBrush(BrushBb)
@@ -59545,11 +61606,11 @@ drawViewportHelpMap() {
        Gdip_DeleteBrush(BrushAa)
        Gdip_DeleteBrush(BrushBb)
 
-       thisFntSize := "Bold Center vCenter cFFeeEEee s" Round(OSDfntSize*0.77)
+       thisFntSize := "Bold Center vCenter cFFeeEEee s" Round(OSDfontSize*0.77)
        thisStylu := " x" thisX " y" thisY
        ERR := Gdip_TextToGraphics(2NDglPG, "Image panning area.`n`nDouble click in this area to change how the image is adapted to the viewport.`n`nShift + Left-click to create a new selection area.`n`nOne-finger swipe gestures allowed when nothing to pan - outside this rectangle they are always allowed.`n`nCtrl + Wheel Up/Down to zoom in/out anywhere", thisFntSize thisStylu , "Arial", thisW, thisH)
 
-       thisFntSize := "Bold Center vCenter cFFeeEEee s" Round(OSDfntSize*0.9)
+       thisFntSize := "Bold Center vCenter cFFeeEEee s" Round(OSDfontSize*0.9)
        thisStylu := " x" thisX " y1"
        ERR := Gdip_TextToGraphics(2NDglPG, "Zoom in", thisFntSize thisStylu, "Arial", thisW, thisY)
        thisStylu := " x" thisX " y" thisY + thisH
@@ -59725,11 +61786,11 @@ HelpWindow(dummy:=0) {
     FileRead, cmdHelp, % mainCompiledPath "\resources\qpv-change-log.txt"
     ; cmdHelp := SubStr(cmdHelp, 1, 65200)
     Gui, Add, Edit, x+15 y+15 w%lstWid% r%rz% ReadOnly vtxtLine1, a ; %cmdHelp%
-    GuiControl, SettingsGUIA:, txtLine1, % cmdHelp
+    GuiControl, SettingsGUIA:, txtLine1, % StrReplace(cmdHelp, "Â")
 
     Gui, Tab, 5
     FileRead, cmdHelp, % mainCompiledPath "\resources\features-list.txt"
-    Gui, Add, Edit, x+15 y+15 w%lstWid% r%rz% ReadOnly, %cmdHelp%
+    Gui, Add, Edit, x+15 y+15 w%lstWid% r%rz% ReadOnly, % StrReplace(cmdHelp, "Â")
 
     Gui, Tab
     Gui, Add, Button, xs+15 y+8 h%thisBtnHeight% w%btnWid% gBtnAboutWin, &About
@@ -59822,10 +61883,11 @@ PanelsCheckFileExists() {
       Return 0
 
    imgPath := getIDimage(currentFileIndex)
-   zPlitPath(imgPath, 0, fileNamu, folderu)
+   zPlitPath(imgPath, 0, fileNamu, OutDir)
    If !FileRexists(imgPath)
    {
-      showTOOLtip("ERROR: File not found or access denied`n" fileNamu "`n" folderu "\")
+      OutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
+      showTOOLtip("ERROR: File not found or access denied`n" fileNamu "`n" OutDir "\")
       SoundBeep, 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return 0
@@ -60017,7 +62079,7 @@ PanelFindDupes(dummy:=0) {
     Gui, Add, Text, x+15 y+15 Section, Filter the results and data collection with a given string:
     Gui, Add, Edit, xp+15 y+7 wp-30 -multi limit12345 gUIeditsGenericAllowCtrlBksp vdupesStringFilter, % dupesStringFilter
     Gui, Add, Button, x+1 hp w35 gUIstringEditFilterErase hwndhBtnFilterRem, &X
-    AddTooltip2Ctrl(hBtnFilterRem, "Remove list filter")
+    AddTooltip2Ctrl(hBtnFilterRem, "Remove list filter",, uiUseDarkMode)
 
     Gui, Add, DropDownList, xs+15 y+7 w%btnWid% gupdateUIFiltersPanel AltSubmit Choose%userFilterStringPos% vuserFilterStringPos, Anywhere|Begins with|Ends with
     Gui, Add, DropDownList, x+2 w%btnWid% gupdateUIFiltersPanel AltSubmit Choose%userFilterWhat% vuserFilterWhat, Full path|Folder path|File name
@@ -61091,10 +63153,11 @@ PanelColorsAdjusterWindow() {
     Gui, Add, Button, xs-10 y+15 h%thisBtnHeight% w35 gBtnPrevImg, <<
     Gui, Add, Button, x+5 hp wp gBtnNextImg, >>
     Gui, Add, Button, x+5 hp wp hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]")
+    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
     ; Gui, Add, Button, x+5 hp w%btnWid% gCopyImage2clip, &Copy to clipboard
     Gui, Add, Button, x+5 hp w%btnWid% gBtnSaveIMGadjustPanel, &Save or copy
     Gui, Add, Button, x+5 hp wp-25 gBtnResetImageView, &Reset all
+    Gui, Add, Button, x+5 hp w2 gBtnCloseWindow, &Close
     ; Gui, Add, Button, x+5 hp w80 Default gBtnCloseWindow, C&lose
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Adjust viewport image view: " appTitle, winPos)
@@ -62907,7 +64970,7 @@ invokePanelStaticFoldersContextMenu() {
       kMenu("PanelStaticMenu", "Add", "Deselect all (files &list)", "dropFilesSelection")
 
    If (total!=totalSelected)
-      kMenu("PanelStaticMenu", "Add", "Select entire &table`tF11", "BTNreviewLVselAll")
+      kMenu("PanelStaticMenu", "Add", "Select entire &table`tCtrl+A", "BTNreviewLVselAll")
    kMenu("PanelStaticMenu", "Add", "&View list as a folders tree", "BTNshowStaticFoldersInTreeView")
    Menu, PanelStaticMenu, Add
    kMenu("PanelStaticMenu", "Add", "Help`tF1", "BtnHelpStaticFoldersPanel")
@@ -63011,7 +65074,7 @@ invokePanelReviewSelContextMenu() {
          kMenu("MenuRevSelFiles", "Add", "Select &none in index", "BTNreviewDropFilesSelection")
 
       If (total!=totalSelected)
-         kMenu("MenuRevSelFiles", "Add", "Select entire &table`tF11", "BTNreviewLVselAll")
+         kMenu("MenuRevSelFiles", "Add", "Select entire &table`tCtrl+A", "BTNreviewLVselAll")
 
       kMenu("MenuRevSelFiles", "Add/UnCheck", "&Filter table to selected path", "BTNreviewFilterLVSelPath")
       If (InStr(folderPath, editu) && OutputVar=1 && editu)
@@ -63049,6 +65112,323 @@ UIlvFilterEraseStaticPanel() {
    SetTimer, UIfilterListViewStaticFolderzList, -50
 }
 
+PanelKeywordsDetector() {
+    Global LViewOthers, listViewFilteru
+
+    thisBtnHeight := createSettingsGUI(71, A_ThisFunc)
+    btnWid := 115
+    txtWid := 360
+    lstWid := 545
+    If (PrefsLargeFonts=1)
+    {
+       lstWid := lstWid + 255
+       btnWid := btnWid + 95
+       txtWid := txtWid + 105
+       Gui, Font, s%LargeUIfontValue%
+    }
+
+    totals := newStaticFoldersListCache.Count()
+    btnWid2 := (PrefsLargeFonts=1) ? 160 : 95
+    btnWid3 := (PrefsLargeFonts=1) ? btnWid + 40 : btnWid + 30
+    btnWid4 := (PrefsLargeFonts=1) ? 70 : 60
+    sml := (PrefsLargeFonts=1) ? 120 : 90
+    CountFilesFolderzList := 0
+    Gui, Add, Text, x15 y15, This panel can help identify most used keywords in the indexed files list.
+    Gui, Add, ListView, +LV0x10000 +LV0x400 r%uLVr% Grid xp y+10 w%lstWid% AltSubmit +multi gLVkeywordResponder vLViewOthers +hwndhLVmainu, Keywords|Files|`%|#
+    Gui, Add, Edit, xs y+10 wp -multi -wantTab +hwndhEditField vkeywrdLVfilter, % keywrdLVfilter
+
+    sml := (PrefsLargeFonts=1) ? 70 : 55
+    Gui, Add, Text, xs y+7 hp +0x200, Min. length:
+    Gui, Add, Edit, x+5 w%sml% number -multi limit2 veditF5, % minKeywordLength
+    Gui, Add, UpDown, vminKeywordLength Range3-25, % minKeywordLength
+
+    Gui, Add, Text, x+10 hp +0x200, Min. files:
+    Gui, Add, Edit, x+5 w%sml% number -multi limit3 veditF6, % thresholdKeywords
+    Gui, Add, UpDown, vthresholdKeywords Range2-987, % thresholdKeywords
+    Gui, Add, Checkbox, x+10 hp Checked%LangKeywordsFilter% vLangKeywordsFilter, Dictionary filter (English)
+    Gui, Add, Button, x+1 hp w%sml% Default gUIfilterListKeywords, &Apply
+    Gui, Add, Button, x+1 hp w35 gUIremKeywordsFilter hwndhBtnFilterRem, &X
+    AddTooltip2Ctrl(hBtnFilterRem, "Remove the filters [Alt+X]",, uiUseDarkMode)
+
+    Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% gBtnUiKeywordsLister w%btnWid2% , &Generate list
+    Gui, Add, Button, x+5 hp w80 gBtnCloseWindow, &Close
+    Gui, Add, Text, x+7 hp +0x200 vtxtLine1, Keywords omitted: 987 129 millions gazillions
+
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Keywords list: " appTitle)
+    PopulateKeywordsListPanel(keywrdLVfilter)
+}
+
+LVkeywordResponder(a,b,c) {
+   If (b="RightClick")
+   {
+      Gui, SettingsGUIA: Default
+      Gui, SettingsGUIA: ListView, LViewOthers
+      If (LV_GetCount("S")>1 || c="enter")
+         filterListByKeywords()
+      Else
+         invokePrefsPanelsContextMenu()
+   } Else If (b="DoubleClick")
+      filterListByKeywords()
+}
+
+filterListByKeywords() {
+   Gui, SettingsGUIA: Default
+   Gui, SettingsGUIA: ListView, LViewOthers
+   RowNumber := LV_GetNext(0, "F")
+   LV_GetText(keyword, RowNumber, 1)
+   ; ToolTip, % folderu "=" colNum "=" RowNumber "=" whichLV , , , 2
+   If StrLen(keyword)<3
+      Return
+
+   setImageLoading()
+   listu := ""
+   RowNumber := 0
+   total := LV_GetCount()
+   Loop, % total
+   {
+       RowNumber := LV_GetNext(RowNumber)
+       If !RowNumber
+          Break
+
+       LV_GetText(keyword, RowNumber, 1)
+       If !keyword
+          Continue
+
+       listu .= StrReplace(Trim(keyword), A_Space, "|") "|"
+   }
+
+   listu := StrReplace(Trim(listu, "|"), "||", "|")
+   If !listu
+      Return
+
+   BtnCloseWindow()
+   userFilterStringPos := userFilterWhat := 1
+   UsrEditFilter := listu
+   userFilterProperty := userFilterDoString := 1
+   userFilterInvertThis := userFilterStringIsNot := 0
+   thisFilter := updateUIFiltersPanel("external")
+   coreEnableFiltru(thisFilter)
+   dummyTimerDelayiedImageDisplay(50)
+   ; ToolTip, % listu  , , , 2
+}
+
+UIremKeywordsFilter() {
+   Gui, SettingsGUIA: Default
+   keywrdLVfilter := ""
+   minKeywordLength := 3
+   thresholdKeywords := 2
+   LangKeywordsFilter := 0
+   GuiControl, SettingsGUIA:, keywrdLVfilter,  % keywrdLVfilter
+   GuiControl, SettingsGUIA:, thresholdKeywords,  % thresholdKeywords
+   GuiControl, SettingsGUIA:, minKeywordLength,  % minKeywordLength
+   GuiControl, SettingsGUIA:, LangKeywordsFilter,  % LangKeywordsFilter
+   PopulateKeywordsListPanel(0)
+}
+
+UIfilterListKeywords() {
+   If (AnyWindowOpen!=71)
+      Return
+
+   Gui, SettingsGUIA: Default
+   GuiControlGet, keywrdLVfilter
+   If (imageLoading=1)
+      Return
+
+   PopulateKeywordsListPanel(keywrdLVfilter)
+}
+
+BtnUiKeywordsLister() {
+   EM_SETCUEBANNER(hEditField, "Generating keywords list - please wait", 0)
+   GenerateKeywordsListNow()
+   PopulateKeywordsListPanel()
+}
+
+
+PopulateKeywordsListPanel(listFilter:=0) {
+  Static dictionary := [], prevLang := 0
+
+  Gui, SettingsGUIA: Default
+  Gui, SettingsGUIA: ListView, LViewOthers
+  GuiControlGet, thresholdKeywords
+  GuiControlGet, minKeywordLength
+  GuiControlGet, LangKeywordsFilter
+  GuiControl, -Redraw, LViewOthers
+  setImageLoading()
+  showTOOLtip("Preparing the dictionary, please wait")
+  If (LangKeywordsFilter=1 && prevLang!=LangKeywordsFilter)
+  {
+     ; i intended to add more languages/dictionaries
+     dictionary := new hashtable()
+     prevLang := LangKeywordsFilter
+     FileRead, dictum, % mainCompiledPath "\resources\dict-eng.txt"
+     Loop, Parse, dictum, `n,`r
+     {
+        If A_LoopField
+           dictionary[A_LoopField] := 1
+     }
+  }
+
+  showTOOLtip("Populating the list view, please wait")
+  EM_SETCUEBANNER(hEditField, "Preparing keywords list - please wait", 0)
+  LV_Delete()
+  LV_ModifyCol(2, "Integer")
+  LV_ModifyCol(3, "Integer")
+  LV_ModifyCol(4, "Integer")
+
+  thisString := StrReplace(Trimmer(listFilter), "||", "|")
+  thisString := Trimmer(thisString, "|")
+  thisFilter := "i)(" JEE_StrRegExLiteral(thisString) ")"
+  isStrFilter := StrLen(thisString)>1 ? 1 : 0
+  FilterSimple := (InStr(thisString, "|") || InStr(thisString, "*") || InStr(thisString, "?")) ? 0 : 1
+  rowsCounter := counter := skippedFiles := wordSkipped := 0
+  maxu := StrLen(filesFilter)>1 ? bckpMaxFilesIndex : maxFilesIndex
+  newArrayu := []
+  doStartLongOpDance()
+  startOperation := A_TickCount
+  prevMSGdisplay := A_TickCount
+  thisMaxCount := keywordsListArray.Count()
+  For Key, Value in keywordsListArray
+  {
+     executingCanceableOperation := A_TickCount
+     If (determineTerminateOperation()=1)
+     {
+        abandonAll := 1
+        Break
+     }
+ 
+     If (A_TickCount - prevMSGdisplay>1000)
+     {
+        etaTime := ETAinfos(A_Index, thisMaxCount, startOperation)
+        showTOOLtip("Filtering the keywords list, please wait" etaTime, 0, 0, A_Index/thisMaxCount)
+        prevMSGdisplay := A_TickCount
+     }
+ 
+     If (Value>=thresholdKeywords && !isInRange(Value, maxFilesIndex - 1, maxFilesIndex) && StrLen(Key)>=minKeywordLength)
+     {
+        If (isStrFilter=1 && FilterSimple=1)
+        {
+           If !inStr(Key, thisString)
+           {
+              wordSkipped++
+              skippedFiles += Value
+              Continue
+           }
+        } Else If (isStrFilter=1)
+        {
+           If !RegExMatch(Key, thisFilter)
+           {
+              wordSkipped++
+              skippedFiles += Value
+              Continue
+           }
+        }
+
+        If (LangKeywordsFilter=1)
+        {
+           doXtra := StrLen(key)
+           If !dictionary[Key]
+           {
+              If (doXtra>4)
+              {
+                 isOkay := 1
+                 a := SubStr(key, 1, doXtra - 1)
+                 b := SubStr(key, 2, doXtra - 1)
+                 c := SubStr(key, 2)
+                 If (!dictionary[a] && !dictionary[b] && !dictionary[c])
+                    isOkay := 0
+
+                 If (doXtra>7 && isOkay=1)
+                 {
+                    a := SubStr(key, doXtra//2)
+                    b := SubStr(key, 1, doXtra//2)
+                    If (!dictionary[a] && !dictionary[b])
+                       isOkay := 0
+                 } Else isOkay := 0
+              } Else isOkay := 0
+
+              If !isOkay
+              {
+                 wordSkipped++
+                 skippedFiles += Value
+                 Continue
+              }
+           }
+        }
+
+        counter++
+        thisKey := (userPrivateMode=1) ? "*****" : Key
+        perc := Value ? Round((Round(Value)/maxu)*100, 1) : 0
+        If (!newArrayu[Value, 1] || newArrayu[Value, 3]>5 || mergeKeywordRows!=1)
+        {
+           rowsCounter++
+           newArrayu[Value] := [rowsCounter, thisKey, 1]
+           LV_Add(A_Index, thisKey, Value, perc, A_Index)
+        } Else
+        {
+           newArrayu[Value, 2] := newArrayu[Value, 2] A_Space thisKey
+           newArrayu[Value, 3] := newArrayu[Value, 3] + 1
+           LV_Modify(newArrayu[Value, 1], "Col1", newArrayu[Value, 2])
+        }
+     } Else
+     {
+        wordSkipped++
+        skippedFiles += Value
+     }
+  }
+
+  Loop, 4
+      LV_ModifyCol(A_Index, "AutoHdr Left")
+
+  fperc := Round((skippedFiles/maxu)*100, 1)
+  wperc := Round((wordSkipped/keywordsListArray.Count())*100, 1)
+  GuiControl, SettingsGUIA:, txtLine1, % "Keywords omitted: " groupDigits(wordSkipped) " ( " wperc "% )"
+  LV_ModifyCol(2, "SortDesc")
+  EM_SETCUEBANNER(hEditField, groupDigits(counter) " keywords are listed", 0)
+  GuiControl, +Redraw, LViewOthers
+  ResetImgLoadStatus()
+  RemoveTooltip()
+}
+
+GenerateKeywordsListNow() {
+   ; keywordsListArray := ""
+   keywordsListArray := new hashtable()
+   prevMSGdisplay := A_TickCount
+   startOperation := A_TickCount
+   Loop, % maxFilesIndex + 1
+   {
+        thisIndexu := A_Index
+        imgPath := resultedFilesList[A_Index, 1]
+        If (InStr(imgPath, "||") || !imgPath)
+           Continue
+
+        changeMcursor()
+        OutDir := Format("{:L}", SubStr(imgPath, 1, InStr(imgPath, ".", 0, -1) - 1))
+        OutDir := RegExReplace(OutDir, "[[:digit:]]", A_Space)
+        OutDir := RegExReplace(OutDir, "[[:punct:]]", A_Space)
+        OutDir := RegExReplace(OutDir, "[[:blank:]]", A_Space)
+        OutDir := StrReplace(OutDir, "  ", A_Space)
+        thisArray := StrSplit(OutDir, A_Space)
+        Loop, % thisArray.Count()
+        {
+           thisu := thisArray[A_Index]
+           If (StrLen(thisu)<3)
+              Continue
+
+           keywordsListArray[thisu] := Round(keywordsListArray[thisu]) + 1
+        }
+
+        If (A_TickCount - prevMSGdisplay>1500)
+        {
+           etaTime := ETAinfos(A_Index, maxFilesIndex, startOperation)
+           showTOOLtip("Generating folders list based on the indexed files" etaTime, 0, 0, A_Index/maxFilesIndex)
+           prevMSGdisplay := A_TickCount
+        }
+   }
+
+   ResetImgLoadStatus()
+   RemoveTooltip()
+}
+
 PanelStaticFolderzManager() {
     Global LViewOthers, listViewFilteru
     If askAboutFileSave(" if any action will be performed in the invoked panel")
@@ -63080,7 +65460,7 @@ PanelStaticFolderzManager() {
     sml := (PrefsLargeFonts=1) ? 90 : 60
     Gui, Add, Button, x+1 hp w%sml% gUIeditApplyStaticFolderFilter Default, &Apply
     Gui, Add, Button, x+1 hp w35 gUIlvFilterEraseStaticPanel hwndhBtnFilterRem, &X
-    AddTooltip2Ctrl(hBtnFilterRem, "Remove list filter [Alt+X]")
+    AddTooltip2Ctrl(hBtnFilterRem, "Remove list filter [Alt+X]",, uiUseDarkMode)
     Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w%btnWid2% gBTNupdateSelectedStaticFolder, &Rescan folder(s)
 
     If isUpdateList
@@ -63131,7 +65511,7 @@ PanelReviewSelectedFiles() {
     Gui, Add, Edit, xs y+10 w%edithu% -multi gUIeditsGenericAllowCtrlBksp +hwndhEditField vlistViewReviewFilteru, % listViewReviewFilteru
     Gui, Add, Button, x+1 hp w%btnWid% gUIeditApplyFilterReviewPanel Default, &Apply
     Gui, Add, Button, x+1 hp w35 gUIstringEditFilterErase hwndhBtnFilterRem, &X
-    AddTooltip2Ctrl(hBtnFilterRem, "Remove list filter [Alt+X]")
+    AddTooltip2Ctrl(hBtnFilterRem, "Remove list filter [Alt+X]",, uiUseDarkMode)
 
     Gui, Add, Button, xs+0 y+15 h%thisBtnHeight% w%btnWid% gBTNreviewApplySelection, &Select
     Gui, Add, Button, x+5 hp wp gBTNreviewRemSelection , &Deselect
@@ -63151,6 +65531,7 @@ PanelReviewSelectedFiles() {
            reviewSelectedIndexes[thisCounter] := [A_Index, 0]
         }
     }
+
     PopulateReviewSelectedFiles("init")
 }
 
@@ -63545,10 +65926,6 @@ BTNreviewPaneLV(a:=0, b:=0, c:=0) {
    } Else If (b="K" && c=117) ; F6
    {
       BtnReviewPaneOpenActs()
-      Return
-   } Else If (b="K" && c=122) ; F11
-   {
-      BTNreviewLVselAll()
       Return
    } Else If (b!="DoubleClick")
       Return
@@ -64537,12 +66914,9 @@ uiLVfolderzFilterListBTN(a:=0, b:=0, c:=0) {
     {
        BTNcountFilesDiskDynaFolder()
        Return
-    } Else If (b="k" && c=122 && ) ; F11
+    } Else If (b="k" && c=122 && whichLV="LViewDynas") ; F11
     {
-       If (whichLV="LViewOthers")
-          BTNreviewLVselAll()
-       Else
-          BTNcountFilesDynaFolders()
+       BTNcountFilesDynaFolders()
        Return
     } Else If (b="K" && (c=119 || c=46)) ; F8
     {
@@ -65075,12 +67449,11 @@ SearchAndReplaceThroughIndex(what, replacer, silentus:=0, folderMode:=0) {
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
     changeMcursor()
-    selectedFiles := markedSelectFile := 0
-    If StrLen(filesFilter)>1
+    getSelectedFiles(0, 1)
+    If (StrLen(filesFilter)>1 && SLDtypeLoaded=3)
        remFilesListFilter("simple")
 
-    newArrayu := []
-    totalAffected := 0
+    selectedFiles := totalAffected := 0
     If (SLDtypeLoaded=3)
     {
        whatESC := SQLescapeStr(what)
@@ -65135,27 +67508,27 @@ SearchAndReplaceThroughIndex(what, replacer, silentus:=0, folderMode:=0) {
     {
        Loop, % maxFilesIndex + 1
        {
-           r := getIDimage(A_Index)
-           If (InStr(r, "||") || !r)
+           imgPath := getIDimage(A_Index)
+           If !imgPath
               Continue
 
-           countFiles++
-           newArrayu[countFiles] := resultedFilesList[A_Index]
-           newArrayu[countFiles, 1] := StrReplace(newArrayu[countFiles, 1], what, replacer, affected)
+           If (!resultedFilesList[A_Index, 2] && limitSearchReplaceSelected=1 && SLDtypeLoaded!=3)
+              Continue
+
+           value := StrReplace(imgPath, what, replacer, affected)
+           resultedFilesList[A_Index, 1] := value
+           If StrLen(filesFilter)>1
+              updateMainUnfilteredList(A_Index, 1, value)
+
            totalAffected += affected
            If (resultedFilesList[A_Index, 2]=1)
               selectedFiles++
        }
     }
 
-    ;  E:\Trash-100\meta\poze\soft\_older-selection\001 (6).jpg
     currentFilesListModified := 1
-    renewCurrentFilesList()
-    maxFilesIndex := countFiles
-    resultedFilesList := newArrayu.Clone()
     markedSelectFile := selectedFiles
     ForceRefreshNowThumbsList()
-    currentFileIndex := clampInRange(oldIndex, 1, maxFilesIndex)
     dummyTimerDelayiedImageDisplay(50)
     If (SLDtypeLoaded=3)
        getMaxRowIDsqlDB()
@@ -65641,6 +68014,7 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
     If (uiUseDarkMode=1)
        CtlColors.Free()
 
+    BalloonTip_Kill()
     endCaptureCloneBrush()
     fnOutputDebug("Close window: " prevOpenedWindow[1] "---" prevOpenedWindow[2])
     If (isNowFakeWinOpen=1 && AnyWindowOpen)
@@ -65820,7 +68194,7 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
     knobSize := imgHUDbaseUnit//3.5
     posXu := uBrushA ? knobSize : 0
     GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
-    BoxBMP := drawTextInBox(msg, OSDFontName, OSDfntSize, mainWidth, mainHeight, OSDtextColor, OSDbgrColor, 0)
+    BoxBMP := drawTextInBox(msg, OSDFontName, OSDfontSize, mainWidth, mainHeight, OSDtextColor, OSDbgrColor, 0)
     If !BoxBMP
     {
        Gdip_DeleteBrush(uBrushA)
@@ -65828,13 +68202,28 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
     }
 
     hasTrans := adjustCanvas2Toolbar(2NDglPG, 1)
+    tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
+    tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
     posYu := perc ? knobSize//2 : 0
     Gdip_GetImageDimensions(BoxBMP, imgW, imgH)
+    If (showInfoBoxHUD>0 && FlipImgH=0 && FlipImgV=0)
+    {
+       thisBrush := Gdip_BrushCreateSolid("0x20" OSDbgrColor)
+       unitu := lastInfoBoxBMP[1,2] //5
+       Loop, 4
+          Gdip_FillRectangle(2NDglPG, thisBrush, 0, knobSize, lastInfoBoxBMP[1,1], unitu)
+       Loop, 3
+          Gdip_FillRectangle(2NDglPG, thisBrush, 0, knobSize + unitu, lastInfoBoxBMP[1,1], unitu)
+       Loop, 2
+          Gdip_FillRectangle(2NDglPG, thisBrush, 0, knobSize + unitu *2, lastInfoBoxBMP[1,1], unitu)
+
+       Gdip_FillRectangle(2NDglPG, thisBrush, 0, knobSize + unitu *3, lastInfoBoxBMP[1,1], unitu)
+       Gdip_DeleteBrush(thisBrush)
+    }
+
     If (hudBTNfuncu && hudBTNtypeFuncu=2)
        Gdip_FillRectangle(2NDglPG, pBrushF, imgW, 0, mainWidth - imgW, imgHUDbaseUnit*1.12)
 
-    tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
-    tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
     Gdip_DrawImage(2NDglPG, BoxBMP, posXu, posYu, imgW, imgH)
     hudBTNheightFuncu := imgH + posYu + tlbrBonusY
     hudBTNwidthFuncu := imgW + posXu + tlbrBonusX
@@ -68330,9 +70719,12 @@ adjustWheelNumbersEditFields(wParam, lParam) {
    GuiControlGet, value,, %A_GuiControl%
    if value is not number
       return
-   
+
+   result := (wParam >> 16)     ; return the HIWORD -  high-order word 
+   stepping := Round(Abs(result) / 120)
+   direction := (result<0) ? -1 : 1
    mult := ((wParam & 0xffff=4) ? 5 : (wParam & 0xffff=8) ? 10 : 1)
-   value += ((StrLen(wParam)>7) ? -amt*mult : amt*mult)
+   value += direction*amt*mult
    GuiControl,, %A_GuiControl%, % RegExReplace(value, "(\.[1-9]+)0+$", "$1")
 }
 
@@ -69174,30 +71566,6 @@ gdipObjectsStats(killAll:=0, filteru:=0) {
       msgbox, % totalBMPs " // " UnremovedBMPs
 }
 
-testMemCrash() {
-   Global sillyArray := []
-   imgPath := "E:\Sucan twins\photos test\SLDs\really-all-images-cached-mega-test.sld"
-   SoundBeep 
-   FileRead, OutputVar, % imgPath
-   Loop, Parse, OutputVar, `n,`r
-   {
-      If A_LoopField
-      {
-         loopsOccured++
-         ; If (loopsOccured<510100)
-            sillyArray[A_Index] := [A_LoopField, "z" A_LoopField] ; "|=|" A_LoopField "||" SubStr(A_LoopField, 4) A_LoopField "==" SubStr(A_LoopField, 4) "|=|" A_LoopField "||" SubStr(A_LoopField, 4)
-         ; Else If (loopsOccured<990100)
-         ;    sillyArrayC[A_Index] := A_LoopField "==" SubStr(A_LoopField, 4) "|=|" A_LoopField "||" SubStr(A_LoopField, 4) A_LoopField "==" SubStr(A_LoopField, 4) "|=|" A_LoopField "||" SubStr(A_LoopField, 4)
-         ; Else
-         ;    sillyArrayB[A_Index] := A_LoopField "==" SubStr(A_LoopField, 4) "|=|" A_LoopField "||" SubStr(A_LoopField, 4) A_LoopField "==" SubStr(A_LoopField, 4) "|=|" A_LoopField "||" SubStr(A_LoopField, 4)
-         ; sillyArray[A_loopField] := A_LoopField "-" SubStr(A_LoopField, 4) "=====" A_LoopField "|||" SubStr(A_LoopField, 4)
-         ; sillyArray[A_Index] := A_LoopField "-" SubStr(A_LoopField, 2) "==" A_LoopField "|" SubStr(A_LoopField, 2)
-      }
-   }
-   ToolTip, % loopsOccured , , , 2
-   SoundBeep 
-}
-
 giveWarningX64() {
    SoundBeep, 300, 100
    msgResult := msgBoxWrapper(appTitle ": WARNING", "You are currently running a 64-bits operating system, but you are executing " appTitle " developed for 32-bits operating systems. Please exit and run the 64-bits edition of QPV, for an optimal experience. The 32-bits edition is severely limited and prone to crash at any moment.`n`nThank you for your inevitable cooperation.", "&Yes|&Exit|&Ask later|Continue...", 1, "error")
@@ -69218,597 +71586,6 @@ giveWarningX64() {
    Else
       exitAppu()
 }
-
-/*
-
-testWicArkive() {
-
-
-
-   ; AHK v1
-
-   wic_IDs.Initialize()
-   file_name := getIDimage(currentFileIndex)
-   ; file_name := "C:\Users\Jeb8\Desktop\external-content.duckduckgo.com.gif"
-
-   factory := IWICImagingFactory.New()
-
-   dbg("test.ptr: " factory.ptr " / type: " factory.__Class)
-
-   decoder := factory.CreateDecoderFromFilename(file_name)
-
-   count := decoder.GetFrameCount()
-
-   dbg( "frame_count: " count)
-
-   frame := decoder.GetFrame(0)
-
-   dbg("GetFrame() done : LA : " frame.LastError)
-
-   dbg("frame info: name: " frame.__Class " / ptr: " frame.ptr)
-
-   dims := frame.GetSize()
-
-   dbg("dims: " dims.w " / " dims.h)
-
-   dpi := frame.GetResolution()
-
-   dbg("dpi: " dpi.x " / " dpi.y)
-
-   pixFormat := frame.GetPixelFormat()
-   dbg("GUID str: " pixFormat " lastErr " frame.lasterror)
-
-   converter := factory.CreateFormatConverter()
-   dbg("converter ptr/type: " converter.ptr " / " converter.__Class)
-
-   r1 := converter.CanConvert(pixFormat, "GUID_WICPixelFormat32bppPBGRA")
-   dbg("CanConvert() : " r1)
-   ; [4780] AHK: GUID str: GUID_WICPixelFormat24bppBGR
-
-   r2 := converter.Initialize(frame, "GUID_WICPixelFormat32bppPBGRA")
-   dbg("convert result: " r2)
-
-; robo code begins here
-
-   pBitmap := Gdip_CreateBitmap(dims.w, dims.h)
-   E1 := Gdip_LockBits(pBitmap, 0, 0, dims.w, dims.h, stride, iScan, iData)
-
-
-   dbg("gdip bitmap created and locked, copy pixels now")
-   ; buf := BufferAlloc(dims.w * dims.h * 4) ; 32-bit, 4 bytes per pixel?
-   r3 := frame.CopyPixels(0, stride, stride* dims.h, iData) ; prc, cbStride, cbBufferSize, pbBuffer
-   dbg("CopyPixels(): LE: " frame.LastError " / r3: " r3)
-   Gdip_UnlockBits(pBitmap, iData)
-
-   trGdip_GraphicsClear(A_ThisFunc, 2NDglPG, "0x00" WindowBGRcolor)
-   Gdip_DrawImage(pBitmap, 30, 30)
-   r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectWin, 2NDglHDC)
-
-   Gdip_DisposeImage(pBitmap, 1)
-
-}
-
-; ===========================================================================
-; Windows Imaging Component Library
-; ===========================================================================
-
-BufferAlloc(bSize, FillByte:="") { ; AHK v1 wrapper
-    If !FillByte
-        VarSetCapacity(DummyVar,bSize)
-    Else VarSetCapacity(DummyVar,bSize,FillByte)
-    return {ptr:&DummyVar, size:bSize, value:DummyVar}
-}
-
-dbg(in_str) {
-    ; OutputDebug "AHK: " in_str  ; AHK v2
-    OutputDebug qpv: %in_str%   ; AHK v1
-}
-
-class wic_IDs {
-    ; Access really_long_name by:  wic_IDs.really_long_name (ahk v1 and v2)
-    ; Leave this Static alone for AHK v1!
-    Static PixelFormats := Object("{6FDDC324-4E03-4BFE-B185-3D77768DC900}","GUID_WICPixelFormatDontCare" ; AHK v1 = Object() / AHK v2 = Map()
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC901}","GUID_WICPixelFormat1bppIndexed"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC902}","GUID_WICPixelFormat2bppIndexed"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC903}","GUID_WICPixelFormat4bppIndexed"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC904}","GUID_WICPixelFormat8bppIndexed"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC905}","GUID_WICPixelFormatBlackWhite"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC906}","GUID_WICPixelFormat2bppGray"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC907}","GUID_WICPixelFormat4bppGray"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC908}","GUID_WICPixelFormat8bppGray"
-                             , "{E6CD0116-EEBA-4161-AA85-27DD9FB3A895}","GUID_WICPixelFormat8bppAlpha"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC909}","GUID_WICPixelFormat16bppBGR555"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC90A}","GUID_WICPixelFormat16bppBGR565"
-                             , "{05EC7C2B-F1E6-4961-AD46-E1CC810A87D2}","GUID_WICPixelFormat16bppBGRA5551"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC90B}","GUID_WICPixelFormat16bppGray"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC90C}","GUID_WICPixelFormat24bppBGR"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC90D}","GUID_WICPixelFormat24bppRGB"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC90E}","GUID_WICPixelFormat32bppBGR"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC90F}","GUID_WICPixelFormat32bppBGRA"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC910}","GUID_WICPixelFormat32bppPBGRA"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC911}","GUID_WICPixelFormat32bppGrayFloat"
-                             , "{D98C6B95-3EFE-47D6-BB25-EB1748AB0CF1}","GUID_WICPixelFormat32bppRGB"
-                             , "{F5C7AD2D-6A8D-43DD-A7A8-A29935261AE9}","GUID_WICPixelFormat32bppRGBA"
-                             , "{3CC4A650-A527-4D37-A916-3142C7EBEDBA}","GUID_WICPixelFormat32bppPRGBA"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC915}","GUID_WICPixelFormat48bppRGB"
-                             , "{E605A384-B468-46CE-BB2E-36F180E64313}","GUID_WICPixelFormat48bppBGR"
-                             , "{A1182111-186D-4D42-BC6A-9C8303A8DFF9}","GUID_WICPixelFormat64bppRGB"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC916}","GUID_WICPixelFormat64bppRGBA"
-                             , "{1562FF7C-D352-46F9-979E-42976B792246}","GUID_WICPixelFormat64bppBGRA"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC917}","GUID_WICPixelFormat64bppPRGBA"
-                             , "{8C518E8E-A4EC-468B-AE70-C9A35A9C5530}","GUID_WICPixelFormat64bppPBGRA"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC913}","GUID_WICPixelFormat16bppGrayFixedPoint"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC914}","GUID_WICPixelFormat32bppBGR101010"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC912}","GUID_WICPixelFormat48bppRGBFixedPoint"
-                             , "{49CA140E-CAB6-493B-9DDF-60187C37532A}","GUID_WICPixelFormat48bppBGRFixedPoint"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC918}","GUID_WICPixelFormat96bppRGBFixedPoint"
-                             , "{E3FED78F-E8DB-4ACF-84C1-E97F6136B327}","GUID_WICPixelFormat96bppRGBFloat"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC919}","GUID_WICPixelFormat128bppRGBAFloat"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC91A}","GUID_WICPixelFormat128bppPRGBAFloat"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC91B}","GUID_WICPixelFormat128bppRGBFloat"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC91C}","GUID_WICPixelFormat32bppCMYK"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC91D}","GUID_WICPixelFormat64bppRGBAFixedPoint"
-                             , "{356DE33C-54D2-4A23-BB04-9B7BF9B1D42D}","GUID_WICPixelFormat64bppBGRAFixedPoint"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC940}","GUID_WICPixelFormat64bppRGBFixedPoint"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC91E}","GUID_WICPixelFormat128bppRGBAFixedPoint"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC941}","GUID_WICPixelFormat128bppRGBFixedPoint"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC93A}","GUID_WICPixelFormat64bppRGBAHalf"
-                             , "{58AD26C2-C623-4D9D-B320-387E49F8C442}","GUID_WICPixelFormat64bppPRGBAHalf"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC942}","GUID_WICPixelFormat64bppRGBHalf"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC93B}","GUID_WICPixelFormat48bppRGBHalf"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC93D}","GUID_WICPixelFormat32bppRGBE"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC93E}","GUID_WICPixelFormat16bppGrayHalf"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC93F}","GUID_WICPixelFormat32bppGrayFixedPoint"
-                             , "{25238D72-FCF9-4522-B514-5578E5AD55E0}","GUID_WICPixelFormat32bppRGBA1010102"
-                             , "{00DE6B9A-C101-434B-B502-D0165EE1122C}","GUID_WICPixelFormat32bppRGBA1010102XR"
-                             , "{604E1BB5-8A3C-4B65-B11C-BC0B8DD75B7F}","GUID_WICPixelFormat32bppR10G10B10A2"
-                             , "{9C215C5D-1ACC-4F0E-A4BC-70FB3AE8FD28}","GUID_WICPixelFormat32bppR10G10B10A2HDR10"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC91F}","GUID_WICPixelFormat64bppCMYK"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC920}","GUID_WICPixelFormat24bpp3Channels"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC921}","GUID_WICPixelFormat32bpp4Channels"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC922}","GUID_WICPixelFormat40bpp5Channels"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC923}","GUID_WICPixelFormat48bpp6Channels"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC924}","GUID_WICPixelFormat56bpp7Channels"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC925}","GUID_WICPixelFormat64bpp8Channels"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC926}","GUID_WICPixelFormat48bpp3Channels"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC927}","GUID_WICPixelFormat64bpp4Channels"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC928}","GUID_WICPixelFormat80bpp5Channels"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC929}","GUID_WICPixelFormat96bpp6Channels"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC92A}","GUID_WICPixelFormat112bpp7Channels"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC92B}","GUID_WICPixelFormat128bpp8Channels"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC92C}","GUID_WICPixelFormat40bppCMYKAlpha"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC92D}","GUID_WICPixelFormat80bppCMYKAlpha"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC92E}","GUID_WICPixelFormat32bpp3ChannelsAlpha"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC92F}","GUID_WICPixelFormat40bpp4ChannelsAlpha"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC930}","GUID_WICPixelFormat48bpp5ChannelsAlpha"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC931}","GUID_WICPixelFormat56bpp6ChannelsAlpha"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC932}","GUID_WICPixelFormat64bpp7ChannelsAlpha"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC933}","GUID_WICPixelFormat72bpp8ChannelsAlpha"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC934}","GUID_WICPixelFormat64bpp3ChannelsAlpha"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC935}","GUID_WICPixelFormat80bpp4ChannelsAlpha"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC936}","GUID_WICPixelFormat96bpp5ChannelsAlpha"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC937}","GUID_WICPixelFormat112bpp6ChannelsAlpha"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC938}","GUID_WICPixelFormat128bpp7ChannelsAlpha"
-                             , "{6FDDC324-4E03-4BFE-B185-3D77768DC939}","GUID_WICPixelFormat144bpp8ChannelsAlpha"
-                             , "{91B4DB54-2DF9-42F0-B449-2909BB3DF88E}","GUID_WICPixelFormat8bppY"
-                             , "{1339F224-6BFE-4C3E-9302-E4F3A6D0CA2A}","GUID_WICPixelFormat8bppCb"
-                             , "{B8145053-2116-49F0-8835-ED844B205C51}","GUID_WICPixelFormat8bppCr"
-                             , "{FF95BA6E-11E0-4263-BB45-01721F3460A4}","GUID_WICPixelFormat16bppCbCr"
-                             , "{A355F433-48E8-4A42-84D8-E2AA26CA80A4}","GUID_WICPixelFormat16bppYQuantizedDctCoefficients"
-                             , "{D2C4FF61-56A5-49C2-8B5C-4C1925964837}","GUID_WICPixelFormat16bppCbQuantizedDctCoefficients"
-                             , "{2FE354F0-1680-42D8-9231-E73C0565BFC1}","GUID_WICPixelFormat16bppCrQuantizedDctCoefficients")
-    
-    ; Static __Item[key] { ; AHK v1 - comment these 3 liens out for AHK v1
-        ; get => this.%key%
-    ; }
-    ; AHK v1 - remove "Static" from all methods() / properties[] for AHK v1 compatibility
-    CLSIDFromString(obj_in) { ; thanks to lexikos - from VA.ahk - modded by TheArkive
-        DllCall("ole32\CLSIDFromString", "str", obj_in, "ptr", (obj_out := BufferAlloc(16,0)).ptr)
-        return obj_out
-    }
-    StringFromGUID2(guid) { ; thanks to lexikos - from VA.ahk - modded by TheArkive
-        Static _iu := StrLen(Chr(0xFFFF)), fnc := "ole32\StringFromGUID2"
-        DllCall(fnc, "ptr", guid.ptr, "ptr", (buf := BufferAlloc(_iu?78:39)).ptr, "int", 39)
-        return StrGet(buf.ptr)
-    }
-    Initialize() { ; run this on startup -> wic_IDs.Initialize()
-        For CLSID, friendly_name in this.PixelFormats {
-            DllCall("ole32\CLSIDFromString","Str",CLSID,"Ptr",(buf := BufferAlloc(16)).ptr)
-            ; wic_IDs.%friendly_name% := {str:CLSID, value:buf, name:friendly_name, ptr:buf.ptr}   ; AHK v2
-            wic_IDs[friendly_name] := {str:CLSID, value:buf, name:friendly_name, ptr:buf.ptr}    ; AHK v1
-        }
-    }
-}
-
-; These are the basic methods that need to apply to every COM instance.
-class Com_Base_Functions {
-    ; https://docs.microsoft.com/en-us/windows/win32/wic/-wic-codec-native-pixel-formats
-    ; Color context information is defined by the IWICColorContext interface for WIC. To retrieve the color context information for an image frame, use the GetColorContext method.
-
-    ; In the absence of color space information for an image, the general rule for color space inference is that UINT RGB and grayscale formats use the standard RGB color space (sRGB), while fixed-point and floating-point RGB and grayscale formats use the extended RGB color space (scRGB). The CMYK color model uses an RWOP color space.
-
-    static v := SubStr(A_AhkVersion,1,1)
-    obj := "", ptr := 0, _LastError := 0
-    
-    __New(inPtr:=0) {
-        If (Com_Base_Functions.v >= 2)
-            this.ptr := (this.obj := (!inPtr) ? ComObjCreate(this.CLSID, this.IID) : ComObject(13,inPtr)).ptr
-        Else this.ptr := this.obj := (!inPtr) ? ComObjCreate(this.CLSID, this.IID) : inPtr
-    }
-    __Delete() {
-        If Com_Base_Functions.v < 2
-            ObjRelease(this.ptr)
-    }
-    exec(index, p*) {
-        return DllCall(NumGet(NumGet(this.ptr+0,"Ptr")+(index*A_PtrSize), "Ptr"), "Ptr", this.ptr+0, p*) ; +0 for AHK v1
-    }
-    LastError[] {
-        get {
-            return (this._LastError) ? Format("0x{:X}",this._LastError & 0xFFFFFFFF) : 0
-        }
-        set {
-            this._LastError := value
-        }
-    }
-    New(inPtr:=0) { ; for AHK v1
-        n := this.__Class, new := "x", obj := New %n%(inPtr) ; [ new:="x" ] to make AHK v2 happy
-        return obj                                           ; for calling "New Class()" in AHK v1 style.
-    }
-    ; vtbl(addr, index) {
-        ; return NumGet(NumGet(addr+0,"Ptr")+(index*A_PtrSize), "Ptr") ; +0 for AHK v1
-    ; }
-    
-    
-}
-
-; https://docs.microsoft.com/en-us/windows/desktop/api/wincodec/nn-wincodec-iwicbitmapsource
-class IWICBitmapSource extends Com_Base_Functions {
-    IID := "{00000120-a8f2-4877-ba0a-fd2b6645fb94}"
-    
-    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicbitmapsource-getsize
-    ; Returns obj with {w, h} properties.
-    GetSize() { ; 3
-        this.LastError := this.exec(3
-        , "Ptr", (w:=BufferAlloc(4)).ptr, "Ptr", (h:=BufferAlloc(4)).ptr)
-        return (!this.LastError) ? {w:NumGet(w.ptr,"UInt"), h:NumGet(h.ptr,"UInt")} : ""
-    }
-    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicbitmapsource-getpixelformat
-    ; Returns friendly name string for GUID that represents the Pixel Format.
-    GetPixelFormat() { ; 4
-        this.LastError := this.exec(4
-        , "Ptr", (pPixelFormat:=BufferAlloc(16)).ptr) ; GUID return type (16 bytes)
-        UID_str := wic_IDs.StringFromGUID2(pPixelFormat)
-        return (!this.LastError) ? wic_IDs.PixelFormats[UID_str] : ""
-    }
-    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicbitmapsource-getresolution
-    GetResolution() { ; 5
-        this.LastError := this.exec(5
-        , "Ptr", (pDpiX:=BufferAlloc(8)).ptr, "Ptr", (pDpiY:=BufferAlloc(8)).ptr) ; "double" return type
-        return (!this.LastError) ? {x:NumGet(pDpiX.ptr,"Double"), y:NumGet(pDpiY.ptr,"Double")} : ""
-    }
-    CopyPalette() { ; 6
-        this.LastError := this.exec(6, "Ptr", (pIPalette:=BufferAlloc(A_PtrSize)).ptr)
-        return (!this.LastError) ? IWICPalette.New(NumGet(pIPalette.ptr,"Ptr")) : ""
-    }
-    CopyPixels(prc, cbStride, cbBufferSize, pbBuffer) { ; 7
-        If ((prc ? WI_ptr := (WIRect := BufferAlloc(16,0)).ptr : WI_ptr := 0)) { ; prc takes [x,y,w,h] as input
-            For i, val in prc
-                ; NumPut("Int", val, WI_ptr, 4*(A_Index - 1)) ; AHK v2
-                NumPut(val, WI_ptr+(4*(A_Index - 1)), "Int") ; AHK v1
-        }
-        this.LastError := this.exec(7
-        , "Ptr", WI_ptr, "UInt", cbStride, "UInt", cbBufferSize, "Ptr", pbBuffer)
-        return (!this.LastError) ? true : ""
-    }
-}
-    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwicbitmap
-    class IWICBitmap extends IWICBitmapSource { ; IWICBitmapSource -> this 
-        IID := "{00000121-a8f2-4877-ba0a-fd2b6645fb94}"
-        Lock() { ; 8
-        }
-        SetPalette() { ; 9
-        }
-        SetResolution() { ; 10
-        }
-    }
-    
-    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwicbitmapclipper
-    class IWICBitmapClipper extends IWICBitmapSource { ; IWICBitmapSource -> this
-        IID := "{E4FBCF03-223D-4e81-9333-D635556DD1B5}"
-        Initialize() { ; 8
-        }
-    }
-    
-    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwicbitmapfliprotator
-    class IWICBitmapFlipRotator extends IWICBitmapSource { ; IWICBitmapSource -> this
-        IID := "{5009834F-2D6A-41ce-9E1B-17C5AFF7A782}"
-        Initialize() { ; 8
-        }
-    }
-    
-    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwicbitmapframedecode
-    class IWICBitmapFrameDecode extends IWICBitmapSource { ; IWICBitmapSource -> this
-        IID := "{3B16811B-6A43-4ec9-A813-3D930C13B940}"
-        GetMetadataQueryReader() { ; 8
-        }
-        GetColorContexts() { ; 9
-        }
-        GetThumbnail() { ; 10
-        }
-    }
-
-        ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwicdevelopraw
-        class IWICDevelopRaw extends IWICBitmapFrameDecode { ; IWICBitmapSource -> IWICBitmapFrameDecode -> this
-            IID := "{fbec5e44-f7be-4b65-b7f8-c0c81fef026d}"
-            QueryRawCapabilitiesInfo() { ; 11
-            }
-            LoadParameterSet() { ; 12
-            }
-            GetCurrentParameterSet() { ; 13
-            }
-            SetExposureCompensation() { ; 14
-            }
-            GetExposureCompensation() { ; 15
-            }
-            SetWhitePointRGB() { ; 16
-            }
-            GetWhitePointRGB() { ; 17
-            }
-            SetNamedWhitePoint() { ; 18
-            }
-            GetNamedWhitePoint() { ; 19
-            }
-            SetWhitePointKelvin() { ; 20
-            }
-            GetWhitePointKelvin() { ; 21
-            }
-            GetKelvinRangeInfo() { ; 22
-            }
-            SetContrast() { ; 23
-            }
-            GetContrast() { ; 24
-            }
-            SetGamma() { ; 25
-            }
-            GetGamma() { ; 26
-            }
-            SetSharpness() { ; 27
-            }
-            GetSharpness() { ; 28
-            }
-            SetSaturation() { ; 29
-            }
-            GetSaturation() { ; 30
-            }
-            SetTint() { ; 31
-            }
-            GetTint() { ; 32
-            }
-            SetNoiseReduction() { ; 33
-            }
-            GetNoiseReduction() { ; 34
-            }
-            SetDestinationColorContext() { ; 35
-            }
-            SetToneCurve() { ; 36?
-            }
-            GetToneCurve() { ; 37?
-            }
-            SetRotation() { ; 38
-            }
-            GetRotation() { ; 39
-            }
-            SetRenderMode() { ; 40
-            }
-            GetRenderMode() { ; 41
-            }
-            SetNotificationCallback() { ; 42
-            }
-        }
-    
-    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwicbitmapscaler
-    class IWICBitmapScaler extends IWICBitmapSource { ; IWICBitmapSource -> this
-        IID := "{00000302-a8f2-4877-ba0a-fd2b6645fb94}"
-        Initialize() { ; 8
-        }
-    }
-    
-    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwiccolortransform
-    class IWICColorTransform extends IWICBitmapSource { ; IWICBitmapSource -> this
-        IID := "{B66F034F-D0E2-40ab-B436-6DE39E321A94}"
-        Initialize() { ; 8
-        }
-    }
-    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwicformatconverter
-    class IWICFormatConverter extends IWICBitmapSource { ; IWICBitmapSource -> this
-        IID := "{00000301-a8f2-4877-ba0a-fd2b6645fb94}"
-        
-        ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicformatconverter-initialize
-        ; Performs / preps conversion from one pixel format to another.
-        ; Dither options:                                      ; Palette options:
-        ; WICBitmapDitherTypeNone              = 0             ; WICBitmapPaletteTypeCustom              = 0 
-        ; WICBitmapDitherTypeSolid             = 1             ; WICBitmapPaletteTypeMedianCut           = 1 
-        ; WICBitmapDitherTypeOrdered4x4        = 2             ; WICBitmapPaletteTypeFixedBW             = 2 
-        ; WICBitmapDitherTypeOrdered8x8        = 3             ; WICBitmapPaletteTypeFixedHalftone8      = 3 
-        ; WICBitmapDitherTypeOrdered16x16      = 4             ; WICBitmapPaletteTypeFixedHalftone27     = 4 
-        ; WICBitmapDitherTypeSpiral4x4         = 5             ; WICBitmapPaletteTypeFixedHalftone64     = 5 
-        ; WICBitmapDitherTypeSpiral8x8         = 6             ; WICBitmapPaletteTypeFixedHalftone125    = 6 
-        ; WICBitmapDitherTypeDualSpiral4x4     = 7             ; WICBitmapPaletteTypeFixedHalftone216    = 7 
-        ; WICBitmapDitherTypeDualSpiral8x8     = 8             ; WICBitmapPaletteTypeFixedWebPalette     = 8 
-        ; WICBitmapDitherTypeErrorDiffusion    = 9             ; WICBitmapPaletteTypeFixedHalftone252    = 9 
-        ; WICBITMAPDITHERTYPE_FORCE_DWORD      = 10            ; WICBitmapPaletteTypeFixedHalftone256    = 10
-                                                               ; WICBitmapPaletteTypeFixedGray4          = 11
-        ; pISource  = input IWICBitmapSource                   ; WICBitmapPaletteTypeFixedGray16         = 12
-        ; dstFormat = destination format guid                  ; WICBitmapPaletteTypeFixedGray256        = 13
-        ; alphaThresholdPercent = float, 1.0 max               ; WICBITMAPPALETTETYPE_FORCE_DWORD        = 14
-        Initialize(pISource, dstFormat, dither:=0, pIPalette:=0, alphaThresholdPercent:=0, paletteTranslate:=0) { ; 8
-            this.LastError := this.exec(8
-            , "Ptr", pISource, "Ptr", wic_IDs[dstFormat].ptr, "Int", dither
-            , "Ptr", pIPalette, "Double", alphaThresholdPercent, "Int", paletteTranslate)
-            return (!this.LastError) ? true : "" ; return 1 on success
-        }
-        ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicformatconverter-canconvert
-        ; Returns bool (true/false) if conversion from specified source to destination palette can be done.
-        CanConvert(srcPixelFormat, dstPixelFormat) { ; 9
-            uid1 := wic_IDs[srcPixelFormat], uid2 := wic_IDs[dstPixelFormat]
-            this.LastError := this.exec(9
-            , "Ptr", uid1.ptr, "Ptr", uid2.ptr, "Ptr", (buf:=BufferAlloc(4)).ptr)
-            return (!this.LastError) ? NumGet(buf.ptr,"Int") : ""
-        }
-    }
-    
-    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwicplanarformatconverter
-    class IWICPlanarFormatConverter extends IWICBitmapSource { ; IWICPlanarFormatConverter -> this
-        IID := "{BEBEE9CB-83B0-4DCC-8132-B0AAA55EAC96}"
-        Initialize() { ; 8
-        }
-        CanConvert() { ; 9
-        }
-    }
-
-; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwicimagingfactory
-class IWICImagingFactory extends Com_Base_Functions { ; root obj
-    CLSID := "{CACAF262-9370-4615-A13B-9F5539DA4C0A}"
-    IID   := "{ec5ec8a9-c395-4314-9c77-54d7a935ff70}"
-    
-    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicimagingfactory-createdecoderfromfilename
-    ; Creates / returns IWICBitmapDecoder.      ; metadataOptions:
-    ; dwDesiredAccess:                          ; WICDecodeMetadataCacheOnDemand        = 0
-    ; GENERIC_READ  := 0x80000000               ; WICDecodeMetadataCacheOnLoad          = 1
-    ; GENERIC_WRITE := 0x40000000               ; WICMETADATACACHEOPTION_FORCE_DWORD    = 2
-    CreateDecoderFromFilename(wzFilename, pguidVendor:=0, dwDesiredAccess:=0x80000000, metadataOptions:=0) { ; 3
-        this.LastError := this.exec(3
-        , "Str", wzFilename, "Ptr", pguidVendor, "UInt", dwDesiredAccess, "Int", metadataOptions, "Ptr", (buf := BufferAlloc(A_PtrSize)).ptr)
-        return (!this.LastError) ? IWICBitmapDecoder.New(NumGet(buf.ptr,"Ptr")) : ""
-    }
-    CreateDecoderFromStream() { ; 4
-    }
-    CreateDecoderFromFileHandle() { ; 5
-    }
-    CreateComponentInfo() { ; 6
-    }
-    CreateDecoder() { ; 7
-    }
-    CreateEncoder() { ; 8
-    }
-    CreatePalette() { ; 9
-    }
-    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicimagingfactory-createformatconverter
-    ; Returns / creates IWICFormatConverter.
-    CreateFormatConverter() { ; 10
-        this.LastError := this.exec(10
-        , "Ptr", (buf:=BufferAlloc(A_PtrSize)).ptr)
-        return (!this.LastError) ? IWICFormatConverter.New(NumGet(buf.ptr,"Ptr")) : ""
-    }
-    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicimagingfactory-createbitmapscaler
-    ; Returns / creates IWICBitmapScaler.
-    CreateBitmapScaler() { ; 11
-        this.LastError := this.exec(11
-        , "Ptr", (buf:=BufferAlloc(A_PtrSize)).ptr)
-        return (!this.LastError) ? IWICBitmapScaler.New(NumGet(buf.ptr,"Ptr")) : ""
-    }
-    CreateBitmapClipper() { ; 12
-    }
-    CreateBitmapFlipRotator() { ; 13
-    }
-    CreateStream() { ; 14
-    }
-    CreateColorContext() { ; 15
-    }
-    CreateColorTransformer() { ; 16
-    }
-    CreateBitmap() { ; 17
-    }
-    CreateBitmapFromSource() { ; 18
-    }
-    CreateBitmapFromSourceRect() { ; 19
-    }
-    CreateBitmapFromMemory() { ; 20
-    }
-    CreateBitmapFromHBITMAP() { ; 21
-    }
-    CreateBitmapFromHICON() { ; 22
-    }
-    CreateComponentEnumerator() { ; 23
-    }
-    CreateFastMetadataEncoderFromDecoder() { ; 24
-    }
-    CreateFastMetadataEncoderFromFrameDecode() { ; 25
-    }
-    CreateQueryWriter() { ; 26
-    }
-    CreateQueryWriterFromReader() { ; 27
-    }
-}
-
-    class IWICImagingFactory2 extends IWICImagingFactory { ; IWICImagingFactory -> this
-        IID := "{7B816B45-1996-4476-B132-DE9E247C8AF0}"
-        CreateImageEncoder() { ; 28
-        }
-    }
-
-; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwicbitmapdecoder
-class IWICBitmapDecoder extends Com_Base_Functions { ; root obj
-    IID := "{9EDDE9E7-8DEE-47ea-99DF-E6FAF2ED44BF}"
-    QueryCapability() { ; 3
-    }
-    Initialize() { ; 4
-    }
-    GetContainerFormat() { ; 5
-    }
-    GetDecoderInfo() { ; 6
-    }
-    CopyPalette() { ; 7
-    }
-    GetMetadataQueryReader() { ; 8
-    }
-    GetPreview() { ; 9
-    } 
-    GetColorContexts() { ; 10
-    }
-    GetThumbnail() { ; 11
-    }
-    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicbitmapdecoder-getframecount
-    GetFrameCount() { ; 12
-        ; this.LastError := DllCall(this.vtbl(this.ptr,12), "Ptr", this.ptr, "UInt*", count:=0)
-        ; return (!this.LastError) ? count : ""
-
-        this.LastError := this.exec(12, "Ptr", (count := BufferAlloc(4)).ptr)
-        return (!this.LastError) ? NumGet(count.ptr,"UInt") : ""
-    }
-    ; https://docs.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicbitmapdecoder-getframe
-    ; Returns / creates IWICBitmapFrameDecode.
-    GetFrame(index) { ; 13
-        this.LastError := this.exec(13, "UInt", index, "Ptr", (ppIBitmapFrame := BufferAlloc(A_PtrSize)).ptr)
-        return (!this.LastError) ? IWICBitmapFrameDecode.New(NumGet(ppIBitmapFrame.ptr,"Ptr")) : ""
-    }
-    
-}
-
-class IWICPalette extends Com_Base_Functions {
-    IID := "{00000040-a8f2-4877-ba0a-fd2b6645fb94}"
-    InitializePredefined() { ; 3
-    }
-    InitializeCustom() { ; 4
-    }
-    InitializeFromBitmap() { ; 5
-    }
-    InitializeFromPalette() { ; 6
-    }
-    GetType() { ; 7
-    }
-    GetColorCount() { ; 8
-    }
-    GetColors() { ; 9
-    }
-    IsBlackWhite() { ; 10
-    }
-    IsGrayscale() { ; 11
-    }
-    HasAlpha() { ; 12
-    }
-}
-*/
 
 checkDLLfiles() {
    Static lastInvoked := 0
@@ -70013,7 +71790,7 @@ tlbrInvokeEditMenu() {
    If (!AnyWindowOpen || imgEditPanelOpened=1)
    {
       If (drawingShapeNow=1)
-         createMenuCustomShapeDrawing(0, 0, 0, 0)
+         createMenuCustomShapeDrawing(0, 0, 0, 0, 0)
       Else If isNowAlphaPainting()
          BuildMainMenu()
       Else If isImgEditingNow()
@@ -70571,6 +72348,7 @@ tlbrResetRotation() {
    {
       vPselRotation := 0
       SetTimer, dummyRefreshImgSelectionWindow, -10
+      userFriendlyPrevImgSelAction := "RESET SELECTION AREA"
       SetTimer, dummyShowSelCoordsInfos, -20
    } Else If (isImgEditingNow()=1 && vpIMGrotation!=0)
       changeImgRotationInVP(1, 45, 1)
@@ -71398,7 +73176,7 @@ createGUItoolbar(dummy:=0) {
    isPaintPanel := (AnyWindowOpen=64) ? 1 : 0
    isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
    addAlphaIcons := (AnyWindowOpen=66 || AnyWindowOpen=55 || AnyWindowOpen=25) ? 1 : 0
-   ToolBarBtnWidth := Round(OSDfntSize*1.5 * ToolbarScaleFactor)
+   ToolBarBtnWidth := Round(OSDfontSize*1.5 * ToolbarScaleFactor)
    currState := "a" isTransPanel isWelcomeScreenu addAlphaIcons isNowAlphaPainting() isAlphaMaskWindow() ToolBarBtnWidth TLBRverticalAlign TLBRtwoColumns isPaintPanel thumbsDisplaying drawingShapeNow
    ; msgbox, %currstateSimple%`n%prevStateSimple%
    If (prevState!=currState || dummy="forced")
@@ -71795,7 +73573,7 @@ tlbrDecideTooltips(hwnd) {
    {
        msgu := "L: Toggle image preview [Z]`nR: Toggle preview area double-size"
        If (drawingShapeNow=1)
-          msgu := "Toggle live preview for to-be added point [P]"
+          msgu := "Toggle live preview for new points [P]"
    } Else If InStr(icoFile, "search") 
    {
       msgu := "L: Search indexed files [Ctrl + F3]`nR: Search and replace in the files list [Ctrl + H]"
@@ -71838,7 +73616,7 @@ tlbrDecideTooltips(hwnd) {
       msgu := "L: Manage folders list to be indexed [Alt + U]" friendly
    } Else If InStr(icoFile, "font-size") 
    {
-      msgu := "Change viewport font size: " OSDfntSize " [Ctrl + -/=]"
+      msgu := "Change viewport font size: " OSDfontSize " [Ctrl + -/=]"
    } Else If InStr(icoFile, "select-align") 
    {
       msgu := "Align selection menu"
@@ -71911,7 +73689,7 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
            prevCtrlHover := ctrlHover
            prevMsg := msgu
            prevState := thisState
-           thisSize := OSDfntSize//3 + 2
+           thisSize := OSDfontSize//3 + 2
            interfaceThread.ahkFunction("mouseCreateOSDinfoLine", msgu, thisSize)
         }
         ; prevPos := mX "-" mY
@@ -71931,7 +73709,11 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
 
 externTooltiput(msg) {
    Static lastMsg := 0
-   thisSize := OSDfntSize//3 + 2
+   msg := Trim(msg)
+   If !msg
+      Return
+
+   thisSize := OSDfontSize//3 + 2
    If (msg="-hide-")
    {
       lastMsg := ""
@@ -71942,7 +73724,7 @@ externTooltiput(msg) {
    } Else
    {
       lastMsg := msg
-      interfaceThread.ahkFunction("mouseCreateOSDinfoLine", msg, thisSize)
+      interfaceThread.ahkFunction("mouseCreateOSDinfoLine", msg, thisSize, 1)
    }
 }
 
@@ -72022,7 +73804,7 @@ invokeKbdToolbarAct(direction) {
 
 displayNowToolbarHelp(msgu) {
    calcScreenLimits()
-   v := OSDfntSize//2
+   v := OSDfontSize//2
    If (msgu=1)
       msgu := "The toolbar can be navigated with the arrow keys.`nPress Enter to execute the main action.`nPress Shift + Enter for the secondary action."
    Else If (msgu=2)
@@ -72066,7 +73848,7 @@ moveMouseToolbar(direction, stepu) {
    }
 
    msgu := tlbrDecideTooltips(hwndu)
-   thisSize := OSDfntSize//3 + 2
+   thisSize := OSDfontSize//3 + 2
    interfaceThread.ahkFunction("ShowClickHalo", aX, aY, ToolBarBtnWidth, ToolBarBtnWidth, 1)
    If msgu
       interfaceThread.ahkFunction("mouseCreateOSDinfoLine", msgu, thisSize)
@@ -72201,7 +73983,6 @@ testPhashalgo() {
    msgbox, % hashuB "`n" hashuC "`n" hashu 
 }
 
-
 testHistoDLL() {
    initQPVmainDLL()
    VarSetCapacity(resultsArray, 4*7, 0)
@@ -72266,3 +74047,64 @@ testHistoDLL() {
 
 ; #If
 
+
+ListGlobalVars() {
+; found on https://www.autohotkey.com/boards/viewtopic.php?t=9610
+; by Lexikos
+    static hwndEdit, pSFW, pSW, bkpSFW, bkpSW
+    
+    if !hwndEdit
+    {
+        dhw := A_DetectHiddenWindows
+        DetectHiddenWindows, On
+        Process, Exist
+        ControlGet, hwndEdit, Hwnd,, Edit1, ahk_class AutoHotkey ahk_pid %ErrorLevel%
+        DetectHiddenWindows, %dhw%
+        
+        astr := A_IsUnicode ? "astr":"str"
+        ptr := A_PtrSize=8 ? "ptr":"uint"
+        hmod := DllCall("GetModuleHandle", "str", "user32.dll")
+        pSFW := DllCall("GetProcAddress", ptr, hmod, astr, "SetForegroundWindow")
+        pSW := DllCall("GetProcAddress", ptr, hmod, astr, "ShowWindow")
+        DllCall("VirtualProtect", ptr, pSFW, ptr, 8, "uint", 0x40, "uint*", 0)
+        DllCall("VirtualProtect", ptr, pSW, ptr, 8, "uint", 0x40, "uint*", 0)
+        bkpSFW := NumGet(pSFW+0, 0, "int64")
+        bkpSW := NumGet(pSW+0, 0, "int64")
+    }
+
+    if (A_PtrSize=8) {
+        NumPut(0x0000C300000001B8, pSFW+0, 0, "int64")  ; return TRUE
+        NumPut(0x0000C300000001B8, pSW+0, 0, "int64")   ; return TRUE
+    } else {
+        NumPut(0x0004C200000001B8, pSFW+0, 0, "int64")  ; return TRUE
+        NumPut(0x0008C200000001B8, pSW+0, 0, "int64")   ; return TRUE
+    }
+    
+    ListVars
+    NumPut(bkpSFW, pSFW+0, 0, "int64")
+    NumPut(bkpSW, pSW+0, 0, "int64")
+    ControlGetText, text,, ahk_id %hwndEdit%
+    RegExMatch(text, "sm)(?<=^Global Variables \(alphabetical\)`r`n-{5~1}`r`n).*", text)
+    final := ""
+    Loop, Parse, text, `n,`r
+    {
+       If StrLen(A_LoopField)>1
+       {
+          If (z := InStr(A_LoopField, "["))
+             line := Trimmer(SubStr(A_LoopField, 1, z - 1))
+          Else
+             line := Trimmer(A_LoopField)
+
+          If (z := InStr(line, "{"))
+             line := SubStr(line, 1, z - 1)
+          
+          line := StrReplace(line, "object object", "object")
+          If !InStr(line, "`n")
+             final .= line "`n"
+       }
+    }
+    ToolTip, % final , , , 2
+    Sleep, 100
+    SendInput, {Esc}
+    return final
+}

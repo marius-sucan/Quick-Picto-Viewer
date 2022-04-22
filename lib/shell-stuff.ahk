@@ -1810,7 +1810,6 @@ ChangeDisplaySettings(cD, sW, sH, rR, Perm="")   {
       Return DllCall("User32.dll\ChangeDisplaySettings", "Ptr", dmAddr, "UInt", 4, "Int")
 }
 
-
 ClipboardGetDropEffect() {
 /*
     Retrieves the preferred method of data transfer (preferred drop effect set by source).
@@ -1915,7 +1914,6 @@ GetWinHwndAtPoint(nX, nY) {
     Return [a, h]
 }
 
-
 TabCtrl_GetCurSel(HWND) {
    ; by just me 
    ; source: https://www.autohotkey.com/board/topic/79783-how-to-get-the-current-tab-name/
@@ -1965,7 +1963,7 @@ TabCtrl_GetItemText(HWND, Index:=0) {
    Return name
 }
 
-BalloonTip(sText, sTitle:="BalloonTip", Options:="") {
+BalloonTip(sText, sTitle:="BalloonTip", Options:="", darkMode:=0) {
 ; Example: BalloonTip("how are you ?", "Mr.World says hello", "I=2 C=001100 T=2")
 ; Source: https://www.autohotkey.com/board/topic/27670-add-tooltips-to-controls/
 ; updated by Marius Șucan -- mardi 8 mars 2022
@@ -1982,11 +1980,15 @@ BalloonTip(sText, sTitle:="BalloonTip", Options:="") {
   ;  NOTE: To Close it before Timeout, use command (WinClose,  ahk_id %<Returned hWnd>%)
   ; ******************************************************************************************************************************
   STATIC hWnd, X, Y, T, W, I, C, Q  ; Options STATIC to force local variables
-  , prevHwnd, lastTimer, lastInvoked
-  If (prevHwnd && lastTimer && (A_TickCount - lastInvoked < lastTimer))
+       , prevHwnd, lastTimer, lastInvoked
+
+  If (prevHwnd && lastTimer && (A_TickCount - lastInvoked < lastTimer) || sText="-" && options="close")
   {
+     If prevHwnd
+        WinClose, ahk_id %prevHwnd%
      prevHwnd :=""
-     WinClose, ahk_id %prevHwnd%
+     If (options="close")
+        Return
   }
 
   X:=Y:="", T:=W:=0, I:=C:=Q:=1, Ptr:=(A_PtrSize ? "Ptr" : "UInt"), sTitle:=((StrLen(sTitle)<99) ? sTitle : (SubStr(sTitle,1,95) . " ..."))
@@ -1997,6 +1999,9 @@ BalloonTip(sText, sTitle:="BalloonTip", Options:="") {
   a:=((C=1) ? ((hDC:=DllCall("GetDC","Uint",0)) (C:=DllCall("GetPixel","Uint",hDC,"int",X,"int",Y)) (DllCall("ReleaseDC","Uint",0,"Uint",hDC))) : ((C:=(StrLen(C)<8 ? "0x" : "") . C) (C:=((C&255)<<16)+(((C>>8)&255)<<8)+(C>>16)))) ; rgb -> bgr
   VarSetCapacity(ti,(A_PtrSize ? 28+A_PtrSize*3 : 40),0), ti:=Chr((A_PtrSize ? 28+A_PtrSize*3 : 40)), NumPut(0x20,ti,4,"UInt"), NumPut(&sText,&ti,(A_PtrSize ? 24+A_PtrSize*3 : 36))
   hWnd:=DllCall("CreateWindowEx",Ptr,0x8,"str","tooltips_class32","str","",Ptr,0xC3,"int",0,"int",0,"int",0,"int",0,Ptr,0,Ptr,0,Ptr,0,Ptr,0,Ptr)
+  If (darkMode=1)
+     DllCall("uxtheme\SetWindowTheme", "ptr", hwnd, "str", "DarkMode_Explorer", "ptr", 0)
+
   a:=(Q ? DllCall("SendMessage","Uint",hWnd,Ptr,0x200b,Ptr,0,Ptr,"") : DllCall("uxtheme\SetWindowTheme","Uint",hWnd,Ptr,0,"UintP",0)) ; TTM_SETWINDOWTHEME
 
   DllCall("SendMessage", Ptr, hWnd, "Uint", 1028, Ptr, 0, Ptr, &ti, Ptr)        ; TTM_ADDTOOL
@@ -2008,22 +2013,20 @@ BalloonTip(sText, sTitle:="BalloonTip", Options:="") {
   DllCall("SendMessage", Ptr, hWnd, "Uint", 1048, Ptr, 0, Ptr, A_ScreenWidth)      ; TTM_SETMAXTIPWIDTH
   DllCall("SendMessage", Ptr, hWnd, "UInt",(A_IsUnicode ? 0x439 : 0x40c), Ptr, 0, Ptr, &ti, Ptr)  ; TTM_UPDATETIPTEXT (OLD_MSG=1036)
   ; IfGreater, I, 0, SoundPlay, % "*" . (I=2 ? 48 : I=3 ? 16 : 64)
+
   If (T>0)
   {
-     prevHwnd := hwnd
      lastTimer := T*1000
      lastInvoked := A_TickCount
-     fn := Func("BalloonTip_TimeOut").Bind(hwnd)
-     SetTimer, % fn, % -T*1000
+     SetTimer, BalloonTip_Kill, % -T*1000
   }
+  prevHwnd := hwnd
   Return hWnd        ; Close it before TimeOut.
 }
 
-BalloonTip_TimeOut(hwnd) {
-  ; SetTimer, BalloonTip_TimeOut, Off
-  WinClose, ahk_id %hWnd%
+BalloonTip_Kill() {
+    BalloonTip("-", "-", "close")
 }
-
 
 EM_ISIME(hCtrl) {
   result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0x4F3, "Int", 0, "Int", 0)
@@ -2218,7 +2221,7 @@ GetComboBoxInfo(hwnd) {
    Return [HCBBEDIT, HCBBLIST, r]
 }
 
-AddTooltip2Ctrl(p1, p2:="", p3="") {
+AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0) {
 ; Description: AddTooltip v2.0
 ;   Add/Update tooltips to GUI controls.
 ;
@@ -2356,7 +2359,7 @@ AddTooltip2Ctrl(p1, p2:="", p3="") {
     DetectHiddenWindows On
 
     ;-- Tooltip control exists?
-    if not hTT
+    if !hTT
     {
         ;-- Create Tooltip window
         hTT:=DllCall("CreateWindowEx"
@@ -2442,23 +2445,19 @@ AddTooltip2Ctrl(p1, p2:="", p3="") {
     if l_RegisteredTool
     {
         if StrLen(p2)
-        {
-            SendMessage, A_IsUnicode ? TTM_UPDATETIPTEXTW : TTM_UPDATETIPTEXTA
-                       , 0, &TOOLINFO,, ahk_id %hTT%
-        } else
-        {
-            SendMessage, A_IsUnicode ? TTM_DELTOOLW : TTM_DELTOOLA
-                       , 0, &TOOLINFO,, ahk_id %hTT%
-        }
+            SendMessage, A_IsUnicode ? TTM_UPDATETIPTEXTW : TTM_UPDATETIPTEXTA, 0, &TOOLINFO,, ahk_id %hTT%
+        else
+            SendMessage, A_IsUnicode ? TTM_DELTOOLW : TTM_DELTOOLA, 0, &TOOLINFO,, ahk_id %hTT%
     } else if StrLen(p2)
     {
-        SendMessage, A_IsUnicode ? TTM_ADDTOOLW : TTM_ADDTOOLA
-                   , 0, &TOOLINFO,, ahk_id %hTT%
+        SendMessage, A_IsUnicode ? TTM_ADDTOOLW : TTM_ADDTOOLA, 0, &TOOLINFO,, ahk_id %hTT%
     }
 
     ;-- Restore DetectHiddenWindows
-    DetectHiddenWindows %l_DetectHiddenWindows%
+    If (darkMode=1)
+       DllCall("uxtheme\SetWindowTheme", "ptr", HTT, "str", "DarkMode_Explorer", "ptr", 0)
 
+    DetectHiddenWindows %l_DetectHiddenWindows%
     ;-- Return the handle to the tooltip control
     Return hTT
 }

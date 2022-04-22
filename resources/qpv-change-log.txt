@@ -1,6 +1,16 @@
-// Quick Picto Viewer - CHANGELOG
+﻿// Quick Picto Viewer - CHANGELOG
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
+
+- v5.7.0 (2022-04-22)
+  - [new] users can now draw Bézier vector paths; this greatly facilitates drawing of complex shapes
+  - [new] multi-rename panel allows to change letters case as well; various bug fixes related to multi-renaming
+  - [new] option to limit «search and replace» in index on the selected files only
+  - [new] keywords identifier; Quick Picto Viewer can now generate a list of the keywords found in folder paths and file names
+  - [new] users can now drag files from the main window to the folders tree panel or the omnibox
+  - keyboard shortcuts are now no longer registered through AHK hotkeys; QPV now uses WM_KeyDown Microsoft Windows messages to detect keystrokes and shortcuts
+  - folder paths are now automatically shortened based on the available width in the viewport
+  - various bug fixes
 
 - v5.6.7 (2022-03-31)
   - [new] private mode; how dubious ^_^
@@ -855,7 +865,6 @@ Files organization:
 
 - v1.0.0 (2010-10-04) by SBC
 
-- known issues [jeudi 2 juillet 2020]
-  - panning/zooming large images on 32 bits edition ... is very slow
-  - high memory consumption; all operations need a lot of RAM [zoom/pan, etc]
+; known issues [jeudi 2 juillet 2020]
+; high memory consumption; all operations need a lot of RAM [zoom/pan, etc]
 

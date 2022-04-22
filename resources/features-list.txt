@@ -1,4 +1,4 @@
-* Support for 85 image file formats, including various Camera RAW formats.
+﻿* Support for 85 image file formats, including various Camera RAW formats.
 
 * List images as thumbnails with preset aspect ratios: square, wide or tall. Easy to adjust their size as well. Use T and +/- keys.
 

@@ -1,4 +1,4 @@
-WHAT IS QUICK PICTO VIEWER?
+﻿WHAT IS QUICK PICTO VIEWER?
 QPV is an image viewer, editor and a tool to organize image collections. It can open about 85 image file formats: .hdr, .raw, .tif, .emf, .wmf, .png, .bmp, .gif, .jpeg and many others.
 
 Quick Picto Viewer is made to gracefully manage large image libraries, e.g., a million images, or more. It is made to help organize and view such libraries. A particular attention is paid through-out development to the needs of people with poor eye-sight. To this end, users can activate large UI fonts, adjust the zoom level for texts (Ctrl + -/+) in the viewport, dark mode, and right-click on menu items or panel controls to display larger their associated texts. 

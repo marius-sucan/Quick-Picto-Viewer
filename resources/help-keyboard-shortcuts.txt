@@ -1,4 +1,4 @@
-,|Decrease slideshow speed|image view|-
+﻿,|Decrease slideshow speed|image view|-
 .|Increase slideshow speed|image view|-
 -|Zoom out [image or thumbnails]|Anywhere|-
 =|Zoom in [image or thumbnails]|Anywhere|-
@@ -141,19 +141,24 @@ S|Toggle slideshow modes|Image view|-
 T|Toggle thumbnails aspect ratios: square, tall or wide|Files list|-
 T|Toggle image rescaling/adapting modes|Image view|-
 T|Cycle different levels of points tension in the freeform path|Vector drawing|-
+B|Toggle Bézier freeform path mode|Vector drawing|-
 U|Viewport colors and image adjustments|Image view|Panel
 X|Play associated audio file|Image view|-
 X|Mark active index to switch to a different index|Files list|-
 X|Switch active index with the already marked index|Files list|-
+X|Start/Stop animated GIF playback|Image view|-
 Shift + X|Move active index at the already marked index|Files list|-
 Shift + X|Stop audio playback|Image view|-
 Shift + [ . ]|Increase audio volume by 5%|Anywhere|-
 Shift + [ , ]|Decrease audio volume by 5%|Anywhere|-
-Middle Click|Switch between image list and image view|Anywhere|Mode switch
-Middle Click|Collapse / expand live edit panel|Live editing|Panel
+M-Click|Switch between image list and image view|Anywhere|Mode switch
+M-Click|Collapse / expand live edit panel|Live editing|Panel
 Double Click|Toggle between image view modes|Anywhere|-
-Right Click|Open main menu or context menu|Anywhere|Menu
-Shift + Right Click|Open quick menu|Anywhere|Menu
+R-Click|Open main menu or context menu|Anywhere|Menu
+Shift + R-Click|Open quick menu|Anywhere|Menu
+Ctrl + R-Click|Start/Stop animated GIF playback|Image view|-
+Alt + L-Click on items|Mark/unmark image, or reorder marked item|Files list|-
+Alt + L-Click|Drag and drop file(s) to folders tree or omnibox|Files list|-
 Apps key|Open main menu or context menu|Anywhere|Menu
 Shift + Apps key|Open quick menu|Anywhere|Menu
 Left / Right|Previous / Next image|Anywhere|-
@@ -169,7 +174,7 @@ Ctrl + Backspace|Jump to previously displayed image|Anywhere|-
 Shift + Backspace|Next random image|Anywhere|-
 Ctrl + Home / End|Jump to the first or last selected file in the index|Anywhere|-
 Ctrl + Arrow keys|Navigate between selected files|Anywhere|-
-Space + Left-Click|Pan image|Image view|-
+Space + L-Click|Pan image|Image view|-
 Space|Start or stop slideshow [if not in «Custom Zoom level» mode|Image view|-
 Space|Select or deselect files [if files selection already exists]|Files list|-
 Tab|Select or deselect active file|Anywhere|-
@@ -183,6 +188,9 @@ Shift + C|Copy file path(s) to clipboard|Anywhere|-
 Shift + Delete|Delete active file and its index entry|Anywhere|-
 Shift + E|Toggle image selection area modes: rect, ellipse, freeform|Image selection area|-
 Ctrl + NumPad keys|Align image selection area: top, bottom, left, right, more|Image selection area|-
+Ctrl + NumPad - / +|Shrink/enlarge selection area|Image selection area|-
+Ctrl + NumPad * / /|Increase or decrease selection area cavity|Image selection area|-
+Ctrl + NumPad .|Reset selection area rotation and cavity|Image selection area|-
 Alt + [+]|Increase viewport grid size|Image view|-
 Alt + [-]|Decrease viewport grid size|Image view|-
 Shift + Esc|Restart Quick Picto Viewer|Anywhere|Close window
@@ -240,12 +248,12 @@ Delete|Delete folder|Folder tree|Panel
 Space|Scan for sub-folders in the selected folder|Folder tree|-
 7|Copy selected or active file(s) into...|Folder tree|-
 Shift + 7|Move selected or active file(s) into...|Folder tree|-
-Double Left-Click on dot|Insert a new dot next to the double-clicked one|Vector drawing|-
-Ctrl + Left-Click on dot|Remove the dot clicked on|Vector drawing|-
-Alt + Left-Click on dot|Move dot ignoring symmetry|Vector drawing|-
-Shift + Left-Click|Add new dot in the path constrained every 45 degrees|Vector drawing|-
-Shift + Left-Click on dot|Select dot|Vector drawing|-
-Right-Click|Options menu|Vector drawing|Menu
+Double L-Click on dot|Insert a new dot next to the double-clicked one|Vector drawing|-
+Ctrl + L-Click on dot|Remove the dot clicked on|Vector drawing|-
+Alt + L-Click on dot|Move dot ignoring symmetry|Vector drawing|-
+Shift + L-Click|Add new dot in the path constrained every 45 degrees|Vector drawing|-
+Shift + L-Click on dot|Select dot|Vector drawing|-
+R-Click|Options menu|Vector drawing|Menu
 Shift + I|Invert selection path points|Vector drawing|-
 Ctrl + A|Select all points in the path|Vector drawing|-
 Ctrl + D|Deselect all points in the path|Vector drawing|-
@@ -255,10 +263,10 @@ Ctrl + Y|Redo last shape action|Vector drawing|-
 Y|Cycle shape symmetry modes|Vector drawing|-
 Enter|Finish freeform path drawing|Vector drawing|-
 Esc|Cancel freeform path drawing|Vector drawing|-
-Shift + Left-Click on edges or dots|Resize selection area maintaing initial aspect ratio|Image selected area|-
-Shift + Left-Click inside area|Move selection area constrained on X or Y axis|Image selected area|-
-Alt + Left-Click inside area|Resize selection area relative to its center and transform to 1:1 ratio [square]|Image selected area|-
-Double Left-Click outside area|Drop image selection area|Image selected area|-
+Shift + L-Click on edges or dots|Resize selection area maintaing initial aspect ratio|Image selected area|-
+Shift + L-Click inside area|Move selection area constrained on X or Y axis|Image selected area|-
+Alt + L-Click inside area|Resize selection area relative to its center and transform to 1:1 ratio [square]|Image selected area|-
+Double L-Click outside area|Drop image selection area|Image selected area|-
 [|Increase brush size|Painting mode|-
 ]|Decrease brush size|Painting mode|-
 .|Increase brush opacity|Painting mode|-
@@ -278,7 +286,7 @@ J|Activate cloner brush and toggle dynamic coordinates modes for the cloner|Pain
 D|Define cloner brush source [when cloner active]|Painting mode|-
 D|Set primary and secondary colors to black and white|Painting mode|-
 X|Toggle between color A and color B|Live editing|-
-Ctrl + Left-Click|Paint with the other color|Painting mode|-
+Ctrl + L-Click|Paint with the other color|Painting mode|-
 S|Toggle between diameter and radius based brush size|Painting mode|-
 C|Pick primary brush color|Live editing|-
 Shift + K|Cycle between draw inside, outside or ignore selection area|Painting mode|-
