@@ -40,7 +40,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , isToolbarActivated := 0, lockToolbar2Win := 1, lastZeitPanCursor := 1, VisibleQuickMenuSearchWin :=0
      , hquickMenuSearchWin, hGuiTip, lastTippyWin, lastMouseLeave := 1, colorPickerModeNow := 0
      , mustCaptureCloneBrush := 0, doNormalCursor := 1, hotkate, uiUseDarkMode := 0
-     , menusflyOutVisible := 0, otherAscriptHwnd := ""
+     , menusflyOutVisible := 0, otherAscriptHwnd := "", lastLclickX := 0, lastLclickY := 0
 
 Global allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, askDeleteFiles, mouseToolTipWinCreated := 0
 , AutoDownScaleIMGs, autoPlaySNDs, autoRemDeadEntry, ColorDepthDithering, countItemz, currentFileIndex, CurrentSLD, defMenuRefreshItm, doSlidesTransitions
@@ -49,7 +49,6 @@ Global allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSuppor
 , noTooltipMSGs, PrefsLargeFonts, RenderOpaqueIMG, resetImageViewOnChange, showHistogram, showImgAnnotations, showInfoBoxHUD, showSelectionGrid, skipDeadFiles
 , skipSeenImagesSlider, SLDcacheFilesList, SLDhasFiles, sldsPattern, syncSlideShow2Audios, thumbnailsListMode, thumbsCacheFolder, thumbsDisplaying, totalFramesIndex
 , TouchScreenMode, userHQraw, userimgQuality, UserMemBMP, usrTextureBGR, slidesFXrandomize, liveDrawingBrushTool := 0
-, lastPointerUseZeit := 1
 
 ; OnMessage(0x388, "WM_PENEVENT")
 OnMessage(0x2a3, "WM_MOUSELEAVE")
@@ -59,8 +58,8 @@ OnMessage(0x202, "WM_LBUTTONUP")
 OnMessage(0x205, "WM_RBUTTONUP")
 OnMessage(0x207, "WM_MBUTTONDOWN")
 OnMessage(0x047, "WM_WINDOWPOSCHANGED") ; window moving
-OnMessage(0x24B, "WM_POINTERACTIVATE") 
 OnMessage(0x20A, "WM_MOUSEWHEEL")
+; OnMessage(0x24B, "WM_POINTERACTIVATE") 
 ; OnMessage(0x216, "WM_MOVING") ; window moving
 
 Loop, 9
@@ -554,6 +553,8 @@ WM_LBUTTONDOWN(wP, lP, msg, hwnd) {
     If preventOwnGui(A_Gui)
        Return
 
+    lastLclickX := lP & 0xFFFF
+    lastLclickY := lP >> 16
     LbtnDwn := 1
     If (mouseToolTipWinCreated=1)
        mouseTurnOFFtooltip()
@@ -592,9 +593,11 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
        Return 0
     }
 
+    mX := lP & 0xFFFF
+    mY := lP >> 16
     isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1) ? 0 : 1
     If (drawingShapeNow=1)
-       remCustomShapePoint()
+       sendWinClickAct("remClick", "n", mX, mY)
     Else If (imgEditPanelOpened=1 && AnyWindowOpen)
        MainExe.ahkPostFunction("toggleImgEditPanelWindow")
     Else If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
@@ -602,11 +605,6 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
     Else If (!AnyWindowOpen && isOkay)
        MainExe.ahkPostFunction("ToggleThumbsMode")
     Return 0
-}
-
-remCustomShapePoint() {
-    GetMouseCoord2wind(PVhwnd, mX, mY, mXo, mYo)
-    sendWinClickAct("remClick", "n", mX, mY, mXo, mYo)
 }
 
 WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
@@ -675,7 +673,8 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
   prefix := ""
   prefix .= (wParam & 0xffff=4) ? "+" : "" ; shift
   prefix .= (wParam & 0xffff=8) ? "^" : "" ; ctrl
-
+  mX := lP & 0xFFFF
+  mY := lP >> 16
   If (whileLoopExec!=1 && runningLongOperation!=1)
   {
      If (prefix="^" && !AnyWindowOpen && drawingShapeNow!=1 && mustCaptureCloneBrush!=1 && thumbsDisplaying!=1)
@@ -683,13 +682,15 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
      Else If (prefix="+" && !AnyWindowOpen && drawingShapeNow!=1 && mustCaptureCloneBrush!=1)
         MainExe.ahkPostFunction("BuildSecondMenu")
      Else
-        SetTimer, InitGuiContextMenu, -5
+        InitGuiContextMenu(mX, mY)
   }
   Return 0
 }
 
-InitMainContextMenu() {
-   GetPhysicalCursorPos(mX, mY)
+InitMainContextMenu(mX, mY) {
+   If mX is not Number
+      GetPhysicalCursorPos(mX, mY)
+
    thisTick := Round(lastMenuInvoked[1])
    thisX := lastMenuInvoked[2]
    thisY := lastMenuInvoked[3]
@@ -701,8 +702,9 @@ InitMainContextMenu() {
       PanelQuickSearchMenuOptions()
       Return
    }
+
    lastMenuInvoked := [A_TickCount, mX, mY]
-   InitGuiContextMenu()
+   InitGuiContextMenu(mX, mY)
    SetTimer, TimerMouseMove, -25
 }
 
@@ -728,8 +730,8 @@ toggleAppToolbar() {
     lastInvoked := A_TickCount
 }
 
-InitGuiContextMenu() {
-    MainExe.ahkPostFunction(A_ThisFunc, "extern")
+InitGuiContextMenu(mX, mY) {
+    MainExe.ahkPostFunction(A_ThisFunc, "extern", mX, mY)
 }
 
 slideshowsHandler(thisSlideSpeed, act, how) {
@@ -788,6 +790,7 @@ WM_POINTERACTIVATE() {
     canCancelImageLoad := 4
     LbtnDwn := 1
     ctrlName := "unknown"
+/*
     Loop, 5
     {
          xu := winCtrlsCoords[A_Index, 1]
@@ -798,11 +801,12 @@ WM_POINTERACTIVATE() {
          If isDotInRect(mX, mY, xu, xu + wu, yu, yu + hu)
             Break
     }
+*/
     ; ToolTip, % mX "=" mY "==" ctrlName , , , 3
     If (slideShowRunning=1)
        turnOffSlideshow()
-    Else
-       sendWinClickAct("normal-pen-down", ctrlName, mX, mY, mXo, mYo)
+    ; Else
+    ;    sendWinClickAct("normal-pen-down", ctrlName, mX, mY, mXo, mYo)
     lastPointerUseZeit := A_TickCount
 }
 
@@ -812,6 +816,7 @@ WM_POINTERUP(wP, lP, msg, hwnd) {
   ; ToolTip, % "r=" r , , , 2
   Return 1
 }
+
 updateGDIwinPos() {
   ; thumbsDisplaying := MainExe.ahkgetvar.thumbsDisplaying
   ; If (A_OSVersion="WIN_7")
@@ -854,7 +859,9 @@ WinClickAction(thisEvent:="normal") {
     If (A_TickCount - lastInvoked<25)
        Return
 
-    GetMouseCoord2wind(PVhwnd, mX, mY, mXo, mYo)
+    ; GetMouseCoord2wind(PVhwnd, mX, mY, mXo, mYo)
+    mX := lastLclickX,    mY := lastLclickY
+    ; ToolTip, % mX "=" mY "`n" lastLclickX "=" lastLclickY , , , 2
     canCancelImageLoad := 4
     ctrlName := A_GuiControl
     Loop, 5
@@ -878,11 +885,11 @@ WinClickAction(thisEvent:="normal") {
     Else If (A_TickCount - lastZeitPanCursor<350) && (thumbsDisplaying=0)
        MainExe.ahkPostFunction("simplePanIMGonClick", 0, 1, 1)
     Else
-       sendWinClickAct(thisEvent, ctrlName, mX, mY, mXo, mYo)
+       sendWinClickAct(thisEvent, ctrlName, mX, mY)
 }
 
-sendWinClickAct(ctrlEvent, guiCtrl, mX, mY, mXo, mYo) {
-     MainExe.ahkPostFunction("WinClickAction", ctrlEvent, guiCtrl, mX, mY, mXo, mYo)
+sendWinClickAct(ctrlEvent, guiCtrl, mX, mY) {
+     MainExe.ahkPostFunction("WinClickAction", ctrlEvent, guiCtrl, mX, mY)
 }
 
 GetMouseCoord2wind(hwnd, ByRef nx, ByRef ny, ByRef ox, ByRef oy) {
@@ -901,10 +908,6 @@ JEE_ScreenToClient(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
   vPosX2 := NumGet(&POINT, 0, "Int")
   vPosY2 := NumGet(&POINT, 4, "Int")
   POINT := ""
-}
-
-sndBeep(freq,dur) {
-  SoundBeep , % freq, % dur
 }
 
 ResetLbtn() {
