@@ -2,6 +2,10 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.7.2 (2022-05-10)
+  - [new] zoom / motion blur
+  - various bug fixes
+
 - v5.7.1 (2022-04-28)
   - [new] ability to skew image object when using the transform tool
   - important bug fixes

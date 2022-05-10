@@ -1469,7 +1469,6 @@ Gdi_SetDIBcolorTable(hDC, iStart, entries, RGBQUADs) {
 
 
 Gdi_CreateCompatibleBitmap(hDC, w, h) {
-
   ; The CreateCompatibleBitmap function creates a DDB bitmap compatible
   ; with the device that is associated with the specified device context.
 
@@ -1499,7 +1498,6 @@ Gdi_CreateCompatibleBitmap(hDC, w, h) {
   ; If a DIB section, which is a bitmap created by the CreateDIBSection
   ; function, is selected into the device context identified by the hdc
   ; parameter, CreateCompatibleBitmap creates a DIB section.
-
 
    return DllCall("gdi32\CreateCompatibleBitmap", "UPtr", hDC, "Int", w, "Int", h)
 }

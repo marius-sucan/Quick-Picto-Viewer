@@ -1042,6 +1042,8 @@ repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:=
     Static lastAsked := 1
          , BS_CHECKBOX := 0x2, BS_RADIOBUTTON := 0x8
 
+    repositionedWindow := winPos ? 1 : 0
+    winPos := (winPos=1) ? "" : winPos
     If !winPos
     {
        SysGet, MonitorCount, 80
@@ -1124,7 +1126,12 @@ repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:=
        If (!Final_y) || (Final_y + 1<mCoordTop)
           Final_y := mCoordTop + 1
        Gui, %whichGUI%: Show, x%Final_x% y%Final_y%, % Chr(160) winTitle
-    } Else Gui, %whichGUI%: Show, AutoSize %winPos%, % Chr(160) winTitle
+    } Else 
+    {
+       ; SoundBeep 
+       ; ToolTip, % winPos , , , 2
+       Gui, %whichGUI%: Show, AutoSize %winPos%, % Chr(160) winTitle
+    }
     SetTimer, highlightActiveCtrl, -100
 }
 

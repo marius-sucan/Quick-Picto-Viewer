@@ -2513,3 +2513,26 @@ WinEnumChild(hwnd:=0, lParam:=0) {
   %ObjPush%(Object(lParam + 0), hwnd)
   return true
 }
+
+WinMoveZ(hWnd, C, X, Y, W, H, Redraw:=0) {
+  ; WinMoveZ v0.5 by SKAN on D35V/D361 - https://www.autohotkey.com/boards/viewtopic.php?f=6&t=76745
+  ; If Redraw=2, the new coordinates will be returned
+  ; Moves a window to given coordinates, but confines the window within the work area of the target monitor.
+  ; Which target monitor? : Whichever monitor POINT (X, Y) belongs to
+  ; What if POINT doesn't belong to any monitor? : The monitor nearest to the POINT will house the window.
+
+  Local V := VarSetCapacity(R, 48, 0), TPM_WORKAREA := 0x10000
+      , A := &R + 16, S := &R + 24, E := &R, NR := &R + 32
+
+  C := ( C:=Abs(C) ) ? DllCall("SetRect", "Ptr",&R, "Int",X-C, "Int",Y-C, "Int",X+C, "Int",Y+C) : 0
+  DllCall("SetRect", "Ptr",&R+16, "Int",X, "Int",Y, "Int",W, "Int",H)
+  DllCall("CalculatePopupWindowPosition", "Ptr",A, "Ptr",S, "UInt",TPM_WORKAREA, "Ptr",E, "Ptr",NR)
+  X := NumGet(NR+0,"Int")
+  Y := NumGet(NR+4,"Int")
+  If (Redraw=2)
+     Return [X, Y]
+  Else 
+     Return DllCall("MoveWindow", "Ptr",hWnd, "Int",X, "Int",Y, "Int",W, "Int",H, "Int",Redraw)
+}
+
+

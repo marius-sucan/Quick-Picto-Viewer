@@ -38951,6 +38951,11 @@ deny
 denying
 denyingly
 deo
+deobfuscate
+deobfuscated
+deobfuscation
+deobfuscator
+deobfuscators
 deobstruct
 deobstruent
 deodand
@@ -100393,6 +100398,8 @@ obfuscate
 obfuscated
 obfuscating
 obfuscation
+obfuscator
+obfuscators
 obham
 obi
 obigation

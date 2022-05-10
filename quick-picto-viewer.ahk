@@ -43,7 +43,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.7.1
+;@Ahk2Exe-SetVersion 5.7.2
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2021)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -197,10 +197,10 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , iduStaticFoldersListCache := 0, lastFilterEditSearch := "", additionalLVrows := 1, uLVr := 12
    , omniBoxMode := 0, hLVquickSearchMenus := "", hotkate, vk_hwnd, lastInfoBoxBMP := []
    , userFriendlyPrevImgSelAction, keywordsListArray := new hashtable(), keywrdLVfilter
-   , lastLclickX, lastLclickY, lastTlbrCliicked := 0, uiLVoffset := 0
+   , lastLclickX, lastLclickY, lastTlbrCliicked := 0, uiLVoffset := 0, repositionedWindow := 0
    , selDotMaX, selDotMaY, selDotMbX, selDotMbY, selDotMcX, selDotMcY, selDotMdX, selDotMdY
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.7.1", vReleaseDate := "28/04/2022"
+   , appVersion := "5.7.2", vReleaseDate := "10/05/2022"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1, usrAutoCropGenerateSelection := 0
@@ -311,7 +311,9 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , innerSelectionCavityX := 0, innerSelectionCavityY := 0, ResizeEnforceCanvas := 0
    , ResizeFillCanvasMode := 1, ShowToolTipsToolbar := 1, userPrivateMode := 0, thresholdKeywords := 1
    , minKeywordLength := 2, LangKeywordsFilter := 0, mergeKeywordRows := 1, limitSearchReplaceSelected := 0
-   , autoReflectVectorAnchors := 0, shearImgX := 0, shearImgY := 0
+   , autoReflectVectorAnchors := 0, shearImgX := 0, shearImgY := 0, zoomBlurAreaYamount := 1
+   , zoomBlurAreaXamount := 1, zoomBlurMode := 1
+   , BlurAreaHue := 0, BlurAreaSaturation := 0, BlurAreaLight := 0, BlurAreaGamma := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -450,13 +452,13 @@ identifyThisWin() {
 }
 
 HKifs(q:=0, whichWin:=-1) {
-   whichBitmap := useGdiBitmap() ? 1 : 0
+   whichBitmap := (useGdiBitmap() && resultedFilesList[currentFileIndex, 1]) ? 1 : 0
    If (q="imgEditSolo")
-      r := (!AnyWindowOpen && openingPanelNow!=1 && currentFileIndex=0 && !CurrentSLD && thumbsDisplaying!=1 && whichBitmap=1) ? 1 : 0
+      r := (!AnyWindowOpen && openingPanelNow!=1 && !CurrentSLD && whichBitmap=1 && thumbsDisplaying!=1) ? 1 : 0
    Else If (q="imgsLoaded")
       r := (!AnyWindowOpen && openingPanelNow!=1 && CurrentSLD && maxFilesIndex>0) ? 1 : 0
    Else If (q="liveEdit")
-      r := (AnyWindowOpen && openingPanelNow!=1 && imgEditPanelOpened=1 && whichBitmap=1 && thumbsDisplaying=0) ? 1 : 0
+      r := (AnyWindowOpen && openingPanelNow!=1 && imgEditPanelOpened=1 && whichBitmap=1 && thumbsDisplaying!=1) ? 1 : 0
    Else If (q="general")
       r := (!AnyWindowOpen && imgEditPanelOpened!=1) ? 1 : 0
 
@@ -7072,10 +7074,11 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
            If (bezierSplineCustomShape=1)
            {
               auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, thisIndex, gmX, gmY)
+              ; ToolTip, % auxiliaryPoints[1, 1] "==" auxiliaryPoints.Count() , , , 2
               Loop, % auxiliaryPoints.Count()
               {
                   initialDrawingStartCoords[auxiliaryPoints[A_Index, 1]] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
-                  If (altState=0)
+                  If (altState=0 && canDoSymmetry=1)
                      initialDrawingStartCoords[auxiliaryPoints[A_Index, 2]] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
               }
            }
@@ -7249,7 +7252,7 @@ getPointsSameCoordsVectorPath(totalCount, givenIndex, gmX, gmY, mainParam:=0) {
    {
        ; determine user clicked point from the entire path
        thisIndex := givenIndex - 6 +  A_Index
-       If !IsObject(customShapePoints[thisIndex])
+       If (!IsObject(customShapePoints[thisIndex]) || thisIndex=givenIndex)
           Continue
 
        oppoIndex := totalCount - thisIndex + 1
@@ -7264,7 +7267,7 @@ getPointsSameCoordsVectorPath(totalCount, givenIndex, gmX, gmY, mainParam:=0) {
        {
            ; determine user clicked point from the entire path
            thisIndex := A_Index
-           If !IsObject(customShapePoints[thisIndex])
+           If (!IsObject(customShapePoints[thisIndex]) || thisIndex=givenIndex)
               Continue
  
            oppoIndex := totalCount - thisIndex + 1
@@ -7277,7 +7280,7 @@ getPointsSameCoordsVectorPath(totalCount, givenIndex, gmX, gmY, mainParam:=0) {
        {
            ; determine user clicked point from the entire path
            thisIndex := totalCount - 3 + A_Index
-           If !IsObject(customShapePoints[thisIndex])
+           If (!IsObject(customShapePoints[thisIndex]) || thisIndex=givenIndex)
               Continue
  
            oppoIndex := totalCount - thisIndex + 1
@@ -7555,6 +7558,7 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
             info := defineWindowUnderMouse()
             If InStr(info, "tooltip")
             {
+               interfaceThread.ahkFunction("showOSDinfoLineNow", 500)
                Continue
             } Else If (InStr(info, "main") && markedSelectFile>1)
             {
@@ -7602,7 +7606,7 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
             } Else 
             {
                func2exec := r := dc := nc := ""
-               friendly := "No action associated to this pointer location"
+               friendly := "`nNo action associated to this pointer location"
             }
 
             If (A_TickCount - prevMSGdisplay>100)
@@ -7789,7 +7793,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       ; SetTimer, updateUIfillPanel, -350
       lastTimeToggleThumbs := A_TickCount 
       Return
-   } Else If (AnyWindowOpen=43 || AnyWindowOpen=44 || AnyWindowOpen=26)
+   } Else If (AnyWindowOpen=69 || AnyWindowOpen=43 || AnyWindowOpen=44 || AnyWindowOpen=26)
    {
       ; respond to clicks in viewport for panels with region based previews
       setwhileLoopExec(1)
@@ -8884,7 +8888,7 @@ ToggleImgFX(dir:=0) {
         , curvesFX := {1:"Brightness (density)", 2:"Contrast", 3:"Highlights", 4:"Shadows", 5:"Midtones", 6:"White saturation", 7:"Black saturation"}
         , curvesChannels := {1:"Red", 2:"Green", 3:"Blue", 4:"All"}
 
-   If (A_TickCount - lastInvoked < 50) || (thumbsDisplaying=1 && thumbsListViewMode>1 && showHUDnavIMG!=1)
+   If (A_TickCount - lastInvoked < 50) || (thumbsDisplaying=1 && showHUDnavIMG!=1)
       Return
 
    lastInvoked := A_TickCount
@@ -9766,7 +9770,7 @@ changeImgRotationInVP(dir, stepu:=15, doReset:=0) {
    If (thumbsDisplaying=1 || liveDrawingBrushTool=1)
       Return
 
-   whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
+   whichBitmap := useGdiBitmap()
    If StrLen(whichBitmap)>3
    {
       Gdip_GetImageDimensions(whichBitmap, imgW, imgH)
@@ -13151,7 +13155,6 @@ alertReduceColorDepth() {
    If (currIMGdetails.TooLargeGDI=1 && StrLen(UserMemBMP)<3)
    {
       infoRes := "`nOriginal resolution: " currIMGdetails.Width " x " currIMGdetails.Height " px | " Round((currIMGdetails.Width*currIMGdetails.Height)/1000000,2) " MPx"
-      ; whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
       Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
       newRes := "`nDownscaled resolution: " imgW " x " imgH " px | " Round((imgW*imgH)/1000000,2) " MPx"
       msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", "The image you now begin to edit exceeds the maximum possible dimensions for image editing." infoRes "`n`nYou will edit it now at an automatically downscaled resolution:" newRes, 0, 0, "exclamation")
@@ -13185,7 +13188,6 @@ alertReduceSaveColorDepth() {
    If (currIMGdetails.TooLargeGDI=1 && StrLen(UserMemBMP)<3)
    {
       infoRes := "`nOriginal resolution: " currIMGdetails.Width " x " currIMGdetails.Height " px | " Round((currIMGdetails.Width*currIMGdetails.Height)/1000000,2) " MPx"
-      ; whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
       Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
       newRes := "`nDownscaled resolution: " imgW " x " imgH " px | " Round((imgW*imgH)/1000000,2) " MPx"
       msgResult := msgBoxWrapper(appTitle ": IMAGE SAVE WARNING", "The image you intend to resave exceeds the maximum possible dimensions for image editing." infoRes "`n`nYou will be saving an automatically downscaled resolution:" newRes, "&Continue|C&ancel", 1, "exclamation")
@@ -14815,7 +14817,6 @@ dummyInfoImgResizeVP() {
 }
 
 DrawLinesInSelectedArea(modus) {
-
     If (slideShowRunning=1)
        ToggleSlideShowu()
 
@@ -15202,6 +15203,22 @@ ApplySpecialFixedBlur(funcu, zBitmap, radius, pEffect, previewMode:=0) {
     Gdip_DisposeEffect(zB)
 }
 
+applyBlurColorsFX(zBitmap) {
+    If (BlurAreaHue!=0 || BlurAreaSaturation!=0)
+    {
+       zEffect := Gdip_CreateEffect(6, BlurAreaHue, BlurAreaSaturation, 0)
+       Gdip_BitmapApplyEffect(zBitmap, zEffect)
+       Gdip_DisposeEffect(zEffect)
+    }
+
+    If (BlurAreaLight!=0 || BlurAreaGamma!=0)
+    {
+       zEffect := Gdip_CreateEffect(5, BlurAreaLight, BlurAreaGamma)
+       Gdip_BitmapApplyEffect(zBitmap, zEffect)
+       Gdip_DisposeEffect(zEffect)
+    }
+}
+
 BlurSelectedArea() {
     startZeit := A_TickCount
     stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc)
@@ -15402,8 +15419,15 @@ BlurSelectedArea() {
     If (BlurAreaBlendMode>1)
     {
        setWindowTitle("APPLYING BLENDING MODE, please wait", 1)
+       If (allowAlphaMasking=1)
+          ou := trGdip_CloneBitmap(A_ThisFunc, bgrBMPu)
+
+       applyBlurColorsFX(zBitmap)
        rz := QPV_BlendBitmaps(bgrBMPu, zBitmap, BlurAreaBlendMode - 1, 0)
-       ou := zBitmap
+       If (allowAlphaMasking=1)
+          trGdip_DisposeImage(zBitmap)
+       Else
+          ou := zBitmap
        zBitmap := bgrBMPu
        bgrBMPu := ou
     }
@@ -15423,6 +15447,185 @@ BlurSelectedArea() {
     trGdip_DisposeImage(zBitmap, 1)
     trGdip_DisposeImage(bgrBMPu, 1)
     Gdip_DisposeEffect(pEffect)
+    Gdip_DeletePath(pPath)
+    Gdip_DeleteGraphics(G2)
+    realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
+    If (r1!="fail" && r0!="fail")
+    {
+       UserMemBMP := whichBitmap
+       recordUndoLevelNow(0, UserMemBMP)
+    }
+    SetTimer, RefreshImageFile, -25
+    zeitOperation := A_TickCount - startZeit
+    addJournalEntry(A_ThisFunc "() operation elapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)))
+}
+
+zoomBlurSelectedArea() {
+    startZeit := A_TickCount
+    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc)
+    whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
+    If (stopNow=1 || !whichBitmap || thumbsDisplaying=1 || editingSelectionNow!=1)
+    {
+       addJournalEntry(A_ThisFunc "() error - operation abandoned: " whichBitmap "--" stopNow "--" thumbsDisplaying "--" editingSelectionNow)
+       SetTimer, ResetImgLoadStatus, -300
+       Return
+    }
+
+    Gdip_GetImageDimensions(whichBitmap, imgW, imgH)
+    allowAlphaMasking := decideAlphaMaskingFeaseable(BlurAreaAlphaMask)
+    calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
+    extendedClone := 1 ; testSelectionLargerThanGiven(imgW, imgH)
+    decXbr := (X1<0) ? Abs(X1) : 0
+    decYbr := (Y1<0) ? Abs(Y1) : 0
+    If (X1<5)
+       X1MarginSnap := 1
+    If (X2>imgW - 5)
+       X2MarginSnap := 1
+    If (Y1<5)
+       Y1MarginSnap := 1
+    If (Y2>imgH - 5)
+       Y2MarginSnap := 1
+
+    If (X1MarginSnap=1 && X2MarginSnap=1 && Y1MarginSnap=1 && Y2MarginSnap=1 && blurAreaInverted=1 && EllipseSelectMode=0 && VPselRotation=0)
+    {
+       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected, however you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK|&Reopen panel", 1, "exclamation")
+       If InStr(msgResult, "reopen")
+          SetTimer, PanelZoomBlurSelectedArea, -500
+       SetTimer, ResetImgLoadStatus, -100
+       Return
+    }
+
+    G2 := trGdip_GraphicsFromImage(A_ThisFunc, whichBitmap, 7, 4)
+    If !G2
+    {
+       SetTimer, ResetImgLoadStatus, -100
+       Return
+    }
+
+    recordUndoLevelNow("init", 0)
+    If (UserMemBMP!=whichBitmap)
+       gdiBitmap := ""
+
+    pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
+    pB := GetPathRelativeBounds(pPath, imgSelPx, imgSelPy)
+    imgSelPx := pB.x,  imgSelPy := pB.y
+    imgSelW  := pB.w,  imgSelH  := pB.h
+
+    If pPath
+    {
+       modus := (blurAreaInverted=1) ? 4 : 0
+       Gdip_SetClipPath(G2, pPath, modus)
+    }
+
+    If (blurAreaInverted=1)
+    {
+       imgSelPx := imgSelPy := 0
+       imgSelW := imgW
+       imgSelH := imgH
+    }
+
+    zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
+    QPV_SetGivenAlphaLevel(zBitmap, 1, 1)
+
+    If (BlurAreaBlendMode>1 || allowAlphaMasking=1)
+       bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
+
+    If (blurAreaOpacity>252 && blurAreaSoftEdges!=1)
+       r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
+
+    setWindowTitle("BLURRING IMAGE, please wait", 1)
+    thisOpacity := blurAreaOpacity/255
+    startOpacity := thisOpacity/6
+    thisBlurAmount := clampInRange(5 + Round(zoomBlurAreaXamount/2) - 2, 5, 20) ; A_Index * thisBlur
+    pEffect := Gdip_CreateEffect(1, thisBlurAmount, 0, 0)
+    gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
+    G3 := trGdip_GraphicsFromImage(A_ThisFunc, gBitmap, 3, 4)
+    thisO := 0.85
+    dimgSelPx := imgSelPx, dimgSelPy := imgSelPy
+    dimgSelW := imgSelW, dimgSelH := imgSelH
+
+    prcX := (clampInRange(tinyPrevAreaCoordX, imgSelPx, imgSelW) - imgSelPx)/imgSelW
+    prcY := (clampInRange(tinyPrevAreaCoordY, imgSelPy, imgSelH) - imgSelPy)/imgSelH
+    b := zoomBlurAreaXamount*2
+    If isInRange(zoomBlurMode, 1, 3)
+    {
+       Loop
+       {
+          thisO -= 0.1 ; thisOpacity - (A_Index - 1) * startOpacity
+          If (thisO<0)
+             Break
+
+          showTOOLtip("Zoom blur: step " A_Index,, , (1 - thisO)/1)
+          ; fnOutputDebug(thisBlurAmount "=" thisO)
+          ApplySpecialFixedBlur(A_ThisFunc, zBitmap, thisBlurAmount, pEffect)
+          If (zoomBlurMode=1 || zoomBlurMode=2)
+             dimgSelW += A_Index * b
+          If (zoomBlurMode=1 || zoomBlurMode=3)
+             dimgSelH += A_Index * b
+
+          If (zoomBlurMode=1 || zoomBlurMode=2)
+             dimgSelPx := 0 - (dimgSelW - imgSelW)*prcX
+          If (zoomBlurMode=1 || zoomBlurMode=3)
+             dimgSelPy := 0 - (dimgSelH - imgSelH)*prcY
+
+          r1 := trGdip_DrawImage(A_ThisFunc, G3, zBitmap, dimgSelPx, dimgSelPy, dimgSelW, dimgSelH,,,,, thisO)
+          trGdip_DisposeImage(zBitmap, 1)
+          zBitmap := trGdip_CloneBitmap(A_ThisFunc, gBitmap)
+       }
+    } Else
+    {
+       f := zoomBlurAreaXamount*8
+       ff := (zoomBlurAreaXamount*8)/2
+       If (zoomBlurMode=4)
+       {
+          wbitmap := trGdip_ResizeBitmap(A_ThisFunc, zBitmap, imgSelW//ff, imgSelH, 0, 5)
+          rbitmap := trGdip_ResizeBitmap(A_ThisFunc, wBitmap, imgSelW//f, imgSelH, 0, 7)
+       } Else
+       {
+          wbitmap := trGdip_ResizeBitmap(A_ThisFunc, zBitmap, imgSelW, imgSelH//ff, 0, 5)
+          rbitmap := trGdip_ResizeBitmap(A_ThisFunc, wBitmap, imgSelW, imgSelH//f, 0, 7)
+       }
+
+       fbitmap := trGdip_ResizeBitmap(A_ThisFunc, rBitmap, imgSelW, imgSelH, 0, 7)
+       r1 := trGdip_DrawImage(A_ThisFunc, G3, fBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH)
+       trGdip_DisposeImage(wBitmap)
+       trGdip_DisposeImage(rBitmap)
+       trGdip_DisposeImage(fBitmap)
+    }
+
+    Gdip_DeleteGraphics(G3)
+    If (BlurAreaBlendMode>1)
+    {
+       setWindowTitle("APPLYING BLENDING MODE, please wait", 1)
+       applyBlurColorsFX(gBitmap)
+       If (allowAlphaMasking=1)
+          ou := trGdip_CloneBitmap(A_ThisFunc, bgrBMPu)
+
+       rz := QPV_BlendBitmaps(bgrBMPu, gBitmap, BlurAreaBlendMode - 1, 0)
+       If (allowAlphaMasking=1)
+          trGdip_DisposeImage(gBitmap)
+       Else
+          ou := gBitmap
+       gBitmap := bgrBMPu
+       bgrBMPu := ou
+    }
+
+    If (allowAlphaMasking=1 && StrLen(bgrBMPu)>2)
+    {
+       realtimePasteInPlaceAlphaMasker(0, gBitmap, "lol", newBitmap, 0, 0, 0, 0)
+       If StrLen(newBitmap)>2
+       {
+          r2 := trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx, imgSelPy, imgSelW, imgSelH)
+          trGdip_DisposeImage(gBitmap, 1)
+          gBitmap := newBitmap
+       }
+    }
+
+    r1 := trGdip_DrawImage(A_ThisFunc, G2, gBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH,,,,, thisOpacity)
+    Gdip_DisposeEffect(pEffect)
+    trGdip_DisposeImage(zBitmap, 1)
+    trGdip_DisposeImage(gBitmap, 1)
+    trGdip_DisposeImage(bgrBMPu, 1)
     Gdip_DeletePath(pPath)
     Gdip_DeleteGraphics(G2)
     realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
@@ -16032,7 +16235,7 @@ CropImageInViewPortToSelection(modus:=0) {
     If (slideShowRunning=1)
        ToggleSlideShowu()
 
-    whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
+    whichBitmap := useGdiBitmap()
     If (!whichBitmap || thumbsDisplaying=1 || editingSelectionNow!=1)
        Return
 
@@ -16051,13 +16254,15 @@ CropImageInViewPortToSelection(modus:=0) {
        Return
     }
 
-    recordUndoLevelNow("init", 0)
     dummyBMP := getSelectedImageArea(whichBitmap, 1, 0, 0, 0)
     If StrLen(dummyBMP)>1
     {
+       recordUndoLevelNow("init", 0)
        If (EllipseSelectMode>0 || VPselRotation>0 || X1<0 || Y1<0 || X2>imgW || Y2>ImgH) || (innerSelectionCavityX>0.01 && innerSelectionCavityY>0.01)
           currIMGdetails.HasAlpha := 1
        UserMemBMP := dummyBMP
+       recordUndoLevelNow(0, UserMemBMP)
+       trGdip_DisposeImage(xBitmap, 1)
     } Else
     {
        showTOOLtip("Failed to crop image to selected area")
@@ -16066,8 +16271,6 @@ CropImageInViewPortToSelection(modus:=0) {
        Return
     }
 
-    recordUndoLevelNow(0, UserMemBMP)
-    trGdip_DisposeImage(xBitmap, 1)
     If (modus="simplex")
        Return
 
@@ -16246,7 +16449,7 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
     }
 
     isImgOpen := 1
-    If ((StrLen(gdiBitmap)>2 || StrLen(UserMemBMP)>2) && imgPath && A_PtrSize=8)
+    If isImgEditingNow()
        isImgOpen := 2
     Else If (!currentFileIndex || !CurrentSLD || !maxFilesIndex || !imgPath)
        isImgOpen := 0
@@ -16276,10 +16479,11 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
        If (isUniform=1 && isInRange(maxLevelIndex, 252, 255))
           currIMGdetails.HasAlpha := 0
     } Else currIMGdetails.HasAlpha := 0
+
     ; ToolTip, % currIMGdetails.HasAlpha " = lol" , , , 2
-    currentImgModified := usrColorDepth := imgFxMode := 1
     imgIndexEditing := currentFileIndex
     vpIMGrotation := FlipImgH := FlipImgV := 0
+    currentImgModified := usrColorDepth := imgFxMode := 1
     defineColorDepth()
     dropFilesSelection(1)
     RemoveTooltip()
@@ -17293,25 +17497,6 @@ mouseTurnOFFtooltip() {
       interfaceThread.ahkPostFunction("mouseTurnOFFtooltip", 1)
       ; Gui, mouseToolTipGuia: Destroy
    ; mouseToolTipWinCreated := 0
-}
-
-adjustWin2MonLimits(winHwnd, winX, winY, ByRef rX, ByRef rY, ByRef Wid, ByRef Heig) {
-   GetWinClientSize(Wid, Heig, winHwnd, 1)
-   ActiveMon := MWAGetMonitorMouseIsIn(winX, winY)
-   If ActiveMon
-   {
-      SysGet, bCoord, Monitor, %ActiveMon%
-      rX := max(bCoordLeft, min(winX, bCoordRight - Wid))
-      rY := max(bCoordTop, min(winY, bCoordBottom - Heig*1.2))
-      ResWidth := Abs(max(bCoordRight, bCoordLeft) - min(bCoordRight, bCoordLeft))
-      ; ResHeight := Abs(max(bCoordTop, bCoordBottom) - min(bCoordTop, bCoordBottom))
-   } Else
-   {
-      rX := winX
-      rY := winY
-   }
-
-   Return ResWidth
 }
 
 createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
@@ -20209,6 +20394,7 @@ FolderTreeResponder(a, b, c) {
 
          If InStr(info, "tooltip")
          {
+            interfaceThread.ahkFunction("showOSDinfoLineNow", 500)
             Continue
          } Else If InStr(info, "tree")
          {
@@ -21752,8 +21938,8 @@ PopulateImgInfos() {
       }
       trGdip_DisposeImage(thumbBMP, 1)
    }
-   LV_Add(A_Index, "Image loaded with ", currIMGdetails.OpenedWith)
 
+   LV_Add(A_Index, "Image loaded with ", currIMGdetails.OpenedWith)
    Loop, 2
        LV_ModifyCol(A_Index, "AutoHdr Left")
 }
@@ -27146,6 +27332,7 @@ readMainSettingsApp(act) {
     RegAction(act, "mainWinMaximized",, 1)
     RegAction(act, "mainWinPos",, 5)
     RegAction(act, "mainWinSize",, 5)
+    RegAction(act, "HUDnavBoxSize",, 2, 75, 250)
 
     If (act=0)
     {
@@ -29809,6 +29996,7 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
          info := defineWindowUnderMouse()
          If InStr(info, "tooltip")
          {
+            interfaceThread.ahkFunction("showOSDinfoLineNow", 500)
             Continue
          } Else If InStr(info, "tree")
          {
@@ -31014,7 +31202,7 @@ PanelSetThumbColumnOptions() {
        GuiControl, SettingsGUIA: Disable, imgFxMode
 
     Gui, Add, Button, xs y+25 w%thisW% h%thisBtnHeight% Default gBtnCloseWindow, &Close
-    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Thumbnails options: " appTitle, winPos)
 }
 
@@ -31504,7 +31692,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
     Gui, Add, Button, x+5 hp w%btnWid% gBtnHelpBrushes, &Help
     Gui, Add, Button, x+5 hp wp-5 Default gBtnCloseWindow, C&lose
     Gui, Add, DropDownList, x+5 wp+60 gupdateUIbrushTool AltSubmit Choose%BrushToolOutsideSelection% vBrushToolOutsideSelection, Ignore selection|Paint inside|Paint outside
-    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Brushes tool: " appTitle, winPos)
     SetTimer, updateUIbrushTool, -125
     SetTimer, resetOpeningPanel, -300
@@ -32083,6 +32271,12 @@ UItriggerBrushUpdate(actu:="noPreview", delayu:=100) {
    {
       fn := Func("updateUIfillPanel").Bind(actu)
       SetTimer, % fn, % -delayu
+   } Else If (AnyWindowOpen=26)
+   {
+      SetTimer, updateUIblurPanel, % -delayu
+   } Else If (AnyWindowOpen=69)
+   {
+      SetTimer, updateUIzoomBlurPanel, % -delayu
    } Else If (AnyWindowOpen=70)
    {
       fn := Func("updateUIalphaMaskerPanel").Bind(actu)
@@ -33933,7 +34127,7 @@ MainPanelTransformArea(dummy:="", toolu:="") {
     Gui, Add, Button, x+5 hp wp-5 gBtnHelpTransform, &Help
     Gui, Add, Button, x+5 hp wp+5 gBtnCloseWindow, &Cancel
     Gui, Add, Checkbox, xs y+7 gupdateUIpastePanel Checked%doImgEditLivePreview% vdoImgEditLivePreview, &Live preview (low quality)
-    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, friendlyTitle appTitle, winPos)
     SetTimer, updateUIpastePanel, -350
     SetTimer, resetOpeningPanel, -300
@@ -33970,6 +34164,22 @@ BtnResetPanelsSpecificControl(CtrlHwnd, b, c) {
    {
       PasteInPlaceGamma := 0
       GuiControl, SettingsGUIA:, PasteInPlaceGamma, % PasteInPlaceGamma
+   } Else If (varu="infoBlurHue")
+   {
+      BlurAreaHue := 0
+      GuiControl, SettingsGUIA:, BlurAreaHue, % BlurAreaHue
+   } Else If (varu="infoBlurSat")
+   {
+      BlurAreaSaturation := 0
+      GuiControl, SettingsGUIA:, BlurAreaSaturation, % BlurAreaSaturation
+   } Else If (varu="infoBlurLight")
+   {
+      BlurAreaLight := 0
+      GuiControl, SettingsGUIA:, BlurAreaLight, % BlurAreaLight
+   } Else If (varu="infoBlurGamma")
+   {
+      BlurAreaGamma := 0
+      GuiControl, SettingsGUIA:, BlurAreaGamma, % BlurAreaGamma
    } Else If (varu="infoPasteOpacity")
    {
       PasteInPlaceOpacity := 255
@@ -35220,9 +35430,20 @@ UIcycleFillShapes() {
 }
 
 BtnResetBlendMode() {
-   FillAreaBlendMode := 1
-   GuiControl, SettingsGUIA: Choose, FillAreaBlendMode, % FillAreaBlendMode
-   updateUIfillPanel()
+   If (AnyWindowOpen=23)
+   {
+      FillAreaBlendMode := 1
+      GuiControl, SettingsGUIA: Choose, FillAreaBlendMode, % FillAreaBlendMode
+      updateUIfillPanel()
+   } Else
+   {
+      BlurAreaBlendMode := 1
+      GuiControl, SettingsGUIA: Choose, BlurAreaBlendMode, % BlurAreaBlendMode
+      If (AnyWindowOpen=69)
+         updateUIzoomBlurPanel()
+      Else
+         updateUIblurPanel()
+   }
 }
 
 BtnResetTextBlendMode() {
@@ -35259,8 +35480,7 @@ PanelEditorImgResize() {
     If (thumbsDisplaying=1 || AnyWindowOpen)
        Return
 
-    whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
-    r1 := Gdip_GetImageDimensions(whichBitmap, oImgW, oImgH)
+    r1 := Gdip_GetImageDimensions(useGdiBitmap(), oImgW, oImgH)
     If (!oImgH || !oImgH)
     {
        showTOOLtip("ERROR: No image seems to be loaded or it is malformed")
@@ -35381,8 +35601,7 @@ BTNimgResizeEditor() {
     }
 
     r1 := trGdip_DrawImage(A_ThisFunc, G2, whichBitmap, dpX, dpY, imgW, imgH)
- 
-    If (ResizeKeepAratio=1 && ResizeEnforceCanvas=1 && ResizeFillCanvasMode=2 && isOkay=1)
+     If (ResizeKeepAratio=1 && ResizeEnforceCanvas=1 && ResizeFillCanvasMode=2 && isOkay=1)
     {
        Gdip_SetClipRect(G2, dpX + 1, dpY + 1, imgW - 2, imgH - 2, 4)
        If (adjustCanvasCentered!=1)
@@ -35976,7 +36195,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     Gui, Add, Checkbox, x+5 hp Checked%doImgEditLivePreview% vdoImgEditLivePreview gupdateUIfillPanel, &Live preview
     Gui, Add, Checkbox, xm+0 y+5 Checked%closeEditPanelOnApply% vcloseEditPanelOnApply gToggleClosePanelApply, Close window after «Apply»
 
-    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Fill shapes in selected area: " appTitle, winPos)
     SetTimer, updateUIfillPanel, -50
     SetTimer, resetOpeningPanel, -300
@@ -36034,8 +36253,9 @@ PanelSoloAlphaMasker() {
     Gui, Add, Checkbox, xm+5 y+5  Checked%doImgEditLivePreview% vdoImgEditLivePreview gupdateUIalphaMaskerPanel, &Live preview
     ; Gui, Add, Checkbox, xm+0 y+5 Checked%closeEditPanelOnApply% vcloseEditPanelOnApply gToggleClosePanelApply, Close window after «Apply»
 
-    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Define alpha mask: " appTitle, winPos)
+    SetTimer, ForceRemoveTooltip, -100
     SetTimer, updateUIalphaMaskerPanel, -50
 }
 
@@ -36144,7 +36364,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     Gui, Add, Button, x+5 wp hp gBtnCloseWindow, &Cancel
     Gui, Add, Checkbox, xs y+5 Checked%closeEditPanelOnApply% vcloseEditPanelOnApply gToggleClosePanelApply, Close window after «Apply»
 
-    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Draw shapes in selected area: " appTitle, winPos)
     SetTimer, updateUIdrawShapesPanel, -50
 }
@@ -36210,7 +36430,7 @@ PanelConfigVPgrid() {
     If postVectorWinOpen
        Gui, Add, Button, x+5 hp wp gBTNopenPrevPanel, &Back
 
-    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Viewport grid: " appTitle, winPos)
     SetTimer, updateUIgridPanel, -50
 }
@@ -36382,7 +36602,7 @@ PanelDrawLines() {
     Gui, Add, Button, x+5 wp hp gBtnCloseWindow, &Cancel
     Gui, Add, Checkbox, xm+0 y+5 Checked%closeEditPanelOnApply% vcloseEditPanelOnApply gToggleClosePanelApply, Close window after «Apply»
 
-    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Draw lines or arcs in selected area: " appTitle, winPos)
     SetTimer, updateUIDrawLinesPanel, -50
 }
@@ -36443,7 +36663,7 @@ PanelDesatureSelectedArea(dummy:=0) {
     Gui, Add, Checkbox, x+5 hp Checked%DesatureAreaAlternate% vDesatureAreaAlternate gupdateUIdesaturatePanel, &Simple mode
     Gui, Add, Checkbox, xm+0 y+5 Checked%closeEditPanelOnApply% vcloseEditPanelOnApply gToggleClosePanelApply, Close window after «Apply»
 
-    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Desaturate selected area: " appTitle, winPos)
     SetTimer, updateUIdesaturatePanel, -150
 }
@@ -36508,7 +36728,7 @@ PanelFloodFillTool() {
     Gui, Add, DropDownList, x+5 w%txtWid2% gupdateUIfloodFillPanel AltSubmit Choose%BrushToolOutsideSelection% vBrushToolOutsideSelection, Ignore selection|Flood inside|Flood outside
     Gui, Add, Checkbox, x+5 yp gupdateUIfloodFillPanel Checked%FloodFillUseAlpha% vFloodFillUseAlpha, Apply alpha mas&k
 
-    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Color bucket tool: " appTitle, winPos)
     SetTimer, updateUIfloodFillPanel, -190
 }
@@ -36551,7 +36771,7 @@ PanelEraseSelectedArea() {
     Gui, Add, Checkbox, x+5 yp hp Checked%EraseAreaUseAlpha% vEraseAreaUseAlpha gupdateUIerasePanel, Apply alpha mas&k
     Gui, Add, Checkbox, xm+0 y+5 Checked%closeEditPanelOnApply% vcloseEditPanelOnApply gToggleClosePanelApply, Close window after «Apply»
 
-    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Erase selected area: " appTitle, winPos)
     SetTimer, updateUIerasePanel, -150
 }
@@ -36598,7 +36818,7 @@ PanelFillBehindBgrImage() {
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
     Gui, Add, Checkbox, xm+0 y+5 Checked%closeEditPanelOnApply% vcloseEditPanelOnApply gToggleClosePanelApply, Close window after «Apply»
 
-    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Fill behind image: " appTitle, winPos)
     SetTimer, updateUIfillBehindPanel, -150
 }
@@ -36953,7 +37173,28 @@ WriteSettingsBlurPanel() {
     ReadSettingsBlurPanel(1)
 }
 
+WriteSettingsZoomBlurPanel() {
+    ReadSettingsZoomBlurPanel(1)
+}
+
+ReadSettingsZoomBlurPanel(act:=0) {
+    RegAction(act, "blurAreaMode",, 2, 1, 3)
+    RegAction(act, "BlurAreaAlphaMask",, 1)
+    RegAction(act, "blurAreaOpacity",, 2, 3, 255)
+    RegAction(act, "blurAreaInverted",, 1)
+    RegAction(act, "BlurAreaBlendMode",, 2, 1, 21)
+    RegAction(act, "BlurAreaGamma",, 2, -100, 100)
+    RegAction(act, "BlurAreaHue",, 2, -180, 180)
+    RegAction(act, "BlurAreaLight",, 2, -255, 255)
+    RegAction(act, "BlurAreaSaturation",, 2, -100, 100)
+    RegAction(act, "zoomBlurAreaXamount",, 2, 1, 25)
+}
+
 ReadSettingsBlurPanel(act:=0) {
+    RegAction(act, "BlurAreaGamma",, 2, -100, 100)
+    RegAction(act, "BlurAreaHue",, 2, -180, 180)
+    RegAction(act, "BlurAreaLight",, 2, -255, 255)
+    RegAction(act, "BlurAreaSaturation",, 2, -100, 100)
     RegAction(act, "blurAreaAmount",, 2, 0, 255)
     RegAction(act, "blurAreaMode",, 2, 1, 3)
     RegAction(act, "blurAreaPixelizeAmount",, 2, 0, 1024)
@@ -36965,6 +37206,106 @@ ReadSettingsBlurPanel(act:=0) {
     RegAction(act, "BlurAreaBlendMode",, 2, 1, 21)
     RegAction(act, "blurAreaTwice",, 1)
     RegAction(act, "BlurAreaAlphaMask",, 1)
+}
+
+PanelZoomBlurSelectedArea() {
+    If (thumbsDisplaying=1)
+       Return
+
+    initQPVmainDLL()
+    wasSelect := editingSelectionNow
+    If (editingSelectionNow!=1)
+       selectEntireImage("r")
+
+    thisBtnHeight := createSettingsGUI(69, A_ThisFunc)
+    ReadSettingsZoomBlurPanel()
+    btnWid := 75
+    txtWid := 280
+    EditWid := 60
+    thisW := 135
+    If (PrefsLargeFonts=1)
+    {
+       EditWid += 50
+       btnWid += 40
+       txtWid += 105
+       thisW += 40
+       Gui, Font, s%LargeUIfontValue%
+    }
+
+    thisOpacity := Round((blurAreaOpacity / 255) * 100)
+    Global infoBlurOpacity, infoBlurAmount, infoZoomX, infoZoomY, uizoomBlurAreaXamount, uizoomBlurAreaYamount
+    If (wasSelect!=1)
+       blurAreaInverted := 0
+
+    Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+    tinyPrevAreaCoordX := !isNumber(tinyPrevAreaCoordX) ? imgW/2 : clampInRange(tinyPrevAreaCoordX, 0, imgW)
+    tinyPrevAreaCoordY := !isNumber(tinyPrevAreaCoordY) ? imgH/2 : clampInRange(tinyPrevAreaCoordY, 0, imgH)
+    friendly := (isWinXP=1) ? " (unsupported)" : ""
+    Gui, -DPIScale
+    Gui, Font, 
+    Gui, Add, Text, x20 y20 w325 h325 Section +0x1000 +0xE gPanelsLivePreviewResponder +hwndhCropCornersPic +TabStop, Preview area
+    If (uiUseDarkMode=1)
+       Gui, Font, c%darkControlColor%
+
+    Gui, Add, Text, xp y+10 wp Center vPrinterPageInfos, Click in the viewport to set the origin for the zoom.
+    If (PrefsLargeFonts=1)
+       Gui, Font, s%LargeUIfontValue%
+
+    infoBlend := (coreDesiredPixFmt="0x21808") ? "Disabled in 24-RGB mode" : "None"
+    If (coreDesiredPixFmt="0x21808")
+       BlurAreaBlendMode := 1
+
+    infoMask := defineCurrentAlphaMask()
+    If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
+       BlurAreaAlphaMask := 0
+
+    Gui, +DPIScale
+    Gui, Add, Tab3, x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
+    Gui, Tab, 1
+    Gui, Add, Text, x+10 y+10 w%thisW% Section , Blur mode: 
+    Gui, Add, DropDownList, x+5 wp gupdateUIzoomBlurPanel AltSubmit Choose%zoomBlurMode% vzoomBlurMode, Zoom H/V|Horizontal|Vertical|Alt-Horizontal|Alt-Vertical
+    ; Gui, Add, Text, xs y+10 w%thisW% gBTNresetBlurAmount vinfoBlurAmount +TabStop, Blur amount: %blurAreaAmount%
+    ; Gui, Add, Slider, Center xs y+5 gupdateUIzoomBlurPanel AltSubmit w%txtWid% vblurAreaAmount Range0-255, % blurAreaAmount
+    Gui, Add, Text, xs y+10 w%thisW% vinfoZoomX +TabStop, Zoom X: %zoomBlurAreaXamount%
+    Gui, Add, Slider, Center xs y+5 gupdateUIzoomBlurPanel AltSubmit w%txtWid% vuizoomBlurAreaXAmount Range1-250, % zoomBlurAreaXamount*10
+    ; Gui, Add, Text, xs y+10 w%thisW% vinfoZoomY +TabStop, Zoom Y: %zoomBlurAreaYamount%
+    ; Gui, Add, Slider, Center xs y+5 gupdateUIzoomBlurPanel AltSubmit w%txtWid% vuizoomBlurAreaYamount Range1-250, % zoomBlurAreaYamount*10
+    Gui, Add, Text, xs y+10 w%txtWid% gBTNresetBlurOpacity vinfoBlurOpacity +TabStop, Opacity: %thisOpacity%`%
+    Gui, Add, Slider, Center xs y+5 gupdateUIzoomBlurPanel AltSubmit w%txtWid% vblurAreaOpacity Range5-255, % blurAreaOpacity
+    Gui, Add, Checkbox, xs y+10 Checked%BlurAreaAlphaMask% vBlurAreaAlphaMask gupdateUIzoomBlurPanel, Apply alpha mas&k
+    Gui, Add, Checkbox, xs y+10 Checked%blurAreaInverted% vblurAreaInverted gupdateUIzoomBlurPanel, &Invert selection area
+    If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
+       GuiControl, Disable, BlurAreaAlphaMask
+
+    If (wasSelect!=1 && EllipseSelectMode=0)
+       GuiControl, Disable, blurAreaInverted
+
+    Global infoBlurHue, infoBlurSat, infoBlurLight, infoBlurGamma
+
+    Gui, Tab, 2
+    Gui, Add, Text, x+10 y+10 Section w%thisW% gBtnResetBlendMode +TabStop, Blending mode: 
+    Gui, Add, DropDownList, x+5 wp gupdateUIzoomBlurPanel AltSubmit Choose%BlurAreaBlendMode% vBlurAreaBlendMode, %infoBlend%|Darken|Multiply|Linear burn|Color burn|Lighten|Screen|Linear dodge [Add]|Hard light|Overlay|Hard mix|Linear light|Color dodge|Vivid light|Division|Exclusion|Difference|Substract|Luminosity|Substract reversed|Inverted difference
+    Gui, Add, Text, xs y+10 w%txtWid% gBtnResetPanelsSpecificControl vinfoBlurHue +TabStop, Hue: %BlurAreaHue%°
+    Gui, Add, Slider, Center y+1 wp AltSubmit NoTicks gupdateUIzoomBlurPanel vBlurAreaHue Range-180-180, % BlurAreaHue
+    Gui, Add, Text, y+6 wp gBtnResetPanelsSpecificControl vinfoBlurSat +TabStop, Saturation: %BlurAreaSaturation%`%
+    Gui, Add, Slider, Center y+1 wp AltSubmit NoTicks gupdateUIzoomBlurPanel vBlurAreaSaturation Range-100-100, % BlurAreaSaturation
+    Gui, Add, Text, y+6 wp gBtnResetPanelsSpecificControl vinfoBlurLight +TabStop, Brightness: %BlurAreaLight%
+    Gui, Add, Slider, Center y+1 wp AltSubmit NoTicks gupdateUIzoomBlurPanel vBlurAreaLight Range-255-255, % BlurAreaLight
+    Gui, Add, Text, y+6 wp gBtnResetPanelsSpecificControl vinfoBlurGamma +TabStop, Contrast: %BlurAreaGamma%`%
+    Gui, Add, Slider, Center y+1 wp AltSubmit NoTicks gupdateUIzoomBlurPanel vBlurAreaGamma Range-100-100, % BlurAreaGamma
+
+    Gui, Tab
+    Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% gBtnZoomBlurSelectedArea, &Proceed
+    Gui, Add, Button, x+6 hp wp gOpenPanelBlur, &Gaussian
+    Gui, Add, Button, x+6 hp wp gBtnCloseWindow, &Cancel
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Zoom blur in selected area: " appTitle, winPos)
+    SetTimer, updateUIzoomBlurPanel, -100
+}
+
+OpenPanelBlur() {
+   BtnCloseWindow()
+   PanelBlurSelectedArea()
 }
 
 PanelBlurSelectedArea() {
@@ -37014,13 +37355,14 @@ PanelBlurSelectedArea() {
     Gui, -DPIScale
     Gui, Font, 
     Gui, Add, Text, x20 y20 w325 h325 Section +0x1000 +0xE gPanelsLivePreviewResponder +hwndhCropCornersPic +TabStop, Preview area
-    Gui, Add, Text, xp y+10 wp Center vPrinterPageInfos, Click and drag, or in the viewport, to change the preview area.
-    If (PrefsLargeFonts=1)
-       Gui, Font, s%LargeUIfontValue%
     If (uiUseDarkMode=1)
        Gui, Font, c%darkControlColor%
 
-    infoBlend := (coreDesiredPixFmt="0x21808") ? "Disabled in 24-RGB mode" : "No blending mode"
+    Gui, Add, Text, xp y+10 wp Center vPrinterPageInfos, Click and drag to change the preview area, or in the viewport.
+    If (PrefsLargeFonts=1)
+       Gui, Font, s%LargeUIfontValue%
+
+    infoBlend := (coreDesiredPixFmt="0x21808") ? "Disabled in 24-RGB mode" : "None"
     If (coreDesiredPixFmt="0x21808")
        BlurAreaBlendMode := 1
 
@@ -37029,7 +37371,9 @@ PanelBlurSelectedArea() {
        BlurAreaAlphaMask := 0
 
     Gui, +DPIScale
-    Gui, Add, Checkbox, x+20 ys w%thisW% Section Checked%blurAreaSoftEdges% vblurAreaSoftEdges gupdateUIblurPanel, &Soft edges%friendly%
+    Gui, Add, Tab3, x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
+    Gui, Tab, 1
+    Gui, Add, Checkbox, x+10 y+10 w%thisW% Section Checked%blurAreaSoftEdges% vblurAreaSoftEdges gupdateUIblurPanel, &Soft edges%friendly%
     Gui, Add, DropDownList, x+5 w60 AltSubmit Choose%blurAreaSoftLevel% gupdateUIblurPanel vblurAreaSoftLevel, 0.3x|0.6x|1x|2x|3x|4x|5x
     Gui, Add, Checkbox, xs y+10 hp Checked%blurAreaTwice% vblurAreaTwice gupdateUIblurPanel, &Blur twice in one go (for large images)
     Gui, Add, Text, xs y+10 w%thisW% gBTNresetBlurAmount vinfoBlurAmount +TabStop, Blur amount: %blurAreaAmount%
@@ -37038,9 +37382,6 @@ PanelBlurSelectedArea() {
     Gui, Add, Text, xs y+10 w%thisW% gBTNresetBlurPixelizationAmount vinfoPixelize +TabStop, Pixelize level: %blurAreaPixelizeAmount%
     Gui, Add, DropDownList, x+5 wp AltSubmit Choose%blurAreaPixelizeMethod% gupdateUIblurPanel vblurAreaPixelizeMethod, Method 1|Method 2|Method 3
     Gui, Add, Slider, Center xs y+5 gupdateUIblurPanel AltSubmit w%txtWid% vblurAreaPixelizeAmount Range0-1024, %blurAreaPixelizeAmount%
-    Gui, Add, Text, xs y+10 w%thisW% gBTNresetBlurOpacity vinfoBlurOpacity +TabStop, Opacity: %thisOpacity%`%
-    Gui, Add, DropDownList, x+5 wp gupdateUIblurPanel AltSubmit Choose%BlurAreaBlendMode% vBlurAreaBlendMode, %infoBlend%|Darken|Multiply|Linear burn|Color burn|Lighten|Screen|Linear dodge [Add]|Hard light|Overlay|Hard mix|Linear light|Color dodge|Vivid light|Division|Exclusion|Difference|Substract|Luminosity|Substract reversed|Inverted difference
-    Gui, Add, Slider, Center xs y+5 gupdateUIblurPanel AltSubmit w%txtWid% vblurAreaOpacity Range5-255, % blurAreaOpacity
     Gui, Add, Checkbox, xs y+10 w%thisW% Checked%blurAreaInverted% vblurAreaInverted gupdateUIblurPanel, &Invert selection
     Gui, Add, Checkbox, x+5 Checked%BlurAreaAlphaMask% vBlurAreaAlphaMask gupdateUIblurPanel, Apply alpha mas&k
 
@@ -37050,11 +37391,32 @@ PanelBlurSelectedArea() {
     If (wasSelect!=1 && EllipseSelectMode=0)
        GuiControl, Disable, blurAreaInverted
 
-    Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% gBtnBlurSelectedArea, &Blur area
-    Gui, Add, Button, x+6 hp w%btnWid% gBtnCloseWindow, &Cancel
-    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    Gui, Tab, 2
+    Gui, Add, Text, x+10 y+10 Section w%thisW% gBtnResetBlendMode +TabStop, Blending mode: 
+    Gui, Add, DropDownList, x+5 wp gupdateUIblurPanel AltSubmit Choose%BlurAreaBlendMode% vBlurAreaBlendMode, %infoBlend%|Darken|Multiply|Linear burn|Color burn|Lighten|Screen|Linear dodge [Add]|Hard light|Overlay|Hard mix|Linear light|Color dodge|Vivid light|Division|Exclusion|Difference|Substract|Luminosity|Substract reversed|Inverted difference
+    Gui, Add, Text, xs y+10 w%txtWid% gBtnResetPanelsSpecificControl vinfoBlurHue +TabStop, Hue: %BlurAreaHue%°
+    Gui, Add, Slider, Center y+1 wp AltSubmit NoTicks gupdateUIblurPanel vBlurAreaHue Range-180-180, % BlurAreaHue
+    Gui, Add, Text, y+6 wp gBtnResetPanelsSpecificControl vinfoBlurSat +TabStop, Saturation: %BlurAreaSaturation%`%
+    Gui, Add, Slider, Center y+1 wp AltSubmit NoTicks gupdateUIblurPanel vBlurAreaSaturation Range-100-100, % BlurAreaSaturation
+    Gui, Add, Text, y+6 wp gBtnResetPanelsSpecificControl vinfoBlurLight +TabStop, Brightness: %BlurAreaLight%
+    Gui, Add, Slider, Center y+1 wp AltSubmit NoTicks gupdateUIblurPanel vBlurAreaLight Range-255-255, % BlurAreaLight
+    Gui, Add, Text, y+6 wp gBtnResetPanelsSpecificControl vinfoBlurGamma +TabStop, Contrast: %BlurAreaGamma%`%
+    Gui, Add, Slider, Center y+1 wp AltSubmit NoTicks gupdateUIblurPanel vBlurAreaGamma Range-100-100, % BlurAreaGamma
+    Gui, Add, Text, y+6 wp gBTNresetBlurOpacity vinfoBlurOpacity +TabStop, Opacity: %thisOpacity%`%
+    Gui, Add, Slider, Center xs y+1 gupdateUIblurPanel AltSubmit wp NoTicks vblurAreaOpacity Range5-255, % blurAreaOpacity
+
+    Gui, Tab
+    Gui, Add, Button, xs+0 y+10 h%thisBtnHeight% Default w%btnWid% gBtnBlurSelectedArea, &Blur area
+    Gui, Add, Button, x+6 hp wp gOpenPanelZoomBlur, &Motion blur
+    Gui, Add, Button, x+6 hp wp gBtnCloseWindow, &Cancel
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Blur/pixelize selected area: " appTitle, winPos)
     SetTimer, updateUIblurPanel, -100
+}
+
+OpenPanelZoomBlur() {
+   BtnCloseWindow()
+   PanelZoomBlurSelectedArea()
 }
 
 BTNresetBlurOpacity() {
@@ -37062,6 +37424,8 @@ BTNresetBlurOpacity() {
    GuiControl, SettingsGUIA:, blurAreaOpacity, 255
    If (AnyWindowOpen=44)
       updateUIaddNoisePanel()
+   Else If (AnyWindowOpen=69)
+      updateUIzoomBlurPanel()
    Else
       updateUIblurPanel()
 }
@@ -37157,12 +37521,12 @@ PanelDetectEdgesImage() {
     Gui, -DPIScale
     Gui, Font, 
     Gui, Add, Text, x20 y20 w325 h325 Section +0x1000 +0xE gPanelsLivePreviewResponder +hwndhCropCornersPic +TabStop, Preview area
-    Gui, Add, Text, xp y+10 wp Center vPrinterPageInfos, Click and drag, or in the viewport, to change the preview area.
-    If (PrefsLargeFonts=1)
-       Gui, Font, s%LargeUIfontValue%
-
     If (uiUseDarkMode=1)
        Gui, Font, c%darkControlColor%
+
+    Gui, Add, Text, xp y+10 wp Center vPrinterPageInfos, Click and drag to change the preview area, or click in the viewport.
+    If (PrefsLargeFonts=1)
+       Gui, Font, s%LargeUIfontValue%
 
     thisW := (PrefsLargeFonts=1) ? 85 : 55
     Gui, +DPIScale
@@ -37188,7 +37552,7 @@ PanelDetectEdgesImage() {
     thisW := (PrefsLargeFonts=1) ? 90 : 65
     Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default gBtnIDedgesNow w%btnWid%, &Process image
     Gui, Add, Button, x+5 hp w%thisW% gBtnCloseWindow, &Cancel
-    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Detect edges in selected area: " appTitle, winPos)
     SetTimer, updateUIedgesPanel, -200
 }
@@ -37226,14 +37590,14 @@ PanelAddNoiserImage() {
     Gui, -DPIScale
     Gui, Font, 
     Gui, Add, Text, x20 y20 w325 h325 Section +0x1000 +0xE gPanelsLivePreviewResponder +hwndhCropCornersPic +TabStop, Preview area
-    Gui, Add, Text, xp y+10 wp Center vPrinterPageInfos, Click and drag, or in the viewport, to change the preview area.
+    If (uiUseDarkMode=1)
+       Gui, Font, c%darkControlColor%
+
+    Gui, Add, Text, xp y+10 wp Center vPrinterPageInfos, Click and drag to change the preview area, or click in the viewport.
     If (PrefsLargeFonts=1)
        Gui, Font, s%LargeUIfontValue%
 
     Gui, +DPIScale
-    If (uiUseDarkMode=1)
-       Gui, Font, c%darkControlColor%
-
     infoMask := defineCurrentAlphaMask()
     If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
        BlurAreaAlphaMask := 0
@@ -37264,7 +37628,7 @@ PanelAddNoiserImage() {
     If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
        GuiControl, Disable, BlurAreaAlphaMask
 
-    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Add noise in selected area: " appTitle, winPos)
     SetTimer, updateUIaddNoisePanel, -200
 }
@@ -37813,7 +38177,7 @@ PanelIMGselProperties() {
     Gui, Add, Button, x+10 wp hp gBTNselectNoneImg, &Select none
     thisW := (PrefsLargeFonts=1) ? 80 : 60
     Gui, Add, Button, x+10 w%thisW% hp gBtnCloseWindow Default, &Close
-    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Selection properties: " appTitle, winPos)
     ; SetTimer, updateUIselPropPanel, -350
     updateUIselPropPanel()
@@ -38268,7 +38632,7 @@ BtnCreateNewImage() {
        currIMGdetails.HasAlpha := 0
 
     imgIndexEditing := currentFileIndex
-    usrColorDepth := imgFxMode := 1
+    currentImgModified := usrColorDepth := imgFxMode := 1
     vpIMGrotation := FlipImgH := FlipImgV := 0
     dropFilesSelection(1)
     RemoveTooltip()
@@ -38372,6 +38736,46 @@ updateUIdrawShapesPanel(actionu:=0, b:=0) {
     SetTimer, WriteSettingsDrawShapeAreaPanel, -250
 }
 
+updateUIzoomBlurPanel(a:=0,b:=0) {
+    Static lastInvoked := 1
+    If (AnyWindowOpen!=69)
+       Return
+
+    Gui, SettingsGUIA: Default
+    Gui, SettingsGUIA: Submit, NoHide
+    GuiControlGet, uizoomBlurAreaXamount
+    If (coreDesiredPixFmt="0x21808")
+    {
+       BlurAreaBlendMode := 0
+       GuiControl, SettingsGUIA: Disable, blurAreaSoftEdges
+       GuiControl, SettingsGUIA: Disable, BlurAreaBlendMode
+       GuiControl, SettingsGUIA: Choose, BlurAreaBlendMode, 1
+    }
+
+    actu2 := (BlurAreaBlendMode>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    GuiControl, % actu2, BlurAreaLight
+    GuiControl, % actu2, BlurAreaGamma
+    GuiControl, % actu2, BlurAreaHue
+    GuiControl, % actu2, BlurAreaSaturation
+    GuiControl, % actu2, infoBlurLight
+    GuiControl, % actu2, infoBlurGamma
+    GuiControl, % actu2, infoBlurHue
+    GuiControl, % actu2, infoBlurSat
+    GuiControl, SettingsGUIA:, infoBlurHue, Hue: %BlurAreaHue%°
+    GuiControl, SettingsGUIA:, infoBlurSat, Saturation: %BlurAreaSaturation%`%
+    GuiControl, SettingsGUIA:, infoBlurLight, Brightness: %BlurAreaLight%
+    GuiControl, SettingsGUIA:, infoBlurGamma, Contrast: %BlurAreaGamma%`%
+
+    thisOpacity := Round((blurAreaOpacity / 255) * 100)
+    thisuX := Round(uizoomBlurAreaXamount/10, 1)
+    zoomBlurAreaXamount := uizoomBlurAreaXamount/10
+    GuiControl, SettingsGUIA:, infoBlurOpacity, Opacity: %thisOpacity%`%
+    GuiControl, SettingsGUIA:, infoZoomX, Intensity: %thisuX%
+    lastInvoked := A_TickCount
+    SetTimer, WriteSettingsZoomBlurPanel, -300
+    updateLiveTinyPreviewsWindow(a, b)
+}
+
 updateUIblurPanel(a:=0,b:=0) {
     Static lastInvoked := 1
     If (AnyWindowOpen!=26)
@@ -38413,8 +38817,24 @@ updateUIblurPanel(a:=0,b:=0) {
     GuiControl, SettingsGUIA:, infoBlurOpacity, Opacity: %thisOpacity%`%
     GuiControl, SettingsGUIA:, infoBlurAmount, Blur amount: %blurAreaAmount%
     GuiControl, SettingsGUIA:, infoPixelize, Pixelize level: %blurAreaPixelizeAmount%
+
+    actu2 := (BlurAreaBlendMode>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    GuiControl, % actu2, BlurAreaLight
+    GuiControl, % actu2, BlurAreaGamma
+    GuiControl, % actu2, BlurAreaHue
+    GuiControl, % actu2, BlurAreaSaturation
+    GuiControl, % actu2, infoBlurLight
+    GuiControl, % actu2, infoBlurGamma
+    GuiControl, % actu2, infoBlurHue
+    GuiControl, % actu2, infoBlurSat
+    GuiControl, SettingsGUIA:, infoBlurHue, Hue: %BlurAreaHue%°
+    GuiControl, SettingsGUIA:, infoBlurSat, Saturation: %BlurAreaSaturation%`%
+    GuiControl, SettingsGUIA:, infoBlurLight, Brightness: %BlurAreaLight%
+    GuiControl, SettingsGUIA:, infoBlurGamma, Contrast: %BlurAreaGamma%`%
+
     lastInvoked := A_TickCount
     updateLiveTinyPreviewsWindow(a, b)
+    SetTimer, WriteSettingsBlurPanel, -300
 }
 
 PanelsLivePreviewResponder(a, b, c) {
@@ -38509,14 +38929,8 @@ PanelsPanIMGpreviewClick() {
          noPreview := 0
          ; If (A_TickCount - thisZeit>95)
          ; zeitSillyPrevent := A_TickCount
-         If (AnyWindowOpen=26)
-            livePreviewBlurPanel()
-         Else If (AnyWindowOpen=43)
-            livePreviewIDedges()
-         Else If (AnyWindowOpen=44)
-            livePreviewAddNoiser()
-         Else If (AnyWindowOpen=64)
-            createLivePreviewBrush()
+         coreUpdateLiveTinyPreviewsWindow()
+         dummyRefreshImgSelectionWindow()
          thisZeit := A_TickCount
       }
    }
@@ -38540,6 +38954,8 @@ PanelsPanIMGpreviewClick() {
          updateUIedgesPanel()
       Else If (AnyWindowOpen=44)
          updateUIaddNoisePanel()
+      Else If (AnyWindowOpen=69)
+         updateUIzoomBlurPanel()
    }
 }
 
@@ -38621,6 +39037,7 @@ livePreviewBlurPanel() {
 
     If (BlurAreaBlendMode>1)
     {
+       applyBlurColorsFX(yBitmap)
        rz := QPV_BlendBitmaps(bgrBMPu, yBitmap, BlurAreaBlendMode - 1, 0)
        ; ToolTip, % "l=" rz , , , 2
        ou := yBitmap
@@ -38646,6 +39063,129 @@ livePreviewBlurPanel() {
     trGdip_DisposeImage(cornersBMP, 1)
     Gdip_DisposeEffect(pEffect)
     Gdip_DisposeEffect(bEffect)
+}
+
+livePreviewZoomBlurPanel() {
+    Static uiboxSize := 325
+    imgBoxSize := (doubleBlurPreviewArea=1) ? 650 : 325
+    whichBmp := useGdiBitmap()
+    cornersBMP := trGdip_CreateBitmap(A_ThisFunc, uiboxSize, uiboxSize, coreDesiredPixFmt)
+    If !cornersBMP
+       Return
+   
+    G := trGdip_GraphicsFromImage(A_ThisFunc, cornersBMP, 3)
+    If !G
+    {
+       trGdip_DisposeImage(cornersBMP, 1)
+       Return
+    }
+
+    fnOutputDebug("redraw: " A_ThisFunc)
+    Gdip_GetImageDimensions(whichBmp, imgW, imgH)
+    thisPrevieCoordX := clampInRange(tinyPrevAreaCoordX - imgBoxSize//2, 0, imgW - imgBoxSize)
+    thisPrevieCoordY := clampInRange(tinyPrevAreaCoordY - imgBoxSize//2, 0, imgH - imgBoxSize)
+    decideGDIPimageFX(matrix, imageAttribs, pEffect)
+    thisOpacity := blurAreaOpacity/255
+    thisBlurAmount := (doubleBlurPreviewArea=1) ? zoomBlurAreaXamount*2 : zoomBlurAreaXamount*4
+
+    r1 := trGdip_DrawImage(A_ThisFunc, G, whichBmp, 0, 0, uiboxSize, uiboxSize, thisPrevieCoordX, thisPrevieCoordY, imgBoxSize, imgBoxSize)
+    If (BlurAreaBlendMode>1)
+       bgrBMPu := trGdip_CloneBitmap(A_ThisFunc, cornersBMP)
+
+    If pEffect
+       Gdip_BitmapApplyEffect(cornersBMP, pEffect)
+
+    zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, cornersBMP)
+    r1 := trGdip_DrawImage(A_ThisFunc, G, zBitmap, 0, 0, uiboxSize, uiboxSize, 0, 0, uiboxSize, uiboxSize, 1, 2, imageAttribs)
+    yBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, cornersBMP)
+
+    Gdip_DisposeImageAttributes(imageAttribs)
+    thisBlurAmount := clampInRange(5 + Round(zoomBlurAreaXamount/2) - 2, 5, 20) ; A_Index * thisBlur
+    If (doubleBlurPreviewArea=1)
+       thisBlurAmount := thisBlurAmount//2 + 1
+
+    opEffect := Gdip_CreateEffect(1, thisBlurAmount, 0, 0)
+    gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, yBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
+    G3 := trGdip_GraphicsFromImage(A_ThisFunc, gBitmap, 5)
+    thisO := 0.85
+    imgSelPx := imgSelPy := 0
+    dimgSelPx := dimgSelPy := 0
+    imgSelW := imgSelH := uiboxSize
+    dimgSelW := dimgSelH := uiboxSize
+
+    b := (doubleBlurPreviewArea=1) ? zoomBlurAreaXamount/3 : zoomBlurAreaXamount/2
+    If isInRange(zoomBlurMode, 1, 3)
+    {
+       Loop
+       {
+          thisO -= 0.1 ; thisOpacity - (A_Index - 1) * startOpacity
+          If (thisO<0)
+             Break
+
+          ; showTOOLtip("Zoom blur: step " A_Index,, , (1 - thisO)/1)
+          ; fnOutputDebug(thisBlurAmount "=" thisO)
+          ApplySpecialFixedBlur(A_ThisFunc, yBitmap, thisBlurAmount, opEffect)
+          If (zoomBlurMode=1 || zoomBlurMode=2)
+             dimgSelW += A_Index * b*2
+          If (zoomBlurMode=1 || zoomBlurMode=3)
+             dimgSelH += A_Index * b*2
+
+          If (zoomBlurMode=1 || zoomBlurMode=2)
+             dimgSelPx -= A_Index * b
+          If (zoomBlurMode=1 || zoomBlurMode=3)
+             dimgSelPy -= A_Index * b
+
+          r1 := trGdip_DrawImage(A_ThisFunc, G3, yBitmap, dimgSelPx, dimgSelPy, dimgSelW, dimgSelH,,,,, thisO)
+          trGdip_DisposeImage(yBitmap, 1)
+          yBitmap := trGdip_CloneBitmap(A_ThisFunc, gBitmap)
+       }
+    } Else
+    {
+       f := (doubleBlurPreviewArea=1) ? (zoomBlurAreaXamount*8)/2 : zoomBlurAreaXamount*8
+       ff := (doubleBlurPreviewArea=1) ? ((zoomBlurAreaXamount*8)/2)/2 : (zoomBlurAreaXamount*8)/2
+       If (zoomBlurMode=4)
+       {
+          wbitmap := trGdip_ResizeBitmap(A_ThisFunc, yBitmap, imgSelW//ff, imgSelH, 0, 5)
+          rbitmap := trGdip_ResizeBitmap(A_ThisFunc, wBitmap, imgSelW//f, imgSelH, 0, 7)
+       } Else
+       {
+          wbitmap := trGdip_ResizeBitmap(A_ThisFunc, yBitmap, imgSelW, imgSelH//ff, 0, 5)
+          rbitmap := trGdip_ResizeBitmap(A_ThisFunc, wBitmap, imgSelW, imgSelH//f, 0, 7)
+       }
+       fbitmap := trGdip_ResizeBitmap(A_ThisFunc, rBitmap, imgSelW, imgSelH, 0, 7)
+       r1 := trGdip_DrawImage(A_ThisFunc, G3, fBitmap, 0, 0, imgSelW, imgSelH)
+       trGdip_DisposeImage(wBitmap)
+       trGdip_DisposeImage(rBitmap)
+       trGdip_DisposeImage(fBitmap)
+    }
+
+    Gdip_DeleteGraphics(G3)
+    If (BlurAreaBlendMode>1)
+    {
+       applyBlurColorsFX(gBitmap)
+       rz := QPV_BlendBitmaps(bgrBMPu, gBitmap, BlurAreaBlendMode - 1, 0)
+       ; ToolTip, % "l=" rz , , , 2
+       ou := gBitmap
+       gBitmap := bgrBMPu
+       bgrBMPu := ou
+    }
+
+    ; thisBMP := (BlurAreaBlendMode>1) ? bgrBMPu : cornersBMP
+    r1 := trGdip_DrawImage(A_ThisFunc, G, gBitmap, 0, 0, uiboxSize, uiboxSize, 0, 0, uiboxSize, uiboxSize, thisOpacity)
+    flipBitmapAccordingToViewPort(cornersBMP, 1)
+    If (r1!="fail")
+       hBitmap := trGdip_CreateHBITMAPFromBitmap(A_ThisFunc, cornersBMP)
+
+    SetImage(hCropCornersPic, hBitmap)
+    Gdi_DeleteObject(hBitmap)
+    Gdip_DeleteGraphics(G)
+    trGdip_DisposeImage(zBitmap, 1)
+    trGdip_DisposeImage(yBitmap, 1)
+    trGdip_DisposeImage(gBitmap, 1)
+    trGdip_DisposeImage(bgrBMPu, 1)
+    trGdip_DisposeImage(cornersBMP, 1)
+    Gdip_DisposeEffect(pEffect)
+    Gdip_DisposeEffect(opEffect)
 }
 
 updateUIerasePanel(actionu:=0, b:=0, c:=0) {
@@ -38830,6 +39370,14 @@ BtnBlurSelectedArea() {
   BtnCloseWindow()
   ToggleEditImgSelection("show-edit")
   BlurSelectedArea()
+}
+
+
+BtnZoomBlurSelectedArea() {
+  updateUIzoomBlurPanel()
+  BtnCloseWindow()
+  ToggleEditImgSelection("show-edit")
+  zoomBlurSelectedArea()
 }
 
 updateUIfillPanel(actionu:=0) {
@@ -39510,7 +40058,7 @@ PanelInsertTextArea() {
     Gui, Add, Checkbox, xm+0 y+5 Checked%closeEditPanelOnApply% vcloseEditPanelOnApply gToggleClosePanelApply, Close window after «Apply»
 
     ; PopulateFontsList("TextInAreaFontName", "SettingsGUIA")
-    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Insert text in image: " appTitle, winPos)
     SetTimer, updateUIInsertTextPanel, -250
     SetTimer, resetOpeningPanel, -300
@@ -39877,7 +40425,7 @@ PanelAdjustToneMapping() {
     Gui, Add, Button, x+5 h%thisBtnHeight% w%btnWid% gBTNtoneMapRefresh Default, &Update viewport
     Gui, Add, Button, x+5 hp w90 gBTNresetToneMap, &Reset
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, Clo&se
-    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "HDR tone-mapping options: " appTitle, winPos)
     RemoveTooltip()
     SetTimer, updateUItoneMappingPanel, -350
@@ -40334,8 +40882,8 @@ PanelDefineEntireSlideshowLength() {
     coreSecToHHMMSS((slideShowDelay/1000)*maxFilesIndex, Hrs, Min, Sec)
     infoSliSpeed := DefineSlidesRate()
     etaTime := EstimateSlideShowLength()
-
-    Gui, Add, Text, x15 y15 Section w%txtWid%, Define the total time of the slideshow`nfor %maxFilesIndex% images.
+    infou := groupDigits(maxFilesIndex)
+    Gui, Add, Text, x15 y15 Section w%txtWid%, Define the total time of the slideshow`nfor %infou% images.
     Gui, Add, Text, y+15 w85, Hours
     Gui, Add, Edit, x+5 wp gUpdateSlideshowPanel r1 limit2 Number -multi -wantTab -wrap vuserHourDur, % Round(Hrs)
     Gui, Add, Checkbox, x+5 hp Checked%doSlidesTransitions% vdoSlidesTransitions gUpdateSlideshowPanel, &Smooth slide transitions
@@ -40349,10 +40897,12 @@ PanelDefineEntireSlideshowLength() {
     thisW := (PrefsLargeFonts=1) ? 105 : 80
     Gui, Add, Button, x+5 hp w%thisW% gSetTimeLapseMode, Timelapse
     Gui, Add, Text, xs y+5 w85, Mode
-    Gui, Add, DropDownList, x+5 wp AltSubmit Choose%SlideHowMode% vSlideHowMode, Random|Backwards|Forwards
+    Gui, Add, DropDownList, x+5 wp gUpdateSlideshowPanel AltSubmit Choose%SlideHowMode% vSlideHowMode, Random|Backwards|Forwards
     Gui, Add, Checkbox, x+5 hp Checked%allowGIFsPlayEntirely% vallowGIFsPlayEntirely gUpdateSlideshowPanel, &Allow GIFs play entirely
 
     Gui, Add, Text, xs y+15 w%txtWid% vinfoLine, One image every: %infoSliSpeed%`nEstimated slideshow duration: %etaTime%
+    Gui, Add, Text, xp+15 y+7 wp-20, - based on current file index position, direction and previous image load time;
+
     Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w%btnWid% Default gStartSlideINtotalTimeBTNaction, &Start slideshow
     Gui, Add, Button, x+5 hp w90 gResetSlideSpeed, De&fault
     Gui, Add, Button, x+5 hp w90 gBtnCloseWindow, C&lose
@@ -40360,9 +40910,7 @@ PanelDefineEntireSlideshowLength() {
 }
 
 TimeLapseInfoBox() {
-    msgBoxWrapper(appTitle ": HELP", "The slideshow durations displayed in the panel include the time estimated to load each image. Based on previously loaded images, it takes about " drawModeCzeit " miliseconds to load an image.`n `nFor optimal timelapses [or very fast slideshows] set zoom at 100`%, disable image rotation and color adjustments and «skip already seen images».", -1, 0, 0)
-    ; coreResetSlideSpeed(33, 1)
-    ; GuiControl, SettingsGUIA: Choose, userDefinedSpeedSlideshow, 2
+    msgBoxWrapper(appTitle ": HELP", "The estimated slideshow duration displayed in the panel includes the time estimated to load each image. Based on previously loaded images, it takes about " groupDigits(drawModeCzeit) " miliseconds to load an image.`n `nIf the option to allow GIFs play entirely during slideshows is selected, the duration of the slideshow will be influenced by how many GIFs are indexed and how long they are.`n `nFor optimal timelapses [or very fast slideshows] set zoom at 100`%, disable image rotation and color adjustments and «skip already seen images».", -1, 0, 0)
 }
 
 SetTimeLapseMode() {
@@ -40488,7 +41036,14 @@ EstimateSlideShowLength(noPrecision:=0) {
     slidesDuration := (slideShowDelay<drawModeCzeit) ? (drawModeCzeit + slideShowDelay)/2 : drawModeCzeit*0.9 + slideShowDelay
     ; slidesDuration := (slideShowDelay<drawModeCzeit) ? drawModeCzeit : slideShowDelay
     approxMarker := (slideShowDelay<drawModeCzeit) ? "~" : ""
-    infoFilesSel := (maxFilesIndex>0) ? maxFilesIndex : 1
+    If (SlideHowMode=1)
+       infoFilesSel := maxFilesIndex - RandyIMGnow
+    Else If (SlideHowMode=2)
+       infoFilesSel := currentFileIndex
+    Else If (SlideHowMode=3)
+       infoFilesSel := maxFilesIndex - currentFileIndex
+    Else
+       infoFilesSel := (maxFilesIndex>0) ? maxFilesIndex : 1
     slidesDuration := Round(slidesDuration/1000, 3) * infoFilesSel
     ; MsgBox, % etaTime "--" slidesDuration "--" slideShowDelay "--" drawModeCzeit "--" maxFilesIndex
     etaTime := approxMarker SecToHHMMSS(slidesDuration)
@@ -43632,10 +44187,9 @@ showTOOLtip(msg, funcu:=0, typeFuncu:=0, perc:=0) {
             b := SubStr(msg, z + 1)
             BalloonTip(b, a, "I=2 T=10", uiUseDarkMode)
          } Else BalloonTip(appTitle, msg, "I=2 T=5", uiUseDarkMode)
-      } Else If !perc
-         ToolTip, % msg, % mX + 25, % mY + 25
-      Else
-         ToolTip
+      } Else ToolTip
+      ; Else If !perc
+      ; ToolTip, % msg, % mX + 25, % mY + 25
    } Else If (AnyWindowOpen>0)
       ToolTip
 }
@@ -43644,6 +44198,13 @@ RemoveTooltip() {
    Tooltip
    lastOSDtooltipInvoked := 1
    CreateOSDinfoLine(1, 1)
+}
+
+ForceRemoveTooltip() {
+   Tooltip
+   lastOSDtooltipInvoked := 1
+   BalloonTip_Kill()
+   CreateOSDinfoLine(2, 1)
 }
 
 PanelAssociateQPV() {
@@ -43968,10 +44529,7 @@ InitGuiContextMenu(keyu:=0, mX:="-", mY:=0) {
       If (thumbsDisplaying=0 && editingSelectionNow=1 && adjustNowSel=0 && drawingShapeNow=0)
          dotActiveObj := determineSelAreaClickRect(mX, mY, SelDotsSize, mainWidth, mainHeight, 1)
 
-      If (showHUDnavIMG=1 && hasDrawnImageMap=1 && thumbsDisplaying=1 && drawingShapeNow=0)
-         z := testIsDupesList()
-
-      If (showHUDnavIMG=1 && hasDrawnImageMap=1 && !dotActiveObj.n && (IMGlargerViewPort=1 && thumbsDisplaying=0 || thumbsDisplaying=1 && (thumbsListViewMode>1 || z=1))
+      If (showHUDnavIMG=1 && hasDrawnImageMap=1 && !dotActiveObj.n && (IMGlargerViewPort=1 && thumbsDisplaying=0 || thumbsDisplaying=1)
       && isDotInRect(mX, mY, HUDobjNavBoxu[7], HUDobjNavBoxu[5] + HUDobjNavBoxu[7], HUDobjNavBoxu[8], HUDobjNavBoxu[6] + HUDobjNavBoxu[8]))
       {
          invokeImgSizeVP()
@@ -44296,6 +44854,7 @@ createMenuImageEditSubMenus() {
    If (thumbsDisplaying!=1 && infoImgEditingNow=1)
    {
       kMenu("PVimgFilters", "Add", "&Blur/pixelize`tShift+B", "PanelBlurSelectedArea", "effects")
+      kMenu("PVimgFilters", "Add", "&Zoom blur", "PanelZoomBlurSelectedArea", "effects")
       kMenu("PVimgFilters", "Add", "&Invert colors`tShift+I", "InvertSelectedArea", "effects")
       kMenu("PVimgFilters", "Add", "Desaturate color&s`tCtrl+G", "PanelDesatureSelectedArea", "grayscale effects")
       kMenu("PVimgFilters", "Add", "&Detect edges filter", "PanelDetectEdgesImage", "emboss effects")
@@ -46968,9 +47527,7 @@ createMenuInterfaceOptions() {
       keyword := (showHUDnavIMG=1) ? " hide" : " show display"
       friendly := (thumbsDisplaying=1) ? "Image previe&w box`tZ" : "Auto-display image navi&gator`tZ"
       kMenu("PvUIprefs", "Add/Uncheck", friendly, "ToggleImgNavBox", "map" keyword)
-      If (thumbsListViewMode=1 && thumbsDisplaying=1 && !testIsDupesList())
-         Menu, PvUIprefs, Delete, % friendly
-      Else If (showHUDnavIMG=1)
+      If (showHUDnavIMG=1)
          kMenu("PvUIprefs", "Check", friendly)
    }
 
@@ -48252,6 +48809,7 @@ ToggleImgNavSizeBox() {
        Return
 
     HUDnavBoxSize := (HUDnavBoxSize=75) ? 125 : 75
+    RegAction(1, "HUDnavBoxSize")
     If (thumbsDisplaying=1)
        mainGdipWinThumbsGrid()
     Else
@@ -48262,7 +48820,7 @@ ToggleImgNavSizeBox() {
 dummyNavBoxInfo() {
     friendly := (IMGlargerViewPort=1) ? "" : "`nThe navigator will be displayed`nwhen the image is larger than the viewport."
     If (thumbsDisplaying=1)
-       friendly := (thumbsListViewMode>1) ? "" : "`nImage preview box will be displayed in other list modes`nPress L to toggle between modes"
+       friendly := ""
 
     labelu := (thumbsDisplaying=1) ? "preview" : "navigator"
     If (showHUDnavIMG=1)
@@ -51462,11 +52020,12 @@ CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReload
      brushu := (brushRequired=1) ? pBrushWinBGR : ""
      ; nBitmap := simpleFreeImgRotate(rBitmap, vpIMGrotation)
      changeMcursor()
-     nBitmap := trGdip_RotateBitmapAtCenter(A_ThisFunc, rBitmap, vpIMGrotation, brushu, imgQuality, pargbPixFmt)
+     nBitmap := trGdip_RotateBitmapAtCenter(A_ThisFunc, rBitmap, vpIMGrotation, "", imgQuality, pargbPixFmt)
      If StrLen(nBitmap)>3
      {
         Gdip_GetImageDimensions(nBitmap, imgW, imgH)
         newW := imgW, newH := imgH
+        currIMGdetails.HasAlpha := 1
         trGdip_DisposeImage(rBitmap, 1)
         rBitmap := nBitmap
      } Else vpIMGrotation := 0
@@ -52365,6 +52924,14 @@ createVPnavBox(ByRef pBitmap, ByRef imgW, ByRef imgH, ByRef posX, ByRef posY, By
    }
 
    Gdip_FillRectangle(Gu, pBrushE, 0, 0, imgW, imgH)
+   If (resultedFilesList[currentFileIndex, 2]=1 && thumbsDisplaying=0)
+   {
+      pBrush3 := Gdip_BrushCreateSolid("0x400188FF")
+      Gdip_FillRectangle(Gu, pBrush3, 0, 0, imgW, imgH)
+      Gdip_DeleteBrush(pBrush3)
+   } Else
+      Gdip_FillRectangle(Gu, pBrushE, 0, 0, imgW, imgH)
+
    E := trGdip_DrawImage(A_ThisFunc, Gu, navBoxu, posX, posY, fImgW, fImgH)
    If (E="fail")
    {
@@ -52379,6 +52946,11 @@ createVPnavBox(ByRef pBitmap, ByRef imgW, ByRef imgH, ByRef posX, ByRef posY, By
    borderu := Round(imgW*0.0099)
    ; Gdip_FillRectangle(Gu, pBrushE, posX - borderu, posY - borderu, fImgW + borderu*2, fImgH + borderu*2)
    ; Gdip_ResetClip(Gu)
+   If (resultedFilesList[currentFileIndex, 3]=1 && highlightAlreadySeenImages=1 && thumbsDisplaying=1)
+      Gdip_DrawRectangle(Gu, pPen5, 2, 2, imgW - 5, imgH - 5)
+
+   If (resultedFilesList[currentFileIndex, 5]=1) ; is bookmarked
+      Gdip_DrawRectangle(Gu, pPen1d, 2, 2, imgW - 5, imgH - 5)
 
    If (editingSelectionNow=1 && thumbsDisplaying!=1)
    {
@@ -55570,7 +56142,7 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
        drawImgSelectionOnWindow("return", "-", "-", "-", mainWidth, mainHeight)
 
     If (AnyWindowOpen=64 && BrushToolType=3) || (AnyWindowOpen=23 && FillAreaColorMode=6) 
-    || (AnyWindowOpen=44 || AnyWindowOpen=43 || AnyWindowOpen=26)
+    || (AnyWindowOpen=69 || AnyWindowOpen=44 || AnyWindowOpen=43 || AnyWindowOpen=26)
     {
        ImageCoords2Window(tinyPrevAreaCoordX, tinyPrevAreaCoordY, prevDestPosX, prevDestPosY, SelDotsSize, outX, outY)
        Gdip_FillRectangle(2NDglPG, pBrushE, outX, outY, SelDotsSize, SelDotsSize)
@@ -57800,6 +58372,10 @@ coreUpdateLiveTinyPreviewsWindow() {
        livePreviewIDedges()
     Else If (AnyWindowOpen=44)
        livePreviewAddNoiser()
+    Else If (AnyWindowOpen=64)
+       createLivePreviewBrush()
+    Else If (AnyWindowOpen=69)
+       livePreviewZoomBlurPanel()
 }
 
 updateLiveTinyPreviewsWindow(hwnd:=0, eventu:=0) {
@@ -57832,21 +58408,11 @@ updateTinyPreviewArea(DestPosX, DestPosY, newW, newH, urgent:=0) {
           If (A_TickCount - lastInvoked<90)
              Return
 
-          If (AnyWindowOpen=26)
-             livePreviewBlurPanel()
-          Else If (AnyWindowOpen=43)
-             livePreviewIDedges()
-          Else If (AnyWindowOpen=44)
-             livePreviewAddNoiser()
+          coreUpdateLiveTinyPreviewsWindow()
           lastInvoked := A_TickCount
        } Else
        {
-          If (AnyWindowOpen=26)
-             SetTimer, livePreviewBlurPanel, -100
-          Else If (AnyWindowOpen=43)
-             SetTimer, livePreviewIDedges, -100
-          Else If (AnyWindowOpen=44)
-             SetTimer, livePreviewAddNoiser, -100
+          SetTimer, coreUpdateLiveTinyPreviewsWindow, -100
        }
     } 
 }
@@ -58261,7 +58827,7 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
 
     Gdip_GraphicsClear(2NDglPG, "0x00" WindowBgrColor)
     thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, startIndex, mainWidth, mainHeight)
-    rowIndex := 0
+    thisThumb := rowIndex := 0, cbox := []
     currentDupeID := columnIndex := -1
     If (simpleMode=0)
     {
@@ -58276,6 +58842,9 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
 
     If (startIndex=prevIndexu)
        prevIndexu := ""
+
+    If (showInfoBoxHUD>0)
+       drawinfoBox(mainWidth, mainHeight, 0, 2NDglPG)
 
     Loop, % maxItemsW*maxItemsH*2
     {
@@ -58300,47 +58869,58 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
            Gdip_FillRectangle(2NDglPG, pBrushE, DestPosX, DestPosY, thumbsW, thumbsH)
            Gdip_DrawRectangle(2NDglPG, pPen3, DestPosX, DestPosY, thumbsW, thumbsH)
            ; Gdip_FillRectangle(2NDglPG, pBrushE, DestPosX, DestPosY, thumbsW, thumbsH)
-           If StrLen(imgPath)<4
+           If (isStringLen=0)
               Gdip_FillRectangle(2NDglPG, pBrushE, DestPosX, DestPosY, thumbsW, thumbsH)
         }
+
+        If (simpleMode=0 && isStringLen=1)
+           isFile := FileRexists(imgPath)
 
         If (simpleMode=1 && isStringLen=1)
         {
            Gdip_FillRectangle(2NDglPG, pBrushE, DestPosX + 1, DestPosY + 1, thumbsW - 2, thumbsH - 2)
-        } Else If (isStringLen=1 && simpleMode=0 && thumbsListViewMode=1)
+        } Else If (thumbsListViewMode=1 && isFile=0)
         {
-           If !FileExist(imgPath)
-           {
-              infoBoxBMP2 := drawTextInBox("! " thisFileIndex, OSDFontName, OSDfontSize//1.5, thumbsW, thumbsH, OSDtextColor, OSDbgrColor, 0, 0)
-              trGdip_DrawImage(A_ThisFunc, 2NDglPG, infoBoxBMP2, DestPosX, DestPosY)
-              infoBoxBMP2 := trGdip_DisposeImage(infoBoxBMP2, 1)
-           }
+           infoBoxBMP2 := drawTextInBox("! " thisFileIndex, OSDFontName, OSDfontSize//1.5, thumbsW, thumbsH, OSDtextColor, OSDbgrColor, 0, 0)
+           trGdip_DrawImage(A_ThisFunc, 2NDglPG, infoBoxBMP2, DestPosX, DestPosY)
+           infoBoxBMP2 := trGdip_DisposeImage(infoBoxBMP2, 1)
         }
 
-        If (simpleMode=0 && isStringLen=1)
-        {
-           If !FileExist(imgPath)
-              Gdip_FillRectangle(2NDglPG, pBrush4, DestPosX, DestPosY, thumbsW, thumbsH)
-        }
-
-        If (imgPathSelected=1)
-        {
-           countSel++
-           Gdip_DrawRectangle(2NDglPG, pPen3, DestPosX, DestPosY, thumbsW, thumbsH)
-           Gdip_FillRectangle(2NDglPG, pBrush3, DestPosX, DestPosY, thumbsW, thumbsH)
-        }
-
-        If (resultedFilesList[thisFileIndex, 3]=1 && highlightAlreadySeenImages=1)
-           Gdip_DrawRectangle(2NDglPG, pPen5, DestPosX, DestPosY, thumbsW, thumbsH)
+        If (isFile=0)
+           Gdip_FillRectangle(2NDglPG, pBrush4, DestPosX, DestPosY, thumbsW, thumbsH)
 
         If (thisFileIndex=currentFileIndex)
         {
            ; Gdip_FillRectangle(2NDglPG, pBrush1, DestPosX, DestPosY, thumbsW, thumbsH)
-           Gdip_DrawRectangle(2NDglPG, pPen6, DestPosX, DestPosY, thumbsW, thumbsH)
+           If (thumbsListViewMode=1 && userPrivateMode=0 && simpleMode=0 && showInfoBoxHUD>0)
+           {
+              MD5name := generateThumbName(imgPath, 1, 1)
+              If StrLen(imgThumbsCacheIDsArray[MD5name])>0
+                 thisThumb := imgThumbsCacheArray[imgThumbsCacheIDsArray[MD5name], 1]
+
+              If thisThumb
+              {
+                 Gdip_GetImageDimensions(thisThumb, imgW, imgH)
+                 thisThumb := Gdip_CloneBitmap(thisThumb)
+                 calcIMGdimensions(imgW, imgH, thumbsW, thumbsH, fW, fH)
+                 dpX := DestPosX + thumbsW/2
+                 dpX -= (imageAligned!=5) ? thumbsW/2 : fW/2
+                 dpY := DestPosY + thumbsH/2
+                 dpY -= (imageAligned!=5) ? thumbsH/2 : fH/2
+                 flipBitmapAccordingToViewPort(thisThumb)
+                 If (usrColorDepth>1)
+                    Gdip_BitmapSetColorDepth(thisThumb, internalColorDepth, ColorDepthDithering)
+
+                 thisThumb := applyVPeffectsOnBMP(thisThumb)
+                 Gdip_DrawImage(2NDglPG, thisThumb, dpX, dpY, fW, fH,,,,, 0.3)
+                 Gdip_DisposeImage(thisThumb)
+              }
+           }
+
            If (isStringLen=1)
            {
               zPlitPath(imgPath, mustDrawBoxNow, fileNamu, folderu)
-              If FileExist(imgPath)
+              If isFile
               {
                  QPV_FileGetSizeTime(imgPath, "R", thisFileIndex)
                  fileSizu := fileSizeFrienly(resultedFilesList[thisFileIndex, 6])
@@ -58359,8 +58939,15 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
            }
         }
 
-        If (resultedFilesList[thisFileIndex, 5]=1) ; is bookmarked
-           Gdip_DrawRectangle(2NDglPG, pPen1d, DestPosX, DestPosY, thumbsW, thumbsH)
+        If (imgPathSelected=1)
+        {
+           countSel++
+           Gdip_DrawRectangle(2NDglPG, pPen3, DestPosX, DestPosY, thumbsW, thumbsH)
+           Gdip_FillRectangle(2NDglPG, pBrush3, DestPosX, DestPosY, thumbsW, thumbsH)
+        }
+
+        If (resultedFilesList[thisFileIndex, 3]=1 && highlightAlreadySeenImages=1)
+           Gdip_DrawRectangle(2NDglPG, pPen5, DestPosX, DestPosY, thumbsW, thumbsH)
 
         If (currentDupeID=resultedFilesList[thisFileIndex, 23] && simpleMode=0 && isDupesList=1 && fadeOtherDupeGroups!=1)
         {
@@ -58374,6 +58961,12 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
 
         If (thisFileIndex=EntryMarkedMoveIndex)
            Gdip_FillRectangle(2NDglPG, pBrushC, DestPosX, DestPosY, thumbsW, thumbsH)
+
+        If (thisFileIndex=currentFileIndex)
+           Gdip_DrawRectangle(2NDglPG, pPen6, DestPosX, DestPosY, thumbsW, thumbsH)
+
+        If (resultedFilesList[thisFileIndex, 5]=1) ; is bookmarked
+           Gdip_DrawRectangle(2NDglPG, pPen1d, DestPosX, DestPosY, thumbsW, thumbsH)
     }
 
     If (countSel>markedSelectFile && countSel>1 && markedSelectFile>1)
@@ -58472,11 +59065,7 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
 
           interfaceThread.ahkPostFunction("UpdateUiStatusBar", theMSG2, ThumbsStatusBarH, 0, maxItemsPage)
           trGdip_DisposeImage(infoBoxBMP, 1)
-
-          If (showInfoBoxHUD>0)
-             drawinfoBox(mainWidth, mainHeight, 0, 2NDglPG)
-
-          If (showHUDnavIMG=1 && (thumbsListViewMode>1 || isDupesList=1))
+          If (showHUDnavIMG=1) ;  && (thumbsListViewMode>1 || isDupesList=1))
              VPnavBoxWrapper(mainWidth, mainHeight - ThumbsStatusBarH, 2NDglPG)
        }
     }
@@ -58488,6 +59077,7 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
     If StrLen(listMap)>2
        Gdip_DrawImage(2NDglPG, listMap, mainWidth - lineThickns - imgHUDbaseUnit//2, mapOffset)
 
+    Gdip_ResetClip(2NDglPG)
     If (scrollHeight<mainHeight)
     {
        whichBrush := (actu="scroll") ? pBrushWinBGR : pBrushC
@@ -63380,7 +63970,7 @@ PanelColorsAdjusterWindow() {
     Gui, Add, Button, x+5 hp wp-25 gBtnResetImageView, &Reset all
     Gui, Add, Button, x+5 hp w2 gBtnCloseWindow, &Close
     ; Gui, Add, Button, x+5 hp w80 Default gBtnCloseWindow, C&lose
-    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Adjust viewport image view: " appTitle, winPos)
     Sleep, 1
     updatePanelColorsInfo()
@@ -64022,8 +64612,7 @@ PanelAdjustImageCanvasSize() {
     If (thumbsDisplaying=1 || AnyWindowOpen)
        Return
 
-    whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
-    r1 := Gdip_GetImageDimensions(whichBitmap, oImgW, oImgH)
+    r1 := Gdip_GetImageDimensions(useGdiBitmap(), oImgW, oImgH)
     If (!oImgH || !oImgH)
     {
        showTOOLtip("ERROR: No image seems to be loaded or it is malformed")
@@ -64101,8 +64690,7 @@ EditCanvasMargins() {
    If (!userAddRight || userAddRight<0)
       userAddRight := 0
 
-   whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
-   Gdip_GetImageDimensions(whichBitmap, oImgW, oImgH)
+   Gdip_GetImageDimensions(useGdiBitmap(), oImgW, oImgH)
    thisWidth := oImgW + userAddLeft + userAddRight + userAddCenter
    thisHeight := oImgH + userAddTop + userAddBottom + userAddCenter
    GuiControl, SettingsGUIA:, ResultEditWidth, % Round(thisWidth)
@@ -64174,8 +64762,7 @@ BTNadjustCanvasAction() {
     If (!userAddRight || userAddRight<0)
        userAddRight := 0
 
-    whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
-    Gdip_GetImageDimensions(whichBitmap, oImgW, oImgH)
+    Gdip_GetImageDimensions(useGdiBitmap(), oImgW, oImgH)
     If (ResultEditWidth=oImgW && ResultEditHeight=oImgH)
     {
        showTOOLtip("WARNING: The new dimension is equal with the initial one")
@@ -64923,10 +65510,9 @@ EditResizeWidth() {
       userEditWidth := 1
 
    If (AnyWindowOpen=73 || AnyWindowOpen=28)
-   {
-      whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
-      Gdip_GetImageDimensions(whichBitmap, oImgW, oImgH)
-   } Else GetImgFileDimension(img2resizePath, oImgW, oImgH, 0)
+      Gdip_GetImageDimensions(useGdiBitmap(), oImgW, oImgH)
+   Else
+      GetImgFileDimension(img2resizePath, oImgW, oImgH, 0)
 
    Global lastEditRWChange := A_TickCount
    Sleep, 5
@@ -64979,10 +65565,9 @@ EditResizeHeight() {
       userEditHeight := 1
 
    If (AnyWindowOpen=28 || AnyWindowOpen=73)
-   {
-      whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
-      Gdip_GetImageDimensions(whichBitmap, oImgW, oImgH)
-   } Else GetImgFileDimension(img2resizePath, oImgW, oImgH, 0)
+      Gdip_GetImageDimensions(useGdiBitmap(), oImgW, oImgH)
+   Else
+      GetImgFileDimension(img2resizePath, oImgW, oImgH, 0)
 
    Global lastEditRHChange := A_TickCount
    Sleep, 5
@@ -68274,7 +68859,7 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
        Return
     }
 
-    If (AnyWindowOpen>0 && imgEditPanelOpened=1)
+    If (AnyWindowOpen>0 && repositionedWindow=1)
        Try WinGetPos, prevSetWinPosX, prevSetWinPosY,,, ahk_id %hSetWinGui%
 
     Global lastOtherWinClose := A_TickCount
@@ -68373,13 +68958,16 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
        hudBTNtypeFuncu := typeFuncu
     } Else hudBTNtypeFuncu := hudBTNfuncu := 0
 
-    If (killWin=1 || StrLen(msg)<3)
+    If (killWin=1 || killWin=2 || StrLen(msg)<3)
     {
        If (A_TickCount - lastInvoked<msgDisplayTime + 900) && (preventKill=1)
        || (A_TickCount - lastInvoked<350) && (killWin=1 && slideShowRunning!=1)
        {
-          SetTimer, RemoveTooltip, -400
-          Return
+          If (killWin!=2)
+          {
+             SetTimer, RemoveTooltip, -400
+             Return
+          }
        }
 
        toolTipGuiCreated := 0
@@ -68701,7 +69289,7 @@ PanelImgAutoCrop() {
        Gui, Add, Button, x+5 hp w90 gBtnCloseWindow, C&lose
     }
 
-    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Automatic image crop: " appTitle, winPos)
     Sleep, 1
     captureImgCorners(useGdiBitmap())
@@ -71161,6 +71749,7 @@ printImageNow(mainBMP, PrintOptions, previewMode) {
    {
       If (previewMode=1)
          imgToPrint := trGdip_ResizeBitmap(A_ThisFunc, mainBMP, 600, 600, 1, 3, -1)
+
       whichBitmap := StrLen(imgToPrint)>3 ? imgToPrint : mainBMP
       newBitmap := trGdip_RotateBitmapAtCenter(A_ThisFunc, whichBitmap, imgOrient, 1)
       If StrLen(imgToPrint)>3
@@ -71305,11 +71894,13 @@ AcquireWIAimage() {
     showTOOLtip("Acquiring image, please wait")
     prevOpenedWindow := [-1, A_ThisFunc, 1, editingSelectionNow, 0, userimgQuality]
     addJournalEntry("Window opened: " A_ThisFunc "() [ WIA standard dialogs ]")
+    WinSet, Disable,, ahk_id %PVhwnd%
 
     Try obju := WIA_AcquireImage(deviceu)
     Catch errMsg
        Sleep, 1
 
+    WinSet, Enable,, ahk_id %PVhwnd%
     If IsObject(obju)
     {
        pBitmap := obju[1]
@@ -73354,16 +73945,6 @@ CoreGUItoolbar() {
     prevState := thisState
     If (simpleRefresh=0)
        Gui, OSDguiToolbar: Show, x0 y0 AutoSize, QPV toolbar
-
-    ; Sleep, 1
-    ; Gui, OSDguiToolbar: Show, %todisplay% x%toolbarX% y%toolbarY%, QPV toolbar
-    ; adjustWin2MonLimits(hQPVtoolbar, toolbarX, toolbarY, rX, rY, tlbrWid, tlbrHeig)
-    ; Gui, OSDguiToolbar: Show, %todisplay% x%rX% y%rY%, QPV toolbar
-    ; WinSet, AlwaysOnTop, On, QPVadvToolbar
-    ; ToolTip, % tlbrIconzList[2,1] "=" tlbrIconzList[2,4] , , , 2
-    ; If (ToolbarOpacity<250)
-    ; WinSet, Transparent, %ToolbarOpacity%, ahk_id %hQPVtoolbar%
-    ; WinSet, Style, +0x40000, ahk_id %hQPVtoolbar%
 }
 
 createGUItoolbar(dummy:=0) {
