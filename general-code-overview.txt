@@ -10,7 +10,7 @@
    i) Image live editing [soon]
 
 
-Deniere mise à jour: mardi 5 avril 2022
+Deniere mise à jour: mardi 24 mai 2022
 ================================================
 
 a) How Quick Picto Viewer initializes
@@ -292,9 +292,9 @@ d) How an image is loaded and displayed on screen [simplified]
    QPV_ShowImgonGui() is then invoked with multiple parameters.
    This is the function that will render the image on screen.
    It can also generate new sets of viewport caches.
-     - "gdiBMPvPsize" - handle of a viewport sized image
+     - "gdiBMPvPsize"   - handle of a viewport sized image
      - "gdiBitmapSmall" - handle of a low-res sized image;
-       - dimensions determined by determineGDIsmallCacheSize()
+     - the dimensions are calculated in determineGDIsmallCacheSize()
 
    These are obtained by resizing "gdiBitmap", the bitmap returned 
    by CloneMainBMP().
@@ -420,18 +420,21 @@ g) Windows, AHK GUIs
    The following is a list, a summary, of what functions, found
    in the main thread, draw what and on which window(s).
    All the windows are owned by the "PVhwnd" window.
-   These are created in the interface thread, in BuildGUI().
+   These are created in the interface thread, from BuildGUI().
    
    0. PVhwnd - main window frame of QPV
+      various text controls are added
 
-   1. hGDIthumbsWin - glPG - layered window
+   1. hGDIthumbsWin - glPG         - layered window
       QPV_listThumbnailsGridMode() - thumbnails grid for the list mode
-      QPV_ShowThumbnails() - draws and generates thumbnails
+      QPV_ShowThumbnails()         - draws and generates thumbnails
+      
       During live image editing
          QPV_ShowImgonGui() - image on screen
-         drawHUDelements() - histo box, ui markers [frames counter, scrollbars]
+         drawHUDelements()  - histogram box [image view only]
+                              various UI markers [frames counter, scrollbars]
 
-   2. hGDIwin - glPG - layered window
+   2. hGDIwin - glPG             - layered window
       livePreviewsImageEditing() - the live image editing tools
          corePasteInPlaceActNow()
          coreDrawLinesSelectionArea()
@@ -440,23 +443,24 @@ g) Windows, AHK GUIs
          livePreviewEraseArea()
          livePreviewDesaturateArea()
 
-      When NOT live image editing
+      When NOT in live image editing
          QPV_ShowImgonGui() - image on screen
-         drawVPgridsNow() - viewport grid
-         drawHUDelements() - histo box, UI markers [frames counter, scrollbars]
+         drawVPgridsNow()   - viewport grid
+         drawHUDelements()  - histogram box [image view only]
+                              various UI markers [frames counter, scrollbars]
 
    3. hGDIselectWin - 2NDglPG - layered window
-      mainGdipWinThumbsGrid() - thumbnails grid overlay, thumbs scrollbar and status bar
+      mainGdipWinThumbsGrid() - thumbnails grid overlay, scrollbar and status bar
       additionalHUDelements() - wrapper for the following functions
-         drawImgSelectionOnWindow() - selection area
-         drawinfoBox() - info box
-         VPnavBoxWrapper() - img nav/preview box
-         drawAnnotationBox() - notes box
-         drawLiveCreateShape() - live shape drawing
+         drawImgSelectionOnWindow() - selection area [image view only]
+         drawinfoBox()              - infos box
+         VPnavBoxWrapper()          - image navigation/preview box
+         drawAnnotationBox()        - image captions box [image view only]
+         drawLiveCreateShape()      - live shape drawing [image view only]
 
    4. hGDIinfosWin - 2NDglPG - layered window
-      CreateOSDinfoLine() - user OSD messages
-      MouseMoveResponder() - hover selection area handler
+      CreateOSDinfoLine()    - user OSD messages
+      MouseMoveResponder()   - hover selection area handler
 
    5. ShowClickHalo() - on-demand, temporary window, invoked
    only by the main thread.
@@ -479,10 +483,10 @@ g) Windows, AHK GUIs
 
    3. createSettingsGUI() - generalized panel, it is used by most
    of the panels users can see in QPV. Each panel has an ID,
-   held in "AnyWindowOpen".
+   assigned to the "AnyWindowOpen" variable.
       hSetWinGui, SettingsGUIA
 
-      It must be noted that some panels are cunstructed by 
+      It must be noted that some panels are constructed by 
       fakeWinCreator() which uses msgBoxWrapper() to create
       simple panels.
 
@@ -500,13 +504,22 @@ g) Windows, AHK GUIs
    The menus are displayed with showThisMenu() from
    the main thread.
 
+   The main GUI of the window, created in BuildGUI(),
+   contains multiple static text controls. These are used
+   as place holders. They are updated with texts pertaining
+   to the various viewport elements. The functions that
+   update the controls are uiAccess*(). They are invoked from
+   the main thread by drawHUDelements() or other associated
+   functions. This is meant to help make the viewport more
+   accessible for users relying on screen readers.
+
 
 h) Input responses
 =============================================
 
    All keyboard shortcuts are «registered» through WM_KEYDOWN and WM_SYSKEYDOWN.
-   Both the main thread and the interface one, register these
-   Window Messages. The function invoked in both treads is
+   Both, the main thread and the interface one, register these
+   Window Messages. The function invoked by these threads is
    WM_KEYDOWN(). The function is meant to finish execution as
    soon as possible. constructKbdKey() is called to convert the
    virtual keys into readble form. In KeyboardResponder(), main thread,
@@ -516,7 +529,7 @@ h) Input responses
 
    Mouse input is mostly handled in the interface thread.
    The Window Messages for mouse buttons (e.g., WM_LBUTTONUP)
-   are registered and, broadly speaking, invoke WinClickAction()
+   are registered and, broadly speaking, invoke WinClickAction(),
    which is a wrapper to the function with the same name from
    the main thread. The function handles most of the imagined
    responses to mouse clicks, based on user context.
@@ -527,4 +540,12 @@ h) Input responses
    based on the user context and calls MouseMoveResponder()
    from the main thread. which handles live viewport updates
    related to hover actions.
+
+   WM_MOUSEMOVE message is registered in the main thread 
+   as well, associated with WM_MOUSEMOVE(). Most importantly, 
+   it displays tooltips when users hover icons in the QPV toolbar, 
+   if it is visible. The toolbar is created by createGUItoolbar(),
+   if "ShowAdvToolbar" equals 1.
+
+
 

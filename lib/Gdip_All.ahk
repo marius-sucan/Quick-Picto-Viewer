@@ -2349,7 +2349,7 @@ Gdip_CreateStreamOnFile(sFile, accessMode:="rw") {
 ; return             Returns the ARGB value of the pixel
 
 Gdip_GetPixel(pBitmap, x, y) {
-   ARGB := 0
+   ARGB := ""
    gdipLastError := DllCall("gdiplus\GdipBitmapGetPixel", "UPtr", pBitmap, "int", x, "int", y, "uint*", ARGB)
    Return ARGB
    ; should use Format("{1:#x}", ARGB)
@@ -2357,16 +2357,16 @@ Gdip_GetPixel(pBitmap, x, y) {
 
 Gdip_GetPixelColor(pBitmap, x, y, Format) {
    ARGBdec := Gdip_GetPixel(pBitmap, x, y)
-   If !ARGBdec
+   If (ARGBdec="")
       Return
 
    If (format=1)  ; in ARGB [HEX; 00-FF] with 0x prefix
    {
       Return Format("{1:#x}", ARGBdec)
-   } Else If (format=2)  ; in RGBA [0-255]
+   } Else If (format=2)  ; in RGBA [0-255], returns an object
    {
       Gdip_FromARGB(ARGBdec, A, R, G, B)
-      Return R "," G "," B "," A
+      Return [R, G, B, A]
    } Else If (format=3)  ; in BGR [HEX; 00-FF] with 0x prefix
    {
       clr := Format("{1:#x}", ARGBdec)

@@ -11,7 +11,7 @@
 ; https://www.autohotkey.com/boards/viewtopic.php?f=6&t=4379
 
 ; Other functions added by Marius Șucan.
-; Last update on: mardi 30 novembre 2021.
+; Last update on: mercredi samedi 28 mai 2022 ; 28/05/2022
 
 Gdi_DrawTextHelper(hDC, hFont, Text, x, y, txtColor, bgrColor:="") {
       ; Transparent background, no color needed
@@ -2283,6 +2283,42 @@ Gdi_SetPixel(hDC, x, y, Color, Fast:=0) {
    return DllCall("gdi32\SetPixel" (Fast=1 ? "V" : ""), "UPtr", hDC, "Int", x, "Int", y, "UInt", Color)
 }
 
+Gdi_GetPixel(hDC, x, y) {
+   ; returns COLORREF
+   return DllCall("gdi32\GetPixel", "UPtr", hDC, "Int", x, "Int", y)
+}
+
+Gdi_ColorRef2RGB(c) {
+  ; c integer must be a COLORREF
+  ; returns a RGB HEX value: eg. 22FFAA
+  r := c >> 16 & 0xff | c & 0xff00 | (c & 0xff) << 16
+  c := "000000"
+  DllCall("msvcrt\sprintf", "AStr", c, "AStr", "%06X", "UInt", r, "CDecl")
+  Return c
+}
+
+Gdi_GetPixelColor(hDC, x, y, Format) {
+   c := Gdi_GetPixel(hDC, x, y)
+   If (c="")
+      Return
+
+   clr := Gdi_ColorRef2RGB(c)
+   If (format=1)  ; in RGB [HEX; 00-FF] with 0x prefix
+   {
+      Return "0x" clr
+   } Else If (format=2)  ; in RGB [0-255]
+   {
+      z := c >> 16 & 0xff | c & 0xff00 | (c & 0xff) << 16
+      R := (0xff0000 & z) >> 16
+      G := (0x00ff00 & z) >> 8
+      B := 0x0000ff & z
+      Return [R, G, B]
+   } Else If (format=3)  ; in BGR [HEX; 00-FF] with 0x prefix
+   {
+      Return "0x" SubStr(clr, 5, 2) SubStr(clr, 3, 2) SubStr(clr, 1, 2)
+   } Else Return clr
+}
+
 ;------------------------------
 ;
 ; Function: Gdi_AddFontResource
@@ -2835,33 +2871,34 @@ Gdi_SetGraphicsMode(hDC, mode) {
 }
 
 Gdi_GetBitmapInfo(hBitmap) {
-   ; from TheArkive
-   ; to do to-do ; must return object
+   ; from TheArkive; returns an object with properties
+
    oi_size := DllCall("GetObject", "UPtr", hBitmap, "Int", 0, "UPtr", 0)  ; get size of struct
    size := VarSetCapacity(oi, (A_PtrSize = 8) ? 104 : 84, 0)           ; always use max size of struct
    DllCall("GetObject", "UPtr", hBitmap, "Int", size, "UPtr", &oi)        ; finally, call GetObject and get data
-   
+
+   obj := []
    ; Main BITMAP struct
-   msgbox % "Return Size: " oi_size "`n"
-        . "Type: " NumGet(oi,0,"UInt") "`n"
-        . "Width: " NumGet(oi, 4, "UInt") "`n"
-        . "Height: " NumGet(oi, 8, "UInt") "`n"
-        . "Stride: " NumGet(oi, 12, "UInt") "`n"
-        . "Planes: " NumGet(oi, 16, "UShort") "`n"
-        . "bpp: " NumGet(oi, 18, "UShort") "`n"
-        . "bPtr: " NumGet(oi, 24, "UPtr") "`n"
-        . "`n"
-        ; BITMAPINFOHEADER struct
-        . "DIBSECTION struct:`n"
-        . "Struct: " NumGet(oi,32,"UInt") "`n"
-        . "Width: " NumGet(oi, 36, "UInt") "`n"
-        . "Height: " NumGet(oi, 40, "UInt") "`n"
-        . "Planes: " NumGet(oi, 44, "UShort") "`n"
-        . "bpp: " NumGet(oi, 46, "UShort") "`n"
-        . "Comp: " NumGet(oi, 48, "UInt") "`n"
-        . "Size: " NumGet(oi, 52, "UInt") "`n"
-        . "ClrUsed: " NumGet(oi, 60, "UInt") "`n"
-        . "ClrImportant: " NumGet(oi, 64, "UInt")
+   obj.Size := oi_size
+   obj.Type := NumGet(oi,0,"UInt")
+   obj.Width := NumGet(oi, 4, "UInt")
+   obj.Height := NumGet(oi, 8, "UInt")
+   obj.Stride := NumGet(oi, 12, "UInt")
+   obj.Planes := NumGet(oi, 16, "UShort")
+   obj.Bpp := NumGet(oi, 18, "UShort")
+   obj.hPtr := NumGet(oi, 24, "UPtr")
+
+   ; BITMAPINFOHEADER struct / DIBSECTION struct
+   obj.Struct := NumGet(oi,32,"UInt")
+   obj.Width := NumGet(oi, 36, "UInt")
+   obj.Height := NumGet(oi, 40, "UInt")
+   obj.Planes := NumGet(oi, 44, "UShort")
+   obj.Bpp := NumGet(oi, 46, "UShort")
+   obj.Comp := NumGet(oi, 48, "UInt")
+   obj.Size := NumGet(oi, 52, "UInt")
+   obj.ClrUsed := NumGet(oi, 60, "UInt")
+   obj.ClrImportant := NumGet(oi, 64, "UInt")
+   Return obj
 }
 
 Gdi_GetStockObject(stockIndex){
@@ -2917,6 +2954,8 @@ Gdi_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
 
 
 rgb2bgr(rgbHex) {
+   ; input must be like AA00FF
+   ; output is FF00AA
    r := SubStr(rgbHex, 1, 2)
    g := SubStr(rgbHex, 3, 2)
    b := SubStr(rgbHex, 5, 2)
@@ -2933,7 +2972,7 @@ calcFntHeightFromPtsSize(ptsSize) {
 }
 
 Gdi_GetLibVersion() {
-  return 1.2 ; 30/11/2021 / mardi 30 novembre 2021 
+  return 1.3 ; samedi 28 mai 2022 ; 28/05/2022
 }
 
 
@@ -3010,7 +3049,6 @@ A selection of API functions left to implement from GDI,
   *GetDIBits
   *CreateDIBitmap
   AlphaBlend [priority]
-  GetPixel
  
 10 Line and curve functions:
   GetArcDirection

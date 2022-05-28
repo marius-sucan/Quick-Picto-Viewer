@@ -2,6 +2,13 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.7.3 (2022-05-28)
+  - [new] dedicated panel to adjust image colours with alpha masking support; previously, one would have had to use the viewport colors adjustment panel
+  - [new] option to set grayscale levels in «desaturate» image panel
+  - [new] option to reset transformed image object to initial coordinates
+  - substantially improved Microsoft Windows Narrator [and other screen readers] compatibility with the viewport
+  - other improvements and fixes
+
 - v5.7.2 (2022-05-10)
   - [new] zoom / motion blur
   - various bug fixes
@@ -44,7 +51,7 @@
   - [new] ability to scale selected vector points
   - [new] copy/paste vector points
   - [new] several new selection area aspect ratio locking modes
-  - [new] users can now do «Ctrl + Left click» inside an image selection area, and drag, to create and adjust how much of the selection area to be excluded
+  - [new] users can now do «Ctrl + Left click» inside an image selection area, and drag, to create and adjust how much of the selection area is to be excluded
   - [new] option to turn off tooltips in the toolbar
   - [new] improvements to panel: «Update files list selectively» / «Folders containing indexed files»; it is now always accessible, regardless of the files list index opened, and it allows counting [selected and total] files per folder; it also allows users to select/deselect files for any of the listed folders
   - viewport grid and rotation icons in the toolbar are now slider icons
@@ -94,7 +101,7 @@ Files organization:
   - [new] implemented the pHash DCT and Mean-Squared Difference algorithms for similar images duplicates detection; simplified options related to image fingerprints duplicates detection
   - [new] dupes detection: ability to detect images horizontally flipped and color inverted images
   - [new] option to have images faded if they do not belong to the same group of duplicates
-  - [new] option to generate stats based on file created date; until now, only file modified date was possible
+  - [new] option to generate statistics based on the file created date; until now, only modified date was considered
   - [new] ability to collect histogram and image fingerprints filtered by a given string
   - [new] option to purge cached data only for modified files
   - [new] panel with detailed overview of the cached data in the database

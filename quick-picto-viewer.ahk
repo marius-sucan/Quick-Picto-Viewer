@@ -43,7 +43,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.7.2
+;@Ahk2Exe-SetVersion 5.7.3
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2021)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -196,11 +196,12 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , postVectorWinOpen := 0, isWelcomeScreenu := 0, prevVectorShapeSymmetryMode := [], AllowDarkModeForWindow := ""
    , iduStaticFoldersListCache := 0, lastFilterEditSearch := "", additionalLVrows := 1, uLVr := 12
    , omniBoxMode := 0, hLVquickSearchMenus := "", hotkate, vk_hwnd, lastInfoBoxBMP := []
-   , userFriendlyPrevImgSelAction, keywordsListArray := new hashtable(), keywrdLVfilter
+   , userFriendlyPrevImgSelAction, keywordsListArray := new hashtable(), keywrdLVfilter, wasVPfxBefore := 0
    , lastLclickX, lastLclickY, lastTlbrCliicked := 0, uiLVoffset := 0, repositionedWindow := 0
    , selDotMaX, selDotMaY, selDotMbX, selDotMbY, selDotMcX, selDotMcY, selDotMdX, selDotMdY
+   , lastInfoBoxZeitToggle := 1, prevHistoBoxString := ""
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.7.2", vReleaseDate := "10/05/2022"
+   , appVersion := "5.7.3", vReleaseDate := "28/05/2022"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1, usrAutoCropGenerateSelection := 0
@@ -312,7 +313,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , ResizeFillCanvasMode := 1, ShowToolTipsToolbar := 1, userPrivateMode := 0, thresholdKeywords := 1
    , minKeywordLength := 2, LangKeywordsFilter := 0, mergeKeywordRows := 1, limitSearchReplaceSelected := 0
    , autoReflectVectorAnchors := 0, shearImgX := 0, shearImgY := 0, zoomBlurAreaYamount := 1
-   , zoomBlurAreaXamount := 1, zoomBlurMode := 1
+   , zoomBlurAreaXamount := 1, zoomBlurMode := 1, DesaturateAreaLevels := 1, DesaturateAreaDither := 0
    , BlurAreaHue := 0, BlurAreaSaturation := 0, BlurAreaLight := 0, BlurAreaGamma := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
@@ -383,7 +384,7 @@ Else If (sz := GetRes(data, 0, "MODULE-INTERFACE.AHK", "LIB"))
 ; enjoy a more responsive user interface when the main thread
 ; is busy processing
 externObj := WindowBgrColor "$" isAlwaysOnTop "$" mainCompiledPath "$" isTitleBarVisible "$" TouchScreenMode "$" userAllowWindowDrag "$" mainWinPos "$" mainWinSize "$" mainWinMaximized "$" IMGresizingMode
-externObj .= "$" OSDbgrColor "$" OSDtextColor "$" LargeUIfontValue "$" PrefsLargeFonts "$" OSDFontName "$" OSDfontBolded
+externObj .= "$" OSDbgrColor "$" OSDtextColor "$" OSDfontSize "$" PrefsLargeFonts "$" OSDFontName "$" OSDfontBolded
 initGUI := interfaceThread.ahkFunction("BuildGUI", externObj)
 fnOutputDebug("extern UI HWNDs: " initGUI)
 If !InStr(initGUI, "|")
@@ -420,7 +421,10 @@ If (qpvCanvasHasInit=1)
 
 ; MsgBox, % A_TickCount - scriptStartTime
 If (doWelcomeNow=1 && qpvCanvasHasInit=1)
-   SetTimer, drawWelcomeImg, -25
+{
+   drawWelcomeImg()
+   interfaceThread.ahkPostFunction("uiAccessWelcomeView")
+}
 
 If (A_Is64bitOS=1 && A_PtrSize!=8)
    SetTimer, giveWarningX64, -500
@@ -481,6 +485,7 @@ constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code) {
       newkate .= "^"
    If vk_alt
       newkate .= "!"
+
    If (vkExtraList[vk_code]!="")
       newkate .= vkExtraList[vk_code]
    Else
@@ -535,27 +540,22 @@ decideBlockKbdKeys(Az, givenKey) {
    {
       GuiControlGet, OutputVar, QuickMenuSearchGUIA: Focus
       If (InStr(OutputVar, "edit") && (givenKey="Up" || givenKey="Down"))
+      || (isVarEqualTo(givenKey, "^Up", "!Up", "!Left", "!BackSpace", "^x", "^c") && omniBoxMode=1)
          blockKey := 1
 
-      If ((givenKey="^Up" || givenKey="!Up" || givenKey="!Left" || givenKey="!BackSpace") && omniBoxMode=1)
-      || (omniBoxMode=1 && (givenKey="^x" || givenKey="^c"))
-         blockKey := 1
-   } Else If (givenKey="Up" || givenKey="Down" || givenKey="Left" || givenKey="Right")
+   } Else If (Az=hSetWinGui && isVarEqualTo(givenKey, "Up", "Down"))
    {
-      GuiControlGet, OutputVar, SettingsGUIA: Focus
-      If (Az=hSetWinGui && (givenKey="Up" || givenKey="Down"))
+      GuiControlGet, OutputVname, SettingsGUIA: FocusV
+      GuiControlGet, hVar, SettingsGUIA: hwnd, % OutputVname
+      WinGetClass, pClass, ahk_id %hVar%
+      isOkay := (SubStr(OutputVname, 1, 5)!="editF" && StrLen(OutputVname)>1 && !InStr(pClass, "_updown") && !InStr(pClass, "ComboBox")) ? 1 : 0
+      If isOkay
       {
-         GuiControlGet, OutputVname, SettingsGUIA: FocusV
-         isOkay := (SubStr(OutputVname, 1, 5)!="editF" || StrLen(OutputVname)>6) ? 1 : 0
-         If isOkay
-         {
-            GuiControlGet, OutputVar, SettingsGUIA: Focus
-            GuiControlGet, OutputVal, SettingsGUIA:, % OutputVname
-            GuiControlGet, OutputEnable, SettingsGUIA: Enabled, % OutputVname
-            GuiControlGet, hVar, SettingsGUIA: hwnd, % OutputVname
-            If (isNumber(OutputVal) && InStr(OutputVar, "edit") && OutputEnable=1)
-               blockKey := 1
-         }
+         GuiControlGet, OutputVar, SettingsGUIA: Focus
+         GuiControlGet, OutputVal, SettingsGUIA:, % OutputVname
+         GuiControlGet, OutputEnable, SettingsGUIA: Enabled, % OutputVname
+         If (isNumber(OutputVal) && InStr(OutputVar, "edit") && OutputEnable=1)
+            blockKey := 1
       }
    } Else If (givenKey="^F4")
    {
@@ -622,6 +622,14 @@ KeyboardResponder(givenKey, thisWin, abusive) {
          {
             changeOptionQuickSearch(givenKey)
             SetTimer, highlightActiveArrowsCtrl, -50
+         } Else If (InStr(OutputVar, "edit") && (givenKey="home" || givenKey="end"))
+         {
+            Static lastSilly :=1
+            lastSilly := !lastSilly
+            If lastSilly
+               highlightActiveCtrl()
+            Else
+               highlightActiveArrowsCtrl()
          } Else If (InStr(OutputVar, "edit") && omniBoxMode=1)
          {
             If (givenKey="F2")
@@ -645,8 +653,11 @@ KeyboardResponder(givenKey, thisWin, abusive) {
             SetTimer, openPreviousPanel, -200
          }
 
-         If ((givenKey="^Up" || givenKey="!Up" || givenKey="!Left" || givenKey="!BackSpace") && omniBoxMode=1)
+         If (isVarEqualTo(givenKey, "^Up", "!Up", "!Left", "!BackSpace") && omniBoxMode=1)
+         {
             GoQuickSearchAction(0, "yes", "!OmniNavigateUpFolder")
+            highlightActiveArrowsCtrl()
+         }
    
          If (omniBoxMode=1 && givenKey="^x")
             omniBoxFolderCutCopy("cut")
@@ -655,19 +666,21 @@ KeyboardResponder(givenKey, thisWin, abusive) {
       } Else If (givenKey="Tab" || givenKey="+Tab")
       {
          SetTimer, highlightActiveCtrl, -50
-      } Else If (givenKey="Up" || givenKey="Down" || givenKey="Left" || givenKey="Right")
+      } Else If isVarEqualTo(givenKey, "Up", "Down", "Left", "Right")
       {
          GuiControlGet, OutputVar, SettingsGUIA: Focus
          If (Az=hSetWinGui && (givenKey="Up" || givenKey="Down"))
          {
             GuiControlGet, OutputVname, SettingsGUIA: FocusV
-            isOkay := (SubStr(OutputVname, 1, 5)!="editF" || StrLen(OutputVname)>6) ? 1 : 0
+            GuiControlGet, hVar, SettingsGUIA: hwnd, % OutputVname
+            WinGetClass, pClass, ahk_id %hVar%
+            isOkay := (SubStr(OutputVname, 1, 5)!="editF" && StrLen(OutputVname)>1 && !InStr(pClass, "_updown") && !InStr(pClass, "ComboBox")) ? 1 : 0
+            ; ToolTip, % isOkay "==" pClass , , , 2
             If isOkay
             {
                GuiControlGet, OutputVar, SettingsGUIA: Focus
                GuiControlGet, OutputVal, SettingsGUIA:, % OutputVname
                GuiControlGet, OutputEnable, SettingsGUIA: Enabled, % OutputVname
-               GuiControlGet, hVar, SettingsGUIA: hwnd, % OutputVname
                If (isNumber(OutputVal) && InStr(OutputVar, "edit") && OutputEnable=1)
                   GuiControl, SettingsGUIA:, % OutputVname, % (givenKey="Up") ? OutputVal + 1 : OutputVal - 1
             }
@@ -696,7 +709,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
          folderTreeCutCopyFolder("copy")
    } Else If (thisWin=hQPVtoolbar && ShowAdvToolbar=1 && Az=thisWin)
    {
-       If (givenKey="+Tab" || givenKey="Tab" || givenKey="Escape" || givenKey="AppsKey")
+       If isVarEqualTo(givenKey, "+Tab", "Tab", "Escape", "AppsKey")
        {
           ; currentKbdBTNtlbr := 0
           isToolbarKBDnav := 0
@@ -705,10 +718,10 @@ KeyboardResponder(givenKey, thisWin, abusive) {
        } Else If (givenKey="h" || givenKey="F1")
        {
           displayNowToolbarHelp(1)
-       } Else If (givenKey="Left" || givenKey="BackSpace" || givenKey="Up")
+       } Else If isVarEqualTo(givenKey, "Left", "BackSpace", "Up")
        {
           moveMouseToolbar(-1, 1)
-       } Else If (givenKey="Right" || givenKey="Delete" || givenKey="Down")
+       } Else If isVarEqualTo(givenKey, "Right", "Delete", "Down")
        {
           moveMouseToolbar(1, 1)
        } Else If (givenKey="PgUp")
@@ -940,7 +953,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              ImgRedoAction("j")
        } Else If (givenKey="e")
        {
-          If ((AnyWindowOpen=64 || AnyWindowOpen=66 || AnyWindowOpen=12) && imgEditPanelOpened=1) ; Brush, Fill and Jpeg Crop
+          If (isVarEqualTo(AnyWindowOpen, 64, 66, 12, 10) && imgEditPanelOpened=1) ; Brush, Fill and Jpeg Crop
              ToggleEditImgSelection()
           Else If (thumbsDisplaying=1)
              QuickSelectFilesSameFolder()
@@ -979,7 +992,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
        } Else If (givenKey="+l")
        {
           If (HKifs("liveEdit") && EllipseSelectMode=2 && editingSelectionNow=1
-          && (AnyWindowOpen=68 || AnyWindowOpen=66 || AnyWindowOpen=65 || AnyWindowOpen=64 || AnyWindowOpen=55 || AnyWindowOpen=25 || AnyWindowOpen=23 || AnyWindowOpen=10))
+          && isVarEqualTo(AnyWindowOpen, 74, 68, 66, 65, 64, 55, 25, 23, 10))
              MenuResumeDrawingShapes()
           Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded")) && (thumbsDisplaying!=1)
           {
@@ -1062,8 +1075,8 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              ChangeRealGamma(1)
        } Else If (givenKey="vkDC")
        {
-          If (HKifs("liveEdit") && AnyWindowOpen=10)
-             MenuToggleColorAdjustments()
+          If (HKifs("liveEdit") && (AnyWindowOpen=10 || AnyWindowOpen=74))
+             BtnToggleNoColorsFX()
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
              ResetImageView()
        } Else If (givenKey="^vkDC")
@@ -1244,18 +1257,18 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              togglePasteInPlaceColorsFX()
           Else If (HKifs("imgsLoaded") && thumbsDisplaying=1 && thumbsListViewMode=1)
              PanelSetThumbColumnOptions()
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit", 10) || HKifs("imgsLoaded"))
-             PanelColorsAdjusterWindow()
+          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+             PanelColorsAdjusterImage()
        } Else If (givenKey="+u")
        {
           If (HKifs("imgsLoaded") && thumbsDisplaying=1)
              filesListApplyColors()
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ApplyColorAdjustsSelectedArea()
+             PanelColorsAdjusterWindow()
        } Else If (givenKey="+^u")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ApplyColorAdjustsSelectedArea("outside")
+             ApplyColorAdjustsSelectedArea()
        } Else If (givenKey="f")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
@@ -1478,7 +1491,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              PanelEditImgCaption()
        } Else If (givenKey="n")
        {
-          If (HKifs("liveEdit") && (isAlphaMaskWindow()=1 || AnyWindowOpen=66 || AnyWindowOpen=55 || AnyWindowOpen=25))
+          If (HKifs("liveEdit") && (isAlphaMaskWindow()=1 || isVarEqualTo(AnyWindowOpen, 74, 66, 55, 25)))
              toggleInvertAlphaMask()
           Else If (HKifs("imgsLoaded") && thumbsDisplaying!=1)
              ToggleImgCaptions()
@@ -2347,6 +2360,7 @@ resetMainWin2Welcome() {
      prevOpenedWindow := ""
      SetTimer, createGUItoolbar, -100
      drawWelcomeImg()
+     interfaceThread.ahkPostFunction("uiAccessWelcomeView")
      SetTimer, TriggerMenuBarUpdate, -90
      SetTimer, ResetImgLoadStatus, -50
 }
@@ -3164,7 +3178,7 @@ ViewAlphaMaskNow() {
    If (thumbsDisplaying=1)
       Return
 
-   If (!(isAlphaMaskWindow()=1 || AnyWindowOpen=66 || AnyWindowOpen=55 || AnyWindowOpen=25) && imgEditPanelOpened=1 && AnyWindowOpen)
+   If (!(isAlphaMaskWindow()=1 || isVarEqualTo(AnyWindowOpen, 74, 66, 55, 25)) && imgEditPanelOpened=1 && AnyWindowOpen)
    {
       showTOOLtip("WARNING: The current tool does not support alpha masks")
       SoundBeep 300, 100
@@ -3949,15 +3963,12 @@ ToggleThumbsMode() {
       Global lastOtherWinClose := A_TickCount
       ; fnOutputDebug("Showing hGDIwin =  " hGDIwin " ")
       ToggleVisibilityWindow("show", hGDIwin)
-      interfaceThread.ahkassign("thumbsDisplaying", 0)
-      interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
-      interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
-
+      uiPanelOpenCloseEvent()
       ; fnOutputDebug("Hiding hGDIthumbsWin =  " hGDIthumbsWin " ")
       ToggleVisibilityWindow("hide", hGDIthumbsWin)
       fnOutputDebug("Image view initialized")
       dummyTimerDelayiedImageDisplay(50)
-      interfaceThread.ahkPostFunction("UpdateUiStatusBar", 0, 0, "image")
+      interfaceThread.ahkPostFunction("uiAccessUpdateUiStatusBar", 0, 0, "image")
       If hSNDmediaFile
          MCI_Resume(hSNDmedia)
       lastTimeToggleThumbs := A_TickCount
@@ -3986,12 +3997,13 @@ ToggleThumbsMode() {
       ; fnOutputDebug("Showing hGDIthumbsWin =  " hGDIthumbsWin " ")
       ToggleVisibilityWindow("show", hGDIthumbsWin)
       thumbsDisplaying := 1
+      uiPanelOpenCloseEvent()
       ; fnOutputDebug("Recalculating thumbnail sizes")
       recalculateThumbsSizes()
+      interfaceThread.ahkFunction("uiAccessUpdateUiStatusBar", 0, 0, "list", 0, OSDfontSize, maxFilesIndex)
       UpdateThumbsScreen()
-      fnOutputDebug("hGDIinfosWin cleaned...  " hGDIinfosWin "  -- G= " 2NDglPG "  -- hDC= " 2NDglHDC " ")
+      ; fnOutputDebug("hGDIinfosWin cleaned... " hGDIinfosWin "  -- G= " 2NDglPG "  -- hDC= " 2NDglHDC " ")
       clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
-      interfaceThread.ahkPostFunction("UpdateUiStatusBar", 0, 0, "list")
       RemoveTooltip()
       lastTimeToggleThumbs := A_TickCount
    }
@@ -4006,10 +4018,11 @@ TriggerMenuBarUpdate(modus:=0) {
 
    modus := (StrLen(UserMemBMP)>2 || (maxFilesIndex>0 && CurrentSLD)) ? modus : "welcome"
    If (drawingShapeNow=1)
-      moduds := "freeform"
+      modus := "freeform"
+
    lastMenuBarUpdated := A_TickCount
    ; fnOutputDebug("Updating menu bar")
-   interfaceThread.ahkassign("thumbsDisplaying", thumbsDisplaying)
+   ; interfaceThread.ahkassign("thumbsDisplaying", thumbsDisplaying)
    interfaceThread.ahkPostFunction("UpdateMenuBar", modus)
 }
 
@@ -4284,8 +4297,6 @@ determineNavKeysDown() {
 UpdateThumbsScreen(forceReload:=0) {
    Critical, on
    Static lastInvoked := 1, lastInvokeReload := 1
-   interfaceThread.ahkassign("thumbsDisplaying", 1)
-   interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
    If (thumbsDisplaying!=1)
       Return
 
@@ -4457,6 +4468,12 @@ invokeFilesListMapNow() {
       friendly := "NONE"
 
    showDelayedTooltip("Files list map: " friendly)
+}
+
+MenuDrawFilesListMap() {
+   SetTimer, RemoveTooltip, Off
+   lastOSDtooltipInvoked := A_TickCount
+   SetTimer, invokeFilesListMapNow, -150
 }
 
 ThumbsScrollbar() {
@@ -5211,9 +5228,11 @@ applyIMGeditFunction() {
        BtnGraySelectedArea()
     Else If (AnyWindowOpen=65)
        BtnDrawShapeSelectedArea()
+    Else If (AnyWindowOpen=74)
+       BtnAdjustColorsImgSelectedArea()
     Else If (AnyWindowOpen=12)
        BtnPerformJpegOp()
-    Else ; If (AnyWindowOpen=10 || AnyWindowOpen=64 || AnyWindowOpen=66) ; colors adjustments / brush tool / flood fill
+    Else
        BtnCloseWindow()
     SetTimer, RemoveTooltip, -300
 }
@@ -5362,6 +5381,8 @@ corelivePreviewsImageEditing(modus:=0, hideHUD:=0) {
          livePreviewFillBehindArea()
       Else If (AnyWindowOpen=55 && okayu=1)
          livePreviewDesaturateArea()
+      Else If (AnyWindowOpen=74)
+         livePreviewAdjustColorsArea()
       Else If (AnyWindowOpen=65 && okayu=1)
          coreDrawShapesSelectionArea()
    }
@@ -5712,7 +5733,7 @@ determineSelAreaClickRect(mX, mY, dotsSize, mainWidth, mainHeight, doFlips) {
    Return obju
 }
 
-createMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK) {
+createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK) {
    deleteMenus()
    If (indexu)
    {
@@ -5853,6 +5874,8 @@ MenuSelAllVectorPoints() {
 
    customShapeHasSelectedPoints := 1
    lastZeitFileSelect := A_TickCount
+   showTOOLtip("Selected all " groupDigits(customShapePoints.count()) " path points")
+   SetTimer, RemoveTooltip, % -msgDisplayTime
    SetTimer, dummyRefreshImgSelectionWindow, -10
 }
 
@@ -5862,6 +5885,8 @@ MenuSelNoVectorPoints() {
 
    customShapeHasSelectedPoints := 0
    lastZeitFileSelect := A_TickCount
+   showTOOLtip("Deselected all " groupDigits(customShapePoints.count()) " path points")
+   SetTimer, RemoveTooltip, % -msgDisplayTime
    SetTimer, dummyRefreshImgSelectionWindow, -10
 }
 
@@ -6537,7 +6562,7 @@ addNewVectorShapePoints(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, shi
 
    If (mainParam="rClick" && dotRemoved!=1)
    {
-      createMenuCustomShapeDrawing(mX, mY, dontAddPoint, thisIndex, k)
+      createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, thisIndex, k)
       Return lastIndex
    }
 
@@ -7726,6 +7751,33 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       closeQuickSearch()
       Return "none"
    }
+
+   displayingImageNow := (thumbsDisplaying!=1 && useGdiBitmap()) ? 1 : 0
+   If isVarEqualTo(AnyWindowOpen, 1, 33, 39, 59, 48, 61)
+   {
+      ; auto-close windows
+      lastTimeToggleThumbs := A_TickCount 
+      BtnCloseWindow()
+      Return
+   } Else If ((InStr(winEventu, "normal") || InStr(winEventu, "DoubleClick")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && displayingImageNow=1 && IMGresizingMode=4 && (scrollBarHy>1 || scrollBarVx>1) && thumbsDisplaying!=1)
+   {
+      ; handle clicks on the H/V scrollbars for images larger than the viewport
+      GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+      knobSize := imgHUDbaseUnit//3
+      If (scrollBarHy>1 && mY>(mainHeight - knobSize))
+      {
+         RemoveTooltip()
+         fn := Func("panIMGonScrollBar").Bind(1,0)
+         SetTimer, % fn, -25
+         Return
+      } Else If (scrollBarVx>1 && mX>(mainWidth - knobSize))
+      {
+         RemoveTooltip()
+         fn := Func("panIMGonScrollBar").Bind(0,1)
+         SetTimer, % fn, -25
+         Return
+      }
+   }
  
    If (IsFunc(hudBTNfuncu) && hudBTNfuncu && hudBTNheightFuncu && mY<hudBTNheightFuncu)
    {
@@ -7746,11 +7798,6 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
             %hudBTNfuncu%(1)
          Return
       }
-   } Else If (AnyWindowOpen=1 || AnyWindowOpen=33 || AnyWindowOpen=39 || AnyWindowOpen=59 || AnyWindowOpen=48 || AnyWindowOpen=61)
-   {
-      lastTimeToggleThumbs := A_TickCount 
-      BtnCloseWindow()
-      Return
    } Else If (AnyWindowOpen=64 && liveDrawingBrushTool=1`&& mustCaptureCloneBrush=1)
    {
       If StrLen(BrushToolSymmetryX)>1
@@ -7793,7 +7840,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       ; SetTimer, updateUIfillPanel, -350
       lastTimeToggleThumbs := A_TickCount 
       Return
-   } Else If (AnyWindowOpen=69 || AnyWindowOpen=43 || AnyWindowOpen=44 || AnyWindowOpen=26)
+   } Else If isVarEqualTo(AnyWindowOpen, 69, 43, 44, 26)
    {
       ; respond to clicks in viewport for panels with region based previews
       setwhileLoopExec(1)
@@ -7812,15 +7859,12 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
    || (A_TickCount - lastWinDrag < 250) 
       Return "none"
 
-   If AnyWindowOpen
+   If (imgEditPanelOpened!=1 && AnyWindowOpen)
    {
-      ; handle clicks in the viewport when another panel is open
-      If (imgEditPanelOpened!=1)
-      {
-         SoundPlay, *-1
-         WinActivate, ahk_id %hSetWinGui%
-         Return
-      }
+      ; handle clicks in the viewport when a panel unrelated to image editing  is open
+      SoundPlay, *-1
+      WinActivate, ahk_id %hSetWinGui%
+      Return
    }
 
    If (imageLoading=1 && thumbsDisplaying=1)
@@ -7892,26 +7936,6 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       Return r
    }
 
-   displayingImageNow := (thumbsDisplaying!=1 && useGdiBitmap()) ? 1 : 0
-   If ((InStr(winEventu, "normal") || InStr(winEventu, "DoubleClick")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && displayingImageNow=1 && IMGresizingMode=4 && (scrollBarHy>1 || scrollBarVx>1) && thumbsDisplaying!=1)
-   {
-      ; handle clicks on the H/V scrollbars for images larger than the viewport
-      knobSize := imgHUDbaseUnit//3
-      If (scrollBarHy>1 && mY>(mainHeight - knobSize))
-      ; || (mY<(mainHeight - scrollBarHy) && FlipImgV=1))
-      {
-         fn := Func("panIMGonScrollBar").Bind(1,0)
-         SetTimer, % fn, -25
-         Return
-      } Else If (scrollBarVx>1 && mX>(mainWidth - knobSize))
-      ; || (mX<(mainWidth - scrollBarVx) && FlipImgH=1))
-      {
-         fn := Func("panIMGonScrollBar").Bind(0,1)
-         SetTimer, % fn, -25
-         Return
-      }
-   }
-
    spaceState := GetKeyState("Space", "P") ? 1 : 0
    If (isAlphaMaskWindow()=1 && spaceState!=1 && imgEditPanelOpened=1 && liveDrawingBrushTool=1)
    {
@@ -7938,8 +7962,8 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
    && (displayingImageNow=1 && getCaptionStyle(PVhwnd)!=1 && InStr(winEventu,"normal") && shiftState=1)
    {
       ; activate selection on single click + shift
-      MouseCoords2Image(mX - 200, mY - 200, 1, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, imgSelX1, imgSelY1)
-      MouseCoords2Image(mX + 200, mY + 200, 1, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, imgSelX2, imgSelY2)
+      MouseCoords2Image(mX - 200, mY - 200, LimitSelectBoundsImg, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, imgSelX1, imgSelY1)
+      MouseCoords2Image(mX + 200, mY + 200, LimitSelectBoundsImg, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, imgSelX2, imgSelY2)
       Gdip_GetImageDimensions(useGdiBitmap(), rImgW, rImgH)
       defineRelativeSelCoords(rImgW, rImgH)
       ToggleEditImgSelection("show-edit")
@@ -8367,9 +8391,9 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
 
       lastInvoked := A_TickCount
       If (slideShowRunning=1)
-         ToggleSlideShowu()
-      Sleep, 1
-      ToggleViewModeTouch()
+         InfoToggleSlideShowu()
+      Else
+         ToggleViewModeTouch()
    } Else If ((displayingImageNow=1 || mustOpenStartFolder) && winEventu!="DoubleClick") && (A_TickCount - thisZeit>950)
    ; } Else If ((maxFilesIndex>1 || mustOpenStartFolder) && CurrentSLD && winEventu!="DoubleClick") && (A_TickCount - thisZeit>950)
    {
@@ -8485,12 +8509,15 @@ ToggleImageSizingMode(dummy:=0) {
        showTOOLtip("Adapt to window mode:`n" friendly moreInfos, A_ThisFunc, 1, (IMGresizingMode - 0.99)/4)
 
     If (allowFreeIMGpanning=1 && imageAligned=5 && IMGresizingMode=4 && o_friendly!=friendly2)
-       PrintPosX := "C"
+    {
+       IMGdecalageX := IMGdecalageY := 1
+       PrintPosX := "X"
+    }
 
     INIaction(1, "IMGresizingMode", "General")
     INIaction(1, "zoomLevel", "General")
     INIaction(1, "lockZoomLevel", "General")
-    interfaceThread.ahkassign("IMGresizingMode", IMGresizingMode)
+    uiPanelOpenCloseEvent()
     SetTimer, RemoveTooltip, % -msgDisplayTime
     If (drawingShapeNow=1)
     {
@@ -8581,12 +8608,12 @@ dummyInfoToggleSlideShowu(actu:=0) {
      friendly := DefineSlideShowType()
      etaTime := "`nEstimated time: " EstimateSlideShowLength()
      If (slidesFXrandomize=1)
-        infosFX := "`nViewport colour effects are randomized for each image."
+        etaTime .= "`nViewport colour effects are randomized for each image."
 
      If (skipSeenImageSlides=1)
-        skippy := "`nAlready seen images will be skipped"
+        etaTime .= "`nAlready seen images will be skipped."
 
-     showTOOLtip("Started " friendly " slideshow`nSpeed: " delayu "`nTotal files: " groupDigits(maxFilesIndex) etaTime infosFX skippy)
+     showTOOLtip("Started " friendly " slideshow`nSpeed: " delayu "`nTotal files: " groupDigits(maxFilesIndex) etaTime)
      SetTimer, RemoveTooltip, % -msgDisplayTime, 900
      If (slideShowDelay < 900)
      {
@@ -8674,22 +8701,28 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
         WinSet, Region, 0-0 w5 h5, ahk_id %hQPVtoolbar%
         WinSet, Transparent, 120, ahk_id %hQPVtoolbar%
      }
+     If (editingSelectionNow=1)
+        ToggleEditImgSelection()
 
      ResetImgLoadStatus()
      If (StrLen(SlidesMusicSong)>3 && autoPlaySlidesAudio=1 && resetMode!=1)
         startSlidesMusicNow()
 
-     interfaceThread.ahkassign("allowNextSlide", 1)
-     editingSelectionNow := 0
-     If !resetMode
-        updateUIctrl()
-
      slideShowRunning := 1
+     interfaceThread.ahkassign("allowNextSlide", 1)
      If (hSNDmediaFile && hSNDmediaDuration && hSNDmedia)
         milisec := MCI_Length(hSNDmedia) 
 
      thisSlideSpeed := (milisec>slideShowDelay) ? milisec : slideShowDelay
-     interfaceThread.ahkFunction("slideshowsHandler", thisSlideSpeed, "start", SlideHowMode)
+     msgu := "Slideshow is running. Direction: " DefineSlideShowType() ". Speed: " DefineSlidesRate() "."
+     If (slidesFXrandomize=1)
+        msgu .= "`nViewport colour effects are randomized for each image."
+
+     If (skipSeenImageSlides=1)
+        msgu .= "`nAlready seen images will be skipped."
+
+     msgu .= "`nPress Escape or click to stop the slideshow."
+     interfaceThread.ahkFunction("slideshowsHandler", thisSlideSpeed, "start", SlideHowMode, msgu)
      ; SetTimer, theSlideShowCore, % thisSlideSpeed
   }
   Return
@@ -8915,13 +8948,13 @@ ToggleImgFX(dir:=0) {
    Else If (imgFxMode=2)
       friendly .= "`nBrightness: " Round(lumosAdjust, 3) "`nContrast: " Round(GammosAdjust, 3) "`nSaturation: " Round(satAdjust*100) "%"
 
-   If (imgFxMode=2 || imgFxMode=4 || imgFxMode=9)
+   If isVarEqualTo(imgFxMode, 2, 4, 9)
       friendly .= "`nGamma: " Round(realGammos, 3)
    
-   If (imgFxMode=2 || imgFxMode=3 || (imgFxMode=4 && bwDithering=0) || imgFxMode=9 || imgFxMode=10) && (IntensityAlphaChannel!=1)
+   If (isVarEqualTo(imgFxMode, 2, 3, 9, 10) || (imgFxMode=4 && !bwDithering)) && (IntensityAlphaChannel!=1)
       friendly .= "`nAlpha channel: ALTERED"
 
-   If (specialColorFXmode>1) && (imgFxMode=2 || imgFxMode=3 || imgFxMode=4 || imgFxMode=9)
+   If (specialColorFXmode>1 && isVarEqualTo(imgFxMode, 2, 3, 4,9))
    {
       friendly .= "`n" moreFX[specialColorFXmode]
       If (specialColorFXmode=7)
@@ -9003,10 +9036,11 @@ ToggleIMGalign() {
    }
 
    IMGdecalageX := IMGdecalageY := 1
-   If (allowFreeIMGpanning=1)
-      PrintPosX := "C"
+   If (allowFreeIMGpanning=1 && IMGresizingMode=4)
+      PrintPosX := "X"
 
    dummyTimerReloadThisPicture(50)
+   uiPanelOpenCloseEvent()
    If (AnyWindowOpen=10 && imgEditPanelOpened=1)
    {
       updatePanelColorsInfo()
@@ -9220,7 +9254,7 @@ ChangeLumos(dir, dummy:=0) {
    Else
       dummyTimerDelayiedImageDisplay(10)
 
-   If (AnyWindowOpen=10 && imgEditPanelOpened=1)
+   If ((AnyWindowOpen=10 || AnyWindowOpen=74) && imgEditPanelOpened=1)
    {
       updatePanelColorsInfo()
       updatePanelColorSliderz()
@@ -9396,10 +9430,9 @@ ChangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
    o_IMGresizingMode := IMGresizingMode
    IMGresizingMode := 4
    customZoomAdaptMode := 0
-   If (allowFreeIMGpanning=1 && imageAligned=5)
+   If (allowFreeIMGpanning=1 && imageAligned=5 && IMGresizingMode=4)
       PrintPosX := (o_IMGresizingMode=IMGresizingMode) ? "W" : "C"
 
-   interfaceThread.ahkassign("IMGresizingMode", IMGresizingMode)
    If (zoomLevel>3 && thisIMGisDownScaled=1 && AutoDownScaleIMGs=1)
    {
       imgPath := getIDimage(currentFileIndex)
@@ -9410,6 +9443,9 @@ ChangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
       zoomLevel := xu
       AutoDownScaleIMGs := 2
    }
+
+   If (o_IMGresizingMode!=IMGresizingMode)
+      uiPanelOpenCloseEvent()
 
    MouseGetPos, , , OutputVarWin
    If (OutputVarWin=PVhwnd && InStr(key, "wheel"))
@@ -9572,7 +9608,7 @@ ChangeGammos(dir) {
    Else
       dummyTimerDelayiedImageDisplay(10)
 
-   If (AnyWindowOpen=10 && imgEditPanelOpened=1)
+   If ((AnyWindowOpen=10 || AnyWindowOpen=74) && imgEditPanelOpened=1)
    {
       updatePanelColorsInfo()
       updatePanelColorSliderz()
@@ -9620,7 +9656,7 @@ ChangeSaturation(dir) {
    INIaction(1, "satAdjust", "General")
    prevValues := newValues
    dummyTimerDelayiedImageDisplay(10)
-   If (AnyWindowOpen=10 && imgEditPanelOpened=1)
+   If ((AnyWindowOpen=10 || AnyWindowOpen=74) && imgEditPanelOpened=1)
    {
       updatePanelColorsInfo()
       updatePanelColorSliderz()
@@ -9662,7 +9698,7 @@ ChangeRealGamma(dir) {
    prevValues := newValues
    dummyTimerDelayiedImageDisplay(10)
 
-   If (AnyWindowOpen=10 && imgEditPanelOpened=1)
+   If ((AnyWindowOpen=10 || AnyWindowOpen=74) && imgEditPanelOpened=1)
    {
       updatePanelColorsInfo()
       updatePanelColorSliderz()
@@ -10969,6 +11005,9 @@ drawHistogram(dataArray, graphFocus, LengthX, Scale, fgrColor, bgrColor, borderS
     stylu := (showHistogram=6) ? 3 : 2
     ; ToolTip, % maxYlimit " || " LengthX  , , , 2
     plotBMP := BarChart(dataArray, lol, Round(296*Scale), 385, "", "DiagonBlackGreen", "DisplayValues:0, BarHeight:" Scale*1.5 ",BarHeightFactor:1, BarSpacing:" Scale/2 ",BarRoundness:0,TextSize:0,AutoCalculateHeight:1, BarColorDirection:" stylu ", BarPeaksColor:eeFFffFF, BgrStyle:3, BarBorderColor:0, MaxPercentValue:" graphFocus ", BarColorA:" fgrColor ", ChartBackColorA:dd" bgrColor)
+    If !plotBMP
+       Return
+
     Gdip_ImageRotateFlip(plotBMP, 5)
     Gdip_ImageRotateFlip(plotBMP, 6)
     Gdip_GetImageDimensions(plotBMP, imgW, imgH)
@@ -10994,8 +11033,9 @@ drawHistogram(dataArray, graphFocus, LengthX, Scale, fgrColor, bgrColor, borderS
        Gdip_DrawRectangle(G3, pPen1d, borderSize/2 - lineThickns, borderSize/2 - lineThickns, imgW + lineThickns*2 + borderSize, imgH + lineThickns*2 + borderSize//2)
        HUDobjHistoBoxu[5] := imgW + lineThickns*2 + borderSize
        HUDobjHistoBoxu[6] := imgH + lineThickns*2 + borderSize
-       trGdip_DrawImage(A_ThisFunc, G3, plotBMP, borderSize, borderSize)
-       trGdip_DrawImage(A_ThisFunc, G3, infoBoxBMP, borderSize//5, imgH + lineThickns*2 + borderSize)
+       Gdip_DrawImage(G3, plotBMP, borderSize, borderSize)
+       If infoBoxBMP
+          Gdip_DrawImage(G3, infoBoxBMP, borderSize//5, imgH + lineThickns*2 + borderSize)
        ; infoBoxBMP is disposed by the caller
        Gdip_DeleteGraphics(G3)
     }
@@ -12421,6 +12461,7 @@ getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, oImgW, oImgH, imgSel
     {
        GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
        thisFXid := decideGDIPimageFX(matrix, imageAttribs, pEffect)
+       ; ToolTip, % thisFXid "`n" matrix , , , 2
        thisFXid .= (BlurAmount>1) ? "." BlurAmount zoomLevel : "."
        thisFXid .= "Z" FlipImgH FlipImgV IMGresizingMode imageAligned zoomLevel prevDestPosX prevDestPosY mainWidth mainHeight useGdiBitmap() prevMaxSelX prevMaxSelY PasteInPlaceAdaptMode fImgW fImgH
 
@@ -12871,7 +12912,7 @@ terminateIMGediting() {
 }
 
 isAlphaMaskWindow() {
-   Return (AnyWindowOpen=23 || AnyWindowOpen=24 || AnyWindowOpen=31 || AnyWindowOpen=32 || AnyWindowOpen=70) ? 1 : 0
+   Return isVarEqualTo(AnyWindowOpen, 23, 24, 31, 32, 70)
 }
 
 isNowAlphaPainting() {
@@ -13391,6 +13432,113 @@ ApplyColorAdjustsSelectedArea(modus:=0) {
     If hasCloned
        trGdip_DisposeImage(o_gdiBitmap, 1)
 
+    SetTimer, RefreshImageFile, -25
+    Return r1
+}
+
+AdjustColorsSelectedArea(prevFXmode:=0) {
+    Static bitsOptions := {0:0, 1:0, 2:2, 3:3, 4:4, 5:5, 6:6, 7:7, 8:8, 9:16}
+    thisBitsDepth := bitsOptions[DesaturateAreaLevels]
+
+    stopNow := (editingSelectionNow=1 && StrLen(gdiBitmap)>4) ? 0 : 1
+    If (stopNow=1)
+       Return 
+
+    If (prevFXmode<2 || !isNumber(prevFXmode))
+    {
+       showTOOLtip("No color adjustments to be applied on image`n`nPress U to open the color adjustments panel")
+       SoundBeep , 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
+
+    o_imgFxMode := imgFxMode
+    imgFxMode := 1
+    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 0, 0)
+    whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
+    If (stopNow=1 || !whichBitmap || thumbsDisplaying=1 || editingSelectionNow!=1)
+    {
+       imgFxMode := o_imgFxMode
+       Return
+    }
+
+    Gdip_GetImageDimensions(whichBitmap, imgW, imgH)
+    compositingQuality := (userimgGammaCorrect=1) ? 2 : 1
+    calcImgSelection2bmp(-1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
+    G2 := trGdip_GraphicsFromImage(A_ThisFunc, whichBitmap, 7, 4, compositingQuality)
+    If !G2
+    {
+       imgFxMode := o_imgFxMode
+       showTOOLtip("Failed to apply the color adjustments to the image selected area")
+       SoundBeep , 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       SetTimer, ResetImgLoadStatus, -250
+       Return
+    }
+
+    pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
+    If !pPath
+    {
+       imgFxMode := o_imgFxMode
+       showTOOLtip("Failed to apply the color adjustments to the image selected area`nUnable to create selection path")
+       SoundBeep , 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       SetTimer, ResetImgLoadStatus, -250
+       Return
+    }
+
+    pB := GetPathRelativeBounds(pPath, imgSelPx, imgSelPy)
+    imgSelPx := pB.x,  imgSelPy := pB.y
+    imgSelW  := pB.w,  imgSelH  := pB.h
+    If (EraseAreaInvert=1)
+    {
+       imgSelPx := 0,     imgSelPy := 0
+       imgSelW  := imgW,  imgSelH  := imgH
+    }
+
+    imgFxMode := prevFXmode
+    recordUndoLevelNow("init", 0)
+    If (UserMemBMP!=whichBitmap)
+       gdiBitmap := ""
+
+    thisOpacity := EraseAreaOpacity/255
+    allowAlphaMasking := decideAlphaMaskingFeaseable(EraseAreaUseAlpha)
+    zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
+    thisMode := (EraseAreaInvert=1) ? 4 : 0
+    Gdip_SetClipPath(G2, pPath, thisMode)
+    If (EraseAreaOpacity>253 && allowAlphaMasking!=1)
+       r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
+
+    zBitmap := applyVPeffectsOnBMP(zBitmap)
+    If (thisBitsDepth>1 && DesaturateAreaLevels>1 && imgFxMode>1)
+    {
+       E := Gdip_BitmapSetColorDepth(zBitmap, thisBitsDepth, DesaturateAreaDither)
+       Gdip_BitmapSetColorDepth(zBitmap, 32)
+    }
+
+    If (allowAlphaMasking=1)
+    {
+       realtimePasteInPlaceAlphaMasker(0, zBitmap, "lol", newBitmap, 0, 0, 0, 0)
+       If StrLen(newBitmap)>2
+       {
+          trGdip_DisposeImage(zBitmap, 1)
+          zBitmap := newBitmap
+       }
+    }
+
+    r1 := trGdip_DrawImage(A_ThisFunc, G2, zBitmap, imgSelPx, imgSelPy,,,,,,, thisOpacity)
+    Gdip_DeleteGraphics(G2)
+    Gdip_DeletePath(pPath)
+    realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
+    If (r0!="fail" && r1!="fail" && G2)
+    {
+       UserMemBMP := whichBitmap
+       recordUndoLevelNow(0, UserMemBMP)
+    }
+
+    trGdip_DisposeImage(zBitmap, 1)
+    wasVPfxBefore := 0
+    imgFxMode := o_imgFxMode
     SetTimer, RefreshImageFile, -25
     Return r1
 }
@@ -14581,6 +14729,8 @@ FillBehindSelectedArea() {
 }
 
 EraseOrInvertOrGraySelectedArea(actionu, funcu) {
+    Static bitsOptions := {0:0, 1:0, 2:2, 3:3, 4:4, 5:5, 6:6, 7:7, 8:8}
+
     If (editingSelectionNow!=1 && thumbsDisplaying!=1 && actionu!="erase")
        selectEntireImage("r")
 
@@ -14691,6 +14841,7 @@ EraseOrInvertOrGraySelectedArea(actionu, funcu) {
        clrMatrix := GenerateColorMatrix(6, 1, 0, 1)
     } Else If (actionu="desaturate")
     {
+       thisBitsDepth := bitsOptions[DesaturateAreaLevels]
        coreDesatureAreaFX(clrMatrix, pEffect)
     } Else If InStr(actionu, "flip")
     {
@@ -14711,13 +14862,26 @@ EraseOrInvertOrGraySelectedArea(actionu, funcu) {
 
     zBitmap := o_gdiBitmap ? o_gdiBitmap : undoLevelsArray[currentUndoLevel, 1]
     allowAlphaMasking := decideAlphaMaskingFeaseable(EraseAreaUseAlpha)
+    If (actionu="desaturate" && thisBitsDepth>1 && allowAlphaMasking!=1)
+       Gdip_BitmapSetColorDepth(zBitmap, thisBitsDepth, DesaturateAreaDither)
+
     If (allowAlphaMasking=1 && (actionu="erase" || actionu="desaturate"))
     {
        If (editingSelectionNow=1 && EraseAreaInvert=0)
           gBitmap := Gdip_CloneBmpPargbArea(funcu, zBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
 
        fBitmap := StrLen(gBitmap)>2 ? gBitmap : zBitmap
-       realtimePasteInPlaceAlphaMasker(0, fBitmap, "lol", newBitmap, 0, 0, 0, 0)
+       If (actionu="desaturate" && thisBitsDepth>1)
+       {
+          clipBMP := trGdip_CloneBitmap(A_ThisFunc, fBitmap)
+          Gdip_BitmapSetColorDepth(clipBMP, thisBitsDepth, DesaturateAreaDither)
+          Gdip_BitmapSetColorDepth(clipBMP, 32)
+       }
+
+       kBitmap := StrLen(clipBMP)>2 ? clipBMP : fBitmap
+       realtimePasteInPlaceAlphaMasker(0, kBitmap, "lol", newBitmap, 0, 0, 0, 0)
+       If StrLen(clipBMP)>2
+          trGdip_DisposeImage(clipBMP)
        If StrLen(newBitmap)>2
        {
           If (actionu="erase")
@@ -14731,11 +14895,18 @@ EraseOrInvertOrGraySelectedArea(actionu, funcu) {
              r0 := trGdip_GraphicsClear(funcu, G3)
              Gdip_ResetClip(G3)
              r2 := trGdip_DrawImage(funcu, G3, newBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH)
-             ; ToolTip, % imgSelPx "," imgSelPy "," imgSelW "," imgSelH , , , 2
              Gdip_DeleteGraphics(G3)
+             ; ToolTip, % imgSelPx "," imgSelPy "," imgSelW "," imgSelH , , , 2
+             If (actionu="desaturate")
+                r2 := trGdip_DrawImage(funcu, G2, gBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH)
              r1 := dummyDrawImage(pEffect, clrMatrix, wBitmap, G2, funcu)
              trGdip_DisposeImage(wBitmap)
-          } Else r1 := dummyDrawImage(pEffect, clrMatrix, newBitmap, G2, funcu)
+          } Else
+          {
+             If (actionu="desaturate")
+                r2 := trGdip_DrawImage(funcu, G2, fBitmap)
+             r1 := dummyDrawImage(pEffect, clrMatrix, newBitmap, G2, funcu)
+          }
           trGdip_DisposeImage(newBitmap)
           done := 1
        }
@@ -17544,9 +17715,6 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
     forceLiveAlphaPreviewMode := userAllowClrGradientRecenter := userAllowsGradientRecentering := liveDrawingBrushTool := panelWinCollapsed := 0
     imgEditPanelOpened := isImgLiveEditor
     o_ImgQuality := userimgQuality
-    interfaceThread.ahkassign("panelWinCollapsed", panelWinCollapsed)
-    interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
-    interfaceThread.ahkassign("imgEditPanelOpened", imgEditPanelOpened)
     If (imgEditPanelOpened=1)
     {
        ; trGdip_GraphicsClear(A_ThisFunc, 2NDglPG, "0x00" WindowBGRcolor, 1)
@@ -17559,8 +17727,8 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
        If (closeEditPanelOnApply=-1)
           INIaction(0, "closeEditPanelOnApply", "General", 1)
 
-       interfaceThread.ahkassign("AnyWindowOpen", IDwin)
-       TriggerMenuBarUpdate()
+       ; interfaceThread.ahkassign("AnyWindowOpen", IDwin)
+       ; TriggerMenuBarUpdate()
        If AnyWindowOpen
           Try WinGetPos, prevSetWinPosX, prevSetWinPosY,,, ahk_id %hSetWinGui%
        ; coreDesiredPixFmt := "0x26200A" ; 32-ARGB
@@ -17590,8 +17758,8 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
 
     AnyWindowOpen := IDwin
     thisPanelTab := TabsPerWindow[AnyWindowOpen] ? TabsPerWindow[AnyWindowOpen] : 1
-    interfaceThread.ahkassign("AnyWindowOpen", IDwin)
-    interfaceThread.ahkassign("hSetWinGui", hSetWinGui)
+    uiPanelOpenCloseEvent()
+    TriggerMenuBarUpdate()
     If (allowReopen=1)
     {
        prevOpenedWindow := []
@@ -20100,8 +20268,12 @@ PanelImageInfos() {
     Gui, Tab, 2 ; general
     Gui, Add, ListView, x+15 y+15 w%lstWid% +LV0x10000 r%uLVr% Grid -multi vLViewMetaOthers, Property|Data
     Gui, Tab
-    Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w40 gInfoBtnPrevImg, <<
-    Gui, Add, Button, x+5 hp wp gInfoBtnNextImg, >>
+
+    Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w40 gInfoBtnPrevImg +hwndhBtnPrevImg, <<
+    Gui, Add, Button, x+5 hp wp gInfoBtnNextImg +hwndhBtnNextImg, >>
+    ToolTip2ctrl(hBtnNextImg, "Next image")
+    ToolTip2ctrl(hBtnPrevImg, "Previous image")
+
     Gui, Add, Button, x+15 hp w%btnWid% gcopyIMGinfos2clip, &Copy to clipboard
     Gui, Add, Button, x+5 hp w%btnWid% gOpenThisFileFolder, &Explore folder
     Gui, Add, Button, x+5 hp w%btnWid% gOpenFileProperties, &File properties
@@ -20111,7 +20283,7 @@ PanelImageInfos() {
 }
 
 MenuPanelFoldersTree() {
-   if (folderTreeWinOpen=1)
+   If (folderTreeWinOpen=1)
       fdTreeClose()
    Else
       PanelFoldersTree()
@@ -20283,7 +20455,6 @@ folderTreeDefaultAction(modus:=0, g:=0) {
 }
 
 fdTreeGuiaGuiSize() {     
-   ; (GuiHwnd, EventInfo, Width, Height) {
    GetWinClientSize(Width, Height, hfdTreeWinGui, 0)
    If (!width || !height || folderTreeWinOpen!=1)
       Return
@@ -23813,8 +23984,13 @@ SaveDBfilesList(enforceFile:=0) {
       Loop, % maxFilesIndex
       {
          imgPath := resultedFilesList[A_Index, 1]
+         If InStr(imgPath, "\\")
+         {
+            imgPath := StrReplace(imgPath, "\\", "\")
+            resultedFilesList[A_Index, 1] := imgPath
+         }
+
          zPlitPath(imgPath, 1, OutFileName, OutDir)
-         
          ; fileInfos := GetFileAttributesEx(imgPath)
          If (resultedFilesList[A_Index, 6] && resultedFilesList[A_Index, 7])
             z := addSQLdbEntry(OutFileName, OutDir, resultedFilesList[A_Index, 6], resultedFilesList[A_Index, 7], resultedFilesList[A_Index, 8], 0)
@@ -24050,6 +24226,12 @@ SaveFilesList(enforceFile:=0) {
             r := resultedFilesList[A_Index, 1]
             If (InStr(r, "||") || !r)
                Continue
+
+            If InStr(r, "\\")
+            {
+               r := StrReplace(r, "\\", "\")
+               resultedFilesList[A_Index, 1] := r
+            }
 
             mainFile.Write(r "`n")
          }
@@ -27779,6 +27961,9 @@ retrieveFavesAsList(dummy:=0) {
     Loop, Parse, historyList, `n,`r
     {
        imgu := Trimmer(A_LoopField)
+       If InStr(imgu, "\\")
+          imgu := StrReplace(imgu, "\\", "\")
+
        If (StrLen(imgu)<4 || !RegExMatch(imgu, RegExFilesPattern))
        {
           If A_LoopField
@@ -29619,6 +29804,14 @@ MenuMoveMarkedEntries() {
 }
 
 moveMarkedEntryNow(indexu, modus:=0) {
+   If StrLen(filesFilter)>1
+   {
+      showTOOLtip("WARNING: Index entries cannot be reordered when the files list is filtered.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
    If (thumbsDisplaying!=1 || maxFilesIndex<2)
       Return
 
@@ -29731,13 +29924,13 @@ switchIndexEntries(newFileIndex, oldIndex) {
    ; ToolTip, % tempA "`n" tempB "`n" oldIndex "===" newFileIndex , , , 2
    resultedFilesList[oldIndex, 1] := tempB
    resultedFilesList[newFileIndex, 1] := tempA
-   If (StrLen(filesFilter)>1 && !InStr(filesFilter, "SQL:query:"))
-   {
-      tempA := bckpResultedFilesList[filteredMap2mainList[oldIndex], 1]
-      tempB := bckpResultedFilesList[filteredMap2mainList[newFileIndex], 1]
-      bckpResultedFilesList[filteredMap2mainList[oldIndex], 1] := tempB
-      bckpResultedFilesList[filteredMap2mainList[newFileIndex], 1] := tempA
-   }
+   ; If (StrLen(filesFilter)>1 && !InStr(filesFilter, "SQL:query:"))
+   ; {
+   ;    tempA := bckpResultedFilesList[filteredMap2mainList[oldIndex], 1]
+   ;    tempB := bckpResultedFilesList[filteredMap2mainList[newFileIndex], 1]
+   ;    bckpResultedFilesList[filteredMap2mainList[oldIndex], 1] := tempB
+   ;    bckpResultedFilesList[filteredMap2mainList[newFileIndex], 1] := tempA
+   ; }
 
    currentFilesListModified := 1
    ForceRefreshNowThumbsList()
@@ -29801,7 +29994,7 @@ PanelUpdateThisFileIndex(dummy:=0) {
       {
          Sleep, 150
          SetTimer, PanelUpdateThisFileIndex, -150
-      } Else If (newFileIndex!=currentFileIndex && newFileIndex && friendlyIndex)
+      } Else If (newFileIndex!=currentFileIndex && newFileIndex && friendlyIndex && !filesFilter)
          switchIndexEntries(newFileIndex, currentFileIndex)
    } Else If (InStr(msgResult.btn, "erase") && maxFilesIndex>1)
    {
@@ -30180,9 +30373,9 @@ updateUistatusLineQuickSearch() {
    If !RowNumber
    {
       If (SubStr(userQuickMenusEdit, 2, 2)=":\")
-         GuiControl, QuickMenuSearchGUIA:, StatusLineQuickSearch, The provided folder path does not exist
+         GuiControl, QuickMenuSearchGUIA:, StatusLineQuickSearch, % AnyWindowOpen ? "You cannot navigate through folders while a panel is opened." : "The provided folder path does not exist."
       Else
-         GuiControl, QuickMenuSearchGUIA:, StatusLineQuickSearch, No results found matching the provided query
+         GuiControl, QuickMenuSearchGUIA:, StatusLineQuickSearch, No results found matching the provided query.
       Return
    }
 
@@ -30384,7 +30577,7 @@ QuickMenuSearchGUIAGuiEscape:
 Return
 
 QuickMenuSearchGUIAGuiSize() {     
-   ; (GuiHwnd, EventInfo, Width, Height) {
+   ; (GuiHwnd, EventInfo, Width, Height)
    GetWinClientSize(Width, Height, hQuickMenuSearchWin, 0)
    If (!width || !height || VisibleQuickMenuSearchWin!=1)
       Return
@@ -31599,14 +31792,18 @@ PanelBrushTool(dummy:=0, modus:=0) {
     ; Gui, Add, Checkbox, x+5 hp gupdateUIbrushTool Checked%BrushToolUseSecondaryColor% vBrushToolUseSecondaryColor , &Use secondary color
     Gui, Add, Checkbox, x+5 hp gupdateUIbrushTool Checked%BrushToolEraserRestore% vBrushToolEraserRestore , Restore pixels opacity
     Gui, Add, Button, xp yp hp wp gBtnSetClonerBrushSource vuiBtnSetCloner, &Define cloner source
-    Gui, Add, Text, xs y+10 hp w%sml% +0x200 Center gBtnToggleBrushColors vUIbtnBrushColorA +TabStop, [X]
+    Gui, Add, Text, xs y+10 hp w%sml% +0x200 Center gBtnToggleBrushColors vUIbtnBrushColorA +TabStop +hwndhBtnTglClrA, [X]
+    ToolTip2ctrl(hBtnTglClrA, "Toggle active color")
     Gui, Add, Slider, Center x+5 w%slideWid% gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolAopacity Range1-255, % BrushToolAopacity
-    Gui, Add, Button, x+5 hp w%sml% gStartPickingColor vPickuBrushToolAcolor, P
+    Gui, Add, Button, x+5 hp w%sml% gStartPickingColor vPickuBrushToolAcolor +hwndhBtnPickClrA, P
+    ToolTip2ctrl(hBtnPickClrA, "Pick color A from the viewport")
     Gui, Add, ListView, x+5 hp w60 %CCLVO% Background%BrushToolAcolor% vBrushToolAcolor hwndhLVfillColor,
     Gui, Add, Text, x+5 hp +0x200 +Tabstop vinfoBrushAopacity gBtnResetBrushColorAopacity, 1011`%
-    Gui, Add, Text, xs y+10 hp w%sml% +0x200 Center gBtnToggleBrushColors vUIbtnBrushColorB +TabStop, [X]
+    Gui, Add, Text, xs y+10 hp w%sml% +0x200 Center gBtnToggleBrushColors vUIbtnBrushColorB +TabStop +hwndhBtnTglClrB, [X]
+    ToolTip2ctrl(hBtnTglClrB, "Toggle active color")
     Gui, Add, Slider, Center x+5 w%slideWid% gupdateUIbrushTool NoTicks ToolTip AltSubmit vBrushToolBopacity Range1-255, % BrushToolBopacity
-    Gui, Add, Button, x+5 hp w%sml% gStartPickingColor vPickuBrushToolBcolor, P
+    Gui, Add, Button, x+5 hp w%sml% gStartPickingColor vPickuBrushToolBcolor +hwndhBtnPickClrB, P
+    ToolTip2ctrl(hBtnPickClrB, "Pick color B from the viewport")
     Gui, Add, ListView, x+5 hp w60 %CCLVO% Background%BrushToolBcolor% vBrushToolBcolor hwndhLVfill2ndColor,
     Gui, Add, Text, x+5 hp +0x200 +TabStop vinfoBrushBopacity gBtnResetBrushColorBopacity, 1011`%
 
@@ -31688,7 +31885,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
     Gui, Tab 
     btnWid := (PrefsLargeFonts=1) ? 90 : 55
     Gui, Add, Button, xs-5 y+15 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
+    ToolTip2ctrl(hBtnCollapse, "Collapse panel [F11]")
     Gui, Add, Button, x+5 hp w%btnWid% gBtnHelpBrushes, &Help
     Gui, Add, Button, x+5 hp wp-5 Default gBtnCloseWindow, C&lose
     Gui, Add, DropDownList, x+5 wp+60 gupdateUIbrushTool AltSubmit Choose%BrushToolOutsideSelection% vBrushToolOutsideSelection, Ignore selection|Paint inside|Paint outside
@@ -32644,7 +32841,7 @@ PanelQuickMoveConfigure() {
     thisW := (PrefsLargeFonts=1) ? 190 : 120
 
     ReadSettingsQuickKeysActsPanel()
-    Gui, Add, Checkbox, x15 y15 Section w%txtWid% Checked%allowUserQuickFileActions% vallowUserQuickFileActions gupdateUIquickFileActs, Associate the keyboard keys from 1 to 6 to quick actions: move or copy images to predefined destination folders.
+    Gui, Add, Checkbox, x15 y15 Section w%txtWid% Checked%allowUserQuickFileActions% vallowUserQuickFileActions gupdateUIquickFileActs, Associate the keyboard keys from 1 to 6 to quick actions: move or copy images to user-defined destination folders.
     Gui, Add, Text, xs y+15 Center +0x200 w%tiny% vtxtLine1, [ 1 ]
     Gui, Add, Edit, x+5 w%EditWid% r1 -wrap gUIeditsGenericAllowCtrlBksp vQuickFileActFolder1, % QuickFileActFolder1
     Gui, Add, Button, x+5 hp w%tiny2% gBTNchooseQuickActDestFolder vbtnFldr1, Browse
@@ -33165,7 +33362,8 @@ PanelSearchIndex(dummy:="") {
     Gui, Add, Text, x+20 w%txtWid% Section, %infou%. Use | as the OR operator. Wildcards ? and * are supported as well.
 
     Gui, Add, ComboBox, y+7 wp gUIgenericComboAction vUsrEditFilter, % SearchedStringz "`n" this "`n`n"
-    Gui, Add, Button, x+1 w30 hp gEraseSearchEdit, &X
+    Gui, Add, Button, x+1 w30 hp gEraseSearchEdit +hwndhTemp, &X
+    ToolTip2ctrl(hTemp, "Discard search criteria")
     Gui, Add, ListBox, xs y+7 w%lst% r4 AltSubmit Choose%userSearchPos% vuserSearchPos, Anywhere`nBegins with`nEnds with`nRegEx
     Gui, Add, ListBox, x+2 wp r4 AltSubmit Choose%userSearchWhat% vuserSearchWhat, Full path`nFolder path`nFile name`nParent folder
     Gui, Add, Checkbox, xs y+10 Checked%markSearchMatches% vmarkSearchMatches, &Highlight matching files in the list view mode
@@ -34121,7 +34319,7 @@ MainPanelTransformArea(dummy:="", toolu:="") {
     sml := (PrefsLargeFonts=1) ? 82 : 65
     friendlyTitle := (toolu="paste") ? "Paste in place image: " : "Transform selected area: "
     Gui, Add, Button, xm+0 y+15 Section h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
+    ToolTip2ctrl(hBtnCollapse, "Collapse panel [F11]")
     Gui, Add, Button, x+5 w%sml% hp Default gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 hp wp vbtnReset gBtnPasteResetOptions, &Reset
     Gui, Add, Button, x+5 hp wp-5 gBtnHelpTransform, &Help
@@ -34135,6 +34333,13 @@ MainPanelTransformArea(dummy:="", toolu:="") {
 
 BtnHelpTransform() {
     msgBoxWrapper(appTitle ": HELP", "The transform tool is a multi-functional one. You can clone, crop, resize, rotate, colour adjust and blend images with this tool.`n`nClone image area. Once you have selected an area in the image and opened this panel, deselect «Erase initially selected area» found in the Main tab.`n`nRotate the image. Locate a gray dot with the mouse cursor in the center of the selection area in the viewport, and click 'n drag to adjust the rotation angle.`n`nCrop an image. Set the first drop-down found in the Main tab, to «Original image size», make the selection as small as you need it to be, and set to your preferences the other drop-downs that designate the cropping shape, its angle and the alignment.`n`nAdjust colours and blend images. In the «Adjust colours» tab one can activate the colour adjustments check-box, adjust opacity and choose different blending modes.`n`nWhen alpha masking is activated and the tab pertaining to this is also activated, users can click 'n drag inside the selection area to adjust the mask's gradient center. To reset the position, press Alt+L-Click inside the selection area.", -1, 0, 0)
+}
+
+ResetTransformToolPos() {
+    VPselRotation := 0
+    ImgSelX1 := prevImgSelX1, ImgSelX2 := prevImgSelX2
+    ImgSelY1 := prevImgSelY1, ImgSelY2 := prevImgSelY2
+    dummyTimerDelayiedImageDisplay(100)
 }
 
 BtnResetPanelsSpecificControl(CtrlHwnd, b, c) {
@@ -34239,19 +34444,20 @@ BtnPasteResetOptions() {
    }
 
    PasteInPlaceBlurAmount := PasteInPlaceHue := PasteInPlaceSaturation := PasteInPlaceLight := FillAreaGradientAngle := 0
-   PasteInPlaceCropSel := PasteInPlaceOrientation := PasteInPlaceAdaptMode := alphaMaskingMode := 1
+   PasteInPlaceGlassy := PasteInPlaceBlendMode := PasteInPlaceCropSel := PasteInPlaceOrientation := PasteInPlaceAdaptMode := alphaMaskingMode := 1
    PasteInPlaceAlignment := 3
-   PasteInPlaceApplyColorFX := PasteInPlaceGamma := 0
+   PasteInPlaceBlurAmount := PasteInPlaceApplyColorFX := PasteInPlaceGamma := 0
    PasteInPlaceOpacity := 255
-   If (AnyWindowOpen=24)
-      GuiControl, SettingsGUIA:, PasteInPlaceBlurAmount, % PasteInPlaceBlurAmount
    GuiControl, SettingsGUIA:, PasteInPlaceHue, % PasteInPlaceHue
    GuiControl, SettingsGUIA:, PasteInPlaceApplyColorFX, % PasteInPlaceApplyColorFX
    GuiControl, SettingsGUIA:, PasteInPlaceSaturation, % PasteInPlaceSaturation
    GuiControl, SettingsGUIA:, PasteInPlaceLight, % PasteInPlaceLight
    GuiControl, SettingsGUIA:, PasteInPlaceGamma, % PasteInPlaceGamma
    GuiControl, SettingsGUIA:, PasteInPlaceOpacity, % PasteInPlaceOpacity
+   GuiControl, SettingsGUIA:, PasteInPlaceBlurAmount, % PasteInPlaceBlurAmount
    GuiControl, SettingsGUIA:, FillAreaGradientAngle, % FillAreaGradientAngle
+   GuiControl, SettingsGUIA: Choose, PasteInPlaceBlendMode, 1
+   GuiControl, SettingsGUIA: Choose, PasteInPlaceGlassy, 1
    GuiControl, SettingsGUIA: Choose, alphaMaskingMode, 1
    GuiControl, SettingsGUIA: Choose, PasteInPlaceAlignment, 3
    GuiControl, SettingsGUIA: Choose, PasteInPlaceOrientation, 1
@@ -34479,26 +34685,6 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
       If (errorOccured>700)
          Break
 
-      Sleep, -1
-      GetMouseCoord2wind(PVhwnd, mX, mY)
-      mX := clampInRange(mX + diffW, 0, imgW)
-      mY := clampInRange(mY + diffH, 0, imgH)
-      ; ToolTip, % imgW " | " imgH "`n" winW " | " winH "`n" diffW " | " diffH "`n" mX " | " mY , , , 2
-      h := Gdip_GetPixelColor(pBitmap, mX, mY, 4)
-      If !h
-      {
-         Sleep, 5
-         errorOccured++
-         Continue
-      }
-
-      ; createColorPrevWin(h)
-      GetPhysicalCursorPos(pX, pY)
-      pX -= LEDu//2, pY -= LEDu//2
-      showLEDgui(h, pX, pY)
-      Sleep, 5
-      hwnd := WinActive("A")
-      ; ToolTip, % h "`n" z "`n" w , , , 2
       If (A_Index>1950)
       {
          errorOccured := 750
@@ -34513,6 +34699,29 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
          errorOccured := 750
          Break
       }
+
+      Sleep, -1
+      GetMouseCoord2wind(PVhwnd, mX, mY)
+      ; hz := Gdi_GetPixelColor(glHDC, mX, mY, 2)
+      mX := clampInRange(mX + diffW, 0, imgW)
+      mY := clampInRange(mY + diffH, 0, imgH)
+      ; ToolTip, % imgW " | " imgH "`n" winW " | " winH "`n" diffW " | " diffH "`n" mX " | " mY , , , 2
+      h := Gdip_GetPixelColor(pBitmap, mX, mY, 4)
+      ; ToolTip, % "hz=" hz[1] "=" hz[2] "=" hz[3] , , , 2
+      If (h="")
+      {
+         Sleep, 5
+         errorOccured++
+         Continue
+      }
+
+      ; createColorPrevWin(h)
+      GetPhysicalCursorPos(pX, pY)
+      pX -= LEDu//2, pY -= LEDu//2
+      showLEDgui(h, pX, pY)
+      Sleep, 5
+      hwnd := WinActive("A")
+      ; ToolTip, % h "`n" z "`n" w , , , 2
    }
 
    setwhileLoopExec(0)
@@ -35174,8 +35383,10 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0) {
         recordVectorUndoLevels(customShapePoints.Clone(), initialDrawingStartCoords.Clone())
      }
 
-     showQuickActionButtonsDrawingShape()
+     CreateGuiButton("Die dummy", 1)
+     updateUIctrl()
      createGUItoolbar()
+     showQuickActionButtonsDrawingShape()
      If (showViewPortGrid=1)
         dummyTimerDelayiedImageDisplay(50)
 
@@ -35342,7 +35553,7 @@ defineVectorPathType() {
 }
 
 showQuickActionButtonsDrawingShape() {
-  If (ShowAdvToolbar=1 && tempBtnVisible="null")
+  If ((showMainMenuBar=1 || ShowAdvToolbar=1) && tempBtnVisible="null")
      Return
 
   LabelCurve := defineVectorPathType()
@@ -36137,13 +36348,17 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     Gui, Add, DropDownList, x+10 y+10 Section w%slideWid% AltSubmit Choose%FillAreaColorMode% vFillAreaColorMode gupdateUIfillPanel, Solid color|Linear gradient|Radial gradient|Box gradient|Random patterns|Texture
     Gui, Add, Checkbox, x+5 hp Checked%FillAreaGradientWrapped% vFillAreaGradientWrapped gupdateUIfillPanel, &Tiling pattern
     Gui, Add, Slider, Center xs y+10 NoTicks w%slideWid% gupdateUIfillPanel ToolTip AltSubmit vFillAreaOpacity Range1-255, % FillAreaOpacity
-    Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuFillAreaColor, P
+    Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuFillAreaColor +hwndhBtnPickClrA, P
     Gui, Add, ListView, x+5 hp w60 %CCLVO% Background%FillAreaColor% vFillAreaColor hwndhLVfillColor,
-    Gui, Add, Text, x+5 hp wp +0x200 +TabStop vinfoFillAreaOpacity gBTNresetFillOpacity, %thisOpacity%`%
+    Gui, Add, Text, x+5 hp wp +0x200 +TabStop vinfoFillAreaOpacity gBTNresetFillOpacity +hwndhBtnRopacity, %thisOpacity%`%
+    ToolTip2ctrl(hBtnRopacity, "Reset color A opacity")
     Gui, Add, Slider, Center xs y+1 NoTicks w%slideWid% gupdateUIfillPanel ToolTip AltSubmit vFillArea2ndOpacity Range1-255, % FillArea2ndOpacity
-    Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuFillArea2ndColor, P
+    Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuFillArea2ndColor +hwndhBtnPickClrB, P
     Gui, Add, ListView, x+5 hp w60 %CCLVO% Background%FillArea2ndColor% vFillArea2ndColor hwndhLVfill2ndColor,
-    Gui, Add, Text, x+5 hp wp +0x200 +TabStop gBTNresetFill2ndOpacity vinfoFillArea2ndOpacity, Opacity: %this2ndOpacity%00`%
+    Gui, Add, Text, x+5 hp wp +0x200 +TabStop gBTNresetFill2ndOpacity vinfoFillArea2ndOpacity +hwndhBtnRopacity, Opacity: %this2ndOpacity%00`%
+    ToolTip2ctrl(hBtnRopacity, "Reset color B opacity")
+    ToolTip2ctrl(hBtnPickClrA, "Pick color A from the viewport")
+    ToolTip2ctrl(hBtnPickClrB, "Pick color B from the viewport")
 
     Gui, Add, Text, xs y+15 w%slideWid% gBtnResetPanelsSpecificControl vinfoFillAreaGradientAngle +TabStop, Angle: %FillAreaGradientAngle%° 
     Gui, Add, Text, x+5 wp gBtnResetPanelsSpecificControl vinfoFillAreaGradientScale +TabStop, Scale: %FillAreaGradientScale%`%
@@ -36160,9 +36375,11 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     Gui, Tab, 3
     Gui, Add, Checkbox, x+10 y+10 Section Checked%FillAreaDoContour% vFillAreaDoContour gupdateUIfillPanel, &Draw shape outline
     Gui, Add, Slider, Center xs y+15 NoTicks w%slideWid% gupdateUIfillPanel ToolTip AltSubmit vDrawLineAreaOpacity Range1-255, % DrawLineAreaOpacity
-    Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuDrawLineAreaColor, P
+    Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuDrawLineAreaColor +hwndhBtnPickClrA, P
     Gui, Add, ListView, x+5 hp w60 %CCLVO% Background%DrawLineAreaColor% vDrawLineAreaColor hwndhLVfillColor,
-    Gui, Add, Text, x+5 hp wp +0x200 +TabStop gBtnResetDrawLineOpacity vinfoDrawLineAreaOpacity, %thisOpacity%`%
+    Gui, Add, Text, x+5 hp wp +0x200 +TabStop gBtnResetDrawLineOpacity vinfoDrawLineAreaOpacity +hwndhBtnRopacity, %thisOpacity%`%
+    ToolTip2ctrl(hBtnRopacity, "Reset border color opacity")
+    ToolTip2ctrl(hBtnPickClrA, "Pick border color from the viewport")
     Gui, Add, Text, xs y+15 w%btnWid% vtxtLine3, Alignment
     Gui, Add, Text, x+5 wp vtxtLine4, Styling
     Gui, Add, DropDownList, xs y+7 wp AltSubmit Choose%DrawLineAreaContourAlign% vDrawLineAreaContourAlign gupdateUIfillPanel, Inside|Centered|Outside
@@ -36189,7 +36406,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     Gui, Tab
     thisW := (PrefsLargeFonts=1) ? 80 : 60
     Gui, Add, Button, xm+0 y+15 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
+    ToolTip2ctrl(hBtnCollapse, "Collapse panel [F11]")
     Gui, Add, Button, x+5 w%thisW% hp Default gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
     Gui, Add, Checkbox, x+5 hp Checked%doImgEditLivePreview% vdoImgEditLivePreview gupdateUIfillPanel, &Live preview
@@ -36243,10 +36460,12 @@ PanelSoloAlphaMasker() {
     Gui, Tab
     thisW := (PrefsLargeFonts=1) ? 85 : 65
     Gui, Add, Button, xm+0 y+15 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
+    ToolTip2ctrl(hBtnCollapse, "Collapse panel [F11]")
+    defu := postVectorWinOpen ? "" : "Default"
     If postVectorWinOpen
-       Gui, Add, Button, x+5 hp w%thisW% gBTNopenPrevPanel, &Back
-    Gui, Add, Button, x+5 hp w%thisW% Default gBtnCloseWindow, &Close
+       Gui, Add, Button, x+5 hp w%thisW% gBTNopenPrevPanel Default, &Back
+
+    Gui, Add, Button, x+5 hp w%thisW% %defu% gBtnCloseWindow, &Close
     Gui, Add, Slider, Center x+2 hp NoTicks gupdateUIalphaMaskerPanel ToolTip AltSubmit valphaMaskPreviewOpacity Range1-255, % alphaMaskPreviewOpacity
     Gui, Add, Text, x+5  hp +0x200 +TabStop gBTNresetAlphaPrevOpacity vinfoOpacity, Opacity
 
@@ -36295,6 +36514,8 @@ BTNopenPrevPanel(givenZZ:=0, isGiven:=0, morrigan:=0) {
       f := "PanelFillBehindBgrImage"
    Else If (zz=70)
       f := "PanelSoloAlphaMasker"
+   Else If (zz=74)
+      f := "PanelColorsAdjusterImage"
 
    If f 
       SetTimer, % f, -100
@@ -36342,9 +36563,12 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     Gui, Add, DropDownList, x+5 y+15 Section w%slideWid% AltSubmit Choose%FillAreaShape% vFillAreaShape gupdateUIdrawShapesPanel, Rectangle|Rounded rectangle|Ellipse|Triangle|Right triangle|Rhombus|Custom shape
     Gui, Add, DropDownList, x+5 wp-25 AltSubmit Choose%FillAreaCurveTension% vFillAreaCurveTension gupdateUIdrawShapesPanel, Polygonal|Smooth corners|Curve|Round curve|Bézier
     Gui, Add, Slider, Center xs y+10 NoTicks w%slideWid% gupdateUIdrawShapesPanel AltSubmit vDrawLineAreaOpacity Range1-255, % DrawLineAreaOpacity
-    Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuDrawLineAreaColor, P
+    Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuDrawLineAreaColor +hwndhBtnPickClrA, P
     Gui, Add, ListView, x+5 hp w60 %CCLVO% Background%DrawLineAreaColor% vDrawLineAreaColor hwndhLVfillColor,
-    Gui, Add, Text, x+5 hp wp +0x200 +TabStop gBtnResetDrawLineOpacity vinfoDrawLineAreaOpacity, %thisOpacity%`%
+    Gui, Add, Text, x+5 hp wp +0x200 +TabStop gBtnResetDrawLineOpacity vinfoDrawLineAreaOpacity +hwndhBtnRopacity, %thisOpacity%`%
+    ToolTip2ctrl(hBtnRopacity, "Reset color opacity")
+    ToolTip2ctrl(hBtnPickClrA, "Pick color from the viewport")
+
     Gui, Add, Text, xs y+15 w%btnWid%, Alignment
     Gui, Add, Text, x+5 wp, Styling
     Gui, Add, DropDownList, xs y+7 wp AltSubmit Choose%DrawLineAreaContourAlign% vDrawLineAreaContourAlign gupdateUIdrawShapesPanel, Inside|Centered|Outside
@@ -36358,7 +36582,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
 
     btnWid := (PrefsLargeFonts=1) ? 105 : 65
     Gui, Add, Button, xs y+20 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
+    ToolTip2ctrl(hBtnCollapse, "Collapse panel [F11]")
     Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 wp hp gBtnOpenPanelLines, &Lines
     Gui, Add, Button, x+5 wp hp gBtnCloseWindow, &Cancel
@@ -36580,23 +36804,25 @@ PanelDrawLines() {
     Gui, Add, Checkbox, xs y+1 w%sml% h%btnHeight% +0x1000 gupdateUIDrawLinesPanel Checked%DrawLineAreaBorderArcC% vDrawLineAreaBorderArcC,○
     Gui, Add, Checkbox, x+1 wp hp +0x1000 gupdateUIDrawLinesPanel Checked%DrawLineAreaBorderBottom% vDrawLineAreaBorderBottom,─
     Gui, Add, Checkbox, x+1 wp hp +0x1000 gupdateUIDrawLinesPanel Checked%DrawLineAreaBorderArcD% vDrawLineAreaBorderArcD,○
-    Gui, Add, ListView, x+10 w%btnWid% hp %CCLVO% Background%DrawLineAreaColor% vDrawLineAreaColor,
-    Gui, Add, Button, x+1 hp w25 gStartPickingColor vPickuDrawLineAreaColor, P
-
-    Gui, Add, DropDownList, xs y+0 w%btnWid% gupdateUIDrawLinesPanel AltSubmit Choose%DrawLineAreaBorderCenter% vDrawLineAreaBorderCenter,No center line|Vertical|Horizontal|Slash|Backslash|Both diagonals|Both H/V lines
     Gui, Add, Checkbox, x+10 w%btnWid% hp +0x1000 gupdateUIDrawLinesPanel Checked%DrawLineAreaKeepBounds% vDrawLineAreaKeepBounds, &Within bounds
 
-    sml := (PrefsLargeFonts=1) ? 25 : 10
-    Gui, Add, Text, xs y+%sml% w%txtWid% +0x200 hp +TabStop gBtnResetDrawLineOpacity vinfoDrawLineAreaOpacity, Opacity: %thisOpacity%`%
+    Gui, Add, DropDownList, xs y+0 w%btnWid% gupdateUIDrawLinesPanel AltSubmit Choose%DrawLineAreaBorderCenter% vDrawLineAreaBorderCenter,No center line|Vertical|Horizontal|Slash|Backslash|Both diagonals|Both H/V lines
+    sml := (PrefsLargeFonts=1) ? 30 : 20
+    Gui, Add, Text, xs y+%sml% +0x200 hp, Color:
+    Gui, Add, ListView, x+5 wp+15 hp %CCLVO% Background%DrawLineAreaColor% vDrawLineAreaColor,
+    Gui, Add, Button, x+1 hp w25 gStartPickingColor vPickuDrawLineAreaColor +hwndhBtnPickClrA, P
+    Gui, Add, Text, x+15 +0x200 hp +TabStop gBtnResetDrawLineOpacity vinfoDrawLineAreaOpacity +hwndhBtnRopacity, Opacity: 1011`%
     Gui, Add, Slider, Center xs y+1 NoTicks gupdateUIDrawLinesPanel AltSubmit w%txtWid% vDrawLineAreaOpacity Range3-255, % DrawLineAreaOpacity
     Gui, Add, Text, xs y+5 +0x200 wp hp vinfoDrawLineAreaContour, Contour thickness: %DrawLineAreaContourThickness% pixels
     Gui, Add, Slider, Center xs y+1 NoTicks gupdateUIDrawLinesPanel AltSubmit w%txtWid% vDrawLineAreaContourThickness Range1-450, % DrawLineAreaContourThickness
     Gui, Add, Checkbox, xs y+5 gupdateUIDrawLinesPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit selection area
+    ToolTip2ctrl(hBtnRopacity, "Reset color opacity")
+    ToolTip2ctrl(hBtnPickClrA, "Pick color from the viewport")
 
     btnWid := (PrefsLargeFonts=1) ? 105 : 65
-    sml := (PrefsLargeFonts=1) ? 35 : 15
+    sml := (PrefsLargeFonts=1) ? 35 : 20
     Gui, Add, Button, xm+0 y+%sml% h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
+    ToolTip2ctrl(hBtnCollapse, "Collapse panel [F11]")
     Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 wp hp gBtnOpenPanelShapes, &Shapes
     Gui, Add, Button, x+5 wp hp gBtnCloseWindow, &Cancel
@@ -36619,6 +36845,20 @@ BtnOpenPanelLines() {
    SetTimer, PanelDrawLines, -50
 }
 
+WriteSettingsDesaturateSelPanel() {
+   ReadSettingsDesaturateSelPanel(1)
+}
+
+ReadSettingsDesaturateSelPanel(actu) {
+   RegAction(actu, "DesatureAreaAmount",, 2, 1, 100)
+   RegAction(actu, "DesatureAreaHue",, 2, -180, 180)
+   RegAction(actu, "DesatureAreaAlternate",, 1)
+   RegAction(actu, "DesaturateAreaDither",, 1)
+   RegAction(actu, "DesaturateAreaChannel",, 2, 1, 4)
+   RegAction(actu, "DesaturateAreaLevels",, 2, 1, 8)
+   RegAction(actu, "EraseAreaInvert",, 1)
+}
+
 PanelDesatureSelectedArea(dummy:=0) {
     If !(thisBtnHeight := createSettingsGUI(55, A_ThisFunc, 1, 1))
        Return
@@ -36626,11 +36866,7 @@ PanelDesatureSelectedArea(dummy:=0) {
     If (editingSelectionNow!=1)
        ToggleEditImgSelection()
 
-    RegAction(0, "DesatureAreaAmount",, 2, 1, 100)
-    RegAction(0, "DesatureAreaHue",, 2, -180, 180)
-    RegAction(0, "DesatureAreaAlternate",, 1)
-    RegAction(0, "DesaturateAreaChannel",, 2, 1, 4)
-    RegAction(0, "EraseAreaInvert",, 1)
+    ReadSettingsDesaturateSelPanel(0)
     btnWid := 70
     txtWid := 340
     EditWid := 60
@@ -36648,16 +36884,18 @@ PanelDesatureSelectedArea(dummy:=0) {
     Global infoAmount, infohueAdjust
     btnWid2 := btnWid + 20
     Gui, Add, Text, x15 y15 Section w%txtWid%, Please experiment with the provided options to control how the image is desatured.
-    Gui, Add, DropDownList, xs w%btnWid2% AltSubmit Choose%DesaturateAreaChannel% gupdateUIdesaturatePanel vDesaturateAreaChannel, All channels|Red|Green|Blue
-    Gui, Add, Checkbox, x+10 yp hp Checked%EraseAreaInvert% vEraseAreaInvert gupdateUIdesaturatePanel, &Invert selection area
+    Gui, Add, DropDownList, xs w%btnWid2% AltSubmit Choose%DesaturateAreaLevels% gupdateUIdesaturatePanel vDesaturateAreaLevels, Levels|4|8|16|32|64|128|256
+    Gui, Add, DropDownList, x+10 w%btnWid2% AltSubmit Choose%DesaturateAreaChannel% gupdateUIdesaturatePanel vDesaturateAreaChannel, All channels|Red|Green|Blue
+    Gui, Add, Checkbox, x+10 yp hp Checked%DesaturateAreaDither% vDesaturateAreaDither gupdateUIdesaturatePanel, &Dithering
     Gui, Add, Text, xs y+10 w%txtWid% gBtnResetAmountDesature vinfoAmount +TabStop, intensity: %thisOpacity%`%
     Gui, Add, Slider, Center xp y+1 wp NoTicks AltSubmit gupdateUIdesaturatePanel vDesatureAreaAmount Range1-100, % DesatureAreaAmount
     Gui, Add, Text, xs y+10 wp gBtnResetDesatureHue vinfohueAdjust +TabStop, Relight: %DesatureAreaHue%°
     Gui, Add, Slider, Center xp y+1 wp NoTicks AltSubmit gupdateUIdesaturatePanel vDesatureAreaHue Range-180-180, % DesatureAreaHue
-    Gui, Add, Checkbox, xs y+5 Checked%EraseAreaUseAlpha% vEraseAreaUseAlpha gupdateUIdesaturatePanel, Apply alpha mas&k
+    Gui, Add, Checkbox, xs y+5 hp Checked%EraseAreaInvert% vEraseAreaInvert gupdateUIdesaturatePanel, &Invert selection area
+    Gui, Add, Checkbox, x+15 Checked%EraseAreaUseAlpha% vEraseAreaUseAlpha gupdateUIdesaturatePanel, Apply alpha mas&k
 
-    Gui, Add, Button, xm+0 y+15 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
+    Gui, Add, Button, xm+0 y+20 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
+    ToolTip2ctrl(hBtnCollapse, "Collapse panel [F11]")
     Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
     Gui, Add, Checkbox, x+5 hp Checked%DesatureAreaAlternate% vDesatureAreaAlternate gupdateUIdesaturatePanel, &Simple mode
@@ -36705,9 +36943,11 @@ PanelFloodFillTool() {
     Gui, Add, Text, x15 y15 Section, Flood fill (bucket) color:
     Gui, Add, Checkbox, x%xCol% yp+0 gupdateUIfloodFillPanel Checked%FloodFillCartoonMode% vFloodFillCartoonMode, Cartoon mode
     Gui, Add, Slider, Center xs+15 y+10 w%txtWid3% NoTicks ToolTip AltSubmit gupdateUIfloodFillPanel vFloodFillClrOpacity Range3-255, % FloodFillClrOpacity
-    Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuFloodFillColor, P
+    Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuFloodFillColor +hwndhBtnPickClrA, P
     Gui, Add, ListView, x+1 hp w60 %CCLVO% Background%FloodFillColor% vFloodFillColor,
-    Gui, Add, Text, x+5 hp +0x200 vinfoClrOpacity gBTNresetFloodClrOpacity +TabStop, 1011`%
+    Gui, Add, Text, x+5 hp +0x200 vinfoClrOpacity gBTNresetFloodClrOpacity +TabStop +hwndhBtnRopacity, 1011`%
+    ToolTip2ctrl(hBtnRopacity, "Reset fill color opacity")
+    ToolTip2ctrl(hBtnPickClrA, "Pick fill color from the viewport")
     ; Gui, Add, Checkbox, xs y+10 hp, &Overlay flood fill
     Gui, Add, Text, xs+15 y+15 hp vinfoOpacity gBTNresetFlooduOpacity +TabStop, Flooding opacity: %thisOpacity%00`%
     Gui, Add, DropDownList, x%xCol% yp+0 wp gupdateUIfloodFillPanel AltSubmit Choose%FloodFillBlendMode% vFloodFillBlendMode, No blending mode|Darken|Multiply|Linear burn|Color burn|Lighten|Screen|Linear dodge [Add]|Hard light|Overlay|Hard mix|Linear light|Color dodge|Vivid light|Division|Exclusion|Difference|Substract|Luminosity|Substract reversed|Inverted difference
@@ -36719,8 +36959,8 @@ PanelFloodFillTool() {
     Gui, Add, Checkbox, x%xCol% yp+0 hp gupdateUIfloodFillPanel Checked%FloodFillEightWays% vFloodFillEightWays , Follow thin lines
     Gui, Add, Checkbox, xs+15 y+10 gupdateUIfloodFillPanel Checked%FloodFillModus% vFloodFillModus, Replace the similar colors anywhere
 
-    Gui, Add, Button, xm+0 y+25 h%thisBtnHeight% w45 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
+    Gui, Add, Button, xm+0 y+25 h%thisBtnHeight% w40 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
+    ToolTip2ctrl(hBtnCollapse, "Collapse panel [F11]")
     ; Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 hp wp+35 gBtnCloseWindow Default, &Close
 
@@ -36764,7 +37004,7 @@ PanelEraseSelectedArea() {
     Gui, Add, Slider, Center xp y+5 wp AltSubmit gupdateUIerasePanel vEraseAreaOpacity Range5-255, % EraseAreaOpacity
 
     Gui, Add, Button, xm+0 y+15 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
+    ToolTip2ctrl(hBtnCollapse, "Collapse panel [F11]")
     Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction, &Apply
     ; Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
@@ -36804,15 +37044,17 @@ PanelFillBehindBgrImage() {
     Gui, Add, Text, x15 y15 Section w%txtWid%, Please set the color and opacity to fill behind the image. This will have no visible effect on images without semi-transparent pixels.
     Gui, Add, Checkbox, xs y+10 Checked%FillBehindInvert% gupdateUIfillBehindPanel vFillBehindInvert, &Invert selection area
     Gui, Add, Text, xs y+15 hp+10 +0x200, Color:
-    Gui, Add, Button,  x+10 hp w25 gStartPickingColor vPickuFillBehindColor, P
-    Gui, Add, ListView, x+5 hp w60 %CCLVO% Background%FillBehindColor% vFillBehindColor,
-    Gui, Add, Text, x+10 wp+90 hp +TabStop +0x200 vinfoOpacity gBTNresetFillBehColorOpacity  +TabStop, Opacity: %thisOpacityA%`%
+    Gui, Add, ListView, x+5 hp wp+15 %CCLVO% Background%FillBehindColor% vFillBehindColor,
+    Gui, Add, Button, x+1 hp w25 gStartPickingColor vPickuFillBehindColor +hwndhBtnPickClrA, P
+    Gui, Add, Text, x+10 hp +TabStop +0x200 vinfoOpacity gBTNresetFillBehColorOpacity +TabStop +hwndhBtnRopacity, Opacity: 1011`%
     Gui, Add, Slider, Center xs y+10 w%txtWid% AltSubmit NoTicks gupdateUIfillBehindPanel vFillBehindClrOpacity Range2-255, % FillBehindClrOpacity
     Gui, Add, Text, xs+10 wp +TabStop +0x200 vtxtLine1 gBTNresetBehindOpacity +TabStop, Image opacity: %thisOpacityB%`%
     Gui, Add, Slider, Center xs y+10 w%txtWid% AltSubmit NoTicks gupdateUIfillBehindPanel vFillBehindOpacity Range1-512, % FillBehindOpacity
+    ToolTip2ctrl(hBtnRopacity, "Reset fill color opacity")
+    ToolTip2ctrl(hBtnPickClrA, "Pick fill color from the viewport")
 
     Gui, Add, Button, xm+0 y+25 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
+    ToolTip2ctrl(hBtnCollapse, "Collapse panel [F11]")
     Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction, &Apply
     ; Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
@@ -37688,7 +37930,7 @@ BtnResetVPgridOpacity() {
 }
 
 BTNresetEraseOpacity() {
-    EraseAreaOpacity := (AnyWindowOpen=68 || AnyWindowOpen=66) ? 255 : 127
+    EraseAreaOpacity := isVarEqualTo(AnyWindowOpen, 74, 68, 66) ? 255 : 127
     GuiControl, SettingsGUIA:, EraseAreaOpacity, % EraseAreaOpacity
     If (AnyWindowOpen=66)
        updateUIfloodFillPanel()
@@ -37696,6 +37938,8 @@ BTNresetEraseOpacity() {
        updateUIerasePanel()
     Else If (AnyWindowOpen=68)
        updateUIfillBehindPanel()
+    Else If (AnyWindowOpen=74)
+       UpdateUIadjustVPcolors()
 }
 
 BTNresetFillBehColorOpacity() {
@@ -39231,25 +39475,21 @@ updateUIdesaturatePanel(actionu:=0, b:=0) {
        GuiControl, SettingsGUIA:, DesatureAreaAmount, 100
     }
 
-    RegAction(1, "DesatureAreaAmount")
-    RegAction(1, "DesatureAreaAlternate")
-    RegAction(1, "DesatureAreaHue")
-    RegAction(1, "EraseAreaInvert")
-    RegAction(1, "DesaturateAreaChannel")
-
     GuiControl, SettingsGUIA:, infoAmount, Intensity: %DesatureAreaAmount%`%
     GuiControl, SettingsGUIA:, infohueAdjust, Relight: %DesatureAreaHue%°
+    actu := (DesaturateAreaLevels>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    GuiControl, % actu, DesaturateAreaDither
     actu := (DesaturateAreaChannel=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu, infoAmount
     GuiControl, % actu, DesatureAreaAmount
 
-    actu := (DesatureAreaAmount>87 && isWinXP=0) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    actu := (DesatureAreaAmount>98 && isWinXP=0) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu, DesatureAreaAlternate
 
-    actu := (DesatureAreaAlternate!=1 && !isWinXP && DesatureAreaAmount>87) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    actu := (DesatureAreaAlternate!=1 && !isWinXP && DesatureAreaAmount>98) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu, infohueAdjust
     GuiControl, % actu, DesatureAreaHue
-
+    SetTimer, WriteSettingsDesaturateSelPanel, -200
     If (actionu!="noPreview")
        livePreviewsImageEditing(0, 0, A_ThisFunc, actionu, b)
     lastInvoked := A_TickCount
@@ -39305,12 +39545,108 @@ coreDesatureAreaFX(ByRef matrix, ByRef pEffect) {
        thisHAmount := clampInRange(thisHAmount, -180, 0)
     }
 
-    If (!isWinXP && (thisHAmount!=0 || thisAmount2!=0))
+    If (!isWinXP && (thisHAmount!=0 || thisAmount2!=0) && DesatureAreaAmount>98 && DesatureAreaAlternate=0)
        pEffect := Gdip_CreateEffect(6, thisHAmount, thisAmount2, 0)
+}
+
+livePreviewAdjustColorsArea(modus:=0) {
+   Critical, on
+   Static bitsOptions := {0:0, 1:0, 2:2, 3:3, 4:4, 5:5, 6:6, 7:7, 8:8, 9:16}
+        , prevState, prevBMP
+
+   thisBitsDepth := bitsOptions[DesaturateAreaLevels]
+   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   imgSelPx := x1 := selDotX + SelDotsSize//2, x2 := selDotAx + SelDotsSize//2
+   imgSelPy := y1 := selDotY + SelDotsSize//2, y2 := selDotAy + SelDotsSize//2
+   imgSelW := max(X1, X2) - min(X1, X2)
+   imgSelH := max(Y1, Y2) - min(Y1, Y2)
+
+   pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
+   If (EraseAreaInvert=1)
+   {
+      getClampedVPimgBounds(imgSelPx, imgSelPy, x2, y2, imgSelW, imgSelH)
+      imgSelPx := prevDestPosX, imgSelPy := prevDestPosY
+   }
+
+   ; trGdip_GraphicsClear(A_ThisFunc, 2NDglPG, "0x00" WindowBGRcolor)
+   Gdip_ResetClip(2NDglPG)
+   modus := (EraseAreaInvert=1) ? 4 : 0
+   Gdip_SetClipPath(2NDglPG, pPath, modus)
+
+   gimgSelW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
+   gimgSelH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
+   thisu := (EraseAreaInvert=1) ? "a" prevDestPosX prevDestPosY : "a" prevResizedVPimgW prevResizedVPimgH
+   thisState := "a" imgSelPx imgSelPy imgSelW imgSelH mainWidth mainHeight zoomLevel thisu EraseAreaInvert IMGresizingMode imageAligned useGdiBitmap() gimgSelW gimgSelH currentUndoLevel undoLevelsRecorded
+   If (prevState!=thisState)
+   {
+      fnOutputDebug("redraw: " A_ThisFunc)
+      trGdip_DisposeImage(prevBMP, 1)
+      If (EraseAreaInvert=1)
+      {
+         pBitmap := useGdiBitmap()
+         Gdip_GetImageDimensions(pBitmap, w, h)
+         If (w!=prevResizedVPimgW || h!=prevResizedVPimgH)
+         {
+            zBitmap := trGdip_ResizeBitmap(A_ThisFunc, pBitmap, prevResizedVPimgW, prevResizedVPimgH, 0, 5)
+            pBitmap := StrLen(zBitmap)>2 ? zBitmap : ""
+         } Else pBitmap := trGdip_CloneBitmap(A_ThisFunc, pBitmap)
+      } Else
+      {
+         ; pBitmap := getImgSelectedAreaEditMode(0, imgSelX1, imgSelY1, gimgSelW, gimgSelH, gimgSelW, gimgSelH, 0)
+         pBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, useGdiBitmap(), imgSelX1, imgSelY1, gimgSelW, gimgSelH, 0, 0, 1)
+         Gdip_GetImageDimensions(pBitmap, w, h)
+         If (w!=imgSelW || h!=imgSelH)
+         {
+            zBitmap := Gdip_ResizeBitmap(pBitmap, imgSelW, imgSelH, 0, 5)
+            trGdip_DisposeImage(pBitmap, 1)
+            pBitmap := zBitmap
+         }
+      }
+      prevBMP := pBitmap
+      prevState := thisState
+      ; ToolTip, % imgSelW "=" imgSelH "`n" w "=" h , , , 2
+   } Else pBitmap := prevBMP
+
+   If (userimgGammaCorrect=1)
+   {
+      Gdip_SetCompositingQuality(2NDglPG, 2)
+      r1 := trGdip_DrawImage(A_ThisFunc, 2NDglPG, pBitmap, imgSelPx, imgSelPy)
+   }
+
+   zBitmap := applyVPeffectsOnBMP(trGdip_CloneBitmap(A_ThisFunc, pBitmap))
+   If (thisBitsDepth>1 && DesaturateAreaLevels>1 && imgFxMode>1)
+   {
+      E := Gdip_BitmapSetColorDepth(zBitmap, thisBitsDepth, DesaturateAreaDither)
+      Gdip_BitmapSetColorDepth(zBitmap, 32)
+   }
+
+   allowAlphaMasking := decideAlphaMaskingFeaseable(EraseAreaUseAlpha)
+   If (allowAlphaMasking=1 && StrLen(zBitmap)>2)
+   {
+      thisIDu := "a" alphaMaskColorReversed alphaMaskingMode userAlphaMaskBmpPainted VPselRotation EllipseSelectMode imgSelPx imgSelPy imgSelW imgSelH EraseAreaInvert getIDvpFX() DesaturateAreaLevels DesaturateAreaDither currentUndoLevel undoLevelsRecorded userimgGammaCorrect useGdiBitmap()
+      realtimePasteInPlaceAlphaMasker(1, zBitmap, thisIDu, newBitmap, 0, 0, 0, 0)
+      If StrLen(newBitmap)>2
+      {
+         trGdip_DisposeImage(zBitmap, 1)
+         zBitmap := newBitmap
+      }
+   }
+
+   thisOpacity := EraseAreaOpacity/255
+   r1 := trGdip_DrawImage(A_ThisFunc, 2NDglPG, zBitmap, imgSelPx, imgSelPy,,,,,,, thisOpacity)
+   If (userimgGammaCorrect=1)
+      Gdip_SetCompositingQuality(2NDglPG, 1)
+
+   ; r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectWin, 2NDglHDC)
+   Gdip_ResetClip(2NDglPG)
+   trGdip_DisposeImage(zBitmap, 1)
 }
 
 livePreviewDesaturateArea(modus:=0) {
    Critical, on
+   Static bitsOptions := {0:0, 1:0, 2:2, 3:3, 4:4, 5:5, 6:6, 7:7, 8:8}
+
+   thisBitsDepth := bitsOptions[DesaturateAreaLevels]
    ; Gdip_GetImageDimensions(useGdiBitmap(), qimgW, qimgH)
    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
    imgSelPx := x1 := selDotX + SelDotsSize//2, x2 := selDotAx + SelDotsSize//2
@@ -39328,10 +39664,16 @@ livePreviewDesaturateArea(modus:=0) {
    modus := (EraseAreaInvert=1) ? 4 : 0
    Gdip_SetClipPath(2NDglPG, pPath, modus)
    zBitmap := getImgSelectedAreaEditMode(1, imgSelPx, imgSelPy, imgSelW, imgSelH, imgSelW, imgSelH, 0, imgSelW, imgSelH)
+   If (thisBitsDepth>1)
+   {
+      E := Gdip_BitmapSetColorDepth(zBitmap, thisBitsDepth, DesaturateAreaDither)
+      Gdip_BitmapSetColorDepth(zBitmap, 32)
+   }
+
    allowAlphaMasking := decideAlphaMaskingFeaseable(EraseAreaUseAlpha)
    If (allowAlphaMasking=1 && StrLen(zBitmap)>2)
    {
-      thisIDu := "a" alphaMaskColorReversed alphaMaskingMode userAlphaMaskBmpPainted VPselRotation EllipseSelectMode imgSelPx imgSelPy imgSelW imgSelH EraseAreaInvert DesatureAreaHue DesatureAreaAmount DesaturateAreaChannel DesatureAreaAlternate
+      thisIDu := "a" alphaMaskColorReversed alphaMaskingMode userAlphaMaskBmpPainted VPselRotation EllipseSelectMode imgSelPx imgSelPy imgSelW imgSelH EraseAreaInvert DesatureAreaHue DesatureAreaAmount DesaturateAreaChannel DesatureAreaAlternate DesaturateAreaLevels DesaturateAreaDither currentUndoLevel undoLevelsRecorded useGdiBitmap()
       realtimePasteInPlaceAlphaMasker(1, zBitmap, thisIDu, newBitmap, 0, 0, 0, 0)
       If StrLen(newBitmap)>2
       {
@@ -39347,6 +39689,7 @@ livePreviewDesaturateArea(modus:=0) {
 
    ; r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectWin, 2NDglHDC)
    Gdip_ResetClip(2NDglPG)
+   Gdip_DisposeEffect(pEffect)
    trGdip_DisposeImage(zBitmap, 1)
 }
 
@@ -39365,13 +39708,29 @@ BtnGraySelectedArea() {
    prevImgEditZeit := A_TickCount
 }
 
+BtnAdjustColorsImgSelectedArea() {
+   If throwErrorSelectionOutsideBounds()
+      Return
+
+   RegAction(1, "EraseAreaOpacity")
+   RegAction(1, "EraseAreaInvert")
+   o_imgFxMode := imgFxMode
+   GuiControlGet, closeEditPanelOnApply, SettingsGUIA:, closeEditPanelOnApply
+   ViewPortBMPcache := trGdip_DisposeImage(ViewPortBMPcache, 1)
+   prevImgEditZeit := A_TickCount
+   If (closeEditPanelOnApply=1)
+      BtnCloseWindow()
+   ToggleEditImgSelection("show-edit")
+   AdjustColorsSelectedArea(o_imgFxMode)
+   prevImgEditZeit := A_TickCount
+}
+
 BtnBlurSelectedArea() {
   updateUIblurPanel()
   BtnCloseWindow()
   ToggleEditImgSelection("show-edit")
   BlurSelectedArea()
 }
-
 
 BtnZoomBlurSelectedArea() {
   updateUIzoomBlurPanel()
@@ -40017,7 +40376,7 @@ PanelInsertTextArea() {
 
     Gui, Add, Checkbox, xs yp+%ml% gupdateUIInsertTextPanel Checked%TextInAreaFillSelArea% vTextInAreaFillSelArea, Fill selection area
     Gui, Add, Checkbox, xm+15 yp+%ml% Section gupdateUIInsertTextPanel Checked%TextInAreaBgrUnified% vTextInAreaBgrUnified, Unified block
-    Gui, Add, Checkbox, xs+%columnBpos% yp hp gupdateUIInsertTextPanel Checked%TextInAreaRoundBoxBgr% vTextInAreaRoundBoxBgr, Rounded  corners
+    Gui, Add, Checkbox, xs+%columnBpos% yp hp gupdateUIInsertTextPanel Checked%TextInAreaRoundBoxBgr% vTextInAreaRoundBoxBgr, Rounded corners
     Gui, Add, Checkbox, xs yp+%ml% gupdateUIInsertTextPanel Checked%TextInAreaCutOutMode% vTextInAreaCutOutMode, Cut-out mode
     Gui, Add, Checkbox, xs+%columnBpos% yp hp gupdateUIInsertTextPanel Checked%TextInAreaBgrEntire% vTextInAreaBgrEntire, Fill entire line(s)
     Gui, Add, Checkbox, xs yp+%ml% gupdateUIInsertTextPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit selection area
@@ -40025,33 +40384,39 @@ PanelInsertTextArea() {
     Gui, Tab, 3
     Gui, Add, Text, x+15 y+15 Section +TabStop vtxtLine6 gBtnResetTextOpacity, Text opacity / color
     Gui, Add, Slider, Center xs y+10 NoTicks w%slideWid% gupdateUIInsertTextPanel ToolTip AltSubmit vTextInAreaFontOpacity Range1-255, % TextInAreaFontOpacity
-    Gui, Add, Button, x+2 hp w27 gStartPickingColor vPickuTextInAreaFontColor, P
+    Gui, Add, Button, x+2 hp w27 gStartPickingColor vPickuTextInAreaFontColor +hwndhBtnPickClrA, P
     Gui, Add, ListView, x+2 w%editWid% hp gupdateUIInsertTextPanel %CCLVO% Background%TextInAreaFontColor% vTextInAreaFontColor hwndhLV3,
-    Gui, Add, Text, x+5 hp +0x200 +TabStop vinfoPasteOpacity gBtnResetTextOpacity, Opacity
+    Gui, Add, Text, x+5 hp +0x200 +TabStop vinfoPasteOpacity gBtnResetTextOpacity +hwndhBtnRopacity, Opacity
+    ToolTip2ctrl(hBtnRopacity, "Reset text color opacity")
+    ToolTip2ctrl(hBtnPickClrA, "Pick text color from the viewport")
 
     ml := (PrefsLargeFonts=1) ? 15 : 10
     Gui, Add, Text, xs y+%ml% +TabStop vtxtLine1 gBtnResetTextBordOpacity, Border opacity / color
     Gui, Add, Slider, Center xs y+10 NoTicks w%slideWid% gupdateUIInsertTextPanel ToolTip AltSubmit vTextInAreaBorderOpacity Range1-255, % TextInAreaBorderOpacity
-    Gui, Add, Button, x+2 hp w27 gStartPickingColor vPickuTextInAreaBorderColor, P
+    Gui, Add, Button, x+2 hp w27 gStartPickingColor vPickuTextInAreaBorderColor +hwndhBtnPickClrA, P
     Gui, Add, ListView, x+2 w%editWid% hp gupdateUIInsertTextPanel %CCLVO% Background%TextInAreaBorderColor% vTextInAreaBorderColor hwndhLV45,
-    Gui, Add, Text, x+5 hp +0x200 +TabStop vinfoFillAreaOpacity gBtnResetTextBordOpacity, Opacity
+    Gui, Add, Text, x+5 hp +0x200 +TabStop vinfoFillAreaOpacity gBtnResetTextBordOpacity +hwndhBtnRopacity, Opacity
     Gui, Add, Checkbox, xs+15 y+2 hp gupdateUIInsertTextPanel Checked%TextInAreaOnlyBorder% vTextInAreaOnlyBorder, &Draw only the border
+    ToolTip2ctrl(hBtnRopacity, "Reset border color opacity")
+    ToolTip2ctrl(hBtnPickClrA, "Pick border color from the viewport")
 
     Gui, Add, Text, xs y+%ml% vtxtLine2, Background opacity / color
     Gui, Add, Slider, Center xs y+10 NoTicks w%slideWid% gupdateUIInsertTextPanel ToolTip AltSubmit vTextInAreaBgrOpacity Range1-255, % TextInAreaBgrOpacity
-    Gui, Add, Button, x+2 hp w27 gStartPickingColor vPickuTextInAreaBgrColor, P
+    Gui, Add, Button, x+2 hp w27 gStartPickingColor vPickuTextInAreaBgrColor +hwndhBtnPickClrA, P
     Gui, Add, ListView, x+2 w%editWid% hp gupdateUIInsertTextPanel %CCLVO% Background%TextInAreaBgrColor% vTextInAreaBgrColor hwndhLV2,
-    Gui, Add, Text, x+5 hp +0x200 +TabStop vinfoFillArea2ndOpacity gBtnResetTextBgrOpacity, Opacity
+    Gui, Add, Text, x+5 hp +0x200 +TabStop vinfoFillArea2ndOpacity gBtnResetTextBgrOpacity +hwndhBtnRopacity, Opacity
     Gui, Add, Checkbox, xs y+%ml% Checked%userimgGammaCorrect% vuserimgGammaCorrect gupdateUIInsertTextPanel, &Apply gamma corrections
     Gui, Add, Text, xs y+10 +TabStop gBtnResetTextBlendMode, Blending mode:
     Gui, Add, DropDownList, x+5 wp+25 gupdateUIInsertTextPanel AltSubmit Choose%TextInAreaBlendMode% vTextInAreaBlendMode, None|Darken|Multiply|Linear burn|Color burn|Lighten|Screen|Linear dodge [Add]|Hard light|Overlay|Hard mix|Linear light|Color dodge|Vivid light|Division|Exclusion|Difference|Substract|Luminosity|Substract reversed|Inverted difference
+    ToolTip2ctrl(hBtnRopacity, "Reset background color opacity")
+    ToolTip2ctrl(hBtnPickClrA, "Pick background color from the viewport")
 
     uiADDalphaMaskTabs(4, 5, "updateUIInsertTextPanel")
 
     Gui, Tab
     ml := (PrefsLargeFonts=1) ? 90 : 70
     Gui, Add, Button, xm+0 y+15 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
+    ToolTip2ctrl(hBtnCollapse, "Collapse panel [F11]")
     Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 hp w%ml% gBtnCloseWindow, &Cancel
     Gui, Add, Checkbox, x+5 hp Checked%doImgEditLivePreview% vdoImgEditLivePreview gupdateUIInsertTextPanel, Live preview (low quality)
@@ -40110,16 +40475,22 @@ uiADDalphaMaskTabs(t1, t2, labelu) {
     Gui, Add, Checkbox, x+15 y+15 Section gBTNtoggleAlphaPainting Choose%uiPasteInPlaceAlphaDrawMode% vuiPasteInPlaceAlphaDrawMode, Enable alpha mask painting mode
     Gui, Add, DropDownList, xs y+10 Section AltSubmit w%txtWid2% g%labelu% Choose%BrushToolType% vBrushToolType, Simple solid color|Soft edges brush
     Gui, Add, Checkbox, x+10 hp gupdateUIbrushTool Checked%BrushToolOverDraw% vBrushToolOverDraw , &Airbrush mode
-    Gui, Add, Text, xs y+10 hp w%sml% +0x200 Center gBtnToggleBrushColors vUIbtnBrushColorA +TabStop, [X]
+    Gui, Add, Text, xs y+10 hp w%sml% +0x200 Center gBtnToggleBrushColors vUIbtnBrushColorA +TabStop +hwndhBtnTglClrA, [X]
     Gui, Add, Slider, Center x+5 w%slideWid% g%labelu% NoTicks ToolTip AltSubmit vBrushToolAopacity Range1-255, % BrushToolAopacity
-    Gui, Add, Button, x+5 hp w%sml% gStartPickingColor vPickuBrushToolAcolor, P
+    Gui, Add, Button, x+5 hp w%sml% gStartPickingColor vPickuBrushToolAcolor +hwndhBtnPickClrA, P
     Gui, Add, ListView, x+5 hp w60 %CCLVO% Background%BrushToolAcolor% vBrushToolAcolor hwndhLVfillColor,
-    Gui, Add, Text, x+5 hp +0x200 +TabStop gBtnResetBrushColorAopacity vinfoBrushAopacity, 1011`%
-    Gui, Add, Text, xs y+10 hp w%sml% +0x200 Center gBtnToggleBrushColors vUIbtnBrushColorB +TabStop, [X]
+    Gui, Add, Text, x+5 hp +0x200 +TabStop gBtnResetBrushColorAopacity vinfoBrushAopacity +hwndhBtnRopacity, 1011`%
+    ToolTip2ctrl(hBtnRopacity, "Reset color A opacity")
+    Gui, Add, Text, xs y+10 hp w%sml% +0x200 Center gBtnToggleBrushColors vUIbtnBrushColorB +TabStop +hwndhBtnTglClrB, [X]
     Gui, Add, Slider, Center x+5 w%slideWid% g%labelu% NoTicks ToolTip AltSubmit vBrushToolBopacity Range1-255, % BrushToolBopacity
-    Gui, Add, Button, x+5 hp w%sml% gStartPickingColor vPickuBrushToolBcolor, P
+    Gui, Add, Button, x+5 hp w%sml% gStartPickingColor vPickuBrushToolBcolor +hwndhBtnPickClrB, P
     Gui, Add, ListView, x+5 hp w60 %CCLVO% Background%BrushToolBcolor% vBrushToolBcolor hwndhLVfill2ndColor,
-    Gui, Add, Text, x+5 hp +0x200 +TabStop gBtnResetBrushColorBopacity vinfoBrushBopacity, 1011`%
+    Gui, Add, Text, x+5 hp +0x200 +TabStop gBtnResetBrushColorBopacity vinfoBrushBopacity +hwndhBtnRopacity, 1011`%
+    ToolTip2ctrl(hBtnRopacity, "Reset color B opacity")
+    ToolTip2ctrl(hBtnTglClrA, "Toggle active color")
+    ToolTip2ctrl(hBtnPickClrA, "Pick color A from the viewport")
+    ToolTip2ctrl(hBtnTglClrB, "Toggle active color")
+    ToolTip2ctrl(hBtnPickClrB, "Pick color B from the viewport")
 
     ; Gui, Add, Text, xs y+15 w%slideWid2% vinfoBrushSize, Size: %BrushToolSize%
     Gui, Add, Checkbox, xs y+15 w%slideWid% g%labelu% Checked%brushToolDoubleSize% vbrushToolDoubleSize, Diameter: 2000 px
@@ -40420,8 +40791,10 @@ PanelAdjustToneMapping() {
     Gui, Add, Checkbox, xs y+10 gupdateUItoneMappingPanel Checked%userHQraw% vuserHQraw, Load camera RAW images at high quality`nEnable this to have tone-mapping apply%friendly%on RAW images as well
 
     initializeFimPreviewIMG(getIDimage(currentFileIndex))
-    Gui, Add, Button, xs+0 y+25 h%thisBtnHeight% w35 gBtnPrevToneMapPic, <<
-    Gui, Add, Button, x+5 hp wp gBtnNextToneMapPic, >>
+    Gui, Add, Button, xs+0 y+25 h%thisBtnHeight% w35 gBtnPrevToneMapPic +hwndhBtnPrevImg, <<
+    Gui, Add, Button, x+5 hp wp gBtnNextToneMapPic +hwndhBtnNextImg, >>
+    ToolTip2ctrl(hBtnNextImg, "Next image")
+    ToolTip2ctrl(hBtnPrevImg, "Previous image")
     Gui, Add, Button, x+5 h%thisBtnHeight% w%btnWid% gBTNtoneMapRefresh Default, &Update viewport
     Gui, Add, Button, x+5 hp w90 gBTNresetToneMap, &Reset
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, Clo&se
@@ -40747,22 +41120,6 @@ InvokeStandardDialogColorPicker(hC, event, c, err:=0) {
   }
 }
 
-hexRGB(c) {
-; unknown source
-  r := ((c&255)<<16)+(c&65280)+((c&0xFF0000)>>16)
-  c := "000000"
-  DllCall("msvcrt\sprintf", "AStr", c, "AStr", "%06X", "UInt", r, "CDecl")
-  Return c
-}
-
-Hex2Str(val, len, x:=false, caps:=true) {
-; Function by Drugwash
-    VarSetCapacity(out, (len+1)*2, 32), c := caps ? "X" : "x"
-    DllCall("msvcrt\sprintf", "AStr", out, "AStr", "%0" len "ll" c, "UInt64", val, "CDecl")
-    Result := x ? "0x" out : out
-    Return Result
-}
-
 getCustomColorsFromImage(whichBitmap) {
   Gdip_GetImageDimensions(whichBitmap, imgW, imgH)
   calcImgSelection2bmp(0, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
@@ -40788,12 +41145,13 @@ getCustomColorsFromImage(whichBitmap) {
 
 createStandardColorzDialog(coloru, hwnd, ctrlName) {
   WinSet, Disable,, ahk_id %PVhwnd%
-  nc := Dlg_Color(coloru, hwnd)
+  customColors := getCustomColorsFromImage(useGdiBitmap())
+  nc := Dlg_Color(coloru, hwnd, customColors)
   WinSet, Enable,, ahk_id %PVhwnd%
   If (nc="-")
      Return "-"
 
-  theColor := hexRGB(nc)
+  theColor := Gdi_ColorRef2RGB(nc)
   If (isNowAlphaPainting()=1 && InStr(ctrlName, "brushtool"))
      theColor := convertColorToGrayscale(theColor)
 
@@ -44857,11 +45215,9 @@ createMenuImageEditSubMenus() {
       kMenu("PVimgFilters", "Add", "&Zoom blur", "PanelZoomBlurSelectedArea", "effects")
       kMenu("PVimgFilters", "Add", "&Invert colors`tShift+I", "InvertSelectedArea", "effects")
       kMenu("PVimgFilters", "Add", "Desaturate color&s`tCtrl+G", "PanelDesatureSelectedArea", "grayscale effects")
+      kMenu("PVimgFilters", "Add", "Ad&just image colors`tU", "PanelColorsAdjusterImage", "grayscale effects lightness contrast saturation levels brightness")
       kMenu("PVimgFilters", "Add", "&Detect edges filter", "PanelDetectEdgesImage", "emboss effects")
       kMenu("PVimgFilters", "Add", "&Add noise filter", "PanelAddNoiserImage", "effects")
-      kMenu("PVimgFilters", "Add", "&Apply viewport colors inside selection`tShift+U", "ApplyColorAdjustsSelectedArea", "effects")
-      If (mustPreventMenus!=1)
-         kMenu("PVimgFilters", "Add", "&... outside the selection`tCtrl+Shift+U", "ApplyColorAdjustsSelectedArea", "colors effects")
 
       kMenu("PVimgDraw", "Add", "Define f&reeform filled shape`tShift+P", "MenuStartDrawingShapes", "curve polygonal")
       kMenu("PVimgDraw", "Add", "Define freeform &outline`tAlt+P", "MenuStartDrawingLines", "curve polygonal lines")
@@ -44873,6 +45229,7 @@ createMenuImageEditSubMenus() {
       kMenu("PVimgDraw", "Add", "Draw s&hape contours`tCtrl+L", "PanelDrawShapesInArea", "lines")
       kMenu("PVimgDraw", "Add", "&Draw simple lines or arcs", "PanelDrawLines")
       kMenu("PVimgDraw", "Add", "Insert te&xt`tShift+T", "PanelInsertTextArea", "write add draw type")
+
       kMenu("PVimgTransform", "Add", "&Adjust canvas size`tAlt+A", "PanelAdjustImageCanvasSize")
       kMenu("PVimgTransform", "Add", "&Resize image`tCtrl+R", "PanelEditorImgResize")
       kMenu("PVimgTransform", "Add", "A&uto-crop image`tAlt+Y", "PanelImgAutoCrop")
@@ -44891,9 +45248,6 @@ createMenuImageEditSubMenus() {
          kMenu("PVimgTransform", "Disable", "Flip selected &vertically`tShift+V")
          kMenu("PVimgTransform", "Disable", "&Crop image to selection`tShift+Enter")
          kMenu("PVimgTransform", "Disable", "&Resize image to selection`tAlt+R")
-         kMenu("PVimgFilters", "Disable", "&Apply viewport colors inside selection`tShift+U")
-         If (mustPreventMenus!=1)
-            kMenu("PVimgFilters", "Disable", "&... outside the selection`tCtrl+Shift+U")
       }
    }
 }
@@ -44907,7 +45261,7 @@ createMenuNavigation() {
       Menu, PVnav, Add,
    } Else 
    {
-      kMenu("PVnav", "Add", "&Display the files list map now`tW", "invokeFilesListMapNow")
+      kMenu("PVnav", "Add", "&Display the files list map now`tW", "MenuDrawFilesListMap")
       kMenu("PVnav", "Add/Uncheck", "&Show files list map on scrollbar click", "ToggleFilesMap")
       If (showFilesListMap=1)
          kMenu("PVnav", "Check", "&Show files list map on scrollbar click")
@@ -45033,7 +45387,7 @@ createMenuHelpQPV() {
    kMenu("PVhelp", "Add", "Session &events journal`tShift+``", "PanelJournalWindow", "journal history")
    kMenu("PVhelp", "Add", "&Command line options", "MenuCmdLineHelp")
    If (TouchScreenMode=1)
-      kMenu("PVhelp", "Add", "&Viewport help map", "dummyDrawViewportHelpMap")
+      kMenu("PVhelp", "Add", "&Viewport help map", "MenuDrawViewportHelpMap")
 
    Menu, PVhelp, Add,
    kMenu("PVhelp", "Add", "C&heck for updates", "checkForUpdatesNow")
@@ -46089,10 +46443,11 @@ createMenuLiveTools() {
    kMenu("PVlTools", "Add", "Define freeform &outline`tAlt+P", "MenuStartDrawingLines")
    kMenu("PVlTools", "Add", "Define alpha mas&k", "PanelSoloAlphaMasker")
    kMenu("PVlTools", "Add", "&Insert te&xt`tShift+T", "PanelInsertTextArea")
-   kMenu("PVlTools", "Add", "&Adjust vie&wport colours and effects`tU", "PanelColorsAdjusterWindow")
+   kMenu("PVlTools", "Add", "&Adjust image colors`tU", "PanelColorsAdjusterImage")
+   kMenu("PVlTools", "Add", "Adjust vie&wport colors and effects`tShift+U", "PanelColorsAdjusterWindow")
    kMenu("PVlTools", "Add", "Desaturate color&s`tCtrl+G", "PanelDesatureSelectedArea")
    If (AnyWindowOpen=10)
-      kMenu("PVlTools", "Check/Disable", "&Adjust vie&wport colours and effects`tU")
+      kMenu("PVlTools", "Check/Disable", "Adjust vie&wport colors and effects`tShift+U")
    Else If (AnyWindowOpen=23)
       kMenu("PVlTools", "Check/Disable", "&Fill shapes`tAlt+Bksp")
    Else If (AnyWindowOpen=25)
@@ -46113,6 +46468,8 @@ createMenuLiveTools() {
       kMenu("PVlTools", "Check/Disable", "Fill be&hind image")
    Else If (AnyWindowOpen=70)
       kMenu("PVlTools", "Check/Disable", "Define alpha mas&k")
+   Else If (AnyWindowOpen=74)
+      kMenu("PVlTools", "Check/Disable", "&Adjust image colors`tU")
 
    If (editingSelectionNow=1)
    {
@@ -46122,11 +46479,6 @@ createMenuLiveTools() {
       kMenu("PVlTools", "Add", "Flip selected &horizontally`tShift+H", "FlipSelectedAreaH")
       kMenu("PVlTools", "Add", "Flip selected &vertically`tShift+V", "FlipSelectedAreaV")
       kMenu("PVlTools", "Add", "&Invert colors`tShift+I", "InvertSelectedArea")
-      If (AnyWindowOpen!=10)
-      {
-         kMenu("PVlTools", "Add", "&Apply color effects inside selection`tShift+U", "ApplyColorAdjustsSelectedArea")
-         kMenu("PVlTools", "Add", "&... outside the selection`tCtrl+Shift+U", "ApplyColorAdjustsSelectedArea")
-      }
    }
 }
 
@@ -46148,12 +46500,25 @@ toggleClrGradientCenterRepose() {
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
+isVarEqualTo(value, vals*) {
+   yay := 0
+   for index, param in vals
+   {
+       If (value=param)
+       {
+          yay := 1
+          Break
+       }
+   }
+   Return yay
+}
+
 BuildImgLiveEditMenu() {
    If (editingSelectionNow!=1 && !AnyWindowOpen) || (thumbsDisplaying=1)
       Return
 
    deleteMenus()
-   isWinCustomShapeFriendly := (AnyWindowOpen=68 || AnyWindowOpen=66 || AnyWindowOpen=65 || AnyWindowOpen=64 || AnyWindowOpen=55 || AnyWindowOpen=25 || AnyWindowOpen=23 || AnyWindowOpen=10) ? 1 : 0
+   isWinCustomShapeFriendly := isVarEqualTo(AnyWindowOpen, 74, 68, 66, 65, 64, 55, 25, 23, 10)
    kMenu("PVmenu", "Add/Uncheck", "&Collapse tool panel`tF8", "toggleImgEditPanelWindow")
    If (panelWinCollapsed=1)
       kMenu("PVmenu", "Check", "&Collapse tool panel`tF8")
@@ -46176,12 +46541,12 @@ BuildImgLiveEditMenu() {
       Menu, PVmenu, Add,
       If (editingSelectionNow=1)
       {
-         kMenu("PVmenu", "Add", "Appl&y color effects inside selection`tShift+U", "ApplyColorAdjustsSelectedArea")
-         kMenu("PVmenu", "Add", "&... outside the selection`tCtrl+Shift+U", "ApplyColorAdjustsSelectedArea")
+         kMenu("PVmenu", "Add", "Appl&y color effects inside selection`tCtrl+Shift+U", "ApplyColorAdjustsSelectedArea")
+         kMenu("PVmenu", "Add", "&... outside the selection", "ApplyColorAdjustsSelectedArea")
       }
 
-      kMenu("PVmenu", "Add/Uncheck", "&Activate viewport color adjustments`t\", "MenuToggleColorAdjustments")
-      If (ForceNoColorMatrix!=1 && imgFxMode!=1)
+      kMenu("PVmenu", "Add/Uncheck", "&Activate viewport color adjustments`t\", "BtnToggleNoColorsFX")
+      If (ForceNoColorMatrix!=1)
          kMenu("PVmenu", "Check", "&Activate viewport color adjustments`t\")
       kMenu("PVmenu", "Add", "&Reset all adjustments to defaults`tCtrl+\", "BtnResetImageView")
    }
@@ -46193,7 +46558,7 @@ BuildImgLiveEditMenu() {
       kMenu("PVmenu", "Add", "&Redo`tCtrl+Y", "ImgRedoAction")
    }
 
-   If ((AnyWindowOpen=10 || AnyWindowOpen=64 || AnyWindowOpen=66 || AnyWindowOpen=12) && imgEditPanelOpened=1)
+   If (isVarEqualTo(AnyWindowOpen, 10, 12, 64, 66) && imgEditPanelOpened=1)
    {
       kMenu("PVmenu", "Add/Uncheck", "&Show selection`tE", "ToggleEditImgSelection")
       If (editingSelectionNow=1)
@@ -46213,7 +46578,7 @@ BuildImgLiveEditMenu() {
    }
 
    decideLiveSelectionBasedOnWindow(angleu, isToolGood)
-   If (AnyWindowOpen=65 || AnyWindowOpen=23)
+   If isVarEqualTo(AnyWindowOpen, 65, 23)
       isToolGood := 1
 
    If (isToolGood=1 && isWinCustomShapeFriendly=1 && EllipseSelectMode!=2 && editingSelectionNow=1)
@@ -46266,7 +46631,7 @@ BuildImgLiveEditMenu() {
          createMenuAlphaMask(givenMenu)
          If !liveDrawingBrushTool
             kMenu("PVmenu", "Add", "Alpha mas&k", ":PValpha")
-      } Else If (AnyWindowOpen=64 || AnyWindowOpen=66)
+      } Else If isVarEqualTo(AnyWindowOpen, 64, 66)
       {
          additions := FloodFillSelectionAdj
          labelu := (AnyWindowOpen=64) ? "Painting" : "Bucket"
@@ -46292,10 +46657,14 @@ BuildImgLiveEditMenu() {
       kMenu("PVmenu", "Add", "&Define symmetry point`tShift+Y", "BtnSetBrushSymmetryCoords")
    }
 
-   If (AnyWindowOpen=31 || AnyWindowOpen=24) && (shearImgX!=0 || shearImgY!=0)
-      kMenu("PVmenu", "Add", "&Reset image skew offsets", "resetImgSkewOffsets")
+   If isVarEqualTo(AnyWindowOpen, 31, 24)
+   {
+      kMenu("PVmenu", "Add", "Reset to &initial position", "ResetTransformToolPos")
+      If (shearImgX!=0 || shearImgY!=0)
+         kMenu("PVmenu", "Add", "&Reset image skew offsets", "resetImgSkewOffsets")
+   }
 
-   If (AnyWindowOpen=66 || AnyWindowOpen=55 || AnyWindowOpen=25)
+   If isVarEqualTo(AnyWindowOpen, 74, 66, 55, 25)
    {
       kMenu("PValpha", "Add", "Previe&w the alpha mask`tM", "ViewAlphaMaskNow")
       kMenu("PValpha", "Add", "&Define alpha mask`tM", "PanelSoloAlphaMasker")
@@ -46366,8 +46735,8 @@ BuildSecondMenu() {
       Menu, PVmenu, Add, 
       If (AnyWindowOpen=10)
       {
-         kMenu("PVmenu", "Add", "Apply vie&wport effects inside selection`tEnter", "ApplyColorAdjustsSelectedArea")
-         kMenu("PVmenu", "Add", "&... outside the selection`tCtrl+Shift+U", "ApplyColorAdjustsSelectedArea")
+         kMenu("PVmenu", "Add", "Apply vie&wport effects inside selection`tCtrl+Shift+U", "ApplyColorAdjustsSelectedArea")
+         kMenu("PVmenu", "Add", "&... outside the selection", "ApplyColorAdjustsSelectedArea")
       } Else kMenu("PVmenu", "Add", "&Apply tool`tEnter", "applyIMGeditFunction")
 
       labelu := (AnyWindowOpen=10) ? "Close panel" : "Cancel tool"
@@ -46398,8 +46767,8 @@ BuildSecondMenu() {
 
       Menu, PVmenu, Add, 
       kMenu("PVmenu", "Add", "Adapt image to viewport`t/", "ToggleImageSizingMode")
-      If (AnyWindowOpen=10)
-         kMenu("PVmenu", "Add", "Toggle FX", "MenuToggleColorAdjustments")
+      If (AnyWindowOpen=10 || AnyWindowOpen=74)
+         kMenu("PVmenu", "Add", "Toggle colour &effects", "BtnToggleNoColorsFX")
       Else
          kMenu("PVmenu", "Add", "Hide tool preview object`tD", "toggleLiveEditObject")
 
@@ -46515,7 +46884,7 @@ BuildMainMenu(dummy:=0) {
    If (drawingShapeNow=1)
    {
       GetMouseCoord2wind(PVhwnd, mX, mY)
-      createMenuCustomShapeDrawing(mX, mY, 0, 0, 0)
+      createContextMenuCustomShapeDrawing(mX, mY, 0, 0, 0)
       ; stopDrawingShape()
       Return
    } Else If (mustCaptureCloneBrush=1)
@@ -47963,7 +48332,7 @@ toggleListViewModeThumbs() {
 }
 
 defineListViewModes() {
-   infoThumbsSize := (thumbsDisplaying=1) ? " (" thumbsW " x " thumbsH " px )" : ""
+   ; infoThumbsSize := (thumbsDisplaying=1) ? " (" thumbsW " x " thumbsH " px )" : ""
    If (thumbsListViewMode=1)
       friendly := "THUMBNAILS"
    Else If (thumbsListViewMode=2)
@@ -48059,8 +48428,9 @@ ToggleInfoBoxu() {
     If (A_TickCount - lastInvoked < 85) ; || (thumbsDisplaying=1)
        Return
 
-    lastInvoked := A_TickCount
     showInfoBoxHUD++
+    lastInvoked := A_TickCount
+    lastInfoBoxZeitToggle := A_TickCount
     showInfoBoxHUD := clampInRange(showInfoBoxHUD, 0, 2, 1)
     INIaction(1, "showInfoBoxHUD", "General")
     If (thumbsDisplaying=1)
@@ -48733,6 +49103,7 @@ ToggleLargeUIfonts() {
     INIaction(1, "PrefsLargeFonts", "General")
     interfaceThread.ahkassign("PrefsLargeFonts", PrefsLargeFonts)
     thisFunc := prevOpenedWindow[2]
+    AddTooltip2Ctrl("reset")
     If (VisibleQuickMenuSearchWin=1)
        closeQuickSearch()
 
@@ -48766,6 +49137,7 @@ ToggleDarkModus() {
     uiUseDarkMode := !uiUseDarkMode
     INIaction(1, "uiUseDarkMode", "General")
     friendly := (uiUseDarkMode=1) ? "ACTIVATED" : "DEACTIVATED"
+    AddTooltip2Ctrl("reset")
     setMenusTheme(uiUseDarkMode)
     showDelayedTooltip("Dark mode: " friendly)
     thisFunc := prevOpenedWindow[2]
@@ -48857,9 +49229,10 @@ ToggleImgHistogram(direction, dummy:=0) {
     If (dummy="normal" && showHistogram=1)
        showHistogram := 2
 
+    msgu := (showHistogram>1) ? "Histogram: " defineHistogramType() "`nGraph focus: " defineHistogramMode() : "Histogram: NONE"
     INIaction(1, "showHistogram", "General")
     If (showHistogram>1)
-       showTOOLtip("Histogram: " defineHistogramType() "`nGraph focus: " defineHistogramMode(), A_ThisFunc, 2, (showHistogram - 0.999)/5)
+       showTOOLtip(msgu, A_ThisFunc, 2, (showHistogram - 0.999)/5)
     Else
        showTOOLtip("Histogram: NONE", A_ThisFunc, 2, 0.001/6)
 
@@ -49303,7 +49676,7 @@ drawWelcomeImg() {
     Gdip_DeleteBrush(pBr4)
     Gdip_DisposeEffect(pEffect)
     Gdip_DisposeEffect(zEffect)
-    updateUIctrl()
+    ; updateUIctrl()
     addJournalEntry("Welcome screen rendered in " A_TickCount - thisZeit " ms." r2 " - " r1)
     setWindowTitle(appTitle " v" appVersion, 1)
     If (A_TickCount - thisZeit<250) || (screenSaverMode=1)
@@ -50724,16 +51097,17 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
    If (A_TickCount - lastTitleChange>300)
       setWindowTitle("Adapting image to viewport")
 
-   If (allowFreeIMGpanning=1 && imageAligned=5 && (gdiBMPchanged=1 || PrintPosX="C" || PrintPosX="W") && IMGresizingMode=4)
+   If (allowFreeIMGpanning=1 && imageAligned=5 && (gdiBMPchanged=1 || isVarEqualTo(PrintPosX, "X", "W", "C")) && IMGresizingMode=4)
    {
-      thisSize := "a" Round(GuiW/2 - ResizedW/2) . Round(GuiH/2 - ResizedH/2) imgPath currentFileIndex maxFilesIndex
+      thisSize := "a" Round(GuiW/2 - ResizedW/2) . Round(GuiH/2 - ResizedH/2) imgPath currentFileIndex maxFilesIndex prevResizedVPimgW prevResizedVPimgH
       If (PrintPosX="W")
       {
          IMGdecalageX += Round((prevResizedVPimgW - ResizedW)/2)
          IMGdecalageY += Round((prevResizedVPimgH - ResizedH)/2)
          prevSize := thisSize
-      } Else If (prevSize!=thisSize)
+      } Else If (prevSize!=thisSize || PrintPosX="X")
       {
+         PrintPosX := "C"
          prevSize := thisSize
          IMGdecalageX := Round(GuiW/2 - ResizedW/2)
          IMGdecalageY := Round(GuiH/2 - ResizedH/2)
@@ -50901,8 +51275,9 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
           prevMsg := entireString
        }
        Gdip_GetImageDimensions(infoBoxGdiCached, imgW, imgH)
-       lastInfoBoxBMP[1] := [imgW, imgH]
        trGdip_DrawImage(A_ThisFunc, Gu, infoBoxGdiCached, tlbrBonusX, tlbrBonusY)
+       lastInfoBoxBMP[1] := [imgW, imgH]
+       interfaceThread.ahkPostFunction("uiAccessUpdateInfoBox", entireString, imgW, imgH, FlipImgV, FlipImgH)
        Return
     }
 
@@ -50948,7 +51323,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
        infoSelection := "`nSelection area activated in image view"
 
     typeu :=  defineFilesListType()
-    If (typeu &&userPrivateMode!=1)
+    If (typeu && userPrivateMode!=1)
     {
        infoThisSLD := "`nFiles list opened: "
        If (SLDtypeLoaded>1)
@@ -50962,10 +51337,16 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
     If (usrColorDepth>1)
        infoColorDepth := "`nSimulated color depth: " defineColorDepth()
 
-    If (StrLen(filesFilter)>1 && userPrivateMode!=1)
+    If (StrLen(filesFilter)>1)
     {
        modus := (userFilterInvertThis=1) ? ": (inverted)`n" : ":`n"
-       infoFilteru := "`nFiles list filtered from " groupDigits(bckpMaxFilesIndex) " down to " groupDigits(maxFilesIndex) " ( " Round(maxFilesIndex/bckpMaxFilesIndex*100, 2) "% ).`nFilter pattern used" modus SubStr(filesFilter, 1, 45)
+       infoFilteru := "`nFiles list filtered from " groupDigits(bckpMaxFilesIndex) " down to " groupDigits(maxFilesIndex) " ( " Round(maxFilesIndex/bckpMaxFilesIndex*100, 2) "% )."
+       oldIndex := filteredMap2mainList[currentFileIndex]
+       If oldIndex
+          infoFilteru .= "`nIndex in main list: " groupDigits(oldIndex)
+       If (userPrivateMode!=1)
+          infoFilteru .= "`nFilter pattern used" modus SubStr(filesFilter, 1, 45)
+
        ; If (userFilterDoString=1 && UsrEditFilter!="")
        ;    infoFilteru .= UsrEditFilter
     }
@@ -51031,10 +51412,16 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
     tlbrBonusX := (hasTrans=1 && (FlipImgH=0 || thumbsDisplaying=1)) ? ToolbarWinW : 0
     tlbrBonusY := (hasTrans=2 && (FlipImgV=0 || thumbsDisplaying=1)) ? ToolbarWinH : 0
     If (FlipImgH=1 && thumbsDisplaying=0 && scrollBarVx>1)
+    {
        tlbrBonusX += knobSize
+       scX := knobSize
+    }
 
     If (FlipImgV=1 && thumbsDisplaying=0 && scrollBarHy>1)
+    {
        tlbrBonusY += knobSize
+       scY := knobSize
+    }
 
     borderSize := imgHUDbaseUnit//6
     thisTxtAlignu := (thumbsDisplaying=1) ? "Left" : 0
@@ -51048,6 +51435,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
     txtOptions.w := mainWidth - borderSize
     txtOptions.h := mainHeight - borderSize
     lastInfoBoxBMP[1] := [dimsFw, dimsFh]
+    interfaceThread.ahkPostFunction("uiAccessUpdateInfoBox", entireString, dimsFw, dimsFh, FlipImgV, FlipImgH, tlbrBonusX, tlbrBonusY, scX, scY)
     Gdip_FillRectangle(Gu, OSDwinFadedBrushBGR, tlbrBonusX, tlbrBonusY, dimsFw, dimsFh)
     If (thumbsDisplaying!=1)
        Gdip_ResetWorldTransform(Gu)
@@ -51087,7 +51475,6 @@ drawAnnotationBox(mainWidth, mainHeight, Gu) {
 
     zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
     textFile := OutDir "\" OutNameNoExt ".txt"
-
     If (SLDtypeLoaded=3)
        textFileContent := retrieveSQLdbEntryCaption(imgPath, "imgCaption")
 
@@ -51104,15 +51491,32 @@ drawAnnotationBox(mainWidth, mainHeight, Gu) {
 
     infoBoxBMP := drawTextInBox(entireString, OSDFontName, OSDfontSize//1.1, mainWidth, mainHeight, OSDtextColor, OSDbgrColor, 0, 1, usrTextAlign)
     Gdip_GetImageDimensions(infoBoxBMP, imgW, imgH)
-    thisPosY := (scrollBarHy>0) ? scrollBarHy - imgH : mainHeight - imgH
-    thisPosX := (scrollBarVx>0) ? scrollBarVx - imgW : mainWidth - imgW
+    thisPosY := mainHeight - imgH
+    thisPosX := mainWidth - imgW
+    If (FlipImgV=0)
+       thisPosY -= scrollBarHy
+
     If (usrTextAlign="Left")
        thisPosX := 0
     Else If (usrTextAlign="Center")
-       thisPosX := (scrollBarVx>0) ? scrollBarVx//2 - imgW//2 : mainWidth//2 - imgW//2
+       thisPosX := mainWidth//2 - imgW//2
+
+    If (FlipImgH=1)
+       thisPosX += scrollBarVx
+    Else If (thisPosX + imgW>mainWidth - scrollBarVx)
+       thisPosX -= scrollBarVx
 
     If infoBoxBMP
+    {
        trGdip_DrawImage(A_ThisFunc, Gu, infoBoxBMP, thisPosX, thisPosY)
+       If (FlipImgH=1 && usrTextAlign="Left")
+          thisPosX := mainWidth - imgW - scrollBarVx
+       Else If (FlipImgH=1 && usrTextAlign="Right")
+          thisPosX := 0
+       If (FlipImgV=1)
+          thisPosY := 0
+       interfaceThread.ahkPostFunction("uiAccessUpdateAnnoBox", entireString, imgW, imgH, thisPosX, thisPosY)
+    }
     infoBoxBMP := trGdip_DisposeImage(infoBoxBMP, 1)
 }
 
@@ -51148,6 +51552,7 @@ changeOSDfontSize(direction) {
   calcHUDsize()
   recalculateThumbsSizes()
   interfaceThread.ahkassign("OSDfontSize", OSDfontSize)
+  updateUIctrl()
   If (thumbsListViewMode>1 && thumbsDisplaying=1)
   {
      ForceRefreshNowThumbsList()
@@ -51360,6 +51765,7 @@ LoadFileWithWIA(imgPath, fastMode, noBMP:=0, sizesDesired:=0, ByRef newBitmap:=0
 LoadBitmapForScreen(imgPath, allowCaching, frameu) {
   Static prevMD5nameA, prevMD5nameB
 
+  initQPVmainDLL()
   coreIMGzeitLoad := A_TickCount
   If StrLen(UserMemBMP)>2
   {
@@ -51718,8 +52124,8 @@ highlightActiveCtrl(modus:=0, givenHwnd:=0) {
 
    If (modus="RButton")
    {
-      A := WinActive("A")
-      If (A=hfdTreeWinGui || A=hQuickMenuSearchWin || A=MsgBox2hwnd || A=hSetWinGui) && (isNowFakeWinOpen=1)
+      ActiveHwnd := WinActive("A")
+      If (isVarEqualTo(ActiveHwnd, hfdTreeWinGui, hQuickMenuSearchWin, MsgBox2hwnd, hSetWinGui) && isNowFakeWinOpen=1)
          Return
 
       MouseGetPos, , , id, hwnd, 2
@@ -51907,6 +52313,9 @@ CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReload
   If StrLen(UserMemBMP)>2
      thisIMGisDownScaled := allowCaching := 0
 
+  If (slideShowRunning!=1 && (A_TickCount - lastInvoked>2000))
+     interfaceThread.ahkPostFunction("uiAccessImgViewSetUIlabels")
+
   oBitmap := LoadBitmapForScreen(thisImgPath, allowCaching, desiredFrameIndex)
   ; ToolTip, % currIMGdetails.OpenedWith , , , 2
   If !oBitmap
@@ -52085,7 +52494,7 @@ createGDIbrushPbitmap(pBitmap) {
 }
 
 extractAmbientalTexture(abortImgLoad:=0) {
-    confirmTexBGR := (vpIMGrotation=0 || vpIMGrotation=90 || vpIMGrotation=180 || vpIMGrotation=270) ? 1 : 0
+    confirmTexBGR := isVarEqualTo(vpIMGrotation, 0, 90, 180, 270)
     If (abortImgLoad<3 && usrTextureBGR=1 && IMGresizingMode!=5 && confirmTexBGR=1)
     {
        setWindowTitle("Extracting image texture for the window background")
@@ -52479,6 +52888,7 @@ createHistogramBMP(whichBitmap) {
 
    ; TulTip(0, "|  ", modePointK3[1], modePointV, r2ndMaxV, graphFocus, lookValue[2], avgBrLvlV, meanValue)
    HistogramBMP := drawHistogram(thisData, graphFocus, 256, Scale, thisGraphColor, OSDbgrColor, imgHUDbaseUnit//2.5, infoBoxBMP)
+   prevHistoBoxString := entireString
    trGdip_DisposeImage(infoBoxBMP, 1)
    If (whichBMP!=whichBitmap && StrLen(whichBMP)>2)
       trGdip_DisposeImage(whichBMP, 1)
@@ -52866,7 +53276,7 @@ AdaptiveImgLight(whichImg, imgPath, Width, Height) {
 VPnavBoxWrapper(mainWidth, mainHeight, Gu) {
     Critical, on
 
-    createVPnavBox(navBoxu, imgW, imgH, diffX, diffY, zImgW, zImgH)
+    createVPnavBox(navBoxu, imgW, imgH, diffX, diffY, zImgW, zImgH, entireString)
     hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
     tlbrBonusX := (hasTrans=1 && (FlipImgH=0 || thumbsDisplaying=1 && FlipImgH=1) && ((ToolbarWinH - 3 > mainHeight - imgH - scrollBarHy) || FlipImgV=1 && thumbsDisplaying=0)) ? ToolbarWinW : 0
     tlbrBonusY := (hasTrans=2 && FlipImgV=1 && ((ToolbarWinW - 3 > mainWidth  - imgW - scrollBarVx) || FlipImgH=0)) ? ToolbarWinH : 0
@@ -52890,10 +53300,12 @@ VPnavBoxWrapper(mainWidth, mainHeight, Gu) {
     If navBoxu
        HUDobjNavBoxu := [zImgW, zImgH, thisPosX + diffX, thisPosY + diffY, imgW, imgH, thisPosX, thisPosY]
 
+    thisString := hasDrawnImageMap ? entireString : "hide"
+    interfaceThread.ahkPostFunction("uiAccessUpdateNavBox", thisString, imgW, imgH, thisPosX, thisPosY)
     trGdip_DisposeImage(navBoxu, 1)
 }
 
-createVPnavBox(ByRef pBitmap, ByRef imgW, ByRef imgH, ByRef posX, ByRef posY, ByRef fImgW, ByRef fImgH) {
+createVPnavBox(ByRef pBitmap, ByRef imgW, ByRef imgH, ByRef posX, ByRef posY, ByRef fImgW, ByRef fImgH, ByRef entireString) {
    Static lastState := 1
    pBitmap := ""
    navBoxu := coreCreateVPnavBox()
@@ -52923,6 +53335,48 @@ createVPnavBox(ByRef pBitmap, ByRef imgW, ByRef imgH, ByRef posX, ByRef posY, By
       Return
    }
 
+   entireString := (thumbsDisplaying=1) ? "Image preview area: " : "Image navigator box: "
+   entireString .= (HUDnavBoxSize<76) ? "small size." : "large size."
+   If (usrColorDepth>1 || imgFxMode>1) 
+      entireString .= "`nViewport color effects are applied."
+
+   If (thumbsDisplaying=1)
+   {
+      If (resultedFilesList[currentFileIndex, 3]=1)
+         entireString .= "`nImage already seen. "
+
+      If (resultedFilesList[currentFileIndex, 5]=1)
+         entireString .= "`nAdded to favourites. "
+
+      If (resultedFilesList[currentFileIndex, 2]=1)
+         entireString .= "`nFile selected."
+   } Else
+   {
+      entireString .= "`nZoom level: " Round(zoomLevel*100) "%."
+      If (allowFreeIMGpanning=1)
+         entireString .= "`nThe image can be panned outside the viewport. "
+
+      If (vpIMGrotation>0)
+         entireString .= "`nImage rotation: " vpIMGrotation "°. "
+
+      If (editingSelectionNow=1)
+         entireString .= "`nImage " DefineVPselAreaMode() " selection area. " 
+
+      If (imgSelLargerViewPort=1)
+         entireString .= "`nIt covers the entire viewport area. "
+      Else If (imgSelOutViewPort=1)
+         entireString .= "`nIt is situated outside the viewport area, but a handle to retrieve it is available in the viewport. "
+
+      entireString .= "`nResolution: " groupDigits(prevMaxSelX) " x " groupDigits(prevMaxSelY) " pixels. " Round((prevMaxSelX*prevMaxSelY)/1000000,2) " megapixels. "
+      If (thisIMGisDownScaled=1 && AutoDownScaleIMGs=1)
+         entireString .= ". The image is downscaled. "
+      If (currIMGdetails.TooLargeGDI=1)
+         entireString .= "`nOriginal resolution: " groupDigits(currIMGdetails.Width) " x " groupDigits(currIMGdetails.Height) " pixels. " Round((currIMGdetails.Width*currIMGdetails.Height)/1000000,2) " megapixels."
+
+      entireString .= "`nAlt+Left click to toggle size. Ctrl+Left-click and drag to adjust zoom level."
+   }
+
+   entireString .= "`nRight-click for more options."
    Gdip_FillRectangle(Gu, pBrushE, 0, 0, imgW, imgH)
    If (resultedFilesList[currentFileIndex, 2]=1 && thumbsDisplaying=0)
    {
@@ -53235,7 +53689,7 @@ toggleBrushDoubleSize() {
    brushToolDoubleSize := !brushToolDoubleSize
    friendly := (brushToolDoubleSize=1) ? "RADIUS" : "DIAMETER"
    showTOOLtip("Brush " friendly " size: " brushToolSize " px", A_ThisFunc, 1, brushToolSize/950)
-   If (AnyWindowOpen=64 || AnyWindowOpen=24 || AnyWindowOpen=31)
+   If isVarEqualTo(AnyWindowOpen, 64, 24, 31)
       GuiControl, SettingsGUIA:, brushToolDoubleSize, % brushToolDoubleSize
 
    SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -53248,7 +53702,7 @@ toggleBrushAirMode() {
    BrushToolOverDraw := !BrushToolOverDraw
    friendly := (BrushToolOverDraw=1) ? "ACTIVATED" : "DEACTIVATED"
    labelu := (BrushToolType>=6) ? "Auto-scale brush deformer: " : "Airbrush mode: "
-   If (AnyWindowOpen=64 || AnyWindowOpen=24 || AnyWindowOpen=31)
+   If isVarEqualTo(AnyWindowOpen, 64, 24, 31)
       GuiControl, SettingsGUIA:, BrushToolOverDraw, % BrushToolOverDraw
 
    showTOOLtip(labelu friendly moreinfos, A_ThisFunc, 1)
@@ -53442,7 +53896,7 @@ toggleAlphaPaintingMode() {
       If StrLen(userAlphaMaskBmpPainted)<3
       {
          freshMode := 1
-         If ((AnyWindowOpen=70 || AnyWindowOpen=32 || AnyWindowOpen=23) && alphaMaskingMode>1)
+         If (isVarEqualTo(AnyWindowOpen, 70, 32, 23) && alphaMaskingMode>1)
             alphaMaskGray := generateAlphaMaskBitmap(0, 0, imgSelW//2, imgSelH//2, 0, 0, 0, 1)
          Else If (alphaMaskingMode>1)
             alphaMaskGray := generateAlphaMaskBitmap(userClipBMPpaste, 0, 0, 0, 0, 0, 0, 1)
@@ -55377,7 +55831,7 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
     If (showHistogram>1 && drawingShapeNow!=1 && mode!=2)
     {
        thisImgCall := imgPath currentFileIndex zoomLevel IMGresizingMode imgFxMode showHistogram gdiBitmap undoLevelsRecorded currentUndoLevel UserMemBMP OSDfontSize histogramMode
-       thisSizingModes := (IMGresizingMode=1 || IMGresizingMode=2 || IMGresizingMode=5) || (IMGresizingMode=4 && IMGlargerViewPort!=1) ? 1 : 0
+       thisSizingModes := isVarEqualTo(IMGresizingMode, 1, 2, 5) || (IMGresizingMode=4 && IMGlargerViewPort!=1) ? 1 : 0
        If (imgFxMode!=1 || thisSizingModes!=1 || animGIFplaying=1 || desiredFrameIndex>0)
        {
           prevImgPath := 0
@@ -55409,7 +55863,11 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
           If StrLen(gdiBitmap)>3
              createHistogramBMP(gdiBitmap)
        }
-    } Else prevImgCall := 0
+    } Else 
+    {
+       prevImgCall := 0
+       interfaceThread.ahkPostFunction("uiAccessUpdateHistoBox", "hide", 1, 1, 0, 0)
+    }
 
     Gdip_SetClipRect(glPG, 0, 0, mainWidth, mainHeight)
     If (showViewPortGrid=1 && slideShowRunning!=1 && imgEditPanelOpened!=1)
@@ -55566,7 +56024,6 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
        hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
        tlbrBonusX := (hasTrans=1 && FlipImgH=1 && ((ToolbarWinH - 3 > mainHeight - imgH - scrollBarHy) || FlipImgV=1)) ? ToolbarWinW : 0
        tlbrBonusY := (hasTrans=2 && FlipImgV=1 && ((ToolbarWinW - 3 > mainWidth  - imgW - scrollBarVx) || FlipImgH=1)) ? ToolbarWinH : 0
-
        thisPosX := (FlipImgH=0 && scrollBarVx>0) ? mainWidth - scrollBarVx - imgW - tlbrBonusX : mainWidth - imgW - tlbrBonusX
        thisPosY := (FlipImgV=0 && scrollBarHy>0) ? mainHeight - scrollBarHy - imgH - tlbrBonusY : mainHeight - imgH - tlbrBonusY
        If (FlipImgH=1 || FlipImgV=1)
@@ -55585,7 +56042,13 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
        HUDobjHistoBoxu[1] := imgW, HUDobjHistoBoxu[2] := imgH
        HUDobjHistoBoxu[3] := thisPosX, HUDobjHistoBoxu[4] := thisPosY
        hasDrawnHistoMap := (E="fail") ? 0 : 1
-    } Else hasDrawnHistoMap := 0
+       thisString := (prevHistoBoxString && hasDrawnHistoMap=1) ? prevHistoBoxString : "hide"
+       interfaceThread.ahkPostFunction("uiAccessUpdateHistoBox", thisString, imgW, imgH, thisPosX, thisPosY)
+    } Else 
+    {
+       hasDrawnHistoMap := 0
+       interfaceThread.ahkPostFunction("uiAccessUpdateHistoBox", "hide", 0, 0, 0, 0)
+    }
 
     additionalHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, 1)
 }
@@ -56142,7 +56605,7 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
        drawImgSelectionOnWindow("return", "-", "-", "-", mainWidth, mainHeight)
 
     If (AnyWindowOpen=64 && BrushToolType=3) || (AnyWindowOpen=23 && FillAreaColorMode=6) 
-    || (AnyWindowOpen=69 || AnyWindowOpen=44 || AnyWindowOpen=43 || AnyWindowOpen=26)
+    || isVarEqualTo(AnyWindowOpen, 69, 44, 43, 26)
     {
        ImageCoords2Window(tinyPrevAreaCoordX, tinyPrevAreaCoordY, prevDestPosX, prevDestPosY, SelDotsSize, outX, outY)
        Gdip_FillRectangle(2NDglPG, pBrushE, outX, outY, SelDotsSize, SelDotsSize)
@@ -56151,12 +56614,18 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
 
     If (showImgAnnotations=1 && !AnyWindowOpen && drawingShapeNow!=1 && currentUndoLevel<3)
        drawAnnotationBox(mainWidth, mainHeight, 2NDglPG)
+    Else
+       interfaceThread.ahkPostFunction("uiAccessUpdateAnnoBox", "hide", 1, 1, 0, 0)
 
     If (showInfoBoxHUD>=1 && drawingShapeNow!=1)
        drawinfoBox(mainWidth, mainHeight, directRefresh, 2NDglPG)
+    Else
+       interfaceThread.ahkPostFunction("uiAccessUpdateInfoBox", "hide", 1, 1, 0, 0)
 
     If (showHUDnavIMG=1 && IMGlargerViewPort=1 && slideShowRunning!=1)
        VPnavBoxWrapper(mainWidth, mainHeight, 2NDglPG)
+    Else
+       interfaceThread.ahkPostFunction("uiAccessUpdateNavBox", "hide", 1, 1, 0, 0)
 
     thisThick := imgHUDbaseUnit//11
     Gdip_SetPenWidth(pPen4, thisThick)
@@ -56200,7 +56669,7 @@ getColorMatrix() {
     If (ForceNoColorMatrix=1 && AnyWindowOpen=10) || (imgFxMode=1)
        Return matrix
 
-    If (imgFxMode=4 && bwDithering=0)       ; grayscale
+    If (imgFxMode=4 && !bwDithering)       ; grayscale
        matrix := GenerateColorMatrix(2, lumosGrayAdjust, GammosGrayAdjust + fraction, , IntensityAlphaChannel)
     Else If (imgFxMode=5)  ; grayscale R
        matrix := GenerateColorMatrix(3, , , , IntensityAlphaChannel)
@@ -56228,8 +56697,8 @@ decideGDIPimageFX(ByRef matrix, ByRef imageAttribs, ByRef pEffect) {
     matrix := getColorMatrix()
     If (thumbsDisplaying=1 && (imgFxMode=3 || imgFxMode=8))
        matrix := ""
-
-    thisFXapplies := (imgFxMode=2 || imgFxMode=3 || imgFxMode=4 || imgFxMode=9 || imgFxMode=10) ? 1 : 0
+    ; ToolTip, % matrix , , , 2
+    thisFXapplies := isVarEqualTo(imgFxMode, 2, 3, 4, 9, 10)
     mustCreateAttribs := (realGammos!=1 && imgThreshold=0 && !matrix) ? 0 : 1
     If (mustCreateAttribs=1 && ForceNoColorMatrix!=1 && imgFxMode>1)
     {
@@ -56253,7 +56722,7 @@ decideGDIPimageFX(ByRef matrix, ByRef imageAttribs, ByRef pEffect) {
        Return "a" thisFXapplies lummyAdjust lumosAdjust lumosGrayAdjust GammosAdjust GammosGrayAdjust realGammos imgThreshold thisZatAdjust mustCreateAttribs imgFxMode ForceNoColorMatrix matrix zatAdjust infos
 
     o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
-    thisZatAdjust := (imgFxMode=4 && bwDithering=0 && zatAdjust=0) ? -40 : zatAdjust
+    thisZatAdjust := (imgFxMode=4 && !bwDithering && zatAdjust=0) ? -40 : zatAdjust
     If ((thisZatAdjust=0 && hueAdjust=0 && lummyAdjust=0) || !colorzFX[specialColorFXmode] || ForceNoColorMatrix=1)
        applyAdjusts := 0
 
@@ -56271,7 +56740,7 @@ decideGDIPimageFX(ByRef matrix, ByRef imageAttribs, ByRef pEffect) {
 }
 
 getIDvpFX() {
-    Return "a" specialColorFXmode uiColorCurveFXchannel uiColorCurveFXmode lummyAdjust lumosAdjust lumosGrayAdjust GammosAdjust GammosGrayAdjust realGammos imgThreshold mustCreateAttribs imgFxMode ForceNoColorMatrix zatAdjust
+    Return "a" specialColorFXmode uiColorCurveFXchannel uiColorCurveFXmode lummyAdjust lumosAdjust lumosGrayAdjust GammosAdjust GammosGrayAdjust realGammos imgThreshold imgFxMode ForceNoColorMatrix zatAdjust satAdjust hueAdjust chnRdecalage chnGdecalage chnBdecalage IntensityAlphaChannel
 }
 
 testSelectOutsideImgEntirely(pBitmap) {
@@ -56668,7 +57137,7 @@ getAccuratePathBounds(pPath, doRound:=0) {
 }
 
 decideLiveSelectionBasedOnWindow(ByRef angleu, ByRef okay) {
-   okay := (imgEditPanelOpened!=1 || AnyWindowOpen=10 || AnyWindowOpen=25 || AnyWindowOpen=55 || AnyWindowOpen=64 || AnyWindowOpen=66 || AnyWindowOpen=68 || AnyWindowOpen=65 && EllipseSelectMode || AnyWindowOpen=23 && EllipseSelectMode) ? 1 : 0
+   okay := (imgEditPanelOpened!=1 || isVarEqualTo(AnyWindowOpen, 10, 25, 55, 64, 66, 68, 74) || AnyWindowOpen=65 && EllipseSelectMode || AnyWindowOpen=23 && EllipseSelectMode) ? 1 : 0
    angleu := (okay=1) ? VPselRotation : 0
 }
 
@@ -57188,7 +57657,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     allowForceIMGload := (thisVPpanningNow=1) ? ForceIMGload : 0
     thisVPcacheIMGid := "a" gdiBitmap currentFileIndex imgPath allowForceIMGload whichBitmap desiredFrameIndex currentUndoLevel UserMemBMP undoLevelsRecorded
     thisVPcachePos := "a" newW newH zoomLevel allowForceIMGload DestPosX DestPosY thisVPcacheIMGid
-    prevVPcacheIDfx := decideGDIPimageFX(matrix, imageAttribs, pEffect)
+    prevVPcacheIDfx := (AnyWindowOpen=74) ? "-" : decideGDIPimageFX(matrix, imageAttribs, pEffect)
     forceNoFXcaching := (thisVPcachePos=prevVPcachePos && prevVPcacheHadpartialFX=2 && thisVPpanningNow=0) ? 1 : 0
     thisThingMatrix := (IntensityAlphaChannel>1 && imgFxMode>=2 && imgFxMode!=8 && currIMGdetails.HasAlpha=1) ? 1 : 0
     isAlphaMaskMode := (currIMGdetails.HasAlpha=1 && imgFxMode=8 && ForceNoColorMatrix=0) ? 1 :0 
@@ -57435,7 +57904,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     }
 
     ; ToolTip, % "l=" r2 "=" kBitmap "=" ViewPortBMPcache "=" gdipLastError "=" glHbitmap , , , 2
-    confirmTexBGR := (vpIMGrotation=0 || vpIMGrotation=90 || vpIMGrotation=180 || vpIMGrotation=270) && (usrTextureBGR=1 && gdiAmbientalTexBrush && (IMGentirelylargerThanVP!=1 || allowFreeIMGpanning=1 && IMGresizingMode=4)) ? 1 : 0
+    confirmTexBGR := isVarEqualTo(vpIMGrotation, 0, 90, 180, 270) && (usrTextureBGR=1 && gdiAmbientalTexBrush && (IMGentirelylargerThanVP!=1 || allowFreeIMGpanning=1 && IMGresizingMode=4)) ? 1 : 0
     If (FlipImgV=1 || FlipImgH=1 || pEffect || imageAttribs || wasVPcached=1)
     {
        ; redraw viewport with the activated FX
@@ -57611,9 +58080,11 @@ getTopMopStyle(hwnd) {
 }
 
 updateUIctrl() {
-    interfaceThread.ahkassign("editingSelectionNow", editingSelectionNow)
-    interfaceThread.ahkassign("isAlwaysOnTop", isAlwaysOnTop)
-    interfaceThread.ahkPostFunction("updateUIctrl")
+   modus := (StrLen(UserMemBMP)>2 || (maxFilesIndex>0 && CurrentSLD)) ? modus : "welcome"
+   If (modus="welcome")
+      interfaceThread.ahkPostFunction("uiAccessWelcomeView")
+   Else
+      interfaceThread.ahkPostFunction("updateUIctrlFromOutside", editingSelectionNow, isAlwaysOnTop, drawingShapeNow, IMGresizingMode)
 }
 
 coreselectRandomFiles(howMany, a, b) {
@@ -58844,8 +59315,14 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
        prevIndexu := ""
 
     If (showInfoBoxHUD>0)
+    {
        drawinfoBox(mainWidth, mainHeight, 0, 2NDglPG)
+       If (A_TickCount - lastInfoBoxZeitToggle<800)
+          Gdip_SetClipRect(2NDglPG, 0, 0, lastInfoBoxBMP[1, 1], lastInfoBoxBMP[1, 2], 4)
+    } Else
+       interfaceThread.ahkPostFunction("uiAccessUpdateInfoBox", "hide", 1, 1, 0, 0)
 
+    listedItems := ""
     Loop, % maxItemsW*maxItemsH*2
     {
         thisFileIndex := startIndex + A_Index - 1
@@ -58861,6 +59338,12 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
         If (rowIndex>=maxItemsH)
            Break
 
+        If (simpleMode=0)
+        {
+           tPath := (thumbsListViewMode>1) ? imgPath : SubStr(imgPath, InStr(imgPath, "\", 0, -1) + 1)
+           listedItems .= (imgPathSelected=1) ? tPath " (selected).`n" : tPath ".`n"
+        }
+
         DestPosX := thumbsW*columnIndex
         DestPosY := thumbsH*rowIndex
         isStringLen := StrLen(imgPath)>5 ? 1 : 0
@@ -58873,7 +59356,7 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
               Gdip_FillRectangle(2NDglPG, pBrushE, DestPosX, DestPosY, thumbsW, thumbsH)
         }
 
-        If (simpleMode=0 && isStringLen=1)
+        If (isStringLen=1 && (simpleMode=0 || thisFileIndex=currentFileIndex))
            isFile := FileRexists(imgPath)
 
         If (simpleMode=1 && isStringLen=1)
@@ -58919,7 +59402,7 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
 
            If (isStringLen=1)
            {
-              zPlitPath(imgPath, mustDrawBoxNow, fileNamu, folderu)
+              zPlitPath(imgPath, 1, fileNamu, folderu)
               If isFile
               {
                  QPV_FileGetSizeTime(imgPath, "R", thisFileIndex)
@@ -58927,15 +59410,25 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
                  FileDateM := resultedFilesList[thisFileIndex, 7]
                  Try FormatTime, FileDateM, % FileDateM, dd/MM/yyyy, HH:mm
                  fileMsg := fileSizu " | " FileDateM
-              } Else fileMsg := "File access error"
+                 fileMsg2 := "File size: " fileSizu " | Modified date: " FileDateM
+              } Else 
+              {
+                 fileMsg := (isStringLen=1) ? "File access error" : "-"
+                 fileMsg2 := (isStringLen=1) ? "File access error" : ""
+              }
 
               delim := (multilineStatusBar=1 || simpleMode>=1) ? "`n" : " | "
               If (multilineStatusBar=1 && userPrivateMode!=1)
-                 folderu := PathCompact(folderu, "a", 1, Ceil(OSDfontSize*0.9), mainWidth - OSDfontSize//2)
+                 folderuz := PathCompact(folderu, "a", 1, Ceil(OSDfontSize*0.9), mainWidth - OSDfontSize//2)
+              Else
+                 folderuz := folderu
 
-              namu := (userPrivateMode=1) ? "******.***" delim "*:\***\******\" : fileNamu delim folderu "\"
+              namu := (userPrivateMode=1) ? "******.***" delim "*:\***\******\" : fileNamu delim folderuz "\"
+              namu2 := (userPrivateMode=1) ? "" : "File: " fileNamu delim "Location: " folderu "\"
               fileIndexu := (multilineStatusBar=1) ? groupDigits(currentFileIndex) " / " groupDigits(maxFilesIndex) : groupDigits(currentFileIndex) 
-              theMsg := fileIndexu " | " fileMsg  " | " namu
+              fileIndexu2 := "Current index: " groupDigits(currentFileIndex) ". " groupDigits(maxFilesIndex)
+              theMsg := fileIndexu " | " fileMsg " | " namu
+              theMsg2 := fileIndexu2 " files listed | " fileMsg2 " | " namu2
            }
         }
 
@@ -58988,6 +59481,7 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
     {
        Gdip_FillRectangle(2NDglPG, pBrush1, 0, 0, mainWidth, imgHUDbaseUnit//5)
        theMsg := groupDigits(markedSelectFile) " selected | " theMsg
+       theMsg2 := groupDigits(markedSelectFile) " files selected | " theMsg2
     }
 
     scrollYpos := startIndex/maxFilesIndex
@@ -59008,18 +59502,24 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
        If isDupesList
        {
           theMSG := "DUPE ID: " currentDupeID StrReplace(currentDupeDetails, ".2500") " | " theMSG
+          theMSG2 := "DUPE ID: " currentDupeID StrReplace(currentDupeDetails, ".2500") " | " theMSG2
           mpxu := " | " Round(resultedFilesList[currentFileIndex, 17], 2) " MPx"
+          mpxu2 := " | " Round(resultedFilesList[currentFileIndex, 17], 2) " Megapixels"
           theMSG := StrReplace(theMSG, " MB |", " MB" mpxu " |")
           theMSG := StrReplace(theMSG, " KB |", " KB" mpxu " |")
+          theMSG2 := StrReplace(theMSG2, " MB |", " MB" mpxu2 " |")
+          theMSG2 := StrReplace(theMSG2, " KB |", " KB" mpxu2 " |")
        } Else If (SLDtypeLoaded=3 && resultedFilesList[currentFileIndex, 33]!="")
        {
           thisu := resultedFilesList[currentFileIndex, 33]
-          labelu := StrReplace(defineSQLdbSort(), "histogram", "Histo")
+          labelu2 := defineSQLdbSort()
+          labelu := StrReplace(labelu2, "histogram", "Histo")
           If (InStr(labelu, "histo") && !InStr(labelu, "rms"))
              thisu := thisu * 256
           If InStr(thisu, ".")
              thisu := Round(thisu, 2)
           theMSG := labelu ": " thisu " | " theMSG
+          theMSG2 := labelu2 ": " thisu " | " theMSG2
        }
 
        hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
@@ -59035,13 +59535,13 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
        trGdip_DrawImage(A_ThisFunc, 2NDglPG, infoBoxBMP, statusPosX, mainHeight - ThumbsStatusBarH)
        If (simpleMode=0)
        {
-          theMSG2 := theMSG
+          ; theMSG2 := theMSG
           If (markSearchMatches=1 && userSearchString && modus!="all")
           {
              If coreSearchIndex(getIDimage(currentFileIndex), thisSearchString, userSearchWhat)
              {
                 Gdip_FillRectangle(2NDglPG, pBrushD, statusPosX, mainHeight - ThumbsStatusBarH, OSDfontSize//2.5+1, ThumbsStatusBarH)
-                theMSG2 .= " | Matched search: " thisSearchString 
+                theMSG2 .= " | File matches search criteria" 
              }
           }
 
@@ -59063,10 +59563,13 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
           If StrLen(filesFilter)>1
              theMSG2 .= " | Files list filtered"
 
-          interfaceThread.ahkPostFunction("UpdateUiStatusBar", theMSG2, ThumbsStatusBarH, 0, maxItemsPage)
+          listInfos := "Files list container: " maxItemsPage " elements in view. Listing mode: " defineListViewModes() ". Tap and hold, or Control+Left-Click, on any listed item to select it. Items listed:`n" listedItems
+          interfaceThread.ahkPostFunction("uiAccessUpdateUiStatusBar", theMSG2, ThumbsStatusBarH, 0, listInfos, OSDfontSize, maxFilesIndex)
           trGdip_DisposeImage(infoBoxBMP, 1)
           If (showHUDnavIMG=1) ;  && (thumbsListViewMode>1 || isDupesList=1))
              VPnavBoxWrapper(mainWidth, mainHeight - ThumbsStatusBarH, 2NDglPG)
+          Else
+             interfaceThread.ahkPostFunction("uiAccessUpdateNavBox", "hide", 1, 1, 0, 0)
        }
     }
 
@@ -59110,14 +59613,17 @@ generateFilesListMap(dummy:=0) {
    Gdip_GraphicsClear(G1, "0xFF" WindowBgrColor)
    thisColor := (thisVal=2) ? "33EEFF" : "FF9922"
    thisThick := (maxFilesIndex - 10<mainHeight) ? 1 : 2
-   selPen := Gdip_CreatePen("0xFF" thisColor, thisThick)
+   If (thisVal=2 && markedSelectFile/maxFilesIndex<3 && maxFilesIndex>mainHeight*2)
+      thisThick := 3
+
    countThese := 0
+   selPen := Gdip_CreatePen("0xFF" thisColor, thisThick)
    Loop, % maxFilesIndex
    {
         If resultedFilesList[A_Index, thisVal]
         {
-           countThese++
            Gdip_DrawLine(G1, selPen, -1, A_Index, 3, A_Index)
+           countThese++
         }
    }
 
@@ -60146,6 +60652,7 @@ GuiGDIupdaterResize(eventu:=0) {
 
 ToggleViewModeTouch() {
    zoomLevel := IMGdecalageY := IMGdecalageX := 1
+
    If (IMGresizingMode=1)
    {
       IMGresizingMode := 3
@@ -62174,7 +62681,7 @@ coreResizeIMG(imgPath, newW, newH, file2save, goFX, toClippy, rotateAngle, soloM
 coreRotateBMP(whichBitmap, rotateAngle, goFX, thisImgQuality, pixFmt, brushRequired) {
     Static imgOrientOpt := {"i000":0, "i100":1, "i200":2, "i300":3, "i010":4, "i110":5, "i210":6, "i310":7, "i001":6, "i101":7, "i201":4, "i301":5, "i011":2, "i111":3, "i211":0, "i311":1}
 
-    confirmSimpleRotation := (rotateAngle=0 || rotateAngle=90 || rotateAngle=180 || rotateAngle=270) ? 1 : 0
+    confirmSimpleRotation := isVarEqualTo(rotateAngle, 0, 90, 180, 270)
     If (confirmSimpleRotation=1)
     {
        imgFoperation := (rotateAngle=90) ? 1 : 0
@@ -62358,7 +62865,7 @@ OpenGitHub() {
         msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening the URL:`n" %thisURL%, 0, 0, "error")
 }
 
-dummyDrawViewportHelpMap() {
+MenuDrawViewportHelpMap() {
    SetTimer, RemoveTooltip, Off
    lastOSDtooltipInvoked := A_TickCount
    SetTimer, drawViewportHelpMap, -100
@@ -62468,7 +62975,7 @@ ShowContextualHelp() {
 
       OutputVar := StrReplace(OutputVar, ": " appTitle)
       If (imgEditPanelOpened=1 && IMGlargerViewPort=1)
-         moreInfo .= "`nHold Space and click to pan image"
+         moreInfo .= "`nHold the Space key and left-click to pan the image"
       msgu := "Current tool: " OutputVar moreInfo
    }
    
@@ -62890,7 +63397,7 @@ PanelFindDupes(dummy:=0) {
     Gui, Add, Text, x+15 y+15 Section, Filter the results and data collection with a given string:
     Gui, Add, Edit, xp+15 y+7 wp-30 -multi limit12345 gUIeditsGenericAllowCtrlBksp vdupesStringFilter, % dupesStringFilter
     Gui, Add, Button, x+1 hp w35 gUIstringEditFilterErase hwndhBtnFilterRem, &X
-    AddTooltip2Ctrl(hBtnFilterRem, "Remove list filter",, uiUseDarkMode)
+    ToolTip2ctrl(hBtnFilterRem, "Remove list filter")
 
     Gui, Add, DropDownList, xs+15 y+7 w%btnWid% gupdateUIFiltersPanel AltSubmit Choose%userFilterStringPos% vuserFilterStringPos, Anywhere|Begins with|Ends with
     Gui, Add, DropDownList, x+2 w%btnWid% gupdateUIFiltersPanel AltSubmit Choose%userFilterWhat% vuserFilterWhat, Full path|Folder path|File name
@@ -63588,9 +64095,11 @@ PanelJpegPerformOperation() {
           Gui, Add, Button, xs y+10 h%thisBtnHeight% w%btnWid% gBTNautoCropRealtime, &Auto-crop selection
           Gui, Add, Button, x+5 hp w%btnWid% gPanelImgAutoCrop, &Configure auto-crop
        }
-       Gui, Add, Button, xs+0 y+25 h%thisBtnHeight% w35 gPreviousPicture, <<
-       Gui, Add, Button, x+5 hp wp gNextPicture, >>
+       Gui, Add, Button, xs+0 y+25 h%thisBtnHeight% w35 gPreviousPicture +hwndhBtnPrevImg, <<
+       Gui, Add, Button, x+5 hp wp gNextPicture +hwndhBtnNextImg, >>
        Gui, Add, Button, x+5 hp w%btnWid% Default gBtnPerformJpegOp vmainBtnACT, &Perform operation
+       ToolTip2ctrl(hBtnNextImg, "Next image")
+       ToolTip2ctrl(hBtnPrevImg, "Previous image")
     } Else Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w%btnWid% Default gBtnPerformJpegOp, &Perform operation
  
     Gui, Add, Button, x+5 hp w80 gBtnCloseWindow, C&lose
@@ -63664,7 +64173,7 @@ BtnPerformJpegOp(dummy:=0) {
 }
 
 reactivatemainBtnACT() {
-    If (AnyWindowOpen=12 || AnyWindowOpen=18 || AnyWindowOpen=17)
+    If isVarEqualTo(AnyWindowOpen, 12, 18, 17)
     {
        If (imageLoading=1)
           SetTimer, reactivatemainBtnACT, -600
@@ -63865,21 +64374,36 @@ selectGivenPanelTab(ot) {
    UItriggerBrushUpdate("noPreview", 5)
 }
 
+PanelColorsAdjusterImage() {
+   coreColorsAdjusterWindow("img")
+}
+
 PanelColorsAdjusterWindow() {
+   coreColorsAdjusterWindow("vp")
+}
+
+coreColorsAdjusterWindow(modus:=0) {
     Global sliderBright, sliderContrst, sliderSatu, realTimePreview, infolummyAdjust, uiIMGresizingMode
          , infoBright, infoContrst, infoSatu, BtnLumPlus, BtnLumMin, BtnFlipH, infoZatAdjust, UIvpImgAlignCenter
          , BtnGammPlus, BtnGammMin, BtnSatPlus, BtnSatMin, ResizeModeDL, BtnFlipV, infohueAdjust
          , infoRGBchnls, RGBcbList := "-3.0|-2.0|-1.5|-1.0|-0.9|-0.8|-0.7|-0.6|-0.5|-0.4|-0.3|-0.2|-0.1|0.0|0.1|0.2|0.3|0.4|0.5|0.6|0.7|0.8|0.9|1.0|1.5|2.0|3.0"
-         , infoRealGammos, infoThreshold, UIimgThreshold, UIrealGammos, infoImgRotation
+         , infoRealGammos, infoThreshold, UIimgThreshold, UIrealGammos, infoImgRotation, uiForceNoColorMatrix
 
     openingPanelNow := 1
-    If !(thisBtnHeight := createSettingsGUI(10, A_ThisFunc, 1, 1))
+    idu := (modus="img") ? 74 : 10
+    thisFuncu := (idu=10) ? A_ThisFunc : "PanelColorsAdjusterImage"
+    If !(thisBtnHeight := createSettingsGUI(idu, thisFuncu, 1, 1))
        Return
+
+    wasVPfxBefore := (imgFxMode>1) ? 1 : 0
+    If (idu=74 && editingSelectionNow!=1)
+       ToggleEditImgSelection()
 
     setImageLoading()
     showTOOLtip("Opening colors adjustments panel, please wait")
     ForceNoColorMatrix := 0
-    If (usrColorDepth=0)
+    uiForceNoColorMatrix := 1
+    If !usrColorDepth
        usrColorDepth := 1
 
     btnWid := 100
@@ -63893,36 +64417,41 @@ PanelColorsAdjusterWindow() {
        txtWid := txtWid + 135
        Gui, Font, s%LargeUIfontValue%
     }
+    ml := (PrefsLargeFonts=1) ? 85 : 60
+    zml := ml//2
 
     UIimgThreshold := imgThreshold*100
     UIrealGammos := (realGammos<=1.001) ? realGammos*200 : ((realGammos+5)*100)/3
     UIvpImgAlignCenter := (imageAligned=5) ? 1 : 0
-    Gui, Add, Tab3, gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Color matrix|More adjustments|Other options
+    moru := (idu=10) ? "|Other options" : ""
+    Gui, Add, Tab3, gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Color matrix|More adjustments%moru%
     Gui, Tab, 1 ; general
     Gui, Add, DropDownList, x+15 y+15 Section w%txtWid% gUpdateUIadjustVPcolors AltSubmit Choose%imgFxMode% vimgFxMode, Original image colors|Personalized colors|Auto-adjusted colors|Grayscale|Red channel|Green channel|Blue channel|Alpha channel|Inverted colors|Sepia
     Gui, Add, DropDownList, xs y+5 w%txtWid% gUpdateUIadjustVPcolors AltSubmit Choose%autoAdjustMode% vAutoAdjustMode, Adaptive mixed mode|Increase brightness|Increase contrast
-    Gui, Add, ComboBox, x+1 w90 gUpdateUIadjustVPcolors vusrAdaptiveThreshold, -2000|-100|-50|-2|1|2|50|1000|2000|%usrAdaptiveThreshold%||
+    Gui, Add, ComboBox, x+1 w%ml% gUpdateUIadjustVPcolors vusrAdaptiveThreshold, -2000|-100|-50|-2|1|2|50|1000|2000|%usrAdaptiveThreshold%||
     Gui, Add, Checkbox, xs y+2 w%txtWid% gUpdateUIadjustVPcolors Checked%doSatAdjusts% vdoSatAdjusts, Auto-adjust image saturation level
-    Gui, Add, Checkbox, x+5 w90 gUpdateUIadjustVPcolors Checked%bwDithering% vbwDithering, B/W
+    If (idu=10)
+       Gui, Add, Checkbox, x+5 w%ml% gUpdateUIadjustVPcolors Checked%bwDithering% vbwDithering, B/W
     Gui, Add, Text, xs y+8 w%txtWid% gBtnResetBrightness vinfoBright +TabStop, Brightness: ----
-    Gui, Add, Slider, Center y+5 AltSubmit ToolTip NoTicks w%slideWid% gUpdateUIadjustVPcolors vsliderBright Range-100-100, 1
-    Gui, Add, Button, x+1 hp w45 gBtnChangeLumPlus vBtnLumPlus, +
-    Gui, Add, Button, x+1 hp wp gBtnChangeLumMin vBtnLumMin, -
+    Gui, Add, Slider, Center y+5 AltSubmit NoTicks w%slideWid% gUpdateUIadjustVPcolors vsliderBright Range-100-100, 1
+    Gui, Add, Button, x+1 hp w%zml% gBtnChangeLumMin vBtnLumMin, -
+    Gui, Add, Button, x+1 hp wp gBtnChangeLumPlus vBtnLumPlus, +
     Gui, Add, Text, xs y+2 w%txtWid% gBtnResetContrast vinfoContrst +TabStop, Contrast: ----
-    Gui, Add, Slider, Center y+1 AltSubmit ToolTip NoTicks w%slideWid% gUpdateUIadjustVPcolors vsliderContrst Range-100-100, 1
-    Gui, Add, Button, x+1 hp w45 gBtnChangeGammPlus vBtnGammPlus, -
+    Gui, Add, Slider, Center y+1 AltSubmit NoTicks w%slideWid% gUpdateUIadjustVPcolors vsliderContrst Range-100-100, 1
+    Gui, Add, Button, x+1 hp w%zml% gBtnChangeGammPlus vBtnGammPlus, -
     Gui, Add, Button, x+1 hp wp gBtnChangeGammMin vBtnGammMin, +
     Gui, Add, Text, xs y+2 w%txtWid% gBtnResetSaturation vinfoSatu +TabStop, Saturation: ----
-    Gui, Add, Slider, Center y+5 AltSubmit ToolTip NoTicks w%slideWid% gUpdateUIadjustVPcolors vsliderSatu Range-100-100, 1
-    Gui, Add, Button, x+1 hp w45 gBtnChangeSatPlus vBtnSatPlus, +
-    Gui, Add, Button, x+1 hp w45 gBtnChangeSatMin vBtnSatMin, -
+    Gui, Add, Slider, Center y+5 AltSubmit NoTicks w%slideWid% gUpdateUIadjustVPcolors vsliderSatu Range-100-100, 1
+    Gui, Add, Button, x+1 hp w%zml% gBtnChangeSatMin vBtnSatMin, -
+    Gui, Add, Button, x+1 hp wp gBtnChangeSatPlus vBtnSatPlus, +
     Gui, Add, Text, xs y+2 w%slide2Wid% gBtnResetRealGamma vinfoRealGammos +TabStop, Gamma: ----
     Gui, Add, Text, x+5 w%slide2Wid% gBtnResetThreshold vinfoThreshold +TabStop, Threshold: ----
-    Gui, Add, Slider, Center xs y+2 AltSubmit NoTicks ToolTip w%slide2Wid% gUpdateUIadjustVPcolors vUIrealGammos Range1-500, % UIrealGammos
-    Gui, Add, Slider, Center x+5 AltSubmit NoTicks ToolTip w%slide2Wid% gUpdateUIadjustVPcolors vUIimgThreshold Range0-100, % UIimgThreshold
+    Gui, Add, Slider, Center xs y+2 AltSubmit NoTicks w%slide2Wid% gUpdateUIadjustVPcolors vUIrealGammos Range1-500, % UIrealGammos
+    Gui, Add, Slider, Center x+5 AltSubmit NoTicks w%slide2Wid% gUpdateUIadjustVPcolors vUIimgThreshold Range0-100, % UIimgThreshold
     ; Gui, Add, Checkbox, xs y+15 gUpdateUIadjustVPcolors Checked%realTimePreview% vrealTimePreview, Update image in real time
+    tml := zml + 15
     Gui, Add, Text, xs y+8 gBtnResetCHNdec vinfoRGBchnls +TabStop, RGBA channels balance:
-    Gui, Add, ComboBox, x+5 w65 gUpdateUIadjustVPcolors vchnRdecalage, %RGBcbList%|%chnRdecalage%||
+    Gui, Add, ComboBox, x+5 w%tml% gUpdateUIadjustVPcolors vchnRdecalage, %RGBcbList%|%chnRdecalage%||
     Gui, Add, ComboBox, x+5 wp gUpdateUIadjustVPcolors vchnGdecalage, %RGBcbList%|%chnGdecalage%||
     Gui, Add, ComboBox, x+5 wp gUpdateUIadjustVPcolors vchnBdecalage, %RGBcbList%|%chnBdecalage%||
     Gui, Add, ComboBox, x+5 wp gUpdateUIadjustVPcolors vIntensityAlphaChannel, 1|2|3|4|5|6|7|8|9|10|15|20|25|30|%IntensityAlphaChannel%||
@@ -63934,50 +64463,95 @@ PanelColorsAdjusterWindow() {
     Gui, Add, DropDownList, x+2 wp gUpdateUIadjustVPcolors AltSubmit Choose%uiColorCurveFXchannel% vuiColorCurveFXchannel, Red|Green|Blue|Apply on all channels
 
     Gui, Add, Text, xs y+10 w%slideWid% gBtnResetHue vinfohueAdjust +TabStop, Hue: ----
-    Gui, Add, Slider, Center xs y+2 wp AltSubmit ToolTip gUpdateUIadjustVPcolors vhueAdjust Range-300-300, % hueAdjust
+    Gui, Add, Slider, Center xs y+2 wp AltSubmit NoTicks gUpdateUIadjustVPcolors vhueAdjust Range-300-300, % hueAdjust
     Gui, Add, Text, xs y+10 wp gBtnResetVibrance vinfoZatAdjust +TabStop, Vibrance: ----
-    Gui, Add, Slider, Center xs y+2 wp AltSubmit ToolTip gUpdateUIadjustVPcolors vzatAdjust Range-300-300, % zatAdjust
+    Gui, Add, Slider, Center xs y+2 wp AltSubmit NoTicks gUpdateUIadjustVPcolors vzatAdjust Range-300-300, % zatAdjust
     Gui, Add, Text, xs y+10 wp gBtnResetLummy vinfolummyAdjust +TabStop, Lightness: ----
-    Gui, Add, Slider, Center xs y+2 wp AltSubmit ToolTip gUpdateUIadjustVPcolors vlummyAdjust Range-300-300, % lummyAdjust
+    Gui, Add, Slider, Center xs y+2 wp AltSubmit NoTicks  gUpdateUIadjustVPcolors vlummyAdjust Range-300-300, % lummyAdjust
 
     uiIMGresizingMode := (customZoomAdaptMode>0 && IMGresizingMode=4) ? 5 + customZoomAdaptMode : IMGresizingMode
-    Gui, Tab, 3 ; others
-    Gui, Add, DropDownList, x+15 y+15 Section w%txtWid% gUpdateUIadjustVPcolors AltSubmit Choose%uiIMGresizingMode% vuiIMGresizingMode, Adapt all images to fit window|Adapt only large images into view|Original resolution (100`%)|Custom zoom level|Stretched to window dimensions|Adapt to window width|Adapt to window height
-    Gui, Add, Checkbox, x+5 gUpdateUIadjustVPcolors Checked%UIvpImgAlignCenter% vUIvpImgAlignCenter, Centered
-    Gui, Add, DropDownList, xs y+5 w%txtWid% gUpdateUIadjustVPcolors AltSubmit Choose%usrColorDepth% vusrColorDepth, Simulate color depth|2 bits [4 colors]|3 bits [8 colors]|4 bits [16 colors]|5 bits [32 colors]|6 bits [64 colors]|7 bits [128 colors]|8 bits [256 colors]|16 bits [65536 colors]
-    Gui, Add, Checkbox, x+5 hp gUpdateUIadjustVPcolors Checked%ColorDepthDithering% vColorDepthDithering, Dithering
-    Gui, Add, Text, xs y+10 hp +0x200, Flip viewport:
-    Gui, Add, Checkbox, x+10 +0x1000 hp gUpdateUIadjustVPcolors Checked%FlipImgV% vFlipImgV, vertically
-    Gui, Add, Checkbox, x+5 +0x1000 hp gUpdateUIadjustVPcolors Checked%FlipImgH% vFlipImgH, horizontally
-    Gui, Add, Slider, Center xs y+10 NoTicks ToolTip w%slide2Wid% gUpdateUIadjustVPcolors vvpIMGrotation Range0-360, % Round(vpIMGrotation)
-    Gui, Add, Text, x+10 hp +0x200 w%slide2Wid% gBtnResetRotation vinfoImgRotation +TabStop, Rotation: ----
-    Gui, Add, Text, xs y+10, Display histogram:
-    Gui, Add, DropDownList, x+10 w%btnWid% gUpdateUIadjustVPcolors AltSubmit Choose%showHistogram% vshowHistogram, None|Luminance|Red|Green|Blue|All mixed
-    Gui, Add, DropDownList, x+6 w%btnWid% gUpdateUIadjustVPcolors AltSubmit Choose%histogramMode% vhistogramMode, Lows|Balanced|Peaks
-    Gui, Add, Checkbox, xs y+10 gUpdateUIadjustVPcolors Checked%userimgQuality% vuserimgQuality, High quality image resampling
-    Gui, Add, Checkbox, xs y+10 gUpdateUIadjustVPcolors Checked%usrTextureBGR% vusrTextureBGR, Auto-generated ambiental textured viewport background
-    Gui, Add, Checkbox, xs y+10 gToggleAutoResetImageView Checked%resetImageViewOnChange% vresetImageViewOnChange, Reset all image adjustments on image file change
-    ; Gui, Add, Checkbox, xs y+10 gUpdateUIadjustVPcolors Checked%showHistogram% vshowHistogram, Display the image luminance histogram
-    Gui, Add, Text, xs y+10, TIP: right click on the viewport for more options.
+    If (idu=10)
+    {
+       Gui, Tab, 3 ; others
+       Gui, Add, DropDownList, x+15 y+15 Section w%txtWid% gUpdateUIadjustVPcolors AltSubmit Choose%uiIMGresizingMode% vuiIMGresizingMode, Adapt all images to fit window|Adapt only large images into view|Original resolution (100`%)|Custom zoom level|Stretched to window dimensions|Adapt to window width|Adapt to window height
+       Gui, Add, Checkbox, x+5 gUpdateUIadjustVPcolors Checked%UIvpImgAlignCenter% vUIvpImgAlignCenter, Centered
+       Gui, Add, DropDownList, xs y+5 w%txtWid% gUpdateUIadjustVPcolors AltSubmit Choose%usrColorDepth% vusrColorDepth, Simulate color depth|2 bits [4 colors]|3 bits [8 colors]|4 bits [16 colors]|5 bits [32 colors]|6 bits [64 colors]|7 bits [128 colors]|8 bits [256 colors]|16 bits [65536 colors]
+       Gui, Add, Checkbox, x+5 hp gUpdateUIadjustVPcolors Checked%ColorDepthDithering% vColorDepthDithering, Dithering
+       Gui, Add, Text, xs y+10 hp +0x200, Flip viewport:
+       Gui, Add, Checkbox, x+10 +0x1000 hp gUpdateUIadjustVPcolors Checked%FlipImgV% vFlipImgV, vertically
+       Gui, Add, Checkbox, x+5 +0x1000 hp gUpdateUIadjustVPcolors Checked%FlipImgH% vFlipImgH, horizontally
+       Gui, Add, Slider, Center xs y+10 NoTicks ToolTip w%slide2Wid% gUpdateUIadjustVPcolors vvpIMGrotation Range0-360, % Round(vpIMGrotation)
+       Gui, Add, Text, x+10 hp +0x200 w%slide2Wid% gBtnResetRotation vinfoImgRotation +TabStop, Rotation: ----
+       Gui, Add, Text, xs y+10, Display histogram:
+       Gui, Add, DropDownList, x+10 w%btnWid% gUpdateUIadjustVPcolors AltSubmit Choose%showHistogram% vshowHistogram, None|Luminance|Red|Green|Blue|All mixed
+       Gui, Add, DropDownList, x+6 w%btnWid% gUpdateUIadjustVPcolors AltSubmit Choose%histogramMode% vhistogramMode, Lows|Balanced|Peaks
+       Gui, Add, Checkbox, xs y+10 gUpdateUIadjustVPcolors Checked%userimgQuality% vuserimgQuality, High quality image resampling
+       Gui, Add, Checkbox, xs y+10 gUpdateUIadjustVPcolors Checked%usrTextureBGR% vusrTextureBGR, Auto-generated ambiental textured viewport background
+       Gui, Add, Checkbox, xs y+10 gToggleAutoResetImageView Checked%resetImageViewOnChange% vresetImageViewOnChange, Reset all image adjustments on image file change
+       ; Gui, Add, Checkbox, xs y+10 gUpdateUIadjustVPcolors Checked%showHistogram% vshowHistogram, Display the image luminance histogram
+       Gui, Add, Text, xs y+10, TIP: right click on the viewport for more options.
+    } Else
+    {
+       thisOpacity := Round((EraseAreaOpacity / 255) * 100)
+       Gui, Add, Text, xs y+1 w%slideWid% hp +0x200 vinfoEraseOpacity gBTNresetEraseOpacity +TabStop, Opacity: %thisOpacity%`%
+       Gui, Add, Slider, Center xp y+5 wp NoTicks AltSubmit gUpdateUIadjustVPcolors vEraseAreaOpacity Range5-255, % EraseAreaOpacity
+
+       sml := (PrefsLargeFonts=1) ? 20 : 5
+       Gui, Add, DropDownList, xs y+5 w%slide3Wid% gUpdateUIadjustVPcolors AltSubmit Choose%DesaturateAreaLevels% vDesaturateAreaLevels, Simulate color depth|2 bits [4 colors]|3 bits [8 colors]|4 bits [16 colors]|5 bits [32 colors]|6 bits [64 colors]|7 bits [128 colors]|8 bits [256 colors]|16 bits [65536 colors]
+       Gui, Add, Checkbox, x+%sml% hp gUpdateUIadjustVPcolors Checked%DesaturateAreaDither% vDesaturateAreaDither, Dithering
+       Gui, Add, Checkbox, xs y+5 hp Checked%EraseAreaInvert% vEraseAreaInvert gUpdateUIadjustVPcolors, &Invert selection area
+       Gui, Add, Checkbox, x+15 Checked%EraseAreaUseAlpha% vEraseAreaUseAlpha gUpdateUIadjustVPcolors, Apply alpha mas&k
+    }
 
     Gui, Tab
-    Gui, Add, Button, xs-10 y+15 h%thisBtnHeight% w35 gBtnPrevImg, <<
-    Gui, Add, Button, x+5 hp wp gBtnNextImg, >>
-    Gui, Add, Button, x+5 hp wp hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-    AddTooltip2Ctrl(hBtnCollapse, "Collapse panel [F11]",, uiUseDarkMode)
+    jk := (PrefsLargeFonts=1) ? 82 : 50
+    If (idu=10)
+    {
+       Gui, Add, Button, xs-10 y+15 h%thisBtnHeight% w35 gBtnPrevImg +hwndhBtnPrevImg, <<
+       Gui, Add, Button, x+5 hp wp gBtnNextImg +hwndhBtnNextImg, >>
+       Gui, Add, Button, x+5 hp wp hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
+       Gui, Add, Button, x+5 hp w%jk% Default gBtnCloseWindow, &Close
+       ToolTip2ctrl(hBtnNextImg, "Next image")
+       ToolTip2ctrl(hBtnPrevImg, "Previous image")
+    } Else
+    {
+       Gui, Add, Button, xs-10 y+15 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
+       Gui, Add, Button, x+5 hp w%jk% gapplyIMGeditFunction Default, &Apply
+       Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Close
+       dummyTimerDelayiedImageDisplay(150)
+    }
+
+    ToolTip2ctrl(hBtnCollapse, "Collapse panel [F11]")
     ; Gui, Add, Button, x+5 hp w%btnWid% gCopyImage2clip, &Copy to clipboard
-    Gui, Add, Button, x+5 hp w%btnWid% gBtnSaveIMGadjustPanel, &Save or copy
-    Gui, Add, Button, x+5 hp wp-25 gBtnResetImageView, &Reset all
-    Gui, Add, Button, x+5 hp w2 gBtnCloseWindow, &Close
+    ; Gui, Add, Button, x+5 hp wp gBtnSaveIMGadjustPanel, &Save or copy
+    Gui, Add, Button, x+5 hp wp+15 gBtnResetImageView, &Reset all
+    Gui, Add, Checkbox, x+5 hp gBtnToggleNoColorsFX Checked%uiForceNoColorMatrix% vuiForceNoColorMatrix, Live preview
+    If (idu=74)
+       Gui, Add, Checkbox, xm+0 y+5 Checked%closeEditPanelOnApply% vcloseEditPanelOnApply gToggleClosePanelApply, Close window after «Apply»
     ; Gui, Add, Button, x+5 hp w80 Default gBtnCloseWindow, C&lose
+    titlu := (idu=10) ? "Adjust viewport image view: " : "Adjust image colors: "
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
-    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Adjust viewport image view: " appTitle, winPos)
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, titlu appTitle, winPos)
     Sleep, 1
     updatePanelColorsInfo()
     updatePanelColorSliderz()
     SetTimer, resetOpeningPanel, -300
     SetTimer, RemoveTooltip, -100
     SetTimer, ResetImgLoadStatus, -50
+}
+
+ToolTip2ctrl(hwnd, msg) {
+    Return AddTooltip2Ctrl(hwnd, msg,, uiUseDarkMode, PrefsLargeFonts)
+}
+
+BtnToggleNoColorsFX() {
+   ; Gui, SettingsGUIA: Default
+   ; SoundBeep 
+   ForceNoColorMatrix := !ForceNoColorMatrix
+   ; GuiControlGet, uiForceNoColorMatrix
+   uiForceNoColorMatrix := !ForceNoColorMatrix
+   GuiControl, SettingsGUIA:, uiForceNoColorMatrix, % uiForceNoColorMatrix
+   dummyTimerDelayiedImageDisplay(50)
 }
 
 resetOpeningPanel() {
@@ -64057,7 +64631,7 @@ BtnResetCHNdec() {
   GuiControl, SettingsGUIA: Choose, chnRdecalage, 14
   GuiControl, SettingsGUIA: Choose, chnGdecalage, 14
   GuiControl, SettingsGUIA: Choose, chnBdecalage, 14
-  GuiControl, SettingsGUIA: Choose, IntensityAlphaChannel, 5
+  GuiControl, SettingsGUIA: Choose, IntensityAlphaChannel, 1
   INIaction(1, "chnRdecalage", "General")
   INIaction(1, "chnGdecalage", "General")
   INIaction(1, "chnBdecalage", "General")
@@ -64118,12 +64692,12 @@ updatePanelColorSliderz() {
       Return
    }
 
-   If (AnyWindowOpen!=10)
+   If (AnyWindowOpen!=10 && AnyWindowOpen!=74)
       Return
 
    ; GuiControlGet, specialColorFXmode, SettingsGUIA:, specialColorFXmode
    Gui, SettingsGUIA: Default
-   If (imgFxMode=1 || imgFxMode=2 || imgFxMode=3)
+   If isInRange(imgFxMode, 1, 3)
    {
       infoSliderBright := (lumosAdjust>1) ? Floor((lumosAdjust - 1)/14*100) : - Floor((1 - lumosAdjust)*100)
       infoSliderContrst := (GammosAdjust<0) ? Floor(Abs(GammosAdjust)/15*100) : - Floor((Abs(GammosAdjust))*100)
@@ -64142,13 +64716,14 @@ updatePanelColorSliderz() {
       GuiControl, SettingsGUIA:, sliderSatu, 0
    }
 
-   GuiControl, SettingsGUIA:, UIvpImgAlignCenter, % (imageAligned=5) ? 1 : 0
+   If (AnyWindowOpen=10)
+      GuiControl, SettingsGUIA:, UIvpImgAlignCenter, % (imageAligned=5) ? 1 : 0
    lastInvoked := A_TickCount
 }
 
 updatePanelColorsInfo() {
    Static colorzFXinfoz := 0, colorzFXminz := 0, colorzFXmaxz := 0, lastInvoked := 1
-   If (AnyWindowOpen!=10)
+   If (AnyWindowOpen!=10 && AnyWindowOpen!=74)
       Return
 
    If (A_TickCount - lastInvoked < 100)
@@ -64188,8 +64763,10 @@ updatePanelColorsInfo() {
 
    GuiControlGet, specialColorFXmode, SettingsGUIA:, specialColorFXmode
    GuiControlGet, imgFxMode, SettingsGUIA:, imgFxMode
-   GuiControlGet, uiIMGresizingMode, SettingsGUIA:, uiIMGresizingMode
    GuiControlGet, bwDithering, SettingsGUIA:, bwDithering
+   If (AnyWindowOpen=10)
+      GuiControlGet, uiIMGresizingMode, SettingsGUIA:, uiIMGresizingMode
+
    thisMinA := colorzFXminz[specialColorFXmode, 1]
    thisMinB := colorzFXminz[specialColorFXmode, 2]
    thisMinC := colorzFXminz[specialColorFXmode, 3]
@@ -64213,32 +64790,35 @@ updatePanelColorsInfo() {
    infolumosAdjust := (imgFxMode=4) ? Round(lumosGrayAdjust, 3) : Round(lumosAdjust, 3)
    infoGammosAdjust := (imgFxMode=4) ? Round(GammosGrayAdjust, 3) : Round(GammosAdjust, 3)
    infoSatAdjust := Round(satAdjust, 3)
-   infoZoom := Round(zoomLevel*100)
    GuiControl, SettingsGUIA:, infoBright, % "Brightness: " infolumosAdjust
    GuiControl, SettingsGUIA:, infoContrst, % "Contrast: " infoGammosAdjust
    GuiControl, SettingsGUIA:, infoSatu, % "Saturation: " infoSatAdjust
    GuiControl, SettingsGUIA:, infoRealGammos, % "Gamma: " realGammos
    GuiControl, SettingsGUIA:, infoThreshold, % "Threshold: " imgThreshold
-   GuiControl, SettingsGUIA:, infoImgRotation, % "Image rotation: " vpIMGrotation "° "
 
    GuiControl, SettingsGUIA:, infohueAdjust, % colorzFXinfoz[specialColorFXmode, 1] ": " hueAdjust
    GuiControl, SettingsGUIA:, infoZatAdjust, % colorzFXinfoz[specialColorFXmode, 2] ": " zatAdjust
    GuiControl, SettingsGUIA:, infoLummyAdjust, % colorzFXinfoz[specialColorFXmode, 3] ": " lummyAdjust
 
-   act := (vpIMGrotation=0 || vpIMGrotation=90 || vpIMGrotation=180 || vpIMGrotation=270) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
-   GuiControl, % act, usrTextureBGR
+   If (AnyWindowOpen=10)
+   {
+      GuiControl, SettingsGUIA:, infoImgRotation, % "Image rotation: " vpIMGrotation "° "
+      act := isVarEqualTo(vpIMGrotation, 0, 90, 180, 270) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+      GuiControl, % act, usrTextureBGR
+
+      act :=  (IMGresizingMode=5) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
+      GuiControl, % act, usrTextureBGR
+      GuiControl, % act, UIvpImgAlignCenter
+   }
+
    act := (usrColorDepth>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % act, ColorDepthDithering
 
    act := (IMGresizingMode=4) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
-   act := (imgFxMode=2) || (imgFxMode=4 && o_bwDithering=0) || (imgFxMode=9) || (imgFxMode=10) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   act := isVarEqualTo(imgFxMode, 2, 9, 10) || (imgFxMode=4 && o_bwDithering=0) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % act, infoRealGammos
    GuiControl, % act, UIrealGammos
-
-   act :=  (IMGresizingMode=5) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
-   GuiControl, % act, usrTextureBGR
-   GuiControl, % act, UIvpImgAlignCenter
 
    act := (imgFxMode=2) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    If (imgFxMode=4 && o_bwDithering=0)
@@ -64275,7 +64855,7 @@ updatePanelColorsInfo() {
    act := (imgFxMode=4) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % act, bwDithering
 
-   act := (imgFxMode=2 || imgFxMode=3 || imgFxMode=4 || imgFxMode=9 || imgFxMode=10) && (o_bwDithering=0) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   act := isVarEqualTo(imgFxMode, 2, 3, 4, 9, 10) && (o_bwDithering=0) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % act, zatAdjust
    GuiControl, % act, infoZatAdjust
    GuiControl, % act, hueAdjust
@@ -64339,30 +64919,48 @@ updatePanelColorsInfo() {
 
 btnResetImageView() {
   ; GuiControlGet, realTimePreview
-   If (AnyWindowOpen!=10)
-      Return
+  If (AnyWindowOpen!=10 && AnyWindowOpen!=74)
+     Return
 
   Gui, SettingsGUIA: Default
   ForceNoColorMatrix := 0
+  GuiControl, SettingsGUIA: , uiForceNoColorMatrix, 1
   GuiControl, SettingsGUIA: Choose, imgFxMode, 1
-  GuiControl, SettingsGUIA: Choose, usrColorDepth, 1
   GuiControl, SettingsGUIA: Choose, usrAdaptiveThreshold, 5
   GuiControl, SettingsGUIA: Choose, chnRdecalage, 14
   GuiControl, SettingsGUIA: Choose, chnGdecalage, 14
   GuiControl, SettingsGUIA: Choose, chnBdecalage, 14
-  GuiControl, SettingsGUIA: Choose, IntensityAlphaChannel, 5
-  GuiControl, SettingsGUIA: Choose, uiIMGresizingMode, 1
   GuiControl, SettingsGUIA: Choose, specialColorFXmode, 1
-  GuiControl, SettingsGUIA:, bwDithering, 0
-  ColorDepthDithering := usrColorDepth := IMGresizingMode := imgFxMode := satAdjust := lumosAdjust := lumosGrayAdjust := specialColorFXmode := IntensityAlphaChannel := 1
-  vpIMGrotation := zatAdjust := hueAdjust := GammosAdjust := GammosGrayAdjust := 0
+  If (AnyWindowOpen=10)
+  {
+     usrColorDepth := IMGresizingMode := ColorDepthDithering := 1
+     FlipImgV := FlipImgH := usrTextureBGR := vpIMGrotation := bwDithering := 0
+     GuiControl, SettingsGUIA: Choose, usrColorDepth, 1
+     GuiControl, SettingsGUIA: Choose, uiIMGresizingMode, 1
+     GuiControl, SettingsGUIA:, bwDithering, 0
+     GuiControl, SettingsGUIA:, ColorDepthDithering, 1
+     GuiControl, SettingsGUIA:, vpIMGrotation, 0
+     GuiControl, SettingsGUIA:, usrTextureBGR, 0
+     GuiControl, SettingsGUIA:, FlipImgV, 0
+     GuiControl, SettingsGUIA:, FlipImgH, 0
+  } Else If (AnyWindowOpen=74)
+  {
+     EraseAreaOpacity := 255
+     DesaturateAreaLevels := 1
+     GuiControl, SettingsGUIA: Choose, DesaturateAreaLevels, 1
+     GuiControl, SettingsGUIA:, EraseAreaOpacity, 255
+  }
+
+  imgFxMode := satAdjust := lumosAdjust := lumosGrayAdjust := specialColorFXmode := IntensityAlphaChannel := 1
+  lummyAdjust := zatAdjust := hueAdjust := GammosAdjust := GammosGrayAdjust := 0
   chnRdecalage := chnGdecalage := chnBdecalage := 0.0
   updatePanelColorsInfo()
   UIrealGammos := 200
   realGammos := usrAdaptiveThreshold := infoBright := infoSatu := 1
-  bwDithering := infoContrst := sliderSatu := sliderBright := sliderContrst := 0
-  FlipImgV := FlipImgH := usrTextureBGR := vpIMGrotation := UIimgThreshold := imgThreshold := 0
+  infoContrst := sliderSatu := sliderBright := sliderContrst := 0
+  UIimgThreshold := imgThreshold := 0
 
+  GuiControl, SettingsGUIA: Choose, IntensityAlphaChannel, 1
   GuiControl, SettingsGUIA:, infoBright, Brightness: 1.009
   GuiControl, SettingsGUIA:, infoContrst, Contrast: 0.000
   GuiControl, SettingsGUIA:, infoSatu, Saturation: 1.000
@@ -64370,16 +64968,13 @@ btnResetImageView() {
   GuiControl, SettingsGUIA:, infoRealGammos, Gamma: 1.00
   GuiControl, SettingsGUIA:, hueAdjust, 0
   GuiControl, SettingsGUIA:, zatAdjust, 0
+  GuiControl, SettingsGUIA:, lummyAdjust, 0
   GuiControl, SettingsGUIA:, UIrealGammos, 200
   GuiControl, SettingsGUIA:, UIimgThreshold, 0
   GuiControl, SettingsGUIA:, sliderSatu, 0
   GuiControl, SettingsGUIA:, sliderBright, 0
   GuiControl, SettingsGUIA:, sliderContrst, 0
-  GuiControl, SettingsGUIA:, vpIMGrotation, 0
-  GuiControl, SettingsGUIA:, usrTextureBGR, 0
-  GuiControl, SettingsGUIA:, FlipImgV, 0
-  GuiControl, SettingsGUIA:, FlipImgH, 0
-  GuiControl, SettingsGUIA:, ColorDepthDithering, 1
+
   interfaceThread.ahkassign("IMGresizingMode", IMGresizingMode)
   defineColorDepth()
   SetTimer, WriteSettingsColorAdjustments, -90
@@ -64388,7 +64983,7 @@ btnResetImageView() {
 
 UpdateUIadjustVPcolors(dummy:=0) {
    Critical, On
-   If (AnyWindowOpen!=10)
+   If (AnyWindowOpen!=10 && AnyWindowOpen!=74)
       Return
 
    Gui, SettingsGUIA: Default
@@ -64396,14 +64991,9 @@ UpdateUIadjustVPcolors(dummy:=0) {
    GuiControlGet, usrAdaptiveThreshold
    GuiControlGet, doSatAdjusts
    GuiControlGet, autoAdjustMode
-   GuiControlGet, showHistogram
    GuiControlGet, sliderBright
    GuiControlGet, sliderContrst
    GuiControlGet, sliderSatu
-   GuiControlGet, bwDithering
-   GuiControlGet, UIvpImgAlignCenter
-   GuiControlGet, FlipImgV
-   GuiControlGet, FlipImgH
    GuiControlGet, chnRdecalage
    GuiControlGet, chnGdecalage
    GuiControlGet, chnBdecalage
@@ -64416,15 +65006,35 @@ UpdateUIadjustVPcolors(dummy:=0) {
    GuiControlGet, specialColorFXmode
    GuiControlGet, UIimgThreshold
    GuiControlGet, UIrealGammos
-   GuiControlGet, userimgQuality
-   GuiControlGet, vpIMGrotation
-   GuiControlGet, usrTextureBGR
-   GuiControlGet, usrColorDepth
-   GuiControlGet, ColorDepthDithering
-   GuiControlGet, histogramMode
+   GuiControlGet, uiForceNoColorMatrix
+
+   ForceNoColorMatrix := !uiForceNoColorMatrix
+   If (AnyWindowOpen=10)
+   {
+      GuiControlGet, bwDithering
+      GuiControlGet, usrColorDepth
+      GuiControlGet, ColorDepthDithering
+      GuiControlGet, UIvpImgAlignCenter
+      GuiControlGet, FlipImgV
+      GuiControlGet, FlipImgH
+      GuiControlGet, userimgQuality
+      GuiControlGet, vpIMGrotation
+      GuiControlGet, usrTextureBGR
+      GuiControlGet, histogramMode
+      GuiControlGet, showHistogram
+   } Else
+   {
+      GuiControlGet, EraseAreaInvert
+      GuiControlGet, EraseAreaUseAlpha
+      GuiControlGet, EraseAreaOpacity
+      GuiControlGet, DesaturateAreaLevels
+      GuiControlGet, DesaturateAreaDither
+      thisOpacity := Round((EraseAreaOpacity / 255) * 100)
+      GuiControl, SettingsGUIA:, infoEraseOpacity, Opacity: %thisOpacity%`%
+   }
 
    ; GuiControlGet, realTimePreview
-   If (dummy!="ignore-zoom")
+   If (dummy!="ignore-zoom" && AnyWindowOpen=10)
    {
       GuiControlGet, uiIMGresizingMode, SettingsGUIA:, uiIMGresizingMode
       If (uiIMGresizingMode=3)
@@ -64449,7 +65059,7 @@ UpdateUIadjustVPcolors(dummy:=0) {
    }
 
    defineColorDepth()
-   ForceNoColorMatrix := 0
+   ; ForceNoColorMatrix := 0
    If (vpIMGrotation=1 || vpIMGrotation>358)
       vpIMGrotation := 0
 
@@ -64475,16 +65085,10 @@ UpdateUIadjustVPcolors(dummy:=0) {
       updatePanelColorSliderz()
    }
 
-   If (imgFxMode!=4)
+   If (imgFxMode!=4 && AnyWindowOpen=10)
    {
-      GuiControl, SettingsGUIA:, bwDithering, 0
       bwDithering := 0
-   }
-
-   If (prevvpIMGrotation!=vpIMGrotation)
-   {
-      mustReloadIMG := 1
-      prevvpIMGrotation := vpIMGrotation
+      GuiControl, SettingsGUIA:, bwDithering, 0
    }
 
    updatePanelColorsInfo()
@@ -65954,7 +66558,7 @@ PanelKeywordsDetector() {
     Gui, Add, Checkbox, x+10 hp Checked%LangKeywordsFilter% vLangKeywordsFilter, Dictionary filter (English)
     Gui, Add, Button, x+1 hp w%sml% Default gUIfilterListKeywords, &Apply
     Gui, Add, Button, x+1 hp w35 gUIremKeywordsFilter hwndhBtnFilterRem, &X
-    AddTooltip2Ctrl(hBtnFilterRem, "Remove the filters [Alt+X]",, uiUseDarkMode)
+    ToolTip2ctrl(hBtnFilterRem, "Remove the filters [Alt+X]")
 
     Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% gBtnUiKeywordsLister w%btnWid2% , &Generate list
     Gui, Add, Button, x+5 hp w80 gBtnCloseWindow, &Close
@@ -66266,7 +66870,7 @@ PanelStaticFolderzManager() {
     sml := (PrefsLargeFonts=1) ? 90 : 60
     Gui, Add, Button, x+1 hp w%sml% gUIeditApplyStaticFolderFilter Default, &Apply
     Gui, Add, Button, x+1 hp w35 gUIlvFilterEraseStaticPanel hwndhBtnFilterRem, &X
-    AddTooltip2Ctrl(hBtnFilterRem, "Remove list filter [Alt+X]",, uiUseDarkMode)
+    ToolTip2ctrl(hBtnFilterRem, "Remove list filter [Alt+X]")
     Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w%btnWid2% gBTNupdateSelectedStaticFolder, &Rescan folder(s)
 
     If isUpdateList
@@ -66317,7 +66921,7 @@ PanelReviewSelectedFiles() {
     Gui, Add, Edit, xs y+10 w%edithu% -multi gUIeditsGenericAllowCtrlBksp +hwndhEditField vlistViewReviewFilteru, % listViewReviewFilteru
     Gui, Add, Button, x+1 hp w%btnWid% gUIeditApplyFilterReviewPanel Default, &Apply
     Gui, Add, Button, x+1 hp w35 gUIstringEditFilterErase hwndhBtnFilterRem, &X
-    AddTooltip2Ctrl(hBtnFilterRem, "Remove list filter [Alt+X]",, uiUseDarkMode)
+    ToolTip2ctrl(hBtnFilterRem, "Remove list filter [Alt+X]")
 
     Gui, Add, Button, xs+0 y+15 h%thisBtnHeight% w%btnWid% gBTNreviewApplySelection, &Select
     Gui, Add, Button, x+5 hp wp gBTNreviewRemSelection , &Deselect
@@ -68322,6 +68926,7 @@ SearchAndReplaceThroughIndex(what, replacer, silentus:=0, folderMode:=0) {
               Continue
 
            value := StrReplace(imgPath, what, replacer, affected)
+           value := StrReplace(value, "\\", "\")
            resultedFilesList[A_Index, 1] := value
            If StrLen(filesFilter)>1
               updateMainUnfilteredList(A_Index, 1, value)
@@ -68812,6 +69417,12 @@ PopulateDynamicFolderzList() {
     ResetImgLoadStatus()
 }
 
+uiPanelOpenCloseEvent(modus:=0) {
+    b := (modus=1) ? "|" 0 "|" 0 "|" 0 "|" : "|" imgEditPanelOpened "|" AnyWindowOpen "|" hSetWinGui "|"
+    a := panelWinCollapsed "|" liveDrawingBrushTool b editingSelectionNow "|" maxFilesIndex "|" UserMemBMP "|" undoLevelsRecorded "|" currentFilesListModified "|" lastOtherWinClose "|" IMGresizingMode "|" thumbsDisplaying
+    interfaceThread.ahkPostFunction("PanelOpenCloseEvent", a)
+}
+
 CloseWindow(forceIT:=0, cleanCaches:=1) {
     Critical, on
     If (toolTipGuiCreated=2)
@@ -68826,7 +69437,7 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
     If (isNowFakeWinOpen=1 && AnyWindowOpen)
     {
        isNowFakeWinOpen := AnyWindowOpen := 0
-       interfaceThread.ahkassign("AnyWindowOpen", AnyWindowOpen)
+       uiPanelOpenCloseEvent()
        SetTimer, CloseMsgBox2Win, Delete
        SetTimer, WatchMsgBox2Win, Delete
        MsgBox2Result := "win_closed"
@@ -68853,9 +69464,7 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
        interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
        toggleAlphaPaintingMode()
        Global lastOtherWinClose := A_TickCount
-       interfaceThread.ahkassign("AnyWindowOpen", AnyWindowOpen)
-       interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
-       interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+       uiPanelOpenCloseEvent()
        Return
     }
 
@@ -68863,14 +69472,11 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
        Try WinGetPos, prevSetWinPosX, prevSetWinPosY,,, ahk_id %hSetWinGui%
 
     Global lastOtherWinClose := A_TickCount
-    interfaceThread.ahkassign("AnyWindowOpen", 0)
-    interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
-    forceLiveAlphaPreviewMode := FloodFillSelectionAdj := liveDrawingBrushTool := isNowFakeWinOpen := ForceNoColorMatrix := 0
-    interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+    panelWinCollapsed := forceLiveAlphaPreviewMode := FloodFillSelectionAdj := liveDrawingBrushTool := isNowFakeWinOpen := ForceNoColorMatrix := 0
+    uiPanelOpenCloseEvent(1)
     DestroyGIFuWin()
     Gui, SettingsGUIA: Destroy
     WinActivate, ahk_id %PVhwnd%
-    interfaceThread.ahkassign("imgEditPanelOpened", 0)
     If globalhFIFimg
     {
        ; related to PanelAdjustToneMapping()
@@ -68882,10 +69488,13 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
     If (imgEditPanelOpened=1)
     {
        ; coreDesiredPixFmt := StrLen(UserMemBMP)>2 ? "0x26200A" : "0xE200B" ; 32-ARGB // 32-PARGB
-       If (AnyWindowOpen=64)
+       If (AnyWindowOpen=74 && wasVPfxBefore=0)
+       {
+          imgFxMode := 1
+       } Else If (AnyWindowOpen=64)
+       {
           clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
-
-       If (AnyWindowOpen=23 && editingSelectionNow=1)
+       } Else If (AnyWindowOpen=23 && editingSelectionNow=1)
        {
           If (FillAreaShape<=2)
              EllipseSelectMode := 0
@@ -68901,7 +69510,6 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
        r2 := doLayeredWinUpdate(A_ThisFunc, hGDIthumbsWin, 2NDglHDC)
        editingSelectionNow := prevOpenedWindow[4]
        dummyTimerDelayiedImageDisplay(90)
-       TriggerMenuBarUpdate()
        getImgSelectedAreaEditMode("kill", 1, 1, 1, 1, 1, 1)
        livePreviewInsertTextinArea("kill")
        realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
@@ -68915,13 +69523,15 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
        ; SetTimer, dummyRefreshImgSelectionWindow, -200
     }
 
+    updateUIctrl()
+    TriggerMenuBarUpdate()
     If !testIsDupesList()
        toBeExcludedIndexes := []
 
     If (AnyWindowOpen=6)
        InitialFilterSettingsPanel(0)
 
-    imgEditPanelOpened := AnyWindowOpen := 0
+    hSetWinGui := imgEditPanelOpened := AnyWindowOpen := 0
     createGUItoolbar()
     If (ShowAdvToolbar=1)
        decideIconBTNmainTooler()
@@ -68971,6 +69581,7 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
        }
 
        toolTipGuiCreated := 0
+       interfaceThread.ahkPostFunction("uiAccessUpdateOSDmsg", "-", 0, 0)
        interfaceThread.ahkassign("toolTipGuiCreated", 0)
        clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
        preventKill := 0
@@ -69018,7 +69629,7 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
     If (showInfoBoxHUD>0 && FlipImgH=0 && FlipImgV=0)
     {
        thisBrush := Gdip_BrushCreateSolid("0x20" OSDbgrColor)
-       unitu := lastInfoBoxBMP[1,2] //5
+       unitu := lastInfoBoxBMP[1, 2] // 5
        Loop, 4
           Gdip_FillRectangle(2NDglPG, thisBrush, 0, knobSize, lastInfoBoxBMP[1,1], unitu)
        Loop, 3
@@ -69042,14 +69653,20 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
        Gdip_FillRectangle(2NDglPG, uBrushA, imgW + posXu, posYu, knobSize, imgH)
     }
 
+    omsg := msg "."
     If perc
     {
        percW := Round(mainWidth*perc)
        Gdip_FillRectangle(2NDglPG, pBrushE, percW, 0, mainWidth - percW + 1, knobSize//2)
        Gdip_FillRectangle(2NDglPG, pBrushB, 0, knobSize//2, mainWidth, 3)
        Gdip_FillRectangle(2NDglPG, pBrushD, 0, 0, percW, knobSize//2)
+       omsg .= "`nProgress bar at " Round(perc*100) "%."
     }
 
+    If hudBTNfuncu
+       omsg .= "`nTemporarily clickable area."
+
+    interfaceThread.ahkPostFunction("uiAccessUpdateOSDmsg", omsg, mainWidth, imgH)
     If (hudBTNfuncu && hudBTNtypeFuncu=1)
     {
        Gdip_FillRectangle(2NDglPG, pBrushD, posXu, posYu, knobSize//2, imgH)
@@ -69274,8 +69891,10 @@ PanelImgAutoCrop() {
        GuiControl, Disable, ResizeDestFolder
     }
 
-    Gui, Add, Button, xs y%thisY% h%thisBtnHeight% w35 gBtnPrevImg, <<
-    Gui, Add, Button, x+5 hp wp gBtnNextImg, >>
+    Gui, Add, Button, xs y%thisY% h%thisBtnHeight% w35 gBtnPrevImg +hwndhBtnPrevImg, <<
+    Gui, Add, Button, x+5 hp wp gBtnNextImg +hwndhBtnNextImg, >>
+    ToolTip2ctrl(hBtnNextImg, "Next image")
+    ToolTip2ctrl(hBtnPrevImg, "Previous image")
 
     If (filesElected>1)
     {
@@ -69508,7 +70127,6 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0) {
    If (silentMode=0)
       showTOOLtip("Calculating auto-cropped region`nStep 1 - Y1", 0, 0, 0.1)
 
-   c := StrSplit(c, ",")
    prevR1 := firstR1 := c[1]
    x := y := ToleranceHits := abortImgLoad := 0
    Loop %Height%
@@ -69601,7 +70219,6 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0) {
    Gdip_UnlockBits(pBitmap, BitmapData1)
    Gdip_ImageRotateFlip(pBitmap, 2)
    c := Gdip_GetPixelColor(pBitmap, 1, 1, 2)
-   c := StrSplit(c, ",")
    prevR1 := firstR1 := c[1]
    x := y := ToleranceHits := 0
    E2 := Gdip_LockBits(pBitmap, 0, 0, Width, Height, Stride1, Scan01, BitmapData1)
@@ -70311,8 +70928,10 @@ PanelSimpleResizeRotate(modus:="") {
 
     If (filesElected<2)
     {
-       Gui, Add, Button, xs+0 y+25 h%thisBtnHeight% w35 gPreviousPicture, <<
-       Gui, Add, Button, x+5 hp wp gNextPicture, >>
+       Gui, Add, Button, xs+0 y+25 h%thisBtnHeight% w35 gPreviousPicture +hwndhBtnPrevImg, <<
+       Gui, Add, Button, x+5 hp wp gNextPicture +hwndhBtnNextImg, >>
+       ToolTip2ctrl(hBtnNextImg, "Next image")
+       ToolTip2ctrl(hBtnPrevImg, "Previous image")
        ; Gui, Add, Button, x+5 hp w%btnWid%  gBtnSaveNowSimpleProcessing , &Save image
        Gui, Add, Button, x+5 hp w%btnWid% Default gBtnSaveAsSimpleProcessing vmainBtnACT, &Save image as...
     } Else Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% wp Default gBtnPerformSimpleProcessing, &Perform operations on the files
@@ -72422,7 +73041,7 @@ checkDLLfiles() {
 
 tlbrAddNewIcon(obju, wi, he, IconSpacing, noSpacing, simpleRefresh) {
     Global
-    Static indexBtn := 0, pickoBeat := 0
+    Static indexBtn := 1, pickoBeat := 0
     If (obju[5]="BTNdisabled" && TLBRtwoColumns=0)
        Return
 
@@ -72442,7 +73061,7 @@ tlbrAddNewIcon(obju, wi, he, IconSpacing, noSpacing, simpleRefresh) {
 
     If (noSpacing=1)
     {
-       indexBtn := 0
+       indexBtn := 1
        pickoBeat := 1
        otherz := "x0 y0"
     }
@@ -72461,13 +73080,13 @@ tlbrAddNewIcon(obju, wi, he, IconSpacing, noSpacing, simpleRefresh) {
           tlbrSetImageIcon(icoFile, hwndul, wi, he)
     } Else
     {
-       Gui, OSDguiToolbar: Add, Text, h%he% w%wi% %otherz% BackgroundTrans +0xE vtlbrValueIcon%IndexBtn% +hwndhwndul gtlbrInvokeFunction, Image icon %indexBtn% ; Windows Narrator friendly buttons 
+       Gui, OSDguiToolbar: Add, Text, h%he% w%wi% %otherz% BackgroundTrans +0xE +0x200 vtlbrValueIcon%IndexBtn% +hwndhwndul gtlbrInvokeFunction, icon%IndexBtn% ; Windows Narrator friendly buttons 
        tlbrSetImageIcon(icoFile, hwndul, wi, he)
     }
 
     ; Gui, OSDguiToolbar: Add, Text,  h%he% w%wi% %otherz% BackgroundTrans +0x1000 +0xE, %btnName% ; Windows Narrator friendly buttons 
     ; Gui, OSDguiToolbar: Add, Picture, vtlbrValueIcon%IndexBtn% AltSubmit  +hwndhwndul xp yp hp wp gtlbrInvokeFunction, %mainCompiledPath%\resources\toolbar\%icoFile%.png
-    tlbrIconzList[indexBtn] := [hwndul, icoFile, btnName, actu, indexBtn, actu2, wi, he, paramu, btnID]
+    tlbrIconzList[IndexBtn] := [hwndul, icoFile, btnName, actu, indexBtn, actu2, wi, he, paramu, btnID]
     tlbrIconzList[hwndul] := [hwndul, icoFile, btnName, actu, indexBtn, actu2, wi, he, paramu, btnID]
     tlbrIconzList[btnID] := [hwndul, icoFile, btnName, actu, indexBtn, actu2, wi, he, paramu, btnID]
 }
@@ -72602,7 +73221,7 @@ tlbrInvokeEditMenu() {
    If (!AnyWindowOpen || imgEditPanelOpened=1)
    {
       If (drawingShapeNow=1)
-         createMenuCustomShapeDrawing(0, 0, 0, 0, 0)
+         createContextMenuCustomShapeDrawing(0, 0, 0, 0, 0)
       Else If isNowAlphaPainting()
          BuildMainMenu()
       Else If isImgEditingNow()
@@ -72685,7 +73304,7 @@ updateToolColorsBasedToolbar(newColor, oldColor, ctrlName) {
     If (imgEditPanelOpened!=1 || isImgEditingNow()!=1)
        Return
 
-    If (AnyWindowOpen=64 || AnyWindowOpen=24 || AnyWindowOpen=31 || isNowAlphaPainting())
+    If (isVarEqualTo(AnyWindowOpen, 64, 24, 31) || isNowAlphaPainting())
     {
        GuiControl, SettingsGUIA: +Background%newColor%, % ctrlName
     } Else If (AnyWindowOpen=66)
@@ -73076,10 +73695,6 @@ tlbrSelAllVectorPoints() {
     Else
        MenuSelNoVectorPoints()
     lastState := !lastState
-
-    friendly := (lastState!=1) ? "Selected" : "Deselected"
-    showTOOLtip(friendly " all points: " groupDigits(customShapePoints.count()))
-    SetTimer, RemoveTooltip, % -msgDisplayTime//2
 }
 
 tlbrViewPortGridu() {
@@ -73211,7 +73826,12 @@ tlbrOpenVPcolors(){
    Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
       PanelSetThumbColumnOptions()
    Else If isImgEditingNow()
-      PanelColorsAdjusterWindow()
+   {
+      If GetKeyState("Alt", "P")
+         PanelColorsAdjusterWindow()
+      Else
+         PanelColorsAdjusterImage()
+   }
 }
 
 tlbrFlipSelectionH() {
@@ -73382,34 +74002,22 @@ tlbrDropSelection() {
 }
 
 tlbrSelectShape() {
-   Static shape := 0, prevHwnd
-   If (isImgEditingNow()=1 && editingSelectionNow=1)
-   {
-      imgLiveEdit := (!AnyWindowOpen) || (HKifs("liveEdit") && (AnyWindowOpen=25 || AnyWindowOpen=10 || AnyWindowOpen=55 || AnyWindowOpen=64 || AnyWindowOpen=66 || AnyWindowOpen=68)) ? 1 : 0
-      If (AnyWindowOpen=31 || AnyWindowOpen=24)
-         toggleLiveEditObject()
-      Else If (AnyWindowOpen=65 || AnyWindowOpen=23)
-         UIcycleFillShapes()
-      Else If imgLiveEdit
-         toggleEllipseSelection()
-   } Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-   {
-      markThisFileNow()
-   } Else If (isImgEditingNow()=1)
-      ToggleEditImgSelection()
-   ; ToolTip, % EllipseSelectMode "=" hwnd "=" paramu , , , 2
+   MenuCycleSelectionShapes()
 }
 
 MenuCycleSelectionShapes() {
    If (isImgEditingNow()=1 && editingSelectionNow=1)
    {
-      imgLiveEdit := (!AnyWindowOpen) || (HKifs("liveEdit") && (AnyWindowOpen=25 || AnyWindowOpen=10 || AnyWindowOpen=55 || AnyWindowOpen=64 || AnyWindowOpen=66 || AnyWindowOpen=68)) ? 1 : 0
-      If (AnyWindowOpen=31 || AnyWindowOpen=24)
+      imgLiveEdit := (!AnyWindowOpen) || (HKifs("liveEdit") && isVarEqualTo(AnyWindowOpen, 10, 25, 55, 64, 66, 68, 74)) ? 1 : 0
+      If isVarEqualTo(AnyWindowOpen, 31, 24)
          toggleLiveEditObject()
-      Else If (AnyWindowOpen=65 || AnyWindowOpen=23)
+      Else If isVarEqualTo(AnyWindowOpen, 65, 23)
          UIcycleFillShapes()
       Else If imgLiveEdit
          toggleEllipseSelection()
+   } Else If (thumbsDisplaying=1 && currentFileIndex>0 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+   {
+      markThisFileNow()
    } Else If (isImgEditingNow()=1)
       ToggleEditImgSelection()
    ; ToolTip, % EllipseSelectMode "=" hwnd "=" paramu , , , 2
@@ -73460,7 +74068,7 @@ decideIconBTNmainTooler() {
    w := tlbrIconzList[thisHwnd, 7]
    h := tlbrIconzList[thisHwnd, 8]
    icoFile := (AnyWindowOpen && imgEditPanelOpened=1 || drawingShapeNow=1) ? "apply-tool" : "go-back"
-   If (AnyWindowOpen=10 || AnyWindowOpen=70 || AnyWindowOpen=64 || AnyWindowOpen=66)
+   If isVarEqualTo(AnyWindowOpen, 10, 64, 66, 70)
       icoFile := "main-tool"
 
    If (icoFile!=initialIcon)
@@ -73749,7 +74357,7 @@ CoreGUItoolbar() {
     handleClrH := (TLBRverticalAlign=1) ? ToolBarBtnWidth : ToolBarBtnWidth + IconSpacing*2
     If (TLBRtwoColumns=1 && !isWelcomeScreenu)
     {
-       handleWidth := handleWidth*2 - IconSpacing
+       handleWidth := handleWidth*2 - IconSpacing*2
        handleClrW := handleWidth - IconSpacing*2
        handleClrH += IconSpacing
        handleHeight := Round(handleHeight*1.5)
@@ -73764,7 +74372,7 @@ CoreGUItoolbar() {
     isTransPanel := (isImgEditingNow() && (AnyWindowOpen=31 || AnyWindowOpen=24)) ? 1 : 0
     totalIconz := (isTransPanel=1) ? 20 : 32
     If isWelcomeScreenu
-       totalIconz := 7
+       totalIconz := 9
     TouchToolbarGUIcreated := 1
     thisState := "a" ToolBarBtnWidth totalIconz TLBRverticalAlign ToolbarScaleFactor TLBRtwoColumns  drawingShapeNow
     simpleRefresh := (thisState=prevState) ? 1 : 0
@@ -73806,13 +74414,13 @@ CoreGUItoolbar() {
        tlbrAddNewIcon(BTNvectSelAll, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
     } Else
     {
-       addAlphaIcons := (AnyWindowOpen=66 || AnyWindowOpen=55 || AnyWindowOpen=25 || isAlphaMaskWindow()) ? 1 : 0
+       addAlphaIcons := (isVarEqualTo(AnyWindowOpen, 74, 66, 55, 25) || isAlphaMaskWindow()) ? 1 : 0
        If (addAlphaIcons=1 && !isNowAlphaPainting())
        {
           tlbrAddNewIcon(BTNalphCapture, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
           tlbrAddNewIcon(BTNalphDiscard, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
           tlbrAddNewIcon(BTNalphInvert, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          If (AnyWindowOpen=66 || AnyWindowOpen=55 || AnyWindowOpen=25)
+          If isVarEqualTo(AnyWindowOpen, 74, 66, 55, 25)
              tlbrAddNewIcon(BTNalphPanel, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
           Else
              tlbrAddNewIcon(BTNalphPaint, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
@@ -73846,7 +74454,7 @@ CoreGUItoolbar() {
           tlbrAddNewIcon(BTNnewImg, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
        }
 
-       If (AnyWindowOpen=23 || AnyWindowOpen=25 || AnyWindowOpen=32 || AnyWindowOpen=30 || AnyWindowOpen=55 || AnyWindowOpen=65)
+       If isVarEqualTo(AnyWindowOpen, 23, 25, 30, 32, 55, 65, 68, 74)
           tlbrAddNewIcon(BTNalignSel, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
        Else If !isWelcomeScreenu
           tlbrAddNewIcon(BTNcrop, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
@@ -73976,7 +74584,7 @@ createGUItoolbar(dummy:=0) {
    isWelcomeScreenu := (isImgEditingNow() || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
    isPaintPanel := (AnyWindowOpen=64) ? 1 : 0
    isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
-   addAlphaIcons := (AnyWindowOpen=66 || AnyWindowOpen=55 || AnyWindowOpen=25) ? 1 : 0
+   addAlphaIcons := isVarEqualTo(AnyWindowOpen, 74, 66, 55, 25) ? 1 : 0
    ToolBarBtnWidth := Round(OSDfontSize*1.5 * ToolbarScaleFactor)
    currState := "a" isTransPanel isWelcomeScreenu addAlphaIcons isNowAlphaPainting() isAlphaMaskWindow() ToolBarBtnWidth TLBRverticalAlign TLBRtwoColumns isPaintPanel thumbsDisplaying drawingShapeNow
    ; msgbox, %currstateSimple%`n%prevStateSimple%
@@ -74026,9 +74634,6 @@ tlbrResetPosition() {
 }
 
 tlbrDecideTooltips(hwnd) {
-   If (ShowToolTipsToolbar!=1)
-      Return
-
    icoFile := tlbrIconzList[hwnd, 2]
    btnID := tlbrIconzList[hwnd, 10]
    f := (markedSelectFile>1) ? "s" : ""
@@ -74044,6 +74649,9 @@ tlbrDecideTooltips(hwnd) {
    {
       friendly := (editingSelectionNow=1) ? "selection area " : ""
       msgu := (thumbsDisplaying=1) ? "L: Copy file" f " to... [C]`nR: Copy file" f " path" f " [Ctrl + Shift + C]" : "L: Copy image " friendly "to clipboard [Ctrl + C]`nR: Copy file" f " path" f " [Ctrl + Shift + C]"
+   } Else If InStr(icoFile, "help")
+   {
+      msgu := "About Quick Picto Viewer v" appVersion
    } Else If InStr(icoFile, "quick-file-acts")
    {
       msgu := "L: Quick file actions settings`nR: Jump to given index [J]"
@@ -74115,7 +74723,7 @@ tlbrDecideTooltips(hwnd) {
    } Else If InStr(icoFile, "eraser")
    {
       keyu := (AnyWindowOpen=64) ? " [R]" : ""
-      msgu := (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) ? "L; Delete file" f " [Delete]`nR: Remove focused index entry [Alt + Delete]" : "L: Eraser - soft brush" keyu
+      msgu := (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) ? "L: Delete file" f " [Delete]`nR: Remove focused index entry [Alt + Delete]" : "L: Eraser - soft brush" keyu
       If (isImgEditingNow()=1 && editingSelectionNow=1)
          msgu .= "`nR: Erase or fade image selected area [Delete]"
       If (isImgEditingNow()=1 && editingSelectionNow=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
@@ -74222,8 +74830,10 @@ tlbrDecideTooltips(hwnd) {
    {
       If (isImgEditingNow()=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
          msgu := "Toggle color adjustments for the image object [U]"
-      Else
+      Else If (thumbsDisplaying=1)
          msgu := "L: Adjust viewport colors and more [U]`nR: Reset viewport adjustments [ \ ]"
+      Else
+         msgu := "L: Adjust image colors [U]`nAlt+L: Adjust viewport colors and more [Shift+U]`nR: Reset viewport adjustments [ \ ]"
    } Else If InStr(icoFile, "transform-img")
    {
       msgu := (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) ? "Import selected image into currently opened one" : "Transform image selected area [Ctrl + T]"
@@ -74431,7 +75041,10 @@ tlbrDecideTooltips(hwnd) {
 }
 
 ResetLbtn() {
-  LbtnDwn := 0
+  If GetKeyState("LButton", "P")
+     SetTimer, ResetLbtn, -60
+  Else
+     LbtnDwn := 0
 }
 
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
@@ -74475,9 +75088,14 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   thisState := "a" OutputVarWin OutputVarControl OutputVarX OutputVarY
   If (okay=1 && thisState!=prevState && OutputVarWin=hQPVtoolbar) && (A_TickCount - zeitSillyPrevent>150)
   {
+     If (wP&0x1)
+     {
+        LbtnDwn := 1
+        SetTimer, ResetLbtn, -55
+     }
      ctrlHover := OutputVarControl
      msgu := tlbrDecideTooltips(ctrlHover)
-     If !msgu
+     If (!msgu && ShowToolTipsToolbar=1)
         interfaceThread.ahkFunction("mouseTurnOFFtooltip", 1)
 
      If ((A_TickCount - lastInvoked > 155) && msgu) ; && (thisPos!=prevPos)
@@ -74485,13 +75103,33 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
         If (thumbsDisplaying!=1)
            dummyRefreshImgSelectionWindow()
         ; isThisWin :=(OutputVarWin=PVhwnd) ? 1 : 0
+        If (imageLoading!=1 && runningLongOperation!=1)
+        {
+           ; WinGetPos, aX, aY,,, ahk_id %ctrlHover%
+           ; interfaceThread.ahkPostFunction("ShowClickHalo", aX, aY, ToolBarBtnWidth, ToolBarBtnWidth, 1, msgu)
+           IndexBtn := tlbrIconzList[ctrlHover, 5] - 1
+           thisHwnd := tlbrIconzList[indexBtn, 1]
+           k := tlbrIconzList[ctrlHover, 11]
+           ; ToolTip, % A_GuiControl "==" A_Gui "==" indexBtn "==" thisHwnd "`n" k , , , 2
+           If (A_Gui="OSDguiToolbar" && thisHwnd && IndexBtn>0 && k!=msgu)
+           {
+              WinSet, Style,-0x0E, ahk_id %thisHwnd%
+              ; DllCall("user32\SetWindowText", "Ptr", thisHwnd, "Str", msgu)
+              ControlSetText , , % StrReplace(msgu, "`n", ".`n") ".", ahk_id %thisHwnd%
+              tlbrIconzList[ctrlHover, 11] := msgu
+              ; GuiControl, OSDguiToolbar:, tlbrValueIcon%IndexBtn%, % msgu
+              WinSet, Style,+0x0E, ahk_id %thisHwnd%
+           }
+        }
+
         If (slideShowRunning!=1 && imageLoading!=1 && runningLongOperation!=1 && prevCtrlHover!=ctrlHover && prevMsg!=msgu)
         {
            prevCtrlHover := ctrlHover
            prevMsg := msgu
            prevState := thisState
            thisSize := OSDfontSize//3 + 2
-           interfaceThread.ahkFunction("mouseCreateOSDinfoLine", msgu, thisSize)
+           If (ShowToolTipsToolbar=1)
+              interfaceThread.ahkFunction("mouseCreateOSDinfoLine", msgu, thisSize)
         }
         ; prevPos := mX "-" mY
         lastInvoked := A_TickCount
@@ -74500,11 +75138,6 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
 
      ; A := WinActive("A")
      ; okay := (A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin) ? 1 : 0
-     If (wP&0x1)
-     {
-        LbtnDwn := 1
-        SetTimer, ResetLbtn, -55
-     }
   }
 }
 
@@ -74632,10 +75265,12 @@ moveMouseToolbar(direction, stepu) {
    Global zeitSillyPrevent := A_TickCount
    hwndu := tlbrIconzList[currentKbdBTNtlbr, 1]
    If !hwndu
-      currentKbdBTNtlbr := (direction=1) ? 0 : 2
+      currentKbdBTNtlbr := (direction=1) ? 1 : 2
 
    hwndu := tlbrIconzList[currentKbdBTNtlbr, 1]
-   If hwndu
+   funcu := tlbrIconzList[currentKbdBTNtlbr, 4]
+   ; ToolTip, % currentKbdBTNtlbr "=" funcu , , , 2
+   If (hwndu && funcu)
    {
       w := tlbrIconzList[hwndu, 7]
       h := tlbrIconzList[hwndu, 8]
@@ -74735,7 +75370,7 @@ testHistoDLL() {
 }
 
 
-; #If, GetKeyState("CapsLock", "T")
+#If, GetKeyState("CapsLock", "T")
 
    ; \::
    ; SoundBeep 
@@ -74763,15 +75398,15 @@ testHistoDLL() {
    ; #If
 
    ; LButton::
-   ; If GetKeyState("CapsLock", "T")
-   ; {
-   ; SendInput, {LButton}
-   ; Sleep, 550
-   ; SendInput, ^{F4}
-   ; }
+   ;    If GetKeyState("CapsLock", "T")
+   ;    {
+   ;       SendInput, {LButton}
+   ;       Sleep, 550
+   ;       SendInput, ^{F4}
+   ;    }
    ; Return
 
-; #If
+#If
 
 
 ListGlobalVars() {
@@ -74798,10 +75433,12 @@ ListGlobalVars() {
         bkpSW := NumGet(pSW+0, 0, "int64")
     }
 
-    if (A_PtrSize=8) {
+    if (A_PtrSize=8)
+    {
         NumPut(0x0000C300000001B8, pSFW+0, 0, "int64")  ; return TRUE
         NumPut(0x0000C300000001B8, pSW+0, 0, "int64")   ; return TRUE
-    } else {
+    } else
+    {
         NumPut(0x0004C200000001B8, pSFW+0, 0, "int64")  ; return TRUE
         NumPut(0x0008C200000001B8, pSW+0, 0, "int64")   ; return TRUE
     }

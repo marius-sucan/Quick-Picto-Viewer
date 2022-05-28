@@ -15,7 +15,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , RegExFilesPattern := "i)^(.\:\\).*(\.(ico|dib|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif))$"
      , PVhwnd, hGDIwin, hGDIthumbsWin, WindowBgrColor, mainCompiledPath, hfdTreeWinGui
      , winGDIcreated := 0, ThumbsWinGDIcreated := 0, MainExe := AhkExported(), omniBoxMode := 0
-     , AnyWindowOpen := 0, easySlideStoppage := 0, lastOtherWinClose := 1, wasMenuFlierCreated := 0
+     , AnyWindowOpen := 0, lastOtherWinClose := 1, wasMenuFlierCreated := 0, ImgAnnoBox
      , slideShowRunning := 0, toolTipGuiCreated, editDummy, LbtnDwn := 0, winCtrlsCoords := []
      , mustAbandonCurrentOperations := 0, lastCloseInvoked := -1, allowGIFsPlayEntirely := 0
      , hCursBusy := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32514, "Ptr")  ; IDC_WAIT
@@ -41,14 +41,10 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , hquickMenuSearchWin, hGuiTip, lastTippyWin, lastMouseLeave := 1, colorPickerModeNow := 0
      , mustCaptureCloneBrush := 0, doNormalCursor := 1, hotkate, uiUseDarkMode := 0
      , menusflyOutVisible := 0, otherAscriptHwnd := "", lastLclickX := 0, lastLclickY := 0
-
-Global allowMultiCoreMode, allowRecordHistory, alwaysOpenwithFIM, animGIFsSupport, askDeleteFiles, mouseToolTipWinCreated := 0
-, AutoDownScaleIMGs, autoPlaySNDs, autoRemDeadEntry, ColorDepthDithering, countItemz, currentFileIndex, CurrentSLD, defMenuRefreshItm, doSlidesTransitions
-, DynamicFoldersList, easySlideStoppage, editingSelectionNow, EllipseSelectMode, enableThumbsCaching, filesFilter, FlipImgH, FlipImgV, hSNDmedia, imgFxMode
-, IMGresizingMode, imgSelX2, imgSelY2, LimitSelectBoundsImg, markedSelectFile, minimizeMemUsage, mustGenerateStaticFolders, MustLoadSLDprefs
-, noTooltipMSGs, PrefsLargeFonts, RenderOpaqueIMG, resetImageViewOnChange, showHistogram, showImgAnnotations, showInfoBoxHUD, showSelectionGrid, skipDeadFiles
-, skipSeenImagesSlider, SLDcacheFilesList, SLDhasFiles, sldsPattern, syncSlideShow2Audios, thumbnailsListMode, thumbsCacheFolder, thumbsDisplaying, totalFramesIndex
-, TouchScreenMode, userHQraw, userimgQuality, UserMemBMP, usrTextureBGR, slidesFXrandomize, liveDrawingBrushTool := 0
+     , mouseToolTipWinCreated := 0, editingSelectionNow, IMGresizingMode, markedSelectFile
+     , PrefsLargeFonts := 0, slidesFXrandomize := 0, liveDrawingBrushTool := 0, ImgHistoBox
+     , lastWinStatus, lastZeitToolTip := 1, OSDfontSize := 14, ImgNavBox, OSDmsgsLine, ImgInfoBox
+     , imgHUDbaseUnit := 0, picVscroll, picHscroll
 
 ; OnMessage(0x388, "WM_PENEVENT")
 OnMessage(0x2a3, "WM_MOUSELEAVE")
@@ -135,12 +131,13 @@ BuildGUI(params:=0) {
       IMGresizingMode := externObj[10]
       OSDbgrColor := externObj[11]
       OSDtextColor := externObj[12]
-      LargeUIfontValue := externObj[13]
+      OSDfontSize := externObj[13]
       PrefsLargeFonts := externObj[14]
       OSDFontName := externObj[15]
       FontBolded := externObj[16]
    }
 
+   calcHUDsize()
    MinGUISize := "+MinSize" A_ScreenWidth//4 "x" A_ScreenHeight//4
    initialWh := "w" A_ScreenWidth//1.7 " h" A_ScreenHeight//1.5
    ; If !A_IsCompiled
@@ -150,12 +147,19 @@ BuildGUI(params:=0) {
    Gui, 1: Margin, 0, 0
    Gui, 1: -DPIScale +Resize %MinGUISize% +hwndPVhwnd +LastFound +OwnDialogs
    Gui, 1: Font, s1
+   Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vOSDmsgsLine, OSD messages.
+   Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vPicVscroll, Vertical scrollbar
+   Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vPicHscroll, Horizontal scrollbar
+   Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vImgInfoBox, Image information box.
+   Gui, 1: Add, Text, x3 y3 w3 h3 BackgroundTrans vImgNavBox, Image navigation area.
+   Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vImgHistoBox, Image histogram area.
+   Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vImgAnnoBox, Image annotations box.
    Gui, 1: Add, Text, x0 y0 w1 h1 BackgroundTrans vPicOnGui1 hwndhPicOnGui1, Previous image
-   Gui, 1: Add, Button, xp-100 yp-100 w1 h1 Default,a
    Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans vPicOnGui2a, Zoom in
    Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans vPicOnGui2b, Double-click to toggle view mode | Swipe to make gestures | Left-click and drag to pan image
    Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans vPicOnGui2c, Zoom out
    Gui, 1: Add, Text, x3 y3 w3 h3 BackgroundTrans vPicOnGui3, Next image
+   Gui, 1: Add, Button, xp-100 yp-100 w1 h1 Default,a
    If (isTitleBarVisible=1)
       Gui, 1: +Caption
    Else
@@ -240,6 +244,14 @@ GetClientSize(ByRef w, ByRef h, hwnd) {
     lastInvoked := A_TickCount
 } 
 
+updateUIctrlFromOutside(paramA, paramB, paramC, paramD) {
+    editingSelectionNow := paramA
+    isAlwaysOnTop := paramB
+    drawingShapeNow := paramC
+    IMGresizingMode := paramD
+    updateUIctrl(0)
+}
+
 updateUIctrl(forceThis:=0) {
    Static prevState
    If (forceThis="kill")
@@ -250,11 +262,9 @@ updateUIctrl(forceThis:=0) {
 
    GetWinClientSize(GuiW, GuiH, PVhwnd, 0)
    If (forceThis=1)
-   {
       editingSelectionNow := MainExe.ahkgetvar.editingSelectionNow
-      isAlwaysOnTop := MainExe.ahkgetvar.isAlwaysOnTop
-   }
 
+   lastWinStatus := ""
    ctrlW := (editingSelectionNow=1) ? GuiW//8 : GuiW//7
    ctrlH2 := (editingSelectionNow=1) ? GuiH//6 : GuiH//5
    ctrlH3 := GuiH - ctrlH2*2
@@ -269,37 +279,219 @@ updateUIctrl(forceThis:=0) {
    winCtrlsCoords[3] := [ctrlX1, ctrlY1, ctrlW2, ctrlH3, "PicOnGUI2b"]
    winCtrlsCoords[4] := [ctrlX1, ctrlY3, ctrlW2, ctrlH2, "PicOnGUI2c"]
    winCtrlsCoords[5] := [ctrlX2, 0, ctrlW, GuiH, "PicOnGUI3"]
-   thisState := "a" GuiW GuiH ctrlW2 ctrlH2 ctrlY3 editingSelectionNow isAlwaysOnTop TouchScreenMode
+   calcHUDsize()
+   thisState := "a" GuiW GuiH ctrlW2 ctrlH2 ctrlY3 editingSelectionNow isAlwaysOnTop TouchScreenMode drawingShapeNow IMGresizingMode OSDfontSize imgHUDbaseUnit
    If (thisState!=prevState)
    {
+      k := imgHUDbaseUnit//3 ; the thickness of scrollbars
       WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%   
       GuiControl, 1: Move, PicOnGUI1, % "w" ctrlW " h" GuiH " x0 y0"
       GuiControl, 1: Move, PicOnGUI2a, % "w" ctrlW2 " h" ctrlH2 " x" ctrlX1 " y0"
       GuiControl, 1: Move, PicOnGUI2b, % "w" ctrlW2 " h" ctrlH3 " x" ctrlX1 " y" ctrlY1
       GuiControl, 1: Move, PicOnGUI2c, % "w" ctrlW2 " h" ctrlH2 " x" ctrlX1 " y" ctrlY3
       GuiControl, 1: Move, PicOnGUI3, % "w" ctrlW " h" GuiH " x" ctrlX2 " y0"
-      setUIlabels()
+      If (IMGresizingMode=4)
+      {
+         GuiControl, 1: Move, picVscroll, % "w" k " h" GuiH " x" GuiW - k " y0"
+         GuiControl, 1: Move, picHscroll, % "w" GuiW " h" k " x0 y" GuiH - k
+      } Else
+      {
+         GuiControl, 1: Move, picVscroll, % "w1 h1 x1 y1"
+         GuiControl, 1: Move, picHscroll, % "w1 h1 x1 y1"
+      }
+      uiAccessImgViewSetUIlabels()
       prevState := thisState
-      UpdateUiStatusBar(0, 0, "kill", 0)
+      uiAccessUpdateUiStatusBar(0, 0, "kill", 0)
    }
 }
 
-setUIlabels() {
-   GuiControl, 1:, PicOnGUI1, % (editingSelectionNow=1 || TouchScreenMode!=1) ? "Image view" : "Previous image"
-   GuiControl, 1:, PicOnGUI2a, % (TouchScreenMode!=1) ? "Image view" : "Zoom in"
-   GuiControl, 1:, PicOnGUI2b, % (editingSelectionNow=1 || TouchScreenMode!=1) ? "Image view | Double-click anywhere to toggle view mode" : "Double-click to toggle view mode | Swipe to make gestures | Left-click and drag to pan image"
-   GuiControl, 1:, PicOnGUI2c, % (TouchScreenMode!=1) ? "Image view" : "Zoom out"
-   GuiControl, 1:, PicOnGUI3, % (editingSelectionNow=1 || TouchScreenMode!=1) ? "Image view" : "Next image"
+calcHUDsize() {
+   imgHUDbaseUnit := (PrefsLargeFonts=1) ? Round(OSDfontSize*2.5) : Round(OSDfontSize*2)
 }
 
-UpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0) {
-   Static prevState
+uiAccessUpdateHistoBox(msgu, tW, tH, tX, tY) {
+   If (msgu="hide" || !tW || !tH)
+   {
+      GuiControl, 1: Move, ImgHistoBox, x1 y1 w2 h2
+      Return
+   }
 
+   msgu := StrReplace(msgu, "`n", ".`n")
+   msgu := StrReplace(msgu, " | ", ".`n")
+   Gui, 1: Default
+   GuiControl, 1:, ImgHistoBox, % "Image histogram box:`nGraph focus: " msgu "`nClick to cycle modes. Right-click for histogram options."
+   GuiControl, 1: Move, ImgHistoBox, % " x" tX " y" tY " w" tW " h" tH 
+}
+
+uiAccessUpdateAnnoBox(msgu, tW, tH, tX, tY) {
+   If (msgu="hide" || !tW || !tH || msgu="")
+   {
+      GuiControl, 1: Move, ImgAnnoBox, x1 y1 w2 h2
+      Return
+   }
+
+   Gui, 1: Default
+   GuiControl, 1:, ImgAnnoBox, % "Image caption:`n" msgu "`nThis viewport area is click-through. The action performed on click will be that as if this box is not visible."
+   GuiControl, 1: Move, ImgAnnoBox, % " x" tX " y" tY " w" tW " h" tH 
+}
+
+uiAccessUpdateNavBox(msgu, tW, tH, tX, tY) {
+   If (msgu="hide" || !tW || !tH)
+   {
+      GuiControl, 1: Move, ImgNavBox, x1 y1 w2 h2
+      Return
+   }
+
+   Gui, 1: Default
+   GuiControl, 1:, ImgNavBox, % msgu
+   GuiControl, 1: Move, ImgNavBox, % " x" tX " y" tY " w" tW " h" tH 
+}
+
+uiAccessUpdateInfoBox(msgu, tW, tH, flipV, flipH, bonusX:=0, bonusY:=0, scrollX:=0, scrollY:=0) {
+   If (msgu="hide" || !tW || !tH)
+   {
+      GuiControl, 1: Move, ImgInfoBox, x1 y1 w2 h2
+      Return
+   }
+
+   msgu := "Viewport and active file details visible in the information box:`n" StrReplace(msgu, "`n", ".`n") ".`nThis viewport area is click-through. The action performed on click will be that as if this box is not visible."
+   Gui, 1: Default
+   GuiControl, 1:, ImgInfoBox, % msgu
+   GetClientSize(GuiW, GuiH, PVhwnd)
+   tX := (flipH=1 && thumbsDisplaying!=1) ? GuiW - tW : 0
+   tY := (flipV=1 && thumbsDisplaying!=1) ? GuiH - tH : 0
+   If (flipH!=1 || thumbsDisplaying=1)
+      tX += Round(bonusX)
+   If (flipV!=1 || thumbsDisplaying=1)
+      tY += Round(bonusY)
+
+   tX -= Round(scrollX)
+   tY -= Round(scrollY)
+   GuiControl, 1: Move, ImgInfoBox, % " x" tX " y" tY " w" tW " h" tH 
+}
+
+uiAccessWelcomeView() {
+   Static msgu := "Random predefined pattern-based image generated in the viewport. No image loaded. No indexed image files. Press O key or Left-Click to open a file or folder. Right-click for the context menu and more options."
+   updateUIctrl()
+   uiAccessUpdateHistoBox("hide", 1, 1, 0, 0)
+   uiAccessUpdateInfoBox("hide", 1, 1, 0, 0)
+   uiAccessUpdateNavBox("hide", 1, 1, 0, 0)
+   uiAccessUpdateAnnoBox("hide", 1, 1, 0, 0)
+   Gui, 1: Default
+   GuiControl, 1:, PicOnGUI1, % msgu
+   GuiControl, 1:, PicOnGUI2a, % msgu
+   GuiControl, 1:, PicOnGUI2b, % msgu
+   GuiControl, 1:, PicOnGUI2c, % msgu
+   GuiControl, 1:, PicOnGUI3, % msgu
+   GuiControl, 1: Move, picVscroll, % "w1 h1 x1 y1"
+   GuiControl, 1: Move, picHscroll, % "w1 h1 x1 y1"
+   updateUIctrl("kill")
+}
+
+uiAccessImgViewSetUIlabels() {
+   Gui, 1: Default
+   zr := (IMGresizingMode=4) ? " Hold the Space key plus left-click and drag to pan the image. Use the mouse wheel to change the zoom level." : " Use Control + mouse wheel to change the image zoom level."
+   If (drawingShapeNow=1 || AnyWindowOpen)
+   {
+      msgu := AnyWindowOpen ? "Image view. A panel window is opened. " : "Image view. Drawing vector shape mode is activated. " zr " Press Escape to cancel. Press Enter to accept defined path or modifications. Swipe gestures are not allowed."
+      If (imgEditPanelOpened=1)
+         msgu := "Image view. An image editing live tool is currently in use. " zr " Swipe gestures are not allowed."
+
+      GuiControl, 1:, PicOnGUI1, % msgu
+      GuiControl, 1:, PicOnGUI2a, % msgu
+      GuiControl, 1:, PicOnGUI2b, % msgu
+      GuiControl, 1:, PicOnGUI2c, % msgu
+      GuiControl, 1:, PicOnGUI3, % msgu
+      Return
+   }
+
+   If (TouchScreenMode=1)
+   {
+      dr := (editingSelectionNow=1) ? " Double click outside selection area to deactivate it. " : " Press Shift + Left-Click anywhere to create a new selection area. "
+      gr := " Otherwise, the movement is considered as a zoom in/out swipe gesture."
+      fr := " `nIf the image is not larger than the viewport, swipe gestures are allowed."
+
+      msgu := "Image view. Left. Click for previous image. Swipe gestures allowed." zr dr
+      If (editingSelectionNow=1)
+      {
+         msgu := "Image view. " dr zr
+         If (IMGresizingMode=4)
+            msgu .= fr
+      }
+
+      GuiControl, 1:, PicOnGUI1, % msgu
+      msgu := "Image view. Top. Click to zoom in. Swipe gestures allowed." zr 
+      If (editingSelectionNow!=1)
+         msgu .= dr
+
+      GuiControl, 1:, PicOnGUI2a, % msgu
+
+      msgu := "Image view. Center. Double-click to toggle view mode in this area. " zr dr
+      If (editingSelectionNow=1)
+         msgu := "Image view. " dr zr
+      If (IMGresizingMode=4)
+         msgu .= fr
+
+      GuiControl, 1:, PicOnGUI2b, % msgu
+      msgu := "Image view. Bottom. Click to zoom out. Swipe gestures allowed." zr
+      If (editingSelectionNow!=1)
+         msgu .= dr
+
+      GuiControl, 1:, PicOnGUI2c, % msgu
+
+      msgu := "Image view. Right. Click for next image. Swipe gestures allowed." zr dr
+      If (editingSelectionNow=1)
+      {
+         msgu := "Image view. " dr zr 
+         If (IMGresizingMode=4)
+            msgu .= fr
+      }
+
+      GuiControl, 1:, PicOnGUI3, % msgu
+
+   } Else
+   {
+      zr := (IMGresizingMode=4) ? " Left-click outside selection area and drag to pan the image. Use the mouse wheel to change the zoom level." : " Use Control + mouse wheel to change the image zoom level."
+      dr := (editingSelectionNow=1) ? "Double click outside selection area to deactivate it." : "Double-click anywhere to toggle view mode. Press Shift + Left-Click anywhere to create a new selection area. "
+      msgu := "Image view. " dr zr
+      GuiControl, 1:, PicOnGUI1, % msgu
+      GuiControl, 1:, PicOnGUI2a, % msgu
+      GuiControl, 1:, PicOnGUI2b, % msgu
+      GuiControl, 1:, PicOnGUI2c, % msgu
+      GuiControl, 1:, PicOnGUI3, % msgu
+   }
+}
+
+uiAccessUpdateOSDmsg(stringu, tW, tH) {
+    If (stringu="-" || !tW || !tH)
+    {
+       GuiControl, 1: Move, OSDmsgsLine, x1 y1 w1 h1
+       Return
+    }
+
+    Gui, 1: Default
+    GuiControl, 1:, OSDmsgsLine, % "OSD: " stringu
+    GuiControl, 1: Move, OSDmsgsLine, % " x1 y1 w" tW " h" tH 
+}
+
+uiAccessUpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0, fntSize:="n", itemz:="n") {
+   Static prevState
+   If itemz is Number
+      maxFilesIndex := itemz
+
+   If fntSize is Number
+   {
+      OSDfontSize := fntSize
+      calcHUDsize()
+   }
+
+   lastWinStatus := ""
    If (mustResize="kill")
    {
       prevState := mustResize
    } Else If (mustResize="list")
    {
+      thumbsDisplaying := 1
       GetClientSize(GuiW, GuiH, PVhwnd)
       thisState := "a" mustResize GuiW GuiH heightu
       If (thisState!=prevState)
@@ -309,7 +501,8 @@ UpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0) {
          GuiControl, 1: Move, PicOnGUI2b, w1 h1 x1 y1
          GuiControl, 1: Move, PicOnGUI2c, w1 h1 x1 y1
          GuiControl, 1: Move, PicOnGUI3, w1 h1 x1 y1
-         winCtrlsCoords[1] := [0, 0, GuiW, GuiH - heightu, "PicOnGUI1"]
+         GuiControl, 1: Move, picHscroll, % "w1 h1 x1 y1"
+         winCtrlsCoords[1] := [0, heightu, GuiW, GuiH - heightu*2, "PicOnGUI1"]
          winCtrlsCoords[2] := [1, GuiH - heightu, GuiW, heightu, "PicOnGUI2a"]
          winCtrlsCoords[3] := [1, 1, 1, 1, "PicOnGUI2b"]
          winCtrlsCoords[4] := [1, 3, 1, 1, "PicOnGUI2c"]
@@ -319,9 +512,12 @@ UpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0) {
 
       GuiControl, 1:, PicOnGUI1, Files list container
       GuiControl, 1:, PicOnGUI2a, Status bar
+      uiAccessUpdateHistoBox("hide", 1, 1, 0, 0)
+      uiAccessUpdateAnnoBox("hide", 1, 1, 0, 0)
       updateUIctrl("kill")
    } Else If (mustResize="image")
    {
+      thumbsDisplaying := 0
       prevState := mustResize
       updateUIctrl()
    } Else If (stringu && heightu)
@@ -331,11 +527,12 @@ UpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0) {
       GetClientSize(GuiW, GuiH, PVhwnd)
       GuiControl, 1: Move, PicOnGUI1, % "w" GuiW " h" GuiH - heightu
       GuiControl, 1: Move, PicOnGUI2a, % "w" GuiW " h" heightu " x1 y" GuiH - heightu
-      GuiControl, 1:, PicOnGUI2a, % stringu
-      winCtrlsCoords[1] := [0, 0, GuiW, GuiH - heightu, "PicOnGUI1"]
+      stringu := StrReplace(stringu, " | ", "`n")
+      GuiControl, 1:, PicOnGUI2a, % "Status bar:`n" stringu
+      lastWinStatus := stringu
+      winCtrlsCoords[1] := [0, heightu, GuiW, GuiH - heightu*2, "PicOnGUI1"]
       winCtrlsCoords[2] := [1, GuiH - heightu, GuiW, heightu, "PicOnGUI2a"]
-      If infos
-         GuiControl, 1:, PicOnGUI1, % "Files list container: " infos " elements in view"
+      GuiControl, 1:, PicOnGUI1, % infos
    }
 }
 
@@ -380,6 +577,25 @@ createGDIselectorWin() {
       SetParentID(PVhwnd, hGDIselectWin)
 
    SelectWinGDIcreated := 1
+}
+
+PanelOpenCloseEvent(a) {
+    b := StrSplit(a, "|")
+    panelWinCollapsed := b[1]
+    liveDrawingBrushTool := b[2]
+    imgEditPanelOpened := b[3]
+    AnyWindowOpen := b[4]
+    hSetWinGui := b[5]
+    editingSelectionNow := b[6]
+    maxFilesIndex := b[7]
+    UserMemBMP := b[8]
+    undoLevelsRecorded := b[9]
+    currentFilesListModified := b[10]
+    lastOtherWinClose := b[11]
+    IMGresizingMode := b[12]
+    thumbsDisplaying := b[13]
+    updateUIctrl()
+    uiAccessImgViewSetUIlabels()
 }
 
 SetParentID(Window_ID, theOther) {
@@ -546,11 +762,12 @@ preventSillyGui(thisGui) {
   Return r
 }
 
-WM_LBUTTONDOWN(wP, lP, msg, hwnd) {
+WM_LBUTTONDOWN(wP, lP, msg, Az) {
     If (A_TickCount - scriptStartTime<500)
        Return 0
 
-    If preventSillyGui(A_Gui)
+    thisWin := (Az=PVhwnd || Az=hGDIwin || Az=hGDIthumbsWin || Az=hGDIinfosWin || Az=hGDIselectWin) ? 1 : 0
+    If (preventSillyGui(A_Gui) || !thisWin)
        Return
 
     lastLclickX := lP & 0xFFFF
@@ -734,20 +951,31 @@ InitGuiContextMenu(mX, mY) {
     MainExe.ahkPostFunction(A_ThisFunc, "extern", mX, mY)
 }
 
-slideshowsHandler(thisSlideSpeed, act, how) {
+slideshowsHandler(thisSlideSpeed, act, how, msgu:=0) {
    SlideHowMode := how
    slideShowDelay := thisSlideSpeed
    prevFullIMGload := 1
    If (act="start")
    {
-      setTaskbarIconState("Normal")
+      setTaskbarIconState("normal")
       slideShowRunning := 1
       SetTimer, theSlideShowCore, % -slideShowDelay
+      Gui, 1: Default
+      If msgu
+      {
+         GuiControl, 1:, PicOnGUI1, % msgu
+         GuiControl, 1:, PicOnGUI2a, % msgu
+         GuiControl, 1:, PicOnGUI2b, % msgu
+         GuiControl, 1:, PicOnGUI2c, % msgu
+         GuiControl, 1:, PicOnGUI3, % msgu
+      }
    } Else If (act="stop")
    {
       allowNextSlide := 1
       slideShowRunning := 0
       SetTimer, theSlideShowCore, Off
+      updateUIctrl()
+      uiAccessImgViewSetUIlabels()
    }
 }
 
@@ -789,24 +1017,10 @@ WM_POINTERACTIVATE() {
     GetMouseCoord2wind(PVhwnd, mX, mY, mXo, mYo)
     canCancelImageLoad := 4
     LbtnDwn := 1
-    ctrlName := "unknown"
-/*
-    Loop, 5
-    {
-         xu := winCtrlsCoords[A_Index, 1]
-         yu := winCtrlsCoords[A_Index, 2]
-         wu := winCtrlsCoords[A_Index, 3]
-         hu := winCtrlsCoords[A_Index, 4]
-         ctrlName := winCtrlsCoords[A_Index, 5]
-         If isDotInRect(mX, mY, xu, xu + wu, yu, yu + hu)
-            Break
-    }
-*/
     ; ToolTip, % mX "=" mY "==" ctrlName , , , 3
     If (slideShowRunning=1)
        turnOffSlideshow()
-    ; Else
-    ;    sendWinClickAct("normal-pen-down", ctrlName, mX, mY, mXo, mYo)
+
     lastPointerUseZeit := A_TickCount
 }
 
@@ -854,6 +1068,21 @@ JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
   vPosY2 := NumGet(&POINT, 4, "Int")
 }
 
+IdentifyCtrlUnderMouse(mX, mY) {
+  ctrlName := A_GuiControl
+  Loop, 5
+  {
+       xu := winCtrlsCoords[A_Index, 1]
+       yu := winCtrlsCoords[A_Index, 2]
+       wu := winCtrlsCoords[A_Index, 3]
+       hu := winCtrlsCoords[A_Index, 4]
+       ctrlName := winCtrlsCoords[A_Index, 5]
+       If isDotInRect(mX, mY, xu, xu + wu, yu, yu + hu)
+          Break
+  }
+  Return ctrlName
+}
+
 WinClickAction(thisEvent:="normal") {
     Static lastInvoked := 1, lastEvent
     If (A_TickCount - lastInvoked<25)
@@ -863,18 +1092,6 @@ WinClickAction(thisEvent:="normal") {
     mX := lastLclickX,    mY := lastLclickY
     ; ToolTip, % mX "=" mY "`n" lastLclickX "=" lastLclickY , , , 2
     canCancelImageLoad := 4
-    ctrlName := A_GuiControl
-    Loop, 5
-    {
-         xu := winCtrlsCoords[A_Index, 1]
-         yu := winCtrlsCoords[A_Index, 2]
-         wu := winCtrlsCoords[A_Index, 3]
-         hu := winCtrlsCoords[A_Index, 4]
-         ctrlName := winCtrlsCoords[A_Index, 5]
-         If isDotInRect(mX, mY, xu, xu + wu, yu, yu + hu)
-            Break
-    }
-
     If (mouseToolTipWinCreated=1)
        mouseTurnOFFtooltip()
 
@@ -885,7 +1102,7 @@ WinClickAction(thisEvent:="normal") {
     Else If (A_TickCount - lastZeitPanCursor<350) && (thumbsDisplaying=0)
        MainExe.ahkPostFunction("simplePanIMGonClick", 0, 1, 1)
     Else
-       sendWinClickAct(thisEvent, ctrlName, mX, mY)
+       sendWinClickAct(thisEvent, IdentifyCtrlUnderMouse(mX, mY), mX, mY)
 }
 
 sendWinClickAct(ctrlEvent, guiCtrl, mX, mY) {
@@ -911,7 +1128,10 @@ JEE_ScreenToClient(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
 }
 
 ResetLbtn() {
-  LbtnDwn := 0
+  If GetKeyState("LButton", "P")
+     SetTimer, ResetLbtn, -60
+  Else
+     LbtnDwn := 0
 }
 
 WM_MOVING() {
@@ -1047,19 +1267,49 @@ isQPVactive() {
     Return last
 }
 
+showMouseTooltipStatusbar() {
+    MouseGetPos, ,, OutputVarWin
+    If (LbtnDwn=1 || !lastWinStatus || !thumbsDisplaying) || (A_TickCount - lastZeitToolTip<1000) || (OutputVarWin!=PVhwnd)
+       Return
+
+    thisSize := OSDfontSize//3.5 + 2
+    mouseCreateOSDinfoLine(lastWinStatus, thisSize)
+    SetTimer, mouseTurnOFFtooltip, -4500
+}
+
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   Static lastInvoked := 1, prevPos, prevArrayPos := [], prevState
   If ((A_TickCount - lastZeitPanCursor < 300) || !isQPVactive())
      Return
 
-  MouseGetPos, mX, mY, OutputVarWin
+  If (wP&0x1)
+  {
+     LbtnDwn := 1
+     SetTimer, ResetLbtn, -55
+  }
+
+   mX := lP & 0xFFFF
+   mY := lP >> 16
+
+  ; MouseGetPos, mX, mY, OutputVarWin
   isSamePos := (isInRange(mX, prevArrayPos[1] + 3, prevArrayPos[1] - 3) && isInRange(mY, prevArrayPos[2] + 3, prevArrayPos[2] - 3)) ? 1 : 0
   If (slideShowRunning=1 && isSamePos=1)
      Try DllCall("user32\SetCursor", "Ptr", 0)
-  Else If (drawingShapeNow=1 && doNormalCursor=0 || liveDrawingBrushTool=1) && (OutputVarWin=PVhwnd)
+  Else If (drawingShapeNow=1 && doNormalCursor=0 || liveDrawingBrushTool=1) && (hwnd=PVhwnd)
      changeMcursor("cross")
   Else If ((runningLongOperation=1 || imageLoading=1) && slideShowRunning!=1)
      changeMcursor("busy")
+  Else If (thumbsDisplaying=1 && !AnyWindowOpen && runningLongOperation!=2 && imageLoading!=1 && lastWinStatus)
+  {
+     ctrlu := IdentifyCtrlUnderMouse(mX, mY) 
+     If (ctrlu="PicOnGUI2a")
+     {
+        changeMcursor("finger")
+        If (isSamePos=0 && (A_TickCount - lastZeitToolTip>1000))
+           SetTimer, showMouseTooltipStatusbar, -500
+     } Else If (isSamePos=0)
+        SetTimer, showMouseTooltipStatusbar, Off
+  }
 
   If (A_TickCount - scriptStartTime < 900)
      Return
@@ -1078,14 +1328,6 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   ; actif := WinActive("A")
   ; WinGetTitle, title, ahk_id %actif%
   ; WinShow, ahk_id %actif%
-
-  If (wP&0x1)
-  {
-     LbtnDwn := 1
-     SetTimer, ResetLbtn, -55
-     ; DllCall("DestroyWindow", "uptr", actif)
-     ; SoundBeep 
-  }
 
   ; ToolTip, % title "= " isTitleBarVisible " - " TouchScreenMode " = " OutputVarWin " = " actif
   If (isTitleBarVisible=0 && userAllowWindowDrag=1 && TouchScreenMode=0 && (wP&0x1))
@@ -1113,7 +1355,7 @@ dummyCheckWin() {
    ; If (imgEditPanelOpened=1 && AnyWindowOpen>0 && panelWinCollapsed=1 && thisHwnd=hSetWinGui)
    ;    MainExe.ahkPostFunction("toggleImgEditPanelWindow")
    If (drawingShapeNow=1 && drawingOkay!=1)
-      MainExe.ahkPostFunction("stopDrawingShape")
+      stopDrawingShape()
 }
 
 activateMainWin() {
@@ -1551,14 +1793,75 @@ turnOffSlideshow() {
       SoundBeep , 900, 100
 }
 
+invokeFreeformDrawMenu() {
+   MainExe.ahkPostFunction("createContextMenuCustomShapeDrawing", 1, 1, 0, 0, 1)
+}
+
+ImgVectorUndoAct() {
+   MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+ImgVectorRedoAct() {
+   MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+stopDrawingShape() {
+   MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+toggleViewPortGridu() {
+   MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+MenuSelAllVectorPoints() {
+   MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+MenuSelNoVectorPoints() {
+   MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+MenuSelInvertVectorPoints() {
+   MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+MenuRemSelVectorPoints() {
+   MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+toggleOpenClosedLineCustomShape() {
+   MainExe.ahkPostFunction(A_ThisFunc)
+}
+
+togglePathCurveTension() {
+   MainExe.ahkPostFunction(A_ThisFunc)
+
+}
+
 BuildFakeMenuBar(modus:=0) {
 
    ; main menu
    If (modus="freeform" || drawingShapeNow=1)
    {
+      kMenu("MENU", "invokeFreeformDrawMenu")
+      kMenu("-", "-")
+      kMenu("UNDO", "ImgVectorUndoAct")
+      kMenu("REDO", "ImgVectorRedoAct")
+      kMenu("-", "-")
+      kMenu("DONE", "stopDrawingShape")
       kMenu("CANCEL", "byeByeRoutine")
       kMenu("-", "-")
-      kMenu("Freeform drawing mode", "dummy")
+      kMenu("SELECT ALL", "MenuSelAllVectorPoints")
+      kMenu("NONE", "MenuSelNoVectorPoints")
+      kMenu("INVERT", "MenuSelInvertVectorPoints")
+      kMenu("ERASE", "MenuRemSelVectorPoints")
+      kMenu("-", "-")
+      kMenu("OPEN PATH", "toggleOpenClosedLineCustomShape")
+      kMenu("SMOOTHNESS", "togglePathCurveTension")
+
+      kMenu("-", "-")
+      kMenu("GRID", "toggleViewPortGridu")
+      kMenu("TOOLBAR", "toggleAppToolbar")
       Return
    }
 
@@ -2039,10 +2342,10 @@ UpdateMenuBar(modus:=0) {
       Return
 
    ; ToolTip, % "l = " modus , , , 2
-   If (thumbsDisplaying=1)
-      UpdateUiStatusBar(0, 0, "list", 0)
-   Else 
-      updateUIctrl()
+   ; If (thumbsDisplaying=1)
+   ;    uiAccessUpdateUiStatusBar(0, 0, "list", 0)
+   ; Else 
+   ;    updateUIctrl()
 
    lastMenuBarUpdate := A_TickCount
    Gui, 1: Menu, PVmanu
@@ -2435,7 +2738,7 @@ constantMenuReader(modus:=0) {
          msgu := "&" Format("{:U}", shortcut) ": " msgu
 
       If InStr(strstyles, "0x00000010")
-         msgu .= InStr(msgu, "item disabled") ? "AND CHECKED" : "`nITEM CHECKED"
+         msgu .= InStr(msgu, "item disabled") ? " AND CHECKED" : "`nITEM CHECKED"
       If InStr(strstyles, "0x40000000")
          msgu .= "`nSUBMENU CONTAINER"
 
@@ -2463,6 +2766,7 @@ mouseTurnOFFtooltip(mode:=0) {
    Gui, mouseToolTipGuia: Destroy
    ; WinActive("ahk_id" PVhwnd)
    Global mouseToolTipWinCreated := 0
+   Global lastZeitToolTip := A_TickCount
    SetTimer, mouseTurnOFFtooltip, Off
    ; ToolTip, % mode , , , 2
    ; If (AnyWindowOpen && mode!=1 || mode=2)
@@ -2501,13 +2805,14 @@ mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0) {
     Gui, mouseToolTipGuia: Color, c%bgrColor%
     Gui, mouseToolTipGuia: Font, s%thisFntSize% %isBold% Q5, %OSDFontName%
     Gui, mouseToolTipGuia: Add, Text, c%txtColor% gmouseClickTurnOFFtooltip vTippyMsg, %msg%
-    Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPVOguiTipsWin
+    Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
     prevMsg := msg
     MainExe.ahkassign("hGuiTip", hGuiTip)
     If (unClickable=1)
       WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
     mouseToolTipWinCreated := 1
     delayu := StrLen(msg) * 75 + 950
+    lastZeitToolTip := A_TickCount
     showOSDinfoLineNow(delayu)
 }
 
@@ -2532,12 +2837,12 @@ showOSDinfoLineNow(delayu) {
           GuiControl, mouseToolTipGuia: Move, TippyMsg, w1 h1
           GuiControl, mouseToolTipGuia:, TippyMsg,
           Gui, mouseToolTipGuia: Add, Text, xp yp c%txtColor% gmouseClickTurnOFFtooltip w%MaxWidth%, %msg%
-          Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPVguiTipsWin
+          Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
           ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
        }
     }
 
-    Gui, mouseToolTipGuia: Show, NoActivate AutoSize x%Final_x% y%Final_y%, QPVguiTipsWin
+    Gui, mouseToolTipGuia: Show, NoActivate AutoSize x%Final_x% y%Final_y%, QPV tooltip window
     WinSet, Transparent, 225, ahk_id %hGuiTip%
     If (delayu<msgDisplayTime/2)
        delayu := msgDisplayTime//2 + 1
@@ -2565,7 +2870,7 @@ adjustWin2MonLimits(winHwnd, winX, winY, ByRef rX, ByRef rY, ByRef Wid, ByRef He
    Return ResWidth
 }
 
-ShowClickHalo(mX, mY, BoxW, BoxH, boxMode) {
+ShowClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu:="") {
     Static
     Static lastInvoked := 1
     Critical, On
@@ -2583,12 +2888,16 @@ ShowClickHalo(mX, mY, BoxW, BoxH, boxMode) {
     }
 
     Gui, MclickH: Destroy
-    Sleep, 30
-    Gui, MclickH: +AlwaysOnTop -DPIScale -Caption +ToolWindow +Owner +E0x20 +E0x8000000 +hwndhClickHalo
+    Sleep, 20
+    modus := msgu ? "" : "+E0x20 +E0x8000000"
+    Gui, MclickH: +AlwaysOnTop -DPIScale -Caption +ToolWindow +Owner %modus% +hwndhClickHalo
     Gui, MclickH: Color, 0099FF
     ; Gui, MclickH: Show, NoActivate Hide x%mX% y%mY% w%BoxW% h%BoxH%, WinMouseClick
     ; WinSet, ExStyle, 0x20, WinMouseClick
-    Gui, MclickH: Show, NoActivate x%mX% y%mY% w%BoxW% h%BoxH%, ahk_id %hClickHalo%
+    If !msgu
+       msgu := "QPV blip"
+
+    Gui, MclickH: Show, NoActivate x%mX% y%mY% w%BoxW% h%BoxH%, %msgu% ; ahk_id %hClickHalo%
     If (boxMode=0)
        WinSet, Region, 0-0 W%BoxW% H%BoxH% E, ahk_id %hClickHalo%
     WinSet, Transparent, 128, ahk_id %hClickHalo%
@@ -4057,7 +4366,8 @@ MWAGetMonitorMouseIsIn(coordX:=0,coordY:=0) {
 GetWindowBounds(hWnd) {
    ; function by GeekDude: https://gist.github.com/G33kDude/5b7ba418e685e52c3e6507e5c6972959
    ; W10 compatible function to find a window's visible boundaries
-   ; modified by Marius Șucanto return an array
+   ; modified by Marius Șucan to return an array
+
    size := VarSetCapacity(rect, 16, 0)
    er := DllCall("dwmapi\DwmGetWindowAttribute"
       , "UPtr", hWnd  ; HWND  hwnd
@@ -4474,6 +4784,8 @@ AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0) {
 
 WinMoveZ(hWnd, C, X, Y, W, H, Redraw:=0) {
   ; WinMoveZ v0.5 by SKAN on D35V/D361 - https://www.autohotkey.com/boards/viewtopic.php?f=6&t=76745
+  ; modified by Marius Șucan
+
   ; If Redraw=2, the new coordinates will be returned
   ; Moves a window to given coordinates, but confines the window within the work area of the target monitor.
   ; Which target monitor? : Whichever monitor POINT (X, Y) belongs to

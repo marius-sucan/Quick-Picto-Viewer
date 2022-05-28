@@ -59,7 +59,7 @@ Ctrl + D|Drop selected area or drop files selection [select none]|Anywhere|-
 Ctrl + E|Open in Explorer containing folder of active file|Anywhere|External app
 Ctrl + F|Filter files list|Anywhere|-
 Ctrl + Space|Deactivate files list filter [if any]|Anywhere|-
-Shift + E|Filter list by the file path of the current file|Files list|-
+Shift + E|Filter list by folder path of the current file|Files list|-
 Ctrl + F2|Modify active index entry|Anywhere|Panel
 Ctrl + F4|Close document, window or panel|Anywhere|-
 Ctrl + F5|Toggle recursive scan of an opened folder|Files list|-
@@ -120,8 +120,8 @@ H|Flip viewport horizontally|Anywhere|-
 V|Flip viewport vertically|Anywhere|-
 W|Flip selection W/H|Image selection area|-
 W|Show files list map now|Files list|-
-Z|Image navigator|Image view|-
-I|Toggle information viewport box|Anywhere|-
+Z|Toggle image navigator box in viewport|Image view|-
+I|Toggle viewport information box|Anywhere|-
 Insert|Insert file(s) into list|Anywhere|Files selector
 J|Jump to given file index or frame|Anywhere|Panel
 Shift + K|Perform JPEG lossless operations|Anywhere|Panel
@@ -142,7 +142,9 @@ T|Toggle thumbnails aspect ratios: square, tall or wide|Files list|-
 T|Toggle image rescaling/adapting modes|Image view|-
 T|Cycle different levels of points tension in the freeform path|Vector drawing|-
 B|Toggle Bézier freeform path mode|Vector drawing|-
-U|Viewport colors and image adjustments|Image view|Panel
+U|Adjust image colors|Image view|Panel
+U|Adjust viewport colors and effects|Files list|Panel
+Shift + U|Adjust viewport colors and effects|Image view|Panel
 X|Play associated audio file|Image view|-
 X|Mark active index to switch to a different index|Files list|-
 X|Switch active index with the already marked index|Files list|-
@@ -226,8 +228,7 @@ Alt + L|Calculate file sizes for selected files|Anywhere|-
 Shift + T|Insert text into selected area|Image selection area|Panel
 Ctrl + Tab|Filter files list to selected files|Files list|-
 Shift + U|Apply viewport color adjustments or effects on the selected file(s)|Files list|-
-Shift + U|Apply viewport color adjustments or effects inside the selected area|Image selection area|-
-Ctrl + Shift + U|Apply viewport color adjustments or effects outside the selected area|Image selection area|-
+Ctrl + Shift + U|Apply viewport color adjustments or effects inside the selected area|Image selection area|-
 Shift + ~|Open Quick Picto Viewer session events journal|Anywhere|Panel
 Page Up / Down|Move selection area on X axis|Live editing|-
 Home / End|Move selection area on Y axis|Live editing|-

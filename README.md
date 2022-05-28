@@ -29,58 +29,166 @@
 
 <h1>Features</h1>
 
+<h2>IMAGE EDITING:</h2>
+
+<ul>
+<li>Options to control viewport brightness, contrast, saturation and RGB color channels balance/intensity.</li>
+
+<li>Adaptive auto-adjustment of brightness, contrast and saturation of displayed images.</li>
+
+<li>Images can be rotated or mirrored horizontally and vertically in the viewport.</li>
+
+<li>Paint brushes: soft edges, cloner, eraser, pinch, bulge, smudge and more:</li>
+<ul>
+   <li>ability to randomize various brush properties when painting</li>
+   <li>textured brushes</li>
+   <li>paint with symmetry</li>
+</ul>
+
+<li>Image editing tools: </li>
+<ul>
+   <li>draw arcs, lines and shapes</li>
+   <li>advanced flood fill [color bucket]</li>
+   <li>insert text with advanced customization options</li>
+   <li>paste in place</li>
+   <li>transform selected area</li>
+   <li>soft edges and motion blur</li>
+   <li>rotate, crop, flip, pixelize, add noise, and more.</li>
+</ul>
+
+<li>Draw free-form Bézier curved paths or polygonal lines; options to fill with color, textures or gradients.</li>
+
+<li>Free-form curved or polygonal selections, elliptical and rectangular selections, rotated at any angle.</li>
+
+<li>Vector shapes can be defined with symmetry on X or Y axis.</li>
+
+<li>Ability to save/load user created vector paths.</li>
+
+<li>18 blending modes and alpha masking support implemented for various image editing tools.</li>
+
+<li>Alpha mask can be user painted or generated: a gradient [linear, box, radial] or a previously drawn vector path.</li>
+
+<li>Advanced yet easy to use auto-crop for images.</li>
+
+<li>Real-time histogram for any image color channel of the image displayed.</li>
+
+<li>Easy to configure viewport grid.</li>
+
+<li>Paste texts from clipboard and render them as images. Text and background colors, font style, alignment and size can be personalized.</li>
+
+<li>Copy / paste image to/ from clipboard with the alpha channel preserved.</li>
+
+<li>Print image. Users can add text, adjust size and position on the page before printing.</li>
+
+<li>Acquire images from scanners.</li>
+
+<li>Resize and crop images preserving the alpha-channel on save.</li>
+
+<li>Multiple file formats supported for saving an image.</li>
+</ul>
+
+<h2>FILES MANAGEMENT</h2>
+<ul>
+<li>Omnibox and folders tree view - two specialized panels meant to help users navigate through folders, with support for drag and drop amongst them.</li>
+
+<li>Quick file actions. Easily move or copy files to user defined folder paths using the number keys: 1 to 6.</li>
+
+<li>Ability to automatically group files into sub-folders based on file types or modification date, by months or years.</li>
+
+<li>Multiple list view modes. Display the indexed files as an easy to scroll list with or without image file details, or as thumbnails list.</li>
+
+<li>The thumbnails list comes with three predefined aspect ratios: square, wide or tall. Easy to adjust their size: +/- keys.</li>
+
+<li>Adaptive multi-threaded thumbnails caching to sizes ranging from 600 pixels to 125 pixels. On very fast PCs, no caching occurs.</li>
+
+<li>Files can automatically be selected by strings, or the ones already seen, favourited, and other options.</li>
+
+<li>Files list map. A quick view, at a glance, of the files list, highlighting selected files.</li>
+
+<li>Sort images by histogram data points, such as the average or median point, resolution, aspect ratio.</li>
+<ul>
+   <li>by their image properties: resolution, aspect ratio, width, height and so on</li>
+   <li>by file properties: size, name, date, et cetera </li>
+</ul>
+
+<li>Option to keep a record of seen images and have these skipped during slideshows or erased from the index list. QPV can also generate statistics and charts based on the image viewing habits.</li>
+
+<li>Image favourites list; easy to manage. It can hold up to 950100 images.</li>
+
+<li>Multi-rename. Rename multiple files with easy to use patterns. Users can add a prefix and/or suffix to file names, or to count them, or search and replace strings in file names, and more.</li>
+
+<li>File statistics panel with categories for: file sizes, file types, modified dates, image size, image histogram data points and much more.</li>
+
+<li>Identify image duplicates by user chosen image properties, histogram data points or image content similarity. Multiple algorithms are available to choose from.</li>
+
+<li>Index filters: based on text strings or file and image properties.</li>
+
+<li>Dedicated panel to automatically identify keywords in file names and folder paths, and option to filter the list based on any identified keyword.</li>
+
+<li>Copy files from Explorer and paste in Quick Picto Viewer, or from QPV to Explorer.</li>
+
+<li>Copy file names or folder paths as text to clipboard.</li>
+
+<li>Quick Picto Viewer has its own slideshow formats to store the list of folders and cache files lists: plain-text and SQLite database.</li>
+
+<li>Ability to selectively refresh the cached files list from selected folders.</li>
+
+<li>Search and replace in the index, enabling users to correct potentially broken files lists.</li>
+
+<li>Very fast loading of cached or not cached lists of files. Tested with 900100 images and it loads in 10 seconds on my system.</li>
+
+<li>Support for drag and drop of folders or files on the QPV window.</li>
+
+<li>Perform JPEG lossless operations in batch: flip or crop images.</li>
+
+<li>Perform actions on image files: resize, rotate [at any degree], crop, change/adjust colors, rename, convert to different file formats, rename, delete, copy or move.</li>
+
+<li>Batch processing. You can apply any of the previously mentioned action or operation on multiple files at once.</li>
+</ul>
+
+<h2>GENERAL / USER INTERFACE</h2>
 <ul>
 <li>Support for 85 image file formats, including various Camera RAW formats.</li>
-<li>List images as thumbnails with preset aspect ratios: square, wide or tall. Easy to adjust their size as well. Use T and +/- keys.</li>
-<li>Adaptive multi-threaded thumbnails caching to sizes ranging from 600 pixels to 125 pixels. On very fast PCs, no caching occurs.</li>
-<li>Touch screen friendly hot-areas on the UI to navigate or zoom into images.</li>
-<li>Sort images by histogram data points, such as the average or median point, resolution, aspect ratio.</li>
-<li>Sort images by their properties such as resolution, aspect ratisomn ușor and so on.</li>
-<li>Options to control brightness, contrast, saturation and RGB color channels balance/intensity.</li>
-<li>Paint brushes: soft edges, cloner, eraser, pinch, bulge, smudge and more; all are customizable; textured brushes.</li>
-<li>Image editing tools: soft edges blur, advanced flood fill [color bucket], insert text, paste in place, draw arcs, lines and shapes, transform selected area, rotate, flip, pixelize, noise, crop and more</li>
-<li>Draw free-form curved paths or polygonal lines; options to fill with color, textures or gradients.</li>
-<li>Free-form curved or polygonal selections, elliptical and rectangular selections, rotated at any angle.</li>
-<li>18 blending modes and alpha masking support implemented for various image editing tools. The mask can be user painted or generated: a gradient [linear, box, radial] or a previously drawn vector path.</li>
-<li>Adaptive auto-adjustment of brightness, contrast and saturation of displayed images.</li>
-<li>Advanced yet easy to use auto-crop for images.</li>
-<li>Display images in grayscale, inverted or personalized colors. Option to save adjusted image, or apply adjusments on multiple images in one go.</li>
-<li>Real-time histogram for any image color channel of the image displayed.</li>
-<li>Various modes to adapt images to window.</li>
-<li>Images can be rotated or mirrored horizontally and vertically in the viewport.</li>
-<li>Multiple list view modes. Display the indexed files as an easy to scroll list with or without details.</li>
-<li>Multiple slideshow directions available and easy to change speed between images: random order, backwards or forwads.</li>
-<li>Option to keep a record of seen images and have these skipped during slideshows or erased from the index list</li>
-<li>Add/remove or manage favourite images</li>
-<li>Perform JPEG lossless operations in batch: flip or crop images.</li>
-<li>Perform actions on image files: resize, rotate [at any degree], crop, change/adjust colors, rename, convert to different file formats, rename, delete, copy or move.</li>
-<li>Batch processing. You can apply any of the previously mentioned action or operation on multiple files at once.</li>
-<li>Multi-rename allows adding a prefix and/or suffix to renamed files, or to count them, or search and replace strings in file names.</li>
-<li>Acquire images from scanners.</li>
-<li>File statistics panel with categories for: file sizes, file types, modified dates, image size, image histogram data and much more.</li>
-<li>Identify image duplicates by customizable image properties, histogram details or image content similarity using multiple algorithms.</li>
-<li>Copy files from Explorer and paste in Quick Picto Viewer, or from QPV to Explorer.</li>
-<li>Paste texts from clipboard and render them as images. Text and background colors, font style, alignment and size can be personalized.</li>
-<li>Quick Picto Viewer has its own slideshow formats to store list of folders and cache files lists: plain-text and SQLite database.</li>
-<li>Ability to selectively refresh the cached files list from selected folders.</li>
-<li>Option to filter the list of files using keywords. The operator | [or] is allowed.</li>
-<li>Folder tree view - meant to help navigate folders</li>
-<li>Very fast loading of cached or not cached lists of files. Tested with 900100 images and it loads in 10 seconds on my system.</li>
-<li>Resize and crop images preserving alpha-channel on save even when image colors are adjusted.</li>
-<li>Support for animated .WEBP and .GIFs in slideshows - HD GIFs are support as well.</li>
-<li>Support for multi-paged .WEBP, .TIFFs and .GIF frames. Ability to go through each image frame/page.</li>
-<li>Support for drag 'n drop of folders or files onto main UI.</li>
-<li>Paste image from clipboard and save it. 17 file formats supported for saving an image.</li>
-<li>Copy to clipboard: the entire image or an area selected from it.</li>
+
+<li>Touch screen friendly user interface: swipe gestures and hot-areas to navigate or zoom into images.</li>
+
 <li>Adjustable user interface font sizes and colors.</li>
-<li>Ambiental textured window background. Automatically generated background based on the current image displayed.</li>
+
+<li>Dark mode for the user interface.</li>
+
+<li>Ambiental textured window background. Automatically generated background based on the currently displayed image.</li>
+
+<li>Various modes to adapt images to window.</li>
+
+<li>Vertical or horizontal toolbar. Toolbar size adjustable.</li>
+
+<li>Slideshows, easy to change speed while running: random order, backwards or forwards.</li>
+
+<li>Ability to set the slideshow duration.</li>
+
+<li>Option to set background music for the entire slideshow.</li>
+
+<li>Audio annotations or text captions for any image file.</li>
+
+<li>Quick search box allows users to search through menus and other available options in QPV.</li>
+
+<li>Support for animated .WEBP and .GIFs in slideshows - HD GIFs are support as well.</li>
+
+<li>Support for multi-paged .WEBP, .TIFFs and .GIF frames. Ability to go through each image frame/page.</li>
+
+<li>Screen readers compatible. All the messages displayed in the viewport can be read through screen readers as well.</li>
+
+<li>Private mode. In this mode, images are blurred, and file names and paths are hidden.</li>
+
 <li>Multi-monitor support.</li>
-<li>Dark mode for the user interface, and fancy welcome screen random-generated images :-).</li>
+
+<li>Fancy welcome screen random-generated images :-).</li>
+
 </ul> 
 
 <p>Developed by <a href="http://marius.sucan.ro/">Marius Șucan</a> with special attention for people with disabilities.</p>
 
-<p>I coded the application as an <a href="https://autohotkey.com/">AHK script</a> for AutoHotkey_H v1.1.32. To execute or compile the source code one needs AHK_H. <em>The required DLL files are found in the provided ZIP compiled script package</em>.</p>
+<p>I coded the application as an <a href="https://autohotkey.com/">AHK script</a> for AutoHotkey_H v1.1.32. To execute or compile the source code one needs AHK_H.<em>The required DLL files are found in the provided ZIP compiled script package</em>.</p>
 
 <p>(*) Quick Picto Viewer can run on Windows XP, but various features might not work well. However, if you choose to do so, you must provide it with files found in Windows 10 (and possibly other Windows versions) installations. You must choose the ones that suit your Windows XP installation: DLLs for x32 or x64. These must be placed in the same folder with the QPV .EXE binary. The DLL files required are:</p>
 <ul>

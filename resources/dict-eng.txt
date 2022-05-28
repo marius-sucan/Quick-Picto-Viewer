@@ -81837,6 +81837,8 @@ kose
 kosher
 koshered
 koshering
+nattering
+natter
 koshulia
 koshër
 kosmos
@@ -97412,7 +97414,6 @@ natrix
 natrolite
 natron
 natsudaidai
-natter
 natterer
 nattereri
 nattergal
@@ -147913,6 +147914,7 @@ tazetta
 tazh
 tazza
 taíhun
+taihun
 taíhunda
 tbilisi
 tch
@@ -148016,6 +148018,7 @@ technically
 technicalness
 technicals
 technician
+technicians
 technicist
 technicological
 technicology
@@ -148028,6 +148031,7 @@ technography
 technol
 technologic
 technological
+technologically
 technologies
 technologist
 technology
@@ -148049,6 +148053,7 @@ tectology
 tectona
 tectonic
 tectonics
+tectonical
 tectorial
 tectorius
 tectorum
@@ -148138,6 +148143,7 @@ tegulated
 tegument
 tegumentary
 teguments
+tegumental
 teh
 tehran
 teichmann
@@ -148166,6 +148172,7 @@ telarly
 telary
 telautogram
 telautograph
+telautographs
 telben
 tele
 telea
@@ -148177,12 +148184,12 @@ telega
 telegonus
 telegony
 telegram
+telegrams
 telegrammic
-telegrapfhic
+telegraphic
 telegraph
 telegraphed
 telegrapher
-telegraphic
 telegraphical
 telegraphically
 telegraphing

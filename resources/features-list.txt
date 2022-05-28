@@ -1,46 +1,107 @@
-﻿* Support for 85 image file formats, including various Camera RAW formats.
+﻿IMAGE EDITING:
+===========================
 
-* List images as thumbnails with preset aspect ratios: square, wide or tall. Easy to adjust their size as well. Use T and +/- keys.
-
-* Adaptive multi-threaded thumbnails caching to sizes ranging from 600 pixels to 125 pixels. On very fast PCs, no caching occurs.
-
-* Touch screen friendly hot-areas on the UI to navigate or zoom into images.
-
-* Sort images by histogram data points, such as the average or median point, resolution, aspect ratio.
-
-* Sort images by their properties such as resolution, aspect ratisomn ușor and so on.
-
-* Options to control brightness, contrast, saturation and RGB color channels balance/intensity.
-
-* Paint brushes: soft edges, cloner, eraser, pinch, bulge, smudge and more; all are customizable; textured brushes.
-
-* Image editing tools: soft edges blur, advanced flood fill [color bucket], insert text, paste in place, draw arcs, lines and shapes, transform selected area, rotate, flip, pixelize, noise, crop and more
-
-* Draw free-form curved paths or polygonal lines; options to fill with color, textures or gradients.
-
-* Free-form curved or polygonal selections, elliptical and rectangular selections, rotated at any angle.
-
-* 18 blending modes and alpha masking support implemented for various image editing tools. The mask can be user painted or generated: a gradient [linear, box, radial] or a previously drawn vector path.
+* Options to control viewport brightness, contrast, saturation and RGB color channels balance/intensity.
 
 * Adaptive auto-adjustment of brightness, contrast and saturation of displayed images.
 
-* Advanced yet easy to use auto-crop for images.
+* Images can be rotated or mirrored horizontally and vertically in the viewport.
 
-* Display images in grayscale, inverted or personalized colors. Option to save adjusted image, or apply adjusments on multiple images in one go.
+* Paint brushes: soft edges, cloner, eraser, pinch, bulge, smudge and more:
+- ability to randomize various brush properties when painting
+- textured brushes
+- paint with symmetry
+
+* Image editing tools: 
+- draw arcs, lines and shapes
+- advanced flood fill [color bucket]
+- insert text with advanced customization options
+- paste in place
+- transform selected area
+- soft edges and motion blur
+- rotate, crop, flip, pixelize, add noise, and more.
+
+* Draw free-form Bézier curved paths or polygonal lines; options to fill with color, textures or gradients.
+
+* Free-form curved or polygonal selections, elliptical and rectangular selections, rotated at any angle.
+
+* Vector shapes can be defined with symmetry on X or Y axis.
+
+* Ability to save/load user created vector paths.
+
+* 18 blending modes and alpha masking support implemented for various image editing tools.
+
+* Alpha mask can be user painted or generated: a gradient [linear, box, radial] or a previously drawn vector path.
+
+* Advanced yet easy to use auto-crop for images.
 
 * Real-time histogram for any image color channel of the image displayed.
 
-* Various modes to adapt images to window.
+* Easy to configure viewport grid.
 
-* Images can be rotated or mirrored horizontally and vertically in the viewport.
+* Paste texts from clipboard and render them as images. Text and background colors, font style, alignment and size can be personalized.
 
-* Multiple list view modes. Display the indexed files as an easy to scroll list with or without details.
+* Copy / paste image to / from clipboard with the alpha channel preserved. 
 
-* Multiple slideshow directions available and easy to change speed between images: random order, backwards or forwads.
+* Print image. Users can add text, adjust size and position on the page before printing. 
 
-* Option to keep a record of seen images and have these skipped during slideshows or erased from the index list
+* Acquire images from scanners.
 
-* Add/remove or manage favourite images
+* Resize and crop images preserving the alpha-channel on save.
+
+* Multiple file formats supported for saving an image.
+
+
+FILES MANAGEMENT:
+===========================
+
+* Omnibox and folders tree view - two specialized panels meant to help users navigate through folders, with support for drag and drop amongst them.
+
+* Quick file actions. Easily move or copy files to user defined folder paths using the number keys: 1 to 6.
+
+* Ability to automatically group files into sub-folders based on file types or modification date, by months or years.
+
+* Multiple list view modes. Display the indexed files as an easy to scroll list with or without image file details, or as thumbnails list.
+
+* The thumbnails list comes with three predefined aspect ratios: square, wide or tall. Easy to adjust their size: +/- keys.
+
+* Adaptive multi-threaded thumbnails caching to sizes ranging from 600 pixels to 125 pixels. On very fast PCs, no caching occurs.
+
+* Files can automatically be selected by strings, or the ones already seen, favourited, and other options.
+
+* Files list map. A quick view, at a glance, of the files list, highlighting selected files.
+
+* Sort images by histogram data points, such as the average or median point, resolution, aspect ratio.
+- by their image properties: resolution, aspect ratio, width, height and so on
+- by file properties: size, name, date, et cetera 
+
+* Option to keep a record of seen images and have these skipped during slideshows or erased from the index list. QPV can also generate statistics and charts based on the image viewing habits.
+
+* Image favourites list; easy to manage. It can hold up to 950100 images.
+
+* Multi-rename. Rename multiple files with easy to use patterns. Users can add a prefix and/or suffix to file names, or to count them, or search and replace strings in file names, and more.
+
+* File statistics panel with categories for: file sizes, file types, modified dates, image size, image histogram data points and much more.
+
+* Identify image duplicates by user chosen image properties, histogram data points or image content similarity. Multiple algorithms are available to choose from.
+
+* Index filters: based on text strings or file and image properties.
+
+* Dedicated panel to automatically identify keywords in file names and folder paths, and option to filter the list based on any identified keyword.
+
+* Copy files from Explorer and paste in Quick Picto Viewer, or from QPV to Explorer.
+
+* Copy file names or folder paths as text to clipboard.
+
+* Quick Picto Viewer has its own slideshow formats to store the list of folders and cache files lists: plain-text and SQLite database.
+
+* Ability to selectively refresh the cached files list from selected folders.
+
+* Search and replace in the index, enabling users to correct potentially broken files lists.
+
+* Very fast loading of cached or not cached lists of files. Tested with 900100 images and it loads in 10 seconds on my system.
+
+* Support for drag and drop of folders or files on the QPV window.
 
 * Perform JPEG lossless operations in batch: flip or crop images.
 
@@ -48,46 +109,42 @@
 
 * Batch processing. You can apply any of the previously mentioned action or operation on multiple files at once.
 
-* Multi-rename allows adding a prefix and/or suffix to renamed files, or to count them, or search and replace strings in file names.
 
-* Acquire images from scanners.
+GENERAL / USER INTERFACE:
+===========================
 
-* File statistics panel with categories for: file sizes, file types, modified dates, image size, image histogram data and much more.
+* Support for 85 image file formats, including various Camera RAW formats.
 
-* Identify image duplicates by customizable image properties, histogram details or image content similarity using multiple algorithms.
+* Touch screen friendly user interface: swipe gestures and hot-areas to navigate or zoom into images.
 
-* Copy files from Explorer and paste in Quick Picto Viewer, or from QPV to Explorer.
+* Adjustable user interface font sizes and colors.
 
-* Paste texts from clipboard and render them as images. Text and background colors, font style, alignment and size can be personalized.
+* Dark mode for the user interface.
 
-* Quick Picto Viewer has its own slideshow formats to store list of folders and cache files lists: plain-text and SQLite database.
+* Ambiental textured window background. Automatically generated background based on the currently displayed image.
 
-* Ability to selectively refresh the cached files list from selected folders.
+* Various modes to adapt images to window.
 
-* Option to filter the list of files using keywords. The operator | [or] is allowed.
+* Vertical or horizontal toolbar. Toolbar size adjustable.
 
-* Folder tree view - meant to help navigate folders
+* Slideshows, easy to change speed while running: random order, backwards or forwards. 
 
-* Very fast loading of cached or not cached lists of files. Tested with 900100 images and it loads in 10 seconds on my system.
+* Ability to set the slideshow duration.
 
-* Resize and crop images preserving alpha-channel on save even when image colors are adjusted.
+* Option to set background music for the entire slideshow.
+
+* Audio annotations or text captions for any image file.
+
+* Quick search box allows users to search through menus and other available options in QPV.
 
 * Support for animated .WEBP and .GIFs in slideshows - HD GIFs are support as well.
 
 * Support for multi-paged .WEBP, .TIFFs and .GIF frames. Ability to go through each image frame/page.
 
-* Support for drag 'n drop of folders or files onto main UI.
+* Screen readers compatible. All the messages displayed in the viewport can be read through screen readers as well.
 
-* Paste image from clipboard and save it. 17 file formats supported for saving an image.
-
-* Copy to clipboard: the entire image or an area selected from it.
-
-* Adjustable user interface font sizes and colors.
-
-* Ambiental textured window background. Automatically generated background based on the current image displayed.
+* Private mode. In this mode, images are blurred, and file names and paths are hidden.
 
 * Multi-monitor support.
-
-* Dark mode for the user interface, and fancy welcome screen with random-generated images :-).
-
  
+* Fancy welcome screen random-generated images :-).

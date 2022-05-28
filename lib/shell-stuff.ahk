@@ -1505,35 +1505,34 @@ GetProcessMemoryUsage(ProcessID) {
    return (ErrorLevel := 1) & 0
 }
 
-Dlg_Color(Color,hwnd) {
+Dlg_Color(clr, hwnd, cclrs) {
 ; Function by maestrith 
+; clr must be RGB ; HEX [00-FF]
+; cclrs - Custom colors must be an object 
+
 ; from: [AHK 1.1] Font and Color Dialogs 
 ; https://autohotkey.com/board/topic/94083-ahk-11-font-and-color-dialogs/
 ; Modified by Marius Șucan and Drugwash
 
   VarSetCapacity(CUSTOM, 64, 0)
   size := VarSetCapacity(CHOOSECOLOR, 9*A_PtrSize, 0)
-  cclrs := getCustomColorsFromImage(useGdiBitmap())
-  Loop, 16
+  If IsObject(cclrs)
   {
-     ; BGR HEX
-     ; thisColor := "0x" SubStr(cclrs[A_Index], -1) SubStr(cclrs[A_Index], 7, 2) SubStr(cclrs[A_Index], 5, 2)
-     NumPut(cclrs[A_Index], &CUSTOM, (A_Index-1)*4, "UInt")
+     Loop, % cclrs.Count()
+        NumPut(cclrs[A_Index], &CUSTOM, (A_Index-1)*4, "UInt")
   }
 
-  oldColor := Color
-  Color := "0x" hexRGB(InStr(Color, "0x") ? Color : Color ? "0x" Color : 0x0)
+  clr := "0x00" clr
+  clr := "0x" SubStr(clr, -1) SubStr(clr, 7, 2) SubStr(clr, 5, 2)
   NumPut(size,CHOOSECOLOR,0,"UInt")
   NumPut(hwnd,CHOOSECOLOR,A_PtrSize,"Ptr")
-  NumPut(Color,CHOOSECOLOR,3*A_PtrSize,"UInt")
+  NumPut(clr,CHOOSECOLOR,3*A_PtrSize,"UInt")
   NumPut(0x3,CHOOSECOLOR,5*A_PtrSize,"UInt")
   NumPut(&CUSTOM,CHOOSECOLOR,4*A_PtrSize,"Ptr")
   If (!ret := DllCall("comdlg32\ChooseColorW","Ptr",&CHOOSECOLOR,"UInt"))
      Return "-"
 
-  SetFormat, Integer, H
   Coloru := NumGet(CHOOSECOLOR,3*A_PtrSize,"UInt")
-  SetFormat, Integer, D
   CHOOSECOLOR := ""
   CUSTOM := ""
   Return Coloru
@@ -2221,7 +2220,7 @@ GetComboBoxInfo(hwnd) {
    Return [HCBBEDIT, HCBBLIST, r]
 }
 
-AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0) {
+AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0, largeFont:=0) {
 ; Description: AddTooltip v2.0
 ;   Add/Update tooltips to GUI controls.
 ;
@@ -2351,6 +2350,14 @@ AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0) {
           ,TTM_UPDATETIPTEXTA:=0x40C                    ;-- WM_USER + 12
           ,TTM_UPDATETIPTEXTW:=0x439                    ;-- WM_USER + 57
 
+    If (p1="reset")
+    {
+       If hTT
+          DllCall("DestroyWindow", "Ptr", hTT)
+       hTT := ""
+       Return
+    }
+
     if (DisableTooltips=1)
        return 
 
@@ -2384,9 +2391,16 @@ AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0) {
         ;   function will be affected.
         ;   DllCall("uxtheme\SetWindowTheme","Ptr",hTT,"Ptr",0,"UIntP",0)
 
+        If (darkMode=1)
+           DllCall("uxtheme\SetWindowTheme", "ptr", HTT, "str", "DarkMode_Explorer", "ptr", 0)
         ;-- Set the maximum width for the tooltip window
         ;   Note: This message makes multi-line tooltips possible
         SendMessage, TTM_SETMAXTIPWIDTH, 0, A_ScreenWidth,, ahk_id %hTT%
+        If (largeFont=1)
+        {
+           hFont := Gdi_CreateFontByName("MS Shell Dlg 2", 20, 400, 0, 0, 0, 4)
+           SendMessage, 0x30, hFont, 1,,ahk_id %hTT% ; WM_SETFONT
+        }
     }
 
     ;-- Other commands
@@ -2454,9 +2468,6 @@ AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0) {
     }
 
     ;-- Restore DetectHiddenWindows
-    If (darkMode=1)
-       DllCall("uxtheme\SetWindowTheme", "ptr", HTT, "str", "DarkMode_Explorer", "ptr", 0)
-
     DetectHiddenWindows %l_DetectHiddenWindows%
     ;-- Return the handle to the tooltip control
     Return hTT
@@ -2533,6 +2544,11 @@ WinMoveZ(hWnd, C, X, Y, W, H, Redraw:=0) {
      Return [X, Y]
   Else 
      Return DllCall("MoveWindow", "Ptr",hWnd, "Int",X, "Int",Y, "Int",W, "Int",H, "Int",Redraw)
+}
+
+GetWinParent(hwnd) {
+   ; Retrieves a handle to the specified window's parent or owner.
+   Return DllCall("GetParent", "Ptr", hwnd)
 }
 
 
