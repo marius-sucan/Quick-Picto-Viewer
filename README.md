@@ -24,7 +24,7 @@
 
 <p>Source code available on <a href="https://github.com/marius-sucan/Quick-Picto-Viewer">Github</a>.</p>
 
-<p><em>If you want to run the uncompiled edition, please make sure you download the required DLL files from the Github repository, or the ones included in the ZIP file.</p>
+<p><em>If you want to run the uncompiled edition, please make sure you download the required DLL files from the Github repository, or the ones included in the ZIP file.</em></p>
 
 <h1>Features</h1>
 
