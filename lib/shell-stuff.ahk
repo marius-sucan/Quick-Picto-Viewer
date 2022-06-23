@@ -2525,6 +2525,85 @@ WinEnumChild(hwnd:=0, lParam:=0) {
   return true
 }
 
+Win_ShowSysMenu(Hwnd, x, y) {
+; Source: https://github.com/majkinetor/mm-autohotkey/blob/master/Appbar/Taskbar/Win.ahk
+; modified by Marius Șucan
+
+  Static WM_SYSCOMMAND := 0x112, TPM_RETURNCMD := 0x100
+  h := WinExist("ahk_id " hwnd)
+  hSysMenu := DllCall("GetSystemMenu", "Uint", Hwnd, "int", False) 
+  r := DllCall("TrackPopupMenu", "uint", hSysMenu, "uint", TPM_RETURNCMD, "int", X, "int", Y, "int", 0, "uint", h, "uint", 0)
+  If (r=0)
+     Return
+
+  SendMessage, WM_SYSCOMMAND, r,,,ahk_id %Hwnd%
+  Return 1
+}
+
+GetClientPos(hwnd, ByRef left, ByRef top, ByRef w, ByRef h) {
+  ; source http://forum.script-coding.com/viewtopic.php?pid=81833#p81833
+  Static r := VarSetCapacity(pwi, 60, 0)
+  s := DllCall("GetWindowInfo", "Ptr", hwnd, "Ptr", &pwi)
+  left := NumGet(pwi, 20, "Int") - NumGet(pwi, 4, "Int")
+  top := NumGet(pwi, 24, "Int") - NumGet(pwi, 8, "Int")
+  w := NumGet(pwi, 28, "Int") - NumGet(pwi, 20, "Int")
+  h := NumGet(pwi, 32, "Int") - NumGet(pwi, 24, "Int")
+  Return s
+}
+
+GetWindowBounds(hWnd) {
+   ; function by GeekDude: https://gist.github.com/G33kDude/5b7ba418e685e52c3e6507e5c6972959
+   ; W10 compatible function to find a window's visible boundaries
+   ; modified by Marius Șucan to return an array
+   size := VarSetCapacity(rect, 16, 0)
+   er := DllCall("dwmapi\DwmGetWindowAttribute"
+      , "UPtr", hWnd  ; HWND  hwnd
+      , "UInt", 9     ; DWORD dwAttribute (DWMWA_EXTENDED_FRAME_BOUNDS)
+      , "UPtr", &rect ; PVOID pvAttribute
+      , "UInt", size  ; DWORD cbAttribute
+      , "UInt")       ; HRESULT
+
+   If er
+      DllCall("GetWindowRect", "UPtr", hwnd, "UPtr", &rect, "UInt")
+
+   r := []
+   r.x1 := NumGet(rect, 0, "Int"), r.y1 := NumGet(rect, 4, "Int")
+   r.x2 := NumGet(rect, 8, "Int"), r.y2 := NumGet(rect, 12, "Int")
+   r.w := Abs(max(r.x1, r.x2) - min(r.x1, r.x2))
+   r.h := Abs(max(r.y1, r.y2) - min(r.y1, r.y2))
+   rect := ""
+   ; ToolTip, % r.w " --- " r.h , , , 2
+   Return r
+}
+
+GetWinClientSize(ByRef w, ByRef h, hwnd, mode) {
+; by Lexikos http://www.autohotkey.com/forum/post-170475.html
+; modified by Marius Șucan
+    Static prevW, prevH, prevHwnd, lastInvoked := 1
+    If (A_TickCount - lastInvoked<95) && (prevHwnd=hwnd)
+    {
+       W := prevW, H := prevH
+       Return
+    }
+
+    prevHwnd := hwnd
+    If (mode=1)
+    {
+       r := GetWindowBounds(hwnd)
+       prevW := W := r.w
+       prevH := H := r.h
+    } Else 
+    {
+       VarSetCapacity(rc, 16, 0)
+       DllCall("GetClientRect", "uint", hwnd, "uint", &rc)
+       prevW := W := NumGet(rc, 8, "int")
+       prevH := H := NumGet(rc, 12, "int")
+       rc := ""
+    }
+
+    lastInvoked := A_TickCount
+} 
+
 WinMoveZ(hWnd, C, X, Y, W, H, Redraw:=0) {
   ; WinMoveZ v0.5 by SKAN on D35V/D361 - https://www.autohotkey.com/boards/viewtopic.php?f=6&t=76745
   ; If Redraw=2, the new coordinates will be returned
@@ -2551,4 +2630,17 @@ GetWinParent(hwnd) {
    Return DllCall("GetParent", "Ptr", hwnd)
 }
 
+GetMenuItemRect(hwnd, hMenu, nPos) {
+    VarSetCapacity(RECT, 16, 0)
+    if DllCall("User32.dll\GetMenuItemRect", "Ptr", hwnd, "Ptr", hMenu, "UInt", nPos, "Ptr", &RECT)
+    {
+       objRect := { left   : numget( RECT,  0, "UInt" )
+                  , top    : numget( RECT,  4, "UInt" )
+                  , right  : numget( RECT,  8, "UInt" )
+                  , bottom : numget( RECT, 12, "UInt" ) }
+       return objRect
+    }
+
+    return 0
+}
 

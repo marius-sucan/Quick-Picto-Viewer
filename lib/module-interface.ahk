@@ -1,4 +1,4 @@
-﻿#Persistent
+#Persistent
 #NoTrayIcon
 #MaxHotkeysPerInterval, 950
 #HotkeyInterval, 50
@@ -6,6 +6,8 @@
 #MaxThreadsPerHotkey, 1
 #MaxThreadsBuffer, Off
 #IfTimeout, 2000
+#UseHook, Off
+#Hotstring NoMouse
 SetWinDelay, 1
 CoordMode, Mouse, Screen
 SetBatchLines, -1
@@ -44,7 +46,15 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , mouseToolTipWinCreated := 0, editingSelectionNow, IMGresizingMode, markedSelectFile
      , PrefsLargeFonts := 0, slidesFXrandomize := 0, liveDrawingBrushTool := 0, ImgHistoBox
      , lastWinStatus, lastZeitToolTip := 1, OSDfontSize := 14, ImgNavBox, OSDmsgsLine, ImgInfoBox
-     , imgHUDbaseUnit := 0, picVscroll, picHscroll
+     , imgHUDbaseUnit := 0, picVscroll, picHscroll, QPVpid := 0, menuArray := [], menuCurrentIndex := 0
+     , menuTotalIndex := 0, hMenuBar, lastMenuZeit := 1, menusList, hFlyOut, menuHotkeys, lastMenuHoverZeit := 1
+     , menusListView := "File:File|Edit:Edit|Selection:Selection|Image:Image|Captions:Captions|Slides:Slides|Find:Find|List:List|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
+     , menusListEditor := "File:EditorFile|Edit:Edit|Selection:EditorSelection|Image:Image|Live tools:EditorTools|View:View|Interface:Interface"
+     , menusListAlphaMasking := "Alpha mask:AlphaMask|View:View|Interface:Interface"
+     , menusListVector := "File:VectorFile|Edit:VectorEdit|Selection:VectorSelection|View:VectorView|Interface:VectorInterface"
+     , menusListThumbs := "File:File|Edit:Edit|Selection:Selection|Image:Image|Find:Find|List:List|Sort:Sort|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
+     , menusListWelcome := "File:File|Edit:Edit|Interface:Interface|Settings:Settings|Help:Help"
+     , prevMenuBarItem := 1
 
 ; OnMessage(0x388, "WM_PENEVENT")
 OnMessage(0x2a3, "WM_MOUSELEAVE")
@@ -74,9 +84,11 @@ OnMessage(0x104, "WM_KEYDOWN")
 OnMessage(0x200, "WM_MOUSEMOVE")
 OnMessage(0x06, "activateMainWin")   ; WM_ACTIVATE 
 OnMessage(0x08, "activateMainWin")   ; WM_KILLFOCUS 
+; OnMessage(0x00A0, "WM_NCMOUSEMOVE")
 
 setPriorityThread(2)
 lastMenuInvoked[1] := A_TickCount
+QPVpid := DllCall("Kernel32.dll\GetCurrentProcessId")
 ; OnExit, doCleanup
 Return
 
@@ -87,19 +99,19 @@ setPriorityThread(level, handle:="A") {
 }
 
 updateWindowColor() {
-     Sleep, 1
-     ; WindowBgrColor := MainExe.ahkgetvar.WindowBgrColor
-     Gui, 1: Color, %WindowBgrColor%
+  Sleep, 1
+  ; WindowBgrColor := MainExe.ahkgetvar.WindowBgrColor
+  Gui, 1: Color, %WindowBgrColor%
 }
 
 destroyAllGUIs() {
-   Gui, 1: Destroy
-   Gui, 2: Destroy
-   Gui, 3: Destroy
-   Gui, 4: Destroy
-   Gui, 5: Destroy
-   taskBarUI.clearAll()
-   Sleep, 50
+  Gui, 1: Destroy
+  Gui, 2: Destroy
+  Gui, 3: Destroy
+  Gui, 4: Destroy
+  Gui, 5: Destroy
+  taskBarUI.clearAll()
+  Sleep, 50
 }
 
 BuildGUI(params:=0) {
@@ -156,7 +168,7 @@ BuildGUI(params:=0) {
    Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vImgAnnoBox, Image annotations box.
    Gui, 1: Add, Text, x0 y0 w1 h1 BackgroundTrans vPicOnGui1 hwndhPicOnGui1, Previous image
    Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans vPicOnGui2a, Zoom in
-   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans vPicOnGui2b, Double-click to toggle view mode | Swipe to make gestures | Left-click and drag to pan image
+   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans vPicOnGui2b, Image view. Center.
    Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans vPicOnGui2c, Zoom out
    Gui, 1: Add, Text, x3 y3 w3 h3 BackgroundTrans vPicOnGui3, Next image
    Gui, 1: Add, Button, xp-100 yp-100 w1 h1 Default,a
@@ -254,7 +266,7 @@ updateUIctrlFromOutside(paramA, paramB, paramC, paramD) {
 
 updateUIctrl(forceThis:=0) {
    Static prevState
-   If (forceThis="kill")
+   If (forceThis="kill" || thumbsDisplaying=1 && maxFilesIndex>0)
    {
       prevState := ""
       Return
@@ -296,8 +308,8 @@ updateUIctrl(forceThis:=0) {
          GuiControl, 1: Move, picHscroll, % "w" GuiW " h" k " x0 y" GuiH - k
       } Else
       {
-         GuiControl, 1: Move, picVscroll, % "w1 h1 x1 y1"
-         GuiControl, 1: Move, picHscroll, % "w1 h1 x1 y1"
+         GuiControl, 1: Move, picVscroll, w1 h1 x1 y1
+         GuiControl, 1: Move, picHscroll, w1 h1 x1 y1
       }
       uiAccessImgViewSetUIlabels()
       prevState := thisState
@@ -312,7 +324,7 @@ calcHUDsize() {
 uiAccessUpdateHistoBox(msgu, tW, tH, tX, tY) {
    If (msgu="hide" || !tW || !tH)
    {
-      GuiControl, 1: Move, ImgHistoBox, x1 y1 w2 h2
+      GuiControl, 1: Move, ImgHistoBox, x1 y1 w1 h1
       Return
    }
 
@@ -326,7 +338,7 @@ uiAccessUpdateHistoBox(msgu, tW, tH, tX, tY) {
 uiAccessUpdateAnnoBox(msgu, tW, tH, tX, tY) {
    If (msgu="hide" || !tW || !tH || msgu="")
    {
-      GuiControl, 1: Move, ImgAnnoBox, x1 y1 w2 h2
+      GuiControl, 1: Move, ImgAnnoBox, x1 y1 w1 h1
       Return
    }
 
@@ -338,7 +350,7 @@ uiAccessUpdateAnnoBox(msgu, tW, tH, tX, tY) {
 uiAccessUpdateNavBox(msgu, tW, tH, tX, tY) {
    If (msgu="hide" || !tW || !tH)
    {
-      GuiControl, 1: Move, ImgNavBox, x1 y1 w2 h2
+      GuiControl, 1: Move, ImgNavBox, x1 y1 w1 h1
       Return
    }
 
@@ -350,7 +362,7 @@ uiAccessUpdateNavBox(msgu, tW, tH, tX, tY) {
 uiAccessUpdateInfoBox(msgu, tW, tH, flipV, flipH, bonusX:=0, bonusY:=0, scrollX:=0, scrollY:=0) {
    If (msgu="hide" || !tW || !tH)
    {
-      GuiControl, 1: Move, ImgInfoBox, x1 y1 w2 h2
+      GuiControl, 1: Move, ImgInfoBox, x1 y1 w1 h1
       Return
    }
 
@@ -372,6 +384,18 @@ uiAccessUpdateInfoBox(msgu, tW, tH, flipV, flipH, bonusX:=0, bonusY:=0, scrollX:
 
 uiAccessWelcomeView() {
    Static msgu := "Random predefined pattern-based image generated in the viewport. No image loaded. No indexed image files. Press O key or Left-Click to open a file or folder. Right-click for the context menu and more options."
+        , lastInvoked := 1, runz := 0
+   If (thumbsDisplaying=1 && maxFilesIndex>0)
+      Return
+
+   If (A_TickCount - lastInvoked<150)
+   {
+      SetTimer, uiAccessWelcomeView, -300
+      Return
+   }
+
+   runz++
+   ; ToolTip, % runz "=p" , , , 2
    updateUIctrl()
    uiAccessUpdateHistoBox("hide", 1, 1, 0, 0)
    uiAccessUpdateInfoBox("hide", 1, 1, 0, 0)
@@ -383,9 +407,10 @@ uiAccessWelcomeView() {
    GuiControl, 1:, PicOnGUI2b, % msgu
    GuiControl, 1:, PicOnGUI2c, % msgu
    GuiControl, 1:, PicOnGUI3, % msgu
-   GuiControl, 1: Move, picVscroll, % "w1 h1 x1 y1"
-   GuiControl, 1: Move, picHscroll, % "w1 h1 x1 y1"
+   GuiControl, 1: Move, picVscroll, w1 h1 x1 y1
+   GuiControl, 1: Move, picHscroll, w1 h1 x1 y1
    updateUIctrl("kill")
+   lastInvoked := A_TickCount
 }
 
 uiAccessImgViewSetUIlabels() {
@@ -475,6 +500,7 @@ uiAccessUpdateOSDmsg(stringu, tW, tH) {
 }
 
 uiAccessUpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0, fntSize:="n", itemz:="n") {
+   Critical, on
    Static prevState
    If itemz is Number
       maxFilesIndex := itemz
@@ -493,19 +519,21 @@ uiAccessUpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0, fntSi
    {
       thumbsDisplaying := 1
       GetClientSize(GuiW, GuiH, PVhwnd)
-      thisState := "a" mustResize GuiW GuiH heightu
+      thisState := "a" mustResize GuiW GuiH heightu imgHUDbaseUnit
       If (thisState!=prevState)
       {
+         k := imgHUDbaseUnit//3 ; the thickness of scrollbars
+         GuiControl, 1: Move, picVscroll, % "w" k " h" GuiH " x" GuiW - k " y0"
          GuiControl, 1: Move, PicOnGUI1, % "w" GuiW " h" GuiH - heightu
          GuiControl, 1: Move, PicOnGUI2a, % "w" GuiW " h" heightu " x1 y" GuiH - heightu
          GuiControl, 1: Move, PicOnGUI2b, w1 h1 x1 y1
          GuiControl, 1: Move, PicOnGUI2c, w1 h1 x1 y1
          GuiControl, 1: Move, PicOnGUI3, w1 h1 x1 y1
-         GuiControl, 1: Move, picHscroll, % "w1 h1 x1 y1"
+         GuiControl, 1: Move, picHscroll, w1 h1 x1 y1
          winCtrlsCoords[1] := [0, heightu, GuiW, GuiH - heightu*2, "PicOnGUI1"]
          winCtrlsCoords[2] := [1, GuiH - heightu, GuiW, heightu, "PicOnGUI2a"]
          winCtrlsCoords[3] := [1, 1, 1, 1, "PicOnGUI2b"]
-         winCtrlsCoords[4] := [1, 3, 1, 1, "PicOnGUI2c"]
+         winCtrlsCoords[4] := [1, 1, 1, 1, "PicOnGUI2c"]
          winCtrlsCoords[5] := [1, 1, 1, 1, "PicOnGUI3"]
          prevState := thisState
       }
@@ -904,14 +932,12 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
   Return 0
 }
 
-InitMainContextMenu(mX, mY) {
-   If mX is not Number
-      GetPhysicalCursorPos(mX, mY)
-
+InitMainContextMenu() {
+   GetPhysicalCursorPos(mX, mY)
    thisTick := Round(lastMenuInvoked[1])
    thisX := lastMenuInvoked[2]
    thisY := lastMenuInvoked[3]
-
+ 
    If ((A_TickCount - thisTick<350) && isDotInRect(mX, mY, 15, 15, thisX, thisY, 1))
    {
       SendInput, {Escape}
@@ -921,8 +947,8 @@ InitMainContextMenu(mX, mY) {
    }
 
    lastMenuInvoked := [A_TickCount, mX, mY]
-   InitGuiContextMenu(mX, mY)
-   SetTimer, TimerMouseMove, -25
+   MainExe.ahkPostFunction("InitGuiContextMenu", "extern", mX, mY, 0)
+   ; SetTimer, TimerMouseMove, -25
 }
 
 TimerMouseMove() {
@@ -934,7 +960,10 @@ PanelQuickSearchMenuOptions() {
     If (A_TickCount - lastInvoked<300)
        Return
 
-    MainExe.ahkPostFunction(A_ThisFunc)
+    If (VisibleQuickMenuSearchWin=1)
+       MainExe.ahkPostFunction("closeQuickSearch")
+    Else
+       MainExe.ahkPostFunction(A_ThisFunc)
     lastInvoked := A_TickCount
 }
 
@@ -1288,8 +1317,8 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
      SetTimer, ResetLbtn, -55
   }
 
-   mX := lP & 0xFFFF
-   mY := lP >> 16
+  mX := lP & 0xFFFF
+  mY := lP >> 16
 
   ; MouseGetPos, mX, mY, OutputVarWin
   isSamePos := (isInRange(mX, prevArrayPos[1] + 3, prevArrayPos[1] - 3) && isInRange(mY, prevArrayPos[2] + 3, prevArrayPos[2] - 3)) ? 1 : 0
@@ -1369,6 +1398,9 @@ activateMainWin() {
    z := identifyThisWin()
    If (editingSelectionNow=1 && slideShowRunning!=1 && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1)
       MainExe.ahkPostFunction("MouseMoveResponder", "krill")
+
+   If (menusflyOutVisible=1 && !identifyMenus())
+      SetTimer, hideMenuFlyOut, -50
 
    ; If (mouseToolTipWinCreated=1 && !z && !identifyParentWind())
    If (mouseToolTipWinCreated=1)
@@ -1509,9 +1541,9 @@ byeByeRoutine() {
        lastInvokedThis := A_TickCount
        lastOtherWinClose := A_TickCount
        MainExe.ahkPostFunction("StopColorPicker")
-   } Else If (omniBoxMode=1)
+   } Else If (VisibleQuickMenuSearchWin=1)
    {
-       omniBoxMode := 0
+       VisibleQuickMenuSearchWin := omniBoxMode := 0
        lastInvokedThis := A_TickCount
        lastOtherWinClose := A_TickCount
        MainExe.ahkPostFunction("closeQuickSearch")
@@ -1618,7 +1650,7 @@ identifyThisWin() {
      Return prevR
 
   Az := WinActive("A")
-  prevR := (Az=PVhwnd || Az=hGDIwin || Az=hGDIthumbsWin || Az=hGDIinfosWin || Az=hGDIselectWin) ? 1 : 0
+  prevR := isVarEqualTo(Az, otherAscriptHwnd,PVhwnd,hGDIwin,hGDIthumbsWin,hGDIinfosWin,hGDIselectWin)
   lastInvoked := A_TickCount
   Return prevR
 }
@@ -1653,23 +1685,36 @@ kbdkeybcallKeysResponder(givenKey, thisWin) {
 guiCreateMenuFlyout() {
    m := LargeUIfontValue // 2 + 1
    h := LargeUIfontValue * 2 + 1
-   Gui, menuFlier: +AlwaysOnTop -MinimizeBox -SysMenu -Caption +ToolWindow
+   Gui, menuFlier: +AlwaysOnTop -MinimizeBox -SysMenu -Caption +ToolWindow +hwndhFlyOut
    Gui, menuFlier: Color, %OSDbgrColor%
    Gui, menuFlier: Font, s%LargeUIfontValue% Bold c%OSDtextColor%
    Gui, menuFlier: Margin, 0, 0
    Gui, menuFlier: Add, Text, Border Center +0x200 x0 y0 w%h% h%h% gPanelQuickSearchMenuOptions hwndhBtn1 +TabStop, S
    Gui, menuFlier: Add, Text, Border Center +0x200 x+%m% yp+0 w%h% h%h% gtoggleAppToolbar hwndhBtn2 +TabStop, T
    AddTooltip2Ctrl(hBtn1, "Search through menus [ `; ]",, uiUseDarkMode)
-   AddTooltip2Ctrl(hBtn2, "Toggle the toolbar [ F10 ]",, uiUseDarkMode)
+   AddTooltip2Ctrl(hBtn2, "Toggle the toolbar [ Shift+F10 ]",, uiUseDarkMode)
    ; AddTooltip2Ctrl("AutoPop", 0.5)
    wasMenuFlierCreated := 1
 }
 
-menuFlyoutDisplay(actu, mX, mY, isOkay, darkMode:=0, thisHwnd:=0) {
+IsNumber(Var) {
+   Static number := "number"
+   If Var Is number
+      Return 1
+   Return 0
+}
+
+menuFlyoutDisplay(actu, mX, mY, isOkay, darkMode:=0, thisHwnd:=0, idu:=0) {
    lastOtherWinClose := A_TickCount
    uiUseDarkMode := darkMode
    otherAscriptHwnd := thisHwnd
    allowMenuReader := actu
+   If (IsNumber(idu) && idu>0)
+      menuCurrentIndex := idu
+
+   If (idu="reset")
+      menuCurrentIndex := 0
+
    If (!isOkay && actu="yes")
       Return
 
@@ -1678,33 +1723,51 @@ menuFlyoutDisplay(actu, mX, mY, isOkay, darkMode:=0, thisHwnd:=0) {
 
    ; GetPhysicalCursorPos(mX, mY)
    fn := Func("dummyMenuFlyoutDisplay").Bind(actu, mX, mY)
-   SetTimer, % fn, -50
+   SetTimer, % fn, -25
 }
 
 dummyMenuFlyoutDisplay(actu, mX, mY) {
    If (actu="yes" && allowMenuReader="yes")
    {
       ; GetPhysicalCursorPos(mX, mY)
-      menusflyOutVisible := 1
-      h := GetMenuWinHwnd(mX, mY, "32768")
-      a := h[1]
-      If !InStr(h[2], "32768")
+      a := WinExist("ahk_class #32768 ahk_pid " QPVpid)
+      If !a
+      {
+         h := GetMenuWinHwnd(mX, mY, "32768")
+         a := h[1]
+      }
+      If (!InStr(h[2], "32768") && !a)
       {
           menusflyOutVisible := 0
           Gui, menuFlier: Hide
           Return
       }
 
+      menusflyOutVisible := 1
       WinGetPos, mX, mY, Width, Height, ahk_id %a%
       ; ToolTip, % z "=" a "=" mY " = " height "=" h , , , 2
       x := mX
       y := mY + Round(Height) + 2
-      Gui, menuFlier: Show, AutoSize x%x% y%y% NoActivate
+      If (x!="" && y!="")
+         Gui, menuFlier: Show, AutoSize x%x% y%y% NoActivate
    } Else
    {
-      menusflyOutVisible := 0
-      Gui, menuFlier: Hide
+      SetTimer, hideMenuFlyOut, -20
    }
+}
+
+hideMenuFlyOut() {
+    MouseGetPos,,, OutputVarWin
+    WinGetClass, glassu, ahk_id %OutputVarWin%
+    WinGetTitle, titlu, ahk_id %OutputVarWin%
+    ; ToolTip, % OutputVarWin "==" hFlyOut "`n" glassu "==" titlu , , , 2
+    If (OutputVarWin!=hFlyOut && !identifyMenus())
+    {
+       menusflyOutVisible := 0
+       Gui, menuFlier: Hide
+       SetTimer, hideMenuFlyOut, Off
+    } Else If (menusflyOutVisible=1)
+       SetTimer, hideMenuFlyOut, -20
 }
 
 GetMenuWinHwnd(mX, mY, n) {
@@ -1758,11 +1821,19 @@ Win_ShowSysMenu(Hwnd) {
 ; Source: https://github.com/majkinetor/mm-autohotkey/blob/master/Appbar/Taskbar/Win.ahk
 ; modified by Marius Șucan
 
-  Static WM_SYSCOMMAND := 0x112, TPM_RETURNCMD := 0x100
   turnOffSlideshow()
-  MainExe.ahkPostFunction("doSuspendu", 1)
+  JEE_ClientToScreen(hPicOnGui1, 1, 1, x, y)
+  ; MainExe.ahkPostFunction("Win_ShowSysMenu", hwnd, x, y)
+  coreShowSysMenu(Hwnd, x, y)
+  Return 1
+}
+
+coreShowSysMenu(Hwnd, x, y) {
+; Source: https://github.com/majkinetor/mm-autohotkey/blob/master/Appbar/Taskbar/Win.ahk
+; modified by Marius Șucan
+
+  Static WM_SYSCOMMAND := 0x112, TPM_RETURNCMD := 0x100
   h := WinExist("ahk_id " hwnd)
-  JEE_ClientToScreen(hPicOnGui1, 1, 1, X, Y)
   hSysMenu := DllCall("GetSystemMenu", "Uint", Hwnd, "int", False) 
   r := DllCall("TrackPopupMenu", "uint", hSysMenu, "uint", TPM_RETURNCMD, "int", X, "int", Y, "int", 0, "uint", h, "uint", 0)
   If (r=0)
@@ -1793,8 +1864,36 @@ turnOffSlideshow() {
       SoundBeep , 900, 100
 }
 
+getMenuCoords(menuLabel) {
+   JEE_ClientToScreen(hPicOnGui1, 1, 1, mX, mY)
+   GetPhysicalCursorPos(x, y)
+   Try MouseGetPos, ,, WinID
+   AccInfoUnderMouse(x, y, winID, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
+   ; ToolTip, % coords.x "==" coords.y , , , 2
+   If (coords.x && coords.y)
+      coords := menuLabel "|" coords.x "|" coords.y + coords.h
+   Else
+      coords := menuLabel "|" mX "|" mY
+   Return coords
+}
+
+GetMenuItemRect(hwnd, hMenu, nPos) {
+    VarSetCapacity(RECT, 16, 0)
+    if DllCall("User32.dll\GetMenuItemRect", "Ptr", hwnd, "Ptr", hMenu, "UInt", nPos, "Ptr", &RECT)
+    {
+       SoundBeep 
+       objRect := { left   : numget( RECT,  0, "UInt" )
+                  , top    : numget( RECT,  4, "UInt" )
+                  , right  : numget( RECT,  8, "UInt" )
+                  , bottom : numget( RECT, 12, "UInt" ) }
+       return objRect
+    }
+
+    return 0
+}
+
 invokeFreeformDrawMenu() {
-   MainExe.ahkPostFunction("createContextMenuCustomShapeDrawing", 1, 1, 0, 0, 1)
+   MainExe.ahkPostFunction("createContextMenuCustomShapeDrawing", 1, 1, 0, 0, 1, coords)
 }
 
 ImgVectorUndoAct() {
@@ -1835,156 +1934,164 @@ toggleOpenClosedLineCustomShape() {
 
 togglePathCurveTension() {
    MainExe.ahkPostFunction(A_ThisFunc)
-
 }
 
-BuildFakeMenuBar(modus:=0) {
-
-   ; main menu
-   If (modus="freeform" || drawingShapeNow=1)
+changeMenusBarKbd(keyu) {
+   ; Static lastItem := 1
+   If ((A_TickCount - lastMenuHoverZeit<300) || (menuCurrentIndex))
    {
-      kMenu("MENU", "invokeFreeformDrawMenu")
-      kMenu("-", "-")
-      kMenu("UNDO", "ImgVectorUndoAct")
-      kMenu("REDO", "ImgVectorRedoAct")
-      kMenu("-", "-")
-      kMenu("DONE", "stopDrawingShape")
-      kMenu("CANCEL", "byeByeRoutine")
-      kMenu("-", "-")
-      kMenu("SELECT ALL", "MenuSelAllVectorPoints")
-      kMenu("NONE", "MenuSelNoVectorPoints")
-      kMenu("INVERT", "MenuSelInvertVectorPoints")
-      kMenu("ERASE", "MenuRemSelVectorPoints")
-      kMenu("-", "-")
-      kMenu("OPEN PATH", "toggleOpenClosedLineCustomShape")
-      kMenu("SMOOTHNESS", "togglePathCurveTension")
+      Sleep, 25
+      msgu := constantMenuReader("focused", 1)
+      WinGet, menus, List , % "ahk_class #32768 ahk_pid " QPVpid
+      If (keyu="left" && menus>1)
+      {
+         SendInput, {%keyu%}
+      } Else If (InStr(msgu, "submenu container") && keyu="right")
+      {
+         SendInput, {%keyu%}
+      } ELse
+      {
+         If menuCurrentIndex
+            thisu := (keyu="Right") ? menuCurrentIndex + 1 : menuCurrentIndex - 1
+         Else
+            thisu := (keyu="Right") ? prevMenuBarItem + 1 : prevMenuBarItem - 1
 
-      kMenu("-", "-")
-      kMenu("GRID", "toggleViewPortGridu")
-      kMenu("TOOLBAR", "toggleAppToolbar")
-      Return
+         n := clampInRange(thisu, 1, menuTotalIndex, 1)
+         ; ToolTip, % keyu "==" funcu "=" n "|" menuCurrentIndex "|" lastItem , , , 2
+         prevMenuBarItem := n
+         funcu := menuArray[n, 2]
+         If IsFunc(funcu)
+         {
+            lastMenuZeit := A_TickCount
+            SendInput, {F10}
+            Sleep, 15
+            %funcu%(0, n)
+         } Else
+            SendInput, {%keyu%}
+      }
+   } Else
+   {
+      SendInput, {%keyu%}
+      ; SoundBeep , 300, 100
+      ; ToolTip, % keyu "==" menuCurrentIndex , , , 2
    }
+}
 
-   kMenu("MENU", "InitMainContextMenu")
-   kMenu("-", "-")
+invokeGivenMenuBarPopup(n) {
+   n := clampInRange(n, 1, menuTotalIndex, 1)
+   funcu := menuArray[n, 2]
+   If IsFunc(funcu)
+   {
+      ; ToolTip, % keyu "==" funcu , , , 2
+      lastMenuZeit := A_TickCount
+      SendInput, {F10}
+      Sleep, 15
+      %funcu%(0, n)
+   }
+}
 
+uiAlphaMaskTrigger(a, b, c, d, e) {
+  AnyWindowOpen := a
+  liveDrawingBrushTool := b
+  editingSelectionNow := c
+  UserMemBMP := d
+  showMainMenuBar := e
+  thumbsDisplaying := 0
+  UpdateMenuBar()
+}
+
+isAlphaMaskWindow() {
+   Return isVarEqualTo(AnyWindowOpen, 23, 24, 31, 32, 70)
+}
+
+isNowAlphaPainting() {
+   Return (imgEditPanelOpened=1 && isAlphaMaskWindow()=1 && liveDrawingBrushTool=1 && editingSelectionNow=1) ? 1 : 0
+}
+
+BuildMenuBar(modus:=0) {
    If (modus="welcome")
-   {
-      kMenu("OPEN FILE", "OpenDialogFiles")
-      kMenu("OPEN FOLDER", "OpenFolders")
-      kMenu("RECENTS", "InvokeRecentMenu")
-      kMenu("FAVORITES", "invokeFavesMenu")
-      kMenu("-", "-")
-      kMenu("NEW IMAGE", "PanelNewImage")
-      kMenu("ACQUIRE", "AcquireWIAimage")
-      kMenu("PASTE CLIPBOARD", "tlbrPasteClipboardIMG")
-      Return
-   }
-
-   If (imgEditPanelOpened=1)
-   {
-      kMenu("HIDE PANEL", "toggleImgEditPanelWindow")
-      kMenu("-", "-")
-      If (AnyWindowOpen=10)
-         kMenu("APPLY TO SELECTION", "ApplyColorAdjustsSelectedArea")
-      Else
-         kMenu("APPLY", "applyIMGeditFunction")
-
-      If (AnyWindowOpen=10)
-         kMenu("CLOSE", "tlbrCloseWindow")
-      Else
-         kMenu("CANCEL", "tlbrCloseWindow")
-
-      kMenu("-", "-")
-      kMenu("UNDO", "ImgUndoAction")
-      kMenu("REDO", "ImgRedoAction")
-      kMenu("-", "-")
-      If (AnyWindowOpen=10)
-         kMenu("SELECT", "ToggleEditImgSelection")
-      ; Else
-      ;    kMenu("SELECT ALL", "MenuSelectAllAction")
-      kMenu("SQUARE", "makeSquareSelection")
-      kMenu("FLIP", "flipSelectionWH")
-      kMenu("IMAGE LIMITS", "toggleLimitSelection")
-      kMenu("-", "-")
-      If (AnyWindowOpen!=10)
-         kMenu("ROTATE 45°", "MenuSelRotation")
-      If (AnyWindowOpen=10)
-         kMenu("RESET VIEW", "BtnResetImageView")
-      Else
-         kMenu("RESET", "resetSelectionRotation")
-      kMenu("-", "-")
-      kMenu("ADAPT IMAGE", "ToggleImageSizingMode")
-      If (AnyWindowOpen=10)
-         kMenu("TOGGLE FX", "MenuToggleColorAdjustments")
-      Else
-         kMenu("HIDE OBJECT", "toggleLiveEditObject")
-      Return
-   }
-
-   isImgEditMode := (thumbsDisplaying!=1 && StrLen(UserMemBMP)>3 && undoLevelsRecorded>1) ? 1 : 0
-   infoThumbsMode := (thumbsDisplaying=1) ? "IMAGE VIEW" : "LIST VIEW"
-   If (isImgEditMode=1)
-      kMenu("NEW", "PanelNewImage")
-
-   kMenu("OPEN", "OpenDialogFiles")
-   kMenu("SAVE", "PanelSaveImg")
-   If (isImgEditMode=1)
-   {
-      kMenu("-", "-")
-      kMenu("UNDO", "ImgUndoAction")
-      kMenu("REDO", "ImgRedoAction")
-      kMenu("-", "-")
-   } Else
-   {
-      kMenu("REFRESH", "RefreshImageFileAction")
-      kMenu("-", "-")
-   }
-
-   kMenu(infoThumbsMode, "MenuDummyToggleThumbsMode")
-   kMenu("-", "-")
-   kMenu("SELECT", "MenuSelectAction")
-   kMenu("ALL/NONE", "MenuSelectAllAction")
-   kMenu("-", "-")
-   kMenu("COPY", "MenuCopyAction")
-   If (thumbsDisplaying!=1)
-      kMenu("PASTE", "tlbrPasteClipboardIMG")
+      menusList := menusListWelcome
+   Else If (modus="freeform" || drawingShapeNow=1)
+      menusList := menusListVector
+   Else If isNowAlphaPainting()
+      menusList := menusListAlphaMasking
+   Else If (imgEditPanelOpened=1 && AnyWindowOpen)
+      menusList := menusListEditor
+   Else If (thumbsDisplaying=1)
+      menusList := menusListThumbs
    Else
-      kMenu("MOVE", "PanelMoveCopyFiles")
-   kMenu("ERASE", "deleteKeyAction")
-   kMenu("-", "-")
+      menusList := menusListView
 
-   If (maxFilesIndex>1)
+   menuArray := []
+   menuTotalIndex := 0
+   menuHotkeys := "|"
+
+   Loop, Parse, menusList, |
    {
-      kMenu("SEARCH", "PanelSearchIndex")
-      kMenu("JUMP TO", "PanelJump2index")
-   } Else If (thumbsDisplaying!=1)
-   {
-      kMenu("ACQUIRE", "AcquireWIAimage")
-      kMenu("PRINT", "PanelPrintImage")
+      ; generate the list of hotkeys for the menu bar items: eg. alt + f
+      k := StrSplit(A_LoopField, ":")
+      n := SubStr(k[1], 1, 1)
+      n2 := SubStr(k[1], 2, 1)
+      lbl := (forbiddenAltKeys(n) || InStr(menuHotkeys, "!" n "|")) ? k[1] : "&" k[1]
+      If !InStr(lbl, "&")
+      {
+         lbl := (forbiddenAltKeys(n2) || InStr(menuHotkeys, "!" n2 "|")) ? k[1] : n "&" SubStr(k[1], 2)
+         menuHotkeys .= (!InStr(menuHotkeys, "!" n2 "|") && InStr(lbl, "&")) ? "!" n2 "|" : ".|"
+      } Else
+         menuHotkeys .= (!InStr(menuHotkeys, "!" n "|") && InStr(lbl, "&")) ? "!" n "|" : ".|"
+
+      kMenu(lbl, "invokeMenuBarItem")
    }
+}
 
-   kMenu("RESET", "ResetImageView")
+forbiddenAltKeys(n) {
    If (thumbsDisplaying=1)
+      Return isVarEqualTo(n, "e","u","l")
+   Else
+      Return isVarEqualTo(n, "a","e","u","p","r","y","g","l")
+}
+
+invokeMenuBarItem(a,b) {
+   Static lastInvoked, lastItem
+
+   ; ToolTip, % a "\" b "\" menuCurrentIndex , , , 2
+   If (!determineMenuBTNsOKAY() || menuCurrentIndex=b)
+      Return
+
+   If (colorPickerModeNow=1)
    {
-      kMenu("-", "-")
-      kMenu("MODES", "toggleListViewModeThumbs")
-      kMenu("-", "-")
-      kMenu("[ + ]", "changeZoomPlus")
-      kMenu("[ - ]", "changeZoomMinus")
-      kMenu("-", "-")
-   } Else
+       colorPickerModeNow := 0
+       MainExe.ahkPostFunction("StopColorPicker")
+       Return
+   } Else If (mustCaptureCloneBrush=1)
    {
-      kMenu("-", "-")
-      If (maxFilesIndex>1 && !isImgEditMode)
-         kMenu("PLAY", "dummyInfoToggleSlideShowu")
-      kMenu("INFO", "ToggleHistoInfoBoxu")
-      kMenu("PREV PANEL", "openPreviousPanel")
+       mustCaptureCloneBrush := 0
+       MainExe.ahkPostFunction("StopCaptureClickStuff", "Escape")
+       Return
    }
+
+   lastMenuZeit := A_TickCount
+   funcu := "InvokeMenuBar"
+   Loop, Parse, menusList, |
+   {
+      If (A_Index!=b)
+         Continue
+
+      k := StrSplit(A_LoopField, ":")
+      funcu .= k[2]
+   }
+
+   If (lastItem=b && (A_TickCount - lastInvoked<125))
+      Return
+ 
+   lastItem := b
+   Global menuCurrentIndex := b
+   lastInvoked := A_TickCount
+   MainExe.ahkPostFunction(funcu, b)
+   SetTimer, findMenuBarItemUnderMouse, 100
 }
 
 kMenu(labelu, funcu, mena:="PVmenu", actu:="add") {
-   Static menuArray := [], indexu := 2
    If (actu="add")
    {
       If (funcu="-")
@@ -1992,8 +2099,10 @@ kMenu(labelu, funcu, mena:="PVmenu", actu:="add") {
       Else
          Menu, % mena, % actu, % labelu, % funcu
 
-      indexu++
-      menuArray[indexu] := labelu
+      menuTotalIndex++
+      t := StrReplace(labelu, "&")
+      menuArray[menuTotalIndex] := [t, funcu]
+      menuArray[t] := [funcu, menuTotalIndex]
    }
 }
 
@@ -2001,328 +2110,74 @@ dummy() {
    Sleep, -1
 }
 
-MenuSelRotation() {
-  If !determineMenuBTNsOKAY()
-     Return
+clampInRange(value, min, max, reverse:=0) {
+   If (reverse=1)
+   {
+      If (value>max)
+         value := min
+      Else If (value<min)
+         value := max
+   } Else
+   {
+      If (value>max)
+         value := max
+      Else If (value<min)
+         value := min
+   }
 
-  MainExe.ahkPostFunction(A_ThisFunc)
+   Return value
 }
 
-ToggleImageSizingMode() {
-  If !determineMenuBTNsOKAY()
-     Return
+findMenuBarItemUnderMouse() {
+   Static prevLabel
 
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-BtnResetImageView() {
-  If !determineMenuBTNsOKAY()
-     Return
-
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-PanelNewImage() {
-  If !determineMenuBTNsOKAY()
-     Return
-
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-
-PanelPrintImage() {
-  If !determineMenuBTNsOKAY()
-     Return
-
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-OpenFolders() {
-  If !determineMenuBTNsOKAY()
-     Return
-
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-AcquireWIAimage() {
-  If !determineMenuBTNsOKAY()
-     Return
-
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-invokeFavesMenu() {
-  If !determineMenuBTNsOKAY()
-     Return
-
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-InvokeRecentMenu() {
-  If !determineMenuBTNsOKAY()
-     Return
-
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-ApplyColorAdjustsSelectedArea() {
-  If !determineMenuBTNsOKAY()
-     Return
-
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-applyIMGeditFunction() {
-  If !determineMenuBTNsOKAY()
-     Return
-
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-MenuToggleColorAdjustments() {
-  If !determineMenuBTNsOKAY()
-     Return
-
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-toggleLiveEditObject() {
-  If !determineMenuBTNsOKAY()
-     Return
-
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-tlbrCloseWindow() {
-  If !determineMenuBTNsOKAY()
-     Return
-
-  MainExe.ahkPostFunction("CloseWindow")
-}
-
-makeSquareSelection() {
-  If !determineMenuBTNsOKAY()
-     Return
-
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-toggleLimitSelection() {
-  If !determineMenuBTNsOKAY()
-     Return
-
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-flipSelectionWH() {
-  If !determineMenuBTNsOKAY()
-     Return
-
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-changeZoomMinus() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction("changeZoom", -1)
-}
-
-changeZoomPlus() {
-  If !determineMenuBTNsOKAY()
-     Return
-
-  MainExe.ahkPostFunction("changeZoom", 1)
-}
-
-CopyImage2clip() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-CopyImagePath() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-dummyInfoToggleSlideShowu() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-PanelMoveCopyFiles() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-MenuMarkThisFileNow() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-OpenDialogFiles() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-PanelJump2index() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-InvokeCopyFiles() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-deleteKeyAction() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-PanelPasteInPlace() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-PanelSearchIndex() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-tlbrPasteClipboardIMG() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-RefreshFilesList() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-RefreshImageFileAction() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-RegenerateEntireList() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-PanelSaveImg() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-PanelSaveSlideShowu() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-selectAllFiles() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-ResetImageView() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-toggleListViewModeThumbs() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-MenuDummyToggleThumbsMode() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-openPreviousPanel() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-ToggleHistoInfoBoxu() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-ToggleEditImgSelection() {
-  If !determineMenuBTNsOKAY()
-     Return
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-selectEntireImage(arg) {
-   If !determineMenuBTNsOKAY()
+   If (!identifyMenus() && (A_TickCount - lastMenuZeit>700))
+   {
+      ; ToolTip, % "killed" , , , 3
+      menuCurrentIndex := 0
+      prevMenuBarItem := 1
+      SetTimer, findMenuBarItemUnderMouse, Off
       Return
-   MainExe.ahkPostFunction(A_ThisFunc, arg)
+   }
+
+   lastMenuHoverZeit := A_TickCount
+   Try MouseGetPos, ,, WinID
+   If (WinID!=PVhwnd)
+      Return
+
+   GetPhysicalCursorPos(x, y)
+   AccInfoUnderMouse(x, y, WinID, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
+   goodText := accFocusValue ? accFocusValue : accFocusName
+   goodRoles := (accIRole=41 || accIRole=42 || accIRole=46) ? 1 : 0
+   If (accIRole=12 && accFocusName && prevLabel!=accFocusName)
+   {
+      prevLabel := accFocusName
+      t := StrReplace(accFocusName, "&")
+      funcu := menuArray[t, 1]
+      idu := menuArray[t, 2]
+      ; ToolTip, % accFocusName "==" funcu "==" t , , , 2
+      If (IsFunc(funcu) && idu!=menuCurrentIndex)
+      {
+         prevMenuBarItem := idu
+         lastMenuZeit := A_TickCount
+         SendInput, {F10}
+         Sleep, 15
+         ; ToolTip, % idu "=l" , , , 2
+         %funcu%(0, idu)
+      }
+   }
 }
 
-dropFilesSelection() {
-  If !determineMenuBTNsOKAY()
-     Return
+WM_NCMOUSEMOVE(wP, lP, msg, hwnd) {
+   Static prevLP, prevMenuID
+   ToolTip, % ";[" , , , 2
 
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-ImgUndoAction() {
-  If !determineMenuBTNsOKAY()
-     Return
-
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-ImgRedoAction() {
-  If !determineMenuBTNsOKAY()
-     Return
-
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-resetSelectionRotation() {
-  If !determineMenuBTNsOKAY()
-     Return
-
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-toggleImgEditPanelWindow() {
-  If !determineMenuBTNsOKAY()
-     Return
-
-  MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-deleteMenus() {
-    Static menusList := "PVmenu|"
-    Loop, Parse, menusList, |
-        Try Menu, % A_LoopField, Delete
+   If (prevLP!=lP && allowMenuReader="yes" && menuCurrentIndex>0)
+   {
+      Random, OutputVar, 1, 100
+      ; ToolTip, % "lol=" outputvar , , , 2
+      prevLP := lP
+   }
 }
 
 UpdateMenuBar(modus:=0) {
@@ -2333,7 +2188,8 @@ UpdateMenuBar(modus:=0) {
       hasRan := 1
    }
 
-   thisState := "a" imgEditPanelOpened AnyWindowOpen thumbsDisplaying maxFilesIndex drawingShapeNow modus UserMemBMP undoLevelsRecorded showMainMenuBar
+   thisState := "a" imgEditPanelOpened AnyWindowOpen thumbsDisplaying maxFilesIndex drawingShapeNow modus undoLevelsRecorded showMainMenuBar isNowAlphaPainting()
+   ; ToolTip, % "lol"  isNowAlphaPainting() isAlphaMaskWindow()  , , , 2
    If !showMainMenuBar
       prevState := thisState
 
@@ -2351,7 +2207,7 @@ UpdateMenuBar(modus:=0) {
    Gui, 1: Menu, PVmanu
    ; kMenu("-", "-", "PVmenu", "delete")
 
-   deleteMenus()
+   Try Menu, PVmenu, Delete
    If (showMainMenuBar!=1)
    {
       Sleep, -1
@@ -2360,7 +2216,8 @@ UpdateMenuBar(modus:=0) {
    }
 
    Sleep, -1
-   BuildFakeMenuBar(modus)
+   BuildMenuBar(modus)
+   MainExe.ahkassign("menuHotkeys", menuHotkeys)
    ; SetMenuInfo(MenuGetHandle("PVmenu"), 2, 1, 0, 1)
    Sleep, -1
    Gui, 1: Menu, PVmanu
@@ -2401,41 +2258,12 @@ SetMenuInfo(hMenu, maxHeight:=0, autoDismiss:=0, modeLess:=0, noCheck:=0) {
    Return DllCall("User32\SetMenuInfo","Ptr", hMenu, "Ptr", &MENUINFO)
 }
 
-
 determineMenuBTNsOKAY() {
+   ; ToolTip, % imageLoading "==" runningLongOperation "==" AnyWindowOpen "==" menuCurrentIndex , , , 2
    If (imageLoading=1 || runningLongOperation=1) || (AnyWindowOpen && imgEditPanelOpened!=1)
       Return 0
    Else
       Return 1
-}
-
-MenuCopyAction() {
-   If !determineMenuBTNsOKAY()
-      Return
-
-   MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-MenuSelectAction() {
-   If !determineMenuBTNsOKAY()
-      Return
-
-   MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-MenuSelectAllAction() {
-   Static prevState := 0
-   If !determineMenuBTNsOKAY()
-      Return
-
-   If (thumbsDisplaying=1)
-   {
-      If prevState
-         dropFilesSelection()
-      Else
-         selectAllFiles()
-      prevState := !prevState
-   } Else selectEntireImage("rm")
 }
 
 TulTip(debugger, sep, params*) {
@@ -2448,9 +2276,22 @@ TulTip(debugger, sep, params*) {
     ToolTip, % OutputVar "===" str , ,, 3
 }
 
+isVarEqualTo(value, vals*) {
+   yay := 0
+   for index, param in vals
+   {
+       If (value=param)
+       {
+          yay := 1
+          Break
+       }
+   }
+   Return yay
+}
+
 KeyboardResponder(givenKey, abusive) {
     ; ToolTip, % givenKey "=" abusive "=" animGIFplaying , , , 2
-    If (givenKey="Left" || givenKey="Right" || givenKey="Up" || givenKey="Down" || givenKey="PgUp" || givenKey="PgDn" || givenKey="Home" || givenKey="End" || givenKey="BackSpace" || givenKey="Delete" || givenKey="Enter")
+    If isVarEqualTo(givenKey, "Left","Right","Up","Down","PgUp","PgDn","Home","End","BackSpace","Delete","Enter")
     {
        If (slideShowRunning=1)
        {
@@ -2567,9 +2408,16 @@ SendMenuTabKey() {
    SendInput, % keyu
 }
 
-#If, (allowMenuReader="yes")
-   ~RButton::
-      constantMenuReader()
+identifyMenus(){
+   ; WinGet, OutputVar, List , % "ahk_class #32768 ahk_pid " QPVpid
+   ; ToolTip, % OutputVar "=l" , , , 2
+   r := WinExist("ahk_class #32768 ahk_pid " QPVpid) ? 1 : 0
+   Return r
+}
+
+#If, (identifyMenus() && allowMenuReader="yes")
+   RButton::
+      constantMenuReader("rbutton")
    Return
 
    ~WheelDown::
@@ -2582,8 +2430,14 @@ SendMenuTabKey() {
       SendInput, {Up 3}
    Return
 
-   ~Space::
-      SendInput, {Enter}
+   Left::
+   Right::
+      changeMenusBarKbd(A_ThisHotkey)
+   Return
+
+   Space::
+      constantMenuReader("focused")
+      ; SendInput, {Enter}
    Return
 
    ~BackSpace::
@@ -2598,7 +2452,7 @@ SendMenuTabKey() {
       }
    Return
 
-   F10::
+   +F10::
       If (menusflyOutVisible=1 || drawingShapeNow=1)
       {
          SendInput, {F10}
@@ -2606,7 +2460,7 @@ SendMenuTabKey() {
       }
    Return
 
-   vkBA::
+   vkBA::    ;  [ ; ]
       If (menusflyOutVisible=1)
       {
          SendInput, {F10}
@@ -2712,20 +2566,37 @@ calcScreenLimits(whichHwnd:="main") {
     Return prevActiveMon
 }
 
-constantMenuReader(modus:=0) {
+constantMenuReader(modus:=0, externMode:=0) {
    Static prevLabel := "z"
+   If (mouseToolTipWinCreated=1)
+   {
+      mouseTurnOFFtooltip()
+      Return
+   }
+
    GetPhysicalCursorPos(x, y)
-   ; winID := WinActive("A")
-   Try MouseGetPos, ,, WinID
    ; ToolTip, % winID "`n" OutputVarWin , , , 2
    If (modus="focused")
-      AccAccFocus(OutputVarWin, accFocusName, accFocusValue, accRole, accIRole)
-   Else
-      AccInfoUnderMouse(x, y, winID, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut)
+   {
+      ; WinID := WinActive("A")
+      ; WinID := DllCall("GetFocus", "ptr")
+      ; If !WinID
+      ;    WinID := DllCall("GetForegroundWindow", "ptr")
+      ; WinID := "0x" Format("{:x}", WinID)
+      ; winChild := WinEnumChild(WinID)
+
+      WinID := WinExist("ahk_class #32768 ahk_pid " QPVpid)
+      AccFromFocused(WinID, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
+   } Else
+   {
+      Try MouseGetPos, ,, WinID
+      AccInfoUnderMouse(x, y, WinID, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
+   }
 
    goodText := accFocusValue ? accFocusValue : accFocusName
    goodRoles := (accIRole=41 || accIRole=42 || accIRole=46) ? 1 : 0
-   If (accIRole=12 && accFocusName && (prevLabel!=accFocusName || mouseToolTipWinCreated!=1))
+   ; ToolTip, % goodText "=" goodRoles "==" WinID "==" winChild.count() , , , 2
+   If (accIRole=12 && accFocusName && (prevLabel!=accFocusName || mouseToolTipWinCreated!=1 || externMode=1))
    {
       prevLabel := accFocusName
       msgu := StrReplace(accFocusName, "`t", "`n[ ")
@@ -2742,10 +2613,23 @@ constantMenuReader(modus:=0) {
       If InStr(strstyles, "0x40000000")
          msgu .= "`nSUBMENU CONTAINER"
 
-      mouseCreateOSDinfoLine(msgu, PrefsLargeFonts)
+      If !externMode
+         ShowClickHalo(coords.x, coords.y, coords.w, coords.h, 1)
+
+      If !externMode
+         mouseCreateOSDinfoLine(msgu, PrefsLargeFonts, 0, coords)
+      Else
+         Return msgu
       ; ToolTip, % accFocusName , , , 2
       ; MainExe.ahkPostFunction("showtooltip", accFocusName)
+   } Else If (modus="RButton")
+   {
+      Try MouseGetPos, ,, WinID
+      WinGetClass, OutputVar, ahk_id %WinID%
+      If !InStr(OutputVar, "#32768")
+         SendInput, {F10}
    }
+
    SetTimer, repeatMenuInfosPopup, -150
 }
 
@@ -2777,7 +2661,7 @@ delayedWinActivateToolTipDeath() {
    WinActivate, ahk_id %lastTippyWin%
 }
 
-mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0) {
+mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
     Critical, On
     Static prevMsg, lastInvoked := 1
     Global TippyMsg
@@ -2810,26 +2694,37 @@ mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0) {
     MainExe.ahkassign("hGuiTip", hGuiTip)
     If (unClickable=1)
       WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
+
     mouseToolTipWinCreated := 1
     delayu := StrLen(msg) * 75 + 950
     lastZeitToolTip := A_TickCount
-    showOSDinfoLineNow(delayu)
+    showOSDinfoLineNow(delayu, givenCoords)
 }
 
-showOSDinfoLineNow(delayu) {
+showOSDinfoLineNow(delayu, givenCoords:=0) {
     If !mouseToolTipWinCreated
        Return
 
     GetPhysicalCursorPos(mX, mY)
-    If !isWinXP
+    If IsObject(givenCoords)
+    {
+       If (givenCoords.x && givenCoords.y)
+       {
+          forced := 1
+          mX := givenCoords.x 
+          mY := givenCoords.y + givenCoords.h
+       }
+    }
+
+    If (!isWinXP && forced!=1)
     {
        GetWinClientSize(Wid, Heig, hGuiTip, 1)
        k := WinMoveZ(hGuiTip, 15, mX, mY, Wid, Heig, 2)
        Final_x := k[1], Final_y := k[2]
     } Else
     {
-       tipX := mX + 15
-       tipY := mY + 15
+       tipX := (forced=1) ?  mX : mX + 15
+       tipY := (forced=1) ?  mY : mY + 15
        ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
        MaxWidth := Floor(ResWidth*0.85)
        If (MaxWidth<Wid && MaxWidth>10)
@@ -2842,7 +2737,8 @@ showOSDinfoLineNow(delayu) {
        }
     }
 
-    Gui, mouseToolTipGuia: Show, NoActivate AutoSize x%Final_x% y%Final_y%, QPV tooltip window
+    If (Final_x!="" && Final_y!="")
+       Gui, mouseToolTipGuia: Show, NoActivate AutoSize x%Final_x% y%Final_y%, QPV tooltip window
     WinSet, Transparent, 225, ahk_id %hGuiTip%
     If (delayu<msgDisplayTime/2)
        delayu := msgDisplayTime//2 + 1
@@ -2871,8 +2767,8 @@ adjustWin2MonLimits(winHwnd, winX, winY, ByRef rX, ByRef rY, ByRef Wid, ByRef He
 }
 
 ShowClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu:="") {
-    Static
-    Static lastInvoked := 1
+    Static lastInvoked := 1, wasCreated := 0, hClickHalo
+
     Critical, On
     If ((A_TickCount - lastInvoked < 100) || !BoxW || !BoxH)
        Return
@@ -2886,6 +2782,11 @@ ShowClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu:="") {
        mX := mX - BoxW//2
        mY := mY - BoxW//2
     }
+    If (wasCreated=1)
+    {
+       displayClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu, hClickHalo)
+       Return
+    }
 
     Gui, MclickH: Destroy
     Sleep, 20
@@ -2897,19 +2798,26 @@ ShowClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu:="") {
     If !msgu
        msgu := "QPV blip"
 
-    Gui, MclickH: Show, NoActivate x%mX% y%mY% w%BoxW% h%BoxH%, %msgu% ; ahk_id %hClickHalo%
-    If (boxMode=0)
-       WinSet, Region, 0-0 W%BoxW% H%BoxH% E, ahk_id %hClickHalo%
+    displayClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu, hClickHalo)
     WinSet, Transparent, 128, ahk_id %hClickHalo%
-    WinSet, AlwaysOnTop, On, ahk_id %hClickHalo%
+}
+
+displayClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu, hwnd) {
+    If (mX!="" && mY!="")
+       Gui, MclickH: Show, NoActivate x%mX% y%mY% w%BoxW% h%BoxH%, %msgu% ; ahk_id %hClickHalo%
+
+    If (boxMode=0)
+       WinSet, Region, 0-0 W%BoxW% H%BoxH% E, ahk_id %hwnd%
+    Else
+       WinSet, Region,, ahk_id %hwnd%
+
+    WinSet, AlwaysOnTop, On, ahk_id %hwnd%
     SetTimer, DestroyClickHalo, -300
 }
 
 DestroyClickHalo() {
-    Gui, MclickH: Destroy
+    Gui, MclickH: Hide
 }
-
-
 
 
 
@@ -4455,24 +4363,29 @@ Acc_ObjectFromWindow(hWnd, idObject = 0) {
     Return ComObjEnwrap(9,pacc,1)
 }
 
-AccAccFocus(hwnd, byref name, byref value, byref role, byref irole) {
-  Static WM_GETOBJECT := 0x003D  
+AccFromFocused(hwnd, byref val, byref name, byref RoleChild, byref RoleParent, byref styleu, byref strstyles, byref shortcut, byref coords) {
+  Static WM_GETOBJECT := 0x003D, hLibrary := 0
+  If !hLibrary
+     hLibrary := DllCall("LoadLibrary", "Str", "oleacc", "Ptr")
+
   SendMessage, WM_GETOBJECT, 0, 1, Chrome_RenderWidgetHostHWND1, % "ahk_id " hwnd
-  Acc := Acc_ObjectFromWindow(hwnd)
-  Try While IsObject(Acc.accFocus)
+  AccObj := Acc_ObjectFromWindow(hwnd)
+  Try While IsObject(AccObj.accFocus)
   {
-    Acc := Acc.accFocus
+    AccObj := AccObj.accFocus
   }
 
-  Try 
+  Try
   {
-    child := Acc.accFocus
-    name := Acc.accName(child)
-    value := Acc.accValue(child)
-    ; role := AccRole(Acc, child) 
-    irole := Acc.accRole(0) 
-    shortcut := Acc.accKeyboardShortCut(child)
-    AccState(Acc, child, styleu, strstyles)
+    child := AccObj.accFocus
+     ChildCount := AccObj.accChildCount
+     Name := AccObj.accName(child)
+     Val := AccObj.accValue(child)
+     RoleChild := AccObj.accRole(child)
+     shortcut := AccObj.accKeyboardShortCut(child)
+     AccState(AccObj, child, styleu, strstyles)
+     coords := AccGetLocation(AccObj, child)
+     ; ToolTip, % coords.x "==" coords.y , , , 2
   }
 }
 
@@ -4486,7 +4399,7 @@ Acc_ObjectFromPoint(ByRef idChild:="", mx:="", my:="") {
     Return g
 }
 
-AccInfoUnderMouse(mx, my, WinID, byref val, byref name, byref RoleChild, byref RoleParent, byref styleu, byref strstyles, byref shortcut) {
+AccInfoUnderMouse(mx, my, WinID, byref val, byref name, byref RoleChild, byref RoleParent, byref styleu, byref strstyles, byref shortcut, byref coords) {
   Static hLibrary, WM_GETOBJECT := 0x003D  
   If !hLibrary
      hLibrary := DllCall("LoadLibrary", "Str", "oleacc", "Ptr")
@@ -4504,9 +4417,21 @@ AccInfoUnderMouse(mx, my, WinID, byref val, byref name, byref RoleChild, byref R
      RoleChild := AccObj.accRole(child)
      shortcut := AccObj.accKeyboardShortCut(child)
      AccState(AccObj, child, styleu, strstyles)
+     coords := AccGetLocation(AccObj, child)
+     ; ToolTip, % coords.x "==" coords.y , , , 2
   }
   ; RoleParent := AccObj.accRole()
   Return ; ChildCount name val RoleChild RoleParent
+}
+
+AccGetLocation(Acc, ChildId=0) {
+  Static x := 0, y := 0, w := 0, h := 0
+  try Acc.accLocation(ComObj(0x4003,&x), ComObj(0x4003,&y), ComObj(0x4003,&w), ComObj(0x4003,&h), ChildId)
+  coord := []
+  coord.x := NumGet(x,0,"int"),  coord.y := NumGet(y,0,"int")
+  coord.w := NumGet(w,0,"int"),  coord.h := NumGet(h,0,"int")
+  ; AccCoord[1]:=NumGet(x,0,"int"), AccCoord[2]:=NumGet(y,0,"int"), AccCoord[3]:=NumGet(w,0,"int"), AccCoord[4]:=NumGet(h,0,"int")
+  Return coord
 }
 
 AccState(Acc, child, byref style, byref str, i := 1) {

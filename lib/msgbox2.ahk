@@ -988,56 +988,6 @@ calcScreenLimits(whichHwnd:="main") {
     Return prevActiveMon
 }
 
-GetWindowBounds(hWnd) {
-   ; function by GeekDude: https://gist.github.com/G33kDude/5b7ba418e685e52c3e6507e5c6972959
-   ; W10 compatible function to find a window's visible boundaries
-   ; modified by Marius Șucan to return an array
-   size := VarSetCapacity(rect, 16, 0)
-   er := DllCall("dwmapi\DwmGetWindowAttribute"
-      , "UPtr", hWnd  ; HWND  hwnd
-      , "UInt", 9     ; DWORD dwAttribute (DWMWA_EXTENDED_FRAME_BOUNDS)
-      , "UPtr", &rect ; PVOID pvAttribute
-      , "UInt", size  ; DWORD cbAttribute
-      , "UInt")       ; HRESULT
-
-   If er
-      DllCall("GetWindowRect", "UPtr", hwnd, "UPtr", &rect, "UInt")
-
-   r := []
-   r.x1 := NumGet(rect, 0, "Int"), r.y1 := NumGet(rect, 4, "Int")
-   r.x2 := NumGet(rect, 8, "Int"), r.y2 := NumGet(rect, 12, "Int")
-   r.w := Abs(max(r.x1, r.x2) - min(r.x1, r.x2))
-   r.h := Abs(max(r.y1, r.y2) - min(r.y1, r.y2))
-   ; ToolTip, % r.w " --- " r.h , , , 2
-   Return r
-}
-
-GetWinClientSize(ByRef w, ByRef h, hwnd, mode) {
-; by Lexikos http://www.autohotkey.com/forum/post-170475.html
-; modified by Marius Șucan
-    Static prevW, prevH, prevHwnd, lastInvoked := 1
-    If (A_TickCount - lastInvoked<95) && (prevHwnd=hwnd)
-    {
-       W := prevW, H := prevH
-       Return
-    }
-
-    prevHwnd := hwnd
-    VarSetCapacity(rc, 16, 0)
-    If (mode=1)
-    {
-       r := GetWindowBounds(hwnd)
-       prevW := W := r.w
-       prevH := H := r.h
-       lastInvoked := A_TickCount
-       Return
-    } Else DllCall("GetClientRect", "uint", hwnd, "uint", &rc)
-
-    prevW := W := NumGet(rc, 8, "int")
-    prevH := H := NumGet(rc, 12, "int")
-    lastInvoked := A_TickCount
-} 
-
 repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:="") {
     Static lastAsked := 1
          , BS_CHECKBOX := 0x2, BS_RADIOBUTTON := 0x8

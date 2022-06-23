@@ -1,2 +1,0 @@
-#define QPVMAIN_API __declspec(dllexport)
-#define QPVMAIN_API __declspec(dllimport)

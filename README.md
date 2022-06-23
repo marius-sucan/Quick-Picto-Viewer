@@ -14,18 +14,17 @@
 
 <p>Quick Picto Viewer is also able to play sound files associated with images, automatically or on demand, and even generate slideshows that are in synch with the audio files duration. Supported audio formats: WAV, MP3 and WMA. It can also display image captions / notes for image.</p>
 
-<p>Since Quick Picto Viewer v4, users can also edit images by using freely rotated elliptical or rectangular selections, or vector shapes. Common functions provided: paint brushes, paste in place, color adjustments, draw arcs, lines or shapes, insert text, soft edges blur area and so on.</p>
+<p>QPV can be used to edit images and/or paint new images. Various tools to this end are available, including blending modes and alpha masking abilities. Please see the features list to learn more in details what QPV can do.</p>
 
 <p width="600" height="410"><img width="600" height="410" alt="Quick Picture Viewer - thumbnails list screenshot" src="https://marius.sucan.ro/media/files/blog/ahk-scripts/images/qpv-screenshot1.jpg"></p>
 
 <p width="600" height="410"><img width="600" height="410" alt="Quick Picture Viewer - image view screenshot" src="https://marius.sucan.ro/media/files/blog/ahk-scripts/images/qpv-screenshot2.jpg"></p>
 
-
-<p>QPV runs on Windows XP*, Windows 7 and Windows 10.</p>
+<p>QPV runs on Windows 7, Windows 10 and Windows 11, and with some efforts, even on Windows XP - please read the notes at the end.</p>
 
 <p>Source code available on <a href="https://github.com/marius-sucan/Quick-Picto-Viewer">Github</a>.</p>
 
-<p><em>To run the uncompiled edition, download the ZIP file.</em> Required DLL files are included in the ZIP file, except for those needed to run on Windows XP.</p>
+<p><em>If you want to run the uncompiled edition, please make sure you download the required DLL files from the Github repository, or the ones included in the ZIP file.</p>
 
 <h1>Features</h1>
 
@@ -186,17 +185,10 @@
 
 </ul> 
 
+<H1>Other details</H1>
 <p>Developed by <a href="http://marius.sucan.ro/">Marius Șucan</a> with special attention for people with disabilities.</p>
 
-<p>I coded the application as an <a href="https://autohotkey.com/">AHK script</a> for AutoHotkey_H v1.1.32. To execute or compile the source code one needs AHK_H.<em>The required DLL files are found in the provided ZIP compiled script package</em>.</p>
+<p>I coded the application as an <a href="https://autohotkey.com/">AHK script</a> for AutoHotkey_H v1.1.32, [newer versions are not yet supported]. To execute or compile the source code one needs <a href="https://hotkeyit.github.io/v2/">AHK_H</a>.</p>
 
-<p>(*) Quick Picto Viewer can run on Windows XP, but various features might not work well. However, if you choose to do so, you must provide it with files found in Windows 10 (and possibly other Windows versions) installations. You must choose the ones that suit your Windows XP installation: DLLs for x32 or x64. These must be placed in the same folder with the QPV .EXE binary. The DLL files required are:</p>
-<ul>
-<li>api-ms-win-core-*-l1-1-0.dll [43 files]</li>
-<li>api-ms-win-crt-*-l1-1-0.dll [15 files]</li>
-<li>api-ms-win-core-file-l1-2-0.dll</li>
-<li>api-ms-win-core-file-l2-1-0.dll</li>
-<li>api-ms-win-core-localization-l1-2-0.dll</li>
-<li>api-ms-win-core-synch-l1-2-0.dll</li>
-<li>ucrtbase.dll</li>
-</ul>
+<p>Quick Picto Viewer can run on Windows 7 and even on XP, but various features might not work. To this end, you may have to copy all the DLL files found in the .\optional-DLL-files-x64\ folder to the same folder where the QPV binary is. If you are running it uncompiled, you must place them in the folder where the AutoHotkey binary resides. The required DLLs for x64 are bundled since version 5.7.5 in the ZIP package and can also be found in the Github repository.</p>
+
