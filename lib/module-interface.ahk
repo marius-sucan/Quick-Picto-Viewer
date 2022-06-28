@@ -54,7 +54,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , menusListVector := "File:VectorFile|Edit:VectorEdit|Selection:VectorSelection|View:VectorView|Interface:VectorInterface"
      , menusListThumbs := "File:File|Edit:Edit|Selection:Selection|Image:Image|Find:Find|List:List|Sort:Sort|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
      , menusListWelcome := "File:File|Edit:Edit|Interface:Interface|Settings:Settings|Help:Help"
-     , prevMenuBarItem := 1
+     , prevMenuBarItem := 1, lastContextMenuZeit := 1, winMX, winMY
 
 ; OnMessage(0x388, "WM_PENEVENT")
 OnMessage(0x2a3, "WM_MOUSELEAVE")
@@ -84,7 +84,8 @@ OnMessage(0x104, "WM_KEYDOWN")
 OnMessage(0x200, "WM_MOUSEMOVE")
 OnMessage(0x06, "activateMainWin")   ; WM_ACTIVATE 
 OnMessage(0x08, "activateMainWin")   ; WM_KILLFOCUS 
-; OnMessage(0x00A0, "WM_NCMOUSEMOVE")
+; OnMessage(0x0A0, "WM_NCMOUSEMOVE")  ; mouse move into window area
+
 
 setPriorityThread(2)
 lastMenuInvoked[1] := A_TickCount
@@ -1395,8 +1396,10 @@ activateMainWin() {
    lastMouseLeave := A_TickCount
    LbtnDwn := 0
    Sleep, -1
-   z := identifyThisWin()
-   If (editingSelectionNow=1 && slideShowRunning!=1 && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1)
+   MouseGetPos, ,, winu
+   ; z := identifyThisWin()
+   If (winu!=hQPVtoolbar && editingSelectionNow=1 && slideShowRunning!=1 && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1
+   && (A_TickCount - lastMenuHoverZeit>300) && (A_TickCount - lastMenuZeit>300) && (A_TickCount - lastContextMenuZeit>200))
       MainExe.ahkPostFunction("MouseMoveResponder", "krill")
 
    If (menusflyOutVisible=1 && !identifyMenus())
@@ -1706,6 +1709,7 @@ IsNumber(Var) {
 
 menuFlyoutDisplay(actu, mX, mY, isOkay, darkMode:=0, thisHwnd:=0, idu:=0) {
    lastOtherWinClose := A_TickCount
+   lastContextMenuZeit := A_TickCount
    uiUseDarkMode := darkMode
    otherAscriptHwnd := thisHwnd
    allowMenuReader := actu
@@ -2129,7 +2133,7 @@ clampInRange(value, min, max, reverse:=0) {
 }
 
 findMenuBarItemUnderMouse() {
-   Static prevLabel
+   Static prevLabel, lastH := 1, lastY := 1
 
    If (!identifyMenus() && (A_TickCount - lastMenuZeit>700))
    {
@@ -2147,10 +2151,19 @@ findMenuBarItemUnderMouse() {
 
    GetPhysicalCursorPos(x, y)
    AccInfoUnderMouse(x, y, WinID, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
-   goodText := accFocusValue ? accFocusValue : accFocusName
-   goodRoles := (accIRole=41 || accIRole=42 || accIRole=46) ? 1 : 0
+   If !(accIRole=12 && accFocusName)
+   {
+      If isInRange(y, lastY - lastH, lastY + lastH)
+      {
+         y := lastY
+         AccInfoUnderMouse(x, y, WinID, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
+      }
+   }
+
    If (accIRole=12 && accFocusName && prevLabel!=accFocusName)
    {
+      lastY := coords.y + coords.h//2
+      lastH := coords.h
       prevLabel := accFocusName
       t := StrReplace(accFocusName, "&")
       funcu := menuArray[t, 1]
@@ -2170,12 +2183,13 @@ findMenuBarItemUnderMouse() {
 
 WM_NCMOUSEMOVE(wP, lP, msg, hwnd) {
    Static prevLP, prevMenuID
-   ToolTip, % ";[" , , , 2
 
    If (prevLP!=lP && allowMenuReader="yes" && menuCurrentIndex>0)
    {
-      Random, OutputVar, 1, 100
-      ; ToolTip, % "lol=" outputvar , , , 2
+      winMX := lP & 0xFFFF
+      winMY := lP >> 16
+
+      ; ToolTip, % "lol=" winMX "=" winMY, , , 2
       prevLP := lP
    }
 }
@@ -4426,8 +4440,8 @@ AccInfoUnderMouse(mx, my, WinID, byref val, byref name, byref RoleChild, byref R
 
 AccGetLocation(Acc, ChildId=0) {
   Static x := 0, y := 0, w := 0, h := 0
-  try Acc.accLocation(ComObj(0x4003,&x), ComObj(0x4003,&y), ComObj(0x4003,&w), ComObj(0x4003,&h), ChildId)
   coord := []
+  try Acc.accLocation(ComObj(0x4003,&x), ComObj(0x4003,&y), ComObj(0x4003,&w), ComObj(0x4003,&h), ChildId)
   coord.x := NumGet(x,0,"int"),  coord.y := NumGet(y,0,"int")
   coord.w := NumGet(w,0,"int"),  coord.h := NumGet(h,0,"int")
   ; AccCoord[1]:=NumGet(x,0,"int"), AccCoord[2]:=NumGet(y,0,"int"), AccCoord[3]:=NumGet(w,0,"int"), AccCoord[4]:=NumGet(h,0,"int")

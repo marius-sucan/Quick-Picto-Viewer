@@ -17,6 +17,7 @@
 ; Gdip standard library versions:
 ; by Marius Șucan - gathered user-contributed functions and implemented hundreds of new functions
 ; - v1.92 [28/10/2021]
+; - v1.92 [28/10/2021]
 ; - v1.91 [11/10/2021]
 ; - v1.90 [09/10/2021]
 ; - v1.89 [08/10/2021]
@@ -70,6 +71,7 @@
 ; - v1.01 [05/31/2008]
 ;
 ; Detailed history:
+; - 27/06/2022 = various minor fixes
 ; - 28/10/2021 = Added Gdip_TranslatePath(), Gdip_ScalePath() and Gdip_RotatePath(). Improved Gdip_RotatePathAtCenter()
 ; - 11/10/2021 = more bug fixes; Gdip_CreatePath() now accepts passing a flat array object that defines the new path; some functions will now return values separated by pipe | instead of a comma [for better consistency across functions]
 ; - 09/10/2021 = [important release] major bug fixes for regressions introduced in previous version
@@ -837,7 +839,7 @@ Gdip_LibraryVersion() {
 ;                 Updated by Marius Șucan reflecting the work on Gdip_all extended compilation
 
 Gdip_LibrarySubVersion() {
-   return 1.92 ; 28/10/2021
+   return 1.93 ; 27/06/2022
 }
 
 ;#####################################################################################
@@ -2965,9 +2967,7 @@ Gdip_SetBitmapToClipboard(pBitmap, hBitmap:=0) {
 
    off1 := A_PtrSize = 8 ? 52 : 44
    off2 := A_PtrSize = 8 ? 32 : 24
-   pid := DllCall("GetCurrentProcessId","uint")
-   hwnd := WinExist("ahk_pid " . pid)
-   r1 := DllCall("OpenClipboard", "UPtr", hwnd)
+   r1 := DllCall("OpenClipboard", "UPtr", 0)
    If !r1
       Return -1
 
@@ -2997,10 +2997,10 @@ Gdip_SetBitmapToClipboard(pBitmap, hBitmap:=0) {
    DllCall("RtlMoveMemory", "UPtr", pdib, "UPtr", &oi+off2, "UPtr", 40)
    DllCall("RtlMoveMemory", "UPtr", pdib+40, "UPtr", NumGet(oi, off2 - A_PtrSize, "UPtr"), "UPtr", NumGet(oi, off1, "UInt"))
    DllCall("GlobalUnlock", "UPtr", hdib)
-   DeleteObject(hBitmap)
    r3 := DllCall("SetClipboardData", "uint", 8, "UPtr", hdib) ; CF_DIB = 8
    DllCall("CloseClipboard")
    DllCall("GlobalFree", "UPtr", hdib)
+   DeleteObject(hBitmap)
    E := r3 ? 0 : -4    ; 0 - success
    Return E
 }

@@ -27,12 +27,12 @@ Ctrl + [|Decrease image saturation by 5%|Anywhere|-
 Ctrl + ]|Increase image saturation by 5%|Anywhere|-
 \|Reset viewport color adjustments or rotation|Anywhere|-
 Ctrl + \|Hard reset color adjustments|Anywhere|-
-A|Toggle image alignment: centered or top-left corner|Anywhere|-
+A|Toggle centered image alignment|Anywhere|-
 Alt + A|Adjust image canvas size|Image view|Panel
 Alt + Backspace|Fill shapes or draw outlines of shapes|Image selection area|Panel
 Alt + Delete|Remove active file index entry|Anywhere|-
-Alt + E|Selection properties|Image view|Panel
-Alt + E|Open in QPV containing folder|Files list|-
+Alt + E|Selection properties|Image selection area|Panel
+Alt + E|Open in QPV containing folder|Anywhere|-
 Alt + U|Manage dynamic folder(s) list|Anywhere|Panel
 Alt + Y|Automatic image crop|Image view|Panel
 Alt + Arrow keys|Adjust image selection: top-left corner position|Image selection area|-
@@ -87,7 +87,6 @@ S|Select the other images in the duplicate images group|Files list|-
 Shift + S|Toggle «already seen» image status|Files list|-
 Ctrl + V|Render text from clipboard as image or paste clipboard image|Image view|-
 Ctrl + V|Paste text files list from clipboard or files from Explorer|Files list|-
-Ctrl + W|Set image as wallpaper|Image view|-
 Ctrl + X|Cut selected image area|Image selection area|-
 Ctrl + Wheel Up / Down|Zoom in/out|Anywhere|-
 D|Hide live previewed dynamic object|Live editing|-
@@ -102,44 +101,44 @@ Shift + Enter|Crop image to selected area|Image selection area|-
 Alt + Enter|File information window|Image view|Panel
 Ctrl + Enter|Open file(s) in a new QPV instance|Anywhere|External app
 Esc|Quit or close panel window|Anywhere|Close window
-F|Toggle between color modes/filters|Anywhere|-
-Shift + F|Toggle between color modes/filters|Anywhere|-
+F|Cycle image color modes and filters|Anywhere|-
+Shift + F|Cycle image color modes and filters|Anywhere|-
 F1|Help / About|Anywhere|Panel
-F10|Toggle toolbar|Anywhere|-
-Shift + F10|Toggle quick bar|Anywhere|-
+F10|Toggle menu|Anywhere|-
+Shift + F10|Toggle toolbar|Anywhere|-
 F11|Toggle full-screen|Image view|Mode switch
 F11|Collapse / expand panel for current tool|Live editing|Panel
 F12|Preferences|Anywhere|Panel
 F2|Rename file(s)|Anywhere|Panel
 F5|Reload files list or image file|Anywhere|-
 F8|Open previous panel|Anywhere|Panel
-G|Toggle histogram modes|Image view|-
-Shift + G|Toggle histogram modes|Image view|-
-Alt + G|Toggle histogram graph focus|Image view|-
+G|Cycle histogram modes|Image view|-
+Shift + G|Cycle histogram modes|Image view|-
+Alt + G|Cycle histogram graph focus modes|Image view|-
 H|Flip viewport horizontally|Anywhere|-
 V|Flip viewport vertically|Anywhere|-
 W|Flip selection W/H|Image selection area|-
 W|Show files list map now|Files list|-
 Z|Toggle image navigator box in viewport|Image view|-
-I|Toggle viewport information box|Anywhere|-
+I|Toggl viewport information box|Anywhere|-
 Insert|Insert file(s) into list|Anywhere|Files selector
 J|Jump to given file index or frame|Anywhere|Panel
-Shift + K|Perform JPEG lossless operations|Anywhere|Panel
+Shift + J|Perform JPEG lossless operations|Anywhere|Panel
 L|Toggle limit selection area to image boundaries|Image selection area|-
 L|Toggle limit viewport grid to image boundaries|Image view|-
-L|Toggle list view modes|Files list|-
+L|Cycle list view modes|Files list|-
 B|Add/remove image to favourites|Anywhere|-
-N|Toggle display of image captions|Image view|-
+N|Toggle image captions display|Image view|-
 Shift + N|Edit image caption|Image view|Panel
 O|Open image with external application|Anywhere|Menu
-Q|Toggle simulated color depth|Image view|-
-Shift + Q|Toggle simulated color depth|Image view|-
+Q|Cycle simulated color depth modes|Image view|-
+Shift + Q|Cycle simulated color depth modes|Image view|-
 R|Transform selection into a square [1:1]|Image selection area|-
 Shift + R|Rotate selection by 45°|Image selection area|-
 R|Review selected files list|Files list|Panel
-S|Toggle slideshow modes|Image view|-
-T|Toggle thumbnails aspect ratios: square, tall or wide|Files list|-
-T|Toggle image rescaling/adapting modes|Image view|-
+S|Cycle slideshow modes|Image view|-
+T|Cycle thumbnails aspect ratios: square, tall or wide|Files list|-
+T|Cycle image rescaling/adapting modes|Image view|-
 T|Cycle different levels of points tension in the freeform path|Vector drawing|-
 B|Toggle Bézier freeform path mode|Vector drawing|-
 U|Adjust image colors|Image view|Panel
@@ -188,7 +187,7 @@ Shift + \|Reset selection area rotation|Image selection area|-
 Shift + B|Blur selected area|Image view|Panel
 Shift + C|Copy file path(s) to clipboard|Anywhere|-
 Shift + Delete|Delete active file and its index entry|Anywhere|-
-Shift + E|Toggle image selection area modes: rect, ellipse, freeform|Image selection area|-
+Shift + E|Cycle image selection area modes: rect, ellipse, freeform|Image selection area|-
 Ctrl + NumPad keys|Align image selection area: top, bottom, left, right, more|Image selection area|-
 Ctrl + NumPad - / +|Shrink/enlarge selection area|Image selection area|-
 Ctrl + NumPad * / /|Increase or decrease selection area cavity|Image selection area|-
@@ -278,17 +277,16 @@ Shift + ,|Decrease brush wetness or deform intensity|Painting mode|-
 B|Toggle between simple and soft edges brush types|Painting mode|-
 Ctrl + K|Paint alpha mask|Live editing|-
 M|Toggle alpha mask preview|Live editing|-
-M|Toggle alpha mask preview|Live editing|-
 N|Invert alpha mask|Live editing|-
 T|Toggle airbrush mode|Painting mode|-
 R|Activate erase brush|Painting mode|-
 Q|Activate effects brush|Painting mode|-
 J|Activate cloner brush and toggle dynamic coordinates modes for the cloner|Painting mode|-
-D|Define cloner brush source [when cloner active]|Painting mode|-
+S|Define cloner brush source [when cloner active]|Painting mode|-
+SHift+S|Toggle between diameter and radius based brush size|Painting mode|-
 D|Set primary and secondary colors to black and white|Painting mode|-
-X|Toggle between color A and color B|Live editing|-
+X|Switch from color A to color B|Live editing|-
 Ctrl + L-Click|Paint with the other color|Painting mode|-
-S|Toggle between diameter and radius based brush size|Painting mode|-
 C|Pick primary brush color|Live editing|-
 Shift + K|Cycle between draw inside, outside or ignore selection area|Painting mode|-
 P|Toggle between bulge and pinch brushes|Painting mode|-

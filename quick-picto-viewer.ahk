@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.7.4
+;@Ahk2Exe-SetVersion 5.7.5
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2021)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -198,9 +198,9 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , userFriendlyPrevImgSelAction, keywordsListArray := new hashtable(), keywrdLVfilter, wasVPfxBefore := 0
    , lastLclickX, lastLclickY, lastTlbrClicked := 0, uiLVoffset := 0, repositionedWindow := 0
    , selDotMaX, selDotMaY, selDotMbX, selDotMbY, selDotMcX, selDotMcY, selDotMdX, selDotMdY
-   , lastInfoBoxZeitToggle := 1, prevHistoBoxString := "", menuHotkeys, whichMainDLL
+   , lastInfoBoxZeitToggle := 1, prevHistoBoxString := "", menuHotkeys, whichMainDLL, lastMenuZeit := 1
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.7.4", vReleaseDate := "23/06/2022"
+   , appVersion := "5.7.5", vReleaseDate := "28/06/2022"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1, usrAutoCropGenerateSelection := 0
@@ -3178,6 +3178,7 @@ CopyImage2clip() {
      If StrLen(zBitmap)>2
      {
         hBitmap := trGdip_CreateHBITMAPFromBitmap(A_ThisFunc, zBitmap)
+        ; Gdi_DeleteObject(hBitmap)
         r := hBitmap ? Gdip_SetBitmapToClipboard(zBitmap, hBitmap) : addJournalEntry("get_last_err")
         ; If (zBitmap!=whichBitmap)
            trGdip_DisposeImage(zBitmap, 1)
@@ -5045,7 +5046,7 @@ MouseMoveResponder(actu:=0) {
   }
 
   brushingMode := (liveDrawingBrushTool=1 && AnyWindowOpen=64) || (FloodFillSelectionAdj!=1 && AnyWindowOpen=66) ? 1 : 0
-  If (editingSelectionNow=1 && thumbsDisplaying=0 && actu="krill" && drawingShapeNow!=1)
+  If (editingSelectionNow=1 && thumbsDisplaying=0 && actu="krill" && drawingShapeNow!=1 && (A_TickCount - lastMenuZeit>250))
   {
      Gdip_GraphicsClear(2NDglPG, "0x00" WindowBgrColor)
      ; clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
@@ -48325,14 +48326,17 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
    interfaceThread.ahkFunction("menuFlyoutDisplay", "yes", mX, mY, okay, uiUseDarkMode, A_ScriptHwnd, idu)
    Sleep, 0
    ; SetMenuInfo(MenuGetHandle(menarg), 0, 1)
+   Global lastMenuZeit := A_TickCount
    Menu, % menarg, Show, % mX, % mY
+   Global lastMenuZeit := A_TickCount
    ; showDelayedTooltip("Menu item selected:`n" A_ThisMenuItem " [" A_ThisMenu "]")
 
    isFakeWin := (isNowFakeWinOpen=1 && AnyWindowOpen>0) ? 1 : 0
    ; If (isFakeWin=0)
       ; SetTimer, setWinCloseZeit, -185, 900
    setWinCloseZeit()
-   SetTimer, RemoveTooltip, % -msgDisplayTime//2
+   If (manubarMode!=1)
+      SetTimer, RemoveTooltip, % -msgDisplayTime//2
    Global lastWinDrag := A_TickCount
    Global lastOtherWinClose := A_TickCount + 100
    interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
@@ -76281,8 +76285,9 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
 
      If ((A_TickCount - lastInvoked > 155) && msgu) ; && (thisPos!=prevPos)
      {
-        If (thumbsDisplaying!=1 && LbtnDwn!=1)
-           dummyRefreshImgSelectionWindow()
+        ; If (thumbsDisplaying!=1 && LbtnDwn!=1)
+        ;    dummyRefreshImgSelectionWindow()        ; I do not remember why i needed this
+
         ; isThisWin :=(OutputVarWin=PVhwnd) ? 1 : 0
         If (imageLoading!=1 && runningLongOperation!=1)
         {

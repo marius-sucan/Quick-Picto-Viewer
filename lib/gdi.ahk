@@ -12,6 +12,7 @@
 
 ; Other functions added by Marius Șucan.
 ; Last update on: mercredi samedi 28 mai 2022 ; 28/05/2022
+; version: 1.30
 
 Gdi_DrawTextHelper(hDC, hFont, Text, x, y, txtColor, bgrColor:="") {
       ; Transparent background, no color needed
@@ -2972,12 +2973,12 @@ calcFntHeightFromPtsSize(ptsSize) {
 }
 
 Gdi_GetLibVersion() {
-  return 1.3 ; samedi 28 mai 2022 ; 28/05/2022
+  return 1.30 ; samedi 28 mai 2022 ; 28/05/2022
 }
 
 
 /*
-A selection of API functions left to implement from GDI,
+A selection of API functions left to implement from GDI.
 ===========================================================
 
 6 Region functions:
