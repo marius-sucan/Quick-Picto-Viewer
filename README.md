@@ -51,7 +51,7 @@
    <li>insert text with advanced customization options</li>
    <li>paste in place</li>
    <li>transform selected area</li>
-   <li>soft edges and motion blur</li>
+   <li>gaussian, box blur and radial blur</li>
    <li>rotate, crop, flip, pixelize, add noise, and more.</li>
 </ul>
 
@@ -93,6 +93,10 @@
 <li>Quick file actions. Easily move or copy files to user defined folder paths using the number keys: 1 to 6.</li>
 
 <li>Ability to automatically group files into sub-folders based on file types or modification date, by months or years.</li>
+
+<li>Create PDFs or multi-paged TIFFs from selected images. Up to 2048 images allowed.</li>
+
+<li>Extract frames from GIF and WebP animated images, or pages from TIFFs.</li>
 
 <li>Multiple list view modes. Display the indexed files as an easy to scroll list with or without image file details, or as thumbnails list.</li>
 

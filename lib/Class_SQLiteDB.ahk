@@ -534,29 +534,28 @@ Class SQLiteDB {
       This.Base.hasFailedInit := 0
       This._Queries := {}               ; Valid queries                                 (Object)
       This._Stmts := {}                 ; Valid prepared statements                     (Object)
-      If (This.Base._RefCount = 0) {
+      If (This.Base._RefCount = 0)
+      {
          SQLiteDLL := FreeImage_FoxGetDllPath("sqlite3.dll") ; mainCompiledPath "\SQLite3.dll"
          This.Base._SQLiteDLL := SQLiteDLL
-         If !FileExist(SQLiteDLL)
-            If FileExist(A_ScriptDir . "\SQLiteDB.ini") {
-               IniRead, SQLiteDLL, %A_ScriptDir%\SQLiteDB.ini, Main, DllPath, %SQLiteDLL%
-               This.Base._SQLiteDLL := SQLiteDLL
-         }
-         If !(DLL := DllCall("LoadLibrary", "Str", This.Base._SQLiteDLL, "UPtr")) {
+         If !(DLL := DllCall("LoadLibrary", "Str", This.Base._SQLiteDLL, "UPtr"))
+         {
             This.Base.hasFailedInit := 1
-            addJournalEntry("ERROR: DLL "SQLiteDLL " does not exist! Failed to initialize SQlite3.")
+            addJournalEntry("ERROR: DLL " SQLiteDLL " does not exist! Failed to initialize SQlite3.")
             ; MsgBox, 16, SQLiteDB Error, % "DLL " . SQLiteDLL . " does not exist!"
             ; ExitApp
          }
+
          If (This.Base.hasFailedInit!=1)
          {
             This.Base.Version := StrGet(DllCall("SQlite3.dll\sqlite3_libversion", "Cdecl UPtr"), "UTF-8")
             multiThread := DllCall("SQlite3.dll\sqlite3_threadsafe", "Cdecl Int")
             SQLVersion := StrSplit(This.Base.Version, ".")
             MinVersion := StrSplit(This.Base._MinVersion, ".")
-            If (SQLVersion[1] < MinVersion[1]) || ((SQLVersion[1] = MinVersion[1]) && (SQLVersion[2] < MinVersion[2])){
+            If (SQLVersion[1] < MinVersion[1]) || ((SQLVersion[1] = MinVersion[1]) && (SQLVersion[2] < MinVersion[2]))
+            {
                This.Base.hasFailedInit := 1
-               DllCall("FreeLibrary", "Ptr", DLL)
+               DllCall("FreeLibrary", "UPtr", DLL)
                addJournalEntry("ERROR: version " This.Base.Version " of SQLite3.dll is not supported!`n`nYou can download the current version from www.sqlite.org!")
                ; ExitApp
             } Else
@@ -571,10 +570,11 @@ Class SQLiteDB {
    __Delete() {
       If (This._Handle)
          This.CloseDB()
+
       This.Base._RefCount -= 1
       If (This.Base._RefCount = 0) {
          If (DLL := DllCall("GetModuleHandle", "Str", This.Base._SQLiteDLL, "UPtr"))
-            DllCall("FreeLibrary", "Ptr", DLL)
+            DllCall("FreeLibrary", "UPtr", DLL)
       }
    }
    ; ===================================================================================================================

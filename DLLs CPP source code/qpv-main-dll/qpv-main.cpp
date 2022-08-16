@@ -7,6 +7,7 @@
 #include "omp.h"
 #include "math.h"
 #include "windows.h"
+#include "Jpeg2PDF.h"
 #include <string>
 #include <sstream>
 #include <vector>
@@ -23,12 +24,18 @@
 #include <gdiplusflat.h>
 #include <locale.h>
 #include <codecvt>
+#include <corecrt_io.h>
+#include <direct.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include "include\CImg-3.1.4\CImg.h"
 // #include <Magick++.h>
 // #include <include\vips\vips8>
-
 // #include <bits/stdc++.h>
 
 using namespace std;
+using namespace cimg_library;
 
 void fnOutputDebug(std::string input) {
     std::stringstream ss;
@@ -1044,95 +1051,6 @@ DLL_API int DLL_CALLCONV SetGivenAlphaLevel(int *imageData, int w, int h, int gi
 }
 
 /*
-The box blur will be applied on the provided pBitmap
-C/C++ function by Tic:
-https://autohotkey.com/board/topic/29449-gdi-standard-library-145-by-tic/page-30
-*/
-
-DLL_API int DLL_CALLCONV BoxBlurBitmap(unsigned char* Bitmap, int w, int h, int Stride, int Passes) {
-    #pragma omp parallel for schedule(dynamic) default(none)
-    for (int i = 0; i < Passes; ++i)
-    {
-        int A1, R1, G1, B1, A2, R2, G2, B2, A3, R3, G3, B3;
-        for (int y = 0; y < h * Stride; y += Stride)
-        {
-            // A1 = R1 = G1 = B1 = A2 = R2 = G2 = B2 = 0;
-            for (int x = 0; x < w; ++x)
-            {
-                int tempCoord = (4 * x) + y;
-                A3 = Bitmap[3 + tempCoord];
-                R3 = Bitmap[2 + tempCoord];
-                G3 = Bitmap[1 + tempCoord];
-                B3 = Bitmap[tempCoord];
-
-                Bitmap[3 + tempCoord] = (A1 + A2 + A3) / 3;
-                Bitmap[2 + tempCoord] = (R1 + R2 + R3) / 3;
-                Bitmap[1 + tempCoord] = (G1 + G2 + G3) / 3;
-                Bitmap[tempCoord] = (B1 + B2 + B3) / 3;
-
-                A1 = A2; R1 = R2; G1 = G2; B1 = B2; A2 = A3; R2 = R3; G2 = G3; B2 = B3;
-            }
-
-            // A1 = R1 = G1 = B1 = A2 = R2 = G2 = B2 = 0;
-            for (int x = w - 1; x >= 0; --x)
-            {
-                int tempCoord = (4 * x) + y;
-                A3 = Bitmap[3 + tempCoord];
-                R3 = Bitmap[2 + tempCoord];
-                G3 = Bitmap[1 + tempCoord];
-                B3 = Bitmap[tempCoord];
-
-                Bitmap[3 + tempCoord] = (A1 + A2 + A3) / 3;
-                Bitmap[2 + tempCoord] = (R1 + R2 + R3) / 3;
-                Bitmap[1 + tempCoord] = (G1 + G2 + G3) / 3;
-                Bitmap[tempCoord] = (B1 + B2 + B3) / 3;
-
-                A1 = A2; R1 = R2; G1 = G2; B1 = B2; A2 = A3; R2 = R3; G2 = G3; B2 = B3;
-            }
-        }
-
-        for (int x = 0; x < w; ++x)
-        {
-            // A1 = R1 = G1 = B1 = A2 = R2 = G2 = B2 = 0;
-            for (int y = 0; y < h * Stride; y += Stride)
-            {
-                int tempCoord = (4 * x) + y;
-                A3 = Bitmap[3 + tempCoord];
-                R3 = Bitmap[2 + tempCoord];
-                G3 = Bitmap[1 + tempCoord];
-                B3 = Bitmap[tempCoord];
-
-                Bitmap[3 + tempCoord] = (A1 + A2 + A3) / 3;
-                Bitmap[2 + tempCoord] = (R1 + R2 + R3) / 3;
-                Bitmap[1 + tempCoord] = (G1 + G2 + G3) / 3;
-                Bitmap[tempCoord] = (B1 + B2 + B3) / 3;
-
-                A1 = A2; R1 = R2; G1 = G2; B1 = B2; A2 = A3; R2 = R3; G2 = G3; B2 = B3;
-            }
-
-            // A1 = R1 = G1 = B1 = A2 = R2 = G2 = B2 = 0;
-            for (int y = (h - 1) * Stride; y >= 0; y -= Stride)
-            {
-                int tempCoord = (4 * x) + y;
-                A3 = Bitmap[3 + tempCoord];
-                R3 = Bitmap[2 + tempCoord];
-                G3 = Bitmap[1 + tempCoord];
-                B3 = Bitmap[tempCoord];
-
-                Bitmap[3 + tempCoord] = (A1 + A2 + A3) / 3;
-                Bitmap[2 + tempCoord] = (R1 + R2 + R3) / 3;
-                Bitmap[1 + tempCoord] = (G1 + G2 + G3) / 3;
-                Bitmap[tempCoord] = (B1 + B2 + B3) / 3;
-
-                A1 = A2; R1 = R2; G1 = G2; B1 = B2; A2 = A3; R2 = R3; G2 = G3; B2 = B3;
-            }
-        }
-    }
-    return 1;
-}
-
-
-/*
 pBitmap and pBitmap2Blend must be the same width and height
 and in 32-ARGB format: PXF32ARGB - 0x26200A.
 */
@@ -1481,26 +1399,6 @@ DLL_API int DLL_CALLCONV ConvertToGrayScale(int *BitmapData, int w, int h, int m
 }
 
 /*
-DLL_API int newBoxBlurBitmap(unsigned char* Bitmap, unsigned char* BitmapOut, int w, int h, int Stride, int r) {
-// function boxBlurT_3 (scl, tcl, w, h, r) {
-// http://blog.ivank.net/fastest-gaussian-blur.html
-
-    for (int i=0; i<h*Stride; i+=Stride)
-    {
-        for(int j=0; j<w; j++)
-        {
-            int val = 0;
-            for (int iy=i-r; iy<i+r+1; iy++)
-            {
-                int y = min(h-1, max(0, iy));
-                val += Bitmap[y*w+j];
-            }
-            BitmapOut[i*w+j] = val/(2*r+1);
-        }
-    }
-
-}
-
 DLL_API int DLL_CALLCONV BlurImage(unsigned char *Bitmap, int width, int height, int Stride, int radius) {
 // https://stackoverflow.com/questions/47209262/c-blur-effect-on-bit-map-is-working-but-colors-are-changed
 
@@ -2566,66 +2464,10 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
                     } else
                     {
                        if (SUCCEEDED(hrGray))
-                       {
                           hr = pScaler->Initialize(pConverterGray, nSize[0], nSize[1], wicScaleQuality);
-                       } else
-                       {
+                       else
                           hr = pScaler->Initialize(m_pOriginalBitmapSource, nSize[0], nSize[1], wicScaleQuality);
-                       }
                     }
-
-/*
-                    if (SUCCEEDED(hr) && doGrayScale==1)
-                    {
-                       IWICFormatConverter* pConverter = NULL;
-                       hr = m_pIWICFactory->CreateFormatConverter(&pConverter);
-                       if (SUCCEEDED(hr))
-                       {
-                           hr = pConverter->Initialize(pScaler,             // Input bitmap to convert
-                                             GUID_WICPixelFormat8bppGray,  // Destination pixel format
-                                             WICBitmapDitherTypeNone,      // Specified dither patterm
-                                             NULL,                         // Specify a particular palette 
-                                             0.f,                          // Alpha threshold
-                                             WICBitmapPaletteTypeCustom);  // Palette translation type
-                           if (SUCCEEDED(hr))
-                           {
-                               hr = pConverter->QueryInterface(IID_IWICBitmapSource, 
-                                                reinterpret_cast<void **>(&pToRenderBitmapSource));
-                               if (SUCCEEDED(hr))
-                               {
-                                   WICRect rcLock = { 0, 0, nSize[0], nSize[1]};
-                                   IWICBitmapLock *pLock = NULL;
-                                   hr = pToRenderBitmapSource->Lock(&rcLock, WICBitmapLockRead, &pLock);
- 
-                                   if (SUCCEEDED(hr))
-                                   {
-                                       UINT cbBufferSize = 0;
-                                       UINT cbStride = 0;
-                                       BYTE *pv = NULL;
- 
-                                       // Retrieve the stride.
-                                       hr = pLock->GetStride(&cbStride);
- 
-                                       if (SUCCEEDED(hr))
-                                       {
-                                           hr = pLock->GetDataPointer(&cbBufferSize, &pv);
-                                       }
-                                       if (SUCCEEDED(hr))
-                                       {
-                                           // Access the bitmap memory starting at pv, where
-                                           // each row begins cbStride bytes after the start
-                                           // of the preceding row.
-                                       }
- 
-                                       // Release the bitmap lock.
-                                       pLock->Release();
-                                   }
-                               }
-                           }
-                           SafeRelease(pConverter);
-                       }
-                    }
-*/
 
                     // std::stringstream ss;
                     // ss << "qpv: threadu - " << threadIDu << " scaled image to W/H " << nSize[0] << "," << nSize[1];
@@ -2690,33 +2532,24 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
             hr = pToRenderBitmapSource->GetPixelFormat(&pixelFormat);
 
             if (SUCCEEDED(hr))
-            {
-                hr = (pixelFormat == GUID_WICPixelFormat32bppPBGRA) ? S_OK : E_FAIL;
-            }
+               hr = (pixelFormat == GUID_WICPixelFormat32bppPBGRA) ? S_OK : E_FAIL;
 
             if (SUCCEEDED(hr))
-            {
-                hr = pToRenderBitmapSource->GetSize(&width, &height); 
-            }
+               hr = pToRenderBitmapSource->GetSize(&width, &height); 
 
+            // Size of a scan line represented in bytes: 4 bytes each pixel
             UINT cbStride = 0;
             if (SUCCEEDED(hr))
-            {
-                // Size of a scan line represented in bytes: 4 bytes each pixel
-                hr = UIntMult(width, sizeof(Gdiplus::ARGB), &cbStride);
-            }
+               hr = UIntMult(width, sizeof(Gdiplus::ARGB), &cbStride);
 
+            // Size of the image, represented in bytes
             UINT cbBufferSize = 0;
             if (SUCCEEDED(hr))
-            {
-                // Size of the image, represented in bytes
-                hr = UIntMult(cbStride, height, &cbBufferSize);
-            }
+               hr = UIntMult(cbStride, height, &cbBufferSize);
 
             // std::stringstream ss;
             // ss << "qpv: threadu - " << threadIDu << " convert to dib format stride=" << cbStride;
             // OutputDebugStringA(ss.str().data());
-
             if (SUCCEEDED(hr))
             {
                 BYTE *m_pbBuffer = NULL;  // the GDI+ bitmap buffer
@@ -2797,11 +2630,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
 
 DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
     HRESULT hr = S_OK;
-    // if (modus==1)
-    // {
-    //    CoUninitialize();
-    //    hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_SPEED_OVER_MEMORY | COINIT_DISABLE_OLE1DDE);
-    // }
+    // to do - fix this; make it work on Windows 7 
 
     if (SUCCEEDED(hr))
     {
@@ -2813,11 +2642,10 @@ DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
     // std::stringstream ss;
     // ss << "qpv: threadu - " << threadIDu << " HRESULT " << hr;
     // OutputDebugStringA(ss.str().data());
-
-   if (SUCCEEDED(hr))
-      return 1;
-   else 
-      return 0;
+    if (SUCCEEDED(hr))
+       return 1;
+    else 
+       return 0;
 }
 
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testFunc(UINT width, UINT height, const wchar_t *szFileName) {
@@ -2845,3 +2673,672 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testFunc(UINT width, UINT height, const 
 int myRound(double x) {
     return (x<0) ? (int)(x-0.5) : (int)(x+0.5);
 }
+
+static void Jpeg2PDF_SetXREF(PJPEG2PDF pPDF, int index, int offset, char c) {
+  if(INDEX_USE_PPDF == index) index = pPDF->pdfObj;
+
+  if('f' == c) 
+    sprintf((char *)pPDF->pdfXREF[index], "%010d 65535 f\r\n", offset);
+  else
+    sprintf((char *)pPDF->pdfXREF[index], "%010d 00000 %c\r\n", offset, c);
+
+  // if (JPEG2PDF_DEBUG)
+  //    printf("pPDF->pdfXREF[%d] = %s", index, (int)pPDF->pdfXREF[index], 3,4,5,6);
+}
+
+PJPEG2PDF Jpeg2PDF_BeginDocument(double pdfW, double pdfH, int pdf_dpi) {
+// based on https://www.codeproject.com/Articles/29879/Simplest-PDF-Generating-API-for-JPEG-Image-Content
+
+  PJPEG2PDF pPDF;
+  pPDF = (PJPEG2PDF)malloc(sizeof(JPEG2PDF));
+  if (pPDF)
+  {
+    memset(pPDF, 0, sizeof(JPEG2PDF));
+    // if (JPEG2PDF_DEBUG)
+    //    printf("PDF List Inited (pPDF = %p)\n", (int)pPDF, 2,3,4,5,6);
+    pPDF->pageW = (UINT32)(pdfW * pdf_dpi);
+    pPDF->pageH = (UINT32)(pdfH * pdf_dpi);
+    fnOutputDebug("PDF Page Size: " + std::to_string(pPDF->pageW) + " x " + std::to_string(pPDF->pageH) + " @ " + std::to_string(pdf_dpi) + " dpi");
+
+    pPDF->currentOffSet = 0;
+    Jpeg2PDF_SetXREF(pPDF, 0, pPDF->currentOffSet, 'f');
+    pPDF->currentOffSet += sprintf((char *)pPDF->pdfHeader, "%%PDF-1.3\r\n%%%cPDF generated by Quick Picture Viewer v5.%c\r\n", 0xFF, 0xFF);
+    // if (JPEG2PDF_DEBUG)
+    //    printf("[pPDF=%p], header: %s", (int)pPDF, (int)pPDF->pdfHeader,3,4,5,6);
+    
+    pPDF->imgObj = 0;
+    pPDF->pdfObj = 2;    // 0 & 1 was reserved for xref & document Root
+  }
+  
+  return pPDF;
+}
+
+STATUS Jpeg2PDF_AddJpeg(PJPEG2PDF pPDF, UINT32 imgW, UINT32 imgH, UINT32 fileSize, UINT8 *pJpeg, UINT8 isColor) {
+  STATUS result = ERROR;
+  PJPEG2PDF_NODE pNode;
+
+  if (pPDF)
+  {
+    if (pPDF->nodeCount >= MAX_PDF_PAGES)
+    {
+       fnOutputDebug("Add JPEG into PDF. Image skipped. The maximum number of pages has been reached for this PDF file. MAX=" + std::to_string(MAX_PDF_PAGES));
+       return result;
+    }
+
+    pNode = (PJPEG2PDF_NODE)malloc(sizeof(JPEG2PDF_NODE));
+    if (pNode)
+    {
+      UINT32 nChars, currentImageObject;
+      UINT8 *pFormat, lenStr[256];
+      pNode->JpegW = imgW;
+      pNode->JpegH = imgH;
+      pNode->JpegSize = fileSize;
+      pNode->pJpeg = (UINT8 *)malloc(pNode->JpegSize);
+      pNode->pNext = NULL;
+    
+      if (pNode->pJpeg != NULL)
+      {
+        memcpy(pNode->pJpeg, pJpeg, pNode->JpegSize);
+        
+        // Image Object
+        Jpeg2PDF_SetXREF(pPDF, INDEX_USE_PPDF, pPDF->currentOffSet, 'n');
+        currentImageObject = pPDF->pdfObj;
+
+        pPDF->currentOffSet += sprintf((char *)pNode->preFormat, "\r\n%d 0 obj\r\n<</Type/XObject/Subtype/Image/Filter/DCTDecode/BitsPerComponent 8/ColorSpace/%s/Width %d/Height %d/Length %d>>\r\nstream\r\n",
+          pPDF->pdfObj, ((isColor)? "DeviceRGB" : "DeviceGray"), pNode->JpegW, pNode->JpegH, pNode->JpegSize);
+        
+        pPDF->currentOffSet += pNode->JpegSize;
+        pFormat = pNode->pstFormat;
+        nChars = sprintf((char *)pFormat, "\r\nendstream\r\nendobj\r\n");
+        pPDF->currentOffSet += nChars;  pFormat += nChars;
+        pPDF->pdfObj++;
+
+        // Page Object
+        Jpeg2PDF_SetXREF(pPDF, INDEX_USE_PPDF, pPDF->currentOffSet, 'n');
+        pNode->PageObj = pPDF->pdfObj;
+        nChars = sprintf((char *)pFormat, "%d 0 obj\r\n<</Type/Page/Parent 1 0 R/MediaBox[0 0 %d %d]/Contents %d 0 R/Resources %d 0 R>>\r\nendobj\r\n",
+            pPDF->pdfObj, pPDF->pageW, pPDF->pageH, pPDF->pdfObj+1, pPDF->pdfObj + 3);
+        pPDF->currentOffSet += nChars;  pFormat += nChars;
+        pPDF->pdfObj++;
+
+        // Contents Object in Page Object
+        Jpeg2PDF_SetXREF(pPDF, INDEX_USE_PPDF, pPDF->currentOffSet, 'n');
+        sprintf((char *)lenStr, "q\r\n1 0 0 1 %.2f %.2f cm\r\n%.2f 0 0 %.2f 0 0 cm\r\n/I%d Do\r\nQ\r\n",
+            PDF_LEFT_MARGIN, PDF_TOP_MARGIN, pPDF->pageW - 2*PDF_LEFT_MARGIN, pPDF->pageH - 2*PDF_TOP_MARGIN, pPDF->imgObj);
+        nChars = sprintf((char *)pFormat, "%d 0 obj\r\n<</Length %d 0 R>>stream\r\n%sendstream\r\nendobj\r\n",
+            pPDF->pdfObj, pPDF->pdfObj+1, lenStr);
+        pPDF->currentOffSet += nChars;  pFormat += nChars;
+        pPDF->pdfObj++;
+
+        // Length Object in Contents Object
+        Jpeg2PDF_SetXREF(pPDF, INDEX_USE_PPDF, pPDF->currentOffSet, 'n');
+        nChars = sprintf((char *)pFormat, "%d 0 obj\r\n%ld\r\nendobj\r\n", pPDF->pdfObj, strlen((char *)lenStr));
+        pPDF->currentOffSet += nChars;  pFormat += nChars;
+        pPDF->pdfObj++;
+        
+        // Resources Object in Page Object
+        Jpeg2PDF_SetXREF(pPDF, INDEX_USE_PPDF, pPDF->currentOffSet, 'n');
+        nChars = sprintf((char *)pFormat, "%d 0 obj\r\n<</ProcSet[/PDF/%s]/XObject<</I%d %d 0 R>>>>\r\nendobj\r\n",
+                pPDF->pdfObj, ((isColor)? "ImageC" : "ImageB"), pPDF->imgObj, currentImageObject);
+        pPDF->currentOffSet += nChars;  pFormat += nChars;
+        pPDF->pdfObj++;
+        pPDF->imgObj++;
+
+        // Update the Link List
+        pPDF->nodeCount++;
+        if(1 == pPDF->nodeCount) {
+          pPDF->pFirstNode = pNode;
+        } else {
+          pPDF->pLastNode->pNext = pNode;
+        }
+
+        pPDF->pLastNode = pNode;
+        result = IDOK;
+      } // pNode->pJpeg allocated OK
+    } // pNode is valid
+  } // pPDF is valid
+
+  return result;
+}
+
+UINT32 Jpeg2PDF_EndDocument(PJPEG2PDF pPDF) {
+  UINT32 headerSize, tailerSize, pdfSize = 0;
+  
+  if (pPDF)
+  {
+    UINT8 strKids[MAX_PDF_PAGES * MAX_KIDS_STRLEN], *pTail = pPDF->pdfTailer;
+    UINT32 i, nChars, xrefOffSet;
+    PJPEG2PDF_NODE pNode;
+    
+    // Catalog Object. This is the Last Object
+    Jpeg2PDF_SetXREF(pPDF, INDEX_USE_PPDF, pPDF->currentOffSet, 'n');
+    nChars = sprintf((char *)pTail, "%d 0 obj\r\n<</Type/Catalog/Pages 1 0 R>>\r\nendobj\r\n", pPDF->pdfObj);
+    pPDF->currentOffSet += nChars;  pTail += nChars;
+    
+    // Pages Object. It's always the Object 1
+    Jpeg2PDF_SetXREF(pPDF, 1, pPDF->currentOffSet, 'n');
+
+    strKids[0] = 0;
+    pNode = pPDF->pFirstNode;
+    while (pNode != NULL)
+    {
+      UINT8 curStr[9];
+      sprintf((char *)curStr, "%d 0 R ", pNode->PageObj);
+      strcat((char *)strKids, (char *)curStr);
+      pNode = pNode->pNext;
+    }
+
+    if (strlen((char *)strKids) > 1 && strKids[strlen((char *)strKids) - 1] == ' ') strKids[strlen((char *)strKids) - 1] = 0;
+
+    nChars = sprintf((char *)pTail, "1 0 obj\r\n<</Type /Pages /Kids [%s] /Count %d>>\r\nendobj\r\n", strKids, pPDF->nodeCount);
+    pPDF->currentOffSet += nChars;  pTail += nChars;
+
+    // The xref & the rest of the tail
+    xrefOffSet = pPDF->currentOffSet;
+    nChars = sprintf((char *)pTail, "xref\r\n0 %d\r\n", pPDF->pdfObj+1);
+    pPDF->currentOffSet += nChars;  pTail += nChars;
+    
+    for (i=0; i<=pPDF->pdfObj; i++)
+    {
+       nChars = sprintf((char *)pTail, "%s", pPDF->pdfXREF[i]);
+       pPDF->currentOffSet += nChars;  pTail += nChars;
+    }
+    
+    nChars = sprintf((char *)pTail, "trailer\r\n<</Root %d 0 R /Size %d>>\r\n", pPDF->pdfObj, pPDF->pdfObj+1);
+    pPDF->currentOffSet += nChars;  pTail += nChars;
+    
+    nChars = sprintf((char *)pTail, "startxref\r\n%d\r\n%%%%EOF\r\n", xrefOffSet);
+    pPDF->currentOffSet += nChars;  pTail += nChars;
+  }
+  
+  headerSize = (UINT32)strlen((char *)pPDF->pdfHeader);
+  tailerSize = (UINT32)strlen((char *)pPDF->pdfTailer);
+  if ( headerSize && tailerSize && ( pPDF->currentOffSet > headerSize + tailerSize ) ) {
+     pdfSize = pPDF->currentOffSet;
+  }
+  
+  return pdfSize;
+}
+
+STATUS Jpeg2PDF_GetFinalDocumentAndCleanup(PJPEG2PDF pPDF, UINT8 *outPDF, UINT32 *outPDFSize, UINT32 tehPDFSize) {
+// based on https://www.codeproject.com/Articles/29879/Simplest-PDF-Generating-API-for-JPEG-Image-Content
+
+  STATUS result = ERROR;
+  if (pPDF)
+  {
+    PJPEG2PDF_NODE pNode, pFreeCurrent;
+    if (outPDF && (tehPDFSize >= pPDF->currentOffSet))
+    {
+      UINT32 nBytes, nBytesOut = 0;
+      UINT8 *pOut = outPDF;
+      
+      nBytes = (UINT32)strlen((char *)pPDF->pdfHeader);
+      memcpy(pOut, pPDF->pdfHeader, nBytes);
+      nBytesOut += nBytes; pOut += nBytes;
+      
+      pNode = pPDF->pFirstNode;
+      while (pNode != NULL)
+      {
+        nBytes = (UINT32)strlen((char *)pNode->preFormat);
+        memcpy(pOut, pNode->preFormat, nBytes);
+        nBytesOut += nBytes; pOut += nBytes;
+        
+        nBytes = pNode->JpegSize;
+        memcpy(pOut, pNode->pJpeg, nBytes);
+        nBytesOut += nBytes; pOut += nBytes;
+        
+        nBytes = (UINT32)strlen((char *)pNode->pstFormat);
+        memcpy(pOut, pNode->pstFormat, nBytes);
+        nBytesOut += nBytes; pOut += nBytes;
+        
+        pNode = pNode->pNext;
+      }
+      
+      nBytes = (UINT32)strlen((char *)pPDF->pdfTailer);
+      memcpy(pOut, pPDF->pdfTailer, nBytes);
+      nBytesOut += nBytes; pOut += nBytes;
+      
+      *outPDFSize = nBytesOut;
+      result = (nBytesOut>950) ? IDOK : ERROR;
+      fnOutputDebug("Jpeg2PDF_GetFinalDocumentAndCleanup(): " + std::to_string(nBytesOut));
+    }
+    
+    pNode = pPDF->pFirstNode;
+    while (pNode != NULL)
+    {
+      if (pNode->pJpeg)
+         free(pNode->pJpeg);
+
+      pFreeCurrent = pNode;
+      pNode = pNode->pNext;
+      free(pFreeCurrent);
+    }
+    
+    if (pPDF)
+    {
+       free(pPDF);
+       pPDF = NULL;
+    }
+  }
+  
+  return result;
+}
+
+static int get_jpeg_size(unsigned char* data, unsigned int data_size, unsigned short *width, unsigned short *height) {
+  // Check for valid JPEG image
+  int i = 0;   // Keeps track of the position within the file
+  if (data[i] == 0xFF && data[i+1] == 0xD8 && data[i+2] == 0xFF && data[i+3] == 0xE0)
+  {
+    i += 4;
+    // Check for valid JPEG header (null terminated JFIF)
+    if (data[i+2] == 'J' && data[i+3] == 'F' && data[i+4] == 'I' && data[i+5] == 'F' && data[i+6] == 0x00)
+    {
+      // Retrieve the block length of the first block since the first block will not contain the size of file
+      unsigned short block_length = data[i] * 256 + data[i+1];
+      while (i<(int)data_size)
+      {
+        i+=block_length;                    // Increase the file index to get to the next block
+        if(i >= (int)data_size) return 0;   // Check to protect against segmentation faults
+        if(data[i] != 0xFF) return 0;       // Check that we are truly at the start of another block
+        if(data[i+1] == 0xC0) {             // 0xFFC0 is the "Start of frame" marker which contains the file size
+          // The structure of the 0xFFC0 block is quite simple [0xFFC0][ushort length][uchar precision][ushort x][ushort y]
+          *height = data[i+5]*256 + data[i+6];
+          *width = data[i+7]*256 + data[i+8];
+          return 1;
+        } else
+        {
+          i+=2;                                       // Skip the block marker
+          block_length = data[i] * 256 + data[i+1];   // Go to the next block
+        }
+      }
+      return 0;                     // If this point is reached then no size was found
+    } else { return 0; }            // Not a valid JFIF string
+  } else { return 0; }              // Not a valid SOI header
+}
+
+
+STATUS InsertJPEGFile2PDF(const char *fileName, int fileSize, PJPEG2PDF pdfId) {
+  FILE *fp;
+  unsigned char *jpegBuf;
+  int readInSize; 
+  unsigned short jpegImgW, jpegImgH;
+  STATUS r = IDOK;
+
+  jpegBuf = (unsigned char *)malloc(fileSize);
+  fp = fopen(fileName, "rb");
+  readInSize = (int)fread(jpegBuf, sizeof(UINT8), fileSize, fp);
+  fclose(fp);
+
+  if (readInSize != fileSize) 
+     fnOutputDebug("file size in bytes mismatched: " + std::to_string(readInSize) + " / " + std::to_string(fileSize));
+
+  // Add JPEG File into PDF
+  if (1 == get_jpeg_size(jpegBuf, readInSize, &jpegImgW, &jpegImgH))
+  {
+     // std::string s = fileName;
+     r = Jpeg2PDF_AddJpeg(pdfId, jpegImgW, jpegImgH, readInSize, jpegBuf, 1);
+     // fnOutputDebug("Image dimensions: " + std::to_string(jpegImgW) + " x " + std::to_string(jpegImgH) + " | " + s);
+  } else
+  {
+     std::string s = fileName;
+     fnOutputDebug("failed to obtain image dimensions from file: " + s);
+     r = ERROR;
+  }
+
+  free(jpegBuf);
+  return r;
+}
+
+DLL_API int DLL_CALLCONV CreatePDFfile(const char* tempDir, const char* destinationPDFfile, const char* scriptDir, UINT *fListArray, int arraySize, float pageW, float pageH, int dpi) {
+// based on https://www.codeproject.com/Articles/29879/Simplest-PDF-Generating-API-for-JPEG-Image-Content
+
+  // Initilized the PDF Object with Page Size Information
+  // fnOutputDebug("function CreatePDFfile called");
+  PJPEG2PDF pdfId;
+  pdfId = Jpeg2PDF_BeginDocument(pageW, pageH, dpi);
+  if (pdfId < 0) 
+     return -1;
+ 
+  UINT32 pdfSize, pdfFinalSize;
+  UINT8  *pdfBuf;
+
+  int dirErr = 0;
+  if (_chdir(tempDir))
+  {
+      switch (errno)
+      {
+        case ENOENT:
+           dirErr = -2;
+           break;
+        case EINVAL:
+           dirErr = -3;
+           break;
+        default:
+           dirErr = -4;
+      }
+      return dirErr;
+  }
+
+  // Process the jpeg files
+  // fnOutputDebug("about to load images pointed by fListArray.size=" + std::to_string(arraySize));
+  struct _finddata_t jpeg_file;
+  long hFile;
+  int somePagesError = 0;
+  for (int i = 0; i < arraySize; ++i)
+  {
+      std::string s = std::to_string(fListArray[i]) + ".jpg";
+      // const char * c = str.c_str();
+      // fnOutputDebug("looping array " + std::to_string(i) + " file=" + s);
+      if ( (hFile = _findfirst(s.c_str(), &jpeg_file )) == -1L )
+         continue;
+ 
+      // fnOutputDebug("found file: " + s);
+      STATUS z = InsertJPEGFile2PDF(jpeg_file.name, jpeg_file.size, pdfId);
+      if (z==ERROR)
+      {
+         fnOutputDebug("Failed to add image to PDF: " + s);
+         somePagesError++;
+      }
+      _findclose( hFile );
+  }
+
+  // Finalize the PDF and get the PDF Size
+  fnOutputDebug("Finalize the PDF and get the PDF Size");
+  pdfSize = Jpeg2PDF_EndDocument(pdfId);
+  // Prepare the PDF Data Buffer based on the PDF Size
+  pdfBuf = (UINT8 * )malloc(pdfSize);
+
+  // Get the PDF into the Data Buffer and do the cleanup
+  fnOutputDebug("PDF size = " + std::to_string(pdfSize) + "; next function Jpeg2PDF_GetFinalDocumentAndCleanup()");
+  // Output the PDF Data Buffer to file
+  STATUS g = Jpeg2PDF_GetFinalDocumentAndCleanup(pdfId, pdfBuf, &pdfFinalSize, pdfSize);
+  if (g=IDOK)
+  {
+     fnOutputDebug("writing PDF: final size =" + std::to_string(pdfFinalSize));
+     FILE *fp = fopen(destinationPDFfile, "wb");
+     if (fp!=NULL)
+     {
+        fwrite(pdfBuf, sizeof(UINT8), pdfFinalSize, fp);
+        fclose(fp);
+     } else 
+     {
+        fnOutputDebug("Failed to create PDF file");
+        dirErr = -6;
+     }
+  } else 
+  {
+     fnOutputDebug("Failed to PDF GetFinalDocument");
+     dirErr = -7;
+  }
+
+  _chdir(scriptDir);
+  free(pdfBuf);
+  if (dirErr == 0 && somePagesError != 0)
+     dirErr = somePagesError;
+
+  return dirErr;
+}
+
+Gdiplus::GpBitmap* CreateBitmapFromCImg(CImg<float> & img, int width, int height) {
+
+fnOutputDebug("CreateBitmapFromCImg called, yay");
+
+    // Size of a scan line represented in bytes: 4 bytes each pixel
+    UINT cbStride = 0;
+    UIntMult(width, sizeof(Gdiplus::ARGB), &cbStride);
+
+    // Size of the image, represented in bytes
+    UINT cbBufferSize = 0;
+    UIntMult(cbStride, height, &cbBufferSize);
+    // hr = (m_pbBuffer) ? S_OK : E_FAIL;
+
+    Gdiplus::GpBitmap  *myBitmap = NULL;
+    Gdiplus::DllExports::GdipCreateBitmapFromScan0(width, height, cbStride, PixelFormat32bppARGB, NULL, &myBitmap);
+    BYTE *m_pbBuffer = NULL;  // the GDI+ bitmap buffer
+    m_pbBuffer = new BYTE[cbBufferSize];
+    fnOutputDebug("gdip bmp created, yay");
+
+    Gdiplus::Rect rectu(0, 0, width, height);
+    Gdiplus::BitmapData bitmapDatu;
+    bitmapDatu.Width = width;
+    bitmapDatu.Height = height;
+    bitmapDatu.Stride = cbStride;
+    bitmapDatu.PixelFormat = PixelFormat32bppARGB;
+    bitmapDatu.Scan0 = m_pbBuffer;
+ 
+    Gdiplus::Status s = Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rectu, 6, PixelFormat32bppARGB, &bitmapDatu);
+    // Step through cimg and bitmap, copy values to bitmap.
+    const int nPlanes = 4; // NOTE we assume alpha plane is the 4th plane.
+    if (s == Gdiplus::Ok)
+    {
+        fnOutputDebug("gdip bmp locked, yay");
+        // fnOutputDebug("init vars for conversion; stride=" + std::to_string(dLineDest));
+        BYTE *pStartDest = (BYTE *) bitmapDatu.Scan0;
+        UINT dPixelDest = nPlanes;             // pixel step in destination
+        UINT dLineDest = bitmapDatu.Stride;    // line step in destination
+        #pragma omp parallel for schedule(dynamic)
+        for (int y = 0; y < height; y++)
+        {
+            // loop through lines
+            BYTE *pLineDest = pStartDest + dLineDest*y;
+            BYTE    *pPixelDest = pLineDest;
+            for (int x = 0; x < width; x++)
+            {
+                // loop through pixels on line
+                // T & operator() (const unsigned int x, const unsigned int y=0, const unsigned int z=0, const unsigned int v=0) const
+                // Fast access to pixel value for reading or writing.
+
+                float    redCompF = img(x,y,0,0);
+                if (redCompF < 0.0f)
+                    redCompF = 0.0f;
+                else if (redCompF > 255.0f)
+                    redCompF = 255.0f;
+
+                float    greenCompF = img(x,y,0,1);
+                if (greenCompF < 0.0f)
+                    greenCompF = 0.0f;
+                else if (greenCompF > 255.0f)
+                    greenCompF = 255.0f;
+
+                float    blueCompF = img(x,y,0,2);
+                if (blueCompF < 0.0f)
+                    blueCompF = 0.0f;
+                else if (blueCompF > 255.0f)
+                    blueCompF = 255.0f;
+
+                float    alphaCompF = img(x,y,0,3);
+                if (alphaCompF < 0.0f)
+                    alphaCompF = 0.0f;
+                else if (alphaCompF > 255.0f)
+                    alphaCompF = 255.0f;
+
+                BYTE    redComp = BYTE(redCompF + 0.4999f);
+                BYTE    greenComp = BYTE(greenCompF + 0.4999f);
+                BYTE    blueComp = BYTE(blueCompF + 0.4999f);
+                BYTE    alphaComp = BYTE(alphaCompF + 0.4999f);
+                *(pPixelDest) = blueComp;
+                *(pPixelDest+1) = greenComp;
+                *(pPixelDest+2) = redComp;
+                *(pPixelDest+3) = alphaComp;
+                pPixelDest += dPixelDest;
+            }
+            // pLineDest += dLineDest;
+        }
+        fnOutputDebug("for loops done");
+        Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu);
+        fnOutputDebug("gdip bmp unlocked");
+    }
+    delete[] m_pbBuffer;
+    m_pbBuffer = NULL; 
+
+    return myBitmap;
+}
+
+int FillCImgFromBitmap(cimg_library::CImg<float> & img, Gdiplus::GpBitmap *myBitmap, int width, int height) {
+
+    fnOutputDebug("FillCImgFromBitmap called, yay");
+    // Size of a scan line represented in bytes: 4 bytes each pixel
+    UINT cbStride = 0;
+    UIntMult(width, sizeof(Gdiplus::ARGB), &cbStride);
+
+    // Size of the image, represented in bytes
+    UINT cbBufferSize = 0;
+    UIntMult(cbStride, height, &cbBufferSize);
+
+    Gdiplus::Rect rectu(0, 0, width, height);
+    Gdiplus::BitmapData bitmapDatu;
+    Gdiplus::Status s = Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rectu, 1, PixelFormat32bppARGB, &bitmapDatu);
+    fnOutputDebug("bits locked: FillCImgFromBitmap()");
+    if (s == Gdiplus::Ok)
+    {
+        // fnOutputDebug("for loops begin: FillCImgFromBitmap(); w=" + std::to_string(nPixels) + "; h=" + std::to_string(nLines) );
+        // fnOutputDebug("moar; stride=" + std::to_string(dLineSrc) + "/scan0=" + std::to_string(*pStartSrc));
+        BYTE *pStartSrc = (BYTE *) bitmapDatu.Scan0;
+        UINT dPixelSrc = 4;          // pixel step in source ; nPlanes
+        UINT dLineSrc = cbStride;    // line step in source
+        #pragma omp parallel for schedule(dynamic)
+        for (int y = 0; y < height; y++)
+        {
+            // loop through lines
+            BYTE *pLineSrc = pStartSrc + dLineSrc*y;
+            BYTE    *pPixelSrc = pLineSrc;
+            // fnOutputDebug("Y loop: " + std::to_string(y) + "//stride=" + std::to_string(dLineSrc));
+            for (int x = 0; x < width; x++)
+            {
+                // loop through pixels on line
+                BYTE    alphaComp = *(pPixelSrc+3);
+                BYTE    redComp = *(pPixelSrc+2);
+                BYTE    greenComp = *(pPixelSrc+1);
+                BYTE    blueComp = *(pPixelSrc+0);
+                img(x,y,0,0) = float(redComp);
+                img(x,y,0,1) = float(greenComp);
+                img(x,y,0,2) = float(blueComp);
+                img(x,y,0,3) = float(alphaComp);
+                pPixelSrc += dPixelSrc;
+                // fnOutputDebug("x loop B: " + std::to_string(x));
+            }
+            // pLineSrc += dLineSrc;
+        }
+        fnOutputDebug("for loops done: FillCImgFromBitmap()");
+        Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu);
+        fnOutputDebug("gdip bmp unlocked: FillCImgFromBitmap()");
+        return 1;
+    } else return 0;
+}
+
+
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV AddGaussianNoiseOnBitmap(Gdiplus::GpBitmap *myBitmap, int width, int height, int intensity) {
+  Gdiplus::GpBitmap *newBitmap = NULL;
+  CImg<float> img(width,height,1,4);
+  int r = FillCImgFromBitmap(img, myBitmap, width, height);
+  if (r==0)
+     return newBitmap;
+
+  img.noise(intensity, 0);
+  newBitmap = CreateBitmapFromCImg(img, width, height);
+  return newBitmap;
+}
+
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV BoxBlurBitmap(Gdiplus::GpBitmap *myBitmap, int width, int height, int intensityX, int intensityY, int modus) {
+  Gdiplus::GpBitmap *newBitmap = NULL;
+  CImg<float> img(width,height,1,4);
+  int r = FillCImgFromBitmap(img, myBitmap, width, height);
+  if (r==0)
+     return newBitmap;
+
+  if (modus==1)
+     img.blur_box(intensityX, intensityY, 0, 2);
+  else
+     img.blur(intensityX, intensityY, 0, 1, 2);
+
+  newBitmap = CreateBitmapFromCImg(img, width, height);
+  return newBitmap;
+}
+
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV GenerateCIMGnoiseBitmap(int width, int height, int intensity, int details, int scale, int blurX, int blurY, int doBlur) {
+  Gdiplus::GpBitmap *newBitmap = NULL;
+  CImg<float> img(width,height,1,4);
+  img.draw_plasma((float)intensity/2.0f, (float)details/2.0f, (float)scale/9.5f);
+  if (doBlur==1)
+     img.blur(blurX, blurY, 0, 1, 2);
+
+  newBitmap = CreateBitmapFromCImg(img, width, height);
+  return newBitmap;
+}
+
+/*
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testCimgQPV(Gdiplus::GpBitmap *myBitmap, int width, int height, int intensityX, int intensityY, int modus) {
+  // width = 129;
+  // height = 129;
+  // CImg<float> img(129,129,1,3,"0,64,128,192,255",true); // Construct image from a value sequence
+  //             img2(129,129,1,3,"if(c==0,255*abs(cos(x/10)),1.8*y)",false); // Construct image from a formula
+  // (img1,img2).display();
+
+  Gdiplus::GpBitmap *newBitmap = NULL;
+  CImg<float> img(width,height,1,4);
+  int r = FillCImgFromBitmap(img, myBitmap, width, height);
+  if (r==0)
+     return newBitmap;
+
+  if (modus==1)
+     img.blur(intensityX, intensityY, 0, 1, 2);
+  else if (modus==2)
+    r = 3;
+     // img.blur_anisotropic(intensityX, 0.7f, intensityY);
+  else if (modus==3)
+     img.blur_box(intensityX, intensityY, 0, 2);
+  else if (modus==4)
+     img.dilate(intensityX, intensityY, 1);
+  else if (modus==5)
+     img.erode(intensityX, intensityY, 1);
+  else if (modus==6)
+     img.opening(intensityX, intensityY, 1);
+  else if (modus==7)
+     img.closing(intensityX, intensityY, 1);
+  else if (modus==8)
+     img.draw_plasma(intensityX, intensityY, 8);
+  else if (modus==9)
+     img.noise(intensityX, intensityY);
+  // img.display();
+
+warp()
+Vanvliet()
+edges()
+deriche()
+blur_angular()
+blur_radial()
+blur_linear()
+deblur()
+syntexturize()
+sharpen()
+watershed()
+noise_perlin()
+rorschach()
+turbulence()
+polka_dots()
+voronoi()
+maze()
+mosaic()
+boxfitting()
+fractalize()
+houghsketchbw()
+stained_glass()
+stencil()
+cubism()
+sponge()
+deform()
+kaleidoscope()
+twirl()
+ripple()
+water()
+spherize()
+fisheye()
+wave()
+wind()
+raindrops()
+
+  newBitmap = CreateBitmapFromCImg(img, width, height);
+  // ~Cimg(img);
+  return newBitmap;
+}
+*/

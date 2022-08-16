@@ -72,10 +72,12 @@ WIA_CreateImage(PxWidth, PxHeight, ARGBData) {
    Vector := ComObjCreate("WIA.Vector")
    I := 1
    Loop
+   {
       For Each, ARGB In ARGBData
          Vector.Add(ComObject(0x3, ARGB))
       Until (++I > DataCount)
-   Until (I > DataCount)
+   } Until (I > DataCount)
+
    Return Vector.ImageFile(PxWidth, PxHeight)
 }
 ; ======================================================================================================================
@@ -347,8 +349,10 @@ WIA_IsInteger(Values*) {
       Return False
 
    For Each, Value In Values
+   {
       If Value Is Not Integer
          Return False
+   }
    Return True
 }
 ; ======================================================================================================================
@@ -356,8 +360,10 @@ WIA_IsPositive(Values*) {
    If Values.MaxIndex() = ""
       Return False
    For Each, Value In Values
+   {
       If (Value < 0)
          Return False
+   }
    Return True
 }
 

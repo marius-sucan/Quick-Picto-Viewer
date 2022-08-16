@@ -2,6 +2,17 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.7.6 (2022-08-16)
+  - [new] tool to create PDFs or multi-paged TIFFs from the selected files; if the selected file(s) have multiple frames or pages, these pages will be processed and become part of the newly created file
+  - [new] option to extract image frames to image files, from GIFs, TIFFs and WebP
+  - [new] ability to print selected files in one go; batch printing
+  - [new] option to remove metadata from selected file[s]; this relies on Exiftool
+  - [new] file information panel now uses Exiftool to display image metadata
+  - [new] «add noise» has additional noise types
+  - [new] the image blur tool now allows users to define independent values for blur on X and Y axis
+  - replaced the box blur function with box_blur() from cImg library; the results looks much better
+  - many important bug fixes
+
 - v5.7.5 (2022-06-28)
   - bug fixes
 

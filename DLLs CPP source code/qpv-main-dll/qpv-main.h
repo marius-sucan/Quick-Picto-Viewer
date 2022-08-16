@@ -8,6 +8,7 @@
 #define DLL_API extern "C" __declspec(dllexport)
 #define DLL_CALLCONV __stdcall
 #define GDIPVER 0x110
+#define cimg_use_openmp 1
 
 const double M_PI = 3.14159265358979323846;  // PI
 const double div2sz = sqrt(2.0 / 32.0);      // used in calculateDCT()

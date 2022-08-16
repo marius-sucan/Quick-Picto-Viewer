@@ -2627,20 +2627,22 @@ WinMoveZ(hWnd, C, X, Y, W, H, Redraw:=0) {
 
 GetWinParent(hwnd) {
    ; Retrieves a handle to the specified window's parent or owner.
-   Return DllCall("GetParent", "Ptr", hwnd)
+   Return DllCall("GetParent", "UPtr", hwnd)
 }
 
 GetMenuItemRect(hwnd, hMenu, nPos) {
     VarSetCapacity(RECT, 16, 0)
-    if DllCall("User32.dll\GetMenuItemRect", "Ptr", hwnd, "Ptr", hMenu, "UInt", nPos, "Ptr", &RECT)
+    if DllCall("User32.dll\GetMenuItemRect", "UPtr", hwnd, "UPtr", hMenu, "UInt", nPos, "UPtr", &RECT)
     {
        objRect := { left   : numget( RECT,  0, "UInt" )
                   , top    : numget( RECT,  4, "UInt" )
                   , right  : numget( RECT,  8, "UInt" )
                   , bottom : numget( RECT, 12, "UInt" ) }
+       rect:= ""
        return objRect
     }
 
+    rect:= ""
     return 0
 }
 

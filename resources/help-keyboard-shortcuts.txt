@@ -223,7 +223,7 @@ Shift + Insert|Add new folder(s) to files index list|Anywhere|Folder selector
 Shift + O|Open folder recursively|Anywhere|Folder selector
 Shift + Space|Stop or start slideshow|Image view|-
 Shift + Space|Drop files selection [if any]|Files list|-
-Alt + L|Calculate file sizes for selected files|Anywhere|-
+Shift + L|Calculate file sizes for selected files|Files list|-
 Shift + T|Insert text into selected area|Image selection area|Panel
 Ctrl + Tab|Filter files list to selected files|Files list|-
 Shift + U|Apply viewport color adjustments or effects on the selected file(s)|Files list|-

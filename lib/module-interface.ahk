@@ -52,9 +52,9 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , menusListEditor := "File:EditorFile|Edit:Edit|Selection:EditorSelection|Image:Image|Live tools:EditorTools|View:View|Interface:Interface"
      , menusListAlphaMasking := "Alpha mask:AlphaMask|View:View|Interface:Interface"
      , menusListVector := "File:VectorFile|Edit:VectorEdit|Selection:VectorSelection|View:VectorView|Interface:VectorInterface"
-     , menusListThumbs := "File:File|Edit:Edit|Selection:Selection|Image:Image|Find:Find|List:List|Sort:Sort|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
+     , menusListThumbs := "File:File|Edit:Edit|Selection:Selection|Image:Image|Slides:Slides|Find:Find|List:List|Sort:Sort|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
      , menusListWelcome := "File:File|Edit:Edit|Interface:Interface|Settings:Settings|Help:Help"
-     , prevMenuBarItem := 1, lastContextMenuZeit := 1, winMX, winMY
+     , prevMenuBarItem := 1, lastContextMenuZeit := 1
 
 ; OnMessage(0x388, "WM_PENEVENT")
 OnMessage(0x2a3, "WM_MOUSELEAVE")
@@ -979,6 +979,12 @@ toggleAppToolbar() {
 
 InitGuiContextMenu(mX, mY) {
     MainExe.ahkPostFunction(A_ThisFunc, "extern", mX, mY)
+}
+
+infosSlideShow(a, b, c, d, e) {
+   slideShowRunning := a,  SlideHowMode := b
+   animGIFplaying := c,    allowNextSlide := d
+   runningLongOperation := e
 }
 
 slideshowsHandler(thisSlideSpeed, act, how, msgu:=0) {
@@ -2050,9 +2056,9 @@ BuildMenuBar(modus:=0) {
 
 forbiddenAltKeys(n) {
    If (thumbsDisplaying=1)
-      Return isVarEqualTo(n, "e","u","l")
+      Return isVarEqualTo(n, "e","u")
    Else
-      Return isVarEqualTo(n, "a","e","u","p","r","y","g","l")
+      Return isVarEqualTo(n, "a","e","u","p","r","y","g")
 }
 
 invokeMenuBarItem(a,b) {
@@ -2399,6 +2405,8 @@ constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code) {
 
 WM_KEYDOWN(wParam, lParam, msg, hwnd) {
     vk_code := Format("{1:x}", wParam)
+    ; ToolTip, % vk_code "|" whileLoopExec "|" runningLongOperation "|" imageLoading "|" animGIFplaying , , , 2
+
     If (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1 && animGIFplaying!=1) && (vk_code!="1B")
     || (A_TickCount - lastOtherWinClose<300)
        Return 0
