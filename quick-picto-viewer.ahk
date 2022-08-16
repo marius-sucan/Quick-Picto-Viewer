@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.7.5
+;@Ahk2Exe-SetVersion 5.7.6
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2021)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -68,16 +68,17 @@ SetWorkingDir, %A_ScriptDir%
 #Include Lib\Gdip_All.ahk           ; graphics display interface plus v1.1, extended compilation editon
 #Include Lib\Gdi.ahk                ; graphics display interface written by Marius Șucan
 #Include Lib\SGdiPrint.ahk
-#Include Lib\freeimage-wrapper.ahk  ; used to load exotic file formats ; written by Marius Șucan
-#Include Lib\MCI.ahk                ; media controller interface [ used for audio annotations/files associated with images ] - by Fincs
+#Include Lib\freeimage-wrapper.ahk  ; used to load exotic file formats, written by Marius Șucan
+#Include Lib\MCI.ahk                ; media controller interface [ used for audio annotations/files associated with images ], by Fincs
 #Include Lib\wia.ahk                ; windows image acquisition ; used for acquiring images from scanners 
-#Include Lib\Class_SQLiteDB.ahk     ; used for slideshow databases and maintaining a list of viewed images [if activated] - by just-me
-#Include Lib\Class_CtlColors.ahk    ; used for dark mode - by just-me
+#Include Lib\Class_SQLiteDB.ahk     ; used for slideshow databases and maintaining a list of viewed images [if activated], by just-me
+#Include Lib\Class_CtlColors.ahk    ; used for dark mode, by just-me
 #Include Lib\msgbox2.ahk
-#Include Lib\tvh.ahk                ; Functions for TreeView controls. by just-me
-#Include Lib\LV_EX.ahk                ; Functions for list views. by just-me
+#Include Lib\tvh.ahk                ; Functions for TreeView controls, by just-me
+#Include Lib\LV_EX.ahk              ; Functions for list views, by just-me
 #Include Lib\shell-stuff.ahk
-#Include Lib\hashtable.ahk          ; super-fast and capable arrays; by Helgef
+#Include Lib\hashtable.ahk          ; super-fast and capable arrays, by Helgef
+#Include Lib\cli-interface.ahk      ; command line interface
 #Include Lib\file-get-prop-lib.ahk  ; used to get file properties on Alt+Enter [ File Information panel ]
 
 SetWinDelay, 1
@@ -197,10 +198,12 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , omniBoxMode := 0, hLVquickSearchMenus := "", hotkate, vk_hwnd, lastInfoBoxBMP := []
    , userFriendlyPrevImgSelAction, keywordsListArray := new hashtable(), keywrdLVfilter, wasVPfxBefore := 0
    , lastLclickX, lastLclickY, lastTlbrClicked := 0, uiLVoffset := 0, repositionedWindow := 0
-   , selDotMaX, selDotMaY, selDotMbX, selDotMbY, selDotMcX, selDotMcY, selDotMdX, selDotMdY
+   , selDotMaX, selDotMaY, selDotMbX, selDotMbY, selDotMcX, selDotMcY, selDotMdX, selDotMdY, onConflictOverwrite := 0
    , lastInfoBoxZeitToggle := 1, prevHistoBoxString := "", menuHotkeys, whichMainDLL, lastMenuZeit := 1
+   , userExtractFramesFmt := 3, maxMultiPagesAllowed := 2048, maxMemLimitMultiPage := 2198765648
+   , cmdExifTool := ""
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.7.5", vReleaseDate := "28/06/2022"
+   , appVersion := "5.7.6", vReleaseDate := "16/08/2022"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1, usrAutoCropGenerateSelection := 0
@@ -267,7 +270,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , lockSelectionAspectRatio := 1, desiredSelAspectRatio := 0, adjustingSelDotNow := 0, cycleFavesOpenIMG := 0
    , slidesFXrandomize := 0, IDedgesCenterAmount := 1, IDedgesXuAmount := 2, IDedgesYuAmount := 1, IDedgesInvert := 0
    , IDedgesEmphasis := 0, IDedgesContrast := 0, IDedgesBlendMode := 0, IDedgesOpacity := 255, IDedgesAfterBlur := 1
-   , IDedgesEmbossLvl := 1, UserAddNoiseIntensity := 35, UserAddNoiseMode := 0, reverseOrderOnSort := 0
+   , IDedgesEmbossLvl := 1, UserAddNoiseIntensity := 35, UserAddNoiseGrays := 0, reverseOrderOnSort := 0
    , userSearchWhat := 1, OnSortdoFilesCheck := 0, QuickFileActFolder1 := "", QuickFileActFolder2 := ""
    , QuickFileActFolder3 := "", QuickFileActFolder4 := "", QuickFileActFolder5 := "", QuickFileActAfter1 := 1
    , QuickFileActAfter2 := 1, QuickFileActAfter3 := 1, QuickFileActAfter4 := 1, QuickFileActAfter5 := 1
@@ -306,7 +309,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , FillBehindClrOpacity  := 200, FillBehindOpacity := 255, FillBehindColor := "ff4400"
    , alphaMaskGradientAngle := 0, DesaturateAreaChannel := 1, FloodFillClrOpacity := 255
    , FloodFillOpacity := 205, FloodFillBlendMode := 1, TextInAreaBlendMode := 1, BlurAreaAlphaMask := 0
-   , UserAddNoiseBlurAmount := 0, UserAddNoIsePixelizeAmount := 2, FillBehindInvert := 0
+   , UserAddNoiseBlurAmount := 0, UserAddNoisePixelizeAmount := 2, FillBehindInvert := 0
    , alphaMaskPreviewOpacity := 255, FloodFillUseAlpha := 0, EraseAreaUseAlpha := 0, bezierSplineCustomShape := 0
    , innerSelectionCavityX := 0, innerSelectionCavityY := 0, ResizeEnforceCanvas := 0
    , ResizeFillCanvasMode := 1, ShowToolTipsToolbar := 1, userPrivateMode := 0, thresholdKeywords := 1
@@ -314,6 +317,10 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , autoReflectVectorAnchors := 0, shearImgX := 0, shearImgY := 0, zoomBlurAreaYamount := 1
    , zoomBlurAreaXamount := 1, zoomBlurMode := 1, DesaturateAreaLevels := 1, DesaturateAreaDither := 0
    , BlurAreaHue := 0, BlurAreaSaturation := 0, BlurAreaLight := 0, BlurAreaGamma := 0
+   , userCombineGIFframeDelay := 100, userCombineFramesFmt := 2, UserCombinePDFpageSize := 1
+   , combinePDFpageLandscape := 0, combinePDFpageHighQuality := 0, usePrevSaveFolder := 0
+   , userCombineSubFrames := 0, blurAreaYamount := 10, blurAreaEqualXY := 1, UserAddNoiseMode := 1
+   , UserAddNoiseDetails := 10
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -764,17 +771,11 @@ KeyboardResponder(givenKey, thisWin, abusive) {
        } Else If (givenKey="w")
        {
            ; w ; to-do
+           ; testCimgQPV()
            If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1 && thumbsDisplaying!=1)
               flipSelectionWH()
            Else If (thumbsDisplaying=1 && maxFilesIndex>10 && CurrentSLD && !z)
               invokeFilesListMapNow()
-          ; testHistoDLL()
-          ; testLhashalgo()
-              ; reorderStoredHash("010110000010101011111001111101010111", "1001011011111111010010010101")
-             ; ToolTip, % extractSQLqueryFromFilter() , , , 2
-                     ; PanelChangeHamDistThreshold()
-            ; ; testWICresizeSpeed()
-             Sleep, 1
        } Else If (givenKey="+^n")
        {
            If HKifs("general")
@@ -835,7 +836,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
            toggleAppToolbar()
        } Else If (givenKey="!F10" || givenKey="F10") && (drawingShapeNow!=1)
        {
-           ToggleQuickBaru()
+           ToggleMenuBaru()
        } Else If (givenKey="^AppsKey" || givenKey="+AppsKey") && (drawingShapeNow!=1)
        {
            BuildSecondMenu("tlbr")
@@ -984,8 +985,9 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              PanelDrawShapesInArea()
        } Else If (givenKey="+l")
        {
-          If (HKifs("liveEdit") && EllipseSelectMode=2 && editingSelectionNow=1
-          && isVarEqualTo(AnyWindowOpen, 74, 68, 66, 65, 64, 55, 25, 23, 10))
+          If (HKifs("imgsLoaded") && (thumbsDisplaying=1))
+             CalculateSelectedFilesSizes()
+          Else If (HKifs("liveEdit") && EllipseSelectMode=2 && editingSelectionNow=1 && isVarEqualTo(AnyWindowOpen, 74, 68, 66, 65, 64, 55, 25, 23, 10))
              MenuResumeDrawingShapes()
           Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded")) && (thumbsDisplaying!=1)
           {
@@ -994,10 +996,6 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              Else
                 MenuResumeDrawingShapes()
           }
-       } Else If (givenKey="!l")
-       {
-          If HKifs("imgsLoaded" && thumbsDisplaying=1)
-             CalculateSelectedFilesSizes()
        } Else If (givenKey="!BackSpace")
        {
           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
@@ -2041,9 +2039,9 @@ KeyboardResponder(givenKey, thisWin, abusive) {
          imgPath := getIDimage(currentFileIndex)
          animGIFplaying := 1
          interfaceThread.ahkassign("animGIFplaying", animGIFplaying)
-         setGIFframesDelay()
+         ; setGIFframesDelay()
          autoChangeDesiredFrame("start", imgPath)
-         SetTimer, autoChangeDesiredFrame, % GIFspeedDelay
+         SetTimer, autoChangeDesiredFrame, % GIFspeedDelay + UserGIFsDelayu
       }
    }
 } ; // KeyboardResponder()
@@ -2058,10 +2056,14 @@ initQPVmainDLL() {
       Return
 
    attempts++
-   whichMainDLL := (A_OSVersion="WIN_7" || isWinXP=1) ? "qpv_main_win7.dll" : "qpvmain.dll"
+   ; whichMainDLL := (A_OSVersion="WIN_7" || isWinXP=1) ? "qpv_main_win7.dll" : "qpvmain.dll"
+   whichMainDLL := "qpvmain.dll"
    DllPath := FreeImage_FoxGetDllPath(whichMainDLL)
    If !DllPath
+   {
+      addJournalEntry("ERROR: Failed to find qpvMain.dll. Various features in QPV will not work.")
       Return
+   }
 
    If (InStr(A_ScriptDir, "sucan twins") && !A_IsCompiled)
    {
@@ -2073,9 +2075,13 @@ initQPVmainDLL() {
 
    qpvMainDll := DllCall("LoadLibraryW", "WStr", DllPath, "UPtr")
    addJournalEntry("INIT main QPV dll: " A_LastError "==" qpvMainDll "==" DllPath)
+   If !qpvMainDll
+      addJournalEntry("ERROR: Failed to initialize qpvMain.dll. Various features in QPV will not work.")
 
    thisFunc := (A_PtrSize=8) ? "calculateDCTcoeffs" : "_calculateDCTcoeffs@4"
    dupesDCTcoeffsInit := DllCall(whichMainDLL "\" thisFunc, "int", 32)
+   If !dupesDCTcoeffsInit
+      addJournalEntry("ERROR: Failed to initialize DCT coefficients required for identifying image duplicates. This feature will not work.")
 
    thisFunc := (A_PtrSize=8) ? "initWICnow" : "_initWICnow@8"
    WICmoduleHasInit := DllCall(whichMainDLL "\" thisFunc, "int", 1, "int", 0)
@@ -2122,7 +2128,8 @@ initQPVmainDLL() {
             openFptrnWIC .= "*." A_LoopField ";"
       }
       openFptrnWIC := Trimmer(openFptrnWIC, ";")
-   }
+      fnOutputDebug("WIC init formats: " openFptrnWIC)
+   } Else addJournalEntry("ERROR: Failed to initialize WIC module. Some image formats may not be supported.")
 
    ; MsgBox, % WICmoduleHasInit "==" CLSIDlist "`n" extensionsList
    ; ToolTip, % WICmoduleHasInit " | " A_LastError "==" qpvMainDll "`n" DllPath , , , 2
@@ -2832,7 +2839,7 @@ DecreaseSlideSpeed() {
    Sleep, 5
 }
 
-fileSizeFrienly(bytez) {
+fileSizeFriendly(bytez) {
   totalSize := Round(bytez/1024, 2)
   If (totalSize>1023)
   {
@@ -2880,17 +2887,18 @@ CalculateSelectedFilesSizes() {
         Break
      }
 
-     countFiles++
      If (A_TickCount - prevMSGdisplay>1000)
      {
+        thisSize := fileSizeFriendly(totalSize)
         etaTime := ETAinfos(countFiles, markedSelectFile, startOperation)
         If failedFiles
            etaTime .= "`nFailed to collect data for " groupDigits(failedFiles) " files"
 
-        showTOOLtip("Calculating total files size, please wait" etaTime, 0, 0, countFiles/markedSelectFile)
+        showTOOLtip("Calculating total files size, please Wait`nTotal size: " totalSize etaTime, 0, 0, countFiles/markedSelectFile)
         prevMSGdisplay := A_TickCount
      }
 
+     countFiles++
      fileInfos := GetFileAttributesEx(resultedFilesList[A_Index, 1])
      If !fileInfos.size
      {
@@ -2907,9 +2915,9 @@ CalculateSelectedFilesSizes() {
      maxCdate := max(maxCdate, fileInfos.ctime)
   }
   ; ToolTip, % minCdate , , , 2
-  totalSize := fileSizeFrienly(totalSize)
-  minSizeu := fileSizeFrienly(minSizeu)
-  maxSizeu := fileSizeFrienly(maxSizeu)
+  totalSize := fileSizeFriendly(totalSize)
+  minSizeu := fileSizeFriendly(minSizeu)
+  maxSizeu := fileSizeFriendly(maxSizeu)
   CurrentSLD := backCurrentSLD
   Try FormatTime, minCdate, % minCdate, dd/MM/yyyy, HH:mm
   Try FormatTime, maxCdate, % maxCdate, dd/MM/yyyy, HH:mm
@@ -4504,18 +4512,27 @@ ThumbsScrollbar() {
    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
    prevFileIndex := currentFileIndex
    prevu := lastu := -2
+   listMap := doMapNow := 0
    If (showFilesListMap=1 && markedSelectFile>1 && maxFilesIndex>10 && minimizeMemUsage!=1)
-   {
-      ToolTip, Please wait - generating list map
-      listMap := generateFilesListMap()
-      ToolTip
-   }
+      doMapNow := 1
 
+   GetMouseCoord2wind(PVhwnd, mX, mY)
    setwhileLoopExec(1)
-   While, (determineLClickstate()=1)
+   startZeit := A_TickCount
+   While, (determineLClickstate()=1 || A_Index<3)
    {
+      If (A_TickCount - startZeit>550 && doMapNow=1)
+      {
+         doMapNow := 2
+         ToolTip, Please wait - generating list map
+         listMap := generateFilesListMap()
+         ToolTip
+      }
+
       zeitSillyPrevent := A_TickCount
-      GetMouseCoord2wind(PVhwnd, mX, mY)
+      If (A_Index>2)
+         GetMouseCoord2wind(PVhwnd, mX, mY)
+
       mYperc := ((mY-15)/mainHeight)*100
       newIndex := clampInRange(Ceil((maxFilesIndex/100)*mYperc), 1, maxFilesIndex)
       ; mapOffset := - clampInRange(mY * 2, 0, mainHeight*2 - 1)
@@ -8843,7 +8860,7 @@ DefineSlideShowType() {
 
 ToggleSlideshowModes() {
    Static lastInvoked := 1
-   If (A_TickCount - lastInvoked < 50) || (thumbsDisplaying=1)
+   If (A_TickCount - lastInvoked < 50) ; || (thumbsDisplaying=1)
       Return
 
    lastInvoked := A_TickCount
@@ -9789,23 +9806,28 @@ changeGIFsDelayu(dir) {
    If (A_TickCount - lastInvoked < 50)
       Return
 
-   lastInvoked := A_TickCount
    If (thumbsDisplaying=1 || !isImgEditingNow() || animGIFsSupport!=1)
       Return
 
+   factoru := (A_TickCount - lastInvoked<350) ? 150 : 15
    resetSlideshowTimer(0, 1)
    value2Adjust := UserGIFsDelayu
    If (dir=1)
-      value2Adjust += 15
+      value2Adjust += factoru
    Else
-      value2Adjust -= 15
+      value2Adjust -= factoru
 
-   value2Adjust := clampInRange(value2Adjust, -300, 300, 1)
+   value2Adjust := clampInRange(value2Adjust, -9500, 9500, 1)
    UserGIFsDelayu := value2Adjust
-   setGIFframesDelay()
-   INIaction(1, "UserGIFsDelayu", "General")
-   showTOOLtip("GIFs playback delay: " value2Adjust " ms", A_ThisFunc, 2, (value2Adjust+300)/600)
+   SetTimer, postPonedWriteGifSpeed, -150
+   ; setGIFframesDelay()
+   showTOOLtip("GIFs playback delay: " value2Adjust " ms", A_ThisFunc, 2, (value2Adjust+9500)/19000)
    SetTimer, RemoveTooltip, % -msgDisplayTime
+   lastInvoked := A_TickCount
+}
+
+postPonedWriteGifSpeed() {
+   INIaction(1, "UserGIFsDelayu", "General")
 }
 
 changeTlbrSelRotation(dir) {
@@ -9913,8 +9935,8 @@ changeDesiredFrame(dir:=1) {
    Else
       value2Adjust--
 
-   If (dir=-1 && value2Adjust<1)
-      value2Adjust := 0
+   If (dir=-1 && value2Adjust<0)
+      value2Adjust := totalFramesIndex
 
    value2Adjust := clampInRange(value2Adjust, 0, totalFramesIndex, 1)
    desiredFrameIndex := value2Adjust
@@ -9951,9 +9973,9 @@ restartGIFplayback() {
    {
       autoChangeDesiredFrame("stop", 0)
       Sleep, 5
-      setGIFframesDelay()
+      ; setGIFframesDelay()
       autoChangeDesiredFrame("start", getIDimage(currentFileIndex))
-      SetTimer, autoChangeDesiredFrame, % GIFspeedDelay
+      SetTimer, autoChangeDesiredFrame, % GIFspeedDelay + UserGIFsDelayu
    }
 }
 
@@ -10025,7 +10047,8 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
    prevAnimGIFwas := ""
    desiredFrameIndex := clampInRange(desiredFrameIndex, 0, totalFramesIndex, 1)
    totalZeit := A_TickCount - startZeitIMGload
-   thisFrameDelay := (totalZeit>25 && totalFramesIndex>20) ? GIFspeedDelay//2 : GIFspeedDelay
+   delayu := GIFspeedDelay + UserGIFsDelayu
+   thisFrameDelay := (totalZeit>25 && totalFramesIndex>20) ? delayu//2 : delayu
    If (totalZeit>70 && totalFramesIndex>15) || (totalZeit>25 && totalFramesIndex>180)
       thisFrameDelay := 10
    If (thisFrameDelay<12 && totalZeit<40 && totalFramesIndex<14)
@@ -10049,7 +10072,8 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
       lastFrameChange := A_TickCount
       SetTimer, RefreshImageFile, -1
    }
-   interfaceThread.ahkassign("allowNextSlide", allowNextSlide)
+   interfaceThread.ahkPostFunction("infosSlideShow", slideShowRunning, SlideHowMode, animGIFplaying, allowNextSlide, runningLongOperation)
+   ; interfaceThread.ahkassign("allowNextSlide", allowNextSlide)
 }
 
 infoShowCurrentFrameIndex() {
@@ -11745,7 +11769,8 @@ QPV_FillBitmapHoles(pBitmap, newColor) {
   }
 
   thisStartZeit := A_TickCount
-  Gdip_GetImageDimensions(pBitmap, w, h)
+  If StrLen(pBitmap)>2
+     Gdip_GetImageDimensions(pBitmap, w, h)
   If (!w || !h || !pBitmap)
   {
      addJournalEntry(A_ThisFunc "(): failed - possibly malformed pBitmap given: " pBitmap)
@@ -11756,7 +11781,7 @@ QPV_FillBitmapHoles(pBitmap, newColor) {
   func2exec := (A_PtrSize=8) ? "FillImageHoles" : "_FillImageHoles@16"
   If !E1
      r := DllCall(whichMainDLL "\" func2exec, "UPtr", iScan, "Int", w, "Int", h, "UInt", newColor)
-  fnOutputDebug(A_ThisFunc ": " func2exec "=r" r "=e" E1 "|" A_LastError)
+  ; fnOutputDebug(A_ThisFunc ": " func2exec "=r" r "=e" E1 "|" A_LastError)
 
   If !E1
      Gdip_UnlockBits(pBitmap, iData)
@@ -11805,6 +11830,9 @@ QPV_CreateBitmapNoise(W, H, intensity, doGray, threads) {
      Return 0
 
   pBitmap := trGdip_CreateBitmap(A_ThisFunc, W, H, "0x26200A")
+  If StrLen(pBitmap)<3
+     Return 0
+
   E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData)
   func2exec := (A_PtrSize=8) ? "RandomNoise" : "_RandomNoise@24"
   If !E1
@@ -11817,7 +11845,31 @@ QPV_CreateBitmapNoise(W, H, intensity, doGray, threads) {
   return pBitmap
 }
 
-generateAlphaMaskBitmap(clipBMP, previewMode, offX:=0, offY:=0, offW:=0, offH:=0, sizeIDu:=0, doGrayScale:=0) {
+QPV_CreatePlasmaBMP(W, H, intensity, details, scaleu, doGray, blurX, blurY, doBlur) {
+  initQPVmainDLL()
+  If (!qpvMainDll || isWinXP=1)
+  {
+     addJournalEntry(A_ThisFunc "(): QPV dll file is missing or failed to initialize: qpvMain.dll")
+     Return Gdip_BlendBitmaps(pBitmap, pBitmap2Blend, clampInRange(blendMode, 1, 18))
+  }
+
+  thisStartZeit := A_TickCount
+  If (!w || !h)
+     Return 0
+
+  func2exec := (A_PtrSize=8) ? "GenerateCIMGnoiseBitmap" : "_GenerateCIMGnoiseBitmap@32"
+  pBitmap := DllCall(whichMainDLL "\" func2exec, "Int", w, "Int", h, "Int", intensity, "Int", details, "Int", scaleu, "int", blurX, "int", blurY, "int", doBlur, "UPtr")
+  If (StrLen(pBitmap)>2 && doGray=1)
+  {
+     pEffectGray := Gdip_CreateEffect(6, 0, -100, 0)
+     Gdip_BitmapApplyEffect(pBitmap, pEffectGray)
+     Gdip_DisposeEffect(pEffectGray)
+  }
+  ; ToolTip, % "r=" r " ; qpv == " A_TickCount - thisStartZeit, , , 2
+  return pBitmap
+}
+
+generateAlphaMaskBitmap(clipBMP, previewMode, offX:=0, offY:=0, offW:=0, offH:=0, sizeIDu:=0, doGrayScale:=0, transformTool:=0) {
     Static prevBMPu, prevState
     If (clipBMP="kill")
     {
@@ -11845,9 +11897,10 @@ generateAlphaMaskBitmap(clipBMP, previewMode, offX:=0, offY:=0, offW:=0, offH:=0
        thisAlphaFile := userAlphaMaskBmpPainted
     Else If (alphaMaskRefBMP=2)
        thisAlphaFile := useGdiBitmap()
-    Else If (alphaMaskRefBMP=3 && (AnyWindowOpen=24 || AnyWindowOpen=31))
+    Else If (alphaMaskRefBMP=3 && transformTool=1)
        thisAlphaFile := (previewMode=1) ? viewportStampBMP : userClipBMPpaste
 
+    ; fnOutputDebug(A_ThisFunc "(): transformTool=" transformTool)
     sizeIDu := sizeIDu ? sizeIDu : "a" rImgW rImgH
     externBMP := (alphaMaskingMode=5 && StrLen(thisAlphaFile)>2) ? 1 : 0
     thisState := "a" externBMP previewMode thisAlphaFile alphaMaskRefBMP alphaMaskingMode alphaMaskClrAintensity alphaMaskClrBintensity alphaMaskGradientAngle alphaMaskGradientScale alphaMaskOffsetX alphaMaskOffsetY alphaMaskGradientWrapped alphaMaskColorReversed alphaMaskReplaceMode alphaMaskBMPchannel VPselRotation lastPaintEventID alphaMaskGradientPosA alphaMaskGradientPosB sizeIDu getVPselIDs("saiz-vpos") userAlphaMaskBmpPainted userPrevAlphaMaskBmpPainted
@@ -12027,7 +12080,7 @@ generateAlphaMaskBitmap(clipBMP, previewMode, offX:=0, offY:=0, offW:=0, offH:=0
     trGdip_DisposeImage(alphaMaskGray, 1)
 }
 
-realtimePasteInPlaceAlphaMasker(previewMode, clipBMP, givenID, ByRef newBitmap, offX:=0, offY:=0, offW:=0, offH:=0) {
+realtimePasteInPlaceAlphaMasker(previewMode, clipBMP, givenID, ByRef newBitmap, offX:=0, offY:=0, offW:=0, offH:=0, transformTool:=0) {
     Static prevBMPu, prevState
     If (previewMode="kill")
     {
@@ -12059,11 +12112,12 @@ realtimePasteInPlaceAlphaMasker(previewMode, clipBMP, givenID, ByRef newBitmap, 
     If StrLen(newBitmap)<3
        Return
 
-    paintedImage := (InStr(alphaMaskRefBMP, "user-painted") && alphaMaskingMode=5) ? 1 : 0
-    alphaMaskGray := generateAlphaMaskBitmap(newBitmap, previewMode, offX, offY, offW, offH)
+    ; paintedImage := (InStr(alphaMaskRefBMP, "user-painted") && alphaMaskingMode=5) ? 1 : 0
+    alphaMaskGray := generateAlphaMaskBitmap(newBitmap, previewMode, offX, offY, offW, offH, 0, 0, transformTool)
     If StrLen(alphaMaskGray)>2
        QPV_SetAlphaChannel(newBitmap, alphaMaskGray, alphaMaskColorReversed, alphaMaskReplaceMode, alphaMaskBMPchannel, threads)
 
+    ; fnOutputDebug(A_ThisFunc "(): transformTool=" transformTool)
     If (previewMode!=1)
     {
        trGdip_DisposeImage(alphaMaskGray, 1)
@@ -12183,7 +12237,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     If (G2)
     {
        prevClipBMP := trGdip_DisposeImage(prevClipBMP, 1)
-       If (userClipBMPpaste && PasteInPlaceBlurAmount>1 && PasteInPlaceToolMode=0)
+       If (StrLen(userClipBMPpaste)>2 && PasteInPlaceBlurAmount>1 && PasteInPlaceToolMode=0)
           QPV_SetGivenAlphaLevel(userClipBMPpaste, 1, 1)
        ; Else If (userClipBMPpaste && PasteInPlaceBlurAmount>1 && PasteInPlaceToolMode=1)
        ;    rz := addBorder2Bitmap(userClipBMPpaste, PasteInPlaceBlurAmount, PasteInPlaceBlurAmount)
@@ -12253,7 +12307,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
        {
           ; thisStartZeit := A_TickCount
           thisIDu := "a" previewMode PasteInPlaceBlurAmount PasteInPlaceToolMode PasteInPlaceOrientation VPselRotation alphaMaskClrAintensity alphaMaskClrBintensity alphaMaskingMode alphaMaskRefBMP alphaMaskReplaceMode alphaMaskGradientWrapped alphaMaskColorReversed alphaMaskGradientScale alphaMaskGradientAngle alphaMaskGradientPosA alphaMaskGradientPosB alphaMaskOffsetX alphaMaskOffsetY alphaMaskBMPchannel lastPaintEventID
-          realtimePasteInPlaceAlphaMasker(previewMode, clipBMP, thisIDu, newBitmap, 0, 0, 0, 0)
+          realtimePasteInPlaceAlphaMasker(previewMode, clipBMP, thisIDu, newBitmap, 0, 0, 0, 0, 1)
           ; ToolTip, % A_TickCount - thisStartZeit, , , 2
           If StrLen(newBitmap)>2
           {
@@ -13953,7 +14007,8 @@ FillSelectedArea() {
 
     If (X1MarginSnap=1 && X2MarginSnap=1 && Y1MarginSnap=1 && Y2MarginSnap=1 && FillAreaShape=1 && FillAreaInverted=1 && VPselRotation=0)
     {
-       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected, however you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK|&Reopen panel", 1, "exclamation")
+       btn := !AnyWindowOpen ? "|&Reopen panel" : ""
+       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected, however you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK" btn, 1, "exclamation")
        If InStr(msgResult, "reopen")
           SetTimer, PanelFillSelectedArea, -500
        SetTimer, ResetImgLoadStatus, -100
@@ -14792,11 +14847,18 @@ EraseOrInvertOrGraySelectedArea(actionu, funcu) {
     If (Y2>imgH - 4)
        Y2MarginSnap := 1
 
-    If (X1MarginSnap=1 && X2MarginSnap=1 && Y1MarginSnap=1 && Y2MarginSnap=1 && EraseAreaInvert=1 && actionu="erase" && EllipseSelectMode=0 && VPselRotation=0)
+    If (X1MarginSnap=1 && X2MarginSnap=1 && Y1MarginSnap=1 && Y2MarginSnap=1 && EraseAreaInvert=1 && isVarEqualTo(actionu, "behind", "erase", "desaturate") && EllipseSelectMode=0 && VPselRotation=0)
     {
-       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected, however you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK|&Reopen panel", 1, "exclamation")
+       If (action="erase")
+          fn := "PanelEraseSelectedArea"
+       Else If (action="behind")
+          fn := "PanelFillBehindBgrImage"
+       Else If (action="desaturate")
+          fn := "PanelDesatureSelectedArea"
+       btn := !AnyWindowOpen ? "|&Reopen panel" : ""
+       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected, however you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK" btn, 1, "exclamation")
        If InStr(msgResult, "reopen")
-          SetTimer, PanelEraseSelectedArea, -500
+          SetTimer, % fn, -500
        SetTimer, ResetImgLoadStatus, -100
        Return
     }
@@ -15454,6 +15516,16 @@ BlurSelectedArea() {
     If (Y2>imgH - 5)
        Y2MarginSnap := 1
 
+    o_blurAreaYamount := blurAreaYamount
+    o_blurAreaAmount := blurAreaAmount
+    If (blurAreaEqualXY=1)
+    {
+       o_blurAreaYamount := blurAreaAmount
+       If (blurAreaMode=2)
+          o_blurAreaYamount := o_blurAreaAmount := Round(blurAreaAmount*0.5)
+    }
+
+    testu := (blurAreaMode=1 || blurAreaMode>1 && blurAreaEqualXY=1) ? o_blurAreaAmount : max(o_blurAreaAmount, o_blurAreaYamount)
     If (X1MarginSnap=1 && X2MarginSnap=1 && Y1MarginSnap=1 && Y2MarginSnap=1 && blurAreaInverted=1 && EllipseSelectMode=0 && VPselRotation=0)
     {
        msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected, however you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK|&Reopen panel", 1, "exclamation")
@@ -15461,7 +15533,7 @@ BlurSelectedArea() {
           SetTimer, PanelBlurSelectedArea, -500
        SetTimer, ResetImgLoadStatus, -100
        Return
-    } Else If (blurAreaAmount<2 && blurAreaPixelizeAmount<2)
+    } Else If (testu<2 && blurAreaPixelizeAmount<2)
     {
        msgResult := msgBoxWrapper(appTitle ": WARNING", "You have set both pixelize amount and blur amount to zero. Operation abandoned.", "&OK|&Reopen panel", 1, "exclamation")
        If InStr(msgResult, "reopen")
@@ -15544,7 +15616,7 @@ BlurSelectedArea() {
     }
 
     thisBlurMode := blurAreaMode
-    pEffect := Gdip_CreateEffect(1, blurAreaAmount, 0, 0)
+    pEffect := Gdip_CreateEffect(1, o_blurAreaAmount, 0, 0)
     If (blurAreaTwice=1)
     {
        setWindowTitle("EXTRA-BLURRING IMAGE, please wait", 1)
@@ -15556,23 +15628,11 @@ BlurSelectedArea() {
           Gdip_ScaleMatrix(dhMatrix, 2, 2, 1)
           Gdip_TranslateMatrix(dhMatrix, imgSelPx, imgSelPy, 1)
           If (thisBlurMode=3)
-          {
-             QPV_BoxBlurBitmap(xBitmap, Round(blurAreaAmount/2))
-          } Else If (thisBlurMode=2)
-          {
-             gBitmap := trGdip_BlurBitmap(xBitmap, blurAreaAmount/2.5, 1, 6)
-             If !isWinXP
-                ApplySpecialFixedBlur(A_ThisFunc, xBitmap, blurAreaAmount, pEffect)
-
-             Gu := trGdip_GraphicsFromImage(A_ThisFunc, xBitmap)
-             If (Gu && gBitmap)
-             {
-                trGdip_DrawImage(A_ThisFunc, Gu, gBitmap)
-                Gdip_DeleteGraphics(Gu)
-             }
-             trGdip_DisposeImage(gBitmap, 1)
-          } Else If (thisBlurMode=1)
-             ApplySpecialFixedBlur(A_ThisFunc, xBitmap, blurAreaAmount, pEffect)
+             QPV_BoxBlurBitmap(xBitmap, o_blurAreaAmount, o_blurAreaYamount, 1)
+          Else If (thisBlurMode=2)
+             QPV_BoxBlurBitmap(xBitmap, o_blurAreaAmount, o_blurAreaYamount, 0)
+          Else If (thisBlurMode=1)
+             ApplySpecialFixedBlur(A_ThisFunc, xBitmap, o_blurAreaAmount, pEffect)
 
           ; trGdip_DisposeImage(zBitmap, 1)
           zBitmap := trGdip_ResizeBitmap(A_ThisFunc, xBitmap, imgSelW, imgSelH, 1, 3, -1)
@@ -15580,35 +15640,17 @@ BlurSelectedArea() {
        }
     }
 
-    If (blurAreaAmount<2)
+    If (o_blurAreaAmount<2)
        thisBlurMode := 0
     Else
        setWindowTitle("BLURRING IMAGE, please wait", 1)
 
     If (thisBlurMode=3) ; box blur
-    {
-       QPV_BoxBlurBitmap(zBitmap, Round(blurAreaAmount/2))
-       gEffect := Gdip_CreateEffect(5, Round(blurAreaAmount/2.5), blurAreaAmount//6)
-       If gEffect  ; light readjustments
-          Gdip_BitmapApplyEffect(zBitmap, gEffect)
-
-       Gdip_DisposeEffect(gEffect)
-    } Else If (thisBlurMode=2)  ; alternate mode
-    {
-       ; gBitmap := Gdip_BlurNewBitmap(zBitmap, blurAreaAmount, 1, 0)
-       gBitmap := trGdip_BlurBitmap(zBitmap, blurAreaAmount/2.5, 1, 6)
-       If (!isWinXP && pEffect)
-          ApplySpecialFixedBlur(A_ThisFunc, zBitmap, blurAreaAmount, pEffect)
-
-       Gu := trGdip_GraphicsFromImage(A_ThisFunc, zBitmap)
-       If (Gu && gBitmap)
-       {
-          trGdip_DrawImage(A_ThisFunc, Gu, gBitmap)
-          Gdip_DeleteGraphics(Gu)
-       }
-       trGdip_DisposeImage(gBitmap, 1)
-    } Else If (thisBlurMode=1) ; high quality
-       ApplySpecialFixedBlur(A_ThisFunc, zBitmap, blurAreaAmount, pEffect)
+       QPV_BoxBlurBitmap(zBitmap, o_blurAreaAmount, o_blurAreaYamount, 1)
+    Else If (thisBlurMode=2)  ; alternate mode
+       QPV_BoxBlurBitmap(zBitmap, o_blurAreaAmount, o_blurAreaYamount, 0)
+    Else If (thisBlurMode=1) ; high quality
+       ApplySpecialFixedBlur(A_ThisFunc, zBitmap, o_blurAreaAmount, pEffect)
 
     If (BlurAreaBlendMode>1 || allowAlphaMasking=1)
        bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
@@ -15619,7 +15661,7 @@ BlurSelectedArea() {
     If (blurAreaSoftEdges=1)
     {
        setWindowTitle("APPLYING SOFT EDGES MASK, please wait", 1)
-       thisAmount := (blurAreaTwice=1) ? blurAreaAmount*2 : blurAreaAmount
+       thisAmount := (blurAreaTwice=1) ? o_blurAreaAmount*2 : o_blurAreaAmount
        thisAmount := (blurAreaSoftLevel>3) ? Round(thisAmount*(blurAreaSoftLevel - 1)) : Round(thisAmount*(blurAreaSoftLevel/3))
        modus := (blurAreaInverted!=1) ? 4 : 0
        carvePathFromBitmap(zBitmap, pPath, imgSelPx , imgSelPy, modus, 2, thisAmount, !blurAreaInverted)
@@ -15651,6 +15693,7 @@ BlurSelectedArea() {
           zBitmap := newBitmap
        }
     }
+
     r1 := trGdip_DrawImage(A_ThisFunc, G2, zBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH,,,,, thisOpacity)
     Gdip_DeleteMatrix(dhMatrix)
     trGdip_DisposeImage(zBitmap, 1)
@@ -15764,7 +15807,7 @@ zoomBlurSelectedArea() {
           If (thisO<0)
              Break
 
-          showTOOLtip("Zoom blur: step " A_Index,, , (1 - thisO)/1)
+          showTOOLtip("Radial blur: step " A_Index,, , (1 - thisO)/1)
           ; fnOutputDebug(thisBlurAmount "=" thisO)
           ApplySpecialFixedBlur(A_ThisFunc, zBitmap, thisBlurAmount, pEffect)
           If (zoomBlurMode=1 || zoomBlurMode=2)
@@ -15969,7 +16012,7 @@ coreDetectEdgesSelectedArea(whichBitmap, previewMode, Gu:=0) {
     }
 
     thisOpacity := IDedgesOpacity/255
-    thisBMP := (IDedgesBlendMode>1 && gBitmap) ? gBitmap : fBitmap
+    thisBMP := (IDedgesBlendMode>1 && StrLen(gBitmap)>2) ? gBitmap : fBitmap
     If (previewMode!=1)
        carvePathFromBitmap(thisBMP, pPath, pB.x, pB.y, 4)
 
@@ -16024,6 +16067,8 @@ addNoiseSelectedArea() {
 }
 
 coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
+    Critical, on
+
     Gdip_GetImageDimensions(whichBitmap, imgW, imgH)
     calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
     If (previewMode!=1)
@@ -16047,37 +16092,51 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
     }
 
     extendedClone := testSelectionLargerThanGiven(imgW, imgH)
-    thisPixelize := (doubleBlurPreviewArea=1 && previewMode=1) ? UserAddNoIsePixelizeAmount/2 : UserAddNoIsePixelizeAmount
-    thisImgW := (thisPixelize>1) ? Ceil(imgSelW/thisPixelize) : imgSelW
-    thisImgH := (thisPixelize>1) ? Ceil(imgSelH/thisPixelize) : imgSelH
-    noiseBMP := QPV_CreateBitmapNoise(thisImgW, thisImgH, UserAddNoiseIntensity, UserAddNoiseMode, 1)
-    If (thisPixelize>1)
+    plasmaScale := (doubleBlurPreviewArea=1 && previewMode=1) ? UserAddNoisePixelizeAmount//1.25 : UserAddNoisePixelizeAmount
+    thisPixelize := (doubleBlurPreviewArea=1 && previewMode=1) ? UserAddNoisePixelizeAmount/2 : UserAddNoisePixelizeAmount
+    If (UserAddNoiseMode!=2)
+       thisPixelize := 0
+
+    thisImgW := (thisPixelize>1 && UserAddNoiseMode!=3) ? Ceil(imgSelW/thisPixelize) : imgSelW
+    thisImgH := (thisPixelize>1 && UserAddNoiseMode!=3) ? Ceil(imgSelH/thisPixelize) : imgSelH
+    thisBlurAmount := (doubleBlurPreviewArea=1 && previewMode=1) ? UserAddNoiseBlurAmount//2 : UserAddNoiseBlurAmount
+    thisBlurAmountY := (doubleBlurPreviewArea=1 && previewMode=1) ? blurAreaYamount//2 : blurAreaYamount
+    If (UserAddNoiseMode=1) ; gaussian
+       noiseBMP := QPV_CreateGaussianNoiseBMP(whichBitmap, UserAddNoiseIntensity*3)
+    Else If (UserAddNoiseMode=2) ; weird noise
+       noiseBMP := QPV_CreateBitmapNoise(thisImgW, thisImgH, UserAddNoiseIntensity, UserAddNoiseGrays, 1)
+    Else ; plasma
+       noiseBMP := QPV_CreatePlasmaBMP(thisImgW, thisImgH, UserAddNoiseIntensity, UserAddNoiseDetails, plasmaScale, UserAddNoiseGrays, thisBlurAmount, thisBlurAmountY, !blurAreaEqualXY)
+
+    If (thisPixelize>1 && UserAddNoiseMode=2)
     {
        newBitmap := trGdip_ResizeBitmap(A_ThisFunc, noiseBMP, imgSelW, imgSelH, 0, 5)
        If StrLen(newBitmap)>2
        {
           trGdip_DisposeImage(noiseBMP, 1)
           noiseBMP := newBitmap
+          newBitmap := ""
        }
     }
 
     fBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
-    thisBlurAmount := (doubleBlurPreviewArea=1 && previewMode=1) ? UserAddNoiseBlurAmount//2 : UserAddNoiseBlurAmount
-    If (thisBlurAmount>1)
+    If (thisBlurAmount>1 && blurAreaEqualXY=1 && UserAddNoiseMode>1)
     {
        pEffect := Gdip_CreateEffect(1, thisBlurAmount, 0, 0)
        ApplySpecialFixedBlur(A_ThisFunc, noiseBMP, thisBlurAmount, pEffect)
        Gdip_DisposeEffect(pEffect)
+    } Else If (blurAreaEqualXY=0 && max(thisBlurAmount, thisBlurAmountY)>1 && UserAddNoiseMode>1)
+       QPV_BoxBlurBitmap(noiseBMP, thisBlurAmount, thisBlurAmountY, 0)
+
+    If ((IDedgesEmphasis!=0 || IDedgesContrast!=0) && UserAddNoiseMode>1)
+    {
+       wEffect := Gdip_CreateEffect(5, IDedgesEmphasis, IDedgesContrast, 0)
+       If wEffect
+          Gdip_BitmapApplyEffect(noiseBMP, wEffect)
+       Gdip_DisposeEffect(wEffect)
     }
 
-    If (IDedgesEmphasis!=0 || IDedgesContrast!=0)
-       wEffect := Gdip_CreateEffect(5, IDedgesEmphasis, IDedgesContrast, 0)
-
-    If wEffect
-       Gdip_BitmapApplyEffect(noiseBMP, wEffect)
-
-    Gdip_DisposeEffect(wEffect)
-    If (IDedgesInvert=1)
+    If (IDedgesInvert=1 && UserAddNoiseMode>1)
     {
        zEffect := Gdip_CreateEffect(7, 0, 0, 100)
        If zEffect
@@ -16085,7 +16144,7 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
        Gdip_DisposeEffect(zEffect)
     }
 
-    If (IDedgesBlendMode>1)
+    If (IDedgesBlendMode>1 && UserAddNoiseMode>1)
     {
        gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
        If StrLen(gBitmap)>2
@@ -16110,10 +16169,19 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
     }
 
     r1 := trGdip_DrawImage(A_ThisFunc, G2, thisBMP, imgSelPx, imgSelPy, imgSelW, imgSelH,,,,, thisOpacity)
+    ; fnOutputDebug(A_ThisFunc ": fbitmap=" fbitmap)
     trGdip_DisposeImage(fBitmap, 1)
+    ; fnOutputDebug(A_ThisFunc ": gbitmap=" gbitmap)
     trGdip_DisposeImage(gBitmap, 1)
+    ; fnOutputDebug(A_ThisFunc ": newbitmap=" newbitmap)
     trGdip_DisposeImage(newBitmap, 1)
-    trGdip_DisposeImage(noiseBMP, 1)
+    If (noiseBMP!=newBitmap)
+    {
+       ; fnOutputDebug(A_ThisFunc ": noiseBMP=" noiseBMP)
+       trGdip_DisposeImage(noiseBMP, 1)
+    }
+
+    ; fnOutputDebug(A_ThisFunc ": alpha masker krill")
     realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
     Gdip_DeletePath(pPath)
     If (previewMode=1)
@@ -16221,7 +16289,7 @@ livePreviewAddNoiser() {
     Return er
 }
 
-QPV_BoxBlurBitmap(pBitmap, passes) {
+QPV_BoxBlurBitmap(ByRef pBitmap, passesX, passesY:=0, modus:=1) {
   initQPVmainDLL()
   If !qpvMainDll
   {
@@ -16229,22 +16297,45 @@ QPV_BoxBlurBitmap(pBitmap, passes) {
      Return Gdip_BoxBlurBitmap(pBitmap, passes)
   }
 
-  If !pBitmap
+  If StrLen(pBitmap)<3
      Return 0
 
   Gdip_GetImageDimensions(pBitmap, w, h)
   If (w<1 || h<1)
      Return 0
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData)
-  If E1
+  func2exec := (A_PtrSize=8) ? "BoxBlurBitmap" : "_BoxBlurBitmap@24"
+  r := DllCall(whichMainDLL "\" func2exec, "UPtr", pBitmap, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", modus, "UPtr")
+  If StrLen(r)>2
+  {
+     trGdip_DisposeImage(pBitmap, 1)
+     pBitmap := r
+  }
+
+  Return r
+}
+
+QPV_CreateGaussianNoiseBMP(pBitmap, intensity) {
+  initQPVmainDLL()
+  If !qpvMainDll
+  {
+     addJournalEntry(A_ThisFunc "(): QPV dll file is missing or failed to initialize: qpvMain.dll")
+     Return Gdip_BoxBlurBitmap(pBitmap, passes)
+  }
+
+  If StrLen(pBitmap)<3
      Return 0
 
-  func2exec := (A_PtrSize=8) ? "BoxBlurBitmap" : "_BoxBlurBitmap@20"
-  r := DllCall(whichMainDLL "\" func2exec, "UPtr", iScan, "Int", w, "Int", h, "Int", stride, "Int", passes)
-  Gdip_UnlockBits(pBitmap, iData)
-  ; DllCall("GlobalFree", "ptr", mCodeFunc)
-  return r
+  Gdip_GetImageDimensions(pBitmap, w, h)
+  If (w<1 || h<1)
+     Return 0
+
+  func2exec := (A_PtrSize=8) ? "AddGaussianNoiseOnBitmap" : "_AddGaussianNoiseOnBitmap@16"
+  r := DllCall(whichMainDLL "\" func2exec, "UPtr", pBitmap, "int", w, "int", h, "Int", intensity, "UPtr")
+  If StrLen(r)<3
+     r := trGdip_CloneBitmap(A_ThisFunc, pBitmap)
+
+  Return r
 }
 
 QPV_PixelateBitmap(pBitmap, ByRef pBitmapOut, BlockSize) {
@@ -18437,9 +18528,9 @@ PlotSeenMonthsStatsNow() {
    dataArray := []
    namesLabel:= []
    dataSkipped := new hashtable()
-   counter := 0
    LV_GetText(endPeriod, 1, 2)
    LV_GetText(startPeriod, LV_GetCount(), 2)
+
    nYear := SubStr(startPeriod, 1, 4)
    nMon:= LTrim(SubStr(startPeriod, 6, 2), "0")
    Loop
@@ -18464,6 +18555,7 @@ PlotSeenMonthsStatsNow() {
    }
 
    ; ToolTip, % startPeriod "`n" endPeriod , , , 2
+   counter := 1
    Loop
    {
        aC++
@@ -18484,7 +18576,7 @@ PlotSeenMonthsStatsNow() {
              maxValu := thisu
              maxKvalu := oindexu
           }
-
+          ; fnOutputDebug(A_ThisFunc "==="  oindexu "|" counter "|" valu)
           totalu += valu
           dataArray[counter] := valu ? valu : 1
           namesLabel[counter] := oindexu
@@ -18587,7 +18679,6 @@ PlotSeenDaysStatsNow(modus:=0) {
    dataArray := []
    dataAvg := []
    dataSkipped := new hashtable()
-   counter := 0
    LV_GetText(endPeriod, 1, 2)
    LV_GetText(startPeriod, LV_GetCount(), 2)
    nYear := SubStr(startPeriod, 1, 4)
@@ -18623,6 +18714,7 @@ PlotSeenDaysStatsNow(modus:=0) {
          Break
    }
 
+   counter := 0
    avgLevel := InStr(modus, "avg-") ? SubStr(modus, 5, 2) : 0 
    Loop
    {
@@ -18746,7 +18838,7 @@ BtnCopySeenStats() {
    }
 }
 
-getListViewData(guiu, lvu, cols, delim:=" | ") {
+getListViewData(guiu, lvu, cols, userDelim:=" | ") {
    Gui, %guiu%: Default
    Gui, %guiu%: ListView, %lvu%
 
@@ -18762,7 +18854,7 @@ getListViewData(guiu, lvu, cols, delim:=" | ") {
        }
 
        LV_GetText(valu, aR, aC)
-       delimu := (aC!=cols) ? " | " : "`n"
+       delimu := (aC!=cols) ? userDelim : "`n"
        If (valu!="")
           textu .= valu delimu
        Sleep, -1
@@ -20286,9 +20378,6 @@ uiFileIndexStatsRetrieveSizeRangeDB(zr, ByRef totalSizeu, indexu, labelu, minu, 
 
 PanelImageInfos() {
     Global LViewMetaD, LViewMetaOthers
-    If (thumbsDisplaying=1)
-       MenuDummyToggleThumbsMode()
-
     imgPath := getIDimage(currentFileIndex)
     zPlitPath(imgPath, 0, fileNamu, folderu)
     If !FileRexists(imgPath)
@@ -20312,11 +20401,14 @@ PanelImageInfos() {
        Gui, Font, s%LargeUIfontValue%
     }
 
-    Gui, Add, Tab3,, General|Others
-    Gui, Tab, 1 ; general
+    thisPanelTab := (CurrentPanelTab=1 && thumbsDisplaying=1) ? 2 : clampInRange(CurrentPanelTab, 1, 3)
+    Gui, Add, Tab3, AltSubmit gBtnTabsInfoUpdate hwndhCurrTab vCurrentPanelTab Choose%thisPanelTab%, General|System|Metadata
+    Gui, Tab, 1 
     Gui, Add, ListView, x+15 y+15 w%lstWid% +LV0x10000 r%uLVr% Grid -multi vLViewMetaD, Property|Data
-    Gui, Tab, 2 ; general
+    Gui, Tab, 2
     Gui, Add, ListView, x+15 y+15 w%lstWid% +LV0x10000 r%uLVr% Grid -multi vLViewMetaOthers, Property|Data
+    Gui, Tab, 3
+    Gui, Add, ListView, x+15 y+15 w%lstWid% +LV0x10000 r%uLVr% Grid -multi vLViewMetaM, Property|Data
     Gui, Tab
 
     Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w40 gInfoBtnPrevImg +hwndhBtnPrevImg, <<
@@ -20837,7 +20929,7 @@ folderTreeInfoStatusLineUpdater(modus:=0) {
 
     If (dirs || sizu)
     {
-       fbytes := fileSizeFrienly(sizu) " | " groupDigits(itemz) " images | " groupDigits(dirs) " folders"
+       fbytes := fileSizeFriendly(sizu) " | " groupDigits(itemz) " images | " groupDigits(dirs) " folders"
        GuiControl, fdTreeGuia:, fdTreeInfoLine, % thisVFolder " | " fbytes
        SetTimer, fdTreeGuiaGuiSize, -50
        Return
@@ -21579,6 +21671,7 @@ folderTreeRenameFolder() {
 }
 
 UIcoreFolderRename(thisFolder, ByRef newFileName) {
+   Static lastChecked := 1
    If !FolderExist(thisFolder)
    {
       showTOOLtip("WARNING: The folder seems to no longer exist:`n" thisFolder "\")
@@ -21589,13 +21682,14 @@ UIcoreFolderRename(thisFolder, ByRef newFileName) {
 
    baseu := SubStr(thisFolder, 1, InStr(thisFolder, "\", 0, -1))
    restu := SubStr(thisFolder, InStr(thisFolder, "\", 0, -1) + 1)
-   msgResult := msgBoxWrapper("Rename folder: " appTitle, "Please type the new folder name for \" restu "`n`nFolder found in:`n" baseu, "&Rename folder|C&ancel", 1, "modify-file", 0, 0, 0, "limit9050", restu)
+   msgResult := msgBoxWrapper("Rename folder: " appTitle, "Please type the new folder name for \" restu "`n`nFolder found in:`n" baseu, "&Rename folder|C&ancel", 1, "modify-file", "&Perform search and replace in current list", lastChecked, 0, "limit9050", restu)
    If InStr(msgResult.btn, "Rename")
    {
       newFileName := Trimmer(msgResult.edit)
       If !newFileName
          Return
 
+      lastChecked := msgResult.check
       newFileName := filterFileName(newFileName)
       If !newFileName
       {
@@ -21616,6 +21710,9 @@ UIcoreFolderRename(thisFolder, ByRef newFileName) {
       FileMoveDir, % thisFolder, % oldPath "\" newFileName, R
       If !ErrorLevel
       {
+         performInSeenDB := performInDynas := 0
+         If (lastChecked=1)
+            SearchAndReplaceThroughIndex(thisFolder, oldPath "\" newFileName "\", 0, 0)
          Return 1
       } Else
       {
@@ -22024,46 +22121,12 @@ InfoBtnPrevImg() {
 
 copyIMGinfos2clip() {
    Gui, SettingsGUIA: Default
-   Gui, SettingsGUIA: ListView, LViewMetaD
-   aR := aC := 0
-   Loop
-   {
-       aC++
-       If (aC>2)
-       {
-          aR++
-          aC := 1
-       }
-       LV_GetText(valu, aR, aC)
-       delimu := (aC=1) ? ": " : "`n"
-       If valu
-          textu .= valu delimu
-       Sleep, -1
-       ; ToolTip, %valu% -- %aC% -- %aR%
-       If (valu="" && A_Index>95)
-          Break
-   }
-
-   textu := Trimmer(textu) "`NOTHER DETAILS:`n"
-   Gui, SettingsGUIA: ListView, LViewMetaOthers
-   aR := aC := 0
-   Loop
-   {
-       aC++
-       If (aC>2)
-       {
-          aR++
-          aC := 1
-       }
-       LV_GetText(valu, aR, aC)
-       delimu := (aC=1) ? ": " : "`n"
-       If valu
-          textu .= valu delimu
-       Sleep, -1
-       ; ToolTip, %valu% -- %aC% -- %aR%
-       If (valu="" && A_Index>99)
-          Break
-   }
+   textu := "`nGENERAL DETAILS:`n"
+   textu .= getListViewData("SettingsGUIA", "LViewMetaD", 2, ": ")
+   textu .= "`n `nSYSTEM FILE DETAILS:`n"
+   textu .= getListViewData("SettingsGUIA", "LViewMetaOthers", 2, ": ")
+   textu .= "`n `nMETADATA:`n"
+   textu .= getListViewData("SettingsGUIA", "LViewMetaM", 2, ": ")
 
    If StrLen(textu)>10
    {
@@ -22084,8 +22147,8 @@ PopulateImgInfos() {
    If (AnyWindowOpen!=5)
       Return
 
-   resultu := getIDimage(currentFileIndex)
-   If !FileExist(resultu)
+   imgPath := getIDimage(currentFileIndex)
+   If !FileExist(imgPath)
    {
       informUserFileMissing()
       Return
@@ -22094,8 +22157,10 @@ PopulateImgInfos() {
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: ListView, LViewMetaOthers
    LV_Delete()
-   zPlitPath(resultu, 0, fileNamu, folderu)
-   Try PropList := FGP_List(resultu)            ; Gets all of a file's non-blank properties.
+
+   zPlitPath(imgPath, 0, fileNamu, folderu)
+   ; Gets all of a file's non-blank properties.
+   Try PropList := FGP_List(imgPath)
    Loop, Parse, % PropList.CSV,`n
    {
        If !A_LoopField
@@ -22110,22 +22175,41 @@ PopulateImgInfos() {
 
    Gui, SettingsGUIA: ListView, LViewMetaD
    LV_Delete()
-   FileGetSize, FileSizu, % resultu, K
-   FileGetTime, FileDateM, % resultu, M
-   FileGetTime, FileDateC, % resultu, C
+   FileGetSize, FileSizu, % imgPath, K
+   FileGetTime, FileDateM, % imgPath, M
+   FileGetTime, FileDateC, % imgPath, C
    FormatTime, FileDateM, % FileDateM, dddd, d MMMM yyyy, HH:mm:ss
    FormatTime, FileDateC, % FileDateC, dddd, d MMMM yyyy, HH:mm:ss
 
-   zoomu := Round(zoomLevel*100)
-   If (thisIMGisDownScaled=1)
-      infoDownScale := " [DOWNSCALED] "
+   If (thumbsDisplaying=1 && fileSizu)
+   {
+      thisFileIndex := currentFileIndex
+      If (!resultedFilesList[thisFileIndex, 9] && notFound!=1)
+      {
+         If !retrieveSQLdbEntryImgInfos(imgPath, thisFileIndex, resultedFilesList[thisFileIndex, 12], 1)
+            GetCachableImgFileDetails(imgPath, thisFileIndex)
+         If (SLDtypeLoaded=3 && resultedFilesList[thisFileIndex, 13])
+            updateSQLdbEntryImgRes(imgPath, 1, 1, resultedFilesList[thisFileIndex, 12], thisFileIndex)
+      }
 
-   Gdip_GetImageDimensions(useGdiBitmap(), Width, Height)
-   If (currIMGdetails.TooLargeGDI=1)
-      infoRes := "`nOriginal resolution (W x H)||" groupDigits(currIMGdetails.Width) " x " groupDigits(currIMGdetails.Height) " (in pixels)"
+      asr := " px (" Round(resultedFilesList[thisFileIndex, 13] / resultedFilesList[thisFileIndex, 14], 2) ") | "
+      infoRes := "`nResolution (W x H)||" groupDigits(resultedFilesList[thisFileIndex, 13]) " x " groupDigits(resultedFilesList[thisFileIndex, 14]) asr resultedFilesList[thisFileIndex, 17] " MPx"
+      infoRes .= " | " resultedFilesList[thisFileIndex, 22] " DPI"
+   } Else If fileSizu
+   {
+      zoomu := Round(zoomLevel*100)
+      If (thisIMGisDownScaled=1 && thumbsDisplaying!=1)
+         infoDownScale := " [DOWNSCALED] "
+
+      zoomu := "`nCurrent zoom level||" zoomu " % (" DefineImgSizing() infoDownScale ")"
+      Gdip_GetImageDimensions(useGdiBitmap(), w, h)
+      infoRes := "`nResolution (W x H)||" groupDigits(w) " x " groupDigits(h) " (in pixels)"
+      If (currIMGdetails.TooLargeGDI=1)
+         infoRes .= "`nOriginal resolution (W x H)||" groupDigits(currIMGdetails.Width) " x " groupDigits(currIMGdetails.Height) " (in pixels)"
+   }
 
    friendlyLabel := (userPrivateMode=1) ? "" : "File name||" fileNamu "`nLocation||" folderu "\`n"
-   generalInfos := friendlyLabel "File size||" groupDigits(fileSizu) " kilobytes`nDate created||" FileDateC "`nDate modified||" FileDateM infoRes "`nResolution (W x H)||" groupDigits(Width) " x " groupDigits(Height) " (in pixels)`nCurrent zoom level||" zoomu " % (" DefineImgSizing() infoDownScale ")"
+   generalInfos := friendlyLabel "File size||" groupDigits(fileSizu) " kilobytes`nDate created||" FileDateC "`nDate modified||" FileDateM infoRes zoomu
    Loop, Parse, generalInfos, `n
    {
        lineArru := StrSplit(A_LoopField, "||")
@@ -22133,29 +22217,34 @@ PopulateImgInfos() {
    }
 
    LV_Add(A_Index, "Colors display mode", DefineFXmodes())
-   Gdip_GetHistogram(useGdiBitmap(), 2, ArrChR, ArrChG, ArrChB)
-   Loop, 256
+   If (thumbsDisplaying!=1 && useGdiBitmap())
    {
-       sumTotalR += ArrChR[A_Index] * A_Index
-       sumTotalG += ArrChG[A_Index] * A_Index
-       sumTotalB += ArrChB[A_Index] * A_Index
+      Gdip_GetHistogram(useGdiBitmap(), 2, ArrChR, ArrChG, ArrChB)
+      Loop, 256
+      {
+          sumTotalR += ArrChR[A_Index] * A_Index
+          sumTotalG += ArrChG[A_Index] * A_Index
+          sumTotalB += ArrChB[A_Index] * A_Index
+      }
+
+      diffRGBtotal := max(sumTotalR, sumTotalG, sumTotalB) - min(sumTotalR, sumTotalG, sumTotalB)
+      diffRGBtotal := diffRGBtotal/max(sumTotalR, sumTotalG, sumTotalB)
+      If (diffRGBtotal<0.0001 || diffRGBtotal="")
+         LV_Add(A_Index, "Grayscale image", 1)
+      Else
+         LV_Add(A_Index, "Grayscale image", 0)
+
+      LV_Add(A_Index, "Image file format", currIMGdetails.RawFormat)
    }
 
-   diffRGBtotal := max(sumTotalR, sumTotalG, sumTotalB) - min(sumTotalR, sumTotalG, sumTotalB)
-   diffRGBtotal := diffRGBtotal/max(sumTotalR, sumTotalG, sumTotalB)
-   If (diffRGBtotal<0.0001 || diffRGBtotal="")
-      LV_Add(A_Index, "Grayscale image", 1)
-   Else
-      LV_Add(A_Index, "Grayscale image", 0)
+   v := (thumbsDisplaying=1) ? resultedFilesList[currentFileIndex, 15] : currIMGdetails.PixelFormat
+   LV_Add(A_Index, "Image pixel format", v)
 
-   LV_Add(A_Index, "Image file format", currIMGdetails.RawFormat)
-   LV_Add(A_Index, "Image pixel format", currIMGdetails.PixelFormat)
+   v := (thumbsDisplaying=1) ? resultedFilesList[currentFileIndex, 9] : currIMGdetails.Frames
+   If (v>1)
+      LV_Add(A_Index, "Embedded frames", v)
 
-   CountFrames := currIMGdetails.Frames
-   If (CountFrames>1)
-      LV_Add(A_Index, "Embedded frames", CountFrames)
-
-   If (currIMGdetails.OpenedWith="GDI+")
+   If (currIMGdetails.OpenedWith="GDI+" && thumbsDisplaying!=1)
    {
       thumbBMP := trGdip_CreateBitmapFromFile(getIDimage(currentFileIndex))
       If StrLen(thumbBMP)>2
@@ -22175,6 +22264,7 @@ PopulateImgInfos() {
                If (PropName="frame delay") || (PropName="bits per sample")
                {
                   valu := SubStr(Val.Value, 1, InStr(Val.Value, A_Space))
+                  ; LV_Add(A_Index, PropName, valu "==ID:" ID "; Len:" val.Length "; Type:" val.Type)
                   LV_Add(A_Index, PropName, valu)
                } Else LV_Add(A_Index, PropName, Val.Value)
             }
@@ -22183,9 +22273,47 @@ PopulateImgInfos() {
       trGdip_DisposeImage(thumbBMP, 1)
    }
 
-   LV_Add(A_Index, "Image loaded with ", currIMGdetails.OpenedWith)
+   If (thumbsDisplaying!=1)
+      LV_Add(A_Index, "Image loaded with", currIMGdetails.OpenedWith)
+
    Loop, 2
        LV_ModifyCol(A_Index, "AutoHdr Left")
+
+   If FileExist(mainCompiledPath "\exiftool.exe")
+      populateExifToolInfos()
+}
+
+populateExifToolInfos() {
+   If (AnyWindowOpen=5)
+   {
+      Gui, SettingsGUIA: Default
+      Gui, SettingsGUIA: ListView, LViewMetaM
+      LV_Delete()
+      cmdLine := """" mainCompiledPath "\exiftool.exe"" -all """ getIDimage(currentFileIndex) """ `r`n `r`n"
+      output := Cli_RunCMD(cmdLine, A_WorkingDir, "CP850", "", 4500)
+      ; ToolTip, % output , , , 2
+      hasAdded := 0
+      Loop, Parse, % output,`n,`r
+      {
+          If (!A_LoopField || SubStr(Trimmer(A_LoopField), 2, 2)=":\" || InStr(A_LoopField, "use -b option")
+          || InStr(A_LoopField, "exiftool version") || InStr(A_LoopField, "wb rb levels"))
+             Continue
+
+          lineArru := StrSplit(A_LoopField, " : ")
+          prop := Trimmer(lineArru[1])
+          val := Trimmer(lineArru[2])
+          If (StrLen(prop)>2 && val!="")
+          {
+             hasAdded++
+             LV_Add(A_Index, prop, val)
+          }
+      }
+      If (hasAdded<2)
+         LV_Add(A_Index, "Failed to retrieve the data", "-")
+
+      Loop, 2
+          LV_ModifyCol(A_Index, "AutoHdr Left")
+   }
 }
 
 Trimmer(string, whatTrim:="") {
@@ -24205,7 +24333,7 @@ SaveFilesList(enforceFile:=0) {
       }
    } Else
    {
-      showTOOLtip("WARNING: Insufficient files added to index")
+      showTOOLtip("WARNING: Insufficient files added to the index")
       SoundBeep 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
@@ -27363,30 +27491,68 @@ multiCoresFormatConvert(coreThread, filesList) {
   initFIMGmodule()
   Loop, Parse, filesList,`n,`r
   {
-       If A_LoopField
-       {
-          lineArr := StrSplit(A_LoopField, "?")
-          imgPath := lineArr[2]
-          If !imgPath
-             Continue
-       } Else Continue
-
-       RegRead, mustAbortAllOperations, %QPVregEntry%\multicore, mustAbortAllOperations
-       If (!WinExist("ahk_id" mainThreadHwnd) || mustAbortAllOperations=1)
-       {
-          abandonAll := 1
-          Break
-       }
-
-      If (RegExMatch(imgPath, "i)(.\.(" rDesireWriteFMT "))$") || InStr(imgPath, "||") || !imgPath)
+      hasAsked := 0
+      If A_LoopField
       {
-         skippedFiles++
-         Continue
+         lineArr := StrSplit(A_LoopField, "?")
+         imgPath := lineArr[2]
+         If !imgPath
+            Continue
+      } Else Continue
+
+      RegRead, mustAbortAllOperations, %QPVregEntry%\multicore, mustAbortAllOperations
+      If (!WinExist("ahk_id" mainThreadHwnd) || mustAbortAllOperations=1)
+      {
+         abandonAll := 1
+         Break
       }
 
       zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
       destImgPath := (ResizeUseDestDir=1) ? ResizeDestFolder : OutDir
       file2save := destImgPath "\" OutNameNoExt "." rDesireWriteFMT
+
+      If (InStr(imgPath, "||") || !imgPath)
+      {
+         skippedFiles++
+         Continue
+      }
+
+      If RegExMatch(imgPath, "i)(.\.(" rDesireWriteFMT "))$")
+      {
+         If (ResizeUseDestDir=1)
+         {
+            If (FileExist(file2save) && !FolderExist(file2save))
+               file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
+
+            If file2save
+            {
+               FileGetTime, originalMtime, % imgPath, M
+               FileGetTime, originalCtime, % imgPath, C
+
+               If (OnConvertKeepOriginals=1)
+                  FileCopy, % imgPath, % file2save, 1
+               Else
+                  FileMove, % imgPath, % file2save, 1
+
+               If !ErrorLevel
+               {
+                  countFilez++
+                  resultsList .= lineArr[1] "?" file2save "`n"
+                  RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadJob%coreThread%, % countFilez "/" failedFiles "/" theseFailures "/" skippedFiles
+                  If originalMtime
+                  {
+                     FileSetTime, % originalMtime, % file2save, M
+                     FileSetTime, % originalCtime, % file2save, C
+                  }
+               } Else failedFiles++
+            } Else skippedFiles++
+            Continue
+         } Else
+         {
+            skippedFiles++
+            Continue
+         }
+      }
 
       If (FileExist(file2save) && !FolderExist(file2save))
          file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
@@ -27431,7 +27597,7 @@ readSlideSettings(readThisFile, act) {
      IniAction(act, "allowGIFsPlayEntirely", "General", 1,0,0,, readThisFile)
      IniAction(act, "ambiTexBrushSize", "General", 2, 25, 950,, readThisFile)
      IniAction(act, "animGIFsSupport", "General", 1,0,0,, readThisFile)
-     IniAction(act, "UserGIFsDelayu", "General", 2,-300,300,, readThisFile)
+     IniAction(act, "UserGIFsDelayu", "General", 2,-9500,9500,, readThisFile)
      IniAction(act, "autoAdjustMode", "General", 2,1,3,, readThisFile)
      IniAction(act, "autoPlaySlidesAudio", "General", 1,0,0,, readThisFile)
      IniAction(act, "autoPlaySNDs", "General", 1,0,0,, readThisFile)
@@ -28107,7 +28273,7 @@ retrieveFavesAsList(dummy:=0) {
    currentFileIndex := (isNumber(dummy)=1 && dummy>0) ? dummy : clampInRange(maxFilesIndex - 1, 1, maxFilesIndex)
    seenEntries := []
    If (mustRenewList=1 || !miniList)
-      renewFavesListBasedOnIndexList()
+      saveFavesListBasedOnIndexList()
 
    currentFilesListModified := 0
    INIaction(0, "SlidesMusicSong", "General")
@@ -28124,14 +28290,10 @@ retrieveFavesAsList(dummy:=0) {
    ; RandomPicture()
 }
 
-renewFavesListBasedOnIndexList() {
+saveFavesListBasedOnIndexList() {
    ; If StrLen(filesFilter)>1
    ;    Return
    newListu := ""
-   realCount := 0
-   setImageLoading()
-   changeMcursor()
-   showTOOLtip("Saving favourites list, please wait")
    If StrLen(filesFilter)>1
    {
       lastInvoked := A_TickCount
@@ -28149,18 +28311,43 @@ renewFavesListBasedOnIndexList() {
             showTOOLtip("WARNING: The destructive option was chosen too fast.`nPlease elaborate allow yourself at least one second to read the message box.")
             SoundBeep , 300, 100
             SetTimer, RemoveTooltip, % -msgDisplayTime
-            SetTimer, ResetImgLoadStatus, -150
             Return
          }
          Sleep, 100
       } Else
       {
          SetTimer, RemoveTooltip, % -msgDisplayTime
-         SetTimer, ResetImgLoadStatus, -150
          Return
       }
    }
+ 
+   realCount := 0
+   testFile := FileOpen(mainFavesFile, "a", "UTF-8")
+   If !IsObject(testFile)
+   {
+      showTOOLtip("ERROR: Unable to open the QPV favourites list file.")
+      SoundBeep , 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
 
+   testFile.Close()
+   Sleep, 5
+
+   mainFile := FileOpen(mainFavesFile, "w", "UTF-8")
+   If IsObject(mainFile)
+      miniFile := FileOpen(miniFavesFile, "w", "UTF-8")
+   If (!IsObject(mainFile) || !IsObject(miniFile))
+   {
+      showTOOLtip("ERROR: Unable to open the QPV favourites list file.")
+      SoundBeep , 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   setImageLoading()
+   changeMcursor()
+   showTOOLtip("Saving favourites list, please wait")
    Loop, % maxFilesIndex
    {
        ; isFaved := resultedFilesList[currentFileIndex, 5]
@@ -28179,29 +28366,20 @@ renewFavesListBasedOnIndexList() {
        {
           realCount++
           If (A_Index<20)
-             miniList .= thisImg "`n"
+             miniFile.Write(thisImg "`n")
+             ; miniList .= thisImg "`n"
           Else
-             newListu .= thisImg "`n"
+             mainFile.Write(thisImg "`n")
+             ; newListu .= thisImg "`n"
        }
    }
 
-   FileDelete, % mainFavesFile
-   FileDelete, % miniFavesFile
-   Sleep, 150
-   ; realCount := List_MakeUnique(newListu, "`n", 0, 0)
+   mainFile.Close()
+   miniFile.Close()
    userAddedFavesCount := realCount
    IniAction(1, "userAddedFavesCount", "General")
-   FileAppend, % newListu "`n", % mainFavesFile, UTF-8
-   FileAppend, % miniList "`n", % miniFavesFile, UTF-8
-   If ErrorLevel
-   {
-      showTOOLtip("ERROR: Unable to save the favourites list file. Unknown cause.")
-      SoundBeep, 300, 100
-   } Else
-   {
-      showTOOLtip("Favourites list saved")
-      SoundBeep, 900, 100
-   }
+   showTOOLtip("Favourites list saved")
+   SoundBeep, 900, 100
 
    currentFilesListModified := 0
    SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -28589,9 +28767,12 @@ searchNextIndex(direction, inLoop:=0) {
    prevMSGdisplay := A_TickCount
    startOperation := A_TickCount
    totalLoops := (direction=1 && inLoop!=1) ? maxFilesIndex - startIndex + 1 : startIndex + 1
-   If (inLoop=1)
+   If (inLoop=1 && direction=-1)
+      totalLoops := startIndex := maxFilesIndex + 1
+   Else If (inLoop=1)
       startIndex := (direction=1) ? 0 : maxFilesIndex + 1
 
+   ; msgbox, % startIndex "==" totalLoops "==" direction
    Loop, % totalLoops
    {
         If (determineTerminateOperation()=1)
@@ -28641,6 +28822,7 @@ searchNextIndex(direction, inLoop:=0) {
 
    If (!newIndex && inLoop!=1)
    {
+      SoundBeep , 500, 100
       searchNextIndex(direction, 1)
       Return
    }
@@ -28657,6 +28839,7 @@ searchNextIndex(direction, inLoop:=0) {
    RemoveTooltip()
    currentFileIndex := newIndex ? newIndex : originalIndex
    dummyTimerDelayiedImageDisplay(25)
+   SetTimer, ResetImgLoadStatus, -100
 }
 
 setContaintFolderAsProtected(givenPath:=0) {
@@ -28837,6 +29020,156 @@ TglOptionMove2recycler() {
   INIaction(1, "userMultiDelChoice", "General")
   actu := (userMultiDelChoice=1 || userMultiDelChoice=3) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
   GuiControl, % actu, move2recycler
+}
+
+batchRemoveMetaData() {
+   Static doNotAskAgain := 0
+   If !FileExist(mainCompiledPath "\exiftool.exe")
+   {
+      showTOOLtip("ERROR: Missing file: exiftool.exe. This feature is not available.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   imgPath := StrReplace(getIDimage(currentFileIndex), "||")
+   zPlitPath(imgPath, 0, OutFileName, OutDir)
+   getSelectedFiles(0, 1)
+   filesElected := markedSelectFile
+   If (markedSelectFile>3 && doNotAskAgain=0)
+   {
+      msgResult := msgBoxWrapper(appTitle ": Remove metadata", "You have selected to remove the metadata from " groupDigits(markedSelectFile) " image files. Please confirm this IRREVERSIBLE action.`n`nPlease note, You should NOT do this to Camera RAW images (except DNG) since proprietary RAW formats often contain information in the makernotes that is necessary for converting the image.", "&Remove metadata|&Cancel", 2, "question", "Do not ask again in this session")
+      If !InStr(msgResult.btn, "remove")
+         Return
+      Else
+         doNotAskAgain := msgResult.check
+   } Else If (!markedSelectFile && !FileExist(imgPath))
+   {
+      showTOOLtip("ERROR: File not found or access denied`n" OutFileName "`n" OutDir)
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      SoundBeep, 300, 100
+      Return
+   }
+
+   ; cmdExifTool := new cli("CMD.exe","","CP850")
+   cmdExifTool := new cli("""" mainCompiledPath "\exiftool.exe"" -stay_open true -@ ""-""" ,"","CP850")
+   baseCmdLine := "`n-preserve`n-overwrite_original`n-all=`n"
+   ; cmdLine := """" mainCompiledPath "\exiftool.exe"" -stay_open true -@ ""-""`r`n `r`n"
+   ; cmdExifTool.Write(cmdLine)
+   ; Sleep, 300
+   ; output := cmdExifTool.Read()
+   ; msgbox % output
+   ; cmdExifTool.Write("`n-ver`n-execute`n")
+   ; Sleep, 300
+   ; output := cmdExifTool.Read()
+   ; msgbox % output
+
+   BtnCloseWindow()
+   prevMSGdisplay := A_TickCount
+   startOperation := A_TickCount
+   destroyGDIfileCache()
+   doStartLongOpDance()
+   yayFiles := abandonAll := failedFiles := skippedFiles := 0
+   countTFilez := otherLoops := thisFileIndex := 0
+   lastInvoked := 1
+   If !markedSelectFile
+   {
+      thisFileIndex := currentFileIndex - 2
+      resultedFilesList[currentFileIndex, 2] := 1
+      showTOOLtip("Removing metadata from the selected file, please wait")
+   } Else
+      showTOOLtip("Removing metadata from " groupDigits(filesElected) " files, please wait")
+
+   Loop
+   {
+      executingCanceableOperation := A_TickCount
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
+      If (A_TickCount - prevMSGdisplay>2000)
+      {
+         etaTime := ETAinfos(countTFilez, filesElected, startOperation)
+         If failedFiles
+            etaTime .= "`nFailed to remove metadata for " groupDigits(failedFiles) " files"
+         If skippedFiles
+            etaTime .= "`n" groupDigits(skippedFiles) " files were skipped"
+
+         showTOOLtip("Removing metadata from selected files, please wait" etaTime, 0, 0, countTFilez/filesElected)
+         prevMSGdisplay := A_TickCount
+      }
+
+      output := cmdExifTool.Read()
+      If (InStr(output, "{ready" thisFileIndex "}") || !countTFilez)
+      {
+         thisFileIndex++
+         If (thisFileIndex>maxFilesIndex)
+         {
+            If InStr(output, "due to errors")
+               failedFiles++
+            Else If InStr(output, "0 image files updated")
+               skippedFiles++
+            Break
+         }
+
+         isSelected := resultedFilesList[thisFileIndex, 2]
+         If (isSelected!=1)
+            Continue
+
+         If InStr(output, "due to errors")
+            failedFiles++
+         Else If InStr(output, "0 image files updated")
+            skippedFiles++
+         Else
+            yayFiles++
+
+         ; MsgBox, % output "`n00`n" cmdLine
+         countTFilez++
+         imgPath := StrReplace(getIDimage(thisFileIndex), "||")
+         cmdLine := baseCmdLine imgPath "`n-execute" thisFileIndex "`n"
+         cmdExifTool.Write(cmdLine)
+         lastInvoked := A_TickCount
+         If !markedSelectFile
+         {
+            resultedFilesList[currentFileIndex, 2] := 0
+            Break
+         }
+
+         Sleep, 0
+      } Else otherLoops++
+
+      ; If (A_TickCount - lastInvoked>500)
+      ; {
+      ;    fnOutputDebug(otherLoops "|" thisFileIndex "|" output "|" cmdLine)
+      ;    lastInvoked := A_TickCount
+      ; }
+   }
+
+   cmdExifTool.Write("`n-stay_open`n0`n-execute`n")
+   cmdExifTool.Close()
+   SetTimer, ResetImgLoadStatus, -50
+   If markedSelectFile
+   {
+      If failedFiles
+         someErrors := "Failed to remove metadata from " groupDigits(failedFiles) " files`n"
+      If skippedFiles
+         someErrors .= groupDigits(skippedFiles) " files were skipped`n"
+
+      If (abandonAll=1)
+      {
+         SoundBeep, 300, 100
+         showTOOLtip(someErrors "Operation aborted. Metadata removed succesfully for " groupDigits(yayFiles) " out of " groupDigits(filesElected) " selected files until now")
+      } Else
+      {
+         SoundBeep, 900, 100
+         showTOOLtip(someErrors "Metadata removed succesfully for " groupDigits(yayFiles) " out of " groupDigits(filesElected) " selected files")
+      }
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+   } Else RemoveTooltip()
+
+   Return abandonAll
 }
 
 batchFileDelete(dontAlterIndex:=0) {
@@ -29063,7 +29396,7 @@ DeletePicture(dummy:=0) {
   FileGetSize, OutputVar, % file2rem
   If (OutputVar>2)
   {
-     fileMsg := "`nFile size: " fileSizeFrienly(OutputVar)
+     fileMsg := "`nFile size: " fileSizeFriendly(OutputVar)
      FileDateM := QPV_FileGetSizeTime(file2rem, "M", thisFileIndex)
      FileDateC := QPV_FileGetSizeTime(file2rem, "C", thisFileIndex)
      Try FormatTime, FileDateM, % FileDateM, dd/MM/yyyy, HH:mm
@@ -29102,7 +29435,7 @@ DeletePicture(dummy:=0) {
      If (SLDtypeLoaded=3)
         markSQLdbEntryDeleted(resultedFilesList[currentFileIndex, 12])
 
-     If (resultedFilesList[currentFileIndex, 5]=1)
+     If (resultedFilesList[currentFileIndex, 5]=1 && !InStr(CurrentSLD, "\QPV\favourite-images-list.SLD"))
      {
         ToggleImgFavourites(file2rem, "rem")
         resultedFilesList[currentFileIndex, 5] := 0
@@ -29167,7 +29500,8 @@ PanelMultiRenameFiles() {
        txtWid := txtWid + 220
        Gui, Font, s%LargeUIfontValue%
     }
-
+    lstWid := EditWid
+    EditWid -= btnWid + 10
     RegAction(0, "PreserveDateTimeOnSave",, 1)
     thisu := groupDigits(markedSelectFile)
     listu := readRecentMultiRenameEntries()
@@ -29175,7 +29509,8 @@ PanelMultiRenameFiles() {
     Gui, +Delimiter`n
     Gui, Add, Text, x15 y15 w%txtWid% Section, Selected files: %thisu%. Type a pattern to rename the files.
     Gui, Add, ComboBox, y+10 w%EditWid% gUIgenericComboAction vUsrEditNewFileName, % listu
-    Gui, Add, ListView, xp y+1 wp -multi +LV0x10000 +LV0x400 r%uLVr% Grid AltSubmit vLViewOthers gUIlvMultiRenameResponder, Original file name`nNew file name`nFolder path`n#
+    Gui, Add, Button, x+5 hp w%btnWid% gEraseMultiRenameHisto, Erase &history
+    Gui, Add, ListView, xs y+1 w%lstWid% -multi +LV0x10000 +LV0x400 r%uLVr% Grid AltSubmit vLViewOthers gUIlvMultiRenameResponder, Original file name`nNew file name`nFolder path`n#
     ml := (PrefsLargeFonts=1) ? 40 : 30
     sml := (PrefsLargeFonts=1) ? 35 : 25
     Gui, Add, Button, y+5 h%thisBtnHeight% w%ml% gUImultiRenameChangeLVoffset, <<
@@ -29186,10 +29521,25 @@ PanelMultiRenameFiles() {
     Gui, Add, Text, xs y+10, In case of file name collisions, you will be prompted.
 
     Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w%btnWid% Default gcoreBatchMultiRenameFiles, &Rename files
-    Gui, Add, Button, x+5 hp w%btnWid% gEraseMultiRenameHisto, Erase &history
-    Gui, Add, Button, x+5 hp w85 gBtnHelpMultiRename, H&elp
+    Gui, Add, Button, x+5 hp wp gBTNdoSoloRename, &Solo rename
+    ml := (PrefsLargeFonts=1) ? 85 : 60
+    Gui, Add, Button, x+5 hp w%ml% gBtnHelpMultiRename, H&elp
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, C&ancel
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Rename multiple files: " appTitle)
+}
+
+BTNdoSoloRename() {
+   Gui, SettingsGUIA: Default
+   Gui, SettingsGUIA: ListView, LViewOthers
+   RowNumber := LV_GetNext(0, "F")
+   LV_GetText(idu, RowNumber, 4)
+   If (idu && RowNumber)
+      currentFileIndex := clampInRange(idu, 1, maxFilesIndex)
+
+   BtnCloseWindow()
+   dummyTimerDelayiedImageDisplay(50)
+   fn := Func("PanelRenameThisFile").Bind("single")
+   SetTimer, % fn, -100
 }
 
 UImultiRenameChangeLVoffset(a:=0, b:=0, c:=0) {
@@ -30079,11 +30429,18 @@ PanelUpdateThisFileIndex(dummy:=0) {
 
       remCurrentEntry(0)
    } Else If InStr(msgResult.btn, "browse")
+   {
+      preventer := 1
       BrowseReplaceIndexEntry()
-   Else If (dummy="reopen")
-      PanelRenameThisFile()
-   If (dummy="reviewer")
-      PanelReviewSelectedFiles()
+   } Else If (dummy="reopen")
+   {
+      preventer := 1
+      fn := Func("PanelRenameThisFile").Bind("single")
+      SetTimer, % fn, -100
+   }
+
+   If (dummy="reviewer" && !preventer)
+      SetTimer, PanelReviewSelectedFiles, -100
 }
 
 PanelBrowseAudioAnnotation() {
@@ -30146,7 +30503,7 @@ PanelQuickSearchMenuOptions() {
 
     If (slideShowRunning=1)
        ToggleSlideShowu()
-
+    DestroyGIFuWin()
     mouseTurnOFFtooltip()
     thisState := "a" uiUseDarkMode PrefsLargeFonts
     If (createdQuickMenuSearchWin=1 && thisState=lastState && VisibleQuickMenuSearchWin=1)
@@ -30707,7 +31064,7 @@ buildQuickSearchMenus() {
       kMenu("PVmenu", "Add", "Increase viewport text size`t+", "MenuChangeZoomPlus", "disability handicap eyes eyesight large")
       kMenu("PVmenu", "Add", "Decrease viewport text size`t-", "MenuChangeZoomMinus", "disability handicap eyes eyesight large")
       keyword := (showMainMenuBar=1) ? " hide" : " display"
-      kMenu("PVmenu", "Add/Uncheck", "Show &menu bar`tF10", "ToggleQuickBaru", "toolbar" keyword)
+      kMenu("PVmenu", "Add/Uncheck", "Show &menu bar`tF10", "ToggleMenuBaru", "toolbar" keyword)
       If (showMainMenuBar=1)
          kMenu("PVmenu", "Check", "Show &menu bar`tF10")
 
@@ -31387,10 +31744,14 @@ PanelRenameThisFile(dummy:=0) {
 
    fakeWinCreator(7, A_ThisFunc, 1)
    undoBtn := FileExist(lastRenameUndo[2]) ? "&Undo previous|" : ""
+   multiBtn := (markedSelectFile>1) ? "&Multi-rename|" : ""
    fileMsg := (userPrivateMode=1) ? "" : "File location:`n" OutDir "\`n`n"
    typeu := (userPrivateMode=1) ? " Password " : ""
-   msgResult := msgBoxWrapper("panelu|Rename file: " appTitle, fileMsg "Please type the new file name.", "&Rename file|" undoBtn "&Modify index entry|C&ancel", 1, "modify-file", "On file name collision, use previously given answer", doLastOption, 0, "limit9050" typeu, OutFileName)
-   If InStr(msgResult.btn, "Rename")
+   msgResult := msgBoxWrapper("panelu|Rename file: " appTitle, fileMsg "Please type the new file name.", "&Rename file|" undoBtn multiBtn "&Modify index entry|C&ancel", 1, "modify-file", "On file name collision, use previously given answer", doLastOption, 0, "limit9050" typeu, OutFileName)
+   If InStr(msgResult.btn, "multi")
+   {
+      SetTimer, PanelMultiRenameFiles, -100
+   } Else If InStr(msgResult.btn, "Rename")
    {
       doLastOption := msgResult.check
       newFileName := Trimmer(msgResult.edit)
@@ -31418,8 +31779,10 @@ PanelRenameThisFile(dummy:=0) {
          CreateGuiButton("Undo rename,,undoFileRenameAction", 0, msgDisplayTime//1.5 + 500)
       }
    } Else If InStr(msgResult.btn, "modify")
-      PanelUpdateThisFileIndex("reopen")
-    Else If InStr(msgResult.btn, "undo")
+   {
+      fn := Func("PanelUpdateThisFileIndex").Bind("reopen")
+      SetTimer, % fn, -100
+   } Else If InStr(msgResult.btn, "undo")
       undoFileRenameAction()
 }
 
@@ -31549,7 +31912,7 @@ PanelSetSystemCores() {
 }
 
 PanelSaveSlideShowu() {
-    Global usePrevSaveFolder := 0, userDesiredSlideFMT := 1
+    Global userDesiredSlideFMT := 1
 
     If (maxFilesIndex<2)
     {
@@ -31641,7 +32004,7 @@ BTNsaveCurrentSlideshow() {
     BtnCloseWindow()
     Sleep, 1
     If InStr(CurrentSLD, "\QPV\favourite-images-list.SLD")
-       renewFavesListBasedOnIndexList()
+       saveFavesListBasedOnIndexList()
     Else If (SLDtypeLoaded=2 && FileRexists(CurrentSLD) && maxFilesIndex>0)
        SaveFilesList(CurrentSLD)
     Else If (SLDtypeLoaded=3 && FileRexists(CurrentSLD) && maxFilesIndex>0)
@@ -31679,12 +32042,471 @@ BTNsaveSlideshowPanel() {
 FolderExist(filePath) {
    If StrLen(filePath)<4
       Return
+   Else
+      Return InStr(FileExist(filePath), "D")
+}
 
-   Return InStr(FileExist(filePath), "D")
+PanelExtractFrames() {
+    If (thumbsDisplaying!=1)
+    {
+       If throwErrorNoImageLoaded()
+          Return
+    }
+
+    thisBtnHeight := createSettingsGUI(74, A_ThisFunc)
+    RegAction(0, "ResizeDestFolder",, 6)
+    RegAction(0, "userJpegQuality",, 2, 1, 100)
+    btnWid := 100
+    txtWid := 330
+    EditWid := 395
+    If (PrefsLargeFonts=1)
+    {
+       EditWid := EditWid + 230
+       btnWid := btnWid + 80
+       txtWid := txtWid + 120
+       Gui, Font, s%LargeUIfontValue%
+    }
+
+    btnWid2 := (PrefsLargeFonts=1) ? btnWid - 40 : btnWid - 25
+    RegAction(0, "userJpegQuality",, 2, 1, 100)
+    filesElected := getSelectedFiles(0, 1)
+    UserCropOnSave := 0
+    depthChoice := (currIMGdetails.HasAlpha=1) ? 1 : 2
+    thisWid := (PrefsLargeFonts=1) ? 70 : 45
+    ml := (PrefsLargeFonts=1) ? 190 : 150
+    ; Gui, Add, Checkbox, Checked%UserCropOnSave% vUserCropOnSave, C&rop image to selected area on save
+    Gui, Add, Text, x15 y15 Section, Save options:
+    ; Gui, Add, Text, xs y+0 wp h2 +0x1007, 
+    Gui, Add, Text, xp+15 y+7 w%ml% hp +0x200, Quality `%:
+    Gui, Add, Edit, x+10 w%thisWid% number -multi limit3 veditF5, % userJpegQuality
+    Gui, Add, UpDown, vuserJpegQuality Range1-100, % userJpegQuality
+    thisWid := (PrefsLargeFonts=1) ? 145 : 115
+    Gui, Add, Text, xs+15 y+7 w%ml% hp +0x200, Color depth:
+    Gui, Add, DropDownList, x+10 w%thisWid% AltSubmit Choose%depthChoice% vuserSaveBitsDepth, 32 bits RGBA|24 bits RGB|16 bits RGB|8 bits RGB [256 colors]
+    Gui, Add, Button, x+5 w40 hp gbtnHelpSaveImgPanel , ?
+    Gui, Add, Text, xs+15 y+7 w%ml% hp +0x200, File format on save:
+    thisWid := (PrefsLargeFonts=1) ? 110 : 80
+    Gui, Add, DropDownList, x+10 w%thisWid% AltSubmit Choose%userExtractFramesFmt% vuserExtractFramesFmt, .hdp|.jng|.jpg|.jp2|.jfif|.jxr|.gif|.png|.ppm|.tif|.tga|.wdp|.webp|.bmp|.xpm
+    Gui, Add, Text, xs y+10 hp w%ml% +0x200, Folder destination:
+    thisWid := (PrefsLargeFonts=1) ? 105 : 65
+    ml := (PrefsLargeFonts=1) ? 250 : 205
+    Gui, Add, Edit, xp+15 y+5 w%ml% r1 -Border right -wrap vResizeDestFolder, % ResizeDestFolder
+    Gui, Add, Button, x+5 hp w%thisWid% gBTNchangeResizeDestFolder vbtnFldr, C&hoose
+    Gui, Add, Checkbox, xs+15 y+10 Checked%onConflictOverwrite% vonConflictOverwrite, &On file name conflict, overwrite files
+    If (filesElected>1)
+       Gui, Add, Text, xs y+20, %filesElected% files are selected.
+
+    ; GuiControl, SettingsGUIA: Disable, ResizeDestFolder
+    btnWid2 := (PrefsLargeFonts=1) ? btnWid - 40 : btnWid - 25
+    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid2% Default gBTNperformExtractFrames, &Proceed
+    If (filesElected>1)
+       Gui, Add, Button, x+5 hp wp gBTNperformExtractFrames, &Active file only
+    btnWid2 := (PrefsLargeFonts=1) ? 90 : 60
+    Gui, Add, Button, x+5 hp w%btnWid2% gBtnCloseWindow, C&ancel
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Extract frames: " appTitle)
+}
+
+BtnChangeMultiPageFmt() {
+   If (AnyWindowOpen!=75)
+      Return
+
+   Gui, SettingsGUIA: Default
+   Gui, SettingsGUIA: Submit, NoHide
+   actu := (userCombineFramesFmt=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   GuiControl, % actu, txtLine2
+   GuiControl, % actu, userCombineGIFframeDelay
+   GuiControl, % actu, editF5
+
+   actu := (userCombineFramesFmt=2) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   GuiControl, % actu, txtLine1
+   GuiControl, % actu, userSaveBitsDepth
+
+   actu := (userCombineFramesFmt=3) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   GuiControl, % actu, txtLine3
+   GuiControl, % actu, txtLine4
+   GuiControl, % actu, txtLine5
+   GuiControl, % actu, UserCombinePDFpageSize
+   GuiControl, % actu, ResizeApplyEffects
+   GuiControl, % actu, combinePDFpageHighQuality
+   GuiControl, % actu, combinePDFpageLandscape
+   GuiControl, % actu, editF6
+   GuiControl, % actu, userJpegQuality
+   GuiControl, % actu, TextInAreaAlign
+   GuiControl, % actu, TextInAreaValign
+}
+
+
+PanelCombineImagesMultipage() {
+    Static hasOpened := 0
+    If !hasOpened
+    {
+       TextInAreaAlign := TextInAreaValign := 2
+       userSaveBitsDepth := 5
+    }
+
+    filesElected := getSelectedFiles(0, 1)
+    If !filesElected
+    {
+       showTOOLtip("WARNING: Insufficient files selected to join.")
+       SoundBeep , 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
+
+    thisBtnHeight := createSettingsGUI(75, A_ThisFunc)
+    btnWid := 100
+    txtWid := 330
+    EditWid := 395
+    If (PrefsLargeFonts=1)
+    {
+       EditWid := EditWid + 230
+       btnWid := btnWid + 80
+       txtWid := txtWid + 120
+       Gui, Font, s%LargeUIfontValue%
+    }
+
+    ReadSettingsCombineIMGs()
+    ; btnWid2 := (PrefsLargeFonts=1) ? btnWid - 40 : btnWid - 25
+    ; depthChoice := (currIMGdetails.HasAlpha=1) ? 1 : 2
+    thisWid := (PrefsLargeFonts=1) ? 70 : 45
+    ml := (PrefsLargeFonts=1) ? 275 : 175
+    ; Gui, Add, Checkbox, Checked%UserCropOnSave% vUserCropOnSave, C&rop image to selected area on save
+    Gui, Add, Text, x15 y15 Section, Please choose the multi-page format.`nThe newly created file will contain the selected images.
+    ; Gui, Add, Text, xs y+0 wp h2 +0x1007, 
+    Gui, Add, Text, xs+15 y+10 w%ml% +0x200, File format on save:
+    Gui, Add, DropDownList, x+1 w%thisWid% gBtnChangeMultiPageFmt AltSubmit Choose%userCombineFramesFmt% vuserCombineFramesFmt, .gif|.tiff|.pdf
+    Gui, Add, Checkbox, xs+30 y+5 hp Checked%userCombineSubFrames% vuserCombineSubFrames, Join contained frames from selected files
+    thisWid := (PrefsLargeFonts=1) ? 145 : 115
+    Gui, Add, Text, xs+15 y+10 w%ml% hp +0x200 vtxtLine1, TIFF maximum color depth:
+    Gui, Add, DropDownList, x+1 w%thisWid% AltSubmit Choose%userSaveBitsDepth% vuserSaveBitsDepth, 32 bits RGBA|24 bits RGB|16 bits RGB|8 bits RGB [256 colors]|Avoid changes
+    Gui, Add, Text, xs+15 y+10 w%ml% hp +0x200 vtxtLine2, GIFs frames delay (in milisec.)
+    thisWid := (PrefsLargeFonts=1) ? 70 : 45
+    Gui, Add, Edit, x+1 w%thisWid% number -multi limit4 veditF5, % userCombineGIFframeDelay
+    Gui, Add, UpDown, vuserCombineGIFframeDelay Range1-9500, % userCombineGIFframeDelay
+    thisWid := (PrefsLargeFonts=1) ? 145 : 115
+    Gui, Add, Text, xs+15 y+10 w%ml% hp +0x200 vtxtLine3, PDF page size:
+    Gui, Add, DropDownList, x+1 w%thisWid% AltSubmit Choose%UserCombinePDFpageSize% vUserCombinePDFpageSize, A4 (1.41)|Business Card (0.63)|Poster (1.33)|Letter (1.29)|Ledger (1.54)|Legal (1.65)
+    Gui, Add, Checkbox, x+5 hp Checked%combinePDFpageLandscape% vcombinePDFpageLandscape, Landscape
+    thisWid := (PrefsLargeFonts=1) ? 90 : 65
+    ml -= 15
+    Gui, Add, Text, xs+30 y+10 w%ml% hp +0x200 vtxtLine4, Image alignment on page:
+    Gui, Add, DropDownList, x+1 w%thisWid% Choose%TextInAreaAlign% AltSubmit vTextInAreaAlign, Left|Center|Right
+    Gui, Add, DropDownList, x+5 wp Choose%TextInAreaValign% AltSubmit vTextInAreaValign, Top|Center|Bottom
+    Gui, Add, Checkbox, xs+30 y+10 Checked%combinePDFpageHighQuality% vcombinePDFpageHighQuality, High resolution pages (192 dpi)
+    Gui, Add, Checkbox, xs+30 y+10 gTglRszApplyEffects Checked%ResizeApplyEffects% vResizeApplyEffects, Apply viewport color adjustments and effects
+    thisWid := (PrefsLargeFonts=1) ? 70 : 45
+    Gui, Add, Text, xs+30 y+7 w%ml% hp+5 +0x200 vtxtLine5, Image quality `%:
+    Gui, Add, Edit, x+1 w%thisWid% number -multi limit3 veditF6, % userJpegQuality
+    Gui, Add, UpDown, vuserJpegQuality Range3-97, % userJpegQuality
+    thisWid := (PrefsLargeFonts=1) ? 145 : 115
+
+    Gui, Font, Bold
+    ml := (PrefsLargeFonts=1) ? 20 : 10
+    If (filesElected>1)
+       Gui, Add, Text, xs y+%ml%, %filesElected% files are selected.
+
+    If (filesElected>=maxMultiPagesAllowed)
+       Gui, Add, Text, xs y+%ml%, The resulted file will be limited to %maxMultiPagesAllowed% frames / pages.
+
+    Gui, Font, Normal
+    ; GuiControl, SettingsGUIA: Disable, ResizeDestFolder
+    ; btnWid2 := (PrefsLargeFonts=1) ? btnWid - 40 : btnWid - 25
+    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid% Default gBTNperformCombineIMGs, &Join images
+    btnWid2 := (PrefsLargeFonts=1) ? 90 : 60
+    Gui, Add, Button, x+5 hp w%btnWid2% gBtnHelpCombineImgs, &Help
+    Gui, Add, Button, x+5 hp w%btnWid2% gBtnCloseWindow, C&ancel
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Join images into a single file: " appTitle)
+    SetTimer, BtnChangeMultiPageFmt, -100
+}
+
+BtnHelpCombineImgs() {
+   msgBoxWrapper(appTitle ": HELP", "This tool allows users to combine multiple images into one image. GIF, TIFF and PDF formats are the supported destination formats.`n`nIf any of the selected files has multiple frames or pages and the option «Join contained frames from selected files», these pages will be processed and become part of the newly created file.`n`nThe resulted order of the pages will reflect the order of originally selected files.`n`nFor proper GIF animations, please select files having the same resolution. Please note, GIF export option is experimental.`n`nPDFs without the «high resolution» option selected will have a DPI of 96. The images are embedded as JPEGs in the PDF. To influence the file size, you can define in the panel the JPEG quality level.`n`nWhen a multipaged TIFF is created, only the images with the color depth exceeding the chosen depth will be converted. The LZW compression mode is used upon creation of such files.", -1, 0, 0)
+}
+
+BTNperformCombineIMGs() {
+   Static fmtz := {1:"gif", 2:"tiff", 3:"pdf"}
+   Gui, SettingsGUIA: Default
+   Gui, SettingsGUIA: Submit, NoHide
+   GuiControlGet, userJpegQuality
+   BtnCloseWindow()
+   f := fmtz[userCombineFramesFmt]
+   IniAction(1, "prevFileSavePath", "General", 6)
+   RegAction(1, "userJpegQuality")
+   animus := (userCombineFramesFmt=1) ? 1 : 0
+   file2save := openFileDialogWrapper("S", "PathMustExist", prevFileSavePath, "Choose ." f " file destination", f " files (*." f ")|All (*.*)", 1, 1)
+   If !file2save
+   {
+      SetTimer, PanelCombineImagesMultipage, -250
+      Return
+   }
+
+   If (!RegExMatch(file2save, "i)(.\." f ")$") && file2save)
+      file2save .= "." f
+
+   zPlitPath(file2save, 0, OutFileName, OutDir)
+   prevFileSavePath := OutDir
+   IniAction(1, "prevFileSavePath", "General", 6)
+   WriteSettingsCombineIMGs()
+   ; prevFileSavePath := file2save
+   ; MsgBox, % A_ThisFunc "()`n" file2save
+   If (userCombineFramesFmt=2)
+      combineImagesMultiTiffGDIp(file2save)
+   Else If (userCombineFramesFmt=3)
+      CombineImgsIntoPDF(file2save)
+   Else
+      combineImagesMultiPage(userSaveBitsDepth, animus, file2save)
+}
+
+CombineImgsIntoPDF(file2save) {
+   If (markedSelectFile>1)
+   {
+      zPlitPath(file2save, 0, OutFileName, OutDir)
+      tempusDir := OutDir "\qpv-tmp-pdf-generator"
+      If !FolderExist(tempusDir)
+      {
+         FileCreateDir, % tempusDir
+         If ErrorLevel
+         {
+            showTOOLtip("ERROR: Unable to create temporary folder required to create the PDF.`nOperation abandoned.")
+            SoundBeep 300, 100
+            SetTimer, RemoveTooltip, % -msgDisplayTime
+            Return
+         }
+      }
+
+      ; process images to suit the desired page layout
+      Static pageSizesH := {1:2245, 2:416, 3:3840, 4:2112, 5:3264, 6:2688}
+           , pageSizesW := {1:1587, 2:657, 3:2880, 4:1632, 5:2112, 6:1632}
+      Static pageSizesInchH := {1:11.69, 2:2.16, 3:20, 4:11, 5:17, 6:14}
+           , pageSizesInchW := {1:8.27, 2:3.42, 3:15, 4:8.5, 5:11, 6:8.5}
+
+      pageW := (combinePDFpageLandscape=1) ? pageSizesH[UserCombinePDFpageSize] : pageSizesW[UserCombinePDFpageSize]
+      pageH := (combinePDFpageLandscape=1) ? pageSizesW[UserCombinePDFpageSize] : pageSizesH[UserCombinePDFpageSize]
+      If (combinePDFpageHighQuality!=1)
+      {
+         pageW := pageW // 2
+         pageH := pageH // 2
+      }
+
+      dpi := (combinePDFpageHighQuality=1) ? 192 : 96
+      newBitmap := trGdip_CreateBitmap(A_ThisFunc, pageW, pageH)
+      If StrLen(newBitmap)>2
+         G := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap)
+      If !G
+      {
+         showTOOLtip("ERROR: Failed to create the PDF page layout required to process images")
+         If tempusDir
+            FileRemoveDir, % tempusDir, 1
+         SoundBeep , 300, 100
+         RemoveTooltip()
+         ResetImgLoadStatus()
+         Return
+      }
+
+      Gdip_BitmapSetResolution(newBitmap, dpi, dpi)
+      prevMSGdisplay := A_TickCount
+      startOperation := A_TickCount
+      doStartLongOpDance()
+      fileIndex := thisIndex := failedFiles := 0
+      backCurrentSLD := CurrentSLD
+      CurrentSLD := ""
+      tempList := []
+      showTOOLtip("Phase 1: Processing the PDF pages, please wait")
+      Loop, % maxFilesIndex
+      {
+         isSelected := resultedFilesList[A_Index, 2]
+         If (isSelected!=1)
+            Continue
+
+         imgPath := resultedFilesList[A_Index, 1]
+         ; zPlitPath(file2save, 0, OutFileName, OutDir)
+         pBitmap := LoadBitmapFromFileu(imgPath)
+         executingCanceableOperation := A_TickCount
+         If (A_TickCount - prevMSGdisplay>3000)
+         {
+            etaTime := ETAinfos(A_Index, z, startOperation)
+            If (failedFiles>0)
+               etaTime .= "`nFailed to process " groupDigits(failedFiles) " images"
+
+            showTOOLtip("Phase 1: Processing images into PDF pages, please wait`n" OutFileName "`nImages processed: " groupDigits(thisIndex) etaTime, 0, 0, A_Index / z)
+            prevMSGdisplay := A_TickCount
+         }
+
+         If (determineTerminateOperation()=1 || abandonAll=1)
+         {
+            abandonAll := 1
+            Break
+         }
+
+         If StrLen(pBitmap)>2
+         {
+            totalFlames := (userCombineSubFrames=1) ? mainLoadedIMGdetails.Frames + 1 : 1
+            Loop, % totalFlames
+            {
+               If (A_Index>1)
+               {
+                  pBitmap := LoadBitmapFromFileu(imgPath, 0, 0, A_Index - 1)
+                  If (determineTerminateOperation()=1)
+                  {
+                     abandonAll := 1
+                     Break
+                  }
+               }
+
+               Gdip_GraphicsClear(G, "0xffFFFFFF")
+               Gdip_GetImageDimensions(pBitmap, imgW, imgH)
+               calcIMGdimensions(imgW, imgH, pageW, pageH, ResizedW, ResizedH)
+               posX := posY := 0
+               If (TextInAreaAlign=2)
+                  posX := Round(pageW/2 - ResizedW/2)
+               If (TextInAreaValign=2)
+                  posY := Round(pageH/2 - ResizedH/2)
+               If (TextInAreaAlign=3)
+                  posX := pageW - ResizedW
+               If (TextInAreaValign=3)
+                  posY := pageH - ResizedH
+
+               If (ResizeApplyEffects=1)
+                  pBitmap := applyVPeffectsOnBMP(pBitmap)
+ 
+               fileIndex++
+               trGdip_DrawImage(A_ThisFunc, G, pBitmap, posX, posY, ResizedW, ResizedH)
+               pBitmap := trGdip_DisposeImage(pBitmap, 1)
+               f := Gdip_SaveBitmapToFile(newBitmap, tempusDir "\" fileIndex ".jpg", userJpegQuality)
+               If f
+               {
+                  failedFiles++
+               } Else
+               {
+                  thisIndex++
+                  tempList[thisIndex] := fileIndex
+               }
+
+               If (thisIndex>=maxMultiPagesAllowed)
+               {
+                  showTOOLtip("WARNING: Maximum allowed pages limit reached: " maxMultiPagesAllowed)
+                  SoundBeep 300, 100
+                  fattalErr := 1
+                  Sleep, 2000
+                  Break
+               }
+            }
+            If fattalErr
+               Break
+         } Else failedFiles++
+         ; fnOutputDebug("zzz=" pBitmap " | " f " | " A_LoopFileLongPath)
+      }
+
+      z := tempList.Count()
+      Gdip_DeleteGraphics(G)
+      trGdip_DisposeImage(newBitmap)
+      ResetImgLoadStatus()
+      If (z>1 && abandonAll!=1)
+      {
+         setImageLoading()
+         VarSetCapacity(fListArray, 8 * z + 1, 0)
+         Loop, % z
+            NumPut(tempList[A_Index], fListArray, (A_Index - 1) * 4, "uint")
+
+         showTOOLtip("Phase 2: Saving the PDF file, please wait`n" groupDigits(z) " images to be embedded")
+         func2exec := (A_PtrSize=8) ? "CreatePDFfile" : "_CreatePDFfile@32"
+         pageWpdf := (combinePDFpageLandscape=1) ? pageSizesInchH[UserCombinePDFpageSize] : pageSizesInchW[UserCombinePDFpageSize]
+         pageHpdf := (combinePDFpageLandscape=1) ? pageSizesInchW[UserCombinePDFpageSize] : pageSizesInchH[UserCombinePDFpageSize]
+         ; fnOutputDebug("pdf dll precall = " z)
+         r := DllCall(whichMainDLL "\" func2exec, "AStr", tempusDir, "AStr", file2save, "AStr", mainCompiledPath, "UPtr", &fListArray, "int", z, "float", pageWpdf, "float", pageHpdf, "Int", dpi)
+         ; fnOutputDebug("pdf dll call = " r)
+      } Else If (abandonAll=1)
+         z := 0
+
+      If (failedFiles>0)
+         rr .= "`nFailed to load " groupDigits(failedFiles) " images out of " groupDigits(filesElected)
+
+      If (r<0)
+      {
+         If (r=-1)
+            showTOOLtip("Failed to create the PDF file. Init_BeginPDFdocument() failure. Error code: " r)
+         Else If (r=-2)
+            showTOOLtip("Failed to create the PDF file. Unable to locate the destination folder. Error code: " r)
+         Else If (r=-6)
+            showTOOLtip("Failed to create the PDF file. Error encountered when writing to the disk. Error code: " r)
+         Else If (r=-7)
+            showTOOLtip("Failed to create the PDF file. PDF_GetFinalDocument() failure. Error code: " r)
+         Else
+            showTOOLtip("Failed to properly create the PDF file. Error code: " r rr)
+      } Else If (abandonAll=1)
+      {
+         showTOOLtip("Operation aborted by user. No .PDF file was created.")
+      } Else If z
+      {
+         FileGetSize, OutputVar, % file2save
+         If (r>0)
+            moreInfos := " out of " groupDigits(z)
+
+         xu := (r>=0) ? groupDigits(z - r) : 0
+         showTOOLtip("Finished creating the .PDF file:`n" OutFileName "`nImages embedded: " xu moreInfos "`nFile size: " fileSizeFriendly(OutputVar) rr)
+         SoundBeep , 900, 100
+      }
+
+      fListArray := ""
+      SoundBeep , % (z>1) ? 900 : 300, 100
+      If tempusDir
+         FileRemoveDir, % tempusDir, 1
+
+      CurrentSLD := backCurrentSLD
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      ResetImgLoadStatus()
+   }
+}
+
+BTNperformExtractFrames(a) {
+   Gui, SettingsGUIA: Default
+   GuiControlGet, ResizeDestFolder
+   GuiControlGet, userJpegQuality
+   GuiControlGet, userSaveBitsDepth
+   GuiControlGet, onConflictOverwrite
+   GuiControlGet, userExtractFramesFmt
+   userJpegQuality := clampInRange(userJpegQuality, 1, 100)
+   RegAction(1, "ResizeDestFolder")
+   RegAction(1, "userJpegQuality")
+   ControlGetText, c,, ahk_id %a%
+   If !FolderExist(ResizeDestFolder)
+   {
+      FileCreateDir, % ResizeDestFolder
+      If ErrorLevel
+      {
+         showTOOLtip("ERROR: Destination folder does not exist:`n" ResizeDestFolder)
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return
+      }
+   }
+
+   BtnCloseWindow()
+   If (markedSelectFile>1 && !InStr(c, "active"))
+   {
+      batchExtractFramesFromImages()
+   } Else
+   {
+      r := coreExtractFramesFromImage(currentFileIndex, 0)
+      If (r=-5)
+         showTOOLtip("WARNING: User abandoned operation.`nSeveral frames or pages may have been extracted already.")
+      Else If (r=-4)
+         showTOOLtip("ERROR: Failed to load the image. No frames or pages were extracted")
+      Else If (r=-3)
+         showTOOLtip("WARNING: The image format does not have support for multiple frames.`nNo frames or pages were extracted.")
+      Else If (r=-2)
+         showTOOLtip("The image has no frames or pages to extract")
+      Else If (r>1)
+         showTOOLtip("Succesfully extracted " groupDigits(r) " frames")
+      Else 
+         showTOOLtip("ERROR: an undefined error has occured.`nNo frames or pages were extracted.")
+
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+   }
 }
 
 PanelSaveImg() {
-    Global userDestinationFolder, editF5, UserCropOnSave, usePrevSaveFolder := 0
+    Global userDestinationFolder, editF5, UserCropOnSave
 
     If (thumbsDisplaying=1)
     {
@@ -31755,7 +32577,7 @@ PanelSaveImg() {
 
     QPV_FileGetSizeTime(imgPath, "R", currentFileIndex)
     ofileSizu := resultedFilesList[currentFileIndex, 6]
-    fileSizu := (ofileSizu>15) ? fileSizeFrienly(ofileSizu) : "N/A"
+    fileSizu := (ofileSizu>15) ? fileSizeFriendly(ofileSizu) : "N/A"
     If (ofileSizu>15)
     {
        FileDateM := QPV_FileGetSizeTime(imgPath, "M", currentFileIndex)
@@ -31809,7 +32631,7 @@ PanelSaveImg() {
 }
 
 btnHelpSaveImgPanel() {
-   msgBoxWrapper(appTitle ": HELP", "Quality level applies only for JPG, JP2, J2K, JXR and WEBP files.`n`nThe color depth option is not applicable to all of the  supported image file formats.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "Quality level applies only for JPG, JP2, J2K, JXR and WEBP files.`n`nThe color depth option is not applicable to all of the supported image file formats.", -1, 0, 0)
 }
 
 PanelBrushTool(dummy:=0, modus:=0) {
@@ -32867,6 +33689,14 @@ BTNperformIndexSearchReplace() {
       Return
    }
 
+   If (editF5==editF6)
+   {
+      showTOOLtip("WARNING: Both fields are equal: what to search for and replace with.")
+      SoundBeep , 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
    BtnCloseWindow()
    If (mustRecordSeenImgs=1 && performInSeenDB=1)
    {
@@ -33121,6 +33951,7 @@ ReadSettingsQuickKeysActsPanel(act:=0) {
 }
 
 TglUsePrevSaveFoderu() {
+   Gui, SettingsGUIA: Default
    GuiControlGet, usePrevSaveFolder
    actu := (usePrevSaveFolder=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, userDestinationFolder
@@ -34633,6 +35464,23 @@ ReadSettingsDrawShapeAreaPanel(act:=0) {
     RegAction(act, "FillAreaClosedPath",, 1)
 }
 
+WriteSettingsCombineIMGs() {
+   ReadSettingsCombineIMGs(1)
+}
+
+ReadSettingsCombineIMGs(act:=0) {
+    RegAction(act, "TextInAreaAlign",, 2, 1, 3)
+    RegAction(act, "TextInAreaValign",, 2, 1, 3)
+    RegAction(act, "UserCombinePDFpageSize",, 2, 1, 6)
+    RegAction(act, "userSaveBitsDepth",, 2, 1, 5)
+    RegAction(act, "userCombineFramesFmt",, 2, 1, 3)
+    RegAction(act, "combinePDFpageLandscape",, 1)
+    RegAction(act, "combinePDFpageHighQuality",, 1)
+    RegAction(act, "ResizeApplyEffects",, 1)
+    RegAction(act, "userCombineSubFrames",, 1)
+    RegAction(act, "userJpegQuality",, 2, 1, 100)
+}
+
 ReadSettingsVPgrid(act:=0) {
     RegAction(act, "vpGridSize",, 2, 10, 350)
     RegAction(act, "vpGridAlpha",, 2, 1, 255)
@@ -35829,7 +36677,7 @@ PanelEditorImgResize() {
     Gui, Add, Text, x+5 vinfoOpacity hp +0x200 +TabStop gBTNresetFillOpacity, n/a`%
 
     Gui, Add, Checkbox, xs y+15 hp Checked%ResizeQualityHigh% vResizeQualityHigh gupdateUIresizeImgEditPanel, &High quality image resampling
-    Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w%btnWid% gBTNimgResizeEditor Default, &Proceed
+    Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w%btnWid% gBTNimgResizeEditor Default, &Resize image
     Gui, Add, Button, x+5 hp w85 gBtnCloseWindow, C&ancel
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Resize image: " appTitle)
     updateUIresizeImgEditPanel()
@@ -35967,7 +36815,6 @@ BTNimgResizeEditor() {
     SetTimer, createGUItoolbar, -100
     SetTimer, TriggerMenuBarUpdate, -90
     SetTimer, ResetImgLoadStatus, -50
-
 }
 
 updateUIresizeImgEditPanel(dummy:=0) {
@@ -35976,15 +36823,9 @@ updateUIresizeImgEditPanel(dummy:=0) {
        Return
 
     Gui, SettingsGUIA: Default
-    GuiControlGet, ResizeFillCanvasMode
-    GuiControlGet, ResizeEnforceCanvas
-    GuiControlGet, ResizeInPercentage
-    GuiControlGet, ResizeKeepAratio
-    GuiControlGet, adjustCanvasCentered
+    Gui, SettingsGUIA: Submit, NoHide
     GuiControlGet, userEditWidth
     GuiControlGet, userEditHeight
-    GuiControlGet, FillAreaOpacity
-    GuiControlGet, PredefinedDocsSizes
 
     thisOpacity := Round((FillAreaOpacity / 255) * 100)
     GuiControl, SettingsGUIA:, infoOpacity, %thisOpacity%`%
@@ -36015,12 +36856,28 @@ updateUIresizeImgEditPanel(dummy:=0) {
     GuiControl, % actu, ResizeInPercentage
 
     Gdip_GetImageDimensions(useGdiBitmap(), oImgW, oImgH)
+    If (ResizeKeepAratio=1)
+    {
+       omgpx := oImgW * oImgH
+       mgpx := userEditWidth * userEditHeight
+       scaleu := mgpx/omgpx
+    } Else scaleu := 1
+
     thisWidth := (ResizeInPercentage=1) ? (oImgW/100)*userEditWidth : userEditWidth
     thisHeight := (ResizeInPercentage=1) ? (oImgH/100)*userEditHeight : userEditHeight
     canvasWidth := (ResizeInPercentage=1) ? (oImgW/100)*userEditWidth : userEditWidth
     canvasHeight := (ResizeInPercentage=1) ? (oImgH/100)*userEditHeight : userEditHeight
     If (ResizeKeepAratio=1)
+    {
        calcIMGdimensions(oImgW, oImgH, thisWidth, thisHeight, thisWidth, thisHeight)
+       If (oImgW=thisWidth && oimgH=thisHeight)
+       {
+          thisWidth *= scaleu
+          thisHeight *= scaleu
+          canvasWidth *= scaleu
+          canvasHeight *= scaleu
+       }
+    }
 
     If (ResizeEnforceCanvas=1 && ResizeKeepAratio=1)
     {
@@ -37525,7 +38382,7 @@ WriteSettingsZoomBlurPanel() {
 }
 
 ReadSettingsZoomBlurPanel(act:=0) {
-    RegAction(act, "blurAreaMode",, 2, 1, 3)
+    RegAction(act, "zoomBlurMode",, 2, 1, 3)
     RegAction(act, "BlurAreaAlphaMask",, 1)
     RegAction(act, "blurAreaOpacity",, 2, 3, 255)
     RegAction(act, "blurAreaInverted",, 1)
@@ -37543,6 +38400,8 @@ ReadSettingsBlurPanel(act:=0) {
     RegAction(act, "BlurAreaLight",, 2, -255, 255)
     RegAction(act, "BlurAreaSaturation",, 2, -100, 100)
     RegAction(act, "blurAreaAmount",, 2, 0, 255)
+    RegAction(act, "blurAreaYamount",, 2, 0, 255)
+    RegAction(act, "blurAreaEqualXY",, 1)
     RegAction(act, "blurAreaMode",, 2, 1, 3)
     RegAction(act, "blurAreaPixelizeAmount",, 2, 0, 1024)
     RegAction(act, "blurAreaPixelizeMethod",, 2, 1, 3)
@@ -37610,7 +38469,7 @@ PanelZoomBlurSelectedArea() {
     Gui, Add, Tab3, x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
     Gui, Tab, 1
     Gui, Add, Text, x+10 y+10 w%thisW% Section , Blur mode: 
-    Gui, Add, DropDownList, x+5 wp gupdateUIzoomBlurPanel AltSubmit Choose%zoomBlurMode% vzoomBlurMode, Zoom H/V|Horizontal|Vertical|Alt-Horizontal|Alt-Vertical
+    Gui, Add, DropDownList, x+5 wp gupdateUIzoomBlurPanel AltSubmit Choose%zoomBlurMode% vzoomBlurMode, Zoom H/V|Horizontal|Vertical ; |Alt-Horizontal|Alt-Vertical
     ; Gui, Add, Text, xs y+10 w%thisW% gBTNresetBlurAmount vinfoBlurAmount +TabStop, Blur amount: %blurAreaAmount%
     ; Gui, Add, Slider, Center xs y+5 gupdateUIzoomBlurPanel AltSubmit w%txtWid% vblurAreaAmount Range0-255, % blurAreaAmount
     Gui, Add, Text, xs y+10 w%thisW% vinfoZoomX +TabStop, Zoom X: %zoomBlurAreaXamount%
@@ -37646,7 +38505,7 @@ PanelZoomBlurSelectedArea() {
     Gui, Add, Button, x+6 hp wp gOpenPanelBlur, &Gaussian
     Gui, Add, Button, x+6 hp wp gBtnCloseWindow, &Cancel
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
-    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Zoom blur in selected area: " appTitle, winPos)
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Radial blur in selected area: " appTitle, winPos)
     SetTimer, updateUIzoomBlurPanel, -100
 }
 
@@ -37675,7 +38534,7 @@ PanelBlurSelectedArea() {
        EditWid += 50
        btnWid += 40
        txtWid += 105
-       thisW += 40
+       thisW += 50
        Gui, Font, s%LargeUIfontValue%
     }
 
@@ -37717,19 +38576,23 @@ PanelBlurSelectedArea() {
     If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
        BlurAreaAlphaMask := 0
 
+    Global infoBlurYamount
     Gui, +DPIScale
     Gui, Add, Tab3, x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
     Gui, Tab, 1
     Gui, Add, Checkbox, x+10 y+10 w%thisW% Section Checked%blurAreaSoftEdges% vblurAreaSoftEdges gupdateUIblurPanel, &Soft edges%friendly%
     Gui, Add, DropDownList, x+5 w60 AltSubmit Choose%blurAreaSoftLevel% gupdateUIblurPanel vblurAreaSoftLevel, 0.3x|0.6x|1x|2x|3x|4x|5x
-    Gui, Add, Checkbox, xs y+10 hp Checked%blurAreaTwice% vblurAreaTwice gupdateUIblurPanel, &Blur twice in one go (for large images)
-    Gui, Add, Text, xs y+10 w%thisW% gBTNresetBlurAmount vinfoBlurAmount +TabStop, Blur amount: %blurAreaAmount%
-    Gui, Add, DropDownList, x+5 wp AltSubmit Choose%blurAreaMode% gupdateUIblurPanel vblurAreaMode, High quality%friendly%|Alternate blur|Box blur (slow)
-    Gui, Add, Slider, Center xs y+5 gupdateUIblurPanel AltSubmit w%txtWid% vblurAreaAmount Range0-255, % blurAreaAmount
-    Gui, Add, Text, xs y+10 w%thisW% gBTNresetBlurPixelizationAmount vinfoPixelize +TabStop, Pixelize level: %blurAreaPixelizeAmount%
+    Gui, Add, Checkbox, xs y+5 hp Checked%blurAreaTwice% vblurAreaTwice gupdateUIblurPanel, &Blur twice in one go (for large images)
+    Gui, Add, Text, xs y+10 w%thisW% -wrap gBTNresetBlurAmount vinfoBlurAmount +TabStop, Blur amount on X: %blurAreaAmount%
+    Gui, Add, DropDownList, x+5 wp AltSubmit Choose%blurAreaMode% gupdateUIblurPanel vblurAreaMode, Gaussian (GDI+)%friendly%|Gaussian (cImg)|Box blur (cImg)
+    Gui, Add, Slider, Center xs y+2 gupdateUIblurPanel AltSubmit w%txtWid% vblurAreaAmount Range0-255, % blurAreaAmount
+    Gui, Add, Text, xs y+5 w%thisW% -wrap gBTNresetBlurYamount vinfoBlurYamount +TabStop, Blur amount on Y: %blurAreaYamount%
+    Gui, Add, Checkbox, x+5 hp Checked%blurAreaEqualXY% vblurAreaEqualXY gupdateUIblurPanel, &Equal X/Y
+    Gui, Add, Slider, Center xs y+2 gupdateUIblurPanel AltSubmit w%txtWid% vblurAreaYamount Range0-255, % blurAreaYamount
+    Gui, Add, Text, xs y+5 w%thisW% gBTNresetBlurPixelizationAmount vinfoPixelize +TabStop, Pixelize level: %blurAreaPixelizeAmount%
     Gui, Add, DropDownList, x+5 wp AltSubmit Choose%blurAreaPixelizeMethod% gupdateUIblurPanel vblurAreaPixelizeMethod, Method 1|Method 2|Method 3
-    Gui, Add, Slider, Center xs y+5 gupdateUIblurPanel AltSubmit w%txtWid% vblurAreaPixelizeAmount Range0-1024, %blurAreaPixelizeAmount%
-    Gui, Add, Checkbox, xs y+10 w%thisW% Checked%blurAreaInverted% vblurAreaInverted gupdateUIblurPanel, &Invert selection
+    Gui, Add, Slider, Center xs y+2 gupdateUIblurPanel AltSubmit w%txtWid% vblurAreaPixelizeAmount Range0-1024, %blurAreaPixelizeAmount%
+    Gui, Add, Checkbox, xs y+5 w%thisW% Checked%blurAreaInverted% vblurAreaInverted gupdateUIblurPanel, &Invert selection
     Gui, Add, Checkbox, x+5 Checked%BlurAreaAlphaMask% vBlurAreaAlphaMask gupdateUIblurPanel, Apply alpha mas&k
 
     If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
@@ -37754,7 +38617,7 @@ PanelBlurSelectedArea() {
 
     Gui, Tab
     Gui, Add, Button, xs+0 y+10 h%thisBtnHeight% Default w%btnWid% gBtnBlurSelectedArea, &Blur area
-    Gui, Add, Button, x+6 hp wp gOpenPanelZoomBlur, &Motion blur
+    Gui, Add, Button, x+6 hp wp gOpenPanelZoomBlur, &Radial blur
     Gui, Add, Button, x+6 hp wp gBtnCloseWindow, &Cancel
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Blur/pixelize selected area: " appTitle, winPos)
@@ -37784,14 +38647,22 @@ BTNresetBlurPixelizationAmount() {
 }
 
 BTNresetPixelizAmountNoiser() {
-   UserAddNoIsePixelizeAmount := 0
-   GuiControl, SettingsGUIA:, UserAddNoIsePixelizeAmount, 0
+   UserAddNoisePixelizeAmount := 0
+   GuiControl, SettingsGUIA:, UserAddNoisePixelizeAmount, 0
    updateUIaddNoisePanel()
 }
 
 BTNresetBlurAmount() {
    blurAreaAmount := 25
    GuiControl, SettingsGUIA:, blurAreaAmount, 25
+   updateUIblurPanel()
+}
+
+BTNresetBlurYamount() {
+   Gui, SettingsGUIA: Default
+   GuiControlGet, blurAreaAmount
+   blurAreaYamount := blurAreaAmount
+   GuiControl, SettingsGUIA:, blurAreaYamount, % blurAreaYamount
    updateUIblurPanel()
 }
 
@@ -37828,11 +38699,15 @@ ReadSettingsAddNoisePanel(act:=0) {
     RegAction(act, "IDedgesContrast",, 2, -100, 100)
     RegAction(act, "IDedgesInvert",, 1)
     RegAction(act, "IDedgesBlendMode",, 2, 1, 21)
-    RegAction(act, "UserAddNoiseMode",, 1)
+    RegAction(act, "UserAddNoiseGrays",, 1)
     RegAction(act, "UserAddNoiseIntensity",, 2, 1, 100)
+    RegAction(act, "UserAddNoiseDetails",, 2, 1, 100)
     RegAction(act, "UserAddNoiseBlurAmount",, 2, 0, 255)
-    RegAction(act, "UserAddNoIsePixelizeAmount",, 2, 0, 1024)
+    RegAction(act, "UserAddNoisePixelizeAmount",, 2, 0, 1024)
+    RegAction(act, "UserAddNoiseMode",, 2, 1, 3)
     RegAction(act, "BlurAreaAlphaMask",, 1)
+    RegAction(act, "blurAreaEqualXY",, 1)
+    RegAction(act, "blurAreaYamount",, 2, 0, 255)
 }
 
 PanelDetectEdgesImage() {
@@ -37949,20 +38824,24 @@ PanelAddNoiserImage() {
     If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
        BlurAreaAlphaMask := 0
 
-    Gui, Add, Checkbox, x+20 ys w%2ndcol% Section gupdateUIaddNoisePanel Checked%UserAddNoiseMode% vUserAddNoiseMode, &Grayscale noise
-    Gui, Add, Text, x+7 +0x200 hp gBTNresetNoiseLevel vinfoNoiseLvl -wrap +TabStop, Noise cut-off: 10001
-    Gui, Add, Slider, Center xs y+5 AltSubmit NoTicks w%txtWid% gupdateUIaddNoisePanel vUserAddNoiseIntensity Range1-100, % UserAddNoiseIntensity
-    
+    Gui, Add, Text, x+20 ys w%2ndcol% Section gBTNresetNoiseLevel vinfoNoiseLvl -wrap +TabStop, Noise cut-off: 10001
+    Gui, Add, DropDownList, x+7 wp AltSubmit gupdateUIaddNoisePanel Choose%UserAddNoiseMode% vUserAddNoiseMode, Gaussian noise|Dynamic noise|Plasma / clouds
+    Gui, Add, Slider, Center xs y+5 AltSubmit NoTicks w%2ndcol% gupdateUIaddNoisePanel vUserAddNoiseIntensity Range1-100, % UserAddNoiseIntensity
+    Gui, Add, Slider, Center x+2 AltSubmit NoTicks wp gupdateUIaddNoisePanel vUserAddNoiseDetails Range1-100, % UserAddNoiseDetails
+
     Gui, Add, Text, xs y+10 w%2ndcol% gBTNresetEdgesBright vinfoBright +TabStop, Brightness: %IDedgesEmphasis%
     Gui, Add, Checkbox, x+7 gupdateUIaddNoisePanel Checked%IDedgesInvert% vIDedgesInvert, &Invert noise
     Gui, Add, Slider, Center xs y+2 AltSubmit NoTicks w%txtWid% gupdateUIaddNoisePanel vIDedgesEmphasis Range-255-255, % IDedgesEmphasis
-    Gui, Add, Text, xs y+7 w%txtWid% gBTNresetEdgesContrast vinfoContrst +TabStop, Contrast: %IDedgesContrast%
+    Gui, Add, Text, xs y+7 w%2ndcol% gBTNresetEdgesContrast vinfoContrst +TabStop, Contrast: %IDedgesContrast%
+    Gui, Add, Checkbox, x+7 gupdateUIaddNoisePanel Checked%UserAddNoiseGrays% vUserAddNoiseGrays, &Grayscale
     Gui, Add, Slider, Center xs y+2 AltSubmit NoTicks w%txtWid% gupdateUIaddNoisePanel vIDedgesContrast Range-100-100, % IDedgesContrast
 
-    Gui, Add, Text, xs y+7 wp gBTNresetPixelizAmountNoiser vinfoPixelize +TabStop, Pixelize: %UserAddNoIsePixelizeAmount%
-    Gui, Add, Slider, Center xs y+2 AltSubmit gupdateUIaddNoisePanel NoTicks w%txtWid% vUserAddNoIsePixelizeAmount Range0-100, % UserAddNoIsePixelizeAmount
-    Gui, Add, Text, xs y+7 w%txtWid% gBTNresetBlurNoiserAmount vinfoBlurAmount +TabStop, Blur: %UserAddNoiseBlurAmount%
-    Gui, Add, Slider, Center xs y+2 AltSubmit gupdateUIaddNoisePanel NoTicks w%txtWid% vUserAddNoiseBlurAmount Range0-254, % UserAddNoiseBlurAmount
+    Gui, Add, Text, xs y+7 wp gBTNresetPixelizAmountNoiser vinfoPixelize +TabStop, Pixelize: %UserAddNoisePixelizeAmount%
+    Gui, Add, Slider, Center xs y+2 AltSubmit gupdateUIaddNoisePanel NoTicks w%txtWid% vUserAddNoisePixelizeAmount Range0-100, % UserAddNoisePixelizeAmount
+    Gui, Add, Text, xs y+7 w%2ndcol% gBTNresetBlurNoiserAmount vinfoBlurAmount +TabStop, Blur: %UserAddNoiseBlurAmount%
+    Gui, Add, Checkbox, x+7 Checked%blurAreaEqualXY% vblurAreaEqualXY gupdateUIaddNoisePanel, &Equal X/Y blur
+    Gui, Add, Slider, Center xs y+2 w%2ndcol% gupdateUIaddNoisePanel AltSubmit NoTicks vUserAddNoiseBlurAmount Range0-255, % UserAddNoiseBlurAmount
+    Gui, Add, Slider, Center x+2 wp gupdateUIaddNoisePanel AltSubmit NoTicks vblurAreaYamount Range0-255, % blurAreaYamount
 
     Gui, Add, Text, xs y+7 w%2ndcol% gBTNresetEdgesOpacity vinfoEdgesOpacity +TabStop, Opacity: %thisOpacity%`%
     Gui, Add, DropDownList, x+7 wp gupdateUIaddNoisePanel AltSubmit Choose%IDedgesBlendMode% vIDedgesBlendMode, No blending|Darken|Multiply|Linear burn|Color burn|Lighten|Screen|Linear dodge [Add]|Hard light|Overlay|Hard mix|Linear light|Color dodge|Vivid light|Division|Exclusion|Difference|Substract|Luminosity|Substract reversed|Inverted difference
@@ -38122,9 +39001,40 @@ updateUIaddNoisePanel(dummy:=0, b:=0) {
     GuiControl, SettingsGUIA:, infoBright, Brightness: %IDedgesEmphasis%
     GuiControl, SettingsGUIA:, infoContrst, Contrast: %IDedgesContrast%`%
     GuiControl, SettingsGUIA:, infoEdgesOpacity, % "Opacity: " Round((IDedgesOpacity / 255) * 100) "%"
-    GuiControl, SettingsGUIA:, infoNoiseLvl, % "Noise cut-off: " UserAddNoiseIntensity "%"
-    GuiControl, SettingsGUIA:, infoBlurAmount, % "Blur: " UserAddNoiseBlurAmount
-    GuiControl, SettingsGUIA:, infoPixelize, % "Pixelize: " UserAddNoIsePixelizeAmount
+    If (UserAddNoiseMode=1)
+       GuiControl, SettingsGUIA:, infoNoiseLvl, % "Amplitude: " UserAddNoiseIntensity
+    Else If (UserAddNoiseMode=3)
+       GuiControl, SettingsGUIA:, infoNoiseLvl, % "Plasma A/B: " UserAddNoiseIntensity " / " UserAddNoiseDetails
+    Else
+       GuiControl, SettingsGUIA:, infoNoiseLvl, % "Noise cut-off: " UserAddNoiseIntensity "%"
+
+    If (blurAreaEqualXY=1)
+       GuiControl, SettingsGUIA:, infoBlurAmount, % "Blur: " UserAddNoiseBlurAmount
+    Else
+       GuiControl, SettingsGUIA:, infoBlurAmount, % "Blur X/Y: " UserAddNoiseBlurAmount "/" blurAreaYamount
+    friendly := (UserAddNoiseMode=3) ? "Plasma scale: " : "Pixelize: "
+    GuiControl, SettingsGUIA:, infoPixelize, % friendly UserAddNoisePixelizeAmount
+
+    actu := (UserAddNoiseMode=3) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    GuiControl, % actu, UserAddNoiseDetails
+
+    actu := (blurAreaEqualXY=0 && UserAddNoiseMode>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    GuiControl, % actu, blurAreaYamount
+
+    actu := (UserAddNoiseMode>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    GuiControl, % actu, infoBright
+    GuiControl, % actu, infoContrst
+    GuiControl, % actu, infoBlurAmount
+    GuiControl, % actu, infoPixelize
+    GuiControl, % actu, IDedgesBlendMode
+    GuiControl, % actu, UserAddNoiseBlurAmount
+    GuiControl, % actu, IDedgesInvert
+    GuiControl, % actu, UserAddNoiseGrays
+    GuiControl, % actu, IDedgesContrast
+    GuiControl, % actu, IDedgesEmphasis
+    GuiControl, % actu, UserAddNoisePixelizeAmount
+    GuiControl, % actu, blurAreaEqualXY
+
     If (dummy!="no")
     {
        SetTimer, WriteSettingsAddNoisePanel, -150
@@ -38208,9 +39118,17 @@ PanelPrintImage() {
     Global EditFx, EditFy, EditFw, EditFh, PrintPosTxtX, PrintPosTxtY, PrintPosTxtW, PrintPosTxtH
          , PrintCopies, SelectedPrinteru, PrintDoFlipuH, PrintDoFlipuV, PrinterPageInfos, UserTextArea, editF1, PickuTextInAreaFontColor
 
-    If (thumbsDisplaying=1 || AnyWindowOpen)
+    If AnyWindowOpen
        Return
 
+    If (thumbsDisplaying=1)
+    {
+       ToggleThumbsMode()
+       SetTimer, PanelPrintImage, -300
+       Return
+    }
+
+    filesElected := getSelectedFiles(0, 1)
     viewportStampBMP := trGdip_DisposeImage(viewportStampBMP, 1)
     GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
 
@@ -38231,7 +39149,7 @@ PanelPrintImage() {
     If (PrefsLargeFonts=1)
     {
        EditWid := EditWid + 25
-       btnWid := btnWid + 85
+       btnWid := btnWid + 75
        txtWid := txtWid + 105
        Gui, Font, s%LargeUIfontValue%
     }
@@ -38274,6 +39192,8 @@ PanelPrintImage() {
     Gui, Add, Text, x+10 hp +0x200, flipped image
     Gui, Add, Checkbox, xs y+10 gupdatePrintPreview Checked%PrintColorMode% vPrintColorMode, Print &with colors
     Gui, Add, Checkbox, xs y+10 gupdatePrintPreview Checked%PrintUseViewportColors% vPrintUseViewportColors, Apply &viewport color adjustments
+    If (filesElected>1)
+       Gui, Add, Text, xs y+10, %filesElected% files are selected for printing.
 
     Gui, Tab, 2
     EditWid2 := (PrefsLargeFonts!=1) ? 290 : 450
@@ -38292,12 +39212,17 @@ PanelPrintImage() {
     Gui, Add, Checkbox, x+2 yp hp w27 +0x1000 gupdatePrintPreview Checked%TextInAreaFontBold% vTextInAreaFontBold, B
     Gui, Add, Checkbox, x+2 yp hp w27 +0x1000 gupdatePrintPreview Checked%TextInAreaFontItalic% vTextInAreaFontItalic, I
     Gui, Add, Checkbox, x+2 yp hp w27 +0x1000 gupdatePrintPreview Checked%TextInAreaFontUline% vTextInAreaFontUline, U
+    If (filesElected>1)
+       Gui, Add, Text, xs y+10, Use "{fname}" as a place-holder for the current file name.
 
     Gui, Tab
-    Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% gBtnStartPrintingNow, &Print now
+    f := (filesElected>1) ? "all" : "now"
+    Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% gBtnStartPrintingNow, &Print %f%
+    If (filesElected>1)
+       Gui, Add, Button, x+5 hp wp gBtnStartPrintingNow, &Active only
+
     Gui, Add, Button, x+5 hp gBtnOpenPrinterOptions, &More options
     Gui, Add, Button, x+5 hp w80 gBtnCloseWindow, &Cancel
-
     PopulateFontsList("TextInAreaFontName", "SettingsGUIA")
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Print image: " appTitle)
     ; SetTimer, updatePrintPreview, -500
@@ -38449,20 +39374,107 @@ updatePrintPreview(dummy:=0) {
    }
 
    PrintOptions := printSettingsObj()
-   printImageNow(viewportStampBMP, PrintOptions, 1)
+   zPlitPath(getIDimage(currentFileIndex), 0, OutFileName, OutDir)
+   printImageNow(viewportStampBMP, PrintOptions, 1, 0, OutFileName)
    lastInvoked := A_TickCount
 }
 
-BtnStartPrintingNow() {
+BtnStartPrintingNow(a, b) {
    PrintOptions := printSettingsObj()
+   ControlGetText, c,, ahk_id %a%
    WriteSettingsPrintPanel()
    BtnCloseWindow()
-   Sleep, 2
    showTOOLtip("Please wait, preparing to print image")
+   zPlitPath(getIDimage(currentFileIndex), 0, OutFileName, OutDir)
    Sleep, 2
-   printImageNow(useGdiBitmap(), PrintOptions, 0)
+   If (markedSelectFile>1 && !InStr(c, "active"))
+      batchImgPrinting(PrintOptions)
+   Else
+      printImageNow(useGdiBitmap(), PrintOptions, 0, 0, OutFileName)
+
    Sleep, 2
    RemoveTooltip()
+}
+
+batchImgPrinting(PrintOptions) {
+   filesElected := getSelectedFiles(0, 1)
+   showTOOLtip("Printing " groupDigits(filesElected) " images, please wait")
+   prevMSGdisplay := A_TickCount
+   thisFileIndex := tFrames := failedFiles := countFilez := countTFilez := 0
+   destroyGDIfileCache()
+   backCurrentSLD := CurrentSLD
+   prevMSGdisplay := 1
+   startOperation := A_TickCount
+   lastInvoked := 2
+   doStartLongOpDance()
+   CurrentSLD := ""
+   Loop
+   {
+      executingCanceableOperation := A_TickCount
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
+      If (A_TickCount - lastInvoked>3100) ; avoid creating printing jobs too fast
+      {
+         thisFileIndex++
+         If (thisFileIndex>maxFilesIndex)
+            Break
+
+         isSelected := resultedFilesList[thisFileIndex, 2]
+         If (isSelected!=1)
+            Continue
+
+         imgPath := getIDimage(thisFileIndex)
+         If (InStr(imgPath, "||") || !imgPath)
+            Continue
+    
+         countTFilez++
+         oBitmap := LoadBitmapFromFileu(imgPath)
+         If !oBitmap
+         {
+            failedFiles++
+            Continue
+         }
+
+         zPlitPath(imgPath, 1, OutFileName, OutDir)
+         r := printImageNow(oBitmap, PrintOptions, 0, 1, OutFileName)
+         trGdip_DisposeImage(oBitmap)
+         If r
+            failedFiles++
+         Else
+            countFilez++
+         lastInvoked := A_TickCount
+      }
+
+      If (A_TickCount - prevMSGdisplay>3000)
+      {
+         etaTime := ETAinfos(countTFilez, filesElected, startOperation)
+         If (failedFiles>0)
+            etaTime .= "`nFor " groupDigits(failedFiles) " files, the operations failed"
+
+         showTOOLtip("Processing images to be printed, please wait" etaTime, 0, 0, countTFilez / filesElected)
+         prevMSGdisplay := A_TickCount
+      }
+   }
+
+   CurrentSLD := backCurrentSLD
+   If (failedFiles>0)
+      someErrors .= "`nFor " groupDigits(failedFiles) " files, printing failed"
+
+   If (abandonAll=1)
+      showTOOLtip("Operation aborted. " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files`nthe printing process began" someErrors)
+   Else
+      showTOOLtip(groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files were processed for printing." someErrors)
+
+   ForceRefreshNowThumbsList()
+   dummyTimerDelayiedImageDisplay(100)
+   SetTimer, ResetImgLoadStatus, -50
+   SoundBeep, % (abandonAll=1) ? 300 : 900, 100
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+   Return
 }
 
 PanelIMGselProperties() {
@@ -39169,11 +40181,20 @@ updateUIblurPanel(a:=0,b:=0) {
 
     actu := (blurAreaSoftEdges=1 && blurAreaAmount>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu, blurAreaSoftLevel
-
+    thisu := (blurAreaMode=1) ? "" : " on X"
     thisOpacity := Round((blurAreaOpacity / 255) * 100)
+    thisAmount := (blurAreaEqualXY=1 || blurAreaMode=1) ? blurAreaAmount : blurAreaYamount
     GuiControl, SettingsGUIA:, infoBlurOpacity, Opacity: %thisOpacity%`%
-    GuiControl, SettingsGUIA:, infoBlurAmount, Blur amount: %blurAreaAmount%
+    GuiControl, SettingsGUIA:, infoBlurAmount, Blur on X: %blurAreaAmount%
+    GuiControl, SettingsGUIA:, infoBlurYamount, Blur on Y: %thisAmount%
     GuiControl, SettingsGUIA:, infoPixelize, Pixelize level: %blurAreaPixelizeAmount%
+
+    actu2 := (blurAreaMode>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    GuiControl, % actu2, blurAreaEqualXY
+
+    actu2 := (blurAreaMode>1 && blurAreaEqualXY!=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    GuiControl, % actu2, infoBlurYamount
+    GuiControl, % actu2, blurAreaYamount
 
     actu2 := (BlurAreaBlendMode>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu2, BlurAreaLight
@@ -39340,10 +40361,19 @@ livePreviewBlurPanel() {
     decideGDIPimageFX(matrix, imageAttribs, pEffect)
     thisOpacity := blurAreaOpacity/255
     thisBlurAmount := (doubleBlurPreviewArea=1) ? blurAreaAmount//2 : blurAreaAmount
+    thisBlurAmountY := (doubleBlurPreviewArea=1) ? blurAreaYamount//2 : blurAreaYamount
+    If (blurAreaEqualXY=1)
+    {
+       thisBlurAmountY := (doubleBlurPreviewArea=1) ? blurAreaAmount//2 : blurAreaAmount
+       If (blurAreaMode=2)
+       {
+          thisBlurAmount := Round(thisBlurAmount*0.5)
+          thisBlurAmountY := Round(thisBlurAmountY*0.5)
+       }
+    }
+
     If (thisBlurMode=1)
        bEffect := Gdip_CreateEffect(1, thisBlurAmount, 0, 0)
-    Else If (thisBlurMode=2)
-       bEffect := Gdip_CreateEffect(1, Round(thisBlurAmount*0.85), 0, 0)
 
     r1 := trGdip_DrawImage(A_ThisFunc, G, whichBmp, 0, 0, uiboxSize, uiboxSize, thisPrevieCoordX, thisPrevieCoordY, imgBoxSize, imgBoxSize)
     If (BlurAreaBlendMode>1)
@@ -39373,10 +40403,12 @@ livePreviewBlurPanel() {
           yBitmap := xBitmap
        }
 
-       If (bEffect && (thisBlurMode=1 || thisBlurMode=2))
+       If (bEffect && thisBlurMode=1)
           ApplySpecialFixedBlur(A_ThisFunc, yBitmap, thisBlurAmount, bEffect)
+       If (thisBlurMode=2)
+          QPV_BoxBlurBitmap(yBitmap, thisBlurAmount, thisBlurAmountY, 0)
        Else If (thisBlurMode=3)
-          QPV_BoxBlurBitmap(yBitmap, Round(thisBlurAmount/2))
+          QPV_BoxBlurBitmap(yBitmap, thisBlurAmount, thisBlurAmountY, 1)
 
        cBitmap := trGdip_ResizeBitmap(A_ThisFunc, yBitmap, uiboxSize, uiboxSize, 1, 3, -1)
        If cBitmap
@@ -39387,10 +40419,12 @@ livePreviewBlurPanel() {
        } Else sF := 1
     } Else sF := 1
 
-    If (bEffect && (thisBlurMode=1 || thisBlurMode=2))
+    If (bEffect && thisBlurMode=1)
        ApplySpecialFixedBlur(A_ThisFunc, yBitmap, thisBlurAmount, bEffect)
+    Else If (thisBlurMode=2)
+       QPV_BoxBlurBitmap(yBitmap, thisBlurAmount, thisBlurAmountY, 0)
     Else If (thisBlurMode=3)
-       QPV_BoxBlurBitmap(yBitmap, Round(thisBlurAmount/2))
+       QPV_BoxBlurBitmap(yBitmap, thisBlurAmount, thisBlurAmountY, 1)
 
     If (BlurAreaBlendMode>1)
     {
@@ -39479,7 +40513,7 @@ livePreviewZoomBlurPanel() {
           If (thisO<0)
              Break
 
-          ; showTOOLtip("Zoom blur: step " A_Index,, , (1 - thisO)/1)
+          ; showTOOLtip("Radial blur: step " A_Index,, , (1 - thisO)/1)
           ; fnOutputDebug(thisBlurAmount "=" thisO)
           ApplySpecialFixedBlur(A_ThisFunc, yBitmap, thisBlurAmount, opEffect)
           If (zoomBlurMode=1 || zoomBlurMode=2)
@@ -39839,10 +40873,10 @@ BtnAdjustColorsImgSelectedArea() {
 }
 
 BtnBlurSelectedArea() {
-  updateUIblurPanel()
-  BtnCloseWindow()
-  ToggleEditImgSelection("show-edit")
-  BlurSelectedArea()
+   updateUIblurPanel()
+   BtnCloseWindow()
+   ToggleEditImgSelection("show-edit")
+   BlurSelectedArea()
 }
 
 BtnZoomBlurSelectedArea() {
@@ -41285,7 +42319,7 @@ OpenUImenu(givenCoords:=0) {
 invokeTlbrContextMenu(givenCoords:=0) {
    deleteMenus()
    kMenu("PvUItoolbarMenu", "Add", "S&earch menu options`t;", "PanelQuickSearchMenuOptions", "actions")
-   kMenu("PvUItoolbarMenu", "Add/Uncheck", "Show &menu bar`tF10", "ToggleQuickBaru", "toolbar")
+   kMenu("PvUItoolbarMenu", "Add/Uncheck", "Show &menu bar`tF10", "ToggleMenuBaru", "toolbar")
    If (showMainMenuBar=1)
       kMenu("PvUItoolbarMenu", "Check", "Show &menu bar`tF10")
 
@@ -41712,7 +42746,7 @@ SaveClipboardImage(dummy:=0, allowCropping:=0, noDialog:=0) {
       {
          FileGetSize, OutputVar, % OutDir "\" OutFileName
          If (OutputVar>2)
-            friendly := "`nFile size: " fileSizeFrienly(OutputVar)
+            friendly := "`nFile size: " fileSizeFriendly(OutputVar)
 
          sOutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
          showTOOLtip("Image file succesfully saved`n" OutFileName "`n" sOutDir "\" friendly)
@@ -41758,12 +42792,9 @@ BtnCpyMvChooseFilesDest() {
    SelectedDir := openFoldersDialogWrapper("S2", prevFileMovePath)
    SelectedDir := Trimmer(SelectedDir)
    If FolderExist(SelectedDir)
-   {
       GuiControl, SettingsGUIA:, UsrEditFileDestination, % SelectedDir
-   } Else
-   {
+   Else
       WinActivate, ahk_id %hSetWinGui%
-   }
 }
 
 zPlitPath(inputu, fastMode, ByRef fileNamu, ByRef folderu, ByRef fileNamuNoEXT:=0, ByRef fileEXT:=0) {
@@ -41775,7 +42806,7 @@ zPlitPath(inputu, fastMode, ByRef fileNamu, ByRef folderu, ByRef fileNamuNoEXT:=
 
     If InStr(OutputAttribs, "D") || (OutputVar="\")
     {
-       ; ToolTip, % OutputVar , , , 2
+       ; fnOutputDebug("hmm = " OutputVar "||" OutputAttribs)
        ; SoundBeep , 300, 100
        folderu := inputu
        fileEXT := fileNamuNoEXT := fileNamu := ""
@@ -41791,7 +42822,7 @@ zPlitPath(inputu, fastMode, ByRef fileNamu, ByRef folderu, ByRef fileNamuNoEXT:=
        If fileEXTpos
           fileEXT := Trimmer(SubStr(fileNamu, fileEXTpos + 1))
 
-       If (fileExt="" || StrLen(fileExt)>4)
+       If (fileExt="")
        {
           fileNamu := fileEXTpos := ""
           folderu := Trim(Trimmer(inputu), "\")
@@ -41806,8 +42837,9 @@ zPlitPath(inputu, fastMode, ByRef fileNamu, ByRef folderu, ByRef fileNamuNoEXT:=
           folderu := Trim(folderu, "\")
        }
 
+       ; fnOutputDebug("goop=" fileEXTpos "|" fileEXT "|" fileNamu)
        ; fileNamuNoEXT := fileEXTpos ? RegExReplace(fileNamu, "\.[^\^.\\/:*?<>|\r\n]+$") : fileNamu
-       fileNamuNoEXT := fileEXTpos!="" ? SubStr(fileNamu, 1, fileEXTpos - 1) : fileNamu
+       fileNamuNoEXT := (fileEXTpos!="") ? SubStr(fileNamu, 1, fileEXTpos - 1) : fileNamu
     }
     Return fileParentFolder
 }
@@ -42329,7 +43361,7 @@ QuickMoveFile2Dest(finalDest, goLastOption, groupingMode:=0, dummy:=0) {
        } Else If (performOverwrite!=2)
        {
           OutDir := PathCompact(finalDest, "a", 1, OSDfontSize)
-          showTOOLtip("Operation aborted. A file with the same name already exists in the destination folder.`n" OldOutFileName "`n" OutDir "\")
+          showTOOLtip("WARNING: operation aborted. A file with the same name already exists in the destination folder.`n" OldOutFileName "`n" OutDir "\")
           SoundBeep, 300, 100
           SetTimer, RemoveTooltip, % -msgDisplayTime
           SetTimer, ResetImgLoadStatus, -25
@@ -42602,9 +43634,9 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0) {
    Return 0
 }
 
-batchConvert2format() {
+batchConvert2format(modus:=0) {
    filesElected := getSelectedFiles(0, 1)
-   If (filesElected>50)
+   If (filesElected>50 && modus!="pdf")
    {
       msgInfos := "Are you sure you want to convert " groupDigits(filesElected) " files to the ." rDesireWriteFMT " format ? "
       If (ResizeUseDestDir=1)
@@ -42617,10 +43649,21 @@ batchConvert2format() {
       If (msgResult!="Yes")
          Return
    }
-   BtnCloseWindow()
-   setImageLoading()
-   showTOOLtip("Converting to ." rDesireWriteFMT " format " groupDigits(filesElected) " files, please wait")
 
+   BtnCloseWindow()
+   If (!FolderExist(ResizeDestFolder) && ResizeUseDestDir=1)
+   {
+      FileCreateDir, % ResizeDestFolder
+      If ErrorLevel
+      {
+         showTOOLtip("ERROR: Destination folder does not seem to exist or permission denied.`nAn unsuccesful attempt was made to create the destination folder.`nOperation abandoned.")
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return
+      }
+   }
+
+   setImageLoading()
    filesPerCore := filesElected//realSystemCores
    If (filesPerCore<2 && realSystemCores>1)
    {
@@ -42628,13 +43671,12 @@ batchConvert2format() {
       filesPerCore := filesElected//systemCores
    } Else systemCores := realSystemCores
 
+   bonusInfo := (modus="pdf") ? "Preparing files for the PDF: Phase 1`n" : ""
+   showTOOLtip(bonusInfo "Converting to ." rDesireWriteFMT " format " groupDigits(filesElected) " files, please wait")
    destroyGDIfileCache()
    backCurrentSLD := CurrentSLD
    mustDoMultiCore := (allowMultiCoreMode=1 && systemCores>1 && filesPerCore>2) ? 1 : 0
-   If (!FolderExist(ResizeDestFolder) && ResizeUseDestDir=1)
-      FileCreateDir, % ResizeDestFolder
-
-   If (mustDoMultiCore=1)
+   If (mustDoMultiCore=1 && modus!="pdf")
    {
       setPriorityThread(-2)
       infoResult := WorkLoadMultiCoresConvertFormat(filesElected)
@@ -42663,12 +43705,6 @@ batchConvert2format() {
 
       thisFileIndex := A_Index
       imgPath := getIDimage(thisFileIndex)
-      If (RegExMatch(imgPath, "i)(.\.(" rDesireWriteFMT "))$") || InStr(imgPath, "||") || !imgPath)
-      {
-         skippedFiles++
-         Continue
-      }
-
       executingCanceableOperation := A_TickCount
       If (A_TickCount - prevMSGdisplay>3000)
       {
@@ -42680,7 +43716,7 @@ batchConvert2format() {
          If (skippedFiles>0)
             etaTime .= "`n" groupDigits(skippedFiles) " files were skipped"
 
-         showTOOLtip("Converting to ." rDesireWriteFMT " format, please wait" etaTime, 0, 0, countTFilez / filesElected)
+         showTOOLtip(bonusInfo "Converting to ." rDesireWriteFMT " format, please wait" etaTime, 0, 0, countTFilez / filesElected)
          prevMSGdisplay := A_TickCount
       }
 
@@ -42690,11 +43726,67 @@ batchConvert2format() {
          Break
       }
 
+      If (InStr(imgPath, "||") || !imgPath)
+      {
+         skippedFiles++
+         Continue
+      }
+
+      If (filesConverted>=maxMultiPagesAllowed && modus="pdf")
+      {
+         SoundBeep 300, 100
+         Break
+      }
+
       countTFilez++
       zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
       destImgPath := (ResizeUseDestDir=1) ? ResizeDestFolder : OutDir
-      file2save := destImgPath "\" OutNameNoExt "." rDesireWriteFMT
-      If (FileExist(file2save) && !FolderExist(file2save))
+      file2save := (modus="pdf") ?  destImgPath "\" thisFileIndex "." rDesireWriteFMT : destImgPath "\" OutNameNoExt "." rDesireWriteFMT
+
+      If RegExMatch(imgPath, "i)(.\.(" rDesireWriteFMT "))$")
+      {
+         If (ResizeUseDestDir=1)
+         {
+            If (FileExist(file2save) && !FolderExist(file2save) && modus!="pdf")
+               file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
+
+            If file2save
+            {
+               FileGetTime, originalMtime, % imgPath, M
+               FileGetTime, originalCtime, % imgPath, C
+
+               If (OnConvertKeepOriginals=1)
+                  FileCopy, % imgPath, % file2save, 1
+               Else
+                  FileMove, % imgPath, % file2save, 1
+
+               If !ErrorLevel
+               {
+                  filesConverted++
+                  If (OnConvertKeepOriginals=0)
+                  {
+                     resultedFilesList[thisFileIndex, 1] := file2save
+                     updateMainUnfilteredList(thisFileIndex, 1, file2save)
+                     If (SLDtypeLoaded=3)
+                        updateSQLdbEntry(imgPath, file2save, 1, resultedFilesList[thisFileIndex, 12])
+                  }
+
+                  If originalMtime
+                  {
+                     FileSetTime, % originalMtime, % file2save, M
+                     FileSetTime, % originalCtime, % file2save, C
+                  }
+               } Else failedFiles++
+            } Else skippedFiles++
+            Continue
+         } Else
+         {
+            skippedFiles++
+            Continue
+         }
+      }
+
+      If (FileExist(file2save) && !FolderExist(file2save) && modus!="pdf")
          file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
 
       If !file2save
@@ -42710,7 +43802,7 @@ batchConvert2format() {
       Else
          filesConverted++
 
-      If (OnConvertKeepOriginals!=1 && !r)
+      If (OnConvertKeepOriginals=0 && !r && modus!="pdf")
       {
          FileSetAttrib, -R, % imgPath
          Sleep, 2
@@ -42751,6 +43843,7 @@ batchConvert2format() {
    SetTimer, ResetImgLoadStatus, -50
    SoundBeep, % (abandonAll=1) ? 300 : 900, 100
    SetTimer, RemoveTooltip, % -msgDisplayTime
+   Return (abandonAll=1) ? -2 : filesConverted
 }
 
 coreConvertImgFormat(imgPath, file2save) {
@@ -42923,7 +44016,7 @@ convert2format(givenIndex) {
   SetTimer, ResetImgLoadStatus, -50
   FileGetSize, OutputVar, % file2save
   If (OutputVar>2 && !r)
-     friendly := "`nFile size: " fileSizeFrienly(OutputVar)
+     friendly := "`nFile size: " fileSizeFriendly(OutputVar)
  
   If r
      showTOOLtip("Failed to convert file`n" OutFileName "`n" OutDir "\")
@@ -42949,6 +44042,734 @@ convert2format(givenIndex) {
   }
   SetTimer, RemoveTooltip, % -msgDisplayTime
   SetTimer, ResetImgLoadStatus, -150
+}
+
+batchExtractFramesFromImages() {
+   filesElected := getSelectedFiles(0, 1)
+   showTOOLtip("Extracting frames from " groupDigits(filesElected) " files, please wait")
+   prevMSGdisplay := A_TickCount
+   tFrames := failedFiles := countFilez := countTFilez := 0
+   destroyGDIfileCache()
+   backCurrentSLD := CurrentSLD
+   prevMSGdisplay := 1
+   startOperation := A_TickCount
+   doStartLongOpDance()
+   CurrentSLD := ""
+   Loop, % maxFilesIndex
+   {
+      isSelected := resultedFilesList[A_Index, 2]
+      If (isSelected!=1)
+         Continue
+
+      executingCanceableOperation := A_TickCount
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
+      thisFileIndex := A_Index
+      imgPath := getIDimage(thisFileIndex)
+      If (InStr(imgPath, "||") || !imgPath)
+         Continue
+ 
+      If (A_TickCount - prevMSGdisplay>2000)
+      {
+         etaTime := ETAinfos(countTFilez, filesElected, startOperation)
+         If (failedFiles>0)
+            etaTime .= "`nFor " groupDigits(failedFiles) " files, the operations failed"
+         If (skippedFiles>0)
+            etaTime .= "`n" groupDigits(skippedFiles) " files were skipped"
+
+         showTOOLtip("Extracting frames from the images, please wait`nFrames extracted: " groupDigits(tFrames) etaTime, 0, 0, countTFilez / filesElected)
+         prevMSGdisplay := A_TickCount
+      }
+
+      countTFilez++
+      If !RegExMatch(imgPath, "i)(.\.(jpeg|jpg|jpe|tif|tiff|webp))$")
+      {
+         skippedFiles++
+         Continue
+      }
+
+      r := coreExtractFramesFromImage(thisFileIndex, 1)
+      If (r>1)
+         tFrames += r
+
+      If (r=-4)
+         failedFiles++
+      Else If (r=-3)
+         skippedFiles++
+      Else If (r=-2)
+         skippedFiles++
+      Else If (r>1)
+         countFilez++
+      Else 
+         failedFiles++
+   }
+
+   CurrentSLD := backCurrentSLD
+   someErrors := "`nFrames extracted: " groupDigits(tFrames) 
+   If (failedFiles>0)
+      someErrors .= "`nFor " groupDigits(failedFiles) " files, the operations failed"
+   If (skippedFiles>0)
+      someErrors .= "`n" groupDigits(skippedFiles) " files were skipped"
+
+   If (abandonAll=1)
+      showTOOLtip("Operation aborted. " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files were processed until now" someErrors)
+   Else
+      showTOOLtip(groupDigits(countFilez) " out of " groupDigits(countTFilez) " selected files were processed" someErrors)
+
+   ForceRefreshNowThumbsList()
+   dummyTimerDelayiedImageDisplay(100)
+   SetTimer, ResetImgLoadStatus, -50
+   SoundBeep, % (abandonAll=1) ? 300 : 900, 100
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+   Return
+}
+
+coreExtractFramesFromImage(indexu, inLoop) {
+   imgPath := isNumber(indexu) ? resultedFilesList[indexu, 1] : indexu
+   If RegExMatch(imgPath, "i)(.\.webp)$")
+   {
+      thisImgQuality := (userimgQuality=1) ? 6 : 5
+      sizesDesired := []
+      sizesDesired[1] := [32500, 32500, 1, 0, thisImgQuality]
+      oBitmap := LoadWICimage(imgPath, 0, 0, sizesDesired)
+      tFrames := mainLoadedIMGdetails.Frames
+
+      If StrLen(oBitmap)<2
+         Return -4
+
+      If (tFrames<0 || !tFrames)
+      {
+         trGdip_DisposeImage(oBitmap)
+         Return -2
+      }
+
+      zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
+      file2save := ResizeDestFolder "\" OutNameNoExt "_0." dialogSaveIndexes[userExtractFramesFmt]
+      QPV_SaveImageFile(A_ThisFunc, oBitmap, file2save, userJpegQuality, userSaveBitsDepth)
+      trGdip_DisposeImage(oBitmap)
+      If (inLoop!=1)
+      {
+         showTOOLtip("Extracting " groupDigits(tFrames) " frames from:`n" OutFileName)
+         doStartLongOpDance()
+      }
+
+      Loop, % tFrames
+      {
+         If (A_Index=1)
+            Continue
+
+         If (inLoop!=1)
+         {
+            executingCanceableOperation := A_TickCount
+            If (determineTerminateOperation()=1)
+            {
+               abandonAll := 1
+               Break
+            }
+         }
+         file2save := ResizeDestFolder "\" OutNameNoExt "_" A_Index "." dialogSaveIndexes[userExtractFramesFmt]
+         If FileExist(file2save) 
+         {
+            If (onConflictOverwrite!=1)
+               Continue
+         }
+
+         nBitmap := LoadWICimage(imgPath, 0, A_Index - 1, sizesDesired)
+         If StrLen(nBitmap)<2
+         {
+            tFrames--
+            Continue
+         }
+
+         QPV_SaveImageFile(A_ThisFunc, nBitmap, file2save, userJpegQuality, userSaveBitsDepth)
+         trGdip_DisposeImage(nBitmap)
+      }
+      If (inLoop!=1)
+         ResetImgLoadStatus()
+
+      Return (abandonAll=1) ? -5 : clampInRange(tFrames, 0, 9892899)
+   } Else oBitmap := trGdip_CreateBitmapFromFile(imgPath)
+
+   If StrLen(oBitmap)<2
+      Return -4
+
+   rawFmt := Gdip_GetImageRawFormat(oBitmap)
+   If RegExMatch(rawFmt, "i)(gif|tiff)$")
+   {
+      tFrames := Gdip_GetBitmapFramesCount(oBitmap) - 1
+      If (tFrames<0 || !tFrames)
+      {
+         trGdip_DisposeImage(oBitmap)
+         Return -2
+      }
+
+      zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
+      If (inLoop!=1)
+      {
+         showTOOLtip("Extracting " groupDigits(tFrames) " frames from:`n" OutFileName)
+         doStartLongOpDance()
+      }
+
+      Loop, % tFrames
+      {
+         file2save := ResizeDestFolder "\" OutNameNoExt "_" A_Index "." dialogSaveIndexes[userExtractFramesFmt]
+         If (inLoop!=1)
+         {
+            executingCanceableOperation := A_TickCount
+            If (determineTerminateOperation()=1)
+            {
+               abandonAll := 1
+               Break
+            }
+         }
+
+         If FileExist(file2save) 
+         {
+            If (onConflictOverwrite!=1)
+               Continue
+         }
+
+         Gdip_BitmapSelectActiveFrame(oBitmap, A_Index)
+         Gdip_GetImageDimensions(oBitmap, imgW, imgH)
+         nBitmap := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH)
+         If StrLen(nBitmap)<2
+         {
+            tFrames--
+            Continue
+         }
+
+         Gu := trGdip_GraphicsFromImage(A_ThisFunc, nBitmap)
+         trGdip_DrawImage(A_ThisFunc, Gu, oBitmap)
+         Gdip_DeleteGraphics(Gu)
+         QPV_SaveImageFile(A_ThisFunc, nBitmap, file2save, userJpegQuality, userSaveBitsDepth)
+         trGdip_DisposeImage(nBitmap)
+      }
+      If (inLoop!=1)
+         ResetImgLoadStatus()
+
+      trGdip_DisposeImage(oBitmap)
+      Return (abandonAll=1) ? -5 : clampInRange(tFrames, 0, 9892899)
+   } Else
+   {
+      trGdip_DisposeImage(oBitmap)
+      Return -3
+   }
+}
+
+combineImagesMultiTiffGDIp(destFilePath) {
+   Static EncoderParameterValueTypeLong := 4
+        , EncoderValueFrameDimensionPage := 23
+        , EncoderValueMultiFrame := 18
+        , EncoderValueFlush := 20
+   ; inspiration: https://senapi.blogspot.com/2010/04/creating-multi-page-tiff-vc-gdi.html
+   ; https://docs.microsoft.com/en-us/windows/win32/gdiplus/-gdiplus-creating-and-saving-a-multiple-frame-image-use
+
+   zPlitPath(destFilePath, 0, OutFileName, OutDir)
+   ; fnOutputDebug("file=" OutFileName "|" OutDir)
+   If !FolderExist(OutDir)
+   {
+      FileCreateDir, % OutDir
+      If ErrorLevel
+      {
+         showTOOLtip("ERROR: Unable to create destination folder of the multipaged file.`nOperation abandoned.")
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return
+      }
+   }
+
+   filesElected := getSelectedFiles(0, 1)
+   rg := Gdip_GetImageEncoder(".tif", pCodec)
+   If !pCodec
+      rg := Gdip_GetImageEncoder(".tif", pCodec)
+   If !pCodec
+      rg := Gdip_GetImageEncoder(".tif", pCodec)
+
+   If !pCodec
+   {
+      showTOOLtip("ERROR: Unable to initialize the .TIFF encoder.`nOperation abandoned.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   tFrames := failedFiles := countTFilez := 0
+   destroyGDIfileCache()
+   backCurrentSLD := CurrentSLD
+   prevMSGdisplay := 1
+   startOperation := A_TickCount
+   doStartLongOpDance()
+   CurrentSLD := ""
+   thisBitsDepth := 0
+   If (userSaveBitsDepth=1)
+      thisBitsDepth := 32
+   Else If (userSaveBitsDepth=2)
+      thisBitsDepth := 24
+   Else If (userSaveBitsDepth=3)
+      thisBitsDepth := 16
+   Else If (userSaveBitsDepth=4)
+      thisBitsDepth := 8
+
+   _p := elem := selectedFiles := 0
+   pad := (A_PtrSize=8) ? 4 : 0
+   encoderParameters := 0
+   Loop, % maxFilesIndex
+   {
+      isSelected := resultedFilesList[A_Index, 2]
+      If (isSelected!=1)
+         Continue
+
+      executingCanceableOperation := A_TickCount
+      If (determineTerminateOperation()=1 || abandonAll=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
+      thisFileIndex := A_Index
+      imgPath := getIDimage(thisFileIndex)
+      If (InStr(imgPath, "||") || !imgPath)
+         Continue
+
+      If (A_TickCount - prevMSGdisplay>2000)
+      {
+         etaTime := ETAinfos(countTFilez, filesElected, startOperation)
+         If (failedFiles>0)
+            etaTime .= "`nFailed to embed " groupDigits(failedFiles) " images"
+
+         showTOOLtip("Adding images into the .TIFF file, please wait`n" OutFileName "`nImages embedded: " groupDigits(selectedFiles) etaTime, 0, 0, countTFilez / filesElected)
+         prevMSGdisplay := A_TickCount
+      }
+
+      countTFilez++
+      ; fnOutputDebug(A_ThisFunc ": " imgPath)
+      thisBitmap := LoadBitmapFromFileu(imgPath)
+      If StrLen(thisBitmap)<2
+      {
+         failedFiles++
+         Continue
+      }
+
+      totalFlames := (userCombineSubFrames=1) ? mainLoadedIMGdetails.Frames + 1 : 1
+      Loop, % totalFlames
+      {
+         If (A_Index>1)
+         {
+            thisBitmap := LoadBitmapFromFileu(imgPath, 0, 0, A_Index - 1)
+            If (determineTerminateOperation()=1)
+            {
+               abandonAll := 1
+               Break
+            }
+         }
+
+         selectedFiles++
+         If thisBitsDepth
+         {
+            pix := Gdip_GetImagePixelFormat(thisBitmap, 2)
+            If (SubStr(pix, 1, InStr(pix, "-") - 1)>thisBitsDepth)
+               Gdip_BitmapSetColorDepth(thisBitmap, thisBitsDepth, 1)
+         }
+
+         If (selectedFiles=1)
+         {
+            multiBitmap := thisBitmap
+            nCount := Gdip_GetEncoderParameterList(multiBitmap, pCodec, EncoderParameters)
+            If !nCount
+            {
+               SoundBeep 300, 100
+               nCount := Gdip_GetEncoderParameterList(multiBitmap, pCodec, EncoderParameters)
+            }
+
+            If !nCount
+            {
+               showTOOLtip("ERROR: Failed to get TIFF encoder properties. Please try again.")
+               SoundBeep 300, 100
+               fnOutputDebug("paramsCount=" nCount "|pCodec=" pCodec)
+               trGdip_DisposeImage(thisBitmap)
+               fattalErr := 1
+               Break
+            }
+
+            Loop, % nCount
+            {
+               elem := (24+A_PtrSize)*(A_Index-1) + 4 + pad
+               If (NumGet(EncoderParameters, elem+16, "UInt") = 1) ; number of values = 1
+               && (NumGet(EncoderParameters, elem+20, "UInt") = EncoderParameterValueTypeLong)
+               {
+                  _p := elem + &EncoderParameters - pad - 4
+                  NumPut(EncoderValueMultiFrame, NumGet(NumPut(4, NumPut(1, _p+0)+20, "UInt")), "UInt")
+                  Break
+               }
+            }
+
+            _E := DllCall("gdiplus\GdipSaveImageToFile", "UPtr", multiBitmap, "WStr", destFilePath, "UPtr", pCodec, "uint", _p)
+            fnOutputDebug(rg " first img=" _E "p=" _p "; elem=" elem "; nCount=" nCount "; nSize=" nSize "; pCodec=" pCodec)
+            If _E
+            {
+               showTOOLtip("ERROR: Failed to create the multipaged .TIFF file. Error code: " _E)
+               SoundBeep 300, 100
+               trGdip_DisposeImage(thisBitmap)
+               fattalErr := 1
+               Break
+            }
+         } Else
+         {
+            If (selectedFiles=2)
+               NumPut(EncoderValueFrameDimensionPage, NumGet(NumPut(4, NumPut(1, _p+0)+20, "UInt")), "UInt")
+
+            _E := Gdip_SaveAddImage(multiBitmap, thisBitmap, _p)
+            If _E
+               failedFiles++
+            trGdip_DisposeImage(thisBitmap)
+            ; fnOutputDebug("tiff-gdi+:" multiBitmap  " | new=" thisBitmap " | e=" _E " | p=" _p)
+         }
+      }
+      if fattalErr
+         Break
+   }
+ 
+   NumPut(EncoderValueFlush, NumGet(NumPut(4, NumPut(1, _p+0)+20, "UInt")), "UInt")
+   _E := DllCall("gdiplus\GdipSaveAddImage", "UPtr", multiBitmap, "uint", _p)
+   ; this call fails, I do not know why; err-code = 2 ; invalid parameter; 
+   ; however the file is created succesfully
+   ; fnOutputDebug("TIFF end: " _E)
+   trGdip_DisposeImage(multiBitmap)
+   encoderParameters := ""
+   
+   If (abandonAll=1)
+   {
+      showTOOLtip("Operation aborted by user. Multipaged .TIFF file not created.")
+      SoundBeep , 900, 100
+      FileDelete, % destFilePath
+   } Else If (!fattalErr && !abandonAll)
+   {
+      If (failedFiles>0)
+         rr .= "`nFailed to embed " groupDigits(failedFiles) " images.`nFiles selected to embed: " groupDigits(filesElected)
+
+      FileGetSize, OutputVar, % destFilePath
+      showTOOLtip("Finished creating the multipaged .TIFF file:`n" OutFileName "`nImages embedded: " groupDigits(selectedFiles) "`nFile size: " fileSizeFriendly(OutputVar) rr)
+      SoundBeep , 900, 100
+   }
+
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+   ResetImgLoadStatus()
+   CurrentSLD := backCurrentSLD
+}
+
+combineImagesMultiPage(modus, animus, destFilePath) {
+   zPlitPath(destFilePath, 0, OutFileName, OutDir)
+   If !FolderExist(OutDir)
+   {
+      FileCreateDir, % OutDir
+      If ErrorLevel
+      {
+         showTOOLtip("ERROR: Unable to create destination folder of the multipaged file.`nOperation abandoned.")
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return
+      }
+   }
+
+   If (animus=1)
+   {
+      showTOOLtip("WARNING: Create animated GIF. Experimental feature.`nQPV will likely crash.")
+      SoundBeep , 300, 100
+      sleep, 3000
+   }
+
+   filesElected := getSelectedFiles(0, 1)
+   showTOOLtip("Phase 1: Preparing " groupDigits(filesElected) " image files, please wait")
+   tFrames := failedFiles := countFilez := countTFilez := 0
+   destroyGDIfileCache()
+   backCurrentSLD := CurrentSLD
+   prevMSGdisplay := 1
+   startOperation := A_TickCount
+   doStartLongOpDance()
+   CurrentSLD := ""
+   formatu := (animus=1) ? 25 : 18
+   extFile := (animus=1) ? ".gif" : ".tiff"
+   imgList := []
+   BMPmemSize := 0
+   Loop, % maxFilesIndex
+   {
+      isSelected := resultedFilesList[A_Index, 2]
+      If (isSelected!=1)
+         Continue
+
+      executingCanceableOperation := A_TickCount
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
+      thisFileIndex := A_Index
+      imgPath := getIDimage(thisFileIndex)
+      If (InStr(imgPath, "||") || !imgPath)
+         Continue
+ 
+      If (A_TickCount - prevMSGdisplay>2000)
+      {
+         etaTime := ETAinfos(countTFilez, filesElected, startOperation)
+         If (failedFiles>0)
+            etaTime .= "`nFailed to load " groupDigits(failedFiles) " images"
+
+         showTOOLtip("Phase 1: Preparing images to combine into a " extFile " file, please wait`nMemory usage: " fileSizeFriendly(BMPmemSize) etaTime, 0, 0, countTFilez / filesElected)
+         prevMSGdisplay := A_TickCount
+      }
+
+      countTFilez++
+      ; fnOutputDebug(A_ThisFunc ": " imgPath)
+      r := coreImgCombinerLoadFimFile(imgPath, modus, animus, otherFrames)
+      If (r!="")
+      {
+         If (otherFrames.Count()>0)
+         {
+            Loop, % otherFrames.Count()
+            {
+               tFrames++
+               If (modus!=5 && animus=0 || animus=1)
+                  z := combineImgsConvertDepth(otherFrames[A_Index], modus, animus)
+   
+               If z
+               {
+                  BMPmemSize += FreeImage_GetMemorySize(z)
+                  FreeImage_UnLoad(otherFrames[A_Index])
+                  imgList[tFrames] := z
+               } Else
+               {
+                  BMPmemSize += FreeImage_GetMemorySize(otherFrames[A_Index])
+                  imgList[tFrames] := otherFrames[A_Index]
+               }
+            }
+         } Else If (r!="f")
+         {
+            tFrames++
+            BMPmemSize += FreeImage_GetMemorySize(r)
+            imgList[tFrames] := r
+         }
+      } Else
+         failedFiles++
+
+      If (tFrames>=maxMultiPagesAllowed || BMPmemSize>maxMemLimitMultiPage)
+      {
+         SoundBeep , 300, 100
+         msgu := (BMPmemSize>maxMemLimitMultiPage) ? "The maximum allowed file size limit was reached: " fileSizeFriendly(maxMemLimitMultiPage) : "The limit of maximum allowed pages was reached: " maxMultiPagesAllowed
+         msgResult := msgBoxWrapper(appTitle ": ERROR", msgu ". If you choose to continue, the remaining selected files will be skipped and the multipaged file will be created. It will have " groupDigits(tFrames) " pages.", "&Continue|&Abort", 0, "error")
+         If (msgResult="abort")
+            abandonAll := 1
+         Break
+      }
+      ; ToolTip, % fileSizeFriendly(BMPmemSize) , , , 2
+   }
+
+   CurrentSLD := backCurrentSLD
+   If (failedFiles>0)
+      someErrors := "`nFailed to load " groupDigits(failedFiles) " images"
+
+   If (abandonAll=1)
+   {
+      showTOOLtip("Operation aborted. No multipaged image file created.")
+      Loop, % tFrames
+         FreeImage_UnLoad(imgList[A_Index])
+   
+      mustEnd := 1
+   } Else If (tFrames<2)
+   {
+      showTOOLtip("ERROR: Failed to load selected images. No multipaged image file created.")
+      Loop, % tFrames
+         FreeImage_UnLoad(imgList[A_Index])
+
+      mustEnd := 1
+   } Else
+      showTOOLtip(groupDigits(tFrames) " out of " groupDigits(countTFilez) " selected files were processed" someErrors)
+
+   If (mustEnd=1)
+   {
+      ForceRefreshNowThumbsList()
+      dummyTimerDelayiedImageDisplay(100)
+      SetTimer, ResetImgLoadStatus, -50
+      SoundBeep, % (mustEnd=1) ? 300 : 900, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   file2save := destFilePath
+   If FileExist(file2save)
+   {
+      FileDelete, % file2save
+      Sleep, 100
+   }
+
+   zPlitPath(file2save, 0, OutFileName, OutDir)
+   multiFim := FreeImage_OpenMultiBitmap(file2save, formatu, 1, 0)
+   dwFrameTime := userCombineGIFframeDelay
+   showTOOLtip("Phase 2: Creating the multipaged image: " groupDigits(tFrames) " pages`n" OutFileName)
+   bonusList := []
+   bonux := 0
+   prevMSGdisplay := 1
+   startOperation := A_TickCount
+   doStartLongOpDance()
+
+   Loop, % tFrames
+   {
+      i := A_Index
+      executingCanceableOperation := A_TickCount
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
+      If (A_TickCount - prevMSGdisplay>2000)
+      {
+         etaTime := ETAinfos(A_Index, tFrames, startOperation)
+         showTOOLtip("Phase 2: Adding pages to the multipaged " extFile " image:" etaTime, 0, 0, A_Index / tFrames)
+         prevMSGdisplay := A_TickCount
+      }
+
+      ; clear any animation metadata used by this dib as we’ll adding our own ones
+      g := FreeImage_SetMetadata(imgList[i], NULL, 9, NULL)   ; FIMD_ANIMATION = 9
+      ; add animation tags to dib[i]
+      If (animus=1)
+      {
+         tag := FreeImage_CreateTag()
+         if tag
+         {
+            p := FreeImage_SetTagKey(tag, "FrameTime")
+            FreeImage_SetTagType(tag, 4)        ; FIDT_LONG = 4
+            FreeImage_SetTagCount(tag, 1)
+            FreeImage_SetTagLength(tag, 4)
+            k := FreeImage_SetTagValue(tag, dwFrameTime)
+            h := FreeImage_GetTagKey(tag)
+            j := FreeImage_SetMetadata(imgList[i], tag, 9, h)   ; FIMD_ANIMATION = 9
+            FreeImage_DeleteTag(tag)
+         }
+      }
+
+      FreeImage_AppendPage(multiFim, imgList[i])
+      ; fnOutputDebug(A_ThisFunc ": " i " | " g "." p "." k "." j "." t "." h " | " imgW " x " imgH)
+   }
+
+   z := FreeImage_GetPageCount(multiFim)
+   showTOOLtip("Phase 3: Saving multipaged image file: " groupDigits(tFrames) " pages`n" OutFileName)
+   ; fnOutputDebug(multiFim "|" z "==" file2save)
+   r := FreeImage_CloseMultiBitmap(multiFim, 0)
+   ; fnOutputDebug("closed and saved = " r)
+   Loop, % tFrames
+      FreeImage_UnLoad(imgList[A_Index])
+
+   If (animus=1 && bonux>0)
+   {
+      Loop, % bonux
+         FreeImage_UnLoad(bonusList[A_Index])
+   }
+   showTOOLtip("Finished creating the multipaged image file: " groupDigits(tFrames) " pages`n" OutFileName "`n" OutDir "\")
+   SetTimer, ResetImgLoadStatus, -50
+   SoundBeep, % (mustEnd=1) ? 300 : 900, 100
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+   ; fnOutputDebug("the end")
+}
+
+coreImgCombinerLoadFimFile(imgPath, modus, animus, ByRef otherFrames) {
+  Critical, on
+  sTime := A_tickcount  
+  loadArgs := 0
+  GFT := FreeImage_GetFileType(imgPath)
+  If (GFT=34 && loadArgs=0)
+     loadArgs := (userHQraw=1) ? 0 : 5
+  Else If (GFT=2 && loadArgs=0)
+     loadArgs := 8
+
+  changeMcursor()
+  multiFlags := (GFT=25) ? 2 : 0
+  If (GFT=18 || GFT=25)
+     hMultiBMP := FreeImage_OpenMultiBitmap(imgPath, GFT, 0, 1, 1, multiFlags)
+
+  otherFrames := []
+  If StrLen(hMultiBMP)>1
+  {
+     tFrames := FreeImage_GetPageCount(hMultiBMP)
+     If (tFrames<0 || !tFrames)
+        tFrames := 0
+
+     If (tFrames>1)
+     {
+        preventer := 1
+        Loop, % tFrames
+        {
+           frameu := clampInRange(A_Index - 1, 0, tFrames - 1)
+           ; fnOutputDebug("fT=" tFrames " | f=" frameu " | " imgPath)
+           hPage := FreeImage_LockPage(hMultiBMP, frameu)
+           otherFrames[A_Index] := FreeImage_Clone(hPage)
+           FreeImage_UnlockPage(hMultiBMP, hPage, 0)
+        }
+     }
+     FreeImage_CloseMultiBitmap(hMultiBMP, 0)
+     If (preventer=1)
+        Return "f"
+  }
+
+  hFIFimgA := FreeImage_Load(imgPath, -1, loadArgs) ; load image
+  If !hFIFimgA
+  {
+     addJournalEntry("Failed to load image file using FreeImage library")
+     Return
+  }
+
+  If (hFIFimgA!="")
+  {
+     imgBPP := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
+     ColorsType := FreeImage_GetColorType(hFIFimgA)
+     mustApplyToneMapping := (imgBPP>32 && !InStr(ColorsType, "rgba")) || (imgBPP>64) ? 1 : 0
+     If (mustApplyToneMapping=1)
+     {
+        changeMcursor()
+        hFIFimgB := FreeImage_ToneMapping(hFIFimgA, cmrRAWtoneMapAlgo - 1, cmrRAWtoneMapParamA, cmrRAWtoneMapParamB)
+     }
+
+     k := hFIFimgB ? hFIFimgB : hFIFimgA
+     If (modus!=5 && animus=0 || animus=1)
+        hFIFimgC := combineImgsConvertDepth(k, modus, animus)
+   
+     ; eTime := A_TickCount - sTime
+     If hFIFimgC
+     {
+        FreeImage_UnLoad(hFIFimgA)
+        If hFIFimgB
+           FreeImage_UnLoad(hFIFimgB)
+        Return hFIFimgC
+     } Else If hFIFimgB
+     {
+        FreeImage_UnLoad(hFIFimgA)
+        Return hFIFimgB
+     } Else Return hFIFimgA
+  }
+
+  ; ToolTip, % imgW ", " imgW2,,,2
+}
+
+combineImgsConvertDepth(k, modus, animus) {
+  imgBPPc := Trimmer(StrReplace(FreeImage_GetBPP(k), "-"))
+  ; fnOutputDebug("depth=" imgBPPc "| m=" modus "| a=" animus)
+  If (imgBPPc!=8 && animus=1)
+     hFIFimgC := FreeImage_ColorQuantize(k)
+  Else If (imgBPPc!=32 && modus=1)
+     hFIFimgC := FreeImage_ConvertTo(k, "32Bits")
+  Else If (imgBPPc!=24 && modus=2)
+     hFIFimgC := FreeImage_ConvertTo(k, "24Bits")
+  Else If (imgBPPc!=16 && modus=3)
+     hFIFimgC := FreeImage_ConvertTo(k, "16bits")
+  Else If (imgBPPc!=8 && modus=4)
+     hFIFimgC := FreeImage_ColorQuantize(k)
+
+  If StrLen(hFIFimgC)>1
+     Return hFIFimgC
 }
 
 OpenFolders(dummy:=0) {
@@ -45172,6 +46993,7 @@ createMenuSelectionAlign() {
    Menu, PVselAlign, Add
    kMenu("PVselAlign", "Add", "&Center horizontally`tCtrl+NumPad5", "alignImgSelectCenterH")
    kMenu("PVselAlign", "Add", "Center &vertically`tCtrl+NumPad0", "alignImgSelectCenterV")
+   kMenu("PVselAlign", "Add", "Centere&d", "alignImgSelectCentered")
    If (AnyWindowOpen=32 || AnyWindowOpen=31 || AnyWindowOpen=24 || AnyWindowOpen=23)
    {
       Menu, PVselAlign, Add
@@ -45331,13 +47153,13 @@ createMenuImageEditSubMenus() {
    infoImgEditingNow := isImgEditingNow()
    If (thumbsDisplaying!=1 && infoImgEditingNow=1)
    {
-      kMenu("PVimgFilters", "Add", "&Blur/pixelize`tShift+B", "PanelBlurSelectedArea", "effects")
-      kMenu("PVimgFilters", "Add", "&Zoom blur", "PanelZoomBlurSelectedArea", "effects")
+      kMenu("PVimgFilters", "Add", "&Blur/pixelize`tShift+B", "PanelBlurSelectedArea", "effects motion directional")
+      kMenu("PVimgFilters", "Add", "&Radial blur", "PanelZoomBlurSelectedArea", "effects motion directional zoom")
       kMenu("PVimgFilters", "Add", "&Invert colors`tShift+I", "InvertSelectedArea", "effects")
       kMenu("PVimgFilters", "Add", "Desaturate color&s`tCtrl+G", "PanelDesatureSelectedArea", "grayscale effects")
       kMenu("PVimgFilters", "Add", "Ad&just image colors`tU", "PanelColorsAdjusterImage", "grayscale effects lightness contrast saturation levels brightness")
-      kMenu("PVimgFilters", "Add", "&Detect edges filter", "PanelDetectEdgesImage", "emboss effects")
-      kMenu("PVimgFilters", "Add", "&Add noise filter", "PanelAddNoiserImage", "effects")
+      kMenu("PVimgFilters", "Add", "&Detect edges", "PanelDetectEdgesImage", "emboss effects")
+      kMenu("PVimgFilters", "Add", "&Add noise", "PanelAddNoiserImage", "effects clouds plasma")
 
       kMenu("PVimgDraw", "Add", "Define f&reeform filled shape`tShift+P", "MenuStartDrawingShapes", "curve polygonal")
       kMenu("PVimgDraw", "Add", "Define freeform &outline`tAlt+P", "MenuStartDrawingLines", "curve polygonal lines")
@@ -45549,7 +47371,8 @@ InvokeMenuBarFile(manuID) {
                kMenu("pvMenuBarFile", "Add", "&Revert changes...`tF5", "RefreshImageFileAction", "reload refresh")
          } Else
             kMenu("pvMenuBarFile", "Add", "&Save image as...`tCtrl+S", "PanelSaveImg", "image editing")
-         kMenu("pvMenuBarFile", "Add", "Print image`tCtrl+P", "PanelPrintImage")
+         
+         kMenu("pvMenuBarFile", "Add", "Print image(s)`tCtrl+P", "PanelPrintImage")
       }
 
       kMenu("pvMenuBarFile", "Add", "Ac&quire image (WIA)", "AcquireWIAimage", "capture devices")
@@ -45582,12 +47405,14 @@ InvokeMenuBarFile(manuID) {
          ; kMenu("pvMenuBarFile", "Add", "Set as &wallpaper", "setImageWallpaper", "desktop image")
          If FileExist(resultedFilesList[currentFileIndex, 1])
             kMenu("pvMenuBarFile", "Add", "&Import into currently loaded image", "importEditGivenImageFile")
+         kMenu("pvMenuBarFile", "Add", "File inform&ations`tAlt+Enter", "PanelImageInfos")
          kMenu("pvMenuBarFile", "Add", "File prope&rties (Explorer)", "OpenFileProperties")
          kMenu("pvMenuBarFile", "Add", "&Containing folder properties (Explorer)", "OpenThisFilePropFolder", "external")
       } Else
          kMenu("pvMenuBarFile", "Add", "Open files in new &QPV instances`tCtrl+Enter", "OpenWithNewQPVinstance")
 
       Menu, pvMenuBarFile, Add,
+      kMenu("pvMenuBarFile", "Add", "Print image(s)`tCtrl+P", "PanelPrintImage")
       kMenu("pvMenuBarFile", "Add", "&Delete file(s)`tDelete", "DeletePicture", "erase")
       kMenu("pvMenuBarFile", "Add", "&Rename file(s)`tF2", "PanelRenameThisFile")
       kMenu("pvMenuBarFile", "Add", "&Move file(s) to...`tM", "PanelMoveCopyFiles")
@@ -45992,6 +47817,10 @@ InvokeMenuBarImage(manuID) {
      {
         Menu, pvMenuBarImage, Add
         kMenu("pvMenuBarImage", "Add", "Set as &wallpaper", "setImageWallpaper", "desktop image") 
+        kMenu("pvMenuBarImage", "Add", "Extract frames/pa&ges", "PanelExtractFrames")
+        If (currIMGdetails.Frames<2 && !markedSelectFile)
+           kMenu("pvMenuBarImage", "Disable", "Extract frames/pa&ges")
+
         kMenu("pvMenuBarImage", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
         imgPath := getIDimage(currentFileIndex)
         kMenu("pvMenuBarImage", "Add", "&JPEG lossless operations`tShift+J", "PanelJpegPerformOperation")
@@ -46004,6 +47833,10 @@ InvokeMenuBarImage(manuID) {
   {
      createMenuImageFileActions("pvMenuBarImage")
      kMenu("pvMenuBarImage", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
+     kMenu("pvMenuBarImage", "Add", "Extract frames/pa&ges", "PanelExtractFrames")
+     kMenu("pvMenuBarImage", "Add", "Join images into...", "PanelCombineImagesMultipage")
+     If !markedSelectFile
+        kMenu("pvMenuBarImage", "Disable", "Join images into...")
   }
   showThisMenu("pvMenuBarImage", 0, 1, manuID)
 }
@@ -46496,7 +48329,7 @@ createMenuSoloFile(modus:=0) {
 
    kMenu("PVtActFile", "Add", "&Delete file`tDelete", "DeleteActivePicture")
    kMenu("PVtActFile", "Add", "&Rename file`tShift+F2", "SingularRenameFile")
-   If (thumbsDisplaying!=1 && modus!="simple")
+   ; If (thumbsDisplaying!=1 && modus!="simple")
       kMenu("PVtActFile", "Add", "&File information`tAlt+Enter", "PanelImageInfos", "show details properties image")
 }
 
@@ -47015,17 +48848,20 @@ createMenuImageFileActions(whichMenu) {
 
    If (thumbsDisplaying=1 || markedSelectFile)
    {
+      Menu, % whichMenu, Add
       infoKbd := (thumbsDisplaying=1) ? "`tShift+U" : ""
       kMenu(whichMenu, "Add", "Apply vie&wport color adjustments" infoKbd, "filesListApplyColors", "image")
       infoKbd := (thumbsDisplaying=1) ? "`tShift+H" : ""
-      kMenu(whichMenu, "Add", "Flip image horizontally" infoKbd, "filesListFlipHimage")
+      kMenu(whichMenu, "Add", "Flip image &horizontally" infoKbd, "filesListFlipHimage")
       infoKbd := (thumbsDisplaying=1) ? "`tShift+V" : ""
-      kMenu(whichMenu, "Add", "Flip image vertically" infoKbd, "filesListFlipVimage")
+      kMenu(whichMenu, "Add", "Flip image &vertically" infoKbd, "filesListFlipVimage")
       infoKbd := (thumbsDisplaying=1) ? "`tShift+0" : ""
-      kMenu(whichMenu, "Add", "Rotate image by 90°" infoKbd, "filesListFlipRotatePlus")
+      kMenu(whichMenu, "Add", "Rotate image by &90°" infoKbd, "filesListFlipRotatePlus")
       infoKbd := (thumbsDisplaying=1) ? "`tShift+9" : ""
       kMenu(whichMenu, "Add", "Rotate image by -90°" infoKbd, "filesListFlipRotateMinus")
    }
+   Menu, % whichMenu, Add
+   kMenu(whichMenu, "Add", "&Remove all metadata", "batchRemoveMetaData", "delete exif comments")
 }
 
 createMenuCurrentFilesActs(dummy:=0) {
@@ -47052,6 +48888,12 @@ createMenuCurrentFilesActs(dummy:=0) {
 
    Menu, PVfilesActs, Add, 
    kMenu("PVfilesActs", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
+   kMenu("PVfilesActs", "Add", "Extract frames/pa&ges", "PanelExtractFrames")
+   kMenu("PVfilesActs", "Add", "Join images into...", "PanelCombineImagesMultipage")
+   If (currIMGdetails.Frames<2 && !markedSelectFile)
+      kMenu("PVfilesActs", "Disable", "Extract frames/pa&ges")
+   If !markedSelectFile
+      kMenu("PVfilesActs", "Disable", "Join images into...")
 
    createMenuImageFileActions("PVtFileImgAct")
    kMenu("PVfilesActs", "Add", "Modify image(s)", ":PVtFileImgAct")
@@ -47067,7 +48909,7 @@ createMenuCurrentFilesActs(dummy:=0) {
    If markedSelectFile
    {
       kMenu("PVfilesActs", "Add", "Re&group dispersed files", "regroupSelectedFiles")
-      kMenu("PVfilesActs", "Add", "&Calculate total files size`tAlt+L", "CalculateSelectedFilesSizes", "file details")
+      kMenu("PVfilesActs", "Add", "&Calculate total files size`tShift+L", "CalculateSelectedFilesSizes", "file details")
       kMenu("PVfilesActs", "Add", "Revie&w selected files`tR", "PanelReviewSelectedFiles")
    } Else kMenu("PVfilesActs", "Add", "&File information`tAlt+Enter", "PanelImageInfos", "properties image details")
 
@@ -47216,7 +49058,11 @@ MenuActSortHisto8() {
 
 createMenuSlideshows() {
    sliSpeed := Round(slideShowDelay/1000, 2) " sec."
-   kMenu("PVslide", "Add", "&Start slideshow`tSpace", "dummyInfoToggleSlideShowu", "play")
+   keyu := (thumbsDisplaying=1 || AnyWindowOpen) ? "" : "`tSpace"
+   If (thumbsDisplaying=1)
+      kMenu("PVslide", "Add", "&Start slideshow" keyu, "tlbrPlaySlides", "play")
+   Else
+      kMenu("PVslide", "Add", "&Start slideshow" keyu, "dummyInfoToggleSlideShowu", "play")
    kMenu("PVslide", "Add/Uncheck", "Smoot&h transitions", "ToggleSlidesTransitions", "fade")
    kMenu("PVslide", "Add/Uncheck", "&Easy to stop slideshows", "ToggleEasySlideStop")
    kMenu("PVslide", "Add/Uncheck", "&Randomize colour effects", "ToggleSlidesFXmode", "slideshow")
@@ -47231,15 +49077,17 @@ createMenuSlideshows() {
       kMenu("PVslide", "Disable", "S&kip already seen images")
    Else If (skipSeenImageSlides=1)
       kMenu("PVslide", "Check", "S&kip already seen images")
-   Menu, PVslide, Add, 
-   kMenu("PVslide", "Add", "De&fine slideshow duration`tShift+/", "PanelDefineEntireSlideshowLength")
+   Menu, PVslide, Add
+   keyu := (thumbsDisplaying=1 || AnyWindowOpen) ? "" : "`tShift+/"
+   kMenu("PVslide", "Add", "De&fine slideshow duration" keyu, "PanelDefineEntireSlideshowLength")
    kMenu("PVslide", "Add", EstimateSlideShowLength(1), "dummy")
    kMenu("PVslide", "Disable", EstimateSlideShowLength(1))
-   Menu, PVslide, Add,
-   kMenu("PVslide", "Add", "C&ycle slideshow directions`tS", "ToggleSlideshowModes")
+   Menu, PVslide, Add
+   keyu := (thumbsDisplaying=1 || AnyWindowOpen) ? "" : "`tS"
+   kMenu("PVslide", "Add", "C&ycle slideshow directions" keyu, "ToggleSlideshowModes")
    kMenu("PVslide", "Add", DefineSlideShowType(), "dummy")
    kMenu("PVslide", "Disable", DefineSlideShowType())
-   Menu, PVslide, Add,
+   Menu, PVslide, Add
    thisMusic := StrLen(SlidesMusicSong)>3 ? PathCompact(SlidesMusicSong, 30) : "NONE"
    kMenu("PVslide", "Add/Uncheck", "Auto&matically play music", "ToggleAutoPlaySlidesMusic")
    kMenu("PVslide", "Add", "Set back&ground music", "PanelSetSlidesMusic")
@@ -47247,9 +49095,11 @@ createMenuSlideshows() {
    kMenu("PVslide", "Disable", thisMusic)
    If (autoPlaySlidesAudio=1)
       kMenu("PVslide", "Check", "Auto&matically play music")
-   Menu, PVslide, Add,
-   kMenu("PVslide", "Add", "&Increase speed`tDot [ . ]", "IncreaseSlideSpeed")
-   kMenu("PVslide", "Add", "&Decrease speed`tComma [ , ]", "DecreaseSlideSpeed")
+   Menu, PVslide, Add
+   keyuA := (thumbsDisplaying=1 || AnyWindowOpen) ? "" : "`tDot [ . ]"
+   keyuB := (thumbsDisplaying=1 || AnyWindowOpen) ? "" : "`tComma [ , ]"
+   kMenu("PVslide", "Add", "&Increase speed" keyuA, "IncreaseSlideSpeed")
+   kMenu("PVslide", "Add", "&Decrease speed" keyuB, "DecreaseSlideSpeed")
    kMenu("PVslide", "Add", "Current speed: " sliSpeed, "dummy")
    kMenu("PVslide", "Disable", "Current speed: " sliSpeed)
    If (allowGIFsPlayEntirely=1)
@@ -47996,7 +49846,7 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
             kMenu("PVedit", "Disable", "&Paste in place`tCtrl+Shift+V")
 
          Menu, PVedit, Add,
-         kMenu("PVedit", "Add", "Print image`tCtrl+P", "PanelPrintImage")
+         kMenu("PVedit", "Add", "Print image(s)`tCtrl+P", "PanelPrintImage")
       }
 
       kMenu("PVedit", "Add", "Ac&quire image (WIA)", "AcquireWIAimage", "capture devices")
@@ -48304,7 +50154,11 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
    } Else
    {
       SetTimer, setWinCloseZeit, Off
-      hMenuBar := "0x" Format("{:x}", DllCall("GetMenu", "ptr", PVhwnd, "uptr"))
+      hMenuBar := DllCall("GetMenu", "UPtr", PVhwnd, "UPtr")
+      If !hMenuBar
+         addJournalEntry("ERROR: Failed to get menu bar handle, from the main window.")
+
+      hMenuBar := "0x" Format("{:x}", hMenuBar)
       rect := GetMenuItemRect(PVhwnd, hMenuBar, manuID - 1)
       mX := Trim(rect.left)
       mY := Trim(rect.bottom)
@@ -48672,7 +50526,7 @@ createMenuFilesSelections(whichMenu) {
    {
       Menu, % whichMenu, Add
       kMenu(whichMenu, "Add", "Revie&w selected files`tR", "PanelReviewSelectedFiles")
-      kMenu(whichMenu, "Add", "&Calculate total files size`tAlt+L", "CalculateSelectedFilesSizes", "file details")
+      kMenu(whichMenu, "Add", "&Calculate total files size`tShift+L", "CalculateSelectedFilesSizes", "file details")
       kMenu(whichMenu, "Add", "Filter files list to selection`tCtrl+Tab", "filterToFilesSelection")
    }
 
@@ -48991,7 +50845,7 @@ createMenuInterfaceOptions() {
    If (drawingShapeNow!=1)
    {
       keyword := (showMainMenuBar=1) ? " hide" : " display"
-      kMenu("PvUIprefs", "Add/Uncheck", "Show &menu bar`tF10", "ToggleQuickBaru", "toolbar" keyword)
+      kMenu("PvUIprefs", "Add/Uncheck", "Show &menu bar`tF10", "ToggleMenuBaru", "toolbar" keyword)
       If (showMainMenuBar=1)
          kMenu("PvUIprefs", "Check", "Show &menu bar`tF10")
    }
@@ -50197,7 +52051,7 @@ dummyToggleTitleBarActionBtns() {
   SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
-ToggleQuickBaru() {
+ToggleMenuBaru() {
    Critical, on
    Static lastInvoked := 1
    hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
@@ -50208,8 +52062,8 @@ ToggleQuickBaru() {
       Win_SetMenu(PVhwnd, 0)
 
    TriggerMenuBarUpdate("forced")
-   If (A_TickCount - lastInvoked > 900)
-      CreateGuiButton("Interface options,,OpenUImenu", 0, msgDisplayTime//1.5 + 500)
+   ; If (A_TickCount - lastInvoked > 900)
+   ;    CreateGuiButton("Interface options,,OpenUImenu", 0, msgDisplayTime//1.5 + 500)
 
    If (isImgEditingNow()=1 || (thumbsDisplaying=1 && maxFilesIndex>1))
    {
@@ -52331,7 +54185,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
     If FileExist(imgPath)
     {
        QPV_FileGetSizeTime(imgPath, "R", currentFileIndex)
-       fileSizu := fileSizeFrienly(resultedFilesList[currentFileIndex, 6])
+       fileSizu := fileSizeFriendly(resultedFilesList[currentFileIndex, 6])
        FileDateM := resultedFilesList[currentFileIndex, 7]
        Try FormatTime, FileDateM, % FileDateM, dd/MM/yyyy, HH:mm
        fileMsg := "`n" fileSizu " | " FileDateM
@@ -52543,8 +54397,8 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
        infoAudio := "`nAudio file associated: " OutFileName mediaDuration statusMedia
     }
 
-    If (animGIFplaying=1)
-       infoAnim := "`nGIF animation playing at " GIFspeedDelay " ms / frame."
+    If ((animGIFplaying=1 || CountGIFframes>1 && animGIFsSupport=1) && thumbsDisplaying=0)
+       infoAnim := "`nGIF animation speed: " GIFspeedDelay + UserGIFsDelayu " ms / frame."
 
     If (imgFxMode>1 || usrColorDepth>1)
        infoColors := "`nColors display mode: " DefineFXmodes()
@@ -52704,7 +54558,7 @@ changeOSDfontSize(direction) {
   Else
      OSDfontSize -= stepu
 
-  OSDfontSize := clampInRange(OSDfontSize, 15, 350)
+  OSDfontSize := clampInRange(OSDfontSize, 10, 350)
   INIaction(1, "OSDfontSize", "General")
   showTOOLtip("OSD font size: " OSDfontSize, A_ThisFunc, 2, OSDfontSize/350)
   SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -52796,17 +54650,23 @@ RescaleBMPtinyVPsize(imgPath, GuiW, GuiH) {
      Return gdiBMPvPsize
 }
 
-setGIFframesDelay() {
-   GIFspeedDelay := (totalFramesIndex>75) ? 35 : 45
+setGIFframesDelay(oBitmap) {
+   base := (totalFramesIndex>75) ? 35 : 45
    If (totalFramesIndex>195)
-      GIFspeedDelay := 20
+      base := 20
    Else If (totalFramesIndex<15)
-      GIFspeedDelay := 60
+      base := 60
 
    If (totalFramesIndex<8)
-      GIFspeedDelay := 85
+      base := 85
 
-   GIFspeedDelay := GIFspeedDelay + UserGIFsDelayu
+   rawFmt := Gdip_GetImageRawFormat(oBitmap)
+   If (rawFmt="gif")
+   {
+      d := Gdip_GetPropertyItem(oBitmap, 0x5100)
+      GIFspeedDelay := clampInRange(Round(SubStr(d.value, 1, InStr(d.value, A_Space) - 1)*10) + base, 15, 9500)
+      ; ToolTip, % "d=" SubStr(d.value, 1, InStr(d.value, A_Space) - 1)*10 "|" GIFspeedDelay , , , 2
+   } Else GIFspeedDelay := base
 }
 
 multiPageFileManaging(oBitmap, frameu) {
@@ -52820,7 +54680,7 @@ multiPageFileManaging(oBitmap, frameu) {
       If (frameu>=tFrames)
          frameu := tFrames
 
-      setGIFframesDelay()
+      setGIFframesDelay(oBitmap)
       If (tFrames>0 && slideShowRunning=1 && SlideHowMode=1 && animGIFsSupport!=1)
          Random, frameu, 0, % tFrames
 
@@ -52951,8 +54811,8 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu) {
      thisMD5name := MD5name imgPath userHQraw cmrRAWtoneMapAlgo cmrRAWtoneMapParamA cmrRAWtoneMapParamB
      tFramesA := Gdip_GetBitmapFramesCount(GDIcacheSRCfileA) - 1
      tFramesB := Gdip_GetBitmapFramesCount(GDIcacheSRCfileB) - 1
-     isFramesA := (tFramesA=AbackupIMGdetails.Frames) ? 1 : 0
-     isFramesB := (tFramesB=BbackupIMGdetails.Frames) ? 1 : 0
+     isFramesA := (tFramesA = AbackupIMGdetails.Frames) ? 1 : 0
+     isFramesB := (tFramesB = BbackupIMGdetails.Frames) ? 1 : 0
      ; ToolTip, % thisMD5name "`n" prevMD5nameA "`n" prevMD5nameB "`n" isFramesA "=" isFramesB "`n" tFramesA "=" tFramesB "`n" AbackupIMGdetails.Frames "=" BbackupIMGdetails.Frames "`n" AbackupIMGdetails.FIle "=" BbackupIMGdetails.File , , , 2
      If (thisMD5name=prevMD5nameA && StrLen(GDIcacheSRCfileA)>2 && StrLen(prevMD5nameA)>2 && isFramesA=1)
      {
@@ -53052,7 +54912,7 @@ LoadFileWithGDIp(imgPath, noBPPconv:=0, frameu:=0, sizesDesired:=0, ByRef newBit
      mainLoadedIMGdetails.OpenedWith := "GDI+"
      mainLoadedIMGdetails.TooLargeGDI := 0
 
-     If (RegExMatch(mainLoadedIMGdetails.RawFormat, "i)(gif|tiff)$") && mainLoadedIMGdetails.Frames>0)
+     If (RegExMatch(mainLoadedIMGdetails.RawFormat, "i)(gif|tiff)$") && mainLoadedIMGdetails.Frames>0 && frameu>0)
      {
         frameu := clampInRange(frameu, 0, mainLoadedIMGdetails.Frames)
         Gdip_BitmapSelectActiveFrame(oBitmap, frameu)
@@ -53501,6 +55361,7 @@ CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReload
   {
      gifLoaded := 1
      CountGIFframes := (animGIFsSupport=1) ? totalFramesIndex : 0
+     setGIFframesDelay(oBitmap)
   }
 
   If (AnyWindowOpen=17 && performAutoCropNow=1 && usrAutoCropGenerateSelection=0)
@@ -54471,7 +56332,16 @@ createVPnavBox(ByRef pBitmap, ByRef imgW, ByRef imgH, ByRef posX, ByRef posY, By
    pBitmap := ""
    navBoxu := coreCreateVPnavBox()
    If StrLen(navBoxu)<3
-      Return
+   {
+      If (thumbsDisplaying=1)
+      {
+         navBoxu := trGdip_CreateBitmap(A_ThisFunc, 50, 50)
+         If StrLen(navBoxu)>2
+            missing := 1
+         Else
+            Return
+      } Else Return
+   }
 
    Gdip_GetImageDimensions(navBoxu, fImgW, fImgH)
    Gdip_GetImageDimensions(useGdiBitmap(), oImgW, oImgH)
@@ -54482,17 +56352,17 @@ createVPnavBox(ByRef pBitmap, ByRef imgW, ByRef imgH, ByRef posX, ByRef posY, By
    pBitmap := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH, coreDesiredPixFmt)
    If StrLen(pBitmap)<3
    {
-      pBitmap := ""
       trGdip_DisposeImage(navBoxu, 1)
+      pBitmap := ""
       Return
    }
 
    Gu := trGdip_GraphicsFromImage(A_ThisFunc, pBitmap)
    If !Gu
    {
-      pBitmap := ""
       trGdip_DisposeImage(navBoxu, 1)
       trGdip_DisposeImage(pBitmap, 1)
+      pBitmap := ""
       Return
    }
 
@@ -54538,7 +56408,9 @@ createVPnavBox(ByRef pBitmap, ByRef imgW, ByRef imgH, ByRef posX, ByRef posY, By
    }
 
    entireString .= "`nRight-click for more options."
-   Gdip_FillRectangle(Gu, pBrushE, 0, 0, imgW, imgH)
+   If !missing
+      Gdip_FillRectangle(Gu, pBrushE, 0, 0, imgW, imgH)
+
    If (resultedFilesList[currentFileIndex, 2]=1 && thumbsDisplaying=0)
    {
       pBrush3 := Gdip_BrushCreateSolid("0x400188FF")
@@ -54547,13 +56419,17 @@ createVPnavBox(ByRef pBitmap, ByRef imgW, ByRef imgH, ByRef posX, ByRef posY, By
    } Else
       Gdip_FillRectangle(Gu, pBrushE, 0, 0, imgW, imgH)
 
-   E := trGdip_DrawImage(A_ThisFunc, Gu, navBoxu, posX, posY, fImgW, fImgH)
+   If !missing
+      E := trGdip_DrawImage(A_ThisFunc, Gu, navBoxu, posX, posY, fImgW, fImgH)
+   Else
+      trGdip_DisposeImage(navBoxu, 1)
+
    If (E="fail")
    {
-      pBitmap := ""
       Gdip_DeleteGraphics(Gu)
       trGdip_DisposeImage(navBoxu, 1)
       trGdip_DisposeImage(pBitmap, 1)
+      pBitmap := ""
       Return
    }
 
@@ -55646,7 +57522,7 @@ createGradientBrushBitmap(brushColor, grPosA, brushSize, grAngle, bAR, opacity:=
              Gdip_DeletePath(grpPath)
           }
 
-          If bgr
+          If (bgr!="")
              Gdip_GraphicsClear(Ga, bgr)
           Gdip_FillEllipse(Ga, gradBrush, 0, 0, rImgW, rImgH)
           Gdip_DeleteBrush(gradBrush)
@@ -59153,9 +61029,9 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
 
     If (mustPlayAnim=1 && !AnyWindowOpen)
     {
-       setGIFframesDelay()
+       ; setGIFframesDelay()
        autoChangeDesiredFrame("start", imgPath)
-       SetTimer, autoChangeDesiredFrame, % GIFspeedDelay
+       SetTimer, autoChangeDesiredFrame, % GIFspeedDelay + UserGIFsDelayu
        If (mustRecordSeenImgs=1 && desiredFrameIndex=2 && gdiBMPchanged=1 && !InStr(r, "error"))
           recordSeenIMGdbEntry(imgPath, currentFileIndex)
     } Else
@@ -59467,6 +61343,11 @@ changeSelectZoom(direction, klop:=0) {
        SetTimer, dummyRefreshImgSelectionWindow, -10
        SetTimer, dummyShowSelCoordsInfos, -25
     }
+}
+
+alignImgSelectCentered() {
+   alignImgSelection(0)
+   alignImgSelection(5)
 }
 
 alignImgSelectCenterV() {
@@ -60330,7 +62211,7 @@ QPV_listThumbnailsGridMode(forceMode, thisGu, thisHDC, thisHwnd) {
         {
            ; file details mode
            ofileSizu := QPV_FileGetSizeTime(imgPath, "S", thisFileIndex)
-           fileSizu := fileSizeFrienly(ofileSizu)
+           fileSizu := fileSizeFriendly(ofileSizu)
            FileDateM := QPV_FileGetSizeTime(imgPath, "M", thisFileIndex)
            FileDateC := QPV_FileGetSizeTime(imgPath, "C", thisFileIndex)
            Try FormatTime, FileDateM, % FileDateM, dd/MM/yyyy, HH:mm
@@ -60364,7 +62245,7 @@ QPV_listThumbnailsGridMode(forceMode, thisGu, thisHDC, thisHwnd) {
               CountFrames := (resultedFilesList[thisFileIndex, 9]>1) ? " | " resultedFilesList[thisFileIndex, 9] " f" : ""
               mgpx := " | " resultedFilesList[thisFileIndex, 17] " MPx | " Round(Width/Height, 2)
               ofileSizu := QPV_FileGetSizeTime(imgPath, "S", thisFileIndex)
-              fileSizu := " | " fileSizeFrienly(ofileSizu)
+              fileSizu := " | " fileSizeFriendly(ofileSizu)
               fileMsg := groupDigits(Width) " x " groupDigits(Height) CountFrames mgpx fileSizu
            } Else fileMsg := "Error gathering data"
 
@@ -60487,7 +62368,7 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
     If (showInfoBoxHUD>0)
     {
        drawinfoBox(mainWidth, mainHeight, 0, 2NDglPG)
-       If (A_TickCount - lastInfoBoxZeitToggle<800)
+       If (A_TickCount - lastInfoBoxZeitToggle<800 || thumbsListViewMode>1)
           Gdip_SetClipRect(2NDglPG, 0, 0, lastInfoBoxBMP[1, 1], lastInfoBoxBMP[1, 2], 4)
     } Else
        interfaceThread.ahkPostFunction("uiAccessUpdateInfoBox", "hide", 1, 1, 0, 0)
@@ -60525,7 +62406,7 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
            If (isStringLen=0)
               Gdip_FillRectangle(2NDglPG, pBrushE, DestPosX, DestPosY, thumbsW, thumbsH)
         }
-
+        isFile := 1
         If (isStringLen=1 && (simpleMode=0 || thisFileIndex=currentFileIndex))
            isFile := FileRexists(imgPath)
 
@@ -60576,7 +62457,7 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
               If isFile
               {
                  QPV_FileGetSizeTime(imgPath, "R", thisFileIndex)
-                 fileSizu := fileSizeFrienly(resultedFilesList[thisFileIndex, 6])
+                 fileSizu := fileSizeFriendly(resultedFilesList[thisFileIndex, 6])
                  FileDateM := resultedFilesList[thisFileIndex, 7]
                  Try FormatTime, FileDateM, % FileDateM, dd/MM/yyyy, HH:mm
                  fileMsg := fileSizu " | " FileDateM
@@ -60668,7 +62549,7 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
     scrollYpos := clampInRange(scrollYpos, 1, mainHeight - imgHUDbaseUnit//4.5)
     If (StrLen(theMsg)>1)
     {
-       bgrTXT := (resultedFilesList[currentFileIndex, 2]=1) ? SubStr(MixARGB("0xFF0188FF", "0xFF" WindowBgrColor, 0.65), 5) : OSDbgrColor
+       bgrTXT := (resultedFilesList[currentFileIndex, 2]=1) ? SubStr(MixARGB("0xFF0188FF", "0xFF" OSDbgrColor, 0.65), 5) : OSDbgrColor
        If isDupesList
        {
           theMSG := "DUPE ID: " currentDupeID StrReplace(currentDupeDetails, ".2500") " | " theMSG
@@ -63672,7 +65553,7 @@ Random_ShuffleArray(Array) {
 ; function from "Facade Functional Programming Suite"
 ; by Shambles, from https://github.com/Shambles-Dev/AutoHotkey-Facade
 ; modified by Marius Șucan
-; This is the Fisher–Yates shuffle algorithm.
+; This is the Durstenfeld's in-place version of the Fisher–Yates shuffle algorithm.
 
     Result := Array.Clone()
     maxArray := Array.Count()
@@ -64212,10 +66093,9 @@ AboutWindow() {
     Gui, Add, Text, y+10 wp h2 +0x1007, lol
     Gui, Add, Text, y+10 wp, Dedicated to people with really large image collections and slideshow needs.
     Gui, Add, Text, y+10 wp, This application contains code from various entities. You can find more details in the source code.
-    Gui, Add, Text, y+10 wp, QPV uses GDI+ [Windows APIs] to display images and FreeImage%thisVersion% to load exotic file formats. FreeImage is licensed under the GNU General Public License, v2.0 (GPLv2) or v3.0 (GPLv3)`, and the FreeImage Public License (FIPL)
+    Gui, Add, Text, y+10 wp, QPV uses GDI+ [Windows APIs] to display images and FreeImage%thisVersion% to load exotic file formats. FreeImage is an open source library licensed under the GNU GPL v2.0 or v3.0`, and the FreeImage Public License (FIPL). For image processing`, some functions also rely on the cImg library, an open-source library distributed under the CeCILL-C license, by David Tschumperlé. 
 
     Gui, Add, Link, y+10 wp, To keep the development going, <a href="https://www.paypal.me/MariusSucan/10">please donate</a> or <a href="mailto:marius.sucan@gmail.com?subject=%appTitle% v%appVersion%">send me feedback</a>.
-
     Gui, Add, Button, xs+15 y+20 h%thisBtnHeight% w%btnWid% gBtnHelpWin, &Help
     Gui, Add, Button, x+5 hp wp gPanelJournalWindow, &Journal
     Gui, Add, Button, x+5 hp wp Default gBtnCloseWindow, &Close
@@ -65216,6 +67096,7 @@ PanelJpegPerformOperation() {
     If !PanelsCheckFileExists()
        Return
 
+    initFIMGmodule()
     filesElected := getSelectedFiles(0, 1)
     panelMode := (filesElected<2 && thumbsDisplaying!=1) ? 1 : 0
     If !(thisBtnHeight := createSettingsGUI(12, A_ThisFunc, 1, panelMode))
@@ -65269,10 +67150,18 @@ PanelJpegPerformOperation() {
        Gui, Add, Button, x+5 hp w%btnWid% Default gBtnPerformJpegOp vmainBtnACT, &Perform operation
        ToolTip2ctrl(hBtnNextImg, "Next image")
        ToolTip2ctrl(hBtnPrevImg, "Previous image")
-    } Else Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w%btnWid% Default gBtnPerformJpegOp, &Perform operation
+    } Else 
+    {
+       Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w%btnWid% Default gBtnPerformJpegOp, &Perform operation
+       Gui, Add, Button, x+5 hp wp-10 gBtnPerformSoloJpegOp, &Active file only
+    }
  
     Gui, Add, Button, x+5 hp w80 gBtnCloseWindow, C&lose
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "JPEG lossless operations: " appTitle)
+}
+
+BtnPerformSoloJpegOp(dummy:=0) {
+   BtnPerformJpegOp("single")
 }
 
 BtnPerformJpegOp(dummy:=0) {
@@ -65304,7 +67193,7 @@ BtnPerformJpegOp(dummy:=0) {
     lastInvoked := A_TickCount
     ForceRefreshNowThumbsList()
     filesElected := getSelectedFiles(0, 1)
-    If (filesElected>1)
+    If (filesElected>1 && dummy!="single")
     {
        batchJpegLLoperations()
        Return
@@ -65312,6 +67201,7 @@ BtnPerformJpegOp(dummy:=0) {
     {
        destroyGDIfileCache()
        r := coreJpegLossLessAction(imgPath, jpegDesiredOperation, jpegDoCrop)
+       ForceRefreshNowThumbsList()
     }
 
     If (dummy!="extern")
@@ -65326,6 +67216,7 @@ BtnPerformJpegOp(dummy:=0) {
        FlipImgV := FlipImgH := vpIMGrotation := 0
        If (SLDtypeLoaded=3)
           selectivePurgeCachedSQLdata(resultedFilesList[currentFileIndex, 12])
+
        showTOOLtip("JPEG operation completed succesfully")
        RefreshImageFile()
     } Else
@@ -65356,14 +67247,14 @@ batchJpegLLoperations() {
    If (filesElected>1 && jpegDoCrop=1) || (filesElected>150)
    {
       msgInfos := (jpegDoCrop=1) ? "`n`nThe crop operation IS irreversible!" : ""
-      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Are you sure you want to perform the JPEG transformations on the selected files? There are currently " filesElected " selected files. " msgInfos, 4, 0, "question")
+      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Are you sure you want to perform the JPEG transformations on the selected files? There are currently " groupdigits(filesElected) " selected files. " msgInfos, 4, 0, "question")
       If (msgResult!="Yes")
          Return
    }
  
    BtnCloseWindow()
    Sleep, 25
-   showTOOLtip("Performing JPEG lossless operations on " filesElected " files, please wait")
+   showTOOLtip("Performing JPEG lossless operations on " groupDigits(filesElected) " files, please wait")
    prevMSGdisplay := A_TickCount
    failedFiles := countFilez := countTFilez := 0
 
@@ -65447,7 +67338,7 @@ batchJpegLLoperations() {
    If (abandonAll=1)
       showTOOLtip("Operation aborted. " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files were processed until now" someErrors)
    Else
-      showTOOLtip(countFilez " out of " groupDigits(countTFilez) " selected JPEG files were processed" someErrors)
+      showTOOLtip(groupDigits(countFilez) " out of " groupDigits(countTFilez) " selected JPEG files were processed" someErrors)
 
    ForceRefreshNowThumbsList()
    dummyTimerDelayiedImageDisplay(100)
@@ -66295,7 +68186,8 @@ PanelFileFormatConverter() {
     Gui, Add, Checkbox, y+10 Checked%PreserveDateTimeOnSave% vPreserveDateTimeOnSave, &Preserve original file date and time
     Gui, Add, Checkbox, y+10 gTglRszDestFoldr Checked%ResizeUseDestDir% vResizeUseDestDir, Save file[s] in the specified destination folder:
     Gui, Add, Edit, xp+10 y+5 wp r1 +0x0800 -wrap vResizeDestFolder, % ResizeDestFolder
-    Gui, Add, Button, x+5 hp w90 gBTNchangeResizeDestFolder vbtnFldr, C&hoose
+    thisW := (PrefsLargeFonts=1) ? 90 : 70
+    Gui, Add, Button, x+5 hp w%thisW% gBTNchangeResizeDestFolder vbtnFldr, C&hoose
     If (filesElected>1)
     {
        Gui, Font, Bold
@@ -66309,14 +68201,19 @@ PanelFileFormatConverter() {
        GuiControl, Disable, ResizeDestFolder
     }
 
-    thisW := (PrefsLargeFonts=1) ? 90 : 70
-    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%thisW% gBTNconvertNow Default vIDbtnConvert, &Convert
-    Gui, Add, Button, x+5 hp wp gBTNconvertHelp, &Help
+    thisV := (PrefsLargeFonts=1) ? 135 : 90
+    ml := (filesElected>1) ? 30 : 5
+    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%thisW% gBTNconvertImgFmtNow Default vIDbtnConvert, &Convert
+    If (filesElected>1)
+       Gui, Add, Button, x+5 hp w%thisV% gBTNconvertImgFmtSoloNow, &Active file only
+
+    sml := (PrefsLargeFonts=1) ? 85 : 60
+    Gui, Add, Button, x+%ml% hp w%sml% gBTNconvertImgFmtHelp, &Help
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, C&ancel
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Image file format conversion: " appTitle)
 }
 
-BTNconvertHelp() {
+BTNconvertImgFmtHelp() {
     msgBoxWrapper(appTitle ": HELP", "File format conversion relies primarly on the FreeImage library.`n`nOn conversion, images will be converted to 24 bits or 32 bits.`n`nFailures can occur if the images are very large (above 250 MPx) and the destination format does not allow such large images, if there is insufficient system memory or... if file access is denied when attempting to write files.`n`nQuality option applies for JPG, JP2, J2K, JXR and WEBP file formats.", -1, 0, 0)
 }
 
@@ -66335,13 +68232,16 @@ TglDesiredSaveFormat() {
     RegAction(1, "userDesireWriteFMT")
 }
 
-BTNconvertNow() {
+BTNconvertImgFmtSoloNow() {
+   BTNconvertImgFmtNow("single")
+}
+
+BTNconvertImgFmtNow(modus:=0) {
    If (AnyWindowOpen!=15)
       Return
 
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: Submit, NoHide
-
    rDesireWriteFMT := saveImgFormatsList[userDesireWriteFMT]
    If (!RegExMatch(rDesireWriteFMT, "i)(bmp|png|tiff|tif|gif|jpg|jpeg)$") && wasInitFIMlib!=1)
    {
@@ -66357,11 +68257,20 @@ BTNconvertNow() {
    RegAction(1, "userActionConflictingFile")
    RegAction(1, "userDesireWriteFMT")
    RegAction(1, "userJpegQuality")
-   If (markedSelectFile>1)
+   performImgFmtConvert(modus)
+}
+
+performImgFmtConvert(modus:=0) {
+   If (markedSelectFile>1 && modus!="single")
    {
-      CloseWindow()
+      BtnCloseWindow()
+      ; SoundBeep , 300, 100
       batchConvert2format()
-   } Else convert2format(currentFileIndex)
+   } Else
+   {
+      ; SoundBeep , 900, 200
+      convert2format(currentFileIndex)
+   }
 }
 
 WriteSettingsAdjustCanvasPanel() {
@@ -72824,6 +74733,8 @@ initFIMGmodule() {
      wasInitFIMlib := (r && !InStr(r, "err")) ? 1 : 0
      If wasInitFIMlib
         addJournalEntry("FreeImage library initialized: v" FreeImage_GetVersion())
+     Else
+        addJournalEntry("ERROR: Failed to initialize the FreeImage library. Many image file formats are no longer supported.")
   }
 
   If InStr(r, "err - ")
@@ -72841,7 +74752,6 @@ initFIMGmodule() {
         msgBoxWrapper(appTitle ": ERROR", "The FreeImage library failed to properly initialize. Some image file formats will no longer be supported. Error code: " r "." friendly, 0, 0, "error")
      }
   } Else FIMfailed2init := 0
-
   firstTimer := 0
   Return r
 }
@@ -73474,9 +75384,9 @@ PrinterGetMatchingBitmap(width, height, color:="0xffFFFFFF") {
   return pBitmap
 }
 
-printImageNow(mainBMP, PrintOptions, previewMode) {
+printImageNow(mainBMP, PrintOptions, previewMode, inLoop:=0, OutFileName:=0) {
    If StrLen(mainBMP)<3
-      Return
+      Return -1
 
    pPrinterName := PrintOptions.pPrinterName
    adaptFit := PrintOptions.adaptFit
@@ -73506,16 +75416,17 @@ printImageNow(mainBMP, PrintOptions, previewMode) {
 
    ; - "print" to bitmap -
    pBitmap := trGdip_CreateBitmap(A_ThisFunc, ResizedW, ResizedH, coreDesiredPixFmt)
-   If (previewMode!=1)
+   If (previewMode!=1 && inLoop=0)
    {
       If warnUserFatalBitmapError(pBitmap, A_ThisFunc)
-         Return
-   }
+         Return -2
+   } Else If StrLen(pBitmap)<3
+      Return -2
 
    gPrint := trGdip_GraphicsFromImage(A_ThisFunc, pBitmap, 7, 4, 2)
    E := trGdip_GraphicsClear(A_ThisFunc, gPrint, "0xFFffFFff")
    If (!pBitmap || !gPrint || E="fail")
-      Return
+      Return -3
 
    If (applyFX=1)
       decideGDIPimageFX(matrix, imageAttribs, pEffect)
@@ -73616,7 +75527,8 @@ printImageNow(mainBMP, PrintOptions, previewMode) {
       Else If (TextInAreaValign=3)
          thisTxtvAlignu := "Bottom "
       ; SoundBeep 
-      ERR := Gdip_TextToGraphics(gPrint, PrintOptions.text, thisTxtAlignu thisTxtvAlignu thisStylu " s" Round(PrintTxtSize*previewScale) " cFF" TextInAreaFontColor, TextInAreaFontName, pageW, pageH)
+      textu := StrReplace(PrintOptions.text, "{fname}", OutFileName)
+      ERR := Gdip_TextToGraphics(gPrint, textu, thisTxtAlignu thisTxtvAlignu thisStylu " s" Round(PrintTxtSize*previewScale) " cFF" TextInAreaFontColor, TextInAreaFontName, pageW, pageH)
       ; ToolTip, % ERR " == "  PrintOptions.text "`n" thisTxtAlignu thisTxtvAlignu " s" TextInAreaFontSize " c" TextInAreaFontColor " == " TextInAreaFontName " == " pageW " == " pageH , , , 2
    }
 
@@ -73764,6 +75676,7 @@ LoadWICimage(imgPath, noBPPconv, frameu, sizesDesired:=0, ByRef newBitmap:=0) {
          createdGDIobjsArray["x" r] := [r, "bmp", 1, A_ThisFunc]
       else
          r := 1
+
       mainLoadedIMGdetails.Width := NumGet(resultsArray, 4 * 0, "uInt")
       mainLoadedIMGdetails.Height := NumGet(resultsArray, 4 * 1, "uInt")
       mainLoadedIMGdetails.Frames := NumGet(resultsArray, 4 * 2, "uInt") - 1
@@ -74421,6 +76334,7 @@ OSDguiToolbarGuiContextMenu(GuiHwnd, CtrlHwnd, EventInfo, IsRightClick, X, Y) {
 }
 
 tlbrPlaySlides() {
+   lastOtherWinClose := 1
    If (thumbsDisplaying=1)
       ToggleThumbsMode()
  
@@ -74954,11 +76868,18 @@ tlbrResetRotation() {
       changeImgRotationInVP(1, 45, 1)
 }
 
+tlbrResizeEditorImg() {
+   If (isImgEditingNow()=1 && !AnyWindowOpen)
+      PanelEditorImgResize()
+}
+
 tlbrTransformSelection() {
    If (isImgEditingNow() && (AnyWindowOpen=31 || AnyWindowOpen=24))
       togglePasteInPlaceAdaptModes()
    Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
       importEditGivenImageFile()
+   Else If (isImgEditingNow()=1 && editingSelectionNow=0)
+      PanelEditorImgResize()
    Else If (isImgEditingNow()=1 && editingSelectionNow=1)
    {
       If !AnyWindowOpen
@@ -75465,7 +77386,7 @@ CoreGUItoolbar() {
          , BTNadjustColors := ["adjust-colors", "tlbrOpenVPcolors", "Adjust viewport colors", "ResetImageView", "BTNadjustColors"]
          , BTNtlbrflipH := ["flip-h", "tlbrFlipStuffH", "Flip horizontally", "tlbrFlipSelectionH", "BTNtlbrflipH"]
          , BTNtlbrflipV := ["flip-v", "tlbrFlipStuffV", "Flip vertically", "tlbrFlipSelectionV", "BTNtlbrflipV"]
-         , BTNtransformArea := ["transform-img", "tlbrTransformSelection", "Transform selected area", 0, "BTNtransformArea"]
+         , BTNtransformArea := ["transform-img", "tlbrTransformSelection", "Transform selected area", "tlbrResizeEditorImg", "BTNtransformArea"]
          , BTNrotateStuff := ["rotation", "tlbrRotateImg", "Rotate by 45 degrees", "tlbrResetRotation", "BTNrotateStuff"]
          , BTNfillShape := ["fill-shape", "tlbrFillShape", "Fill selection area", "tlbrFillBehind", "BTNfillShape"]
          , BTNoutlineShape := ["outline-shape", "tlbrOutlineShape", "Draw shape contours", "tlbrOpenLinesPanel", "BTNoutlineShape"]
@@ -75938,7 +77859,7 @@ tlbrDecideTooltips(hwnd) {
       msgu := "L: Flood fill / color bucket [K]"
    } Else If InStr(icoFile, "calculate")
    {
-      msgu := "L: Calculate total size of selected files [Alt + L]`nR: Review panel for selected files [R]"
+      msgu := "L: Calculate total size of selected files [Shift + L]`nR: Review panel for selected files [R]"
    } Else If (btnID="BTNinvertStuff")
    {
       msgu := (thumbsDisplaying=1) ? "Invert files selection [Shift + I]" : "Invert image [Shift + I]"
@@ -76017,12 +77938,16 @@ tlbrDecideTooltips(hwnd) {
       Else If (thumbsDisplaying=1)
          msgu := "L: Adjust viewport colors and more [U]`nR: Reset viewport adjustments [ \ ]"
       Else
-         msgu := "L: Adjust image colors [U]`nAlt+L: Adjust viewport colors and more [Shift+U]`nR: Reset viewport adjustments [ \ ]"
+         msgu := "L: Adjust image colors [U]`nAlt+LMB: Adjust viewport colors and more [Shift+U]`nR: Reset viewport adjustments [ \ ]"
    } Else If InStr(icoFile, "transform-img")
    {
-      msgu := (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) ? "Import selected image into currently opened one" : "Transform image selected area [Ctrl + T]"
-      If (isImgEditingNow()=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
-         msgu := "Cycle through image object dimensions adapt modes"
+      msgu := (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) ? "L: Import selected image into currently opened one" : "L: Transform image selected area [Ctrl + T]"
+      If (isImgEditingNow()=1 && editingSelectionNow=0)
+         msgu := "L: Resize image [Ctrl + R]"
+      Else If (isImgEditingNow()=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
+         msgu := "L: Cycle through image object dimensions adapt modes"
+      If (isImgEditingNow()=1 && !AnyWindowOpen && editingSelectionNow=1)
+         msgu .= "`nR: Resize image [Ctrl + R]"
    } Else If InStr(icoFile, "flip-h")
    {
       editing := isImgEditingNow()
@@ -76553,7 +78478,7 @@ testHistoDLL() {
 }
 
 
-#If, GetKeyState("CapsLock", "T")
+; #If, GetKeyState("CapsLock", "T")
 
    ; \::
    ; SoundBeep 
@@ -76589,7 +78514,7 @@ testHistoDLL() {
    ;    }
    ; Return
 
-#If
+; #If
 
 
 ListGlobalVars() {
@@ -76655,4 +78580,21 @@ ListGlobalVars() {
     return final
 }
 
-
+/*
+testCimgQPV() {
+  Static modus := 0
+  modus++
+  ToolTip, % modus "=l" , , , 3
+  If (modus>99)
+     modus := 1
+  func2exec := (A_PtrSize=8) ? "testCimgQPV" : "_BoxBlurBitmap@20"
+  pBitmap := useGdiBitmap()
+  Gdip_GetImageDimensions(pBitmap, w, h)
+  r := DllCall(whichMainDLL "\" func2exec, "UPtr", pBitmap, "Int", w, "Int", h, "Int", modus, "Int", 0, "Int", 9, "UPtr")
+  Gdip_GraphicsClear(2NDglPG)
+  If StrLen(r)>2
+     Gdip_DrawImage(2NDglPG, r, 10, 10)
+  r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+  Gdip_DisposeImage(r)
+}
+*/
