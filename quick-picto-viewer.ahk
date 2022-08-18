@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.7.6
+;@Ahk2Exe-SetVersion 5.7.7
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2021)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -203,7 +203,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , userExtractFramesFmt := 3, maxMultiPagesAllowed := 2048, maxMemLimitMultiPage := 2198765648
    , cmdExifTool := ""
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.7.6", vReleaseDate := "16/08/2022"
+   , appVersion := "5.7.7", vReleaseDate := "18/08/2022"
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1, usrAutoCropGenerateSelection := 0
@@ -375,6 +375,7 @@ OnMessage(0x202, "WM_LBUTTONup")
 OnMessage(0x200, "WM_MOUSEMOVE")
 OnMessage(0x203, "OnLButtonDblClk")
 OnMessage(0x20A, "adjustWheelNumbersEditFields") ; WM_MOUSEWHEEL
+OnMessage(0x20E, "adjustWheelNumbersEditFields") ; WM_MOUSEWHEEL
 ; Loop, 9
 ;     OnMessage(255+A_Index, "PreventKeyPressBeep")   ; 0x100 to 0x108
 OnMessage(0x100, "WM_KEYDOWN")
@@ -1834,7 +1835,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
        } Else If (givenKey="WheelUp")
        {
           If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-             ThumbsNavigator("Down", givenKey)
+             ThumbsNavigator("Upu", givenKey)
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1) && (IMGresizingMode=4 && thumbsDisplaying!=1)
              ChangeZoom(1, "WheelUp")
           Else If (HKifs("imgsLoaded"))
@@ -1842,7 +1843,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
        } Else If (givenKey="WheelDown")
        {
           If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-             ThumbsNavigator("Upu", givenKey)
+             ThumbsNavigator("Down", givenKey)
           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1) && (IMGresizingMode=4 && thumbsDisplaying!=1)
              ChangeZoom(-1, "WheelDown")
           Else If (HKifs("imgsLoaded"))
@@ -16126,7 +16127,7 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
        ApplySpecialFixedBlur(A_ThisFunc, noiseBMP, thisBlurAmount, pEffect)
        Gdip_DisposeEffect(pEffect)
     } Else If (blurAreaEqualXY=0 && max(thisBlurAmount, thisBlurAmountY)>1 && UserAddNoiseMode>1)
-       QPV_BoxBlurBitmap(noiseBMP, thisBlurAmount, thisBlurAmountY, 0)
+       QPV_BoxBlurBitmap(noiseBMP, thisBlurAmount, thisBlurAmountY, 1)
 
     If ((IDedgesEmphasis!=0 || IDedgesContrast!=0) && UserAddNoiseMode>1)
     {
@@ -30503,6 +30504,7 @@ PanelQuickSearchMenuOptions() {
 
     If (slideShowRunning=1)
        ToggleSlideShowu()
+
     DestroyGIFuWin()
     mouseTurnOFFtooltip()
     thisState := "a" uiUseDarkMode PrefsLargeFonts
@@ -30540,7 +30542,7 @@ PanelQuickSearchMenuOptions() {
     thisBtnHeight := (PrefsLargeFonts=1) ? 34 : 24
     btnWid := 105
     txtWid := 360
-    lstWid := 550
+    lstWid := 650
     If (PrefsLargeFonts=1)
     {
        lstWid := lstWid + 240
@@ -63594,6 +63596,8 @@ saveMainWinPos() {
    WinGetPos, winX, winY, winWidth, winHeight, ahk_id %PVhwnd%
    mainWinPos := winX "|" winY
    RegAction(1, "mainWinPos")
+   mainWinSize := winWidth "|" winHeight
+   RegAction(1, "mainWinSize")
 }
 
 writeMainWindowPos() {
@@ -63606,8 +63610,8 @@ writeMainWindowPos() {
 
    thisWinHwnd := (thumbsDisplaying=1) ? hGDIthumbsWin : hGDIwin
    WinGetPos, winX, winY, winWidth, winHeight, ahk_id %PVhwnd%
-   WinGetPos,,, winWidth, winHeight, ahk_id %thisWinHwnd%
-   WinGetPos,,, win2Width, win2Height, ahk_id %PVhwnd%
+   ; WinGetPos,,, winWidth, winHeight, ahk_id %thisWinHwnd%
+   ; WinGetPos,,, win2Width, win2Height, ahk_id %PVhwnd%
    If (winX && winY && winWidth && winHeight)
    {
       mainWinPos := winX "|" winY
@@ -63615,7 +63619,7 @@ writeMainWindowPos() {
       WinGet, Stylu, Style, ahk_id %PVhwnd%
       mainWinMaximized := (Stylu & 0x1000000) ? 2 : 1
       ; ToolTip, % mainWinPos "==" mainWinSize "==" mainWinMaximized , , , 2
-      thisInfos := win2Width "z" win2Height "z" mainWinSize "z" mainWinPos "z" mainWinMaximized
+      thisInfos := winWidth "z" winHeight "z" mainWinSize "z" mainWinPos "z" mainWinMaximized
       If (prevInfos!=thisInfos)
       {
          prevInfos := thisInfos
@@ -75209,13 +75213,12 @@ WM_LBUTTONdown(wP, lP, msg, hwnd) {
     }
 }
 
-adjustWheelNumbersEditFields(wParam, lParam) {
+adjustWheelNumbersEditFields(wParam, lParam, msg) {
    ; author: tidbit
    ; Created: Thu October 10, 2013
    If !AnyWindowOpen
       Return
 
-   Static amt := 1 ; How much to increase the value
    GuiControlGet, controlType, Focus
    GuiControlGet, OutputVname, SettingsGUIA: FocusV
    GuiControlGet, OutputEnable, SettingsGUIA: Enabled, % OutputVname
@@ -75224,13 +75227,17 @@ adjustWheelNumbersEditFields(wParam, lParam) {
       return
       
    GuiControlGet, value,, %A_GuiControl%
-   if value is not number
-      return
+   If value is not number
+      Return
+
+   If !A_GuiControl
+      Return
 
    result := (wParam >> 16)     ; return the HIWORD -  high-order word 
    stepping := Round(Abs(result) / 120)
-   direction := (result<0) ? -1 : 1
+   direction := (result>0 && result<51234) ? 1 : -1
    mult := ((wParam & 0xffff=4) ? 5 : (wParam & 0xffff=8) ? 10 : 1)
+   amt := (msg=526) ? 5 : 1 ; How much to increase the value
    value += direction*amt*mult
    GuiControl,, %A_GuiControl%, % RegExReplace(value, "(\.[1-9]+)0+$", "$1")
 }
@@ -78580,7 +78587,7 @@ ListGlobalVars() {
     return final
 }
 
-/*
+
 testCimgQPV() {
   Static modus := 0
   modus++
@@ -78590,11 +78597,10 @@ testCimgQPV() {
   func2exec := (A_PtrSize=8) ? "testCimgQPV" : "_BoxBlurBitmap@20"
   pBitmap := useGdiBitmap()
   Gdip_GetImageDimensions(pBitmap, w, h)
-  r := DllCall(whichMainDLL "\" func2exec, "UPtr", pBitmap, "Int", w, "Int", h, "Int", modus, "Int", 0, "Int", 9, "UPtr")
+  r := DllCall(whichMainDLL "\" func2exec, "UPtr", pBitmap, "Int", w, "Int", h, "Int", modus, "Int",0, "Int", 8, "UPtr")
   Gdip_GraphicsClear(2NDglPG)
   If StrLen(r)>2
      Gdip_DrawImage(2NDglPG, r, 10, 10)
   r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
   Gdip_DisposeImage(r)
 }
-*/

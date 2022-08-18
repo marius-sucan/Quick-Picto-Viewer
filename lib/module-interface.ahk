@@ -65,6 +65,7 @@ OnMessage(0x205, "WM_RBUTTONUP")
 OnMessage(0x207, "WM_MBUTTONDOWN")
 OnMessage(0x047, "WM_WINDOWPOSCHANGED") ; window moving
 OnMessage(0x20A, "WM_MOUSEWHEEL")
+OnMessage(0x20E, "WM_MOUSEWHEEL")
 ; OnMessage(0x24B, "WM_POINTERACTIVATE") 
 ; OnMessage(0x216, "WM_MOVING") ; window moving
 
@@ -217,8 +218,9 @@ BuildGUI(params:=0) {
       Gui, 1: Show, Maximize
    } Else
    {
-      Gui, 1: Show, x%pX% y%pY% w%sW% h%sH%
-      Sleep, 25
+      Gui, 1: Show ; , x%pX% y%pY% w%sW% h%sH%
+      WinMoveZ(PVhwnd, 0, pX, pY, sW, sH)
+      Sleep, 2
    }
 
    r := PVhwnd "|" hGDIinfosWin "|" hGDIwin "|" hGDIthumbsWin "|" hGDIselectWin "|" hPicOnGui1 "|" winGDIcreated "|" ThumbsWinGDIcreated
@@ -758,7 +760,7 @@ addJournalEntry(msg) {
       MainExe.ahkPostFunction(A_ThisFunc, msg)
 }
 
-WM_MOUSEWHEEL(wParam, lP, msg, hwnd) {
+WM_MOUSEWHEEL(wParam, lParam, msg, hwnd) {
    isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1 && animGIFplaying!=1) ? 0 : 1
    If !isOkay
       Return 0
@@ -778,10 +780,14 @@ WM_MOUSEWHEEL(wParam, lP, msg, hwnd) {
    prefix .= GetKeyState("Alt", "P") ? "!" : ""
    ; HI := (Value >> 16) & 0xFFFF
    ; LO := Value & 0xFFFF
-   result := (wParam >> 16)      ; return the HIWORD -  high-order word 
+   mouseData := (wParam >> 16)      ; return the HIWORD -  high-order word 
    ; TulTip(1, " == ", result, resultA, resultB, resultC, resultD, resultE)
-   stepping := Round(Abs(result) / 120)
-   direction := (result<0) ? "WheelUp" : "WheelDown"
+   stepping := Round(Abs(mouseData) / 120)
+   ; ToolTip, % msg , , , 2
+   If (msg=526) ; horizontal mouse wheel
+      direction := (mouseData>0 && mouseData<51234) ? "Right" : "Left"
+   Else
+      direction := (mouseData>0 && mouseData<51234) ? "WheelUp" : "WheelDown"
    MainExe.ahkPostFunction("KeyboardResponder", prefix direction, PVhwnd, 0)
    Return 0
 }
@@ -2741,7 +2747,7 @@ showOSDinfoLineNow(delayu, givenCoords:=0) {
     If (!isWinXP && forced!=1)
     {
        GetWinClientSize(Wid, Heig, hGuiTip, 1)
-       k := WinMoveZ(hGuiTip, 15, mX, mY, Wid, Heig, 2)
+       k := WinMoveZ(hGuiTip, 0, mX, mY, Wid, Heig, 2)
        Final_x := k[1], Final_y := k[2]
     } Else
     {
