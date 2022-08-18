@@ -201,7 +201,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , selDotMaX, selDotMaY, selDotMbX, selDotMbY, selDotMcX, selDotMcY, selDotMdX, selDotMdY, onConflictOverwrite := 0
    , lastInfoBoxZeitToggle := 1, prevHistoBoxString := "", menuHotkeys, whichMainDLL, lastMenuZeit := 1
    , userExtractFramesFmt := 3, maxMultiPagesAllowed := 2048, maxMemLimitMultiPage := 2198765648
-   , cmdExifTool := ""
+   , cmdExifTool := "", tabzDarkModus := 0
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
    , appVersion := "5.7.7", vReleaseDate := "18/08/2022"
 
@@ -17806,6 +17806,7 @@ mouseTurnOFFtooltip() {
 
 createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
     Critical, on
+    tabzDarkModus := (uiUseDarkMode=1) ? "-Border +Buttons cFFFFaa" : ""
     lastZeitOpenWin := A_TickCount
     lastFilterEditSearch := ""
     If (thumbsDisplaying=1 && isImgLiveEditor=1)
@@ -17933,7 +17934,7 @@ PanelSeenStats() {
     }
 
     changeMcursor()
-    Gui, Add, Tab3, gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Daily|Monthly|Hourly|Options
+    Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Daily|Monthly|Hourly|Options
     Gui, Tab, 1 ; Daily
     Gui, Add, ListView, x+15 y+15 w%lstWid% +LV0x10000 r%uLVr% Grid vLViewMetaD AltSubmit -multi gSeenStatsLVaction, #|Date|Images|`%
     Gui, Tab, 2 ; Monthly
@@ -17979,7 +17980,7 @@ PanelIndexedImagesStats() {
     }
 
     changeMcursor()
-    Gui, Add, Tab3, gBtnTabsInfoUpdate AltSubmit vCurrentPanelTab Choose%thisPanelTab% hwndhCurrTab, Megapixels|Aspect ratios|DPI|Frames|Pixel formats|Histogram
+    Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate AltSubmit vCurrentPanelTab Choose%thisPanelTab% hwndhCurrTab, Megapixels|Aspect ratios|DPI|Frames|Pixel formats|Histogram
     Gui, Tab, 1
     Gui, Add, ListView, x+15 y+15 w%lstWid% +LV0x10000 r%uLVr% Grid vLViewMetaD -multi AltSubmit gIndexStatsLVaction, #|MPx|Images|`%
     Gui, Tab, 2
@@ -18073,7 +18074,7 @@ PanelIndexedFilesStats() {
     }
 
     changeMcursor()
-    Gui, Add, Tab3, gBtnTabsInfoUpdate AltSubmit vCurrentPanelTab Choose%thisPanelTab% hwndhCurrTab, Days|Months|Years|Sizes|Types
+    Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate AltSubmit vCurrentPanelTab Choose%thisPanelTab% hwndhCurrTab, Days|Months|Years|Sizes|Types
     Gui, Tab, 1 ; Daily
     Gui, Add, ListView, x+15 y+15 w%lstWid% +LV0x10000 r%uLVr% Grid vLViewMetaD -multi AltSubmit gIndexStatsLVaction, #|Date|Images|`%
     Gui, Tab, 2 ; Monthly
@@ -20403,7 +20404,7 @@ PanelImageInfos() {
     }
 
     thisPanelTab := (CurrentPanelTab=1 && thumbsDisplaying=1) ? 2 : clampInRange(CurrentPanelTab, 1, 3)
-    Gui, Add, Tab3, AltSubmit gBtnTabsInfoUpdate hwndhCurrTab vCurrentPanelTab Choose%thisPanelTab%, General|System|Metadata
+    Gui, Add, Tab3, %tabzDarkModus% AltSubmit gBtnTabsInfoUpdate hwndhCurrTab vCurrentPanelTab Choose%thisPanelTab%, General|System|Metadata
     Gui, Tab, 1 
     Gui, Add, ListView, x+15 y+15 w%lstWid% +LV0x10000 r%uLVr% Grid -multi vLViewMetaD, Property|Data
     Gui, Tab, 2
@@ -22558,7 +22559,7 @@ PanelEnableFilesFilter() {
        listu := UsrEditFilter "`n`n" listu
 
     Gui, +Delimiter`n
-    Gui, Add, Tab3,, Text`nFile and image
+    Gui, Add, Tab3, %tabzDarkModus%, Text`nFile and image
     Gui, Tab, 1
     Gui, Add, Checkbox, x+15 y+15 Section w%txtWid% gupdateUIFiltersPanel Checked%userFilterDoString% vuserFilterDoString, Filter files list with given string
     Gui, Add, ComboBox, y+7 w%EditWid% gUIgenericComboAction vUsrEditFilter, % listu
@@ -32702,7 +32703,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
     }
 
     sml := (PrefsLargeFonts=1) ? 30 : 20
-    Gui, Add, Tab3, AltSubmit Choose%thisPanelTab% vCurrentPanelTab gBtnTabsInfoUpdate hwndhCurrTab, General|Effects options|Randomize
+    Gui, Add, Tab3, %tabzDarkModus% AltSubmit Choose%thisPanelTab% vCurrentPanelTab gBtnTabsInfoUpdate hwndhCurrTab, General|Effects options|Randomize
     Gui, Tab, 1 ; general
     Gui, Add, DropDownList, x+15 y+15 w%slideWid% Section AltSubmit gupdateUIbrushTool Choose%BrushToolType% vBrushToolType, Simple solid color|Soft edges brush|Cloner|Eraser|Effects|Smudge|Pinch|Bulge
     ; Gui, Add, Checkbox, x+5 hp gupdateUIbrushTool Checked%BrushToolUseSecondaryColor% vBrushToolUseSecondaryColor , &Use secondary color
@@ -35200,7 +35201,7 @@ MainPanelTransformArea(dummy:="", toolu:="") {
          , infoAlphaMaskSigma, infoAlphaMaskBlend, infoAlphaMaskGradientAngle, infoAlphaMaskGradientScale
          , infoAlphaClrAint, infoAlphaClrBint, infoAlphaFile, infoAngleu, uiPasteInPlaceAlphaDrawMode
 
-    Gui, Add, Tab3, gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Main|Adjust colors|Alpha mask|Paint alpha mask
+    Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Main|Adjust colors|Alpha mask|Paint alpha mask
     Gui, Tab, 1 ; general
     fr :=  (toolu="transform") ? "Transformed" : "Clipboard"
     Gui, Add, Text, x+15 y+15 Section w%txtWid%, Canvas: %oImgW% x %oImgH% px.`n%fr% object: %imgW% x %imgH% px.
@@ -37286,7 +37287,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
          , uiPasteInPlaceAlphaDrawMode
 
     infoBlend := (coreDesiredPixFmt="0x21808") ? "Disabled in 24-RGB mode" : "None"
-    Gui, Add, Tab3, gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Main|Fill|Border|Adjust colors|Alpha mask|Paint mask
+    Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Main|Fill|Border|Adjust colors|Alpha mask|Paint mask
     Gui, Tab, 1
     Gui, Add, DropDownList, x+10 y+10 Section w%slideWid% AltSubmit Choose%FillAreaShape% vFillAreaShape gupdateUIfillPanel, Rectangle|Rounded rectangle|Ellipse|Triangle|Right triangle|Rhombus|Custom shape
     Gui, Add, DropDownList, x+5 w%slideWid% AltSubmit Choose%FillAreaCurveTension% vFillAreaCurveTension gupdateUIfillPanel, Polygonal|Smooth corners|Curve|Round curve|Bézier
@@ -37407,7 +37408,7 @@ PanelSoloAlphaMasker() {
          , infoFillAreaSigma, infoFillAreaBlend, PickuFillAreaColor, PickuFillArea2ndColor, txtLine4
          , uiPasteInPlaceAlphaDrawMode
 
-    Gui, Add, Tab3, gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Alpha mask|Painting mode
+    Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Alpha mask|Painting mode
     Gui, Tab, 1
     ; Gui, Add, Text, x+10 y+10 Section w%slideWid%, Hello vorld
 
@@ -38468,7 +38469,7 @@ PanelZoomBlurSelectedArea() {
        BlurAreaAlphaMask := 0
 
     Gui, +DPIScale
-    Gui, Add, Tab3, x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
+    Gui, Add, Tab3, %tabzDarkModus% x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
     Gui, Tab, 1
     Gui, Add, Text, x+10 y+10 w%thisW% Section , Blur mode: 
     Gui, Add, DropDownList, x+5 wp gupdateUIzoomBlurPanel AltSubmit Choose%zoomBlurMode% vzoomBlurMode, Zoom H/V|Horizontal|Vertical ; |Alt-Horizontal|Alt-Vertical
@@ -38580,7 +38581,7 @@ PanelBlurSelectedArea() {
 
     Global infoBlurYamount
     Gui, +DPIScale
-    Gui, Add, Tab3, x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
+    Gui, Add, Tab3, %tabzDarkModus% x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
     Gui, Tab, 1
     Gui, Add, Checkbox, x+10 y+10 w%thisW% Section Checked%blurAreaSoftEdges% vblurAreaSoftEdges gupdateUIblurPanel, &Soft edges%friendly%
     Gui, Add, DropDownList, x+5 w60 AltSubmit Choose%blurAreaSoftLevel% gupdateUIblurPanel vblurAreaSoftLevel, 0.3x|0.6x|1x|2x|3x|4x|5x
@@ -39162,7 +39163,7 @@ PanelPrintImage() {
     Gui, Add, Text, xp y+10 wp Center vPrinterPageInfos, -`n-`n-`n-
     Gui, +DPIScale
 
-    Gui, Add, Tab3, x+20 ys Section, General|Text line
+    Gui, Add, Tab3, %tabzDarkModus% x+20 ys Section, General|Text line
 
     Gui, Tab, 1
     Gui, Add, Text, x+15 y+15 Section, Please choose printer:
@@ -41284,7 +41285,7 @@ PanelJournalWindow(tabu:=1) {
     If (tabu=2)
        thisPanelTab := 3
 
-    Gui, Add, Tab3, AltSubmit gBtnTabsInfoUpdate hwndhCurrTab vCurrentPanelTab Choose%thisPanelTab%, Journal|Errors|Seen images
+    Gui, Add, Tab3, %tabzDarkModus% AltSubmit gBtnTabsInfoUpdate hwndhCurrTab vCurrentPanelTab Choose%thisPanelTab%, Journal|Errors|Seen images
     Gui, Tab, 1
     Gui, Add, Button, x+15 y+15 w1 h1 gBtnCloseWindow Default, Clo&se
     Gui, Add, Edit, x+0 y+0 Section ReadOnly w%txtWid% r15, % "WinTitle: " thisTitle "`n`n" textList
@@ -41479,7 +41480,7 @@ PanelInsertTextArea() {
 
     widu := (PrefsLargeFonts=1) ? 55 : 40
     ml := (PrefsLargeFonts=1) ? 35 : 24
-    Gui, Add, Tab3, gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Text|Styling|Colors|Alpha mask|Paint mask
+    Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Text|Styling|Colors|Alpha mask|Paint mask
     Gui, Tab, 1
     Gui, Add, Edit, x+15 y+15 Section w%txtWid% r10 gupdateUIInsertTextPanel vUserTextArea hwndhEditField, % UserTextArea
     Gui, Add, Button, gBtnFntDlgInsertText, Font options
@@ -52148,6 +52149,7 @@ ToggleDarkModus() {
     If (VisibleQuickMenuSearchWin=1)
        closeQuickSearch()
 
+    tabzDarkModus := (uiUseDarkMode=1) ? "-Border +Buttons cFFFFaa" : ""
     If (AnyWindowOpen && thisfunc)
     {
        BtnCloseWindow()
@@ -66134,7 +66136,7 @@ HelpWindow(dummy:=0) {
     tabu := (dummy="cmdu") ? 3 : 2
     rz := (PrefsLargeFonts=1) ? 15 + additionalLVrows : 17 + additionalLVrows
     rx := rz - 4
-    Gui, Add, Tab3, x15 y15 Choose%tabu%, General|Keyboard shortcuts|Command line|Change log|Features
+    Gui, Add, Tab3, %tabzDarkModus% x15 y15 Choose%tabu%, General|Keyboard shortcuts|Command line|Change log|Features
     Gui, Tab, 1 ; general
 
     FileRead, cmdHelp, % mainCompiledPath "\resources\general-help.txt"
@@ -66382,7 +66384,7 @@ PanelFindDupes(dummy:=0) {
        CurrentPanelTab := dummy
 
     col := (PrefsLargeFonts=1) ? 285 : 190
-    Gui, Add, Tab3, gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Image hashes|Collect data|Filtering
+    Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Image hashes|Collect data|Filtering
     Gui, Tab, 1 ; general
     Gui, Add, DropDownList, x+15 y+15 Section w%txtWid% gupdateUIdupesPanel AltSubmit Choose%userFindDupePresets% vuserFindDupePresets, Image content fingerprint (dHash 8x8)|Image histogram data|Image resolution and file size|Image histogram, resolution and file size|Identical file names|Identical file names and file sizes|Custom mode
     Gui, Add, Checkbox, xs y+7 w%col% -wrap gUIfindDupesChecksu Checked%UIcheckimgfile% vUIcheckimgfile, File name and its extension
@@ -67488,7 +67490,7 @@ coreColorsAdjusterWindow(modus:=0) {
     UIrealGammos := (realGammos<=1.001) ? realGammos*200 : ((realGammos+5)*100)/3
     UIvpImgAlignCenter := (imageAligned=5) ? 1 : 0
     moru := (idu=10) ? "|Other options" : ""
-    Gui, Add, Tab3, gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Color matrix|More adjustments%moru%
+    Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Color matrix|More adjustments%moru%
     Gui, Tab, 1 ; general
     Gui, Add, DropDownList, x+15 y+15 Section w%txtWid% gUpdateUIadjustVPcolors AltSubmit Choose%imgFxMode% vimgFxMode, Original image colors|Personalized colors|Auto-adjusted colors|Grayscale|Red channel|Green channel|Blue channel|Alpha channel|Inverted colors|Sepia
     Gui, Add, DropDownList, xs y+5 w%txtWid% gUpdateUIadjustVPcolors AltSubmit Choose%autoAdjustMode% vAutoAdjustMode, Adaptive mixed mode|Increase brightness|Increase contrast
@@ -68534,7 +68536,7 @@ PanelResizeImageWindow() {
     If (resetImageViewOnChange=1)
        ResizeApplyEffects := 0
 
-    Gui, Add, Tab3, , General|File(s) destination
+    Gui, Add, Tab3, %tabzDarkModus% , General|File(s) destination
     Gui, Tab, 1
     If (multipleFilesMode=1)
     {
@@ -72515,6 +72517,7 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
 
     BalloonTip_Kill()
     endCaptureCloneBrush()
+    tabzDarkModus := (uiUseDarkMode=1) ? "-Border +Buttons cFFFFaa" : ""
     fnOutputDebug("Close window: " prevOpenedWindow[1] "---" prevOpenedWindow[2])
     If (isNowFakeWinOpen=1 && AnyWindowOpen)
     {

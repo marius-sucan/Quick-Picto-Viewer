@@ -1018,7 +1018,7 @@ repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:=
            ; MsgBox, % CtrlClass
            If InStr(CtrlClass, "systab")
            {
-              GuiControl, %whichGUI%:-Border +Buttons cFFFFaa, %strControl%
+              ; GuiControl, %whichGUI%:-Border +Buttons cFFFFaa, %strControl%
               doAttachCtlColor := -2
            } Else If InStr(CtrlClass, "Button")
            {
