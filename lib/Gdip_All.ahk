@@ -2680,9 +2680,11 @@ Gdip_GetImageRawFormat(pBitmap) {
   Static RawFormatsList := {"{B96B3CA9-0728-11D3-9D7B-0000F81EF32E}":"Undefined", "{B96B3CAA-0728-11D3-9D7B-0000F81EF32E}":"MemoryBMP", "{B96B3CAB-0728-11D3-9D7B-0000F81EF32E}":"BMP", "{B96B3CAC-0728-11D3-9D7B-0000F81EF32E}":"EMF", "{B96B3CAD-0728-11D3-9D7B-0000F81EF32E}":"WMF", "{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}":"JPEG", "{B96B3CAF-0728-11D3-9D7B-0000F81EF32E}":"PNG", "{B96B3CB0-0728-11D3-9D7B-0000F81EF32E}":"GIF", "{B96B3CB1-0728-11D3-9D7B-0000F81EF32E}":"TIFF", "{B96B3CB2-0728-11D3-9D7B-0000F81EF32E}":"EXIF", "{B96B3CB5-0728-11D3-9D7B-0000F81EF32E}":"Icon"}
   ; DEFINE_GUID(ImageFormatHEIF, 0xb96b3cb6,0x0728,0x11d3,0x9d,0x7b,0x00,0x00,0xf8,0x1e,0xf3,0x2e);
   ; DEFINE_GUID(ImageFormatWEBP, 0xb96b3cb7,0x0728,0x11d3,0x9d,0x7b,0x00,0x00,0xf8,0x1e,0xf3,0x2e);
+  If (pBitmap="")
+     Return
 
   VarSetCapacity(pGuid, 16, 0)
-  E1 := DllCall("gdiplus\GdipGetImageRawFormat", "UPtr", pBitmap, "UPtr", &pGuid)
+  gdipLastError := DllCall("gdiplus\GdipGetImageRawFormat", "UPtr", pBitmap, "UPtr", &pGuid)
 
   size := VarSetCapacity(sguid, (38 << !!A_IsUnicode) + 1, 0)
   E2 := DllCall("ole32.dll\StringFromGUID2", "uptr", &pguid, "uptr", &sguid, "int", size)
@@ -3232,6 +3234,22 @@ Gdip_CloneBitmap(pBitmap) {
    pBitmapDest := 0
    gdipLastError := DllCall("gdiplus\GdipCloneImage", "UPtr", pBitmap, "UPtr*", pBitmapDest)
    return pBitmapDest
+}
+
+Gdip_GetFrameDelay(pBitmap, FrameIndex) {
+     ItemSize := 0
+     R := DllCall("Gdiplus\GdipGetPropertyItemSize", "UPtr", pBitmap, "UInt", 0x5100, "UInt*", ItemSize)
+     If (R || !ItemSize)
+        Return -1
+
+     VarSetCapacity(Item, ItemSize, 0)
+     R := DllCall("Gdiplus\GdipGetPropertyItem", "UPtr", pBitmap, "UInt", 0x5100, "UInt", ItemSize, "UPtr", &Item)
+     If R
+        Return -1
+     Else
+        FrameDelay := ((g := NumGet(NumGet(item, 8 + A_PtrSize, "UPtr")+0, (FrameIndex - 1)*4, "UInt") * 10 ) ? g : 100)
+     item := ""
+     Return FrameDelay
 }
 
 Gdip_BitmapSelectActiveFrame(pBitmap, FrameIndex) {

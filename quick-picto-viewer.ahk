@@ -42,8 +42,8 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.7.7
-;@Ahk2Exe-SetCopyright Marius Şucan (2019-2021)
+;@Ahk2Exe-SetVersion 5.7.8
+;@Ahk2Exe-SetCopyright Marius Şucan (2019-2022)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
 ;
@@ -104,7 +104,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , gdiBitmap := "", mainSettingsFile := "quick-picto-viewer.ini", mainRecentsFile := "quick-picto-viewer-recents.ini"
    , mustOpenStartFolder := "", mainFavesFile := "quick-picto-viewer-favourites.ini", miniFavesFile := "quick-picto-viewer-minifaves.ini"
    , RegExAllFilesPattern := "ico|dib|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif|webp"
-   , RegExFilesPattern := "i)^(.\:\\).*(\.(" RegExAllFilesPattern "))$"
+   , RegExFilesPattern := "i)^(.\:\\).*(\.(" RegExAllFilesPattern "))$", folderFavesFile := "quick-picto-viewer-folder-faves.ini"
    , RegExFIMformPtrn := "i)(.\\*\.(DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
    , RegExWICfmtPtrn := "i)(.\\*\.(place-holder|webp|bmp|dib|jpg|jpeg|tif|tiff|png))$"
    , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|jng|jif|jfif|jpg|jpe|jpeg|ppm|xpm))$"
@@ -201,9 +201,9 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , selDotMaX, selDotMaY, selDotMbX, selDotMbY, selDotMcX, selDotMcY, selDotMdX, selDotMdY, onConflictOverwrite := 0
    , lastInfoBoxZeitToggle := 1, prevHistoBoxString := "", menuHotkeys, whichMainDLL, lastMenuZeit := 1
    , userExtractFramesFmt := 3, maxMultiPagesAllowed := 2048, maxMemLimitMultiPage := 2198765648
-   , cmdExifTool := "", tabzDarkModus := 0
+   , cmdExifTool := "", tabzDarkModus := 0, maxRecentOpenedFolders := 15
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.7.7", vReleaseDate := "18/08/2022"
+   , appVersion := "5.7.8", vReleaseDate := "2022/10/01" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1, usrAutoCropGenerateSelection := 0
@@ -320,7 +320,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , userCombineGIFframeDelay := 100, userCombineFramesFmt := 2, UserCombinePDFpageSize := 1
    , combinePDFpageLandscape := 0, combinePDFpageHighQuality := 0, usePrevSaveFolder := 0
    , userCombineSubFrames := 0, blurAreaYamount := 10, blurAreaEqualXY := 1, UserAddNoiseMode := 1
-   , UserAddNoiseDetails := 10
+   , UserAddNoiseDetails := 10, slidesRandoMode := 1
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -772,11 +772,19 @@ KeyboardResponder(givenKey, thisWin, abusive) {
        } Else If (givenKey="w")
        {
            ; w ; to-do
-           ; testCimgQPV()
+            ; testMoonPhase()
+            ; testSunRise()
+            ; testDayLight()
+            ; GeoDataAddDstToData()
+            ; finalizeGeoDataFromText()
+            ; extractDataFromText()
            If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1 && thumbsDisplaying!=1)
               flipSelectionWH()
            Else If (thumbsDisplaying=1 && maxFilesIndex>10 && CurrentSLD && !z)
               invokeFilesListMapNow()
+        
+           ; testEuclidPolarGDIP()
+           ; testEuclidPolarCIMG()
        } Else If (givenKey="+^n")
        {
            If HKifs("general")
@@ -1575,7 +1583,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              PanelStaticFolderzManager()
        } Else If (givenKey="!u")
        {
-          If HKifs("imgsLoaded")
+          ; If HKifs("imgsLoaded")
              PanelDynamicFolderzWindow()
        } Else If (givenKey="^k")
        {
@@ -2443,9 +2451,53 @@ GenerateRandyList() {
 coreGenerateRandomList() {
    interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
    RandyIMGids := []
-   Loop, % maxFilesIndex
-       RandyIMGids[A_Index] := A_Index
-   RandyIMGids := Random_ShuffleArray(RandyIMGids)
+   If (slidesRandoMode=1 || maxFilesIndex<100 || !slidesRandoMode)
+   {
+      Loop, % maxFilesIndex
+          RandyIMGids[A_Index] := A_Index
+      RandyIMGids := Random_ShuffleArray(RandyIMGids)
+   } Else If (slidesRandoMode>1)
+   {
+      ; SoundBeep 
+      x := []
+      Loop, % maxFilesIndex//4
+          x[A_Index] := A_Index
+      a := Random_ShuffleArray(x.Clone())
+      ; b := Random_ShuffleArray(x.Clone())
+      ; c := Random_ShuffleArray(x.Clone())
+      Loop, % maxFilesIndex - (maxFilesIndex//4) * 3
+          x[A_Index] := A_Index
+      d := Random_ShuffleArray(x)
+
+      f := []
+      Loop, % (maxFilesIndex//4) * 2
+          f[A_Index] := A_Index
+
+      ; Loop, % maxFilesIndex//4
+      ;     f[A_Index + maxFilesIndex//4] := c[A_Index] + maxFilesIndex//4
+
+      f := Random_ShuffleArray(f)
+      Loop, % maxFilesIndex//4
+          RandyIMGids[A_Index] := (slidesRandoMode=2) ? a[A_Index] : d[A_Index] + (maxFilesIndex//4)*3
+      Loop, % (maxFilesIndex//4) * 2
+          RandyIMGids[A_Index + maxFilesIndex//4] := f[A_Index] + maxFilesIndex//4
+      Loop, % maxFilesIndex - (maxFilesIndex//4) * 3
+          RandyIMGids[A_Index + (maxFilesIndex//4)*3] := (slidesRandoMode=2) ? d[A_Index] + (maxFilesIndex//4)*3 : a[A_Index]
+      
+      Loop, % maxFilesIndex//2
+      {
+         Random, f, 1, 20
+         If (f=2)
+         {
+            t := RandyIMGids[A_Index]
+            RandyIMGids[A_Index] := RandyIMGids[maxFilesIndex - A_Index]
+            RandyIMGids[maxFilesIndex - A_Index] := t
+         }
+      }
+      ; k := printArrayStr(RandyIMGids)
+      ; addJournalEntry(k)
+      ; ToolTip, %  RandyIMGids.Count()  , , , 2
+   }
    RandyIMGnow := 1
    ; MsgBox, % SecToHHMMSS((A_TickCount - startZeit)/1000)
 }
@@ -2926,6 +2978,7 @@ CalculateSelectedFilesSizes() {
   Try FormatTime, maxMdate, % maxMdate, dd/MM/yyyy, HH:mm
   If (abandonAll=1)
      someErrors := "Operation aborted by user`n"
+
   showTOOLtip(someErrors "Details for " groupDigits(countFiles) " selected files:`nTotal size: " totalSize "`nFile sizes range: " minSizeu " - " maxSizeu "`nDate modified: " minMdate " - " maxMdate "`nDate created: " minCdate " - " maxCdate)
   SetTimer, ResetImgLoadStatus, -200
   SetTimer, RemoveTooltip, % -msgDisplayTime * 2
@@ -8438,7 +8491,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       lastInvoked := A_TickCount
       If (slideShowRunning=1)
          InfoToggleSlideShowu()
-      Else
+      Else If (thisCtrlClicked="PicOnGUI2b" && TouchScreenMode=1 || TouchScreenMode!=1)
          ToggleViewModeTouch()
    } Else If ((displayingImageNow=1 || mustOpenStartFolder) && winEventu!="DoubleClick") && (A_TickCount - thisZeit>950)
    ; } Else If ((maxFilesIndex>1 || mustOpenStartFolder) && CurrentSLD && winEventu!="DoubleClick") && (A_TickCount - thisZeit>950)
@@ -8852,10 +8905,47 @@ SecToHHMMSS(Seco) {
   Return r
 }
 
+MenuSlideshowModeNext() {
+   SlideHowMode := 2
+   ToggleSlideshowModes()
+}
+
+MenuSlideshowModePrev() {
+   SlideHowMode := 1
+   ToggleSlideshowModes()
+}
+
+MenuSlideshowModeRando() {
+   slidesRandoMode := 1
+   SlideHowMode := 0
+   GenerateRandyList()
+   ToggleSlideshowModes()
+}
+
+MenuSlideshowModeRandyFirst() {
+   SlideHowMode := 0
+   slidesRandoMode := 2
+   GenerateRandyList()
+   ToggleSlideshowModes()
+}
+
+MenuSlideshowModeRandySecond() {
+   SlideHowMode := 0
+   slidesRandoMode := 3
+   GenerateRandyList()
+   ToggleSlideshowModes()
+}
+
 DefineSlideShowType() {
    friendly := (SlideHowMode=1) ? "RANDOM" : "BACKWARD"
    If (SlideHowMode=3)
       friendly := "FORWARD"
+
+   If (SlideHowMode=1 && slidesRandoMode=2)
+      friendly .= " (1st half bias)"
+   Else If (SlideHowMode=1 && slidesRandoMode=3)
+      friendly .= " (2nd half bias)"
+
    Return friendly
 }
 
@@ -8875,6 +8965,7 @@ ToggleSlideshowModes() {
    showTOOLtip("Slideshow direction: " friendly, A_ThisFunc, 1, SlideHowMode/3)
    SetTimer, RemoveTooltip, % -msgDisplayTime
    INIaction(1, "SlideHowMode", "General")
+   RegAction(1, "slidesRandoMode")
 }
 
 DefineVPselAreaMode() {
@@ -15522,8 +15613,14 @@ BlurSelectedArea() {
     If (blurAreaEqualXY=1)
     {
        o_blurAreaYamount := blurAreaAmount
-       If (blurAreaMode=2)
+       If (blurAreaMode=2 && blurAreaTwice!=1)
           o_blurAreaYamount := o_blurAreaAmount := Round(blurAreaAmount*0.5)
+    }
+
+    If (blurAreaTwice=1 && blurAreaMode>1)
+    {
+       o_blurAreaYamount *= 2
+       o_blurAreaAmount *= 2
     }
 
     testu := (blurAreaMode=1 || blurAreaMode>1 && blurAreaEqualXY=1) ? o_blurAreaAmount : max(o_blurAreaAmount, o_blurAreaYamount)
@@ -15618,7 +15715,7 @@ BlurSelectedArea() {
 
     thisBlurMode := blurAreaMode
     pEffect := Gdip_CreateEffect(1, o_blurAreaAmount, 0, 0)
-    If (blurAreaTwice=1)
+    If (blurAreaTwice=1 && blurAreaMode=1)
     {
        setWindowTitle("EXTRA-BLURRING IMAGE, please wait", 1)
        xBitmap := trGdip_ResizeBitmap(A_ThisFunc, zBitmap, imgSelW//2, imgSelH//2, 1, 3, -1)
@@ -16883,6 +16980,7 @@ generateNumberRangeString(pA, pB) {
     Return stringRange
 }
 
+
 selectFilesRange(pA, pB, sel) {
     mB := max(pA, pB)
     mA := min(pA, pB)
@@ -16898,6 +16996,28 @@ selectFilesRange(pA, pB, sel) {
     }
     lastZeitFileSelect := A_TickCount
     Return rangeC
+}
+
+
+selectSeenFilesSession() {
+    wasSelect := (markedSelectFile>2) ? 1 : 0
+    Loop, % maxFilesIndex
+    {
+        imgPath := resultedFilesList[A_Index, 1]
+        If userSeenSessionImagesArray[Format("{:L}", imgPath)]
+           resultedFilesList[A_Index, 2] := 1
+    }
+
+    lastZeitFileSelect := A_TickCount
+    getSelectedFiles(0, 1)
+    dummyTimerReloadThisPicture(50)
+
+    If (markedSelectFile>2 && wasSelect=0)
+    {
+       msgResult := msgBoxWrapper(appTitle ": Confirmation", "You have selected " groupDigits(markedSelectFile) " files. Would you like to remove these index entries?", 4, 2, "question")
+       If (msgResult="Yes")
+          InListMultiEntriesRemover(0, "y")
+    }
 }
 
 jumpSelectRangeGiven(pA, pB) {
@@ -17224,6 +17344,165 @@ omniBoxFolderImport(dummy:=0, isGiven:=0) {
    WinActivate, ahk_id %hQuickMenuSearchWin%
 }
 
+MenuAddThisListAtFaves() {
+   If CurrentSLD
+      addFolderSldATfavorites(CurrentSLD)
+}
+
+removeDeadFavedFolders() {
+   favesFoldersList := readFoldersFavedList()
+   counter := favesFoldersList.Count()
+   newListu := ""
+   failed := 0
+   Loop, % counter
+   {
+      folderu := favesFoldersList[A_Index]
+      If (SubStr(folderu, 1, 5)="\qpv\")
+      {
+         newListu .= "`n" folderu "`n"
+         Continue
+      }
+
+      isFile := RegExMatch(folderu, sldsPattern) ? FileExist(folderu) : FolderExist(StrReplace(folderu, "|"))
+      If isFile
+         newListu .= "`n" folderu "`n"
+      Else
+         failed++
+   }
+
+   FileDelete, % folderFavesFile
+   If (ErrorLevel && counter>0)
+   {
+      showTOOLtip("ERROR: Failed to update the folder favorites list file. Access denied?")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   FileAppend, % newListu, % folderFavesFile, UTF-8
+   If ErrorLevel
+   {
+      showTOOLtip("ERROR: Failed to update the folder favorites list file. Access denied?")
+      SoundBeep 300, 100
+   } Else
+      showTOOLtip("Operation succesfully completed.`n" failed " inexistent folders or files were found.")
+
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+clearAllFavedFolders() {
+  Static lastInvoked := 1
+  lastInvoked := A_TickCount
+  msgResult := msgBoxWrapper(appTitle ": Favourites", "Are you sure you want to remove all the entries pointing to folders and/or files lists from favourites?", 4, 0, "question")
+  If !InStr(msgResult, "yes")
+     Return
+
+  If (A_TickCount - lastInvoked<950)
+  {
+     showTOOLtip("ERROR: User answered the message box too quickly.`nPlease read the message before confirming action.")
+     SoundBeep 300, 100
+     Return
+  }
+
+  FileDelete, % folderFavesFile
+  showTOOLtip("All the entries pointing to folders and/or files lists from favourites were removed.")
+  SetTimer, RemoveTooltip, % -msgDisplayTime//2
+  SetTimer, ResetImgLoadStatus, -150
+}
+
+readFoldersFavedList() {
+   FileRead, OutputVar, % " *t " folderFavesFile
+   thisIndex := 0
+   newArrayu := []
+   Loop, Parse, OutputVar, `n,`r
+   {
+      If StrLen(A_LoopField)<4
+         Continue
+      thisIndex++
+      newArrayu[thisIndex] := Trimmer(A_LoopField)
+   }
+   Return newArrayu
+}
+
+OpenDirsFavedEntry(a, b, c) {
+   openThisu := SubStr(a, 2, InStr(a, ". ")-2)
+   favesFoldersList := readFoldersFavedList()
+   folderu := favesFoldersList[openThisu]
+   isList := RegExMatch(folderu, sldsPattern) ? 1:0
+
+   If FolderExist(StrReplace(folderu, "|"))
+      OpenFolders(folderu)
+   Else If FileExist(folderu)
+      OpenSLD(folderu)
+   Else If (folderu="\QPV\favourite-images-list.SLD")
+      retrieveFavesAsList()
+   Else If (folderu="\QPV\viewed-images-history|current-session.SLD")
+      BtnViewedImages2List()
+   Else If InStr(folderu, "\QPV\viewed-images-history|")
+   {
+      g := StrReplace(folderu, ".sld")
+      p := InStr(folderu, "|")
+      filteru := "|filteru|" SubStr(g, p + 1)
+      If InStr(folderu, "|all.sld")
+         filteru := ""
+
+      BtnALLviewedImages2List(filteru)
+   } Else
+   {
+      showTOOLtip("Failed to open favourited list:`n" folderu)
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+   }
+}
+
+addFolderSldATfavorites(givenPath) {
+   If !givenPath
+      Return
+
+   thisu := RegExMatch(givenPath, sldsPattern) ? ".SLD file" : "Folder"
+   FileRead, OutputVar, % " *t " folderFavesFile
+   Sleep, 5
+   FileDelete, % folderFavesFile
+   If ErrorLevel
+   {
+      showTOOLtip("ERROR: Failed to access the folder favorites list file.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   Sleep, 5
+   If InStr(OutputVar, "`n" givenPath "`n")
+   {
+      ; remove entry
+      OutputVar := StrReplace(OutputVar, "`n" givenPath "`n", "`n")
+      OutputVar := StrReplace(OutputVar, "`n`n`n", "`n`n")
+      FileAppend, % OutputVar, % folderFavesFile, UTF-8
+      givenPath := PathCompact(givenPath, "a", 1, OSDfontSize)
+      If ErrorLevel
+      {
+         showTOOLtip("ERROR: Failed to update the folder favorites list file. " thisu " was not removed from the favorites list.")
+         SoundBeep 300, 100
+      } Else showTOOLtip(thisu " removed from the favorites list:`n" givenPath)
+   } Else
+   {
+      OutputVar := "`n" givenPath "`n" OutputVar
+      givenPath := PathCompact(givenPath, "a", 1, OSDfontSize)
+      FileAppend, % OutputVar, % folderFavesFile, UTF-8
+      If ErrorLevel
+      {
+         showTOOLtip("ERROR: Failed to update the folder favorites list file. " thisu " was not added to the favorites list.")
+         SoundBeep 300, 100
+      } Else showTOOLtip(thisu " added to the favorites list:`n" givenPath)
+   }
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+omniBoxFolderToFaves() {
+   folderPath := OmniBoxGetSelectedFolder()
+   addFolderSldATfavorites(folderPath)
+}
+
 omniBoxFolderExplorerOpen() {
    folderPath := OmniBoxGetSelectedFolder()
    Try Run, "%folderPath%"
@@ -17429,6 +17708,7 @@ createOmniBoxFoldersContextMenu(folderPath) {
       kMenu("PVfomni", "Check", "Se&t as the protected folder")
 
    kMenu("PVfomni", "Add", "Folder properties (E&xplorer)`tF12", "omniBoxFolderProperties")
+   kMenu("PVfomni", "Add", "Add to/remove from fa&vorites", "omniBoxFolderToFaves")
    Menu, PVfomni, Add
    kMenu("PVfomni", "Add", "Paste clip&board file(s) into...", "omniBoxFolderPasteClippy")
    kMenu("PVfomni", "Add", "Cop&y selected file(s) into...", "omniBoxFolderCopyFiles")
@@ -18616,6 +18896,7 @@ PlotSeenMonthsStatsNow() {
    Else
       plotBMP := BarChart(dataArray, namesLabel, Round(196*Scale), 385, "", "DiagonBlackGreen", "DisplayValues:2, BarHeight:" Scale*3.5 ",BarHeightFactor:1, BarSpacing:" Scale/2 ",BarRoundness:0,AutoCalculateHeight:1, BarColorDirection:2, BgrStyle:3, BarBorderColor:0,BarTextColor:ff999999, BarColorA:ff" OSDtextColor ", ChartBackColorA:00" OSDbgrColor)
 
+   Gdip_ImageRotateFlip(plotBMP, 6)
    Gdip_GetImageDimensions(plotBMP, imgW, imgH)
    Gdip_GetImageDimensions(infoBoxBMP, boxW, boxH)
 
@@ -18791,6 +19072,7 @@ PlotSeenDaysStatsNow(modus:=0) {
    Else
       plotBMP := BarChart(dataArray, namesLabel, Round(196*Scale), 385, "", "DiagonBlackGreen", "DisplayValues:2, BarHeight:" Scale*3.5 ",BarHeightFactor:1, BarSpacing:" Scale/2 ",BarRoundness:0,AutoCalculateHeight:1, BarColorDirection:2, BgrStyle:3, BarBorderColor:0,BarTextColor:ff999999, BarColorA:ff" OSDtextColor ", ChartBackColorA:00" OSDbgrColor)
 
+   Gdip_ImageRotateFlip(plotBMP, 6)
    Gdip_GetImageDimensions(plotBMP, imgW, imgH)
    Gdip_GetImageDimensions(infoBoxBMP, boxW, boxH)
    If (imgH>H - boxH - borderSizeY*2)
@@ -20533,6 +20815,10 @@ folderTreeCopyPath(dummy:=0) {
    } Else lastInvoked := A_TickCount
 }
 
+folderTreeAddFolderFaves() {
+   folderTreeDefaultAction("faves", "yo")
+}
+
 folderTreeSetFolderProtected() {
    folderTreeDefaultAction("protect", "yo")
 }
@@ -20551,7 +20837,9 @@ folderTreePropertiesFolder() {
 
 folderTreeDefaultAction(modus:=0, g:=0) {
    z := 0
-   If (modus="protect" && g="yo")
+   If (modus="faves" && g="yo")
+      z := 5
+   Else If (modus="protect" && g="yo")
       z := 4
    Else If (modus="properties" && g="yo")
       z := 3
@@ -20581,6 +20869,9 @@ folderTreeDefaultAction(modus:=0, g:=0) {
    } Else If (z=4 && folderPath)
    {
       setContaintFolderAsProtected(folderPath)
+   } Else If (z=5 && folderPath)
+   {
+      addFolderSldATfavorites(folderPath)
    } Else If folderPath
    {
       If askAboutFileSave(" and the selected folder will be opened")
@@ -21316,6 +21607,8 @@ folderTreeContextMenu() {
          kMenu("PVfdTree", "Add", "&Paste folder(s) into...", "folderTreePasteFoldersInto")
          kMenu("PVfdTree", "Add", "&Rename folder`tF2", "folderTreeRenameFolder")
          kMenu("PVfdTree", "Add", "&Delete folder`tDelete", "folderTreeDeleteFolder")
+         Menu, PVfdTree, Add
+         kMenu("PVfdTree", "Add", "Add to/remove from fa&vorites", "folderTreeAddFolderFaves")
          kMenu("PVfdTree", "Add/UnCheck", "Se&t as the protected folder", "folderTreeSetFolderProtected")
          If (protectedFolderPath=folderPath && preventDeleteFromProtectedPath=1)
             kMenu("PVfdTree", "Check", "Se&t as the protected folder")
@@ -24509,7 +24802,7 @@ LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders, allowAsk:=0) {
           oldDateu := lineArru[1]
           oldDateu := SubStr(oldDateu, InStr(oldDateu, "=")+1)
           z := Format("{:L}", folderu)
-          If (StrLen(folderu)>3 && StrLen(oldDateu)>3 && hash[z]!=1)
+          If (StrLen(folderu)>3 && hash[z]!=1)
           {
              hash[z] := 1
              countStaticFolders++
@@ -24713,6 +25006,8 @@ GenerateStaticFoldersListNow() {
 
        counter++
        FileGetTime, dirDate, % folderu, M
+       If ErrorLevel
+          dirDate := "-"
        selVal := foldersSelListArray[folderu]
        newStaticFoldersListCache[counter] := [folderu, dirDate, Value, selVal]
        ; changeMcursor()
@@ -24768,7 +25063,7 @@ cleanDeadFilesList(dummy:=0) {
       showTOOLtip(friendlyLabel ", please wait")
       prevMSGdisplay := A_TickCount
       doStartLongOpDance()
-      If (InStr(backCurrentSLD, "\QPV\viewed-images-history-") && !InStr(backCurrentSLD, "-viewed-images-history-current-session"))
+      If (InStr(backCurrentSLD, "\QPV\viewed-images-history|") && !InStr(backCurrentSLD, "-viewed-images-history|current-session"))
          CleanDeadFilesSeenImagesDB("yesu", StrReplace(backCurrentSLD, "\QPV\", "\"))
       Else If (SLDtypeLoaded=3)
          activeSQLdb.Exec("BEGIN TRANSACTION;")
@@ -27756,6 +28051,7 @@ readMainSettingsApp(act) {
     RegAction(act, "mainWinPos",, 5)
     RegAction(act, "mainWinSize",, 5)
     RegAction(act, "HUDnavBoxSize",, 2, 75, 250)
+    RegAction(act, "slidesRandoMode",, 2, 1, 3)
 
     If (act=0)
     {
@@ -27834,7 +28130,7 @@ readRecentEntries(forceNewList:=0, doFiltering:=1) {
    }
 
    historyList := ""
-   Loop, 10
+   Loop, % maxRecentOpenedFolders
    {
        IniRead, newEntry, % mainRecentsFile, RecentOpen, E%A_Index%, @
        newEntry := Trimmer(newEntry)
@@ -27911,7 +28207,7 @@ RecentFilesManager(entry2add) {
   List_MakeUnique(historyList, "`n", 0, 0)
   Loop, Parse, historyList, `n, `r
   {
-      If (A_Index>11)
+      If (A_Index>maxRecentOpenedFolders)
          Break
 
       If (StrLen(A_LoopField)<5 || !FileExist(StrReplace(A_LoopField, "|")))
@@ -27933,17 +28229,9 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
   If (A_TickCount - lastInvoked<550) && (directCall=1 && prevImg=imgPath) || !imgPath
      Return
 
-  If (!FileRexists(imgPath) && actu!="rem")
-  {
-     showTOOLtip("ERROR: The file seems to not exist.`nYou cannot add to favourites inexistent files")
-     SoundBeep , 300, 100
-     SetTimer, RemoveTooltip, % -msgDisplayTime
-     Return
-  }
-
-  resetSlideshowTimer(0, 1)
   prevImg := imgPath
-  isFaved := isPipe ? 0 : resultedFilesList[currentFileIndex, 5]
+  resetSlideshowTimer(0, 1)
+  isFaved := resultedFilesList[currentFileIndex, 5]
   If (!isFaved && actu!="rem")
   {
      If !userAddedFavesCount
@@ -28639,21 +28927,8 @@ navSelectedFiles(direction) {
         If (isSelected!=1 || !r || InStr(r, "||"))
            Continue
 
-        If (skipDeadFiles=1)
-        {
-           If !FileRexists(r)
-           {
-              Continue
-           } Else
-           {
-              newIndex := thisIndex
-              Break
-           }
-        } Else
-        {
-           newIndex := thisIndex
-           Break
-        }
+        newIndex := thisIndex
+        Break
    }
 
    CurrentSLD := backCurrentSLD
@@ -28824,15 +29099,15 @@ searchNextIndex(direction, inLoop:=0) {
 
    If (!newIndex && inLoop!=1)
    {
-      SoundBeep , 500, 100
+      ; SoundBeep , 500, 100
       searchNextIndex(direction, 1)
       Return
    }
 
    If (!newIndex && inLoop=1)
    {
-      showTOOLtip("WARNING: No indexed file matched the search criteria:`n" userSearchString)
       userSearchString := ""
+      showTOOLtip("WARNING: No indexed file matched the search criteria:`n" userSearchString)
       SetTimer, RemoveTooltip, % -msgDisplayTime
       SoundBeep , 900, 100
       Return
@@ -31104,6 +31379,10 @@ buildQuickSearchMenus() {
       kMenu("PVmenu", "Add/Uncheck", "Allow WIC loader", "ToggleWICloader")
       If (allowWICloader=1)
          kMenu("PVmenu", "Check", "Allow WIC loader")
+
+      userSeenSlideImages := userSeenSessionImagesArray.Count()
+      If (userSeenSlideImages>1 && maxFilesIndex>2 && CurrentSLD && SLDtypeLoaded!=3)
+         kMenu("PVmenu", "Add", "Select seen images in current session", "selectSeenFilesSession")
 
       kMenu("PVmenu", "Add/Uncheck", "Allow FreeImage loader", "ToggleFIMloader")
       kMenu("PVmenu", "Add/Uncheck", "Private mode UI", "TogglePrivateMode")
@@ -34409,7 +34688,7 @@ PanelEditImgCaption(dummy:=0) {
     If !textFileContent
     {
        textFile := OutDir "\" OutNameNoExt ".txt"
-       Try FileRead, textFileContent, % textFile
+       Try FileRead, textFileContent, % " *t " textFile
     }
 
     thisBtnHeight := createSettingsGUI(22, A_ThisFunc)
@@ -41171,20 +41450,27 @@ BtnInsertTextSelectedArea() {
 
 BtnViewedImages2List() {
    userSeenSlideImages := userSeenSessionImagesArray.Count()
-   If (userSeenSlideImages<3)
+   If (userSeenSlideImages<2)
+   {
+      showTOOLtip("No images were seen in this session")
+      SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
+   }
 
    If askAboutFileSave(". The current files list will be discarded as well")
       Return
 
-  If askAboutSlidesListSave()
-     Return
+   If askAboutSlidesListSave()
+      Return
+
+   If askAboutFilesSelect("discard it")
+      Return
 
    BtnCloseWindow()
    AnyWindowOpen := 100
    resetMainWin2Welcome()
    AnyWindowOpen := 0
-   CurrentSLD := "\QPV\viewed-images-history-current-session.SLD"
+   CurrentSLD := "\QPV\viewed-images-history|current-session.SLD"
    For Key, Value in userSeenSessionImagesArray
        resultedFilesList[Value] := [Key]
 
@@ -41203,6 +41489,9 @@ BtnALLviewedImages2List(dummy:=0) {
       Return
 
    If askAboutSlidesListSave()
+      Return
+
+   If askAboutFilesSelect("discard it")
       Return
 
    BtnCloseWindow()
@@ -41233,7 +41522,7 @@ BtnALLviewedImages2List(dummy:=0) {
    AnyWindowOpen := 100
    resetMainWin2Welcome()
    AnyWindowOpen := 0
-   CurrentSLD := "\QPV\viewed-images-history-" friendly ".SLD"
+   CurrentSLD := "\QPV\viewed-images-history|" friendly ".SLD"
    For Key, Value in seenEntries
        resultedFilesList[A_Index] := [Key,,1]
 
@@ -46186,7 +46475,7 @@ addNewFolder2list(givenPath:=0, externMode:=0, actu:=0) {
       If !CurrentSLD
       {
          SLDtypeLoaded := 2
-         CurrentSLD := SelectedDir "\newFile.SLD"
+         CurrentSLD := SelectedDir "\newFilesList.SLD"
          RandomPicture()
       }
    }
@@ -46778,7 +47067,7 @@ exitAppu(dummy:=0) {
 
 askAboutFilesSelect(act) {
    Static doNotAskAgain := 0
-   If (markedSelectFile>50 && maxFilesIndex>250 && doNotAskAgain=0)
+   If (isInRange(markedSelectFile, 50, maxFilesIndex - 3) && maxFilesIndex>250 && doNotAskAgain=0)
    {
       msgResult := msgBoxWrapper(appTitle ": Discard selection", "The current opened files list has " groupDigits(markedSelectFile) " files selected. Are you sure you want to " act " ?", "&Yes|&No", 2, "question", "Do not ask again in the current session")
       If !InStr(msgResult.btn, "Yes")
@@ -47386,7 +47675,10 @@ InvokeMenuBarFile(manuID) {
    kMenu("pvMenuBarFile", "Add", "&Open folder recursively`tShift+O", "OpenFolders", "open image folder files")
    kMenu("pvMenuBarFile", "Add", "&New QPV instance`tCtrl+Shift+N", "OpenNewQPVinstance")
    If (maxFilesIndex<1 || !CurrentSLD)
-      kMenu("pvMenuBarFile", "Add", "Insert file(s)`tInsert", "addNewFile2list", "images list")
+   {
+      kMenu("pvMenuBarFile", "Add", "Insert &file(s)`tInsert", "addNewFile2list", "images list")
+      kMenu("pvMenuBarFile", "Add", "&Manage folders list`tAlt+U", "PanelDynamicFolderzWindow")
+   }
 
    Menu, pvMenuBarFile, Add
    kMenu("pvMenuBarFile", "Add", "&Recents", ":PVopenF", "files recent")
@@ -49086,10 +49378,31 @@ createMenuSlideshows() {
    kMenu("PVslide", "Add", EstimateSlideShowLength(1), "dummy")
    kMenu("PVslide", "Disable", EstimateSlideShowLength(1))
    Menu, PVslide, Add
+   Try Menu, PVhowSlide, Delete
+   
    keyu := (thumbsDisplaying=1 || AnyWindowOpen) ? "" : "`tS"
-   kMenu("PVslide", "Add", "C&ycle slideshow directions" keyu, "ToggleSlideshowModes")
-   kMenu("PVslide", "Add", DefineSlideShowType(), "dummy")
-   kMenu("PVslide", "Disable", DefineSlideShowType())
+   kMenu("PVhowSlide", "Add", "C&ycle slideshow directions" keyu, "ToggleSlideshowModes")
+   Menu, PVhowSlide, Add
+   kMenu("PVhowSlide", "Add/UnCheck", "&Forward", "MenuSlideshowModeNext")
+   kMenu("PVhowSlide", "Add/UnCheck", "&Backward", "MenuSlideshowModePrev")
+   kMenu("PVhowSlide", "Add/UnCheck", "&Random", "MenuSlideshowModeRando")
+   Menu, PVhowSlide, Add
+   kMenu("PVhowSlide", "Add/UnCheck", "Random [&1st half bias]", "MenuSlideshowModeRandyFirst")
+   kMenu("PVhowSlide", "Add/UnCheck", "Random [&2nd half bias]", "MenuSlideshowModeRandySecond")
+   If (SlideHowMode=2)
+      kMenu("PVhowSlide", "Check", "&Backward")
+   Else If (SlideHowMode=3)
+      kMenu("PVhowSlide", "Check", "&Forward")
+   Else If (SlideHowMode=1 && slidesRandoMode=2)
+      kMenu("PVhowSlide", "Check", "Random [&1st half bias]")
+   Else If (SlideHowMode=1 && slidesRandoMode=3)
+      kMenu("PVhowSlide", "Check", "Random [&2nd half bias]")
+   Else If (SlideHowMode=1)
+      kMenu("PVhowSlide", "Check", "&Random")
+
+   kMenu("PVslide", "Add", "Slideshow direc&tions", ":PVhowSlide")
+   ; kMenu("PVslide", "Add", DefineSlideShowType(), "dummy")
+   ; kMenu("PVslide", "Disable", DefineSlideShowType())
    Menu, PVslide, Add
    thisMusic := StrLen(SlidesMusicSong)>3 ? PathCompact(SlidesMusicSong, 30) : "NONE"
    kMenu("PVslide", "Add/Uncheck", "Auto&matically play music", "ToggleAutoPlaySlidesMusic")
@@ -50103,10 +50416,11 @@ kMenu(mena, actu, labelu, funcu:=0, keywords:="") {
       }
 
       Menu, % mena, Add, % zLabelu, % funcu
-      If (!InStr(funcu, ":") && InStr(actu, "Uncheck") && mustPreventMenus!=1)
+      If (!InStr(funcu, ":") && InStr(actu, "Uncheck"))
       {
          objuA[indexu, 5] := -1
-         Try Menu, % mena, Icon, % zLabelu, %mainCompiledPath%\resources\menu-checkable.ico
+         If (mustPreventMenus!=1)
+            Try Menu, % mena, Icon, % zLabelu, %mainCompiledPath%\resources\menu-checkable.ico
       }
    } Else If (RegExMatch(actu, "i)(disable|check)") && labelu)
    {
@@ -50557,7 +50871,10 @@ createMenuOpenRecents(modus:=0) {
       kMenu("PVopenF", "Add", "&Folder recursively`tShift+O", "OpenFolders", "open image folder files")
       kMenu("PVopenF", "Add", "&New QPV instance`tCtrl+Shift+N", "OpenNewQPVinstance")
       If (maxFilesIndex<1 || !CurrentSLD)
+      {
          kMenu("PVopenF", "Add", "Insert file(s)`tInsert", "addNewFile2list", "images list")
+         kMenu("PVopenF", "Add", "&Manage folders list`tAlt+U", "PanelDynamicFolderzWindow")
+      }
    }
 
    If (allowRecordHistory=1 && mustPreventMenus!=1)
@@ -50571,7 +50888,7 @@ createMenuOpenRecents(modus:=0) {
       historyList := readRecentEntries(0, 0)
       Loop, Parse, historyList, `n
       {
-         If (A_Index>10)
+         If (A_Index>maxRecentOpenedFolders)
             Break
 
          countItemz++
@@ -50618,11 +50935,55 @@ createMenuOpenRecents(modus:=0) {
       kMenu("PVopenF", "Check", "&Record recently opened")
 }
 
+invokeFavedDirsMenu() {
+   deleteMenus()
+   createMenuDirsFaved(100)
+   showThisMenu("PVdirsFaved")
+}
+
+createMenuDirsFaved(howMany) {
+   Try Menu, PVdirsFaved, Delete
+   If (mustPreventMenus!=1)
+      favesFoldersList := readFoldersFavedList()
+
+   counter := favesFoldersList.Count()
+   maxu := (counter>howMany) ? howMany : counter
+   Loop, % maxu
+   {
+      entryu := (userPrivateMode=1) ? "*:\*******\******.***" : PathCompact(favesFoldersList[A_Index], 30)
+      kMenu("PVdirsFaved", "Add", "&" A_Index ". " entryu, "OpenDirsFavedEntry")
+   }
+
+   If (counter<1)
+   {
+      kMenu("PVdirsFaved", "Add", "No folders or files lists", "dummy")
+      kMenu("PVdirsFaved", "Disable", "No folders or files lists")
+   } Else If (counter>howMany)
+   {
+      kMenu("PVdirsFaved", "Add", "... and " counter - howMany " more items", "invokeFavedDirsMenu")
+      ; kMenu("PVdirsFaved", "Disable", "... and " counter - 15 " more items")
+   }
+
+   Menu, PVdirsFaved, Add
+   kMenu("PVdirsFaved", "Add", "&Add/remove current files list to favourites", "MenuAddThisListAtFaves")
+   If (counter>0)
+      kMenu("PVdirsFaved", "Add", "&Remove inexistent entries", "removeDeadFavedFolders")
+   If !(maxFilesIndex>0 && CurrentSLD)
+      kMenu("PVdirsFaved", "Disable", "&Add/remove current files list to favourites")
+
+   kMenu("PVdirsFaved", "Add", "&Remove all these from favourites", "clearAllFavedFolders")
+}
+
 createMenuFavourites() {
+
+   createMenuDirsFaved(15)
+   kMenu("PVfaves", "Add", "Files lists and folders", ":PVdirsFaved")
+
    If (mustPreventMenus!=1)
       favesList := readMiniFavesEntries()
 
-   Loop, Parse, favesList, `n
+   Menu, PVfaves, Add
+   Loop, Parse, favesList, `n,`r
    {
       If (A_Index>15)
          Break
@@ -50638,6 +50999,8 @@ createMenuFavourites() {
          kMenu("PVfaves", "Add", "&" countItemz ". " entryu, "OpenFavesEntry")
       }
    }
+   If !userAddedFavesCount
+      IniAction(0, "userAddedFavesCount", "General", 2, 0, 987654321)
 
    If !countFaved
    {
@@ -50646,8 +51009,8 @@ createMenuFavourites() {
    } Else If (userAddedFavesCount>15)
    {
       moru := userAddedFavesCount - 15
-      kMenu("PVfaves", "Add", "... and another " moru " images", "dummy")
-      kMenu("PVfaves", "Disable", "... and another " moru " images")
+      kMenu("PVfaves", "Add", "... and " groupDigits(moru) " more images", "retrieveFavesAsList")
+      ; kMenu("PVfaves", "Disable", "... and " groupDigits(moru) " more images")
    }
 
    Menu, PVfaves, Add
@@ -51046,7 +51409,7 @@ INIaction(act, var, section, type:=0, mini:=0, maxy:=0, forcedDef:="", iniFile:=
          RegWrite, REG_SZ, % QPVregEntry "\" section, %var%, %varValue%
       Else
          IniWrite, %varValue%, % thisIniFile, %section%, %var%
-      If ErrorLevel
+      If (ErrorLevel && (A_TickCount - scriptStartTime<2500))
          addJournalEntry("Error saving INI settings (" var ") in " thisIniFile " | " section)
    } Else
    {
@@ -51060,7 +51423,7 @@ INIaction(act, var, section, type:=0, mini:=0, maxy:=0, forcedDef:="", iniFile:=
       If (ErrorLevel && loadedValue="") || (ErrorLevel && storeReg=1)
          loadedValue := defaultu
 
-      If ErrorLevel
+      If (ErrorLevel && (A_TickCount - scriptStartTime<2500))
          addJournalEntry("Error loading INI settings (" var ") in " thisIniFile " | " section)
 
       If (type=1) ; binary
@@ -53425,9 +53788,9 @@ CleanDeadFilesSeenImagesDB(doPartial:=0, partu:=0) {
   startOperation := A_TickCount
   entriesCount := entriesScanned := entriesDoneCount := 0
   RecordSet := ""
-  npartu := StrReplace(partu, "\viewed-images-history-")
+  npartu := StrReplace(partu, "\viewed-images-history|")
   npartu := StrReplace(npartu, ".sld")
-  If (doPartial="yesu" && !InStr(partu, "-viewed-images-history-current-session"))
+  If (doPartial="yesu" && !InStr(partu, "viewed-images-history|current-session"))
      SQL := "SELECT imgfile FROM images WHERE imgViewDate LIKE '" npartu "%';"
   Else
      SQL := "SELECT imgfile FROM images;"
@@ -53755,6 +54118,7 @@ ShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
         winTitle := currentFileIndex "/" maxFilesIndex zoomu
      Else
         winTitle := currentFileIndex "/" maxFilesIndex zoomu " | " OutFileName " | " OutDir "\"
+
      winPrefix := defineWinTitlePrefix()
      pVwinTitle := winPrefix winTitle
      setWindowTitle(pVwinTitle, 1)
@@ -53871,9 +54235,11 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
                SoundBeep, 300, 50
                lastInvoked2 := A_TickCount
             }
-    
-            If (autoRemDeadEntry=1)
+
+            thisu := (slideShowRunning=1 && SlideHowMode=1) ? 1 : 0
+            If (autoRemDeadEntry=1 && thisu!=1)
                remCurrentEntry(1)
+
             lastInvoked := A_TickCount
             SetTimer, ResetImgLoadStatus, -15
             Return "fail"
@@ -54060,6 +54426,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
       {
          ws := "100%"
       } Else ws .= "%"
+
       zoomLevel := 1
       ResizedW := imgW
       ResizedH := imgH
@@ -54497,7 +54864,7 @@ drawAnnotationBox(mainWidth, mainHeight, Gu) {
 
     If !textFileContent
     {
-       Try FileRead, textFileContent, % textFile
+       Try FileRead, textFileContent, % " *t " textFile
        If StrLen(textFileContent)<1
           textFileContent := ""
     }
@@ -54667,8 +55034,11 @@ setGIFframesDelay(oBitmap) {
    rawFmt := Gdip_GetImageRawFormat(oBitmap)
    If (rawFmt="gif")
    {
-      d := Gdip_GetPropertyItem(oBitmap, 0x5100)
-      GIFspeedDelay := clampInRange(Round(SubStr(d.value, 1, InStr(d.value, A_Space) - 1)*10) + base, 15, 9500)
+      g := Gdip_GetFrameDelay(oBitmap, desiredFrameIndex)
+      ; d := Gdip_GetPropertyItem(oBitmap, 0x5100)
+      ; GIFspeedDelay := clampInRange(Round(SubStr(d.value, 1, InStr(d.value, A_Space) - 1)*10) + base, 15, 9500)
+      GIFspeedDelay := clampInRange(g + base, 15, 9500)
+      ; ToolTip, % GIFspeedDelay "==" g "==" d.value , , , 2
       ; ToolTip, % "d=" SubStr(d.value, 1, InStr(d.value, A_Space) - 1)*10 "|" GIFspeedDelay , , , 2
    } Else GIFspeedDelay := base
 }
@@ -71140,7 +71510,13 @@ BTNpasteDynaFoldersList() {
     mustOpenStartFolder := ""
     Sort, newFoldersList, UD`n
     DynamicFoldersList := cleanDynamicFoldersList(newFoldersList)
-    If (SLDtypeLoaded=3)
+    If (InStr(DynamicFoldersList, ":\") && !CurrentSLD)
+    {
+       CurrentSLD := prevOpenFolderPath "\NewFilesList.SLD"
+       SLDtypeLoaded := 2
+    }
+
+    If (SLDtypeLoaded=3 && RegExMatch(CurrentSLD, sldsPattern))
        recreateDynaFoldersSQLdbList(DynamicFoldersList)
 
     currentFilesListModified := 1
@@ -71180,7 +71556,9 @@ BTNremDynaSelFolder() {
     If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
        recreateDynaFoldersSQLdbList(newFoldersList)
 
-    msgResult := msgBoxWrapper(appTitle ": Remove dynamic folder", "Would you like to remove the files from the index/list pertaining to the removed dynamic folder as well ?`n`n" folderu "\", 4, 0, "question")
+    If (maxFilesIndex>1)
+       msgResult := msgBoxWrapper(appTitle ": Remove dynamic folder", "Would you like to remove the files from the index/list pertaining to the removed dynamic folder as well ?`n`n" folderu "\", 4, 0, "question")
+
     If (msgResult="yes")
     {
        remFilesFromList(StrReplace(folderu, "|"))
@@ -72408,13 +72786,20 @@ PopulateStaticFolderzList(listFilter:=0, modus:=0) {
            showTOOLtip("Populating the list, please wait`n" groupDigits(countStaticFolders) " folders", 0, 0, A_Index/countStaticFolders)
         }
 
-        oldDateu := newStaticFoldersListCache[A_Index, 2]
-        FileGetTime, dirDateO, % folderu, M
         If (userPrivateMode=1)
            folderu := "*:\********\******\"
-        statusu := (dirDateO!=oldDateu && isUpdateList=1) ? "*" : ""
-        dirDate := SubStr(dirDateO, 1, StrLen(dirDate) - 2)
-        FormatTime, dirDate, % dirDate, yyyy/MM/dd ; -HH:mm
+
+        oldDateu := newStaticFoldersListCache[A_Index, 2]
+        If (oldDateu="-")
+        {
+           statusu := dirDate := "-"
+        } Else 
+        {
+           FileGetTime, dirDateO, % folderu, M
+           statusu := (dirDateO!=oldDateu && isUpdateList=1) ? "*" : ""
+           dirDate := SubStr(dirDateO, 1, StrLen(dirDate) - 2)
+           FormatTime, dirDate, % dirDate, yyyy/MM/dd ; -HH:mm
+        }
         countedSelFiles := markedSelectFile ? Round(newStaticFoldersListCache[A_Index, 4]) : 0
         countFiles := newStaticFoldersListCache[A_Index, 3]
         countTFiles := newStaticFoldersListCache[A_Index, 5]
@@ -72869,6 +73254,7 @@ initCompiled(mode) {
       mainSettingsFile := OutDir "\" mainSettingsFile
       mainRecentsFile := OutDir "\" mainRecentsFile
       mainFavesFile := OutDir "\" mainFavesFile
+      folderFavesFile := OutDir "\" folderFavesFile
       miniFavesFile := OutDir "\" miniFavesFile
    } Else
    {
@@ -78591,6 +78977,70 @@ ListGlobalVars() {
 }
 
 
+testMoonPhase(t:=0, g:=1) {
+   DllPath := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\bells-tower\v3\cpp-dll\cbt-main.dll"
+   DllCall("LoadLibraryW", "WStr", DllPath, "UPtr")
+   age := phase := fraction := ""
+   If t
+      t -= 19700101000000, S   ; convert to Unix TimeStamp
+   else
+      g := 0
+   r := DllCall("cbt-main.dll\getMoonPhase", "double", t, "Int", g, "double*", phase, "double*", age, "double*", fraction, "Int")
+   ToolTip, % age "=" phase "=" fraction "=l=" r "`n" t , , , 2
+}
+
+testDayLight() {
+   DllPath := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\bells-tower\v3\cpp-dll\cbt-main.dll"
+   hmod := DllCall("LoadLibraryW", "WStr", DllPath, "UPtr")
+latu:=46.186, longu:=21.312
+userDay := A_YDay
+winterSols := 355
+
+dayu := userDay - (365 - winterSols)
+
+; ToolTip, % A_YDay "|" (365 - winterSols), , , 2
+
+   r := DllCall("cbt-main.dll\calcDayLength", "double", latu, "double", longu, "Int", dayu, "Int")
+   DllCall("FreeLibrary", "UPtr", hMod)
+}
+
+testSunRise(t:=0, latu:=46.186, longu:=21.312, gmtMode:=0, obju:="Sun", givenTime:=1) {
+   latu := 52.524,   longu := 13.411 ; germany, berlin
+   ; initQPVmainDLL()
+   If t
+      t -= 19700101000000, S   ; convert to Unix TimeStamp
+   else
+      givenTime := 0
+
+   DllPath := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\bells-tower\v3\cpp-dll\cbt-main.dll"
+   hMod := DllCall("LoadLibraryW", "WStr", DllPath, "UPtr")
+   VarSetCapacity(rise, 512, 0)
+   r := DllCall("cbt-main.dll\get" obju "Infos", "double", t, "Int", givenTime, "Int", gmtMode, "Float", latu, "Float", longu, "uptr", &rise, "Int")
+   nrise := nsetu := ""
+   Loop, 14
+   {
+       i := A_Index
+       If (i=7 || i=14)
+          Continue
+
+       nm := NumGet(rise, 4*(A_Index - 1), "UInt")
+       v := (i<8) ? "nrise" : "nsetu"
+       If ((i=6 || i=13) && nm>50 && prevNM!=59) ; if it is more than 50 seconds, increase minutes by 1
+       {
+          nm := 1
+          %v% += 1
+       }
+
+       %v% .= isInRange(i, 2, 6) || isInRange(i, 9, 13) ? format("{1:02}", nm) : nm
+       prevNM := nm
+   }
+   ; nrise := StrReplace(nrise, "|")
+   ; nsetu := StrReplace(nsetu, "|")
+   rise := ""
+   DllCall("FreeLibrary", "UPtr", hMod)
+   fnOutputDebug(obju "=" r "=" nrise "=" nsetu)
+}
+
 testCimgQPV() {
   Static modus := 0
   modus++
@@ -78607,3 +79057,106 @@ testCimgQPV() {
   r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
   Gdip_DisposeImage(r)
 }
+
+
+testEuclidPolarCIMG() {
+  Static modus := 0
+  modus++
+  initQPVmainDLL()
+  If (modus>99)
+     modus := 1
+  func2exec := (A_PtrSize=8) ? "euclidean2polarCIMG" : "_BoxBlurBitmap@20"
+  pBitmap := useGdiBitmap()
+  Gdip_GetImageDimensions(pBitmap, w, h)
+  r := DllCall(whichMainDLL "\" func2exec, "UPtr", pBitmap, "Int", w, "Int", h, "UPtr")
+  Gdip_GraphicsClear(2NDglPG)
+  If StrLen(r)>2
+     Gdip_DrawImage(2NDglPG, r, 10, 10)
+  r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+  Gdip_DisposeImage(r)
+  ToolTip, % r "=l" w , , , 3
+}
+
+testEuclidPolarGDIP() {
+  Static modus := 0
+  modus++
+  initQPVmainDLL()
+  ToolTip, % modus "=l" , , , 3
+  If (modus>99)
+     modus := 1
+  func2exec := (A_PtrSize=8) ? "euclidean2polarGDIP" : "_BoxBlurBitmap@20"
+  pBitmap := useGdiBitmap()
+  Gdip_GetImageDimensions(pBitmap, w, h)
+  newBitmap := trGdip_CreateBitmap(A_ThisFunc, w, h)
+
+  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData)
+  E2 := Gdip_LockBits(newBitmap, 0, 0, w, h, stride, mScan, mData, 1)
+
+  r := DllCall(whichMainDLL "\" func2exec, "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h)
+  Gdip_GraphicsClear(2NDglPG)
+  If !E1
+     Gdip_UnlockBits(pBitmap, iData)
+  If !E2
+     Gdip_UnlockBits(newBitmap, mData)
+
+  Gdip_DrawImage(2NDglPG, newBitmap, 10, 10)
+  r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+  trGdip_DisposeImage(newBitmap)
+}
+
+
+
+
+
+GeoDataAddDstToData() {
+; source of timezones.txt: https://download.geonames.org/export/dump/
+; country codes are a variant of  ISO-3166 , based on 2-letters; the list was created by me from Wikipedia
+SoundBeep 
+   FileRead, finalcontent, E:\Sucan twins\_small-apps\AutoHotkey\my scripts\bells-tower\v3\geo-locations-final.txt
+   FileRead, originalcontent, E:\Sucan twins\_small-apps\AutoHotkey\my scripts\bells-tower\v3\geo-data\cities15000.txt
+   FileRead, tmz, E:\Sucan twins\_small-apps\AutoHotkey\my scripts\bells-tower\v3\geo-data\timezones.txt
+   newu := ""
+   objTmzGmt := new hashtable()
+   objTmzDst := new hashtable()
+   m := new hashtable()
+   Loop, Parse, tmz, `n, `r
+   {
+      If (A_Index=1 || !InStr(A_LoopField, "|"))
+         Continue
+
+      k := StrSplit(A_LoopField, "|")
+      labelu := Format("{:L}", k[2])
+      objTmzGmt[labelu] := k[3]
+      objTmzDst[labelu] := k[4]
+   }
+
+   Loop, Parse, originalcontent, `n, `r
+   {
+      If StrLen(A_LoopField)<4
+         Continue
+
+      k := StrSplit(A_LoopField, "`t")
+      p := Format("{:L}", k[18])
+      gmtu := objTmzGmt[p]
+      testu := Round(k[5], 3) "|" Round(k[6], 3) "|" gmtu "|" k[8]
+      m[testu] := p
+   }
+
+   newcontent := ""
+   Loop, Parse, finalcontent, `n, `r
+   {
+      If StrLen(A_LoopField)<4
+         Continue
+
+      k := StrSplit(A_LoopField, "|")
+      testu := k[3] "|" k[4] "|" k[5] "|" k[6]
+      newcontent .= (p := m[testu]) ? A_LoopField "?" objTmzDst[p] "`n" : A_LoopField "!" "`n"
+   }
+
+   m := ""
+   objTmzDst := ""
+   objTmzGmt := ""
+   Try Clipboard := newcontent
+   SoundBeep
+}
+

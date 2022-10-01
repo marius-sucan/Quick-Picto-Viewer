@@ -1,6 +1,12 @@
-﻿// Quick Picto Viewer - CHANGELOG
+// Quick Picto Viewer - CHANGELOG
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
+
+- v5.7.8 (2022-10-01)
+  - [new] option to add to favourites folders and files lists [.SLDs]
+  - [new] slideshow random modes: with a bias for the first or second half of the files list, or no explicit bias
+  - users can now create a folders list to scan for files when no image or folder is opened
+  - various small fixes
 
 - v5.7.7 (2022-08-18)
   - several important bug fixes
@@ -903,6 +909,11 @@ Files organization:
 
 - v1.0.0 (2010-10-04) by SBC
 
-; known issues [jeudi 2 juillet 2020]
-; high memory consumption; all operations need a lot of RAM [zoom/pan, etc]
+; known issues [jeudi 18 août 2022]
+  - high memory consumption; all operations need a lot of RAM [zoom/pan, etc]
+  - when multi-threaded is activated, QPV randomly hangs in thumbnails mode
+  - jpeg lossless crop: the selection area does not precisely match with the resulted image [freeimage]
+
+
+
 

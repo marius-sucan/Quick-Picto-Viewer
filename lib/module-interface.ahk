@@ -1148,7 +1148,8 @@ WinClickAction(thisEvent:="normal") {
 }
 
 sendWinClickAct(ctrlEvent, guiCtrl, mX, mY) {
-     MainExe.ahkPostFunction("WinClickAction", ctrlEvent, guiCtrl, mX, mY)
+   ; ToolTip, % ctrlEvent "==" guiCtrl , , , 2
+   MainExe.ahkPostFunction("WinClickAction", ctrlEvent, guiCtrl, mX, mY)
 }
 
 GetMouseCoord2wind(hwnd, ByRef nx, ByRef ny, ByRef ox, ByRef oy) {
@@ -2680,6 +2681,7 @@ mouseTurnOFFtooltip(mode:=0) {
    Global mouseToolTipWinCreated := 0
    Global lastZeitToolTip := A_TickCount
    SetTimer, mouseTurnOFFtooltip, Off
+   ; MouseGetPos, OutputVarX, OutputVarY, OutputVarWin
    ; ToolTip, % mode , , , 2
    ; If (AnyWindowOpen && mode!=1 || mode=2)
    ;    SetTimer, delayedWinActivateToolTipDeath, -150
@@ -2687,6 +2689,14 @@ mouseTurnOFFtooltip(mode:=0) {
 
 delayedWinActivateToolTipDeath() {
    WinActivate, ahk_id %lastTippyWin%
+}
+
+destroyTooltipu() {
+   mouseTurnOFFtooltip()
+   Sleep, 1
+   MouseGetPos, ,, OutputVarWin
+   If (OutputVarWin=hQPVtoolbar)
+      MouseClick, Left
 }
 
 mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
@@ -2713,10 +2723,11 @@ mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
     lastTippyWin := WinActive("A")
     Sleep, 25
     Gui, mouseToolTipGuia: -Caption -DPIScale +Owner%thisHwnd% +ToolWindow +hwndhGuiTip
+    ; Gui, mouseToolTipGuia: Margin, 0, 0
     Gui, mouseToolTipGuia: Margin, % thisFntSize, % thisFntSize
     Gui, mouseToolTipGuia: Color, c%bgrColor%
     Gui, mouseToolTipGuia: Font, s%thisFntSize% %isBold% Q5, %OSDFontName%
-    Gui, mouseToolTipGuia: Add, Text, c%txtColor% gmouseClickTurnOFFtooltip vTippyMsg, %msg%
+    Gui, mouseToolTipGuia: Add, Text, c%txtColor% gdestroyTooltipu vTippyMsg, %msg%
     Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
     prevMsg := msg
     MainExe.ahkassign("hGuiTip", hGuiTip)
@@ -2747,12 +2758,12 @@ showOSDinfoLineNow(delayu, givenCoords:=0) {
     If (!isWinXP && forced!=1)
     {
        GetWinClientSize(Wid, Heig, hGuiTip, 1)
-       k := WinMoveZ(hGuiTip, 0, mX, mY, Wid, Heig, 2)
+       k := WinMoveZ(hGuiTip, 0, mX + 20, mY + 29, Wid, Heig, 2)
        Final_x := k[1], Final_y := k[2]
     } Else
     {
-       tipX := (forced=1) ?  mX : mX + 15
-       tipY := (forced=1) ?  mY : mY + 15
+       tipX := (forced=1) ?  mX : mX + 20
+       tipY := (forced=1) ?  mY : mY + 20
        ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
        MaxWidth := Floor(ResWidth*0.85)
        If (MaxWidth<Wid && MaxWidth>10)
