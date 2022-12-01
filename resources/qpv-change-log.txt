@@ -2,7 +2,7 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
-- v5.5.9 (2022-12-01)
+- v5.7.9 (2022-12-01)
   - [new] gradient preview in the Fill Area panel and in Alpha Mask tab
   - [new] options to choose image destination format on auto-crop
   - [new] ability to choose for what monitor to set the image as wallpaper, and its position on the desktop, and background color; it now works on Windows 7 [but nor per monitor]
