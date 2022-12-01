@@ -2,6 +2,18 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.5.9 (2022-12-01)
+  - [new] gradient preview in the Fill Area panel and in Alpha Mask tab
+  - [new] options to choose image destination format on auto-crop
+  - [new] ability to choose for what monitor to set the image as wallpaper, and its position on the desktop, and background color; it now works on Windows 7 [but nor per monitor]
+  - the file operations conflict message box now shows an image thumbnail for the source and destination files
+  - reimplemented from scratch the auto-crop function; now it uses C++ [the DLL] and it is MUCH faster; about 30x faster
+  - the alpha mask panel shows fewer UI elements at once; they are shown or hidden based on the options selected
+  - made larger the image preview area in the panels that integrate this kind of UI element
+  - the color picker should now work on Windows 7 if hardware acceleration is enabled
+  - panel layout fixes for Windows 7 
+  - really MANY bug fixes , and important ones
+
 - v5.7.8 (2022-10-01)
   - [new] option to add to favourites folders and files lists [.SLDs]
   - [new] slideshow random modes: with a bias for the first or second half of the files list, or no explicit bias

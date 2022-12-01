@@ -880,78 +880,6 @@ SHGetKnownFolderPath(FOLDERID, KF_FLAG:=0) {                  ;   By SKAN on D35
 
 }
 
-Class IDesktopWallpaper 
-{
-; class created by Flipeador
-; source https://github.com/flipeador/Library-AutoHotkey/blob/master/device/IDesktopWallpaper.ahk
-
-    ; ===================================================================================================================
-    ; CONSTRUCTOR
-    ; ===================================================================================================================
-    __New() {
-        this.IDesktopWallpaper := ComObjCreate("{C2CF3110-460E-4fc1-B9D0-8A1C0C9CC4BD}", "{B92B56A9-8B55-4E14-9A89-0199BBB6F93B}")
-
-        For Each, Method in ["SetWallpaper","GetWallpaper","GetMonitorDevicePathAt","GetMonitorDevicePathCount","GetMonitorRECT","SetBackgroundColor","GetBackgroundColor","SetPosition","GetPosition","SetSlideshow", "GetSlideshow","SetSlideshowOptions","GetSlideshowOptions","AdvanceSlideshow","GetStatus","Enable"]
-            ObjRawSet(this, "p" . Method, NumGet(NumGet(this.IDesktopWallpaper), (2 + A_Index) * A_PtrSize))
-    } ; https://msdn.microsoft.com/en-us/library/windows/desktop/bb775771(v=vs.85).aspx
-
-    ; ===================================================================================================================
-    ; DESTRUCTOR
-    ; ===================================================================================================================
-    __Delete() {
-        Return ObjRelease(this.IDesktopWallpaper)
-    }
-
-    ; ===================================================================================================================
-    ; PRIVATE METHODS
-    ; ===================================================================================================================
-    _R(R, pBuffer, ByRef Var := "", Error := "") {
-        If (R == 0)
-        {
-            If (IsByRef(Var))
-                Var := StrGet(pBuffer, "UTF-16")
-            DllCall("Kernel32.dll\GlobalFree", "UPtr", pBuffer, "UPtr")
-        }
-        Else If (IsByRef(Var))
-            Var := Error
-        Return R
-    }
-
-    ; ===================================================================================================================
-    ; PUBLIC METHODS
-    ; ===================================================================================================================
-    /*
-        Establece el fondo de escritorio.
-        Parámetros:
-            MonitorID: El identificador del monitor. Este valor se puede obtener a través de GetMonitorDevicePathAt. Establezca este valor en NULL para establecer la imagen en todos los monitores.
-            Wallpaper: La ruta completa del archivo de imagen de fondo de pantalla.
-    */
-    SetWallpaper(MonitorID, Wallpaper) {
-        Return DllCall(this.pSetWallpaper, "UPtr", this.IDesktopWallpaper, "Ptr", MonitorID, "UPtr", &Wallpaper, "UInt")
-    } ; https://msdn.microsoft.com/en-us/library/windows/desktop/hh706962(v=vs.85).aspx
-
-    /*
-        Recupera el identificador de uno de los monitores del sistema.
-        Parámetros:
-            MonitorIndex: El número del monitor. LLame a GetMonitorDevicePathCount para determinar el número total de monitores.
-            MonitorID   : Recibe el identificador del monitor.
-    */
-    GetMonitorDevicePathAt(MonitorIndex, ByRef MonitorID) {
-        Return this._R(DllCall(this.pGetMonitorDevicePathAt, "UPtr", this.IDesktopWallpaper, "UInt", MonitorIndex, "UPtrP", pBuffer, "UInt"), pBuffer, MonitorID)
-    } ; https://msdn.microsoft.com/en-us/library/windows/desktop/hh706950(v=vs.85).aspx
-
-    /*
-        Recupera la cantidad de monitores que están asociados con el sistema.
-        Parámetros:
-            Count: Recibe la cantidad de monitores.
-    */
-    GetMonitorDevicePathCount(ByRef Count) {
-        Return DllCall(this.pGetMonitorDevicePathCount, "UPtr", this.IDesktopWallpaper, "UIntP", Count, "UInt")
-    } ; https://msdn.microsoft.com/en-us/library/windows/desktop/hh706951(v=vs.85).aspx
-
-} ; https://msdn.microsoft.com/en-us/library/windows/desktop/hh706946(v=vs.85).aspx
-
-
 ShellFileOperation(fileO, fSource, fTarget, flags, ghwnd:=0x0) {
 /*
    Provides access to Windows built-in file operation system 
@@ -2644,5 +2572,98 @@ GetMenuItemRect(hwnd, hMenu, nPos) {
 
     rect:= ""
     return 0
+}
+
+
+JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
+; function by jeeswg found on:
+; https://autohotkey.com/boards/viewtopic.php?t=38472
+
+  VarSetCapacity(POINT, 8)
+  NumPut(vPosX, &POINT, 0, "Int")
+  NumPut(vPosY, &POINT, 4, "Int")
+  DllCall("user32\ClientToScreen", "Ptr", hWnd, "Ptr", &POINT)
+  vPosX2 := NumGet(&POINT, 0, "Int")
+  vPosY2 := NumGet(&POINT, 4, "Int")
+}
+
+JEE_ScreenToWindow(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
+; function by jeeswg found on:
+; https://autohotkey.com/boards/viewtopic.php?t=38472
+
+  VarSetCapacity(RECT, 16, 0)
+  DllCall("user32\GetWindowRect", "UPtr", hWnd, "UPtr", &RECT)
+  vWinX := NumGet(&RECT, 0, "Int")
+  vWinY := NumGet(&RECT, 4, "Int")
+  vPosX2 := vPosX - vWinX
+  vPosY2 := vPosY - vWinY
+  RECT := ""
+}
+
+JEE_ScreenToClient(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
+; function by jeeswg found on:
+; https://autohotkey.com/boards/viewtopic.php?t=38472
+  VarSetCapacity(POINT, 8, 0)
+  NumPut(vPosX, &POINT, 0, "Int")
+  NumPut(vPosY, &POINT, 4, "Int")
+  DllCall("user32\ScreenToClient", "UPtr", hWnd, "UPtr", &POINT)
+  vPosX2 := NumGet(&POINT, 0, "Int")
+  vPosY2 := NumGet(&POINT, 4, "Int")
+  POINT := ""
+}
+
+
+MWAGetMonitorMouseIsIn(coordX:=0,coordY:=0) {
+; function from: https://autohotkey.com/boards/viewtopic.php?f=6&t=54557
+; by Maestr0
+
+  ; get the mouse coordinates first
+  If (coordX && coordY)
+  {
+     Mx := coordX
+     My := coordY
+  } Else GetPhysicalCursorPos(mX, mY)
+
+  SysGet, MonitorCount, 80  ; monitorcount, so we know how many monitors there are, and the number of loops we need to do
+  Loop, %MonitorCount%
+  {
+    SysGet, mon%A_Index%, Monitor, %A_Index%  ; "Monitor" will get the total desktop space of the monitor, including taskbars
+    If (Mx>=mon%A_Index%left) && (Mx<mon%A_Index%right)
+    && (My>=mon%A_Index%top) && (My<mon%A_Index%bottom)
+    {
+       ActiveMon := A_Index
+       Break
+    }
+  }
+  Return ActiveMon
+}
+
+GetPhysicalCursorPos(ByRef mX, ByRef mY) {
+; function from: https://github.com/jNizM/AHK_DllCall_WinAPI/blob/master/src/Cursor%20Functions/GetPhysicalCursorPos.ahk
+; by jNizM, modified by Marius Șucan
+    Static lastMx, lastMy, lastInvoked := 1
+    If (A_TickCount - lastInvoked<70)
+    {
+       mX := lastMx
+       mY := lastMy
+       Return
+    }
+
+    lastInvoked := A_TickCount
+    Static POINT
+         , init := VarSetCapacity(POINT, 8, 0) && NumPut(8, POINT, "Int")
+    GPC := DllCall("user32.dll\GetPhysicalCursorPos", "Ptr", &POINT)
+    If (!GPC || A_OSVersion="WIN_XP")
+    {
+       MouseGetPos, mX, mY
+       lastMx := mX
+       lastMy := mY
+       Return
+     ; Return DllCall("kernel32.dll\GetLastError")
+    }
+
+    lastMx := mX := NumGet(POINT, 0, "Int")
+    lastMy := mY := NumGet(POINT, 4, "Int")
+    Return
 }
 

@@ -140,15 +140,16 @@ Cli_RunCMD(CmdLine, WorkingDir:="", Codepage:="CP850", Fn:="RunCMD_Output", maxD
   timeOut := 0
   While ((A_Args.RunCMD.PID + DllCall("Sleep", "Int",0)) && DllCall("PeekNamedPipe", "UPtr",hPipeR, "UPtr",0, "Int",0, "UPtr",0, "UPtr",0, "UPtr",0))
   {
-       If (A_TickCount - startTime>maxDelay)
+       If ((A_TickCount - startTime>maxDelay) || GetKeyState("Escape", "P"))
        {
           timeOut := 1
           Break
        }
+
        While (A_Args.RunCMD.PID and (Line := FileObj.ReadLine()))
        {
             sOutput .= Fn ? Fn.Call(Line, LineNum++) : Line
-            If (A_TickCount - startTime>maxDelay)
+            If ((A_TickCount - startTime>maxDelay) || GetKeyState("Escape", "P"))
             {
                timeOut := 1
                Break

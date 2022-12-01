@@ -1,4 +1,4 @@
-// qpv-main.cpp : Définit les fonctions exportées de la DLL.
+﻿// qpv-main.cpp : Définit les fonctions exportées de la DLL.
 
 #define GDIPVER 0x110
 #include "pch.h"
@@ -678,6 +678,14 @@ bool decideColorsEqual(int newColor, int oldColor, float tolerance, float prevCL
     return result;
 }
 
+int wrapRGBtoGray(int color, int mode) {
+    int rB = (color >> 16) & 0xFF;
+    int gB = (color >> 8) & 0xFF;
+    int bB = color & 0xFF;
+    int index = RGBtoGray(rB, gB, bB, mode);
+    return index;
+}
+
 int FloodFill8Stack(int *imageData, int w, int h, int x, int y, int newColor, float *nC, int oldColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay) {
 // based on https://lodev.org/cgtutor/floodfill.html
 // by Lode Vandevenne
@@ -940,6 +948,110 @@ DLL_API int DLL_CALLCONV FloodFyll(int *imageData, int modus, int w, int h, int 
     // OutputDebugStringA(ss.str().data());
 
     return r;
+}
+
+DLL_API int DLL_CALLCONV autoCropAider(int* bitmapData, int Width, int Height, int adaptLevel, double threshold, double vTolrc, int whichLoop, int aaMode, int* fcoord) {
+   int maxThresholdHitsW = round(Width*threshold) + 1;
+   if (maxThresholdHitsW>floor(Width/2))
+      maxThresholdHitsW = floor(Width/2);
+
+   int maxThresholdHitsH = round(Height*threshold) + 1;
+   if (maxThresholdHitsH>floor(Height/2))
+      maxThresholdHitsH = floor(Height/2);
+
+   if (threshold==0)
+      maxThresholdHitsW = maxThresholdHitsH = 1;
+
+   int clrPrimeA = bitmapData[0];
+   int clrPrimeB = bitmapData[1];
+   int clrPrimeC = bitmapData[Height];
+   int prevR1 = wrapRGBtoGray(clrPrimeA, 1);
+   int prevR2 = wrapRGBtoGray(clrPrimeB, 1);
+   int prevR3 = wrapRGBtoGray(clrPrimeC, 1);
+   int prevR4 = (prevR1 + prevR2 + prevR3)/3;
+   int oprevR4 = prevR4;
+
+   int ToleranceHits = 0;
+   int loopDone = 0;
+   int x = 0; int y = 0;
+   if (whichLoop==1)
+   {
+      for (y = 0; y < Height; y++)
+      {
+         for (x = 0; x < Width; x++)
+         {
+            int clrR1 = bitmapData[x + (y * Width)];
+            int R1 = wrapRGBtoGray(clrR1, 1);
+            int d = abs(prevR4 - R1);
+
+            if (aaMode==1)
+            {
+               if (inRange(d - adaptLevel, d + adaptLevel, vTolrc))
+                  prevR4 = R1;
+
+               // d = min(d, abs(oprevR4 - R1));
+            }
+
+            if (ToleranceHits<maxThresholdHitsW && d>vTolrc)
+            {
+               ToleranceHits++;
+            } else if (d<=vTolrc)
+            {
+               d = 0;
+            } else
+            {
+               loopDone = 1;
+               break;
+            }
+            // fnOutputDebug(std::to_string(whichLoop) + " d" + std::to_string(d) + " R" + std::to_string(R1) + " H" + std::to_string(ToleranceHits) + " maxH" + std::to_string(maxThresholdHitsW) );
+         }
+
+         ToleranceHits = 0;
+         if (loopDone==1)
+         {
+            *fcoord = y;
+            break;
+         }
+      }
+   } else if (whichLoop==2)
+   {
+      for (x = 0; x < Width; x++)
+      {
+         for (y = 0; y < Height; y++)
+         {
+            int clrR1 = bitmapData[x + (y * Width)];
+            // int clrR1 = bitmapData[x * Height + y];
+            int R1 = wrapRGBtoGray(clrR1, 1);
+            int d = abs(prevR4 - R1);
+
+            if (inRange(d - adaptLevel, d + adaptLevel, vTolrc) && aaMode==1)
+               prevR4 = R1;
+
+            if (ToleranceHits<maxThresholdHitsW && d>vTolrc)
+            {
+               ToleranceHits++;
+            } else if (d<=vTolrc)
+            {
+               d = 0;
+            } else
+            {
+               loopDone = 1;
+               break;
+            }
+            // fnOutputDebug(std::to_string(whichLoop) + " d" + std::to_string(d) + " R" + std::to_string(R1) + " H" + std::to_string(ToleranceHits) + " maxH" + std::to_string(maxThresholdHitsW) );
+         }
+
+         ToleranceHits = 0;
+         if (loopDone==1)
+         {
+            *fcoord = x;
+            break;
+         }
+      }
+   }
+   // fnOutputDebug(std::to_string(whichLoop) + " fc" + std::to_string(*fcoord)  + " x" + std::to_string(x) + " y" + std::to_string(y) + " prev=" + std::to_string(prevR4) );
+
+   return 1;
 }
 
 DLL_API int DLL_CALLCONV EraserBrush(int *imageData, int *maskData, int w, int h, int invertMask, int replaceMode, int levelAlpha, int *clonedData, int useClone) {
@@ -1752,10 +1864,17 @@ DLL_API UINT DLL_CALLCONV clearHammingDistanceResults() {
     return 1;
 }
 
-DLL_API UINT DLL_CALLCONV hammingDistanceOverArray(UINT64 *givenHashesArray, UINT64 *givenFlippedHashesArray, UINT *givenIDs, UINT arraySize, int threshold, UINT hamDistLBorderCrop, UINT hamDistRBorderCrop, int checkInverted, int checkFlipped) {
+void setMainWindowTitle(std::string str, HWND pvHwnd) {
+  // std::string str = "Calculating hamming distance: " + std::to_string(yay) + " / " + std::to_string(yoyo);
+  std::wstring temp = std::wstring(str.begin(), str.end());
+  LPCWSTR wideString = temp.c_str();
+
+  SetWindowText(pvHwnd, wideString);
+}
+
+DLL_API UINT DLL_CALLCONV hammingDistanceOverArray(UINT64 *givenHashesArray, UINT64 *givenFlippedHashesArray, UINT *givenIDs, UINT arraySize, int threshold, UINT hamDistLBorderCrop, UINT hamDistRBorderCrop, int checkInverted, int checkFlipped, int stepping, int offsetu, int* hoffset) {
    UINT results = 0;
    UINT n = arraySize;
-   bool done = false;
    bool doRange = (hamDistLBorderCrop==0 && hamDistRBorderCrop==0) ? 0 : 1;
    // int mainIndex = 1;
    // int returnVal = 1;
@@ -1764,27 +1883,26 @@ DLL_API UINT DLL_CALLCONV hammingDistanceOverArray(UINT64 *givenHashesArray, UIN
    // ss << " maxResults " << maxResults;
    // OutputDebugStringA(ss.str().data());
 
-    #pragma omp parallel for schedule(dynamic) default(none) shared(results)
-    for ( INT secondIndex = 0 ; secondIndex<n+1 ; secondIndex++)
+    int noffset = 0;
+    for ( INT secondIndex = offsetu ; secondIndex<n+1 ; secondIndex++)
     {
         UINT64 invert2ndindex = 0;
         // UINT64 reversed2ndindex = 0;
         if (checkInverted==1)
-        {
            invert2ndindex = ~(givenHashesArray[secondIndex]);
-        }
+
         // if (checkFlipped==1)
         // {
         //    reversed2ndindex = revBits_entire(givenHashesArray[secondIndex]);
         //    // fnOutputDebug("reverso " + to_string(givenHashesArray[secondIndex]) + " -- " + to_string(reversed2ndindex));
         // }
 
+        noffset++;
+        #pragma omp parallel for schedule(dynamic) default(none) shared(results)
         for ( INT mainIndex = secondIndex + 1 ; mainIndex<n ; mainIndex++)
         {
             int diff2 = 900;
             int diff3 = 900;
-            // if (done==1)
-            //    break;
 
             int diff = hammingDistance(givenHashesArray[mainIndex], givenHashesArray[secondIndex], hamDistLBorderCrop, hamDistRBorderCrop, doRange);
             if (checkInverted==1)
@@ -1799,12 +1917,10 @@ DLL_API UINT DLL_CALLCONV hammingDistanceOverArray(UINT64 *givenHashesArray, UIN
             {
                if (diff<threshold)
                {
-        
                    dupesListIDsA.push_back(givenIDs[mainIndex]);
                    dupesListIDsB.push_back(givenIDs[secondIndex]);
                    dupesListIDsC.push_back(diff);
                    results++;
-                   // done = results > maxResults;
                };
 
                if (diff2<threshold)
@@ -1825,8 +1941,11 @@ DLL_API UINT DLL_CALLCONV hammingDistanceOverArray(UINT64 *givenHashesArray, UIN
                }
             }
         }
+        if (noffset>stepping)
+           break;
     }
 
+   *hoffset = noffset;
    // fnOutputDebug("hamDist results=" + to_string(results));
    // int test = hammingDistance(givenHashesArray[5], givenHashesArray[7]);
    // std::stringstream ss;

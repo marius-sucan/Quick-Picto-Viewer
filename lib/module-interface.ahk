@@ -54,7 +54,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , menusListVector := "File:VectorFile|Edit:VectorEdit|Selection:VectorSelection|View:VectorView|Interface:VectorInterface"
      , menusListThumbs := "File:File|Edit:Edit|Selection:Selection|Image:Image|Slides:Slides|Find:Find|List:List|Sort:Sort|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
      , menusListWelcome := "File:File|Edit:Edit|Interface:Interface|Settings:Settings|Help:Help"
-     , prevMenuBarItem := 1, lastContextMenuZeit := 1
+     , prevMenuBarItem := 1, lastContextMenuZeit := 1, colorPickerMustEnd := 0
 
 ; OnMessage(0x388, "WM_PENEVENT")
 OnMessage(0x2a3, "WM_MOUSELEAVE")
@@ -824,6 +824,7 @@ WM_LBUTTONDOWN(wP, lP, msg, Az) {
 
 WM_LBUTTONUP(wP, lP, msg, hwnd) {
     LbtnDwn := 0
+    colorPickerMustEnd := 1
     Return 0
 }
 
@@ -831,6 +832,7 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
     If (A_TickCount - scriptStartTime<500)
        Return 0
 
+    colorPickerMustEnd := -1
     If preventSillyGui(A_Gui)
        Return
 
@@ -897,6 +899,7 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
   If (A_TickCount - scriptStartTime<500)
      Return 0
 
+  colorPickerMustEnd := -1
   If preventSillyGui(A_Gui)
      Return
 
@@ -991,6 +994,13 @@ infosSlideShow(a, b, c, d, e) {
    slideShowRunning := a,  SlideHowMode := b
    animGIFplaying := c,    allowNextSlide := d
    runningLongOperation := e
+}
+
+initSlidesModes(paramA, paramB, paramC, paramD) {
+    animGIFplaying := paramA
+    allowNextSlide := paramB
+    maxFilesIndex := paramC
+    slidesFXrandomize := paramD
 }
 
 slideshowsHandler(thisSlideSpeed, act, how, msgu:=0) {
@@ -1407,6 +1417,9 @@ activateMainWin() {
       Return
 
    lastMouseLeave := A_TickCount
+   If (A_TickCount - lastOtherWinClose>500)
+      colorPickerMustEnd := 1
+
    LbtnDwn := 0
    Sleep, -1
    MouseGetPos, ,, winu
@@ -1609,15 +1622,15 @@ byeByeRoutine() {
    {
       MainExe.ahkPostFunction("exitAppu", "select-external")
       ;  lastCloseInvoked++
-   } Else lastCloseInvoked := 10
+   } Else lastCloseInvoked := 5
 
-   If (A_TickCount - lastOtherWinClose < 450)
+   If (A_TickCount - lastOtherWinClose < 650)
       Return
 
    If (lastCloseInvoked>3)
    {
       ; SoundBeep , 500, 2000
-      SetTimer, TimerExit, % (lastCloseInvoked=10) ? -950 : -10
+      SetTimer, TimerExit, % (lastCloseInvoked>5) ? -550 : -10
       MainExe.ahkPostFunction("TrueCleanup", 1)
    }
    lastInvoked := A_TickCount
@@ -1863,6 +1876,7 @@ coreShowSysMenu(Hwnd, x, y) {
 stopGiFsPlayback() {
    If (animGIFplaying!=0)
    {
+      lastOtherWinClose := A_TickCount
       animGIFplaying := 0
       MainExe.ahkPostFunction("autoChangeDesiredFrame", "stop")
       changeMcursor("normal-extra")
@@ -1879,6 +1893,7 @@ turnOffSlideshow() {
    MainExe.ahkPostFunction("dummyInfoToggleSlideShowu", "stop")
    If (slideShowDelay<950)
       SoundBeep , 900, 100
+   lastOtherWinClose := A_TickCount
 }
 
 getMenuCoords(menuLabel) {
@@ -2371,6 +2386,17 @@ PreProcessKbdKey() {
    If (A_TickCount - lastInvoked>250)
       counter := 0
 
+   If (hotkate="Escape" || hotkate="Enter" || hotkate="Space")
+   {
+       pp := (slideShowRunning=1 || slideShowRunning=1) ? 1 : 0
+       If (animGIFplaying=1)
+          stopGiFsPlayback()
+       If (slideShowRunning=1)
+          turnOffSlideshow()
+       If pp
+          Return
+   }
+
    ; addJournalEntry(A_ThisFunc "(): " thisWin "|" hotkate)
    If (A_TickCount - lastInvoked>30) && (whileLoopExec=0 && runningLongOperation=0)
    {
@@ -2414,7 +2440,7 @@ WM_KEYDOWN(wParam, lParam, msg, hwnd) {
     vk_code := Format("{1:x}", wParam)
     ; ToolTip, % vk_code "|" whileLoopExec "|" runningLongOperation "|" imageLoading "|" animGIFplaying , , , 2
 
-    If (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1 && animGIFplaying!=1) && (vk_code!="1B")
+    If (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1) && (vk_code!="1B" && animGIFplaying!=1 && slideShowRunning!=1)
     || (A_TickCount - lastOtherWinClose<300)
        Return 0
 

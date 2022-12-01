@@ -303,7 +303,7 @@ SetStretchBltMode(hdc, iStretchMode:=4) {
 ; Description        Associates a new image with a static control
 ;
 ; hwnd               handle of the control to update
-; hBitmap            a gdi bitmap to associate the static control with
+; hBitmap            a GDI bitmap to associate the static control with
 ;
 ; return             If the function succeeds, the return value is nonzero
 
@@ -315,6 +315,40 @@ SetImage(hwnd, hBitmap) {
 
    E := DllCall("SendMessage", "UPtr", hwnd, "UInt", 0x172, "UInt", 0x0, "UPtr", hBitmap)
    DeleteObject(E)
+   return E
+}
+
+;#####################################################################################
+
+; Function           Gdip_SetPbitmapCtrl
+; Description        Associates a GDI+ bitmap with a static control
+; note               the control should be a static text with +0xE -Border 
+
+; hwnd               handle of the control to update
+; pBitmap            a GDI+ bitmap to associate the static control with
+
+; return             If the function succeeds, the return value is nonzero
+
+Gdip_SetPbitmapCtrl(hwnd, pBitmap, w:=0, h:=0, quality:=7, KeepRatio:=0) {
+   If (!pBitmap || !hwnd)
+      Return 0
+
+   If (!w || !h)
+      WinGetPos, , , w, h, ahk_id %hwnd%
+
+   Gdip_GetImageDimensions(pBitmap, imgW, imgH)
+   If (imgW!=w || imgH!=h)
+      fbmp := Gdip_ResizeBitmap(pBitmap, w, h, KeepRatio, quality)
+   Else
+      fbmp := Gdip_CloneBitmap(pBitmap)
+
+   If !fbmp
+      Return 0
+
+   hBitmap := Gdip_CreateHBITMAPFromBitmap(fbmp)
+   E := SetImage(hwnd, hBitmap)
+   DeleteObject(hBitmap)
+   Gdip_DisposeImage(fbmp)
    return E
 }
 
@@ -631,9 +665,9 @@ PrintWindow(hwnd, hdc, Flags:=2) {
 ; set Flags to 2, to capture hardware accelerated windows
 ; this only applies on Windows 8.1 and later versions.
 
-   If ((A_OSVersion="WIN_XP" || A_OSVersion="WIN_2000" || A_OSVersion="WIN_2003") && flags=2)
+   If ((A_OSVersion="WIN_XP" || A_OSVersion="WIN_7" || A_OSVersion="WIN_2000" || A_OSVersion="WIN_2003") && flags=2)
       flags := 0
- 
+
    return DllCall("PrintWindow", "UPtr", hwnd, "UPtr", hdc, "uint", Flags)
 }
 
