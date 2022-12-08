@@ -207,7 +207,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , userExtractFramesFmt := 3, maxMultiPagesAllowed := 2048, maxMemLimitMultiPage := 2198765648
    , cmdExifTool := "", tabzDarkModus := 0, maxRecentOpenedFolders := 15
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.7.9", vReleaseDate := "2022/12/01" ; yyyy-mm-dd
+   , appVersion := "5.8.0", vReleaseDate := "2022/12/08" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -326,6 +326,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , userCombineSubFrames := 0, blurAreaYamount := 10, blurAreaEqualXY := 1, UserAddNoiseMode := 1
    , UserAddNoiseDetails := 10, slidesRandoMode := 1, convertOnAutoCrop := 0, AutoCropStrongAdaptiveMode := 0
    , UIcropThreshold := 5, onConflictMultiRenameAct := 4, userActionAutoCropConflictingFile := 4
+   , userCopyMoveStructuredConflictMode := 4
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -2930,6 +2931,204 @@ fileSizeFriendly(bytez) {
   Return totalSize
 }
 
+copyMoveStructuredFolders(srcDir, finalDest) {
+   Static lastInvoked := 1
+   filesElected := getSelectedFiles(0, 1)
+   If (srcDir=finalDest || !srcDir || !finalDest || filesElected<2)
+      Return
+
+   If (filesElected>150) ; ((A_TickCount - lastInvoked > 29500) && dummy!="quick-actu")
+   {
+      wording := (UsrCopyMoveOperation=2) ? "MOVE" : "COPY"
+      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Please confirm you want to " wording " the selected files.`n`nSelected " groupDigits(filesElected) " files`nDestination: " finalDest "\", 4, 0, "question")
+      If (msgResult!="Yes")
+         Return 0
+   }
+
+   BtnCloseWindow()
+   lastInvoked := A_TickCount
+   friendly := (UsrCopyMoveOperation=2) ? "Moving " : "Copying "
+   showTOOLtip(friendly groupDigits(filesElected) " files to`n" finalDest "\`nPlease wait")
+
+   destroyGDIfileCache()
+   Sleep, 25
+   nullvara := askAboutFileCollision(0, 0, 1, 3, 0, nullvar)
+   prevMSGdisplay := A_TickCount
+   startOperation := A_TickCount
+   doStartLongOpDance()
+   countTFilez := filezMoved := failedFiles := skippedFiles := 0
+   oFinalDest := finalDest
+   forceConflictOption := userCopyMoveStructuredConflictMode
+   If (SLDtypeLoaded=3)
+      activeSQLdb.Exec("BEGIN TRANSACTION;")
+   prevuDir := ""
+   Loop, % maxFilesIndex
+   {
+      isSelected := resultedFilesList[A_Index, 2]
+      If (isSelected!=1)
+         Continue
+
+      changeMcursor()
+      thisFileIndex := A_Index
+      file2rem := getIDimage(thisFileIndex)
+      countTFilez++
+      If !FileExist(file2rem)
+      {
+         failedFiles++
+         Continue
+      }
+
+      If !InStr(file2rem, srcDir "\")
+      {
+         skippedFiles++
+         Continue
+      }
+
+      FileGetTime, originalMtime, % file2rem, M
+      FileGetTime, originalCtime, % file2rem, C
+      executingCanceableOperation := A_TickCount
+      If (A_TickCount - prevMSGdisplay>2000)
+      {
+         etaTime := ETAinfos(countTFilez, filesElected, startOperation)
+         If (skippedFiles>0)
+            etaTime .= "`n" groupDigits(skippedFiles) " files were skipped"
+         If (failedFiles>0)
+            etaTime .= "`nFailed to perform action on " groupDigits(failedFiles) " files"
+
+         showTOOLtip(friendly "files and structure to`n" finalDest "\" etaTime, 0, 0, countTFilez/filesElected)
+         prevMSGdisplay := A_TickCount
+      }
+
+      file2save := StrReplace(file2rem, srcDir "\", finalDest "\")
+      zPlitPath(file2save, 1, OldOutFileName, OutDir, OutFileNameNoExt, OutFileExt)
+      If (prevuDir!=OutDir)
+      {
+         If !FolderExist(OutDir)
+         {
+            FileCreateDir, % OutDir
+            If ErrorLevel
+            {
+               failedFiles++
+               Continue
+            } Else prevuDir := OutDir
+         }
+      }
+      ; Tooltip, % file2rem "`n" file2save "`n" OutDir
+
+      thisFileExists := wasError := operationExecuted := 0
+      If (FileExist(file2save) && !FolderExist(file2save))
+      {
+         thisFileExists := 1
+         file2save := askAboutFileCollision(file2rem, file2save, 1, 0, forceConflictOption, performOverwrite)
+      }
+  
+      If !file2save
+      {
+         skippedFiles++
+         Continue
+      } Else If (file2save="abort")
+      {
+         abandonAll := 1
+         Break
+      }
+  
+      If (thisFileExists=1)
+      {
+         If (performOverwrite=1)
+         {
+            FileSetAttrib, -R, %file2save%
+            Sleep, 2
+            FileRecycle, %file2save%
+            Sleep, 2
+            mustPerformOperation := 1
+         } Else If (performOverwrite!=2)
+         {
+            skippedFiles++
+            Continue
+         } Else mustPerformOperation := 1
+      } Else mustPerformOperation := 1
+
+      If (mustPerformOperation=1)
+      {
+         operationExecuted := 1
+         If (UsrCopyMoveOperation=2)
+            FileMove, %file2rem%, %file2save%, 1
+         Else
+            FileCopy, %file2rem%, %file2save%, 1
+         If ErrorLevel
+            wasError := 1
+      }
+
+      If (wasError!=1 && operationExecuted=1)
+      {
+         updateDates := 1
+         If (originalMtime)
+         {
+            FileSetTime, % originalMtime, % file2save, M
+            FileSetTime, % originalCtime, % file2save, C
+            updateDates := 0
+         }
+
+         filezMoved++
+         ; zPlitPath(file2save, 0, OldOutFileName, OldOutDir)
+         If (UsrCopyMoveOperation=2)
+         {
+            resultedFilesList[thisFileIndex, 1] := file2save
+            ; resultedFilesList[thisFileIndex, 2] := 1
+            If (SLDtypeLoaded=3)
+               updateSQLdbEntry(file2rem, file2save, updateDates, resultedFilesList[thisFileIndex, 12])
+
+            updateMainUnfilteredList(thisFileIndex, 1, file2save)
+         }
+      } Else If (operationExecuted=1)
+         failedFiles++
+
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+   }
+
+   someErrors := "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
+   If (SLDtypeLoaded=3)
+   {
+      If !activeSQLdb.Exec("COMMIT TRANSACTION;")
+         someErrors .= "`nFailed to commit changes to the SQL database"
+   }
+
+   If (skippedFiles>0)
+      someErrors .= "`n" groupDigits(skippedFiles) " files were skipped"
+   If (failedFiles>0)
+      someErrors .= "`nFailed to perform action on " groupDigits(failedFiles) " files"
+
+   watchFolderDetails := ""
+   If (UsrCopyMoveOperation=2 && filezMoved>0)
+      currentFilesListModified := 1
+
+   ForceRefreshNowThumbsList()
+   dummyTimerDelayiedImageDisplay(100)
+   If (UsrCopyMoveOperation=2)
+   {
+      If (abandonAll=1)
+         showTOOLtip("Operation aborted. " groupDigits(filezMoved) " out of " groupDigits(filesElected) " selected files were moved to`n" finalDest "\" someErrors)
+      Else
+         showTOOLtip("Finished moving " groupDigits(filezMoved) " out of " groupDigits(filesElected) " files to`n" finalDest "\" someErrors)
+   } Else
+   {
+      If (abandonAll=1)
+         showTOOLtip("Operation aborted. " groupDigits(filezMoved) " out of " groupDigits(filesElected) " selected files were copied to`n" finalDest "\" someErrors)
+      Else
+         showTOOLtip("Finished copying " groupDigits(filezMoved) " out of " groupDigits(filesElected) " files to`n" finalDest "\" someErrors)
+   }
+
+   SetTimer, ResetImgLoadStatus, -50
+   SoundBeep, % (abandonAll=1) ? 300 : 900, 100
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+   lastInvoked := A_TickCount
+   Return 0
+}
+
 CalculateSelectedFilesSizes() {
   DestroyGIFuWin()
   If (slideShowRunning=1)
@@ -2971,7 +3170,7 @@ CalculateSelectedFilesSizes() {
         If failedFiles
            etaTime .= "`nFailed to collect data for " groupDigits(failedFiles) " files"
 
-        showTOOLtip("Calculating total files size, please Wait`nTotal size: " totalSize etaTime, 0, 0, countFiles/markedSelectFile)
+        showTOOLtip("Calculating total files size`nTotal size: " thisSize etaTime, 0, 0, countFiles/markedSelectFile)
         prevMSGdisplay := A_TickCount
      }
 
@@ -5143,12 +5342,15 @@ MouseMoveResponder(actu:=0) {
   brushingMode := (liveDrawingBrushTool=1 && AnyWindowOpen=64) || (FloodFillSelectionAdj!=1 && AnyWindowOpen=66) ? 1 : 0
   If (editingSelectionNow=1 && thumbsDisplaying=0 && actu="krill" && drawingShapeNow!=1 && (A_TickCount - lastMenuZeit>250))
   {
-     Gdip_GraphicsClear(2NDglPG, "0x00" WindowBgrColor)
-     ; clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
-     GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
-     setMainCanvasTransform(mainWidth, mainHeight, 2NDglPG)
-     SkeletDrawSelectionBox()
-     Gdip_ResetWorldTransform(2NDglPG)
+     If (AnyWindowOpen!=12)
+     {
+        Gdip_GraphicsClear(2NDglPG, "0x00" WindowBgrColor)
+        ; clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
+        GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+        setMainCanvasTransform(mainWidth, mainHeight, 2NDglPG)
+        SkeletDrawSelectionBox()
+        Gdip_ResetWorldTransform(2NDglPG)
+     }
      If identifyThisWin()
         SetTimer, dummyRefreshImgSelectionWindow, -150
   } Else If (drawingShapeNow=1)
@@ -5325,9 +5527,11 @@ applyIMGeditKeepWin() {
 
 applyIMGeditFunction() {
     ; recordSelUndoLevelNow()
+    GuiControl, SettingsGUIA: Disable, btnLiveApplyTool
     If isNowAlphaPainting()
     {
        toggleAlphaPaintingMode()
+       GuiControl, SettingsGUIA: Enable, btnLiveApplyTool
        Return
     }
 
@@ -5353,7 +5557,10 @@ applyIMGeditFunction() {
        BtnPerformJpegOp()
     Else
        BtnCloseWindow()
+
     SetTimer, RemoveTooltip, -300
+    If AnyWindowOpen
+       GuiControl, SettingsGUIA: Enable, btnLiveApplyTool
 }
 
 LivePreviewAlphaMaskPasteInPlace() {
@@ -7783,7 +7990,7 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
             rDest := SubStr(dest, InStr(dest, "\", 0, -1) + 1)
             If (doNotAskAgain=0 && InStr(dest, ":\") && r)
             {
-               msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action from the main window into the omnibox: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: selected files`nDestination: .\" rDest "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
+               msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action from the main window into the omnibox: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: selected files`nDestination: .\" rDest "\", "&Yes|&No", 2, "question", "Do not ask again in this application session")
                If !InStr(msgResult.btn, "Yes")
                {
                   SetTimer, PopulateQuickMenuSearch, -200
@@ -10937,12 +11144,12 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
 
     thisBlur := Round(TextInAreaBlurAmount * scaleuBlrPreview)
     If (thisBlur>0 && TextInAreaDoBlurs=1 && !isWinXP)
-       pEffect := Gdip_CreateEffect(1, thisBlur, 0, 0)
+       pEffect := 1 ; Gdip_CreateEffect(1, thisBlur, 0, 0)
 
     ; ToolTip, % thisBlur "`n" scaleuBlrPreview "`n" scaleuPreview , , , 2
     thisBorderBlur := Round(TextInAreaBlurBorderAmount * scaleuBlrPreview)
     If (thisBorderBlur>0 && TextInAreaDoBlurs=1 && !isWinXP)
-       zEffect := Gdip_CreateEffect(1, thisBorderBlur, 0, 0)
+       zEffect := 1 ; Gdip_CreateEffect(1, thisBorderBlur, 0, 0)
 
     zBrush := Gdip_BrushCreateSolid(bgrColor)
     thisQuality := (previewMode=1) ? 5 : 7
@@ -10979,12 +11186,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
 
        pBitmapContours := objBMPs[2]
        If (pEffect && (TextInAreaBgrUnified!=1 || TextInAreaPaintBgr!=1))
-       {
-          If (previewMode!=1 || userimgQuality=1)
-             ApplySpecialFixedBlur(A_ThisFunc, pBitmap, thisBlur, pEffect)
-          Else
-             Gdip_BitmapApplyEffect(pBitmap, pEffect)
-       }
+          QPV_BoxBlurBitmap(pBitmap, thisBlur, thisBlur, 0)
 
        thisBMP := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH, "0xE200B")
        If StrLen(thisBMP)<3
@@ -11043,12 +11245,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
        If (doConturDraw=1 && TextInAreaOnlyBorder!=1 && pBitmapContours)
        {
           If zEffect
-          {
-             If (previewMode!=1 || userimgQuality=1)
-                ApplySpecialFixedBlur(A_ThisFunc, pBitmapContours, thisBorderBlur, zEffect)
-             Else
-                Gdip_BitmapApplyEffect(pBitmapContours, zEffect)
-          }
+             QPV_BoxBlurBitmap(pBitmapContours, thisBorderBlur, thisBorderBlur, 0)
 
           thizBMP := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH, "0xE200B")
           G5 := trGdip_GraphicsFromImage(A_ThisFunc, thizBMP)
@@ -11106,11 +11303,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
     {
        If pEffect
        {
-          If (previewMode!=1 || userimgQuality=1)
-             ApplySpecialFixedBlur(A_ThisFunc, mainBMP, thisBlur, pEffect)
-          Else
-             Gdip_BitmapApplyEffect(mainBMP, pEffect)
-
+          QPV_BoxBlurBitmap(mainBMP, thisBlur, thisBlur, 0)
           fBMP := trGdip_CreateBitmap(A_ThisFunc, maxW, maxH)
           G7 := trGdip_GraphicsFromImage(A_ThisFunc, fBMP)
           trGdip_GraphicsClear(A_ThisFunc, G7, o_txtColor)
@@ -11145,8 +11338,8 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
        mainBMP := newBMP
     }
 
-    Gdip_DisposeEffect(pEffect)
-    Gdip_DisposeEffect(zEffect)
+    ; Gdip_DisposeEffect(pEffect)
+    ; Gdip_DisposeEffect(zEffect)
     Gdip_DeleteBrush(zBrush)
     obju := [mainBMP, minedX, minedY, maxedW, maxedH, scaleuPreview]
     Return obju
@@ -11508,9 +11701,7 @@ realtimePasteInPlaceBlurrator(previewMode, clipBMP, ByRef newBitmap) {
           setWindowTitle("Applying blur filter on image")
 
        ; ToolTip, % thisAmount "=" fScale  , , , 2
-       pEffect := Gdip_CreateEffect(1, thisAmount, 0, 0)
-       ApplySpecialFixedBlur(A_ThisFunc, clipBMP, thisAmount, pEffect, previewMode)
-       Gdip_DisposeEffect(pEffect)
+       QPV_BoxBlurBitmap(clipBMP, thisAmount, thisAmount, 0)
     }
 
     If (PasteInPlaceToolMode=1) ; && (prevVPselRotation>0 || prevEllipseSelectMode>0))
@@ -11953,6 +12144,7 @@ QPV_CreatePlasmaBMP(W, H, intensity, details, scaleu, doGray, blurX, blurY, doBl
   pBitmap := DllCall(whichMainDLL "\" func2exec, "Int", w, "Int", h, "Int", intensity, "Int", details, "Int", scaleu, "int", blurX, "int", blurY, "int", doBlur, "UPtr")
   If (StrLen(pBitmap)>2 && doGray=1)
   {
+     createdGDIobjsArray["x" r] := [r, "bmp", 1, A_ThisFunc]
      pEffectGray := Gdip_CreateEffect(6, 0, -100, 0)
      Gdip_BitmapApplyEffect(pBitmap, pEffectGray)
      Gdip_DisposeEffect(pEffectGray)
@@ -12053,11 +12245,8 @@ generateAlphaMaskBitmap(clipBMP, previewMode, offX:=0, offY:=0, offW:=0, offH:=0
              thisAlphaBlur := Round(thisAlphaBlur * (rsize / msize))
 
           If (thisAlphaBlur>1)
-          {
-             pBlurEffect := Gdip_CreateEffect(1, thisAlphaBlur, 0)
-             ApplySpecialFixedBlur(A_ThisFunc, alphaMaskGray, thisAlphaBlur, pBlurEffect, 0)
-             Gdip_DisposeEffect(pBlurEffect)
-          }
+             QPV_BoxBlurBitmap(alphaMaskGray, thisAlphaBlur, thisAlphaBlur, 0)
+
           allGood := 1
           ; ToolTip, % clipBMP "--" alphaMaskGray "--" userAlpha "=" brLvl "=" contrLvl , , , 2
        } Else 
@@ -12293,6 +12482,7 @@ applyPersonalizedColorsBMP(clipBMP, doBlur, blurStrength, applyColorFX) {
 
     If (blurStrength>2 && doBlur=1)
     {
+       ; QPV_BoxBlurBitmap(clipBMP, blurStrength, blurStrength, 0)
        pEffect := Gdip_CreateEffect(1, blurStrength, 0, 0)
        ApplySpecialFixedBlur(A_ThisFunc, clipBMP, blurStrength, pEffect, 0)
        Gdip_DisposeEffect(pEffect)
@@ -12690,9 +12880,7 @@ getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, oImgW, oImgH, imgSel
           If (BlurAmount>1 && prevBlurredBMP)
           {
              BlurAmount := Round(BlurAmount*zoomLevel)
-             zEffect := Gdip_CreateEffect(1, BlurAmount, 0, 0)
-             ApplySpecialFixedBlur(A_ThisFunc, prevBlurredBMP, BlurAmount, zEffect, 1)
-             Gdip_DisposeEffect(zEffect)
+             QPV_BoxBlurBitmap(prevBlurredBMP, BlurAmount, BlurAmount, 0)
           }
           prevFXid := thisFXid
        } Else
@@ -12772,13 +12960,9 @@ getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, oImgW, oImgH, imgSel
        Return
     }
 
+    BlurAmount := Round(BlurAmount)
     If (BlurAmount>1 && G2)
-    {
-       BlurAmount := Round(BlurAmount)
-       zEffect := Gdip_CreateEffect(1, BlurAmount, 0, 0)
-       ApplySpecialFixedBlur(A_ThisFunc, newBitmap, BlurAmount, zEffect)
-       Gdip_DisposeEffect(zEffect)
-    }
+       QPV_BoxBlurBitmap(newBitmap, BlurAmount, BlurAmount, 0)
 
     prevState := 0
     Return newBitmap
@@ -14795,16 +14979,14 @@ carvePathFromBitmap(ByRef pBitmap, pPath, cX, cY, modus, safeWay:=0, blurLevel:=
 
        Gdip_DeleteGraphics(G3)
        thisAmount := clampInRange(blurLevel, 1, 255)
-       pEffect := Gdip_CreateEffect(1, thisAmount, 0, 0)
-       ApplySpecialFixedBlur(A_ThisFunc, newBitmap, thisAmount, pEffect, 0)
-       Gdip_DisposeEffect(pEffect)
+
+       QPV_BoxBlurBitmap(newBitmap, thisAmount, thisAmount, 0)
        If (blurLevel>257)
        {
           thisAmount := clampInRange(blurLevel - 255, 1, 255)
-          pEffect := Gdip_CreateEffect(1, thisAmount, 0, 0)
-          ApplySpecialFixedBlur(A_ThisFunc, newBitmap, thisAmount, pEffect, 0)
-          Gdip_DisposeEffect(pEffect)
+          QPV_BoxBlurBitmap(newBitmap, thisAmount, thisAmount, 0)
        }
+
        r0 := QPV_SetAlphaChannel(pBitmap, newBitmap)
        Gdip_DeletePath(zPath)
        Gdip_DeletePath(wPath)
@@ -15737,7 +15919,7 @@ BlurSelectedArea() {
           If (thisBlurMode=3)
              QPV_BoxBlurBitmap(xBitmap, o_blurAreaAmount, o_blurAreaYamount, 1)
           Else If (thisBlurMode=2)
-             QPV_BoxBlurBitmap(xBitmap, o_blurAreaAmount, o_blurAreaYamount, 0)
+             QPV_BoxBlurBitmap(xBitmap, o_blurAreaAmount, o_blurAreaYamount, 0, 1)
           Else If (thisBlurMode=1)
              ApplySpecialFixedBlur(A_ThisFunc, xBitmap, o_blurAreaAmount, pEffect)
 
@@ -15819,7 +16001,7 @@ BlurSelectedArea() {
     addJournalEntry(A_ThisFunc "() operation elapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)))
 }
 
-zoomBlurSelectedArea() {
+ZoomBlurSelectedArea() {
     startZeit := A_TickCount
     stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc)
     whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
@@ -15889,23 +16071,29 @@ zoomBlurSelectedArea() {
     If (BlurAreaBlendMode>1 || allowAlphaMasking=1)
        bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
 
-    If (blurAreaOpacity>252 && blurAreaSoftEdges!=1)
+    If (blurAreaOpacity>252)
        r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
 
     setWindowTitle("BLURRING IMAGE, please wait", 1)
     thisOpacity := blurAreaOpacity/255
-    startOpacity := thisOpacity/6
-    thisBlurAmount := clampInRange(5 + Round(zoomBlurAreaXamount/2) - 2, 5, 20) ; A_Index * thisBlur
-    pEffect := Gdip_CreateEffect(1, thisBlurAmount, 0, 0)
     gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
-    G3 := trGdip_GraphicsFromImage(A_ThisFunc, gBitmap, 3, 4)
+    G3 := trGdip_GraphicsFromImage(A_ThisFunc, gBitmap, 1, 3)
+    Gdip_SetClipRect(G3, 0, 0, imgSelW, imgSelH)
     thisO := 0.85
     dimgSelPx := imgSelPx, dimgSelPy := imgSelPy
     dimgSelW := imgSelW, dimgSelH := imgSelH
 
     prcX := (clampInRange(tinyPrevAreaCoordX, imgSelPx, imgSelW) - imgSelPx)/imgSelW
     prcY := (clampInRange(tinyPrevAreaCoordY, imgSelPy, imgSelH) - imgSelPy)/imgSelH
-    b := zoomBlurAreaXamount*2
+    b := (zoomBlurAreaXamount*2)/1980
+    b := b*((imgSelW + imgSelH)/2)
+    thisBlurX := thisBlurY := clampInRange(Round(zoomBlurAreaXamount * 0.51), 1, 21)
+    If (zoomBlurMode=2)
+       thisBlurY := thisBlurY/5 + 1
+    Else If (zoomBlurMode=3)
+       thisBlurX := thisBlurX/5 + 1
+    doStartLongOpDance()
+    fnOutputDebug("zb=" b "|" thisBlurX "|" thisBlurY)
     If isInRange(zoomBlurMode, 1, 3)
     {
        Loop
@@ -15914,9 +16102,9 @@ zoomBlurSelectedArea() {
           If (thisO<0)
              Break
 
-          showTOOLtip("Radial blur: step " A_Index,, , (1 - thisO)/1)
+          showTOOLtip("Radial blur: step " A_Index ".0`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startZeit)/1000, 3)),, , (1 - thisO)/1)
           ; fnOutputDebug(thisBlurAmount "=" thisO)
-          ApplySpecialFixedBlur(A_ThisFunc, zBitmap, thisBlurAmount, pEffect)
+          QPV_BoxBlurBitmap(zBitmap, thisBlurX, thisBlurY, 0)
           If (zoomBlurMode=1 || zoomBlurMode=2)
              dimgSelW += A_Index * b
           If (zoomBlurMode=1 || zoomBlurMode=3)
@@ -15927,33 +16115,27 @@ zoomBlurSelectedArea() {
           If (zoomBlurMode=1 || zoomBlurMode=3)
              dimgSelPy := 0 - (dimgSelH - imgSelH)*prcY
 
+          If (determineTerminateOperation()=1)
+          {
+             abandonAll := 1
+             Break
+          }
+
+          showTOOLtip("Radial blur: step " A_Index ".5`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startZeit)/1000, 3)),, , (1 - (thisO - 0.05))/1)
           r1 := trGdip_DrawImage(A_ThisFunc, G3, zBitmap, dimgSelPx, dimgSelPy, dimgSelW, dimgSelH,,,,, thisO)
           trGdip_DisposeImage(zBitmap, 1)
           zBitmap := trGdip_CloneBitmap(A_ThisFunc, gBitmap)
-       }
-    } Else
-    {
-       f := zoomBlurAreaXamount*8
-       ff := (zoomBlurAreaXamount*8)/2
-       If (zoomBlurMode=4)
-       {
-          wbitmap := trGdip_ResizeBitmap(A_ThisFunc, zBitmap, imgSelW//ff, imgSelH, 0, 5)
-          rbitmap := trGdip_ResizeBitmap(A_ThisFunc, wBitmap, imgSelW//f, imgSelH, 0, 7)
-       } Else
-       {
-          wbitmap := trGdip_ResizeBitmap(A_ThisFunc, zBitmap, imgSelW, imgSelH//ff, 0, 5)
-          rbitmap := trGdip_ResizeBitmap(A_ThisFunc, wBitmap, imgSelW, imgSelH//f, 0, 7)
-       }
+          If (determineTerminateOperation()=1)
+          {
+             abandonAll := 1
+             Break
+          }
 
-       fbitmap := trGdip_ResizeBitmap(A_ThisFunc, rBitmap, imgSelW, imgSelH, 0, 7)
-       r1 := trGdip_DrawImage(A_ThisFunc, G3, fBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH)
-       trGdip_DisposeImage(wBitmap)
-       trGdip_DisposeImage(rBitmap)
-       trGdip_DisposeImage(fBitmap)
+       }
     }
 
     Gdip_DeleteGraphics(G3)
-    If (BlurAreaBlendMode>1)
+    If (BlurAreaBlendMode>1 && abandonAll!=1)
     {
        setWindowTitle("APPLYING BLENDING MODE, please wait", 1)
        applyBlurColorsFX(gBitmap)
@@ -15969,7 +16151,7 @@ zoomBlurSelectedArea() {
        bgrBMPu := ou
     }
 
-    If (allowAlphaMasking=1 && StrLen(bgrBMPu)>2)
+    If (allowAlphaMasking=1 && StrLen(bgrBMPu)>2 && abandonAll!=1)
     {
        realtimePasteInPlaceAlphaMasker(0, gBitmap, "lol", newBitmap, 0, 0, 0, 0)
        If StrLen(newBitmap)>2
@@ -15981,7 +16163,6 @@ zoomBlurSelectedArea() {
     }
 
     r1 := trGdip_DrawImage(A_ThisFunc, G2, gBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH,,,,, thisOpacity)
-    Gdip_DisposeEffect(pEffect)
     trGdip_DisposeImage(zBitmap, 1)
     trGdip_DisposeImage(gBitmap, 1)
     trGdip_DisposeImage(bgrBMPu, 1)
@@ -16070,16 +16251,12 @@ coreDetectEdgesSelectedArea(whichBitmap, previewMode, Gu:=0) {
        gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
 
     If (IDedgesCenterAmount>1)
-    {
-       pEffect := Gdip_CreateEffect(1, IDedgesCenterAmount, 0, 0)
-       If pEffect
-          ApplySpecialFixedBlur(A_ThisFunc, zBitmap, IDedgesCenterAmount, pEffect)
+       QPV_BoxBlurBitmap(zBitmap, IDedgesCenterAmount, IDedgesCenterAmount, 0)
 
-       Gdip_DisposeEffect(pEffect)
-    }
+    Static pxs := {1:"-3", 2:"-2", 3:"-1", 4:"0", 5:"1", 6:"2", 7:"3"}
 
     G3 := trGdip_GraphicsFromImage(A_ThisFunc, zBitmap)
-    r0 := trGdip_DrawImage(A_ThisFunc, G3, zBitmap, IDedgesXuAmount, IDedgesYuAmount)
+    r0 := trGdip_DrawImage(A_ThisFunc, G3, zBitmap, pxs[IDedgesXuAmount], pxs[IDedgesYuAmount])
     QPV_BlendBitmaps(fBitmap, zBitmap, 16, 0) ; difference mode
 
     zEffect := Gdip_CreateEffect(6, 0, -100, 0)  ; desaturate image
@@ -16101,15 +16278,9 @@ coreDetectEdgesSelectedArea(whichBitmap, previewMode, Gu:=0) {
           Gdip_BitmapApplyEffect(fBitmap, zEffect)
        Gdip_DisposeEffect(zEffect)
     }
-
+    pr := (IDedgesAfterBlur=2) ? 1 : IDedgesAfterBlur*2
     If (IDedgesAfterBlur>1)
-    {
-       pEffect := Gdip_CreateEffect(1, IDedgesAfterBlur*2, 0, 0)
-       If pEffect
-          ApplySpecialFixedBlur(A_ThisFunc, fBitmap, IDedgesAfterBlur*2, pEffect)
-
-       Gdip_DisposeEffect(pEffect)
-    }
+       QPV_BoxBlurBitmap(fBitmap, pr, pr, 0)
 
     If (IDedgesBlendMode>1)
     {
@@ -16356,7 +16527,7 @@ livePreviewAddNoiser(modus:=0) {
     Return er
 }
 
-QPV_BoxBlurBitmap(ByRef pBitmap, passesX, passesY:=0, modus:=1) {
+QPV_BoxBlurBitmap(ByRef pBitmap, passesX, passesY:=0, modus:=1, forceCimg:=0) {
   initQPVmainDLL()
   If !qpvMainDll
   {
@@ -16371,15 +16542,54 @@ QPV_BoxBlurBitmap(ByRef pBitmap, passesX, passesY:=0, modus:=1) {
   If (w<1 || h<1)
      Return 0
 
+  If (modus=0 && forceCimg=0 && passesX=passesY && isInRange(passesX, 21, 255))
+  {
+     ; fnOutputDebug("large radius for blur=" passesX)
+     zA := Gdip_CreateEffect(1, passesX, 0, 0)
+     Gdip_BitmapApplyEffect(pBitmap, zA)
+     Gdip_DisposeEffect(zA)
+     Return 1
+  } else If (modus=0 && forceCimg=0 && passesX=passesY)
+     passesX := passesY := Round(passesX * 0.4) + 1
+
   func2exec := (A_PtrSize=8) ? "BoxBlurBitmap" : "_BoxBlurBitmap@24"
   r := DllCall(whichMainDLL "\" func2exec, "UPtr", pBitmap, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", modus, "UPtr")
   If StrLen(r)>2
   {
+     createdGDIobjsArray["x" r] := [r, "bmp", 1, A_ThisFunc]
      trGdip_DisposeImage(pBitmap, 1)
      pBitmap := r
   }
 
   Return r
+}
+
+QPV_RotateBitmap(pBitmap, angle, interpolation:=1, bond:=0) {
+; it is not faster than gdi+ rotation
+
+  initQPVmainDLL()
+  If !qpvMainDll
+  {
+     addJournalEntry(A_ThisFunc "(): QPV dll file is missing or failed to initialize: qpvMain.dll")
+     Return Gdip_BoxBlurBitmap(pBitmap, passes)
+  }
+
+  If StrLen(pBitmap)<3
+     Return 0
+
+  Gdip_GetImageDimensions(pBitmap, w, h)
+  If (w<1 || h<1)
+     Return 0
+
+  func2exec := (A_PtrSize=8) ? "cImgRotateBitmap" : "_BoxBlurBitmap@24"
+  r := DllCall(whichMainDLL "\" func2exec, "UPtr", pBitmap, "Int", w, "Int", h, "float", angle, "Int", interpolation, "int", bond, "UPtr")
+  If StrLen(r)>2
+  {
+     createdGDIobjsArray["x" r] := [r, "bmp", 1, A_ThisFunc]
+     Return r
+  }
+
+  Return 0
 }
 
 QPV_CreateGaussianNoiseBMP(pBitmap, intensity) {
@@ -16401,6 +16611,8 @@ QPV_CreateGaussianNoiseBMP(pBitmap, intensity) {
   r := DllCall(whichMainDLL "\" func2exec, "UPtr", pBitmap, "int", w, "int", h, "Int", intensity, "UPtr")
   If StrLen(r)<3
      r := trGdip_CloneBitmap(A_ThisFunc, pBitmap)
+  Else
+     createdGDIobjsArray["x" r] := [r, "bmp", 1, A_ThisFunc]
 
   Return r
 }
@@ -16538,13 +16750,12 @@ applyVPeffectsAdvOnBMP(zBitmap, allowCache:=0, givenID:=0, gImgW:=0, gImgH:=0, B
        }
     }
 
-    fnOutputDebug("redraw: " A_ThisFunc)
+    ; fnOutputDebug("redraw: " A_ThisFunc " | " BlurAmount)
+    startZeit := A_TickCount
     If (BlurAmount>1)
-    {
-       pEffect := Gdip_CreateEffect(1, BlurAmount, 0, 0)
-       ApplySpecialFixedBlur(A_ThisFunc, nBitmap, BlurAmount, pEffect, 0)
-       Gdip_DisposeEffect(pEffect)
-    }
+       QPV_BoxBlurBitmap(nBitmap, BlurAmount, BlurAmount, 0)
+
+    ; fnOutputDebug(A_TickCount - startZeit)
 
     Gdip_DisposeImageAttributes(imageAttribs)
     prevState := (allowCache=1 && minimizeMemUsage=0) ? thisState : 0
@@ -19414,6 +19625,7 @@ ETAinfos(countTFilez, filesElected, startOperation) {
    zeitF := prevZeit ? (Round(zeitC) + Round(prevZeit))/2 : zeitC
    If !zeitF
       zeitF := zeitLeftB
+
    prevZeit := zeitC
    etaTime .= "`nEstimated time left: " SecToHHMMSS(Round(zeitF/1000, 3))
    ; etaTime .= "`nEstimated B time left: " SecToHHMMSS(Round(zeitLeft2/1000, 3))
@@ -24999,6 +25211,15 @@ determineTerminateOperation() {
      Return 0
 
   lastInvoked := A_TickCount
+  Loop 
+  {
+      p := interfaceThread.ahkgetvar.userPendingAbortOperations
+      If (p!=1)
+         Break
+      Else
+         Sleep, 1
+  }
+
   theEnd := interfaceThread.ahkgetvar.mustAbandonCurrentOperations
   If theEnd
      lastLongOperationAbort := A_TickCount
@@ -25009,6 +25230,7 @@ doStartLongOpDance() {
      startLongOperation := A_TickCount
      imageLoading := runningLongOperation := 1
      interfaceThread.ahkassign("mustAbandonCurrentOperations", 0)
+     interfaceThread.ahkassign("userPendingAbortOperations", 0)
      interfaceThread.ahkassign("lastCloseInvoked", 0)
      interfaceThread.ahkassign("imageLoading", 1)
      interfaceThread.ahkassign("runningLongOperation", 1)
@@ -28201,6 +28423,14 @@ RecentFilesManager(entry2add) {
   }
 
   readRecentEntries(newHistoryList)
+}
+
+markUndefinedFavedList() {
+   Loop, % maxFilesIndex
+   {
+        If (!InStr(resultedFilesList[A_Index, 5], "||") && resultedFilesList[A_Index, 5]="")
+           resultedFilesList[A_Index, 5] := 1
+   }
 }
 
 ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
@@ -35895,7 +36125,7 @@ MainPanelTransformArea(dummy:="", toolu:="") {
 
     thisOpacity := Round((PasteInPlaceOpacity / 255) * 100)
     Global infoPasteBlur, infoPasteOpacity, infoPasteHue, infoPasteSat, infoPasteLight, infoPasteGamma, btnReset
-         , infoAlphaMaskSigma, infoAlphaMaskBlend, infoAlphaMaskGradientAngle, infoAlphaMaskGradientScale
+         , infoAlphaMaskSigma, infoAlphaMaskBlend, infoAlphaMaskGradientAngle, infoAlphaMaskGradientScale, btnLiveApplyTool
          , infoAlphaClrAint, infoAlphaClrBint, infoAlphaFile, infoAngleu, uiPasteInPlaceAlphaDrawMode, UIremAlpha
 
     Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Main|Adjust colors|Alpha mask|Paint alpha mask
@@ -35947,7 +36177,7 @@ MainPanelTransformArea(dummy:="", toolu:="") {
     friendlyTitle := (toolu="paste") ? "Paste in place image: " : "Transform selected area: "
     Gui, Add, Button, xm+0 y+15 Section h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
     ToolTip2ctrl(hBtnCollapse, "Collapse panel [F11]")
-    Gui, Add, Button, x+5 w%sml% hp Default gapplyIMGeditFunction, &Apply
+    Gui, Add, Button, x+5 w%sml% hp Default gapplyIMGeditFunction vbtnLiveApplyTool, &Apply
     Gui, Add, Button, x+5 hp wp vbtnReset gBtnPasteResetOptions, &Reset
     Gui, Add, Button, x+5 hp wp-5 gBtnHelpTransform, &Help
     Gui, Add, Button, x+5 hp wp+5 gBtnCloseWindow, &Cancel
@@ -36549,7 +36779,7 @@ stopDrawingShape(dummy:="") {
     PenuDrawLive := ""
     drawingShapeNow := 0
     DestroyTempBtnGui("now")
-    If (customShapePoints.Count()<3)
+    If (customShapePoints.Count()<3 || dummy="cancel")
     {
        If (dummy!="cancel")
        {
@@ -36559,17 +36789,19 @@ stopDrawingShape(dummy:="") {
        }
 
        dummyRefreshImgSelectionWindow()
-       showDelayedTooltip("Drawing abandoned")
+       noOpen := (dummy="cancel" && InStr(postVectorWinOpen, "c")) ? 1 : 0
+       If (!AnyWindowOpen && drawingVectorLiveMode!=3 && noOpen!=1)
+          BTNopenPrevPanel(StrReplace(postVectorWinOpen, "c"), "yes", "n")
        ; SetTimer, RemoveTooltip, % -msgDisplayTime
+       showDelayedTooltip("Drawing abandoned")
     } Else
     {
        saveVectorShapeInRegistry()
        editingSelectionNow := 1
        EllipseSelectMode := 2
        dummyTimerDelayiedImageDisplay(100)
-       noOpen := (dummy="cancel" && InStr(postVectorWinOpen, "c")) ? 1 : 0
-       If (!AnyWindowOpen && drawingVectorLiveMode!=3 && noOpen!=1)
-          BTNopenPrevPanel(postVectorWinOpen, "yes", "n")
+       If (!AnyWindowOpen && drawingVectorLiveMode!=3)
+          BTNopenPrevPanel(StrReplace(postVectorWinOpen, "c"), "yes", "n")
     }
 
     postVectorWinOpen := 0
@@ -36996,12 +37228,13 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0) {
      {
         PenuDrawLive := Gdip_CreatePen("0x99446644", imgHUDbaseUnit//10)
         drawingVectorLiveMode := 3
-        EllipseSelectMode := 2
         LimitSelectBoundsImg := VPselRotation := innerSelectionCavityX := innerSelectionCavityY := 0
         lockSelectionAspectRatio := 1
         ; closedLineCustomShape :=  1
      }
 
+     EllipseSelectMode := 2
+     ; ToolTip, % modus "==" drawingVectorLiveMode , , , 2
      customShapeHasSelectedPoints := 0
      initialDrawingStartCoords := []
      Loop, % customShapePoints.Count()
@@ -38069,7 +38302,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     thisW := (PrefsLargeFonts=1) ? 80 : 60
     Gui, Add, Button, xm+0 y+15 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
     ToolTip2ctrl(hBtnCollapse, "Collapse panel [F11]")
-    Gui, Add, Button, x+5 w%thisW% hp Default gapplyIMGeditFunction, &Apply
+    Gui, Add, Button, x+5 w%thisW% hp Default gapplyIMGeditFunction vbtnLiveApplyTool, &Apply
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
     Gui, Add, Checkbox, x+5 hp Checked%doImgEditLivePreview% vdoImgEditLivePreview gupdateUIfillPanel, &Live preview
     Gui, Add, Checkbox, xm+0 y+5 Checked%closeEditPanelOnApply% vcloseEditPanelOnApply gToggleClosePanelApply, Close window after «Apply»
@@ -38245,7 +38478,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     btnWid := (PrefsLargeFonts=1) ? 105 : 65
     Gui, Add, Button, xs y+20 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
     ToolTip2ctrl(hBtnCollapse, "Collapse panel [F11]")
-    Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction, &Apply
+    Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction vbtnLiveApplyTool, &Apply
     Gui, Add, Button, x+5 wp hp gBtnOpenPanelLines, &Lines
     Gui, Add, Button, x+5 wp hp gBtnCloseWindow, &Cancel
     Gui, Add, Checkbox, xs y+5 Checked%closeEditPanelOnApply% vcloseEditPanelOnApply gToggleClosePanelApply, Close window after «Apply»
@@ -38494,7 +38727,7 @@ PanelDrawLines() {
     sml := (PrefsLargeFonts=1) ? 35 : 20
     Gui, Add, Button, xm+0 y+%sml% h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
     ToolTip2ctrl(hBtnCollapse, "Collapse panel [F11]")
-    Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction, &Apply
+    Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction vbtnLiveApplyTool, &Apply
     Gui, Add, Button, x+5 wp hp gBtnOpenPanelShapes, &Shapes
     Gui, Add, Button, x+5 wp hp gBtnCloseWindow, &Cancel
     Gui, Add, Checkbox, xm+0 y+5 Checked%closeEditPanelOnApply% vcloseEditPanelOnApply gToggleClosePanelApply, Close window after «Apply»
@@ -38567,7 +38800,7 @@ PanelDesatureSelectedArea(dummy:=0) {
 
     Gui, Add, Button, xm+0 y+20 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
     ToolTip2ctrl(hBtnCollapse, "Collapse panel [F11]")
-    Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction, &Apply
+    Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction vbtnLiveApplyTool, &Apply
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
     Gui, Add, Checkbox, x+5 hp Checked%DesatureAreaAlternate% vDesatureAreaAlternate gupdateUIdesaturatePanel, &Simple mode
     Gui, Add, Checkbox, xm+0 y+5 Checked%closeEditPanelOnApply% vcloseEditPanelOnApply gToggleClosePanelApply, Close window after «Apply»
@@ -38676,7 +38909,7 @@ PanelEraseSelectedArea() {
 
     Gui, Add, Button, xm+0 y+15 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
     ToolTip2ctrl(hBtnCollapse, "Collapse panel [F11]")
-    Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction, &Apply
+    Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction vbtnLiveApplyTool, &Apply
     ; Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
     Gui, Add, Checkbox, x+5 yp hp Checked%EraseAreaUseAlpha% vEraseAreaUseAlpha gupdateUIerasePanel, Apply alpha mas&k
@@ -38726,7 +38959,7 @@ PanelFillBehindBgrImage() {
 
     Gui, Add, Button, xm+0 y+25 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
     ToolTip2ctrl(hBtnCollapse, "Collapse panel [F11]")
-    Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction, &Apply
+    Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction vbtnLiveApplyTool, &Apply
     ; Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
     Gui, Add, Checkbox, xm+0 y+5 Checked%closeEditPanelOnApply% vcloseEditPanelOnApply gToggleClosePanelApply, Close window after «Apply»
@@ -39405,8 +39638,8 @@ ReadSettingsEdgesPanel(act:=0) {
     RegAction(act, "IDedgesContrast",, 2, -100, 100)
     RegAction(act, "IDedgesBlendMode",, 2, 1, 21)
     RegAction(act, "IDedgesCenterAmount",, 2, 1, 6)
-    RegAction(act, "IDedgesXuAmount",, 2, -3, 3)
-    RegAction(act, "IDedgesYuAmount",, 2, -3, 3)
+    RegAction(act, "IDedgesXuAmount",, 2, 1, 7)
+    RegAction(act, "IDedgesYuAmount",, 2, 1, 7)
     RegAction(act, "IDedgesAfterBlur",, 2, 1, 5)
     RegAction(act, "IDedgesEmbossLvl",, 2, 1, 6)
     RegAction(act, "IDedgesInvert",, 1)
@@ -39473,16 +39706,17 @@ PanelDetectEdgesImage() {
     If (PrefsLargeFonts=1)
        Gui, Font, s%LargeUIfontValue%
 
-    thisW := (PrefsLargeFonts=1) ? 85 : 55
+    thisW := (PrefsLargeFonts=1) ? 68 : 48
     Gui, +DPIScale
-    Gui, Add, Text, x+20 ys Section, Direction and iterations:
-    Gui, Add, DropDownList, x+6 w45 gupdateUIedgesPanel AltSubmit Choose%IDedgesEmbossLvl% vIDedgesEmbossLvl, 1|2|3|4|5|6
+    Gui, Add, Text, x+20 ys Section, Direction of edge detection:
     Gui, Add, Text, xs y+10 w%thisW%, X
     Gui, Add, Text, x+3 wp, Y
     Gui, Add, Text, x+3 wp, C
-    Gui, Add, DropDownList, xs y+7 wp gupdateUIedgesPanel vIDedgesXuAmount, -3|-2|-1|0|1|2|3|%IDedgesXuAmount%||
-    Gui, Add, DropDownList, x+3 wp gupdateUIedgesPanel vIDedgesYuAmount, -3|-2|-1|0|1|2|3|%IDedgesYuAmount%||
+    Gui, Add, Text, x+3 wp -wrap vtxtLine1, Iterations
+    Gui, Add, DropDownList, xs y+7 w%thisW% gupdateUIedgesPanel AltSubmit Choose%IDedgesXuAmount% vIDedgesXuAmount, -3|-2|-1|0|1|2|3
+    Gui, Add, DropDownList, x+3 wp gupdateUIedgesPanel AltSubmit Choose%IDedgesYuAmount% vIDedgesYuAmount, -3|-2|-1|0|1|2|3
     Gui, Add, DropDownList, x+3 wp gupdateUIedgesPanel AltSubmit Choose%IDedgesCenterAmount% vIDedgesCenterAmount, 0|1|2|3|4|5
+    Gui, Add, DropDownList, x+3 wp gupdateUIedgesPanel AltSubmit Choose%IDedgesEmbossLvl% vIDedgesEmbossLvl, 1|2|3|4|5|6
 
     Gui, Add, Text, xs y+10 w%2ndcol% gBTNresetEdgesBright vinfoBright +TabStop, Brightness: %IDedgesEmphasis%
     Gui, Add, Checkbox, x+7 gupdateUIedgesPanel Checked%IDedgesInvert% vIDedgesInvert, &Invert image
@@ -39706,6 +39940,10 @@ updateUIedgesPanel(dummy:=0, b:=0) {
 
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: Submit, NoHide
+    actu := (IDedgesBlendMode>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    GuiControl, % actu, IDedgesEmbossLvl
+    GuiControl, % actu, txtLine1
+
     GuiControl, SettingsGUIA:, infoBright, Brightness: %IDedgesEmphasis%
     GuiControl, SettingsGUIA:, infoContrst, Contrast: %IDedgesContrast%`%
     GuiControl, SettingsGUIA:, infoEdgesOpacity, % "Opacity: " Round((IDedgesOpacity / 255) * 100) "%"
@@ -42339,7 +42577,7 @@ PanelInsertTextArea() {
     ml := (PrefsLargeFonts=1) ? 90 : 70
     Gui, Add, Button, xm+0 y+15 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
     ToolTip2ctrl(hBtnCollapse, "Collapse panel [F11]")
-    Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction, &Apply
+    Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction vbtnLiveApplyTool, &Apply
     Gui, Add, Button, x+5 hp w%ml% gBtnCloseWindow, &Cancel
     Gui, Add, Checkbox, x+5 hp Checked%doImgEditLivePreview% vdoImgEditLivePreview gupdateUIInsertTextPanel, Live preview (low quality)
     Gui, Add, Checkbox, xm+0 y+5 Checked%closeEditPanelOnApply% vcloseEditPanelOnApply gToggleClosePanelApply, Close window after «Apply»
@@ -43560,16 +43798,19 @@ SaveClipboardImage(dummy:=0, allowCropping:=0, noDialog:=0) {
 }
 
 BtnCpyMvChooseFilesDest() {
-   If (currentFileIndex=0)
-      Return
-
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
    SelectedDir := openFoldersDialogWrapper("S2", prevFileMovePath)
    SelectedDir := Trimmer(SelectedDir)
    If FolderExist(SelectedDir)
       GuiControl, SettingsGUIA:, UsrEditFileDestination, % SelectedDir
+   Else
+      WinActivate, ahk_id %hSetWinGui%
+}
+
+BtnCpyMvStrctrdChooseFilesSrc() {
+   SelectedDir := openFoldersDialogWrapper("S2", prevFileMovePath)
+   SelectedDir := Trimmer(SelectedDir)
+   If FolderExist(SelectedDir)
+      GuiControl, SettingsGUIA:, UsrEditFileSource, % SelectedDir
    Else
       WinActivate, ahk_id %hSetWinGui%
 }
@@ -43753,7 +43994,7 @@ CopyMovePanelWindow() {
     If (markedSelectFile>1)
     {
        finalListu .= "[group-by-month-year]`n[group-by-years]`n[group-by-file-types]"
-       infoSelection := "Selected files: " markedSelectFile ". "
+       infoSelection := "Selected files: " groupDigits(markedSelectFile) ". "
     }
 
     Gui, +Delimiter`n
@@ -43788,6 +44029,250 @@ CopyMovePanelWindow() {
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, btnName " file(s) to...: " appTitle)
     SetTimer, resetOpeningPanel, -300
 }
+
+BtnIdentifyFileRoots() {
+   ToolTip, Please wait...
+   alistu := IdentifyFileFolderRoots("cached")
+   listu := alistu[1]
+   Try Menu, Manna, Delete
+   Loop, Parse, listu, `n
+   {
+      If (A_Index>10)
+         Break
+      If !A_LoopField
+         Continue
+
+      entryu := A_Index ". " PathCompact(A_LoopField, 35) "\"
+      Menu, Manna, Add, % entryu, menuSetSourceStructuredOper
+   }
+
+   If (alistu[2]>10)
+   {
+      Try Menu, Manna, Add, % "... and " alistu[2] - 10 " folders more", dummy
+      Try Menu, Manna, Disable, % "... and " alistu[2] - 10 " folders more"
+   }
+   Try Menu, Manna, Show
+   ToolTip
+}
+
+menuSetSourceStructuredOper(menuItem) {
+   openThisu := SubStr(menuItem, 1, InStr(menuItem, ".") - 1)
+   alistu := IdentifyFileFolderRoots("cached")
+   listu := alistu[1]
+   ; ToolTip, % menuitem "==" openThisu , , , 2
+   Loop, Parse, listu, `n
+   {
+      If (openThisu=A_Index)
+         GuiControl, SettingsGUIA:, UsrEditFileSource, % A_LoopField
+   }
+}
+
+IdentifyFileFolderRoots(modus) {
+   Static gList, counter
+   If (modus="kill")
+   {
+      counter := 0
+      gList := ""
+      Return
+   }
+
+   If (gList && modus="cached")
+      Return [gList, counter]
+
+   foldersListArray := new hashtable()
+   Loop, % maxFilesIndex + 1
+   {
+        imgPath := resultedFilesList[A_Index, 1]
+        If (InStr(imgPath, "||") || !imgPath || resultedFilesList[A_Index, 2]!=1)
+           Continue
+
+        OutDir := Format("{:L}", SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1))
+        foldersListArray[OutDir] := 1
+   }
+
+   listu := ""
+   For Key, Value in foldersListArray
+   {
+      If key
+         listu .= key "`n"
+   }
+
+   foldersListArray := ""
+   flist := ""
+   Loop, Parse, listu, `n
+   {
+      n := ST_Count(A_LoopField, "\")
+      If (n>0)
+         flist .= n "|" A_LoopField "`n"
+   }
+
+   nList := ""
+   Sort, flist, ND`n
+   Loop, Parse, flist, `n
+   {
+      If !A_LoopField
+         Continue
+
+      k := InStr(A_LoopField, "|") + 1
+      p := SubStr(A_LoopField, k, InStr(A_LoopField, "\", 0, -1) - k)
+      If !InStr(nList, p "`n")
+         nList .= p "`n"
+   }
+
+   flist := ""
+   Loop, Parse, nList, `n
+   {
+      If !A_LoopField
+         Continue
+
+      n := ST_Count(A_LoopField, "\")
+      If (n>0)
+         flist .= n "|" A_LoopField "`n"
+   }
+   Sort, flist, ND`n
+
+   p := 0
+   nList := ""
+   Loop, Parse, flist, `n
+   {
+      If !A_LoopField
+         Continue
+      k := StrSplit(A_LoopField, "|")
+      If (p=0)
+         p := k[1]
+      if (k[1]>p + 1)
+         Break
+      nList .= k[2] "`n"
+   }
+
+   Sort, nList, D`n
+   counter := 0
+   prevu := gList := ""
+   Loop, Parse, nList, `n
+   {
+      If !A_LoopField
+         Continue
+
+      If (!InStr(A_LoopField, prevu "\") || !prevu)
+      {
+         gList .= A_LoopField "`n"
+         prevu := A_LoopField
+         counter++
+      }
+   }
+
+   ; Sort, nList, D`n
+   ; Try Clipboard := gList "`n===`n" nList "`n====`n" flist
+   Return [glist, counter]
+}
+
+PanelStructuredCopyMoveWindow() {
+    Global BtnCpyMv, UsrEditFileSource, lastInvoked := 1
+    ; Static prevmainDynaFoldersListu, prevCurrentSLD
+
+    openingPanelNow := 1
+    IdentifyFileFolderRoots("kill")
+    thisBtnHeight := createSettingsGUI(77, A_ThisFunc)
+    sml := (PrefsLargeFonts=1) ? 90 : 72
+    btnWid := 125
+    btnWid2 := 60
+    txtWid := 360
+    If (PrefsLargeFonts=1)
+    {
+       btnWid := btnWid + 70
+       btnWid2 += 60
+       txtWid := txtWid + 105
+       Gui, Font, s%LargeUIfontValue%
+    }
+    EditWid := (PrefsLargeFonts=1) ? 455 : 290
+    lstWid := sml + editWid
+
+    ToolTip, Please wait...,,, 2
+    UsrCopyMoveOperation := 1
+    zPlitPath(getIDimage(currentFileIndex), 1, OldOutFileName, OutDir, OutFileNameNoExt, OutFileExt)
+
+    getSelectedFiles(0, 1)
+    ml := (PrefsLargeFonts=1) ? 110 : 70
+    Gui, +Delimiter`n
+    sml := (PrefsLargeFonts=1) ? 50 : 30
+    Gui, Add, Text, x15 y15 Section, %infoSelection%This panels allows users to copy or move folder structures.`nPlease select source and destination folders.`nThe files not found in the defined source folder (or in a sub-folder of it)`, will be skipped.
+    Gui, Add, Text, xs y+10 w%ml%, Source: 
+    Gui, Add, Edit, x+5 w%EditWid% gUIeditsGenericAllowCtrlBksp r1 -WantReturn -wantTab -multi vUsrEditFileSource, % OutDir
+    Gui, Add, Button, x+1 w%sml% hp gBtnCpyMvStrctrdChooseFilesSrc hwndhTemp, ...
+    ToolTip2ctrl(hTemp, "Browse source folder`nPlease define the correct source path for the optimal experience.`nYou must choose the root folder of all the images to be copied or moved.`nThe selected files that are not in this source path [or in a sub-folder], will be skipped.")
+    Gui, Add, Button, x+1 w%sml% hp gBtnIdentifyFileRoots hwndhTemp, ▼
+    ToolTip2ctrl(hTemp, "Automatically identify possible source paths based on the selected files.`nThe number of listed folders in the menu is an indicator`nof how dispersed are the locations of the selected files.")
+    Gui, Add, Text, xs y+10 w%ml% hp +0x200, Destination:
+    Gui, Add, Edit, x+5 w%EditWid% gUIeditsGenericAllowCtrlBksp r1 -WantReturn -wantTab -multi vUsrEditFileDestination, % UsrEditFileDestination
+    Gui, Add, Button, x+1 w%sml% hp gBtnCpyMvChooseFilesDest hwndhTemp, ...
+    ToolTip2ctrl(hTemp, "Browse destination folder`nIn this folder, the folder structure will be created containing the selected files.")
+    thisW := (PrefsLargeFonts=1) ? 190 : 120
+    Gui, Add, DropDownList, xs y+15 w%thisW% AltSubmit Choose%userCopyMoveStructuredConflictMode% vuserCopyMoveStructuredConflictMode, Skip files`nAuto-rename`nOverwrite`nAsk user
+    Gui, Add, Text, x+5 hp +0x200, on file name conflicts
+    getSelectedFiles(0, 1)
+    infoSelection := "Selected files: " groupDigits(markedSelectFile) ". "
+
+    ToolTip,,,,2
+    sml := (PrefsLargeFonts=1) ? 90 : 72
+    SetTimer, ResetImgLoadStatus, -50
+    Gui, Add, DropDownList, xs y+10 w%thisW% AltSubmit Choose%UsrCopyMoveOperation% vUsrCopyMoveOperation, Action to perform...`nMove file(s)`nCopy file(s)
+
+    Gui, Add, Button, xs y+25 h%thisBtnHeight% w%btnWid2% Default gBTNuiProceedStructuredOperation vBtnCpyMv, &Proceed
+    Gui, Add, Button, x+5 hp w%sml% gBtnCloseWindow, C&ancel
+    Gui, Add, Text, x+5 hp +0x200, % infoSelection
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Structured copy/move file(s): " appTitle)
+    SetTimer, resetOpeningPanel, -300
+}
+
+BTNuiProceedStructuredOperation() {
+   Gui, SettingsGUIA: Default
+   GuiControlGet, UsrEditFileSource
+   GuiControlGet, UsrEditFileDestination
+   GuiControlGet, userCopyMoveStructuredConflictMode
+   GuiControlGet, UsrCopyMoveOperation
+   If (UsrCopyMoveOperation=1)
+   {
+      showTOOLtip("ERROR: Please select action to perform: copy or move files.") 
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   fS := Trim(UsrEditFileSource, "\")
+   dS := Trim(UsrEditFileDestination, "\")
+   fS := StrReplace(fS, "/", "\")
+   dS := StrReplace(dS, "/", "\")
+   fS := Trimmer(fS)
+   dS := Trimmer(dS)
+
+   If !FolderExist(fS)
+   {
+      showTOOLtip("ERROR: Please choose an existing source folder.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   If !FolderExist(dS)
+   {
+      showTOOLtip("ERROR: Please choose an existing destination folder.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   If (dS=fS)
+   {
+      showTOOLtip("ERROR: source and destination folders cannot be the same.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   BtnCloseWindow()
+   copyMoveStructuredFolders(fS, dS)
+}
+
 
 BTNlvRecentFileDesties(a, b, c) {
    If !(b="RightClick" || b="k" ||  b="normal" || b="DoubleClick")
@@ -44382,9 +44867,9 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0) {
    }
 
    If (skippedFiles>0)
-      someErrors .= "`n" skippedFiles " files were skipped"
+      someErrors .= "`n" groupDigits(skippedFiles) " files were skipped"
    If (failedFiles>0)
-      someErrors .= "`nFailed to perform action on " failedFiles " files"
+      someErrors .= "`nFailed to perform action on " groupDigits(failedFiles) " files"
 
    watchFolderDetails := ""
    If (UsrCopyMoveOperation=2 && filezMoved>0)
@@ -46865,9 +47350,9 @@ coreAddNewFiles(imgsListu, countFiles, SelectedDir, selectNewOnes:=0) {
     SetTimer, ResetImgLoadStatus, -150
 }
 
-wrapperAddNewFolderToList(folderu, forceRemAll, isInLoop:=0) {
-    showTOOLtip("Preparing files list, please wait`n" folderu "\")
-    z := coreAddNewFolder(folderu, forceRemAll, 0, 0, 0)
+wrapperAddNewFolderToList(folderu, forceRemAll, isInLoop:=0, noRemAtAll:=0) {
+    showTOOLtip("Preparing files list to import:`n" folderu "\")
+    z := coreAddNewFolder(folderu, forceRemAll, 0, 0, 0, noRemAtAll)
     If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=2 && isInLoop!=1)
     {
        FileReadLine, firstLine, % CurrentSLD, 1
@@ -46968,6 +47453,9 @@ addNewFolder2list(givenPath:=0, externMode:=0, actu:=0) {
       If (SLDtypeLoaded=3 && RegExMatch(CurrentSLD, sldsPattern))
          recreateDynaFoldersSQLdbList(DynamicFoldersList)
 
+      If InStr(CurrentSLD, "\QPV\favourite-images-list.SLD")
+         markUndefinedFavedList()
+
       ResetImgLoadStatus()
       SoundBeep 900, 100
       If !CurrentSLD
@@ -46979,7 +47467,7 @@ addNewFolder2list(givenPath:=0, externMode:=0, actu:=0) {
    }
 }
 
-coreAddNewFolder(SelectedDir, forceRemAll, noRandom:=0, forReal:=1, fastu:=1) {
+coreAddNewFolder(SelectedDir, forceRemAll, noRandom:=0, forReal:=1, fastu:=1, noRemAtAll:=0) {
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
     ; markedSelectFile := 0
@@ -46990,7 +47478,9 @@ coreAddNewFolder(SelectedDir, forceRemAll, noRandom:=0, forReal:=1, fastu:=1) {
     If (forReal=0 && SLDtypeLoaded=3)
        getMaxRowIDsqlDB()
 
-    remFilesFromList(thisFolder, 1, forReal)
+    If (noRemAtAll=0)
+       remFilesFromList(thisFolder, 1, forReal)
+
     z := GetFilesList(SelectedDir "\*", 0, 1, fastu)
     If (fastu=1)
     {
@@ -47024,7 +47514,7 @@ detectFileID(imgPath) {
 
 GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
    Critical, on
-   Static lastInvoked := 1
+   Static lastInvoked := 1, noAsking := 0
    If (A_TickCount - lastInvoked<900)
       Return
 
@@ -47094,24 +47584,37 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
       If StrLen(filesFilter)>1
          remFilesListFilter("simple")
 
+      prlist := ""
       mainListu := retrieveListFoldersIndexed()
+      For zKey, zValue in mainListu
+          prlist .= zKey "\`n"
+
       newListu := DynamicFoldersList "`n"
+      backCurrentSLD := CurrentSLD
+      CurrentSLD := ""
       Loop, Parse, foldersListu,`n,`r
       {
           linea := Trimmer(A_LoopField)
           If StrLen(linea)<4
              Continue
 
-          If mainListu[Format("{:L}", linea)]
+          noRemAtAll := 1
+          If (mainListu[Format("{:L}", linea)] && noAsking!=1)
           {
              msgu := "The following folder seems to be already indexed:`n`n" linea "\"
-             msgResult := msgBoxWrapper(appTitle ": Confirmation", msgu "`n`nDo you want to add it to the list? This may lead to duplicate entries.", 4, 0, "question")
-             If (msgResult!="Yes")
+             msgResult := msgBoxWrapper(appTitle ": Confirmation", msgu "`n`nDo you want to add it to the list? This may lead to duplicate entries.", "&Yes|&No|&Abort", 2, "question", "Do not ask again in this application session")
+             noAsking := msgResult.check
+             If (msgResult.btn="No")
                 Continue
-          }
+             Else If (msgResult.btn="Abort")
+                Break
+             Else
+                noRemAtAll := 0
+          } Else If InStr(prlist, linea "\")
+             noRemAtAll := 0
 
           changeMcursor()
-          r := wrapperAddNewFolderToList(linea, 1, 1)
+          r := wrapperAddNewFolderToList(linea, 1, 1, noRemAtAll)
           ; r := GetFilesList(linea "\*")
           If (r="abandoned")
              Break
@@ -47122,6 +47625,10 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
       }
 
       mainListu := ""
+      CurrentSLD := backCurrentSLD
+      If InStr(CurrentSLD, "\QPV\favourite-images-list.SLD")
+         markUndefinedFavedList()
+
       DynamicFoldersList := cleanDynamicFoldersList(newListu)
       If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
          recreateDynaFoldersSQLdbList(DynamicFoldersList)
@@ -48208,6 +48715,8 @@ InvokeMenuBarFile(manuID) {
       kMenu("pvMenuBarFile", "Add", "Print image(s)`tCtrl+P", "PanelPrintImage")
       kMenu("pvMenuBarFile", "Add", "&Delete file(s)`tDelete", "DeletePicture", "erase")
       kMenu("pvMenuBarFile", "Add", "&Rename file(s)`tF2", "PanelRenameThisFile")
+      If (markedSelectFile>1)
+         kMenu("pvMenuBarFile", "Add", "Structured file operations", "PanelStructuredCopyMoveWindow", "hierarchy backup copy move folders directories dirs")
       kMenu("pvMenuBarFile", "Add", "&Move file(s) to...`tM", "PanelMoveCopyFiles")
       kMenu("pvMenuBarFile", "Add", "&Copy file(s) to...`tC", "InvokeCopyFiles")
    } Else If FileExist(resultedFilesList[currentFileIndex, 1])
@@ -49722,6 +50231,8 @@ createMenuCurrentFilesActs(dummy:=0) {
 
    kMenu("PVfilesActs", "Add", "&Delete file(s)`tDelete", "DeletePicture", "erase")
    kMenu("PVfilesActs", "Add", "&Rename file(s)`tF2", "PanelRenameThisFile")
+   If (markedSelectFile>1)
+      kMenu("PVfilesActs", "Add", "Structured file operations", "PanelStructuredCopyMoveWindow", "hierarchy backup copy move folders directories dirs")
    kMenu("PVfilesActs", "Add", "&Move file(s) to...`tM", "PanelMoveCopyFiles")
    kMenu("PVfilesActs", "Add", "&Copy file(s) to...`tC", "InvokeCopyFiles")
    Menu, PVfilesActs, Add,
@@ -54963,6 +55474,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
    prevImgPath := imgPath
    IDprevImgPath := imgPath "-" userHQraw extraID
    GetWinClientSize(GuiW, GuiH, PVhwnd, 0)
+
    imgW := oImgW
    imgH := oImgH
    decideUndoLevelsAccepted(imgW, imgH)
@@ -55013,9 +55525,33 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
       ws := Round(ResizedW / imgW * 100) "%"
    }
 
+   IMGlargerViewPort := ((ResizedH - 5>GuiH + 1) || (ResizedW - 5>GuiW + 1)) ? 1 : 0
+   If (IMGlargerViewPort!=1 && IMGresizingMode!=4 && IMGresizingMode!=3)
+      hasTrans := adjustCanvas2Toolbar(2NDglPG, 0) ; to-do ; make image not appear under the toolbar
+
+   If (hasTrans=1 && (ResizedW>GuiW - ToolbarWinW + 2))
+   {
+      pwq := (ResizedW - ToolbarWinW)/ResizedW
+      ResizedW -= ToolbarWinW
+      If (IMGresizingMode!=5)
+         ResizedH := Floor(ResizedH*pwq)
+   } Else If (hasTrans=2 && (ResizedH>GuiH - ToolbarWinH + 2))
+   {
+      pwq := (ResizedH - ToolbarWinH)/ResizedH
+      ResizedH -= ToolbarWinH
+      If (IMGresizingMode!=5)
+         ResizedW := Floor(ResizedW*pwq)
+   }
+
+   If isNumber(pwq)
+   {
+      zoomLevel := Round(ResizedW / imgW, 3)
+      ws := Round(ResizedW / imgW * 100) "%"
+      IMGlargerViewPort := ((ResizedH - 5>GuiH + 1) || (ResizedW - 5>GuiW + 1)) ? 1 : 0
+   }
+
    ; ToolTip, % imgW ", " oImgW ", " roImgW ", " ResizedW ,,, 2
-   IMGlargerViewPort := ((ResizedH-5>GuiH+1) || (ResizedW-5>GuiW+1)) ? 1 : 0
-   IMGentirelylargerThanVP := ((ResizedH-5>GuiH+1) && (ResizedW-5>GuiW+1)) ? 1 : 0
+   IMGentirelylargerThanVP := ((ResizedH - 5>GuiH + 1) && (ResizedW - 5>GuiW + 1)) ? 1 : 0
    If (vpIMGrotation>0)
       zoomu := " @ " vpIMGrotation "°"
 
@@ -56298,7 +56834,7 @@ CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReload
   totalScreenRes := ResolutionWidth + ResolutionHeight
   thisImgQuality := (userimgQuality=1) ? 6 : 5
   preventDownScaling := (multiFrameImg=1) || (IMGresizingMode=3) || StrLen(UserMemBMP)>2 || (currentFileIndex=0) || (IMGresizingMode=4 && zoomLevel>1.5) ? 1 : 0
-  If (hasAutoCropped!=1 && preventDownScaling!=1 && !FileExist(file2load) && AutoDownScaleIMGs=1 && totalIMGres/totalScreenRes>1.3)
+  If (preventDownScaling!=1 && !FileExist(file2load) && AutoDownScaleIMGs=1 && totalIMGres/totalScreenRes>1.3)
   {
      setWindowTitle("Downscaling large image to viewport")
      thisImgQuality := (userimgQuality=1) ? "" : 5
@@ -56359,7 +56895,6 @@ CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReload
   {
      setWindowTitle("Rotating image at " vpIMGrotation "°")
      brushu := (brushRequired=1) ? pBrushWinBGR : ""
-     ; nBitmap := simpleFreeImgRotate(rBitmap, vpIMGrotation)
      changeMcursor()
      nBitmap := trGdip_RotateBitmapAtCenter(A_ThisFunc, rBitmap, vpIMGrotation, "", imgQuality, pargbPixFmt)
      If StrLen(nBitmap)>3
@@ -61198,6 +61733,9 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
            If (imgEditPanelOpened!=1)
               Gdip_FillRectangle(2NDglPG, pBrushF, 0, 0, mainWidth, mainHeight)
 
+           If (AnyWindowOpen=17 || AnyWindowOpen=12)
+              Gdip_FillRectangle(2NDglPG, pBrushE, 0, 0, mainWidth, mainHeight)
+
            If (allowControls=1)
               Gdip_DrawRectangle(2NDglPG, zPen, imgSelPx, imgSelPy, imgSelW, imgSelH)
            If (imgEditPanelOpened!=1 && showSelectionGrid=1 && allowControls=1)
@@ -64423,6 +64961,15 @@ calcIMGcoordsInVP(usePrevious, mainWidth, mainHeight, newW, newH, ByRef DestPosX
     Static orderu := {1:7, 2:8, 3:9, 4:4, 5:5, 6:6, 7:1, 8:2, 9:3}
          , prevW := 1, prevH := 1, prevZoom := 0
 
+    isOkay := (IMGresizingMode=4 && (customZoomAdaptMode>0)) ? 0 : 1
+    If (isOkay=1)
+       hasTrans := adjustCanvas2Toolbar(2NDglPG, 0) ; to-do ; make image not appear under the toolbar
+
+    If (hasTrans=1)
+       mainWidth -= ToolbarWinW
+    If (hasTrans=2)
+       mainHeight -= ToolbarWinH
+
     If (allowFreeIMGpanning=1 && IMGresizingMode=4)
     {
        o_mW := mainWidth
@@ -64437,17 +64984,14 @@ calcIMGcoordsInVP(usePrevious, mainWidth, mainHeight, newW, newH, ByRef DestPosX
     CX := Round(mainWidth/2 - newW/2)
     CY := Round(mainHeight/2 - newH/2)
 
-    ; hasTrans := adjustCanvas2Toolbar(2NDglPG, 0) ; to-do ; make image not appear under the toolbar
-    tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
-    tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
     If ((imageAligned=1) || (allowFreeIMGpanning=1 && IMGresizingMode=4) && thumbsDisplaying=0)
     {
-       DestPosX := tlbrBonusX
-       DestPosY := tlbrBonusY
+       DestPosX := 0
+       DestPosY := 0
     } Else If (imageAligned=5)
     {
-       DestPosX := CX + tlbrBonusX
-       DestPosY := CY + tlbrBonusY
+       DestPosX := CX
+       DestPosY := CY
     } 
 
     If (IMGlargerViewPort!=1 && allowFreeIMGpanning=0) || (IMGresizingMode!=4 && allowFreeIMGpanning=1)
@@ -64496,7 +65040,11 @@ calcIMGcoordsInVP(usePrevious, mainWidth, mainHeight, newW, newH, ByRef DestPosX
        }
     }
 
-; ToolTip, % DestPosX "=" DestPosY "`n" IMGdecalageX "=" IMGdecalageY , , , 2
+    If (hasTrans=1)
+       DestPosX += ToolbarWinW
+    If (hasTrans=2)
+       DestPosY += ToolbarWinH
+    ; ToolTip, % DestPosX "=" DestPosY "`n" IMGdecalageX "=" IMGdecalageY , , , 2
     If (allowFreeIMGpanning=1)
        PrintPosX := ""
     prevW := newW
@@ -65134,7 +65682,7 @@ filterDupeResultsByHdist(threshold, mustConvertHash) {
 
    ; MsgBox, % "groups=" totalLoops "= l=" rtotalLoops
    prevMSGdisplay := A_TickCount
-   startOperation := A_TickCount
+   ; startOperation := A_TickCount
    resultsDupesArray := []
    thisLoop := 0
    For Key, arrayGroup in groupies
@@ -65155,7 +65703,7 @@ filterDupeResultsByHdist(threshold, mustConvertHash) {
        thisLoop += arrayGroup.Count()
        thisCounter := resultsDupesArray.Count()
        ; fnOutputDebug("tL=" arrayGroup.Count() )
-       If corefilterDupeResultsByHdist(arrayGroup, threshold, thisLoop, rtotalLoops, thisCounter)
+       If corefilterDupeResultsByHdist(arrayGroup, threshold, thisLoop, rtotalLoops, thisCounter, startOperation)
        {
           abandonAll := 1
           Break
@@ -65482,7 +66030,7 @@ calcMSDvalues(arrayA, arrayB, size, asStr:=0) {
     Return squaredCache[sumB]
 }
 
-corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCounter) {
+corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCounter, mainZeit) {
    startOperation := A_TickCount
    prevMSGdisplay := A_TickCount
    totalLoops := dupeIDsArray.Count()
@@ -65544,7 +66092,7 @@ corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCo
 
    ; If (A_TickCount - prevMSGdisplay>1000)
    ; {
-      showTOOLtip("Calculating Hamming distance between the images in the current group" generalDetails "`nPlease wait", 0, 0, grupu/totalgroups)
+      showTOOLtip("Calculating Hamming distance between the images in the current group: " generalDetails "`nPlease wait", 0, 0, grupu/totalgroups)
       prevMSGdisplay := A_TickCount
    ; }
 
@@ -65552,6 +66100,7 @@ corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCo
    thisFunc := (A_PtrSize=8) ? "hammingDistanceOverArray" : "_hammingDistanceOverArray@36"
    callOffset := totalResults := 0
    stepping := 100
+   startuZ := A_TickCount
    lastStep := A_TickCount
    doStartLongOpDance()
    Loop
@@ -65570,8 +66119,11 @@ corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCo
 
       If (A_TickCount - prevMSGdisplay>1000)
       {
+         etaTime := SubStr(ETAinfos(callOffset, totalLoops, startuZ), 2)
+         etaTime := SubStr(etaTime, InStr(etaTime, "`n"))
+         etaTime .= "`nTotal elapsed time: " SecToHHMMSS(Round((A_TickCount - mainZeit)/1000, 3))
          pxk := Round(callOffset/totalLoops * 100, 1) 
-         showTOOLtip("Calculating Hamming distance between the images" generalDetails " ( " pxk "% )", 0, 0, callOffset/totalLoops)
+         showTOOLtip("Calculating Hamming distance between the images" generalDetails " ( " pxk "% )" etatime, 0, 0, callOffset/totalLoops)
          prevMSGdisplay := A_TickCount
       }
 
@@ -68069,7 +68621,7 @@ PanelJpegPerformOperation() {
 
     Gui, Add, Text, x15 y15 Section, Please choose a JPEG lossless operation...
     Gui, Add, DropDownList, y+10 Section w%txtWid% AltSubmit Choose%jpegDesiredOperation% vjpegDesiredOperation, None|Flip Horizontally|Flip Vertically|Transpose|Transverse|Rotate 90°|Rotate 180°|Rotate -90° [270°]
-    Gui, Add, Checkbox, y+10 Checked%jpegDoCrop% vjpegDoCrop, Crop image(s) to selected area (irreversible)
+    Gui, Add, Checkbox, y+10 Checked%jpegDoCrop% gdummyRefreshImgSelectionWindow vjpegDoCrop, Crop image(s) to selected area (irreversible)
     If (filesElected>1)
        Gui, Add, Text, y+20, %filesElected% files are selected.
     If (editingSelectionNow!=1 && imgEditPanelOpened!=1)
@@ -68079,7 +68631,7 @@ PanelJpegPerformOperation() {
     {
        If (thumbsDisplaying!=1)
        {
-          Gui, Add, Button, xs y+10 h%thisBtnHeight% w%btnWid% gBTNautoCropRealtime, &Auto-crop selection
+          Gui, Add, Button, xs y+10 h%thisBtnHeight% w%btnWid% gJpegBTNautoCropRealtime, &Auto-crop selection
           Gui, Add, Button, x+5 hp w%btnWid% gPanelImgAutoCrop, &Configure auto-crop
        }
        Gui, Add, Button, xs+0 y+25 h%thisBtnHeight% w35 gPreviousPicture +hwndhBtnPrevImg, <<
@@ -68095,6 +68647,18 @@ PanelJpegPerformOperation() {
  
     Gui, Add, Button, x+5 hp w80 gBtnCloseWindow, C&lose
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "JPEG lossless operations: " appTitle)
+    If (editingSelectionNow=1)
+       SetTimer, dummyRefreshImgSelectionWindow, -150
+}
+
+JpegBTNautoCropRealtime() {
+   Static hasRan := 0
+   If !hasRan
+      ReadSettingsAutoCropPanel()
+   If (editingSelectionNow!=1)
+      ToggleEditImgSelection()
+   BTNautoCropRealtime()
+   hasRan := 1
 }
 
 BtnPerformSoloJpegOp(dummy:=0) {
@@ -68513,7 +69077,7 @@ coreColorsAdjusterWindow(modus:=0) {
     } Else
     {
        Gui, Add, Button, xs-10 y+15 h%thisBtnHeight% w35 hwndhBtnCollapse gtoggleImgEditPanelWindow, ▲
-       Gui, Add, Button, x+5 hp w%jk% gapplyIMGeditFunction Default, &Apply
+       Gui, Add, Button, x+5 hp w%jk% Default gapplyIMGeditFunction vbtnLiveApplyTool, &Apply
        Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Close
        dummyTimerDelayiedImageDisplay(150)
     }
@@ -70386,6 +70950,8 @@ invokePanelStaticFoldersContextMenu() {
       kMenu("PanelStaticMenu", "Add", "&Select files`tAlt+L-Click", "BTNselFilesStaticFolder")
       kMenu("PanelStaticMenu", "Add", "&Deselect files`tAlt+R-Click", "BTNunselFilesStaticFolder")
       kMenu("PanelStaticMenu", "Add", "&Erase files from the index`tDelete", "BTNremFilesStaticFolder")
+      kMenu("PanelStaticMenu", "Add", "C&ut folder (Explorer mode)", "BTNcutCopyStaticFolders")
+      kMenu("PanelStaticMenu", "Add", "C&opy folder (Explorer mode)", "BTNcutCopyStaticFolders")
       kMenu("PanelStaticMenu", "Add", "&Copy folder path(s) as text", "BTNcopyStaticFolderPath")
       kMenu("PanelStaticMenu", "Add/UnCheck", "&Set as the protected folder", "BtnPanelManageFoldersProtect")
       If (protectedFolderPath=folderPath && preventDeleteFromProtectedPath=1)
@@ -71745,6 +72311,52 @@ BTNcopyStaticFolderPath() {
     } Else
        showTOOLtip(groupDigits(counter) " folder path(s) copied to clipboard as text")
 
+    SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+BTNcutCopyStaticFolders(a) {
+    Gui, SettingsGUIA: Default
+    Gui, SettingsGUIA: ListView, LViewOthers
+    colNum := (AnyWindowOpen=3) ? 3 : 1
+    RowNumber := LV_GetNext(0, "F")
+    LV_GetText(folderu, RowNumber, colNum)
+    If (AnyWindowOpen=2)
+       folderu := newStaticFoldersListCache[folderu, 1]
+
+    If (StrLen(folderu)<3 || folderu="folder path")
+       Return
+
+    counter := indexu := RowNumber := 0
+    total := LV_GetCount()
+    foldersListArray := []
+    Loop, % total
+    {
+       RowNumber := LV_GetNext(RowNumber)
+       If !RowNumber
+          Break
+
+       LV_GetText(indexu, RowNumber, colNum)
+       If !indexu
+          Continue
+
+       folderu := newStaticFoldersListCache[indexu, 1]
+       If FolderExist(folderu)
+       {
+          counter++
+          foldersListArray[counter] := folderu "\"
+       }
+    }
+
+    If (counter<1)
+       Return
+
+    userOption := InStr(StrReplace(a, "&"), "cut") ? "CUT" : "COPY"
+    destroyGDIfileCache()
+    dataHandle := ClipboardSetFiles(foldersListArray, userOption, 1)
+    Sleep, 5
+    testClipType := IsClipboardFormatAvailable(15)
+    infoText := (testClipType!=1 || !dataHandle) ? "ERROR: Failed to set the clipboard" : userOption " action: " counter " folders can now be pasted in any file manager or in QPV"
+    showTOOLtip(infoText)
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -73482,6 +74094,7 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
     If (uiUseDarkMode=1)
        CtlColors.Free()
 
+    createGUItoolbar("state")
     BalloonTip_Kill()
     endCaptureCloneBrush()
     tabzDarkModus := (uiUseDarkMode=1) ? "-Border +Buttons cFFFFaa" : ""
@@ -73575,8 +74188,6 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
        ; SetTimer, dummyRefreshImgSelectionWindow, -200
     }
 
-    updateUIctrl()
-    TriggerMenuBarUpdate()
     If !testIsDupesList()
        toBeExcludedIndexes := []
 
@@ -73584,6 +74195,8 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
        InitialFilterSettingsPanel(0)
 
     hSetWinGui := imgEditPanelOpened := AnyWindowOpen := 0
+    updateUIctrl()
+    TriggerMenuBarUpdate()
     createGUItoolbar()
     If (ShowAdvToolbar=1)
        decideIconBTNmainTooler()
@@ -77609,6 +78222,9 @@ tlbrAmaskDiscard() {
 tlbrPenFill() {
    If isImgEditingNow()
    {
+      If (imgEditPanelOpened=1)
+         BtnCloseWindow()
+
       MenuStartDrawingShapes()
       Return "m"
    }
@@ -77617,6 +78233,9 @@ tlbrPenFill() {
 tlbrPenOutline() {
    If isImgEditingNow()
    {
+      If (imgEditPanelOpened=1)
+         BtnCloseWindow()
+
       MenuStartDrawingLines()
       Return "m"
    }
@@ -78564,6 +79183,7 @@ CoreGUItoolbar() {
 }
 
 createGUItoolbar(dummy:=0) {
+   Critical, on
    Static prevState, hasEverDisplayed
    If (ShowAdvToolbar=0)
    {
@@ -78595,9 +79215,19 @@ createGUItoolbar(dummy:=0) {
    addAlphaIcons := isAlphaMaskPartialWin()
    ToolBarBtnWidth := Round(OSDfontSize*1.5 * ToolbarScaleFactor)
    currState := "a" isTransPanel isWelcomeScreenu addAlphaIcons isNowAlphaPainting() isAlphaMaskWindow() ToolBarBtnWidth TLBRverticalAlign TLBRtwoColumns isPaintPanel thumbsDisplaying drawingShapeNow
+   ; fnOutputDebug("toolbar state prev=" prevState)
+   ; fnOutputDebug("toolbar state curr=" currState)
+   If (dummy="state")
+   {
+      ; fnOutputDebug("toolbar updated - forced")
+      prevState := currState
+      Return
+   }
+
    ; msgbox, %currstateSimple%`n%prevStateSimple%
    If (prevState!=currState || dummy="forced")
    {
+      ; fnOutputDebug("toolbar updated")
       TouchToolbarGUIcreated := 0
       CoreGUItoolbar()
       prevState := currState
@@ -78785,7 +79415,10 @@ tlbrDecideTooltips(hwnd) {
       msgu := "Toggle open/closed path [O]"
    } Else If InStr(icoFile, "pen-vector")
    {
-      msgu := "L: Draw freeform filled shape [Shift + P]`nR: Draw freeform poly or curve line [Alt + P]"
+      ; If (editingSelectionNow=1 && EllipseSelectMode=2)
+      ;    msgu := "Modify vector shape [Shift + L]"
+      ; Else
+         msgu := "L: Draw freeform filled shape [Shift + P]`nR: Draw freeform poly or curve line [Alt + P]"
    } Else If InStr(icoFile, "pipette")
    {
       keyu := (imgEditPanelOpened=1 && AnyWindowOpen) ? " [C]" : ""

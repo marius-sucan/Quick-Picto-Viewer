@@ -30,12 +30,17 @@
 #include <errno.h>
 #include "Jpeg2PDF.h"
 #include "Jpeg2PDF.cpp"
+// #define cimg_plugin "include\gmic-master\gmic.cpp";
+#define cimg_use_openmp 1
 #include "include\CImg-3.1.4\CImg.h"
-// #include "include\gmic-3.1.6-x64\gmic.h"
+// #include "include\CImg-master\CImg.h"
+// #include "include\gmic-master\gmic.h"
+// #include "include\CImg-master\gmic.h"
+// #include "include\CImg-master\gmic.cpp"
+// #include "include\gmic-master\gmic.cpp"
 // #include <Magick++.h>
 // #include <include\vips\vips8>
 // #include <bits/stdc++.h>
-
 using namespace std;
 using namespace cimg_library;
 
@@ -1080,7 +1085,7 @@ DLL_API int DLL_CALLCONV EraserBrush(int *imageData, int *maskData, int w, int h
             else
                alpha2 = levelAlpha;
 
-            alpha2 = (alpha2==a) ? a : ceil(alpha2*fintensity + a*max(0, 1.0f - fintensity));  // Formula: A*w + B*(1 – w)
+            alpha2 = (alpha2==a) ? a : ceil(alpha2*fintensity + a*max(0.0f, 1.0f - fintensity));  // Formula: A*w + B*(1 – w)
             int haha = (alpha2!=a) ? 1 : 0;
             if (alpha2!=a)
             {
@@ -3060,6 +3065,20 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV BoxBlurBitmap(Gdiplus::GpBitmap *myBitma
   return newBitmap;
 }
 
+
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV cImgRotateBitmap(Gdiplus::GpBitmap *myBitmap, int width, int height, float angle, int interpolation, int bond) {
+  Gdiplus::GpBitmap *newBitmap = NULL;
+  CImg<float> img(width,height,1,4);
+  int r = FillCImgFromBitmap(img, myBitmap, width, height);
+  if (r==0)
+     return newBitmap;
+
+  img.rotate(angle, interpolation, bond);
+
+  newBitmap = CreateBitmapFromCImg(img, img.width(), img.height());
+  return newBitmap;
+}
+
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV GenerateCIMGnoiseBitmap(int width, int height, int intensity, int details, int scale, int blurX, int blurY, int doBlur) {
   Gdiplus::GpBitmap *newBitmap = NULL;
   CImg<float> img(width,height,1,4);
@@ -3090,9 +3109,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testCimgQPV(Gdiplus::GpBitmap *myBitmap,
     CImg<char>::string("First image").move_to(image_names);
 
     // Invoke libgmic to execute a G'MIC pipeline.
-    gmic("blur_angular 2% "
-    "name \"Result image\"",
-    image_list,image_names);
+    gmic("blur_angular 2% name \"Result image\"", image_list, image_names);
 
     // Display resulting image.
     const char *const title_bar = image_names[0];
@@ -3102,8 +3119,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testCimgQPV(Gdiplus::GpBitmap *myBitmap,
     return newBitmap;
 }
 
-
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testCimgQPV(Gdiplus::GpBitmap *myBitmap, int width, int height, int intensityX, int intensityY, int modus) {
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testOtherCimgQPV(Gdiplus::GpBitmap *myBitmap, int width, int height, int intensityX, int intensityY, int modus) {
   // width = 129;
   // height = 129;
   // CImg<float> img(129,129,1,3,"0,64,128,192,255",true); // Construct image from a value sequence

@@ -2,15 +2,23 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.8.0 (2022-12-08)
+  - [new] tool to copy/move files by maintaining their folder(s) structure
+  - optimized features that use blur; instead of relying on GDI+ , I use cImg for small radius blurring
+  - optimized the speed for «Radial blur» tool; it should still be faster
+  - fixed broken toolbar button - pen/vector draw tool
+  - aborting long operations is now easier; the prompt will show up faster when trying to stop the operation; and the processes are no longer continuing while the prompt is visible
+  - other bug fixes I no longer remember to list here
+
 - v5.7.9 (2022-12-01)
   - [new] gradient preview in the Fill Area panel and in Alpha Mask tab
   - [new] options to choose image destination format on auto-crop
-  - [new] ability to choose for what monitor to set the image as wallpaper, and its position on the desktop, and background color; it now works on Windows 7 [but nor per monitor]
+  - [new] ability to choose for what monitor to set the image as wallpaper, and its position on the desktop, and background color; it now works on Windows 7 [but not per monitor]
   - the file operations conflict message box now shows an image thumbnail for the source and destination files
   - reimplemented from scratch the auto-crop function; now it uses C++ [the DLL] and it is MUCH faster; about 30x faster
   - the alpha mask panel shows fewer UI elements at once; they are shown or hidden based on the options selected
   - made larger the image preview area in the panels that integrate this kind of UI element
-  - the color picker should now work on Windows 7 if hardware acceleration is enabled
+  - the color picker should now work on Windows 7 if the hardware acceleration is enabled
   - panel layout fixes for Windows 7 
   - really MANY bug fixes , and important ones
 

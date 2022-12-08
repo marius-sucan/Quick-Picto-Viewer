@@ -54,7 +54,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , menusListVector := "File:VectorFile|Edit:VectorEdit|Selection:VectorSelection|View:VectorView|Interface:VectorInterface"
      , menusListThumbs := "File:File|Edit:Edit|Selection:Selection|Image:Image|Slides:Slides|Find:Find|List:List|Sort:Sort|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
      , menusListWelcome := "File:File|Edit:Edit|Interface:Interface|Settings:Settings|Help:Help"
-     , prevMenuBarItem := 1, lastContextMenuZeit := 1, colorPickerMustEnd := 0
+     , prevMenuBarItem := 1, lastContextMenuZeit := 1, colorPickerMustEnd := 0, userPendingAbortOperations := 0
 
 ; OnMessage(0x388, "WM_PENEVENT")
 OnMessage(0x2a3, "WM_MOUSELEAVE")
@@ -885,12 +885,18 @@ WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
 askAboutStoppingOperations() {
      If (mustAbandonCurrentOperations!=1)
      {
+        userPendingAbortOperations := 1
         lastCloseInvoked := 0
         WinSet, Enable,, ahk_id %PVhwnd%
         msgResult := msgBoxWrapper(appTitle, "Do you want to stop the currently executing operation ?", 4, 0, "question")
         If (msgResult="yes")
+        {
            mustAbandonCurrentOperations := 1
-     } ; Else SoundBeep , % 250 + 100*lastCloseInvoked, 100
+           userPendingAbortOperations := 0
+        } Else
+           userPendingAbortOperations := 0
+     } Else userPendingAbortOperations := 0
+      ; Else SoundBeep , % 250 + 100*lastCloseInvoked, 100
 }
 
 WM_RBUTTONUP(wParam, lP, msg, hwnd) {
@@ -978,6 +984,15 @@ PanelQuickSearchMenuOptions() {
 }
 
 toggleAppToolbar() {
+    Static lastInvoked := 1
+    If (A_TickCount - lastInvoked<300)
+       Return
+
+    MainExe.ahkPostFunction(A_ThisFunc)
+    lastInvoked := A_TickCount
+}
+
+ToggleMenuBaru() {
     Static lastInvoked := 1
     If (A_TickCount - lastInvoked<300)
        Return
@@ -1242,7 +1257,7 @@ changeMcursor(whichCursor) {
 
   If (whichCursor="normal-extra")
   {
-     imageLoading := mustAbandonCurrentOperations := 0
+     userPendingAbortOperations := imageLoading := mustAbandonCurrentOperations := 0
      runningLongOperation := lastCloseInvoked := 0
      setTaskbarIconState("normal")
      thisCursor := hCursN
@@ -1712,16 +1727,18 @@ kbdkeybcallKeysResponder(givenKey, thisWin) {
 }
 
 guiCreateMenuFlyout() {
-   m := LargeUIfontValue // 2 + 1
+   Static m := 2
    h := LargeUIfontValue * 2 + 1
    Gui, menuFlier: +AlwaysOnTop -MinimizeBox -SysMenu -Caption +ToolWindow +hwndhFlyOut
    Gui, menuFlier: Color, %OSDbgrColor%
    Gui, menuFlier: Font, s%LargeUIfontValue% Bold c%OSDtextColor%
    Gui, menuFlier: Margin, 0, 0
    Gui, menuFlier: Add, Text, Border Center +0x200 x0 y0 w%h% h%h% gPanelQuickSearchMenuOptions hwndhBtn1 +TabStop, S
-   Gui, menuFlier: Add, Text, Border Center +0x200 x+%m% yp+0 w%h% h%h% gtoggleAppToolbar hwndhBtn2 +TabStop, T
-   AddTooltip2Ctrl(hBtn1, "Search through menus [ `; ]",, uiUseDarkMode)
-   AddTooltip2Ctrl(hBtn2, "Toggle the toolbar [ Shift+F10 ]",, uiUseDarkMode)
+   Gui, menuFlier: Add, Text, Border Center +0x200 x+%m% wp hp gtoggleAppToolbar hwndhBtn2 +TabStop, T
+   Gui, menuFlier: Add, Text, Border Center +0x200 x+%m% wp hp gToggleMenuBaru hwndhBtn3 +TabStop, M
+   AddTooltip2Ctrl(hBtn1, "Search through ther available options [ `; ]",, uiUseDarkMode)
+   AddTooltip2Ctrl(hBtn2, "Toggle app toolbar [ Shift+F10 ]",, uiUseDarkMode)
+   AddTooltip2Ctrl(hBtn3, "Toggle menu bar [ F10 ]",, uiUseDarkMode)
    ; AddTooltip2Ctrl("AutoPop", 0.5)
    wasMenuFlierCreated := 1
 }
