@@ -55,6 +55,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , menusListThumbs := "File:File|Edit:Edit|Selection:Selection|Image:Image|Slides:Slides|Find:Find|List:List|Sort:Sort|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
      , menusListWelcome := "File:File|Edit:Edit|Interface:Interface|Settings:Settings|Help:Help"
      , prevMenuBarItem := 1, lastContextMenuZeit := 1, colorPickerMustEnd := 0, userPendingAbortOperations := 0
+     , statusBarTooltipVisible := 0
 
 ; OnMessage(0x388, "WM_PENEVENT")
 OnMessage(0x2a3, "WM_MOUSELEAVE")
@@ -528,13 +529,13 @@ uiAccessUpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0, fntSi
          k := imgHUDbaseUnit//3 ; the thickness of scrollbars
          GuiControl, 1: Move, picVscroll, % "w" k " h" GuiH " x" GuiW - k " y0"
          GuiControl, 1: Move, PicOnGUI1, % "w" GuiW " h" GuiH - heightu
-         GuiControl, 1: Move, PicOnGUI2a, % "w" GuiW " h" heightu " x1 y" GuiH - heightu
+         GuiControl, 1: Move, PicOnGUI2a, % "w" GuiW - heightu//2 " h" heightu " x1 y" GuiH - heightu
          GuiControl, 1: Move, PicOnGUI2b, w1 h1 x1 y1
          GuiControl, 1: Move, PicOnGUI2c, w1 h1 x1 y1
          GuiControl, 1: Move, PicOnGUI3, w1 h1 x1 y1
          GuiControl, 1: Move, picHscroll, w1 h1 x1 y1
          winCtrlsCoords[1] := [0, heightu, GuiW, GuiH - heightu*2, "PicOnGUI1"]
-         winCtrlsCoords[2] := [1, GuiH - heightu, GuiW, heightu, "PicOnGUI2a"]
+         winCtrlsCoords[2] := [1, GuiH - heightu, GuiW - heightu//2, heightu, "PicOnGUI2a"]
          winCtrlsCoords[3] := [1, 1, 1, 1, "PicOnGUI2b"]
          winCtrlsCoords[4] := [1, 1, 1, 1, "PicOnGUI2c"]
          winCtrlsCoords[5] := [1, 1, 1, 1, "PicOnGUI3"]
@@ -557,12 +558,12 @@ uiAccessUpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0, fntSi
       prevState := mustResize
       GetClientSize(GuiW, GuiH, PVhwnd)
       GuiControl, 1: Move, PicOnGUI1, % "w" GuiW " h" GuiH - heightu
-      GuiControl, 1: Move, PicOnGUI2a, % "w" GuiW " h" heightu " x1 y" GuiH - heightu
+      GuiControl, 1: Move, PicOnGUI2a, % "w" GuiW - heightu//2 " h" heightu " x1 y" GuiH - heightu
       stringu := StrReplace(stringu, " | ", "`n")
       GuiControl, 1:, PicOnGUI2a, % "Status bar:`n" stringu
       lastWinStatus := stringu
       winCtrlsCoords[1] := [0, heightu, GuiW, GuiH - heightu*2, "PicOnGUI1"]
-      winCtrlsCoords[2] := [1, GuiH - heightu, GuiW, heightu, "PicOnGUI2a"]
+      winCtrlsCoords[2] := [1, GuiH - heightu, GuiW - heightu//2, heightu, "PicOnGUI2a"]
       GuiControl, 1:, PicOnGUI1, % infos
    }
 }
@@ -823,6 +824,9 @@ WM_LBUTTONDOWN(wP, lP, msg, Az) {
 }
 
 WM_LBUTTONUP(wP, lP, msg, hwnd) {
+    If (statusBarTooltipVisible=1)
+       mouseTurnOFFtooltip()
+
     LbtnDwn := 0
     colorPickerMustEnd := 1
     Return 0
@@ -831,6 +835,9 @@ WM_LBUTTONUP(wP, lP, msg, hwnd) {
 WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
     If (A_TickCount - scriptStartTime<500)
        Return 0
+
+    If (statusBarTooltipVisible=1)
+       mouseTurnOFFtooltip()
 
     colorPickerMustEnd := -1
     If preventSillyGui(A_Gui)
@@ -904,6 +911,9 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
   LbtnDwn := 0
   If (A_TickCount - scriptStartTime<500)
      Return 0
+
+  If (statusBarTooltipVisible=1)
+     mouseTurnOFFtooltip()
 
   colorPickerMustEnd := -1
   If preventSillyGui(A_Gui)
@@ -1341,6 +1351,7 @@ showMouseTooltipStatusbar() {
        Return
 
     thisSize := OSDfontSize//3.5 + 2
+    statusBarTooltipVisible := 1
     mouseCreateOSDinfoLine(lastWinStatus, thisSize)
     SetTimer, mouseTurnOFFtooltip, -4500
 }
@@ -2456,6 +2467,8 @@ constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code) {
 WM_KEYDOWN(wParam, lParam, msg, hwnd) {
     vk_code := Format("{1:x}", wParam)
     ; ToolTip, % vk_code "|" whileLoopExec "|" runningLongOperation "|" imageLoading "|" animGIFplaying , , , 2
+    If (statusBarTooltipVisible=1)
+       mouseTurnOFFtooltip()
 
     If (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1) && (vk_code!="1B" && animGIFplaying!=1 && slideShowRunning!=1)
     || (A_TickCount - lastOtherWinClose<300)
@@ -2715,13 +2728,15 @@ mouseClickTurnOFFtooltip(mode:=0) {
 }
 
 mouseTurnOFFtooltip(mode:=0) {
-   Sleep, 10
+   Global statusBarTooltipVisible := 0
    If (mouseToolTipWinCreated!=1)
       Return
 
+   Sleep, 10
    Gui, mouseToolTipGuia: Destroy
    ; WinActive("ahk_id" PVhwnd)
    Global mouseToolTipWinCreated := 0
+   Global statusBarTooltipVisible := 0
    Global lastZeitToolTip := A_TickCount
    SetTimer, mouseTurnOFFtooltip, Off
    ; MouseGetPos, OutputVarX, OutputVarY, OutputVarWin

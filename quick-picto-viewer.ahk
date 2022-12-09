@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.7.9
+;@Ahk2Exe-SetVersion 5.8.1
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2023)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -207,7 +207,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , userExtractFramesFmt := 3, maxMultiPagesAllowed := 2048, maxMemLimitMultiPage := 2198765648
    , cmdExifTool := "", tabzDarkModus := 0, maxRecentOpenedFolders := 15
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.8.0", vReleaseDate := "2022/12/08" ; yyyy-mm-dd
+   , appVersion := "5.8.1", vReleaseDate := "2022/12/09" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -3647,7 +3647,8 @@ CopyAlphaMask2clippy(modus:=0, allowAsk:=0) {
      vPimgSelH := max(selDotY, selDotAy) - min(selDotY, selDotAy)
   }
 
-  alphaMaskGray := generateAlphaMaskBitmap(0, 0, vPimgSelW, vPimgSelH, 0, 0, 0, 1)
+  transformTool := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
+  alphaMaskGray := generateAlphaMaskBitmap(0, 0, vPimgSelW, vPimgSelH, 0, 0, 0, 1, transformTool)
   If StrLen(alphaMaskGray)>2
   {
      pEffectGray := Gdip_CreateEffect(6, 0, -100, 0)
@@ -12184,7 +12185,8 @@ generateAlphaMaskBitmap(clipBMP, previewMode, offX:=0, offY:=0, offW:=0, offH:=0
     Else If (alphaMaskRefBMP=3 && transformTool=1)
        thisAlphaFile := (previewMode=1) ? viewportStampBMP : userClipBMPpaste
 
-    ; fnOutputDebug(A_ThisFunc "(): transformTool=" transformTool)
+    fnOutputDebug(A_ThisFunc "(): refBMP=" alphaMaskRefBMP " | transformTool=" transformTool " | " thisAlphaFile)
+
     sizeIDu := sizeIDu ? sizeIDu : "a" rImgW rImgH
     externBMP := (alphaMaskingMode=5 && StrLen(thisAlphaFile)>2) ? 1 : 0
     thisState := "a" externBMP previewMode thisAlphaFile alphaMaskRefBMP alphaMaskingMode alphaMaskClrAintensity alphaMaskClrBintensity alphaMaskGradientAngle alphaMaskGradientScale alphaMaskOffsetX alphaMaskOffsetY alphaMaskGradientWrapped alphaMaskColorReversed alphaMaskReplaceMode alphaMaskBMPchannel VPselRotation lastPaintEventID alphaMaskGradientPosA alphaMaskGradientPosB sizeIDu getVPselIDs("saiz-vpos") userAlphaMaskBmpPainted userPrevAlphaMaskBmpPainted
@@ -12207,13 +12209,16 @@ generateAlphaMaskBitmap(clipBMP, previewMode, offX:=0, offY:=0, offW:=0, offH:=0
     {
        userAlpha := trGdip_CloneBitmap(A_ThisFunc, thisAlphaFile)
        Gdip_GetImageDimensions(userAlpha, testImgW, testImgH)
+
        msize := (testImgW + testImgH)//2
        threads := (previewMode=1) ? realSystemCores : 0
        If (StrLen(userAlpha)>2 && testImgW>1 && testImgH>1)
        {
+          If (!rImgW || !rImgH)
+             Gdip_GetImageDimensions(userAlpha, rImgW, rImgH)
+
           brLvl := Round(alphaMaskClrAintensity/255*510 - 255)
           contrLvl := Round(alphaMaskClrBintensity/255*100)
-
           thisImgQuality := (PasteInPlaceQuality=1 && previewMode!=1) ? 7 : 5
           alphaMaskGray := realtimePasteInPlaceAlphaMaskRotator(previewMode, userAlpha, rImgW, rImgH, thisImgQuality)
           rsize := (rImgW + rimgH)//2
@@ -35579,6 +35584,7 @@ updateUIalphaMaskStuff(tabu) {
        actu := (alphaMaskingMode>1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
        GuiControl, % actu, alphaMaskReplaceMode
        GuiControl, % actu, alphaMaskColorReversed
+       GuiControl, % actu, UIviewAlpha
 
        actu := isInRange(alphaMaskingMode, 2, 4) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
        If isInRange(alphaMaskingMode, 2, 4)
@@ -39127,8 +39133,8 @@ livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
    }
 
    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
-   imgSelW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
-   imgSelH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
+   imgSelW := Round( max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2) )
+   imgSelH := Round( max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2) )
 
    ; pEffectGray := Gdip_CreateEffect(6, 0, -100, 0)
    thisOpacity := (alphaMaskPreviewOpacity<254) ? alphaMaskPreviewOpacity/255 : 1
@@ -39154,10 +39160,11 @@ livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
       Else If InStr(friendly, "transformed")
          Gdip_GetImageDimensions(userClipBMPpaste, w, h)
 
-      kImgSelW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
-      kImgSelH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
+      kImgSelW := Round( max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2) )
+      kImgSelH := Round( max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2) )
       thisIDu := "a" alphaMaskingMode alphaMaskColorReversed userAlphaMaskBmpPainted kImgSelW kImgSelH VPselRotation zoomLevel
-      alphaMaskGray := generateAlphaMaskBitmap(0, 1, vPimgSelW//2 + 1, vPimgSelH//2 + 1, 0, 0, thisIDu, 1)
+      transformTool := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
+      alphaMaskGray := generateAlphaMaskBitmap(0, 1, vPimgSelW//2 + 1, vPimgSelH//2 + 1, 0, 0, thisIDu, 1, transformTool)
       msg := "Alpha mask type: " friendly "`nDimensions: " groupDigits(w) " x " groupDigits(h) " (" Round(w/h, 2) ")`nSelection dimensions: " groupDigits(imgSelW) " x " groupDigits(imgSelH) " (" Round(imgSelW/imgSelH, 2) ")"
       If StrLen(alphaMaskGray)>2
       {
@@ -42590,9 +42597,10 @@ PanelInsertTextArea() {
 }
 
 uiADDalphaMaskTabs(t1, t2, labelu) {
-    Global uiPasteInPlaceAlphaDrawMode
+    Global uiPasteInPlaceAlphaDrawMode, UIviewAlpha
     btnWid := 90,  txtWid := 310
     EditWid := 60, slideWid := 150
+
     If (PrefsLargeFonts=1)
     {
        slideWid := slideWid + 55
@@ -42603,11 +42611,16 @@ uiADDalphaMaskTabs(t1, t2, labelu) {
     }
 
     txtWid2 := txtWid//2
-    sml := (PrefsLargeFonts=1) ? 70 : 55
+    sml := (PrefsLargeFonts=1) ? 30 : 20
+    transformTool := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
+    If (transformTool=0 && alphaMaskRefBMP=3)
+       alphaMaskRefBMP := 1
 
     Gui, Tab, %t1% ; alpha mask
     friendlyMaskInfo := (coreDesiredPixFmt="0x21808") ? "Disabled in 24-RGB mode" : "No alpha mask"
     Gui, Add, DropDownList, x+15 y+15 Section w%txtWid2% AltSubmit Choose%alphaMaskingMode% valphaMaskingMode g%labelu%, %friendlyMaskInfo%|Linear gradient|Radial gradient|Box gradient|Image file|Custom shape
+    Gui, Add, Button, x+2 w%sml% hp vUIviewAlpha +hwndhtempu gViewAlphaMaskNow, P
+    ToolTip2ctrl(htempu, "Show a temporary preview of the alpha mask in the viewport")
     Gui, Add, Checkbox, x+8 hp Checked%alphaMaskGradientWrapped% valphaMaskGradientWrapped g%labelu%, &Tiled gradient
     Gui, Add, Text, xs y+10 w%slideWid% +0x200 gBtnResetPanelsSpecificControl vinfoAlphaClrAint +TabStop, Intensity A: 0
     Gui, Add, Text, x+5 hp wp +0x200 gBtnResetPanelsSpecificControl vinfoAlphaClrBint +TabStop, Intensity B: 0
@@ -42619,14 +42632,13 @@ uiADDalphaMaskTabs(t1, t2, labelu) {
     Gui, Add, Slider, Center xs y+1 wp NoTicks g%labelu% AltSubmit valphaMaskGradientAngle Range0-360, % alphaMaskGradientAngle
     Gui, Add, Slider, Center x+5 wp NoTicks g%labelu% AltSubmit valphaMaskGradientScale Range1-300, % alphaMaskGradientScale
 
-    sml := (PrefsLargeFonts=1) ? 30 : 20
     Gui, Add, Text, xs y+10 wp Section -wrap gBtnResetPanelsSpecificControl vinfoAlphaMaskSigma +TabStop, Sigma: %alphaMaskGradientPosA%`%
     ; Gui, Add, Text, x+5 wp +BackgroundTrans gBtnResetPanelsSpecificControl vinfoAlphaMaskBlend +TabStop, Blend: %alphaMaskGradientPosB%`%
     Gui, Add, Text, x+15 wp-20 hp -Border +0xE gBtnResetPanelsSpecificControl vinfoAlphaMaskBlend +hwndhGradientAlphaMSKpreview, Gradient preview
     Gui, Add, Slider, Center xs y+1 w%slideWid% NoTicks g%labelu% AltSubmit valphaMaskGradientPosA Range0-100, % alphaMaskGradientPosA
     Gui, Add, Slider, Center x+5 wp NoTicks g%labelu% AltSubmit valphaMaskGradientPosB Range0-100, % alphaMaskGradientPosB
     Gui, Add, Text, xs ys+2 vinfoAlphaFile, Image to use as alpha mask:
-    Gui, Add, DropDownList, xs y+10 w%txtWid2% g%labelu% AltSubmit valphaMaskRefBMP Choose%alphaMaskRefBMP%, User painted bitmap|Main image|Transformed object
+    Gui, Add, DropDownList, xs y+10 w%txtWid2% g%labelu% AltSubmit valphaMaskRefBMP Choose%alphaMaskRefBMP%, % (transformTool=1) ? "User painted bitmap|Main image|Transformed object" : "User painted bitmap|Main image"
     Gui, Add, DropDownList, x+5 wp-95 AltSubmit Choose%alphaMaskBMPchannel% valphaMaskBMPchannel g%labelu%, Red|Green|Blue|Alpha|All gray
     Gui, Add, Button, x+5 w%sml% hp vUIremAlpha +hwndhtempu gdiscardUserPaintedAlpha, &X
     ToolTip2ctrl(htempu, "Destroy the user painted bitmap")
@@ -47778,7 +47790,7 @@ showTOOLtip(msg, funcu:=0, typeFuncu:=0, perc:=0) {
    If (AnyWindowOpen>0 && WinActive("A")=hSetWinGui && panelWinCollapsed=0)
    {
       GetPhysicalCursorPos(mX, mY)
-      If ((InStr(msg, "error") || InStr(msg, "failed") || InStr(msg, "warning")) && !perc)
+      If ((InStr(msg, "error") || InStr(msg, "failed") || InStr(msg, "warning")) && !perc && AnyWindowOpen!=70)
       {
          If (z := InStr(msg, "`n"))
          {
@@ -58384,16 +58396,21 @@ toggleAlphaPaintingMode() {
       }
 
       liveDrawingBrushTool := 1
-      imgSelW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
-      imgSelH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
+      imgSelW := Round( max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2) )
+      imgSelH := Round( max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2) )
       showTOOLtip("Please wait, activating painting mode")
       If StrLen(userAlphaMaskBmpPainted)<3
       {
          freshMode := 1
          If (isVarEqualTo(AnyWindowOpen, 70, 32, 23) && alphaMaskingMode>1)
+         {
             alphaMaskGray := generateAlphaMaskBitmap(0, 0, imgSelW//2, imgSelH//2, 0, 0, 0, 1)
-         Else If (alphaMaskingMode>1)
-            alphaMaskGray := generateAlphaMaskBitmap(userClipBMPpaste, 0, 0, 0, 0, 0, 0, 1)
+         } Else If (alphaMaskingMode>1)
+         {
+            transformTool := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
+            alphaMaskGray := generateAlphaMaskBitmap(0, 0, imgSelW, imgSelH, 0, 0, 0, 1, transformTool)
+            ; alphaMaskGray := generateAlphaMaskBitmap(userClipBMPpaste, 0, 0, 0, 0, 0, 0, 1)
+         }
 
          If StrLen(alphaMaskGray)>2
             generated := 1
