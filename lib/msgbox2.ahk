@@ -59,7 +59,6 @@ Global MsgBox2InputHook, MsgBox2Result, MsgBox2hwnd
 MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=0, fontSize:=0, modalHwnd:="", ownerHwnd:="", checkBoxCaption:="", checkBoxState:=0, dropListu:="", editOptions:="", editDefaultLine:="", DropListMode:=0, setWidth:=0, 2ndDropListu:=0, 2ndDropListMode:=0) {
   Global UsrCheckBoxu, 2ndDropListuChoice, DropListuChoice, EditUserMsg, prompt, BoxIcon
   oCritic := A_IsCritical 
-  Critical, off
   thisHwnd := ownerHwnd ? ownerHwnd : modalHwnd
   If !thisHwnd
      thisHwnd := "mouse"
@@ -391,7 +390,9 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   If !btnCount
      SetTimer, CloseMsgBox2Win, 300
 
+  Critical, off
   SetTimer, WatchMsgBox2Win, 300
+  Gui, WinMsgBox: Default
   MsgBox2InputHook := InputHook("V") ; "V" for not blocking input
   MsgBox2InputHook.KeyOpt("{BackSpace}{Delete}{PgUp}{PgDn}{Enter}{Escape}{F4}{NumpadEnter}","N")
   MsgBox2InputHook.OnKeyDown := Func("MsgBox2InputHookKeyDown")

@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.8.1
+;@Ahk2Exe-SetVersion 5.8.2
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2023)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -207,7 +207,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , userExtractFramesFmt := 3, maxMultiPagesAllowed := 2048, maxMemLimitMultiPage := 2198765648
    , cmdExifTool := "", tabzDarkModus := 0, maxRecentOpenedFolders := 15
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.8.1", vReleaseDate := "2022/12/09" ; yyyy-mm-dd
+   , appVersion := "5.8.2", vReleaseDate := "2022/12/12" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -779,7 +779,6 @@ KeyboardResponder(givenKey, thisWin, abusive) {
        {
            ; w ; to-do
            ; wallpaperGetMonitorImagePathDesktopSize(0)
-           ; testJSONstuff()
            If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1 && thumbsDisplaying!=1)
               flipSelectionWH()
            Else If (thumbsDisplaying=1 && maxFilesIndex>10 && CurrentSLD && !z)
@@ -17644,6 +17643,14 @@ addFolderSldATfavorites(givenPath) {
    If !givenPath
       Return
 
+   If (InStr(givenPath, "\newFile.SLD") && !FileRexists(givenPath))
+   {
+      showTOOLtip("WARNING: This file list seems to be inexistend.`nIt was not added to favourites.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
    thisu := RegExMatch(givenPath, sldsPattern) ? ".SLD file" : "Folder"
    FileRead, OutputVar, % " *t " folderFavesFile
    Sleep, 5
@@ -18913,7 +18920,7 @@ PlotSeenHourStatsNow() {
    Loop, 24
    {
        dataArray[A_Index] := 1
-       namesLabel[A_Index] := A_Index < 10 ? "0" . A_Index : A_Index
+       namesLabel[A_Index] := (A_Index < 10) ? "0" . A_Index : A_Index
     }
 
    Loop
@@ -18930,7 +18937,7 @@ PlotSeenHourStatsNow() {
        {
           LV_GetText(oindexu, aR, 2)
           oindexu := SubStr(oindexu, 1, 2)
-          indexu := LTrim(oindexu, 0)
+          indexu := (oindexu="00" || !oindexu) ? "24" : LTrim(oindexu, 0)
           thisu := max(maxValu, valu)
           If (thisu!=maxValu)
           {
@@ -18940,7 +18947,7 @@ PlotSeenHourStatsNow() {
 
           totalu += valu
           dataArray[indexu] := valu ? valu : 1
-          namesLabel[indexu] := oindexu
+          ; namesLabel[indexu] := oindexu
        }
        ; ToolTip, %valu% -- %aC% -- %aR%
        If (valu="" && A_Index>950)
@@ -42618,7 +42625,7 @@ uiADDalphaMaskTabs(t1, t2, labelu) {
 
     Gui, Tab, %t1% ; alpha mask
     friendlyMaskInfo := (coreDesiredPixFmt="0x21808") ? "Disabled in 24-RGB mode" : "No alpha mask"
-    Gui, Add, DropDownList, x+15 y+15 Section w%txtWid2% AltSubmit Choose%alphaMaskingMode% valphaMaskingMode g%labelu%, %friendlyMaskInfo%|Linear gradient|Radial gradient|Box gradient|Image file|Custom shape
+    Gui, Add, DropDownList, x+15 y+15 Section w%txtWid2% AltSubmit Choose%alphaMaskingMode% valphaMaskingMode g%labelu%, %friendlyMaskInfo%|Linear gradient|Radial gradient|Box gradient|Image bitmap|Custom shape
     Gui, Add, Button, x+2 w%sml% hp vUIviewAlpha +hwndhtempu gViewAlphaMaskNow, P
     ToolTip2ctrl(htempu, "Show a temporary preview of the alpha mask in the viewport")
     Gui, Add, Checkbox, x+8 hp Checked%alphaMaskGradientWrapped% valphaMaskGradientWrapped g%labelu%, &Tiled gradient
@@ -42637,7 +42644,7 @@ uiADDalphaMaskTabs(t1, t2, labelu) {
     Gui, Add, Text, x+15 wp-20 hp -Border +0xE gBtnResetPanelsSpecificControl vinfoAlphaMaskBlend +hwndhGradientAlphaMSKpreview, Gradient preview
     Gui, Add, Slider, Center xs y+1 w%slideWid% NoTicks g%labelu% AltSubmit valphaMaskGradientPosA Range0-100, % alphaMaskGradientPosA
     Gui, Add, Slider, Center x+5 wp NoTicks g%labelu% AltSubmit valphaMaskGradientPosB Range0-100, % alphaMaskGradientPosB
-    Gui, Add, Text, xs ys+2 vinfoAlphaFile, Image to use as alpha mask:
+    Gui, Add, Text, xs ys+2 vinfoAlphaFile, Alpha mask bitmap:
     Gui, Add, DropDownList, xs y+10 w%txtWid2% g%labelu% AltSubmit valphaMaskRefBMP Choose%alphaMaskRefBMP%, % (transformTool=1) ? "User painted bitmap|Main image|Transformed object" : "User painted bitmap|Main image"
     Gui, Add, DropDownList, x+5 wp-95 AltSubmit Choose%alphaMaskBMPchannel% valphaMaskBMPchannel g%labelu%, Red|Green|Blue|Alpha|All gray
     Gui, Add, Button, x+5 w%sml% hp vUIremAlpha +hwndhtempu gdiscardUserPaintedAlpha, &X
@@ -80235,17 +80242,14 @@ testEuclidPolarCIMG() {
 
 testEuclidPolarGDIP() {
   Static modus := 0
-  modus++
   initQPVmainDLL()
-  ToolTip, % modus "=l" , , , 3
-  If (modus>99)
-     modus := 1
+
   func2exec := (A_PtrSize=8) ? "euclidean2polarGDIP" : "_BoxBlurBitmap@20"
   pBitmap := useGdiBitmap()
   Gdip_GetImageDimensions(pBitmap, w, h)
   newBitmap := trGdip_CreateBitmap(A_ThisFunc, w, h)
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData)
+  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 1)
   E2 := Gdip_LockBits(newBitmap, 0, 0, w, h, stride, mScan, mData, 1)
 
   r := DllCall(whichMainDLL "\" func2exec, "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h)
@@ -80259,3 +80263,5 @@ testEuclidPolarGDIP() {
   r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
   trGdip_DisposeImage(newBitmap)
 }
+
+

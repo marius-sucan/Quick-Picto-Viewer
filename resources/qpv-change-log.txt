@@ -2,12 +2,16 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.8.2 (2022-12-12)
+  - fixed important regression; it caused the malfunctioning of message boxes since v5.8.0;
+
 - v5.8.1 (2022-12-09)
   - bug fixes related to alpha masking
 
 - v5.8.0 (2022-12-08)
   - [new] tool to copy/move files by maintaining their folder(s) structure
   - optimized features that use blur; instead of relying on GDI+ , I use cImg for small radius blurring
+  - image alignment in the viewport is now adapting to the toolbar [if activated]
   - optimized the speed for «Radial blur» tool; it should still be faster
   - fixed broken toolbar button - pen/vector draw tool
   - aborting long operations is now easier; the prompt will show up faster when trying to stop the operation; and the processes are no longer continuing while the prompt is visible
