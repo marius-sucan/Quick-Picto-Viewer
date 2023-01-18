@@ -16,6 +16,11 @@
 
 <p>QPV can be used to edit images and/or paint new images. Various tools to this end are available, including blending modes and alpha masking abilities. Please see the features list to learn more in details what QPV can do.</p>
 
+<h2>In action</h2>
+
+<p><a href="https://www.youtube.com/watch?v=Q-_tBX-a8ko">Video showing file management capabilities.</a></p>
+<p><a href="https://www.youtube.com/watch?v=YneYL1TXXtg">Image painting time-lapse. The video shows the image editing capabilities.</a></p>
+
 <p width="600" height="410"><img width="600" height="410" alt="Quick Picture Viewer - thumbnails list screenshot" src="https://marius.sucan.ro/media/files/blog/ahk-scripts/images/qpv-screenshot1.jpg"></p>
 
 <p width="600" height="410"><img width="600" height="410" alt="Quick Picture Viewer - image view screenshot" src="https://marius.sucan.ro/media/files/blog/ahk-scripts/images/qpv-screenshot2.jpg"></p>
@@ -46,12 +51,13 @@
 
 <li>Image editing tools: </li>
 <ul>
-   <li>draw arcs, lines and shapes</li>
+   <li>draw arcs, lines and filled shapes</li>
+   <li>parametric line generators [grids, spirals, rays and more]</li>
    <li>advanced flood fill [color bucket]</li>
    <li>insert text with advanced customization options</li>
    <li>paste in place</li>
    <li>transform selected area</li>
-   <li>gaussian, box blur and radial blur</li>
+   <li>various blur filters: gaussian, box blur, radial blur and others</li>
    <li>rotate, crop, flip, pixelize, add noise, and more.</li>
 </ul>
 
@@ -94,6 +100,8 @@
 
 <li>Ability to automatically group files into sub-folders based on file types or modification date, by months or years.</li>
 
+<li>Tool to copy or move files by maintaining their folder(s) structure.</li>
+
 <li>Create PDFs or multi-paged TIFFs from selected images. Up to 2048 images allowed.</li>
 
 <li>Extract frames from GIF and WebP animated images, or pages from TIFFs.</li>
@@ -116,7 +124,7 @@
 
 <li>Option to keep a record of seen images and have these skipped during slideshows or erased from the index list. QPV can also generate statistics and charts based on the image viewing habits.</li>
 
-<li>Image favourites list; easy to manage. It can hold up to 950100 images.</li>
+<li>Image and folders favourites lists; easy to manage. The list can be very big, up to 950100 images.</li>
 
 <li>Multi-rename. Rename multiple files with easy to use patterns. Users can add a prefix and/or suffix to file names, or to count them, or search and replace strings in file names, and more.</li>
 
@@ -168,6 +176,8 @@
 <li>Slideshows, easy to change speed while running: random order, backwards or forwards.</li>
 
 <li>Ability to set the slideshow duration.</li>
+
+<li>Slideshow random modes: with a bias for the first or second half of the files list, or no explicit bias.</li>
 
 <li>Option to set background music for the entire slideshow.</li>
 
