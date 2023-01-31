@@ -2,8 +2,24 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.8.5 (2023-01-31)
+  - [new] complete overhaul of all the panels; better layouts, replaced all the win32 sliders with a custom slider control
+  - [new] tool to create image symmetry, to mirror sides, or to simply generate patterns
+  - [new] users can now create customizable rays, grids and spirals [in the «Draw parametric lines» panel]
+  - [new] automatic contrast and levels image filter; it can also be applied in batch, on multiple files in one go
+  - [new] image filters: sharpen, rectangular to polar, polar to rectangular, and several new blur modes [in the «Gaussian blur» panel]
+  - [new] fill area shape allows users to control rectangle roundness and the cavity of the shape
+  - [new] the ellipse can be sliced into a pie in the «Fill area shape» panel
+  - [new] ability to set a string filter for the recorded seen images; this allows users to prevent QPV from recording images as seen from a specific folder or those that match a given keyword, or partial path
+  - users can now drop an image on the window from Explorer to paste it in place, into the current image
+  - added the ability to drop vector shapes [*.vqpv files] on the main window, to import and edit the shape
+  - separated the pixelize filter from the blur panel
+  - fixed bugs related to creating PDF files; the generated PDFs should be correct now
+  - various other fixes and improvements
+  - code clean-up and reorganization
+
 - v5.8.2 (2022-12-12)
-  - fixed important regression; it caused the malfunctioning of message boxes since v5.8.0;
+  - fixed important regression; it caused the malfunctioning of message boxes since v5.8.0
 
 - v5.8.1 (2022-12-09)
   - bug fixes related to alpha masking
@@ -12,7 +28,7 @@
   - [new] tool to copy/move files by maintaining their folder(s) structure
   - optimized features that use blur; instead of relying on GDI+ , I use cImg for small radius blurring
   - image alignment in the viewport is now adapting to the toolbar [if activated]
-  - optimized the speed for «Radial blur» tool; it should still be faster
+  - optimized the speed for «Radial blur» tool; ... it should still be faster
   - fixed broken toolbar button - pen/vector draw tool
   - aborting long operations is now easier; the prompt will show up faster when trying to stop the operation; and the processes are no longer continuing while the prompt is visible
   - other bug fixes I no longer remember to list here
@@ -116,7 +132,7 @@
 - v5.6.1 (2022-02-26)
   - silly bug prevented previous release from starting ;/
 
-- v5.6.0 (2022-02-25)
+- v5.6.0 (2022-02-25) - major release
 General stuff:
   - [new] ability to load images through WIC - Windows Imaging Component; the newly supported formats are listed in the open dialog
   - [new] animated webp support [with WIC]; experimental
@@ -140,7 +156,7 @@ Image editing:
   - [new] a specialized tool to fill with colour behind images
   - [new] ability to auto expand the canvas when using «draw shape contours», «fill selected area» and «insert text» panels; this was possible only with the transform tool
   - [new] automated selection alignment option
-  - [new] option to invert selection area in «desature image» panel, and to output the R, G or B channel as a gray image
+  - [new] option to invert selection area in «desaturate image» panel, and the ability to output the R, G or B channel as a gray image
   - [new] option to discard or keep the user painted alpha mask bitmap between tool sessions
   - [new] options to rasterize [pixelize] generated alpha masks; this will automatically occur when users choose to paint inside the alpha mask
   - [new] options to view and copy to clipboard the alpha mask bitmap
@@ -339,7 +355,7 @@ Files organization:
   - fixed image navigator not responding properly to clicks when images in the viewport were aligned to the top-left corner
   - improvements to shift+right-click menu [i made it more context aware]
 
-- v4.8.6 (2021-02-03)
+- v4.8.6 (2021-02-03) - major release
   - [new] freeform polygonal and curved/spline-based selection areas support [ Shift + L ]
   - [new] edit freeform polygonal shape or selection after finalising it
   - [new] by holding long left-click during freeform shape drawing, one can draw the path freely
@@ -386,7 +402,7 @@ Files organization:
     - removing index entries when the files list was filtered resulted in files list corruption
     - on files list resave, the main folders list got lost sometimes
 
-- v4.7.6 (2020-12-29)
+- v4.7.6 (2020-12-29)  - major release
   - [new] panel to help identify image duplicates, by multiple criteria or visual similarity
   - [new] indexed files list statistics panel; offers a detailed breakdown of the files and it can be used to filter the files based on file dates, file sizes, resolution, histogram data and more
   - [new] files list filter panel allows users to create custom filters that can match files by image or file properties, such as resolution, histogram data, file size and so on
@@ -445,7 +461,7 @@ Files organization:
     - choosing to open in QPV the containing folder of a given image, in some cases, would have led to an error
     - some error messages displayed in the OSD vanished quicker than they could have ever been read :-)
 
-- v4.6.5 (2020-10-28)
+- v4.6.5 (2020-10-28) - major release
   - [new] option to lock aspect ratio of image selection area to predefined ratios; you can also click and hold Shift on selection's corners to have QPV preserve its aspect ratio - when it is not locked to a predefined ratio [thanks to CyberKlabauter's suggestion]
   - [new] blending modes now available in the «fill area/draw shape» panel; blending modes can be used with gradients and the glass effect
   - [new] you can now activate the glass effect in the transform tool as well, when using any blending mode; it will blur what is behind
@@ -550,7 +566,7 @@ Files organization:
   - [improvement] image blur, invert, grayscale can now be invoked without a selection area
   - other minor improvements in usability
 
-- v4.1.0 (2020-05-24)
+- v4.1.0 (2020-05-24) - major release
   - [new] quick shortcuts toolbar [F10]; to further facilitate the usage of QPV
   - [new] ability to change OSD font sizes with Ctrl [+] / [-]
   - [new] toggle true full-screen mode with F11 shortcut key
@@ -659,7 +675,7 @@ Files organization:
   - added ctrl + wheel up/down to zoom in/out
   - important bug fixes to resize panel features and batch processing
 
-- v3.8.0 (2019-10-15)
+- v3.8.0 (2019-10-15) - major release
   - [new] option to navigate between GIF frames or multi-paged TIFFs using Page Up/Down; by pressing Ctrl+C, the currently visible frame is copied to the clipboard
   - [new] option to display luminance histogram for the current image, in real time during color adjustments
   - [new] ability to make file selections that are not limited to ranges; files can now be individually selected
@@ -705,7 +721,7 @@ Files organization:
   - various bug fixes;
   - updated the GDI+ library; added DrawImageFX, CreateEffect and others
 
-- v3.6.0 (2019-08-11)
+- v3.6.0 (2019-08-11)   - major release
   - [new] integrated and updated FreeImage library wrapper; Quick Picto Viewer can now load the following image file formats: DDS, EXR, HDR, IFF, JBG, JNG, JP2, JXR, JIF, MNG, PBM, PGM, PPM, PCX, PFM, PSD, PCD, RAW, SGI, RAS, TGA, WBMP, WEBP, XBM, XPM and many RAW file formats. The previous version supported only PNG, BMP, DIB, TIFF, EMF, WMF, RLE, GIF and JPG files... in total 85 formats are supported.
   - [new] the possibility to save/convert images in 18 file formats: .BMP, .GIF, .HDP, .J2C, .J2K, .JFIF, .JIF, .JNG, .JP2, .JPG, .JXR, .PNG, .PPM, .TGA, .TIF, .WDP, .WEBP, .XPM
   - [new] option to perform lossless JPEG operations: flip H/V, rotate and crop; this too can be applied in batch / on multiple files at once
@@ -722,7 +738,7 @@ Files organization:
   - bug fixes and improvements related to creating selections
   - made it respond to «key up» events for actions meant not to be overly repeated; this change was made to reduce chances of potential «overload» or crashes; it should also no longer buffer/respond to keys pressed while busy
 
-- v3.5.0 (2019-07-28)
+- v3.5.0 (2019-07-28)  - major release
   - [new] the ability to make a selection in the viewport [and copy it to clipboard]
   - [new] option to crop image[s] to the selected area [in Image Resize panel]
   - [new] option to control the threshold of automatic color adjustments
@@ -752,7 +768,7 @@ Files organization:
 - v3.3.1 (2019-07-10)
   - important silly bug fix that prevented people from opening files ;-)
 
-- v3.3.0 (2019-07-09)
+- v3.3.0 (2019-07-09) - major release
   - [new] option to copy file[s] to a specified destination
   - [new] option for automatic brightness and contrast calibration of images; press F key to change colour adjustment modes for the viewport
   - [new] option to paste and save image from the clipboard
@@ -800,7 +816,7 @@ Files organization:
   - this is the first version to be branded as « Quick Picto Viewer » at About and reference its GitHub repository ;-)
   - various improvements and fixes
 
-- v2.7.0 (2019-06-19)
+- v2.7.0 (2019-06-19) - major release
   - [new] dynamic folders list manager panel; easily add/remove folders to be indexed recursively or not
   - [new] «Update files list selectively» panel, which allows users to update the files list index by selecting only sub-folders they want to rescan; it relies on the static folders list, generated when the SLD is saved;
   - [new] multiple files rename
@@ -914,7 +930,7 @@ Files organization:
   - [new] click anywhere in the viewport when no image is loaded to open the files dialog
   - improvements related to window resizing and auto-adjusting the image to it
 
-- v1.2.0 (2019-05-29)
+- v1.2.0 (2019-05-29) - major release
   - [new] option to delete, rename current image file
   - [new] option to open image file with external app, or open containing folder
   - [new] viewport color adjustments: grayscale, inverted

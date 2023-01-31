@@ -106,7 +106,8 @@ b) How a files list index is created
   , 17_imgMGPX, 18_imgHAvg, 19_imgHmedian, 20_imgHpeak, 21_imgHlow
   , 22_imgDPI, 23_dupeID, 24_imghRMS, 25_imghRange, 26_imghMode
   , 27_imghMin, 28_imgHASH, 29_pixelzFsmall, 30_pixelzFbig
-  , 31_HpixelzFsmall, 32_HpixelzFbig, 33_dateSeen]
+  , 31_HpixelzFsmall, 32_HpixelzFbig, 33_HammingDist, 34_MSEscore
+  , 35_dateSeenDB, 36_sortModeDB]
 
   All these properties are optional and are filled based on the
   application context. 1_filePath is the only property that is not

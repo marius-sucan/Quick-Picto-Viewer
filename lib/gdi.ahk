@@ -11,8 +11,8 @@
 ; https://www.autohotkey.com/boards/viewtopic.php?f=6&t=4379
 
 ; Other functions added by Marius Șucan.
-; Last update on: mercredi samedi 28 mai 2022 ; 28/05/2022
-; version: 1.30
+; Last update on: mercredi samedi 21 janvier 2023; 21/01/2023
+; version: 1.31
 
 Gdi_DrawTextHelper(hDC, hFont, Text, x, y, txtColor, bgrColor:="") {
       ; Transparent background, no color needed
@@ -1200,9 +1200,12 @@ Gdi_GetObjectType(obj) {
    Return R ? R : E
 }
 
-Gdi_CreateBitmap(hDC, w, h, BitCount:=32, Planes:=1, pBits:=0) {
-   ; Creates a GDI bitmap; it can be a DIB or DDB.
-   ; https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-createcompatiblebitmap
+Gdi_CreateBitmap(w, h, BitCount:=32, Planes:=1, pBits:=0) {
+  ; The function creates a device-dependent bitmap [DDB].
+  ; After a bitmap is created, it can be selected into a device context [DC] by calling
+  ; the Gdi_SelectObject function. However, the bitmap can only be selected into
+  ; a DC if the bitmap and the DC have the same format.
+
    Return DllCall("gdi32\CreateBitmap", "Int", w, "Int", h, "UInt", Planes, "UInt", BitCount, "Ptr", pBits, "UPtr")
 }
 
@@ -1627,17 +1630,17 @@ Gdi_WindowFromDC(hDC) {
    return DllCall("user32\WindowFromDC", "UPtr", hDC)
 }
 
-Gdi_CopyImage(hBitmap, type:=0, w:=0, h:=0, flags:=0) {
-   ; type options
+Gdi_CopyImage(hBitmap, imgType:=0, w:=0, h:=0, flags:=0) {
+   ; IMGTYPE options
    ; IMAGE_BITMAP  = 0
    ; IMAGE_CURSOR  = 2
    ; IMAGE_ICON    = 1
  
-   ; w, h
-   ; The desired width and height, in pixels, of the image. If one of these is zero,
-   ; the returned image will have the same dimensions as the original hBitmap.
+   ; W, H
+   ; The desired width and height, in pixels, of the image.
+   ; Set W=0 and/or H=0 for original dimension(s).
 
-   ; flag options:
+   ; FLAGS options:
    ; LR_COPYDELETEORG = 0x00000008
    ; Deletes the original image after creating the copy.
 
@@ -1675,7 +1678,7 @@ Gdi_CopyImage(hBitmap, type:=0, w:=0, h:=0, flags:=0) {
    ; If the function fails, the return value is NULL. To get extended error information,
    ; call GetLastError.
 
-   return DllCall("user32\CopyImage", "UPtr", hBitmap, "int", x, "int", y, "uint", flags)
+   return DllCall("user32\CopyImage", "UPtr", hBitmap, "int", imgType, "int", w, "int", h, "uint", flags)
 }
 
 Gdi_DeleteObject(hObject) {
@@ -1802,11 +1805,25 @@ Gdi_GetWindowRegion(hwnd, ByRef regionType:=0) {
     return hRgn
 }
 
-Gdi_GetUpdateRegion(hwnd, bErase, ByRef regionType:=0) {
-    hRgn := Gdi_CreateRectRegion(0, 0, 0, 0)
-    If hRgn
-       regionType := DllCall("GetUpdateRgn", "UPtr", hwnd, "UPtr*", hRgn)
-    return hRgn
+Gdi_GetUpdateRegion(hwnd, hRgn, bErase) {
+; The GetUpdateRgn function retrieves the update region of a window
+; by copying it into the specified region. The coordinates of the update
+; region are relative to the upper-left corner of the window (that is,
+; they are client coordinates).
+
+; Parameters
+; hWnd = Handle to the window with an update region that is to be retrieved.
+; hRgn = Handle to the region to receive the update region; you can create one 
+; with Gdi_CreateRectRegion()
+
+; bErase = Specifies whether the window background should be erased and whether
+; nonclient areas of child windows should be drawn. If this parameter is 0,
+; no drawing is done.
+
+; Return value
+; The return value indicates the complexity of the resulting region.
+
+    return DllCall("GetUpdateRgn", "UPtr", hwnd, "UPtr*", hRgn, "int", bErase)
 }
 
 Gdi_SetWindowRegion(hwnd, hRgn, bRedraw) {

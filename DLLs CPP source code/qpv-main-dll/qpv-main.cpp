@@ -95,6 +95,23 @@ DLL_API int DLL_CALLCONV SetAlphaChannel(int *imageData, int *maskData, int w, i
     return 1;
 }
 
+DLL_API int DLL_CALLCONV SetColorAlphaChannel(int *imageData, int w, int h, int newColor, int invert) {
+    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+    for (int x = 0; x < w; x++)
+    {
+        for (int y = 0; y < h; y++)
+        {
+            int px = x + y * w;
+            unsigned char alpha1 = (imageData[px] >> 16) & 0xFF; // red
+            alpha1 = (invert==1) ? 255 - alpha1 : alpha1;
+            unsigned char alpha2 = (newColor >> 24) & 0xFF; // alpha
+            // imageData[px] = newColor;
+            imageData[px] = (min(alpha1,alpha2) << 24) | (newColor & 0x00ffffff);
+        }
+    }
+    return 1;
+}
+
 double inverseGamma(double X) {
   // Inverse sRGB gamma correction
   if (X>0.0404482362771076)
@@ -125,12 +142,14 @@ double toLABfx(double Y) {
 
 double deg2rad(double degree) {
     // convert degree to radian
-    return (degree * (M_PI / 180));
+    const double p = M_PI / 180.0;
+    return (degree * p);
 }
 
 double rad2deg(double radian) {
     // convert radian to degree
-    return (radian * (180 / M_PI));
+    const double p = 180.0 / M_PI;
+    return (radian * p);
 }
 
 int fastRGBtoGray(int n) {
@@ -547,19 +566,9 @@ void calculateBlendModes(int rO, int gO, int bO, int rB, int gB, int bB, int ble
     }
 
     if (blendMode != 10) {
-        if (rT < 0)
-            rT = 0;
-        if (gT < 0)
-            gT = 0;
-        if (bT < 0)
-            bT = 0;
-
-        if (rT > 255)
-            rT = 255;
-        if (gT > 255)
-            gT = 255;
-        if (bT > 255)
-            bT = 255;
+       rT = clamp(rT, 0, 255);
+       gT = clamp(gT, 0, 255);
+       bT = clamp(bT, 0, 255); 
     }
 
     results[0] = rT;   
@@ -703,11 +712,11 @@ int FloodFill8Stack(int *imageData, int w, int h, int x, int y, int newColor, fl
   static const int gx[4] = {0, 1, 0, -1}; // relative neighbor x coordinates
   static const int gy[4] = {-1, 0, 1, 0}; // relative neighbor y coordinates
 
-  UINT maxPixels = w*h + 1;
+  UINT maxPixels = w*h + w;
   UINT loopsOccured = 0;
   UINT suchDeviations = 0;
   int suchAppliedDeviations = 0;
-  std::vector<int> pixelzMap(maxPixels, 0);
+  std::vector<bool> pixelzMap(maxPixels, 0);
   std::vector<float> indexes(maxPixels, 0);
   std::stack<int> starkX;
   std::stack<int> starkY;
@@ -1099,7 +1108,6 @@ DLL_API int DLL_CALLCONV EraserBrush(int *imageData, int *maskData, int w, int h
             // ss << " var a = " << a;
             // ss << " var haha = " << haha;
             // OutputDebugStringA(ss.str().data());
-
         }
     }
  
@@ -1178,10 +1186,6 @@ DLL_API int DLL_CALLCONV BlendBitmaps(int* bgrImageData, int* otherData, int w, 
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int x = 0; x < w; x++)
     {
-        // int rT, gT, bT; // , aB, aO, aX;
-        //  int rO, gO, bO, rB, gB, bB;
-
-        // #pragma omp parallel for schedule(static) default(none) num_threads(threadz)
         for (int y = 0; y < h; y++)
         {
             UINT BGRcolor = bgrImageData[x + (y * w)];
@@ -1225,21 +1229,21 @@ It must be in 32-ARGB format: PXF32ARGB - 0x26200A.
 */
 
 
-DLL_API int DLL_CALLCONV RandomNoise(int* bgrImageData, int w, int h, int intensity, int mode, int threadz) {
+DLL_API int DLL_CALLCONV RandomNoise(int* bgrImageData, int w, int h, int intensity, int mode, int threadz, int fillBgr) {
     // srand (time(NULL));
     // #pragma omp parallel for default(none) num_threads(threadz)
-
+    time_t nTime;
+    srand((unsigned) time(&nTime));
     for (int x = 0; x < w; x++)
     {
         for (int y = 0; y < h; y++)
         {
             unsigned char aT = 255;
             unsigned char z = rand() % 101;
- 
             if (z<intensity)
             {
                // unsigned char rT = 0;
-               bgrImageData[x + (y * w)] = 0;
+               bgrImageData[x + (y * w)] = (fillBgr!=1) ? 0 : (255 << 24) | (0 << 16) | (0 << 8) | 0;
                continue;
             }
 
@@ -1388,13 +1392,11 @@ DLL_API int DLL_CALLCONV PixelateBitmap(unsigned char* sBitmap, unsigned char* d
                 }
             }
 
-            {
-                int tmp = (w % Size) * Size;
-                sA = tmp ? (sA / tmp) : 0;
-                sR = tmp ? (sR / tmp) : 0;
-                sG = tmp ? (sG / tmp) : 0;
-                sB = tmp ? (sB / tmp) : 0;
-            }
+            int tmp = (w % Size) * Size;
+            sA = tmp ? (sA / tmp) : 0;
+            sR = tmp ? (sR / tmp) : 0;
+            sG = tmp ? (sG / tmp) : 0;
+            sB = tmp ? (sB / tmp) : 0;
             for (int y2 = 0; y2 < Size; ++y2)
             {
                 for (int x2 = 0; x2 < w % Size; ++x2)
@@ -1424,13 +1426,11 @@ DLL_API int DLL_CALLCONV PixelateBitmap(unsigned char* sBitmap, unsigned char* d
             }
         }
 
-        {
-            int tmp = Size * (h % Size);
-            sA = tmp ? (sA / tmp) : 0;
-            sR = tmp ? (sR / tmp) : 0;
-            sG = tmp ? (sG / tmp) : 0;
-            sB = tmp ? (sB / tmp) : 0;
-        }
+        int tmp = Size * (h % Size);
+        sA = tmp ? (sA / tmp) : 0;
+        sR = tmp ? (sR / tmp) : 0;
+        sG = tmp ? (sG / tmp) : 0;
+        sB = tmp ? (sB / tmp) : 0;
 
         for (int y2 = 0; y2 < h % Size; ++y2)
         {
@@ -1458,13 +1458,11 @@ DLL_API int DLL_CALLCONV PixelateBitmap(unsigned char* sBitmap, unsigned char* d
         }
     }
 
-    {
-        int tmp = (w % Size) * (h % Size);
-        sA = tmp ? (sA / tmp) : 0;
-        sR = tmp ? (sR / tmp) : 0;
-        sG = tmp ? (sG / tmp) : 0;
-        sB = tmp ? (sB / tmp) : 0;
-    }
+    int tmp = (w % Size) * (h % Size);
+    sA = tmp ? (sA / tmp) : 0;
+    sR = tmp ? (sR / tmp) : 0;
+    sG = tmp ? (sG / tmp) : 0;
+    sB = tmp ? (sB / tmp) : 0;
 
     for (int y2 = 0; y2 < h % Size; ++y2)
     {
@@ -1516,291 +1514,6 @@ DLL_API int DLL_CALLCONV ConvertToGrayScale(int *BitmapData, int w, int h, int m
     }
     return 1;
 }
-
-/*
-DLL_API int DLL_CALLCONV BlurImage(unsigned char *Bitmap, int width, int height, int Stride, int radius) {
-// https://stackoverflow.com/questions/47209262/c-blur-effect-on-bit-map-is-working-but-colors-are-changed
-
-    float rs = ceil(radius * 2.57);
-    for (int i = 0; i < height; ++i)
-    {
-        for (int j = 0; j < width; ++j)
-        {
-            int tempCoord;
-            double a = 0, r = 0, g = 0, b = 0;
-            double count = 0;
-
-            for (int iy = i - rs; iy < i + rs + 1; ++iy)
-            {
-                for (int ix = j - rs; ix < j + rs + 1; ++ix)
-                {
-                    auto x = min(width - 1, max(0, ix));
-                    auto y = min(height - 1, max(0, iy));
-
-                    auto dsq = ((ix - j) * (ix - j)) + ((iy - i) * (iy - i));
-                    float wght = std::exp(-dsq / (2.0 * radius * radius)) / (M_PI * 2.0 * radius * radius);
-
-                    tempCoord = (4 * x) + y*Stride;
-                    a = Bitmap[3 + tempCoord] * wght;
-                    r = Bitmap[2 + tempCoord] * wght;
-                    g = Bitmap[1 + tempCoord] * wght;
-                    b = Bitmap[tempCoord] * wght;
-                    // rgb32* pixel = bmp->getPixel(x, y);
-                    // r += pixel->r * wght;
-                    // g += pixel->g * wght;
-                    // b += pixel->b * wght;
-                    count += wght;
-                }
-            }
-
-            tempCoord = (4 * j) + i*Stride;
-            // if a
-               Bitmap[3 + tempCoord] = round(a);
-            // if r
-               Bitmap[2 + tempCoord] = round(r);
-            // if g
-               Bitmap[1 + tempCoord] = round(g);
-            // if b
-               Bitmap[tempCoord] = round(b);
-            // rgb32* pixel = bmp->getPixel(j, i);
-            // pixel->r = std::round(r / count);
-            // pixel->g = std::round(g / count);
-            // pixel->b = std::round(b / count);
-        }
-    }
-    return 1;
-}
-
-DLL_API int DLL_CALLCONV ResizePixels(int* pixelsData, int* destData, int w1, int h1, int w2, int h2) {
-// source https://tech-algorithm.com/articles/nearest-neighbor-image-scaling/
-// https://www.researchgate.net/figure/Nearest-neighbour-image-scaling-algorithm_fig2_272092207
-
-    //double x_ratio = (double)(w1)/w2;
-    //double y_ratio = (double)(h1)/h2;
-    //#pragma omp simd simdlen(30) // schedule(dynamic) default(none)
-    for (int i=0; i < h2; i++)
-    {
-        UINT py = i*(h1/h2);
-        for (int j=0; j < w2; j++)
-        {
-            UINT px = j*(w1/w2);
-            destData[(i*w2) + j] = pixelsData[(py*w1) + px];
-        }
-    }
-    return 1;
-}
-
-
-DLL_API int DLL_CALLCONV hammingDistance(char str1[], char str2[])
-{
-    int i = 0, count = 0;
-    while(str1[i]!='\0')
-    {
-        if (str1[i] != str2[i])
-            count++;
-        i++;
-    }
-    return count;
-}
-
-DLL_API int DLL_CALLCONV hamming_distance(int* a, int*b, int n) {
-    int dist = 0;
-    std::stringstream ss;
-    ss << "qpv: a " << a;
-    ss << "qpv: b " << b;
-
-    for(int i=0; i<n; i++) {
-        if (a[i] != b[i])
-           dist++;
-    }
-    return dist;
-}
-
-// For every integer on 8bits (from 0 to 255), keep track of how many
-// bits are set in the binary representation of that integer.
-// Note, the only 8bit integer that has all 8 bits set is 255 (last element here)
-// and 0 is the only element with no bits set.
-const std::vector<int> globalNumberOfBits = {
-0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
-1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
-1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
-2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
-2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
-1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
-2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
-2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
-3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
-4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
-};
-
-// Used once, to populate the variable above.
-void GenerateCodeFor_globalNumberOfBits() {
-  printf("const std::vector<int> globalNumberOfBits = {\n");
-  for (int i = 0; i < 256; ++i) {
-    int count = 0;
-    for (int bit = 0; bit < 8; ++bit) {
-      if (i & (1 << bit)) count++;
-    }
-    printf("%d, ", count);
-    if (i % 16 == 15) printf("\n");
-  }
-  printf("};\n");
-}
-
-int CountDifferentBits(int64_t a, int64_t b) {
-  int nr_diff_bits = 0;
-  int64_t diffs = a ^ b;
-  for (int i = 0; i < sizeof(int64_t); ++i) {
-    const int last_8_bits = diffs & 0xFF;
-    diffs = diffs >> 8;
-    nr_diff_bits += globalNumberOfBits[last_8_bits];
-  }
-  return nr_diff_bits;
-}
-
-int CountDifferentBits(int64_t *img1, int64_t *img2, int nr_values) {
-  int n_diff = 0;
-  for (int i = 0; i < nr_values; ++i) {
-    n_diff += CountDifferentBits(img1[i], img2[i]);
-  }
-  return n_diff;
-}
-
-unsigned long long int fact(UINT n) {
-   if (n == 0 || n == 1)
-      return 1;
-
-   unsigned long long int r = n;
-   for (unsigned long long int i = 1; i < n; i++)
-   {
-       r *= i;
-   }
-   return r;
-}
-
-DLL_API unsigned long long int DLL_CALLCONV dumbcalculateNCR(UINT n) {
-// Calculates the number of combinations of N things taken r=2 at a time.
-
-   // std::stringstream ss;
-   // ss << "qpv: n=" << n;
- 
-   unsigned long long int combinations = 0;
-   for ( unsigned long long int secondIndex = 0 ; secondIndex<n+1 ; secondIndex++)
-   {
-       for ( unsigned long long int mainIndex = secondIndex + 1 ; mainIndex<n ; mainIndex++)
-       {
-          // if (secondIndex!=mainIndex && secondIndex<n && mainIndex<n) 
-          // {
-             // std::stringstream ss;
-             // ss << "qpv: sI=" << secondIndex;
-             // ss << " mI=" << mainIndex;
-             // OutputDebugStringA(ss.str().data());
-             combinations++;
-          // }
-       }
-   }
-
-   // std::stringstream ss;
-   // ss << " combos=" << combinations;
-   // OutputDebugStringA(ss.str().data());
-   return combinations;
-}
-
-
-UINT64 reverse_8bits(UINT64 n) {
-  for (int i = 0, bytes = sizeof(n); i < bytes; ++i) {
-    const int bit_offset = i * 8;
-    for (int j = 0; j < 4; ++j) {
-      // Calculam care e bit de schimbat, in cadrul la byte current (situat
-      // la bit_offset, pe spatiu de 8 bits, numerotati de la 0 la 7.
-      const int bit = bit_offset + j;
-      const int sym_bit = bit_offset + 7 - j;
-
-      // testam daca e setat bit
-      // 1 << i face shift to left la bitul 1 cu i bits.
-      const bool bit_s = (n & (1 << bit)) ? 1 : 0;
-
-      // testam daca e setat bit sym_bit
-      const bool bit_sym_s = (n & (1 << sym_bit)) ? 1 : 0;
-
-      // Daca bit e setat, seteaza sym_i in loc (sau sterge)
-      if (bit_s) {
-        // bitwise or pe bit sym_i
-        n |= 1 << sym_bit;
-      } else {
-        // bitwise and cu un numar care e
-        // doar 1, si un singur 0 pe pozitia sym_bit (~ face negare)
-        n &= ~(1 << sym_bit);
-      }
-
-      // La fel ca mai sus, la bit.
-      if (bit_sym_s) {
-        n |= 1 << bit;
-      } else {
-        n &= ~(1 << bit);
-      }
-    }
-  }
-  return n;
-}
-
-UINT64 revBits(UINT64 n){
-  return (
-     n    &0x0101010101010101 |  n>>5&0x0202020202020202 |  n>>3&0x0404040404040404 | n>>1&0x0808080808080808
-  & ~n<< 1&0x1010101010101010 & ~n<<3&0x2020202020202020 & ~n<<5&0x4040404040404040 | n   &0x8080808080808080
-  );
-}
-
-UINT64 revBits_entire(UINT64 n){
-  return (
-    n>> 7&0x0101010101010101 | n>>5&0x0202020202020202 | n>>3&0x0404040404040404 | n>>1&0x0808080808080808
-  | n<< 1&0x1010101010101010 | n<<3&0x2020202020202020 | n<<5&0x4040404040404040 | n<<7&0x8080808080808080
-  );
-}
-
-
-int reverse_bits(int n) {
-  for (int i = 0, bits = sizeof(n) * 8; i < bits / 2; ++i)
-  {
-      // punctul simetric la i
-      const int sym_i = bits - i - 1;
-
-      // testam daca e setat bit i
-      // 1 << i face shift to left la bitul 1 cu i bits.
-      const bool bit_i = (n & (1 << i)) ? 1 : 0;
-
-      // testam daca e setat bit sym_i
-      const bool bit_sym_i = (n & (1 << sym_i)) ? 1 : 0;
-
-      // Daca i e setat, seteaza sym_i in loc (sau sterge)
-      if (bit_i)
-      {
-         // bitwise or pe bit sym_i
-         n |= 1 << sym_i;
-      } else
-      {
-         // bitwise and cu un numar care e
-         // doar 1, si un singur 0 pe pozitia sym_i (~ face negare)
-         n &= ~(1 << sym_i);
-      }
-
-      // La fel ca mai sus, la bit i.
-      if (bit_sym_i)
-      {
-         n |= 1 << i;
-      } else {
-         n &= ~(1 << i);
-      }
-  }
-  return n;
-}
-*/
 
 inline int hammingDistance(UINT64 n1, UINT64 n2, UINT hamDistLBorderCrop, UINT hamDistRBorderCrop, bool doRange) { 
     UINT64 x = n1 ^ n2; 
@@ -2118,30 +1831,6 @@ inline void SafeRelease(T *&p)
         p = NULL;
     }
 }
-
-/*
-DLL_API int DLL_CALLCONV testFuncNow(int givenQuality, UINT width, UINT height, const wchar_t *szFileName, const wchar_t *szFileNameOut) {
-  //  VImage in = VImage::new_from_file (szFileName,
-  //   VImage::option ()->set ("access", VIPS_ACCESS_SEQUENTIAL));
-
-  // double avg = in.avg ();
-
-  // printf ("avg = %g\n", avg);
-  // printf ("width = %d\n", in.width ());
-  in = VImage::new_from_file (szFileName,
-    VImage::option ()->set ("access", VIPS_ACCESS_SEQUENTIAL));
-
-  VImage out = in.embed (10, 10, 1000, 1000,
-    VImage::option ()->
-      set ("extend", "background")->
-      set ("background", 128));
-
-  out.write_to_file (szFileNameOut);
-
-  vips_shutdown ();
-  return 1
-}
-*/
 
 INT indexedPixelFmts(WICPixelFormatGUID oPixFmt) {
     INT uPixFmt = 0;
@@ -2773,37 +2462,47 @@ DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
        return 0;
 }
 
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testFunc(UINT width, UINT height, const wchar_t *szFileName) {
-    Gdiplus::GpBitmap* myBitmap = NULL;
-    Gdiplus::DllExports::GdipCreateBitmapFromFile(szFileName, &myBitmap);
-/*
-    // Gdiplus::DllExports::GdipCreateBitmapFromScan0(width, height, 0, PixelFormat32bppRGB, NULL, &myBitmap);
-
-    std::wstring string_to_convert(szFileName);
-
-    //setup converter
-    using convert_type = std::codecvt_utf8<wchar_t>;
-    std::wstring_convert<convert_type, wchar_t> converter;
-
-    //use converter (.to_bytes: wstr->str, .from_bytes: str->wstr)
-    std::string converted_str = converter.to_bytes( string_to_convert );
-
-    std::stringstream ss;
-    ss << "qpv: bmp file " << converted_str;
-    OutputDebugStringA(ss.str().data());
-*/
-    return myBitmap;
-}
-
 int myRound(double x) {
     return (x<0) ? (int)(x-0.5) : (int)(x+0.5);
+}
+
+STATUS InsertJPEGFile2PDF(const char *fileName, int fileSize, PJPEG2PDF pdfId) {
+  FILE *fp;
+  unsigned char *jpegBuf;
+  int readInSize; 
+  unsigned short jpegImgW, jpegImgH;
+  STATUS r = IDOK;
+
+  jpegBuf = (unsigned char *)malloc(fileSize);
+  fp = fopen(fileName, "rb");
+  readInSize = (int)fread(jpegBuf, sizeof(UINT8), fileSize, fp);
+  fclose(fp);
+
+  if (readInSize != fileSize) 
+     fnOutputDebug("file size in bytes mismatched: " + std::to_string(readInSize) + " / " + std::to_string(fileSize));
+
+  // Add JPEG File into PDF
+  if (1 == get_jpeg_size(jpegBuf, readInSize, &jpegImgW, &jpegImgH))
+  {
+     std::string s = fileName;
+     r = Jpeg2PDF_AddJpeg(pdfId, jpegImgW, jpegImgH, readInSize, jpegBuf, 1);
+     fnOutputDebug("Image dimensions: " + std::to_string(jpegImgW) + " x " + std::to_string(jpegImgH) + " | " + s);
+  } else
+  {
+     std::string s = fileName;
+     fnOutputDebug("failed to obtain image dimensions from file: " + s);
+     r = ERROR;
+  }
+
+  free(jpegBuf);
+  return r;
 }
 
 DLL_API int DLL_CALLCONV CreatePDFfile(const char* tempDir, const char* destinationPDFfile, const char* scriptDir, UINT *fListArray, int arraySize, float pageW, float pageH, int dpi) {
 // based on https://www.codeproject.com/Articles/29879/Simplest-PDF-Generating-API-for-JPEG-Image-Content
 
-  // Initilized the PDF Object with Page Size Information
-  // fnOutputDebug("function CreatePDFfile called");
+  // Initializd the PDF Object with Page Size Information
+  fnOutputDebug("function CreatePDFfile called" + std::to_string(pageW) + " x " + std::to_string(pageH) );
   PJPEG2PDF pdfId;
   pdfId = Jpeg2PDF_BeginDocument(pageW, pageH, dpi);
   if (pdfId < 0) 
@@ -2830,7 +2529,7 @@ DLL_API int DLL_CALLCONV CreatePDFfile(const char* tempDir, const char* destinat
   }
 
   // Process the jpeg files
-  // fnOutputDebug("about to load images pointed by fListArray.size=" + std::to_string(arraySize));
+  fnOutputDebug("about to load images pointed by fListArray.size=" + std::to_string(arraySize));
   struct _finddata_t jpeg_file;
   long hFile;
   int somePagesError = 0;
@@ -2890,9 +2589,7 @@ DLL_API int DLL_CALLCONV CreatePDFfile(const char* tempDir, const char* destinat
 }
 
 Gdiplus::GpBitmap* CreateBitmapFromCImg(CImg<float> & img, int width, int height) {
-
-fnOutputDebug("CreateBitmapFromCImg called, yay");
-
+    fnOutputDebug("CreateBitmapFromCImg called, yay");
     // Size of a scan line represented in bytes: 4 bytes each pixel
     UINT cbStride = 0;
     UIntMult(width, sizeof(Gdiplus::ARGB), &cbStride);
@@ -3049,22 +2746,85 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV AddGaussianNoiseOnBitmap(Gdiplus::GpBitm
   return newBitmap;
 }
 
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV BoxBlurBitmap(Gdiplus::GpBitmap *myBitmap, int width, int height, int intensityX, int intensityY, int modus) {
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV SharpenBitmap(Gdiplus::GpBitmap *myBitmap, int width, int height, int intensity, int typ, float edge, float ralph, float flegma) {
   Gdiplus::GpBitmap *newBitmap = NULL;
   CImg<float> img(width,height,1,4);
   int r = FillCImgFromBitmap(img, myBitmap, width, height);
   if (r==0)
      return newBitmap;
 
-  if (modus==1)
-     img.blur_box(intensityX, intensityY, 0, 2);
-  else
-     img.blur(intensityX, intensityY, 0, 1, 2);
-
+  img.sharpen(intensity, typ, edge, ralph, flegma);
   newBitmap = CreateBitmapFromCImg(img, width, height);
   return newBitmap;
 }
 
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV BlurBitmapFilters(Gdiplus::GpBitmap *myBitmap, int width, int height, int intensityX, int intensityY, int modus, int circle, int preview) {
+  Gdiplus::GpBitmap *newBitmap = NULL;
+  int ow = width;  int oh = height;
+
+  CImg<float> img(width,height,1,4);
+  int r = FillCImgFromBitmap(img, myBitmap, width, height);
+  if (r==0)
+     return newBitmap;
+
+  if (preview==1)
+  {
+     width /=2;          height /=2;
+     intensityX /=2;     intensityY /=2;
+     img.resize(width,height, -100, -100, 3);
+  }
+
+  CImg<unsigned char> shape(intensityX,intensityX,1,3,0);
+  const unsigned char clr[] = {254, 254, 254};
+  if (circle==1)
+  {
+     shape.draw_circle(intensityX/2, intensityX/2, intensityX/2, clr);
+     // shape.blur(3, 3, 0, 1, 3);
+     if (intensityX!=intensityY)
+        shape.resize(intensityX, intensityY);
+  }
+
+  if (modus==1)
+  {
+     img.blur_box(intensityX, intensityY, 0, 3);
+  } else if (modus==2)
+  {
+     if (circle==1)
+        img.dilate(shape);
+     else
+        img.dilate(intensityX, intensityY, 1);
+  } else if (modus==3)
+  {
+     if (circle==1)
+        img.erode(shape);
+     else
+        img.erode(intensityX, intensityY, 1);
+  } else if (modus==4)
+  {
+     if (circle==1)
+        img.opening(shape);
+     else
+        img.opening(intensityX, intensityY, 1);
+  } else if (modus==5)
+  {
+     if (circle==1)
+        img.closing(shape);
+     else
+        img.closing(intensityX, intensityY, 1);
+  } else
+  {
+     img.blur(intensityX, intensityY, 0, 1, 3);
+  }
+
+  if (circle==1)
+     img.blur(3, 3, 0, 1, 3);
+
+  if (preview==1)
+     img.resize(ow, oh, -100, -100, 3);
+
+  newBitmap = CreateBitmapFromCImg(img, ow, oh);
+  return newBitmap;
+}
 
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV cImgRotateBitmap(Gdiplus::GpBitmap *myBitmap, int width, int height, float angle, int interpolation, int bond) {
   Gdiplus::GpBitmap *newBitmap = NULL;
@@ -3082,6 +2842,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV cImgRotateBitmap(Gdiplus::GpBitmap *myBi
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV GenerateCIMGnoiseBitmap(int width, int height, int intensity, int details, int scale, int blurX, int blurY, int doBlur) {
   Gdiplus::GpBitmap *newBitmap = NULL;
   CImg<float> img(width,height,1,4);
+
   img.draw_plasma((float)intensity/2.0f, (float)details/2.0f, (float)scale/9.5f);
   if (doBlur==1)
      img.blur(blurX, blurY, 0, 1, 2);
@@ -3089,6 +2850,570 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV GenerateCIMGnoiseBitmap(int width, int h
   newBitmap = CreateBitmapFromCImg(img, width, height);
   return newBitmap;
 }
+
+
+DLL_API int DLL_CALLCONV dissolveBitmap(int *imageData, int *newData, int Width, int Height, int rx, int ry) {
+      // fnOutputDebug("maxR===" + std::to_string(maxuRadius) + "; rS=" + std::to_string(rScale) + "; imgAR=" + std::to_string(imgAR));
+      const UINT maxPixels = Width + Height * Width;
+      std::vector<bool> pixelzMap(maxPixels, 0);
+      time_t nTime;
+      srand((unsigned) time(&nTime));
+
+      #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+      for (int y = 0; y < Height; y++)
+      {
+         for (int x = 0; x < Width; x++)
+         {
+            int gx = rand() % (rx*2) - rx;
+            int gy = rand() % (ry*2) - ry;
+            int dx = clamp(x + gx, 0, Width - 1);
+            int dy = clamp(y + gy, 0, Height - 1);
+            if (pixelzMap[dx + dy*Width]==1)
+            {
+               gx = rand() % (rx*2) - rx;
+               gy = rand() % (ry*2) - ry;
+               dx = clamp(x + gx, 0, Width - 1);
+               dy = clamp(y + gy, 0, Height - 1);
+            }
+
+            pixelzMap[dx + dy*Width] = 1;
+            newData[x + y*Width] = imageData[dx + (dy * Width)];
+         }
+      }
+
+      if (rx>35 || ry>35)
+      {
+          #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+          for (int y = 0; y < Height; y++)
+          {
+             for (int x = 0; x < Width; x++)
+             {
+                int gx = rand() % (rx*2) - rx;
+                int gy = rand() % (ry*2) - ry;
+                int dx = clamp(x + gx, 0, Width - 1);
+                int dy = clamp(y + gy, 0, Height - 1);
+                if (pixelzMap[dx + dy*Width]==1)
+                {
+                   gx = rand() % (rx*2) - rx;
+                   gy = rand() % (ry*2) - ry;
+                   dx = clamp(x + gx, 0, Width - 1);
+                   dy = clamp(y + gy, 0, Height - 1);
+                }
+
+                pixelzMap[dx + dy*Width] = 1;
+                newData[x + y*Width] = imageData[dx + (dy * Width)];
+            }
+          }
+      }
+
+      if (rx>350 || ry>350)
+      {
+          #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+          for (int y = 0; y < Height; y++)
+          {
+             for (int x = 0; x < Width; x++)
+             {
+                int gx = rand() % (rx*2) - rx;
+                int gy = rand() % (ry*2) - ry;
+                int dx = clamp(x + gx, 0, Width - 1);
+                int dy = clamp(y + gy, 0, Height - 1);
+                if (pixelzMap[dx + dy*Width]==1)
+                {
+                   gx = rand() % (rx*2) - rx;
+                   gy = rand() % (ry*2) - ry;
+                   dx = clamp(x + gx, 0, Width - 1);
+                   dy = clamp(y + gy, 0, Height - 1);
+                }
+
+                pixelzMap[dx + dy*Width] = 1;
+                newData[x + y*Width] = imageData[dx + (dy * Width)];
+            }
+          }
+      }
+
+      #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+      for (int y = 0; y < Height; y++)
+      {
+         for (int x = 0; x < Width; x++)
+         {
+            if (pixelzMap[x + y*Width]!=1)
+               newData[x + y*Width] = imageData[x + (y * Width)];
+        }
+      }
+      return 1;
+}
+
+DLL_API int DLL_CALLCONV symmetricaBitmap(int *imageData, int Width, int Height, int rx, int ry) {
+ 
+      if (rx>0)
+      {
+         #pragma omp parallel for schedule(static) default(none) // num_threads(3)
+         for (int y = 0; y < Height; y++)
+         {
+            // fnOutputDebug("y=" + std::to_string(y) + "; rx=" + std::to_string(rx));
+            int p = -1;
+            for (int x = 0; x < Width; x++)
+            {
+               if (x>=rx)
+               {
+                  p++;
+                  int gx = (p>=rx) ? clamp(x - rx*2, 0, Width - 1) : clamp(rx - p, 0, Width - 1);
+                  // fnOutputDebug(std::to_string(p) + "=p; x="  +  std::to_string(x) + "; gx=" + std::to_string(gx));
+                  imageData[x + y*Width] = imageData[gx + (y * Width)];
+               }
+            }
+            p = 0;
+         }
+      }
+
+      if (ry>0)
+      {
+         #pragma omp parallel for schedule(static) default(none) // num_threads(3)
+         for (int x = 0; x < Width; x++)
+         {
+            // fnOutputDebug("y=" + std::to_string(y) + "; rx=" + std::to_string(rx));
+            int p = -1;
+            for (int y = 0; y < Height; y++)
+            {
+               if (y>=ry)
+               {
+                  p++;
+                  int gy = (p>=ry) ? clamp(y - ry*2, 0, Height - 1) : clamp(ry - p, 0, Height - 1);
+                  // fnOutputDebug(std::to_string(p) + "=p; x="  +  std::to_string(x) + "; gx=" + std::to_string(gx));
+                  imageData[x + y*Width] = imageData[x + (gy * Width)];
+               }
+            }
+            p = 0;
+         }
+      }
+
+      return 1;
+}
+
+
+DLL_API int DLL_CALLCONV autoContrastBitmap(int *imageData, int *miniData, int Width, int Height, int mw, int mh, int modus, int intensity) {
+      int maxRLevel = 0;      int minRLevel = 255;
+      int maxGLevel = 0;      int minGLevel = 255;
+      int maxBLevel = 0;      int minBLevel = 255;
+      for (int y = 0; y < mh; y++)
+      {
+         for (int x = 0; x < mw; x++)
+         {
+            if (modus==2)
+            {
+               int aR = (miniData[x + (y * mw)] >> 16) & 0xFF; // red
+               int aB = (miniData[x + (y * mw)] >> 0) & 0xFF;  // blue
+               maxRLevel = max(aR, maxRLevel);    minRLevel = min(aR, minRLevel);
+               maxBLevel = max(aB, maxBLevel);    minBLevel = min(aB, minBLevel);
+            }
+
+            int aG = (miniData[x + (y * mw)] >> 8) & 0xFF;  // green
+            maxGLevel = max(aG, maxGLevel);    minGLevel = min(aG, minGLevel);
+         }
+      }
+      if ((maxGLevel==minGLevel || maxGLevel==0 && minGLevel==255) && modus==1)
+         return 1;
+
+      minGLevel = clamp(minGLevel - intensity, 0, 255);
+      maxGLevel = clamp(maxGLevel + intensity, 0, 255);
+      maxGLevel -= minGLevel;
+      double fG = 255.0f / maxGLevel;
+      double fR = fG;
+      double fB = fG;
+      if (modus==2)
+      {
+         minRLevel = clamp(minRLevel - intensity, 0, 255);
+         maxRLevel = clamp(maxRLevel + intensity, 0, 255);
+         minBLevel = clamp(minBLevel - intensity, 0, 255);
+         maxBLevel = clamp(maxBLevel + intensity, 0, 255);
+         maxRLevel -= minRLevel;
+         fR = 255.0f / maxRLevel;
+         maxBLevel -= minBLevel;
+         fB = 255.0f / maxBLevel;
+      } else
+      {
+         minRLevel = minGLevel;
+         minBLevel = minGLevel;
+         maxRLevel = maxGLevel;
+         maxBLevel = maxGLevel;
+      }
+      fnOutputDebug("maxL===" + std::to_string(maxRLevel) + "; minL=" + std::to_string(minRLevel) + "; fR=" + std::to_string(fR) + "; m=" + std::to_string(modus));
+
+      fnOutputDebug("maxL===" + std::to_string(maxGLevel) + "; minL=" + std::to_string(minGLevel) + "; fG=" + std::to_string(fG)  );
+      fnOutputDebug("maxL===" + std::to_string(maxBLevel) + "; minL=" + std::to_string(minBLevel) + "; fB=" + std::to_string(fB)  );
+      #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+      for (int y = 0; y < Height; y++)
+      {
+         for (int x = 0; x < Width; x++)
+         {
+            int tR, tG, tB;
+            int colorO = imageData[x + (y * Width)];
+            // fnOutputDebug("x===" + std::to_string(x) + "; y=" + std::to_string(y));
+            int aO = (colorO >> 24) & 0xFF;
+            float rO = round( ((float)((colorO >> 16) & 0xFF) - minRLevel)*fR  );
+            float gO = round( ((float)((colorO >> 8) & 0xFF) - minGLevel)*fG  );
+            float bO = round( ((float)(colorO & 0xFF) - minBLevel)*fB  );
+            tR = clamp((int)rO, 0, 255);
+            tG = clamp((int)gO, 0, 255);
+            tB = clamp((int)bO, 0, 255);
+
+            // imageData[x + (y * Width)] = 0;
+            imageData[x + (y * Width)] = (aO << 24) | (tR << 16) | (tG << 8) | tB;
+         }
+      }
+      return 1;
+}
+
+DLL_API int DLL_CALLCONV rect2polarIMG(int *imageData, int *newData, int Width, int Height, double cx, double cy, double userScale) {
+// inspired by https://imagej.nih.gov/ij/plugins/polar-transformer.html
+      double maxuRadius = 0;
+      double minBoundary = min(Width, Height);
+
+      #pragma omp parallel for schedule(dynamic) default(none) shared(maxuRadius) // num_threads(3)
+      for (int y = 0; y < Height; y++)
+      {
+         for (int x = 0; x < Width; x++)
+         {
+            double px = x - cx;     double py = y - cy;
+            double r = sqrt(px*px + py*py);
+            if (r<0)
+               r = 0;
+
+            maxuRadius = max(r, maxuRadius);
+        }
+      }
+
+      double desiredRadius = minBoundary/2;
+      double rScale = maxuRadius/desiredRadius;
+
+      // fnOutputDebug("maxR===" + std::to_string(maxuRadius) + "; rS=" + std::to_string(rScale) + "; imgAR=" + std::to_string(imgAR));
+      #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+      for (int y = 0; y < Height; y++)
+      {
+         for (int x = 0; x < Width; x++)
+         {
+            double angle = 0;
+            double px = x - cx;     double py = y - cy;
+            double r = sqrt(px*px + py*py);
+            // if ((y - cy)<=0)
+            //    angle = 2*M_PI + atan2(y - cy, x - cx);
+            // else
+               angle = atan2(py, px);
+
+            angle = rad2deg(angle) + 90;
+            if (angle<0)
+               angle += 360;
+            // double zx = r*cos(angle);
+            // double zy = r*sin(angle);
+            int dx = (angle / 360.0f) * Width;
+            int dy = (r / maxuRadius) * Height * rScale * userScale;
+            dx = clamp(dx, 0, Width - 1);
+            dy = clamp(dy, 0, Height - 1);
+            newData[x + y*Width] = imageData[dx + (dy * Width)];
+        }
+      }
+      return (int)maxuRadius;
+}
+
+
+DLL_API int DLL_CALLCONV polar2rectIMG(int *imageData, int *newData, int Width, int Height, double cx, double cy, double userScale) {
+// TO-DO: this is an absolutely dumb implementation; I do not know how to optimize it
+// inspired by https://imagej.nih.gov/ij/plugins/polar-transformer.html
+
+      double maxuRadius = 0;
+      double minBoundary = min(Width, Height);
+
+      // identify the maximum radius
+      // #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+      for (int y = 0; y < Height*2; y++)
+      {
+         for (int x = 0; x < Width*2; x++)
+         {
+            double px = x/2.0f - cx;     double py = y/2.0f - cy;
+            double r = sqrt(px*px + py*py);
+            if (r<0)
+               r = 0;
+
+            maxuRadius = max(r, maxuRadius);
+        }
+      }
+
+      double desiredRadius = minBoundary/2;
+      double rScale = maxuRadius/desiredRadius;
+      const UINT maxPixels = Width + Height * Width;
+      // int *pixelzMap{ new int[maxPixels]{} };  // dynamically allocated array
+      // memset(pixelzMap, -1, maxPixels * sizeof(int*)); // and fill it with -1
+      // std::fill(pixelzMap, pixelzMap + maxPixels, -1); 
+      std::vector<int> pixelzMap(maxPixels, -1);
+      double imgAR = Width/Height;
+      if (imgAR<1)
+         imgAR = 1;
+
+      // fill image with accuracy 2x, 4x, 8x, 16x and 32x
+      // the upper sections of the image need high accuracy
+      double acX = 1.0;
+      double acY = 1.0;
+      int ph = Height;
+      int pw = Width;
+
+
+      acX = 2.0;       acY = 2.0;
+      ph = Height*acY; pw = Width*acX;
+      #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+      for (int y = 0; y < ph; y++)
+      {
+         // if (y>=ph*0.425)
+         //   continue;
+         for (int x = 0; x < pw; x++)
+         {
+            if (x>=pw*0.41 && x<=pw*0.59)
+              continue;
+
+            double angle = 0;
+            double px = (double)x/acX - cx;     double py = (double)y/acY - cy;
+            double r = sqrt(px*px + py*py);
+            // if ((y - cy)<=0)
+            //    angle = 2*M_PI + atan2(y - cy, x - cx);
+            // else
+               angle = atan2(py, px);
+
+            angle = rad2deg(angle) + 90;
+            if (angle<0)
+               angle += 360;
+
+            int dx = (angle / 360.0f) * Width;
+            int dy = (r / maxuRadius) * Height * rScale * userScale;
+            dx = clamp(dx, 0, Width - 1);
+            dy = clamp(dy, 0, Height - 1);
+
+            int zx = x/acX; int zy = y/acY;
+            zx = clamp(zx, 0, Width - 1);
+            zy = clamp(zy, 0, Height - 1);
+
+            pixelzMap[dx + dy*Width] = zx;
+            newData[dx + dy*Width] = imageData[zx + (zy * Width)];
+        }
+      }
+
+      acX = 4.0;       acY = 4.0;
+      ph = Height*acY; pw = Width*acX;
+      #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+      for (int y = 0; y < ph; y++)
+      {
+         // if (y>ph*0.455)
+         //   continue;
+         for (int x = 0; x < pw; x++)
+         {
+            if (x<pw*0.4)
+              continue;
+            if (x>pw*0.6)
+              continue;
+
+            double px = (double)x/acX - cx;     double py = (double)y/acY - cy;
+            double r = sqrt(px*px + py*py);
+            double angle = atan2(py, px);
+            angle = rad2deg(angle) + 90;
+            if (angle<0)
+               angle += 360;
+
+            int dx = (angle / 360.0f) * Width;
+            int dy = (r / maxuRadius) * Height * rScale * userScale;
+            dx = clamp(dx, 0, Width - 1);
+            dy = clamp(dy, 0, Height - 1);
+
+            int zx = x/acX; int zy = y/acY;
+            zx = clamp(zx, 0, Width - 1);
+            zy = clamp(zy, 0, Height - 1);
+
+            pixelzMap[dx + dy*Width] = zx;
+            newData[dx + dy*Width] = imageData[zx + (zy * Width)];
+        }
+      }
+
+      acX = 8.0;       acY = 8.0;
+      ph = Height*acY; pw = Width*acX;
+      #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+      for (int y = 0; y < ph; y++)
+      {
+         if (y<ph*0.45)
+           continue;
+         for (int x = 0; x < pw; x++)
+         {
+            if (x<pw*0.45)
+              continue;
+            if (x>pw*0.55)
+              continue;
+
+            double px = (double)x/acX - cx;     double py = (double)y/acY - cy;
+            double r = sqrt(px*px + py*py);
+            double angle = atan2(py, px);
+            angle = rad2deg(angle) + 90;
+            if (angle<0)
+               angle += 360;
+
+            int dx = (angle / 360.0f) * Width;
+            int dy = (r / maxuRadius) * Height * rScale * userScale;
+            dx = clamp(dx, 0, Width - 1);
+            dy = clamp(dy, 0, Height - 1);
+
+            int zx = x/acX; int zy = y/acY;
+            zx = clamp(zx, 0, Width - 1);
+            zy = clamp(zy, 0, Height - 1);
+
+            pixelzMap[dx + dy*Width] = zx;
+            newData[dx + dy*Width] = imageData[zx + (zy * Width)];
+        }
+      }
+
+      acX = 16.0;      acY = 16.0;
+      ph = Height*acY; pw = Width*acX;
+      #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+      for (int y = 0; y < ph; y++)
+      {
+         if (y<ph*0.47)
+           continue;
+         for (int x = 0; x < pw; x++)
+         {
+            if (x<pw*0.47)
+              continue;
+            if (x>pw*0.53)
+              continue;
+
+            double px = (double)x/acX - cx;     double py = (double)y/acY - cy;
+            double r = sqrt(px*px + py*py);
+            double angle = atan2(py, px);
+            angle = rad2deg(angle) + 90;
+            if (angle<0)
+               angle += 360;
+
+            int dx = (angle / 360.0f) * Width;
+            int dy = (r / maxuRadius) * Height * rScale * userScale;
+            dx = clamp(dx, 0, Width - 1);
+            dy = clamp(dy, 0, Height - 1);
+
+            int zx = x/acX; int zy = y/acY;
+            zx = clamp(zx, 0, Width - 1);
+            zy = clamp(zy, 0, Height - 1);
+
+            pixelzMap[dx + dy*Width] = zx;
+            newData[dx + dy*Width] = imageData[zx + (zy * Width)];
+        }
+      }
+
+      acX = 32.0;       acY = 32.0;
+      ph = Height*acY;  pw = Width*acX;
+      #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+      for (int y = 0; y < ph; y++)
+      {
+         if (y<ph*0.49)
+           continue;
+         for (int x = 0; x < pw; x++)
+         {
+            if (x<pw*0.49)
+              continue;
+            if (x>pw*0.51)
+              continue;
+
+            double px = (double)x/acX - cx;     double py = (double)y/acY - cy;
+            double r = sqrt(px*px + py*py);
+            double angle = atan2(py, px);
+            angle = rad2deg(angle) + 90;
+            if (angle<0)
+               angle += 360;
+
+            int dx = (angle / 360.0f) * Width;
+            int dy = (r / maxuRadius) * Height * rScale * userScale;
+            dx = clamp(dx, 0, Width - 1);
+            dy = clamp(dy, 0, Height - 1);
+
+            int zx = x/acX; int zy = y/acY;
+            zx = clamp(zx, 0, Width - 1);
+            zy = clamp(zy, 0, Height - 1);
+
+            pixelzMap[dx + dy*Width] = zx;
+            newData[dx + dy*Width] = imageData[zx + (zy * Width)];
+        }
+      }
+
+      int failed = 0; int fixt = 0;
+      // fill missing pixels; silly algorithm
+      #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+      for (int y = 1; y < Height - 1; y++)
+      {
+         for (int x = 1; x < Width - 1; x++)
+         {
+               int px = x + y*Width;
+               if (pixelzMap[px]==-1)
+               {
+                   fixt++;
+                   if (pixelzMap[x-1 + y*Width]==(x-1))
+                   {
+                      pixelzMap[px] = pixelzMap[x-1 + y*Width];
+                      newData[px] = newData[x-1 + (y * Width)];
+                   } else if (pixelzMap[x+1 + y*Width]==(x+1))
+                   {
+                      pixelzMap[px] = pixelzMap[x+1 + y*Width];
+                      newData[px] = newData[x+1 + (y * Width)];
+                   } else if (pixelzMap[x + (y-1)*Width]==x)
+                   {
+                      pixelzMap[px] = pixelzMap[x + (y-1)*Width];
+                      newData[px] = newData[x + ((y-1) * Width)];
+                   } else if (pixelzMap[x + (y+1)*Width]==x)
+                   {
+                      pixelzMap[px] = pixelzMap[x + (y+1)*Width];
+                      newData[px] = newData[x + ((y+1) * Width)];
+                   } else if (pixelzMap[x + (y-1)*Width]>=0)
+                   {
+                      pixelzMap[px] = pixelzMap[x + (y-1)*Width];
+                      newData[px] = newData[x + ((y-1) * Width)];
+                   } else if (pixelzMap[x + (y+1)*Width]>=0)
+                   {
+                      pixelzMap[px] = pixelzMap[x + (y+1)*Width];
+                      newData[px] = newData[x + ((y+1) * Width)];
+                   } else if (pixelzMap[x-1 + y*Width]>=0)
+                   {
+                      pixelzMap[px] = pixelzMap[x-1 + y*Width];
+                      newData[px] = newData[x-1 + (y * Width)];
+                   } else if (pixelzMap[x+1 + y*Width]>=0)
+                   {
+                      pixelzMap[px] = pixelzMap[x+1 + y*Width];
+                      newData[px] = newData[x+1 + (y * Width)];
+                   } else 
+                      failed++;
+               }
+        }
+      }
+
+      fixt -= failed;
+      // fnOutputDebug("failed= " + std::to_string(failed) + " yay= " + std::to_string(fixt));
+      int y = 0;
+      for (int x = 1; x < Width - 1; x++)
+      {
+          int px = x + y*Width;
+          if (pixelzMap[px]==-1)
+          {
+              fixt++;
+              pixelzMap[px] = pixelzMap[x-1 + y*Width];
+              newData[px] = newData[x-1 + (y * Width)];
+          }
+      }
+
+      y = Height - 1;
+      for (int x = 1; x < Width - 1; x++)
+      {
+          int px = x + y*Width;
+          if (pixelzMap[px]==-1)
+          {
+              fixt++;
+              pixelzMap[px] = pixelzMap[x-1 + y*Width];
+              newData[px] = newData[x-1 + (y * Width)];
+          }
+      }
+
+      // delete[] pixelzMap;
+      return (int)maxuRadius;
+}
+
 
 /*
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testCimgQPV(Gdiplus::GpBitmap *myBitmap, int width, int height, int intensityX, int intensityY, int modus) {
@@ -3119,6 +3444,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testCimgQPV(Gdiplus::GpBitmap *myBitmap,
     return newBitmap;
 }
 
+
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testOtherCimgQPV(Gdiplus::GpBitmap *myBitmap, int width, int height, int intensityX, int intensityY, int modus) {
   // width = 129;
   // height = 129;
@@ -3132,8 +3458,14 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testOtherCimgQPV(Gdiplus::GpBitmap *myBi
   if (r==0)
      return newBitmap;
   char k = 'x';
-  // img.blur_anisotropic(intensityX, 0.7f, intensityY);
-  if (modus==4)
+
+  // if (modus==1)
+  //    img.blur_median(intensityX, 3);   // size, distance threshold
+  if (modus==2)
+     img.blur_guided(img, intensityX, intensityY/2);     // guide, radius, regularization
+  // else if (modus==3)
+  //    img.vanvliet(intensityX, 1, k);       // sigma, order, axis
+  else if (modus==4)
      img.dilate(intensityX, intensityY, 1);
   else if (modus==5)
      img.erode(intensityX, intensityY, 1);
@@ -3142,8 +3474,21 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testOtherCimgQPV(Gdiplus::GpBitmap *myBi
   else if (modus==7)
      img.closing(intensityX, intensityY, 1);
   else if (modus==8)
-     img.sinc();
-  // img.display();
+     img.normalize(intensityX, intensityY);  // min.val , max.val
+  else if (modus==9)
+     img.equalize(255, intensityX, intensityY);   // nr.levels , min.val , max.val
+  else if (modus==10)
+     img.threshold(intensityX);         // value, soft, strict
+  else if (modus==11)
+     img.quantize(intensityX, 1);   // nr.levels, keepRange
+  else if (modus==12)
+     img.warp(img);          /// img, mode, interpolation
+  else if (modus==13)
+     img.watershed(img);
+  else
+     return newBitmap;
+
+// img.display();
 
 // warp()
 // Vanvliet()
@@ -3186,28 +3531,339 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testOtherCimgQPV(Gdiplus::GpBitmap *myBi
   return newBitmap;
 }
 
+*/
 
 
-DLL_API int DLL_CALLCONV euclidean2polarGDIP(int *imageData, int *newData, int w, int h) {
-    // #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
-    for (int x = 0; x < w; x++)
+/*
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testFunc(UINT width, UINT height, const wchar_t *szFileName) {
+    Gdiplus::GpBitmap* myBitmap = NULL;
+    Gdiplus::DllExports::GdipCreateBitmapFromFile(szFileName, &myBitmap);
+    // Gdiplus::DllExports::GdipCreateBitmapFromScan0(width, height, 0, PixelFormat32bppRGB, NULL, &myBitmap);
+
+    std::wstring string_to_convert(szFileName);
+
+    //setup converter
+    using convert_type = std::codecvt_utf8<wchar_t>;
+    std::wstring_convert<convert_type, wchar_t> converter;
+
+    //use converter (.to_bytes: wstr->str, .from_bytes: str->wstr)
+    std::string converted_str = converter.to_bytes( string_to_convert );
+
+    std::stringstream ss;
+    ss << "qpv: bmp file " << converted_str;
+    OutputDebugStringA(ss.str().data());
+    return myBitmap;
+}
+*/
+
+
+/*
+DLL_API int DLL_CALLCONV testFuncNow(int givenQuality, UINT width, UINT height, const wchar_t *szFileName, const wchar_t *szFileNameOut) {
+  //  VImage in = VImage::new_from_file (szFileName,
+  //   VImage::option ()->set ("access", VIPS_ACCESS_SEQUENTIAL));
+
+  // double avg = in.avg ();
+
+  // printf ("avg = %g\n", avg);
+  // printf ("width = %d\n", in.width ());
+  in = VImage::new_from_file (szFileName,
+    VImage::option ()->set ("access", VIPS_ACCESS_SEQUENTIAL));
+
+  VImage out = in.embed (10, 10, 1000, 1000,
+    VImage::option ()->
+      set ("extend", "background")->
+      set ("background", 128));
+
+  out.write_to_file (szFileNameOut);
+
+  vips_shutdown ();
+  return 1
+}
+*/
+
+
+/*
+DLL_API int DLL_CALLCONV BlurImage(unsigned char *Bitmap, int width, int height, int Stride, int radius) {
+// https://stackoverflow.com/questions/47209262/c-blur-effect-on-bit-map-is-working-but-colors-are-changed
+
+    float rs = ceil(radius * 2.57);
+    for (int i = 0; i < height; ++i)
     {
-        int pix, dx = 0, dy = 0;
-        dx++;
-        for (int y = 0; y < h; y++)
+        for (int j = 0; j < width; ++j)
         {
-            dy++;
-            dy+=2;
-            if (dy>h)
-               dy = h;
-            pix = x + y * w;
-            int dix = dx + dy * w;
-            newData[dix] = imageData[pix];
+            int tempCoord;
+            double a = 0, r = 0, g = 0, b = 0;
+            double count = 0;
+
+            for (int iy = i - rs; iy < i + rs + 1; ++iy)
+            {
+                for (int ix = j - rs; ix < j + rs + 1; ++ix)
+                {
+                    auto x = min(width - 1, max(0, ix));
+                    auto y = min(height - 1, max(0, iy));
+
+                    auto dsq = ((ix - j) * (ix - j)) + ((iy - i) * (iy - i));
+                    float wght = std::exp(-dsq / (2.0 * radius * radius)) / (M_PI * 2.0 * radius * radius);
+
+                    tempCoord = (4 * x) + y*Stride;
+                    a = Bitmap[3 + tempCoord] * wght;
+                    r = Bitmap[2 + tempCoord] * wght;
+                    g = Bitmap[1 + tempCoord] * wght;
+                    b = Bitmap[tempCoord] * wght;
+                    // rgb32* pixel = bmp->getPixel(x, y);
+                    // r += pixel->r * wght;
+                    // g += pixel->g * wght;
+                    // b += pixel->b * wght;
+                    count += wght;
+                }
+            }
+
+            tempCoord = (4 * j) + i*Stride;
+            // if a
+               Bitmap[3 + tempCoord] = round(a);
+            // if r
+               Bitmap[2 + tempCoord] = round(r);
+            // if g
+               Bitmap[1 + tempCoord] = round(g);
+            // if b
+               Bitmap[tempCoord] = round(b);
+            // rgb32* pixel = bmp->getPixel(j, i);
+            // pixel->r = std::round(r / count);
+            // pixel->g = std::round(g / count);
+            // pixel->b = std::round(b / count);
+        }
+    }
+    return 1;
+}
+
+DLL_API int DLL_CALLCONV ResizePixels(int* pixelsData, int* destData, int w1, int h1, int w2, int h2) {
+// source https://tech-algorithm.com/articles/nearest-neighbor-image-scaling/
+// https://www.researchgate.net/figure/Nearest-neighbour-image-scaling-algorithm_fig2_272092207
+
+    //double x_ratio = (double)(w1)/w2;
+    //double y_ratio = (double)(h1)/h2;
+    //#pragma omp simd simdlen(30) // schedule(dynamic) default(none)
+    for (int i=0; i < h2; i++)
+    {
+        UINT py = i*(h1/h2);
+        for (int j=0; j < w2; j++)
+        {
+            UINT px = j*(w1/w2);
+            destData[(i*w2) + j] = pixelsData[(py*w1) + px];
         }
     }
     return 1;
 }
 
 
+DLL_API int DLL_CALLCONV hammingDistance(char str1[], char str2[])
+{
+    int i = 0, count = 0;
+    while(str1[i]!='\0')
+    {
+        if (str1[i] != str2[i])
+            count++;
+        i++;
+    }
+    return count;
+}
+
+DLL_API int DLL_CALLCONV hamming_distance(int* a, int*b, int n) {
+    int dist = 0;
+    std::stringstream ss;
+    ss << "qpv: a " << a;
+    ss << "qpv: b " << b;
+
+    for(int i=0; i<n; i++) {
+        if (a[i] != b[i])
+           dist++;
+    }
+    return dist;
+}
+
+// For every integer on 8bits (from 0 to 255), keep track of how many
+// bits are set in the binary representation of that integer.
+// Note, the only 8bit integer that has all 8 bits set is 255 (last element here)
+// and 0 is the only element with no bits set.
+const std::vector<int> globalNumberOfBits = {
+0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
+1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
+};
+
+// Used once, to populate the variable above.
+void GenerateCodeFor_globalNumberOfBits() {
+  printf("const std::vector<int> globalNumberOfBits = {\n");
+  for (int i = 0; i < 256; ++i) {
+    int count = 0;
+    for (int bit = 0; bit < 8; ++bit) {
+      if (i & (1 << bit)) count++;
+    }
+    printf("%d, ", count);
+    if (i % 16 == 15) printf("\n");
+  }
+  printf("};\n");
+}
+
+int CountDifferentBits(int64_t a, int64_t b) {
+  int nr_diff_bits = 0;
+  int64_t diffs = a ^ b;
+  for (int i = 0; i < sizeof(int64_t); ++i) {
+    const int last_8_bits = diffs & 0xFF;
+    diffs = diffs >> 8;
+    nr_diff_bits += globalNumberOfBits[last_8_bits];
+  }
+  return nr_diff_bits;
+}
+
+int CountDifferentBits(int64_t *img1, int64_t *img2, int nr_values) {
+  int n_diff = 0;
+  for (int i = 0; i < nr_values; ++i) {
+    n_diff += CountDifferentBits(img1[i], img2[i]);
+  }
+  return n_diff;
+}
+
+unsigned long long int fact(UINT n) {
+   if (n == 0 || n == 1)
+      return 1;
+
+   unsigned long long int r = n;
+   for (unsigned long long int i = 1; i < n; i++)
+   {
+       r *= i;
+   }
+   return r;
+}
+
+DLL_API unsigned long long int DLL_CALLCONV dumbcalculateNCR(UINT n) {
+// Calculates the number of combinations of N things taken r=2 at a time.
+
+   // std::stringstream ss;
+   // ss << "qpv: n=" << n;
+ 
+   unsigned long long int combinations = 0;
+   for ( unsigned long long int secondIndex = 0 ; secondIndex<n+1 ; secondIndex++)
+   {
+       for ( unsigned long long int mainIndex = secondIndex + 1 ; mainIndex<n ; mainIndex++)
+       {
+          // if (secondIndex!=mainIndex && secondIndex<n && mainIndex<n) 
+          // {
+             // std::stringstream ss;
+             // ss << "qpv: sI=" << secondIndex;
+             // ss << " mI=" << mainIndex;
+             // OutputDebugStringA(ss.str().data());
+             combinations++;
+          // }
+       }
+   }
+
+   // std::stringstream ss;
+   // ss << " combos=" << combinations;
+   // OutputDebugStringA(ss.str().data());
+   return combinations;
+}
+
+
+UINT64 reverse_8bits(UINT64 n) {
+  for (int i = 0, bytes = sizeof(n); i < bytes; ++i) {
+    const int bit_offset = i * 8;
+    for (int j = 0; j < 4; ++j) {
+      // Calculam care e bit de schimbat, in cadrul la byte current (situat
+      // la bit_offset, pe spatiu de 8 bits, numerotati de la 0 la 7.
+      const int bit = bit_offset + j;
+      const int sym_bit = bit_offset + 7 - j;
+
+      // testam daca e setat bit
+      // 1 << i face shift to left la bitul 1 cu i bits.
+      const bool bit_s = (n & (1 << bit)) ? 1 : 0;
+
+      // testam daca e setat bit sym_bit
+      const bool bit_sym_s = (n & (1 << sym_bit)) ? 1 : 0;
+
+      // Daca bit e setat, seteaza sym_i in loc (sau sterge)
+      if (bit_s) {
+        // bitwise or pe bit sym_i
+        n |= 1 << sym_bit;
+      } else {
+        // bitwise and cu un numar care e
+        // doar 1, si un singur 0 pe pozitia sym_bit (~ face negare)
+        n &= ~(1 << sym_bit);
+      }
+
+      // La fel ca mai sus, la bit.
+      if (bit_sym_s) {
+        n |= 1 << bit;
+      } else {
+        n &= ~(1 << bit);
+      }
+    }
+  }
+  return n;
+}
+
+UINT64 revBits(UINT64 n){
+  return (
+     n    &0x0101010101010101 |  n>>5&0x0202020202020202 |  n>>3&0x0404040404040404 | n>>1&0x0808080808080808
+  & ~n<< 1&0x1010101010101010 & ~n<<3&0x2020202020202020 & ~n<<5&0x4040404040404040 | n   &0x8080808080808080
+  );
+}
+
+UINT64 revBits_entire(UINT64 n){
+  return (
+    n>> 7&0x0101010101010101 | n>>5&0x0202020202020202 | n>>3&0x0404040404040404 | n>>1&0x0808080808080808
+  | n<< 1&0x1010101010101010 | n<<3&0x2020202020202020 | n<<5&0x4040404040404040 | n<<7&0x8080808080808080
+  );
+}
+
+
+int reverse_bits(int n) {
+  for (int i = 0, bits = sizeof(n) * 8; i < bits / 2; ++i)
+  {
+      // punctul simetric la i
+      const int sym_i = bits - i - 1;
+
+      // testam daca e setat bit i
+      // 1 << i face shift to left la bitul 1 cu i bits.
+      const bool bit_i = (n & (1 << i)) ? 1 : 0;
+
+      // testam daca e setat bit sym_i
+      const bool bit_sym_i = (n & (1 << sym_i)) ? 1 : 0;
+
+      // Daca i e setat, seteaza sym_i in loc (sau sterge)
+      if (bit_i)
+      {
+         // bitwise or pe bit sym_i
+         n |= 1 << sym_i;
+      } else
+      {
+         // bitwise and cu un numar care e
+         // doar 1, si un singur 0 pe pozitia sym_i (~ face negare)
+         n &= ~(1 << sym_i);
+      }
+
+      // La fel ca mai sus, la bit i.
+      if (bit_sym_i)
+      {
+         n |= 1 << i;
+      } else {
+         n &= ~(1 << i);
+      }
+  }
+  return n;
+}
 */
 

@@ -281,35 +281,3 @@ static int get_jpeg_size(unsigned char* data, unsigned int data_size, unsigned s
   } else { return 0; }              // Not a valid SOI header
 }
 
-
-STATUS InsertJPEGFile2PDF(const char *fileName, int fileSize, PJPEG2PDF pdfId) {
-  FILE *fp;
-  unsigned char *jpegBuf;
-  int readInSize; 
-  unsigned short jpegImgW, jpegImgH;
-  STATUS r = IDOK;
-
-  jpegBuf = (unsigned char *)malloc(fileSize);
-  fp = fopen(fileName, "rb");
-  readInSize = (int)fread(jpegBuf, sizeof(UINT8), fileSize, fp);
-  fclose(fp);
-
-  if (readInSize != fileSize) 
-     // fnOutputDebug("file size in bytes mismatched: " + std::to_string(readInSize) + " / " + std::to_string(fileSize));
-
-  // Add JPEG File into PDF
-  if (1 == get_jpeg_size(jpegBuf, readInSize, &jpegImgW, &jpegImgH))
-  {
-     // std::string s = fileName;
-     r = Jpeg2PDF_AddJpeg(pdfId, jpegImgW, jpegImgH, readInSize, jpegBuf, 1);
-     // // fnOutputDebug("Image dimensions: " + std::to_string(jpegImgW) + " x " + std::to_string(jpegImgH) + " | " + s);
-  } else
-  {
-     std::string s = fileName;
-     // fnOutputDebug("failed to obtain image dimensions from file: " + s);
-     r = ERROR;
-  }
-
-  free(jpegBuf);
-  return r;
-}

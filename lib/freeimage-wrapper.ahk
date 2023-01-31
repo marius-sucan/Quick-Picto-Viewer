@@ -300,7 +300,7 @@ FreeImage_SetDotsPerMeterX(hImage, dpiX) {
 }
 
 FreeImage_SetDotsPerMeterY(hImage, dpiY) {
-   Return DllCall(getFIMfunc("SetDotsPerMeterY"), "uptr", hImage, "uint", dpiX)
+   Return DllCall(getFIMfunc("SetDotsPerMeterY"), "uptr", hImage, "uint", dpiY)
 }
 
 FreeImage_GetInfoHeader(hImage) {
@@ -1025,8 +1025,11 @@ ConvertFIMtoPBITMAP(hFIFimgA) {
   greenMASK := FreeImage_GetGreenMask(hFIFimgA)
   blueMASK := FreeImage_GetBlueMask(hFIFimgA)
   E := Gdip_LockBits(pBitmap, 0, 0, imgW, imgH, Stride, Scan0, BitmapData)
-  R := FreeImage_ConvertToRawBits(Scan0, hFIFimgA, pitch, 32, redMASK, greenMASK, blueMASK, 1)
-  Gdip_UnlockBits(pBitmap, BitmapData)
+  IF !E
+  {
+     R := FreeImage_ConvertToRawBits(Scan0, hFIFimgA, pitch, 32, redMASK, greenMASK, blueMASK, 1)
+     Gdip_UnlockBits(pBitmap, BitmapData)
+  }
   FreeImage_GetDPIresolution(hFIFimgA, dpiX, dpiY)
   Gdip_BitmapSetResolution(pBitmap, dpiX, dpiY)
   Return pBitmap
@@ -1042,8 +1045,11 @@ ConvertPBITMAPtoFIM(pBitmap) {
 
   Gdip_GetImageDimensions(pBitmap, imgW, imgH)
   E := Gdip_LockBits(pBitmap, 0, 0, imgW, imgH, Stride, Scan0, BitmapData)
-  hFIFimgA := FreeImage_ConvertFromRawBits(Scan0, imgW, imgH, Stride, 32, redMASK, greenMASK, blueMASK, 1)
-  Gdip_UnlockBits(pBitmap, BitmapData)
+  IF !E
+  {
+     hFIFimgA := FreeImage_ConvertFromRawBits(Scan0, imgW, imgH, Stride, 32, redMASK, greenMASK, blueMASK, 1)
+     Gdip_UnlockBits(pBitmap, BitmapData)
+  }
   Gdip_BitmapGetDPIresolution(pBitmap, dpiX, dpiY)
   FreeImage_SetDotsPerMeterX(hFIFimgA, dpiX)
   FreeImage_SetDotsPerMeterY(hFIFimgA, dpiY)

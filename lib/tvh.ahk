@@ -225,7 +225,7 @@ TVH_GetNextChecked(HTV, ItemID := 0) {
 ; Retrieves the ID of the item below the specified item (or 0 if none).
 ; ==================================================================================================================================
 TVH_GetNextItem(HTV, ItemID := 0) {  ; TVM_GETNEXTITEM, TVGN_NEXT
-   Static Options := {Checked: True, Full: True}
+   ; Static Options := {Checked: True, Full: True}
    If (ItemID = 0)
       Return TVH_GetRoot(HTV)
 
@@ -245,7 +245,7 @@ TVH_GetNextItem(HTV, ItemID := 0) {  ; TVM_GETNEXTITEM, TVGN_NEXT
 ; Retrieves the ID of the sibling below the specified item (or 0 if none).
 ; ==================================================================================================================================
 TVH_GetNextSibling(HTV, ItemID := 0) { ; TVM_GETNEXTITEM, TVGN_NEXT
-   Static Options := {Checked: True, Full: True}
+   ; Static Options := {Checked: True, Full: True}
    If (ItemID = 0)
       Return TVH_GetRoot(HTV)
 

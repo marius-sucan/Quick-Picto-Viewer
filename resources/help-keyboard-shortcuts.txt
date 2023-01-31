@@ -283,7 +283,7 @@ R|Activate erase brush|Painting mode|-
 Q|Activate effects brush|Painting mode|-
 J|Activate cloner brush and toggle dynamic coordinates modes for the cloner|Painting mode|-
 S|Define cloner brush source [when cloner active]|Painting mode|-
-SHift+S|Toggle between diameter and radius based brush size|Painting mode|-
+Shift + S|Toggle between diameter and radius based brush size|Painting mode|-
 D|Set primary and secondary colors to black and white|Painting mode|-
 X|Switch from color A to color B|Live editing|-
 Ctrl + L-Click|Paint with the other color|Painting mode|-

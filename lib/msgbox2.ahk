@@ -351,22 +351,37 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   Else If (2ndDropListu && (2ndDropListMode=2 || 2ndDropListMode=3))
      Gui, Add, ListBox, xp y+%marginz% r%2ndlistRows% w%2ndlistWidth% AltSubmit %2ndmultisel% v2ndDropListuChoice, % 2ndDropListu
 
+  hDefBtn := ""
+  ledH := (PrefsLargeFonts=1) ? 14 : 7
   Loop, Parse, btnList, | ; list specified buttons
   {
       If !A_LoopField
          Continue
 
       btnText := A_LoopField
-      def := (A_Index=btnDefault) ? " +Default" : ""
+      def := (A_Index=btnDefault) ? " +Default +hwndhDefBtn" : ""
       thisBW := btnDimensions[A_Index].w + bH
       If (thisBW<minBW)
          thisBW := minBW
 
+      thisYpos := (addedLine=1) ? "yp-" bH - 0 : ""
       If (A_Index=1)
          Gui, Add, Button, gMsgBox2event xp y+%marginz% w%thisBW% h%bH% %def% -wrap, %btnText%
       Else
-         Gui, Add, Button, gMsgBox2event x+5 w%thisBW% hp %def% -wrap, %btnText%
+         Gui, Add, Button, gMsgBox2event x+5 %thisYpos% w%thisBW% h%bH% %def% -wrap, %btnText%
+
+      addedLine := 0
+      If RegExMatch(StrReplace(btnText, "&"), "i)(discard|remove|delete|erase|wipe)")
+      {
+         Gui, Add, Progress, xp+0 y+0 wp h%ledH% -border BackgroundFF5522 cFF5500 -TabStop +disabled, 100
+         addedLine := 1
+      } Else If InStr(def, "+def")
+      {
+         Gui, Add, Progress, xp+0 y+0 wp h%ledH% -border Background2288FF c2288FF -TabStop +disabled, 100
+         addedLine := 1
+      }
   }
+
   If !btnCount
      Gui, Add, Button, gMsgBox2event x+0 w1 h1 Default, --
 
@@ -392,6 +407,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
 
   Critical, off
   SetTimer, WatchMsgBox2Win, 300
+
   Gui, WinMsgBox: Default
   MsgBox2InputHook := InputHook("V") ; "V" for not blocking input
   MsgBox2InputHook.KeyOpt("{BackSpace}{Delete}{PgUp}{PgDn}{Enter}{Escape}{F4}{NumpadEnter}","N")
@@ -555,7 +571,7 @@ GetMsgDimensions(sString, FaceName, FontSize, maxW, maxH, btnMode:=0, bBold:=0) 
     Return r
 }
 
-GuiDefaultFont() {
+GetGuiDefaultFont() {
    ; by SKAN (modified by just me)
    ; https://www.autohotkey.com/boards/viewtopic.php?t=6750
    ; By SKAN https://autohotkey.com/board/topic/7984-ahk-functions-incache-cache-list-of-recent-items/page-10#entry443622
@@ -566,99 +582,9 @@ GuiDefaultFont() {
    Return False
 }
 
-Fnt_GetSizeForEdit(hFont,p_Text,p_MaxW:=0,mustWrap:=1,ByRef r_Width:="",ByRef r_Height:="") {
-    Static Dummy13373556
-          ,DEFAULT_GUI_FONT:=17
-          ,HWND_DESKTOP    :=0
-          ,MAXINT          :=0x7FFFFFFF
-          ,OBJ_FONT        :=6
-          ,SIZE
-
-          ;-- DrawText formats
-          ,DT_WORDBREAK:=0x10
-                ;-- Breaks words.  Lines are automatically broken between words
-                ;   if a word extends past the edge of the rectangle specified
-                ;   by the lprc parameter.  A carriage return line feed sequence
-                ;   also breaks the line.
-
-          ,DT_EXPANDTABS:=0x40
-                ;-- Expands tab characters. The default number of characters per
-                ;   tab is eight.
-
-          ,DT_NOCLIP:=0x100
-                ;-- Draws without clipping.  DrawText is somewhat faster when
-                ;   DT_NOCLIP is used.
-
-          ,DT_CALCRECT:=0x400
-                ;-- Determines the width and height of the rectangle.  The text
-                ;   is not drawn.
-
-          ,DT_NOPREFIX:=0x800
-                ;-- Turns off processing of prefix characters.
-
-          ,DT_EDITCONTROL:=0x2000
-                ;-- Duplicates the text-displaying characteristics of a
-                ;   multiline edit control.  Specifically, the average character
-                ;   width is calculated in the same manner as for an Edit
-                ;   control, and the function does not display a partially
-                ;   visible last line.
-
-          ,s_DTFormat:=DT_EXPANDTABS|DT_CALCRECT|DT_NOPREFIX|DT_EDITCONTROL|DT_NOCLIP
-
-    If (mustWrap=1)
-       s_DTFormat |= DT_WORDBREAK
-
-    ;-- Initialize
-    VarSetCapacity(SIZE,8,0)
-    r_Width := r_Height := 0
-    l_Width := MAXINT
-    if p_MaxW is Integer
-        if (p_MaxW>0)
-            l_Width:=p_MaxW
-
-    ;-- Bounce if p_Text is null.  All output and return values are zero.
-    if not StrLen(p_Text)
-        Return &SIZE
-
-    ;-- If needed, get the handle to the default GUI font
-    if (DllCall("GetObjectType","Ptr",hFont)<>OBJ_FONT)
-        hFont:=DllCall("GetStockObject","Int",DEFAULT_GUI_FONT)
-
-    ;-- Create and populate the RECT structure
-    VarSetCapacity(RECT,16,0)
-    NumPut(l_Width,RECT,8,"Int")                       ;-- right
-
-    ;-- Select the font into the device context for the desktop
-    hDC      :=DllCall("GetDC","Ptr",HWND_DESKTOP)
-    old_hFont:=DllCall("SelectObject","Ptr",hDC,"Ptr",hFont)
-
-    ;-- DrawText
-    DllCall("DrawText"
-        ,"Ptr",hDC                                      ;-- hdc [in]
-        ,"Str",p_Text                                   ;-- lpchText [in, out]
-        ,"Int",-1                                       ;-- cchText [in]
-        ,"Ptr",&RECT                                    ;-- lprc [in, out]
-        ,"UInt",s_DTFormat)                             ;-- uFormat [in]
-
-    ;-- Release the objects needed by the DrawText function
-    DllCall("SelectObject","Ptr",hDC,"Ptr",old_hFont)
-        ;-- Necessary to avoid memory leak
-
-    DllCall("ReleaseDC","Ptr",HWND_DESKTOP,"Ptr",hDC)
-
-    ;-- Update output variables and populate SIZE structure
-    NumPut(r_Width:=NumGet(RECT,8,"Int"),SIZE,0,"Int")
-        ;-- right, cx
-
-    NumPut(r_Height:=NumGet(RECT,12,"Int"),SIZE,4,"Int")
-        ;-- bottom, cy
-
-    Return &SIZE
-}
-
 GetStringSize(FontFace, fontSize, doBold, p_String, mustWrap, l_Width:=0) {
 ; ======================================================================
-; functions from Fnt_Library v3 posted by jballi
+; function based on a function from Fnt_Library v3 posted by jballi
 ; https://www.autohotkey.com/boards/viewtopic.php?f=6&t=4379
 ; modified by Marius Șucan
 ; ======================================================================
@@ -674,7 +600,7 @@ GetStringSize(FontFace, fontSize, doBold, p_String, mustWrap, l_Width:=0) {
     If (defObjDetected=0)
     {
        defObjDetected := 1
-       obju := GuiDefaultFont()
+       obju := GetGuiDefaultFont()
        defFontFace := Trim(obju.name), defFontSize := Round(obju.size)
        ; msgbox, % defFontFace "=" defFontSize "`n" fontFace "=" fontSize
     }
@@ -690,7 +616,7 @@ GetStringSize(FontFace, fontSize, doBold, p_String, mustWrap, l_Width:=0) {
     If (DllCall("GetObjectType","Ptr",hFont)!=OBJ_FONT)
        hFont := DllCall("GetStockObject","Int",DEFAULT_GUI_FONT)
 
-    Fnt_GetSizeForEdit(hFont, p_String, mustWrap, l_Width, r_Width, r_Height)
+    Fnt_GetSizeForEdit(hFont, p_String, l_Width, r_Width, r_Height, mustWrap)
     Fnt_DeleteFont(hFont)
     ; If (r_Height>15*fontSize && mustWrap!=1)
     ;    r_Height := fontSize * 3
@@ -699,237 +625,6 @@ GetStringSize(FontFace, fontSize, doBold, p_String, mustWrap, l_Width:=0) {
     result.w := (mustWrap=1) ? r_Width + Round(fontSize*1.5) : r_Width
     result.h := r_Height ? r_Height : fontSize * 2
     Return result
-}
-
-Fnt_GetFontName(hFont:="") {
-    Static Dummy87890484
-          ,DEFAULT_GUI_FONT    :=17
-          ,HWND_DESKTOP        :=0
-          ,OBJ_FONT            :=6
-          ,MAX_FONT_NAME_LENGTH:=32     ;-- In TCHARS
-
-    ;-- If needed, get the handle to the default GUI font
-    if (DllCall("GetObjectType","Ptr",hFont)<>OBJ_FONT)
-        hFont:=DllCall("GetStockObject","Int",DEFAULT_GUI_FONT)
-
-    ;-- Select the font into the device context for the desktop
-    hDC      :=DllCall("GetDC","Ptr",HWND_DESKTOP)
-    old_hFont:=DllCall("SelectObject","Ptr",hDC,"Ptr",hFont)
-
-    ;-- Get the font name
-    VarSetCapacity(l_FontName,MAX_FONT_NAME_LENGTH*(A_IsUnicode ? 2:1), 0)
-    DllCall("GetTextFace","Ptr",hDC,"Int",MAX_FONT_NAME_LENGTH,"Str",l_FontName)
-
-    ;-- Release the objects needed by the GetTextFace function
-    DllCall("SelectObject","Ptr",hDC,"Ptr",old_hFont)
-        ;-- Necessary to avoid memory leak
-
-    DllCall("ReleaseDC","Ptr",HWND_DESKTOP,"Ptr",hDC)
-
-    ;-- Return to sender
-    Return l_FontName
-}
-
-Fnt_GetFontSize(hFont:="") {
-    Static Dummy64998752
-
-          ;-- Device constants
-          ,HWND_DESKTOP:=0
-          ,LOGPIXELSY  :=90
-
-          ;-- Misc.
-          ,DEFAULT_GUI_FONT:=17
-          ,OBJ_FONT        :=6
-
-    ;-- If needed, get the handle to the default GUI font
-    if (DllCall("GetObjectType","Ptr",hFont)<>OBJ_FONT)
-        hFont:=DllCall("GetStockObject","Int",DEFAULT_GUI_FONT)
-
-    ;-- Select the font into the device context for the desktop
-    hDC      :=DllCall("GetDC","Ptr",HWND_DESKTOP)
-    old_hFont:=DllCall("SelectObject","Ptr",hDC,"Ptr",hFont)
-
-    ;-- Collect the number of pixels per logical inch along the screen height
-    l_LogPixelsY:=DllCall("GetDeviceCaps","Ptr",hDC,"Int",LOGPIXELSY)
-
-    ;-- Get text metrics for the font
-    VarSetCapacity(TEXTMETRIC,A_IsUnicode ? 60:56,0)
-    DllCall("GetTextMetrics","Ptr",hDC,"Ptr",&TEXTMETRIC)
-
-    ;-- Convert em height to point size
-    l_Size:=Round((NumGet(TEXTMETRIC,0,"Int")-NumGet(TEXTMETRIC,12,"Int"))*72/l_LogPixelsY)
-        ;-- (Height - Internal Leading) * 72 / LogPixelsY
-
-    ;-- Release the objects needed by the GetTextMetrics function
-    DllCall("SelectObject","Ptr",hDC,"Ptr",old_hFont)
-        ;-- Necessary to avoid memory leak
-
-    DllCall("ReleaseDC","Ptr",HWND_DESKTOP,"Ptr",hDC)
-
-    ;-- Return to sender
-    Return l_Size
-}
-
-
-Fnt_CreateFont(p_Name:="",p_Options:="") {
-    Static Dummy34361446
-
-          ;-- Device constants
-          ,LOGPIXELSY:=90
-
-          ;-- Misc. font constants
-          ,CLIP_DEFAULT_PRECIS:=0
-          ,DEFAULT_CHARSET    :=1
-          ,DEFAULT_GUI_FONT   :=17
-          ,OUT_TT_PRECIS      :=4
-
-          ;-- Font family
-          ,FF_DONTCARE  :=0x0
-          ,FF_ROMAN     :=0x1
-          ,FF_SWISS     :=0x2
-          ,FF_MODERN    :=0x3
-          ,FF_SCRIPT    :=0x4
-          ,FF_DECORATIVE:=0x5
-
-          ;-- Font pitch
-          ,DEFAULT_PITCH :=0
-          ,FIXED_PITCH   :=1
-          ,VARIABLE_PITCH:=2
-
-          ;-- Font quality
-          ,DEFAULT_QUALITY       :=0
-          ,DRAFT_QUALITY         :=1
-          ,PROOF_QUALITY         :=2  ;-- AutoHotkey default
-          ,NONANTIALIASED_QUALITY:=3
-          ,ANTIALIASED_QUALITY   :=4
-          ,CLEARTYPE_QUALITY     :=5
-
-          ;-- Font weight
-          ,FW_DONTCARE:=0
-          ,FW_NORMAL  :=400
-          ,FW_BOLD    :=700
-
-    ;-- Parameters
-    ;   Remove all leading/trailing white space
-    p_Name   :=Trim(p_Name," `f`n`r`t`v")
-    p_Options:=Trim(p_Options," `f`n`r`t`v")
-
-    ;-- If both parameters are null or unspecified, return the handle to the
-    ;   default GUI font.
-    if (p_Name="" and p_Options="")
-        Return DllCall("GetStockObject","Int",DEFAULT_GUI_FONT)
-
-    ;-- Initialize options
-    o_Height   :=""             ;-- Undefined
-    o_Italic   :=False
-    o_Quality  :=PROOF_QUALITY  ;-- AutoHotkey default
-    o_Size     :=""             ;-- Undefined
-    o_Strikeout:=False
-    o_Underline:=False
-    o_Weight   :=FW_DONTCARE
-
-    ;-- Extract options (if any) from p_Options
-    Loop Parse,p_Options,%A_Space%
-        {
-        if A_LoopField is Space
-            Continue
-
-        if (SubStr(A_LoopField,1,4)="bold")
-            o_Weight:=1000
-        else if (SubStr(A_LoopField,1,6)="italic")
-            o_Italic:=True
-        else if (SubStr(A_LoopField,1,4)="norm")
-            {
-            o_Italic   :=False
-            o_Strikeout:=False
-            o_Underline:=False
-            o_Weight   :=FW_DONTCARE
-            }
-        else if (A_LoopField="-s")
-            o_Size:=0
-        else if (SubStr(A_LoopField,1,6)="strike")
-            o_Strikeout:=True
-        else if (SubStr(A_LoopField,1,9)="underline")
-            o_Underline:=True
-        else if (SubStr(A_LoopField,1,1)="h")
-            {
-            o_Height:=SubStr(A_LoopField,2)
-            o_Size  :=""  ;-- Undefined
-            }
-        else if (SubStr(A_LoopField,1,1)="q")
-            o_Quality:=SubStr(A_LoopField,2)
-        else if (SubStr(A_LoopField,1,1)="s")
-            {
-            o_Size  :=SubStr(A_LoopField,2)
-            o_Height:=""  ;-- Undefined
-            }
-        else if (SubStr(A_LoopField,1,1)="w")
-            o_Weight:=SubStr(A_LoopField,2)
-        }
-
-    ;----------------------------------
-    ;-- Convert/Fix invalid or
-    ;-- unspecified parameters/options
-    ;----------------------------------
-    if p_Name is Space
-        p_Name:=Fnt_GetFontName()   ;-- Font name of the default GUI font
-
-    if o_Height is not Integer
-        o_Height:=""                ;-- Undefined
-
-    if o_Quality is not Integer
-        o_Quality:=PROOF_QUALITY    ;-- AutoHotkey default
-
-    if o_Size is Space              ;-- Undefined
-        o_Size:=Fnt_GetFontSize()   ;-- Font size of the default GUI font
-     else
-        if o_Size is not Integer
-            o_Size:=""              ;-- Undefined
-         else
-            if (o_Size=0)
-                o_Size:=""          ;-- Undefined
-
-    if o_Weight is not Integer
-        o_Weight:=FW_DONTCARE       ;-- A font with a default weight is created
-
-    ;-- If needed, convert point size to em height
-    if o_Height is Space        ;-- Undefined
-        if o_Size is Integer    ;-- Allows for a negative size (emulates AutoHotkey)
-            {
-            hDC:=DllCall("CreateDC","Str","DISPLAY","Ptr",0,"Ptr",0,"Ptr",0)
-            o_Height:=-Round(o_Size*DllCall("GetDeviceCaps","Ptr",hDC,"Int",LOGPIXELSY)/72)
-            DllCall("DeleteDC","Ptr",hDC)
-            }
-
-    if o_Height is not Integer
-        o_Height:=0                 ;-- A font with a default height is created
-
-    ;-- Create font
-    hFont:=DllCall("CreateFont"
-        ,"Int",o_Height                                 ;-- nHeight
-        ,"Int",0                                        ;-- nWidth
-        ,"Int",0                                        ;-- nEscapement (0=normal horizontal)
-        ,"Int",0                                        ;-- nOrientation
-        ,"Int",o_Weight                                 ;-- fnWeight
-        ,"UInt",o_Italic                                ;-- fdwItalic
-        ,"UInt",o_Underline                             ;-- fdwUnderline
-        ,"UInt",o_Strikeout                             ;-- fdwStrikeOut
-        ,"UInt",DEFAULT_CHARSET                         ;-- fdwCharSet
-        ,"UInt",OUT_TT_PRECIS                           ;-- fdwOutputPrecision
-        ,"UInt",CLIP_DEFAULT_PRECIS                     ;-- fdwClipPrecision
-        ,"UInt",o_Quality                               ;-- fdwQuality
-        ,"UInt",(FF_DONTCARE<<4)|DEFAULT_PITCH          ;-- fdwPitchAndFamily
-        ,"Str",SubStr(p_Name,1,31))                     ;-- lpszFace
-
-  Return hFont
-}
-
-
-Fnt_DeleteFont(hFont) {
-    If !hFont  ;-- Zero or null
-       Return True
-
-    Return DllCall("gdi32\DeleteObject","Ptr",hFont) ? True:False
 }
 
 calcScreenLimits(whichHwnd:="main") {
@@ -989,99 +684,3 @@ calcScreenLimits(whichHwnd:="main") {
     Return prevActiveMon
 }
 
-repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:="") {
-    Static lastAsked := 1
-         , BS_CHECKBOX := 0x2, BS_RADIOBUTTON := 0x8
-
-    repositionedWindow := winPos ? 1 : 0
-    winPos := (winPos=1) ? "" : winPos
-    If !winPos
-    {
-       SysGet, MonitorCount, 80
-       ActiveMonDetails := calcScreenLimits(referencePoint)
-       ActiveMon := ActiveMonDetails.m
-       ResWidth := ActiveMonDetails.w, ResHeight:= ActiveMonDetails.h
-       mCoordRight := ActiveMonDetails.mCRight, mCoordLeft := ActiveMonDetails.mCLeft
-       mCoordTop := ActiveMonDetails.mCTop, mCoordBottom := ActiveMonDetails.mCBottom
-    }
-
-    If (uiUseDarkMode=1)
-    {
-       setDarkWinAttribs(hwndGUI)
-       WinGet,strControlList, ControlList, ahk_id %hwndGUI%
-       Gui, %whichGUI%: Color, %intWindowColor%, %intControlColor%
-       For strKey, strControl in StrSplit(strControlList,"`n","`r`n")
-       {
-           ControlGet, strControlHwnd, HWND, , %strControl%, ahk_id %hwndGUI%
-           WinGetClass, CtrlClass, ahk_id %strControlhwnd%
-           ControlGet, CtrlStyle, Style, , , ahk_id %strControlhwnd%
-           doAttachCtlColor := 0
-           ; MsgBox, % CtrlClass
-           If InStr(CtrlClass, "systab")
-           {
-              ; GuiControl, %whichGUI%:-Border +Buttons cFFFFaa, %strControl%
-              doAttachCtlColor := -2
-           } Else If InStr(CtrlClass, "Button")
-           {
-              IF (CtrlStyle & BS_RADIOBUTTON) || (CtrlStyle & BS_CHECKBOX)
-                 doAttachCtlColor := 2
-              IF (CtrlStyle & 0x1000)
-                 doAttachCtlColor := 1
-           } Else If InStr(CtrlClass, "ComboBox")
-              doAttachCtlColor := 1
-           Else If InStr(CtrlClass, "Edit")
-              doAttachCtlColor := -1
-           Else If (InStr(CtrlClass, "Static") || InStr(CtrlClass, "syslink"))
-              doAttachCtlColor := -2 
-  
-           If InStr(CtrlClass, "syslink")
-              LinkUseDefaultColor(strControlHwnd, 1, whichGUI)
-  
-           If (doAttachCtlColor=1)
-              CtlColors.Attach(strControlHwnd, SubStr(darkWindowColor, 3), SubStr(darkControlColor, 3))
-  
-           If (doAttachCtlColor!=2 && doAttachCtlColor!=-2)
-              DllCall("uxtheme\SetWindowTheme", "ptr", strControlHwnd, "str", "DarkMode_Explorer", "ptr", 0)
-       }
-    }
-
-    If (ShowAdvToolbar=1)
-    {
-       createGUItoolbar()
-       decideIconBTNmainTooler()
-       fromCurrentPanelToColorsSwatch()
-    }
-
-    If (MonitorCount>1 && !winPos && A_OSVersion!="WIN_XP")
-    {
-       ; center window on the monitor/screen where the mouse cursor is
-       semiFinal_x := mCoordLeft + 2
-       semiFinal_y := mCoordTop + 2
-       If !semiFinal_y
-          semiFinal_y := 1
-       If !semiFinal_x
-          semiFinal_x := 1
-
-       Gui, %whichGUI%: Show, Hide AutoSize x%semiFinal_x% y%semiFinal_y%, % winTitle
-       Sleep, 25
-       GetWinClientSize(msgWidth, msgHeight, hwndGUI, 1)
-       If !msgWidth
-          msgWidth := 1
-       If !msgHeight
-          msgHeight := 1
-
-       Final_x := Round(mCoordLeft + ResWidth/2 - msgWidth/2)
-       Final_y := Round(mCoordTop + ResHeight/2 - msgHeight/2)
-       If (!Final_x) || (Final_x + 1<mCoordLeft)
-          Final_x := mCoordLeft + 1
-       If (!Final_y) || (Final_y + 1<mCoordTop)
-          Final_y := mCoordTop + 1
-       Gui, %whichGUI%: Show, x%Final_x% y%Final_y%, % Chr(160) winTitle
-    } Else 
-    {
-       ; SoundBeep 
-       ; ToolTip, % winPos , , , 2
-       Gui, %whichGUI%: Show, AutoSize %winPos%, % Chr(160) winTitle
-    }
-    SetTimer, highlightActiveCtrl, -100
-}

@@ -88,8 +88,7 @@ SelectFolderEx(StartingFolder:="", DlgTitle:="", OwnerHwnd:=0, OkBtnLabel:="", c
 ; 26  SetFilter
 
 
-   Static OsVersion := DllCall("GetVersion", "UChar")
-        , IID_IShellItem := 0
+   Static IID_IShellItem := 0
         , InitIID := 0
         , ShowDialog := A_PtrSize * 3
         , SetFileTypes := A_PtrSize * 4
@@ -670,7 +669,7 @@ Dlg_OpenSaveFile(p_Type,hOwner:=0,p_Title:="",p_Filter:="",p_FilterIndex:="",p_R
     ;-- Rebuild r_Flags for output
     r_Flags  :=0
     l_Flags:=NumGet(OPENFILENAME,(A_PtrSize=8) ? 96:52,"UInt")
-    n_FilterIndex := NumGet(OPENFILENAME,(A_PtrSize=8) ? 44:24,"UInt")
+    ; n_FilterIndex := NumGet(OPENFILENAME,(A_PtrSize=8) ? 44:24,"UInt")
     ;-- Flags
 
     if p_DfltExt is not Space  ;-- Flag is ignored unless p_DfltExt contains a value
@@ -1228,7 +1227,6 @@ RunAdminMode() {
    }
 }
 
-
 SetVolume(val:=100, r:="") {
 ; Function by Drugwash
   v := Round(val*655.35)
@@ -1236,7 +1234,7 @@ SetVolume(val:=100, r:="") {
   Try DllCall("winmm\waveOutSetVolume", "UInt", 0, "UInt", (v|vr<<16))
 }
 
-ShellFileAssociate(Label,Ext,Cmd,Icon, batchMode,storePath) {
+ShellFileAssociate(Label,Ext,Cmd,batchMode,storePath) {
   Static q := Chr(34)  ; the quotes symbol
   ; by Ħakito: https://autohotkey.com/boards/viewtopic.php?f=6&t=55638 
   ; modified by Marius Șucan
@@ -1279,8 +1277,6 @@ ShellFileAssociate(Label,Ext,Cmd,Icon, batchMode,storePath) {
   regFile .= "`n[-HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FileExts\" Ext "\OpenWithProgids]`n"
   regFile .= "`n[-HKEY_CLASSES_ROOT\" Ext "\OpenWithProgids]`n`n"
 
-  ; If Icon
-  ;    regFile .= "`n[HKEY_CLASSES_ROOT\" QPVslideshow "\DefaultIcon]`n@=" Icon "`n`n"
   If !FolderExist(storePath "\regFiles")
   {
      FileCreateDir, %storePath%\regFiles
@@ -1453,16 +1449,18 @@ Dlg_Color(clr, hwnd, cclrs) {
   clr := "0x00" clr
   clr := "0x" SubStr(clr, -1) SubStr(clr, 7, 2) SubStr(clr, 5, 2)
   NumPut(size,CHOOSECOLOR,0,"UInt")
-  NumPut(hwnd,CHOOSECOLOR,A_PtrSize,"Ptr")
+  NumPut(hwnd,CHOOSECOLOR,A_PtrSize,"UPtr")
   NumPut(clr,CHOOSECOLOR,3*A_PtrSize,"UInt")
   NumPut(0x3,CHOOSECOLOR,5*A_PtrSize,"UInt")
-  NumPut(&CUSTOM,CHOOSECOLOR,4*A_PtrSize,"Ptr")
-  If (!ret := DllCall("comdlg32\ChooseColorW","Ptr",&CHOOSECOLOR,"UInt"))
+  NumPut(&CUSTOM,CHOOSECOLOR,4*A_PtrSize,"UPtr")
+  If (!ret := DllCall("comdlg32\ChooseColorW","UPtr",&CHOOSECOLOR,"UInt"))
      Return "-"
 
   Coloru := NumGet(CHOOSECOLOR,3*A_PtrSize,"UInt")
-  CHOOSECOLOR := ""
-  CUSTOM := ""
+  Coloru := (Coloru & 0xFF00) + ((Coloru & 0xFF0000) >> 16) + ((Coloru & 0xFF) << 16)
+  Coloru := Format("{:06X}", Coloru)
+  CHOOSECOLOR := "",  CUSTOM := ""
+
   Return Coloru
 }
 
@@ -1669,7 +1667,7 @@ LinkUseDefaultColor(hLink, Use, whichGui) {
    NumPut(0x03, LITEM, "UInt")               ; LIF_ITEMINDEX (0x01) | LIF_STATE (0x02)
    NumPut(Use ? 0x10 : 0, LITEM, 8, "UInt")  ; ? LIS_DEFAULTCOLORS : 0
    NumPut(0x10, LITEM, 12, "UInt")           ; LIS_DEFAULTCOLORS
-   While DllCall("SendMessage", "Ptr", hLink, "UInt", 0x0702, "Ptr", 0, "Ptr", &LITEM, "UInt") ; LM_SETITEM
+   While DllCall("SendMessage", "UPtr", hLink, "UInt", 0x0702, "Ptr", 0, "Ptr", &LITEM, "UInt") ; LM_SETITEM
          NumPut(A_Index, LITEM, 4, "Int")
    GuiControl, %whichGUI%: +Redraw, %hLink%
 }
@@ -2146,6 +2144,15 @@ GetComboBoxInfo(hwnd) {
    HCBBLIST := NumGet(CBBInfo, 40 + (2 * A_PtrSize), "UPtr")
    CBBInfo := ""
    Return [HCBBEDIT, HCBBLIST, r]
+}
+
+GetWindowFromPos(X, Y, DetectHidden := 0) {
+   ; by just me https://www.autohotkey.com/boards/viewtopic.php?p=80118
+   ; CWP_ALL = 0x0000, CWP_SKIPINVISIBLE = 0x0001
+   Return DllCall("ChildWindowFromPointEx", "Ptr", DllCall("GetDesktopWindow", "UPtr")
+                                          , "Int64", (X & 0xFFFFFFFF) | ((Y & 0xFFFFFFFF) << 32)
+                                          , "UInt", !DetectHidden
+                                          , "UPtr")
 }
 
 AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0, largeFont:=0) {
@@ -2667,3 +2674,58 @@ GetPhysicalCursorPos(ByRef mX, ByRef mY) {
     Return
 }
 
+GetWindowPlacement(hWnd) {
+    Local WINDOWPLACEMENT, Result := {}
+    NumPut(VarSetCapacity(WINDOWPLACEMENT, 44, 0), WINDOWPLACEMENT, 0, "UInt")
+    DllCall("GetWindowPlacement", "Ptr", hWnd, "Ptr", &WINDOWPLACEMENT)
+    Result.x := NumGet(WINDOWPLACEMENT, 28, "Int")
+    Result.y := NumGet(WINDOWPLACEMENT, 32, "Int")
+    Result.w := NumGet(WINDOWPLACEMENT, 36, "Int") - Result.x
+    Result.h := NumGet(WINDOWPLACEMENT, 40, "Int") - Result.y
+    Result.flags := NumGet(WINDOWPLACEMENT, 4, "UInt") ; 2 = WPF_RESTORETOMAXIMIZED
+    Result.showCmd := NumGet(WINDOWPLACEMENT, 8, "UInt") ; 1 = normal, 2 = minimized, 3 = maximized
+    Return Result
+}
+
+SetWindowPlacement(hWnd, x, y, w, h, showCmd) {
+    Local WINDOWPLACEMENT
+    NumPut(VarSetCapacity(WINDOWPLACEMENT, 44, 0), WINDOWPLACEMENT, 0, "UInt")
+    NumPut(x, WINDOWPLACEMENT, 28, "Int")
+    NumPut(y, WINDOWPLACEMENT, 32, "Int")
+    NumPut(w + x, WINDOWPLACEMENT, 36, "Int")
+    NumPut(h + y, WINDOWPLACEMENT, 40, "Int")
+    NumPut(showCmd, WINDOWPLACEMENT, 8, "UInt")
+    Return DllCall("SetWindowPlacement", "Ptr", hWnd, "Ptr", &WINDOWPLACEMENT)
+}
+
+GetWindowInfo(hWnd) {
+    Local WINDOWINFO, wi := {}
+    NumPut(VarSetCapacity(WINDOWINFO, 60, 0), WINDOWINFO, 0, "UInt")
+    DllCall("GetWindowInfo", "Ptr", hWnd, "Ptr", &WINDOWINFO)
+    wi.WindowX := NumGet(WINDOWINFO, 4, "Int")
+    wi.WindowY := NumGet(WINDOWINFO, 8, "Int")
+    wi.WindowW := NumGet(WINDOWINFO, 12, "Int") - wi.WindowX
+    wi.WindowH := NumGet(WINDOWINFO, 16, "Int") - wi.WindowY
+    wi.ClientX := NumGet(WINDOWINFO, 20, "Int")
+    wi.ClientY := NumGet(WINDOWINFO, 24, "Int")
+    wi.ClientW := NumGet(WINDOWINFO, 28, "Int") - wi.ClientX
+    wi.ClientH := NumGet(WINDOWINFO, 32, "Int") - wi.ClientY
+    wi.Style   := NumGet(WINDOWINFO, 36, "UInt")
+    wi.ExStyle := NumGet(WINDOWINFO, 40, "UInt")
+    wi.Active  := NumGet(WINDOWINFO, 44, "UInt")
+    wi.BorderW := NumGet(WINDOWINFO, 48, "UInt")
+    wi.BorderH := NumGet(WINDOWINFO, 52, "UInt")
+    ;wi.Atom    := NumGet(WINDOWINFO, 56, "UShort")
+    ;wi.Version := NumGet(WINDOWINFO, 58, "UShort")
+    Return wi
+}
+
+Edit_ShowBalloonTip(hEdit, Text, Title := "", Icon := 0) {
+    Local EDITBALLOONTIP
+    NumPut(VarSetCapacity(EDITBALLOONTIP, 4 * A_PtrSize, 0), EDITBALLOONTIP)
+    NumPut(&Title, EDITBALLOONTIP, A_PtrSize, "Ptr")
+    NumPut(&Text, EDITBALLOONTIP, A_PtrSize * 2, "Ptr")
+    NumPut(Icon, EDITBALLOONTIP, A_PtrSize * 3, "UInt")
+    SendMessage 0x1503, 0, &EDITBALLOONTIP,, ahk_id %hEdit% ; EM_SHOWBALLOONTIP
+    Return ErrorLevel
+}

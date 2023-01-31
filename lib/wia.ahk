@@ -155,7 +155,7 @@ WIA_CropImage(ImgObj, PxLeft, PxTop, PxRight, PxBottom) {
 ;     A string containing the filter name(s), ID(s), and description(s) on success, otherwise an empty string.
 ; ======================================================================================================================
 WIA_FilterDescriptions(FilterName := "") {
-   Static SubTypes := ["Range", "List", "Flag"]
+   ; Static SubTypes := ["Range", "List", "Flag"]
    Static Delimiter := "============================================================"
                      . "========================================`r`n"
    Description := Delimiter
@@ -252,15 +252,14 @@ WIA_LoadImage(ImgPath) {
 ; ======================================================================================================================
 ; Rotates an image in steps of 90°.
 ; Parameters:
-;     Mode        -  Direction: "Left" or "Right" or angle [0, 90, 180, 270]
+;     Angle        -   options [0, 90, 180, 270]
 ; ======================================================================================================================
-WIA_RotateImage(ImgObj, Mode := "Right") {
-   Static Modes := {"Left": 270, "Right": 90}
+WIA_RotateImage(ImgObj, Angle:=90) {
    If (ComObjType(ImgObj, "Name") <> "IImageFile")
       Return False
    ImgProc := WIA_ImageProcess()
    ImgProc.Filters.Add(ImgProc.FilterInfos("RotateFlip").FilterID)
-   ImgProc.Filters[1].Properties("RotationAngle") := Mode
+   ImgProc.Filters[1].Properties("RotationAngle") := Angle
    Return ImgProc.Apply(ImgObj)
 }
 ; ======================================================================================================================

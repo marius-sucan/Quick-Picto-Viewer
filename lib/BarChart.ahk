@@ -109,7 +109,7 @@ BarChart(ChartData, LabelsData, Width, Height:="", TitleText:="", Skin:="LightOr
         TitleBackColorA := 0, TitleBackColorB := 0, TitleBackColorDirection := 1, TitleBorderColor := 0, TitleTextColor := "ff000000", TitleHeightFactor := 1
         PlotBackColorA := "ffffffff", PlotBackColorB := "ffffffff", PlotBackColorDirection := 1, PlotRangeBorderColor := 0
         ChartBackColorA := "ffffffff", ChartBackColorB := "ffffffff", ChartBackColorDirection := 1
-        ChartBackHatchColorA :=  0, ChartBackHatchColorB := 0, ChartBackHatchStyle :=  0, ChartBackRoundness := 4
+        ChartBackHatchColorA :=  0, ChartBackHatchColorB := 0, ChartBackHatchStyle :=  0
     }
     else if Skin in LightGreen,LightBlue,LightOrange
     {
@@ -123,7 +123,7 @@ BarChart(ChartData, LabelsData, Width, Height:="", TitleText:="", Skin:="LightOr
         TitleBackColorA := 0, TitleBackColorB := 0, TitleBackColorDirection := 1, TitleBorderColor := 0, TitleTextColor := "ff6B624C", TitleHeightFactor := 1
         PlotBackColorA := 0, PlotBackColorB := 0, PlotBackColorDirection := 1, PlotRangeBorderColor := 0
         ChartBackColorA := "ffffffff", ChartBackColorB := "ffffffff", ChartBackColorDirection := 1
-        ChartBackHatchColorA :=  0, ChartBackHatchColorB := 0, ChartBackHatchStyle :=  18, ChartBackRoundness := 4
+        ChartBackHatchColorA :=  0, ChartBackHatchColorB := 0, ChartBackHatchStyle :=  18
     }
     else if Skin in ClassicGreen,ClassicBlue,ClassicOrange
     {
@@ -137,7 +137,7 @@ BarChart(ChartData, LabelsData, Width, Height:="", TitleText:="", Skin:="LightOr
         TitleBackColorA := 0, TitleBackColorB := 0, TitleBackColorDirection := 0, TitleBorderColor := 0, TitleTextColor := "ff6B624C", TitleHeightFactor := 1
         PlotBackColorA := 0, PlotBackColorB := 0, PlotBackColorDirection := 0, PlotRangeBorderColor := 0
         ChartBackColorA := "ffffffff", ChartBackColorB := "ffffffff", ChartBackColorDirection := 1
-        ChartBackHatchColorA :=  0, ChartBackHatchColorB := 0, ChartBackHatchStyle :=  18, ChartBackRoundness := 4
+        ChartBackHatchColorA :=  0, ChartBackHatchColorB := 0, ChartBackHatchStyle :=  18
     }
     else if Skin in DiagonBlackGreen,DiagonBlackBlue,DiagonBlackOrange
     {
@@ -151,7 +151,7 @@ BarChart(ChartData, LabelsData, Width, Height:="", TitleText:="", Skin:="LightOr
         TitleBackColorA := 0, TitleBackColorB := 0, TitleBackColorDirection := 1, TitleBorderColor := 0, TitleTextColor := "ffdddddd", TitleHeightFactor := 1
         PlotBackColorA := 0, PlotBackColorB := 0, PlotBackColorDirection := 1, PlotRangeBorderColor := 0
         ChartBackColorA := "ff000000", ChartBackColorB := "ff000000", ChartBackColorDirection := 1
-        ChartBackHatchColorA :=  "20ffffff", ChartBackHatchColorB := 0, ChartBackHatchStyle :=  18, ChartBackRoundness := 4
+        ChartBackHatchColorA :=  "20ffffff", ChartBackHatchColorB := 0, ChartBackHatchStyle :=  18
     }
     else if Skin in DiagonWhiteGreen,DiagonWhiteBlue,DiagonWhiteOrange
     {
@@ -165,7 +165,7 @@ BarChart(ChartData, LabelsData, Width, Height:="", TitleText:="", Skin:="LightOr
         TitleBackColorA := "ffffffff", TitleBackColorB := "55ffffff", TitleBackColorDirection := 1, TitleBorderColor := "ffdddddd", TitleTextColor := "ff555555", TitleHeightFactor := 1.4
         PlotBackColorA := "55ffffff", PlotBackColorB := "ffffffff", PlotBackColorDirection := 1, PlotRangeBorderColor := "ffdddddd"
         ChartBackColorA := "ffffffff", ChartBackColorB := "fff7f7f7", ChartBackColorDirection := 1
-        ChartBackHatchColorA := "ffffffff", ChartBackHatchColorB := "ffffffff", ChartBackHatchStyle :=  18, ChartBackRoundness := 4
+        ChartBackHatchColorA := "ffffffff", ChartBackHatchColorB := "ffffffff", ChartBackHatchStyle :=  18
     }
     else if skin in OutlinesWhite,OutlinesGray,OutlinesDark 
     {
@@ -179,23 +179,22 @@ BarChart(ChartData, LabelsData, Width, Height:="", TitleText:="", Skin:="LightOr
         TitleBackColorA := 0, TitleBackColorB := 0, TitleBackColorDirection := 1, TitleBorderColor := "", TitleTextColor := OutlineColor, TitleHeightFactor := 1
         PlotBackColorA := 0, PlotBackColorB := 0, PlotBackColorDirection := 1, PlotRangeBorderColor := ""
         ChartBackColorA := BackgroundColor, ChartBackColorB := BackgroundColor, ChartBackColorDirection := 1
-        ChartBackHatchColorA :=  0, ChartBackHatchColorB := 0, ChartBackHatchStyle :=  38, ChartBackRoundness := 4
+        ChartBackHatchColorA :=  0, ChartBackHatchColorB := 0, ChartBackHatchStyle :=  38
     }
     else if (Skin = "DarkT") {
         BarColorA := "ff858ADB", BarColorB := "ff383C77", BarColorDirection := 1, BarBorderColor := 0, BarTextColor := "ffffffff", BarColorWidthDiv := 1, BarColorHeightDiv := 1
         TitleBackColorA := "aa000000", TitleBackColorB := "66000022", TitleBackColorDirection := 1, TitleBorderColor := 0, TitleTextColor := "ffffffff", TitleHeightFactor := 1.4
         PlotBackColorA := "66000022", PlotBackColorB := "aa333344", PlotBackColorDirection := 1, PlotRangeBorderColor := 0
         ChartBackColorA := "ff333344", ChartBackColorB := "ff111122", ChartBackColorDirection := 1
-        ChartBackHatchColorA :=  "44000000", ChartBackHatchColorB := 0, ChartBackHatchStyle :=  21, ChartBackRoundness := 4
+        ChartBackHatchColorA :=  "44000000", ChartBackHatchColorB := 0, ChartBackHatchStyle :=  21
     }
     else if (Skin = "Bricks") {
         BarColorA := "ffffffff", BarColorB := "99619B68", BarColorDirection := 1, BarBorderColor := "44619B68", BarTextColor := "ff555555", BarColorWidthDiv := 1, BarColorHeightDiv := 1
         TitleBackColorA := "ffffffff", TitleBackColorB := "ccffffff", TitleBackColorDirection := 1, TitleBorderColor := "ffbbbbbb", TitleTextColor := "ff6B624C", TitleHeightFactor := 1.4
         PlotBackColorA := "ccffffff", PlotBackColorB := "ffffffff", PlotBackColorDirection := 1, PlotRangeBorderColor := "ffbbbbbb"
         ChartBackColorA := "ffffffff", ChartBackColorB := "ffffffff", ChartBackColorDirection := 1
-        ChartBackHatchColorA :=  "45000000", ChartBackHatchColorB := 0, ChartBackHatchStyle :=  38, ChartBackRoundness := 4
+        ChartBackHatchColorA :=  "45000000", ChartBackHatchColorB := 0, ChartBackHatchStyle :=  38
     }
-    ; etc.
     
     ;=== if user wants to automaticaly set bitmap to picture control and than dispose of it ===
     if Width is not number
@@ -266,8 +265,8 @@ BarChart(ChartData, LabelsData, Width, Height:="", TitleText:="", Skin:="LightOr
     StringUpper, DataAlignment, DataAlignment, T
     StringUpper, TitleTextFormat, TitleTextFormat, T
     StringUpper, TitleAlignment, TitleAlignment, T
-    if TitleTextFormat contains Bolditalic
-        StringReplace, TitleTextFormat, TitleTextFormat, Bolditalic, BoldItalic, All
+    if InStr(TitleTextFormat, "Bolditalic")
+       TitleTextFormat := StrReplace(TitleTextFormat, "Bolditalic", "BoldItalic")
 
     ;=== Bitmap, Graphics, SmoothingMode ===
     pBitmap := Gdip_CreateBitmap(Width, Height)

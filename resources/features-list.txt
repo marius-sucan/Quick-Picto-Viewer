@@ -13,12 +13,13 @@
 - paint with symmetry
 
 * Image editing tools: 
-- draw arcs, lines and shapes
+- draw arcs, lines and filled shapes
+- parametric line generators [grids, spirals, rays and more]
 - advanced flood fill [color bucket]
 - insert text with advanced customization options
 - paste in place
 - transform selected area
-- gaussian, box blur and radial blur
+- various blur filters: gaussian, box blur, radial blur and others
 - rotate, crop, flip, pixelize, add noise, and more.
 
 * Draw free-form Bézier curved paths or polygonal lines; options to fill with color, textures or gradients.
@@ -61,6 +62,8 @@ FILES MANAGEMENT:
 
 * Ability to automatically group files into sub-folders based on file types or modification date, by months or years.
 
+* Tool to copy or move files by maintaining their folder(s) structure
+
 * Create PDFs or multi-paged TIFFs from selected images. Up to 2048 images allowed.
 
 * Extract frames from GIF and WebP animated images, or pages from TIFFs.
@@ -81,7 +84,7 @@ FILES MANAGEMENT:
 
 * Option to keep a record of seen images and have these skipped during slideshows or erased from the index list. QPV can also generate statistics and charts based on the image viewing habits.
 
-* Image favourites list; easy to manage. It can hold up to 950100 images.
+* Image and folders favourites lists; easy to manage. The list can be very big, up to 950100 images.
 
 * Multi-rename. Rename multiple files with easy to use patterns. Users can add a prefix and/or suffix to file names, or to count them, or search and replace strings in file names, and more.
 
@@ -132,6 +135,8 @@ GENERAL / USER INTERFACE:
 * Vertical or horizontal toolbar. Toolbar size adjustable.
 
 * Slideshows, easy to change speed while running: random order, backwards or forwards. 
+
+* Slideshow random modes: with a bias for the first or second half of the files list, or no explicit bias.
 
 * Ability to set the slideshow duration.
 

@@ -480,7 +480,7 @@ LV_EX_RedrawRows(HLV, First := 0, Last := "") {
 ; ======================================================================================================================
 LV_EX_SetBkImage(HLV, ImgPath, Width := "", Height := "") {
    ; LVM_SETBKIMAGEA := 0x1044 -> http://msdn.microsoft.com/en-us/library/bb761155(v=vs.85).aspx
-   Static XAlign := {C: 50, L: 0, R: 100}, YAlign := {B: 100, C: 50, T: 0}
+   ; Static XAlign := {C: 50, L: 0, R: 100}, YAlign := {B: 100, C: 50, T: 0} [ unused ]
    Static KnownCtrls := []
    Static OSVERSION := DllCall("Kernel32.dll\GetVersion", "UInt") & 0xFF
    HBITMAP := 0

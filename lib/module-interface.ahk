@@ -1,4 +1,4 @@
-#Persistent
+﻿#Persistent
 #NoTrayIcon
 #MaxHotkeysPerInterval, 950
 #HotkeyInterval, 50
@@ -437,7 +437,7 @@ uiAccessImgViewSetUIlabels() {
    If (TouchScreenMode=1)
    {
       dr := (editingSelectionNow=1) ? " Double click outside selection area to deactivate it. " : " Press Shift + Left-Click anywhere to create a new selection area. "
-      gr := " Otherwise, the movement is considered as a zoom in/out swipe gesture."
+      ; gr := " Otherwise, the movement is considered as a zoom in/out swipe gesture."
       fr := " `nIf the image is not larger than the viewport, swipe gestures are allowed."
 
       msgu := "Image view. Left. Click for previous image. Swipe gestures allowed." zr dr
@@ -596,8 +596,6 @@ createGDIinfosWin() {
    Gui, 4: Show, NoActivate, %appTitle%: Infos container
    If (A_OSVersion!="WIN_7")
       SetParentID(PVhwnd, hGDIinfosWin)
-
-   InfosWinGDIcreated := 1
 }
 
 createGDIselectorWin() {
@@ -607,8 +605,6 @@ createGDIselectorWin() {
    Gui, 5: Show, NoActivate, %appTitle%: Selector container
    If (A_OSVersion!="WIN_7")
       SetParentID(PVhwnd, hGDIselectWin)
-
-   SelectWinGDIcreated := 1
 }
 
 PanelOpenCloseEvent(a) {
@@ -636,7 +632,7 @@ SetParentID(Window_ID, theOther) {
 
 miniGDIupdater() {
    updateUIctrl(0)
-   r := MainExe.ahkPostFunction("GuiGDIupdaterResize", PrevGuiSizeEvent)
+   MainExe.ahkPostFunction("GuiGDIupdaterResize", PrevGuiSizeEvent)
 }
 
 detectLongOperation(timer) {
@@ -650,9 +646,7 @@ detectLongOperation(timer) {
      If (msgResult="yes")
      {
         executingCanceableOperation := mustAbandonCurrentOperations := 1
-        lastLongOperationAbort := A_TickCount
         ; MainExe.ahkassign("executingCanceableOperation", executingCanceableOperation)
-        ; MainExe.ahkassign("lastLongOperationAbort", lastLongOperationAbort)
         ; MainExe.ahkassign("mustAbandonCurrentOperations", mustAbandonCurrentOperations)
      } Else lastCloseInvoked := executingCanceableOperation := mustAbandonCurrentOperations := 0
      Return 1
@@ -782,8 +776,8 @@ WM_MOUSEWHEEL(wParam, lParam, msg, hwnd) {
    ; HI := (Value >> 16) & 0xFFFF
    ; LO := Value & 0xFFFF
    mouseData := (wParam >> 16)      ; return the HIWORD -  high-order word 
-   ; TulTip(1, " == ", result, resultA, resultB, resultC, resultD, resultE)
-   stepping := Round(Abs(mouseData) / 120)
+   ; TulTip(" == ", result, resultA, resultB, resultC, resultD, resultE)
+   ; stepping := Round(Abs(mouseData) / 120)
    ; ToolTip, % msg , , , 2
    If (msg=526) ; horizontal mouse wheel
       direction := (mouseData>0 && mouseData<51234) ? "Right" : "Left"
@@ -907,7 +901,6 @@ askAboutStoppingOperations() {
 }
 
 WM_RBUTTONUP(wParam, lP, msg, hwnd) {
-  Static lastState := 0
   LbtnDwn := 0
   If (A_TickCount - scriptStartTime<500)
      Return 0
@@ -1089,20 +1082,19 @@ theSlideShowCore(paramu:=0) {
 }
 
 WM_POINTERACTIVATE() {
-    lastPointerUseZeit := A_TickCount
-    MouseGetPos, , , OutputVarWin
+  ; unused
+    ; MouseGetPos, , , OutputVarWin
     GetMouseCoord2wind(PVhwnd, mX, mY, mXo, mYo)
     canCancelImageLoad := 4
     LbtnDwn := 1
     ; ToolTip, % mX "=" mY "==" ctrlName , , , 3
     If (slideShowRunning=1)
        turnOffSlideshow()
-
-    lastPointerUseZeit := A_TickCount
 }
 
 WM_POINTERUP(wP, lP, msg, hwnd) {
   SoundBeep, 400, 90 
+  ; unused
   ; Return DllCall("DefWindowProc", "Ptr", hwnd, "uint", msg, "UPtr", wP, "Ptr", lP, "Ptr")
   ; ToolTip, % "r=" r , , , 2
   Return 1
@@ -1161,7 +1153,7 @@ IdentifyCtrlUnderMouse(mX, mY) {
 }
 
 WinClickAction(thisEvent:="normal") {
-    Static lastInvoked := 1, lastEvent
+    Static lastInvoked := 1
     If (A_TickCount - lastInvoked<25)
        Return
 
@@ -1255,7 +1247,6 @@ tlbrResetPosition() {
 }
 
 changeMcursor(whichCursor) {
-  Static lastInvoked := 1
   ; If (whichCursor="normal")
   ;    SetTimer, ResetLoadStatus, -20
 
@@ -1298,8 +1289,7 @@ changeMcursor(whichCursor) {
      thisCursor := hCursCross
   } Else Return
 
-  Try DllCall("user32\SetCursor", "Ptr", thisCursor)
-  lastInvoked := A_TickCount
+  Try DllCall("user32\SetCursor", "UPtr", thisCursor)
 }
 
 ResetLoadStatus() {
@@ -1357,7 +1347,7 @@ showMouseTooltipStatusbar() {
 }
 
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
-  Static lastInvoked := 1, prevPos, prevArrayPos := [], prevState
+  Static lastInvoked := 1, prevPos, prevArrayPos := []
   If ((A_TickCount - lastZeitPanCursor < 300) || !isQPVactive())
      Return
 
@@ -1438,7 +1428,6 @@ dummyCheckWin() {
 }
 
 activateMainWin() {
-   Static lastInvoked := 1
    If (A_TickCount - scriptStartTime<2000)
       Return
 
@@ -1461,13 +1450,8 @@ activateMainWin() {
    If (mouseToolTipWinCreated=1)
       SetTimer, mouseTurnOFFtooltip, -150
 
-   ; If (A_TickCount - lastInvoked > 530)
-   ;    GuiControl, 1:, editDummy, -
-
    ; If (drawingShapeNow=1) || (imgEditPanelOpened=1 && AnyWindowOpen>0 && panelWinCollapsed=1)
    ;    SetTimer, dummyCheckWin, -150
-
-   lastInvoked := A_TickCount
 }
 
 dummyCheckActiveWin() {
@@ -1482,7 +1466,6 @@ GuiSize(GuiHwnd, EventInfo, Width, Height) {
 
     PrevGuiSizeEvent := EventInfo
     ; ToolTip, % "l=" EventInfo , , , 2
-    prevGUIresize := A_TickCount
     turnOffSlideshow()
     canCancelImageLoad := 4
     delayu := (isWinXP=1 || thumbsDisplaying=1) ? -15 : -5
@@ -1522,7 +1505,7 @@ dummyTimerProccessDroppedFiles() {
 
    isCtrlDown := GetKeyState("Ctrl", "P")
    lastInvoked := A_TickCount
-   imgFiles := foldersList := sldFile := ""
+   vectorShape := imgFiles := foldersList := sldFile := ""
    turnOffSlideshow()
    canCancelImageLoad := 4
    countFiles := 0
@@ -1539,6 +1522,9 @@ dummyTimerProccessDroppedFiles() {
       {
          sldFile := line
          Break
+      } Else If RegExMatch(line, "i)(.\.vqpv)$")
+      {
+         vectorShape := line
       } Else If InStr(FileExist(line), "D")
       {
          foldersList .= line "`n"
@@ -1551,6 +1537,8 @@ dummyTimerProccessDroppedFiles() {
    ToolTip, , , , 2
    If !isCtrlDown
       isCtrlDown := GetKeyState("Ctrl", "P")
+   If (!imgFiles && !sldFile && vectorShape)
+      sldFile := vectorShape
    MainExe.ahkPostFunction("GuiDroppedFiles", imgFiles, foldersList, sldFile, countFiles, isCtrlDown)
    groppedFiles := ""
    lastInvoked := A_TickCount
@@ -1563,7 +1551,7 @@ doCleanup:
 Return
 
 byeByeRoutine() {
-   Static lastInvoked := 1, lastInvokedThis := 1
+   Static lastInvokedThis := 1
 
    If (A_TickCount - lastInvokedThis < 250)
       Return
@@ -1617,7 +1605,6 @@ byeByeRoutine() {
    } Else If ((AnyWindowOpen || thumbsDisplaying=1 || slideShowRunning=1) && (imageLoading!=1 && runningLongOperation!=1)) || (animGIFplaying=1)
    {
       lastInvokedThis := A_TickCount
-      lastInvoked := A_TickCount
       If AnyWindowOpen
       {
          lastOtherWinClose := A_TickCount
@@ -1659,7 +1646,6 @@ byeByeRoutine() {
       SetTimer, TimerExit, % (lastCloseInvoked>5) ? -550 : -10
       MainExe.ahkPostFunction("TrueCleanup", 1)
    }
-   lastInvoked := A_TickCount
 }
 
 dummyTimerExit() {
@@ -1737,16 +1723,31 @@ kbdkeybcallKeysResponder(givenKey, thisWin) {
       counter := 0
 }
 
+destroyMenuFlyout() {
+   wasMenuFlierCreated := 0
+   Gui, menuFlier: Destroy
+}
+
 guiCreateMenuFlyout() {
+   Critical, on
    Static m := 2
    h := LargeUIfontValue * 2 + 1
    Gui, menuFlier: +AlwaysOnTop -MinimizeBox -SysMenu -Caption +ToolWindow +hwndhFlyOut
-   Gui, menuFlier: Color, %OSDbgrColor%
-   Gui, menuFlier: Font, s%LargeUIfontValue% Bold c%OSDtextColor%
+   If (uiUseDarkMode=1)
+   {
+      brd := "+border"
+      Gui, menuFlier: Color, 212121
+      Gui, menuFlier: Font, s%LargeUIfontValue% Bold cFFffFF
+   } Else
+   {
+      brd := ""
+      Gui, menuFlier: Color, EEeeEE
+      Gui, menuFlier: Font, s%LargeUIfontValue% Bold c111111
+   }
    Gui, menuFlier: Margin, 0, 0
-   Gui, menuFlier: Add, Text, Border Center +0x200 x0 y0 w%h% h%h% gPanelQuickSearchMenuOptions hwndhBtn1 +TabStop, S
-   Gui, menuFlier: Add, Text, Border Center +0x200 x+%m% wp hp gtoggleAppToolbar hwndhBtn2 +TabStop, T
-   Gui, menuFlier: Add, Text, Border Center +0x200 x+%m% wp hp gToggleMenuBaru hwndhBtn3 +TabStop, M
+   Gui, menuFlier: Add, Text, %brd% Center +0x200 x0 y0 w%h% h%h% gPanelQuickSearchMenuOptions hwndhBtn1 +TabStop, S
+   Gui, menuFlier: Add, Text, %brd% Center +0x200 x+%m% wp hp gtoggleAppToolbar hwndhBtn2 +TabStop, T
+   Gui, menuFlier: Add, Text, %brd% Center +0x200 x+%m% wp hp gToggleMenuBaru hwndhBtn3 +TabStop, M
    AddTooltip2Ctrl(hBtn1, "Search through ther available options [ `; ]",, uiUseDarkMode)
    AddTooltip2Ctrl(hBtn2, "Toggle app toolbar [ Shift+F10 ]",, uiUseDarkMode)
    AddTooltip2Ctrl(hBtn3, "Toggle menu bar [ F10 ]",, uiUseDarkMode)
@@ -1762,11 +1763,13 @@ IsNumber(Var) {
 }
 
 menuFlyoutDisplay(actu, mX, mY, isOkay, darkMode:=0, thisHwnd:=0, idu:=0) {
+   Critical, on
    lastOtherWinClose := A_TickCount
    lastContextMenuZeit := A_TickCount
-   uiUseDarkMode := darkMode
+   uiUseDarkMode := (darkMode="yes") ? 1 : 0
    otherAscriptHwnd := thisHwnd
    allowMenuReader := actu
+   ; ToolTip, % "d=" darkMode , , , 2
    If (IsNumber(idu) && idu>0)
       menuCurrentIndex := idu
 
@@ -1802,7 +1805,7 @@ dummyMenuFlyoutDisplay(actu, mX, mY) {
       }
 
       menusflyOutVisible := 1
-      WinGetPos, mX, mY, Width, Height, ahk_id %a%
+      WinGetPos, mX, mY, , Height, ahk_id %a%
       ; ToolTip, % z "=" a "=" mY " = " height "=" h , , , 2
       x := mX
       y := mY + Round(Height) + 2
@@ -1816,8 +1819,8 @@ dummyMenuFlyoutDisplay(actu, mX, mY) {
 
 hideMenuFlyOut() {
     MouseGetPos,,, OutputVarWin
-    WinGetClass, glassu, ahk_id %OutputVarWin%
-    WinGetTitle, titlu, ahk_id %OutputVarWin%
+    ; WinGetClass, glassu, ahk_id %OutputVarWin%
+    ; WinGetTitle, titlu, ahk_id %OutputVarWin%
     ; ToolTip, % OutputVarWin "==" hFlyOut "`n" glassu "==" titlu , , , 2
     If (OutputVarWin!=hFlyOut && !identifyMenus())
     {
@@ -1927,8 +1930,8 @@ turnOffSlideshow() {
 getMenuCoords(menuLabel) {
    JEE_ClientToScreen(hPicOnGui1, 1, 1, mX, mY)
    GetPhysicalCursorPos(x, y)
-   Try MouseGetPos, ,, WinID
-   AccInfoUnderMouse(x, y, winID, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
+   ; Try MouseGetPos, ,, WinID
+   AccInfoUnderMouse(x, y, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
    ; ToolTip, % coords.x "==" coords.y , , , 2
    If (coords.x && coords.y)
       coords := menuLabel "|" coords.x "|" coords.y + coords.h
@@ -2206,13 +2209,13 @@ findMenuBarItemUnderMouse() {
       Return
 
    GetPhysicalCursorPos(x, y)
-   AccInfoUnderMouse(x, y, WinID, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
+   AccInfoUnderMouse(x, y, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
    If !(accIRole=12 && accFocusName)
    {
       If isInRange(y, lastY - lastH, lastY + lastH)
       {
          y := lastY
-         AccInfoUnderMouse(x, y, WinID, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
+         AccInfoUnderMouse(x, y, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
       }
    }
 
@@ -2238,6 +2241,7 @@ findMenuBarItemUnderMouse() {
 }
 
 WM_NCMOUSEMOVE(wP, lP, msg, hwnd) {
+  ; unused
    Static prevLP, prevMenuID
 
    If (prevLP!=lP && allowMenuReader="yes" && menuCurrentIndex>0)
@@ -2336,7 +2340,7 @@ determineMenuBTNsOKAY() {
       Return 1
 }
 
-TulTip(debugger, sep, params*) {
+TulTip(sep, params*) {
     str := ""
     For index,param in params
         str .= "[" A_Index "]" param . sep
@@ -2483,7 +2487,7 @@ WM_KEYDOWN(wParam, lParam, msg, hwnd) {
        SetTimer, PreProcessKbdKey, -3
        Return 0
     }
-    ; TulTip(0, "|   ", wParam, vk_shift, vk_ctrl, vk_alt, msg, "ui thread")
+    ; TulTip("|   ", wParam, vk_shift, vk_ctrl, vk_alt, msg, "ui thread")
 }
 
 SendMenuTabKey() {
@@ -2674,12 +2678,11 @@ constantMenuReader(modus:=0, externMode:=0) {
       AccFromFocused(WinID, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
    } Else
    {
-      Try MouseGetPos, ,, WinID
-      AccInfoUnderMouse(x, y, WinID, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
+      AccInfoUnderMouse(x, y, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
    }
 
-   goodText := accFocusValue ? accFocusValue : accFocusName
-   goodRoles := (accIRole=41 || accIRole=42 || accIRole=46) ? 1 : 0
+   ; goodText := accFocusValue ? accFocusValue : accFocusName
+   ; goodRoles := (accIRole=41 || accIRole=42 || accIRole=46) ? 1 : 0
    ; ToolTip, % goodText "=" goodRoles "==" WinID "==" winChild.count() , , , 2
    If (accIRole=12 && accFocusName && (prevLabel!=accFocusName || mouseToolTipWinCreated!=1 || externMode=1))
    {
@@ -2723,26 +2726,21 @@ repeatMenuInfosPopup() {
       constantMenuReader()
 }
 
-mouseClickTurnOFFtooltip(mode:=0) {
-    mouseTurnOFFtooltip(2)
+mouseClickTurnOFFtooltip() {
+    SetTimer, mouseTurnOFFtooltip, -50
 }
 
-mouseTurnOFFtooltip(mode:=0) {
+mouseTurnOFFtooltip() {
    Global statusBarTooltipVisible := 0
    If (mouseToolTipWinCreated!=1)
       Return
 
    Sleep, 10
    Gui, mouseToolTipGuia: Destroy
-   ; WinActive("ahk_id" PVhwnd)
    Global mouseToolTipWinCreated := 0
    Global statusBarTooltipVisible := 0
    Global lastZeitToolTip := A_TickCount
    SetTimer, mouseTurnOFFtooltip, Off
-   ; MouseGetPos, OutputVarX, OutputVarY, OutputVarWin
-   ; ToolTip, % mode , , , 2
-   ; If (AnyWindowOpen && mode!=1 || mode=2)
-   ;    SetTimer, delayedWinActivateToolTipDeath, -150
 }
 
 delayedWinActivateToolTipDeath() {
@@ -4297,17 +4295,14 @@ class taskbarInterface {
    }
 }
 
-
 repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:="") {
-    Static lastAsked := 1
     If !winPos
     {
        SysGet, MonitorCount, 80
        ActiveMonDetails := calcScreenLimits(referencePoint)
-       ActiveMon := ActiveMonDetails.m
        ResWidth := ActiveMonDetails.w, ResHeight:= ActiveMonDetails.h
-       mCoordRight := ActiveMonDetails.mCRight, mCoordLeft := ActiveMonDetails.mCLeft
-       mCoordTop := ActiveMonDetails.mCTop, mCoordBottom := ActiveMonDetails.mCBottom
+       mCoordLeft := ActiveMonDetails.mCLeft
+       mCoordTop := ActiveMonDetails.mCTop
     }
 
     If (MonitorCount>1 && !winPos && A_OSVersion!="WIN_XP")
@@ -4474,8 +4469,8 @@ AccFromFocused(hwnd, byref val, byref name, byref RoleChild, byref RoleParent, b
 
   Try
   {
-    child := AccObj.accFocus
-     ChildCount := AccObj.accChildCount
+     child := AccObj.accFocus
+     ; ChildCount := AccObj.accChildCount
      Name := AccObj.accName(child)
      Val := AccObj.accValue(child)
      RoleChild := AccObj.accRole(child)
@@ -4496,7 +4491,7 @@ Acc_ObjectFromPoint(ByRef idChild:="", mx:="", my:="") {
     Return g
 }
 
-AccInfoUnderMouse(mx, my, WinID, byref val, byref name, byref RoleChild, byref RoleParent, byref styleu, byref strstyles, byref shortcut, byref coords) {
+AccInfoUnderMouse(mx, my, byref val, byref name, byref RoleChild, byref RoleParent, byref styleu, byref strstyles, byref shortcut, byref coords) {
   Static hLibrary, WM_GETOBJECT := 0x003D  
   If !hLibrary
      hLibrary := DllCall("LoadLibrary", "Str", "oleacc", "Ptr")
@@ -4508,7 +4503,7 @@ AccInfoUnderMouse(mx, my, WinID, byref val, byref name, byref RoleChild, byref R
   ; SendMessage, WM_GETOBJECT, 0, 1, Chrome_RenderWidgetHostHWND1, % "ahk_id " WinID
   Try
   {
-     ChildCount := AccObj.accChildCount
+     ; ChildCount := AccObj.accChildCount
      Name := AccObj.accName(child)
      Val := AccObj.accValue(child)
      RoleChild := AccObj.accRole(child)

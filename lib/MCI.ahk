@@ -1,4 +1,4 @@
-/*
+﻿/*
 Title: MCI Library v1.1
 Updated in October, 2019
 https://autohotkey.com/board/topic/32291-library-mci-v11-playcontrol-media-files/
@@ -232,7 +232,7 @@ MCI_Close(p_lpszDeviceID) {
     l_Return:=MCI_SendString("close " . p_lpszDeviceID . " wait")
 
     ;-- Turn off monitoring of MM_MCINOTIFY message?
-    if OnMessage(MM_MCINOTIFY)="MCI_Notify"
+    if (OnMessage(MM_MCINOTIFY)="MCI_Notify")
         {
         ;-- Don't process unless all MCI devices are closed
         MCI_SendString("sysinfo all quantity open",l_OpenMCIDevices)
@@ -435,7 +435,7 @@ MCI_Open(p_MediaFile,p_Alias:="",p_Flags:="", checkFile:=1) {
         }
 
         ;-- Enclose in DQ
-        p_MediaFile="%p_MediaFile%"
+        p_MediaFile:= """" p_MediaFile """"
         }
 
     ;-- Alias
@@ -512,12 +512,11 @@ MCI_Open(p_MediaFile,p_Alias:="",p_Flags:="", checkFile:=1) {
 ;   value or until the device is closed.
 ;
 ;------------------------------------------------------------------------------
-MCI_OpenCDAudio(p_Drive="",p_Alias="",p_CheckForMedia=True) {
+MCI_OpenCDAudio(p_Drive:="",p_Alias:="",p_CheckForMedia:=True) {
     Static s_Seq:=0
 
     ;-- Parameters
-    p_Drive=%p_Drive%  ;-- Autotrim
-    p_Drive:=SubStr(p_Drive,1,1)
+    p_Drive:=SubStr(Trim(p_Drive),1,1)
     if p_Drive is not Alpha
         p_Drive:=""
 
@@ -890,7 +889,7 @@ MCI_Pause(p_lpszDeviceID) {
 ;   completed successfully.
 ;
 ;------------------------------------------------------------------------------
-MCI_Play(p_lpszDeviceID,p_Flags="",p_Callback="",p_hwndCallback=0) {
+MCI_Play(p_lpszDeviceID,p_Flags:="",p_Callback:="",p_hwndCallback:=0) {
     Static MM_MCINOTIFY:=0x03B9
 
     ;-- Build command string
@@ -899,7 +898,7 @@ MCI_Play(p_lpszDeviceID,p_Flags="",p_Callback="",p_hwndCallback=0) {
         l_CmdString.=A_Space . p_Flags
 
     ;-- Notify
-    p_Callback=%p_Callback%  ;-- AutoTrim
+    p_Callback:=Trim(p_Callback)
     if StrLen(p_Callback)
         {
         l_CmdString.=" notify"
@@ -914,10 +913,9 @@ MCI_Play(p_lpszDeviceID,p_Flags="",p_Callback="",p_hwndCallback=0) {
         }
 
     ;-- Callback handle
-    if not p_hwndCallback
+    if !p_hwndCallback
         {
-        if InStr(A_Space . l_CmdString . A_Space," notify ")
-        or StrLen(p_Callback)
+        if (InStr(A_Space . l_CmdString . A_Space," notify ") || StrLen(p_Callback)>0)
             {
             l_DetectHiddenWindows:=A_DetectHiddenWindows
             DetectHiddenWindows On
@@ -953,7 +951,7 @@ MCI_Play(p_lpszDeviceID,p_Flags="",p_Callback="",p_hwndCallback=0) {
 ;   track relative to entire media is returned.
 ;
 ;------------------------------------------------------------------------------
-MCI_Position(p_lpszDeviceID,p_Track=0) {
+MCI_Position(p_lpszDeviceID,p_Track:=0) {
     l_CmdString:="status " . p_lpszDeviceID . " position"
     if p_Track
         l_CmdString.=" track " . p_Track
@@ -1023,7 +1021,7 @@ MCI_Position(p_lpszDeviceID,p_Track=0) {
 ;   Original function and examples by heresy.
 ;
 ;------------------------------------------------------------------------------
-MCI_Record(p_lpszDeviceID,p_Flags="") {
+MCI_Record(p_lpszDeviceID,p_Flags:="") {
     Return MCI_SendString("record " . p_lpszDeviceID . A_Space . p_Flags)
 }
 

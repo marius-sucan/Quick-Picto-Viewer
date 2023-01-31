@@ -909,7 +909,6 @@ Gdip_BitmapFromBRA(ByRef BRAFromMemIn, File, Alternate := 0) {
 
    OffsetTOC := StrPut(Headers.1, "CP0") + StrPut(Headers.2, "CP0") ;  + 2
    OffsetData := _Info.2
-   SearchIndex := Alternate ? 1 : 2
    TOC := StrGet(&BRAFromMemIn + OffsetTOC, OffsetData - OffsetTOC - 1, "CP0")
    RX1 := A_AhkVersion < "2" ? "mi`nO)^" : "mi`n)^"
    Offset := Size := 0
@@ -2333,7 +2332,6 @@ Gdip_SaveImagesInTIFF(filesListArray, destFilePath) {
          Continue
 
       countTFilez++
-      ; fnOutputDebug(A_ThisFunc ": " imgPath)
       thisBitmap := Gdip_CreateBitmapFromFile(imgPath)
       If StrLen(thisBitmap)<2
       {
@@ -2859,7 +2857,7 @@ Gdip_CreateBitmapFromFile(sFile, IconNumber:=1, IconSize:="", useICM:=0) {
             continue
          }
 
-         hbmMask  := NumGet(buf, 12 + (A_PtrSize - 4))
+         ; hbmMask  := NumGet(buf, 12 + (A_PtrSize - 4))
          hbmColor := NumGet(buf, 12 + (A_PtrSize - 4) + A_PtrSize)
          if !(hbmColor && DllCall("GetObject", "UPtr", hbmColor, "int", BufSize, "UPtr", &buf))
          {
@@ -4947,12 +4945,13 @@ Gdip_StringFormatGetGeneric(whichFormat:=0) {
    Return hStringFormat
 }
 
-Gdip_SetStringFormatAlign(hStringFormat, Align) {
+Gdip_SetStringFormatAlign(hStringFormat, Align, LineAlign:="") {
 ; Text alignments:
 ; 0 - [Near / Left] Alignment is towards the origin of the bounding rectangle
 ; 1 - [Center] Alignment is centered between origin and extent (width) of the formatting rectangle
 ; 2 - [Far / Right] Alignment is to the far extent (right side) of the formatting rectangle
-
+   If (LineAlign!="")
+      Gdip_SetStringFormatLineAlign(hStringFormat, LineAlign)
    return DllCall("gdiplus\GdipSetStringFormatAlign", "UPtr", hStringFormat, "int", Align)
 }
 
@@ -5192,6 +5191,17 @@ Gdip_FontFamilyCreateGeneric(whichStyle) {
    Else If (whichStyle=2)
       DllCall("gdiplus\GdipGetGenericFontFamilySerif", "UPtr*", hFontFamily)
    Return hFontFamily
+}
+
+Gdip_GetWindowFont(hwnd) {
+   Static WM_GETFONT := 0x31
+   ; for this function to work, you must provide a hwnd of button  control or something similar
+   hFONT := DllCall("User32.dll\SendMessage", "UPtr", HWND, "UInt", WM_GETFONT, "Ptr", 0, "Ptr", 0, "Ptr")
+   hDC := GetDC(HWND)
+   SelectObject(hDC, hFont)
+   pFont := Gdip_CreateFontFromDC(hDC)
+   ReleaseDC(hDC, hwnd)
+   Return pFONT
 }
 
 Gdip_CreateFontFromDC(hDC) {
@@ -5544,6 +5554,7 @@ Gdip_AddPathRoundedRectangle(pPath, x, y, w, h, r, angle:=0) {
 
 Gdip_AddPathPolygon(pPath, Points) {
 ; Points: the coordinates of all the points passed as x1,y1|x2,y2|x3,y3..... [minimum three points must be given]
+; it can also be an object [x1,y1,x2,y2,x3,y3]
 
    iCount := CreatePointsF(PointsF, Points)
    return DllCall("gdiplus\GdipAddPathPolygon", "UPtr", pPath, "UPtr", &PointsF, "int", iCount)
@@ -5716,7 +5727,7 @@ Gdip_GetPathPointsCount(pPath) {
 
 Gdip_GetPathPoints(pPath, returnArray:=0) {
 ; Please note: if the pPath is a Cardinal spline with a tension 
-; hßigher than 0, GDI+ will return additional points
+; higher than 0, GDI+ will return additional points
 ; than the initial points when it was created.
 
    PointsCount := Gdip_GetPathPointsCount(pPath)
@@ -7530,7 +7541,8 @@ Gdip_GetMatrixLastStatus(hMatrix) {
 ;
 ; pPath:  Pointer to the GraphicsPath.
 ; Points: The coordinates of all the points passed as x1,y1|x2,y2|x3,y3... This can also be a flat array object
-;
+
+
 ; Return: Status enumeration. 0 = success.
 ;
 ; Notes: The first spline is constructed from the first point through the fourth point in the array and uses the second and third points as control points. Each subsequent spline in the sequence needs exactly three more points: the ending point of the previous spline is used as the starting point, the next two points in the sequence are control points, and the third point is the ending point.
@@ -7541,7 +7553,7 @@ Gdip_AddPathBeziers(pPath, Points) {
 }
 
 Gdip_AddPathBezier(pPath, x1, y1, x2, y2, x3, y3, x4, y4) {
-  ; Adds a Bézier spline to the current figure of this path
+  ; Adds a Bézier spline to the current figure of the given pPath
   return DllCall("gdiplus\GdipAddPathBezier", "UPtr", pPath
          , "float", x1, "float", y1, "float", x2, "float", y2
          , "float", x3, "float", y3, "float", x4, "float", y4)
@@ -7552,7 +7564,7 @@ Gdip_AddPathBezier(pPath, x1, y1, x2, y2, x3, y3, x4, y4) {
 ; Description: Adds a sequence of connected lines to the current figure of this path.
 ;
 ; pPath: Pointer to the GraphicsPath
-; Points: the coordinates of all the points passed as x1,y1|x2,y2|x3,y3.....
+; Points: the coordinates of all the points passed as x1,y1|x2,y2|x3,y3... ; it can also be an object [x1,y1,x2,y2,x3,y3]
 ;
 ; Return: status enumeration. 0 = success.
 
