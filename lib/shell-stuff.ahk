@@ -2151,8 +2151,7 @@ GetWindowFromPos(X, Y, DetectHidden := 0) {
    ; CWP_ALL = 0x0000, CWP_SKIPINVISIBLE = 0x0001
    Return DllCall("ChildWindowFromPointEx", "Ptr", DllCall("GetDesktopWindow", "UPtr")
                                           , "Int64", (X & 0xFFFFFFFF) | ((Y & 0xFFFFFFFF) << 32)
-                                          , "UInt", !DetectHidden
-                                          , "UPtr")
+                                          , "UInt", !DetectHidden, "UPtr")
 }
 
 AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0, largeFont:=0) {

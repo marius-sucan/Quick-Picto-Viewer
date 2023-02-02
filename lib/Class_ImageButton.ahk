@@ -3,8 +3,10 @@
 ; Function:          Create images and assign them to pushbuttons.
 ; Tested with:       AHK 1.1.33.02 (A32/U32/U64)
 ; Tested on:         Win 10 (x64)
-; Change history:    1.6.00.00/2023-01-31/marius-sucan - allows now to use & to underline the accelerator key; border works with mode 0 also
-; Change history:    1.5.00.00/2020-12-16/just me - increased script performance, added support for icons (HICON)
+; Change history:    1.6.00.00/2023-02-02/marius-sucan - It now allows to use & to underline the accelerator key for the button, and they are no longer broken, they work.. It breaks winxp compatiblity.
+;                                                        Changed all PTR and PtrP to Uptr and Uptr*.
+
+;                    1.5.00.00/2020-12-16/just me - increased script performance, added support for icons (HICON)
 ;                    1.4.00.00/2014-06-07/just me - fixed bug for button caption = "0", "000", etc.
 ;                    1.3.00.00/2014-02-28/just me - added support for ARGB colors
 ;                    1.2.00.00/2014-02-23/just me - added borders
@@ -57,7 +59,7 @@
 ;           6     GuiColor    optional, needed for rounded buttons if you've changed the GUI background color:
 ;                             -  RGB integer value (0xRRGGBB) or HTML color name ("Red").
 ;                                Default: AHK default GUI background color
-;           7     BorderColor optional, ignored for mode 7, color of the border:
+;           7     BorderColor optional, ignored for modes 0 (bitmap) and 7, color of the border:
 ;                             -  RGB integer value (0xRRGGBB) or HTML color name ("Red").
 ;           8     BorderWidth optional, ignored for modes 0 (bitmap) and 7, width of the border in pixels:
 ;                             -  Default: 1
@@ -83,8 +85,6 @@ Class ImageButton {
    ; PRIVATE PROPERTIES ================================================================================================
    ; ===================================================================================================================
    Static BitMaps := []
-   Static GDIPDll := 0
-   Static GDIPToken := 0
    Static MaxOptions := 8
    ; HTML colors
    Static HTML := {BLACK: 0x000000, GRAY: 0x808080, SILVER: 0xC0C0C0, WHITE: 0xFFFFFF, MAROON: 0x800000
@@ -109,12 +109,12 @@ Class ImageButton {
    ; ===================================================================================================================
    BitmapOrIcon(O2, O3) {
       ; OBJ_BITMAP = 7
-      Return (This.IsInt(O2) && (O3 = "HICON")) || (DllCall("GetObjectType", "Ptr", O2, "UInt") = 7) || FileExist(O2)
+      Return (This.IsInt(O2) && (O3 = "HICON")) || (DllCall("GetObjectType", "UPtr", O2, "UInt") = 7) || FileExist(O2)
    }
    ; ===================================================================================================================
    FreeBitmaps() {
       For I, HBITMAP In This.BitMaps
-         DllCall("Gdi32.dll\DeleteObject", "Ptr", HBITMAP)
+         DllCall("Gdi32.dll\DeleteObject", "UPtr", HBITMAP)
       This.BitMaps := []
    }
    ; ===================================================================================================================
@@ -130,20 +130,20 @@ Class ImageButton {
    }
    ; ===================================================================================================================
    PathAddRectangle(Path, X, Y, W, H) {
-      Return DllCall("Gdiplus.dll\GdipAddPathRectangle", "Ptr", Path, "Float", X, "Float", Y, "Float", W, "Float", H)
+      Return DllCall("Gdiplus.dll\GdipAddPathRectangle", "UPtr", Path, "Float", X, "Float", Y, "Float", W, "Float", H)
    }
    ; ===================================================================================================================
    PathAddRoundedRect(Path, X1, Y1, X2, Y2, R) {
       D := (R * 2), X2 -= D, Y2 -= D
       DllCall("Gdiplus.dll\GdipAddPathArc"
-            , "Ptr", Path, "Float", X1, "Float", Y1, "Float", D, "Float", D, "Float", 180, "Float", 90)
+            , "UPtr", Path, "Float", X1, "Float", Y1, "Float", D, "Float", D, "Float", 180, "Float", 90)
       DllCall("Gdiplus.dll\GdipAddPathArc"
-            , "Ptr", Path, "Float", X2, "Float", Y1, "Float", D, "Float", D, "Float", 270, "Float", 90)
+            , "UPtr", Path, "Float", X2, "Float", Y1, "Float", D, "Float", D, "Float", 270, "Float", 90)
       DllCall("Gdiplus.dll\GdipAddPathArc"
-            , "Ptr", Path, "Float", X2, "Float", Y2, "Float", D, "Float", D, "Float", 0, "Float", 90)
+            , "UPtr", Path, "Float", X2, "Float", Y2, "Float", D, "Float", D, "Float", 0, "Float", 90)
       DllCall("Gdiplus.dll\GdipAddPathArc"
-            , "Ptr", Path, "Float", X1, "Float", Y2, "Float", D, "Float", D, "Float", 90, "Float", 90)
-      Return DllCall("Gdiplus.dll\GdipClosePathFigure", "Ptr", Path)
+            , "UPtr", Path, "Float", X1, "Float", Y2, "Float", D, "Float", D, "Float", 90, "Float", 90)
+      Return DllCall("Gdiplus.dll\GdipClosePathFigure", "UPtr", Path)
    }
    ; ===================================================================================================================
    SetRect(ByRef Rect, X1, Y1, X2, Y2) {
@@ -162,11 +162,11 @@ Class ImageButton {
    ; ===================================================================================================================
    SetError(Msg) {
       If (This.Bitmap)
-         DllCall("Gdiplus.dll\GdipDisposeImage", "Ptr", This.Bitmap)
+         DllCall("Gdiplus.dll\GdipDisposeImage", "UPtr", This.Bitmap)
       If (This.Graphics)
-         DllCall("Gdiplus.dll\GdipDeleteGraphics", "Ptr", This.Graphics)
+         DllCall("Gdiplus.dll\GdipDeleteGraphics", "UPtr", This.Graphics)
       If (This.Font)
-         DllCall("Gdiplus.dll\GdipDeleteFont", "Ptr", This.Font)
+         DllCall("Gdiplus.dll\GdipDeleteFont", "UPtr", This.Font)
       This.Delete("Bitmap")
       This.Delete("Graphics")
       This.Delete("Font")
@@ -195,7 +195,7 @@ Class ImageButton {
       HBITMAP := HFORMAT := PBITMAP := PBRUSH := PFONT := PPATH := 0
       ; ----------------------------------------------------------------------------------------------------------------
       ; Check HWND
-      If !DllCall("User32.dll\IsWindow", "Ptr", HWND)
+      If !DllCall("User32.dll\IsWindow", "UPtr", HWND)
          Return This.SetError("Invalid parameter HWND!")
       ; ----------------------------------------------------------------------------------------------------------------
       ; Check Options
@@ -209,17 +209,17 @@ Class ImageButton {
          Return This.SetError("The control must be a pushbutton!")
       ; ----------------------------------------------------------------------------------------------------------------
       ; Get the button's font
-      HFONT := DllCall("User32.dll\SendMessage", "Ptr", HWND, "UInt", WM_GETFONT, "Ptr", 0, "Ptr", 0, "Ptr")
-      DC := DllCall("User32.dll\GetDC", "Ptr", HWND, "Ptr")
-      DllCall("Gdi32.dll\SelectObject", "Ptr", DC, "Ptr", HFONT)
-      DllCall("Gdiplus.dll\GdipCreateFontFromDC", "Ptr", DC, "PtrP", PFONT)
-      DllCall("User32.dll\ReleaseDC", "Ptr", HWND, "Ptr", DC)
+      HFONT := DllCall("User32.dll\SendMessage", "UPtr", HWND, "UInt", WM_GETFONT, "UPtr", 0, "UPtr", 0, "Ptr")
+      DC := DllCall("User32.dll\GetDC", "UPtr", HWND, "Ptr")
+      DllCall("Gdi32.dll\SelectObject", "UPtr", DC, "UPtr", HFONT)
+      DllCall("Gdiplus.dll\GdipCreateFontFromDC", "UPtr", DC, "UPtr*", PFONT)
+      DllCall("User32.dll\ReleaseDC", "UPtr", HWND, "UPtr", DC)
       If !(This.Font := PFONT)
          Return This.SetError("Couldn't get button's font!")
       ; ----------------------------------------------------------------------------------------------------------------
       ; Get the button's rectangle
       VarSetCapacity(RECT, 16, 0)
-      If !DllCall("User32.dll\GetWindowRect", "Ptr", HWND, "Ptr", &RECT)
+      If !DllCall("User32.dll\GetWindowRect", "UPtr", HWND, "UPtr", &RECT)
          Return This.SetError("Couldn't get button's rectangle!")
       BtnW := NumGet(RECT,  8, "Int") - NumGet(RECT, 0, "Int")
       BtnH := NumGet(RECT, 12, "Int") - NumGet(RECT, 4, "Int")
@@ -231,20 +231,20 @@ Class ImageButton {
       ; ----------------------------------------------------------------------------------------------------------------
       ; Create a GDI+ bitmap
       DllCall("Gdiplus.dll\GdipCreateBitmapFromScan0", "Int", BtnW, "Int", BtnH, "Int", 0
-            , "UInt", 0x26200A, "Ptr", 0, "PtrP", PBITMAP)
+            , "UInt", 0x26200A, "UPtr", 0, "UPtr*", PBITMAP)
       If !(This.Bitmap := PBITMAP)
          Return This.SetError("Couldn't create the GDI+ bitmap!")
       ; Get the pointer to its graphics
       PGRAPHICS := 0
-      DllCall("Gdiplus.dll\GdipGetImageGraphicsContext", "Ptr", PBITMAP, "PtrP", PGRAPHICS)
+      DllCall("Gdiplus.dll\GdipGetImageGraphicsContext", "UPtr", PBITMAP, "UPtr*", PGRAPHICS)
       If !(This.Graphics := PGRAPHICS)
          Return This.SetError("Couldn't get the the GDI+ bitmap's graphics!")
       ; Quality settings
-      DllCall("Gdiplus.dll\GdipSetSmoothingMode", "Ptr", PGRAPHICS, "UInt", 4)
-      DllCall("Gdiplus.dll\GdipSetInterpolationMode", "Ptr", PGRAPHICS, "Int", 7)
-      DllCall("Gdiplus.dll\GdipSetCompositingQuality", "Ptr", PGRAPHICS, "UInt", 4)
-      DllCall("Gdiplus.dll\GdipSetRenderingOrigin", "Ptr", PGRAPHICS, "Int", 0, "Int", 0)
-      DllCall("Gdiplus.dll\GdipSetPixelOffsetMode", "Ptr", PGRAPHICS, "UInt", 4)
+      DllCall("Gdiplus.dll\GdipSetSmoothingMode", "UPtr", PGRAPHICS, "UInt", 4)
+      DllCall("Gdiplus.dll\GdipSetInterpolationMode", "UPtr", PGRAPHICS, "Int", 7)
+      DllCall("Gdiplus.dll\GdipSetCompositingQuality", "UPtr", PGRAPHICS, "UInt", 4)
+      DllCall("Gdiplus.dll\GdipSetRenderingOrigin", "UPtr", PGRAPHICS, "Int", 0, "Int", 0)
+      DllCall("Gdiplus.dll\GdipSetPixelOffsetMode", "UPtr", PGRAPHICS, "UInt", 4)
       ; ----------------------------------------------------------------------------------------------------------------
       ; Create the bitmap(s)
       This.BitMaps := []
@@ -307,12 +307,12 @@ Class ImageButton {
          BorderWidth := Opt[8] ? Opt[8] : 1
          ; -------------------------------------------------------------------------------------------------------------
          ; Clear the background
-         DllCall("Gdiplus.dll\GdipGraphicsClear", "Ptr", PGRAPHICS, "UInt", GuiColor)
+         DllCall("Gdiplus.dll\GdipGraphicsClear", "UPtr", PGRAPHICS, "UInt", GuiColor)
          ; Create the image
          If (Image = "") { ; Create a BitMap based on the specified colors
             PathX := PathY := 0, PathW := BtnW, PathH := BtnH
             ; Create a GraphicsPath
-            DllCall("Gdiplus.dll\GdipCreatePath", "UInt", 0, "PtrP", PPATH)
+            DllCall("Gdiplus.dll\GdipCreatePath", "UInt", 0, "UPtr*", PPATH)
             If (Rounded < 1) ; the path is a rectangular rectangle
                This.PathAddRectangle(PPATH, PathX, PathY, PathW, PathH)
             Else ; the path is a rounded rectangle
@@ -320,13 +320,13 @@ Class ImageButton {
             ; If BorderColor and BorderWidth are specified, 'draw' the border (not for Mode 7)
             If (BorderColor <> "") && (BorderWidth > 0) && (Mode <> 7) {
                ; Create a SolidBrush
-               DllCall("Gdiplus.dll\GdipCreateSolidFill", "UInt", BorderColor, "PtrP", PBRUSH)
+               DllCall("Gdiplus.dll\GdipCreateSolidFill", "UInt", BorderColor, "UPtr*", PBRUSH)
                ; Fill the path
-               DllCall("Gdiplus.dll\GdipFillPath", "Ptr", PGRAPHICS, "Ptr", PBRUSH, "Ptr", PPATH)
+               DllCall("Gdiplus.dll\GdipFillPath", "UPtr", PGRAPHICS, "UPtr", PBRUSH, "UPtr", PPATH)
                ; Free the brush
-               DllCall("Gdiplus.dll\GdipDeleteBrush", "Ptr", PBRUSH)
+               DllCall("Gdiplus.dll\GdipDeleteBrush", "UPtr", PBRUSH)
                ; Reset the path
-               DllCall("Gdiplus.dll\GdipResetPath", "Ptr", PPATH)
+               DllCall("Gdiplus.dll\GdipResetPath", "UPtr", PPATH)
                ; Add a new 'inner' path
                PathX := PathY := BorderWidth, PathW -= BorderWidth, PathH -= BorderWidth, Rounded -= BorderWidth
                If (Rounded < 1) ; the path is a rectangular rectangle
@@ -342,31 +342,23 @@ Class ImageButton {
             PBRUSH := 0
             If (Mode = 0) { ; the background is unicolored
                ; Create a SolidBrush
-               DllCall("Gdiplus.dll\GdipCreateSolidFill", "UInt", BkgColor1, "PtrP", PBRUSH)
+               DllCall("Gdiplus.dll\GdipCreateSolidFill", "UInt", BkgColor1, "UPtr*", PBRUSH)
                ; Fill the path
-               DllCall("Gdiplus.dll\GdipFillPath", "Ptr", PGRAPHICS, "Ptr", PBRUSH, "Ptr", PPATH)
-               If (BorderColor!="" && BorderWidth>0) {
-                  rrrr := DllCall("gdiplus\GdipCreatePen1", "UInt", BorderColor, "float", BorderWidth, "int", 2, "UPtr*", pPen)
-                  If !rrrr
-                  {
-                     DllCall("gdiplus\GdipDrawRectangle", "UPtr", PGRAPHICS, "UPtr", pPen, "float", 0, "float", 0, "float", BtnW, "float", BtnH)
-                     DllCall("gdiplus\GdipDeletePen", "UPtr", pPen)
-                  }
-               }
+               DllCall("Gdiplus.dll\GdipFillPath", "UPtr", PGRAPHICS, "UPtr", PBRUSH, "UPtr", PPATH)
             }
             Else If (Mode = 1) || (Mode = 2) { ; the background is bicolored
                ; Create a LineGradientBrush
                This.SetRectF(RECTF, PathX, PathY, PathW, PathH)
-               DllCall("Gdiplus.dll\GdipCreateLineBrushFromRect", "Ptr", &RECTF
-                     , "UInt", BkgColor1, "UInt", BkgColor2, "Int", Mode & 1, "Int", 3, "PtrP", PBRUSH)
-               DllCall("Gdiplus.dll\GdipSetLineGammaCorrection", "Ptr", PBRUSH, "Int", 1)
+               DllCall("Gdiplus.dll\GdipCreateLineBrushFromRect", "UPtr", &RECTF
+                     , "UInt", BkgColor1, "UInt", BkgColor2, "Int", Mode & 1, "Int", 3, "UPtr*", PBRUSH)
+               DllCall("Gdiplus.dll\GdipSetLineGammaCorrection", "UPtr", PBRUSH, "Int", 1)
                ; Set up colors and positions
                This.SetRect(COLORS, BkgColor1, BkgColor1, BkgColor2, BkgColor2) ; sorry for function misuse
                This.SetRectF(POSITIONS, 0, 0.5, 0.5, 1) ; sorry for function misuse
-               DllCall("Gdiplus.dll\GdipSetLinePresetBlend", "Ptr", PBRUSH
-                     , "Ptr", &COLORS, "Ptr", &POSITIONS, "Int", 4)
+               DllCall("Gdiplus.dll\GdipSetLinePresetBlend", "UPtr", PBRUSH
+                     , "UPtr", &COLORS, "UPtr", &POSITIONS, "Int", 4)
                ; Fill the path
-               DllCall("Gdiplus.dll\GdipFillPath", "Ptr", PGRAPHICS, "Ptr", PBRUSH, "Ptr", PPATH)
+               DllCall("Gdiplus.dll\GdipFillPath", "UPtr", PGRAPHICS, "UPtr", PBRUSH, "UPtr", PPATH)
             }
             Else If (Mode >= 3) && (Mode <= 6) { ; the background is a gradient
                ; Determine the brush's width/height
@@ -374,88 +366,88 @@ Class ImageButton {
                H := Mode = 5 ? PathH / 2 : PathH  ; vertical
                ; Create a LineGradientBrush
                This.SetRectF(RECTF, PathX, PathY, W, H)
-               DllCall("Gdiplus.dll\GdipCreateLineBrushFromRect", "Ptr", &RECTF
-                     , "UInt", BkgColor1, "UInt", BkgColor2, "Int", Mode & 1, "Int", 3, "PtrP", PBRUSH)
-               DllCall("Gdiplus.dll\GdipSetLineGammaCorrection", "Ptr", PBRUSH, "Int", 1)
+               DllCall("Gdiplus.dll\GdipCreateLineBrushFromRect", "UPtr", &RECTF
+                     , "UInt", BkgColor1, "UInt", BkgColor2, "Int", Mode & 1, "Int", 3, "UPtr*", PBRUSH)
+               DllCall("Gdiplus.dll\GdipSetLineGammaCorrection", "UPtr", PBRUSH, "Int", 1)
                ; Fill the path
-               DllCall("Gdiplus.dll\GdipFillPath", "Ptr", PGRAPHICS, "Ptr", PBRUSH, "Ptr", PPATH)
+               DllCall("Gdiplus.dll\GdipFillPath", "UPtr", PGRAPHICS, "UPtr", PBRUSH, "UPtr", PPATH)
             }
             Else { ; raised mode
-               DllCall("Gdiplus.dll\GdipCreatePathGradientFromPath", "Ptr", PPATH, "PtrP", PBRUSH)
+               DllCall("Gdiplus.dll\GdipCreatePathGradientFromPath", "UPtr", PPATH, "UPtr*", PBRUSH)
                ; Set Gamma Correction
-               DllCall("Gdiplus.dll\GdipSetPathGradientGammaCorrection", "Ptr", PBRUSH, "UInt", 1)
+               DllCall("Gdiplus.dll\GdipSetPathGradientGammaCorrection", "UPtr", PBRUSH, "UInt", 1)
                ; Set surround and center colors
                VarSetCapacity(ColorArray, 4, 0)
                NumPut(BkgColor1, ColorArray, 0, "UInt")
-               DllCall("Gdiplus.dll\GdipSetPathGradientSurroundColorsWithCount", "Ptr", PBRUSH, "Ptr", &ColorArray
+               DllCall("Gdiplus.dll\GdipSetPathGradientSurroundColorsWithCount", "UPtr", PBRUSH, "UPtr", &ColorArray
                    , "IntP", 1)
-               DllCall("Gdiplus.dll\GdipSetPathGradientCenterColor", "Ptr", PBRUSH, "UInt", BkgColor2)
+               DllCall("Gdiplus.dll\GdipSetPathGradientCenterColor", "UPtr", PBRUSH, "UInt", BkgColor2)
                ; Set the FocusScales
                FS := (BtnH < BtnW ? BtnH : BtnW) / 3
                XScale := (BtnW - FS) / BtnW
                YScale := (BtnH - FS) / BtnH
-               DllCall("Gdiplus.dll\GdipSetPathGradientFocusScales", "Ptr", PBRUSH, "Float", XScale, "Float", YScale)
+               DllCall("Gdiplus.dll\GdipSetPathGradientFocusScales", "UPtr", PBRUSH, "Float", XScale, "Float", YScale)
                ; Fill the path
-               DllCall("Gdiplus.dll\GdipFillPath", "Ptr", PGRAPHICS, "Ptr", PBRUSH, "Ptr", PPATH)
+               DllCall("Gdiplus.dll\GdipFillPath", "UPtr", PGRAPHICS, "UPtr", PBRUSH, "UPtr", PPATH)
             }
             ; Free resources
-            DllCall("Gdiplus.dll\GdipDeleteBrush", "Ptr", PBRUSH)
-            DllCall("Gdiplus.dll\GdipDeletePath", "Ptr", PPATH)
+            DllCall("Gdiplus.dll\GdipDeleteBrush", "UPtr", PBRUSH)
+            DllCall("Gdiplus.dll\GdipDeletePath", "UPtr", PPATH)
          } Else { ; Create a bitmap from HBITMAP or file
             If This.IsInt(Image)
                If (Opt[3] = "HICON")
-                  DllCall("Gdiplus.dll\GdipCreateBitmapFromHICON", "Ptr", Image, "PtrP", PBM)
+                  DllCall("Gdiplus.dll\GdipCreateBitmapFromHICON", "UPtr", Image, "UPtr*", PBM)
                Else
-                  DllCall("Gdiplus.dll\GdipCreateBitmapFromHBITMAP", "Ptr", Image, "Ptr", 0, "PtrP", PBM)
+                  DllCall("Gdiplus.dll\GdipCreateBitmapFromHBITMAP", "UPtr", Image, "UPtr", 0, "UPtr*", PBM)
             Else
-               DllCall("Gdiplus.dll\GdipCreateBitmapFromFile", "WStr", Image, "PtrP", PBM)
+               DllCall("Gdiplus.dll\GdipCreateBitmapFromFile", "WStr", Image, "UPtr*", PBM)
             ; Draw the bitmap
-            DllCall("Gdiplus.dll\GdipDrawImageRectI", "Ptr", PGRAPHICS, "Ptr", PBM, "Int", 0, "Int", 0
+            DllCall("Gdiplus.dll\GdipDrawImageRectI", "UPtr", PGRAPHICS, "UPtr", PBM, "Int", 0, "Int", 0
                   , "Int", BtnW, "Int", BtnH)
             ; Free the bitmap
-            DllCall("Gdiplus.dll\GdipDisposeImage", "Ptr", PBM)
+            DllCall("Gdiplus.dll\GdipDisposeImage", "UPtr", PBM)
          }
          ; -------------------------------------------------------------------------------------------------------------
          ; Draw the caption
          If (BtnCaption <> "") {
             ; Create a StringFormat object
-            DllCall("Gdiplus.dll\GdipStringFormatGetGenericTypographic", "PtrP", HFORMAT)
+            DllCall("Gdiplus.dll\GdipStringFormatGetGenericTypographic", "UPtr*", HFORMAT)
             ; Text color
-            DllCall("Gdiplus.dll\GdipCreateSolidFill", "UInt", TxtColor, "PtrP", PBRUSH)
+            DllCall("Gdiplus.dll\GdipCreateSolidFill", "UInt", TxtColor, "UPtr*", PBRUSH)
             ; Horizontal alignment
             HALIGN := (BtnStyle & BS_CENTER) = BS_CENTER ? SA_CENTER
                     : (BtnStyle & BS_CENTER) = BS_RIGHT  ? SA_RIGHT
                     : (BtnStyle & BS_CENTER) = BS_Left   ? SA_LEFT
                     : SA_CENTER
-            DllCall("Gdiplus.dll\GdipSetStringFormatAlign", "Ptr", HFORMAT, "Int", HALIGN)
+            DllCall("Gdiplus.dll\GdipSetStringFormatAlign", "UPtr", HFORMAT, "Int", HALIGN)
             ; Vertical alignment
             VALIGN := (BtnStyle & BS_VCENTER) = BS_TOP ? 0
                     : (BtnStyle & BS_VCENTER) = BS_BOTTOM ? 2
                     : 1
-            DllCall("Gdiplus.dll\GdipSetStringFormatLineAlign", "Ptr", HFORMAT, "Int", VALIGN)
+            DllCall("Gdiplus.dll\GdipSetStringFormatLineAlign", "UPtr", HFORMAT, "Int", VALIGN)
             DllCall("gdiplus\GdipSetStringFormatHotkeyPrefix", "UPtr", HFORMAT, "uint", 1)
              ; Set render quality to system default
-            DllCall("Gdiplus.dll\GdipSetTextRenderingHint", "Ptr", PGRAPHICS, "Int", 0)
+            DllCall("Gdiplus.dll\GdipSetTextRenderingHint", "UPtr", PGRAPHICS, "Int", 0)
             ; Set the text's rectangle
             VarSetCapacity(RECT, 16, 0)
             NumPut(BtnW, RECT,  8, "Float")
             NumPut(BtnH, RECT, 12, "Float")
             ; Draw the text
-            DllCall("Gdiplus.dll\GdipDrawString", "Ptr", PGRAPHICS, "WStr", BtnCaption, "Int", -1
-                  , "Ptr", PFONT, "Ptr", &RECT, "Ptr", HFORMAT, "Ptr", PBRUSH)
+            DllCall("Gdiplus.dll\GdipDrawString", "UPtr", PGRAPHICS, "WStr", BtnCaption, "Int", -1
+                  , "UPtr", PFONT, "UPtr", &RECT, "UPtr", HFORMAT, "UPtr", PBRUSH)
          }
          ; -------------------------------------------------------------------------------------------------------------
          ; Create a HBITMAP handle from the bitmap and add it to the array
-         DllCall("Gdiplus.dll\GdipCreateHBITMAPFromBitmap", "Ptr", PBITMAP, "PtrP", HBITMAP, "UInt", 0X00FFFFFF)
+         DllCall("Gdiplus.dll\GdipCreateHBITMAPFromBitmap", "UPtr", PBITMAP, "UPtr*", HBITMAP, "UInt", 0X00FFFFFF)
          This.BitMaps[Idx] := HBITMAP
          ; Free resources
-         DllCall("Gdiplus.dll\GdipDeleteBrush", "Ptr", PBRUSH)
-         DllCall("Gdiplus.dll\GdipDeleteStringFormat", "Ptr", HFORMAT)
+         DllCall("Gdiplus.dll\GdipDeleteBrush", "UPtr", PBRUSH)
+         DllCall("Gdiplus.dll\GdipDeleteStringFormat", "UPtr", HFORMAT)
       }
       ; Now free remaining the GDI+ objects
-      DllCall("Gdiplus.dll\GdipDisposeImage", "Ptr", PBITMAP)
-      DllCall("Gdiplus.dll\GdipDeleteGraphics", "Ptr", PGRAPHICS)
-      DllCall("Gdiplus.dll\GdipDeleteFont", "Ptr", PFONT)
+      DllCall("Gdiplus.dll\GdipDisposeImage", "UPtr", PBITMAP)
+      DllCall("Gdiplus.dll\GdipDeleteGraphics", "UPtr", PGRAPHICS)
+      DllCall("Gdiplus.dll\GdipDeleteFont", "UPtr", PFONT)
       This.Delete("Bitmap")
       This.Delete("Graphics")
       This.Delete("Font")
@@ -465,26 +457,24 @@ Class ImageButton {
                    , "UInt", BtnW, "UInt", BtnH, "UInt", ILC_COLOR32, "Int", 6, "Int", 0, "Ptr")
       Loop, % (This.BitMaps.MaxIndex() > 1 ? 6 : 1) {
          HBITMAP := This.BitMaps.HasKey(A_Index) ? This.BitMaps[A_Index] : This.BitMaps.1
-         DllCall("Comctl32.dll\ImageList_Add", "Ptr", HIL, "Ptr", HBITMAP, "Ptr", 0)
+         DllCall("Comctl32.dll\ImageList_Add", "UPtr", HIL, "UPtr", HBITMAP, "UPtr", 0)
       }
       ; Create a BUTTON_IMAGELIST structure
       VarSetCapacity(BIL, 20 + A_PtrSize, 0)
       ; Get the currently assigned image list
-      DllCall("User32.dll\SendMessage", "Ptr", HWND, "UInt", BCM_GETIMAGELIST, "Ptr", 0, "Ptr", &BIL)
+      DllCall("User32.dll\SendMessage", "UPtr", HWND, "UInt", BCM_GETIMAGELIST, "UPtr", 0, "UPtr", &BIL)
       IL := NumGet(BIL, "UPtr")
       ; Create a new BUTTON_IMAGELIST structure
       VarSetCapacity(BIL, 20 + A_PtrSize, 0)
-      NumPut(HIL, BIL, 0, "Ptr")
-      Numput(BUTTON_IMAGELIST_ALIGN_CENTER, BIL, A_PtrSize + 16, "UInt")
-      ; Hide buttons's caption
-      ControlSetText, , , ahk_id %HWND%
+      NumPut(HIL, BIL, 0, "UPtr")
+      NumPut(BUTTON_IMAGELIST_ALIGN_CENTER, BIL, A_PtrSize + 16, "UInt")
       Control, Style, +%BS_BITMAP%, , ahk_id %HWND%
       ; Remove the currently assigned image list, if any
-      If(IL)
+      If (IL)
          IL_Destroy(IL)
       ; Assign the ImageList to the button
-      DllCall("User32.dll\SendMessage", "Ptr", HWND, "UInt", BCM_SETIMAGELIST, "Ptr", 0, "Ptr", 0)
-      DllCall("User32.dll\SendMessage", "Ptr", HWND, "UInt", BCM_SETIMAGELIST, "Ptr", 0, "Ptr", &BIL)
+      DllCall("User32.dll\SendMessage", "UPtr", HWND, "UInt", BCM_SETIMAGELIST, "UPtr", 0, "UPtr", 0)
+      DllCall("User32.dll\SendMessage", "UPtr", HWND, "UInt", BCM_SETIMAGELIST, "UPtr", 0, "UPtr", &BIL)
       ; Free the bitmaps
       This.FreeBitmaps()
       ; ----------------------------------------------------------------------------------------------------------------
