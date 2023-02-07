@@ -20,6 +20,7 @@
 
 <p><a href="https://www.youtube.com/watch?v=Q-_tBX-a8ko">Video showing file management capabilities.</a></p>
 <p><a href="https://www.youtube.com/watch?v=YneYL1TXXtg">Image painting time-lapse. The video shows the image editing capabilities.</a></p>
+<p><a href="https://www.youtube.com/playlist?list=PLlfQlmy-i21bWEoFJKKH2dBZvt0yabRBV">YouTube playlist with more videos.</a></p>
 
 <p width="600" height="410"><img width="600" height="410" alt="Quick Picture Viewer - thumbnails list screenshot" src="https://marius.sucan.ro/media/files/blog/ahk-scripts/images/qpv-screenshot1.jpg"></p>
 

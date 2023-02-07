@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.8.6
+;@Ahk2Exe-SetVersion 5.8.7
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2023)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -211,7 +211,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , cmdExifTool := "", tabzDarkModus := 0, maxRecentOpenedFolders := 15, UIuserToneMapParamA := 38, UIuserToneMapParamB := 100
    , userImgChannelRlvl, userImgChannelGlvl, userImgChannelBlvl, userImgChannelAlvl, combosDarkModus := ""
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.8.6", vReleaseDate := "2023/02/02" ; yyyy-mm-dd
+   , appVersion := "5.8.7", vReleaseDate := "2023/02/07" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -343,6 +343,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , DrawLineAreaAtomizedGrid := 1, DrawLineAreaEqualGrid := 1, DrawLineAreaAltRays := 0
    , DrawLineAreaGridCenter := 2, DrawLineAreaCropShape := 1, OutlierFillColor := "eeFFaa"
    , OutlierFillOpacity := 200, alphaMaskBMPbright := 0, alphaMaskBMPcontrast := 0, FillAreaWelcomePattern := 1
+   , toolbarViewerMode := 1, userCustomizedToolbar := 0, userThumbsToolbarList, userImgViewToolbarList
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -759,20 +760,20 @@ KeyboardResponder(givenKey, thisWin, abusive) {
           displayNowToolbarHelp(1)
        } Else If isVarEqualTo(givenKey, "Left", "BackSpace", "Up")
        {
-          moveMouseToolbar(-1, 1)
+          KeyboardMoveMouseToolbar(-1, 1)
        } Else If isVarEqualTo(givenKey, "Right", "Delete", "Down")
        {
-          moveMouseToolbar(1, 1)
+          KeyboardMoveMouseToolbar(1, 1)
        } Else If (givenKey="PgUp")
        {
-          moveMouseToolbar(-1, 4)
+          KeyboardMoveMouseToolbar(-1, 4)
        } Else If (givenKey="Home")
        {
           currentKbdBTNtlbr := 0
-          moveMouseToolbar(1, 1)
+          KeyboardMoveMouseToolbar(1, 1)
        } Else If (givenKey="PgDn" || givenKey="End")
        {
-          moveMouseToolbar(1, 4)
+          KeyboardMoveMouseToolbar(1, 4)
        } Else If (givenKey="Space" || givenKey="Enter")
        {
           invokeKbdToolbarAct(0)
@@ -783,7 +784,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
        {
           currentKbdBTNtlbr := 0
           v := givenKey ? givenKey : 10
-          moveMouseToolbar(1, v)
+          KeyboardMoveMouseToolbar(1, v)
        }
    } Else If (thisWin=PVhwnd && identifyThisWin()=1)
    {
@@ -1414,15 +1415,17 @@ KeyboardResponder(givenKey, thisWin, abusive) {
              changeLittleImgRotationInVP(1)
        } Else If (givenKey="Up" || givenKey="+Up")
        {
+          okayu :=  (thumbsDisplaying=1 || undoLevelsRecorded<2) ? 1 : 0
           If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
              PanIMGonScreen("U", givenKey)
-          Else If HKifs("imgsLoaded")
+          Else If (HKifs("imgsLoaded") && okayu=1)
              ThumbsNavigator("Upu", givenKey)
        } Else If (givenKey="Down" || givenKey="+Down")
        {
+          okayu :=  (thumbsDisplaying=1 || undoLevelsRecorded<2) ? 1 : 0
           If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
              PanIMGonScreen("D", givenKey)
-          Else If HKifs("imgsLoaded")
+          Else If (HKifs("imgsLoaded") && okayu=1)
              ThumbsNavigator("Down", givenKey)
        } Else If (givenKey="^WheelUp")
        {
@@ -1560,7 +1563,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
           {
              isToolbarKBDnav := 1
              WinActivate, ahk_id %hQPVtoolbar%
-             ; moveMouseToolbar(1, 1)
+             ; KeyboardMoveMouseToolbar(1, 1)
              displayNowToolbarHelp(2)
           }
        } Else If (givenKey="^Tab")
@@ -1673,18 +1676,11 @@ KeyboardResponder(givenKey, thisWin, abusive) {
        } Else If (givenKey="t")
        {
           If (liveDrawingBrushTool=1)
-          {
              toggleBrushAirMode()
-          } Else If (isImgEditingNow()=1 && drawingShapeNow=1)
-          {
+          Else If (isImgEditingNow()=1 && drawingShapeNow=1)
              togglePathCurveTension()
-          } Else If HKifs("imgsLoaded")
-          {
-             If (thumbsDisplaying=1)
-                ToggleThumbsAratio()
-             Else
-                ToggleImageSizingMode()
-          }
+          Else If HKifs("imgsLoaded")
+             ToggleImageSizingMode()
        } Else If (givenKey="+Space")
        {
           If HKifs("imgsLoaded")
@@ -1713,14 +1709,16 @@ KeyboardResponder(givenKey, thisWin, abusive) {
             PrevRandyPicture()
        } Else If (givenKey="+BackSpace")
        {
-          If HKifs("imgsLoaded")
+          okayu := (thumbsDisplaying=1 || undoLevelsRecorded<2) ? 1 : 0
+          If (HKifs("imgsLoaded") && okayu=1)
           {
              resetSlideshowTimer()
              RandomPicture()
           }
        } Else If (givenKey="^BackSpace")
        {
-          If HKifs("imgsLoaded")
+          okayu := (thumbsDisplaying=1 || undoLevelsRecorded<2) ? 1 : 0
+          If (HKifs("imgsLoaded") && okayu=1)
              jumpPreviousImage()
        } Else If (givenKey="!period")
        {
@@ -1891,10 +1889,11 @@ KeyboardResponder(givenKey, thisWin, abusive) {
                 PanIMGonScreen("R", givenKey)
              } Else
              {
+                okayu := (thumbsDisplaying=1 || undoLevelsRecorded<2) ? 1 : 0
                 resetSlideshowTimer()
                 If (thumbsDisplaying=1)
                    ThumbsNavigator("Right", givenKey)
-                Else
+                Else If (okayu=1)
                    NextPicture("key-" givenKey)
             }
           } Else If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
@@ -1908,10 +1907,11 @@ KeyboardResponder(givenKey, thisWin, abusive) {
                 PanIMGonScreen("L", givenKey)
              } Else
              {
+                okayu := (thumbsDisplaying=1 || undoLevelsRecorded<2) ? 1 : 0
                 resetSlideshowTimer()
                 If (thumbsDisplaying=1)
                    ThumbsNavigator("Left", givenKey)
-                Else
+                Else If (okayu=1)
                    PreviousPicture("key-" givenKey)
             }
           } Else If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
@@ -3629,8 +3629,19 @@ dummyViewAlphaMaskNow() {
    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
    setMainCanvasTransform(mainWidth, mainHeight, 2NDglPG)
    toolTipGuiCreated := 2
+   If (AnyWindowOpen=66 && editingSelectionNow!=1)
+   {
+      restoreThis := 1
+      opa := BrushToolOutsideSelection
+      editingSelectionNow := BrushToolOutsideSelection := 1
+   }
    SkeletDrawSelectionBox(1)
    Gdip_ResetWorldTransform(2NDglPG)
+   If (restoreThis=1)
+   {
+      editingSelectionNow := 0
+      BrushToolOutsideSelection := opa
+   }
    lastOSDtooltipInvoked := A_TickCount
    toolTipGuiCreated := 2
 }
@@ -4007,7 +4018,7 @@ FirstPicture() {
    If StrLen(mustOpenStartFolder)>3
       currentFileIndex := doOpenStartFolder()
 
-   If (maxFilesIndex>1 && currentFileIndex!=1)
+   If (maxFilesIndex>1 && currentFileIndex!=1 && thumbsDisplaying!=1)
    {
       If askAboutFileSave(" and another image will be loaded")
          Return
@@ -4025,7 +4036,7 @@ LastPicture() {
    If StrLen(mustOpenStartFolder)>3
       currentFileIndex := doOpenStartFolder()
 
-   If (maxFilesIndex>1 && currentFileIndex!=maxFilesIndex)
+   If (maxFilesIndex>1 && currentFileIndex!=maxFilesIndex && thumbsDisplaying!=1)
    {
       If askAboutFileSave(" and another image will be loaded")
          Return
@@ -4370,8 +4381,11 @@ ToggleThumbsMode() {
       RemoveTooltip()
       lastTimeToggleThumbs := A_TickCount
    }
+
    SetTimer, createGUItoolbar, -125
    SetTimer, TriggerMenuBarUpdate, -90
+   If (ShowAdvToolbar=1)
+      updateTlbrColorsSwatch()
    lastInvoked := A_TickCount
 }
 
@@ -8743,6 +8757,12 @@ ToggleImageSizingMode(modus:=0) {
     Static lastInvoked := 1
     If (A_TickCount - lastInvoked < 50)
        Return
+
+    If (thumbsDisplaying=1)
+    {
+       ToggleThumbsAratio()
+       Return
+    }
 
     o_friendly := DefineImgSizing()
     If (drawingShapeNow=1)
@@ -13501,6 +13521,7 @@ mergeViewPortEffectsImgEditing(funcu:=0, recordUndoAfter:=1, applyOnArea:=0, all
        Return 1
     }
 
+    userPrivateMode := 0
     If (editingSelectionNow=1)
     {
        If testSelectOutsideImgEntirely(whichBitmap)
@@ -17873,12 +17894,16 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
     {
        showTOOLtip("Retrieving clipboard, please wait")
        If PasteHDropFiles(1)
+       {
+          ResetImgLoadStatus()
+          SetTimer, RemoveTooltip, -500
           Return
+       }
 
        clipBMP := corePasteClipboardImg(1, ResolutionWidth*2, Round(ResolutionHeight*4.3), 1)
     }
 
-    If !clipBMP
+    If StrLen(clipBMP)<3
     {
        ResetImgLoadStatus()
        SetTimer, RemoveTooltip, -500
@@ -17908,7 +17933,7 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
        labelu := (modus="scanner") ? "WIA-Acquired-" : "Clipboard-"
        resultedFilesList[currentFileIndex, 1] := "\Temporary Memory Object\" labelu "-" clippyCount ".img"
     }
-    
+
     If (modus!="scanner")
     {
        currIMGdetails.HasAlpha := 1
@@ -19597,6 +19622,17 @@ UIeditHammingInterpolation() {
 }
 
 PanelWrapperFilesStats() {
+    If StrLen(mustOpenStartFolder)>3
+       currentFileIndex := doOpenStartFolder()
+
+    If (maxFilesIndex<3 && !filesFilter)
+    {
+       showTOOLtip("WARNING: Insufficient files are currently indexed.")
+       SoundBeep , 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
+
     thisBtnHeight := createSettingsGUI(58, A_ThisFunc)
     btnWid := 105
     txtWid := 370
@@ -24013,9 +24049,8 @@ InitialFilterSettingsPanel(modus) {
 
 PanelEnableFilesFilter() {
     Global FilterTypeu := 0
-
-    If (maxFilesIndex<3 && !filesFilter)
-       Return
+    If StrLen(mustOpenStartFolder)>3
+       currentFileIndex := doOpenStartFolder()
 
     If (testIsDupesList() && InStr(resultedFilesList[currentFileIndex, 23], "_"))
     {
@@ -24023,6 +24058,14 @@ PanelEnableFilesFilter() {
        ; SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
        SetTimer, PanelChangeHamDistThreshold, -50
+       Return
+    }
+
+    If (maxFilesIndex<3 && !filesFilter)
+    {
+       showTOOLtip("WARNING: Insufficient files are currently indexed.")
+       SoundBeep , 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
        Return
     }
 
@@ -27350,40 +27393,6 @@ calcLhashAlgo(pixArray) {
     }
 
     Return hashu
-}
-
-flipImgArray(arrayChars, b) {
-   newArray := []
-   allIndex := 0
-   If (b=0)
-   {
-      size := 1024
-      Loop, % size
-      {
-         mindex := A_Index 
-         Loop, % size
-         {
-            allIndex++
-            thisIndex := mindex*size - A_Index + 1
-            newArray[allIndex] := arrayChars[thisIndex]
-            ; fnOutputDebug(allIndex "==" thisIndex)
-         }
-      }
-   } Else
-   {
-      Loop, 8
-      {
-         mindex := A_Index 
-         Loop, 9
-         {
-            allIndex++
-            thisIndex := mindex*8 - A_Index + mindex + 1
-            newArray[allIndex] := arrayChars[thisIndex]
-            ; fnOutputDebug(allIndex "==" thisIndex)
-         }
-      }
-   }
-   Return newArray
 }
 
 discretizeValue(valu, levelu) {
@@ -32555,6 +32564,13 @@ MenuDecGIFspeed() {
 buildQuickSearchMenus() {
    mustPreventMenus := 1
    BuildMainMenu("forced")
+   If (ShowAdvToolbar=1)
+   {
+      kMenu("PVmenu", "Add/Uncheck", "Show toolbar tooltips", "ToggleToolBarToolTips")
+      If (ShowToolTipsToolbar=1)
+         kMenu("PVmenu", "Check", "Show toolbar tooltips")
+   }
+
    If (imgEditPanelOpened=1)
    {
       kMenu("PVmenu", "Add/Uncheck", "Dar&k mode", "ToggleDarkModus", "disability handicap eyes eyesight black display")
@@ -34481,10 +34497,8 @@ PanelBrushTool(dummy:=0, modus:=0) {
     }
 
     slideWid2 := slideWid//2
-    Global infoBrushAopacity, infoBrushBopacity, infoBrushSize, infoBrushAngle, infoBrushDrying, infoBrushBlurel
-    , infoBrushAspectRatio, infoBrushSoftness, infoBrushWetness, PickuBrushToolAcolor, PickuBrushToolBcolor
-    , infoBrushStepping, UIbtnBrushColorA, UIbtnBrushColorB, uiBtnSetCloner
-    , infoSymmetryLabel, BTNuiSetLabelSymmetry
+    Global PickuBrushToolAcolor, PickuBrushToolBcolor, UIbtnBrushColorA, UIbtnBrushColorB, uiBtnSetCloner
+         , infoSymmetryLabel, BTNuiSetLabelSymmetry
 
     ReadSettingsBrushPanel()
     FloodFillSelectionAdj := 0
@@ -34542,7 +34556,6 @@ PanelBrushTool(dummy:=0, modus:=0) {
     GuiAddSlider("BrushToolBopacity", 2,255, 255, "Opacity", "updateUIbrushTool", 1, "x+5 w" opaciSlideW " hp")
     Gui, Add, Checkbox, x+5 hp wp gupdateUIbrushTool Checked%brushToolDoubleSize% vbrushToolDoubleSize, Size × 2
 
-    ; Gui, Add, Text, xs y+15 w%slideWid2% vinfoBrushSize, Size: %BrushToolSize%
     GuiAddSlider("BrushToolSize", 2,950, 25, "Brush size: $€", "updateUIbrushTool", 1, "xs y+15 w" slideWid " hp")
     GuiAddSlider("BrushToolStepping", 0,251, 0, ".updateLabelBrushStep", "updateUIbrushTool", 1, "x+10 wp hp")
     GuiAddSlider("BrushToolAspectRatio", -100,100, 0, "Aspect ratio", "updateUIbrushTool", 2, "xs y+10 wp hp")
@@ -34768,7 +34781,8 @@ updateTlbrColorsSwatch() {
    thisHwnd := tlbrIconzList["BTNcolorsSwatch", 1]
    w := tlbrIconzList[thisHwnd, 7]
    h := tlbrIconzList[thisHwnd, 8]
-   tlbrSetImageIcon("colorz-swatch", thisHwnd, W, H)
+   If thisHwnd
+      tlbrSetImageIcon("colorz-swatch", thisHwnd, W, H)
 }
 
 distanceBetweenTwoPoints(x1, y1, x2, y2) {
@@ -34851,7 +34865,11 @@ BtnResetGradientCenter() {
    {
       showTOOLtip("Alpha mask gradient center was reset")
       alphaMaskOffsetX := alphaMaskOffsetY := 0
-      SetTimer, updateUIpastePanel, -150
+      If (imgEditPanelOpened=1 && AnyWindowOpen>0)
+      {
+         livePreviewsImageEditing()
+         UItriggerBrushUpdate()
+      }
       SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 }
@@ -35306,6 +35324,16 @@ BtnChangeHamDistThreshold() {
 
 PanelSearchAndReplaceIndex() {
     Global editF5, editF6, performSRinSeenDB, performSRinDynas
+    If StrLen(mustOpenStartFolder)>3
+       currentFileIndex := doOpenStartFolder()
+
+    If (maxFilesIndex<3 && !filesFilter)
+    {
+       showTOOLtip("WARNING: Insufficient files are currently indexed.")
+       SoundBeep , 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
 
     getSelectedFiles(0, 1)
     thisBtnHeight := createSettingsGUI(56, A_ThisFunc)
@@ -36460,6 +36488,12 @@ updateUIalphaMaskStuff(tabu) {
        uiSlidersArray["alphaMaskClrAintensity", 5] := (alphaMaskingMode=6) ? "Blur strength" : "Intensity A"
        uiSlidersArray["alphaMaskClrBintensity", 5] := (alphaMaskingMode=6) ? ".updateLabelMaskCurvePath" : "Intensity B"
 
+       actu := isInRange(alphaMaskingMode, 2, 4) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+       GuiControl, % actu, infoAlphaMaskGradientView
+       GuiControl, % actu, UIresetAlphaCenter
+       If InStr(actu, "show")
+          updateUIgradientPreviewAlphaMask(1)
+
        actu := (alphaMaskingMode=5 && alphaMaskRefBMP=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
        GuiControl, % actu, UIremAlpha
 
@@ -36543,13 +36577,15 @@ updateUIgradientPreviewAlphaMask(modus) {
    {
       thisColorA := Gdip_ToARGB("0xFF", alphaMaskClrAintensity, alphaMaskClrAintensity, alphaMaskClrAintensity)
       thisColorB := Gdip_ToARGB("0xFF", alphaMaskClrBintensity, alphaMaskClrBintensity, alphaMaskClrBintensity)
+      If (alphaMaskColorReversed=1)
+         flipVars(thisColorA, thisColorB)
    } else
    {
       thisColorA := makeRGBAcolor(FillAreaColor, FillAreaOpacity)
       thisColorB := makeRGBAcolor(FillArea2ndColor, FillArea2ndOpacity)
+      If (FillAreaColorReversed=1)
+         flipVars(thisColorA, thisColorB)
    }
-   If (FillAreaColorReversed=1)
-      flipVars(thisColorA, thisColorB)
 
    G := ""
    newBitmap := Gdip_CreateBitmap(rImgW, rImgH, "0xE200B")
@@ -36709,6 +36745,30 @@ importAlphaMaskGivenImageFile() {
    zBitmap := LoadBitmapFromFileu(imgPath)
    SetImageAsAlphaMask("yes-bitmap", zBitmap)
    trGdip_DisposeImage(zBitmap)
+}
+
+importAlphaMaskFromClipboard() {
+    setImageLoading()
+    changeMcursor()
+    calcScreenLimits()
+    showTOOLtip("Retrieving clipboard, please wait")
+    If PasteHDropFiles(1)
+    {
+       ResetImgLoadStatus()
+       SetTimer, RemoveTooltip, -500
+       Return
+    }
+
+    clipBMP := corePasteClipboardImg(1, ResolutionWidth*2, Round(ResolutionHeight*4.3), 1)
+    If StrLen(clipBMP)<3
+    {
+       ResetImgLoadStatus()
+       SetTimer, RemoveTooltip, -500
+       Return
+    }
+
+   SetImageAsAlphaMask("yes-bitmap", clipBMP)
+   trGdip_DisposeImage(clipBMP)
 }
 
 ReadSettingsPasteInPlace(act:=0) {
@@ -38203,6 +38263,14 @@ decideCustomShapeStyle() {
 }
 
 togglePathCurveTension() {
+   If (EllipseSelectMode!=2 || editingSelectionNow!=1)
+   {
+      showTOOLtip("WARNING: Please activate or create a freeform path.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
    FillAreaCurveTension := clampInRange(FillAreaCurveTension + 1, 1, 5, 1)
    decideCustomShapeStyle()
    If (FillAreaCurveTension=1)
@@ -39067,7 +39135,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     Gui, Add, ListView, x+5 hp w%sml% %CCLVO% Background%FillAreaColor% vFillAreaColor,
     GuiAddSlider("FillAreaOpacity", 3,255, 255, "Opacity", "updateUIfillPanel", 1, "x+5 w" wml " hp")
     kak := Round(ha*2.2), kuk := (PrefsLargeFonts=1) ? sml*2 - 13 : sml*2 - 7
-    Gui, Add, Text, xp+%kuk% yp w%kak% h%kak% -Border +0xE gPanelsPanIMGpreviewClick vinfoFillAreaGradientView +hwndhGradientFillpreview, Gradient preview
+    Gui, Add, Text, xp+%kuk% yp w%kak% h%kak% -Border +0xE ggradientsPreviewResponder vinfoFillAreaGradientView +hwndhGradientFillpreview, Gradient preview
     ToolTip2ctrl(hGradientFillpreview, "Click and drag to adjust the gradient center.")
 
     kak := ha + 5
@@ -39221,6 +39289,8 @@ BTNopenPrevPanel(givenZZ:=0, isGiven:=0, morrigan:=0) {
       f := "PanelSoloAlphaMasker"
    Else If (zz=74)
       f := "PanelColorsAdjusterImage"
+   Else If (zz=81)
+      f := "PanelSymmetricaImage"
 
    If f 
       SetTimer, % f, -100
@@ -42086,72 +42156,83 @@ updateUIblurPanel(a:=0,b:=0) {
     SetTimer, WriteSettingsBlurPanel, -300
 }
 
+gradientsPreviewResponder(thisHwnd:=0) {
+   keysState := (GetKeyState("Shift", "P") || GetKeyState("Ctrl", "P")) ? 1 : 0
+   If (thisHwnd=hCropCornersPic && AnyWindowOpen=64)
+      winOpen := 64
+   Else If (thisHwnd=hGradientFillpreview && AnyWindowOpen=23)
+      winOpen := 23
+   Else If (thisHwnd=hGradientAlphaMSKpreview && isAlphaMaskWindow())
+      winOpen := "x"
+   Else
+      Return
+
+   GetPhysicalCursorPos(zX, zY)
+   setwhileLoopExec(1)
+   varXvalue := (winOpen!=23) ? alphaMaskOffsetX : clrGradientOffX
+   varYvalue := (winOpen!=23) ? alphaMaskOffsetY : clrGradientOffY
+   WinGetPos, , , W, H, ahk_id %thisHwnd%
+   px := w, py := ph
+   w *=2, h *= 2
+   While, (determineLClickstate()=1)
+   {
+      Sleep, 1
+      If !keysState
+         keysState := (GetKeyState("Shift", "P") || GetKeyState("Ctrl", "P")) ? 1 : 0
+
+      GetPhysicalCursorPos(mX, mY)
+      If (isInRange(mX, zX - 2, zX + 2) && isInRange(mY, zY - 2, zY + 2))
+         Continue
+
+      GetMouseCoord2wind(thisHwnd, nX, nY)
+      Sleep, 1
+      varXvalue := clampInRange( Round( (nX / w) * 2, 4) , 0, 2) - 1
+      varYvalue := clampInRange( Round( (nY / h) * 2, 4) , 0, 2) - 1
+      If (winOpen=23)
+      {
+         varXvalue := clrGradientOffX := clampInRange(varXvalue, -0.9, 0.9)
+         varYvalue := clrGradientOffY := clampInRange(varYvalue, -0.9, 0.9)
+      } Else
+      {
+         varXvalue := alphaMaskOffsetX := clampInRange(varXvalue, -0.9, 0.9)
+         varYvalue := alphaMaskOffsetY := clampInRange(varYvalue, -0.9, 0.9)
+      }
+
+      zX := mX, zY := mY
+      Sleep, 2
+      If (winOpen=64)
+      {
+         createLivePreviewBrush()
+      } Else 
+      {
+         livePreviewsImageEditing()
+         zz := (winOpen=23) ? 0 : 1
+         updateUIgradientPreviewAlphaMask(zz)
+      }
+   }
+
+   setwhileLoopExec(0)
+   ; ToolTip, % vPosX "==" vPosY "`n" alphaMaskOffsetX "==" alphaMaskOffsetY , , , 2
+   If (keysState=1 && winOpen=23)
+      clrGradientOffX := clrGradientOffY := 0
+   Else If (keysState=1)
+      alphaMaskOffsetX := alphaMaskOffsetY := 0
+
+   zz := (winOpen=23) ? 0 : 1
+   If (winOpen=64)
+      SetTimer, updateUIbrushTool, -150
+   Else
+      updateUIgradientPreviewAlphaMask(zz)
+}
+
 PanelsLivePreviewResponder(a, b, c) {
    ; ToolTip, % a "=" b "=" c , , , 2
    SetTimer, PanelsPanIMGpreviewClick, -15
 }
 
-PanelsPanIMGpreviewClick() {
+PanelsPanIMGpreviewClick(a:=0) {
    Static noPreview := 0
    keysState := (GetKeyState("Shift", "P") || GetKeyState("Ctrl", "P")) ? 1 : 0
-   If ((AnyWindowOpen=64 && (BrushToolType=2 || BrushToolType=4)) || (AnyWindowOpen=23))
-   {
-      thisHwnd := (AnyWindowOpen=64) ? hCropCornersPic : hGradientFillpreview
-      GetPhysicalCursorPos(zX, zY)
-      setwhileLoopExec(1)
-      varXvalue := (AnyWindowOpen=64) ? alphaMaskOffsetX : clrGradientOffX
-      varYvalue := (AnyWindowOpen=64) ? alphaMaskOffsetY : clrGradientOffY
-      WinGetPos, , , W, H, ahk_id %thisHwnd%
-      px := w, py := ph
-      w *=2, h *= 2
-      While, (determineLClickstate()=1)
-      {
-         Sleep, 1
-         If !keysState
-            keysState := (GetKeyState("Shift", "P") || GetKeyState("Ctrl", "P")) ? 1 : 0
-
-         GetPhysicalCursorPos(mX, mY)
-         If (isInRange(mX, zX - 2, zX + 2) && isInRange(mY, zY - 2, zY + 2))
-            Continue
-
-         GetMouseCoord2wind(thisHwnd, nX, nY)
-         Sleep, 1
-         varXvalue := clampInRange( Round( (nX / w) * 2, 4) , 0, 2) - 1
-         varYvalue := clampInRange( Round( (nY / h) * 2, 4) , 0, 2) - 1
-         If (AnyWindowOpen=23)
-         {
-            varXvalue := clrGradientOffX := clampInRange(varXvalue, -0.9, 0.9)
-            varYvalue := clrGradientOffY := clampInRange(varYvalue, -0.9, 0.9)
-         } Else
-         {
-            varXvalue := alphaMaskOffsetX := clampInRange(varXvalue, -0.9, 0.9)
-            varYvalue := alphaMaskOffsetY := clampInRange(varYvalue, -0.9, 0.9)
-         }
-
-         zX := mX, zY := mY
-         Sleep, 2
-         If (AnyWindowOpen=64)
-         {
-            createLivePreviewBrush()
-         } Else If (AnyWindowOpen=23)
-         {
-            livePreviewsImageEditing()
-            updateUIgradientPreviewAlphaMask(0)
-         }
-      }
-
-      setwhileLoopExec(0)
-      ; ToolTip, % vPosX "==" vPosY "`n" alphaMaskOffsetX "==" alphaMaskOffsetY , , , 2
-      If (keysState=1 && AnyWindowOpen=64)
-         alphaMaskOffsetX := alphaMaskOffsetY := 0
-      Else If (keysState=1 && AnyWindowOpen=23)
-         clrGradientOffX := clrGradientOffY := 0
-
-      If (AnyWindowOpen=64)
-         SetTimer, updateUIbrushTool, -150
-      Return
-   }
-
    If (AnyWindowOpen=64 && !(BrushToolType=3 || BrushToolType=5))
       Return
 
@@ -43739,7 +43820,7 @@ PanelInsertTextArea() {
 }
 
 uiADDalphaMaskTabs(t1, t2, labelu) {
-    Global uiPasteInPlaceAlphaDrawMode, UIviewAlpha
+    Global uiPasteInPlaceAlphaDrawMode, UIviewAlpha, infoAlphaMaskGradientView, UIresetAlphaCenter
     btnWid := 90,  txtWid := 310
     EditWid := 60, slideWid := 150
 
@@ -43774,13 +43855,19 @@ uiADDalphaMaskTabs(t1, t2, labelu) {
     GuiAddSlider("alphaMaskGradientPosA", 0,200, 0, "Position A", labelu, 3, "xs y+10 Section wp hp")
     GuiAddSlider("alphaMaskGradientPosB", 0,200, 200, "Position B", labelu, 3, "x+5 wp hp")
 
+    ha := (PrefsLargeFonts=1) ? 27 : 18
+    kak := Round(ha*2.2)
     Gui, Add, Text, xs ys+2 vinfoAlphaFile, Alpha mask bitmap:
-    Gui, Add, DropDownList, %combosDarkModus% xs y+10 w%txtWid2% g%labelu% AltSubmit valphaMaskRefBMP Choose%alphaMaskRefBMP%, % (transformTool=1) ? "User painted bitmap|Main image|Transformed object" : "User painted bitmap|Main image"
+    Gui, Add, DropDownList, %combosDarkModus% xs y+10 Section w%txtWid2% g%labelu% AltSubmit valphaMaskRefBMP Choose%alphaMaskRefBMP%, % (transformTool=1) ? "User painted bitmap|Main image|Transformed object" : "User painted bitmap|Main image"
     Gui, Add, DropDownList, %combosDarkModus% x+5 wp-95 AltSubmit Choose%alphaMaskBMPchannel% valphaMaskBMPchannel g%labelu% +hwndhTemp, Red|Green|Blue|Alpha|All gray
     ToolTip2ctrl(hTemp, "Which channel to use from the bitmap as the alpha mask")
     Gui, Add, Button, x+5 w%sml% hp vUIremAlpha +hwndhtemp gdiscardUserPaintedAlpha, &X
     ToolTip2ctrl(hTemp, "Destroy the user painted bitmap")
-    Gui, Add, Checkbox, xs y+15 w%txtWid2% hp Checked%alphaMaskColorReversed% valphaMaskColorReversed g%labelu%, Invert mas&k
+    Gui, Add, Text, xs ys+5 w%kak% h%kak% -Border +0xE ggradientsPreviewResponder vinfoAlphaMaskGradientView +hwndhGradientAlphaMSKpreview, Alpha mask gradient preview
+    ToolTip2ctrl(hGradientAlphaMSKpreview, "Click and drag to adjust the gradient center.")
+    Gui, Add, Button, x+10 h%ha% vUIresetAlphaCenter gBtnResetGradientCenter, &Reset gradient center
+    kak := Round(ha*1.5)
+    Gui, Add, Checkbox, xs y+%kak% w%txtWid2% Checked%alphaMaskColorReversed% valphaMaskColorReversed g%labelu%, Invert mas&k
     Gui, Add, Checkbox, x+0 hp Checked%alphaMaskReplaceMode% valphaMaskReplaceMode g%labelu% +hwndhTemp, &Replace alpha channel
     ToolTip2ctrl(hTemp, "When this is checked, users can restore partially transparent pixels")
 
@@ -43809,7 +43896,6 @@ uiADDalphaMaskTabs(t1, t2, labelu) {
     ToolTip2ctrl(hBtnTglClrB, "Toggle active color")
     ToolTip2ctrl(hBtnPickClrB, "Pick color B from the viewport")
 
-    ; Gui, Add, Text, xs y+15 w%slideWid2% vinfoBrushSize, Size: %BrushToolSize%
     GuiAddSlider("BrushToolSize", 2,950, 25, "Brush size: $€", labelu, 1, "xs y+15 w" slideWid " hp")
     GuiAddSlider("BrushToolStepping", 0,251, 0, ".updateLabelBrushStep", labelu, 1, "x+10 wp hp")
     GuiAddSlider("BrushToolAspectRatio", -100,100, 0, "Aspect ratio", labelu, 2, "xs y+10 wp hp")
@@ -44485,20 +44571,32 @@ OpenUImenu(givenCoords:=0) {
    showThisMenu("PvUIprefs")
 }
 
+createTlbrContextMenu() {
+    invokeTlbrContextMenu("extern")
+}
+
 invokeTlbrContextMenu(givenCoords:=0) {
-   deleteMenus()
-   kMenu("PvUItoolbarMenu", "Add", "S&earch menu options`t;", "PanelQuickSearchMenuOptions", "actions")
-   kMenu("PvUItoolbarMenu", "Add/Uncheck", "Show &menu bar`tF10", "ToggleMenuBaru", "toolbar")
-   If (showMainMenuBar=1)
-      kMenu("PvUItoolbarMenu", "Check", "Show &menu bar`tF10")
+   If (givenCoords!="extern")
+   {
+      deleteMenus()
+      kMenu("PvUItoolbarMenu", "Add", "S&earch menu options`t;", "PanelQuickSearchMenuOptions", "actions")
+      kMenu("PvUItoolbarMenu", "Add/Uncheck", "Show &menu bar`tF10", "ToggleMenuBaru", "toolbar")
+      If (showMainMenuBar=1)
+         kMenu("PvUItoolbarMenu", "Check", "Show &menu bar`tF10")
+   }
 
-   kMenu("PvUItoolbarMenu", "Add/Uncheck", "&Show tooltips on icons", "ToggleToolBarToolTips")
-   If (ShowToolTipsToolbar=1)
-      kMenu("PvUItoolbarMenu", "Check", "&Show tooltips on icons")
+   If (userCustomizedToolbar!=1)
+   {
+      kMenu("PvUItoolbarMenu", "Add/Uncheck", "&Viewer mode toolbar", "ToggleToolBarViewModa")
+      If (toolbarViewerMode=1)
+         kMenu("PvUItoolbarMenu", "Check", "&Viewer mode toolbar")
+   }
 
-   kMenu("PvUItoolbarMenu", "Add", "Toggle toolbar`tShift+F10", "toggleAppToolbar")
+   k := (ShowAdvToolbar=1) ? "Hide" : "Show"
+   If (givenCoords!="extern")
+      kMenu("PvUItoolbarMenu", "Add", k " toolbar`tShift+F10", "toggleAppToolbar")
+
    Menu, PvUItoolbarMenu, Add
-
    kMenu("PvUItoolbarMenu", "Add/Uncheck", "&Vertical toolbar", "TglToolBarValign")
    If (TLBRverticalAlign=1 || TLBRtwoColumns=1)
       kMenu("PvUItoolbarMenu", "Check", "&Vertical toolbar")
@@ -44510,21 +44608,41 @@ invokeTlbrContextMenu(givenCoords:=0) {
    kMenu("PvUItoolbarMenu", "Add/Uncheck", "Attach to main &window", "tlbrLockPositionWin")
    If (lockToolbar2Win=1)
       kMenu("PvUItoolbarMenu", "Check", "Attach to main &window")
+   If (lockToolbar2Win=1)
+      kMenu("PvUItoolbarMenu", "Add", "&Reset position", "tlbrResetPosition")
 
-   Menu, PvUItoolbarMenu, Add
-   kMenu("PvUItoolbarMenu", "Add", "Scale: " Round(ToolbarScaleFactor, 2) "x", "dummy")
-   kMenu("PvUItoolbarMenu", "Disable", "Scale: " Round(ToolbarScaleFactor, 2) "x", "dummy")
-   kMenu("PvUItoolbarMenu", "Add", "0.50x", "SetToolbarScaling")
-   kMenu("PvUItoolbarMenu", "Add", "0.75x", "SetToolbarScaling")
-   kMenu("PvUItoolbarMenu", "Add", "1.00x", "SetToolbarScaling")
-   kMenu("PvUItoolbarMenu", "Add", "1.25x", "SetToolbarScaling")
-   kMenu("PvUItoolbarMenu", "Add", "1.50x", "SetToolbarScaling")
-   kMenu("PvUItoolbarMenu", "Add", "2.00x", "SetToolbarScaling")
-   kMenu("PvUItoolbarMenu", "Add", "3.00x", "SetToolbarScaling")
-   Menu, PvUItoolbarMenu, Add
-   kMenu("PvUItoolbarMenu", "Add", "Help", "btnHelpToolbar")
-   globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PvUItoolbarMenu") : givenCoords
-   showThisMenu("PvUItoolbarMenu")
+   If (ShowAdvToolbar=1)
+   {
+      kMenu("PvUItoolbarMenu", "Add", "Customi&ze toolbar", "PanelCustomizeToolbar")
+      If ((thumbsDisplaying=1 && maxFilesIndex>1 || isImgEditingNow()=1) && !AnyWindowOpen)
+      {
+         kMenu("PvUItoolbarMenu", "Add/Uncheck", "Use customi&zed toolbar", "toggleCustomaToolbara")
+         If (userCustomizedToolbar=1)
+            kMenu("PvUItoolbarMenu", "Check", "Use customi&zed toolbar")
+      } Else kMenu("PvUItoolbarMenu", "Disable", "Customi&ze toolbar")
+
+      If (mustPreventMenus!=1)
+      {
+         Menu, PvUItoolbarMenu, Add
+         kMenu("PvUItoolbarMenu", "Add", "Scale: " Round(ToolbarScaleFactor, 2) "x", "dummy")
+         kMenu("PvUItoolbarMenu", "Disable", "Scale: " Round(ToolbarScaleFactor, 2) "x", "dummy")
+         kMenu("PvUItoolbarMenu", "Add", "0.50x", "SetToolbarScaling")
+         kMenu("PvUItoolbarMenu", "Add", "0.75x", "SetToolbarScaling")
+         kMenu("PvUItoolbarMenu", "Add", "1.00x", "SetToolbarScaling")
+         kMenu("PvUItoolbarMenu", "Add", "1.25x", "SetToolbarScaling")
+         kMenu("PvUItoolbarMenu", "Add", "1.50x", "SetToolbarScaling")
+         kMenu("PvUItoolbarMenu", "Add", "2.00x", "SetToolbarScaling")
+         kMenu("PvUItoolbarMenu", "Add", "3.00x", "SetToolbarScaling")
+      }
+   }
+
+   If (givenCoords!="extern")
+   {
+      Menu, PvUItoolbarMenu, Add
+      kMenu("PvUItoolbarMenu", "Add", "Help", "btnHelpToolbar")
+      globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PvUItoolbarMenu") : givenCoords
+      showThisMenu("PvUItoolbarMenu")
+   }
 }
 
 SetToolbarScaling(a, b, c) {
@@ -45360,6 +45478,138 @@ BtnUiSharpenTabsInfoUpdate() {
 
 iniSaveJPGquality() {
     RegAction(1, "userJpegQuality")
+}
+
+PanelCustomizeToolbar() {
+    thisBtnHeight := createSettingsGUI(82, A_ThisFunc)
+    btnWid := 195
+    EditWid := 60
+    If (PrefsLargeFonts=1)
+    {
+       thisW := 200
+       EditWid := EditWid + 50
+       btnWid := btnWid + 130
+       Gui, Font, s%LargeUIfontValue%
+    }
+
+    txtWid := btnWid * 2 + 5
+    Global UImainTlbrList, UIuserTlbrList, PickuToolbarBgrColor
+    btnzList := CoreGUItoolbar("getBtnList")
+    userList := CoreGUItoolbar("getCustomList", thumbsDisplaying)
+    ; ToolTip, % btnzList , , , 2
+    Sort, btnzList, D|
+    ml := (PrefsLargeFonts=1) ? 60 : 45
+    k := (thumbsDisplaying=1) ? "thumbnails / list view" : "image view"
+    Gui, Add, Text, x+10 y+15 w%txtWid% Section , Active toolbar mode: %k%.
+    Gui, Add, Text, xs y+15 w%btnWid% Section , Buttons available for this mode:
+    Gui, Add, Text, x+10 wp , User defined custom list:
+    Gui, Add, ListBox, xs y+5 wp r10 Choose1 vUImainTlbrList gBtnMainListToolbarIconsAction, % btnzList
+    Gui, Add, ListBox, x+10 wp r10 Choose1 vUIuserTlbrList gBtnUserListToolbarIconsAction , % userList
+    Gui, Add, Button, xs y+5 wp h%thisBtnHeight% gBTNaddCustomTlbrIcon vtxtLine1, A&dd to custom list
+    Gui, Add, Button, x+10 wp hp gBTNremCustomTlbrIcon vtxtLine2, &Remove from custom list
+    Gui, Add, Checkbox, xs y+10 wp hp Checked%ShowToolTipsToolbar% vShowToolTipsToolbar, &Show tooltips on icon hover
+    Gui, Add, Checkbox, x+10 wp hp Checked%userCustomizedToolbar% vuserCustomizedToolbar gBTNtglCustoTlbr, &Use customized toolbar
+    Gui, Add, Text, xs y+9 hp +0x200, Toolbar background color:
+    Gui, Add, Button, x+5 hp w25 gStartPickingColor vPickuToolbarBgrColor +hwndhTemp, &P
+    ToolTip2ctrl(hTemp, "Pick color from the viewport")
+    Gui, Add, ListView, x+5 hp w%ml% %CCLVO% Background%ToolbarBgrColor% vToolbarBgrColor,
+ 
+    thisW := (PrefsLargeFonts=1) ? 90 : 65
+    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%thisW% Default gBtnSaveCustomToolbar, &Apply
+    Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
+    Tooltip
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Customize toolbar: " appTitle)
+    SetTimer, resetOpeningPanel, -300
+    BTNtglCustoTlbr()
+}
+
+BTNtglCustoTlbr() {
+   GuiControlGet, OutputVar, SettingsGUIA:, userCustomizedToolbar
+   actu := (OutputVar=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   GuiControl, % actu, UImainTlbrList
+   GuiControl, % actu, UIuserTlbrList
+   GuiControl, % actu, txtLine1
+   GuiControl, % actu, txtLine2
+}
+
+BtnMainListToolbarIconsAction(a,b) {
+   If (b="DoubleClick")
+      BTNaddCustomTlbrIcon()
+}
+
+BtnUserListToolbarIconsAction(a,b) {
+   If (b="DoubleClick")
+      BTNremCustomTlbrIcon()
+}
+
+BtnSaveCustomToolbar() {
+   Gui, SettingsGUIA: Default
+   GuiControlGet, userCustomizedToolbar
+   GuiControlGet, ShowToolTipsToolbar
+   GuiControlGet, hwnd, hwnd, UIuserTlbrList
+   ControlGet, listBoxOptions, List,,, ahk_id %hwnd%
+   btnzListArray := CoreGUItoolbar("getListArray")
+   listu := ""
+   Loop, Parse, listBoxOptions,`n
+   {
+      thisu := SubStr(A_LoopField, InStr(A_LoopField, " [") + 1)
+      thisu := Trim(thisu, "[ ]")
+      If btnzListArray[thisu]
+         listu .= btnzListArray[thisu] ","
+   }
+
+   listu := Trim(listu, ",")
+   If (thumbsDisplaying=1)
+      userThumbsToolbarList := listu
+   Else
+      userImgViewToolbarList := listu
+
+   If !InStr(listu, ",")
+      userCustomizedToolbar := 0
+
+   BtnCloseWindow()
+   createGUItoolbar("forced")
+   RegAction(1, "ShowToolTipsToolbar", "General")
+   IniAction(1, "ToolbarBgrColor", "General")
+   IniAction(1, "userCustomizedToolbar", "General")
+   IniAction(1, "userThumbsToolbarList", "General")
+   IniAction(1, "userImgViewToolbarList", "General")
+}
+
+BTNaddCustomTlbrIcon() {
+   Gui, SettingsGUIA: Default
+   GuiControlGet, UImainTlbrList
+   GuiControlGet, UIuserTlbrList
+   ; ToolTip, % UImainTlbrList , , , 2
+   thisu := SubStr(UImainTlbrList, InStr(UImainTlbrList, " ["))
+   GuiControlGet, hwnd, hwnd, UIuserTlbrList
+   ControlGet, listBoxOptions, List,,, ahk_id %hwnd%
+   If (InStr(listBoxOptions, thisu) || InStr(listBoxOptions, UImainTlbrList "`n"))
+      Return
+
+   If UIuserTlbrList
+   {
+      listBoxOptions := StrReplace(listBoxOptions "`n", UIuserTlbrList "`n", UIuserTlbrList "`n" UImainTlbrList "`n`n")
+      GuiControl, SettingsGUIA:, UIuserTlbrList, % "|" Trim(StrReplace(listBoxOptions, "`n", "|"), "|")
+   } Else
+   {
+      listBoxOptions := listBoxOptions "`n" UImainTlbrList "`n`n"
+      GuiControl, SettingsGUIA:, UIuserTlbrList, % "|" StrReplace(listBoxOptions, "`n", "|")
+   }
+}
+
+BTNremCustomTlbrIcon() {
+   Gui, SettingsGUIA: Default
+   GuiControlGet, UIuserTlbrList
+   ; ToolTip, % UImainTlbrList , , , 2
+   GuiControlGet, hwnd, hwnd, UIuserTlbrList
+   ControlGet, listBoxOptions, List,,, ahk_id %hwnd%
+   listBoxOptions := StrReplace(listBoxOptions "`n", UIuserTlbrList "`n", "`n")
+   listBoxOptions := Trim(listBoxOptions, "`n")
+   If !InStr(listBoxOptions, "`n`n")
+      listBoxOptions .= "`n`n"
+
+   GuiControl, SettingsGUIA:, UIuserTlbrList, % "|" StrReplace(listBoxOptions, "`n", "|")
 }
 
 PanelAutoColors() {
@@ -50325,7 +50575,7 @@ InvokeMenuBarEdit(manuID) {
       If markedSelectFile
       {
          Menu, pvMenuBarEdit, Add
-         kMenu("pvMenuBarEdit", "Add", "Re&group dispersed files", "regroupSelectedFiles")
+         kMenu("pvMenuBarEdit", "Add", "Re&group selected dispersed files", "regroupSelectedFiles")
       }
 
       Menu, pvMenuBarEdit, Add
@@ -50587,6 +50837,14 @@ InvokeMenuBarImage(manuID) {
         kMenu("pvMenuBarImage", "Add", "&JPEG lossless operations`tShift+J", "PanelJpegPerformOperation")
         If !RegExMatch(imgPath, "i)(.\.(jpg|jpeg))$")
            kMenu("pvMenuBarImage", "Disable", "&JPEG lossless operations`tShift+J")
+  
+        If (ShowAdvToolbar=1 && userCustomizedToolbar!=1)
+        {
+           Menu, pvMenuBarImage, Add
+           kMenu("pvMenuBarImage", "Add/Uncheck", "&Advanced mode toolbar", "ToggleToolBarViewModa")
+           If (toolbarViewerMode!=1)
+              kMenu("pvMenuBarImage", "Check", "&Advanced mode toolbar")
+        }
      }
   } Else If (thumbsDisplaying=1 && maxFilesIndex>0)
   {
@@ -50596,6 +50854,7 @@ InvokeMenuBarImage(manuID) {
         kMenu("pvMenuBarImage", "Add", "&Import as alpha mask bitmap", "importAlphaMaskGivenImageFile")
         Menu, pvMenuBarImage, Add
      }
+
      createMenuImageFileActions("pvMenuBarImage")
      kMenu("pvMenuBarImage", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
      kMenu("pvMenuBarImage", "Add", "Set as &wallpaper", "PanelSetWallpaper", "desktop image")
@@ -50603,6 +50862,14 @@ InvokeMenuBarImage(manuID) {
      kMenu("pvMenuBarImage", "Add", "Join images into...", "PanelCombineImagesMultipage", "pdf create document")
      If !markedSelectFile
         kMenu("pvMenuBarImage", "Disable", "Join images into...")
+
+     If (ShowAdvToolbar=1 && userCustomizedToolbar!=1)
+     {
+        Menu, pvMenuBarImage, Add
+        kMenu("pvMenuBarImage", "Add/Uncheck", "&Advanced mode toolbar", "ToggleToolBarViewModa")
+        If (toolbarViewerMode!=1)
+           kMenu("pvMenuBarImage", "Check", "&Advanced mode toolbar")
+     }
   } Else
   {
      kMenu("pvMenuBarImage", "Add", "No image loaded", "dummy")
@@ -50884,7 +51151,7 @@ createMenuAlphaMask(givenMenu:="PValpha") {
       kMenu(givenMenu, "Add/Uncheck", "&Allow gradient center repositioning", "toggleAlphaGradientCenterReposition")
       If (userAllowsGradientRecentering=1)
          kMenu(givenMenu, "Check", "&Allow gradient center repositioning")
-   } 
+   }
 
    If (editingSelectionNow=1 && alphaMaskingMode>1 && AnyWindowOpen!=70)
    {
@@ -50939,6 +51206,7 @@ createMenuAlphaMask(givenMenu:="PValpha") {
       kMenu(givenMenu, "Add", "&Define alpha mask`tM", "PanelSoloAlphaMasker")
 
    infoMask := defineCurrentAlphaMask()
+   kMenu(givenMenu, "Add", "Import clipboard as alpha mask", "importAlphaMaskFromClipboard")
    kMenu(givenMenu, "Add", "Copy to clipboard", "CopyAlphaMask2clippy")
    If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
       kMenu(givenMenu, "Disable", "Copy to clipboard")
@@ -50979,12 +51247,17 @@ createMenuHelpQPV() {
    kMenu("PVhelp", "Add", "&Keyboard shortcuts`tF1", "PanelHelpWindow", "keyboard shortcuts")
    kMenu("PVhelp", "Add", "Session &events journal`tShift+``", "PanelJournalWindow", "journal history errors logs")
    kMenu("PVhelp", "Add", "&Command line options", "MenuCmdLineHelp")
+   kMenu("PVhelp", "Add", "&Video demos", "MenuOpenVideoDemos")
    If (TouchScreenMode=1)
       kMenu("PVhelp", "Add", "&Viewport help map", "MenuDrawViewportHelpMap")
 
    Menu, PVhelp, Add,
    kMenu("PVhelp", "Add", "C&heck for updates", "checkForUpdatesNow")
    kMenu("PVhelp", "Add", "&About", "PanelAboutWindow", "author developer")
+}
+
+MenuOpenVideoDemos() {
+   Try, Run https://www.youtube.com/playlist?list=PLlfQlmy-i21bWEoFJKKH2dBZvt0yabRBV
 }
 
 MenuSetShapeTensionP() {
@@ -51191,9 +51464,9 @@ createMenuNavBox() {
    If (maxFilesIndex>0 && CurrentSLD)
    {
       keyword := (showInfoBoxHUD=1) ? "hide" : "show display"
-      kMenu("PvImgAdapt", "Add/Uncheck", "&Show viewport Info-box`tI", "ToggleInfoBoxu", "files information properties " keyword)
+      kMenu("PvImgAdapt", "Add/Uncheck", "&Show viewport info-box`tI", "ToggleInfoBoxu", "files details information properties " keyword)
       If (showInfoBoxHUD>=1)
-         kMenu("PvImgAdapt", "Check", "&Show viewport Info-box`tI")
+         kMenu("PvImgAdapt", "Check", "&Show viewport info-box`tI")
    }
 
    kMenu("PvImgAdapt", "Add/Uncheck", "&Show image preview`tZ", "ToggleImgNavBox")
@@ -51324,9 +51597,9 @@ createMenuImgSizeAdapt(dummy:=0) {
          If (maxFilesIndex>0 && CurrentSLD)
          {
             keyword := (showInfoBoxHUD=1) ? "hide" : "show display"
-            kMenu("PVview", "Add/Uncheck", "&Show viewport Info-box`tI", "ToggleInfoBoxu", "files information properties " keyword)
+            kMenu("PVview", "Add/Uncheck", "&Show viewport info-box`tI", "ToggleInfoBoxu", "files details information properties " keyword)
             If (showInfoBoxHUD>=1)
-               kMenu("PVview", "Check", "&Show viewport Info-box`tI")
+               kMenu("PVview", "Check", "&Show viewport info-box`tI")
          }
          kMenu("PvImgAdapt", "Add", "&More options", ":PVview")
       } Else
@@ -53733,16 +54006,20 @@ createMenuInterfaceOptions() {
    keyword := (ShowAdvToolbar=1) ? "hide" : "display"
    kMenu("PvUIprefs", "Add/Uncheck", "Show &toolbar`tShift+F10", "toggleAppToolbar", keyword)
    If (ShowAdvToolbar=1)
+   {
+      createTlbrContextMenu()
       kMenu("PvUIprefs", "Check", "Show &toolbar`tShift+F10")
+      kMenu("PvUIprefs", "Add", "&Toolbar options", ":PvUItoolbarMenu")
+   }
 
    If (maxFilesIndex>0 && CurrentSLD && drawingShapeNow!=1)
    {
       keyword := (showInfoBoxHUD=1) ? "hide" : "show display"
       If (AnyWindowOpen!=14)
       {
-         kMenu("PvUIprefs", "Add/Uncheck", "&Show viewport Info-box`tI", "ToggleInfoBoxu", "files information properties " keyword)
+         kMenu("PvUIprefs", "Add/Uncheck", "&Show viewport info-box`tI", "ToggleInfoBoxu", "files details information properties " keyword)
          If (showInfoBoxHUD>=1)
-            kMenu("PvUIprefs", "Check", "&Show viewport Info-box`tI")
+            kMenu("PvUIprefs", "Check", "&Show viewport info-box`tI")
       }
    }
 
@@ -54855,6 +55132,9 @@ TogglePrivateMode() {
    showTOOLtip("Private mode: " friendly, A_ThisFunc, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
    ForceRefreshNowThumbsList()
+   If (thumbsDisplaying!=1 && isImgEditingNow() && FileExist(getIDimage(currentFileIndex)) && undoLevelsRecorded<2)
+      RefreshImageFileAction()
+
    dummyTimerReloadThisPicture(100)
    ; dummyTimerDelayiedImageDisplay(100)
 }
@@ -55010,10 +55290,11 @@ ToggleTexyBGR() {
 }
 
 ToggleDarkModus() {
-    If (isWinXP=1 || A_OSVersion="WIN_7")
-       msgBoxWrapper(appTitle ": WARNING", "This option was not optimized for your operating system.", 0, 0, "exclamation")
 
     uiUseDarkMode := !uiUseDarkMode
+    If ((isWinXP=1 || A_OSVersion="WIN_7") && uiUseDarkMode=1)
+       msgBoxWrapper(appTitle ": WARNING", "This option was not optimized for your operating system.", 0, 0, "exclamation")
+
     INIaction(1, "uiUseDarkMode", "General")
     friendly := (uiUseDarkMode=1) ? "ACTIVATED" : "DEACTIVATED"
     AddTooltip2Ctrl("reset")
@@ -55091,6 +55372,17 @@ invokeHistoMenu(givenCoords:=0) {
    showThisMenu("PVimgHistos")
 }
 
+tlbrInvokeHistoMenu(givenCoords:=0) {
+   invokeHistoMenu("tlbr")
+}
+
+tlbrInvokeImgSizeVP(givenCoords:=0) {
+   deleteMenus()
+   createMenuImgSizeAdapt()
+   globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PvImgAdapt") : givenCoords
+   showThisMenu("PvImgAdapt")
+}
+
 invokeImgSizeVP(givenCoords:=0) {
    deleteMenus()
    If (thumbsDisplaying=1)
@@ -55129,6 +55421,11 @@ ToggleImgHistogram(direction, dummy:=0) {
        updatePanelColorSliderz()
     }
     lastInvoked := A_TickCount
+}
+
+tlbrToggleHistoModes() {
+   If isImgEditingNow()
+      ToggleImgHistogram(1)
 }
 
 ToggleHistogramMode() {
@@ -55291,7 +55588,28 @@ ToggleRAWquality() {
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
+toggleCustomaToolbara() {
+    userCustomizedToolbar := !userCustomizedToolbar
+    listuIcons := (thumbsDisplaying=1) ? Trim(userThumbsToolbarList, ",") : Trim(userImgViewToolbarList, ",")
+    listu := StrSplit(listuIcons, ",")
+    If (!InStr(listuIcons, ",") || listu.Count()<2)
+    {
+       f := "WARNING: No custom toolbar was defined.`n"
+       userCustomizedToolbar := 0
+    }
+
+    INIaction(1, "userCustomizedToolbar", "General")
+    friendly := (userCustomizedToolbar=1) ? "ACTIVATED" : "DEACTIVATED"
+    showTOOLtip(f "Custom defined toolbar: " friendly, A_ThisFunc, 1)
+    If (ShowAdvToolbar=1)
+       createGUItoolbar("forced")
+    SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
 toggleFreePanning() {
+    If (thumbsDisplaying=1)
+       Return
+
     allowFreeIMGpanning := !allowFreeIMGpanning
     INIaction(1, "allowFreeIMGpanning", "General")
     friendly := (allowFreeIMGpanning=1) ? "ACTIVATED" : "DEACTIVATED"
@@ -55337,13 +55655,6 @@ toggleCustomZLmodes() {
       ToggleImageSizingMode("cus-h")
    Else If (customZoomAdaptMode=0)
       ToggleImageSizingMode("cus-w")
-}
-
-ToggleMultiCoreSupport() {
-    allowMultiCoreMode := !allowMultiCoreMode
-    INIaction(1, "allowMultiCoreMode", "General")
-    If (thumbsDisplaying=1 && thumbsListViewMode=1 && multiCoreThumbsInitGood="n")
-       initAHKhThumbThreads()
 }
 
 ToggleLimitMemUsage() {
@@ -55404,7 +55715,17 @@ toggleAppToolbar() {
 
 ToggleToolBarToolTips() {
     ShowToolTipsToolbar := !ShowToolTipsToolbar
-    INIaction(1, "ShowToolTipsToolbar", "General")
+    RegAction(1, "ShowToolTipsToolbar", "General")
+    friendly := (ShowToolTipsToolbar=1) ? "ACTIVATED" : "DEACTIVATED"
+    showTOOLtip("Toolbar tooltips: " friendly)
+    SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+ToggleToolBarViewModa() {
+    toolbarViewerMode := !toolbarViewerMode
+    IniAction(1, "toolbarViewerMode", "General")
+    If (ShowAdvToolbar=1)
+       createGUItoolbar()
 }
 
 ToggleTouchMode() {
@@ -58349,6 +58670,12 @@ CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReload
         blurEffect := Gdip_CreateEffect(1, 150, 0, 0)
         Gdip_BitmapApplyEffect(rBitmap, blurEffect)
         Gdip_DisposeEffect(blurEffect)
+        klBitmap := trGdip_ResizeBitmap(A_ThisFunc, rBitmap, imgW, imgH, 1, 5, pargbPixFmt)
+        If StrLen(klBitmap)>2
+        {
+           trGdip_DisposeImage(rBitmap)
+           rBitmap := klBitmap
+        }
     } Else rBitmap := trGdip_ResizeBitmap(A_ThisFunc, oBitmap, newW, newH, 0, thisImgQuality, pargbPixFmt)
 
     If rBitmap
@@ -64096,11 +64423,15 @@ alignImgSelection(keyu, outside:=0) {
     If (outside=1)
     {
        PasteInPlaceAutoExpandIMG := 1
-       PasteInPlaceBlendMode := 1
-       GuiControl, SettingsGUIA:, PasteInPlaceAutoExpandIMG, 1
-       GuiControl, SettingsGUIA: Choose, PasteInPlaceBlendMode, 1
        LimitSelectBoundsImg := 0
+       GuiControl, SettingsGUIA:, PasteInPlaceAutoExpandIMG, 1
+       If (AnyWindowOpen=31 || AnyWindowOpen=24)
+       {
+          PasteInPlaceBlendMode := 1
+          GuiControl, SettingsGUIA: Choose, PasteInPlaceBlendMode, 1
+       }
     }
+
 
     timgSelH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
     timgSelW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
@@ -68847,6 +69178,7 @@ PanelHelpWindow(dummy:=0) {
 
     Gui, Tab
     Gui, Add, Button, xs+15 y+8 h%thisBtnHeight% w%btnWid% gBtnAboutWin, &About
+    Gui, Add, Button, x+5 hp wp gMenuOpenVideoDemos, &Videos
     Gui, Add, Button, x+5 hp wp gPanelJournalWindow, &Journal
     Gui, Add, Button, x+5 hp wp gPanelQuickSearchMenuOptions, &Search
     Gui, Add, Button, x+5 hp wp Default gBtnCloseWindow, &Close
@@ -70117,6 +70449,12 @@ PanelColorsAdjusterWindow() {
    coreColorsAdjusterWindow("vp")
 }
 
+BtnOpenPanelAdjustToneMapping() {
+   BtnCloseWindow()
+   Sleep, 5
+   PanelAdjustToneMapping()
+}
+
 coreColorsAdjusterWindow(modus:=0) {
     Global realTimePreview, uiIMGresizingMode
          , UIvpImgAlignCenter, uiForceNoColorMatrix
@@ -70185,8 +70523,8 @@ coreColorsAdjusterWindow(modus:=0) {
     GuiAddSlider("userImgClrMtrxBrightness", -0.999,1.000, "0f", "Brightness", "UpdateUIadjustVPcolors", 2, "xs y+5 w" slideWid " hp")
     GuiAddSlider("userImgClrMtrxContrast", -0.999, 1.000, "0f", "Contrast", "UpdateUIadjustVPcolors", 2, "xs y+5 w" slideWid " hp")
     GuiAddSlider("userImgClrMtrxSaturation", -0.999,1.000, "0f", "Saturation", "UpdateUIadjustVPcolors", 2, "xs y+5 w" slideWid " hp")
-    thisW := (PrefsLargeFonts=1) ? slide3wid : slide3wid - 3
-    GuiAddSlider("userImgVPgammaLevel", -0.999,1.000, "0f", "Gamma", "UpdateUIadjustVPcolors", 2, "xs y+5 w" thisW " hp")
+    thisWS := (PrefsLargeFonts=1) ? slide3wid : slide3wid - 3
+    GuiAddSlider("userImgVPgammaLevel", -0.999,1.000, "0f", "Gamma", "UpdateUIadjustVPcolors", 2, "xs y+5 w" thisWS " hp")
     GuiAddSlider("userImgVPthreshold", 0,200, "0f", "Threshold", "UpdateUIadjustVPcolors", 1, "x+5 wp hp")
     thisW := (PrefsLargeFonts=1) ? txtWid//3 - 3 : txtWid//3 - 4
     GuiAddSlider("userImgChannelRlvl", -300,300, 0, "Red", "UpdateUIadjustVPcolors", 2, "xs y+5 w" thisW " hp")
@@ -70195,7 +70533,9 @@ coreColorsAdjusterWindow(modus:=0) {
     tml := zml + 15
     If (idu=10)
     {
-       Gui, Add, Checkbox, xs y+10 hp gUpdateUIadjustVPcolors Checked%bwDithering% vbwDithering, Black/white
+       Gui, Add, Checkbox, xs y+10 w%thisWS% h%thisBtnHeight% gUpdateUIadjustVPcolors Checked%bwDithering% vbwDithering, Black/white
+       If InStr(currIMGdetails.PixelFormat, "TONE-MAPPED")
+          Gui, Add, Button, x+5 wp hp gBtnOpenPanelAdjustToneMapping, &HDR tone-mapping
     } Else
     {
        GuiAddSlider("EraseAreaOpacity", 3,255, 355, "Image opacity", "UpdateUIadjustVPcolors", 1, "xs y+10 w" slide3wid " hp")
@@ -70242,7 +70582,9 @@ coreColorsAdjusterWindow(modus:=0) {
        Gui, Add, Text, xs y+10, TIP: right click on the viewport for more options.
     } Else
     {
-       Gui, Add, Checkbox, xs y+5 w%slide3Wid% Checked%EraseAreaUseAlpha% vEraseAreaUseAlpha gUpdateUIadjustVPcolors, Apply alpha mas&k
+       Gui, Add, Checkbox, xs y+5 w%slide3Wid% h%thisBtnHeight% Checked%EraseAreaUseAlpha% vEraseAreaUseAlpha gUpdateUIadjustVPcolors, Apply alpha mas&k
+       If InStr(currIMGdetails.PixelFormat, "TONE-MAPPED")
+          Gui, Add, Button, x+5 wp hp gBtnOpenPanelAdjustToneMapping, &HDR tone-mapping
     }
 
     Gui, Tab
@@ -70488,6 +70830,7 @@ updatePanelColorsInfo() {
       GuiControl, % act, EraseAreaInvert
       GuiControl, % act, EraseAreaUseAlpha
       GuiControl, % act, DesaturateAreaLevels
+      act := (imgFxMode>1 && DesaturateAreaLevels>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
       GuiControl, % act, DesaturateAreaDither
    }
 
@@ -77674,13 +78017,6 @@ isInRange(value, inputA, inputB) {
     Return (value>=min(inputA, inputB) && value<=max(inputA, inputB)) ? 1 : 0
 }
 
-triggerOwnDialogs() {
-  If AnyWindowOpen
-     Gui, SettingsGUIA: +OwnDialogs
-  Else
-     Gui, 1: +OwnDialogs
-}
-
 checkThumbExists(MD5name, imgPath, ByRef file2load) {
    file2save := thumbsCacheFolder "\" thumbsSizeQuality "-" MD5name ".jpg"
    If FileExist(file2save)
@@ -77742,31 +78078,6 @@ generateThumbName(imgPath, forceThis:=0) {
    lastInvoked := A_TickCount
    prevMD5name := MD5name
    Return MD5name
-}
-
-reorderStoredHashes(a, b) {
-    outsideLoop := insideLoop := 0
-    Loop, 8
-    {
-       pY := A_Index - 1 ; y++
-       Loop, 8
-       {
-          pX := A_Index - 1 ; , pY := y - 1
-          If (pY=0 || pY=7 || pX=0 || pX=7)
-          {
-             outsideLoop++
-             newHash .= SubStr(b, outsideLoop, 1)
-          } Else
-          {
-             insideLoop++
-             newHash .= SubStr(a, insideLoop, 1)
-          }
-          ; pixContent .= Round(Gdip_RFromARGB(NumGet(Scan01+0, ((A_Index - 1)*4)+((y - 1)*Stride1), "UInt"))*0.9)
-       }
-    }
-    ; Clipboard := newHash
-    ; ToolTip, % newHash , , , 2
-    Return newHash
 }
 
 decideWinReactivation() {
@@ -77989,20 +78300,6 @@ initExternalCoreMode() {
   ; msgbox, killaaaa
   ForceExitNow()
   Return
-}
-
-PrinterGetMatchingBitmap(width, height, color:="0xffFFFFFF") {
-  ; set background-color (default is white)
-  pBitmap := trGdip_CreateBitmap(A_ThisFunc, width, height)
-  If StrLen(pBitmap)<3
-     Return
-
-  G := trGdip_GraphicsFromImage(A_ThisFunc, pBitmap, 7, 4, 2)
-  If G
-     Gdip_GraphicsClear(G, color)
-
-  Gdip_DeleteGraphics(G)
-  return pBitmap
 }
 
 printImageNow(mainBMP, PrintOptions, previewMode, inLoop:=0, OutFileName:=0) {
@@ -78789,6 +79086,7 @@ tlbrAddNewIcon(obju, wi, he, IconSpacing, noSpacing, simpleRefresh) {
        tlbrSetImageIcon(icoFile, hwndul, wi, he)
     }
 
+    tlbrIconzList["counter"] := tlbrIconzList["counter"] + 1
     ; Gui, OSDguiToolbar: Add, Text,  h%he% w%wi% %otherz% BackgroundTrans +0x1000 +0xE, %btnName% ; Windows Narrator friendly buttons 
     ; Gui, OSDguiToolbar: Add, Picture, vtlbrValueIcon%IndexBtn% AltSubmit  +hwndhwndul xp yp hp wp gtlbrInvokeFunction, %mainCompiledPath%\resources\toolbar\%icoFile%.png
     tlbrIconzList[IndexBtn] := [hwndul, icoFile, btnName, actu, indexBtn, actu2, wi, he, paramu, btnID, menuMode]
@@ -78802,29 +79100,29 @@ tlbrSetImageIcon(icoFile, hwnd, W, H) {
        pBitmap := Gdip_CreateBitmap(512, 512)
        Gu := Gdip_GraphicsFromImage(pBitmap)
        Gdip_GraphicsClear(Gu, "0xFF" ToolbarBgrColor)
-       If (BrushToolUseSecondaryColor=1)
+       posYu := (TLBRverticalAlign!=1) ? 55 : 33
+       If (thumbsDisplaying!=1)
        {
-          BrushA := Gdip_BrushCreateSolid("0xFF" BrushToolBcolor)
-          BrushB := Gdip_BrushCreateSolid("0xFF" BrushToolAcolor)
+          BrushA := (BrushToolUseSecondaryColor=1) ? Gdip_BrushCreateSolid("0xFF" BrushToolBcolor) : Gdip_BrushCreateSolid("0xFF" BrushToolAcolor)
+          BrushB := (BrushToolUseSecondaryColor=1) ? Gdip_BrushCreateSolid("0xFF" BrushToolAcolor) : Gdip_BrushCreateSolid("0xFF" BrushToolBcolor)
+          pPenB := Gdip_CreatePen("0xFF101010", 25)
+          pPenA := Gdip_CreatePen("0xFFffFFff", 10)
+          Gdip_FillEllipse(Gu, BrushB, 412//2, posYu, 412//2, 400)
+          Gdip_DrawEllipse(Gu, pPenB, 412//2, posYu, 412//2, 400)
+          Gdip_FillEllipse(Gu, BrushA, 80, posYu, 412//2, 400)
+          Gdip_DrawEllipse(Gu, pPenB, 80, posYu, 412//2, 400)
+          Gdip_DrawEllipse(Gu, pPenA, 80, posYu, 412//2, 400)
+          Gdip_DeleteBrush(BrushA)
+          Gdip_DeleteBrush(BrushB)
+          Gdip_DeletePen(pPenB)
        } Else
        {
-          BrushA := Gdip_BrushCreateSolid("0xFF" BrushToolAcolor)
-          BrushB := Gdip_BrushCreateSolid("0xFF" BrushToolBcolor)
+          pPenA := Gdip_CreatePen("0xFF888888", 12)
+          Gdip_DrawEllipse(Gu, pPenA, 412//2, posYu, 412//2, 400)
+          Gdip_DrawEllipse(Gu, pPenA, 80, posYu, 412//2, 400)
        }
-
-       pPenA := Gdip_CreatePen("0xFFffFFff", 10)
-       pPenB := Gdip_CreatePen("0xFF101010", 25)
-       posYu := (TLBRverticalAlign!=1) ? 55 : 33
-       Gdip_FillEllipse(Gu, BrushB, 412//2, posYu, 412//2, 400)
-       Gdip_DrawEllipse(Gu, pPenB, 412//2, posYu, 412//2, 400)
-       Gdip_FillEllipse(Gu, BrushA, 80, posYu, 412//2, 400)
-       Gdip_DrawEllipse(Gu, pPenB, 80, posYu, 412//2, 400)
-       Gdip_DrawEllipse(Gu, pPenA, 80, posYu, 412//2, 400)
-       Gdip_DeleteGraphics(Gu)
-       Gdip_DeleteBrush(BrushA)
-       Gdip_DeleteBrush(BrushB)
        Gdip_DeletePen(pPenA)
-       Gdip_DeletePen(pPenB)
+       Gdip_DeleteGraphics(Gu)
     } Else pbitmap := Gdip_CreateBitmapFromFileSimplified(mainCompiledPath "\resources\toolbar\" icoFile ".png")
 
     If StrLen(pBitmap)>2
@@ -78980,15 +79278,29 @@ tlbrInsertTextArea() {
 tlbrEraserTool() {
    If (isImgEditingNow() && (AnyWindowOpen=31 || AnyWindowOpen=24))
       toggleErasePasteInPlace()
-   Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-      singleInListEntriesRemover()
    Else If (isImgEditingNow()=1 && editingSelectionNow=1)
       PanelEraseSelectedArea()
+}
+
+tlbrDeleteFile() {
+   If (maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+      deleteKeyAction()
+}
+
+tlbrDeleteIndexFile() {
+   If (maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+      singleInListEntriesRemover()
 }
 
 tlbrActColorsSwatch() {
    If preventColorChange()
       Return
+
+   If (thumbsDisplaying=1)
+   {
+      TogglePrivateMode()
+      Return
+   }
 
    oldColor := (BrushToolUseSecondaryColor=1) ? BrushToolBcolor : BrushToolAcolor
    oldClrName := (BrushToolUseSecondaryColor=1) ? "BrushToolBcolor" : "BrushToolAcolor"
@@ -79248,10 +79560,7 @@ tlbrChangeBrushRatio() {
 }
 
 tlbrEraserBrush() {
-   If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-   {
-      DeletePicture()
-   } Else If isImgEditingNow()
+   If isImgEditingNow()
    {
       If (AnyWindowOpen=31 || AnyWindowOpen=24)
          toggleErasePasteInPlace()
@@ -79359,6 +79668,7 @@ tlbrBtnViewToggle() {
 }
 
 tlbrNavSizeBox() {
+    isWelcomeScreenu := (isImgEditingNow()=1 || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
     If (isImgEditingNow()=1 && drawingShapeNow=1)
        togglePreviewVectorNewPoint()
     Else If !isWelcomeScreenu
@@ -79373,13 +79683,13 @@ tlbrPipette() {
 
 tlbrSwitchColors() {
    ; If isImgEditingNow()
-   If (!AnyWindowOpen || imgEditPanelOpened=1 && AnyWindowOpen)
+   If ((!AnyWindowOpen || imgEditPanelOpened=1 && AnyWindowOpen) && (thumbsDisplaying!=1))
       ToggleBrushColors()
 }
 
 tlbrSelectAlignMenu() {
    ; If isImgEditingNow()
-   If (isImgEditingNow() && imgEditPanelOpened=1)
+   If (isImgEditingNow() && editingSelectionNow=1)
    {
       deleteMenus()
       createMenuSelectionAlign()
@@ -79413,12 +79723,15 @@ tlbrSelAllVectorPoints() {
     lastState := !lastState
 }
 
-tlbrViewPortGridu() {
+tlbrtoggleListViewModeThumbs() {
    Static lastInvoked := 1
    If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-   {
       toggleListViewModeThumbs()
-   } Else If isImgEditingNow()
+}
+
+tlbrViewPortGridu() {
+   Static lastInvoked := 1
+   If isImgEditingNow()
    {
       If (A_TickCount - lastInvoked<450)
          Return
@@ -79453,7 +79766,7 @@ tlbrRotateImg() {
    If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
    {
       filesListFlipRotatePlus()
-   } Else If (isImgEditingNow()=1 && editingSelectionNow=1)
+   } Else If (isImgEditingNow()=1 && editingSelectionNow=1 && !isTlbrViewModus())
    {
       If (GetKeyState("Ctrl", "P") || GetKeyState("Shift", "P"))
       {
@@ -79473,7 +79786,9 @@ tlbrRotateImg() {
          Return
       }
 
-      If GetKeyState("Alt", "P")
+      If isTlbrViewModus()
+         changeImgRotationInVP(1, 45)
+      Else If GetKeyState("Alt", "P")
          coreTlbrSlider("changeLittleImgRotationInVP", 5, 0)
       Else
          coreTlbrSlider("changeImgRotationInVP", 25, 0)
@@ -79557,7 +79872,7 @@ tlbrOpenVPcolors(){
       PanelSetThumbColumnOptions()
    Else If isImgEditingNow()
    {
-      If GetKeyState("Alt", "P")
+      If (GetKeyState("Alt", "P") || isTlbrViewModus())
          PanelColorsAdjusterWindow()
       Else
          PanelColorsAdjusterImage()
@@ -79662,8 +79977,7 @@ tlbrOpenLinesPanel() {
 }
 
 tlbrZoomIN(dummy:=0) {
-   If (thumbsDisplaying=1 && maxFilesIndex>3 && CurrentSLD)
-   || (isImgEditingNow()=1)
+   If ((thumbsDisplaying=1 && maxFilesIndex>3 && CurrentSLD) || (isImgEditingNow()=1))
    {
       If (GetKeyState("Ctrl", "P") || GetKeyState("Shift", "P")) && (IMGresizingMode=4 && dummy!="navBox")
       {
@@ -79681,7 +79995,15 @@ tlbrZoomIN(dummy:=0) {
       {
          GetPhysicalCursorPos(mX, mY)
          dir := (oY<mY) ? -1 : 1
-         If isDotInRect(mX, mY, 5, 5, cX, cY, 1)
+         If (dummy="zin")
+            dir := 1
+         Else If (dummy="zout")
+            dir := -1
+
+         If InStr(dummy, "z")
+         {
+            Sleep, 25
+         } Else If isDotInRect(mX, mY, 5, 5, cX, cY, 1)
          {
             If !isInRange(thisIndex, lastIndex - 2, lastIndex + 2)
             || (A_TickCount - lastInvoked>100)
@@ -79694,13 +80016,24 @@ tlbrZoomIN(dummy:=0) {
          lastInvoked := A_TickCount
          cX := mX, cY := mY
          ChangeZoom(dir, 0, 1, 1) 
-         Sleep, % (thumbsDisplaying=1) ? 10 : -1
+         Sleep, % (thumbsDisplaying=1 || InStr(dummy, "z")) ? 10 : -1
          thisIndex++
       }
       vpImgPanningNow := 0
       dummyTimerDelayiedImageDisplay(150)
       setwhileLoopExec(0)
    }
+   Return "m"
+}
+
+
+tlbrSimpleZoomIN() {
+   tlbrZoomIN("zin")
+   Return "m"
+}
+
+tlbrSimpleZoomOut() {
+   tlbrZoomIN("zout")
    Return "m"
 }
 
@@ -79756,6 +80089,9 @@ MenuCycleSelectionShapes() {
 decideIconBTNselectShape() {
    initialIcon := tlbrIconzList["BTNselectShape", 2]
    thisHwnd := tlbrIconzList["BTNselectShape", 1]
+   If !thisHwnd
+      Return
+
    w := tlbrIconzList[thisHwnd, 7]
    h := tlbrIconzList[thisHwnd, 8]
    icoFile := (EllipseSelectMode=1) ? "select-ellipse" : "select-rect"
@@ -79771,13 +80107,14 @@ decideIconBTNselectShape() {
    }
 }
 
-
 decideIconBTNthumbsList() {
    initialIcon := tlbrIconzList["BTNthumbsList", 2]
    thisHwnd := tlbrIconzList["BTNthumbsList", 1]
+   If !thisHwnd
+      Return
+
    w := tlbrIconzList[thisHwnd, 7]
    h := tlbrIconzList[thisHwnd, 8]
-
    If (thumbsListViewMode=1)
       icoFile := "thumbs-list"
    Else If (thumbsListViewMode=2)
@@ -79793,11 +80130,14 @@ decideIconBTNthumbsList() {
 }
 
 decideIconBTNmainTooler() {
-   initialIcon := tlbrIconzList["BTNmainTooler", 2]
    thisHwnd := tlbrIconzList["BTNmainTooler", 1]
+   If !thisHwnd
+      Return
+
+   initialIcon := tlbrIconzList["BTNmainTooler", 2]
    w := tlbrIconzList[thisHwnd, 7]
    h := tlbrIconzList[thisHwnd, 8]
-   icoFile := (AnyWindowOpen && imgEditPanelOpened=1 || drawingShapeNow=1) ? "apply-tool" : "go-back"
+   icoFile := (AnyWindowOpen && imgEditPanelOpened=1 || drawingShapeNow=1) ? "apply-tool" : "thumbs-mode"
    If isVarEqualTo(AnyWindowOpen, 10, 64, 66, 70)
       icoFile := "main-tool"
 
@@ -79809,8 +80149,11 @@ decideIconBTNmainTooler() {
 }
 
 decideIconBTNpaintBrushSelect() {
-   initialIcon := tlbrIconzList["BTNpaintSelection", 2]
    thisHwnd := tlbrIconzList["BTNpaintSelection", 1]
+   If !thisHwnd
+      Return
+
+   initialIcon := tlbrIconzList["BTNpaintSelection", 2]
    w := tlbrIconzList[thisHwnd, 7]
    h := tlbrIconzList[thisHwnd, 8]
    icoFile := (BrushToolOutsideSelection=1) ? "paint-any" : "paint-inside"
@@ -79908,14 +80251,11 @@ tlbrCloseWindow() {
 
 tlbrApplyImgEditFunc() {
    If (isImgEditingNow()=1 && drawingShapeNow=1)
-   {
       stopDrawingShape()
-   } Else If (isImgEditingNow()=1 && imgEditPanelOpened=1)
-   {
+   Else If (isImgEditingNow()=1 && imgEditPanelOpened=1)
       applyIMGeditFunction()
-      ; SetTimer, BtnCloseWindow, -100
-   } Else If !AnyWindowOpen
-      openPreviousPanel()
+   Else If !AnyWindowOpen
+      ToggleThumbsMode()   ; openPreviousPanel()
    Return "m"
 }
 
@@ -79953,87 +80293,118 @@ tlbrAcquireimage() {
       AcquireWIAimage()
 }
 
-invokeSortListMenu(){
-   If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+invokeSortListMenu() {
+   If (maxFilesIndex>1 && CurrentSLD && !AnyWindowOpen)
    {
       deleteMenus()
       createMenuFilesSort()
       globalMenuOptions := StrReplace(globalMenuOptions, "tlbrMenu", "PVsort")
       showThisMenu("PVsort")
       Return "m"
+   } Else If StrLen(mustOpenStartFolder)>3
+   {
+      currentFileIndex := doOpenStartFolder()
+      SetTimer, invokeSortListMenu, -200
+   } Else If (maxFilesIndex<3)
+   {
+      showTOOLtip("WARNING: Insufficient files are currently indexed.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
    }
+}
+
+tlbrRecentMenu() {
+   If AnyWindowOpen
+      Return
+
+   InvokeOpenRecentMenu("tlbr")
 }
 
 tlbrFoldersTree() {
    If AnyWindowOpen
       Return
 
-   isWelcomeScreenu := (isImgEditingNow()=1 || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
-   If isWelcomeScreenu
-      InvokeOpenRecentMenu("tlbr")
-   Else
-      MenuPanelFoldersTree()
+   MenuPanelFoldersTree()
 }
 
-CoreGUItoolbar() {
-    Static BTNrotateTlbr := ["rotate-tlbr", "TLBRswitchAlign", "Toggle vertical or horizontal toolbar alignment", "BTNrotateTlbr"]
-         ; , localBtnID := [ico-file-name, primary-func-l-click, base-user-friendly-name, secontary-func-r-click, button-ID, param-func, menu-mode]
-         , BTNdragTlbr := ["dragger", "tlbrDraggyNow", "Reposition toolbar", "invokeTlbrContextMenu", "BTNdragTlbr", 0, 1]
-         , BTNdisabled := ["disabled", "dummy", "-", 0, "BTNdisabled"]
-         , BTNcloseTlbr := ["close", "toggleAppToolbar", "Close toolbar", 0, "BTNcloseTlbr"]
-         , BTNcancelTool := ["cancel-tool", "tlbrCloseWindow", "Cancel tool", 0, "BTNcancelTool"]
-         , BTNsettings := ["menu", "tlbrInvokeEditMenu", "Quick settings menu", "tlbrInvokeInterfaceMenu", "BTNsettings", 0, 1]
-         , BTNcopyImg := ["copy", "MenuCopyAction", "Copy to clipboard", "CopyImagePath", "BTNcopyImg"]
-         , BTNnewImg := ["new-image", "tlbrNewImage", "New image", "tlbrAcquireimage", "BTNnewImg"]
-         , BTNpasteImg := ["paste-clip", "tlbrPasteQuick", "Paste from clipboard", "PanelPasteInPlace", "BTNpasteImg"]
+isTlbrViewModus(p:=0) {
+   If (p=1)
+      r := (userCustomizedToolbar=1 && imgEditPanelOpened!=1) ? 1 : 0
+   Else
+      r := (toolbarViewerMode=1 && imgEditPanelOpened!=1) ? 1 : 0
+
+   isVectorMode := (drawingShapeNow=1 && editingSelectionNow=1 && EllipseSelectMode=2) ? 1 : 0
+   isWelcomeScreenu := (isImgEditingNow()=1 || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
+   isTransPanel := (isImgEditingNow() && (AnyWindowOpen=31 || AnyWindowOpen=24)) ? 1 : 0
+   addAlphaIcons := (isAlphaMaskPartialWin()=1 || isAlphaMaskWindow()=1) ? 1 : 0
+   If (isVectorMode=1 || isWelcomeScreenu=1 || isTransPanel=1 || addAlphaIcons=1 || isNowAlphaPainting())
+      r := 0
+
+   Return r
+}
+
+CoreGUItoolbar(scopul:=0, whichList:=0) {
+    Static BTNdragTlbr := ["dragger", "tlbrDraggyNow", "Reposition toolbar", "invokeTlbrContextMenu", "BTNdragTlbr", 0, 1, 1]
+         , BTNrotateTlbr := ["rotate-tlbr", "TglToolBarValign", "Toggle toolbar orientation", 0, "BTNrotateTlbr", 0, 0, 1]
+         ; localBtnID := [ico-file-name, primary-func-l-click, base-user-friendly-name, secontary-func-r-click, button-ID, param-func, menu-mode, modes-availability]
+         , BTNdisabled := ["disabled", "dummy", "-", 0, "BTNdisabled", 0, 0, 1]
+         , BTNcloseTlbr := ["close", "toggleAppToolbar", "Close toolbar", 0, "BTNcloseTlbr", 0, 0, 1]
+         , BTNcancelTool := ["cancel-tool", "tlbrCloseWindow", "Cancel active tool", 0, "BTNcancelTool"]
+         , BTNsettings := ["menu", "tlbrInvokeEditMenu", "Quick settings menu", "tlbrInvokeInterfaceMenu", "BTNsettings", 0, 1, 1]
+         , BTNcopyImg := ["copy", "MenuCopyAction", "Copy to clipboard", "CopyImagePath", "BTNcopyImg", 0, 0, 1]
+         , BTNnewImg := ["new-image", "tlbrNewImage", "New image", "tlbrAcquireimage", "BTNnewImg", 0, 0, 1]
+         , BTNpasteImg := ["paste-clip", "tlbrPasteQuick", "Paste from clipboard", "PanelPasteInPlace", "BTNpasteImg", 0, 0, 1]
          , BTNundoImg := ["undo", "tlbrUndoAction", "Undo image action", "ImgSelUndoAct", "BTNundoImg"]
          , BTNredoImg := ["redo", "tlbrRedoAction", "Redo image action", "ImgSelRedoAct", "BTNredoImg"]
          , BTNtextTool := ["add-text", "tlbrInsertTextArea", "Insert text into image", "tlbrOpenAnnotations", "BTNtextTool"]
-         , BTNeraserTool := ["eraser", "tlbrEraserBrush", "Eraser brush", "tlbrEraserTool", "BTNeraserTool"]
+         , BTNeraserBrush := ["eraser", "tlbrEraserBrush", "Eraser brush", "tlbrEraserTool", "BTNeraserBrush"]
+         , BTNdeleteTool := ["delete-file", "tlbrDeleteFile", "Delete file", "tlbrDeleteIndexFile", "BTNdeleteTool", 0, 0, 1]
          , BTNblurTool := ["brush-blur", "tlbrBlurBrush", "Blur brush", "tlbrBlurArea", "BTNblurTool"]
          , BTNclonerTool := ["brush-cloner", "tlbrClonerBrush", "Cloner brush", "BtnSetClonerBrushSource", "BTNclonerTool"]
          , BTNbrushMtool := ["brush-main", "tlbrMainBrushSoft", "Brush tool", "tlbrMainBrushHard", "BTNbrushMtool"]
          , BTNFXbrush := ["brush-fx", "tlbrFXbrush", "Color effects soft brush", 0, "BTNFXbrush"]
-         , BTNwetbrush := ["brush-wet", "tlbrWetBrush", "Soft edges wet Brush", "tlbrDecreaseWetBrush", "BTNwetbrush"]
+         , BTNwetbrush := ["brush-wet", "tlbrWetBrush", "Soft wet brush", "tlbrDecreaseWetBrush", "BTNwetbrush"]
          , BTNpenVector := ["pen-vector", "tlbrPenFill", "Draw freeform shape", "tlbrPenOutline", "BTNpenVector"]
-         , BTNpipette := ["pipette", "tlbrPipette", "Pick color", "tlbrSwitchColors", "BTNpipette"]
-         , BTNcolorsSwatch := ["colorz-swatch", "tlbrActColorsSwatch", "Choose colors", "tlbrSwitchColors", "BTNcolorsSwatch"]
+         , BTNpipette := ["pipette", "tlbrPipette", "Pick color from the viewport", "tlbrSwitchColors", "BTNpipette"]
+         , BTNcolorsSwatch := ["colorz-swatch", "tlbrActColorsSwatch", "Primary / secondary colors", "tlbrSwitchColors", "BTNcolorsSwatch"]
          , BTNalphInvert := ["alpha-mask-invert", "tlbrAmaskInvert", "Invert alpha mask", 0, "BTNalphInvert"]
          , BTNalphRaster := ["alpha-mask-pixelize", "tlbrAmaskRaster", "Rasterize alpha mask", 0, "BTNalphRaster"]
          , BTNalphPaint := ["alpha-mask-paint", "tlbrAmaskPaint", "Paint alpha mask", 0, "BTNalphPaint"]
-         , BTNalphCapture := ["alpha-mask-capture", "tlbrAmaskCapture", "Capture alpha mask", 0, "BTNalphCapture"]
+         , BTNalphCapture := ["alpha-mask-capture", "tlbrAmaskCapture", "Capture alpha mask", "importAlphaMaskFromClipboard", "BTNalphCapture"]
          , BTNalphPanel := ["alpha-mask-panel", "tlbrAmaskPanel", "Alpha mask options panel", 0, "BTNalphPanel"]
          , BTNalphView := ["alpha-mask-view", "tlbrAmaskView", "View alpha mask", 0, "BTNalphView"]
          , BTNalphDiscard := ["alpha-mask-discard", "tlbrAmaskDiscard", "Discard alpha mask", 0, "BTNalphDiscard"]
-         , BTNcrop := ["crop", "tlbrCropImg", "Crop image to selection", "tlbrResizeImage", "BTNcrop"]
-         , BTNsave := ["save-disk", "tlbrSaveImg", "Save image to disk", "tlbrSaveList", "BTNsave"]
-         , BTNopen := ["open", "tlbrOpenImg", "Open image", "tlbrOpenMenu", "BTNopen", 0, 1]
-         , BTNcutImg := ["cut", "tlbrCutImg", "Cut selection", "tlbrMoveFiles", "BTNcutImg"]
-         , BTNadjustColors := ["adjust-colors", "tlbrOpenVPcolors", "Adjust viewport colors", "ResetImageView", "BTNadjustColors"]
-         , BTNtlbrflipH := ["flip-h", "tlbrFlipStuffH", "Flip horizontally", "tlbrFlipSelectionH", "BTNtlbrflipH"]
-         , BTNtlbrflipV := ["flip-v", "tlbrFlipStuffV", "Flip vertically", "tlbrFlipSelectionV", "BTNtlbrflipV"]
-         , BTNtransformArea := ["transform-img", "tlbrTransformSelection", "Transform selected area", "tlbrResizeEditorImg", "BTNtransformArea"]
-         , BTNrotateStuff := ["rotation", "tlbrRotateImg", "Rotate by 45 degrees", "tlbrResetRotation", "BTNrotateStuff"]
+         , BTNcrop := ["crop", "tlbrCropImg", "Resize or crop image", "tlbrResizeImage", "BTNcrop", 0, 0, 1]
+         , BTNsave := ["save-disk", "tlbrSaveImg", "Save image or files list", "tlbrSaveList", "BTNsave", 0, 0, 1]
+         , BTNopen := ["open", "tlbrOpenImg", "Open image or files list", "tlbrOpenMenu", "BTNopen", 0, 1, 1]
+         , BTNcutImg := ["cut", "tlbrCutImg", "Cut image selection or file(s)", "tlbrMoveFiles", "BTNcutImg", 0, 0, 1]
+         , BTNadjustColors := ["adjust-colors", "tlbrOpenVPcolors", "Adjust viewport colors", "ResetImageView", "BTNadjustColors", 0, 0, 1]
+         , BTNtlbrflipH := ["flip-h", "tlbrFlipStuffH", "Flip horizontally", "tlbrFlipSelectionH", "BTNtlbrflipH", 0, 0, 1]
+         , BTNtlbrflipV := ["flip-v", "tlbrFlipStuffV", "Flip vertically", "tlbrFlipSelectionV", "BTNtlbrflipV", 0, 0, 1]
+         , BTNtransformArea := ["transform-img", "tlbrTransformSelection", "Import file or transform selected area", "tlbrResizeEditorImg", "BTNtransformArea", 0, 0, 1]
+         , BTNrotateStuff := ["rotation", "tlbrRotateImg", "Rotate image", "tlbrResetRotation", "BTNrotateStuff", 0, 0, 1]
          , BTNfillShape := ["fill-shape", "tlbrFillShape", "Fill selection area", "tlbrFillBehind", "BTNfillShape"]
          , BTNoutlineShape := ["outline-shape", "tlbrOutlineShape", "Draw shape contours", "tlbrOpenLinesPanel", "BTNoutlineShape"]
-         , BTNselectShape := ["select-rect", "tlbrSelectShape", "Create selection area", "tlbrDropSelection", "BTNselectShape"]
+         , BTNselectShape := ["select-rect", "tlbrSelectShape", "Create or cycle selection area modes", "tlbrDropSelection", "BTNselectShape"]
+         , BTNselectFileu := ["select-rect", "markThisFileNow", "Select / deseleect file", "dropFilesSelection", "BTNselectFileu", 0, 0, 1]
          , BTNselectFreeform := ["create-freeform", "tlbrSelectFreeform", "Create freeform selection", "tlbrInvokeShapesMenu", "BTNselectFreeform"]
-         , BTNloupe := ["loupe", "tlbrZoomIN", "Zoom in / out", "tlbrZoomToggle", "BTNloupe"]
-         , BTNpreviewBox := ["view", "tlbrBtnViewToggle", "Toggle image preview", "tlbrNavSizeBox", "BTNpreviewBox"]
+         , BTNloupe := ["loupe", "tlbrZoomIN", "Zoom in / out", "tlbrZoomToggle", "BTNloupe", 0, 0, 1]
+         , BTNpreviewBox := ["view", "tlbrBtnViewToggle", "Toggle image preview", "tlbrNavSizeBox", "BTNpreviewBox", 0, 0, 1]
          , BTNsearch := ["search", "PanelSearchIndex", "Search", "PanelSearchAndReplaceIndex", "BTNsearch"]
-         , BTNmodifyEntry := ["modify-entry", "PanelRenameThisFile", "Rename file[s]", "PanelUpdateThisFileIndex", "BTNmodifyEntry"]
-         , BTNfilterList := ["filter", "PanelEnableFilesFilter", "Filter files list", "MenuRemFilesListFilter", "BTNfilterList"]
-         , BTNstatsList := ["statistics", "PanelWrapperFilesStats", "Indexed files statistics", "PanelFindDupes", "BTNstatsList"]
-         , BTNsortList := ["sort-list", "invokeSortListMenu", "Sort files list", 0, "BTNsortList", 0, 1]
-         , BTNrefreshList := ["refresh", "RefreshFilesList", "Refresh files list", "DeepRefreshThumbsNow", "BTNrefreshList"]
-         , BTNfolderTree := ["folder-tree", "tlbrFoldersTree", "Folder tree view", "invokeFoldersListerMenu", "BTNfolderTree"]
-         , BTNinfozHud := ["infos", "ToggleInfoBoxu", "Show image information", "PanelImageInfos", "BTNinfozHud"]
-         , BTNmngFolderz := ["manage-folders", "PanelDynamicFolderzWindow", "Manage folders", "PanelStaticFolderzManager", "BTNmngFolderz"]
-         , BTNfntSize := ["font-size", "tlbrChangeOSDfontSize", "Change OSD font size", "tlbrDecreaseOSDfontSize", "BTNfntSize"]
-         , BTNfaves := ["star", "tlbrAddFaves", "Add/remove from favourites", "InvokeFavesMenu", "BTNfaves", 0, 1]
+         , BTNmodifyEntry := ["modify-entry", "PanelRenameThisFile", "Rename file[s]", "PanelUpdateThisFileIndex", "BTNmodifyEntry", 0, 0, 1]
+         , BTNfilterList := ["filter", "PanelEnableFilesFilter", "Filter files list", "MenuRemFilesListFilter", "BTNfilterList", 0, 0, 1]
+         , BTNstatsList := ["statistics", "PanelWrapperFilesStats", "Indexed files statistics", "PanelFindDupes", "BTNstatsList", 0, 0, 1]
+         , BTNsortList := ["sort-list", "invokeSortListMenu", "Sort files list", 0, "BTNsortList", 0, 1, 1]
+         , BTNrefreshList := ["refresh", "RefreshFilesList", "Refresh files list", "DeepRefreshThumbsNow", "BTNrefreshList", 0, 0, 1]
+         , BTNfolderTree := ["folder-tree", "tlbrFoldersTree", "Folder tree view", "invokeFoldersListerMenu", "BTNfolderTree", 0, 0, 1]
+         , BTNrecentOpened := ["recent", "tlbrRecentMenu", "Recents menu", "invokeFoldersListerMenu", "BTNrecentOpened", 0, 0, 1]
+         , BTNinfozHud := ["infos", "ToggleInfoBoxu", "Show image information", "PanelImageInfos", "BTNinfozHud", 0, 0, 1]
+         , BTNmngFolderz := ["manage-folders", "PanelDynamicFolderzWindow", "Manage folders", "PanelStaticFolderzManager", "BTNmngFolderz", 0, 0, 1]
+         , BTNfntSize := ["font-size", "tlbrChangeOSDfontSize", "Change OSD font size", "tlbrDecreaseOSDfontSize", "BTNfntSize", 0, 0, 1]
+         , BTNfaves := ["star", "tlbrAddFaves", "Add / remove from favourites", "InvokeFavesMenu", "BTNfaves", 0, 1, 1]
          , BTNpanImg := ["pan-img", "tlbrPanIMG", "Pan image in viewport", "ToggleImgNavBox", "BTNpanImg"]
          , BTNmainTooler := ["apply-tool", "tlbrApplyImgEditFunc", "Apply current tool", "tlbrCloseWindow", "BTNmainTooler"]
-         , BTNplaySlides := ["play", "tlbrPlaySlides", "Play slideshow", "PanelDefineEntireSlideshowLength", "BTNplaySlides"]
+         , BTNplaySlides := ["play", "tlbrPlaySlides", "Play slideshow", "ToggleSlideshowModes", "BTNplaySlides", 0, 0, 1]
          , BTNchangeBrushSoft := ["brush-set-soft", "tlbrChangeBrushSoft", "Change brush softness", "tlbrDecreaseBrushSoft", "BTNchangeBrushSoft"]
          , BTNchangeBrushOpacity := ["brush-set-opacity", "tlbrChangeBrushOpacity", "Change brush opacity", "tlbrDecreaseBrushOpacity", "BTNchangeBrushOpacity"]
          , BTNchangeBrushSize := ["brush-set-size", "tlbrChangeBrushSize", "Change brush size", "toggleBrushDoubleSize", "BTNchangeBrushSize"]
@@ -80047,15 +80418,95 @@ CoreGUItoolbar() {
          , BTNvectSelAll := ["vector-select-all", "tlbrSelAllVectorPoints", "Select all points in path", "MenuSelNoVectorPoints", "BTNvectSelAll"]
          , BTNpaintSelection := ["paint-outside", "tlbrtoggleBrushDrawModes", "Toggle brush selection area mode", 0, "BTNpaintSelection"]
          , BTNalignSel := ["select-align", "tlbrSelectAlignMenu", "Align selection area", 0, "BTNalignSel", 0, 1]
-         , BTNhelp := ["help", "tlbrHelpBtn", "Help", 0, "BTNhelp"]
+         , BTNhelp := ["help", "tlbrHelpBtn", "Help", "MenuDrawViewportHelpMap", "BTNhelp", 0, 0, 1]
          , BTNfloodFill := ["flood-fill", "tlbrFloodFill", "Flood fill", 0, "BTNfloodFill"]
-         , BTNcalculate := ["calculate", "CalculateSelectedFilesSizes", "Calculate file sizes", "PanelReviewSelectedFiles", "BTNcalculate"]
-         , BTNinvertStuff := ["invert", "tlbrInvertStuff", "Invert image", 0, "BTNinvertStuff"]
-         , BTNquickFacts := ["quick-file-acts", "PanelQuickMoveConfigure", "Quick file actions", "PanelJump2index", "BTNquickFacts"]
+         , BTNcalculate := ["calculate", "CalculateSelectedFilesSizes", "Calculate file sizes", "PanelReviewSelectedFiles", "BTNcalculate", 0, 0, 2]
+         , BTNinvertStuff := ["invert", "tlbrInvertStuff", "Invert image or file selection", 0, "BTNinvertStuff", 0, 0, 1]
+         , BTNquickFacts := ["quick-file-acts", "PanelQuickMoveConfigure", "Quick file actions", "PanelJump2index", "BTNquickFacts", 0, 0, 1]
          , BTNvpGrid := ["vp-grid", "tlbrViewPortGridu", "Viewport grid", "tlbrConfigVPgrid", "BTNvpGrid"]
-         , BTNthumbsList := ["thumbs-list", "tlbrViewPortGridu", "Viewport grid", "ToggleIMGalign", "BTNthumbsList"]
-         , prevState := 0
+         , BTNthumbsList := ["thumbs-list", "tlbrtoggleListViewModeThumbs", "Cycle list view modes", "ToggleIMGalign", "BTNthumbsList", 0, 0, 2]
+         , BTNimgSizers := ["img-sizing", "ToggleImageSizingMode", "Cycle image adapt modes", "tlbrInvokeImgSizeVP", "BTNimgSizers", 0, 0, 1]
+         , BTNzoomInIMG := ["zoom-in", "tlbrSimpleZoomIN", "Zoom in", "MenuChangeZoomPlus", "BTNzoomInIMG", 0, 0, 1]
+         , BTNzoomOutIMG := ["zoom-out", "tlbrSimpleZoomOut", "Zoom out", "MenuChangeZoomMinus", "BTNzoomOutIMG", 0, 0, 1]
+         , BTNnavFirstImgu := ["first", "FirstPicture", "Jump to the first image in the list", "PrevRandyPicture", "BTNnavFirstImgu", 0, 0, 1]
+         , BTNnavLastImgu := ["last", "LastPicture", "Jump to the last image in the list", "RandomPicture", "BTNnavLastImgu", 0, 0, 1]
+         , BTNnavNextImgu := ["next", "NextPicture", "Next image in the list", 0, "BTNnavNextImgu"]
+         , BTNnavPrevImgu := ["previous", "PreviousPicture", "Previous image in the list", "jumpPreviousImage", "BTNnavPrevImgu"]
+         , BTNalignVPimgu := ["vp-center-img", "ToggleIMGalign", "Toggle align image to center", "toggleFreePanning", "BTNalignVPimgu", 0, 0, 1]
+         , BTNhudHisto := ["histogram", "tlbrToggleHistoModes", "Cycle histogram modes", "tlbrInvokeHistoMenu", "BTNhudHisto"]
+         , BTNannotate := ["annotate", "PanelEditImgCaption", "Define image caption", "ToggleImgCaptions", "BTNannotate", 0, 0, 1]
+         , BTNprivatModa := ["private", "TogglePrivateMode", "Toggle private mode", "ToggleRecordSeenImages", "BTNprivatModa", 0, 0, 1]
+         , BTNsoundPlay := ["sound", "PlayAudioFileAssociatedNow", "Play associated sound file", "StopMediaPlaying", "BTNsoundPlay"]
+         , BTNjumpAtIndex := ["jump-to", "PanelJump2index", "Jump at given index", 0, "BTNjumpAtIndex", 0, 0, 1]
+         , BTNswitchThumbs := ["thumbs-mode", "ToggleThumbsMode", "Toggle list / thumbnails mode", "openPreviousPanel", "BTNswitchThumbs", 0, 0, 1]
+         , BTNprintAcquire := ["print", "PanelPrintImage", "Print/acquire image", "AcquireWIAimage", "BTNprintAcquire", 0, 0, 1]
+         , BTNgoPrevPanel := ["go-back", "openPreviousPanel", "Open previous panel", 0, "BTNgoPrevPanel", 0, 0, 1]
+         , BtnReturnImgView := ["go-back", "MenuReturnIMGedit", "Return to image view", "openPreviousPanel", "BtnReturnImgView", 0, 0, 2]
+         , BTNgoFileMaps := ["files-map", "MenuDrawFilesListMap", "Show files map", "ToggleFilesMap", "BTNgoFileMaps", 0, 0, 2]
+         , BTNspiralLinez := ["spiral", "PanelDrawLines", "Draw parametric lines", 0, "BTNspiralLinez"]
+         , btnzList := "BTNrotateTlbr,BTNcloseTlbr,BTNsettings,BTNcopyImg,BTNnewImg,BTNpasteImg,BTNundoImg,BTNredoImg,BTNtextTool,BTNeraserBrush,BTNdeleteTool,BTNblurTool,BTNclonerTool,BTNbrushMtool,BTNFXbrush,BTNwetbrush,BTNpenVector,BTNpipette,BTNcolorsSwatch,BTNalphInvert,BTNalphRaster,BTNalphCapture,BTNalphPanel,BTNalphView,BTNalphDiscard,BTNcrop,BTNsave,BTNopen,BTNcutImg,BTNadjustColors,BTNtlbrflipH,BTNtlbrflipV,BTNtransformArea,BTNrotateStuff,BTNfillShape,BTNoutlineShape,BTNselectShape,BTNselectFreeform,BTNloupe,BTNpreviewBox,BTNsearch,BTNmodifyEntry,BTNfilterList,BTNstatsList,BTNsortList,BTNrefreshList,BTNfolderTree,BTNrecentOpened,BTNinfozHud,BTNmngFolderz,BTNfntSize,BTNfaves,BTNpanImg,BTNgoPrevPanel,BTNplaySlides,BTNvectSmooth,BTNalignSel,BTNhelp,BTNfloodFill,BTNcalculate,BTNinvertStuff,BTNquickFacts,BTNvpGrid,BTNthumbsList,BTNimgSizers,BTNzoomInIMG,BTNzoomOutIMG,BTNnavFirstImgu,BTNnavLastImgu,BTNnavNextImgu,BTNnavPrevImgu,BTNalignVPimgu,BTNhudHisto,BTNannotate,BTNprivatModa,BTNsoundPlay,BTNjumpAtIndex,BTNswitchThumbs,BTNprintAcquire,BTNgoFileMaps,BTNspiralLinez,BTNselectFileu,BtnReturnImgView"
+         , prevState := 0, hasRan := 0, btnzListArray := [], hasObjectifiedList := 0
 
+    If !hasObjectifiedList
+    {
+       hasObjectifiedList := 1
+       Loop, Parse, btnzList,`,
+       {
+          pk := Trimmer(A_LoopField)
+          If pk
+          {
+             btnzListArray[pk] := A_Index
+             btnzListArray[A_Index] := pk
+          }
+       }
+    }
+
+    If (scopul="getListArray")
+    {
+       Return btnzListArray
+    } Else If (scopul="getCustomList")
+    {
+       l := (whichList=1) ? userThumbsToolbarList : userImgViewToolbarList
+       If !l
+       {
+          Loop, % tlbrIconzList["counter"]
+             l .= tlbrIconzList[A_Index, 10] ","
+       }
+
+       listu := ""
+       Loop, Parse, l,`,
+       {
+          pk := Trimmer(A_LoopField)
+          If (pk && btnzListArray[pk]>0)
+          {
+             pka := %pk%
+             listu .= pka[3] " [" btnzListArray[pk] "]|"
+          }
+       }
+       Return listu
+    } Else If (scopul="getBtnList")
+    {
+       ; modes-availability
+       ; btnOobj[8]=1   //   for thumbs mode and img-view mode
+       ; btnOobj[8]=2   //   for thumbs mode only
+       ; btnOobj[8]=""  //   for img-view mode only
+
+       listu := ""
+       Loop, % btnzListArray.Count()
+       {
+             thisa := btnzListArray[A_Index]
+             If !thisa
+                Continue
+
+             thisu := %thisa%
+             ; fnOutputDebug(A_Index " p=" thisu[3] "==" thisu[8])
+             If ((thumbsDisplaying=1 && (thisu[8]=1 || thisu[8]=2)) || (thumbsDisplaying!=1 && thisu[8]!=2))
+                listu .= thisu[3] " [" A_Index "]|"
+       }
+       Return listu
+    }
+
+    tlbrIconzList["counter"] := 0
     BTNmainTooler[1] := (AnyWindowOpen && imgEditPanelOpened=1 || drawingShapeNow=1) ? "apply-tool" : "go-back"
     If (AnyWindowOpen=10 || AnyWindowOpen=70 || AnyWindowOpen=64 || AnyWindowOpen=66)
        BTNmainTooler[1] := "main-tool"
@@ -80102,190 +80553,244 @@ CoreGUItoolbar() {
     isVectorMode := (drawingShapeNow=1 && editingSelectionNow=1 && EllipseSelectMode=2) ? 1 : 0
     isWelcomeScreenu := (isImgEditingNow()=1 || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
     isTransPanel := (isImgEditingNow() && (AnyWindowOpen=31 || AnyWindowOpen=24)) ? 1 : 0
-    totalIconz := (isTransPanel=1) ? 20 : 32
+    tlbrTotalIconz := (isTransPanel=1) ? 24 : 36
     If isWelcomeScreenu
-       totalIconz := 9
+       tlbrTotalIconz := 9
+    Else If isTlbrViewModus()
+       tlbrTotalIconz := 21
+
+    sjk := isTlbrViewModus(1)
+    If sjk
+       listuIcons := (thumbsDisplaying=1) ? StrSplit(userThumbsToolbarList, ",") : StrSplit(userImgViewToolbarList, ",")
 
     TouchToolbarGUIcreated := 1
-    thisState := "a" ToolBarBtnWidth totalIconz TLBRverticalAlign ToolbarScaleFactor TLBRtwoColumns  drawingShapeNow
+    thisState := "a" toolbarViewerMode userCustomizedToolbar Round(listuIcons.Count()) userThumbsToolbarList userImgViewToolbarList ToolBarBtnWidth tlbrTotalIconz TLBRverticalAlign ToolbarScaleFactor TLBRtwoColumns drawingShapeNow ToolbarBgrColor
     simpleRefresh := (thisState=prevState) ? 1 : 0
     If (simpleRefresh=0)
     {
+       If !hasRan
+       {
+          ; hack required to fix window redraw issues
+          Gui, dummyGuia: Default      ;
+          Gui, dummyGuia: -DPIScale -MaximizeBox -MinimizeBox +Owner%PVhwnd% +ToolWindow +E0x20
+          hasRan := 1
+       }
+
        Gui, OSDguiToolbar: Destroy
-       Sleep, 10
+       Sleep, 9
        Gui, OSDguiToolbar: Default
        Gui, OSDguiToolbar: Margin, 0, 0
-       Gui, OSDguiToolbar: -DPIScale -Caption +ToolWindow +hwndhQPVtoolbar +Owner%PVhwnd%
+       Gui, OSDguiToolbar: -DPIScale -Caption -MinimizeBox -MaximizeBox +ToolWindow +hwndhQPVtoolbar +Owner%PVhwnd%
        Gui, OSDguiToolbar: Color, % ToolbarBgrColor, % ToolbarBgrColor
     }
     ; Gui, OSDguiToolbar: Font, s1
     tlbrAddNewIcon(BTNdragTlbr, handleWidth, handleHeight, 0, 1, simpleRefresh)
-    tlbrAddNewIcon(BTNsettings, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-    tlbrAddNewIcon(BTNmainTooler, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-    If (thumbsDisplaying=1)
+    If (listuIcons.Count()>1 && sjk=1)
     {
-       tlbrAddNewIcon(BTNplaySlides, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-       tlbrAddNewIcon(BTNfntSize, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-    } Else If !isWelcomeScreenu
-    {
-       If (isVectorMode=1)
+       Loop, % listuIcons.Count()
        {
-          tlbrAddNewIcon(BTNpreviewBox, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          tlbrAddNewIcon(BTNcancelTool, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+           thisu := Trimmer(listuIcons[A_Index])
+           thisu := %thisu%
+           If IsObject(thisu)
+           {
+             If ((thumbsDisplaying=1 && (thisu[8]=1 || thisu[8]=2)) || (thumbsDisplaying!=1 && thisu[8]!=2))
+                tlbrAddNewIcon(thisu, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+           }
        }
-       tlbrAddNewIcon(BTNundoImg, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-       tlbrAddNewIcon(BTNredoImg, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-    }
-
-    If (isVectorMode=1)
+    } Else If (tlbrTotalIconz=21)
     {
-       tlbrAddNewIcon(BTNvectSmooth, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-       tlbrAddNewIcon(BTNvectRemLast, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-       tlbrAddNewIcon(BTNvectRemPoints, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-       tlbrAddNewIcon(BTNvectSelInvert, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-       tlbrAddNewIcon(BTNvectOpenPath, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-       tlbrAddNewIcon(BTNvectSelAll, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+       Static simpleThumbs := "BTNsettings|BtnReturnImgView|BTNopen|BTNsave|BTNcutImg|BTNcopyImg|BTNpasteImg|BTNnewImg|BTNfaves|BTNdeleteTool|BTNthumbsList|BTNselectShape|BTNsearch|BTNmodifyEntry|BTNsortList|BTNrefreshList|BTNfolderTree|BTNcalculate|BTNinfozHud|BTNpreviewBox"
+       Static simpleView := "BTNsettings|BTNswitchThumbs|BTNopen|BTNcopyImg|BTNfaves|BTNplaySlides|BTNnavPrevImgu|BTNnavNextImgu|BTNnavFirstImgu|BTNnavLastImgu|BTNzoomOutIMG|BTNzoomInIMG|BTNrotateStuff|BTNalignVPimgu|BTNtlbrflipV|BTNtlbrflipH|BTNimgSizers|BTNadjustColors|BTNinfozHud|BTNdeleteTool"
+       listu := (thumbsDisplaying=1) ? simpleThumbs : simpleView
+       Loop, Parse, listu,|
+       {
+             If !A_LoopField
+                Continue
+
+             thisu := %A_loopField%
+             If IsObject(thisu)
+                tlbrAddNewIcon(thisu, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+       }
     } Else
     {
-       addAlphaIcons := (isAlphaMaskPartialWin()=1 || isAlphaMaskWindow()=1) ? 1 : 0
-       If (addAlphaIcons=1 && !isNowAlphaPainting())
-       {
-          tlbrAddNewIcon(BTNalphCapture, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          tlbrAddNewIcon(BTNalphDiscard, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          tlbrAddNewIcon(BTNalphInvert, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          If isAlphaMaskPartialWin()
-             tlbrAddNewIcon(BTNalphPanel, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          Else
-             tlbrAddNewIcon(BTNalphPaint, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+       tlbrAddNewIcon(BTNsettings, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+       thisu := (thumbsDisplaying!=1 && !AnyWindowOpen) ? BTNswitchThumbs : BtnReturnImgView
+       If (AnyWindowOpen || drawingShapeNow=1)
+          thisu := BTNmainTooler
 
-          tlbrAddNewIcon(BTNalphView, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          If (AnyWindowOpen=66)
-             tlbrAddNewIcon(BTNpaintSelection, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          Else
-             tlbrAddNewIcon(BTNalphRaster, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-       } Else If (AnyWindowOpen=64 || isNowAlphaPainting())
-       {
-          tlbrAddNewIcon(BTNchangeBrushSoft, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          tlbrAddNewIcon(BTNchangeBrushOpacity, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          tlbrAddNewIcon(BTNchangeBrushSize, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          tlbrAddNewIcon(BTNchangeBrushAngle, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          tlbrAddNewIcon(BTNchangeBrushRatio, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          If isNowAlphaPainting()
-             tlbrAddNewIcon(BTNalphView, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          Else
-             tlbrAddNewIcon(BTNpaintSelection, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-       } Else
-       {
-          tlbrAddNewIcon(BTNopen, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          If !isWelcomeScreenu
-          {
-             tlbrAddNewIcon(BTNsave, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-             tlbrAddNewIcon(BTNcutImg, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-             tlbrAddNewIcon(BTNcopyImg, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          }
-          tlbrAddNewIcon(BTNpasteImg, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          tlbrAddNewIcon(BTNnewImg, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-       }
-
-       If isVarEqualTo(AnyWindowOpen, 23, 25, 30, 32, 55, 65, 68, 74)
-          tlbrAddNewIcon(BTNalignSel, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-       Else If !isWelcomeScreenu
-          tlbrAddNewIcon(BTNcrop, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-
-       If !isWelcomeScreenu
-          tlbrAddNewIcon(BTNselectShape, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-
-       If (thumbsDisplaying!=1 && !isWelcomeScreenu)
-       {
-          If (isTransPanel!=1)
-          {
-             tlbrAddNewIcon(BTNselectFreeform, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-             tlbrAddNewIcon(BTNfillShape, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-             tlbrAddNewIcon(BTNoutlineShape, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-             tlbrAddNewIcon(BTNpipette, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-             tlbrAddNewIcon(BTNbrushMtool, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-             tlbrAddNewIcon(BTNFXbrush, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-             tlbrAddNewIcon(BTNwetbrush, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-             tlbrAddNewIcon(BTNblurTool, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-             tlbrAddNewIcon(BTNclonerTool, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          }
-       } Else
-       {
-          tlbrAddNewIcon(BTNfaves, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          If !isWelcomeScreenu
-          {
-             tlbrAddNewIcon(BTNmngFolderz, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-             tlbrAddNewIcon(BTNsearch, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-             tlbrAddNewIcon(BTNmodifyEntry, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-             tlbrAddNewIcon(BTNfilterList, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-             tlbrAddNewIcon(BTNstatsList, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-             tlbrAddNewIcon(BTNsortList, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-             tlbrAddNewIcon(BTNrefreshList, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          }
-          tlbrAddNewIcon(BTNfolderTree, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-       }
-
-       If !isWelcomeScreenu
-          tlbrAddNewIcon(BTNeraserTool, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-
+       tlbrAddNewIcon(thisu, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
        If (thumbsDisplaying=1)
        {
-          tlbrAddNewIcon(BTNinfozHud, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          tlbrAddNewIcon(BTNcalculate, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          tlbrAddNewIcon(BTNquickFacts, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          tlbrAddNewIcon(BTNplaySlides, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          tlbrAddNewIcon(BTNthumbsList, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
        } Else If !isWelcomeScreenu
        {
-          If (isTransPanel!=1)
+          If (isVectorMode=1)
           {
-             tlbrAddNewIcon(BTNpenVector, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-             tlbrAddNewIcon(BTNfloodFill, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             tlbrAddNewIcon(BTNpreviewBox, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             tlbrAddNewIcon(BTNcancelTool, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
           }
-
-          If isNowAlphaPainting()
-             tlbrAddNewIcon(BTNalphInvert, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          Else If (isTransPanel=1)
-             tlbrAddNewIcon(BTNalignSel, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          Else
-             tlbrAddNewIcon(BTNinvertStuff, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          tlbrAddNewIcon(BTNundoImg, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          tlbrAddNewIcon(BTNredoImg, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
        }
 
-       If (isTransPanel!=1 && !isWelcomeScreenu)
-          tlbrAddNewIcon(BTNtextTool, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-    }
-
-    If !isWelcomeScreenu
-    {
-       tlbrAddNewIcon(BTNtlbrflipV, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-       If !isVectorMode
+       If (isVectorMode=1)
        {
-          tlbrAddNewIcon(BTNtlbrflipH, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          tlbrAddNewIcon(BTNtransformArea, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          tlbrAddNewIcon(BTNrotateStuff, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          tlbrAddNewIcon(BTNadjustColors, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-       }
-
-       tlbrAddNewIcon(BTNloupe, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-       If (thumbsDisplaying=1)
-       {
-          tlbrAddNewIcon(BTNthumbsList, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          tlbrAddNewIcon(BTNpreviewBox, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          tlbrAddNewIcon(BTNvectSmooth, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          tlbrAddNewIcon(BTNvectRemLast, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          tlbrAddNewIcon(BTNvectRemPoints, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          tlbrAddNewIcon(BTNvectSelInvert, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          tlbrAddNewIcon(BTNvectOpenPath, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          tlbrAddNewIcon(BTNvectSelAll, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
        } Else
        {
-          tlbrAddNewIcon(BTNvpGrid, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-          tlbrAddNewIcon(BTNpanImg, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          addAlphaIcons := (isAlphaMaskPartialWin()=1 || isAlphaMaskWindow()=1) ? 1 : 0
+          If (addAlphaIcons=1 && !isNowAlphaPainting())
+          {
+             tlbrAddNewIcon(BTNalphCapture, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             tlbrAddNewIcon(BTNalphDiscard, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             tlbrAddNewIcon(BTNalphInvert, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             If isAlphaMaskPartialWin()
+                tlbrAddNewIcon(BTNalphPanel, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             Else
+                tlbrAddNewIcon(BTNalphPaint, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+
+             tlbrAddNewIcon(BTNalphView, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             If (AnyWindowOpen=66)
+                tlbrAddNewIcon(BTNpaintSelection, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             Else
+                tlbrAddNewIcon(BTNalphRaster, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          } Else If (AnyWindowOpen=64 || isNowAlphaPainting())
+          {
+             tlbrAddNewIcon(BTNchangeBrushSoft, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             tlbrAddNewIcon(BTNchangeBrushOpacity, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             tlbrAddNewIcon(BTNchangeBrushSize, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             tlbrAddNewIcon(BTNchangeBrushAngle, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             tlbrAddNewIcon(BTNchangeBrushRatio, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             If isNowAlphaPainting()
+                tlbrAddNewIcon(BTNalphView, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             Else
+                tlbrAddNewIcon(BTNpaintSelection, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          } Else
+          {
+             tlbrAddNewIcon(BTNopen, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             If !isWelcomeScreenu
+             {
+                tlbrAddNewIcon(BTNsave, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+                tlbrAddNewIcon(BTNcutImg, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+                tlbrAddNewIcon(BTNcopyImg, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             }
+             tlbrAddNewIcon(BTNpasteImg, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             tlbrAddNewIcon(BTNnewImg, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          }
+
+          If isVarEqualTo(AnyWindowOpen, 23, 25, 30, 32, 55, 65, 68, 74)
+             tlbrAddNewIcon(BTNalignSel, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          Else If !isWelcomeScreenu
+             tlbrAddNewIcon(BTNcrop, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+
+          If !isWelcomeScreenu
+             tlbrAddNewIcon(BTNselectShape, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+
+          If (thumbsDisplaying!=1 && !isWelcomeScreenu)
+          {
+             If (isTransPanel!=1)
+             {
+                tlbrAddNewIcon(BTNselectFreeform, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+                tlbrAddNewIcon(BTNfillShape, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+                tlbrAddNewIcon(BTNoutlineShape, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+                tlbrAddNewIcon(BTNpipette, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+                tlbrAddNewIcon(BTNbrushMtool, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+                tlbrAddNewIcon(BTNFXbrush, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+                tlbrAddNewIcon(BTNwetbrush, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+                tlbrAddNewIcon(BTNblurTool, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+                tlbrAddNewIcon(BTNclonerTool, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             }
+          } Else
+          {
+             tlbrAddNewIcon(BTNfaves, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             If !isWelcomeScreenu
+             {
+                tlbrAddNewIcon(BTNmngFolderz, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+                tlbrAddNewIcon(BTNsearch, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+                tlbrAddNewIcon(BTNmodifyEntry, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+                tlbrAddNewIcon(BTNfilterList, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+                tlbrAddNewIcon(BTNstatsList, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+                tlbrAddNewIcon(BTNsortList, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+                tlbrAddNewIcon(BTNrefreshList, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             }
+
+             If isWelcomeScreenu
+                tlbrAddNewIcon(BTNrecentOpened, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             Else
+                tlbrAddNewIcon(BTNfolderTree, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          }
+
+          thisu := (thumbsDisplaying=1) ? BTNdeleteTool : BTNeraserBrush
+          If !isWelcomeScreenu
+             tlbrAddNewIcon(thisu, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+
+          If (thumbsDisplaying=1)
+          {
+             tlbrAddNewIcon(BTNinfozHud, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             tlbrAddNewIcon(BTNcalculate, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             tlbrAddNewIcon(BTNquickFacts, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          } Else If !isWelcomeScreenu
+          {
+             If (isTransPanel!=1)
+             {
+                tlbrAddNewIcon(BTNpenVector, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+                tlbrAddNewIcon(BTNfloodFill, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             }
+
+             If isNowAlphaPainting()
+                tlbrAddNewIcon(BTNalphInvert, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             Else If (isTransPanel=1)
+                tlbrAddNewIcon(BTNalignSel, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             Else
+                tlbrAddNewIcon(BTNinvertStuff, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          }
+
+          thisu:= (thumbsDisplaying=1) ? BTNannotate : BTNtextTool
+          If (isTransPanel!=1 && !isWelcomeScreenu)
+             tlbrAddNewIcon(thisu, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
        }
+
+       If !isWelcomeScreenu
+       {
+          tlbrAddNewIcon(BTNtlbrflipV, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          If !isVectorMode
+          {
+             tlbrAddNewIcon(BTNtlbrflipH, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             tlbrAddNewIcon(BTNtransformArea, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             tlbrAddNewIcon(BTNrotateStuff, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             tlbrAddNewIcon(BTNadjustColors, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          }
+
+          tlbrAddNewIcon(BTNloupe, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          If (thumbsDisplaying=1)
+          {
+             tlbrAddNewIcon(BTNfntSize, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             tlbrAddNewIcon(BTNpreviewBox, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          } Else
+          {
+             tlbrAddNewIcon(BTNvpGrid, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             tlbrAddNewIcon(BTNpanImg, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+          }
+       }
+
+       If (!isWelcomeScreenu && !isVectorMode)
+          tlbrAddNewIcon(BTNcolorsSwatch, handleClrW, handleClrH, 0, 0, simpleRefresh)
+       Else If !isVectorMode
+          tlbrAddNewIcon(BtnHelp, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
     }
 
-    If (!isWelcomeScreenu && !isVectorMode)
-       tlbrAddNewIcon(BTNcolorsSwatch, handleClrW, handleClrH, 0, 0, simpleRefresh)
-    Else If !isVectorMode
-       tlbrAddNewIcon(BtnHelp, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
     ; tlbrAddNewIcon(BTNrotateTlbr, handleWidth, handleHeight, 0)
-    toolbarY := UserToolbarY, toolbarX := UserToolbarX
+    tX := Round(UserToolbarX),    tY := Round(UserToolbarY)
     todisplay := (ShowAdvToolbar=1) ? "" : "hide"
     prevState := thisState
     If (simpleRefresh=0)
-       Gui, OSDguiToolbar: Show, x0 y0 AutoSize, QPV toolbar
+       Gui, OSDguiToolbar: Show, x%tX% y%tY% AutoSize NoActivate, QPV toolbar
 }
 
 GuiSlidersResponder(a, m_event, keyu) {
@@ -80634,7 +81139,12 @@ createGUItoolbar(dummy:=0) {
       UserToolbarY--
       hasEverDisplayed := 1
       delayedWriteTlbrColors(0)
-      IniAction(0, "ShowToolTipsToolbar", "General", 1)
+      RegAction(0, "ShowToolTipsToolbar", "General", 1)
+      IniAction(0, "userCustomizedToolbar", "General", 1)
+      IniAction(0, "userThumbsToolbarList", "General")
+      IniAction(0, "userImgViewToolbarList", "General")
+      IniAction(0, "toolbarViewerMode", "General", 1)
+      IniAction(0, "ToolbarBgrColor", "General", 3)
       IniAction(0, "ToolbarScaleFactor", "General", 2, 0.2, 5)
       IniAction(0, "TLBRverticalAlign", "General", 1)
       IniAction(0, "TLBRtwoColumns", "General", 1)
@@ -80646,7 +81156,8 @@ createGUItoolbar(dummy:=0) {
    isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
    addAlphaIcons := isAlphaMaskPartialWin()
    ToolBarBtnWidth := Round(OSDfontSize*1.5 * ToolbarScaleFactor)
-   currState := "a" isTransPanel isWelcomeScreenu addAlphaIcons isNowAlphaPainting() isAlphaMaskWindow() ToolBarBtnWidth TLBRverticalAlign TLBRtwoColumns isPaintPanel thumbsDisplaying drawingShapeNow
+   viewModus := (toolbarViewerMode=1) ? "a" toolbarViewerMode thumbsDisplaying : 1
+   currState := "a" toolbarViewerMode userCustomizedToolbar userThumbsToolbarList userImgViewToolbarList isTransPanel isWelcomeScreenu addAlphaIcons viewModus isNowAlphaPainting() isAlphaMaskWindow() ToolBarBtnWidth TLBRverticalAlign TLBRtwoColumns isPaintPanel thumbsDisplaying drawingShapeNow ToolbarBgrColor
    ; fnOutputDebug("toolbar state prev=" prevState)
    ; fnOutputDebug("toolbar state curr=" currState)
    If (dummy="state")
@@ -80699,8 +81210,20 @@ tlbrResetPosition() {
   JEE_ClientToScreen(hPicOnGui1, 1, 1, UserToolbarX, UserToolbarY)
   UserToolbarX--
   UserToolbarY--
-  Gui, OSDguiToolbar: Show, NoActivate x%UserToolbarX% y%UserToolbarY%, QPV toolbar
+  tX := Round(UserToolbarX),    tY := Round(UserToolbarY)
+  Gui, OSDguiToolbar: Show, NoActivate x%tX% y%tY%, QPV toolbar
   Return "m"
+}
+
+defineLastPanel() {
+   winIDu := prevOpenedWindow[1]
+   thisFunc := prevOpenedWindow[2]
+   allowReopen := prevOpenedWindow[3]
+   If (IsFunc(thisfunc) && thisFunc && allowReopen=1 && winIDu)
+      keyu := ": " thisFunc "(" winIDU ") [F8]"
+   Else
+      keyu := " [F8]"
+   Return keyu
 }
 
 tlbrDecideTooltips(hwnd) {
@@ -80715,6 +81238,79 @@ tlbrDecideTooltips(hwnd) {
       msgu :=  (thumbsDisplaying=1) ? "L: Quick actions menu [Shift + AppsKey]`nR: Interface options menu" : "L: Edit image menu`nR: Interface options menu"
       If (drawingShapeNow=1)
          msgu := "L: Vector shape options`nR: Viewport options"
+   } Else If (btnID="BTNnavNextImgu")
+   {
+      msgu := "Next image [Right]"
+   } Else If (btnID="BTNdeleteTool")
+   {
+      msgu := "L: Move to recycle bin [Delete]`nR: Remove focused index entry [Alt + Delete]"
+      If (askDeleteFiles!=1 && (!markedSelectFile || thumbsDisplaying!=1))
+         msgu .= "`nWARNING: User will not be prompted before file operation"
+   } Else If (btnID="BTNnavPrevImgu")
+   {
+      msgu := "L: Previous image [Left]`nR: Previously displayed image [Ctrl + Backspace]"
+   } Else If (btnID="BTNnavFirstImgu")
+   {
+      msgu := "L: First image [Home]`nR: Previous random image [Backspace]"
+   } Else If (btnID="BTNnavLastImgu")
+   {
+      msgu := "L: Last image [End]`nR: Next random image [Shift + Backspace]"
+   } Else If (btnID="BTNalignVPimgu")
+   {
+      msgu := "L: Toggle centered image alignment [A]`nR: Toggle outside viewport image panning"
+   } Else If (btnID="BTNimgSizers")
+   {
+      msgu := "L: Cycle adapt to window modes [T]`nR: Adapt modes options menu"
+   } Else If (btnID="BTNprintAcquire")
+   {
+      msgu := (thumbsDisplaying=1) ? "Print image(s) [Ctrl + P]" : "L: Print image(s) [Ctrl + P]`nR: Acquire image [WIA]"
+   } Else If (btnID="BTNhudHisto")
+   {
+      msgu := "L: Cycle histogram modes [G]`nR: Histogram options menu"
+   } Else If (btnID="BTNgoPrevPanel")
+   {
+      msgu := "Open previous panel" defineLastPanel()
+   } Else If (btnID="BtnReturnImgView")
+   {
+      msgu := "L: Return to image view [Escape / Enter]`nR: Open previous panel" defineLastPanel()
+   } Else If (btnID="BTNannotate")
+   {
+      msgu := "L: Edit image caption [Shift + N]`nR: Toggle display image caption [N]"
+   } Else If (btnID="BTNrotateTlbr")
+   {
+      msgu := "Toggle toolbar orientation"
+   } Else If (btnID="BTNcloseTlbr")
+   {
+      msgu := "Close this toolbar"
+   } Else If (btnID="BTNselectFileu")
+   {
+      msgu := "L: Select / deselect active file [Tab / Space]`nR: Drop files selection [Ctrl + D]"
+   } Else If (btnID="BTNzoomOutIMG")
+   {
+      msgu := "Zoom out"
+      If (thumbsDisplaying=1)
+         msgu := (thumbsListViewMode=1) ? "Decrease the number of columns" : "Decrease font size"
+   } Else If (btnID="BTNzoomInIMG")
+   {
+      msgu := "Zoom in"
+      If (thumbsDisplaying=1)
+         msgu := (thumbsListViewMode=1) ? "Increase the number of columns"  : "Increase font size"
+   } Else If (btnID="BTNprivatModa")
+   {
+      msgu := "L: Toggle private mode`nR: Toggle record seen images"
+   } Else If (btnID="BTNjumpAtIndex")
+   {
+      msgu := "Jump at user given file index"
+   } Else If (btnID="BTNswitchThumbs")
+   {
+      friendly := (thumbsDisplaying=1) ? "image view" : defineListViewModes() " list mode"
+      msgu := "L: Switch to " friendly " [Enter]`nR: Open previous panel" defineLastPanel()
+   } Else If (btnID="BTNswitchThumbs")
+   {
+      msgu := "L: Print image [Ctrl + P]`nR: Acquire image [WIA]"
+   } Else If (btnID="BTNsoundPlay")
+   {
+      msgu := "L: Play associated audio file [X]`nR: Stop audio playback [Shift + X]"
    } Else If InStr(icoFile, "copy")
    {
       friendly := (editingSelectionNow=1) ? "selection area " : ""
@@ -80739,7 +81335,7 @@ tlbrDecideTooltips(hwnd) {
       msgu := "Paint in the alpha mask [Ctrl + K]"
    } Else If InStr(icoFile, "alpha-mask-capture")
    {
-      msgu := "Capture image selected area as alpha mask"
+      msgu := "L: Capture image selected area as alpha mask`nR: Import clipboard as alpha mask"
    } Else If InStr(icoFile, "alpha-mask-pixelize")
    {
       msgu := "Rasterize / pixelize the alpha mask"
@@ -80793,7 +81389,7 @@ tlbrDecideTooltips(hwnd) {
    } Else If InStr(icoFile, "eraser")
    {
       keyu := (AnyWindowOpen=64) ? " [R]" : ""
-      msgu := (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) ? "L: Delete file" f " [Delete]`nR: Remove focused index entry [Alt + Delete]" : "L: Eraser - soft brush" keyu
+      msgu := "L: Eraser - soft brush" keyu
       If (isImgEditingNow()=1 && editingSelectionNow=1)
          msgu .= "`nR: Erase or fade image selected area [Delete]"
       If (isImgEditingNow()=1 && editingSelectionNow=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
@@ -80817,7 +81413,7 @@ tlbrDecideTooltips(hwnd) {
       msgu := "Color effects - soft brush" keyu
    } Else If InStr(icoFile, "brush-wet")
    {
-      msgu := "Soft wet brush: " BrushToolWetness
+      msgu := (AnyWindowOpen=64 && BrushToolType<3) ? "Soft wet brush: " Round(BrushToolWetness/22 * 100) "%" : "Soft wet brush"
    } Else If InStr(icoFile, "flood-fill")
    {
       msgu := "L: Flood fill / color bucket [K]"
@@ -80847,19 +81443,24 @@ tlbrDecideTooltips(hwnd) {
       msgu := "Toggle open/closed path [O]"
    } Else If InStr(icoFile, "pen-vector")
    {
-      ; If (editingSelectionNow=1 && EllipseSelectMode=2)
-      ;    msgu := "Modify vector shape [Shift + L]"
-      ; Else
-         msgu := "L: Draw freeform filled shape [Shift + P]`nR: Draw freeform poly or curve line [Alt + P]"
+      msgu := "L: Draw freeform filled shape [Shift + P]`nR: Draw freeform poly or curve line [Alt + P]"
+   } Else If InStr(icoFile, "spiral")
+   {
+      msgu := "Draw parametric lines [spirals, rays, grids]"
+   } Else If InStr(icoFile, "files-map")
+   {
+      msgu := "L: Show selected files map [W]`nR: Toggle show map on scrollbar click"
    } Else If InStr(icoFile, "pipette")
    {
       keyu := (imgEditPanelOpened=1 && AnyWindowOpen) ? " [C]" : ""
       keyu2 := (imgEditPanelOpened=1 && AnyWindowOpen) ? " [X]" : ""
-      msgu := "L: Pick color" keyu "`nR: Switch primary / secondary color" keyu2
+      msgu := "L: Pick color (click and drag)" keyu "`nR: Switch primary / secondary color" keyu2
    } Else If InStr(icoFile, "colorz-swatch")
    {
       keyu2 := (imgEditPanelOpened=1 && AnyWindowOpen) ? " [X]" : ""
       msgu := "L: Choose color`nR: Switch primary / secondary color" keyu2
+      If (thumbsDisplaying=1)
+         msgu := "Toggle private mode"
    } Else If InStr(icoFile, "crop")
    {
       If (isImgEditingNow()=1 && editingSelectionNow=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
@@ -80904,6 +81505,8 @@ tlbrDecideTooltips(hwnd) {
          msgu := "Toggle color adjustments for the image object [U]"
       Else If (thumbsDisplaying=1)
          msgu := "L: Adjust viewport colors and more [U]`nR: Reset viewport adjustments [ \ ]"
+      Else If isTlbrViewModus()
+         msgu := "L: Adjust viewport colors and more [Shift+U]`nR: Reset viewport adjustments [ \ ]"
       Else
          msgu := "L: Adjust image colors [U]`nAlt+LMB: Adjust viewport colors and more [Shift+U]`nR: Reset viewport adjustments [ \ ]"
    } Else If InStr(icoFile, "transform-img")
@@ -80971,12 +81574,14 @@ tlbrDecideTooltips(hwnd) {
    } Else If InStr(icoFile, "rotation")
    {
       friendly := (editingSelectionNow=1) ? "L: Image selection area" : "L: Viewport"
-      keyu := (editingSelectionNow=1) ? " [Shift + 9, 0]" : " [9, 0]"
+      keyu := (editingSelectionNow=1) ? " [Shift + 9, 0]" : " [9 / 0]"
       keyu2 := (editingSelectionNow=1) ? " [Shift + \]" : " [\]"
       msgu := friendly " - rotate by 15°" keyu "`nR: Reset rotation" keyu2
       msgu .= "`nHold Alt to change rotation by 1° "
       If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
          msgu := "L: Rotate image file by +90° [Shift + 0]`nR: Rotate image file by -90° [Shift + 9]"
+      Else If isTlbrViewModus()
+         msgu := "L: Rotate image by 45° [9 / 0]`nR: Reset rotation  [\]"
    } Else If InStr(icoFile, "fill-shape")
    {
       msgu := (AnyWindowOpen=23) ? "L: Cycle through fill shapes [Alt + BackSpace]" : "L: Fill selection area [Alt + Backspace]"
@@ -81011,14 +81616,8 @@ tlbrDecideTooltips(hwnd) {
    } Else If (btnID="BTNmainTooler")
    {
       friendly := (thumbsDisplaying=1) ? "image view [Enter]" : defineListViewModes() " list mode [Enter]"
-      winIDu := prevOpenedWindow[1]
-      thisFunc := prevOpenedWindow[2]
-      allowReopen := prevOpenedWindow[3]
-      If (IsFunc(thisfunc) && thisFunc && allowReopen=1 && winIDu)
-         keyu := ": " thisFunc "(" winIDU ")"
-
       moreFriendly := isNowAlphaPainting() ? "Exit Alpha Painting mode [Enter / Escape]" : "L: Apply current tool [Enter]`nR: Abandon current tool [Escape]"
-      msgu := !AnyWindowOpen ? "L: Open previous panel" keyu " [F8]`nR: Switch to " friendly : moreFriendly
+      msgu := !AnyWindowOpen ? "L: Open previous panel" defineLastPanel() "`nR: Switch to " friendly : moreFriendly
       If (isImgEditingNow()=1 && drawingShapeNow=1)
          msgu := "Apply changes to the vector shape and exit vector drawing mode [Enter]"
    } Else If InStr(icoFile, "brush-set-soft")
@@ -81088,8 +81687,9 @@ tlbrDecideTooltips(hwnd) {
    } Else If InStr(icoFile, "folder-tree") 
    {
       msgu := "L: Folders tree view panel [F4]`nR: Explore file location menu [Shift + F4]"
-      If isWelcomeScreenu
-         msgu := "Recently opened files"
+   } Else If InStr(icoFile, "recent") 
+   {
+      msgu := "Recently opened folders"
    } Else If InStr(icoFile, "infos") 
    {
       msgu := "L: Image and viewport details [I]`nR: Files information panel [Alt + Enter]"
@@ -81113,7 +81713,7 @@ tlbrDecideTooltips(hwnd) {
    } Else If InStr(icoFile, "play") 
    {
       friendly := DefineSlideShowType()
-      msgu := "L: Play " friendly " slideshow`nR: Slideshow duration settings [Shift + /]"
+      msgu := "L: Play " friendly " slideshow`nR: Cycle slideshow modes"
    } ; Else msgu := "N/A"
 
    Return msgu
@@ -81124,6 +81724,16 @@ ResetLbtn() {
      SetTimer, ResetLbtn, -60
   Else
      LbtnDwn := 0
+}
+
+DelayedToolbarTooltips(msgu, idu) {
+  MouseGetPos,,,, ctrlHover, 2
+  IndexBtn := tlbrIconzList[ctrlHover, 5] - 1
+  thisHwnd := tlbrIconzList[indexBtn, 1]
+  thisu := thisHwnd indexBtn
+  thisSize := OSDfontSize//3 + 2
+  If (thisu=idu && ShowAdvToolbar=1)
+     interfaceThread.ahkFunction("mouseCreateOSDinfoLine", msgu, thisSize)
 }
 
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
@@ -81206,17 +81816,15 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
            prevCtrlHover := ctrlHover
            prevMsg := msgu
            prevState := thisState
-           thisSize := OSDfontSize//3 + 2
            If (ShowToolTipsToolbar=1)
-              interfaceThread.ahkFunction("mouseCreateOSDinfoLine", msgu, thisSize)
+           {
+              fn := Func("DelayedToolbarTooltips").Bind(msgu, thisHwnd indexBtn)
+              SetTimer, % fn, -500
+           }
         }
         ; prevPos := mX "-" mY
         lastInvoked := A_TickCount
      }
-        ; ToolTip, % lastInvoked "=" ctrlHover "`n" msgu , , , 2
-
-     ; A := WinActive("A")
-     ; okay := (A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin) ? 1 : 0
   }
 }
 
@@ -81309,7 +81917,7 @@ invokeKbdToolbarAct(direction) {
    } Else
    {
       currentKbdBTNtlbr := 0
-      moveMouseToolbar(1, 1)
+      KeyboardMoveMouseToolbar(1, 1)
       displayNowToolbarHelp(1)
    }
 }
@@ -81327,7 +81935,7 @@ displayNowToolbarHelp(msgu) {
    interfaceThread.ahkFunction("mouseCreateOSDinfoLine", msgu, v)
 }
 
-moveMouseToolbar(direction, stepu) {
+KeyboardMoveMouseToolbar(direction, stepu) {
    If (isToolbarKBDnav!=1)
    {
        isToolbarKBDnav := 0
@@ -81335,11 +81943,13 @@ moveMouseToolbar(direction, stepu) {
        Return
    }
 
+   tlbrTotalIconz := tlbrIconzList["counter"]
    If (direction=1)
       currentKbdBTNtlbr += stepu
    Else
       currentKbdBTNtlbr -= stepu
 
+   currentKbdBTNtlbr := clampInRange(currentKbdBTNtlbr, 1, tlbrTotalIconz, 1)
    Global zeitSillyPrevent := A_TickCount
    hwndu := tlbrIconzList[currentKbdBTNtlbr, 1]
    If !hwndu
@@ -81367,10 +81977,6 @@ moveMouseToolbar(direction, stepu) {
    If msgu
       interfaceThread.ahkFunction("mouseCreateOSDinfoLine", msgu, thisSize)
 }
-
-; to do
-; - keyboard shortcuts for opacity ; tools
-
 
 testHistoDLL() {
    initQPVmainDLL()

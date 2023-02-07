@@ -2,6 +2,12 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.8.7 (2023-02-07)
+  - [new] users can now customize the toolbar; a dedicated panel allows users to add/remove icons in the toolbar, for the image view and thumbnails/list modes
+  - [new] viewer mode toolbar; activated by default; in this mode, only common actions for an image viewer are shown
+  - [new] option to import clipboard image as an alpha mask
+  - bug fixes
+
 - v5.8.6 (2023-02-02)
   - various bug fixes;
 

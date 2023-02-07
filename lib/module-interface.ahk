@@ -1117,14 +1117,6 @@ updateGDIwinPos() {
   WinMove, ahk_id %hGDIinfosWin%,, %GuiX%, %GuiY% ; , %mainWidth%, %mainHeight%
 }
 
-triggerOwnDialogs() {
-  ; AnyWindowOpen := MainExe.ahkgetvar.AnyWindowOpen
-  ; If AnyWindowOpen
-  ;    Gui, SettingsGUIA: +OwnDialogs
-  ; Else
-     Gui, 1: +OwnDialogs
-}
-
 JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
 ; function by jeeswg found on:
 ; https://autohotkey.com/boards/viewtopic.php?t=38472

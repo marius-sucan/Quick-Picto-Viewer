@@ -352,7 +352,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
      Gui, Add, ListBox, xp y+%marginz% r%2ndlistRows% w%2ndlistWidth% AltSubmit %2ndmultisel% v2ndDropListuChoice, % 2ndDropListu
 
   hDefBtn := ""
-  ledH := (PrefsLargeFonts=1) ? 14 : 7
+  ledH := (PrefsLargeFonts=1) ? 10 : 6
   Loop, Parse, btnList, | ; list specified buttons
   {
       If !A_LoopField
