@@ -126,6 +126,8 @@ GENERAL / USER INTERFACE:
 
 * Adjustable user interface font sizes and colors.
 
+* Customizable keyboard shortcuts and toolbar icons
+
 * Dark mode for the user interface.
 
 * Ambiental textured window background. Automatically generated background based on the currently displayed image.

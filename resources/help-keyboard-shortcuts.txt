@@ -6,6 +6,7 @@ NumPad +|Zoom in [image or thumbnails]|Anywhere|-
 NumPad -|Zoom out [image or thumbnails]|Anywhere|-
 NumPad *|100% image zoom [original size]|Image view|-
 NumPad /|Adjust image to window|Image view|-
+Ctrl + /|100% image zoom [original size]|Image view|-
 /|Adjust image to window|Image view|-
 Ctrl + -|Increase OSD font sizes|Anywhere|-
 Ctrl + =|Decrease OSD font sizes|Anywhere|-
@@ -31,6 +32,7 @@ A|Toggle centered image alignment|Anywhere|-
 Alt + A|Adjust image canvas size|Image view|Panel
 Alt + Backspace|Fill shapes or draw outlines of shapes|Image selection area|Panel
 Alt + Delete|Remove active file index entry|Anywhere|-
+Ctrl + Delete|Delete active file|Anywhere|-
 Alt + E|Selection properties|Image selection area|Panel
 Alt + E|Open in QPV containing folder|Anywhere|-
 Alt + U|Manage dynamic folder(s) list|Anywhere|Panel
@@ -89,7 +91,7 @@ Ctrl + V|Render text from clipboard as image or paste clipboard image|Image view
 Ctrl + V|Paste text files list from clipboard or files from Explorer|Files list|-
 Ctrl + X|Cut selected image area|Image selection area|-
 Ctrl + Wheel Up / Down|Zoom in/out|Anywhere|-
-D|Hide live previewed dynamic object|Live editing|-
+D|Hide live preview dynamic object|Live editing|-
 E|Toggle edit image selection area|Image view|-
 E|Select files in same folder|Files list|-
 Delete|Delete file(s)|Anywhere|Panel
@@ -107,7 +109,7 @@ F1|Help / About|Anywhere|Panel
 F10|Toggle menu|Anywhere|-
 Shift + F10|Toggle toolbar|Anywhere|-
 F11|Toggle full-screen|Image view|Mode switch
-F11|Collapse / expand panel for current tool|Live editing|Panel
+F11|Collapse / expand panel for the current tool|Live editing|Panel
 F12|Preferences|Anywhere|Panel
 F2|Rename file(s)|Anywhere|Panel
 F5|Reload files list or image file|Anywhere|-
@@ -168,6 +170,7 @@ Home / End|Jump to the first or last image in the index|Anywhere|-
 Wheel Up / Down|Next / Previous image [does not apply in custom zoom mode]|Image view|-
 Wheel Up / Down|Up/down two lines of images|Files list|-
 Page Up / Down|Next / Previous image|Image view|-
+Shift + Page Up / Down|Next / Previous frame (in GIFs, TIFFs or WEBP)|Image view|-
 Page Up / Down|Jump forwards or backwards one page of images|Files list|-
 Backspace|Previous random image|Anywhere|-
 Backspace|Remove last added point in the path|Vector drawing|-
@@ -176,12 +179,12 @@ Shift + Backspace|Next random image|Anywhere|-
 Ctrl + Home / End|Jump to the first or last selected file in the index|Anywhere|-
 Ctrl + Arrow keys|Navigate between selected files|Anywhere|-
 Space + L-Click|Pan image|Image view|-
-Space|Start or stop slideshow [if not in «Custom Zoom level» mode|Image view|-
+Space|Start or stop slideshow [if not in «Custom Zoom level» mode]|Image view|-
 Space|Select or deselect files [if files selection already exists]|Files list|-
 Tab|Select or deselect active file|Anywhere|-
 Shift + /|Define slideshow duration|Image view|Panel
-Shift + -|Decrease selection area|Image selection area|-
-Shift + =|Increase selection area|Image selection area|-
+Shift + -|Decrease/shrink selection area|Image selection area|-
+Shift + =|Increase/enlarge selection area|Image selection area|-
 Shift + \|Preview image without color adjustments|Image view|-
 Shift + \|Reset selection area rotation|Image selection area|-
 Shift + B|Blur selected area|Image view|Panel
@@ -190,10 +193,11 @@ Shift + Delete|Delete active file and its index entry|Anywhere|-
 Shift + E|Cycle image selection area modes: rect, ellipse, freeform|Image selection area|-
 Ctrl + NumPad keys|Align image selection area: top, bottom, left, right, more|Image selection area|-
 Ctrl + NumPad - / +|Shrink/enlarge selection area|Image selection area|-
-Ctrl + NumPad * / /|Increase or decrease selection area cavity|Image selection area|-
-Ctrl + NumPad .|Reset selection area rotation and cavity|Image selection area|-
-Alt + [+]|Increase viewport grid size|Image view|-
-Alt + [-]|Decrease viewport grid size|Image view|-
+Ctrl + NumPad * / /|Increase or decrease selection area exclusion|Image selection area|-
+Ctrl + , / .|Increase or decrease selection area exclusion|Image selection area|-
+Alt + \|Reset selection area rotation and exclusion|Image selection area|-
+Alt + =|Increase viewport grid size|Image view|-
+Alt + -|Decrease viewport grid size|Image view|-
 Shift + Esc|Restart Quick Picto Viewer|Anywhere|Close window
 Shift + F2|Rename active file|Anywhere|Panel
 Ctrl + H|Search and replace in files list index|Anywhere|Panel
@@ -248,6 +252,7 @@ Delete|Delete folder|Folder tree|Panel
 Space|Scan for sub-folders in the selected folder|Folder tree|-
 7|Copy selected or active file(s) into...|Folder tree|-
 Shift + 7|Move selected or active file(s) into...|Folder tree|-
+G|Toggle viewport grid|Vector drawing|-
 Double L-Click on dot|Insert a new dot next to the double-clicked one|Vector drawing|-
 Ctrl + L-Click on dot|Remove the dot clicked on|Vector drawing|-
 Alt + L-Click on dot|Move dot ignoring symmetry|Vector drawing|-
@@ -269,6 +274,12 @@ Alt + L-Click inside area|Resize selection area relative to its center and trans
 Double L-Click outside area|Drop image selection area|Image selected area|-
 [|Increase brush size|Painting mode|-
 ]|Decrease brush size|Painting mode|-
+Shift + [|Increase brush softness|Painting mode|-
+Shift + ]|Decrease brush softness|Painting mode|-
+Ctrl + [|Increase brush angle|Painting mode|-
+Ctrl + ]|Decrease brush angle|Painting mode|-
+Alt + [|Increase brush aspect ratio|Painting mode|-
+Alt + ]|Decrease brush aspect ratio|Painting mode|-
 .|Increase brush opacity|Painting mode|-
 ,|Decrease brush opacity|Painting mode|-
 Shift + .|Increase brush wetness or deform intensity|Painting mode|-

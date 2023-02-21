@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.8.7
+;@Ahk2Exe-SetVersion 5.8.8
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2023)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -110,7 +110,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , RegExAllFilesPattern := "ico|dib|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif|webp"
    , RegExFilesPattern := "i)^(.\:\\).*(\.(" RegExAllFilesPattern "))$", folderFavesFile := "quick-picto-viewer-folder-faves.ini"
    , RegExFIMformPtrn := "i)(.\\*\.(DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
-   , RegExWICfmtPtrn := "i)(.\\*\.(place-holder|webp|bmp|dib|jpg|jpeg|tif|tiff|png))$"
+   , RegExWICfmtPtrn := "i)(.\\*\.(place-holder|webp|bmp|dib|jpg|jpeg|tif|tiff|png))$", customKbdFile := "quick-picto-viewer-custom-kbd.ini"
    , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|jng|jif|jfif|jpg|jpe|jpeg|ppm|xpm))$"
    , saveTypesFriendly := ".BMP, .GIF, .HDP, .J2K, .JFIF, .JIF, .JNG, .JP2, .JPE, .JPG, .JXR, .PNG, .PPM, .TGA, .TIF, .WDP, .WEBP or .XPM"
    , saveAlphaTypesRegEX := "i)(.\.(j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp))$", userJpegQuality := 90
@@ -158,7 +158,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , prevVPselRotation, prevrotateSelBoundsKeepRatio, prevEllipseSelectMode, currentSelUndoLevel := 1, liveDrawingBrushTool := 0
    , seenImagesDB := "", mustRecordSeenImgs := 0, hEditField := "", gdiBMPvPsize := "", maxGDIbmpSize := 533654021
    , GDIcacheSRCfileA := "", idGDIcacheSRCfileA := "", GDIcacheSRCfileB := "", idGDIcacheSRCfileB := "", prevOpenedWindow := []
-   , startLongOperation := 1, thisIMGisDownScaled := 0, simpleOpRotationAngle := 1, UserTextArea := ""
+   , startLongOperation := 1, thisIMGisDownScaled := 0, simpleOpRotationAngle := 1, UserTextArea := "", hKbdGuia
    , runningLongOperation := 0, hasReachedMaxUndoLevels := 0, GIFframesPlayied := 0, allImagesWereSeen := 0
    , 2NDglHbitmap := "", 2NDglHDC := "", 2NDglOBM := "", 2NDglPG := "", mainThreadHwnd := "", imgDecLX := "", imgDecLY := ""
    , undoLevelsArray := [], currentUndoLevel := 0, maxUndoLevels := 50, undoLevelsRecorded := 0, hGDIinfosWin := ""
@@ -196,7 +196,8 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , dupesHashesData := [], dbVersion := 0, dbExpectedVersion := 2, userPrevAlphaMaskBmpPainted := ""
    , clrGradientOffX := 0, clrGradientOffY := 0, userAllowClrGradientRecenter := 0, TabsPerWindow := []
    , darkWindowColor := 0x202020, darkControlColor := 0xEDedED, allowWICloader := 1, allowFIMloader := 1
-   , monitorBgrColor := darkWindowColor, hBtnCollapse := "", lastSlidersPainted := []
+   , monitorBgrColor := darkWindowColor, hBtnCollapse := "", lastSlidersPainted := [], userCustomKeysDefined := []
+   , simulateMenusMode := 0, lastLVquickSearchSortCol := []
 
 Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameSavedVectorShape := ""
    , postVectorWinOpen := 0, isWelcomeScreenu := 0, prevVectorShapeSymmetryMode := [], AllowDarkModeForWindow := ""
@@ -210,8 +211,9 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , userImgClrMtrxBrightness, userImgClrMtrxContrast, userImgClrMtrxSaturation, userImgVPthreshold, userImgVPgammaLevel
    , cmdExifTool := "", tabzDarkModus := 0, maxRecentOpenedFolders := 15, UIuserToneMapParamA := 38, UIuserToneMapParamB := 100
    , userImgChannelRlvl, userImgChannelGlvl, userImgChannelBlvl, userImgChannelAlvl, combosDarkModus := ""
+   , sillySeparator :=  "▪", menuCustomNames := new hashtable()
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.8.7", vReleaseDate := "2023/02/07" ; yyyy-mm-dd
+   , appVersion := "5.8.8", vReleaseDate := "2023/02/21" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -313,7 +315,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , dupesApplyBlur := 0, BreakDupesGroups := 0, fadeOtherDupeGroups := 1, TextInAreaFillSelArea := 0
    , keepUserPaintAlphaMask := 0, alphaMaskColorReversed := 0, alphaMaskGradientScale := 100
    , alphaMaskGradientPosA := 0, alphaMaskGradientPosB := 100, alphaMaskGradientWrapped := 0
-   , FillBehindClrOpacity  := 200, FillBehindOpacity := 255, FillBehindColor := "ff4400"
+   , FillBehindClrOpacity  := 200, FillBehindOpacity := 255, FillBehindColor := "ff4400", allowCustomKeys := 1
    , alphaMaskGradientAngle := 0, DesaturateAreaChannel := 1, FloodFillClrOpacity := 255
    , FloodFillOpacity := 205, FloodFillBlendMode := 1, TextInAreaBlendMode := 1, BlurAreaAlphaMask := 0
    , UserAddNoiseBlurAmount := 0, UserAddNoisePixelizeAmount := 2, FillBehindInvert := 0
@@ -503,9 +505,13 @@ HKifs(q:=0, whichWin:=-1) {
 }
 
 constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code) {
-   Static vkList := {8:"BACKSPACE", 9:"TAB", C:"NUMPADCLEAR", D:"ENTER", 14:"CAPSLOCK", 1B:"ESCAPE", 20:"SPACE", 21:"PGUP", 22:"PGDN", 23:"END", 24:"HOME", 25:"LEFT", 26:"UP", 27:"RIGHT", 28:"DOWN", 2D:"INSERT", 2E:"DELETE", 5B:"SCROLLLOCK", 5D:"APPSKEY", 60:"NUMPAD0", 61:"NUMPAD1", 62:"NUMPAD2", 63:"NUMPAD3", 64:"NUMPAD4", 65:"NUMPAD5", 66:"NUMPAD6", 67:"NUMPAD7", 68:"NUMPAD8", 69:"NUMPAD9", 6A:"NUMPADMULT", 6B:"NUMPADADD", 6D:"NUMPADSUB", 6E:"NUMPADDOT", 6F:"NUMPADDIV", 70:"F1", 71:"F2", 72:"F3", 73:"F4", 74:"F5", 75:"F6", 76:"F7", 77:"F8", 78:"F9", 79:"F10", 7A:"F11", 7B:"F12", 90:"NUMLOCK", AD:"VOLUME_MUTE", AE:"VOLUME_DOWN", AF:"VOLUME_UP", B0:"MEDIA_NEXT", B1:"MEDIA_PREV", B2:"MEDIA_STOP", B3:"MEDIA_PLAY_PAUSE", FF:"PAUSE", 1:"LBUTTON", 2:"RBUTTON", 3:"BREAK", 4:"MBUTTON", 5:"XBUTTON1", 6:"XBUTTON2", 10:"SHIFT", 11:"CONTROL", 12:"ALT", 13:"PAUSE", 15:"KANA/HANGUL", 17:"JUNJA", 18:"IME_FINAL", 19:"HANJA/KANJI", 16:"IME_ON", 1A:"IME_OFF", 1C:"IME_CONVERT", 1D:"IME_NON_CONVERT", E5:"IME_PROCESSKEY", 1E:"IME_ACCEPT", 1F:"IME_MODECHANGE", 2F:"HELP", 29:"SELECT", 2A:"PRINT", 2B:"EXECUTE", 2C:"PRINT_SCREEN", 5F:"SLEEP", 7C:"F13", 7D:"F14", 7E:"F15", 7F:"F16", 80:"F17", 81:"F18", 82:"F19", 83:"F20", 84:"F21", 85:"F22", 86:"F23", 87:"F24", A6:"BROWSER_BACK", A7:"BROWSER_FORWARD", A8:"BROWSER_REFRESH", A9:"BROWSER_STOP", AA:"BROWSER_SEARCH", AB:"BROWSER_FAVORITES", AC:"BROWSER_HOME", B4:"LAUNCH_MAIL", B5:"LAUNCH_MEDIA_SELECT", B6:"LAUNCH_APP1", B7:"LAUNCH_APP2", F6:"ATTN", F7:"CrSEL", F8:"ExSEL", F9:"ERASE_EOF", FA:"PLAY", FB:"ZOOM", FD:"PA1", A0:"LSHIFT", A1:"RSHIFT", A2:"LCTRL", A3:"RCTRL", A4:"LALT", A5:"RALT", 5B:"LWIN", 5C:"RWIN"}
-        , vkExtraList := {30:"00.1", 31:"1", 32:"2", 33:"3", 34:"4", 35:"5", 36:"6", 37:"7", 38:"8", 39:"9", 41:"A", 42:"B", 43:"C", 44:"D", 45:"E", 46:"F", 47:"G", 48:"H", 49:"I", 4A:"J", 4B:"K", 4C:"L", 4D:"M", 4E:"N", 4F:"O", 50:"P", 51:"Q", 52:"R", 53:"S", 54:"T", 55:"U", 56:"V", 57:"W", 58:"X", 59:"Y", 5A:"Z", BB:"PLUS", BC:"COMMA", BD:"MINUS", BE:"PERIOD"}
-        ; , BA:"OEM_1", BF:"OEM_2", C0:"OEM_3", DB:"OEM_4", DC:"OEM_5", DD:"OEM_6", DE:"OEM_7", DF:"OEM_8", E2:"OEM_102", E1:"OEM_9", E3:"OEM_11", E4:"OEM_12", E6:"OEM_13", FE:"OEM_CLEAR", 92:"OEM_14", 93:"OEM_15", 94:"OEM_16", 95:"OEM_17", 96:"OEM_18"}
+   Static vkList := {8:"BACKSPACE", 9:"TAB", C:"NUMPADCLEAR", D:"ENTER", 14:"CAPSLOCK", 1B:"ESCAPE", 20:"SPACE", 21:"PGUP", 22:"PGDN", 23:"END", 24:"HOME", 25:"LEFT", 26:"UP", 27:"RIGHT", 28:"DOWN", 2D:"INSERT", 2E:"DELETE", 5B:"SCROLLLOCK", 5D:"APPSKEY", 60:"NUMPAD0", 61:"NUMPAD1", 62:"NUMPAD2", 63:"NUMPAD3", 64:"NUMPAD4", 65:"NUMPAD5", 66:"NUMPAD6", 67:"NUMPAD7", 68:"NUMPAD8", 69:"NUMPAD9"
+                   , 6A:"NUMPADMULT", 6B:"NUMPADADD", 6D:"NUMPADSUB", 6E:"NUMPADDOT", 6F:"NUMPADDIV", 70:"F1", 71:"F2", 72:"F3", 73:"F4", 74:"F5", 75:"F6", 76:"F7", 77:"F8", 78:"F9", 79:"F10", 7A:"F11", 7B:"F12", 90:"NUMLOCK", AD:"VOLUME_MUTE", AE:"VOLUME_DOWN", AF:"VOLUME_UP", B0:"MEDIA_NEXT", B1:"MEDIA_PREV", B2:"MEDIA_STOP", B3:"MEDIA_PLAY_PAUSE", FF:"PAUSE", 1:"LBUTTON", 2:"RBUTTON"
+                   , 3:"BREAK", 4:"MBUTTON", 5:"XBUTTON1", 6:"XBUTTON2", 10:"SHIFT", 11:"CONTROL", 12:"ALT", 13:"PAUSE", 15:"KANA/HANGUL", 17:"JUNJA", 18:"IME_FINAL", 19:"HANJA/KANJI", 16:"IME_ON", 1A:"IME_OFF", 1C:"IME_CONVERT", 1D:"IME_NON_CONVERT", E5:"IME_PROCESSKEY", 1E:"IME_ACCEPT", 1F:"IME_MODECHANGE", 2F:"HELP", 29:"SELECT", 2A:"PRINT", 2B:"EXECUTE", 2C:"PRINT_SCREEN", 5F:"SLEEP"
+                   , 7C:"F13", 7D:"F14", 7E:"F15", 7F:"F16", 80:"F17", 81:"F18", 82:"F19", 83:"F20", 84:"F21", 85:"F22", 86:"F23", 87:"F24", A6:"BROWSER_BACK", A7:"BROWSER_FORWARD", A8:"BROWSER_REFRESH", A9:"BROWSER_STOP", AA:"BROWSER_SEARCH", AB:"BROWSER_FAVORITES", AC:"BROWSER_HOME", B4:"LAUNCH_MAIL", B5:"LAUNCH_MEDIA_SELECT", B6:"LAUNCH_APP1", B7:"LAUNCH_APP2", F6:"ATTN", F7:"CrSEL"
+                   , F8:"ExSEL", F9:"ERASE_EOF", FA:"PLAY", FB:"ZOOM", FD:"PA1", A0:"LSHIFT", A1:"RSHIFT", A2:"LCTRL", A3:"RCTRL", A4:"LALT", A5:"RALT", 5B:"LWIN", 5C:"RWIN", BF:"SLASH", DC:"BSLASH", C0:"TILDA", DE:"QUOTES"}
+        , vkExtraList := {30:"00.1", 31:"1", 32:"2", 33:"3", 34:"4", 35:"5", 36:"6", 37:"7", 38:"8", 39:"9", 41:"A", 42:"B", 43:"C", 44:"D", 45:"E", 46:"F", 47:"G", 48:"H", 49:"I", 4A:"J", 4B:"K", 4C:"L", 4D:"M", 4E:"N", 4F:"O", 50:"P", 51:"Q", 52:"R", 53:"S", 54:"T", 55:"U", 56:"V", 57:"W", 58:"X", 59:"Y", 5A:"Z", BB:"EQUAL", BC:"COMMA", BD:"MINUS", BE:"PERIOD", BA:"COLON", DB:"LBRACKET", DD:"RBRACKET"}
+        ; DF:"OEM_8", E2:"OEM_102", E1:"OEM_9", E3:"OEM_11", E4:"OEM_12", E6:"OEM_13", FE:"OEM_CLEAR", 92:"OEM_14", 93:"OEM_15", 94:"OEM_16", 95:"OEM_17", 96:"OEM_18"}
    ; vk list based on https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
 
    newkate := ""
@@ -520,6 +526,7 @@ constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code) {
       newkate .= vkExtraList[vk_code]
    Else
       newkate .= vkList[vk_code] ? vkList[vk_code] : "vk" vk_code
+
    Return newkate
 }
 
@@ -631,7 +638,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
    ; SoundBeep 
    Az := WinActive("A")
    ; addJournalEntry(A_ThisFunc "(): " az "=" thisWin "|" givenKey)
-   If (VisibleQuickMenuSearchWin && Az!=hQuickMenuSearchWin && omniBoxMode=0)
+   If (VisibleQuickMenuSearchWin=1 && !isVarEqualTo(Az, hQuickMenuSearchWin, hKbdGuia, hSetWinGui) && omniBoxMode=0)
    {
       lastTimeToggleThumbs := A_TickCount 
       closeQuickSearch()
@@ -662,7 +669,7 @@ KeyboardResponder(givenKey, thisWin, abusive) {
             SetTimer, highlightActiveArrowsCtrl, -50
          } Else If (InStr(OutputVar, "edit") && (givenKey="home" || givenKey="end"))
          {
-            Static lastSilly :=1
+            Static lastSilly := 1
             lastSilly := !lastSilly
             If lastSilly
                highlightActiveCtrl()
@@ -685,6 +692,9 @@ KeyboardResponder(givenKey, thisWin, abusive) {
          } Else If (InStr(OutputVar, "edit") && givenKey="F1")
          {
             btnHelpQuickSearchMenus()
+         } Else If (InStr(OutputVar, "edit") && givenKey="F2")
+         {
+            PanelDefineKbdShortcut()
          } Else If (InStr(OutputVar, "edit") && givenKey="F8")
          {
             closeQuickSearch()
@@ -789,1264 +799,17 @@ KeyboardResponder(givenKey, thisWin, abusive) {
    } Else If (thisWin=PVhwnd && identifyThisWin()=1)
    {
        ; ToolTip, % givenKey "==" thisWin , , , 2
-       If (givenKey="^o")
+       If (ckbd := testCustomKBDcontexts(givenKey))
        {
-           If HKifs("general")
-              OpenDialogFiles()
-       } Else If (givenKey="o")
-       {
-           imgPath := getIDimage(currentFileIndex)
-           If (isImgEditingNow()=1 && drawingShapeNow=1)
-              toggleOpenClosedLineCustomShape()
-           Else If HKifs("imgsLoaded")
-              OpenThisFileMenu()
-           Else If ((HKifs("general") && (!CurrentSLD || StrLen(gdiBitmap)<3)) && !FileRexists(imgPath))
-              OpenDialogFiles()
-       } Else If (givenKey="w")
-       {
-           ; w ; to-do
-           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1 && thumbsDisplaying!=1)
-              flipSelectionWH()
-           Else If (thumbsDisplaying=1 && maxFilesIndex>10 && CurrentSLD && !z)
-              invokeFilesListMapNow()
-
-           ; testDissolver()
-           ; testGmicQPV()
-       } Else If (givenKey="+^n")
-       {
-           If HKifs("general")
-              OpenNewQPVinstance()
-       } Else If (givenKey="^n")
-       {
-           If HKifs("general")
-              PanelNewImage()
-       } Else If (givenKey="+vkC0")
-       {
-           If HKifs("general")
-              PanelJournalWindow()
-       } Else If (givenKey="F12")
-       {
-           If HKifs("general")
-              PanelPrefsWindow()
-       } Else If (givenKey="p")
-       {
-           If (isImgEditingNow()=1 && drawingShapeNow=1)
-             togglePreviewVectorNewPoint()
-           Else If (liveDrawingBrushTool=1 && isImgEditingNow()=1 && AnyWindowOpen=64)
-             toggleBrushDeformers()
-           Else If ((HKifs("imgEditSolo") || HKifs("liveEdit", 64) || HKifs("imgsLoaded")) && AnyWindowOpen!=31 && AnyWindowOpen!=24)
-             PanelBrushTool()
-       } Else If (givenKey="!p")
-       {
-           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-              MenuStartDrawingLines()
-       } Else If (givenKey="+p")
-       {
-           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-              MenuStartDrawingShapes()
-       } Else If (givenKey="^p")
-       {
-           If (imageLoading!=1 && (HKifs("imgEditSolo") || HKifs("imgsLoaded")))
-              PanelPrintImage()
-       } Else If (givenKey="vkBA")
-       {
-           PanelQuickSearchMenuOptions()
-       } Else If (givenKey="+vkBA")
-       {
-           invokeOmniBoxCurrentFile()
-       } Else If InStr(givenKey, "^Numpad")
-       {
-           alignImgSelection(givenKey)
-       } Else If (givenKey="^NumpadAdd" || givenKey="^plus")
-       {
-           changeOSDfontSize(1)
-       } Else If (givenKey="^NumpadSub" || givenKey="^minus")
-       {
-           changeOSDfontSize(-1)
-       } Else If (givenKey="+o")
-       {
-           If HKifs("general")
-              OpenFolders()
-       } Else If (givenKey="^F10" || givenKey="+F10" || givenKey="+!F10")
-       {
-           toggleAppToolbar()
-       } Else If (givenKey="!F10" || givenKey="F10") && (drawingShapeNow!=1)
-       {
-           ToggleMenuBaru()
-       } Else If (givenKey="^AppsKey" || givenKey="+AppsKey") && (drawingShapeNow!=1)
-       {
-           BuildSecondMenu("tlbr")
-       } Else If (givenKey="#AppsKey" || givenKey="!AppsKey" || givenKey="AppsKey" || givenKey="RButton")
-       {
-           InitGuiContextMenu(givenKey)
-       } Else If (givenKey="Insert")
-       {
-           If (HKifs("general") && imageLoading!=1)
-              addNewFile2list()
-       } Else If (givenKey="^v")
-       {
-           If (HKifs("general") && imageLoading!=1)
-              PasteClipboardIMG()
-       } Else If (givenKey="+Escape")
-       {
-           restartAppu()
-       } Else If (givenKey="F1")
-       {
-           showQuickHelp()
-       } Else If (givenKey="F9")
-       {
-          If (HKifs("imgsLoaded") && folderTreeWinOpen=1)
-             FolderTreeFindActiveFile()
-       } Else If (givenKey="^F4")
-       {
-          If (drawingShapeNow=1)
-             stopDrawingShape()
-          Else If AnyWindowOpen
-             CloseWindow()
-          Else If (thumbsDisplaying=1)
-             MenuReturnIMGedit()
-          Else
-             closeDocuments()
-       } Else If (givenKey="d")
-       {
-           If (HKifs("liveEdit") && liveDrawingBrushTool=1)
-              ResetColorsToBW()
-           Else If (HKifs("liveEdit") && AnyWindowOpen!=10)
-              toggleLiveEditObject()
-       } Else If (givenKey="l")
-       {
-           If ((HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1 || showViewPortGrid=1) && thumbsDisplaying!=1)
-              toggleLimitSelection()
-           Else If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-              toggleListViewModeThumbs()
-       } Else If (givenKey="+^v")
-       {
-           If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
-              PanelPasteInPlace()
-       } Else If (givenKey="^d")
-       {
-           If (isImgEditingNow()=1 && drawingShapeNow=1)
-              MenuSelNoVectorPoints()
-           Else If (HKifs("imgsLoaded") && ((thumbsDisplaying=1) || (editingSelectionNow!=1 && markedSelectFile)))
-              dropFilesSelection()
-           Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
-              resetImgSelection()
-       } Else If (givenKey="^c")
-       {
-           If (thumbsDisplaying=1 && HKifs("imgsLoaded"))
-              MenuExplorerCopyFiles()
-           Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
-              CopyImage2clip()
-       } Else If (givenKey="^x")
-       {
-           If (thumbsDisplaying=1 && HKifs("imgsLoaded"))
-              MenuExplorerCutFiles()
-           Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
-              CutSelectedArea()
-       } Else If (givenKey="^z")
-       {
-           allowLoop := 1
-           If (isImgEditingNow()=1 && drawingShapeNow=1)
-              ImgVectorUndoAct()
-           Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-              ImgUndoAction()
-       } Else If (givenKey="z")
-       {
-           If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ToggleImgNavBox()
-       } Else If (givenKey="^y")
-       {
-          allowLoop := 1
-          If (isImgEditingNow()=1 && drawingShapeNow=1)
-             ImgVectorRedoAct()
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ImgRedoAction()
-       } Else If (givenKey="+^z")
-       {
-          allowLoop := 1
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ImgSelUndoAct()
-       } Else If (givenKey="+^y")
-       {
-          allowLoop := 1
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ImgSelRedoAct()
-       } Else If (givenKey="^!z")
-       {
-          allowLoop := 1
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ImgUndoAction("j")
-       } Else If (givenKey="^!y")
-       {
-          allowLoop := 1
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ImgRedoAction("j")
-       } Else If (givenKey="e")
-       {
-          If (isVarEqualTo(AnyWindowOpen, 64, 66, 12, 10) && imgEditPanelOpened=1) ; Brush, Fill and Jpeg Crop
-             ToggleEditImgSelection()
-          Else If (thumbsDisplaying=1)
-             QuickSelectFilesSameFolder()
-          Else If (HKifs("liveEdit") && AnyWindowOpen!=10)
-             livePreviewsImageEditing(1)
-          Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+          If isFunc(userCustomKeysDefined[ckbd, 1])
           {
-             ToggleEditImgSelection()
-             If (editingSelectionNow=1)
-                CreateGuiButton("Selection options,,invokeSelectionAreaMenu", 0, msgDisplayTime//1.5 + 500)
+             thisu := userCustomKeysDefined[ckbd, 1]
+             If testFuncIsInMenus(thisu) ; prevent execution of functions that are no available in the current context
+                %thisu%()
           }
-       } Else If (givenKey="+e")
+       } Else If (allowLoop := processDefaultKbdCombos(givenKey, thisWin, abusive, Az, 0))
        {
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1 && currentFileIndex>0 && maxFilesIndex>2)
-          {
-             activateFilesListFilterBasedOnFolder(currentFileIndex)
-          } Else
-          {
-             If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-                MenuCycleSelectionShapes()
-          }
-       } Else If (givenKey="!e")
-       {
-          If ((HKifs("imgEditSolo") || HKifs("imgsLoaded") || HKifs("liveEdit")) && editingSelectionNow=1)
-             PanelIMGselProperties()
-          Else If HKifs("imgsLoaded")
-             OpenQPVfileFolder()
-       } Else If (givenKey="^s")
-       {
-          If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
-             PanelSaveImg()
-       } Else If (givenKey="^l")
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit", 65) || HKifs("imgsLoaded"))
-             PanelDrawShapesInArea()
-       } Else If (givenKey="+l")
-       {
-          If (HKifs("imgsLoaded") && (thumbsDisplaying=1))
-             CalculateSelectedFilesSizes()
-          Else If (HKifs("liveEdit") && EllipseSelectMode=2 && editingSelectionNow=1 && isVarEqualTo(AnyWindowOpen, 74, 68, 66, 65, 64, 55, 25, 23, 10))
-             MenuResumeDrawingShapes()
-          Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded")) && (thumbsDisplaying!=1)
-          {
-             If (editingSelectionNow!=1 || EllipseSelectMode!=2)
-                MenuStartDrawingSelectionArea()
-             Else
-                MenuResumeDrawingShapes()
-          }
-       } Else If (givenKey="!BackSpace")
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             tlbrFillShape()          ; PanelFillSelectedArea()
-       } Else If (givenKey="!y")
-       {
-          If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
-            PanelImgAutoCrop()
-       } Else If (givenKey="y")
-       {
-          If ((liveDrawingBrushTool=1 || drawingShapeNow=1) && isImgEditingNow()=1)
-             toggleBrushSymmetryModes()
-       } Else If (givenKey="+y")
-       {
-          If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
-             BtnSetBrushSymmetryCoords()
-       } Else If (givenKey="i")
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ToggleInfoBoxu()
-       } Else If (givenKey="vkDB")
-       {
-          allowLoop := 1 
-          If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
-             changeBrushSize(-1)
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ChangeLumos(-1)
-       } Else If (givenKey="vkDD")
-       {
-          allowLoop := 1 
-          If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
-             changeBrushSize(1)
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ChangeLumos(1)
-       } Else If (givenKey="+vkDB")
-       {
-          allowLoop := 1 
-          If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
-             changeBrushSoftness(-1)
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ChangeGammos(-1)
-       } Else If (givenKey="+vkDD")
-       {
-          allowLoop := 1 
-          If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
-             changeBrushSoftness(1)
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ChangeGammos(1)
-       } Else If (givenKey="^vkDB")
-       {
-          allowLoop := 1 
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ChangeSaturation(-1)
-       } Else If (givenKey="^vkDD")
-       {
-          allowLoop := 1 
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ChangeSaturation(1)
-       } Else If (givenKey="!vkDB")
-       {
-          allowLoop := 1 
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ChangeRealGamma(-1)
-       } Else If (givenKey="!vkDD")
-       {
-          allowLoop := 1 
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ChangeRealGamma(1)
-       } Else If (givenKey="vkDC")
-       {
-          If (HKifs("liveEdit") && (AnyWindowOpen=10 || AnyWindowOpen=74))
-             BtnToggleNoColorsFX()
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ResetImageView()
-       } Else If (givenKey="^vkDC")
-       {
-          If (HKifs("liveEdit") && AnyWindowOpen=10)
-             btnResetImageView()
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             HardResetImageView()
-       } Else If (givenKey="+vkDC")
-       {
-          If HKifs("liveEdit")
-          {
-             If (innerSelectionCavityX>0 && innerSelectionCavityY>0)
-                resetSelectionAreaCavity()
-             Else
-                resetSelectionRotation()
-          } Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
-          {
-             If (innerSelectionCavityX>0 && innerSelectionCavityY>0 && editingSelectionNow=1)
-                resetSelectionAreaCavity()
-             Else If (editingSelectionNow=1 && VPselRotation>0)
-                resetSelectionRotation()
-             Else
-                toggleColorAdjustments()
-          }
-       } Else If (givenKey="vkBF" || givenKey="NumpadDiv") ; /
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow()) && (thumbsDisplaying!=1)
-          {
-             IMGresizingMode := 0
-             ToggleImageSizingMode("z")
-          }
-       } Else If (givenKey="NumpadMult" || givenKey="^vkBF") ; Ctrl+/
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow()) && (thumbsDisplaying!=1)
-             toggleCustomZLmodes()
-       } Else If (givenKey="+NumpadAdd" || givenKey="+plus")
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             changeSelectZoom(1)
-       } Else If (givenKey="+NumpadSub" || givenKey="+minus")
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             changeSelectZoom(-1)
-       } Else If (givenKey="!minus")
-       {
-          allowLoop := 1
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
-             changeGridSize(-1)
-       } Else If (givenKey="!plus")
-       {
-          allowLoop := 1
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
-             changeGridSize(1)
-       } Else If (givenKey="NumpadAdd" || givenKey="plus")
-       {
-          allowLoop := 1
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
-             ChangeZoom(1)
-       } Else If (givenKey="NumpadSub" || givenKey="minus")
-       {
-          allowLoop := 1
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
-             ChangeZoom(-1)
-       } Else If (givenKey="g")
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ToggleImgHistogram(1)
-       } Else If (givenKey="+g")
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ToggleImgHistogram(-1)
-       } Else If (givenKey="!g")
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ToggleHistogramMode()
-       } Else If (givenKey="^r")
-       {
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-             PanelSimpleResizeRotate()
-          Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
-             PanelEditorImgResize()
-       } Else If (givenKey="!r")
-       {
-          If (HKifs("imgEditSolo") || HKifs("imgsLoaded")) && (!AnyWindowOpen)
-             ResizeIMGviewportSelection()
-       } Else If (givenKey="r")
-       {
-          If (isImgEditingNow()=1 && drawingShapeNow=1 && bezierSplineCustomShape=1)
-             toggleAutoReflectAnchors()
-          Else If (HKifs("liveEdit") && (liveDrawingBrushTool=1 || AnyWindowOpen=64))
-             toggleBrushTypeEraser()
-          Else If (HKifs("imgsLoaded") && thumbsDisplaying=1 && markedSelectFile)
-             PanelReviewSelectedFiles()
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             makeSquareSelection()
-       } Else If (givenKey="+r")
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             MenuSelRotation()
-       } Else If (givenKey="^t")
-       {
-          If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
-             PanelTransformSelectedArea()
-       } Else If (givenKey="+t")
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit", 32) || HKifs("imgsLoaded"))
-             PanelInsertTextArea()
-       } Else If (givenKey="+i")
-       {
-          If (isImgEditingNow()=1 && drawingShapeNow=1)
-             MenuSelInvertVectorPoints()
-          Else If (HKifs("imgsLoaded") && thumbsDisplaying=1 && markedSelectFile>1)
-             invertFilesSelection()
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             InvertSelectedArea()
-       } Else If (givenKey="^g")
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit", 55) || HKifs("imgsLoaded"))
-             PanelDesatureSelectedArea()
-       } Else If (givenKey="+b")
-       {
-          If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
-             PanelBlurSelectedArea()
-       } Else If (givenKey="b")
-       {
-          If (isImgEditingNow()=1 && drawingShapeNow=1)
-             MenuToggleBezierMode()
-          Else If (HKifs("liveEdit") && (liveDrawingBrushTool=1 || AnyWindowOpen=64))
-             toggleBrushTypes()
-          Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
-             ToggleImgFavourites(0, 0, 1)
-       } Else If (givenKey="^h")
-       {
-          If (HKifs("imgsLoaded") && maxFilesIndex>1)
-             PanelSearchAndReplaceIndex()
-       } Else If (givenKey="h")
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-          {
-             If (EllipseSelectMode=2 && editingSelectionNow=1)
-                flipWHcustomShape("h")
-             Else
-                VPflipImgH()
-          }
-       } Else If (givenKey="v")
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-          {
-             If (EllipseSelectMode=2 && editingSelectionNow=1)
-                flipWHcustomShape("V")
-             Else
-                VPflipImgV()
-          }
-       } Else If (givenKey="+h")
-       {
-          If (HKifs("liveEdit") && isNowAlphaPainting()=1)
-             FlipHalphaMask()
-          Else If (HKifs("liveEdit") && (AnyWindowOpen=31 || AnyWindowOpen=24))
-             FlipHtransformedIMGpanel()
-          Else If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-             filesListFlipHimage()
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             FlipSelectedAreaH()
-       } Else If (givenKey="+v")
-       {
-          If (HKifs("liveEdit") && isNowAlphaPainting()=1)
-             FlipValphaMask()
-          Else If (HKifs("liveEdit") && (AnyWindowOpen=31 || AnyWindowOpen=24))
-             FlipVtransformedIMGpanel()
-          Else If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-             filesListFlipVimage()
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             FlipSelectedAreaV()
-       } Else If (givenKey="u")
-       {
-          If (HKifs("liveEdit") && (AnyWindowOpen=31 || AnyWindowOpen=24))
-             togglePasteInPlaceColorsFX()
-          Else If (HKifs("imgsLoaded") && thumbsDisplaying=1 && thumbsListViewMode=1)
-             PanelSetThumbColumnOptions()
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             PanelColorsAdjusterImage()
-       } Else If (givenKey="+u")
-       {
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-             filesListApplyColors()
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             PanelColorsAdjusterWindow()
-       } Else If (givenKey="+^u")
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ApplyColorAdjustsSelectedArea()
-       } Else If (givenKey="f")
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
-             ToggleImgFX(1)
-       } Else If (givenKey="+f")
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
-             ToggleImgFX(-1)
-       } Else If (givenKey="+q")
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (liveDrawingBrushTool!=1)
-             ToggleImgColorDepth(-1)
-       } Else If (givenKey="q")
-       {
-          If (HKifs("liveEdit") && (liveDrawingBrushTool=1 || AnyWindowOpen=64))
-             toggleBrushTypeFX()
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             ToggleImgColorDepth(1)
-       } Else If (givenKey="Delete")
-       {
-          If (isImgEditingNow()=1 && drawingShapeNow=1)
-             MenuRemSelVectorPoints()
-          Else If ((HKifs("imgEditSolo") || HKifs("liveEdit", 25)) && thumbsDisplaying!=1 && editingSelectionNow=1)
-             PanelEraseSelectedArea()
-          Else If HKifs("imgsLoaded")
-             deleteKeyAction()
-       } Else If (givenKey="!Delete")
-       {
-          If (HKifs("imgsLoaded") && maxFilesIndex>1 && currentFileIndex>0)
-             singleInListEntriesRemover()
-       } Else If (givenKey="+Delete")
-       {
-          If HKifs("imgsLoaded")
-          {
-             DeleteActivePicture()
-             Sleep, 350
-             If (maxFilesIndex>1 && currentFileIndex>0)
-                singleInListEntriesRemover()
-          }
-       } Else If (givenKey="a")
-       {
-          If HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || (AnyWindowOpen>1) || (isImgEditingNow()=1 && drawingShapeNow=1)
-             ToggleIMGalign()
-       } Else If (givenKey="+a")
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             toggleImgSelectionAspectRatio()
-       } Else If (givenKey="+^a")
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             toggleImgSelectLockedRatio()
-       } Else If (givenKey="!a")
-       {
-          If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
-             PanelAdjustImageCanvasSize()
-       } Else If (givenKey="^a")
-       {
-          If (isImgEditingNow()=1 && drawingShapeNow=1)
-             MenuSelAllVectorPoints()
-          Else If HKifs("liveEdit")
-             selectEntireImage()
-          Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
-          {
-             If (thumbsDisplaying=1 && HKifs("imgsLoaded"))
-                selectAllFiles()
-             Else
-                selectEntireImage()
-          }
-       } Else If (givenKey="+9")
-       {
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-          {
-             filesListFlipRotateMinus()
-          } Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1)
-          {
-             changeSelRotation(-1)
-             allowLoop := 1
-          }
-       } Else If (givenKey="8")
-       {
-          allowLoop := 1
-          If (HKifs("liveEdit") && liveDrawingBrushTool=1)
-             changeBrushOpacity(givenKey, 1)
-       } Else If (givenKey="9")
-       {
-          allowLoop := 1
-          If (HKifs("liveEdit") && liveDrawingBrushTool=1)
-             changeBrushOpacity(givenKey, 1)
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             changeImgRotationInVP(-1)
-       } Else If (givenKey="!9")
-       {
-          allowLoop := 1
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             changeLittleImgRotationInVP(-1)
-       } Else If (givenKey="+00.1")
-       {
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-          {
-             filesListFlipRotatePlus()
-          } Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1)
-          {
-             changeSelRotation(1)
-             allowLoop := 1
-          }
-       } Else If (givenKey="00.1")
-       {
-          allowLoop := 1
-          If (HKifs("liveEdit") && liveDrawingBrushTool=1)
-             changeBrushOpacity(givenKey, 1)
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             changeImgRotationInVP(1)
-       } Else If (givenKey="!00.1")
-       {
-          allowLoop := 1
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             changeLittleImgRotationInVP(1)
-       } Else If (givenKey="Up" || givenKey="+Up")
-       {
-          okayu :=  (thumbsDisplaying=1 || undoLevelsRecorded<2) ? 1 : 0
-          If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
-             PanIMGonScreen("U", givenKey)
-          Else If (HKifs("imgsLoaded") && okayu=1)
-             ThumbsNavigator("Upu", givenKey)
-       } Else If (givenKey="Down" || givenKey="+Down")
-       {
-          okayu :=  (thumbsDisplaying=1 || undoLevelsRecorded<2) ? 1 : 0
-          If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
-             PanIMGonScreen("D", givenKey)
-          Else If (HKifs("imgsLoaded") && okayu=1)
-             ThumbsNavigator("Down", givenKey)
-       } Else If (givenKey="^WheelUp")
-       {
-          allowLoop := 1
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1)
-             ChangeZoom(1, "WheelUp")
-       } Else If (givenKey="^WheelDown")
-       {
-          allowLoop := 1
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1)
-             ChangeZoom(-1, "WheelDown")
-       } Else If (givenKey="!Left")
-       {
-          allowLoop := 1
-          If (isImgEditingNow()=1 && drawingShapeNow=1)
-             arrowKeysAdjustPrevPointPath(-1, 1)
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             arrowKeysAdjustSelectionArea(-1, 1)
-       } Else If (givenKey="!Right")
-       {
-          allowLoop := 1
-          If (isImgEditingNow()=1 && drawingShapeNow=1)
-             arrowKeysAdjustPrevPointPath(1, 1)
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             arrowKeysAdjustSelectionArea(1, 1)
-       } Else If (givenKey="!Up")
-       {
-          allowLoop := 1
-          If (isImgEditingNow()=1 && drawingShapeNow=1)
-             arrowKeysAdjustPrevPointPath(-2, 1)
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             arrowKeysAdjustSelectionArea(-2, 1)
-       } Else If (givenKey="!Down")
-       {
-          allowLoop := 1
-          If (isImgEditingNow()=1 && drawingShapeNow=1)
-             arrowKeysAdjustPrevPointPath(2, 1)
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             arrowKeysAdjustSelectionArea(2, 1)
-       } Else If (givenKey="+!Left")
-       {
-          If (isImgEditingNow()=1 && drawingShapeNow=1)
-             arrowKeysAdjustPrevPointPath(-1, 2)
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             arrowKeysAdjustSelectionArea(-1, 2)
-       } Else If (givenKey="+!Right")
-       {
-          allowLoop := 1
-          If (isImgEditingNow()=1 && drawingShapeNow=1)
-             arrowKeysAdjustPrevPointPath(1, 2)
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             arrowKeysAdjustSelectionArea(1, 2)
-       } Else If (givenKey="+!Up")
-       {
-          allowLoop := 1
-          If (isImgEditingNow()=1 && drawingShapeNow=1)
-             arrowKeysAdjustPrevPointPath(-2, 2)
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             arrowKeysAdjustSelectionArea(-2, 2)
-       } Else If (givenKey="+!Down")
-       {
-          allowLoop := 1
-          If (isImgEditingNow()=1 && drawingShapeNow=1)
-             arrowKeysAdjustPrevPointPath(2, 2)
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-             arrowKeysAdjustSelectionArea(2, 2)
-       } Else If (givenKey="F8")
-       {
-          If HKifs("liveEdit")
-             toggleImgEditPanelWindow()
-          Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
-             openPreviousPanel()
-       } Else If (givenKey="Space")
-       {
-          If (HKifs("imgsLoaded") && drawingShapeNow!=1)
-          {
-             If ((thumbsDisplaying=1 || markedSelectFile) && slideShowRunning!=1)
-                markThisFileNow()
-             Else If (slideShowRunning=1)
-                dummyInfoToggleSlideShowu("stop")
-             Else If (A_TickCount - lastOtherWinClose>350) && (A_TickCount - prevSlideShowStop>950) ; && (drawingShapeNow!=1)
-                InfoToggleSlideShowu()
-          } Else if (!CurrentSLD && !maxFilesIndex && StrLen(UserMemBMP)<3)
-             toggleScreenSaverMode()
-       } Else If (givenKey="+n")
-       {
-          If HKifs("imgsLoaded")
-             PanelEditImgCaption()
-       } Else If (givenKey="n")
-       {
-          If (HKifs("liveEdit") && (isAlphaMaskWindow()=1 || isAlphaMaskPartialWin()=1))
-             toggleInvertAlphaMask()
-          Else If (HKifs("imgsLoaded") && thumbsDisplaying!=1)
-             ToggleImgCaptions()
-       } Else If (SubStr(givenKey, 1, 1)="^" && isInRange(SubStr(givenKey, 2, 1), 0, 8))
-       {
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-          {
-             If (givenKey="^1")
-                SetTimer, ActSortName, -150
-             Else If (givenKey="^2")
-                SetTimer, ActSortPath, -150
-             Else If (givenKey="^3")
-                SetTimer, ActSortFileName, -150
-             Else If (givenKey="^4")
-                SetTimer, ActSortSize, -150
-             Else If (givenKey="^5")
-                SetTimer, ActSortModified, -150
-             Else If (givenKey="^6")
-                SetTimer, ActSortCreated, -150
-             Else If (givenKey="^7")
-                SetTimer, PanelResolutionSorting, -50
-             Else If (givenKey="^8")
-                SetTimer, PanelHistogramSorting, -50
-             Else If (givenKey="^00.1")
-                SetTimer, ReverseListNow, -150
-          }
-       } Else If (givenKey="j")
-       {
-          If (liveDrawingBrushTool=1 || AnyWindowOpen=64) && HKifs("liveEdit")
-             toggleBrushTypeCloner()
-          Else If HKifs("imgsLoaded")
-             PanelJump2index()
-       } Else If (givenKey="+Insert")
-       {
-          If HKifs("imgsLoaded")
-             addNewFolder2list()
-       } Else If (givenKey="Tab")
-       {
-           mainWinTabResponse()
-       } Else If (givenKey="+Tab")
-       {
-          ; currentKbdBTNtlbr := 0
-          If (ShowAdvToolbar=1 && hQPVtoolbar)
-          {
-             isToolbarKBDnav := 1
-             WinActivate, ahk_id %hQPVtoolbar%
-             ; KeyboardMoveMouseToolbar(1, 1)
-             displayNowToolbarHelp(2)
-          }
-       } Else If (givenKey="^Tab")
-       {
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1 && markedSelectFile>1)
-             filterToFilesSelection()
-       } Else If (givenKey="F11")
-       {
-          If HKifs("liveEdit")
-             toggleImgEditPanelWindow()
-          Else If !AnyWindowOpen
-             ToggleFullScreenMode()
-       } Else If (givenKey="+Enter")
-       {
-          If HKifs("liveEdit")
-             applyIMGeditKeepWin()
-          Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded")) && (!AnyWindowOpen)
-             CropImageInViewPortToSelection()
-       } Else If (givenKey="^Enter")
-       {
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-             OpenWithNewQPVinstance()
-          Else If HKifs("imgsLoaded")
-             SoloNewQPVinstance()
-       } Else If (givenKey="Enter")
-       {
-          If (isImgEditingNow()=1 && drawingShapeNow=1)
-             stopDrawingShape()
-          Else If HKifs("liveEdit")
-             applyIMGeditFunction()
-          Else If (HKifs("imgsLoaded") && (A_TickCount - lastOtherWinClose>250))
-             ToggleThumbsMode()
-       } Else If (givenKey="!Enter")
-       {
-          If HKifs("imgsLoaded")
-             PanelImageInfos()
-       } Else If (givenKey="c")
-       {
-          If HKifs("liveEdit")
-             changeBrushColorPicker()
-          Else If HKifs("imgsLoaded")
-             InvokeCopyFiles()
-       } Else If (givenKey="^u")
-       {
-          If HKifs("imgsLoaded")
-             PanelStaticFolderzManager()
-       } Else If (givenKey="!u")
-       {
-          ; If HKifs("imgsLoaded")
-             PanelDynamicFolderzWindow()
-       } Else If (givenKey="^k")
-       {
-          If (HKifs("liveEdit") && (AnyWindowOpen=64 || AnyWindowOpen=66 || isAlphaMaskWindow()=1))
-             toggleAlphaPaintingMode()
-          Else If HKifs("imgsLoaded")
-             PanelFileFormatConverter()
-       } Else If (givenKey="k")
-       {
-          If (HKifs("imgsLoaded") || HKifs("liveEdit") || HKifs("imgEditSolo"))
-             PanelFloodFillTool()
-       } Else If (givenKey="+k")
-       {
-          If (imgEditPanelOpened=1 && liveDrawingBrushTool=1 || AnyWindowOpen=64 || AnyWindowOpen=66)
-             toggleBrushDrawInOutModes()
-       } Else If (givenKey="+j")
-       {
-          If (HKifs("imgsLoaded") && !AnyWindowOpen)
-          {
-             If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.(jpg|jpeg))$") || markedSelectFile)
-                PanelJpegPerformOperation()
-          }
-       } Else If (givenKey="+c")
-       {
-          If HKifs("imgsLoaded")
-             CopyImagePath()
-       } Else If (givenKey="^e")
-       {
-          If HKifs("imgsLoaded")
-             OpenThisFileFolder()
-       } Else If (givenKey="^f")
-       {
-          If HKifs("imgsLoaded")
-             PanelEnableFilesFilter()
-       } Else If (givenKey="s")
-       {
-          If (HKifs("liveEdit") && liveDrawingBrushTool=1)
-          {
-             If (AnyWindowOpen=64 && BrushToolType=3)
-                BtnSetClonerBrushSource()
-          } Else If (HKifs("liveEdit") && AnyWindowOpen=23 && FillAreaColorMode=6)
-          {
-             BtnSetTextureSource()
-          } Else If HKifs("imgsLoaded")
-          {
-             If (thumbsDisplaying=1)
-                keepSelectedDupeInGroup()
-             Else
-                ToggleSlideshowModes()
-          }
-       } Else If (givenKey="+s")
-       {
-          If (HKifs("liveEdit") && liveDrawingBrushTool=1)
-             toggleBrushDoubleSize()
-          Else If (HKifs("imgsLoaded") && mustRecordSeenImgs=1 && thumbsDisplaying=1)
-             ToggleSeenIMGstatus()
-       } Else If (givenKey="+^s")
-       {
-          If HKifs("imgsLoaded")
-             PanelSaveSlideShowu()
-       } Else If (givenKey="t")
-       {
-          If (liveDrawingBrushTool=1)
-             toggleBrushAirMode()
-          Else If (isImgEditingNow()=1 && drawingShapeNow=1)
-             togglePathCurveTension()
-          Else If HKifs("imgsLoaded")
-             ToggleImageSizingMode()
-       } Else If (givenKey="+Space")
-       {
-          If HKifs("imgsLoaded")
-          {
-             If (thumbsDisplaying=1)
-                dropFilesSelection()
-             Else If (slideShowRunning=1)
-                dummyInfoToggleSlideShowu("stop")
-             Else If (A_TickCount - prevSlideShowStop>950)
-                dummyInfoToggleSlideShowu()
-          }
-       } Else If (givenKey="^Space")
-       {
-          If HKifs("imgsLoaded")
-          {
-             If (slideShowRunning=1)
-                dummyInfoToggleSlideShowu("stop")
-             Else If StrLen(filesFilter)>1
-                MenuRemFilesListFilter()
-          }
-       } Else If (givenKey="BackSpace")
-       {
-          If (isImgEditingNow()=1 && drawingShapeNow=1)
-            reduceCustomShapelength()
-          Else If HKifs("imgsLoaded")
-            PrevRandyPicture()
-       } Else If (givenKey="+BackSpace")
-       {
-          okayu := (thumbsDisplaying=1 || undoLevelsRecorded<2) ? 1 : 0
-          If (HKifs("imgsLoaded") && okayu=1)
-          {
-             resetSlideshowTimer()
-             RandomPicture()
-          }
-       } Else If (givenKey="^BackSpace")
-       {
-          okayu := (thumbsDisplaying=1 || undoLevelsRecorded<2) ? 1 : 0
-          If (HKifs("imgsLoaded") && okayu=1)
-             jumpPreviousImage()
-       } Else If (givenKey="!period")
-       {
-          allowLoop := 1
-          If (HKifs("imgsLoaded") && animGIFsSupport=1)
-             changeGIFsDelayu(1)
-       } Else If (givenKey="+period")
-       {
-          allowLoop := 1
-          If (liveDrawingBrushTool=1)
-             changeBrushWetness(1)
-          Else
-             ChangeVolume(1)
-       } Else If (givenKey="period")
-       {
-          allowLoop := 1
-          If (liveDrawingBrushTool=1)
-             changeBrushOpacity(-1, 0)
-          Else If HKifs("imgsLoaded")
-             IncreaseSlideSpeed()
-       } Else If (givenKey="comma")
-       {
-          allowLoop := 1
-          If (liveDrawingBrushTool=1)
-             changeBrushOpacity(1, 0)
-          Else If HKifs("imgsLoaded")
-             DecreaseSlideSpeed()
-       } Else If (givenKey="!comma")
-       {
-          allowLoop := 1
-          If (HKifs("imgsLoaded") && animGIFsSupport=1)
-             changeGIFsDelayu(-1)
-       } Else If (givenKey="+comma")
-       {
-          allowLoop := 1
-          If (liveDrawingBrushTool=1)
-             changeBrushWetness(-1)
-          Else
-             ChangeVolume(-1)
-       } Else If (givenKey="+vkBF") ; Shift+/
-       {
-          If HKifs("imgsLoaded")
-             PanelDefineEntireSlideshowLength()
-       } Else If (givenKey="F5")
-       {
-          If HKifs("imgsLoaded") || (liveDrawingBrushTool=1 && AnyWindowOpen=64)
-             RefreshImageFileAction()
-       } Else If (givenKey="!F5")
-       {
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-             DeepRefreshThumbsNow()
-       } Else If (givenKey="+F5")
-       {
-          If HKifs("imgsLoaded")
-             RefreshFilesList()
-       } Else If (givenKey="^F5")
-       {
-          If HKifs("imgsLoaded")
-             invertCurrentFolderRecursiveness()
-       } Else If (givenKey="F2")
-       {
-          If HKifs("imgsLoaded")
-             PanelRenameThisFile()
-       } Else If (givenKey="+F2")
-       {
-          If HKifs("imgsLoaded")
-             SingularRenameFile()
-       } Else If (givenKey="^F2")
-       {
-          If HKifs("imgsLoaded")
-             PanelUpdateThisFileIndex()
-       } Else If (givenKey="m")
-       {
-          If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && ((editingSelectionNow=1 || AnyWindowOpen=66) && thumbsDisplaying!=1 && AnyWindowOpen!=70)
-             ViewAlphaMaskNow()
-          Else If HKifs("imgsLoaded")
-             PanelMoveCopyFiles()
-       } Else If (givenKey="^q")
-       {
-          If (HKifs("imgsLoaded") && AutoDownScaleIMGs=1)
-             ToggleImgDownScaling()
-       } Else If (givenKey="x")
-       {
-          If HKifs("liveEdit")
-          {
-             ToggleBrushColors()
-          } Else If HKifs("imgsLoaded")
-          {
-             If (animGIFplaying=1)
-                DestroyGIFuWin()
-             Else If (thumbsDisplaying=1 && maxFilesIndex>1 && currentFileIndex>0)
-                moveMarkedEntryNow(currentFileIndex)
-             Else
-                PlayAudioFileAssociatedNow()
-          }
-       } Else If (givenKey="+x")
-       {
-          If HKifs("imgsLoaded")
-          {
-             If (animGIFplaying=1)
-                DestroyGIFuWin()
-             Else If (thumbsDisplaying=1 && maxFilesIndex>1 && currentFileIndex>0 && markedSelectFile>1)
-                regroupSelectedFiles()
-             Else If (thumbsDisplaying=1 && maxFilesIndex>1 && currentFileIndex>0)
-                moveMarkedEntryNow(currentFileIndex, "move")
-             Else
-                StopMediaPlaying()
-          }
-       } Else If ((isInRange(givenKey, 1, 7) && isNumber(givenKey))
-              || (SubStr(givenKey, 1, 1)="+" && isInRange(SubStr(givenKey, 2, 1), 1, 7)))
-       {
-          If (HKifs("liveEdit") && liveDrawingBrushTool=1)
-          {
-             allowLoop := 1
-             changeBrushOpacity(givenKey, 1)
-          } Else If (HKifs("imgsLoaded") && !InStr(givenKey, "8"))
-             triggerQuickFileAction(givenKey)
-       } Else If (givenKey="^Left")
-       {
-          If HKifs("imgsLoaded")
-             navSelectedFiles(-1)
-       } Else If (givenKey="^Right")
-       {
-          If HKifs("imgsLoaded")
-             navSelectedFiles(1)
-       } Else If (givenKey="F3")
-       {
-          If HKifs("imgsLoaded")
-             searchNextIndex(1)
-       } Else If (givenKey="+F3")
-       {
-          If HKifs("imgsLoaded")
-             searchNextIndex(-1)
-       } Else If (givenKey="^F3")
-       {
-          If HKifs("imgsLoaded")
-             PanelSearchIndex()
-       } Else If (givenKey="F4")
-       {
-          ; If HKifs("imgsLoaded")
-          PanelFoldersTree()
-       } Else If (givenKey="+F4")
-       {
-          If HKifs("imgsLoaded")
-             invokeFoldersListerMenu()
-       } Else If (givenKey="WheelUp")
-       {
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-             ThumbsNavigator("Upu", givenKey)
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1) && (IMGresizingMode=4 && thumbsDisplaying!=1)
-             ChangeZoom(1, "WheelUp")
-          Else If (HKifs("imgsLoaded"))
-             PreviousPicture("key-" givenKey)
-       } Else If (givenKey="WheelDown")
-       {
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1)
-             ThumbsNavigator("Down", givenKey)
-          Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1) && (IMGresizingMode=4 && thumbsDisplaying!=1)
-             ChangeZoom(-1, "WheelDown")
-          Else If (HKifs("imgsLoaded"))
-             NextPicture("key-" givenKey)
-       } Else If (givenKey="Right" || givenKey="+Right")
-       {
-          If HKifs("imgsLoaded")
-          {
-             If ((IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
-             {
-                PanIMGonScreen("R", givenKey)
-             } Else
-             {
-                okayu := (thumbsDisplaying=1 || undoLevelsRecorded<2) ? 1 : 0
-                resetSlideshowTimer()
-                If (thumbsDisplaying=1)
-                   ThumbsNavigator("Right", givenKey)
-                Else If (okayu=1)
-                   NextPicture("key-" givenKey)
-            }
-          } Else If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
-            PanIMGonScreen("R", givenKey)
-       } Else If (givenKey="Left" || givenKey="+Left")
-       {
-          If HKifs("imgsLoaded")
-          {
-             If ((IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
-             {
-                PanIMGonScreen("L", givenKey)
-             } Else
-             {
-                okayu := (thumbsDisplaying=1 || undoLevelsRecorded<2) ? 1 : 0
-                resetSlideshowTimer()
-                If (thumbsDisplaying=1)
-                   ThumbsNavigator("Left", givenKey)
-                Else If (okayu=1)
-                   PreviousPicture("key-" givenKey)
-            }
-          } Else If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
-            PanIMGonScreen("L", givenKey)
-       } Else If (givenKey="PgDn")
-       {
-          If (isImgEditingNow()=1 && drawingShapeNow=1)
-          {
-             allowLoop := 1
-             adjustCustomShapePositionLive(-1)
-          } Else If (HKifs("liveEdit") && editingSelectionNow=1)
-          {
-             allowLoop := 1
-             arrowKeysAdjustSelectionArea(-1, 1)
-             arrowKeysAdjustSelectionArea(-1, 2)
-          } Else If HKifs("imgsLoaded")
-          {
-             resetSlideshowTimer()
-             If (thumbsDisplaying=1)
-             {
-                allowLoop := 1
-                ThumbsNavigator("PgDn", givenKey)
-             } Else NextPicture()
-          }
-       } Else If (givenKey="PgUp")
-       {
-          If (isImgEditingNow()=1 && drawingShapeNow=1)
-          {
-             allowLoop := 1
-             adjustCustomShapePositionLive(1)
-          } Else If (HKifs("liveEdit") && editingSelectionNow=1)
-          {
-             allowLoop := 1
-             arrowKeysAdjustSelectionArea(1, 1)
-             arrowKeysAdjustSelectionArea(1, 2)
-          } Else If HKifs("imgsLoaded")
-          {
-             resetSlideshowTimer()
-             If (thumbsDisplaying=1)
-             {
-                allowLoop := 1
-                ThumbsNavigator("PgUp", givenKey)
-             } Else PreviousPicture()
-          }
-       } Else If (givenKey="+PgDn")
-       {
-          If HKifs("imgsLoaded")
-          {
-             resetSlideshowTimer()
-             If (thumbsDisplaying=1)
-             {
-                allowLoop := 1
-                ThumbsNavigator("PgDn", givenKey)
-             } Else If (totalFramesIndex>0 && thumbsDisplaying!=1)
-                changeDesiredFrame(-1)
-          }
-       } Else If (givenKey="+PgUp")
-       {
-          ; ToolTip, % totalFramesIndex "===" thumbsDisplaying , , , 2
-          If HKifs("imgsLoaded")
-          {
-             resetSlideshowTimer()
-             If (thumbsDisplaying=1)
-             {
-                allowLoop := 1
-                ThumbsNavigator("PgUp", givenKey)
-             } Else If (totalFramesIndex>0 && thumbsDisplaying!=1)
-                changeDesiredFrame(1)
-          }
-       } Else If (givenKey="^PgUp")
-       {
-          allowLoop := 1
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1 && SLDtypeLoaded=1)
-             FileExploreUpDownLevel(-1)
-       } Else If (givenKey="^PgDn")
-       {
-          allowLoop := 1
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1 && SLDtypeLoaded=1)
-             FileExploreUpDownLevel(1)
-       } Else If (givenKey="!PgUp")
-       {
-          allowLoop := 1
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1 && SLDtypeLoaded=1)
-             FileExploreSiblingsNav(-1)
-       } Else If (givenKey="!PgDn")
-       {
-          allowLoop := 1
-          If (HKifs("imgsLoaded") && thumbsDisplaying=1 && SLDtypeLoaded=1)
-             FileExploreSiblingsNav(1)
-       } Else If (givenKey="^Home")
-       {
-          If HKifs("imgsLoaded")
-             jumpToFilesSelBorder(-1)
-       } Else If (givenKey="^End")
-       {
-          If HKifs("imgsLoaded")
-             jumpToFilesSelBorder(1)
-       } Else If (givenKey="Home" || givenKey="+Home")
-       {
-          If (isImgEditingNow()=1 && drawingShapeNow=1)
-          {
-             allowLoop := 1
-             adjustCustomShapePositionLive(2)
-          } Else If (HKifs("liveEdit") && editingSelectionNow=1)
-          {
-             allowLoop := 1
-             arrowKeysAdjustSelectionArea(-2, 1)
-             arrowKeysAdjustSelectionArea(-2, 2)
-          } Else If HKifs("imgsLoaded")
-          {
-             If (thumbsDisplaying=1)
-             {
-                allowLoop := 1
-                ThumbsNavigator("Home", givenKey)
-             } Else FirstPicture()
-          }
-       } Else If (givenKey="End" || givenKey="+End")
-       {
-          If (isImgEditingNow()=1 && drawingShapeNow=1)
-          {
-             allowLoop := 1
-             adjustCustomShapePositionLive(-2)
-          } Else If (HKifs("liveEdit") && editingSelectionNow=1)
-          {
-             allowLoop := 1
-             arrowKeysAdjustSelectionArea(2, 1)
-             arrowKeysAdjustSelectionArea(2, 2)
-          } Else If HKifs("imgsLoaded")
-          {
-             If (thumbsDisplaying=1)
-             {
-                allowLoop := 1
-                ThumbsNavigator("End", givenKey)
-             } Else LastPicture()
-         }
+          allowLoop := (allowLoop=-1) ? 0 : allowLoop - 1
        } Else If (InStr(menuHotkeys, givenKey "|") && showMainMenuBar=1 && InStr(givenKey, "!") && StrLen(givenKey)=2)
        {
           n := 0
@@ -2081,6 +844,1312 @@ KeyboardResponder(givenKey, thisWin, abusive) {
    }
 } ; // KeyboardResponder()
 
+processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
+    func2Call := []
+    allowLoop := 0
+    If (givenKey="^o")
+    {
+        If HKifs("general")
+           func2Call := ["OpenDialogFiles"]
+    } Else If (givenKey="o")
+    {
+        imgPath := getIDimage(currentFileIndex)
+        If (isImgEditingNow()=1 && drawingShapeNow=1)
+           func2Call := ["toggleOpenClosedLineCustomShape"]
+        Else If HKifs("imgsLoaded")
+           func2Call := ["OpenThisFileMenu"]
+        Else If ((HKifs("general") && (!CurrentSLD || StrLen(gdiBitmap)<3)) && !FileRexists(imgPath))
+           func2Call := ["OpenDialogFiles"]
+    } Else If (givenKey="w")
+    {
+        ; w ; to-do
+        If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1 && thumbsDisplaying!=1)
+           func2Call := ["flipSelectionWH"]
+        Else If (thumbsDisplaying=1 && maxFilesIndex>10 && CurrentSLD && !z)
+           func2Call := ["invokeFilesListMapNow"]
+
+        ; func2Call := ["testDissolver"]
+        ; func2Call := ["testGmicQPV"]
+    } Else If (givenKey="+^n")
+    {
+        If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+           func2Call := ["OpenNewQPVinstance"]
+    } Else If (givenKey="^n")
+    {
+        If HKifs("general")
+           func2Call := ["PanelNewImage"]
+    } Else If (givenKey="+tilda")
+    {
+        If HKifs("general")
+           func2Call := ["PanelJournalWindow"]
+    } Else If (givenKey="F12")
+    {
+        If HKifs("general")
+           func2Call := ["PanelPrefsWindow"]
+    } Else If (givenKey="p")
+    {
+        If (isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["togglePreviewVectorNewPoint"]
+        Else If (liveDrawingBrushTool=1 && isImgEditingNow()=1 && AnyWindowOpen=64)
+          func2Call := ["toggleBrushDeformers"]
+        Else If ((HKifs("imgEditSolo") || HKifs("liveEdit", 64) || HKifs("imgsLoaded")) && AnyWindowOpen!=31 && AnyWindowOpen!=24)
+          func2Call := ["PanelBrushTool"]
+    } Else If (givenKey="!p")
+    {
+        If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+           func2Call := ["MenuStartDrawingLines"]
+    } Else If (givenKey="+p")
+    {
+        If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+           func2Call := ["MenuStartDrawingShapes"]
+    } Else If (givenKey="^p")
+    {
+        If (imageLoading!=1 && (HKifs("imgEditSolo") || HKifs("imgsLoaded")))
+           func2Call := ["PanelPrintImage"]
+    } Else If (givenKey="COLON")
+    {
+        func2Call := ["PanelQuickSearchMenuOptions"]
+    } Else If (givenKey="+COLON")
+    {
+        func2Call := ["invokeOmniBoxCurrentFile"]
+    } Else If InStr(givenKey, "^Numpad")
+    {
+        func2Call := ["alignImgSelection", givenKey]
+    } Else If (givenKey="^NumpadAdd" || givenKey="^equal")
+    {
+        func2Call := ["MenuChangeOSDZoomPlus"]
+    } Else If (givenKey="^NumpadSub" || givenKey="^minus")
+    {
+        func2Call := ["MenuChangeOSDZoomMinus"]
+    } Else If (givenKey="+o")
+    {
+        If HKifs("general")
+           func2Call := ["OpenFolders"]
+    } Else If (givenKey="^F10" || givenKey="+F10" || givenKey="+!F10")
+    {
+        func2Call := ["toggleAppToolbar"]
+    } Else If (givenKey="!F10" || givenKey="F10") && (drawingShapeNow!=1)
+    {
+        func2Call := ["ToggleMenuBaru"]
+    } Else If (givenKey="^AppsKey" || givenKey="+AppsKey") && (drawingShapeNow!=1)
+    {
+        func2Call := ["BuildSecondMenu", "tlbr"]
+    } Else If (givenKey="#AppsKey" || givenKey="!AppsKey" || givenKey="AppsKey" || givenKey="RButton")
+    {
+        func2Call := ["InitGuiContextMenu", givenKey]
+    } Else If (givenKey="Insert")
+    {
+        If (HKifs("general") && imageLoading!=1)
+           func2Call := ["addNewFile2list"]
+    } Else If (givenKey="^v")
+    {
+        If (HKifs("general") && imageLoading!=1)
+           func2Call := (thumbsDisplaying=1) ? ["MenuPasteHDropFiles"] : ["PasteClipboardIMG"]
+    } Else If (givenKey="Escape")
+    {
+        func2Call := ["dummy"]
+    } Else If (givenKey="+Escape")
+    {
+        func2Call := ["restartAppu"]
+    } Else If (givenKey="F1")
+    {
+        func2Call := ["showQuickHelp"]
+    } Else If (givenKey="F9")
+    {
+       If (HKifs("imgsLoaded") && folderTreeWinOpen=1)
+          func2Call := ["FolderTreeFindActiveFile"]
+    } Else If (givenKey="^F4")
+    {
+       If (drawingShapeNow=1)
+          func2Call := ["stopDrawingShape"]
+       Else If AnyWindowOpen
+          func2Call := ["CloseWindow"]
+       Else If (thumbsDisplaying=1)
+          func2Call := ["MenuReturnIMGedit"]
+       Else
+          func2Call := ["closeDocuments"]
+    } Else If (givenKey="d")
+    {
+        If (HKifs("liveEdit") && liveDrawingBrushTool=1)
+           func2Call := ["ResetColorsToBW"]
+        Else If (HKifs("liveEdit") && AnyWindowOpen!=10)
+           func2Call := ["toggleLiveEditObject"]
+    } Else If (givenKey="l")
+    {
+        If ((HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1 || showViewPortGrid=1) && thumbsDisplaying!=1)
+           func2Call := ["toggleLimitSelection"]
+        Else If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+           func2Call := ["toggleListViewModeThumbs"]
+    } Else If (givenKey="+^v")
+    {
+        If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+           func2Call := ["PanelPasteInPlace"]
+    } Else If (givenKey="^d")
+    {
+        If (isImgEditingNow()=1 && drawingShapeNow=1)
+           func2Call := ["MenuSelNoVectorPoints"]
+        Else If (HKifs("imgsLoaded") && ((thumbsDisplaying=1) || (editingSelectionNow!=1 && markedSelectFile)))
+           func2Call := ["dropFilesSelection"]
+        Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+           func2Call := ["resetImgSelection"]
+    } Else If (givenKey="^c")
+    {
+        If (thumbsDisplaying=1 && HKifs("imgsLoaded"))
+           func2Call := ["MenuExplorerCopyFiles"]
+        Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+           func2Call := ["CopyImage2clip"]
+    } Else If (givenKey="^x")
+    {
+        If (thumbsDisplaying=1 && HKifs("imgsLoaded"))
+           func2Call := ["MenuExplorerCutFiles"]
+        Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+           func2Call := ["CutSelectedArea"]
+    } Else If (givenKey="^z")
+    {
+        allowLoop := 1
+        If (isImgEditingNow()=1 && drawingShapeNow=1)
+           func2Call := ["ImgVectorUndoAct"]
+        Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+           func2Call := ["ImgUndoAction"]
+    } Else If (givenKey="z")
+    {
+        If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || (isImgEditingNow()=1 && drawingShapeNow=1))
+          func2Call := ["ToggleImgNavBox"]
+    } Else If (givenKey="^y")
+    {
+       allowLoop := 1
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["ImgVectorRedoAct"]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["ImgRedoAction"]
+    } Else If (givenKey="+^z")
+    {
+       allowLoop := 1
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["ImgSelUndoAct"]
+    } Else If (givenKey="+^y")
+    {
+       allowLoop := 1
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["ImgSelRedoAct"]
+    } Else If (givenKey="^!z")
+    {
+       allowLoop := 1
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["MenuUndoImgJumpy"]
+    } Else If (givenKey="^!y")
+    {
+       allowLoop := 1
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["MenuRedoImgJumpy"]
+    } Else If (givenKey="e")
+    {
+       If (isVarEqualTo(AnyWindowOpen, 64, 66, 12, 10) && imgEditPanelOpened=1) ; Brush, Fill and Jpeg Crop
+          func2Call := ["ToggleEditImgSelection"]
+       Else If (thumbsDisplaying=1)
+          func2Call := ["QuickSelectFilesSameFolder"]
+       Else If (HKifs("liveEdit") && AnyWindowOpen!=10)
+          func2Call := ["livePreviewsImageEditing", 1]
+       Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+          func2Call := ["ToggleEditImgSelection", "key"]
+    } Else If (givenKey="+e")
+    {
+       If (HKifs("imgsLoaded") && thumbsDisplaying=1 && currentFileIndex>0 && maxFilesIndex>2)
+          func2Call := ["activateFilesListFilterBasedOnFolder", currentFileIndex]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["MenuCycleSelectionShapes"]
+    } Else If (givenKey="!e")
+    {
+       isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
+       If ((HKifs("imgEditSolo") || HKifs("imgsLoaded") || HKifs("liveEdit") && !isTransPanel) && editingSelectionNow=1)
+          func2Call := ["PanelIMGselProperties"]
+       Else If HKifs("imgsLoaded")
+          func2Call := ["OpenQPVfileFolder"]
+    } Else If (givenKey="^s")
+    {
+       If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+          func2Call := ["PanelSaveImg"]
+    } Else If (givenKey="^l")
+    {
+       isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
+       If (HKifs("imgEditSolo") || (HKifs("liveEdit", 65) && !isTransPanel) || HKifs("imgsLoaded"))
+          func2Call := ["tlbrDrawShapesContour"]
+    } Else If (givenKey="+l")
+    {
+       If (HKifs("imgsLoaded") && (thumbsDisplaying=1))
+          func2Call := ["CalculateSelectedFilesSizes"]
+       Else If (HKifs("liveEdit") && EllipseSelectMode=2 && editingSelectionNow=1 && isVarEqualTo(AnyWindowOpen, 74, 68, 66, 65, 64, 55, 25, 23, 10))
+          func2Call := ["MenuResumeDrawingShapes"]
+       Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded")) && (thumbsDisplaying!=1)
+       {
+          If (editingSelectionNow!=1 || EllipseSelectMode!=2)
+             func2Call := ["MenuStartDrawingSelectionArea"]
+          Else
+             func2Call := ["MenuResumeDrawingShapes"]
+       }
+    } Else If (givenKey="!BackSpace")
+    {
+       isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
+       If (HKifs("imgEditSolo") || (HKifs("liveEdit") && !isTransPanel) || HKifs("imgsLoaded"))
+          func2Call := ["tlbrFillShape"]
+    } Else If (givenKey="!y")
+    {
+       isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
+       If (HKifs("imgEditSolo") || (HKifs("liveEdit") && !isTransPanel) || HKifs("imgsLoaded"))
+         func2Call := ["PanelImgAutoCrop"]
+    } Else If (givenKey="y")
+    {
+       If ((liveDrawingBrushTool=1 || drawingShapeNow=1) && isImgEditingNow()=1)
+          func2Call := ["toggleBrushSymmetryModes"]
+    } Else If (givenKey="+y")
+    {
+       If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
+          func2Call := ["BtnSetBrushSymmetryCoords"]
+    } Else If (givenKey="i")
+    {
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["ToggleInfoBoxu"]
+    } Else If (givenKey="LBRACKET")
+    {
+       allowLoop := 1 
+       If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
+          func2Call := ["MenuDecBrushSize"]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["MenuChangeDecBright"]
+    } Else If (givenKey="RBRACKET")
+    {
+       allowLoop := 1 
+       If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
+          func2Call := ["MenuIncBrushSize"]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["MenuChangeIncBright"]
+    } Else If (givenKey="+LBRACKET")
+    {
+       allowLoop := 1 
+       If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
+          func2Call := ["MenuIncBrushSoftness"]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["MenuChangeDecContrast"]
+    } Else If (givenKey="+RBRACKET")
+    {
+       allowLoop := 1 
+       If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
+          func2Call := ["MenuDecBrushSoftness"]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["MenuChangeIncContrast"]
+    } Else If (givenKey="^LBRACKET")
+    {
+       allowLoop := 1 
+       If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
+          func2Call := ["MenuDecBrushAngle"]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["MenuChangeDecSaturat"]
+    } Else If (givenKey="^RBRACKET")
+    {
+       allowLoop := 1 
+       If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
+          func2Call := ["MenuIncBrushAngle"]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["MenuChangeIncSaturat"]
+    } Else If (givenKey="!LBRACKET")
+    {
+       allowLoop := 1 
+       If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
+          func2Call := ["MenuDecBrushAspectRatio"]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["MenuChangeIncGamma"]
+    } Else If (givenKey="!RBRACKET")
+    {
+       allowLoop := 1 
+       If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
+          func2Call := ["MenuIncBrushspectRatio"]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["MenuChangeDecGamma"]
+    } Else If (givenKey="BSLASH")
+    {
+       If (HKifs("liveEdit") && (AnyWindowOpen=10 || AnyWindowOpen=74))
+          func2Call := ["BtnToggleNoColorsFX"]
+       Else If ((HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && vpIMGrotation!=0)
+          func2Call := ["MenuResetVProtation"]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["ResetImageView"]
+    } Else If (givenKey="^BSLASH")
+    {
+       If (HKifs("liveEdit") && AnyWindowOpen=10)
+          func2Call := ["btnResetImageView"]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["HardResetImageView"]
+    } Else If (givenKey="+BSLASH")
+    {
+       If HKifs("liveEdit")
+       {
+          If (innerSelectionCavityX>0 && innerSelectionCavityY>0)
+             func2Call := ["resetSelectionAreaCavity"]
+          Else
+             func2Call := ["resetSelectionRotation"]
+       } Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+       {
+          If (innerSelectionCavityX>0 && innerSelectionCavityY>0 && editingSelectionNow=1)
+             func2Call := ["resetSelectionAreaCavity"]
+          Else If (editingSelectionNow=1 && VPselRotation>0)
+             func2Call := ["resetSelectionRotation"]
+          Else
+             func2Call := ["toggleColorAdjustments"]
+       }
+    } Else If (givenKey="SLASH" || givenKey="NumpadDiv") ; /
+    {
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow()) && (thumbsDisplaying!=1)
+          func2Call := ["MenuSetImageAdaptAll"]
+    } Else If (givenKey="NumpadMult" || givenKey="^SLASH") ; Ctrl+/
+    {
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow()) && (thumbsDisplaying!=1)
+          func2Call := ["toggleCustomZLmodes"]
+    } Else If (givenKey="!BSLASH")
+    {
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["MenuResetSelAreaCavityRotation"]
+    } Else If (givenKey="+NumpadAdd" || givenKey="+equal")
+    {
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["MenuIncSelAreaSize"]
+    } Else If (givenKey="+NumpadSub" || givenKey="+minus")
+    {
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["MenuDecSelAreaSize"]
+    } Else If (givenKey="!minus")
+    {
+       allowLoop := 1
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
+          func2Call := ["MenuDecVPgridSize"]
+    } Else If (givenKey="!equal")
+    {
+       allowLoop := 1
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
+          func2Call := ["MenuIncVPgridSize"]
+    } Else If (givenKey="NumpadAdd" || givenKey="equal")
+    {
+       allowLoop := 1
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
+          func2Call := ["MenuChangeImgZoomPlus"]
+    } Else If (givenKey="NumpadSub" || givenKey="minus")
+    {
+       allowLoop := 1
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
+          func2Call := ["MenuChangeImgZoomMinus"]
+    } Else If (givenKey="g")
+    {
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["toggleViewPortGridu"]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["ToggleImgHistogram", 1]
+    } Else If (givenKey="+g")
+    {
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["ToggleImgHistogram", -1]
+    } Else If (givenKey="!g")
+    {
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["ToggleHistogramMode"]
+    } Else If (givenKey="^r")
+    {
+       If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+          func2Call := ["PanelSimpleResizeRotate"]
+       Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+          func2Call := ["PanelEditorImgResize"]
+    } Else If (givenKey="!r")
+    {
+       If (HKifs("imgEditSolo") || HKifs("imgsLoaded")) && (!AnyWindowOpen)
+          func2Call := ["ResizeIMGviewportSelection"]
+    } Else If (givenKey="r")
+    {
+       If (isImgEditingNow()=1 && drawingShapeNow=1 && bezierSplineCustomShape=1)
+          func2Call := ["toggleAutoReflectAnchors"]
+       Else If (HKifs("liveEdit") && (liveDrawingBrushTool=1 || AnyWindowOpen=64))
+          func2Call := ["toggleBrushTypeEraser"]
+       Else If (HKifs("imgsLoaded") && thumbsDisplaying=1 && markedSelectFile)
+          func2Call := ["PanelReviewSelectedFiles"]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["makeSquareSelection"]
+    } Else If (givenKey="+r")
+    {
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["MenuSelRotation"]
+    } Else If (givenKey="^t")
+    {
+       If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+          func2Call := ["PanelTransformSelectedArea"]
+    } Else If (givenKey="+t")
+    {
+       isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
+       If (HKifs("imgEditSolo") || (HKifs("liveEdit", 32) && !isTransPanel) || HKifs("imgsLoaded"))
+          func2Call := ["PanelInsertTextArea"]
+    } Else If (givenKey="+i")
+    {
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["MenuSelInvertVectorPoints"]
+       Else If (HKifs("imgsLoaded") && thumbsDisplaying=1 && markedSelectFile>1)
+          func2Call := ["invertFilesSelection"]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["InvertSelectedArea"]
+    } Else If (givenKey="^g")
+    {
+       isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
+       If (HKifs("imgEditSolo") || (HKifs("liveEdit", 55) && !isTransPanel) || HKifs("imgsLoaded"))
+          func2Call := ["PanelDesatureSelectedArea"]
+    } Else If (givenKey="+b")
+    {
+       If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+          func2Call := ["PanelBlurSelectedArea"]
+    } Else If (givenKey="b")
+    {
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["MenuToggleBezierMode"]
+       Else If (HKifs("liveEdit") && (liveDrawingBrushTool=1 || AnyWindowOpen=64))
+          func2Call := ["toggleBrushTypes"]
+       Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+          func2Call := ["KbdToggleImgFavourites"]
+    } Else If (givenKey="^h")
+    {
+       If (HKifs("imgsLoaded") && maxFilesIndex>1)
+          func2Call := ["PanelSearchAndReplaceIndex"]
+    } Else If (givenKey="h")
+    {
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       {
+          If (EllipseSelectMode=2 && editingSelectionNow=1)
+             func2Call := ["MenuSelectionFlipH"]
+          Else
+             func2Call := ["VPflipImgH"]
+       }
+    } Else If (givenKey="v")
+    {
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       {
+          If (EllipseSelectMode=2 && editingSelectionNow=1)
+             func2Call := ["MenuSelectionFlipV"]
+          Else
+             func2Call := ["VPflipImgV"]
+       }
+    } Else If (givenKey="+h")
+    {
+       If (HKifs("liveEdit") && isNowAlphaPainting()=1)
+          func2Call := ["FlipHalphaMask"]
+       Else If (HKifs("liveEdit") && (AnyWindowOpen=31 || AnyWindowOpen=24))
+          func2Call := ["FlipHtransformedIMGpanel"]
+       Else If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+          func2Call := ["filesListFlipHimage"]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["FlipSelectedAreaH"]
+    } Else If (givenKey="+v")
+    {
+       If (HKifs("liveEdit") && isNowAlphaPainting()=1)
+          func2Call := ["FlipValphaMask"]
+       Else If (HKifs("liveEdit") && (AnyWindowOpen=31 || AnyWindowOpen=24))
+          func2Call := ["FlipVtransformedIMGpanel"]
+       Else If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+          func2Call := ["filesListFlipVimage"]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["FlipSelectedAreaV"]
+    } Else If (givenKey="u")
+    {
+       If (HKifs("liveEdit") && (AnyWindowOpen=31 || AnyWindowOpen=24))
+          func2Call := ["togglePasteInPlaceColorsFX"]
+       Else If (HKifs("imgsLoaded") && thumbsDisplaying=1 && thumbsListViewMode=1)
+          func2Call := ["PanelSetThumbColumnOptions"]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["PanelColorsAdjusterImage"]
+    } Else If (givenKey="+u")
+    {
+       isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
+       If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+          func2Call := ["filesListApplyColors"]
+       Else If (HKifs("imgEditSolo") || (HKifs("liveEdit") && !isTransPanel) || HKifs("imgsLoaded"))
+          func2Call := ["PanelColorsAdjusterWindow"]
+    } Else If (givenKey="+^u")
+    {
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["ApplyColorAdjustsSelectedArea"]
+    } Else If (givenKey="f")
+    {
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
+          func2Call := ["ToggleImgFX", 1]
+    } Else If (givenKey="+f")
+    {
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
+          func2Call := ["ToggleImgFX", -1]
+    } Else If (givenKey="+q")
+    {
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (liveDrawingBrushTool!=1)
+          func2Call := ["ToggleImgColorDepth", -1]
+    } Else If (givenKey="q")
+    {
+       isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
+       If (HKifs("liveEdit") && (liveDrawingBrushTool=1 || AnyWindowOpen=64) && !isTransPanel)
+          func2Call := ["toggleBrushTypeFX"]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["ToggleImgColorDepth", 1]
+    } Else If (givenKey="Delete")
+    {
+       isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["MenuRemSelVectorPoints"]
+       Else If ((HKifs("imgEditSolo") || HKifs("liveEdit", 25) || HKifs("imgsLoaded")) && thumbsDisplaying!=1 && editingSelectionNow=1 && !isTransPanel)
+          func2Call := ["PanelEraseSelectedArea"]
+       Else If HKifs("imgsLoaded" && thumbsDisplaying!=1)
+          func2Call := ["DeleteActivePicture"]
+       Else If HKifs("imgsLoaded")
+          func2Call := ["DeletePicture"]
+    } Else If (givenKey="!Delete")
+    {
+       If (HKifs("imgsLoaded") && maxFilesIndex>1 && currentFileIndex>0)
+          func2Call := ["singleInListEntriesRemover"]
+    } Else If (givenKey="+Delete")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["DeleteActiveImgFileAndEntry"]
+    } Else If (givenKey="^Delete")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["DeleteActivePicture"]
+    } Else If (givenKey="a")
+    {
+       If HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || (AnyWindowOpen>1) || (isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["ToggleIMGalign"]
+    } Else If (givenKey="+a")
+    {
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["toggleImgSelectionAspectRatio"]
+    } Else If (givenKey="+^a")
+    {
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["toggleImgSelectLockedRatio"]
+    } Else If (givenKey="!a")
+    {
+       If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+          func2Call := ["PanelAdjustImageCanvasSize"]
+    } Else If (givenKey="^a")
+    {
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["tlbrSelAllVectorPoints"]
+       Else If HKifs("liveEdit")
+          func2Call := ["selectEntireImage"]
+       Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+       {
+          If (thumbsDisplaying=1 && HKifs("imgsLoaded"))
+             func2Call := ["selectAllFiles"]
+          Else
+             func2Call := ["selectEntireImage"]
+       }
+    } Else If (givenKey="+9")
+    {
+       If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       {
+          func2Call := ["filesListFlipRotateMinus"]
+       } Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1)
+       {
+          allowLoop := 1
+          func2Call := ["MenuSelDecRotation"]
+       }
+    } Else If (givenKey="8")
+    {
+       allowLoop := 1
+       If (HKifs("liveEdit") && liveDrawingBrushTool=1)
+          func2Call := ["changeBrushOpacity", givenKey, 1]
+    } Else If (givenKey="9")
+    {
+       allowLoop := 1
+       If (HKifs("liveEdit") && liveDrawingBrushTool=1)
+          func2Call := ["changeBrushOpacity", givenKey, 1]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["MenuDecVProtation"]
+    } Else If (givenKey="!9")
+    {
+       allowLoop := 1
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["changeLittleImgRotationInVP", -1]
+    } Else If (givenKey="+00.1")
+    {
+       If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       {
+          func2Call := ["filesListFlipRotatePlus"]
+       } Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1)
+       {
+          allowLoop := 1
+          func2Call := ["MenuSelIncRotation"]
+       }
+    } Else If (givenKey="00.1")
+    {
+       allowLoop := 1
+       If (HKifs("liveEdit") && liveDrawingBrushTool=1)
+          func2Call := ["changeBrushOpacity", givenKey, 1]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["MenuIncVProtation"]
+    } Else If (givenKey="!00.1")
+    {
+       allowLoop := 1
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["changeLittleImgRotationInVP", 1]
+    } Else If (givenKey="Up" || givenKey="+Up")
+    {
+       okayu := (thumbsDisplaying=1 || undoLevelsRecorded<2 || currentImgModified!=1) ? 1 : 0
+       If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
+          func2Call := ["PanIMGonScreen", "U", givenKey]
+       Else If (HKifs("imgsLoaded") && okayu=1)
+          func2Call := ["ThumbsNavigator", "Upu", givenKey]
+    } Else If (givenKey="Down" || givenKey="+Down")
+    {
+       okayu := (thumbsDisplaying=1 || undoLevelsRecorded<2 || currentImgModified!=1) ? 1 : 0
+       If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
+          func2Call := ["PanIMGonScreen", "D", givenKey]
+       Else If (HKifs("imgsLoaded") && okayu=1)
+          func2Call := ["ThumbsNavigator", "Down", givenKey]
+    } Else If (givenKey="^WheelUp")
+    {
+       allowLoop := 1
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["ChangeZoom", 1, "WheelUp"]
+    } Else If (givenKey="^WheelDown")
+    {
+       allowLoop := 1
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["ChangeZoom", -1, "WheelDown"]
+    } Else If (givenKey="!Left")
+    {
+       allowLoop := 1
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["arrowKeysAdjustPrevPointPath", -1, 1]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["arrowKeysAdjustSelectionArea", -1, 1]
+    } Else If (givenKey="!Right")
+    {
+       allowLoop := 1
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["arrowKeysAdjustPrevPointPath", 1, 1]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["arrowKeysAdjustSelectionArea", 1, 1]
+    } Else If (givenKey="!Up")
+    {
+       allowLoop := 1
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["arrowKeysAdjustPrevPointPath", -2, 1]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["arrowKeysAdjustSelectionArea", -2, 1]
+    } Else If (givenKey="!Down")
+    {
+       allowLoop := 1
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["arrowKeysAdjustPrevPointPath", 2, 1]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["arrowKeysAdjustSelectionArea", 2, 1]
+    } Else If (givenKey="+!Left")
+    {
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["arrowKeysAdjustPrevPointPath", -1, 2]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["arrowKeysAdjustSelectionArea", -1, 2]
+    } Else If (givenKey="+!Right")
+    {
+       allowLoop := 1
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["arrowKeysAdjustPrevPointPath", 1, 2]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["arrowKeysAdjustSelectionArea", 1, 2]
+    } Else If (givenKey="+!Up")
+    {
+       allowLoop := 1
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["arrowKeysAdjustPrevPointPath", -2, 2]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["arrowKeysAdjustSelectionArea", -2, 2]
+    } Else If (givenKey="+!Down")
+    {
+       allowLoop := 1
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["arrowKeysAdjustPrevPointPath", 2, 2]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+          func2Call := ["arrowKeysAdjustSelectionArea", 2, 2]
+    } Else If (givenKey="F8")
+    {
+       If HKifs("general")
+          func2Call := ["openPreviousPanel"]
+    } Else If (givenKey="Space")
+    {
+       If (HKifs("imgsLoaded") && drawingShapeNow!=1)
+       {
+          If ((thumbsDisplaying=1 || markedSelectFile) && slideShowRunning!=1)
+             func2Call := ["markThisFileNow"]
+          Else If (slideShowRunning=1)
+             func2Call := ["dummyInfoToggleSlideShowu", "stop"]
+          Else If (A_TickCount - lastOtherWinClose>350) && (A_TickCount - prevSlideShowStop>950) ; && (drawingShapeNow!=1)
+             func2Call := ["MenuGoPlaySlidesNow"]
+       } Else if (!CurrentSLD && !maxFilesIndex && StrLen(UserMemBMP)<3)
+          func2Call := ["toggleScreenSaverMode"]
+    } Else If (givenKey="+n")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["PanelEditImgCaption"]
+    } Else If (givenKey="n")
+    {
+       If (HKifs("liveEdit") && (isAlphaMaskWindow()=1 || isAlphaMaskPartialWin()=1))
+          func2Call := ["toggleInvertAlphaMask"]
+       Else If HKifs("imgsLoaded")
+          func2Call := ["ToggleImgCaptions"]
+    } Else If (SubStr(givenKey, 1, 1)="^" && isInRange(SubStr(givenKey, 2, 1), 0, 8))
+    {
+       If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       {
+          If (givenKey="^1")
+             func2Call := ["ActSortName"]
+          Else If (givenKey="^2")
+             func2Call := ["ActSortPath"]
+          Else If (givenKey="^3")
+             func2Call := ["ActSortFileName"]
+          Else If (givenKey="^4")
+             func2Call := ["ActSortSize"]
+          Else If (givenKey="^5")
+             func2Call := ["ActSortModified"]
+          Else If (givenKey="^6")
+             func2Call := ["ActSortCreated"]
+          Else If (givenKey="^7")
+             func2Call := ["PanelResolutionSorting"]
+          Else If (givenKey="^8")
+             func2Call := ["PanelHistogramSorting"]
+          Else If (givenKey="^00.1")
+             func2Call := ["ReverseListNow"]
+       }
+    } Else If (givenKey="j")
+    {
+       If (liveDrawingBrushTool=1 || AnyWindowOpen=64) && HKifs("liveEdit")
+          func2Call := ["toggleBrushTypeCloner"]
+       Else If HKifs("imgsLoaded")
+          func2Call := ["PanelJump2index"]
+    } Else If (givenKey="+Insert")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["addNewFolder2list"]
+    } Else If (givenKey="Tab")
+    {
+        func2Call := ["mainWinTabResponse"]
+    } Else If (givenKey="+Tab")
+    {
+       If (ShowAdvToolbar=1 && hQPVtoolbar)
+          func2Call := ["focusToolbarNavKeys"]
+    } Else If (givenKey="^Tab")
+    {
+       If (HKifs("imgsLoaded") && thumbsDisplaying=1 && markedSelectFile>1)
+          func2Call := ["filterToFilesSelection"]
+    } Else If (givenKey="F11")
+    {
+       If HKifs("liveEdit")
+          func2Call := ["toggleImgEditPanelWindow"]
+       Else If !AnyWindowOpen
+          func2Call := ["ToggleFullScreenMode"]
+    } Else If (givenKey="+Enter")
+    {
+       If HKifs("liveEdit")
+          func2Call := ["applyIMGeditKeepWin"]
+       Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded")) && (!AnyWindowOpen)
+          func2Call := ["CropImageInViewPortToSelection"]
+    } Else If (givenKey="^Enter")
+    {
+       If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+          func2Call := ["OpenWithNewQPVinstance"]
+       Else If HKifs("imgsLoaded")
+          func2Call := ["SoloNewQPVinstance"]
+    } Else If (givenKey="Enter")
+    {
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["stopDrawingShape"]
+       Else If HKifs("liveEdit")
+          func2Call := ["applyIMGeditFunction"]
+       Else If (HKifs("imgsLoaded") && (A_TickCount - lastOtherWinClose>250))
+          func2Call := ["ToggleThumbsMode"]
+    } Else If (givenKey="!Enter")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["PanelImageInfos"]
+    } Else If (givenKey="c")
+    {
+       If HKifs("liveEdit")
+          func2Call := ["changeBrushColorPicker"]
+       Else If HKifs("imgsLoaded")
+          func2Call := ["InvokeCopyFiles"]
+    } Else If (givenKey="^u")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["PanelStaticFolderzManager"]
+    } Else If (givenKey="!u")
+    {
+        If !AnyWindowOpen
+           func2Call := ["PanelDynamicFolderzWindow"]
+    } Else If (givenKey="^k")
+    {
+       If (HKifs("liveEdit") && (AnyWindowOpen=64 || AnyWindowOpen=66 || isAlphaMaskWindow()=1))
+          func2Call := ["toggleAlphaPaintingMode"]
+       Else If HKifs("imgsLoaded")
+          func2Call := ["PanelFileFormatConverter"]
+    } Else If (givenKey="k")
+    {
+       If (HKifs("imgsLoaded") || HKifs("liveEdit") || HKifs("imgEditSolo"))
+          func2Call := ["PanelFloodFillTool"]
+    } Else If (givenKey="+k")
+    {
+       If (imgEditPanelOpened=1 && liveDrawingBrushTool=1 || AnyWindowOpen=64 || AnyWindowOpen=66)
+          func2Call := ["toggleBrushDrawInOutModes"]
+    } Else If (givenKey="+j")
+    {
+       If (HKifs("imgsLoaded") && !AnyWindowOpen)
+       {
+          If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.(jpg|jpeg))$") || markedSelectFile)
+             func2Call := ["PanelJpegPerformOperation"]
+       }
+    } Else If (givenKey="+c")
+    {
+       If (HKifs("liveEdit") && (AnyWindowOpen=31 || AnyWindowOpen=24))
+          func2Call := ["togglePasteInPlaceCropShapes"]
+       Else If HKifs("imgsLoaded")
+          func2Call := ["CopyImagePath"]
+    } Else If (givenKey="^e")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["OpenThisFileFolder"]
+    } Else If (givenKey="^f")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["PanelEnableFilesFilter"]
+    } Else If (givenKey="s")
+    {
+       If (HKifs("liveEdit"))
+       {
+          If (AnyWindowOpen=31 || AnyWindowOpen=24)
+             func2Call := ["togglePasteInPlaceAdaptModes"]
+          Else If (AnyWindowOpen=64 && BrushToolType=3 && liveDrawingBrushTool=1)
+             func2Call := ["BtnSetClonerBrushSource"]
+          Else If (AnyWindowOpen=23 && FillAreaColorMode=6)
+             func2Call := ["BtnSetTextureSource"]
+       } Else If HKifs("imgsLoaded")
+       {
+          If (thumbsDisplaying=1)
+             func2Call := ["keepSelectedDupeInGroup"]
+          Else
+             func2Call := ["ToggleSlideshowModes"]
+       }
+    } Else If (givenKey="+s")
+    {
+       If (HKifs("liveEdit") && liveDrawingBrushTool=1)
+          func2Call := ["toggleBrushDoubleSize"]
+       Else If (HKifs("imgsLoaded") && mustRecordSeenImgs=1 && thumbsDisplaying=1)
+          func2Call := ["ToggleSeenIMGstatus"]
+    } Else If (givenKey="+^s")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["PanelSaveSlideShowu"]
+    } Else If (givenKey="T")
+    {
+       If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
+          func2Call := ["toggleBrushAirMode"]
+       Else If (isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["togglePathCurveTension"]
+       Else If (HKifs("imgsLoaded") || HKifs("liveEdit"))
+          func2Call := ["ToggleImageSizingMode"]
+    } Else If (givenKey="+Space")
+    {
+       If HKifs("imgsLoaded")
+       {
+          If (thumbsDisplaying=1)
+             func2Call := ["dropFilesSelection"]
+          Else If (slideShowRunning=1)
+             func2Call := ["dummyInfoToggleSlideShowu", "stop"]
+          Else If (A_TickCount - prevSlideShowStop>950)
+             func2Call := ["MenuGoPlaySlidesNow"]
+       }
+    } Else If (givenKey="^Space")
+    {
+       If HKifs("imgsLoaded")
+       {
+          If (slideShowRunning=1)
+             func2Call := ["dummyInfoToggleSlideShowu", "stop"]
+          Else If StrLen(filesFilter)>1
+             func2Call := ["MenuRemFilesListFilter"]
+       }
+    } Else If (givenKey="BackSpace")
+    {
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+         func2Call := ["reduceCustomShapelength"]
+       Else If (HKifs("liveEdit") && (AnyWindowOpen=31 || AnyWindowOpen=24))
+         func2Call := ["toggleErasePasteInPlace"]
+       Else If HKifs("imgsLoaded")
+         func2Call := ["PrevRandyPicture", "key"]
+    } Else If (givenKey="+BackSpace")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["RandomPicture", "key"]
+    } Else If (givenKey="^Backspace")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["jumpPreviousImage"]
+    } Else If (givenKey="!period")
+    {
+       allowLoop := 1
+       If (HKifs("imgsLoaded") && animGIFsSupport=1)
+          func2Call := ["MenuIncGIFspeed"]
+    } Else If (givenKey="+period")
+    {
+       allowLoop := 1
+       If (liveDrawingBrushTool=1)
+          func2Call := ["MenuIncBrushWetness"]
+       Else
+          func2Call := ["MenuSetVolumeUp"]
+    } Else If (givenKey="^period")
+    {
+       func2Call := ["MenuIncSelAreaCavity"]
+    } Else If (givenKey="^comma")
+    {
+       func2Call := ["MenuDecSelAreaCavity"]
+    } Else If (givenKey="period")
+    {
+       allowLoop := 1
+       If (liveDrawingBrushTool=1)
+          func2Call := ["MenuDecBrushOpacity"]
+       Else If HKifs("imgsLoaded")
+          func2Call := ["IncreaseSlideSpeed"]
+    } Else If (givenKey="comma")
+    {
+       allowLoop := 1
+       If (liveDrawingBrushTool=1)
+          func2Call := ["MenuIncBrushOpacity"]
+       Else If HKifs("imgsLoaded")
+          func2Call := ["DecreaseSlideSpeed"]
+    } Else If (givenKey="!comma")
+    {
+       allowLoop := 1
+       If (HKifs("imgsLoaded") && animGIFsSupport=1)
+          func2Call := ["MenuDecGIFspeed"]
+    } Else If (givenKey="+comma")
+    {
+       allowLoop := 1
+       If (liveDrawingBrushTool=1)
+          func2Call := ["MenuDecBrushWetness"]
+       Else
+          func2Call := ["MenuSetVolumeDown"]
+    } Else If (givenKey="+SLASH") ; Shift+/
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["PanelDefineEntireSlideshowLength"]
+    } Else If (givenKey="F5")
+    {
+       If HKifs("imgsLoaded") || (liveDrawingBrushTool=1 && AnyWindowOpen=64)
+          func2Call := ["RefreshImageFileAction"]
+    } Else If (givenKey="!F5")
+    {
+       If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+          func2Call := ["DeepRefreshThumbsNow"]
+    } Else If (givenKey="+F5")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["RefreshFilesList"]
+    } Else If (givenKey="^F5")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["invertCurrentFolderRecursiveness"]
+    } Else If (givenKey="F2")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["PanelRenameThisFile"]
+    } Else If (givenKey="+F2")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["SingularRenameFile"]
+    } Else If (givenKey="^F2")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["PanelUpdateThisFileIndex"]
+    } Else If (givenKey="m")
+    {
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && ((editingSelectionNow=1 || AnyWindowOpen=66) && thumbsDisplaying!=1 && AnyWindowOpen!=70)
+          func2Call := ["ViewAlphaMaskNow"]
+       Else If HKifs("imgsLoaded")
+          func2Call := ["PanelMoveCopyFiles"]
+    } Else If (givenKey="^q")
+    {
+       If (HKifs("imgsLoaded") && AutoDownScaleIMGs=1)
+          func2Call := ["ToggleImgDownScaling"]
+    } Else If (givenKey="x")
+    {
+       If HKifs("liveEdit")
+       {
+          func2Call := ["ToggleBrushColors"]
+       } Else If HKifs("imgsLoaded")
+       {
+          If (animGIFplaying=1)
+             func2Call := ["DestroyGIFuWin"]
+          Else If (thumbsDisplaying=1 && maxFilesIndex>1 && currentFileIndex>0)
+             func2Call := ["moveMarkedEntryNow", currentFileIndex]
+          Else
+             func2Call := ["PlayAudioFileAssociatedNow"]
+       }
+    } Else If (givenKey="+x")
+    {
+       If HKifs("imgsLoaded")
+       {
+          If (animGIFplaying=1)
+             func2Call := ["DestroyGIFuWin"]
+          Else If (thumbsDisplaying=1 && maxFilesIndex>1 && currentFileIndex>0 && markedSelectFile>1)
+             func2Call := ["regroupSelectedFiles"]
+          Else If (thumbsDisplaying=1 && maxFilesIndex>1 && currentFileIndex>0)
+             func2Call := ["moveMarkedEntryNow", currentFileIndex, "move"]
+          Else
+             func2Call := ["StopMediaPlaying"]
+       }
+    } Else If ((isInRange(givenKey, 1, 7) && isNumber(givenKey))
+           || (SubStr(givenKey, 1, 1)="+" && isInRange(SubStr(givenKey, 2, 1), 1, 7)))
+    {
+       If (HKifs("liveEdit") && liveDrawingBrushTool=1)
+       {
+          allowLoop := 1
+          func2Call := ["changeBrushOpacity", givenKey, 1]
+       } Else If (HKifs("imgsLoaded") && !InStr(givenKey, "8"))
+          func2Call := ["triggerQuickFileAction", givenKey]
+    } Else If (givenKey="^Left")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["navSelectedFiles", -1]
+    } Else If (givenKey="^Right")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["navSelectedFiles", 1]
+    } Else If (givenKey="F3")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["MenuSearchNextIndex"]
+    } Else If (givenKey="+F3")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["MenuSearchPrevIndex"]
+    } Else If (givenKey="^F3")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["PanelSearchIndex"]
+    } Else If (givenKey="F4")
+    {
+       If !AnyWindowOpen
+          func2Call := ["PanelFoldersTree"]
+    } Else If (givenKey="+F4")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["invokeFoldersListerMenu"]
+    } Else If (givenKey="WheelUp")
+    {
+       If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+          func2Call := ["ThumbsNavigator", "Upu", givenKey]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1) && (IMGresizingMode=4 && thumbsDisplaying!=1)
+          func2Call := ["ChangeZoom", 1, "WheelUp"]
+       Else If (HKifs("imgsLoaded"))
+          func2Call := ["PreviousPicture", "key-" givenKey]
+    } Else If (givenKey="WheelDown")
+    {
+       If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+          func2Call := ["ThumbsNavigator", "Down", givenKey]
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1) && (IMGresizingMode=4 && thumbsDisplaying!=1)
+          func2Call := ["ChangeZoom", -1, "WheelDown"]
+       Else If (HKifs("imgsLoaded"))
+          func2Call := ["NextPicture", "key-" givenKey]
+    } Else If (givenKey="Right" || givenKey="+Right")
+    {
+       If HKifs("imgsLoaded")
+       {
+          If ((IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
+          {
+             func2Call := ["PanIMGonScreen", "R", givenKey]
+          } Else
+          {
+             okayu := (thumbsDisplaying=1 || undoLevelsRecorded<2 || currentImgModified!=1) ? 1 : 0
+             func2Call := ["resetSlideshowTimer"]
+             If (thumbsDisplaying=1)
+                func2Call := ["ThumbsNavigator", "Right", givenKey]
+             Else If (okayu=1)
+                func2Call := ["NextPicture", "key-" givenKey]
+         }
+       } Else If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
+         func2Call := ["PanIMGonScreen", "R", givenKey]
+    } Else If (givenKey="Left" || givenKey="+Left")
+    {
+       If HKifs("imgsLoaded")
+       {
+          If ((IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
+          {
+             func2Call := ["PanIMGonScreen", "L", givenKey]
+          } Else
+          {
+             okayu := (thumbsDisplaying=1 || undoLevelsRecorded<2 || currentImgModified!=1) ? 1 : 0
+             func2Call := ["resetSlideshowTimer"]
+             If (thumbsDisplaying=1)
+                func2Call := ["ThumbsNavigator", "Left", givenKey]
+             Else If (okayu=1)
+                func2Call := ["PreviousPicture", "key-" givenKey]
+         }
+       } Else If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
+         func2Call := ["PanIMGonScreen", "L", givenKey]
+    } Else If (givenKey="PgDn")
+    {
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+       {
+          allowLoop := 1
+          func2Call := ["adjustCustomShapePositionLive", -1]
+       } Else If (HKifs("liveEdit") && editingSelectionNow=1)
+       {
+          allowLoop := 1
+          func2Call := ["MenuSelAreaMoveLeft"]
+       } Else If HKifs("imgsLoaded")
+       {
+          func2Call := ["resetSlideshowTimer"]
+          If (thumbsDisplaying=1)
+          {
+             allowLoop := 1
+             func2Call := ["ThumbsNavigator", "PgDn", givenKey]
+          } Else func2Call := ["NextPicture"]
+       }
+    } Else If (givenKey="PgUp")
+    {
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+       {
+          allowLoop := 1
+          func2Call := ["adjustCustomShapePositionLive", 1]
+       } Else If (HKifs("liveEdit") && editingSelectionNow=1)
+       {
+          allowLoop := 1
+          func2Call := ["MenuSelAreaMoveRight"]
+       } Else If HKifs("imgsLoaded")
+       {
+          func2Call := ["resetSlideshowTimer"]
+          If (thumbsDisplaying=1)
+          {
+             allowLoop := 1
+             func2Call := ["ThumbsNavigator", "PgUp", givenKey]
+          } Else func2Call := ["PreviousPicture"]
+       }
+    } Else If (givenKey="+PgDn")
+    {
+       If HKifs("imgsLoaded")
+       {
+          func2Call := ["resetSlideshowTimer"]
+          If (thumbsDisplaying=1)
+          {
+             allowLoop := 1
+             func2Call := ["ThumbsNavigator", "PgDn", givenKey]
+          } Else If (totalFramesIndex>0 && thumbsDisplaying!=1)
+             func2Call := ["MenuPrevDesiredFrame"]
+       }
+    } Else If (givenKey="+PgUp")
+    {
+       If HKifs("imgsLoaded")
+       {
+          func2Call := ["resetSlideshowTimer"]
+          If (thumbsDisplaying=1)
+          {
+             allowLoop := 1
+             func2Call := ["ThumbsNavigator", "PgUp", givenKey]
+          } Else If (totalFramesIndex>0 && thumbsDisplaying!=1)
+             func2Call := ["MenuNextDesiredFrame"]
+       }
+    } Else If (givenKey="^PgUp")
+    {
+       allowLoop := 1
+       If (HKifs("imgsLoaded") && thumbsDisplaying=1 && SLDtypeLoaded=1)
+          func2Call := ["FileExploreUpDownLevel", -1]
+    } Else If (givenKey="^PgDn")
+    {
+       allowLoop := 1
+       If (HKifs("imgsLoaded") && thumbsDisplaying=1 && SLDtypeLoaded=1)
+          func2Call := ["FileExploreUpDownLevel", 1]
+    } Else If (givenKey="!PgUp")
+    {
+       allowLoop := 1
+       If (HKifs("imgsLoaded") && thumbsDisplaying=1 && SLDtypeLoaded=1)
+          func2Call := ["FileExploreSiblingsNav", -1]
+    } Else If (givenKey="!PgDn")
+    {
+       allowLoop := 1
+       If (HKifs("imgsLoaded") && thumbsDisplaying=1 && SLDtypeLoaded=1)
+          func2Call := ["FileExploreSiblingsNav", 1]
+    } Else If (givenKey="^Home")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["jumpToFilesSelBorder", -1]
+    } Else If (givenKey="^End")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["jumpToFilesSelBorder", 1]
+    } Else If (givenKey="Home" || givenKey="+Home")
+    {
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+       {
+          allowLoop := 1
+          func2Call := ["adjustCustomShapePositionLive", 2]
+       } Else If (HKifs("liveEdit") && editingSelectionNow=1)
+       {
+          allowLoop := 1
+          func2Call := ["MenuSelAreaMoveUp"]
+       } Else If HKifs("imgsLoaded")
+       {
+          If (thumbsDisplaying=1)
+          {
+             allowLoop := 1
+             func2Call := ["ThumbsNavigator", "Home", givenKey]
+          } Else func2Call := ["FirstPicture"]
+       }
+    } Else If (givenKey="End" || givenKey="+End")
+    {
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+       {
+          allowLoop := 1
+          func2Call := ["adjustCustomShapePositionLive", -2]
+       } Else If (HKifs("liveEdit") && editingSelectionNow=1)
+       {
+          allowLoop := 1
+          func2Call := ["MenuSelAreaMoveDown"]
+       } Else If HKifs("imgsLoaded")
+       {
+          If (thumbsDisplaying=1)
+          {
+             allowLoop := 1
+             func2Call := ["ThumbsNavigator", "End", givenKey]
+          } Else func2Call := ["LastPicture"]
+      }
+    }
+
+    If (simulacrum=1)
+       Return func2Call
+
+    c := defineKBDcontexts(0) "." func2Call[1]
+    If (SubStr(userCustomKeysDefined[c, 1], 1, 1)="?")
+       func2Call := ""
+
+    If IsFunc(func2Call[1])
+    {
+       fn := func2Call[1]
+       If (func2Call.Count()=1)
+          %fn%()
+       Else If (func2Call.Count()=2)
+          %fn%(func2Call[2])
+       Else If (func2Call.Count()=3)
+          %fn%(func2Call[2], func2Call[3])
+       Else If (func2Call.Count()=4)
+          %fn%(func2Call[2], func2Call[3], func2Call[4])
+       Else
+          r := 1
+    } Else If (Strlen(func2Call[1])>1)
+       r := func2Call[1]
+    Else
+       Return 0
+
+    If (r=1)
+       simpleMsgBoxWrapper(appTitle ": ERROR", "An error occured calling " fn "() for " givenKey ". Too many parameters.")
+    Else If r
+       simpleMsgBoxWrapper(appTitle ": ERROR", "An error occured calling " r "() function for " givenKey ".")
+
+    Return r ? -1 : allowLoop + 1
+} ; // processDefaultKbdCombos
 
 ;____________ Functions __________________
 
@@ -2233,6 +2302,8 @@ initializeAppWithGivenArguments() {
 runDelayedfunc2exec() {
    If IsFunc(delayedfunc2exec)
       %delayedfunc2exec%()
+   Else If delayedfunc2exec
+      addJournalEntry("ERROR: The function passed as argument does not seem to exist: " delayedfunc2exec)
 }
 
 OpenSLD(fileNamu, dontStartSlide:=0) {
@@ -2427,16 +2498,6 @@ resetMainWin2Welcome() {
      SetTimer, ResetImgLoadStatus, -50
      If (lockToolbar2Win=1 && ShowAdvToolbar=1)
         SetTimer, tlbrResetPosition, -100
-}
-
-deleteKeyAction() {
-    If !getIDimage(currentFileIndex)
-       Return
-
-    If (thumbsDisplaying!=1 && editingSelectionNow=1)
-       PanelEraseSelectedArea()
-    Else
-       DeletePicture()
 }
 
 activateFilesListFilterBasedOnFolder(thisIndex) {
@@ -4329,7 +4390,7 @@ ToggleThumbsMode() {
    If (thumbsDisplaying=1)
    {
       lastTimeToggleThumbs := A_TickCount
-      fnOutputDebug("Deactivating thumbs mode")
+      fnOutputDebug("Deactivating the thumbnails mode")
       If (thisIndexu!=prevIndexu)
          FadeMainWindow()
 
@@ -5019,17 +5080,6 @@ simplePanIMGonClick(modus:=0, doX:=1, doY:=1) {
             prevMY := mY
             thisZeit := A_TickCount
          }
-/*
-         ; ToolTip, % diffIMGdecX " == " diffIMGdecY , , , 2
-         MouseGetPos,,, Az
-         isOkay := (Az=PVhwnd || Az=hGDIwin || Az=hGDIthumbsWin || Az=hGDIinfosWin || Az=hGDIselectWin || Az=hGuiTip && mouseToolTipWinCreated=1 || Az=hquickMenuSearchWin && VisibleQuickMenuSearchWin=1 || Az=hQPVtoolbar && ShowAdvToolbar=1 || Az=hfdTreeWinGui && folderTreeWinOpen=1) ? 1 : 0
-         ; ToolTip, % isOkay " | " Az , , , 2
-         If (isOkay!=1)
-         {
-            If (A_TickCount - lastInvoked>1550)
-               Break
-         } Else lastInvoked := A_TickCount
-*/
       }
    }
 
@@ -5542,8 +5592,6 @@ applyIMGeditFunction() {
        BtnAdjustColorsImgSelectedArea()
     Else If (AnyWindowOpen=81)
        BtnSymmetrySelectedArea()
-    Else If (AnyWindowOpen=12)
-       BtnPerformJpegOp()
     Else
        BtnCloseWindow()
 
@@ -6113,7 +6161,7 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
    }
 
    Menu, PVnav, Add
-   kMenu("PVnav", "Add", "Select all points`tCtrl+A", "MenuSelAllVectorPoints")
+   kMenu("PVnav", "Add", "Select all points`tCtrl+A", "tlbrSelAllVectorPoints")
    If (customShapeHasSelectedPoints=1)
    {
       If (bezierSplineCustomShape!=1)
@@ -6133,7 +6181,7 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
    {
       Menu, PVnav, Add
       kMenu("PVnav", "Add", "&Done`tEnter", "stopDrawingShape")
-      kMenu("PVnav", "Add", "&Cancel / exit pen tool`tEscape", "cancelDrawingShape")
+      kMenu("PVnav", "Add", "&Cancel / exit pen tool`tEscape", "MenuCancelDrawingShape")
       Menu, PVnav, Add
       kMenu("PVnav", "Add", "&Remove last point`tBackspace", "reduceCustomShapelength")
       If (customShapePoints.Count()<2)
@@ -6161,9 +6209,9 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
             kMenu("PVnav", "Check", "Auto-reflect anchors`tR")
       }
 
-      kMenu("PVnav", "Add/Uncheck", "Show viewport &grid`tAlt+=", "toggleViewPortGridu")
+      kMenu("PVnav", "Add/Uncheck", "Show viewport &grid`tG", "toggleViewPortGridu")
       If (showViewPortGrid=1)
-         kMenu("PVnav", "Check", "Show viewport &grid`tAlt+=")
+         kMenu("PVnav", "Check", "Show viewport &grid`tG")
 
       kMenu("PVnav", "Add/UnCheck", "&Show toolbar`tShift+F10", "toggleAppToolbar")
       If (ShowAdvToolbar=1)
@@ -6173,8 +6221,14 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
       If (closedLineCustomShape=0)
          kMenu("PVnav", "Check", "&Open ended path`tO")
 
-      createMenuImgSizeAdapt("bonus")
-      kMenu("PVnav", "Add", "Vie&wport options", ":PvImgAdapt")
+      If (mustPreventMenus=1 || showMainMenuBar!=1)
+      {
+         Menu, PVnav, Add
+         createMenuInterfaceOptions()
+         InvokeMenuBarVectorView(0, "extern")
+         kMenu("PVnav", "Add", "Interface", ":PvUIprefs")
+         kMenu("PVnav", "Add", "Vie&w options", ":pvMenuBarView")
+      }
    }
 
    globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PVnav") : givenCoords
@@ -9040,29 +9094,10 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
   Return
 }
 
-theSlideShowCore() {
-   If (slideShowRunning=1 && slidesFXrandomize=1)
-      VPimgFXrandomizer()
-
-   If (SlideHowMode=1)
-     RandomPicture()
-   Else If (SlideHowMode=2)
-     PreviousPicture()
-   Else If (SlideHowMode=3)
-     NextPicture()
-   Return
-}
-
 GoNextSlide() {
   Sleep, 15
-  If GetKeyState("LButton")
-  {
-     SetTimer, GoNextSlide, -100
-     Return
-  }
-
   resetSlideshowTimer()
-  If (SlideHowMode=1)
+  If (SlideHowMode=1 && !GetKeyState("Ctrl", "P"))
      RandomPicture()
   Else
      NextPicture()
@@ -9070,14 +9105,8 @@ GoNextSlide() {
 
 GoPrevSlide() {
   Sleep, 15
-  If GetKeyState("LButton")
-  {
-     SetTimer, GoPrevSlide, -100
-     Return
-  }
-
   resetSlideshowTimer()
-  If (SlideHowMode=1)
+  If (SlideHowMode=1 && !GetKeyState("Ctrl", "P"))
      PrevRandyPicture()
   Else
      PreviousPicture()
@@ -9401,6 +9430,10 @@ ToggleIMGalign() {
    }
 }
 
+MenuToggleColorAdjustments() {
+   toggleColorAdjustments()
+}
+
 toggleColorAdjustments(modus:=0) {
    Static lastInvoked := 1, prevImgAlphaChn := 1, prevFXmode := 1
    If (modus="backup")
@@ -9433,7 +9466,7 @@ toggleColorAdjustments(modus:=0) {
      If (modus=0)
      {
         AnyWindowOpen := 10
-        SetTimer, resetClrMatrix, -1500
+        SetTimer, resetClrMatrix, -1950
      }
   }
 }
@@ -10201,11 +10234,11 @@ dummyChangeVProtation() {
    }
 }
 
-nextDesiredFrame() {
+MenuNextDesiredFrame() {
     changeDesiredFrame(1)
 }
 
-prevDesiredFrame() {
+MenuPrevDesiredFrame() {
     changeDesiredFrame(-1)
 }
 
@@ -10253,6 +10286,9 @@ changeDesiredFrame(dir:=1) {
 
 DestroyGIFuWin() {
     Critical, on
+    If (mustPreventMenus=1 || simulateMenusMode=1)
+       Return
+
     If (slideShowRunning=1 || animGIFplaying=1)
        SetTimer, ResetImgLoadStatus, -15
 
@@ -10349,7 +10385,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
    If (totalZeit>100 && totalFramesIndex>95)
       thisFrameDelay := 1
 
-   If (thumbsDisplaying=1 || liveDrawingBrushTool=1 || drawingShapeNow=1)
+   If (thumbsDisplaying=1 || liveDrawingBrushTool=1 && imgEditPanelOpened=1 || drawingShapeNow=1)
       allowNextSlide := 0
 
    If (slideShowRunning=1 && (A_TickCount - lastInvoked>slideShowDelay + 1) && allowNextSlide=1)
@@ -10542,7 +10578,7 @@ coreNextPrevImage(direction, startIndex, randomMode) {
    If newIndex
       newIndex := clampInRange(newIndex, 1, maxFilesIndex, 1)
 
-   If (countSeen >= maxFilesIndex - 1) || (!newIndex) ; || (allImagesWereSeen=1)
+   If (countSeen>=maxFilesIndex - 1) || (!newIndex) ; || (allImagesWereSeen=1)
    {
       allImagesWereSeen := 1
       newIndex := (direction=-1) ? startIndex - 1 : startIndex + 1
@@ -10567,7 +10603,7 @@ coreNextPrevImage(direction, startIndex, randomMode) {
 }
 
 PreviousPicture(dummy:=0, selForbidden:=0) {
-   If (StrLen(UserMemBMP)>2 && editingSelectionNow=1 && InStr(dummy, "key-wheel"))
+   If (StrLen(UserMemBMP)>2 && (editingSelectionNow=1 || thumbsDisplaying!=1 && currentImgModified=1) && InStr(dummy, "key-wheel"))
       Return
 
    If (InStr(dummy, "key-") && slideShowRunning=1 && easySlideStoppage=1)
@@ -10585,7 +10621,7 @@ PreviousPicture(dummy:=0, selForbidden:=0) {
 }
 
 NextPicture(dummy:=0, selForbidden:=0) {
-   If (StrLen(UserMemBMP)>2 && editingSelectionNow=1 && InStr(dummy, "key-wheel"))
+   If (StrLen(UserMemBMP)>2 && (editingSelectionNow=1 || thumbsDisplaying!=1 && currentImgModified=1) && InStr(dummy, "key-wheel"))
       Return
 
    If (InStr(dummy, "key-") && slideShowRunning=1 && easySlideStoppage=1)
@@ -10603,14 +10639,7 @@ NextPicture(dummy:=0, selForbidden:=0) {
 }
 
 drawInPlaceTextInBox(Gu, theString, txtOptions) {
-    ; startZeit := A_TickCount
-    ; pBr0 := Gdip_BrushCreateSolid(bgrColor)
-    ; ToolTip, % mainObju.hfnt "`n" mainObju.hStrFmt "`n" mainObju.hBrush , , , 2
-
-    ;  TextuToGraphics(Gu, theString, nul, txtOptions.fontu, "measure", 0, mainObju)
    Return TextuToGraphics(Gu, theString, txtOptions, txtOptions.fontu, "draw2", 0, mainObju)
-    ; ToolTip, % dims.w "--" dims.h "--" _E , , , 2
-    ; fnOutputDebug("draw text in box: " A_TickCount - startZeit " ms")
 }
 
 drawTextInBox(theString, fntName, theFntSize, maxW, maxH, txtColor, bgrColor, NoWrap, flippable:=0, thisTextAlign:=0, BGRopacity:="0xDD", borderu:=0) {
@@ -13124,36 +13153,40 @@ recordUndoLevelNow(actionu, recordedBitmap, dX:=0, dY:=0, forceAlpha:="x") {
       SoundBeep , 900, 100
 }
 
-terminateIMGediting() {
+terminateIMGediting(modus:=0) {
    lastZeitIMGsaved := []
-   If (StrLen(UserMemBMP)<3 && undoLevelsRecorded>0 && currentFileIndex!=imgIndexEditing && minimizeMemUsage=1)
+   allowThis := (modus="forced" && (undoLevelsRecorded>0 || StrLen(UserMemBMP)>2)) ? 0 : 1
+   If (allowThis=1)
    {
-      UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
-      userClipBMPpaste := trGdip_DisposeImage(userClipBMPpaste, 1)
-      viewportStampBMP := trGdip_DisposeImage(viewportStampBMP, 1)
-      viewportIDstampBMP := ""
-      Loop, 3
+      If (StrLen(UserMemBMP)<3 && undoLevelsRecorded>0 && currentFileIndex!=imgIndexEditing && minimizeMemUsage=1)
       {
-          trGdip_DisposeImage(undoLevelsArray[A_Index, 1], 1)
-          undoLevelsArray[A_Index, 1] := ""
+         UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
+         userClipBMPpaste := trGdip_DisposeImage(userClipBMPpaste, 1)
+         viewportStampBMP := trGdip_DisposeImage(viewportStampBMP, 1)
+         viewportIDstampBMP := ""
+         Loop, 3
+         {
+             trGdip_DisposeImage(undoLevelsArray[A_Index, 1], 1)
+             undoLevelsArray[A_Index, 1] := ""
+         }
+
+         gdipObjectsStats(1, "recordUndoLevelNow")
+         currentImgModified := 0
+         undoSelLevelsArray := []
+         currentSelUndoLevel := 1
+         undoVectorShapesLevelsArray := []
+         currentVectorUndoLevel := 1
+         customShapeHasSelectedPoints := 0
+         currentUndoLevel := hasReachedMaxUndoLevels := undoLevelsRecorded := 0
+         interfaceThread.ahkassign("UserMemBMP", UserMemBMP)
+         interfaceThread.ahkassign("undoLevelsRecorded", undoLevelsRecorded)
+         SetTimer, TriggerMenuBarUpdate, -50
+         Return
       }
 
-      gdipObjectsStats(1, "recordUndoLevelNow")
-      currentImgModified := 0
-      undoSelLevelsArray := []
-      currentSelUndoLevel := 1
-      undoVectorShapesLevelsArray := []
-      currentVectorUndoLevel := 1
-      customShapeHasSelectedPoints := 0
-      currentUndoLevel := hasReachedMaxUndoLevels := undoLevelsRecorded := 0
-      interfaceThread.ahkassign("UserMemBMP", UserMemBMP)
-      interfaceThread.ahkassign("undoLevelsRecorded", undoLevelsRecorded)
-      SetTimer, TriggerMenuBarUpdate, -50
-      Return
+      If (StrLen(UserMemBMP)<3 && undoLevelsRecorded<1) || (currentFileIndex=imgIndexEditing && undoLevelsRecorded>1 && currentImgModified=2)
+         Return
    }
-
-   If (StrLen(UserMemBMP)<3 && undoLevelsRecorded<1) || (currentFileIndex=imgIndexEditing && undoLevelsRecorded>1 && currentImgModified=2)
-      Return
 
    currentImgModified := 0
    UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
@@ -14111,7 +14144,8 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
              trGdip_DisposeImage(alphaMaskGray, 1)
        } Else If (alphaMaskingMode>1)
        {
-          thisIDu := "a" previewMode alphaMaskingMode alphaMaskRefBMP alphaMaskClrAintensity alphaMaskClrBintensity alphaMaskGradientAngle alphaMaskGradientScale alphaMaskOffsetX alphaMaskOffsetY alphaMaskGradientWrapped alphaMaskColorReversed alphaMaskReplaceMode alphaMaskBMPchannel VPselRotation lastPaintEventID alphaMaskGradientPosA alphaMaskGradientPosB zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY getVPselIDs("saiz-vpos") FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY TextInAreaFlipV TextInAreaFlipV TextInAreaAlign TextInAreaLineAngle TextInAreaCharSpacing TextInAreaBlendMode TextInAreaValign TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaFillSelArea TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr TextInAreaAutoWrap TextInAreaCaseTransform userimgGammaCorrect undoLevelsRecorded currentUndoLevel useGdiBitmap() alphaMaskBMPbright alphaMaskBMPcontrast
+          thisIDu := "a" previewMode alphaMaskingMode alphaMaskRefBMP alphaMaskClrAintensity alphaMaskClrBintensity alphaMaskGradientAngle alphaMaskGradientScale alphaMaskOffsetX alphaMaskOffsetY alphaMaskGradientWrapped alphaMaskColorReversed alphaMaskReplaceMode alphaMaskBMPchannel VPselRotation lastPaintEventID alphaMaskGradientPosA alphaMaskGradientPosB zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY getVPselIDs("saiz-vpos") FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY TextInAreaFlipV TextInAreaFlipV TextInAreaAlign TextInAreaLineAngle TextInAreaCharSpacing TextInAreaBlendMode TextInAreaValign TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaFillSelArea TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName
+          thisIDu .= "b" TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr TextInAreaAutoWrap TextInAreaCaseTransform userimgGammaCorrect undoLevelsRecorded currentUndoLevel useGdiBitmap() alphaMaskBMPbright alphaMaskBMPcontrast
           realtimePasteInPlaceAlphaMasker(previewMode, fBitmap, thisIDu, maskedBitmap)
        }
 
@@ -17865,13 +17899,6 @@ corePasteClipboardImg(modus, imgW, imgH, allowFilesPaste) {
     Return clipBMP
 }
 
-tlbrPasteClipboardIMG() {
-   If (isImgEditingNow()=1 && editingSelectionNow=1)
-      PanelPasteInPlace()
-   Else
-      PasteClipboardIMG()
-}
-
 PasteClipboardIMG(modus:=0, clipBMP:=0) {
     Critical, on
     Static clippyCount := 0
@@ -18075,8 +18102,7 @@ selectSeenFilesSession() {
     lastZeitFileSelect := A_TickCount
     getSelectedFiles(0, 1)
     dummyTimerReloadThisPicture(50)
-
-    If (markedSelectFile>2 && wasSelect=0)
+    If (markedSelectFile>2 && wasSelect=0 && SLDtypeLoaded!=3 && !InStr(CurrentSLD, "\QPV\favourite-images-list.SLD"))
     {
        msgResult := msgBoxWrapper(appTitle ": Confirmation", "You have selected " groupDigits(markedSelectFile) " files. Would you like to remove these index entries?", 4, 2, "question")
        If (msgResult="Yes")
@@ -18336,6 +18362,514 @@ SettingsGUIAGuiContextMenu(GuiHwnd, CtrlHwnd, EventInfo, IsRightClick, X, Y) {
     Return
 }
 
+MenuRestoreAnyContextDefaultKBD() {
+   MenuRestoreDefaultKBD("all")
+   k := defineKBDcontexts(2)
+   showTOOLtip("Any custom key binding associated with the selected function was removed")
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+MenuDisableKbdShortcut() {
+    Gui, QuickMenuSearchGUIA: Default
+    Gui, QuickMenuSearchGUIA: ListView, LVsearchMenus
+    RowNumber := LV_GetNext(0, "F")
+    LV_GetText(menuName, RowNumber, 2)
+    LV_GetText(oshortcut, RowNumber, 3)
+    LV_GetText(menuLocation, RowNumber, 4)
+    LV_GetText(funcu, RowNumber, 6)
+    LV_GetText(kwds, RowNumber, 5)
+
+    posu := InStr(kwds, sillySeparator)
+    If (oshortcut="" && !posu)
+    {
+       showTOOLtip("WARNING: No keyboard shortcut is associated with the selected option:`n" menuName)
+       SoundBeep , 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
+
+    c := defineKBDcontexts(0)
+    shortcut := processHumanKkbdName(oshortcut)
+    defaultHotKateRaw := posu ? SubStr(kwds, posu + 1) : shortcut
+    txtLine := sillySeparator "?" funcu sillySeparator menuName sillySeparator menuLocation sillySeparator c sillySeparator defaultHotKateRaw
+    cshortcut := c shortcut
+    If ((SubStr(userCustomKeysDefined[cshortcut, 1], 1, 1)="?")
+    || (SubStr(userCustomKeysDefined[c . defaultHotKateRaw, 1], 1, 1)="?" && defaultHotKateRaw && posu && shortcut=""))
+    {
+       showTOOLtip("WARNING: The keyboard shortcut is already disabled")
+       SoundBeep , 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    } Else If (userCustomKeysDefined[cshortcut, 1]="?2")
+    {
+       pk := userCustomKeysDefined[cshortcut, 2]
+       showTOOLtip("WARNING: This keyboard shortcut is already replaced with: " pk "`n" userCustomKeysDefined[pk, 2])
+       SoundBeep , 300, 100
+       Settimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    } Else If (IsFunc(userCustomKeysDefined[cshortcut, 1]) && shortcut!="")
+    {
+       closeQuickSearch()
+       oldShortcut := userCustomKeysDefined[cshortcut, 5]
+       humanKbd := sillySeparator processKkbdNameToHuman(oldShortcut)
+       newLine := (oldShortcut!="") ? oldShortcut txtLine humanKbd : ""
+       defaultu := processDefaultKbdCombos(shortcut, PVhwnd, 0, PVhwnd, 1)
+       If StrLen(defaultu[1])>2
+          bonusLine := (oldShortcut!=shortcut) ? shortcut sillySeparator "?_generic" sillySeparator "ALL" sillySeparator "\ANYWHERE" sillySeparator c sillySeparator shortcut sillySeparator oshortcut : ""
+   
+       r := updateCustomUserKbds(newLine, userCustomKeysDefined[cshortcut, 7], 0, bonusLine)
+       If !r
+       {
+          showTOOLtip("ERROR: Failed to update the custom keyboard settings file")
+          SoundBeep 300, 100
+          Settimer, RemoveTooltip, % -msgDisplayTime
+       }
+       Sleep, 5
+       loadCustomUserKbds()
+       PanelQuickSearchMenuOptions()
+       Return
+    }
+
+    closeQuickSearch()
+    If (shortcut!="")
+    {
+       humanKbd := sillySeparator processKkbdNameToHuman(shortcut)
+       FileAppend, % shortcut txtLine humanKbd "`n", % customKbdFile, UTF-8
+       Sleep, 5
+       loadCustomUserKbds()
+    }
+
+    PanelQuickSearchMenuOptions()
+}
+
+MenuRestoreDefaultKBD(modus:=0) {
+    Gui, QuickMenuSearchGUIA: Default
+    Gui, QuickMenuSearchGUIA: ListView, LVsearchMenus
+    RowNumber := LV_GetNext(0, "F")
+    LV_GetText(funcu, RowNumber, 6)
+    LV_GetText(kwds, RowNumber, 5)
+    LV_GetText(shortcut, RowNumber, 3)
+
+    posu := InStr(kwds, sillySeparator)
+    If (posu && shortcut="")
+       HotKateRaw := SubStr(kwds, posu + 1)
+
+    r := restoreDefaultCustomUserKbds(HotKateRaw, funcu, defineKBDcontexts(0), modus)
+    If !r
+    {
+       showTOOLtip("ERROR: Failed to update the custom keyboard settings file")
+       SoundBeep 300, 100
+       Settimer, RemoveTooltip, % -msgDisplayTime
+    }
+
+    loadCustomUserKbds()
+    Sleep, 5
+    closeQuickSearch()
+    PanelQuickSearchMenuOptions()
+}
+
+processHumanKkbdName(shortcut, ByRef obju:=0) {
+    Static humanlistu := {0:"00.1","PageUp":"PGUP","PageDown":"PGDN","-":"MINUS","=":"EQUAL","[":"LBRACKET","]":"RBRACKET","\":"BSLASH","/":"SLASH",";":"COLON",",":"COMMA",".":"PERIOD","""":"QUOTES","Numpad+":"NumpadAdd","Numpad-":"NumpadSub","Numpad*":"NumpadMult","Numpad/":"NumpadDiv","Numpad.":"NumpadDot","Esc":"Escape","``":"TILDA"}
+    obju := []
+    shortcut := Trimmer(StrReplace(shortcut, A_Space))
+    shortcut := StrReplace(shortcut, "numpad+", "NumpadAdd")
+    If InStr(shortcut, "+")
+       shortcut := StrReplace(shortcut, "+", "®")
+
+    If InStr(shortcut, "shift®")
+    {
+       shortcut := StrReplace(shortcut, "shift®")
+       nsh .= "+"
+    }
+
+    If InStr(shortcut, "ctrl®")
+    {
+       shortcut := StrReplace(shortcut, "ctrl®")
+       nsh .=  "^"
+    }
+
+    If InStr(shortcut, "alt®")
+    {
+       shortcut := StrReplace(shortcut, "alt®")
+       nsh .= "!"
+    }
+ 
+    shortcut := StrReplace(shortcut, "®")
+    shortcut := StrReplace(shortcut, "NumpadAdd", "Numpad+")
+    nraw := StrReplace(shortcut, "Page", "Page ")
+    obju.r := StrReplace(nraw, "Numpad", "Numpad ")
+    shortcut := humanlistu[shortcut] ? humanlistu[shortcut] : shortcut
+    obju.p := nsh
+    obju.s := shortcut
+    Return nsh shortcut
+}
+
+processKkbdNameToHuman(shortcut) {
+    Static humanlistu := {"00.1":"0","PGUP":"Page Up","PGDN":"Page Down","MINUS":"-","EQUAL":"=","LBRACKET":"[","RBRACKET":"]","BSLASH":"\","SLASH":"/","COLON":";","COMMA":",","PERIOD":".","QUOTES":"""","NumpadAdd":"Numpad +","NumpadSub":"Numpad -","NumpadMult":"Numpad *","NumpadDiv":"Numpad /","NumpadDot":"Numpad .","TILDA":"``"}
+    p := ""
+    If InStr(shortcut, "^")
+    {
+       shortcut := StrReplace(shortcut, "^")
+       p .= "Ctrl+"
+    }
+
+    If InStr(shortcut, "!")
+    {
+       shortcut := StrReplace(shortcut, "!")
+       p .=  "Alt+"
+    }
+
+    If InStr(shortcut, "+")
+    {
+       shortcut := StrReplace(shortcut, "+")
+       p .= "Shift+"
+    }
+
+    shortcut := humanlistu[shortcut] ? humanlistu[shortcut] : shortcut
+    Return p shortcut
+}
+
+BtnApplyNewKbdShortcut() {
+    Static humanlistu := {0:"00.1","PageUp":"PGUP","PageDown":"PGDN","-":"MINUS","=":"EQUAL","[":"LBRACKET","]":"RBRACKET","\":"BSLASH","/":"SLASH",";":"COLON",",":"COMMA",".":"PERIOD","""":"QUOTES","Numpad+":"NumpadAdd","Numpad-":"NumpadSub","Numpad*":"NumpadMult","Numpad/":"NumpadDiv","Numpad.":"NumpadDot","Esc":"Escape","``":"TILDA"}
+
+    Gui, customKbdGUIA: Default
+    GuiControlGet, BtnModsCtrl
+    GuiControlGet, BtnModsAlt
+    GuiControlGet, BtnModsShift
+    GuiControlGet, tehCustomKeysThing
+    GuiControlGet, txtline2 ; menu item details
+    GuiControlGet, txtline3 ; previous keyboard shortcut
+    GuiControlGet, txtline4 ; default keyboard shortcut
+
+    GuiControlGet, hwnd, hwnd, tehCustomKeysThing
+    ControlGetText, info,, ahk_id %hwnd%
+    If (info="(None)")
+    {
+       showTOOLtip("WARNING: No keyboard shortcut is defined.")
+       SoundBeep 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    } Else If (info="escape" && (BtnModsShift=0 && BtnModsAlt=0 && BtnModsCtrl=0 || BtnModsShift=1 && BtnModsAlt=1 && BtnModsCtrl=1 || BtnModsShift=0 && BtnModsAlt=0 && BtnModsCtrl=1))
+    {
+       showTOOLtip("WARNING: Illegal shortcut defined.")
+       SoundBeep 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    } Else If (isInRange(tehCustomKeysThing, 79, 89) && InStr(info, "numpad") && BtnModsShift=1)
+    {
+       showTOOLtip("WARNING: Numpad digits with Shift are not supported.")
+       SoundBeep 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
+
+    CloseKbdDefinePanel()
+    If (info="Esc")
+       info := StrReplace(info, "Esc", "Escape")
+
+    Sleep, 1
+    If (BtnModsShift=1)
+       nsh .= "+"
+    If (BtnModsCtrl=1)
+       nsh .= "^"
+    If (BtnModsAlt=1)
+       nsh .= "!"
+
+    humanKbd := StrReplace(nsh, "+", "Shift+")
+    humanKbd := StrReplace(humanKbd, "^", "Ctrl+")
+    humanKbd := StrReplace(humanKbd, "!", "Alt+")
+    humanKbd .= info
+    info := StrReplace(info, A_Space)
+    infok := (humanlistu[info]!="") ? humanlistu[info] : info
+
+    c := defineKBDcontexts(0)
+    shortcut := nsh infok
+    cshortcut := c shortcut
+    finalu := shortcut sillySeparator txtline2 sillySeparator txtLine4 sillySeparator humanKbd
+    If Trimmer(txtLine3)
+    {
+       ; delete user previously defined key for the selected menu item
+       reupdate := 1
+       updateCustomUserKbds("`n", userCustomKeysDefined[c . txtline3, 7])
+    }
+
+    If (SubStr(userCustomKeysDefined[c . txtLine4, 1], 1, 1)="?")
+    {
+       ; if default keyboard is disabled, remove the binding
+       reupdate := 1
+       updateCustomUserKbds("`n", userCustomKeysDefined[c . txtline4, 7])
+    }
+
+    If (reupdate=1)
+       loadCustomUserKbds()
+
+    If (shortcut=txtLine4 && txtLine4!="")
+    {
+       ; avoid assigning the default keyboard shortcut as a custom one
+       PanelQuickSearchMenuOptions()
+       Return
+    }
+
+    ; fnOutputDebug(userCustomKeysDefined[cshortcut, 7] "===" finalu )
+    If (SubStr(userCustomKeysDefined[cshortcut, 1], 1, 1)="?")
+    {
+       pk := StrSplit(finalu, sillySeparator)
+       updateCustomUserKbds(finalu, userCustomKeysDefined[cshortcut, 7], 0, bonusLine)
+       Sleep, 5
+       loadCustomUserKbds()
+       PanelQuickSearchMenuOptions()
+       Return
+    } Else If IsFunc(userCustomKeysDefined[cshortcut, 1])
+    {
+       ; ask about keyboard keys conflict ? nah, too lazy
+       pk := StrSplit(finalu, sillySeparator)
+       ; fnOutputDebug(pk[2] "|" userCustomKeysDefined["." pk[2], 3])
+       If (SubStr(userCustomKeysDefined[c "." pk[2], 1], 1, 1)="?")
+       {
+          SoundBeep 900, 200
+          pk[6] := userCustomKeysDefined[c "." pk[2], 5]
+          bonusRem := userCustomKeysDefined[c "." pk[2], 7]
+       } Else
+       {
+          pk[6] := txtLine4 ; the default
+       }
+
+       If (userCustomKeysDefined[cshortcut, 5]!="" && userCustomKeysDefined[cshortcut, 5]!=userCustomKeysDefined["." pk, 8])
+       {
+          humanKbd := sillySeparator processKkbdNameToHuman(userCustomKeysDefined[cshortcut, 5])
+          bonusLine := userCustomKeysDefined[cshortcut, 5] sillySeparator "?" userCustomKeysDefined[cshortcut, 1] sillySeparator userCustomKeysDefined[cshortcut, 2] sillySeparator userCustomKeysDefined[cshortcut, 3] sillySeparator c sillySeparator userCustomKeysDefined[cshortcut, 5] humanKbd
+       }
+
+       lineRem := userCustomKeysDefined[cshortcut, 7]
+       updateCustomUserKbds(pk, lineRem, bonusRem, bonusLine)
+       Sleep, 5
+       loadCustomUserKbds()
+       PanelQuickSearchMenuOptions()
+       Return
+    }
+
+    ; ToolTip, % finalu , , , 2
+    FileAppend, % finalu "`n", % customKbdFile, UTF-8
+    Sleep, 5
+    loadCustomUserKbds()
+    PanelQuickSearchMenuOptions()
+}
+
+BtnDisableKbdDefine() {
+   CloseKbdDefinePanel()
+   Sleep, 1
+   MenuDisableKbdShortcut()
+}
+
+BtnRestoreKbdDefine() {
+   CloseKbdDefinePanel()
+   Sleep, 1
+   MenuRestoreDefaultKBD()
+}
+
+BtnCloseKbdDefine() {
+   CloseKbdDefinePanel()
+   Sleep, 1
+   PanelQuickSearchMenuOptions()
+}
+
+CloseKbdDefinePanel() {
+    Global lastOtherWinClose := A_TickCount
+    uiPanelOpenCloseEvent(1)
+
+    WinSet, Enable,, ahk_id %PVhwnd%
+    WinSet, Enable,, ahk_id %hQuickMenuSearchWin%
+    If AnyWindowOpen
+       WinSet, Enable,, ahk_id %hSetWinGui%
+
+    Sleep, 1
+    Gui, customKbdGUIA: Destroy
+    hKbdGuia := ""
+    If (ShowAdvToolbar=1 && hQPVtoolbar)
+       WinSet, Enable,, ahk_id %hQPVtoolbar%
+    If (folderTreeWinOpen=1 && hfdTreeWinGui)
+       WinSet, Enable,, ahk_id %hfdTreeWinGui%
+
+    Sleep, 1
+}
+
+defineKBDcontexts(humanMode) {
+   Static lastInvoked := 1, lastState
+   Static lp := {5:"Vector shape drawing", 4:"Paint brush tools", 3:"Live image editor tools", 2:"Image view / welcome screen", 1:"Files list/thumbnails mode", 100:"Unknown"}
+
+   If (humanMode=2)
+   {
+      Return lp.Count()
+   } Else If (humanMode=3)
+   {
+      lis := ""
+      Loop, % lp.Count()
+         lis .= lp[A_Index] "|"
+      Return Trim(lis, "|")
+   }
+
+   If ((A_TickCount - lastInvoked < 100) && (humanMode=0))
+      Return lastState
+
+   pk := isImgEditingNow()
+   isVectorMode := (pk=1 && drawingShapeNow=1 && editingSelectionNow=1 && EllipseSelectMode=2) ? 1 : 0
+   isWelcomeScreenu := (pk=1 || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
+   isAlphaPainting := isNowAlphaPainting()
+   paintModus := (isAlphaPainting=1 || liveDrawingBrushTool=1 && AnyWindowOpen=64 && imgEditPanelOpened=1 && pk=1) ? 1 : 0
+   liveEdit := (pk=1 && imgEditPanelOpened=1 && AnyWindowOpen>0) ? 1 : 0
+   ; isTransPanel := (liveEdit=1 && (AnyWindowOpen=31 || AnyWindowOpen=24)) ? 1 : 0
+   isThumbs := (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD) ? 1 : 0
+
+   rz := 100
+   If (isVectorMode=1)
+      rz := 5
+   Else If (isAlphaPainting=1 || paintModus=1)
+      rz := 4
+   Else If (liveEdit=1)
+      rz := 3
+   Else If (pk=1 || isWelcomeScreenu) ; image view
+      rz := 2
+   Else If (isThumbs=1)
+      rz := 1
+
+   lastState := rz
+   lastInvoked := A_TickCount
+   If (humanMode=1)
+      Return lp[rz]
+   Else
+      Return rz
+}
+
+testCustomKBDcontexts(givenKey) {
+   r := defineKBDcontexts(0)
+   If StrLen(userCustomKeysDefined[r . givenKey, 1])>0
+      Return r givenKey
+}
+
+PanelDefineKbdShortcut() {
+    Static keyzList := "0|1|2|3|4|5|6|7|8|9|0|A|B|C|D|E|F|G|H|I|J|K|L|M|N|O|P|Q|R|S|T|U|V|W|X|Y|Z|F1|F2|F3|F4|F5|F6|F7|F8|F9|F10|F11|F12|Tab|Space|Enter|Backspace|Delete|Insert|Home|End|Page up|Page down|Left|Right|Up |Down|-|=|[|]|\|/|;|,|.|""|Numpad +|Numpad -|Numpad *|Numpad /|Numpad .|Numpad 0|Numpad 1|Numpad 2|Numpad 3|Numpad 4|Numpad 5|Numpad 6|Numpad 7|Numpad 8|Numpad 9|Escape"
+    Global BtnModsCtrl, BtnModsAlt, BtnModsShift, tehCustomKeysThing
+    If (allowCustomKeys!=1)
+    {
+        msgResult := msgBoxWrapper(appTitle ": Confirmation", "To customize the selected keyboard shortcut, the option to allow custom user defined keyboard shortcuts must be activated. Would you like to activate it now?", 4, 0, "question")
+        If (msgResult="Yes")
+        {
+           ToggleCustomKBDsMode()
+           PanelQuickSearchMenuOptions()
+           SetTimer, PanelDefineKbdShortcut, -100
+           Return
+        } Else Return
+    }
+
+    Gui, QuickMenuSearchGUIA: Default
+    Gui, QuickMenuSearchGUIA: ListView, LVsearchMenus
+    ; [func, menu-name, menu-location, kbd-human, context-id, original-default-kbd]
+    RowNumber := LV_GetNext(0, "F")
+    LV_GetText(menuName, RowNumber, 2)
+    LV_GetText(shortcut, RowNumber, 3)
+    LV_GetText(menuLocation, RowNumber, 4)
+    LV_GetText(kwds, RowNumber, 5)
+    LV_GetText(funcu, RowNumber, 6)
+    If (!funcu || !RowNumber)
+       Return
+
+    lastZeitOpenWin := A_TickCount
+    thisBtnHeight := (PrefsLargeFonts=1) ? 34 : 24
+    setLVrowsCount()
+    mouseTurnOFFtooltip()
+    ; closeQuickSearch()
+    contextID := defineKBDcontexts(0)
+    contextu := defineKBDcontexts(1)
+    WinSet, Disable,, ahk_id %PVhwnd%
+    If AnyWindowOpen
+       WinSet, Disable,, ahk_id %hSetWinGui%
+    If VisibleQuickMenuSearchWin
+       WinSet, Disable,, ahk_id %hQuickMenuSearchWin%
+    If (ShowAdvToolbar=1 && hQPVtoolbar)
+       WinSet, Disable,, ahk_id %hQPVtoolbar%
+    If (folderTreeWinOpen=1 && hfdTreeWinGui)
+       WinSet, Disable,, ahk_id %hfdTreeWinGui%
+
+    Gui, customKbdGUIA: Destroy
+    Sleep, 2
+    Gui, customKbdGUIA: Default
+    Gui, customKbdGUIA: +Border -MaximizeBox -MinimizeBox +Owner%PVhwnd% +hwndhKbdGuia
+    Gui, customKbdGUIA: Margin, 15, 15
+    If (uiUseDarkMode=1)
+    {
+       Gui, Color, % darkWindowColor, % darkWindowColor
+       Gui, Font, c%darkControlColor%
+       setDarkWinAttribs(hKbdGui)
+    }
+
+    btnWid := 45
+    lstWid := 105
+    txtWid := 242
+    If (PrefsLargeFonts=1)
+    {
+       btnWid +=30
+       lstWid += 70
+       txtWid += 157
+       Gui, Font, s%LargeUIfontValue%
+       Gui, Font, Bold Q4
+    }
+ 
+    If !menuLocation
+       menuLocation := "QPVmenu"
+ 
+    HotKateRaw := processHumanKkbdName(shortcut, obju)
+    pp := isFunc(userCustomKeysDefined[contextID HotKateRaw, 1]) ? HotKateRaw : ""
+    defaultHotKateRaw := (posu := InStr(kwds, sillySeparator)) ? SubStr(kwds, posu + 1) : HotKateRaw
+    If (defaultHotKateRaw=pp && !posu)
+       defaultHotKateRaw := ""
+
+    combosDarkModus := (uiUseDarkMode=1) ? "-theme -border " : ""
+    reused := "x+0 +0x1000 w" btnWid " hp "
+    Gui, Add, Text, x15 y15 w%txtWid% Section, Please configure the shortcut for:
+    Gui, Add, Edit, y+5 wp ReadOnly r1 -wrap -multi vtxtLine1, % menuName " | " menuLocation
+    Gui, Add, Edit, y+1 w1 h1 ReadOnly -wrap -multi vtxtLine2, % funcu sillySeparator menuName sillySeparator menuLocation sillySeparator contextID
+    Gui, Add, Edit, x+1 wp hp ReadOnly -wrap -multi vtxtLine3, % pp ; user defined key to be deleted if user applies
+    Gui, Add, Edit, x+1 wp hp ReadOnly -wrap -multi vtxtLine4, % defaultHotKateRaw
+
+    modsC := InStr(HotKateRaw, "^") ? 1 : 0
+    modsS := InStr(HotKateRaw, "+") ? 1 : 0
+    modsA := InStr(HotKateRaw, "!") ? 1 : 0
+    ComboChoice := (obju.r!="") ? obju.r : "(None)"
+    Gui, Add, DropDownList, xs y+10 w%lstWid% %combosDarkModus% AltSubmit vtehCustomKeysThing, % ComboChoice "||" keyzList
+    Gui, Add, Checkbox, % reused " Checked" modsC " vBtnModsCtrl", Ctrl
+    Gui, Add, Checkbox, % reused " Checked" modsA " vBtnModsAlt", Alt
+    Gui, Add, Checkbox, % reused " Checked" modsS " vBtnModsShift", Shift
+    Gui, Add, Text, xs y+10 w%txtWid% Section +TabStop gbtnHelpKbdContexts, The newly defined shortcut will apply only to:`n%contextu%
+ 
+    Gui, Add, Button, xs y+15 w80 h%thisBtnHeight% Default gBtnApplyNewKbdShortcut, &Apply
+    Gui, Add, Button, x+5 wp+5 hp gBtnRestoreKbdDefine, &Restore
+    Gui, Add, Button, x+5 wp hp gBtnDisableKbdDefine, &Disable
+    Gui, Add, Button, x+5 wp hp gBtnCloseKbdDefine, &Cancel
+    GuiControl, Focus, tehCustomKeysThing
+    repositionWindowCenter("customKbdGUIA", hKbdGuia, PVhwnd, "Set new keyboard shortcut: " appTitle)
+}
+
+ProcessRawComboChoiceKBD(strg) {
+  Loop, Parse, % "^~#&!+<>$*"
+     strg := StrReplace(strg, A_LoopField)
+
+  strg := Trim(strg)
+  If (InStr(strg, "vk")=1)
+  {
+     strg := GetKeyName(strg)
+  } Else If (!InStr(strg, "[[") && StrLen(strg)>3)
+  {
+     strg := StrReplace(strg, "numpad", "Numpad ")
+     strg := StrReplace(strg, "PgUp", "Page Up")
+     strg := StrReplace(strg, "PgDn", "Page Down")
+  }
+
+  If !strg
+     strg := "(None)"
+
+  Return strg
+}
+
 QuickMenuSearchGUIAGuiContextMenu(GuiHwnd, CtrlHwnd, EventInfo, IsRightClick, X, Y) {
     Static lastInvoked := 1
 
@@ -18354,7 +18888,7 @@ QuickMenuSearchGUIAGuiContextMenu(GuiHwnd, CtrlHwnd, EventInfo, IsRightClick, X,
     }
 
     lastInvoked := A_TickCount
-    invokePrefsPanelsContextMenu(1, addBonus)
+    invokePrefsPanelsContextMenu("omni", addBonus)
 }
 
 OmniBoxGetSelectedFolder(givenRow:=0, isGiven:=0, givenPath:=0) {
@@ -18795,31 +19329,41 @@ createOmniBoxFoldersContextMenu(folderPath) {
    showThisMenu("PVfomni", 1)
 }
 
+btnHelpKbdContexts() {
+   msgBoxWrapper(appTitle ": HELP", "Users can customize keyboard shortcuts based on contexts in the application, such as, but not limited to: image view, files list modes, image editor live tools, et cetera.`n`nThe same keyboard shortcut can do different things based on the context. Or, the same function, if available in multiple contexts, can have a different shortcut for each context.", -1, 0, 0)
+}
+
 invokePrefsPanelsContextMenu(modus:=0, addBonus:=0) {
     Menu, ContextMenu, UseErrorLevel
     Try Menu, ContextMenu, Delete
     Sleep, 5
 
-    If (modus=1)
+    If (modus="omni")
     {
        If (addBonus=1)
        {
           kMenu("ContextMenu", "Add", "Selected folder is inexistent", "dummy")
           kMenu("ContextMenu", "Disable", "Selected folder is inexistent")
-          Menu, ContextMenu, Add, 
+          Menu, ContextMenu, Add
+       } Else
+       {
+          kMenu("ContextMenu", "Add", "Customize keyboard shortcut`tF2", "PanelDefineKbdShortcut")
+          ; kMenu("ContextMenu", "Add", "Disable keyboard shortcut", "MenuDisableKbdShortcut")
+          ; kMenu("ContextMenu", "Add", "Restore default keyboard shortcut", "MenuRestoreDefaultKBD")
+          ; kMenu("ContextMenu", "Add", "Restore default shortcut in all contexts", "MenuRestoreAnyContextDefaultKBD")
        }
        kMenu("ContextMenu", "Add", "&Close panel`tEscape", "QuickMenuSearchGUIAGuiClose")
     } Else
        kMenu("ContextMenu", "Add", "&Close panel`tEscape", "CloseWindow")
 
-    kMenu("ContextMenu", "Add/UnCheck", "Dar&k mode", "ToggleDarkModus")
+    kMenu("ContextMenu", "Add/UnCheck", "Dar&k mode UI", "ToggleDarkModus")
     If (uiUseDarkMode=1)
-       kMenu("ContextMenu", "Check", "Dar&k mode")
+       kMenu("ContextMenu", "Check", "Dar&k mode UI")
 
     kMenu("ContextMenu", "Add/UnCheck", "&Large UI fonts", "ToggleLargeUIfonts")
-    If (imgEditPanelOpened=1 && modus!=1)
-       kMenu("ContextMenu", "Add/UnCheck", "C&ollapse panel`tF8", "toggleImgEditPanelWindow")
-    Menu, ContextMenu, Add, 
+    If (imgEditPanelOpened=1 && modus!="omni")
+       kMenu("ContextMenu", "Add", "C&ollapse panel`tF11", "toggleImgEditPanelWindow")
+    Menu, ContextMenu, Add,
     If (PrefsLargeFonts=1)
        kMenu("ContextMenu", "Check", "&Large UI fonts")
 
@@ -18831,7 +19375,7 @@ invokePrefsPanelsContextMenu(modus:=0, addBonus:=0) {
     Menu, ContextMenu, Add
     kMenu("ContextMenu", "Add", "&New instance", "OpenNewQPVinstance")
     kMenu("ContextMenu", "Add", "&Restart " appTitle, "restartAppu")
-    If (modus=1)
+    If (modus="omni")
     {
        Menu, ContextMenu, Add
        kMenu("ContextMenu", "Add", "&Help`tF1", "btnHelpQuickSearchMenus")
@@ -18841,7 +19385,7 @@ invokePrefsPanelsContextMenu(modus:=0, addBonus:=0) {
 }
 
 btnHelpQuickSearchMenus() {
-   msgBoxWrapper(appTitle ": HELP", "This panel allows users to search the available menu options based on the current context. It also allows users to:`n`n- navigate through folders; just type or paste a folder path`n`n- open folders or add the containing image files to the current files index`n`n- manage folders; common actions available, such as copy, paste, delete, rename, et cetera`n`n- jump to a given index in the list; type a number beginning with @`n `nDrag and drop is supported between listed folders, and between this panel and the main window or the folders tree panel.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "This panel allows users to search the available menu options based on the current context. It also allows users to:`n`n- customize keyboard shortcuts; right-click on any menu item and choose «Customize keyboard shortcut»;`n`n- navigate through folders; just type or paste a folder path;`n`n- open folders or add the containing image files to the current files index;`n`n- manage folders; common actions available, such as copy, paste, delete, rename, et cetera;`n`n- jump to a given index in the list; begin with the symbol @ and type a number then press Enter;`n`n- execute internal code functions or display global variable values, if the query begins with >. Users can also set variables by using >set_variableName=NewValue.`n`nDrag and drop is supported between listed folders, and between this panel and the main window or the folders tree panel.", -1, 0, 0)
    WinActivate, ahk_id %hQuickMenuSearchWin%
 }
 
@@ -18876,12 +19420,15 @@ identifyParentWind() {
 SettingsToolTips() {
    ActiveWin := WinActive("A")
    ; bActiveWin := WinExist("A")
-   thisHwndGood := (ActiveWin=hSetWinGui || ActiveWin=MsgBox2hwnd) ? 1 : 0
+   thisHwndGood := isVarEqualTo(ActiveWin,hKbdGuia, hSetWinGui, MsgBox2hwnd)
    ;  ToolTip, % isNowFakeWinOpen "==" ActiveWin "==" thisHwndGood "==" PVhwnd "==" hSetWinGui "==" MsgBox2hwnd , , , 2
    If (thisHwndGood!=1) ;  && ActiveWin!=PVhwnd)
       Return
 
-   If (ActiveWin=MsgBox2hwnd)
+   If (ActiveWin=hKbdGuia)
+   {
+      Gui, customKbdGUIA: Default
+   } Else If (ActiveWin=MsgBox2hwnd)
    {
       Gui, WinMsgBox: Default
    } Else
@@ -19386,6 +19933,9 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
     } ; Else CloseWindow()
     If (folderTreeWinOpen=1)
        fdTreeClose()
+
+    If (VisibleQuickMenuSearchWin=1)
+       closeQuickSearch()
 
     Sleep, 15
     Gui, SettingsGUIA: Default
@@ -19962,7 +20512,7 @@ PlotSeenHourStatsNow() {
    {
        dataArray[A_Index] := 1
        namesLabel[A_Index] := (A_Index < 10) ? "0" . A_Index : A_Index
-    }
+   }
 
    Loop
    {
@@ -21945,7 +22495,7 @@ PanelImageInfos() {
 MenuPanelFoldersTree() {
    If (folderTreeWinOpen=1)
       fdTreeClose()
-   Else
+   Else If !AnyWindowOpen
       PanelFoldersTree()
 }
 
@@ -21956,6 +22506,7 @@ PanelFoldersTree() {
        Return
 
     mouseTurnOFFtooltip()
+    setLVrowsCount()
     thisSize := 300 + PrefsLargeFonts + uiUseDarkMode
     If (hasRan=1 && prevSize!=thisSize)
     {
@@ -23253,7 +23804,8 @@ UIcoreFolderRename(thisFolder, ByRef newFileName) {
 }
 
 invokeOmniBoxCurrentFile() {
-   fromFolderTreeToOmniBox("thisFile", resultedFilesList[currentFileIndex, 1])
+   If (drawingShapeNow!=1)
+      fromFolderTreeToOmniBox("thisFile", resultedFilesList[currentFileIndex, 1])
 }
 
 fromFolderTreeToOmniBox(modus:=0,imgPath:=0) {
@@ -24441,25 +24993,27 @@ msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, checkBoxuCapti
        hwnd := PVhwnd
     } Else DestroyTempBtnGui("now")
 
-    hasDisabled := []
-    If (folderTreeWinOpen=1)
+    If (WinActive("A")!=hKbdGuia)
     {
-       hasDisabled[1] := 1
-       WinSet, Disable,, ahk_id %hfdTreeWinGui%
-    }
+       hasDisabled := []
+       If (folderTreeWinOpen=1)
+       {
+          hasDisabled[1] := 1
+          WinSet, Disable,, ahk_id %hfdTreeWinGui%
+       }
 
-    If (VisibleQuickMenuSearchWin=1)
-    {
+       If (VisibleQuickMenuSearchWin=1 && az)
+       {
+          hasDisabled[2] := 1
+          WinSet, Disable,, ahk_id %hQuickMenuSearchWin%
+       }
 
-       hasDisabled[2] := 1
-       WinSet, Disable,, ahk_id %hQuickMenuSearchWin%
-    }
-
-    If (imgEditPanelOpened=1 && Hwnd!=PVhwnd)
-    {
-       hasDisabled[3] := 1
-       WinSet, Disable,, ahk_id %PVhwnd%
-    }
+       If (imgEditPanelOpened=1 && Hwnd!=PVhwnd)
+       {
+          hasDisabled[3] := 1
+          WinSet, Disable,, ahk_id %PVhwnd%
+       }
+    } Else hwnd := hKbdGuia
 
     oc := A_IsCritical 
     Critical, off
@@ -29202,6 +29756,93 @@ writeMainSettingsApp() {
     lastInvoked := A_TickCount
 }
 
+loadCustomUserKbds() {
+    userCustomKeysDefined := []
+    If (allowCustomKeys!=1)
+       Return
+
+    FileRead, pk, % customKbdFile
+    Loop, Parse, pk,`n,`r
+    {
+       If !A_LoopField
+          Continue
+
+       sp := StrSplit(A_LoopField, sillySeparator)
+       c := sp[5],        funcu := sp[2],    defu := sp[6]
+
+       phFuncu := isFunc(funcu) ? funcu : SubStr(funcu, 2)
+       userCustomKeysDefined[c "." phFuncu] := [funcu, sp[3], sp[4], c, defu, sp[7], A_Index, sp[1]] ; [funcu, menu-name, menu-location, context-id, default-kbd, new-kbd-human, file-line, user-kbdu]
+
+       kbdu := c . sp[1]
+       userCustomKeysDefined[kbdu] := [funcu, sp[3], sp[4], c, defu, sp[7], A_Index, sp[1]] ; [funcu, menu-name, menu-location, context-id, default-kbd, new-kbd-human, file-line, user-kbdu]
+       If (defu!="" && StrLen(userCustomKeysDefined[defu, 1])<3 && !InStr(funcu, "?") && sp[1]!=sp[6])
+       {
+          kp := processKkbdNameToHuman(defu)
+          userCustomKeysDefined[c . defu] := ["?_" funcu, "generic", "anywhere", c, defu, kp, A_Index, sp[1]]  ; [funcu, menu-name, menu-location, context-id, default-kbd, new-kbd-human, file-line, user-kbdu]
+       }
+    }
+}
+
+updateCustomUserKbds(newLine, skipLine, bonusSkipLine:=0, bonusLine:=0) {
+    newu .= []
+    FileRead, pk, % customKbdFile
+    If !pk
+       Return 0
+
+    Loop, Parse, pk,`n,`r
+    {
+       If (A_Index=skipLine)
+          Continue
+
+       If (A_Index=bonusSkipLine && bonusSkipLine)
+          Continue
+
+       If A_LoopField
+          newu .= A_LoopField "`n"
+    }
+    Sleep, 5
+    FileDelete, % customKbdFile
+    Sleep, 5
+    If IsObject(newLine)
+    {
+       nova := ""
+       Loop, % newLine.Count()
+           nova .= newLine[A_Index] sillySeparator
+    }
+
+    newu .= nova ? nova "`n" : newLine "`n"
+    If bonusLine
+       newu .= bonusLine "`n"
+
+    FileAppend, % newu, % customKbdFile, UTF-8
+    r := ErrorLevel ? 0 : 1
+    Return r
+}
+
+restoreDefaultCustomUserKbds(keyu, funcu, contextu, modus) {
+    newu .= []
+    FileRead, txt, % customKbdFile
+    dfunkt := "?" funcu
+    dafunkt := keyu sillySeparator "?_generic"
+    ; ToolTip, % dafunkt , , , 2
+    Loop, Parse, txt,`n,`r
+    {
+       pk := StrSplit(A_LoopField, sillySeparator)
+       If (((pk[2]=funcu || pk[2]=dfunkt) && (pk[5]=contextu || modus="all")))
+       || (InStr(A_LoopField, dafunkt)=1 && keyu!="" && pk[5]=contextu)
+          Continue
+
+       newu .= A_LoopField "`n"
+    }
+
+    Sleep, 5
+    FileDelete, % customKbdFile
+    Sleep, 5
+    FileAppend, % newu, % customKbdFile, UTF-8
+    r := ErrorLevel ? 0 : 1
+    Return r
+}
+
 readMainSettingsApp(act) {
     EnvGet, thisSystemCores, NUMBER_OF_PROCESSORS
     If (thisSystemCores>8)
@@ -29271,11 +29912,14 @@ readMainSettingsApp(act) {
     IniAction(act, "usrTextAlign", "General", 5)
     IniAction(act, "preventDeleteFromProtectedPath", "General", 1)
     IniAction(act, "protectedFolderPath", "General", 6)
+    IniAction(act, "allowCustomKeys", "General", 1)
     RegAction(act, "mainWinMaximized",, 1)
     RegAction(act, "mainWinPos",, 5)
     RegAction(act, "mainWinSize",, 5)
     RegAction(act, "HUDnavBoxSize",, 2, 75, 250)
     RegAction(act, "slidesRandoMode",, 2, 1, 3)
+    loadCustomUserKbds()
+
     If (act=0)
     {
        If (LimitSelectBoundsImg=1)
@@ -29449,6 +30093,10 @@ markUndefinedFavedList() {
    }
 }
 
+KbdToggleImgFavourites() {
+   ToggleImgFavourites(0, 0, 1)
+}
+
 ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
   Static lastInvoked := 1, prevImg, prevRemSpeed := 1
   imgPath := thisImg ? thisImg : getIDimage(currentFileIndex)
@@ -29518,6 +30166,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
         OutFileName := "*******.***"
         OutDir := "*:\******\*****"
      } Else OutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
+
      showTOOLtip("Image ADDED to favourites:`n" OutFileName "`n" OutDir "\`nTotal entries: " groupDigits(userAddedFavesCount), 0, 0, userAddedFavesCount/maxFavesEntries)
      resultedFilesList[currentFileIndex, 5] := 1
      updateMainUnfilteredList(currentFileIndex, 5, 1)
@@ -29927,12 +30576,15 @@ eraseAllFavedIMGs() {
   SetTimer, ResetImgLoadStatus, -150
 }
 
-RandomPicture() {
+RandomPicture(modus:=0) {
    ; Static inLoop := 0
-   If (maxFilesIndex=0 || maxFilesIndex="") && (!CurrentSLD)
+   okayu := (thumbsDisplaying=1 || undoLevelsRecorded<2 || currentImgModified!=1) || (modus!="key") ? 1 : 0
+   If (!maxFilesIndex && !CurrentSLD) || (okayu!=1)
       Return
 
-   ; resetSlideshowTimer()
+   If (modus="key")
+      resetSlideshowTimer()
+
    If (RandyIMGnow=-1 || !RandyIMGids.Count())
       coreGenerateRandomList()
 
@@ -29940,8 +30592,9 @@ RandomPicture() {
    dummyTimerDelayiedImageDisplay(10)
 }
 
-PrevRandyPicture() {
-   If (maxFilesIndex=0 || maxFilesIndex="") && (!CurrentSLD)
+PrevRandyPicture(modus:=0) {
+   okayu := (thumbsDisplaying=1 || undoLevelsRecorded<2 || currentImgModified!=1) || (modus!="key") ? 1 : 0
+   If (!maxFilesIndex && !CurrentSLD) || (okayu!=1)
       Return
 
    resetSlideshowTimer()
@@ -30058,11 +30711,10 @@ dropFilesSelection(silentMode:=0) {
    }
 }
 
-MenuMarkThisFileNow() {
-   markThisFileNow()
-}
-
 markThisFileNow(thisFileIndex:=0) {
+  if !IsNumber(thisFileIndex)
+     thisFileIndex := 0
+
   If (currentFileIndex=0 || maxFilesIndex<2 || AnyWindowOpen>0)
      Return
 
@@ -30455,11 +31107,23 @@ BTNactiveFileDel() {
 
    BtnCloseWindow()
    DeleteActivePicture()
-   getSelectedFiles(0, 1)
    preventDBentryRemoval := 0
 }
 
+DeleteActiveImgFileAndEntry() {
+   If !HKifs("imgsLoaded")
+      Return
+
+    DeleteActivePicture()
+    Sleep, 300
+    If (maxFilesIndex>1 && currentFileIndex>0)
+       singleInListEntriesRemover()
+}
+
 DeleteActivePicture() {
+   If !HKifs("imgsLoaded")
+      Return
+
    DeletePicture("single")
    getSelectedFiles(0, 1)
 }
@@ -30817,10 +31481,11 @@ batchFileDelete(dontAlterIndex:=0) {
 DeletePicture(dummy:=0) {
   Static lastInvoked := 1, prevDelFileIndex := -1
   getSelectedFiles(0, 1)
-  If (markedSelectFile>1 && thumbsDisplaying!=1 && dummy!="single")
-  {
-     dummy := "single"   
-  } Else If (markedSelectFile>1 && dummy!="single")
+  ; If (markedSelectFile>1 && thumbsDisplaying!=1 && dummy!="single")
+  ; {
+  ;    dummy := "single"   
+  ; } Else
+  If (markedSelectFile>1 && dummy!="single")
   {
      PanelMultiFileDelete()
      Return
@@ -32004,24 +32669,28 @@ UIeditQuickMenuSearchTrigger() {
    SetTimer, PopulateQuickMenuSearch, % delayu
 }
 
-PanelQuickSearchMenuOptions() {
-    Global LVsearchMenus, StatusLineQuickSearch
+PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
+    Global LVsearchMenus, StatusLineQuickSearch, UIclearBtn
     Static lastState := 0
-    If (drawingShapeNow=1)
-       Return
-
     If (slideShowRunning=1)
        ToggleSlideShowu()
 
-    If (AnyWindowOpen=61)
+    If (AnyWindowOpen=61 || AnyWindowOpen=83)
        CloseWindow()
 
-    DestroyGIFuWin()
+    If (animGIFplaying)
+       DestroyGIFuWin()
+
     mouseTurnOFFtooltip()
+    If (given="yes" && StrLen(whatu)>1)
+       GuiControl, QuickMenuSearchGUIA:, userQuickMenusEdit, % whatu
+
     thisState := "a" uiUseDarkMode PrefsLargeFonts
     If (createdQuickMenuSearchWin=1 && thisState=lastState && VisibleQuickMenuSearchWin=1)
     {
        WinActivate, ahk_id %hQuickMenuSearchWin%
+       interfaceThread.ahkassign("VisibleQuickMenuSearchWin", VisibleQuickMenuSearchWin)
+       PopulateQuickMenuSearch("resel")
        Return
     } Else If (createdQuickMenuSearchWin=1 && thisState=lastState)
     {
@@ -32034,6 +32703,7 @@ PanelQuickSearchMenuOptions() {
        Return
     }
 
+    setLVrowsCount()
     Gui, QuickMenuSearchGUIA: Destroy
     Sleep, 25
     mr := (PrefsLargeFonts=1) ? 10 : 5
@@ -32056,34 +32726,54 @@ PanelQuickSearchMenuOptions() {
     lstWid := 650
     If (PrefsLargeFonts=1)
     {
-       lstWid := lstWid + 240
+       lstWid := lstWid + 395
        btnWid := btnWid + 75
        txtWid := txtWid + 105
        Gui, Font, s%LargeUIfontValue%
     }
 
-    Gui, Add, Edit, x15 y15 Section -multi w%lstWid% gUIeditQuickMenuSearchTrigger vuserQuickMenusEdit +hwndhEditMenuSearch, % userQuickMenusEdit
-    Gui, Add, Button, x+2 yp+0 w2 hp h%thisBtnHeight% -TabStop Default gBTNquickSearchHidden, &Execute
+    tp := (given="yes" && StrLen(whatu)>1) ? whatu : userQuickMenusEdit
+    Gui, Add, Edit, x15 y15 Section -multi w%lstWid% gUIeditQuickMenuSearchTrigger vuserQuickMenusEdit +hwndhEditMenuSearch, % tp
+    Gui, Add, Button, x+2 yp+0 w2 hp -TabStop Default gBTNquickSearchHidden, &Execute
+    Gui, Add, Text, x+1 yp w20 hp +0x200 Center +Border -TabStop gBtnClearQuickSearchEdit vUIclearBtn +hwndhTemp, X
+    ToolTip2ctrl(hTemp, "Clear edit field")
     Gui, Add, ListView, xs y+20 w%lstWid% +LV0x10000 +LV0x400 r%uLVr% -multi gLVquickSearchMenusResponder vLVsearchMenus +hwndhLVquickSearchMenus AltSubmit, X|Action|Shortcut|Menu|Keywords|Function|#|Score
-    Gui, Add, Text, xs y+2 wp vStatusLineQuickSearch +0x200 h%thisBtnHeight% -wrap, Status bar...
-
+    Gui, Add, Text, xs y+2 wp vStatusLineQuickSearch +0x200 -wrap, Status bard
     ; Gui, Add, Button, x+5 wp hp gBtnCloseWindow, C&lose
     VisibleQuickMenuSearchWin := 1
     createdQuickMenuSearchWin := 1
+    lastLVquickSearchSortCol := [8, "SortDesc"]
     interfaceThread.ahkassign("VisibleQuickMenuSearchWin", VisibleQuickMenuSearchWin)
     interfaceThread.ahkassign("hQuickMenuSearchWin", hQuickMenuSearchWin)
     lastState := thisState
-    repositionWindowCenter("QuickMenuSearchGUIA", hQuickMenuSearchWin, PVhwnd, "Quick actions search")
+    repositionWindowCenter("QuickMenuSearchGUIA", hQuickMenuSearchWin, PVhwnd, "Quick menu options search")
     QuickMenuSearchGUIAGuiSize()
     PopulateQuickMenuSearch()
 }
 
+BtnClearQuickSearchEdit() {
+   userQuickMenusEdit := ""
+   lastLVquickSearchSortCol := [8, "SortDesc"]
+   GuiControl, QuickMenuSearchGUIA:, userQuickMenusEdit,
+   GuiControl, QuickMenuSearchGUIA:Focus, userQuickMenusEdit
+}
+
 LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
    Critical, on
-   Static lastInvoked := 1, doNotaskAgain := 0
+   Static lastInvoked := 1, doNotaskAgain := 0, lastSortDirection := 0
 
    ; If (b="k")  
-   ; ToolTip, % b "|" c , , , 2
+   If (b="ColClick" && c>0)
+   {
+   ;   ToolTip, % a "|" b "|" c , , , 2
+      lastSortDirection := !lastSortDirection
+      If (c!=lastLVquickSearchSortCol[1])
+         lastSortDirection := 0
+
+      diru := (lastSortDirection=1) ? "SortDesc" : "Sort"
+      lastLVquickSearchSortCol := [c, diru]
+   }
+
    If (b="a" || b="i" || b="f") || (A_TickCount - zeitSillyPrevent<350) && (b!="DoubleClick" && b!="d")
       Return
 
@@ -32272,32 +32962,46 @@ BTNquickSearchHidden(actu) {
    GuiControlGet, userQuickMenusEdit
    userQuickMenusEdit := Trimmer(userQuickMenusEdit)
    testu := SubStr(userQuickMenusEdit, 1, 1)
-
-   If (testu=":")
+   If isVarEqualTo(testu, ":", "|", ".", ">")
    {
-      thisu := StrReplace(userQuickMenusEdit, ":")
-      If IsObject(thisu)
+      thisu := SubStr(userQuickMenusEdit, 2)
+      If RegExMatch(thisu, "i)^(set\_..*\=..*)")
       {
-         listu := ""
-         For Key, Value in %thisu%
+         paramSet := SubStr(thisu, 5, InStr(thisu, "=") - 5)
+         paramSetValue := SubStr(thisu, InStr(thisu, "=") + 1)
+         If (paramSet && paramSetValue!="")
          {
-             If (A_Index>15)
+            %paramSet% := paramSetValue
+            thisu := paramSet
+            kk := " changed now by user"
+         } Else Return
+      }
+
+      pp := %thisu%
+      If IsObject(pp)
+      {
+         listu := A_Space thisu " (object):`n"
+         For Key, Value in pp
+         {
+             If (A_Index>50)
                 Break
-             listu .= Key "," Value "`n"
+
+             pl := IsObject(Value) ? " (sub-object)" : ""
+             listu .= Key "," Value pl "`n"
          }
-      } If IsFunc(thisu)
+      } Else If IsFunc(thisu)
       {
          funcu := 1
          %thisu%()
       } Else 
       {
          listu := %thisu%
-         listu := thisu " = " listu
+         listu := " (variable" kk ")`n" thisu " = " listu
       }
 
       If !funcu
       {
-         showTOOLtip("Result:`n" listu)
+         showTOOLtip("Result:" listu)
          SetTimer, RemoveTooltip, % -msgDisplayTime
       }
    } Else If ((userQuickMenusEdit=";o" || userQuickMenusEdit=".\o"))
@@ -32383,10 +33087,11 @@ GoQuickSearchAction(dummy:="", isGiven:=0, ef:=0) {
       Return
 
    LV_GetText(funcu, RowNumber, 6)
+   LV_GetText(indexu, RowNumber, 7)
    If (isGiven="yes" && ef)
       funcu := ef
 
-   If InStr(funcu, "!")
+   If (SubStr(funcu, 1, 1)="!")
    {
       If !InStr(funcu, "!OmniNavigate")
          closeQuickSearch()
@@ -32492,13 +33197,18 @@ GoQuickSearchAction(dummy:="", isGiven:=0, ef:=0) {
       }
    } Else If IsFunc(funcu)
    {
-      closeQuickSearch()
-      Sleep, 5
+      objs := kMenu(0, "give", 0)
+      mainList := objs[1]
+      If !mainList[indexu, 12] ; keep panel opened or not
+      {
+         closeQuickSearch()
+         Sleep, 3
+      }
       %funcu%()
    } Else If IsLabel(funcu)
    {
       closeQuickSearch()
-      Sleep, 5
+      Sleep, 3
       Gosub, %funcu%
    } Else
    {
@@ -32537,8 +33247,12 @@ QuickMenuSearchGUIAGuiSize() {
    lvh := height - ly - eh
    lvy := ex + eh + 2
    yPos := lvy + lvh
+   mw := (PrefsLargeFonts=1) ? 65 : 45
    width -= 30
-   GuiControl, QuickMenuSearchGUIA: Move, userQuickMenusEdit, w%width% 
+   mwidth := width - mw
+   mx := ex + mwidth + 2
+   GuiControl, QuickMenuSearchGUIA: Move, UIclearBtn, w%mw% x%mx% 
+   GuiControl, QuickMenuSearchGUIA: Move, userQuickMenusEdit, w%mwidth% 
    GuiControl, QuickMenuSearchGUIA: Move, LVsearchMenus, w%width% h%lvh% y%lvy%
    GuiControl, QuickMenuSearchGUIA: Move, StatusLineQuickSearch, y%yPos% w%width% h%eh%
    ; SoundBeep , 900, 100
@@ -32553,6 +33267,14 @@ GetControlPosGui(WinID, ctrlID, byref x, byref y, byref w, byref h) {
    ; ToolTip, % y "==" eyy "==" ey , , , 2
 }
 
+MenuUndoImgJumpy() {
+   ImgUndoAction("j")
+}
+
+MenuRedoImgJumpy() {
+   ImgRedoAction("j")
+}
+
 MenuIncGIFspeed() {
    changeGIFsDelayu(1)
 }
@@ -32561,7 +33283,40 @@ MenuDecGIFspeed() {
    changeGIFsDelayu(-1)
 }
 
+MenuIncSelAreaSize() {
+   changeSelectZoom(1)
+}
+
+MenuDecSelAreaSize() {
+   changeSelectZoom(-1)
+}
+
+MenuIncSelAreaCavity() {
+   changeSelectionAreaCavity(1)
+}
+
+MenuDecSelAreaCavity() {
+   changeSelectionAreaCavity(-1)
+}
+
+testFuncIsInMenus(funcu) {
+   Static lastInvoked := 1
+   If (A_TickCount -lastInvoked < 200)
+   {
+      listu := kMenu(0, "FuncGive", 0)
+      Return listu[funcu, 1]
+   }
+
+   simulateMenusMode := 1
+   buildQuickSearchMenus()
+   simulateMenusMode := 0
+   listu := kMenu(0, "FuncGive", 0)
+   lastInvoked := A_TickCount
+   Return listu[funcu, 1]
+}
+
 buildQuickSearchMenus() {
+   deleteMenus()
    mustPreventMenus := 1
    BuildMainMenu("forced")
    If (ShowAdvToolbar=1)
@@ -32571,73 +33326,15 @@ buildQuickSearchMenus() {
          kMenu("PVmenu", "Check", "Show toolbar tooltips")
    }
 
-   If (imgEditPanelOpened=1)
-   {
-      kMenu("PVmenu", "Add/Uncheck", "Dar&k mode", "ToggleDarkModus", "disability handicap eyes eyesight black display")
-      If (uiUseDarkMode=1)
-         kMenu("PVmenu", "Check", "Dar&k mode")
-
-      kMenu("PVmenu", "Add/Uncheck", "&Large UI fonts", "ToggleLargeUIfonts", "disability handicap eyes eyesight large display")
-      kMenu("PVmenu", "Add", "Increase viewport text size`t+", "MenuChangeZoomPlus", "disability handicap eyes eyesight large")
-      kMenu("PVmenu", "Add", "Decrease viewport text size`t-", "MenuChangeZoomMinus", "disability handicap eyes eyesight large")
-      keyword := (showMainMenuBar=1) ? " hide" : " display"
-      kMenu("PVmenu", "Add/Uncheck", "Show &menu bar`tF10", "ToggleMenuBaru", "toolbar" keyword)
-      If (showMainMenuBar=1)
-         kMenu("PVmenu", "Check", "Show &menu bar`tF10")
-
-      keyword := (ShowAdvToolbar=1) ? "hide" : "display"
-      kMenu("PVmenu", "Add/Uncheck", "Show &toolbar`tShift+F10", "toggleAppToolbar", keyword)
-      If (ShowAdvToolbar=1)
-         kMenu("PVmenu", "Check", "Show &toolbar`tShift+F10", "toggleAppToolbar")
-
-      kMenu("PVmenu", "Add", "&New QPV instance`tCtrl+Shift+N", "OpenNewQPVinstance")
-      kMenu("PVmenu", "Add", "Cop&y file path(s) as text`tShift+C", "CopyImagePath", "clipboard")
-      kMenu("PVmenu", "Add", "Open file in a new &QPV instance`tCtrl+Enter", "SoloNewQPVinstance")
-      kMenu("PVmenu", "Add", "&Explore the containing folder`tCtrl+E", "OpenThisFileFolder", "external")
-      kMenu("PVmenu", "Add/Uncheck", "&Apply gamma correction", "toggleImgEditGammaCorrect")
-      If (userimgGammaCorrect=1)
-         kMenu("PVmenu", "Check", "&Apply gamma correction")
-      If (PrefsLargeFonts=1)
-         kMenu("PVmenu", "Check", "&Large UI fonts")
-   } Else If !AnyWindowOpen
-   {
-      If (maxFilesIndex>1 && CurrentSLD)
-         kMenu("PVmenu", "Add", "&Identify favourited images in the list", "findFavesInList", "faved faves stared")
-
-      kMenu("PVmenu", "Add", "O&pen QPV settings folder", "openSettingsDir")
-      kMenu("PVmenu", "Add", "&Visit official QPV site", "OpenGitHub")
-      kMenu("PVmenu", "Add", "&Make a donation via PayPal", "DonateNow")
-      kMenu("PVmenu", "Add", "&Close everything`tCtrl+F4", "closeDocuments")
-      If (thumbsDisplaying=1)
-      {
-         kMenu("PVmenu", "Add/Uncheck", "&Two lines status bar", "ToggleMultiLineStatus", "statusbar info")
-         If (multilineStatusBar=1)
-            kMenu("PVmenu", "Check", "&Two lines status bar")
-      }
-
-      kMenu("PVmenu", "Add/Uncheck", "Allow WIC loader", "ToggleWICloader")
-      If (allowWICloader=1)
-         kMenu("PVmenu", "Check", "Allow WIC loader")
-
-      userSeenSlideImages := userSeenSessionImagesArray.Count()
-      If (userSeenSlideImages>1 && maxFilesIndex>2 && CurrentSLD && SLDtypeLoaded!=3)
-         kMenu("PVmenu", "Add", "Select seen images in current session", "selectSeenFilesSession")
-
-      kMenu("PVmenu", "Add/Uncheck", "Allow FreeImage loader", "ToggleFIMloader")
-      kMenu("PVmenu", "Add/Uncheck", "Private mode UI", "TogglePrivateMode")
-      If (userPrivateMode=1)
-         kMenu("PVmenu", "Check", "Private mode UI")
-      If (allowFIMloader=1)
-         kMenu("PVmenu", "Check", "Allow FreeImage loader")
-      If (isImgEditingNow()=1 && animGIFsSupport=1)
-      {
-         kMenu("PVmenu", "Add", "&Increase GIFs playback speed`Alt+.", "MenuIncGIFspeed")
-         kMenu("PVmenu", "Add", "&Decrease GIFs playback speed`Alt+,", "MenuDecGIFspeed")
-      }
-   }
+   If (isImgEditingNow()=1 && imgEditPanelOpened=1)
+      createMenuBonusImageLiveEditMode()
+   Else If (!AnyWindowOpen && !drawingShapeNow)
+      createMenuBonusNoImageOpened()
 
    zeitSillyPrevent := A_TickCount
-   BuildSecondMenu()
+   If (drawingShapeNow!=1)
+      BuildSecondMenu()
+   mustPreventMenus := 0
 }
 
 PopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
@@ -32667,7 +33364,7 @@ PopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
    allowMenuSearch := 1
    tj := SubStr(userQuickMenusEdit, 1, 1)
    ndiaz := SubStr(userQuickMenusEdit, 2)
-   If (isNumber(ndiaz) && (tj="@" || tj="." || tj="#") && maxFilesIndex>1 && CurrentSLD && !AnyWindowOpen)
+   If (isNumber(ndiaz) && (tj="@" || tj="#") && maxFilesIndex>1 && CurrentSLD && !AnyWindowOpen)
    {
       IndexJump := 1
    } Else If (SubStr(userQuickMenusEdit, 2, 2)=":\" && !AnyWindowOpen)
@@ -32789,8 +33486,8 @@ PopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
    {
       omniBoxMode := 0
       interfaceThread.ahkassign("omniBoxMode", omniBoxMode)
-      deleteMenus()
       buildQuickSearchMenus()
+      mustPreventMenus := 0
       objs := kMenu(0, "give", 0)
       userQuery := fuzzifyString(prevEditu)
       userQuery := StrSplit(userQuery, A_Space)
@@ -32800,6 +33497,9 @@ PopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
       groups := objs[3]
       thisList := new hashtable()
       fzgrupu := zgrupu := accels := ""
+      Gui, QuickMenuSearchGUIA: Default
+      Gui, QuickMenuSearchGUIA: ListView, LVsearchMenus
+
       Loop, % mainList.Count()
       {
          score := 0
@@ -32902,19 +33602,25 @@ PopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
    }
 
    groups := thisList := mainList := ""
-   mustPreventMenus := 0
+   ; msgp := lastLVquickSearchSortCol[1] "|" lastLVquickSearchSortCol[2]
+   ; ToolTip, % msgp , , , 2
    Loop, 8
        LV_ModifyCol(A_Index, "AutoHdr Left")
-
    LV_ModifyCol(7, "Integer")
    LV_ModifyCol(8, "Integer")
-   LV_ModifyCol(8, "SortDesc")
+   LV_ModifyCol(lastLVquickSearchSortCol[1], lastLVquickSearchSortCol[2])
+
    If (allowMenuSearch=0 && pathModus=1 && mustReselect>0 && prevOmniBoxFolder)
       LV_Modify(mustReselect, "Focus Select Vis")
    Else If (a="resel" && LV_GetCount()=initialCount && RowNumber)
       LV_Modify(RowNumber, "Focus Select Vis")
-   Else 
+   Else
       LV_Modify(1, "Focus Select Vis")
+
+   If !LV_GetCount()
+      lastLVquickSearchSortCol := [8, "SortDesc"]
+
+   EM_SETCUEBANNER(hEditMenuSearch, "Please type the search query here... " LV_GetCount() " options listed.", 0)
 
    ; prevOmniBoxFolder := ""
    mustReselect := 0
@@ -33730,7 +34436,16 @@ BTNrebuildDBpanel() {
 }
 
 BTNhelpSlideshows() {
-    msgBoxWrapper(appTitle ": HELP", "In the plain-text SLD format QPV can store:`n- the settings pertaining to the viewport and slideshow`n- a folders list [so-called «main» folders list]; this is the source of the files list and can be [re]scanned at any time.`n- the actual files list. If it is not cached / present when the SLD is opened, the main folders list will be scanned for images to populate the files list index.`n- a «static» folders list; this list is automatically generated when the SLD is saved based on the indexed files' paths - only if the user chooses to cache the files list. In later sessions, one can rescan any of these folders, allowing users to selectively update the files list whenever needed.`n`nIn addition to all of the above, the SQL-Lite database SLDB format can store:`n- image captions [no need for external text files] and also allows users to attach audio files to image files without the constraint of having them located in the same folder(s) with the image(s).`n- file and image details cache: file size, file date created, modified, image information (resolution, pixel format, histogram details and so on)`n`nThe caching of data facilitates management of large image collections, because files list sorting, image and file statistics are performed MUCH faster once the data is cached. The cached data is stored and reused between sessions and can be generated gradually in multiple QPV sessions.", -1, 0, 0)
+    msgu := "In the plain-text SLD format QPV can store:`n- the settings pertaining to the viewport and slideshow`n- a folders list [so-called «main» folders list]; "
+    msgu .= "this is the source of the files list and can be [re]scanned at any time.`n- the actual files list. If it is not cached / present when the SLD is opened, the main folders "
+    msgu .= "list will be scanned for images to populate the files list index.`n- a «static» folders list; this list is automatically generated when the SLD is saved based on the indexed "
+    msgu .= "files' paths - only if the user chooses to cache the files list. In later sessions, one can rescan any of these folders, allowing users to selectively update the files list "
+    msgu .= "whenever needed.`n`nIn addition to all of the above, the SQL-Lite database SLDB format can store:`n- image captions [no need for external text files] and also allows users "
+    msgu .= "to attach audio files to image files without the constraint of having them located in the same folder(s) with the image(s).`n- file and image details cache: file size, file "
+    msgu .= "date created, modified, image information (resolution, pixel format, histogram details and so on)`n`nThe caching of data facilitates management of large image collections, "
+    msgu .= "because files list sorting, image and file statistics are performed MUCH faster once the data is cached. The cached data is stored and reused between sessions and can be "
+    msgu .= "generated gradually in multiple QPV sessions."
+    msgBoxWrapper(appTitle ": HELP", msgu, -1, 0, 0)
 }
 
 BTNopenPanelDynamicFolderzWindow() {
@@ -34504,6 +35219,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
     FloodFillSelectionAdj := 0
     liveDrawingBrushTool := 1
     interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+    interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
     If (modus="e" && isNumber(dummy))
     {
        BrushToolType := dummy
@@ -34775,6 +35491,7 @@ showLEDprimaryColor() {
    ; ToolTip, % a "=" f "=" z "=" thisOpacity, , , 2
    createLEDgui(imgHUDbaseUnit, clampInRange(z, 2, 255), pX + 2, pY + 2, thisColorH)
    ; showLEDgui(thisColorH, pX + 2, pY + 2)
+   SetTimer, StopColorPicker, % -msgDisplayTime//2 + 250
 }
 
 updateTlbrColorsSwatch() {
@@ -35433,6 +36150,14 @@ BTNperformIndexSearchReplace() {
       If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
          recreateDynaFoldersSQLdbList(DynamicFoldersList)
    }
+}
+
+toggleQuickMoveActionKeys() {
+   allowUserQuickFileActions := !allowUserQuickFileActions
+   friendly := (allowUserQuickFileActions=1) ? "ACTIVATED" : "DEACTIVATED"
+   showTOOLtip("Quick file action shortcuts: " friendly, A_ThisFunc, 1)
+   IniAction(1, "allowUserQuickFileActions", "General")
+   SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
 updateUIquickFileActs(zz:=0) {
@@ -36830,6 +37555,14 @@ togglePasteInPlaceCropShapes() {
    }
 }
 
+togglePasteInPlaceCropNone() {
+   If (AnyWindowOpen=31 || AnyWindowOpen=24)
+   {
+      PasteInPlaceCropSel := 1
+      GuiControl, SettingsGUIA: Choose, PasteInPlaceCropSel, % PasteInPlaceCropSel
+      updateUIpastePanel()
+   }
+}
 
 FlipVtransformedIMGpanel() {
    Static kl := {4:2, 3:1, 2:4, 1:3}
@@ -37276,6 +38009,15 @@ ReadSettingsBrushPanel(act:=0) {
    }
 }
 
+customKbdGUIAGuiContextMenu:
+   SettingsToolTips()
+Return
+
+customKbdGUIAGuiClose:
+customKbdGUIAGuiEscape:
+   BtnCloseKbdDefine()
+Return
+
 LEDguiGuiClose:
 LEDguiGuiEscape:
    StopColorPicker()
@@ -37311,8 +38053,8 @@ StopColorPicker() {
    colorPickerModeNow := 0
    Gui, LEDgui: Destroy
    Global lastOtherWinClose := A_TickCount
-   interfaceThread.ahkassign("colorPickerModeNow", colorPickerModeNow)
    interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
+   interfaceThread.ahkassign("colorPickerModeNow", colorPickerModeNow)
 }
 
 StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
@@ -37536,7 +38278,7 @@ snapToValues(given, valA, valB, errMargin, clamping) {
       Return given
 }
 
-cancelDrawingShape() {
+MenuCancelDrawingShape() {
    stopDrawingShape("cancel")
 }
 
@@ -37957,7 +38699,7 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0) {
      If (dummy="resume" && customShapePoints.Count()<3)
         dummy := ""
 
-     If VisibleQuickMenuSearchWin
+     If (VisibleQuickMenuSearchWin=1)
         closeQuickSearch()
 
      postVectorWinOpen := 0
@@ -38242,7 +38984,7 @@ showQuickActionButtonsDrawingShape() {
      ll := "Tension: " tensionCurveCustomShape
 
   LabelTension := "||" ll ",,togglePathCurveTension"
-  CreateGuiButton("Undo,,ImgVectorUndoAct||Cancel,,cancelDrawingShape||Done,,stopDrawingShape" btnOpenLine LabelTension, "Forced", msgDisplayTime*10000)
+  CreateGuiButton("Undo,,ImgVectorUndoAct||Cancel,,MenuCancelDrawingShape||Done,,stopDrawingShape" btnOpenLine LabelTension, "Forced", msgDisplayTime*10000)
   SetTimer, DestroyTempBtnGui, Off
 }
 
@@ -39436,7 +40178,7 @@ PanelConfigVPgrid() {
     GuiAddSlider("vpGridThickness", 1,15, 1, "Line thickness: $€", "updateUIgridPanel", 1, "y+10 wp hp")
     GuiAddSlider("vpGridStepu", 2,20, 2, "Stepping: $€", "updateUIgridPanel", 1, "y+10 wp hp")
 
-    Gui, Add, Text, xs y+15 w%slideWid%, You can use Alt + [-] / [+] in the main window to change the dimensions of the grid.
+    Gui, Add, Text, xs y+15 w%slideWid%, You can use Alt + [-] / [=] in the main window to change the dimensions of the grid.
 
     thisW := (PrefsLargeFonts=1) ? 90 : 60
     Gui, Add, Button, xs y+15 w%thisW% h%thisBtnHeight% Default gBtnCloseWindow, &Close
@@ -39820,6 +40562,7 @@ PanelFloodFillTool() {
     txtWid := 250
     EditWid := 60
     FloodFillSelectionAdj := 0
+    interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
     If (PrefsLargeFonts=1)
     {
        EditWid := EditWid + 50
@@ -44587,7 +45330,7 @@ invokeTlbrContextMenu(givenCoords:=0) {
 
    If (userCustomizedToolbar!=1)
    {
-      kMenu("PvUItoolbarMenu", "Add/Uncheck", "&Viewer mode toolbar", "ToggleToolBarViewModa")
+      kMenu("PvUItoolbarMenu", "Add/Uncheck", "&Viewer mode toolbar", "ToggleToolBarViewModa", "advanced")
       If (toolbarViewerMode=1)
          kMenu("PvUItoolbarMenu", "Check", "&Viewer mode toolbar")
    }
@@ -44601,20 +45344,20 @@ invokeTlbrContextMenu(givenCoords:=0) {
    If (TLBRverticalAlign=1 || TLBRtwoColumns=1)
       kMenu("PvUItoolbarMenu", "Check", "&Vertical toolbar")
 
-   kMenu("PvUItoolbarMenu", "Add/Uncheck", "&Two columns vertical", "tlbrApplyTwoColumns")
+   kMenu("PvUItoolbarMenu", "Add/Uncheck", "&Two columns vertical", "tlbrApplyTwoColumns",, " (toolbar)")
    If (TLBRtwoColumns=1)
-      kMenu("PvUItoolbarMenu", "Check", "&Two columns vertical")
+      kMenu("PvUItoolbarMenu", "Check", "&Two columns vertical",,, " (toolbar)")
 
-   kMenu("PvUItoolbarMenu", "Add/Uncheck", "Attach to main &window", "tlbrLockPositionWin")
+   kMenu("PvUItoolbarMenu", "Add/Uncheck", "Attach to main &window", "tlbrLockPositionWin",, " (toolbar)")
    If (lockToolbar2Win=1)
-      kMenu("PvUItoolbarMenu", "Check", "Attach to main &window")
+      kMenu("PvUItoolbarMenu", "Check", "Attach to main &window",,, " (toolbar)")
    If (lockToolbar2Win=1)
-      kMenu("PvUItoolbarMenu", "Add", "&Reset position", "tlbrResetPosition")
+      kMenu("PvUItoolbarMenu", "Add", "&Reset position", "tlbrResetPosition",, " for toolbar")
 
    If (ShowAdvToolbar=1)
    {
       kMenu("PvUItoolbarMenu", "Add", "Customi&ze toolbar", "PanelCustomizeToolbar")
-      If ((thumbsDisplaying=1 && maxFilesIndex>1 || isImgEditingNow()=1) && !AnyWindowOpen)
+      If ((thumbsDisplaying=1 && maxFilesIndex>1 || isImgEditingNow()=1) && !AnyWindowOpen && drawingShapeNow!=1)
       {
          kMenu("PvUItoolbarMenu", "Add/Uncheck", "Use customi&zed toolbar", "toggleCustomaToolbara")
          If (userCustomizedToolbar=1)
@@ -44652,6 +45395,9 @@ SetToolbarScaling(a, b, c) {
 }
 
 InvokeOpenRecentMenu(givenCoords:=0) {
+   If (givenCoords="tlbr" && AnyWindowOpen)
+      Return
+
    deleteMenus()
    createMenuOpenRecents()
    globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PVopenF") : givenCoords
@@ -44857,6 +45603,10 @@ jumpPreviousImage() {
     If (slideShowRunning=1)
        ToggleSlideShowu()
 
+    okayu := (thumbsDisplaying=1 || undoLevelsRecorded<2) ? 1 : 0
+    If !okayu
+       Return
+
     If askAboutFileSave(" and another image will be loaded")
        Return
 
@@ -45046,12 +45796,6 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
             prevOpenFolderPath := OutDir
             CurrentSLD := "|" OutDir
             SLDtypeLoaded := 1
-         ; } Else If (imgPath!=file2save && StrLen(filesFilter)<2)
-         ; {
-         ;    obju := [file2save]
-         ;    resultedFilesList.InsertAt(currentFileIndex, obju)
-         ;    currentFileIndex++
-         ;    maxFilesIndex++
          } Else If (imgPath=file2save)
             resultedFilesList[currentFileIndex, 1] := file2save
 
@@ -45521,6 +46265,94 @@ PanelCustomizeToolbar() {
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Customize toolbar: " appTitle)
     SetTimer, resetOpeningPanel, -300
     BTNtglCustoTlbr()
+}
+
+PanelCustomKeysMiniManager() {
+    If (allowCustomKeys!=1)
+    {
+        msgResult := msgBoxWrapper(appTitle ": Confirmation", "To customize keyboard shortcuts, the option to allow custom user defined keyboard shortcuts must be activated. Would you like to activate it now?", 4, 0, "question")
+        If (msgResult="Yes")
+        {
+           ToggleCustomKBDsMode()
+           SetTimer, PanelCustomKeysMiniManager, -100
+           Return
+        } Else Return
+    }
+
+    thisBtnHeight := createSettingsGUI(83, A_ThisFunc)
+    btnWid := 195
+    EditWid := 60
+    If (PrefsLargeFonts=1)
+    {
+       thisW := 200
+       EditWid := EditWid + 50
+       btnWid := btnWid + 130
+       Gui, Font, s%LargeUIfontValue%
+    }
+
+    txtWid := btnWid * 2 + 5
+    Global UImainTlbrList, UIuserTlbrList, whichUIkbdContext
+    ml := (PrefsLargeFonts=1) ? 60 : 45
+    listu := defineKBDcontexts(3)
+    lp := defineKBDcontexts(0)
+    Gui, Add, Text, x+10 y+15 Section , Application contexts:
+    Gui, Add, DropDownList, %combosDarkModus% x+10 w%btnWid% AltSubmit Choose%lp% vwhichUIkbdContext gupdateUIKeysListManager, % listu
+    ; Gui, Add, Text, xs y+15 w%btnWid% , User defined shortcuts:
+    Gui, Add, ListView, xs y+1 w%txtWid% -multi +LV0x10000 +LV0x400 r7 Grid vLViewOthers gBtnLVcustomKBDies, Key|Menu item|Menu container|Function
+    Gui, Add, Text, xs y+10 wp, The shortcuts can be customized in the Quick Menus Search box.`nTo open it, click Customize.`n`nThis panel is meant to provide an overview of the already defined custom keyboard shortcuts.
+ 
+    thisW := (PrefsLargeFonts=1) ? 130 : 115
+    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%thisW% Default gPanelQuickSearchMenuOptions, C&ustomize
+    Gui, Add, Button, x+5 hp wp-25 gBtnCloseWindow, &Cancel
+    Tooltip
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Customized keyboard shortcuts overview: " appTitle)
+    SetTimer, resetOpeningPanel, -300
+    updateUIKeysListManager()
+}
+
+BtnLVcustomKBDies(a, b, c) {
+   If (b!="DoubleClick")
+      Return
+
+   Gui, SettingsGUIA: Default
+   GuiControlGet, whichUIkbdContext
+   Gui, SettingsGUIA: ListView, LViewOthers
+   RowNumber := LV_GetNext(0, "F")
+   LV_GetText(funcu, RowNumber, 4)
+   If InStr(funcu, "()")
+   {
+      funcu := StrReplace(funcu, "()")
+      userQuickMenusEdit := funcu
+      BtnCloseWindow()
+      PanelQuickSearchMenuOptions(funcu, "yes")
+      SetTimer, PanelDefineKbdShortcut, -150
+   }
+}
+
+updateUIKeysListManager() {
+   Gui, SettingsGUIA: Default
+   GuiControlGet, whichUIkbdContext
+   Gui, SettingsGUIA: ListView, LViewOthers
+   GuiControl, -Redraw, LViewOthers
+   LV_Delete()
+
+   For Key, V in userCustomKeysDefined
+   {
+      If (SubStr(key, 2, 1)=".")
+         Continue
+
+      If (V[4]=whichUIkbdContext)
+      {
+         funcu := (InStr(V[1], "?")=1) ? "{Disabled}" : V[1] "()"
+         LV_Add(A_Index, V[6], V[2], V[3], funcu)
+      }
+
+   }
+
+   Loop, 4
+     LV_ModifyCol(A_Index, "AutoHdr Left")
+
+   GuiControl, +Redraw, LViewOthers
 }
 
 BTNtglCustoTlbr() {
@@ -47983,7 +48815,7 @@ coreOpenFolder(thisFolder, doOptionals:=1, openFirst:=0, doReset:=0, safeMode:=0
    mustOpenStartFolder := ""
    If FolderExist(testThis)
    {
-      If (A_TickCount - scriptStartTime>350)
+      If ((A_TickCount - scriptStartTime>350) && AnyWindowOpen)
          BtnCloseWindow()
 
       filesFilter := CurrentSLD := ""
@@ -49823,7 +50655,7 @@ InitGuiContextMenu(keyu:=0, mX:="-", mY:=0, givenCoords:=0) {
       If (showHUDnavIMG=1 && hasDrawnImageMap=1 && !dotActiveObj.n && (IMGlargerViewPort=1 && thumbsDisplaying=0 || thumbsDisplaying=1)
       && isDotInRect(mX, mY, HUDobjNavBoxu[7], HUDobjNavBoxu[5] + HUDobjNavBoxu[7], HUDobjNavBoxu[8], HUDobjNavBoxu[6] + HUDobjNavBoxu[8]))
       {
-         invokeImgSizeVP()
+         invokeMenuNavBoxImgSizeVP()
          lastInvoked := A_TickCount
          Return
       } Else If (dotActiveObj.n>0 && dotActiveObj.n!=9 && editingSelectionNow=1 && adjustNowSel=0 && imgSelLargerViewPort!=1)
@@ -49932,73 +50764,74 @@ PathCompact(givenPath, CharMax, allowOverflow:=0, fontSizeu:=0, givenWidth:=0, m
 
 createMenuSelectionRotationAspectRatio() {
    ; defiSelAR := defineSelectionAspectRatios()
-   kMenu("PVselRatio", "Add", "&Increase rotation by 1°`tShift+0", "MenuSelIncRotation")
-   kMenu("PVselRatio", "Add", "&Decrease rotation by 1°`tShift+9", "MenuSelDecRotation")
-   kMenu("PVselRatio", "Add", "R&otate by 45°`tShift+R", "MenuSelRotation")
+   kMenu("PVselRatio", "Add", "&Increase rotation by 1°`tShift+0", "MenuSelIncRotation",, " (selection area)", 1)
+   kMenu("PVselRatio", "Add", "&Decrease rotation by 1°`tShift+9", "MenuSelDecRotation",, " (selection area)", 1)
+   kMenu("PVselRatio", "Add", "R&otate selection by 45°`tShift+R", "MenuSelRotation",,, 1)
    If (VPselRotation>0)
-      kMenu("PVselRatio", "Add", "R&eset rotation`tShift+\", "resetSelectionRotation")
-   kMenu("PVselRatio", "Add/Uncheck", "&Keep aspect ratio on rotation", "ToggleSelKeepRatioRotation")
-   kMenu("PVselRatio", "Add", "Set to s&quare ratio (1:1)`tR", "makeSquareSelection")
+      kMenu("PVselRatio", "Add", "R&eset rotation`tShift+\", "resetSelectionRotation",, " (selection area)")
+
+   kMenu("PVselRatio", "Add/Uncheck", "&Keep aspect ratio on rotation", "ToggleSelKeepRatioRotation",, " (selection area)")
+   If (rotateSelBoundsKeepRatio=1)
+      kMenu("PVselRatio", "Check", "&Keep aspect ratio on rotation",,, " (selection area)")
+
+   kMenu("PVselRatio", "Add", "Set to s&quare ratio (1:1)`tR", "makeSquareSelection",, " (selection area)")
    If (lockSelectionAspectRatio>1)
-      kMenu("PVselRatio", "Disable", "Set to s&quare ratio (1:1)`tR")
+      kMenu("PVselRatio", "Disable", "Set to s&quare ratio (1:1)`tR",,, " (selection area)")
 
    Menu, PVselRatio, Add
-   kMenu("PVselRatio", "Add", "Cycle loc&k aspect ratios`tShift+A", "toggleImgSelectionAspectRatio")
-   kMenu("PVselRatio", "Add/Uncheck", "&Unlocked", "MenuSetLockSelRatioUnlocked")
-   kMenu("PVselRatio", "Add/Uncheck", "&Active selection`tCtrl+Shift+A", "MenuSetLockSelRatioSelu")
-   kMenu("PVselRatio", "Add/Uncheck", "&Current window", "MenuSetLockSelRatioWindow")
-   kMenu("PVselRatio", "Add/Uncheck", "&Current image", "MenuSetLockSelRatioImage")
-   kMenu("PVselRatio", "Add/Uncheck", "&Square [1:1]", "MenuSetLockSelRatioSquare")
-   kMenu("PVselRatio", "Add/Uncheck", "&SDTV [4:3]", "MenuSetLockSelRatioSDTV")
-   kMenu("PVselRatio", "Add/Uncheck", "&35mm film [3:2]", "MenuSetLockSelRatio35mmFilm")
-   kMenu("PVselRatio", "Add/Uncheck", "&HDTV [16:9]", "MenuSetLockSelRatioHDTV")
-   kMenu("PVselRatio", "Add/Uncheck", "&Wide screens [16:10]", "MenuSetLockSelRatioWide")
-   kMenu("PVselRatio", "Add/Uncheck", "&Phone", "MenuSetLockSelRatioPhone")
+   kMenu("PVselRatio", "Add", "Cycle loc&k aspect ratios`tShift+A", "toggleImgSelectionAspectRatio",,,1)
+   kMenu("PVselRatio", "Add/Uncheck", "&Unlocked", "MenuSetLockSelRatioUnlocked",," aspect ratio (selection)")
+   kMenu("PVselRatio", "Add/Uncheck", "&Active selection`tCtrl+Shift+A", "MenuSetLockSelRatioSelu",, "Lock aspect ratio to " sillySeparator)
+   kMenu("PVselRatio", "Add/Uncheck", "&Current window", "MenuSetLockSelRatioWindow",, " (selection aspect ratio)")
+   kMenu("PVselRatio", "Add/Uncheck", "&Current image", "MenuSetLockSelRatioImage",, " (selection aspect ratio)")
+   kMenu("PVselRatio", "Add/Uncheck", "&Square [1:1]", "MenuSetLockSelRatioSquare",, " (selection aspect ratio)")
+   kMenu("PVselRatio", "Add/Uncheck", "&SDTV [4:3]", "MenuSetLockSelRatioSDTV",, " (selection aspect ratio)")
+   kMenu("PVselRatio", "Add/Uncheck", "&35mm film [3:2]", "MenuSetLockSelRatio35mmFilm",, " (selection aspect ratio)")
+   kMenu("PVselRatio", "Add/Uncheck", "&HDTV [16:9]", "MenuSetLockSelRatioHDTV",, " (selection aspect ratio)")
+   kMenu("PVselRatio", "Add/Uncheck", "&Wide screens [16:10]", "MenuSetLockSelRatioWide",, " (selection aspect ratio)")
+   kMenu("PVselRatio", "Add/Uncheck", "&Phone", "MenuSetLockSelRatioPhone",, " (selection aspect ratio)")
    If (lockSelectionAspectRatio<=1)
-      kMenu("PVselRatio", "Check", "&Unlocked")
+      kMenu("PVselRatio", "Check", "&Unlocked",,, " aspect ratio (selection)")
    Else If (lockSelectionAspectRatio=2)
-      kMenu("PVselRatio", "Check", "&Active selection`tCtrl+Shift+A")
+      kMenu("PVselRatio", "Check", "&Active selection`tCtrl+Shift+A",,, "Lock aspect ratio to " sillySeparator)
    Else If (lockSelectionAspectRatio=3)
-      kMenu("PVselRatio", "Check", "&Current window")
+      kMenu("PVselRatio", "Check", "&Current window",,, " (selection aspect ratio)")
    Else If (lockSelectionAspectRatio=4)
-      kMenu("PVselRatio", "Check", "&Current image")
+      kMenu("PVselRatio", "Check", "&Current image",,, " (selection aspect ratio)")
    Else If (lockSelectionAspectRatio=5)
-      kMenu("PVselRatio", "Check", "&Square [1:1]")
+      kMenu("PVselRatio", "Check", "&Square [1:1]",,, " (selection aspect ratio)")
    Else If (lockSelectionAspectRatio=6)
-      kMenu("PVselRatio", "Check", "&SDTV [4:3]")
+      kMenu("PVselRatio", "Check", "&SDTV [4:3]",,, " (selection aspect ratio)")
    Else If (lockSelectionAspectRatio=7)
-      kMenu("PVselRatio", "Check", "&35mm film [3:2]")
+      kMenu("PVselRatio", "Check", "&35mm film [3:2]",,, " (selection aspect ratio)")
    Else If (lockSelectionAspectRatio=8)
-      kMenu("PVselRatio", "Check", "&HDTV [16:9]")
+      kMenu("PVselRatio", "Check", "&HDTV [16:9]",,, " (selection aspect ratio)")
    Else If (lockSelectionAspectRatio=9)
-      kMenu("PVselRatio", "Check", "&Wide screens [16:10]")
+      kMenu("PVselRatio", "Check", "&Wide screens [16:10]",,, " (selection aspect ratio)")
    Else If (lockSelectionAspectRatio=10)
-      kMenu("PVselRatio", "Check", "&Phone")
-
-   If (rotateSelBoundsKeepRatio=1)
-      kMenu("PVselRatio", "Check", "&Keep aspect ratio on rotation")
+      kMenu("PVselRatio", "Check", "&Phone",,, " (selection aspect ratio)")
 }
 
 createMenuSelectionAlign() {
    kMenu("PVselAlign", "Add", "Inside", "dummy")
    kMenu("PVselAlign", "Disable", "Inside")
-   kMenu("PVselAlign", "Add", "&Top`tCtrl+NumPad8", "alignImgSelectTop")
-   kMenu("PVselAlign", "Add", "&Bottom`tCtrl+NumPad2", "alignImgSelectBottom")
-   kMenu("PVselAlign", "Add", "&Left`tCtrl+NumPad4", "alignImgSelectLeft")
-   kMenu("PVselAlign", "Add", "&Right`tCtrl+NumPad6", "alignImgSelectRight")
+   kMenu("PVselAlign", "Add", "&Top`tCtrl+NumPad 8", "alignImgSelectTop",, "Align selection: " sillySeparator)
+   kMenu("PVselAlign", "Add", "&Bottom`tCtrl+NumPad 2", "alignImgSelectBottom",, "Align selection: " sillySeparator)
+   kMenu("PVselAlign", "Add", "&Left`tCtrl+NumPad 4", "alignImgSelectLeft",, "Align selection: " sillySeparator)
+   kMenu("PVselAlign", "Add", "&Right`tCtrl+NumPad 6", "alignImgSelectRight",, "Align selection: " sillySeparator)
    Menu, PVselAlign, Add
-   kMenu("PVselAlign", "Add", "&Center horizontally`tCtrl+NumPad5", "alignImgSelectCenterH")
-   kMenu("PVselAlign", "Add", "Center &vertically`tCtrl+NumPad0", "alignImgSelectCenterV")
-   kMenu("PVselAlign", "Add", "Centere&d", "alignImgSelectCentered")
+   kMenu("PVselAlign", "Add", "&Center horizontally`tCtrl+NumPad 5", "alignImgSelectCenterH",, "Align selection: " sillySeparator)
+   kMenu("PVselAlign", "Add", "Center &vertically`tCtrl+NumPad 0", "alignImgSelectCenterV",, "Align selection: " sillySeparator)
+   kMenu("PVselAlign", "Add", "Centere&d", "alignImgSelectCentered",, "Align selection: " sillySeparator)
    If isVarEqualTo(AnyWindowOpen, 74, 65, 32, 31, 24, 23)
    {
       Menu, PVselAlign, Add
       kMenu("PVselAlign", "Add", "Outside", "dummy")
       kMenu("PVselAlign", "Disable", "Outside")
-      kMenu("PVselAlign", "Add", "&Top", "alignImgSelectOutTop")
-      kMenu("PVselAlign", "Add", "&Bottom", "alignImgSelectOutBottom")
-      kMenu("PVselAlign", "Add", "&Left", "alignImgSelectOutLeft")
-      kMenu("PVselAlign", "Add", "&Right", "alignImgSelectOutRight")
+      kMenu("PVselAlign", "Add", "&Top", "alignImgSelectOutTop",, "Align selection outside: " sillySeparator)
+      kMenu("PVselAlign", "Add", "&Bottom", "alignImgSelectOutBottom",, "Align selection outside: " sillySeparator)
+      kMenu("PVselAlign", "Add", "&Left", "alignImgSelectOutLeft",, "Align selection outside: " sillySeparator)
+      kMenu("PVselAlign", "Add", "&Right", "alignImgSelectOutRight",, "Align selection outside: " sillySeparator)
    }
 }
 
@@ -50023,7 +50856,7 @@ createMenuSelectShapeTension() {
    Else If (FillAreaCurveTension=4)
       kMenu("PVshapeTension", "Check", "&Rounded curve")
 
-   kMenu("PVshapeTension", "Disable", "&Cycle smoothness levels" keyuB, "togglePathCurveTension", "shape tension")
+   ; kMenu("PVshapeTension", "Disable", "&Cycle smoothness levels" keyuB, "togglePathCurveTension", "shape tension")
    If (bezierSplineCustomShape=1)
       kMenu("PVshapeTension", "Check", "Bézier spline" keyuA)
 }
@@ -50032,16 +50865,16 @@ createMenuSelectSizeShapes(dummy:=0, b:=0) {
    If (dummy!="simple")
    {
       kMenu("PVselSize", "Add", "C&ycle selection types`tShift+E", "toggleEllipseSelection")
-      kMenu("PVselSize", "Add/Uncheck", "&Rectangular", "MenuSetSelectionShapeRect", "shape type")
-      kMenu("PVselSize", "Add/Uncheck", "&Ellipse / oval", "MenuSetSelectionShapeEllipse", "shape type")
-      kMenu("PVselSize", "Add/Uncheck", "&Custom shape", "MenuSetSelectionShapeFreeform", "freeform type spline polygonal")
+      kMenu("PVselSize", "Add/Uncheck", "&Rectangular", "MenuSetSelectionShapeRect", "shape type", "Selection type: " sillySeparator)
+      kMenu("PVselSize", "Add/Uncheck", "&Ellipse / oval", "MenuSetSelectionShapeEllipse", "shape type", "Selection type: " sillySeparator)
+      kMenu("PVselSize", "Add/Uncheck", "&Custom shape", "MenuSetSelectionShapeFreeform", "freeform type spline polygonal", "Selection type: " sillySeparator)
 
       If (EllipseSelectMode=1)
-         kMenu("PVselSize", "Check", "&Ellipse / oval")
+         kMenu("PVselSize", "Check", "&Ellipse / oval",,, "Selection type: " sillySeparator)
       Else If (EllipseSelectMode=2)
-         kMenu("PVselSize", "Check", "&Custom shape")
+         kMenu("PVselSize", "Check", "&Custom shape",,, "Selection type: " sillySeparator)
       Else
-         kMenu("PVselSize", "Check", "&Rectangular")
+         kMenu("PVselSize", "Check", "&Rectangular",,, "Selection type: " sillySeparator)
    }
 
    friendly := AnyWindowOpen ? "" : "Manage / "
@@ -50071,22 +50904,76 @@ createMenuSelectSizeShapes(dummy:=0, b:=0) {
    }
 }
 
+MenuSelAreaMoveUp() {
+   arrowKeysAdjustSelectionArea(-2, 1)
+   arrowKeysAdjustSelectionArea(-2, 2)
+}
+
+MenuSelAreaMoveDown() {
+   arrowKeysAdjustSelectionArea(2, 1)
+   arrowKeysAdjustSelectionArea(2, 2)
+}
+
+MenuSelAreaMoveLeft() {
+   arrowKeysAdjustSelectionArea(-1, 1)
+   arrowKeysAdjustSelectionArea(-1, 2)
+}
+
+MenuSelAreaMoveRight() {
+   arrowKeysAdjustSelectionArea(1, 1)
+   arrowKeysAdjustSelectionArea(1, 2)
+}
+
+focusToolbarNavKeys() {
+   If (ShowAdvToolbar=1 && hQPVtoolbar)
+   {
+      isToolbarKBDnav := 1
+      WinActivate, ahk_id %hQPVtoolbar%
+      displayNowToolbarHelp(2)
+   }
+}
+
+addMenuBonusesSelectionArea() {
+   If (mustPreventMenus=1 && editingSelectionNow=1)
+   {
+      kMenu("PVselv", "Add", "Move selection: up`tHome", "MenuSelAreaMoveUp",,,1)
+      kMenu("PVselv", "Add", "Move selection: down`tEnd", "MenuSelAreaMoveDown",,,1)
+      kMenu("PVselv", "Add", "Move selection: right`tPage up", "MenuSelAreaMoveLeft",,,1)
+      kMenu("PVselv", "Add", "Move selection: left`tPage down", "MenuSelAreaMoveRight",,,1)
+      kMenu("PVselv", "Add", "Enlarge selection area`tShift+-", "MenuIncSelAreaSize", "increase size",,1)
+      kMenu("PVselv", "Add", "Shrink selection area`tShift+=", "MenuDecSelAreaSize", "decrease size",,1)
+      kMenu("PVselv", "Add", "Increase exclusion (selection area)`tCtrl+.", "MenuIncSelAreaCavity", "hallow",,1)
+      kMenu("PVselv", "Add", "Decrease exclusion (selection area)`tCtrl+,", "MenuDecSelAreaCavity", "hallow",,1)
+      If (innerSelectionCavityX>0.01 && innerSelectionCavityY>0.01 || VPselRotation!=0)
+         kMenu("PVselv", "Add", "Reset selection area rotation and exclusion`tAlt+\", "MenuResetSelAreaCavityRotation")
+   }
+}
+
+MenuSearchNextIndex() {
+   searchNextIndex(1)
+}
+
+MenuSearchPrevIndex() {
+   searchNextIndex(-1)
+}
+
 createMenuSelectionArea(modus:=0) {
    If (modus="DoubleClick")
    {
       kMenu("PVselv", "Add", "Main menu`tAppsKey", "InitGuiContextForcedMenu")
-      Menu, PVselv, Add, 
-   }
-
-   If (undoLevelsRecorded>1 && undoLevelsRecorded!="" && infoImgEditingNow=1 && editingSelectionNow=1)
-   {
-      friendly := (modus="DoubleClick") ? " selection" : ""
-      kMenu("PVselv", "Add", "&Undo" friendly "`tCtrl+Shift+Z", "ImgSelUndoAct")
-      kMenu("PVselv", "Add", "&Redo" friendly "`tCtrl+Shift+Y", "ImgSelRedoAct")
-      Menu, PVselv, Add,
+      Menu, PVselv, Add 
    }
 
    infoImgEditingNow := isImgEditingNow()
+   If (undoLevelsRecorded>1 && undoLevelsRecorded!="" && infoImgEditingNow=1 && editingSelectionNow=1)
+   {
+      friendly := (modus="DoubleClick") ? " selection" : ""
+      f := (modus="DoubleClick") ? "" : " (selection area)"
+      kMenu("PVselv", "Add", "&Undo" friendly "`tCtrl+Shift+Z", "ImgSelUndoAct",, f)
+      kMenu("PVselv", "Add", "&Redo" friendly "`tCtrl+Shift+Y", "ImgSelRedoAct",, f)
+      Menu, PVselv, Add
+   }
+
    If (infoImgEditingNow=1)
    {
       keyword := (editingSelectionNow=1) ? "hide" : " display"
@@ -50095,23 +50982,24 @@ createMenuSelectionArea(modus:=0) {
          kMenu("PVselv", "Check", "&Show selection area`tE")
    }
 
+   addMenuBonusesSelectionArea()
    If (modus!="DoubleClick")
-      kMenu("PVselv", "Add", "&Drop and reset`tCtrl+D", "resetImgSelection", "hide")
+      kMenu("PVselv", "Add", "&Drop and reset`tCtrl+D", "resetImgSelection", "hide", " (selection area)")
 
    If (innerSelectionCavityX>0.01 && innerSelectionCavityY>0.01)
-      kMenu("PVselv", "Add", "R&eset exclude area`tShift+\", "resetSelectionAreaCavity")
+      kMenu("PVselv", "Add", "R&eset exclusion area`tShift+\", "resetSelectionAreaCavity",, " (selection area)")
 
    If (infoImgEditingNow=1)
-      kMenu("PVselv", "Add", "Se&lect all`tCtrl+A", "selectEntireImage")
+      kMenu("PVselv", "Add", "Se&lect all`tCtrl+A", "selectEntireImage",, " (image canvas)")
 
    If (editingSelectionNow=1 && infoImgEditingNow=1)
    {
       createMenuSelectSizeShapes()
       createMenuSelectionAlign()
-      kMenu("PVselv", "Add/Uncheck", "Limit to image bo&undaries`tL", "toggleLimitSelection")
-      kMenu("PVselv", "Add", "Flip width / &height`tW", "flipSelectionWH")
+      kMenu("PVselv", "Add/Uncheck", "Limit to image bo&undaries`tL", "toggleLimitSelection",, " (selection area)")
+      kMenu("PVselv", "Add", "Flip width / &height`tW", "flipSelectionWH",, " (selection area)")
       If (LimitSelectBoundsImg=1)
-         kMenu("PVselv", "Check", "Limit to image bo&undaries`tL")
+         kMenu("PVselv", "Check", "Limit to image bo&undaries`tL",,, " (selection area)")
 
       createMenuSelectionRotationAspectRatio()
       kMenu("PVselv", "Add", "&Selection shapes", ":PVselSize")
@@ -50119,10 +51007,10 @@ createMenuSelectionArea(modus:=0) {
       kMenu("PVselv", "Add", "Rotation and &aspect ratio", ":PVselRatio")
       Menu, PVselv, Add, 
       keyword := (editingSelectionNow=1) ? "hide" : " display"
-      kMenu("PVselv", "Add/Uncheck", "Sho&w grid", "ToggleSelectGrid", keyword)
+      kMenu("PVselv", "Add/Uncheck", "Sho&w grid", "ToggleSelectGrid", keyword, " (selection area)")
       kMenu("PVselv", "Add", "Selection properties`tAlt+E", "PanelIMGselProperties")
       If (showSelectionGrid=1)
-         kMenu("PVselv", "Check", "Sho&w grid")
+         kMenu("PVselv", "Check", "Sho&w grid",,, " (selection area)")
    }
 
    If (infoImgEditingNow=1 && modus="DoubleClick")
@@ -50145,14 +51033,17 @@ createMenuSelectionArea(modus:=0) {
    }
 }
 
-createMenuImageEditSubMenus() {
+createMenuImageEditSubMenus(modus:=0) {
    infoImgEditingNow := isImgEditingNow()
    If (thumbsDisplaying!=1 && infoImgEditingNow=1)
    {
+      If (editingSelectionNow=1 && AnyWindowOpen!=10 && mustPreventMenus=1)
+         kMenu("PVimgFilters", "Add", "Appl&y color effects inside selection`tCtrl+Shift+U", "ApplyColorAdjustsSelectedArea")
+
       kMenu("PVimgFilters", "Add", "&Gaussian and other blur modes`tShift+B", "PanelBlurSelectedArea", "effects motion directional dissolve dilate erode box glow")
       kMenu("PVimgFilters", "Add", "&Radial blur", "PanelZoomBlurSelectedArea", "effects motion directional zoom")
-      kMenu("PVimgFilters", "Add", "&Pixelize", "PanelPixelizeSelectedArea", "pixelization mozaic deform")
-      kMenu("PVimgFilters", "Add", "S&harpen", "PanelSharpenImage", "effects")
+      kMenu("PVimgFilters", "Add", "&Pixelize", "PanelPixelizeSelectedArea", "pixelization mozaic deform", " image")
+      kMenu("PVimgFilters", "Add", "S&harpen", "PanelSharpenImage", "effects", " image")
       Menu, PVimgFilters, Add
       kMenu("PVimgFilters", "Add", "A&utomatic contrast / levels", "PanelAutoColors")
       kMenu("PVimgFilters", "Add", "&Invert colors`tShift+I", "InvertSelectedArea", "effects negative")
@@ -50162,15 +51053,17 @@ createMenuImageEditSubMenus() {
       kMenu("PVimgFilters", "Add", "&Add noise", "PanelAddNoiserImage", "effects clouds plasma")
       kMenu("PVimgFilters", "Add", "Create s&ymmetry", "PanelSymmetricaImage", "generate textures tiles mirroring patterns")
       kMenu("PVimgFilters", "Add", "&Detect edges", "PanelDetectEdgesImage", "emboss effects")
+      If (modus="filters")
+         Return
 
       kMenu("PVimgDraw", "Add", "Define f&reeform filled shape`tShift+P", "MenuStartDrawingShapes", "curve polygonal")
       kMenu("PVimgDraw", "Add", "Define freeform &outline`tAlt+P", "MenuStartDrawingLines", "curve polygonal lines")
       kMenu("PVimgDraw", "Add", "&Paint brushes`tP", "PanelBrushTool", "pinch bulge effects draw deformer smudge cloner effects")
       kMenu("PVimgDraw", "Add", "&Erase or fade area`tDelete", "PanelEraseSelectedArea")
       kMenu("PVimgDraw", "Add", "&Flood fill / color bucket`tK", "PanelFloodFillTool", "colorize similarity cartoon")
-      kMenu("PVimgDraw", "Add", "&Fill shapes`tAlt+Bksp", "PanelFillSelectedArea", "curve polygonal glass effects blur pie ellipse triangle rhombus gradients rectangle")
+      kMenu("PVimgDraw", "Add", "&Fill shapes`tAlt+Backspace", "tlbrFillShape", "curve polygonal glass effects blur pie ellipse triangle rhombus gradients rectangle")
       kMenu("PVimgDraw", "Add", "Fill be&hind image", "PanelFillBehindBgrImage", "background")
-      kMenu("PVimgDraw", "Add", "Draw s&hape contours`tCtrl+L", "PanelDrawShapesInArea", "lines curve polygonal pie ellipse triangle rhombus rectangle arcs")
+      kMenu("PVimgDraw", "Add", "Draw s&hape contours`tCtrl+L", "tlbrDrawShapesContour", "lines curve polygonal pie ellipse triangle rhombus rectangle arcs")
       kMenu("PVimgDraw", "Add", "&Draw parametric lines", "PanelDrawLines", "lines arcs diagonals spiral rays spokes grids")
       kMenu("PVimgDraw", "Add", "Insert te&xt`tShift+T", "PanelInsertTextArea", "write add draw type")
 
@@ -50206,8 +51099,7 @@ InvokeMenuBarVectorFile(manuID) {
    kMenu("pvMenuBarFile", "Add", "Vector drawing mode", "dummy")
    kMenu("pvMenuBarFile", "Disable", "Vector drawing mode")
    kMenu("pvMenuBarFile", "Add", "&Apply / done`tEnter", "stopDrawingShape")
-   kMenu("pvMenuBarFile", "Add", "&Exit pen tool mode`tEscape", "cancelDrawingShape")
-
+   kMenu("pvMenuBarFile", "Add", "&Exit pen tool mode`tEscape", "MenuCancelDrawingShape")
    showThisMenu("pvMenuBarFile", 0, 1, manuID)
 }
 
@@ -50217,8 +51109,9 @@ InvokeMenuBarVectorInterface(manuID) {
    showThisMenu("PvUIprefs", 0, 1, manuID)
 }
 
-InvokeMenuBarVectorView(manuID) {
-   deleteMenus()
+InvokeMenuBarVectorView(manuID, modus:=0) {
+   If (modus!="extern")
+      deleteMenus()
    Try Menu, pvMenuBarView, Delete
 
    createMenuImgSizeAdapt()
@@ -50228,15 +51121,15 @@ InvokeMenuBarVectorView(manuID) {
    kMenu("pvMenuBarView", "Add", "Colors F&X and display modes", ":PVimgColorsFX")
    kMenu("pvMenuBarView", "Add", "Reset vie&wport adjustments`t\", "ResetImageView", "image")
    Menu, pvMenuBarView, Add
-   kMenu("pvMenuBarView", "Add/Uncheck", "Show viewport &grid", "toggleViewPortGridu", keyword)
+   kMenu("pvMenuBarView", "Add/Uncheck", "Show viewport &grid`tG", "toggleViewPortGridu")
    kMenu("pvMenuBarView", "Add/Uncheck", "Fi&xed grid size", "toggleGridFixedSize")
    If (vpGridFixedSize=1)
       kMenu("pvMenuBarView", "Check", "Fi&xed grid size")
    If (showViewPortGrid=1)
-      kMenu("pvMenuBarView", "Check", "Show viewport &grid")
+      kMenu("pvMenuBarView", "Check", "Show viewport &grid`tG")
 
-   kMenu("pvMenuBarView", "Add", "Increase grid size`tAlt+[+]", "MenuIncVPgridSize")
-   kMenu("pvMenuBarView", "Add", "Decrease grid size`tAlt+[-]", "MenuDecVPgridSize")
+   kMenu("pvMenuBarView", "Add", "Increase grid size`tAlt+=", "MenuIncVPgridSize",,,1)
+   kMenu("pvMenuBarView", "Add", "Decrease grid size`tAlt+-", "MenuDecVPgridSize",,,1)
    Menu, pvMenuBarView, Add
    kMenu("pvMenuBarView", "Add/Uncheck", "Centered &alignment`tA", "ToggleIMGalign", "viewport image position")
    If (imageAligned=5)
@@ -50246,7 +51139,8 @@ InvokeMenuBarVectorView(manuID) {
    If (allowFreeIMGpanning=1)
       kMenu("pvMenuBarView", "Check", "Allo&w outside viewport image panning")
 
-   showThisMenu("pvMenuBarView", 0, 1, manuID)
+   If (modus!="extern")
+      showThisMenu("pvMenuBarView", 0, 1, manuID)
 }
 
 InvokeMenuBarVectorSelection(manuID) {
@@ -50327,9 +51221,9 @@ InvokeMenuBarEditorFile(manuID) {
 
    kMenu("pvMenuBarFile", "Add", "Live tool mode", "dummy")
    kMenu("pvMenuBarFile", "Disable", "Live tool mode")
-   kMenu("pvMenuBarFile", "Add/Uncheck", "&Collapse tool panel`tF8", "toggleImgEditPanelWindow")
+   kMenu("pvMenuBarFile", "Add/Uncheck", "&Collapse tool panel`tF11", "toggleImgEditPanelWindow")
    If (panelWinCollapsed=1)
-      kMenu("pvMenuBarFile", "Check", "&Collapse tool panel`tF8")
+      kMenu("pvMenuBarFile", "Check", "&Collapse tool panel`tF11")
 
    drawing := isNowAlphaPainting()
    If (drawing!=1)
@@ -50349,6 +51243,7 @@ InvokeMenuBarEditorFile(manuID) {
 
       Menu, pvMenuBarFile, Add
       kMenu("pvMenuBarFile", "Add", "Open this&...", ":PVtActFile")
+      kMenu("pvMenuBarFile", "Add", "&New QPV instance`tCtrl+Shift+N", "OpenNewQPVinstance")
       kMenu("pvMenuBarFile", "Add", "File prope&rties (Explorer)", "OpenFileProperties")
       kMenu("pvMenuBarFile", "Add", "&Explore containing folder", "OpenThisFileFolder")
       If !FolderExist(OutDir)
@@ -50487,7 +51382,7 @@ InvokeMenuBarEdit(manuID) {
       If (infoImgEditingNow!=1)
          kMenu("pvMenuBarEdit", "Disable", "&Copy to clipboard`tCtrl+C")
 
-      kMenu("pvMenuBarEdit", "Add", "P&aste clipboard`tCtrl+V", "PasteClipboardIMG")
+      kMenu("pvMenuBarEdit", "Add", "P&aste clipboard`tCtrl+V", "PasteClipboardIMG", "image memory")
       kMenu("pvMenuBarEdit", "Add", "&Paste in place`tCtrl+Shift+V", "PanelPasteInPlace")
       If !AnyWindowOpen
       {
@@ -50564,14 +51459,14 @@ InvokeMenuBarEdit(manuID) {
          {
             If !added
                Menu, pvMenuBarEdit, Add
-            kMenu("pvMenuBarEdit", "Add", "&Hide dynamic object`tD", "toggleLiveEditObject")
+            kMenu("pvMenuBarEdit", "Add", "&Hide dynamic object`tD", "toggleLiveEditObject", "preview")
          }
       }
    } Else
    {
       createMenuCopyFile("pvMenuBarEdit")
       Menu, pvMenuBarEdit, Add
-      kMenu("pvMenuBarEdit", "Add", "&Paste file(s) to list`tCtrl+V", "PasteClipboardIMG", "index list")
+      kMenu("pvMenuBarEdit", "Add", "&Paste file(s) to list`tCtrl+V", "MenuPasteHDropFiles", "index list clipboard")
       If markedSelectFile
       {
          Menu, pvMenuBarEdit, Add
@@ -50586,10 +51481,10 @@ InvokeMenuBarEdit(manuID) {
 
       kMenu("pvMenuBarEdit", "Add", "Remove inde&x entry`tAlt+Delete", "singleInListEntriesRemover")
       If markedSelectFile
-        kMenu("pvMenuBarEdit", "Add", "Remove selected inde&x entries`tDelete", "InListMultiEntriesRemover", "erase")
+         kMenu("pvMenuBarEdit", "Add", "Remove selected inde&x entries", "InListMultiEntriesRemover", "erase")
 
       kMenu("pvMenuBarEdit", "Add", "&Modify index entry`tCtrl+F2", "PanelUpdateThisFileIndex")
-      If (StrLen(UserMemBMP)>2)
+      If (StrLen(UserMemBMP)>2 && thumbsDisplaying=1)
       {
          Menu, pvMenuBarEdit, Add
          kMenu("pvMenuBarEdit", "Add", "&Return to image editing", "MenuReturnIMGedit", "back")
@@ -50622,13 +51517,13 @@ InvokeMenuBarEditorSelection(manuID) {
       If (editingSelectionNow=1)
          kMenu("PVselv", "Check", "&Show selection`tE")
       Else
-         kMenu("PVselv", "Add", "&Select all`tCtrl+A", "MenuSelectAllAction")
+         kMenu("PVselv", "Add", "&Select all`tCtrl+A", "selectEntireImage")
    }
 
    isWinCustomShapeFriendly := isVarEqualTo(AnyWindowOpen, 81, 74, 68, 66, 65, 64, 55, 25, 23, 10)
    drawing := isNowAlphaPainting()
    decideLiveSelectionBasedOnWindow(angleu, isToolGood)
-   If isVarEqualTo(AnyWindowOpen, 65, 23)
+   If isVarEqualTo(AnyWindowOpen, 81, 65, 23)
       isToolGood := 1
 
    If (editingSelectionNow=1)
@@ -50662,19 +51557,19 @@ InvokeMenuBarEditorSelection(manuID) {
          Menu, PVselv, Add
       }
 
-      kMenu("PVselv", "Add", "&Select all`tCtrl+A", "MenuSelectAllAction")
+      kMenu("PVselv", "Add", "&Select all`tCtrl+A", "selectEntireImage")
       If (innerSelectionCavityX>0.01 && innerSelectionCavityY>0.01)
          kMenu("PVselv", "Add", "R&eset exclude area`tShift+\", "resetSelectionAreaCavity")
 
-      kMenu("PVselv", "Add", "&Flip selection W/H`tW", "flipSelectionWH")
+      kMenu("PVselv", "Add", "&Flip selection area W/H`tW", "flipSelectionWH")
       kMenu("PVselv", "Add/Uncheck", "&Limit selection to image area`tL", "toggleLimitSelection")
       If (LimitSelectBoundsImg=1)
          kMenu("PVselv", "Check", "&Limit selection to image area`tL")
 
-      kMenu("PVselv", "Add", "&Reset selection", "newImgSelection")
-      kMenu("PVselv", "Add/Uncheck", "Sho&w grid", "ToggleSelectGrid")
+      kMenu("PVselv", "Add", "&Reset selection area", "newImgSelection")
+      kMenu("PVselv", "Add/Uncheck", "Sho&w grid", "ToggleSelectGrid",, " (selection area)")
       If (showSelectionGrid=1)
-         kMenu("PVselv", "Check", "Sho&w grid")
+         kMenu("PVselv", "Check", "Sho&w grid",,, " (selection area)")
 
       createMenuSelectionAlign()
       createMenuSelectionRotationAspectRatio()
@@ -50687,7 +51582,7 @@ InvokeMenuBarEditorSelection(manuID) {
       }
    } Else If (isVarEqualTo(AnyWindowOpen, 64, 66) && editingSelectionNow=1)
    {
-      kMenu("PVselv", "Add", "&Activate selection mode`tK", "toggleAlphaPaintingMode")
+      kMenu("PVselv", "Add", "&Activate selection mode`tCtrl+K", "toggleAlphaPaintingMode")
    }
 
    showThisMenu("PVselv", 0, 1, manuID)
@@ -50777,7 +51672,7 @@ InvokeMenuBarSelection(manuID) {
       }
       Menu, pvMenuBarSelection, Add, 
       friendly := resultedFilesList[currentFileIndex, 2] ? "De&select" : "&Select"
-      kMenu("pvMenuBarSelection", "Add", friendly " file`tTab", "MenuMarkThisFileNow")
+      kMenu("pvMenuBarSelection", "Add", friendly " file`tTab", "markThisFileNow")
       If (maxFilesIndex<2)
          kMenu("pvMenuBarSelection", "Disable", friendly " file`tTab")
    }
@@ -50805,7 +51700,7 @@ InvokeMenuBarImage(manuID) {
         Try kMenu("pvMenuBarImage", "Add", "&Transform", ":PVimgTransform")
      } Else If (editingSelectionNow=1 && dummy!="mbr")
      {
-        createMenuImageEditSubMenus()
+        createMenuImageEditSubMenus("filters")
         Try kMenu("pvMenuBarImage", "Add", "&Filters", ":PVimgFilters")
         kMenu("pvMenuBarImage", "Add", "Flip selected &horizontally`tShift+H", "FlipSelectedAreaH")
         kMenu("pvMenuBarImage", "Add", "Flip selected &vertically`tShift+V", "FlipSelectedAreaV")
@@ -50813,12 +51708,12 @@ InvokeMenuBarImage(manuID) {
      }
 
      Menu, pvMenuBarImage, Add
-     kMenu("pvMenuBarImage", "Add/Uncheck", "&Use gamma correction", "toggleImgEditGammaCorrect")
+     kMenu("pvMenuBarImage", "Add/Uncheck", "&Use gamma correction", "toggleImgEditGammaCorrect", "image colors")
      If (userimgGammaCorrect=1)
         kMenu("pvMenuBarImage", "Check", "&Use gamma correction")
 
      If (imgEditPanelOpened=1)
-        kMenu("pvMenuBarImage", "Add", "Pic&k color from image`tC", "changeBrushColorPicker")
+        kMenu("pvMenuBarImage", "Add", "Pic&k color from image`tC", "changeBrushColorPicker", "pipette picker")
 
      If !AnyWindowOpen
      {
@@ -50886,7 +51781,9 @@ InvokeMenuBarFind(manuID) {
      kMenu("pvMenuBarFind", "Add", "Searc&h index`tCtrl+F3", "PanelSearchIndex", "files list")
      If userSearchString
      {
-        kMenu("pvMenuBarFind", "Add", "Erase search criteria", "EraseSearchEdit")
+        kMenu("pvMenuBarFind", "Add", "S&earch next`tF3", "MenuSearchNextIndex")
+        kMenu("pvMenuBarFind", "Add", "Search p&revious`tShift+F3", "MenuSearchPrevIndex")
+        kMenu("pvMenuBarFind", "Add", "Erase search &criteria", "EraseSearchEdit")
         Menu, pvMenuBarFind, Add
      }
 
@@ -51008,7 +51905,12 @@ InvokeMenuBarView(manuID) {
 
 InvokeMenuBarEditorTools(manuID) {
   deleteMenus()
-  If isImgEditingNow()
+  If isVarEqualTo(AnyWindowOpen, 31, 24)
+  {
+     kMenu("PVlTools", "Add", "`Options disabled", "dummy")
+     kMenu("PVlTools", "Disable", "Options disabled")
+     showThisMenu("PVlTools", 0, 1, manuID)
+  } Else If isImgEditingNow()
   {
      createMenuLiveTools("mbr")
      showThisMenu("PVlTools", 0, 1, manuID)
@@ -51070,11 +51972,11 @@ InvokeMenuBarHelp(manuID) {
 createMenuNavigation() {
    If (thumbsDisplaying!=1)
    {
-      kMenu("PVnav", "Add/Uncheck", "&Skip missing files", "ToggleSkipDeadFiles")
+      kMenu("PVnav", "Add/Uncheck", "&Skip missing files", "ToggleSkipDeadFiles", "dead inexistent", " in image view")
       If (skipDeadFiles=1)
-         kMenu("PVnav", "Check", "&Skip missing files")
+         kMenu("PVnav", "Check", "&Skip missing files",,, " in image view")
       If (maxFilesIndex<2)
-         kMenu("PVnav", "Disable", "&Skip missing files")
+         kMenu("PVnav", "Disable", "&Skip missing files",,, " in image view")
       Menu, PVnav, Add
    } Else 
    {
@@ -51084,19 +51986,27 @@ createMenuNavigation() {
          kMenu("PVnav", "Check", "&Show files list map on scrollbar click")
       If !(maxFilesIndex>10 && markedSelectFile>1)
          kMenu("PVnav", "Disable", "&Show files list map on scrollbar click")
-      Menu, PVnav, Add,
+      Menu, PVnav, Add
    }
 
-   showThese := (StrLen(mustOpenStartFolder)>3 || maxFilesIndex>1) ? 1 : 0
-   kMenu("PVnav", "Add", "&First`tHome", "FirstPicture")
-   kMenu("PVnav", "Add", "&Previous`tPage down", "PreviousPicture")
-   kMenu("PVnav", "Add", "&Next`tPage up", "NextPicture")
-   kMenu("PVnav", "Add", "&Last`tEnd", "LastPicture")
+   kMenu("PVnav", "Add", "&First`tHome", "FirstPicture",, " image in index")
    If (thumbsDisplaying!=1)
    {
-      Menu, PVnav, Add,
-      kMenu("PVnav", "Add", "Previous &frame`tShift+Page Down", "prevDesiredFrame", "gifs")
-      kMenu("PVnav", "Add", "Ne&xt frame`tShift+Page Up", "nextDesiredFrame", "gifs")
+      kMenu("PVnav", "Add", "&Previous`tPage down", "PreviousPicture",, " image in index")
+      kMenu("PVnav", "Add", "&Next`tPage up", "NextPicture",, " image in index")
+   } Else If (mustPreventMenus=1 && thumbsDisplaying=1)
+   {
+      kMenu("PVnav", "Add", "Select to first in index`tShift+Home", "MenuSelectHomeFiles")
+      kMenu("PVnav", "Add", "Select to last in index`tShift+End", "MenuSelectEndFiles")
+   }
+
+   kMenu("PVnav", "Add", "&Last`tEnd", "LastPicture",, " image in index")
+   kMenu("PVnav", "Add", "&Previously displayed image`tCtrl+Backspace", "jumpPreviousImage")
+   If (thumbsDisplaying!=1)
+   {
+      Menu, PVnav, Add
+      kMenu("PVnav", "Add", "Previous &frame`tShift+Page Down", "MenuPrevDesiredFrame", "gifs tiffs multipage")
+      kMenu("PVnav", "Add", "Ne&xt frame`tShift+Page Up", "MenuNextDesiredFrame", "gifs tiffs multipageNP")
       If (totalFramesIndex<1)
       {
          kMenu("PVnav", "Disable", "Previous &frame`tShift+Page Down")
@@ -51116,30 +52026,46 @@ createMenuNavigation() {
    thisFolder := StrReplace(Trimmer(CurrentSLD), "|")
    imgPath := getIDimage(currentFileIndex)
    OutDir := SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1))
+   showThese := (StrLen(mustOpenStartFolder)>3 || maxFilesIndex>1) ? 1 : 0
+   Menu, PVnav, Add
+   If showThese
+   {
+      kMenu("PVnav", "Add", "&Skip to index`tJ", "PanelJump2index", "frames")
+      kMenu("PVnav", "Add", "Next &random image`tShift+Backspace", "RandomPicture")
+      kMenu("PVnav", "Add", "Pre&vious random image`tBackspace", "PrevRandyPicture", "previous")
+   }
 
-   Menu, PVnav, Add,
-   kMenu("PVnav", "Add", "&Skip to index`tJ", "PanelJump2index", "frames")
-   kMenu("PVnav", "Add", "Next &random image`tShift+Bksp", "RandomPicture")
-   kMenu("PVnav", "Add", "Pre&vious random image`tBksp", "PrevRandyPicture", "previous")
    If (FolderExist(thisFolder) || FolderExist(OutDir) || FileRexists(imgPath))
    {
-      Menu, PVnav, Add,
+      If (thumbsDisplaying=1 && SLDtypeLoaded=1)
+      {
+         Menu, PVnav, Add
+         kMenu("PVnav", "Add", "Open child folder`tCtrl+Page Down", "MenuFolderExplorerBreadDeeper")
+         kMenu("PVnav", "Add", "Open parent folder`tCtrl+Page Up", "MenuFolderExplorerBreadHigher")
+         kMenu("PVnav", "Add", "Next sibling folder`tAlt+Page Down", "MenuFolderExplorerNextSiblings")
+         kMenu("PVnav", "Add", "Previous sibling folder`tAlt+Page Up", "MenuFolderExplorerPrevSiblings")
+      }
+
+      Menu, PVnav, Add
       kMenu("PVnav", "Add", "Open &omnibox to file location`tShift+;", "invokeOmniBoxCurrentFile")
       kMenu("PVnav", "Add", "Folders e&xplorer menu for active file`tShift+F4", "chainInvokerFoldersListMenu")
-      kMenu("PVnav", "Add/UnCheck", "Show folders tree panel`tF4", "PanelFoldersTree")
+      kMenu("PVnav", "Add/UnCheck", "Show folders tree panel`tF4", "MenuPanelFoldersTree", "window treeview directories explore")
       If (folderTreeWinOpen=1)
          kMenu("PVnav", "Check", "Show folders tree panel`tF4")
    }
 
    If !showThese
    {
-      kMenu("PVnav", "Add", "&First`tHome", "FirstPicture")
-      kMenu("PVnav", "Add", "&Previous`tPage down", "PreviousPicture")
-      kMenu("PVnav", "Add", "&Next`tPage up", "NextPicture")
-      kMenu("PVnav", "Add", "&Last`tEnd", "LastPicture")
+      kMenu("PVnav", "Add", "&First`tHome", "FirstPicture",, " image in index")
+      If (thumbsDisplaying!=1)
+      {
+         kMenu("PVnav", "Add", "&Previous`tPage down", "PreviousPicture",, " image in index")
+         kMenu("PVnav", "Add", "&Next`tPage up", "NextPicture",, " image in index")
+      }
+      kMenu("PVnav", "Add", "&Last`tEnd", "LastPicture",, " image in index")
       kMenu("PVnav", "Add", "&Skip to index`tJ", "PanelJump2index", "frames")
-      kMenu("PVnav", "Add", "Next &random image`tShift+Bksp", "RandomPicture")
-      kMenu("PVnav", "Add", "Pre&vious random image`tBksp", "PrevRandyPicture", "previous")
+      kMenu("PVnav", "Add", "Next &random image`tShift+Backspace", "RandomPicture")
+      kMenu("PVnav", "Add", "Pre&vious random image`tBackspace", "PrevRandyPicture", "previous")
    }
 }
 
@@ -51206,10 +52132,12 @@ createMenuAlphaMask(givenMenu:="PValpha") {
       kMenu(givenMenu, "Add", "&Define alpha mask`tM", "PanelSoloAlphaMasker")
 
    infoMask := defineCurrentAlphaMask()
-   kMenu(givenMenu, "Add", "Import clipboard as alpha mask", "importAlphaMaskFromClipboard")
-   kMenu(givenMenu, "Add", "Copy to clipboard", "CopyAlphaMask2clippy")
+   If (liveDrawingBrushTool!=1)
+      kMenu(givenMenu, "Add", "Import clipboard as alpha mask", "importAlphaMaskFromClipboard")
+
+   kMenu(givenMenu, "Add", "Copy to clipboard", "CopyAlphaMask2clippy",, " alpha mask bitmap")
    If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
-      kMenu(givenMenu, "Disable", "Copy to clipboard")
+      kMenu(givenMenu, "Disable", "Copy to clipboard",, " alpha mask bitmap")
 
    If (alphaMaskingMode>1)
    {
@@ -51243,16 +52171,18 @@ createMenuHelpQPV() {
       Menu, PVhelp, Add,
    }
 
-   kMenu("PVhelp", "Add", "&Search menu options`t;", "PanelQuickSearchMenuOptions", "keyboard")
+   kMenu("PVhelp", "Add", "&Search menu options`t;", "PanelQuickSearchMenuOptions", "keyboard fast help where")
    kMenu("PVhelp", "Add", "&Keyboard shortcuts`tF1", "PanelHelpWindow", "keyboard shortcuts")
    kMenu("PVhelp", "Add", "Session &events journal`tShift+``", "PanelJournalWindow", "journal history errors logs")
    kMenu("PVhelp", "Add", "&Command line options", "MenuCmdLineHelp")
-   kMenu("PVhelp", "Add", "&Video demos", "MenuOpenVideoDemos")
+   kMenu("PVhelp", "Add", "&Video demos", "MenuOpenVideoDemos", "youtube recordings")
    If (TouchScreenMode=1)
       kMenu("PVhelp", "Add", "&Viewport help map", "MenuDrawViewportHelpMap")
 
    Menu, PVhelp, Add,
-   kMenu("PVhelp", "Add", "C&heck for updates", "checkForUpdatesNow")
+   kMenu("PVhelp", "Add", "C&heck for updates", "checkForUpdatesNow", "version")
+   kMenu("PVhelp", "Add", "&Official QPV page", "OpenGitHub", "site")
+   kMenu("PVhelp", "Add", "&Make a donation", "DonateNow", "paypal")
    kMenu("PVhelp", "Add", "&About", "PanelAboutWindow", "author developer")
 }
 
@@ -51344,6 +52274,75 @@ MenuCmdLineHelp() {
    PanelHelpWindow("cmdu")
 }
 
+createMenuBonusNoImageOpened() {
+   kMenu("PVmenu", "Add", "O&pen QPV settings folder", "openSettingsDir")
+   kMenu("PVmenu", "Add", "&Close everything`tCtrl+F4", "closeDocuments")
+   If (maxFilesIndex>1 && CurrentSLD)
+      kMenu("PVmenu", "Add", "&Identify favourited images in the list", "findFavesInList", "faved faves stared")
+
+   If (thumbsDisplaying=1)
+   {
+      If (mustPreventMenus=1 && showMainMenuBar=1)
+      {
+         createMenuSlideshows()
+         kMenu("PVmenu", "Add", "&Slideshow", ":PVslide")
+      } Else 
+         kMenu("PVmenu", "Add", "&Play slideshow now", "MenuGoPlaySlidesNow")
+
+      kMenu("PVmenu", "Add", "&Edit image captions`tShift+N", "PanelEditImgCaption", "modify annotations")
+      keywords := (showImgAnnotations=1) ? "hide" : "display"
+      kMenu("PVmenu", "Add/Uncheck", "&Show image captions`tN", "ToggleImgCaptions", keywords " viewport annotations")
+      If (showImgAnnotations=1)
+         kMenu("PVmenu", "Check", "&Show image captions`tN")
+
+      kMenu("PVmenu", "Add/Uncheck", "&Two lines status bar", "ToggleMultiLineStatus", "statusbar info")
+      If (multilineStatusBar=1)
+         kMenu("PVmenu", "Check", "&Two lines status bar")
+   }
+
+   kMenu("PVmenu", "Add/Uncheck", "Allow WIC loader", "ToggleWICloader")
+   If (allowWICloader=1)
+      kMenu("PVmenu", "Check", "Allow WIC loader")
+
+   userSeenSlideImages := userSeenSessionImagesArray.Count()
+   If (userSeenSlideImages>1 && maxFilesIndex>2 && CurrentSLD)
+      kMenu("PVmenu", "Add", "Select seen images in current session", "selectSeenFilesSession")
+
+   kMenu("PVmenu", "Add/Uncheck", "Allow FreeImage loader", "ToggleFIMloader")
+   kMenu("PVmenu", "Add/Uncheck", "Private mode UI", "TogglePrivateMode")
+   If (userPrivateMode=1)
+      kMenu("PVmenu", "Check", "Private mode UI")
+   If (allowFIMloader=1)
+      kMenu("PVmenu", "Check", "Allow FreeImage loader")
+
+   If (isImgEditingNow()=1 && animGIFsSupport=1)
+   {
+      kMenu("PVmenu", "Add", "&Increase GIFs playback speed`tAlt+.", "MenuIncGIFspeed",,,1)
+      kMenu("PVmenu", "Add", "&Decrease GIFs playback speed`tAlt+,", "MenuDecGIFspeed",,,1)
+   }
+}
+
+createMenuBonusImageLiveEditMode() {
+   kMenu("PVtActFile", "Add", "&Open with external app (menu)", "OpenThisFileMenu")
+   kMenu("PVtActFile", "Add", "File prope&rties (Explorer)", "OpenFileProperties")
+   kMenu("PVtActFile", "Add", "&New QPV instance`tCtrl+Shift+N", "OpenNewQPVinstance")
+   kMenu("PVtActFile", "Add", "Cop&y file path(s) as text", "CopyImagePath", "clipboard")
+   kMenu("PVtActFile", "Add", "Open file in a new &QPV instance", "SoloNewQPVinstance")
+   kMenu("PVtActFile", "Add", "&Explore the containing folder", "OpenThisFileFolder", "external open")
+
+   If !isVarEqualTo(AnyWindowOpen, 31, 24)
+   {
+      createMenuImageEditSubMenus("filters")
+      Try kMenu("PVmenu", "Add", "&Image filters", ":PVimgFilters")
+   }
+
+   kMenu("PVmenu", "Add", "File actions", ":PVtActFile")
+   kMenu("PVmenu", "Add", "Pic&k color from image`tC", "changeBrushColorPicker", "picker pipette")
+   kMenu("PVmenu", "Add/Uncheck", "&Apply image gamma correction", "toggleImgEditGammaCorrect", "image colors")
+   If (userimgGammaCorrect=1)
+      kMenu("PVmenu", "Check", "&Apply image gamma correction")
+}
+
 createMenuSoloFile(modus:=0) {
    Try Menu, PVtActFile, Delete
    kMenu("PVtActFile", "Add", "&Open with external app`tO", "OpenThisFileMenu")
@@ -51379,14 +52378,15 @@ createMenuSoloFile(modus:=0) {
 
       friendly := resultedFilesList[currentFileIndex, 2] ? "De&select" : "&Select"
       If !markedSelectFile
-         kMenu("PVfilesActs", "Add", friendly " file`tTab", "MenuMarkThisFileNow")
+         kMenu("PVfilesActs", "Add", friendly " file`tTab", "markThisFileNow")
 
       kMenu("PVtActFile", "Add", "Remove inde&x entry`tAlt+Delete", "singleInListEntriesRemover")
       kMenu("PVtActFile", "Add", "&Modify index entry`tCtrl+F2", "PanelUpdateThisFileIndex")
       Menu, PVtActFile, Add
    }
 
-   kMenu("PVtActFile", "Add", "&Delete file`tDelete", "DeleteActivePicture")
+   kMenu("PVtActFile", "Add", "&Delete file`tCtrl+Delete", "DeleteActivePicture")
+   kMenu("PVtActFile", "Add", "&Delete file and index entry`tShift+Delete", "DeleteActiveImgFileAndEntry")
    kMenu("PVtActFile", "Add", "&Rename file`tShift+F2", "SingularRenameFile")
    ; If (thumbsDisplaying!=1 && modus!="simple")
       kMenu("PVtActFile", "Add", "&File information`tAlt+Enter", "PanelImageInfos", "show details properties image")
@@ -51405,32 +52405,110 @@ MenuDecVProtation() {
    changeImgRotationInVP(-1)
 }
 
+MenuLIncVProtation() {
+   changeImgRotationInVP(1, 1)
+}
+
+MenuLDecVProtation() {
+   changeImgRotationInVP(-1, 1)
+}
+
 MenuResetVProtation() {
    vpIMGrotation := 0
    dummyTimerDelayiedImageDisplay(50)
 }
 
+MenuChangeIncContrast() {
+   ChangeGammos(-1)
+}
+MenuChangeDecContrast() {
+   ChangeGammos(1)
+}
+MenuChangeIncSaturat() {
+   ChangeSaturation(1)
+}
+MenuChangeDecSaturat() {
+   ChangeSaturation(-1)
+}
+MenuChangeIncGamma() {
+   ChangeRealGamma(1)
+}
+MenuChangeDecGamma() {
+   ChangeRealGamma(-1)
+}
+MenuChangeIncBright() {
+   ChangeLumos(1)
+}
+MenuChangeDecBright() {
+   ChangeLumos(-1)
+}
+MenuIncBrushSize() {
+   changeBrushSize(1)
+}
+MenuIncBrushAngle() {
+   changeBrushRatioAngle(1, 2)
+}
+MenuDecBrushAngle() {
+   changeBrushRatioAngle(-1, 2)
+}
+MenuIncBrushAspectRatio() {
+   userChangeBrushRatio(0, 1)
+}
+MenuDecBrushAspectRatio() {
+   userChangeBrushRatio(0, -1)
+}
+MenuIncBrushSoftness() {
+   userChangeBrushSoft(0, 1)
+}
+MenuIncBrushWetness() {
+   changeBrushWetness(1)
+}
+MenuIncBrushOpacity() {
+   changeBrushOpacity(-1,0)
+}
+MenuDecBrushSize() {
+   changeBrushSize(-1)
+}
+MenuDecBrushSoftness() {
+   userChangeBrushSoft(0, -1)
+}
+MenuDecBrushWetness() {
+   changeBrushWetness(-1)
+}
+MenuDecBrushOpacity() {
+   changeBrushOpacity(1,0)
+}
+
 createMenuImgVProtation() {
-   kMenu("PVimgVProt", "Add", "&Increase rotation by 15°`t0", "MenuIncVProtation")
-   kMenu("PVimgVProt", "Add", "&Decrease rotation by 15°`t9", "MenuDecVProtation")
+   kMenu("PVimgVProt", "Add", "&Rotate by +15°`t0", "MenuIncVProtation",, " (image)", 1)
+   kMenu("PVimgVProt", "Add", "R&otate by -15°`t9", "MenuDecVProtation",, " (image)", 1)
+   If (mustPreventMenus=1)
+   {
+      kMenu("PVimgVProt", "Add", "&Rotate by +1°`tAlt+0", "MenuLIncVProtation",, " (image)", 1)
+      kMenu("PVimgVProt", "Add", "&Rotate by -1°`tAlt+9", "MenuLDecVProtation",, " (image)", 1)
+   }
+
    If (vpIMGrotation>0)
    {
-      kMenu("PVimgVProt", "Add", "&Reset rotation`t\", "MenuResetVProtation")
+      kMenu("PVimgVProt", "Add", "&Reset rotation`t\", "MenuResetVProtation",, " (image)")
       Return
    }
 
-   Menu, PVimgVProt, Add
-   kMenu("PVimgVProt", "Add", "0°", "MenuSetVProt")
-   kMenu("PVimgVProt", "Add", "23°", "MenuSetVProt")
-   kMenu("PVimgVProt", "Add", "45°", "MenuSetVProt")
-   kMenu("PVimgVProt", "Add", "90°", "MenuSetVProt")
-   kMenu("PVimgVProt", "Add", "135°", "MenuSetVProt")
-   kMenu("PVimgVProt", "Add", "180°", "MenuSetVProt")
-   kMenu("PVimgVProt", "Add", "225°", "MenuSetVProt")
-   kMenu("PVimgVProt", "Add", "270°", "MenuSetVProt")
-   kMenu("PVimgVProt", "Add", "315°", "MenuSetVProt")
-   kMenu("PVimgVProt", "Add", vpIMGrotation "°", "dummy")
-   kMenu("PVimgVProt", "Check/Disable", vpIMGrotation "°")
+   If (mustPreventMenus!=1)
+   {
+      Menu, PVimgVProt, Add
+      kMenu("PVimgVProt", "Add", "0°", "MenuSetVProt")
+      kMenu("PVimgVProt", "Add", "23°", "MenuSetVProt")
+      kMenu("PVimgVProt", "Add", "45°", "MenuSetVProt")
+      kMenu("PVimgVProt", "Add", "90°", "MenuSetVProt")
+      kMenu("PVimgVProt", "Add", "135°", "MenuSetVProt")
+      kMenu("PVimgVProt", "Add", "180°", "MenuSetVProt")
+      kMenu("PVimgVProt", "Add", "225°", "MenuSetVProt")
+      kMenu("PVimgVProt", "Add", "270°", "MenuSetVProt")
+      kMenu("PVimgVProt", "Add", "315°", "MenuSetVProt")
+      kMenu("PVimgVProt", "Add", vpIMGrotation "°", "dummy")
+      kMenu("PVimgVProt", "Check/Disable", vpIMGrotation "°")
+   }
 }
 
 createMenuNavBox() {
@@ -51440,7 +52518,7 @@ createMenuNavBox() {
       kMenu("PvImgAdapt", "Add", "C&ycle view modes`tL", "toggleListViewModeThumbs")
 
    If (maxFilesIndex>0 && !AnyWindowOpen)
-      kMenu("PvImgAdapt", "Add", infoThumbsMode "`tEnter/MClick", "MenuDummyToggleThumbsMode")
+      kMenu("PvImgAdapt", "Add", infoThumbsMode "`tEnter", "MenuDummyToggleThumbsMode")
 
    If (mustRecordSeenImgs=1 && thumbsDisplaying=1)
    {
@@ -51452,7 +52530,7 @@ createMenuNavBox() {
    }
 
    keyword := (folderTreeWinOpen=1) ? " hide" : " display"
-   kMenu("PvImgAdapt", "Add/Uncheck", "Show &folders tree panel`tF4", "MenuPanelFoldersTree", "window treeview explore" keyword)
+   kMenu("PvImgAdapt", "Add/Uncheck", "Show &folders tree panel`tF4", "MenuPanelFoldersTree", "window treeview directories explore" keyword)
    If (folderTreeWinOpen=1)
       kMenu("PvImgAdapt", "Check", "Show &folders tree panel`tF4")
 
@@ -51480,32 +52558,34 @@ createMenuNavBox() {
 }
 
 createMenuImgSizeAdapt(dummy:=0) {
-   keyu := (drawingShapeNow=1) ? "" : "`tT"
-   kMenu("PvImgAdapt", "Add", "C&ycle adapt to window modes" keyu, "ToggleImageSizingMode")
+   keyu := (drawingShapeNow=1 || liveDrawingBrushTool=1 && thumbsDisplaying!=1) ? "" : "`tT"
+   kMenu("PvImgAdapt", "Add", "C&ycle adapt to window modes" keyu, "ToggleImageSizingMode",, " (image)", 1)
+   kMenu("PvImgAdapt", "Add", "Cycle custom zoom modes`tCtrl+/", "toggleCustomZLmodes",,,1)
    Menu, PvImgAdapt, Add
-   kMenu("PvImgAdapt", "Add/Uncheck", "&Adapt all to fit window`t/", "MenuSetImageAdaptAll")
-   kMenu("PvImgAdapt", "Add/Uncheck", "Adapt only &large images", "MenuSetImageAdaptLarge")
-   kMenu("PvImgAdapt", "Add/Uncheck", "Custom &zoom level (" Round(zoomLevel*100) "%)", "MenuSetImageCustomZoom")
-   kMenu("PvImgAdapt", "Add/Uncheck", "Stretched to &window", "MenuSetImageStretchedWin")
-   If (IMGresizingMode=5)
-      kMenu("PvImgAdapt", "Check", "Stretched to &window")
+   kMenu("PvImgAdapt", "Add/Uncheck", "&Adapt all to fit window`t/", "MenuSetImageAdaptAll",, " (image)")
+   If (imgEditPanelOpened!=1)
+   {
+      kMenu("PvImgAdapt", "Add/Uncheck", "Adapt only &large images", "MenuSetImageAdaptLarge",, " (image)")
+      If (IMGresizingMode=2)
+         kMenu("PvImgAdapt", "Check", "Adapt only &large images",,, " (image)")
+   
+      kMenu("PvImgAdapt", "Add/Uncheck", "Stretched to &window", "MenuSetImageStretchedWin",, " (image)")
+      If (IMGresizingMode=5)
+         kMenu("PvImgAdapt", "Check", "Stretched to &window",,, " (image)")
+   }
 
-   If (drawingShapeNow=1 || imgEditPanelOpened=1)
-      kMenu("PvImgAdapt", "Disable", "Stretched to &window")
-
-   kMenu("PvImgAdapt", "Add/Uncheck", "&Adapt to window width`tNUM *", "toggleCustomZLadaptW")
-   kMenu("PvImgAdapt", "Add/Uncheck", "&Adapt to window height`tNUM *", "toggleCustomZLadaptH")
+   kMenu("PvImgAdapt", "Add/Uncheck", "Custom &zoom level (" Round(zoomLevel*100) "%)", "MenuSetImageCustomZoom",, " (image)")
+   kMenu("PvImgAdapt", "Add/Uncheck", "&Adapt to window width`tNumpad *", "toggleCustomZLadaptW",, " (image)")
+   kMenu("PvImgAdapt", "Add/Uncheck", "&Adapt to window height`tNumpad *", "toggleCustomZLadaptH",, " (image)")
    If (customZoomAdaptMode=1 && IMGresizingMode=4)
-      kMenu("PvImgAdapt", "Check", "&Adapt to window width`tNUM *")
+      kMenu("PvImgAdapt", "Check", "&Adapt to window width`tNumpad *",,, " (image)")
    Else If (customZoomAdaptMode=2 && IMGresizingMode=4)
-      kMenu("PvImgAdapt", "Check", "&Adapt to window height`tNUM *")
+      kMenu("PvImgAdapt", "Check", "&Adapt to window height`tNumpad *",,, " (image)")
 
    If (IMGresizingMode=1)
-      kMenu("PvImgAdapt", "Check", "&Adapt all to fit window`t/")
-   Else If (IMGresizingMode=2)
-      kMenu("PvImgAdapt", "Check", "Adapt only &large images")
+      kMenu("PvImgAdapt", "Check", "&Adapt all to fit window`t/",,, " (image)")
    Else If (IMGresizingMode=4 && customZoomAdaptMode=0)
-      kMenu("PvImgAdapt", "Check", "Custom &zoom level (" Round(zoomLevel*100) "%)")
+      kMenu("PvImgAdapt", "Check", "Custom &zoom level (" Round(zoomLevel*100) "%)",,, " (image)")
 
    If (mustPreventMenus!=1)
    {
@@ -51517,7 +52597,7 @@ createMenuImgSizeAdapt(dummy:=0) {
          kMenu("PvImgAdapt", "Add", "25%", "MenuSetImgZoom")
       }
       kMenu("PvImgAdapt", "Add", "50%", "MenuSetImgZoom")
-      kMenu("PvImgAdapt", "Add", "100% (original size)`tNUM *", "MenuSetImgZoom")
+      kMenu("PvImgAdapt", "Add", "100% (original size)`tNumpad *", "MenuSetImgZoom")
       kMenu("PvImgAdapt", "Add", "200%", "MenuSetImgZoom")
       If (dummy!="bonus")
       {
@@ -51559,9 +52639,9 @@ createMenuImgSizeAdapt(dummy:=0) {
             kMenu("PVview", "Add", "Viewport and color adjustments panel`tU", "PanelColorsAdjusterWindow")
 
          kMenu("PVview", "Add", "Reset vie&wport adjustments`t\", "ResetImageView", "image")
-         kMenu("PVview", "Add/Uncheck", "Centered &alignment`tA", "ToggleIMGalign", "viewport image position")
+         kMenu("PVview", "Add/Uncheck", "Centered &alignment`tA", "ToggleIMGalign", "viewport image position", " (image)")
          If (imageAligned=5)
-            kMenu("PVview", "Check", "Centered &alignment`tA")
+            kMenu("PVview", "Check", "Centered &alignment`tA",,, " (image)")
 
          If (thumbsDisplaying!=1)
          {
@@ -51577,14 +52657,15 @@ createMenuImgSizeAdapt(dummy:=0) {
          If (showViewPortGrid=1)
             kMenu("PVview", "Check", "Show viewport &grid")
 
-         kMenu("PVview", "Add", "C&ycle histogram modes`tShift+G", "ToggleImgHistogram")
-         kMenu("PVview", "Add", "C&ycle simulate color depths`tQ", "ToggleImgColorDepth")
-         kMenu("PVview", "Add", "C&ycle colors display modes`tF", "ToggleImgFX")
+         kMenu("PVview", "Add", "C&ycle histogram modes`tG", "ToggleImgHistogram",,,1)
+         keyu := (liveDrawingBrushTool=1 && thumbsDisplaying!=1 || AnyWindowOpen=63) ? "" : "`tQ"
+         kMenu("PVview", "Add", "C&ycle simulate color depths" keyu, "ToggleImgColorDepth",,,1)
+         kMenu("PVview", "Add", "C&ycle colors display modes`tF", "ToggleImgFX",,,1)
 
          infoThumbsList := defineListViewModes()
          infoThumbsMode := (thumbsDisplaying=1) ? "Switch to image view" : "Switch to " infoThumbsList " list view"
          If (maxFilesIndex>0 && !AnyWindowOpen)
-            kMenu("PVview", "Add", infoThumbsMode "`tEnter/MClick", "MenuDummyToggleThumbsMode")
+            kMenu("PVview", "Add", infoThumbsMode "`tEnter", "MenuDummyToggleThumbsMode")
 
          If (maxFilesIndex>1 && !AnyWindowOpen && prevOpenedWindow[2])
             kMenu("PVview", "Add", "Open pre&vious panel`tF8", "openPreviousPanel", "show")
@@ -51604,9 +52685,9 @@ createMenuImgSizeAdapt(dummy:=0) {
          kMenu("PvImgAdapt", "Add", "&More options", ":PVview")
       } Else
       {
-         kMenu("PvImgAdapt", "Add/Uncheck", "Centered &alignment`tA", "ToggleIMGalign", "viewport image position")
+         kMenu("PvImgAdapt", "Add/Uncheck", "Centered &alignment`tA", "ToggleIMGalign", "viewport image position", " (image)")
          If (imageAligned=5)
-            kMenu("PvImgAdapt", "Check", "Centered &alignment`tA")
+            kMenu("PvImgAdapt", "Check", "Centered &alignment`tA",,, " (image)")
 
          If (thumbsDisplaying!=1)
          {
@@ -51642,7 +52723,7 @@ createMenuMainPreferences() {
          kMenu("PVperfs", "Check", "&Downscale images to viewport dimensions")
    }
    kMenu("PVperfs", "Add/Uncheck", "&Perform dithering on color depth changes", "ToggleImgColorDepthDithering")
-   kMenu("PVperfs", "Add/Uncheck", "&Apply gamma correction", "toggleImgEditGammaCorrect")
+   kMenu("PVperfs", "Add/Uncheck", "&Apply gamma correction", "toggleImgEditGammaCorrect", "image colors")
    kMenu("PVperfs", "Add/Uncheck", "&Load Camera RAW files at high quality", "ToggleRAWquality")
    If (userimgGammaCorrect=1)
       kMenu("PVperfs", "Check", "&Apply gamma correction")
@@ -51676,7 +52757,18 @@ createMenuMainPreferences() {
          kMenu("PVprefs", "Disable", "Auto-play an&imated GIFs")
    }
 
-   kMenu("PVprefs", "Add", "&Quick file actions", "PanelQuickMoveConfigure", "index list")
+   kMenu("PVprefs", "Add/Uncheck", "Allo&w custom keyboard shortcuts", "ToggleCustomKBDsMode")
+   If (allowCustomKeys=1)
+      kMenu("PVprefs", "Check", "Allo&w custom keyboard shortcuts")
+   kMenu("PVprefs", "Add", "C&ustom keyboard shortcuts", "PanelCustomKeysMiniManager", "customize defined users manage personal")
+   kMenu("PVprefs", "Add", "&Quick file actions", "PanelQuickMoveConfigure", "index list fast")
+   If (mustPreventMenus=1)
+   {
+      kMenu("PVprefs", "Add/Uncheck", "&Toggle Quick file action shortcuts", "toggleQuickMoveActionKeys", "index list fast")
+      If (allowUserQuickFileActions=1)
+         kMenu("PVprefs", "Check", "&Toggle Quick file action shortcuts")
+   }
+
    kMenu("PVprefs", "Add/Uncheck", "&Record seen images", "ToggleRecordSeenImages", "history")
    If (mustRecordSeenImgs=1)
       kMenu("PVprefs", "Check", "&Record seen images")
@@ -51689,9 +52781,7 @@ createMenuMainPreferences() {
 
    Menu, PVprefs, Add, 
    If (mustRecordSeenImgs=1)
-   {
       kMenu("PVprefs", "Add", "Seen images database options", "PanelSeenIMGsOptions")
-   }
 
    If FolderExist(thumbsCacheFolder)
       kMenu("PVprefs", "Add", "Erase cached thumbnails", "PanelfolderThanEraseThumbsCache")
@@ -51743,24 +52833,22 @@ createMenuMainView() {
       {
          infoThumbZoom := thumbsColumns " | " thumbsW "x" thumbsH " px" ; " (" Round(thumbsZoomLevel*100) "%)"
          kMenu("PVview", "Add", "&Cycle aspect ratios`tT", "ToggleThumbsAratio")
-         Try kMenu("PVview", "Add", defineThumbsAratio(), "ToggleThumbsAratio")
+         Try kMenu("PVview", "Add", defineThumbsAratio(), "dummy")
          Try kMenu("PVview", "Disable", defineThumbsAratio())
          Menu, PVview, Add
          kMenu("PVview", "Add", "&Set columns and other options`tU", "PanelSetThumbColumnOptions")
          ; kMenu("PVview", "Disable", "Thumbnails columns and size:")
-         kMenu("PVview", "Add", infoThumbZoom, "ToggleThumbsAratio")
+         kMenu("PVview", "Add", infoThumbZoom, "dummy")
          kMenu("PVview", "Disable", infoThumbZoom)
       }
    } Else
    {
       createMenuImgSizeAdapt()
-      If !AnyWindowOpen
-         createMenuImgVProtation()
-
+      createMenuImgVProtation()
       If (InStr(currIMGdetails.PixelFormat, "TONE-MAPPED") && !AnyWindowOpen)
          kMenu("PVview", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw")
 
-      If !AnyWindowOpen
+      If (!AnyWindowOpen || isNowAlphaPainting()!=1 && imgEditPanelOpened=1 && AnyWindowOpen!=24 && AnyWindowOpen!=31)
          kMenu("PVview", "Add", "Viewport and color adjustments panel`tShift+U", "PanelColorsAdjusterWindow")
 
       ; createMenuVPhudHisto()
@@ -51770,7 +52858,7 @@ createMenuMainView() {
       If (A_PtrSize=4)
          kMenu("PVview", "Add", "Pi&xel format mode: " friendlyPix, "ToggleCorePixFmt")
 
-      If !AnyWindowOpen
+      ; If (!AnyWindowOpen || mustPreventMenus=1)
          kMenu("PVview", "Add", "&Rotation ("vpIMGrotation "°)", ":PVimgVProt")
       kMenu("PVview", "Add", "&Zoom and adapt modes", ":PvImgAdapt")
    }
@@ -51811,14 +52899,53 @@ createMenuMainView() {
 
    If (thumbsDisplaying!=1 || thumbsListViewMode=1)
       kMenu("PVview", "Add", "Reset vie&wport adjustments`t\", "ResetImageView", "image")
+   If (mustPreventMenus=1)
+      kMenu("PVview", "Add", "Deep reset of vie&wport adjustments`tCtrl+\", "HardResetImageView", "image")
 
+   keyword := (showViewPortGrid=1) ? "hide" : "display"
    If (mustPreventMenus=1 && thumbsDisplaying!=1)
    {
-      keyword := (showViewPortGrid=1) ? "hide" : "display"
-      kMenu("PVview", "Add", "Increase viewport grid size`tAlt+[+]", "MenuIncVPgridSize")
-      kMenu("PVview", "Add", "Decrease viewport grid size`tAlt+[-]", "MenuDecVPgridSize")
+      kMenu("PVview", "Add", "Increase viewport grid size`tAlt+=", "MenuIncVPgridSize",,,1)
+      kMenu("PVview", "Add", "Decrease viewport grid size`tAlt+-", "MenuDecVPgridSize",,,1)
    }
  
+   If (mustPreventMenus=1)
+   {
+      If (thumbsDisplaying=1)
+      {
+         If (thumbsListViewMode>1)
+         {
+            kMenu("PVview", "Add", "Increase viewport text size`tCtrl+=", "MenuChangeOSDZoomPlus", "disability handicap eyes eyesight large",,1)
+            kMenu("PVview", "Add", "Decrease viewport text size`tCtrl+-", "MenuChangeOSDZoomMinus", "disability handicap eyes eyesight large",,1)
+         } Else
+         {
+            kMenu("PVview", "Add", "Decrease thumbnails size`t=", "MenuChangeImgZoomPlus")
+            kMenu("PVview", "Add", "Increase thumbnails size`t-", "MenuChangeImgZoomMinus")
+         }
+      } Else
+      {
+         kMenu("PVview", "Add", "Zoom in (image)`t=", "MenuChangeImgZoomPlus",,, 1)
+         kMenu("PVview", "Add", "Zoom out (image)`t-", "MenuChangeImgZoomMinus",,, 1)
+      }
+
+      keyu := (liveDrawingBrushTool=1 && thumbsDisplaying!=1) ? "" : "`tShift+]"
+      kMenu("PVview", "Add", "Increase image contrast" keyu, "MenuChangeIncContrast",,, 1)
+      keyu := (liveDrawingBrushTool=1 && thumbsDisplaying!=1) ? "" : "`tShift+["
+      kMenu("PVview", "Add", "Decrease image contrast" keyu, "MenuChangeDecContrast",,, 1)
+      keyu := (liveDrawingBrushTool=1 && thumbsDisplaying!=1) ? "" : "`tCtrl+]"
+      kMenu("PVview", "Add", "Increase image saturation" keyu, "MenuChangeIncSaturat",,, 1)
+      keyu := (liveDrawingBrushTool=1 && thumbsDisplaying!=1) ? "" : "`tCtrl+["
+      kMenu("PVview", "Add", "Decrease image saturation" keyu, "MenuChangeDecSaturat",,, 1)
+      keyu := (liveDrawingBrushTool=1 && thumbsDisplaying!=1) ? "" : "`tAlt+]"
+      kMenu("PVview", "Add", "Increase image gamma" keyu, "MenuChangeIncGamma",,, 1)
+      keyu := (liveDrawingBrushTool=1 && thumbsDisplaying!=1) ? "" : "`tAlt+["
+      kMenu("PVview", "Add", "Decrease image gamma" keyu, "MenuChangeDecGamma",,, 1)
+      keyu := (liveDrawingBrushTool=1 && thumbsDisplaying!=1) ? "" : "`t]"
+      kMenu("PVview", "Add", "Increase image brightness" keyu, "MenuChangeIncBright",,, 1)
+      keyu := (liveDrawingBrushTool=1 && thumbsDisplaying!=1) ? "" : "`t["
+      kMenu("PVview", "Add", "Decrease image brightness" keyu, "MenuChangeDecBright",,, 1)
+   }
+
    If (thumbsDisplaying!=1)
    {
       kMenu("PVview", "Add/Uncheck", "Show viewport &grid", "toggleViewPortGridu", keyword)
@@ -51832,7 +52959,7 @@ createMenuMainView() {
             kMenu("PVview", "Check", "Fi&xed grid size")
       }
 
-      If (!AnyWindowOpen || imgEditPanelOpened=1 && AnyWindowOpen!=24 && AnyWindowOpen!=31)
+      If (!AnyWindowOpen || isNowAlphaPainting()!=1 && imgEditPanelOpened=1 && AnyWindowOpen!=24 && AnyWindowOpen!=31)
          kMenu("PVview", "Add", "Configure viewport &grid", "PanelConfigVPgrid")
 
       If !AnyWindowOpen
@@ -51951,11 +53078,10 @@ createMenuCurrentFilesActs(dummy:=0) {
    Menu, PVfilesActs, Add, 
    kMenu("PVfilesActs", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
    kMenu("PVfilesActs", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs")
-   kMenu("PVfilesActs", "Add", "Join images into...", "PanelCombineImagesMultipage", "pdf create document")
+   If (markedSelectFile || dummy!="rclick")
+      kMenu("PVfilesActs", "Add", "Join images into...", "PanelCombineImagesMultipage", "pdf create document")
    If (currIMGdetails.Frames<2 && !markedSelectFile)
       kMenu("PVfilesActs", "Disable", "Extract frames/pa&ges")
-   If !markedSelectFile
-      kMenu("PVfilesActs", "Disable", "Join images into...")
 
    If (!markedSelectFile && FileRexists(resultedFilesList[currentFileIndex, 1]) && thumbsDisplaying=1)
    {
@@ -51967,33 +53093,39 @@ createMenuCurrentFilesActs(dummy:=0) {
 
    createMenuImageFileActions("PVtFileImgAct")
    kMenu("PVfilesActs", "Add", "Modify image(s)", ":PVtFileImgAct")
-   Menu, PVfilesActs, Add, 
+   Menu, PVfilesActs, Add
    If markedSelectFile
-      kMenu("PVfilesActs", "Add", "Remove file inde&x entries`tDelete", "InListMultiEntriesRemover", "erase")
+      kMenu("PVfilesActs", "Add", "Remove file inde&x entries", "InListMultiEntriesRemover", "erase")
 
-   kMenu("PVfilesActs", "Add", "&Delete file(s)`tDelete", "DeletePicture", "erase")
+   keyu := (thumbsDisplaying!=1 && editingSelectionNow=1) ? "" : "`tDelete"
+   kMenu("PVfilesActs", "Add", "&Delete file(s)" keyu, "DeletePicture", "erase")
    kMenu("PVfilesActs", "Add", "&Rename file(s)`tF2", "PanelRenameThisFile")
    If (markedSelectFile>1)
       kMenu("PVfilesActs", "Add", "Structured file operations", "PanelStructuredCopyMoveWindow", "hierarchy backup copy move folders directories dirs")
-   kMenu("PVfilesActs", "Add", "&Move file(s) to...`tM", "PanelMoveCopyFiles")
+
+   keyu := (thumbsDisplaying!=1 && editingSelectionNow=1) ? "" : "`tM"
+   kMenu("PVfilesActs", "Add", "&Move file(s) to..." keyu, "PanelMoveCopyFiles")
    kMenu("PVfilesActs", "Add", "&Copy file(s) to...`tC", "InvokeCopyFiles")
-   Menu, PVfilesActs, Add,
+   Menu, PVfilesActs, Add
    If markedSelectFile
    {
       kMenu("PVfilesActs", "Add", "Re&group dispersed files", "regroupSelectedFiles")
-      kMenu("PVfilesActs", "Add", "&Calculate total files size`tShift+L", "CalculateSelectedFilesSizes", "file details")
-      kMenu("PVfilesActs", "Add", "Revie&w selected files`tR", "PanelReviewSelectedFiles")
+      keyu := (thumbsDisplaying=1) ? "`tShift+L" : ""
+      kMenu("PVfilesActs", "Add", "&Calculate total files size" keyu, "CalculateSelectedFilesSizes", "file details")
+      keyu := (thumbsDisplaying=1) ? "`tR" : ""
+      kMenu("PVfilesActs", "Add", "Revie&w selected files" keyu, "PanelReviewSelectedFiles")
    } Else kMenu("PVfilesActs", "Add", "&File information`tAlt+Enter", "PanelImageInfos", "properties image details")
 
    If !markedSelectFile
    {
       friendly := resultedFilesList[currentFileIndex, 2] ? "De&select" : "&Select"
-      kMenu("PVfilesActs", "Add", friendly " file`tTab", "MenuMarkThisFileNow")
+      kMenu("PVfilesActs", "Add", friendly " file`tTab", "markThisFileNow")
       If (dummy="rclick")
       {
          friendly := resultedFilesList[currentFileIndex, 5] ? "Remove from" : "Add to"
          kMenu("PVfilesActs", "Add", friendly " f&avourites list`tB", "ToggleImgFavourites")
          kMenu("PVfilesActs", "Add", "Remove inde&x entry`tAlt+Delete", "singleInListEntriesRemover")
+         kMenu("PVfilesActs", "Add", "Delete file and inde&x entry`tShift+Delete", "DeleteActiveImgFileAndEntry")
          kMenu("PVfilesActs", "Add", "&Modify index entry`tCtrl+F2", "PanelUpdateThisFileIndex")
       }
    }
@@ -52005,16 +53137,16 @@ createMenuCurrentFilesActs(dummy:=0) {
 createMenuFilesSort() {
    kMenu("PVsort", "Add", "File details", "dummy")
    kMenu("PVsort", "Disable", "File details")
-   kMenu("PVsort", "Add", "&Path and name`tCtrl+1", "ActSortName")
-   kMenu("PVsort", "Add", "&Folder path`tCtrl+2", "ActSortPath")
-   kMenu("PVsort", "Add", "&File name`tCtrl+3", "ActSortFileName")
-   kMenu("PVsort", "Add", "File si&ze`tCtrl+4", "ActSortSize")
-   kMenu("PVsort", "Add", "&Modified date`tCtrl+5", "ActSortModified")
-   kMenu("PVsort", "Add", "&Created date`tCtrl+6", "ActSortCreated")
+   kMenu("PVsort", "Add", "&Path and name`tCtrl+1", "ActSortName",, "Sort by " sillySeparator)
+   kMenu("PVsort", "Add", "&Folder path`tCtrl+2", "ActSortPath",, "Sort by " sillySeparator)
+   kMenu("PVsort", "Add", "&File name`tCtrl+3", "ActSortFileName",, "Sort by " sillySeparator)
+   kMenu("PVsort", "Add", "File si&ze`tCtrl+4", "ActSortSize",, "Sort by " sillySeparator)
+   kMenu("PVsort", "Add", "&Modified date`tCtrl+5", "ActSortModified",, "Sort by " sillySeparator)
+   kMenu("PVsort", "Add", "&Created date`tCtrl+6", "ActSortCreated",, "Sort by " sillySeparator)
    If testIsDupesList()
    {
       Menu, PVsort, Add
-      kMenu("PVsort", "Add", "&Duplicates ID group", "ActSortDupeGroups")
+      kMenu("PVsort", "Add", "&Duplicates ID group", "ActSortDupeGroups",, "Sort by " sillySeparator)
    }
 
    Menu, PVsort, Add
@@ -52039,31 +53171,31 @@ createMenuFilesSort() {
       StringUpper, defaultSort, defaultSort
       Menu, PVsort, Add
       kMenu("PVsort", "Add", "Default sorting:", "ToggleDBdefaultSQLsort")
-      kMenu("PVsort", "Add", "[" defaultSort "]", "ToggleDBdefaultSQLsort")
+      kMenu("PVsort", "Add", "[" defaultSort "]", "dummy")
       kMenu("PVsort", "Disable", "[" defaultSort "]")
    }
 
    Menu, PVsort, Add
    kMenu("PVsort", "Add", "Image information", "dummy")
    kMenu("PVsort", "Disable", "Image information")
-   kMenu("PVsort", "Add", "&Resolution`tCtrl+7", "PanelResolutionSorting")
-   kMenu("PVsort", "Add", "&Histogram data points`tCtrl+8", "PanelHistogramSorting")
+   kMenu("PVsort", "Add", "&Resolution`tCtrl+7", "PanelResolutionSorting",, "Sort by " sillySeparator)
+   kMenu("PVsort", "Add", "&Histogram data points`tCtrl+8", "PanelHistogramSorting",, "Sort by " sillySeparator)
    If (mustPreventMenus=1)
    {
-      kMenu("PVsort", "Add", "Resolution (MPx)", "MenuSortImageResolutionMGPX")
-      kMenu("PVsort", "Add", "Image width", "MenuSortImageWdithRes")
-      kMenu("PVsort", "Add", "Image height", "MenuSortImageHeightRes")
-      kMenu("PVsort", "Add", "Aspect ratio (W/H)", "MenuSortImageAspectRatioRes")
-      kMenu("PVsort", "Add", "Image DPI", "MenuSortImageDPIres")
-      kMenu("PVsort", "Add", "Pages / frames", "MenuSortImageFrameRes")
-      kMenu("PVsort", "Add", "Histogram average", "MenuActSortHisto1")
-      kMenu("PVsort", "Add", "Histogram median", "MenuActSortHisto2")
-      kMenu("PVsort", "Add", "Histogram peak range", "MenuActSortHisto3")
-      kMenu("PVsort", "Add", "Histogram minimum range", "MenuActSortHisto4")
-      kMenu("PVsort", "Add", "Histogram range", "MenuActSortHisto5")
-      kMenu("PVsort", "Add", "Histogram mode", "MenuActSortHisto6")
-      kMenu("PVsort", "Add", "Histogram minimum", "MenuActSortHisto7")
-      kMenu("PVsort", "Add", "Histogram root-mean square", "MenuActSortHisto8")
+      kMenu("PVsort", "Add", "Resolution (MPx)", "MenuSortImageResolutionMGPX",, "Sort by " sillySeparator)
+      kMenu("PVsort", "Add", "Image width", "MenuSortImageWdithRes",, "Sort by " sillySeparator)
+      kMenu("PVsort", "Add", "Image height", "MenuSortImageHeightRes",, "Sort by " sillySeparator)
+      kMenu("PVsort", "Add", "Aspect ratio (W/H)", "MenuSortImageAspectRatioRes",, "Sort by " sillySeparator)
+      kMenu("PVsort", "Add", "Image DPI", "MenuSortImageDPIres",, "Sort by " sillySeparator)
+      kMenu("PVsort", "Add", "Pages / frames", "MenuSortImageFrameRes",, "Sort by " sillySeparator)
+      kMenu("PVsort", "Add", "Histogram average", "MenuActSortHisto1",, "Sort by " sillySeparator)
+      kMenu("PVsort", "Add", "Histogram median", "MenuActSortHisto2",, "Sort by " sillySeparator)
+      kMenu("PVsort", "Add", "Histogram peak range", "MenuActSortHisto3",, "Sort by " sillySeparator)
+      kMenu("PVsort", "Add", "Histogram minimum range", "MenuActSortHisto4",, "Sort by " sillySeparator)
+      kMenu("PVsort", "Add", "Histogram range", "MenuActSortHisto5",, "Sort by " sillySeparator)
+      kMenu("PVsort", "Add", "Histogram mode", "MenuActSortHisto6",, "Sort by " sillySeparator)
+      kMenu("PVsort", "Add", "Histogram minimum", "MenuActSortHisto7",, "Sort by " sillySeparator)
+      kMenu("PVsort", "Add", "Histogram root-mean square", "MenuActSortHisto8",, "Sort by " sillySeparator)
    }
 
    Menu, PVsort, Add, 
@@ -52129,19 +53261,23 @@ MenuActSortHisto8() {
 
 createMenuSlideshows() {
    sliSpeed := Round(slideShowDelay/1000, 2) " sec."
-   keyu := (thumbsDisplaying=1 || AnyWindowOpen) ? "" : "`tSpace"
-   If (thumbsDisplaying=1)
-      kMenu("PVslide", "Add", "&Start slideshow" keyu, "tlbrPlaySlides", "play")
-   Else
-      kMenu("PVslide", "Add", "&Start slideshow" keyu, "dummyInfoToggleSlideShowu", "play")
-   kMenu("PVslide", "Add/Uncheck", "Smoot&h transitions", "ToggleSlidesTransitions", "fade")
+   keyu := (thumbsDisplaying=1 || markedSelectFile>0) ? "" : "`tSpace"
+   If !AnyWindowOpen
+      kMenu("PVslide", "Add", "&Start slideshow" keyu, "MenuGoPlaySlidesNow", "play")
+
+   kMenu("PVslide", "Add/Uncheck", "Smoot&h transitions", "ToggleSlidesTransitions", "fade", " (slideshows)")
+   If (doSlidesTransitions=1)
+      kMenu("PVslide", "Check", "Smoot&h transitions",,, " (slideshows)")
+   If (minimizeMemUsage=1)
+      kMenu("PVslide", "Disable", "Smoot&h transitions",,, " (slideshows)")
+
    kMenu("PVslide", "Add/Uncheck", "&Easy to stop slideshows", "ToggleEasySlideStop")
-   kMenu("PVslide", "Add/Uncheck", "&Randomize colour effects", "ToggleSlidesFXmode", "slideshow")
+   kMenu("PVslide", "Add/Uncheck", "&Randomize colour effects", "ToggleSlidesFXmode", "slideshow", " during slideshows")
    kMenu("PVslide", "Add/Uncheck", "&Wait for GIFs to play once", "ToggleGIFsPlayEntirely", "animations")
    If (animGIFsSupport!=1 || alwaysOpenwithFIM=1)
       kMenu("PVslide", "Disable", "&Wait for GIFs to play once")
    If (slidesFXrandomize=1)
-      kMenu("PVslide", "Check", "&Randomize colour effects")
+      kMenu("PVslide", "Check", "&Randomize colour effects",,, " during slideshows")
 
    kMenu("PVslide", "Add/Uncheck", "S&kip already seen images", "ToggleSkipSeenIMGs")
    If (mustRecordSeenImgs!=1)
@@ -52157,49 +53293,45 @@ createMenuSlideshows() {
    Try Menu, PVhowSlide, Delete
    
    keyu := (thumbsDisplaying=1 || AnyWindowOpen) ? "" : "`tS"
-   kMenu("PVhowSlide", "Add", "C&ycle slideshow directions" keyu, "ToggleSlideshowModes")
+   kMenu("PVhowSlide", "Add", "C&ycle slideshow directions" keyu, "ToggleSlideshowModes",,,1)
    Menu, PVhowSlide, Add
-   kMenu("PVhowSlide", "Add/UnCheck", "&Forward", "MenuSlideshowModeNext")
-   kMenu("PVhowSlide", "Add/UnCheck", "&Backward", "MenuSlideshowModePrev")
-   kMenu("PVhowSlide", "Add/UnCheck", "&Random", "MenuSlideshowModeRando")
+   kMenu("PVhowSlide", "Add/UnCheck", "&Forward", "MenuSlideshowModeNext",, " (slideshow modes)")
+   kMenu("PVhowSlide", "Add/UnCheck", "&Backward", "MenuSlideshowModePrev",, " (slideshow modes)")
+   kMenu("PVhowSlide", "Add/UnCheck", "&Random", "MenuSlideshowModeRando",, " (slideshow modes)")
    Menu, PVhowSlide, Add
-   kMenu("PVhowSlide", "Add/UnCheck", "Random [&1st half bias]", "MenuSlideshowModeRandyFirst")
-   kMenu("PVhowSlide", "Add/UnCheck", "Random [&2nd half bias]", "MenuSlideshowModeRandySecond")
+   kMenu("PVhowSlide", "Add/UnCheck", "Random [&1st half bias]", "MenuSlideshowModeRandyFirst",, " (slideshow modes)")
+   kMenu("PVhowSlide", "Add/UnCheck", "Random [&2nd half bias]", "MenuSlideshowModeRandySecond",, " (slideshow modes)")
    If (SlideHowMode=2)
-      kMenu("PVhowSlide", "Check", "&Backward")
+      kMenu("PVhowSlide", "Check", "&Backward",,, " (slideshow modes)")
    Else If (SlideHowMode=3)
-      kMenu("PVhowSlide", "Check", "&Forward")
+      kMenu("PVhowSlide", "Check", "&Forward",,, " (slideshow modes)")
    Else If (SlideHowMode=1 && slidesRandoMode=2)
-      kMenu("PVhowSlide", "Check", "Random [&1st half bias]")
+      kMenu("PVhowSlide", "Check", "Random [&1st half bias]",,, " (slideshow modes)")
    Else If (SlideHowMode=1 && slidesRandoMode=3)
-      kMenu("PVhowSlide", "Check", "Random [&2nd half bias]")
+      kMenu("PVhowSlide", "Check", "Random [&2nd half bias]",,, " (slideshow modes)")
    Else If (SlideHowMode=1)
-      kMenu("PVhowSlide", "Check", "&Random")
+      kMenu("PVhowSlide", "Check", "&Random",,, " (slideshow modes)")
 
    kMenu("PVslide", "Add", "Slideshow direc&tions", ":PVhowSlide")
    ; kMenu("PVslide", "Add", DefineSlideShowType(), "dummy")
    ; kMenu("PVslide", "Disable", DefineSlideShowType())
    Menu, PVslide, Add
    thisMusic := StrLen(SlidesMusicSong)>3 ? PathCompact(SlidesMusicSong, 30) : "NONE"
-   kMenu("PVslide", "Add/Uncheck", "Auto&matically play music", "ToggleAutoPlaySlidesMusic")
-   kMenu("PVslide", "Add", "Set back&ground music", "PanelSetSlidesMusic")
+   kMenu("PVslide", "Add/Uncheck", "Auto&matically play music", "ToggleAutoPlaySlidesMusic",, " (slideshows)")
+   kMenu("PVslide", "Add", "Set back&ground music", "PanelSetSlidesMusic",, " (slideshows)")
    kMenu("PVslide", "Add", thisMusic, "dummy")
    kMenu("PVslide", "Disable", thisMusic)
    If (autoPlaySlidesAudio=1)
-      kMenu("PVslide", "Check", "Auto&matically play music")
+      kMenu("PVslide", "Check", "Auto&matically play music",,, " (slideshows)")
    Menu, PVslide, Add
-   keyuA := (thumbsDisplaying=1 || AnyWindowOpen) ? "" : "`tDot [ . ]"
-   keyuB := (thumbsDisplaying=1 || AnyWindowOpen) ? "" : "`tComma [ , ]"
-   kMenu("PVslide", "Add", "&Increase speed" keyuA, "IncreaseSlideSpeed")
-   kMenu("PVslide", "Add", "&Decrease speed" keyuB, "DecreaseSlideSpeed")
+   keyuA := (thumbsDisplaying=1 || AnyWindowOpen) ? "" : "`t."
+   keyuB := (thumbsDisplaying=1 || AnyWindowOpen) ? "" : "`t,"
+   kMenu("PVslide", "Add", "&Increase speed" keyuA, "IncreaseSlideSpeed",, " (slideshows)", 1)
+   kMenu("PVslide", "Add", "&Decrease speed" keyuB, "DecreaseSlideSpeed",, " (slideshows)", 1)
    kMenu("PVslide", "Add", "Current speed: " sliSpeed, "dummy")
    kMenu("PVslide", "Disable", "Current speed: " sliSpeed)
    If (allowGIFsPlayEntirely=1)
       kMenu("PVslide", "Check", "&Wait for GIFs to play once")
-   If (doSlidesTransitions=1)
-      kMenu("PVslide", "Check", "Smoot&h transitions")
-   If (minimizeMemUsage=1)
-      kMenu("PVslide", "Disable", "Smoot&h transitions")
    If (easySlideStoppage=1)
       kMenu("PVslide", "Check", "&Easy to stop slideshows")
 }
@@ -52214,9 +53346,9 @@ createMenuAnnotations() {
    If (SLDtypeLoaded=3)
       kMenu("PVsounds", "Add", "&Choose audio file", "PanelBrowseAudioAnnotation")
    kMenu("PVsounds", "Add", "&Play associated sound file`tX", "PlayAudioFileAssociatedNow")
-   kMenu("PVsounds", "Add", "&Stop playing`tShift+X", "StopMediaPlaying")
+   kMenu("PVsounds", "Add", "&Stop playing audio`tShift+X", "StopMediaPlaying")
    If !hSNDmedia
-      kMenu("PVsounds", "Disable", "&Stop playing`tShift+X")
+      kMenu("PVsounds", "Disable", "&Stop playing audio`tShift+X")
    Menu, PVsounds, Add, 
    kMenu("PVsounds", "Add/Uncheck", "&Auto-play sound files", "ToggleAutoPlaySND")
    If (autoPlaySNDs=1)
@@ -52227,144 +53359,147 @@ createMenuAnnotations() {
    If (autoPlaySNDs!=1)
       kMenu("PVsounds", "Disable", "Slidesho&w speed based on audio length")
    Menu, PVsounds, Add, 
-   kMenu("PVsounds", "Add", "&Increase audio volume`tShift + [ . ]", "MenuSetVolumeUp")
-   kMenu("PVsounds", "Add", "&Decrease audio volume`tShift + [ , ]", "MenuSetVolumeDown")
+   kMenu("PVsounds", "Add", "&Increase audio volume`tShift+.", "MenuSetVolumeUp",,,1)
+   kMenu("PVsounds", "Add", "&Decrease audio volume`tShift+,", "MenuSetVolumeDown",,,1)
    kMenu("PVsounds", "Add", "Audio volume: " mediaSNDvolume "%", "dummy")
    kMenu("PVsounds", "Disable", "Audio volume: " mediaSNDvolume "%")
 }
 
 createMenuVPhudHisto() {
-   kMenu("PVimgHistos", "Add", "C&ycle histogram modes`tShift+G", "ToggleImgHistogram")
-   Menu, PVimgHistos, Add, 
-   kMenu("PVimgHistos", "Add/Uncheck", "&None", "MenuSetVPhistoNone", "histogram")
-   kMenu("PVimgHistos", "Add/Uncheck", "&Luminance", "MenuSetVPhistoLuminance", "histogram")
-   kMenu("PVimgHistos", "Add/Uncheck", "&Red", "MenuSetVPhistoRed", "histogram")
-   kMenu("PVimgHistos", "Add/Uncheck", "&Green", "MenuSetVPhistoGreen", "histogram")
-   kMenu("PVimgHistos", "Add/Uncheck", "&Blue", "MenuSetVPhistoBlue", "histogram")
-   kMenu("PVimgHistos", "Add/Uncheck", "&All mixed", "MenuSetVPhistoAll", "histogram")
-   Menu, PVimgHistos, Add, 
-   kMenu("PVimgHistos", "Add", "Graph emphasis", "dummy")
-   kMenu("PVimgHistos", "Disable", "Graph emphasis")
-   kMenu("PVimgHistos", "Add/Uncheck", "&Lows", "MenuSetVPgraphHistoLows", "graph histogram")
-   kMenu("PVimgHistos", "Add/Uncheck", "&Balanced", "MenuSetVPgraphHistoMids", "graph histogram")
-   kMenu("PVimgHistos", "Add/Uncheck", "&Peaks", "MenuSetVPgraphHistoPeaks", "graph histogram")
-
-   If (showHistogram=1)
-      kMenu("PVimgHistos", "Check", "&None")
-   Else If (showHistogram=2)
-      kMenu("PVimgHistos", "Check", "&Luminance")
-   Else If (showHistogram=3)
-      kMenu("PVimgHistos", "Check", "&Red")
-   Else If (showHistogram=4)
-      kMenu("PVimgHistos", "Check", "&Green")
-   Else If (showHistogram=5)
-      kMenu("PVimgHistos", "Check", "&Blue")
-   Else If (showHistogram=6)
-      kMenu("PVimgHistos", "Check", "&All mixed")
-
-   If (showHistogram=1)
+   kMenu("PVimgHistos", "Add", "C&ycle histogram modes`tG", "ToggleImgHistogram",,,1)
+   Menu, PVimgHistos, Add 
+   kMenu("PVimgHistos", "Add/Uncheck", "&None", "MenuSetVPhistoNone", "histogram", "Histogram panel: " sillySeparator)
+   kMenu("PVimgHistos", "Add/Uncheck", "&Luminance", "MenuSetVPhistoLuminance", "histogram", "Histogram channel: " sillySeparator)
+   kMenu("PVimgHistos", "Add/Uncheck", "&Red", "MenuSetVPhistoRed", "histogram", "Histogram channel: " sillySeparator)
+   kMenu("PVimgHistos", "Add/Uncheck", "&Green", "MenuSetVPhistoGreen", "histogram", "Histogram channel: " sillySeparator)
+   kMenu("PVimgHistos", "Add/Uncheck", "&Blue", "MenuSetVPhistoBlue", "histogram", "Histogram channel: " sillySeparator)
+   kMenu("PVimgHistos", "Add/Uncheck", "&All mixed", "MenuSetVPhistoAll", "histogram", "Histogram channel: " sillySeparator)
+   If (mustPreventMenus!=1 && showHistogram>1)
    {
-      kMenu("PVimgHistos", "Disable", "&Lows")
-      kMenu("PVimgHistos", "Disable", "&Balanced")
-      kMenu("PVimgHistos", "Disable", "&Peaks")
+      Menu, PVimgHistos, Add
+      kMenu("PVimgHistos", "Add", "Graph emphasis", "dummy")
+      kMenu("PVimgHistos", "Disable", "Graph emphasis")
+      kMenu("PVimgHistos", "Add/Uncheck", "&Lows", "MenuSetVPgraphHistoLows", "graph histogram", "Histogram graph focus: " sillySeparator)
+      kMenu("PVimgHistos", "Add/Uncheck", "&Balanced", "MenuSetVPgraphHistoMids", "graph histogram", "Histogram graph focus: " sillySeparator)
+      kMenu("PVimgHistos", "Add/Uncheck", "&Peaks", "MenuSetVPgraphHistoPeaks", "graph histogram", "Histogram graph focus: " sillySeparator)
+      If (histogramMode=1)
+         kMenu("PVimgHistos", "Check", "&Lows",,, "Histogram graph focus: " sillySeparator)
+      Else If (histogramMode=2)
+         kMenu("PVimgHistos", "Check", "&Balanced",,, "Histogram graph focus: " sillySeparator)
+      Else If (histogramMode=3)
+         kMenu("PVimgHistos", "Check", "&Peaks",,, "Histogram graph focus: " sillySeparator)
    }
 
-   If (histogramMode=1)
-      kMenu("PVimgHistos", "Check", "&Lows")
-   Else If (histogramMode=2)
-      kMenu("PVimgHistos", "Check", "&Balanced")
-   Else If (histogramMode=3)
-      kMenu("PVimgHistos", "Check", "&Peaks")
+   Menu, PVimgHistos, Add
+   kMenu("PVimgHistos", "Add", "Cycle graph emphasis modes`tAlt+G", "ToggleHistogramMode",, " (histogram)", 1)
+   If (showHistogram=1)
+      kMenu("PVimgHistos", "Disable", "Cycle graph emphasis modes`tAlt+G",,, " (histogram)")
+
+   If (showHistogram=1)
+      kMenu("PVimgHistos", "Check", "&None",,, "Histogram panel: " sillySeparator)
+   Else If (showHistogram=2)
+      kMenu("PVimgHistos", "Check", "&Luminance",,, "Histogram channel: " sillySeparator)
+   Else If (showHistogram=3)
+      kMenu("PVimgHistos", "Check", "&Red",,, "Histogram channel: " sillySeparator)
+   Else If (showHistogram=4)
+      kMenu("PVimgHistos", "Check", "&Green",,, "Histogram channel: " sillySeparator)
+   Else If (showHistogram=5)
+      kMenu("PVimgHistos", "Check", "&Blue",,, "Histogram channel: " sillySeparator)
+   Else If (showHistogram=6)
+      kMenu("PVimgHistos", "Check", "&All mixed",,, "Histogram channel: " sillySeparator)
 }
 
 createMenuColorDepth() {
    infoColorDepth := (usrColorDepth>1) ? "Original / reset" : defineColorDepth()
-   kMenu("PVimgSdepth", "Add", "C&ycle simulate color depths`tQ", "ToggleImgColorDepth")
+   keyu := (liveDrawingBrushTool=1 && thumbsDisplaying!=1 || AnyWindowOpen=64) ? "" : "`tQ"
+   kMenu("PVimgSdepth", "Add", "C&ycle simulate color depths" keyu, "ToggleImgColorDepth",,,1)
    Menu, PVimgSdepth, Add
    kMenu("PVimgSdepth", "Add/Uncheck", infoColorDepth, "MenuResetImageColorDepth")
-   kMenu("PVimgSdepth", "Add/Uncheck", "2 bits (4 colors)", "MenuSetImageDepth2bits")
-   kMenu("PVimgSdepth", "Add/Uncheck", "3 bits (8 colors)", "MenuSetImageDepth3bits")
-   kMenu("PVimgSdepth", "Add/Uncheck", "4 bits (16 colors)", "MenuSetImageDepth4bits")
-   kMenu("PVimgSdepth", "Add/Uncheck", "5 bits (32 colors)", "MenuSetImageDepth5bits")
-   kMenu("PVimgSdepth", "Add/Uncheck", "6 bits (64 colors)", "MenuSetImageDepth6bits")
-   kMenu("PVimgSdepth", "Add/Uncheck", "7 bits (128 colors)", "MenuSetImageDepth7bits")
-   kMenu("PVimgSdepth", "Add/Uncheck", "8 bits (256 colors)", "MenuSetImageDepth8bits")
-   kMenu("PVimgSdepth", "Add/Uncheck", "16 bits (65536 colors)", "MenuSetImageDepth16bits")
+   kMenu("PVimgSdepth", "Add/Uncheck", "2 bits (4 colors)", "MenuSetImageDepth2bits",, "Color depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "3 bits (8 colors)", "MenuSetImageDepth3bits",, "Color depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "4 bits (16 colors)", "MenuSetImageDepth4bits",, "Color depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "5 bits (32 colors)", "MenuSetImageDepth5bits",, "Color depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "6 bits (64 colors)", "MenuSetImageDepth6bits",, "Color depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "7 bits (128 colors)", "MenuSetImageDepth7bits",, "Color depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "8 bits (256 colors)", "MenuSetImageDepth8bits",, "Color depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "16 bits (65536 colors)", "MenuSetImageDepth16bits",, "Color depth: " sillySeparator)
    If (usrColorDepth<2)
    {
       kMenu("PVimgSdepth", "Check", infoColorDepth)
       kMenu("PVimgSdepth", "Disable", infoColorDepth)
    } Else If (usrColorDepth=2)
-      kMenu("PVimgSdepth", "Check", "2 bits (4 colors)")
+      kMenu("PVimgSdepth", "Check", "2 bits (4 colors)",,, "Color depth: " sillySeparator)
    Else If (usrColorDepth=3)
-      kMenu("PVimgSdepth", "Check", "3 bits (8 colors)")
+      kMenu("PVimgSdepth", "Check", "3 bits (8 colors)",,, "Color depth: " sillySeparator)
    Else If (usrColorDepth=4)
-      kMenu("PVimgSdepth", "Check", "4 bits (16 colors)")
+      kMenu("PVimgSdepth", "Check", "4 bits (16 colors)",,, "Color depth: " sillySeparator)
    Else If (usrColorDepth=5)
-      kMenu("PVimgSdepth", "Check", "5 bits (32 colors)")
+      kMenu("PVimgSdepth", "Check", "5 bits (32 colors)",,, "Color depth: " sillySeparator)
    Else If (usrColorDepth=6)
-      kMenu("PVimgSdepth", "Check", "6 bits (64 colors)")
+      kMenu("PVimgSdepth", "Check", "6 bits (64 colors)",,, "Color depth: " sillySeparator)
    Else If (usrColorDepth=7)
-      kMenu("PVimgSdepth", "Check", "7 bits (128 colors)")
+      kMenu("PVimgSdepth", "Check", "7 bits (128 colors)",,, "Color depth: " sillySeparator)
    Else If (usrColorDepth=8)
-      kMenu("PVimgSdepth", "Check", "8 bits (256 colors)")
+      kMenu("PVimgSdepth", "Check", "8 bits (256 colors)",,, "Color depth: " sillySeparator)
    Else If (usrColorDepth=9)
-      kMenu("PVimgSdepth", "Check", "16 bits (65536 colors)")
+      kMenu("PVimgSdepth", "Check", "16 bits (65536 colors)",,, "Color depth: " sillySeparator)
 
    Menu, PVimgSdepth, Add
-   kMenu("PVimgSdepth", "Add/Uncheck", "&Perform dithering", "ToggleImgColorDepthDithering", "settings performance quality")
+   kMenu("PVimgSdepth", "Add/Uncheck", "&Perform dithering", "ToggleImgColorDepthDithering", "settings performance quality", " on color depth changes")
    If (ColorDepthDithering=1)
-      kMenu("PVimgSdepth", "Check", "&Perform dithering")
+      kMenu("PVimgSdepth", "Check", "&Perform dithering",,, " on color depth changes")
 }
 
 createMenuImgColorsFX() {
    infolumosAdjust := (imgFxMode=2 || imgFxMode=3) ? Round(lumosAdjust, 2) : Round(lumosGrayAdjust, 2)
    infoGammosAdjust := (imgFxMode=2 || imgFxMode=3) ? Round(GammosAdjust, 2) : Round(GammosGrayAdjust, 2)
    infoSatAdjust := (imgFxMode=4) ? zatAdjust : Round(satAdjust*100)
-   kMenu("PVimgColorsFX", "Add", "C&ycle colors display modes`tF", "ToggleImgFX")
-   kMenu("PVimgColorsFX", "Add", DefineFXmodes(), "ToggleImgFX")
+   kMenu("PVimgColorsFX", "Add", "C&ycle colors display modes`tF", "ToggleImgFX",,,1)
+   kMenu("PVimgColorsFX", "Add", DefineFXmodes(), "dummy")
    kMenu("PVimgColorsFX", "Disable", DefineFXmodes())
    If (imgFxMode=2 || imgFxMode=3 || imgFxMode=4)
    {
-      kMenu("PVimgColorsFX", "Add", "Br: " infolumosAdjust " / Ctr: "infoGammosAdjust " / dS: " infoSatAdjust, "ToggleImgFX")
+      kMenu("PVimgColorsFX", "Add", "Br: " infolumosAdjust " / Ctr: "infoGammosAdjust " / dS: " infoSatAdjust, "dummy")
       kMenu("PVimgColorsFX", "Disable", "Br: " infolumosAdjust " / Ctr: "infoGammosAdjust " / dS: " infoSatAdjust)
    }
 
    Menu, PVimgColorsFX, Add
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Original colors", "MenuSetColorModeOriginal")
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Personalized colors", "MenuSetColorModePersonalized")
-   kMenu("PVimgColorsFX", "Add/Uncheck", "Grays&cale", "MenuSetColorModeGrayscale")
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Red channel", "MenuSetColorModeRedC")
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Green channel", "MenuSetColorModeGreenC")
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Blue channel", "MenuSetColorModeBlueC")
-   kMenu("PVimgColorsFX", "Add/Uncheck", "Alp&ha channel", "MenuSetColorModeAlphaC")
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Inverted colors", "MenuSetColorModeInverted")
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Sepia", "MenuSetColorModeSepia")
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Original colors", "MenuSetColorModeOriginal",, "Viewport colors: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Personalized colors", "MenuSetColorModePersonalized",, "Viewport colors: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "Grays&cale", "MenuSetColorModeGrayscale",, "Viewport colors: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Red channel", "MenuSetColorModeRedC",, "Viewport colors: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Green channel", "MenuSetColorModeGreenC",, "Viewport colors: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Blue channel", "MenuSetColorModeBlueC",, "Viewport colors: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "Alp&ha channel", "MenuSetColorModeAlphaC",, "Viewport colors: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Inverted colors", "MenuSetColorModeInverted",, "Viewport colors: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Sepia", "MenuSetColorModeSepia",, "Viewport colors: " sillySeparator)
    If (thumbsDisplaying=1)
-      kMenu("PVimgColorsFX", "Disable", "Alp&ha channel")
+      kMenu("PVimgColorsFX", "Disable", "Alp&ha channel",,,"Viewport colors: " sillySeparator)
 
    If (imgFxMode=1)
-      kMenu("PVimgColorsFX", "Check", "&Original colors")
+      kMenu("PVimgColorsFX", "Check", "&Original colors",,,"Viewport colors: " sillySeparator)
    Else If (imgFxMode=2)
-      kMenu("PVimgColorsFX", "Check", "&Personalized colors")
+      kMenu("PVimgColorsFX", "Check", "&Personalized colors",,,"Viewport colors: " sillySeparator)
    Else If (imgFxMode=4)
-      kMenu("PVimgColorsFX", "Check", "Grays&cale")
+      kMenu("PVimgColorsFX", "Check", "Grays&cale",,,"Viewport colors: " sillySeparator)
    Else If (imgFxMode=5)
-      kMenu("PVimgColorsFX", "Check", "&Red channel")
+      kMenu("PVimgColorsFX", "Check", "&Red channel",,,"Viewport colors: " sillySeparator)
    If (imgFxMode=6)
-      kMenu("PVimgColorsFX", "Check", "&Green channel")
+      kMenu("PVimgColorsFX", "Check", "&Green channel",,,"Viewport colors: " sillySeparator)
    Else If (imgFxMode=7)
-      kMenu("PVimgColorsFX", "Check", "&Blue channel")
+      kMenu("PVimgColorsFX", "Check", "&Blue channel",,,"Viewport colors: " sillySeparator)
    Else If (imgFxMode=8)
-      kMenu("PVimgColorsFX", "Check", "Alp&ha channel")
+      kMenu("PVimgColorsFX", "Check", "Alp&ha channel",,,"Viewport colors: " sillySeparator)
    Else If (imgFxMode=9)
-      kMenu("PVimgColorsFX", "Check", "&Inverted colors")
+      kMenu("PVimgColorsFX", "Check", "&Inverted colors",,,"Viewport colors: " sillySeparator)
    Else If (imgFxMode=10)
-      kMenu("PVimgColorsFX", "Check", "&Sepia")
-}
+      kMenu("PVimgColorsFX", "Check", "&Sepia",,,"Viewport colors: " sillySeparator)
 
-MenuSelectAllAction() {
-   selectEntireImage("rm")
+   If (thumbsDisplaying!=1 && imgFxMode>1)
+   {
+      Menu, PVimgColorsFX, Add
+      kMenu("PVimgColorsFX", "Add", "Toggle colors for 2 seconds`tShift+\", "MenuToggleColorAdjustments",, " (viewport)")
+   }
 }
 
 MenuDoOpenStartFolder() {
@@ -52372,21 +53507,6 @@ MenuDoOpenStartFolder() {
      currentFileIndex := doOpenStartFolder()
    dummyTimerDelayiedImageDisplay(50)
    RemoveTooltip()
-}
-
-MenuToggleColorAdjustments() {
-   If (imgFxMode=1)
-   {
-      UpdateUIadjustVPcolors("ignore-zoom")
-   } Else
-   {
-      o_usrColorDepth := usrColorDepth
-      imgFxMode := usrColorDepth := 1
-      If (o_usrColorDepth=1)
-         dummyTimerDelayiedImageDisplay(50)
-      Else
-         dummyTimerReloadThisPicture(50)
-   }
 }
 
 MenuStartDrawingSelectionArea() {
@@ -52414,21 +53534,22 @@ createMenuLiveTools(dummy:=0) {
    kMenu("PVlTools", "Add", "&Paint brushes`tP", "PanelBrushTool", "pinch bulge effects draw deformer smudge cloner effects eraser")
    kMenu("PVlTools", "Add", "&Erase or fade area`tDelete", "PanelEraseSelectedArea")
    kMenu("PVlTools", "Add", "F&lood fill / color bucket`tK", "PanelFloodFillTool", "colorize similarity")
-   kMenu("PVlTools", "Add", "&Fill shapes`tAlt+Bksp", "PanelFillSelectedArea", "curve polygonal glass effects blur pie ellipse triangle rhombus gradients rectangle")
+   kMenu("PVlTools", "Add", "&Fill shapes`tAlt+Backspace", "tlbrFillShape", "curve polygonal glass effects blur pie ellipse triangle rhombus gradients rectangle")
    kMenu("PVlTools", "Add", "Fill be&hind image", "PanelFillBehindBgrImage", "background")
-   kMenu("PVlTools", "Add", "Draw s&hape contours`tCtrl+L", "PanelDrawShapesInArea", "lines curve polygonal pie ellipse triangle rhombus rectangle arcs")
+   kMenu("PVlTools", "Add", "Draw s&hape contours`tCtrl+L", "tlbrDrawShapesContour", "lines curve polygonal pie ellipse triangle rhombus rectangle arcs")
    kMenu("PVlTools", "Add", "&Draw parametric lines", "PanelDrawLines", "lines arcs diagonals spiral rays spokes grids")
    kMenu("PVlTools", "Add", "Define f&reeform filled shape`tShift+P", "MenuStartDrawingShapes")
    kMenu("PVlTools", "Add", "Define freeform &outline`tAlt+P", "MenuStartDrawingLines")
    kMenu("PVlTools", "Add", "Define alpha mas&k", "PanelSoloAlphaMasker")
    kMenu("PVlTools", "Add", "&Insert te&xt`tShift+T", "PanelInsertTextArea")
+   kMenu("PVlTools", "Add", "Create image s&ymmetry", "PanelSymmetricaImage")
    kMenu("PVlTools", "Add", "&Adjust image colors`tU", "PanelColorsAdjusterImage")
    kMenu("PVlTools", "Add", "Adjust vie&wport colors and effects`tShift+U", "PanelColorsAdjusterWindow")
    kMenu("PVlTools", "Add", "Desaturate color&s`tCtrl+G", "PanelDesatureSelectedArea")
    If (AnyWindowOpen=10)
       kMenu("PVlTools", "Check/Disable", "Adjust vie&wport colors and effects`tShift+U")
    Else If (AnyWindowOpen=23)
-      kMenu("PVlTools", "Check/Disable", "&Fill shapes`tAlt+Bksp")
+      kMenu("PVlTools", "Check/Disable", "&Fill shapes`tAlt+Backspace")
    Else If (AnyWindowOpen=25)
       kMenu("PVlTools", "Check/Disable", "&Erase or fade area`tDelete")
    Else If (AnyWindowOpen=30)
@@ -52449,6 +53570,8 @@ createMenuLiveTools(dummy:=0) {
       kMenu("PVlTools", "Check/Disable", "Define alpha mas&k")
    Else If (AnyWindowOpen=74)
       kMenu("PVlTools", "Check/Disable", "&Adjust image colors`tU")
+   Else If (AnyWindowOpen=81)
+      kMenu("PVlTools", "Check/Disable", "Create image s&ymmetry")
 
    If (editingSelectionNow=1 && dummy!="mbr")
    {
@@ -52505,15 +53628,98 @@ isVarEqualTo(value, vals*) {
    Return yay
 }
 
+createMenuLiveEditSelectionArea(isToolGood, isWinCustomShapeFriendly) {
+   If (AnyWindowOpen=31 || AnyWindowOpen=24)
+   {
+      Gui, SettingsGUIA: Default
+      GuiControlGet, hwnd, hwnd, PasteInPlaceCropSel
+      ControlGetText, labelu,, ahk_id %hwnd%
+      kMenu("PVselv", "Add", "Cycle image crop shapes`tShift+C", "togglePasteInPlaceCropShapes",,, 1)
+      If labelu
+      {
+         kMenu("PVselv", "Add", labelu, "dummy")
+         kMenu("PVselv", "Disable", labelu)
+      }
+
+      If (PasteInPlaceCropSel>1)
+         kMenu("PVselv", "Add", "Do not crop the object", "togglePasteInPlaceCropNone")
+      Menu, PVselv, Add
+   }
+
+   kMenu("PVselv", "Add", "&Reset selection area", "newImgSelection")
+   If (undoLevelsRecorded>1 && undoLevelsRecorded!="" && editingSelectionNow=1)
+   {
+      Menu, PVselv, Add
+      kMenu("PVselv", "Add", "&Undo selection`tCtrl+Shift+Z", "ImgSelUndoAct")
+      kMenu("PVselv", "Add", "&Redo selection`tCtrl+Shift+Y", "ImgSelRedoAct")
+   }
+
+   If (isToolGood=1 && isWinCustomShapeFriendly=1 && editingSelectionNow=1)
+      kMenu("PVselv", "Add", "&Load custom shapes", "PanelManageVectorShapes", "freeform presets premade forms triangle moon cloud crescent heart water droplet rhombus star christian cross callout")
+
+   Menu, PVselv, Add
+   kMenu("PVselv", "Add", "&Select all`tCtrl+A", "selectEntireImage",, " (image canvas)")
+   If (innerSelectionCavityX>0.01 && innerSelectionCavityY>0.01)
+      kMenu("PVselv", "Add", "R&eset exclude area`tShift+\", "resetSelectionAreaCavity")
+
+   kMenu("PVselv", "Add", "&Flip selection area W/H`tW", "flipSelectionWH")
+   kMenu("PVselv", "Add/Uncheck", "&Limit selection to image area`tL", "toggleLimitSelection")
+   If (LimitSelectBoundsImg=1)
+      kMenu("PVselv", "Check", "&Limit selection to image area`tL")
+
+   kMenu("PVselv", "Add/Uncheck", "Sho&w grid", "ToggleSelectGrid",, " (selection area)")
+   If (showSelectionGrid=1)
+      kMenu("PVselv", "Check", "Sho&w grid",,, " (selection area)")
+
+   addMenuBonusesSelectionArea()
+   If (isToolGood=1)
+   {
+      infoSelShape := DefineVPselAreaMode()
+      kMenu("PVselv", "Add", "C&ycle selection types`tShift+E", "MenuCycleSelectionShapes")
+      kMenu("PVselv", "Add", infoSelShape, "dummy")
+      kMenu("PVselv", "Disable", infoSelShape)
+   }
+}
+
+addMenuBonusesBrushTools() {
+   If (mustPreventMenus=1 && liveDrawingBrushTool=1)
+   {
+      kMenu("PVmenu", "Add", "Increase brush size`t]", "MenuIncBrushSize",,, 1)
+      kMenu("PVmenu", "Add", "Decrease brush size`t[", "MenuDecBrushSize",,, 1)
+      kMenu("PVmenu", "Add", "Increase brush softness`tShift+]", "MenuIncBrushSoftness",,, 1)
+      kMenu("PVmenu", "Add", "Decrease brush softness`tShift+[", "MenuDecBrushSoftness",,, 1)
+      kMenu("PVmenu", "Add", "Increase brush angle`tCtrl+]", "MenuIncBrushAngle",,, 1)
+      kMenu("PVmenu", "Add", "Decrease brush angle`tCtrl+[", "MenuDecBrushAngle",,, 1)
+      kMenu("PVmenu", "Add", "Increase brush aspect ratio`tAlt+]", "MenuIncBrushAspectRatio",,, 1)
+      kMenu("PVmenu", "Add", "Decrease brush aspect ratio`tAlt+[", "MenuDecBrushAspectRatio",,, 1)
+      kMenu("PVmenu", "Add", "Increase brush wetness`tShift+.", "MenuIncBrushWetness",,, 1)
+      kMenu("PVmenu", "Add", "Decrease brush wetness`tShift+,", "MenuDecBrushWetness",,, 1)
+      kMenu("PVmenu", "Add", "Increase brush opacity`t.", "MenuIncBrushOpacity",,, 1)
+      kMenu("PVmenu", "Add", "Decrease brush opacity`t,", "MenuDecBrushOpacity",,, 1)
+      kMenu("PVmenu", "Add", "Toggle simple/soft brush types`tB", "toggleBrushTypes")
+      kMenu("PVmenu", "Add", "Toggle brush double size`tShift+S", "toggleBrushDoubleSize")
+      kMenu("PVmenu", "Add", "Toggle airbrush mode`tT", "toggleBrushAirMode")
+      kMenu("PVmenu", "Add", "Reset colors to black and white`tD", "ResetColorsToBW")
+      kMenu("PVmenu", "Add", "Reset brush aspect ratio and rotation", "MenuResetBrushAsRatio")
+      If (AnyWindowOpen=64)
+      {
+         kMenu("PVmenu", "Add", "Color Effects brush`tQ", "toggleBrushTypeFX")
+         kMenu("PVmenu", "Add", "Eraser brush`tR", "toggleBrushTypeEraser")
+         kMenu("PVmenu", "Add", "Cloner brush`tJ", "toggleBrushTypeCloner")
+         kMenu("PVmenu", "Add", "Deformer brushes`tP", "toggleBrushDeformers")
+      }
+   }
+}
+
 BuildImgLiveEditMenu() {
    If (editingSelectionNow!=1 && !AnyWindowOpen) || (thumbsDisplaying=1)
       Return
 
    deleteMenus()
-   isWinCustomShapeFriendly := isVarEqualTo(AnyWindowOpen, 74, 68, 66, 65, 64, 55, 25, 23, 10)
-   kMenu("PVmenu", "Add/Uncheck", "&Collapse tool panel`tF8", "toggleImgEditPanelWindow")
+   isWinCustomShapeFriendly := isVarEqualTo(AnyWindowOpen, 81, 74, 68, 66, 65, 64, 55, 25, 23, 10)
+   kMenu("PVmenu", "Add/Uncheck", "&Collapse tool panel`tF11", "toggleImgEditPanelWindow")
    If (panelWinCollapsed=1)
-      kMenu("PVmenu", "Check", "&Collapse tool panel`tF8")
+      kMenu("PVmenu", "Check", "&Collapse tool panel`tF11")
 
    drawing := isNowAlphaPainting()
    If (drawing!=1)
@@ -52522,7 +53728,7 @@ BuildImgLiveEditMenu() {
       kMenu("PVmenu", "Add", "Appl&y tool`tEnter", "applyIMGeditFunction")
 
    Menu, PVmenu, Add
-   If (AnyWindowOpen!=24 && AnyWindowOpen!=31 && drawing!=1 && showMainMenuBar!=1)
+   If ((AnyWindowOpen!=24 && AnyWindowOpen!=31) && (drawing!=1 && (showMainMenuBar!=1 || mustPreventMenus=1)))
    {
       createMenuLiveTools()
       kMenu("PVmenu", "Add", "S&witch live tool", ":PVlTools")
@@ -52548,6 +53754,11 @@ BuildImgLiveEditMenu() {
       Menu, PVmenu, Add
       kMenu("PVmenu", "Add", "&Undo`tCtrl+Z", "ImgUndoAction")
       kMenu("PVmenu", "Add", "&Redo`tCtrl+Y", "ImgRedoAction")
+      If (undoLevelsRecorded>5 && mustPreventMenus=1)
+      {
+         kMenu("PVmenu", "Add", "&Undo image (4 steps)`tCtrl+Alt+Z", "MenuUndoImgJumpy")
+         kMenu("PVmenu", "Add", "&Redo image (4 steps)`tCtrl+Alt+Y", "MenuRedoImgJumpy")
+      }
    }
 
    If (isVarEqualTo(AnyWindowOpen, 10, 12, 64, 66) && imgEditPanelOpened=1)
@@ -52555,50 +53766,18 @@ BuildImgLiveEditMenu() {
       kMenu("PVmenu", "Add/Uncheck", "&Show selection`tE", "ToggleEditImgSelection")
       If (editingSelectionNow=1)
          kMenu("PVmenu", "Check", "&Show selection`tE")
-
-      If (editingSelectionNow=1)
-         kMenu("PVselv", "Add", "&Reset selection", "newImgSelection")
       Else
-         kMenu("PVmenu", "Add", "&Select all`tCtrl+A", "MenuSelectAllAction")
-   }
-
-   If (undoLevelsRecorded>1 && undoLevelsRecorded!="" && editingSelectionNow=1)
-   {
-      Menu, PVselv, Add
-      kMenu("PVselv", "Add", "&Undo selection`tCtrl+Shift+Z", "ImgSelUndoAct")
-      kMenu("PVselv", "Add", "&Redo selection`tCtrl+Shift+Y", "ImgSelRedoAct")
+         kMenu("PVmenu", "Add", "&Select all`tCtrl+A", "selectEntireImage",, " (image canvas)")
    }
 
    decideLiveSelectionBasedOnWindow(angleu, isToolGood)
-   If isVarEqualTo(AnyWindowOpen, 65, 23)
+   If isVarEqualTo(AnyWindowOpen, 81, 65, 23)
       isToolGood := 1
 
-   If (isToolGood=1 && isWinCustomShapeFriendly=1 && editingSelectionNow=1)
-      kMenu("PVselv", "Add", "&Load custom shapes", "PanelManageVectorShapes", "freeform presets premade forms triangle moon cloud crescent heart water droplet rhombus star christian cross callout")
+   Menu, PVmenu, Add
+   If (mustPreventMenus=1)
+      kMenu("PVmenu", "Add", "Swap tool colors: A / B`tX", "ToggleBrushColors")
 
-   Menu, PVselv, Add
-   kMenu("PVselv", "Add", "&Select all`tCtrl+A", "MenuSelectAllAction")
-   If (innerSelectionCavityX>0.01 && innerSelectionCavityY>0.01)
-      kMenu("PVselv", "Add", "R&eset exclude area`tShift+\", "resetSelectionAreaCavity")
-
-   kMenu("PVselv", "Add", "&Flip selection W/H`tW", "flipSelectionWH")
-   kMenu("PVselv", "Add/Uncheck", "&Limit selection to image area`tL", "toggleLimitSelection")
-   If (LimitSelectBoundsImg=1)
-      kMenu("PVselv", "Check", "&Limit selection to image area`tL")
-
-   kMenu("PVselv", "Add/Uncheck", "Sho&w grid", "ToggleSelectGrid")
-   If (showSelectionGrid=1)
-      kMenu("PVselv", "Check", "Sho&w grid")
-
-   If (isToolGood=1)
-   {
-      infoSelShape := DefineVPselAreaMode()
-      kMenu("PVselv", "Add", "C&ycle selection types`tShift+E", "MenuCycleSelectionShapes")
-      kMenu("PVselv", "Add", infoSelShape, "dummy")
-      kMenu("PVselv", "Disable", infoSelShape)
-   }
-
-   Menu, PVmenu, Add, 
    If (editingSelectionNow=1)
    {
       additions := 1
@@ -52636,6 +53815,8 @@ BuildImgLiveEditMenu() {
          createMenuAlphaMask(givenMenu)
          If !liveDrawingBrushTool
             kMenu("PVmenu", "Add", "Alpha mas&k", ":PValpha")
+         Else
+            addMenuBonusesBrushTools()
       } Else If isVarEqualTo(AnyWindowOpen, 64, 66)
       {
          additions := FloodFillSelectionAdj
@@ -52650,23 +53831,35 @@ BuildImgLiveEditMenu() {
       {
          createMenuSelectionAlign()
          createMenuSelectionRotationAspectRatio()
+         createMenuLiveEditSelectionArea(isToolGood, isWinCustomShapeFriendly) 
          kMenu("PVmenu", "Add", "Ali&gnment", ":PVselAlign")
          kMenu("PVmenu", "Add", "&Selection area", ":PVselv")
          kMenu("PVmenu", "Add", "&Rotation and aspect ratio", ":PVselRatio")
       }
    }
 
-   If (AnyWindowOpen=64 && BrushToolType=3)
-      kMenu("PVmenu", "Add", "Define cloner &source`tS", "BtnSetClonerBrushSource")
-
-   If (AnyWindowOpen=64 && BrushToolType<4)
+   If (AnyWindowOpen=64)
    {
-      kMenu("PVmenu", "Add", "&Cycle symmetry modes`tY", "toggleBrushSymmetryModes")
-      kMenu("PVmenu", "Add", "&Define symmetry point`tShift+Y", "BtnSetBrushSymmetryCoords")
-   }
-
-   If isVarEqualTo(AnyWindowOpen, 31, 24)
+      addMenuBonusesBrushTools()
+      If (BrushToolType=3)
+      {
+         kMenu("PVmenu", "Add", "Define cloner &source`tS", "BtnSetClonerBrushSource")
+      } Else If (BrushToolType<4)
+      {
+         kMenu("PVmenu", "Add", "&Cycle symmetry modes`tY", "toggleBrushSymmetryModes")
+         kMenu("PVmenu", "Add", "&Define symmetry point`tShift+Y", "BtnSetBrushSymmetryCoords")
+      }
+   } Else If isVarEqualTo(AnyWindowOpen, 31, 24)
    {
+      kMenu("PVmenu", "Add", "Cycle adapt to selection modes`tS", "togglePasteInPlaceAdaptModes")
+      kMenu("PVmenu", "Add/Uncheck", "Color adjustments on object`tU", "togglePasteInPlaceColorsFX")
+      If (PasteInPlaceApplyColorFX=1)
+         kMenu("PVmenu", "Check", "Color adjustments on object`tU")
+
+      kMenu("PVmenu", "Add/Uncheck", "Erase &initial area`tBackspace", "toggleErasePasteInPlace")
+      If (PasteInPlaceEraseInitial=1)
+         kMenu("PVmenu", "Check", "Erase &initial area`tBackspace")
+
       kMenu("PVmenu", "Add", "Reset to &initial position", "ResetTransformToolPos")
       If (shearImgX!=0 || shearImgY!=0)
          kMenu("PVmenu", "Add", "&Reset image skew offsets", "resetImgSkewOffsets")
@@ -52694,53 +53887,50 @@ BuildImgLiveEditMenu() {
       kMenu("PVmenu", "Add", "Selection &properties`tAlt+E", "PanelIMGselProperties")
 
    Menu, PVmenu, Add
-   If (showMainMenuBar!=1)
+   If (showMainMenuBar!=1 || mustPreventMenus=1)
    {
       createMenuMainView()
       kMenu("PVmenu", "Add", "Image vie&w", ":PVview")
+      createMenuInterfaceOptions()
+      kMenu("PVmenu", "Add", "Inter&face", ":PvUIprefs")
    }
 
    If (imgEditPanelOpened=1 && !isVarEqualTo(AnyWindowOpen, 10, 64, 66, 12) && drawing!=1)
-      kMenu("PVmenu", "Add", "&Hide dynamic object`tD", "toggleLiveEditObject")
+      kMenu("PVmenu", "Add", "&Hide dynamic object`tD", "toggleLiveEditObject", "preview")
 
    showThisMenu("PVmenu")
 }
 
-MenuCopyAction() {
-   If (thumbsDisplaying=1)
-      InvokeCopyFiles()
-   Else If isImgEditingNow()
-      CopyImage2clip()
+MenuSelectEndFiles() {
+   ThumbsNavigator("End", "+End")
 }
 
-MenuSelectAction() {
-   If (thumbsDisplaying=1)
-      MenuMarkThisFileNow()
-   Else
-      ToggleEditImgSelection()
+MenuSelectHomeFiles() {
+   ThumbsNavigator("Home", "+Home")
 }
 
-MenuChangeZoomMinus() {
+MenuChangeOSDZoomMinus() {
+   changeOSDfontSize(-1)
+}
+
+MenuChangeOSDZoomPlus() {
+   changeOSDfontSize(1)
+}
+
+MenuChangeImgZoomMinus() {
    changeZoom(-1)
 }
 
-MenuChangeZoomPlus() {
+MenuChangeImgZoomPlus() {
    changeZoom(1)
 }
 
 BuildSecondMenu(givenCoords:=0) {
    ; main menu
-   If (drawingShapeNow=1)
-   {
-      stopDrawingShape()
-      Return
-   }
-
    DestroyGIFuWin()
    If (thumbsDisplaying=1)
    {
-      invokeFileOptionsMenu(givenCoords)
-      Return
+      Sleep, -1
    } Else If (editingSelectionNow=1 && useGdiBitmap() && StrLen(getIDimage(currentFileIndex))>4 && imgEditPanelOpened!=1)
    {
       invokeSelectionAreaMenu("DoubleClick")
@@ -52751,7 +53941,7 @@ BuildSecondMenu(givenCoords:=0) {
    If (imgEditPanelOpened=1)
    {
       kMenu("PVmenu", "Add", "Collapse panel`tF11", "toggleImgEditPanelWindow")
-      Menu, PVmenu, Add, 
+      Menu, PVmenu, Add
       If (AnyWindowOpen=10)
       {
          kMenu("PVmenu", "Add", "Apply vie&wport effects inside selection`tCtrl+Shift+U", "ApplyColorAdjustsSelectedArea")
@@ -52760,36 +53950,49 @@ BuildSecondMenu(givenCoords:=0) {
 
       labelu := (AnyWindowOpen=10) ? "Close panel" : "Cancel tool"
       kMenu("PVmenu", "Add", labelu "`tEscape", "CloseWindow")
-      Menu, PVmenu, Add, 
-      kMenu("PVmenu", "Add", "Undo`tCtrl+Z", "ImgUndoAction", "image editing")
-      kMenu("PVmenu", "Add", "Redo`tCtrl+Y", "ImgRedoAction", "image editing")
-      Menu, PVmenu, Add, 
-      If (AnyWindowOpen=10)
-         kMenu("PVmenu", "Add", "Select area`tE", "ToggleEditImgSelection", "image editing")
-      Else
-         kMenu("PVmenu", "Add", "Select all`tCtrl+A", "MenuSelectAllAction")
+      if (undoLevelsRecorded>1)
+      {
+         Menu, PVmenu, Add
+         kMenu("PVmenu", "Add", "Undo`tCtrl+Z", "ImgUndoAction", "image editing")
+         kMenu("PVmenu", "Add", "Redo`tCtrl+Y", "ImgRedoAction", "image editing")
+      }
 
-      kMenu("PVmenu", "Add", "Square`tR", "makeSquareSelection", "image editing selection")
-      kMenu("PVmenu", "Add", "Flip selection W/H`tW", "flipSelectionWH", "image editing selection")
-      kMenu("PVmenu", "Add", "Limit selection to image boundaries`tL", "toggleLimitSelection")
-      Menu, PVmenu, Add, 
-      If (AnyWindowOpen!=10)
-         kMenu("PVmenu", "Add", "&Rotate selection by 45°`tShift+R", "MenuSelRotation")
+      Menu, PVmenu, Add
+      If (AnyWindowOpen=10)
+         kMenu("PVmenu", "Add", "Selection area`tE", "ToggleEditImgSelection", "image editing")
+      Else If (thumbsDisplaying=1)
+         kMenu("PVmenu", "Add", "Select all`tCtrl+A", "selectAllFiles",, " (files)")
+      Else
+         kMenu("PVmenu", "Add", "Select all`tCtrl+A", "selectEntireImage",, " (image canvas)")
+
+      If (editingSelectionNow=1 && drawingShapeNow!=1)
+      {
+         keyu := (liveDrawingBrushTool=1 && thumbsDisplaying!=1 || AnyWindowOpen=64) ? "" : "`tR"
+         kMenu("PVmenu", "Add", "Square (1:1)" keyu, "makeSquareSelection", "image editing selection", "Selection area: " sillySeparator)
+         kMenu("PVmenu", "Add", "Flip selection area W/H`tW", "flipSelectionWH", "image editing selection")
+         kMenu("PVmenu", "Add/Uncheck", "Limit selection to image area`tL", "toggleLimitSelection", "constrain")
+         If (LimitSelectBoundsImg=1)
+            kMenu("PVmenu", "Check", "Limit selection to image area`tL")
+
+         Menu, PVmenu, Add
+         kMenu("PVmenu", "Add", "&Rotate selection by 45°`tShift+R", "MenuSelRotation",,,1)
+
+         If (VPselRotation>0)
+            kMenu("PVmenu", "Add", "&Reset selection rotation`tShift+\", "resetSelectionRotation")
+   
+         If (innerSelectionCavityX>0 && innerSelectionCavityY>0)
+            kMenu("PVmenu", "Add", "R&eset exclusion area`tShift+\", "resetSelectionAreaCavity",, " (selection area)")
+      }
 
       If (AnyWindowOpen=10)
          kMenu("PVmenu", "Add", "Reset image vie&w", "BtnResetImageView", "viewport")
-      Else If (VPselRotation>0)
-         kMenu("PVmenu", "Add", "&Reset selection rotation`tShift+\", "resetSelectionRotation")
+      Else If (imgFxMode>1)
+         kMenu("PVmenu", "Add", "Reset image vie&w", "ResetImageView", "viewport")
 
-      If (innerSelectionCavityX>0 && innerSelectionCavityY>0)
-         kMenu("PVmenu", "Add", "R&eset exclude area`tShift+\", "resetSelectionAreaCavity")
-
-      Menu, PVmenu, Add, 
-      kMenu("PVmenu", "Add", "Adapt image to viewport`t/", "ToggleImageSizingMode")
+      Menu, PVmenu, Add 
+      kMenu("PVmenu", "Add", "Adapt image to viewport`t/", "MenuSetImageAdaptAll")
       If (AnyWindowOpen=10 || AnyWindowOpen=74)
-         kMenu("PVmenu", "Add", "Toggle colour &effects", "BtnToggleNoColorsFX")
-      Else
-         kMenu("PVmenu", "Add", "Hide tool preview object`tD", "toggleLiveEditObject")
+         kMenu("PVmenu", "Add", "Toggle colour &effects", "BtnToggleNoColorsFX",, " (viewport)")
 
       showThisMenu("PVmenu")
       Return
@@ -52814,33 +54017,39 @@ BuildSecondMenu(givenCoords:=0) {
    {
       kMenu("PVmenu", "Add", "&Save " zt2 "`tCtrl+S", "PanelSaveImg")
       kMenu("PVmenu", "Add", "&Refresh " zt2 "`tF5", "RefreshImageFileAction", "reload revert image")
-      Menu, PVmenu, Add, 
+      Menu, PVmenu, Add 
 
       If (thumbsDisplaying=1)
-         kMenu("PVmenu", "Add", "S&elect file`tSpace", "MenuSelectAction")
+         kMenu("PVmenu", "Add", "S&elect file`tSpace", "markThisFileNow")
       Else
-         kMenu("PVmenu", "Add", "S&election area`tE", "MenuSelectAction", "create")
+         kMenu("PVmenu", "Add", "S&election area`tE", "ToggleEditImgSelection", "create")
 
-      kMenu("PVmenu", "Add", "&All / none`tCtrl+A", "MenuSelectAllAction")
-      Menu, PVmenu, Add, 
+      ; kMenu("PVmenu", "Add", "&All / none`tCtrl+A", "selectEntireImage")
+      Menu, PVmenu, Add,
       If (thumbsDisplaying!=1)
       {
          kMenu("PVmenu", "Add", "&Copy image`tCtrl+C", "CopyImage2clip")
          If (editingSelectionNow=1)
+         {
             kMenu("PVmenu", "Add", "Cut area`tCtrl+X", "CutSelectedArea", "create image editing selection")
-
-         kMenu("PVmenu", "Add", "&Paste image`tCtrl+V", "tlbrPasteClipboardIMG")
+            kMenu("PVmenu", "Add", "&Paste image into`tCtrl+Shift+V", "PanelPasteInPlace")
+         } Else
+            kMenu("PVmenu", "Add", "&Paste image`tCtrl+V", "PasteClipboardIMG")
       } Else
       {
          kMenu("PVmenu", "Add", "Cut file(s) (for E&xplorer)`tCtrl+X", "MenuExplorerCutFiles")
-         kMenu("PVmenu", "Add", "&Copy file(s) to`tC", "InvokeCopyFiles")
-         kMenu("PVmenu", "Add", "&Move file(s) to`tM", "PanelMoveCopyFiles")
+         kMenu("PVmenu", "Add", "&Copy file(s) to...`tC", "InvokeCopyFiles")
+         kMenu("PVmenu", "Add", "&Move file(s) to...`tM", "PanelMoveCopyFiles")
          kMenu("PVmenu", "Add", "Pas&te file(s)`tCtrl+V", "MenuPasteHDropFiles")
       }
 
-      kl := (editingSelectionNow=1 && thumbsDisplaying!=1) ? "area" : "file(s)"
-      kMenu("PVmenu", "Add", "Er&ase " kl "`tDelete", "deleteKeyAction")
-      Menu, PVmenu, Add, 
+      isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
+      If (editingSelectionNow=1 && thumbsDisplaying!=1 && (!AnyWindowOpen || imgEditPanelOpened=1) && isTransPanel!=1)
+         kMenu("PVmenu", "Add", "Er&ase selected area`tDelete", "PanelEraseSelectedArea")
+      Else If (thumbsDisplaying!=1 && StrLen(getIDimage(currentFileIndex))>2)
+         kMenu("PVmenu", "Add", "Er&ase file`tDelete", "DeleteActivePicture")
+
+      Menu, PVmenu, Add
       If (maxFilesIndex>1)
       {
          kMenu("PVmenu", "Add", "Searc&h index`tF3", "PanelSearchIndex")
@@ -52850,28 +54059,32 @@ BuildSecondMenu(givenCoords:=0) {
       kMenu("PVmenu", "Add", "Reset " zt2 " vie&w`t\", "ResetImageView")
       If (thumbsDisplaying=1)
       {
-         Menu, PVmenu, Add, 
+         Menu, PVmenu, Add
          kMenu("PVmenu", "Add", "&Toggle list modes`tL", "toggleListViewModeThumbs")
          If (thumbsListViewMode>1)
          {
-            kMenu("PVmenu", "Add", "Increase text size`t+", "MenuChangeZoomPlus")
-            kMenu("PVmenu", "Add", "Decrease text size`t-", "MenuChangeZoomMinus")
+            kMenu("PVmenu", "Add", "Increase text size`t=", "MenuChangeOSDZoomPlus",,,1)
+            kMenu("PVmenu", "Add", "Decrease text size`t-", "MenuChangeOSDZoomMinus",,,1)
          } Else
          {
-            kMenu("PVmenu", "Add", "More columns`t+", "MenuChangeZoomPlus")
-            kMenu("PVmenu", "Add", "Fewer columns`t-", "MenuChangeZoomMinus")
+            kMenu("PVmenu", "Add", "More thumbnails columns`t=", "MenuChangeImgZoomPlus")
+            kMenu("PVmenu", "Add", "Fewer thumbnails columns`t-", "MenuChangeImgZoomMinus")
          }
       } Else
       {
-         Menu, PVmenu, Add, 
+         Menu, PVmenu, Add
          If (maxFilesIndex>1)
          {
             infoThumbsMode := (thumbsDisplaying=1) ? "Image view" : "List view"
             kMenu("PVmenu", "Add", infoThumbsMode "`tEnter", "MenuDummyToggleThumbsMode", "full view list")
-            kMenu("PVmenu", "Add", "Start slideshow`tSpace", "dummyInfoToggleSlideShowu", "play")
          }
-         kMenu("PVmenu", "Add", "Image information`tI", "ToggleHistoInfoBoxu", "histogram")
-         kMenu("PVmenu", "Add", "Open previous panel`tF8", "openPreviousPanel", "last opened")
+         keyu := (thumbsDisplaying=1 || markedSelectFile>0) ? "" : "`tSpace"
+         If !AnyWindowOpen
+         {
+            kMenu("PVmenu", "Add", "Start slideshow" keyu, "MenuGoPlaySlidesNow", "play")
+            kMenu("PVmenu", "Add", "Open previous panel`tF8", "openPreviousPanel", "last opened")
+         }
+         kMenu("PVmenu", "Add", "Image information and histogram HUD`tI", "ToggleHistoInfoBoxu", "viewport")
       }
    } Else
    {
@@ -52908,7 +54121,6 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
    {
       GetMouseCoord2wind(PVhwnd, mX, mY)
       createContextMenuCustomShapeDrawing(mX, mY, 0, 0, 0)
-      ; stopDrawingShape()
       Return
    } Else If (mustCaptureCloneBrush=1)
    {
@@ -52949,7 +54161,7 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
          kMenu("PVedit", "Add", "Close ima&ge and files list`tCtrl+F4", "closeDocuments", "reset")
       }
 
-      kMenu("PVedit", "Add", "P&aste clipboard`tCtrl+V", "PasteClipboardIMG")
+      kMenu("PVedit", "Add", "P&aste clipboard`tCtrl+V", "PasteClipboardIMG", "image")
       If (infoImgEditingNow=1)
       {
          createMenuAlphaMask()
@@ -52961,7 +54173,7 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
          kMenu("PVedit", "Add", "Print image(s)`tCtrl+P", "PanelPrintImage")
       }
 
-      kMenu("PVedit", "Add", "Ac&quire image (WIA)", "AcquireWIAimage", "capture devices")
+      kMenu("PVedit", "Add", "Ac&quire image (WIA)", "AcquireWIAimage", "capture devices scanner")
       Menu, PVedit, Add, 
       If (editingSelectionNow!=1 && infoImgEditingNow=1)
          kMenu("PVedit", "Add", "&Load freeform shape", "PanelManageVectorShapes", "freeform presets premade forms triangle moon cloud crescent heart water droplet rhombus star christian cross callout")
@@ -52988,15 +54200,20 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
    If StrLen(mustOpenStartFolder)>3
       kMenu("PVmenu", "Add", "&Scan files in folder`tSpace/Wheel", "MenuDoOpenStartFolder", "open index")
    If (thumbsDisplaying=1)
-      kMenu("PVmenu", "Add", "&Paste files`tCtrl+V", "PasteClipboardIMG", "index list")
+      kMenu("PVmenu", "Add", "&Paste file(s)`tCtrl+V", "MenuPasteHDropFiles", "index list clipboard")
 
-   If (StrLen(UserMemBMP)>2 && thumbsDisplaying!=1 && showMainMenuBar!=1)
+   If (StrLen(UserMemBMP)>2 && thumbsDisplaying!=1 && (showMainMenuBar!=1 || mustPreventMenus=1))
    {
       Menu, PVmenu, Add,
       If (undoLevelsRecorded>1 && undoLevelsRecorded!="")
       {
          kMenu("PVmenu", "Add", "&Undo`tCtrl+Z", "ImgUndoAction", "image edit")
          kMenu("PVmenu", "Add", "&Redo`tCtrl+Y", "ImgRedoAction", "image edit")
+         If (undoLevelsRecorded>5 && mustPreventMenus=1)
+         {
+            kMenu("PVmenu", "Add", "&Undo image (4 steps)`tCtrl+Alt+Z", "MenuUndoImgJumpy")
+            kMenu("PVmenu", "Add", "&Redo image (4 steps)`tCtrl+Alt+Y", "MenuRedoImgJumpy")
+         }
       }
       kMenu("PVmenu", "Add", "&Save image`tCtrl+S", "PanelSaveImg", "image edit")
       If FileExist(resultedFilesList[currentFileIndex, 1])
@@ -53029,7 +54246,7 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
          kMenu("PVmenu", "Add", "&Active / focused file", ":PVtActFile")
       }
 
-      If (thumbsDisplaying=1) || (thumbsDisplaying!=1 && editingSelectionNow!=1)
+      If (thumbsDisplaying=1) || (thumbsDisplaying!=1 && (editingSelectionNow!=1 || mustPreventMenus=1 && showMainMenuBar=1))
       {
          createMenuFilesIndexOptions()
          kMenu("PVmenu", "Add", "Files inde&x/list", ":PVfList")
@@ -53048,7 +54265,7 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
       createMenuMainView()
       kMenu("PVmenu", "Add", friendlyImgView, ":PVview")
 
-      If (thumbsDisplaying!=1 && StrLen(UserMemBMP)<3 && currentFileIndex!=0)
+      If (thumbsDisplaying!=1 && (editingSelectionNow!=1 || mustPreventMenus=1 && showMainMenuBar=1))
       {
          createMenuAnnotations()
          kMenu("PVmenu", "Add", "&Annotation", ":PVsounds")
@@ -53058,13 +54275,13 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
       {
          createMenuNavigation()
          kMenu("PVmenu", "Add", "Navi&gation", ":PVnav")
-         If (thumbsDisplaying!=1 && editingSelectionNow!=1)
+         If (thumbsDisplaying!=1 && (editingSelectionNow!=1 || mustPreventMenus=1 && showMainMenuBar=1))
          {
             createMenuSlideshows()
             kMenu("PVmenu", "Add", "Slides&how", ":PVslide")
          }
       }
-      Menu, PVmenu, Add,
+      Menu, PVmenu, Add
    } Else If StrLen(UserMemBMP)>2
    {
       If (editingSelectionNow=1 && thumbsDisplaying!=1)
@@ -53081,7 +54298,7 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
    If (markedSelectFile && thumbsDisplaying!=1)
       kMenu("PVmenu", "Add", "Dro&p files selection`tShift+Tab", "dropFilesSelection")
 
-   If (thumbsDisplaying=1 || mustPreventMenus=1 && maxFilesIndex>2 && CurrentSLD)
+   If (thumbsDisplaying=1)
    {
       createMenuFilesSelections("PVfileSel")
       kMenu("PVmenu", "Add", "F&iles selection", ":PVfileSel")
@@ -53141,69 +54358,144 @@ createMenuSeenImages() {
    kMenu("PVmenu", "Add", "&Already seen images statistics", "PanelSeenStats", "stats")
 }
 
-kMenu(mena, actu, labelu, funcu:=0, keywords:="") {
+kMenu(mena, actu, labelu, funcu:=0, keywords:="", altLabel:="", keepUp:=0) {
+   ; mena = menu name to add to
+   ; actu = menu actions to perform, eg. add, disable, check
+   ; labelu = menu item label
+   ; funcu = the function to perform on menu click
+   ; keywords for the menu when searched
+
    Static objuA := [], indexu := 0
         , objuB := new hashtable()
-        , objuC := []
+        , objuC := [], funcListu := []
 
    If (actu="Reset" && !mena)
    {
       indexu := 0
-      objuA := []
-      objuC := []
-      objuB := ""
+      menuCustomNames := []
+      funcListu := []
+      objuA := [] ; menu items by index with properties objuA[menuIndex] := [prop1, prop2,... etc]
+      objuC := [] ; menu names and their properties objuC[mena] := [menu-name, container-menu, accelatorkey]
+      objuB := "" ; maps menu/menu items pairs to indexexes of objuA; objuB[mena "-" labelu] := menuIndex
       objuB := new hashtable()
       Return
    } Else If (actu="Give" && !mena)
       Return [objuA, objuB, objuC]
+   Else If (actu="FuncGive" && !mena)
+      Return funcListu
 
-   zLabelu := StrReplace(labelu, "%", "`%")
-   zLabelu := StrReplace(zlabelu, ",", "`,")
+   If (mustPreventMenus=1)
+   {
+      If InStr(altLabel, sillySeparator)
+         labelu := StrReplace(altLabel, sillySeparator) labelu
+      Else If InStr(labelu, "`t")
+         labelu := StrReplace(labelu, "`t", altLabel "`t")
+      Else
+         labelu := labelu altLabel 
+   }
+
+   ; mustPreventMenus is used to generate a searchable list of the menus, used by PanelQuickSearchMenuOptions() via buildQuickSearchMenus()
+   ; when this is used, some menu items are hidden, while others are added, and the menus themselves are not invoked. showThisMenu() obeys this
+
+   ; simulateMenusMode is used when a user presses a keyboard key, and it is a custom defined one
+   ; funcListu is used to determine if the function is allowed to execute or not, in KeyboardResponder()
+   If (!InStr(funcu, ":") && simulateMenusMode!=1)
+   {
+      ; rename the menus to reflect the custom shortcut[s]
+      ckbd := testCustomKBDcontexts("." funcu)
+      If ckbd
+         thisu := ckbd
+
+      If (thisu && InStr(actu, "Add") && funcu && labelu)
+      {
+         ; fnOutputDebug(funcu "() " userCustomKeysDefined["." funcu, 6])
+         oLabelu := labelu
+         If InStr(labelu, "`t")
+         {
+            defu := A_Space sillySeparator  processHumanKkbdName(SubStr(labelu, InStr(labelu, "`t") + 1))
+            labelu := SubStr(labelu, 1, InStr(labelu, "`t") - 1)
+         }
+         If (userCustomKeysDefined[thisu, 6]!="" && SubStr(userCustomKeysDefined[thisu, 1], 1, 1)!="?")
+            labelu .= "`t" userCustomKeysDefined[thisu, 6]
+
+         menuCustomNames[mena "." oLabelu] := labelu
+      } Else If (InStr(labelu, "`t") && InStr(actu, "Add"))
+      {
+         ; when the added menu item has a default keyboard shorcut but the functions are not the same
+         ; assume this default keyboard shortcut is disabled
+
+         c := defineKBDcontexts(0)
+         skeyu := processHumanKkbdName(SubStr(labelu, InStr(labelu, "`t") + 1))
+         shu := c . skeyu
+         If (StrLen(userCustomKeysDefined[shu, 1])>0 && userCustomKeysDefined[shu, 1]!=funcu)
+         {
+            oLabelu := labelu
+            defu := A_Space sillySeparator skeyu
+            labelu := SubStr(labelu, 1, InStr(labelu, "`t") - 1)
+            menuCustomNames[mena "." oLabelu] := labelu
+         }
+      }
+
+      If (RegExMatch(actu, "i)(disable|check)") && labelu && menuCustomNames[mena "." labelu] && !InStr(actu, "Add"))
+         labelu := menuCustomNames[mena "." labelu]
+   }
+
+   If (simulateMenusMode!=1)
+   {
+      zLabelu := StrReplace(labelu, "%", "`%")
+      zLabelu := StrReplace(zlabelu, ",", "`,")
+   }
+
    If (InStr(actu, "Add") && funcu && labelu)
    {
       If !InStr(funcu, ":")
       {
-         accel :=  InStr(labelu, "&") ? Format("{:U}", SubStr(labelu, InStr(labelu, "&") + 1, 1)) : ""
          kLabelu := StrReplace(labelu, "&")
-         gup := StrSplit(kLabelu, "`t")
-         flabel := Trimmer(fuzzifyString(gup[1]))
-         testu := gup[1] A_Space funcu
-         If (RegExMatch(testu, "i)(image|bitmap)") && !InStr(keywords, "img"))
-            keywords .= " img"
-         If (InStr(testu, "duplicate") && !InStr(keywords, "dupes"))
-            keywords .= " dupes"
-         If (InStr(testu, "image") && !InStr(keywords, "bitmap"))
-            keywords .= " bitmap"
-         If (InStr(testu, "img") && !InStr(keywords, "image"))
-            keywords .= " image"
-         If (InStr(testu, "create") && !InStr(keywords, "new"))
-            keywords .= " new"
-         If (InStr(testu, "insert") && !InStr(keywords, "add"))
-            keywords .= " add"
-         If (InStr(testu, "favo") && !InStr(keywords, "faves"))
-            keywords .= " faves"
-         If (InStr(testu, "save") && !InStr(keywords, "write"))
-            keywords .= " write"
-         If (InStr(testu, "statistic") && !InStr(keywords, "stats"))
-            keywords .= " stats"
-         If (InStr(testu, "folder") && !InStr(keywords, "directory"))
-            keywords .= " directory"
-         If (InStr(testu, "delete") && !InStr(keywords, "remove"))
-            keywords .= " remove"
-         If (InStr(testu, "remove") && !InStr(keywords, "delete"))
-            keywords .= " delete"
-         If (InStr(testu, "erase") && !InStr(keywords, "delete"))
-            keywords .= " delete"
-         If (InStr(testu, "purge") && !InStr(keywords, "delete"))
-            keywords .= " delete"
-         If ((InStr(testu, "preference") || InStr(testu, "settings")) && !InStr(keywords, "prefs"))
-            keywords .= " prefs config"
-         fkwds := keywords ? fuzzifyString(keywords) : ""
-         ffuncu := fuzzifyString(StrReplace(funcu, "menu"))
+         If (mustPreventMenus=1 && simulateMenusMode!=1)
+         {
+            accel :=  InStr(labelu, "&") ? Format("{:U}", SubStr(labelu, InStr(labelu, "&") + 1, 1)) : ""
+            gup := StrSplit(kLabelu, "`t")
+            flabel := Trimmer(fuzzifyString(gup[1]))
+            testu := gup[1] A_Space funcu
+            If (RegExMatch(testu, "i)(image|bitmap)") && !InStr(keywords, "img"))
+               keywords .= " img"
+            If (InStr(testu, "duplicate") && !InStr(keywords, "dupes"))
+               keywords .= " dupes"
+            If (InStr(testu, "image") && !InStr(keywords, "bitmap"))
+               keywords .= " bitmap"
+            If (InStr(testu, "img") && !InStr(keywords, "image"))
+               keywords .= " image"
+            If (InStr(testu, "create") && !InStr(keywords, "new"))
+               keywords .= " new"
+            If (InStr(testu, "insert") && !InStr(keywords, "add"))
+               keywords .= " add"
+            If (InStr(testu, "favo") && !InStr(keywords, "faves"))
+               keywords .= " faves"
+            If (InStr(testu, "save") && !InStr(keywords, "write"))
+               keywords .= " write"
+            If (InStr(testu, "statistic") && !InStr(keywords, "stats"))
+               keywords .= " stats"
+            If (InStr(testu, "folder") && !InStr(keywords, "directory"))
+               keywords .= " directory"
+            If (InStr(testu, "delete") && !InStr(keywords, "remove"))
+               keywords .= " remove"
+            If (InStr(testu, "remove") && !InStr(keywords, "delete"))
+               keywords .= " delete"
+            If (InStr(testu, "erase") && !InStr(keywords, "delete"))
+               keywords .= " delete"
+            If (InStr(testu, "purge") && !InStr(keywords, "delete"))
+               keywords .= " delete"
+            If ((InStr(testu, "preference") || InStr(testu, "settings")) && !InStr(keywords, "prefs"))
+               keywords .= " prefs config"
+            fkwds := keywords ? fuzzifyString(keywords) : ""
+            ffuncu := fuzzifyString(StrReplace(funcu, "menu"))
+         }
+
          indexu++
-         objuA[indexu] := [gup[1], funcu, keywords, 1, 0, mena, gup[2], accel, flabel, fkwds, ffuncu]
+         objuA[indexu] := [gup[1], funcu, keywords defu, 1, 0, mena, gup[2], accel, flabel, fkwds, ffuncu, keepUp]
          objuB[mena "-" klabelu] := indexu
-      } Else
+         funcListu[funcu] := [indexu, gup[2], keepUp]
+      } Else If (mustPreventMenus=1 && simulateMenusMode!=1)
       {
          kLabelu := StrReplace(labelu, "&")
          gLabelu := kLabelu ? kLabelu : "Q" mena
@@ -53214,11 +54506,14 @@ kMenu(mena, actu, labelu, funcu:=0, keywords:="") {
          objuC[kfuncu, 4] := InStr(labelu, "&") ? SubStr(labelu, InStr(labelu, "&") + 1, 1) : ""
       }
 
-      Menu, % mena, Add, % zLabelu, % funcu
+      ; fnOutputDebug(mustPreventMenus "=" zLabelu " | " funcu "() | menu=" mena)
+      If (mustPreventMenus!=1 && simulateMenusMode!=1)
+         Menu, % mena, Add, % zLabelu, % funcu
+
       If (!InStr(funcu, ":") && InStr(actu, "Uncheck"))
       {
          objuA[indexu, 5] := -1
-         If (mustPreventMenus!=1)
+         If (mustPreventMenus!=1 && simulateMenusMode!=1)
             Try Menu, % mena, Icon, % zLabelu, %mainCompiledPath%\resources\menu-checkable.ico
       }
    } Else If (RegExMatch(actu, "i)(disable|check)") && labelu)
@@ -53226,21 +54521,28 @@ kMenu(mena, actu, labelu, funcu:=0, keywords:="") {
       kLabelu := StrReplace(labelu, "&")
       thisindexu := objuB[mena "-" klabelu]
       If (actu="Disable" || actu="Check/Disable")
+      {
+         pkFunc := objuA[thisIndexu, 2]
          objuA[thisindexu, 4] := 0
-      Else If (actu="Check" || actu="Check/Disable")
+         funcListu[pkFunc] := 0
+      } Else If (actu="Check" || actu="Check/Disable")
+      {
          objuA[thisindexu, 5] := 1
-      Else If (mustPreventMenus!=1)
+      } Else If (mustPreventMenus!=1 && simulateMenusMode!=1)
       {
          If InStr(actu, "Check")
             Menu, % mena, Icon, % zLabelu
       }
 
-      If (actu="Check/Disable")
+      If (simulateMenusMode!=1 && mustPreventMenus!=1)
       {
-         Menu, % mena, Check, % zLabelu
-         Menu, % mena, Disable, % zLabelu
-      } Else
-         Menu, % mena, % actu, % zLabelu
+         If (actu="Check/Disable")
+         {
+            Menu, % mena, Check, % zLabelu
+            Menu, % mena, Disable, % zLabelu
+         } Else 
+            Menu, % mena, % actu, % zLabelu
+      }
    }
 }
 
@@ -53322,7 +54624,9 @@ deleteMenus() {
     If (mustPreventMenus=1)
        Return
 
+    ; fnOutputDebug("menus deleted")
     Static menusList := "PVmenu|PValpha|PVtFileOpen|PVtFileImgAct|PVselSize|PVselRatio|PVimgTransform|PVimgCreate|PVimgFilters|PVimgDraw|PVperfs|PVfileSel|PVslide|PVnav|PVview|PVfList|PVtActFile|PVfilesActs|PVprefs|PvUIprefs|PVfaves|PVopenF|PVsort|PVedit|PVselv|PVsounds|PvImgAdapt|PVimgColorsFX|PVimgSdepth|PVimgVProt|PVimgHistos|PVlTools|PVstats|PVhelp|PvUItoolbarMenu|PVshapeTension|PVselAlign"
+    menuCustomNames := []
     kMenu(0, "Reset", 0)
     Loop, Parse, menusList, |
         Try Menu, % A_LoopField, Delete
@@ -53578,7 +54882,7 @@ MenuSetVolumeUp() {
 }
 
 MenuSetImgZoom(a, b) {
-   zoomLevel := StrReplace(StrReplace(a, "`tNUM *"), "%")/100
+   zoomLevel := StrReplace(StrReplace(a, "`tNumpad *"), "%")/100
    IMGresizingMode := 4
    customZoomAdaptMode := 0
    interfaceThread.ahkassign("IMGresizingMode", IMGresizingMode)
@@ -53619,7 +54923,8 @@ createMenuFilesSelections(whichMenu) {
    If (markedSelectFile>1 || EntryMarkedMoveIndex)
       kMenu(whichMenu, "Add", "Select none`tCtrl+D", "dropFilesSelection", "files list")
    kMenu(whichMenu, "Add", "Select all`tCtrl+A", "selectAllFiles", "files list")
-   kMenu(whichMenu, "Add", "Select / deselect file`tTab / Space", "MenuMarkThisFileNow")
+   keyu := (thumbsDisplaying=1 || markedSelectFile>1) ? "Space" : "Tab"
+   kMenu(whichMenu, "Add", "Select / deselect file`t" keyu, "markThisFileNow")
    kMenu(whichMenu, "Add", "Select &random", "PanelSelectRandomFiles")
    kMenu(whichMenu, "Add", "Select all in same folder`tE", "QuickSelectFilesSameFolder")
    kMenu(whichMenu, "Add", "Select ine&xistent files", "SelectFilesDead", "missing dead")
@@ -53632,11 +54937,12 @@ createMenuFilesSelections(whichMenu) {
    If (markedSelectFile>1)
    {
       Menu, % whichMenu, Add
-      kMenu(whichMenu, "Add", "Revie&w selected files`tR", "PanelReviewSelectedFiles")
-      kMenu(whichMenu, "Add", "&Calculate total files size`tShift+L", "CalculateSelectedFilesSizes", "file details")
+      keyu := (thumbsDisplaying=1) ? "`tR" : ""
+      kMenu(whichMenu, "Add", "Revie&w selected files" keyu, "PanelReviewSelectedFiles")
+      keyu := (thumbsDisplaying=1) ? "`tShift+L" : ""
+      kMenu(whichMenu, "Add", "&Calculate total files size" keyu, "CalculateSelectedFilesSizes", "file details")
       kMenu(whichMenu, "Add", "Filter files list to selection`tCtrl+Tab", "filterToFilesSelection")
    }
-
 }
 
 InvokeRecentMenu(givenCoords:=0) {
@@ -53657,8 +54963,8 @@ createMenuOpenRecents(modus:=0) {
    countItemz := 0
    If (modus!="simple")
    {
-      kMenu("PVopenF", "Add", "&Image or slideshow`tCtrl+O", "OpenDialogFiles", "open image files")
-      kMenu("PVopenF", "Add", "&Folder recursively`tShift+O", "OpenFolders", "open image folder files")
+      kMenu("PVopenF", "Add", "&Image or slideshow`tCtrl+O", "OpenDialogFiles", "open image files", "Open " sillySeparator)
+      kMenu("PVopenF", "Add", "&Folder recursively`tShift+O", "OpenFolders", "open image folder files", "Open a " sillySeparator)
       kMenu("PVopenF", "Add", "&New QPV instance`tCtrl+Shift+N", "OpenNewQPVinstance")
       If (maxFilesIndex<1 || !CurrentSLD)
       {
@@ -53908,6 +55214,13 @@ createMenuFilesIndexOptions() {
 
       kMenu("PVfList", "Add", "&Keywords indexer", "PanelKeywordsDetector")
       kMenu("PVfList", "Add", "Searc&h index`tCtrl+F3", "PanelSearchIndex", "files list")
+      If (mustPreventMenus=1 && userSearchString)
+      {
+         kMenu("PVfList", "Add", "S&earch next`tF3", "MenuSearchNextIndex")
+         kMenu("PVfList", "Add", "Search p&revious`tShift+F3", "MenuSearchPrevIndex")
+         kMenu("PVfList", "Add", "Erase search &criteria", "EraseSearchEdit")
+      }
+
       kMenu("PVfList", "Add", "Search and re&place`tCtrl+H", "PanelSearchAndReplaceIndex", "files index list")
       kMenu("PVfList", "Add", "&Index filters`tCtrl+F", "PanelEnableFilesFilter", "files list")
       If (StrLen(filesFilter)>1 && !testIsDupesList())
@@ -53918,11 +55231,11 @@ createMenuFilesIndexOptions() {
 createMenuInterfaceOptions() {
    If (AnyWindowOpen && imgEditPanelOpened=1)
    {
-      kMenu("PvUIprefs", "Add/Uncheck", "&Collapse tool panel`tF8", "toggleImgEditPanelWindow")
+      kMenu("PvUIprefs", "Add/Uncheck", "&Collapse tool panel`tF11", "toggleImgEditPanelWindow")
       If (panelWinCollapsed=1)
-         kMenu("PvUIprefs", "Check", "&Collapse tool panel`tF8")
+         kMenu("PvUIprefs", "Check", "&Collapse tool panel`tF11")
       Menu, PvUIprefs, Add
-      If (showMainMenuBar=1)
+      If (showMainMenuBar=1 || mustPreventMenus=1)
       {
          kMenu("PvUIprefs", "Add", "&Search menu options`t;", "PanelQuickSearchMenuOptions", "keyboard")
          Menu, PvUIprefs, Add
@@ -53933,12 +55246,12 @@ createMenuInterfaceOptions() {
    {
       infoThumbsList := defineListViewModes()
       infoThumbsMode := (thumbsDisplaying=1) ? "Switch to image view" : "Switch to " infoThumbsList " list view"
-      If (thumbsDisplaying=1 && showMainMenuBar!=1)
+      If (thumbsDisplaying=1 && (showMainMenuBar!=1 || mustPreventMenus=1))
          kMenu("PvUIprefs", "Add", "C&ycle view modes`tL", "toggleListViewModeThumbs")
 
       If (maxFilesIndex>0 && !AnyWindowOpen)
-         kMenu("PvUIprefs", "Add", infoThumbsMode "`tEnter/MClick", "MenuDummyToggleThumbsMode")
-      If (maxFilesIndex>1 && !AnyWindowOpen && prevOpenedWindow[2])
+         kMenu("PvUIprefs", "Add", infoThumbsMode "`tEnter", "MenuDummyToggleThumbsMode")
+      If (!AnyWindowOpen && prevOpenedWindow[2])
          kMenu("PvUIprefs", "Add", "Open pre&vious panel`tF8", "openPreviousPanel", "show")
 
       If (thumbsDisplaying!=1 && !AnyWindowOpen)
@@ -53946,26 +55259,30 @@ createMenuInterfaceOptions() {
 
       If (thumbsDisplaying!=1)
       {
-         kMenu("PvUIprefs", "Add/Uncheck", "&Touch screen mode", "ToggleTouchMode")
+         kMenu("PvUIprefs", "Add/Uncheck", "&Touch screen mode (viewport)", "ToggleTouchMode")
          If (TouchScreenMode=1)
-            kMenu("PvUIprefs", "Check", "&Touch screen mode")
+            kMenu("PvUIprefs", "Check", "&Touch screen mode (viewport)")
       }
 
       Menu, PvUIprefs, Add
+   } Else 
+      kMenu("PvUIprefs", "Add", "&Search menu options`t;", "PanelQuickSearchMenuOptions")
+
+   If (isNowAlphaPainting()!=1)
+   {
+      kMenu("PvUIprefs", "Add/Uncheck", "Dar&k mode UI", "ToggleDarkModus", "disability handicap eyes eyesight black display")
+      If (uiUseDarkMode=1)
+         kMenu("PvUIprefs", "Check", "Dar&k mode UI")
+
+      kMenu("PvUIprefs", "Add/Uncheck", "&Large UI fonts", "ToggleLargeUIfonts", "disability handicap eyes eyesight large display")
+      If (PrefsLargeFonts=1)
+         kMenu("PvUIprefs", "Check", "&Large UI fonts")
    }
-
-   kMenu("PvUIprefs", "Add/Uncheck", "Dar&k mode", "ToggleDarkModus", "disability handicap eyes eyesight black display")
-   If (uiUseDarkMode=1)
-      kMenu("PvUIprefs", "Check", "Dar&k mode")
-
-   kMenu("PvUIprefs", "Add/Uncheck", "&Large UI fonts", "ToggleLargeUIfonts", "disability handicap eyes eyesight large display")
-   If (PrefsLargeFonts=1)
-      kMenu("PvUIprefs", "Check", "&Large UI fonts")
 
    If (AnyWindowOpen!=14)
    {
-      kMenu("PvUIprefs", "Add", "Increase viewport text size`tCtrl+Plus", "MenuChangeZoomPlus", "disability handicap eyes eyesight large")
-      kMenu("PvUIprefs", "Add", "Decrease viewport text size`tCtrl+Minus", "MenuChangeZoomMinus", "disability  handicap eyes eyesight large")
+      kMenu("PvUIprefs", "Add", "Increase viewport text size`tCtrl+=", "MenuChangeOSDZoomPlus", "disability handicap eyes eyesight large",,1)
+      kMenu("PvUIprefs", "Add", "Decrease viewport text size`tCtrl+-", "MenuChangeOSDZoomMinus", "disability  handicap eyes eyesight large",,1)
    }
 
    Menu, PvUIprefs, Add
@@ -53984,12 +55301,12 @@ createMenuInterfaceOptions() {
    If (AnyWindowOpen!=14 && imgEditPanelOpened!=1 && drawingShapeNow!=1)
    {
       keyword := (folderTreeWinOpen=1) ? " hide" : " display"
-      kMenu("PvUIprefs", "Add/Uncheck", "Show &folders tree panel`tF4", "MenuPanelFoldersTree", "window treeview explore" keyword)
+      kMenu("PvUIprefs", "Add/Uncheck", "Show &folders tree panel`tF4", "MenuPanelFoldersTree", "window treeview directories explore" keyword)
       If (folderTreeWinOpen=1)
          kMenu("PvUIprefs", "Check", "Show &folders tree panel`tF4")
    }
 
-   If (!throwErrorNoImageLoaded(1) && thumbsDisplaying!=1 && drawingShapeNow!=1)
+   If (isImgEditingNow() && thumbsDisplaying!=1 && drawingShapeNow!=1)
    {
       createMenuVPhudHisto()
       kMenu("PvUIprefs", "Add", "Show histogram", ":PVimgHistos")
@@ -54029,7 +55346,12 @@ createMenuInterfaceOptions() {
       friendly := (thumbsDisplaying=1) ? "Image previe&w box`tZ" : "Auto-display image navi&gator`tZ"
       kMenu("PvUIprefs", "Add/Uncheck", friendly, "ToggleImgNavBox", "map" keyword)
       If (showHUDnavIMG=1)
+      {
          kMenu("PvUIprefs", "Check", friendly)
+         kMenu("PvUIprefs", "Add/Uncheck", "&Large preview size", "ToggleImgNavSizeBox")
+         If (HUDnavBoxSize>=125)
+            kMenu("PvUIprefs", "Check", "&Large preview size")
+      }
    }
 
    If (maxFilesIndex>0 && CurrentSLD && thumbsDisplaying!=1)
@@ -54043,7 +55365,7 @@ createMenuInterfaceOptions() {
    If (!AnyWindowOpen && drawingShapeNow!=1)
    {
       Menu, PvUIprefs, Add
-      kMenu("PvUIprefs", "Add", "Additional settings`tF12", "PanelPrefsWindow")
+      kMenu("PvUIprefs", "Add", "Additional settings`tF12", "PanelPrefsWindow",, " (interface)")
    }
 }
 
@@ -54584,15 +55906,16 @@ ToggleInfoBoxu() {
 
 ToggleImgCaptions() {
     Static lastInvoked := 1
-    If (thumbsDisplaying=1)
-       Return
-
     If (slideShowRunning=1)
        ToggleSlideShowu()
 
     showImgAnnotations := !showImgAnnotations
     INIaction(1, "showImgAnnotations", "General")
-    SetTimer, dummyRefreshImgSelectionWindow, -50
+    If (thumbsDisplaying!=1)
+       SetTimer, dummyRefreshImgSelectionWindow, -50
+    Else
+       dummyTimerDelayiedImageDisplay(25)
+
     If (showImgAnnotations=1)
     {
        imgPath := getIDimage(currentFileIndex)
@@ -54747,9 +56070,10 @@ invokeFoldersListerMenu() {
     friendly := (SLDtypeLoaded=1) ? "Currently opened" : "Selected file"
     kMenu("PVmFexplorer", "Add", friendly " folder:", "dummy")
     kMenu("PVmFexplorer", "Disable", friendly " folder:")
-    Try kMenu("PVmFexplorer", "Add", PathCompact(baseFolder, 40), "OpenQPVfileFolder")
+    kl := PathCompact(baseFolder, 40)
+    Try kMenu("PVmFexplorer", "Add", kl, "OpenQPVfileFolder")
     If (SLDtypeLoaded=1)
-       Try kMenu("PVmFexplorer", "Disable", PathCompact(baseFolder, 40))
+       Try kMenu("PVmFexplorer", "Disable", kl)
 
     Menu, PVmFexplorer, Add
     If (FolderExist(thisFolder) && hasAddedSubs>0)
@@ -54767,8 +56091,8 @@ invokeFoldersListerMenu() {
        Try kMenu("PVmFexplorer", "Add", "Breadcrumb folders &hierarchy", ":PVmFparents")
        If (parentsObj.Count()>1 && SLDtypeLoaded=1)
        {
-          kMenu("PVmFexplorer", "Add", "Next breadcrumb`tCtrl+Page Down", "MenuFolderExplorerUpDown")
-          kMenu("PVmFexplorer", "Add", "Previous breadcrumb`tCtrl+Page Up", "MenuFolderExplorerUpDown")
+          kMenu("PVmFexplorer", "Add", "Breadcrumb deeper level`tCtrl+Page Down", "MenuFolderExplorerBreadDeeper")
+          kMenu("PVmFexplorer", "Add", "Breadcrumb higher level`tCtrl+Page Up", "MenuFolderExplorerBreadHigher")
        }
     }
 
@@ -54778,8 +56102,8 @@ invokeFoldersListerMenu() {
        Try kMenu("PVmFexplorer", "Add", "Sibling folders", ":PVmFsibs")
        If (SLDtypeLoaded=1)
        {
-          kMenu("PVmFexplorer", "Add", "Next sibling`tAlt+Page Down", "MenuFolderExplorerSiblings")
-          kMenu("PVmFexplorer", "Add", "Previous sibling`tAlt+Page Up", "MenuFolderExplorerSiblings")
+          kMenu("PVmFexplorer", "Add", "Open next sibling`tAlt+Page Down", "MenuFolderExplorerNextSiblings")
+          kMenu("PVmFexplorer", "Add", "Open previous sibling`tAlt+Page Up", "MenuFolderExplorerPrevSiblings")
        }
     } Else
     {
@@ -54790,14 +56114,14 @@ invokeFoldersListerMenu() {
     Menu, PVmFexplorer, Add
     If (folderTreeWinOpen!=1)
     {
-       kMenu("PVmFexplorer", "Add/UnCheck", "Folders tree view`tF4", "MenuPanelFoldersTree")
+       kMenu("PVmFexplorer", "Add/UnCheck", "Folders tree view`tF4", "MenuPanelFoldersTree", "window treeview directories explore")
        kMenu("PVmFexplorer", "Add", "Open omnibox at file location`tShift+;", "invokeOmniBoxCurrentFile")
     } Else
     {
        kMenu("PVmFexplorer", "Add/UnCheck", "&Large UI fonts", "folderTreeToggleLargeUIfonts")
        If (PrefsLargeFonts=1)
           kMenu("PVmFexplorer", "Check", "&Large UI fonts")
-       kMenu("PVmFexplorer", "Add", "Open omnibox from folder tree item`t;", "fromFolderTreeToOmniBox")
+       kMenu("PVmFexplorer", "Add", "Open omnibox from folder tree item", "fromFolderTreeToOmniBox")
        kMenu("PVmFexplorer", "Add/UnCheck", "Sho&w folder details", "toggleFDtreeInfos")
        If (showFolderTreeDetails=1)
           kMenu("PVmFexplorer", "Check", "Sho&w folder details")
@@ -54810,17 +56134,19 @@ invokeFoldersListerMenu() {
     Return "m"
 }
 
-MenuFolderExplorerUpDown(menuItem) {
-   If InStr(menuItem, "next")
-      FileExploreUpDownLevel(1)
-   Else
+MenuFolderExplorerBreadHigher() {
       FileExploreUpDownLevel(-1)
 }
 
-MenuFolderExplorerSiblings(menuItem) {
-   If InStr(menuItem, "next")
+MenuFolderExplorerBreadDeeper() {
+      FileExploreUpDownLevel(1)
+}
+
+MenuFolderExplorerNextSiblings() {
       FileExploreSiblingsNav(1)
-   Else
+}
+
+MenuFolderExplorerPrevSiblings() {
       FileExploreSiblingsNav(-1)
 }
 
@@ -54858,6 +56184,7 @@ tryOpenGivenFolder(thisFolder, oldFolder) {
    {
       showTOOLtip("ERROR: Folder not found or access denied:`n" thisFolder)
       SoundBeep , 300, 100
+      TriggerMenuBarUpdate()
       Return
    }
 
@@ -54900,6 +56227,10 @@ tryOpenGivenFolder(thisFolder, oldFolder) {
    currentFileIndex := clampInRange(oldIndex, 1, maxFilesIndex)
    If maxFilesIndex
       dummyTimerDelayiedImageDisplay(50)
+
+   SetTimer, TriggerMenuBarUpdate, -150
+   If (ShowAdvToolbar=1)
+      SetTimer, createGUItoolbar, -150
 
    If (hasFailed=1 || maxFilesIndex<1)
    {
@@ -54954,6 +56285,7 @@ toggleEllipseSelection(modus:=-1) {
       EllipseSelectMode := modus
 
    interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+   interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
    If (customShapePoints.Count()<3 && EllipseSelectMode=2)
    {
       RegAction(0, "FillAreaCustomShape",, 5)
@@ -55249,9 +56581,6 @@ ToggleTitleBaru() {
 
 ToggleLargeUIfonts() {
     PrefsLargeFonts := !PrefsLargeFonts
-    ; If (AnyWindowOpen=14)
-    ;    PanelPrefsWindow()
-
     calcHUDsize()
     INIaction(1, "PrefsLargeFonts", "General")
     interfaceThread.ahkassign("PrefsLargeFonts", PrefsLargeFonts)
@@ -55289,8 +56618,16 @@ ToggleTexyBGR() {
     showDelayedTooltip("Viewport ambiental texture: " friendly, A_ThisFunc, 1)
 }
 
-ToggleDarkModus() {
+ToggleCustomKBDsMode() {
+    allowCustomKeys := !allowCustomKeys
+    INIaction(1, "allowCustomKeys", "General")
+    friendly := (allowCustomKeys=1) ? "ACTIVATED" : "DEACTIVATED"
+    showTOOLtip("User customized keyboard shortcuts: " friendly, A_ThisFunc, 1)
+    loadCustomUserKbds()
+    SetTimer, RemoveTooltip, % -msgDisplayTime
+}
 
+ToggleDarkModus() {
     uiUseDarkMode := !uiUseDarkMode
     If ((isWinXP=1 || A_OSVersion="WIN_7") && uiUseDarkMode=1)
        msgBoxWrapper(appTitle ": WARNING", "This option was not optimized for your operating system.", 0, 0, "exclamation")
@@ -55303,7 +56640,10 @@ ToggleDarkModus() {
     showDelayedTooltip("Dark mode: " friendly)
     thisFunc := prevOpenedWindow[2]
     If (VisibleQuickMenuSearchWin=1)
+    {
        closeQuickSearch()
+       SetTimer, PanelQuickSearchMenuOptions, -200
+    }
 
     ; tabzDarkModus := (uiUseDarkMode=1) ? "-Border +Buttons cFFFFaa" : ""
     If (AnyWindowOpen && thisfunc)
@@ -55365,6 +56705,10 @@ dummyNavBoxInfo() {
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
+tlbrVectorDrawingModeContextMenu() {
+   createContextMenuCustomShapeDrawing(0, 0, 0, 0, 0, "tlbr")
+}
+
 invokeHistoMenu(givenCoords:=0) {
    deleteMenus()
    createMenuVPhudHisto()
@@ -55372,18 +56716,14 @@ invokeHistoMenu(givenCoords:=0) {
    showThisMenu("PVimgHistos")
 }
 
-tlbrInvokeHistoMenu(givenCoords:=0) {
-   invokeHistoMenu("tlbr")
-}
-
-tlbrInvokeImgSizeVP(givenCoords:=0) {
+InvokeMenuImgSizeVP(givenCoords:=0) {
    deleteMenus()
    createMenuImgSizeAdapt()
    globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PvImgAdapt") : givenCoords
    showThisMenu("PvImgAdapt")
 }
 
-invokeImgSizeVP(givenCoords:=0) {
+invokeMenuNavBoxImgSizeVP(givenCoords:=0) {
    deleteMenus()
    If (thumbsDisplaying=1)
       createMenuNavBox()
@@ -55394,9 +56734,9 @@ invokeImgSizeVP(givenCoords:=0) {
    showThisMenu("PvImgAdapt")
 }
 
-ToggleImgHistogram(direction, dummy:=0) {
+ToggleImgHistogram(direction:=1, dummy:=0) {
     Static lastInvoked := 1
-    If (A_TickCount - lastInvoked < 50) || (thumbsDisplaying=1) || (dummy="rClick")
+    If ((A_TickCount - lastInvoked < 50) || thumbsDisplaying=1 || dummy="rClick" || !isImgEditingNow())
        Return
 
     ; HistogramBMP := trGdip_DisposeImage(HistogramBMP, 1)
@@ -55421,11 +56761,6 @@ ToggleImgHistogram(direction, dummy:=0) {
        updatePanelColorSliderz()
     }
     lastInvoked := A_TickCount
-}
-
-tlbrToggleHistoModes() {
-   If isImgEditingNow()
-      ToggleImgHistogram(1)
 }
 
 ToggleHistogramMode() {
@@ -57724,7 +59059,6 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
 drawAnnotationBox(mainWidth, mainHeight, Gu) {
     maxSelX := prevMaxSelX, maxSelY := prevMaxSelY
     imgPath := getIDimage(currentFileIndex)
-
     thisSNDfile := IdentifyAudioFileAssociated()
     If thisSNDfile
     {
@@ -57765,26 +59099,35 @@ drawAnnotationBox(mainWidth, mainHeight, Gu) {
     If !entireString
        Return
 
-    infoBoxBMP := drawTextInBox(entireString, OSDFontName, OSDfontSize//1.1, mainWidth, mainHeight, OSDtextColor, OSDbgrColor, 0, 1, usrTextAlign)
-    Gdip_GetImageDimensions(infoBoxBMP, imgW, imgH)
+    hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+    tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
+    tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
+    textBoxBMP := drawTextInBox(entireString, OSDFontName, OSDfontSize//1.1, mainWidth - tlbrBonusX, mainHeight, OSDtextColor, OSDbgrColor, 0, !thumbsDisplaying, usrTextAlign)
+    Gdip_GetImageDimensions(textBoxBMP, imgW, imgH)
     thisPosY := mainHeight - imgH
-    thisPosX := mainWidth - imgW
+    If (thumbsDisplaying=1)
+       thisPosY -= ThumbsStatusBarH
+    Else If (FlipImgV=1)
+       thisPosY -= tlbrBonusY
+
+    thisPosX := mainWidth - imgW 
     If (FlipImgV=0)
        thisPosY -= scrollBarHy
 
     If (usrTextAlign="Left")
-       thisPosX := 0
+       thisPosX := 0 + tlbrBonusX
     Else If (usrTextAlign="Center")
-       thisPosX := mainWidth//2 - imgW//2
+       thisPosX := tlbrBonusX//2 + Round(mainWidth/2 - imgW/2)
 
     If (FlipImgH=1)
-       thisPosX += scrollBarVx
-    Else If (thisPosX + imgW>mainWidth - scrollBarVx)
-       thisPosX -= scrollBarVx
+       thisPosX += scrollBarVx - tlbrBonusX
+    ; Else 
+    ; If (thisPosX + imgW>mainWidth - scrollBarVx)
+    ;    thisPosX -= scrollBarVx
 
-    If infoBoxBMP
+    If textBoxBMP
     {
-       trGdip_DrawImage(A_ThisFunc, Gu, infoBoxBMP, thisPosX, thisPosY)
+       trGdip_DrawImage(A_ThisFunc, Gu, textBoxBMP, thisPosX, thisPosY)
        If (FlipImgH=1 && usrTextAlign="Left")
           thisPosX := mainWidth - imgW - scrollBarVx
        Else If (FlipImgH=1 && usrTextAlign="Right")
@@ -57793,7 +59136,7 @@ drawAnnotationBox(mainWidth, mainHeight, Gu) {
           thisPosY := 0
        interfaceThread.ahkPostFunction("uiAccessUpdateAnnoBox", entireString, imgW, imgH, thisPosX, thisPosY)
     }
-    infoBoxBMP := trGdip_DisposeImage(infoBoxBMP, 1)
+    textBoxBMP := trGdip_DisposeImage(textBoxBMP, 1)
 }
 
 clampInRange(value, min, max, reverse:=0) {
@@ -59580,7 +60923,7 @@ ImageNavBoxClickResponder() {
 
    If (GetKeyState("Ctrl", "P") || GetKeyState("Shift", "P")) && (thumbsDisplaying!=1)
    {
-      tlbrZoomIN("navBox")
+      tlbrZoomINout("navBox")
       Return
    }
 
@@ -59708,7 +61051,12 @@ toggleBrushDoubleSize() {
 
 toggleBrushAirMode() {
    If (BrushToolType=2 || BrushToolType=3)
+   {
+      showTOOLtip("WARNING: Airbrush mode is not available for the current brush type.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
+   }
 
    BrushToolOverDraw := !BrushToolOverDraw
    friendly := (BrushToolOverDraw=1) ? "ACTIVATED" : "DEACTIVATED"
@@ -59863,7 +61211,9 @@ toggleAlphaPaintingMode() {
       FloodFillSelectionAdj := !FloodFillSelectionAdj
       If (AnyWindowOpen=64)
          liveDrawingBrushTool := !FloodFillSelectionAdj
+
       interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+      interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
       If (FloodFillSelectionAdj=1)
          showTOOLtip(labelu " tool: DEACTIVATED`nSelection area can be adjusted.", A_ThisFunc, 1)
       Else
@@ -59882,6 +61232,7 @@ toggleAlphaPaintingMode() {
 
    FloodFillSelectionAdj := 0
    liveDrawingBrushTool := !liveDrawingBrushTool
+   interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
    Random, OutputVar, 1, 950
    Random, OutputaVar, 1, 950
    randomu := OutputVar / OutputaVar
@@ -60019,6 +61370,7 @@ toggleAlphaPaintingMode() {
 
    createGUItoolbar()
    interfaceThread.ahkPostFunction("uiAlphaMaskTrigger", AnyWindowOpen, liveDrawingBrushTool, editingSelectionNow, UserMemBMP, showMainMenuBar)
+   interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
    BrushToolTexture := 1
    dummyRefreshImgSelectionWindow()
    BtnTabsInfoUpdate("ignore-panel")
@@ -60033,9 +61385,13 @@ toggleBrushTypes() {
 
    endCaptureCloneBrush()
    liveDrawingBrushTool := 1
+   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
    friendly := (BrushToolType=1) ? "Simple color brush" : "Soft edges color brush"
    thisOpacity := (BrushToolUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
    moreInfos := "`nOpacity: " Round(thisOpacity/255*100) "%"
+   If (BrushToolSoftness<5)
+      BrushToolSoftness := 6
+
    If (BrushToolType=2)
       moreInfos .= "`nSoftness: " BrushToolSoftness "%"
 
@@ -60058,6 +61414,7 @@ toggleBrushDeformers() {
       BrushToolType := (BrushToolType=7) ? 8 : 7
 
    liveDrawingBrushTool := 1
+   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
    friendly := (BrushToolType=7) ? "Pinch brush" : "Bulge brush"
    thisOpacity := (BrushToolUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
    moreInfos := "`nOpacity: " Round(thisOpacity/255*100) "%"
@@ -60101,7 +61458,7 @@ toggleBrushTypeFX() {
    liveDrawingBrushTool := 1
    endCaptureCloneBrush()
    BrushToolUseSecondaryColor := 0
-   friendly := "Effects brush"
+   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
    thisOpacity := (BrushToolUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
    moreInfos := "`nOpacity: " Round(thisOpacity/255*100) "%"
    moreInfos .= "`nSoftness: " BrushToolSoftness "%"
@@ -60111,7 +61468,7 @@ toggleBrushTypeFX() {
       updateUIbrushTool()
    }
 
-   showTOOLtip(friendly ":" moreinfos)
+   showTOOLtip("Effects brush:" moreinfos)
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -60123,12 +61480,13 @@ togglePresetsBrushes(modus, dir:=1) {
    liveDrawingBrushTool := 1
    endCaptureCloneBrush()
    BrushToolUseSecondaryColor := 0
+   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
    level := 0, maxu := 0
    If (modus=1)
    {
       BrushToolApplyColorFX := 0
       BrushToolBlurStrength := clampInRange(BrushToolBlurStrength + 5*dir, 3, 99, 1)
-      friendly := "Effects brush`nBlur strength: " BrushToolBlurStrength "%"
+      friendly := "Effects brush:`nBlur strength: " BrushToolBlurStrength "%"
       level := BrushToolBlurStrength
       maxu := 99
    } Else If (modus=2)
@@ -60140,7 +61498,7 @@ togglePresetsBrushes(modus, dir:=1) {
    {
       BrushToolType := 2
       BrushToolWetness := clampInRange(BrushToolWetness + 1*dir, 2, 22, 1)
-      friendly := "Soft edges brush`nWetness: " Round(BrushToolWetness/22 * 100) "%"
+      friendly := "Soft edges brush:`nWetness: " Round(BrushToolWetness/22 * 100) "%"
       level := BrushToolWetness
       maxu := 22
    } Else If (modus=4)
@@ -60179,6 +61537,8 @@ toggleBrushDrawInOutModes() {
    If (AnyWindowOpen!=66)
       liveDrawingBrushTool := 1
 
+   interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
+   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
    BrushToolOutsideSelection := clampInRange(BrushToolOutsideSelection + 1, 1, 3, 1)
    friendly := (BrushToolOutsideSelection=1) ? "ANYWHERE" : "INSIDE"
    If (BrushToolOutsideSelection=3)
@@ -60210,6 +61570,7 @@ toggleBrushTypeCloner() {
 
    BrushToolType := 3
    liveDrawingBrushTool := 1
+   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
    friendly := "Cloner brush"
    If (BrushToolDynamicCloner=1)
       friendly .= " (dynamic coords mode)"
@@ -60280,6 +61641,7 @@ changeBrushOpacity(keyu, isKeyu:=0) {
     }
 
     liveDrawingBrushTool := 1
+    interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
     SetTimer, RemoveTooltip, % -msgDisplayTime
     SetTimer, MouseMoveResponder, -25
 }
@@ -60324,6 +61686,7 @@ changeBrushColorPicker() {
 
 changeBrushSize(dir) {
    liveDrawingBrushTool := 1
+   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
    factoru := (brushToolSize>50) ? 10 : 5
    If (dir=1)
       brushToolSize += factoru
@@ -60355,20 +61718,19 @@ changeBrushAnglu(dir) {
 
 changeBrushRatioAngle(dir, what) {
    liveDrawingBrushTool := 1
+   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
    endCaptureCloneBrush()
    If (what=1)
    {
-      factoru := 5
-      BrushToolAspectRatio := clampInRange(BrushToolAspectRatio + factoru*dir, -100, 100, 0)
+      BrushToolAspectRatio := clampInRange(BrushToolAspectRatio + 5*dir, -100, 100, 0)
       If (AnyWindowOpen=64 || isAlphaMaskWindow()=1)
          GuiUpdateSliders("BrushToolAspectRatio")
 
       showTOOLtip("Brush aspect ratio: " BrushToolAspectRatio, 0, 0, (BrushToolAspectRatio + 100)/201)
    } Else
    {
-      factoru := 10
       BrushToolAutoAngle := 0
-      BrushToolAngle := clampInRange(BrushToolAngle + factoru*dir, -180, 180, 0)
+      BrushToolAngle := clampInRange(BrushToolAngle + 10*dir, -180, 180, 0)
       If (AnyWindowOpen=64 || isAlphaMaskWindow()=1)
          GuiUpdateSliders("BrushToolAngle")
 
@@ -60379,8 +61741,9 @@ changeBrushRatioAngle(dir, what) {
    SetTimer, MouseMoveResponder, -25
 }
 
-tlbrResetBrushAsRatio() {
+MenuResetBrushAsRatio() {
    liveDrawingBrushTool := 1
+   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
    endCaptureCloneBrush()
    BrushToolAspectRatio := BrushToolAngle := 0
    If (AnyWindowOpen=64 || isAlphaMaskWindow()=1)
@@ -60398,6 +61761,7 @@ toggleBrushMouseAngle() {
    endCaptureCloneBrush()
    liveDrawingBrushTool := 1
    BrushToolAutoAngle  := !BrushToolAutoAngle
+   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
    If (AnyWindowOpen=64 || isAlphaMaskWindow()=1)
    {
       GuiControl, SettingsGUIA:, BrushToolAutoAngle, % BrushToolAutoAngle
@@ -60422,6 +61786,7 @@ changeBrushSoftness(dir) {
 
    endCaptureCloneBrush()
    liveDrawingBrushTool := 1
+   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
    BrushToolSoftness := clampInRange(BrushToolSoftness, 1, 99)
    showTOOLtip("Brush softness: " BrushToolSoftness "%", A_ThisFunc, 2, BrushToolSoftness/100)
    If (AnyWindowOpen=64 || AnyWindowOpen=24 || AnyWindowOpen=31)
@@ -60441,6 +61806,7 @@ changeBrushWetness(dir) {
       BrushToolWetness--
 
    liveDrawingBrushTool := 1
+   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
    BrushToolWetness := clampInRange(BrushToolWetness, 0, 22)
    friendly := (BrushToolType>6) ? "deform intensity" : "wetness"
    showTOOLtip("Brush " friendly ": " BrushToolWetness, A_ThisFunc, 2, BrushToolWetness/22)
@@ -64225,9 +65591,11 @@ ToggleEditImgSelection(modus:=0) {
   liveDrawingBrushTool := (AnyWindowOpen=64 && editingSelectionNow=0) ? 1 : 0
   FloodFillSelectionAdj := (AnyWindowOpen=66 && editingSelectionNow=0) ? 0 : 1
   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+  interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
   If (AnyWindowOpen=12)
      EllipseSelectMode := 0
-  if (imgSelX2=-1 || ImgSelX2="c") && (editingSelectionNow=1)
+
+  If (imgSelX2=-1 || ImgSelX2="c") && (editingSelectionNow=1)
   {
      GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
      createDefaultSizedSelectionArea(prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, prevMaxSelX, prevMaxSelY, mainWidth, mainHeight)
@@ -64238,6 +65606,9 @@ ToggleEditImgSelection(modus:=0) {
   If (ShowAdvToolbar=1)
      decideIconBTNselectShape()
   clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
+  If (modus="key" && editingSelectionNow=1)
+     CreateGuiButton("Selection options,,invokeSelectionAreaMenu", 0, msgDisplayTime//1.5 + 500)
+
   SetTimer, MouseMoveResponder, -90
   SetTimer, dummyRefreshImgSelectionWindow, -25
   ; dummyTimerDelayiedImageDisplay(25)
@@ -64368,9 +65739,19 @@ alignImgSelectOutLeft() {
    alignImgSelection(4, 1)
 }
 
-
 alignImgSelectOutRight() {
    alignImgSelection(6, 1)
+}
+
+MenuResetSelAreaCavityRotation() {
+    If (thumbsDisplaying=1 || editingSelectionNow!=1)
+       Return
+
+    If (innerSelectionCavityX>0 && innerSelectionCavityY>0)
+       resetSelectionAreaCavity()
+    Else
+       resetSelectionRotation()
+    SetTimer, RemoveTooltip, % -msgDisplayTime//2
 }
 
 alignImgSelection(keyu, outside:=0) {
@@ -64396,11 +65777,7 @@ alignImgSelection(keyu, outside:=0) {
        Return
     } Else IF (keyu="^NumpadDot")
     {
-       If (innerSelectionCavityX>0 && innerSelectionCavityY>0)
-          resetSelectionAreaCavity()
-       Else
-          resetSelectionRotation()
-       SetTimer, RemoveTooltip, % -msgDisplayTime//2
+       MenuResetSelAreaCavityRotation()
        Return
     }
 
@@ -64516,7 +65893,7 @@ alignImgSelection(keyu, outside:=0) {
 }
 
 arrowKeysAdjustSelectionArea(direction, modus, extraUmphf:=1, silent:=0) {
-    If (thumbsDisplaying=1 || editingSelectionNow!=1 || liveDrawingBrushTool=1)
+    If (thumbsDisplaying=1 || editingSelectionNow!=1 || slideShowRunning=1 || !isImgEditingNow())
        Return
 
     factoru := (zoomLevel>2) ? 1 : 2 - zoomLevel
@@ -64601,7 +65978,7 @@ dummyShowSelCoordsInfos() {
 }
 
 resetImgSelection() {
-  If (thumbsDisplaying=1) || (slideShowRunning=1 && editingSelectionNow!=1)
+  If (thumbsDisplaying=1 || drawingShapeNow=1 || editingSelectionNow!=1 || slideShowRunning=1 || !isImgEditingNow())
      Return
 
   imgSelX1 := imgSelY1 := VPselRotation := innerSelectionCavityX := innerSelectionCavityY := 0
@@ -64612,6 +65989,7 @@ resetImgSelection() {
   liveDrawingBrushTool := (AnyWindowOpen=64 && editingSelectionNow=0) ? 1 : 0
   FloodFillSelectionAdj := (AnyWindowOpen=66 && editingSelectionNow=0) ? 0 : 1
   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+  interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
   updateUIctrl()
   SetTimer, MouseMoveResponder, -90
   SetTimer, dummyRefreshImgSelectionWindow, -25
@@ -64619,19 +65997,18 @@ resetImgSelection() {
 }
 
 resetSelectionAreaCavity() {
-  If (thumbsDisplaying=1) || (slideShowRunning=1 && editingSelectionNow!=1)
+  If (thumbsDisplaying=1 || drawingShapeNow=1 || editingSelectionNow!=1 || slideShowRunning=1 || !isImgEditingNow())
      Return
 
   innerSelectionCavityX := innerSelectionCavityY := 0
   SetTimer, dummyRefreshImgSelectionWindow, -25
   userFriendlyPrevImgSelAction := "RESET SELECTION CAVITY"
   SetTimer, dummyShowSelCoordsInfos, -50
-
   ; dummyTimerDelayiedImageDisplay(50)
 }
 
 changeSelectionAreaCavity(dir:=1) {
-  If (thumbsDisplaying=1) || (slideShowRunning=1 && editingSelectionNow!=1)
+  If (thumbsDisplaying=1 || drawingShapeNow=1 || editingSelectionNow!=1 || slideShowRunning=1 || !isImgEditingNow())
      Return
 
   thisValue := (dir=1) ? innerSelectionCavityX + 0.01 : innerSelectionCavityX - 0.01
@@ -64660,7 +66037,6 @@ createDefaultSizedSelectionArea(DestPosX, DestPosY, newW, newH, maxSelX, maxSelY
     } Else If (imgSelX2=-1 && imgSelY2=-1)
     {
        obju := createImgSelection2Win(DestPosX, DestPosY, newW, newH, maxSelX, maxSelY, mainWidth, mainHeight, 2, 1)
-
        imgSelX1 := obju.x1, imgSelY1 := obju.y1
        imgSelX2 := obju.x2, imgSelY2 := obju.y2
        If (imgSelX2>maxSelX/2 && newW<mainWidth)
@@ -64672,10 +66048,8 @@ createDefaultSizedSelectionArea(DestPosX, DestPosY, newW, newH, maxSelX, maxSelY
 
 createImgSelection2Win(DestPosX, DestPosY, newW, newH, maxSelX, maxSelY, mainWidth, mainHeight, factor, applyLimits) {
     obju := []
-
     x1 := (DestPosX<0) ? Abs(DestPosX)/newW : 0
     SelX1 := Round(x1*maxSelX)
-
     y1 := (DestPosY<0) ? Abs(DestPosY)/newH : 0
     SelY1 := Round(y1*maxSelY)
     If (applyLimits!=1)
@@ -65350,6 +66724,9 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
 
     If (startIndex=prevIndexu)
        prevIndexu := ""
+
+    If (showImgAnnotations=1)
+       drawAnnotationBox(mainWidth, mainHeight, 2NDglPG)
 
     If (showInfoBoxHUD>0)
     {
@@ -68957,10 +70334,13 @@ drawViewportHelpMap() {
        Gdip_Draw%thisu%(2NDglPG, Penuha, thisX, thisY, thisW, thisH)
        thisFntSize := "Bold Center vCenter cFFeeEEee s" Round(OSDfontSize*0.77)
        thisStylu := " x" thisX " y" thisY
+       hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+       tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
+       tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
        thisString := (EllipseSelectMode=2) ? "Image selected area`nFreeform shape" : "Image selected area"
        ERR := Gdip_TextToGraphics(2NDglPG, thisString, thisFntSize thisStylu , "Arial", thisW, thisH)
        thisFntSize := "Bold cFFeeEEee s" Round(OSDfontSize*0.77)
-       thisStylu := " x" OSDfontSize*2 " y" OSDfontSize*2
+       thisStylu := " x" OSDfontSize*2 + tlbrBonusX " y" OSDfontSize*2 + tlbrBonusY
        ERR := Gdip_TextToGraphics(2NDglPG, "Current selection type: " DefineVPselAreaMode() ".`n `nDouble click on it to open a menu.`n `nDouble click outside to drop the selection.`n `nHold Space and click to pan image.`n `nCtrl + Wheel Up/Down to zoom in/out anywhere.", thisFntSize thisStylu , "Arial", mainWidth - OSDfontSize*2, mainHeight - OSDfontSize*2)
        Gdip_DeletePen(Penuha)
        Gdip_DeleteBrush(BrushAa)
@@ -69145,9 +70525,9 @@ PanelHelpWindow(dummy:=0) {
 
     drawViewportHelpMap()
     tabu := (dummy="cmdu") ? 3 : 2
-    rz := (PrefsLargeFonts=1) ? 15 + additionalLVrows : 17 + additionalLVrows
-    rx := rz - 4
-    Gui, Add, Tab3, %tabzDarkModus% x15 y15 Choose%tabu%, General|Keyboard shortcuts|Command line|Change log|Features
+    rz := (PrefsLargeFonts=1) ? 15 : 17
+    rx := rz - 5
+    Gui, Add, Tab3, %tabzDarkModus% x15 y15 Choose%tabu%, Philosophy|Shortcuts|Command line|Change log|Features
     Gui, Tab, 1 ; general
 
     FileRead, cmdHelp, % mainCompiledPath "\resources\general-help.txt"
@@ -69156,6 +70536,7 @@ PanelHelpWindow(dummy:=0) {
     Gui, Tab, 2 ; keyboard 
     Gui, Add, ListView, x+15 y+15 w%lstWid% r%rx% Grid +LV0x10000 vLViewOthers, Keys|Action|Context|Opens
     Gui, Add, Combobox, xp y+10 wp gUIgenericComboAction hwndhEditField vlistViewFilteru, \Files list|\Image view|\Image selection area|\Live editing|\Folder tree|\Painting mode|\Vector drawing|\Anywhere|\Panel|\Menu
+    Gui, Add, Text, xp y+5 wp, The listed keyboard shortcuts are the defaults. This list does not reflect user customized shortcuts.
 
     cmdHelp := "QPV can be invoked with command line arguments. Examples:`n`n1. Open a folder:`nqpv.exe ""fd=C:\example folder\tempus""`n`nAdd a pipe ""|"" after equal ""="" to NOT have images loaded recursively."
     cmdHelp .= "`n`n2. Call an internal function:`nqpv.exe call_ToggleThumbsMode() ""fd=C:\folder\tempus""`n`nThis will index all the images in the given folder and switch to thumbnails mode.`n`nOnly functions that need no parameters can be invoked. If multiple call_ are used, only the last valid one will be considered."
@@ -73467,6 +74848,9 @@ PopulateReviewSelectedFiles(modus:="") {
 
 PanelDynamicFolderzWindow(dummy:=0) {
     Static LViewDynas, hasWarned := 0
+    If AnyWindowOpen
+       Return
+
     If askAboutFileSave(" if any action will be performed in the invoked panel")
        Return
 
@@ -75491,6 +76875,8 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
     postVectorWinOpen := 0
     If (imgEditPanelOpened=1)
     {
+       If (VisibleQuickMenuSearchWin=1)
+          closeQuickSearch()
        ; coreDesiredPixFmt := StrLen(UserMemBMP)>2 ? "0x26200A" : "0xE200B" ; 32-ARGB // 32-PARGB
        If (AnyWindowOpen=74)
        {
@@ -75792,6 +77178,7 @@ initCompiled(mode) {
       mainSettingsFile := OutDir "\" mainSettingsFile
       mainRecentsFile := OutDir "\" mainRecentsFile
       mainFavesFile := OutDir "\" mainFavesFile
+      customKbdFile := OutDir "\" customKbdFile
       folderFavesFile := OutDir "\" folderFavesFile
       miniFavesFile := OutDir "\" miniFavesFile
    } Else
@@ -79149,45 +80536,49 @@ tlbrInvokeFunction(a, b, c) {
    || (A_TickCount - lastOtherWinClose<500)
       Return
 
+   GetMouseCoord2wind(hQPVtoolbar, nX, nY)
+   If (nX<2 || nY<2) ; prevent accidental clicks
+      Return
+
    SetTimer, drawWelcomeImg, Off
    If (c!="kbd")
       isToolbarKBDnav := 0
 
    hwnd := (c="kbd") ? a : Format("0x{1:x}", a)
-   funcu := InStr(b, "right") ? tlbrIconzList[hwnd, 6] : tlbrIconzList[hwnd, 4]
+   btnID := tlbrIconzList[hwnd, 10]
+   func2Call := processToolbarFunctions(btnID, b)
    ; ToolTip, % z "=" a "=" b "=" c "=" funcu , , , 2
-   paramu := tlbrIconzList[hwnd, 9]
-   If funcu
-      addJournalEntry("Toolbar action: " tlbrIconzList[hwnd, 3] " | " funcu "(" paramu ")")
 
    WinGetPos, aX, aY,,, ahk_id %hwnd%
    interfaceThread.ahkFunction("ShowClickHalo", aX, aY, ToolBarBtnWidth, ToolBarBtnWidth, 1)
-   globalMenuOptions := tlbrIconzList[hwnd, 10] ? "tlbrMenu|" aX "|" aY + ToolBarBtnWidth : 0
+   globalMenuOptions := !tlbrIconzList[hwnd, 12] ? "tlbrMenu|" aX "|" aY + ToolBarBtnWidth : 0
    ; ToolTip, % globalMenuOptions , , , 2
    lastTlbrClicked := hwnd
-   If IsFunc(funcu)
+   If IsFunc(func2Call[1])
    {
-      If paramu
-         z := %funcu%(hwnd, paramu)
+      fn := func2Call[1]
+      addJournalEntry("Toolbar action executed: " tlbrIconzList[hwnd, 3] " | " fn "(). Parameters: " func2Call.Count() - 1)
+      If (func2Call.Count()=1)
+         z := %fn%()
+      Else If (func2Call.Count()=2)
+         z := %fn%(func2Call[2])
+      Else If (func2Call.Count()=3)
+         z := %fn%(func2Call[2], func2Call[3])
+      Else If (func2Call.Count()=4)
+         z := %fn%(func2Call[2], func2Call[3], func2Call[4])
       Else
-         z := %funcu%()
-   } Else
-   {
-      z := "m"
-      If funcu
-         invokeTlbrContextMenu("tlbr")
-   }
+         r := 1
+   } Else If (Strlen(func2Call[1])>1)
+      r := func2Call[1]
 
+   If (r=1)
+      simpleMsgBoxWrapper(appTitle ": ERROR", "An error occured calling " fn "() for " btnID ". Too many parameters.")
+   Else If r
+      simpleMsgBoxWrapper(appTitle ": ERROR", "An error occured calling " r "() function for " btnID ".")
+   
    MouseGetPos, OutputVarX, OutputVarY, OutputVarWin, OutputVarControl, 2
    If ((InStr(b, "right") || OutputVarWin!=hQPVtoolbar) && c!="kbd")
       decideWinReactivation()
-   ; If (InStr(b, "right") || z="m") && (c!="kbd")
-   ; {
-   ;    If (AnyWindowOpen && imgEditPanelOpened!=1) || (AnyWindowOpen && imgEditPanelOpened=1 && panelWinCollapsed!=1)
-   ;       WinActivate, ahk_id %hSetWinGui%
-   ;    Else
-   ;       WinActivate, ahk_id %PVhwnd%
-   ; }
 }
 
 OnLButtonDblClk(wParam, lParam, msg, hwnd) {
@@ -79223,38 +80614,12 @@ isImgEditingNow() {
    Return infoImgEditingNow
 }
 
-tlbrInvokeEditMenu() {
-   If (!AnyWindowOpen || imgEditPanelOpened=1)
-   {
-      If (drawingShapeNow=1)
-         createContextMenuCustomShapeDrawing(0, 0, 0, 0, 0, "tlbr")
-      Else If (isNowAlphaPainting() || imgEditPanelOpened=1)
-         BuildMainMenu(0, "tlbr")
-      Else If isImgEditingNow()
-         invokeSelectionAreaMenu("DoubleClick", "tlbr")
-      Else
-         BuildSecondMenu("tlbr")
-      Return "m"
-   }
-}
-
-tlbrInvokeInterfaceMenu() {
-   If (!AnyWindowOpen || imgEditPanelOpened=1)
-   {
-      If (drawingShapeNow=1)
-         invokeImgSizeVP()
-      Else
-         OpenUImenu("tlbr")
-      Return "m"
-   }
-}
-
 OSDguiToolbarGuiContextMenu(GuiHwnd, CtrlHwnd, EventInfo, IsRightClick, X, Y) {
    If isRightClick
       tlbrInvokeFunction(CtrlHwnd, "Right", 1)
 }
 
-tlbrPlaySlides() {
+MenuGoPlaySlidesNow() {
    lastOtherWinClose := 1
    If (thumbsDisplaying=1)
       ToggleThumbsMode()
@@ -79262,45 +80627,9 @@ tlbrPlaySlides() {
    SetTimer, dummyInfoToggleSlideShowu, -250
 }
 
-tlbrInsertTextArea() {
-   If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-   {
-      PanelEditImgCaption()
-      Return
-   }
-
-   If (isImgEditingNow()!=1 && thumbsDisplaying=1 && maxFilesIndex.1)
-      PanelSearchIndex()
-   Else If isImgEditingNow()
-      PanelInsertTextArea()
-}
-
-tlbrEraserTool() {
-   If (isImgEditingNow() && (AnyWindowOpen=31 || AnyWindowOpen=24))
-      toggleErasePasteInPlace()
-   Else If (isImgEditingNow()=1 && editingSelectionNow=1)
-      PanelEraseSelectedArea()
-}
-
-tlbrDeleteFile() {
-   If (maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-      deleteKeyAction()
-}
-
-tlbrDeleteIndexFile() {
-   If (maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-      singleInListEntriesRemover()
-}
-
 tlbrActColorsSwatch() {
    If preventColorChange()
       Return
-
-   If (thumbsDisplaying=1)
-   {
-      TogglePrivateMode()
-      Return
-   }
 
    oldColor := (BrushToolUseSecondaryColor=1) ? BrushToolBcolor : BrushToolAcolor
    oldClrName := (BrushToolUseSecondaryColor=1) ? "BrushToolBcolor" : "BrushToolAcolor"
@@ -79365,100 +80694,8 @@ updateToolColorsBasedToolbar(newColor, oldColor, ctrlName) {
     }
 }
 
-tlbrCutImg() {
-   If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-   {
-      MenuExplorerCutFiles()
-      Return "m"
-   } Else If (isImgEditingNow()=1 && editingSelectionNow=1 && !AnyWindowOpen)
-      CutSelectedArea()
-}
-
-tlbrMoveFiles() {
-   If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-      PanelMoveCopyFiles()
-}
-
-tlbrClonerBrush() {
-   If isImgEditingNow()
-   {
-      If (AnyWindowOpen!=64)
-         PanelBrushTool(3, "e")
-      Else
-         toggleBrushTypeCloner()
-   }
-}
-
-tlbrMainBrushSoft() {
-   If isImgEditingNow()
-   {
-      If (AnyWindowOpen!=64)
-         PanelBrushTool(2, "e")
-      Else
-         togglePresetsBrushes(4)
-   }
-}
-
-tlbrMainBrushHard() {
-   If isImgEditingNow()
-   {
-      If (AnyWindowOpen!=64)
-         PanelBrushTool(1, "e")
-      Else
-         togglePresetsBrushes(5)
-   }
-}
-
-tlbrFXbrush() {
-   If isImgEditingNow()
-   {
-      If (AnyWindowOpen!=64)
-         PanelBrushTool(5, "fx")
-      Else
-         togglePresetsBrushes(2)
-   }
-}
-
-tlbrWetBrush() {
-   If isImgEditingNow()
-   {
-      If (AnyWindowOpen!=64)
-         PanelBrushTool(2, "w")
-      Else
-         coreTlbrSlider("tlbrChangeBrushWet", 200, 0)
-   }
-}
-
 tlbrChangeBrushWet(dir) {
    togglePresetsBrushes(3, dir)
-}
-
-tlbrDecreaseWetBrush() {
-   If (isImgEditingNow()=1 && AnyWindowOpen!=64)
-      togglePresetsBrushes(3, -1)
-}
-
-tlbrChangeOSDfontSize() {
-   If !AnyWindowOpen
-      coreTlbrSlider("changeOSDfontSize", 125, 0)
-}
-
-tlbrDecreaseOSDfontSize() {
-   If !AnyWindowOpen
-      changeOSDfontSize(-1)
-}
-
-tlbrHelpBtn() {
-   If !AnyWindowOpen
-      PanelAboutWindow()
-}
-
-tlbrAddFaves() {
-   isWelcomeScreenu := (isImgEditingNow()=1 || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
-   If isWelcomeScreenu
-      InvokeFavesMenu("tlbr")
-   Else If !AnyWindowOpen
-      ToggleImgFavourites()
 }
 
 coreTlbrSlider(thisFunc, delayu, invertDir) {
@@ -79502,56 +80739,33 @@ coreTlbrSlider(thisFunc, delayu, invertDir) {
    setwhileLoopExec(0)
 }
 
-tlbrChangeBrushSoft() {
+userChangeBrushSoft(modus, dir) {
    If (isImgEditingNow()=1 && (AnyWindowOpen=64 || isNowAlphaPainting()))
    {
       If (BrushToolType>1 && BrushToolTexture=1)
-         coreTlbrSlider("changeBrushSoftness", 100, 0)
-      Else If (BrushToolType=1)
+      {
+         okayu := 1
+         If (modus="tlbr" && dir=1)
+            coreTlbrSlider("changeBrushSoftness", 100, 0)
+         Else
+            changeBrushSoftness(dir)
+      } Else If (BrushToolType=1)
          showTOOLtip("WARNING: The current brush type does not have the softness property.")
       Else If (BrushToolTexture>1)
          showTOOLtip("WARNING: The current brush is based on a texture.`nSoftness does not apply for textures.")
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+
+      If !okayu
+         SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 }
 
-tlbrDecreaseBrushSoft() {
-   If (isImgEditingNow()=1 && (AnyWindowOpen=64 || isNowAlphaPainting()))
-   {
-      If (BrushToolType>1 && BrushToolTexture=1)
-         changeBrushSoftness(-1)
-      Else If (BrushToolType=1)
-         showTOOLtip("WARNING: The current brush type does not have the softness property.")
-      Else If (BrushToolTexture>1)
-         showTOOLtip("WARNING: The current brush is based on a texture.`nSoftness does not apply for textures.")
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-   }
-}
-
-tlbrChangeBrushOpacity() {
-   If (isImgEditingNow()=1 && (AnyWindowOpen=64 || isNowAlphaPainting()))
-      coreTlbrSlider("changeBrushOpacity", 150, 1)
-}
-
-tlbrDecreaseBrushOpacity() {
-   If (isImgEditingNow()=1 && (AnyWindowOpen=64 || isNowAlphaPainting()))
-      changeBrushOpacity(-1, 0)
-}
-
-tlbrChangeBrushSize() {
-   If (isImgEditingNow()=1 && (AnyWindowOpen=64 || isNowAlphaPainting()))
-      coreTlbrSlider("changeBrushSize", "brushSize", 0)
-}
-
-tlbrChangeBrushAngle() {
-   If (isImgEditingNow()=1 && (AnyWindowOpen=64 || isNowAlphaPainting()))
-      coreTlbrSlider("changeBrushAnglu", 100, 0)
-}
-
-tlbrChangeBrushRatio() {
+userChangeBrushRatio(modus, dir) {
    If (isImgEditingNow()=1 && (AnyWindowOpen=64 || isNowAlphaPainting()) && (BrushToolTexture=1 || BrushToolType=1))
    {
-      coreTlbrSlider("changeBrushShapeRatio", 125, 0)
+      If (modus="tlbr" && dir=1)
+         coreTlbrSlider("changeBrushShapeRatio", 125, 0)
+      Else
+         changeBrushRatioAngle(dir, 1)
    } Else If (isImgEditingNow()=1 && (AnyWindowOpen=64 || isNowAlphaPainting()) && BrushToolType>1)
    {
       showTOOLtip("WARNING: The current brush is based on a texture.`nThe aspect ratio cannot be changed")
@@ -79559,174 +80773,26 @@ tlbrChangeBrushRatio() {
    }
 }
 
-tlbrEraserBrush() {
-   If isImgEditingNow()
-   {
-      If (AnyWindowOpen=31 || AnyWindowOpen=24)
-         toggleErasePasteInPlace()
-      Else If (AnyWindowOpen!=64)
-         PanelBrushTool(4, "e")
-      Else
-         toggleBrushTypeEraser()
-   }
-}
-
-tlbrFloodFill() {
-   If isImgEditingNow()
-   {
-      If (AnyWindowOpen!=66)
-         PanelFloodFillTool()
-      Else If (editingSelectionNow=1)
-         toggleBrushDrawInOutModes()
-   }
-}
-
-tlbrInvertStuff() {
-   If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen && markedSelectFile>0)
-      invertFilesSelection()
-   Else If isImgEditingNow()
-      InvertSelectedArea()
-}
-
-tlbrBlurBrush() {
-   If isImgEditingNow()
-   {
-      If (AnyWindowOpen!=64)
-         PanelBrushTool(5, "b")
-      Else
-         coreTlbrSlider("tlbrChangeBrushFXblur", 200, 0)
-   }
-}
-
 tlbrChangeBrushFXblur(dir) {
    togglePresetsBrushes(1, dir)
 }
 
-tlbrAmaskPanel() {
-   If isImgEditingNow()
-      PanelSoloAlphaMasker()
-}
-
-tlbrAmaskInvert() {
-   If isImgEditingNow()
-      toggleInvertAlphaMask()
-}
-
-tlbrAmaskCapture() {
-   If (isImgEditingNow() && editingSelectionNow=1)
-      SetImageAsAlphaMask()
-}
-
-tlbrAmaskView() {
-   If (isImgEditingNow() && editingSelectionNow=1)
-      ViewAlphaMaskNow()
-}
-
-tlbrAmaskRaster() {
-   If isImgEditingNow()
-      RasterizeAlphaMaskNow()
-}
-
-tlbrAmaskPaint() {
-   If (isImgEditingNow() && isAlphaMaskWindow() && editingSelectionNow=1)
-      toggleAlphaPaintingMode()
-}
-
-tlbrAmaskDiscard() {
-   If isImgEditingNow()
-      discardUserPaintedAlpha()
-}
-
-tlbrPenFill() {
-   If isImgEditingNow()
-   {
-      If (imgEditPanelOpened=1)
-         BtnCloseWindow()
-
-      MenuStartDrawingShapes()
-      Return "m"
-   }
-}
-
-tlbrPenOutline() {
-   If isImgEditingNow()
-   {
-      If (imgEditPanelOpened=1)
-         BtnCloseWindow()
-
-      MenuStartDrawingLines()
-      Return "m"
-   }
-}
-
-tlbrBtnViewToggle() {
-    isWelcomeScreenu := (isImgEditingNow()=1 || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
-    If (isImgEditingNow()=1 && drawingShapeNow=1)
-       togglePreviewVectorNewPoint()
-    Else If !isWelcomeScreenu
-       ToggleImgNavBox()
-}
-
-tlbrNavSizeBox() {
-    isWelcomeScreenu := (isImgEditingNow()=1 || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
-    If (isImgEditingNow()=1 && drawingShapeNow=1)
-       togglePreviewVectorNewPoint()
-    Else If !isWelcomeScreenu
-       ToggleImgNavSizeBox()
-}
-
-tlbrPipette() {
-   ; If (isImgEditingNow()=1 && AnyWindowOpen=64)
-   If (!AnyWindowOpen || imgEditPanelOpened=1 && AnyWindowOpen)
-      changeBrushColorPicker()
-}
-
-tlbrSwitchColors() {
-   ; If isImgEditingNow()
-   If ((!AnyWindowOpen || imgEditPanelOpened=1 && AnyWindowOpen) && (thumbsDisplaying!=1))
-      ToggleBrushColors()
-}
-
-tlbrSelectAlignMenu() {
+InvokeSelectAreaAlignMenu(givenCoords:=0) {
    ; If isImgEditingNow()
    If (isImgEditingNow() && editingSelectionNow=1)
    {
       deleteMenus()
       createMenuSelectionAlign()
-      globalMenuOptions := StrReplace(globalMenuOptions, "tlbrMenu", "PVselAlign")
+      globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PVselAlign") : givenCoords
       showThisMenu("PVselAlign")
    }
 }
 
-tlbrCropImg() {
-   If (isImgEditingNow() && (AnyWindowOpen=31 || AnyWindowOpen=24))
-   {
-      togglePasteInPlaceCropShapes()
-   } Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-   {
-      PanelSimpleResizeRotate()
-   } Else If (isImgEditingNow()=1 && !AnyWindowOpen)
-   {
-      If (editingSelectionNow=1)
-         CropImageInViewPortToSelection()
-      Else If !AnyWindowOpen
-         PanelAdjustImageCanvasSize()
-   }
-}
-
-tlbrSelAllVectorPoints() {
-    Static lastState := 0
-    If lastState
+tlbrSelAllVectorPoints(a:=0) {
+    If !customShapeHasSelectedPoints || InStr(a, "select")
        MenuSelAllVectorPoints()
     Else
        MenuSelNoVectorPoints()
-    lastState := !lastState
-}
-
-tlbrtoggleListViewModeThumbs() {
-   Static lastInvoked := 1
-   If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-      toggleListViewModeThumbs()
 }
 
 tlbrViewPortGridu() {
@@ -79748,187 +80814,6 @@ tlbrViewPortGridu() {
    }
 }
 
-tlbrConfigVPgrid() {
-   If (isImgEditingNow()=1 && drawingShapeNow=1)
-      toggleViewPortGridu()
-   Else If (isImgEditingNow()=1 && (!AnyWindowOpen || imgEditPanelOpened=1 && AnyWindowOpen!=24 && AnyWindowOpen!=31))
-      PanelConfigVPgrid()
-}
-
-tlbrResizeImage() {
-   If (isImgEditingNow()=1 && editingSelectionNow!=1)
-      ToggleEditImgSelection()
-   Else If (isImgEditingNow()=1 && editingSelectionNow=1)
-      ResizeIMGviewportSelection()
-}
-
-tlbrRotateImg() {
-   If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-   {
-      filesListFlipRotatePlus()
-   } Else If (isImgEditingNow()=1 && editingSelectionNow=1 && !isTlbrViewModus())
-   {
-      If (GetKeyState("Ctrl", "P") || GetKeyState("Shift", "P"))
-      {
-         VPselRotation := 0
-         Return
-      }
-
-      If GetKeyState("Alt", "P")
-         coreTlbrSlider("changeSelRotation", 5, 0)
-      Else
-         coreTlbrSlider("changeTlbrSelRotation", 25, 0)
-   } Else If (isImgEditingNow()=1)
-   {
-      If (GetKeyState("Ctrl", "P") || GetKeyState("Shift", "P"))
-      {
-         vpIMGrotation := 0
-         Return
-      }
-
-      If isTlbrViewModus()
-         changeImgRotationInVP(1, 45)
-      Else If GetKeyState("Alt", "P")
-         coreTlbrSlider("changeLittleImgRotationInVP", 5, 0)
-      Else
-         coreTlbrSlider("changeImgRotationInVP", 25, 0)
-   }
-}
-
-tlbrResetRotation() {
-   If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-   {
-      filesListFlipRotateMinus()
-   } Else If (isImgEditingNow()=1 && editingSelectionNow=1 && VPselRotation!=0)
-   {
-      VPselRotation := 0
-      SetTimer, dummyRefreshImgSelectionWindow, -10
-      userFriendlyPrevImgSelAction := "RESET SELECTION AREA"
-      SetTimer, dummyShowSelCoordsInfos, -20
-   } Else If (isImgEditingNow()=1 && vpIMGrotation!=0)
-      changeImgRotationInVP(1, 45, 1)
-}
-
-tlbrResizeEditorImg() {
-   If (isImgEditingNow()=1 && !AnyWindowOpen)
-      PanelEditorImgResize()
-}
-
-tlbrTransformSelection() {
-   If (isImgEditingNow() && (AnyWindowOpen=31 || AnyWindowOpen=24))
-      togglePasteInPlaceAdaptModes()
-   Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-      importEditGivenImageFile()
-   Else If (isImgEditingNow()=1 && editingSelectionNow=0)
-      PanelEditorImgResize()
-   Else If (isImgEditingNow()=1 && editingSelectionNow=1)
-   {
-      If !AnyWindowOpen
-      {
-         PanelTransformSelectedArea()
-      } Else If (imgEditPanelOpened=1)
-      {
-         showTOOLtip("WARNING: Action not permitted while the current tool is active.")
-         SoundBeep , 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-      }
-   }
-}
-
-tlbrOpenImg() {
-   If !AnyWindowOpen
-      OpenDialogFiles()
-   Return "m"
-}
-
-tlbrOpenMenu() {
-   If !AnyWindowOpen
-      InvokeOpenRecentMenu("tlbr")
-   Return "m"
-}
-
-tlbrBlurArea() {
-   If (isImgEditingNow()=1 && (!AnyWindowOpen || imgEditPanelOpened=1))
-      PanelBlurSelectedArea()
-}
-
-tlbrSaveImg() {
-   If (isImgEditingNow()=1 && !AnyWindowOpen)
-      PanelSaveImg()
-   Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-      PanelSaveSlideShowu()
-}
-
-tlbrOpenAnnotations(){
-   imgPath := getIDimage(currentFileIndex)
-   If (isImgEditingNow()=1 && FileExist(imgPath) && (!AnyWindowOpen || imgEditPanelOpened=1))
-      PanelEditImgCaption()
-}
-
-tlbrOpenVPcolors(){
-   If (isImgEditingNow() && (AnyWindowOpen=31 || AnyWindowOpen=24))
-      togglePasteInPlaceColorsFX()
-   Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-      PanelSetThumbColumnOptions()
-   Else If isImgEditingNow()
-   {
-      If (GetKeyState("Alt", "P") || isTlbrViewModus())
-         PanelColorsAdjusterWindow()
-      Else
-         PanelColorsAdjusterImage()
-   }
-}
-
-tlbrFlipSelectionH() {
-   If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-      VPflipImgH()
-   Else If (isImgEditingNow()=1 && EllipseSelectMode=2 && editingSelectionNow=1 && drawingShapeNow!=1)
-      flipWHcustomShape("H")
-   Else If (isImgEditingNow()=1 && editingSelectionNow=1 && drawingShapeNow!=1)
-      VPflipImgH()
-}
-
-tlbrFlipSelectionV() {
-   If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-      VPflipImgV()
-   Else If (isImgEditingNow()=1 && EllipseSelectMode=2 && editingSelectionNow=1 && drawingShapeNow!=1)
-      flipWHcustomShape("V")
-   Else If (isImgEditingNow()=1 && editingSelectionNow=1 && drawingShapeNow!=1)
-      VPflipImgV()
-}
-
-tlbrFlipStuffH(){
-   editing := isImgEditingNow()
-   If (editing=1 && drawingShapeNow=1)
-      toggleBrushSymmetryModes()
-   Else If (editing=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
-      FlipHtransformedIMGpanel()
-   Else If (editing=1 && isNowAlphaPainting())
-      FlipHalphaMask()
-   Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-      filesListFlipHimage()
-   Else If (editing=1 && editingSelectionNow=1)
-      FlipSelectedAreaH()
-   Else If (editing=1)
-      VPflipImgH()
-}
-
-tlbrFlipStuffV(){
-   editing := isImgEditingNow()
-   If (editing=1 && drawingShapeNow=1)
-      toggleBrushSymmetryModes()
-   Else If (editing=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
-      FlipVtransformedIMGpanel()
-   Else If (editing=1 && isNowAlphaPainting())
-      FlipValphaMask()
-   Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-      filesListFlipVimage()
-   Else If (editing=1 && editingSelectionNow=1)
-      FlipSelectedAreaV()
-   Else If (editing=1)
-      VPflipImgV()
-}
-
 tlbrFillShape() {
    If (isImgEditingNow()=1 && AnyWindowOpen=23)
    {
@@ -79946,12 +80831,7 @@ tlbrFillShape() {
    }
 }
 
-tlbrFillBehind() {
-   If isImgEditingNow()
-      PanelFillBehindBgrImage()
-}
-
-tlbrOutlineShape() {
+tlbrDrawShapesContour() {
    If (isImgEditingNow()=1 && AnyWindowOpen=65)
    {
       UIcycleFillShapes()
@@ -79971,12 +80851,7 @@ tlbrOutlineShape() {
    }
 }
 
-tlbrOpenLinesPanel() {
-   If (isImgEditingNow()=1 && editingSelectionNow=1)
-      PanelDrawLines()
-}
-
-tlbrZoomIN(dummy:=0) {
+tlbrZoomINout(dummy:=0) {
    If ((thumbsDisplaying=1 && maxFilesIndex>3 && CurrentSLD) || (isImgEditingNow()=1))
    {
       If (GetKeyState("Ctrl", "P") || GetKeyState("Shift", "P")) && (IMGresizingMode=4 && dummy!="navBox")
@@ -80026,46 +80901,10 @@ tlbrZoomIN(dummy:=0) {
    Return "m"
 }
 
-
-tlbrSimpleZoomIN() {
-   tlbrZoomIN("zin")
-   Return "m"
-}
-
-tlbrSimpleZoomOut() {
-   tlbrZoomIN("zout")
-   Return "m"
-}
-
-tlbrZoomToggle() {
-   If (thumbsDisplaying=1 && maxFilesIndex>3 && CurrentSLD)
-      ToggleThumbsAratio()
-   Else If (isImgEditingNow()=1)
-      ToggleImageSizingMode()
-}
-
-tlbrPasteQuick() {
-   If (thumbsDisplaying=1)
-      MenuPasteHDropFiles()
-   Else
-      PasteClipboardIMG()
-}
-
-tlbrDropSelection() {
-   If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) 
-   {
-      deleteMenus()
-      createMenuFilesSelections("PVfileSel")
-      showThisMenu("PVfileSel")
-      Return "m"
-   } Else If (isImgEditingNow()=1)
-   {
-      ToggleEditImgSelection() 
-   }
-}
-
-tlbrSelectShape() {
-   MenuCycleSelectionShapes()
+invokeFilesSelectionMenu() {
+   deleteMenus()
+   createMenuFilesSelections("PVfileSel")
+   showThisMenu("PVfileSel")
 }
 
 MenuCycleSelectionShapes() {
@@ -80167,29 +81006,7 @@ decideIconBTNpaintBrushSelect() {
    }
 }
 
-tlbrtoggleBrushDrawModes() {
-   If (isImgEditingNow()=1 && (AnyWindowOpen=64 || AnyWindowOpen=66))
-      toggleBrushDrawInOutModes()
-      ; ToolTip, % EllipseSelectMode "=" hwnd "=" paramu , , , 2
-}
-
-tlbrSaveList() {
-   If (maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-      PanelSaveSlideShowu()
-}
-
-tlbrSelectFreeform() {
-   If isImgEditingNow()
-   {
-      If (editingSelectionNow!=1 || EllipseSelectMode!=2)
-         MenuStartDrawingSelectionArea()
-      Else
-         MenuResumeDrawingShapes()
-   }
-   Return "m"
-}
-
-tlbrInvokeShapesMenu(givenCoords:=0) {
+InvokeSelShapesMenu(givenCoords:=0) {
    If isImgEditingNow()
    {
       deleteMenus()
@@ -80201,21 +81018,13 @@ tlbrInvokeShapesMenu(givenCoords:=0) {
 }
 
 tlbrUndoAction() {
-   If isImgEditingNow()
+   setwhileLoopExec(1)
+   While, (determineLClickstate()=1 || A_Index=1)
    {
-      If (drawingShapeNow=1)
-      {
-         ImgVectorUndoAct()
-         Return "m"
-      }
-      setwhileLoopExec(1)
-      While, (determineLClickstate()=1 || A_Index=1)
-      {
-         ImgUndoAction()
-         Sleep, % (A_Index<10) ? 200 : 90
-      }
-      setwhileLoopExec(0)
+      ImgUndoAction()
+      Sleep, % (A_Index<10) ? 200 : 90
    }
+   setwhileLoopExec(0)
    Return "m"
 }
 
@@ -80237,60 +81046,15 @@ tlbrPanIMG() {
    Return "m"
 }
 
-tlbrCloseWindow() {
-   If isNowAlphaPainting()
-      toggleAlphaPaintingMode()
-   Else If (isImgEditingNow()=1 && drawingShapeNow=1)
-      stopDrawingShape("cancel")
-   Else If (maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-      ToggleThumbsMode()
-   Else If (isImgEditingNow()=1 && imgEditPanelOpened=1)
-      BtnCloseWindow()
-   Return "m"
-}
-
-tlbrApplyImgEditFunc() {
-   If (isImgEditingNow()=1 && drawingShapeNow=1)
-      stopDrawingShape()
-   Else If (isImgEditingNow()=1 && imgEditPanelOpened=1)
-      applyIMGeditFunction()
-   Else If !AnyWindowOpen
-      ToggleThumbsMode()   ; openPreviousPanel()
-   Return "m"
-}
-
 tlbrRedoAction() {
-   If isImgEditingNow()
+   setwhileLoopExec(1)
+   While, (determineLClickstate()=1 || A_Index=1)
    {
-      If (drawingShapeNow=1)
-      {
-         ImgVectorRedoAct()
-         Return "m"
-      }
-
-      setwhileLoopExec(1)
-      While, (determineLClickstate()=1 || A_Index=1)
-      {
-         ImgRedoAction()
-         Sleep, % (A_Index<10) ? 200 : 90
-      }
-      setwhileLoopExec(0)
+      ImgRedoAction()
+      Sleep, % (A_Index<10) ? 200 : 90
    }
+   setwhileLoopExec(0)
    Return "m"
-}
-
-tlbrNewImage() {
-   If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-      addNewFile2list()
-   Else If (!AnyWindowOpen || imgEditPanelOpened=1)
-      PanelNewImage()
-}
-
-tlbrAcquireimage() {
-   If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-      addNewFolder2list()
-   Else If !AnyWindowOpen
-      AcquireWIAimage()
 }
 
 invokeSortListMenu() {
@@ -80313,29 +81077,16 @@ invokeSortListMenu() {
    }
 }
 
-tlbrRecentMenu() {
-   If AnyWindowOpen
-      Return
-
-   InvokeOpenRecentMenu("tlbr")
-}
-
-tlbrFoldersTree() {
-   If AnyWindowOpen
-      Return
-
-   MenuPanelFoldersTree()
-}
-
 isTlbrViewModus(p:=0) {
    If (p=1)
       r := (userCustomizedToolbar=1 && imgEditPanelOpened!=1) ? 1 : 0
    Else
       r := (toolbarViewerMode=1 && imgEditPanelOpened!=1) ? 1 : 0
 
+   pk := isImgEditingNow()
    isVectorMode := (drawingShapeNow=1 && editingSelectionNow=1 && EllipseSelectMode=2) ? 1 : 0
-   isWelcomeScreenu := (isImgEditingNow()=1 || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
-   isTransPanel := (isImgEditingNow() && (AnyWindowOpen=31 || AnyWindowOpen=24)) ? 1 : 0
+   isWelcomeScreenu := (pk=1 || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
+   isTransPanel := (pk=1 && (AnyWindowOpen=31 || AnyWindowOpen=24)) ? 1 : 0
    addAlphaIcons := (isAlphaMaskPartialWin()=1 || isAlphaMaskWindow()=1) ? 1 : 0
    If (isVectorMode=1 || isWelcomeScreenu=1 || isTransPanel=1 || addAlphaIcons=1 || isNowAlphaPainting())
       r := 0
@@ -80343,109 +81094,877 @@ isTlbrViewModus(p:=0) {
    Return r
 }
 
+processToolbarFunctions(btnID, actu, simulacrum:=0) {
+   func2call := []
+   If InStr(actu,"right")
+   {
+      If (btnID="BTNdragTlbr")
+      {
+         func2Call := ["invokeTlbrContextMenu"]
+      } Else If (btnID="BTNsettings")
+      {
+         If (!AnyWindowOpen || imgEditPanelOpened=1)
+         {
+            If (drawingShapeNow=1)
+               func2Call := ["invokeMenuNavBoxImgSizeVP", "tlbr"]
+            Else
+               func2Call := ["OpenUImenu", "tlbr"]
+         }
+      } Else If (btnID="BTNcopyImg")
+      {
+         func2Call := ["CopyImagePath"]
+      } Else If (btnID="BTNnewImg")
+      {
+         If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+            func2Call := ["addNewFolder2list"]
+         Else If !AnyWindowOpen
+            func2Call := ["AcquireWIAimage"]
+      } Else If (btnID="BTNpasteImg")
+      {
+         func2Call := ["PanelPasteInPlace"]
+      } Else If (btnID="BTNundoImg")
+      {
+         If (drawingShapeNow!=1)
+            func2Call := ["ImgSelUndoAct"]
+      } Else If (btnID="BTNredoImg")
+      {
+         If (drawingShapeNow!=1)
+            func2Call := ["ImgSelRedoAct"]
+      } Else If (btnID="BTNtextTool")
+      {
+         imgPath := getIDimage(currentFileIndex)
+         If (isImgEditingNow()=1 && FileExist(imgPath) && (!AnyWindowOpen || imgEditPanelOpened=1))
+            func2Call := ["PanelEditImgCaption"]
+      } Else If (btnID="BTNeraserBrush")
+      {
+         If (isImgEditingNow()=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
+            func2Call := ["toggleErasePasteInPlace"]
+         Else If (isImgEditingNow()=1 && editingSelectionNow=1)
+            func2Call := ["PanelEraseSelectedArea"]
+      } Else If (btnID="BTNdeleteTool")
+      {
+         If (maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+            func2Call := ["singleInListEntriesRemover"]
+      } Else If (btnID="BTNblurTool")
+      {
+         If (isImgEditingNow()=1 && (!AnyWindowOpen || imgEditPanelOpened=1))
+            func2Call := ["PanelBlurSelectedArea"]
+      } Else If (btnID="BTNclonerTool")
+      {
+         If (AnyWindowOpen=64)
+            func2Call := ["BtnSetClonerBrushSource"]
+      } Else If (btnID="BTNwetbrush")
+      {
+         func2Call := ["MenuDecBrushWetness"]
+      } Else If (btnID="BTNpenVector")
+      {
+         func2Call := ["MenuStartDrawingLines"]
+      } Else If (btnID="BTNpipette" || btnID="BTNcolorsSwatch")
+      {
+         If ((!AnyWindowOpen || imgEditPanelOpened=1 && AnyWindowOpen) && (thumbsDisplaying!=1))
+            func2Call := ["ToggleBrushColors"]
+      } Else If (btnID="BTNalphCapture")
+      {
+         func2Call := ["importAlphaMaskFromClipboard"]
+      } Else If (btnID="BTNcrop")
+      {
+         If (isImgEditingNow()=1 && editingSelectionNow!=1)
+            func2Call := ["PanelImgAutoCrop"]
+         Else If (isImgEditingNow()=1 && editingSelectionNow=1)
+            func2Call := ["ResizeIMGviewportSelection"]
+      } Else If (btnID="BTNsave")
+      {
+         If (maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+            func2Call := ["PanelSaveSlideShowu"]
+      } Else If (btnID="BTNopen")
+      {
+         If !AnyWindowOpen
+            func2Call := ["InvokeOpenRecentMenu", "tlbr"]
+      } Else If (btnID="BTNcutImg")
+      {
+         If (maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+            func2Call := ["PanelMoveCopyFiles"]
+      } Else If (btnID="BTNadjustColors")
+      {
+         func2Call := ["ResetImageView"]
+      } Else If (btnID="BTNtlbrflipH")
+      {
+         If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+            func2Call := ["VPflipImgH"]
+         Else If (isImgEditingNow()=1 && EllipseSelectMode=2 && editingSelectionNow=1 && drawingShapeNow!=1)
+            func2Call := ["flipWHcustomShape", "H"]
+         Else If (isImgEditingNow()=1 && editingSelectionNow=1 && drawingShapeNow!=1)
+            func2Call := ["VPflipImgH"]
+      } Else If (btnID="BTNtlbrflipV")
+      {
+         If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+            func2Call := ["VPflipImgV"]
+         Else If (isImgEditingNow()=1 && EllipseSelectMode=2 && editingSelectionNow=1 && drawingShapeNow!=1)
+            func2Call := ["flipWHcustomShape", "V"]
+         Else If (isImgEditingNow()=1 && editingSelectionNow=1 && drawingShapeNow!=1)
+            func2Call := ["VPflipImgV"]
+      } Else If (btnID="BTNtransformArea")
+      {
+         If (isImgEditingNow()=1 && !AnyWindowOpen)
+            func2Call := ["PanelEditorImgResize"]
+      } Else If (btnID="BTNrotateStuff")
+      {
+         If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+            func2Call := ["filesListFlipRotateMinus"]
+         Else If (isImgEditingNow()=1 && editingSelectionNow=1 && VPselRotation!=0)
+            func2Call := ["resetSelectionRotation"]
+         Else If (isImgEditingNow()=1 && vpIMGrotation!=0)
+            func2Call := ["MenuResetVProtation"]
+      } Else If (btnID="BTNfillShape")
+      {
+         If isImgEditingNow()
+            func2Call := ["PanelFillBehindBgrImage"]
+      } Else If (btnID="BTNoutlineShape")
+      {
+         If isImgEditingNow()
+            func2Call := ["PanelDrawLines"]
+      } Else If (btnID="BTNselectShape")
+      {
+         If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) 
+            func2Call := ["invokeFilesSelectionMenu"]
+         Else If (isImgEditingNow()=1)
+            func2Call := ["ToggleEditImgSelection"]
+      } Else If (btnID="BTNselectFileu")
+      {
+         func2Call := ["dropFilesSelection"]
+      } Else If (btnID="BTNselectFreeform")
+      {
+         func2Call := ["InvokeSelShapesMenu"]
+      } Else If (btnID="BTNloupe")
+      {
+         If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD)
+            func2Call := ["ToggleThumbsAratio"]
+         Else If (isImgEditingNow()=1)
+            func2Call := ["ToggleImageSizingMode"]
+      } Else If (btnID="BTNpreviewBox")
+      {
+          isWelcomeScreenu := (isImgEditingNow()=1 || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
+             func2Call := ["togglePreviewVectorNewPoint"]
+          Else If !isWelcomeScreenu
+             func2Call := ["ToggleImgNavSizeBox"]
+      } Else If (btnID="BTNsearch")
+         func2Call := ["PanelSearchAndReplaceIndex"]
+      Else If (btnID="BTNmodifyEntry")
+         func2Call := ["PanelUpdateThisFileIndex"]
+      Else If (btnID="BTNfilterList")
+         func2Call := ["MenuRemFilesListFilter"]
+      Else If (btnID="BTNstatsList")
+         func2Call := ["PanelFindDupes"]
+      Else If (btnID="BTNrefreshList")
+         func2Call := ["DeepRefreshThumbsNow"]
+      Else If (btnID="BTNfolderTree")
+         func2Call := ["invokeFoldersListerMenu"]
+      Else If (btnID="BTNrecentOpened")
+         func2Call := ["invokeFoldersListerMenu"]
+      Else If (btnID="BTNinfozHud")
+         func2Call := ["PanelImageInfos"]
+      Else If (btnID="BTNmngFolderz")
+         func2Call := ["PanelStaticFolderzManager"]
+      Else If (btnID="BTNfntSize")
+         func2Call := ["MenuChangeOSDZoomMinus"]
+      Else If (btnID="BTNfaves")
+         func2Call := ["InvokeFavesMenu"]
+      Else If (btnID="BTNpanImg")
+         func2Call := ["ToggleImgNavBox"]
+      Else If (btnID="BTNplaySlides")
+         func2Call := ["ToggleSlideshowModes"]
+      Else If (btnID="BTNchangeBrushSoft")
+         func2Call := ["MenuDecBrushSoftness"]
+      Else If (btnID="BTNchangeBrushOpacity")
+         func2Call := ["MenuDecBrushOpacity"]
+      Else If (btnID="BTNchangeBrushSize")
+         func2Call := ["toggleBrushDoubleSize"]
+      Else If (btnID="BTNchangeBrushAngle")
+         func2Call := ["toggleBrushMouseAngle"]
+      Else If (btnID="BTNchangeBrushRatio")
+         func2Call := ["MenuResetBrushAsRatio"]
+      Else If (btnID="BTNvectSelAll")
+         func2Call := ["MenuSelNoVectorPoints"]
+      Else If (btnID="BTNhelp")
+         func2Call := ["MenuDrawViewportHelpMap"]
+      Else If (btnID="BTNcalculate")
+         func2Call := ["PanelReviewSelectedFiles"]
+      Else If (btnID="BTNquickFileActs")
+         func2Call := ["toggleQuickMoveActionKeys"]
+      Else If (btnID="BTNvpGrid")
+      {
+         If (isImgEditingNow()=1 && drawingShapeNow=1)
+            func2Call := ["toggleViewPortGridu"]
+         Else If (isImgEditingNow()=1 && (!AnyWindowOpen || imgEditPanelOpened=1 && AnyWindowOpen!=24 && AnyWindowOpen!=31))
+            func2Call := ["PanelConfigVPgrid"]
+      } Else If (btnID="BTNthumbsList")
+         func2Call := ["ToggleIMGalign"]
+      Else If (btnID="BTNimgSizers")
+         func2Call := ["InvokeMenuImgSizeVP", "tlbr"]
+      Else If (btnID="BTNzoomInIMG")
+         func2Call := ["MenuChangeOSDZoomPlus"]
+      Else If (btnID="BTNzoomOutIMG")
+         func2Call := ["MenuChangeOSDZoomMinus"]
+      Else If (btnID="BTNnavFirstImgu")
+         func2Call := ["PrevRandyPicture"]
+      Else If (btnID="BTNnavLastImgu")
+         func2Call := ["RandomPicture"]
+      Else If (btnID="BTNnavPrevImgu")
+         func2Call := ["jumpPreviousImage"]
+      Else If (btnID="BTNalignVPimgu")
+         func2Call := ["toggleFreePanning"]
+      Else If (btnID="BTNhudHisto")
+         func2Call := ["invokeHistoMenu", "tlbr"]
+      Else If (btnID="BTNannotate")
+         func2Call := ["ToggleImgCaptions"]
+      Else If (btnID="BTNprivatModa")
+         func2Call := ["ToggleRecordSeenImages"]
+      Else If (btnID="BTNsoundPlay")
+         func2Call := ["StopMediaPlaying"]
+      Else If (btnID="BTNmainTooler" || btnID="BTNswitchThumbs")
+      {
+         If isNowAlphaPainting()
+            func2Call := ["toggleAlphaPaintingMode"]
+         Else If (isImgEditingNow()=1 && drawingShapeNow=1)
+            func2Call := ["stopDrawingShape", "cancel"]
+         Else If (isImgEditingNow()=1 && imgEditPanelOpened=1)
+            func2Call := ["BtnCloseWindow"]
+         Else If !AnyWindowOpen
+            func2Call := ["openPreviousPanel"]
+      } Else If (btnID="BTNprintAcquire")
+         func2Call := ["AcquireWIAimage"]
+      Else If (btnID="BtnReturnImgView")
+         func2Call := ["openPreviousPanel"]
+      Else If (btnID="BTNgoFileMaps")
+         func2Call := ["ToggleFilesMap"]
+   } Else
+   {
+      If (btnID="BTNdragTlbr")
+         func2Call := ["tlbrDraggyNow"]
+      Else If (btnID="BTNrotateTlbr")
+         func2Call := ["TglToolBarValign"]
+      Else If (btnID="BTNcloseTlbr")
+         func2Call := ["toggleAppToolbar"]
+      Else If (btnID="BTNcancelTool")
+      {
+         If isNowAlphaPainting()
+            func2Call := ["toggleAlphaPaintingMode"]
+         Else If (isImgEditingNow()=1 && drawingShapeNow=1)
+            func2Call := ["stopDrawingShape", "cancel"]
+         Else If (isImgEditingNow()=1 && imgEditPanelOpened=1)
+            func2Call := ["BtnCloseWindow"]
+         Else If !AnyWindowOpen
+            func2Call := ["openPreviousPanel"]
+      } Else If (btnID="BTNsettings")
+      {
+         If (!AnyWindowOpen || imgEditPanelOpened=1)
+         {
+            If (drawingShapeNow=1)
+               func2Call := ["tlbrVectorDrawingModeContextMenu"]
+            Else If (isNowAlphaPainting() || imgEditPanelOpened=1)
+               func2Call := ["BuildMainMenu", 0, "tlbr"]
+            Else If isImgEditingNow()
+               func2Call := ["invokeSelectionAreaMenu", "DoubleClick", "tlbr"]
+            Else
+               func2Call := ["BuildSecondMenu", "tlbr"]
+         }
+      } Else If (btnID="BTNcopyImg")
+      {
+         If (thumbsDisplaying=1)
+            func2Call := ["InvokeCopyFiles"]
+         Else If isImgEditingNow()
+            func2Call := ["CopyImage2clip"]
+      } Else If (btnID="BTNnewImg")
+      {
+         If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+            func2Call := ["addNewFile2list"]
+         Else If (!AnyWindowOpen || imgEditPanelOpened=1)
+            func2Call := ["PanelNewImage"]
+      } Else If (btnID="BTNpasteImg")
+      {
+         If (thumbsDisplaying=1)
+            func2Call := ["MenuPasteHDropFiles"]
+         Else
+            func2Call := ["PasteClipboardIMG"]
+      } Else If (btnID="BTNundoImg")
+      {
+         If isImgEditingNow()
+         {
+            If (drawingShapeNow=1)
+               func2Call := ["ImgVectorUndoAct"]
+            Else If (simulacrum=1)
+               func2Call := ["ImgUndoAction"]
+            Else
+               func2Call := ["tlbrUndoAction"]
+         }
+      } Else If (btnID="BTNredoImg")
+      {
+         If isImgEditingNow()
+         {
+            If (drawingShapeNow=1)
+               func2Call := ["ImgVectorRedoAct"]
+            Else If (simulacrum=1)
+               func2Call := ["ImgRedoAction"]
+            Else
+               func2Call := ["tlbrRedoAction"]
+         }
+      } Else If (btnID="BTNtextTool")
+      {
+         If isImgEditingNow()
+            func2Call := ["PanelInsertTextArea"]
+      } Else If (btnID="BTNdeleteTool")
+      {
+         If (maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+         {
+            If (thumbsDisplaying=1)
+               func2Call := ["DeletePicture"]
+            Else
+               func2Call := ["DeleteActivePicture"]
+         }
+      } Else If (btnID="BTNeraserBrush")
+      {
+         If isImgEditingNow()
+         {
+            If (AnyWindowOpen=31 || AnyWindowOpen=24)
+               func2Call := ["toggleErasePasteInPlace"]
+            Else If (AnyWindowOpen!=64)
+               func2Call := ["PanelBrushTool", 4, "e"]
+            Else
+               func2Call := ["toggleBrushTypeEraser"]
+         }
+      } Else If (btnID="BTNblurTool")
+      {
+         If isImgEditingNow()
+         {
+            If (AnyWindowOpen!=64)
+               func2Call := ["PanelBrushTool", 5, "b"]
+            Else
+               func2Call := ["coreTlbrSlider", "tlbrChangeBrushFXblur", 200, 0]
+         }
+      } Else If (btnID="BTNclonerTool")
+      {
+         If isImgEditingNow()
+         {
+            If (AnyWindowOpen!=64)
+               func2Call := ["PanelBrushTool", 3, "e"]
+            Else
+               func2Call := ["toggleBrushTypeCloner"]
+         }
+      } Else If (btnID="BTNbrushMtool")
+      {
+         If isImgEditingNow()
+         {
+            If (AnyWindowOpen!=64)
+               func2Call := ["PanelBrushTool", 2, "e"]
+            Else
+               func2Call := ["toggleBrushTypes"]
+         }
+      } Else If (btnID="BTNFXbrush")
+      {
+         If isImgEditingNow()
+         {
+            If (AnyWindowOpen!=64)
+               func2Call := ["PanelBrushTool", 5, "fx"]
+            Else
+               func2Call := ["toggleBrushTypeFX"]
+         }
+      } Else If (btnID="BTNwetbrush")
+      {
+         If isImgEditingNow()
+         {
+            If (AnyWindowOpen!=64)
+               func2Call := ["PanelBrushTool", 2, "w"]
+            Else If (simulacrum=1)
+               func2Call := ["MenuIncBrushWetness"]
+            Else
+               func2Call := ["coreTlbrSlider", "tlbrChangeBrushWet", 200, 0]
+         }
+      } Else If (btnID="BTNpenVector")
+      {
+         func2Call := ["MenuStartDrawingShapes"]
+      } Else If (btnID="BTNpipette")
+      {
+         If (!AnyWindowOpen || imgEditPanelOpened=1 && AnyWindowOpen)
+            func2Call := ["changeBrushColorPicker"]
+      } Else If (btnID="BTNcolorsSwatch")
+      {
+         If (thumbsDisplaying=1)
+            func2Call := ["TogglePrivateMode"]
+         Else If (simulacrum=1)
+            func2Call := ["ToggleBrushColors"]
+         Else
+            func2Call := ["tlbrActColorsSwatch"]
+      } Else If (btnID="BTNalphInvert")
+      {
+         If isImgEditingNow()
+            func2Call := ["toggleInvertAlphaMask"]
+      } Else If (btnID="BTNalphRaster")
+      {
+         If isImgEditingNow()
+            func2Call := ["RasterizeAlphaMaskNow"]
+      } Else If (btnID="BTNalphPaint")
+      {
+         If (isImgEditingNow() && isAlphaMaskWindow() && editingSelectionNow=1)
+            func2Call := ["toggleAlphaPaintingMode"]
+      } Else If (btnID="BTNalphCapture")
+      {
+         If (isImgEditingNow() && editingSelectionNow=1)
+            func2Call := ["SetImageAsAlphaMask"]
+      } Else If (btnID="BTNalphPanel")
+      {
+         If isImgEditingNow()
+            func2Call := ["PanelSoloAlphaMasker"]
+      } Else If (btnID="BTNalphView")
+      {
+         If (isImgEditingNow() && editingSelectionNow=1)
+            func2Call := ["ViewAlphaMaskNow"]
+      } Else If (btnID="BTNalphDiscard")
+      {
+         If isImgEditingNow()
+            func2Call := ["discardUserPaintedAlpha"]
+      } Else If (btnID="BTNcrop")
+      {
+         If (isImgEditingNow() && (AnyWindowOpen=31 || AnyWindowOpen=24))
+         {
+            func2Call := ["togglePasteInPlaceCropShapes"]
+         } Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+         {
+            func2Call := ["PanelSimpleResizeRotate"]
+         } Else If (isImgEditingNow()=1 && !AnyWindowOpen)
+         {
+            If (editingSelectionNow=1)
+               func2Call := ["CropImageInViewPortToSelection"]
+            Else If !AnyWindowOpen
+               func2Call := ["PanelAdjustImageCanvasSize"]
+         }
+      } Else If (btnID="BTNsave")
+      {
+         If (isImgEditingNow()=1 && !AnyWindowOpen)
+            func2Call := ["PanelSaveImg"]
+         Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+            func2Call := ["PanelSaveSlideShowu"]
+      } Else If (btnID="BTNopen")
+      {
+         If !AnyWindowOpen
+            func2Call := ["OpenDialogFiles"]
+      } Else If (btnID="BTNcutImg")
+      {
+         If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+            func2Call := ["MenuExplorerCutFiles"]
+         Else If (isImgEditingNow()=1 && editingSelectionNow=1 && !AnyWindowOpen)
+            func2Call := ["CutSelectedArea"]
+      } Else If (btnID="BTNadjustColors")
+      {
+         If (isImgEditingNow() && (AnyWindowOpen=31 || AnyWindowOpen=24))
+            func2Call := ["togglePasteInPlaceColorsFX"]
+         Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+            func2Call := ["PanelSetThumbColumnOptions"]
+         Else If isImgEditingNow()
+         {
+            If isTlbrViewModus()
+               func2Call := ["PanelColorsAdjusterWindow"]
+            Else
+               func2Call := ["PanelColorsAdjusterImage"]
+         }
+      } Else If (btnID="BTNtlbrflipH")
+      {
+         editing := isImgEditingNow()
+         If (editing=1 && drawingShapeNow=1)
+            func2Call := ["toggleBrushSymmetryModes"]
+         Else If (editing=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
+            func2Call := ["FlipHtransformedIMGpanel"]
+         Else If (editing=1 && isNowAlphaPainting())
+            func2Call := ["FlipHalphaMask"]
+         Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+            func2Call := ["filesListFlipHimage"]
+         Else If (editing=1 && editingSelectionNow=1)
+            func2Call := ["FlipSelectedAreaH"]
+         Else If (editing=1)
+            func2Call := ["VPflipImgH"]
+      } Else If (btnID="BTNtlbrflipV")
+      {
+         editing := isImgEditingNow()
+         If (editing=1 && drawingShapeNow=1)
+            func2Call := ["toggleBrushSymmetryModes"]
+         Else If (editing=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
+            func2Call := ["FlipVtransformedIMGpanel"]
+         Else If (editing=1 && isNowAlphaPainting())
+            func2Call := ["FlipValphaMask"]
+         Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+            func2Call := ["filesListFlipVimage"]
+         Else If (editing=1 && editingSelectionNow=1)
+            func2Call := ["FlipSelectedAreaV"]
+         Else If (editing=1)
+            func2Call := ["VPflipImgV"]
+      } Else If (btnID="BTNtransformArea")
+      {
+         If (isImgEditingNow() && (AnyWindowOpen=31 || AnyWindowOpen=24))
+            func2Call := ["togglePasteInPlaceAdaptModes"]
+         Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+            func2Call := ["importEditGivenImageFile"]
+         Else If (isImgEditingNow()=1 && editingSelectionNow=0 && !AnyWindowOpen)
+            func2Call := ["PanelEditorImgResize"]
+         Else If (isImgEditingNow()=1 && editingSelectionNow=1 && !AnyWindowOpen)
+            func2Call := ["PanelTransformSelectedArea"]
+      } Else If (btnID="BTNrotateStuff")
+      {
+         editing := isImgEditingNow()
+         If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+         {
+            func2Call := ["filesListFlipRotatePlus"]
+         } Else If (editing=1 && editingSelectionNow=1 && VPselRotation!=0 && (GetKeyState("Ctrl", "P") || GetKeyState("Shift", "P")))
+         {
+            func2Call := ["resetSelectionRotation"]
+         } Else If (editing=1 && editingSelectionNow=1 && !isTlbrViewModus())
+         {
+            If GetKeyState("Alt", "P")
+               func2Call := ["coreTlbrSlider", "changeSelRotation", 5, 0]
+            Else If (simulacrum=1)
+               func2Call := ["MenuSelIncRotation"]
+            Else
+               func2Call := ["coreTlbrSlider", "changeTlbrSelRotation", 25, 0]
+         } Else If (isImgEditingNow()=1)
+         {
+            If isTlbrViewModus()
+               func2Call := ["changeImgRotationInVP", 1, 45]
+            Else If GetKeyState("Alt", "P")
+               func2Call := ["coreTlbrSlider", "changeLittleImgRotationInVP", 5, 0]
+            Else If (simulacrum=1)
+               func2Call := ["MenuIncVProtation"]
+            Else
+               func2Call := ["coreTlbrSlider", "changeImgRotationInVP", 25, 0]
+         }
+      } Else If (btnID="BTNfillShape")
+      {
+         func2Call := ["tlbrFillShape"]
+      } Else If (btnID="BTNoutlineShape")
+      {
+         func2Call := ["tlbrDrawShapesContour"]
+      } Else If (btnID="BTNselectShape")
+      {
+         If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) 
+            func2Call := ["markThisFileNow"]
+         Else If (simulacrum=1 && editingSelectionNow!=1)
+            func2Call := ["ToggleEditImgSelection"]
+         Else
+            func2Call := ["MenuCycleSelectionShapes"]
+      } Else If (btnID="BTNselectFileu")
+      {
+         func2Call := ["markThisFileNow"]
+      } Else If (btnID="BTNselectFreeform")
+      {
+         If isImgEditingNow()
+         {
+            If (editingSelectionNow!=1 || EllipseSelectMode!=2)
+               func2Call := ["MenuStartDrawingSelectionArea"]
+            Else
+               func2Call := ["MenuResumeDrawingShapes"]
+         }
+      } Else If (btnID="BTNloupe")
+      {
+         If (isImgEditingNow() || (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD))
+         {
+            If (simulacrum=1)
+               func2Call := ["MenuChangeImgZoomPlus"]
+            Else
+               func2Call := ["tlbrZoomINout"]
+         }
+      } Else If (btnID="BTNpreviewBox")
+      {
+          isWelcomeScreenu := (isImgEditingNow()=1 || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
+          If (isImgEditingNow()=1 && drawingShapeNow=1)
+             func2Call := ["togglePreviewVectorNewPoint"]
+          Else If !isWelcomeScreenu
+             func2Call := ["ToggleImgNavBox"]
+      } Else If (btnID="BTNsearch")
+         func2Call := ["PanelSearchIndex"]
+      Else If (btnID="BTNmodifyEntry")
+         func2Call := ["PanelRenameThisFile"]
+      Else If (btnID="BTNfilterList")
+         func2Call := ["PanelEnableFilesFilter"]
+      Else If (btnID="BTNstatsList")
+         func2Call := ["PanelWrapperFilesStats"]
+      Else If (btnID="BTNsortList")
+         func2Call := ["invokeSortListMenu"]
+      Else If (btnID="BTNrefreshList")
+         func2Call := ["RefreshFilesList"]
+      Else If (btnID="BTNfolderTree")
+         func2Call := ["MenuPanelFoldersTree"]
+      Else If (btnID="BTNrecentOpened")
+         func2Call := ["InvokeOpenRecentMenu", "tlbr"]
+      Else If (btnID="BTNinfozHud")
+         func2Call := ["ToggleInfoBoxu"]
+      Else If (btnID="BTNmngFolderz")
+         func2Call := ["PanelDynamicFolderzWindow"]
+      Else If (btnID="BTNfntSize")
+         func2Call := ["MenuChangeOSDZoomPlus"]
+      Else If (btnID="BTNfaves")
+      {
+         isWelcomeScreenu := (isImgEditingNow()=1 || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
+         If isWelcomeScreenu
+            func2Call := ["InvokeFavesMenu", "tlbr"]
+         Else If !AnyWindowOpen
+            func2Call := ["ToggleImgFavourites"]
+      } Else If (btnID="BTNpanImg")
+      {
+         func2Call := ["tlbrPanIMG"]
+      } Else If (btnID="BTNswitchThumbs" || btnID="BTNmainTooler")
+      {
+         If (isImgEditingNow()=1 && drawingShapeNow=1)
+            func2Call := ["stopDrawingShape"]
+         Else If (isImgEditingNow()=1 && imgEditPanelOpened=1)
+            func2Call := ["applyIMGeditFunction"]
+         Else If !AnyWindowOpen
+            func2Call := ["ToggleThumbsMode"]
+      } Else If (btnID="BTNplaySlides")
+      {
+         func2Call := ["MenuGoPlaySlidesNow"]
+      } Else If (btnID="BTNchangeBrushSoft")
+      {
+         func2Call := ["userChangeBrushSoft", "tlbr", 1]
+      } Else If (btnID="BTNchangeBrushOpacity")
+      {
+         If (isImgEditingNow()=1 && (AnyWindowOpen=64 || isNowAlphaPainting()))
+         {
+            If (simulacrum=1)
+               func2Call := ["MenuIncBrushOpacity"]
+            Else
+               func2Call := ["coreTlbrSlider", "changeBrushOpacity", 150, 1]
+         }
+      } Else If (btnID="BTNchangeBrushSize")
+      {
+         If (isImgEditingNow()=1 && (AnyWindowOpen=64 || isNowAlphaPainting()))
+         {
+            If (simulacrum=1)
+               func2Call := ["MenuIncBrushSize"]
+            Else
+               func2Call := ["coreTlbrSlider", "changeBrushSize", "BrushSize", 0]
+         }
+      } Else If (btnID="BTNchangeBrushAngle")
+      {
+         If (isImgEditingNow()=1 && (AnyWindowOpen=64 || isNowAlphaPainting()))
+         {
+            If (simulacrum=1)
+               func2Call := ["MenuIncBrushAngle"]
+            Else
+               func2Call := ["coreTlbrSlider", "changeBrushAnglu", 100, 0]
+         }
+      } Else If (btnID="BTNchangeBrushRatio")
+         func2Call := ["userChangeBrushRatio", "tlbr", 1]
+      Else If (btnID="BTNvectSmooth")
+         func2Call := ["togglePathCurveTension"]
+      Else If (btnID="BTNvectRemLast")
+         func2Call := ["reduceCustomShapelength"]
+      Else If (btnID="BTNvectRemPoints")
+         func2Call := ["MenuRemSelVectorPoints"]
+      Else If (btnID="BTNvectSelInvert")
+         func2Call := ["MenuSelInvertVectorPoints"]
+      Else If (btnID="BTNvectOpenPath")
+         func2Call := ["toggleOpenClosedLineCustomShape"]
+      Else If (btnID="BTNvectSelAll")
+         func2Call := ["tlbrSelAllVectorPoints"]
+      Else If (btnID="BTNpaintSelection")
+      {
+         If (isImgEditingNow()=1 && (AnyWindowOpen=64 || AnyWindowOpen=66))
+            func2Call := ["toggleBrushDrawInOutModes"]
+      } Else If (btnID="BTNalignSel")
+      {
+         func2Call := ["InvokeSelectAreaAlignMenu", "tlbr"]
+      } Else If (btnID="BTNhelp")
+      {
+         If !AnyWindowOpen
+            func2Call := ["PanelAboutWindow"]
+         Else
+            func2Call := ["showQuickHelp"]
+      } Else If (btnID="BTNfloodFill")
+      {
+         If isImgEditingNow()
+         {
+            If (AnyWindowOpen!=66)
+               func2Call := ["PanelFloodFillTool"]
+            Else If (editingSelectionNow=1)
+               func2Call := ["toggleBrushDrawInOutModes"]
+         }
+      } Else If (btnID="BTNcalculate")
+      {
+         func2Call := ["CalculateSelectedFilesSizes"]
+      } Else If (btnID="BTNinvertStuff")
+      {
+         If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen && markedSelectFile>0)
+            func2Call := ["invertFilesSelection"]
+         Else If isImgEditingNow()
+            func2Call := ["InvertSelectedArea"]
+      } Else If (btnID="BTNquickFileActs")
+      {
+         func2Call := ["PanelQuickMoveConfigure"]
+      } Else If (btnID="BTNvpGrid")
+      {
+         If isImgEditingNow()
+         {
+            If (GetKeyState("Ctrl", "P") || GetKeyState("Shift", "P"))
+               func2Call := ["toggleViewPortGridu"]
+            Else If (simulacrum=1)
+               func2Call := ["MenuIncVPgridSize"]
+            Else
+               func2Call := ["coreTlbrSlider", "changeGridSize", 10, 0]
+         }
+      } Else If (btnID="BTNthumbsList")
+      {
+         If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+            func2Call := ["toggleListViewModeThumbs"]
+      } Else If (btnID="BTNimgSizers")
+      {
+         func2Call := ["ToggleImageSizingMode"]
+      } Else If (btnID="BTNzoomInIMG")
+      {
+         If (simulacrum=1)
+            func2Call := ["MenuChangeImgZoomPlus"]
+         Else
+            func2Call := ["tlbrZoomINout", "zin"]
+      } Else If (btnID="BTNzoomOutIMG")
+      {
+         If (simulacrum=1)
+            func2Call := ["MenuChangeImgZoomMinus"]
+         Else
+            func2Call := ["tlbrZoomINout", "zout"]
+      } Else If (btnID="BTNnavFirstImgu")
+         func2Call := ["FirstPicture"]
+      Else If (btnID="BTNnavLastImgu")
+         func2Call := ["LastPicture"]
+      Else If (btnID="BTNnavNextImgu")
+         func2Call := ["NextPicture"]
+      Else If (btnID="BTNnavPrevImgu")
+         func2Call := ["PreviousPicture"]
+      Else If (btnID="BTNalignVPimgu")
+         func2Call := ["ToggleIMGalign"]
+      Else If (btnID="BTNhudHisto")
+         func2Call := ["ToggleImgHistogram", 1]
+      Else If (btnID="BTNannotate")
+         func2Call := ["PanelEditImgCaption"]
+      Else If (btnID="BTNprivatModa")
+         func2Call := ["TogglePrivateMode"]
+      Else If (btnID="BTNsoundPlay")
+         func2Call := ["PlayAudioFileAssociatedNow"]
+      Else If (btnID="BTNjumpAtIndex")
+         func2Call := ["PanelJump2index"]
+      Else If (btnID="BTNprintAcquire")
+         func2Call := ["PanelPrintImage"]
+      Else If (btnID="BTNgoPrevPanel")
+         func2Call := ["openPreviousPanel"]
+      Else If (btnID="BtnReturnImgView")
+         func2Call := (simulacrum=1) ? ["MenuDummyToggleThumbsMode"] : ["MenuReturnIMGedit"]
+      Else If (btnID="BTNgoFileMaps")
+         func2Call := ["MenuDrawFilesListMap"]
+      Else If (btnID="BTNspiralLinez")
+         func2Call := ["PanelDrawLines"]
+   }
+   Return func2Call
+} ; // processToolbarFunctions()
+
 CoreGUItoolbar(scopul:=0, whichList:=0) {
-    Static BTNdragTlbr := ["dragger", "tlbrDraggyNow", "Reposition toolbar", "invokeTlbrContextMenu", "BTNdragTlbr", 0, 1, 1]
-         , BTNrotateTlbr := ["rotate-tlbr", "TglToolBarValign", "Toggle toolbar orientation", 0, "BTNrotateTlbr", 0, 0, 1]
-         ; localBtnID := [ico-file-name, primary-func-l-click, base-user-friendly-name, secontary-func-r-click, button-ID, param-func, menu-mode, modes-availability]
-         , BTNdisabled := ["disabled", "dummy", "-", 0, "BTNdisabled", 0, 0, 1]
-         , BTNcloseTlbr := ["close", "toggleAppToolbar", "Close toolbar", 0, "BTNcloseTlbr", 0, 0, 1]
-         , BTNcancelTool := ["cancel-tool", "tlbrCloseWindow", "Cancel active tool", 0, "BTNcancelTool"]
-         , BTNsettings := ["menu", "tlbrInvokeEditMenu", "Quick settings menu", "tlbrInvokeInterfaceMenu", "BTNsettings", 0, 1, 1]
-         , BTNcopyImg := ["copy", "MenuCopyAction", "Copy to clipboard", "CopyImagePath", "BTNcopyImg", 0, 0, 1]
-         , BTNnewImg := ["new-image", "tlbrNewImage", "New image", "tlbrAcquireimage", "BTNnewImg", 0, 0, 1]
-         , BTNpasteImg := ["paste-clip", "tlbrPasteQuick", "Paste from clipboard", "PanelPasteInPlace", "BTNpasteImg", 0, 0, 1]
-         , BTNundoImg := ["undo", "tlbrUndoAction", "Undo image action", "ImgSelUndoAct", "BTNundoImg"]
-         , BTNredoImg := ["redo", "tlbrRedoAction", "Redo image action", "ImgSelRedoAct", "BTNredoImg"]
-         , BTNtextTool := ["add-text", "tlbrInsertTextArea", "Insert text into image", "tlbrOpenAnnotations", "BTNtextTool"]
-         , BTNeraserBrush := ["eraser", "tlbrEraserBrush", "Eraser brush", "tlbrEraserTool", "BTNeraserBrush"]
-         , BTNdeleteTool := ["delete-file", "tlbrDeleteFile", "Delete file", "tlbrDeleteIndexFile", "BTNdeleteTool", 0, 0, 1]
-         , BTNblurTool := ["brush-blur", "tlbrBlurBrush", "Blur brush", "tlbrBlurArea", "BTNblurTool"]
-         , BTNclonerTool := ["brush-cloner", "tlbrClonerBrush", "Cloner brush", "BtnSetClonerBrushSource", "BTNclonerTool"]
-         , BTNbrushMtool := ["brush-main", "tlbrMainBrushSoft", "Brush tool", "tlbrMainBrushHard", "BTNbrushMtool"]
-         , BTNFXbrush := ["brush-fx", "tlbrFXbrush", "Color effects soft brush", 0, "BTNFXbrush"]
-         , BTNwetbrush := ["brush-wet", "tlbrWetBrush", "Soft wet brush", "tlbrDecreaseWetBrush", "BTNwetbrush"]
-         , BTNpenVector := ["pen-vector", "tlbrPenFill", "Draw freeform shape", "tlbrPenOutline", "BTNpenVector"]
-         , BTNpipette := ["pipette", "tlbrPipette", "Pick color from the viewport", "tlbrSwitchColors", "BTNpipette"]
-         , BTNcolorsSwatch := ["colorz-swatch", "tlbrActColorsSwatch", "Primary / secondary colors", "tlbrSwitchColors", "BTNcolorsSwatch"]
-         , BTNalphInvert := ["alpha-mask-invert", "tlbrAmaskInvert", "Invert alpha mask", 0, "BTNalphInvert"]
-         , BTNalphRaster := ["alpha-mask-pixelize", "tlbrAmaskRaster", "Rasterize alpha mask", 0, "BTNalphRaster"]
-         , BTNalphPaint := ["alpha-mask-paint", "tlbrAmaskPaint", "Paint alpha mask", 0, "BTNalphPaint"]
-         , BTNalphCapture := ["alpha-mask-capture", "tlbrAmaskCapture", "Capture alpha mask", "importAlphaMaskFromClipboard", "BTNalphCapture"]
-         , BTNalphPanel := ["alpha-mask-panel", "tlbrAmaskPanel", "Alpha mask options panel", 0, "BTNalphPanel"]
-         , BTNalphView := ["alpha-mask-view", "tlbrAmaskView", "View alpha mask", 0, "BTNalphView"]
-         , BTNalphDiscard := ["alpha-mask-discard", "tlbrAmaskDiscard", "Discard alpha mask", 0, "BTNalphDiscard"]
-         , BTNcrop := ["crop", "tlbrCropImg", "Resize or crop image", "tlbrResizeImage", "BTNcrop", 0, 0, 1]
-         , BTNsave := ["save-disk", "tlbrSaveImg", "Save image or files list", "tlbrSaveList", "BTNsave", 0, 0, 1]
-         , BTNopen := ["open", "tlbrOpenImg", "Open image or files list", "tlbrOpenMenu", "BTNopen", 0, 1, 1]
-         , BTNcutImg := ["cut", "tlbrCutImg", "Cut image selection or file(s)", "tlbrMoveFiles", "BTNcutImg", 0, 0, 1]
-         , BTNadjustColors := ["adjust-colors", "tlbrOpenVPcolors", "Adjust viewport colors", "ResetImageView", "BTNadjustColors", 0, 0, 1]
-         , BTNtlbrflipH := ["flip-h", "tlbrFlipStuffH", "Flip horizontally", "tlbrFlipSelectionH", "BTNtlbrflipH", 0, 0, 1]
-         , BTNtlbrflipV := ["flip-v", "tlbrFlipStuffV", "Flip vertically", "tlbrFlipSelectionV", "BTNtlbrflipV", 0, 0, 1]
-         , BTNtransformArea := ["transform-img", "tlbrTransformSelection", "Import file or transform selected area", "tlbrResizeEditorImg", "BTNtransformArea", 0, 0, 1]
-         , BTNrotateStuff := ["rotation", "tlbrRotateImg", "Rotate image", "tlbrResetRotation", "BTNrotateStuff", 0, 0, 1]
-         , BTNfillShape := ["fill-shape", "tlbrFillShape", "Fill selection area", "tlbrFillBehind", "BTNfillShape"]
-         , BTNoutlineShape := ["outline-shape", "tlbrOutlineShape", "Draw shape contours", "tlbrOpenLinesPanel", "BTNoutlineShape"]
-         , BTNselectShape := ["select-rect", "tlbrSelectShape", "Create or cycle selection area modes", "tlbrDropSelection", "BTNselectShape"]
-         , BTNselectFileu := ["select-rect", "markThisFileNow", "Select / deseleect file", "dropFilesSelection", "BTNselectFileu", 0, 0, 1]
-         , BTNselectFreeform := ["create-freeform", "tlbrSelectFreeform", "Create freeform selection", "tlbrInvokeShapesMenu", "BTNselectFreeform"]
-         , BTNloupe := ["loupe", "tlbrZoomIN", "Zoom in / out", "tlbrZoomToggle", "BTNloupe", 0, 0, 1]
-         , BTNpreviewBox := ["view", "tlbrBtnViewToggle", "Toggle image preview", "tlbrNavSizeBox", "BTNpreviewBox", 0, 0, 1]
-         , BTNsearch := ["search", "PanelSearchIndex", "Search", "PanelSearchAndReplaceIndex", "BTNsearch"]
-         , BTNmodifyEntry := ["modify-entry", "PanelRenameThisFile", "Rename file[s]", "PanelUpdateThisFileIndex", "BTNmodifyEntry", 0, 0, 1]
-         , BTNfilterList := ["filter", "PanelEnableFilesFilter", "Filter files list", "MenuRemFilesListFilter", "BTNfilterList", 0, 0, 1]
-         , BTNstatsList := ["statistics", "PanelWrapperFilesStats", "Indexed files statistics", "PanelFindDupes", "BTNstatsList", 0, 0, 1]
-         , BTNsortList := ["sort-list", "invokeSortListMenu", "Sort files list", 0, "BTNsortList", 0, 1, 1]
-         , BTNrefreshList := ["refresh", "RefreshFilesList", "Refresh files list", "DeepRefreshThumbsNow", "BTNrefreshList", 0, 0, 1]
-         , BTNfolderTree := ["folder-tree", "tlbrFoldersTree", "Folder tree view", "invokeFoldersListerMenu", "BTNfolderTree", 0, 0, 1]
-         , BTNrecentOpened := ["recent", "tlbrRecentMenu", "Recents menu", "invokeFoldersListerMenu", "BTNrecentOpened", 0, 0, 1]
-         , BTNinfozHud := ["infos", "ToggleInfoBoxu", "Show image information", "PanelImageInfos", "BTNinfozHud", 0, 0, 1]
-         , BTNmngFolderz := ["manage-folders", "PanelDynamicFolderzWindow", "Manage folders", "PanelStaticFolderzManager", "BTNmngFolderz", 0, 0, 1]
-         , BTNfntSize := ["font-size", "tlbrChangeOSDfontSize", "Change OSD font size", "tlbrDecreaseOSDfontSize", "BTNfntSize", 0, 0, 1]
-         , BTNfaves := ["star", "tlbrAddFaves", "Add / remove from favourites", "InvokeFavesMenu", "BTNfaves", 0, 1, 1]
-         , BTNpanImg := ["pan-img", "tlbrPanIMG", "Pan image in viewport", "ToggleImgNavBox", "BTNpanImg"]
-         , BTNmainTooler := ["apply-tool", "tlbrApplyImgEditFunc", "Apply current tool", "tlbrCloseWindow", "BTNmainTooler"]
-         , BTNplaySlides := ["play", "tlbrPlaySlides", "Play slideshow", "ToggleSlideshowModes", "BTNplaySlides", 0, 0, 1]
-         , BTNchangeBrushSoft := ["brush-set-soft", "tlbrChangeBrushSoft", "Change brush softness", "tlbrDecreaseBrushSoft", "BTNchangeBrushSoft"]
-         , BTNchangeBrushOpacity := ["brush-set-opacity", "tlbrChangeBrushOpacity", "Change brush opacity", "tlbrDecreaseBrushOpacity", "BTNchangeBrushOpacity"]
-         , BTNchangeBrushSize := ["brush-set-size", "tlbrChangeBrushSize", "Change brush size", "toggleBrushDoubleSize", "BTNchangeBrushSize"]
-         , BTNchangeBrushAngle := ["brush-set-angle", "tlbrChangeBrushAngle", "Change brush angle", "toggleBrushMouseAngle", "BTNchangeBrushAngle"]
-         , BTNchangeBrushRatio := ["brush-set-ratio", "tlbrChangeBrushRatio", "Change brush ratio", "tlbrResetBrushAsRatio", "BTNchangeBrushRatio"]
-         , BTNvectSmooth := ["vector-smooth", "togglePathCurveTension", "Cycle path smoothness", 0, "BTNvectSmooth"]
-         , BTNvectRemLast := ["vector-rem-last", "reduceCustomShapelength", "Remove last point in path", 0, "BTNvectRemLast"]
-         , BTNvectRemPoints := ["vector-rem-points", "MenuRemSelVectorPoints", "Remove selected points in path", 0, "BTNvectRemPoints"]
-         , BTNvectSelInvert := ["vector-select-invert", "MenuSelInvertVectorPoints", "Invert selected points in path", 0, "BTNvectSelInvert"]
-         , BTNvectOpenPath := ["vector-open-path", "toggleOpenClosedLineCustomShape", "Toggle opened path", 0, "BTNvectOpenPath"]
-         , BTNvectSelAll := ["vector-select-all", "tlbrSelAllVectorPoints", "Select all points in path", "MenuSelNoVectorPoints", "BTNvectSelAll"]
-         , BTNpaintSelection := ["paint-outside", "tlbrtoggleBrushDrawModes", "Toggle brush selection area mode", 0, "BTNpaintSelection"]
-         , BTNalignSel := ["select-align", "tlbrSelectAlignMenu", "Align selection area", 0, "BTNalignSel", 0, 1]
-         , BTNhelp := ["help", "tlbrHelpBtn", "Help", "MenuDrawViewportHelpMap", "BTNhelp", 0, 0, 1]
-         , BTNfloodFill := ["flood-fill", "tlbrFloodFill", "Flood fill", 0, "BTNfloodFill"]
-         , BTNcalculate := ["calculate", "CalculateSelectedFilesSizes", "Calculate file sizes", "PanelReviewSelectedFiles", "BTNcalculate", 0, 0, 2]
-         , BTNinvertStuff := ["invert", "tlbrInvertStuff", "Invert image or file selection", 0, "BTNinvertStuff", 0, 0, 1]
-         , BTNquickFacts := ["quick-file-acts", "PanelQuickMoveConfigure", "Quick file actions", "PanelJump2index", "BTNquickFacts", 0, 0, 1]
-         , BTNvpGrid := ["vp-grid", "tlbrViewPortGridu", "Viewport grid", "tlbrConfigVPgrid", "BTNvpGrid"]
-         , BTNthumbsList := ["thumbs-list", "tlbrtoggleListViewModeThumbs", "Cycle list view modes", "ToggleIMGalign", "BTNthumbsList", 0, 0, 2]
-         , BTNimgSizers := ["img-sizing", "ToggleImageSizingMode", "Cycle image adapt modes", "tlbrInvokeImgSizeVP", "BTNimgSizers", 0, 0, 1]
-         , BTNzoomInIMG := ["zoom-in", "tlbrSimpleZoomIN", "Zoom in", "MenuChangeZoomPlus", "BTNzoomInIMG", 0, 0, 1]
-         , BTNzoomOutIMG := ["zoom-out", "tlbrSimpleZoomOut", "Zoom out", "MenuChangeZoomMinus", "BTNzoomOutIMG", 0, 0, 1]
-         , BTNnavFirstImgu := ["first", "FirstPicture", "Jump to the first image in the list", "PrevRandyPicture", "BTNnavFirstImgu", 0, 0, 1]
-         , BTNnavLastImgu := ["last", "LastPicture", "Jump to the last image in the list", "RandomPicture", "BTNnavLastImgu", 0, 0, 1]
-         , BTNnavNextImgu := ["next", "NextPicture", "Next image in the list", 0, "BTNnavNextImgu"]
-         , BTNnavPrevImgu := ["previous", "PreviousPicture", "Previous image in the list", "jumpPreviousImage", "BTNnavPrevImgu"]
-         , BTNalignVPimgu := ["vp-center-img", "ToggleIMGalign", "Toggle align image to center", "toggleFreePanning", "BTNalignVPimgu", 0, 0, 1]
-         , BTNhudHisto := ["histogram", "tlbrToggleHistoModes", "Cycle histogram modes", "tlbrInvokeHistoMenu", "BTNhudHisto"]
-         , BTNannotate := ["annotate", "PanelEditImgCaption", "Define image caption", "ToggleImgCaptions", "BTNannotate", 0, 0, 1]
-         , BTNprivatModa := ["private", "TogglePrivateMode", "Toggle private mode", "ToggleRecordSeenImages", "BTNprivatModa", 0, 0, 1]
-         , BTNsoundPlay := ["sound", "PlayAudioFileAssociatedNow", "Play associated sound file", "StopMediaPlaying", "BTNsoundPlay"]
-         , BTNjumpAtIndex := ["jump-to", "PanelJump2index", "Jump at given index", 0, "BTNjumpAtIndex", 0, 0, 1]
-         , BTNswitchThumbs := ["thumbs-mode", "ToggleThumbsMode", "Toggle list / thumbnails mode", "openPreviousPanel", "BTNswitchThumbs", 0, 0, 1]
-         , BTNprintAcquire := ["print", "PanelPrintImage", "Print/acquire image", "AcquireWIAimage", "BTNprintAcquire", 0, 0, 1]
-         , BTNgoPrevPanel := ["go-back", "openPreviousPanel", "Open previous panel", 0, "BTNgoPrevPanel", 0, 0, 1]
-         , BtnReturnImgView := ["go-back", "MenuReturnIMGedit", "Return to image view", "openPreviousPanel", "BtnReturnImgView", 0, 0, 2]
-         , BTNgoFileMaps := ["files-map", "MenuDrawFilesListMap", "Show files map", "ToggleFilesMap", "BTNgoFileMaps", 0, 0, 2]
-         , BTNspiralLinez := ["spiral", "PanelDrawLines", "Draw parametric lines", 0, "BTNspiralLinez"]
-         , btnzList := "BTNrotateTlbr,BTNcloseTlbr,BTNsettings,BTNcopyImg,BTNnewImg,BTNpasteImg,BTNundoImg,BTNredoImg,BTNtextTool,BTNeraserBrush,BTNdeleteTool,BTNblurTool,BTNclonerTool,BTNbrushMtool,BTNFXbrush,BTNwetbrush,BTNpenVector,BTNpipette,BTNcolorsSwatch,BTNalphInvert,BTNalphRaster,BTNalphCapture,BTNalphPanel,BTNalphView,BTNalphDiscard,BTNcrop,BTNsave,BTNopen,BTNcutImg,BTNadjustColors,BTNtlbrflipH,BTNtlbrflipV,BTNtransformArea,BTNrotateStuff,BTNfillShape,BTNoutlineShape,BTNselectShape,BTNselectFreeform,BTNloupe,BTNpreviewBox,BTNsearch,BTNmodifyEntry,BTNfilterList,BTNstatsList,BTNsortList,BTNrefreshList,BTNfolderTree,BTNrecentOpened,BTNinfozHud,BTNmngFolderz,BTNfntSize,BTNfaves,BTNpanImg,BTNgoPrevPanel,BTNplaySlides,BTNvectSmooth,BTNalignSel,BTNhelp,BTNfloodFill,BTNcalculate,BTNinvertStuff,BTNquickFacts,BTNvpGrid,BTNthumbsList,BTNimgSizers,BTNzoomInIMG,BTNzoomOutIMG,BTNnavFirstImgu,BTNnavLastImgu,BTNnavNextImgu,BTNnavPrevImgu,BTNalignVPimgu,BTNhudHisto,BTNannotate,BTNprivatModa,BTNsoundPlay,BTNjumpAtIndex,BTNswitchThumbs,BTNprintAcquire,BTNgoFileMaps,BTNspiralLinez,BTNselectFileu,BtnReturnImgView"
-         , prevState := 0, hasRan := 0, btnzListArray := [], hasObjectifiedList := 0
+    Static prevState := 0, hasRan := 0, btnzListArray := [], hasObjectifiedList := 0
+       ; , localBtnID := [ico-file-name, 0, base-user-friendly-name, 0, button-ID, 0, menu-mode, modes-availability]
+         , BTNdragTlbr := ["dragger", 0, "Reposition toolbar", 0, "BTNdragTlbr", 0, 1, 1]
+         , BTNrotateTlbr := ["rotate-tlbr", 0, "Toggle toolbar orientation", 0, "BTNrotateTlbr", 0, 0, 1]
+         , BTNdisabled := ["disabled", 0, "-", 0, "BTNdisabled", 0, 0, 1]
+         , BTNcloseTlbr := ["close", 0, "Close toolbar", 0, "BTNcloseTlbr", 0, 0, 1]
+         , BTNcancelTool := ["cancel-tool", 0, "Cancel active tool", 0, "BTNcancelTool"]
+         , BTNsettings := ["menu", 0, "Quick settings menu", 0, "BTNsettings", 0, 1, 1]
+         , BTNcopyImg := ["copy", 0, "Copy to clipboard", 0, "BTNcopyImg", 0, 0, 1]
+         , BTNnewImg := ["new-image", 0, "New image", 0, "BTNnewImg", 0, 0, 1]
+         , BTNpasteImg := ["paste-clip", 0, "Paste from clipboard", 0, "BTNpasteImg", 0, 0, 1]
+         , BTNundoImg := ["undo", 0, "Undo image action", 0, "BTNundoImg"]
+         , BTNredoImg := ["redo", 0, "Redo image action", 0, "BTNredoImg"]
+         , BTNtextTool := ["add-text", 0, "Insert text into image", 0, "BTNtextTool"]
+         , BTNeraserBrush := ["eraser", 0, "Eraser brush", 0, "BTNeraserBrush"]
+         , BTNdeleteTool := ["delete-file", 0, "Delete file", 0, "BTNdeleteTool", 0, 0, 1]
+         , BTNblurTool := ["brush-blur", 0, "Blur brush", 0, "BTNblurTool"]
+         , BTNclonerTool := ["brush-cloner", 0, "Cloner brush", 0, "BTNclonerTool"]
+         , BTNbrushMtool := ["brush-main", 0, "Brush tool", 0, "BTNbrushMtool"]
+         , BTNFXbrush := ["brush-fx", 0, "Color effects soft brush", 0, "BTNFXbrush"]
+         , BTNwetbrush := ["brush-wet", 0, "Soft wet brush", 0, "BTNwetbrush"]
+         , BTNpenVector := ["pen-vector", 0, "Draw freeform shape", 0, "BTNpenVector"]
+         , BTNpipette := ["pipette", 0, "Pick color from the viewport", 0, "BTNpipette"]
+         , BTNcolorsSwatch := ["colorz-swatch", 0, "Primary / secondary colors", 0, "BTNcolorsSwatch"]
+         , BTNalphCapture := ["alpha-mask-capture", 0, "Capture alpha mask", 0, "BTNalphCapture"]
+         , BTNalphInvert := ["alpha-mask-invert", 0, "Invert alpha mask", 0, "BTNalphInvert"]
+         , BTNalphRaster := ["alpha-mask-pixelize", 0, "Rasterize alpha mask", 0, "BTNalphRaster"]
+         , BTNalphPaint := ["alpha-mask-paint", 0, "Paint alpha mask", 0, "BTNalphPaint"]
+         , BTNalphPanel := ["alpha-mask-panel", 0, "Alpha mask options panel", 0, "BTNalphPanel"]
+         , BTNalphView := ["alpha-mask-view", 0, "View alpha mask", 0, "BTNalphView"]
+         , BTNalphDiscard := ["alpha-mask-discard", 0, "Discard alpha mask", 0, "BTNalphDiscard"]
+         , BTNcrop := ["crop", 0, "Resize or crop image", 0, "BTNcrop", 0, 0, 1]
+         , BTNsave := ["save-disk", 0, "Save image or files list", 0, "BTNsave", 0, 0, 1]
+         , BTNopen := ["open", 0, "Open image or files list", 0, "BTNopen", 0, 1, 1]
+         , BTNcutImg := ["cut", 0, "Cut image selection or file(s)", 0, "BTNcutImg", 0, 0, 1]
+         , BTNadjustColors := ["adjust-colors", 0, "Adjust viewport colors", 0, "BTNadjustColors", 0, 0, 1]
+         , BTNtlbrflipH := ["flip-h", 0, "Flip horizontally", 0, "BTNtlbrflipH", 0, 0, 1]
+         , BTNtlbrflipV := ["flip-v", 0, "Flip vertically", 0, "BTNtlbrflipV", 0, 0, 1]
+         , BTNtransformArea := ["transform-img", 0, "Import file or transform selected area", 0, "BTNtransformArea", 0, 0, 1]
+         , BTNrotateStuff := ["rotation", 0, "Rotate image", 0, "BTNrotateStuff", 0, 0, 1]
+         , BTNfillShape := ["fill-shape", 0, "Fill selection area", 0, "BTNfillShape"]
+         , BTNoutlineShape := ["outline-shape", 0, "Draw shape contours", 0, "BTNoutlineShape"]
+         , BTNselectShape := ["select-rect", 0, "Create or cycle selection area modes", 0, "BTNselectShape"]
+         , BTNselectFileu := ["select-rect", 0, "Select / deseleect file", 0, "BTNselectFileu", 0, 0, 1]
+         , BTNselectFreeform := ["create-freeform", 0, "Create freeform selection", 0, "BTNselectFreeform"]
+         , BTNloupe := ["loupe", 0, "Zoom in / out", 0, "BTNloupe", 0, 0, 1]
+         , BTNpreviewBox := ["view", 0, "Toggle image preview", 0, "BTNpreviewBox", 0, 0, 1]
+         , BTNsearch := ["search", 0, "Search", 0, "BTNsearch"]
+         , BTNmodifyEntry := ["modify-entry", 0, "Rename file(s)", 0, "BTNmodifyEntry", 0, 0, 1]
+         , BTNfilterList := ["filter", 0, "Filter files list", 0, "BTNfilterList", 0, 0, 1]
+         , BTNstatsList := ["statistics", 0, "Indexed files statistics", 0, "BTNstatsList", 0, 0, 1]
+         , BTNsortList := ["sort-list", 0, "Sort files list", 0, "BTNsortList", 0, 1, 1]
+         , BTNrefreshList := ["refresh", 0, "Refresh files list", 0, "BTNrefreshList", 0, 0, 1]
+         , BTNfolderTree := ["folder-tree", 0, "Folder tree view", 0, "BTNfolderTree", 0, 0, 1]
+         , BTNrecentOpened := ["recent", 0, "Recents menu", 0, "BTNrecentOpened", 0, 1, 1]
+         , BTNinfozHud := ["infos", 0, "Show image information", 0, "BTNinfozHud", 0, 0, 1]
+         , BTNmngFolderz := ["manage-folders", 0, "Manage folders", 0, "BTNmngFolderz", 0, 0, 1]
+         , BTNfntSize := ["font-size", 0, "Change OSD font size", 0, "BTNfntSize", 0, 0, 1]
+         , BTNfaves := ["star", 0, "Add / remove from favourites", 0, "BTNfaves", 0, 1, 1]
+         , BTNpanImg := ["pan-img", 0, "Pan image in viewport", 0, "BTNpanImg"]
+         , BTNmainTooler := ["apply-tool", 0, "Apply current tool", 0, "BTNmainTooler"]
+         , BTNplaySlides := ["play", 0, "Play slideshow", 0, "BTNplaySlides", 0, 0, 1]
+         , BTNchangeBrushSoft := ["brush-set-soft", 0, "Change brush softness", 0, "BTNchangeBrushSoft"]
+         , BTNchangeBrushOpacity := ["brush-set-opacity", 0, "Change brush opacity", 0, "BTNchangeBrushOpacity"]
+         , BTNchangeBrushSize := ["brush-set-size", 0, "Change brush size", 0, "BTNchangeBrushSize"]
+         , BTNchangeBrushAngle := ["brush-set-angle", 0, "Change brush angle", 0, "BTNchangeBrushAngle"]
+         , BTNchangeBrushRatio := ["brush-set-ratio", 0, "Change brush ratio", 0, "BTNchangeBrushRatio"]
+         , BTNvectSmooth := ["vector-smooth", 0, "Cycle path smoothness", 0, "BTNvectSmooth"]
+         , BTNvectRemLast := ["vector-rem-last", 0, "Remove last point in path", 0, "BTNvectRemLast"]
+         , BTNvectRemPoints := ["vector-rem-points", 0, "Remove selected points in path", 0, "BTNvectRemPoints"]
+         , BTNvectSelInvert := ["vector-select-invert", 0, "Invert selected points in path", 0, "BTNvectSelInvert"]
+         , BTNvectOpenPath := ["vector-open-path", 0, "Toggle opened path", 0, "BTNvectOpenPath"]
+         , BTNfloodFill := ["flood-fill", 0, "Flood fill", 0, "BTNfloodFill"]
+         , BTNvectSelAll := ["vector-select-all", 0, "Select all points in path", 0, "BTNvectSelAll"]
+         , BTNalignSel := ["select-align", 0, "Align selection area", 0, "BTNalignSel", 0, 1]
+         , BTNinvertStuff := ["invert", 0, "Invert image or file selection", 0, "BTNinvertStuff", 0, 0, 1]
+         , BTNhelp := ["help", 0, "Help", 0, "BTNhelp", 0, 0, 1]
+         , BTNpaintSelection := ["paint-outside", 0, "Toggle brush selection area mode", 0, "BTNpaintSelection"]
+         , BTNcalculate := ["calculate", 0, "Calculate file sizes", 0, "BTNcalculate", 0, 0, 2]
+         , BTNquickFileActs := ["quick-file-acts", 0, "Quick file actions", 0, "BTNquickFileActs", 0, 0, 1]
+         , BTNvpGrid := ["vp-grid", 0, "Viewport grid", 0, "BTNvpGrid"]
+         , BTNthumbsList := ["thumbs-list", 0, "Cycle list view modes", 0, "BTNthumbsList", 0, 0, 2]
+         , BTNimgSizers := ["img-sizing", 0, "Cycle image adapt modes", 0, "BTNimgSizers", 0, 0, 1]
+         , BTNzoomInIMG := ["zoom-in", 0, "Zoom in", 0, "BTNzoomInIMG", 0, 0, 1]
+         , BTNzoomOutIMG := ["zoom-out", 0, "Zoom out", 0, "BTNzoomOutIMG", 0, 0, 1]
+         , BTNnavFirstImgu := ["first", 0, "Jump to the first image in the list", 0, "BTNnavFirstImgu", 0, 0, 1]
+         , BTNnavLastImgu := ["last", 0, "Jump to the last image in the list", 0, "BTNnavLastImgu", 0, 0, 1]
+         , BTNnavNextImgu := ["next", 0, "Next image in the list", 0, "BTNnavNextImgu"]
+         , BTNnavPrevImgu := ["previous", 0, "Previous image in the list", 0, "BTNnavPrevImgu"]
+         , BTNalignVPimgu := ["vp-center-img", 0, "Toggle align image to center", 0, "BTNalignVPimgu", 0, 0, 1]
+         , BTNhudHisto := ["histogram", 0, "Cycle histogram modes", 0, "BTNhudHisto"]
+         , BTNannotate := ["annotate", 0, "Define image caption", 0, "BTNannotate", 0, 0, 1]
+         , BTNprivatModa := ["private", 0, "Toggle private mode", 0, "BTNprivatModa", 0, 0, 1]
+         , BTNsoundPlay := ["sound", 0, "Play associated sound file", 0, "BTNsoundPlay"]
+         , BTNjumpAtIndex := ["jump-to", 0, "Jump at given index", 0, "BTNjumpAtIndex", 0, 0, 1]
+         , BTNswitchThumbs := ["thumbs-mode", 0, "Toggle list / thumbnails mode", 0, "BTNswitchThumbs", 0, 0, 1]
+         , BTNprintAcquire := ["print", 0, "Print/acquire image", 0, "BTNprintAcquire", 0, 0, 1]
+         , BTNgoPrevPanel := ["go-back", 0, "Open previous panel", 0, "BTNgoPrevPanel", 0, 0, 1]
+         , BtnReturnImgView := ["go-back", 0, "Return to image view", 0, "BtnReturnImgView", 0, 0, 2]
+         , BTNgoFileMaps := ["files-map", 0, "Show files map", 0, "BTNgoFileMaps", 0, 0, 2]
+         , BTNspiralLinez := ["spiral", 0, "Draw parametric lines", 0, "BTNspiralLinez"]
+         , btnzList := "BTNrotateTlbr,BTNcloseTlbr,BTNsettings,BTNcopyImg,BTNnewImg,BTNpasteImg,BTNundoImg,BTNredoImg,BTNtextTool,BTNeraserBrush,BTNdeleteTool,BTNblurTool,BTNclonerTool,BTNbrushMtool,BTNFXbrush,BTNwetbrush,BTNpenVector,BTNpipette,BTNcolorsSwatch,BTNalphInvert,BTNalphRaster,BTNalphCapture,BTNalphPanel,BTNalphView,BTNalphDiscard,BTNcrop,BTNsave,BTNopen,BTNcutImg,BTNadjustColors,BTNtlbrflipH,BTNtlbrflipV,BTNtransformArea,BTNrotateStuff,BTNfillShape,BTNoutlineShape,BTNselectShape,BTNselectFreeform,BTNloupe,BTNpreviewBox,BTNsearch,BTNmodifyEntry,BTNfilterList,BTNstatsList,BTNsortList,BTNrefreshList,BTNfolderTree,BTNrecentOpened,BTNinfozHud,BTNmngFolderz,BTNfntSize,BTNfaves,BTNpanImg,BTNgoPrevPanel,BTNplaySlides,BTNvectSmooth,BTNalignSel,BTNhelp,BTNfloodFill,BTNcalculate,BTNinvertStuff,BTNquickFileActs,BTNvpGrid,BTNthumbsList,BTNimgSizers,BTNzoomInIMG,BTNzoomOutIMG,BTNnavFirstImgu,BTNnavLastImgu,BTNnavNextImgu,BTNnavPrevImgu,BTNalignVPimgu,BTNhudHisto,BTNannotate,BTNprivatModa,BTNsoundPlay,BTNjumpAtIndex,BTNswitchThumbs,BTNprintAcquire,BTNgoFileMaps,BTNspiralLinez,BTNselectFileu,BtnReturnImgView"
 
     If !hasObjectifiedList
     {
@@ -80550,9 +82069,11 @@ CoreGUItoolbar(scopul:=0, whichList:=0) {
     } Else If (TLBRverticalAlign=1)
        handleClrH := handleClrH - Ceil(IconSpacing*2.5)
 
+
+    dksu := isImgEditingNow()
     isVectorMode := (drawingShapeNow=1 && editingSelectionNow=1 && EllipseSelectMode=2) ? 1 : 0
-    isWelcomeScreenu := (isImgEditingNow()=1 || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
-    isTransPanel := (isImgEditingNow() && (AnyWindowOpen=31 || AnyWindowOpen=24)) ? 1 : 0
+    isWelcomeScreenu := (dksu=1 || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
+    isTransPanel := (dksu=1 && (AnyWindowOpen=31 || AnyWindowOpen=24)) ? 1 : 0
     tlbrTotalIconz := (isTransPanel=1) ? 24 : 36
     If isWelcomeScreenu
        tlbrTotalIconz := 9
@@ -80734,7 +82255,7 @@ CoreGUItoolbar(scopul:=0, whichList:=0) {
           {
              tlbrAddNewIcon(BTNinfozHud, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
              tlbrAddNewIcon(BTNcalculate, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
-             tlbrAddNewIcon(BTNquickFacts, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
+             tlbrAddNewIcon(BTNquickFileActs, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
           } Else If !isWelcomeScreenu
           {
              If (isTransPanel!=1)
@@ -80929,13 +82450,14 @@ GuiAddSlider(givenVar, varMin, varMax, varDefault, uiLabel, func2exec, fillMode,
 ;    1. "Simple label" -> "Simple label: x%" // x% is added
 ;    2. "Label with slider value: $€ unit" -> $€ is replaced with givenVar/slider value
 ;    3. "|Static label" -> No change. Only the pipe is removed
-;    3. ".func2callLabel" -> The string or value returned by whatever function is displayed as label
+;    3. ".func2callLabel" -> The string or value returned by function() is displayed as the slider label
 ;    4. "!Label text|varName" -> varName is replaced with its value and the !| symbols removed
 
 ; b) fillMode
 ;    1. progress bar
 ;    2. centered progress bar around 0
 ;    3. simple knob
+;    4. range slider, two knobs [ to-do todo ]
 
     Global
     If (!givenVar || !uiLabel || !func2exec || !InStr(coords, " w") || !InStr(coords, " h"))
@@ -81150,10 +82672,10 @@ createGUItoolbar(dummy:=0) {
       IniAction(0, "TLBRtwoColumns", "General", 1)
       IniAction(0, "lockToolbar2Win", "General", 1)
    }
-
-   isWelcomeScreenu := (isImgEditingNow()=1 || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
-   isPaintPanel := (AnyWindowOpen=64) ? 1 : 0
-   isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
+   pku := isImgEditingNow()
+   isWelcomeScreenu := (pku=1 || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
+   isPaintPanel := (pku=1 && AnyWindowOpen=64) ? 1 : 0
+   isTransPanel := (pku=1 && (AnyWindowOpen=31 || AnyWindowOpen=24)) ? 1 : 0
    addAlphaIcons := isAlphaMaskPartialWin()
    ToolBarBtnWidth := Round(OSDfontSize*1.5 * ToolbarScaleFactor)
    viewModus := (toolbarViewerMode=1) ? "a" toolbarViewerMode thumbsDisplaying : 1
@@ -81207,6 +82729,9 @@ createGUItoolbar(dummy:=0) {
 }
 
 tlbrResetPosition() {
+  If (ShowAdvToolbar!=1)
+     Return
+
   JEE_ClientToScreen(hPicOnGui1, 1, 1, UserToolbarX, UserToolbarY)
   UserToolbarX--
   UserToolbarY--
@@ -81220,9 +82745,9 @@ defineLastPanel() {
    thisFunc := prevOpenedWindow[2]
    allowReopen := prevOpenedWindow[3]
    If (IsFunc(thisfunc) && thisFunc && allowReopen=1 && winIDu)
-      keyu := ": " thisFunc "(" winIDU ") [F8]"
+      keyu := ": " thisFunc "(" winIDU ") «F8»"
    Else
-      keyu := " [F8]"
+      keyu := " «F8»"
    Return keyu
 }
 
@@ -81235,47 +82760,47 @@ tlbrDecideTooltips(hwnd) {
       msgu := "L: Reposition toolbar`nR: Toolbar options menu"
    } Else If InStr(icoFile, "menu")
    {
-      msgu :=  (thumbsDisplaying=1) ? "L: Quick actions menu [Shift + AppsKey]`nR: Interface options menu" : "L: Edit image menu`nR: Interface options menu"
+      msgu :=  (thumbsDisplaying=1) ? "L: Quick actions menu «Shift + AppsKey»`nR: Interface options menu" : "L: Edit image menu`nR: Interface options menu"
       If (drawingShapeNow=1)
          msgu := "L: Vector shape options`nR: Viewport options"
    } Else If (btnID="BTNnavNextImgu")
    {
-      msgu := "Next image [Right]"
+      msgu := "Next image «Right»"
    } Else If (btnID="BTNdeleteTool")
    {
-      msgu := "L: Move to recycle bin [Delete]`nR: Remove focused index entry [Alt + Delete]"
+      msgu := "L: Move image file to recycle bin «Delete»`nR: Remove focused index entry «Alt + Delete»"
       If (askDeleteFiles!=1 && (!markedSelectFile || thumbsDisplaying!=1))
          msgu .= "`nWARNING: User will not be prompted before file operation"
    } Else If (btnID="BTNnavPrevImgu")
    {
-      msgu := "L: Previous image [Left]`nR: Previously displayed image [Ctrl + Backspace]"
+      msgu := "L: Previous image «Left»`nR: Previously displayed image «Ctrl + Backspace»"
    } Else If (btnID="BTNnavFirstImgu")
    {
-      msgu := "L: First image [Home]`nR: Previous random image [Backspace]"
+      msgu := "L: First image «Home»`nR: Previous random image «Backspace»"
    } Else If (btnID="BTNnavLastImgu")
    {
-      msgu := "L: Last image [End]`nR: Next random image [Shift + Backspace]"
+      msgu := "L: Last image «End»`nR: Next random image «Shift + Backspace»"
    } Else If (btnID="BTNalignVPimgu")
    {
-      msgu := "L: Toggle centered image alignment [A]`nR: Toggle outside viewport image panning"
+      msgu := "L: Toggle centered image alignment «A»`nR: Toggle outside viewport image panning"
    } Else If (btnID="BTNimgSizers")
    {
-      msgu := "L: Cycle adapt to window modes [T]`nR: Adapt modes options menu"
+      msgu := "L: Cycle adapt to window modes «T»`nR: Adapt modes options menu"
    } Else If (btnID="BTNprintAcquire")
    {
-      msgu := (thumbsDisplaying=1) ? "Print image(s) [Ctrl + P]" : "L: Print image(s) [Ctrl + P]`nR: Acquire image [WIA]"
+      msgu := (thumbsDisplaying=1) ? "Print image(s) «Ctrl + P»" : "L: Print image(s) «Ctrl + P»`nR: Acquire image (WIA)"
    } Else If (btnID="BTNhudHisto")
    {
-      msgu := "L: Cycle histogram modes [G]`nR: Histogram options menu"
+      msgu := "L: Cycle histogram modes «G»`nR: Histogram options menu"
    } Else If (btnID="BTNgoPrevPanel")
    {
       msgu := "Open previous panel" defineLastPanel()
    } Else If (btnID="BtnReturnImgView")
    {
-      msgu := "L: Return to image view [Escape / Enter]`nR: Open previous panel" defineLastPanel()
+      msgu := "L: Return to image view «Enter»`nR: Open previous panel" defineLastPanel() "`nTo return to the last image in view, press Escape"
    } Else If (btnID="BTNannotate")
    {
-      msgu := "L: Edit image caption [Shift + N]`nR: Toggle display image caption [N]"
+      msgu := "L: Edit image caption «Shift + N»`nR: Toggle display image caption «N»"
    } Else If (btnID="BTNrotateTlbr")
    {
       msgu := "Toggle toolbar orientation"
@@ -81284,7 +82809,7 @@ tlbrDecideTooltips(hwnd) {
       msgu := "Close this toolbar"
    } Else If (btnID="BTNselectFileu")
    {
-      msgu := "L: Select / deselect active file [Tab / Space]`nR: Drop files selection [Ctrl + D]"
+      msgu := "L: Select / deselect active file «Tab / Space»`nR: Drop files selection «Ctrl + D»"
    } Else If (btnID="BTNzoomOutIMG")
    {
       msgu := "Zoom out"
@@ -81304,35 +82829,33 @@ tlbrDecideTooltips(hwnd) {
    } Else If (btnID="BTNswitchThumbs")
    {
       friendly := (thumbsDisplaying=1) ? "image view" : defineListViewModes() " list mode"
-      msgu := "L: Switch to " friendly " [Enter]`nR: Open previous panel" defineLastPanel()
-   } Else If (btnID="BTNswitchThumbs")
-   {
-      msgu := "L: Print image [Ctrl + P]`nR: Acquire image [WIA]"
+      msgu := "L: Switch to " friendly " «Enter»`nR: Open previous panel" defineLastPanel()
    } Else If (btnID="BTNsoundPlay")
    {
-      msgu := "L: Play associated audio file [X]`nR: Stop audio playback [Shift + X]"
-   } Else If InStr(icoFile, "copy")
+      msgu := "L: Play associated audio file «X»`nR: Stop audio playback «Shift + X»"
+   } Else If (btnID="BTNcopyImg")
    {
       friendly := (editingSelectionNow=1) ? "selection area " : ""
-      msgu := (thumbsDisplaying=1) ? "L: Copy file" f " to... [C]`nR: Copy file" f " path" f " [Ctrl + Shift + C]" : "L: Copy image " friendly "to clipboard [Ctrl + C]`nR: Copy file" f " path" f " [Ctrl + Shift + C]"
-   } Else If InStr(icoFile, "help")
+      msgu := (thumbsDisplaying=1) ? "L: Copy file" f " to... «C»`nR: Copy file" f " path" f " «Shift + C»" : "L: Copy image " friendly "to clipboard «Ctrl + C»`nR: Copy file" f " path" f " «Shift + C»"
+   } Else If (btnID="BtnHelp")
    {
       msgu := "About Quick Picto Viewer v" appVersion
-   } Else If InStr(icoFile, "quick-file-acts")
+   } Else If (btnID="BTNquickFileActs")
    {
-      msgu := "L: Quick file actions settings`nR: Jump to given index [J]"
+      ph := allowUserQuickFileActions=1 ? "(ACTIVATED)" : "(DEACTIVATED)"
+      msgu := "L: Quick file actions settings`nR: Toggle quick file action shortcuts " ph A_Space
    } Else If InStr(icoFile, "alpha-mask-discard")
    {
       msgu := StrLen(userAlphaMaskBmpPainted)>2 ? "Discard user painted alpha mask bitmap" : "Set alpha mask as undefined"
    } Else If InStr(icoFile, "alpha-mask-view")
    {
-      msgu := "Preview alpha mask [M]"
+      msgu := "Preview alpha mask «M»"
    } Else If InStr(icoFile, "alpha-mask-panel")
    {
-      msgu := "Define alpha mask panel [M]"
+      msgu := "Define alpha mask panel «M»"
    } Else If InStr(icoFile, "alpha-mask-paint")
    {
-      msgu := "Paint in the alpha mask [Ctrl + K]"
+      msgu := "Paint in the alpha mask «Ctrl + K»"
    } Else If InStr(icoFile, "alpha-mask-capture")
    {
       msgu := "L: Capture image selected area as alpha mask`nR: Import clipboard as alpha mask"
@@ -81341,16 +82864,16 @@ tlbrDecideTooltips(hwnd) {
       msgu := "Rasterize / pixelize the alpha mask"
    } Else If InStr(icoFile, "alpha-mask-invert")
    {
-      msgu := "Invert alpha mask [N]"
+      msgu := "Invert alpha mask «N»"
    } Else If InStr(icoFile, "new-image")
    {
       If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-         msgu := "L: Import list or insert file[s] into list [Insert]`nR: Add folder[s] into current list [Shift + Insert]"
+         msgu := "L: Import list or insert file(s) into list «Insert»`nR: Add folder(s) into current list «Shift + Insert»"
       Else
-         msgu :="L: Create new image [Ctrl + N]`nR: Acquire image from scanner"
+         msgu :="L: Create new image «Ctrl + N»`nR: Acquire image from scanner"
    } Else If InStr(icoFile, "paste-clip")
    {
-      msgu := (thumbsDisplaying=1) ? "Paste files from clipboard into current list [Ctrl + V]" : "L: Paste image from clipboard [Ctrl + V]`nR: Paste into selection area [Ctrl + Shift + V]"
+      msgu := (thumbsDisplaying=1) ? "Paste files from clipboard into current list «Ctrl + V»" : "L: Paste image from clipboard «Ctrl + V»`nR: Paste into selection area «Ctrl + Shift + V»"
    } Else If InStr(icoFile, "undo")
    {
       If (isImgEditingNow()=1)
@@ -81358,15 +82881,15 @@ tlbrDecideTooltips(hwnd) {
          If undoLevelsRecorded
             infosA := ": " currentUndoLevel "/" undoLevelsRecorded
          If (totalSelUndos := undoSelLevelsArray.Count()) && (editingSelectionNow=1)
-            infosB := ": " currentSelUndoLevel " / " totalSelUndos " ]"
+            infosB := ": " currentSelUndoLevel " / " totalSelUndos " »"
       }
 
-      msgu := "Undo image" infosA " [Ctrl + Z]"
+      msgu := "Undo image" infosA " «Ctrl + Z»"
       infosV := currentVectorUndoLevel " / "  Round(undoVectorShapesLevelsArray.Count())
       If (drawingShapeNow=1 && editingSelectionNow=1)
-         msgu := "Undo vector editing: " infosV " [Ctrl + Z]"
+         msgu := "Undo vector editing: " infosV " «Ctrl + Z»"
       Else If (editingSelectionNow=1)
-         msgu := "L: " msgu "`nR: Undo selection area" infosB " [Ctrl + Shift + Z]"
+         msgu := "L: " msgu "`nR: Undo selection area" infosB " «Ctrl + Shift + Z»"
    } Else If InStr(icoFile, "redo")
    {
       If (isImgEditingNow()=1)
@@ -81374,101 +82897,102 @@ tlbrDecideTooltips(hwnd) {
          If undoLevelsRecorded
             infosA := ": " currentUndoLevel "/" undoLevelsRecorded
          If (totalSelUndos := undoSelLevelsArray.Count()) && (editingSelectionNow=1)
-            infosB := ": " currentSelUndoLevel " / " totalSelUndos " ]"
+            infosB := ": " currentSelUndoLevel " / " totalSelUndos " »"
       }
 
-      msgu := "Redo image" infosA " [Ctrl + Y]"
+      msgu := "Redo image" infosA " «Ctrl + Y»"
       infosV := currentVectorUndoLevel " / "  Round(undoVectorShapesLevelsArray.Count())
       If (drawingShapeNow=1 && editingSelectionNow=1)
-         msgu := "Redo vector editing: " infosV " [Ctrl + Y]"
+         msgu := "Redo vector editing: " infosV " «Ctrl + Y»"
       Else If (editingSelectionNow=1)
-         msgu := "L: " msgu "`nR: Redo selection area" infosB " [Ctrl + Shift + Y]"
+         msgu := "L: " msgu "`nR: Redo selection area" infosB " «Ctrl + Shift + Y»"
    } Else If InStr(icoFile, "add-text")
    {
-      msgu := (thumbsDisplaying=1) ? "Edit image caption [Shift + N]" : "L: Insert text into image [Shift + T]`nR: Edit image caption [Shift + N]"
+      msgu := (thumbsDisplaying=1) ? "Edit image caption «Shift + N»" : "L: Insert text into image «Shift + T»`nR: Edit image caption «Shift + N»"
    } Else If InStr(icoFile, "eraser")
    {
-      keyu := (AnyWindowOpen=64) ? " [R]" : ""
+      keyu := (AnyWindowOpen=64) ? " «R»" : ""
       msgu := "L: Eraser - soft brush" keyu
       If (isImgEditingNow()=1 && editingSelectionNow=1)
-         msgu .= "`nR: Erase or fade image selected area [Delete]"
+         msgu .= "`nR: Erase or fade image selected area «Delete»"
       If (isImgEditingNow()=1 && editingSelectionNow=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
-         msgu := "Erase initially selected image area"
+         msgu := "Erase initially selected image area «Backspace»"
    } Else If InStr(icoFile, "brush-blur")
    {
       friendly := (AnyWindowOpen=64) ? "brush: " BrushToolBlurStrength "%" : "brush"
       msgu := "L: Blur - soft " friendly "`nR: Blur or pixelize selected area"
    } Else If InStr(icoFile, "brush-cloner")
    {
-      keyu := (AnyWindowOpen=64) ? " [J]" : ""
+      keyu := (AnyWindowOpen=64) ? " «J»" : ""
       friendly := (AnyWindowOpen=64 && BrushToolType=3) ? "Toggle dynamic cloner source coordinates" : "Cloner - soft brush"
-      msgu := "L: " friendly keyu "`nR: Define cloner source [S]"
+      keyus := (AnyWindowOpen=64 && BrushToolType=3) ? " «S»" : ""
+      msgu := "L: " friendly keyu "`nR: Define cloner source" keyus
    } Else If InStr(icoFile, "brush-main")
    {
-      keyu := (AnyWindowOpen=64) ? " [B]" : " [P]"
-      msgu := "L: Soft paint brush" keyu "`nR: Hard paint brush" keyu
+      keyu := (AnyWindowOpen=64) ? " «B»" : " «P»"
+      msgu := "Soft/Hard paint brush" keyu
    } Else If InStr(icoFile, "brush-fx")
    {
-      keyu := (AnyWindowOpen=64) ? " [Q]" : ""
+      keyu := (AnyWindowOpen=64) ? " «Q»" : ""
       msgu := "Color effects - soft brush" keyu
    } Else If InStr(icoFile, "brush-wet")
    {
       msgu := (AnyWindowOpen=64 && BrushToolType<3) ? "Soft wet brush: " Round(BrushToolWetness/22 * 100) "%" : "Soft wet brush"
    } Else If InStr(icoFile, "flood-fill")
    {
-      msgu := "L: Flood fill / color bucket [K]"
+      msgu := "L: Flood fill / color bucket «K»"
    } Else If InStr(icoFile, "calculate")
    {
-      msgu := "L: Calculate total size of selected files [Shift + L]`nR: Review panel for selected files [R]"
+      msgu := "L: Calculate total size of selected files «Shift + L»`nR: Review panel for selected files «R»"
    } Else If (btnID="BTNinvertStuff")
    {
-      msgu := (thumbsDisplaying=1) ? "Invert files selection [Shift + I]" : "Invert image [Shift + I]"
+      msgu := (thumbsDisplaying=1) ? "Invert files selection «Shift + I»" : "Invert image «Shift + I»"
    } Else If (btnID="BTNvectSelInvert")
    {
-      msgu := "Invert selected points [Shift + I]"
+      msgu := "Invert selected points «Shift + I»"
    } Else If (btnID="BTNvectRemPoints")
    {
-      msgu := "Delete selected points [Delete]"
+      msgu := "Delete selected points «Delete»"
    } Else If (btnID="BTNvectRemLast")
    {
-      msgu := "Remove last added point [Backspace]"
+      msgu := "Remove last added point «Backspace»"
    } Else If (btnID="BTNvectSelAll")
    {
-      msgu := "L: Select all points [Ctrl + A]`nR: Deselect all points [Ctrl + D]"
+      msgu := "L: Select all points «Ctrl + A»`nR: Deselect all points «Ctrl + D»"
    } Else If (btnID="BTNvectSmooth")
    {
-      msgu := "Cycle shape smoothness levels [T]"
+      msgu := "Cycle shape smoothness levels «T»"
    } Else If (btnID="BTNvectOpenPath")
    {
-      msgu := "Toggle open/closed path [O]"
+      msgu := "Toggle open/closed path «O»"
    } Else If InStr(icoFile, "pen-vector")
    {
-      msgu := "L: Draw freeform filled shape [Shift + P]`nR: Draw freeform poly or curve line [Alt + P]"
+      msgu := "L: Draw freeform filled shape «Shift + P»`nR: Draw freeform poly or curve line «Alt + P»"
    } Else If InStr(icoFile, "spiral")
    {
-      msgu := "Draw parametric lines [spirals, rays, grids]"
+      msgu := "Draw parametric lines (spirals, rays, grids)"
    } Else If InStr(icoFile, "files-map")
    {
-      msgu := "L: Show selected files map [W]`nR: Toggle show map on scrollbar click"
+      msgu := "L: Show selected files map «W»`nR: Toggle show map on scrollbar click"
    } Else If InStr(icoFile, "pipette")
    {
-      keyu := (imgEditPanelOpened=1 && AnyWindowOpen) ? " [C]" : ""
-      keyu2 := (imgEditPanelOpened=1 && AnyWindowOpen) ? " [X]" : ""
+      keyu := (imgEditPanelOpened=1 && AnyWindowOpen) ? " «C»" : ""
+      keyu2 := (imgEditPanelOpened=1 && AnyWindowOpen) ? " «X»" : ""
       msgu := "L: Pick color (click and drag)" keyu "`nR: Switch primary / secondary color" keyu2
    } Else If InStr(icoFile, "colorz-swatch")
    {
-      keyu2 := (imgEditPanelOpened=1 && AnyWindowOpen) ? " [X]" : ""
+      keyu2 := (imgEditPanelOpened=1 && AnyWindowOpen) ? " «X»" : ""
       msgu := "L: Choose color`nR: Switch primary / secondary color" keyu2
       If (thumbsDisplaying=1)
          msgu := "Toggle private mode"
    } Else If InStr(icoFile, "crop")
    {
       If (isImgEditingNow()=1 && editingSelectionNow=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
-         msgu := "Cycle through shapes to clip the image object"
+         msgu := "Cycle through shapes to clip the image object «Shift + C»"
       Else If (isImgEditingNow()=1 && editingSelectionNow=1)
-         msgu := "L: Crop image to selection area [Shift + Enter]`nR: Resize image to selection area [Alt + R]"
+         msgu := "L: Crop image to selection area «Shift + Enter»`nR: Resize image to selection area «Alt + R»"
       Else
-         msgu := (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) ? "Resize / crop / rotate image" f " [Ctrl + R]" : "Adjust image canvas size [Alt + A]"
+         msgu := (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) ? "Resize / crop / rotate image" f " «Ctrl + R»" : "L: Adjust image canvas size «Alt + A»`nR: Auto-crop image «Alt + Y»"
    } Else If InStr(icoFile, "save-disk")
    {
       imgPath := getIDimage(currentFileIndex)
@@ -81492,188 +83016,188 @@ tlbrDecideTooltips(hwnd) {
       If (currentFilesListModified=1 && maxFilesIndex>1 && thumbsDisplaying=1)
          fileStatus := "`n `nThe files list has been MODIFIED"
 
-      msgu := (thumbsDisplaying=1) ? "Save files list [Ctrl + S]" fileStatus : "L: Save image to disk [Ctrl + S]`nR: Save files list [Ctrl + Shift + S]" fileStatus InfosPreviousSave
+      msgu := (thumbsDisplaying=1) ? "Save files list «Ctrl + S»" fileStatus : "L: Save image to disk «Ctrl + S»`nR: Save files list «Ctrl + Shift + S»" fileStatus InfosPreviousSave
    } Else If InStr(icoFile, "open")
    {
-      msgu := "L: Open image or folder dialog [Ctrl + O]`nR: Recents menu"
+      msgu := "L: Open image or folder dialog «Ctrl + O»`nR: Recents menu"
    } Else If InStr(icoFile, "cut")
    {
-      msgu := (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) ? "L: Cut file" f " (Explorer mode) [Ctrl + X]`nR: Move file" f " to.. [M]" : "Cut image selected area [Ctrl + X]"
+      msgu := (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) ? "L: Cut file" f " (Explorer mode) «Ctrl + X»`nR: Move file" f " to.. «M»" : "L: Cut image selected area «Ctrl + X»`nR: Move file" f " to.. «M»"
    } Else If InStr(icoFile, "adjust-colors")
    {
       If (isImgEditingNow()=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
-         msgu := "Toggle color adjustments for the image object [U]"
+         msgu := "Toggle color adjustments for the image object «U»"
       Else If (thumbsDisplaying=1)
-         msgu := "L: Adjust viewport colors and more [U]`nR: Reset viewport adjustments [ \ ]"
+         msgu := "L: Adjust viewport colors and more «U»`nR: Reset viewport adjustments « \ »"
       Else If isTlbrViewModus()
-         msgu := "L: Adjust viewport colors and more [Shift+U]`nR: Reset viewport adjustments [ \ ]"
+         msgu := "L: Adjust viewport colors and more «Shift + U»`nR: Reset viewport adjustments « \ »"
       Else
-         msgu := "L: Adjust image colors [U]`nAlt+LMB: Adjust viewport colors and more [Shift+U]`nR: Reset viewport adjustments [ \ ]"
+         msgu := "L: Adjust image colors «U»`nR: Reset viewport adjustments « \ »"
    } Else If InStr(icoFile, "transform-img")
    {
-      msgu := (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) ? "L: Import selected image into currently opened one" : "L: Transform image selected area [Ctrl + T]"
+      msgu := (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) ? "L: Import selected image into currently opened one" : "L: Transform image selected area «Ctrl + T»"
       If (isImgEditingNow()=1 && editingSelectionNow=0)
-         msgu := "L: Resize image [Ctrl + R]"
+         msgu := "L: Resize image «Ctrl + R»"
       Else If (isImgEditingNow()=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
-         msgu := "L: Cycle through image object dimensions adapt modes"
+         msgu := "L: Cycle through image object dimensions adapt modes «S»"
       If (isImgEditingNow()=1 && !AnyWindowOpen && editingSelectionNow=1)
-         msgu .= "`nR: Resize image [Ctrl + R]"
+         msgu .= "`nR: Resize image «Ctrl + R»"
    } Else If InStr(icoFile, "flip-h")
    {
       editing := isImgEditingNow()
       If (editing=1 && isNowAlphaPainting())
-         msgu := "Alpha mask bitmap - flip horizontally [Shift + H]"
+         msgu := "Alpha mask bitmap - flip horizontally «Shift + H»"
       Else If (editing=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
-         msgu := "Image object - flip horizontally [Shift + H]"
+         msgu := "Image object - flip horizontally «Shift + H»"
       Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-         msgu := "Image file - flip horizontally [Shift + H]"
+         msgu := "Image file - flip horizontally «Shift + H»"
       Else If (editing=1 && editingSelectionNow=1)
-         msgu := "Image selected area - flip horizontally [Shift + H]"
+         msgu := "Image selected area - flip horizontally «Shift + H»"
       Else If (editing=1)
-         msgu := "Viewport - flip horizontally [H]"
+         msgu := "Viewport - flip horizontally «H»"
       Else
          msgu := "Flip horizontally"
 
       If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-         msgu2 := "Viewport - flip horizontally [H]"
+         msgu2 := "Viewport - flip horizontally «H»"
       Else If (editing=1 && EllipseSelectMode=2 && editingSelectionNow=1)
          msgu2 := "Freeform selection shape - flip horizontally"
       Else If (editing=1 && editingSelectionNow=1)
-         msgu2 := "Viewport - flip horizontally [H]"
+         msgu2 := "Viewport - flip horizontally «H»"
 
       If msgu2
          msgu := "L: " msgu "`nR: " msgu2
-
    } Else If InStr(icoFile, "flip-v")
    {
       editing := isImgEditingNow()
       If (editing=1 && isNowAlphaPainting())
-         msgu := "Alpha mask bitmap - flip vertically [Shift + V]"
+         msgu := "Alpha mask bitmap - flip vertically «Shift + V»"
       Else If (editing=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
-         msgu := "Image object - flip vertically [Shift + V]"
+         msgu := "Image object - flip vertically «Shift + V»"
       Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-         msgu := "Image file - flip vertically [Shift + V]"
+         msgu := "Image file - flip vertically «Shift + V»"
       Else If (editing=1 && editingSelectionNow=1)
-         msgu := "Image selected area - flip vertically [Shift + V]"
+         msgu := "Image selected area - flip vertically «Shift + V»"
       Else If (editing=1)
-         msgu := "Viewport - flip vertically [V]"
+         msgu := "Viewport - flip vertically «V»"
       Else
          msgu := "Flip vertically"
 
       If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-         msgu2 := "Viewport - flip vertically [V]"
+         msgu2 := "Viewport - flip vertically «V»"
       Else If (editing=1 && EllipseSelectMode=2 && editingSelectionNow=1)
          msgu2 := "Freeform selection shape - flip vertically"
       Else If (editing=1 && editingSelectionNow=1)
-         msgu2 := "Viewport - flip vertically [V]"
+         msgu2 := "Viewport - flip vertically «V»"
 
       If msgu2
          msgu := "L: " msgu "`nR: " msgu2 
       If (drawingShapeNow=1)
-         msgu := "Cycle symmetry modes [Y]"
+         msgu := "Cycle symmetry modes «Y»"
    } Else If InStr(icoFile, "rotation")
    {
-      friendly := (editingSelectionNow=1) ? "L: Image selection area" : "L: Viewport"
-      keyu := (editingSelectionNow=1) ? " [Shift + 9, 0]" : " [9 / 0]"
-      keyu2 := (editingSelectionNow=1) ? " [Shift + \]" : " [\]"
-      msgu := friendly " - rotate by 15°" keyu "`nR: Reset rotation" keyu2
+      friendly := (editingSelectionNow=1) ? "L: Image selection area:" : "L: Viewport:"
+      keyu := (editingSelectionNow=1) ? " «Shift + 0»" : " «0»"
+      keyu2 := (editingSelectionNow=1) ? " «Shift + \»" : " « \ »"
+      msgu := friendly " rotate by 15°" keyu "`nR: Reset rotation" keyu2
       msgu .= "`nHold Alt to change rotation by 1° "
       If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-         msgu := "L: Rotate image file by +90° [Shift + 0]`nR: Rotate image file by -90° [Shift + 9]"
+         msgu := "L: Rotate image file by +90° «Shift + 0»`nR: Rotate image file by -90° «Shift + 9»"
       Else If isTlbrViewModus()
-         msgu := "L: Rotate image by 45° [9 / 0]`nR: Reset rotation  [\]"
+         msgu := "L: Rotate image by 45° «0»`nR: Reset rotation  «\»"
    } Else If InStr(icoFile, "fill-shape")
    {
-      msgu := (AnyWindowOpen=23) ? "L: Cycle through fill shapes [Alt + BackSpace]" : "L: Fill selection area [Alt + Backspace]"
+      msgu := (AnyWindowOpen=23) ? "L: Cycle through fill shapes «Alt + BackSpace»" : "L: Fill selection area «Alt + Backspace»"
       msgu .= "`nR: Fill behind image"
    } Else If InStr(icoFile, "outline-shape")
    {
-      msgu := (AnyWindowOpen=65) ? "Cycle through shape contours" : "L: Draw shape contours [Ctrl + L]`nR: Draw simple predefined selection area related lines"
+      msgu := (AnyWindowOpen=65) ? "Cycle through shape contours" : "L: Draw shape contours «Ctrl + L»`nR: Draw parametric lines"
    } Else If (btnID="BTNselectShape")
    {
-      friendly := (editingSelectionNow=1) ? "Cycle selection area types [Shift + E]" : "Create image selection area [E]"
+      friendly := (editingSelectionNow=1) ? "Cycle selection area types «Shift + E»" : "Create image selection area «E»"
       If (isImgEditingNow() && (AnyWindowOpen=31 || AnyWindowOpen=24))
-         msgu := "Toggle image object visibility [D]"
+         msgu := "Toggle image object visibility «D»"
       Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-         msgu :=  "L: Select / deselect focused index entry [Tab]`nR: Files selection options menu"
+         msgu :=  "L: Select / deselect focused index entry «Tab»`nR: Files selection options menu"
       Else
-         msgu := (editingSelectionNow=1 && isImgEditingNow()=1) ? "L: " friendly "`nR: Toggle image selection area [E]" : friendly
+         msgu := (editingSelectionNow=1 && isImgEditingNow()=1) ? "L: " friendly "`nR: Toggle image selection area «E»" : friendly
    } Else If InStr(icoFile, "create-freeform")
    {
       friendly := (editingSelectionNow!=1 || EllipseSelectMode!=2) ? "Create new" : "Modify"
-      msgu := "L: " friendly " freeform selection area [Shift + L]`nR: Selection area shapes options menu"
+      msgu := "L: " friendly " freeform selection area «Shift + L»`nR: Selection area shapes options menu"
    } Else If InStr(icoFile, "loupe")
    {
       friendly := (thumbsDisplaying=1) ? "Cycle thumbnails aspect ratios" : "Cycle adapt image to window modes"
       friendly2 := (thumbsDisplaying=1) ? "thumbnails" : "image"
-      msgu := "L: Zoom in / out " friendly2 " [-, =]`nR: " friendly " [T]"
+      msgu := "L: Zoom in / out " friendly2 " « = »`nR: " friendly " «T»"
    } Else If InStr(icoFile, "pan-img")
    {
-      msgu := "L: Pan image in viewport`nR: Toggle image navigator [Z]"
+      msgu := "L: Pan image in viewport`nR: Toggle image navigator «Z»"
    } Else If (btnID="BTNcancelTool")
    {
-      msgu := "Cancel / exit current tool [Escape]"
+      msgu := "Cancel / exit current tool «Escape»"
    } Else If (btnID="BTNmainTooler")
    {
-      friendly := (thumbsDisplaying=1) ? "image view [Enter]" : defineListViewModes() " list mode [Enter]"
-      moreFriendly := isNowAlphaPainting() ? "Exit Alpha Painting mode [Enter / Escape]" : "L: Apply current tool [Enter]`nR: Abandon current tool [Escape]"
+      friendly := (thumbsDisplaying=1) ? "image view «Enter»" : defineListViewModes() " list mode «Enter»"
+      moreFriendly := isNowAlphaPainting() ? "Exit Alpha Painting mode «Enter / Escape»" : "L: Apply current tool «Enter»`nR: Abandon current tool «Escape»"
       msgu := !AnyWindowOpen ? "L: Open previous panel" defineLastPanel() "`nR: Switch to " friendly : moreFriendly
       If (isImgEditingNow()=1 && drawingShapeNow=1)
-         msgu := "Apply changes to the vector shape and exit vector drawing mode [Enter]"
+         msgu := "Apply changes to the vector shape and exit vector drawing mode «Enter»"
    } Else If InStr(icoFile, "brush-set-soft")
    {
-      msgu := "Change brush softness: " BrushToolSoftness "% [Shift + [, Shift + ]]"
+      msgu := "Change brush softness: " BrushToolSoftness "% «Shift + ]»"
    } Else If InStr(icoFile, "brush-set-opacity")
    {
       thisOpacity := (BrushToolUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
-      msgu := "Change brush opacity: " Round((thisOpacity / 255) * 100) "% [ 0 - 9 ]"
+      msgu := "Change brush opacity: " Round((thisOpacity / 255) * 100) "% «0»"
    } Else If InStr(icoFile, "brush-set-size")
    {
       friendly := (brushToolDoubleSize=1) ? "RADIUS" : "DIAMETER"
       friendly2 := (brushToolDoubleSize!=1) ? "RADIUS" : "DIAMETER"
-      msgu := "L: Change brush " friendly ": " brushToolSize " px [ [, ] ] `nR: Switch to setting the " friendly2 " [Shift+S]"
+      msgu := "L: Change brush " friendly ": " brushToolSize " px « [ » `nR: Switch to setting the " friendly2 " «Shift + S»"
    } Else If InStr(icoFile, "brush-set-angle")
    {
       If (BrushToolAutoAngle=1)
          msgu := "Deactivate mouse movements based angle for the brush"
       Else
-         msgu := "L: Change brush angle: " BrushToolAngle "°`nR: Activate mouse movements based angle"
+         msgu := "L: Change brush angle: " BrushToolAngle "° «Ctrl + ]»`nR: Activate mouse movements based angle"
    } Else If InStr(icoFile, "brush-set-ratio")
    {
-      msgu := "L: Change brush aspect ratio: " BrushToolAspectRatio "`nR: Reset brush aspect ratio"
+      msgu := "L: Change brush aspect ratio: " BrushToolAspectRatio "% «Alt + ]»`nR: Reset brush aspect ratio"
    } Else If (btnID="BTNpaintSelection")
    {
       friendly := (BrushToolOutsideSelection=1) ? "ANYWHERE" : "INSIDE"
       If (BrushToolOutsideSelection=3)
          friendly := "OUTSIDE"
-      msgu := "Paint " Friendly " image selection area`nCycle through options [Shift + K]"
+      msgu := "Paint " Friendly " image selection area`nCycle through options «Shift + K»"
    } Else If InStr(icoFile, "vp-grid")
    {
       b := (drawingShapeNow=1) ? "Toggle" : "Configure"
-      msgu := "L: Adjust viewport grid [Alt + - / +]`nR: " b " viewport grid"
+      msgu := "L: Adjust viewport grid «Alt + =»`nR: " b " viewport grid"
       If (drawingShapeNow!=1)
          msgu .= "`nCtrl+LMB: Toggle viewport grid"
    } Else If (btnID="BTNthumbsList")
    {
-      msgu := "Cycle through list view modes [L]"
+      msgu := "Cycle through list view modes «L»"
       If (thumbsListViewMode=1)
-         msgu := "L: " msgu "`nR: Toggle centered alignment for thumbnails [A]"
+         msgu := "L: " msgu "`nR: Toggle centered alignment for thumbnails «A»"
    } Else If InStr(icoFile, "view") 
    {
-       msgu := "L: Toggle image preview [Z]`nR: Toggle preview area double-size"
+       msgu := "L: Toggle image preview «Z»`nR: Toggle preview area double-size"
        If (drawingShapeNow=1)
-          msgu := "Toggle live preview for new points [P]"
+          msgu := "Toggle live preview for new points «P»"
    } Else If InStr(icoFile, "search") 
    {
-      msgu := "L: Search indexed files [Ctrl + F3]`nR: Search and replace in the files list [Ctrl + H]"
+      msgu := "L: Search indexed files «Ctrl + F3»`nR: Search and replace in the files list «Ctrl + H»"
    } Else If InStr(icoFile, "modify-entry") 
    {
-      msgu := "L: Rename file" f " [F2]`nR: Modify focused index entry [Ctrl + F2]"
+      msgu := "L: Rename file" f " «F2»`nR: Modify focused index entry «Ctrl + F2»"
    } Else If InStr(icoFile, "filter") 
    {
+      friendly := StrLen(filesFilter)>2 ? "L:" : ""
+      msgu := friendly "Filter files list «Ctrl + F»"
       If StrLen(filesFilter)>2
-         friendly := "`n `nThe files list is filtered"
-      msgu := "L: Filter files list [Ctrl + F]`nR: Deactivate files list filter [Ctrl + Space]" friendly
+         msgu .= "`nR: Deactivate active files list filter «Ctrl + Space»"
    } Else If InStr(icoFile, "statistics") 
    {
       msgu := "L: Files list statistics`nR: Find image duplicates"
@@ -81683,30 +83207,30 @@ tlbrDecideTooltips(hwnd) {
    } Else If InStr(icoFile, "refresh") 
    {
       friendly := (markedSelectFile>1) ? "Refresh selected thumbnails on scroll" : "Refresh all thumbnails on scroll"
-      msgu := "L: Refresh the files list [F5]`nR: " friendly " [Alt + F5]"
+      msgu := "L: Refresh the files list «F5»`nR: " friendly " «Alt + F5»"
    } Else If InStr(icoFile, "folder-tree") 
    {
-      msgu := "L: Folders tree view panel [F4]`nR: Explore file location menu [Shift + F4]"
+      msgu := "L: Folders tree view panel «F4»`nR: Explore file location menu «Shift + F4»"
    } Else If InStr(icoFile, "recent") 
    {
       msgu := "Recently opened folders"
    } Else If InStr(icoFile, "infos") 
    {
-      msgu := "L: Image and viewport details [I]`nR: Files information panel [Alt + Enter]"
+      msgu := "L: Image and viewport details «I»`nR: Files information panel «Alt + Enter»"
    } Else If InStr(icoFile, "star") 
    {
       friendly := resultedFilesList[currentFileIndex, 5] ? "Remove from" : "Add to"
-      msgu := "L: " friendly " favourites [B]`nR: Favourites menu"
+      msgu := "L: " friendly " favourites «B»`nR: Favourites menu"
       If isWelcomeScreenu
          msgu := "Favourited images"
    } Else If InStr(icoFile, "manage-folders") 
    {
       If (RegExMatch(CurrentSLD, sldsPattern) && SLDcacheFilesList=1)
-         friendly := "`nR: Update files list selectively [Ctrl + U]"
-      msgu := "L: Manage folders list to be indexed [Alt + U]" friendly
+         friendly := "`nR: Update files list selectively «Ctrl + U»"
+      msgu := "L: Manage folders list to be indexed «Alt + U»" friendly
    } Else If InStr(icoFile, "font-size") 
    {
-      msgu := "Change viewport font size: " OSDfontSize " [Ctrl + -/=]"
+      msgu := "Change viewport font size: " OSDfontSize " «Ctrl + =»"
    } Else If InStr(icoFile, "select-align") 
    {
       msgu := "Align selection menu"
@@ -81716,6 +83240,86 @@ tlbrDecideTooltips(hwnd) {
       msgu := "L: Play " friendly " slideshow`nR: Cycle slideshow modes"
    } ; Else msgu := "N/A"
 
+   msgu := processTlbrTooltip(msgu, btnID)
+   Return msgu
+} ; // tlbrDecideTooltips
+
+processTlbrTooltip(msgu, btnID) {
+   Static lastInvoked := 1, lastState, lastMsg
+   thisState := msgu "||" btnID
+   If (A_TickCount - lastInvoked<950)
+   {
+      If (thisState=lastState || (A_TickCount - lastInvoked<50))
+         Return lastMsg
+   }
+
+   lastState := thisState
+   l := processToolbarFunctions(btnID, 0, 1)
+   r := processToolbarFunctions(btnID, "right", 1)
+   lf := l[1], rf := r[1]
+   ; ToolTip, % msgu "|" lf , , , 2
+   If (InStr(msgu, "L:")!=1)
+   {
+      lastMsg := coreprocessTlbrTooltip(msgu, lf)
+   } Else
+   {
+      newMsgu := ""
+      Loop, Parse, msgu, `n, `r
+      {
+         If (InStr(A_LoopField, "L:")=1)
+            newMsgu .= coreprocessTlbrTooltip(A_LoopField, lf) "`n"
+         Else If (InStr(A_LoopField, "R:")=1)
+            newMsgu .= coreprocessTlbrTooltip(A_LoopField, rf) "`n"
+         Else
+            newMsgu .= A_LoopField "`n"
+      }
+      lastMsg := Trimmer(newMsgu)
+   }
+
+   lastInvoked := A_TickCount
+   Return lastMsg ; "`n" btnID
+}
+
+coreprocessTlbrTooltip(msgu, lf) {
+   ckbd := testCustomKBDcontexts("." lf)
+   If ckbd
+      lthisu := ckbd
+
+   posu := InStr(msgu, "«")
+   If (!lthisu && posu)
+   {
+      thisHumanKey := SubStr(msgu, posu + 1)
+      thisHumanKey := SubStr(thisHumanKey, 1, InStr(thisHumanKey, "»") - 1)
+      thisKey := processHumanKkbdName(thisHumanKey)
+      ckbd := testCustomKBDcontexts(thisKey)
+      If ckbd
+         shu := ckbd
+
+      remKey := (shu && StrLen(userCustomKeysDefined[shu, 1])>0 && userCustomKeysDefined[shu, 1]!=lf) ? 1 : 0
+      If !shu
+      {
+         defaultu := processDefaultKbdCombos(thisKey, PVhwnd, 0, PVhwnd, 1)
+         remKey := StrLen(defaultu[1])>2 ? 0 : 1
+         ; fnOutputDebug("yay= " remKey "|" defaultu[1] "|" thiskey "|" lf)
+      }
+      ; ToolTip, % shu "|" thisKey "|" thisHumanKey "|" remKey  , , , 2
+   } Else If (userCustomKeysDefined[lthisu, 6]!="" && SubStr(userCustomKeysDefined[lthisu, 1], 1, 1)!="?" && lthisu)
+   {
+      newKey := " [" userCustomKeysDefined[lthisu, 6] "]"
+      remKey := 1
+   } Else If (userCustomKeysDefined[lthisu, 6]!="" && SubStr(userCustomKeysDefined[lthisu, 1], 1, 1)="?" && lthisu)
+   {
+      newKey := ""
+      remKey := 1
+   }
+   ; msgu .=  " | " lf " | " testFuncIsInMenus(lf)
+   If (posu && remKey=1)
+      msgu := SubStr(msgu, 1, posu - 1) newKey SubStr(msgu, InStr(msgu, "»") + 1)
+   Else If newKey
+      msgu .= newKey
+   msgu := StrReplace(msgu, "  ", A_Space)
+   msgu := StrReplace(msgu, "«", "[")
+   msgu := StrReplace(msgu, "»", "]")
    Return msgu
 }
 
@@ -81781,6 +83385,7 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
         LbtnDwn := 1
         SetTimer, ResetLbtn, -55
      }
+
      ctrlHover := OutputVarControl
      msgu := tlbrDecideTooltips(ctrlHover)
      If (!msgu && ShowToolTipsToolbar=1)

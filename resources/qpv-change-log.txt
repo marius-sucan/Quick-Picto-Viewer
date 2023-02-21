@@ -1,6 +1,11 @@
-// Quick Picto Viewer - CHANGELOG
+﻿// Quick Picto Viewer - CHANGELOG
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
+
+- v5.8.8 (2023-02-21)
+  - [new] users can now customize the keyboard shortcuts
+  - image captions can be now defined and displayed in the files list/thumbs mode
+  - various important bug fixes
 
 - v5.8.7 (2023-02-07)
   - [new] users can now customize the toolbar; a dedicated panel allows users to add/remove icons in the toolbar, for the image view and thumbnails/list modes
@@ -965,7 +970,3 @@ Files organization:
   - high memory consumption; all operations need a lot of RAM [zoom/pan, etc]
   - when multi-threaded is activated, QPV randomly hangs in thumbnails mode
   - jpeg lossless crop: the selection area does not precisely match with the resulted image [freeimage]
-
-
-
-

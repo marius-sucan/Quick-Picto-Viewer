@@ -1,4 +1,4 @@
-﻿#Persistent
+#Persistent
 #NoTrayIcon
 #MaxHotkeysPerInterval, 950
 #HotkeyInterval, 50
@@ -55,7 +55,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , menusListThumbs := "File:File|Edit:Edit|Selection:Selection|Image:Image|Slides:Slides|Find:Find|List:List|Sort:Sort|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
      , menusListWelcome := "File:File|Edit:Edit|Interface:Interface|Settings:Settings|Help:Help"
      , prevMenuBarItem := 1, lastContextMenuZeit := 1, colorPickerMustEnd := 0, userPendingAbortOperations := 0
-     , statusBarTooltipVisible := 0
+     , statusBarTooltipVisible := 0, FloodFillSelectionAdj := 0
 
 ; OnMessage(0x388, "WM_PENEVENT")
 OnMessage(0x2a3, "WM_MOUSELEAVE")
@@ -1351,12 +1351,11 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
 
   mX := lP & 0xFFFF
   mY := lP >> 16
-
   ; MouseGetPos, mX, mY, OutputVarWin
   isSamePos := (isInRange(mX, prevArrayPos[1] + 3, prevArrayPos[1] - 3) && isInRange(mY, prevArrayPos[2] + 3, prevArrayPos[2] - 3)) ? 1 : 0
   If (slideShowRunning=1 && isSamePos=1)
      Try DllCall("user32\SetCursor", "Ptr", 0)
-  Else If (drawingShapeNow=1 && doNormalCursor=0 || liveDrawingBrushTool=1) && (hwnd=PVhwnd)
+  Else If (drawingShapeNow=1 && doNormalCursor=0 || liveDrawingBrushTool=1 || AnyWindowOpen=66 && FloodFillSelectionAdj=0) && (hwnd=PVhwnd)
      changeMcursor("cross")
   Else If ((runningLongOperation=1 || imageLoading=1) && slideShowRunning!=1)
      changeMcursor("busy")
@@ -1409,16 +1408,6 @@ WM_MOUSELEAVE(wP, lP, msg, hwnd) {
     lastMouseLeave := A_TickCount
 }
 
-dummyCheckWin() {
-   thisHwnd := WinActive("A")
-   drawingOkay := (thisHwnd=hGuiTip && mouseToolTipWinCreated=1 || thisHwnd=hQPVtoolbar && ShowAdvToolbar=1 || thisHwnd=PVhwnd || thisHwnd=tempBtnVisible || thisHwnd=hSetWinGui) ? 1 : 0
-   ; ToolTip, % hSetWinGui "`n" thisHwnd , , , 2
-   ; If (imgEditPanelOpened=1 && AnyWindowOpen>0 && panelWinCollapsed=1 && thisHwnd=hSetWinGui)
-   ;    MainExe.ahkPostFunction("toggleImgEditPanelWindow")
-   If (drawingShapeNow=1 && drawingOkay!=1)
-      stopDrawingShape()
-}
-
 activateMainWin() {
    If (A_TickCount - scriptStartTime<2000)
       Return
@@ -1441,9 +1430,6 @@ activateMainWin() {
    ; If (mouseToolTipWinCreated=1 && !z && !identifyParentWind())
    If (mouseToolTipWinCreated=1)
       SetTimer, mouseTurnOFFtooltip, -150
-
-   ; If (drawingShapeNow=1) || (imgEditPanelOpened=1 && AnyWindowOpen>0 && panelWinCollapsed=1)
-   ;    SetTimer, dummyCheckWin, -150
 }
 
 dummyCheckActiveWin() {
@@ -1947,50 +1933,6 @@ GetMenuItemRect(hwnd, hMenu, nPos) {
     return 0
 }
 
-invokeFreeformDrawMenu() {
-   MainExe.ahkPostFunction("createContextMenuCustomShapeDrawing", 1, 1, 0, 0, 1, coords)
-}
-
-ImgVectorUndoAct() {
-   MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-ImgVectorRedoAct() {
-   MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-stopDrawingShape() {
-   MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-toggleViewPortGridu() {
-   MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-MenuSelAllVectorPoints() {
-   MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-MenuSelNoVectorPoints() {
-   MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-MenuSelInvertVectorPoints() {
-   MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-MenuRemSelVectorPoints() {
-   MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-toggleOpenClosedLineCustomShape() {
-   MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-togglePathCurveTension() {
-   MainExe.ahkPostFunction(A_ThisFunc)
-}
-
 changeMenusBarKbd(keyu) {
    ; Static lastItem := 1
    If ((A_TickCount - lastMenuHoverZeit<300) || (menuCurrentIndex))
@@ -2441,9 +2383,13 @@ PreProcessKbdKey() {
 }
 
 constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code) {
-   Static vkList := {8:"BACKSPACE", 9:"TAB", C:"NUMPADCLEAR", D:"ENTER", 14:"CAPSLOCK", 1B:"ESCAPE", 20:"SPACE", 21:"PGUP", 22:"PGDN", 23:"END", 24:"HOME", 25:"LEFT", 26:"UP", 27:"RIGHT", 28:"DOWN", 2D:"INSERT", 2E:"DELETE", 5B:"SCROLLLOCK", 5D:"APPSKEY", 60:"NUMPAD0", 61:"NUMPAD1", 62:"NUMPAD2", 63:"NUMPAD3", 64:"NUMPAD4", 65:"NUMPAD5", 66:"NUMPAD6", 67:"NUMPAD7", 68:"NUMPAD8", 69:"NUMPAD9", 6A:"NUMPADMULT", 6B:"NUMPADADD", 6D:"NUMPADSUB", 6E:"NUMPADDOT", 6F:"NUMPADDIV", 70:"F1", 71:"F2", 72:"F3", 73:"F4", 74:"F5", 75:"F6", 76:"F7", 77:"F8", 78:"F9", 79:"F10", 7A:"F11", 7B:"F12", 90:"NUMLOCK", AD:"VOLUME_MUTE", AE:"VOLUME_DOWN", AF:"VOLUME_UP", B0:"MEDIA_NEXT", B1:"MEDIA_PREV", B2:"MEDIA_STOP", B3:"MEDIA_PLAY_PAUSE", FF:"PAUSE", 1:"LBUTTON", 2:"RBUTTON", 3:"BREAK", 4:"MBUTTON", 5:"XBUTTON1", 6:"XBUTTON2", 10:"SHIFT", 11:"CONTROL", 12:"ALT", 13:"PAUSE", 15:"KANA/HANGUL", 17:"JUNJA", 18:"IME_FINAL", 19:"HANJA/KANJI", 16:"IME_ON", 1A:"IME_OFF", 1C:"IME_CONVERT", 1D:"IME_NON_CONVERT", E5:"IME_PROCESSKEY", 1E:"IME_ACCEPT", 1F:"IME_MODECHANGE", 2F:"HELP", 29:"SELECT", 2A:"PRINT", 2B:"EXECUTE", 2C:"PRINT_SCREEN", 5F:"SLEEP", 7C:"F13", 7D:"F14", 7E:"F15", 7F:"F16", 80:"F17", 81:"F18", 82:"F19", 83:"F20", 84:"F21", 85:"F22", 86:"F23", 87:"F24", A6:"BROWSER_BACK", A7:"BROWSER_FORWARD", A8:"BROWSER_REFRESH", A9:"BROWSER_STOP", AA:"BROWSER_SEARCH", AB:"BROWSER_FAVORITES", AC:"BROWSER_HOME", B4:"LAUNCH_MAIL", B5:"LAUNCH_MEDIA_SELECT", B6:"LAUNCH_APP1", B7:"LAUNCH_APP2", F6:"ATTN", F7:"CrSEL", F8:"ExSEL", F9:"ERASE_EOF", FA:"PLAY", FB:"ZOOM", FD:"PA1", A0:"LSHIFT", A1:"RSHIFT", A2:"LCTRL", A3:"RCTRL", A4:"LALT", A5:"RALT", 5B:"LWIN", 5C:"RWIN"}
-        , vkExtraList := {30:"00.1", 31:"1", 32:"2", 33:"3", 34:"4", 35:"5", 36:"6", 37:"7", 38:"8", 39:"9", 41:"A", 42:"B", 43:"C", 44:"D", 45:"E", 46:"F", 47:"G", 48:"H", 49:"I", 4A:"J", 4B:"K", 4C:"L", 4D:"M", 4E:"N", 4F:"O", 50:"P", 51:"Q", 52:"R", 53:"S", 54:"T", 55:"U", 56:"V", 57:"W", 58:"X", 59:"Y", 5A:"Z", BB:"PLUS", BC:"COMMA", BD:"MINUS", BE:"PERIOD"}
-        ; , BA:"OEM_1", BF:"OEM_2", C0:"OEM_3", DB:"OEM_4", DC:"OEM_5", DD:"OEM_6", DE:"OEM_7", DF:"OEM_8", E2:"OEM_102", E1:"OEM_9", E3:"OEM_11", E4:"OEM_12", E6:"OEM_13", FE:"OEM_CLEAR", 92:"OEM_14", 93:"OEM_15", 94:"OEM_16", 95:"OEM_17", 96:"OEM_18"}
+   Static vkList := {8:"BACKSPACE", 9:"TAB", C:"NUMPADCLEAR", D:"ENTER", 14:"CAPSLOCK", 1B:"ESCAPE", 20:"SPACE", 21:"PGUP", 22:"PGDN", 23:"END", 24:"HOME", 25:"LEFT", 26:"UP", 27:"RIGHT", 28:"DOWN", 2D:"INSERT", 2E:"DELETE", 5B:"SCROLLLOCK", 5D:"APPSKEY", 60:"NUMPAD0", 61:"NUMPAD1", 62:"NUMPAD2", 63:"NUMPAD3", 64:"NUMPAD4", 65:"NUMPAD5", 66:"NUMPAD6", 67:"NUMPAD7"
+                  , 68:"NUMPAD8", 69:"NUMPAD9", 6A:"NUMPADMULT", 6B:"NUMPADADD", 6D:"NUMPADSUB", 6E:"NUMPADDOT", 6F:"NUMPADDIV", 70:"F1", 71:"F2", 72:"F3", 73:"F4", 74:"F5", 75:"F6", 76:"F7", 77:"F8", 78:"F9", 79:"F10", 7A:"F11", 7B:"F12", 90:"NUMLOCK", AD:"VOLUME_MUTE", AE:"VOLUME_DOWN", AF:"VOLUME_UP", B0:"MEDIA_NEXT", B1:"MEDIA_PREV", B2:"MEDIA_STOP", B3:"MEDIA_PLAY_PAUSE"
+                  , FF:"PAUSE", 1:"LBUTTON", 2:"RBUTTON", 3:"BREAK", 4:"MBUTTON", 5:"XBUTTON1", 6:"XBUTTON2", 10:"SHIFT", 11:"CONTROL", 12:"ALT", 13:"PAUSE", 15:"KANA/HANGUL", 17:"JUNJA", 18:"IME_FINAL", 19:"HANJA/KANJI", 16:"IME_ON", 1A:"IME_OFF", 1C:"IME_CONVERT", 1D:"IME_NON_CONVERT", E5:"IME_PROCESSKEY", 1E:"IME_ACCEPT", 1F:"IME_MODECHANGE", 2F:"HELP", 29:"SELECT", 2A:"PRINT"
+                  , 2B:"EXECUTE", 2C:"PRINT_SCREEN", 5F:"SLEEP", 7C:"F13", 7D:"F14", 7E:"F15", 7F:"F16", 80:"F17", 81:"F18", 82:"F19", 83:"F20", 84:"F21", 85:"F22", 86:"F23", 87:"F24", A6:"BROWSER_BACK", A7:"BROWSER_FORWARD", A8:"BROWSER_REFRESH", A9:"BROWSER_STOP", AA:"BROWSER_SEARCH", AB:"BROWSER_FAVORITES", AC:"BROWSER_HOME", B4:"LAUNCH_MAIL", B5:"LAUNCH_MEDIA_SELECT"
+                  , B6:"LAUNCH_APP1", B7:"LAUNCH_APP2", F6:"ATTN", F7:"CrSEL", F8:"ExSEL", F9:"ERASE_EOF", FA:"PLAY", FB:"ZOOM", FD:"PA1", A0:"LSHIFT", A1:"RSHIFT", A2:"LCTRL", A3:"RCTRL", A4:"LALT", A5:"RALT", 5B:"LWIN", 5C:"RWIN", BF:"SLASH", DC:"BSLASH", C0:"TILDA", DE:"QUOTES"}
+        , vkExtraList := {30:"00.1", 31:"1", 32:"2", 33:"3", 34:"4", 35:"5", 36:"6", 37:"7", 38:"8", 39:"9", 41:"A", 42:"B", 43:"C", 44:"D", 45:"E", 46:"F", 47:"G", 48:"H", 49:"I", 4A:"J", 4B:"K", 4C:"L", 4D:"M", 4E:"N", 4F:"O", 50:"P", 51:"Q", 52:"R", 53:"S", 54:"T", 55:"U", 56:"V", 57:"W", 58:"X", 59:"Y", 5A:"Z", BB:"EQUAL", BC:"COMMA", BD:"MINUS", BE:"PERIOD", BA:"COLON", DB:"LBRACKET", DD:"RBRACKET"}
+        ; DF:"OEM_8", E2:"OEM_102", E1:"OEM_9", E3:"OEM_11", E4:"OEM_12", E6:"OEM_13", FE:"OEM_CLEAR", 92:"OEM_14", 93:"OEM_15", 94:"OEM_16", 95:"OEM_17", 96:"OEM_18"}
    ; vk list based on https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
 
    newkate := ""
@@ -2457,6 +2403,7 @@ constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code) {
       newkate .= vkExtraList[vk_code]
    Else
       newkate .= vkList[vk_code] ? vkList[vk_code] : "vk" vk_code
+
    Return newkate
 }
 

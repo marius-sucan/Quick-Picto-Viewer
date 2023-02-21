@@ -1,22 +1,29 @@
 ﻿WHAT IS QUICK PICTO VIEWER?
 QPV is an image viewer, editor and a tool to organize image collections. It can open about 85 image file formats: .hdr, .raw, .tif, .emf, .wmf, .png, .bmp, .gif, .jpeg and many others.
 
-Quick Picto Viewer is made to gracefully manage large image libraries, e.g., a million images, or more. It is made to help organize and view such libraries. A particular attention is paid through-out development to the needs of people with poor eye-sight. To this end, users can activate large UI fonts, adjust the zoom level for texts (Ctrl + -/+) in the viewport, dark mode, and right-click on menu items or panel controls to display larger their associated texts. 
+Quick Picto Viewer is made to gracefully manage large image libraries, e.g., a million images, or more. It is made to help organize and view such libraries.
 
 QPV is able to create image slideshows and cache very large dynamic lists of files. The index of files can be saved as plain-text or as an SQLite database.
 
 With Quick Picto Viewer users can identify image duplicates (by similarity) and generate file statistics over huge image libraries which can help identify very small images, very low key, or washed out images.
 
-QPV is also able to play sound files associated with images, automatically or on demand, and even generate slideshows that are in synch with the audio files duration. Supported audio formats: WAV, MP3 and WMA. It can also display image captions / notes for image.
+QPV is also able to play sound files associated with images, automatically or on demand, and even generate slideshows that are in synch with the audio files duration. Supported audio formats: WAV, MP3 and WMA. It can also display image captions / notes for images.
 
-Advanced image editing tools are also available: alpha masking, blending modes, paint brushes, paste in place, color adjustments, draw arcs, lines or shapes, insert text, soft edges blur area and so on. Selection areas can be freely rotated elliptical, rectangular or vector shapes. 
+Advanced image editing tools are also available: alpha masking, blending modes, paint brushes, paste in place, color adjustments, parametric spirals, arcs, lines or shapes, insert text, soft edges blur area and so on. Selection areas can be freely rotated elliptical, rectangular or they can be defined as vector shapes. 
+
+By using QPV, one can observe that many similar tools are provided, which may achieve the exact same thing. QPV was thought like this, to allow users perform basic tasks by different means, because each mean is suited for specific use-case scenarios. 
 
 
-KEYBOARD SHORTCUTS:
-QPV was developed having in mind keyboard users by providing many keyboard shortcuts or menu accelerators. At the moment, there is no way to customize these in QPV. They are all assigned based on the user context and in-app conditions. Therefore, in the «Keyboard shortcuts» list you will see the same keyboard shortcut listed several times, with different actions associated with it. Please pay attention to the indicated contexts. 
+WHY ANOTHER IMAGE VIEWER?
+===========================
+
+This project is developed out of passion since May 2019 by me, Marius Șucan. It first began as a challenge to make a simple image viewer that can generate slideshows very quickly on over 100 000 images. What I was using back in those days (XnView and Irfan View) could not do this. After having succeeded this, the project expanded into a complete image viewer and organizer, and gradually, into an image editor as well. The target audience is any occasional user, or the people with huge image libraries, or those who might like advanced image editing features, available through isolated tools, in their image viewer.
+
+As a physically disabled developer, I paid particular attention through-out the development to the needs of people with poor eye-sight and other disabilities. To this end, users with screen readers might notice that the user interface is populated with readable texts. Furthermore, users can activate large UI fonts, adjust the zoom level for texts (Ctrl + -/=) in the viewport, activate dark mode, and right-click on menu items or panel controls to display larger the control's associated texts. The panels' controls can be navigated with the Tab and arrow keys, even the custom slider controls. The users can define the value of a slider via Ctrl+L-Click, where a dialog box prompts the user for the new value.
 
 
 KEY CONCEPTS IN QPV TO KNOW ABOUT:
+=====================================
 
 THE FILES LIST:
 The files list is an index, a list of records pointing to files on the disk.  
@@ -25,8 +32,13 @@ Given that it is just an index, the files added are not inserted (or pasted) int
 The files list index can be saved and reopened in later sessions. QPV allows users to save the files list in two formats: plain-text and as a SQLite database. For more details, see the Help provided in the Save panel (Ctrl+Shift+S). 
 
 
-THE VIEWPORT
+THE VIEWPORT:
 In QPV, unlike in other image viewers, there is a clear distinction between how images are displayed on the screen and the pixel/image data. QPV allows users to alter the viewing conditions without affecting the images themselves. The color adjustments, image rotation and flip options (available in the «Viewport adjustments» panel), are applied in real-time for each image when loaded, before displaying it on screen. There are distinct options and tools in QPV to edit and adjust images or to apply the viewport conditions. QPV will seamlessly apply the viewport viewing conditions onto the image itself when users choose to save the image or when image editing tools are used. 
 
 
-By using QPV, people can observe that many similar tools are provided, which may achieve the exact same thing. QPV was thought like this, to allow users perform basic tasks by different means, because each mean is suited for specific use-case scenarios. 
+USER/APP CONTEXTS:
+QPV was developed having in mind keyboard users by providing many keyboard shortcuts or menu accelerators keys. The purpose is to ease the access to different tools.
+
+The user is provided with different keyboard shortcuts, menus, context menus and toolbar icons based on the application context. The main contexts are: image view, files list/thumbs modes, image live editing, and vector shape drawing mode. For each of these contexts, the same keys can do different things, based on the context, or new shortcuts are available, while others are disabled. The same applies to toolbar icons and menus. The toolbar icon tooltips and menu items available always reflect these changes. This contextual mindset is expanded to, and applies to, the ability to customize keyboard shortcuts and the toolbar.
+
+In any context, users can invoke the Quick Menus Search panel with «;», where they can search for the currently available options. Most of the menu items are associated with keywords, and synonyms, to facilitate the ease of reach to the available tools.
