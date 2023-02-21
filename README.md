@@ -166,6 +166,8 @@
 
 <li>Adjustable user interface font sizes and colors.</li>
 
+<li>Customizable keyboard shortcuts and toolbar icons.</li>
+
 <li>Dark mode for the user interface.</li>
 
 <li>Ambiental textured window background. Automatically generated background based on the currently displayed image.</li>
