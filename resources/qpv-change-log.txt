@@ -2,11 +2,17 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.8.9 (2023-02-23)
+  - users can now adjust the gradient offset for radial and box gradients; to adjust the gradient center, users can Alt+Click and drag in the gradient preview area 
+  - transformed the checkbox option to crop the image [found in the JPEG lossless operations panel], into a drop down option
+  - when collapsing a panel, a compact sensical bar appears, instead of displaying a tiny corner of the initial window
+  - bug fixes
+
 - v5.8.8 (2023-02-21)
   - [new] users can now customize the keyboard shortcuts
   - image captions can be now defined and displayed in the files list/thumbs mode
-  - various important bug fixes
-
+  - various important bug fixes; many inconsistencies between the menus, the toolbar options and keyboard shortcuts were fixed.
+  
 - v5.8.7 (2023-02-07)
   - [new] users can now customize the toolbar; a dedicated panel allows users to add/remove icons in the toolbar, for the image view and thumbnails/list modes
   - [new] viewer mode toolbar; activated by default; in this mode, only common actions for an image viewer are shown

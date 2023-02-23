@@ -1715,12 +1715,12 @@ guiCreateMenuFlyout() {
    {
       brd := "+border"
       Gui, menuFlier: Color, 212121
-      Gui, menuFlier: Font, s%LargeUIfontValue% Bold cFFffFF
+      Gui, menuFlier: Font, s12 Bold cFFffFF
    } Else
    {
       brd := ""
       Gui, menuFlier: Color, EEeeEE
-      Gui, menuFlier: Font, s%LargeUIfontValue% Bold c111111
+      Gui, menuFlier: Font, s12 Bold c111111
    }
    Gui, menuFlier: Margin, 0, 0
    Gui, menuFlier: Add, Text, %brd% Center +0x200 x0 y0 w%h% h%h% gPanelQuickSearchMenuOptions hwndhBtn1 +TabStop, S
