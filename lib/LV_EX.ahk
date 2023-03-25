@@ -112,6 +112,7 @@ LV_EX_GetColumnOrder(HLV) {
       ColArray[A_Index] := NumGet(COA, 4 * (A_Index - 1), "Int") + 1
    Return ColArray
 }
+
 ; ======================================================================================================================
 ; LV_EX_GetColumnWidth - Gets the width of a column in report or list view.
 ; ======================================================================================================================
@@ -427,6 +428,27 @@ LV_EX_IsRowFocused(HLV, Row) {
 LV_EX_IsRowSelected(HLV, Row) {
    Return LV_EX_GetItemState(HLV, Row).Selected
 }
+
+LV_GetFirstVisible(HLV) {
+   LV_GetFirstSelected(HLV, 1)
+}
+
+LV_GetFirstSelected(HLV, visible:=0) {
+   LV_EX_GetItemsCount(HLV, rows, cols)
+   p := 0
+   Loop, % Rows 
+   {
+      p := A_Index
+      If (visible=1)
+         s := LV_EX_IsRowVisible(HLV, p)
+      Else
+         s := LV_EX_IsRowSelected(HLV, p)
+      If s
+         Break
+   }
+   Return p
+}
+
 ; ======================================================================================================================
 ; LV_EX_IsRowVisible - Indicates if a row in the list-view control is visible.
 ; ======================================================================================================================

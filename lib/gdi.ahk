@@ -1012,7 +1012,8 @@ Gdi_FillShape(hDC, x, y, w, h, Color, Shape, BorderColor:=0, BorderWidth:=0) {
       ; Reselect the original pen and brush
       Gdi_SelectObject(hDC, hOriginalPen)
       Gdi_SelectObject(hDC, hOriginalBrush)
-      Gdi_DeleteObject(Pen)
+      If Pen
+         Gdi_DeleteObject(Pen)
       Gdi_DeleteObject(Brush)
       Return E
 }

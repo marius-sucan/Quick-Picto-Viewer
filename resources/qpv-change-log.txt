@@ -2,10 +2,15 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.9.0 (2023-03-25)
+  - many improvements for the compatibility with Windows Narrator and other screen readers
+  - bug fixes
+
 - v5.8.9 (2023-02-23)
   - users can now adjust the gradient offset for radial and box gradients; to adjust the gradient center, users can Alt+Click and drag in the gradient preview area 
   - transformed the checkbox option to crop the image [found in the JPEG lossless operations panel], into a drop down option
-  - when collapsing a panel, a compact sensical bar appears, instead of displaying a tiny corner of the initial window
+  - when user collapses a panel, a compact sensical bar appears, instead of displaying a tiny corner of the initial window
+  - the preview box is now always 2x larger than the displayed thumbnails
   - bug fixes
 
 - v5.8.8 (2023-02-21)
@@ -955,13 +960,13 @@ Files organization:
   - [new] option to open image file with external app, or open containing folder
   - [new] viewport color adjustments: grayscale, inverted
   - [new] option to toggle adapt images to window size or display them at original size
-  - [new] options to change slideshow speed and type: random, forward or backward
+  - [new] ability to change slideshow speed and type: random, forward or backward
   - [new] open/save files list option
-  - [new] option to flip H/V image view
-  - [new] option to filter files list by a given string
-  - [new] option to jump at specific index in the files list
-  - [new] option to copy image to clipboard
-  - [new] option to copy image file path to clipboard with Shift+C
+  - [new] flip H/V image view
+  - [new] filter files list by a given string
+  - [new] jump at specific index in the files list
+  - [new] copy image to clipboard
+  - [new] copy image file path to clipboard with Shift+C
   - [new] added option to open folders recursively
   - changed open file to use the common open file dialog
 

@@ -3,6 +3,7 @@
 ; Function:          Create images and assign them to pushbuttons.
 ; Tested with:       AHK 1.1.33.02 (A32/U32/U64)
 ; Tested on:         Win 10 (x64)
+; Change history:    1.7.00.00/2023-03-21/marius-sucan - [new] ability to use bitmaps as button labels/captions or a text label for each state and it no longer rejects check-boxes with BS_PUSHLIKE style
 ; Change history:    1.6.00.00/2023-02-02/marius-sucan - It now allows to use & to underline the accelerator key for the button, and they are no longer broken, they work.. It breaks winxp compatiblity.
 ;                                                        Changed all PTR and PtrP to Uptr and Uptr*.
 
@@ -63,6 +64,11 @@
 ;                             -  RGB integer value (0xRRGGBB) or HTML color name ("Red").
 ;           8     BorderWidth optional, ignored for modes 0 (bitmap) and 7, width of the border in pixels:
 ;                             -  Default: 1
+;           9     DrawText    optional, set this to 0 to not draw the text
+;                             -  Default: 1
+;           10    NewLabel    optional, set the label to use; it can be a string, or a path to an image file, or a reference to a GDI+ bitmap - it has to be like PBMP:handle
+;                             - BorderWidth is used as a margin
+;                             -  Default: none
 ;        ---------------------------------------------------------------------------------------------------------------
 ;        If the the button has a caption it will be drawn above the bitmap.
 ; Credits:           THX tic     for GDIP.AHK     : http://www.autohotkey.com/forum/post-198949.html
@@ -85,7 +91,7 @@ Class ImageButton {
    ; PRIVATE PROPERTIES ================================================================================================
    ; ===================================================================================================================
    Static BitMaps := []
-   Static MaxOptions := 8
+   Static MaxOptions := 10
    ; HTML colors
    Static HTML := {BLACK: 0x000000, GRAY: 0x808080, SILVER: 0xC0C0C0, WHITE: 0xFFFFFF, MAROON: 0x800000
                  , PURPLE: 0x800080, FUCHSIA: 0xFF00FF, RED: 0xFF0000, GREEN: 0x008000, OLIVE: 0x808000
@@ -183,10 +189,9 @@ Class ImageButton {
       Static BCM_GETIMAGELIST := 0x1603, BCM_SETIMAGELIST := 0x1602
            , BS_CHECKBOX := 0x02, BS_RADIOBUTTON := 0x04, BS_GROUPBOX := 0x07, BS_AUTORADIOBUTTON := 0x09
            , BS_LEFT := 0x0100, BS_RIGHT := 0x0200, BS_CENTER := 0x0300, BS_TOP := 0x0400, BS_BOTTOM := 0x0800
-           , BS_VCENTER := 0x0C00, BS_BITMAP := 0x0080
+           , BS_VCENTER := 0x0C00, BS_BITMAP := 0x0080, BS_PUSHLIKE := 0x1000
            , BUTTON_IMAGELIST_ALIGN_LEFT := 0, BUTTON_IMAGELIST_ALIGN_RIGHT := 1, BUTTON_IMAGELIST_ALIGN_CENTER := 4
-           , ILC_COLOR32 := 0x20
-           , OBJ_BITMAP := 7
+           , ILC_COLOR32 := 0x20, OBJ_BITMAP := 7
            , RCBUTTONS := BS_CHECKBOX | BS_RADIOBUTTON | BS_AUTORADIOBUTTON
            , SA_LEFT := 0x00, SA_CENTER := 0x01, SA_RIGHT := 0x02
            , WM_GETFONT := 0x31
@@ -205,7 +210,8 @@ Class ImageButton {
       ; Get and check control's class and styles
       WinGetClass, BtnClass, ahk_id %HWND%
       ControlGet, BtnStyle, Style, , , ahk_id %HWND%
-      If (BtnClass != "Button") || ((BtnStyle & 0xF ^ BS_GROUPBOX) = 0) || ((BtnStyle & RCBUTTONS) > 1)
+      pushLike := BtnStyle & BS_PUSHLIKE ? 1 : 0
+      If (BtnClass != "Button") || (((BtnStyle & 0xF ^ BS_GROUPBOX) = 0) || ((BtnStyle & RCBUTTONS) > 1) && pushLike!=1)
          Return This.SetError("The control must be a pushbutton!")
       ; ----------------------------------------------------------------------------------------------------------------
       ; Get the button's font
@@ -214,7 +220,7 @@ Class ImageButton {
       DllCall("Gdi32.dll\SelectObject", "UPtr", DC, "UPtr", HFONT)
       DllCall("Gdiplus.dll\GdipCreateFontFromDC", "UPtr", DC, "UPtr*", PFONT)
       DllCall("User32.dll\ReleaseDC", "UPtr", HWND, "UPtr", DC)
-      If !(This.Font := PFONT)
+      If !(This.Font := PFONT) && (Options[1, 9]!=0)
          Return This.SetError("Couldn't get button's font!")
       ; ----------------------------------------------------------------------------------------------------------------
       ; Get the button's rectangle
@@ -248,12 +254,15 @@ Class ImageButton {
       ; ----------------------------------------------------------------------------------------------------------------
       ; Create the bitmap(s)
       This.BitMaps := []
-      For Idx, Opt In Options {
+      For Idx, Opt In Options
+      {
          If !IsObject(Opt)
             Continue
+
          BkgColor1 := BkgColor2 := TxtColor := Mode := Rounded := GuiColor := Image := ""
          ; Replace omitted options with the values of Options.1
-         Loop, % This.MaxOptions {
+         Loop, % This.MaxOptions
+         {
             If (Opt[A_Index] = "")
                Opt[A_Index] := Options[1, A_Index]
          }
@@ -295,10 +304,12 @@ Class ImageButton {
             Opt[6] := This.DefGuiColor
          If !This.IsInt(Opt[6]) && !This.HTML.HasKey(Opt[6])
             Return This.SetError("Invalid value for GuiColor in Options[" . Idx . "]!")
+
          GuiColor := This.GetARGB(Opt[6])
          ; BorderColor
          BorderColor := ""
-         If (Opt[7] <> "") {
+         If (Opt[7] <> "")
+         {
             If !This.IsInt(Opt[7]) && !This.HTML.HasKey(Opt[7])
                Return This.SetError("Invalid value for BorderColor in Options[" . Idx . "]!")
             BorderColor := 0xFF000000 | This.GetARGB(Opt[7]) ; BorderColor must be always opaque
@@ -379,8 +390,7 @@ Class ImageButton {
                ; Set surround and center colors
                VarSetCapacity(ColorArray, 4, 0)
                NumPut(BkgColor1, ColorArray, 0, "UInt")
-               DllCall("Gdiplus.dll\GdipSetPathGradientSurroundColorsWithCount", "UPtr", PBRUSH, "UPtr", &ColorArray
-                   , "IntP", 1)
+               DllCall("Gdiplus.dll\GdipSetPathGradientSurroundColorsWithCount", "UPtr", PBRUSH, "UPtr", &ColorArray, "IntP", 1)
                DllCall("Gdiplus.dll\GdipSetPathGradientCenterColor", "UPtr", PBRUSH, "UInt", BkgColor2)
                ; Set the FocusScales
                FS := (BtnH < BtnW ? BtnH : BtnW) / 3
@@ -402,14 +412,33 @@ Class ImageButton {
             Else
                DllCall("Gdiplus.dll\GdipCreateBitmapFromFile", "WStr", Image, "UPtr*", PBM)
             ; Draw the bitmap
-            DllCall("Gdiplus.dll\GdipDrawImageRectI", "UPtr", PGRAPHICS, "UPtr", PBM, "Int", 0, "Int", 0
-                  , "Int", BtnW, "Int", BtnH)
+            DllCall("Gdiplus.dll\GdipDrawImageRectI", "UPtr", PGRAPHICS, "UPtr", PBM, "Int", 0, "Int", 0, "Int", BtnW, "Int", BtnH)
             ; Free the bitmap
             DllCall("Gdiplus.dll\GdipDisposeImage", "UPtr", PBM)
          }
          ; -------------------------------------------------------------------------------------------------------------
          ; Draw the caption
-         If (BtnCaption <> "") {
+         kCaption := (Opt[10]!="") ? Trim(Opt[10], A_Space) : BtnCaption
+         thisCaption := (Opt[9]=0) ? "" : kCaption
+         If (SubStr(Opt[10], 1, 5)="PBMP:") {
+            ; the caller has to manage [create and destroy] the pBitmap
+            ZPBM := SubStr(Opt[10], 6)
+            DllCall("Gdiplus.dll\GdipDrawImage", "UPtr", PGRAPHICS, "UPtr", ZPBM, "Int", 0, "Int", 0)
+         } Else If (FileExist(Opt[10]) && Opt[10]) {
+            DllCall("Gdiplus.dll\GdipCreateBitmapFromFile", "WStr", Opt[10], "UPtr*", ZPBM)
+            If StrLen(ZPBM)>1
+            {
+               ; fnOutputDebug(A_ThisFunc "=file=" ZPBM)
+               iw := ih := 0
+               DllCall("gdiplus\GdipGetImageDimension", "UPtr", ZPBM, "float*", iw, "float*", ih)
+               calcIMGdimensions(iw, ih, BtnW - BorderWidth*2, BtnH - BorderWidth*2, nW, nH)
+               px := BorderWidth + (BtnW - BorderWidth*2)/2 - nW//2
+               py := BorderWidth + (BtnH - BorderWidth*2)/2 - nH//2
+               ; ToolTip, % Round(iw) "|" Round(ih) "`n" Round(px) "|" Round(py) "`n" Round(BtnW) "|" Round(BtnH) , , , 2
+               DllCall("Gdiplus.dll\GdipDrawImageRectI", "UPtr", PGRAPHICS, "UPtr", ZPBM, "Int", px, "Int", py, "Int", nW, "Int", nH)
+               DllCall("Gdiplus.dll\GdipDisposeImage", "UPtr", ZPBM)
+            }
+         } Else If (thisCaption <> "") {
             ; Create a StringFormat object
             DllCall("Gdiplus.dll\GdipStringFormatGetGenericTypographic", "UPtr*", HFORMAT)
             ; Text color
@@ -433,7 +462,7 @@ Class ImageButton {
             NumPut(BtnW, RECT,  8, "Float")
             NumPut(BtnH, RECT, 12, "Float")
             ; Draw the text
-            DllCall("Gdiplus.dll\GdipDrawString", "UPtr", PGRAPHICS, "WStr", BtnCaption, "Int", -1
+            DllCall("Gdiplus.dll\GdipDrawString", "UPtr", PGRAPHICS, "WStr", thisCaption, "Int", -1
                   , "UPtr", PFONT, "UPtr", &RECT, "UPtr", HFORMAT, "UPtr", PBRUSH)
          }
          ; -------------------------------------------------------------------------------------------------------------

@@ -209,73 +209,94 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
      If (icon="error" || icon="stop")
      {
        iconFile := "imageres.dll", iconNum := 94
+       iconLabel := "Error message box."
        SoundPlay, *16
      } Else If (icon="question")
      {
        iconFile := "imageres.dll", iconNum := 95
+       iconLabel := "Question message box."
        SoundPlay, *32
      } Else If (icon="warning" || icon="alert" || icon="exclamation")
      {
        iconFile := "imageres.dll", iconNum := 80
+       iconLabel := "Alert message box."
        SoundPlay, *48
      } Else If (icon="hand" || icon="forbidden")
      {
        iconFile := "imageres.dll", iconNum := 208
+       iconLabel := "Forbidden action attempted. Message box."
        SoundPlay, *48
      } Else If (icon="info")
      {
        iconFile := "imageres.dll", iconNum := 77
+       iconLabel := "Information message box."
        SoundPlay, *64
      } Else If (icon="info2")
      {
        iconFile := "explorer.exe", iconNum := 6
+       iconLabel := "Information message box."
        SoundPlay, *64
      } Else If (icon="search")
      {
        iconFile := "imageres.dll", iconNum := 169
+       iconLabel := "Search icon."
      } Else If (icon="checkbox")
      {
        iconFile := "imagres.dll", iconNum := 233
+       iconLabel := "Checkbox icon."
      } Else If (icon="cloud")
      {
        iconFile := "imagres.dll", iconNum := 232
+       iconLabel := "Cloud icon."
      } Else If (icon="recycle" || icon="refresh")
      {
        iconFile := "imageres.dll", iconNum := 229
+       iconLabel := "Recycle icon."
      } Else If (icon="trash")
      {
        iconFile := "imageres.dll", iconNum := 51
+       iconLabel := "Trash bin icon."
        SoundPlay, *32
      } Else If (icon="file")
      {
        iconFile := "imageres.dll", iconNum := 15
+       iconLabel := "File icon."
      } Else If (icon="audio-file" || icon="audio")
      {
        iconFile := "imageres.dll", iconNum := 126
+       iconLabel := "Audio icon."
      } Else If (icon="image-file" || icon="image")
      {
        iconFile := "imageres.dll", iconNum := 68
+       iconLabel := "Image icon."
      } Else If (icon="folder")
      {
        iconFile := "imageres.dll", iconNum := 4
+       iconLabel := "Folder icon."
      } Else If (icon="modify-file")
      {
        iconFile := "imageres.dll", iconNum := 247
+       iconLabel := "Modify file icon."
      } Else If (icon="modify-entry")
      {
        iconFile := "imageres.dll", iconNum := 90
+       iconLabel := "Modify entry icon."
      } Else If (icon="settings" || icon="gear")
      {
        iconFile := "shell32.dll", iconNum := 317
+       iconLabel := "Gear icon."
      } Else If (icon="cut" || icon="scissor")
      {
        iconFile := "shell32.dll", iconNum := 260
+       iconLabel := "Cut, scissor icon."
      } Else If (icon="fast-forward")
      {
        iconFile := "shell32.dll", iconNum := 268
+       iconLabel := "Fast-forward icon."
      } Else If (icon="disc" || icon="save")
      {
        iconFile := "shell32.dll", iconNum := 259
+       iconLabel := "Disquette, save icon."
      } Else If (!InStr(icon,"HBITMAP:") && !InStr(icon,"HICON:"))
      {
        iconArr := StrSplit(icon,"/")
@@ -291,6 +312,8 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
 
    If (iconFile)
    {
+      If (iconLabel)
+         Try Gui, Add, Text, x%marginsGui% y%marginsGui% h1 w1, % iconLabel
       If (iconHandle)
          Try Gui, Add, Picture, AltSubmit x%marginsGui% y%marginsGui% h%bH% w-1 vBoxIcon, %iconFile%
       Else If (iconNum)
@@ -306,12 +329,18 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   yPos := iconFile ? "" : "y+" marginsGui
   xPos := iconFile ? "x+" marginsGui : "x" marginsGui
   If (btnCount>0)
-     ; Gui, Add, Text, %xPos% %yPos% w%msgW% %msgH% vprompt, %sMsg%
-     Gui, Add, Edit, %xPos% %yPos% w%msgW% %msgH% ReadOnly -WantReturn vprompt -Tabstop -E0x200 -HScroll -VScroll, %sMsg%
-  Else
+  {
+     moar := InStr(iconLabel, "message box") ? StrReplace(iconLabel, ".") " prompt." : "Message box prompt."
+     Gui, Add, Text, %xPos% %yPos% w1 h1, %moar%
+     Gui, Add, Edit, %xPos% %yPos% w%msgW% %msgH% ReadOnly -WantReturn vprompt -E0x200 -HScroll -VScroll, %sMsg%
+  } Else
      Gui, Add, Text, %xPos% %yPos% w%msgW% %msgH% vprompt gKillMsgbox2Win, %sMsg%
 
-  Gui, Add, Text, xp yp wp hp BackgroundTrans, %A_Space%
+  moar := editOptions ? "User input." : A_Space
+  If (!editOptions && dropListu)
+     moar := "Prompt choice."
+
+  Gui, Add, Text, xp yp wp hp BackgroundTrans -wrap, % moar
   addLabelu := InStr(editOptions, "number") ? "" : " gUIeditsGenericAllowCtrlBksp "
   If editOptions
      Gui, Add, Edit, xp y+%marginz% wp %addLabelu% -WantReturn r1 -multi -HScroll -VScroll %editOptions% vEditUserMsg, %editDefaultLine%
@@ -373,11 +402,13 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
       addedLine := 0
       If RegExMatch(StrReplace(btnText, "&"), "i)(discard|remove|delete|erase|wipe)")
       {
-         Gui, Add, Progress, xp+0 y+0 wp h%ledH% -border BackgroundFF5522 cFF5500 -TabStop +disabled, 100
+         Gui, Add, Text, xp+0 y+0 wp h%ledH% -border +0xE +hwndhTemp +Disabled, Destructive option indicator
+         oldupdateColoredRectCtrl("FF5500", hTemp)
          addedLine := 1
       } Else If InStr(def, "+def")
       {
-         Gui, Add, Progress, xp+0 y+0 wp h%ledH% -border Background2288FF c2288FF -TabStop +disabled, 100
+         Gui, Add, Text, xp+0 y+0 wp h%ledH% -border +0xE +hwndhTemp +Disabled, Default option indicator
+         oldupdateColoredRectCtrl("2288FF", hTemp)
          addedLine := 1
       }
   }

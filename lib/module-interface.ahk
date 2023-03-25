@@ -55,7 +55,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , menusListThumbs := "File:File|Edit:Edit|Selection:Selection|Image:Image|Slides:Slides|Find:Find|List:List|Sort:Sort|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
      , menusListWelcome := "File:File|Edit:Edit|Interface:Interface|Settings:Settings|Help:Help"
      , prevMenuBarItem := 1, lastContextMenuZeit := 1, colorPickerMustEnd := 0, userPendingAbortOperations := 0
-     , statusBarTooltipVisible := 0, FloodFillSelectionAdj := 0
+     , statusBarTooltipVisible := 0, FloodFillSelectionAdj := 0, isToolbarKBDnav := 0
 
 ; OnMessage(0x388, "WM_PENEVENT")
 OnMessage(0x2a3, "WM_MOUSELEAVE")
@@ -117,6 +117,18 @@ destroyAllGUIs() {
   Sleep, 50
 }
 
+infosUIAbtns(msgu) {
+   Static lastu := 0, prevMsg
+   If (prevMsg=msgu)
+      Return
+
+   lastu := !lastu
+   GuiControl, 1:, UIAbtn%lastu%, % msgu
+   Sleep, 1
+   GuiControl, 1: Focus, UIAbtn%lastu%
+   prevMsg := msgu
+}
+
 BuildGUI(params:=0) {
    Critical, on
    If !InStr(params, "$")
@@ -157,11 +169,13 @@ BuildGUI(params:=0) {
    initialWh := "w" A_ScreenWidth//1.7 " h" A_ScreenHeight//1.5
    ; If !A_IsCompiled
      Try Menu, Tray, Icon, %mainCompiledPath%\qpv-icon.ico
-
+   Global UIAbtn0, UIAbtn1
    Gui, 1: Color, %WindowBgrColor%
    Gui, 1: Margin, 0, 0
    Gui, 1: -DPIScale +Resize %MinGUISize% +hwndPVhwnd +LastFound +OwnDialogs
    Gui, 1: Font, s1
+   Gui, 1: Add, Button, x1 y1 w1 h1 vUIAbtn0, Btn-A
+   Gui, 1: Add, Button, x1 y1 w1 h1 vUIAbtn1, Btn-B
    Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vOSDmsgsLine, OSD messages.
    Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vPicVscroll, Vertical scrollbar
    Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vPicHscroll, Horizontal scrollbar
@@ -1221,7 +1235,7 @@ WM_WINDOWPOSCHANGED() {
       If (A_OSVersion="WIN_7" || isWinXP=1)
          SetTimer, updateGDIwinPos, -5
       If (ShowAdvToolbar=1 && lockToolbar2Win=1)
-         SetTimer, tlbrResetPosition, -90
+         SetTimer, updateTlbrPosition, -10
       b := a
   }
 }
@@ -1231,10 +1245,6 @@ RepositionTempBtnGui() {
 }
 
 saveMainWinPos() {
-     MainExe.ahkPostFunction(A_ThisFunc)
-}
-
-tlbrResetPosition() {
      MainExe.ahkPostFunction(A_ThisFunc)
 }
 
@@ -2188,6 +2198,18 @@ WM_NCMOUSEMOVE(wP, lP, msg, hwnd) {
    }
 }
 
+updateTlbrPosition() {
+  If (lockToolbar2Win!=1 || ShowAdvToolbar!=1)
+     Return
+
+  JEE_ClientToScreen(hPicOnGui1, 1, 1, UserToolbarX, UserToolbarY)
+  UserToolbarX--
+  UserToolbarY--
+  tX := Round(UserToolbarX),    tY := Round(UserToolbarY)
+  WinMove, ahk_id %hQPVtoolbar%, , % tX, % tY
+  ; Gui, OSDguiToolbar: Show, NoActivate x%tX% y%tY%, QPV toolbar
+
+}
 UpdateMenuBar(modus:=0) {
    Static hasRan := 0, prevState
    If !hasRan
@@ -2203,7 +2225,10 @@ UpdateMenuBar(modus:=0) {
 
    ; ToolTip, % thisState "`n" prevState , , , 2
    If (prevState=thisState)
+   {
+      updateTlbrPosition()
       Return
+   }
 
    ; ToolTip, % "l = " modus , , , 2
    ; If (thumbsDisplaying=1)
@@ -2214,7 +2239,6 @@ UpdateMenuBar(modus:=0) {
    lastMenuBarUpdate := A_TickCount
    Gui, 1: Menu, PVmanu
    ; kMenu("-", "-", "PVmenu", "delete")
-
    Try Menu, PVmenu, Delete
    If (showMainMenuBar!=1)
    {
@@ -2232,6 +2256,7 @@ UpdateMenuBar(modus:=0) {
    Gui, 1: Menu, PVmenu
    lastMenuBarUpdate := A_TickCount
    prevState := thisState
+   updateTlbrPosition()
 }
 
 SetMenuInfo(hMenu, maxHeight:=0, autoDismiss:=0, modeLess:=0, noCheck:=0) {
@@ -2699,7 +2724,7 @@ mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
     Static prevMsg, lastInvoked := 1
     Global TippyMsg
 
-    ; ToolTip, % largus "==" msg , , , 2
+    ; ToolTip, % givenCoords "===" largus "==" msg , , , 2
     thisHwnd := PVhwnd
     If (StrLen(msg)<3) || (prevMsg=msg && mouseToolTipWinCreated=1) || (A_TickCount - lastInvoked<100) || !thisHwnd
        Return
@@ -2748,6 +2773,10 @@ showOSDinfoLineNow(delayu, givenCoords:=0) {
           mX := givenCoords.x 
           mY := givenCoords.y + givenCoords.h
        }
+    } Else If InStr(givenCoords, "|")
+    {
+       pk := StrSplit(givenCoords, "|")
+       mX := pk[1], mY := pk[2]
     }
 
     If (!isWinXP && forced!=1)

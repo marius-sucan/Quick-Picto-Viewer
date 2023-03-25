@@ -1198,7 +1198,7 @@ GetModuleFileNameEx(PID) {
     hProcess := DllCall("Kernel32.dll\OpenProcess", "UInt", 0x001F0FFF, "UInt", 0, "UInt", PID)
     If (ErrorLevel || hProcess = 0)
        Return
-    Static lpFilename, nSize := 260, int := VarSetCapacity(lpFilename, nSize, 0)
+    Static lpFilename, nSize := 2260, int := VarSetCapacity(lpFilename, nSize, 0)
     DllCall("Psapi.dll\GetModuleFileNameEx", "Ptr", hProcess, "Ptr", 0, "Str", lpFilename, "UInt", nSize)
     DllCall("Kernel32.dll\CloseHandle", "Ptr", hProcess)
     Return lpFilename
@@ -1642,6 +1642,9 @@ CalcAddrHash(addr, length, algid, byref hash = 0, byref hashlength = 0) {
 }
 
 setMenusTheme(modus) {
+   If (A_OSVersion="WIN_7" || A_OSVersion="WIN_XP")
+      Return
+
    uxtheme := DllCall("GetModuleHandle", "str", "uxtheme", "ptr")
    SetPreferredAppMode := DllCall("GetProcAddress", "ptr", uxtheme, "ptr", 135, "ptr")
    global AllowDarkModeForWindow := DllCall("GetProcAddress", "ptr", uxtheme, "ptr", 133, "ptr")
@@ -1652,6 +1655,9 @@ setMenusTheme(modus) {
 }
 
 setDarkWinAttribs(hwndGUI, modus:=1) {
+   If (A_OSVersion="WIN_7" || A_OSVersion="WIN_XP")
+      Return
+
    if (A_OSVersion >= "10.0.17763" && SubStr(A_OSVersion, 1, 3) = "10.")
    {
        DWMWA_USE_IMMERSIVE_DARK_MODE  := 19
@@ -1927,16 +1933,16 @@ BalloonTip(sText, sTitle:="BalloonTip", Options:="", darkMode:=0) {
   If (darkMode=1)
      DllCall("uxtheme\SetWindowTheme", "ptr", hwnd, "str", "DarkMode_Explorer", "ptr", 0)
 
-  a:=(Q ? DllCall("SendMessage","Uint",hWnd,Ptr,0x200b,Ptr,0,Ptr,"") : DllCall("uxtheme\SetWindowTheme","Uint",hWnd,Ptr,0,"UintP",0)) ; TTM_SETWINDOWTHEME
+  a:=(Q ? DllCall("SendMessage","UPtr",hWnd,Ptr,0x200b,Ptr,0,Ptr,"") : DllCall("uxtheme\SetWindowTheme","UPtr",hWnd,Ptr,0,"UintP",0)) ; TTM_SETWINDOWTHEME
 
-  DllCall("SendMessage", Ptr, hWnd, "Uint", 1028, Ptr, 0, Ptr, &ti, Ptr)        ; TTM_ADDTOOL
-  DllCall("SendMessage", Ptr, hWnd, "Uint", 1041, Ptr, 1, Ptr, &ti, Ptr)        ; TTM_TRACKACTIVATE
-  DllCall("SendMessage", Ptr, hWnd, "Uint", 1042, Ptr, 0, Ptr, (X & 0xFFFF)|(Y & 0xFFFF)<<16,Ptr)  ; TTM_TRACKPOSITION
-  DllCall("SendMessage", Ptr, hWnd, "Uint", 1043, Ptr, C, Ptr,   0, Ptr)        ; TTM_SETTIPBKCOLOR
-  DllCall("SendMessage", Ptr, hWnd, "Uint", 1044, Ptr, ~C & 0xFFFFFF,  Ptr, 0,Ptr)    ; TTM_SETTIPTEXTCOLOR
-  DllCall("SendMessage", Ptr, hWnd, "Uint",(A_IsUnicode ? 1057 : 1056),Ptr, I,Ptr, &sTitle, Ptr)  ; TTM_SETTITLE 0:None, 1:Info, 2:Warning, 3:Error, >3:assumed to be an hIcon.
-  DllCall("SendMessage", Ptr, hWnd, "Uint", 1048, Ptr, 0, Ptr, A_ScreenWidth)      ; TTM_SETMAXTIPWIDTH
-  DllCall("SendMessage", Ptr, hWnd, "UInt",(A_IsUnicode ? 0x439 : 0x40c), Ptr, 0, Ptr, &ti, Ptr)  ; TTM_UPDATETIPTEXT (OLD_MSG=1036)
+  DllCall("SendMessage", "UPtr", hWnd, "Uint", 1028, Ptr, 0, Ptr, &ti, Ptr)        ; TTM_ADDTOOL
+  DllCall("SendMessage", "UPtr", hWnd, "Uint", 1041, Ptr, 1, Ptr, &ti, Ptr)        ; TTM_TRACKACTIVATE
+  DllCall("SendMessage", "UPtr", hWnd, "Uint", 1042, Ptr, 0, Ptr, (X & 0xFFFF)|(Y & 0xFFFF)<<16,Ptr)  ; TTM_TRACKPOSITION
+  DllCall("SendMessage", "UPtr", hWnd, "Uint", 1043, Ptr, C, Ptr,   0, Ptr)        ; TTM_SETTIPBKCOLOR
+  DllCall("SendMessage", "UPtr", hWnd, "Uint", 1044, Ptr, ~C & 0xFFFFFF,  Ptr, 0,Ptr)    ; TTM_SETTIPTEXTCOLOR
+  DllCall("SendMessage", "UPtr", hWnd, "Uint",(A_IsUnicode ? 1057 : 1056),Ptr, I,Ptr, &sTitle, Ptr)  ; TTM_SETTITLE 0:None, 1:Info, 2:Warning, 3:Error, >3:assumed to be an hIcon.
+  DllCall("SendMessage", "UPtr", hWnd, "Uint", 1048, Ptr, 0, Ptr, A_ScreenWidth)      ; TTM_SETMAXTIPWIDTH
+  DllCall("SendMessage", "UPtr", hWnd, "UInt",(A_IsUnicode ? 0x439 : 0x40c), Ptr, 0, Ptr, &ti, Ptr)  ; TTM_UPDATETIPTEXT (OLD_MSG=1036)
   ; IfGreater, I, 0, SoundPlay, % "*" . (I=2 ? 48 : I=3 ? 16 : 64)
 
   If (T>0)
@@ -2521,7 +2527,12 @@ GetWinClientSize(ByRef w, ByRef h, hwnd, mode) {
     }
 
     prevHwnd := hwnd
-    If (mode=1)
+    If (mode=2)
+    {
+       r := GetWindowPlacement(hwnd)
+       prevW := W := r.w
+       prevH := H := r.h
+    } Else If (mode=1)
     {
        r := GetWindowBounds(hwnd)
        prevW := W := r.w
@@ -2556,7 +2567,7 @@ WinMoveZ(hWnd, C, X, Y, W, H, Redraw:=0) {
   If (Redraw=2)
      Return [X, Y]
   Else 
-     Return DllCall("MoveWindow", "Ptr",hWnd, "Int",X, "Int",Y, "Int",W, "Int",H, "Int",Redraw)
+     Return DllCall("MoveWindow", "UPtr",hWnd, "Int",X, "Int",Y, "Int",W, "Int",H, "Int",Redraw)
 }
 
 GetWinParent(hwnd) {
@@ -2580,6 +2591,9 @@ GetMenuItemRect(hwnd, hMenu, nPos) {
     return 0
 }
 
+doSetCursorPos(pX, pY) {
+  DllCall("user32\SetCursorPos", "Int", pX, "Int", pY)
+}
 
 JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
 ; function by jeeswg found on:
@@ -2588,7 +2602,7 @@ JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
   VarSetCapacity(POINT, 8)
   NumPut(vPosX, &POINT, 0, "Int")
   NumPut(vPosY, &POINT, 4, "Int")
-  DllCall("user32\ClientToScreen", "Ptr", hWnd, "Ptr", &POINT)
+  DllCall("user32\ClientToScreen", "UPtr", hWnd, "UPtr", &POINT)
   vPosX2 := NumGet(&POINT, 0, "Int")
   vPosY2 := NumGet(&POINT, 4, "Int")
 }
@@ -2617,7 +2631,6 @@ JEE_ScreenToClient(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
   vPosY2 := NumGet(&POINT, 4, "Int")
   POINT := ""
 }
-
 
 MWAGetMonitorMouseIsIn(coordX:=0,coordY:=0) {
 ; function from: https://autohotkey.com/boards/viewtopic.php?f=6&t=54557
@@ -2676,17 +2689,24 @@ GetPhysicalCursorPos(ByRef mX, ByRef mY) {
 GetWindowPlacement(hWnd) {
     Local WINDOWPLACEMENT, Result := {}
     NumPut(VarSetCapacity(WINDOWPLACEMENT, 44, 0), WINDOWPLACEMENT, 0, "UInt")
-    DllCall("GetWindowPlacement", "Ptr", hWnd, "Ptr", &WINDOWPLACEMENT)
+    r := DllCall("GetWindowPlacement", "UPtr", hWnd, "UPtr", &WINDOWPLACEMENT)
+    If (r=0)
+    {
+       WINDOWPLACEMENT := ""
+       Return 0
+    }
     Result.x := NumGet(WINDOWPLACEMENT, 28, "Int")
     Result.y := NumGet(WINDOWPLACEMENT, 32, "Int")
     Result.w := NumGet(WINDOWPLACEMENT, 36, "Int") - Result.x
     Result.h := NumGet(WINDOWPLACEMENT, 40, "Int") - Result.y
     Result.flags := NumGet(WINDOWPLACEMENT, 4, "UInt") ; 2 = WPF_RESTORETOMAXIMIZED
     Result.showCmd := NumGet(WINDOWPLACEMENT, 8, "UInt") ; 1 = normal, 2 = minimized, 3 = maximized
+    WINDOWPLACEMENT := ""
     Return Result
 }
 
-SetWindowPlacement(hWnd, x, y, w, h, showCmd) {
+SetWindowPlacement(hWnd, x, y, w, h, showCmd:=1) {
+    ; showCmd: 1 = normal, 2 = minimized, 3 = maximized
     Local WINDOWPLACEMENT
     NumPut(VarSetCapacity(WINDOWPLACEMENT, 44, 0), WINDOWPLACEMENT, 0, "UInt")
     NumPut(x, WINDOWPLACEMENT, 28, "Int")
@@ -2694,13 +2714,15 @@ SetWindowPlacement(hWnd, x, y, w, h, showCmd) {
     NumPut(w + x, WINDOWPLACEMENT, 36, "Int")
     NumPut(h + y, WINDOWPLACEMENT, 40, "Int")
     NumPut(showCmd, WINDOWPLACEMENT, 8, "UInt")
-    Return DllCall("SetWindowPlacement", "Ptr", hWnd, "Ptr", &WINDOWPLACEMENT)
+    r := DllCall("SetWindowPlacement", "UPtr", hWnd, "UPtr", &WINDOWPLACEMENT)
+    WINDOWPLACEMENT := ""
+    Return r
 }
 
 GetWindowInfo(hWnd) {
     Local WINDOWINFO, wi := {}
     NumPut(VarSetCapacity(WINDOWINFO, 60, 0), WINDOWINFO, 0, "UInt")
-    DllCall("GetWindowInfo", "Ptr", hWnd, "Ptr", &WINDOWINFO)
+    r := DllCall("GetWindowInfo", "UPtr", hWnd, "UPtr", &WINDOWINFO)
     wi.WindowX := NumGet(WINDOWINFO, 4, "Int")
     wi.WindowY := NumGet(WINDOWINFO, 8, "Int")
     wi.WindowW := NumGet(WINDOWINFO, 12, "Int") - wi.WindowX
@@ -2716,6 +2738,7 @@ GetWindowInfo(hWnd) {
     wi.BorderH := NumGet(WINDOWINFO, 52, "UInt")
     ;wi.Atom    := NumGet(WINDOWINFO, 56, "UShort")
     ;wi.Version := NumGet(WINDOWINFO, 58, "UShort")
+    WINDOWINFO := ""
     Return wi
 }
 
@@ -2728,3 +2751,11 @@ Edit_ShowBalloonTip(hEdit, Text, Title := "", Icon := 0) {
     SendMessage 0x1503, 0, &EDITBALLOONTIP,, ahk_id %hEdit% ; EM_SHOWBALLOONTIP
     Return ErrorLevel
 }
+
+SetWindowRegion(hwnd, x:=0, y:=0, w:=0, h:=0, r:=1) {
+  hR1 := DllCall("gdi32\CreateRoundRectRgn", "Int", x, "Int", y, "Int", w, "Int", h, "Int", r, "Int", r, "Ptr")
+  Result := DllCall("user32\SetWindowRgn", "Ptr", hwnd, "Ptr", hR1, "UInt", 1)
+  DllCall("gdi32\DeleteObject", "Ptr", hR1)
+  Return Result
+}
+
