@@ -2,12 +2,18 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.9.1 (2023-03-30)
+  - [new] users can enable multi-threaded processing for file format conversions
+  - file format converter has an option to prevent it from skipping the files with the extension of the destination format
+  - copy/move file actions have full support for relative paths; multiple files, in different folders, can be moved into a sibling folder or into the parent folder relative to their own paths
+  - [major bug fix] FINALLY, hopefully, A PROPER fix for the message box that allows users to choose what action to perform on file name conflicts; the whole application was freezing and the user was forced to kill the application when this message box was displayed ;[
+
 - v5.9.0 (2023-03-25)
   - many improvements for the compatibility with Windows Narrator and other screen readers
   - bug fixes
 
 - v5.8.9 (2023-02-23)
-  - users can now adjust the gradient offset for radial and box gradients; to adjust the gradient center, users can Alt+Click and drag in the gradient preview area 
+  - users can now adjust the gradient offset for radial and box gradients; to adjust the gradient center, users can Alt+L-Click and drag in the gradient preview area 
   - transformed the checkbox option to crop the image [found in the JPEG lossless operations panel], into a drop down option
   - when user collapses a panel, a compact sensical bar appears, instead of displaying a tiny corner of the initial window
   - the preview box is now always 2x larger than the displayed thumbnails

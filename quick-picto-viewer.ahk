@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.9.0
+;@Ahk2Exe-SetVersion 5.9.1
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2023)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -213,7 +213,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , userImgChannelRlvl, userImgChannelGlvl, userImgChannelBlvl, userImgChannelAlvl, combosDarkModus := ""
    , sillySeparator :=  "▪", menuCustomNames := new hashtable(), clrGradientCoffX := 0, clrGradientCoffY := 0
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.9.0", vReleaseDate := "2023/03/25" ; yyyy-mm-dd
+   , appVersion := "5.9.1", vReleaseDate := "2023/03/30" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -346,7 +346,8 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , DrawLineAreaGridCenter := 2, DrawLineAreaCropShape := 1, OutlierFillColor := "eeFFaa"
    , OutlierFillOpacity := 200, alphaMaskBMPbright := 0, alphaMaskBMPcontrast := 0, FillAreaWelcomePattern := 1
    , toolbarViewerMode := 1, userCustomizedToolbar := 0, userThumbsToolbarList, userImgViewToolbarList
-   , thumbsModeItemHighlight := 1
+   , thumbsModeItemHighlight := 1, convertFormatUseMultiThreads := 0, convertFormatAutoSkip := 1
+   , SimpleOperationsMultiThreaded := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -612,12 +613,47 @@ decideBlockKbdKeys(Az, givenKey) {
    Return blockKey
 }
 
+MsgBoxConflictKeysResponder(keyu) {
+    Static listu := {"o":"overwrite", "a":"auto-rename", "s":"skip file", "c":"cancel"}
+    pp := constructKbdKey(0, 0, 0, keyu)
+    SetTimer, highlightActiveArrowsCtrl, -50, 200
+    If (pp="Escape")
+    {
+       KillMsgbox2Win()
+    } Else If (pp="Space" || pp="Enter")
+    {
+       Gui, WinMsgBox: Default
+       GuiControlGet, btnFocused, WinMsgBox: FocusV
+       GuiControlGet, hwnd, hwnd, %btnFocused%
+       ControlGetText, btnText, , ahk_id %hwnd%
+       WinGetClass, classu, ahk_id %hwnd%
+       ; ToolTip, % A_GuiControl "|" btnFocused "|" btnText "|" hwnd "|" pp "|" classu , , , 3
+       If (btnText=btnFocused && A_GuiControl=btnFocused && InStr(classu, "button") && !InStr(btnFocused, "checkbox"))
+       {
+          MsgBox2Result := btnFocused && btnText ? btnText : "close"
+          MsgBox2InputHook.Stop()
+       }
+    } Else If isVarEqualTo(pp,"o", "a", "s", "c")
+    {
+       MsgBox2Result := listu[pp]
+       MsgBox2InputHook.Stop()
+    }
+}
+
 WM_KEYDOWN(wParam, lParam, msg, ctrlHwnd) {
     vk_code := Format("{1:x}", wParam)
     Awin := WinActive("A")
+
+    If (MsgBox2hwnd=Awin && MsgBox2Result="wait-ask")
+    {
+       MsgBoxConflictKeysResponder(vk_code)
+       Return
+    }
+
+
     If (whileLoopExec=1 || runningLongOperation=1) && (vk_code!="1B") 
     || (A_TickCount - lastOtherWinClose<300) || (Awin=PVhwnd)
-       Return 0
+       Return 
 
     vk_shift := DllCall("GetKeyState","Int", 0x10, "short") >> 16
     vk_ctrl := DllCall("GetKeyState","Int", 0x11, "short") >> 16
@@ -875,7 +911,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
         Else If (thumbsDisplaying=1 && maxFilesIndex>10 && CurrentSLD && !z)
            func2Call := ["invokeFilesListMapNow"]
 
-        ; func2Call := ["testDissolver"]
+        ; func2Call := ["parseBibleXML"]
         ; func2Call := ["RGBtoHEXandBack", "ff00ff"]
     } Else If (givenKey="+^n")
     {
@@ -6844,7 +6880,6 @@ addNewVectorShapePoints(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, shi
 
    Critical, on
    Static lastIndex
-
    If (mainParam="setStart") || (A_TickCount - lastOtherWinClose<250)
       Return lastIndex
 
@@ -18980,6 +19015,7 @@ GuiAddEdit(options, defaultu, labelu:="", guiu:="SettingsGUIA") {
        Gui, %guiu%: Add, Text, % posu " +BackgroundTrans +hide -wrap", % labelu
        Gui, %guiu%: Add, Edit, % " xp yp wp " nopt " +hwndhTemp", % defaultu
        EM_SETCUEBANNER(hTemp, labelu, 1)
+       ToolTip2ctrl(hTemp, labelu)
     } Else
        Gui, %guiu%: Add, Edit, % options " +hwndhTemp", % defaultu
 
@@ -19055,7 +19091,7 @@ GuiAddListView(options, headeru, labelu, guiu:="SettingsGUIA") {
        }
     }
 
-    Gui, %guiu%: Add, Text, % posu " w1 h1 +BackgroundTrans -wrap", % labelu
+    Gui, %guiu%: Add, Text, % posu " w1 h1 +BackgroundTrans +hide -wrap", % labelu
     Gui, %guiu%: Add, ListView, % " xp yp " nopt " +hwndhTemp", % headeru
     Return hTemp
 }
@@ -19090,14 +19126,15 @@ GuiAddButton(options, uiLabel, readerLabel, ttipu:=0, guiu:="SettingsGUIA") {
 
 GuiAddColor(options, colorReference, labelu:=0, guiu:="SettingsGUIA") {
     realColor := %colorReference%
-    ; Gui, %guiu%: Add, ListView, % options " v" colorReference A_Space CCLVO A_Space " +hwndhTemp +Background" realColor
+    p := labelu ? labelu : "Color."
     If (isWinXP=1)
-       Gui, %guiu%: Add, Text, % options " v" colorReference A_Space " +hwndhTemp gInvokeStandardDialogColorPicker +TabStop +0xE", Color. Invoke color picker.
+       Gui, %guiu%: Add, Text, % options " v" colorReference A_Space " +hwndhTemp gInvokeStandardDialogColorPicker +TabStop +0xE", %p% Invoke color picker.
     Else
-       Gui, %guiu%: Add, Button, % options " +0x8000 v" colorReference A_Space " +hwndhTemp gInvokeStandardDialogColorPicker", Color. Invoke color picker.
+       Gui, %guiu%: Add, Button, % options " +0x8000 v" colorReference A_Space " +hwndhTemp gInvokeStandardDialogColorPicker", %p% Invoke color picker.
 
     updateColoredRectCtrl(realColor, colorReference, guiu, hTemp)
-    ToolTip2ctrl(hTemp, "Define color")
+    p := labelu ? labelu : "Define color"
+    ToolTip2ctrl(hTemp, p)
     Return hTemp
 }
 
@@ -19136,7 +19173,7 @@ oldupdateColoredRectCtrl(coloru, clrHwnd) {
     Gdip_DisposeImage(pBitmap)
     ; ToolTip, % z.w "|" z.h "|" coloru "|" hwnd  , , , 2
     Return 1
- }
+}
 
 ProcessRawComboChoiceKBD(strg) {
   Loop, Parse, % "^~#&!+<>$*"
@@ -25293,6 +25330,13 @@ RecentFiltersManager(entry2add) {
   }
 }
 
+WinMsgBoxGuiClose:
+WinMsgBoxGuiEscape:
+  KillMsgbox2Win()
+  Gui, WinMsgBox: Destroy
+Return
+
+
 msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, checkBoxuCaption:="", checkState:=0, dropListu:="",edithu:="", edithuDef:="", listEditMode:=0, setWidth:=0, 2ndDropListu:=0, 2ndlistEditMode:=0) {
     Static msgBoxed := 0
 
@@ -29856,6 +29900,7 @@ coreReadSettingsImageProcessing(act) {
     RegAction(act, "ResizeRotationUser",, 2, -180, 180)
     RegAction(act, "ResizeUseDestDir",, 1)
     RegAction(act, "ResizeWithCrop",, 1)
+    RegAction(act, "convertFormatAutoSkip",, 1)
     RegAction(act, "SimpleOperationsDoCrop",, 1)
     RegAction(act, "SimpleOperationsFlipH",, 1)
     RegAction(act, "SimpleOperationsFlipV",, 1)
@@ -29879,6 +29924,7 @@ multiCoresFormatConvert(coreThread, filesList) {
   ; FileRead, filesList, %thumbsCacheFolder%\tempList%coreThread%.txt
   ReadSettingsFormatConvert()
   initFIMGmodule()
+  ; fnOutputDebug(A_ThisHotkey "|" coreThread "|" convertFormatAutoSkip)
   Loop, Parse, filesList,`n,`r
   {
       hasAsked := 0
@@ -29900,14 +29946,14 @@ multiCoresFormatConvert(coreThread, filesList) {
       zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
       destImgPath := (ResizeUseDestDir=1) ? ResizeDestFolder : OutDir
       file2save := destImgPath "\" OutNameNoExt "." rDesireWriteFMT
-
       If (InStr(imgPath, "||") || !imgPath)
       {
          skippedFiles++
          Continue
       }
 
-      If RegExMatch(imgPath, "i)(.\.(" rDesireWriteFMT "))$")
+      isSameFormat := RegExMatch(imgPath, "i)(.\.(" rDesireWriteFMT "))$") ? 1 : 0
+      If (isSameFormat=1 && convertFormatAutoSkip=1)
       {
          If (ResizeUseDestDir=1)
          {
@@ -29949,13 +29995,20 @@ multiCoresFormatConvert(coreThread, filesList) {
          }
       }
 
+      of := file2save
       If (FileExist(file2save) && !FolderExist(file2save))
          file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
 
       If !file2save
       {
-         skippedFiles++
-         Continue
+         If (ResizeUseDestDir!=1 && convertFormatAutoSkip=0 && isSameFormat=1)
+         {
+            file2save := of
+         } Else
+         {
+            skippedFiles++
+            Continue
+         }
       } Else If (file2save="abort")
       {
          abandonAll := 1
@@ -29971,11 +30024,14 @@ multiCoresFormatConvert(coreThread, filesList) {
       wasSucces := r ? 0 : 1
       If (OnConvertKeepOriginals!=1 && !r)
       {
-         FileSetAttrib, -R, %imgPath%
-         Sleep, 2
-         FileRecycle, %imgPath%
-         If ErrorLevel
-            theseFailures++
+         If (imgPath!=file2save)
+         {
+            FileSetAttrib, -R, %imgPath%
+            Sleep, 2
+            FileRecycle, %imgPath%
+            If ErrorLevel
+               theseFailures++
+         }
 
          If (wasSucces=1)
             resultsList .= lineArr[1] "?" file2save "`n"
@@ -34217,6 +34273,7 @@ SingularRenameFile() {
 
 coreDialogConflictsMsgBox(title, sMsg, dMsg, filez, btnList, checkBoxCaption, checkBoxState) {
   ; based on the msgbox2() dialog box
+  ; Critical, off
   Global UsrCheckBoxu
   If !InStr(btnList, "|")
      Return
@@ -34226,7 +34283,7 @@ coreDialogConflictsMsgBox(title, sMsg, dMsg, filez, btnList, checkBoxCaption, ch
   fontSize := (PrefsLargeFonts=1) ? LargeUIfontValue : 8
 
   oCritic := A_IsCritical 
-  Critical, off
+  ; Thread, Priority, -2100
   thisHwnd := ownerHwnd ? ownerHwnd : modalHwnd
   If !thisHwnd
      thisHwnd := "mouse"
@@ -34298,13 +34355,15 @@ coreDialogConflictsMsgBox(title, sMsg, dMsg, filez, btnList, checkBoxCaption, ch
   thumbu := (PrefsLargeFonts=1) ? 250 : 200
   msgW := (PrefsLargeFonts=1) ? 850 : 480
   msgH := (PrefsLargeFonts=1) ? 180 : 100
-  Gui, Add, Text, %xPos% %yPos% Section, File name conflict. Do you want to overwrite the destination file?
-  Gui, Add, Text, xp %yPos% w%thumbu% h%thumbu% +Border +0x1000 +0xE +hwndhConflictThumbSrc  gdummy, Preview source file
+  Gui, Add, Text, %xPos% %yPos% Section, File names conflict: please choose what action to perform.
 
+  Gui, Add, Text, xs %yPos% w1 h1 hide -wrap, Source file thumbnail
+  Gui, Add, Text, xp yp w%thumbu% h%thumbu% +Border +0x1000 +0xE +hwndhConflictThumbSrc  gdummy, Preview source file
   Gui, Add, Text, x+15 w%msgW% hp -wrap +hwndhTemp vUIvSmsg gdummy, %sMsg%
   ToolTip2ctrl(hTemp, "Source file:`n" filez.st)
 
-  Gui, Add, Text, xs %yPos% w%thumbu% h%thumbu% +Border +0x1000 +0xE +hwndhConflictThumbDst  gdummy, Preview destination file
+  Gui, Add, Text, xs %yPos% w1 h1 hide -wrap, Destination file thumbnail
+  Gui, Add, Text, xp yp w%thumbu% h%thumbu% +Border +0x1000 +0xE +hwndhConflictThumbDst  gdummy, Preview destination file
   Gui, Add, Text, x+15 w%msgW% hp -wrap +hwndhTemp vUIvDmsg gdummy, %dMsg%
   ToolTip2ctrl(hTemp, "Destination file:`n" filez.dt)
 
@@ -34325,9 +34384,14 @@ coreDialogConflictsMsgBox(title, sMsg, dMsg, filez, btnList, checkBoxCaption, ch
          thisBW := minBW
 
       If (A_Index=1)
-         Gui, Add, Button, gMsgBox2event xp y+%marginz% w%thisBW% h%bH% %def% -wrap, %btnText%
-      Else
-         Gui, Add, Button, gMsgBox2event x+5 w%thisBW% hp %def% -wrap, %btnText%
+      {
+         Gui, Add, Button, gMsgBoxConflictEvent xp y+%marginz% w%thisBW% h%bH% %def% -wrap, %btnText%
+      } Else
+      {
+         Gui, Add, Button, gMsgBoxConflictEvent x+5 w%thisBW% hp %def% -wrap +hwndhTempus, %btnText%
+         If InStr(btnText, "auto")
+            ToolTip2ctrl(hTempus, "Into the destination folder, the source file will have an added suffix.`nExample: Image_File_Name (2).jpg")
+      }
   }
 
   Gui, Add, Text, xp yp w1 h1 BackgroundTrans,% A_Space
@@ -34338,20 +34402,40 @@ coreDialogConflictsMsgBox(title, sMsg, dMsg, filez, btnList, checkBoxCaption, ch
      WinSet, Disable,, ahk_id %modalHwnd%
 
   repositionWindowCenter("WinMsgBox", MsgBox2hwnd, thisHwnd, title)
-  fnc := Func("uiPopulateConflictImgThumbs").Bind(filez.src, filez.dst, hConflictThumbSrc, hConflictThumbDst, sMsg, dMsg)
-  SetTimer, % fnc, -50
+  ; fnc := Func("uiPopulateConflictImgThumbs").Bind(filez.src, filez.dst, hConflictThumbSrc, hConflictThumbDst, sMsg, dMsg)
+  ; SetTimer, % fnc, -50, 92000
 
   If checkBoxCaption
      GuiControl, WinMsgBox: Focus, UsrCheckBoxu
   Else
      GuiControl, WinMsgBox: Focus, Button%btnDefault%
 
-  SetTimer, WatchMsgBox2Win, 300
-  MsgBox2InputHook := InputHook("V") ; "V" for not blocking input
-  MsgBox2InputHook.KeyOpt("{BackSpace}{Delete}{PgUp}{PgDn}{Enter}{Escape}{F4}{NumpadEnter}","N")
-  MsgBox2InputHook.OnKeyDown := Func("MsgBox2InputHookKeyDown")
-  MsgBox2InputHook.Start()
-  MsgBox2InputHook.Wait()
+  SetTimer, WatchMsgBox2Win, 300, -800
+  MsgBox2Result := "wait-ask"
+  hasSrc := hasDst := 0
+  startu := A_TickCount
+  While, (MsgBox2Result="wait-ask")
+  {
+     Sleep, 5
+     If ((A_TickCount - startu>100) && hasSrc!=1)
+     {
+        uiPopulateConflictImgThumbs(filez.src, 0, hConflictThumbSrc, hConflictThumbDst, sMsg, dMsg)
+        startu := A_TickCount
+        hasSrc := 1
+     }
+     If ((A_TickCount - startu>100) && hasDst!=1)
+     {
+        uiPopulateConflictImgThumbs(0, filez.dst, hConflictThumbSrc, hConflictThumbDst, sMsg, dMsg)
+        startu := A_TickCount
+        hasDst := 1
+     }
+  }
+  
+  ; MsgBox2InputHook := InputHook("V") ; "V" for not blocking input
+  ; MsgBox2InputHook.KeyOpt("{BackSpace}{Delete}{PgUp}{PgDn}{Enter}{Escape}{F4}{NumpadEnter}","N")
+  ; MsgBox2InputHook.OnKeyDown := Func("MsgBox2InputHookKeyDown")
+  ; MsgBox2InputHook.Start()
+  ; MsgBox2InputHook.Wait()
   r := []
   Sleep, 1
   Gui, WinMsgBox: Default
@@ -34372,8 +34456,16 @@ coreDialogConflictsMsgBox(title, sMsg, dMsg, filez, btnList, checkBoxCaption, ch
   SetTimer, CloseMsgBox2Win, Delete
   SetTimer, WatchMsgBox2Win, Delete
   MsgBox2hwnd := 0
-  Critical, % oCritic 
+  ; Critical, % oCritic 
   return r
+}
+
+MsgBoxConflictEvent(CtrlHwnd, GuiEvent, EventInfo) {
+  Gui, WinMsgBox: Default
+  GuiControlGet, btnFocused, WinMsgBox: FocusV
+  ControlGetText, btnText, , ahk_id %CtrlHwnd%
+  MsgBox2Result := btnFocused ? btnText : "close"
+  MsgBox2InputHook.Stop()
 }
 
 uiPopulateConflictImgThumbs(srcFile, destFile, hwndSrc, hwndDst, sMsg, dMsg) {
@@ -34381,33 +34473,40 @@ uiPopulateConflictImgThumbs(srcFile, destFile, hwndSrc, hwndDst, sMsg, dMsg) {
       Return
  
    Gui, WinMsgBox: Default
-   srcBitmap := LoadBitmapFromFileu(srcFile)
-   Gdip_GetImageDimensions(srcBitmap, w, h)
-   dd := "`n" groupDigits(w) " x " groupDigits(h) " |  " Round((w * h)/1000000,2) " MPx"
-   sMsg .= dd
-   GuiControl, WinMsgBox:, UIvSmsg, % sMsg
-   GuiControl, WinMsgBox: +Redraw, UIvSmsg
-   ToolTip2ctrl(hwndSrc, "Source image dimensions:" dd)
+   If srcFile
+   {
+      srcBitmap := LoadBitmapFromFileu(srcFile)
+      Gdip_GetImageDimensions(srcBitmap, w, h)
+      dd := "`n" groupDigits(w) " x " groupDigits(h) " |  " Round((w * h)/1000000,2) " MPx"
+      sMsg .= dd
+      GuiControl, WinMsgBox:, UIvSmsg, % sMsg
+      GuiControl, WinMsgBox: +Redraw, UIvSmsg
+      ToolTip2ctrl(hwndSrc, "Source image dimensions:" dd)
 
-   If srcBitmap
-      Gdip_SetPbitmapCtrl(hwndSrc, srcBitmap, 0, 0, 1, 1)
-   trGdip_DisposeImage(srcBitmap)
+      If srcBitmap
+         Gdip_SetPbitmapCtrl(hwndSrc, srcBitmap, 0, 0, 1, 1)
+      trGdip_DisposeImage(srcBitmap)
+   }
    If !MsgBox2hwnd
       Return
 
-   dstBitmap := LoadBitmapFromFileu(destFile)
-   Gdip_GetImageDimensions(dstBitmap, w2, h2)
-   dd := "`n" groupDigits(w2) " x " groupDigits(h2) " |  " Round((w2 * h2)/1000000,2) " MPx"
-   dMsg .= dd
-   ToolTip2ctrl(hwndDst, "Destination image dimensions:" dd)
-   GuiControl, WinMsgBox:, UIvDmsg, % dMsg
-   GuiControl, WinMsgBox: +Redraw, UIvDmsg
-   If dstBitmap
-      Gdip_SetPbitmapCtrl(hwndDst, dstBitmap, 0, 0, 1, 1)
-   trGdip_DisposeImage(dstBitmap)
+   If destFile
+   {
+      dstBitmap := LoadBitmapFromFileu(destFile)
+      Gdip_GetImageDimensions(dstBitmap, w2, h2)
+      dd := "`n" groupDigits(w2) " x " groupDigits(h2) " |  " Round((w2 * h2)/1000000,2) " MPx"
+      dMsg .= dd
+      ToolTip2ctrl(hwndDst, "Destination image dimensions:" dd)
+      GuiControl, WinMsgBox:, UIvDmsg, % dMsg
+      GuiControl, WinMsgBox: +Redraw, UIvDmsg
+      If dstBitmap
+         Gdip_SetPbitmapCtrl(hwndDst, dstBitmap, 0, 0, 1, 1)
+      trGdip_DisposeImage(dstBitmap)
+   }
 }
 
 askAboutFileCollision(srcFile, destFile, allowSkip, doLastOption, forceOption, ByRef performOverwrite) {
+   ; Critical, off
    Static lastOption, useLastOption := 0
 
    If (doLastOption=3)
@@ -34446,7 +34545,7 @@ askAboutFileCollision(srcFile, destFile, allowSkip, doLastOption, forceOption, B
       filez.dt := dOutFileName "`n" dOutDir "\"
       filez.src := srcFile
       filez.dst := destFile
-      msgResult := coreDialogConflictsMsgBox(appTitle ": File name conflict", sMsg, dMsg, filez, "&Overwrite|&Auto-rename|" skipBtn "C&ancel", checkBtn, doLastOption)
+      msgResult := coreDialogConflictsMsgBox(appTitle ": File name conflict", sMsg, dMsg, filez, "&Overwrite|&Auto-rename|" skipBtn "&Cancel", checkBtn, doLastOption)
       ; msgResult := msgBoxWrapper(appTitle ": File name conflict", "SOURCE FILE:`n" sOutFileName "`n" groupDigits(srcFileSizu) " Kilobytes (" srcFileDateM ")`n" sOutDir "\`n`nFile name conflict. Do you want to overwrite the destination file?`n`nDESTINATION FILE:`n" dOutFileName "`n" groupDigits(destFileSizu) " Kilobytes (" destFileDateM ")`n" dOutDir "\", "&Overwrite|&Auto-rename|" skipBtn "C&ancel", 2, "question", checkBtn, doLastOption)
    }
 
@@ -35355,7 +35454,7 @@ PanelSetWallpaper() {
 
     GuiAddDropDownList("xs y+10 wp AltSubmit Choose1 vuserMonitorIDu", listu, "Monitor")
     GuiAddDropDownList("xs y+10 wp-100 AltSubmit Choose" userMonitorImgPos " vuserMonitorImgPos", "Centered|Tiled|Stretched|Fit|Fill|Span", "Adapt to desktop mode")
-    GuiAddColor("x+5 hp w55", "monitorBgrColor")
+    GuiAddColor("x+5 hp w55", "monitorBgrColor", "Desktop background color")
     GuiAddPickerColor("x+5 hp wp-20", "monitorBgrColor")
 
     Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid% Default gBTNsetImgWallpaper vbtn1, &Set wallpaper
@@ -35616,7 +35715,8 @@ PanelBrushTool(dummy:=0, modus:=0) {
     GuiAddDropDownList("x+10 wp gupdateUIbrushTool AltSubmit Choose" BrushToolOutsideSelection " vBrushToolOutsideSelection", "Ignore selection area|Paint inside selection|Paint outside selection", "Selection fill mode")
 
     gW := gH := (PrefsLargeFonts=1) ? 60 : 45
-    Gui, Add, Text, xs y+10 w%gW% h%gH% -border +0xE +hwndhCropCornersPic gPanelsLivePreviewResponder +TabStop, Brush preview
+    Gui, Add, Text, xs y+10 w1 h1 hide, Brush preview
+    Gui, Add, Text, xp yp w%gW% h%gH% -border +0xE +hwndhCropCornersPic gPanelsLivePreviewResponder +TabStop, Brush preview
     Gui, Add, Checkbox, x+10 gupdateUIbrushTool Checked%BrushToolOverDraw% vBrushToolOverDraw , &Airbrush mode / deformer option
     Gui, Add, Checkbox, y+10 gupdateUIbrushTool Checked%BrushToolDynamicCloner% vBrushToolDynamicCloner , D&ynamic X/Y source coordinates
 
@@ -35629,7 +35729,8 @@ PanelBrushTool(dummy:=0, modus:=0) {
     GuiAddSlider("PasteInPlaceSaturation", -100,100, 0, "Saturation", "updateUIbrushTool", 2, "xs y+10 wp hp")
     GuiAddSlider("PasteInPlaceLight", -255,255, 0, "Brightness", "updateUIbrushTool", 2, "xs y+10 wp hp")
     GuiAddSlider("PasteInPlaceGamma", -100,100, 0, "Contrast", "updateUIbrushTool", 2, "xs y+10 wp hp")
-    Gui, Add, Text, xs y+10 w%gW% h%gH% -border +0xE +hwndhCropCornersPic2 gPanelsLivePreviewResponder +TabStop, Brush preview
+    Gui, Add, Text, xs y+10 w1 h1 hide, Brush preview
+    Gui, Add, Text, xp yp w%gW% h%gH% -border +0xE +hwndhCropCornersPic2 gPanelsLivePreviewResponder +TabStop, Brush preview
 
     sml := (PrefsLargeFonts=1) ? 55 : 35
     Gui, Add, Text, x+10 h%hasa% +0x200 vinfoSymmetryLabel, Apply symmetry on: 
@@ -39472,7 +39573,7 @@ PanelEditorImgResize() {
     friendly := (isImgEditingNow() && editingSelectionNow=1) ? "|Selection area||" : "||"
     Gui, Add, Text, x15 y15 Section, Original image size: %oImgW% x %oImgH% pixels.
     Gui, Add, Text, xs y+10, Set new dimensions (W x H):
-    GuiAddDropDownList("xs+15 y+8 wp gupdateUIresizeImgEditPanel AltSubmit vPredefinedDocsSizes", "Viewport size|Screen size|Current image size|640x480|800x600|1024x768|HD 480p|HD 720p|HD 1080p|HD 2160p [4K]|A4 @ 300 dpi|A4 @ 150 dpi|Custom dimensions" friendly, "Dimensions preset")
+    GuiAddDropDownList("xs+15 y+7 wp gupdateUIresizeImgEditPanel AltSubmit vPredefinedDocsSizes", "Viewport size|Screen size|Current image size|640x480|800x600|1024x768|HD 480p|HD 720p|HD 1080p|HD 2160p [4K]|A4 @ 300 dpi|A4 @ 150 dpi|Custom dimensions" friendly, "Dimensions preset")
     GuiAddEdit("xp y+5 w" editWid " r1 limit5 -multi number -wrap gupdateUIresizeImgEditPanel vuserEditWidth", (ResizeInPercentage=1) ? 100 : oImgW, "Width")
     GuiAddEdit("x+5 wp r1 limit5 -multi number -wrap gupdateUIresizeImgEditPanel vuserEditHeight", (ResizeInPercentage=1) ? 100 : oImgH, "Height")
     Gui, Add, Checkbox, x+5 hp gTglRszInPercentage Checked%ResizeInPercentage% vResizeInPercentage, Use `% percentages
@@ -39484,9 +39585,9 @@ PanelEditorImgResize() {
     Gui, Add, Checkbox, xs y+10 hp Checked%ResizeEnforceCanvas% vResizeEnforceCanvas gupdateUIresizeImgEditPanel, Set the given dimensions as canvas size
     sml := (PrefsLargeFonts=1) ? 90 : 60
     ha := (PrefsLargeFonts=1) ? 28 : 19
-    GuiAddDropDownList("xs+10 y+10 wp-" sml " AltSubmit Choose" ResizeFillCanvasMode " vResizeFillCanvasMode gupdateUIresizeImgEditPanel", "Transparent background|Extend image borders|Solid color|Blurred image", "Canvas fill mode")
+    GuiAddDropDownList("xs+15 y+7 wp-" sml " AltSubmit Choose" ResizeFillCanvasMode " vResizeFillCanvasMode gupdateUIresizeImgEditPanel", "Transparent background|Extend image borders|Solid color|Blurred image", "Canvas fill mode")
     GuiAddPickerColor("xp y+10 w25 hp", "OutlierFillColor")
-    GuiAddColor("x+2 hp w" clrW " hp", "OutlierFillColor")
+    GuiAddColor("x+2 hp w" clrW " hp", "OutlierFillColor", "Background color")
     GuiAddSlider("OutlierFillOpacity", 3,255, 255, "Opacity", "iniSaveOutlierClrOpaciy", 1, "x+5 w" clrW*2 + 10 " hp")
 
     Gui, Add, Checkbox, xs y+15 hp Checked%ResizeQualityHigh% vResizeQualityHigh gupdateUIresizeImgEditPanel, &High quality image resampling
@@ -40219,7 +40320,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     Gui, Add, Text, xs y+15 h%ha% +0x200 vtxtLine5, Border color
     GuiAddPickerColor("x+10 hp w25", "DrawLineAreaColor")
     ml := (PrefsLargeFonts=1) ? 60 : 45
-    GuiAddColor("x+5 hp w" ml, "DrawLineAreaColor")
+    GuiAddColor("x+5 hp w" ml, "DrawLineAreaColor", "Line color")
     GuiAddSlider("DrawLineAreaOpacity", 3,255, 255, "Opacity", "updateUIfillPanel", 1, "x+5 w" btnWid " hp")
 
     Gui, Add, Text, xs y+15 w%btnWid% vtxtLine3, Alignment
@@ -40404,7 +40505,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     ml := (PrefsLargeFonts=1) ? 60 : 45
     Gui, Add, Text, xs y+15 hp +0x200, Line color:
     GuiAddPickerColor("x+5 hp w25", "DrawLineAreaColor")
-    GuiAddColor("x+5 hp w" ml, "DrawLineAreaColor")
+    GuiAddColor("x+5 hp w" ml, "DrawLineAreaColor", "Line color")
     GuiAddSlider("DrawLineAreaOpacity", 3,255, 255, "Opacity", "updateUIdrawShapesPanel", 1, "x+5 w" btnWid " hp")
 
     Gui, Add, Text, xs y+15 w%btnWid%, Alignment:
@@ -40490,7 +40591,7 @@ PanelConfigVPgrid() {
     ml := (PrefsLargeFonts=1) ? 55 : 40
     Gui, Add, Checkbox, x15 y15 w%slideWid2% Section gupdateUIgridPanel Checked%showViewPortGrid% vshowViewPortGrid, &Show viewport grid
     GuiAddPickerColor("xs+16 y+10 hp+5 w25", "vpGridColor")
-    GuiAddColor("x+5 hp w" ml, "vpGridColor")
+    GuiAddColor("x+5 hp w" ml, "vpGridColor", "Grid color")
     
     ml := (PrefsLargeFonts=1) ? 115 : 80
     GuiAddSlider("vpGridAlpha", 3,255, 128, "Opacity", "updateUIgridPanel", 1, "x+5 w" ml " hp")
@@ -40671,7 +40772,7 @@ PanelDrawLines() {
 
     sml := (PrefsLargeFonts=1) ? 30 : 20
     Gui, Add, Text, xs y+%sml% +0x200 hp, Color:
-    GuiAddColor("x+5 wp+15 hp", "DrawLineAreaColor")
+    GuiAddColor("x+5 wp+15 hp", "DrawLineAreaColor", "Line color")
     GuiAddPickerColor("x+1 hp w25", "DrawLineAreaColor")
     GuiAddSlider("DrawLineAreaOpacity", 3,255, 255, "Opacity", "updateUIDrawLinesPanel", 1, "x+10 w" btnWid " h" ha)
     GuiAddSlider("DrawLineAreaContourThickness", 1,450, 5, "Line width: $€ pixels", "updateUIDrawLinesPanel", 1, "xs y+10 w" txtWid - 23 " hp")
@@ -40900,7 +41001,7 @@ PanelFloodFillTool() {
     ha := (PrefsLargeFonts=1) ? 27 : 18
     ml := (PrefsLargeFonts=1) ? 55 : 35
     GuiAddPickerColor("xs+15 y+10 h" ha " w25", "FloodFillColor")
-    GuiAddColor("x+1 hp w" ml, "FloodFillColor")
+    GuiAddColor("x+1 hp w" ml, "FloodFillColor", "Flood fill color")
     GuiAddSlider("FloodFillClrOpacity", 3,255, 255, "Opacity", "updateUIfloodFillPanel", 1, "x+3 w" btnWid - 10 " hp")
     Gui, Add, Checkbox, x%xCol% yp+0 hp gupdateUIfloodFillPanel Checked%FloodFillUseAlpha% vFloodFillUseAlpha, Apply alpha mas&k
 
@@ -40996,7 +41097,7 @@ PanelFillBehindBgrImage() {
     Gui, Add, Text, x15 y15 Section, Please set the color and opacity`nto fill behind the image.
     ml := (PrefsLargeFonts=1) ? 29 : 19
     Gui, Add, Text, xs y+15 h%ml% +0x200, Color:
-    GuiAddColor("x+5 hp wp+15", "FillBehindColor")
+    GuiAddColor("x+5 hp wp+15", "FillBehindColor", "Background color")
     GuiAddPickerColor("x+1 hp w25", "FillBehindColor")
     If (wasSelect!=1 && EllipseSelectMode=0 && VPselRotation=0)
        FillBehindInvert := 0
@@ -42066,7 +42167,7 @@ PanelNewImage() {
     ha := (PrefsLargeFonts=1) ? 28 : 19
     clrW := (PrefsLargeFonts=1) ? 65 : 45
     GuiAddPickerColor("xs+17 y+10 w26 h" ha, "OutlierFillColor")
-    GuiAddColor("x+2 hp w" clrW, "OutlierFillColor")
+    GuiAddColor("x+2 hp w" clrW, "OutlierFillColor", "Background color")
     txtWid -= 95
     GuiAddSlider("OutlierFillOpacity", 3,255, 255, "Opacity", "iniSaveOutlierClrOpaciy", 1, "x+5 w" clrW*2 + 20 " hp")
 
@@ -42180,7 +42281,7 @@ PanelPrintImage() {
     Gui, Add, Text, xs y+15, Text size and color:
     GuiAddEdit("xs+0 y+5 w" editWid " gupdatePrintPreview r1 limit3 -multi number -wantCtrlA -wantTab -wrap veditF1 ", PrintTxtSize, "Font size")
     Gui, Add, UpDown, vPrintTxtSize gupdatePrintPreview Range25-999, % PrintTxtSize
-    GuiAddColor("x+2 w55 hp", "TextInAreaFontColor")
+    GuiAddColor("x+2 w55 hp", "TextInAreaFontColor", "Text color")
     GuiAddPickerColor("x+2 hp w27", "TextInAreaFontColor")
     Gui, Add, Text, xs y+15, Text alignment and style:
     GuiAddDropDownList("xs y+5 w" editWid " gupdatePrintPreview Choose" TextInAreaAlign " AltSubmit vTextInAreaAlign", "Left|Center|Right", "Text horizontal alignment")
@@ -44846,19 +44947,19 @@ PanelInsertTextArea() {
 
     Gui, Add, Text, x+15 y+15 h%ha% w%wa% +0x200 Section vtxtLine6, Text:
     GuiAddPickerColor("x+1 hp w27", "TextInAreaFontColor")
-    GuiAddColor("x+2 w" clrW " hp", "TextInAreaFontColor")
+    GuiAddColor("x+2 w" clrW " hp", "TextInAreaFontColor", "Text color")
     GuiAddSlider("TextInAreaFontOpacity", 2,255, 255, "Opacity", "updateUIInsertTextPanel", 1, "x+5 w" opaciSlideW " hp")
 
     ml := (PrefsLargeFonts=1) ? 12 : 8
     Gui, Add, Text, xs y+%ml% h%ha% w%wa% +0x200 vtxtLine1, Border:
     GuiAddPickerColor("x+1 hp w27", "TextInAreaBorderColor")
-    GuiAddColor("x+2 w" clrW " hp", "TextInAreaBorderColor")
+    GuiAddColor("x+2 w" clrW " hp", "TextInAreaBorderColor", "Border color")
     GuiAddSlider("TextInAreaBorderOpacity", 2,255, 255, "Opacity", "updateUIInsertTextPanel", 1, "x+5 w" opaciSlideW " hp")
     Gui, Add, Checkbox, xs+%wa% y+5 hp gupdateUIInsertTextPanel Checked%TextInAreaOnlyBorder% vTextInAreaOnlyBorder, &Draw only the border
 
     Gui, Add, Text, xs y+%ml% h%ha% w%wa% +0x200 vtxtLine2, Background:
     GuiAddPickerColor("x+1 hp w27", "TextInAreaBgrColor")
-    GuiAddColor("x+2 w" clrW " hp", "TextInAreaBgrColor")
+    GuiAddColor("x+2 w" clrW " hp", "TextInAreaBgrColor", "Background color")
     GuiAddSlider("TextInAreaBgrOpacity", 2,255, 255, "Opacity", "updateUIInsertTextPanel", 1, "x+5 w" opaciSlideW " hp")
     Gui, Add, Text, xs y+10 w%wa% hp +0x200 +TabStop gBtnResetTextBlendMode +hwndhTemp, Blending mode:
     GuiAddDropDownList("x+1 wp+25 gupdateUIInsertTextPanel AltSubmit Choose" TextInAreaBlendMode " vTextInAreaBlendMode", "None|Darken|Multiply|Linear burn|Color burn|Lighten|Screen|Linear dodge [Add]|Hard light|Overlay|Hard mix|Linear light|Color dodge|Vivid light|Division|Exclusion|Difference|Substract|Luminosity|Substract reversed|Inverted difference", [hTemp])
@@ -45170,16 +45271,16 @@ PanelPrefsWindow() {
     GuiAddEdit("x+2 w" editWid " r1 gupdateUIsettings limit3 -multi number -wantCtrlA -wantReturn -wantTab -wrap veditF4", PasteFntSize, "Text on paste font size")
     Gui, Add, UpDown, vPasteFntSize Range12-350, %PasteFntSize%
 
-    GuiAddColor("xs yp+30 w" editWid " h28", "OSDtextColor")
+    GuiAddColor("xs yp+30 w" editWid " h28", "OSDtextColor", "OSD text color")
     GuiAddPickerColor("x+5 hp w25", "OSDtextColor")
     GuiAddCheckbox("x+2 yp hp w27 gupdateUIsettings Checked" OSDfontBolded " vOSDfontBolded","Bold", "B")
     GuiAddCheckbox("x+2 yp hp w27 gupdateUIsettings Checked" OSDfontItalica " vOSDfontItalica", "Italic", "I")
     GuiAddDropDownList("xs yp+30 w" editWid " gupdateUIsettings vusrTextAlign", usrTextAlign "||Left|Right|Center", "Text alignment")
-    GuiAddColor("xs+0 yp+30 w" editWid " hp", "OSDbgrColor")
+    GuiAddColor("xs+0 yp+30 w" editWid " hp", "OSDbgrColor", "OSD background color")
     GuiAddPickerColor("x+5 hp w25", "OSDbgrColor")
     GuiAddEdit("xs+0 yp+30 gupdateUIsettings w" editWid " hp r1 limit2 -multi number -wantCtrlA -wantReturn -wantTab -wrap veditF6", DisplayTimeUser, "OSD display time in seconds")
     Gui, Add, UpDown, vDisplayTimeUser Range1-99, %DisplayTimeUser%
-    GuiAddColor("xs+0 yp+30 w" editWid " hp", "WindowBGRcolor")
+    GuiAddColor("xs+0 yp+30 w" editWid " hp", "WindowBGRcolor", "Window background color")
     GuiAddPickerColor("x+5 hp w25", "WindowBGRcolor")
     GuiAddEdit("xs+0 yp+30 gupdateUIsettings w" editWid " hp r1 limit2 -multi number -wantCtrlA -wantReturn -wantTab -wrap veditF8", additionalLVrows, "Additional list view rows")
     Gui, Add, UpDown, vadditionalLVrows Range0-15, % additionalLVrows
@@ -46202,6 +46303,7 @@ zPlitPath(inputu, fastMode, ByRef fileNamu, ByRef folderu, ByRef fileNamuNoEXT:=
        ; SoundBeep , 300, 100
        folderu := inputu
        fileEXT := fileNamuNoEXT := fileNamu := ""
+       fileParentFolder := SubStr(folderu, 1, InStr(folderu, "\", 0, -1) - 1)
     } Else
     {
        lineArr := StrSplit(inputu, "\")
@@ -46306,6 +46408,7 @@ CopyMovePanelWindow() {
        txtWid := txtWid + 105
        Gui, Font, s%LargeUIfontValue%
     }
+
     EditWid -= sml
     lstWid := sml + editWid
 
@@ -46334,7 +46437,6 @@ CopyMovePanelWindow() {
     ; DynamicFoldersList := mainDynaFoldersListu
     prevCurrentSLD := CurrentSLD
     lastInvoked := A_TickCount
-
     Loop, Parse, thisDynaList, `n
     {
         If (A_Index>15)
@@ -46374,7 +46476,7 @@ CopyMovePanelWindow() {
     Gui, +Delimiter`n
     sml := (PrefsLargeFonts=1) ? 90 : 72
     Gui, Add, Text, x15 y15 Section, Destination folder:
-    GuiAddEdit("xs y+5 w" EditWid " gUIeditsGenericAllowCtrlBksp vUsrEditFileDestination", prevFileMovePath)
+    GuiAddEdit("xs y+5 w" EditWid " gUIeditsGenericAllowCtrlBksp vUsrEditFileDestination r1 -wrap -multi -WantReturn", prevFileMovePath)
     Gui, Add, Button, x+1 w%sml% hp gBtnCpyMvChooseFilesDest, &Browse
     hLVmainu := GuiAddListView("xs y+5 w" lstWid " gBTNlvRecentFileDesties -multi r10 Grid AltSubmit vLViewDynas", "Recent destination folders`n#", "Recent destination folders")
     thisW := (PrefsLargeFonts=1) ? 190 : 120
@@ -46586,7 +46688,7 @@ PanelCustomizeToolbar() {
     Gui, Add, Checkbox, x+10 wp hp Checked%userCustomizedToolbar% vuserCustomizedToolbar gBTNtglCustoTlbr, &Use customized toolbar
     Gui, Add, Text, xs y+9 hp +0x200, Toolbar background color:
     GuiAddPickerColor("x+5 hp w35", "ToolbarBgrColor")
-    GuiAddColor("x+5 hp w" ml, "ToolbarBgrColor")
+    GuiAddColor("x+5 hp w" ml, "ToolbarBgrColor", "Toolbar background color")
  
     thisW := (PrefsLargeFonts=1) ? 90 : 65
     Gui, Add, Button, xs y+20 h%thisBtnHeight% w%thisW% Default gBtnSaveCustomToolbar, &Apply
@@ -47101,7 +47203,7 @@ BtnHelpCopyMovePanel() {
   If (AnyWindowOpen=9)
      moreInfo := "`n`nIf you click on «Mark files (Explorer)» button, the selected file(s) will be marked as «COPY» or «CUT» and you can paste them in any file manager, or in another session of " appTitle "."
 
-  msgBoxWrapper(appTitle ": HELP", "Recognized patterns:`n`na) " btnName " files to parent folder: .\`n`nb) " btnName " files to a new or existing sub-folder: \given-folder`n`nc) " btnName " files into a new or exiting folder within the parent folder: .\given-folder`n`nThe destination folder for all selected files [if any] will be calculated relative to the currently focused file index entry: " groupDigits(currentFileIndex) ".`n" OutDir "`n`nUse [group-by-month-year], [group-by-years] or [group-by-file-types] as folder name to automatically group files in newly created folders named based on files' modification date or file types." moreInfo, -1, 0, 0)
+  msgBoxWrapper(appTitle ": HELP", "Recognized patterns:`n`na) " btnName " files to parent folder: .\`n`nb) " btnName " files to a new or existing sub-folder: \given-folder`n`nc) " btnName " files into a new or existing folder within the parent folder: .\given-folder`n`nThe destination folder for every selected file(s) will be calculated relative to its own location path.`n `nUse [group-by-month-year], [group-by-years] or [group-by-file-types] as folder name to automatically group files in newly created folders named based on files' modification date or file types." moreInfo, -1, 0, 0)
 }
 
 changeCopyMoveAction() {
@@ -47228,6 +47330,7 @@ BtnCopyMoveAction(dummy:=0) {
   } Else If (folderu=".\")
   {
      ; move files one level up
+     relativePath := folderu
      folderu := SubStr(OutDir, 1, InStr(OutDir, "\", 0, -1) - 1)
   } Else If RegExMatch(folderu, "^(\\.)")
   {
@@ -47236,8 +47339,12 @@ BtnCopyMoveAction(dummy:=0) {
      folderu := Trimmer(folderu, ".")
      If (b := InStr(folderu, "; "))
         folderu := SubStr(folderu, b+2)
+
      If folderu
+     {
+        relativePath := "\" folderu
         folderu := OutDir "\" folderu
+     }
   } Else If RegExMatch(folderu, "^(\.\\.)")
   {
      ; move files to a given sibling folder
@@ -47247,14 +47354,17 @@ BtnCopyMoveAction(dummy:=0) {
      If (b := InStr(folderu, "; "))
         folderu := SubStr(folderu, b+2)
      If folderu
+     {
+        relativePath := ".\" folderu
         folderu := OutDir "\" folderu
+     }
   }
 
   folderu := StrReplace(folderu, "\\", "\")
   folderu := Trimmer(folderu, "\")
   folderu := Trimmer(folderu, ".")
   If (b := InStr(folderu, "; "))
-     folderu := SubStr(folderu, b+2)
+     folderu := SubStr(folderu, b + 2)
 
   wrongNames := 0
   testFolderu := SubStr(folderu, 4)
@@ -47267,7 +47377,7 @@ BtnCopyMoveAction(dummy:=0) {
   If (InStr(folderu, "[group-by-month-year]") || InStr(folderu, "[group-by-file-types]") || InStr(folderu, "[group-by-years]"))
      groupingMode := 1
 
-  If (!RegExMatch(folderu, "^(.\:\\.)") || wrongNames=1)
+  If (!RegExMatch(folderu, "^(.\:\\.)") && !relativePath || wrongNames=1)
   {
      showTOOLtip("WARNING: Incorrect file path given:`n" folderu)
      SoundBeep, 300, 100
@@ -47276,10 +47386,10 @@ BtnCopyMoveAction(dummy:=0) {
   }
 
   nullvara := askAboutFileCollision(0, 0, 1, 3, 0, nullvar)
-  If (FolderExist(folderu) || groupingMode=1)
+  If (FolderExist(folderu) || groupingMode=1 || relativePath)
   {
      Sleep, 2
-     r := QuickMoveFile2Dest(folderu, groupingMode, dummy)
+     r := QuickMoveFile2Dest(folderu, groupingMode, dummy, relativePath)
      dummyTimerDelayiedImageDisplay(50)
   } Else If (StrLen(folderu)>4)
   {
@@ -47345,14 +47455,14 @@ RecentCopyMoveManager(entry2add) {
   }
 }
 
-QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0) {
+QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
     If (slideShowRunning=1)
        ToggleSlideShowu()
  
     getSelectedFiles(0, 1)
     If (markedSelectFile>1)
     {
-       batchCopyMoveFile(finalDest, groupingMode, dummy)
+       batchCopyMoveFile(finalDest, groupingMode, dummy, relativePath)
        Return 0
     } 
 
@@ -47517,8 +47627,10 @@ determineCreateFileGroupFolder(oFinalDest, originalMtime, OutFileExt) {
    Return FinalDest
 }
 
-batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0) {
+batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
    Static lastInvoked := 1
+   ; Critical, off
+   ; Thread, Priority, -4100
    filesElected := getSelectedFiles(0, 1)
    If (filesElected>150) ; ((A_TickCount - lastInvoked > 29500) && dummy!="quick-actu")
    {
@@ -47550,6 +47662,18 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0) {
    If (SLDtypeLoaded=3)
       activeSQLdb.Exec("BEGIN TRANSACTION;")
 
+   If relativePath
+   {
+      relativeModePath := (SubStr(relativePath, 1, 2)=".\") ? 1 : 3
+      If (relativeModePath=1 && StrLen(relativePath)=2)
+         relativeModePath := 2
+      
+      relativeStringPath := (relativeModePath=1) ? SubStr(relativePath, 2) : relativePath
+      If (relativeModePath=2)
+         relativeStringPath := ""
+   }
+   setwhileLoopExec(1)
+   ; fnOutputDebug(groupingMode "|" relativeModePath "|" relativeStringPath "|" finalDest)
    Loop, % maxFilesIndex
    {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
@@ -47566,14 +47690,33 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0) {
          Continue
       }
 
-      If (OldOutDir=finalDest)
+      If relativeModePath
       {
-         skippedFiles++
-         Continue
+         parentu :=SubStr(OldOutDir, 1, InStr(OldOutDir, "\", 0, -1) - 1)
+         If (relativeModePath=1 || relativeModePath=2)
+            finalDest := parentu relativeStringPath
+         Else
+            finalDest := OldOutDir relativeStringPath
+
+         finalDest := StrReplace(finalDest, "\\", "\")
+         ftestu := (SubStr(finalDest, 2, 2)=":\") ? 1 : 0
+         If (groupingMode!=1 && ftestu=1)
+         {
+            If !FolderExist(finalDest)
+            {
+               FileCreateDir, % finalDest
+               Sleep, 2
+            }
+         }
+
+         ; fnOutputDebug(ftestu "|" groupingMode "|" relativeModePath "|" relativeStringPath "|" finalDest "|" parentu)
+         If (ftestu=0)
+         {
+            failedFiles++
+            Continue
+         } Else oFinalDest := finalDest
       }
 
-      FileGetTime, originalMtime, % file2rem, M
-      FileGetTime, originalCtime, % file2rem, C
       executingCanceableOperation := A_TickCount
       If (A_TickCount - prevMSGdisplay>2000)
       {
@@ -47587,10 +47730,24 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0) {
          prevMSGdisplay := A_TickCount
       }
 
-      ; grouper := ""
-      If (groupingMode=1)
-         finalDest := determineCreateFileGroupFolder(oFinalDest, originalMtime, OutFileExt)
+      If (OldOutDir=finalDest || !finalDest)
+      {
+         skippedFiles++
+         Continue
+      }
 
+      FileGetTime, originalMtime, % file2rem, M
+      If (groupingMode=1)
+      {
+         finalDest := determineCreateFileGroupFolder(oFinalDest, originalMtime, OutFileExt)
+         If (OldOutDir=finalDest || !finalDest)
+         {
+            skippedFiles++
+            Continue
+         }
+      }
+
+      FileGetTime, originalCtime, % file2rem, C
       file2save := finalDest "\" OldOutFileName
       thisFileExists := wasError := operationExecuted := 0
       If (FileExist(file2save) && !FolderExist(file2save))
@@ -47667,6 +47824,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0) {
       }
    }
 
+   setwhileLoopExec(0)
    someErrors := "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
    If (SLDtypeLoaded=3)
    {
@@ -47747,7 +47905,7 @@ batchConvert2format(modus:=0) {
    showTOOLtip(bonusInfo "Converting to ." rDesireWriteFMT " format " groupDigits(filesElected) " files, please wait")
    destroyGDIfileCache()
    backCurrentSLD := CurrentSLD
-   mustDoMultiCore := (allowMultiCoreMode=1 && systemCores>1 && filesPerCore>2) ? 1 : 0
+   mustDoMultiCore := (convertFormatUseMultiThreads=1 && systemCores>1 && filesPerCore>2) ? 1 : 0
    If (mustDoMultiCore=1 && modus!="pdf")
    {
       setPriorityThread(-2)
@@ -47813,9 +47971,9 @@ batchConvert2format(modus:=0) {
       countTFilez++
       zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
       destImgPath := (ResizeUseDestDir=1) ? ResizeDestFolder : OutDir
-      file2save := (modus="pdf") ?  destImgPath "\" thisFileIndex "." rDesireWriteFMT : destImgPath "\" OutNameNoExt "." rDesireWriteFMT
-
-      If RegExMatch(imgPath, "i)(.\.(" rDesireWriteFMT "))$")
+      file2save := (modus="pdf") ? destImgPath "\" thisFileIndex "." rDesireWriteFMT : destImgPath "\" OutNameNoExt "." rDesireWriteFMT
+      isSameFormat := RegExMatch(imgPath, "i)(.\.(" rDesireWriteFMT "))$") ? 1 : 0
+      If (isSameFormat=1 && convertFormatAutoSkip=1 && modus!="pdf")
       {
          If (ResizeUseDestDir=1)
          {
@@ -47826,7 +47984,6 @@ batchConvert2format(modus:=0) {
             {
                FileGetTime, originalMtime, % imgPath, M
                FileGetTime, originalCtime, % imgPath, C
-
                If (OnConvertKeepOriginals=1)
                   FileCopy, % imgPath, % file2save, 1
                Else
@@ -47858,13 +48015,20 @@ batchConvert2format(modus:=0) {
          }
       }
 
+      of := file2save
       If (FileExist(file2save) && !FolderExist(file2save) && modus!="pdf")
          file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
 
       If !file2save
       {
-         skippedFiles++
-         Continue
+         If (ResizeUseDestDir!=1 && convertFormatAutoSkip=0 && isSameFormat=1)
+         {
+            file2save := of
+         } Else
+         {
+            skippedFiles++
+            Continue
+         }
       }
 
       changeMcursor()
@@ -47874,7 +48038,7 @@ batchConvert2format(modus:=0) {
       Else
          filesConverted++
 
-      If (OnConvertKeepOriginals=0 && !r && modus!="pdf")
+      If (OnConvertKeepOriginals=0 && !r && modus!="pdf" && imgPath!=file2save)
       {
          FileSetAttrib, -R, % imgPath
          Sleep, 2
@@ -48046,7 +48210,7 @@ convert2format(givenIndex) {
      ToggleSlideShowu()
 
   file2rem := getIDimage(givenIndex)
-  If RegExMatch(file2rem, "i)(.\.(" rDesireWriteFMT "))$")
+  If (RegExMatch(file2rem, "i)(.\.(" rDesireWriteFMT "))$") && convertFormatAutoSkip=1)
   {
      SoundBeep, 300, 100
      msgBoxWrapper(appTitle ": WARNING", "The image file seems to be already in the given file format: ." rDesireWriteFMT ". Please choose another format.", 0, 0, "exclamation")
@@ -48057,7 +48221,7 @@ convert2format(givenIndex) {
   zPlitPath(file2rem, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
   destImgPath := (ResizeUseDestDir=1) ? ResizeDestFolder : OutDir
   file2save := destImgPath "\" OutNameNoExt "." rDesireWriteFMT
-  If FileExist(file2save)
+  If (FileExist(file2save) && convertFormatAutoSkip=1)
   {
      ToolTip
      zPlitPath(file2save, 0, OutFileName, OutDir)
@@ -48097,7 +48261,7 @@ convert2format(givenIndex) {
      showTOOLtip("File converted succesfully to ." rDesireWriteFMT "`n" OutNameNoExt "." rDesireWriteFMT "`n" destImgPath "\" friendly)
 
   SoundBeep, % r ? 300 : 900, 100
-  If (OnConvertKeepOriginals!=1 && !r)
+  If (OnConvertKeepOriginals!=1 && !r && file2rem!=file2save)
   {
      currentFilesListModified := 1
      Try FileSetAttrib, -R, %file2rem%
@@ -72324,7 +72488,7 @@ coreColorsAdjusterWindow(modus:=0) {
           Gui, Add, Button, x+5 wp hp gBtnOpenPanelAdjustToneMapping, &HDR tone-mapping
     } Else
     {
-       GuiAddSlider("EraseAreaOpacity", 3,255, 355, "Image opacity", "UpdateUIadjustVPcolors", 1, "xs y+10 w" slide3wid " hp")
+       GuiAddSlider("EraseAreaOpacity", 3,255, 255, "Image opacity", "UpdateUIadjustVPcolors", 1, "xs y+10 w" slide3wid " hp")
        Gui, Add, Checkbox, x+5 wp+5 hp -wrap Checked%EraseAreaInvert% vEraseAreaInvert gUpdateUIadjustVPcolors, &Invert selection area
     }
 
@@ -72801,14 +72965,21 @@ PanelFileFormatConverter() {
     thisW := (PrefsLargeFonts=1) ? 85 : 75
     initFIMGmodule()
     ReadSettingsFormatConvert()
+    convertFormatAutoSkip := 1
     Gui, Add, Text, x15 y15 w%sml% Section +0x200 +hwndhTemp, Destination format:
     GuiAddDropDownList("x+5 w" thisW " gTglDesiredSaveFormat AltSubmit Choose" userDesireWriteFMT " vuserDesireWriteFMT", userPossibleWriteFMTs, [hTemp])
+    Gui, Add, Checkbox, x+5 Checked%convertFormatAutoSkip% vconvertFormatAutoSkip +hwndhTemp, Auto-skip format
+    ToolTip2ctrl(hTemp, "The files with the selected file destination extension format will be skipped when this option is selected.")
     Gui, Add, Text, xs y+10 w%sml% hp +0x200 +hwndhTemp, On file name conflicts:
     GuiAddDropDownList("x+5 w150 AltSubmit gTglOverwriteFiles Choose" userActionConflictingFile " vuserActionConflictingFile", "Skip files|Auto-rename|Overwrite", [hTemp])
     Gui, Add, Text, xs y+10 w%sml% hp +0x200, Image quality (1`% - 100`%):
     GuiAddEdit("x+5 w" thisW " hp number -multi limit3 veditF5", userJpegQuality)
     Gui, Add, UpDown, vuserJpegQuality Range1-100, % userJpegQuality
-    Gui, Add, Checkbox, xs y+10 gTglKeepOriginals Checked%OnConvertKeepOriginals% vOnConvertKeepOriginals, &Keep original file[s]
+    Gui, Add, Checkbox, xs y+10 Checked%convertFormatUseMultiThreads% vconvertFormatUseMultiThreads, &Use multiple threads (experimental)
+    If !(filesElected>1)
+       GuiControl, SettingsGUIA: Disable, convertFormatUseMultiThreads
+
+    Gui, Add, Checkbox, y+10 gTglKeepOriginals Checked%OnConvertKeepOriginals% vOnConvertKeepOriginals, &Keep original file[s]
     Gui, Add, Checkbox, y+10 Checked%PreserveDateTimeOnSave% vPreserveDateTimeOnSave, &Preserve original file date and time
     Gui, Add, Checkbox, y+10 gTglRszDestFoldr Checked%ResizeUseDestDir% vResizeUseDestDir, Save file[s] in the specified destination folder:
     GuiAddEdit("xp+10 y+5 wp r1 +0x0800 -wrap vResizeDestFolder", ResizeDestFolder, "Destination folder")
@@ -72881,6 +73052,8 @@ BTNconvertImgFmtNow(modus:=0) {
    RegAction(1, "PreserveDateTimeOnSave")
    RegAction(1, "ResizeDestFolder")
    RegAction(1, "userActionConflictingFile")
+   RegAction(1, "convertFormatUseMultiThreads")
+   RegAction(1, "convertFormatAutoSkip")
    RegAction(1, "userDesireWriteFMT")
    RegAction(1, "userJpegQuality")
    performImgFmtConvert(modus)
@@ -72953,7 +73126,7 @@ PanelAdjustImageCanvasSize() {
     Gui, Add, Text, xs y+15, Resulted dimensions and background color:
     GuiAddEdit("xs+15 y+5 w" editWid " r1 Disabled -wrap vResultEditWidth", oImgW, "Calculated width")
     GuiAddEdit("x+5 wp r1 Disabled -wrap vResultEditHeight", oImgH, "Calculated height")
-    GuiAddColor("x+5 wp hp", "OutlierFillColor")
+    GuiAddColor("x+5 wp hp", "OutlierFillColor", "Canvas background color")
     GuiAddPickerColor("x+5 hp w25", "OutlierFillColor")
 
     sml := (PrefsLargeFonts=1) ? 140 : 80
@@ -78760,9 +78933,12 @@ PanelSimpleResizeRotate(modus:="") {
     ml := (PrefsLargeFonts=1) ? 152 : 93
     Gui, Add, Text, xs y+10 hp +0x200 +hwndhTemp, Action on file name conflicts:
     GuiAddDropDownList("xs y+5 wp-15 gTglOverwriteFiles AltSubmit Choose" userActionConflictingFile " vuserActionConflictingFile", "Skip files|Auto-rename|Overwrite", [hTemp])
-
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
     GuiAddSlider("userJpegQuality", 2,100, 95, "Quality on save", "iniSaveJPGquality", 1, "x+5 wp-15 hp", "This only applies to the JPEG and WEBP file formats")
+    Gui, Add, Checkbox, xs y+15 Checked%convertFormatUseMultiThreads% vconvertFormatUseMultiThreads, Use multiple threads for processing (experimental)
+    If !(filesElected>1)
+       GuiControl, SettingsGUIA: Disable, convertFormatUseMultiThreads
+
     If !ResizeUseDestDir
     {
        GuiControl, Disable, btnFldr
@@ -78839,9 +79015,11 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="") {
        GuiControlGet, ResizeUseDestDir, SettingsGUIA:, ResizeUseDestDir
        GuiControlGet, ResizeInPercentage, SettingsGUIA:, ResizeInPercentage
        GuiControlGet, userActionConflictingFile, SettingsGUIA:, userActionConflictingFile
+       GuiControlGet, convertFormatUseMultiThreads, SettingsGUIA:, convertFormatUseMultiThreads
 
        userJpegQuality := clampInRange(userJpegQuality, 1, 100)
        RegAction(1, "userJpegQuality")
+       RegAction(1, "convertFormatUseMultiThreads")
        cleanResizeUserOptionsVars()
        If (ResizeMustPerform=0 && SimpleOperationsRotateAngle=1 && SimpleOperationsFlipV=0 && SimpleOperationsFlipH=0 && SimpleOperationsDoCrop=0)
        {
@@ -79006,7 +79184,6 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor) {
    backCurrentSLD := CurrentSLD
    setImageLoading()
    showTOOLtip("Processing " filesElected " images, please wait")
-
    filesPerCore := filesElected//realSystemCores
    If (filesPerCore<2 && realSystemCores>1)
    {
@@ -79015,7 +79192,7 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor) {
    } Else systemCores := realSystemCores
 
    destroyGDIfileCache()
-   mustDoMultiCore := (allowMultiCoreMode=1 && systemCores>1 && filesPerCore>2) ? 1 : 0
+   mustDoMultiCore := (convertFormatUseMultiThreads=1 && systemCores>1 && filesPerCore>2) ? 1 : 0
    If (!FolderExist(ResizeDestFolder) && ResizeUseDestDir=1)
       FileCreateDir, % ResizeDestFolder
 
@@ -79887,6 +80064,22 @@ dummyDecideWinReactivation() {
 
 WM_LBUTTONup(wP, lP, msg, hwnd) {
     thisWin := WinActive("A")
+    If (MsgBox2hwnd=thisWin && MsgBox2Result="wait-ask")
+    {
+       Gui, WinMsgBox: Default
+       MouseGetPos, ,,, OutputVarControl, 2
+       GuiControlGet, btnFocused, WinMsgBox: FocusV
+       GuiControlGet, hwnd, hwnd, %btnFocused%
+       ControlGetText, btnText, , ahk_id %hwnd%
+       ; ToolTip, % A_GuiControl "|" btnFocused "|" btnText "|" hwnd "|" OutputVarControl , , , 3
+       If (hwnd!=OutputVarControl || InStr(btnFocused, "checkbox") || InStr(A_GuiControl, "checkbox"))
+          Return
+
+       MsgBox2Result := btnFocused && btnText ? btnText : "close"
+       MsgBox2InputHook.Stop()
+       Return
+    }
+
     colorPickerMustEnd := 1
     If (thisWin=hSetWinGui && AnyWindowOpen)
     {
@@ -84613,7 +84806,7 @@ testus() {
    }
    Sleep, 150
    ; SendInput, ^{F4}
-   SendInput, {Esc}
+   ; SendInput, {Esc}
    Sleep, 50
    SendInput, {Right}
    Sleep, 50

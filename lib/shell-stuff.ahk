@@ -2155,7 +2155,7 @@ GetComboBoxInfo(hwnd) {
 GetWindowFromPos(X, Y, DetectHidden := 0) {
    ; by just me https://www.autohotkey.com/boards/viewtopic.php?p=80118
    ; CWP_ALL = 0x0000, CWP_SKIPINVISIBLE = 0x0001
-   Return DllCall("ChildWindowFromPointEx", "Ptr", DllCall("GetDesktopWindow", "UPtr")
+   Return DllCall("ChildWindowFromPointEx", "UPtr", DllCall("GetDesktopWindow", "UPtr")
                                           , "Int64", (X & 0xFFFFFFFF) | ((Y & 0xFFFFFFFF) << 32)
                                           , "UInt", !DetectHidden, "UPtr")
 }
@@ -2754,7 +2754,7 @@ Edit_ShowBalloonTip(hEdit, Text, Title := "", Icon := 0) {
 
 SetWindowRegion(hwnd, x:=0, y:=0, w:=0, h:=0, r:=1) {
   hR1 := DllCall("gdi32\CreateRoundRectRgn", "Int", x, "Int", y, "Int", w, "Int", h, "Int", r, "Int", r, "Ptr")
-  Result := DllCall("user32\SetWindowRgn", "Ptr", hwnd, "Ptr", hR1, "UInt", 1)
+  Result := DllCall("user32\SetWindowRgn", "UPtr", hwnd, "UPtr", hR1, "UInt", 1)
   DllCall("gdi32\DeleteObject", "Ptr", hR1)
   Return Result
 }

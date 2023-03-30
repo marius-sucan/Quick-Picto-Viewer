@@ -170,6 +170,8 @@
 
 <li>Dark mode for the user interface.</li>
 
+<li>User interface compatible with screen readers, e.g., Windows Narrator. </li>
+
 <li>Ambiental textured window background. Automatically generated background based on the currently displayed image.</li>
 
 <li>Various modes to adapt images to window.</li>

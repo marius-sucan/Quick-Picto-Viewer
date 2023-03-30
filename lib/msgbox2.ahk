@@ -54,7 +54,7 @@
    ; - 2ndDropListu
    ; - 2ndDropListMode
 
-Global MsgBox2InputHook, MsgBox2Result, MsgBox2hwnd
+Global MsgBox2InputHook, MsgBox2Result, MsgBox2hwnd, lastMsgBox2win := []
 
 MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=0, fontSize:=0, modalHwnd:="", ownerHwnd:="", checkBoxCaption:="", checkBoxState:=0, dropListu:="", editOptions:="", editDefaultLine:="", DropListMode:=0, setWidth:=0, 2ndDropListu:=0, 2ndDropListMode:=0) {
   Global UsrCheckBoxu, 2ndDropListuChoice, DropListuChoice, EditUserMsg, prompt, BoxIcon
@@ -438,7 +438,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
 
   Critical, off
   SetTimer, WatchMsgBox2Win, 300
-
+  lastMsgBox2win := [modalHwnd, thisHwnd]
   Gui, WinMsgBox: Default
   MsgBox2InputHook := InputHook("V") ; "V" for not blocking input
   MsgBox2InputHook.KeyOpt("{BackSpace}{Delete}{PgUp}{PgDn}{Enter}{Escape}{F4}{NumpadEnter}","N")
@@ -476,17 +476,25 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
 }
 
 KillMsgbox2Win() {
-     MsgBox2Result := "win_closed"
-     MsgBox2InputHook.Stop()
+   modalHwnd := lastMsgBox2win[1]
+   If modalHwnd
+      WinSet, Enable,, ahk_id %modalHwnd%
+
+   thisHwnd := lastMsgBox2win[2]
+   If (thisHwnd && thisHwnd!="mouse")
+      WinActivate, ahk_id %thisHwnd%
+
+   ; ToolTip, % modalHwnd "|" thisHwnd , , , 2
+   MsgBox2Result := "win_closed"
+   MsgBox2InputHook.Stop()
 }
 
 CloseMsgBox2Win() {
   hwnd := WinActive("A")
   If (hwnd!=MsgBox2hwnd)
   {
-     MsgBox2Result := "win_closed"
-     MsgBox2InputHook.Stop()
-     SetTimer, , Off
+     KillMsgbox2Win()
+     SetTimer, CloseMsgBox2Win, Off
   }
 }
 
