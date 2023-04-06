@@ -2,6 +2,9 @@
 // by Marius Șucan (http://marius.sucan.ro)
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.9.2 (2023-04-06)
+  - various bug fixes related to dupes detection
+
 - v5.9.1 (2023-03-30)
   - [new] users can enable multi-threaded processing for file format conversions
   - file format converter has an option to prevent it from skipping the files with the extension of the destination format

@@ -32,7 +32,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , runningLongOperation := 0, alterFilesIndex := 0, animGIFplaying := 0, prevOpenedFile := 0
      , canCancelImageLoad := 0, hGDIinfosWin, hGDIselectWin, hasAdvancedSlide := 1
      , imgEditPanelOpened := 0, showMainMenuBar := 1, undoLevelsRecorded := 0, UserMemBMP := 0
-     , taskBarUI, hSetWinGui, panelWinCollapsed, groppedFiles, tempBtnVisible := "null"
+     , taskBarUI, hSetWinGui, panelWinCollapsed, groppedFiles := [], tempBtnVisible := "null"
      , userAllowWindowDrag := 0, drawingShapeNow := 0, isAlwaysOnTop, lastMenuBarUpdate := 1
      , mainWinPos := 0, mainWinMaximized := 1, mainWinSize := 0, PrevGuiSizeEvent := 0, FontBolded := 1
      , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0
@@ -68,6 +68,9 @@ OnMessage(0x047, "WM_WINDOWPOSCHANGED") ; window moving
 OnMessage(0x20A, "WM_MOUSEWHEEL")
 OnMessage(0x20E, "WM_MOUSEWHEEL")
 ; OnMessage(0x24B, "WM_POINTERACTIVATE") 
+; OnMessage(0x0246, "WM_POINTERDOWN") 
+; OnMessage(0x0249, "WM_POINTERENTER") 
+; OnMessage(0x239, "WM_POINTERDEVICEINRANGE") 
 ; OnMessage(0x216, "WM_MOVING") ; window moving
 
 Loop, 9
@@ -1095,8 +1098,20 @@ theSlideShowCore(paramu:=0) {
   hasAdvancedSlide := 1
 }
 
+WM_POINTERENTER() {
+  SoundBeep 900, 100
+}
+WM_POINTERDEVICEINRANGE() {
+  SoundBeep 900, 100
+}
+
+WM_POINTERDOWN() {
+  SoundBeep 300, 100
+}
+
 WM_POINTERACTIVATE() {
   ; unused
+  SoundBeep , 500, 100
     ; MouseGetPos, , , OutputVarWin
     GetMouseCoord2wind(PVhwnd, mX, mY, mXo, mYo)
     canCancelImageLoad := 4
@@ -1462,14 +1477,14 @@ GuiSize(GuiHwnd, EventInfo, Width, Height) {
 
 GuiDropFiles(GuiHwnd, FileArray, CtrlHwnd, X, Y) {
    Static lastInvoked := 1
-   If (AnyWindowOpen>0 || mustCaptureCloneBrush=1 || whileLoopExec=1 || drawingShapeNow=1 || imageLoading=1 || runningLongOperation=1 || groppedFiles) || (A_TickCount - lastInvoked<300)
+   If (AnyWindowOpen>0 || mustCaptureCloneBrush=1 || whileLoopExec=1 || drawingShapeNow=1 || imageLoading=1 || runningLongOperation=1 || groppedFiles.Count()>0) || (A_TickCount - lastInvoked<300)
       Return
 
    lastInvoked := A_TickCount
    GuiHwnd := Format("{1:#x}", GuiHwnd)
    ; ToolTip, % GuiHwnd "`n" PVhwnd "`n" hGDIwin "`n" hGDIthumbsWin "`n" hGDIselectWin "`n" hGDIinfosWin, , , 2
    For i, file in FileArray
-          groppedFiles .= file "`n"
+       groppedFiles[A_Index] := Trimmer(file)
 
    SetTimer, dummyTimerProccessDroppedFiles, -200
    lastInvoked := A_TickCount
@@ -1487,8 +1502,8 @@ Trimmer(string, whatTrim:="") {
 
 dummyTimerProccessDroppedFiles() {
    Static lastInvoked := 1
-   groppedFiles := Trimmer(groppedFiles)
-   If (!groppedFiles || (A_TickCount - lastInvoked<400))
+   totalGroppy := groppedFiles.Count()
+   If (!totalGroppy || (A_TickCount - lastInvoked<400))
       Return
 
    isCtrlDown := GetKeyState("Ctrl", "P")
@@ -1496,25 +1511,31 @@ dummyTimerProccessDroppedFiles() {
    vectorShape := imgFiles := foldersList := sldFile := ""
    turnOffSlideshow()
    canCancelImageLoad := 4
-   countFiles := 0
-   Loop, Parse, groppedFiles, `n,`r
+   countD := countV := countF := countFiles := 0
+   Loop, % totalGroppy
    {
       changeMcursor("busy")
-      ToolTip, % Please wait - processing dropped files list , , , 2
-      line := Trimmer(A_LoopField)
+      ToolTip, Please wait - processing dropped files list , , , 2
+      line := groppedFiles[A_Index]
+      If !line
+         Continue
+
       ; MsgBox, % A_LoopField
-      If (A_Index>9900)
+      If (A_Index>29900)
       {
          Break
       } Else If RegExMatch(line, "i)(.\.sld|.\.sldb)$")
       {
-         sldFile := line
-         Break
+         countD++
+         If !sldFile
+            sldFile := line
       } Else If RegExMatch(line, "i)(.\.vqpv)$")
       {
+         countV++
          vectorShape := line
       } Else If InStr(FileExist(line), "D")
       {
+         countF++
          foldersList .= line "`n"
       } Else If RegExMatch(line, RegExFilesPattern)
       {
@@ -1522,13 +1543,18 @@ dummyTimerProccessDroppedFiles() {
          imgFiles .= line "`n"
       }
    }
+
+   If (countFiles>1 || countF>1)
+      sldFile := ""
+
    ToolTip, , , , 2
    If !isCtrlDown
       isCtrlDown := GetKeyState("Ctrl", "P")
    If (!imgFiles && !sldFile && vectorShape)
       sldFile := vectorShape
+
+   groppedFiles := []
    MainExe.ahkPostFunction("GuiDroppedFiles", imgFiles, foldersList, sldFile, countFiles, isCtrlDown)
-   groppedFiles := ""
    lastInvoked := A_TickCount
 }
 

@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.9.1
+;@Ahk2Exe-SetVersion 5.9.2
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2023)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -213,7 +213,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , userImgChannelRlvl, userImgChannelGlvl, userImgChannelBlvl, userImgChannelAlvl, combosDarkModus := ""
    , sillySeparator :=  "▪", menuCustomNames := new hashtable(), clrGradientCoffX := 0, clrGradientCoffY := 0
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.9.1", vReleaseDate := "2023/03/30" ; yyyy-mm-dd
+   , appVersion := "5.9.2", vReleaseDate := "2023/04/06" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -25993,6 +25993,8 @@ remCurrentEntry(silentus:=0, whichIndex:=0) {
 
 addSQLdbEntry(fileNamu, imgPath, fileSizu, fileMdate, fileCdate, simple:=0, factCheck:=1) {
    Static prevIDu := 0
+   fileNamu := Format("{:L}", fileNamu)
+   imgPath := Format("{:L}", imgPath)
    fileMdate := SubStr(fileMdate, 1, 12)
    fileCdate := SubStr(fileCdate, 1, 12)
    If (simple=1)
@@ -26143,6 +26145,7 @@ updateSQLdbEntryImgHisto(fullPath, obju, imgResu, fileInfos, dbIndex, indexu:=0)
 }
 
 updateSQLdbEntryCaption(imgPath, txtData, whatSet) {
+   imgPath := Format("{:L}", imgPath)
    activeSQLdb.EscapeStr(imgPath)
    activeSQLdb.EscapeStr(txtData)
    SQLstr := "INSERT INTO imagesData (imgfile) VALUES (" imgPath ");"
@@ -27838,7 +27841,10 @@ extractSQLqueryFromFilter() {
 
 PanelStateOFsqlNation(){
    If AnyWindowOpen
+   {
+      zz := AnyWindowOpen
       BtnCloseWindow()
+   }
 
    backCurrentSLD := CurrentSLD
    CurrentSLD := ""
@@ -27892,7 +27898,12 @@ PanelStateOFsqlNation(){
    widthu := (PrefsLargeFonts=1) ? 1150 : 660
    msgResult := msgBoxWrapper("Database overview: " appTitle, "This is an overview of how much data was collected pertaining to the indexed files.`n`n" msgu, "&Back|C&lose", 1, 0, 0, 0, "", "", 0, 0, widthu)
    If InStr(msgResult, "back")
-      PanelWrapperFilesStats()
+   {
+      If (zz=58)
+         PanelWrapperFilesStats()
+      Else If (zz=49)
+         PanelFindDupes()
+   }
 }
 
 collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu:=0, mustNotHave:=0, strPosu:=0, whatu:=0) {
@@ -49373,7 +49384,7 @@ addDynamicFolderSQLdb(whichFolder, renewList, whichTable) {
     If (renewList=1)
        activeSQLdb.Exec("DELETE FROM dynamicfolders;")
 
-    folderu := StrReplace(whichFolder, "|")
+    folderu := Format("{:L}", StrReplace(whichFolder, "|"))
     If !FolderExist(folderu)
        Return
 
@@ -49395,6 +49406,7 @@ addStaticFolderSQLdb(whichFolder, fileMdate, renewList) {
     If (renewList=1)
        activeSQLdb.Exec("DELETE FROM staticfolders;")
 
+    whichFolder := Format("{:L}", whichFolder)
     SQLstr := "INSERT INTO staticfolders (imgfolder, fmodified) VALUES ('" whichFolder "', '" fileMdate "');"
     If !activeSQLdb.Exec(SQLStr)
     {
@@ -50620,7 +50632,13 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
 
       DynamicFoldersList := cleanDynamicFoldersList(newListu)
       If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
+      {
          recreateDynaFoldersSQLdbList(DynamicFoldersList)
+         thisIndex := currentFileIndex
+         OpenSLD(CurrentSLD, 1)
+         currentFileIndex := clampInRange(thisIndex, 1, maxFilesIndex)
+         hasReopened := 1
+      }
 
       If (stuffAdded=1)
       {
@@ -50646,9 +50664,12 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
       SetTimer, ResetImgLoadStatus, -50
       SoundBeep, 900, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
-      SetTimer, createGUItoolbar, -100
-      TriggerMenuBarUpdate()
-      currentFileIndex := maxFilesIndex - 1
+      If (hasReopened!=1)
+      {
+         SetTimer, createGUItoolbar, -100
+         TriggerMenuBarUpdate()
+         currentFileIndex := maxFilesIndex - 1
+      }
       dummyTimerDelayiedImageDisplay(10)
    } Else If (imgsListu && countFiles=1 && !CurrentSLD)
    {
@@ -70022,12 +70043,16 @@ keepSelectedDupeInGroup() {
 autoSelectDupesInGroups(mode, givenRegEx:=0) {
    ; dropFilesSelection(1)
    theArray := []
+   megaCheck := new hashtable()
    ; ToolTip, % mode "==" givenRegEx , , , 2
    Loop, % maxFilesIndex
    {
       If (grpID := resultedFilesList[A_Index, 23])
       {
-         countPerGroup%grpID%++
+         p := Format("{:L}", resultedFilesList[A_Index, 1])
+         If !megaCheck[p]
+            countPerGroup%grpID%++
+         megaCheck[p] := Round(megaCheck[p]) + 1
          fs := resultedFilesList[A_Index, 6]
          mgpx := Round(resultedFilesList[A_Index, 17], 4)
          If (fs>theArray[grpID, 1, 1])
@@ -70160,6 +70185,7 @@ autoSelectDupesInGroups(mode, givenRegEx:=0) {
       }
    }
 
+   megaCheck := ""
    lastZeitFileSelect := A_TickCount
    getSelectedFiles(0, 1)
    ForceRefreshNowThumbsList()
@@ -71398,6 +71424,7 @@ PanelFindDupes(dummy:=0) {
     Gui, Add, UpDown, vgraylevelCompressor gupdateUIdupesPanel Range1-9, % graylevelCompressor
     Gui, Add, Button, xs y+15 h%thisBtnHeight% gBtnPurgeCachedSQLdata, Pur&ge cached data
     Gui, Add, Button, x+5 hp gBtnCollectDupesData, Collect image pi&xels data
+    Gui, Add, Button, x+5 hp gPanelStateOFsqlNation, &Overview
 
     Gui, Tab, 4
     Gui, Add, Text, x+15 y+15 Section, Filter the results and data collection with a given string:
@@ -76635,7 +76662,7 @@ remFilesFromList(SelectedDir, silentus:=0, forReal:=1) {
 
     If (SLDtypeLoaded=3)
     {
-       thisR := SQLescapeStr(SelectedDir, 1)
+       thisR := Format("{:L}", SQLescapeStr(SelectedDir, 1))
        thisR := (isPipe=1) ? thisR : thisR "%"
        If (forReal=1)
        {
@@ -84779,6 +84806,7 @@ RGBtoHEXandBack(clr) {
 
 testus() {
 
+   WinGetActiveTitle, titlu
    Sleep, 90
    SendInput, {LButton}
    Sleep, 350
@@ -84792,6 +84820,9 @@ testus() {
    allowa := 1
    Loop
    {
+      p := GetKeyState("CapsLock", "T")
+      If !p
+         Break
       SoundBeep , 500, 100
       WinGetActiveTitle, OutputVar
       If InStr(outputvar, "confirmer")
@@ -84809,8 +84840,15 @@ testus() {
    ; SendInput, {Esc}
    Sleep, 50
    SendInput, {Right}
-   Sleep, 50
+   ; Sleep, 50
+   ; Sleep, 480
+   ; WinGetActiveTitle, newTitle
+   ; p := GetKeyState("CapsLock", "T")
+   ; If (titlu!=newTitle && p)
+   ;    SetTimer, testus, -150
+   ; ToolTip, % P "||" titlu "||" newTitle , , , 2
 }
+
 
 ; #If, GetKeyState("CapsLock", "T")
 ;    \::
