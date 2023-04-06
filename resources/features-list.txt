@@ -3,8 +3,6 @@
 
 * Options to control viewport brightness, contrast, saturation and RGB color channels balance/intensity.
 
-* Adaptive auto-adjustment of brightness, contrast and saturation of displayed images.
-
 * Images can be rotated or mirrored horizontally and vertically in the viewport.
 
 * Paint brushes: soft edges, cloner, eraser, pinch, bulge, smudge and more:
@@ -44,7 +42,9 @@
 
 * Copy / paste image to / from clipboard with the alpha channel preserved. 
 
-* Print image. Users can add text, adjust size and position on the page before printing. 
+* Print image. Users can add text, adjust size and position on the page before printing.
+
+* Batch printing of multiple images.
 
 * Acquire images from scanners.
 
@@ -126,9 +126,9 @@ GENERAL / USER INTERFACE:
 
 * Adjustable user interface font sizes and colors.
 
-* Customizable keyboard shortcuts and toolbar icons
-
 * Dark mode for the user interface.
+
+* Customizable keyboard shortcuts and toolbar icons
 
 * Ambiental textured window background. Automatically generated background based on the currently displayed image.
 
@@ -136,11 +136,9 @@ GENERAL / USER INTERFACE:
 
 * Vertical or horizontal toolbar. Toolbar size adjustable.
 
-* Slideshows, easy to change speed while running: random order, backwards or forwards. 
+* Slideshows modes: random order, backwards or forwards. 
 
 * Slideshow random modes: with a bias for the first or second half of the files list, or no explicit bias.
-
-* Ability to set the slideshow duration.
 
 * Option to set background music for the entire slideshow.
 
@@ -151,8 +149,6 @@ GENERAL / USER INTERFACE:
 * Support for animated .WEBP and .GIFs in slideshows - HD GIFs are support as well.
 
 * Support for multi-paged .WEBP, .TIFFs and .GIF frames. Ability to go through each image frame/page.
-
-* Screen readers compatible. All the messages displayed in the viewport can be read through screen readers as well.
 
 * Private mode. In this mode, images are blurred, and file names and paths are hidden.
 

@@ -39,8 +39,6 @@
 <ul>
 <li>Options to control viewport brightness, contrast, saturation and RGB color channels balance/intensity.</li>
 
-<li>Adaptive auto-adjustment of brightness, contrast and saturation of displayed images.</li>
-
 <li>Images can be rotated or mirrored horizontally and vertically in the viewport.</li>
 
 <li>Paint brushes: soft edges, cloner, eraser, pinch, bulge, smudge and more:</li>
@@ -85,6 +83,8 @@
 <li>Copy / paste image to/ from clipboard with the alpha channel preserved.</li>
 
 <li>Print image. Users can add text, adjust size and position on the page before printing.</li>
+
+<li>Batch printing of multiple images.</li>
 
 <li>Acquire images from scanners.</li>
 
@@ -160,17 +160,16 @@
 
 <h2>GENERAL / USER INTERFACE</h2>
 <ul>
+
 <li>Support for 85 image file formats, including various Camera RAW formats.</li>
 
 <li>Touch screen friendly user interface: swipe gestures and hot-areas to navigate or zoom into images.</li>
 
 <li>Adjustable user interface font sizes and colors.</li>
 
-<li>Customizable keyboard shortcuts and toolbar icons.</li>
-
 <li>Dark mode for the user interface.</li>
 
-<li>User interface compatible with screen readers, e.g., Windows Narrator. </li>
+<li>Customizable keyboard shortcuts and toolbar icons</li>
 
 <li>Ambiental textured window background. Automatically generated background based on the currently displayed image.</li>
 
@@ -178,9 +177,7 @@
 
 <li>Vertical or horizontal toolbar. Toolbar size adjustable.</li>
 
-<li>Slideshows, easy to change speed while running: random order, backwards or forwards.</li>
-
-<li>Ability to set the slideshow duration.</li>
+<li>Slideshows modes: random order, backwards or forwards. </li>
 
 <li>Slideshow random modes: with a bias for the first or second half of the files list, or no explicit bias.</li>
 
@@ -194,11 +191,11 @@
 
 <li>Support for multi-paged .WEBP, .TIFFs and .GIF frames. Ability to go through each image frame/page.</li>
 
-<li>Screen readers compatible. All the messages displayed in the viewport can be read through screen readers as well.</li>
-
 <li>Private mode. In this mode, images are blurred, and file names and paths are hidden.</li>
 
 <li>Multi-monitor support.</li>
+ 
+<li>User interface compatible with Windows Narrator and other screen readers.</li>
 
 <li>Fancy welcome screen random-generated images :-).</li>
 
