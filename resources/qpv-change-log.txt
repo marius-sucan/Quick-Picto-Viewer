@@ -1,6 +1,13 @@
 ﻿// Quick Picto Viewer - CHANGELOG
-// by Marius Șucan (http://marius.sucan.ro)
+// by Marius Șucan ( https://marius.sucan.ro )
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
+
+- v5.9.3 (2023-04-24)
+  - [new] users can now paint or define the alpha mask in real time when using the image color adjustments tool
+  - it is now possible to draw with a brush of 1px in size
+  - ellipse and pie chart objects now share their center of rotation
+  - fill shape and fill behind should now fill the ENTIRE canvas when the canvas is entirely selected with a rectangular selection
+  - folder tree panel and menus search panel are no longer relying on -DPIscale; this renders the panels monitor DPI scale dependent
 
 - v5.9.2 (2023-04-06)
   - various bug fixes related to dupes detection

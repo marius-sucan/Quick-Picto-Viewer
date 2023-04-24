@@ -240,6 +240,7 @@ Class ImageButton {
             , "UInt", 0x26200A, "UPtr", 0, "UPtr*", PBITMAP)
       If !(This.Bitmap := PBITMAP)
          Return This.SetError("Couldn't create the GDI+ bitmap!")
+
       ; Get the pointer to its graphics
       PGRAPHICS := 0
       DllCall("Gdiplus.dll\GdipGetImageGraphicsContext", "UPtr", PBITMAP, "UPtr*", PGRAPHICS)

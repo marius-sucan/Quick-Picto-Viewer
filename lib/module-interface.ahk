@@ -1512,10 +1512,10 @@ dummyTimerProccessDroppedFiles() {
    turnOffSlideshow()
    canCancelImageLoad := 4
    countD := countV := countF := countFiles := 0
+   ToolTip, Please wait - processing dropped files list , , , 2
    Loop, % totalGroppy
    {
       changeMcursor("busy")
-      ToolTip, Please wait - processing dropped files list , , , 2
       line := groppedFiles[A_Index]
       If !line
          Continue

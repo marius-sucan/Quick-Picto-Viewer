@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.9.2
+;@Ahk2Exe-SetVersion 5.9.3
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2023)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -213,7 +213,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , userImgChannelRlvl, userImgChannelGlvl, userImgChannelBlvl, userImgChannelAlvl, combosDarkModus := ""
    , sillySeparator :=  "▪", menuCustomNames := new hashtable(), clrGradientCoffX := 0, clrGradientCoffY := 0
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.9.2", vReleaseDate := "2023/04/06" ; yyyy-mm-dd
+   , appVersion := "5.9.3", vReleaseDate := "2023/04/24" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -3744,6 +3744,7 @@ dummyViewAlphaMaskNow() {
       opa := BrushToolOutsideSelection
       editingSelectionNow := BrushToolOutsideSelection := 1
    }
+
    SkeletDrawSelectionBox(1)
    Gdip_ResetWorldTransform(2NDglPG)
    If (restoreThis=1)
@@ -12208,7 +12209,7 @@ generateAlphaMaskBitmap(clipBMP, previewMode, offX:=0, offY:=0, offW:=0, offH:=0
     ; fnOutputDebug(A_ThisFunc "(): refBMP=" alphaMaskRefBMP " | transformTool=" transformTool " | " thisAlphaFile)
     sizeIDu := sizeIDu ? sizeIDu : "a" rImgW rImgH
     externBMP := (alphaMaskingMode=5 && StrLen(thisAlphaFile)>2) ? 1 : 0
-    thisState := "a" externBMP previewMode thisAlphaFile alphaMaskRefBMP alphaMaskingMode alphaMaskClrAintensity alphaMaskClrBintensity alphaMaskGradientAngle alphaMaskGradientScale alphaMaskOffsetX alphaMaskOffsetY alphaMaskGradientWrapped alphaMaskColorReversed alphaMaskReplaceMode alphaMaskBMPchannel VPselRotation lastPaintEventID alphaMaskGradientPosA alphaMaskGradientPosB sizeIDu getVPselIDs("saiz-vpos") userAlphaMaskBmpPainted userPrevAlphaMaskBmpPainted alphaMaskBMPbright alphaMaskBMPcontrast alphaMaskCoffsetX alphaMaskCoffsetY
+    thisState := "a" externBMP previewMode thisAlphaFile VPselRotation sizeIDu getVPselIDs("saiz-vpos") getAlphaMaskIDu()
     If (thisState=prevState && StrLen(prevBMPu)>2)
     {
        ; fnOutputDebug("cached alpha mask bitmap used")
@@ -12553,7 +12554,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
        ; trGdip_GraphicsClear(A_ThisFunc, G2, "0x00" WindowBGRcolor)
        GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
        ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, prevMaxSelX, prevMaxSelY, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
-       thisImgCall := "a" getIDimage(currentFileIndex) currentFileIndex viewportStampBMP viewportIDstampBMP PasteInPlaceOrientation VPselRotation PasteInPlaceBlurAmount alphaMaskingMode alphaMaskClrAintensity alphaMaskClrBintensity alphaMaskColorReversed alphaMaskReplaceMode alphaMaskGradientScale alphaMaskGradientPosA alphaMaskGradientPosB alphaMaskGradientWrapped alphaMaskGradientAngle alphaMaskRefBMP alphaMaskOffsetX alphaMaskOffsetY PasteInPlaceLight PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceGamma PasteInPlaceApplyColorFX PasteInPlaceBlendMode alphaMaskBMPchannel PasteInPlaceBlurEdgesSoft lastPaintEventID liveDrawingBrushTool brushingMode shearImgX shearImgY alphaMaskBMPcontrast alphaMaskBMPbright alphaMaskCoffsetX alphaMaskCoffsetY
+       thisImgCall := "a" getIDimage(currentFileIndex) currentFileIndex viewportStampBMP viewportIDstampBMP PasteInPlaceOrientation VPselRotation PasteInPlaceBlurAmount PasteInPlaceLight PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceGamma PasteInPlaceApplyColorFX PasteInPlaceBlendMode PasteInPlaceBlurEdgesSoft brushingMode shearImgX shearImgY getAlphaMaskIDu()
        If (prevImgCall=thisImgCall && StrLen(prevClipBMP)>2)
        {
           hasCached := 1
@@ -12594,7 +12595,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
        If (alphaMaskingMode>1 && brushingMode!=1)
        {
           ; thisStartZeit := A_TickCount
-          thisIDu := "a" previewMode PasteInPlaceBlurAmount PasteInPlaceToolMode PasteInPlaceOrientation VPselRotation alphaMaskClrAintensity alphaMaskClrBintensity alphaMaskingMode alphaMaskRefBMP alphaMaskReplaceMode alphaMaskGradientWrapped alphaMaskColorReversed alphaMaskGradientScale alphaMaskGradientAngle alphaMaskGradientPosA alphaMaskGradientPosB alphaMaskOffsetX alphaMaskOffsetY alphaMaskBMPchannel lastPaintEventID alphaMaskBMPbright alphaMaskBMPcontrast alphaMaskCoffsetX alphaMaskCoffsetY
+          thisIDu := "a" previewMode PasteInPlaceBlurAmount PasteInPlaceToolMode PasteInPlaceOrientation VPselRotation getAlphaMaskIDu()
           realtimePasteInPlaceAlphaMasker(previewMode, clipBMP, thisIDu, newBitmap, 0, 0, 0, 0, 1)
           ; ToolTip, % A_TickCount - thisStartZeit, , , 2
           If StrLen(newBitmap)>2
@@ -13286,11 +13287,11 @@ terminateIMGediting(modus:=0) {
 }
 
 isAlphaMaskPartialWin() {
-   Return isVarEqualTo(AnyWindowOpen, 81, 74, 66, 55, 25)
+   Return isVarEqualTo(AnyWindowOpen, 81, 66, 55, 25)
 }
 
 isAlphaMaskWindow() {
-   Return isVarEqualTo(AnyWindowOpen, 23, 24, 31, 32, 70)
+   Return isVarEqualTo(AnyWindowOpen, 23, 24, 31, 32, 70, 74)
 }
 
 isNowAlphaPainting() {
@@ -13880,7 +13881,7 @@ AdjustColorsSelectedArea(prevFXmode:=0) {
        gdiBitmap := ""
 
     thisOpacity := EraseAreaOpacity/255
-    allowAlphaMasking := decideAlphaMaskingFeaseable(EraseAreaUseAlpha)
+    allowAlphaMasking := decideAlphaMaskingFeaseable(1)
     zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
     thisMode := (EraseAreaInvert=1) ? 4 : 0
     Gdip_SetClipPath(G2, pPath, thisMode)
@@ -14001,6 +14002,16 @@ InsertTextSelectedArea() {
     hY := max(o_imgSelPy + o_imgSelH, imgSelPy + zImgH)
     tW := wX - tX
     tH := hY - tY
+    If (EllipseSelectMode=0 && TextInAreaRoundBoxBgr=0)
+    {
+       If testEntireImgSelected()
+       {
+          tX := tY := -2
+          tW += 6
+          tH += 6
+       }
+    }
+
     ; fnOutputDebug(A_ThisFunc "(): " tX "," tY "," wX "," hY "," tW "," tH)
     If (TextInAreaBlendMode>1 || alphaMaskingMode>1)
     {
@@ -14217,8 +14228,8 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
              trGdip_DisposeImage(alphaMaskGray, 1)
        } Else If (alphaMaskingMode>1)
        {
-          thisIDu := "a" previewMode alphaMaskingMode alphaMaskRefBMP alphaMaskClrAintensity alphaMaskClrBintensity alphaMaskGradientAngle alphaMaskGradientScale alphaMaskOffsetX alphaMaskOffsetY alphaMaskGradientWrapped alphaMaskColorReversed alphaMaskReplaceMode alphaMaskBMPchannel VPselRotation lastPaintEventID alphaMaskGradientPosA alphaMaskGradientPosB zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY getVPselIDs("saiz-vpos") FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY TextInAreaFlipV TextInAreaFlipV TextInAreaAlign TextInAreaLineAngle TextInAreaCharSpacing TextInAreaBlendMode TextInAreaValign TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaFillSelArea TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName
-          thisIDu .= "b" TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr TextInAreaAutoWrap TextInAreaCaseTransform userimgGammaCorrect undoLevelsRecorded currentUndoLevel useGdiBitmap() alphaMaskBMPbright alphaMaskBMPcontrast alphaMaskCoffsetX alphaMaskCoffsetY
+          thisIDu := "a" previewMode VPselRotation zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY getVPselIDs("saiz-vpos") FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY TextInAreaFlipV TextInAreaFlipV TextInAreaAlign TextInAreaLineAngle TextInAreaCharSpacing TextInAreaBlendMode TextInAreaValign TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaFillSelArea TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName
+          thisIDu .= "b" TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr TextInAreaAutoWrap TextInAreaCaseTransform userimgGammaCorrect undoLevelsRecorded currentUndoLevel useGdiBitmap() getAlphaMaskIDu()
           realtimePasteInPlaceAlphaMasker(previewMode, fBitmap, thisIDu, maskedBitmap)
        }
 
@@ -14393,7 +14404,17 @@ coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, shape, angleu:=0, 
     } 
 
     If (angleu && pPath)
-       trGdip_RotatePathAtCenter(pPath, angleu, 1, 1, keepBounds, 1)
+    {
+       If (shape=3 && FillAreaEllipseSection<847 && FillAreaEllipsePie=1)
+       {
+          ; ToolTip, % "l=" keepBounds "|" angleu , , , 2
+          sPath := Gdip_CreatePath()
+          Gdip_AddPathEllipse(sPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
+          trGdip_RotatePathAtCenter(sPath, angleu, 1, 1, keepBounds, 1, pPath)
+          Gdip_DeletePath(sPath)
+       } Else
+          trGdip_RotatePathAtCenter(pPath, angleu, 1, 1, keepBounds, 1)
+    }
 
     If ((shape=7 || shape=5 || shape=4) && pPath && allowSelectionCenter=1)
        centerPath2bounds(pPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
@@ -14401,7 +14422,7 @@ coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, shape, angleu:=0, 
     Return pPath
 }
 
-trGdip_RotatePathAtCenter(pPath, Angle, MatrixOrder:=1, withinBounds:=0, withinBkeepRatio:=1, highAccuracy:=0) {
+trGdip_RotatePathAtCenter(pPath, Angle, MatrixOrder:=1, withinBounds:=0, withinBkeepRatio:=1, highAccuracy:=0, destinationPath:=0) {
 ; modified by Marius Șucan - added withinBounds option
 ; and highAccuracy option
 
@@ -14416,7 +14437,10 @@ trGdip_RotatePathAtCenter(pPath, Angle, MatrixOrder:=1, withinBounds:=0, withinB
   Gdip_TranslateMatrix(pMatrix, -cX , -cY)
   Gdip_RotateMatrix(pMatrix, Angle, MatrixOrder)
   Gdip_TranslateMatrix(pMatrix, cX, cY, MatrixOrder)
-  E := Gdip_TransformPath(pPath, pMatrix)
+  pathu := destinationPath ? destinationPath : pPath
+  E := Gdip_TransformPath(pathu, pMatrix)
+  If destinationPath
+     E := Gdip_TransformPath(pPath, pMatrix)
   Gdip_DeleteMatrix(pMatrix)
 
   If (withinBounds=1 && !E && Angle!=0)
@@ -14440,7 +14464,7 @@ trGdip_RotatePathAtCenter(pPath, Angle, MatrixOrder:=1, withinBounds:=0, withinB
      Gdip_ScaleMatrix(pMatrix, sX, sY, MatrixOrder)
      Gdip_TranslateMatrix(pMatrix, ncX, ncY, MatrixOrder)
      If (sX!=0 && sY!=0)
-        E := Gdip_TransformPath(pPath, pMatrix)
+        E := Gdip_TransformPath(pathu, pMatrix)
      Gdip_DeleteMatrix(pMatrix)
   }
 
@@ -14591,6 +14615,10 @@ warnUserFatalBitmapError(pBitmap, funcu) {
        generalInternalErrorMsgBox(r, baseMsg)
        Return "fail"
     }
+}
+
+getAlphaMaskIDu() {
+   Return "a" alphaMaskBMPbright alphaMaskBMPchannel alphaMaskBMPcontrast alphaMaskClrAintensity alphaMaskClrBintensity alphaMaskCoffsetX alphaMaskCoffsetY alphaMaskColorReversed alphaMaskGradientAngle alphaMaskGradientPosA alphaMaskGradientPosB alphaMaskGradientScale alphaMaskGradientWrapped alphaMaskingMode alphaMaskOffsetX alphaMaskOffsetY alphaMaskRefBMP alphaMaskReplaceMode lastPaintEventID liveDrawingBrushTool userAlphaMaskBmpPainted userPrevAlphaMaskBmpPainted
 }
 
 getVPselIDs(what) {
@@ -14800,13 +14828,14 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
          alphaMaskGray := trGdip_ResizeBitmap(A_ThisFunc, userAlphaMaskBmpPainted, oimgW, oimgH, 0, 5, -1)
          hasResized := 1
       } Else alphaMaskGray := userAlphaMaskBmpPainted
+
       QPV_SetAlphaChannel(fBitmapA, alphaMaskGray, alphaMaskColorReversed, alphaMaskReplaceMode, alphaMaskBMPchannel, 3)
       If hasResized
          trGdip_DisposeImage(alphaMaskGray, 1)
    } Else If (alphaMaskingMode>1)
    {
       moreStuff := (FillAreaGlassy>1 || FillAreaBlendMode>1) ? "a" imgSelPx imgSelPy : ""
-      thisIDu := "a" previewMode FillAreaRemBGR FillAreaInverted userimgGammaCorrect FillAreaGlassy FillAreaBlendMode FillAreaColor FillAreaColorMode FillArea2ndColor FillAreaOpacity FillArea2ndOpacity FillAreaGradientWrapped FillAreaGradientAngle FillAreaGradientPosB FillAreaGradientPosA FillAreaColorReversed FillAreaGradientScale alphaMaskingMode alphaMaskRefBMP alphaMaskClrAintensity alphaMaskClrBintensity alphaMaskGradientAngle alphaMaskGradientScale alphaMaskOffsetX alphaMaskOffsetY alphaMaskGradientWrapped alphaMaskColorReversed alphaMaskReplaceMode alphaMaskBMPchannel VPselRotation lastPaintEventID alphaMaskGradientPosA alphaMaskGradientPosB zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY getVPselIDs("saiz-vpos") moreStuff FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY undoLevelsRecorded currentUndoLevel useGdiBitmap() alphaMaskBMPbright alphaMaskBMPcontrast alphaMaskCoffsetX alphaMaskCoffsetY
+      thisIDu := "a" previewMode FillAreaRemBGR FillAreaInverted userimgGammaCorrect FillAreaGlassy FillAreaBlendMode FillAreaColor FillAreaColorMode FillArea2ndColor FillAreaOpacity FillArea2ndOpacity FillAreaGradientWrapped FillAreaGradientAngle FillAreaGradientPosB FillAreaGradientPosA FillAreaColorReversed FillAreaGradientScale VPselRotation zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY getVPselIDs("saiz-vpos") moreStuff FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY undoLevelsRecorded currentUndoLevel useGdiBitmap() getAlphaMaskIDu()
       realtimePasteInPlaceAlphaMasker(previewMode, fBitmapA, thisIDu, newBitmap, offX, offY, offW, offH)
       If StrLen(newBitmap)>2
       {
@@ -15117,7 +15146,6 @@ EraseOrInvertOrGraySelectedArea(actionu, funcu) {
 
     Gdip_GetImageDimensions(whichBitmap, imgW, imgH)
     calcImgSelection2bmp(!LimitSelectBoundsImg, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-
     infoFriendly := InStr(actionu, "flip-") ? actionu : actionu " the colours in"
     G2 := trGdip_GraphicsFromImage(funcu, whichBitmap, 7, 4)
     If !G2
@@ -15149,6 +15177,7 @@ EraseOrInvertOrGraySelectedArea(actionu, funcu) {
        Return
     }
 
+    ; ToolTip, % imgSelPx "|" imgSelPy "`n" imgSelW "|" imgSelH "`n" imgW "|" imgH , , , 2
     ha := currIMGdetails.HasAlpha
     modus := (EraseAreaInvert=1 && (actionu="desaturate" || actionu="erase")) ? 4 : 0
     If (actionu!="behind")
@@ -18850,7 +18879,7 @@ Return
 
 CreateCollapsedPanelWidget() {
     Static lastState := -1
-    thisState := "a" uiUseDarkMode PrefsLargeFonts colorPickerModeNow mustCaptureCloneBrush
+    thisState := "a" uiUseDarkMode ToolbarScaleFactor PrefsLargeFonts colorPickerModeNow mustCaptureCloneBrush
     If (thisState=lastState)
        Return
 
@@ -18872,12 +18901,16 @@ CreateCollapsedPanelWidget() {
        Gui, Font, Bold Q4
  
     h := (PrefsLargeFonts=1) ? 27 : 22
+    w := (PrefsLargeFonts=1) ? 30 : 26
+    h := Round(h*ToolbarScaleFactor)
+    w := Round(w*ToolbarScaleFactor)
+    ww := Round(15*ToolbarScaleFactor)
     pk := (uiUseDarkMode=1) ? "" : "-dark"
     pp := mainCompiledPath "\resources\toolbar\"
     ; w := (PrefsLargeFonts=1) ? 64 : 58
-    Gui, Add, Picture, x1 y1 w15 h%h% +Border Center +0x200 gDragCollapsedWidget +hwndhTemp, % mainCompiledPath "\resources\toolbar\dragger.png"
+    Gui, Add, Picture, x1 y1 w%ww% h%h% +Border Center +0x200 gDragCollapsedWidget +hwndhTemp, % mainCompiledPath "\resources\toolbar\dragger.png"
     ToolTip2ctrl(hTemp, "Click and drag to reposition this widget")
-    GuiAddButton("x+2 yp w29 hp gtoggleImgEditPanelWindow", pp "triangle-down" pk ".png", "Show tool panel. F11", "Show panel for the current tool [F11]", "collapseWidgetGUIA")
+    GuiAddButton("x+2 yp w" w " hp gtoggleImgEditPanelWindow", pp "triangle-down" pk ".png", "Show tool panel. F11", "Show panel for the current tool [F11]", "collapseWidgetGUIA")
     If (mustCaptureCloneBrush!=1 && colorPickerModeNow!=1)
     {
        GuiAddButton("x+2 yp wp hp gPanelQuickSearchMenuOptions", pp "loupe" pk ".png", "Quick search panel options. Semi-colon", "Quick search menu options [ `; ]", "collapseWidgetGUIA")
@@ -18893,14 +18926,14 @@ PanelDefineKbdShortcut() {
     Global BtnModsCtrl, BtnModsAlt, BtnModsShift, tehCustomKeysThing
     If (allowCustomKeys!=1)
     {
-        msgResult := msgBoxWrapper(appTitle ": Confirmation", "To customize the selected keyboard shortcut, the option to allow custom user defined keyboard shortcuts must be activated. Would you like to activate it now?", 4, 0, "question")
-        If (msgResult="Yes")
-        {
-           ToggleCustomKBDsMode()
-           PanelQuickSearchMenuOptions()
-           SetTimer, PanelDefineKbdShortcut, -100
-           Return
-        } Else Return
+       msgResult := msgBoxWrapper(appTitle ": Confirmation", "To customize the selected keyboard shortcut, the option to allow custom user defined keyboard shortcuts must be activated. Would you like to activate it now?", 4, 0, "question")
+       If (msgResult="Yes")
+       {
+          ToggleCustomKBDsMode()
+          PanelQuickSearchMenuOptions()
+          SetTimer, PanelDefineKbdShortcut, -100
+          Return
+       } Else Return
     }
 
     Gui, QuickMenuSearchGUIA: Default
@@ -19215,6 +19248,10 @@ QuickMenuSearchGUIAGuiContextMenu(GuiHwnd, CtrlHwnd, EventInfo, IsRightClick, X,
 
     lastInvoked := A_TickCount
     invokePrefsPanelsContextMenu("omni", addBonus)
+}
+
+BTNinvokeQuickSearchMenu() {
+    QuickMenuSearchGUIAGuiContextMenu(hQuickMenuSearchWin, 0, 0, 1, 2, 3)
 }
 
 OmniBoxGetSelectedFolder(givenRow:=0, isGiven:=0, givenPath:=0) {
@@ -22861,7 +22898,7 @@ MenuPanelFoldersTree() {
 
 PanelFoldersTree() {
     Static hasRan, prevSize := 0
-    Global fdTreeInfoLine
+    Global fdTreeInfoLine, BTNfdTreeMenu, BTNfdTreeMainMenu
     If MsgBox2hwnd
        Return
 
@@ -22887,7 +22924,7 @@ PanelFoldersTree() {
 
     INIaction(0, "showFolderTreeDetails", "General", 1)
     Gui, fdTreeGuia: Default
-    Gui, fdTreeGuia: +Resize -DPIScale -MaximizeBox -MinimizeBox +Owner%PVhwnd% +hwndhfdTreeWinGui +ToolWindow
+    Gui, fdTreeGuia: +Resize -MaximizeBox -MinimizeBox +Owner%PVhwnd% +hwndhfdTreeWinGui +ToolWindow
     Gui, fdTreeGuia: Margin, 1, 1
     If (PrefsLargeFonts=1)
        Gui, Font, Bold Q4
@@ -22913,7 +22950,8 @@ PanelFoldersTree() {
     }
 
     Gui, Add, TreeView, r10 vTVlistFolders AltSubmit +hwndhTVlistFolders gFolderTreeResponder
-    GuiAddButton("xp y+1 w" thisBtnHeight + 15 " h" thisBtnHeight + 15 " gfolderTreeMiniBtn vbtnFldr", "\\", "Options",, "fdTreeGuia")
+    GuiAddButton("xp y+1 w" thisBtnHeight " h" thisBtnHeight " gfolderTreeMiniBtn vBTNfdTreeMenu", "\\", "Folder tree",, "fdTreeGuia")
+    GuiAddButton("xp y+1 wp hp gfolderTreeContextMenu vBTNfdTreeMainMenu", ">", "Menu options",, "fdTreeGuia")
     Gui, Add, Text, x+2 vfdTreeInfoLine +0x200 gfolderTreeCopyPath -wrap +TabStop, Folder tree status bar...
     Gui, Add, Button, x+1 y+1 w1 h1 -wantTab -TabStop Default gfolderTreeDefaultAction, &Default
 
@@ -23037,32 +23075,20 @@ folderTreeDefaultAction(modus:=0, g:=0) {
 
 fdTreeGuiaGuiSize() {
    Critical, on
-   Static hasRan := 0, lastState := -1
-   If (lastState!=PrefsLargeFonts)
-   {
-      hasRan := 0
-      lastState := PrefsLargeFonts
-   }
-
    GetWinClientSize(Width, Height, hfdTreeWinGui, 0)
    If (!width || !height || folderTreeWinOpen!=1)
       Return
-
-   ; GuiControlGet, hBtn, fdTreeGuia: hwnd, btnFldr
+   
+   m := (PrefsLargeFonts=1) ? 10 : 8
+   GuiControlGet, hButn, fdTreeGuia: hwnd, BTNfdTreeMainMenu
+   GuiControlGet, hBtn, fdTreeGuia: hwnd, BTNfdTreeMenu
    GuiControlGet, hText, fdTreeGuia: hwnd, fdTreeInfoLine
-   GetControlPosGui(hfdTreeWinGui, hText, ex, ey, ew, eh)
-   f := (PrefsLargeFonts=1) ? 1.5 : 1.7
-   b := hasRan ? eh : Round(eh*f)
-   height -= b
-   GuiControl, fdTreeGuia: Move, TVlistFolders, w%width% h%height%
-   width -= b + b//3
-   yPos := height + 2
-   x := b + b//3
-   bf := b - 2
-   hasRan++
-   GuiControl, fdTreeGuia: Move, fdTreeInfoLine, x%x% y%yPos% w%width% h%b%
-   GuiControl, fdTreeGuia: Move, btnFldr, y%yPos% w%b% h%bf%
-   ; SoundBeep , 900, 100
+   r := GetWindowPlacement(hText)
+
+   SetWindowPlacement(hTVlistFolders, m, m, Width - m*2, Height - r.h - m*2)
+   SetWindowPlacement(hText, m*2 + Round(r.h*1.6)*2, Height - r.h - m//2, Width - m*2 - r.h*4, r.h)
+   SetWindowPlacement(hBtn, m, Height - r.h - m + 2, Round(r.h*1.5), r.h + m//2)
+   SetWindowPlacement(hButn, m + Round(r.h*1.5) + 1, Height - r.h - m + 2, Round(r.h*1.5), r.h + m//2)
    If determineLClickstate()
       SetTimer, fdTreeGuiaGuiSize, -300
 }
@@ -33065,7 +33091,7 @@ UIeditQuickMenuSearchTrigger() {
 }
 
 PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
-    Global LVsearchMenus, StatusLineQuickSearch, UIclearBtn
+    Global LVsearchMenus, StatusLineQuickSearch, UIclearBtn, UImenuQSbtn
     Static lastState := 0
     If (slideShowRunning=1)
        ToggleSlideShowu()
@@ -33103,7 +33129,7 @@ PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
     Sleep, 25
     mr := (PrefsLargeFonts=1) ? 10 : 5
     Gui, QuickMenuSearchGUIA: Default
-    Gui, QuickMenuSearchGUIA: -MaximizeBox -DPIScale +Resize +ToolWindow -MinimizeBox +Owner%PVhwnd% hwndhQuickMenuSearchWin
+    Gui, QuickMenuSearchGUIA: +Resize -MaximizeBox -MinimizeBox +ToolWindow +Owner%PVhwnd% hwndhQuickMenuSearchWin
     Gui, QuickMenuSearchGUIA: Margin, % mr, % mr
     If (PrefsLargeFonts=1)
        Gui, Font, Bold Q4
@@ -33118,10 +33144,10 @@ PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
     thisBtnHeight := (PrefsLargeFonts=1) ? 34 : 24
     btnWid := 105
     txtWid := 360
-    lstWid := 650
+    lstWid := 600
     If (PrefsLargeFonts=1)
     {
-       lstWid := lstWid + 395
+       lstWid := lstWid + 215
        btnWid := btnWid + 75
        txtWid := txtWid + 105
        Gui, Font, s%LargeUIfontValue%
@@ -33130,8 +33156,9 @@ PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
     tp := (given="yes" && StrLen(whatu)>1) ? whatu : userQuickMenusEdit
     hEditMenuSearch := GuiAddEdit("x15 y15 Section -multi w" lstWid " gUIeditQuickMenuSearchTrigger vuserQuickMenusEdit", tp, "Search query or file path", "QuickMenuSearchGUIA")
     Gui, Add, Button, x+2 yp+0 w2 hp -TabStop Default gBTNquickSearchHidden, Execute
-    GuiAddButton("x+1 yp w65 hp -TabStop gBtnClearQuickSearchEdit vUIclearBtn", "X", "Clear edit field",, "QuickMenuSearchGUIA")
+    GuiAddButton("x+1 yp w45 hp -TabStop gBtnClearQuickSearchEdit vUIclearBtn", "X", "Clear edit field",, "QuickMenuSearchGUIA")
     hLVquickSearchMenus := GuiAddListView("xs y+20 w" lstWid " +LV0x10000 +LV0x400 r" uLVr " -multi gLVquickSearchMenusResponder vLVsearchMenus AltSubmit", "Action|X|Shortcut|Menu|Keywords|Function|#|Score", "Search results", "QuickMenuSearchGUIA")
+    GuiAddButton("x+1 yp w45 h45 gBTNinvokeQuickSearchMenu vUImenuQSbtn", ">", "Options",, "QuickMenuSearchGUIA")
     Gui, Add, Text, xs y+2 wp vStatusLineQuickSearch +0x200 -wrap, Status bard
     ; Gui, Add, Button, x+5 wp hp gBtnCloseWindow, C&lose
     LV_EX_SetColumnOrder(hLVquickSearchMenus, [2,1,3,4,5,6,7,8])
@@ -33644,21 +33671,17 @@ QuickMenuSearchGUIAGuiSize() {
    If (!width || !height || VisibleQuickMenuSearchWin!=1)
       Return
 
-   GetControlPosGui(hQuickMenuSearchWin, hEditMenuSearch, ex, ey, ew, eh)
-   GetControlPosGui(hQuickMenuSearchWin, hLVquickSearchMenus, lx, ly, lw, lh)
-   ; ToolTip, % eh "==" ey  , , , 2
-   lvh := height - ly - eh
-   lvy := ex + eh + 2
-   yPos := lvy + lvh
-   mw := (PrefsLargeFonts=1) ? 65 : 45
-   width -= 30
-   mwidth := width - mw
-   mx := ex + mwidth + 2
-   GuiControl, QuickMenuSearchGUIA: Move, UIclearBtn, w%mw% x%mx% 
-   GuiControl, QuickMenuSearchGUIA: Move, userQuickMenusEdit, w%mwidth% 
-   GuiControl, QuickMenuSearchGUIA: Move, LVsearchMenus, w%width% h%lvh% y%lvy%
-   GuiControl, QuickMenuSearchGUIA: Move, StatusLineQuickSearch, y%yPos% w%width% h%eh%
-   ; SoundBeep , 900, 100
+   m := (PrefsLargeFonts=1) ? 10 : 8
+   GuiControlGet, hBtn, QuickMenuSearchGUIA: hwnd, UIclearBtn
+   GuiControlGet, hButn, QuickMenuSearchGUIA: hwnd, UImenuQSbtn
+   GuiControlGet, hLine, QuickMenuSearchGUIA: hwnd, StatusLineQuickSearch
+   r := GetWindowPlacement(hEditMenuSearch)
+   btnW := Round(r.h * 1.5)
+   SetWindowPlacement(hEditMenuSearch, m, m, Width - m*2 - btnW, r.h)
+   SetWindowPlacement(hBtn, Width - m*1 - btnW, m, btnW, r.h)
+   SetWindowPlacement(hLVquickSearchMenus, m, m + r.h + 1, Width - m*2, Height - m*2 - r.h*2)
+   SetWindowPlacement(hLine, btnW + m, m + r.h + 1 + Height - m*1.5 - r.h*2, Width - m*2 - btnW, r.h)
+   SetWindowPlacement(hButn, m, m + r.h + 1 + Height - m*1.25 - r.h*2, Round(r.h*1.3), Round(r.h*0.9))
    If determineLClickstate()
       SetTimer, QuickMenuSearchGUIAGuiSize, -300
 }
@@ -35716,7 +35739,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
     GuiAddSlider("BrushToolBopacity", 2,255, 255, "Opacity", "updateUIbrushTool", 1, "x+5 w" opaciSlideW " hp")
     Gui, Add, Checkbox, x+5 hp wp gupdateUIbrushTool Checked%brushToolDoubleSize% vbrushToolDoubleSize, Size × 2
 
-    GuiAddSlider("BrushToolSize", 2,950, 25, "Brush size: $€", "updateUIbrushTool", 1, "xs y+15 w" slideWid " hp")
+    GuiAddSlider("BrushToolSize", 1,950, 25, "Brush size: $€", "updateUIbrushTool", 1, "xs y+15 w" slideWid " hp")
     GuiAddSlider("BrushToolStepping", 0,251, 0, ".updateLabelBrushStep", "updateUIbrushTool", 1, "x+10 wp hp")
     GuiAddSlider("BrushToolAspectRatio", -100,100, 0, "Aspect ratio", "updateUIbrushTool", 2, "xs y+10 wp hp")
     GuiAddSlider("BrushToolAngle", -180,180, 0, "Angle: $€°", "updateUIbrushTool", 2, "x+10 wp hp")
@@ -35795,7 +35818,10 @@ BtnToggleBrushColors(dummy:=0) {
    ;    Return
 
    BrushToolUseSecondaryColor := !BrushToolUseSecondaryColor
-   If (AnyWindowOpen=70)
+   If (AnyWindowOpen=74)
+   {
+      UpdateUIadjustVPcolors()
+   } Else If (AnyWindowOpen=70)
    {
       updateUIalphaMaskerPanel()
    } Else If (AnyWindowOpen=64)
@@ -36274,6 +36300,9 @@ UItriggerBrushUpdate(actu:="noPreview", delayu:=100) {
    } Else If (AnyWindowOpen=69)
    {
       SetTimer, updateUIzoomBlurPanel, % -delayu
+   } Else If (AnyWindowOpen=74)
+   {
+      SetTimer, UpdateUIadjustVPcolors, % -delayu
    } Else If (AnyWindowOpen=70)
    {
       fn := Func("updateUIalphaMaskerPanel").Bind(actu)
@@ -36292,6 +36321,8 @@ UItriggerBrushUpdate(actu:="noPreview", delayu:=100) {
 }
 
 createBrushShapePath(brushSize, tkX, tkY, thisAR, angleu) {
+   If (brushSize=1)
+      brushSize := 1.25
    thisAR := 1 - Abs(thisAR)/105
    brImgSelW := (BrushToolAspectRatio>0) ? brushSize * thisAR : brushSize
    brImgSelH := (BrushToolAspectRatio<0) ? brushSize * thisAR : brushSize
@@ -36299,8 +36330,13 @@ createBrushShapePath(brushSize, tkX, tkY, thisAR, angleu) {
    brimgSelPy := 0 - (brImgSelH - brushSize)/2
    tmpMatrix := Gdip_CreateMatrix()
    tmpPath := Gdip_CreatePath()
+   ; ToolTip, % brushSize "||" brImgSelW "|" brImgSelH , , , 2
    Gdip_AddPathEllipse(tmpPath, brimgSelPx, brimgSelPy, brimgSelW, brimgSelH)
-   trGdip_RotatePathAtCenter(tmpPath, angleu)
+   If (brushSize>1)
+      trGdip_RotatePathAtCenter(tmpPath, angleu)
+
+   If (brushSize<2)
+      brushSize := 1.5
    Gdip_TranslateMatrix(tmpMatrix, tkX - brushSize/2, tkY - brushSize/2)
    Gdip_TransformPath(tmpPath, tmpMatrix)
    Gdip_DeleteMatrix(tmpMatrix)
@@ -40406,7 +40442,6 @@ PanelSoloAlphaMasker() {
     GuiAddSlider("alphaMaskPreviewOpacity", 1,255, 255, "Preview opacity", "updateUIalphaMaskerPanel", 1, "xs yp wp hp")
 
     Gui, Tab
-
     thisW := (PrefsLargeFonts=1) ? 85 : 65
     GuiAddCollapseBtn("xm+0 y+15 h" thisBtnHeight " w35")
     defu := postVectorWinOpen ? "" : "Default"
@@ -41285,7 +41320,7 @@ livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
    imgSelH := Round( max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2) )
 
    ; pEffectGray := Gdip_CreateEffect(6, 0, -100, 0)
-   thisOpacity := (alphaMaskPreviewOpacity<254) ? alphaMaskPreviewOpacity/255 : 1
+   thisOpacity := (alphaMaskPreviewOpacity<254 && AnyWindowOpen=70) ? alphaMaskPreviewOpacity/255 : 1
    If dummyOpacity
       thisOpacity := dummyOpacity
 
@@ -43959,11 +43994,29 @@ livePreviewAdjustColorsArea(modus:=0) {
       Gdip_BitmapSetColorDepth(zBitmap, 32)
    }
 
-   allowAlphaMasking := decideAlphaMaskingFeaseable(EraseAreaUseAlpha)
+   If (alphaMaskingMode>1 && liveDrawingBrushTool=1 && AnyWindowOpen=74 && StrLen(zBitmap)>2)
+   {
+      Gdip_GetImageDimensions(userAlphaMaskBmpPainted, zImgW, zImgH)
+      viewportDynamicOBJcoords.x := imgSelPx, viewportDynamicOBJcoords.y := imgSelPy
+      viewportDynamicOBJcoords.w := imgSelW,  viewportDynamicOBJcoords.h := imgSelH
+      viewportDynamicOBJcoords.zl := (imgSelW/zImgW + imgSelH/zImgH)/2 + 0.0001
+      Gdip_GetImageDimensions(zBitmap, oImgW, oImgH)
+      If (oImgW!=zImgW || oImgH!=zImgH)
+      {
+         alphaMaskGray := trGdip_ResizeBitmap(A_ThisFunc, userAlphaMaskBmpPainted, oimgW, oimgH, 0, 5, -1)
+         hasResized := 1
+      } Else alphaMaskGray := userAlphaMaskBmpPainted
+
+      QPV_SetAlphaChannel(zBitmap, alphaMaskGray, alphaMaskColorReversed, alphaMaskReplaceMode, alphaMaskBMPchannel, 3)
+      If hasResized
+         trGdip_DisposeImage(alphaMaskGray, 1)
+   } Else allowAlphaMasking := decideAlphaMaskingFeaseable(1)
+
    If (allowAlphaMasking=1 && StrLen(zBitmap)>2)
    {
-      thisIDu := "a" alphaMaskColorReversed alphaMaskingMode userAlphaMaskBmpPainted VPselRotation EllipseSelectMode imgSelPx imgSelPy imgSelW imgSelH EraseAreaInvert getIDvpFX() DesaturateAreaLevels DesaturateAreaDither currentUndoLevel undoLevelsRecorded userimgGammaCorrect useGdiBitmap()
+      thisIDu := "a" VPselRotation EllipseSelectMode imgSelPx imgSelPy imgSelW imgSelH EraseAreaInvert getIDvpFX() DesaturateAreaLevels DesaturateAreaDither currentUndoLevel undoLevelsRecorded userimgGammaCorrect useGdiBitmap() getAlphaMaskIDu()
       realtimePasteInPlaceAlphaMasker(1, zBitmap, thisIDu, newBitmap, 0, 0, 0, 0)
+      ; fnOutputDebug(thisIDu)
       If StrLen(newBitmap)>2
       {
          trGdip_DisposeImage(zBitmap, 1)
@@ -61822,8 +61875,9 @@ toggleAlphaPaintingMode() {
       If StrLen(userAlphaMaskBmpPainted)<3
       {
          freshMode := 1
-         If (isVarEqualTo(AnyWindowOpen, 70, 32, 23) && alphaMaskingMode>1)
+         If (isVarEqualTo(AnyWindowOpen, 74, 70, 32, 23) && alphaMaskingMode>1)
          {
+            ; tools with no object as reference
             alphaMaskGray := generateAlphaMaskBitmap(0, 0, imgSelW//2, imgSelH//2, 0, 0, 0, 1)
          } Else If (alphaMaskingMode>1)
          {
@@ -61852,7 +61906,7 @@ toggleAlphaPaintingMode() {
       doImgEditLivePreview := 1
       GuiControl, SettingsGUIA:, doImgEditLivePreview, 1
       GuiControl, SettingsGUIA: Disable, doImgEditLivePreview
-      If (AnyWindowOpen=24 || AnyWindowOpen=31)
+      If (AnyWindowOpen=24 || AnyWindowOpen=31 || AnyWindowOpen=74)
          GuiControl, SettingsGUIA: Disable, btnReset
 
       GuiControl, SettingsGUIA:, uiPasteInPlaceAlphaDrawMode, 1
@@ -61870,7 +61924,7 @@ toggleAlphaPaintingMode() {
 
       If (StrLen(userAlphaMaskBmpPainted)<3 || freshMode=1)
       {
-         If (PasteInPlaceOpacity<20)
+         If (PasteInPlaceOpacity<20 && (AnyWindowOpen=24 || AnyWindowOpen=31))
          {
             PasteInPlaceOpacity := 20
             GuiUpdateSliders("PasteInPlaceOpacity")
@@ -61889,8 +61943,10 @@ toggleAlphaPaintingMode() {
          } Else
          {
             keepUserPaintAlphaMask := 1
-            Gdip_GetImageDimensions(userClipBMPpaste, rImgW, rImgH)
-            If (AnyWindowOpen=70 || AnyWindowOpen=32 || AnyWindowOpen=23)
+            If StrLen(userClipBMPpaste)>2
+               Gdip_GetImageDimensions(userClipBMPpaste, rImgW, rImgH)
+   
+            If isVarEqualTo(AnyWindowOpen, 74, 70, 32, 23)
                userAlphaMaskBmpPainted := trGdip_CreateBitmap(A_ThisFunc, ImgSelW//2, imgSelH//2, "0xE200B")
             Else
                userAlphaMaskBmpPainted := trGdip_CreateBitmap(A_ThisFunc, rImgW, rimgH, "0xE200B")
@@ -61899,6 +61955,20 @@ toggleAlphaPaintingMode() {
             Gdip_DeleteGraphics(G)
          }
       }
+
+      If StrLen(userAlphaMaskBmpPainted)<3
+      {
+         showTOOLtip("ERROR: User alpha mask bitmap could not be created.")
+         SoundBeep 300, 100
+         liveDrawingBrushTool := 0
+         If AnyWindowOpen
+            GuiControl, SettingsGUIA:, uiPasteInPlaceAlphaDrawMode, 0
+         If (AnyWindowOpen=24 || AnyWindowOpen=31 || AnyWindowOpen=74)
+            GuiControl, SettingsGUIA: Enable, btnReset
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return
+      }
+
       lastPaintEventID := "a" A_TickCount userAlphaMaskBmpPainted randomu
       SetTimer, showLEDprimaryColor, -200
       If (ShowAdvToolbar=1)
@@ -61913,7 +61983,7 @@ toggleAlphaPaintingMode() {
       lastPaintEventID := "a" A_TickCount userAlphaMaskBmpPainted randomu
       GuiControl, SettingsGUIA:, uiPasteInPlaceAlphaDrawMode, 0
       GuiControl, SettingsGUIA: Enable, doImgEditLivePreview
-      If (AnyWindowOpen=24 || AnyWindowOpen=31)
+      If (AnyWindowOpen=24 || AnyWindowOpen=31 || AnyWindowOpen=74)
          GuiControl, SettingsGUIA: Enable, btnReset
 
       If (ShowAdvToolbar=1 && (AnyWindowOpen=23 || AnyWindowOpen=32))
@@ -62386,7 +62456,7 @@ changeBrushWetness(dir) {
 
 createGradientBrushBitmap(brushColor, grPosA, brushSize, grAngle, bAR, opacity:=0, bgr:=0) {
     Critical, on
-    Static offsetX := 0, offsetY := 0, grPosB := 99, prevState, prevBrushu
+    Static offsetX := 0, offsetY := 0, grPosB := 99.9, prevState, prevBrushu
     If (brushColor="kill")
     {
        prevState := ""
@@ -63030,13 +63100,13 @@ ActPaintBrushNow() {
 
    ; create base brush element / bitmap
    If (BrushToolType=3) ; cloner
-      brushu := createClonedBrushBitmap(brushSize, 101 - thisToolSoftness, thisToolAngle, thisToolAspectRatio, whichBitmap, 0, 0, 1)
+      brushu := createClonedBrushBitmap(brushSize, 100 - thisToolSoftness, thisToolAngle, thisToolAspectRatio, whichBitmap, 0, 0, 1)
    Else If (BrushToolType=4 || BrushToolType=5 || BrushToolType=7 || BrushToolType=8) ; eraser, effects, pinch and bulge brushes
-      brushu := createGradientBrushBitmap("ffFFff", 101 - thisToolSoftness, brushSize, thisToolAngle, thisToolAspectRatio, 0, "0xff000000")
+      brushu := createGradientBrushBitmap("ffFFff", 100 - thisToolSoftness, brushSize, thisToolAngle, thisToolAspectRatio, 0, "0xff000000")
    Else If (BrushToolType=6) ; smudge/pinch/bulge
-      brushu := createGradientBrushBitmap("ffFFff", 101 - thisToolSoftness, brushSize + thisBulgePinchFactor, thisToolAngle, thisToolAspectRatio, 0, "0xff000000")
+      brushu := createGradientBrushBitmap("ffFFff", 100 - thisToolSoftness, brushSize + thisBulgePinchFactor, thisToolAngle, thisToolAspectRatio, 0, "0xff000000")
    Else If (BrushToolType>1) ; soft edges
-      brushu := createGradientBrushBitmap(startToolColor, 101 - thisToolSoftness, brushSize, thisToolAngle, thisToolAspectRatio)
+      brushu := createGradientBrushBitmap(startToolColor, 100 - thisToolSoftness, brushSize, thisToolAngle, thisToolAspectRatio)
    Else ; simple solid
       gdipbrushu := Gdip_BrushCreateSolid(thisHexOpacity startToolColor)
 
@@ -63097,13 +63167,17 @@ ActPaintBrushNow() {
    dryRateZeit := 50 + BrushToolDryingRate*4
    thisDryRate := clampInRange(BrushToolDryingRate/4, 0.5, 20)
    isUserStepu := (brushToolStepping=1 || brushToolStepping=2 || brushToolStepping=251) ? 0 : 1
-   stepu := (isUserStepu=0) ? Ceil(brushSize * 0.2)**1.09 : brushToolStepping
+   If (brushSize<2)
+      isUserStepu := 0
+
+   stepu := (isUserStepu=0 || brushSize<2) ? Ceil(brushSize * 0.2)**1.09 : brushToolStepping
    If (BrushToolType>6 || BrushToolType=5) && (isUserStepu=1 && stepu<brushSize/4 && isInRange(BrushToolAspectRatio, -5, 5) && isInRange(thisToolAngle, 0, 5))
       stepu := brushSize//4 + 1
 
-   If (!stepu || BrushToolType>=7 || brushToolStepping=0)
+   If (!stepu || BrushToolType>=7 || brushToolStepping=0 && brushSize>1)
       stepu := 1
 
+   ; ToolTip, % stepu "|" isUserStepu "|" brushSize , , , 2
    If !GetKeyState("Shift", "P")
       prevMX := prevMY := 0
 
@@ -63111,7 +63185,7 @@ ActPaintBrushNow() {
    setwhileLoopExec(1)
    While, (determineLClickstate()=1 || A_Index<2)
    {
-      If (thisOpacity<0.005 || brushSize<2)
+      If (thisOpacity<0.005 || brushSize<1)
          Break
       
       GetMouseCoord2wind(PVhwnd, mX, mY)
@@ -63164,9 +63238,12 @@ ActPaintBrushNow() {
       mY := (FlipImgV=1) ? mainHeight - mY : mY
       MouseCoords2Image(mX, mY, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kY, whichBitmap, 1, imgW, imgH)
       ; ToolTip, % offX "-" offY "`n" kX "-" kY "`n" oMx "-" oMy , , , 2
-      If isDotInRect(kX, kY, prevMX - stepu, prevMX + stepu, prevMY - stepu, prevMY + stepu)
-      || !isDotInRect(kX, kY, 0 - brushSize//2, imgW + brushSize//2, 0 - brushSize//2, imgH + brushSize//2)
-         Continue
+      If (brushSize>1)
+      {
+         If isDotInRect(kX, kY, prevMX - stepu, prevMX + stepu, prevMY - stepu, prevMY + stepu)
+         || !isDotInRect(kX, kY, 0 - brushSize//2, imgW + brushSize//2, 0 - brushSize//2, imgH + brushSize//2)
+            Continue
+      }
 
       thisState := "a" mX mY kX kY randomFactor
       ; ToolTip, % thisState , , , 2
@@ -63179,6 +63256,10 @@ ActPaintBrushNow() {
             prevMY := kY
          distX := Abs(kX - prevMX) ; max(kX, prevMX) - min(kX, prevMX)
          distY := Abs(kY - prevMY) ; max(kY, prevMY) - min(kX, prevMY)
+         If (distX<1)
+            distX := 1
+         If (distY<1)
+            distY := 1
          maxDistuK := (distX>=distY) ? 1 : 2
          maxDistuV := (distX>=distY) ? distX : distY
          steps2cover := maxDistuV/stepu
@@ -63411,7 +63492,7 @@ ActPaintBrushNow() {
             }
             thisZeit := A_TickCount
             ; ToolTip, % A_TickCount - thisZeit , , , 2
-            If (Xgood=1 && Ygood=1 && A_index>1 || stepu<=1 && BrushToolType>5 || brushToolStepping=0 || BrushToolType>=7 || brushSize<2 || thisOpacity<0.005)
+            If (Xgood=1 && Ygood=1 && A_index>1 || stepu<=1 && BrushToolType>5 || brushToolStepping=0 && brushSize>1 || BrushToolType>=7 || brushSize<1 || thisOpacity<0.005)
                Break
          }
          prevState := thisState
@@ -63419,6 +63500,7 @@ ActPaintBrushNow() {
          zeitSillyPrevent := A_TickCount
          If (thisIndex=1)
             oMx := tkX, oMy := tkY
+
          dummyResizeImageGDIwin()
       }
    }
@@ -63430,7 +63512,6 @@ ActPaintBrushNow() {
    trGdip_DisposeImage(clonescu, 1)
 
    ; gdipObjectsStats(1, "createGradientBrushBitmap")
-
    If gdipbrushu
       Gdip_DeleteBrush(gdipbrushu)
 
@@ -64775,7 +64856,6 @@ ViewPortSelectionManageCoords(mainWidth, mainHeight, dpX, dpY, maxSelX, maxSelY,
      kimgSelW := max(nImgSelX1, nImgSelX2) - min(nImgSelX1, nImgSelX2)
      kimgSelH := max(nImgSelY1, nImgSelY2) - min(nImgSelY1, nImgSelY2)
      kimgSelRatio := Round(kimgSelW/kimgSelH, 2)
-
      If (LimitSelectBoundsImg!=1 && lockSelectionAspectRatio>1 && kimgSelRatio!=Round(desiredSelAspectRatio, 2) && desiredSelAspectRatio && !adjustingSelDotNow)
      {
         avgWH := min(kimgSelW, kimgSelH)
@@ -64813,18 +64893,27 @@ ViewPortSelectionManageCoords(mainWidth, mainHeight, dpX, dpY, maxSelX, maxSelY,
      zImgSelY1 := Round(nImgSelY1*zoomLevel)
      zImgSelY2 := Round(nImgSelY2*zoomLevel)
 
-     minSizu := SelDotsSize*2
+     selSmall := 0
+     minSelSizu := SelDotsSize//2 + 1
      vPimgSelW := max(zImgSelX1, zImgSelX2) - min(zImgSelX1, zImgSelX2)
      vPimgSelH := max(zImgSelY1, zImgSelY2) - min(zImgSelY1, zImgSelY2)
-     If (vPimgSelW<minSizu)
-        vPimgSelW := minSizu
-     If (vPimgSelH<minSizu)
-        vPimgSelH := minSizu
+     If (vPimgSelW<minSelSizu)
+     {
+        selSmall := 1
+        vPimgSelW := minSelSizu
+     }
 
+     If (vPimgSelH<minSelSizu)
+     {
+        selSmall := 1
+        vPimgSelH := minSelSizu
+     }
+
+     minSizu := SelDotsSize*2
      vPimgSelPx := dpX + min(zImgSelX1, zImgSelX2)
      vPimgSelPy := dpY + min(zImgSelY1, zImgSelY2)
 
-     minMargin := 2 ; (mainWidth*0.025 + mainHeight*0.205)//2
+     Static minMargin := 2 ; (mainWidth*0.025 + mainHeight*0.205)//2
      imgSelLargerViewPort := (vPimgSelPx<minMargin && vPimgSelPy<minMargin) && (vPimgSelPx + vPimgSelW>mainWidth - minMargin) && (vPimgSelPy + vPimgSelH>mainHeight - minMargin) ? 1 : 0
      imgSelOutViewPort := 0
      If (vPimgSelPx>mainWidth - minSizu)
@@ -64874,6 +64963,7 @@ ViewPortSelectionManageCoords(mainWidth, mainHeight, dpX, dpY, maxSelX, maxSelY,
      selDotMdY := vPimgSelPy + vPimgSelH//2 - dotsSize
      If ((AnyWindowOpen=31 || AnyWindowOpen=24) && imgEditPanelOpened=1)
         prevModeViewPortSelectionManager(dpX, dpY, maxSelX, maxSelY)
+     Return selSmall
 }
 
 prevModeViewPortSelectionManager(dpX, dpY, maxSelX, maxSelY) {
@@ -65004,9 +65094,33 @@ createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepB
       PointsList := convertCustomShape2givenArea(customShapePoints, imgSelPx, imgSelPy, imgSelW, imgSelH, 1, !bezierSplineCustomShape)
       createPathVectorCustomShape(ImgSelPath, PointsList, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape, zeroTension)
    } Else If (ellipse=1)
+   {
       Gdip_AddPathEllipse(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
-   Else
+   } Else
+   {
+      If isVarEqualTo(angleu, 0, 90, 180, 270, 360)
+      {
+         If (imgSelPx=0)
+         {
+            imgSelPx := -2
+            imgSelW += 2
+         }
+
+         If (imgSelPy=0)
+         {
+            imgSelPy := -2
+            imgSelH += 2
+         }
+         p := testEntireImgSelected()
+         If (p=1)
+         {
+            imgSelW += 2
+            imgSelH += 2
+         }
+      }
+
       Gdip_AddPathRectangle(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
+   }
 
    If (selCavityX>0.01 && selCavityY>0.01 && allowCavity=1)
    {
@@ -65147,7 +65261,10 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
         prevuDPx := DestPosX, prevuDPy := DestPosY
         lineThickns :=  imgHUDbaseUnit//10
         Gdip_SetPenWidth(pPen1, lineThickns)
-        ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, maxSelX, maxSelY, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
+        selSmall := ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, maxSelX, maxSelY, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
+        If (selSmall=1)
+           dotSize := dotSize/2
+
         ImgSelPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, angleu, rotateSelBoundsKeepRatio, 0, 1, isAngleu, innerSelectionCavityX, innerSelectionCavityY)
         Gdip_SetClipRect(2NDglPG, 0, 0, mainWidth, mainHeight)
         Gdip_SetPenWidth(zPen, imgHUDbaseUnit//7)
@@ -65168,9 +65285,11 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
         Gdip_SetPenWidth(pPen, lineThickns)
         createDefaultSizedSelectionArea(DestPosX, DestPosY, newW, newH, maxSelX, maxSelY, mainWidth, mainHeight)
 
-        ViewPortSelectionManageCoords(mainWidth, mainHeight, DestPosX, DestPosY, maxSelX, maxSelY, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
+        selSmall := ViewPortSelectionManageCoords(mainWidth, mainHeight, DestPosX, DestPosY, maxSelX, maxSelY, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
         imgSelX1 := nImgSelX1, imgSelY1 := nImgSelY1 
         imgSelX2 := nimgSelX2, imgSelY2 := nimgSelY2 
+        If (selSmall=1)
+           dotSize := dotSize/2
 
         If (o_operation!="faker")
         {
@@ -65257,9 +65376,11 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
         Sleep, 1
         lineThickns := imgHUDbaseUnit/9
         trGdip_GraphicsClear(A_ThisFunc, 2NDglPG, "0x00" WindowBGRcolor, 1)
-        ViewPortSelectionManageCoords(mainWidth, mainHeight, prevuDPx, prevuDPy, maxSelX, maxSelY, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
+        selSmall := ViewPortSelectionManageCoords(mainWidth, mainHeight, prevuDPx, prevuDPy, maxSelX, maxSelY, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
         imgSelX1 := nImgSelX1, imgSelY1 := nImgSelY1 
         imgSelX2 := nimgSelX2, imgSelY2 := nimgSelY2 
+        If (selSmall=1)
+           dotSize := dotSize/2
 
         ImgSelPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, angleu, rotateSelBoundsKeepRatio, 0, 1, isAngleu, innerSelectionCavityX, innerSelectionCavityY)
         Gdip_SetPenWidth(pPen1d, lineThickns//2 + 1)
@@ -72434,7 +72555,7 @@ BtnOpenPanelAdjustToneMapping() {
 }
 
 coreColorsAdjusterWindow(modus:=0) {
-    Global realTimePreview, uiIMGresizingMode, UIvpImgAlignCenter, uiForceNoColorMatrix
+    Global realTimePreview, uiIMGresizingMode, UIvpImgAlignCenter
 
     openingPanelNow := 1
     idu := (modus="img") ? 74 : 10
@@ -72450,7 +72571,6 @@ coreColorsAdjusterWindow(modus:=0) {
     showTOOLtip("Opening colors adjustments panel, please wait")
     RegAction(0, "EraseAreaOpacity",, 2, 3, 255)
     ForceNoColorMatrix := 0
-    uiForceNoColorMatrix := 1
     If !usrColorDepth
        usrColorDepth := 1
 
@@ -72482,20 +72602,21 @@ coreColorsAdjusterWindow(modus:=0) {
        If (DesaturateAreaLevels>1 && UIimgFxMode=1)
           UIimgFxMode := 2
     }
+
     userImgChannelRlvl := Round(chnRdecalage*100)
     userImgChannelGlvl := Round(chnGdecalage*100)
     userImgChannelBlvl := Round(chnBdecalage*100)
     userImgChannelAlvl := Round(IntensityAlphaChannel)
     userImgVPthreshold := Round(imgThreshold*200)
     UIvpImgAlignCenter := (imageAligned=5) ? 1 : 0
-    moru := (idu=10) ? "|Other options" : ""
+    moru := (idu=10) ? "|Other options" : "|Alpha mask|Paint mask"
     slide3wid := slide2wid - 40
     thisW := (idu=10) ? txtWid : slide3wid
     Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Color matrix|More adjustments%moru%
     Gui, Tab, 1 ; general
     GuiAddDropDownList("x+15 y+15 Section w" thisW " gUpdateUIadjustVPcolors AltSubmit Choose" UIimgFxMode " vUIimgFxMode", "Original image colors|Personalized colors|Grayscale|Red channel|Green channel|Blue channel|Alpha channel|Inverted colors|Sepia", "Colors mode")
     If (idu!=10)
-       Gui, Add, Button, x+5 hp wp gPanelAutoColors, A&uto-adjust panel
+       Gui, Add, Button, x+5 hp wp gPanelAutoColors vbtn1, A&uto-adjust panel
 
     GuiAddSlider("userImgClrMtrxBrightness", -0.999,1.000, "0f", "Brightness", "UpdateUIadjustVPcolors", 2, "xs y+5 w" slideWid " hp")
     GuiAddSlider("userImgClrMtrxContrast", -0.999, 1.000, "0f", "Contrast", "UpdateUIadjustVPcolors", 2, "xs y+5 w" slideWid " hp")
@@ -72559,9 +72680,10 @@ coreColorsAdjusterWindow(modus:=0) {
        Gui, Add, Text, xs y+10, TIP: right click on the viewport for more options.
     } Else
     {
-       Gui, Add, Checkbox, xs y+5 w%slide3Wid% h%thisBtnHeight% Checked%EraseAreaUseAlpha% vEraseAreaUseAlpha gUpdateUIadjustVPcolors, Apply alpha mas&k
+       ; Gui, Add, Checkbox, xs y+5 w%slide3Wid% h%thisBtnHeight% Checked%EraseAreaUseAlpha% vEraseAreaUseAlpha gUpdateUIadjustVPcolors, Apply alpha mas&k
        If InStr(currIMGdetails.PixelFormat, "TONE-MAPPED")
-          Gui, Add, Button, x+5 wp hp gBtnOpenPanelAdjustToneMapping, &HDR tone-mapping
+          Gui, Add, Button, xs y+5 w%slide3Wid% h%thisBtnHeight% gBtnOpenPanelAdjustToneMapping, &HDR tone-mapping
+       uiADDalphaMaskTabs(3, 4, "UpdateUIadjustVPcolors")
     }
 
     Gui, Tab
@@ -72583,8 +72705,8 @@ coreColorsAdjusterWindow(modus:=0) {
 
     ; Gui, Add, Button, x+5 hp w%btnWid% gCopyImage2clip, &Copy to clipboard
     ; Gui, Add, Button, x+5 hp wp gBtnSaveIMGadjustPanel, &Save or copy
-    Gui, Add, Button, x+5 hp wp+15 gBtnResetImageView, &Reset all
-    Gui, Add, Checkbox, x+5 hp gBtnToggleNoColorsFX Checked%uiForceNoColorMatrix% vuiForceNoColorMatrix, Live preview
+    Gui, Add, Button, x+5 hp wp+15 gBtnResetImageView vbtnReset, &Reset all
+    Gui, Add, Checkbox, x+5 hp gBtnToggleNoColorsFX Checked%doImgEditLivePreview% vdoImgEditLivePreview, &Live preview
     If (idu=74)
        Gui, Add, Checkbox, xm+0 y+5 Checked%closeEditPanelOnApply% vcloseEditPanelOnApply gToggleClosePanelApply, Close window after «Apply»
     ; Gui, Add, Button, x+5 hp w80 Default gBtnCloseWindow, C&lose
@@ -72607,9 +72729,8 @@ BtnToggleNoColorsFX() {
    ; Gui, SettingsGUIA: Default
    ; SoundBeep 
    ForceNoColorMatrix := !ForceNoColorMatrix
-   ; GuiControlGet, uiForceNoColorMatrix
-   uiForceNoColorMatrix := !ForceNoColorMatrix
-   GuiControl, SettingsGUIA:, uiForceNoColorMatrix, % uiForceNoColorMatrix
+   doImgEditLivePreview := !ForceNoColorMatrix
+   GuiControl, SettingsGUIA:, doImgEditLivePreview, % doImgEditLivePreview
    dummyTimerDelayiedImageDisplay(50)
 }
 
@@ -72791,7 +72912,7 @@ updatePanelColorsInfo() {
    uiSlidersArray["userImgVPthreshold", 10] := act
 
    canEnableThese := act
-   act := (act=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   act := (act=1 && liveDrawingBrushTool!=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % act, specialColorFXmode
 
    act := (specialColorFXmode=7 && canEnableThese=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
@@ -72800,9 +72921,10 @@ updatePanelColorsInfo() {
 
    If (AnyWindowOpen=74)
    {
-      act := (imgFxMode>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+      act := (imgFxMode>1 && liveDrawingBrushTool!=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
       GuiControl, % act, EraseAreaInvert
-      GuiControl, % act, EraseAreaUseAlpha
+
+      act := (imgFxMode>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
       GuiControl, % act, DesaturateAreaLevels
       act := (imgFxMode>1 && DesaturateAreaLevels>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
       GuiControl, % act, DesaturateAreaDither
@@ -72821,7 +72943,7 @@ btnResetImageView() {
 
   Gui, SettingsGUIA: Default
   ForceNoColorMatrix := 0
-  GuiControl, SettingsGUIA: , uiForceNoColorMatrix, 1
+  GuiControl, SettingsGUIA: , doImgEditLivePreview, 1
   GuiControl, SettingsGUIA: Choose, UIimgFxMode, 1
   chnRdecalage := chnGdecalage := chnBdecalage := imgThreshold := 0
   realGammos := IntensityAlphaChannel := 1
@@ -72878,10 +73000,11 @@ UpdateUIadjustVPcolors(dummy:=0) {
 
    Gui, SettingsGUIA: Default
    GuiControlGet, UIimgFxMode
+   GuiControlGet, CurrentPanelTab
    GuiControlGet, uiColorCurveFXchannel
    GuiControlGet, uiColorCurveFXmode
    GuiControlGet, specialColorFXmode
-   GuiControlGet, uiForceNoColorMatrix
+   GuiControlGet, doImgEditLivePreview
    If (AnyWindowOpen=10)
    {
       GuiControlGet, bwDithering
@@ -72896,14 +73019,29 @@ UpdateUIadjustVPcolors(dummy:=0) {
       GuiControlGet, showHistogram
    } Else
    {
+      GuiControlGet, alphaMaskingMode
+      GuiControlGet, alphaMaskRefBMP
+      GuiControlGet, alphaMaskGradientWrapped
+      GuiControlGet, alphaMaskColorReversed
+      GuiControlGet, alphaMaskReplaceMode
+      GuiControlGet, alphaMaskBMPchannel
+      GuiControlGet, uiPasteInPlaceAlphaDrawMode
+      GuiControlGet, BrushToolOverDraw
+      GuiControlGet, BrushToolType
+      GuiControlGet, BrushToolAutoAngle
+      GuiControlGet, BrushToolDoubleSize
       GuiControlGet, EraseAreaInvert
-      GuiControlGet, EraseAreaUseAlpha
       GuiControlGet, DesaturateAreaLevels
       GuiControlGet, DesaturateAreaDither
+      ; ToolTip, % "l=" CurrentPanelTab , , , 2
+      If (CurrentPanelTab=3)
+         updateUIalphaMaskStuff(1)
+      Else If (CurrentPanelTab=4)
+         updateUIalphaMaskStuff(2)
    }
 
    imgFxMode := (UIimgFxMode>2) ? UIimgFxMode + 1 : UIimgFxMode
-   ForceNoColorMatrix := !uiForceNoColorMatrix
+   ForceNoColorMatrix := !doImgEditLivePreview
    ; GuiControlGet, realTimePreview
    If (dummy!="ignore-zoom" && AnyWindowOpen=10)
    {
@@ -72933,7 +73071,13 @@ UpdateUIadjustVPcolors(dummy:=0) {
    {
       actu := (imgFxMode>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
       GuiControl, % actu, btnLiveApplyTool
+      GuiControl, % actu, alphaMaskingMode
+      GuiControl, % actu, uiPasteInPlaceAlphaDrawMode
       uiSlidersArray["EraseAreaOpacity", 10] := (imgFxMode>1) ? 1 : 0
+
+      actu := (liveDrawingBrushTool=1 && isNowAlphaPainting()=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
+      GuiControl, % actu, btn1
+      GuiControl, % actu, UIimgFxMode
    }
 
    defineColorDepth()
@@ -84805,7 +84949,7 @@ RGBtoHEXandBack(clr) {
 ; #If
 
 testus() {
-
+; devart
    WinGetActiveTitle, titlu
    Sleep, 90
    SendInput, {LButton}
@@ -84850,11 +84994,52 @@ testus() {
 }
 
 
+testus2() {
+
+   WinGetActiveTitle, titlu
+   Sleep, 90
+   SendInput, {RButton}
+   Sleep, 90
+   SendInput, s
+   Sleep, 150
+   allowa := 1
+   Loop
+   {
+      p := GetKeyState("CapsLock", "T")
+      If !p
+         Break
+      SoundBeep , 500, 100
+      WinGetActiveTitle, OutputVar
+      If InStr(outputvar, "confirmer")
+      {
+         SoundBeep , 950, 100
+         allowa := 0
+         SendInput, o
+      } Else If (A_Index>150 || !InStr(outputvar, "enregistrer"))
+         Break
+      Else If (allowa=1)
+         SendInput, {alt down}e{alt up}
+   }
+   Sleep, 150
+   SendInput, ^{F4}
+   Sleep, 50
+}
+
+
 ; #If, GetKeyState("CapsLock", "T")
 ;    \::
-;      SetTimer, testus, -150
+;      SetTimer, testus2, -150
 ;    Return
-; #If
+
+;    LButton::
+;       Sleep, 50
+;       SoundBeep , 300, 100
+;       SendInput, {LButton}
+;       Sleep, 950
+;       SendInput, ^{PgDn}
+;       SoundBeep , 900, 100
+;    Return
+; #If 
 
 ; #If, GetKeyState("CapsLock", "T")
 
@@ -84871,16 +85056,6 @@ testus() {
 
    ; Return
 
-   ; LButton::
-   ; If GetKeyState("CapsLock", "T")
-   ; {
-   ; Sleep, 50
-   ; SendInput, {LButton}
-   ; Sleep, 300
-   ; SendInput, ^{PgDn}
-   ; SoundBeep , 900, 100
-   ; }
-   ; Return
    ; #If
 
    ; LButton::

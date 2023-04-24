@@ -16,6 +16,7 @@
 ;
 ; Gdip standard library versions:
 ; by Marius Șucan - gathered user-contributed functions and implemented hundreds of new functions
+; - v1.95 [21/04/2023]
 ; - v1.94 [23/03/2023]
 ; - v1.93 [27/06/2022]
 ; - v1.92 [28/10/2021]
@@ -72,6 +73,7 @@
 ; - v1.01 [05/31/2008]
 ;
 ; Detailed history:
+; - 21/04/2023 = bug fixes related to Gdip_TextToGraphics() and private font collections
 ; - 23/03/2023 = added Gdip_SaveAddImage(), Gdip_SaveImagesInTIFF(), Gdip_GetFrameDelay(), Gdip_GetImageEncodersList(), and other fixes, and minor functions
 ; - 27/06/2022 = various minor fixes
 ; - 28/10/2021 = Added Gdip_TranslatePath(), Gdip_ScalePath() and Gdip_RotatePath(). Improved Gdip_RotatePathAtCenter()
@@ -88,7 +90,7 @@
 ; - 28/10/2019 = Added 7 new GDI+ functions and fixes related to Gdip_CreateFontFamilyFromFile()
 ; - 27/10/2019 = Added 5 new GDI+ functions and bug fixes for Gdip_TestBitmapUniformity(), Gdip_RotateBitmapAtCenter() and Gdip_ResizeBitmap()
 ; - 06/10/2019 = Added more parameters to Gdip_GraphicsFromImage/HDC/HWND and added Gdip_GetPixelColor()
-; - 27/09/2019 = bug fixes...
+; - 27/09/2019 = bug fixes
 ; - 23/09/2019 = Added 4 new functions and improved Gdip_CreateBitmap() [ Marius Șucan ]
 ; - 19/09/2019 = Added 4 new functions and improved Gdip_RotateBitmapAtCenter() [ Marius Șucan ]
 ; - 17/09/2019 = Added 6 new GDI+ functions and renamed curve related functions [ Marius Șucan ]
@@ -875,7 +877,7 @@ Gdip_LibraryVersion() {
 ;                 Updated by Marius Șucan reflecting the work on Gdip_all extended compilation
 
 Gdip_LibrarySubVersion() {
-   return 1.94 ; 23/03/2023
+   return 1.95 ; 21/04/2023
 }
 
 ;#####################################################################################
@@ -4428,7 +4430,7 @@ Gdip_DeleteFontFamily(hFontFamily) {
 
 Gdip_DeletePrivateFontCollection(hFontCollection) {
    If (hFontCollection!="")
-      return DllCall("gdiplus\GdipDeletePrivateFontCollection", "UPtr", hFontCollection)
+      return DllCall("gdiplus\GdipDeletePrivateFontCollection", "UPtr*", hFontCollection)
 }
 
 Gdip_DeleteMatrix(hMatrix) {
@@ -4590,6 +4592,12 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
    if !(IWidth && IHeight) && ((xpos && xpos[2]) || (ypos && ypos[2]) || (Width && Width[2]) || (Height && Height[2]) || (Size && Size[2]))
       return -1
 
+   if (Colour && IsInteger(Colour[2]) && !userBrush && StrLen(Colour[2])!=6 && StrLen(Colour[2])!=8)
+   {
+      If !Gdip_DeleteBrush(Gdip_CloneBrush(Colour[2]))
+         userBrush := Colour[2]
+   }
+
    fColor := (Colour && Colour[2]) ? Colour[2] : "ff000000"
    If (StrLen(fColor)=6)
       fColor := "ff" fColor
@@ -4697,10 +4705,11 @@ Gdip_TextToGraphics(pGraphics, Text, Options, Font:="Arial", Width:="", Height:=
       Gdip_DeleteBrush(pBrush)
    Gdip_DeleteStringFormat(hStringFormat)
    Gdip_DeleteFont(hFont)
-   If hFontCollection
-      Gdip_DeletePrivateFontCollection(hFontCollection)
    If (hFontFamily && !wasGivenFontFamily)
       Gdip_DeleteFontFamily(hFontFamily)
+   If hFontCollection
+      Gdip_DeletePrivateFontCollection(hFontCollection)
+
    return _E ? _E : ReturnRC
 }
 
@@ -5139,9 +5148,15 @@ Gdip_FontFamilyCreate(FontName) {
    Return hFontFamily
 }
 
+Gdip_GetFontCollectionFamilyCount(hFontCollection) {
+   counter := 0
+   gdipLastError := DllCall("gdiplus\GdipGetFontCollectionFamilyCount", "uptr", hFontCollection, "int*", counter)
+   Return counter
+}
+
 Gdip_NewPrivateFontCollection() {
    hFontCollection := 0
-   gdipLastError := DllCall("gdiplus\GdipNewPrivateFontCollection", "ptr*", hFontCollection)
+   gdipLastError := DllCall("gdiplus\GdipNewPrivateFontCollection", "uptr*", hFontCollection)
    Return hFontCollection
 }
 
@@ -5176,30 +5191,30 @@ Gdip_CreateFontFamilyFromFile(FontFile, hFontCollection, FontName:="") {
    Return hFontFamily
 }
 
-Gdip_GetInstalledFontFamilies(nameRegex := "") {
+Gdip_GetInstalledFontFamilies(nameRegex := "", userFontCollection:=0) {
    ; The results can be filtered. Example: GetInstalledFontFamilies("Arial")
    ; Returns an array with names of installed font families.
    ; Source: https://github.com/mcl-on-github/oGdip.ahk/blob/main/OGdip.ahk
-   ; by MCL
+   ; by MCL; modified by Marius Șucan to allow users to point to a given font collection
 
    Static pFontCollection := 0
    If (pFontCollection == 0)
       DllCall("GdiPlus\GdipNewInstalledFontCollection", "UPtr*", pFontCollection := 0)
 
-   DllCall("GdiPlus\GdipGetFontCollectionFamilyCount", "UPtr" , pFontCollection, "Int*", familyCount := 0)
-   VarSetCapacity(familyList, 2*A_PtrSize*familyCount, 0)
+   thisFontCollection := (userFontCollection!=0) ? userFontCollection : pFontCollection
+   familyCount := Gdip_GetFontCollectionFamilyCount(thisFontCollection)
+   VarSetCapacity(familyList, 2 * A_PtrSize * familyCount, 0)
    DllCall("GdiPlus\GdipGetFontCollectionFamilyList"
-         , "UPtr", pFontCollection
+         , "UPtr", thisFontCollection
          , "Int" , familyCount
          , "UPtr", &familyList
          , "Int*", familyCount)
-   
+
    langId := 0
    families := []
-   
    Loop % familyCount
    {
-      familyPtr := NumGet(familyList, (A_Index-1)*A_PtrSize, "UPtr")
+      familyPtr := NumGet(familyList, (A_Index - 1) * A_PtrSize, "UPtr")
       VarSetCapacity(familyName, 64, 0)  ; LF_FACESIZE = 32 WChars
       DllCall("GdiPlus\GdipGetFamilyName"
             , "UPtr"  , familyPtr
@@ -5209,7 +5224,7 @@ Gdip_GetInstalledFontFamilies(nameRegex := "") {
       If (familyName ~= nameRegex)
          families.Push(familyName)
    }
-   
+   familyName := 0, familyList := 0
    Return families
 }
 

@@ -8,9 +8,10 @@
    g) Windows, AHK GUIs
    h) Input responses
    i) Image live editing [soon]
+   j) How to enable alpha masking for an image editing live tool
 
 
-Deniere mise à jour: mardi 24 mai 2022
+Deniere mise à jour: lundi 24 avril 2023
 ================================================
 
 a) How Quick Picto Viewer initializes
@@ -62,6 +63,7 @@ a) How Quick Picto Viewer initializes
      maxUndoLevels := 2
      coreDesiredPixFmt := "0x21808" ;  24-RGB
      These are meant to limit memory usage as much as possible.
+     Side note: the 32 bits edition is no longer actively tested.
 
 b) How a files list index is created
 =============================================
@@ -70,10 +72,9 @@ b) How a files list index is created
   "mustOpenStartFolder" to the folder path where the image is from.
 
   If the aforementioned variable is set, various user actions will
-  trigger automatic loading / indexing of the files found within
-  the folder using doOpenStartFolder(). Examples of such actions:
-  toggle thumbnails mode, search, attempt to go to the next
-  or previous image, and so on.
+  trigger the indexation of the files found in the folder using
+  doOpenStartFolder(). Examples of such actions: toggle thumbnails
+  mode, search, attempt to go to the next or previous image, and so on.
 
   Once the folder is indexed, "mustOpenStartFolder" is set empty.
 
@@ -91,10 +92,10 @@ b) How a files list index is created
   which uses a regular expression held in "RegExFilesPattern"
   to match supported file types.
 
-  QPV internally relies on resultedFilesList[] array. 
+  QPV internally relies on the resultedFilesList[] array object. 
   Each file entry is defined by various properties:
 
-  resultedFilesList[] array is populated by, GetFilesList(),
+  The resultedFilesList[] array object is populated by, GetFilesList(),
   OpenSLD(), sldGenerateFilesList(), OpenSLDBdataBase(),
   performSQLgetTable(), dbSortingCached(), SortFilesList() and others.
 
@@ -128,6 +129,7 @@ b) How a files list index is created
 
   If a slideshow database is already opened, GetFilesList() will
   automatically add the files into the database using addSQLdbEntry().
+  In this context, the file names are converted to lower case.
 
   The file details related properties are optional, as previously indicated.
   They are filled by GetFilesList() or collectFileInfosNow() and are used
@@ -518,15 +520,19 @@ g) Windows, AHK GUIs
 h) Input responses
 =============================================
 
-   All keyboard shortcuts are «registered» through WM_KEYDOWN and WM_SYSKEYDOWN.
-   Both, the main thread and the interface one, register these
-   Window Messages. The function invoked by these threads is
+   All keyboard shortcuts are «registered» through WM_KEYDOWN and
+   WM_SYSKEYDOWN. Both, the main thread and the interface one, register
+   these Window Messages. The function invoked by these threads is
    WM_KEYDOWN(). The function is meant to finish execution as
    soon as possible. constructKbdKey() is called to convert the
-   virtual keys into readble form. In KeyboardResponder(), main thread,
+   virtual keys into readable form. In KeyboardResponder(), main thread,
    is where each keyboard shortcut is actually registered, where the code 
    gets to decide what functions to call based on the keyboard input,
-   and the user context, in-app conditions.
+   and the user context, in-app conditions. QPV allows custom defined
+   keyboard shortcuts. These are stored as an object: "userCustomKeysDefined".
+   The object is initialized by loadCustomUserKbds().
+   In KeyboardResponder(), if the user-pressed key is not customized [defined]
+   in the aforementioned object, the key is passed to processDefaultKbdCombos().
 
    Mouse input is mostly handled in the interface thread.
    The Window Messages for mouse buttons (e.g., WM_LBUTTONUP)
@@ -548,5 +554,41 @@ h) Input responses
    if it is visible. The toolbar is created by createGUItoolbar(),
    if "ShowAdvToolbar" equals 1.
 
+i) Image live editing [soon]
+=======================================================================
 
+
+j) How to enable alpha masking for an image editing live tool
+=======================================================================
+
+1. Add the window ID to isAlphaMaskWindow().
+   Window ID is AnyWindowOpen. The panels are created using createSettingsGUI().
+
+2. Add uiADDalphaMaskTabs(tab-ID-A, tab-ID-B, funcUIpanel) in the function
+creating the panel of the tool, eg., PanelFillSelectedArea(). This will add the 
+specific alpha masking options, controls, in the panel.
+   tab-ID-A and B are the tab order in the panel created.
+   "funcUIpanel" must point to the function used by the panel controls to
+   update the user interface elements and the viewport, eg., updateUIfillPanel().
+
+3. Add in UItriggerBrushUpdate() a pointer to "funcUIpanel"(), as explained
+previously, based on the AnyWindowOpen ID. Do the same in: BtnToggleBrushColors().
+
+4. Add in "funcUIpanel"() calls to updateUIalphaMaskStuff(1) and 
+updateUIalphaMaskStuff(2) based on the "CurrentPanelTab". This will make the 
+alpha mask controls' options to show or hide as expected.
+
+5. Define the "viewportDynamicOBJcoords" object properties: x, y, w, h and zl.
+It must be defined inside the live preview drawing function of the tool itself, 
+eg., livePreviewAdjustColorsArea(). The object is used by MouseMoveResponder().
+
+6. The live preview drawing function must generate a bitmap and then pass it to
+realtimePasteInPlaceAlphaMasker() based on decideAlphaMaskingFeaseable().
+See livePreviewAdjustColorsArea() for an example. Alternatively, when alpha
+mask painting mode is activated, for performance considerations, a direct call to
+QPV_SetAlphaChannel() is suggested, as in livePreviewAdjustColorsArea().
+
+7. Update toggleAlphaPaintingMode(), the commented section "tools with no object
+as reference". Add the AnyWindowOpen ID of the tool to isVarEqualTo(). The user
+alpha mask bitmap must be created based on the selection area dimensions.
 
