@@ -1645,25 +1645,25 @@ setMenusTheme(modus) {
    If (A_OSVersion="WIN_7" || A_OSVersion="WIN_XP")
       Return
 
-   uxtheme := DllCall("GetModuleHandle", "str", "uxtheme", "ptr")
-   SetPreferredAppMode := DllCall("GetProcAddress", "ptr", uxtheme, "ptr", 135, "ptr")
-   global AllowDarkModeForWindow := DllCall("GetProcAddress", "ptr", uxtheme, "ptr", 133, "ptr")
-   FlushMenuThemes := DllCall("GetProcAddress", "ptr", uxtheme, "ptr", 136, "ptr")
+   uxtheme := DllCall("GetModuleHandle", "str", "uxtheme", "uptr")
+   SetPreferredAppMode := DllCall("GetProcAddress", "uptr", uxtheme, "ptr", 135, "uptr")
+   global AllowDarkModeForWindow := DllCall("GetProcAddress", "uptr", uxtheme, "ptr", 133, "uptr")
+   FlushMenuThemes := DllCall("GetProcAddress", "uptr", uxtheme, "ptr", 136, "uptr")
    DllCall(SetPreferredAppMode, "int", modus) ; Dark
    DllCall(FlushMenuThemes)
    interfaceThread.ahkPostFunction("setMenusTheme", modus)
 }
 
-setDarkWinAttribs(hwndGUI, modus:=1) {
+setDarkWinAttribs(hwndGUI, modus:=2) {
    If (A_OSVersion="WIN_7" || A_OSVersion="WIN_XP")
       Return
 
-   if (A_OSVersion >= "10.0.17763" && SubStr(A_OSVersion, 1, 3) = "10.")
+   if (A_OSVersion >= "10.0.17763" && SubStr(A_OSVersion, 1, 4)>=10)
    {
-       DWMWA_USE_IMMERSIVE_DARK_MODE  := 19
+       DWMWA_USE_IMMERSIVE_DARK_MODE := 19
        if (A_OSVersion >= "10.0.18985")
-          DWMWA_USE_IMMERSIVE_DARK_MODE  := 20
-       DllCall("dwmapi\DwmSetWindowAttribute", "ptr", hwndGUI, "int", DWMWA_USE_IMMERSIVE_DARK_MODE, "int*", modus, "int", 4)
+          DWMWA_USE_IMMERSIVE_DARK_MODE := 20
+       DllCall("dwmapi\DwmSetWindowAttribute", "UPtr", hwndGUI, "int", DWMWA_USE_IMMERSIVE_DARK_MODE, "int*", modus, "int", 4)
    }
    DllCall(AllowDarkModeForWindow, "UPtr", hwndGUI, "int", modus) ; Dark
 }
@@ -1673,7 +1673,7 @@ LinkUseDefaultColor(hLink, Use, whichGui) {
    NumPut(0x03, LITEM, "UInt")               ; LIF_ITEMINDEX (0x01) | LIF_STATE (0x02)
    NumPut(Use ? 0x10 : 0, LITEM, 8, "UInt")  ; ? LIS_DEFAULTCOLORS : 0
    NumPut(0x10, LITEM, 12, "UInt")           ; LIS_DEFAULTCOLORS
-   While DllCall("SendMessage", "UPtr", hLink, "UInt", 0x0702, "Ptr", 0, "Ptr", &LITEM, "UInt") ; LM_SETITEM
+   While DllCall("SendMessage", "UPtr", hLink, "UInt", 0x0702, "Ptr", 0, "UPtr", &LITEM, "UInt") ; LM_SETITEM
          NumPut(A_Index, LITEM, 4, "Int")
    GuiControl, %whichGUI%: +Redraw, %hLink%
 }
@@ -1695,8 +1695,21 @@ ConvertBase(InputBase, OutputBase, nptr){
     return s
 }
 
+GetScreenResInfos(disp:=0) {
+; function by Masonjar13
+; screenObj := GetScreenResInfos()
+; msgbox % screenObj.w "x" screenObj.h "@" screenObj.hz ", orientation: " screenObj.o
+; orientations:
+; 0=landscape, 1=portrait, 2=landscape (flipped), 3=portrait (flipped)
+    local dm,n:=varSetCapacity(dm,220,0)
+    dllCall("EnumDisplaySettingsW",(disp=0?"Ptr":"WStr"),disp,"Int",-1,"Ptr",&dm)
+    p := {w:numGet(dm,172,"UInt"),h:numGet(dm,176,"UInt"),hz:numGet(dm,184,"UInt"),o:numGet(dm,84,"UShort")}
+    dm := 0
+    return p
+}
+
 ChangeDisplaySettings(cD, sW, sH, rR, Perm="")   {
-   ; By "just me" and "lexicos".
+   ; By "just me" and "lexikos".
    ; Use 1 for Perm parameter to make the screen resolution change permanent so it stays after ExitApp.
    ; Otherwise the screen resolution will revert back when the program exits. The dafault.
 

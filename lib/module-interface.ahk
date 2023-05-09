@@ -2228,14 +2228,17 @@ updateTlbrPosition() {
   If (lockToolbar2Win!=1 || ShowAdvToolbar!=1)
      Return
 
-  JEE_ClientToScreen(hPicOnGui1, 1, 1, UserToolbarX, UserToolbarY)
-  UserToolbarX--
-  UserToolbarY--
+  JEE_ClientToScreen(PVhwnd, 0, 0, UserToolbarX, UserToolbarY)
+  ; fnOutDebug(UserToolbarX "|" UserToolbarY)
   tX := Round(UserToolbarX),    tY := Round(UserToolbarY)
   WinMove, ahk_id %hQPVtoolbar%, , % tX, % tY
   ; Gui, OSDguiToolbar: Show, NoActivate x%tX% y%tY%, QPV toolbar
-
 }
+
+fnOutDebug(msg) {
+      OutputDebug, % "QPV: " Trim(msg)
+}
+
 UpdateMenuBar(modus:=0) {
    Static hasRan := 0, prevState
    If !hasRan
@@ -2252,7 +2255,8 @@ UpdateMenuBar(modus:=0) {
    ; ToolTip, % thisState "`n" prevState , , , 2
    If (prevState=thisState)
    {
-      updateTlbrPosition()
+      ; updateTlbrPosition()
+      SetTimer, updateTlbrPosition, -300
       Return
    }
 
@@ -2282,7 +2286,8 @@ UpdateMenuBar(modus:=0) {
    Gui, 1: Menu, PVmenu
    lastMenuBarUpdate := A_TickCount
    prevState := thisState
-   updateTlbrPosition()
+   ; updateTlbrPosition()
+   SetTimer, updateTlbrPosition, -300
 }
 
 SetMenuInfo(hMenu, maxHeight:=0, autoDismiss:=0, modeLess:=0, noCheck:=0) {

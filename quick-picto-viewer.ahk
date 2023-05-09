@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.9.3
+;@Ahk2Exe-SetVersion 5.9.4
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2023)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -213,7 +213,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , userImgChannelRlvl, userImgChannelGlvl, userImgChannelBlvl, userImgChannelAlvl, combosDarkModus := ""
    , sillySeparator :=  "▪", menuCustomNames := new hashtable(), clrGradientCoffX := 0, clrGradientCoffY := 0
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.9.3", vReleaseDate := "2023/04/24" ; yyyy-mm-dd
+   , appVersion := "5.9.4", vReleaseDate := "2023/05/09" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -347,7 +347,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , OutlierFillOpacity := 200, alphaMaskBMPbright := 0, alphaMaskBMPcontrast := 0, FillAreaWelcomePattern := 1
    , toolbarViewerMode := 1, userCustomizedToolbar := 0, userThumbsToolbarList, userImgViewToolbarList
    , thumbsModeItemHighlight := 1, convertFormatUseMultiThreads := 0, convertFormatAutoSkip := 1
-   , SimpleOperationsMultiThreaded := 0
+   , SimpleOperationsMultiThreaded := 0, FillAreaBlurAmount := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -1170,14 +1170,14 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     {
        allowLoop := 1 
        If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
-          func2Call := ["MenuIncBrushSoftness"]
+          func2Call := ["MenuDecBrushSoftness"]
        Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
           func2Call := ["MenuChangeDecContrast"]
     } Else If (givenKey="+RBRACKET")
     {
        allowLoop := 1 
        If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
-          func2Call := ["MenuDecBrushSoftness"]
+          func2Call := ["MenuIncBrushSoftness"]
        Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
           func2Call := ["MenuChangeIncContrast"]
     } Else If (givenKey="^LBRACKET")
@@ -5050,6 +5050,11 @@ simplePanIMGonClick(modus:=0, doX:=1, doY:=1, bX:=0, bY:=0) {
    If (modus="scroll")
       wrapResizeImageGDIwin()
 
+   imgW := prevResizedVPimgW
+   imgH := prevResizedVPimgH
+   vrSizeX := imgW + mainWidth*2
+   vrSizeY := imgH + mainHeight*2
+
    While, (determineLClickstate()=1)
    {
       If (allowFreeIMGpanning=1 && modus="scroll")
@@ -5062,51 +5067,29 @@ simplePanIMGonClick(modus:=0, doX:=1, doY:=1, bX:=0, bY:=0) {
       calculateScrollBars(prevResizedVPimgW, prevResizedVPimgH, prevDestPosX, prevDestPosY, mainWidth, mainHeight, knobW, knobH, knobX, knobY)
       scrolly := (doX=1) ? isInRange(moX, knobX, knobX + knobW) : isInRange(moY, knobY, knobY + knobH)
       thisState := mX "=" mY "=" prevResizedVPimgW "=" prevResizedVPimgH
-      If (thisState!=prevState && allowFreeIMGpanning=1 && modus="scroll" && scrolly=0 && (A_TickCount - normalModeZeit>250))
+      If ((thisState!=prevState && allowFreeIMGpanning=1 && modus="scroll") && (A_TickCount - lastInvoked>30))
       {
          prevState := thisState
-         oDx := IMGdecalageX, oDy := IMGdecalageY
-         prevMX := oX := mX, prevMY := oY := mY
-         If (FlipImgH=1)
-         {
-            If (doX=1 && moX<knobX)
-               PanIMGonScreen("R", "-")
-            Else If (doX=1) && (moX>knobX+knobW)
-               PanIMGonScreen("L", "-")
-         } Else
-         {
-            If (doX=1 && moX<knobX)
-               PanIMGonScreen("L", "-")
-            Else If (doX=1) && (moX>knobX+knobW)
-               PanIMGonScreen("R", "-")
-         }
-
-         If (FlipImgV=1)
-         {
-            If (doY=1 && moY<knobY)
-               PanIMGonScreen("D", "-")
-            Else If (doY=1) && (moY>knobY+knobH)
-               PanIMGonScreen("U", "-")
-         } Else
-         {
-            If (doY=1 && moY<knobY)
-               PanIMGonScreen("U", "-")
-            Else If (doY=1) && (moY>knobY+knobH)
-               PanIMGonScreen("D", "-")
-         }
-   
-         ; If thisIndex
-            dummyResizeImageGDIwin()
-         Sleep, 2
+         prcX := moX/mainWidth
+         prcY := moY/mainHeight
+         If (doX=1)
+            IMGdecalageX := Round(weighTwoValues(mainWidth*2, mainWidth, prcX) - vrSizeX*prcX)
+         If (doY=1)
+            IMGdecalageY := Round(weighTwoValues(mainHeight*2, mainHeight, prcY) - vrSizeY*prcY)
+         diffIMGdecX := diffIMGdecY := 1
+         ; ToolTip, % prcY "|" IMGdecalageY "|" vrSizeY "|" imgH , , , 2
+         dummyResizeImageGDIwin()
+         Sleep, -1
          thisIndex := !thisIndex
          lastInvoked := A_TickCount
       } Else If (allowFreeIMGpanning=1 && modus="scroll")
       {
-         Sleep, 2
+         Sleep, -1
       } Else
       {
          If (scrolly=1)
             normalModeZeit := A_TickCount
+
          diffIMGdecX := Dx := Ceil((mX - oX)*thisZL)
          diffIMGdecY := Dy := Ceil((mY - oY)*thisZL)
          If (modus="navBox")
@@ -5142,7 +5125,7 @@ simplePanIMGonClick(modus:=0, doX:=1, doY:=1, bX:=0, bY:=0) {
       doSetCursorPos(bX, bY)
 
    vpImgPanningNow := diffIMGdecX := diffIMGdecY := 0
-   If (thisIndex>10 || lastWasLowQuality=1 || allowFreeIMGpanning=1 || modus="scroll")
+   ; If (thisIndex>10 || lastWasLowQuality=1 || allowFreeIMGpanning=1 || modus="scroll")
       SetTimer, wrapResizeImageGDIwin, -60
    SetTimer, ResetImgLoadStatus, -100
 }
@@ -5872,6 +5855,12 @@ SkeletDrawSelectionBox(paintAlphaMask:=0) {
    {
       livePreviewAlphaMasking()
       generateAlphaMaskBitmap("kill", 0)
+   }
+
+   If (showInfoBoxHUD>0 && editingSelectionNow=1)
+   {
+      GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+      drawinfoBox(mainWidth, mainHeight, 0, 2NDglPG)
    }
 
    thisWin := (paintAlphaMask=1) ? hGDIinfosWin : hGDIselectWin
@@ -8192,8 +8181,8 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
    } Else If ((InStr(winEventu, "normal") || InStr(winEventu, "DoubleClick")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && displayingImageNow=1 && IMGresizingMode=4 && (scrollBarHy>1 || scrollBarVx>1) && thumbsDisplaying!=1)
    {
       ; handle clicks on the H/V scrollbars for images larger than the viewport
-      GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
       knobSize := imgHUDbaseUnit//3
+      GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
       If (scrollBarHy>1 && mY>(mainHeight - knobSize))
       {
          RemoveTooltip()
@@ -13086,7 +13075,7 @@ MenuReturnIMGedit() {
 }
 
 recordSelUndoLevelNow() {
-   selectionCoords := Round(imgSelX1) "|" Round(imgSelY1) "|" Round(imgSelX2) "|" Round(imgSelY2) "|" prcSelX1 "|" prcSelY1 "|" prcSelX2 "|" prcSelY2 "|" VPselRotation "|" rotateSelBoundsKeepRatio "|" EllipseSelectMode "|" LimitSelectBoundsImg "|" showSelectionGrid "|" innerSelectionCavityX "|" innerSelectionCavityY
+   selectionCoords := Round(imgSelX1) "|" Round(imgSelY1) "|" Round(imgSelX2) "|" Round(imgSelY2) "|" prcSelX1 "|" prcSelY1 "|" prcSelX2 "|" prcSelY2 "|" VPselRotation "|" rotateSelBoundsKeepRatio "|" EllipseSelectMode "|" LimitSelectBoundsImg "|" showSelectionGrid "|" innerSelectionCavityX "|" innerSelectionCavityY "|" FillAreaRectRoundness "|" FillAreaEllipseSection
    totalSelUndos := Round(undoSelLevelsArray.Count())
    currentSelUndoLevel := clampInRange(currentSelUndoLevel, 0, totalSelUndos)
    newArray := []
@@ -13132,7 +13121,7 @@ recordUndoLevelNow(actionu, recordedBitmap, dX:=0, dY:=0, forceAlpha:="x") {
    }
 
    HasAlpha := (forceAlpha!="x") ? forceAlpha : currIMGdetails.HasAlpha
-   selectionCoords := imgSelX1 "|" imgSelY1 "|" imgSelX2 "|" imgSelY2 "|" prcSelX1 "|" prcSelY1 "|" prcSelX2 "|" prcSelY2 "|" VPselRotation "|" rotateSelBoundsKeepRatio "|" EllipseSelectMode "|" LimitSelectBoundsImg "|" showSelectionGrid
+   selectionCoords := Round(imgSelX1) "|" Round(imgSelY1) "|" Round(imgSelX2) "|" Round(imgSelY2) "|" prcSelX1 "|" prcSelY1 "|" prcSelX2 "|" prcSelY2 "|" VPselRotation "|" rotateSelBoundsKeepRatio "|" EllipseSelectMode "|" LimitSelectBoundsImg "|" showSelectionGrid "|" innerSelectionCavityX "|" innerSelectionCavityY "|" FillAreaRectRoundness "|" FillAreaEllipseSection
    If (StrLen(undoLevelsArray[1, 1])<3 && StrLen(whichBitmap)>2 && minimizeMemUsage!=1)
    {
       thisBMP := trGdip_CloneBitmap(A_ThisFunc "(init)", whichBitmap)
@@ -13503,6 +13492,8 @@ restorePreviousSelections(thisLevel) {
    showSelectionGrid := selectionPrefsArray[13]
    innerSelectionCavityX := selectionPrefsArray[14]
    innerSelectionCavityY := selectionPrefsArray[15]
+   FillAreaRectRoundness := selectionPrefsArray[16]
+   FillAreaEllipseSection := selectionPrefsArray[17]
    currentSelUndoLevel := thisLevel
    ; currentImgModified := 1
 }
@@ -14333,7 +14324,7 @@ FillSelectedArea() {
     If (FillAreaDoContour=1)
     {
        fn := Func("DrawLinesInSelectedArea").Bind(2)
-       SetTimer, % fn, -150
+       SetTimer, % fn, -100
     }
 }
 
@@ -14807,7 +14798,11 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
       bgrBMPu := getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, imgSelW, imgSelH, imgSelW, imgSelH, 0, imgSelW, imgSelH)
 
    If (userimgGammaCorrect=1 && StrLen(bgrBMPu)>2 && previewMode=1)
+   {
+      Gdip_ResetClip(G2)
       trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx, imgSelPy, imgSelW, imgSelH)
+      Gdip_SetClipPath(G2, pPath, modus)
+   }
 
    bgrBMPu := trGdip_DisposeImage(bgrBMPu, 1)
    If (userimgGammaCorrect=1)
@@ -14845,6 +14840,14 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
    }
 
    thisOpacity := (FillAreaColorMode>4) ? FillAreaOpacity/255 : 1
+   thisBlurAmount := (previewMode=1)? (Round(FillAreaBlurAmount * (rsize / msize))) : FillAreaBlurAmount
+   If (FillAreaBlurAmount>1 && thisBlurAmount>1)
+   {
+      nodus := (FillAreaInverted!=1) ? 4 : 0
+      carvePathFromBitmap(fBitmapA, pPath, imgSelPx, imgSelPy, nodus, 2, thisBlurAmount, 0, !FillAreaInverted)
+      Gdip_ResetClip(G2)
+   }
+
    ; ToolTip, % "g2=" g2 " bmp="  fBitmapA " g=" gradientsBMP " o=" thisOpacity " p=" pPath , , , 2
    trGdip_DrawImage(A_ThisFunc, G2, fBitmapA, imgSelPx, imgSelPy, imgSelW, imgSelH, , , , , thisOpacity)
    If (userimgGammaCorrect=1)
@@ -14852,6 +14855,7 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
 
    If (previewMode!=1)
       Gdip_DeleteGraphics(G2)
+
    Gdip_ResetClip(G2)
    trGdip_DisposeImage(fBitmapA, 1)
    trGdip_DisposeImage(fBitmapB, 1)
@@ -14994,7 +14998,7 @@ drawFillSelGradient(pPath, imgSelW, imgSelH, previewMode, offX, offY, offW, offH
     Return pBitmap
 }
 
-carvePathFromBitmap(ByRef pBitmap, pPath, cX, cY, modus, safeWay:=0, blurLevel:=0, doBorder:=1) {
+carvePathFromBitmap(ByRef pBitmap, pPath, cX, cY, modus, safeWay:=0, blurLevel:=0, doBorder:=1, doDecalage:=1) {
     If (safeWay=2 && blurLevel>1)
     {
        Gdip_GetImageDimensions(pBitmap, imgW, imgH)
@@ -15007,11 +15011,20 @@ carvePathFromBitmap(ByRef pBitmap, pPath, cX, cY, modus, safeWay:=0, blurLevel:=
        Gdip_TranslateMatrix(pMatrix, -cX , -cY)
        ; Gdip_TranslateMatrix(pMatrix, blurLevel , blurLevel)
        E := Gdip_TransformPath(zPath, pMatrix)
-       Gdip_SetClipPath(G3, zPath, modus)
 
+       Gdip_SetClipPath(G3, zPath, modus)
        BrushB := Gdip_BrushCreateSolid("0xFF000000")
        r3 := Gdip_FillRectangle(G3, BrushB, 0, 0, imgW, imgH)
        Gdip_ResetClip(G3)
+
+       If (doDecalage=1)
+       {
+          kBitmap := trGdip_CloneBitmap(A_ThisFunc, newBitmap)
+          r2 := trGdip_GraphicsClear(A_ThisFunc, G3, "0xFF000000")
+          Gdip_DrawImage(G3, kBitmap, blurLevel, blurLevel, imgW - blurLevel*2, imgH - blurLevel*2)
+          trGdip_DisposeImage(kBitmap, 1)
+       }
+
        Gdip_SetClipRect(G3, blurLevel, blurLevel, imgW - blurLevel*2, imgH - blurLevel*2, 4)
        If (doBorder=1)
           r3 := Gdip_FillRectangle(G3, BrushB, 0, 0, imgW, imgH)
@@ -16915,7 +16928,7 @@ BlurSelectedArea(modus:="") {
        thisAmount := (blurAreaTwice=1) ? kpl*2 : kpl
        thisAmount := (blurAreaSoftLevel>3) ? Round(thisAmount*(blurAreaSoftLevel - 1)) : Round(thisAmount*(blurAreaSoftLevel/3))
        nodus := (blurAreaInverted!=1) ? 4 : 0
-       carvePathFromBitmap(zBitmap, pPath, imgSelPx , imgSelPy, nodus, 2, thisAmount, !blurAreaInverted)
+       carvePathFromBitmap(zBitmap, pPath, imgSelPx, imgSelPy, nodus, 2, thisAmount, !blurAreaInverted)
     }
 
     If (BlurAreaBlendMode>1)
@@ -17792,7 +17805,7 @@ getSelectedImageArea(whichBitmap, doCarving, limitBounds, applyVPfx, fakeBGR) {
 
     Gdip_GetImageDimensions(whichBitmap, imgW, imgH)
     calcImgSelection2bmp(!limitBounds, imgW, imgH, imgW - 1, imgH - 1, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-    pPath := createImgSelPath(0, 0, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
+    pPath := createImgSelPath(0, 0, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY, 0)
     If pPath
     {
        pB := GetPathRelativeBounds(pPath, imgSelPx, imgSelPy)
@@ -18299,7 +18312,7 @@ PanIMGonScreen(direction, thisKey) {
       ToggleSlideShowu()
 
    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
-   fastMode := (InStr(thisKey, "+") || InStr(thisKey, "-")) ? 1 : 0
+   fastMode := (InStr(thisKey, "+") || InStr(thisKey, "-/")) ? 1 : 0
    If (fastMode=1)
       zL := clampInRange(zoomLevel, 0.8, 3.2)
    Else
@@ -18307,6 +18320,9 @@ PanIMGonScreen(direction, thisKey) {
 
    stepu := InStr(thisKey, "+") ? 0.35 * zL : 0.1 * zL
    stepu := Round(mainHeight*stepu + mainWidth*stepu)//2 + 1
+   If (thisKey="-")
+      stepu := stepu//2 + 1
+
    If (direction="U" && FlipImgV=0) || (direction="D" && FlipImgV=1)
       IMGdecalageY := IMGdecalageY + stepu
    Else If (direction="D" && FlipImgV=0) || (direction="U" && FlipImgV=1)
@@ -18324,9 +18340,10 @@ PanIMGonScreen(direction, thisKey) {
       diffIMGdecX := stepu
    Else If (direction="R" && FlipImgH=0) || (direction="L" && FlipImgH=1)
       diffIMGdecX := - stepu
-
+; ToolTip, % stepu , , , 2
    If (thisKey!="-")
       dummyTimerDelayiedImageDisplay(5)
+   Return 1
 }
 
 dummyTimerDelayiedImageDisplay(timeru:=0) {
@@ -18886,7 +18903,7 @@ CreateCollapsedPanelWidget() {
     Gui, collapseWidgetGUIA: Destroy
     Sleep, 2
     Gui, collapseWidgetGUIA: Default
-    Gui, collapseWidgetGUIA: +Border -MaximizeBox -MinimizeBox -SysMenu +hwndhCollapseWidget +Owner%PVhwnd% -Caption
+    Gui, collapseWidgetGUIA: -DPIScale +Border -MaximizeBox -MinimizeBox -SysMenu +hwndhCollapseWidget +Owner%PVhwnd% -Caption
     Gui, collapseWidgetGUIA: Margin, 1, 1
     If (uiUseDarkMode=1)
     {
@@ -18899,11 +18916,9 @@ CreateCollapsedPanelWidget() {
     ; WinSet, Transparent, 195, ahk_id %hCollapseWidget%
     If (PrefsLargeFonts=1)
        Gui, Font, Bold Q4
- 
-    h := (PrefsLargeFonts=1) ? 27 : 22
-    w := (PrefsLargeFonts=1) ? 30 : 26
-    h := Round(h*ToolbarScaleFactor)
-    w := Round(w*ToolbarScaleFactor)
+
+    ToolBarBtnWidth := Round(OSDfontSize*1.5 * ToolbarScaleFactor)
+    w := h := ToolBarBtnWidth
     ww := Round(15*ToolbarScaleFactor)
     pk := (uiUseDarkMode=1) ? "" : "-dark"
     pp := mainCompiledPath "\resources\toolbar\"
@@ -40323,9 +40338,10 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     Gui, Tab, 1
     GuiAddDropDownList("x+10 y+10 Section w" slideWid " AltSubmit Choose" FillAreaShape " vFillAreaShape gupdateUIfillPanel", "Rectangle|Rounded rectangle|Ellipse|Triangle|Right triangle|Rhombus|Custom shape", "Shape to fill")
     GuiAddDropDownList("x+5 wp AltSubmit Choose" FillAreaCurveTension " vFillAreaCurveTension gupdateUIfillPanel", "Polygonal|Smooth corners|Curve|Round curve|Bézier", "Vector path type")
-    GuiAddSlider("userUIshapeCavity", 0,185, 0, "Shape cavity", "updateFillInnerCavity", 1, "xs y+5 w" slideWid " hp")
-    GuiAddSlider("FillAreaRectRoundness", 4,98, 10, "Roundness", "updateUIfillPanel", 1, "x+5 yp+0 wp-25 hp")
+    GuiAddSlider("FillAreaRectRoundness", 4,98, 10, "Roundness", "updateUIfillPanel", 1, "xp yp wp hp")
     GuiAddSlider("FillAreaEllipseSection", -270,850, 850, ".updateLabelEllipseSect", "updateUIfillPanel", 3, "xp yp wp hp")
+    GuiAddSlider("userUIshapeCavity", 0,185, 0, "Shape cavity", "updateFillInnerCavity", 1, "xs y+5 w" slideWid " hp")
+    GuiAddSlider("FillAreaBlurAmount", 0,255, 0, "Object blur", "updateUIfillPanel", 1, "x+5 yp wp hp")
 
     Gui, Add, Checkbox, xs y+7 hp Checked%FillAreaRemBGR% vFillAreaRemBGR gupdateUIfillPanel, &Erase background behind the object
     Gui, Add, Checkbox, xs y+5 hp Checked%FillAreaInverted% vFillAreaInverted gupdateUIfillPanel, &Invert selection area
@@ -55457,7 +55473,7 @@ MenuSetVolumeUp() {
 }
 
 MenuSetImgZoom(a, b) {
-   zoomLevel := StrReplace(StrReplace(a, "`tNumpad *"), "%")/100
+   zoomLevel := SubStr(a, 1, InStr(a, "%") - 1)/100
    IMGresizingMode := 4
    customZoomAdaptMode := 0
    interfaceThread.ahkassign("IMGresizingMode", IMGresizingMode)
@@ -64893,23 +64909,17 @@ ViewPortSelectionManageCoords(mainWidth, mainHeight, dpX, dpY, maxSelX, maxSelY,
      zImgSelY1 := Round(nImgSelY1*zoomLevel)
      zImgSelY2 := Round(nImgSelY2*zoomLevel)
 
-     selSmall := 0
-     minSelSizu := SelDotsSize//2 + 1
+     minSelSizu := SelDotsSize//2 
      vPimgSelW := max(zImgSelX1, zImgSelX2) - min(zImgSelX1, zImgSelX2)
      vPimgSelH := max(zImgSelY1, zImgSelY2) - min(zImgSelY1, zImgSelY2)
      If (vPimgSelW<minSelSizu)
-     {
-        selSmall := 1
         vPimgSelW := minSelSizu
-     }
 
      If (vPimgSelH<minSelSizu)
-     {
-        selSmall := 1
         vPimgSelH := minSelSizu
-     }
 
      minSizu := SelDotsSize*2
+     selSmall := (vPimgSelW<minSizu*1.55 || vPimgSelH<minSizu*1.55) ? 1 : 0
      vPimgSelPx := dpX + min(zImgSelX1, zImgSelX2)
      vPimgSelPy := dpY + min(zImgSelY1, zImgSelY2)
 
@@ -64961,6 +64971,9 @@ ViewPortSelectionManageCoords(mainWidth, mainHeight, dpX, dpY, maxSelX, maxSelY,
      selDotMcY := vPimgSelPy + vPimgSelH - dotsSize
      selDotMdX := vPimgSelPx - dotsSize
      selDotMdY := vPimgSelPy + vPimgSelH//2 - dotsSize
+     If (selSmall=1)
+        selDotDx := selDotDy := selDotMaX := selDotMaY := selDotMbX := selDotMbY := selDotMcX := selDotMcY := selDotMdX := selDotMdY := -dotsSize*5
+
      If ((AnyWindowOpen=31 || AnyWindowOpen=24) && imgEditPanelOpened=1)
         prevModeViewPortSelectionManager(dpX, dpY, maxSelX, maxSelY)
      Return selSmall
@@ -65084,7 +65097,7 @@ createPathVectorCustomShape(ImgSelPath, ByRef PointsList, tension, isClosed, isB
       Gdip_AddPathCurve(ImgSelPath, PointsList, tensionCurveCustomShape)
 }
 
-createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepBounds:=0, zeroTension:=0, allowSelectionCenter:=1, allowCavity:=1, selCavityX:=0, selCavityY:=0) {
+createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepBounds:=0, zeroTension:=0, allowSelectionCenter:=1, allowCavity:=1, selCavityX:=0, selCavityY:=0, allowErrMargin:=1) {
    ImgSelPath := Gdip_CreatePath()
    If (ImgSelPath="")
       Return
@@ -65098,7 +65111,7 @@ createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepB
       Gdip_AddPathEllipse(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
    } Else
    {
-      If isVarEqualTo(angleu, 0, 90, 180, 270, 360)
+      If (isVarEqualTo(angleu, 0, 90, 180, 270, 360) && allowErrMargin=1)
       {
          If (imgSelPx=0)
          {
@@ -65111,6 +65124,7 @@ createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepB
             imgSelPy := -2
             imgSelH += 2
          }
+
          p := testEntireImgSelected()
          If (p=1)
          {
@@ -65348,7 +65362,7 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
            Gdip_Fill%whichFunc%(2NDglPG, pBrushD, SelDotAx, SelDotAy, dotsSize, dotsSize)
            Gdip_Fill%whichFunc%(2NDglPG, pBrushD, SelDotBx, SelDotBy, dotsSize, dotsSize)
            Gdip_Fill%whichFunc%(2NDglPG, pBrushD, SelDotCx, SelDotCy, dotsSize, dotsSize)
-           If (AnyWindowOpen=31 || AnyWindowOpen=24)
+           If ((AnyWindowOpen=31 || AnyWindowOpen=24) && selSmall!=1)
            {
               Gdip_FillEllipse(2NDglPG, pBrushD, selDotMdX, selDotMdY, dotsSize, dotsSize)
               Gdip_FillEllipse(2NDglPG, pBrushD, SelDotMaX, SelDotMaY, dotsSize, dotsSize)
@@ -65362,7 +65376,7 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
            Gdip_Draw%whichFunc%C(2NDglPG, zPen, SelDotCx + dotsSize//2, SelDotCy + dotsSize//2, dotsSize//2 + 1)
         }
 
-        If (allowControls=1 && o_operation!="faker")
+        If (allowControls=1 && o_operation!="faker" && selSmall!=1)
         {
            If (VPselRotation!=0)
               Gdip_FillEllipse(2NDglPG, pBrushD, SelDotDx - dotsSize/3.5, SelDotDy - dotsSize/3.5, dotsSize*1.5, dotsSize*1.5)
@@ -65408,7 +65422,7 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
         If (IMGentirelylargerThanVP!=1) ; image boundaries
            Gdip_DrawRectangle(2NDglPG, pPen4, prevuDPx, prevuDPy, prevResizedVPimgW, prevResizedVPimgH)
 
-        If (imgSelW>125 && imgSelH>125 && minimizeMemUsage!=1 && dotActive<10 && !InStr(theMsg, "offset"))
+        If (imgSelW>175 && imgSelH>175 && minimizeMemUsage!=1 && dotActive<10 && !InStr(theMsg, "offset"))
         {
            cornersPreview := coreCaptureImgCorners(useGdiBitmap(), 6, 100)
            Gdip_GetImageDimensions(cornersPreview, cImgW, cImgH)
@@ -77683,8 +77697,10 @@ adjustCanvas2Toolbar(Gu, applyTransform) {
        Return 0
 
     hasTrans := 0
-    JEE_ScreenToClient(PVhwnd, UserToolbarX, UserToolbarY, thisX, thisY)
-    positionOk := (isInRange(thisX, -2, 10) && isInRange(thisY, -2, 10)) ? 1 : 0
+    WinGetPos, thisX, thisY, , , ahk_id %hQPVtoolbar%
+    JEE_ScreenToClient(PVhwnd, thisX, thisY, thisX, thisY)
+    positionOk := (isInRange(thisX, -5, 5) && isInRange(thisY, -5, 5)) ? 1 : 0
+    ; ToolTip, % "p=" positionOk "||" UserToolbarX "|" UserToolbarY "||" thisX "|" thisY , , , 2
     If (positionOk=1 && (TLBRverticalAlign=1 || TLBRtwoColumns=1) && isTitleBarVisible=1)
     {
        hasTrans := 1
@@ -83806,6 +83822,7 @@ createGUItoolbar(dummy:=0) {
       IniAction(0, "TLBRtwoColumns", "General", 1)
       IniAction(0, "lockToolbar2Win", "General", 1)
    }
+
    pku := isImgEditingNow()
    isWelcomeScreenu := (pku=1 || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
    isPaintPanel := (pku=1 && AnyWindowOpen=64) ? 1 : 0
@@ -83862,6 +83879,11 @@ createGUItoolbar(dummy:=0) {
       Sleep, 1
       ; WinMove, ahk_id %hQPVtoolbar%,, 100, 100
       WinSet, Transparent, % ToolbarOpacity, ahk_id %hQPVtoolbar%
+      If (lockToolbar2Win=1)
+         JEE_ClientToScreen(PVhwnd, 0, 0, UserToolbarX, UserToolbarY)
+
+      ; fnOutputDebug(UserToolbarX "|" UserToolbarY)
+      tX := Round(UserToolbarX),    tY := Round(UserToolbarY)
       Gui, OSDguiToolbar: Show, NoActivate x%UserToolbarX% y%UserToolbarY%, QPV toolbar
       whichWin := (AnyWindowOpen && panelWinCollapsed!=1) ? hSetWinGui : PVhwnd
       If (WinActive("A")=hQPVtoolbar)
@@ -85024,23 +85046,28 @@ testus2() {
    SendInput, ^{F4}
    Sleep, 50
 }
+/*
 
+#If, GetKeyState("CapsLock", "T")
+   \::
+     SetTimer, testus2, -150
+   Return
 
-; #If, GetKeyState("CapsLock", "T")
-;    \::
-;      SetTimer, testus2, -150
-;    Return
+   ; LButton::
+   ;    Sleep, 50
+   ;    SoundBeep , 300, 100
+   ;    SendInput, {LButton}
+   ;    Sleep, 950
+   ;    SendInput, ^{PgDn}
+   ;    SoundBeep , 900, 100
+   ; Return
 
-;    LButton::
-;       Sleep, 50
-;       SoundBeep , 300, 100
-;       SendInput, {LButton}
-;       Sleep, 950
-;       SendInput, ^{PgDn}
-;       SoundBeep , 900, 100
-;    Return
-; #If 
-
+   Tab::
+      SendInput, ^{PgDn}
+      SoundBeep , 900, 100
+   Return
+#If 
+*/
 ; #If, GetKeyState("CapsLock", "T")
 
    ; \::

@@ -2,6 +2,9 @@
 // by Marius Șucan ( https://marius.sucan.ro )
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.9.4 (2023-05-09)
+  - various bug fixes and improvements
+
 - v5.9.3 (2023-04-24)
   - [new] users can now paint or define the alpha mask in real time when using the image color adjustments tool
   - it is now possible to draw with a brush of 1px in size
