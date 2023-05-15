@@ -14488,6 +14488,7 @@ testSelectionLargerThanGiven(imgW, imgH) {
 testEntireImgSelected(imgW:=0, imgH:=0) {
     If (!imgW || !imgH)
        Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+
     nImgSelX1 := min(imgSelX1, imgSelX2)
     nImgSelY1 := min(imgSelY1, imgSelY2)
     nimgSelX2 := max(imgSelX1, imgSelX2)
@@ -16842,11 +16843,10 @@ BlurSelectedArea(modus:="") {
     If (UserMemBMP!=whichBitmap)
        gdiBitmap := ""
 
-    pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
+    pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY, 0)
     pB := GetPathRelativeBounds(pPath, imgSelPx, imgSelPy)
     imgSelPx := pB.x,  imgSelPy := pB.y
     imgSelW  := pB.w,  imgSelH  := pB.h
-
     If (blurAreaSoftEdges!=1 && pPath || modus="pixelize")
     {
        nodus := (blurAreaInverted=1) ? 4 : 0
@@ -16865,9 +16865,12 @@ BlurSelectedArea(modus:="") {
 
     thisOpacity := blurAreaOpacity/255
     zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
-    QPV_SetGivenAlphaLevel(zBitmap, 1, 1)
+    If (modus="pixelize")
+       isUni := Gdip_TestBitmapUniformity(zBitmap, 7, maxLevelIndex, nimo, avgLevelAlpha)
 
+    ; ToolTip, % "l=" isUni " | " maxLevelIndex , , , 2
     ; ToolTip, % blurAreaPixelizeAmount "==" blurAreaPixelizeMethod "==" modus , , , 2
+    QPV_SetGivenAlphaLevel(zBitmap, 1, 1)
     If (blurAreaPixelizeAmount>1 && blurAreaPixelizeMethod>1 && modus="pixelize")
     {
        thisAmount := blurAreaPixelizeAmount
@@ -16959,6 +16962,9 @@ BlurSelectedArea(modus:="") {
        ApplySpecialFixedBlur(A_ThisFunc, zBitmap, o_blurAreaAmount, pEffect)
     Else If (modus="pixelize" && blurAreaAmount>2)
        QPV_BoxBlurBitmap(zBitmap, Round(blurAreaAmount*0.5), Round(blurAreaAmount*0.5), 0)
+
+    If (isUni && modus="pixelize")
+       QPV_SetGivenAlphaLevel(zBitmap, avgLevelAlpha, 0)
 
     If (BlurAreaBlendMode>1 || allowAlphaMasking=1)
        bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
@@ -41880,8 +41886,13 @@ PanelBlurSelectedArea() {
     If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
        GuiControl, Disable, BlurAreaAlphaMask
 
-    If (wasSelect!=1 && EllipseSelectMode=0 && VPselRotation=0)
+    If ((wasSelect!=1 || testEntireImgSelected()) && EllipseSelectMode=0 && VPselRotation=0)
+    {
        GuiControl, Disable, blurAreaInverted
+       GuiControl, Disable, blurAreaSoftEdges
+       GuiControl,, blurAreaInverted, 0
+       GuiControl,, blurAreaSoftEdges, 0
+    }
 
     Gui, Tab, 2
     Gui, Add, Text, x+10 y+10 Section w%thisW% gBtnResetBlendMode +TabStop +hwndhTemp, Blending mode: 
@@ -43382,22 +43393,25 @@ updateUIblurPanel(a:=0,b:=0) {
           GuiControl, SettingsGUIA: Disable, blurAreaSoftEdges
           GuiControl, SettingsGUIA:, blurAreaSoftEdges, 0
        }
+
        pr := (blurAreaEqualXY=1) ? blurAreaAmount : max(blurAreaAmount, blurAreaYamount)
+       gr := (testEntireImgSelected() && EllipseSelectMode=0 && VPselRotation=0) ? 1 : 0
+       actu := (gr==0) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        If (pr>1)
        {
           GuiControl, SettingsGUIA: Enable, blurAreaMode
-          GuiControl, SettingsGUIA: Enable, blurAreaSoftEdges
-          GuiControl, SettingsGUIA: Enable, blurAreaSoftLevel
           GuiControl, SettingsGUIA: Enable, mainBtnACT
+          GuiControl, % actu, blurAreaSoftEdges
+          GuiControl, % actu, blurAreaSoftLevel
           If (blurAreaSoftEdges=1)
              GuiControl, SettingsGUIA: Enable, blurAreaTwice
        } Else
        {
           GuiControl, SettingsGUIA: Disable, blurAreaMode
           GuiControl, SettingsGUIA: Disable, blurAreaTwice
-          GuiControl, SettingsGUIA: Disable, blurAreaSoftEdges
-          GuiControl, SettingsGUIA: Disable, blurAreaSoftLevel
           GuiControl, SettingsGUIA: Disable, mainBtnACT
+          GuiControl, % actu, blurAreaSoftEdges
+          GuiControl, % actu, blurAreaSoftLevel
        }
 
        actu := (blurAreaMode>=4) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"

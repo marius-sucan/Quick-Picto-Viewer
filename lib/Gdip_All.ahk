@@ -8676,7 +8676,7 @@ Gdip_RenderPixelsOpaque(pBitmap, pBrush:=0, alphaLevel:=0, PixelFormat:=0) {
     Return newBitmap
 }
 
-Gdip_TestBitmapUniformity(pBitmap, HistogramFormat:=3, ByRef maxLevelIndex:=0, ByRef maxLevelPixels:=0) {
+Gdip_TestBitmapUniformity(pBitmap, HistogramFormat:=3, ByRef maxLevelIndex:=0, ByRef maxLevelPixels:=0, ByRef avgLevel:=0) {
 ; This function tests whether the given pBitmap 
 ; is in a single shade [color] or not.
 
@@ -8705,20 +8705,28 @@ Gdip_TestBitmapUniformity(pBitmap, HistogramFormat:=3, ByRef maxLevelIndex:=0, B
       Return -2
 
    histoList := ""
+   counter := 0
+   sum := 0
    Loop 256
    {
        nrPixels := Round(LevelsArray[A_Index - 1])
        If (nrPixels>0)
+       {
+          counter++
           histoList .= nrPixels "." A_Index - 1 "|"
+          sum += A_Index - 1
+       }
    }
+
+   avgLevel := Round(sum/counter, 1)
    Sort histoList, NURD|
    histoList := Trim(histoList, "|")
    histoListSortedArray := StrSplit(histoList, "|")
    maxLevel := StrSplit(histoListSortedArray[1], ".")
    maxLevelIndex := maxLevel[2]
    maxLevelPixels := maxLevel[1]
-   ; ToolTip, % maxLevelIndex " -- " maxLevelPixels " | " histoListSortedArray[1] "`n" histoList, , , 3
-   pixelsThreshold := Round((Width * Height) * 0.0005) + 1
+   pixelsThreshold := Round((Width * Height) * 0.0065) + 1
+   ; ToolTip, % pixelsThreshold "|" maxLevelIndex " -- " maxLevelPixels " | " histoListSortedArray[1] "`n" histoList, , , 3
    If (Floor(histoListSortedArray[2])<pixelsThreshold)
       Return 1
    Else 
