@@ -2,7 +2,13 @@
 // by Marius Șucan ( https://marius.sucan.ro )
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.9.5 (2023-05-15)
+  - [new] fill selected area object can be invert-blurred... this is a rudimentary implementation to create glows and inner shadows
+  - [new] selection area is previewed in the thumbnails list mode for the selected files
+  - fixed «crop selected images» option
+
 - v5.9.4 (2023-05-09)
+  - [new] the object can be blured in the «Fill selected area» panel
   - various bug fixes and improvements
 
 - v5.9.3 (2023-04-24)
