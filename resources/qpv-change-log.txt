@@ -2,14 +2,32 @@
 // by Marius Șucan ( https://marius.sucan.ro )
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.9.6 (2023-07-01)
+  - [new] soft brush tool allows users to paint with blending modes
+  - [new] «air-brush mode» for the soft brush tool
+  - [new] painting with symmetry is now possible with the eraser and effects brushes as well
+  - [new] more blending modes: average, ghosting, divide
+  - [new] option to swap layer A with layer B for the non-commutative blending modes
+  - fixed regressions since version v5.9.3; add noise, detect edges filters were malfunctioning
+  - various other bug fixes
+
 - v5.9.5 (2023-05-15)
   - [new] fill selected area object can be invert-blurred... this is a rudimentary implementation to create glows and inner shadows
   - [new] selection area is previewed in the thumbnails list mode for the selected files
   - fixed «crop selected images» option
+  - fixed regressions related to image blur introduced by v5.9.3
 
 - v5.9.4 (2023-05-09)
   - [new] the object can be blured in the «Fill selected area» panel
   - various bug fixes and improvements
+    - fixed issues related to toolbar positioning, when attached to the main window
+    - fixed dark mode menus on Win11
+    - fixed «crop image to viewport selection», regression since v5.9.3
+    - fixed menu item «Zoom 100%»
+    - reimplemented image scrolling in the viewport when «allow image panning outside the viewport» is activated; it is now much smoother
+    - the viewport info-box is no longer being hidden when the QPV main window is deactivated
+    - the panel collapsed widget icons are now of the same size as the main toolbar
+    - now, when the selection area is small, the dots get small as well; the mid-center rotation dot also hides
 
 - v5.9.3 (2023-04-24)
   - [new] users can now paint or define the alpha mask in real time when using the image color adjustments tool
@@ -20,6 +38,8 @@
 
 - v5.9.2 (2023-04-06)
   - various bug fixes related to dupes detection
+  - when a database is opened and a folder is dropped, the files list is now correctly updated
+  - improved behaviour when dropping files on the main window
 
 - v5.9.1 (2023-03-30)
   - [new] users can enable multi-threaded processing for file format conversions
@@ -50,7 +70,8 @@
   - bug fixes
 
 - v5.8.6 (2023-02-02)
-  - various bug fixes;
+  - various bug fixes, some are related to the user interface [panels] and dark mode
+  - the user is now prompted to paste in place the image dropped or add it to the files list
 
 - v5.8.5 (2023-01-31)
   - [new] complete overhaul of all the panels; better layouts, replaced all the win32 sliders with a custom slider control

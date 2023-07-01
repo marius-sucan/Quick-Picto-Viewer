@@ -403,12 +403,12 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
       If RegExMatch(StrReplace(btnText, "&"), "i)(discard|remove|delete|erase|wipe)")
       {
          Gui, Add, Text, xp+0 y+0 wp h%ledH% -border +0xE +hwndhTemp +Disabled, Destructive option indicator
-         oldupdateColoredRectCtrl("FF5500", hTemp)
+         ; oldupdateColoredRectCtrl("FF5500", hTemp)
          addedLine := 1
       } Else If InStr(def, "+def")
       {
          Gui, Add, Text, xp+0 y+0 wp h%ledH% -border +0xE +hwndhTemp +Disabled, Default option indicator
-         oldupdateColoredRectCtrl("2288FF", hTemp)
+         ; oldupdateColoredRectCtrl("2288FF", hTemp)
          addedLine := 1
       }
   }

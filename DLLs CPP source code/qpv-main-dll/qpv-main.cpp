@@ -12,6 +12,8 @@
 #include <vector>
 #include <stack>
 #include <map>
+#include <unordered_map>
+#include <list>
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -112,6 +114,15 @@ DLL_API int DLL_CALLCONV SetColorAlphaChannel(int *imageData, int w, int h, int 
     return 1;
 }
 
+
+int inline INTweighTwoValues(int A, int B, float w) {
+    return (float)(A * w + B * (1 - w));
+}
+
+float inline weighTwoValues(float A, float B, float w) {
+    return (A*w + B*(1-w));
+}
+
 double inverseGamma(double X) {
   // Inverse sRGB gamma correction
   if (X>0.0404482362771076)
@@ -168,9 +179,9 @@ int RGBtoGray(int sR, int sG, int sB, int alternateMode) {
      return round((float)(sR*0.299 + sG*0.587 + sB*0.114)); // weighted grayscale conversion
 
   // convert RGB to XYZ color space
-  double var_R = (float)sR/255;
-  double var_G = (float)sG/255;
-  double var_B = (float)sB/255;
+  double var_R = (float)sR/255.0;
+  double var_G = (float)sG/255.0;
+  double var_B = (float)sB/255.0;
 
   // Inverse sRGB gamma correction
   var_R = inverseGamma(var_R);
@@ -182,7 +193,7 @@ int RGBtoGray(int sR, int sG, int sB, int alternateMode) {
   //    return round(Y); // return derived luminosity in XYZ color space
 
   Y = toLABfx(Y);
-  double L = 116*Y - 16;
+  double L = 116.0*Y - 16.0;
   // if (L>499)
   //     L = 499;
   // else if (L<0)
@@ -443,137 +454,265 @@ auto RGBtoLAB(int sR, int sG, int sB) {
   // ss << " a=" << Lab[1];
   // ss << " b=" << Lab[2];
   // OutputDebugStringA(ss.str().data());
-
   return Lab;
 }
 
+
+HSLColor ConvertRGBtoHSL(float iR, float iG, float iB, int isFloat) {
+   double R = (isFloat==1) ? iR : (iR / 255.0f);
+   double G = (isFloat==1) ? iG : (iG / 255.0f);
+   double B = (isFloat==1) ? iB : (iB / 255.0f);
+   double minu    = min(R, min(G, B));
+   double maxu    = max(R, max(G, B));
+   double del_Max = maxu - minu;
+   double L       = (maxu + minu) / 2.0f;
+   // fnOutputDebug(std::to_string(R) + " / " + std::to_string(G) + " / " + std::to_string(B));
+   // fnOutputDebug(std::to_string(del_Max) + " mi/ma:" + std::to_string(minu) + " / " + std::to_string(maxu));
+   double H, S, del_R, del_G, del_B;
+   if (del_Max == 0)
+   {
+      H = S = 0;
+   } else
+   {
+      if (L < 0.5)
+         S = del_Max / (maxu + minu);
+      else
+         S = del_Max / (2.0f - del_Max);
+
+      del_R = (((maxu - R) / 6.0f) + (del_Max / 2.0f)) / del_Max;
+      del_G = (((maxu - G) / 6.0f) + (del_Max / 2.0f)) / del_Max;
+      del_B = (((maxu - B) / 6.0f) + (del_Max / 2.0f)) / del_Max;
+      if (R == maxu)
+      {
+         H = del_B - del_G;
+      } else
+      {
+         if (G == maxu)
+            H = (1.0f / 3.0f) + del_R - del_B;
+         else if (B == maxu)
+            H = (2.0f / 3.0f) + del_G - del_R;
+      }
+      if (H < 0)
+         H += 1.0f;
+      if (H > 1)
+         H -= 1.0f;
+   }
+
+   H = abs(H*360.0f);
+   S = abs(S);
+   L = abs(L);
+   return {H, S, L};
+}
+
+double ConvertHueToRGB(double v1, double v2, double vH) {
+   vH = ((vH<0) ? ++vH : vH);
+   vH = ((vH>1) ? --vH : vH);
+   return ((6.0f * vH) < 1) ? (v1 + (v2 - v1) * 6.0f * vH)
+          : ((2.0f * vH) < 1) ? (v2)
+          : ((3.0f * vH) < 2) ? (v1 + (v2 - v1) * ((2.0f / 3.0f) - vH) * 6.0f)
+          : v1;
+}
+
+RGBColor ConvertHSLtoRGB(double H, double S, double L) {
+// http://www.had2know.com/technology/hsl-rgb-color-converter.html
+
+   H = H/360.0f;
+   double var_1, var_2, R, G, B;
+
+   if (S == 0)
+   {
+      R = L*255.0f;
+      G = L*255.0f;
+      B = L*255.0f;
+   } else
+   {
+      if (L < 0.5)
+         var_2 = L * (1.0f + S);
+      else
+         var_2 = (L + S) - (S * L);
+
+      var_1 = 2.0f * L - var_2;
+      R = 255.0f * ConvertHueToRGB(var_1, var_2, H + (1.0f / 3.0f));
+      G = 255.0f * ConvertHueToRGB(var_1, var_2, H);
+      B = 255.0f * ConvertHueToRGB(var_1, var_2, H - (1.0f / 3.0f));
+   }
+   return {R, G, B};
+}
+
+DLL_API int DLL_CALLCONV testHSLrgbConv(int rOh, int gOs, int bOl) {
+  fnOutputDebug("yahoos");
+
+  HSLColor hslO = ConvertRGBtoHSL(rOh, gOs, bOl, 0);
+  fnOutputDebug("HSL: " + std::to_string(hslO.h) + " / " + std::to_string(hslO.s) + " / " + std::to_string(hslO.l) ); 
+ 
+  RGBColor r = ConvertHSLtoRGB(hslO.h, hslO.s, hslO.l);
+  fnOutputDebug("RGB: " + std::to_string(r.r) + " / " + std::to_string(r.g) + " / " + std::to_string(r.b) ); 
+  return 1;
+}
+
 void calculateBlendModes(int rO, int gO, int bO, int rB, int gB, int bB, int blendMode, int *results) {
-    int rT = 0;
-    int gT = 0;
-    int bT = 0;
+    float rT = 0;
+    float gT = 0;
+    float bT = 0;
+    float rOf = char_to_float[rO];
+    float gOf = char_to_float[gO];
+    float bOf = char_to_float[bO];
+    float rBf = char_to_float[rB];
+    float gBf = char_to_float[gB];
+    float bBf = char_to_float[bB];
 
     if (blendMode == 1) { // darken
-        rT = min(rO, rB);
-        gT = min(gO, gB);
-        bT = min(bO, bB);
+        rT = min(rOf, rBf);
+        gT = min(gOf, gBf);
+        bT = min(bOf, bBf);
     }
     else if (blendMode == 2) { // multiply
-        rT = (rO * rB) / 255;
-        gT = (gO * gB) / 255;
-        bT = (bO * bB) / 255;
+        rT = rOf * rBf;
+        gT = gOf * gBf;
+        bT = bOf * bBf;
     }
     else if (blendMode == 3) { // linear burn
-       rT = rO + rB - 255;
-       gT = gO + gB - 255;
-       bT = bO + bB - 255;
+       rT = rOf + rBf - 1;
+       gT = gOf + gBf - 1;
+       bT = bOf + bBf - 1;
     }
     else if (blendMode == 4) { // color burn
-        rT = (255 - ((255 - rB) * 255) / (1 + rO) < 1) ? 0 : 255 - ((255 - rB) * 255) / (1 + rO);
-        gT = (255 - ((255 - gB) * 255) / (1 + gO) < 1) ? 0 : 255 - ((255 - gB) * 255) / (1 + gO);
-        bT = (255 - ((255 - bB) * 255) / (1 + bO) < 1) ? 0 : 255 - ((255 - bB) * 255) / (1 + bO);
+       rT = 1 - ((1 - rBf) / rOf);
+       gT = 1 - ((1 - gBf) / gOf);
+       bT = 1 - ((1 - bBf) / bOf);
     }
     else if (blendMode == 5) { // lighten
-        rT = max(rO, rB);
-        gT = max(gO, gB);
-        bT = max(bO, bB);
+        rT = max(rOf, rBf);
+        gT = max(gOf, gBf);
+        bT = max(bOf, bBf);
     }
     else if (blendMode == 6) { // screen
-        rT = 255 - (((255 - rO) * (255 - rB)) / 255);
-        gT = 255 - (((255 - gO) * (255 - gB)) / 255);
-        bT = 255 - (((255 - bO) * (255 - bB)) / 255);
+        rT = 1 - ( (1 - rBf) * (1 - rOf) );
+        gT = 1 - ( (1 - gBf) * (1 - gOf) );
+        bT = 1 - ( (1 - bBf) * (1 - bOf) );
     }
     else if (blendMode == 7) { // linear dodge [add]
-        rT = rO + rB;
-        gT = gO + gB;
-        bT = bO + bB;
+        rT = rOf + rBf;
+        gT = gOf + gBf;
+        bT = bOf + bBf;
     }
     else if (blendMode == 8) { // hard light
-        rT = (rO < 127) ? (2 * rO * rB) / 255 : 255 - ((2 * (255 - rO) * (255 - rB)) / 255);
-        gT = (gO < 127) ? (2 * gO * gB) / 255 : 255 - ((2 * (255 - gO) * (255 - gB)) / 255);
-        bT = (bO < 127) ? (2 * bO * bB) / 255 : 255 - ((2 * (255 - bO) * (255 - bB)) / 255);
+        rT = (rOf < 0.5) ? 2 * rOf * rBf : 1 - (2 * (1 - rOf) * (1 - rBf) );
+        gT = (gOf < 0.5) ? 2 * gOf * gBf : 1 - (2 * (1 - gOf) * (1 - gBf) );
+        bT = (bOf < 0.5) ? 2 * bOf * bBf : 1 - (2 * (1 - bOf) * (1 - bBf) );
     }
-    else if (blendMode == 9) { // overlay
-        rT = (rB < 127) ? (2 * rO * rB) / 255 : 255 - ((2 * (255 - rO) * (255 - rB)) / 255);
-        gT = (gB < 127) ? (2 * gO * gB) / 255 : 255 - ((2 * (255 - gO) * (255 - gB)) / 255);
-        bT = (bB < 127) ? (2 * bO * bB) / 255 : 255 - ((2 * (255 - bO) * (255 - bB)) / 255);
+    // else if (blendMode == 9) { // soft light A
+    //     rT = (1 - 2*rOf) * pow(rBf, 2) + 2 * rOf * rBf;
+    //     gT = (1 - 2*gOf) * pow(gBf, 2) + 2 * gOf * gBf;
+    //     bT = (1 - 2*bOf) * pow(bBf, 2) + 2 * bOf * bBf;
+    // }
+    else if (blendMode == 9) { // soft light B
+        rT = (rOf < 0.5) ? (1 - 2*rOf) * pow(rBf, 2) + 2 * rBf * rOf : 2 * rBf * (1 - rOf) + sqrt(rBf) * (2 * rOf - 1);
+        gT = (gOf < 0.5) ? (1 - 2*gOf) * pow(gBf, 2) + 2 * gBf * gOf : 2 * gBf * (1 - gOf) + sqrt(gBf) * (2 * gOf - 1);
+        bT = (bOf < 0.5) ? (1 - 2*bOf) * pow(bBf, 2) + 2 * bBf * bOf : 2 * bBf * (1 - bOf) + sqrt(bBf) * (2 * bOf - 1);
     }
-    else if (blendMode == 10) { // hard mix
-        rT = (rO <= (255 - rB)) ? 0 : 255;
-        gT = (gO <= (255 - gB)) ? 0 : 255;
-        bT = (bO <= (255 - bB)) ? 0 : 255;
+    else if (blendMode == 10) { // overlay
+        rT = (rBf < 0.5) ? 2 * rOf * rBf : 1 - (2 * (1 - rOf) * (1 - rBf) );
+        gT = (gBf < 0.5) ? 2 * gOf * gBf : 1 - (2 * (1 - gOf) * (1 - gBf) );
+        bT = (bBf < 0.5) ? 2 * bOf * bBf : 1 - (2 * (1 - bOf) * (1 - bBf) );
     }
-    else if (blendMode == 11) { // linear light
-        rT = rB + (2 * rO) - 255;
-        gT = gB + (2 * gO) - 255;
-        bT = bB + (2 * bO) - 255;
+    else if (blendMode == 11) { // hard mix
+        rT = (rOf <= (1 - rBf)) ? 0 : 1;
+        gT = (gOf <= (1 - gBf)) ? 0 : 1;
+        bT = (bOf <= (1 - bBf)) ? 0 : 1;
     }
-    else if (blendMode == 12) { // color dodge
-        rT = (rB * 255) / (256 - rO);
-        gT = (gB * 255) / (256 - gO);
-        bT = (bB * 255) / (256 - bO);
+    else if (blendMode == 12) { // linear light
+        rT = rBf + (2 * rOf) - 1;
+        gT = gBf + (2 * gOf) - 1;
+        bT = bBf + (2 * bOf) - 1;
     }
-    else if (blendMode == 13) { // vivid light 
-        if (rO < 127)
-            rT = 255 - ((255 - rB) * 255) / (1 + 2 * rO);
+    else if (blendMode == 13) { // color dodge
+        rT = rBf / (1 - rOf);
+        gT = gBf / (1 - gOf);
+        bT = bBf / (1 - bOf);
+    }
+    else if (blendMode == 14) { // vivid light 
+        // this blend mode combines Color Dodge and Color Burn (rescaled so that neutral colors become middle gray). Dodge applies when values in the top layer are lighter than middle gray, and burn applies to darker values
+        if (rOf < 0.5)
+           rT = 1 - (1 - rBf) / (2 * rOf);
         else
-            rT = (rB * 255) / (2 * (256 - rO));
+           rT = rBf / (2 * (1 - rOf));
 
-        if (gO < 127)
-            gT = 255 - ((255 - gB) * 255) / (1 + 2 * gO);
+        if (gOf < 0.5)
+           gT = 1 - (1 - gBf) / (2 * gOf);
         else
-            gT = (gB * 255) / (2 * (256 - gO));
+           gT = gBf / (2 * (1 - gOf));
 
-        if (bO < 127)
-            bT = 255 - ((255 - bB) * 255) / (1 + 2 * bO);
+        if (bOf < 0.5)
+           bT = 1 - (1 - bBf) / (2 * bOf);
         else
-            bT = (bB * 255) / (2 * (256 - bO));
+           bT = bBf / (2 * (1 - bOf));
     }
-    else if (blendMode == 14) { // division
-        rT = (rO * 255) / (1 + rB);
-        gT = (gO * 255) / (1 + gB);
-        bT = (bO * 255) / (1 + bB);
+    else if (blendMode == 15) { // average
+        rT = (rBf + rOf)/2;
+        gT = (gBf + gOf)/2;
+        bT = (bBf + bOf)/2;
     }
-    else if (blendMode == 15) { // exclusion
-        rT = rO + rB - 2 * ((rO * rB) / 255);
-        gT = gO + gB - 2 * ((gO * gB) / 255);
-        bT = bO + bB - 2 * ((bO * bB) / 255);
+    else if (blendMode == 16) { // divide
+        rT = rBf / rOf;
+        gT = gBf / gOf;
+        bT = bBf / bOf;
     }
-    else if (blendMode == 16) { // difference
-        rT = (rO > rB) ? rO - rB : rB - rO;
-        gT = (gO > gB) ? gO - gB : gB - gO;
-        bT = (bO > bB) ? bO - bB : bB - bO;
+    else if (blendMode == 17) { // exclusion
+        rT = rOf + rBf - 2 * (rOf * rBf);
+        gT = gOf + gBf - 2 * (gOf * gBf);
+        bT = bOf + bBf - 2 * (bOf * bBf);
     }
-    else if (blendMode == 17) { // substract
-        rT = rO - rB;
-        gT = gO - gB;
-        bT = bO - bB;
+    else if (blendMode == 18) { // difference
+        rT = (rOf > rBf) ? rOf - rBf : rBf - rOf;
+        gT = (gOf > gBf) ? gOf - gBf : gBf - gOf;
+        bT = (bOf > bBf) ? bOf - bBf : bBf - bOf;
     }
-    else if (blendMode == 18) { // luminosity
-        int gray = RGBtoGray(rO, gO, bO, 1) - RGBtoGray(rB, gB, bB, 1);
-        rT = gray + rB;
-        gT = gray + gB;
-        bT = gray + bB;
+    else if (blendMode == 19) { // substract
+        rT = rBf - rOf;
+        gT = gBf - gOf;
+        bT = bBf - bOf;
     }
-    else if (blendMode == 19) { // substract reverse
-        rT = rB - rO;
-        gT = gB - gO;
-        bT = bB - bO;
+    else if (blendMode == 20) { // luminosity
+        double lO = (rO*0.299f + gO*0.587f + bO*0.114f)/255.0f;
+        double lB = (rB*0.299f + gB*0.587f + bB*0.114f)/255.0f;
+        rT = lO + rBf - lB;
+        gT = lO + gBf - lB;
+        bT = lO + bBf - lB;
+
+        // HSLColor hslO = ConvertRGBtoHSL(rOf, gOf, bOf, 1);
+        // HSLColor hslB = ConvertRGBtoHSL(rBf, gBf, bBf, 1);
+        // // RGBColor rgbf = ConvertHSLtoRGB(hslB.h, hslB.s, hslB.l);
+        // RGBColor rgbf = ConvertHSLtoRGB(hslO.h, hslO.s, hslO.l);
+        // rT = rgbf.r/255.0f;
+        // gT = rgbf.g/255.0f;
+        // bT = rgbf.b/255.0f;
     }
-    else if (blendMode == 20) { // inverted difference
-        rT = (rO > rB) ? 255 - rO - rB : 255 - rB - rO;
-        gT = (gO > gB) ? 255 - gO - gB : 255 - gB - gO;
-        bT = (bO > bB) ? 255 - bO - bB : 255 - bB - bO;
+    else if (blendMode == 21) { // luminosity
+        double lO = (rO*0.299f + gO*0.587f + bO*0.114f)/255.0f;
+        double lB = (rB*0.299f + gB*0.587f + bB*0.114f)/255.0f;
+        rT = lB - lO + rBf + rOf/5;
+        gT = lB - lO + gBf + gOf/5;
+        bT = lB - lO + bBf + bOf/5;
+    }
+    // else if (blendMode == 22) { // substract reverse
+    //     rT = rOf - rBf;
+    //     gT = gOf - gBf;
+    //     bT = bOf - bBf;
+    // }
+    else if (blendMode == 22) { // inverted difference
+        rT = (rOf > rBf) ? 1 - rOf - rBf : 1 - rBf - rOf;
+        gT = (gOf > gBf) ? 1 - gOf - gBf : 1 - gBf - gOf;
+        bT = (bOf > bBf) ? 1 - bOf - bBf : 1 - bBf - bOf;
     }
 
-    if (blendMode != 10) {
-       rT = clamp(rT, 0, 255);
-       gT = clamp(gT, 0, 255);
-       bT = clamp(bT, 0, 255); 
-    }
+    rT = clamp(rT, 0.0f, 1.0f);
+    gT = clamp(gT, 0.0f, 1.0f);
+    bT = clamp(bT, 0.0f, 1.0f); 
 
-    results[0] = rT;   
-    results[1] = gT;   
-    results[2] = bT;   
+    results[0] = clamp((int)round(rT*255), 0, 255);
+    results[1] = clamp((int)round(gT*255), 0, 255);
+    results[2] = clamp((int)round(bT*255), 0, 255);
 }
 
 void toCMYK(float red, float green, float blue, float* cmyk) {
@@ -589,17 +728,9 @@ void toCMYK(float red, float green, float blue, float* cmyk) {
 }
 
 void toRGB(float c, float m, float y, float k, float *rgb) {
-  rgb[0] = -((c * (255-k)) / 255 + k - 255);
-  rgb[1] = -((m * (255-k)) / 255 + k - 255);
-  rgb[2] = -((y * (255-k)) / 255 + k - 255);
-}
-
-int inline INTweighTwoValues(int A, int B, float w) {
-    return (float)(A * w + B * (1 - w));
-}
-
-float inline weighTwoValues(float A, float B, float w) {
-    return (A*w + B*(1-w));
+  rgb[0] = -((c * (255.0 - k)) / 255.0 + k - 255.0);
+  rgb[1] = -((m * (255.0 - k)) / 255.0 + k - 255.0);
+  rgb[2] = -((y * (255.0 - k)) / 255.0 + k - 255.0);
 }
 
 int mixColors(int colorB, float *colorA, float f, int dynamicOpacity, int blendMode, float prevCLRindex, float tolerance, int alternateMode, float thisCLRindex) {
@@ -645,6 +776,67 @@ int mixColors(int colorB, float *colorA, float f, int dynamicOpacity, int blendM
   int rT = INTweighTwoValues(rO, rB, f);
   int gT = INTweighTwoValues(gO, gB, f);
   int bT = INTweighTwoValues(bO, bB, f);
+
+    // std::stringstream ss;
+    // ss << "qpv: opacity = " << f;
+    // ss << " rA=" << rA;
+    // ss << "rB=" << rB;
+    // ss << "rT=" << rT;
+    // ss << " | gA=" << gA;
+    // ss << "gB=" << gB;
+    // ss << "gT=" << gT;
+    // // ss << " r = " << result;
+    // OutputDebugStringA(ss.str().data());
+
+  return (aT << 24) | ((rT & 0xFF) << 16) | ((gT & 0xFF) << 8) | (bT & 0xFF);
+}
+
+int simpleMixColors(int colorB, float *colorA, float f, int blendMode, int linearGamma, int flipLayers) {
+// source https://stackoverflow.com/questions/10139833/adding-colours-colors-together-like-paint-blue-yellow-green-etc
+// http://www.easyrgb.com/en/math.php
+ 
+  int aB = (colorB >> 24) & 0xFF;
+  int rB = (colorB >> 16) & 0xFF;
+  int gB = (colorB >> 8) & 0xFF;
+  int bB = colorB & 0xFF;
+  int aO = colorA[0];
+  int rO = colorA[1];
+  int gO = colorA[2];
+  int bO = colorA[3];
+  int aBf, rBf, gBf, bBf, aOf, rOf, gOf, bOf;
+  aBf = (linearGamma==1) ? gamma_to_linear[aB] : aB;
+  rBf = (linearGamma==1) ? gamma_to_linear[rB] : rB;
+  gBf = (linearGamma==1) ? gamma_to_linear[gB] : gB;
+  bBf = (linearGamma==1) ? gamma_to_linear[bB] : bB;
+  aOf = (linearGamma==1) ? gamma_to_linear[aO] : aO;
+  rOf = (linearGamma==1) ? gamma_to_linear[rO] : rO;
+  gOf = (linearGamma==1) ? gamma_to_linear[gO] : gO;
+  bOf = (linearGamma==1) ? gamma_to_linear[bO] : bO;
+
+  if (blendMode>0)
+  {
+     int results[3];
+     if (flipLayers==1)
+        calculateBlendModes(rB, gB, bB, rO, gO, bO, blendMode, results);
+     else
+        calculateBlendModes(rO, gO, bO, rB, gB, bB, blendMode, results);
+
+     rOf = (linearGamma==1) ? gamma_to_linear[results[0]] : results[0];
+     gOf = (linearGamma==1) ? gamma_to_linear[results[1]] : results[1];
+     bOf = (linearGamma==1) ? gamma_to_linear[results[2]] : results[2];
+  }
+
+  int aT = INTweighTwoValues(aOf, aBf, f);
+  int rT = INTweighTwoValues(rOf, rBf, f);
+  int gT = INTweighTwoValues(gOf, gBf, f);
+  int bT = INTweighTwoValues(bOf, bBf, f);
+  if (linearGamma==1)
+  {
+     aT = linear_to_gamma[aT];
+     rT = linear_to_gamma[rT];
+     gT = linear_to_gamma[gT];
+     bT = linear_to_gamma[bT];
+  }
 
     // std::stringstream ss;
     // ss << "qpv: opacity = " << f;
@@ -938,7 +1130,7 @@ DLL_API int DLL_CALLCONV FloodFyll(int *imageData, int modus, int w, int h, int 
     // float CIE = CIEdeltaE2000(LabA[0], LabA[1], LabA[2], LabB[0], LabB[1], LabB[2], 1, 1, 1);
     // float CIE2 = testCIEdeltaE2000(LabA[0], LabA[1], LabA[2], LabB[0], LabB[1], LabB[2], 1, 1, 1);
 
-    float opacity = (float)fillOpacity / 255;
+    float opacity = (float)fillOpacity / 255.0f;
     if (tolerance==0 && (opacity<1 || blendMode>0))
        newColor = mixColors(prevColor, nC, opacity, 0, blendMode, 0, 0, 0, 0);
 
@@ -1095,7 +1287,7 @@ DLL_API int DLL_CALLCONV EraserBrush(int *imageData, int *maskData, int w, int h
                alpha2 = levelAlpha;
 
             alpha2 = (alpha2==a) ? a : ceil(alpha2*fintensity + a*max(0.0f, 1.0f - fintensity));  // Formula: A*w + B*(1 – w)
-            int haha = (alpha2!=a) ? 1 : 0;
+            // int haha = (alpha2!=a) ? 1 : 0;
             if (alpha2!=a)
             {
                 if (useClone==1)
@@ -1114,6 +1306,68 @@ DLL_API int DLL_CALLCONV EraserBrush(int *imageData, int *maskData, int w, int h
     // fnOutputDebug("eraser alpha = " + std::to_string(levelAlpha));
     return 1;
 }
+
+DLL_API int DLL_CALLCONV ColourBrush(int *opacityImgData, int *imageData, int *maskData, int newColor, int w, int h, int invertMask, int replaceMode, int brushAlpha, int blendMode, int *clonedData, int useClone, int overDraw, int linearGamma, int wa, int ha, int offX, int offY, int flipLayers) {
+// only works with 32-PARGB bitmaps 
+    float nC[4];
+    nC[0] = (replaceMode==1) ? brushAlpha : (newColor >> 24) & 0xFF;
+    nC[1] = (newColor >> 16) & 0xFF;
+    nC[2] = (newColor >> 8) & 0xFF;
+    nC[3] = newColor & 0xFF;
+    int apx = (w/2) * h + h/2;
+    int centerLevel = (maskData[apx] >> 8) & 0xff;
+
+    float pK[4];
+    pK[0] = 255;
+    pK[1] = centerLevel;
+    pK[2] = centerLevel;
+    pK[3] = centerLevel;
+    float fr = 2.5f;
+    if (overDraw==1 && blendMode>0)
+    {
+       brushAlpha = clamp(brushAlpha + 128, 0, 255);
+       fr = 3.25f;
+    }
+
+    float fb = (255.0f - brushAlpha)/255.0f;
+    for (int y = 0; y < h; y++)
+    {
+        for (int x = 0; x < w; x++)
+        {
+            int px = x * h + y;
+            int BGRcolor = (overDraw==0) ? clonedData[px] : imageData[px];
+            int intensity = (maskData[px] >> 8) & 0xff;
+            int clipFlag = (opacityImgData[px] >> 24) & 0xff;
+            if (invertMask==1)
+               intensity = 255 - intensity;
+
+            float fintensity = intensity/255.0f;
+            if (overDraw==1)
+            {
+               fintensity -= fb;
+            } else
+            {
+               int altoAlpha = (opacityImgData[px] >> 8) & 0xff;
+               int tL = INTweighTwoValues(255, altoAlpha, fintensity/fr);
+               fintensity = tL/255.0f - fb;
+               if (clipFlag<2)
+                  tL = 0;
+
+               if (overDraw==0 || blendMode>0)
+                  opacityImgData[px] = (clipFlag << 24) | ((tL & 0xFF) << 16) | ((tL & 0xFF) << 8) | (tL & 0xFF);
+            }
+    
+            if (fintensity<0 || clipFlag<2)
+               fintensity = 0;
+
+            imageData[px] = simpleMixColors(BGRcolor, nC, fintensity, blendMode, linearGamma, flipLayers);
+        }
+    }
+ 
+    // fnOutputDebug("alles gut");
+    return 1;
+}
+
 
 DLL_API int DLL_CALLCONV FillImageHoles(int *imageData, int w, int h, int newColor) {
     // fnOutputDebug("FillImageHoles newColor = " + std::to_string(newColor));
@@ -1182,7 +1436,7 @@ pBitmap and pBitmap2Blend must be the same width and height
 and in 32-ARGB format: PXF32ARGB - 0x26200A.
 */
 
-DLL_API int DLL_CALLCONV BlendBitmaps(int* bgrImageData, int* otherData, int w, int h, int blendMode, int threadz) {
+DLL_API int DLL_CALLCONV BlendBitmaps(int* bgrImageData, int* otherData, int w, int h, int blendMode, int flipLayers, int threadz) {
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int x = 0; x < w; x++)
     {
@@ -1208,13 +1462,13 @@ DLL_API int DLL_CALLCONV BlendBitmaps(int* bgrImageData, int* otherData, int w, 
                 int rB = (BGRcolor >> 16) & 0xFF;
                 int gB = (BGRcolor >> 8) & 0xFF;
                 int bB = BGRcolor & 0xFF;
+
                 int results[3];
                 // int theGray = RGBtoGray(rO, gO, bO, 0);
-                // int theGray = fastRGBtoGray(colorO);
-                // results[0] = theGray;
-                // results[1] = theGray;
-                // results[2] = theGray;
-                calculateBlendModes(rO, gO, bO, rB, gB, bB, blendMode, results);
+                if (flipLayers==1)
+                   calculateBlendModes(rB, gB, bB, rO, gO, bO, blendMode, results);
+                else
+                   calculateBlendModes(rO, gO, bO, rB, gB, bB, blendMode, results);
                 bgrImageData[x + (y * w)] = (aX << 24) | ((results[0] & 0xFF) << 16) | ((results[1] & 0xFF) << 8) | (results[2] & 0xFF);
             }
         }
@@ -2453,6 +2707,24 @@ DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
                     IID_PPV_ARGS(&m_pIWICFactory));
     }
 
+    // source https://www.teamten.com/lawrence/graphics/gamma/
+    static const float GAMMA = 2.2;
+    int result;
+
+    for (int i = 0; i < 256; i++) {
+        result = (int)(pow(i/255.0, GAMMA)*32768.0 + 0.5);
+        gamma_to_linear[i] = (unsigned short)result;
+    }
+
+    for (int i = 0; i < 32769; i++) {
+        result = (int)(pow(i/32768.0, 1/GAMMA)*255.0 + 0.5);
+        linear_to_gamma[i] = (unsigned char)result;
+    }
+
+    for (int i = 0; i < 256; i++) {
+        char_to_float[i] = i/255.0f;
+    }
+
     // std::stringstream ss;
     // ss << "qpv: threadu - " << threadIDu << " HRESULT " << hr;
     // OutputDebugStringA(ss.str().data());
@@ -2944,7 +3216,8 @@ DLL_API int DLL_CALLCONV dissolveBitmap(int *imageData, int *newData, int Width,
 }
 
 DLL_API int DLL_CALLCONV symmetricaBitmap(int *imageData, int Width, int Height, int rx, int ry) {
- 
+// only works with 32-ARGB bitmaps 
+
       if (rx>0)
       {
          #pragma omp parallel for schedule(static) default(none) // num_threads(3)
@@ -3037,10 +3310,10 @@ DLL_API int DLL_CALLCONV autoContrastBitmap(int *imageData, int *miniData, int W
          maxRLevel = maxGLevel;
          maxBLevel = maxGLevel;
       }
-      fnOutputDebug("maxL===" + std::to_string(maxRLevel) + "; minL=" + std::to_string(minRLevel) + "; fR=" + std::to_string(fR) + "; m=" + std::to_string(modus));
 
-      fnOutputDebug("maxL===" + std::to_string(maxGLevel) + "; minL=" + std::to_string(minGLevel) + "; fG=" + std::to_string(fG)  );
-      fnOutputDebug("maxL===" + std::to_string(maxBLevel) + "; minL=" + std::to_string(minBLevel) + "; fB=" + std::to_string(fB)  );
+      // fnOutputDebug("maxL===" + std::to_string(maxRLevel) + "; minL=" + std::to_string(minRLevel) + "; fR=" + std::to_string(fR) + "; m=" + std::to_string(modus));
+      // fnOutputDebug("maxL===" + std::to_string(maxGLevel) + "; minL=" + std::to_string(minGLevel) + "; fG=" + std::to_string(fG)  );
+      // fnOutputDebug("maxL===" + std::to_string(maxBLevel) + "; minL=" + std::to_string(minBLevel) + "; fB=" + std::to_string(fB)  );
       #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
       for (int y = 0; y < Height; y++)
       {

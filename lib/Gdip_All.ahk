@@ -9408,7 +9408,6 @@ ConvertRGBtoHSL(R, G, B) {
    del_Max := Max - Min
 
    L := (Max + Min) / 2
-
    if (del_Max = 0)
    {
       H := S := 0

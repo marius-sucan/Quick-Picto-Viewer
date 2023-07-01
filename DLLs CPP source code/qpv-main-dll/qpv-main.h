@@ -13,11 +13,16 @@
 const double M_PI = 3.14159265358979323846;  // PI
 const double div2sz = sqrt(2.0 / 32.0);      // used in calculateDCT()
 const double div2sq = 1 / sqrt(2.0);         // used in calculateDCT()
+static unsigned short gamma_to_linear[256];
+static unsigned char linear_to_gamma[32769];
+static float char_to_float[256];
 
 IWICImagingFactory *m_pIWICFactory;
 std::vector<UINT>  dupesListIDsA(1);
 std::vector<UINT>  dupesListIDsB(1);
 std::vector<UINT>  dupesListIDsC(1);
+// std::unordered_map<UINT, unsigned char>  brushMoveImgData(1);
+
 std::array<double, 1025>  DCTcoeffs;
 
 // for the Windows 7 dll edition
@@ -32,3 +37,15 @@ std::array<double, 1025>  DCTcoeffs;
 // DEFINE_GUID(GUID_WICPixelFormat96bppRGBFloat, 0xe3fed78f, 0xe8db, 0x4acf, 0x84, 0xc1, 0xe9, 0x7f, 0x61, 0x36, 0xb3, 0x27);
 // DEFINE_GUID(GUID_WICPixelFormat64bppPRGBAHalf, 0x58ad26c2, 0xc623, 0x4d9d, 0xb3, 0x20, 0x38, 0x7e, 0x49, 0xf8, 0xc4, 0x42);
 
+
+struct HSLColor {
+    double h;
+    double s;
+    double l;
+};
+
+struct RGBColor {
+    double r;
+    double g;
+    double b;
+};
