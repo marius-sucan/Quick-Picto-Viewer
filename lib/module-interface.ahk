@@ -56,6 +56,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , menusListWelcome := "File:File|Edit:Edit|Interface:Interface|Settings:Settings|Help:Help"
      , prevMenuBarItem := 1, lastContextMenuZeit := 1, colorPickerMustEnd := 0, userPendingAbortOperations := 0
      , statusBarTooltipVisible := 0, FloodFillSelectionAdj := 0, isToolbarKBDnav := 0
+     , lastALclickX := 0, lastALclickY := 0
 
 ; OnMessage(0x388, "WM_PENEVENT")
 OnMessage(0x2a3, "WM_MOUSELEAVE")
@@ -128,7 +129,8 @@ infosUIAbtns(msgu) {
    lastu := !lastu
    GuiControl, 1:, UIAbtn%lastu%, % msgu
    Sleep, 1
-   GuiControl, 1: Focus, UIAbtn%lastu%
+   If (WinActive("A")=PVhwnd)
+      GuiControl, 1: Focus, UIAbtn%lastu%
    prevMsg := msgu
 }
 
@@ -817,8 +819,14 @@ WM_LBUTTONDOWN(wP, lP, msg, Az) {
     If (preventSillyGui(A_Gui) || !thisWin)
        Return
 
-    lastLclickX := lP & 0xFFFF
-    lastLclickY := lP >> 16
+    lastALclickX := lastLclickX := lP & 0xFFFF
+    lastALclickY := lastLclickY := lP >> 16
+    If (ShowAdvToolbar=1 && lockToolbar2Win=1)
+    {
+      JEE_ClientToScreen(PVhwnd, lastLclickX, lastLclickY, mXo, mYo)
+      JEE_ScreenToClient(hGDIwin, mXo, mYo, lastALclickX, lastALclickY)
+    }
+
     LbtnDwn := 1
     If (mouseToolTipWinCreated=1)
        mouseTurnOFFtooltip()
@@ -867,6 +875,12 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
 
     mX := lP & 0xFFFF
     mY := lP >> 16
+    If (ShowAdvToolbar=1 && lockToolbar2Win=1)
+    {
+      JEE_ClientToScreen(PVhwnd, mX, mY, mXo, mYo)
+      JEE_ScreenToClient(hGDIwin, mXo, mYo, mX, mY)
+    }
+
     isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1) ? 0 : 1
     If (drawingShapeNow=1)
        sendWinClickAct("remClick", "n", mX, mY)
@@ -958,6 +972,12 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
   mY := lP >> 16
   If (whileLoopExec!=1 && runningLongOperation!=1)
   {
+     If (ShowAdvToolbar=1 && lockToolbar2Win=1)
+     {
+        JEE_ClientToScreen(PVhwnd, mX, mY, mXo, mYo)
+        JEE_ScreenToClient(hGDIwin, mXo, mYo, mX, mY)
+     }
+
      If (prefix="^" && !AnyWindowOpen && drawingShapeNow!=1 && mustCaptureCloneBrush!=1 && thumbsDisplaying!=1)
         MainExe.ahkPostFunction("restartGIFplayback")
      Else If (prefix="+" && !AnyWindowOpen && drawingShapeNow!=1 && mustCaptureCloneBrush!=1)
@@ -969,6 +989,7 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
 }
 
 InitMainContextMenu() {
+   ; unused function
    GetPhysicalCursorPos(mX, mY)
    thisTick := Round(lastMenuInvoked[1])
    thisX := lastMenuInvoked[2]
@@ -1179,7 +1200,7 @@ WinClickAction(thisEvent:="normal") {
        Return
 
     ; GetMouseCoord2wind(PVhwnd, mX, mY, mXo, mYo)
-    mX := lastLclickX,    mY := lastLclickY
+    mX := lastALclickX,    mY := lastALclickY
     ; ToolTip, % mX "=" mY "`n" lastLclickX "=" lastLclickY , , , 2
     canCancelImageLoad := 4
     If (mouseToolTipWinCreated=1)

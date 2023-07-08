@@ -42,7 +42,7 @@
 ;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.9.6
+;@Ahk2Exe-SetVersion 5.9.7
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2023)
 ;@Ahk2Exe-SetCompanyName marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -95,14 +95,14 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , prevFullThumbsUpdate := 1, winGDIcreated := 0, ThumbsWinGDIcreated := 0, currentFilesListModified := 0
    , hPicOnGui1 := "", scriptStartTime := A_TickCount, lastEditRHChange :=1, doubleBlurPreviewArea := 0
    , newStaticFoldersListCache := [], lastEditRWChange := 1, QPVjournal := [], pPen7 := "", hQPVtoolbar
-   , mainCompiledExe := "", mainCompiledPath := "", wasInitFIMlib := 0, hGDIselectWin, allowNextSlide := 1
+   , mainCompiledPath := "", wasInitFIMlib := 0, hGDIselectWin, allowNextSlide := 1, LVitemsPerPage := 5100
    , filteredMap2mainList := [], thumbsCacheFolder := A_ScriptDir "\thumbs-cache", hSNDsong, lastZeitOpenWin := 1
    , resultedFilesList := [], currentFileIndex := "", maxFilesIndex := 0, gdiBitmapIDentire := 0
    , appTitle := "Quick Picto Viewer", FirstRun := 1, hSNDmediaFile := "", mouseToolTipWinCreated := 0
    , bckpResultedFilesList := [], bckpMaxFilesIndex := 0, DynamicFoldersList := "", lastPointerUseZeit := 1
    , animGIFplaying := 0, startPageIndex := 0, RandyIMGids := [], IMGdecalageY := 1, IMGdecalageX := 1
    , RandyIMGnow := 0, GDIPToken := "", gdiBitmapSmall := "", hSNDmedia := "", imgIndexEditing := 0
-   , AprevGdiBitmap := "", BprevGdiBitmap := "", msgDisplayTime := 3000, gdiBitmapIDcall := "", LVitemsPerPage := 5100
+   , AprevGdiBitmap := "", BprevGdiBitmap := "", msgDisplayTime := 3000, gdiBitmapIDcall := ""
    , slideShowRunning := 0, CurrentSLD := "", markedSelectFile := 0, IMGlargerViewPort := 0, thisPanelTab := 1
    , ResolutionWidth := "", ResolutionHeight := "", prevStartIndex := 1, mustReloadThumbsList := 0
    , gdiBitmap := "", mainSettingsFile := "quick-picto-viewer.ini", mainRecentsFile := "quick-picto-viewer-recents.ini"
@@ -214,7 +214,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , sillySeparator :=  "▪", menuCustomNames := new hashtable(), clrGradientCoffX := 0, clrGradientCoffY := 0
    , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*"
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.9.6", vReleaseDate := "2023/07/01" ; yyyy-mm-dd
+   , appVersion := "5.9.7", vReleaseDate := "2023/07/07" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -3738,7 +3738,7 @@ dummyViewAlphaMaskNow() {
    lastOSDtooltipInvoked := A_TickCount
    Gdip_GraphicsClear(2NDglPG, "0x00" WindowBgrColor)
    ; clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    setMainCanvasTransform(mainWidth, mainHeight, 2NDglPG)
    toolTipGuiCreated := 2
    If (AnyWindowOpen=66 && editingSelectionNow!=1)
@@ -4553,7 +4553,7 @@ recalculateThumbsSizes() {
  
    thumbsH := Round(othumbsH*thumbsZoomLevel)
    thumbsW := Round(othumbsW*thumbsZoomLevel)
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    If (thumbsH>mainHeight || thumbsW>mainWidth)
    {
       calcIMGdimensions(thumbsW, thumbsH, mainWidth//2 - 16, mainHeight//2 - 16, ResizedW, ResizedH)
@@ -4647,7 +4647,7 @@ ToggleTDupesGroupsFading() {
 
 thumbsInfoYielder(ByRef maxItemsW, ByRef maxItemsH, ByRef maxItemsPage, ByRef maxPages, ByRef startIndex, ByRef mainWidth, ByRef mainHeight) {
    Static prevRealThumbsIndex := -1
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0) ; global vars:
+   vpWinClientSize(mainWidth, mainHeight) ; global vars:
    maxItemsW := mainWidth//thumbsW               ;    prevStartIndex
    If (maxItemsW<4 && thumbsListViewMode=1)
       maxItemsW := mainWidth//Round(thumbsW*0.95)
@@ -4790,7 +4790,7 @@ determineNavKeysDown() {
 
 UpdateThumbsScreen(forceReload:=0) {
    Critical, on
-   Static lastInvoked := 1
+   Static lastInvoked := 1, prevMW, prevMH
    If (thumbsDisplaying!=1)
       Return
 
@@ -4799,6 +4799,9 @@ UpdateThumbsScreen(forceReload:=0) {
    Gdip_ResetClip(glPG)
    startPageIndex := thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, startIndex, mainWidth, mainHeight)
    createGDIPcanvas(mainWidth, mainHeight)
+   If (prevMW!=mainWidth || prevMH!=mainHeight)
+      recalculateThumbsSizes()
+
    Gdip_ResetWorldTransform(glPG)
    IMGlargerViewPort := IMGentirelylargerThanVP := 0
    If (slideShowRunning=1)
@@ -4842,8 +4845,8 @@ GDIwindowsPosCorrections(whichHwnd:="") {
     Static lastInvoked := 1
     If (A_OSVersion="WIN_7" || isWinXP=1) && (A_TickCount - lastInvoked>100) || (isWinXP=1 && editingSelectionNow=1)
     {
-       GetPhysicalCursorPos(mainX, mainY)
-       JEE_ClientToScreen(hPicOnGui1, 1, 1, mainX, mainY)
+       ; GetPhysicalCursorPos(mainX, mainY)
+       vpGetTopCorner(mainX, mainY)
        If whichHwnd
        {
           WinMove, ahk_id %whichHwnd%,, %mainX%, %mainY%
@@ -4869,7 +4872,7 @@ panIMGonScrollBar(doX, doY) {
    If (slideShowRunning=1)
       ToggleSlideShowu()
 
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    ; GetMouseCoord2wind(PVhwnd, oX, oY)
    If (allowFreeIMGpanning=1)
    {
@@ -4969,7 +4972,7 @@ MenuDrawFilesListMap() {
 }
 
 ThumbsScrollbar() {
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    prevFileIndex := currentFileIndex
    prevu := lastu := -2
    listMap := doMapNow := 0
@@ -5033,12 +5036,12 @@ setwhileLoopExec(val) {
 
 simplePanIMGonClick(modus:=0, doX:=1, doY:=1, bX:=0, bY:=0) {
    clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    If (modus="scroll")
-      JEE_ClientToScreen(hPicOnGui1, lastLclickX, lastLclickY, oX, oY)
+      JEE_ClientToScreen(hGDIwin, lastLclickX, lastLclickY, oX, oY)
    Else
       GetPhysicalCursorPos(oX, oY)
-
+   ; ToolTip, % modus "=l" , , , 2
    oDx := IMGdecalageX, oDy := IMGdecalageY
    minTopCornerX := (allowFreeIMGpanning=1) ? mainWidth : 0
    minTopCornerY := (allowFreeIMGpanning=1) ? mainHeight : 0
@@ -5175,12 +5178,12 @@ winSwipeAction(thisCtrlClicked, mainParam) {
 
    startZeit := A_TickCount
    ; GetPhysicalCursorPos(oX, oY)
-   JEE_ClientToScreen(hPicOnGui1, lastLclickX, lastLclickY, oX, oY)
+   JEE_ClientToScreen(hGDIwin, lastLclickX, lastLclickY, oX, oY)
    SelDotsSize := (PrefsLargeFonts=1) ? imgHUDbaseUnit//3 : imgHUDbaseUnit//3.25
    dotSize := Round(SelDotsSize*2.5)
    lowerLimitRatio := (IMGresizingMode=4) ? 0.4 : 0.4
    GetPhysicalCursorPos(mX, mY)
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    setwhileLoopExec(1)
    While, (determineLClickstate()=1)
    {
@@ -5290,7 +5293,10 @@ winSwipeAction(thisCtrlClicked, mainParam) {
 GetMouseCoord2wind(hwnd, ByRef nX, ByRef nY) {
     ; CoordMode, Mouse, Screen
     MouseGetPos, oX, oY
-    JEE_ScreenToClient(hwnd, oX, oY, nX, nY)
+    If (hwnd=PVhwnd && ShowAdvToolbar=1 && lockToolbar2Win=1)
+       JEE_ScreenToClient(hGDIwin, oX, oY, nX, nY)
+    Else
+       JEE_ScreenToClient(hwnd, oX, oY, nX, nY)
 }
 
 doLayeredWinUpdate(funcu, hwnd, HDCu, opacity:=255) {
@@ -5320,12 +5326,57 @@ doLayeredWinUpdate(funcu, hwnd, HDCu, opacity:=255) {
      fnOutputDebug(A_ThisFunc "(): " funcu " = " nameHwnd " = " nameDCu)
   }
 
-  GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
-  Static xPos := 0, yPos := 0
+  vpWinClientSize(mainWidth, mainHeight)
+  xPos := 0, yPos := 0
   If (A_OSVersion="WIN_7" || isWinXP=1)
-     JEE_ClientToScreen(hPicOnGui1, 1, 1, xPos, yPos)
+  {
+     vpGetTopCorner(xPos, yPos)
+  } Else If (ShowAdvToolbar=1 && lockToolbar2Win=1)
+  {
+     hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+     If (hasTrans=1)
+        xPos += ToolbarWinW
+     If (hasTrans=2)
+        yPos += ToolbarWinH
+  }
 
   Return UpdateLayeredWindow(hwnd, HDCu, xPos, yPos, mainWidth, mainHeight, opacity)
+}
+
+vpGetTopCorner(ByRef xPos, ByRef yPos) {
+   p := JEE_ClientToScreen(hPicOnGui1, 1, 1, xPos, yPos)
+   If (ShowAdvToolbar=1 && lockToolbar2Win=1)
+      hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+   If (hasTrans=1)
+      xPos += ToolbarWinW
+   If (hasTrans=2)
+      yPos += ToolbarWinH
+   Return p
+}
+
+vpWinClientSize(ByRef w, ByRef h, hwnd:=0, mode:=0) {
+  Static lastInvoked := 1, pW, pH, pa
+
+  If !hwnd
+     hwnd := PVhwnd
+
+  If ((A_TickCount - lastInvoked<70) && pW && pH && pa=hwnd)
+  {
+     w := pW, h := pH
+     Return
+  }
+
+  p := GetWinClientSize(w, h, hwnd, mode)
+  If (ShowAdvToolbar=1)
+     hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+  If (hasTrans=1)
+     w -= ToolbarWinW
+  If (hasTrans=2)
+     h -= ToolbarWinH
+
+  pW := w, pH := h, pa := hwnd
+  lastInvoked := A_TickCount
+  Return p
 }
 
 BtnSetBrushSymmetryCoords() {
@@ -5354,7 +5405,7 @@ BtnSetBrushSymmetryCoords() {
 
 setNewBrushSymmetryPoints() {
    whichBitmap := useGdiBitmap()
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    Gdip_GetImageDimensions(whichBitmap, imgW, imgH)
    thisZeit := kX := kY := 0
    BrushToolSymmetryX := SubStr(BrushToolSymmetryX, 1, 1)
@@ -5426,7 +5477,7 @@ MouseMoveResponder(actu:=0) {
      {
         Gdip_GraphicsClear(2NDglPG, "0x00" WindowBgrColor)
         ; clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
-        GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+        vpWinClientSize(mainWidth, mainHeight)
         setMainCanvasTransform(mainWidth, mainHeight, 2NDglPG)
         SkeletDrawSelectionBox()
         Gdip_ResetWorldTransform(2NDglPG)
@@ -5443,7 +5494,7 @@ MouseMoveResponder(actu:=0) {
      brushSize := (brushToolDoubleSize=1) ? brushToolSize*2 : brushToolSize
      thisSize := (AnyWindowOpen=64) ? brushSize * zoomLevel : brushSize * viewportDynamicOBJcoords.zl
      Gdip_ResetClip(2NDglPG)
-     GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+     vpWinClientSize(mainWidth, mainHeight)
      Gdip_GraphicsClear(2NDglPG, "0x00" WindowBgrColor)
      If (GetKeyState("CapsLock", "T") || mustCaptureCloneBrush=1 || whileLoopExec=1)
      {
@@ -5464,7 +5515,7 @@ MouseMoveResponder(actu:=0) {
            Gdip_SetClipPath(2NDglPG, ImgSelPath, modus)
         }
 
-        GetMouseCoord2wind(hGDIwin, mX, mY)
+        GetMouseCoord2wind(PVhwnd, mX, mY)
         If ((A_TickCount - lastInvoked > 90) && BrushToolAutoAngle=1)
         {
            If (prevMouseCoords[1] && prevMouseCoords[2]
@@ -5517,8 +5568,8 @@ MouseMoveResponder(actu:=0) {
   } Else If (editingSelectionNow=1 && adjustNowSel=0 && imgSelLargerViewPort!=1 && drawingShapeNow!=1 && brushingMode!=1)
   {
      ; ToolTip, % SelDotsSize , , , 2
-     GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
-     GetMouseCoord2wind(hGDIwin, mX, mY)
+     vpWinClientSize(mainWidth, mainHeight)
+     GetMouseCoord2wind(PVhwnd, mX, mY)
      dotActiveObj := determineSelAreaClickRect(mX, mY, SelDotsSize, mainWidth, mainHeight, 1)
      If !identifyThisWin()
         dotActiveObj.n := 0
@@ -5600,7 +5651,7 @@ applyIMGeditKeepWin() {
    GuiControl, SettingsGUIA:, closeEditPanelOnApply, 0
    applyIMGeditFunction()
    Sleep, 2
-   CreateGuiButton("Undo action,,ImgUndoAction||Reopen panel,,openPreviousPanel", 0, msgDisplayTime//1.5 + 500)
+   CreateTempGuiButton("Undo action,,ImgUndoAction||Reopen panel,,openPreviousPanel", 0, msgDisplayTime//1.5 + 500)
    closeEditPanelOnApply := o
    GuiControl, SettingsGUIA:, closeEditPanelOnApply, % o
 }
@@ -5653,7 +5704,7 @@ LivePreviewAlphaMaskPasteInPlace() {
     whichBitmap := obju[2]
     zBitmap := obju[3]
 
-    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+    vpWinClientSize(mainWidth, mainHeight)
     ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, prevMaxSelX, prevMaxSelY, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
     Gdip_GetImageDimensions(whichBitmap, oImgW, oImgH)
     Gdip_GetImageDimensions(userAlphaMaskBmpPainted, zImgW, zImgH)
@@ -5756,7 +5807,7 @@ corelivePreviewsImageEditing(modus:=0) {
       RemoveTooltip()
 
    Gdip_GraphicsClear(2NDglPG, "0x00" WindowBGRcolor)
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    createGDIPcanvas(mainWidth, mainHeight)
    If (modus!="live-selection")
       setMainCanvasTransform(mainWidth, mainHeight, 2NDglPG)
@@ -5862,7 +5913,7 @@ SkeletDrawSelectionBox(paintAlphaMask:=0) {
 
    If (showInfoBoxHUD>0 && editingSelectionNow=1)
    {
-      GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+      vpWinClientSize(mainWidth, mainHeight)
       drawinfoBox(mainWidth, mainHeight, 0, 2NDglPG)
    }
 
@@ -5926,7 +5977,6 @@ determineSelAreaClickRect(mX, mY, dotsSize, mainWidth, mainHeight, doFlips) {
 ;  |                    |
 ; [4]---6---[13]---6---[2]
 ; 
-
    If (showHUDnavIMG=1 && hasDrawnImageMap=1 && IMGlargerViewPort=1
    && isDotInRect(mX, mY, HUDobjNavBoxu[7], HUDobjNavBoxu[5] + HUDobjNavBoxu[7], HUDobjNavBoxu[8], HUDobjNavBoxu[6] + HUDobjNavBoxu[8]))
       Return
@@ -6147,6 +6197,7 @@ determineSelAreaClickRect(mX, mY, dotsSize, mainWidth, mainHeight, doFlips) {
    obju.cY1 := cY1
    obju.cY2 := cY2
    obju.line := line ? line : cX1
+   ; fnOutputDebug("dot=" dotActive "|" mX "\" mY)
 
    Return obju
 }
@@ -6253,9 +6304,9 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
             kMenu("PVnav", "Check", "&Preview new point`tP")
       } Else
       {
-         kMenu("PVnav", "Add/Uncheck", "Auto-reflect anchors`tR", "toggleAutoReflectAnchors")
+         kMenu("PVnav", "Add/Uncheck", "Symmetrical anchors`tR", "toggleAutoReflectAnchors")
          If (autoReflectVectorAnchors=1)
-            kMenu("PVnav", "Check", "Auto-reflect anchors`tR")
+            kMenu("PVnav", "Check", "Symmetrical anchors`tR")
       }
 
       kMenu("PVnav", "Add/Uncheck", "Show viewport &grid`tG", "toggleViewPortGridu")
@@ -6286,13 +6337,13 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
 
 MenuSplitVectorPoint() {
   lastOtherWinClose := 1
-  GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+  vpWinClientSize(mainWidth, mainHeight)
   addNewVectorShapePoints(lastUserRclickVPx, lastUserRclickVPy, mainWidth, mainHeight, "DoubleClick", 0, 0)
 }
 
 MenuRemVectorPoint() {
   lastOtherWinClose := 1
-  GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+  vpWinClientSize(mainWidth, mainHeight)
   addNewVectorShapePoints(lastUserRclickVPx, lastUserRclickVPy, mainWidth, mainHeight, "remClick", 0, 0)
 }
 
@@ -6335,7 +6386,7 @@ configVectorShapeSymmetryPoint(modus, silentu, givenIndex) {
       Return
 
    lastOtherWinClose := 1
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    If givenIndex
       thisIndex := givenIndex
    Else
@@ -6530,7 +6581,7 @@ MenuCollapseSelectedAnchorPoints() {
 
 MenuReflectAnchorVectorPoint() {
   lastOtherWinClose := 1
-  GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+  vpWinClientSize(mainWidth, mainHeight)
   lastZeitFileSelect := A_TickCount
   addNewVectorShapePoints(lastUserRclickVPx, lastUserRclickVPy, mainWidth, mainHeight, "reflectAnchor", 0, 0, 0)
   SetTimer, dummyRefreshImgSelectionWindow, -10
@@ -6660,7 +6711,7 @@ MenuRemSelVectorPoints() {
 }
 
 MenuPasteVectorPoints() {
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    thisIndex := addNewVectorShapePoints(lastUserRclickVPx, lastUserRclickVPy, mainWidth, mainHeight, "setStart", 0, 1)
    MenuCopyVectorPoints("paste", thisIndex)
 }
@@ -6754,7 +6805,7 @@ MenuSelInvertVectorPoints() {
 
 MenuSelVectorPoint() {
   lastOtherWinClose := 1
-  GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+  vpWinClientSize(mainWidth, mainHeight)
   lastZeitFileSelect := A_TickCount
   addNewVectorShapePoints(lastUserRclickVPx, lastUserRclickVPy, mainWidth, mainHeight, "selClick", 0, 1)
   SetTimer, dummyRefreshImgSelectionWindow, -10
@@ -6762,7 +6813,7 @@ MenuSelVectorPoint() {
 
 MenuCollapseVectorPoint() {
   lastOtherWinClose := 1
-  GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+  vpWinClientSize(mainWidth, mainHeight)
   lastZeitFileSelect := A_TickCount
   addNewVectorShapePoints(lastUserRclickVPx, lastUserRclickVPy, mainWidth, mainHeight, "collapseClick", 0, 0, 0)
   SetTimer, dummyRefreshImgSelectionWindow, -10
@@ -6770,7 +6821,7 @@ MenuCollapseVectorPoint() {
 
 MenuExpandVectorPointAnchors() {
   lastOtherWinClose := 1
-  GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+  vpWinClientSize(mainWidth, mainHeight)
   lastZeitFileSelect := A_TickCount
   addNewVectorShapePoints(lastUserRclickVPx, lastUserRclickVPy, mainWidth, mainHeight, "expandClick", 0, 0, 0)
   SetTimer, dummyRefreshImgSelectionWindow, -10
@@ -6791,7 +6842,7 @@ MenuSetStartVectorPoint(given:=0, isGiven:=0) {
      Return
 
   lastOtherWinClose := 1
-  GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+  vpWinClientSize(mainWidth, mainHeight)
   If (wasGiven=1)
      newStartPoint := given
   Else
@@ -6997,7 +7048,7 @@ addNewVectorShapePoints(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, shi
    }
 
    ; If (FlipImgH=1 || FlipImgV=1)
-      ; GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+      ; vpWinClientSize(mainWidth, mainHeight)
    If (doSpecialAct!=1 && dotRemoved!=1 && dontAddPoint!=1 && mainParam!="DoubleClick" && !InStr(mainParam, "pen-") && ctrlState=0 && altState=0)
    {
       ; actually add new point[s] to path, if nothing else happened before ^_^ 
@@ -7477,7 +7528,7 @@ rescaleSelectedVectorPoints() {
 moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY, altState) {
    soX := soY := doX := doY := poX := poY := hasLooped := mustRem := 0
    mustSnapLiveDrawPoints := 0
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    c := customShapePoints[thisIndex]
    setwhileLoopExec(1)
    startOperation := A_TickCount
@@ -7996,6 +8047,14 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
          While, determineLClickstate()
          {
             ; drag and drop
+            If (GetKeyState("Escape", "P"))
+            {
+               func2exec := r := info := ""
+               Global lastOtherWinClose := A_TickCount
+               interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
+               Break
+            }
+
             info := defineWindowUnderMouse()
             If InStr(info, "tooltip")
             {
@@ -8055,7 +8114,7 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
                externToolTiput(info friendly)
                prevMSGdisplay := A_TickCount
             }
-         }
+         } ; while end
 
          If (InStr(info, "main") && r)
          {
@@ -8116,6 +8175,7 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
                   func2exec := "FolderTreeMenuMoveFiles"
             }
          }
+
          externTooltiput("-hide-")
          If func2exec
             SetTimer, % func2exec, -500
@@ -8185,7 +8245,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
    {
       ; handle clicks on the H/V scrollbars for images larger than the viewport
       knobSize := imgHUDbaseUnit//3
-      GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+      vpWinClientSize(mainWidth, mainHeight)
       If (scrollBarHy>1 && mY>(mainHeight - knobSize))
       {
          RemoveTooltip()
@@ -8221,7 +8281,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       Return
    } Else If (AnyWindowOpen=23 && FillAreaColorMode=6`&& mustCaptureCloneBrush=1)
    {
-      GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+      vpWinClientSize(mainWidth, mainHeight)
       setwhileLoopExec(1)
       While, (determineLClickstate()=1)
       {
@@ -8251,7 +8311,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       Return
    } Else If (AnyWindowOpen=81 && UserSymmetricaCenteringMode=1)
    {
-      GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+      vpWinClientSize(mainWidth, mainHeight)
       dotActiveObj := determineSelAreaClickRect(mX, mY, SelDotsSize, mainWidth, mainHeight, 1)
       If (dotActiveObj.n=0 || dotActiveObj.n=9)
       {
@@ -8326,7 +8386,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       Return
    }
 
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    If (thumbsDisplaying!=1 && drawingShapeNow!=1)
    {
       If (editingSelectionNow=1 && adjustNowSel=0 && !IsObject(dotActiveObj))
@@ -8493,7 +8553,8 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       }
 
       setwhileLoopExec(0)
-      JEE_ClientToScreen(hPicOnGui1, mX, mY, mXo, mYo)
+      ; JEE_ClientToScreen(hPicOnGui1, mX, mY, mXo, mYo)
+      MouseGetPos, mXo, mYo
       While, (determineLClickstate()=1 && o_imageLoading!=1 && dotActive)
       {
           MouseGetPos, mX, mY
@@ -9673,7 +9734,7 @@ ChangeLumos(dir, dummy:=0) {
       If (dummy!="k" && showHardReset=1)
       {
          addMore := "`nReset all adjustments to defaults with Ctrl + \"
-         CreateGuiButton("Reset all adjustments,,HardResetImageView", 0, msgDisplayTime//1.5 + 100)
+         CreateTempGuiButton("Reset all adjustments,,HardResetImageView", 0, msgDisplayTime//1.5 + 100)
       }
       showTOOLtip("Image display: UNALTERED " addMsg addMore)
    } Else showTOOLtip("Image brightness: " value2show, A_ThisFunc, 2, value2show / 25)
@@ -9889,7 +9950,7 @@ ChangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
    If (OutputVarWin=PVhwnd && InStr(key, "wheel"))
    {
       GetMouseCoord2wind(PVhwnd, mX, mY)
-      GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+      vpWinClientSize(mainWidth, mainHeight)
       prcW := mX/mainWidth
       prcH := mY/mainHeight
 
@@ -11123,7 +11184,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
     bgrColor := makeRGBAcolor(TextInAreaBgrColor, TextInAreaBgrOpacity)
     borderColor := makeRGBAcolor(TextInAreaBorderColor, TextInAreaBorderOpacity)
 
-    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+    vpWinClientSize(mainWidth, mainHeight)
     fntQuality := (previewMode=1) ? 1 : 4
     fntWeight := (TextInAreaFontBold=1) ? 800 : 400
 
@@ -12602,7 +12663,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
        previewMode := 1
        Gdip_ResetClip(G2)
        ; trGdip_GraphicsClear(A_ThisFunc, G2, "0x00" WindowBGRcolor)
-       GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+       vpWinClientSize(mainWidth, mainHeight)
        ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, prevMaxSelX, prevMaxSelY, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
        thisImgCall := "a" getIDimage(currentFileIndex) currentFileIndex viewportStampBMP viewportIDstampBMP PasteInPlaceOrientation VPselRotation PasteInPlaceBlurAmount PasteInPlaceLight PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceGamma PasteInPlaceApplyColorFX PasteInPlaceBlendMode PasteInPlaceBlurEdgesSoft brushingMode shearImgX shearImgY getAlphaMaskIDu()
        If (prevImgCall=thisImgCall && StrLen(prevClipBMP)>2)
@@ -12886,7 +12947,7 @@ getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, oImgW, oImgH, imgSel
 
     If (previewMode=1)
     {
-       GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+       vpWinClientSize(mainWidth, mainHeight)
        thisFXid := decideGDIPimageFX(matrix, imageAttribs, pEffect)
        ; ToolTip, % thisFXid "`n" matrix , , , 2
        thisFXid .= (BlurAmount>1) ? "." BlurAmount zoomLevel : "."
@@ -14163,7 +14224,7 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
     G2 := 2NDglPG
     Gdip_ResetClip(G2)
     ; trGdip_GraphicsClear(A_ThisFunc, G2, "0x00" WindowBGRcolor)
-    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+    vpWinClientSize(mainWidth, mainHeight)
     calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
 
     thisState := "a" UserTextArea TextInAreaAlign TextInAreaValign TextInAreaDoBlurs TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr imgSelW imgSelH mainWidth mainHeight TextInAreaLineAngle TextInAreaCharSpacing TextInAreaAutoWrap TextInAreaCaseTransform TextInAreaFlipH TextInAreaFlipV userimgGammaCorrect
@@ -14524,7 +14585,7 @@ trGdip_RotatePathAtCenter(pPath, Angle, MatrixOrder:=1, withinBounds:=0, withinB
 }
 
 testSelectionLargerThanViewport() {
-    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+    vpWinClientSize(mainWidth, mainHeight)
     obju := []
     obju.mainWidth := mainWidth
     obju.mainHeight := mainHeight
@@ -14678,7 +14739,7 @@ getVPselIDs(what) {
    kImgSelW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
    kImgSelH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
    If InStr(what, "csize")
-      GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+      vpWinClientSize(mainWidth, mainHeight)
 
    MouseCoords2Image(1, 1, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, nimgSelX1, nimgSelY1)
    MouseCoords2Image(mainWidth, mainHeight, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, nimgSelX2, nimgSelY2)
@@ -14728,7 +14789,7 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
 
    ; trGdip_GraphicsClear(A_ThisFunc, 2NDglPG, "0x00" WindowBGRcolor)
    Gdip_GetImageDimensions(whichBitmap, oImgW, oImgH)
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    imgSelPx := x1 := selDotX + SelDotsSize//2, x2 := selDotAx + SelDotsSize//2
    imgSelPy := y1 := selDotY + SelDotsSize//2, y2 := selDotAy + SelDotsSize//2
    imgSelW := max(X1, X2) - min(X1, X2)
@@ -18426,7 +18487,7 @@ PanIMGonScreen(direction, thisKey) {
    If (slideShowRunning=1)
       ToggleSlideShowu()
 
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    fastMode := (InStr(thisKey, "+") || InStr(thisKey, "-/")) ? 1 : 0
    If (fastMode=1)
       zL := clampInRange(zoomLevel, 0.8, 3.2)
@@ -20067,7 +20128,7 @@ SetParentID(Window_ID, theOther) {
   Return r
 }
 
-CreateGuiButton(btnList, killWin:=0, delayu:=950) {
+CreateTempGuiButton(btnList, killWin:=0, delayu:=950) {
     Critical, On
     Static lastCreated := 1, bgrColor := 112288, txtColor := "ddeeFF", thisOpacity := 200
          , prevBtnList := "z"
@@ -20142,7 +20203,8 @@ RepositionTempBtnGui() {
     offsetuY := scrollBarHy ? scrollBarHy : 0
     Final_y := winPosY + Heig - thisFntSize * 2 - gHeig - offsetuY//2
     hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
-    tlbrBonusX := (hasTrans=1 && (winPosX + ToolbarWinH - 10 > Final_y)) ? ToolbarWinW : 0
+    tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
+    ; ToolTip, % tlbrBonusX "|" hasTrans , , , 2
     Final_x := winPosX + thisFntSize * 2 + tlbrBonusX
     WinSet, Transparent, 231, ahk_id %hGuiBtn%
     ; WinSet, AlwaysOnTop, On, ahk_id %hGuiBtn%
@@ -20201,7 +20263,7 @@ DestroyTempBtnGui(dummy:=0) {
     okay := (thisWin=PVhwnd || thisWin=hSetWinGui) ? 1 : 0
     ; ToolTip, % OutputVarWin , , , 2
     If (OutputVarWin!=tempBtnVisible) || (okay!=1) || (dummy="now")
-       CreateGuiButton("Die dummy", 1)  ;   ;-)
+       CreateTempGuiButton("Die dummy", 1)  ;   ;-)
     Else
        SetTimer, DestroyTempBtnGui, -950
 }
@@ -20464,7 +20526,7 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
        Gui, SettingsGUIA: Destroy
        Sleep, 5
        clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
-       GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+       vpWinClientSize(mainWidth, mainHeight)
        drawImgSelectionOnWindow("faker", "-", "-", "-", mainWidth, mainHeight)
     } ; Else CloseWindow()
     If (folderTreeWinOpen=1)
@@ -21083,13 +21145,13 @@ PlotSeenHourStatsNow() {
 
    itemz := LV_GetCount()
    avgu := groupDigits(Floor(totalu/24))
-   GetWinClientSize(W, H, PVhwnd, 0)
+   vpWinClientSize(W, H)
    Gdip_GraphicsClear(2NDglPG)
    textu := "Seen images chart: HOURS.`nRange: 01:00 to 24:00.`nAverage: " avgu ". Peak at " maxKvalu "h: " groupDigits(maxValu)
    infoBoxBMP := drawTextInBox(textu, OSDFontName, OSDfontSize, w, h, OSDtextColor, OSDbgrColor, 1, 0)
    Scale := imgHUDbaseUnit/40
 
-   hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+   ; hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
    tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
    tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
    borderSizeX := imgHUDbaseUnit//10 + tlbrBonusX
@@ -21199,13 +21261,13 @@ PlotSeenMonthsStatsNow() {
    lacking := (countSkipped>0) ? groupDigits(countSkipped) " months lack data." : ""
    itemz := LV_GetCount()
    avgu := groupDigits(Floor(totalu/counter))
-   GetWinClientSize(W, H, PVhwnd, 0)
+   vpWinClientSize(W, H)
    Gdip_GraphicsClear(2NDglPG)
    textu := "Seen images chart: MONTHS`nTotal: " groupDigits(counter) " months. " lacking "`nRange: " startPeriod " - " endPeriod "`nAverage: " avgu ". Peak on " maxKvalu "=" groupDigits(maxValu)
    infoBoxBMP := drawTextInBox(textu, OSDFontName, OSDfontSize, w, h, OSDtextColor, OSDbgrColor, 1, 0)
    Scale := imgHUDbaseUnit/40
 
-   hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+   ; hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
    tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
    tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
    borderSizeX := imgHUDbaseUnit//10 + tlbrBonusX
@@ -21371,13 +21433,13 @@ PlotSeenDaysStatsNow(modus:=0) {
    lacking := (countSkipped>0) ? groupDigits(countSkipped) " days lack data." : ""
    itemz := LV_GetCount()
    avgu := groupDigits(Floor(totalu/counter))
-   GetWinClientSize(W, H, PVhwnd, 0)
+   vpWinClientSize(W, H)
    Gdip_GraphicsClear(2NDglPG)
    friendly := InStr(modus, "avg-") ? avgLevel " DAYS AVERAGED" : "DAYS"
    textu := "Seen images chart: " friendly "`nTotal: " groupDigits(counter) " days. " lacking "`nRange: " startPeriod " - " endPeriod "`nAverage: " avgu ". Peak on: " maxKvalu "=" groupDigits(maxValu)
    infoBoxBMP := drawTextInBox(textu, OSDFontName, OSDfontSize, w, h, OSDtextColor, OSDbgrColor, 1, 0)
    Scale := imgHUDbaseUnit/40
-   hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+   ; hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
    tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
    tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
    borderSize := (counter>200) ? imgHUDbaseUnit/60 : imgHUDbaseUnit/10
@@ -22675,7 +22737,6 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
       LV_ModifyCol(A_Index, "AutoHdr Center")
 
   ; LV_ModifyCol(3, "SortDesc")
-
   GuiControl, +Redraw, LViewMetaD
   GuiControl, +Redraw, LViewMetaM
   GuiControl, +Redraw, LViewMetaU
@@ -23109,15 +23170,20 @@ folderTreeMiniBtn() {
 }
 
 folderTreeCopyPath(dummy:=0) {
-   Static lastInvoked := 0
-   If (A_TickCount - lastInvoked<356) || (dummy="forced")
+   Static lastInvoked := 1
+
+   If ((A_TickCount - lastInvoked<356) || (dummy="forced") || InStr(dummy, "copy"))
    {
       Gui, fdTreeGuia: Default
       Gui, fdTreeGuia: TreeView, TVlistFolders
       c := TV_GetSelection()
       folderPath := folderTreeGetSelectedPath(c)
       If !folderPath
+      {
+         showTOOLtip("WARNING: No folder tree element is selected")
+         SetTimer, RemoveTooltip, % -msgDisplayTime
          Return
+      }
 
       Try Clipboard := folderPath
       Catch wasError
@@ -23132,7 +23198,8 @@ folderTreeCopyPath(dummy:=0) {
          SoundBeep 300, 100
       }
       SetTimer, RemoveTooltip, % -msgDisplayTime
-   } Else lastInvoked := A_TickCount
+   } 
+   lastInvoked := A_TickCount
 }
 
 folderTreeAddFolderFaves() {
@@ -23163,9 +23230,9 @@ folderTreeDefaultAction(modus:=0, g:=0) {
       z := 4
    Else If (modus="properties" && g="yo")
       z := 3
-   Else If GetKeyState("Shift", "P") || (modus="anew" && g="yo") 
+   Else If (GetKeyState("Shift", "P") || (modus="anew" && g="yo") )
       z := 2
-   Else If GetKeyState("Ctrl", "P") || (modus="explorer" && g="yo")
+   Else If (GetKeyState("Ctrl", "P") || (modus="explorer" && g="yo"))
       z := 1
 
    Gui, fdTreeGuia: Default
@@ -23240,7 +23307,14 @@ fdTreeClose() {
 }
 
 fdTreeGuiaGuiClose:
+   fdTreeClose()
+Return
+
+
 fdTreeGuiaGuiEscape:
+   If (A_TickCount - lastOtherWinClose < 400)
+      Return
+
    fdTreeClose()
 Return
 
@@ -23318,6 +23392,16 @@ FolderTreeResponder(a, b, c) {
       prevMSGdisplay := 1
       While, determineLClickstate()
       {
+         ; drag and drop
+         If (GetKeyState("Escape", "P"))
+         {
+            func2exec := r := info := ""
+            thisFolder := dc := nc := r := info := ""
+            Global lastOtherWinClose := A_TickCount
+            interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
+            Break
+         }
+
          Gui, fdTreeGuia: Default
          Gui, fdTreeGuia: TreeView, TVlistFolders
          info := defineWindowUnderMouse()
@@ -23343,7 +23427,8 @@ FolderTreeResponder(a, b, c) {
             r := GetKeyState("Shift", "P") ? "[_MOVE_]" : "[_COPY_]"
             If thisFolder
                friendly .= "`nDestination: ." thisFolder "\ " r
-
+            Else
+               friendly .= "`nNo defined destination."
          } Else If InStr(info, "main")
          {
             r := nc := ""
@@ -23354,7 +23439,7 @@ FolderTreeResponder(a, b, c) {
          } Else If InStr(info, "omnibox window")
          {
             r := dc := nc := ""
-            friendly := "`nDrop folder here to begin navigate it using the omnibox."
+            friendly := "`nDrop folder here to begin navigation using the omnibox."
          } Else If InStr(info, "omnibox list")
          {
             TV_Modify(c)
@@ -23474,7 +23559,7 @@ defineWindowUnderMouse() {
       info := "Main window"
    Else If (OutputVarWin=hQuickMenuSearchWin && hwnd=hLVquickSearchMenus && VisibleQuickMenuSearchWin=1)
       info := "Omnibox list"
-   Else If (OutputVarWin=hQuickMenuSearchWin && VisibleQuickMenuSearchWin=1)
+   Else If (OutputVarWin=hQuickMenuSearchWin && hwnd=hEditMenuSearch && VisibleQuickMenuSearchWin=1)
       info := "Omnibox window"
    Else If (OutputVarWin=hGuiTip)
       info := "Tooltip"
@@ -33390,6 +33475,16 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
       prevMSGdisplay := 1
       While, determineLClickstate()
       {
+         ; drag and drop
+         If (GetKeyState("Escape", "P"))
+         {
+            func2exec := r := info := ""
+            thisFolder := dc := nc := r := info := ""
+            Global lastOtherWinClose := A_TickCount
+            interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
+            Break
+         }
+
          info := defineWindowUnderMouse()
          If InStr(info, "tooltip")
          {
@@ -33409,9 +33504,10 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
                TV_Modify(nc)
             }
 
-            friendly .= "`nDestination: ." thisFolder "\"
+            friendly .= nc ? "`nDestination: ." thisFolder "\" : "No destination folder."
             r := GetKeyState("Shift", "P") ? "[_MOVE_]" : "[_COPY_]"
-            friendly .= A_Space r
+            If nc
+               friendly .= A_Space r
          } Else If InStr(info, "main")
          {
             r := dc := nc := ""
@@ -33440,12 +33536,12 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
             friendly := "`nMove or copy folder into another one. Hold SHIFT to MOVE."
             r := GetKeyState("Shift", "P") ? "[_MOVE_]" : "[_COPY_]"
             friendly2 := "`nDestination: ." restu "\ " r
-            friendly .= thisFolder ? friendly2 : "`nNo folder is currently underneath."
+            friendly .= thisFolder ? friendly2 : "`nNo destination folder is currently underneath."
             ; r := GetKeyState("Shift", "P") ? "[MOVE]" : "[COPY]"
          } Else 
          {
             r := dc := nc := ""
-            friendly := "No action associated to this pointer location"
+            friendly := "`nNo action associated to this pointer location."
          }
 
          If (A_TickCount - prevMSGdisplay>100)
@@ -33803,8 +33899,14 @@ closeQuickSearch() {
    interfaceThread.ahkassign("VisibleQuickMenuSearchWin", VisibleQuickMenuSearchWin)
 }
 
-QuickMenuSearchGUIAGuiClose:
 QuickMenuSearchGUIAGuiEscape:
+   If (A_TickCount - lastOtherWinClose < 400)
+      Return
+ 
+   closeQuickSearch()
+Return
+
+QuickMenuSearchGUIAGuiClose:
    closeQuickSearch()
 Return
 
@@ -34829,7 +34931,7 @@ PanelRenameThisFile(dummy:=0) {
          updateMainUnfilteredList(currentFileIndex, 5, 0)
          ForceRefreshNowThumbsList()
          dummyTimerDelayiedImageDisplay(50)
-         CreateGuiButton("Undo rename,,undoFileRenameAction", 0, msgDisplayTime//1.5 + 500)
+         CreateTempGuiButton("Undo rename,,undoFileRenameAction", 0, msgDisplayTime//1.5 + 500)
       }
    } Else If InStr(msgResult.btn, "modify")
    {
@@ -36274,7 +36376,7 @@ updateUIfloodFillPanel() {
 ReadSettingsFloodFillPanel(act:=0) {
    RegAction(act, "BrushToolOutsideSelection",, 2, 1, 3)
    RegAction(act, "FloodFillOpacity",, 2, 4, 255)
-   RegAction(act, "FloodFillBlendMode",, 2, 1, 21)
+   RegAction(act, "FloodFillBlendMode",, 2, 1, 23)
    RegAction(act, "FloodFillColor",, 3)
    RegAction(act, "FloodFillClrOpacity",, 2, 1, 255)
    RegAction(act, "FloodFillAltToler",, 2, 1, 3)
@@ -36879,7 +36981,7 @@ BtnApplyQuickActionsPanel() {
 BTNchooseQuickActDestFolder(CtrlHwnd) {
    Static lastFolder
    If !lastFolder
-      lastFolder := ResizeDestFolder ? ResizeDestFolder : A_ScriptDir
+      lastFolder := ResizeDestFolder ? ResizeDestFolder : A_MyDocuments
 
    GuiControlGet, varu, SettingsGUIA: Name, % CtrlHwnd
    ; ToolTip, % varu "`n" a "|" b "|" c , , , 2
@@ -38116,7 +38218,7 @@ importAlphaMaskFromClipboard() {
 
 ReadSettingsPasteInPlace(act:=0) {
     RegAction(act, "PasteInPlaceGlassy",, 2, 1, 6)
-    RegAction(act, "PasteInPlaceBlendMode",, 2, 1, 21)
+    RegAction(act, "PasteInPlaceBlendMode",, 2, 1, 23)
     RegAction(act, "PasteInPlaceAdaptMode",, 2, 1, 3)
     RegAction(act, "alphaMaskClrAintensity",, 2, 0, 255)
     RegAction(act, "alphaMaskClrBintensity",, 2, 0, 255)
@@ -38251,7 +38353,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0) {
     DestroyGIFuWin()
     changeMcursor()
     setImageLoading()
-    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+    vpWinClientSize(mainWidth, mainHeight)
     If (toolu="transform")
     {
        showTOOLtip("Retrieving image selected area, please wait")
@@ -38486,7 +38588,7 @@ ReadSettingsFillAreaPanel(act:=0) {
     RegAction(act, "FillAreaOpacity",, 2, 1, 255)
     RegAction(act, "FillArea2ndColor",, 3)
     RegAction(act, "FillArea2ndOpacity",, 2, 1, 255)
-    RegAction(act, "FillAreaBlendMode",, 2, 1, 21)
+    RegAction(act, "FillAreaBlendMode",, 2, 1, 23)
     RegAction(act, "FillAreaClosedPath",, 1)
     RegAction(act, "FillAreaColorMode",, 2, 1, 6)
     RegAction(act, "FillAreaColorReversed",, 1)
@@ -39037,7 +39139,7 @@ addFluidPointsCustomShape() {
       Return
 
    lastInvoked := 1
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    newArrayu := new hashtable()
    dotsSize := (FillAreaCurveTension>1) ? SelDotsSize : SelDotsSize//2 + 1
    If (FillAreaCurveTension=3)
@@ -39087,7 +39189,7 @@ adjustAnchorPointsCustomShape(thisIndex:=0) {
        Return
  
     lastInvoked := A_TickCount
-    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+    vpWinClientSize(mainWidth, mainHeight)
  
     prevState := thisState := prevMX := prevMY := 0
     setwhileLoopExec(1)
@@ -39418,7 +39520,7 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0) {
         recordVectorUndoLevels(customShapePoints.Clone(), initialDrawingStartCoords.Clone())
      }
 
-     CreateGuiButton("Die dummy", 1)
+     CreateTempGuiButton("Die dummy", 1)
      updateUIctrl()
      createGUItoolbar()
      showQuickActionButtonsDrawingShape()
@@ -39602,7 +39704,7 @@ showQuickActionButtonsDrawingShape() {
      ll := "Tension: " tensionCurveCustomShape
 
   LabelTension := "||" ll ",,togglePathCurveTension"
-  CreateGuiButton("Undo,,ImgVectorUndoAct||Cancel,,MenuCancelDrawingShape||Done,,stopDrawingShape" btnOpenLine LabelTension, "Forced", msgDisplayTime*10000)
+  CreateTempGuiButton("Undo,,ImgVectorUndoAct||Cancel,,MenuCancelDrawingShape||Done,,stopDrawingShape" btnOpenLine LabelTension, "Forced", msgDisplayTime*10000)
   SetTimer, DestroyTempBtnGui, Off
 }
 
@@ -41346,7 +41448,7 @@ createHatchBrush(thisOpacity) {
 }
 
 getClampedVPimgBounds(ByRef dpX, ByRef dpY, ByRef kX, ByRef kY, ByRef kW, ByRef kH) {
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    dpX := clampInRange(prevDestPosX, 0, mainWidth)
    dpY := clampInRange(prevDestPosY, 0, mainHeight)
    kX := clampInRange(prevDestPosX + prevResizedVPimgW, 2, mainWidth)
@@ -41456,7 +41558,7 @@ livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
 
    If (dummy!="live")
    {
-      hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+      ; hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
       tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
       tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
    } Else If StrLen(userAlphaMaskBmpPainted)>2
@@ -41467,7 +41569,7 @@ livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
       viewportDynamicOBJcoords.zl := (vPimgSelW/w + vPimgSelH/h)/2 + 0.0001
    }
 
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    imgSelW := Round( max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2) )
    imgSelH := Round( max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2) )
 
@@ -41551,7 +41653,7 @@ livePreviewFillBehindArea(modus:=0) {
 
       thisColorA := makeRGBAcolor(FillBehindColor, FillBehindClrOpacity)
       thisBrush := Gdip_BrushCreateSolid(thisColorA)
-      GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+      vpWinClientSize(mainWidth, mainHeight)
       If (FillBehindOpacity<254 || FillBehindClrOpacity<254 || FillBehindInvert=1)
       {
          If (FillBehindInvert=1)
@@ -41670,7 +41772,7 @@ ReadSettingsZoomBlurPanel(act:=0) {
     RegAction(act, "BlurAreaAlphaMask",, 1)
     RegAction(act, "blurAreaOpacity",, 2, 3, 255)
     RegAction(act, "blurAreaInverted",, 1)
-    RegAction(act, "BlurAreaBlendMode",, 2, 1, 21)
+    RegAction(act, "BlurAreaBlendMode",, 2, 1, 23)
     RegAction(act, "BlurAreaGamma",, 2, -100, 100)
     RegAction(act, "BlurAreaHue",, 2, -180, 180)
     RegAction(act, "BlurAreaLight",, 2, -255, 255)
@@ -41693,7 +41795,7 @@ ReadSettingsBlurPanel(act:=0) {
     RegAction(act, "blurAreaInverted",, 1)
     RegAction(act, "blurAreaSoftEdges",, 1)
     RegAction(act, "blurAreaSoftLevel",, 2, 1, 7)
-    RegAction(act, "BlurAreaBlendMode",, 2, 1, 21)
+    RegAction(act, "BlurAreaBlendMode",, 2, 1, 23)
     RegAction(act, "blurAreaTwice",, 1)
     RegAction(act, "BlurAreaAlphaMask",, 1)
 }
@@ -42021,7 +42123,7 @@ ReadSettingsSymmetricaPanel(act:=0) {
     RegAction(act, "UserSymmetricaSelOffY",, 2, 0, 200)
     RegAction(act, "UserSymmetricaUseAlpha",, 1)
     RegAction(act, "UserSymmetricaInvertArea",, 1)
-    RegAction(act, "UserSymmetricaBlendMode",, 2, 1, 21)
+    RegAction(act, "UserSymmetricaBlendMode",, 2, 1, 23)
     RegAction(act, "UserSymmetricaDoColors",, 1)
 }
 
@@ -42029,7 +42131,7 @@ ReadSettingsEdgesPanel(act:=0) {
     RegAction(act, "IDedgesOpacity",, 2, 3, 255)
     RegAction(act, "IDedgesEmphasis",, 2, -255, 255)
     RegAction(act, "IDedgesContrast",, 2, -100, 100)
-    RegAction(act, "IDedgesBlendMode",, 2, 1, 21)
+    RegAction(act, "IDedgesBlendMode",, 2, 1, 23)
     RegAction(act, "IDedgesCenterAmount",, 2, 1, 6)
     RegAction(act, "IDedgesXuAmount",, 2, 1, 7)
     RegAction(act, "IDedgesYuAmount",, 2, 1, 7)
@@ -42043,7 +42145,7 @@ ReadSettingsAddNoisePanel(act:=0) {
     RegAction(act, "IDedgesEmphasis",, 2, -255, 255)
     RegAction(act, "IDedgesContrast",, 2, -100, 100)
     RegAction(act, "IDedgesInvert",, 1)
-    RegAction(act, "IDedgesBlendMode",, 2, 1, 21)
+    RegAction(act, "IDedgesBlendMode",, 2, 1, 23)
     RegAction(act, "UserAddNoiseGrays",, 1)
     RegAction(act, "UserAddNoiseIntensity",, 2, 1, 100)
     RegAction(act, "UserAddNoiseTransparent",, 1)
@@ -42393,6 +42495,7 @@ ReadSettingsPrintPanel(act:=0) {
     RegAction(act, "TextInAreaAlign",, 2, 1, 3)
     RegAction(act, "TextInAreaValign",, 2, 1, 3)
     RegAction(act, "TextInAreaFontColor",, 3)
+    RegAction(act, "TextInAreaFontOpacity",, 2, 3, 255)
     RegAction(act, "TextInAreaFontName",, 5)
     RegAction(act, "TextInAreaFontBold",, 1)
     RegAction(act, "TextInAreaFontItalic",, 1)
@@ -42425,7 +42528,7 @@ PanelPrintImage() {
 
     filesElected := getSelectedFiles(0, 1)
     viewportStampBMP := trGdip_DisposeImage(viewportStampBMP, 1)
-    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+    vpWinClientSize(mainWidth, mainHeight)
 
     If StrLen(useGdiBitmap())>2
        viewportStampBMP := trGdip_ResizeBitmap(A_ThisFunc, useGdiBitmap(), 450, 450, 1, 3, -1)
@@ -42437,6 +42540,7 @@ PanelPrintImage() {
     PrintPosY := printDims[2]
     PrintPosW := printDims[3]
     PrintPosH := printDims[4]
+    TextInAreaFontOpacity := clampInRange(TextInAreaFontOpacity, 10, 255)
 
     btnWid := 70
     txtWid := 350
@@ -42489,6 +42593,8 @@ PanelPrintImage() {
     Gui, Add, UpDown, vPrintTxtSize gupdatePrintPreview Range25-999, % PrintTxtSize
     GuiAddColor("x+2 w55 hp", "TextInAreaFontColor", "Text color")
     GuiAddPickerColor("x+2 hp w27", "TextInAreaFontColor")
+    GuiAddSlider("TextInAreaFontOpacity", 10, 255, 255, "Opacity", "updatePrintPreview", 1, "x+5 w" EditWid2//2 " hp")
+
     Gui, Add, Text, xs y+15, Text alignment and style:
     GuiAddDropDownList("xs y+5 w" editWid " gupdatePrintPreview Choose" TextInAreaAlign " AltSubmit vTextInAreaAlign", "Left|Center|Right", "Text horizontal alignment")
     GuiAddDropDownList("x+2 wp gupdatePrintPreview Choose" TextInAreaValign " AltSubmit vTextInAreaValign", "Top|Center|Bottom", "Text vertical alignment")
@@ -43089,7 +43195,7 @@ updateUInewImagePanel() {
 GetPresetDocSizes(docSize, ByRef UserNewWidth, ByRef UserNewHeight, ByRef UserNewDPI) {
     If (docSize=1)
     {
-       GetWinClientSize(UserNewWidth, UserNewHeight, PVhwnd, 0)
+       vpWinClientSize(UserNewWidth, UserNewHeight, PVhwnd, 0)
        UserNewDPI := A_ScreenDPI
     } Else If (docSize=2)
     {
@@ -43106,7 +43212,7 @@ GetPresetDocSizes(docSize, ByRef UserNewWidth, ByRef UserNewHeight, ByRef UserNe
           UserNewDPI := (dpix + dpiy)//2
        } Else
        {
-          GetWinClientSize(imgW, imgH, PVhwnd, 0)
+          vpWinClientSize(imgW, imgH, PVhwnd, 0)
           UserNewDPI := A_ScreenDPI
        }
        UserNewWidth := imgW
@@ -43624,7 +43730,7 @@ PanelsPanIMGpreviewClick(a:=0) {
       Return
 
    Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
-   ; GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   ; vpWinClientSize(mainWidth, mainHeight)
    Sleep, 0
    GetPhysicalCursorPos(oX, oY)
    newPosZeit := A_TickCount
@@ -44092,7 +44198,7 @@ livePreviewAdjustColorsArea(modus:=0) {
         , prevState, prevBMP
 
    thisBitsDepth := bitsOptions[DesaturateAreaLevels]
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    imgSelPx := x1 := selDotX + SelDotsSize//2, x2 := selDotAx + SelDotsSize//2
    imgSelPy := y1 := selDotY + SelDotsSize//2, y2 := selDotAy + SelDotsSize//2
    imgSelW := max(X1, X2) - min(X1, X2)
@@ -44332,7 +44438,7 @@ livePreviewSymmetricaImgArea(modus:=0) {
 
    lastSymmetryCoords := [tinyPrevAreaCoordX, tinyPrevAreaCoordY]
    ; Gdip_GetImageDimensions(useGdiBitmap(), qimgW, qimgH)
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    imgSelPx := x1 := selDotX + SelDotsSize//2, x2 := selDotAx + SelDotsSize//2
    imgSelPy := y1 := selDotY + SelDotsSize//2, y2 := selDotAy + SelDotsSize//2
    imgSelW := max(X1, X2) - min(X1, X2)
@@ -44433,7 +44539,7 @@ livePreviewDesaturateArea(modus:=0) {
 
    thisBitsDepth := bitsOptions[DesaturateAreaLevels]
    ; Gdip_GetImageDimensions(useGdiBitmap(), qimgW, qimgH)
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    imgSelPx := x1 := selDotX + SelDotsSize//2, x2 := selDotAx + SelDotsSize//2
    imgSelPy := y1 := selDotY + SelDotsSize//2, y2 := selDotAy + SelDotsSize//2
    imgSelW := max(X1, X2) - min(X1, X2)
@@ -45048,7 +45154,7 @@ ReadSettingsTextInArea(act:=0) {
     RegAction(act, "TextInAreaAlign",, 2, 1, 3)
     RegAction(act, "TextInAreaLineAngle",, 2, -900, 900)
     RegAction(act, "TextInAreaCharSpacing",, 2, -100, 255)
-    RegAction(act, "TextInAreaBlendMode",, 2, 1, 21)
+    RegAction(act, "TextInAreaBlendMode",, 2, 1, 23)
     RegAction(act, "TextInAreaValign",, 2, 1, 3)
     RegAction(act, "TextInAreaBlurAmount",, 2, 1, 255)
     RegAction(act, "TextInAreaBlurBorderAmount",, 2, 1, 255)
@@ -45123,10 +45229,9 @@ PanelInsertTextArea() {
        Gui, Font, s%LargeUIfontValue%
     }
 
+    EllipseSelectMode := 0
     ddWid := Round(editWid*3.25)
     txtWid := (PrefsLargeFonts=1) ? Round(editWid*4.5) : Round(editWid*5)
-    EllipseSelectMode := 0
-
     Global editF1, editF2, editF3, editF4, editF5, editF6,  editF7, editF8, editF9, editF10, editF11
          , editF12, PickuTextInAreaFontColor, PickuTextInAreaBgrColor, PickuTextInAreaBorderColor, uiPasteInPlaceAlphaDrawMode
 
@@ -46008,19 +46113,19 @@ invokeTlbrContextMenu(givenCoords:=0) {
       kMenu("PvUItoolbarMenu", "Add", k " toolbar`tShift+F10", "toggleAppToolbar")
 
    Menu, PvUItoolbarMenu, Add
-   kMenu("PvUItoolbarMenu", "Add/Uncheck", "&Vertical toolbar", "TglToolBarValign")
+   kMenu("PvUItoolbarMenu", "Add/Uncheck", "&Vertical toolbar", "ToggleToolBarValign")
    If (TLBRverticalAlign=1 || TLBRtwoColumns=1)
       kMenu("PvUItoolbarMenu", "Check", "&Vertical toolbar")
 
-   kMenu("PvUItoolbarMenu", "Add/Uncheck", "&Two columns vertical", "tlbrApplyTwoColumns",, " (toolbar)")
+   kMenu("PvUItoolbarMenu", "Add/Uncheck", "&Two columns vertical", "toggleToolbarTwoColumns",, " (toolbar)")
    If (TLBRtwoColumns=1)
       kMenu("PvUItoolbarMenu", "Check", "&Two columns vertical",,, " (toolbar)")
 
-   kMenu("PvUItoolbarMenu", "Add/Uncheck", "Attach to main &window", "tlbrLockPositionWin",, " (toolbar)")
+   kMenu("PvUItoolbarMenu", "Add/Uncheck", "Attach to main &window", "ToggleToolbarLockPositionWin",, " (toolbar)")
    If (lockToolbar2Win=1)
       kMenu("PvUItoolbarMenu", "Check", "Attach to main &window",,, " (toolbar)")
    If (lockToolbar2Win=1)
-      kMenu("PvUItoolbarMenu", "Add", "&Reset position", "tlbrResetPosition",, " for toolbar")
+      kMenu("PvUItoolbarMenu", "Add", "&Reset position", "MenuTlbrResetPosition",, " for toolbar")
 
    If (ShowAdvToolbar=1)
    {
@@ -49694,7 +49799,7 @@ RefreshImageFileAction() {
       thisIMGisDownScaled := 0
       SetTimer, RemoveTooltip, % -msgDisplayTime
       If (FlipImgH=1 || FlipImgV=1 || vpIMGrotation>0 || imgFxMode>1 || usrColorDepth>1)
-         CreateGuiButton("Display unaltered image,,HardResetImageView", 0, msgDisplayTime//1.5 + 500)
+         CreateTempGuiButton("Display unaltered image,,HardResetImageView", 0, msgDisplayTime//1.5 + 500)
    } Else If (thumbsDisplaying=1)
       RefreshFilesList()
 }
@@ -49989,7 +50094,7 @@ MenuOpenLastImg(forceOpenGiven:=0) {
          dummyTimerDelayiedImageDisplay(250)
       }
       If (FlipImgH=1 || FlipImgV=1 || vpIMGrotation>0 || imgFxMode>1 || usrColorDepth>1)
-         CreateGuiButton("Display unaltered image,,HardResetImageView", 0, msgDisplayTime//1.5 + 500)
+         CreateTempGuiButton("Display unaltered image,,HardResetImageView", 0, msgDisplayTime//1.5 + 500)
    }
 }
 
@@ -50029,7 +50134,7 @@ OpenArgFile(inputu) {
     SLDtypeLoaded := 1
     SetTimer, createGUItoolbar, -100
     If (FlipImgH=1 || FlipImgV=1 || vpIMGrotation>0 || imgFxMode>1 || usrColorDepth>1)
-       CreateGuiButton("Display unaltered image,,HardResetImageView", 0, msgDisplayTime//1.5 + 500)
+       CreateTempGuiButton("Display unaltered image,,HardResetImageView", 0, msgDisplayTime//1.5 + 500)
 
     SetTimer, TriggerMenuBarUpdate, -90
     ; Else resetMainWin2Welcome()
@@ -51379,7 +51484,7 @@ InitGuiContextMenu(keyu:=0, mX:="-", mY:=0, givenCoords:=0) {
       If (A_TickCount - lastInvoked<250) && (keyu="extern") || (A_TickCount - zeitSillyPrevent<250)
          Return
 
-      GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+      vpWinClientSize(mainWidth, mainHeight)
       Au := WinActive("A")
       If !InStr(keyu, "appsk")
          MouseGetPos, , , Bu
@@ -51432,7 +51537,7 @@ InitGuiContextMenu(keyu:=0, mX:="-", mY:=0, givenCoords:=0) {
 
    If (drawingShapeNow=1)
    {
-      GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+      vpWinClientSize(mainWidth, mainHeight)
       ; GetMouseCoord2wind(PVhwnd, mX, mY)
       addNewVectorShapePoints(mX, mY, mainWidth, mainHeight, "rClick", 0, 0)
       Return
@@ -51484,7 +51589,7 @@ MeasureStringGdipLight(stringu, fontName, isBold, Size, xpos, ypos, Width, Heigh
 PathCompact(givenPath, CharMax, allowOverflow:=0, fontSizeu:=0, givenWidth:=0, minChars:=0) {
     If (CharMax="a")
     {
-       GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+       vpWinClientSize(mainWidth, mainHeight)
        mainWidth := givenWidth ? givenWidth : mainWidth//1.6 + 1
        borderSize := imgHUDbaseUnit//5
        txtResW := MeasureStringGdipLight(givenPath, OSDFontName, OSDfontBolded, fontSizeu, borderSize, 0, mainWidth*3, mainHeight)
@@ -51950,9 +52055,9 @@ InvokeMenuBarVectorEdit(manuID) {
          kMenu("pvMenuBarEdit", "Check", "&Preview new point`tP")
    } Else
    {
-      kMenu("pvMenuBarEdit", "Add/Uncheck", "Auto-reflect anchors`tR", "toggleAutoReflectAnchors")
+      kMenu("pvMenuBarEdit", "Add/Uncheck", "Symmetrical anchors`tR", "toggleAutoReflectAnchors")
       If (autoReflectVectorAnchors=1)
-         kMenu("pvMenuBarEdit", "Check", "Auto-reflect anchors`tR")
+         kMenu("pvMenuBarEdit", "Check", "Symmetrical anchors`tR")
    }
 
    kMenu("pvMenuBarEdit", "Add/Uncheck", "&Open ended path`tO", "toggleOpenClosedLineCustomShape", "opened closed vector")
@@ -52966,7 +53071,13 @@ MenuSetShapeTension(a,b,c) {
 }
 
 checkForUpdatesNow() {
-  Static iniURL := "http://marius.sucan.ro/media/files/blog/ahk-scripts/qpv-version.ini"
+  If (FileExist("win-store-mode.ini") && A_IsCompiled)
+  {
+     Try Run, ms-windows-store://pdp/?productid=9N07RF144FV1
+     Return
+  }
+
+  Static iniURL := "https://marius.sucan.ro/media/files/blog/ahk-scripts/qpv-version.ini"
   iniTMP := mainCompiledPath "\resources\update-infos.ini"
   BtnCloseWindow()
   showTOOLtip("Checking for updates, please wait")
@@ -56398,7 +56509,7 @@ dummyFullScreenButtons() {
   }
 
   showTOOLtip(friendly)
-  CreateGuiButton(1stLabel ",," 1stact "||" 2ndLabel ",," 2ndact, "force", msgDisplayTime + 500)
+  CreateTempGuiButton(1stLabel ",," 1stact "||" 2ndLabel ",," 2ndact, "force", msgDisplayTime + 500)
   SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -56676,7 +56787,7 @@ ToggleMultiLineStatus() {
     multilineStatusBar := !multilineStatusBar
     INIaction(1, "multilineStatusBar", "General")
     dummyTimerDelayiedImageDisplay(50)
-    CreateGuiButton("File options,,invokeFileOptionsMenu", 0, msgDisplayTime//1.5 + 500)
+    CreateTempGuiButton("File options,,invokeFileOptionsMenu", 0, msgDisplayTime//1.5 + 500)
 }
 
 invokeFileOptionsMenu(givenCoords:=0) {
@@ -57056,7 +57167,7 @@ toggleEllipseSelection(modus:=-1) {
 
    If (ShowAdvToolbar=1)
       decideIconBTNselectShape()
-   CreateGuiButton("Draw new form,,MenuStartDrawingSelectionArea" dummy, 0, msgDisplayTime//1.5 + 500)
+   CreateTempGuiButton("Draw new form,,MenuStartDrawingSelectionArea" dummy, 0, msgDisplayTime//1.5 + 500)
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -57096,7 +57207,7 @@ defineSelectionAspectRatios(doFlipper:=0, modus:=0) {
 
    imgSelW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
    imgSelH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    If isImgEditingNow()
       Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
 
@@ -57273,7 +57384,7 @@ dummyToggleTitleBarActionBtns() {
   }
 
   ; If (isTitleBarVisible=0)
-  CreateGuiButton(1stLabel ",," 1stact "||" 2ndLabel ",," 2ndact, "force", msgDisplayTime + 500)
+  CreateTempGuiButton(1stLabel ",," 1stact "||" 2ndLabel ",," 2ndact, "force", msgDisplayTime + 500)
   showTOOLtip(friendly)
   SetTimer, RemoveTooltip, % -msgDisplayTime
 }
@@ -57293,12 +57404,13 @@ ToggleMenuBaru() {
 
    TriggerMenuBarUpdate("forced")
    ; If (A_TickCount - lastInvoked > 900)
-   ;    CreateGuiButton("Interface options,,OpenUImenu", 0, msgDisplayTime//1.5 + 500)
+   ;    CreateTempGuiButton("Interface options,,OpenUImenu", 0, msgDisplayTime//1.5 + 500)
 
    If (isImgEditingNow()=1 || (thumbsDisplaying=1 && maxFilesIndex>1))
    {
       ; If (thumbsDisplaying=1)
       ForceRefreshNowThumbsList()
+      recalculateThumbsSizes()
       SetTimer, dummyUpdateWin, -300, 100
    }
    If hasTrans
@@ -57309,7 +57421,7 @@ ToggleMenuBaru() {
 }
 
 dummyUpdateWin() {
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    ; ToolTip, % mainWidth "=" mainHeight , , , 2
    createGDIPcanvas(mainWidth, mainHeight, 1)
    dummyTimerDelayiedImageDisplay(50)
@@ -57394,7 +57506,7 @@ ToggleDarkModus() {
     }
 }
 
-tlbrLockPositionWin() {
+ToggleToolbarLockPositionWin() {
     lockToolbar2Win := !lockToolbar2Win
     INIaction(1, "lockToolbar2Win", "General")
     friendly := (lockToolbar2Win=1) ? "ATTACHED to the main window" : "DETACHED from the main window"
@@ -57403,7 +57515,12 @@ tlbrLockPositionWin() {
 
     interfaceThread.ahkassign("lockToolbar2Win", lockToolbar2Win)
     showDelayedTooltip("Toolbar position: `n" friendly, A_ThisFunc, 1)
-}
+    If (isImgEditingNow()=1 || (thumbsDisplaying=1 && maxFilesIndex>1))
+    {
+       ForceRefreshNowThumbsList()
+       dummyTimerDelayiedImageDisplay(50)
+    }
+ }
 
 ToggleImgNavBox() {
     Static lastInvoked := 1
@@ -57590,6 +57707,8 @@ ToggleIgnoreSLDprefs() {
 toggleFDtreeInfos() {
     showFolderTreeDetails := !showFolderTreeDetails
     INIaction(1, "showFolderTreeDetails", "General")
+    friendly := (showFolderTreeDetails=1) ? "ACTIVATED" : "DEACTIVATED"
+    showTOOLtip("Folder details in status bar: " friendly, A_ThisFunc, 1)
     If (folderTreeWinOpen=1)
        folderTreeInfoStatusLineUpdater()
 }
@@ -57785,9 +57904,16 @@ toggleAppToolbar() {
     createGUItoolbar()
     If (lockToolbar2Win=1 && ShowAdvToolbar=1)
        tlbrResetPosition()
+
+    If (isImgEditingNow()=1 || (thumbsDisplaying=1 && maxFilesIndex>1))
+    {
+       ForceRefreshNowThumbsList()
+       dummyTimerDelayiedImageDisplay(50)
+    }
+
     SetTimer, fromCurrentPanelToColorsSwatch, -150
-   If (panelWinCollapsed=1 && AnyWindowOpen)
-      SetTimer, collapseWidgetGUIAGuiEscape, -25
+    If (panelWinCollapsed=1 && AnyWindowOpen)
+       SetTimer, collapseWidgetGUIAGuiEscape, -25
 }
 
 ToggleToolBarToolTips() {
@@ -57803,6 +57929,12 @@ ToggleToolBarViewModa() {
     IniAction(1, "toolbarViewerMode", "General")
     If (ShowAdvToolbar=1)
        createGUItoolbar()
+
+    If (isImgEditingNow()=1 || (thumbsDisplaying=1 && maxFilesIndex>1))
+    {
+       ForceRefreshNowThumbsList()
+       dummyTimerDelayiedImageDisplay(50)
+    }
 }
 
 ToggleTouchMode() {
@@ -57873,7 +58005,7 @@ defineWinTitlePrefix() {
 }
 
 calculateTouchMargins(ByRef thisX, ByRef thisY, ByRef thisW, ByRef thisH) {
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    thisX := (editingSelectionNow=1) ? mainWidth//8 : mainWidth//7
    thisY := (editingSelectionNow=1) ? mainHeight//6 : mainHeight//5
    thisW := mainWidth - thisX*2
@@ -57900,7 +58032,7 @@ drawWelcomeImg() {
     }
 
     thisZeit := A_TickCount
-    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+    vpWinClientSize(mainWidth, mainHeight)
     Random, modelu, 1, 8
     If (modelu=8)
        Random, modelu, 1, 8
@@ -58400,7 +58532,7 @@ createGDIPcanvas(W:=0, H:=0, forceIT:=0) {
       Return
 
    If (!W || !H)
-      GetWinClientSize(W, H, PVhwnd, 0)
+      vpWinClientSize(W, H)
 
    newDimensions := "w" W "-h" H "-mbar" showMainMenuBar
    doAgain := (prevDimensions!=newDimensions) ? 1 : 0
@@ -59349,7 +59481,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
 
    prevImgPath := imgPath
    IDprevImgPath := imgPath "-" userHQraw extraID
-   GetWinClientSize(GuiW, GuiH, PVhwnd, 0)
+   vpWinClientSize(GuiW, GuiH, PVhwnd, 0)
 
    imgW := oImgW
    imgH := oImgH
@@ -59402,8 +59534,8 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
    }
 
    IMGlargerViewPort := ((ResizedH - 5>GuiH + 1) || (ResizedW - 5>GuiW + 1)) ? 1 : 0
-   If (IMGlargerViewPort!=1 && IMGresizingMode!=4 && IMGresizingMode!=3)
-      hasTrans := adjustCanvas2Toolbar(2NDglPG, 0) ; to-do ; make image not appear under the toolbar
+   ; If (IMGlargerViewPort!=1 && IMGresizingMode!=4 && IMGresizingMode!=3)
+   ;    hasTrans := adjustCanvas2Toolbar(2NDglPG, 0) ; to-do ; make image not appear under the toolbar
 
    If (hasTrans=1 && (ResizedW>GuiW - ToolbarWinW + 2))
    {
@@ -59608,7 +59740,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
     knobSize := imgHUDbaseUnit//3
     If (showInfoBoxHUD=1)
     {
-       hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+       ; hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
        If (thumbsDisplaying=1)
        {
           tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
@@ -59769,7 +59901,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu) {
        memUsage .= "`nMulti-threaded mode: " friendlyCoreInfo
    }
 
-    hasTrans := adjustCanvas2Toolbar(Gu, 0)
+    ; hasTrans := adjustCanvas2Toolbar(Gu, 0)
     entireString := infoEditing fileRelatedInfos infoFaved infoRes infoPixFmt memUsage infoSizing infoMirroring infoColors infoColorDepth infoFrames infoAnim InfoLoadTime infoThisSLD infoFilesSel infoAudio infoSlider infoFilteru infoSelection 
     tlbrBonusX := (hasTrans=1 && (FlipImgH=0 || thumbsDisplaying=1)) ? ToolbarWinW : 0
     tlbrBonusY := (hasTrans=2 && (FlipImgV=0 || thumbsDisplaying=1)) ? ToolbarWinH : 0
@@ -59850,7 +59982,7 @@ drawAnnotationBox(mainWidth, mainHeight, Gu) {
     If !entireString
        Return
 
-    hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+    ; hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
     tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
     tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
     textBoxBMP := drawTextInBox(entireString, OSDFontName, OSDfontSize//1.1, mainWidth - tlbrBonusX, mainHeight, OSDtextColor, OSDbgrColor, 0, !thumbsDisplaying, usrTextAlign)
@@ -61161,7 +61293,7 @@ createHistogramBMP(whichBitmap) {
    RstringArray := Trim(RstringArray, "`n")
    RstringArray := StrSplit(RstringArray, "`n")
 
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    avgBrLvlK := Round(sumTotalBr/TotalPixelz - 1, 1)
    thisVal := minu := maxu := 0
    Loop, 256
@@ -61362,7 +61494,7 @@ VPnavBoxWrapper(mainWidth, mainHeight, Gu) {
     Critical, on
 
     createVPnavBox(navBoxu, imgW, imgH, diffX, diffY, zImgW, zImgH, entireString)
-    hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+    ; hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
     scrbH := (thumbsDisplaying=1 && FlipImgV=0) ? 0 : scrollBarHy
     scrbV := (thumbsDisplaying=1 && FlipImgH=1) ? 0 : scrollBarVx
     tlbrBonusX := (hasTrans=1 && (FlipImgH=0 || thumbsDisplaying=1 && FlipImgH=1) && ((ToolbarWinH - 3 > mainHeight - imgH - scrbH) || FlipImgV=1 && thumbsDisplaying=0)) ? ToolbarWinW : 0
@@ -61533,7 +61665,7 @@ createVPnavBox(ByRef pBitmap, ByRef imgW, ByRef imgH, ByRef posX, ByRef posY, By
 
    If (thumbsDisplaying!=1)
    {
-      GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+      vpWinClientSize(mainWidth, mainHeight)
       obju := createImgSelection2Win(prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, prevMaxSelX, prevMaxSelY, mainWidth, mainHeight, 1, 0)
       coords := obju.x1 "|" obju.y1 "|" obju.x2 "|" obju.y2
       calcImgSelection2bmp(1, oimgW, oimgH, fimgW, fimgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2, 0, 0, coords)
@@ -61569,7 +61701,7 @@ calculateNavBoxSize() {
    If (imgW<minSizeu*fs) ; avoid having the preview smaller than the thumbnails in the list
       imgW := Round(minSizeu*fs)
    
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    maxu := Round(min(mainWidth, mainHeight)*0.75)
    If (imgW>maxu)
       imgW := maxu
@@ -61701,7 +61833,7 @@ ImageNavBoxClickResponder() {
    navHeight := HUDobjNavBoxu[2]
    diffIMGdecX := diffIMGdecY := 0
    prevImgDecaX := prevImgDecaY := 0
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    minTopCornerX := (allowFreeIMGpanning=1) ? mainWidth : 0
    minTopCornerY := (allowFreeIMGpanning=1) ? mainHeight : 0
    vpImgPanningNow := (allowFreeIMGpanning=1) ? 1 : 2
@@ -62728,7 +62860,7 @@ createClonedBrushBitmap(brushSize, brushSofty, brushAngle, thisAR, whichBitmap, 
          mX := brushSize
          mY := brushSofty
       } Else GetMouseCoord2wind(PVhwnd, mX, mY)
-      GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+      vpWinClientSize(mainWidth, mainHeight)
       mX := (FlipImgH=1) ? mainWidth - mX : mX
       mY := (FlipImgV=1) ? mainHeight - mY : mY
       MouseCoords2Image(mX, mY, 1, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kY, whichBitmap, 1, imgW, imgH)
@@ -63048,7 +63180,7 @@ ActFloodFillNow() {
       Return
    }
 
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    GetMouseCoord2wind(PVhwnd, mX, mY)
    mX := (FlipImgH=1) ? mainWidth - mX : mX
    mY := (FlipImgV=1) ? mainHeight - mY : mY
@@ -63224,7 +63356,7 @@ ActPaintBrushNow() {
    If (BrushToolBlurStrength<3 && canApplyFXa=0 && canApplyFXb=0 && BrushToolType=5)
       Return
 
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    GetMouseCoord2wind(PVhwnd, mX, mY)
    mX := (FlipImgH=1) ? mainWidth - mX : mX
    mY := (FlipImgV=1) ? mainHeight - mY : mY
@@ -63799,7 +63931,7 @@ ActDrawAlphaMaskBrushNow() {
    If (A_TickCount - lastOtherWinClose<450)
       Return
 
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    GetMouseCoord2wind(PVhwnd, mX, mY)
    mX := (FlipImgH=1) ? mainWidth - mX : mX
    mY := (FlipImgV=1) ? mainHeight - mY : mY
@@ -64132,10 +64264,11 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
           thisPosY := (DestPosY<0) ? 0 : DestPosY
           thisW := (newW>mainWidth) ? mainWidth : newW
           thisH := (newH>mainHeight) ? mainHeight : newH
-          If (thisPosX+thisW>mainWidth)
+          If (thisPosX + thisW>mainWidth)
              thisW := mainWidth - thisPosX
-          If (thisPosY+thisH>mainHeight)
+          If (thisPosY + thisH>mainHeight)
              thisH := mainHeight - thisPosY
+
           HistogramBMP := trGdip_DisposeImage(HistogramBMP, 1)
           If (thisW>4 && thisH>4)
              tempBMP := trGdip_CreateBitmapFromHBITMAP(glHbitmap)
@@ -64314,7 +64447,7 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
     If (showHistogram>1 && StrLen(HistogramBMP)>3 && mode!=2)
     { 
        Gdip_GetImageDimensions(HistogramBMP, imgW, imgH)
-       hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+       ; hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
        tlbrBonusX := (hasTrans=1 && FlipImgH=1 && ((ToolbarWinH - 3 > mainHeight - imgH - scrollBarHy) || FlipImgV=1)) ? ToolbarWinW : 0
        tlbrBonusY := (hasTrans=2 && FlipImgV=1 && ((ToolbarWinW - 3 > mainWidth  - imgW - scrollBarVx) || FlipImgH=1)) ? ToolbarWinH : 0
        thisPosX := (FlipImgH=0 && scrollBarVx>0) ? mainWidth - scrollBarVx - imgW - tlbrBonusX : mainWidth - imgW - tlbrBonusX
@@ -65804,7 +65937,7 @@ dummyRefreshImgSelectionWindow() {
         Return
      }
 
-     GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+     vpWinClientSize(mainWidth, mainHeight)
      If (drawingShapeNow=1)
         GetMouseCoord2wind(PVhwnd, mX, mY)
 
@@ -66545,7 +66678,7 @@ ToggleEditImgSelection(modus:=0) {
 
   If (imgSelX2=-1 || ImgSelX2="c") && (editingSelectionNow=1)
   {
-     GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+     vpWinClientSize(mainWidth, mainHeight)
      createDefaultSizedSelectionArea(prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, prevMaxSelX, prevMaxSelY, mainWidth, mainHeight)
      ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, prevMaxSelX, prevMaxSelY, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
   }
@@ -66555,7 +66688,7 @@ ToggleEditImgSelection(modus:=0) {
      decideIconBTNselectShape()
   clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
   If (modus="key" && editingSelectionNow=1)
-     CreateGuiButton("Selection options,,invokeSelectionAreaMenu", 0, msgDisplayTime//1.5 + 500)
+     CreateTempGuiButton("Selection options,,invokeSelectionAreaMenu", 0, msgDisplayTime//1.5 + 500)
 
   SetTimer, MouseMoveResponder, -90
   SetTimer, dummyRefreshImgSelectionWindow, -25
@@ -67163,7 +67296,7 @@ ImageCoords2Window(inputX, inputY, DestPosX, DestPosY, dotSize, ByRef outX, ByRe
 
    If (limitBounds=1)
    {
-      GetWinClientSize(mW, mH, PVhwnd, 0)
+      vpWinClientSize(mW, mH, PVhwnd, 0)
       outX := clampInRange(outX, 0, mW)
       outY := clampInRange(outY, 0, mH)
    }
@@ -67223,8 +67356,8 @@ updateTinyPreviewArea(DestPosX, DestPosY, newW, newH, urgent:=0) {
     Static lastInvoked := 1
     If (tinyPrevAreaCoordX="C" || tinyPrevAreaCoordY="C" || urgent=1)
     {
-       GetMouseCoord2wind(hGDIwin, mX, mY)
-       GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+       GetMouseCoord2wind(PVhwnd, mX, mY)
+       vpWinClientSize(mainWidth, mainHeight)
        mX := (FlipImgH=1) ? mainWidth - mX : mX
        mY := (FlipImgV=1) ? mainHeight - mY : mY
        MouseCoords2Image(mX, mY, 1, DestPosX, DestPosY, newW, newH, x, y)
@@ -67283,13 +67416,13 @@ GdipCleanMain(modus:=0) {
     {
        ; BlackedCreator(128)
        ; SetTimer, destroyBlacked, -100
-       GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+       vpWinClientSize(mainWidth, mainHeight)
        Gdi_FillShape(glHDC, 0, 0, mainWidth, mainHeight, WindowBgrColor, 1)
        r2 := doLayeredWinUpdate(A_ThisFunc, hGDIwin, glHDC, 200)
        Return
     }
 
-    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+    vpWinClientSize(mainWidth, mainHeight)
     opacity := (modus=1) ? "0xFF" : "0x50"
     If (modus=4 || modus=5 || modus=6)
     {
@@ -67938,7 +68071,7 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
           theMSG2 := labelu2 ": " thisu " | " theMSG2
        }
 
-       hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+       ; hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
        tlbrBonusX := (hasTrans=1 && (ToolbarWinH - 3 > mainHeight - ThumbsStatusBarH)) ? ToolbarWinW + 5 : 0
        tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
        infoBoxBMP := drawTextInBox(theMsg, OSDFontName, Round(OSDfontSize*0.9), mainWidth, mainHeight//3, OSDtextColor, bgrTXT, 1)
@@ -68026,7 +68159,7 @@ generateFilesListMap(dummy:=0) {
       thisVal := 2
 
    lastVal := !lastVal
-   GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+   vpWinClientSize(mainWidth, mainHeight)
    mainBMP := trGdip_CreateBitmap(A_ThisFunc, 2, maxFilesIndex)
    G1 := trGdip_GraphicsFromImage(A_ThisFunc, mainBMP)
    Gdip_GraphicsClear(G1, "0xFF" WindowBgrColor)
@@ -68877,14 +69010,14 @@ calcIMGcoordsInVP(mainWidth, mainHeight, newW, newH, ByRef DestPosX, ByRef DestP
     Static orderu := {1:7, 2:8, 3:9, 4:4, 5:5, 6:6, 7:1, 8:2, 9:3}
          , prevW := 1, prevH := 1, prevZoom := 0
 
-    isOkay := (IMGresizingMode=4 && (customZoomAdaptMode>0)) ? 0 : 1
-    If (isOkay=1)
-       hasTrans := adjustCanvas2Toolbar(2NDglPG, 0) ; to-do ; make image not appear under the toolbar
+    ; isOkay := (IMGresizingMode=4 && (customZoomAdaptMode>0)) ? 0 : 1
+    ; If (isOkay=1)
+    ;    hasTrans := adjustCanvas2Toolbar(2NDglPG, 0) ; to-do ; make image not appear under the toolbar
 
-    If (hasTrans=1)
-       mainWidth -= ToolbarWinW
-    If (hasTrans=2)
-       mainHeight -= ToolbarWinH
+    ; If (hasTrans=1)
+    ;    mainWidth -= ToolbarWinW
+    ; If (hasTrans=2)
+    ;    mainHeight -= ToolbarWinH
 
     If (allowFreeIMGpanning=1 && IMGresizingMode=4)
     {
@@ -68958,6 +69091,7 @@ calcIMGcoordsInVP(mainWidth, mainHeight, newW, newH, ByRef DestPosX, ByRef DestP
 
     If (hasTrans=1)
        DestPosX += ToolbarWinW
+    ; ToolTip, % "h=" hasTrans "| fH=" FlipImgH " | " ToolbarWinW "||" DestPosX , , , 2
     If (hasTrans=2)
        DestPosY += ToolbarWinH
     ; ToolTip, % DestPosX "=" DestPosY "`n" IMGdecalageX "=" IMGdecalageY , , , 2
@@ -69069,8 +69203,8 @@ GuiGDIupdaterResize(eventu:=0) {
    } Else If (thumbsDisplaying=1 && maxFilesIndex>1)
    {
       fnOutputDebug("Resize window event - thumbs mode.")
-      recalculateThumbsSizes()
-      ; GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+      ; recalculateThumbsSizes()
+      ; vpWinClientSize(mainWidth, mainHeight)
       ; WinSet, Region, 0-0 R6-6 w%mainWidth% h%mainHeight% , ahk_id %hGDIthumbsWin%
       delayu := (A_TickCount - lastWinDrag<450) ? 550 : 325
       SetTimer, RefreshThumbsList, % -delayu
@@ -71331,7 +71465,7 @@ MenuDrawViewportHelpMap() {
 }
 
 drawViewportHelpMap() {
-    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+    vpWinClientSize(mainWidth, mainHeight)
     If (editingSelectionNow=1)
     {
        lastOSDtooltipInvoked := A_TickCount
@@ -71351,7 +71485,7 @@ drawViewportHelpMap() {
        Gdip_Draw%thisu%(2NDglPG, Penuha, thisX, thisY, thisW, thisH)
        thisFntSize := "Bold Center vCenter cFFeeEEee s" Round(OSDfontSize*0.77)
        thisStylu := " x" thisX " y" thisY
-       hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+       ; hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
        tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
        tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
        thisString := (EllipseSelectMode=2) ? "Image selected area`nFreeform shape" : "Image selected area"
@@ -71508,6 +71642,8 @@ PanelAboutWindow() {
     Gui, Add, Text, y+10 wp, Dedicated to people with really large image collections and slideshow needs.
     Gui, Add, Text, y+10 wp, This application contains code from various entities. You can find more details in the source code.
     Gui, Add, Text, y+10 wp, QPV uses GDI+ [Windows APIs] to display images and FreeImage%thisVersion% to load exotic file formats. FreeImage is an open source library licensed under the GNU GPL v2.0 or v3.0`, and the FreeImage Public License (FIPL). For image processing`, some functions also rely on the cImg library, an open-source library distributed under the CeCILL-C license, by David Tschumperlé. 
+    If (FileExist("win-store-mode.ini") && A_IsCompiled)
+       Gui, Add, Link, y+10 wp, This application was downloaded through <a href="ms-windows-store://pdp/?productid=9N07RF144FV1">Windows Store</a>.
 
     Gui, Add, Link, y+10 wp, To keep the development going, <a href="https://www.paypal.me/MariusSucan/10">please donate</a> or <a href="mailto:marius.sucan@gmail.com?subject=%appTitle% v%appVersion%">send me feedback</a>.
     Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid% gBtnHelpWin, &Help
@@ -71802,7 +71938,7 @@ PanelFindDupes(dummy:=0) {
     fingEdt := (PrefsLargeFonts=1) ? 70 : 50
     thumbu := (PrefsLargeFonts=1) ? 90 : 70
     Gui, Tab, 2
-    Gui, Add, Text, x+15 y+15 w%txtWid% Section vbtnFldr6, Below you can choose what image hashing algorithm to use to compare images and configure what sections of the hashes to compare. The blue dots in the preview area highlight the areas of the images that will be compared. Higher threshold may yield more false-positives listed. lHash is the worst performing.
+    Gui, Add, Text, x+15 y+15 w%txtWid% Section vbtnFldr6, Below you can choose what image hashing algorithm to use to compare images and configure what sections of the hashes to compare. The blue dots in the preview area highlight the areas of the images that will be compared. Higher threshold may yield more false-positives listed.
     GuiAddDropDownList("xs y+10 w" fingWid " AltSubmit Section gupdateUIdupesPanel Choose" userFindDupesFilterHamDist " vuserFindDupesFilterHamDist", "Ignore|dHash 8x8|pHash DCT 32x32|lHash 8x8", "Image hash type")
     GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit1 veditF11", hamDistLBorderCrop, "Image hash crop left.")
     Gui, Add, UpDown, vhamDistLBorderCrop gupdateUIdupesPanel Range0-9, % hamDistLBorderCrop
@@ -77969,11 +78105,18 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
 }
 
 adjustCanvas2Toolbar(Gu, applyTransform) {
+    Static lastX := 0, lastY := 0
+
     If (ShowAdvToolbar!=1 || slideShowRunning=1)
        Return 0
 
     hasTrans := 0
     WinGetPos, thisX, thisY, , , ahk_id %hQPVtoolbar%
+    If (thisX="" && ToolbarWinW && ToolbarWinH)
+       thisX := lastX
+    If (thisY="" && ToolbarWinW && ToolbarWinH)
+       thisY := lastY
+
     JEE_ScreenToClient(PVhwnd, thisX, thisY, thisX, thisY)
     positionOk := (isInRange(thisX, -5, 5) && isInRange(thisY, -5, 5)) ? 1 : 0
     ; ToolTip, % "p=" positionOk "||" UserToolbarX "|" UserToolbarY "||" thisX "|" thisY , , , 2
@@ -77987,6 +78130,11 @@ adjustCanvas2Toolbar(Gu, applyTransform) {
        hasTrans := 2
        If (applyTransform=1)
           Gdip_TranslateWorldTransform(Gu, 0, ToolbarWinH)
+    }
+    If hasTrans
+    {
+       lastX := thisX
+       lastY := thisY
     }
     Return hasTrans
 }
@@ -78051,7 +78199,7 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
 
     knobSize := imgHUDbaseUnit//3.5
     posXu := uBrushA ? knobSize : 0
-    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+    vpWinClientSize(mainWidth, mainHeight)
     BoxBMP := drawTextInBox(msg, OSDFontName, OSDfontSize, mainWidth, mainHeight, OSDtextColor, OSDbgrColor, 0)
     If !BoxBMP
     {
@@ -78059,7 +78207,7 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
        Return
     }
 
-    hasTrans := adjustCanvas2Toolbar(2NDglPG, 1)
+    ; hasTrans := adjustCanvas2Toolbar(2NDglPG, 1)
     tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
     tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
     posYu := perc ? knobSize//2 : 0
@@ -78139,7 +78287,7 @@ BlackedCreator(thisOpacity, killWin:=0) {
     lastInvoked := A_TickCount
     Gui, BlackGuia: Destroy
     Sleep, 5
-    GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+    vpWinClientSize(mainWidth, mainHeight)
     Gui, BlackGuia: -DPIScale -Caption +Owner%PVhwnd% +ToolWindow +E0x80000 +E0x20 +hwndhGuiBlack
     Gui, BlackGuia: Color, c%OSDbgrColor%
     Gui, BlackGuia: Margin, 0, 0
@@ -78207,8 +78355,19 @@ initCompiled(mode) {
    fullPath2exe := GetModuleFileNameEx(QPVpid)
    If (mode=1)
    {
-      zPlitPath(fullPath2exe, 0, OutFileName, OutDir)
-      mainCompiledExe := OutFileName
+      If FileExist("win-store-mode.ini")
+      {
+         SetWorkingDir, %A_AppData%
+         x := A_AppData "\QuickPictoViewer"
+         WinStoreDataPath := "\Local\Packages\13644TabletPro.QuickPictoViewer_3wyk1bs4amrq4\AppData"
+         WinStorePath := StrReplace(x, "\Roaming\QuickPictoViewer", WinStoreDataPath)
+         If !FileExist(WinStorePath "\resources")
+            FileCreateDir, % WinStorePath "\resources"
+
+         SetWorkingDir, %A_ScriptDir%
+         OutDir := WinStorePath
+      } Else zPlitPath(fullPath2exe, 0, OutFileName, OutDir)
+
       mainCompiledPath := OutDir
       thumbsCacheFolder := OutDir "\thumbs-cache"
       mainSettingsFile := OutDir "\" mainSettingsFile
@@ -80803,7 +80962,8 @@ printImageNow(mainBMP, PrintOptions, previewMode, inLoop:=0, OutFileName:=0) {
       Return -2
 
    gPrint := trGdip_GraphicsFromImage(A_ThisFunc, pBitmap, 7, 4, 2)
-   E := trGdip_GraphicsClear(A_ThisFunc, gPrint, "0xFFffFFff")
+   If (previewMode=1)
+      E := trGdip_GraphicsClear(A_ThisFunc, gPrint, "0xFFffFFff")
    If (!pBitmap || !gPrint || E="fail")
       Return -3
 
@@ -80907,7 +81067,9 @@ printImageNow(mainBMP, PrintOptions, previewMode, inLoop:=0, OutFileName:=0) {
          thisTxtvAlignu := "Bottom "
       ; SoundBeep 
       textu := StrReplace(PrintOptions.text, "{fname}", OutFileName)
-      ERR := Gdip_TextToGraphics(gPrint, textu, thisTxtAlignu thisTxtvAlignu thisStylu " s" Round(PrintTxtSize*previewScale) " cFF" TextInAreaFontColor, TextInAreaFontName, pageW, pageH)
+      thisColoru := " c" Format("{:x}", TextInAreaFontOpacity) . TextInAreaFontColor
+      ; ToolTip, % thisColoru , , , 2
+      ERR := Gdip_TextToGraphics(gPrint, textu, thisTxtAlignu thisTxtvAlignu thisStylu " s" Round(PrintTxtSize*previewScale) thisColoru, TextInAreaFontName, pageW, pageH)
       ; ToolTip, % ERR " == "  PrintOptions.text "`n" thisTxtAlignu thisTxtvAlignu " s" TextInAreaFontSize " c" TextInAreaFontColor " == " TextInAreaFontName " == " pageW " == " pageH , , , 2
    }
 
@@ -82402,7 +82564,7 @@ tlbrPanIMG() {
          Return
       }
 
-      GetWinClientSize(mainWidth, mainHeight, PVhwnd, 0)
+      vpWinClientSize(mainWidth, mainHeight)
       If (mainWidth && mainHeight)
       {
          MouseGetPos, oX, oY
@@ -82713,7 +82875,7 @@ processToolbarFunctions(btnID, actu, simulacrum:=0) {
       If (btnID="BTNdragTlbr")
          func2Call := ["tlbrDraggyNow"]
       Else If (btnID="BTNrotateTlbr")
-         func2Call := ["TglToolBarValign"]
+         func2Call := ["ToggleToolBarValign"]
       Else If (btnID="BTNcloseTlbr")
          func2Call := ["toggleAppToolbar"]
       Else If (btnID="BTNcancelTool")
@@ -84172,6 +84334,15 @@ createGUItoolbar(dummy:=0) {
    WinGetPos, , , ToolbarWinW, ToolbarWinH, ahk_id %hQPVtoolbar%
 }
 
+MenuTlbrResetPosition() {
+   tlbrResetPosition()
+   If (isImgEditingNow()=1 || (thumbsDisplaying=1 && maxFilesIndex>1))
+   {
+      ForceRefreshNowThumbsList()
+      dummyTimerDelayiedImageDisplay(50)
+   }
+}
+
 tlbrResetPosition() {
   If (ShowAdvToolbar!=1)
      Return
@@ -84890,7 +85061,7 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
 
 externTooltiput(msg) {
    Static lastMsg := 0
-   msg := Trim(msg)
+   msg := Trimmer(Trim(msg))
    If !msg
       Return
 
@@ -84909,27 +85080,37 @@ externTooltiput(msg) {
    }
 }
 
-TglToolBarValign() {
-  TLBRverticalAlign := !TLBRverticalAlign
-  If (TLBRtwoColumns=1)
+ToggleToolBarValign() {
+   TLBRverticalAlign := !TLBRverticalAlign
+   If (TLBRtwoColumns=1)
      TLBRverticalAlign := 0
 
-  TLBRtwoColumns := 0
-  ShowAdvToolbar := 1
-  IniAction(1, "TLBRverticalAlign", "General")
-  IniAction(1, "TLBRtwoColumns", "General")
-  IniAction(1, "ShowAdvToolbar", "General")
-  createGUItoolbar()
+   TLBRtwoColumns := 0
+   ShowAdvToolbar := 1
+   IniAction(1, "TLBRverticalAlign", "General")
+   IniAction(1, "TLBRtwoColumns", "General")
+   IniAction(1, "ShowAdvToolbar", "General")
+   createGUItoolbar()
+   If (isImgEditingNow()=1 || (thumbsDisplaying=1 && maxFilesIndex>1))
+   {
+      ForceRefreshNowThumbsList()
+      dummyTimerDelayiedImageDisplay(50)
+   }
 }
 
-tlbrApplyTwoColumns() {
-  TLBRverticalAlign := 1
-  TLBRtwoColumns := !TLBRtwoColumns
-  ShowAdvToolbar := 1
-  IniAction(1, "TLBRverticalAlign", "General")
-  IniAction(1, "TLBRtwoColumns", "General")
-  IniAction(1, "ShowAdvToolbar", "General")
-  createGUItoolbar()
+toggleToolbarTwoColumns() {
+   TLBRverticalAlign := 1
+   TLBRtwoColumns := !TLBRtwoColumns
+   ShowAdvToolbar := 1
+   IniAction(1, "TLBRverticalAlign", "General")
+   IniAction(1, "TLBRtwoColumns", "General")
+   IniAction(1, "ShowAdvToolbar", "General")
+   createGUItoolbar()
+   If (isImgEditingNow()=1 || (thumbsDisplaying=1 && maxFilesIndex>1))
+   {
+      ForceRefreshNowThumbsList()
+      dummyTimerDelayiedImageDisplay(50)
+   }
 }
 
 tlbrDraggyNow() {

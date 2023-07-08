@@ -2,6 +2,13 @@
 // by Marius Șucan ( https://marius.sucan.ro )
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.9.7 (2023-07-07)
+  - [new] text opacity option in print image panel
+  - fixed viewport flip h/v issues
+  - fixed the issues related to the omnibox and the folder tree losing keyboard and window focus on almost any action; it was a regression since v5.9.0
+  - fixes for the Microsoft Windows Store edition
+  - improvements to how drag and drop is handled between omnibox, folder tree and the main window
+  
 - v5.9.6 (2023-07-01)
   - [new] soft brush tool allows users to paint with blending modes
   - [new] «air-brush mode» for the soft brush tool
