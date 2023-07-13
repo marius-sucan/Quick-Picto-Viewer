@@ -2564,6 +2564,8 @@ GetWinClientSize(ByRef w, ByRef h, hwnd, mode) {
 
 WinMoveZ(hWnd, C, X, Y, W, H, Redraw:=0) {
   ; WinMoveZ v0.5 by SKAN on D35V/D361 - https://www.autohotkey.com/boards/viewtopic.php?f=6&t=76745
+  ; modified by Marius Șucan
+
   ; If Redraw=2, the new coordinates will be returned
   ; Moves a window to given coordinates, but confines the window within the work area of the target monitor.
   ; Which target monitor? : Whichever monitor POINT (X, Y) belongs to

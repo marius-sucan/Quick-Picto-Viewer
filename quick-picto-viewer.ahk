@@ -44,7 +44,7 @@
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
 ;@Ahk2Exe-SetVersion 5.9.7
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2023)
-;@Ahk2Exe-SetCompanyName marius.sucan.ro
+;@Ahk2Exe-SetCompanyName https://marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
 ;
 ;___________ Auto Execute Section ____
@@ -65,25 +65,25 @@ CoordMode, Mouse, Screen
 CoordMode, ToolTip, Screen
 CoordMode, Menu, Screen
 SetWorkingDir, %A_ScriptDir%
-#Include Lib\Gdip_All.ahk           ; graphics display interface plus v1.1, extended compilation editon
-#Include Lib\Gdi.ahk                ; graphics display interface written by Marius Șucan
-#Include Lib\SGdiPrint.ahk
-#Include Lib\freeimage-wrapper.ahk  ; used to load exotic file formats, written by Marius Șucan
-#Include Lib\MCI.ahk                ; media controller interface [ used for audio annotations/files associated with images ], by Fincs
-#Include Lib\wia.ahk                ; windows image acquisition ; used for acquiring images from scanners 
-#Include Lib\Font_library3.ahk      ; Fnt_library 3.0 by jballi; used for message boxes, to size them
-#Include Lib\Class_SQLiteDB.ahk     ; used for slideshow databases and maintaining a list of viewed images [if activated], by just-me
-#Include Lib\Class_CtlColors.ahk    ; used for dark mode, by just-me
-#Include Lib\Class_ImageButton.ahk  ; used for dark mode and custom buttons, by just-me, v1.7
-#Include Lib\msgbox2.ahk
-#Include Lib\tvh.ahk                ; Functions for TreeView controls, by just-me
-#Include Lib\LV_EX.ahk              ; Functions for list views, by just-me
-#Include Lib\shell-stuff.ahk
-#Include Lib\iDesktopWallpaper.ahk  ; functions to set the windows wallpaper on windows 8 and above
-; #Include Lib\json.ahk
-#Include Lib\hashtable.ahk          ; super-fast and capable arrays, by Helgef
-#Include Lib\cli-interface.ahk      ; command line interface
-#Include Lib\file-get-prop-lib.ahk  ; used to get file properties on Alt+Enter [ File Information panel ]
+#Include %A_ScriptDir%\Lib\Gdip_All.ahk           ; graphics display interface plus v1.1, extended compilation editon
+#Include %A_ScriptDir%\Lib\Gdi.ahk                ; graphics display interface written by Marius Șucan
+#Include %A_ScriptDir%\Lib\SGdiPrint.ahk
+#Include %A_ScriptDir%\Lib\freeimage-wrapper.ahk  ; used to load exotic file formats, written by Marius Șucan
+#Include %A_ScriptDir%\Lib\MCI.ahk                ; media controller interface [ used for audio annotations/files associated with images ], by Fincs
+#Include %A_ScriptDir%\Lib\wia.ahk                ; windows image acquisition ; used for acquiring images from scanners 
+#Include %A_ScriptDir%\Lib\Font_library3.ahk      ; Fnt_library 3.0 by jballi; used for message boxes, to size them
+#Include %A_ScriptDir%\Lib\Class_SQLiteDB.ahk     ; used for slideshow databases and maintaining a list of viewed images [if activated], by just-me
+#Include %A_ScriptDir%\Lib\Class_CtlColors.ahk    ; used for dark mode, by just-me
+#Include %A_ScriptDir%\Lib\Class_ImageButton.ahk  ; used for dark mode and custom buttons, by just-me, v1.7
+#Include %A_ScriptDir%\Lib\msgbox2.ahk
+#Include %A_ScriptDir%\Lib\tvh.ahk                ; Functions for TreeView controls, by just-me
+#Include %A_ScriptDir%\Lib\LV_EX.ahk              ; Functions for list views, by just-me
+#Include %A_ScriptDir%\Lib\shell-stuff.ahk
+#Include %A_ScriptDir%\Lib\iDesktopWallpaper.ahk  ; functions to set the windows wallpaper on windows 8 and above
+#Include %A_ScriptDir%\Lib\hashtable.ahk          ; super-fast and capable arrays, by Helgef
+#Include %A_ScriptDir%\Lib\cli-interface.ahk      ; command line interface
+#Include %A_ScriptDir%\Lib\file-get-prop-lib.ahk  ; used to get file properties on Alt+Enter [ File Information panel ]
+; #Include %A_ScriptDir%\Lib\json.ahk
 
 SetWinDelay, 1
 SetBatchLines, -1
@@ -2226,7 +2226,10 @@ initQPVmainDLL() {
    qpvMainDll := DllCall("LoadLibraryW", "WStr", DllPath, "UPtr")
    addJournalEntry("INIT main QPV dll: " A_LastError "==" qpvMainDll "==" DllPath)
    If !qpvMainDll
+   {
       addJournalEntry("ERROR: Failed to initialize qpvMain.dll. Various features in QPV will not work.")
+      Return
+   }
 
    thisFunc := (A_PtrSize=8) ? "calculateDCTcoeffs" : "_calculateDCTcoeffs@4"
    dupesDCTcoeffsInit := DllCall(whichMainDLL "\" thisFunc, "int", 32)
@@ -19097,9 +19100,9 @@ CreateCollapsedPanelWidget() {
     w := h := ToolBarBtnWidth
     ww := Round(15*ToolbarScaleFactor)
     pk := (uiUseDarkMode=1) ? "" : "-dark"
-    pp := mainCompiledPath "\resources\toolbar\"
+    pp := A_ScriptDir "\resources\toolbar\"
     ; w := (PrefsLargeFonts=1) ? 64 : 58
-    Gui, Add, Picture, x1 y1 w%ww% h%h% +Border Center +0x200 gDragCollapsedWidget +hwndhTemp, % mainCompiledPath "\resources\toolbar\dragger.png"
+    Gui, Add, Picture, x1 y1 w%ww% h%h% +Border Center +0x200 gDragCollapsedWidget +hwndhTemp, % A_ScriptDir "\resources\toolbar\dragger.png"
     ToolTip2ctrl(hTemp, "Click and drag to reposition this widget")
     GuiAddButton("x+2 yp w" w " hp gtoggleImgEditPanelWindow", pp "triangle-down" pk ".png", "Show tool panel. F11", "Show panel for the current tool [F11]", "collapseWidgetGUIA")
     If (mustCaptureCloneBrush!=1 && colorPickerModeNow!=1)
@@ -19329,21 +19332,21 @@ GuiAddCheckBox(options, readerLabel, uiLabel, guiu:="SettingsGUIA") {
 GuiAddFlipBlendLayers(options, guiu:="SettingsGUIA") {
     Static p := "Swap layers: A with B.`nThis will not have any impact on commutative`nblending modes marked with * (asterisk)."
     Gui, %guiu%: Add, Checkbox, % options " +hwndhTemp +0x1000 +0x8000 Checked" BlendModesFlipped " vBlendModesFlipped", % p
-    SetImgButtonStyle(hTemp, mainCompiledPath "\resources\toolbar\blending-layers.png", 1)
+    SetImgButtonStyle(hTemp, A_ScriptDir "\resources\toolbar\blending-layers.png", 1)
     ToolTip2ctrl(hTemp, p)
 }
 
 GuiAddPickerColor(options, colorReference, guiu:="SettingsGUIA") {
     Gui, %guiu%: Add, Button, % options " +0x8000 gStartPickingColor vPicku" colorReference " +hwndhTemp", Color pipette
     pk := (uiUseDarkMode=1) ? "" : "-dark"
-    SetImgButtonStyle(hTemp, mainCompiledPath "\resources\toolbar\pipette" pk ".png")
+    SetImgButtonStyle(hTemp, A_ScriptDir "\resources\toolbar\pipette" pk ".png")
     ToolTip2ctrl(hTemp, "Pick color from the viewport")
 }
 
 GuiAddCollapseBtn(options, guiu:="SettingsGUIA") {
     Gui, %guiu%: Add, Button, % options " +0x8000 gtoggleImgEditPanelWindow +hwndhTemp", Collapse panel. F11
     pk := (uiUseDarkMode=1) ? "" : "-dark"
-    SetImgButtonStyle(hTemp, mainCompiledPath "\resources\toolbar\triangle-up" pk ".png")
+    SetImgButtonStyle(hTemp, A_ScriptDir "\resources\toolbar\triangle-up" pk ".png")
     ToolTip2ctrl(hTemp, "Collapse panel [F11]")
 }
 
@@ -24968,7 +24971,7 @@ PopulateImgInfos() {
    Loop, 2
        LV_ModifyCol(A_Index, "AutoHdr Left")
 
-   If FileExist(mainCompiledPath "\exiftool.exe")
+   If FileExist(A_ScriptDir "\exiftool.exe")
       populateExifToolInfos()
 }
 
@@ -24978,7 +24981,7 @@ populateExifToolInfos() {
       Gui, SettingsGUIA: Default
       Gui, SettingsGUIA: ListView, LViewMetaM
       LV_Delete()
-      cmdLine := """" mainCompiledPath "\exiftool.exe"" -all """ getIDimage(currentFileIndex) """ `r`n `r`n"
+      cmdLine := """" A_ScriptDir "\exiftool.exe"" -all """ getIDimage(currentFileIndex) """ `r`n `r`n"
       output := Cli_RunCMD(cmdLine, A_WorkingDir, "CP850", "", 4500)
       ; ToolTip, % output , , , 2
       hasAdded := 0
@@ -31095,8 +31098,10 @@ retrieveFavesAsList(dummy:=0) {
 
    interfaceThread.ahkassign("currentFilesListModified", currentFilesListModified)
    GenerateRandyList()
-   dummyTimerDelayiedImageDisplay(50)
-   SetTimer, createGUItoolbar, -100
+   createGUItoolbar()
+   p := (ShowAdvToolbar=1 && lockToolbar2Win=1) ? 100 : 50
+   dummyTimerDelayiedImageDisplay(p)
+   SetTimer, mainGdipWinThumbsGrid, % -p*2
    SetTimer, TriggerMenuBarUpdate, -90
    showDelayedTooltip("Favourites list loaded`nTotal entries: " groupDigits(maxFilesIndex), 0, 200)
    ; RandomPicture()
@@ -31842,7 +31847,7 @@ TglOptionMove2recycler() {
 
 batchRemoveMetaData() {
    Static doNotAskAgain := 0
-   If !FileExist(mainCompiledPath "\exiftool.exe")
+   If !FileExist(A_ScriptDir "\exiftool.exe")
    {
       showTOOLtip("ERROR: Missing file: exiftool.exe. This feature is not available.")
       SoundBeep 300, 100
@@ -31870,9 +31875,9 @@ batchRemoveMetaData() {
    }
 
    ; cmdExifTool := new cli("CMD.exe","","CP850")
-   cmdExifTool := new cli("""" mainCompiledPath "\exiftool.exe"" -stay_open true -@ ""-""" ,"","CP850")
+   cmdExifTool := new cli("""" A_ScriptDir "\exiftool.exe"" -stay_open true -@ ""-""" ,"","CP850")
    baseCmdLine := "`n-preserve`n-overwrite_original`n-all=`n"
-   ; cmdLine := """" mainCompiledPath "\exiftool.exe"" -stay_open true -@ ""-""`r`n `r`n"
+   ; cmdLine := """" A_ScriptDir "\exiftool.exe"" -stay_open true -@ ""-""`r`n `r`n"
    ; cmdExifTool.Write(cmdLine)
    ; Sleep, 300
    ; output := cmdExifTool.Read()
@@ -47428,7 +47433,7 @@ PanelStructuredCopyMoveWindow() {
     zPlitPath(getIDimage(currentFileIndex), 1, OldOutFileName, OutDir, OutFileNameNoExt, OutFileExt)
 
     pk := (uiUseDarkMode=1) ? "" : "-dark"
-    pp := mainCompiledPath "\resources\toolbar\"
+    pp := A_ScriptDir "\resources\toolbar\"
     getSelectedFiles(0, 1)
     ml := (PrefsLargeFonts=1) ? 110 : 70
     Gui, +Delimiter`n
@@ -51416,7 +51421,7 @@ restartAppu() {
       Return
 
    ; writeMainSettings()
-   If A_IsCompiled
+   If (A_IsCompiled || isWinStore())
       Try Run, "%fullPath2exe%"
    Else
       Try Run, %unCompiledExePath%
@@ -53071,7 +53076,7 @@ MenuSetShapeTension(a,b,c) {
 }
 
 checkForUpdatesNow() {
-  If (FileExist("win-store-mode.ini") && A_IsCompiled)
+  If isWinStore()
   {
      Try Run, ms-windows-store://pdp/?productid=9N07RF144FV1
      Return
@@ -58113,8 +58118,8 @@ coredrawWelcomeImg(modelu, iterations, moduz, sweepRand, mainWidth, mainHeight, 
        prevBMPu := trGdip_DisposeImage(prevBMPu, 1)
        Return
     }
-    ; ToolTip, % modelu "|" moduz "|" iterations , , , 2
 
+    ; ToolTip, % modelu "|" moduz "|" iterations , , , 2
     kimgSelW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
     kimgSelH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
     thisState := "a" kimgSelW kimgSelH AnyWindowOpen VPselRotation FillAreaInverted FillAreaWelcomePattern modelu iterations moduz sweepRand minX minY startMode previewMode usePrevious
@@ -62802,7 +62807,7 @@ createGradientBrushBitmap(brushColor, grPosA, brushSize, grAngle, bAR, opacity:=
           Gdip_DeleteBrush(gradBrush)
        } Else
        {
-          pBitmap := LoadCachableBitmapFromFile(mainCompiledPath "\resources\brush-texture-" BrushToolTexture - 1 ".png")
+          pBitmap := LoadCachableBitmapFromFile(A_ScriptDir "\resources\brush-texture-" BrushToolTexture - 1 ".png")
           If pBitmap
           {
              If (grAngle>0)
@@ -71633,7 +71638,11 @@ PanelAboutWindow() {
     Gui, Font, Bold
 
     Gui, Add, Text, xs y+25 w%txtWid%, Current version: v%appVersion% from %vReleaseDate%. Internal AHK-H version: %A_AhkVersion%. %compiled%OS: %A_OSVersion%.
-    Gui, Add, Link, y+10 wp, New and previous versions are available on <a href="https://github.com/marius-sucan/Quick-Picto-Viewer">GitHub</a>.
+    If isWinStore()
+       Gui, Add, Link, y+10 wp, This open source application was downloaded through <a href="ms-windows-store://pdp/?productid=9N07RF144FV1">Windows Store</a>, published by <a href="https://tabletpro.com">Tablet Pro</a>. Source code available on <a href="https://github.com/marius-sucan/Quick-Picto-Viewer">GitHub</a>.
+    Else
+       Gui, Add, Link, y+10 wp, New and previous versions are available on <a href="https://github.com/marius-sucan/Quick-Picto-Viewer">GitHub</a>.
+
     Gui, Font, Normal
     If (uiUseDarkMode=1)
        Gui, Font, c%darkControlColor%
@@ -71642,8 +71651,6 @@ PanelAboutWindow() {
     Gui, Add, Text, y+10 wp, Dedicated to people with really large image collections and slideshow needs.
     Gui, Add, Text, y+10 wp, This application contains code from various entities. You can find more details in the source code.
     Gui, Add, Text, y+10 wp, QPV uses GDI+ [Windows APIs] to display images and FreeImage%thisVersion% to load exotic file formats. FreeImage is an open source library licensed under the GNU GPL v2.0 or v3.0`, and the FreeImage Public License (FIPL). For image processing`, some functions also rely on the cImg library, an open-source library distributed under the CeCILL-C license, by David Tschumperlé. 
-    If (FileExist("win-store-mode.ini") && A_IsCompiled)
-       Gui, Add, Link, y+10 wp, This application was downloaded through <a href="ms-windows-store://pdp/?productid=9N07RF144FV1">Windows Store</a>.
 
     Gui, Add, Link, y+10 wp, To keep the development going, <a href="https://www.paypal.me/MariusSucan/10">please donate</a> or <a href="mailto:marius.sucan@gmail.com?subject=%appTitle% v%appVersion%">send me feedback</a>.
     Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid% gBtnHelpWin, &Help
@@ -71683,7 +71690,7 @@ PanelHelpWindow(dummy:=0) {
     Gui, Add, Tab3, %tabzDarkModus% x15 y15 Choose%tabu%, Philosophy|Shortcuts|Command line|Change log|Features
     Gui, Tab, 1 ; general
 
-    FileRead, cmdHelp, % mainCompiledPath "\resources\general-help.txt"
+    FileRead, cmdHelp, % A_ScriptDir "\resources\general-help.txt"
     GuiAddEdit("x+15 y+15 w" lstWid " r" rz " ReadOnly", cmdHelp, "General QPV overview")
 
     Gui, Tab, 2 ; keyboard 
@@ -71702,13 +71709,13 @@ PanelHelpWindow(dummy:=0) {
     GuiAddEdit("x+15 y+15 w" lstWid " r" rz " ReadOnly", cmdHelp, "Command line options for QPV")
 
     Gui, Tab, 4
-    FileRead, cmdHelp, % mainCompiledPath "\resources\qpv-change-log.txt"
+    FileRead, cmdHelp, % A_ScriptDir "\resources\qpv-change-log.txt"
     ; cmdHelp := SubStr(cmdHelp, 1, 65200)
     GuiAddEdit("x+15 y+15 w" lstWid " r" rz " ReadOnly vtxtLine1", a, "QPV version history") ; cmdHelp
     GuiControl, SettingsGUIA:, txtLine1, % StrReplace(cmdHelp, "Â")
 
     Gui, Tab, 5
-    FileRead, cmdHelp, % mainCompiledPath "\resources\features-list.txt"
+    FileRead, cmdHelp, % A_ScriptDir "\resources\features-list.txt"
     GuiAddEdit("x+15 y+15 w" lstWid " r" rz " ReadOnly", StrReplace(cmdHelp, "Â"), "QPV features list")
 
     Gui, Tab
@@ -71742,7 +71749,7 @@ PopulateAboutKbdShortcutsList(useFilter:=0) {
     startZeit := A_TickCount
  
     If !fileData
-       FileRead, fileData, % mainCompiledPath "\resources\help-keyboard-shortcuts.txt"
+       FileRead, fileData, % A_ScriptDir "\resources\help-keyboard-shortcuts.txt"
 
     listFilter := (useFilter=1) ? listViewFilteru : ""
     If (SubStr(listFilter, 1, 1)="\" && StrLen(listFilter)>3) 
@@ -75149,7 +75156,7 @@ PopulateKeywordsListPanel(listFilter:=0) {
      ; i intended to add more languages/dictionaries
      dictionary := new hashtable()
      prevLang := LangKeywordsFilter
-     FileRead, dictum, % mainCompiledPath "\resources\dict-eng.txt"
+     FileRead, dictum, % A_ScriptDir "\resources\dict-eng.txt"
      Loop, Parse, dictum, `n,`r
      {
         If A_LoopField
@@ -78351,11 +78358,16 @@ ST_Insert(insert,input,pos=1) {
   Return output
 }
 
+isWinStore() {
+   p := (FileExist("win-store-mode.ini") && FileExist("AppxManifest.xml")) ? 1 : 0
+   Return p
+}
+
 initCompiled(mode) {
    fullPath2exe := GetModuleFileNameEx(QPVpid)
-   If (mode=1)
+   If (mode=1 || isWinStore())
    {
-      If FileExist("win-store-mode.ini")
+      If isWinStore()
       {
          SetWorkingDir, %A_AppData%
          x := A_AppData "\QuickPictoViewer"
@@ -78363,6 +78375,12 @@ initCompiled(mode) {
          WinStorePath := StrReplace(x, "\Roaming\QuickPictoViewer", WinStoreDataPath)
          If !FileExist(WinStorePath "\resources")
             FileCreateDir, % WinStorePath "\resources"
+
+         If !FileExist(WinStorePath "\resources\vector-shapes")
+         {
+            FileCreateDir, % WinStorePath "\resources\vector-shapes"
+            FileCopy, % A_ScriptDir "\resources\vector-shapes\*.vqpv", % WinStorePath "\resources\vector-shapes\*.vqpv"
+         }
 
          SetWorkingDir, %A_ScriptDir%
          OutDir := WinStorePath
@@ -78376,6 +78394,7 @@ initCompiled(mode) {
       customKbdFile := OutDir "\" customKbdFile
       folderFavesFile := OutDir "\" folderFavesFile
       miniFavesFile := OutDir "\" miniFavesFile
+      unCompiledExePath := Chr(34) fullPath2exe Chr(34) A_Space Chr(34) A_ScriptFullPath Chr(34)
    } Else
    {
       mainCompiledPath := A_ScriptDir
@@ -81806,19 +81825,19 @@ tlbrSetImageIcon(icoFile, hwnd, W, H) {
 tlbrLoadIcon(whichFile) {
    Static pBitmap, listu := []
 /*
-   ; If !FileRexists(mainCompiledPath "\resources\toolbar-all.png")
+   ; If !FileRexists(A_ScriptDir "\resources\toolbar-all.png")
    ;    mergeIconsOneFile()
 
    If !pBitmap
    {
-      oBitmap := trGdip_CreateBitmapFromFile(mainCompiledPath "\resources\toolbar-all.png")
+      oBitmap := trGdip_CreateBitmapFromFile(A_ScriptDir "\resources\toolbar-all.png")
       If StrLen(oBitmap)>2
       {
          zBitmap := cloneGDItoMem(A_ThisFunc, oBitmap)
          pBitmap := Gdip_CloneBitmap(zBitmap)
          Gdip_DisposeImage(oBitmap)
          Gdip_DisposeImage(zBitmap)
-         FileRead, OutputVar, % mainCompiledPath "\resources\toolbar-all.txt"
+         FileRead, OutputVar, % A_ScriptDir "\resources\toolbar-all.txt"
          Loop, Parse, OutputVar, `n, `r
          {
             p := StrSplit(A_LoopField, "|")
@@ -81830,13 +81849,14 @@ tlbrLoadIcon(whichFile) {
    If (listu[whichFile]!="" && pBitmap!="")
       newBitmap := Gdip_CloneBitmapArea(pBitmap, listu[whichFile, 1], listu[whichFile, 2], listu[whichFile, 3], listu[whichFile, 4])
    Else
-      newBitmap := Gdip_CreateBitmapFromFileSimplified(mainCompiledPath "\resources\toolbar\" whichFile ".png")
+      newBitmap := Gdip_CreateBitmapFromFileSimplified(A_ScriptDir "\resources\toolbar\" whichFile ".png")
 
    Return newBitmap
 }
 
 mergeIconsOneFile() {
-   diru := mainCompiledPath "\resources\toolbar\*.png"
+   ; unused function
+   diru := A_ScriptDir "\resources\toolbar\*.png"
    listFiles := []
    thisIndex := imgW := imgH := 0
    Loop, Files, % diru
@@ -81878,13 +81898,13 @@ mergeIconsOneFile() {
 
       Gdip_DisposeImage(pBitmap)
    }
-   FileDelete, % mainCompiledPath "\resources\toolbar-all.png"
-   FileDelete, % mainCompiledPath "\resources\toolbar-all.txt"
+   FileDelete, % A_ScriptDir "\resources\toolbar-all.png"
+   FileDelete, % A_ScriptDir "\resources\toolbar-all.txt"
    Sleep, 10
 
    Gdip_DeleteGraphics(G)
-   Gdip_SaveBitmapToFile(newBitmap, mainCompiledPath "\resources\toolbar-all.png")
-   FileAppend, % newArray, % mainCompiledPath "\resources\toolbar-all.txt"
+   Gdip_SaveBitmapToFile(newBitmap, A_ScriptDir "\resources\toolbar-all.png")
+   FileAppend, % newArray, % A_ScriptDir "\resources\toolbar-all.txt"
    trGdip_DisposeImage(newBitmap)
 }
 

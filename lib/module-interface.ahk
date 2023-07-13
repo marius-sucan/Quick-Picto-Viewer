@@ -20,11 +20,11 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , AnyWindowOpen := 0, lastOtherWinClose := 1, wasMenuFlierCreated := 0, ImgAnnoBox
      , slideShowRunning := 0, toolTipGuiCreated, editDummy, LbtnDwn := 0, winCtrlsCoords := []
      , mustAbandonCurrentOperations := 0, lastCloseInvoked := -1, allowGIFsPlayEntirely := 0
-     , hCursBusy := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32514, "Ptr")  ; IDC_WAIT
-     , hCursN := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32512, "Ptr")  ; IDC_ARROW
-     , hCursMove := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32646, "Ptr")  ; IDC_Hand
-     , hCursCross := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32515, "Ptr")  ; IDC_Cross
-     , hCursFinger := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32649, "Ptr")
+     , hCursBusy := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32514, "Ptr")  ; IDC_WAIT
+     , hCursN := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32512, "Ptr")  ; IDC_ARROW
+     , hCursMove := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32646, "Ptr")  ; IDC_Hand
+     , hCursCross := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32515, "Ptr")  ; IDC_Cross
+     , hCursFinger := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32649, "Ptr")
      , SlideHowMode := 1, lastWinDrag := 1, TouchScreenMode := 0, allowNextSlide := 1
      , isTitleBarVisible := 0, imageLoading := 0, hPicOnGui1, hotkeysSuspended := 0
      , slideShowDelay := 9000, scriptStartTime := A_TickCount, prevFullIMGload := 1

@@ -4,7 +4,9 @@
 
 <p>QPV is an image viewer, editor and a tool to organize image collections based on the GDI+ and FreeImage libraries. It can open about 85 image file formats: .hdr, .raw, .tif, .emf, .wmf, .png, .bmp, .gif, .jpeg and many others.</p>
 
-<h2><a href="https://marius.sucan.ro/media/files/blog/ahk-scripts/quick-picto-viewer-compiled.zip">Download latest version</a> (compiled for  Windows, as a x64 binary)</h2>
+<h2><a href="https://marius.sucan.ro/media/files/blog/ahk-scripts/quick-picto-viewer-compiled.zip">Download latest version</a> (compiled for Windows, x64 binary)</h2>
+
+<h2><a href="https://www.microsoft.com/store/apps/9N07RF144FV1">Download QPV from the Microsoft Store</a> (for x64)</h2>
 
 <p>QPV is able to create image slideshows and cache very large dynamic lists of files. Unlike other applications of this kind, it can load, on my system, a list of 900100 files in under 10 seconds, while XnView Classic or Irfan View need more than 15 minutes. The index of files can be saved as plain-text or as an SQLite database.</p>
 
