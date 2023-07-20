@@ -1234,7 +1234,7 @@ SetVolume(val:=100, r:="") {
   Try DllCall("winmm\waveOutSetVolume", "UInt", 0, "UInt", (v|vr<<16))
 }
 
-ShellFileAssociate(Label,Ext,Cmd,batchMode,storePath) {
+ShellFileAssociate(Label,Ext,Cmd,batchMode,storePath, bonusArg:=0) {
   Static q := Chr(34)  ; the quotes symbol
   ; by Ħakito: https://autohotkey.com/boards/viewtopic.php?f=6&t=55638 
   ; modified by Marius Șucan
@@ -1258,7 +1258,7 @@ ShellFileAssociate(Label,Ext,Cmd,batchMode,storePath) {
   ; Note that "HKEY_CLASSES_ROOT" actually writes to "HKEY_LOCAL_MACHINE\SOFTWARE\Classes"
   ; If the command is just a simple path, then convert it into a proper run command
   iF (SubStr(Cmd,2,2)=":\" && FileExist(Cmd))
-     Cmd := q Cmd q A_Space q "%1" q
+     Cmd := bonusArg ? q Cmd q A_Space q bonusArg q A_Space q "%1" q : q Cmd q A_Space q "%1" q
   Else
      Return 0
 

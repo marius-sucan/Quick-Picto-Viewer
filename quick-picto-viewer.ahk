@@ -114,7 +114,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|jng|jif|jfif|jpg|jpe|jpeg|ppm|xpm))$"
    , saveTypesFriendly := ".BMP, .GIF, .HDP, .J2K, .JFIF, .JIF, .JNG, .JP2, .JPE, .JPG, .JXR, .PNG, .PPM, .TGA, .TIF, .WDP, .WEBP or .XPM"
    , saveAlphaTypesRegEX := "i)(.\.(j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp))$", userJpegQuality := 90
-   , openFptrn1 := "*.png;*.bmp;*.gif;*.jpg;*.tif;*.tga;*.webp;*.jpeg", prevLoadedImageIndex := 0
+   , openFptrn1 := "*.png;*.bmp;*.gif;*.jpg;*.tif;*.tga;*.webp;*.jpeg", prevLoadedImageIndex := 0, mainExecPath
    , openFptrn2 := "*.dds;*.emf;*.exr;*.g3;*.hdp;*.iff;*.j2c;*.j2k;*.jbg;*.jif;*.jng;*.jp2;*.jxr;*.koa;*.lbm;*.mng;*.pbm;*.pcd;*.pct;*.pcx;*.pfm;*.pgm;*.pic;*.ppm;*.psd;*.ras;*.sgi;*.wap;*.wbm;*.wbmp;*.wdp;*.wmf;*.xbm;*.xpm"
    , openFptrn3 := "*.3fr;*.arw;*.bay;*.bmq;*.cap;*.cine;*.cr2;*.crw;*.cs1;*.dc2;*.dcr;*.drf;*.dsc;*.erf;*.fff;*.hdr;*.ia;*.iiq;*.k25;*.kc2;*.kdc;*.mdc;*.mef;*.mos;*.mrw;*.nef;*.nrw;*.orf;*.pef;*.ptx;*.pxn;*.qtk;*.raf;*.raw;*.rdc;*.rw2;*.rwz;*.sr2;*.srf;*.x3f"
    , openFptrn4 := "*.tiff;*.targa;*.jpe;*.dib;*.pict;*.rle", openFptrnWIC := "", forceLiveAlphaPreviewMode := 0
@@ -366,11 +366,11 @@ If (Abs(A_TickCount - InitTimeReg)<600 && IsNumber(InitTimeReg) && InitCheckReg=
    ExitApp
 }
 
-If !A_IsCompiled
-   Try Menu, Tray, Icon, qpv-icon.ico
 
 OnExit, doCleanup
 initCompiled(A_IsCompiled)
+If !A_IsCompiled
+   Try Menu, Tray, Icon, %mainExecPath%\qpv-icon.ico
 thisGDIPversion := Gdip_LibrarySubVersion()
 GDIPToken := Gdip_Startup()
 If (!GDIPToken || thisGDIPversion<1.92)
@@ -2377,8 +2377,10 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
   renewCurrentFilesList()
   newStaticFoldersListCache := []
   DynamicFoldersList := CurrentSLD := filesFilter := ""
-  zPlitPath(fileNamu, 0, OutFileName, OutDir)
-  showTOOLtip("Loading slideshow, please wait`n" OutFileName "`n" OutDir "\")
+  zPlitPath(fileNamu, 0, OutFileName, OutDir, extname)
+  pfn := (userPrivateMode=1) ? "******." extname : OutFileName
+  fdr := (userPrivateMode=1) ? "*:\******\***" : OutDir
+  showTOOLtip("Loading slideshow, please wait`n" pfn "`n" fdr "\")
   setWindowTitle("Loading slideshow, please wait", 1)
   If RegExMatch(fileNamu, "i)(.\.sldb)$")
   {
@@ -19100,9 +19102,9 @@ CreateCollapsedPanelWidget() {
     w := h := ToolBarBtnWidth
     ww := Round(15*ToolbarScaleFactor)
     pk := (uiUseDarkMode=1) ? "" : "-dark"
-    pp := A_ScriptDir "\resources\toolbar\"
+    pp := mainExecPath "\resources\toolbar\"
     ; w := (PrefsLargeFonts=1) ? 64 : 58
-    Gui, Add, Picture, x1 y1 w%ww% h%h% +Border Center +0x200 gDragCollapsedWidget +hwndhTemp, % A_ScriptDir "\resources\toolbar\dragger.png"
+    Gui, Add, Picture, x1 y1 w%ww% h%h% +Border Center +0x200 gDragCollapsedWidget +hwndhTemp, % mainExecPath "\resources\toolbar\dragger.png"
     ToolTip2ctrl(hTemp, "Click and drag to reposition this widget")
     GuiAddButton("x+2 yp w" w " hp gtoggleImgEditPanelWindow", pp "triangle-down" pk ".png", "Show tool panel. F11", "Show panel for the current tool [F11]", "collapseWidgetGUIA")
     If (mustCaptureCloneBrush!=1 && colorPickerModeNow!=1)
@@ -19332,21 +19334,21 @@ GuiAddCheckBox(options, readerLabel, uiLabel, guiu:="SettingsGUIA") {
 GuiAddFlipBlendLayers(options, guiu:="SettingsGUIA") {
     Static p := "Swap layers: A with B.`nThis will not have any impact on commutative`nblending modes marked with * (asterisk)."
     Gui, %guiu%: Add, Checkbox, % options " +hwndhTemp +0x1000 +0x8000 Checked" BlendModesFlipped " vBlendModesFlipped", % p
-    SetImgButtonStyle(hTemp, A_ScriptDir "\resources\toolbar\blending-layers.png", 1)
+    SetImgButtonStyle(hTemp, mainExecPath "\resources\toolbar\blending-layers.png", 1)
     ToolTip2ctrl(hTemp, p)
 }
 
 GuiAddPickerColor(options, colorReference, guiu:="SettingsGUIA") {
     Gui, %guiu%: Add, Button, % options " +0x8000 gStartPickingColor vPicku" colorReference " +hwndhTemp", Color pipette
     pk := (uiUseDarkMode=1) ? "" : "-dark"
-    SetImgButtonStyle(hTemp, A_ScriptDir "\resources\toolbar\pipette" pk ".png")
+    SetImgButtonStyle(hTemp, mainExecPath "\resources\toolbar\pipette" pk ".png")
     ToolTip2ctrl(hTemp, "Pick color from the viewport")
 }
 
 GuiAddCollapseBtn(options, guiu:="SettingsGUIA") {
     Gui, %guiu%: Add, Button, % options " +0x8000 gtoggleImgEditPanelWindow +hwndhTemp", Collapse panel. F11
     pk := (uiUseDarkMode=1) ? "" : "-dark"
-    SetImgButtonStyle(hTemp, A_ScriptDir "\resources\toolbar\triangle-up" pk ".png")
+    SetImgButtonStyle(hTemp, mainExecPath "\resources\toolbar\triangle-up" pk ".png")
     ToolTip2ctrl(hTemp, "Collapse panel [F11]")
 }
 
@@ -24971,7 +24973,7 @@ PopulateImgInfos() {
    Loop, 2
        LV_ModifyCol(A_Index, "AutoHdr Left")
 
-   If FileExist(A_ScriptDir "\exiftool.exe")
+   If FileExist(mainExecPath "\exiftool.exe")
       populateExifToolInfos()
 }
 
@@ -24981,7 +24983,7 @@ populateExifToolInfos() {
       Gui, SettingsGUIA: Default
       Gui, SettingsGUIA: ListView, LViewMetaM
       LV_Delete()
-      cmdLine := """" A_ScriptDir "\exiftool.exe"" -all """ getIDimage(currentFileIndex) """ `r`n `r`n"
+      cmdLine := """" mainExecPath "\exiftool.exe"" -all """ getIDimage(currentFileIndex) """ `r`n `r`n"
       output := Cli_RunCMD(cmdLine, A_WorkingDir, "CP850", "", 4500)
       ; ToolTip, % output , , , 2
       hasAdded := 0
@@ -31847,7 +31849,7 @@ TglOptionMove2recycler() {
 
 batchRemoveMetaData() {
    Static doNotAskAgain := 0
-   If !FileExist(A_ScriptDir "\exiftool.exe")
+   If !FileExist(mainExecPath "\exiftool.exe")
    {
       showTOOLtip("ERROR: Missing file: exiftool.exe. This feature is not available.")
       SoundBeep 300, 100
@@ -31875,9 +31877,9 @@ batchRemoveMetaData() {
    }
 
    ; cmdExifTool := new cli("CMD.exe","","CP850")
-   cmdExifTool := new cli("""" A_ScriptDir "\exiftool.exe"" -stay_open true -@ ""-""" ,"","CP850")
+   cmdExifTool := new cli("""" mainExecPath "\exiftool.exe"" -stay_open true -@ ""-""" ,"","CP850")
    baseCmdLine := "`n-preserve`n-overwrite_original`n-all=`n"
-   ; cmdLine := """" A_ScriptDir "\exiftool.exe"" -stay_open true -@ ""-""`r`n `r`n"
+   ; cmdLine := """" mainExecPath "\exiftool.exe"" -stay_open true -@ ""-""`r`n `r`n"
    ; cmdExifTool.Write(cmdLine)
    ; Sleep, 300
    ; output := cmdExifTool.Read()
@@ -45092,7 +45094,8 @@ PanelJournalWindow(tabu:=1) {
        Gui, Add, Button, y+5 hp wp gPanelSeenStats, &Seen images statistics panel
        Gui, Add, Text, y+10 wp hp +0x200 gBtnApplyPrivateFolder +hwndhTempu, Private folder / privacy filter:
        ToolTip2ctrl(hTempu, "You can type keyword(s) or a complete folder path in the edit field.`nAny image that matches the content of this edit field will not be recorded as seen.")
-       GuiAddEdit("y+5 wp r1 veditF1 " typeu, SeenIMGprivateFolder)
+       pw := (userPrivateMode=1) ? " +Password " : ""
+       GuiAddEdit("y+5 wp r1 veditF1 " typeu pw, SeenIMGprivateFolder)
        Gui, Add, Button, xs y+5 hp gBtnBrowsePrivateFolder, &Browse
        Gui, Add, Button, x+2 hp wp gBtnApplyPrivateFolder, &Apply
        Gui, Add, Button, x+2 hp wp gBtnRemPrivateFolder +hwndhTempu, &None
@@ -47433,7 +47436,7 @@ PanelStructuredCopyMoveWindow() {
     zPlitPath(getIDimage(currentFileIndex), 1, OldOutFileName, OutDir, OutFileNameNoExt, OutFileExt)
 
     pk := (uiUseDarkMode=1) ? "" : "-dark"
-    pp := A_ScriptDir "\resources\toolbar\"
+    pp := mainExecPath "\resources\toolbar\"
     getSelectedFiles(0, 1)
     ml := (PrefsLargeFonts=1) ? 110 : 70
     Gui, +Delimiter`n
@@ -51195,14 +51198,14 @@ ForceRemoveTooltip() {
 PanelAssociateQPV() {
    fakeWinCreator(52, A_ThisFunc, 1)
    p := TestQPVisAssociated() ? "`n`nQPV seems to be associated with the file format of the selected image file." : ""
-   msgResult := msgBoxWrapper("panelu|Associate " appTitle, "Please choose what to associate " appTitle " with." p, "&Proceed|C&ancel", 1, "settings", "Add file explorer context menu entry for folders: Open in QPV", 0, "Associate with common image formats`f`fAssociate with all supported image formats`fAssociate with QPV slideshow / files list formats`fRemove QPV files associations`fDo not change files associations", 0, 0)
+   msgResult := msgBoxWrapper("panelu|Associate " appTitle, "Please choose what to associate " appTitle " with." p "`n`nPlease note, you may receive several warnings about system settings being changed and to allow to execute the command line app. To succesfully associate QPV with the image file formats, please answer affirmatively when prompted.", "&Proceed|C&ancel", 1, "settings", "Add ""Open in QPV"" file explorer context menu for folders", 0, "Associate with common image formats`f`fAssociate with all supported image formats`fAssociate with QPV slideshow / files list formats`fRemove QPV files associations`fDo not change files associations", 0, 0)
    If InStr(msgResult.btn, "Proceed")
    {
-      If !A_IsCompiled
-      {
-         msgBoxWrapper(appTitle ": ERROR", "This feature is only available when this application is compiled.", 0, 0, "error")
-         Return
-      }
+      ; If (!A_IsCompiled && !isWinStore())
+      ; {
+      ;    msgBoxWrapper(appTitle ": ERROR", "This feature is only available when this application is compiled.", 0, 0, "error")
+      ;    Return
+      ; }
 
       associateWithImages(msgResult.list)
       If (msgResult.check=1)
@@ -51212,20 +51215,21 @@ PanelAssociateQPV() {
    }
 }
 
-associateWithExplorer(modus) {
+associateWithExplorer(modus, bza:=-1) {
    Static q := Chr(34)
    zPlitPath(fullPath2exe, 0, OutFileName, OutDir)
-   Cmd := q fullPath2exe q A_Space q "%1" q
+   Cmd := A_IsCompiled ? q fullPath2exe q A_Space q "%1" q : q fullPath2exe q A_Space q A_ScriptFullPath q A_Space q "%1" q
    Cmd := StrReplace(Cmd, "\", "\\")
    Cmd := StrReplace(Cmd, """", "\""")
 
    regFile := "Windows Registry Editor Version 5.00`n`n"
    If (modus=1)
    {
+      k := !A_IsCompiled ? "\""" StrReplace(A_ScriptFullPath, "\", "\\") "\"" " : ""
       regFile .= "[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Directory\shell\QuickPictoViewer]`n""Icon""=" q StrReplace(fullPath2exe, "\", "\\") q "`n"
-      regFile .= "@=""Open in QPV""`n"
+      regFile .= "@=""Open with QPV""`n"
       regFile .= "[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Directory\shell\QuickPictoViewer\Command]`n"
-      regFile .= "@=""\" q StrReplace(fullPath2exe, "\", "\\") "\"" fd=|\""%1\" q q "`n"
+      regFile .= "@=""\" q StrReplace(fullPath2exe, "\", "\\") "\"" " k "fd=|\""%1\" q q "`n"
    } Else If (modus=3) ; remove explorer context menu
    {
       regFile .= "[-HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Directory\shell\QuickPictoViewer]`n"
@@ -51250,7 +51254,11 @@ associateWithExplorer(modus) {
       regFile .= "[HKEY_LOCAL_MACHINE\Software\Classes\Applications\" OutFileName "\shell\open]`n" q "FriendlyAppName""=" q appTitle q "`n"
       regFile .= "[HKEY_LOCAL_MACHINE\Software\Classes\Applications\" OutFileName "\shell\open\command]`n@=" q Cmd q "`n"
       regFile .= "[HKEY_LOCAL_MACHINE\Software\Classes\Applications\" OutFileName "\SupportedTypes]`n"
-      allFormats := StrReplace(SubStr(RegExFilesPattern, 17), "))$")
+      If (bza=1)
+         allFormats := "|png|bmp|gif|jpg|tif|tga|webp|jpeg|tiff|exr|hdr|psd|"
+      Else
+         allFormats := StrReplace(SubStr(RegExFilesPattern, 17), "))$")
+
       Loop, Parse, allFormats, |
       {
          If !A_LoopField
@@ -51289,12 +51297,14 @@ associateWithExplorer(modus) {
    FileDelete, %mainCompiledPath%\regFiles\runThis.bat
    If (errorOccured && modus!=2)
       msgBoxWrapper(appTitle ": ERROR", "An unknown error occured while associating " appTitle " with Explorer context menu options.", 0, 0, "error")
+
 }
 
 associateSLDsNow() {
-    z := ShellFileAssociate("QPVslideshow",".sld", fullPath2exe, 0, mainCompiledPath)
+    bonus := A_IsCompiled ? "" : A_ScriptFullPath
+    z := ShellFileAssociate("QPVslideshow",".sld", fullPath2exe, 0, mainCompiledPath, bonus)
     If z
-       ShellFileAssociate("QPVslideshow",".sldb", fullPath2exe, 0, mainCompiledPath)
+       ShellFileAssociate("QPVslideshow",".sldb", fullPath2exe, 0, mainCompiledPath, bonus)
     Else
        msgBoxWrapper(appTitle ": ERROR", "An unknown error occured when associating " appTitle " with slideshow / files list formats.", 0, 0, "error")
 }
@@ -51314,20 +51324,21 @@ associateWithImages(modus) {
   {
      associateWithExplorer(4)
      Return
-  } Else Return
+  } Else If (modus>2)
+     Return
 
+  bonus := A_IsCompiled ? "" : A_ScriptFullPath
   Loop, Parse, FileFormatsCommon, |
   {
       If !A_LoopField
          Continue
 
-      z := ShellFileAssociate("QPVimage." A_LoopField,"." A_LoopField, fullPath2exe, 1, mainCompiledPath)
+      z := ShellFileAssociate("QPVimage." A_LoopField,"." A_LoopField, fullPath2exe, 1, mainCompiledPath, bonus)
       If !z
       {
          errorOccured := 1
          Break
       }
-
   }
 
   Sleep, 25
@@ -51346,7 +51357,7 @@ associateWithImages(modus) {
          If (!A_LoopField || InStr(FileFormatsCommon, "|" A_LoopField "|"))
             Continue
  
-         z := ShellFileAssociate("QPVimage." A_LoopField,"." A_LoopField, fullPath2exe, 1, mainCompiledPath)
+         z := ShellFileAssociate("QPVimage." A_LoopField,"." A_LoopField, fullPath2exe, 1, mainCompiledPath, bonus)
          If !z
          {
             errorOccured := 1
@@ -51366,7 +51377,7 @@ associateWithImages(modus) {
   {
      msgBoxWrapper(appTitle ": ERROR", "An unknown error occured during associating " appTitle " with image file formats.", 0, 0, "error")
      Return
-  } Else associateWithExplorer(2)
+  } Else associateWithExplorer(2, modus)
 
   addJournalEntry(appTitle " has been associated with image file formats")
 }
@@ -59419,7 +59430,8 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
     }
 
     imgPath := StrReplace(imgPath, "||")
-    setWindowTitle("Loading file | " imgPath)
+    pfn := (userPrivateMode=1) ? "Loading file..." : StrReplace(imgPath, "||")
+    setWindowTitle(pfn)
     changeMcursor()
     calcScreenLimits()
     ; If (winGDIcreated!=1)
@@ -62807,7 +62819,7 @@ createGradientBrushBitmap(brushColor, grPosA, brushSize, grAngle, bAR, opacity:=
           Gdip_DeleteBrush(gradBrush)
        } Else
        {
-          pBitmap := LoadCachableBitmapFromFile(A_ScriptDir "\resources\brush-texture-" BrushToolTexture - 1 ".png")
+          pBitmap := LoadCachableBitmapFromFile(mainExecPath "\resources\brush-texture-" BrushToolTexture - 1 ".png")
           If pBitmap
           {
              If (grAngle>0)
@@ -71660,6 +71672,7 @@ PanelAboutWindow() {
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "About " appTitle " v" appVersion)
     PopulateAboutKbdShortcutsList()
     checkDLLfiles()
+    ; ToolTip, % "l=" A_ScriptFullPath , , , 2
 }
 
 BtnHelpWin() {
@@ -71690,7 +71703,7 @@ PanelHelpWindow(dummy:=0) {
     Gui, Add, Tab3, %tabzDarkModus% x15 y15 Choose%tabu%, Philosophy|Shortcuts|Command line|Change log|Features
     Gui, Tab, 1 ; general
 
-    FileRead, cmdHelp, % A_ScriptDir "\resources\general-help.txt"
+    FileRead, cmdHelp, % mainExecPath "\resources\general-help.txt"
     GuiAddEdit("x+15 y+15 w" lstWid " r" rz " ReadOnly", cmdHelp, "General QPV overview")
 
     Gui, Tab, 2 ; keyboard 
@@ -71709,13 +71722,13 @@ PanelHelpWindow(dummy:=0) {
     GuiAddEdit("x+15 y+15 w" lstWid " r" rz " ReadOnly", cmdHelp, "Command line options for QPV")
 
     Gui, Tab, 4
-    FileRead, cmdHelp, % A_ScriptDir "\resources\qpv-change-log.txt"
+    FileRead, cmdHelp, % mainExecPath "\resources\qpv-change-log.txt"
     ; cmdHelp := SubStr(cmdHelp, 1, 65200)
     GuiAddEdit("x+15 y+15 w" lstWid " r" rz " ReadOnly vtxtLine1", a, "QPV version history") ; cmdHelp
     GuiControl, SettingsGUIA:, txtLine1, % StrReplace(cmdHelp, "Â")
 
     Gui, Tab, 5
-    FileRead, cmdHelp, % A_ScriptDir "\resources\features-list.txt"
+    FileRead, cmdHelp, % mainExecPath "\resources\features-list.txt"
     GuiAddEdit("x+15 y+15 w" lstWid " r" rz " ReadOnly", StrReplace(cmdHelp, "Â"), "QPV features list")
 
     Gui, Tab
@@ -71749,7 +71762,7 @@ PopulateAboutKbdShortcutsList(useFilter:=0) {
     startZeit := A_TickCount
  
     If !fileData
-       FileRead, fileData, % A_ScriptDir "\resources\help-keyboard-shortcuts.txt"
+       FileRead, fileData, % mainExecPath "\resources\help-keyboard-shortcuts.txt"
 
     listFilter := (useFilter=1) ? listViewFilteru : ""
     If (SubStr(listFilter, 1, 1)="\" && StrLen(listFilter)>3) 
@@ -75156,7 +75169,7 @@ PopulateKeywordsListPanel(listFilter:=0) {
      ; i intended to add more languages/dictionaries
      dictionary := new hashtable()
      prevLang := LangKeywordsFilter
-     FileRead, dictum, % A_ScriptDir "\resources\dict-eng.txt"
+     FileRead, dictum, % mainExecPath "\resources\dict-eng.txt"
      Loop, Parse, dictum, `n,`r
      {
         If A_LoopField
@@ -78359,7 +78372,7 @@ ST_Insert(insert,input,pos=1) {
 }
 
 isWinStore() {
-   p := (FileExist("win-store-mode.ini") && FileExist("AppxManifest.xml")) ? 1 : 0
+   p := (!A_IsCompiled && FileExist("win-store-mode.ini") && InStr(fullPath2exe, "Quick-Picto-Viewer.exe")) ? 1 : 0
    Return p
 }
 
@@ -78369,6 +78382,9 @@ initCompiled(mode) {
    {
       If isWinStore()
       {
+         zPlitPath(fullPath2exe, 0, OutFileName, OutDir)
+         mainExecPath := OutDir
+
          SetWorkingDir, %A_AppData%
          x := A_AppData "\QuickPictoViewer"
          WinStoreDataPath := "\Local\Packages\13644TabletPro.QuickPictoViewer_3wyk1bs4amrq4\AppData"
@@ -78379,13 +78395,18 @@ initCompiled(mode) {
          If !FileExist(WinStorePath "\resources\vector-shapes")
          {
             FileCreateDir, % WinStorePath "\resources\vector-shapes"
-            FileCopy, % A_ScriptDir "\resources\vector-shapes\*.vqpv", % WinStorePath "\resources\vector-shapes\*.vqpv"
+            FileCopy, % mainExecPath "\resources\vector-shapes\*.vqpv", % WinStorePath "\resources\vector-shapes\*.vqpv"
          }
 
-         SetWorkingDir, %A_ScriptDir%
-         OutDir := WinStorePath
-      } Else zPlitPath(fullPath2exe, 0, OutFileName, OutDir)
 
+         OutDir := WinStorePath
+      } Else 
+      {
+         zPlitPath(fullPath2exe, 0, OutFileName, OutDir)
+         mainExecPath := OutDir
+      }
+
+      SetWorkingDir, %mainExecPath%
       mainCompiledPath := OutDir
       thumbsCacheFolder := OutDir "\thumbs-cache"
       mainSettingsFile := OutDir "\" mainSettingsFile
@@ -78394,12 +78415,14 @@ initCompiled(mode) {
       customKbdFile := OutDir "\" customKbdFile
       folderFavesFile := OutDir "\" folderFavesFile
       miniFavesFile := OutDir "\" miniFavesFile
-      unCompiledExePath := Chr(34) fullPath2exe Chr(34) A_Space Chr(34) A_ScriptFullPath Chr(34)
+      ; ToolTip, % A_ScriptDir " `n " OutDir "`n " fullPath2exe  , , , 2
    } Else
    {
+      mainExecPath := A_ScriptDir
       mainCompiledPath := A_ScriptDir
-      unCompiledExePath := Chr(34) fullPath2exe Chr(34) A_Space Chr(34) A_ScriptFullPath Chr(34)
    }
+
+   unCompiledExePath := Chr(34) fullPath2exe Chr(34) A_Space Chr(34) A_ScriptFullPath Chr(34)
 }
 
 MenuInvokeSHopenWith() {
@@ -81849,14 +81872,14 @@ tlbrLoadIcon(whichFile) {
    If (listu[whichFile]!="" && pBitmap!="")
       newBitmap := Gdip_CloneBitmapArea(pBitmap, listu[whichFile, 1], listu[whichFile, 2], listu[whichFile, 3], listu[whichFile, 4])
    Else
-      newBitmap := Gdip_CreateBitmapFromFileSimplified(A_ScriptDir "\resources\toolbar\" whichFile ".png")
+      newBitmap := Gdip_CreateBitmapFromFileSimplified(mainExecPath "\resources\toolbar\" whichFile ".png")
 
    Return newBitmap
 }
 
 mergeIconsOneFile() {
    ; unused function
-   diru := A_ScriptDir "\resources\toolbar\*.png"
+   diru := mainExecPath "\resources\toolbar\*.png"
    listFiles := []
    thisIndex := imgW := imgH := 0
    Loop, Files, % diru
@@ -81898,13 +81921,13 @@ mergeIconsOneFile() {
 
       Gdip_DisposeImage(pBitmap)
    }
-   FileDelete, % A_ScriptDir "\resources\toolbar-all.png"
-   FileDelete, % A_ScriptDir "\resources\toolbar-all.txt"
+   FileDelete, % mainExecPath "\resources\toolbar-all.png"
+   FileDelete, % mainExecPath "\resources\toolbar-all.txt"
    Sleep, 10
 
    Gdip_DeleteGraphics(G)
-   Gdip_SaveBitmapToFile(newBitmap, A_ScriptDir "\resources\toolbar-all.png")
-   FileAppend, % newArray, % A_ScriptDir "\resources\toolbar-all.txt"
+   Gdip_SaveBitmapToFile(newBitmap, mainExecPath "\resources\toolbar-all.png")
+   FileAppend, % newArray, % mainExecPath "\resources\toolbar-all.txt"
    trGdip_DisposeImage(newBitmap)
 }
 

@@ -58,6 +58,9 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , statusBarTooltipVisible := 0, FloodFillSelectionAdj := 0, isToolbarKBDnav := 0
      , lastALclickX := 0, lastALclickY := 0
 
+If !A_IsCompiled
+   Try Menu, Tray, Icon, %A_ScriptDir%\qpv-icon.ico
+
 ; OnMessage(0x388, "WM_PENEVENT")
 OnMessage(0x2a3, "WM_MOUSELEAVE")
 OnMessage(0x201, "WM_LBUTTONDOWN")
