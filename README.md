@@ -204,14 +204,14 @@
 </ul> 
 
 
-<h1>Why another image viewer/editor??</h1>
+<h1>Why another image viewer/editor</h1>
 
 <p>This project is developed out of passion since May 2019 by me, Marius Șucan. It first began as a challenge to make a simple image viewer that can generate slideshows very quickly on over 100 thousand images. What I was using back in those days (XnView and Irfan View) could not do this. After having succeeded this, the project expanded into a complete image viewer and organizer, and gradually, into an image editor as well. The target audience is any occasional user, or the people with huge image libraries, or those who might like advanced image editing features, available through isolated tools, in their image viewer.</p>
 
 <p>As a physically disabled developer, I paid particular attention through-out the development to the needs of people with poor eye-sight and other disabilities. To this end, users with screen readers might notice that the user interface is populated with readable texts. Furthermore, users can activate large UI fonts, adjust the zoom level for texts (Ctrl + -/=) in the viewport, activate dark mode, and right-click on menu items or panel controls to display larger the control's associated texts. The panels' controls can be navigated with the Tab and arrow keys, even the custom slider controls. The users can define the value of a slider via Ctrl+L-Click, where a dialog box prompts the user for the new value. To navigate with the keyboard the main toolbar, press Shift+Tab when the viewport is focused and it will gain keyboard focus.</p>
 
 
-<h1>Key concepts in qpv to know about</h1>
+<h1>Key concepts in QPV to know about</h1>
 
 <p><em>THE FILES LIST</em>. It is an index, a list of records pointing to files on the disk.</p>
 <p>When users open a folder, a files list index is automatically generated where one can add more files, from other folders, to the index, or remove index entries. Dedicated options and tools are available to manage the index itself.</p>
