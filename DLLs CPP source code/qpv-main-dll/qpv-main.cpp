@@ -176,7 +176,7 @@ int RGBtoGray(int sR, int sG, int sB, int alternateMode) {
   // return value is L* - Luminance from L*ab, based on D65 luminant
 
   if (alternateMode==1)
-     return round((float)(sR*0.299 + sG*0.587 + sB*0.114)); // weighted grayscale conversion
+     return round((float)(sR*0.299f + sG*0.587f + sB*0.114f)); // weighted grayscale conversion
 
   // convert RGB to XYZ color space
   double var_R = (float)sR/255.0;
@@ -664,9 +664,9 @@ void calculateBlendModes(int rO, int gO, int bO, int rB, int gB, int bB, int ble
         bT = bOf + bBf - 2 * (bOf * bBf);
     }
     else if (blendMode == 18) { // difference
-        rT = (rOf > rBf) ? rOf - rBf : rBf - rOf;
-        gT = (gOf > gBf) ? gOf - gBf : gBf - gOf;
-        bT = (bOf > bBf) ? bOf - bBf : bBf - bOf;
+        rT = abs(rBf - rOf);
+        gT = abs(gBf - gOf);
+        bT = abs(bBf - bOf);
     }
     else if (blendMode == 19) { // substract
         rT = rBf - rOf;
@@ -674,8 +674,8 @@ void calculateBlendModes(int rO, int gO, int bO, int rB, int gB, int bB, int ble
         bT = bBf - bOf;
     }
     else if (blendMode == 20) { // luminosity
-        double lO = (rO*0.299f + gO*0.587f + bO*0.114f)/255.0f;
-        double lB = (rB*0.299f + gB*0.587f + bB*0.114f)/255.0f;
+        double lO = (rO*0.2997f + gO*0.58713f + bO*0.11418f)/255.0f;
+        double lB = (rB*0.2997f + gB*0.58713f + bB*0.11418f)/255.0f;
         rT = lO + rBf - lB;
         gT = lO + gBf - lB;
         bT = lO + bBf - lB;
@@ -688,9 +688,9 @@ void calculateBlendModes(int rO, int gO, int bO, int rB, int gB, int bB, int ble
         // gT = rgbf.g/255.0f;
         // bT = rgbf.b/255.0f;
     }
-    else if (blendMode == 21) { // luminosity
-        double lO = (rO*0.299f + gO*0.587f + bO*0.114f)/255.0f;
-        double lB = (rB*0.299f + gB*0.587f + bB*0.114f)/255.0f;
+    else if (blendMode == 21) { // ghosting
+        double lO = (rO*0.2997f + gO*0.58713f + bO*0.11418f)/255.0f;
+        double lB = (rB*0.2997f + gB*0.58713f + bB*0.11418f)/255.0f;
         rT = lB - lO + rBf + rOf/5;
         gT = lB - lO + gBf + gOf/5;
         bT = lB - lO + bBf + bOf/5;
@@ -733,7 +733,7 @@ void toRGB(float c, float m, float y, float k, float *rgb) {
   rgb[2] = -((y * (255.0 - k)) / 255.0 + k - 255.0);
 }
 
-int mixColors(int colorB, float *colorA, float f, int dynamicOpacity, int blendMode, float prevCLRindex, float tolerance, int alternateMode, float thisCLRindex) {
+int mixColors(int colorB, float *colorA, float f, int dynamicOpacity, int blendMode, float prevCLRindex, float tolerance, int alternateMode, float thisCLRindex, int linearGamma) {
 // source https://stackoverflow.com/questions/10139833/adding-colours-colors-together-like-paint-blue-yellow-green-etc
 // http://www.easyrgb.com/en/math.php
  
@@ -745,6 +745,17 @@ int mixColors(int colorB, float *colorA, float f, int dynamicOpacity, int blendM
   int rO = colorA[1];
   int gO = colorA[2];
   int bO = colorA[3];
+
+  int aBf, rBf, gBf, bBf, aOf, rOf, gOf, bOf;
+  aBf = (linearGamma==1) ? gamma_to_linear[aB] : aB;
+  rBf = (linearGamma==1) ? gamma_to_linear[rB] : rB;
+  gBf = (linearGamma==1) ? gamma_to_linear[gB] : gB;
+  bBf = (linearGamma==1) ? gamma_to_linear[bB] : bB;
+  aOf = (linearGamma==1) ? gamma_to_linear[aO] : aO;
+  rOf = (linearGamma==1) ? gamma_to_linear[rO] : rO;
+  gOf = (linearGamma==1) ? gamma_to_linear[gO] : gO;
+  bOf = (linearGamma==1) ? gamma_to_linear[bO] : bO;
+
   float fz;
   if (dynamicOpacity==1)
   {
@@ -767,15 +778,22 @@ int mixColors(int colorB, float *colorA, float f, int dynamicOpacity, int blendM
   {
      int results[3];
      calculateBlendModes(rO, gO, bO, rB, gB, bB, blendMode, results);
-     rO = results[0];
-     gO = results[1];
-     bO = results[2];
+     rOf = (linearGamma==1) ? gamma_to_linear[results[0]] : results[0];
+     gOf = (linearGamma==1) ? gamma_to_linear[results[1]] : results[1];
+     bOf = (linearGamma==1) ? gamma_to_linear[results[2]] : results[2];
   }
 
-  int aT = INTweighTwoValues(aO, aB, f);
-  int rT = INTweighTwoValues(rO, rB, f);
-  int gT = INTweighTwoValues(gO, gB, f);
-  int bT = INTweighTwoValues(bO, bB, f);
+  int aT = INTweighTwoValues(aOf, aBf, f);
+  int rT = INTweighTwoValues(rOf, rBf, f);
+  int gT = INTweighTwoValues(gOf, gBf, f);
+  int bT = INTweighTwoValues(bOf, bBf, f);
+  if (linearGamma==1)
+  {
+     aT = linear_to_gamma[aT];
+     rT = linear_to_gamma[rT];
+     gT = linear_to_gamma[gT];
+     bT = linear_to_gamma[bT];
+  }
 
     // std::stringstream ss;
     // ss << "qpv: opacity = " << f;
@@ -892,7 +910,7 @@ int wrapRGBtoGray(int color, int mode) {
     return index;
 }
 
-int FloodFill8Stack(int *imageData, int w, int h, int x, int y, int newColor, float *nC, int oldColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay) {
+int FloodFill8Stack(int *imageData, int w, int h, int x, int y, int newColor, float *nC, int oldColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay, int linearGamma) {
 // based on https://lodev.org/cgtutor/floodfill.html
 // by Lode Vandevenne
 
@@ -982,7 +1000,7 @@ int FloodFill8Stack(int *imageData, int w, int h, int x, int y, int newColor, fl
          if (cartoonMode==1)
             thisColor = oldColor;
          else
-            thisColor = mixColors(prevColor, nC, opacity, dynamicOpacity, blendMode, prevCLRindex, tolerance, alternateMode, indexes[pix]);
+            thisColor = mixColors(prevColor, nC, opacity, dynamicOpacity, blendMode, prevCLRindex, tolerance, alternateMode, indexes[pix], linearGamma);
 
          imageData[pix] = thisColor;
       } else
@@ -1069,7 +1087,7 @@ int FloodFillScanlineStack(int *imageData, int w, int h, int x, int y, int newCo
   return loopsOccured;
 }
 
-int ReplaceGivenColor(int *imageData, int w, int h, int x, int y, int newColor, float *nC, int prevColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode) {
+int ReplaceGivenColor(int *imageData, int w, int h, int x, int y, int newColor, float *nC, int prevColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int linearGamma) {
     if ((x < 0) || (x >= (w-1)) || (y < 0) || (y >= (h-1)))  // out of bounds
        return 0;
 
@@ -1090,7 +1108,7 @@ int ReplaceGivenColor(int *imageData, int w, int h, int x, int y, int newColor, 
                   if (cartoonMode==1)
                      thisColor = oldColor;
                   else
-                     thisColor = mixColors(prevColor, nC, opacity, dynamicOpacity, blendMode, prevCLRindex, tolerance, alternateMode, index);
+                     thisColor = mixColors(prevColor, nC, opacity, dynamicOpacity, blendMode, prevCLRindex, tolerance, alternateMode, index, linearGamma);
                   imageData[zx + zy * w] = thisColor;
                } else
                {
@@ -1103,7 +1121,7 @@ int ReplaceGivenColor(int *imageData, int w, int h, int x, int y, int newColor, 
     return loopsOccured;
 }
 
-DLL_API int DLL_CALLCONV FloodFyll(int *imageData, int modus, int w, int h, int x, int y, int newColor, int tolerance, int fillOpacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay) {
+DLL_API int DLL_CALLCONV FloodFyll(int *imageData, int modus, int w, int h, int x, int y, int newColor, int tolerance, int fillOpacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay, int linearGamma) {
     if ((x < 0) || (x >= (w-1)) || (y < 0) || (y >= (h-1)))  // out of bounds
        return 0;
 
@@ -1132,13 +1150,13 @@ DLL_API int DLL_CALLCONV FloodFyll(int *imageData, int modus, int w, int h, int 
 
     float opacity = (float)fillOpacity / 255.0f;
     if (tolerance==0 && (opacity<1 || blendMode>0))
-       newColor = mixColors(prevColor, nC, opacity, 0, blendMode, 0, 0, 0, 0);
+       newColor = mixColors(prevColor, nC, opacity, 0, blendMode, 0, 0, 0, 0, linearGamma);
 
     int r;
     if (modus==1)
-       r = ReplaceGivenColor(imageData, w, h, x, y, newColor, nC, prevColor, toleranza, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode);
+       r = ReplaceGivenColor(imageData, w, h, x, y, newColor, nC, prevColor, toleranza, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma);
     else if (toleranza>0)
-       r = FloodFill8Stack(imageData, w, h, x, y, newColor, nC, prevColor, toleranza, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, eightWay);
+       r = FloodFill8Stack(imageData, w, h, x, y, newColor, nC, prevColor, toleranza, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, eightWay, linearGamma);
     else
        r = FloodFillScanlineStack(imageData, w, h, x, y, newColor, prevColor);
 
@@ -1733,7 +1751,8 @@ DLL_API int DLL_CALLCONV PixelateBitmap(unsigned char* sBitmap, unsigned char* d
 }
 
 DLL_API int DLL_CALLCONV ConvertToGrayScale(int *BitmapData, int w, int h, int modus) {
-// NTSC RGB weights: r := 0.29970, g := 0.587130, b := 0.114180
+// NTSC // CCIR 601 luma RGB weights:
+// r := 0.29970, g := 0.587130, b := 0.114180
 
     #pragma omp parallel for schedule(dynamic) default(none)
     for (int x = 0; x < w; x++)
@@ -1755,12 +1774,12 @@ DLL_API int DLL_CALLCONV ConvertToGrayScale(int *BitmapData, int w, int h, int m
             } else if (modus==4)
             {
                G = aO;
-            } else if (modus==5)
+            } else // if (modus==5)
             {
                float rO = ((colorO >> 16) & 0xFF)*0.29970f;
                float gO = ((colorO >> 8) & 0xFF)*0.587130f;
                float bO = (colorO & 0xFF)*0.114180f;
-               G = round(rO + gO + bO);
+               G = clamp((int)round(rO + gO + bO), 0, 255);
             }
 
             BitmapData[x + (y * w)] = (aO << 24) | (G << 16) | (G << 8) | G;

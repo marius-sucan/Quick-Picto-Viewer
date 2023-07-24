@@ -38,15 +38,18 @@
 ; Original Licence: GPL. Please reffer to this page for more information. http://www.gnu.org/licenses/gpl.html
 ; Current licence: I do not know, I do not care. Licences are for obedient entities.
 ;
-;@Ahk2Exe-AddResource LIB Lib\module-interface.ahk
-;@Ahk2Exe-AddResource LIB Lib\module-fim-thumbs.ahk
+;@Ahk2Exe-AddResource Lib\module-interface.ahk
+;@Ahk2Exe-AddResource Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
+;@Ahk2Exe-SetProductName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
-;@Ahk2Exe-SetVersion 5.9.7
+;@Ahk2Exe-UpdateManifest 0, Quick Picto Viewer
+;@Ahk2Exe-SetOrigFilename Quick-Picto-Viewer.exe
+;@Ahk2Exe-SetVersion 5.9.8
+;@Ahk2Exe-SetProductVersion 5.9.8
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2023)
 ;@Ahk2Exe-SetCompanyName https://marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
-;
 ;___________ Auto Execute Section ____
 
 #NoEnv
@@ -197,7 +200,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , clrGradientOffX := 0, clrGradientOffY := 0, userAllowClrGradientRecenter := 0, TabsPerWindow := []
    , darkWindowColor := 0x202020, darkControlColor := 0xEDedED, allowWICloader := 1, allowFIMloader := 1
    , monitorBgrColor := darkWindowColor, lastSlidersPainted := [], userCustomKeysDefined := []
-   , simulateMenusMode := 0, lastLVquickSearchSortCol := [], soloSliderWinVisible := 0
+   , simulateMenusMode := 0, lastLVquickSearchSortCol := [], soloSliderWinVisible := 0, backupGdiBMP := 0
 
 Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameSavedVectorShape := ""
    , postVectorWinOpen := 0, isWelcomeScreenu := 0, prevVectorShapeSymmetryMode := [], AllowDarkModeForWindow := ""
@@ -214,7 +217,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , sillySeparator :=  "▪", menuCustomNames := new hashtable(), clrGradientCoffX := 0, clrGradientCoffY := 0
    , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*"
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.9.7", vReleaseDate := "2023/07/07" ; yyyy-mm-dd
+   , appVersion := "5.9.8", vReleaseDate := "2023/07/24" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -413,7 +416,7 @@ OnMessage(0x104, "WM_KEYDOWN")
 Global interfaceThread
 If !A_IsCompiled
    interfaceThread := ahkthread("#Include *i Lib\module-interface.ahk")
-Else If (sz := GetRes(data, 0, "MODULE-INTERFACE.AHK", "LIB"))
+Else If (sz := GetRes(data, 0, "MODULE-INTERFACE.AHK", 10))
    interfaceThread := ahkThread(StrGet(&data, sz, "utf-8"))
 
 ; the interface is a separate thread to allow users 
@@ -4343,7 +4346,7 @@ initAHKhThumbThreads() {
     {
        ; SoundBeep 300, 100
        If A_IsCompiled
-          r := GetRes(dataFile, 0, "MODULE-FIM-THUMBS.AHK", "LIB")
+          r := GetRes(dataFile, 0, "MODULE-FIM-THUMBS.AHK", 10)
 
        Loop, % realSystemCores
        {
@@ -9190,7 +9193,10 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
         Return
 
      If (TouchToolbarGUIcreated=1 && ShowAdvToolbar=1)
+     {
         SetWindowRegion(hQPVtoolbar, 1, 1, 1, 1)
+        DelayiedImageDisplay()
+     }
 
      If (editingSelectionNow=1)
         ToggleEditImgSelection()
@@ -11537,6 +11543,7 @@ PasteInPlaceNow() {
        trGdip_DisposeImage(wasClone, 1)
        userClipBMPpaste := trGdip_DisposeImage(userClipBMPpaste, 1)
        viewportStampBMP := trGdip_DisposeImage(viewportStampBMP, 1)
+       backupGdiBMP := trGdip_DisposeImage(backupGdiBMP, 1)
        viewportIDstampBMP := ""
        Return
     }
@@ -11996,7 +12003,7 @@ QPV_FloodFill(pBitmap, x, y, newColor, fillOpacity) {
   tolerance := (FloodFillAltToler=1) ? Ceil(FloodFillTolerance*0.7) + 1 : FloodFillTolerance
   func2exec := (A_PtrSize=8) ? "FloodFyll" : "_FloodFyll@56"
   If !E1
-     r := DllCall(whichMainDLL "\" func2exec, "UPtr", iScan, "Int", FloodFillModus, "Int", w, "Int", h, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", fillOpacity, "int", FloodFillDynamicOpacity, "int", FloodFillBlendMode - 1, "int", FloodFillCartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays)
+     r := DllCall(whichMainDLL "\" func2exec, "UPtr", iScan, "Int", FloodFillModus, "Int", w, "Int", h, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", fillOpacity, "int", FloodFillDynamicOpacity, "int", FloodFillBlendMode - 1, "int", FloodFillCartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays, "int", userimgGammaCorrect)
   ; ToolTip, % A_PtrSize "=" A_LastError "==" r "=" func2exec "=" SecToHHMMSS(Round(zeitOperation/1000, 3)) , , , 2
 
   If !E1
@@ -12296,6 +12303,7 @@ generateAlphaMaskBitmap(clipBMP, previewMode, offX:=0, offY:=0, offW:=0, offH:=0
     {
        prevState := 0
        prevBMPu := trGdip_DisposeImage(prevBMPu, 1)
+       backupGdiBMP := trGdip_DisposeImage(backupGdiBMP, 1)
        realtimePasteInPlaceAlphaMaskRotator("kill", 0, 0, 0)
        Return
     }
@@ -12318,7 +12326,7 @@ generateAlphaMaskBitmap(clipBMP, previewMode, offX:=0, offY:=0, offW:=0, offH:=0
     If (alphaMaskRefBMP=1)
        thisAlphaFile := userAlphaMaskBmpPainted
     Else If (alphaMaskRefBMP=2)
-       thisAlphaFile := useGdiBitmap()
+       thisAlphaFile := (previewMode!=1 && StrLen(backupGdiBMP)>3) ? backupGdiBMP : useGdiBitmap()
     Else If (alphaMaskRefBMP=3 && transformTool=1)
        thisAlphaFile := (previewMode=1) ? viewportStampBMP : userClipBMPpaste
 
@@ -12631,6 +12639,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
        prevClipBMP := trGdip_DisposeImage(prevClipBMP, 1)
        userClipBMPpaste := trGdip_DisposeImage(userClipBMPpaste, 1)
        viewportStampBMP := trGdip_DisposeImage(viewportStampBMP, 1)
+       backupGdiBMP := trGdip_DisposeImage(backupGdiBMP, 1)
        userPrevAlphaMaskBmpPainted := trGdip_DisposeImage(userPrevAlphaMaskBmpPainted, 1)
        If (keepUserPaintAlphaMask!=1)
           userAlphaMaskBmpPainted := trGdip_DisposeImage(userAlphaMaskBmpPainted, 1)
@@ -13402,12 +13411,14 @@ terminateIMGediting(modus:=0) {
    maxUndoLevels := (A_PtrSize=8) ? 100 : 2
 }
 
-isAlphaMaskPartialWin() {
-   Return isVarEqualTo(AnyWindowOpen, 81, 66, 55, 25)
+isAlphaMaskPartialWin(m:=0) {
+   k := (m=1) ? prevOpenedWindow[1] : AnyWindowOpen
+   Return isVarEqualTo(k, 81, 66, 55, 25)
 }
 
-isAlphaMaskWindow() {
-   Return isVarEqualTo(AnyWindowOpen, 23, 24, 31, 32, 70, 74)
+isAlphaMaskWindow(m:=0) {
+   k := (m=1) ? prevOpenedWindow[1] : AnyWindowOpen
+   Return isVarEqualTo(k, 23, 24, 31, 32, 70, 74)
 }
 
 isNowAlphaPainting() {
@@ -13780,6 +13791,7 @@ mergeViewPortEffectsImgEditing(funcu:=0, recordUndoAfter:=1, applyOnArea:=0, all
 
     discardViewPortCaches()
     ; msgbox % UserMemBMP "---" gdiBitmap
+
     If StrLen(gdiBitmap)>2
     {
        UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
@@ -13788,7 +13800,14 @@ mergeViewPortEffectsImgEditing(funcu:=0, recordUndoAfter:=1, applyOnArea:=0, all
 
     decideGDIPimageFX(matrix, imageAttribs, pEffect)
     If (pEffect || imageAttribs)
+    {
+       If (imgFxMode>1 && alphaMaskingMode=5 && alphaMaskRefBMP=2 && (isAlphaMaskWindow(1) || isAlphaMaskPartialWin(1)))
+       {
+          backupGdiBMP := trGdip_DisposeImage(backupGdiBMP, 1)
+          backupGdiBMP := trGdip_CloneBitmap(A_ThisFunc, useGdiBitmap())
+       }
        recordUndoLevelNow("init", 0)
+    }
 
     Gdip_GetImageDimensions(UserMemBMP, imgW, imgH)
     If (editingSelectionNow=1 && applyOnArea=1 && selOutsideEntirely!=1)
@@ -35229,7 +35248,7 @@ PanelExtractFrames() {
           Return
     }
 
-    thisBtnHeight := createSettingsGUI(74, A_ThisFunc)
+    thisBtnHeight := createSettingsGUI(84, A_ThisFunc)
     RegAction(0, "ResizeDestFolder",, 6)
     RegAction(0, "userJpegQuality",, 2, 1, 100)
     btnWid := 100
@@ -36003,7 +36022,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
 
     gW := gH := (PrefsLargeFonts=1) ? 60 : 45
     Gui, Add, Text, xs y+10 w1 h1 hide, Brush preview
-    Gui, Add, Text, xp yp w%gW% h%gH% -border +0xE +hwndhCropCornersPic gPanelsLivePreviewResponder +TabStop, Brush preview
+    Gui, Add, Text, xp yp w%gW% h%gH% -border +0xE +hwndhCropCornersPic gUIresponderPanelsLivePreview +TabStop, Brush preview
     Gui, Add, Checkbox, x+10 gupdateUIbrushTool Checked%BrushToolOverDraw% vBrushToolOverDraw , &Airbrush mode / deformer option
     Gui, Add, Checkbox, y+10 gupdateUIbrushTool Checked%BrushToolDynamicCloner% vBrushToolDynamicCloner , D&ynamic X/Y source coordinates
 
@@ -36020,7 +36039,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
     GuiAddSlider("PasteInPlaceLight", -255,255, 0, "Brightness", "updateUIbrushTool", 2, "xs y+10 wp hp")
     GuiAddSlider("PasteInPlaceGamma", -100,100, 0, "Contrast", "updateUIbrushTool", 2, "xs y+10 wp hp")
     Gui, Add, Text, xs y+10 w1 h1 hide, Brush preview
-    Gui, Add, Text, xp yp w%gW% h%gH% -border +0xE +hwndhCropCornersPic2 gPanelsLivePreviewResponder +TabStop, Brush preview
+    Gui, Add, Text, xp yp w%gW% h%gH% -border +0xE +hwndhCropCornersPic2 gUIresponderPanelsLivePreview +TabStop, Brush preview
 
     sml := (PrefsLargeFonts=1) ? 55 : 35
     Gui, Add, Text, x+10 h%hasa% +0x200 vinfoSymmetryLabel, Apply symmetry on: 
@@ -41846,7 +41865,7 @@ PanelZoomBlurSelectedArea() {
     ; gH := (PrefsLargeFonts=1) ? 640 : 540
     Gui, -DPIScale
     Gui, Font
-    Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE gPanelsLivePreviewResponder +hwndhCropCornersPic +TabStop, Preview area
+    Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE gUIresponderPanelsLivePreview +hwndhCropCornersPic +TabStop, Preview area
     If (uiUseDarkMode=1)
        Gui, Font, c%darkControlColor%
 
@@ -41934,7 +41953,7 @@ PanelPixelizeSelectedArea() {
 
     Gui, Font
     Gui, -DPIScale
-    Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE gPanelsLivePreviewResponder +hwndhCropCornersPic +TabStop, Preview area
+    Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE gUIresponderPanelsLivePreview +hwndhCropCornersPic +TabStop, Preview area
     If (uiUseDarkMode=1)
        Gui, Font, c%darkControlColor%
 
@@ -42035,7 +42054,7 @@ PanelBlurSelectedArea() {
 
     Gui, Font
     Gui, -DPIScale
-    Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE gPanelsLivePreviewResponder +hwndhCropCornersPic +TabStop, Preview area
+    Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE gUIresponderPanelsLivePreview +hwndhCropCornersPic +TabStop, Preview area
     If (uiUseDarkMode=1)
        Gui, Font, c%darkControlColor%
 
@@ -42199,7 +42218,7 @@ PanelDetectEdgesImage() {
 
     Gui, -DPIScale
     Gui, Font
-    Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE gPanelsLivePreviewResponder +hwndhCropCornersPic +TabStop, Preview area
+    Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE gUIresponderPanelsLivePreview +hwndhCropCornersPic +TabStop, Preview area
     If (uiUseDarkMode=1)
        Gui, Font, c%darkControlColor%
 
@@ -42320,7 +42339,7 @@ PanelAddNoiserImage() {
 
     Gui, -DPIScale
     Gui, Font, 
-    Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE gPanelsLivePreviewResponder +hwndhCropCornersPic +TabStop, Preview area
+    Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE gUIresponderPanelsLivePreview +hwndhCropCornersPic +TabStop, Preview area
     If (uiUseDarkMode=1)
        Gui, Font, c%darkControlColor%
 
@@ -42519,6 +42538,57 @@ ReadSettingsPrintPanel(act:=0) {
     RegAction(act, "PrintPaperOrient",, 1)
 }
 
+UIresponderPrintPreview(a, m_event) {
+   Gui, SettingsGUIA: Default
+   GuiControlGet, PrintAdaptToFit
+   If (PrintAdaptToFit=1)
+   {
+      PrintAdaptToFit := 0
+      GuiControl, SettingsGUIA: , PrintAdaptToFit, 0
+      SoundBeep 900, 100
+      updatePrintPreview()
+      Return
+   }
+
+   hwnd := "0x" Format("{:x}", a)
+   WinGetPos, , , w, h, ahk_id %hwnd%
+   lastInvoked := A_TickCount
+   zx := zy := 0
+   modus := GetKeyState("Ctrl", "P") ? 1 : 0
+   While, (determineLClickstate()=1)
+   {
+      GetPhysicalCursorPos(mX, mY)
+      If (isInRange(mX, zX - 2, zX + 2) && isInRange(mY, zY - 2, zY + 2) && A_Index>1)
+         Continue
+
+      GetMouseCoord2wind(hwnd, nX, nY)
+      Sleep, 1
+      zX := mX, zY := mY
+      newX := clampInRange( Round( (nX / w, 1) * 100) , 0, 100)
+      newY := clampInRange( Round( (nY / h, 1) * 100) , 0, 100)
+      If (modus!=1)
+      {
+         PrintPosX := newX
+         PrintPosY := newY
+         GuiUpdateSliders("PrintPosX")
+         GuiUpdateSliders("PrintPosY")
+      } Else
+      {
+         PrintPosW := clampInRange(newX - PrintPosX, 1, 100)
+         PrintPosH := clampInRange(newY - PrintPosY, 1, 100)
+         GuiUpdateSliders("PrintPosW")
+         GuiUpdateSliders("PrintPosH")
+      }
+      ; ToolTip, % wx "|" w "|" rangeu "|" newValue , , , 2
+      If (A_TickCount - lastInvoked>150)
+      {
+         updatePrintPreview()
+         lastInvoked := A_TickCount
+      }
+   }
+   updatePrintPreview()
+}
+
 PanelPrintImage() {
     Global PrintCopies, SelectedPrinteru, PrintDoFlipuH, PrintDoFlipuV, PrinterPageInfos
          , UserTextArea, editF1, PickuTextInAreaFontColor
@@ -42563,7 +42633,8 @@ PanelPrintImage() {
     gW := (PrefsLargeFonts=1) ? 226 : 186
     gH := (PrefsLargeFonts=1) ? 319 : 263
     printerlist := SGDIPrint_GetDefaultPrinter() "||" SGDIPrint_EnumPrinters("|") 
-    Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE +hwndhCropCornersPic, Print preview
+    Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE +hwndhCropCornersPic gUIresponderPrintPreview, Print preview
+    ToolTip2ctrl(hCropCornersPic, "Click to set image position on page.`nCtrl+click to set its size.")
     Gui, Add, Text, xp y+10 wp Center vPrinterPageInfos, -`n-`n-`n-
     Gui, Add, Tab3, %tabzDarkModus% x+20 ys Section, General|Text line
 
@@ -42576,8 +42647,8 @@ PanelPrintImage() {
     Gui, Add, UpDown, vPrintCopies gupdatePrintPreview Range1-99, % PrintCopies
     Gui, Add, Text, x+5 hp +0x200, copies to print
     Gui, Add, Checkbox, xs y+10 hp gupdatePrintPreview Checked%PrintAdaptToFit% vPrintAdaptToFit, Automatically adapt image to cover page
-    GuiAddSlider("PrintPosY", 0,100, 0, "X", "updatePrintPreview", 1, "xs+15 y+10 w" EditWid " hp")
-    GuiAddSlider("PrintPosX", 0,100, 0, "Y", "updatePrintPreview", 1, "x+2 wp hp")
+    GuiAddSlider("PrintPosX", 0,100, 0, "X", "updatePrintPreview", 1, "xs+15 y+10 w" EditWid " hp")
+    GuiAddSlider("PrintPosY", 0,100, 0, "Y", "updatePrintPreview", 1, "x+2 wp hp")
     GuiAddSlider("PrintPosW", 1,100, 50, "W", "updatePrintPreview", 1, "x+2 wp hp")
     GuiAddSlider("PrintPosH", 1,100, 50, "H", "updatePrintPreview", 1, "x+2 wp hp")
     Gui, Add, Checkbox, xs+15 y+10 hp gupdatePrintPreview Checked%PrintStrechedSize% vPrintStrechedSize, &Stretch to given dimensions
@@ -43725,7 +43796,7 @@ gradientsPreviewResponder(thisHwnd:=0) {
       updateUIgradientPreviewAlphaMask(zz)
 }
 
-PanelsLivePreviewResponder(a, b, c) {
+UIresponderPanelsLivePreview(a, b, c) {
    ; ToolTip, % a "=" b "=" c , , , 2
    SetTimer, PanelsPanIMGpreviewClick, -15
 }
@@ -44580,10 +44651,17 @@ livePreviewDesaturateArea(modus:=0) {
       }
    }
 
-   If pEffect
-      r1 := trGdip_DrawImageFX(A_ThisFunc, 2NDglPG, zBitmap, imgSelPx, imgSelPy,,,,, clrMatrix, pEffect)
-   Else
-      r1 := trGdip_DrawImage(A_ThisFunc, 2NDglPG, zBitmap, imgSelPx, imgSelPy,,,,,,, clrMatrix)
+   If (DesaturateAreaChannel>=5)
+   {
+      QPV_ConvertToGrayscale(zBitmap, DesaturateAreaChannel)
+      r1 := trGdip_DrawImage(A_ThisFunc, 2NDglPG, zBitmap, imgSelPx, imgSelPy)
+   } Else
+   {
+      If pEffect
+         r1 := trGdip_DrawImageFX(A_ThisFunc, 2NDglPG, zBitmap, imgSelPx, imgSelPy,,,,, clrMatrix, pEffect)
+      Else
+         r1 := trGdip_DrawImage(A_ThisFunc, 2NDglPG, zBitmap, imgSelPx, imgSelPy,,,,,,, clrMatrix)
+   }
 
    ; r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectWin, 2NDglHDC)
    Gdip_ResetClip(2NDglPG)
@@ -47347,7 +47425,7 @@ PanelSharpenImage() {
     IDedgesBlendMode := IDedgesEmbossLvl := 1
     Gui, -DPIScale
     Gui, Font
-    Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE gPanelsLivePreviewResponder +hwndhCropCornersPic +TabStop, Preview area
+    Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE gUIresponderPanelsLivePreview +hwndhCropCornersPic +TabStop, Preview area
     If (uiUseDarkMode=1)
        Gui, Font, c%darkControlColor%
 
@@ -51196,6 +51274,12 @@ ForceRemoveTooltip() {
 }
 
 PanelAssociateQPV() {
+   If isWinStore()
+   {
+      msgBoxWrapper(appTitle ": WARNING", "You are currently running " appTitle " (QPV) from the Microsoft Store. Due to stringent security measures on the store, QPV cannot change file format associations. Therefore, you must manually associate QPV with the desired image file formats.`n`nOpen Explorer and use «Open with» and select " apptitle " from the list. Make sure to check «Always use this app».", 0, 1, "exclamation")
+      Return
+   }
+
    fakeWinCreator(52, A_ThisFunc, 1)
    p := TestQPVisAssociated() ? "`n`nQPV seems to be associated with the file format of the selected image file." : ""
    msgResult := msgBoxWrapper("panelu|Associate " appTitle, "Please choose what to associate " appTitle " with." p "`n`nPlease note, you may receive several warnings about system settings being changed and to allow to execute the command line app. To succesfully associate QPV with the image file formats, please answer affirmatively when prompted.", "&Proceed|C&ancel", 1, "settings", "Add ""Open in QPV"" file explorer context menu for folders", 0, "Associate with common image formats`f`fAssociate with all supported image formats`fAssociate with QPV slideshow / files list formats`fRemove QPV files associations`fDo not change files associations", 0, 0)
@@ -60792,6 +60876,7 @@ CloneMainBMP(imgPath, ByRef imgW, ByRef imgH, mustReloadIMG, ByRef hasFullReload
   prevLastImg[2] := prevLastImg[1]
   prevLastImg[1] := [currentFileIndex, resultedFilesList[currentFileIndex, 1]]
   gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
+  backupGdiBMP := trGdip_DisposeImage(backupGdiBMP, 1)
   file2load := thumbsCacheFolder "\big-" alwaysOpenwithFIM userHQraw MD5name ".png"
   ignoreCache := (prevFrame!=desiredFrameIndex || minimizeMemUsage=1 || StrLen(UserMemBMP)>2) ? 1 : mustReloadIMG
   ; MsgBox, % imgPath "`n" AbackupIMGdetails.File "`n" BbackupIMGdetails.File "`n" CbackupIMGdetails.File
@@ -66693,6 +66778,9 @@ ToggleEditImgSelection(modus:=0) {
   If (AnyWindowOpen=12)
      EllipseSelectMode := 0
 
+  If (ShowAdvToolbar=1 && lockToolbar2Win=1 && editingSelectionNow=1)
+     DelayiedImageDisplay()
+
   If (imgSelX2=-1 || ImgSelX2="c") && (editingSelectionNow=1)
   {
      vpWinClientSize(mainWidth, mainHeight)
@@ -66703,6 +66791,7 @@ ToggleEditImgSelection(modus:=0) {
   updateUIctrl()
   If (ShowAdvToolbar=1)
      decideIconBTNselectShape()
+
   clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
   If (modus="key" && editingSelectionNow=1)
      CreateTempGuiButton("Selection options,,invokeSelectionAreaMenu", 0, msgDisplayTime//1.5 + 500)
@@ -71615,6 +71704,8 @@ showQuickHelp() {
 }
 
 PanelAboutWindow() {
+;start shell:appsFolder\13644TabletPro.QuickPictoViewer_3wyk1bs4amrq4!TabletPro "C:\Program Files\WindowsApps\13644TabletPro.QuickPictoViewer_5.9.71.0_x64__3wyk1bs4amrq4\quick-picto-viewer.ahk" "C:\Users\User\Downloads\Desktop\photo_2023-07-19_00-05-29 (2).jpg"
+
     Global LViewOthers, listViewFilteru
     thisBtnHeight := createSettingsGUI(1, A_ThisFunc)
     Gui, Add, Button, x15 y15 h1 w1 Default Section gBtnCloseWindow, Close
@@ -71624,11 +71715,11 @@ PanelAboutWindow() {
     Gui, Add, Picture, x+2 y+2 w%ml%  h-1 +0x3 gOpenGitHub, qpv-icon.ico
     Gui, Add, Text, x+20 yp, %appTitle% v%appVersion%
     Gui, Font, s10 Bold, Arial, -wrap
-    Gui, Add, Link, y+5 wp, Developed by <a href="http://marius.sucan.ro/">Marius Șucan</a>.
+    Gui, Add, Link, y+10 wp +0x200, Developed by: <a href="https://marius.sucan.ro/">Marius Șucan</a>.
+    Gui, Add, Text, y+20 wp +0x200, Release date: %vReleaseDate%.
     Gui, Font
     If (uiUseDarkMode=1)
        Gui, Font, c%darkControlColor%
-    Gui, Add, Link, y+10 wp, Based on the prototype image viewer by <a href="http://sites.google.com/site/littlescripting/">SBC</a> from October 2010 published on <a href="https://autohotkey.com/board/topic/58226-ahk-picture-viewer/">AHK forums</a>.
     lstWid := 450
     btnWid := 60
     txtWid := 440
@@ -71649,7 +71740,7 @@ PanelAboutWindow() {
     Gui, +DPIScale
     Gui, Font, Bold
 
-    Gui, Add, Text, xs y+25 w%txtWid%, Current version: v%appVersion% from %vReleaseDate%. Internal AHK-H version: %A_AhkVersion%. %compiled%OS: %A_OSVersion%.
+    Gui, Add, Text, xs y+25 w%txtWid% BackgroundTrans, Internal AHK-H version: %A_AhkVersion%. %compiled%OS: %A_OSVersion%.
     If isWinStore()
        Gui, Add, Link, y+10 wp, This open source application was downloaded through <a href="ms-windows-store://pdp/?productid=9N07RF144FV1">Windows Store</a>, published by <a href="https://tabletpro.com">Tablet Pro</a>. Source code available on <a href="https://github.com/marius-sucan/Quick-Picto-Viewer">GitHub</a>.
     Else
@@ -78372,19 +78463,20 @@ ST_Insert(insert,input,pos=1) {
 }
 
 isWinStore() {
-   p := (!A_IsCompiled && FileExist("win-store-mode.ini") && InStr(fullPath2exe, "Quick-Picto-Viewer.exe")) ? 1 : 0
+   p := (A_IsCompiled && FileExist(mainExecPath "\win-store-mode.ini") && InStr(fullPath2exe, "13644TabletPro.QuickPictoViewer")) ? 1 : 0
+   ; ToolTip, % "l=" FileExist(mainExecPath "\win-store-mode.ini") "`n" fullPath2exe "`n" A_ScriptFullPath "`n" A_ScriptDir "`n" mainExecPath , , , 2
+   ; p := (!A_IsCompiled && FileExist("win-store-mode.ini") && InStr(fullPath2exe, "Quick-Picto-Viewer.exe")) ? 1 : 0
    Return p
 }
 
 initCompiled(mode) {
    fullPath2exe := GetModuleFileNameEx(QPVpid)
+   zPlitPath(fullPath2exe, 0, OutFileName, OutDir)
+   mainExecPath := OutDir
    If (mode=1 || isWinStore())
    {
       If isWinStore()
       {
-         zPlitPath(fullPath2exe, 0, OutFileName, OutDir)
-         mainExecPath := OutDir
-
          SetWorkingDir, %A_AppData%
          x := A_AppData "\QuickPictoViewer"
          WinStoreDataPath := "\Local\Packages\13644TabletPro.QuickPictoViewer_3wyk1bs4amrq4\AppData"
@@ -78398,12 +78490,7 @@ initCompiled(mode) {
             FileCopy, % mainExecPath "\resources\vector-shapes\*.vqpv", % WinStorePath "\resources\vector-shapes\*.vqpv"
          }
 
-
          OutDir := WinStorePath
-      } Else 
-      {
-         zPlitPath(fullPath2exe, 0, OutFileName, OutDir)
-         mainExecPath := OutDir
       }
 
       SetWorkingDir, %mainExecPath%

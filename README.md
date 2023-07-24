@@ -203,10 +203,31 @@
 
 </ul> 
 
-<H1>Other details</H1>
+
+<h1>Why another image viewer/editor??</h1>
+
+<p>This project is developed out of passion since May 2019 by me, Marius Șucan. It first began as a challenge to make a simple image viewer that can generate slideshows very quickly on over 100 thousand images. What I was using back in those days (XnView and Irfan View) could not do this. After having succeeded this, the project expanded into a complete image viewer and organizer, and gradually, into an image editor as well. The target audience is any occasional user, or the people with huge image libraries, or those who might like advanced image editing features, available through isolated tools, in their image viewer.</p>
+
+<p>As a physically disabled developer, I paid particular attention through-out the development to the needs of people with poor eye-sight and other disabilities. To this end, users with screen readers might notice that the user interface is populated with readable texts. Furthermore, users can activate large UI fonts, adjust the zoom level for texts (Ctrl + -/=) in the viewport, activate dark mode, and right-click on menu items or panel controls to display larger the control's associated texts. The panels' controls can be navigated with the Tab and arrow keys, even the custom slider controls. The users can define the value of a slider via Ctrl+L-Click, where a dialog box prompts the user for the new value. To navigate with the keyboard the main toolbar, press Shift+Tab when the viewport is focused and it will gain keyboard focus.</p>
+
+
+<h1>Key concepts in qpv to know about</h1>
+
+<p><em>THE FILES LIST</em>. It is an index, a list of records pointing to files on the disk.</p>
+<p>When users open a folder, a files list index is automatically generated where one can add more files, from other folders, to the index, or remove index entries. Dedicated options and tools are available to manage the index itself.</p>
+<p>Given that it is just an index, when you add files, or paste files from the clipboard, the images are inserted only in the files list index, and not into the initially opened folder.</p>
+<p>The files list index can be saved and reopened in later sessions. QPV allows users to save the files list in two formats: plain-text and as a SQLite database. For more details, see the Help provided in the Save panel (Ctrl+Shift+S).</p>
+
+<p><em>THE VIEWPORT</em>. In QPV, unlike in other image viewers, there is a clear distinction between how images are displayed on the screen and the pixel/image data. QPV allows users to alter the viewing conditions without affecting the images themselves. The color adjustments, image rotation and flip options (available in the «Viewport adjustments» panel), are applied in real-time for each image when loaded, before displaying it on screen. There are distinct options and tools in QPV to edit and adjust images or to apply the viewport conditions. QPV will seamlessly apply the viewport viewing conditions onto the image itself when users choose to save the image or when image editing tools are used.</p>
+
+<p><em>USER/APP CONTEXTS</em>. QPV was developed having in mind keyboard users by providing many keyboard shortcuts or menu accelerators keys. The purpose is to ease the access to different tools.</p>
+<p>The user is provided with different keyboard shortcuts, menus, context menus and toolbar icons based on the application context. The main contexts are: image view, files list/thumbs modes, image live editing, and vector shape drawing mode. For each of these contexts, the same keys can do different things, based on the context, or new shortcuts are available, while others are disabled. The same applies to toolbar icons and menus. The toolbar icon tooltips and menu items available always reflect these changes. This contextual mindset is expanded to, and applies to, the ability to customize keyboard shortcuts and the toolbar.</p>
+<p>In any context, users can invoke the Quick Menus Search panel with the «;» key or by clicking on the «S» button below the menu items. In this panel, users can search for the currently available options. Most of the menu items are associated with keywords, and synonyms, to facilitate the ease of reach to the available tools.</p>
+
+<h1>Other details</h1>
 <p>Developed by <a href="http://marius.sucan.ro/">Marius Șucan</a> with special attention for people with disabilities.</p>
 
-<p>I coded the application as an <a href="https://autohotkey.com/">AHK script</a> for AutoHotkey_H v1.1.32, [newer versions are not yet supported]. To execute or compile the source code one needs <a href="https://hotkeyit.github.io/v2/">AHK_H</a>.</p>
+<p>I coded the application as an <a href="https://autohotkey.com/">AHK script</a> for AutoHotkey_H v1.1.33. To execute or compile the source code one needs <a href="https://hotkeyit.github.io/v2/">AHK_H</a>.</p>
 
 <p>Quick Picto Viewer can run on Windows 7 and even on XP, but various features might not work. To this end, you may have to copy all the DLL files found in the .\optional-DLL-files-x64\ folder to the same folder where the QPV binary is. If you are running it uncompiled, you must place them in the folder where the AutoHotkey binary resides. The required DLLs for x64 are bundled since version 5.7.5 in the ZIP package and can also be found in the Github repository.</p>
 

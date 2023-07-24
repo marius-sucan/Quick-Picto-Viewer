@@ -2,6 +2,12 @@
 // by Marius Șucan ( https://marius.sucan.ro )
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.9.8 (2023-07-24)
+  - users can now click on the print preview area in the print panel to adjust size and position of the image on the page
+  - flood fill/bucket tool is now able to mix colors with gamma correction, if the option «use gamma correction» is activated from the menu «Image»
+  - improved file associations mechanisms
+  - other fixes
+
 - v5.9.7 (2023-07-07)
   - [new] text opacity option in print image panel
   - fixed viewport flip h/v issues
