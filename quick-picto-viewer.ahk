@@ -217,7 +217,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , sillySeparator :=  "▪", menuCustomNames := new hashtable(), clrGradientCoffX := 0, clrGradientCoffY := 0
    , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*"
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.9.8", vReleaseDate := "2023/07/24" ; yyyy-mm-dd
+   , appVersion := "5.9.8.1", vReleaseDate := "2023/07/25" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -9192,16 +9192,19 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
      If (A_TickCount - prevSlideShowStop<500) && (actu!="start")
         Return
 
-     If (TouchToolbarGUIcreated=1 && ShowAdvToolbar=1)
+     If (editingSelectionNow=1)
+        ToggleEditImgSelection()
+
+     If (TouchToolbarGUIcreated=1 && ShowAdvToolbar=1 && slideShowRunning!=1)
      {
         SetWindowRegion(hQPVtoolbar, 1, 1, 1, 1)
         DelayiedImageDisplay()
      }
 
-     If (editingSelectionNow=1)
-        ToggleEditImgSelection()
-
-     ResetImgLoadStatus()
+     imageLoading := 0
+     interfaceThread.ahkassign("imageLoading", imageLoading)
+     changeMcursor("normal-extra")
+     SetTimer, ResetImgLoadStatus, Off
      If (StrLen(SlidesMusicSong)>3 && autoPlaySlidesAudio=1 && resetMode!=1)
         startSlidesMusicNow()
 
@@ -56479,7 +56482,7 @@ INIaction(act, var, section, type:=0, mini:=0, maxy:=0, forcedDef:="", iniFile:=
          IniRead, %var%, % thisIniFile, %section%, %var%, %varValue%
 
       loadedValue := %var%
-      If (ErrorLevel && loadedValue="") || (ErrorLevel && storeReg=1)
+      If ((ErrorLevel && loadedValue="") || (ErrorLevel && storeReg=1) || (storeReg=1 && type=1 && loadedValue=""))
          loadedValue := defaultu
 
       If (ErrorLevel && (A_TickCount - scriptStartTime<2500))
