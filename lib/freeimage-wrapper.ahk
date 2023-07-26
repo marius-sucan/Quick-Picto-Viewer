@@ -53,11 +53,14 @@ FreeImage_FoxInit(isInit:=1) {
    Return hFIDll
 }
 
-FreeImage_FoxGetDllPath(DllName) {
-   DirList := "|" A_WorkingDir "|" mainCompiledPath "|" A_scriptdir "|" A_scriptdir "\bin|" A_scriptdir "\lib|" mainCompiledPath "\lib|"
+FreeImage_FoxGetDllPath(DllName, bonusPath:="") {
+   DirList := "|" A_WorkingDir "|" bonusPath "|" A_ScriptDir "|" A_ScriptDir "\bin|" A_ScriptDir "\lib|" bonusPath "\lib|"
    DllPath := ""
    Loop, Parse, DirList, |
    {
+      If !A_LoopField
+         Continue
+
       If FileExist(A_LoopField "\" DllName)
          DllPath := A_LoopField "\" DllName
    }

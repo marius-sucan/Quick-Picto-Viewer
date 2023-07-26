@@ -217,7 +217,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , sillySeparator :=  "▪", menuCustomNames := new hashtable(), clrGradientCoffX := 0, clrGradientCoffY := 0
    , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*"
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.9.8.1", vReleaseDate := "2023/07/25" ; yyyy-mm-dd
+   , appVersion := "5.9.82", vReleaseDate := "2023/07/26" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -2209,9 +2209,8 @@ initQPVmainDLL() {
       Return
 
    attempts++
-   ; whichMainDLL := (A_OSVersion="WIN_7" || isWinXP=1) ? "qpv_main_win7.dll" : "qpvmain.dll"
    whichMainDLL := "qpvmain.dll"
-   DllPath := FreeImage_FoxGetDllPath(whichMainDLL)
+   DllPath := FreeImage_FoxGetDllPath(whichMainDLL, mainExecPath)
    If !DllPath
    {
       addJournalEntry("ERROR: Failed to find qpvMain.dll. Various features in QPV will not work.")
@@ -9198,7 +9197,15 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
      If (TouchToolbarGUIcreated=1 && ShowAdvToolbar=1 && slideShowRunning!=1)
      {
         SetWindowRegion(hQPVtoolbar, 1, 1, 1, 1)
-        DelayiedImageDisplay()
+        ; DelayiedImageDisplay()
+        ; dummyResizeImageGDIwin()
+     }
+
+     Static lastInvoked := 1
+     If ((A_TickCount - lastInvoked>100) && TouchToolbarGUIcreated=1 && ShowAdvToolbar=1 && lockToolbar2Win=1)
+     {
+        createGDIPcanvas()
+        lastInvoked := A_TickCount
      }
 
      imageLoading := 0
@@ -20537,6 +20544,10 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
        ; trGdip_GraphicsClear(A_ThisFunc, 2NDglPG, "0x00" WindowBGRcolor, 1)
        r2 := doLayeredWinUpdate(A_ThisFunc, hGDIthumbsWin, glHDC)
        ToggleVisibilityWindow("show", hGDIthumbsWin)
+       ToggleVisibilityWindow("show", hGDIwin)
+       If (editingSelectionNow=1)
+          ToggleVisibilityWindow("show", hGDIselectwin)
+
        ForceRefreshNowThumbsList()
        ; dummyTimerDelayiedImageDisplay(150) ; probably needed in some cases ; I do not know 
        initQPVmainDLL()
@@ -58605,30 +58616,38 @@ getCurrentDate() {
    Return CurrentDateB ", " CurrentTimeB
 }
 
-destroyGDIPcanvas() {
-    qpvCanvasHasInit := 0
-    Gdi_SelectObject(glHDC, glOBM)
-    If glHbitmap
-       Gdi_DeleteObject(glHbitmap)
-    If glHDC
-       Gdi_DeleteDC(glHDC)
-    If glPG
-       Gdip_DeleteGraphics(glPG)
+destroyGDIPcanvas(modus:=0) {
+    If (modus=0)
+       qpvCanvasHasInit := 0
 
-    Gdi_SelectObject(2NDglHDC, 2NDglOBM)
-    If 2NDglHbitmap
-       Gdi_DeleteObject(2NDglHbitmap)
-    If 2NDglHDC
-       Gdi_DeleteDC(2NDglHDC)
-    If 2NDglPG
-       Gdip_DeleteGraphics(2NDglPG)
+    If (which=0 || which=1)
+    {
+       Gdi_SelectObject(glHDC, glOBM)
+       If glHbitmap
+          Gdi_DeleteObject(glHbitmap)
+       If glHDC
+          Gdi_DeleteDC(glHDC)
+       If glPG
+          Gdip_DeleteGraphics(glPG)
 
-    glHbitmap := 2NDglHbitmap := ""
-    glHDC := 2NDglHDC := ""
-    glPG := 2NDglPG := ""
+       glHbitmap := glHDC := glPG := ""
+    }
+
+    If (which=0 || which=2)
+    {
+       Gdi_SelectObject(2NDglHDC, 2NDglOBM)
+       If 2NDglHbitmap
+          Gdi_DeleteObject(2NDglHbitmap)
+       If 2NDglHDC
+          Gdi_DeleteDC(2NDglHDC)
+       If 2NDglPG
+          Gdip_DeleteGraphics(2NDglPG)
+
+       2NDglHbitmap := 2NDglHDC := 2NDglPG := ""
+    }
 }
 
-createGDIPcanvas(W:=0, H:=0, forceIT:=0) {
+createGDIPcanvas(W:=0, H:=0, forceIT:=0, which:=0) {
    Critical, on
    Static prevDimensions, hasInit
    If (A_TickCount - lastMenuBarUpdated<700) && (forceIT=0)
@@ -58641,8 +58660,9 @@ createGDIPcanvas(W:=0, H:=0, forceIT:=0) {
    doAgain := (prevDimensions!=newDimensions) ? 1 : 0
    If (!qpvCanvasHasInit || doAgain=1 || forceIT=1)
    {
+      pwc := (!hasInit || forceIT=1) ? 0 : which
       If (hasInit=1)
-         destroyGDIPcanvas()
+         destroyGDIPcanvas(pwc)
 
       ; gdiBMPvPsize := trGdip_DisposeImage(gdiBMPvPsize, 1)
       imgQuality := (userimgQuality=1) ? 6 : 5
@@ -58652,22 +58672,31 @@ createGDIPcanvas(W:=0, H:=0, forceIT:=0) {
       PixelMode := (userimgQuality=1) ? 2 : 0
       smoothMode := (userimgQuality=1) ? 4 : 1
       compositingQuality := 1 ; (userimgGammaCorrect=1) ? 2 : 1
-      glHDC := Gdi_CreateCompatibleDC()
-      ; Gdi_SetPolyFillMode(glHDC, 2)
-      glHbitmap := Gdi_CreateDIBSection(W, H)
-      glOBM := Gdi_SelectObject(glHDC, glHbitmap)
-      glPG := Gdip_GraphicsFromHDC(glHDC, 0, imgQuality, smoothMode, 2, compositingQuality)
-      Gdip_SetPixelOffsetMode(glPG, 2)
+      If (which=0 || which=1 || !hasInit || forceIT=1)
+      {
+         glHDC := Gdi_CreateCompatibleDC()
+         ; Gdi_SetPolyFillMode(glHDC, 2)
+         glHbitmap := Gdi_CreateDIBSection(W, H)
+         glOBM := Gdi_SelectObject(glHDC, glHbitmap)
+         glPG := Gdip_GraphicsFromHDC(glHDC, 0, imgQuality, smoothMode, 2, compositingQuality)
+         Gdip_SetPixelOffsetMode(glPG, 2)
+      }
       ; ToolTip, % W "==" H "==" glHDC "==" glHbitmap "==" glOBM "==" glPG , , , 2
 
-      2NDglHDC := Gdi_CreateCompatibleDC()
-      2NDglHbitmap := Gdi_CreateDIBSection(W, H)
-      2NDglOBM := Gdi_SelectObject(2NDglHDC, 2NDglHbitmap)
-      2NDglPG := Gdip_GraphicsFromHDC(2NDglHDC, 0, imgQuality, smoothMode, 2, compositingQuality)
-      Gdip_SetPixelOffsetMode(2NDglPG, 2)
+      
+      If (which=0 || which=2 || !hasInit || forceIT=1)
+      {
+         2NDglHDC := Gdi_CreateCompatibleDC()
+         2NDglHbitmap := Gdi_CreateDIBSection(W, H)
+         2NDglOBM := Gdi_SelectObject(2NDglHDC, 2NDglHbitmap)
+         2NDglPG := Gdip_GraphicsFromHDC(2NDglHDC, 0, imgQuality, smoothMode, 2, compositingQuality)
+         Gdip_SetPixelOffsetMode(2NDglPG, 2)
+      }
 
       hasInit := 1
-      prevDimensions := newDimensions
+      If (which=0)
+         prevDimensions := newDimensions
+
       addJournalEntry("Canvas infos: " prevDimensions " - glPG:" glPG " - glHDC:" glHDC " - glOBM:" glOBM " - glHbmp:" glHbitmap " - 2NDglPG:" 2NDglPG " - 2NDglHDC:" 2NDglHDC " - 2NDglOBM:" 2NDglOBM " - 2NDglHbmp:" 2NDglHbitmap)
       If (!glPG || !glHDC || !glHbitmap || !glOBM || !2NDglPG || !2NDglHDC || !2NDglOBM || !2NDglHbitmap)
       {
@@ -81783,11 +81812,11 @@ checkDLLfiles() {
       Return
 
    lastInvoked++
-   DllPathA := FreeImage_FoxGetDllPath("freeimage.dll")
+   DllPathA := FreeImage_FoxGetDllPath("freeimage.dll", mainExecPath)
    If !FileExist(DllPathA)
       freeIMGmissin := 1
    
-   DllPathB := FreeImage_FoxGetDllPath("sqlite3.dll")
+   DllPathB := FreeImage_FoxGetDllPath("sqlite3.dll", mainExecPath)
    If !FileExist(DllPathB)
       sqlMissin := 1
 

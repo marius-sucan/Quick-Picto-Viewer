@@ -16,7 +16,7 @@ SetWinDelay, 1
 Global GDIPToken, MainExe := AhkExported(), runningGDIPoperation := 0, WICmoduleHasInit := 0
      , mainCompiledPath := "", wasInitFIMlib := 0, listBitmaps := "", imgQuality := 0
      , operationDone := 1, resultsList := "", FIMfailed2init := 0, thisThreadID := -1
-     , waitDataCollect := 1, operationFailed := 0, RegExWICfmtPtrn, whichMainDLL
+     , waitDataCollect := 1, operationFailed := 0, RegExWICfmtPtrn
      , RegExFIMformPtrn := "i)(.\\*\.(DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
 
 ; E := initThisThread()
@@ -66,7 +66,7 @@ LoadWICimage(imgPath, w:=0, h:=0, keepAratio:=1, thisImgQuality:=0, frameu:=0, S
    ;    imgPath := getIDimage(currentFileIndex)
    ; fnOutputDebug("wic-load " imgPath)
    func2exec := (A_PtrSize=8) ? "LoadWICimage" : "_LoadWICimage@48"
-   r := DllCall(whichMainDLL "\" func2exec, "Int", thisThreadID, "Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", doFlipu, "int", doGray, "Str", imgPath, "UPtr", &resultsArray, "Ptr")
+   r := DllCall("qpvmain.dll\" func2exec, "Int", thisThreadID, "Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", doFlipu, "int", doGray, "Str", imgPath, "UPtr", &resultsArray, "Ptr")
    ; mainLoadedIMGdetails.imgW := NumGet(resultsArray, 4 * 0, "uInt")
    ; mainLoadedIMGdetails.imgH := NumGet(resultsArray, 4 * 1, "uInt")
    ; mainLoadedIMGdetails.Frames := NumGet(resultsArray, 4 * 2, "uInt")
@@ -83,26 +83,6 @@ LoadWICimage(imgPath, w:=0, h:=0, keepAratio:=1, thisImgQuality:=0, frameu:=0, S
    ; https://stackoverflow.com/questions/8101203/wicbitmapsource-copypixels-to-gdi-bitmap-scan0
    ; https://github.com/Microsoft/Windows-classic-samples/blob/master/Samples/Win7Samples/multimedia/wic/wicviewergdi/WicViewerGdi.cpp#L354
    Return r
-}
-
-initQPVmainDLL() {
-   If qpvMainDll
-      Return
-
-   whichMainDLL := (A_OSVersion="WIN_7") ? "qpv_main_win7.dll" : "qpvmain.dll"
-   DllPath := FreeImage_FoxGetDllPath(whichMainDLL)
-   If (InStr(A_ScriptDir, "sucan twins") && !A_IsCompiled)
-   {
-      If (A_PtrSize=8)
-         DllPath := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\cPlusPlus\qpv-main\x64\Release\qpvmain.dll"
-      Else
-         DllPath := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\cPlusPlus\qpv-main\Release\qpvmain.dll"
-   }
-
-   qpvMainDll := DllCall("LoadLibraryW", "WStr", DllPath, "UPtr")
-   ; WICmoduleHasInit := DllCall("qpvmain.dll\initWICnow", "Int", 0, "int", thisThreadID)
-   ; MsgBox, % qpvMainDll "==" WICmoduleHasInit
-   ; ToolTip, % WICmoduleHasInit " | " A_LastError "==" qpvMainDll "`n" DllPath , , , 2
 }
 
 cleanMess(thisID:=0) {
@@ -438,11 +418,14 @@ FreeImage_FoxInit(isInit:=1) {
    Return hFIDll
 }
 
-FreeImage_FoxGetDllPath(DllName) {
-   DirList := "|" A_WorkingDir "|" mainCompiledPath "|" A_scriptdir "|" A_scriptdir "\bin|" A_scriptdir "\lib|" mainCompiledPath "\lib|"
+FreeImage_FoxGetDllPath(DllName, bonusPath:="") {
+   DirList := "|" A_WorkingDir "|" bonusPath "|" A_ScriptDir "|" A_ScriptDir "\bin|" A_ScriptDir "\lib|" bonusPath "\lib|"
    DllPath := ""
    Loop, Parse, DirList, |
    {
+      If !A_LoopField
+         Continue
+
       If FileExist(A_LoopField "\" DllName)
          DllPath := A_LoopField "\" DllName
    }
