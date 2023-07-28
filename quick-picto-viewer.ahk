@@ -217,7 +217,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , sillySeparator :=  "▪", menuCustomNames := new hashtable(), clrGradientCoffX := 0, clrGradientCoffY := 0
    , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*"
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.9.82", vReleaseDate := "2023/07/26" ; yyyy-mm-dd
+   , appVersion := "5.9.83", vReleaseDate := "2023/07/27" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -2784,7 +2784,7 @@ OpenThisFileMenu() {
 TestQPVisAssociated() {
   imgPath := getIDimage(currentFileIndex)
   zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, Ext)
-  labelu := "QPVimage." Ext
+  labelu := "QPVimg." Ext
   RegRead, regEntryA, HKEY_CLASSES_ROOT\.%Ext%
   If (regEntryA=labelu)
      testA := 1
@@ -51342,8 +51342,8 @@ associateWithExplorer(modus, bza:=-1) {
          If !A_LoopField
             Continue
 
-         regFile .= "[-HKEY_CLASSES_ROOT\QPVimage." A_LoopField "]`n"
-         regFile .= "[-HKEY_LOCAL_MACHINE\SOFTWARE\Classes\QPVimage." A_LoopField "]`n"
+         regFile .= "[-HKEY_CLASSES_ROOT\QPVimg." A_LoopField "]`n"
+         regFile .= "[-HKEY_LOCAL_MACHINE\SOFTWARE\Classes\QPVimg." A_LoopField "]`n"
       }
    } Else
    {
@@ -51431,7 +51431,7 @@ associateWithImages(modus) {
       If !A_LoopField
          Continue
 
-      z := ShellFileAssociate("QPVimage." A_LoopField,"." A_LoopField, fullPath2exe, 1, mainCompiledPath, bonus)
+      z := ShellFileAssociate("QPVimg." A_LoopField,"." A_LoopField, fullPath2exe, 1, mainCompiledPath, bonus)
       If !z
       {
          errorOccured := 1
@@ -51455,7 +51455,7 @@ associateWithImages(modus) {
          If (!A_LoopField || InStr(FileFormatsCommon, "|" A_LoopField "|"))
             Continue
  
-         z := ShellFileAssociate("QPVimage." A_LoopField,"." A_LoopField, fullPath2exe, 1, mainCompiledPath, bonus)
+         z := ShellFileAssociate("QPVimg." A_LoopField,"." A_LoopField, fullPath2exe, 1, mainCompiledPath, bonus)
          If !z
          {
             errorOccured := 1
@@ -56496,7 +56496,7 @@ INIaction(act, var, section, type:=0, mini:=0, maxy:=0, forcedDef:="", iniFile:=
       If ((ErrorLevel && loadedValue="") || (ErrorLevel && storeReg=1) || (storeReg=1 && type=1 && loadedValue=""))
          loadedValue := defaultu
 
-      If (ErrorLevel && (A_TickCount - scriptStartTime<2500))
+      If (ErrorLevel && (A_TickCount - scriptStartTime<2500) && var!="userAddedFavesCount")
          addJournalEntry("Error loading INI settings (" var ") in " thisIniFile " | " section)
 
       If (type=1) ; binary
@@ -80453,7 +80453,7 @@ initFIMGmodule() {
   Static firstTimer := 1
   If (wasInitFIMlib!=1)
   {
-     r := FreeImage_FoxInit(1) ; Load the FreeImage Dll
+     r := FreeImage_FoxInit(1, mainExecPath) ; Load the FreeImage Dll
      wasInitFIMlib := (r && !InStr(r, "err")) ? 1 : 0
      If wasInitFIMlib
         addJournalEntry("FreeImage library initialized: v" FreeImage_GetVersion())
