@@ -2416,6 +2416,7 @@ KeyboardResponder(givenKey, abusive) {
     } Else callMain := 1
 
     isOkay := (imageLoading=1 && animGIFplaying!=1) ? 0 : 1
+    ; ToolTip, % callMain "=" isOkay "(" imageLoading "|" animGIFplaying ")=" runningLongOperation "=" whileLoopExec "=" givenKey , , , 2
     If (callMain=1 && isOkay=1 && runningLongOperation!=1 && whileLoopExec!=1 && givenKey)
     {
        ; addJournalEntry(A_ThisFunc "(): " WinActive("A") "==" givenKey)

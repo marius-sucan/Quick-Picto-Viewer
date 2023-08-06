@@ -217,7 +217,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , sillySeparator :=  "▪", menuCustomNames := new hashtable(), clrGradientCoffX := 0, clrGradientCoffY := 0
    , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*"
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.9.83", vReleaseDate := "2023/07/27" ; yyyy-mm-dd
+   , appVersion := "5.9.84", vReleaseDate := "2023/08/06" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -5854,7 +5854,7 @@ corelivePreviewsImageEditing(modus:=0) {
       Else If (AnyWindowOpen=65 && okayu=1)
          coreDrawShapesSelectionArea()
    }
-
+ 
    fnOutputDebug("redraw: " A_ThisFunc)
    If (showViewPortGrid=1 && imgEditPanelOpened=1)
       drawVPgridsNow(mainWidth, mainHeight, 2NDglPG)
@@ -19361,8 +19361,8 @@ GuiAddCheckBox(options, readerLabel, uiLabel, guiu:="SettingsGUIA") {
 }
 
 GuiAddFlipBlendLayers(options, guiu:="SettingsGUIA") {
-    Static p := "Swap layers: A with B.`nThis will not have any impact on commutative`nblending modes marked with * (asterisk)."
-    Gui, %guiu%: Add, Checkbox, % options " +hwndhTemp +0x1000 +0x8000 Checked" BlendModesFlipped " vBlendModesFlipped", % p
+    Static p := "Swap blended layers: A with B.`nThis will not have any impact on commutative`nblending modes marked with * (asterisk)."
+    Gui, %guiu%: Add, Checkbox, % options " +hwndhTemp +0x1000 +0x8000 Checked" BlendModesFlipped " vBlendModesFlipped", Swap blended layers
     SetImgButtonStyle(hTemp, mainExecPath "\resources\toolbar\blending-layers.png", 1)
     ToolTip2ctrl(hTemp, p)
 }
@@ -37477,6 +37477,7 @@ PanelSearchIndex(dummy:="") {
     lst := btnWid + 50
     infou := (dummy="select") ? "Please type the string by which to select files" : "Please type the string to search for in the indexed files"
 
+    sml := (PrefsLargeFonts=1) ? 30 : 20
     iconFile := "imageres.dll", iconNum := 169
     this := userSearchString ? userSearchString : A_Space
     Gui, +Delimiter`n
@@ -37484,7 +37485,7 @@ PanelSearchIndex(dummy:="") {
     Gui, Add, Text, x+20 w%txtWid% Section, %infou%. Use | as the OR operator. Wildcards ? and * are supported as well.
     Gui, Add, Text, y+7 wp h1 Hide, Search string
     Gui, Add, ComboBox, yp wp gUIgenericComboAction vUsrEditFilter, % SearchedStringz "`n" this "`n`n"
-    GuiAddButton("x+1 w30 hp gEraseSearchEdit", "X", "Discard search criteria")
+    GuiAddButton("x+1 w" sml " hp gEraseSearchEdit", "X", "Discard search criteria")
     GuiAddDropDownList("xs y+10 w" lst " AltSubmit Choose" userSearchPos " vuserSearchPos", "Anywhere`nBegins with`nEnds with`nRegEx", "Search matching mode")
     GuiAddDropDownList("x+2 wp AltSubmit Choose" userSearchWhat " vuserSearchWhat", "Full paths`nFolder paths`nFile names`nParent folders", "Limit search to...")
     Gui, Add, Checkbox, xs y+5 Checked%markSearchMatches% vmarkSearchMatches, &Highlight matching files in the list view mode
@@ -42366,10 +42367,10 @@ PanelAddNoiserImage() {
     If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
        BlurAreaAlphaMask := 0
 
+    sml := (PrefsLargeFonts=1) ? 30 : 20
     Gui, Add, Text, x+20 ys w%2ndcol% Section -wrap +hwndhTemp, Noise type:
     GuiAddDropDownList("x+7 wp-30 AltSubmit gupdateUIaddNoisePanel Choose" UserAddNoiseMode " vUserAddNoiseMode", "Gaussian noise|Dynamic noise|Plasma / clouds", [hTemp])
-    Gui, Add, Button, x+1 hp w28 gBtnUIpresetsClouds +hwndhTempu, &D
-    ToolTip2ctrl(hTempu, "Default presets: noise and clouds")
+    GuiAddButton("x+1 w" sml " hp gBtnUIpresetsClouds", "D", "Reset to default presets: noise or clouds")
     GuiAddSlider("UserAddNoiseIntensity", 1,100, 30, "Noise cut-off", "updateUIaddNoisePanel", 1, "xs y+10 w" txtWid//2 - 4 " hp")
     GuiAddSlider("UserAddNoiseDetails", 1,100, 20, "Plasmagon", "updateUIaddNoisePanel", 1, "x+5 wp hp")
     GuiAddSlider("IDedgesEmphasis", -255,255, 0, "Brightness", "updateUIaddNoisePanel", 2, "xs y+8 w" txtWid - 2 " hp")
@@ -44289,6 +44290,12 @@ livePreviewAdjustColorsArea(modus:=0) {
    Static bitsOptions := {0:0, 1:0, 2:2, 3:3, 4:4, 5:5, 6:6, 7:7, 8:8, 9:16}
         , prevState, prevBMP
 
+   If (forceLiveAlphaPreviewMode=1 && liveDrawingBrushTool=1)
+   {
+      livePreviewAlphaMasking("live")
+      Return
+   }
+
    thisBitsDepth := bitsOptions[DesaturateAreaLevels]
    vpWinClientSize(mainWidth, mainHeight)
    imgSelPx := x1 := selDotX + SelDotsSize//2, x2 := selDotAx + SelDotsSize//2
@@ -45451,8 +45458,7 @@ uiADDalphaMaskTabs(t1, t2, labelu) {
     friendlyMaskInfo := (coreDesiredPixFmt="0x21808") ? "Disabled in 24-RGB mode" : "No alpha mask"
     GuiAddDropDownList("x+15 y+15 Section w" txtWid2 " AltSubmit Choose" alphaMaskingMode " valphaMaskingMode g" labelu, friendlyMaskInfo "|Linear gradient|Radial gradient|Box gradient|Image bitmap|Custom shape", "Alpha mask type")
     If (AnyWindowOpen!=70)
-       Gui, Add, Button, x+2 w%sml% hp vUIviewAlpha +hwndhtempu gUIbtnViewAlphaMaskNow, P
-    ToolTip2ctrl(htempu, "Show a temporary preview of the alpha mask in the viewport")
+       GuiAddButton("x+1 w" sml " hp vUIviewAlpha gUIbtnViewAlphaMaskNow", "P", "Alpha mask preview", "Show a temporary preview of the alpha mask in the viewport")
     
     ml := (PrefsLargeFonts=1) ? 170 : 125
     GuiAddDropDownList("x+5 w" ml " AltSubmit Choose" alphaMaskGradientWrapped " valphaMaskGradientWrapped g" labelu, "Tiled gradient|Tiled - flip X|Tiled - flip Y|Tiled - flip X/Y|No gradient tiling", "Gradient tiling mode")
@@ -45470,8 +45476,7 @@ uiADDalphaMaskTabs(t1, t2, labelu) {
     Gui, Add, Text, xs ys+2 vinfoAlphaFile, Alpha mask bitmap:
     GuiAddDropDownList("xs y+10 Section w" txtWid2 " g" labelu " AltSubmit valphaMaskRefBMP Choose" alphaMaskRefBMP, (transformTool=1) ? "User painted bitmap|Main image|Transformed object" : "User painted bitmap|Main image", "Alpha mask bitmap source")
     GuiAddDropDownList("x+5 wp-90 AltSubmit Choose" alphaMaskBMPchannel " valphaMaskBMPchannel g" labelu " +hwndhTemp", "Red|Green|Blue|Alpha|All gray", "Alpha mask bitmap color channel to use")
-    Gui, Add, Button, x+5 w%sml% hp vUIremAlpha +hwndhtemp gdiscardUserPaintedAlpha, &X
-    ToolTip2ctrl(hTemp, "Destroy the user painted bitmap")
+    GuiAddButton("x+2 w" sml " hp vUIremAlpha gdiscardUserPaintedAlpha", "X", "Discard user bitmap", "Destroy the user painted bitmap")
     Gui, Add, Text, xs ys+5 w%kak% h%kak% -Border +0xE gGradientsPreviewResponder vinfoAlphaMaskGradientView +hwndhGradientAlphaMSKpreview, Alpha mask gradient preview
     ToolTip2ctrl(hGradientAlphaMSKpreview, "Click and drag to adjust the gradient offset.`nHold Alt while dragging to adjust its center.")
 
@@ -66186,7 +66191,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
 
     mustGoIntoLowQuality := 0
     thisDelayu := (vpImgPanningNow=2 || sizeChanged=1) ? 950 : 400
-    If (((A_TickCount - lastZeitLowQuality<thisDelayu + prevDelayu) || (drawModeAzeit>70 && mustPlayAnim=1 && desiredFrameIndex>1) || (usePrevious=1)) && (userimgQuality=1 && usePrevious!=2 && zoomLevel!=1))
+    If (((A_TickCount - lastZeitLowQuality<thisDelayu + prevDelayu) || (drawModeAzeit>70 && mustPlayAnim=1 && desiredFrameIndex>1) || (usePrevious=1)) && (userimgQuality=1 && usePrevious!=2 && zoomLevel!=1) || (zoomLevel>5))
        mustGoIntoLowQuality := 1
 
     If (imgEditPanelOpened=1 || drawingShapeNow=1 || paintBrushToolActive=1) && (userimgQuality=1)
@@ -66854,6 +66859,9 @@ selectEntireImage(act:=0) {
    vpy := (act="r") ? 0 : innerSelectionCavityY
    If (act="r")
       EllipseSelectMode := 0
+
+   If (ShowAdvToolbar=1 && lockToolbar2Win=1)
+      DelayiedImageDisplay()
 
    Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
    If (ImgSelX2=imgW && imgSelY2=imgH

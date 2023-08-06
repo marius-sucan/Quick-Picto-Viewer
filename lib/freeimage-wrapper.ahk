@@ -34,10 +34,10 @@
 ;  - URL : http://www.autohotkey.net/~linpinger/index.html
 
 
-FreeImage_FoxInit(isInit:=1) {
+FreeImage_FoxInit(isInit:=1, bonusPath:=0) {
    Static hFIDll
    ; if you change the dll name, getFIMfunc() needs to reflect this
-   DllPath := FreeImage_FoxGetDllPath("freeimage.dll")
+   DllPath := FreeImage_FoxGetDllPath("freeimage.dll", bonusPath)
    If !DllPath
       Return "err - 404"
 

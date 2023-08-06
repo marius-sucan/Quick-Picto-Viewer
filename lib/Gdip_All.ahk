@@ -8339,7 +8339,8 @@ GenerateColorMatrix(modus, bright:=1, contrast:=0, saturation:=1, alph:=1, chnRd
 ;
 ; function written by Marius Șucan
 ; infos from http://www.graficaobscura.com/matrix/index.html
-; NTSC RGB weights: r := 0.29970, g := 0.587130, b := 0.114180
+; NTSC // CCIR 601 luma RGB weights:
+; r := 0.29970, g := 0.587130, b := 0.114180
 
     Static NTSCr := 0.308, NTSCg := 0.650, NTSCb := 0.095   ; personalized values
     matrix := ""
