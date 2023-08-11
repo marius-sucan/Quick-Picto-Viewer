@@ -2,20 +2,25 @@
 // by Marius Șucan ( https://marius.sucan.ro )
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
-- v5.9.8 (2023-07-24)
+- v5.9.86 (2023-08-11)
+  - important bug fixes and improvements to how HDR and camera RAW images are handled
+  - overhauled the HDR tone mapping panel
+  - updated the FreeImage library DLL
+
+- v5.9.80 (2023-07-24)
   - users can now click on the print preview area in the print panel to adjust size and position of the image on the page
   - flood fill/bucket tool is now able to mix colors with gamma correction, if the option «use gamma correction» is activated from the menu «Image»
   - improved file associations mechanisms
   - other fixes
 
-- v5.9.7 (2023-07-07)
+- v5.9.70 (2023-07-07)
   - [new] text opacity option in print image panel
   - fixed viewport flip h/v issues
   - fixed the issues related to the omnibox and the folder tree losing keyboard and window focus on almost any action; it was a regression since v5.9.0
   - fixes for the Microsoft Windows Store edition
   - improvements to how drag and drop is handled between omnibox, folder tree and the main window
   
-- v5.9.6 (2023-07-01)
+- v5.9.60 (2023-07-01)
   - [new] soft brush tool allows users to paint with blending modes
   - [new] «air-brush mode» for the soft brush tool
   - [new] painting with symmetry is now possible with the eraser and effects brushes as well
@@ -24,13 +29,13 @@
   - fixed regressions since version v5.9.3; add noise, detect edges filters were malfunctioning
   - various other bug fixes
 
-- v5.9.5 (2023-05-15)
+- v5.9.50 (2023-05-15)
   - [new] fill selected area object can be invert-blurred... this is a rudimentary implementation to create glows and inner shadows
   - [new] selection area is previewed in the thumbnails list mode for the selected files
   - fixed «crop selected images» option
   - fixed regressions related to image blur introduced by v5.9.3
 
-- v5.9.4 (2023-05-09)
+- v5.9.40 (2023-05-09)
   - [new] the object can be blured in the «Fill selected area» panel
   - various bug fixes and improvements
     - fixed issues related to toolbar positioning, when attached to the main window
@@ -42,51 +47,51 @@
     - the panel collapsed widget icons are now of the same size as the main toolbar
     - now, when the selection area is small, the dots get small as well; the mid-center rotation dot also hides
 
-- v5.9.3 (2023-04-24)
+- v5.9.30 (2023-04-24)
   - [new] users can now paint or define the alpha mask in real time when using the image color adjustments tool
   - it is now possible to draw with a brush of 1px in size
   - ellipse and pie chart objects now share their center of rotation
   - fill shape and fill behind should now fill the ENTIRE canvas when the canvas is entirely selected with a rectangular selection
   - folder tree panel and menus search panel are no longer relying on -DPIscale; this renders the panels monitor DPI scale dependent
 
-- v5.9.2 (2023-04-06)
+- v5.9.20 (2023-04-06)
   - various bug fixes related to dupes detection
   - when a database is opened and a folder is dropped, the files list is now correctly updated
   - improved behaviour when dropping files on the main window
 
-- v5.9.1 (2023-03-30)
+- v5.9.10 (2023-03-30)
   - [new] users can enable multi-threaded processing for file format conversions
   - file format converter has an option to prevent it from skipping the files with the extension of the destination format
   - copy/move file actions have full support for relative paths; multiple files, in different folders, can be moved into a sibling folder or into the parent folder relative to their own paths
   - [major bug fix] FINALLY, hopefully, A PROPER fix for the message box that allows users to choose what action to perform on file name conflicts; the whole application was freezing and the user was forced to kill the application when this message box was displayed ;[
 
-- v5.9.0 (2023-03-25)
+- v5.9.00 (2023-03-25)
   - many improvements for the compatibility with Windows Narrator and other screen readers
   - bug fixes
 
-- v5.8.9 (2023-02-23)
+- v5.8.90 (2023-02-23)
   - users can now adjust the gradient offset for radial and box gradients; to adjust the gradient center, users can Alt+L-Click and drag in the gradient preview area 
   - transformed the checkbox option to crop the image [found in the JPEG lossless operations panel], into a drop down option
   - when user collapses a panel, a compact sensical bar appears, instead of displaying a tiny corner of the initial window
   - the preview box is now always 2x larger than the displayed thumbnails
   - bug fixes
 
-- v5.8.8 (2023-02-21)
+- v5.8.80 (2023-02-21)
   - [new] users can now customize the keyboard shortcuts
   - image captions can be now defined and displayed in the files list/thumbs mode
   - various important bug fixes; many inconsistencies between the menus, the toolbar options and keyboard shortcuts were fixed.
   
-- v5.8.7 (2023-02-07)
+- v5.8.70 (2023-02-07)
   - [new] users can now customize the toolbar; a dedicated panel allows users to add/remove icons in the toolbar, for the image view and thumbnails/list modes
   - [new] viewer mode toolbar; activated by default; in this mode, only common actions for an image viewer are shown
   - [new] option to import clipboard image as an alpha mask
   - bug fixes
 
-- v5.8.6 (2023-02-02)
+- v5.8.60 (2023-02-02)
   - various bug fixes, some are related to the user interface [panels] and dark mode
   - the user is now prompted to paste in place the image dropped or add it to the files list
 
-- v5.8.5 (2023-01-31)
+- v5.8.50 (2023-01-31)
   - [new] complete overhaul of all the panels; better layouts, replaced all the win32 sliders with a custom slider control
   - [new] tool to create image symmetry, to mirror sides, or to simply generate patterns
   - [new] users can now create customizable rays, grids and spirals [in the «Draw parametric lines» panel]
@@ -102,13 +107,13 @@
   - various other fixes and improvements
   - code clean-up and reorganization
 
-- v5.8.2 (2022-12-12)
+- v5.8.20 (2022-12-12)
   - fixed important regression; it caused the malfunctioning of message boxes since v5.8.0
 
-- v5.8.1 (2022-12-09)
+- v5.8.10 (2022-12-09)
   - bug fixes related to alpha masking
 
-- v5.8.0 (2022-12-08)
+- v5.8.00 (2022-12-08)
   - [new] tool to copy/move files by maintaining their folder(s) structure
   - optimized features that use blur; instead of relying on GDI+ , I use cImg for small radius blurring
   - image alignment in the viewport is now adapting to the toolbar [if activated]
@@ -117,7 +122,7 @@
   - aborting long operations is now easier; the prompt will show up faster when trying to stop the operation; and the processes are no longer continuing while the prompt is visible
   - other bug fixes I no longer remember to list here
 
-- v5.7.9 (2022-12-01)
+- v5.7.90 (2022-12-01)
   - [new] gradient preview in the Fill Area panel and in Alpha Mask tab
   - [new] options to choose image destination format on auto-crop
   - [new] ability to choose for what monitor to set the image as wallpaper, and its position on the desktop, and background color; it now works on Windows 7 [but not per monitor]
@@ -129,16 +134,16 @@
   - panel layout fixes for Windows 7 
   - really MANY bug fixes , and important ones
 
-- v5.7.8 (2022-10-01)
+- v5.7.80 (2022-10-01)
   - [new] option to add to favourites folders and files lists [.SLDs]
   - [new] slideshow random modes: with a bias for the first or second half of the files list, or no explicit bias
   - users can now create a folders list to scan for files when no image or folder is opened
   - various small fixes
 
-- v5.7.7 (2022-08-18)
+- v5.7.70 (2022-08-18)
   - several important bug fixes
 
-- v5.7.6 (2022-08-16)
+- v5.7.60 (2022-08-16)
   - [new] tool to create PDFs or multi-paged TIFFs from the selected files; if the selected file(s) have multiple frames or pages, these pages will be processed and become part of the newly created file
   - [new] option to extract image frames to image files, from GIFs, TIFFs and WebP
   - [new] ability to print selected files in one go; batch printing
@@ -149,31 +154,31 @@
   - replaced the box blur function with box_blur() from cImg library; the results look much better
   - many important bug fixes
 
-- v5.7.5 (2022-06-28)
+- v5.7.50 (2022-06-28)
   - bug fixes
 
-- v5.7.4 (2022-06-23)
+- v5.7.40 (2022-06-23)
   - [new] menu bar; the quick bar was replaced with a proper menu bar structure
   - all of the required DLLs are now packaged in the ZIP and available on the GitHub repository; it should be easier for new users to pick-up and run QPV
   - restored Windows 7 compatibility; should be entirely functional now
   - various bug fixes
 
-- v5.7.3 (2022-05-28)
+- v5.7.30 (2022-05-28)
   - [new] dedicated panel to adjust image colors with alpha masking support; previously, one would have had to use the viewport colors adjustment panel
   - [new] option to set grayscale levels in «desaturate» image panel
   - [new] option to reset transformed image object to initial coordinates
   - substantially improved Microsoft Windows Narrator [and other screen readers] compatibility with the viewport
   - other improvements and fixes
 
-- v5.7.2 (2022-05-10)
+- v5.7.20 (2022-05-10)
   - [new] zoom / motion blur
   - various bug fixes
 
-- v5.7.1 (2022-04-28)
+- v5.7.10 (2022-04-28)
   - [new] ability to skew image object when using the transform tool
   - important bug fixes
 
-- v5.7.0 (2022-04-22)
+- v5.7.00 (2022-04-22)
   - [new] users can now draw Bézier vector paths; this greatly facilitates drawing of complex shapes
   - [new] multi-rename panel allows to change letters case as well; various bug fixes related to multi-renaming
   - [new] option to limit «search and replace» in index on the selected files only
@@ -183,7 +188,7 @@
   - folder paths are now automatically shortened based on the available width in the viewport
   - various bug fixes
 
-- v5.6.7 (2022-03-31)
+- v5.6.70 (2022-03-31)
   - [new] private mode; how dubious ^_^
   - [new] context menu with many options in «Review selected files» panel and improvements; it can now handle a million of files, gradually listed in the panel - by user demand
   - [new] «static» folders panel now allows multiple folders to be selected and filtering by file count; it also has more options related to files management
@@ -200,7 +205,7 @@
   - added the ability in more edit fields to press ctrl+bksp
   - more bug fixes
 
-- v5.6.5 (2022-03-11)
+- v5.6.50 (2022-03-11)
   - [new] specialised tool to resize images in image editing mode; it can fill the canvas by extending image margins or blurring the image in the backgrou
   - [new] dedicated toolbar for vector shapes drawing mode
   - [new] ability to load/save/delete created vector shapes
@@ -213,10 +218,10 @@
   - viewport grid and rotation icons in the toolbar are now slider icons
   - various bug fixes
 
-- v5.6.1 (2022-02-26)
+- v5.6.10 (2022-02-26)
   - silly bug prevented previous release from starting ;/
 
-- v5.6.0 (2022-02-25) - major release
+- v5.6.00 (2022-02-25) - major release
 General stuff:
   - [new] ability to load images through WIC - Windows Imaging Component; the newly supported formats are listed in the open dialog
   - [new] animated webp support [with WIC]; experimental

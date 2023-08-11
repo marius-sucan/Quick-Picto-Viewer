@@ -17,7 +17,7 @@ Global GDIPToken, MainExe := AhkExported(), runningGDIPoperation := 0, WICmodule
      , mainCompiledPath := "", wasInitFIMlib := 0, listBitmaps := "", imgQuality := 0
      , operationDone := 1, resultsList := "", FIMfailed2init := 0, thisThreadID := -1
      , waitDataCollect := 1, operationFailed := 0, RegExWICfmtPtrn
-     , RegExFIMformPtrn := "i)(.\\*\.(DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
+     , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
 
 ; E := initThisThread()
 Return
@@ -109,15 +109,38 @@ fnOutputDebug(msg) {
    OutputDebug, QPV: threadex %thisThreadID% - %msg%
 }
 
-MonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerImg, coreIndex, thisfileIndex, thisBindex) {
+isVarEqualTo(value, vals*) {
+   yay := 0
+   for index, param in vals
+   {
+       If (value=param)
+       {
+          yay := 1
+          Break
+       }
+   }
+   Return yay
+}
+
+MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
    Critical, on
+   optionz := StrSplit(params, "|")
+   mustSaveFile := optionz[1]
+   thumbsSizeQuality := optionz[2]
+   userHQraw := optionz[3]
+   allowToneMappingImg := optionz[4]
+   timePerImg := optionz[5]
+   coreIndex := optionz[6]
+   thisFileIndex := optionz[7]
+   allowWICloader := optionz[8]
+   ; mustSaveFile "|" thumbsSizeQuality "|" userHQraw "|" allowToneMappingImg "|" timePerImg "|" coreIndex "|" thisFileIndex
 
    operationDone := hFIFimgA := finalBitmap := 0
    waitDataCollect := operationFailed := 0
    startZeit := A_TickCount
    resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
    ; RegWrite, REG_SZ, %QPVregEntry%, thumbThreadDone%coreIndex%, 0
-   If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1)
+   If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1 && !RegExMatch(imgPath, RegExFIMformPtrn))
    {
       thisImgQuality := (imgQuality=1) ? 6 : 5
       finalBitmap := LoadWICimage(imgPath, thumbsSizeQuality, thumbsSizeQuality, 1, thisImgQuality, 3, 0)
@@ -130,8 +153,15 @@ MonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerIm
    {
       r := imgPath
       GFT := FreeImage_GetFileType(r)
-      loadOption := (GFT=34) ? 5 : 0
-      hFIFimgA := FreeImage_Load(r, -1, loadOption)
+      loadArgs := 0
+      If (GFT=34 && loadArgs=0 && RegExMatch(r, "i)(.\.(dng))$"))
+         loadArgs := (userHQraw=1) ? 0 : 2
+      Else If (GFT=34 && loadArgs=0)
+         loadArgs := (userHQraw=1) ? 0 : 1
+      Else If (GFT=2 && loadArgs=0)
+         loadArgs := 8
+
+      hFIFimgA := FreeImage_Load(r, -1, loadArgs)
       If !hFIFimgA
       {
          operationDone := 1
@@ -163,7 +193,8 @@ MonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, timePerIm
       imgBPP := Trim(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
       ColorsType := FreeImage_GetColorType(hFIFimgA)
       mustApplyToneMapping := (imgBPP>32 && !InStr(ColorsType, "rgba")) || (imgBPP>64) ? 1 : 0
-      If (mustApplyToneMapping=1)
+      thisAllow := isVarEqualTo(GFT, 32, 26, 29) ? 1 : allowToneMappingImg
+      If (mustApplyToneMapping=1 && thisAllow=1)
       {
          hFIFimgB := FreeImage_ToneMapping(hFIFimgA, 0, 1.85, 0)
          FreeImage_UnLoad(hFIFimgA)

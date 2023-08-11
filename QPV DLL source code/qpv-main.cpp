@@ -116,11 +116,11 @@ DLL_API int DLL_CALLCONV SetColorAlphaChannel(int *imageData, int w, int h, int 
 
 
 int inline INTweighTwoValues(int A, int B, float w) {
-    return (float)(A * w + B * (1 - w));
+    return (float)(A * w + B * (1.0 - w));
 }
 
 float inline weighTwoValues(float A, float B, float w) {
-    return (A*w + B*(1-w));
+    return (A*w + B*(1.0 - w));
 }
 
 double inverseGamma(double X) {

@@ -37,7 +37,12 @@
 FreeImage_FoxInit(isInit:=1, bonusPath:=0) {
    Static hFIDll
    ; if you change the dll name, getFIMfunc() needs to reflect this
-   DllPath := FreeImage_FoxGetDllPath("freeimage.dll", bonusPath)
+   If RegExMatch(bonusPath, "i)(.\.(dll))$")
+      DllPath := bonusPath
+   Else
+      DllPath := FreeImage_FoxGetDllPath("freeimage.dll", bonusPath)
+
+   ; ToolTip, % bonusPath , , , 2
    If !DllPath
       Return "err - 404"
 
@@ -546,6 +551,18 @@ FreeImage_ToneMapping(hImage, algo:=0, p1:=0, p2:=0) {
       ; p1 = saturation [0.4, 0.6]; p2 = attenuation [0.8, 0.9]
 
    Return DllCall(getFIMfunc("ToneMapping"), "uptr", hImage, "int", algo, "Double", p1, "Double", p2, "uptr")
+}
+
+FreeImage_TmoDrago(hImage, gamma, exposure) {
+; Converts a High Dynamic Range image to a 24-bit RGB image, suitable for display.
+; function required to display HDR and RAW images
+
+; parameters intervals and meaning 
+; Adaptive logarithmic mapping (F. Drago, 2003)
+      ; gamma = from 0.0 to 9.9
+      ; exposure = from -8 to 8
+
+   Return DllCall(getFIMfunc("TmoDrago03"), "uptr", hImage, "Double", gamma, "Double", exposure, "uptr")
 }
 
 ; === ICC profile functions ===

@@ -1264,7 +1264,7 @@ ShellFileAssociate(Label,Ext,Cmd,batchMode,storePath, bonusArg:=0) {
 
   Cmd := StrReplace(Cmd, "\", "\\")
   Cmd := StrReplace(Cmd, """", "\""")
-  typeInfo := "`n""ContentType""=" q "image/" Ext q "`n""PerceivedType""=" q "image" q "`n"
+  typeInfo := "`n""Content Type""=" q "image/" Ext q "`n""PerceivedType""=" q "image" q "`n"
   regFile .= "[HKEY_CLASSES_ROOT\" Ext "]`n@=" q Label q typeInfo
   regFile .= "`n[HKEY_CLASSES_ROOT\" Label "]`n@=" q Label q "`n"
   regFile .= "`n[HKEY_CLASSES_ROOT\" Label "\Shell\Open\Command]`n@=" q Cmd q "`n"
