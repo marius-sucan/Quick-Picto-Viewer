@@ -45,8 +45,8 @@
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
 ;@Ahk2Exe-UpdateManifest 0, Quick Picto Viewer
 ;@Ahk2Exe-SetOrigFilename Quick-Picto-Viewer.exe
-;@Ahk2Exe-SetVersion 5.9.86
-;@Ahk2Exe-SetProductVersion 5.9.86
+;@Ahk2Exe-SetVersion 5.9.87
+;@Ahk2Exe-SetProductVersion 5.9.87
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2023)
 ;@Ahk2Exe-SetCompanyName https://marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -212,12 +212,12 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , lastInfoBoxZeitToggle := 1, prevHistoBoxString := "", menuHotkeys, whichMainDLL, lastMenuZeit := 1
    , userExtractFramesFmt := 3, maxMultiPagesAllowed := 2048, maxMemLimitMultiPage := 2198765648, alphaMaskCoffsetX := 0
    , userImgClrMtrxBrightness, userImgClrMtrxContrast, userImgClrMtrxSaturation, userImgVPthreshold, userImgVPgammaLevel
-   , cmdExifTool := "", tabzDarkModus := 0, maxRecentOpenedFolders := 15, UIuserToneMapParamA := 38, UIuserToneMapParamB := 100
+   , cmdExifTool := "", tabzDarkModus := 0, maxRecentOpenedFolders := 15, UIuserToneMapParamA := 74, UIuserToneMapParamB := 200
    , userImgChannelRlvl, userImgChannelGlvl, userImgChannelBlvl, userImgChannelAlvl, combosDarkModus := ""
    , sillySeparator :=  "▪", menuCustomNames := new hashtable(), clrGradientCoffX := 0, clrGradientCoffY := 0
    , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*"
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.9.86", vReleaseDate := "2023/08/11" ; yyyy-mm-dd
+   , appVersion := "5.9.87", vReleaseDate := "2023/08/12" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -66879,7 +66879,7 @@ selectAllFiles() {
 ToggleEditImgSelection(modus:=0) {
   Critical, on
   imgPath := getIDimage(currentFileIndex)
-  If (thumbsDisplaying=1) || (!useGdiBitmap() && !CurrentSLD) || !imgPath
+  If ((thumbsDisplaying=1) || (!useGdiBitmap() && !CurrentSLD) || !imgPath)
      Return
 
   If (slideShowRunning=1)
@@ -66887,34 +66887,41 @@ ToggleEditImgSelection(modus:=0) {
 
   DestroyGIFuWin()
   If (editingSelectionNow!=1)
+  {
      r := correctActiveSelectionAreaViewPort()
+  } Else
+  {
+     Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+     If (!imgW || !imgH)
+        r := -1
+  }
 
-  If (r=-1)
+  If (r=-1 && editingSelectionNow!=1)
      Return
 
-  ; If (relativeImgSelCoords=1)
-     z = calcRelativeSelCoords(0, prevMaxSelX, prevMaxSelY)
+  If (r!=-1)
+     z = calcRelativeSelCoords(useGdiBitmap(), 0, 0)
   If (z=-1)
      Return
 
   If (getCaptionStyle(PVhwnd)=1)
      ToggleTitleBaruNow()
 
-  If (editingSelectionNow=1)
+  If (r!=-1 && editingSelectionNow=1)
      recordSelUndoLevelNow()
 
-  editingSelectionNow := (modus="show-edit") ? 1 : !editingSelectionNow
+  editingSelectionNow := (modus="show-edit" && r!=-1) ? 1 : !editingSelectionNow
+  If (AnyWindowOpen=12 || r=-1)
+     EllipseSelectMode := 0
+
   liveDrawingBrushTool := (AnyWindowOpen=64 && editingSelectionNow=0) ? 1 : 0
   FloodFillSelectionAdj := (AnyWindowOpen=66 && editingSelectionNow=0) ? 0 : 1
   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
   interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
-  If (AnyWindowOpen=12)
-     EllipseSelectMode := 0
-
   If (ShowAdvToolbar=1 && lockToolbar2Win=1 && editingSelectionNow=1)
      DelayiedImageDisplay()
 
-  If ((imgSelX2=-1 || ImgSelX2="c") && (editingSelectionNow=1))
+  If ((imgSelX2=-1 || ImgSelX2="C") && (editingSelectionNow=1))
   {
      vpWinClientSize(mainWidth, mainHeight)
      createDefaultSizedSelectionArea(prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, prevMaxSelX, prevMaxSelY, mainWidth, mainHeight)
@@ -66929,6 +66936,7 @@ ToggleEditImgSelection(modus:=0) {
   If (modus="key" && editingSelectionNow=1)
      CreateTempGuiButton("Selection options,,invokeSelectionAreaMenu", 0, msgDisplayTime//1.5 + 500)
 
+  ; ToolTip, % prcSelX2 "|" prcSelY2 , , , 2
   SetTimer, MouseMoveResponder, -90
   SetTimer, dummyRefreshImgSelectionWindow, -25
   ; dummyTimerDelayiedImageDisplay(25)
@@ -67420,7 +67428,6 @@ correctActiveSelectionAreaViewPort() {
        Return -1
 
     theseDimensions := imgW "," imgH
-
     If (imgSelX2=-1 && imgSelY2=-1)
     {
        prevDimensions := theseDimensions
@@ -67431,8 +67438,8 @@ correctActiveSelectionAreaViewPort() {
        Return
 
     capSelectionRelativeCoords()
-    calcImgSelection2bmp(0, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-    ; msgbox, % x1 "--" x2 "--" y1 "--" y2
+    calcImgSelection2bmp(0, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2, 0, 0, "a")
+    ; msgbox, % x1 "--" x2 "--" y1 "--" y2 "`n" prcSelX2 "|" prcSelY2
     imgSelX1 := X1, imgSelY1 := Y1
     imgSelX2 := X2, imgSelY2 := Y2
     prevDimensions := theseDimensions
