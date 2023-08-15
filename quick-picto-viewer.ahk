@@ -145,7 +145,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , imageLoading := 0, PrevGuiSizeEvent := 0, imgSelOutViewPort := 0, prevLastImg := [], userUIshapeCavity := 0
    , imgEditPanelOpened := 0, jpegDesiredOperation := 1, copyMoveDoLastOption := 4, alphaMaskCoffsetY := 0
    , rDesireWriteFMT := "jpg", FIMfailed2init := 0, prevMaxSelX := "", prevMaxSelY := "", prevDestPosX := "", prevDestPosY := ""
-   , CCLVO := "gInvokeStandardDialogColorPicker -E0x200 +Border -Hdr -Multi +ReadOnly Report AltSubmit ", FontList := []
+   , CCLVO := " gInvokeStandardDialogColorPicker -E0x200 +Border -Hdr -Multi +ReadOnly Report AltSubmit ", FontList := []
    , totalFramesIndex := 0, pVwinTitle := "", AprevImgCall := "", BprevImgCall := "", prevSetWinPosX := "", prevSetWinPosY := ""
    , coreIMGzeitLoad := 0, desiredFrameIndex := 0, prevDrawingMode := 0, sqlFailedInit := 0, currentImgModified := 0
    , currIMGdetails := [], AbackupIMGdetails := [], BbackupIMGdetails := [], mainLoadedIMGdetails := [], lastSelPrinterName := ""
@@ -66284,7 +66284,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     If (((A_TickCount - lastZeitLowQuality<thisDelayu + prevDelayu) || (drawModeAzeit>70 && mustPlayAnim=1 && desiredFrameIndex>1) || (usePrevious=1)) && (userimgQuality=1 && usePrevious!=2 && zoomLevel!=1) || (zoomLevel>5))
        mustGoIntoLowQuality := 1
 
-    If (imgEditPanelOpened=1 || drawingShapeNow=1 || paintBrushToolActive=1) && (userimgQuality=1)
+    If ((mustPlayAnim=1 || imgEditPanelOpened=1 || drawingShapeNow=1 || paintBrushToolActive=1) && (userimgQuality=1))
        mustGoIntoLowQuality := 2
 
     If (mustGoIntoLowQuality=1 && minimizeMemUsage!=1 && mustGenerate=0 && usePrevious!=2 && mustPlayAnim!=1 && imgFxMode>1 && vpImgPanningNow!=2)
@@ -80637,7 +80637,15 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
   sTime := A_tickcount  
   initFIMGmodule()
   If !wasInitFIMlib
+  {
+     If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1)
+     {
+        oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, sizesDesired, gBitmap)
+        newBitmap := gBitmap
+        Return oBitmap
+     }
      Return
+  }
 
   loadArgs := (noBPPconv=1 || noBMP=1) ? -1 : 0   ; FIF_LOAD_NOPIXELS
   GFT := FreeImage_GetFileType(imgPath)
@@ -80681,6 +80689,12 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
   {
      ; ToolTip, % "lol " GFT "=" loadArgs , , , 2
      addJournalEntry("Failed to load image file using FreeImage library:`n" imgPath)
+     If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1)
+     {
+        oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, sizesDesired, gBitmap)
+        newBitmap := gBitmap
+        Return oBitmap
+     }
      Return
   }
 

@@ -3,6 +3,8 @@
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
 - v5.9.86 (2023-08-11)
+  - [new] batch rename allows changing the extension of selected files
+  - [new] display file header
   - important bug fixes and improvements to how HDR and camera RAW images are handled
   - overhauled the HDR tone mapping panel
   - updated the FreeImage library DLL
