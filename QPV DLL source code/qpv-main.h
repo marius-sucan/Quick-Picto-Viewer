@@ -9,6 +9,14 @@
 #define DLL_CALLCONV __stdcall
 #define GDIPVER 0x110
 #define cimg_use_openmp 1
+const DWORD dwHwndTabletProperty = 
+    TABLET_DISABLE_PRESSANDHOLD | // disables press and hold (right-click) gesture
+    TABLET_DISABLE_PENTAPFEEDBACK | // disables UI feedback on pen up (waves)
+    TABLET_DISABLE_PENBARRELFEEDBACK | // disables UI feedback on pen button down (circle)
+    TABLET_DISABLE_FLICKFALLBACKKEYS |
+    TABLET_DISABLE_SMOOTHSCROLLING |
+    TABLET_DISABLE_TOUCHUIFORCEON |
+    TABLET_DISABLE_FLICKS; // disables pen flicks (back, forward, drag down, drag up)
 
 const double M_PI = 3.14159265358979323846;  // PI
 const double div2sz = sqrt(2.0 / 32.0);      // used in calculateDCT()

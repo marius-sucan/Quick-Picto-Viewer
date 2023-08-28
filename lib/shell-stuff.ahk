@@ -1754,6 +1754,10 @@ ChangeDisplaySettings(cD, sW, sH, rR, Perm="")   {
       Return DllCall("User32.dll\ChangeDisplaySettings", "Ptr", dmAddr, "UInt", 4, "Int")
 }
 
+UnregisterTouchWindow(hwnd) {
+      Return DllCall("User32.dll\UnregisterTouchWindow", "UPtr", hwnd)
+}
+
 ClipboardGetDropEffect() {
 /*
     Retrieves the preferred method of data transfer (preferred drop effect set by source).

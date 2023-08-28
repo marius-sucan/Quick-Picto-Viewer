@@ -20,6 +20,8 @@
 #include <numeric>
 #include <algorithm>
 #include <wincodec.h>
+#include "Tchar.h"
+#include "Tpcshrd.h"
 #include "qpv-main.h"
 #include <gdiplus.h>
 #include <gdiplusflat.h>
@@ -3706,6 +3708,13 @@ DLL_API int DLL_CALLCONV polar2rectIMG(int *imageData, int *newData, int Width, 
       return (int)maxuRadius;
 }
 
+DLL_API int DLL_CALLCONV SetTabletPenServiceProperties(HWND hWnd) {
+    // https://learn.microsoft.com/en-us/windows/win32/tablet/wm-tablet-querysystemgesturestatus-message
+    ATOM atom = ::GlobalAddAtom(MICROSOFT_TABLETPENSERVICE_PROPERTY);    
+    ::SetProp(hWnd, MICROSOFT_TABLETPENSERVICE_PROPERTY, reinterpret_cast<HANDLE>(dwHwndTabletProperty));
+    ::GlobalDeleteAtom(atom);
+    return 1;
+}        
 
 /*
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testCimgQPV(Gdiplus::GpBitmap *myBitmap, int width, int height, int intensityX, int intensityY, int modus) {
