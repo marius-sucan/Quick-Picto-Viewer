@@ -1,10 +1,19 @@
-﻿// Quick Picto Viewer - CHANGELOG
+// Quick Picto Viewer - CHANGELOG
 // by Marius Șucan ( https://marius.sucan.ro )
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.9.88 (2023-08-28)
+  - added up/down buttons for the scrollbar in thumbnails/files list mode
+  - fixed a bug that prevented users from pressing Escape to terminate lenghty operations
+  - improvements to the full-screen mode and touch screen mode, and/or pen usage
+  - various bug fixes
+
+- v5.9.87 (2023-08-12)
+  - minor bug fixes
+
 - v5.9.86 (2023-08-11)
   - [new] batch rename allows changing the extension of selected files
-  - [new] display file header
+  - [new] option to display file header [available only through Search Menu panel]
   - important bug fixes and improvements to how HDR and camera RAW images are handled
   - overhauled the HDR tone mapping panel
   - updated the FreeImage library DLL
