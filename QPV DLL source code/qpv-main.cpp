@@ -2368,6 +2368,14 @@ auto adaptImageGivenSize(UINT keepAratio, UINT ScaleAnySize, UINT imgW, UINT img
      size[1] = givenH;
   }
 
+  double mpx = (size[0] * size[1])/1000000;
+  if (mpx>536.4)
+  {
+     float g = 536.4/mpx;
+     size[0] = floor(size[0] * g);
+     size[1] = floor(size[1] * g);
+  }
+
   return size;
 }
 
@@ -2512,15 +2520,11 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
                    //    hrGray = pConverterGray->QueryInterface(IID_IWICBitmapSource, 
                    //                  reinterpret_cast<void **>(&gToRenderBitmapSource));
                    // }
-
                }
             }
 
-
             if (SUCCEEDED(hr))
             {
-
-
                 if (doFlip==4)
                 {
                    hrFlip = m_pIWICFactory->CreateBitmapFlipRotator(&pIFlipRotator);
@@ -3127,6 +3131,19 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV cImgRotateBitmap(Gdiplus::GpBitmap *myBi
      return newBitmap;
 
   img.rotate(angle, interpolation, bond);
+
+  newBitmap = CreateBitmapFromCImg(img, img.width(), img.height());
+  return newBitmap;
+}
+
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV cImgResizeBitmap(Gdiplus::GpBitmap *myBitmap, int width, int height, int resizedW, int resizedH, int interpolation, int bond) {
+  Gdiplus::GpBitmap *newBitmap = NULL;
+  CImg<float> img(width,height,1,4);
+  int r = FillCImgFromBitmap(img, myBitmap, width, height);
+  if (r==0)
+     return newBitmap;
+
+  img.resize(resizedW, resizedH, -100, -100, interpolation, bond);
 
   newBitmap = CreateBitmapFromCImg(img, img.width(), img.height());
   return newBitmap;
