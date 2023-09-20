@@ -1231,14 +1231,14 @@ Gdi_CreateDIBitmap(hDC, bmpInfoHeader, CBM_INIT, pBits, BITMAPINFO, DIB_COLORS) 
             , "uint", CBM_INIT    ; = 4
             , "UPtr", pBits
             , "UPtr", BITMAPINFO
-            , "uint", DIB_COLORS, Ptr)    ; PAL=1 ; RGB=2
+            , "uint", DIB_COLORS, "UPtr")    ; PAL=1 ; RGB=2
 
    Return hBitmap
 }
 
 Gdi_StretchDIBits(hDestDC, dX, dY, dW, dH, sX, sY, sW, sH, tBITMAPINFO, DIB_COLORS, pBits, RasterOper) {
    ; The StretchDIBits function copies the color data for a rectangle of pixels
-   ; in a DIB, JPEG, or PNG image to the specified destination rectangle.
+   ; in a DIB, BMP, JPEG, or PNG image to the specified destination rectangle.
    ; If the destination rectangle is larger than the source rectangle, this
    ; function stretches the rows and columns of color data to fit the
    ; destination rectangle. If the destination rectangle is smaller than the
@@ -1268,7 +1268,8 @@ Gdi_StretchDIBits(hDestDC, dX, dY, dW, dH, sX, sY, sW, sH, tBITMAPINFO, DIB_COLO
    ; codes, see BitBlt.
 
    ; Return value
-   ; If the function succeeds, the return value is the number of scan lines copied. Note that this value can be negative for mirrored content.
+   ; If the function succeeds, the return value is the number of scan lines copied. 
+   ; Note that this value can be negative for mirrored content.
    ; If the function fails, or no scan lines are copied, the return value is 0.
 
    ; If the driver cannot support the JPEG or PNG file image passed to
@@ -3131,7 +3132,7 @@ A selection of API functions left to implement from GDI.
   GetDCOrgEx
   GetDCPenColor
   GetLayout
-  GetObject
+  *GetObject
   ResetDC
   SetLayout
 
@@ -3185,9 +3186,7 @@ A selection of API functions left to implement from GDI.
   SetBoundsRect
   GetBoundsRect
   GetUpdateRect
-  
-
-              
+                
 
   https://docs.microsoft.com/en-us/windows/win32/gdi/about-bitmaps
 */

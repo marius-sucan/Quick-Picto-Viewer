@@ -12,7 +12,8 @@
 ; To calculate the largest bitmap you can create:
 ;    The maximum object size is 2GB = 2,147,483,648 bytes
 ;    Default bitmap is 32bpp (4 bytes), the largest area we can have is 2GB / 4 = 536,870,912 bytes
-;    If we want a square, the largest we can get is sqrt(2GB/4) = 23,170 pixels
+;    If we want a square, the largest we can get is sqrt(2GB/4) = 23,170 pixels (536.4 mgpx)
+;    For 24-bits: sqrt(2GB/3) = 26,745 pixels (715.3 mgpx)
 ;
 ; Gdip standard library versions:
 ; by Marius Șucan - gathered user-contributed functions and implemented hundreds of new functions
@@ -3383,8 +3384,7 @@ Gdip_RotateBitmapAtCenter(pBitmap, Angle, pBrush:=0, InterpolationMode:=7, Pixel
     Gdip_GetImageDimensions(pBitmap, Width, Height)
     Gdip_GetRotatedDimensions(Width, Height, Angle, RWidth, RHeight)
     Gdip_GetRotatedTranslation(Width, Height, Angle, xTranslation, yTranslation)
-
-    If (RWidth*RHeight>536848912) || (Rwidth>32100) || (RHeight>32100)
+    If (RWidth*RHeight>536847512) || (Rwidth>32750) || (RHeight>32750)
        Return
 
     PixelFormatReadable := Gdip_GetImagePixelFormat(pBitmap, 2)
@@ -3476,9 +3476,8 @@ Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", Kee
        ResizedH := givenH
     }
 
-    If (((ResizedW*ResizedH>536848912) || (ResizedW>32100) || (ResizedH>32100)) && checkTooLarge=1)
-       Return
 
+    mpx := Round((ResizedW * ResizedH)/1000000, 1)
     PixelFormatReadable := Gdip_GetImagePixelFormat(pBitmap, 2)
     If (KeepPixelFormat=1)
        PixelFormat := Gdip_GetImagePixelFormat(pBitmap, 1)
@@ -3486,6 +3485,9 @@ Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", Kee
        PixelFormat := "0xE200B"
     Else If Strlen(KeepPixelFormat)>3
        PixelFormat := KeepPixelFormat
+
+    If ((mpx>536.4 && (!PixelFormat || PixelFormat=0x22009 || PixelFormat=0xE200B)) || (mpx>715.3 && PixelFormat=0x21808) || max(ResizedW, ResizedH)>32750 && checkTooLarge=1)
+       Return
 
     If (ResizedW=Width && ResizedH=Height)
        InterpolationMode := 5

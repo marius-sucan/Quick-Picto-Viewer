@@ -220,7 +220,7 @@ FreeImage_GetImageType(hImage, humanReadable:=0) {
 ; 11 = FIT_RGBF   ;   96-bit RGB float image: 3 x 32-bit IEEE floating point
 ; 12 = FIT_RGBAF  ;   128-bit RGBA float image: 4 x 32-bit IEEE floating point
 
-   Static imgTypes := {0:"UNKNOWN", 1:"Standard Bitmap", 2:"UINT16", 3:"INT16", 4:"UINT32", 5:"INT32", 6:"FLOAT [32-bit]", 7:"DOUBLE [64-bit]", 8:"COMPLEX [2x64-bit]", 9:"RGB16 [48-bit]", 10:"RGBA16 [64-bit]", 11:"RGBF [96-bit]", 12:"RGBAF [128-bit]"}
+   Static imgTypes := {0:"UNKNOWN", 1:"Standard Bitmap", 2:"UINT16 [16-bit]", 3:"INT16 [16-bit]", 4:"UINT32 [32-bit]", 5:"INT32 [32-bit]", 6:"FLOAT [32-bit]", 7:"DOUBLE [64-bit]", 8:"COMPLEX [2x64-bit]", 9:"RGB16 [48-bit]", 10:"RGBA16 [64-bit]", 11:"RGBF [96-bit]", 12:"RGBAF [128-bit]"}
    r := DllCall(getFIMfunc("GetImageType"), "uptr", hImage)
    If (humanReadable=1 && imgTypes.HasKey(r))
       r := imgTypes[r]
@@ -301,6 +301,12 @@ FreeImage_GetDotsPerMeterX(hImage) {
 
 FreeImage_GetDotsPerMeterY(hImage) {
    Return DllCall(getFIMfunc("GetDotsPerMeterY"), "uptr", hImage, "int")
+}
+
+FreeImage_SetDPIresolution(hImage, dpiX, dpiY) {
+  FreeImage_SetDotsPerMeterX(hImage, dpiX)
+  r := FreeImage_SetDotsPerMeterY(hImage, dpiY)
+  Return r
 }
 
 FreeImage_SetDotsPerMeterX(hImage, dpiX) {
@@ -410,7 +416,8 @@ FreeImage_SetBackgroundColor(hImage, RGBArray:="255,255,255,0") {
 ; ValidateFromHandle and ValidateFromMemory.
 
 FreeImage_GetFileType(ImgPath, humanReadable:=0) {
-   Static fileTypes := {0:"BMP", 1:"ICO", 2:"JPEG", 3:"JNG", 4:"KOALA", 5:"LBM", 5:"IFF", 6:"MNG", 7:"PBM", 8:"PBMRAW", 9:"PCD", 10:"PCX", 11:"PGM", 12:"PGMRAW", 13:"PNG", 14:"PPM", 15:"PPMRAW", 16:"RAS", 17:"TARGA", 18:"TIFF", 19:"WBMP", 20:"PSD", 21:"CUT", 22:"XBM", 23:"XPM", 24:"DDS", 25:"GIF", 26:"HDR", 27:"FAXG3", 28:"SGI", 29:"EXR", 30:"J2K", 31:"JP2", 32:"PFM", 33:"PICT", 34:"RAW", 35:"WEBP", 36:"JXR"}
+; the given ImgPath can be fictional / inexistent
+   Static fileTypes := {-1:"unknown", 0:"BMP", 1:"ICO", 2:"JPEG", 3:"JNG", 4:"KOALA", 5:"LBM", 5:"IFF", 6:"MNG", 7:"PBM", 8:"PBMRAW", 9:"PCD", 10:"PCX", 11:"PGM", 12:"PGMRAW", 13:"PNG", 14:"PPM", 15:"PPMRAW", 16:"RAS", 17:"TARGA", 18:"TIFF", 19:"WBMP", 20:"PSD", 21:"CUT", 22:"XBM", 23:"XPM", 24:"DDS", 25:"GIF", 26:"HDR", 27:"FAXG3", 28:"SGI", 29:"EXR", 30:"J2K", 31:"JP2", 32:"PFM", 33:"PICT", 34:"RAW", 35:"WEBP", 36:"JXR"}
    r := DllCall(getFIMfunc("GetFileTypeU"), "WStr", ImgPath, "Int", 0)
    If (r=-1)
       r := FreeImage_GetFIFFromFilename(ImgPath)
@@ -1034,44 +1041,50 @@ getFIMfunc(funct) {
 }
 
 ConvertFIMtoPBITMAP(hFIFimgA) {
-; hFIFimgA - provide a 32 bits Standard RGBA FBITMAP.
+; hFIFimgA - provide a 32 bits Standard RGBA FreeImage bitmap.
+; If succesful, the function returns a 32-bit RGBA GDI+ pBitmap.
 ; this function relies on GDI+ AHK library 
-; If succesful, the function returns a 32-bit RGBA pBitmap.
 
   FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
-  Pitch := FreeImage_GetPitch(hFIFimgA)
   pBitmap := Gdip_CreateBitmap(imgW, imgH, "0xE200B")
-  redMASK := FreeImage_GetRedMask(hFIFimgA)
-  greenMASK := FreeImage_GetGreenMask(hFIFimgA)
-  blueMASK := FreeImage_GetBlueMask(hFIFimgA)
-  E := Gdip_LockBits(pBitmap, 0, 0, imgW, imgH, Stride, Scan0, BitmapData)
-  IF !E
+  If StrLen(pBitmap)>2
   {
-     R := FreeImage_ConvertToRawBits(Scan0, hFIFimgA, pitch, 32, redMASK, greenMASK, blueMASK, 1)
-     Gdip_UnlockBits(pBitmap, BitmapData)
+     Pitch := FreeImage_GetPitch(hFIFimgA)
+     redMASK := FreeImage_GetRedMask(hFIFimgA)
+     greenMASK := FreeImage_GetGreenMask(hFIFimgA)
+     blueMASK := FreeImage_GetBlueMask(hFIFimgA)
+     E := Gdip_LockBits(pBitmap, 0, 0, imgW, imgH, Stride, Scan0, BitmapData)
+     IF !E
+     {
+        R := FreeImage_ConvertToRawBits(Scan0, hFIFimgA, pitch, 32, redMASK, greenMASK, blueMASK, 1)
+        Gdip_UnlockBits(pBitmap, BitmapData)
+     }
+     FreeImage_GetDPIresolution(hFIFimgA, dpiX, dpiY)
+     Gdip_BitmapSetResolution(pBitmap, dpiX, dpiY)
+     Return pBitmap
   }
-  FreeImage_GetDPIresolution(hFIFimgA, dpiX, dpiY)
-  Gdip_BitmapSetResolution(pBitmap, dpiX, dpiY)
-  Return pBitmap
 }
 
-ConvertPBITMAPtoFIM(pBitmap) {
-; please provide a 32 RGBA image format GDI+ object.
+ConvertPBITMAPtoFIM(pBitmap, do24bits:=0) {
+; Please provide a 32 RGBA image format GDI+ object.
+; To provide a 24-RGB image, use do24bits=1.
 ; this function relies on GDI+ AHK library 
 
-  Static  redMASK   := "0x00FF0000" ; FI_RGBA_RED_MASK;
-        , greenMASK := "0x0000FF00" ; FI_RGBA_GREEN_MASK;
-        , blueMASK  := "0x000000FF" ; FI_RGBA_BLUE_MASK;
+  Static redMASK   := "0x00FF0000" ; FI_RGBA_RED_MASK;
+       , greenMASK := "0x0000FF00" ; FI_RGBA_GREEN_MASK;
+       , blueMASK  := "0x000000FF" ; FI_RGBA_BLUE_MASK;
 
   Gdip_GetImageDimensions(pBitmap, imgW, imgH)
-  E := Gdip_LockBits(pBitmap, 0, 0, imgW, imgH, Stride, Scan0, BitmapData)
+  pixelFormat := (do24bits=1) ? "0x21808" : "0x26200A"
+  bitsDepth := (do24bits=1) ? 24 : 32
+  E := Gdip_LockBits(pBitmap, 0, 0, imgW, imgH, Stride, Scan0, BitmapData, 1, pixelFormat)
+  ; fnOutputDebug(A_ThisFunc "|" pixelFormat "|" bitsDepth "|" do24bits)
   IF !E
   {
-     hFIFimgA := FreeImage_ConvertFromRawBits(Scan0, imgW, imgH, Stride, 32, redMASK, greenMASK, blueMASK, 1)
+     hFIFimgA := FreeImage_ConvertFromRawBits(Scan0, imgW, imgH, Stride, bitsDepth, redMASK, greenMASK, blueMASK, 1)
      Gdip_UnlockBits(pBitmap, BitmapData)
+     Gdip_BitmapGetDPIresolution(pBitmap, dpiX, dpiY)
+     FreeImage_SetDPIresolution(hFIFimgA, dpiX, dpiY)
   }
-  Gdip_BitmapGetDPIresolution(pBitmap, dpiX, dpiY)
-  FreeImage_SetDotsPerMeterX(hFIFimgA, dpiX)
-  FreeImage_SetDotsPerMeterY(hFIFimgA, dpiY)
   Return hFIFimgA
 }

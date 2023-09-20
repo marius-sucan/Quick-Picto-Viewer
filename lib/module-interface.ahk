@@ -58,6 +58,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , statusBarTooltipVisible := 0, FloodFillSelectionAdj := 0, isToolbarKBDnav := 0, TLBRtwoColumns := 1
      , lastALclickX := 0, lastALclickY := 0, lastDoubleClickZeit := 1, TLBRverticalAlign := 1
      , hPic0, hPic1, hPic2, hPic3, hPic4, hPic5, hPic6, hPic7, hPic8, hPic9, hPic10, hPic11
+     , navKeysCounter := 0, lastSwipeZeitGesture := 1
 
 If !A_IsCompiled
    Try Menu, Tray, Icon, %A_ScriptDir%\qpv-icon.ico
@@ -843,15 +844,17 @@ WM_LBUTTONDOWN(wP, lP, msg, hwnd) {
 
     pp := 0
     thisWin := isVarEqualTo(WinActive("A"), PVhwnd, hGDIwin, hGDIthumbsWin, hGDIinfosWin, hGDIselectWin)
+    If (preventSillyGui(A_Gui) || !thisWin || runningLongOperation=1 || imageLoading=1 || whileLoopExec=1)
+       Return
+ 
     isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1 && animGIFplaying!=1) ? 0 : 1
-    If ((drawingShapeNow=1 && doNormalCursor=0 || liveDrawingBrushTool=1 || AnyWindowOpen=66 && FloodFillSelectionAdj=0) && (thisWin=1 && isOkay=1))
+    If (A_TickCount - lastSwipeZeitGesture<350)
+       pp := 0
+    Else If ((drawingShapeNow=1 && doNormalCursor=0 || liveDrawingBrushTool=1 || AnyWindowOpen=66 && FloodFillSelectionAdj=0) && (thisWin=1 && isOkay=1))
        pp := 1
 
     If ((A_TickCount - scriptStartTime<500) || (A_TickCount - lastWinDrag<400) || (A_TickCount - lastDoubleClickZeit<400) && pp=1)
        Return 0
-
-    If (preventSillyGui(A_Gui) || !thisWin)
-       Return
 
     LbtnDwn := 1
     lastInvoked := A_TickCount
@@ -958,7 +961,8 @@ WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
        Return 0
     }
 
-    If ((A_TickCount - scriptStartTime<500) || !isOkay || (A_TickCount - lastInvoked<350))
+    zz := (A_TickCount - lastSwipeZeitGesture<350) ? 1 : 0
+    If ((A_TickCount - scriptStartTime<500) || !isOkay || (A_TickCount - lastInvoked<350) && zz=0)
        Return 0
 
     If preventSillyGui(A_Gui)
@@ -972,7 +976,9 @@ WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
        Return 0
     }
 
-    If (A_TickCount - lastMouseLeave>350)
+    If (zz=1)
+       WinClickAction()
+    Else If (A_TickCount - lastMouseLeave>350)
        WinClickAction("DoubleClick")
 
     Return 0
@@ -2446,7 +2452,7 @@ KeyboardResponder(givenKey, abusive) {
     If (callMain=1 && isOkay=1 && runningLongOperation!=1 && whileLoopExec!=1 && givenKey)
     {
        ; addJournalEntry(A_ThisFunc "(): " WinActive("A") "==" givenKey)
-       MainExe.ahkPostFunction("KeyboardResponder", givenKey, PVhwnd, abusive)
+       MainExe.ahkPostFunction("KeyboardResponder", givenKey, PVhwnd, abusive, navKeysCounter)
     }
 }
 
@@ -2516,6 +2522,9 @@ constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code) {
 
 WM_KEYDOWN(wParam, lParam, msg, hwnd) {
     vk_code := Format("{1:x}", wParam)
+    If isInRange(vk_code, 21, 28)
+       navKeysCounter++
+
     If (statusBarTooltipVisible=1)
        mouseTurnOFFtooltip()
 
