@@ -844,8 +844,8 @@ WM_LBUTTONDOWN(wP, lP, msg, hwnd) {
 
     pp := 0
     thisWin := isVarEqualTo(WinActive("A"), PVhwnd, hGDIwin, hGDIthumbsWin, hGDIinfosWin, hGDIselectWin)
-    If (preventSillyGui(A_Gui) || !thisWin || runningLongOperation=1 || imageLoading=1 || whileLoopExec=1)
-       Return
+    ; If (preventSillyGui(A_Gui) || !thisWin || runningLongOperation=1 || imageLoading=1 || whileLoopExec=1)
+    ;    Return
  
     isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1 && animGIFplaying!=1) ? 0 : 1
     If (A_TickCount - lastSwipeZeitGesture<350)
@@ -965,7 +965,7 @@ WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
     If ((A_TickCount - scriptStartTime<500) || !isOkay || (A_TickCount - lastInvoked<350) && zz=0)
        Return 0
 
-    If preventSillyGui(A_Gui)
+    If (preventSillyGui(A_Gui) || liveDrawingBrushTool=1 || AnyWindowOpen=66 && FloodFillSelectionAdj=0)
        Return 0
 
     lastInvoked := A_TickCount
@@ -975,7 +975,7 @@ WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
        turnOffSlideshow()
        Return 0
     }
-
+    ; ToolTip, % "z=" zz , , , 2
     If (zz=1)
        WinClickAction()
     Else If (A_TickCount - lastMouseLeave>350)

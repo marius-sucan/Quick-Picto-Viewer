@@ -889,6 +889,25 @@ FreeImage_Rescale(hImage, w, h, filter:=3) {
    Return DllCall(getFIMfunc("Rescale"), "uptr", hImage, "Int", w, "Int", h, "Int", filter, "uptr")
 }
 
+FreeImage_RescaleRect(hImage, dstW, dstH, x, y, w, h, filter:=3, flags:=2) {
+; Filter parameter options
+; 0 = FILTER_BOX;        Box, pulse, Fourier window, 1st order (constant) B-Spline
+; 1 = FILTER_BICUBIC;    Mitchell and Netravali's two-param cubic filter
+; 2 = FILTER_BILINEAR;   Bilinear filter
+; 3 = FILTER_BSPLINE;    4th order (cubic) B-Spline
+; 4 = FILTER_CATMULLROM; Catmull-Rom spline, Overhauser spline
+; 5 = FILTER_LANCZOS3;   Lanczos-windowed sinc filter
+; Flags options:
+; FI_RESCALE_DEFAULT         0x00   // default options; none of the following other options apply
+; FI_RESCALE_TRUE_COLOR      0x01   // for non-transparent greyscale images, convert to 24-bit if src bitdepth <= 8 (default is a 8-bit greyscale image). 
+; FI_RESCALE_OMIT_METADATA   0x02   // do not copy metadata to the rescaled image
+
+   If (hImage="")
+      Return
+
+   Return DllCall(getFIMfunc("RescaleRect"), "uptr", hImage, "Int", dstW, "Int", dstH, "Int", x, "Int", y, "Int", x + w, "Int", y + h, "Int", filter, "Int", flags, "uptr")
+}
+
 FreeImage_MakeThumbnail(hImage, squareSize, convert:=1) {
 ; Filter parameter options
 ; 0 = FILTER_BOX;        Box, pulse, Fourier window, 1st order (constant) B-Spline

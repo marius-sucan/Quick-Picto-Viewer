@@ -2,12 +2,16 @@
 // by Marius Șucan ( https://marius.sucan.ro )
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.9.90 (2023-09-22)
+  - bug fixes only
+
 - v5.9.89 (2023-09-20)
   - [new] tool to create thumbnail sheets, highly customizable; can output image sheets of up to 715 megapixels
   - fixed GIF frames extraction; when multiple files were selected, GIFs were skipped
   - fixed the button «Process images» from the «Panel resize images». It was not working with fewer than 100 files.
   - various bug fixes related to how QPV handles very large images
   - overhauled the tool to convert image formats; it now tries to preserve color depths
+  - fixes related to drag-n-drop
 
 - v5.9.88 (2023-08-28)
   - added up/down buttons for the scrollbar in thumbnails/files list mode

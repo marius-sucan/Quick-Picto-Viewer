@@ -3231,7 +3231,7 @@ Gdip_CloneBitmapArea(pBitmap, x:="", y:="", w:=0, h:=0, PixelFormat:=0, KeepPixe
 ;
 ; If the specified coordinates exceed the boundaries of pBitmap
 ; the resulted pBitmap is erroneuous / defective.
-   If !pBitmap
+   If (pBitmap="")
    {
       gdipLastError := 2
       Return

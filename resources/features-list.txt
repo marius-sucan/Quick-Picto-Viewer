@@ -66,6 +66,8 @@ FILES MANAGEMENT:
 
 * Create PDFs or multi-paged TIFFs from selected images. Up to 2048 images allowed.
 
+* Create customizable contact sheets (thumbnail sheets) of selected images
+
 * Extract frames from GIF and WebP animated images, or pages from TIFFs.
 
 * Multiple list view modes. Display the indexed files as an easy to scroll list with or without image file details, or as thumbnails list.
@@ -104,7 +106,9 @@ FILES MANAGEMENT:
 
 * Ability to selectively refresh the cached files list from selected folders.
 
+
 * Search and replace in the index, enabling users to correct potentially broken files lists.
+
 
 * Very fast loading of cached or not cached lists of files. Tested with 900100 images and it loads in 10 seconds on my system.
 

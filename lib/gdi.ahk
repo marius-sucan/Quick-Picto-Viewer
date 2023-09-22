@@ -13,6 +13,11 @@
 ; Other functions added by Marius Șucan.
 ; Last update on: mercredi samedi 21 janvier 2023; 21/01/2023
 ; version: 1.31
+;
+; The maximum object size is 2GB = 2,147,483,648 bytes
+; The largest bitmap allowed is based on its color depth.
+; If we want a square, 32-bits, the largest we can get is sqrt(2GB/4) = 23,170 pixels (536.4 mgpx)
+; For 24-bits: sqrt(2GB/3) = 26,745 pixels (715.3 mgpx)
 
 Gdi_DrawTextHelper(hDC, hFont, Text, x, y, txtColor, bgrColor:="") {
       ; Transparent background, no color needed
