@@ -147,6 +147,8 @@
 
 <li>Ability to selectively refresh the cached files list from selected folders.</li>
 
+<li>Multiple levels of undo for file actions: rename, move, copy or delete</li>
+
 <li>Search and replace in the index, enabling users to correct potentially broken files lists.</li>
 
 <li>Very fast loading of cached or not cached lists of files. Tested with 900100 images and it loads in 10 seconds on my system.</li>
