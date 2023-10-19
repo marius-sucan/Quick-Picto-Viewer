@@ -61806,6 +61806,9 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
         currIMGdetails.PixelFormat := StrReplace(currIMGdetails.PixelFormat, "A")
 
      currIMGdetails.RawFormat := Gdip_GetImageRawFormat(UserMemBMP)
+     Gdip_GetImageDimensions(UserMemBMP, w, h)
+     currIMGdetails.Width := w
+     currIMGdetails.Height := h
      ; currIMGdetails.HasAlpha := InStr(currIMGdetails.PixelFormat, "argb") ? 1 : 0
      currIMGdetails.Frames := 0
      prevMD5nameA := prevMD5nameB := ""
