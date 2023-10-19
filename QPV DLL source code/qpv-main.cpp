@@ -7,6 +7,14 @@
 #include "omp.h"
 #include "math.h"
 #include "windows.h"
+#include <shellapi.h>
+#include <shlobj.h>
+#include <shlwapi.h>
+#include <Knownfolders.h>
+#include <objbase.h>
+#include <strsafe.h>
+#include <shobjidl.h>
+#include <oleidl.h>
 #include <string>
 #include <sstream>
 #include <vector>
@@ -2379,6 +2387,207 @@ auto adaptImageGivenSize(UINT keepAratio, UINT ScaleAnySize, UINT imgW, UINT img
   return size;
 }
 
+DLL_API int DLL_CALLCONV WICdestroyPreloadedImage(int id) {
+  SafeRelease(pWICclassDecoder);
+  SafeRelease(pWICclassFrameDecoded);
+  SafeRelease(pWICclassPixelsBitmapSource);
+  return 1;
+}
+
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV WICgetRectImage(int x, int y, int w, int h, int newW, int newH, int mustClip) {
+  Gdiplus::GpBitmap  *myBitmap = NULL;
+  IWICBitmapClipper  *pIClipper = NULL;
+  IWICBitmapSource   *pBitmapSource = NULL;
+  WICRect rcClip = { x, y, w, h };
+  HRESULT hr;
+
+  if (mustClip==1)
+  {
+      hr = m_pIWICFactory->CreateBitmapClipper(&pIClipper);
+      if (SUCCEEDED(hr))
+         hr = pIClipper->Initialize(pWICclassPixelsBitmapSource, &rcClip);
+
+      fnOutputDebug("clip wic img: " + std::to_string(w) + " / " + std::to_string(h));
+      // Retrieve IWICBitmapSource from the frame
+      if (SUCCEEDED(hr))
+      {
+         hr = pIClipper->QueryInterface(IID_IWICBitmapSource, 
+                                     reinterpret_cast<void **>(&pBitmapSource));
+      }
+  } else hr = S_OK;
+
+  IWICBitmapScaler    *pScaler = NULL;
+  if (SUCCEEDED(hr))
+     hr = m_pIWICFactory->CreateBitmapScaler(&pScaler);
+
+  if (SUCCEEDED(hr))
+  {
+     fnOutputDebug("rescale wic img: " + std::to_string(newW) + " / " + std::to_string(newH));
+     if (mustClip==1)
+        hr = pScaler->Initialize(pBitmapSource, newW, newH, WICBitmapInterpolationModeNearestNeighbor);
+     else
+        hr = pScaler->Initialize(pWICclassPixelsBitmapSource, newW, newH, WICBitmapInterpolationModeNearestNeighbor);
+  }
+
+  IWICBitmapSource    *pFinalBitmapSource = NULL;
+  IWICFormatConverter *pConverter = NULL;
+  if (SUCCEEDED(hr))
+  {
+      hr = m_pIWICFactory->CreateFormatConverter(&pConverter);
+      if (SUCCEEDED(hr))
+      {
+          hr = pConverter->Initialize(pScaler, GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, NULL, 0.f, WICBitmapPaletteTypeCustom);
+          if (SUCCEEDED(hr))
+          {
+             hr = pConverter->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void **>(&pFinalBitmapSource));
+                              // IID_PPV_ARGS(ppToRenderBitmapSource));
+          }
+          fnOutputDebug("WIC PIXEL Format converted");
+      }
+  }
+
+  // Create a DIB from the IWICBitmapSource
+  if (SUCCEEDED(hr))
+  {
+      hr = S_OK;
+      UINT width = 0;
+      UINT height = 0;
+
+      // Check BitmapSource format
+      WICPixelFormatGUID pixelFormat;
+      hr = pFinalBitmapSource->GetPixelFormat(&pixelFormat);
+
+      if (SUCCEEDED(hr))
+         hr = (pixelFormat == GUID_WICPixelFormat32bppPBGRA) ? S_OK : E_FAIL;
+
+      if (SUCCEEDED(hr))
+         hr = pFinalBitmapSource->GetSize(&width, &height); 
+
+      // Size of a scan line represented in bytes: 4 bytes each pixel
+      UINT cbStride = 0;
+      if (SUCCEEDED(hr))
+         hr = UIntMult(width, sizeof(Gdiplus::ARGB), &cbStride);
+
+      // Size of the image, represented in bytes
+      UINT cbBufferSize = 0;
+      if (SUCCEEDED(hr))
+         hr = UIntMult(cbStride, height, &cbBufferSize);
+
+      if (SUCCEEDED(hr))
+      {
+          BYTE *m_pbBuffer = NULL;  // the GDI+ bitmap buffer
+          m_pbBuffer = new BYTE[cbBufferSize];
+          hr = (m_pbBuffer) ? S_OK : E_FAIL;
+          if (SUCCEEDED(hr))
+          {
+              // WICRect rc = { 0, 0, width, height };
+              // Extract the image into the GDI+ Bitmap
+              // fnOutputDebug("WIC pre-copy pixels");
+              hr = pFinalBitmapSource->CopyPixels(NULL, cbStride, cbBufferSize, m_pbBuffer);
+              // fnOutputDebug("WIC after copy pixels");
+              if (SUCCEEDED(hr))
+              {
+                 Gdiplus::DllExports::GdipCreateBitmapFromScan0(width, height, cbStride, PixelFormat32bppPARGB, NULL, &myBitmap);
+                 Gdiplus::Rect rectu(0, 0, width, height);
+                 Gdiplus::BitmapData bitmapDatu;
+                 bitmapDatu.Width = width;
+                 bitmapDatu.Height = height;
+                 bitmapDatu.Stride = cbStride;
+                 bitmapDatu.PixelFormat = PixelFormat32bppPARGB;
+                 bitmapDatu.Scan0 = m_pbBuffer;
+
+                 Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rectu, 6, PixelFormat32bppPARGB, &bitmapDatu);
+                 Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu);
+                 hr = myBitmap ? S_OK : E_FAIL;
+              }
+          }
+          delete[] m_pbBuffer;
+          m_pbBuffer = NULL; 
+      }
+  }
+
+  SafeRelease(pIClipper);
+  SafeRelease(pConverter);
+  SafeRelease(pScaler);
+  SafeRelease(pBitmapSource);
+  SafeRelease(pFinalBitmapSource);
+  return myBitmap;
+}
+
+DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFrame, UINT *resultsArray) {
+  // IWICBitmapDecoder *pWICclassDecoder = NULL;
+  HRESULT hr = S_OK;
+  try {
+      hr = m_pIWICFactory->CreateDecoderFromFilename(szFileName,NULL,GENERIC_READ, WICDecodeMetadataCacheOnDemand, &pWICclassDecoder);
+  } catch (const char* message) {
+      std::stringstream ss;
+      ss << "qpv: WIC decoder error on file " << szFileName;
+      ss << " WIC error " << message;
+      OutputDebugStringA(ss.str().data());
+      return 0;
+  }
+
+  if (SUCCEEDED(hr))
+  {
+      // IWICBitmapFrameDecode *pWICclassFrameDecoded = NULL;
+      UINT tFrames = 0;
+      hr = pWICclassDecoder->GetFrameCount(&tFrames);
+      if (givenFrame > tFrames - 1)
+         givenFrame = tFrames - 1;
+
+      resultsArray[2] = tFrames;
+      resultsArray[6] = givenFrame;
+      hr = pWICclassDecoder->GetFrame(givenFrame, &pWICclassFrameDecoded);
+      // std::stringstream ss;
+      // ss << "qpv: decoder tFrames " << tFrames;
+      // ss << " givenFrame " << givenFrame;
+      // OutputDebugStringA(ss.str().data());
+  } else
+  {
+      std::stringstream ss;
+      ss << "qpv: WIC decoder error on file " << szFileName;
+      OutputDebugStringA(ss.str().data());
+      return 0;
+  };
+
+  // Retrieve IWICBitmapSource from the frame
+  if (SUCCEEDED(hr))
+  {
+      // IWICBitmapSource   *pWICclassPixelsBitmapSource = NULL;
+      GUID containerFmt;
+      hr = pWICclassDecoder->GetContainerFormat(&containerFmt);
+      UINT ucontainerFmt = indexedContainerFmts(containerFmt);
+      resultsArray[5] = ucontainerFmt;
+
+      hr = pWICclassFrameDecoded->QueryInterface(IID_IWICBitmapSource, 
+                                  reinterpret_cast<void **>(&pWICclassPixelsBitmapSource));
+  }
+
+  if (SUCCEEDED(hr))
+  {
+      // std::stringstream ss;
+      // ss << "qpv: collect image infos ";
+      // OutputDebugStringA(ss.str().data());
+      hr = S_OK;
+      UINT owidth = 0;
+      UINT oheight = 0;
+      hr = pWICclassPixelsBitmapSource->GetSize(&owidth, &oheight); 
+      resultsArray[0] = owidth;
+      resultsArray[1] = oheight;
+
+      double dpix = 0;
+      double dpiy = 0;
+      hr = pWICclassPixelsBitmapSource->GetResolution(&dpix, &dpiy); 
+      resultsArray[4] = round((dpix + dpiy)/2);
+
+      WICPixelFormatGUID opixelFormat;
+      hr = pWICclassPixelsBitmapSource->GetPixelFormat(&opixelFormat);
+      UINT uPixFmt = indexedPixelFmts(opixelFormat);
+      resultsArray[3] = uPixFmt;
+      return 1;
+  } else return 0;
+}
+
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPconv, int givenQuality, UINT givenW, UINT givenH, UINT keepAratio, UINT ScaleAnySize, UINT givenFrame, int doFlip, int doGrayScale, const wchar_t *szFileName, UINT *resultsArray) {
     Gdiplus::GpBitmap  *myBitmap = NULL;
 
@@ -2924,8 +3133,8 @@ Gdiplus::GpBitmap* CreateBitmapFromCImg(CImg<float> & img, int width, int height
         for (int y = 0; y < height; y++)
         {
             // loop through lines
-            BYTE *pLineDest = pStartDest + dLineDest*y;
-            BYTE    *pPixelDest = pLineDest;
+            BYTE *pLineDest  = pStartDest + dLineDest*y;
+            BYTE *pPixelDest = pLineDest;
             for (int x = 0; x < width; x++)
             {
                 // loop through pixels on line
@@ -3146,6 +3355,25 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV cImgResizeBitmap(Gdiplus::GpBitmap *myBi
   img.resize(resizedW, resizedH, -100, -100, interpolation, bond);
 
   newBitmap = CreateBitmapFromCImg(img, img.width(), img.height());
+  return newBitmap;
+}
+
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV cImgLoadBitmap(const char *szFileName, int givenW, int givenH, int interpolation, int bond) {
+// it does not work
+
+  Gdiplus::GpBitmap *newBitmap = NULL;
+  std::string ss = szFileName;
+  fnOutputDebug("cimg file = " + ss);
+
+  CImg<unsigned char> img;
+  img.load_jpeg(szFileName);
+
+  auto nSize = adaptImageGivenSize(1, 1, img.width(), img.height(), givenW, givenH);
+  img.resize(nSize[0], nSize[1], -100, -100, interpolation, bond);
+
+  CImg<float> img2 = img;
+  newBitmap = CreateBitmapFromCImg(img2, img.width(), img.height());
+
   return newBitmap;
 }
 
@@ -4184,4 +4412,3 @@ int reverse_bits(int n) {
   return n;
 }
 */
-

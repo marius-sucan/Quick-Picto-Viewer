@@ -62,6 +62,8 @@ FILES MANAGEMENT:
 
 * Ability to automatically group files into sub-folders based on file types or modification date, by months or years.
 
+* Multiple levels of undo for file actions: rename, move, copy or delete
+
 * Tool to copy or move files by maintaining their folder(s) structure
 
 * Create PDFs or multi-paged TIFFs from selected images. Up to 2048 images allowed.
@@ -106,9 +108,7 @@ FILES MANAGEMENT:
 
 * Ability to selectively refresh the cached files list from selected folders.
 
-
 * Search and replace in the index, enabling users to correct potentially broken files lists.
-
 
 * Very fast loading of cached or not cached lists of files. Tested with 900100 images and it loads in 10 seconds on my system.
 

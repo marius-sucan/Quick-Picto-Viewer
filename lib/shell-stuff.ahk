@@ -1,4 +1,4 @@
-
+﻿
 SelectFolderEx(StartingFolder:="", DlgTitle:="", OwnerHwnd:=0, OkBtnLabel:="", comboList:="", desiredDefault:=1, comboLabel:="", CustomPlaces:="", pickFoldersOnly:=1, usrFilters:="", defIndexFilter:=1, FileMustExist:=1, defaultEditField:="") {
 ; ==================================================================================================================================
 ; Shows a dialog to select a folder.
@@ -2778,3 +2778,158 @@ SetWindowRegion(hwnd, x:=0, y:=0, w:=0, h:=0, r:=1) {
   Return Result
 }
 
+GetFileAttributesEx(inFile, getAttributes:=0) {
+; https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfileattributesexw
+; coded by TheArkive and modified by Marius Șucan
+; https://www.autohotkey.com/boards/viewtopic.php?t=83269
+; https://github.com/TheArkive
+; THANK YOU VERY MUCH @ TheArkive
+
+    If (StrLen(inFile)>32766 || StrLen(inFile)<4)
+       return
+
+    Static GetFileExInfoStandard := 0, GetFileExMaxInfoLevel := 1 ; https://docs.microsoft.com/en-us/windows/win32/api/minwinbase/ne-minwinbase-get_fileex_info_levels
+    Static attr := { Archive:0x20 ; https://docs.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants
+            , Compressed:0x800, Device:0x40, Directory:0x10, Encrypted:0x4000, Hidden:0x2, integ_stream:0x8000, Normal:0x80, NotContentIndexed:0x2000
+            , NoScrubData:0x20000, Offline:0x1000, ReadOnly:0x1, RecallOnDataAccess:0x400000, RecallOnOpen:0x40000, ReparsePoint:0x400, SparseFile:0x200
+            , System:0x4, Temporary:0x100, Virtual:0x10000}
+    
+    VarSetCapacity(bFileAttribs,((A_PtrSize=8)?40:36),0) ; AHK v1
+    p2 := &bFileAttribs
+    r := DllCall("GetFileAttributesExW", "Str", "\\?\" inFile,"Int", 0, "Ptr", p2)
+    iAttribs := NumGet(bFileAttribs,"UInt")
+    dir := (0x10 & iAttribs) ? 1 : 0
+    If (getAttributes=1)
+    {
+       AttrList := []
+       For attrib, value in attr
+       {
+           If (value & iAttribs)
+              AttrList[A_Index] := attrib
+       }
+    }
+
+    cTime := FileTimeToSystemTime(p2 + 4)    ; CreationTimePtr
+    wTime := FileTimeToSystemTime(p2 + 20)   ; LastWriteTime
+    ; aTime := FileTimeToSystemTime(p2+12)   ; LastAccessTime
+    ; sizeHigh << 32 | sizeLow 
+    fileSize := (NumGet(bFileAttribs, 28, "UInt") << 32) | NumGet(bFileAttribs, 32, "UInt")
+    return {attr:AttrList, cTime:cTime, aTime:aTime, wTime:wTime, size:fileSize, dir:dir}
+}
+
+FileTimeToSystemTime(ptr) {         
+    VarSetCapacity(SYSTEMTIME, 16, 0)
+    r := DllCall("FileTimeToSystemTime","UPtr",ptr,"UPtr",&SYSTEMTIME)
+
+    VarSetCapacity(SYSTIME2, 16, 0)
+    r := DllCall("SystemTimeToTzSpecificLocalTime","UPtr",0,"UPtr",&SYSTEMTIME,"Ptr",&SYSTIME2) ; https://docs.microsoft.com/en-us/windows/win32/api/timezoneapi/nf-timezoneapi-systemtimetotzspecificlocaltime
+
+    ; dayOfWeek := NumGet(SYSTIME2,4,"UShort")
+    ; mil := NumGet(SYSTIME2,14,"UShort")
+    year := NumGet(SYSTIME2,0,"UShort")
+    month := Format("{:02d}", NumGet(SYSTIME2,2,"UShort"))
+    day := Format("{:02d}", NumGet(SYSTIME2,6,"UShort"))
+    hour := Format("{:02d}", NumGet(SYSTIME2,8,"UShort"))
+    minute := Format("{:02d}", NumGet(SYSTIME2,10,"UShort"))
+    second := Format("{:02d}", NumGet(SYSTIME2,12,"UShort"))
+    SYSTEMTIME := ""
+    SYSTIME2 := ""
+    return year month day hour minute second
+    ; return {year:year, month:month, day:day, dayOfWeek:dayOfWeek, hour:hour, minute:minute, second:second, mil:mil}
+}
+
+restoreFileFromRecycleBin(userFileFullPath, userFileSize:=0) {
+/*
+userFileFullPath = the full path for the original file to restore
+userFileSize     = match the file to restore by size (in bytes) as well
+                   in recycle bin, the same original full path can occur
+                   multiple times; today I delete a file which is 2mb, 
+                   tomorrow one that is 5mb, but both had the same path;
+                   which one to restore then? if you know the exact size 
+                   in bytes, you can restore the file you actually want to
+
+Return values:
+ 0 = file not found in recycle bin
+ 1 = file found in recycle bin and restored to userFileFullPath
+-1 = file found in recycle bin but failed to restore
+-2 = COM object error occured
+
+; function by Marius Șucan
+*/
+
+   shellObj := ComObjCreate("Shell.Application")
+   If !IsObject(shellObj)
+      Return -2
+
+   recyclerObj := shellObj.NameSpace(10) ; CSIDL_BitBucket // user recycle bin folder
+   If !IsObject(recyclerObj)
+   {
+      ObjRelease(shellObj)
+      Return -2
+   }
+
+   folderItemsObj := recyclerObj.Items()
+   If !IsObject(folderItemsObj)
+   {
+      ObjRelease(recyclerObj)
+      ObjRelease(shellObj)
+      Return -2
+   }
+
+   foundFile := 0
+   Loop, % folderItemsObj.Count + 1
+   {
+      fItemObj := folderItemsObj.Item(A_Index - 1)
+      If (fItemObj.Size=0 || fItemObj.isLink!=0)
+      {
+         ObjRelease(fItemObj)
+         Continue
+      }
+
+      ftype := SubStr(fItemObj.Path, InStr(fItemObj.Path, ".", 0, -1))
+      fileName := recyclerObj.GetDetailsOf(fItemObj, 0)
+      If !RegExMatch(fileName, "i)(\" ftype ")$")
+         fileName .= ftype
+
+      fullPath := recyclerObj.GetDetailsOf(fItemObj, 1) "\" fileName
+      If (fullPath=userFileFullPath)
+      {
+         If (userFileSize>0)
+         {
+            zs := fItemObj.Path
+            FileGetSize, size, % zs
+            If (size=userFileSize)
+               foundFile := 1
+         } Else foundFile := 1
+
+         If (foundFile=1)
+         {
+            ; fnOutputDebug(A_Index - 1 "==" date "|" size "|" fullPath)
+            fItemVerbsObj := fItemObj.Verbs()
+            TheItemVerbObj := fItemVerbsObj.Item(0)
+            Sleep, 1
+            TheItemVerbObj.DoIt()
+            startTime := A_TickCount
+            While, !FileExist(userFileFullPath)
+            {
+                If (A_TickCount - startTime>3500)
+                   Break
+                Sleep, 100
+            }
+            ObjRelease(TheItemVerbObj)
+            ObjRelease(fItemVerbsObj)
+            ObjRelease(fItemObj)
+            Break
+         }
+      }
+      ObjRelease(fItemObj)
+   }
+
+   ObjRelease(folderItemsObj)
+   ObjRelease(recyclerObj)
+   ObjRelease(shellObj)
+   If (foundFile=1 && !FileExist(userFileFullPath))
+      Return -1
+
+   Return foundFile
+}

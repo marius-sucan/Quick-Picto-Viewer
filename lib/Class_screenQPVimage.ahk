@@ -10,16 +10,18 @@ Class screenQPVimage {
 
    LoadImage(imgPath, frameu, noBMP:=0) {
       ; If ((RegExMatch(imgPath, RegExFIMformPtrn) || alwaysOpenwithFIM=1) && allowFIMloader=1)
-      If imgPath
+      If (imgPath && allowFIMloader=1)
       {
          r := This.LoadFreeImageFile(imgPath, frameu, noBMP)
-      } Else If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1)
+      ; Else If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1)
+      } Else If imgPath
       {
-         SoundBeep
-      } Else
-      {
-         SoundBeep 
+         r := This.LoadWICfile(imgPath, frameu, noBMP)
       }
+      ; Else
+      ; {
+      ;    SoundBeep 
+      ; }
       ; ToolTip, % "l=" r , , , 2
       Return r
    }
@@ -27,12 +29,16 @@ Class screenQPVimage {
    ImageGetRect(x, y, w, h) {
       If InStr(This.OpenedWith, "[FIM]")
          r := This.FimGetRect(x, y, w, h, 0, 0)
+      Else If InStr(This.OpenedWith, "[WIC]")
+         r := This.WicGetRect(x, y, w, h, 0, 0)
       Return r
    }
 
    ImageGetResizedRect(x, y, w, h, newW, newH) {
       If InStr(This.OpenedWith, "[FIM]")
          r := This.FimGetRect(x, y, w, h, newW, newH)
+      Else If InStr(This.OpenedWith, "[WIC]")
+         r := This.WicGetRect(x, y, w, h, newW, newH)
       Return r
    }
 
@@ -41,16 +47,20 @@ Class screenQPVimage {
       {
          If InStr(This.OpenedWith, "[FIM]")
             FreeImage_UnLoad(This.imgHandle)
+         Else If InStr(This.OpenedWith, "[WIC]")
+            DllCall(whichMainDLL "\WICdestroyPreloadedImage", "Int", 1, "Int")
+
+         This.imgHandle := ""
       }
    }
 
    FimGetRect(x, y, w, h, newW, newH) {
-
      GFT := FreeImage_GetFileType(This.ImgFile)
      If (newW && newH)
         hFIFimgZ := FreeImage_RescaleRect(This.imgHandle, newW, newH, x, y, w, h)
      Else
         hFIFimgZ := FreeImage_Copy(This.imgHandle, x, y, x + w, y + h)
+
      If !hFIFimgZ
         Return 0
 
@@ -63,10 +73,16 @@ Class screenQPVimage {
 
      hFIFimgE := hFIFimgX ? hFIFimgX : hFIFimgZ
      If alphaBitmap
+     {
         This.HasAlpha := FIMalphaChannelFix(alphaBitmap, hFIFimgE)
-
+        ; image object discarded by FIMalphaChannelFix()
+     }
      ; FreeImage_PreMultiplyWithAlpha(hFIFimgE)
      pBitmap := ConvertFIMtoPBITMAP(hFIFimgE)
+     If hFIFimgX
+        FreeImage_UnLoad(hFIFimgX)
+
+     FreeImage_UnLoad(hFIFimgZ)
      ; ToolTip, % pBitmap "|"  hFIFimgE "|" hFIFimgZ "|" x "|" y "|" w "|" h "|" newW "|" newH , , , 2
      If StrLen(pBitmap)
         createdGDIobjsArray["x" pBitmap] := [pBitmap, "bmp", 1, A_ThisFunc]
@@ -124,10 +140,7 @@ Class screenQPVimage {
         Return 0
 
      FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
-     This.Width := imgW,     This.Height := imgH
      FreeImage_GetDPIresolution(hFIFimgA, dpiX, dpiY)
-     This.dpiX := dpiX,      This.dpiY := dpiY,    This.DPI := Round((dpiX + dpiY)/2)
-
      oimgBPP := FreeImage_GetBPP(hFIFimgA)
      imgBPP := Trimmer(StrReplace(oimgBPP, "-"))
      ColorsType := FreeImage_GetColorType(hFIFimgA)
@@ -152,12 +165,66 @@ Class screenQPVimage {
      This.PixelFormat := StrReplace(oimgBPP, "-", "+") "-" ColorsType toneMapped
      This.OpenedWith := "FreeImage library [FIM]"
      This.TooLargeGDI := isImgSizeTooLarge(imgW, imgH)
-     This.imgW := imgW
-     This.imgH := imgH
+     This.Width := imgW
+     This.Height := imgH
+     This.dpiX := dpiX
+     This.dpiY := dpiY
+     This.DPI := Round((dpiX + dpiY)/2)
      This.FIMcolors := ColorsType
      This.FIMtype := imgType
      This.FIMbpp := imgBPP
      Return 1
    } ; // LoadFimFile
+
+
+   WicGetRect(x, y, w, h, newW, newH) {
+      mustClip := (x=0 && y=0 && w=This.Width && h=This.Height) ? 0 : 1
+      func2exec := (A_PtrSize=8) ? "WICgetRectImage" : "_LoadWICimage@48"
+      If !newW
+         newW := w
+      If !newH
+         newH := h
+
+      pBitmap := DllCall(whichMainDLL "\" func2exec, "Int", x, "Int", y, "Int", w, "Int", h, "Int", newW, "Int", newH, "Int", mustClip, "UPtr")
+      ; ToolTip, % pBitmap "|"  hFIFimgE "|" hFIFimgZ "|" x "|" y "|" w "|" h "|" newW "|" newH , , , 2
+      If StrLen(pBitmap)>1
+         createdGDIobjsArray["x" pBitmap] := [pBitmap, "bmp", 1, A_ThisFunc]
+     Return pBitmap
+   }
+
+   LoadWICfile(imgPath, frameu, noBPPconv) {
+      ; Return
+      Static lastEdition := 1, hasRan := 0
+      startZeit := A_TickCount
+      ; lastEdition := !lastEdition
+      VarSetCapacity(resultsArray, 8 * 6)
+      func2exec := (A_PtrSize=8) ? "WICpreLoadImage" : "_LoadWICimage@48"
+      r := DllCall(whichMainDLL "\" func2exec, "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "UPtr")
+      If r
+      {
+         Random, OutputVar, 1, 999999
+         k := This.PixelFormat := WicPixelFormats(NumGet(resultsArray, 4 * 3, "uInt"))
+         This.ImgFile := imgPath
+         This.imgHandle := OutputVar
+         This.Width := NumGet(resultsArray, 4 * 0, "uInt")
+         This.Height := NumGet(resultsArray, 4 * 1, "uInt")
+         This.Frames := NumGet(resultsArray, 4 * 2, "uInt") - 1
+         This.ActiveFrame := NumGet(resultsArray, 4 * 6, "uInt")
+         This.DPI := NumGet(resultsArray, 4 * 4, "uInt")
+         This.RawFormat := WICcontainerFmts(NumGet(resultsArray, 4 * 5, "uInt"))
+         This.TooLargeGDI := isImgSizeTooLarge(This.Width, This.Height)
+         This.HasAlpha := varContains(k, "argb", "prgba", "bgra", "rgba", "alpha")
+         This.OpenedWith := "Windows Imaging Component [WIC]"
+      }
+
+      resultsArray := ""
+      zeitu := A_TickCount - startZeit
+      ; msgbox, % r "==" zeitu " = " pixfmt "=" rawFmt
+      ; ToolTip, % WICmoduleHasInit " | " r "==" zeitu " = " mainLoadedIMGdetails.pixfmt "=" mainGdipWinThumbsGrid.RawFormat , , , 3
+      ; https://stackoverflow.com/questions/8101203/wicbitmapsource-copypixels-to-gdi-bitmap-scan0
+      ; https://github.com/Microsoft/Windows-classic-samples/blob/master/Samples/Win7Samples/multimedia/wic/wicviewergdi/WicViewerGdi.cpp#L354
+      Return r
+   } ; // LoadWICfile
+
 
 } ; // class screenQPVimage

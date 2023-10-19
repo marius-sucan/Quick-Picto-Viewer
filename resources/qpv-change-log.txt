@@ -2,6 +2,16 @@
 // by Marius Șucan ( https://marius.sucan.ro )
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.9.91 (2023-10-19)
+  - [new] multiple undo levels for actions applied on files: move, rename, copy or delete
+  - «resize/crop/rotate» tool now allows users, in simple mode, to save the image in other image formats than the initial one
+  - zoom in/out now is performed relative to the center of the viewport; previously it was zooming in at the center of the image and it was frustrating with large images, the subject always went out of view [viewport]
+  - improvements to the image map/navigation box
+  - optimizations for «Create symmetry and patterns» tool
+  - removed option to downscale and cache images
+  - fixes related to vector shapes drawing
+  - many other bug fixes and improvements
+
 - v5.9.90 (2023-09-22)
   - bug fixes only
 

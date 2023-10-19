@@ -889,7 +889,7 @@ FreeImage_Rescale(hImage, w, h, filter:=3) {
    Return DllCall(getFIMfunc("Rescale"), "uptr", hImage, "Int", w, "Int", h, "Int", filter, "uptr")
 }
 
-FreeImage_RescaleRect(hImage, dstW, dstH, x, y, w, h, filter:=3, flags:=2) {
+FreeImage_RescaleRect(hImage, dstW, dstH, x, y, w, h, filter:=0, flags:=2) {
 ; Filter parameter options
 ; 0 = FILTER_BOX;        Box, pulse, Fourier window, 1st order (constant) B-Spline
 ; 1 = FILTER_BICUBIC;    Mitchell and Netravali's two-param cubic filter

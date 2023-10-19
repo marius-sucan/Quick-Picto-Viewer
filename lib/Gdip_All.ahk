@@ -7607,10 +7607,11 @@ Gdip_GetMatrixLastStatus(hMatrix) {
 ; pPath:  Pointer to the GraphicsPath.
 ; Points: The coordinates of all the points passed as x1,y1|x2,y2|x3,y3... This can also be a flat array object
 
-
 ; Return: Status enumeration. 0 = success.
-;
-; Notes: The first spline is constructed from the first point through the fourth point in the array and uses the second and third points as control points. Each subsequent spline in the sequence needs exactly three more points: the ending point of the previous spline is used as the starting point, the next two points in the sequence are control points, and the third point is the ending point.
+; Notes: The first spline is constructed from the first point through the fourth point in the array and 
+; uses the second and third points as control points. Each subsequent spline in the sequence needs 
+; exactly three more points: the ending point of the previous spline is used as the starting point,
+; the next two points in the sequence are control points, and the third point is the ending point.
 
 Gdip_AddPathBeziers(pPath, Points) {
   iCount := CreatePointsF(PointsF, Points)

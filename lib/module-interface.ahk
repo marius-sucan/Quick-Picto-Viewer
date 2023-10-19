@@ -1,4 +1,4 @@
-#Persistent
+﻿#Persistent
 #NoTrayIcon
 #MaxHotkeysPerInterval, 950
 #HotkeyInterval, 50
@@ -58,7 +58,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , statusBarTooltipVisible := 0, FloodFillSelectionAdj := 0, isToolbarKBDnav := 0, TLBRtwoColumns := 1
      , lastALclickX := 0, lastALclickY := 0, lastDoubleClickZeit := 1, TLBRverticalAlign := 1
      , hPic0, hPic1, hPic2, hPic3, hPic4, hPic5, hPic6, hPic7, hPic8, hPic9, hPic10, hPic11
-     , navKeysCounter := 0, lastSwipeZeitGesture := 1
+     , navKeysCounter := 0, lastSwipeZeitGesture := 1, hFlyBtn1, hFlyBtn2, hFlyBtn3
 
 If !A_IsCompiled
    Try Menu, Tray, Icon, %A_ScriptDir%\qpv-icon.ico
@@ -270,6 +270,37 @@ BuildGUI(params:=0) {
 
    r := PVhwnd "|" hGDIinfosWin "|" hGDIwin "|" hGDIthumbsWin "|" hGDIselectWin "|" hPicOnGui1 "|" winGDIcreated "|" ThumbsWinGDIcreated
    Return r
+}
+
+setMenuBarState(modus, mena:="PVmenu") {
+  Critical, on 
+  If (showMainMenuBar!=1)
+     Return
+
+  ; causes a lot of flickers
+  Loop, % menuTotalIndex
+  {
+     labelu := menuArray[A_Index, 3]
+     s := menuArray[A_Index, 4]
+     If (s!=modus)
+     {
+        Try Menu, % mena, % modus, % labelu
+        menuArray[A_Index, 4] := modus
+        Sleep, -1
+     }
+  }
+  ; ToolTip, % modus " s=" menuTotalIndex , , , 2
+}
+
+initAppBusyMode() {
+     mustAbandonCurrentOperations := 0
+     userPendingAbortOperations := 0
+     lastCloseInvoked := 0
+     imageLoading := 1
+     runningLongOperation := 1
+     executingCanceableOperation := A_TickCount
+     setTaskbarIconState("anim")
+     ; setMenuBarState("Disable")
 }
 
 setTaskbarIconState(mode) {
@@ -871,9 +902,17 @@ WM_LBUTTONDOWN(wP, lP, msg, hwnd) {
        mouseTurnOFFtooltip()
 
     SetTimer, ResetLbtn, -55
+    MouseGetPos, , , OutputVarWin, hwnd, 2
+    ; ToolTip, % OutputVarControl "|" hFlyBtn1 , , , 2
     isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1) ? 0 : 1
     If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900) && slideShowRunning!=1 && animGIFplaying!=1)
        askAboutStoppingOperations()
+    Else If (hwnd=hFlyBtn1 && menusflyOutVisible=1)
+       PanelQuickSearchMenuOptions()
+    Else If (hwnd=hFlyBtn2 && menusflyOutVisible=1)
+       toggleAppToolbar()
+    Else If (hwnd=hFlyBtn3 && menusflyOutVisible=1)
+       ToggleMenuBaru()
     Else If (slideShowRunning=1 || animGIFplaying=1)
        turnOffSlideshow()
     Else If isOkay
@@ -1067,7 +1106,7 @@ PanelQuickSearchMenuOptions() {
     Static lastInvoked := 1
     If (A_TickCount - lastInvoked<300)
        Return
-
+ 
     If (VisibleQuickMenuSearchWin=1)
        MainExe.ahkPostFunction("closeQuickSearch")
     Else
@@ -1338,6 +1377,7 @@ changeMcursor(whichCursor) {
      userPendingAbortOperations := imageLoading := mustAbandonCurrentOperations := 0
      runningLongOperation := lastCloseInvoked := 0
      setTaskbarIconState("normal")
+     ; setMenuBarState("Enable")
      thisCursor := hCursN
   } Else If (whichCursor="busy-img")
   {
@@ -1632,7 +1672,6 @@ Return
 
 byeByeRoutine() {
    Static lastInvokedThis := 1
-
    If (A_TickCount - lastInvokedThis < 250)
       Return
 
@@ -1661,9 +1700,9 @@ byeByeRoutine() {
    } Else If (colorPickerModeNow=1)
    {
        colorPickerModeNow := 0
+       colorPickerMustEnd := -1
        lastInvokedThis := A_TickCount
        lastOtherWinClose := A_TickCount
-       MainExe.ahkPostFunction("StopColorPicker")
    } Else If (VisibleQuickMenuSearchWin=1)
    {
        VisibleQuickMenuSearchWin := omniBoxMode := 0
@@ -1824,13 +1863,14 @@ guiCreateMenuFlyout() {
       Gui, menuFlier: Color, EEeeEE
       Gui, menuFlier: Font, s12 Bold c111111
    }
+
    Gui, menuFlier: Margin, 0, 0
-   Gui, menuFlier: Add, Text, %brd% Center +0x200 x0 y0 w%h% h%h% gPanelQuickSearchMenuOptions hwndhBtn1 +TabStop, S
-   Gui, menuFlier: Add, Text, %brd% Center +0x200 x+%m% wp hp gtoggleAppToolbar hwndhBtn2 +TabStop, T
-   Gui, menuFlier: Add, Text, %brd% Center +0x200 x+%m% wp hp gToggleMenuBaru hwndhBtn3 +TabStop, M
-   AddTooltip2Ctrl(hBtn1, "Search through ther available options [ `; ]",, uiUseDarkMode)
-   AddTooltip2Ctrl(hBtn2, "Toggle app toolbar [ Shift+F10 ]",, uiUseDarkMode)
-   AddTooltip2Ctrl(hBtn3, "Toggle menu bar [ F10 ]",, uiUseDarkMode)
+   Gui, menuFlier: Add, Text, %brd% Center +0x200 x0 y0 w%h% h%h% hwndhFlyBtn1 +TabStop, S
+   Gui, menuFlier: Add, Text, %brd% Center +0x200 x+%m% wp hp hwndhFlyBtn2 +TabStop, T
+   Gui, menuFlier: Add, Text, %brd% Center +0x200 x+%m% wp hp hwndhFlyBtn3 +TabStop, M
+   AddTooltip2Ctrl(hFlyBtn1, "Search through ther available options [ `; ]",, uiUseDarkMode)
+   AddTooltip2Ctrl(hFlyBtn2, "Toggle app toolbar [ Shift+F10 ]",, uiUseDarkMode)
+   AddTooltip2Ctrl(hFlyBtn3, "Toggle menu bar [ F10 ]",, uiUseDarkMode)
    ; AddTooltip2Ctrl("AutoPop", 0.5)
    wasMenuFlierCreated := 1
 }
@@ -1908,7 +1948,7 @@ hideMenuFlyOut() {
        Gui, menuFlier: Hide
        SetTimer, hideMenuFlyOut, Off
     } Else If (menusflyOutVisible=1)
-       SetTimer, hideMenuFlyOut, -20
+       SetTimer, hideMenuFlyOut, -30
 }
 
 GetMenuWinHwnd(mX, mY, n) {
@@ -2117,7 +2157,6 @@ BuildMenuBar(modus:=0) {
    menuArray := []
    menuTotalIndex := 0
    menuHotkeys := "|"
-
    Loop, Parse, menusList, |
    {
       ; generate the list of hotkeys for the menu bar items: eg. alt + f
@@ -2145,22 +2184,27 @@ forbiddenAltKeys(n) {
 
 invokeMenuBarItem(a,b) {
    Static lastInvoked, lastItem
+   If (runningLongOperation!=1 && imageLoading=1 && animGIFplaying!=1)
+   || (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
+   {
+      Sleep, -1
+      Return
+   } Else If (animGIFplaying=1)
+   {
+      lastOtherWinClose := A_TickCount
+      If (slideShowRunning=1)
+         turnOffSlideshow()
+
+      stopGiFsPlayback()
+   } Else If (slideShowRunning=1)
+   {
+      lastOtherWinClose := A_TickCount
+      turnOffSlideshow()
+   }
 
    ; ToolTip, % a "\" b "\" menuCurrentIndex , , , 2
    If (!determineMenuBTNsOKAY() || menuCurrentIndex=b)
       Return
-
-   If (colorPickerModeNow=1)
-   {
-       colorPickerModeNow := 0
-       MainExe.ahkPostFunction("StopColorPicker")
-       Return
-   } Else If (mustCaptureCloneBrush=1)
-   {
-       mustCaptureCloneBrush := 0
-       MainExe.ahkPostFunction("StopCaptureClickStuff", "Escape")
-       Return
-   }
 
    lastMenuZeit := A_TickCount
    funcu := "InvokeMenuBar"
@@ -2193,8 +2237,8 @@ kMenu(labelu, funcu, mena:="PVmenu", actu:="add") {
 
       menuTotalIndex++
       t := StrReplace(labelu, "&")
-      menuArray[menuTotalIndex] := [t, funcu]
-      menuArray[t] := [funcu, menuTotalIndex]
+      menuArray[menuTotalIndex] := [t, funcu, labelu, "Enable"]
+      menuArray[t] := [funcu, menuTotalIndex, labelu]
    }
 }
 
@@ -2522,7 +2566,7 @@ constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code) {
 
 WM_KEYDOWN(wParam, lParam, msg, hwnd) {
     vk_code := Format("{1:x}", wParam)
-    If isInRange(vk_code, 21, 28)
+    If (isInRange(vk_code, 21, 28) || isVarEqualTo(vk_code, "6B", "6D", "BB", "BD", "D"))
        navKeysCounter++
 
     If (statusBarTooltipVisible=1)

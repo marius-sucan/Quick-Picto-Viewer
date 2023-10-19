@@ -83,6 +83,8 @@ Ctrl + Alt + Y|Redo image [jump 4 steps]|Image view|-
 Ctrl + Alt + Z|Undo image [jump 4 steps]|Image view|-
 Ctrl + Y|Redo image|Image view|-
 Ctrl + Z|Undo image|Image view|-
+Ctrl + Z|Undo file action(s)|Files list|-
+Ctrl + Shift + Z|Undo file action(s) - chronologically|Files list|-
 Ctrl + T|Transform selected image area|Image selection area|Panel
 Ctrl + U|Static folders manager - update files list selectively|Anywhere|Panel
 S|Select the other images in the duplicate images group|Files list|-
@@ -238,6 +240,8 @@ Home / End|Move selection area on Y axis|Live editing|-
 Arrow keys|Navigate between indexed files|Anywhere|-
 Ctrl + Page Up / Down|Move up/down the hierarchy of folders (as in a breadcrumb)|Files list|-
 Alt + Page Up / Down|Open next or previous sibling folder (in the hierarchy of folders)|Files list|-
+Alt + Page Up / Down|Move left/right selection area|Image selection area|-
+Alt + Home / End|Move up/down selection area|Image selection area|-
 Shift + F4|Current folder navigation options|Anywhere|Menu
 Shift + ;|Explore with Omnibox the file location|Anywhere|Panel
 F4|Switch to or open folders tree view|Anywhere|Panel
