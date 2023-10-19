@@ -107,6 +107,8 @@
 
 <li>Create PDFs or multi-paged TIFFs from selected images. Up to 2048 images allowed.</li>
 
+<li>Create customizable contact sheets (thumbnail sheets) of selected images</li>
+
 <li>Extract frames from GIF and WebP animated images, or pages from TIFFs.</li>
 
 <li>Multiple list view modes. Display the indexed files as an easy to scroll list with or without image file details, or as thumbnails list.</li>
