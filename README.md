@@ -103,11 +103,11 @@
 
 <li>Ability to automatically group files into sub-folders based on file types or modification date, by months or years.</li>
 
-<li>Tool to copy or move files by maintaining their folder(s) structure.</li>
+<li>Specialized tool to copy or move files by maintaining their folder(s) structure.</li>
 
 <li>Create PDFs or multi-paged TIFFs from selected images. Up to 2048 images allowed.</li>
 
-<li>Create customizable contact sheets (thumbnail sheets) of selected images</li>
+<li>Create customizable contact sheets (thumbnail sheets) of selected images.</li>
 
 <li>Extract frames from GIF and WebP animated images, or pages from TIFFs.</li>
 
@@ -149,7 +149,6 @@
 
 <li>Ability to selectively refresh the cached files list from selected folders.</li>
 
-<li>Multiple levels of undo for file actions: rename, move, copy or delete</li>
 
 <li>Search and replace in the index, enabling users to correct potentially broken files lists.</li>
 
@@ -162,6 +161,8 @@
 <li>Perform actions on image files: resize, rotate [at any degree], crop, change/adjust colors, rename, convert to different file formats, rename, delete, copy or move.</li>
 
 <li>Batch processing. You can apply any of the previously mentioned action or operation on multiple files at once.</li>
+
+<li>Multiple levels of undo for file actions: rename, move, copy or delete.</li>
 </ul>
 
 <h2>GENERAL / USER INTERFACE</h2>
