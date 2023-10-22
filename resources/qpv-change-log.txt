@@ -2,6 +2,9 @@
 // by Marius Șucan ( https://marius.sucan.ro )
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 
+- v5.9.92 (2023-10-22)
+  - bug fixes only
+
 - v5.9.91 (2023-10-19)
   - [new] multiple undo levels for actions applied on files: move, rename, copy or delete
   - «resize/crop/rotate» tool now allows users, in simple mode, to save the image in other image formats than the initial one
@@ -164,7 +167,7 @@
   - made larger the image preview area in the panels that integrate this kind of UI element
   - the color picker should now work on Windows 7 if the hardware acceleration is enabled
   - panel layout fixes for Windows 7 
-  - really MANY bug fixes , and important ones
+  - really MANY bug fixes, important ones
 
 - v5.7.80 (2022-10-01)
   - [new] option to add to favourites folders and files lists [.SLDs]

@@ -45,8 +45,8 @@
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
 ;@Ahk2Exe-UpdateManifest 0, Quick Picto Viewer
 ;@Ahk2Exe-SetOrigFilename Quick-Picto-Viewer.exe
-;@Ahk2Exe-SetVersion 5.9.91
-;@Ahk2Exe-SetProductVersion 5.9.91
+;@Ahk2Exe-SetVersion 5.9.92
+;@Ahk2Exe-SetProductVersion 5.9.92
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2023)
 ;@Ahk2Exe-SetCompanyName https://marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -220,7 +220,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*"
    , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable()
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.9.91", vReleaseDate := "2023/10/19" ; yyyy-mm-dd
+   , appVersion := "5.9.92", vReleaseDate := "2023/10/22" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -21158,7 +21158,7 @@ PanelWrapperFilesStats() {
     ; Gui, Add, Button, x+5 h%thisBtnHeight% gPanelFindDupes, Find &duplicates panel
     Gui, Add, Button, xs+15 y+10 hp gBtnCollectImageInfos, Collect image &properties and file details
     If (SLDtypeLoaded=3)
-       Gui, Add, Button, xs y+30 h%thisBtnHeight% gOpenFileDupesPanel, Collect fingerprints and &histogram details options
+       Gui, Add, Button, xs y+30 h%thisBtnHeight% gOpenFileDupesPanel, Advanced options (Find duplicates panel)
     Else
        Gui, Add, Button, xs y+30 h%thisBtnHeight% gBtnCollectHistoInfos, Collect image properties and &histogram details
     ; Gui, Add, Button, x+5 h%thisBtnHeight% gOpenFileDupesPanel, &Options
@@ -21174,7 +21174,6 @@ PanelWrapperFilesStats() {
 
     wu := (PrefsLargeFonts=1) ? 90 : 60
     Gui, Add, Button, x+5 w%wu% hp Default gBtnCloseWindow, C&lose
-
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Statistics: " appTitle)
 }
 
@@ -28516,26 +28515,23 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
       filesToBeSorted := RecordSet.RowCount
       thisMaxCount := StrLen(filesFilter)>2 ? bckpMaxFilesIndex : maxFilesIndex
       alreadySorted := thisMaxCount - filesToBeSorted
-      o_noQuestion := noQuestion
-      If (alreadySorted<5)
-         noQuestion := 1
-
       ; MsgBox, % strPosu "=" whatu "`n" SQLstr 
       zEffect := (adaptedSortCriteria=3 && filesToBeSorted>0) ? Gdip_CreateEffect(6, 0, -100, 0) : 0
-      If (asku=1 && noQuestion=0 && filesToBeSorted>10)
+      If (asku=1 && noQuestion=0 && filesToBeSorted>10 && filesToBeSorted!=thisMaxCount)
       {
          thisFriendly := (SLDtypeLoaded=3) ? "`n`nThe data will be automatically cached in the database and you can stop and resume this process at anytime." : ""
          msgResult := msgBoxWrapper(appTitle ": Confirmation", "You have selected to perform an operation that relies on collected file and image details. " appTitle " needs to scan " groupDigits(filesToBeSorted) " out of " groupDigits(thisMaxCount) " files. By refusing to the collect data, the operation you chose (sort, filter, generate statistics or find duplicates) will likely give incomplete or erroneous results." thisFriendly, "Collect &data now|&Continue with incomplete data", 0, "question", "&Do not collect file data and never ask again in this session", 0)
-
-         If (InStr(msgResult.btn, "incomplete") || msgResult.Check=1)
-         {
+         If (InStr(msgResult.btn, "incomplete") || InStr(msgResult.btn, "collect"))
             noQuestion := msgResult.Check
+
+         If !InStr(msgResult.btn, "collect")
+         {
             CurrentSLD := backCurrentSLD
             SetTimer, RemoveTooltip, % -msgDisplayTime
             SetTimer, ResetImgLoadStatus, -200
             Return 0
          }
-      } Else o_noQuestion := noQuestion
+      }
 
       If (filesToBeSorted>0)
          activeSQLdb.Exec("BEGIN TRANSACTION;")
@@ -28906,7 +28902,7 @@ processPixArrayChars(ByRef arrayChars) {
 }
 
 generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave, strPosu, whatu) {
-   Static noQuestion := 0, userFriendly := {1:"NONE", 2:"dHash", 3:"pHash", 4:"lHash"}
+   Static userFriendly := {1:"NONE", 2:"dHash", 3:"pHash", 4:"lHash"}
    setImageLoading()
    doStartLongOpDance()
    backCurrentSLD := CurrentSLD
@@ -29995,6 +29991,7 @@ WorkLoadMultiCoresConvertFormat(maxList) {
   RegWrite, REG_SZ, %QPVregEntry%, Running, 1
   thisZeit := A_TickCount
   doStartLongOpDance()
+  setwhileLoopExec(1)
   Loop
   {
       Loop, % systemCores
@@ -30066,8 +30063,8 @@ WorkLoadMultiCoresConvertFormat(maxList) {
       If (determineTerminateOperation()=1)
       {
          RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 1
-         abandonAll := 1
          lastLongOperationAbort := A_TickCount
+         abandonAll := 1
          ; fatalError := 0
          ; Break
       }
@@ -30097,6 +30094,9 @@ WorkLoadMultiCoresConvertFormat(maxList) {
         Try FileDelete, %thumbsCacheFolder%\tempList%A_Index%.txt
   }
 
+  If (SLDtypeLoaded=3)
+     activeSQLdb.Exec("BEGIN TRANSACTION;")
+
   Loop, Parse, theFinalList,`n,`r
   {
        If StrLen(A_LoopField)>2
@@ -30104,11 +30104,25 @@ WorkLoadMultiCoresConvertFormat(maxList) {
           lineArr := StrSplit(A_LoopField, "?")
           thisIndex := lineArr[1]
           imgPath := lineArr[2]
-          If (imgPath && thisIndex)
+          initial := resultedFilesList[thisIndex, 1]
+          If (imgPath && isNumber(thisIndex) && thisIndex>0 && initial!=imgPath && OnConvertKeepOriginals=0)
+          {
+             currentFilesListModified := 1
              resultedFilesList[thisIndex, 1] := imgPath
+             updateMainUnfilteredList(thisIndex, 1, imgPath)
+             If (SLDtypeLoaded=3)
+                updateSQLdbEntry(initial, imgPath, 1, resultedFilesList[thisIndex, 12])
+          }
        }
   }
 
+  If (SLDtypeLoaded=3)
+  {
+     If !activeSQLdb.Exec("COMMIT TRANSACTION;")
+        throwSQLqueryDBerror(A_ThisFunc)
+  }
+
+  setwhileLoopExec(0)
   zeitOperation := A_TickCount - startOperation
   percDone := " ( " Round((processedFiles / countTFilez) * 100) "% )"
   someErrors := "`nElapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)) percDone
@@ -30128,6 +30142,7 @@ WorkLoadMultiCoresConvertFormat(maxList) {
      r := "error"
   }
 
+  CurrentSLD := backCurrentSLD
   ForceRefreshNowThumbsList()
   dummyTimerDelayiedImageDisplay(100)
   If (abandonAll=1 && fatalError!=1)
@@ -30146,7 +30161,6 @@ WorkLoadMultiCoresConvertFormat(maxList) {
      r := "abandoned"
   }
 
-  CurrentSLD := backCurrentSLD
   Return r
 }
 
@@ -49109,7 +49123,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
    If (filesElected>150) ; ((A_TickCount - lastInvoked > 29500) && dummy!="quick-actu")
    {
       wording := (UsrCopyMoveOperation=2) ? "MOVE" : "COPY"
-      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Please confirm you want to " wording " the selected files.`n`nSelected " groupDigits(filesElected) " files`nDestination: " finalDest "\", 4, 0, "question")
+      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Please confirm you want to " wording " the selected files.`n`nSelected: " groupDigits(filesElected) " files.`nDestination: " finalDest "\", 4, 0, "question")
       If (msgResult!="Yes")
          Return 0
    }
@@ -49398,7 +49412,6 @@ batchConvert2format(modus:=0) {
    If (infoResult="single-core")
       addJournalEntry("JPEG lossless processing: failed to initialize multi-threaded processing")
 
-   CurrentSLD := ""
    prevMSGdisplay := A_TickCount
    startOperation := A_TickCount
    If (ResizeUseDestDir=1 && userPrivateMode!=1)
@@ -49410,6 +49423,7 @@ batchConvert2format(modus:=0) {
    If (SLDtypeLoaded=3)
       activeSQLdb.Exec("BEGIN TRANSACTION;")
 
+   CurrentSLD := ""
    nullvara := askAboutFileCollision(0, 0, 1, 3, 0, nullvar)
    Loop, % maxFilesIndex
    {
@@ -49460,6 +49474,8 @@ batchConvert2format(modus:=0) {
       {
          If (ResizeUseDestDir=1)
          {
+            ; if the user defined destination format is the same with the initial file format
+            ; perform only a move file, ONLY IF ResizeUseDestDir=1 and convertFormatAutoSkip=1
             If (FileExist(file2save) && !FolderExist(file2save) && modus!="pdf")
                file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
 
@@ -49469,6 +49485,7 @@ batchConvert2format(modus:=0) {
                Break
             } Else If file2save
             {
+               originalMtime := ""
                FileGetTime, originalMtime, % imgPath, M
                FileGetTime, originalCtime, % imgPath, C
                If (OnConvertKeepOriginals=1)
@@ -49479,8 +49496,9 @@ batchConvert2format(modus:=0) {
                If !ErrorLevel
                {
                   filesConverted++
-                  If (OnConvertKeepOriginals=0)
+                  If (OnConvertKeepOriginals=0 && file2save!=imgPath)
                   {
+                     currentFilesListModified := 1
                      resultedFilesList[thisFileIndex, 1] := file2save
                      updateMainUnfilteredList(thisFileIndex, 1, file2save)
                      If (SLDtypeLoaded=3)
@@ -49537,6 +49555,7 @@ batchConvert2format(modus:=0) {
          If ErrorLevel
             theseFailures++
 
+         currentFilesListModified := 1
          resultedFilesList[thisFileIndex, 1] := file2save
          ; resultedFilesList[thisFileIndex, 2] := 1
          updateMainUnfilteredList(thisFileIndex, 1, file2save)
@@ -49545,7 +49564,6 @@ batchConvert2format(modus:=0) {
       }
    }
 
-   currentFilesListModified := 1
    If (SLDtypeLoaded=3)
    {
       If !activeSQLdb.Exec("COMMIT TRANSACTION;")
@@ -54682,6 +54700,9 @@ createMenuBonusNoImageOpened() {
    If (undoLevelsRecorded<1 && thumbsDisplaying!=1 && hasFileIndexUndo(currentFileIndex))
       kMenu("PVmenu", "Add", "Undo file action", "BtnUndoSingleFileAct", "history restore actions records")
 
+   If (undoLevelsRecorded<1 && fileActsHistoryArray.Count()>0)
+      kMenu("PVmenu", "Add", "Undo history", "PanelFileUndoHistory", "history restore actions records")
+
    kMenu("PVmenu", "Add/Uncheck", "Allow WIC loader", "ToggleWICloader")
    If (allowWICloader=1)
       kMenu("PVmenu", "Check", "Allow WIC loader")
@@ -55441,20 +55462,20 @@ createMenuCurrentFilesActs(dummy:=0) {
    {
       createMenuSoloFile()
       kMenu("PVfilesActs", "Add", "Active / focused file", ":PVtActFile")
-      Menu, PVfilesActs, Add
+      kMenu("PVfilesActs", "AddSeparator", 0)
    }
 
    Try Menu, PVcopy, Delete
    createMenuCopyFile("PVcopy")
-   If (hasFileIndexUndo(currentFileIndex) || markedSelectFile && fileActsHistoryArray.Count()>0)
-   {
+   If hasFileIndexUndo(currentFileIndex)
       kMenu("PVfilesActs", "Add", "&Undo file action`tCtrl+Z", "ImgUndoAction", "history restore actions records")
-      kMenu("PVfilesActs", "Add", "Undo last actions(s) (chronologically)`tCtrl+Shift+Z", "doUndoFileActsChronos", "records actions files rename move copy history restore")
-      Menu, PVfilesActs, Add, 
-   }
 
+   If (fileActsHistoryArray.Count()>0)
+      kMenu("PVfilesActs", "Add", "Undo last actions(s) (chronologically)`tCtrl+Shift+Z", "doUndoFileActsChronos", "records actions files rename move copy history restore")
+
+   kMenu("PVfilesActs", "AddSeparator", 0)
    kMenu("PVfilesActs", "Add", "&Copy", ":PVcopy")
-   Menu, PVfilesActs, Add, 
+   kMenu("PVfilesActs", "AddSeparator", 0)
    If !markedSelectFile
    {
       createMenuOpenFileOptions()
@@ -56609,11 +56630,11 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
    If (thumbsDisplaying=1)
    {
       kMenu("PVmenu", "Add", "&Paste file(s)`tCtrl+V", "MenuPasteHDropFiles", "index list clipboard")
-      If (hasFileIndexUndo(currentFileIndex) || markedSelectFile && fileActsHistoryArray.Count()>0)
-      {
+      If hasFileIndexUndo(currentFileIndex)
          kMenu("PVmenu", "Add", "&Undo file action`tCtrl+Z", "ImgUndoAction", "history restore actions records")
-         kMenu("PVmenu", "Add", "Undo last actions(s) (chronologically)`tCtrl+Shift+Z", "doUndoFileActsChronos", "records actions files rename move copy history restore")
-      }
+
+      If (fileActsHistoryArray.Count()>0)
+         kMenu("PVmenu", "Add", "Undo last actions(s)`tCtrl+Shift+Z", "doUndoFileActsChronos", "records actions files rename move copy history restore")
    }
 
    If (StrLen(UserMemBMP)>2 && thumbsDisplaying!=1 && (showMainMenuBar!=1 || mustPreventMenus=1))
@@ -71946,7 +71967,6 @@ corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCo
 
 retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
    Static prevMode, notFloatsRegEX := "i)(fcreated|fmodified|fsize|imgfile|dHash|lHash|pHash|imgwidth|imgheight|imgframes|imgdpi|imgpixfmt)"
-
    If SortCriterion
       mode := prevMode
 
@@ -77898,6 +77918,9 @@ batchUndoFileActs(modus) {
    CurrentSLD := ""
    failedFiles := failedRecoverFiles := overwrittenFiles := skippedFiles := 0
    showTOOLtip("Performing UNDO " thisuType "on " groupDigits(totalu) " files, please wait")
+   If (SLDtypeLoaded=3)
+      activeSQLdb.Exec("BEGIN TRANSACTION;")
+
    setwhileLoopExec(1)
    Loop, % totalu
    {
@@ -78134,6 +78157,12 @@ batchUndoFileActs(modus) {
                FileMove, % deleteFileConflictDest, % imgPath
          }
       }
+   }
+
+   If (SLDtypeLoaded=3)
+   {
+      If !activeSQLdb.Exec("COMMIT TRANSACTION;")
+         someErrors .= "`nFailed to commit changes to the SQL database"
    }
 
    thisIndex := 0

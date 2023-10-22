@@ -875,7 +875,10 @@ WM_LBUTTONDOWN(wP, lP, msg, hwnd) {
 
     pp := 0
     thisWin := isVarEqualTo(WinActive("A"), PVhwnd, hGDIwin, hGDIthumbsWin, hGDIinfosWin, hGDIselectWin)
-    ; If (preventSillyGui(A_Gui) || !thisWin || runningLongOperation=1 || imageLoading=1 || whileLoopExec=1)
+    If (preventSillyGui(A_Gui) || !thisWin)
+       Return
+
+    ; If (runningLongOperation=1 || imageLoading=1 || whileLoopExec=1)
     ;    Return
  
     isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1 && animGIFplaying!=1) ? 0 : 1
@@ -902,17 +905,10 @@ WM_LBUTTONDOWN(wP, lP, msg, hwnd) {
        mouseTurnOFFtooltip()
 
     SetTimer, ResetLbtn, -55
-    MouseGetPos, , , OutputVarWin, hwnd, 2
     ; ToolTip, % OutputVarControl "|" hFlyBtn1 , , , 2
     isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1) ? 0 : 1
     If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900) && slideShowRunning!=1 && animGIFplaying!=1)
        askAboutStoppingOperations()
-    Else If (hwnd=hFlyBtn1 && menusflyOutVisible=1)
-       PanelQuickSearchMenuOptions()
-    Else If (hwnd=hFlyBtn2 && menusflyOutVisible=1)
-       toggleAppToolbar()
-    Else If (hwnd=hFlyBtn3 && menusflyOutVisible=1)
-       ToggleMenuBaru()
     Else If (slideShowRunning=1 || animGIFplaying=1)
        turnOffSlideshow()
     Else If isOkay
@@ -926,6 +922,16 @@ WM_LBUTTONUP(wP, lP, msg, hwnd) {
 
     LbtnDwn := 0
     colorPickerMustEnd := 1
+    If (menusflyOutVisible=1)
+    {
+       MouseGetPos, , , OutputVarWin, hwnd, 2
+       If (hwnd=hFlyBtn1)
+          PanelQuickSearchMenuOptions()
+       Else If (hwnd=hFlyBtn2)
+          toggleAppToolbar()
+       Else If (hwnd=hFlyBtn3)
+          ToggleMenuBaru()
+    }
     Return 0
 }
 
@@ -1285,7 +1291,8 @@ IdentifyCtrlUnderMouse(mX, mY) {
 
 WinClickAction(thisEvent:="normal") {
     Static lastInvoked := 1
-    If (A_TickCount - lastInvoked<25)
+    MouseGetPos, ,, OutputVarWin
+    If ((A_TickCount - lastInvoked<25) || (OutputVarWin=hGuiTip))
        Return
 
     ; GetMouseCoord2wind(PVhwnd, mX, mY, mXo, mYo)
@@ -1532,7 +1539,7 @@ TestDraggableWindow() {
 }
 
 trackMouseDragging() {
-    lastWinDrag := A_TickCount
+    Global lastWinDrag := A_TickCount
 }
 
 WM_MOUSELEAVE(wP, lP, msg, hwnd) {
@@ -2813,6 +2820,9 @@ mouseTurnOFFtooltip() {
    If (mouseToolTipWinCreated!=1)
       Return
 
+   MouseGetPos, ,, OutputVarWin
+   If (OutputVarWin=hGuiTip)
+      Global lastWinDrag := A_TickCount - 125
    Sleep, 10
    Gui, mouseToolTipGuia: Destroy
    Global mouseToolTipWinCreated := 0
@@ -2829,7 +2839,7 @@ destroyTooltipu() {
    mouseTurnOFFtooltip()
    Sleep, 1
    MouseGetPos, ,, OutputVarWin
-   If (OutputVarWin=hQPVtoolbar)
+   If (OutputVarWin=hQPVtoolbar && ShowAdvToolbar=1)
       MouseClick, Left
 }
 
