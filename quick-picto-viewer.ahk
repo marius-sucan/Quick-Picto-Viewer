@@ -40804,7 +40804,7 @@ PanelEditorImgResize() {
     Gui, Add, Checkbox, x+5 hp Checked%adjustCanvasCentered% vadjustCanvasCentered, Centered image
 
     clrW := (PrefsLargeFonts=1) ? 65 : 45
-    Gui, Add, Text, xs y+15 vInfoResized, Resulted dimensions for the resized image `n and canvas
+    Gui, Add, Text, xs y+15 vInfoResized, Resulted dimensions for the resized image: TO DECIDE! `n and canvas
     Gui, Add, Checkbox, xs y+10 hp Checked%ResizeEnforceCanvas% vResizeEnforceCanvas gupdateUIresizeImgEditPanel, Set the given dimensions as canvas size
     sml := (PrefsLargeFonts=1) ? 90 : 60
     ha := (PrefsLargeFonts=1) ? 28 : 19
@@ -40826,6 +40826,16 @@ BTNimgResizeEditor() {
     tUserNewHeight := Round(obju[1, 4])
     imgW := Round(obju[1, 1])
     imgH := Round(obju[1, 2])
+    cmpx := Round((tUserNewWidth * tUserNewHeight)/1000000, 1)
+    impx := Round((imgW * imgH)/1000000, 1)
+    If (max(cmpx, impx)>536.4)
+    {
+       showTOOLtip("WARNING: Resulted image cannot exceed 536.4 megapixels.")
+       SoundBeep 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
+
     whichBitmap := useGdiBitmap()
     Gdip_GetImageDimensions(whichBitmap, oImgW, oImgH)
     If (oImgW=tUserNewWidth && oImgH=tUserNewHeight)
@@ -40839,7 +40849,7 @@ BTNimgResizeEditor() {
     If (min(imgW, imgH, tUserNewWidth, tUserNewHeight)<3
     || max(imgW, imgH, tUserNewWidth, tUserNewHeight)>32750)
     {
-       showTOOLtip("WARNING: Incorrect values provided to resize image.")
+       showTOOLtip("WARNING: Incorrect values provided to resize image.`nValues must be between 3 and 32750 pixels.")
        SoundBeep 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
        Return
@@ -41013,20 +41023,25 @@ updateUIresizeImgEditPanel(dummy:=0) {
        canvasHeight := thisHeight
     }
 
-    pk := capIMGdimensionsGDIPlimits(canvasWidth, canvasHeight)
-    If pk
-    {
-       thisWidth := Floor(thisWidth * pk)
-       thisHeight := Floor(thisHeight * pk)
-    }
+    ; pk := capIMGdimensionsGDIPlimits(canvasWidth, canvasHeight)
+    ; If pk
+    ; {
+    ;    thisWidth := Floor(thisWidth * pk)
+    ;    thisHeight := Floor(thisHeight * pk)
+    ; }
 
     mpx := Round((canvasWidth * canvasHeight)/1000000, 1)
+    If (mpx>536.4)
+       mpx := "! " mpx
+
     If (doFriendly=1)
        friendly := "`nCanvas size: " groupDigits(Round(canvasWidth)) " x " groupDigits(Round(canvasHeight)) " px (" mpx " MPx)"
-; 10601 x 34500
 
     lastInvoked := A_TickCount
     mpx := Round((thisWidth * thisHeight)/1000000, 1)
+    If (mpx>536.4)
+       mpx := "! " mpx
+
     GuiControl, SettingsGUIA:, infoResized, % "Image size: " groupDigits(Round(thisWidth)) " x " groupDigits(Round(thisHeight)) " px (" mpx " MPx)" friendly
     thisOpa := (BrushToolUseSecondaryColor=1) ? "BrushToolBopacity" : "BrushToolAopacity"
     %thisOpa% := OutlierFillOpacity
