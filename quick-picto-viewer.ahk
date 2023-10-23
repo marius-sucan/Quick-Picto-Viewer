@@ -14430,14 +14430,12 @@ InsertTextSelectedArea() {
     ; fnOutputDebug(A_ThisFunc "(): " tX "," tY "," wX "," hY "," tW "," tH)
     If (TextInAreaBlendMode>1 || alphaMaskingMode>1)
     {
-       bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, tX, tY, tW, tH, 0, 0, 1)
+       If (TextInAreaBlendMode>1)
+          bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, tX, tY, tW, tH, 0, 0, 1)
        newBitmap := trGdip_CreateBitmap(A_ThisFunc, tW, tH)
        Gr := Gdip_GraphicsFromImage(newBitmap)
        If (userimgGammaCorrect=1)
           Gdip_SetCompositingQuality(Gr, 2)
-
-       If (TextInAreaBlendMode=1)
-          r1 := trGdip_DrawImage(A_ThisFunc, Gr, bgrBMPu)
 
        If (TextInAreaRoundBoxBgr=1 && TextInAreaFillSelArea=1)
           Gdip_FillRoundedRectanglePath(Gr, zBrush, 0, 0, tW, tH, min(tW, tH)//6)
@@ -14457,13 +14455,6 @@ InsertTextSelectedArea() {
        }
 
        gBitmap := (StrLen(maskedBitmap)>2) ? maskedBitmap : bgrBMPu
-       If (TextInAreaBlendMode=1)
-       {
-          Gdip_SetClipRect(G2, tX, tY, tW, tH)
-          Gdip_GraphicsClear(G2)
-          Gdip_ResetClip(G2)
-       }
-
        r2 := trGdip_DrawImage(A_ThisFunc, G2, gBitmap, tX, tY)
        ; fnOutputDebug(A_ThisFunc "(): " r1 "=" r2 "=" zr)
        trGdip_DisposeImage(newBitmap, 1)
