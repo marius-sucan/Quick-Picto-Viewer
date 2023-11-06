@@ -1,6 +1,16 @@
 // Quick Picto Viewer - CHANGELOG
 // by Marius Șucan ( https://marius.sucan.ro )
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
+// Project began in early May 2019.
+
+- v6.0.00 (2023-**-** / work in progress)
+  - [new] QPV can now display, at full resolution, images of up to 12500 megapixels or more; previously, they were down-scaled to 536 mgpx.
+  - images exceeding 536 mgpx can be resized, cropped, rotated by 90°, or flipped H/V; colors invert is also available; image selected area can be copied to clipboard
+  - increased the limit from 32567 to 234950 pixels in width or height for images in the viewport that can be edited with any available tool
+  - [...] more to be decided 
+
+- v5.9.93 (2023-11-06)
+  - more bug fixes
 
 - v5.9.92 (2023-10-22)
   - bug fixes only
@@ -1005,7 +1015,7 @@ Files organization:
   - all tool tip messages no longer have now a hard-coded expiry time
 
 - v2.0.0 (2019-06-04)
-  - [new] touch screen mode ; the viewport is now split into different areas that respond distinctively to touches/clicks
+  - [new] touch screen mode; the viewport is now split into different areas that respond distinctively to touches/clicks
   - [new] file information dialog box
   - [new] preferences menu
     - options to toggle image resizing interpolation quality
@@ -1076,7 +1086,10 @@ Files organization:
 
 - v1.0.0 (2010-10-04) by SBC
 
-; known issues [jeudi 18 août 2022]
+
+; known issues [mardi 24 octobre 2023]
   - high memory consumption; all operations need a lot of RAM [zoom/pan, etc]
   - when multi-threaded is activated, QPV randomly hangs in thumbnails mode
   - jpeg lossless crop: the selection area does not precisely match with the resulted image [freeimage]
+  - sometimes the viewport fails to update when the brush tool is used
+

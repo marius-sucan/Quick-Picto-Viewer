@@ -45,8 +45,8 @@
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
 ;@Ahk2Exe-UpdateManifest 0, Quick Picto Viewer
 ;@Ahk2Exe-SetOrigFilename Quick-Picto-Viewer.exe
-;@Ahk2Exe-SetVersion 5.9.92
-;@Ahk2Exe-SetProductVersion 5.9.92
+;@Ahk2Exe-SetVersion 5.9.93
+;@Ahk2Exe-SetProductVersion 5.9.93
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2023)
 ;@Ahk2Exe-SetCompanyName https://marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -220,7 +220,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*"
    , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable()
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.9.92", vReleaseDate := "2023/10/22" ; yyyy-mm-dd
+   , appVersion := "5.9.93", vReleaseDate := "2023/11/06" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -4240,8 +4240,8 @@ TrueCleanup() {
    RegWrite, REG_SZ, %QPVregEntry%, Running, 0
 
    lastInvoked := A_TickCount
-   RemoveTooltip()
-   DestroyGIFuWin()
+   If (slideShowRunning=1)
+      DestroyGIFuWin()
    Sleep, 1
    If (wasInitFIMlib=1)
       FreeImage_FoxInit(0) ; Unload Dll
@@ -4251,8 +4251,8 @@ TrueCleanup() {
    destroyGDIfileCache()
    discardViewPortCaches()
    terminateIMGediting()
-   trGdip_DisposeImage(userAlphaMaskBmpPainted)
-   trGdip_DisposeImage(userPrevAlphaMaskBmpPainted)
+   userAlphaMaskBmpPainted := trGdip_DisposeImage(userAlphaMaskBmpPainted)
+   userPrevAlphaMaskBmpPainted := trGdip_DisposeImage(userPrevAlphaMaskBmpPainted)
    Gdip_DeleteBrush(pBrushWinBGR)
    Gdip_DeleteBrush(pBrushHatch)
    Gdip_DeleteBrush(pBrushHatchLow)
@@ -5415,7 +5415,11 @@ doLayeredWinUpdate(funcu, hwnd, HDCu, opacity:=255) {
         yPos += ToolbarWinH
   }
 
-  Return UpdateLayeredWindow(hwnd, HDCu, xPos, yPos, mainWidth, mainHeight, opacity)
+  rr := UpdateLayeredWindow(hwnd, HDCu, xPos, yPos, mainWidth, mainHeight, opacity)
+  If !rr
+     addJournalEntry(A_ThisFunc "(): ERROR. Failed to update window: " hwnd ". Device context: " HDCu ". Invoked by: " funcu)
+
+  Return rr
 }
 
 vpWinClientSize(ByRef w, ByRef h, hwnd:=0, mode:=0) {
@@ -8462,7 +8466,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
          SetTimer, RemoveTooltip, % -msgDisplayTime//2
          Return
       }
-   } Else If isVarEqualTo(AnyWindowOpen, 69, 43, 44, 26, 78)
+   } Else If isVarEqualTo(AnyWindowOpen, 69, 43, 44, 26, 78, 79)
    {
       ; respond to clicks in viewport for panels with region based previews
       setwhileLoopExec(1)
@@ -10042,7 +10046,7 @@ decideNewVPzoomLevel(zl, key, dir, stepFactor) {
    Else If isInRange(zl, 9.90, 10.10)
       zl := 10
 
-   zl := clampInRange(zl, 0.01, 20)
+   zl := clampInRange(zl, 0.005, 20)
    Return zl 
 }
 
@@ -13218,9 +13222,19 @@ capIMGdimensionsFormatlimits(typu, keepRatio, ByRef ResizedW, ByRef ResizedH) {
     mpx := Round((ResizedW * ResizedH)/1000000, 1)
     If (mpx>mpxLimit)
     {
-       g := mpxLimit/mpx
-       ResizedW := Floor(ResizedW * g)
-       ResizedH := Floor(ResizedH * g)
+       g := 1
+       rw := rh := 0
+       Loop
+       {
+          g -= 0.001
+          rw := Floor(ResizedW * g)
+          rh := Floor(ResizedH * g)
+          mpx := Round((rw * rh)/1000000, 1)
+          If (mpx<mpxLimit)
+             Break
+       }
+       ResizedW := rw
+       ResizedH := rh
     }
 
     p := ((ResizedW + ResizedH)/2) / ((ow + oh)/2)
@@ -14151,12 +14165,23 @@ CutSelectedArea() {
 
 ApplyColorAdjustsSelectedArea(modus:=0) {
     Static prevFXmode := "n"
+    If (thumbsDisplaying=1)
+    {
+       prevFXmode := imgFxMode
+       Return
+    }
+
     If InStr(modus, "outside")
        modus := "outside"
+    Else If (editingSelectionNow!=1)
+       selectEntireImage()
 
     stopNow := (editingSelectionNow=1 && StrLen(gdiBitmap)>4) ? 0 : 1
-    If (stopNow=1)
+    If (stopNow=1 || throwErrorSelectionOutsideBounds(useGdiBitmap()) || testEntireImgSelected() && modus="ouside")
+    {
+       prevFXmode := imgFxMode
        Return 
+    }
 
     o_imgFxMode := imgFxMode
     If (imgFxMode>1)
@@ -16363,33 +16388,49 @@ dummyDrawImage(pEffect, clrMatrix, zBitmap, G2, funcu) {
 }
 
 ResizeIMGviewportSelection() {
-    stopNow := (editingSelectionNow=1 && StrLen(gdiBitmap)>4) ? 0 : 1
+    stopNow := (editingSelectionNow=1 && StrLen(gdiBitmap)>2) ? 0 : 1
     If (stopNow=1)
        Return 
 
-    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc)
-    whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
-    If (stopNow=1 ||!whichBitmap || thumbsDisplaying=1 || editingSelectionNow!=1)
-       Return
-
+    Gdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+    mgpx := Round((imgW * imgH)/1000000, 1)
     imgSelW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
     imgSelH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
     capIMGdimensionsGDIPlimits(imgSelW, imgSelH)
+    If (imgSelW=imgW && imgSelH=imgH)
+       Return
+
+    If (throwErrorSelectionOutsideBounds(useGdiBitmap()) || testEntireImgSelected())
+       Return
+
+    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc)
+    whichBitmap := StrLen(UserMemBMP)>2 ? UserMemBMP : gdiBitmap
+    If (stopNow=1 || !whichBitmap || thumbsDisplaying=1 || editingSelectionNow!=1)
+       Return
+
     thisQuality := (userimgQuality=1) ? 7 : 5
     pargbPixFmt := (coreDesiredPixFmt="0xE200B") ? -1 : 0
+    nmgpx := Round((imgSelW * imgSelH)/1000000, 1)
+    showTOOLtip("Please wait, resizing image to`n" imgSelW " x " imgSelH " pixels`n" nmgpx " megapixels")
     newBitmap := trGdip_ResizeBitmap(A_ThisFunc, whichBitmap, imgSelW, imgSelH, 0, thisQuality, pargbPixFmt)
     If StrLen(newBitmap)<2
     {
+       showTOOLtip("Failed to resize image to`n" imgSelW " x " imgSelH " pixels`n" nmgpx " megapixels")
+       SoundBeep 300, 100
        SetTimer, ResetImgLoadStatus, -150
        Return "fail"
     }
+
+    diffu := max(nmgpx, mgpx) - min(nmgpx, mgpx)
+    If (diffu>50)
+       PrintPosX := "X"
 
     recordUndoLevelNow("init", 0)
     UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
     gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
     UserMemBMP := newBitmap
-    editingSelectionNow := 0
-    vpIMGrotation := 0
+    VPselRotation := EllipseSelectMode := vpIMGrotation := 0
+    selectEntireImage()
     updateUIctrl()
     MouseMoveResponder()
     recordUndoLevelNow(0, newBitmap)
@@ -16547,6 +16588,8 @@ coreDrawLinesSelectionArea(G2:=0, whichBitmap:=0) {
     If (DrawLineAreaContourAlign=1)
        dR := -thisThick//2
 
+    x1 := imgSelPx,              y1 := imgSelPy
+    x2 := imgSelPx + imgSelW,    y2 := imgSelPy + imgSelH
     imgSelPx -= dR
     imgSelPy -= dR
     imgSelW += dR*2
@@ -18341,6 +18384,44 @@ getSelectedImageArea(whichBitmap, doCarving, limitBounds, applyVPfx, fakeBGR) {
     } Else addJournalEntry(A_ThisFunc "(): failed to create GDI+ object path")
 }
 
+MenuRotateEditImagePlus() {
+   RotateEditedImage(90)
+}
+
+MenuRotateEditImageMinus() {
+   RotateEditedImage(-90)
+}
+
+RotateEditedImage(modus:=0) {
+    If (slideShowRunning=1)
+       ToggleSlideShowu()
+
+    whichBitmap := useGdiBitmap()
+    If (!whichBitmap || thumbsDisplaying=1)
+       Return
+
+    If (UserMemBMP=whichBitmap)
+       xBitmap := UserMemBMP
+
+    dir := (modus=90) ? 1 : 3
+    dummyBMP := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+    r := Gdip_ImageRotateFlip(dummyBMP, dir)
+    If (StrLen(dummyBMP)>2 && !r)
+    {
+       recordUndoLevelNow("init", 0)
+       UserMemBMP := dummyBMP
+       recordUndoLevelNow(0, UserMemBMP)
+       trGdip_DisposeImage(xBitmap, 1)
+       SetTimer, RefreshImageFile, -25
+    } Else
+    {
+       showTOOLtip("Failed to rotate image")
+       trGdip_DisposeImage(dummyBMP, 1)
+       SoundBeep 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+    }
+}
+
 CropImageInViewPortToSelection(modus:=0) {
     If (slideShowRunning=1)
        ToggleSlideShowu()
@@ -18349,10 +18430,11 @@ CropImageInViewPortToSelection(modus:=0) {
     If (!whichBitmap || thumbsDisplaying=1 || editingSelectionNow!=1)
        Return
 
-    If throwErrorSelectionOutsideBounds(whichBitmap)
+    If (throwErrorSelectionOutsideBounds(whichBitmap) || testEntireImgSelected())
        Return
 
     Gdip_GetImageDimensions(whichBitmap, imgW, imgH)
+    mgpx := Round((imgW * imgH)/1000000, 1)
     calcImgSelection2bmp(1, imgW, imgH, imgW - 1, imgH - 1, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
     If (UserMemBMP=whichBitmap)
        xBitmap := UserMemBMP
@@ -18365,14 +18447,21 @@ CropImageInViewPortToSelection(modus:=0) {
     }
 
     dummyBMP := getSelectedImageArea(whichBitmap, 1, 0, 0, 0)
-    If StrLen(dummyBMP)>1
+    If StrLen(dummyBMP)>2
     {
+       Gdip_GetImageDimensions(dummyBMP, kw, kh)
+       nmgpx := Round((kw * kh)/1000000, 1)
+       diffu := max(nmgpx, mgpx) - min(nmgpx, mgpx)
+       If (diffu>50)
+          PrintPosX := "X"
+
        recordUndoLevelNow("init", 0)
        If (EllipseSelectMode>0 || VPselRotation>0 || X1<0 || Y1<0 || X2>imgW || Y2>ImgH) || (innerSelectionCavityX>0.01 && innerSelectionCavityY>0.01)
           currIMGdetails.HasAlpha := 1
        UserMemBMP := dummyBMP
        recordUndoLevelNow(0, UserMemBMP)
        trGdip_DisposeImage(xBitmap, 1)
+       dummyTimerDelayiedImageDisplay(50)
     } Else
     {
        showTOOLtip("Failed to crop image to selected area")
@@ -18384,8 +18473,7 @@ CropImageInViewPortToSelection(modus:=0) {
     If (modus="simplex")
        Return
 
-    editingSelectionNow := 0
-    vpIMGrotation := 0
+    editingSelectionNow := vpIMGrotation := 0
     updateUIctrl()
     MouseMoveResponder()
     SetTimer, RefreshImageFile, -25
@@ -20827,7 +20915,10 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
     {
        rz := CloseWindow()
        If rz
+       {
+          openingPanelNow := 0
           Return
+       }
     }
 
     thisBtnHeight := (PrefsLargeFonts=1) ? 34 : 24
@@ -30495,7 +30586,7 @@ coreReadSettingsImageProcessing(act) {
     RegAction(act, "SimpleOperationsFlipV",, 1)
     RegAction(act, "SimpleOperationsRotateAngle",, 2, 1, 4)
     RegAction(act, "SimpleOperationsScaleXimgFactor",, 2, 1, 32750)
-    RegAction(act, "SimpleOperationsScaleYimgFactor",, 2, 1, 32000)
+    RegAction(act, "SimpleOperationsScaleYimgFactor",, 2, 1, 32750)
     RegAction(act, "userActionConflictingFile",, 2, 1, 3)
     RegAction(act, "userDesireWriteFMT",, 2, 1, 16)
     RegAction(act, "userJpegQuality",, 2, 1, 100)
@@ -36577,14 +36668,17 @@ PanelSetWallpaper() {
     dw := Delete IDesktopWallpaper
     listu := Trim(listu, "|")
     
+    ml := (PrefsLargeFonts=1) ? 450 : 285
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
-    ml := (PrefsLargeFonts=1) ? 275 : 175
-    Gui, Add, Text, x15 y15 Section, Please choose the monitor and the image position`nand size adaptation mode on the desktop.
+    warnu := (thumbsDisplaying!=1) ? "The active image file will be set as a wallpaper, which may differ from the image you see in the viewport (if altered)." : ""
+    Gui, Add, Text, x15 y15 Section w%ml%, Please choose the monitor and the image position and size adaptation mode on the desktop.
 
     GuiAddDropDownList("xs y+10 wp AltSubmit Choose1 vuserMonitorIDu", listu, "Monitor")
     GuiAddDropDownList("xs y+10 wp-100 AltSubmit Choose" userMonitorImgPos " vuserMonitorImgPos", "Centered|Tiled|Stretched|Fit|Fill|Span", "Adapt to desktop mode")
     GuiAddColor("x+5 hp w55", "monitorBgrColor", "Desktop background color")
     GuiAddPickerColor("x+5 hp wp-20", "monitorBgrColor")
+    If warnu
+       Gui, Add, Text, xs y+15 w%ml%, %warnu%
 
     Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid% Default gBTNsetImgWallpaper vbtn1, &Set wallpaper
     Gui, Add, Button, x+5 hp wp-10 gBTNremWallpaper vbtn3, &No wallpaper
@@ -40726,6 +40820,8 @@ BtnResetBlendMode() {
       GuiControl, SettingsGUIA: Choose, BlurAreaBlendMode, % BlurAreaBlendMode
       If (AnyWindowOpen=69)
          updateUIzoomBlurPanel()
+      Else If (AnyWindowOpen=44)
+         updateUIaddNoisePanel()
       Else
          updateUIblurPanel()
    }
@@ -40740,7 +40836,10 @@ BtnResetTextBlendMode() {
 BtnResetEdgesBlendMode() {
    IDedgesBlendMode := 1
    GuiControl, SettingsGUIA: Choose, IDedgesBlendMode, % IDedgesBlendMode
-   updateUIedgesPanel()
+   If (AnyWindowOpen=44)
+      updateUIaddNoisePanel()
+   Else
+      updateUIedgesPanel()
 }
 
 BtnResetGlassFX() {
@@ -40994,6 +41093,7 @@ updateUIresizeImgEditPanel(dummy:=0) {
 
     actu1 := (ResizeEnforceCanvas=1 && ResizeKeepAratio=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu1, ResizeFillCanvasMode
+    GuiControl, % actu1, adjustCanvasCentered
 
     actu := (PredefinedDocsSizes=13) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     If (PredefinedDocsSizes!=13)
@@ -46774,7 +46874,7 @@ PanelAdjustToneMapping() {
     Gui, +DPIScale
     Gui, Add, Text, x15 y+10 Section w%txtWid% vinfoLine, Image pixel format: %globalInfohFIFbmp%`n.
     Gui, Add, Checkbox, xs y+10 gupdateUItoneMappingPanel Checked%allowToneMappingImg% vallowToneMappingImg, Apply tone mapping to images
-    GuiAddDropDownList("xs y+10 w" txtWid " AltSubmit gupdateUItoneMappingPanel Choose" cmrRAWtoneMapAlgo " vcmrRAWtoneMapAlgo", "Adaptive logarithmic mapping (F. Drago, 2003)|HDR reduction inspired by photoreceptors physiology (E. Reinhard, 2005)", "HDR tone mapping algorithm")
+    GuiAddDropDownList("xs y+10 w" txtWid " AltSubmit gupdateUItoneMappingPanel Choose" cmrRAWtoneMapAlgo " vcmrRAWtoneMapAlgo", "F. Drago: Adaptive logarithmic mapping (2003)|E. Reinhard: HDR reduction inspired by photoreceptors physiology (2005)", "HDR tone mapping algorithm")
     GuiAddSlider("UIuserToneMapParamA", 1,400, 74, "Tone-mapping: Param A", "updateUItoneMappingPanel", 1, "xs y+10 wp hp+2")
     GuiAddSlider("UIuserToneMapParamB", 1,400, 200, "Tone-mapping: Param B", "updateUItoneMappingPanel", 1, "xs y+10 wp hp")
     Gui, Add, Checkbox, xs y+10 wp gupdateUItoneMappingPanel Checked%userHQraw% vuserHQraw, Load camera RAW images at high quality
@@ -46856,7 +46956,11 @@ initializeFimPreviewIMG(imgPath) {
      mustApplyToneMapping := (imgBPP>32 && !InStr(ColorsType, "rgba") && GFT!=13) || (imgBPP>64) ? 1 : 0
      globalInfohFIFbmp := imgBPP "-" ColorsType " | " imgType ".`nFile format: " pk
      If (mustApplyToneMapping=1)
+     {
         hFIFimgB := FreeImage_Rescale(hFIFimgA, thisW, thisH, 0)
+        FreeImage_UnLoad(hFIFimgA)
+        hFIFimgA := ""
+     }
   } Else
      globalInfohFIFbmp := "Failed to load the image file."
 
@@ -46864,11 +46968,14 @@ initializeFimPreviewIMG(imgPath) {
   If !hFIFimgB
   {
      FreeImage_UnLoad(globalhFIFimg)
+     If hFIFimgA
+        FreeImage_UnLoad(hFIFimgA)
+     globalInfohFIFbmp := ""
      globalhFIFimg := ""
      Return 0
   }
 
-  globalhFIFimg := hFIFimgB ? hFIFimgB : 0
+  globalhFIFimg := hFIFimgB
   If !globalhFIFimg
      Return 0
   Else
@@ -53421,6 +53528,9 @@ createMenuImageEditSubMenus(modus:=0) {
       kMenu("PVimgFilters", "Add", "&Invert colors`tShift+I", "InvertSelectedArea", "effects negative")
       kMenu("PVimgFilters", "Add", "Desaturate color&s`tCtrl+G", "PanelDesatureSelectedArea", "grayscale effects")
       kMenu("PVimgFilters", "Add", "Ad&just image colors`tU", "PanelColorsAdjusterImage", "grayscale effects lightness contrast saturation levels brightness")
+      If (AnyWindowOpen!=10)
+         kMenu("PVimgFilters", "Add", "Appl&y viewport color effects`tCtrl+Shift+U", "ApplyColorAdjustsSelectedArea")
+
       Menu, PVimgFilters, Add
       kMenu("PVimgFilters", "Add", "&Add noise", "PanelAddNoiserImage", "effects clouds plasma")
       kMenu("PVimgFilters", "Add", "Create s&ymmetry or patterns", "PanelSymmetricaImage", "generate textures tiles mirroring patterns")
@@ -53447,8 +53557,12 @@ createMenuImageEditSubMenus(modus:=0) {
       kMenu("PVimgTransform", "Add", "A&uto-crop image(s)`tAlt+Y", "PanelImgAutoCrop")
       kMenu("PVimgTransform", "Add", "A&dvanced live transform`tCtrl+T", "PanelTransformSelectedArea", "crop rotate resize clone blend alpha-masking flip blur glass effects adjust colors")
       Menu, PVimgTransform, Add 
-      kMenu("PVimgTransform", "Add", "Flip selected &horizontally`tShift+H", "FlipSelectedAreaH")
-      kMenu("PVimgTransform", "Add", "Flip selected &vertically`tShift+V", "FlipSelectedAreaV")
+      f := (editingSelectionNow=1) ? "selected " : ""
+      kMenu("PVimgTransform", "Add", "Flip " f "&horizontally`tShift+H", "FlipSelectedAreaH")
+      kMenu("PVimgTransform", "Add", "Flip " f "&vertically`tShift+V", "FlipSelectedAreaV")
+      kMenu("PVimgTransform", "Add", "Rotate image by 90°", "MenuRotateEditImagePlus")
+      kMenu("PVimgTransform", "Add", "Rotate image by -90°", "MenuRotateEditImageMinus")
+      Menu, PVimgTransform, Add 
       kMenu("PVimgTransform", "Add", "&Crop image to selection`tShift+Enter", "CropImageInViewPortToSelection")
       kMenu("PVimgTransform", "Add", "&Resize image to selection`tAlt+R", "ResizeIMGviewportSelection")
 
@@ -53456,8 +53570,6 @@ createMenuImageEditSubMenus(modus:=0) {
       {
          kMenu("PVimgDraw", "Disable", "&Erase or fade area`tDelete")
          kMenu("PVimgTransform", "Disable", "A&dvanced live transform`tCtrl+T")
-         kMenu("PVimgTransform", "Disable", "Flip selected &horizontally`tShift+H")
-         kMenu("PVimgTransform", "Disable", "Flip selected &vertically`tShift+V")
          kMenu("PVimgTransform", "Disable", "&Crop image to selection`tShift+Enter")
          kMenu("PVimgTransform", "Disable", "&Resize image to selection`tAlt+R")
       }
@@ -60964,7 +61076,9 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
     }
 
     imgPath := StrReplace(imgPath, "||")
-    pfn := (userPrivateMode=1) ? "Loading file..." : StrReplace(imgPath, "||")
+    fldr := SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1)
+    filu := SubStr(imgPath, InStr(imgPath, "\", 0, -1) + 1)
+    pfn := (userPrivateMode=1) ? "Loading file..." : "<> " filu " | " fldr "\"
     setWindowTitle(pfn)
     changeMcursor()
     calcScreenLimits()
@@ -61054,14 +61168,14 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
       If (customZoomAdaptMode>0)
       {
          zoomLevel := (customZoomAdaptMode=1) ? GuiW/oImgW : GuiH/oImgH
-         zoomLevel := clampInRange(Round(zoomLevel, 3), 0.01, 20)
+         zoomLevel := clampInRange(Round(zoomLevel, 7), 0.01, 20)
          ResizedW := Round(oImgW * zoomLevel, 3)
          ResizedH := Round(oImgH * zoomLevel, 3)
          ws := Round(zoomLevel * 100) "%"
       } Else If (prevVPsize>2 && gdiBMPchanged=1 && lockZoomLevel=0 && animGIFplaying!=1 && allowFreeIMGpanning=0)
       {
          calcImgSizeForVP(1, oImgW, oImgH, prevVPsize, prevVPsize, ResizedW, ResizedH)
-         zoomLevel := clampInRange(Round(ResizedW / oImgW, 3), 0.01, 20)
+         zoomLevel := clampInRange(Round(ResizedW / oImgW, 7), 0.01, 20)
          ResizedW := Round(oImgW * zoomLevel, 3)
          ResizedH := Round(oImgH * zoomLevel, 3)
          ws := Round(zoomLevel * 100) "%"
@@ -61074,7 +61188,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
    } Else
    {
       calcImgSizeForVP(IMGresizingMode, oImgW, oImgH, GuiW, GuiH, ResizedW, ResizedH)
-      zoomLevel := Round(ResizedW / oImgW, 3)
+      zoomLevel := Round(ResizedW / oImgW, 7)
       ws := Round(ResizedW / oImgW * 100) "%"
    }
 
@@ -64955,6 +65069,7 @@ ActPaintBrushNow() {
    interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
    interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
    vpWinClientSize(mainWidth, mainHeight)
+   createGDIPcanvas(mainWidth, mainHeight)
    GetMouseCoord2wind(PVhwnd, mX, mY)
    mX := (FlipImgH=1) ? mainWidth - mX : mX
    mY := (FlipImgV=1) ? mainHeight - mY : mY
@@ -66067,8 +66182,8 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
 calculateScrollBars(newW, newH, DestPosX, DestPosY, mainWidth, mainHeight, ByRef knobW, ByRef knobH, ByRef knobX, ByRef knobY) {
    If (allowFreeIMGpanning=1 && IMGresizingMode=4)
    {
-       totalW := (IMGlargerViewPort=1) ? newW*3 : newW + mainWidth
-       totalH := (IMGlargerViewPort=1) ? newH*3 : newH + mainHeight
+       totalW := (newW>mainWidth) ? newW*3 : newW + mainWidth
+       totalH := (newH>mainHeight) ? newH*3 : newH + mainHeight
        prcVisX := mainWidth/totalW
        prcVisY := mainHeight/totalH
        knobW := Round(mainWidth*prcVisX)
@@ -68957,9 +69072,11 @@ MouseCoords2Image(mX, mY, limitBounds, dPosX, dPosY, newW, newH, ByRef x, ByRef 
        y1 := clampInRange(y1, 0, newH)
     }
 
-    whichBitmap := whichBitmap ? whichBitmap : useGdiBitmap()
     If (!imgW || !imgH)
+    {
+       whichBitmap := whichBitmap ? whichBitmap : useGdiBitmap()
        Gdip_GetImageDimensions(whichBitmap, imgW, imgH)
+    }
 
     prcx1 := x1/newW
     prcy1 := y1/newH
@@ -75488,7 +75605,7 @@ PanelAdjustImageCanvasSize() {
     Gui, Add, Text, xs y+15, Resulted dimensions and background color:
     GuiAddEdit("xs+15 y+5 w" editWid " r1 Disabled -wrap vResultEditWidth", oImgW, "Calculated width")
     GuiAddEdit("x+5 wp r1 Disabled -wrap vResultEditHeight", oImgH, "Calculated height")
-    Gui, Add, Text, x+5 hp wp+25 +0x200 vinfoLine -wrap, -
+    Gui, Add, Text, x+5 hp wp+45 +0x200 vinfoLine -wrap, -
 
     sml := (PrefsLargeFonts=1) ? 140 : 80
     Gui, Add, Checkbox, xs y+10 hp Checked%adjustCanvasDoBgr% vadjustCanvasDoBgr gupdateUIadjustCanvasPanel, Fill with a background color
@@ -75555,8 +75672,8 @@ updateUIadjustCanvasPanel() {
     GuiControlGet, adjustCanvasMode
     GuiControlGet, adjustCanvasCentered
 
-    actu1 := (adjustCanvasMode=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
-    actu2 := (adjustCanvasMode!=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    actu1 := (adjustCanvasMode=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    actu2 := (adjustCanvasMode!=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiControl, % actu2, ResizeKeepAratio
     GuiControl, % actu2, ResizeInPercentage
     GuiControl, % actu2, adjustCanvasCentered
@@ -84121,7 +84238,7 @@ LoadWICimage(imgPath, noBPPconv, frameu, sizesDesired:=0, ByRef newBitmap:=0) {
    Static lastEdition := 1, hasRan := 0
    startZeit := A_TickCount
    ; lastEdition := !lastEdition
-   VarSetCapacity(resultsArray, 8 * 6)
+   VarSetCapacity(resultsArray, 8 * 6, 0)
 
    If IsObject(sizesDesired[1])
    {
@@ -84693,6 +84810,7 @@ tlbrSetImageIcon(icoFile, hwnd, W, H) {
        Gdip_DeletePen(pPenA)
        Gdip_DeleteGraphics(Gu)
        icoBMP := Gdip_ResizeBitmap(zpBitmap, w, h, 0, 3, -1, 0)
+       Gdip_DisposeImage(zpBitmap, 1)
        z := "PBMP:" icoBMP
        mustDispose := 1
     } Else
@@ -87668,7 +87786,7 @@ tlbrDecideTooltips(hwnd) {
       If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
          msgu := "L: Rotate image file by +90° «Shift + 0»`nR: Rotate image file by -90° «Shift + 9»"
       Else If isTlbrViewModus()
-         msgu := "L: Rotate image by 45° «0»`nR: Reset rotation  «\»"
+         msgu := "L: Rotate viewport image by 45° «0»`nR: Reset viewport rotation «\»"
    } Else If InStr(icoFile, "fill-shape")
    {
       msgu := (AnyWindowOpen=23) ? "L: Cycle through fill shapes «Alt + BackSpace»" : "L: Fill selection area «Alt + Backspace»"
