@@ -45,8 +45,8 @@
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
 ;@Ahk2Exe-UpdateManifest 0, Quick Picto Viewer
 ;@Ahk2Exe-SetOrigFilename Quick-Picto-Viewer.exe
-;@Ahk2Exe-SetVersion 5.9.93
-;@Ahk2Exe-SetProductVersion 5.9.93
+;@Ahk2Exe-SetVersion 5.9.94
+;@Ahk2Exe-SetProductVersion 5.9.94
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2023)
 ;@Ahk2Exe-SetCompanyName https://marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -220,7 +220,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*"
    , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable()
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.9.93", vReleaseDate := "2023/11/06" ; yyyy-mm-dd
+   , appVersion := "5.9.94", vReleaseDate := "2023/11/08" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -2531,6 +2531,7 @@ resetMainWin2Welcome() {
         seenImagesDB.Exec("BEGIN TRANSACTION;")
      }
 
+     trackImageListButtons("kill")
      desiredFrameIndex := SLDtypeLoaded := 0
      hasDrawnImageMap := hasDrawnHistoMap := editingSelectionNow := thumbsDisplaying := 0
      userAllowClrGradientRecenter := userAllowsGradientRecentering := 0
@@ -4247,6 +4248,7 @@ TrueCleanup() {
       FreeImage_FoxInit(0) ; Unload Dll
 
    tlbrSetImageIcon("kill", "kill", 0, 0)
+   trackImageListButtons("kill")
    disposeCacheIMGs()
    destroyGDIfileCache()
    discardViewPortCaches()
@@ -19499,8 +19501,15 @@ collapseWidgetGUIAGuiEscape:
    WinActivate, ahk_id %PVhwnd%
 Return
 
-CreateCollapsedPanelWidget() {
+CreateCollapsedPanelWidget(modus:=0) {
     Static lastState := -1
+    If (modus="kill")
+    {
+       Gui, collapseWidgetGUIA: Destroy
+       lastState := ""
+       Return
+    }
+
     thisState := "a" uiUseDarkMode ToolbarScaleFactor PrefsLargeFonts colorPickerModeNow mustCaptureCloneBrush
     If (thisState=lastState)
        Return
@@ -19798,6 +19807,31 @@ GuiAddColor(options, colorReference, labelu:=0, guiu:="SettingsGUIA") {
     Return hTemp
 }
 
+trackImageListButtons(actu, r:=0) {
+    Static HILs := []
+    Static counteru := 0
+    If (actu="record")
+    {
+       ; SoundBeep , 300, 100
+       counteru++
+       HILs[counteru] := r
+       Return
+    }
+
+    CreateCollapsedPanelWidget("kill")
+    Loop, % counteru
+    {
+       If (HILs[A_Index]!="")
+       {
+          ; SoundBeep , 900, 100
+          DllCall("Comctl32.dll\ImageList_Destroy", "uptr", HILs[A_Index])
+       }
+
+       HILs[A_Index] := ""
+    }
+    counteru := 0
+}
+
 updateColoredRectCtrl(coloru, varu, guiu:="SettingsGUIA", clrHwnd:=0) {
     If !clrHwnd
        GuiControlGet, clrHwnd, %guiu%: hwnd, %varu%
@@ -19813,6 +19847,8 @@ updateColoredRectCtrl(coloru, varu, guiu:="SettingsGUIA", clrHwnd:=0) {
     copt4 := [0, "0xFF" coloru, "0xFF" coloru,,,, "0xFF999999", 2, 0] ; disabled
     copt5 := [0, "0xFF" coloru, "0xFF" coloru,,,, "0xff999999", 4, 0] ; active/focused
     r := ImageButton.Create(clrHwnd, copt1, copt2, copt3, copt4, copt5)
+    If (r!="")
+       trackImageListButtons("record", r)
     ; ToolTip, % r "|" coloru "|" hwnd  , , , 2
     Return r
 }
@@ -20746,6 +20782,8 @@ SetImgButtonStyle(hwnd, newLabel:="", checkMode:=0) {
       r := ImageButton.Create(hwnd, dopt1, dopt2, dopt%pi%, dopt4, dopt5)
    Else
       r := ImageButton.Create(hwnd, lopt1, lopt2, lopt%pi%, lopt4, lopt5)
+   If (r!="")
+      trackImageListButtons("record", r)
 
    Return r
 }
@@ -81153,7 +81191,7 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
 
 adjustCanvas2Toolbar(Gu, applyTransform) {
     Static lastX := 0, lastY := 0
-    If (ShowAdvToolbar!=1 || slideShowRunning=1)
+    If (ShowAdvToolbar!=1 || lockToolbar2Win!=1 || slideShowRunning=1)
        Return 0
 
     hasTrans := 0
@@ -84852,6 +84890,9 @@ tlbrSetImageIcon(icoFile, hwnd, W, H) {
     d4 := [0, "0xFF" ToolbarBgrColor,"0xFF" ToolbarBgrColor,,,,, 0, 1 z] ; disabled
     d5 := [0, "0xFF" c,"0xFF" c,,,,, 0, 1, z] ; active/focused
     r := ImageButton.Create(hwnd, d1, d2, d3, d4, d5)
+    If (r!="")
+       trackImageListButtons("record", r)
+
     If mustDispose
        Gdip_DisposeImage(icoBMP)
 }
@@ -86671,6 +86712,8 @@ CoreGUItoolbar(scopul:=0, whichList:=0) {
           Gui, dummyGuia: -DPIScale -MaximizeBox -MinimizeBox +Owner%PVhwnd% +ToolWindow +E0x20 
           hasRan := 1
        }
+       If !AnyWindowOpen
+          trackImageListButtons("kill")
 
        Gui, OSDguiToolbar: Destroy
        Sleep, 15

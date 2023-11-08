@@ -483,11 +483,11 @@ Class ImageButton {
       This.Delete("Font")
       ; ----------------------------------------------------------------------------------------------------------------
       ; Create the ImageList
-      HIL := DllCall("Comctl32.dll\ImageList_Create"
-                   , "UInt", BtnW, "UInt", BtnH, "UInt", ILC_COLOR32, "Int", 6, "Int", 0, "Ptr")
+      HIL := DllCall("Comctl32.dll\ImageList_Create", "UInt", BtnW, "UInt", BtnH, "UInt", ILC_COLOR32, "Int", 6, "Int", 0, "UPtr")
       Loop, % (This.BitMaps.MaxIndex() > 1 ? 6 : 1) {
          HBITMAP := This.BitMaps.HasKey(A_Index) ? This.BitMaps[A_Index] : This.BitMaps.1
          DllCall("Comctl32.dll\ImageList_Add", "UPtr", HIL, "UPtr", HBITMAP, "UPtr", 0)
+         DllCall("gdi32\DeleteObject", "UPtr", HBITMAP)
       }
       ; Create a BUTTON_IMAGELIST structure
       VarSetCapacity(BIL, 20 + A_PtrSize, 0)
@@ -501,15 +501,17 @@ Class ImageButton {
       Control, Style, +%BS_BITMAP%, , ahk_id %HWND%
       ; Remove the currently assigned image list, if any
       If (IL)
-         IL_Destroy(IL)
+         DllCall("Comctl32.dll\ImageList_Destroy", "UPtr", IL)
       ; Assign the ImageList to the button
       DllCall("User32.dll\SendMessage", "UPtr", HWND, "UInt", BCM_SETIMAGELIST, "UPtr", 0, "UPtr", 0)
       DllCall("User32.dll\SendMessage", "UPtr", HWND, "UInt", BCM_SETIMAGELIST, "UPtr", 0, "UPtr", &BIL)
       ; Free the bitmaps
+      BIL := ""
+      RECT := ""
       This.FreeBitmaps()
       ; ----------------------------------------------------------------------------------------------------------------
       ; All done successfully
-      Return True
+      Return HIL
    }
    ; ===================================================================================================================
    ; Set the default GUI color
