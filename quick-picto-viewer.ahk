@@ -2531,7 +2531,8 @@ resetMainWin2Welcome() {
         seenImagesDB.Exec("BEGIN TRANSACTION;")
      }
 
-     trackImageListButtons("kill")
+     If (ShowAdvToolbar!=1)
+        trackImageListButtons("kill")
      desiredFrameIndex := SLDtypeLoaded := 0
      hasDrawnImageMap := hasDrawnHistoMap := editingSelectionNow := thumbsDisplaying := 0
      userAllowClrGradientRecenter := userAllowsGradientRecentering := 0
@@ -47290,6 +47291,7 @@ InvokeStandardDialogColorPicker(hC, event, c) {
   {
      createLivePreviewBrush()
      delayedWriteTlbrColors(1)
+     SetTimer, fromCurrentPanelToColorsSwatch, -100
   } Else If (AnyWindowOpen=63)
   {
      updateUIgridPanel()
@@ -53062,6 +53064,8 @@ closeDocuments() {
       Return
    }
 
+   trackImageListButtons("kill")
+   createGUItoolbar("refresh-later")
    terminateIMGediting()
    interfaceThread.ahkassign("currentFilesListModified", currentFilesListModified)
    PopulateIndexFilesStatsInfos("kill")
@@ -60159,62 +60163,53 @@ getCurrentDate() {
    Return CurrentDateB ", " CurrentTimeB
 }
 
-destroyGDIPcanvas(modus:=0) {
-    If (modus=0)
-       qpvCanvasHasInit := 0
+destroyGDIPcanvas() {
+    qpvCanvasHasInit := 0
+    Gdi_SelectObject(glHDC, glOBM)
+    If glHbitmap
+       Gdi_DeleteObject(glHbitmap)
+    If glOBM
+       Gdi_DeleteObject(glOBM)
+    If glHDC
+       Gdi_DeleteDC(glHDC)
+    If glPG
+       Gdip_DeleteGraphics(glPG)
 
-    If (which=0 || which=1)
-    {
-       Gdi_SelectObject(glHDC, glOBM)
-       If glHbitmap
-          Gdi_DeleteObject(glHbitmap)
-       If glHDC
-          Gdi_DeleteDC(glHDC)
-       If glPG
-          Gdip_DeleteGraphics(glPG)
+    glHbitmap := glHDC := glPG := ""
+    Gdi_SelectObject(2NDglHDC, 2NDglOBM)
+    If 2NDglHbitmap
+       Gdi_DeleteObject(2NDglHbitmap)
+    If 2NDglOBM
+       Gdi_DeleteObject(2NDglOBM)
+    If 2NDglHDC
+       Gdi_DeleteDC(2NDglHDC)
+    If 2NDglPG
+       Gdip_DeleteGraphics(2NDglPG)
 
-       glHbitmap := glHDC := glPG := ""
-    }
-
-    If (which=0 || which=2)
-    {
-       Gdi_SelectObject(2NDglHDC, 2NDglOBM)
-       If 2NDglHbitmap
-          Gdi_DeleteObject(2NDglHbitmap)
-       If 2NDglHDC
-          Gdi_DeleteDC(2NDglHDC)
-       If 2NDglPG
-          Gdip_DeleteGraphics(2NDglPG)
-
-       2NDglHbitmap := 2NDglHDC := 2NDglPG := ""
-    }
+    2NDglHbitmap := 2NDglHDC := 2NDglPG := ""
 }
 
-createGDIPcanvas(W:=0, H:=0, forceIT:=0, which:=0) {
+createGDIPcanvas(W:=0, H:=0, forceIT:=0) {
    Critical, on
    Static prevDimensions, hasInit
    If (A_TickCount - lastMenuBarUpdated<500) && (forceIT=0)
       Return
 
-   If qpvCanvasHasInit
-      Return
-
    If (!W || !H)
       vpWinClientSize(W, H)
 
-   Gdi_GetImageDimensions(glHbitmap, pW, pH, bpp)
-   Gdi_GetImageDimensions(2NDglHbitmap, ppW, ppH, bpp)
-   If (pW!=W || pH!=H || ppW!=W || ppH!=H)
-      forceIT := 1
+   ; Gdi_GetImageDimensions(glHbitmap, pW, pH, bpp)
+   ; Gdi_GetImageDimensions(2NDglHbitmap, ppW, ppH, bpp)
+   ; If (pW!=W || pH!=H || ppW!=W || ppH!=H)
+   ;    forceIT := 1
 
    azp := (ShowAdvToolbar=1 && lockToolbar2Win=1) ? 1 "|" TLBRverticalAlign : 0
    newDimensions := "w" W "-h" H "-mbar" showMainMenuBar azp
    doAgain := (prevDimensions!=newDimensions) ? 1 : 0
    If (!qpvCanvasHasInit || doAgain=1 || forceIT=1)
    {
-      pwc := (!hasInit || forceIT=1) ? 0 : which
       If (hasInit=1)
-         destroyGDIPcanvas(pwc)
+         destroyGDIPcanvas()
 
       ; gdiBMPvPsize := trGdip_DisposeImage(gdiBMPvPsize, 1)
       imgQuality := (userimgQuality=1) ? 6 : 5
@@ -60224,30 +60219,21 @@ createGDIPcanvas(W:=0, H:=0, forceIT:=0, which:=0) {
       PixelMode := (userimgQuality=1) ? 2 : 0
       smoothMode := (userimgQuality=1) ? 4 : 1
       compositingQuality := 1 ; (userimgGammaCorrect=1) ? 2 : 1
-      If (which=0 || which=1 || !hasInit || forceIT=1)
-      {
-         glHDC := Gdi_CreateCompatibleDC()
-         ; Gdi_SetPolyFillMode(glHDC, 2)
-         glHbitmap := Gdi_CreateDIBSection(W, H)
-         glOBM := Gdi_SelectObject(glHDC, glHbitmap)
-         glPG := Gdip_GraphicsFromHDC(glHDC, 0, imgQuality, smoothMode, 2, compositingQuality)
-         Gdip_SetPixelOffsetMode(glPG, 2)
-      }
+      glHDC := Gdi_CreateCompatibleDC()
+      glHbitmap := Gdi_CreateDIBSection(W, H)
+      glOBM := Gdi_SelectObject(glHDC, glHbitmap)
+      glPG := Gdip_GraphicsFromHDC(glHDC, 0, imgQuality, smoothMode, 2, compositingQuality)
+      Gdip_SetPixelOffsetMode(glPG, 2)
       ; ToolTip, % W "==" H "==" glHDC "==" glHbitmap "==" glOBM "==" glPG , , , 2
 
-      If (which=0 || which=2 || !hasInit || forceIT=1)
-      {
-         2NDglHDC := Gdi_CreateCompatibleDC()
-         2NDglHbitmap := Gdi_CreateDIBSection(W, H)
-         2NDglOBM := Gdi_SelectObject(2NDglHDC, 2NDglHbitmap)
-         2NDglPG := Gdip_GraphicsFromHDC(2NDglHDC, 0, imgQuality, smoothMode, 2, compositingQuality)
-         Gdip_SetPixelOffsetMode(2NDglPG, 2)
-      }
+      2NDglHDC := Gdi_CreateCompatibleDC()
+      2NDglHbitmap := Gdi_CreateDIBSection(W, H)
+      2NDglOBM := Gdi_SelectObject(2NDglHDC, 2NDglHbitmap)
+      2NDglPG := Gdip_GraphicsFromHDC(2NDglHDC, 0, imgQuality, smoothMode, 2, compositingQuality)
+      Gdip_SetPixelOffsetMode(2NDglPG, 2)
 
       hasInit := 1
-      If (which=0)
-         prevDimensions := newDimensions
-
+      prevDimensions := newDimensions
       addJournalEntry("Canvas infos: " prevDimensions " - glPG:" glPG " - glHDC:" glHDC " - glOBM:" glOBM " - glHbmp:" glHbitmap " - 2NDglPG:" 2NDglPG " - 2NDglHDC:" 2NDglHDC " - 2NDglOBM:" 2NDglOBM " - 2NDglHbmp:" 2NDglHbitmap)
       If (!glPG || !glHDC || !glHbitmap || !glOBM || !2NDglPG || !2NDglHDC || !2NDglOBM || !2NDglHbitmap)
       {
