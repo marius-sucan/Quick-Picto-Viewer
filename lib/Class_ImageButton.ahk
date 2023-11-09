@@ -1,10 +1,11 @@
-; ======================================================================================================================
+﻿; ======================================================================================================================
 ; Namespace:         ImageButton
 ; Function:          Create images and assign them to pushbuttons.
 ; Tested with:       AHK 1.1.33.02 (A32/U32/U64)
 ; Tested on:         Win 10 (x64)
+; Change history:    1.7.10.00/2023-11-09/marius-sucan - ImageButton.Create() now returns the handle to the ImageList on success, to allow users to dispose them, and avoid memory leaks; fixed some memory leaks in the code
 ; Change history:    1.7.00.00/2023-03-21/marius-sucan - [new] ability to use bitmaps as button labels/captions or a text label for each state and it no longer rejects check-boxes with BS_PUSHLIKE style
-; Change history:    1.6.00.00/2023-02-02/marius-sucan - It now allows to use & to underline the accelerator key for the button, and they are no longer broken, they work.. It breaks winxp compatiblity.
+;               :    1.6.00.00/2023-02-02/marius-sucan - It now allows to use & to underline the accelerator key for the button, and they are no longer broken, they work.. It breaks winxp compatiblity.
 ;                                                        Changed all PTR and PtrP to Uptr and Uptr*.
 
 ;                    1.5.00.00/2020-12-16/just me - increased script performance, added support for icons (HICON)

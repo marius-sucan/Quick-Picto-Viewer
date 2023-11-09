@@ -1399,7 +1399,7 @@ GlobalMemoryStatusEx() {
 ; by jNizM
 ; https://github.com/jNizM/MemoryInfo/blob/master/src/MemoryInfo.ahk
     static MSEX, init := NumPut(VarSetCapacity(MSEX, 64, 0), MSEX, "uint")
-    if !(DllCall("GlobalMemoryStatusEx", "ptr", &MSEX))
+    if !(DllCall("GlobalMemoryStatusEx", "uptr", &MSEX))
        Return 0
        ;  throw Exception("Call to GlobalMemoryStatusEx failed: " A_LastError, -1)
     return { MemoryLoad: NumGet(MSEX, 4, "uint"), TotalPhys: NumGet(MSEX, 8, "uint64"), AvailPhys: NumGet(MSEX, 16, "uint64") }
@@ -1414,19 +1414,64 @@ GetProcessMemoryUsage(ProcessID) {
 
    if (hProcess := DllCall("OpenProcess", "uint", 0x1000, "int", 0, "uint", ProcessID))
    {
-      if !(DllCall("GetProcessMemoryInfo", "ptr", hProcess, "ptr", &PMC_EX, "uint", size))
+      if !(DllCall("GetProcessMemoryInfo", "uptr", hProcess, "uptr", &PMC_EX, "uint", size))
       {
-         if !(DllCall("psapi\GetProcessMemoryInfo", "ptr", hProcess, "ptr", &PMC_EX, "uint", size))
-            return (ErrorLevel := 2) & 0, DllCall("CloseHandle", "ptr", hProcess)
+         if !(DllCall("psapi\GetProcessMemoryInfo", "uptr", hProcess, "uptr", &PMC_EX, "uint", size))
+            return (ErrorLevel := 2) & 0, DllCall("CloseHandle", "uptr", hProcess)
       }
-      DllCall("CloseHandle", "ptr", hProcess)
+      DllCall("CloseHandle", "uptr", hProcess)
       infos := []
       infos[0] := NumGet(PMC_EX, A_PtrSize, "uptr")   ; peak working set bytes
       infos[1] := NumGet(PMC_EX, 8 + A_PtrSize, "uptr")   ; working set bytes
       infos[8] := NumGet(PMC_EX, 8 + A_PtrSize*8, "uptr") ; private bytes
+      infos.WorkingSetSize := infos[1]
+      infos.PrivateUsage := infos[8]
       Return infos
    }
    return (ErrorLevel := 1) & 0
+}
+
+; ----------------------------------------------------------------------------------------------------------------------
+; Function .....: SysProcInfo_GetSystemMemoryStatus
+; Author/ source: cyruz / https://www.autohotkey.com/boards/viewtopic.php?f=6&t=1395
+; Description ..: Retrieves information about the system's current usage of both physical and virtual memory.
+; Return .......: An object containing system performance information, structured like the following:
+; ..............: obj.MemoryLoad        - Percentage of physical memory in use.
+; ..............: obj.CommitTotal       - Number of pages currently committed by the system.
+; ..............: obj.CommitLimit       - Max number of pages that can be committed by the system.
+; ..............: obj.CommitPeak        - Max number of pages committed since last reboot.
+; ..............: obj.PhysicalTotal     - The amount of actual physical memory, in pages.
+; ..............: obj.PhysicalAvailable - The amount of available physical memory, in pages.
+; ..............: obj.PhysicalUsed      - The amount of used physical memory, in pages.
+; ..............: obj.SystemCache       - The amount of system cache memory, in pages.
+; ..............: obj.KernelTotal       - Memory in paged and nonpaged kernel pools, in pages.
+; ..............: obj.KernelPaged       - Memory currently in the paged kernel pool, in pages.
+; ..............: obj.KernelNonpaged    - Memory currently in the nonpaged kernel pool, in pages.
+; ..............: obj.PageSize          - The size of a page, in bytes.
+; ..............: obj.HandleCount       - The current number of open handles.
+; ..............: obj.ProcessCount      - The current number of processes.
+; ..............: obj.ThreadCount       - The current number of threads.
+; ----------------------------------------------------------------------------------------------------------------------
+SysProcInfo_GetSystemMemoryStatus() {
+    nSz := VarSetCapacity(PERFORMANCEINFO, (A_PtrSize == 4) ? 56 : 104), NumPut(nSz, PERFORMANCEINFO, 0)
+    DllCall( "psapi.dll\GetPerformanceInfo", "UPtr", &PERFORMANCEINFO, "UInt", nSz )
+    nPhysUsed := NumGet(PERFORMANCEINFO, A_PtrSize*4, "UPtr") - NumGet(PERFORMANCEINFO, A_PtrSize*5, "UPtr")
+    nMemLoad  := Ceil((nPhysUsed*100) / NumGet(PERFORMANCEINFO, A_PtrSize*4, "UPtr"))
+    Return { "MemoryLoad":        nMemLoad  ; Not present in the WinAPI PERFORMANCE_INFORMATION structure.
+           , "CommitTotal":       NumGet( PERFORMANCEINFO, A_PtrSize,                  "UPtr" )
+           , "CommitLimit":       NumGet( PERFORMANCEINFO, A_PtrSize *  2,             "UPtr" )
+           , "CommitPeak":        NumGet( PERFORMANCEINFO, A_PtrSize *  3,             "UPtr" )
+           , "PhysicalTotal":     NumGet( PERFORMANCEINFO, A_PtrSize *  4,             "UPtr" )
+           , "PhysicalAvailable": NumGet( PERFORMANCEINFO, A_PtrSize *  5,             "UPtr" )
+           , "PhysicalUsed":      nPhysUsed ; Not present in the WinAPI PERFORMANCE_INFORMATION structure.
+           , "SystemCache":       NumGet( PERFORMANCEINFO, A_PtrSize *  6,             "UPtr" )
+           , "KernelTotal":       NumGet( PERFORMANCEINFO, A_PtrSize *  7,             "UPtr" )
+           , "KernelPaged":       NumGet( PERFORMANCEINFO, A_PtrSize *  8,             "UPtr" )
+           , "KernelNonpaged":    NumGet( PERFORMANCEINFO, A_PtrSize *  9,             "UPtr" )
+           , "PageSize":          NumGet( PERFORMANCEINFO, A_PtrSize * 10,             "UPtr" )
+           , "HandleCount":       NumGet( PERFORMANCEINFO, A_PtrSize * 11,             "UInt" )
+           , "ProcessCount":      NumGet( PERFORMANCEINFO, (A_PtrSize == 4) ? 48 : 92, "UInt" )
+           , "ThreadCount":       NumGet( PERFORMANCEINFO, (A_PtrSize == 4) ? 52 : 96, "UInt" ) }
 }
 
 Dlg_Color(clr, hwnd, cclrs) {

@@ -7,8 +7,9 @@
 ;
 ; AHK forums: https://www.autohotkey.com/boards/viewtopic.php?f=6&t=6517
 ;
-; NOTES: The drawing of GDI+ Bitmaps is limited to a size
-; of 32767 pixels in either direction (width, height).
+; NOTES: The drawing of GDI+ Bitmaps is limited to a size of 32767 pixels
+; in either direction (width, height). This limit applies only if the
+; interpolation mode is set to NearestNeighbor for the Graphics Object.
 ; To calculate the largest bitmap you can create:
 ;    The maximum object size is 2GB = 2,147,483,648 bytes
 ;    Default bitmap is 32bpp (4 bytes), the largest area we can have is 2GB / 4 = 536,870,912 bytes
@@ -3077,8 +3078,8 @@ Gdip_CreateARGBHBITMAPFromBitmap(ByRef pBitmap) {
   E := DllCall("gdiplus\GdipBitmapLockBits"
         ,    "uptr", pBitmap
         ,    "uptr", &Rect
-        ,   "uint", 5            ; ImageLockMode.UserInputBuffer | ImageLockMode.ReadOnly
-        ,    "int", 0xE200B      ; Format32bppPArgb
+        ,    "uint", 5            ; ImageLockMode.UserInputBuffer | ImageLockMode.ReadOnly
+        ,     "int", 0xE200B      ; Format32bppPArgb
         ,    "uptr", &BitmapData) ; Contains the pointer (pBits) to the hbm.
   If !E
      DllCall("gdiplus\GdipBitmapUnlockBits", "uptr", pBitmap, "uptr", &BitmapData)
@@ -5928,10 +5929,15 @@ Gdip_SetInterpolationMode(pGraphics, InterpolationMode) {
 ; LowQuality = 1
 ; HighQuality = 2
 ; Bilinear = 3
-; Bicubic = 4
-; NearestNeighbor = 5
+; Bicubic = 4 [very slow]
+; NearestNeighbor = 5 [fastest]
 ; HighQualityBilinear = 6
-; HighQualityBicubic = 7
+; HighQualityBicubic = 7 [fast]
+
+; NOTES: The drawing of GDI+ Bitmaps is limited to a size of 32767 pixels
+; in either direction (width, height). This limit applies only if the
+; interpolation mode is set to NearestNeighbor for the Graphics Object.
+
    If !pGraphics
       Return 2
    Return DllCall("gdiplus\GdipSetInterpolationMode", "UPtr", pGraphics, "int", InterpolationMode)
@@ -9198,8 +9204,8 @@ calcIMGdimensions(imgW, imgH, givenW, givenH, ByRef ResizedW, ByRef ResizedH) {
 ;                      by keeping the aspect ratio
 ; function initially written by SBC; modified by Marius Șucan
 
-   PicRatio := Round(imgW/imgH, 5)
-   givenRatio := Round(givenW/givenH, 5)
+   PicRatio := Round(imgW/imgH, 8)
+   givenRatio := Round(givenW/givenH, 8)
    If (imgW<=givenW && imgH<=givenH)
    {
       ResizedW := givenW

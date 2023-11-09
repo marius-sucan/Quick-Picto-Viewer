@@ -329,7 +329,6 @@ updateUIctrlFromOutside(paramA) {
 
 detectToolbar(ByRef ToolbarWinW:=0, ByRef ToolbarWinH:=0) {
     Static lastX := 0, lastY := 0, lW, lH
-
     If (ShowAdvToolbar!=1 || slideShowRunning=1 || lockToolbar2Win!=1)
        Return 0
 

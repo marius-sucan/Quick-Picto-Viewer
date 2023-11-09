@@ -19819,6 +19819,9 @@ trackImageListButtons(actu, r:=0) {
     }
 
     CreateCollapsedPanelWidget("kill")
+    If (ShowAdvToolbar!=1)
+       createGUItoolbar("refresh-later")
+
     Loop, % counteru
     {
        If (HILs[A_Index]!="")
@@ -60193,6 +60196,9 @@ createGDIPcanvas(W:=0, H:=0, forceIT:=0, which:=0) {
    If (A_TickCount - lastMenuBarUpdated<500) && (forceIT=0)
       Return
 
+   If qpvCanvasHasInit
+      Return
+
    If (!W || !H)
       vpWinClientSize(W, H)
 
@@ -81108,6 +81114,9 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
     If (uiUseDarkMode=1)
        CtlColors.Free()
 
+    If (ShowAdvToolbar!=1)
+       trackImageListButtons("kill")
+
     Global lastOtherWinClose := A_TickCount
     panelWinCollapsed := forceLiveAlphaPreviewMode := FloodFillSelectionAdj := liveDrawingBrushTool := isNowFakeWinOpen := ForceNoColorMatrix := 0
     uiPanelOpenCloseEvent(1)
@@ -86703,6 +86712,9 @@ CoreGUItoolbar(scopul:=0, whichList:=0) {
     TouchToolbarGUIcreated := 1
     thisState := "a" toolbarViewerMode userCustomizedToolbar Round(listuIcons.Count()) userThumbsToolbarList userImgViewToolbarList ToolBarBtnWidth tlbrTotalIconz TLBRverticalAlign ToolbarScaleFactor TLBRtwoColumns drawingShapeNow ToolbarBgrColor
     simpleRefresh := (thisState=prevState) ? 1 : 0
+    If (scopul=1)
+       simpleRefresh := 0
+
     If (simpleRefresh=0)
     {
        If !hasRan
@@ -87344,7 +87356,13 @@ GuiUpdateFocusedSliders(modus:=0) {
 
 createGUItoolbar(dummy:=0) {
    Critical, on
-   Static prevState, hasEverDisplayed
+   Static prevState, hasEverDisplayed := 0, mustDoRefresh := 1
+   If (dummy="refresh-later")
+   {
+      mustDoRefresh := 1
+      Return
+   }
+
    If (ShowAdvToolbar=0)
    {
       ; prevState := ""
@@ -87356,8 +87374,8 @@ createGUItoolbar(dummy:=0) {
 
    If !hasEverDisplayed
    {
-      JEE_ClientToScreen(PVhwnd, 0, 0, UserToolbarX, UserToolbarY)
       hasEverDisplayed := 1
+      JEE_ClientToScreen(PVhwnd, 0, 0, UserToolbarX, UserToolbarY)
       delayedWriteTlbrColors(0)
       RegAction(0, "ShowToolTipsToolbar", "General", 1)
       IniAction(0, "userCustomizedToolbar", "General", 1)
@@ -87389,18 +87407,18 @@ createGUItoolbar(dummy:=0) {
    }
    ; ToolTip, % "a=" addAlphaIcons "|TP=" isTransPanel "|p=" isPaintPanel , , , 2
    ; msgbox, %currstateSimple%`n%prevStateSimple%
-   If (prevState!=currState || dummy="forced")
+   If (prevState!=currState || dummy="forced" || mustDoRefresh=1)
    {
       startZeit := A_TickCount
       ; fnOutputDebug("toolbar updated")
       TouchToolbarGUIcreated := 0
-      CoreGUItoolbar()
+      CoreGUItoolbar(mustDoRefresh)
       prevState := currState
       endZeit := A_TickCount
       SetTimer, refreshEntireViewport, -450
       ; ToolTip, % endZeit - startZeit , , , 2
    }
-
+   mustDoRefresh := 0
    interfaceThread.ahkPostFunction("tlbrInitPrefs", hQPVtoolbar "|" ShowAdvToolbar "|" lockToolbar2Win "|" TLBRverticalAlign "|" TLBRtwoColumns)
    If (TouchToolbarGUIcreated=1 && ShowAdvToolbar=1)
    {

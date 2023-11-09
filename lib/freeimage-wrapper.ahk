@@ -4,12 +4,15 @@
 
 ; Change log:
 ; =============================
+; 27 October 2023 by Marius Șucan- v1.8
+; - implemented more functions
+;
 ; 16 July 2022 by Marius Șucan - v1.7
 ; - implemented functions to access image metadata tags
-
+;
 ; 26 February 2021 by Marius Șucan - v1.6
 ; - implemented the multi-page functions
-
+;
 ; 14 January 2021 by Marius Șuca n- v1.5
 ; - bug fixes - many thanks to TheArkive
 ;
@@ -148,8 +151,8 @@ FreeImage_GetVersion() {
    Return DllCall(getFIMfunc("GetVersion"), "AStr")
 }
 
-FreeImage_GeLibtVersion() {
-   Return 1.7 ;  16/07/2022
+FreeImage_GetLibVersion() {
+   Return 1.8 ;  16/07/2022
 }
 
 FreeImage_GetCopyrightMessage() {
@@ -205,7 +208,7 @@ FreeImage_UnLoad(hImage) {
 ; missing functions: GetThumbnail and SetThumbnail.
 
 FreeImage_GetImageType(hImage, humanReadable:=0) {
-; Possible return values:
+; Possible return values [FREE_IMAGE_TYPE enumeration]:
 ; 0 = FIT_UNKNOWN ;   Unknown format (returned value only, never use it as input value for other functions)
 ; 1 = FIT_BITMAP  ;   Standard image: 1-, 4-, 8-, 16-, 24-, 32-bit
 ; 2 = FIT_UINT16  ;   Array of unsigned short: unsigned 16-bit
@@ -274,7 +277,13 @@ FreeImage_GetLine(hImage) {
    Return DllCall(getFIMfunc("GetLine"), "uptr", hImage, "uint")
 } ; Untested 
 
+FreeImage_GetStride(hImage) {
+   Return DllCall(getFIMfunc("GetPitch"), "uptr", hImage, "uint")
+}
+
 FreeImage_GetPitch(hImage) {
+; Returns the width of the bitmap in bytes, rounded to the next 32-bit boundary, also known as
+; pitch or stride or scan width.
    Return DllCall(getFIMfunc("GetPitch"), "uptr", hImage, "uint")
 }
 
@@ -326,6 +335,7 @@ FreeImage_GetInfo(hImage) {
 }
 
 FreeImage_GetColorType(hImage, humanReadable:=1) {
+; FREE_IMAGE_COLOR_TYPE enumeration:
 ; 0 = MINISWHITE  - Monochrome bitmap (1-bit) : first palette entry is white. Palletised bitmap (4 or 8-bit) - the bitmap has an inverted greyscale palette
 ; 1 = MINISBLACK  - Monochrome bitmap (1-bit) : first palette entry is black. Palletised bitmap (4 or 8-bit) and single - channel non-standard bitmap: the bitmap has a greyscale palette
 ; 2 = RGB         - High-color bitmap (16, 24 or 32 bit), RGB16 or RGBF
@@ -416,7 +426,9 @@ FreeImage_SetBackgroundColor(hImage, RGBArray:="255,255,255,0") {
 ; ValidateFromHandle and ValidateFromMemory.
 
 FreeImage_GetFileType(ImgPath, humanReadable:=0) {
-; the given ImgPath can be fictional / inexistent
+; the given ImgPath can be fictional / inexistent.
+; returns FREE_IMAGE_FORMAT enumeration if humanReadable=0.
+
    Static fileTypes := {-1:"unknown", 0:"BMP", 1:"ICO", 2:"JPEG", 3:"JNG", 4:"KOALA", 5:"LBM", 5:"IFF", 6:"MNG", 7:"PBM", 8:"PBMRAW", 9:"PCD", 10:"PCX", 11:"PGM", 12:"PGMRAW", 13:"PNG", 14:"PPM", 15:"PPMRAW", 16:"RAS", 17:"TARGA", 18:"TIFF", 19:"WBMP", 20:"PSD", 21:"CUT", 22:"XBM", 23:"XPM", 24:"DDS", 25:"GIF", 26:"HDR", 27:"FAXG3", 28:"SGI", 29:"EXR", 30:"J2K", 31:"JP2", 32:"PFM", 33:"PICT", 34:"RAW", 35:"WEBP", 36:"JXR"}
    r := DllCall(getFIMfunc("GetFileTypeU"), "WStr", ImgPath, "Int", 0)
    If (r=-1)
@@ -427,8 +439,38 @@ FreeImage_GetFileType(ImgPath, humanReadable:=0) {
    Return r
 }
 
+FreeImage_FIFSupportsExportBPP(FIF, bpp) {
+; FIF is the FREE_IMAGE_FORMAT enumeration
+; see FreeImage_GetFileType()
+   Return DllCall(getFIMfunc("FIFSupportsExportBPP"), "Int", FIF, "int", bpp)
+}
+
+FreeImage_FIFSupportsExportType(FIF, pixelsDataType) {
+; FIF is the FREE_IMAGE_FORMAT enumeration
+; see FreeImage_GetFileType()
+; pixelsDataType is FREE_IMAGE_TYPE enumeration
+; see FreeImage_GetImageType()
+   Return DllCall(getFIMfunc("FIFSupportsExportType"), "Int", FIF, "int", pixelsDataType)
+}
+
+FreeImage_FIFSupportsICCProfiles(FIF) {
+   Return DllCall(getFIMfunc("FIFSupportsICCProfiles"), "Int", FIF)
+}
+
+FreeImage_FIFSupportsNoPixels(FIF) {
+   Return DllCall(getFIMfunc("FIFSupportsNoPixels"), "Int", FIF)
+}
+
+FreeImage_FIFSupportsReading(FIF) {
+   Return DllCall(getFIMfunc("FIFSupportsReading"), "Int", FIF)
+}
+
+FreeImage_FIFSupportsWriting(FIF) {
+   Return DllCall(getFIMfunc("FIFSupportsWriting"), "Int", FIF)
+}
+
 FreeImage_GetFIFFromFilename(ImgPath) {
-   Return DllCall(getFIMfunc("GetFIFFromFilename"), "AStr", ImgPath)
+   Return DllCall(getFIMfunc("GetFIFFromFilenameU"), "WStr", ImgPath)
 }
 
 FreeImage_Validate(ImgPath, FifFormat) {
@@ -486,7 +528,6 @@ FreeImage_SetPixelColor(hImage, xPos, yPos, RGBArray:="255,255,255,0") {
 
 ; === Conversion functions ===
 ; missing functions: ColorQuantizeEx, ConvertToType
-; and ConvertFromRawBitsEx.
 
 FreeImage_ConvertTo(hImage, MODE) {
 ; This is a wrapper for multiple FreeImage functions.
@@ -497,9 +538,23 @@ FreeImage_ConvertTo(hImage, MODE) {
       Return
 
    If (mode="16bits")
-      mode := "16Bits565"
+      mode := "16Bits555"
 
    Return DllCall(getFIMfunc("ConvertTo" MODE), "uptr", hImage, "uptr")
+}
+
+FreeImage_ConvertTo32Bits(hImage) {
+   If !hImage
+      Return
+
+   Return DllCall(getFIMfunc("ConvertTo32Bits"), "uptr", hImage, "uptr")
+}
+
+FreeImage_ConvertTo24Bits(hImage) {
+   If !hImage
+      Return
+
+   Return DllCall(getFIMfunc("ConvertTo24Bits"), "uptr", hImage, "uptr")
 }
 
 FreeImage_ConvertToRawBits(pBits, hImage, scan_width, BPP, redMASK, greenMASK, blueMASK, topDown:=1) {
@@ -513,17 +568,27 @@ FreeImage_ConvertFromRawBits(pBits, imgW, imgH, PitchStride, BPP, redMASK, green
    Return r
 }
 
+FreeImage_ConvertFromRawBitsEx(copySource, pBits, FimType, imgW, imgH, PitchStride, BPP, redMASK, greenMASK, blueMASK, topDown:=1) {
+   r := DllCall(getFIMfunc("ConvertFromRawBitsEx"), "int", copySource, "uptr", pBits, "int", FimType, "Int", imgW, "Int", imgH, "uInt", PitchStride, "Int", BPP, "uInt", redMASK, "uInt", greenMASK, "uInt", blueMASK, "int", topDown, "uptr")
+   Return r
+}
+
 FreeImage_ConvertToStandardType(hImage, bScaleLinear:=1) {
    Return DllCall(getFIMfunc("ConvertToStandardType"), "uptr", hImage, "int", bScaleLinear, "uptr")
 }
 
+FreeImage_ConvertToGreyscale(hImage) {
+   ; hImage - input must be a standard type, from 1-bit to 32 bits image, or a 16-UINT16
+   Return DllCall(getFIMfunc("ConvertToGreyscale"), "uptr", hImage, "uptr")
+}
+
 FreeImage_ColorQuantize(hImage, quantizeAlgo:=0) {
-; hImage - input must be a 24 or a 32 bits image
-; quantizeAlgo:
-   ; 0 = FIQ_WUQUANT - Xiaolin Wu color quantization algorithm
-   ; 1 = FIQ_NNQUANT - NeuQuant neural-net quantization algorithm by Anthony Dekker (24-bit only)
-   ; 2 = FIQ_LFPQUANT - Lossless Fast Pseudo-Quantization Algorithm by Carsten Klein
-; the function returns an 8 bit image
+   ; hImage - input must be a 24 or a 32 bits image
+   ; quantizeAlgo:
+      ; 0 = FIQ_WUQUANT  - Xiaolin Wu color quantization algorithm
+      ; 1 = FIQ_NNQUANT  - NeuQuant neural-net quantization algorithm by Anthony Dekker (24-bit only)
+      ; 2 = FIQ_LFPQUANT - Lossless Fast Pseudo-Quantization Algorithm by Carsten Klein
+   ; the function returns an 8 bit image
    Return DllCall(getFIMfunc("ColorQuantize"), "uptr", hImage, "int", quantizeAlgo, "uptr")
 }
 
@@ -532,42 +597,42 @@ FreeImage_Threshold(hImage, TT:=0) { ; TT: 0 - 255
 }
 
 FreeImage_Dither(hImage, ditherAlgo:=0) {
-; ditherAlgo parameter: dithering method
-; FID_FS           = 0   // Floyd & Steinberg error diffusion
-; FID_BAYER4x4     = 1   // Bayer ordered dispersed dot dithering (order 2 dithering matrix)
-; FID_BAYER8x8     = 2   // Bayer ordered dispersed dot dithering (order 3 dithering matrix)
-; FID_CLUSTER6x6   = 3   // Ordered clustered dot dithering (order 3 - 6x6 matrix)
-; FID_CLUSTER8x8   = 4   // Ordered clustered dot dithering (order 4 - 8x8 matrix)
-; FID_CLUSTER16x16 = 5   // Ordered clustered dot dithering (order 8 - 16x16 matrix)
-; FID_BAYER16x16   = 6   // Bayer ordered dispersed dot dithering (order 4 dithering matrix)
-; it returns an 1-bit image
+   ; ditherAlgo parameter: dithering method
+   ; FID_FS           = 0   // Floyd & Steinberg error diffusion
+   ; FID_BAYER4x4     = 1   // Bayer ordered dispersed dot dithering (order 2 dithering matrix)
+   ; FID_BAYER8x8     = 2   // Bayer ordered dispersed dot dithering (order 3 dithering matrix)
+   ; FID_CLUSTER6x6   = 3   // Ordered clustered dot dithering (order 3 - 6x6 matrix)
+   ; FID_CLUSTER8x8   = 4   // Ordered clustered dot dithering (order 4 - 8x8 matrix)
+   ; FID_CLUSTER16x16 = 5   // Ordered clustered dot dithering (order 8 - 16x16 matrix)
+   ; FID_BAYER16x16   = 6   // Bayer ordered dispersed dot dithering (order 4 dithering matrix)
+   ; it returns an 1-bit image
 
    Return DllCall(getFIMfunc("Dither"), "uptr", hImage, "int", ditherAlgo, "uptr")
 }
 
 FreeImage_ToneMapping(hImage, algo:=0, p1:=0, p2:=0) {
-; Converts a High Dynamic Range image (48-bit RGB or 96-bit RGBF) to a 24-bit RGB image, suitable for display.
-; function required to display HDR and RAW images
+   ; Converts a High Dynamic Range image (48-bit RGB or 96-bit RGBF) to a 24-bit RGB image, suitable for display.
+   ; function required to display HDR and RAW images
 
-; algo parameter and p1/p2 intervals and meaning 
-; 0 = FITMO_DRAGO03    ; Adaptive logarithmic mapping (F. Drago, 2003)
-      ; p1 = gamma [0.0, 9.9]; p2 = exposure [-8, 8]
-; 1 = FITMO_REINHARD05 ; Dynamic range reduction inspired by photoreceptor physiology (E. Reinhard, 2005)
-      ; p1 = intensity [-8, 8]; p2 = contrast [0.3, 1.0]
-; 2 = FITMO_FATTAL02   ; Gradient domain High Dynamic Range compression (R. Fattal, 2002)
-      ; p1 = saturation [0.4, 0.6]; p2 = attenuation [0.8, 0.9]
+   ; algo parameter and p1/p2 intervals and meaning 
+   ; 0 = FITMO_DRAGO03    ; Adaptive logarithmic mapping (F. Drago, 2003)
+         ; p1 = gamma [0.0, 9.9]; p2 = exposure [-8, 8]
+   ; 1 = FITMO_REINHARD05 ; Dynamic range reduction inspired by photoreceptor physiology (E. Reinhard, 2005)
+         ; p1 = intensity [-8, 8]; p2 = contrast [0.3, 1.0]
+   ; 2 = FITMO_FATTAL02   ; Gradient domain High Dynamic Range compression (R. Fattal, 2002)
+         ; p1 = saturation [0.4, 0.6]; p2 = attenuation [0.8, 0.9]
 
    Return DllCall(getFIMfunc("ToneMapping"), "uptr", hImage, "int", algo, "Double", p1, "Double", p2, "uptr")
 }
 
 FreeImage_TmoDrago(hImage, gamma, exposure) {
-; Converts a High Dynamic Range image to a 24-bit RGB image, suitable for display.
-; function required to display HDR and RAW images
+   ; Converts a High Dynamic Range image to a 24-bit RGB image, suitable for display.
+   ; function required to display HDR and RAW images
 
-; parameters intervals and meaning 
-; Adaptive logarithmic mapping (F. Drago, 2003)
-      ; gamma = from 0.0 to 9.9
-      ; exposure = from -8 to 8
+   ; parameters intervals and meaning 
+   ; Adaptive logarithmic mapping (F. Drago, 2003)
+         ; gamma = from 0.0 to 9.9
+         ; exposure = from -8 to 8
 
    Return DllCall(getFIMfunc("TmoDrago03"), "uptr", hImage, "Double", gamma, "Double", exposure, "uptr")
 }
@@ -928,11 +993,29 @@ FreeImage_AdjustColors(hImage, bright, contrast, gamma, invert) {
    Return DllCall(getFIMfunc("AdjustColors"), "uptr", hImage, "Double", bright, "Double", contrast, "Double", gamma, "Int", invert)
 }
 
+FreeImage_Crop(hImage, x, y, w, h) {
+   Return FreeImage_Copy(hImage, x, y, x + w, y + h)
+}
+
 FreeImage_Copy(hImage, nLeft, nTop, nRight, nBottom) {
+; use this function to crop images
    If (hImage="")
       Return
 
    Return DllCall(getFIMfunc("Copy"), "uptr", hImage, "int", nLeft, "int", nTop, "int", nRight, "int", nBottom, "uptr")
+}
+
+FreeImage_CreateView(hImage, nLeft, nTop, nRight, nBottom) {
+; Creates a dynamic read/write view into a FreeImage bitmap.
+; A dynamic view is a FreeImage bitmap with its own width and height, that, however, shares
+; its bits with another FreeImage bitmap. Typically, views are used to define one or more
+; rectangular sub-images of an existing bitmap. All FreeImage operations, like saving,
+; displaying and all the toolkit functions, when applied to the view, only affect the view's
+; rectangular area.
+   If (hImage="")
+      Return
+
+   Return DllCall(getFIMfunc("CreateView"), "uptr", hImage, "int", nLeft, "int", nTop, "int", nRight, "int", nBottom, "uptr")
 }
 
 FreeImage_Paste(hImageDst, hImageSrc, nLeft, nTop, nAlpha) {
@@ -1062,7 +1145,7 @@ getFIMfunc(funct) {
 ConvertFIMtoPBITMAP(hFIFimgA) {
 ; hFIFimgA - provide a 32 bits Standard RGBA FreeImage bitmap.
 ; If succesful, the function returns a 32-bit RGBA GDI+ pBitmap.
-; this function relies on GDI+ AHK library 
+; This function relies on the GDI+ AHK library.
 
   FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
   pBitmap := Gdip_CreateBitmap(imgW, imgH, "0xE200B")
@@ -1087,7 +1170,10 @@ ConvertFIMtoPBITMAP(hFIFimgA) {
 ConvertPBITMAPtoFIM(pBitmap, do24bits:=0) {
 ; Please provide a 32 RGBA image format GDI+ object.
 ; To provide a 24-RGB image, use do24bits=1.
-; this function relies on GDI+ AHK library 
+; This function relies on the GDI+ AHK library.
+;
+; If succesful, the function returns a FreeImage image object
+; created from pBitmap [GDI+ image object].
 
   Static redMASK   := "0x00FF0000" ; FI_RGBA_RED_MASK;
        , greenMASK := "0x0000FF00" ; FI_RGBA_GREEN_MASK;
