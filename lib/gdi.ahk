@@ -1191,7 +1191,7 @@ Gdi_GetImageDimensions(hBitmap, ByRef width, ByRef height, ByRef BPP) {
      If (Gdi_GetObjectType(hBitmap)!="BITMAP")
         Return -1
 
-     size := VarSetCapacity(dib, 76+2*(A_PtrSize=8?4:0)+2*A_PtrSize) ; sizeof(DIBSECTION) = x86:84, x64:104
+     size := VarSetCapacity(dib, 76+2*(A_PtrSize=8?4:0)+2*A_PtrSize, 0) ; sizeof(DIBSECTION) = x86:84, x64:104
      E := DllCall("gdi32\GetObject", "UPtr", hBitmap, "int", size, "UPtr", &dib)
      width := NumGet(dib, 4, "uint")
      height := NumGet(dib, 8, "uint")
@@ -2964,7 +2964,6 @@ Gdi_ScreenToClient(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
   vPosX2 := NumGet(&POINT, 0, "Int")
   vPosY2 := NumGet(&POINT, 4, "Int")
 }
-
 
 Gdi_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
 ; function by jeeswg found on:
