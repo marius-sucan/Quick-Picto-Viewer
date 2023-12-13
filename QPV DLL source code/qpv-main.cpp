@@ -21,6 +21,7 @@
 #include <stack>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <list>
 #include <array>
 #include <cstdint>
@@ -30,7 +31,7 @@
 #include <wincodec.h>
 #include "Tchar.h"
 #include "Tpcshrd.h"
-#include "qpv-main.h"
+#define GDIPVER 0x110
 #include <gdiplus.h>
 #include <gdiplusflat.h>
 #include <locale.h>
@@ -40,27 +41,238 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
+#include "stb_image_resize2.h"
 #include "Jpeg2PDF.h"
 #include "Jpeg2PDF.cpp"
 // #define cimg_plugin "include\gmic-master\gmic.cpp";
 #define cimg_use_openmp 1
-#include "include\CImg-3.1.4\CImg.h"
-// #include "include\CImg-master\CImg.h"
-// #include "include\gmic-master\gmic.h"
-// #include "include\CImg-master\gmic.h"
-// #include "include\CImg-master\gmic.cpp"
-// #include "include\gmic-master\gmic.cpp"
-// #include <Magick++.h>
-// #include <include\vips\vips8>
+#include "include\CImg-3.3.1\CImg.h"
+// #include "include\CImg-3.1.4\CImg.h"
 // #include <bits/stdc++.h>
 using namespace std;
 using namespace cimg_library;
+#define DLL_API extern "C" __declspec(dllexport)
+#define DLL_CALLCONV __stdcall
+
 
 void fnOutputDebug(std::string input) {
     std::stringstream ss;
     ss << "qpv: " << input;
     OutputDebugStringA(ss.str().data());
 }
+
+inline bool inRange(const float low, const float high, const float x) {
+    return (low <= x && x <= high);
+}
+
+inline bool inRange(const int low, const int high, const int x) {
+    return (low <= x && x <= high);
+}
+
+int inline weighTwoValues(float A, float B, float w) {
+    if (w>=1)
+       return A;
+    else if (w<=0)
+       return B;
+    else
+       return w * (A - B) + B;
+       // return (A*w + B*(1.0f - w));
+}
+
+float inline weighTwoValues(float A, float B, float w, int r) {
+    if (w>=1)
+       return A;
+    else if (w<=0)
+       return B;
+    else
+       return w * (A - B) + B;
+       // return (A*w + B*(1.0f - w));
+}
+
+static unsigned short gamma_to_linear[256];
+static unsigned char linear_to_gamma[32769];
+static float char_to_float[256];
+static float char_to_grayRfloat[256];
+static float char_to_grayGfloat[256];
+static float char_to_grayBfloat[256];
+static float int_to_float[65536];
+static int LUTgamma[65536];
+static int LUTgammaBright[65536];
+static int LUTbright[65536];
+static int LUTshadows[65536];
+static int LUThighs[65536];
+static int LUTcontra[65536];
+static int int_to_char[65536];
+static int char_to_int[256];
+static int int_to_grayRi[65536];
+static int int_to_grayGi[65536];
+static int int_to_grayBi[65536];
+static int linear_to_gammaInt16[65536];
+static int gamma_to_linearInt16[65536];
+
+IWICImagingFactory *m_pIWICFactory;
+
+DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
+    HRESULT hr = S_OK;
+    // to do - fix this; make it work on Windows 7 
+
+    if (SUCCEEDED(hr))
+    {
+       hr = CoCreateInstance(CLSID_WICImagingFactory,
+                    NULL, CLSCTX_INPROC_SERVER,
+                    IID_PPV_ARGS(&m_pIWICFactory));
+    }
+
+    // source https://www.teamten.com/lawrence/graphics/gamma/
+    static const float GAMMA = 2.0;
+    int result;
+    for (int i = 0; i < 32769; i++) {
+        result = (int)(pow(i/32768.0, 1/GAMMA)*255.0 + 0.5);
+        linear_to_gamma[i] = (unsigned char)result;
+    }
+
+    for (int i = 0; i < 256; i++) {
+        char_to_float[i] = i/255.0f;
+        result = (int)(pow(char_to_float[i], GAMMA)*32768.0f + 0.5f);
+        gamma_to_linear[i] = (unsigned short)result;
+        char_to_grayRfloat[i] = i*0.299701f;
+        char_to_grayGfloat[i] = i*0.587130f;
+        char_to_grayBfloat[i] = i*0.114180f;
+        char_to_int[i] = char_to_float[i] * 65535.0f;
+    }
+
+    for (int i = 0; i < 65536; i++) {
+        int_to_float[i] = (float)i/65535.0f;
+        int_to_char[i] = int_to_float[i] * 255.0f;
+        int_to_grayRi[i] = i*0.299701f;
+        int_to_grayGi[i] = i*0.587130f;
+        int_to_grayBi[i] = i*0.114180f;
+
+        result = (int)(pow(int_to_float[i], 1.0f/GAMMA)*65535.0f + 0.5f);
+        linear_to_gammaInt16[i] = result;
+        result = (int)(pow(int_to_float[i], GAMMA)*65535.0f + 0.5f);
+        gamma_to_linearInt16[i] = result;
+    }
+
+    // std::stringstream ss;
+    // ss << "qpv: threadu - " << threadIDu << " HRESULT " << hr;
+    // OutputDebugStringA(ss.str().data());
+    if (SUCCEEDED(hr))
+       return 1;
+    else 
+       return 0;
+}
+
+int inline getGrayscale(int r, int g, int b) {
+    return clamp(char_to_grayRfloat[r] + char_to_grayGfloat[g] + char_to_grayBfloat[b], 0.0f, 255.0f);
+}
+
+
+int inline brightMaths(int i, float fintensity) {
+    return clamp(i + round( (float)i*fintensity ), 0.0f, 255.0f);
+}
+
+int inline contraMaths(int i, float fintensity, float deviation) {
+    return clamp(floor( (float)fintensity * (i - 128.0f) ) + deviation, 0.0f, 255.0f);
+}
+
+int inline gammaMaths(int i, double gamma) {
+    return round(255.0f * pow(char_to_float[i], gamma));
+}
+
+int inline getInt16grayscale(int r, int g, int b) {
+    return clamp((int)(int_to_grayRi[r] + int_to_grayGi[g] + int_to_grayBi[b]), 0, 65535);
+}
+int inline brightMathsInt16(int i, float fintensity) {
+    return clamp(i + (float)i*fintensity, 0.0f, 65535.0f);
+}
+
+int inline contraMathsInt16(int i, float fintensity, float deviation) {
+    return clamp(floor( (float)fintensity * (i - 32768.0f) ) + deviation, 0.0f, 65535.0f);
+}
+
+int inline gammaMathsInt16(int i, double gamma) {
+    return round(65535.0f * pow(int_to_float[i], gamma));
+}
+
+
+#include "qpv-main.h"
+
+inline INT64 CalcPixOffset(int x, int y, INT64 Stride, INT64 bitsPerPixel) {
+    return y * Stride + x * (bitsPerPixel / 8);
+}
+
+DLL_API int DLL_CALLCONV prepareSelectionArea(int x1, int y1, int x2, int y2, int w, int h, float xf, float yf, float angle, int mode, int flip, float exclusion, int invertArea) {
+    imgSelX1 = x1;
+    imgSelY1 = y1;
+    imgSelX2 = x2;
+    imgSelY2 = y2;
+    imgSelW = w;
+    imgSelH = h;
+    imgSelXscale = xf;
+    imgSelYscale = yf;
+    hImgSelW = w / 2.0f;
+    hImgSelH = h / 2.0f;
+    EllipseSelectMode = mode;
+    flippedSelection = flip;
+    invertSelection = invertArea;
+    excludeSelectScale = exclusion;
+    vpSelRotation = (angle * M_PI) / 180.0f; // convert to radians
+    cosVPselRotation = cos(vpSelRotation);
+    sinVPselRotation = sin(vpSelRotation);
+    return 1;
+}
+
+bool isInsideRectOval(float ox, float oy, int modus) {
+    // Translate the coordinates
+    float tw = hImgSelW;
+    float th = hImgSelH;
+    float x = ox - tw;
+    float y = oy - th;
+    x *= imgSelXscale;
+    y *= imgSelYscale;
+    if (modus==2)
+    {
+       x *= excludeSelectScale;
+       y *= excludeSelectScale;
+    }
+
+    // Apply rotation to the coordinates
+    float rotatedX, rotatedY;
+    if (flippedSelection==1)
+    {
+       rotatedX = x * cosVPselRotation + y * sinVPselRotation;
+       rotatedY = x * sinVPselRotation - y * cosVPselRotation;
+    } else
+    {
+       rotatedX = x * cosVPselRotation - y * sinVPselRotation;
+       rotatedY = x * sinVPselRotation + y * cosVPselRotation;
+    }
+
+    bool f;
+    float result;
+    if (EllipseSelectMode==1)
+    {
+       result = (rotatedX * rotatedX) / (tw * tw) + (rotatedY * rotatedY) / (th * th);
+       f = (result <= 1.0f);
+    } else
+    {
+       f = ((fabs(rotatedX) < tw) && (fabs(rotatedY) < th));
+    }
+
+    if (f && modus==1 && excludeSelectScale!=0)
+    {
+       bool nf = isInsideRectOval(ox, oy, 2);
+       if (f && nf)
+          return 0;
+       else 
+          return 1;
+    }
+
+    return f;
+}
+
 
 /*
 Function written with help provided by Spawnova. Thank you very much.
@@ -72,36 +284,35 @@ The alpha channel will be applied directly on the pBitmap provided.
 For best results, pBitmapMask should be grayscale.
 */
 
-DLL_API int DLL_CALLCONV SetAlphaChannel(int *imageData, int *maskData, int w, int h, int invert, int replaceAlpha, int whichChannel, int threadz) {
+DLL_API int DLL_CALLCONV SetAlphaChannel(unsigned char *imageData, unsigned char *maskData, int w, int h, int Stride, int bpp, int invert, int replaceAlpha, int whichChannel, int threadz) {
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int x = 0; x < w; x++)
     {
-        int px;
-        unsigned char alpha, alpha2, a;
+        unsigned char alpha, alpha2;
         for (int y = 0; y < h; y++)
         {
-            px = x + y * w;
+            int px = CalcPixOffset(x, y, Stride, bpp);
             if (whichChannel==2)
-               alpha = (maskData[px] >> 8) & 0xFF; // green
+               alpha = maskData[px + 1]; // green
             else if (whichChannel==3)
-               alpha = (maskData[px] >> 0) & 0xFF; // blue
+               alpha = maskData[px];     // blue
             else if (whichChannel==4)
-               alpha = (maskData[px] >> 24) & 0xFF; // alpha
+               alpha = maskData[px + 3]; // alpha
             else
-               alpha = (maskData[px] >> 16) & 0xFF; // red
+               alpha = maskData[px + 2]; // red
 
             if (replaceAlpha!=1)
             {
                if (invert == 1)
                   alpha = 255 - alpha;
-               a = (imageData[px] >> 24) & 0xFF;
+               int a = imageData[px + 3];
                alpha2 = min(alpha, a);    // handles bitmaps that already have alpha
             }
             else {
                alpha2 = (invert == 1) ? 255 - alpha : alpha;
             }
 
-            imageData[px] = (alpha2 << 24) | (imageData[px] & 0x00ffffff);
+            imageData[px + 3] = alpha2;
         }
     }
     return 1;
@@ -122,15 +333,6 @@ DLL_API int DLL_CALLCONV SetColorAlphaChannel(int *imageData, int w, int h, int 
         }
     }
     return 1;
-}
-
-
-int inline INTweighTwoValues(int A, int B, float w) {
-    return (float)(A * w + B * (1.0 - w));
-}
-
-float inline weighTwoValues(float A, float B, float w) {
-    return (A*w + B*(1.0 - w));
 }
 
 double inverseGamma(double X) {
@@ -181,17 +383,17 @@ int fastRGBtoGray(int n) {
 int RGBtoGray(int sR, int sG, int sB, int alternateMode) {
   // https://getreuer.info/posts/colorspace/index.html
   // http://www.easyrgb.com/en/math.php
-  // sR, sG and sB (Standard RGB) input range = 0 ÷ 255
+  // sR, sG and sB (Standard RGB) input range [0, 255]
   // X, Y and Z output refer to a D65/2° standard illuminant.
   // return value is L* - Luminance from L*ab, based on D65 luminant
 
   if (alternateMode==1)
-     return round((float)(sR*0.299f + sG*0.587f + sB*0.114f)); // weighted grayscale conversion
+     return round(char_to_grayRfloat[sR] + char_to_grayGfloat[sG] + char_to_grayBfloat[sB]); // weighted grayscale conversion
 
   // convert RGB to XYZ color space
-  double var_R = (float)sR/255.0;
-  double var_G = (float)sG/255.0;
-  double var_B = (float)sB/255.0;
+  double var_R = char_to_float[sR];
+  double var_G = char_to_float[sG];
+  double var_B = char_to_float[sB];
 
   // Inverse sRGB gamma correction
   var_R = inverseGamma(var_R);
@@ -335,26 +537,28 @@ float CIEdeltaE2000(double Cl_1, double Ca_1, double Cb_1, double Cl_2, double C
 // http://www.easyrgb.com/en/math.php
 // https://zschuessler.github.io/DeltaE/demos/
 
-  double xC1 = sqrt( pow(Ca_1, 2) + pow(Cb_1, 2) );
-  double xC2 = sqrt( pow(Ca_2, 2) + pow(Cb_2, 2) );
-  double xCX = ( xC1 + xC2 ) / 2;   // C-bar
+  const double pwr = 6103515625; // 25^7;
+  double xC1 = sqrt( Ca_1*Ca_1 + Cb_1*Cb_1 );
+  double xC2 = sqrt( Ca_2*Ca_2 + Cb_2*Cb_2 );
+  double xCX = ( xC1 + xC2 ) / 2.0;   // C-bar
+  double zpx = xCX*xCX*xCX*xCX*xCX*xCX*xCX; // xCX^7
+  double xGX = 0.5 * ( 1.0 - sqrt( zpx / ( zpx + pwr ) ) );
 
-  double xGX = 0.5 * ( 1 - sqrt( pow(xCX,7) / ( pow(xCX,7) + pow(25,7) ) ) );
-
-  double xNN = ( 1 + xGX ) * Ca_1;            // A-Prime 1
-  xC1 = sqrt( pow(xNN, 2) + pow(Cb_1, 2) );   // C-Prime 1
+  double xNN = ( 1.0 + xGX ) * Ca_1;            // A-Prime 1
+  xC1 = sqrt( xNN*xNN + Cb_1*Cb_1 );   // C-Prime 1
   double xH1 = CieLab2Hue( xNN, Cb_1 );       // H-Prime 1
  
-  xNN = ( 1 + xGX ) * Ca_2;                   // A-Prime 2
-  xC2 = sqrt( pow(xNN, 2) + pow(Cb_2, 2) );   // C-Prime 2
+  xNN = ( 1.0 + xGX ) * Ca_2;                   // A-Prime 2
+  xC2 = sqrt( xNN*xNN + Cb_2*Cb_2 );   // C-Prime 2
   double xH2 = CieLab2Hue( xNN, Cb_2 );       // H-Prime 2
 
   // compute Delta H-Prime based on H-Primes
   double xDH; 
-  if ( ( xC1 * xC2 ) == 0 ) {
+  if ( ( xC1 * xC2 ) == 0 )
+  {
      xDH = 0;
-  }
-  else {
+  } else 
+  {
      xNN = xH2 - xH1;   // the diff between the H-Primes
      if ( abs( xNN ) <= 180 ) {
         xDH = xNN;
@@ -370,40 +574,43 @@ float CIEdeltaE2000(double Cl_1, double Ca_1, double Cb_1, double Cl_2, double C
   xDH = 2 * sqrt( xC1 * xC2 ) * sin( deg2rad( xDH / 2 ) ); // Delta H-Prime
 
   double xHX;  // compute the H-Bar Prime
-  if ( ( xC1 *  xC2 ) == 0 ) {
+  if ( ( xC1 *  xC2 ) == 0 )
+  {
      xHX = xH1 + xH2;
-  }
-  else {
+  } else
+  {
      xNN = abs(xH1 - xH2);
-     if ( xNN > 180 ) {
+     if ( xNN > 180 )
+     {
         if ( ( xH2 + xH1 ) < 360 )
            xHX = xH1 + xH2 + 360;
         else
            xHX = xH1 + xH2 - 360;
-     }
-     else {
+     } else
+     {
         xHX = xH1 + xH2;
      }
      xHX /= 2; // the H-Bar Prime
   }
 
   // xTX, the T variable, based on H-Bar Prime
-  double xTX = 1 - 0.17 * cos( deg2rad(xHX - 30) )     + 0.24
-                        * cos( deg2rad(2 * xHX ) )     + 0.32
-                        * cos( deg2rad(3 * xHX + 6 ) ) - 0.20
-                        * cos( deg2rad(4 * xHX - 63) );
+  double xTX = 1.0 - 0.17 * cos( deg2rad(xHX - 30.0) ) + 0.24
+                          * cos( deg2rad(2.0 * xHX ) ) + 0.32
+                          * cos( deg2rad(3.0 * xHX + 6.0 ) ) - 0.20
+                          * cos( deg2rad(4.0 * xHX - 63.0) );
 
-  double xCY = ( xC1 + xC2 ) / 2;        // C-Bar Prime based on C-Primes
-
+  double xCY = ( xC1 + xC2 ) / 2.0;        // C-Bar Prime based on C-Primes
+  double ytp = xCY*xCY*xCY*xCY*xCY*xCY*xCY; // xCY^7
   // compute R sub T
-  double xPH = 60 * exp( - ( pow( ( xHX  - 275 ) / 25, 2) ) );           // based on H-Bar Prime
-  double xRC = 2 * sqrt( pow(xCY, 7) / ( pow(xCY, 7) + pow(25, 7) ) );   // based on C-Bar Prime
+  double grp = ( xHX - 275.0 ) / 25.0;
+  double xPH = 60.0 * exp(-1*(grp*grp));           // based on H-Bar Prime
+  double xRC = 2.0 * sqrt( ytp / ( ytp + pwr ) );   // based on C-Bar Prime
   double xRT = - sin( deg2rad(xPH) ) * xRC;  // R sub T
 
-  double xLX = ( Cl_1 + Cl_2 ) / 2 - 50; // L-Bar
-  double xSL = 1 + ( 0.015 * pow(xLX, 2) ) / sqrt( 20 + pow(xLX, 2) );   // S sub L based on L-Bar
-  double xSC = 1 + 0.045 * xCY;       // S sub C - based on C-Bar Prime
-  double xSH = 1 + 0.015 * xCY * xTX; // S sub H - based on C-Bar Prime and T-var
+  double xLX = ( Cl_1 + Cl_2 ) / 2.0 - 50.0; // L-Bar
+  double xSL = 1.0 + ( 0.015 * (xLX*xLX) ) / sqrt( 20.0 + (xLX*xLX) );   // S sub L based on L-Bar
+  double xSC = 1.0 + 0.045 * xCY;       // S sub C - based on C-Bar Prime
+  double xSH = 1.0 + 0.015 * xCY * xTX; // S sub H - based on C-Bar Prime and T-var
 
   double xDL = Cl_2 - Cl_1;              // Delta L-Prime
   double xDC = xC2 - xC1;                // Delta C-Prime based on C-Primes
@@ -411,7 +618,7 @@ float CIEdeltaE2000(double Cl_1, double Ca_1, double Cb_1, double Cl_2, double C
   xDC = xDC / ( WHT_C * xSC );
   xDH = xDH / ( WHT_H * xSH );
 
-  double DeltaE = sqrt(pow(xDL, 2) + pow(xDC, 2) + pow(xDH, 2) + xRT * xDC * xDH);
+  double DeltaE = sqrt(xDL*xDL + xDC*xDC + xDH*xDH + xRT * xDC * xDH);
   return DeltaE;
 }
 
@@ -424,9 +631,9 @@ auto RGBtoLAB(int sR, int sG, int sB) {
   // tested against ColorMine.org
 
   // convert RGB to XYZ color space
-  double var_R = (double)sR/255.0;
-  double var_G = (double)sG/255.0;
-  double var_B = (double)sB/255.0;
+  double var_R = char_to_float[sR];
+  double var_G = char_to_float[sG];
+  double var_B = char_to_float[sB];
 
   // Inverse sRGB gamma correction
   var_R = inverseGamma(var_R);
@@ -467,103 +674,8 @@ auto RGBtoLAB(int sR, int sG, int sB) {
   return Lab;
 }
 
-
-HSLColor ConvertRGBtoHSL(float iR, float iG, float iB, int isFloat) {
-   double R = (isFloat==1) ? iR : (iR / 255.0f);
-   double G = (isFloat==1) ? iG : (iG / 255.0f);
-   double B = (isFloat==1) ? iB : (iB / 255.0f);
-   double minu    = min(R, min(G, B));
-   double maxu    = max(R, max(G, B));
-   double del_Max = maxu - minu;
-   double L       = (maxu + minu) / 2.0f;
-   // fnOutputDebug(std::to_string(R) + " / " + std::to_string(G) + " / " + std::to_string(B));
-   // fnOutputDebug(std::to_string(del_Max) + " mi/ma:" + std::to_string(minu) + " / " + std::to_string(maxu));
-   double H, S, del_R, del_G, del_B;
-   if (del_Max == 0)
-   {
-      H = S = 0;
-   } else
-   {
-      if (L < 0.5)
-         S = del_Max / (maxu + minu);
-      else
-         S = del_Max / (2.0f - del_Max);
-
-      del_R = (((maxu - R) / 6.0f) + (del_Max / 2.0f)) / del_Max;
-      del_G = (((maxu - G) / 6.0f) + (del_Max / 2.0f)) / del_Max;
-      del_B = (((maxu - B) / 6.0f) + (del_Max / 2.0f)) / del_Max;
-      if (R == maxu)
-      {
-         H = del_B - del_G;
-      } else
-      {
-         if (G == maxu)
-            H = (1.0f / 3.0f) + del_R - del_B;
-         else if (B == maxu)
-            H = (2.0f / 3.0f) + del_G - del_R;
-      }
-      if (H < 0)
-         H += 1.0f;
-      if (H > 1)
-         H -= 1.0f;
-   }
-
-   H = abs(H*360.0f);
-   S = abs(S);
-   L = abs(L);
-   return {H, S, L};
-}
-
-double ConvertHueToRGB(double v1, double v2, double vH) {
-   vH = ((vH<0) ? ++vH : vH);
-   vH = ((vH>1) ? --vH : vH);
-   return ((6.0f * vH) < 1) ? (v1 + (v2 - v1) * 6.0f * vH)
-          : ((2.0f * vH) < 1) ? (v2)
-          : ((3.0f * vH) < 2) ? (v1 + (v2 - v1) * ((2.0f / 3.0f) - vH) * 6.0f)
-          : v1;
-}
-
-RGBColor ConvertHSLtoRGB(double H, double S, double L) {
-// http://www.had2know.com/technology/hsl-rgb-color-converter.html
-
-   H = H/360.0f;
-   double var_1, var_2, R, G, B;
-
-   if (S == 0)
-   {
-      R = L*255.0f;
-      G = L*255.0f;
-      B = L*255.0f;
-   } else
-   {
-      if (L < 0.5)
-         var_2 = L * (1.0f + S);
-      else
-         var_2 = (L + S) - (S * L);
-
-      var_1 = 2.0f * L - var_2;
-      R = 255.0f * ConvertHueToRGB(var_1, var_2, H + (1.0f / 3.0f));
-      G = 255.0f * ConvertHueToRGB(var_1, var_2, H);
-      B = 255.0f * ConvertHueToRGB(var_1, var_2, H - (1.0f / 3.0f));
-   }
-   return {R, G, B};
-}
-
-DLL_API int DLL_CALLCONV testHSLrgbConv(int rOh, int gOs, int bOl) {
-  fnOutputDebug("yahoos");
-
-  HSLColor hslO = ConvertRGBtoHSL(rOh, gOs, bOl, 0);
-  fnOutputDebug("HSL: " + std::to_string(hslO.h) + " / " + std::to_string(hslO.s) + " / " + std::to_string(hslO.l) ); 
- 
-  RGBColor r = ConvertHSLtoRGB(hslO.h, hslO.s, hslO.l);
-  fnOutputDebug("RGB: " + std::to_string(r.r) + " / " + std::to_string(r.g) + " / " + std::to_string(r.b) ); 
-  return 1;
-}
-
-void calculateBlendModes(int rO, int gO, int bO, int rB, int gB, int bB, int blendMode, int *results) {
-    float rT = 0;
-    float gT = 0;
-    float bT = 0;
+RGBColorI calculateBlendModes(int rO, int gO, int bO, int rB, int gB, int bB, int blendMode) {
+    float rT, gT, bT;
     float rOf = char_to_float[rO];
     float gOf = char_to_float[gO];
     float bOf = char_to_float[bO];
@@ -617,9 +729,9 @@ void calculateBlendModes(int rO, int gO, int bO, int rB, int gB, int bB, int ble
     //     bT = (1 - 2*bOf) * pow(bBf, 2) + 2 * bOf * bBf;
     // }
     else if (blendMode == 9) { // soft light B
-        rT = (rOf < 0.5) ? (1 - 2*rOf) * pow(rBf, 2) + 2 * rBf * rOf : 2 * rBf * (1 - rOf) + sqrt(rBf) * (2 * rOf - 1);
-        gT = (gOf < 0.5) ? (1 - 2*gOf) * pow(gBf, 2) + 2 * gBf * gOf : 2 * gBf * (1 - gOf) + sqrt(gBf) * (2 * gOf - 1);
-        bT = (bOf < 0.5) ? (1 - 2*bOf) * pow(bBf, 2) + 2 * bBf * bOf : 2 * bBf * (1 - bOf) + sqrt(bBf) * (2 * bOf - 1);
+        rT = (rOf < 0.5) ? (1 - 2*rOf) * (rBf*rBf) + 2 * rBf * rOf : 2 * rBf * (1 - rOf) + sqrt(rBf) * (2 * rOf - 1);
+        gT = (gOf < 0.5) ? (1 - 2*gOf) * (gBf*gBf) + 2 * gBf * gOf : 2 * gBf * (1 - gOf) + sqrt(gBf) * (2 * gOf - 1);
+        bT = (bOf < 0.5) ? (1 - 2*bOf) * (bBf*bBf) + 2 * bBf * bOf : 2 * bBf * (1 - bOf) + sqrt(bBf) * (2 * bOf - 1);
     }
     else if (blendMode == 10) { // overlay
         rT = (rBf < 0.5) ? 2 * rOf * rBf : 1 - (2 * (1 - rOf) * (1 - rBf) );
@@ -684,8 +796,8 @@ void calculateBlendModes(int rO, int gO, int bO, int rB, int gB, int bB, int ble
         bT = bBf - bOf;
     }
     else if (blendMode == 20) { // luminosity
-        double lO = (rO*0.2997f + gO*0.58713f + bO*0.11418f)/255.0f;
-        double lB = (rB*0.2997f + gB*0.58713f + bB*0.11418f)/255.0f;
+        double lO = char_to_float[getGrayscale(rO, gO, bO)];
+        double lB = char_to_float[getGrayscale(rB, gB, bB)];
         rT = lO + rBf - lB;
         gT = lO + gBf - lB;
         bT = lO + bBf - lB;
@@ -699,8 +811,8 @@ void calculateBlendModes(int rO, int gO, int bO, int rB, int gB, int bB, int ble
         // bT = rgbf.b/255.0f;
     }
     else if (blendMode == 21) { // ghosting
-        double lO = (rO*0.2997f + gO*0.58713f + bO*0.11418f)/255.0f;
-        double lB = (rB*0.2997f + gB*0.58713f + bB*0.11418f)/255.0f;
+        double lO = char_to_float[getGrayscale(rO, gO, bO)];
+        double lB = char_to_float[getGrayscale(rB, gB, bB)];
         rT = lB - lO + rBf + rOf/5;
         gT = lB - lO + gBf + gOf/5;
         bT = lB - lO + bBf + bOf/5;
@@ -719,10 +831,7 @@ void calculateBlendModes(int rO, int gO, int bO, int rB, int gB, int bB, int ble
     rT = clamp(rT, 0.0f, 1.0f);
     gT = clamp(gT, 0.0f, 1.0f);
     bT = clamp(bT, 0.0f, 1.0f); 
-
-    results[0] = clamp((int)round(rT*255), 0, 255);
-    results[1] = clamp((int)round(gT*255), 0, 255);
-    results[2] = clamp((int)round(bT*255), 0, 255);
+    return {clamp((int)round(rT*255), 0, 255), clamp((int)round(gT*255), 0, 255), clamp((int)round(bT*255), 0, 255)};
 }
 
 void toCMYK(float red, float green, float blue, float* cmyk) {
@@ -762,9 +871,6 @@ int mixColors(int colorB, float *colorA, float f, int dynamicOpacity, int blendM
   gBf = (linearGamma==1) ? gamma_to_linear[gB] : gB;
   bBf = (linearGamma==1) ? gamma_to_linear[bB] : bB;
   aOf = (linearGamma==1) ? gamma_to_linear[aO] : aO;
-  rOf = (linearGamma==1) ? gamma_to_linear[rO] : rO;
-  gOf = (linearGamma==1) ? gamma_to_linear[gO] : gO;
-  bOf = (linearGamma==1) ? gamma_to_linear[bO] : bO;
 
   float fz;
   if (dynamicOpacity==1)
@@ -786,17 +892,21 @@ int mixColors(int colorB, float *colorA, float f, int dynamicOpacity, int blendM
 
   if (blendMode>0)
   {
-     int results[3];
-     calculateBlendModes(rO, gO, bO, rB, gB, bB, blendMode, results);
-     rOf = (linearGamma==1) ? gamma_to_linear[results[0]] : results[0];
-     gOf = (linearGamma==1) ? gamma_to_linear[results[1]] : results[1];
-     bOf = (linearGamma==1) ? gamma_to_linear[results[2]] : results[2];
+     RGBColorI blended = calculateBlendModes(rO, gO, bO, rB, gB, bB, blendMode);
+     rOf = (linearGamma==1) ? gamma_to_linear[blended.r] : blended.r;
+     gOf = (linearGamma==1) ? gamma_to_linear[blended.g] : blended.g;
+     bOf = (linearGamma==1) ? gamma_to_linear[blended.b] : blended.b;
+  } else
+  {
+     rOf = (linearGamma==1) ? gamma_to_linear[rO] : rO;
+     gOf = (linearGamma==1) ? gamma_to_linear[gO] : gO;
+     bOf = (linearGamma==1) ? gamma_to_linear[bO] : bO;
   }
 
-  int aT = INTweighTwoValues(aOf, aBf, f);
-  int rT = INTweighTwoValues(rOf, rBf, f);
-  int gT = INTweighTwoValues(gOf, gBf, f);
-  int bT = INTweighTwoValues(bOf, bBf, f);
+  int aT = weighTwoValues(aOf, aBf, f);
+  int rT = weighTwoValues(rOf, rBf, f);
+  int gT = weighTwoValues(gOf, gBf, f);
+  int bT = weighTwoValues(bOf, bBf, f);
   if (linearGamma==1)
   {
      aT = linear_to_gamma[aT];
@@ -843,21 +953,21 @@ int simpleMixColors(int colorB, float *colorA, float f, int blendMode, int linea
 
   if (blendMode>0)
   {
-     int results[3];
+     RGBColorI blended;
      if (flipLayers==1)
-        calculateBlendModes(rB, gB, bB, rO, gO, bO, blendMode, results);
+        blended = calculateBlendModes(rB, gB, bB, rO, gO, bO, blendMode);
      else
-        calculateBlendModes(rO, gO, bO, rB, gB, bB, blendMode, results);
+        blended = calculateBlendModes(rO, gO, bO, rB, gB, bB, blendMode);
 
-     rOf = (linearGamma==1) ? gamma_to_linear[results[0]] : results[0];
-     gOf = (linearGamma==1) ? gamma_to_linear[results[1]] : results[1];
-     bOf = (linearGamma==1) ? gamma_to_linear[results[2]] : results[2];
+     rOf = (linearGamma==1) ? gamma_to_linear[blended.r] : blended.r;
+     gOf = (linearGamma==1) ? gamma_to_linear[blended.g] : blended.g;
+     bOf = (linearGamma==1) ? gamma_to_linear[blended.b] : blended.b;
   }
 
-  int aT = INTweighTwoValues(aOf, aBf, f);
-  int rT = INTweighTwoValues(rOf, rBf, f);
-  int gT = INTweighTwoValues(gOf, gBf, f);
-  int bT = INTweighTwoValues(bOf, bBf, f);
+  int aT = weighTwoValues(aOf, aBf, f);
+  int rT = weighTwoValues(rOf, rBf, f);
+  int gT = weighTwoValues(gOf, gBf, f);
+  int bT = weighTwoValues(bOf, bBf, f);
   if (linearGamma==1)
   {
      aT = linear_to_gamma[aT];
@@ -880,9 +990,42 @@ int simpleMixColors(int colorB, float *colorA, float f, int blendMode, int linea
   return (aT << 24) | ((rT & 0xFF) << 16) | ((gT & 0xFF) << 8) | (bT & 0xFF);
 }
 
-bool inline inRange(float low, float high, float x) {        
-    return (low <= x && x <= high);
+bool clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
+    if (invertSelection==1)
+    {
+       if (inRange(imgSelX1, imgSelX2, x) && inRange(imgSelY1, imgSelY2, y))
+       {
+          if (maskBitmap!=NULL)
+          {
+             INT64 mo = CalcPixOffset(x - imgSelX1, y - imgSelY1, mStride, 24);
+             if (maskBitmap[mo]>128)
+                return 1;
+          } else if (EllipseSelectMode==1 || EllipseSelectMode==0 && (vpSelRotation!=0 || excludeSelectScale!=0))
+          {
+             return isInsideRectOval(x - imgSelX1, y - imgSelY1, 1);
+          } else 
+          {
+             return 1;
+          }
+       }
+    } else
+    {
+       if (!inRange(imgSelX1, imgSelX2, x) || !inRange(imgSelY1, imgSelY2, y))
+          return 1;
+
+       if (maskBitmap!=NULL)
+       {
+          INT64 mo = CalcPixOffset(x - imgSelX1, y - imgSelY1, mStride, 24);
+          if (maskBitmap[mo]<128)
+             return 1;
+       } else if (EllipseSelectMode==1 || EllipseSelectMode==0 && (vpSelRotation!=0 || excludeSelectScale!=0))
+       {
+          return !isInsideRectOval(x - imgSelX1, y - imgSelY1, 1);
+       }
+    }
+    return 0;
 }
+
 
 bool decideColorsEqual(int newColor, int oldColor, float tolerance, float prevCLRindex, int alternateMode, float *nC, float& index) {
     // should use , CIEDE2000
@@ -1131,7 +1274,7 @@ int ReplaceGivenColor(int *imageData, int w, int h, int x, int y, int newColor, 
     return loopsOccured;
 }
 
-DLL_API int DLL_CALLCONV FloodFyll(int *imageData, int modus, int w, int h, int x, int y, int newColor, int tolerance, int fillOpacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay, int linearGamma) {
+DLL_API int DLL_CALLCONV FloodFillWrapper(int *imageData, int modus, int w, int h, int x, int y, int newColor, int tolerance, int fillOpacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay, int linearGamma) {
     if ((x < 0) || (x >= (w-1)) || (y < 0) || (y >= (h-1)))  // out of bounds
        return 0;
 
@@ -1158,7 +1301,7 @@ DLL_API int DLL_CALLCONV FloodFyll(int *imageData, int modus, int w, int h, int 
     // float CIE = CIEdeltaE2000(LabA[0], LabA[1], LabA[2], LabB[0], LabB[1], LabB[2], 1, 1, 1);
     // float CIE2 = testCIEdeltaE2000(LabA[0], LabA[1], LabA[2], LabB[0], LabB[1], LabB[2], 1, 1, 1);
 
-    float opacity = (float)fillOpacity / 255.0f;
+    float opacity = char_to_float[fillOpacity];
     if (tolerance==0 && (opacity<1 || blendMode>0))
        newColor = mixColors(prevColor, nC, opacity, 0, blendMode, 0, 0, 0, 0, linearGamma);
 
@@ -1184,7 +1327,7 @@ DLL_API int DLL_CALLCONV FloodFyll(int *imageData, int modus, int w, int h, int 
     return r;
 }
 
-DLL_API int DLL_CALLCONV autoCropAider(int* bitmapData, int Width, int Height, int adaptLevel, double threshold, double vTolrc, int whichLoop, int aaMode, int* fcoord) {
+DLL_API int DLL_CALLCONV autoCropAider(int* BitmapData, int Width, int Height, int adaptLevel, double threshold, double vTolrc, int whichLoop, int aaMode, int* fcoord) {
    int maxThresholdHitsW = round(Width*threshold) + 1;
    if (maxThresholdHitsW>floor(Width/2))
       maxThresholdHitsW = floor(Width/2);
@@ -1196,9 +1339,9 @@ DLL_API int DLL_CALLCONV autoCropAider(int* bitmapData, int Width, int Height, i
    if (threshold==0)
       maxThresholdHitsW = maxThresholdHitsH = 1;
 
-   int clrPrimeA = bitmapData[0];
-   int clrPrimeB = bitmapData[1];
-   int clrPrimeC = bitmapData[Height];
+   int clrPrimeA = BitmapData[0];
+   int clrPrimeB = BitmapData[1];
+   int clrPrimeC = BitmapData[Height];
    int prevR1 = wrapRGBtoGray(clrPrimeA, 1);
    int prevR2 = wrapRGBtoGray(clrPrimeB, 1);
    int prevR3 = wrapRGBtoGray(clrPrimeC, 1);
@@ -1214,7 +1357,7 @@ DLL_API int DLL_CALLCONV autoCropAider(int* bitmapData, int Width, int Height, i
       {
          for (x = 0; x < Width; x++)
          {
-            int clrR1 = bitmapData[x + (y * Width)];
+            int clrR1 = BitmapData[x + (y * Width)];
             int R1 = wrapRGBtoGray(clrR1, 1);
             int d = abs(prevR4 - R1);
 
@@ -1253,8 +1396,8 @@ DLL_API int DLL_CALLCONV autoCropAider(int* bitmapData, int Width, int Height, i
       {
          for (y = 0; y < Height; y++)
          {
-            int clrR1 = bitmapData[x + (y * Width)];
-            // int clrR1 = bitmapData[x * Height + y];
+            int clrR1 = BitmapData[x + (y * Width)];
+            // int clrR1 = BitmapData[x * Height + y];
             int R1 = wrapRGBtoGray(clrR1, 1);
             int d = abs(prevR4 - R1);
 
@@ -1303,7 +1446,7 @@ DLL_API int DLL_CALLCONV EraserBrush(int *imageData, int *maskData, int w, int h
             if (invertMask == 1)
                intensity = 255 - intensity;
 
-            float fintensity = intensity/255.0f;
+            float fintensity = char_to_float[intensity];
             if (a==0)
                continue;
 
@@ -1369,15 +1512,15 @@ DLL_API int DLL_CALLCONV ColourBrush(int *opacityImgData, int *imageData, int *m
             if (invertMask==1)
                intensity = 255 - intensity;
 
-            float fintensity = intensity/255.0f;
+            float fintensity = char_to_float[intensity];
             if (overDraw==1)
             {
                fintensity -= fb;
             } else
             {
                int altoAlpha = (opacityImgData[px] >> 8) & 0xff;
-               int tL = INTweighTwoValues(255, altoAlpha, fintensity/fr);
-               fintensity = tL/255.0f - fb;
+               int tL = weighTwoValues(255, altoAlpha, fintensity/fr);
+               fintensity = char_to_float[tL] - fb;
                if (clipFlag<2)
                   tL = 0;
 
@@ -1491,13 +1634,14 @@ DLL_API int DLL_CALLCONV BlendBitmaps(int* bgrImageData, int* otherData, int w, 
                 int gB = (BGRcolor >> 8) & 0xFF;
                 int bB = BGRcolor & 0xFF;
 
-                int results[3];
+                RGBColorI blended;
                 // int theGray = RGBtoGray(rO, gO, bO, 0);
                 if (flipLayers==1)
-                   calculateBlendModes(rB, gB, bB, rO, gO, bO, blendMode, results);
+                   blended = calculateBlendModes(rB, gB, bB, rO, gO, bO, blendMode);
                 else
-                   calculateBlendModes(rO, gO, bO, rB, gB, bB, blendMode, results);
-                bgrImageData[x + (y * w)] = (aX << 24) | ((results[0] & 0xFF) << 16) | ((results[1] & 0xFF) << 8) | (results[2] & 0xFF);
+                   blended = calculateBlendModes(rO, gO, bO, rB, gB, bB, blendMode);
+
+                bgrImageData[x + (y * w)] = (aX << 24) | ((blended.r & 0xFF) << 16) | ((blended.g & 0xFF) << 8) | (blended.b & 0xFF);
             }
         }
     }
@@ -1511,7 +1655,7 @@ It must be in 32-ARGB format: PXF32ARGB - 0x26200A.
 */
 
 
-DLL_API int DLL_CALLCONV RandomNoise(int* bgrImageData, int w, int h, int intensity, int mode, int threadz, int fillBgr) {
+DLL_API int DLL_CALLCONV GenerateRandomNoise(int* bgrImageData, int w, int h, int intensity, int doGrayScale, int threadz, int fillBgr) {
     // srand (time(NULL));
     // #pragma omp parallel for default(none) num_threads(threadz)
     time_t nTime;
@@ -1529,7 +1673,7 @@ DLL_API int DLL_CALLCONV RandomNoise(int* bgrImageData, int w, int h, int intens
                continue;
             }
 
-            if (mode!=1)
+            if (doGrayScale!=1)
             {
                unsigned char rT = rand() % 256;
                unsigned char gT = rand() % 256;
@@ -1546,7 +1690,9 @@ DLL_API int DLL_CALLCONV RandomNoise(int* bgrImageData, int w, int h, int intens
     return 1;
 }
 
+
 DLL_API int DLL_CALLCONV getPBitmapistoInfos(Gdiplus::GpBitmap* pBitmap, int w, int h, UINT* resultsArray) {
+// unused function
      UINT entries = 256;
      UINT elements[256];
      // Gdiplus::DllExports::GetHistogramSize(3, entries);
@@ -1623,8 +1769,9 @@ Pixelate C/C++ Function by Tic and fixed by Fincs;
 https://autohotkey.com/board/topic/29449-gdi-standard-library-145-by-tic/page-55
 */
 
-DLL_API int DLL_CALLCONV PixelateBitmap(unsigned char* sBitmap, unsigned char* dBitmap, int w, int h, int Stride, int Size) {
-    int sA, sR, sG, sB, o;
+DLL_API int DLL_CALLCONV PixelateBitmap(unsigned char* sBitmap, unsigned char* dBitmap, int w, int h, int Stride, int Size, int bpp) {
+    int sA, sR, sG, sB;
+    UINT o;
     for (int y1 = 0; y1 < h / Size; ++y1)
     {
         for (int x1 = 0; x1 < w / Size; ++x1)
@@ -1634,15 +1781,17 @@ DLL_API int DLL_CALLCONV PixelateBitmap(unsigned char* sBitmap, unsigned char* d
             {
                 for (int x2 = 0; x2 < Size; ++x2)
                 {
-                    o = 4 * (x2 + x1 * Size) + Stride * (y2 + y1 * Size);
-                    sA += sBitmap[3 + o];
+                    o = (bpp/8) * (x2 + x1 * Size) + Stride * (y2 + y1 * Size);
+                    if (bpp==32)
+                       sA += sBitmap[3 + o];
                     sR += sBitmap[2 + o];
                     sG += sBitmap[1 + o];
                     sB += sBitmap[o];
                 }
             }
 
-            sA /= Size * Size;
+            if (bpp==32)
+               sA /= Size * Size;
             sR /= Size * Size;
             sG /= Size * Size;
             sB /= Size * Size;
@@ -1650,8 +1799,9 @@ DLL_API int DLL_CALLCONV PixelateBitmap(unsigned char* sBitmap, unsigned char* d
             {
                 for (int x2 = 0; x2 < Size; ++x2)
                 {
-                    o = 4 * (x2 + x1 * Size) + Stride * (y2 + y1 * Size);
-                    dBitmap[3 + o] = sA;
+                    o = (bpp/8) * (x2 + x1 * Size) + Stride * (y2 + y1 * Size);
+                    if (bpp==32)
+                       dBitmap[3 + o] = sA;
                     dBitmap[2 + o] = sR;
                     dBitmap[1 + o] = sG;
                     dBitmap[o] = sB;
@@ -1666,8 +1816,9 @@ DLL_API int DLL_CALLCONV PixelateBitmap(unsigned char* sBitmap, unsigned char* d
             {
                 for (int x2 = 0; x2 < w % Size; ++x2)
                 {
-                    o = 4 * (x2 + (w / Size) * Size) + Stride * (y2 + y1 * Size);
-                    sA += sBitmap[3 + o];
+                    o = (bpp/8) * (x2 + (w / Size) * Size) + Stride * (y2 + y1 * Size);
+                    if (bpp==32)
+                       sA += sBitmap[3 + o];
                     sR += sBitmap[2 + o];
                     sG += sBitmap[1 + o];
                     sB += sBitmap[o];
@@ -1675,7 +1826,8 @@ DLL_API int DLL_CALLCONV PixelateBitmap(unsigned char* sBitmap, unsigned char* d
             }
 
             int tmp = (w % Size) * Size;
-            sA = tmp ? (sA / tmp) : 0;
+            if (bpp==32)
+               sA = tmp ? (sA / tmp) : 0;
             sR = tmp ? (sR / tmp) : 0;
             sG = tmp ? (sG / tmp) : 0;
             sB = tmp ? (sB / tmp) : 0;
@@ -1683,8 +1835,9 @@ DLL_API int DLL_CALLCONV PixelateBitmap(unsigned char* sBitmap, unsigned char* d
             {
                 for (int x2 = 0; x2 < w % Size; ++x2)
                 {
-                    o = 4 * (x2 + (w / Size) * Size) + Stride * (y2 + y1 * Size);
-                    dBitmap[3 + o] = sA;
+                    o = (bpp/8) * (x2 + (w / Size) * Size) + Stride * (y2 + y1 * Size);
+                    if (bpp==32)
+                       dBitmap[3 + o] = sA;
                     dBitmap[2 + o] = sR;
                     dBitmap[1 + o] = sG;
                     dBitmap[o] = sB;
@@ -1700,8 +1853,9 @@ DLL_API int DLL_CALLCONV PixelateBitmap(unsigned char* sBitmap, unsigned char* d
         {
             for (int x2 = 0; x2 < Size; ++x2)
             {
-                o = 4 * (x2 + x1 * Size) + Stride * (y2 + (h / Size) * Size);
-                sA += sBitmap[3 + o];
+                o = (bpp/8) * (x2 + x1 * Size) + Stride * (y2 + (h / Size) * Size);
+                if (bpp==32)
+                   sA += sBitmap[3 + o];
                 sR += sBitmap[2 + o];
                 sG += sBitmap[1 + o];
                 sB += sBitmap[o];
@@ -1709,7 +1863,8 @@ DLL_API int DLL_CALLCONV PixelateBitmap(unsigned char* sBitmap, unsigned char* d
         }
 
         int tmp = Size * (h % Size);
-        sA = tmp ? (sA / tmp) : 0;
+        if (bpp==32)
+           sA = tmp ? (sA / tmp) : 0;
         sR = tmp ? (sR / tmp) : 0;
         sG = tmp ? (sG / tmp) : 0;
         sB = tmp ? (sB / tmp) : 0;
@@ -1718,8 +1873,9 @@ DLL_API int DLL_CALLCONV PixelateBitmap(unsigned char* sBitmap, unsigned char* d
         {
             for (int x2 = 0; x2 < Size; ++x2)
             {
-                o = 4 * (x2 + x1 * Size) + Stride * (y2 + (h / Size) * Size);
-                dBitmap[3 + o] = sA;
+                o = (bpp/8) * (x2 + x1 * Size) + Stride * (y2 + (h / Size) * Size);
+                if (bpp==32)
+                   dBitmap[3 + o] = sA;
                 dBitmap[2 + o] = sR;
                 dBitmap[1 + o] = sG;
                 dBitmap[o] = sB;
@@ -1732,8 +1888,9 @@ DLL_API int DLL_CALLCONV PixelateBitmap(unsigned char* sBitmap, unsigned char* d
     {
         for (int x2 = 0; x2 < w % Size; ++x2)
         {
-            o = 4 * (x2 + (w / Size) * Size) + Stride * (y2 + (h / Size) * Size);
-            sA += sBitmap[3 + o];
+            o = (bpp/8) * (x2 + (w / Size) * Size) + Stride * (y2 + (h / Size) * Size);
+            if (bpp==32)
+               sA += sBitmap[3 + o];
             sR += sBitmap[2 + o];
             sG += sBitmap[1 + o];
             sB += sBitmap[o];
@@ -1741,7 +1898,8 @@ DLL_API int DLL_CALLCONV PixelateBitmap(unsigned char* sBitmap, unsigned char* d
     }
 
     int tmp = (w % Size) * (h % Size);
-    sA = tmp ? (sA / tmp) : 0;
+    if (bpp==32)
+       sA = tmp ? (sA / tmp) : 0;
     sR = tmp ? (sR / tmp) : 0;
     sG = tmp ? (sG / tmp) : 0;
     sB = tmp ? (sB / tmp) : 0;
@@ -1750,8 +1908,9 @@ DLL_API int DLL_CALLCONV PixelateBitmap(unsigned char* sBitmap, unsigned char* d
     {
         for (int x2 = 0; x2 < w % Size; ++x2)
         {
-            o = 4 * (x2 + (w / Size) * Size) + Stride * (y2 + (h / Size) * Size);
-            dBitmap[3 + o] = sA;
+            o = (bpp/8) * (x2 + (w / Size) * Size) + Stride * (y2 + (h / Size) * Size);
+            if (bpp==32)
+               dBitmap[3 + o] = sA;
             dBitmap[2 + o] = sR;
             dBitmap[1 + o] = sG;
             dBitmap[o] = sB;
@@ -1760,39 +1919,667 @@ DLL_API int DLL_CALLCONV PixelateBitmap(unsigned char* sBitmap, unsigned char* d
     return 1;
 }
 
-DLL_API int DLL_CALLCONV ConvertToGrayScale(int *BitmapData, int w, int h, int modus) {
+DLL_API int DLL_CALLCONV ConvertToGrayScale(unsigned char *BitmapData, const int w, const int h, const int modus, const int intensity, const int Stride, const int bpp, unsigned char *maskBitmap, const int mStride) {
 // NTSC // CCIR 601 luma RGB weights:
 // r := 0.29970, g := 0.587130, b := 0.114180
 
+    const float fintensity = intensity/100.0f;
     #pragma omp parallel for schedule(dynamic) default(none)
     for (int x = 0; x < w; x++)
     {
         for (int y = 0; y < h; y++)
         {
             int G;
-            UINT colorO = BitmapData[x + (y * w)];
-            int aO = (colorO >> 24) & 0xFF;
+            if (clipMaskFilter(x, y, maskBitmap, mStride)==1)
+               continue;
+
+            INT64 o = CalcPixOffset(x, y, Stride, bpp);
+            int zR = BitmapData[2 + o];
+            int zG = BitmapData[1 + o];
+            int zB = BitmapData[o];
             if (modus==1)
             {
-               G = (colorO >> 16) & 0xFF;
+               G = BitmapData[2 + o]; // red
             } else if (modus==2)
             {
-               G = (colorO >> 8) & 0xFF;
+               G = BitmapData[1 + o]; // green
             } else if (modus==3)
             {
-               G = colorO & 0xFF;
-            } else if (modus==4)
+               G = BitmapData[o];     // blue
+            } else if (modus==4 && bpp==32)
             {
-               G = aO;
+               G = BitmapData[3 + o]; // alpha
             } else // if (modus==5)
             {
-               float rO = ((colorO >> 16) & 0xFF)*0.29970f;
-               float gO = ((colorO >> 8) & 0xFF)*0.587130f;
-               float bO = (colorO & 0xFF)*0.114180f;
-               G = clamp((int)round(rO + gO + bO), 0, 255);
+               G = clamp((int)round(char_to_grayRfloat[zR] + char_to_grayGfloat[zG] + char_to_grayBfloat[zB]), 0, 255);
             }
 
-            BitmapData[x + (y * w)] = (aO << 24) | (G << 16) | (G << 8) | G;
+            BitmapData[2 + o] = weighTwoValues(G, zR, fintensity);
+            BitmapData[1 + o] = weighTwoValues(G, zG, fintensity);
+            BitmapData[o]     = weighTwoValues(G, zB, fintensity);
+        }
+    }
+    return 1;
+}
+
+DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h, int Stride, int bpp, int color, int opacity, int eraser, int linearGamma, int blendMode, int flipLayers, unsigned char *maskBitmap, int mStride, unsigned char *colorBitmap, int gStride, int gBpp, int fillBehind, int opacityMultiplier) {
+    // fnOutputDebug("FillSelectArea mStride=" + std::to_string(mStride));
+    // fnOutputDebug("clipMaskFilter=zx=" + std::to_string(zx1) + "/" + std::to_string(zx2) + "=w=" + std::to_string(max(zx1, zx2) - min(zx1, zx2)));
+    // fnOutputDebug("clipMaskFilter=zy=" + std::to_string(zy1) + "/" + std::to_string(zy2) + "=h=" + std::to_string(max(zy1, zy2) - min(zy1, zy2)));
+    RGBAColor initialColor;
+    initialColor.a = (color >> 24) & 0xFF;
+    initialColor.r = (color >> 16) & 0xFF;
+    initialColor.g = (color >> 8) & 0xFF;
+    initialColor.b = color & 0xFF;
+    float fi = char_to_float[opacity];
+    const int bpc = bpp/8;
+    const int gbpc = gBpp/8;
+    const int bmpX = (imgSelX1<0 || invertSelection==1) ? 0 : imgSelX1;
+    const int bmpY = (imgSelY1<0 || invertSelection==1) ? 0 : imgSelY1;
+    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(8)
+    for (int x = 0; x < w; x++)
+    {
+        INT64 kx = (INT64)x * bpc;
+        INT64 kzx = (INT64)(x - bmpX) * gbpc;
+        for (int y = 0; y < h; y++)
+        {
+            float fintensity;
+            RGBAColor newColor;
+            RGBAColor userColor;
+            int thisOpacity, oA, oR, oG, oB;
+            if (clipMaskFilter(x, y, maskBitmap, mStride)==1)
+               continue;
+
+            // INT64 o = CalcPixOffset(x, y, Stride, bpp);
+            INT64 o = (INT64)y * Stride + kx;
+            if (colorBitmap!=NULL)
+            {
+               // INT64 oz = CalcPixOffset(x - zx1, y - zy1, gStride, 32);
+               INT64 oz = (INT64)(y - bmpY) * gStride + kzx;
+               thisOpacity = (gBpp==32) ? colorBitmap[3 + oz] : opacity;
+               if (opacityMultiplier>0 && gBpp==32)
+                  thisOpacity = clamp(thisOpacity + opacityMultiplier, 0, 255);
+               userColor.a = thisOpacity;
+               userColor.r = colorBitmap[2 + oz];
+               userColor.g = colorBitmap[1 + oz];
+               userColor.b = colorBitmap[oz];
+               newColor = userColor;
+               fintensity = char_to_float[thisOpacity];
+            } else
+            {
+               fintensity = fi;
+               thisOpacity = opacity;
+               userColor = initialColor;
+               newColor = initialColor;
+            }
+
+            if (bpp==32)
+            {
+               oA = (eraser==-1) ? 0 : BitmapData[3 + o];
+               int tA = weighTwoValues(newColor.a, oA, fintensity);
+               BitmapData[3 + o] = (colorBitmap!=NULL) ? max(tA, oA) : tA;
+            }
+
+            if (eraser!=1 || bpp!=32)
+            {
+               oR = (eraser==-1) ? 0 : BitmapData[2 + o];
+               oG = (eraser==-1) ? 0 : BitmapData[1 + o];
+               oB = (eraser==-1) ? 0 : BitmapData[o];
+            }
+
+            if (eraser!=1 || bpp!=32)
+            {
+               if (blendMode>0 && eraser==0 && thisOpacity>0 && oA>0)
+               {
+                  RGBColorI blended;
+                  if (flipLayers==1)
+                     blended = calculateBlendModes(oR, oG, oB, userColor.r, userColor.g, userColor.b, blendMode);
+                  else
+                     blended = calculateBlendModes(userColor.r, userColor.g, userColor.b, oR, oG, oB, blendMode);
+
+                  newColor.r = blended.r;
+                  newColor.g = blended.g;
+                  newColor.b = blended.b;
+               }
+
+               if (fillBehind==1)
+               {
+                  fintensity = char_to_float[oA];
+                  swap(oR, newColor.r);
+                  swap(oG, newColor.g);
+                  swap(oB, newColor.b);
+               }
+
+               if (linearGamma==1 && eraser==0 && thisOpacity>0)
+               {
+                  BitmapData[2 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[newColor.r], gamma_to_linear[oR], fintensity)];
+                  BitmapData[1 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[newColor.g], gamma_to_linear[oG], fintensity)];
+                  BitmapData[o]     = linear_to_gamma[weighTwoValues(gamma_to_linear[newColor.b], gamma_to_linear[oB], fintensity)];
+                } else
+                {
+                  BitmapData[2 + o] = weighTwoValues(newColor.r, oR, fintensity);
+                  BitmapData[1 + o] = weighTwoValues(newColor.g, oG, fintensity);
+                  BitmapData[o]     = weighTwoValues(newColor.b, oB, fintensity);
+                }
+            }
+        }
+    }
+    return 1;
+}
+
+DLL_API int DLL_CALLCONV AdjustImageColorsPrecise(unsigned char *BitmapData, int w, int h, int Stride, int bpp, int opacity, int invertColors, int altSat, int saturation, int altBright, int brightness, int altContra, int contrast, int altHiLows, int shadows, int highs, int hue, int tintDegrees, int tintAmount, int altTint, int gamma, int rOffset, int gOffset, int bOffset, int aOffset, int rThreshold, int gThreshold, int bThreshold, int aThreshold, int seeThrough, int linearGamma, int noClamping, int whitePoint, int blackPoint, int noiseMode, unsigned char *maskBitmap, int mStride) {
+    int bpc = bpp/8;
+    if (opacity<2)
+      return 1;
+
+    if (gamma!=300)
+    {
+       double zamma = 1.0f / ((float)gamma/300.0f);
+       for (int i = 0; i < 65536; i++) {
+          LUTgamma[i] = gammaMathsInt16(i, zamma);
+       }
+    }
+
+    if (altBright==0 && brightness<0)
+    {
+       double zamma = 1.0f / ((float)(77069.0f - brightness)/77069.0f);
+       for (int i = 0; i < 65536; i++) {
+          LUTgammaBright[i] = gammaMathsInt16(i, zamma);
+       }
+    }
+
+    float fiBright = (brightness>0) ? brightness/32768.0f : -1*int_to_float[-1*brightness];
+    if (brightness!=0 && altBright==1)
+    {
+       for (int i = 0; i < 65536; i++) {
+           LUTbright[i] = brightMathsInt16(i, fiBright);
+       }
+    }
+
+    float azx = (altHiLows==1) ? 25 : 95;
+    float factorHiLows = (65536.5f * (azx + 65535.0f)) / (65535.0f * (65536.5f - azx));
+    float fiShadows = (shadows>0) ? shadows/32768.0f : -1*int_to_float[-1*shadows];
+    if (shadows!=0)
+    {
+       for (int i = 0; i < 65536; i++) {
+           LUTshadows[i] = brightMathsInt16(i, fiShadows);
+       }
+    }
+
+    float fiHighs = (highs>0) ? highs/32768.0f : -1*int_to_float[-1*highs];
+    if (highs!=0)
+    {
+       for (int i = 0; i < 65536; i++) {
+           LUThighs[i] = brightMathsInt16(i, fiHighs);
+       }
+    }
+
+    float factorContrast = contrast/98302.0f;
+    if (contrast>65525)
+       contrast = 65525;
+    float fiContra = (65536.5f * (contrast + 65535.0f)) / (65535.0f * (65536.5f - contrast));
+    if (contrast!=0)
+    {
+       for (int i = 0; i < 65536; i++) {
+           LUTcontra[i] = contraMathsInt16(i, fiContra, 32768);
+       }
+    }
+
+    if (hue<0)
+       hue += 360;
+    if (tintDegrees<0)
+       tintDegrees += 360;
+
+    float saturateFactor = (saturation<0) ? (65535.0f - abs(saturation))/131070.0f : 0.5f + saturation/131070.0f;
+    float fintensity = char_to_float[opacity];
+    time_t nTime;
+    srand((unsigned) time(&nTime));
+
+    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(8)
+    for (int x = 0; x < w; x++)
+    {
+        INT64 kx = (INT64)x * bpc;
+        for (int y = 0; y < h; y++)
+        {
+            int oA = 255;
+            int oR, oG, oB;
+            if (clipMaskFilter(x, y, maskBitmap, mStride)==1)
+               continue;
+
+            // INT64 o = CalcPixOffset(x, y, Stride, bpp);
+            INT64 o = (INT64)y * Stride + kx;
+            if (bpp==32)
+            {
+               oA = BitmapData[3 + o];
+               if (oA==0 && altContra==0 && aOffset==0)
+                  continue;
+            }
+
+            oR = BitmapData[2 + o];
+            oG = BitmapData[1 + o];
+            oB = BitmapData[o];
+            RGBA16color pixel = {char_to_int[oB], char_to_int[oG], char_to_int[oR], char_to_int[oA]};
+            if (invertColors==1)
+               pixel.invert();
+            if (gamma!=300)
+               pixel.gamma(gamma, brightness, altBright, noClamping);
+            if (shadows!=0 || highs!=0)
+            {
+               int gray = (noClamping==1) ? 0 : getInt16grayscale(pixel.r, pixel.g, pixel.b);
+               if (shadows!=0)
+                  pixel.shadows(shadows, altHiLows, linearGamma, gray, noClamping, fiShadows);
+               if (highs!=0)
+                  pixel.highlights(highs, altHiLows, linearGamma, factorHiLows, gray, noClamping, fiHighs);
+            }
+            if (aOffset!=0 || rOffset!=0 || gOffset!=0 || bOffset!=0)
+               pixel.channelOffset(aOffset, rOffset, gOffset, bOffset, noClamping);
+            if (brightness!=0)
+               pixel.brightness(brightness, altBright, noClamping, fiBright);
+            if (contrast!=0)
+               pixel.contrast(contrast, altContra, linearGamma, factorContrast, noClamping, fiContra);
+            if (noClamping==1)
+            {
+               // the other filters rely on clamped values
+               pixel.r = clamp(pixel.r, 0, 65535);
+               pixel.g = clamp(pixel.g, 0, 65535);
+               pixel.b = clamp(pixel.b, 0, 65535);
+            }
+
+            if (hue!=0)
+               pixel.hueRotate(hue, saturateFactor, altSat, saturation);
+            if (saturation!=0)
+               pixel.saturation(saturation, altSat, linearGamma, saturateFactor);
+            if (blackPoint>0)
+               pixel.blackPoint(blackPoint, noiseMode);
+            if (whitePoint<65535)
+               pixel.whitePoint(whitePoint, noiseMode);
+            if (tintAmount>0)
+               pixel.tint(tintDegrees, tintAmount, altTint, linearGamma);
+            if (aThreshold>=0 || rThreshold>=0 || gThreshold>=0 || bThreshold>=0)
+               pixel.threshold(aThreshold, rThreshold, gThreshold, bThreshold, seeThrough);
+
+            if (linearGamma==1 && opacity<255)
+            {
+               if (bpp==32)
+                  BitmapData[3 + o] = int_to_char[linear_to_gammaInt16[weighTwoValues(gamma_to_linearInt16[pixel.a], gamma_to_linearInt16[char_to_int[oA]], fintensity)]];
+               BitmapData[2 + o] = int_to_char[linear_to_gammaInt16[weighTwoValues(gamma_to_linearInt16[pixel.r], gamma_to_linearInt16[char_to_int[oR]], fintensity)]];
+               BitmapData[1 + o] = int_to_char[linear_to_gammaInt16[weighTwoValues(gamma_to_linearInt16[pixel.g], gamma_to_linearInt16[char_to_int[oG]], fintensity)]];
+               BitmapData[o]     = int_to_char[linear_to_gammaInt16[weighTwoValues(gamma_to_linearInt16[pixel.b], gamma_to_linearInt16[char_to_int[oB]], fintensity)]];
+            } else
+            {
+               if (bpp==32)
+                  BitmapData[3 + o] = weighTwoValues(int_to_char[pixel.a], oA, fintensity);
+               BitmapData[2 + o] = weighTwoValues(int_to_char[pixel.r], oR, fintensity);
+               BitmapData[1 + o] = weighTwoValues(int_to_char[pixel.g], oG, fintensity);
+               BitmapData[o]     = weighTwoValues(int_to_char[pixel.b], oB, fintensity);
+            }
+        }
+    }
+    return 1;
+}
+
+DLL_API int DLL_CALLCONV AdjustImageColors(unsigned char *BitmapData, int w, int h, int Stride, int bpp, int opacity, int invertColors, int altSat, int saturation, int altBright, int brightness, int altContra, int contrast, int altHiLows, int shadows, int highs, int hue, int tintDegrees, int tintAmount, int altTint, int gamma, int rOffset, int gOffset, int bOffset, int aOffset, int rThreshold, int gThreshold, int bThreshold, int aThreshold, int seeThrough, int linearGamma, int noClamping, int whitePoint, int blackPoint, int noiseMode, unsigned char *maskBitmap, int mStride) {
+    int bpc = bpp/8;
+    if (opacity<2)
+      return 1;
+
+    brightness = (brightness>0) ? int_to_char[brightness] : - int_to_char[abs(brightness)];
+    contrast = (contrast>0) ? int_to_char[contrast] : - int_to_char[abs(contrast)];
+    shadows = (shadows>0) ? int_to_char[shadows] : - int_to_char[abs(shadows)];
+    highs = (highs>0) ? int_to_char[highs] : - int_to_char[abs(highs)];
+    rOffset = (rOffset>0) ? int_to_char[rOffset] : - int_to_char[abs(rOffset)];
+    gOffset = (gOffset>0) ? int_to_char[gOffset] : - int_to_char[abs(gOffset)];
+    bOffset = (bOffset>0) ? int_to_char[bOffset] : - int_to_char[abs(bOffset)];
+    aOffset = (aOffset>0) ? int_to_char[aOffset] : - int_to_char[abs(aOffset)];
+    whitePoint = (whitePoint<65535) ? int_to_char[whitePoint] : 255;
+    blackPoint = (blackPoint>0) ? int_to_char[blackPoint] : 0;
+    if (rThreshold>0)
+       rThreshold = (rThreshold>0) ? int_to_char[rThreshold] : - int_to_char[abs(rThreshold)];
+    if (gThreshold>0)
+       gThreshold = (gThreshold>0) ? int_to_char[gThreshold] : - int_to_char[abs(gThreshold)];
+    if (bThreshold>0)
+       bThreshold = (bThreshold>0) ? int_to_char[bThreshold] : - int_to_char[abs(bThreshold)];
+    if (aThreshold>0)
+       aThreshold = (aThreshold>0) ? int_to_char[aThreshold] : - int_to_char[abs(aThreshold)];
+
+    if (gamma!=300)
+    {
+       double zamma = 1.0f / ((float)gamma/300.0f);
+       for (int i = 0; i < 256; i++) {
+          LUTgamma[i] = gammaMaths(i, zamma);
+       }
+    }
+
+    if (altBright==0 && brightness<0)
+    {
+       double zamma = 1.0f / ((float)(300 - brightness)/300.0f);
+       for (int i = 0; i < 256; i++) {
+          LUTgammaBright[i] = gammaMaths(i, zamma);
+       }
+    }
+
+    if (brightness!=0 && altBright==1)
+    {
+       float fi = (brightness>0) ? brightness/128.0f : -1*char_to_float[-1*brightness];
+       for (int i = 0; i < 256; i++) {
+           LUTbright[i] = brightMaths(i, fi);
+       }
+    }
+
+    float azx = (altHiLows==1) ? 25 : 95;
+    float factorHiLows = (259.0f * (azx + 255.0f)) / (255.0f * (259.0f - azx));
+    if (shadows!=0)
+    {
+       float fi = (shadows>0) ? shadows/128.0f : -1*char_to_float[-1*shadows];
+       for (int i = 0; i < 256; i++) {
+           LUTshadows[i] = brightMaths(i, fi);
+       }
+    }
+
+    if (highs!=0)
+    {
+       float fi = (highs>0) ? highs/128.0f : -1*char_to_float[-1*highs];
+       for (int i = 0; i < 256; i++) {
+           LUThighs[i] = brightMaths(i, fi);
+       }
+    }
+
+    float factorContrast = contrast/383.0f;
+    if (contrast!=0)
+    {
+       if (contrast<-230)
+          contrast = -230;
+       float mid = gamma_to_linear[128];
+       float fintensity = (contrast<0) ? char_to_float[contrast + 255] : 0;
+       float factor = (259.0f * (contrast + 255.0f)) / (255.0f * (259.0f - contrast));
+  
+       float fi = (contrast>0) ? char_to_float[contrast] : -1*char_to_float[-1*contrast];
+       float ff = (1.01f * (fi + 1.0f)) / (1.0f * (1.01f - fi));
+       for (int i = 0; i < 256; i++)
+       {
+           if (contrast<0)
+              LUTcontra[i] = linear_to_gamma[weighTwoValues(gamma_to_linear[i], mid, fintensity)];
+           else
+              LUTcontra[i] = clamp( (float)ff * (char_to_float[i] - 0.5f)  + 0.5f, 0.0f, 1.0f)*255.0f;
+           // else
+           //    LUTcontra[i] = contraMaths(i, factor, 128);
+       }
+    }
+    if (hue<0)
+       hue += 360;
+    if (tintDegrees<0)
+       tintDegrees += 360;
+
+    time_t nTime;
+    srand((unsigned) time(&nTime));
+    float saturateFactor = (saturation<0) ? (65535.0f - abs(saturation))/131070.0f : 0.5f + saturation/131070.0f;
+    float fintensity = char_to_float[opacity];
+    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(8)
+    for (int x = 0; x < w; x++)
+    {
+        INT64 kx = (INT64)x * bpc;
+        for (int y = 0; y < h; y++)
+        {
+            int oA = 255;
+            int oR, oG, oB;
+            if (clipMaskFilter(x, y, maskBitmap, mStride)==1)
+               continue;
+
+            // INT64 o = CalcPixOffset(x, y, Stride, bpp);
+            INT64 o = (INT64)y * Stride + kx;
+            if (bpp==32)
+            {
+               oA = BitmapData[3 + o];
+               if (oA==0 && altContra==0 && aOffset==0)
+                  continue;
+            }
+
+            oR = BitmapData[2 + o];
+            oG = BitmapData[1 + o];
+            oB = BitmapData[o];
+            RGBAColor pixel = {oB, oG, oR, oA};
+            if (invertColors==1)
+               pixel.invert();
+            if (gamma!=300)
+               pixel.gamma();
+            if (aOffset!=0 || rOffset!=0 || gOffset!=0 || bOffset!=0)
+               pixel.channelOffset(aOffset, rOffset, gOffset, bOffset);
+            if (shadows!=0 || highs!=0)
+            {
+               int gray = getGrayscale(oR, oG, oB);
+               if (shadows!=0)
+                  pixel.shadows(altHiLows, linearGamma, gray);
+               if (highs!=0)
+                  pixel.highlights(altHiLows, linearGamma, factorHiLows, gray);
+            }
+            if (brightness!=0)
+               pixel.brightness(brightness, altBright);
+            if (contrast!=0)
+               pixel.contrast(contrast, altContra, linearGamma, factorContrast);
+            if (hue!=0)
+               pixel.hueRotate(hue, saturateFactor, altSat, saturation);
+            if (saturation!=0)
+               pixel.saturation(saturation, altSat, linearGamma, saturateFactor);
+            if (blackPoint>0)
+               pixel.blackPoint(blackPoint, noiseMode);
+            if (whitePoint<255)
+               pixel.whitePoint(whitePoint, noiseMode);
+            if (tintAmount>0)
+               pixel.tint(tintDegrees, tintAmount, altTint, linearGamma);
+            if (aThreshold>=0 || rThreshold>=0 || gThreshold>=0 || bThreshold>=0)
+               pixel.threshold(aThreshold, rThreshold, gThreshold, bThreshold, seeThrough);
+
+            if (linearGamma==1 && fintensity<1)
+            {
+               if (bpp==32)
+                  BitmapData[3 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[pixel.a], gamma_to_linear[oA], fintensity)];
+               BitmapData[2 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[pixel.r], gamma_to_linear[oR], fintensity)];
+               BitmapData[1 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[pixel.g], gamma_to_linear[oG], fintensity)];
+               BitmapData[o]     = linear_to_gamma[weighTwoValues(gamma_to_linear[pixel.b], gamma_to_linear[oB], fintensity)];
+            } else
+            {
+               if (bpp==32)
+                  BitmapData[3 + o] = weighTwoValues(pixel.a, oA, fintensity);
+               BitmapData[2 + o] = weighTwoValues(pixel.r, oR, fintensity);
+               BitmapData[1 + o] = weighTwoValues(pixel.g, oG, fintensity);
+               BitmapData[o]     = weighTwoValues(pixel.b, oB, fintensity);
+            }
+        }
+    }
+    return 1;
+}
+
+DLL_API int DLL_CALLCONV MergeBitmapsWithMask(unsigned char *originalData, unsigned char *newBitmap, unsigned char *maskBitmap, int invert, int w, int h, int maskOpacity, int invertMaskOpacity, int Stride, int bpp, int linearGamma) {
+    #pragma omp parallel for schedule(dynamic) default(none)
+    for (int x = 0; x < w; x++)
+    {
+        for (int y = 0; y < h; y++)
+        {
+            int nA = 1;
+            int oA = 1;
+            int intensity = 0;
+            INT64 o = CalcPixOffset(x, y, Stride, bpp);
+            if (maskBitmap!=NULL)
+            {
+               intensity = (invert==1) ? 255 - maskBitmap[o] : maskBitmap[o];
+               if (maskOpacity!=0)
+               {
+                  intensity = (invertMaskOpacity==1) ? intensity + maskOpacity : intensity - maskOpacity;
+                  intensity = clamp(intensity, 0, 255);
+               }
+            } else intensity = maskOpacity;
+
+            if (intensity<1)
+               continue;
+
+            if (bpp==32)
+               nA = newBitmap[3 + o];
+            int nR = newBitmap[2 + o];
+            int nG = newBitmap[1 + o];
+            int nB = newBitmap[o];
+            if (intensity>254)
+            {
+               originalData[2 + o] = nR;
+               originalData[1 + o] = nG;
+               originalData[o] = nB;
+               if (bpp==32)
+                  originalData[3 + o] = nA;
+               continue;
+            }
+
+            if (bpp==32)
+               oA = originalData[3 + o];
+            int oR = originalData[2 + o];
+            int oG = originalData[1 + o];
+            int oB = originalData[o];
+            float fintensity = char_to_float[intensity];
+            if (linearGamma==1)
+            {
+               originalData[2 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[nR], gamma_to_linear[oR], fintensity)];
+               originalData[1 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[nG], gamma_to_linear[oG], fintensity)];
+               originalData[o]     = linear_to_gamma[weighTwoValues(gamma_to_linear[nB], gamma_to_linear[oB], fintensity)];
+            } else
+            {
+               originalData[2 + o] = weighTwoValues(nR, oR, fintensity);
+               originalData[1 + o] = weighTwoValues(nG, oG, fintensity);
+               originalData[o]     = weighTwoValues(nB, oB, fintensity);
+            }
+
+            if (bpp==32)
+               originalData[3 + o] = weighTwoValues(nA, oA, fintensity);
+        }
+    }
+    return 1;
+}
+
+DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, int h, int Stride, int bpp, int maskOpacity, int blendMode, int flipLayers, int linearGamma, unsigned char *newBitmap, int StrideMini, int mw, int mh, int bImgSelW, int bImgSelH, unsigned char *maskBitmap, int mStride) {
+    if (maskOpacity<2)
+        return 1;
+
+    std::vector<int> pixelzMapW(w, 0);
+    std::vector<int> pixelzMapH(h, 0);
+    const int bmpX = (imgSelX1<0 || invertSelection==1) ? 0 : imgSelX1;
+    const int bmpY = (imgSelY1<0 || invertSelection==1) ? 0 : imgSelY1;
+    for (int x = 0; x < w; x++)
+    {
+        pixelzMapW[x] = (float)mw*((x - bmpX)/(float)bImgSelW);
+    }
+
+    for (int y = 0; y < h; y++)
+    {
+        pixelzMapH[y] = (float)mh*((y - bmpY)/(float)bImgSelH);
+    }
+
+    const float fintensity = char_to_float[maskOpacity];
+    #pragma omp parallel for schedule(dynamic) default(none)
+    for (int x = 0; x < w; x++)
+    {
+        for (int y = 0; y < h; y++)
+        {
+            int nA = 1;
+            int oA = 1;
+            if (clipMaskFilter(x, y, maskBitmap, mStride)==1)
+               continue;
+
+            INT64 on = CalcPixOffset(pixelzMapW[x], pixelzMapH[y], StrideMini, bpp);
+            INT64 o = CalcPixOffset(x, y, Stride, bpp);
+            if (bpp==32)
+               nA = newBitmap[3 + on];
+            int nR = newBitmap[2 + on];
+            int nG = newBitmap[1 + on];
+            int nB = newBitmap[on];
+ 
+            if (bpp==32)
+               oA = originalData[3 + o];
+            int oR = originalData[2 + o];
+            int oG = originalData[1 + o];
+            int oB = originalData[o];
+
+            if (blendMode>0)
+            {
+               RGBColorI blended;
+               if (flipLayers=1)
+                  blended = calculateBlendModes(oR, oG, oB, nR, nG, nB, blendMode);
+               else
+                  blended = calculateBlendModes(oR, oG, oB, nR, nG, nB, blendMode);
+
+               nR = blended.r;
+               nG = blended.g;
+               nB = blended.b;
+            }
+
+            if (linearGamma==1)
+            {
+               originalData[2 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[nR], gamma_to_linear[oR], fintensity)];
+               originalData[1 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[nG], gamma_to_linear[oG], fintensity)];
+               originalData[o]     = linear_to_gamma[weighTwoValues(gamma_to_linear[nB], gamma_to_linear[oB], fintensity)];
+            } else
+            {
+               originalData[2 + o] = weighTwoValues(nR, oR, fintensity);
+               originalData[1 + o] = weighTwoValues(nG, oG, fintensity);
+               originalData[o]     = weighTwoValues(nB, oB, fintensity);
+            }
+
+            if (bpp==32)
+               originalData[3 + o] = weighTwoValues(nA, oA, fintensity);
+        }
+    }
+    return 1;
+}
+
+DLL_API int DLL_CALLCONV UndoAiderSwapPixelRegions(unsigned char* BitmapData, int w, int h, const INT64 Stride, unsigned char* otherData, const INT64 mStride, int bpp, const int x1, const int y1, const int x2, const int y2) {
+
+    const INT64 bytesPerPixel = (bpp==32) ? 4 : 3;
+    const INT64 opx = x1 * bytesPerPixel;
+    const INT64 chunk = (x2 - x1) * bytesPerPixel;
+    #pragma omp parallel for schedule(dynamic) default(none)
+    for (int y = y1; y < y2; y++)
+    {
+            INT64 o = y * Stride + opx;
+            INT64 n = (y - y1) * mStride;
+            // Swap pixels
+            BYTE *temp = NULL;
+            temp = new BYTE[chunk];
+            memcpy(temp, &BitmapData[o], chunk);
+            memcpy(&BitmapData[o], &otherData[n], chunk);
+            memcpy(&otherData[n], temp, chunk);
+            delete[] temp;
+    }
+    return 1;
+}
+
+DLL_API int DLL_CALLCONV ColorizeGrayImage(unsigned char *originalData, int w, int h, int Stride, int bpp, int linearGamma, int colorA, int colorB) {
+    const int aB = (colorB >> 24) & 0xFF;
+    const int rB = (colorB >> 16) & 0xFF;
+    const int gB = (colorB >> 8) & 0xFF;
+    const int bB = colorB & 0xFF;
+    const int aA = (colorA >> 24) & 0xFF;
+    const int rA = (colorA >> 16) & 0xFF;
+    const int gA = (colorA >> 8) & 0xFF;
+    const int bA = colorA & 0xFF;
+
+    #pragma omp parallel for schedule(dynamic) default(none)
+    for (int x = 0; x < w; x++)
+    {
+        for (int y = 0; y < h; y++)
+        {
+            INT64 o = CalcPixOffset(x, y, Stride, bpp);
+            float fintensity = char_to_float[originalData[o]];
+            // float f = char_to_float[originalData[o]];
+            if (linearGamma==1)
+            {
+               originalData[2 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[rA], gamma_to_linear[rB], fintensity)];
+               originalData[1 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[gA], gamma_to_linear[gB], fintensity)];
+               originalData[o]     = linear_to_gamma[weighTwoValues(gamma_to_linear[bA], gamma_to_linear[bB], fintensity)];
+            } else
+            {
+               originalData[2 + o] = weighTwoValues(rA, rB, fintensity);
+               originalData[1 + o] = weighTwoValues(gA, gB, fintensity);
+               originalData[o]     = weighTwoValues(bA, bB, fintensity);
+            }
+
+            if (bpp==32)
+               originalData[3 + o] = weighTwoValues(aA, aB, fintensity);
         }
     }
     return 1;
@@ -2388,19 +3175,25 @@ auto adaptImageGivenSize(UINT keepAratio, UINT ScaleAnySize, UINT imgW, UINT img
 }
 
 DLL_API int DLL_CALLCONV WICdestroyPreloadedImage(int id) {
-  SafeRelease(pWICclassDecoder);
-  SafeRelease(pWICclassFrameDecoded);
   SafeRelease(pWICclassPixelsBitmapSource);
-  return 1;
+  pWICclassPixelsBitmapSource = NULL;
+  SafeRelease(pWICclassFrameDecoded);
+  pWICclassFrameDecoded = NULL;
+  SafeRelease(pWICclassDecoder);
+  pWICclassDecoder = NULL;
+  return id;
 }
 
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV WICgetRectImage(int x, int y, int w, int h, int newW, int newH, int mustClip) {
-  Gdiplus::GpBitmap  *myBitmap = NULL;
-  IWICBitmapClipper  *pIClipper = NULL;
-  IWICBitmapSource   *pBitmapSource = NULL;
+  Gdiplus::GpBitmap   *myBitmap = NULL;
+  IWICBitmapClipper   *pIClipper = NULL;
+  IWICBitmapSource    *pBitmapSource = NULL;
+  IWICBitmapScaler    *pScaler = NULL;
+  IWICBitmapSource    *pFinalBitmapSource = NULL;
+  IWICFormatConverter *pConverter = NULL;
+
   WICRect rcClip = { x, y, w, h };
   HRESULT hr;
-
   if (mustClip==1)
   {
       hr = m_pIWICFactory->CreateBitmapClipper(&pIClipper);
@@ -2416,7 +3209,6 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV WICgetRectImage(int x, int y, int w, int
       }
   } else hr = S_OK;
 
-  IWICBitmapScaler    *pScaler = NULL;
   if (SUCCEEDED(hr))
      hr = m_pIWICFactory->CreateBitmapScaler(&pScaler);
 
@@ -2429,8 +3221,6 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV WICgetRectImage(int x, int y, int w, int
         hr = pScaler->Initialize(pWICclassPixelsBitmapSource, newW, newH, WICBitmapInterpolationModeNearestNeighbor);
   }
 
-  IWICBitmapSource    *pFinalBitmapSource = NULL;
-  IWICFormatConverter *pConverter = NULL;
   if (SUCCEEDED(hr))
   {
       hr = m_pIWICFactory->CreateFormatConverter(&pConverter);
@@ -2473,6 +3263,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV WICgetRectImage(int x, int y, int w, int
       if (SUCCEEDED(hr))
          hr = UIntMult(cbStride, height, &cbBufferSize);
 
+      fnOutputDebug("WIC prepare gdi+ obj");
       if (SUCCEEDED(hr))
       {
           BYTE *m_pbBuffer = NULL;  // the GDI+ bitmap buffer
@@ -2480,6 +3271,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV WICgetRectImage(int x, int y, int w, int
           hr = (m_pbBuffer) ? S_OK : E_FAIL;
           if (SUCCEEDED(hr))
           {
+              fnOutputDebug("WIC gdi+ obj buffer");
               // WICRect rc = { 0, 0, width, height };
               // Extract the image into the GDI+ Bitmap
               // fnOutputDebug("WIC pre-copy pixels");
@@ -2487,6 +3279,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV WICgetRectImage(int x, int y, int w, int
               // fnOutputDebug("WIC after copy pixels");
               if (SUCCEEDED(hr))
               {
+                 fnOutputDebug("WIC gdi+ obj copy pixels into buffer");
                  Gdiplus::DllExports::GdipCreateBitmapFromScan0(width, height, cbStride, PixelFormat32bppPARGB, NULL, &myBitmap);
                  Gdiplus::Rect rectu(0, 0, width, height);
                  Gdiplus::BitmapData bitmapDatu;
@@ -2499,6 +3292,8 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV WICgetRectImage(int x, int y, int w, int
                  Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rectu, 6, PixelFormat32bppPARGB, &bitmapDatu);
                  Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu);
                  hr = myBitmap ? S_OK : E_FAIL;
+                 if (SUCCEEDED(hr))
+                    fnOutputDebug("WIC gdi+ obj created");
               }
           }
           delete[] m_pbBuffer;
@@ -2512,6 +3307,125 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV WICgetRectImage(int x, int y, int w, int
   SafeRelease(pBitmapSource);
   SafeRelease(pFinalBitmapSource);
   return myBitmap;
+}
+
+DLL_API BYTE* DLL_CALLCONV WICgetLargeBufferImage(int okay, int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize, int sliceHeight) {
+  okay = 0;
+  HRESULT hr;
+  IWICFormatConverter *pConverter = NULL;
+  IWICBitmapSource *pFinalBitmapSource = NULL;
+
+  UINT width = 0;
+  UINT height = 0;
+  // UINT cbStride = 0;
+  // double cbBufferSize = 0;
+  hr = pWICclassPixelsBitmapSource->GetSize(&width, &height); 
+  if (SUCCEEDED(hr))
+     hr = m_pIWICFactory->CreateFormatConverter(&pConverter);
+
+  if (SUCCEEDED(hr))
+  {
+     if (bitsDepth==32)
+        hr = pConverter->Initialize(pWICclassPixelsBitmapSource, GUID_WICPixelFormat32bppBGRA, WICBitmapDitherTypeNone, NULL, 0.f, WICBitmapPaletteTypeCustom);
+     else
+        hr = pConverter->Initialize(pWICclassPixelsBitmapSource, GUID_WICPixelFormat24bppBGR, WICBitmapDitherTypeNone, NULL, 0.f, WICBitmapPaletteTypeCustom);
+  }
+
+  if (SUCCEEDED(hr))
+     hr = pConverter->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void **>(&pFinalBitmapSource));
+
+  BYTE *m_pbBuffer = NULL;
+  m_pbBuffer = new BYTE[cbBufferSize];
+  hr = (m_pbBuffer) ? S_OK : E_FAIL;
+
+  int y = 0;
+  int indexu = 0;
+  UINT64 buffOffset = 0;
+  if (SUCCEEDED(hr))
+  {
+      fnOutputDebug(std::to_string(cbStride) + " WIC buffer created: " + std::to_string(cbBufferSize) + "; h=" + std::to_string(height) + "; w=" + std::to_string(width));
+      while (y<height)
+      {
+          if (indexu>0)
+             y += sliceHeight;
+          if (y>=height)
+             break;
+
+          int h = (y + sliceHeight>height) ? height - y : sliceHeight;
+          WICRect rc = { 0, y, width, h };
+          UINT tmpBufferSize = cbStride * h;
+          // fnOutputDebug(std::to_string(indexu) + "# y=" + std::to_string(y) + "; h=" + std::to_string(h));
+          // fnOutputDebug("tmp buffer prepped:" + std::to_string(tmpBufferSize));
+          HRESULT hr = pFinalBitmapSource->CopyPixels(&rc, cbStride, tmpBufferSize, m_pbBuffer + buffOffset);
+          if (SUCCEEDED(hr))
+          {
+             // fnOutputDebug("tmp buffer YAY");
+             buffOffset += tmpBufferSize;
+          }
+          indexu++;
+          // delete[] tmp_Buffer;
+      }
+
+      if (SUCCEEDED(hr))
+      {
+          okay = 1;
+          fnOutputDebug("WIC copy pixels to buffer: yay");
+      } else
+      {
+         delete[] m_pbBuffer;
+         m_pbBuffer = NULL;
+      }
+  }
+
+  SafeRelease(pFinalBitmapSource);
+  SafeRelease(pConverter);
+  return m_pbBuffer;
+}
+
+DLL_API BYTE* DLL_CALLCONV WICgetBufferImage(int okay, int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize) {
+  okay = 0;
+  HRESULT hr;
+  IWICFormatConverter *pConverter = NULL;
+  IWICBitmapSource *pFinalBitmapSource = NULL;
+
+  UINT width = 0;
+  UINT height = 0;
+  hr = pWICclassPixelsBitmapSource->GetSize(&width, &height); 
+  if (SUCCEEDED(hr))
+     hr = m_pIWICFactory->CreateFormatConverter(&pConverter);
+
+  if (SUCCEEDED(hr))
+  {
+     if (bitsDepth==32)
+        hr = pConverter->Initialize(pWICclassPixelsBitmapSource, GUID_WICPixelFormat32bppBGRA, WICBitmapDitherTypeNone, NULL, 0.f, WICBitmapPaletteTypeCustom);
+     else
+        hr = pConverter->Initialize(pWICclassPixelsBitmapSource, GUID_WICPixelFormat24bppBGR, WICBitmapDitherTypeNone, NULL, 0.f, WICBitmapPaletteTypeCustom);
+  }
+
+  if (SUCCEEDED(hr))
+     hr = pConverter->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void **>(&pFinalBitmapSource));
+
+  BYTE *m_pbBuffer = NULL;
+  m_pbBuffer = new BYTE[cbBufferSize];
+  hr = (m_pbBuffer) ? S_OK : E_FAIL;
+  if (SUCCEEDED(hr))
+  {
+      fnOutputDebug("WIC buffer created: " + std::to_string(cbBufferSize));
+      hr = pFinalBitmapSource->CopyPixels(NULL, cbStride, cbBufferSize, m_pbBuffer);
+      if (SUCCEEDED(hr))
+      {
+          okay = 1;
+          fnOutputDebug("WIC copy pixels to buffer: yay");
+      } else
+      {
+         delete[] m_pbBuffer;
+         m_pbBuffer = NULL;
+      }
+  }
+
+  SafeRelease(pFinalBitmapSource);
+  SafeRelease(pConverter);
+  return m_pbBuffer;
 }
 
 DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFrame, UINT *resultsArray) {
@@ -2850,7 +3764,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
                hr = UIntMult(cbStride, height, &cbBufferSize);
 
             // std::stringstream ss;
-            // ss << "qpv: threadu - " << threadIDu << " convert to dib format stride=" << cbStride;
+            // ss << "qpv: threadu - " << threadIDu << " convert to dib format Stride=" << cbStride;
             // OutputDebugStringA(ss.str().data());
             if (SUCCEEDED(hr))
             {
@@ -2928,44 +3842,6 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
     OutputDebugStringA(ss.str().data());
 */
     return myBitmap;
-}
-
-DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
-    HRESULT hr = S_OK;
-    // to do - fix this; make it work on Windows 7 
-
-    if (SUCCEEDED(hr))
-    {
-       hr = CoCreateInstance(CLSID_WICImagingFactory,
-                    NULL, CLSCTX_INPROC_SERVER,
-                    IID_PPV_ARGS(&m_pIWICFactory));
-    }
-
-    // source https://www.teamten.com/lawrence/graphics/gamma/
-    static const float GAMMA = 2.2;
-    int result;
-
-    for (int i = 0; i < 256; i++) {
-        result = (int)(pow(i/255.0, GAMMA)*32768.0 + 0.5);
-        gamma_to_linear[i] = (unsigned short)result;
-    }
-
-    for (int i = 0; i < 32769; i++) {
-        result = (int)(pow(i/32768.0, 1/GAMMA)*255.0 + 0.5);
-        linear_to_gamma[i] = (unsigned char)result;
-    }
-
-    for (int i = 0; i < 256; i++) {
-        char_to_float[i] = i/255.0f;
-    }
-
-    // std::stringstream ss;
-    // ss << "qpv: threadu - " << threadIDu << " HRESULT " << hr;
-    // OutputDebugStringA(ss.str().data());
-    if (SUCCEEDED(hr))
-       return 1;
-    else 
-       return 0;
 }
 
 int myRound(double x) {
@@ -3094,8 +3970,8 @@ DLL_API int DLL_CALLCONV CreatePDFfile(const char* tempDir, const char* destinat
   return dirErr;
 }
 
-Gdiplus::GpBitmap* CreateBitmapFromCImg(CImg<float> & img, int width, int height) {
-    fnOutputDebug("CreateBitmapFromCImg called, yay");
+Gdiplus::GpBitmap* CreateGdipBitmapFromCImg(CImg<float> & img, int width, int height) {
+    // fnOutputDebug("CreateGdipBitmapFromCImg called, yay");
     // Size of a scan line represented in bytes: 4 bytes each pixel
     UINT cbStride = 0;
     UIntMult(width, sizeof(Gdiplus::ARGB), &cbStride);
@@ -3103,7 +3979,6 @@ Gdiplus::GpBitmap* CreateBitmapFromCImg(CImg<float> & img, int width, int height
     // Size of the image, represented in bytes
     UINT cbBufferSize = 0;
     UIntMult(cbStride, height, &cbBufferSize);
-    // hr = (m_pbBuffer) ? S_OK : E_FAIL;
 
     Gdiplus::GpBitmap  *myBitmap = NULL;
     Gdiplus::DllExports::GdipCreateBitmapFromScan0(width, height, cbStride, PixelFormat32bppARGB, NULL, &myBitmap);
@@ -3118,14 +3993,14 @@ Gdiplus::GpBitmap* CreateBitmapFromCImg(CImg<float> & img, int width, int height
     bitmapDatu.Stride = cbStride;
     bitmapDatu.PixelFormat = PixelFormat32bppARGB;
     bitmapDatu.Scan0 = m_pbBuffer;
+    const int nPlanes = 4; // NOTE we assume alpha plane is the 4th plane.
  
     Gdiplus::Status s = Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rectu, 6, PixelFormat32bppARGB, &bitmapDatu);
     // Step through cimg and bitmap, copy values to bitmap.
-    const int nPlanes = 4; // NOTE we assume alpha plane is the 4th plane.
     if (s == Gdiplus::Ok)
     {
         // fnOutputDebug("gdip bmp locked, yay");
-        // fnOutputDebug("init vars for conversion; stride=" + std::to_string(dLineDest));
+        // fnOutputDebug("init vars for conversion; Stride=" + std::to_string(dLineDest));
         BYTE *pStartDest = (BYTE *) bitmapDatu.Scan0;
         UINT dPixelDest = nPlanes;             // pixel step in destination
         UINT dLineDest = bitmapDatu.Stride;    // line step in destination
@@ -3187,6 +4062,32 @@ Gdiplus::GpBitmap* CreateBitmapFromCImg(CImg<float> & img, int width, int height
     return myBitmap;
 }
 
+void FillGdipLockedBitmapDataFromCImg(unsigned char *imageData, CImg<unsigned char> &img, int width, int height, int Stride, int bpp, unsigned char *maskBitmap, int mStride) {
+    #pragma omp parallel for schedule(dynamic)
+    for (int y = 0; y < height; y++)
+    {
+        for (int x = 0; x < width; x++)
+        {
+            if (mStride>-1)
+            {
+               if (clipMaskFilter(x, y, maskBitmap, mStride)==1)
+                  continue;
+            }
+
+            INT64 o = CalcPixOffset(x, y, Stride, bpp);
+            imageData[o]     = img(x,y,0,0); // b
+            imageData[o + 1] = img(x,y,0,1); // g
+            imageData[o + 2] = img(x,y,0,2); // r
+            if (bpp==32)
+               imageData[o + 3] = img(x,y,0,3); // a
+        }
+    }
+}
+
+void FillGdipLockedBitmapDataFromCImg(unsigned char *imageData, CImg<unsigned char> &img, int width, int height, int Stride, int bpp) {
+     FillGdipLockedBitmapDataFromCImg(imageData, img, width, height, Stride, bpp, NULL, -1);
+}
+
 int FillCImgFromBitmap(cimg_library::CImg<float> & img, Gdiplus::GpBitmap *myBitmap, int width, int height) {
 
     // fnOutputDebug("FillCImgFromBitmap called, yay");
@@ -3205,7 +4106,7 @@ int FillCImgFromBitmap(cimg_library::CImg<float> & img, Gdiplus::GpBitmap *myBit
     if (s == Gdiplus::Ok)
     {
         // fnOutputDebug("for loops begin: FillCImgFromBitmap(); w=" + std::to_string(nPixels) + "; h=" + std::to_string(nLines) );
-        // fnOutputDebug("moar; stride=" + std::to_string(dLineSrc) + "/scan0=" + std::to_string(*pStartSrc));
+        // fnOutputDebug("moar; Stride=" + std::to_string(dLineSrc) + "/scan0=" + std::to_string(*pStartSrc));
         BYTE *pStartSrc = (BYTE *) bitmapDatu.Scan0;
         UINT dPixelSrc = 4;          // pixel step in source ; nPlanes
         UINT dLineSrc = cbStride;    // line step in source
@@ -3214,15 +4115,15 @@ int FillCImgFromBitmap(cimg_library::CImg<float> & img, Gdiplus::GpBitmap *myBit
         {
             // loop through lines
             BYTE *pLineSrc = pStartSrc + dLineSrc*y;
-            BYTE    *pPixelSrc = pLineSrc;
-            // fnOutputDebug("Y loop: " + std::to_string(y) + "//stride=" + std::to_string(dLineSrc));
+            BYTE *pPixelSrc = pLineSrc;
+            // fnOutputDebug("Y loop: " + std::to_string(y) + "//Stride=" + std::to_string(dLineSrc));
             for (int x = 0; x < width; x++)
             {
                 // loop through pixels on line
-                BYTE    alphaComp = *(pPixelSrc+3);
-                BYTE    redComp = *(pPixelSrc+2);
-                BYTE    greenComp = *(pPixelSrc+1);
-                BYTE    blueComp = *(pPixelSrc+0);
+                BYTE alphaComp = *(pPixelSrc+3);
+                BYTE redComp = *(pPixelSrc+2);
+                BYTE greenComp = *(pPixelSrc+1);
+                BYTE blueComp = *(pPixelSrc+0);
                 img(x,y,0,0) = float(redComp);
                 img(x,y,0,1) = float(greenComp);
                 img(x,y,0,2) = float(blueComp);
@@ -3239,40 +4140,64 @@ int FillCImgFromBitmap(cimg_library::CImg<float> & img, Gdiplus::GpBitmap *myBit
     } else return 0;
 }
 
+int FillCImgFromLockedBitmapData(cimg_library::CImg<unsigned char> & img, unsigned char *myBitmap, int width, int height, int Stride, int bpp, int zx1, int zy1, int zx2, int zy2, int invertArea) {
+    #pragma omp parallel for schedule(dynamic)
+    for (int y = 0; y < height; y++)
+    {
+        if (invertArea==1)
+        {
+           if (inRange(zy1, zy2, y))
+              continue;
+        } else
+        {
+           if (!inRange(zy1, zy2, y))
+              continue;
+        }
 
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV AddGaussianNoiseOnBitmap(Gdiplus::GpBitmap *myBitmap, int width, int height, int intensity) {
-  Gdiplus::GpBitmap *newBitmap = NULL;
-  CImg<float> img(width,height,1,4);
-  int r = FillCImgFromBitmap(img, myBitmap, width, height);
-  if (r==0)
-     return newBitmap;
+        for (int x = 0; x < width; x++)
+        {
+            if (invertArea==1)
+            {
+               if (inRange(zx1, zx2, x))
+                  continue;
+            } else
+            {
+               if (!inRange(zx1, zx2, x))
+                  continue;
+            }
 
+            INT64 o = CalcPixOffset(x, y, Stride, bpp);
+            img(x,y,0,0) = myBitmap[2 + o];
+            img(x,y,0,1) = myBitmap[1 + o];
+            img(x,y,0,2) = myBitmap[o];
+            img(x,y,0,3) = myBitmap[3 + o];
+        }
+    }
+}
+
+DLL_API int DLL_CALLCONV cImgAddGaussianNoiseOnBitmap(unsigned char *imageData, int width, int height, int intensity, int Stride, int bpp) {
+  int channels = (bpp==32) ? 4 : 3;
+  CImg<unsigned char> img(imageData, channels, width, height, 1);
+  img.permute_axes("yzcx");
   img.noise(intensity, 0);
-  newBitmap = CreateBitmapFromCImg(img, width, height);
-  return newBitmap;
+  FillGdipLockedBitmapDataFromCImg(imageData, img, width, height, Stride, bpp);
+  return 1;
 }
 
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV SharpenBitmap(Gdiplus::GpBitmap *myBitmap, int width, int height, int intensity, int typ, float edge, float ralph, float flegma) {
-  Gdiplus::GpBitmap *newBitmap = NULL;
-  CImg<float> img(width,height,1,4);
-  int r = FillCImgFromBitmap(img, myBitmap, width, height);
-  if (r==0)
-     return newBitmap;
-
-  img.sharpen(intensity, typ, edge, ralph, flegma);
-  newBitmap = CreateBitmapFromCImg(img, width, height);
-  return newBitmap;
+DLL_API int DLL_CALLCONV cImgSharpenBitmap(unsigned char *imageData, int width, int height, int intensity, int Stride, int bpp) {
+  int channels = (bpp==32) ? 4 : 3;
+  CImg<unsigned char> img(imageData, channels, width, height, 1);
+  img.permute_axes("yzcx");
+  img.sharpen(intensity); // shock filters do not work?!
+  FillGdipLockedBitmapDataFromCImg(imageData, img, width, height, Stride, bpp);
+  return 1;
 }
 
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV BlurBitmapFilters(Gdiplus::GpBitmap *myBitmap, int width, int height, int intensityX, int intensityY, int modus, int circle, int preview) {
-  Gdiplus::GpBitmap *newBitmap = NULL;
+DLL_API int DLL_CALLCONV cImgBlurBitmapFilters(unsigned char *imageData, int width, int height, int intensityX, int intensityY, int modus, int circle, int preview, int Stride, int bpp) {
   int ow = width;  int oh = height;
-
-  CImg<float> img(width,height,1,4);
-  int r = FillCImgFromBitmap(img, myBitmap, width, height);
-  if (r==0)
-     return newBitmap;
-
+  int channels = (bpp==32) ? 4 : 3;
+  CImg<unsigned char> img(imageData, channels, width, height, 1);
+  img.permute_axes("yzcx");
   if (preview==1)
   {
      width /=2;          height /=2;
@@ -3328,11 +4253,12 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV BlurBitmapFilters(Gdiplus::GpBitmap *myB
   if (preview==1)
      img.resize(ow, oh, -100, -100, 3);
 
-  newBitmap = CreateBitmapFromCImg(img, ow, oh);
-  return newBitmap;
+  FillGdipLockedBitmapDataFromCImg(imageData, img, ow, oh, Stride, bpp);
+  return 1;
 }
 
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV cImgRotateBitmap(Gdiplus::GpBitmap *myBitmap, int width, int height, float angle, int interpolation, int bond) {
+// function unused
   Gdiplus::GpBitmap *newBitmap = NULL;
   CImg<float> img(width,height,1,4);
   int r = FillCImgFromBitmap(img, myBitmap, width, height);
@@ -3340,8 +4266,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV cImgRotateBitmap(Gdiplus::GpBitmap *myBi
      return newBitmap;
 
   img.rotate(angle, interpolation, bond);
-
-  newBitmap = CreateBitmapFromCImg(img, img.width(), img.height());
+  newBitmap = CreateGdipBitmapFromCImg(img, img.width(), img.height());
   return newBitmap;
 }
 
@@ -3354,7 +4279,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV cImgResizeBitmap(Gdiplus::GpBitmap *myBi
 
   img.resize(resizedW, resizedH, -100, -100, interpolation, bond);
 
-  newBitmap = CreateBitmapFromCImg(img, img.width(), img.height());
+  newBitmap = CreateGdipBitmapFromCImg(img, img.width(), img.height());
   return newBitmap;
 }
 
@@ -3372,7 +4297,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV cImgLoadBitmap(const char *szFileName, i
   img.resize(nSize[0], nSize[1], -100, -100, interpolation, bond);
 
   CImg<float> img2 = img;
-  newBitmap = CreateBitmapFromCImg(img2, img.width(), img.height());
+  newBitmap = CreateGdipBitmapFromCImg(img2, img.width(), img.height());
 
   return newBitmap;
 }
@@ -3385,10 +4310,9 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV GenerateCIMGnoiseBitmap(int width, int h
   if (doBlur==1)
      img.blur(blurX, blurY, 0, 1, 2);
 
-  newBitmap = CreateBitmapFromCImg(img, width, height);
+  newBitmap = CreateGdipBitmapFromCImg(img, width, height);
   return newBitmap;
 }
-
 
 DLL_API int DLL_CALLCONV dissolveBitmap(int *imageData, int *newData, int Width, int Height, int rx, int ry) {
       // fnOutputDebug("maxR===" + std::to_string(maxuRadius) + "; rS=" + std::to_string(rScale) + "; imgAR=" + std::to_string(imgAR));
@@ -3529,8 +4453,7 @@ DLL_API int DLL_CALLCONV symmetricaBitmap(int *imageData, int Width, int Height,
       return 1;
 }
 
-
-DLL_API int DLL_CALLCONV autoContrastBitmap(int *imageData, int *miniData, int Width, int Height, int mw, int mh, int modus, int intensity) {
+DLL_API int DLL_CALLCONV autoContrastBitmap(unsigned char *imageData, unsigned char *miniData, int Width, int Height, int mw, int mh, int modus, int intensity, int linearGamma, int Stride, int StrideMini, int bpp, unsigned char *maskBitmap, int mStride) {
       int maxRLevel = 0;      int minRLevel = 255;
       int maxGLevel = 0;      int minGLevel = 255;
       int maxBLevel = 0;      int minBLevel = 255;
@@ -3538,33 +4461,35 @@ DLL_API int DLL_CALLCONV autoContrastBitmap(int *imageData, int *miniData, int W
       {
          for (int x = 0; x < mw; x++)
          {
+            INT64 o = CalcPixOffset(x, y, StrideMini, bpp);
+            if (bpp==32)
+            {
+               if (miniData[3 + o]<30)
+                  continue;
+            }
+
             if (modus==2)
             {
-               int aR = (miniData[x + (y * mw)] >> 16) & 0xFF; // red
-               int aB = (miniData[x + (y * mw)] >> 0) & 0xFF;  // blue
+               int aR = miniData[2 + o]; // red
+               int aB = miniData[o];     // blue
                maxRLevel = max(aR, maxRLevel);    minRLevel = min(aR, minRLevel);
                maxBLevel = max(aB, maxBLevel);    minBLevel = min(aB, minBLevel);
             }
 
-            int aG = (miniData[x + (y * mw)] >> 8) & 0xFF;  // green
+            int aG = miniData[1 + o];   // green
             maxGLevel = max(aG, maxGLevel);    minGLevel = min(aG, minGLevel);
          }
       }
+
       if ((maxGLevel==minGLevel || maxGLevel==0 && minGLevel==255) && modus==1)
          return 1;
 
-      minGLevel = clamp(minGLevel - intensity, 0, 255);
-      maxGLevel = clamp(maxGLevel + intensity, 0, 255);
       maxGLevel -= minGLevel;
       double fG = 255.0f / maxGLevel;
       double fR = fG;
       double fB = fG;
       if (modus==2)
       {
-         minRLevel = clamp(minRLevel - intensity, 0, 255);
-         maxRLevel = clamp(maxRLevel + intensity, 0, 255);
-         minBLevel = clamp(minBLevel - intensity, 0, 255);
-         maxBLevel = clamp(maxBLevel + intensity, 0, 255);
          maxRLevel -= minRLevel;
          fR = 255.0f / maxRLevel;
          maxBLevel -= minBLevel;
@@ -3577,29 +4502,42 @@ DLL_API int DLL_CALLCONV autoContrastBitmap(int *imageData, int *miniData, int W
          maxBLevel = maxGLevel;
       }
 
-      // fnOutputDebug("maxL===" + std::to_string(maxRLevel) + "; minL=" + std::to_string(minRLevel) + "; fR=" + std::to_string(fR) + "; m=" + std::to_string(modus));
-      // fnOutputDebug("maxL===" + std::to_string(maxGLevel) + "; minL=" + std::to_string(minGLevel) + "; fG=" + std::to_string(fG)  );
-      // fnOutputDebug("maxL===" + std::to_string(maxBLevel) + "; minL=" + std::to_string(minBLevel) + "; fB=" + std::to_string(fB)  );
+      float fintensity = char_to_float[intensity];
+      fnOutputDebug("RmaxL===" + std::to_string(maxRLevel) + "; minL=" + std::to_string(minRLevel) + "; fR=" + std::to_string(fR) + "; m=" + std::to_string(modus));
+      fnOutputDebug("GmaxL===" + std::to_string(maxGLevel) + "; minL=" + std::to_string(minGLevel) + "; fG=" + std::to_string(fG)  );
+      fnOutputDebug("BmaxL===" + std::to_string(maxBLevel) + "; minL=" + std::to_string(minBLevel) + "; fB=" + std::to_string(fB)  );
       #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
-      for (int y = 0; y < Height; y++)
+      for (int x = 0; x < Width; x++)
       {
-         for (int x = 0; x < Width; x++)
+         for (int y = 0; y < Height; y++)
          {
-            int tR, tG, tB;
-            int colorO = imageData[x + (y * Width)];
-            // fnOutputDebug("x===" + std::to_string(x) + "; y=" + std::to_string(y));
-            int aO = (colorO >> 24) & 0xFF;
-            float rO = round( ((float)((colorO >> 16) & 0xFF) - minRLevel)*fR  );
-            float gO = round( ((float)((colorO >> 8) & 0xFF) - minGLevel)*fG  );
-            float bO = round( ((float)(colorO & 0xFF) - minBLevel)*fB  );
-            tR = clamp((int)rO, 0, 255);
-            tG = clamp((int)gO, 0, 255);
-            tB = clamp((int)bO, 0, 255);
+            if (clipMaskFilter(x, y, maskBitmap, mStride)==1)
+               continue;
 
-            // imageData[x + (y * Width)] = 0;
-            imageData[x + (y * Width)] = (aO << 24) | (tR << 16) | (tG << 8) | tB;
+            INT64 o = CalcPixOffset(x, y, Stride, bpp);
+            // fnOutputDebug("x===" + std::to_string(x) + "; y=" + std::to_string(y));
+            int rO = imageData[2 + o];
+            int gO = imageData[1 + o];
+            int bO = imageData[o];
+            int rB = clamp((int)round( (float)(rO - minRLevel)*fR ) , 0, 255);
+            int gB = clamp((int)round( (float)(gO - minGLevel)*fG ) , 0, 255);
+            int bB = clamp((int)round( (float)(bO - minBLevel)*fB ) , 0, 255);
+
+            if (linearGamma==1 && intensity<255)
+            {
+               imageData[2 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[rB], gamma_to_linear[rO], fintensity)];
+               imageData[1 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[gB], gamma_to_linear[gO], fintensity)];
+               imageData[o]     = linear_to_gamma[weighTwoValues(gamma_to_linear[bB], gamma_to_linear[bO], fintensity)];
+            } else
+            {
+               imageData[2 + o] = weighTwoValues(rB, rO, fintensity);
+               imageData[1 + o] = weighTwoValues(gB, gO, fintensity);
+               imageData[o]     = weighTwoValues(bB, bO, fintensity);
+            }
+            // imageData[x + (y * Width)] = (aO << 24) | (tR << 16) | (tG << 8) | tB;
          }
       }
+
       return 1;
 }
 
@@ -3961,7 +4899,12 @@ DLL_API int DLL_CALLCONV SetTabletPenServiceProperties(HWND hWnd) {
     return 1;
 }        
 
+
 /*
+DLL_API int DLL_CALLCONV STBresizeBitmap(const unsigned char *bitmapDatu, int w, int h, int Stride, unsigned char *otherData, int w2, int h2, int mStride) { 
+  unsigned char *r = stbir_resize_uint8_linear(bitmapDatu, w, h, Stride, otherData, w2, h2, mStride, STBIR_BGRA);
+  return 1;
+}
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testCimgQPV(Gdiplus::GpBitmap *myBitmap, int width, int height, int intensityX, int intensityY, int modus) {
 
     // Load input image files, using the CImg Library.
@@ -3986,7 +4929,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testCimgQPV(Gdiplus::GpBitmap *myBitmap,
     const char *const title_bar = image_names[0];
     image_list.display(title_bar);
 
-    newBitmap = CreateBitmapFromCImg(img, width, height);
+    newBitmap = CreateGdipBitmapFromCImg(img, width, height);
     return newBitmap;
 }
 
@@ -4072,7 +5015,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testOtherCimgQPV(Gdiplus::GpBitmap *myBi
 // wind()
 // raindrops()
 
-  newBitmap = CreateBitmapFromCImg(img, width, height);
+  newBitmap = CreateGdipBitmapFromCImg(img, width, height);
   // ~Cimg(img);
   return newBitmap;
 }
@@ -4181,26 +5124,6 @@ DLL_API int DLL_CALLCONV BlurImage(unsigned char *Bitmap, int width, int height,
     }
     return 1;
 }
-
-DLL_API int DLL_CALLCONV ResizePixels(int* pixelsData, int* destData, int w1, int h1, int w2, int h2) {
-// source https://tech-algorithm.com/articles/nearest-neighbor-image-scaling/
-// https://www.researchgate.net/figure/Nearest-neighbour-image-scaling-algorithm_fig2_272092207
-
-    //double x_ratio = (double)(w1)/w2;
-    //double y_ratio = (double)(h1)/h2;
-    //#pragma omp simd simdlen(30) // schedule(dynamic) default(none)
-    for (int i=0; i < h2; i++)
-    {
-        UINT py = i*(h1/h2);
-        for (int j=0; j < w2; j++)
-        {
-            UINT px = j*(w1/w2);
-            destData[(i*w2) + j] = pixelsData[(py*w1) + px];
-        }
-    }
-    return 1;
-}
-
 
 DLL_API int DLL_CALLCONV hammingDistance(char str1[], char str2[])
 {

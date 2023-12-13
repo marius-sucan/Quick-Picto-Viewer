@@ -11,7 +11,7 @@
    j) How to enable alpha masking for an image editing live tool
 
 
-Deniere mise à jour: lundi 24 avril 2023
+Deniere mise à jour: mardi 28 novembre 2023
 ================================================
 
 a) How Quick Picto Viewer initializes
@@ -255,12 +255,11 @@ d) How an image is loaded and displayed on screen [simplified]
    file is loaded, ResizeImageGDIwin() will call CloneMainBMP().
 
    CloneMainBMP() manages «original» image caching and pre-processes
-   images for display: rotate, convert depth modes or remove 
-   alpha channel. It can hold only two images. This function can 
-   abort image processing if the user attempts to change image 
-   before it finishes. It communicates with the interface thread
-   by retrieving "canCancelImageLoad". When it is set to 4,
-   it means abort.
+   images for display: rotate, convert depth modes. It caches only
+   two images at a time. This function can abort image processing
+   if the user attempts to change image before it finishes. It
+   communicates with the interface thread by retrieving
+   "canCancelImageLoad". When it is set to 4, it means abort.
 
    CloneMainBMP() is called only by ResizeImageGDIwin().
    coreShowTheImage() is the only function that can invoke
@@ -269,16 +268,28 @@ d) How an image is loaded and displayed on screen [simplified]
    LoadBitmapForScreen() is called by CloneMainBMP(). This is
    the function that accesses files. It is a wrapper for three
    functions that return a GDI+ bitmap:
-      - LoadWICimage        - loads images through Windows Imaging Component
+      - LoadWICscreenImage()- loads images through Windows Imaging Component
                               it is the prefered loader since v5.6.0
+      - LoadFimFile()       - used to load additional file formats
+                            - this function converts any image to 24 or
+                              32 bits depth and then to a GDI+ bitmap object
       - LoadFileWithGDIp()  - loads GDI+ supported files
       - LoadFileWithWIA()   - the fallback function of LoadFileWithGDIp()
                               for very large images
                             - WIA stands for Windows Image Acquisition
 
-      - LoadFimFile()       - used to load FreeImage supported files
-                            - this function converts any image to 24 or
-                              32 bits depth and then to a GDI+ bitmap object
+   LoadWICscreenImage() calls DLL functions found in qpvmain.dll: 
+   WICpreLoadImage(), WICgetRectImage() and WICdestroyPreloadedImage().
+   WICpreLoadImage() returns the handle and properties of the image to
+   be loaded. WICgetRectImage() return a GDI+ bitmap object. It is
+   invoked only if the image does not exceed the GDI+ limit of 536 mgpx.
+   When the image exceeds 536 megapixels, it is transfered to FreeImage
+   using teleportWICtoFIM().
+
+   LoadWICscreenImage() and LoadFimFile() can return to LoadBitmapForScreen()
+   the string "very-large", when an image over 536 mgpx was loaded. In this
+   context, the image is a FreeImage object and a dummy GDI+ bitmap
+   is created.
 
    LoadBitmapForScreen() returns a GDI+ bitmap handle on success.
    When it is invoked by CloneMainBMP(), it has as argument
@@ -307,14 +318,26 @@ d) How an image is loaded and displayed on screen [simplified]
    only if "userImgQuality" is set to 1, for high-quality image
    resampling. The cached bitmap is held in variable named "ViewPortBMPcache".
 
-   decideGDIPimageFX() is used to obtain GDI+ objects that alter 
-   colors display.
+   If the image loaded exceeds 536 megapixels, the aforementioned caches
+   are not created: gdiBMPvPsize, gdiBitmapSmall. QPV_ShowImgonGui() no
+   longer reuses parts of the previously rendered image. Instead, it
+   calls retrieveQPVscreenImgSection(). This function renders / displays
+   very large images. Internally, it caches a viewport sized image.
 
-   drawHUDelements() is the function that renders selection area,
-   histogram box or the info-box on the viewport. These UI elements
-   are rendered on a different GDI window.
+   decideGDIPimageFX() is used to obtain GDI+ objects that can alter 
+   the display of colors: a color matrix and an Effects object.
 
-   QPV_ShowImgonGui() track how fast the render on screen is and
+   drawHUDelements() is the function that renders the scroll bars, 
+   current frame index (visual indicator), the grid ( drawVPgridsNow() )
+   and the histogram box ( createHistogramBMP() ) on the viewport.
+   These UI elements are rendered on a different GDI window.
+   drawHUDelements() also invokes additionalHUDelements(), a function
+   that wraps additional HUD elements: drawImgSelectionOnWindow(),
+   drawAnnotationBox(), VPnavBoxWrapper(), and drawinfoBox().
+   additionalHUDelements() is often invoked in the code to update the
+   selection area and/or other HUD elements.
+
+   QPV_ShowImgonGui() tracks how fast the render on screen is and
    adaptively choose between the available caches. To draw the
    image on screen, Gdip_DrawImage() or Gdip_DrawImageFX() are used.
 
@@ -445,6 +468,7 @@ g) Windows, AHK GUIs
          livePreviewInsertTextinArea()
          livePreviewEraseArea()
          livePreviewDesaturateArea()
+         ... and others
 
       When NOT in live image editing
          QPV_ShowImgonGui() - image on screen
@@ -566,10 +590,10 @@ j) How to enable alpha masking for an image editing live tool
 
 2. Add uiADDalphaMaskTabs(tab-ID-A, tab-ID-B, funcUIpanel) in the function
 creating the panel of the tool, eg., PanelFillSelectedArea(). This will add the 
-specific alpha masking options, controls, in the panel.
+specific alpha masking options/controls in the panel.
    tab-ID-A and B are the tab order in the panel created.
-   "funcUIpanel" must point to the function used by the panel controls to
-   update the user interface elements and the viewport, eg., updateUIfillPanel().
+   "funcUIpanel" is the reference to the function of the panel used to updatr
+   the user interface elements and the viewport, eg., updateUIfillPanel().
 
 3. Add in UItriggerBrushUpdate() a pointer to "funcUIpanel"(), as explained
 previously, based on the AnyWindowOpen ID. Do the same in: BtnToggleBrushColors().
@@ -588,7 +612,7 @@ See livePreviewAdjustColorsArea() for an example. Alternatively, when alpha
 mask painting mode is activated, for performance considerations, a direct call to
 QPV_SetAlphaChannel() is suggested, as in livePreviewAdjustColorsArea().
 
-7. Update toggleAlphaPaintingMode(), the commented section "tools with no object
-as reference". Add the AnyWindowOpen ID of the tool to isVarEqualTo(). The user
-alpha mask bitmap must be created based on the selection area dimensions.
-
+7. Update toggleAlphaPaintingMode(), the commented section «tools with no object
+as reference», and «create new bitmap for these tools». Add the AnyWindowOpen ID
+of the tool to isVarEqualTo(). The user alpha mask bitmap must be created based
+on the selection area dimensions.

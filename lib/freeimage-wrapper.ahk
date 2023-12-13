@@ -40,12 +40,11 @@
 FreeImage_FoxInit(isInit:=1, bonusPath:=0) {
    Static hFIDll
    ; if you change the dll name, getFIMfunc() needs to reflect this
-   If RegExMatch(bonusPath, "i)(.\.(dll))$")
+   If RegExMatch(bonusPath, "i)(.\.dll)$")
       DllPath := bonusPath
    Else
       DllPath := FreeImage_FoxGetDllPath("freeimage.dll", bonusPath)
 
-   ; ToolTip, % bonusPath , , , 2
    If !DllPath
       Return "err - 404"
 
@@ -274,26 +273,31 @@ FreeImage_GetImageDimensions(hImage, ByRef imgW, ByRef imgH) {
 }
 
 FreeImage_GetLine(hImage) {
+; Returns the width of the bitmap in bytes.
    Return DllCall(getFIMfunc("GetLine"), "uptr", hImage, "uint")
-} ; Untested 
+} 
 
 FreeImage_GetStride(hImage) {
-   Return DllCall(getFIMfunc("GetPitch"), "uptr", hImage, "uint")
+; Returns the width of the bitmap in bytes, rounded to the next 32-bit boundary, also known as
+; pitch or stride or scan width.
+; In FreeImage each scanline starts at a 32-bit boundary for performance reasons.
+; This function is essential when using low level pixel manipulation functions.
+   Return FreeImage_GetPitch(hImage)
 }
 
 FreeImage_GetPitch(hImage) {
-; Returns the width of the bitmap in bytes, rounded to the next 32-bit boundary, also known as
-; pitch or stride or scan width.
    Return DllCall(getFIMfunc("GetPitch"), "uptr", hImage, "uint")
 }
 
 FreeImage_GetDIBSize(hImage) {
+; returns a value in bytes
    Return DllCall(getFIMfunc("GetDIBSize"), "uptr", hImage, "uint")
-} ; Untested
+}
 
 FreeImage_GetMemorySize(hImage) {
+; returns a value in bytes
    Return DllCall(getFIMfunc("GetMemorySize"), "uptr", hImage, "uint")
-} ; Untested
+}
 
 FreeImage_GetPalette(hImage) {
    Return DllCall(getFIMfunc("GetPalette"), "uptr", hImage)
@@ -480,10 +484,21 @@ FreeImage_Validate(ImgPath, FifFormat) {
 ; === Pixel access functions ===
 
 FreeImage_GetBits(hImage) {
+; Returns a pointer to the data-bits of the bitmap. It is up to you to interpret these bytes
+; correctly, according to the results of FreeImage_GetBPP, FreeImage_GetRedMask,
+; FreeImage_GetGreenMask and FreeImage_GetBlueMask.
+; For performance reasons, the address returned by FreeImage_GetBits is aligned on
+; a 16 bytes alignment boundary
+; This function returns a pointer to the equivalent of Scan0
+; when one locks the bits of a bitmap in GDI+.
+
    Return DllCall(getFIMfunc("GetBits"), "uptr", hImage, "uptr")
 }
 
 FreeImage_GetScanLine(hImage, iScanline) { ; Base 0
+; Returns a pointer to the start of the given scanline in the bitmap’s data-bits.
+; It is up to you to interpret these bytes correctly, according to the results of
+; FreeImage_GetBPP and FreeImage_GetImageType (see the following sample).
    Return DllCall(getFIMfunc("GetScanLine"), "uptr", hImage, "Int", iScanline, "uptr")
 }
 
@@ -956,12 +971,8 @@ FreeImage_Rescale(hImage, w, h, filter:=3) {
 
 FreeImage_RescaleRect(hImage, dstW, dstH, x, y, w, h, filter:=0, flags:=2) {
 ; Filter parameter options
-; 0 = FILTER_BOX;        Box, pulse, Fourier window, 1st order (constant) B-Spline
-; 1 = FILTER_BICUBIC;    Mitchell and Netravali's two-param cubic filter
-; 2 = FILTER_BILINEAR;   Bilinear filter
-; 3 = FILTER_BSPLINE;    4th order (cubic) B-Spline
-; 4 = FILTER_CATMULLROM; Catmull-Rom spline, Overhauser spline
-; 5 = FILTER_LANCZOS3;   Lanczos-windowed sinc filter
+; see FreeImage_Rescale()
+
 ; Flags options:
 ; FI_RESCALE_DEFAULT         0x00   // default options; none of the following other options apply
 ; FI_RESCALE_TRUE_COLOR      0x01   // for non-transparent greyscale images, convert to 24-bit if src bitdepth <= 8 (default is a 8-bit greyscale image). 
@@ -971,6 +982,15 @@ FreeImage_RescaleRect(hImage, dstW, dstH, x, y, w, h, filter:=0, flags:=2) {
       Return
 
    Return DllCall(getFIMfunc("RescaleRect"), "uptr", hImage, "Int", dstW, "Int", dstH, "Int", x, "Int", y, "Int", x + w, "Int", y + h, "Int", filter, "Int", flags, "uptr")
+}
+
+FreeImage_RescaleRawBits(srcBits, dstBits, FimType, imgW, imgH, srcStride, dstStride, BPP, dstW, dstH, filter) {
+   Return FreeImage_RescaleRectRawBits(srcBits, dstBits, FimType, imgW, imgH, srcStride, dstStride, BPP, dstW, dstH, 0, 0, imgW, imgH, filter)
+}
+
+FreeImage_RescaleRectRawBits(srcBits, dstBits, FimType, imgW, imgH, srcStride, dstStride, BPP, dstW, dstH, srcX1, srcY1, srcX2, srcY2, filter) {
+   r := DllCall(getFIMfunc("RescaleRawBits"), "uptr", srcBits, "uptr", dstBits, "Int", FimType, "Int", imgW, "Int", imgH, "uInt", srcStride, "uInt", dstStride, "Int", BPP, "Int", dstW, "Int", dstH, "Int", srcX1, "int", srcY1, "Int", srcX2, "int", srcY2, "int", filter)
+   Return r
 }
 
 FreeImage_MakeThumbnail(hImage, squareSize, convert:=1) {
@@ -1030,7 +1050,7 @@ FreeImage_Composite(hImage, useFileBkg:=0, RGBArray:="255,255,255", hImageBkg:=0
    NumPut(RGBA[1], RGBQUAD, 2, "UChar")
    NumPut(RGBA[4], RGBQUAD, 3, "UChar")
    Return DllCall(getFIMfunc("Composite"), "uptr", hImage, "int", useFileBkg, "Uint", &RGBQUAD, "uptr", hImageBkg, "uptr")
-}
+} ; untested
 
 FreeImage_PreMultiplyWithAlpha(hImage) {
 ; Return value: 1 -- succes; 0 -- fail

@@ -13,8 +13,10 @@
 ; To calculate the largest bitmap you can create:
 ;    The maximum object size is 2GB = 2,147,483,648 bytes
 ;    Default bitmap is 32bpp (4 bytes), the largest area we can have is 2GB / 4 = 536,870,912 bytes
-;    If we want a square, the largest we can get is sqrt(2GB/4) = 23,170 pixels (536.4 mgpx)
-;    For 24-bits: sqrt(2GB/3) = 26,745 pixels (715.3 mgpx)
+;    If we want a square, the largest we can get is sqrt(2GB/4) = 23,170 pixels (536 mgpx)
+;    For 24-bits: sqrt(2GB/3) = 26,755 pixels (715 mgpx)
+;    Gdip_DrawImage() will fail with images above 536 mgpx,
+;    even if these are below 32 bits.
 ;
 ; Gdip standard library versions:
 ; by Marius Șucan - gathered user-contributed functions and implemented hundreds of new functions
@@ -1647,6 +1649,7 @@ Gdip_DrawImagePointsRect(pGraphics, pBitmap, Points, sx:="", sy:="", sw:="", sh:
 
 ; Function        Gdip_DrawImage
 ; Description     This function draws a bitmap into the Graphics of another bitmap
+; Note            The function will fail with images above 536 mgpx, even if these are below 32 bits.
 ;
 ; pGraphics       Pointer to the Graphics of a bitmap
 ; pBitmap         Pointer to a bitmap to be drawn
@@ -1940,9 +1943,13 @@ Gdip_ResetImageAttributes(ImageAttr, ColorAdjustType) {
 ;
 ; pBitmap            Pointer to a bitmap to get the pointer to its graphics
 ;
-; return             returns a pointer to the graphics of a bitmap
+; return             Returns a pointer to the graphics of a bitmap
 ;
-; notes              a bitmap can be drawn into the graphics of another bitmap
+; remarks            A bitmap can be drawn into the graphics of another bitmap.
+;                    This function will fail with these bitmap pixel formats:
+;                    PXF01INDEXED, PXF04INDEXED, PXF16GRAYSCALE
+;                    PXF16ARGB1555, PXF64PARGB, PXF32CMYK
+;                    See Gdip_GetImagePixelFormat() for more details.
 
 Gdip_GraphicsFromImage(pBitmap, InterpolationMode:="", SmoothingMode:="", PageUnit:="", CompositingQuality:="") {
    pGraphics := 0
@@ -2741,21 +2748,24 @@ Gdip_GetImagePixelFormat(pBitmap, mode:=0) {
 ; 1 - in hex
 ; 2 - in human readable format
 ;
-; PXF01INDEXED = 0x00030101  ; 1 bpp, indexed
-; PXF04INDEXED = 0x00030402  ; 4 bpp, indexed
-; PXF08INDEXED = 0x00030803  ; 8 bpp, indexed
-; PXF16GRAYSCALE = 0x00101004; 16 bpp, grayscale
-; PXF16RGB555 = 0x00021005   ; 16 bpp; 5 bits for each RGB
-; PXF16RGB565 = 0x00021006   ; 16 bpp; 5 bits red, 6 bits green, and 5 bits blue
-; PXF16ARGB1555 = 0x00061007 ; 16 bpp; 1 bit for alpha and 5 bits for each RGB component
-; PXF24RGB = 0x00021808   ; 24 bpp; 8 bits for each RGB
-; PXF32RGB = 0x00022009   ; 32 bpp; 8 bits for each RGB, no alpha.
-; PXF32ARGB = 0x0026200A  ; 32 bpp; 8 bits for each RGB and alpha
-; PXF32PARGB = 0x000E200B ; 32 bpp; 8 bits for each RGB and alpha, pre-mulitiplied
-; PXF48RGB = 0x0010300C   ; 48 bpp; 16 bits for each RGB
-; PXF64ARGB = 0x0034400D  ; 64 bpp; 16 bits for each RGB and alpha
-; PXF64PARGB = 0x001A400E ; 64 bpp; 16 bits for each RGB and alpha, pre-multiplied
-; PXF32CMYK = 0x200F      ; 32 bpp; CMYK
+; *PXF01INDEXED = 0x00030101  ; 1 bpp, indexed
+; *PXF04INDEXED = 0x00030402  ; 4 bpp, indexed
+; PXF08INDEXED = 0x00030803   ; 8 bpp, indexed
+; *PXF16GRAYSCALE = 0x00101004; 16 bpp, grayscale
+; PXF16RGB555 = 0x00021005    ; 16 bpp; 5 bits for each RGB
+; PXF16RGB565 = 0x00021006    ; 16 bpp; 5 bits red, 6 bits green, and 5 bits blue
+; *PXF16ARGB1555 = 0x00061007 ; 16 bpp; 1 bit for alpha and 5 bits for each RGB component
+; PXF24RGB = 0x00021808       ; 24 bpp; 8 bits for each RGB
+; PXF32RGB = 0x00022009       ; 32 bpp; 8 bits for each RGB, no alpha.
+; PXF32ARGB = 0x0026200A      ; 32 bpp; 8 bits for each RGB and alpha
+; PXF32PARGB = 0x000E200B     ; 32 bpp; 8 bits for each RGB and alpha, pre-mulitiplied
+; PXF48RGB = 0x0010300C       ; 48 bpp; 16 bits for each RGB
+; PXF64ARGB = 0x0034400D      ; 64 bpp; 16 bits for each RGB and alpha
+; *PXF64PARGB = 0x001A400E    ; 64 bpp; 16 bits for each RGB and alpha, pre-multiplied
+; *PXF32CMYK = 0x200F         ; 32 bpp; CMYK
+
+; NOTE: GDI+ does not fully support the formats marked with an asterisk (*).
+; Gdip_GraphicsFromImage() will fail on bitmaps with these pixel formats.
 
 ; INDEXED [1-bits, 4-bits and 8-bits] pixel formats rely on color palettes.
 ; The color information for the pixels is stored in palettes.
@@ -3477,6 +3487,8 @@ Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", Kee
        ResizedH := givenH
     }
 
+    If (Width=resizedW && Height=resizedH)
+       Return Gdip_CloneBitmap(pBitmap)
 
     mpx := Round((ResizedW * ResizedH)/1000000, 1)
     PixelFormatReadable := Gdip_GetImagePixelFormat(pBitmap, 2)
@@ -5902,7 +5914,7 @@ Gdip_IsVisiblePathRectEntirely(pGraphics, pPath, X, Y, Width, Height) {
 }
 
 Gdip_DeletePath(pPath) {
-   If pPath
+   If (pPath!="")
       return DllCall("gdiplus\GdipDeletePath", "UPtr", pPath)
 }
 
@@ -6187,7 +6199,7 @@ Gdip_SetWorldTransform(pGraphics, hMatrix) {
 }
 
 Gdip_GetRotatedTranslation(Width, Height, Angle, ByRef xTranslation, ByRef yTranslation) {
-   Static pi := 3.14159
+   Static pi := 3.141592653
    TAngle := Angle*(pi/180)
 
    Bound := (Angle >= 0) ? Mod(Angle, 360) : 360-Mod(-Angle, -360)
@@ -6202,14 +6214,16 @@ Gdip_GetRotatedTranslation(Width, Height, Angle, ByRef xTranslation, ByRef yTran
 }
 
 Gdip_GetRotatedDimensions(Width, Height, Angle, ByRef RWidth, ByRef RHeight) {
-; modified by Marius Șucan; removed Ceil()
-   Static pi := 3.14159
+; modified by Marius Șucan
+   Static pi := 3.141592653
    if !(Width && Height)
       return -1
 
    TAngle := Angle*(pi/180)
-   RWidth := Abs(Width*Cos(TAngle))+Abs(Height*Sin(TAngle))
-   RHeight := Abs(Width*Sin(TAngle))+Abs(Height*Cos(Tangle))
+   cTAngle := Cos(TAngle)
+   sTAngle := Sin(TAngle)
+   RWidth := Abs(Width * cTAngle) + Abs(Height * sTAngle)
+   RHeight := Abs(Width * sTAngle) + Abs(Height * cTangle)
 }
 
 Gdip_GetRotatedEllipseDimensions(Width, Height, Angle, ByRef RWidth, ByRef RHeight) {
@@ -6227,7 +6241,7 @@ Gdip_GetRotatedEllipseDimensions(Width, Height, Angle, ByRef RWidth, ByRef RHeig
    thisBMP := Gdip_CreateBitmap(10, 10)
    dummyG := Gdip_GraphicsFromImage(thisBMP)
    Gdip_SetClipPath(dummyG, pPath) ; it is more accurate to use this instead of Gdip_GetPathWorldBounds()
-   pathBounds := Gdip_GetClipBounds(pPath)
+   pathBounds := Gdip_GetClipBounds(dummyG)
    Gdip_DeletePath(pPath)
    RWidth := pathBounds.w
    RHeight := pathBounds.h
@@ -9320,6 +9334,8 @@ Gdip_BitmapSetColorDepth(pBitmap, bitsDepth, useDithering:=1) {
       E := Gdip_BitmapConvertFormat(pBitmap, 0x21808, 2, 1, 0, 0, 0, 0, 0)
    Else If (bitsDepth=32)
       E := Gdip_BitmapConvertFormat(pBitmap, 0x26200A, 2, 1, 0, 0, 0, 0, 0)
+   Else If (bitsDepth=48)
+      E := Gdip_BitmapConvertFormat(pBitmap, 0x10300C, 2, 1, 0, 0, 0, 0, 0)
    Else If (bitsDepth=64)
       E := Gdip_BitmapConvertFormat(pBitmap, 0x34400D, 2, 1, 0, 0, 0, 0, 0)
    Else
