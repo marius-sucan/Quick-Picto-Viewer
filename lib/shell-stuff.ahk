@@ -2639,6 +2639,18 @@ GetWinParent(hwnd) {
    Return DllCall("GetParent", "UPtr", hwnd)
 }
 
+ModifyMenuItem(hMenu, Pos, hSubMenu) {
+    ; If the function succeeds, the return value is nonzero.
+    res := DllCall("ModifyMenu"
+         , "UPtr", hMenu
+         , "Int", Pos
+         , "UInt", 0x410 ; modify by position
+         , "UPtr", hSubMenu
+         , "UPtr", 0)
+    Return res
+
+}
+
 GetMenuItemRect(hwnd, hMenu, nPos) {
     VarSetCapacity(RECT, 16, 0)
     if DllCall("User32.dll\GetMenuItemRect", "UPtr", hwnd, "UPtr", hMenu, "UInt", nPos, "UPtr", &RECT)

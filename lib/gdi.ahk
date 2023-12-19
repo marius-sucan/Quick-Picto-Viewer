@@ -2898,9 +2898,13 @@ Gdi_SetGraphicsMode(hDC, mode) {
 
 Gdi_GetBitmapInfo(hBitmap) {
    ; from TheArkive; returns an object with properties
+   ; For uncompressed RGB formats, the minimum stride is always the image width
+   ; in bytes, rounded up to the nearest DWORD. You can use the following formula to calculate the stride and image size:
+   ; stride = ((((biWidth * biBitCount) + 31) & ~31) >> 3);
+   ; biSizeImage = abs(biHeight) * stride;
 
    oi_size := DllCall("GetObject", "UPtr", hBitmap, "Int", 0, "UPtr", 0)  ; get size of struct
-   size := VarSetCapacity(oi, (A_PtrSize = 8) ? 104 : 84, 0)           ; always use max size of struct
+   size := VarSetCapacity(oi, (A_PtrSize = 8) ? 104 : 84, 0)              ; always use max size of struct
    DllCall("GetObject", "UPtr", hBitmap, "Int", size, "UPtr", &oi)        ; finally, call GetObject and get data
 
    obj := []
@@ -2912,7 +2916,7 @@ Gdi_GetBitmapInfo(hBitmap) {
    obj.Stride := NumGet(oi, 12, "UInt")
    obj.Planes := NumGet(oi, 16, "UShort")
    obj.Bpp := NumGet(oi, 18, "UShort")
-   obj.hPtr := NumGet(oi, 24, "UPtr")
+   obj.RawBits := NumGet(oi, 24, "UPtr") ; A pointer to the location of the raw bits of the bitmap
 
    ; BITMAPINFOHEADER struct / DIBSECTION struct
    obj.Struct := NumGet(oi,32,"UInt")

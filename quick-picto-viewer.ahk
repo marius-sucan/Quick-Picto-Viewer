@@ -202,7 +202,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , darkWindowColor := 0x202020, darkControlColor := 0xEDedED, allowWICloader := 1, allowFIMloader := 1
    , monitorBgrColor := darkWindowColor, lastSlidersPainted := [], userCustomKeysDefined := []
    , simulateMenusMode := 0, lastLVquickSearchSortCol := [], soloSliderWinVisible := 0, backupGdiBMP := 0
-   , lastFastImgChangeHUDzeit := 1, viewportQPVimage := new screenQPVimage
+   , lastFastImgChangeHUDzeit := 1, viewportQPVimage := new screenQPVimage, forceProtectLoadedImg := 0
 
 Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameSavedVectorShape := ""
    , postVectorWinOpen := 0, isWelcomeScreenu := 0, prevVectorShapeSymmetryMode := [], AllowDarkModeForWindow := ""
@@ -251,7 +251,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , EraseAreaFader := 0, EraseAreaOpacity := 190, blurAreaOpacity := 250, blurAreaAmount := 10
    , FillAreaOpacity := 250, FillAreaColor := OSDbgrColor, FillAreaShape := 1, FillAreaInverted := 0
    , PasteInPlaceAlignment := 3, PasteInPlaceOpacity := 255, PasteInPlaceAdaptMode := 1, PasteInPlaceQuality := 1
-   , PasteInPlaceOrientation := 1, showImgAnnotations := 0, blurAreaSoftEdges := 1, BlurAreaInverted := 0
+   , PasteInPlaceOrientation := 4, showImgAnnotations := 0, blurAreaSoftEdges := 1, BlurAreaInverted := 0
    , PasteInPlaceBlurAmount := 0, PasteInPlaceCropSel := 1, PasteInPlaceCropAngular := 0, globalMenuOptions := 0
 
 Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0, PasteInPlaceLight := 0
@@ -370,7 +370,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , userImgAdjustHiPrecision := 0, userImgAdjustNoClamp := 0, userImgAdjustConvertDepth := 0
    , UserSymmetricaBlendMode := 1, UserSymmetricaOpacity := 255, userImgAdjustNoisePoints := 0
    , blurAreaApplyFX := 0, FillAreaDoBehind := 0, PasteInPlaceRevealOriginal := 0, PasteInPlaceCropDo := 0
-   , PasteInPlaceCropAdaptImg := 1
+   , PasteInPlaceCropAdaptImg := 1, PasteInPlaceOrientFlipX := 0, PasteInPlaceOrientFlipY := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -1449,7 +1449,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     } Else If (givenKey="+^u")
     {
        If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-          func2Call := ["ApplyColorAdjustsSelectedArea"]
+          func2Call := ["ApplyVPcolorAdjustSelectedArea"]
     } Else If (givenKey="f")
     {
        If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
@@ -5856,7 +5856,7 @@ LivePreviewAlphaMaskPasteInPlace() {
     ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, fImgW, fImgH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
     trGdip_GetImageDimensions(whichBitmap, oImgW, oImgH)
     trGdip_GetImageDimensions(userAlphaMaskBmpPainted, zImgW, zImgH)
-    PasteInPlaceCalcObjSize(1, hasRotated, oImgW, oImgH, imgSelW, imgSelH, VPselRotation, ResizedW, ResizedH)
+    PasteInPlaceCalcObjSize(1, hasRotated, oImgW, oImgH, imgSelW, imgSelH, VPselRotation, 1, ResizedW, ResizedH)
     PasteInPlaceCalcObjCoords(imgSelW, imgSelH, ResizedW, ResizedH, imgSelPx, imgSelPy)
     imgSelW := ResizedW, imgSelH := ResizedH
     viewportDynamicOBJcoords.x := imgSelPx, viewportDynamicOBJcoords.y := imgSelPy
@@ -9639,7 +9639,6 @@ ToggleImgColorDepth(dir:=0) {
    INIaction(1, "usrColorDepth", "General")
    INIaction(1, "imgFxMode", "General")
    SetTimer, RefreshImageFile, -50
-
    If (AnyWindowOpen=10 && imgEditPanelOpened=1)
    {
       GuiControl, SettingsGUIA: Choose, usrColorDepth, % usrColorDepth
@@ -9994,7 +9993,7 @@ ChangeLumos(dir, dummy:=0) {
       SetTimer, dummySaveLumGammos, -70
 
    prevValues := newValues
-   If (o_bwDithering=1 || otherFX=1) ; && (thumbsDisplaying!=1)
+   If (o_bwDithering=1) ; && (thumbsDisplaying!=1)
       SetTimer, RefreshImageFile, -50
    Else
       dummyTimerDelayiedImageDisplay(10)
@@ -10551,7 +10550,7 @@ changeLittleImgRotationInVP(dir) {
 }
 
 changeImgRotationInVP(dir, stepu:=15, doReset:=0) {
-   If (thumbsDisplaying=1 || liveDrawingBrushTool=1)
+   If (thumbsDisplaying=1)
       Return
 
    If blockBrokenIMGrefresh()
@@ -10588,8 +10587,8 @@ changeImgRotationInVP(dir, stepu:=15, doReset:=0) {
       value2Adjust := clampInRange(value2Adjust, 0, 360 - stepu, 1)
 
    vpIMGrotation := value2Adjust
-   dummyChangeVProtation()
    SetTimer, RefreshImageFile, -750
+   dummyChangeVProtation()
 }
 
 dummyChangeVProtation() {
@@ -10856,19 +10855,33 @@ doOpenStartFolder(ByRef didSomething:=0) {
    didSomething := 0
    If StrLen(mustOpenStartFolder)>3
    {
+      ForceRefreshNowThumbsList()
       startIndex := currentFileIndex ? currentFileIndex : 1
-      If askAboutFileSave(" and files found in " mustOpenStartFolder "\ will be indexed")
-         Return currentFileIndex
+      imgPath := getIDimage(currentFileIndex)
+      If !FileRexists(imgPath)
+      {
+         If askAboutFileSave(" and files found in " mustOpenStartFolder "\ will be indexed.")
+            Return currentFileIndex
+      }
  
       didSomething := "yes"
       SLDtypeLoaded := 1
-      imgPath := getIDimage(currentFileIndex)
+      forceProtectLoadedImg := 1
       coreOpenFolder("|" mustOpenStartFolder, 0)
       If FileRexists(imgPath)
+      {
          startIndex := detectFileID(imgPath)
-      Else
+      } Else
+      {
          startIndex := clampInRange(startIndex, 1, maxFilesIndex)
+         discardSRCfileCaches()
+         destroyGDIfileCache()
+         discardViewPortCaches()
+         disposeCacheIMGs()
+         terminateIMGediting()
+      }
 
+      forceProtectLoadedImg := 0
       dummyTimerReloadThisPicture(150)
       SetTimer, TriggerMenuBarUpdate, -90
       SetTimer, createGUItoolbar, -110
@@ -11715,7 +11728,7 @@ drawHistogram(dataArray, graphFocus, Scale, fgrColor, bgrColor, borderSize, info
     Return clipBMP
 }
 
-performAutoExpandCanvas(imgW, imgH, ByRef whichBitmap) {
+performAutoExpandCanvas(imgW, imgH) {
     nImgSelX1 := imgSelX1, nImgSelY1 := imgSelY1
     nimgSelX2 := imgSelX2, nimgSelY2 := imgSelY2
     If (imgSelX1>=0)
@@ -11738,7 +11751,6 @@ performAutoExpandCanvas(imgW, imgH, ByRef whichBitmap) {
     VPselRotation := EllipseSelectMode := innerSelectionCavityX := innerSelectionCavityY :=  0
     defineRelativeSelCoords(imgW, imgH)
     CropImageInViewPortToSelection("simplex")
-    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     prevImgSelX1 += Round(zimgSelX1)
     prevImgSelY1 += Round(zimgSelY1)
     prevImgSelX2 += Round(zimgSelX1)
@@ -11754,25 +11766,53 @@ performAutoExpandCanvas(imgW, imgH, ByRef whichBitmap) {
     innerSelectionCavityX := obju[1, 3]
     innerSelectionCavityY := obju[1, 4]
     editingSelectionNow := 1
+    trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
     defineRelativeSelCoords(imgW, imgH)
     Return 1
 }
 
-testAllowOutsidePasteInPlace(imgW, imgH, whichBitmap) {
+testAllowOutsidePasteInPlace(imgW, imgH, oImgW, oImgH) {
     allowOutside := 0 
-    MouseCoords2Image(prevPasteInPlaceVPcoords[1], prevPasteInPlaceVPcoords[2], 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, xa, ya)
-    MouseCoords2Image(prevPasteInPlaceVPcoords[1] + prevPasteInPlaceVPcoords[3], prevPasteInPlaceVPcoords[2] + prevPasteInPlaceVPcoords[4], 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, xb, yb)
-    If ((xa<0 || ya<0 || xb>imgW || yb>imgH) && PasteInPlaceAutoExpandIMG=1 && validBMP(whichBitmap) && imgW && imgH)
+    imgSelW := Round( ( max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2) ) )
+    imgSelH := Round( ( max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2) ) )
+    imgSelPx := imgSelX1, imgSelPy := imgSelY1
+    capped := (viewportQPVimage.imgHandle) ? 0 : 1
+    If ((PasteInPlaceOrientation=2 || PasteInPlaceOrientation=4) && (PasteInPlaceAdaptMode=1 || PasteInPlaceAdaptMode=3) )
+    {
+       flipVars(oImgW, oImgH)
+       ; If (capped=0)
+       ; {
+       ;    calcIMGdimensions(oImgW, oImgH, oImgH, oImgW, oImgW, oImgH)
+       ;    flipVars(oImgW, oImgH)
+       ; }
+    }
+
+    If (VPselRotation>0 && prevPasteInPlaceVPcoords[5]=1 && !viewportQPVimage.imgHandle)
+    {
+       If (EllipseSelectMode=1 && PasteInPlaceToolMode=1)
+          Gdip_GetRotatedEllipseDimensions(oImgW, oImgH, VPselRotation, oImgW, oImgH)
+       Else
+          Gdip_GetRotatedDimensions(oImgW, oImgH, VPselRotation, oImgW, oImgH)
+    }
+
+    PasteInPlaceCalcObjSize(0, prevPasteInPlaceVPcoords[5], oImgW, oImgH, imgSelW, imgSelH, VPselRotation, capped, ResizedW, ResizedH)
+    PasteInPlaceCalcObjCoords(imgSelW, imgSelH, ResizedW, ResizedH, imgSelPx, imgSelPy)
+    xa := imgSelPx, ya := imgSelPy
+    xb := imgSelPx + ResizedW, yb := imgSelPy + ResizedH
+    If ((xa<0 || ya<0 || xb>imgW || yb>imgH) && PasteInPlaceAutoExpandIMG=1 && imgW && imgH)
        allowOutside := 1
 
+          ToolTip, % oImgW "|" oImgH "`n" ResizedW "|" ResizedH , , , 2
+    ; TulTip(A_ThisFunc, "|", xa, ya, xb, yb, prevPasteInPlaceVPcoords[1], prevPasteInPlaceVPcoords[2], prevPasteInPlaceVPcoords[3], prevPasteInPlaceVPcoords[4])
     Return [allowOutside, xa, ya, xb, yb]
 }
 
-PasteInPlaceNow() {
-    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
+PasteInPlaceSelectedArea() {
+    trGdip_GetImageDimensions(userClipBMPpaste, rzW, rzH)
+    whichBitmap := useGdiBitmap()
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
-    allowOutside := testAllowOutsidePasteInPlace(imgW, imgH, whichBitmap)
-    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 1, 0, allowOutside[1])
+    allowOutside := testAllowOutsidePasteInPlace(imgW, imgH, rzW, rzH)
+    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 1, allowOutside[1])
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
     {
@@ -11786,36 +11826,37 @@ PasteInPlaceNow() {
     {
        xa := imgSelX1, ya := imgSelY1
        xb := imgSelX2, yb := imgSelY2
+       zW := Round( ( max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2) ) )
+       zH := Round( ( max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2) ) )
        imgSelX1 := allowOutside[2], imgSelY1 := allowOutside[3]
        imgSelX2 := allowOutside[4], imgSelY2 := allowOutside[5]
+       zX := (imgSelX1<0) ? abs(imgSelX1) : 0,  zY := (imgSelY1<0) ? abs(imgSelY1) : 0
        defineRelativeSelCoords(imgW, imgH)
-       hasRanExpand := performAutoExpandCanvas(imgW, imgH, whichBitmap)
-       imgSelX1 := xa, imgSelY1 := ya
-       imgSelX2 := xb, imgSelY2 := yb
+       hasRanExpand := performAutoExpandCanvas(imgW, imgH)
+       imgSelX1 := xa + zX, imgSelY1 := ya + zY
+       imgSelX2 := xb + zX, imgSelY2 := yb + zY
        defineRelativeSelCoords(imgW, imgH)
     }
 
     startZeit := A_TickCount
-    If (UserMemBMP!=whichBitmap && whichBitmap)
-    {
-       fnOutputDebug(A_ThisFunc ": cloning GDI+ bitmap: " whichBitmap)
-       whichBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap)
-       wasClone := whichBitmap
-    } Else If warnUserFatalBitmapError(whichBitmap, A_ThisFunc)
-       whichBitmap := ""
-
+    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     thisImgQuality := (PasteInPlaceQuality=1) ? 7 : 5
     compositingQuality := (userimgGammaCorrect=1) ? 2 : 1
-    If validBMP(whichBitmap)
-    {
-       fnOutputDebug(A_ThisFunc ": create graphics")
-       G2 := trGdip_GraphicsFromImage(A_ThisFunc, whichBitmap, thisImgQuality, 4,, compositingQuality)
-    }
+    newBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+    If validBMP(newBitmap)
+       G2 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap, thisImgQuality, 4,, compositingQuality)
 
     If !G2
     {
+       If validBMP(newBitmap)
+          showTOOLtip("Failed to perform paste in place. Unable to create GDI+ graphics object.")
+       Else
+          showTOOLtip("Failed to perform paste in place. Unable to allocate new bitmap.")
+
+       SoundBeep 300, 100
        SetTimer, ResetImgLoadStatus, -100
-       trGdip_DisposeImage(wasClone, 1)
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       trGdip_DisposeImage(newBitmap, 1)
        userClipBMPpaste := trGdip_DisposeImage(userClipBMPpaste, 1)
        viewportStampBMP := trGdip_DisposeImage(viewportStampBMP, 1)
        backupGdiBMP := trGdip_DisposeImage(backupGdiBMP, 1)
@@ -11823,23 +11864,28 @@ PasteInPlaceNow() {
        Return
     }
 
-    recordUndoLevelNow("init", 0)
     ; setImageLoading()
-    r1 := corePasteInPlaceActNow(G2, whichBitmap)
+    r1 := corePasteInPlaceActNow(G2, newBitmap)
     If (PasteInPlaceEraseInitial=1)
        currIMGdetails.HasAlpha := 1
 
     Gdip_DeleteGraphics(G2)
     corePasteInPlaceActNow("kill")
-    If (r1!="fail")
+    If (r1!="fail" && validBMP(newBitmap))
     {
-       UserMemBMP := whichBitmap
-       recordUndoLevelNow(0, UserMemBMP)
+       wrapRecordUndoLevelNow(newBitmap)
+    } Else
+    {
+       showTOOLtip("Failed to perform paste in place")
+       SoundBeep 300, 100
+       trGdip_DisposeImage(newBitmap)
+       SetTimer, RemoveTooltip, % -msgDisplayTime
     }
 
+    SetTimer, ResetImgLoadStatus, -100
     zeitOperation := A_TickCount - startZeit
     addJournalEntry(A_ThisFunc "(): transformations ended. Elapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)))
-    RefreshImageFile()
+    dummyTimerDelayiedImageDisplay(50)
     If (hasRanExpand=1)
     {
        totalSelUndos := Round(undoSelLevelsArray.Count())
@@ -11857,9 +11903,8 @@ determineSizeRotateSkew(whichBitmap, Angle, shearX, shearY, ellipseModus, reveal
    } Else
       trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
 
-getVPselSize(zW, zH, 1, 0)
-calcIMGdimensions(zW, zH, imgW, imgH, newW, newH)
-
+   getVPselSize(zW, zH, 1, 0)
+   calcIMGdimensions(zW, zH, imgW, imgH, newW, newH)
    pPath := Gdip_CreatePath()
    If (ellipseModus=1)
       Gdip_AddPathEllipse(pPath, 0, 0, imgW, imgH)
@@ -11941,7 +11986,7 @@ realtimePasteInPlaceRotator(previewMode, clipBMP, ByRef newBitmap) {
        Return
     }
 
-    thisState := "a" previewMode PasteInPlaceBlurAmount PasteInPlaceToolMode PasteInPlaceOrientation VPselRotation prevrotateSelBoundsKeepRatio prevEllipseSelectMode prevVPselRotation getIDimage(currentFileIndex) currentFileIndex PasteInPlaceBlurEdgesSoft previnnerSelectionCavityX previnnerSelectionCavityY shearImgX shearImgY PasteInPlaceRevealOriginal
+    thisState := "a" previewMode PasteInPlaceBlurAmount PasteInPlaceToolMode PasteInPlaceOrientation VPselRotation prevrotateSelBoundsKeepRatio prevEllipseSelectMode prevVPselRotation getIDimage(currentFileIndex) currentFileIndex PasteInPlaceBlurEdgesSoft previnnerSelectionCavityX previnnerSelectionCavityY shearImgX shearImgY PasteInPlaceRevealOriginal PasteInPlaceOrientFlipX PasteInPlaceOrientFlipY
     If (thisState=prevState && validBMP(prevBMPu))
     {
        newBitmap := trGdip_CloneBitmap(A_ThisFunc, prevBMPu)
@@ -11965,12 +12010,16 @@ realtimePasteInPlaceRotator(previewMode, clipBMP, ByRef newBitmap) {
     fScale := JimgW/vpImgW
     ellipseModus := (prevEllipseSelectMode=1 && PasteInPlaceToolMode=1) ? 1 : 0
     trGdip_GetImageDimensions(clipBMP, eImgW, eImgH)
-    If (PasteInPlaceOrientation=2)
-       ER := Gdip_ImageRotateFlip(clipBMP, 4)
-    Else If (PasteInPlaceOrientation=3)
-       ER := Gdip_ImageRotateFlip(clipBMP, 6)
-    Else If (PasteInPlaceOrientation=4)
+
+    If (PasteInPlaceOrientation>1)
+       ER := Gdip_ImageRotateFlip(clipBMP, PasteInPlaceOrientation - 1)
+
+    If (PasteInPlaceOrientFlipX=1 && PasteInPlaceOrientFlipY=1)
        ER := Gdip_ImageRotateFlip(clipBMP, 2)
+    Else If (PasteInPlaceOrientFlipX=1)
+       ER := Gdip_ImageRotateFlip(clipBMP, 4)
+    Else If (PasteInPlaceOrientFlipY=1)
+       ER := Gdip_ImageRotateFlip(clipBMP, 6)
 
     If ((VPselRotation>0 || shearImgX!=0 || shearImgY!=0) && !ER && !viewportQPVimage.imgHandle)
     {
@@ -12151,7 +12200,7 @@ useGdiBitmap(doConvertPARG:=0) {
    {
       If (doConvertPARG="yes")
          thisPixFmt := Gdip_GetImagePixelFormat(gdiBitmap, 1)
-      If (thisPixFmt!="0xE200B" && thisPixFmt)
+      If (!isVarEqualTo(thisPixFmt, "0xE200B", "0x26200A") && thisPixFmt)
       {
           newBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, gdiBitmap)
           If validBMP(newBitmap)
@@ -12165,7 +12214,7 @@ useGdiBitmap(doConvertPARG:=0) {
    {
       If (doConvertPARG="yes")
          thisPixFmt := Gdip_GetImagePixelFormat(UserMemBMP, 1)
-      If (thisPixFmt!="0xE200B" && thisPixFmt)
+      If (!isVarEqualTo(thisPixFmt, "0xE200B", "0x26200A") && thisPixFmt)
       {
           newBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, UserMemBMP)
           If validBMP(newBitmap)
@@ -13309,8 +13358,8 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
        vpWinClientSize(mainWidth, mainHeight)
        trGdip_GetImageDimensions(useGdiBitmap(), thisW, thisH)
        ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, thisW, thisH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
-       opacityExtra := (oldSelectionArea[10]=32 viewportQPVimage.imgHandle && PasteInPlaceOpacity>255) ? clampInRange(PasteInPlaceOpacity - 255, 0, 255)*257 : 0 
-       thisImgCall := "a" getIDimage(currentFileIndex) currentFileIndex viewportStampBMP viewportIDstampBMP PasteInPlaceOrientation VPselRotation PasteInPlaceBlurAmount PasteInPlaceLight PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceGamma PasteInPlaceApplyColorFX PasteInPlaceBlendMode PasteInPlaceBlurEdgesSoft brushingMode shearImgX shearImgY getAlphaMaskIDu() PasteInPlaceRevealOriginal userImgAdjustInvertColors userImgAdjustAltSat userImgAdjustAltBright opacityExtra
+       opacityExtra := (oldSelectionArea[10]=32 && viewportQPVimage.imgHandle && PasteInPlaceOpacity>255) ? clampInRange(PasteInPlaceOpacity - 255, 0, 255)*257 : 0 
+       thisImgCall := "a" getIDimage(currentFileIndex) currentFileIndex viewportStampBMP viewportIDstampBMP PasteInPlaceOrientation VPselRotation PasteInPlaceBlurAmount PasteInPlaceLight PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceGamma PasteInPlaceApplyColorFX PasteInPlaceBlendMode PasteInPlaceBlurEdgesSoft brushingMode shearImgX shearImgY getAlphaMaskIDu() PasteInPlaceRevealOriginal userImgAdjustInvertColors userImgAdjustAltSat userImgAdjustAltBright opacityExtra PasteInPlaceOrientFlipX PasteInPlaceOrientFlipY
        If (prevImgCall=thisImgCall && validBMP(prevClipBMP))
        {
           hasCached := 1
@@ -13338,7 +13387,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
           }
        }
 
-       If (PasteInPlaceOrientation>1 || VPselRotation>0 || shearImgX!=0 || shearImgY!=0)
+       If (PasteInPlaceOrientation>1 || VPselRotation>0 || shearImgX!=0 || shearImgY!=0 || PasteInPlaceOrientFlipX=1 || PasteInPlaceOrientFlipY=1)
        {
           hasRotated := realtimePasteInPlaceRotator(previewMode, clipBMP, newBitmap)
           If validBMP(newBitmap)
@@ -13361,7 +13410,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
           }
        }
 
-       opacityExtra := (PasteInPlaceOpacity>255 && oldSelectionArea[10]=32) ? clampInRange(PasteInPlaceOpacity - 255, 0, 255)*256 : 0 
+       opacityExtra := (PasteInPlaceOpacity>255 && oldSelectionArea[10]=32) ? clampInRange(PasteInPlaceOpacity - 255, 0, 255)*256 : 0
        If (viewportQPVimage.imgHandle && (PasteInPlaceApplyColorFX=1 || opacityExtra>0) && previewMode=1)
        {
           trGdip_GetImageDimensions(clipBMP, tw, th)
@@ -13375,8 +13424,9 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     }
 
     trGdip_GetImageDimensions(clipBMP, oImgW, oImgH)
-    PasteInPlaceCalcObjSize(previewMode, hasRotated, oImgW, oImgH, imgSelW, imgSelH, VPselRotation, ResizedW, ResizedH)
-    If (PasteInPlaceEraseInitial=1 && brushingMode!=1)
+    capped := (viewportQPVimage.imgHandle) ? 0 : 1
+    PasteInPlaceCalcObjSize(previewMode, hasRotated, oImgW, oImgH, imgSelW, imgSelH, VPselRotation, capped, ResizedW, ResizedH)
+    If (PasteInPlaceEraseInitial=1) ; && brushingMode!=1)
        PasteInPlaceEraseArea(G2, previewMode)
 
     Gdip_ResetClip(G2)
@@ -13482,14 +13532,14 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
        Gdip_SetClipPath(G2, pPath, 1)
     }
 
-    If (allowPreviewThis=1 && userimgGammaCorrect=1 && previewMode=1 && PasteInPlaceEraseInitial=0)
+    If (allowPreviewThis=1 && userimgGammaCorrect=1 && previewMode=1)
     {
        ; fnOutputDebug("gamma correct: " A_ThisFunc)
        ; bgrBMPu := getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, oImgW, oImgH, ResizedW, ResizedH, 0, ResizedW, ResizedH)
        If validBMP(o_bgrBMP)
        {
-          trGdip_DrawImage(A_ThisFunc, G2, o_bgrBMP, imgSelPx, imgSelPy, ResizedW, ResizedH)
           Gdip_SetCompositingQuality(G2, 2)
+          trGdip_DrawImage(A_ThisFunc, G2, o_bgrBMP, imgSelPx, imgSelPy, ResizedW, ResizedH)
        }
     }
 
@@ -13498,10 +13548,24 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     If (viewportQPVimage.imgHandle && previewMode=1 && PasteInPlaceOpacity>255)
        thisOpacity := 1
 
-    prevPasteInPlaceVPcoords := [imgSelPx, imgSelPy, ResizedW, ResizedH]
+    prevPasteInPlaceVPcoords := [imgSelPx, imgSelPy, ResizedW, ResizedH, hasRotated]
     allowPreviewThis := (previewMode!=1 || VPmpx<MAINmpx) ? 1 : 0
     If (validBMP(thisBMP) && G2 && allowPreviewThis=1)
+    {
        r1 := trGdip_DrawImage(A_ThisFunc, G2, thisBMP, imgSelPx, imgSelPy, ResizedW, ResizedH, , , , , thisOpacity)
+    } Else If (allowPreviewThis!=1)
+    {
+       If (bgrBMP=thisBMP && PasteInPlaceEraseInitial=1)
+          PasteInPlaceEraseArea(G2, previewMode)
+       black := makeRGBAcolor("998877", 128)
+       blackBrush := Gdip_BrushCreateSolid(black)
+       If (pPath && PasteInPlaceCropDo=1)
+          Gdip_FillPath(G2, blackBrush, pPath)
+       Else
+          Gdip_FillRectangle(G2, blackBrush, imgSelPx, imgSelPy, ResizedW, ResizedH)
+
+       Gdip_DeleteBrush(blackBrush)
+    }
 
     If (userimgGammaCorrect=1)
        Gdip_SetCompositingQuality(G2, 1)
@@ -13509,7 +13573,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
 
     Gdip_ResetClip(G2)
     trGdip_DisposeImage(bgrBMP, 1)
-    If (bgrBMP=thisBMP && PasteInPlaceEraseInitial=1)
+    If (bgrBMP=thisBMP && PasteInPlaceEraseInitial=1 && allowPreviewThis=1)
        PasteInPlaceEraseArea(G2, previewMode)
 
     setWindowTitle(pVwinTitle, 1)
@@ -13558,7 +13622,7 @@ PasteInPlaceCalcObjCoords(imgSelW, imgSelH, ResizedW, ResizedH, ByRef imgSelPx, 
     imgSelPy := Round(imgSelPy)
 }
 
-PasteInPlaceCalcObjSize(previewMode, hasRotated, oImgW, oImgH, imgSelW, imgSelH, anglu, ByRef ResizedW, ByRef ResizedH) {
+PasteInPlaceCalcObjSize(previewMode, hasRotated, oImgW, oImgH, imgSelW, imgSelH, anglu, capped, ByRef ResizedW, ByRef ResizedH) {
     calcIMGdimensions(oImgW, oImgH, imgSelW, imgSelH, ResizedW, ResizedH)
     If (previewMode=1)
     {
@@ -13580,12 +13644,17 @@ PasteInPlaceCalcObjSize(previewMode, hasRotated, oImgW, oImgH, imgSelW, imgSelH,
        {
           If (viewportQPVimage.imgHandle)
           {
-             ResizedW := prevImgSelX2 - prevImgSelX1
-             ResizedH := prevImgSelY2 - prevImgSelY1
+             ResizedW := oldSelectionArea[12]
+             ResizedH := oldSelectionArea[13]
+             If (PasteInPlaceOrientation=2 || PasteInPlaceOrientation=4)
+                flipVars(ResizedW, ResizedH)
           } Else ; If (PasteInPlaceAdaptMode=3)
           {
              ; fnOutputDebug("hello9")
              trGdip_GetImageDimensions(userClipBMPpaste, ResizedW, ResizedH)
+             If (PasteInPlaceOrientation=2 || PasteInPlaceOrientation=4)
+                flipVars(ResizedW, ResizedH)
+
              If (anglu>0 && hasRotated=1)
              {
                 If (EllipseSelectMode=1 && PasteInPlaceToolMode=1)
@@ -13602,9 +13671,11 @@ PasteInPlaceCalcObjSize(previewMode, hasRotated, oImgW, oImgH, imgSelW, imgSelH,
        ResizedW := imgSelW
        ResizedH := imgSelH
     }
-
+    ; ToolTip, % ResizedW "|" ResizedH , , , 2
     ResizedW := Round(ResizedW), ResizedH := Round(ResizedH)
-    capIMGdimensionsGDIPlimits(ResizedW, ResizedH)
+    keepRatio := (PasteInPlaceAdaptMode=2) ? 0 : 1
+    If (capped=1)
+       capIMGdimensionsFormatlimits("gdip", keepRatio, ResizedW, ResizedH)
 }
 
 capIMGdimensionsGDIPlimits(ByRef ResizedW, ByRef ResizedH) {
@@ -14019,6 +14090,43 @@ recordSelUndoLevelNow() {
    ; ToolTip, % currentSelUndoLevel  " = l" , , , 2
 }
 
+wrapRecordUndoLevelNow(newBitmap, allowRecord:=1) {
+   If (viewportQPVimage.imgHandle || !validBMP(newBitmap))
+      Return
+   
+   gdiBitmapSmall := trGdip_DisposeImage(gdiBitmapSmall, 1)
+   gdiBMPvPsize := trGdip_DisposeImage(gdiBMPvPsize, 1)
+   ViewPortBMPcache := trGdip_DisposeImage(ViewPortBMPcache, 1)
+   HistogramBMP := trGdip_DisposeImage(HistogramBMP, 1)
+   GDIfadeVPcache := trGdip_DisposeImage(GDIfadeVPcache, 1)
+
+   currentImgModified := 1
+   imgIndexEditing := currentFileIndex
+   If (preventUndoLevels=1 && allowRecord=0)
+   {
+      If (newBitmap!=UserMemBMP)
+         UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
+      If (newBitmap!=gdiBitmap)
+         gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
+      gdiBitmap := newBitmap
+      UserMemBMP := trGdip_CloneBitmap(A_ThisFunc, newBitmap)
+      Return
+   }
+
+   recordUndoLevelNow("init", 0)
+   If (newBitmap!=UserMemBMP)
+      UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
+   If (newBitmap!=gdiBitmap)
+      gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
+
+   UserMemBMP := newBitmap
+   gdiBitmap := trGdip_CloneBitmap(A_ThisFunc, newBitmap)
+   If (UserMemBMP=gdiBitmap)
+      addJournalEntry(A_ThisFunc "(): ERROR. Illegal inequality. UserMemBMP=gdiBitmap" )
+
+   recordUndoLevelNow(0, newBitmap)
+}
+
 recordUndoLevelNow(actionu, recordedBitmap, dX:=0, dY:=0, forceAlpha:="x") {
    Static prevAct, lastInvoked := 1
    If (preventUndoLevels=1 || viewportQPVimage.imgHandle)
@@ -14246,7 +14354,7 @@ ImgUndoAction(dummy:=0) {
 
    If !validBMP(undoLevelsArray[currentUndoLevel - 1, 1])
    {
-      friendly := (preventUndoLevels=1) ? "WARNING: Undo levels are not recorded`n" : ""
+      friendly := (preventUndoLevels=1) ? "WARNING: Undo levels are not being recorded (user option)`n" : ""
       showTOOLtip(friendly "Undo [ " currentUndoLevel " / " undoLevelsRecorded " ]", 0, 0, currentUndoLevel/undoLevelsRecorded)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
       Return
@@ -14255,13 +14363,29 @@ ImgUndoAction(dummy:=0) {
    currentImgModified := 1
    howFar := (dummy="j") ? 4 : 1
    currentUndoLevel := clampInRange(currentUndoLevel - howFar, 1, undoLevelsRecorded)
-   UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
-   UserMemBMP := trGdip_CloneBitmap(A_ThisFunc, undoLevelsArray[currentUndoLevel, 1])
-   currIMGdetails.HasAlpha := undoLevelsArray[currentUndoLevel, 5]
-   ; restorePreviousSelections(undoLevelsArray[currentUndoLevel, 4])
-   SetTimer, RefreshImageFile, -325
+   coreChangeImgUndoLevel(currentUndoLevel)
+   dummyTimerDelayiedImageDisplay(325)
    showTOOLtip("Undo [ " currentUndoLevel " / " undoLevelsRecorded " ]", 0, 0, currentUndoLevel/undoLevelsRecorded)
    SetTimer, RemoveTooltip, % -msgDisplayTime//2
+}
+
+coreChangeImgUndoLevel(levelu) {
+   pBitmap := undoLevelsArray[levelu, 1]
+   If (pBitmap!=UserMemBMP)
+      UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
+   If (pBitmap!=gdiBitmap)
+      gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
+
+   UserMemBMP := trGdip_CloneBitmap(A_ThisFunc, pBitmap)
+   gdiBitmap := trGdip_CloneBitmap(A_ThisFunc, pBitmap)
+   currIMGdetails.HasAlpha := undoLevelsArray[levelu, 5]
+   vpIMGrotation := 0
+   imgFxMode := usrColorDepth := 1
+   defineColorDepth()
+   INIaction(1, "usrColorDepth", "General")
+   INIaction(1, "vpIMGrotation", "General")
+   INIaction(1, "imgFxMode", "General")
+   ; restorePreviousSelections(undoLevelsArray[currentUndoLevel, 4])
 }
 
 ImgSelUndoAct(dummy:=0) {
@@ -14340,7 +14464,7 @@ ImgVectorUndoAct() {
    totalUndos := Round(undoVectorShapesLevelsArray.Count())
    If !IsObject(undoVectorShapesLevelsArray[currentVectorUndoLevel - 1])
    {
-      friendly := (preventUndoLevels=1) ? "WARNING: Undo levels are not recorded`n" : ""
+      friendly := (preventUndoLevels=1) ? "WARNING: Undo levels are not being recorded (user option)`n" : ""
       showTOOLtip(friendly "Shape undo [ " currentVectorUndoLevel " / " totalUndos " ]", 0, 0, currentVectorUndoLevel/totalUndos)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
       Return
@@ -14451,7 +14575,7 @@ ImgRedoAction(dummy:=0) {
       Return
    } Else If !validBMP(undoLevelsArray[currentUndoLevel + 1, 1])
    {
-      friendly := (preventUndoLevels=1) ? "WARNING: Undo levels are not recorded, to limit memory usage`n" : ""
+      friendly := (preventUndoLevels=1) ? "WARNING: Undo levels are not being recorded (user option)`n" : ""
       showTOOLtip(friendly "Redo [ " currentUndoLevel " / " undoLevelsRecorded " ]", 0, 0, currentUndoLevel/undoLevelsRecorded)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
       Return
@@ -14460,11 +14584,8 @@ ImgRedoAction(dummy:=0) {
    currentImgModified := 1
    howFar := (dummy="j") ? 4 : 1
    currentUndoLevel := clampInRange(currentUndoLevel + howFar, 1, undoLevelsRecorded)
-   UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
-   UserMemBMP := trGdip_CloneBitmap(A_ThisFunc, undoLevelsArray[currentUndoLevel, 1])
-   currIMGdetails.HasAlpha := undoLevelsArray[currentUndoLevel, 5]
-   ; restorePreviousSelections(undoLevelsArray[currentUndoLevel, 4])
-   SetTimer, RefreshImageFile, -325
+   coreChangeImgUndoLevel(currentUndoLevel)
+   dummyTimerDelayiedImageDisplay(325)
    showTOOLtip("Redo [ "  currentUndoLevel " / " undoLevelsRecorded " ]", 0, 0, currentUndoLevel/undoLevelsRecorded)
    SetTimer, RemoveTooltip, % -msgDisplayTime//2
 }
@@ -14484,7 +14605,10 @@ ToggleCorePixFmt() {
 }
 
 alertReduceColorDepth() {
-   pixFmt := currIMGdetails.PixelFormat  " | " currIMGdetails.RawFormat
+   If (validBMP(UserMemBMP) || viewportQPVimage.imgHandle)
+      Return
+
+   pixFmt := currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat
    thisImgBPP := SubStr(pixFmt, 1, InStr(pixFmt, "-") - 1)
    If (currIMGdetails.HasAlpha=1 && thisImgBPP=32 && coreDesiredPixFmt="0x21808")
       r := msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", "The image you now begin to edit has an alpha channel. However, " appTitle " is set to work in 24-RGB space, without an alpha channel, to reduce memory usage.  Please activate 32-RGBA mode to preserve the alpha channel.", "&OK|&Activate 32-RGBA", 1, "exclamation")
@@ -14586,7 +14710,7 @@ downscaleHugeImagesForEditing() {
    }
 }
 
-mergeViewPortEffectsImgEditing(funcu:=0, recordUndoAfter:=1, applyOnArea:=0, allowOutside:=0) {
+mergeViewPortEffectsImgEditing(funcu:=0, recordUndoAfter:=1, allowOutside:=0) {
     If (slideShowRunning=1)
        ToggleSlideShowu()
 
@@ -14594,6 +14718,7 @@ mergeViewPortEffectsImgEditing(funcu:=0, recordUndoAfter:=1, applyOnArea:=0, all
        Return 1
 
     funcuInfo := funcu ? "`n" funcu "()" : ""
+    mergeViewPortRotationImgEditing()
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (!validBMP(whichBitmap) || thumbsDisplaying=1)
     {
@@ -14617,7 +14742,7 @@ mergeViewPortEffectsImgEditing(funcu:=0, recordUndoAfter:=1, applyOnArea:=0, all
        }
     }
 
-    trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+    trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     If isImgSizeTooLarge(imgW, imgH)
     {
        SoundBeep, 300, 100
@@ -14637,70 +14762,41 @@ mergeViewPortEffectsImgEditing(funcu:=0, recordUndoAfter:=1, applyOnArea:=0, all
     discardViewPortCaches()
     ; msgbox % UserMemBMP "---" gdiBitmap
 
-    If validBMP(gdiBitmap)
-    {
-       UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
-       UserMemBMP := Gdip_CloneBmpPargbArea(A_ThisFunc, gdiBitmap)
-    } 
+    If (AnyWindowOpen!=74 && AnyWindowOpen!=10)
+       decideGDIPimageFX(matrix, imageAttribs, pEffect)
 
-    decideGDIPimageFX(matrix, imageAttribs, pEffect)
     If (pEffect || imageAttribs)
     {
+       newBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+       newBitmap := applyVPeffectsOnBMP(newBitmap)
+
+       Gdip_DisposeEffect(pEffect)
+       Gdip_DisposeImageAttributes(imageAttribs)
        If (imgFxMode>1 && alphaMaskingMode=5 && alphaMaskRefBMP=2 && (isAlphaMaskWindow(1) || isAlphaMaskPartialWin(1)))
        {
           backupGdiBMP := trGdip_DisposeImage(backupGdiBMP, 1)
           backupGdiBMP := trGdip_CloneBitmap(A_ThisFunc, useGdiBitmap())
        }
-       recordUndoLevelNow("init", 0)
-    }
-
-    trGdip_GetImageDimensions(UserMemBMP, imgW, imgH)
-    If (editingSelectionNow=1 && applyOnArea=1 && selOutsideEntirely!=1)
-    {
-       nImgSelX1 := min(imgSelX1, imgSelX2)
-       nImgSelY1 := min(imgSelY1, imgSelY2)
-       kimgSelW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
-       kimgSelH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
-       isEntire := (kimgSelW=imgW && kimgSelH=imgH && nImgSelX1=0 && nImgSelY1=0) ? 1 : 0
-       allowOnArea := !isEntire
-    }
-
-    If (allowOnArea=1)
-    {
-       calcImgSelection2bmp(1, imgW, imgH, imgW - 1, imgH - 1, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-       pPath := createImgSelPath(1, 0, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
-       If pPath
+   
+       If validBMP(newBitmap)
        {
-          pB := GetPathRelativeBounds(pPath, imgSelPx, imgSelPy)
-          dummyBMP := Gdip_CloneBmpPargbArea(A_ThisFunc, UserMemBMP, pB.xa, pB.ya, pB.w, pB.h, 0, 0, 1)
+          wrapRecordUndoLevelNow(newBitmap, recordUndoAfter)
+          disposeCacheIMGs("soft")
+       } Else 
+       {
+          addJournalEntry(A_ThisFunc "(): Failed to apply viewport color effects on the image.")
+          trGdip_DisposeImage(newBitmap)
        }
 
-       If dummyBMP
-       {
-          dummyBMP := applyVPeffectsOnBMP(dummyBMP)
-          carvePathFromBitmap(dummyBMP, pPath, pB.x, pB.y, 4)
-          carvePathFromBitmap(UserMemBMP, pPath, pB.x, pB.y, 0)
-          G4 := trGdip_GraphicsFromImage(A_ThisFunc, UserMemBMP)
-          r1 := trGdip_DrawImage(A_ThisFunc, G4, dummyBMP, pB.xa, pB.ya)
-          Gdip_DeleteGraphics(G4)
-          trGdip_DisposeImage(dummyBMP, 1)
-       } Else r1 := "fail"
-
-       Gdip_DeletePath(pPath)
-    } Else UserMemBMP := applyVPeffectsOnBMP(UserMemBMP)
-   
-    Gdip_DisposeEffect(pEffect)
-    Gdip_DisposeImageAttributes(imageAttribs)
-    If ((pEffect || imageAttribs) && validBMP(UserMemBMP) && recordUndoAfter!=0 && r1!="fail")
-    {
-       recordUndoLevelNow(0, UserMemBMP)
-       disposeCacheIMGs("soft")
-       ; gdiBitmap := trGdip_CloneBitmap(A_ThisFunc, UserMemBMP)
+       imgFxMode := usrColorDepth := 1
+       vpIMGrotation := 0 ; FlipImgH := FlipImgV := 0
+       defineColorDepth()
+       INIaction(1, "usrColorDepth", "General")
+       INIaction(1, "vpIMGrotation", "General")
+       INIaction(1, "imgFxMode", "General")
     }
 
     SetTimer, RemoveTooltip, % -msgDisplayTime//2
-    usrColorDepth := imgFxMode := 1
-    vpIMGrotation := 0 ; FlipImgH := FlipImgV := 0
 }
 
 CutSelectedArea() {
@@ -14716,27 +14812,37 @@ CutSelectedArea() {
    EraseSelectedArea()
 }
 
-ApplyColorAdjustsSelectedArea(modus:=0) {
+ApplyVPcolorAdjustSelectedArea(modus:=0) {
     Static prevFXmode := "n"
     If (thumbsDisplaying=1)
     {
-       prevFXmode := imgFxMode
+       If (imgFxMode>1)
+          prevFXmode := imgFxMode
        Return
     }
+
+    If (AnyWindowOpen=74)
+    {
+       applyIMGeditFunction()
+       Return
+    }
+
     startOperation := A_TickCount
     If InStr(modus, "outside")
        modus := "outside"
     Else If (editingSelectionNow!=1)
        selectEntireImage()
 
-    stopNow := (editingSelectionNow=1 && validBMP(gdiBitmap)) ? 0 : 1
+    mergeViewPortRotationImgEditing()
+    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
+    stopNow := (editingSelectionNow=1 && validBMP(whichBitmap)) ? 0 : 1
     If (stopNow=1)
     {
        prevFXmode := imgFxMode
        Return 
     }
 
-    If (throwErrorSelectionOutsideBounds(useGdiBitmap()) || testEntireImgSelected() && modus="ouside")
+    If (throwErrorSelectionOutsideBounds(whichBitmap) || testEntireImgSelected() && modus="ouside")
     {
        prevFXmode := imgFxMode
        Return 
@@ -14756,10 +14862,7 @@ ApplyColorAdjustsSelectedArea(modus:=0) {
        Return
     }
 
-    thisMode := (modus="outside") ? 0 : 1
-    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 0, thisMode)
-    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
-    If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
+    If (!validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
     {
        imgFxMode := o_imgFxMode
        Return
@@ -14767,11 +14870,13 @@ ApplyColorAdjustsSelectedArea(modus:=0) {
 
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     calcImgSelection2bmp(-1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-    G2 := trGdip_GraphicsFromImage(A_ThisFunc, whichBitmap, 7, 4)
+    newBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+    G2 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap, 7, 4)
     If !G2
     {
-       imgFxMode := o_imgFxMode
        showTOOLtip("Failed to apply the viewport color adjustments to the image selected area")
+       imgFxMode := o_imgFxMode
+       trGdip_DisposeImage(newBitmap)
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
        SetTimer, ResetImgLoadStatus, -250
@@ -14782,45 +14887,53 @@ ApplyColorAdjustsSelectedArea(modus:=0) {
     If !pPath
     {
        showTOOLtip("Failed to apply the viewport color adjustments to the image selected area`nUnable to create selection path")
+       trGdip_DisposeImage(newBitmap)
+       Gdip_DeleteGraphics(G2)
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
 
-    If (!validBMP(gdiBitmap) && preventUndoLevels=1)
-    {
-       hasCloned := 1
-       o_gdiBitmap := Gdip_CloneBmpPargbArea(funcu, UserMemBMP)
-    } Else o_gdiBitmap := gdiBitmap
-
-    thisMode := (modus="outside") ? 0 : 4
+    thisMode := (modus="outside") ? 4 : 0
     Gdip_SetClipPath(G2, pPath, thisMode)
-    zBitmap := validBMP(o_gdiBitmap) ? o_gdiBitmap : undoLevelsArray[currentUndoLevel, 1] 
+    setImageLoading()
+    zBitmap := trGdip_CloneBitmap(A_ThisFunc, useGdiBitmap())
+    zBitmap := applyVPeffectsOnBMP(zBitmap)
     r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
     r1 := trGdip_DrawImage(A_ThisFunc, G2, zBitmap, 0, 0)
     Gdip_DeletePath(pPath)
     Gdip_DeleteGraphics(G2)
+    okay := validBMP(zBitmap)
+    trGdip_DisposeImage(zBitmap)
     etaTime := "Elapsed time to apply viewport color effects: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) 
     addJournalEntry(etaTime)
-    If (r0!="fail" && r1!="fail" && G2)
+    If (r0!="fail" && r1!="fail" && G2 && validBMP(newBitmap) && okay=1)
     {
-       UserMemBMP := whichBitmap
-       recordUndoLevelNow(0, UserMemBMP)
+       wrapRecordUndoLevelNow(newBitmap)
+       If (AnyWindowOpen!=10)
+       {
+          imgFxMode := 1
+          INIaction(1, "imgFxMode", "General")
+       }
+    } Else
+    {
+       showTOOLtip("Failed to apply the viewport color adjustments to the image selected area`nError messages feel so desaturated...")
+       SoundBeep , 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       trGdip_DisposeImage(newBitmap)
     }
 
-    If hasCloned
-       trGdip_DisposeImage(o_gdiBitmap, 1)
-
-    SetTimer, RefreshImageFile, -25
+    dummyTimerDelayiedImageDisplay(50)
+    SetTimer, ResetImgLoadStatus, -150
     Return r1
 }
 
-AdjustColorsSelectedArea(prevFXmode:=0) {
+AdjustColorsLegacySelectedArea(prevFXmode:=0) {
     Static bitsOptions := {0:0, 1:0, 2:2, 3:3, 4:4, 5:5, 6:6, 7:7, 8:8, 9:16}
     thisBitsDepth := bitsOptions[DesaturateAreaLevels]
     startOperation := A_TickCount
-    stopNow := (editingSelectionNow=1 && validBMP(gdiBitmap)) ? 0 : 1
+    stopNow := (editingSelectionNow=1 && validBMP(useGdiBitmap())) ? 0 : 1
     If (stopNow=1)
        Return 
 
@@ -14832,24 +14945,23 @@ AdjustColorsSelectedArea(prevFXmode:=0) {
        Return
     }
 
+    mergeViewPortRotationImgEditing()
+    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
+    If (!validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
+       Return
+
     o_imgFxMode := imgFxMode
     imgFxMode := 1
-    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 0, 0)
-    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
-    If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
-    {
-       imgFxMode := o_imgFxMode
-       Return
-    }
-
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     compositingQuality := (userimgGammaCorrect=1) ? 2 : 1
     calcImgSelection2bmp(-1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-    G2 := trGdip_GraphicsFromImage(A_ThisFunc, whichBitmap, 7, 4, compositingQuality)
+    newBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+    G2 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap, 7, 4, compositingQuality)
     If !G2
     {
-       imgFxMode := o_imgFxMode
        showTOOLtip("Failed to apply the color adjustments to the image selected area")
+       trGdip_DisposeImage(newBitmap)
+       imgFxMode := o_imgFxMode
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
        SetTimer, ResetImgLoadStatus, -250
@@ -14859,8 +14971,10 @@ AdjustColorsSelectedArea(prevFXmode:=0) {
     pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
     If !pPath
     {
-       imgFxMode := o_imgFxMode
        showTOOLtip("Failed to apply the color adjustments to the image selected area`nUnable to create selection path")
+       trGdip_DisposeImage(newBitmap)
+       Gdip_DeleteGraphics(G2)
+       imgFxMode := o_imgFxMode
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
        SetTimer, ResetImgLoadStatus, -250
@@ -14876,14 +14990,11 @@ AdjustColorsSelectedArea(prevFXmode:=0) {
        imgSelW  := imgW,  imgSelH  := imgH
     }
 
+    setImageLoading()
     imgFxMode := prevFXmode
-    recordUndoLevelNow("init", 0)
-    If (UserMemBMP!=whichBitmap)
-       gdiBitmap := ""
-
     thisOpacity := imgColorsFXopacity/255
     allowAlphaMasking := decideAlphaMaskingFeaseable(1)
-    zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
+    zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, newBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
     xBitmap := trGdip_CloneBitmap(A_ThisFunc, zBitmap)
 
     thisMode := (EraseAreaInvert=1) ? 4 : 0
@@ -14900,13 +15011,12 @@ AdjustColorsSelectedArea(prevFXmode:=0) {
 
     If (allowAlphaMasking=1)
     {
-       realtimePasteInPlaceAlphaMasker(0, zBitmap, "lol", newBitmap, 0, 0, 0, 0, 0, xBitmap, 255 - imgColorsFXopacity)
-       If validBMP(newBitmap)
+       realtimePasteInPlaceAlphaMasker(0, zBitmap, "lol", nowBitmap, 0, 0, 0, 0, 0, xBitmap, 255 - imgColorsFXopacity)
+       If validBMP(nowBitmap)
        {
           trGdip_DisposeImage(zBitmap, 1)
-          zBitmap := newBitmap
+          zBitmap := nowBitmap
        }
-       trGdip_DisposeImage(xBitmap, 1)
     } Else
        QPV_MergeBitmapsWithMask(zBitmap, xBitmap, 0, 0, 255 - imgColorsFXopacity)
 
@@ -14915,31 +15025,37 @@ AdjustColorsSelectedArea(prevFXmode:=0) {
     Gdip_ResetClip(G2)
     Gdip_DeleteGraphics(G2)
     Gdip_DeletePath(pPath)
+    okay := validBMP(zBitmap)
+    trGdip_DisposeImage(zBitmap, 1)
+    trGdip_DisposeImage(xBitmap, 1)
     etaTime := "Elapsed time to apply viewport color effects: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) 
     addJournalEntry(etaTime)
     realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
-    If (r0!="fail" && r1!="fail" && G2)
+    If (r0!="fail" && r1!="fail" && G2 && validBMP(newBitmap) && okay=1)
     {
-       UserMemBMP := whichBitmap
-       recordUndoLevelNow(0, UserMemBMP)
+       wrapRecordUndoLevelNow(newBitmap)
+    } Else
+    {
+       showTOOLtip("Failed to apply the color adjustments to the image selected area`nIt is all so blue in my coding...")
+       SoundBeep , 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       trGdip_DisposeImage(newBitmap)
     }
 
-    trGdip_DisposeImage(zBitmap, 1)
     wasVPfxBefore := 0
     imgFxMode := o_imgFxMode
-    SetTimer, RefreshImageFile, -25
+    dummyTimerDelayiedImageDisplay(50)
+    SetTimer, ResetImgLoadStatus, -150
     Return r1
 }
 
 AdjustColorsSimpleSelectedArea() {
-    Static bitsOptions := {0:0, 1:0, 2:2, 3:3, 4:4, 5:5, 6:6, 7:7, 8:8, 9:16}
-    thisBitsDepth := bitsOptions[DesaturateAreaLevels]
     startOperation := A_TickCount
-    stopNow := (editingSelectionNow=1 && validBMP(gdiBitmap)) ? 0 : 1
+    stopNow := (editingSelectionNow=1 && validBMP(useGdiBitmap())) ? 0 : 1
     If (stopNow=1)
        Return 
 
-    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 0, 0)
+    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc)
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
     {
@@ -14950,10 +15066,12 @@ AdjustColorsSimpleSelectedArea() {
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     compositingQuality := (userimgGammaCorrect=1) ? 2 : 1
     calcImgSelection2bmp(-1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-    G2 := trGdip_GraphicsFromImage(A_ThisFunc, whichBitmap, 7, 4, compositingQuality)
+    newBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+    G2 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap, 7, 4, compositingQuality)
     If !G2
     {
        showTOOLtip("Failed to apply the color adjustments to the image selected area")
+       trGdip_DisposeImage(newBitmap)
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
        SetTimer, ResetImgLoadStatus, -250
@@ -14964,6 +15082,8 @@ AdjustColorsSimpleSelectedArea() {
     If !pPath
     {
        showTOOLtip("Failed to apply the color adjustments to the image selected area`nUnable to create selection path")
+       trGdip_DisposeImage(newBitmap)
+       Gdip_DeleteGraphics(G2)
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
        SetTimer, ResetImgLoadStatus, -250
@@ -14980,13 +15100,9 @@ AdjustColorsSimpleSelectedArea() {
     }
 
     imgFxMode := prevFXmode
-    recordUndoLevelNow("init", 0)
-    If (UserMemBMP!=whichBitmap)
-       gdiBitmap := ""
-
     thisOpacity := imgColorsFXopacity/255
     allowAlphaMasking := decideAlphaMaskingFeaseable(1)
-    zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
+    zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, newBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
     xBitmap := trGdip_CloneBitmap(A_ThisFunc, zBitmap)
 
     thisMode := (EraseAreaInvert=1) ? 4 : 0
@@ -14999,13 +15115,12 @@ AdjustColorsSimpleSelectedArea() {
 
     If (allowAlphaMasking=1)
     {
-       realtimePasteInPlaceAlphaMasker(0, zBitmap, "lol", newBitmap, 0, 0, 0, 0, 0, xBitmap, 0)
-       If validBMP(newBitmap)
+       realtimePasteInPlaceAlphaMasker(0, zBitmap, "lol", nowBitmap, 0, 0, 0, 0, 0, xBitmap, 0)
+       If validBMP(nowBitmap)
        {
           trGdip_DisposeImage(zBitmap, 1)
-          zBitmap := newBitmap
+          zBitmap := nowBitmap
        }
-       trGdip_DisposeImage(xBitmap, 1)
     } Else
        QPV_MergeBitmapsWithMask(zBitmap, xBitmap, 0, 0, 0)
 
@@ -15013,28 +15128,36 @@ AdjustColorsSimpleSelectedArea() {
     Gdip_ResetClip(G2)
     Gdip_DeleteGraphics(G2)
     Gdip_DeletePath(pPath)
+    okay := validBMP(zBitmap)
+    realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
     etaTime := "Elapsed time to apply viewport color effects: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) 
     addJournalEntry(etaTime)
-    realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
-    If (r0!="fail" && r1!="fail" && G2)
+    trGdip_DisposeImage(zBitmap, 1)
+    trGdip_DisposeImage(xBitmap, 1)
+    If (r0!="fail" && r1!="fail" && G2 && validBMP(newBitmap) && okay=1)
     {
-       UserMemBMP := whichBitmap
-       recordUndoLevelNow(0, UserMemBMP)
+       wrapRecordUndoLevelNow(newBitmap)
+       dummyTimerDelayiedImageDisplay(50)
+    } Else
+    {
+       showTOOLtip("Failed to apply the color adjustments to the image selected area`nIt is so vividly painful...")
+       SoundBeep , 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       trGdip_DisposeImage(newBitmap)
     }
 
-    trGdip_DisposeImage(zBitmap, 1)
-    SetTimer, RefreshImageFile, -25
+    SetTimer, ResetImgLoadStatus, -100
     Return r1
 }
 
 InsertTextSelectedArea() {
     allowOutside := 0
-    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
+    whichBitmap := useGdiBitmap()
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     If ((imgSelX1<0 || imgSelY1<0 || imgSelX2>imgW || imgSelY2>imgH) && PasteInPlaceAutoExpandIMG=1 && validBMP(whichBitmap) && imgW && imgH)
        allowOutside := 1
 
-    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 1, 0, allowOutside)
+    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 1, allowOutside)
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
     {
@@ -15043,22 +15166,27 @@ InsertTextSelectedArea() {
        Return
     }
 
-    If (allowOutside=1)
-       hasRanExpand := performAutoExpandCanvas(imgW, imgH, whichBitmap)
-
-    recordUndoLevelNow("init", 0)
-    If (UserMemBMP!=whichBitmap)
-       gdiBitmap := ""
-
     startOperation := A_TickCount
+    If (allowOutside=1)
+       hasRanExpand := performAutoExpandCanvas(imgW, imgH)
+
+    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
     compositingQuality := (userimgGammaCorrect=1) ? 2 : 1
-    G2 := trGdip_GraphicsFromImage(A_ThisFunc, whichBitmap, 7, 4,, compositingQuality)
+    metaBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+    If validBMP(metaBitmap)
+       G2 := trGdip_GraphicsFromImage(A_ThisFunc, metaBitmap, 7, 4,, compositingQuality)
+
     If !G2
     {
-       showTOOLtip(A_ThisFunc "(): Failed to perform action. Graphics object error.")
-       SoundBeep , 300, 100
+       If validBMP(metaBitmap)
+          showTOOLtip("Failed to insert text in the selected area.`nUnable to create GDI+ graphics object.")
+       Else
+          showTOOLtip("Failed to insert text in the selected area.`nUnable to allocate new bitmap.")
+       SoundBeep 300, 100
+       SetTimer, ResetImgLoadStatus, -100
+       trGdip_DisposeImage(metaBitmap)
        Return
     }
 
@@ -15120,7 +15248,7 @@ InsertTextSelectedArea() {
     If (TextInAreaBlendMode>1 || alphaMaskingMode>1)
     {
        If (TextInAreaBlendMode>1)
-          bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, tX, tY, tW, tH, 0, 0, 1)
+          bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, tX, tY, tW, tH, 0, 0, 1)
 
        newBitmap := trGdip_CreateBitmap(A_ThisFunc, tW, tH)
        Gr := Gdip_GraphicsFromImage(newBitmap)
@@ -15164,15 +15292,21 @@ InsertTextSelectedArea() {
     Gdip_DeleteGraphics(G2)
     Gdip_DeleteBrush(zBrush)
     zeitOperation := A_TickCount - startOperation
-    If (r1!="fail")
+    If (r1!="fail" && validBMP(metaBitmap))
     {
-       UserMemBMP := whichBitmap
-       recordUndoLevelNow(0, UserMemBMP)
+       wrapRecordUndoLevelNow(metaBitmap)
+    } Else
+    {
+       trGdip_DisposeImage(metaBitmap)
+       showTOOLtip("Failed to draw the text on the image")
+       SoundBeep 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
     }
 
+    SetTimer, ResetImgLoadStatus, -100
+    dummyTimerDelayiedImageDisplay(50)
     etaTime := SecToHHMMSS(Round(zeitOperation/1000, 3))
     addJournalEntry("Text drawn on image in: " etaTime)
-    RefreshImageFile()
     If (hasRanExpand=1)
     {
        totalSelUndos := Round(undoSelLevelsArray.Count())
@@ -15378,12 +15512,12 @@ FillSelectedArea() {
     }
 
     allowOutside := 0
-    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
+    whichBitmap := useGdiBitmap()
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     If ((imgSelX1<0 || imgSelY1<0 || imgSelX2>imgW || imgSelY2>imgH) && PasteInPlaceAutoExpandIMG=1 && validBMP(whichBitmap) && imgW && imgH)
        allowOutside := 1
 
-    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 1, 0, allowOutside)
+    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 1, allowOutside)
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
     {
@@ -15392,31 +15526,41 @@ FillSelectedArea() {
        Return
     }
 
+    startZeit := A_TickCount
     If (allowOutside=1)
-       hasRanExpand := performAutoExpandCanvas(imgW, imgH, whichBitmap)
+       hasRanExpand := performAutoExpandCanvas(imgW, imgH)
 
+    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     calcImgSelection2bmp(0, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
+    newBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap)
+    If !validBMP(newBitmap)
+    {
+       showTOOLtip("Failed to fill selected area. Unable to allocate new bitmap.")
+       SoundBeep 300, 100
+       ResetImgLoadStatus()
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
 
-    startZeit := A_TickCount
-    recordUndoLevelNow("init", 0)
-    If (UserMemBMP!=whichBitmap)
-       whichBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap)
-
-    r := coreFillSelectedArea("no", whichBitmap)
-
-    If (r="fail")
+    r := coreFillSelectedArea("no", newBitmap)
+    If (r="fail" || !validBMP(newBitmap))
+    {
+       showTOOLtip("Failed to fill selected area")
+       SoundBeep 300, 100
+       ResetImgLoadStatus()
+       SetTimer, RemoveTooltip, % -msgDisplayTime
        Return "fail"
+    }
 
     If (FillAreaRemBGR=1)
        currIMGdetails.HasAlpha := 1
 
-    UserMemBMP := whichBitmap
     coreFillSelectedArea("kill", 0)
-    recordUndoLevelNow(0, UserMemBMP)
+    wrapRecordUndoLevelNow(newBitmap)
     zeitOperation := A_TickCount - startZeit
     addJournalEntry("Fill selected area operation. Elapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)))
-    RefreshImageFile()
+    dummyTimerDelayiedImageDisplay(50)
     If (hasRanExpand=1)
     {
        totalSelUndos := Round(undoSelLevelsArray.Count())
@@ -16001,8 +16145,8 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
       LoadCachableBitmapFromFile("kill")
       realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
       drawFillSelGradient("kill", 0, 0, 0, 0, 0, 0)
-      applyVPeffectsAdvOnBMP("kill")
       getImgSelectedAreaEditMode("kill", 1, 1, 1, 1, 1, 1)
+      applyVPeffectsAdvOnBMP("kill")
       coredrawWelcomeImg("kill", 0, 0, 0, 0, 0, 0, 0, 0)
       userPrevAlphaMaskBmpPainted := trGdip_DisposeImage(userPrevAlphaMaskBmpPainted, 1)
       If (keepUserPaintAlphaMask!=1)
@@ -16014,6 +16158,11 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
    If (previewMode=0)
    {
       G2 := trGdip_GraphicsFromImage(A_ThisFunc, whichBitmap)
+      If !G2
+      {
+         addJournalEntry("Failed to create the GDI+ graphics object.")
+         Return "fail"
+      }
    } Else
    {
       G2 := 2NDglPG
@@ -16090,7 +16239,7 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
          SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
       }
-      Return
+      Return "fail"
    }
 
    If (FillAreaApplyColorFX=1 && FillAreaColorMode>4)
@@ -16278,7 +16427,7 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
    }
 
    ; ToolTip, % "g2=" g2 " bmp="  fBitmapA " g=" gradientsBMP " o=" thisOpacity " p=" pPath , , , 2
-   trGdip_DrawImage(A_ThisFunc, G2, fBitmapA, imgSelPx, imgSelPy, imgSelW, imgSelH, , , , , thisOpacity)
+   rz := trGdip_DrawImage(A_ThisFunc, G2, fBitmapA, imgSelPx, imgSelPy, imgSelW, imgSelH, , , , , thisOpacity)
    If (userimgGammaCorrect=1)
       Gdip_SetCompositingQuality(G2, 1)
 
@@ -16290,6 +16439,7 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
    trGdip_DisposeImage(fBitmapB, 1)
    If (FillAreaDoContour=1 && previewMode=1)
       coreDrawShapesSelectionArea()
+   Return rz
 }
 
 flipVars(ByRef a, ByRef b) {
@@ -16612,35 +16762,31 @@ EraseOrInvertOrGraySelectedArea(actionu, funcu) {
        Return
     }
 
-    stopNow := mergeViewPortEffectsImgEditing(funcu)
+    If isVarEqualTo(actionu, "invert", "behind", "desaturate")
+       stopNow := mergeViewPortEffectsImgEditing(funcu)
+    Else
+       mergeViewPortRotationImgEditing()
+
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
        Return
 
-    trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
+    metaBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+    trGdip_GetImageDimensions(metaBitmap, imgW, imgH)
     calcImgSelection2bmp(!LimitSelectBoundsImg, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
     infoFriendly := InStr(actionu, "flip-") ? actionu : actionu " the colours in"
-    G2 := trGdip_GraphicsFromImage(funcu, whichBitmap, 7, 4)
+    G2 := trGdip_GraphicsFromImage(funcu, metaBitmap, 7, 4)
     If !G2
     {
        showTOOLtip("Failed to " infoFriendly " the selected area")
        SoundBeep , 300, 100
+       trGdip_DisposeImage(metaBitmap)
        SetTimer, RemoveTooltip, % -msgDisplayTime
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
 
-    recordUndoLevelNow("init", 0)
-    If (!validBMP(gdiBitmap) && preventUndoLevels=1)
-    {
-       hasCloned := 1
-       o_gdiBitmap := Gdip_CloneBmpPargbArea(funcu, UserMemBMP)
-    } Else o_gdiBitmap := gdiBitmap
-
-    If (UserMemBMP!=whichBitmap)
-       gdiBitmap := ""
-
-    zBitmap := validBMP(o_gdiBitmap) ? o_gdiBitmap : undoLevelsArray[currentUndoLevel, 1]
+    zBitmap := useGdiBitmap()
     If (actionu="behind")
        pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio)
     Else
@@ -16649,6 +16795,8 @@ EraseOrInvertOrGraySelectedArea(actionu, funcu) {
     If (pPath="")
     {
        showTOOLtip("Failed to " infoFriendly " the selected area`nUnable to create selection path")
+       trGdip_DisposeImage(metaBitmap)
+       Gdip_DeleteGraphics(G2)
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
        SetTimer, ResetImgLoadStatus, -250
@@ -16792,26 +16940,31 @@ EraseOrInvertOrGraySelectedArea(actionu, funcu) {
 
     If !done
        r1 := dummyDrawImage(pEffect, clrMatrix, zBitmap, G2, funcu)
+    
     realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
     Gdip_DeletePath(pPath)
     Gdip_DisposeEffect(pEffect)
     Gdip_DeleteGraphics(G2)
-    If hasCloned
-       trGdip_DisposeImage(o_gdiBitmap, 1)
-
-    If (r0!="fail" && r1!="fail" && G2)
+    If (r0!="fail" && r1!="fail" && G2 && validBMP(metaBitmap))
     {
        If (ha=1)
           currIMGdetails.HasAlpha := ha
+     
        isInside := (imgSelX1>=0 && imgSelY1>=0 && imgSelX2<=imgW && imgSelY2<=imgH) ? 1 : 0
        If (actionu="erase") || (InStr(actionu, "flip") && isInside=0)
           currIMGdetails.HasAlpha := 1
 
-       UserMemBMP := whichBitmap
-       recordUndoLevelNow(0, UserMemBMP)
+       wrapRecordUndoLevelNow(metaBitmap)
+    } Else
+    {
+       showTOOLtip("Failed to " infoFriendly " the selected area")
+       SoundBeep , 300, 100
+       trGdip_DisposeImage(metaBitmap)
+       SetTimer, RemoveTooltip, % -msgDisplayTime
     }
-    SetTimer, RefreshImageFile, -25
-}
+    SetTimer, ResetImgLoadStatus, -250
+    dummyTimerDelayiedImageDisplay(50)
+} ; // EraseOrInvertOrGraySelectedArea()
 
 QPV_rect2polar(pBitmap) {
   initQPVmainDLL()
@@ -16984,7 +17137,7 @@ SharpenSelectedArea() {
     If (editingSelectionNow!=1 && thumbsDisplaying!=1)
        selectEntireImage("r")
 
-    stopNow := (editingSelectionNow=1 && validBMP(gdiBitmap)) ? 0 : 1
+    stopNow := (editingSelectionNow=1 && validBMP(useGdiBitmap())) ? 0 : 1
     If (stopNow=1)
        Return 
 
@@ -16998,47 +17151,45 @@ SharpenSelectedArea() {
        Return
     }
 
-    stopNow := mergeViewPortEffectsImgEditing(funcu)
+    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc)
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
        Return
 
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     calcImgSelection2bmp(!LimitSelectBoundsImg, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-    G2 := trGdip_GraphicsFromImage(funcu, whichBitmap, 7, 4)
+    metaBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+    G2 := trGdip_GraphicsFromImage(funcu, metaBitmap, 7, 4)
     If !G2
     {
-       showTOOLtip("Failed to transform the selected area")
-       SoundBeep , 300, 100
+       If validBMP(metaBitmap)
+          showTOOLtip("Failed to apply filter: sharpen.`nUnable to create GDI+ graphics object.")
+       Else
+          showTOOLtip("Failed to apply filter: sharpen.`nUnable to allocate new bitmap.")
+       SoundBeep 300, 100
+       trGdip_DisposeImage(metaBitmap)
+       SetTimer, ResetImgLoadStatus, -100
        SetTimer, RemoveTooltip, % -msgDisplayTime
-       SetTimer, ResetImgLoadStatus, -250
        Return
     }
-
-    recordUndoLevelNow("init", 0)
-    If (!validBMP(gdiBitmap) && preventUndoLevels=1)
-    {
-       hasCloned := 1
-       o_gdiBitmap := Gdip_CloneBmpPargbArea(funcu, UserMemBMP)
-    } Else o_gdiBitmap := gdiBitmap
-
-    If (UserMemBMP!=whichBitmap)
-       gdiBitmap := ""
 
     pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
     If !pPath
     {
        showTOOLtip("Failed to sharpen the selected area`nUnable to create selection path")
        SoundBeep , 300, 100
+       trGdip_DisposeImage(metaBitmap)
+       Gdip_DeleteGraphics(G2)
        SetTimer, RemoveTooltip, % -msgDisplayTime
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
+
     modus := (BlurAreaInverted=1) ? 4 : 0
     If (BlurAreaInverted=1)
-       zBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+       zBitmap := trGdip_CloneBitmap(A_ThisFunc, metaBitmap)
     Else
-       zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1)
+       zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1)
 
     Gdip_SetClipPath(G2, pPath, modus)
     r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
@@ -17066,23 +17217,26 @@ SharpenSelectedArea() {
 
     Gdip_DeletePath(pPath)
     Gdip_DeleteGraphics(G2)
-    If hasCloned
-       trGdip_DisposeImage(o_gdiBitmap, 1)
-
     trGdip_DisposeImage(zBitmap, 1)
-    If (r1!="fail" && G2)
+    If (r1!="fail" && G2 && validBMP(metaBitmap))
     {
-       UserMemBMP := whichBitmap
-       recordUndoLevelNow(0, UserMemBMP)
+       wrapRecordUndoLevelNow(metaBitmap)
+       dummyTimerDelayiedImageDisplay(50)
+    } Else
+    {
+       showTOOLtip("Failed to apply filter: sharpen.`nI aint so sharp to know why...")
+       trGdip_DisposeImage(metaBitmap)
+       SoundBeep 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
     }
-    SetTimer, RefreshImageFile, -25
+    SetTimer, ResetImgLoadStatus, -250
 }
 
 SymmetrySelectedArea() {
     If (editingSelectionNow!=1 && thumbsDisplaying!=1)
        selectEntireImage("r")
 
-    stopNow := (editingSelectionNow=1 && validBMP(gdiBitmap)) ? 0 : 1
+    stopNow := (editingSelectionNow=1 && validBMP(useGdiBitmap())) ? 0 : 1
     If (stopNow=1)
        Return 
 
@@ -17096,54 +17250,58 @@ SymmetrySelectedArea() {
        Return
     }
 
-    stopNow := mergeViewPortEffectsImgEditing(funcu)
+    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc)
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
        Return
 
+    startZeit := A_TickCount
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     calcImgSelection2bmp(!LimitSelectBoundsImg, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
+    metaBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+    If validBMP(metaBitmap)
+       G2 := trGdip_GraphicsFromImage(funcu, metaBitmap, 7, 4)
 
-    startZeit := A_TickCount
-    G2 := trGdip_GraphicsFromImage(funcu, whichBitmap, 7, 4)
     If !G2
     {
-       showTOOLtip("Failed to process the selected area")
+       pfu := !validBMP(metaBitmap) ? "Failed to allocate the new bitmap." : "Failed to create the GDI+ graphics object."
+       showTOOLtip("Failed to process the selected area: symmetry tool.`n" pfu)
+       trGdip_DisposeImage(metaBitmap)
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
-
-    recordUndoLevelNow("init", 0)
-    If (!validBMP(gdiBitmap) && preventUndoLevels=1)
-    {
-       hasCloned := 1
-       o_gdiBitmap := Gdip_CloneBmpPargbArea(funcu, UserMemBMP)
-    } Else o_gdiBitmap := gdiBitmap
-
-    If (UserMemBMP!=whichBitmap)
-       gdiBitmap := ""
 
     pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
     If !pPath
     {
-       showTOOLtip("Failed to process the selected area`nUnable to create selection path")
+       showTOOLtip("Failed to process the selected area: symmetry tool`nUnable to create selection path")
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
        SetTimer, ResetImgLoadStatus, -250
        Gdip_DeleteGraphics(G2)
+       trGdip_DisposeImage(metaBitmap)
        Return
     }
 
-    pBitmap := whichBitmap
-    ; trGdip_GraphicsClear(A_ThisFunc, 2NDglPG, "0x00" WindowBGRcolor)
     modus := (UserSymmetricaInvertArea=1) ? 4 : 0
     Gdip_SetClipPath(G2, pPath, modus)
-    zBitmap := coreSymmetricaImageGenerator(trGdip_CloneBitmap(A_ThisFunc, pBitmap))
- 
+    zBitmap := coreSymmetricaImageGenerator(trGdip_CloneBitmap(A_ThisFunc, metaBitmap))
+    If !validBMP(zBitmap)
+    {
+       showTOOLtip("Failed to process the selected area: symmetry tool`nCoreSymmetricaImageGenerator() failed poetically.")
+       SoundBeep , 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       SetTimer, ResetImgLoadStatus, -250
+       Gdip_DeleteGraphics(G2)
+       Gdip_DeletePath(pPath)
+       trGdip_DisposeImage(metaBitmap)
+       Return
+    }
+
     trGdip_GetImageDimensions(zBitmap, zw, zh)
-    trGdip_GetImageDimensions(whichBitmap, mw, mh)
+    trGdip_GetImageDimensions(metaBitmap, mw, mh)
     nx := Round(zw * (min(ImgSelX1, ImgSelX2)/mw))
     ny := Round(zh * (min(ImgSelY1, ImgSelY2)/mh))
     nw := Round(zw * (max(ImgSelX1, ImgSelX2)/mw)) - nx
@@ -17155,7 +17313,6 @@ SymmetrySelectedArea() {
     offY := Round(nmY * (UserSymmetricaSelOffY/200))
     bx := (UserSymmetricaSelAligned=1 && UserSymmetricaInvertArea=0) ? offX : nx
     by := (UserSymmetricaSelAligned=1 && UserSymmetricaInvertArea=0) ? offY : ny
- 
     If (UserSymmetricaInvertArea!=1)
     {
        kBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, zBitmap, bx, by, nw, nh, 0, 0, 1)
@@ -17172,7 +17329,7 @@ SymmetrySelectedArea() {
     If (UserSymmetricaBlendMode>1)
     {
        threads := (previewMode=1) ? realSystemCores : 0
-       bgrBMP := (UserSymmetricaInvertArea=1) ? trGdip_CloneBitmap(A_ThisFunc, pBitmap) : Gdip_CloneBmpPargbArea(A_ThisFunc, pBitmap, nx, ny, nw, nh, 0, 0, 1)
+       bgrBMP := (UserSymmetricaInvertArea=1) ? trGdip_CloneBitmap(A_ThisFunc, metaBitmap) : Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, nx, ny, nw, nh, 0, 0, 1)
        zr := QPV_BlendBitmaps(bgrBMP, zBitmap, UserSymmetricaBlendMode - 1, threads, BlendModesFlipped)
        If zr
        {
@@ -17197,7 +17354,6 @@ SymmetrySelectedArea() {
     }
  
     thisOpacity := UserSymmetricaOpacity/255
-    ; thisOpacity := GenerateColorMatrix(2)
     px := (UserSymmetricaInvertArea=1) ? 0 : imgSelPx
     py := (UserSymmetricaInvertArea=1) ? 0 : imgSelPy
     If (!hasApplied && thisOpacity>0.98)
@@ -17206,19 +17362,21 @@ SymmetrySelectedArea() {
     r1 := trGdip_DrawImage(A_ThisFunc, G2, zBitmap, px, py,,,,,,, thisOpacity)
     ; r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectWin, 2NDglHDC)
     trGdip_DisposeImage(zBitmap, 1)
-
     Gdip_DeletePath(pPath)
     Gdip_DeleteGraphics(G2)
-    If hasCloned
-       trGdip_DisposeImage(o_gdiBitmap, 1)
-
-    If (r1!="fail" && G2)
+    If (r1!="fail" && G2 && validBMP(metaBitmap))
     {
-       UserMemBMP := whichBitmap
-       recordUndoLevelNow(0, UserMemBMP)
+       wrapRecordUndoLevelNow(metaBitmap)
+       dummyTimerDelayiedImageDisplay(50)
+    } Else
+    {
+       showTOOLtip("Failed to apply tool: symmetry generator.`nAn unexpected asymmetry occured.")
+       trGdip_DisposeImage(metaBitmap)
+       SoundBeep 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
     }
+    SetTimer, ResetImgLoadStatus, -100
     fnOutputDebug(A_ThisFunc "(): " A_TickCount - startZeit)
-    SetTimer, RefreshImageFile, -25
 }
 
 doRectPolarTransformSelectedArea() {
@@ -17233,7 +17391,7 @@ PolarRectSelectedArea(funcu, actionu, extraMod:=0, entireImg:=0) {
     If (editingSelectionNow!=1 && thumbsDisplaying!=1)
        selectEntireImage("r")
 
-    stopNow := (editingSelectionNow=1 && validBMP(gdiBitmap)) ? 0 : 1
+    stopNow := (editingSelectionNow=1 && validBMP(useGdiBitmap())) ? 0 : 1
     If (stopNow=1)
        Return
 
@@ -17245,41 +17403,35 @@ PolarRectSelectedArea(funcu, actionu, extraMod:=0, entireImg:=0) {
     startZeit := A_TickCount
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     calcImgSelection2bmp(!LimitSelectBoundsImg, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-    G2 := trGdip_GraphicsFromImage(funcu, whichBitmap, 7, 4)
+    newBitmap := trGdip_CloneBitmap(A_ThisFunc "<-" funcu, whichBitmap)
+    G2 := trGdip_GraphicsFromImage(funcu, newBitmap, 7, 4)
     If !G2
     {
-       showTOOLtip("Failed to process the selected area")
+       showTOOLtip("Failed to process the selected area:`n" funcu "()")
+       trGdip_DisposeImage(newBitmap)
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
-
-    recordUndoLevelNow("init", 0)
-    If (!validBMP(gdiBitmap) && preventUndoLevels=1)
-    {
-       hasCloned := 1
-       o_gdiBitmap := Gdip_CloneBmpPargbArea(funcu, UserMemBMP)
-    } Else o_gdiBitmap := gdiBitmap
-
-    If (UserMemBMP!=whichBitmap)
-       gdiBitmap := ""
 
     pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY, 0)
     If !pPath
     {
-       showTOOLtip("Failed to process the selected area`nUnable to create selection path")
+       showTOOLtip("Failed to process the selected area`nUnable to create selection path`n" funcu "()")
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
        SetTimer, ResetImgLoadStatus, -250
        Gdip_DeleteGraphics(G2)
+       trGdip_DisposeImage(newBitmap)
        Return
     }
 
+    setImageLoading()
     if (actionu=3 && entireImg=1)
-       mainBMP := trGdip_CloneBitmap(funcu, whichBitmap)
+       mainBMP := trGdip_CloneBitmap(funcu, newBitmap)
 
-    zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1)
+    zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, newBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1)
     Gdip_SetClipPath(G2, pPath)
     r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
     If (actionu=1)
@@ -17304,17 +17456,20 @@ PolarRectSelectedArea(funcu, actionu, extraMod:=0, entireImg:=0) {
     r1 := trGdip_DrawImage(A_ThisFunc, G2, gBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH)
     Gdip_DeletePath(pPath)
     Gdip_DeleteGraphics(G2)
-    If hasCloned
-       trGdip_DisposeImage(o_gdiBitmap, 1)
-
     trGdip_DisposeImage(gBitmap, 1)
     If (r1!="fail" && G2)
     {
-       UserMemBMP := whichBitmap
-       recordUndoLevelNow(0, UserMemBMP)
+       wrapRecordUndoLevelNow(newBitmap)
+       dummyTimerDelayiedImageDisplay(50)
+    } Else
+    {
+       showTOOLtip("Failed to process the image selected area`n" funcu "()")
+       SoundBeep , 300, 100
+       trGdip_DisposeImage(newBitmap)
+       SetTimer, RemoveTooltip, % -msgDisplayTime
     }
-    fnOutputDebug(A_ThisFunc "(" actionu "," extraMod "): " A_TickCount - startZeit)
-    SetTimer, RefreshImageFile, -25
+    SetTimer, ResetImgLoadStatus, -250
+    ; fnOutputDebug(A_ThisFunc "(" actionu "," extraMod "): " A_TickCount - startZeit)
 }
 
 QPV_polar2rect(oBitmap) {
@@ -17326,7 +17481,6 @@ QPV_polar2rect(oBitmap) {
      Return 
   }
 
-  ; pBitmap := useGdiBitmap()
   trGdip_GetImageDimensions(pBitmap, ow, oh)
   ; kBitmap := trGdip_ResizeBitmap(A_ThisFunc, oBitmap, ow*2, oh*2, 0, 5, -1, 1)
   If !validBMP(kBitmap)
@@ -17335,12 +17489,18 @@ QPV_polar2rect(oBitmap) {
      pBitmap := kBitmap
 
   If !validBMP(pBitmap)
+  {
+     addJournalEntry(A_ThisFunc "(): ERROR. Invalid bitmap")
      Return
+  }
 
   ; Gdip_ImageRotateFlip(pBitmap, 3)
   trGdip_GetImageDimensions(pBitmap, w, h)
   If (!w || !h)
+  {
+     addJournalEntry(A_ThisFunc "(): ERROR. Invalid image dimensions. W=" w " | H=" h)
      Return
+  }
 
   cx := w/2 , cy := h/2
   pk := min(w, h)/2
@@ -17351,6 +17511,7 @@ QPV_polar2rect(oBitmap) {
   GP := trGdip_GraphicsFromImage(A_ThisFunc, pBitmap)
   If !GP
   {
+     addJournalEntry(A_ThisFunc "(): ERROR. Unable to process the image. GDI+ graphics object was not created.")
      trGdip_DisposeImage(pBitmap, 1)
      Return
   }
@@ -17365,6 +17526,8 @@ QPV_polar2rect(oBitmap) {
   Static orbScale := 1
   If (!E1 && !E2)
      r := DllCall(whichMainDLL "\polar2rectIMG", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "double", cx, "double", cy, "double", orbScale, "Int")
+  Else
+     addJournalEntry(A_ThisFunc "(): ERROR. Unable to process the image. Failed to lock the bitmap bits.")
 
   If !E1
      Gdip_UnlockBits(pBitmap, iData)
@@ -17404,11 +17567,11 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
       lastu := []
    }
 
-   bpp := FreeImage_GetBPP(viewportQPVimage.imgHandle)
-   If (imgSelPx="kill")
+   If (imgSelPx="kill" ||preventUndoLevels=1)
       Return
 
    recordSelUndoLevelNow()
+   bpp := FreeImage_GetBPP(viewportQPVimage.imgHandle)
    If (viewportQPVimage.LoadedWith!="FIM" || !isVarEqualTo(bpp, 24, 32))
    {
       addJournalEntry("Error. Unable to record undo level. Image not loaded into memory as a FreeImage bitmap.")
@@ -17417,14 +17580,15 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
 
    If !isVarEqualTo(bpp, 24, 32)
    {
-      addJournalEntry("Error. Unable to record undo level. Image is not a 24- or 32-bits bitmap.")
+      addJournalEntry("ERROR. Unable to record undo level. Image is not a 24- or 32-bits bitmap.")
       Return
    }
+
 
    FreeImage_GetImageDimensions(viewportQPVimage.imgHandle, imgW, imgH)
    If (imgSelPx="entire-vp" || invertArea=1)
    {
-      If memoryUsageWarning(imgW, imgH, bpp)
+      If memoryUsageWarning(imgW, imgH, bpp, 2)
          Return
 
       calcImgSelection2bmp(0, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2, 0, 0, "a")
@@ -17440,7 +17604,7 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
    flastu :=  !isNumber(imgSelPx) ? imgSelPx : "img-crop"
    If (flastu="img-crop")
    {
-      If memoryUsageWarning(imgSelW, imgSelH, bpp)
+      If memoryUsageWarning(imgSelW, imgSelH, bpp, 3)
          Return
 
       y1 := imgH - imgSelH - imgSelPy
@@ -17461,6 +17625,14 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
 }
 
 undoRedoHugeImagesAct() {
+   If (preventUndoLevels=1)
+   {
+      showTOOLtip("WARNING: Undo levels are not being recorded (user option).`nOne undo level is allowed with images over 536 mgpx.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+ 
    setImageLoading()
    prevVPselRotation := VPselRotation
    prevrotateSelBoundsKeepRatio := rotateSelBoundsKeepRatio
@@ -17632,6 +17804,7 @@ HugeImagesFlipHVinvert(modus) {
          Else If (modus="v")
             r := FreeImage_FlipVertical(hFIFimgA)
          FreeImage_UnLoad(hFIFimgA)
+         ; ToolTip, % x1 "|" y1 "`n" x2 "|" y2 "`n" imgSelW "|" imgSelH , , , 2
       }
    } Else
    {
@@ -17702,7 +17875,11 @@ memoryUsageWarning(givenW:=0, givenH:=0, bitsDepth:=0, opener:=0, bonusBuffer:=0
    thisMemoryLoad := Round(((max(mamUsage[1], mamUsage[8]) + 0)/systemMemInfo.TotalPhys)*100, 1)
    projectedMemoryLoad := Round(((max(mamUsage[1], mamUsage[8]) + bufferSize + bonusBuffer)/systemMemInfo.TotalPhys)*100, 1)
    diffu := projectedMemoryLoad - thisMemoryLoad
-   If (projectedMemoryLoad>90 || prcSys>85 && diffu>5)
+   If ((projectedMemoryLoad>95 || prcSys>90) && opener=2)
+      Return 1
+   Else If ((projectedMemoryLoad>105 || prcSys>99) && opener=3)
+      Return 1
+   Else If (projectedMemoryLoad>90 || prcSys>85 && diffu>5)
    {
       If (opener=1)
       {
@@ -17820,7 +17997,7 @@ HugeImagesConvertClrDepth(modus) {
          discarded := 1
          viewportQPVimage.DiscardImage()
       }
-   } else thisu := hFIFimgX
+   } Else thisu := hFIFimgX
 
    If (modus=32)
       hFIFimgA := FreeImage_ConvertTo(hFIFimgX, "32Bits")
@@ -17987,27 +18164,42 @@ HugeImagesApplyAutoColors() {
       ResetImgLoadStatus()
 }
 
+terminatePasteInPlace() {
+   corePasteInPlaceActNow("kill")
+   coreFillSelectedArea("kill")
+   FreeImage_UnLoad(oldSelectionArea[11])
+   oldSelectionArea := []
+}
+
 HugeImagesApplyPasteInPlace() {
       If warnHugeImageNotFIM()
+      {
+         terminatePasteInPlace()
          Return
+      }
 
       If throwErrorSelectionOutsideBounds()
-         Return "out-bounds"
+      {
+         terminatePasteInPlace()
+         Return
+      }
 
       bpp := FreeImage_GetBPP(viewportQPVimage.imgHandle)
       If warnIncorrectColorDepthHugeImage(bpp, 1)
+      {
+         terminatePasteInPlace()
          Return
+      }
 
+      friendly := (PasteInPlaceToolMode=1) ? "transform selected area" : "paste in place"
       trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
       vpWinClientSize(mainWidth, mainHeight)
-      showTOOLtip("Applying transform tool, please wait...")
+      showTOOLtip("Applying " friendly ", please wait...")
       prevVPselRotation := VPselRotation
       prevrotateSelBoundsKeepRatio := rotateSelBoundsKeepRatio
       prevEllipseSelectMode := EllipseSelectMode
       previnnerSelectionCavityX := innerSelectionCavityX
       previnnerSelectionCavityY := innerSelectionCavityY
-      ; prevImgSelX1 := imgSelX1, prevImgSelX2 := imgSelX2
-      ; prevImgSelY1 := imgSelY1, prevImgSelY2 := imgSelY2
       
       x1 := clampInRange(prevImgSelX1, 0, imgW - 1)
       y1 := clampInRange(prevImgSelY1, 0, imgH - 1)
@@ -18015,41 +18207,104 @@ HugeImagesApplyPasteInPlace() {
       y2 := clampInRange(prevImgSelY2, prevImgSelY1 + 1, imgH)
       w := x2 - x1
       h := y2 - y1
-      If memoryUsageWarning(w, h, bpp)
-         Return
 
       thisQuality := (PasteInPlaceQuality=1) ? 3 : 0
-      MouseCoords2Image(prevPasteInPlaceVPcoords[1], prevPasteInPlaceVPcoords[2], 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, xa, ya)
-      MouseCoords2Image(prevPasteInPlaceVPcoords[1] + prevPasteInPlaceVPcoords[3], prevPasteInPlaceVPcoords[2] + prevPasteInPlaceVPcoords[4], 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, xb, yb)
-      dw := xb - xa
-      dh := yb - ya
+      allowOutside := testAllowOutsidePasteInPlace(imgW, imgH, oldSelectionArea[12], oldSelectionArea[13])
+      xa := allowOutside[2], ya := allowOutside[3]
+      xb := allowOutside[4], yb := allowOutside[5]
+      dw := xb - xa,         dh := yb - ya
+      If memoryUsageWarning(max(dw, w), max(dh, h), bpp)
+      {
+         terminatePasteInPlace()
+         Return
+      }
+
       setImageLoading()
-      showTOOLtip("Applying transform tool, please wait...`nRescaling object", 1)
-      If (PasteInPlaceToolMode=1)
-         hFIFimgA := FreeImage_RescaleRect(viewportQPVimage.imgHandle, dw, dh, x1, y1, w, h, thisQuality)
+      If (PasteInPlaceToolMode!=1)
+         FreeImage_GetImageDimensions(oldSelectionArea[11], w, h)
+
+      dmpx := Round((dw * dh)/1000000, 3)
+      smpx := Round((w * h)/1000000, 3)
+      applyCLRfxAfter := (dmpx<smpx) ? 1 : 0
+      applyRotateAfter := (dmpx<smpx) ? 1 : 0
+      If (PasteInPlaceApplyColorFX=1 && applyCLRfxAfter=0 && PasteInPlaceToolMode=0 && oldSelectionArea[11])
+         HugeImagesApplyCLRfxPasteInPlace(oldSelectionArea[11], friendly)
       Else
-         hFIFimgA := FreeImage_Rescale(viewportQPVimage.imgHandle, dw, dh, thisQuality)
+         applyCLRfxAfter := 1
+
+      ; If ((PasteInPlaceOrientFlipX=1 || PasteInPlaceOrientFlipY=1 || PasteInPlaceOrientation>1) && applyRotateAfter=0 && PasteInPlaceToolMode=0 && oldSelectionArea[11])
+      ;    oldSelectionArea[11] := HugeImagesApplyRotationPasteInPlace(oldSelectionArea[11], friendly)
+      ; Else
+         applyRotateAfter := 1
+
+      showTOOLtip("Applying " friendly ", please wait...`nRescaling image object", 1)
+      If (PasteInPlaceToolMode=1)
+      {
+         hFIFimgA := FreeImage_RescaleRect(viewportQPVimage.imgHandle, dw, dh, x1, y1, w, h, thisQuality)
+      } Else
+      {
+         If oldSelectionArea[11]
+            hFIFimgA := FreeImage_Rescale(oldSelectionArea[11], dw, dh, thisQuality)
+         FreeImage_UnLoad(oldSelectionArea[11])
+         oldSelectionArea[11] := ""
+      }
 
       If !hFIFimgA
       {
+         terminatePasteInPlace()
          ResetImgLoadStatus()
-         showTOOLtip("ERROR: Failed to transform selected area:`nUnable to retrieve image rect.")
+         showTOOLtip("ERROR: Failed to " friendly ":`nUnable to rescale image object.")
          SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
          Return
       }
 
-      If (PasteInPlaceApplyColorFX=1)
+      If (PasteInPlaceApplyColorFX=1 && applyCLRfxAfter=1)
+         r := HugeImagesApplyCLRfxPasteInPlace(hFIFimgA, friendly)
+      Else
+         r := 1
+
+      If ((PasteInPlaceOrientFlipX=1 || PasteInPlaceOrientFlipY=1 || PasteInPlaceOrientation>1) && applyRotateAfter=1 && r=1)
+         hFIFimgA := HugeImagesApplyRotationPasteInPlace(hFIFimgA, friendly)
+
+
+
+/*
+      tFrames := frameu := 1
+      imgPath := viewportQPVimage.ImgFile
+      viewportQPVimage.DiscardImage()
+      killQPVscreenImgSection()
+      Sleep, 1
+      viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, [hFIFimgA, tFrames], 1)
+      If (modus="resize" || modus="rotate90")
       {
-         showTOOLtip("Applying transform tool, please wait...`nPerforming color adjustments", 1)
-         userImgAdjustNoClamp := (PasteInPlaceLight>1 && PasteInPlaceGamma<1) ? 1 : 0 
-         pBitsAll := FreeImage_GetBits(hFIFimgA)
-         Stride := FreeImage_GetStride(hFIFimgA)
-         bpp := FreeImage_GetBPP(hFIFimgA)
-         FreeImage_GetImageDimensions(hFIFimgA, tW, tH)
-         QPV_PrepareSelectionArea(0, 0, tW, tH, tW, tH, -1, 0, 0, 0, 0, 0)
-         r := DllCall(whichMainDLL "\AdjustImageColorsPrecise", "UPtr", pBitsAll, "Int", tW, "Int", tH, "int", Stride, "int", bpp, "int", 255, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", Round(PasteInPlaceSaturation*655.35), "int", userImgAdjustAltBright, "int", Round(PasteInPlaceLight*257), "int", 0, "int", Round(PasteInPlaceGamma*655.30), "int", 0, "int", 0, "int", 0, "int", PasteInPlaceHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", 65535, "int", 0, "int", 0, "UPtr", 0, "int", 1)
-      } Else r := 1
+         oimgBPP := FreeImage_GetBPP(hFIFimgA)
+         ColorsType := FreeImage_GetColorType(hFIFimgA)
+         imgType := FreeImage_GetImageType(hFIFimgA, 1)
+         fileType := FreeImage_GetFileType(imgPath, 1)
+
+         currIMGdetails.HasAlpha := InStr(ColorsType, "rgba") ? 1 : 0
+         currIMGdetails.RawFormat := fileType " | " imgType
+         currIMGdetails.PixelFormat := StrReplace(oimgBPP, "-", "+") "-" ColorsType
+         viewportQPVimage.HasAlpha := InStr(ColorsType, "rgba") ? 1 : 0
+         viewportQPVimage.RawFormat := fileType " | " imgType
+         viewportQPVimage.PixelFormat := StrReplace(oimgBPP, "-", "+") "-" ColorsType
+         viewportQPVimage.clrinfo := oimgBPP "-bit " ColorsType
+      }
+
+      SoundBeep 900, 100
+      RemoveTooltip()
+      currentImgModified := 1
+      imgIndexEditing := currentFileIndex
+      If (editingSelectionNow=1)
+      {
+         VPselRotation := EllipseSelectMode := innerSelectionCavityX := innerSelectionCavityY := 0
+         selectEntireImage("r")
+      }
+      dummyTimerDelayiedImageDisplay(500)
+      Return
+*/
+
 
       If (PasteInPlaceEraseInitial=1 && PasteInPlaceToolMode=1 && r)
       {
@@ -18062,19 +18317,14 @@ HugeImagesApplyPasteInPlace() {
          imgSelX1 := oldSelectionArea[1],            imgSelX2 := oldSelectionArea[3]
          imgSelY1 := oldSelectionArea[2],            imgSelY2 := oldSelectionArea[4]
          defineRelativeSelCoords(imgW, imgH)
-         r := HugeImagesApplyDesaturateFillSelArea("erase initially selected area", 0)
+         r := HugeImagesApplyDesaturateFillSelArea("erase initially selected area", 0, 0, 0)
       }
 
-      If (PasteInPlaceOrientation=3 || PasteInPlaceOrientation=4)
-         FreeImage_FlipVertical(hFIFimgA)
-      If (PasteInPlaceOrientation=2 || PasteInPlaceOrientation=4)
-         FreeImage_FlipHorizontal(hFIFimgA)
-
       rotateSelBoundsKeepRatio := prevrotateSelBoundsKeepRatio
-      innerSelectionCavityX := previnnerSelectionCavityX
-      innerSelectionCavityY := previnnerSelectionCavityY
-      imgSelX1 := xa,         imgSelY1 := ya
-      imgSelX2 := xb,         imgSelY2 := yb
+      innerSelectionCavityX    := previnnerSelectionCavityX
+      innerSelectionCavityY    := previnnerSelectionCavityY
+      imgSelX1 := xa,          imgSelY1 := ya
+      imgSelX2 := xb,          imgSelY2 := yb
       defineRelativeSelCoords(imgW, imgH)
       If (PasteInPlaceCropSel=3)
          EllipseSelectMode := 1
@@ -18089,14 +18339,52 @@ HugeImagesApplyPasteInPlace() {
          VPselRotation := 0
 
       If (PasteInPlaceToolMode=1)
-         r := HugeImagesApplyDesaturateFillSelArea("transform selected area", 1, hFIFimgA)
+         r := HugeImagesApplyDesaturateFillSelArea(friendly, 1, hFIFimgA, 0)
       Else
-         r := HugeImagesApplyDesaturateFillSelArea("paste in place", 1, hFIFimgA)
+         r := HugeImagesApplyDesaturateFillSelArea(friendly, 1, hFIFimgA, 0)
 
-      ; FreeImage_UnLoad(hFIFimgA) // it is discarded by HugeImagesApplyDesaturateFillSelArea()
+      terminatePasteInPlace()
+      If (r!=1)
+         FreeImage_UnLoad(hFIFimgA)
 }
 
-HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0) {
+HugeImagesApplyCLRfxPasteInPlace(hFIFimgA, friendly) {
+   showTOOLtip("Applying " friendly ", please wait...`nPerforming color adjustments", 1)
+   userImgAdjustNoClamp := (PasteInPlaceLight>1 && PasteInPlaceGamma<1) ? 1 : 0 
+   pBitsAll := FreeImage_GetBits(hFIFimgA)
+   Stride := FreeImage_GetStride(hFIFimgA)
+   bpp := FreeImage_GetBPP(hFIFimgA)
+   FreeImage_GetImageDimensions(hFIFimgA, tW, tH)
+   QPV_PrepareSelectionArea(0, 0, tW, tH, tW, tH, -1, 0, 0, 0, 0, 0)
+   r := DllCall(whichMainDLL "\AdjustImageColorsPrecise", "UPtr", pBitsAll, "Int", tW, "Int", tH, "int", Stride, "int", bpp, "int", 255, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", Round(PasteInPlaceSaturation*655.35), "int", userImgAdjustAltBright, "int", Round(PasteInPlaceLight*257), "int", 0, "int", Round(PasteInPlaceGamma*655.30), "int", 0, "int", 0, "int", 0, "int", PasteInPlaceHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", 65535, "int", 0, "int", 0, "UPtr", 0, "int", 1)
+   Return r
+}
+
+HugeImagesApplyRotationPasteInPlace(hFIFimgA, friendly) {
+   deg := (PasteInPlaceOrientation=2) ? 90 : 180
+   If (PasteInPlaceOrientation=4)
+      deg := 270
+
+   showTOOLtip("Applying " friendly ", please wait...`nRotate and/or flip the bitmap", 1)
+   If (PasteInPlaceOrientation>1 && deg>0)
+   {
+      hFIFimgD := FreeImage_Rotate(hFIFimgA, deg)
+      If hFIFimgD
+      {
+         FreeImage_UnLoad(hFIFimgA)
+         hFIFimgA := hFIFimgD
+      } Else
+         addJournalEntry(A_ThisFunc "(): Failed to rotate bitmap with FreeImage")
+   }
+
+   If (PasteInPlaceOrientFlipY=1)
+      FreeImage_FlipVertical(hFIFimgA)
+   If (PasteInPlaceOrientFlipX=1)
+      FreeImage_FlipHorizontal(hFIFimgA)
+   Return hFIFimgA
+}
+
+HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=1) {
       If warnHugeImageNotFIM()
          Return
 
@@ -18277,7 +18565,7 @@ HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0) {
          r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", blending, "int", BlendModesFlipped, "UPtr", mScan, "int", mStride, "UPtr", gScan, "int", gStride, "int", gBpp, "int", doBehind, "int", opacityExtra)
          If hFIFimgRealGradient
             FreeImage_UnLoad(hFIFimgRealGradient)
-         If hFIFimgExtern
+         If (hFIFimgExtern && r=1)
             FreeImage_UnLoad(hFIFimgExtern)
    
          userImgAdjustNoClamp := (PasteInPlaceLight>1 && PasteInPlaceGamma<1) ? 1 : 0 
@@ -18285,13 +18573,20 @@ HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0) {
          If (FillAreaApplyColorFX=1 && FillAreaBlendMode>1 && r && fillTool=1)
          {
             showTOOLtip("Applying " modus "`nPerforming color adjustments, please wait", 1)
-            r := DllCall(whichMainDLL "\AdjustImageColorsPrecise", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisOpacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", Round(PasteInPlaceSaturation*655.35), "int", userImgAdjustAltBright, "int", Round(PasteInPlaceLight*257), "int", 0, "int", Round(PasteInPlaceGamma*655.30), "int", 0, "int", 0, "int", 0, "int", PasteInPlaceHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
+            rz := DllCall(whichMainDLL "\AdjustImageColorsPrecise", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisOpacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", Round(PasteInPlaceSaturation*655.35), "int", userImgAdjustAltBright, "int", Round(PasteInPlaceLight*257), "int", 0, "int", Round(PasteInPlaceGamma*655.30), "int", 0, "int", 0, "int", 0, "int", PasteInPlaceHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
          }
 
          If (mustUnlock=1 && !EZ)
          {
             Gdip_UnlockBits(gradientsBMP, gData)
             trGdip_DisposeImage(gradientsBMP)
+         }
+
+         If (fillTool=1 && !AnyWindowOpen)
+         {
+            coreFillSelectedArea("kill")
+            drawFillSelGradient("kill", 0, 0, 0, 0, 0, 0)
+            getImgSelectedAreaEditMode("kill", 1, 1, 1, 1, 1, 1)
          }
 
          If (bpp=32 && FillAreaRemBGR=1)
@@ -18392,7 +18687,9 @@ HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0) {
          SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
       }
+
       ResetImgLoadStatus()
+      Return r
 } ; // HugeImagesApplyDesaturateFillSelArea()
 
 HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=0, allowUndo:=1) {
@@ -18429,7 +18726,38 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
       nmgpx := mgpx
       deg := (modus="rotate90") ? 90 : -90
       showTOOLtip("Rotating image to " deg "°`nPlease wait...")
-      hFIFimgA := FreeImage_Rotate(viewportQPVimage.imgHandle, deg)
+      bpp := FreeImage_GetBPP(viewportQPVimage.imgHandle)
+      If (zbpp=32 || zbpp=24)
+      {
+         Static redMASK   := "0x00FF0000" ; FI_RGBA_RED_MASK;
+              , greenMASK := "0x0000FF00" ; FI_RGBA_GREEN_MASK;
+              , blueMASK  := "0x000000FF" ; FI_RGBA_BLUE_MASK;
+
+         imgPath := viewportQPVimage.ImgFile
+         FreeImage_GetImageDimensions(viewportQPVimage.imgHandle, imgW, imgH)
+         pBits := FreeImage_GetBits(viewportQPVimage.imgHandle)
+         stride := FreeImage_GetStride(viewportQPVimage.imgHandle)
+         r := DllCall(whichMainDLL "\rotateImage90Degrees", "UPtr", pBits, "Int", imgW, "Int", imgH, "int", bpp)
+         ; r := DllCall(whichMainDLL "\transposeImageBitmap", "UPtr", pBits, "Int", stride, "Int", imgW, "Int", imgH, "int", bpp)
+         buffer := viewportQPVimage.DiscardImage(0)
+         viewportQPVimage.ImgFile := imgPath
+         ; flipVars(imgW, imgH)
+         nstride := (bpp * imgW) / 8
+         hFIFimgA := FreeImage_ConvertFromRawBitsEx(0, buffer, 1, imgW, imgH, nstride, bpp, "0x00FF0000", "0x0000FF00", "0x000000FF", 1)
+         viewportQPVimage.imgHandle := hFIFimgA
+         viewportQPVimage.Width := imgW
+         viewportQPVimage.Height := imgH
+         currIMGdetails.Width := imgW
+         currIMGdetails.Height := imgH
+         killQPVscreenImgSection()
+         SoundBeep 900, 100
+         RemoveTooltip()
+         currentImgModified := 1
+         imgIndexEditing := currentFileIndex
+         dummyTimerDelayiedImageDisplay(500)
+         Return
+      } Else
+         hFIFimgA := FreeImage_Rotate(viewportQPVimage.imgHandle, deg)
    }
 
    If hFIFimgA
@@ -18448,6 +18776,22 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
       killQPVscreenImgSection()
       Sleep, 1
       viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, [hFIFimgA, tFrames], 1)
+      If (modus="resize" || modus="rotate90")
+      {
+         oimgBPP := FreeImage_GetBPP(hFIFimgA)
+         ColorsType := FreeImage_GetColorType(hFIFimgA)
+         imgType := FreeImage_GetImageType(hFIFimgA, 1)
+         fileType := FreeImage_GetFileType(imgPath, 1)
+
+         currIMGdetails.HasAlpha := InStr(ColorsType, "rgba") ? 1 : 0
+         currIMGdetails.RawFormat := fileType " | " imgType
+         currIMGdetails.PixelFormat := StrReplace(oimgBPP, "-", "+") "-" ColorsType
+         viewportQPVimage.HasAlpha := InStr(ColorsType, "rgba") ? 1 : 0
+         viewportQPVimage.RawFormat := fileType " | " imgType
+         viewportQPVimage.PixelFormat := StrReplace(oimgBPP, "-", "+") "-" ColorsType
+         viewportQPVimage.clrinfo := oimgBPP "-bit " ColorsType
+      }
+
       SoundBeep 900, 100
       RemoveTooltip()
       currentImgModified := 1
@@ -18474,11 +18818,13 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
 }
 
 ResizeIMGviewportSelection() {
-    stopNow := (editingSelectionNow=1 && validBMP(gdiBitmap)) ? 0 : 1
+    mergeViewPortRotationImgEditing()
+    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
+    stopNow := (editingSelectionNow=1 && validBMP(whichBitmap)) ? 0 : 1
     If (stopNow=1)
        Return 
 
-    trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+    trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     mgpx := Round((imgW * imgH)/1000000, 1)
     imgSelW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
     imgSelH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
@@ -18487,7 +18833,7 @@ ResizeIMGviewportSelection() {
     If (imgSelW=imgW && imgSelH=imgH)
        Return
 
-    If (throwErrorSelectionOutsideBounds(useGdiBitmap()) || testEntireImgSelected(0, 0, 1))
+    If (throwErrorSelectionOutsideBounds(whichBitmap) || testEntireImgSelected(0, 0, 1))
        Return
 
     If (viewportQPVimage.imgHandle)
@@ -18496,8 +18842,6 @@ ResizeIMGviewportSelection() {
        Return
     }
 
-    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc)
-    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
        Return
 
@@ -18518,21 +18862,19 @@ ResizeIMGviewportSelection() {
     If (diffu>50)
        PrintPosX := "X"
 
-    recordUndoLevelNow("init", 0)
-    UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
-    gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
-    UserMemBMP := newBitmap
+    wrapRecordUndoLevelNow(newBitmap)
     VPselRotation := EllipseSelectMode := vpIMGrotation := 0
+    INIaction(1, "vpIMGrotation", "General")
     selectEntireImage()
     updateUIctrl()
     MouseMoveResponder()
-    recordUndoLevelNow(0, newBitmap)
-    SetTimer, RefreshImageFile, -25
+    dummyTimerDelayiedImageDisplay(50)
+    SetTimer, ResetImgLoadStatus, -150
     SetTimer, dummyInfoImgResizeVP, -125
 }
 
 PerformAutoCropViewportMode() {
-    stopNow := (editingSelectionNow=1 && validBMP(gdiBitmap)) ? 0 : 1
+    stopNow := (editingSelectionNow=1 && validBMP(useGdiBitmap())) ? 0 : 1
     If (stopNow=1)
        Return 
 
@@ -18544,21 +18886,19 @@ PerformAutoCropViewportMode() {
     newBitmap := AutoCropAction(whichBitmap, usrAutoCropColorTolerance, usrAutoCropErrThreshold/100, 0, 0)
     If !validBMP(newBitmap)
     {
+       addJournalEntry(A_ThisFunc "(): ERROR. Failed to perform auto-crop for image.")
+       SoundBeep 300, 100
        SetTimer, ResetImgLoadStatus, -150
        Return "fail"
     }
 
-    recordUndoLevelNow("init", 0)
-    UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
-    gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
-    UserMemBMP := newBitmap
-
-    editingSelectionNow := 0
-    vpIMGrotation := 0
+    wrapRecordUndoLevelNow(newBitmap)
+    ResetImgLoadStatus()
+    editingSelectionNow := vpIMGrotation := 0
     updateUIctrl()
     MouseMoveResponder()
-    recordUndoLevelNow(0, newBitmap)
-    SetTimer, RefreshImageFile, -25
+    dummyTimerDelayiedImageDisplay(50)
+    SetTimer, ResetImgLoadStatus, -150
     SetTimer, dummyInfoImgResizeVP, -125
 }
 
@@ -18574,23 +18914,19 @@ DrawLinesInSelectedArea(modus) {
        ToggleSlideShowu()
 
     allowOutside := 0
-    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
+    whichBitmap := useGdiBitmap()
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     tk := (DrawLineAreaContourAlign=1 || PasteInPlaceAutoExpandIMG!=1) ? 0 : DrawLineAreaContourThickness
-    o_imgSelX1 := imgSelX1
-    o_imgSelY1 := imgSelY1
-    o_imgSelX2 := imgSelX2
-    o_imgSelY2 := imgSelY2
-    imgSelX1 := imgSelX1 - tk//2
-    imgSelY1 := imgSelY1 - tk//2
-    imgSelX2 := imgSelX2 + tk//2
-    imgSelY2 := imgSelY2 + tk//2
+    o_imgSelX1 := imgSelX1,    o_imgSelY1 := imgSelY1
+    o_imgSelX2 := imgSelX2,    o_imgSelY2 := imgSelY2
+    imgSelX1 := imgSelX1 - tk//2,    imgSelY1 := imgSelY1 - tk//2
+    imgSelX2 := imgSelX2 + tk//2,    imgSelY2 := imgSelY2 + tk//2
     offX := (imgSelX1<0) ? abs(imgSelX1) : 0
     offY := (imgSelY1<0) ? abs(imgSelY1) : 0
     If ((imgSelX1<0 || imgSelY1<0 || imgSelX2>imgW || imgSelY2>imgH) && PasteInPlaceAutoExpandIMG=1 && validBMP(whichBitmap) && imgW && imgH)
        allowOutside := 1
 
-    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 1, 0, allowOutside)
+    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 1, allowOutside)
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
     {
@@ -18599,21 +18935,28 @@ DrawLinesInSelectedArea(modus) {
        Return
     }
 
+    startZeit := A_TickCount
     If (allowOutside=1)
-       hasRanExpand := performAutoExpandCanvas(imgW, imgH, whichBitmap)
+       hasRanExpand := performAutoExpandCanvas(imgW, imgH)
 
+    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     compositingQuality := (userimgGammaCorrect=1) ? 2 : 1
-    G2 := trGdip_GraphicsFromImage(A_ThisFunc, whichBitmap, 7, 4,, compositingQuality)
+    newBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+    If validBMP(newBitmap)
+       G2 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap, 7, 4,, compositingQuality)
+
     If !G2
     {
-       SoundBeep , 300, 100
-       addJournalEntry(A_ThisFunc "(): error - failed to create graphics object for main image")
+       If validBMP(newBitmap)
+          showTOOLtip("Failed to draw lines in the selected area.`nUnable to create GDI+ graphics object.")
+       Else
+          showTOOLtip("Failed to draw lines in the selected area.`nUnable to allocate new bitmap.")
+       SoundBeep 300, 100
+       SetTimer, ResetImgLoadStatus, -100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       trGdip_DisposeImage(newBitmap)
        Return
     }
-
-    recordUndoLevelNow("init", 0)
-    If (UserMemBMP!=whichBitmap)
-       gdiBitmap := ""
 
     If (hasRanExpand=1)
     {
@@ -18621,17 +18964,20 @@ DrawLinesInSelectedArea(modus) {
        imgSelY1 := o_imgSelY1 + offY
        imgSelX2 := o_imgSelX2 + offX
        imgSelY2 := o_imgSelY2 + offY
+       defineRelativeSelCoords(imgW, imgH)
     }
 
     If (modus=1)
-       coreDrawLinesSelectionArea(G2, whichBitmap)
+       coreDrawLinesSelectionArea(G2, newBitmap)
     Else
-       coreDrawShapesSelectionArea(G2, whichBitmap)
+       coreDrawShapesSelectionArea(G2, newBitmap)
 
     Gdip_DeleteGraphics(G2)
-    UserMemBMP := whichBitmap
-    recordUndoLevelNow(0, UserMemBMP)
-    RefreshImageFile()
+    wrapRecordUndoLevelNow(newBitmap)
+    zeitOperation := A_TickCount - startZeit
+    addJournalEntry("Draw lines operation. Elapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)))
+    dummyTimerDelayiedImageDisplay(50)
+    SetTimer, ResetImgLoadStatus, -100
     If (hasRanExpand=1)
     {
        totalSelUndos := Round(undoSelLevelsArray.Count())
@@ -19084,6 +19430,23 @@ coreDrawLinesSelectionArea(G2:=0, whichBitmap:=0) {
        Gdip_SetCompositingQuality(G2, 1)
 } ; // coreDrawLinesSelectionArea()
 
+createDrawLinesPen(thisThick) {
+    Static compoundArray := "0.0|0.33|0.67|1.0"
+    If (thisThick<2)
+       thisThick := 1
+
+    thisColor := makeRGBAcolor(DrawLineAreaColor, DrawLineAreaOpacity)
+    thisPen := Gdip_CreatePen(thisColor, thisThick)
+    Gdip_SetPenDashStyle(thisPen, DrawLineAreaDashStyle - 1)
+    If (DrawLineAreaCapsStyle=1)
+       Gdip_SetPenLineCaps(thisPen, 2, 2, 2)
+
+    If (DrawLineAreaDoubles=1)
+       Gdip_SetPenCompoundArray(thisPen, compoundArray)
+
+    Return thisPen
+}
+
 coreDrawShapesSelectionArea(G2:=0, whichBitmap:=0) {
     If (G2)
     {
@@ -19118,16 +19481,7 @@ coreDrawShapesSelectionArea(G2:=0, whichBitmap:=0) {
        }
     }
 
-    thisColor := makeRGBAcolor(DrawLineAreaColor, DrawLineAreaOpacity)
-    thisPen := Gdip_CreatePen(thisColor, thisThick)
-    Gdip_SetPenDashStyle(thisPen, DrawLineAreaDashStyle - 1)
-    If (DrawLineAreaCapsStyle=1)
-       Gdip_SetPenLineCaps(thisPen, 2, 2, 2)
-
-    Static compoundArray := "0.0|0.33|0.67|1.0"
-    If (DrawLineAreaDoubles=1)
-       Gdip_SetPenCompoundArray(thisPen, compoundArray)
-
+    thisPen := createDrawLinesPen(thisThick)
     pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio)
     modus := (DrawLineAreaContourAlign=1) ? 0 : 4
     If (DrawLineAreaContourAlign!=2)
@@ -19179,32 +19533,14 @@ getRelativePointCoordsCircle(angle, ByRef zx, ByRef zy) {
    zx := cos(angle/180),   zy := sin(angle/180)
 }
 
-ChangeImageCanvasSize(userW, userH, userAddT, userAddB, userAddL, userAddR, userAddC, vpMode) {
-    whichBitmap := useGdiBitmap()
+ChangeImageCanvasSize(userW, userH, userAddT, userAddB, userAddL, userAddR, userAddC) {
+    mergeViewPortRotationImgEditing()
+    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (!validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
        Return
 
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
-    If (vpMode=1)
-    {
-       calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-       newW := imgSelW, newH := imgSelH
-       If isImgSizeTooLarge(newW, newH)
-       {
-          capIMGdimensionsGDIPlimits(newW, newH)
-          SoundBeep, 300, 100
-          msgBoxWrapper(appTitle ": WARNING", "Image canvas too large: " imgSelW " x " imgSelH ".`nThe dimensions will be readjusted to: " newW " x " newH ".", 0, 0, "exclamation")
-       }
-
-       If (isInRange(imgSelW, imgW - 2, imgW + 2) && isInRange(imgSelH, imgH - 2, imgH + 2) && !imgSelPx && !imgSelPy)
-          Return
-
-       imgSelPx := - imgSelPx
-       imgSelPy := - imgSelPy
-       editingSelectionNow := 0
-       updateUIctrl()
-       MouseMoveResponder()
-    } Else If (adjustCanvasMode=1)
+    If (adjustCanvasMode=1)
     {
        newW := userAddL + userAddR + userAddC + imgW
        newH := userAddT + userAddB + userAddC + imgH
@@ -19233,59 +19569,59 @@ ChangeImageCanvasSize(userW, userH, userAddT, userAddB, userAddL, userAddR, user
           capIMGdimensionsGDIPlimits(newW, newH)
        imgSelPx := (adjustCanvasCentered=1) ? newW//2 - imgW//2 : 0
        imgSelPy := (adjustCanvasCentered=1) ? newH//2 - imgH//2 : 0
+       ; ToolTip, % newW "|" imgW "|" imgSelPx "|" adjustCanvasCentered , , , 2
     }
 
     xBitmap := trGdip_CreateBitmap(A_ThisFunc, newW, newH, coreDesiredPixFmt)
     If warnUserFatalBitmapError(xBitmap, A_ThisFunc)
     {
+       showTOOLtip("Failed to adjust the canvas size of the image")
+       SoundBeep , 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
        ResetImgLoadStatus()
-       dummyTimerDelayiedImageDisplay(50)
        Return "fail"
     }
 
     G2 := trGdip_GraphicsFromImage(A_ThisFunc, xBitmap, 7, 4)
     If !G2
     {
+       showTOOLtip("Failed to adjust the canvas size of the image")
+       SoundBeep , 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
        ResetImgLoadStatus()
-       dummyTimerDelayiedImageDisplay(50)
+       trGdip_DisposeImage(xBitmap)
        Return "fail"
     }
-    If (UserMemBMP=whichBitmap)
-       kBitmap := UserMemBMP
 
-    recordUndoLevelNow("init", 0)
     currIMGdetails.HasAlpha := 1
     If (adjustCanvasDoBgr=1)
     {
        thisColor := makeRGBAcolor(OutlierFillColor, OutlierFillOpacity)
-       Gdip_SetClipRect(G2, 0, 0, newW, newH, 0)
        Gdip_SetClipRect(G2, imgSelPx, imgSelPy, imgW, imgH, 4)
-       r0 := trGdip_GraphicsClear(A_ThisFunc, G2, thisColor)
+       r0 := Gdip_GraphicsClear(G2, thisColor)
        If r0
           addJournalEntry(A_ThisFunc "(): failed to set background color through trGdip_GraphicsClear()")
+
        Gdip_ResetClip(G2)
     }
     ; MsgBox, % newW "--" newH "--" imgSelPx "--" imgSelPy
-    ; r1 := trGdip_DrawImage(A_ThisFunc, G2, whichBitmap, imgSelPx, imgSelPy, imgW, imgH, 0, 0, imgW, imgH)
-    r1 := trGdip_DrawImage(A_ThisFunc, G2, useGdiBitmap(), imgSelPx, imgSelPy)
-    If (vpMode=1)
-       pPath := createImgSelPath(0, 0, newW, newH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
-
-    If pPath
-    {
-       Gdip_SetClipPath(G2, pPath, 4)
-       Gdip_DeletePath(pPath)
-       r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
-    }
-
+    r1 := trGdip_DrawImage(A_ThisFunc, G2, whichBitmap, imgSelPx, imgSelPy)
     Gdip_DeleteGraphics(G2)
-    trGdip_DisposeImage(kBitmap, 1)
-    If (r1!="fail")
+    If (r1!="fail" && validBMP(xBitmap))
     {
-       UserMemBMP := xBitmap
-       recordUndoLevelNow(0, UserMemBMP)
-    } Else trGdip_DisposeImage(xBitmap, 1)
-    SetTimer, RefreshImageFile, -25
+       imgSelX1 := imgSelPx,           imgSelY1 := imgSelPy
+       imgSelX2 := imgSelPx + imgW,    imgSelY2 := imgSelPy + imgH
+       defineRelativeSelCoords(newW, newH)
+       wrapRecordUndoLevelNow(xBitmap)
+    } Else
+    {
+       showTOOLtip("Failed to adjust the canvas size of the image")
+       trGdip_DisposeImage(xBitmap, 1)
+       SoundBeep , 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+    }
+    dummyTimerDelayiedImageDisplay(50)
+    SetTimer, ResetImgLoadStatus, -250
 }
 
 ApplySpecialFixedBlur(funcu, zBitmap, radius, pEffect, previewMode:=0) {
@@ -19371,7 +19707,6 @@ BlurSelectedArea(modus:="") {
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     allowAlphaMasking := decideAlphaMaskingFeaseable(BlurAreaAlphaMask)
     calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-    extendedClone := 1 ; testSelectionLargerThanGiven(imgW, imgH)
     o_blurAreaYamount := blurAreaYamount
     o_blurAreaAmount := blurAreaAmount
     If (blurAreaEqualXY=1 && modus!="pixelize")
@@ -19407,16 +19742,19 @@ BlurSelectedArea(modus:="") {
        Return
     }
 
-    G2 := trGdip_GraphicsFromImage(A_ThisFunc, whichBitmap, 7, 4)
+    metaBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+    G2 := trGdip_GraphicsFromImage(A_ThisFunc, metaBitmap, 7, 4)
     If !G2
     {
+       If validBMP(metaBitmap)
+          showTOOLtip("Failed to blur the selected area.`nUnable to create GDI+ graphics object.")
+       Else
+          showTOOLtip("Failed to blur the selected area.`nUnable to allocate new bitmap.")
+       SoundBeep 300, 100
        SetTimer, ResetImgLoadStatus, -100
+       trGdip_DisposeImage(metaBitmap)
        Return
     }
-
-    recordUndoLevelNow("init", 0)
-    If (UserMemBMP!=whichBitmap)
-       gdiBitmap := ""
 
     pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY, 0)
     pB := GetPathRelativeBounds(pPath, imgSelPx, imgSelPy)
@@ -19439,7 +19777,7 @@ BlurSelectedArea(modus:="") {
     }
 
     thisOpacity := blurAreaOpacity/255
-    zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
+    zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
     If (modus="pixelize")
        isUni := Gdip_TestBitmapUniformity(zBitmap, 7, maxLevelIndex, nimo, avgLevelAlpha)
 
@@ -19542,7 +19880,7 @@ BlurSelectedArea(modus:="") {
        QPV_SetGivenAlphaLevel(zBitmap, avgLevelAlpha, 0)
 
     If (BlurAreaBlendMode>1 || allowAlphaMasking=1)
-       bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
+       bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
 
     If (blurAreaOpacity>252 && blurAreaSoftEdges!=1)
        r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
@@ -19592,12 +19930,18 @@ BlurSelectedArea(modus:="") {
     Gdip_DeletePath(pPath)
     Gdip_DeleteGraphics(G2)
     realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
-    If (r1!="fail" && r0!="fail")
+    If (r1!="fail" && r0!="fail" && validBMP(metaBitmap))
     {
-       UserMemBMP := whichBitmap
-       recordUndoLevelNow(0, UserMemBMP)
+       wrapRecordUndoLevelNow(metaBitmap)
+    } Else
+    {
+       showTOOLtip("Failed to blur the selected image area.`nPlease do not tell anyone")
+       SoundBeep 300, 100
+       trGdip_DisposeImage(metaBitmap)
     }
-    SetTimer, RefreshImageFile, -25
+
+    SetTimer, ResetImgLoadStatus, -100
+    dummyTimerDelayiedImageDisplay(50)
     zeitOperation := A_TickCount - startZeit
     addJournalEntry(A_ThisFunc "() operation elapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)))
 }
@@ -19611,6 +19955,7 @@ ZoomBlurSelectedArea() {
        SetTimer, ResetImgLoadStatus, -100
        Return
     }
+
     startZeit := A_TickCount
     stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc)
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
@@ -19621,26 +19966,30 @@ ZoomBlurSelectedArea() {
        Return
     }
 
+    setImageLoading()
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     allowAlphaMasking := decideAlphaMaskingFeaseable(BlurAreaAlphaMask)
     calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-    extendedClone := 1 ; testSelectionLargerThanGiven(imgW, imgH)
-    G2 := trGdip_GraphicsFromImage(A_ThisFunc, whichBitmap, 7, 4)
+    metaBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+    If validBMP(metaBitmap)
+       G2 := trGdip_GraphicsFromImage(A_ThisFunc, metaBitmap, 7, 4)
+
     If !G2
     {
+       If validBMP(metaBitmap)
+          showTOOLtip("Failed to apply filter: radial blur.`nUnable to create GDI+ graphics object.")
+       Else
+          showTOOLtip("Failed to apply filter: radial blur.`nUnable to allocate new bitmap.")
+       SoundBeep 300, 100
        SetTimer, ResetImgLoadStatus, -100
+       trGdip_DisposeImage(metaBitmap)
        Return
     }
-
-    recordUndoLevelNow("init", 0)
-    If (UserMemBMP!=whichBitmap)
-       gdiBitmap := ""
 
     pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
     pB := GetPathRelativeBounds(pPath, imgSelPx, imgSelPy)
     imgSelPx := pB.x,  imgSelPy := pB.y
     imgSelW  := pB.w,  imgSelH  := pB.h
-
     If pPath
     {
        modus := (BlurAreaInverted=1) ? 4 : 0
@@ -19654,18 +20003,28 @@ ZoomBlurSelectedArea() {
        imgSelH := imgH
     }
 
-    zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
-    QPV_SetGivenAlphaLevel(zBitmap, 1, 1)
+    zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
+    If !validBMP(zBitmap)
+    {
+       showTOOLtip("Failed to apply filter: radial blur.`nUnable to allocate new bitmap.")
+       SoundBeep 300, 100
+       SetTimer, ResetImgLoadStatus, -100
+       trGdip_DisposeImage(metaBitmap)
+       Gdip_DeleteGraphics(G2)
+       Gdip_DeletePath(pPath)
+       Return
+    }
 
+    QPV_SetGivenAlphaLevel(zBitmap, 1, 1)
     If (BlurAreaBlendMode>1 || allowAlphaMasking=1)
-       bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
+       bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
 
     If (blurAreaOpacity>252)
        r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
 
-    setWindowTitle("BLURRING IMAGE, please wait", 1)
+    setWindowTitle("APPLYING BLUR ON IMAGE, please wait", 1)
     thisOpacity := blurAreaOpacity/255
-    gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
+    gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
     G3 := trGdip_GraphicsFromImage(A_ThisFunc, gBitmap, 1, 3)
     Gdip_SetClipRect(G3, 0, 0, imgSelW, imgSelH)
     thisO := 0.85
@@ -19738,6 +20097,7 @@ ZoomBlurSelectedArea() {
           trGdip_DisposeImage(gBitmap)
        Else
           ou := gBitmap
+
        gBitmap := bgrBMPu
        bgrBMPu := ou
     }
@@ -19760,12 +20120,18 @@ ZoomBlurSelectedArea() {
     Gdip_DeletePath(pPath)
     Gdip_DeleteGraphics(G2)
     realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
-    If (r1!="fail" && r0!="fail")
+    If (r1!="fail" && r0!="fail" && validBMP(metaBitmap))
     {
-       UserMemBMP := whichBitmap
-       recordUndoLevelNow(0, UserMemBMP)
+       wrapRecordUndoLevelNow(metaBitmap)
+    } Else
+    {
+       showTOOLtip("Failed to apply filter: radial blur. It is all a blur...")
+       SoundBeep 300, 100
+       trGdip_DisposeImage(metaBitmap)
     }
-    SetTimer, RefreshImageFile, -25
+
+    SetTimer, ResetImgLoadStatus, -100
+    dummyTimerDelayiedImageDisplay(50)
     zeitOperation := A_TickCount - startZeit
     addJournalEntry(A_ThisFunc "() operation elapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)))
 }
@@ -19785,6 +20151,7 @@ detectEdgesSelectedArea() {
        SetTimer, ResetImgLoadStatus, -100
        Return
     }
+
     startZeit := A_TickCount
     stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc)
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
@@ -19795,34 +20162,46 @@ detectEdgesSelectedArea() {
        Return
     }
 
-    G2 := trGdip_GraphicsFromImage(A_ThisFunc, whichBitmap, 7, 4)
+    newBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+    If validBMP(newBitmap)
+       G2 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap, 7, 4)
+
     If !G2
     {
+       If validBMP(newBitmap)
+          showTOOLtip("Failed to apply filter: detect edges.`nUnable to create GDI+ graphics object.")
+       Else
+          showTOOLtip("Failed to apply filter: detect edges.`nUnable to allocate new bitmap.")
+       SoundBeep 300, 100
        SetTimer, ResetImgLoadStatus, -100
-       Return "fail"
+       trGdip_DisposeImage(newBitmap)
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
     }
-
-    recordUndoLevelNow("init", 0)
-    If (UserMemBMP!=whichBitmap)
-       gdiBitmap := ""
 
     thisCount := (isNumber(IDedgesEmbossLvl) && IDedgesBlendMode>1) ? clampInRange(IDedgesEmbossLvl, 1, 10) : 1
     Loop, % thisCount
     {
        setWindowTitle("DETECTING EDGES - iteration " A_Index "/" thisCount ", please wait", 1)
-       r0 := coreDetectEdgesSelectedArea(whichBitmap, 0, G2)
-       If r0
+       rz := coreDetectEdgesSelectedArea(newBitmap, 0, G2)
+       If rz
           Break
     }
 
     Gdip_DeleteGraphics(G2)
-    If (r0!="fail")
+    If (rz!="fail" && validBMP(newBitmap))
     {
-       UserMemBMP := whichBitmap
-       recordUndoLevelNow(0, UserMemBMP)
+       wrapRecordUndoLevelNow(newBitmap)
+    } Else
+    {
+       trGdip_DisposeImage(newBitmap)
+       showTOOLtip("Failed to apply filter: detect edges")
+       SoundBeep 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
     }
 
-    SetTimer, RefreshImageFile, -25
+    SetTimer, ResetImgLoadStatus, -100
+    dummyTimerDelayiedImageDisplay(50)
     zeitOperation := A_TickCount - startZeit
     addJournalEntry(A_ThisFunc "() elapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)))
 }
@@ -19946,28 +20325,39 @@ addNoiseSelectedArea() {
     }
 
     compositingQuality := (userimgGammaCorrect=1) ? 2 : 1
-    G2 := trGdip_GraphicsFromImage(A_ThisFunc, whichBitmap, 7, 4,, compositingQuality)
+    newBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+    If validBMP(newBitmap)
+       G2 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap, 7, 4,, compositingQuality)
+
     If !G2
     {
+       If validBMP(newBitmap)
+          showTOOLtip("Failed to apply filter: add noise.`nUnable to create GDI+ graphics object.")
+       Else
+          showTOOLtip("Failed to apply filter: add noise.`nUnable to allocate new bitmap.")
+       SoundBeep 300, 100
        SetTimer, ResetImgLoadStatus, -100
-       Return "fail"
+       trGdip_DisposeImage(newBitmap)
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
     }
 
-    recordUndoLevelNow("init", 0)
-    If (UserMemBMP!=whichBitmap)
-       gdiBitmap := ""
-
-    setWindowTitle("ADDING NOISE, please wait", 1)
-    r0 := coreAddNoiseSelectedArea(whichBitmap, 0, G2)
-
+    setWindowTitle("GENERATING NOISE :-), please wait", 1)
+    rz := coreAddNoiseSelectedArea(whichBitmap, 0, G2)
     Gdip_DeleteGraphics(G2)
-    If (r0!="fail")
+    If (rz!="fail" && validBMP(newBitmap))
     {
-       UserMemBMP := whichBitmap
-       recordUndoLevelNow(0, UserMemBMP)
+       wrapRecordUndoLevelNow(newBitmap)
+    } Else
+    {
+       trGdip_DisposeImage(newBitmap)
+       showTOOLtip("Failed to apply filter: add noise. How noisy!")
+       SoundBeep 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
     }
 
-    SetTimer, RefreshImageFile, -25
+    SetTimer, ResetImgLoadStatus, -100
+    dummyTimerDelayiedImageDisplay(50)
     zeitOperation := A_TickCount - startZeit
     addJournalEntry(A_ThisFunc "() elapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)))
 }
@@ -20361,7 +20751,6 @@ applyVPeffectsOnBMP(zBitmap, doClrDepths:=0, isAlpha:=0, isG:=0) {
 
     If (imageAttribs && matrix && !InStr(r, "moreThanClrMatrix"))
     {
-       CreateColourMatrix(matrix, datau)
        pEffect := Gdip_CreateEffect(3, matrix, 0)
        If pEffect
        {
@@ -20425,7 +20814,6 @@ applyVPeffectsAdvOnBMP(zBitmap, allowCache:=0, givenID:=0, gImgW:=0, gImgH:=0, B
 
     If (imageAttribs && matrix && !InStr(r, "moreThanClrMatrix"))
     {
-       CreateColourMatrix(matrix, datau)
        pEffect := Gdip_CreateEffect(3, matrix, 0)
        If pEffect
        {
@@ -20535,7 +20923,8 @@ RotateEditedImage(modus:=0) {
     If (slideShowRunning=1)
        ToggleSlideShowu()
 
-    whichBitmap := useGdiBitmap()
+    mergeViewPortRotationImgEditing()
+    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (!validBMP(whichBitmap) || thumbsDisplaying=1)
        Return
 
@@ -20545,33 +20934,33 @@ RotateEditedImage(modus:=0) {
        Return
     }
 
-    If (UserMemBMP=whichBitmap)
-       xBitmap := UserMemBMP
-
+    setImageLoading()
     dir := (modus=90) ? 1 : 3
-    dummyBMP := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
-    r := Gdip_ImageRotateFlip(dummyBMP, dir)
-    If (StrLen(dummyBMP)>2 && !r)
+    newBitmap := (preventUndoLevels=1) ? whichBitmap : trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+    r := Gdip_ImageRotateFlip(newBitmap, dir)
+    If (validBMP(newBitmap) && !r)
     {
-       recordUndoLevelNow("init", 0)
-       UserMemBMP := dummyBMP
-       recordUndoLevelNow(0, UserMemBMP)
-       trGdip_DisposeImage(xBitmap, 1)
-       SetTimer, RefreshImageFile, -25
+       wrapRecordUndoLevelNow(newBitmap)
+       vpIMGrotation := 0
+       SoundBeep 900, 100
+       dummyTimerDelayiedImageDisplay(50)
     } Else
     {
        showTOOLtip("Failed to rotate image")
-       trGdip_DisposeImage(dummyBMP, 1)
+       If (preventUndoLevels!=1)
+          trGdip_DisposeImage(newBitmap, 1)
        SoundBeep 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
     }
+    SetTimer, ResetImgLoadStatus, -125
 }
 
 CropImageInViewPortToSelection(modus:=0) {
     If (slideShowRunning=1)
        ToggleSlideShowu()
 
-    whichBitmap := useGdiBitmap()
+    mergeViewPortRotationImgEditing()
+    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (!validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
        Return
 
@@ -20602,54 +20991,41 @@ CropImageInViewPortToSelection(modus:=0) {
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     mgpx := Round((imgW * imgH)/1000000, 1)
     calcImgSelection2bmp(1, imgW, imgH, imgW - 1, imgH - 1, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-    If (UserMemBMP=whichBitmap)
-       xBitmap := UserMemBMP
-
     If (modus!="simplex" && EllipseSelectMode=0 && isInRange(imgSelW, imgW - 2, imgW + 2) && isInRange(imgSelH, imgH - 2, imgH + 2) && !imgSelPx && !imgSelPy)
     {
        MouseMoveResponder()
-       SetTimer, RefreshImageFile, -25
+       dummyTimerDelayiedImageDisplay(50)
        Return
     }
 
-    dummyBMP := getSelectedImageArea(whichBitmap, 1, 0, 0)
-    If StrLen(dummyBMP)>2
+    newBitmap := getSelectedImageArea(whichBitmap, 1, 0, 0)
+    If validBMP(newBitmap)
     {
-       trGdip_GetImageDimensions(dummyBMP, kw, kh)
+       trGdip_GetImageDimensions(newBitmap, kw, kh)
        nmgpx := Round((kw * kh)/1000000, 1)
        diffu := max(nmgpx, mgpx) - min(nmgpx, mgpx)
        If (diffu>50)
           PrintPosX := "X"
 
-       If (modus!="simplex")
-          recordUndoLevelNow("init", 0)
-
        If (EllipseSelectMode>0 || VPselRotation>0 || X1<0 || Y1<0 || X2>imgW || Y2>ImgH) || (innerSelectionCavityX>0.01 && innerSelectionCavityY>0.01)
           currIMGdetails.HasAlpha := 1
       
-       UserMemBMP := dummyBMP
+       wrapRecordUndoLevelNow(newBitmap)
        If (modus!="simplex")
        {
-          recordUndoLevelNow(0, UserMemBMP)
-          trGdip_DisposeImage(xBitmap, 1)
+          editingSelectionNow := vpIMGrotation := 0
+          updateUIctrl()
+          MouseMoveResponder()
           dummyTimerDelayiedImageDisplay(50)
+          SetTimer, dummyInfoImgCropVP, -150
        }
     } Else
     {
        showTOOLtip("Failed to crop image to selected area")
        SoundBeep 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
     }
-
-    If (modus="simplex")
-       Return
-
-    editingSelectionNow := vpIMGrotation := 0
-    updateUIctrl()
-    MouseMoveResponder()
-    SetTimer, RefreshImageFile, -25
-    SetTimer, dummyInfoImgCropVP, -125
+    ResetImgLoadStatus()
 }
 
 dummyInfoImgCropVP() {
@@ -20729,6 +21105,68 @@ PasteHDropFiles(allowFilesPaste) {
    SetTimer, TriggerMenuBarUpdate, -90
    SetTimer, RemoveTooltip, % -msgDisplayTime
    Return 1
+}
+
+rescaleFIMbmpGDIp(ByRef hFIFimgA, nw, nh) {
+    If !hFIFimgA
+       Return
+
+    rescaled := 0
+    thisQuality := (userimgQuality=1) ? 3 : 0
+    FreeImage_GetImageDimensions(hFIFimgA, oImgW, oImgH)
+    If (nw*1.25<oImgW || nh*1.25<oImgH)
+    {
+       rescaled := 1
+       calcIMGdimensions(oImgW, oImgH, nw, nh, nw, nh)
+       hFIFimgB := FreeImage_Rescale(hFIFimgA, nw, nh, thisQuality)
+    } Else
+       hFIFimgB := hFIFimgA
+
+    If !hFIFimgB
+    {
+       FreeImage_UnLoad(hFIFimgA)
+       hFIFimgA := ""
+       Return
+    }
+
+    imgBPP := FreeImage_GetBPP(hFIFimgA)
+    If (imgBPP!=32)
+    {
+       hFIFimgD := FreeImage_ConvertTo(hFIFimgB, "32Bits")
+       If hFIFimgD
+       {
+          If (rescaled=1)
+             FreeImage_UnLoad(hFIFimgB)
+
+          hFIFimgB := hFIFimgD
+          rescaled := 1
+       }
+    }
+
+    If hFIFimgB
+    {
+       bpp := FreeImage_GetBPP(hFIFimgB)
+       pBitmap := ConvertFIMtoPBITMAP(hFIFimgB)
+       If (rescaled=1)
+          FreeImage_UnLoad(hFIFimgB)
+
+       If StrLen(pBitmap)>2
+       {
+          recordGdipBitmaps(pBitmap, A_ThisFunc)
+          addJournalEntry(A_ThisFunc "(): YAY - rescaled FIM bitmap to screen. BPP = " bpp "|" rescaled)
+       } Else
+       {
+          addJournalEntry(A_ThisFunc "(): Failed to convert to GDI+ the rescaled FIM bitmap to screen. BPP = " bpp "|" rescaled)
+          FreeImage_UnLoad(hFIFimgA)
+          hFIFimgA := ""
+       }
+    } Else
+    {
+       addJournalEntry(A_ThisFunc "(): Failed to rescale FIM bitmap to screen.")
+       FreeImage_UnLoad(hFIFimgA)
+       hFIFimgA := ""
+    }
+    Return pBitmap
 }
 
 corePasteClipboardImg(modus, imgW, imgH, allowFilesPaste) {
@@ -20822,17 +21260,11 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
     Else If (!currentFileIndex || !CurrentSLD || !maxFilesIndex || !imgPath)
        isImgOpen := 0
 
-    ; terminateIMGediting()
-    If (isImgOpen=2)
-       recordUndoLevelNow("init", 0)
-
     clippyCount++
-    UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
     If (editingSelectionNow=1)
        ToggleEditImgSelection()
 
     discardViewPortCaches()
-    UserMemBMP := clipBMP
     If (isImgOpen=0)
     {
        maxFilesIndex := currentFileIndex := 0
@@ -20852,16 +21284,21 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
     imgIndexEditing := currentFileIndex
     vpIMGrotation := FlipImgH := FlipImgV := 0
     currentImgModified := usrColorDepth := imgFxMode := 1
-    defineColorDepth()
-    dropFilesSelection(1)
-    RemoveTooltip()
     INIaction(1, "FlipImgH", "General")
     INIaction(1, "FlipImgV", "General")
     INIaction(1, "usrColorDepth", "General")
     INIaction(1, "imgFxMode", "General")
+    INIaction(1, "vpIMGrotation", "General")
+    UserMemBMP := clipBMP
     If (isImgOpen=2)
-       recordUndoLevelNow(0, UserMemBMP)
-    RefreshImageFile()
+       wrapRecordUndoLevelNow(clipBMP)
+    Else 
+       gdiBitmap := trGdip_CloneBitmap(A_ThisFunc, clipBMP)
+
+    defineColorDepth()
+    dropFilesSelection(1)
+    RemoveTooltip()
+    dummyTimerDelayiedImageDisplay(5)
     SetTimer, createGUItoolbar, -100
     SetTimer, ResetImgLoadStatus, -55
     SetTimer, TriggerMenuBarUpdate, -95
@@ -32818,7 +33255,7 @@ ReadSettingsFormatConvert() {
 }
 
 WriteSettingsFormatConvert() {
-    coreReadSettingsImageProcessing(0)
+    coreReadSettingsImageProcessing(1)
 }
 
 ReadSettingsImageProcessing() {
@@ -33206,6 +33643,7 @@ readMainSettingsApp(act) {
     IniAction(act, "OSDtextColor", "General", 3)
     IniAction(act, "PasteFntSize", "General", 2, 10, 350)
     IniAction(act, "PrefsLargeFonts", "General", 1)
+    IniAction(act, "preventUndoLevels", "General", 1)
     IniAction(act, "prevFileMovePath", "General", 6)
     IniAction(act, "prevFileSavePath", "General", 6)
     IniAction(act, "prevOpenFolderPath", "General", 6)
@@ -40370,12 +40808,6 @@ BTNsaveImgPanel() {
       SaveClipboardImage(userDestinationFolder, 0)
    Else
       SaveClipboardImage("current", 1)
-
-   If (minimizeMemUsage=1)
-   {
-      HardResetImageView()
-      SetTimer, RefreshImageFileAction, -125
-   }
 }
 
 BTNsaveBrowseImgPanel() {
@@ -41141,13 +41573,15 @@ updateUIpastePanel(actionu:=0, b:=0) {
        actu := (PasteInPlaceBlurAmount>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu, PasteInPlaceBlurEdgesSoft
 
+       actu := (PasteInPlaceToolMode=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+       GuiControl, % actu, PasteInPlaceEraseInitial
+
        actu := (viewportQPVimage.imgHandle) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
        GuiControl, % actu, PasteInPlaceAutoExpandIMG
        uiSlidersArray["PasteInPlaceBlurAmount", 10] := (viewportQPVimage.imgHandle) ? 0 : 1
 
        actu := (PasteInPlaceAdaptMode=2) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
        GuiControl, % actu, PasteInPlaceAlignment
-
     } Else If (CurrentPanelTab=2)
     {
        actu := (PasteInPlaceCropSel=2) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
@@ -41450,8 +41884,8 @@ BtnPasteInSelectedArea() {
     }
 
     updateUIpastePanel("noPreview")
-    doImgEditLivePreview := 1
-    corePasteInPlaceActNow(0, 0)
+    ; doImgEditLivePreview := 1
+    ; corePasteInPlaceActNow(0, 0)
     Sleep, 1
     CloseWindow(0, 0)
     ToggleEditImgSelection("show-edit")
@@ -41459,7 +41893,7 @@ BtnPasteInSelectedArea() {
     If (viewportQPVimage.imgHandle)
        HugeImagesApplyPasteInPlace()
     Else
-       PasteInPlaceNow()
+       PasteInPlaceSelectedArea()
 }
 
 importEditGivenImageFile() {
@@ -41563,7 +41997,9 @@ ReadSettingsPasteInPlace(act:=0) {
     RegAction(act, "PasteInPlaceLight",, 2, -255, 255)
     RegAction(act, "PasteInPlaceSaturation",, 2, -100, 100)
     RegAction(act, "PasteInPlaceOpacity",, 2, 1, 512)
-    RegAction(act, "PasteInPlaceOrientation",, 2, 1, 4)
+    RegAction(act, "PasteInPlaceOrientation",, 2, 1, 7)
+    RegAction(act, "PasteInPlaceOrientFlipX",, 1)
+    RegAction(act, "PasteInPlaceOrientFlipY",, 1)
     RegAction(act, "PasteInPlaceQuality",, 1)
     RegAction(act, "PasteInPlaceAutoExpandIMG",, 1)
 }
@@ -41578,7 +42014,7 @@ togglePasteInPlaceAdaptModes() {
 }
 
 toggleErasePasteInPlace() {
-   If (AnyWindowOpen=31 || AnyWindowOpen=24)
+   If ((AnyWindowOpen=31 || AnyWindowOpen=24) && PasteInPlaceToolMode=1)
    {
       PasteInPlaceEraseInitial := !PasteInPlaceEraseInitial
       GuiControl, SettingsGUIA:, PasteInPlaceEraseInitial, % PasteInPlaceEraseInitial
@@ -41587,7 +42023,7 @@ toggleErasePasteInPlace() {
 }
 
 toggleRevealRectPasteInPlace() {
-   If (AnyWindowOpen=31 || AnyWindowOpen=24)
+   If ((AnyWindowOpen=31 || AnyWindowOpen=24) && PasteInPlaceToolMode=1)
    {
       PasteInPlaceRevealOriginal := !PasteInPlaceRevealOriginal
       dummyTimerDelayiedImageDisplay(100)
@@ -41723,21 +42159,24 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0) {
     changeMcursor()
     setImageLoading()
     vpWinClientSize(mainWidth, mainHeight)
+    If (viewportQPVimage.imgHandle)
+    {
+       oPasteInPlaceCropAngular := (VPselRotation>=0) ? VPselRotation : VPselRotation + 360
+       If (EllipseSelectMode=1)
+          oPasteInPlaceCropSel := 3
+       Else If (EllipseSelectMode=2)
+          oPasteInPlaceCropSel := 7
+       Else
+          oPasteInPlaceCropSel := 1
+       oPasteInPlaceCropDo := (EllipseSelectMode>0 || VPselRotation || innerSelectionCavityX || innerSelectionCavityY) ? 1 : 0
+    }
+
     If (toolu="transform")
     {
        trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
        If (viewportQPVimage.imgHandle)
        {
-          oPasteInPlaceCropAngular := (VPselRotation>=0) ? VPselRotation : VPselRotation + 360
-          If (EllipseSelectMode=1)
-             oPasteInPlaceCropSel := 3
-          Else If (EllipseSelectMode=2)
-             oPasteInPlaceCropSel := 7
-          Else
-             oPasteInPlaceCropSel := 1
-
           bpp := FreeImage_GetBPP(viewportQPVimage.imgHandle)
-          oPasteInPlaceCropDo := (EllipseSelectMode>0 || VPselRotation || innerSelectionCavityX || innerSelectionCavityY) ? 1 : 0
           oldSelectionArea := [imgSelX1, imgSelY1, imgSelX2, imgSelY2, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, innerSelectionCavityX, innerSelectionCavityY, bpp]
           VPselRotation := EllipseSelectMode := innerSelectionCavityX := innerSelectionCavityY := 0
           x1 := clampInRange(ImgSelX1, 0, imgW - 1)
@@ -41746,6 +42185,9 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0) {
           y2 := clampInRange(ImgSelY2, ImgSelY1 + 1, imgH)
           imgSelX1 := x1, imgSelY1 := y1
           imgSelX2 := x2, imgSelY2 := y2
+          defineRelativeSelCoords(imgW, imgH)
+          oldSelectionArea[12] := imgSelX2 - imgSelX1
+          oldSelectionArea[13] := imgSelY2 - imgSelY1
        }
 
        zW := imgSelX2 - imgSelX1
@@ -41772,18 +42214,47 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0) {
 
        If (wasGiven=1)
        {
-          thisPBitmap := LoadBitmapFromFileu(dummy)
-          userClipBMPpaste := Gdip_CloneBmpPargbArea(A_ThisFunc, thisPBitmap)
-          trGdip_DisposeImage(thisPBitmap, 1)
+          If (viewportQPVimage.imgHandle)
+          {
+             hFIFimgA := LoadBitmapAsFreeImage(dummy, -1, oImgW, oImgH, imgBPP)
+             userClipBMPpaste := rescaleFIMbmpGDIp(hFIFimgA, mainWidth, mainHeight)
+          } Else
+             userClipBMPpaste := LoadBitmapFromFileu(dummy)
        } Else
-          userClipBMPpaste := corePasteClipboardImg(1, ResolutionWidth*2, Round(ResolutionHeight*4.3), 0)
+       {
+          userClipBMPpaste := corePasteClipboardImg(1, ResolutionWidth*3, ResolutionHeight*4, 0)
+          If (validBMP(userClipBMPpaste) && viewportQPVimage.imgHandle)
+          {
+             hFIFimgA := ConvertPBITMAPtoFIM(userClipBMPpaste)
+             If !hFIFimgA
+             {
+                trGdip_DisposeImage(userClipBMPpaste)
+                addJournalEntry("(): Failed to convert the clipboard image to a FreeImage bitmap object.")
+             }
+          }
+       }
 
        If validBMP(userClipBMPpaste)
        {
+          If (hFIFimgA && viewportQPVimage.imgHandle)
+          {
+             FreeImage_GetImageDimensions(hFIFimgA, ow, oh)
+             imgBPP := FreeImage_GetBPP(hFIFimgA)
+             oPasteInPlaceCropDo := 0
+          }
+
+          oldSelectionArea := [imgSelX1, imgSelY1, imgSelX2, imgSelY2, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, innerSelectionCavityX, innerSelectionCavityY, imgBPP, hFIFimgA, ow, oh]
+          VPselRotation := EllipseSelectMode := innerSelectionCavityX := innerSelectionCavityY := 0
           trGdip_GetImageDimensions(userClipBMPpaste, imgW, imgH)
           If (imgW>mainWidth || imgH>mainHeight)
+          {
              viewportStampBMP := trGdip_ResizeBitmap(A_ThisFunc, userClipBMPpaste, mainWidth, mainHeight, 1, 3, -1)
-          Else
+             If (viewportQPVimage.imgHandle && validBMP(viewportStampBMP))
+             {
+                trGdip_DisposeImage(userClipBMPpaste)
+                userClipBMPpaste := trGdip_CloneBitmap(A_ThisFunc, viewportStampBMP)
+             }
+          } Else
              viewportStampBMP := Gdip_CloneBmpPargbArea(A_ThisFunc, userClipBMPpaste)
 
           QPV_SetGivenAlphaLevel(viewportStampBMP, 1, 1)
@@ -41793,6 +42264,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0) {
     If (!validBMP(userClipBMPpaste) || !validBMP(viewportStampBMP))
     {
        openingPanelNow := 0
+       oldSelectionArea := []
        viewportStampBMP := trGdip_DisposeImage(viewportStampBMP, 1)
        userClipBMPpaste := trGdip_DisposeImage(userClipBMPpaste, 1)
        showTOOLtip("ERROR: Failed to retrieve and prepare image to perform transformations")
@@ -41848,6 +42320,9 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0) {
        innerSelectionCavityY := oldSelectionArea[9]
     }
 
+    If (PasteInPlaceToolMode=0)
+       PasteInPlaceEraseInitial := 0
+
     If !isNumber(PasteInPlaceCropAngular)
        PasteInPlaceCropAngular := 0
 
@@ -41879,8 +42354,14 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0) {
 
     thisOpacity := Round((PasteInPlaceOpacity / 255) * 100)
     Global btnReset, btnLiveApplyTool, infoAlphaFile, uiPasteInPlaceAlphaDrawMode, UIremAlpha
-    bonusTabs := (viewportQPVimage.imgHandle) ? "" : "|Alpha mask|Paint alpha mask"
+    If (viewportQPVimage.imgHandle)
+    {
+       imgW := oldSelectionArea[12]
+       imgH := oldSelectionArea[13]
+    } Else
+       trGdip_GetImageDimensions(userClipBMPpaste, imgW, imgH)
 
+    bonusTabs := (viewportQPVimage.imgHandle) ? "" : "|Alpha mask|Paint alpha mask"
     Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Main|Crop|Adjust colors%bonusTabs%
     Gui, Tab, 1 ; general
     fr :=  (toolu="transform") ? "Transformed" : "Clipboard"
@@ -41889,9 +42370,12 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0) {
        PasteInPlaceBlurAmount := PasteInPlaceAutoExpandIMG := 0
 
     sml := (PrefsLargeFonts=1) ? 70 : 55
+    widu := (PrefsLargeFonts=1) ? 30 : 25
     GuiAddDropDownList("xs y+7 wp gupdateUIpastePanel AltSubmit Choose" PasteInPlaceAdaptMode " vPasteInPlaceAdaptMode", "Adjust image to selection|Fill selection area entirely (ignore aspect ratio)|Original image size", "Image adapt mode to selection")
-    GuiAddDropDownList("xs y+7 gupdateUIpastePanel w" txtWid2 " AltSubmit Choose" PasteInPlaceOrientation " vPasteInPlaceOrientation", "None|Flip horizontal|Flip vertical|Flip horizontal and vertical", "Mirroring mode")
-    GuiAddDropDownList("x+2 gupdateUIpastePanel wp AltSubmit Choose" PasteInPlaceAlignment " vPasteInPlaceAlignment", "Top, left corner|Top, right corner|Center point|Bottom, left corner|Bottom, right corner", "Anchor point in selection area")
+    GuiAddDropDownList("xs y+7 gupdateUIpastePanel w" txtWid2 " AltSubmit Choose" PasteInPlaceAlignment " vPasteInPlaceAlignment", "Top, left corner|Top, right corner|Center point|Bottom, left corner|Bottom, right corner", "Anchor point in selection area")
+    GuiAddDropDownList("x+2 gupdateUIpastePanel w" txtWid2 - widu*2 - 4 " AltSubmit Choose" PasteInPlaceOrientation " vPasteInPlaceOrientation", "0°|90°|180°|270°", "Image orientation")
+    GuiAddCheckbox("x+2 yp hp w" widu " gupdateUIpastePanel Checked" PasteInPlaceOrientFlipX " vPasteInPlaceOrientFlipX", "Flip horizontally", "X")
+    GuiAddCheckbox("x+2 yp hp wp gupdateUIpastePanel Checked" PasteInPlaceOrientFlipY " vPasteInPlaceOrientFlipY", "Flip vertically", "Y")
     Gui, Add, Checkbox, xs y+7 hp gupdateUIpastePanel Checked%PasteInPlaceEraseInitial% vPasteInPlaceEraseInitial, &Erase initially selected area
     Gui, Add, Checkbox, xs y+7 hp gupdateUIpastePanel Checked%PasteInPlaceQuality% vPasteInPlaceQuality, &High quality image resampling
     Gui, Add, Checkbox, xs y+7 hp gupdateUIpastePanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit image object
@@ -41917,8 +42401,8 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0) {
 
     Gui, Tab, 3 ; colors
     GuiAddDropDownList("x+15 y+15 w" txtWid2 " Section gupdateUIpastePanel AltSubmit Choose" PasteInPlaceBlendMode " vPasteInPlaceBlendMode", "No blend mode|" userBlendModesList, "Blending mode")
-    GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIpastePanel")
-    GuiAddDropDownList("x+2 w" txtWid2 - 27 " AltSubmit Choose" PasteInPlaceGlassy " vPasteInPlaceGlassy gupdateUIpastePanel", "No glass effect|Weak|Mild|Moderate|Strong|Extreme", "Glass effect")
+    GuiAddFlipBlendLayers("x+1 yp hp w" widu " gupdateUIpastePanel")
+    GuiAddDropDownList("x+2 w" txtWid2 - widu - 3 " AltSubmit Choose" PasteInPlaceGlassy " vPasteInPlaceGlassy gupdateUIpastePanel", "No glass effect|Weak|Mild|Moderate|Strong|Extreme", "Glass effect")
     GuiAddSlider("PasteInPlaceOpacity", 1,512, 255, ".updateLabelPasteImgOpacity", "updateUIpastePanel", 1, "xs y+10 w" txtWid " hp", "Opacity above 100% allows user to restore partially`nvisible pixels in the manipulated image object.")
     Gui, Add, Checkbox, xs y+15 hp gupdateUIpastePanel Checked%PasteInPlaceApplyColorFX% vPasteInPlaceApplyColorFX, Apply color adjustments on the image
     GuiAddGeneralColorAdjustCtrls(txtWid, "updateUIpastePanel")
@@ -41942,11 +42426,14 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0) {
 }
 
 BtnHelpTransform() {
-    msgBoxWrapper(appTitle ": HELP", "The transform tool is a multi-functional one. You can clone, crop, resize, rotate, colour adjust and blend images with this tool.`n`nClone image area. Once you have selected an area in the image and opened this panel, deselect «Erase initially selected area» found in the Main tab.`n`nRotate the image. Locate a gray dot with the mouse cursor in the center of the selection area in the viewport, and click 'n drag to adjust the rotation angle.`n`nCrop an image. Set the first drop-down found in the Main tab, to «Original image size», make the selection as small as you need it to be, and set to your preferences the other drop-downs that designate the cropping shape, its angle and the alignment.`n`nAdjust colors and blend images. In the «Adjust colors» tab one can activate the colour adjustments check-box, adjust opacity and choose different blending modes.`n`nWhen alpha masking is activated and the tab pertaining to this is also activated, users can click 'n drag inside the selection area to adjust the mask's gradient center. To reset the position, press Alt+L-Click inside the selection area.", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "The transform panel host a multi-functional tool. You can clone, crop, resize, rotate, align images side by side, colour adjust and/or blend images with this tool.`n`nClone image area. Once you have selected an area in the image and opened this panel, deselect «Erase initially selected area» found in the Main tab.`n`nRotate the image. Locate the dot in the center of the selection area with the mouse cursor in the viewport, and click 'n drag to adjust the rotation angle. Alternatively, set the object orientation angle found in the Main tab.`n`nCrop an image. Set the first drop-down found in the Main tab, to «Original image size», make the selection as small as you need it to be and set the alignment of the pivot (Main tab). Then go to the Crop tab and set to the preferences available: crop shape, angle and so on.`n`nAdjust colors and blend images. In the «Adjust colors» tab one can activate the colour adjustments check-box, adjust opacity and choose different blending modes.`n`nWhen alpha masking is activated and the tab pertaining to this is also activated, users can click 'n drag inside the selection area to adjust the mask's gradient center. To reset the position, press Alt+L-Click inside the selection area.", -1, 0, 0)
 }
 
 MenuResetTransformToolPos() {
-    PasteInPlaceRevealOriginal := 0
+    If (PasteInPlaceToolMode!=1)
+       Return
+
+    PasteInPlaceOrientFlipX := PasteInPlaceOrientFlipY := PasteInPlaceRevealOriginal := 0
     PasteInPlaceAdaptMode := PasteInPlaceOrientation := PasteInPlaceCropSel := 1
     PasteInPlaceCropDo := VPselRotation := shearImgX := shearImgY := 0
     PasteInPlaceAlignment := 3
@@ -41975,6 +42462,8 @@ MenuResetTransformToolPos() {
        GuiControl, SettingsGUIA: Choose, PasteInPlaceAdaptMode, 1
        GuiControl, SettingsGUIA: Choose, PasteInPlaceOrientation, 1
        GuiControl, SettingsGUIA: , PasteInPlaceCropDo, % PasteInPlaceCropDo
+       GuiControl, SettingsGUIA: , PasteInPlaceOrientFlipX, 0
+       GuiControl, SettingsGUIA: , PasteInPlaceOrientFlipY, 0
        GuiUpdateSliders("PasteInPlaceCropAngular")
        GuiUpdateSliders("userUIshapeCavity")
     }
@@ -42002,7 +42491,7 @@ BtnPasteResetOptions() {
    }
 
    PasteInPlaceGlassy := PasteInPlaceBlendMode := PasteInPlaceCropSel := PasteInPlaceOrientation := PasteInPlaceAdaptMode := alphaMaskingMode := 1
-   PasteInPlaceBlurAmount := PasteInPlaceHue := PasteInPlaceSaturation := PasteInPlaceLight := FillAreaGradientAngle := 0
+   PasteInPlaceOrientFlipX := PasteInPlaceOrientFlipY := PasteInPlaceBlurAmount := PasteInPlaceHue := PasteInPlaceSaturation := PasteInPlaceLight := FillAreaGradientAngle := 0
    userImgAdjustInvertColors := PasteInPlaceCropDo := PasteInPlaceBlurAmount := PasteInPlaceApplyColorFX := PasteInPlaceGamma := 0
    PasteInPlaceAlignment := 3
    PasteInPlaceOpacity := 255
@@ -42023,6 +42512,8 @@ BtnPasteResetOptions() {
    GuiControl, SettingsGUIA: Choose, PasteInPlaceCropSel, 1
    GuiControl, SettingsGUIA: , PasteInPlaceApplyColorFX, 0
    GuiControl, SettingsGUIA: , PasteInPlaceCropDo, 0
+   GuiControl, SettingsGUIA: , PasteInPlaceOrientFlipX, 0
+   GuiControl, SettingsGUIA: , PasteInPlaceOrientFlipY, 0
    GuiControl, SettingsGUIA: , userImgAdjustInvertColors, 0
    ; WriteSettingsPasteInPlacePanel()
    updateUIpastePanel()
@@ -42913,7 +43404,7 @@ resumeCustomShapeSelection(thisZL) {
    ; ToolTip, % customShapePoints.Count() "===" PointsList , , , 2
 }
 
-startDrawingShape(modus, dummy:=0, forcePanel:=0) {
+startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0) {
      If !CustomShapeSymmetry
         CustomShapeLockedSymmetry := 0
 
@@ -42956,6 +43447,9 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0) {
      If InStr(forcePanel, "draw")
         postVectorWinOpen := (modus="line") ? "65c" : "23c"
 
+     If wasOpen
+        postVectorWinOpen := StrReplace(postVectorWinOpen, "c")
+
      drawingShapeNow := 1
      If (customShapePoints.Count()>2)
         oldCustomShapePoints := customShapePoints.Clone()
@@ -42987,7 +43481,25 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0) {
      thisColorA := (modus="line") ? "0xAA" FillAreaColor : "0x88" FillAreaColor
      If (modus="line")
      {
-        PenuDrawLive := (isWinOpen=10) ? Gdip_CreatePen("0x99446644", imgHUDbaseUnit//10) : Gdip_CreatePen(thisColorA, imgHUDbaseUnit//7)
+        RegAction(0, "DrawLineAreaColor",, 3)
+        RegAction(0, "DrawLineAreaOpacity",, 2, 1, 255)
+        RegAction(0, "DrawLineAreaCapsStyle",, 1)
+        RegAction(0, "DrawLineAreaDoubles",, 1)
+        RegAction(0, "DrawLineAreaDashStyle",, 2, 1, 4)
+        RegAction(0, "DrawLineAreaContourThickness",, 2, 1, 450)
+        If InStr(postVectorWinOpen, "c")
+        {
+           DrawLineAreaOpacity := clampInRange(DrawLineAreaOpacity, 128, 255)
+           DrawLineAreaDoubles := 0
+           DrawLineAreaDashStyle := 1
+           RegAction(1, "DrawLineAreaOpacity",, 2, 1, 255)
+           RegAction(1, "DrawLineAreaDoubles",, 1)
+           RegAction(1, "DrawLineAreaDashStyle",, 2, 1, 4)
+        }
+
+        thisThick := InStr(postVectorWinOpen, "c") ? imgHUDbaseUnit//10 : DrawLineAreaContourThickness * zoomLevel
+        PenuDrawLive := createDrawLinesPen(thisThick)
+        ; PenuDrawLive := (isWinOpen=10) ? Gdip_CreatePen("0x99446644", imgHUDbaseUnit//10) : Gdip_CreatePen(thisColorA, imgHUDbaseUnit//7)
         drawingVectorLiveMode := 1
      } Else If (modus="shape")
      {
@@ -43439,7 +43951,8 @@ BTNimgResizeEditor() {
        Return
     }
 
-    whichBitmap := useGdiBitmap()
+    mergeViewPortRotationImgEditing()
+    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     trGdip_GetImageDimensions(whichBitmap, oImgW, oImgH)
     If (oImgW=tUserNewWidth && oImgH=tUserNewHeight)
     {
@@ -43562,19 +44075,14 @@ BTNimgResizeEditor() {
     }
 
     Gdip_DeleteGraphics(G2)
-    recordUndoLevelNow("init", 0)
-    UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
-    gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
-    UserMemBMP := newBitmap
+    wrapRecordUndoLevelNow(newBitmap)
     updateUIctrl()
     MouseMoveResponder()
-    recordUndoLevelNow(0, newBitmap)
-    imgIndexEditing := currentFileIndex
     usrColorDepth := 1
     vpIMGrotation := 0
     dropFilesSelection(1)
     RemoveTooltip()
-    RefreshImageFile()
+    dummyTimerDelayiedImageDisplay(50)
     SetTimer, createGUItoolbar, -100
     SetTimer, TriggerMenuBarUpdate, -90
     SetTimer, ResetImgLoadStatus, -50
@@ -43660,6 +44168,7 @@ updateUIresizeImgEditPanel(dummy:=0) {
        obju[1] := [thisWidth, thisHeight, canvasWidth, canvasHeight]
        Return obju
     } Else GuiRefreshSliders()
+ 
     SetTimer, WriteSettingsImageProcessing, -250
 }
 
@@ -44408,7 +44917,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
        Gui, Font, s%LargeUIfontValue%
     }
 
-    minislideWid := slideWid//2
+    minislideWid := (PrefsLargeFonts=1) ? slideWid//2.32 : slideWid//2.52
     Global PickuFillAreaColor, PickuFillArea2ndColor
 
     userUIshapeCavity := (innerSelectionCavityX<0.02 && innerSelectionCavityY<0.02) ? 0 : Round(184 - (innerSelectionCavityX*2 + innerSelectionCavityY*2) / 2 * 184)
@@ -44418,7 +44927,8 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     GuiAddSlider("userUIshapeCavity", 0,185, 0, "Shape cavity", "updateFillInnerCavity", 1, "xs y+5 w" slideWid " hp")
     GuiAddSlider("FillAreaRectRoundness", 4,98, 10, "Roundness", "updateUIdrawShapesPanel", 1, "x+5 yp+0 wp-25 hp")
     GuiAddSlider("FillAreaEllipseSection", -270,850, 850, ".updateLabelEllipseSect", "updateUIdrawShapesPanel", 3, "xp yp wp hp")
-    Gui, Add, Checkbox, xp yp wp hp +0x1000 gupdateUIdrawShapesPanel Checked%FillAreaClosedPath% vFillAreaClosedPath, &Closed path
+    Gui, Add, Checkbox, xp yp w%minislideWid% hp +0x1000 gupdateUIdrawShapesPanel Checked%FillAreaClosedPath% vFillAreaClosedPath, &Closed
+    Gui, Add, Button, x+2 w%minislideWid% hp gMenuStartDrawingLines vBtn1, Modify
 
     ml := (PrefsLargeFonts=1) ? 60 : 45
     Gui, Add, Text, xs y+15 hp +0x200, Line color
@@ -47298,15 +47808,16 @@ BtnCreateNewImage() {
     RegAction(1, "NewImageReverseDimensions")
     DestroyGIFuWin()
     BtnCloseWindow()
-    If askAboutFileSave(" and new image will be created")
-       Return
+    ; If askAboutFileSave(" and new image will be created")
+    ;    Return
 
-    PredefinedDocsSizes := 13
     showTOOLtip("Creating the new image, please wait")
+    isImgOpen := isImgEditingNow()
+    PredefinedDocsSizes := 13
     setImageLoading()
     calcScreenLimits()
     mustOpenStartFolder := ""
-    terminateIMGediting()
+    ; terminateIMGediting()
     discardViewPortCaches()
     clippyCount++
     If (NewImageReverseDimensions=1)
@@ -47319,27 +47830,31 @@ BtnCreateNewImage() {
        tUserNewHeight := UserNewHeight
     }
 
-    UserMemBMP := trGdip_CreateBitmap(A_ThisFunc, tUserNewWidth, tUserNewHeight, coreDesiredPixFmt)
-    If warnUserFatalBitmapError(UserMemBMP, A_ThisFunc)
+    newBitmap := trGdip_CreateBitmap(A_ThisFunc, tUserNewWidth, tUserNewHeight, coreDesiredPixFmt)
+    If !validBMP(newBitmap)
     {
-       showTOOLtip("Failed to create new image")
+       showTOOLtip("Failed to create new image.`nUnable to allocate the new bitmap.")
        SetTimer, RemoveTooltip, % -msgDisplayTime
        ResetImgLoadStatus()
        clippyCount--
        Return
     }
 
-    Gdip_BitmapSetResolution(UserMemBMP, UserNewDPI, UserNewDPI)
+    Gdip_BitmapSetResolution(newBitmap, UserNewDPI, UserNewDPI)
     If (NewDocUseColor=1)
     {
-       G2 := trGdip_GraphicsFromImage(A_ThisFunc, UserMemBMP)
-       thisColor := makeRGBAcolor(OutlierFillColor, OutlierFillOpacity)
-       Gdip_GraphicsClear(G2, thisColor)
-       ; Gdip_SetClipRect(G2, tUserNewWidth//2, 0, tUserNewWidth, tUserNewHeight)
-       ; Gdip_GraphicsClear(G2, "0x99FFaa22")
-       ; Gdip_SetClipRect(G2, tUserNewWidth//1.25, 0, tUserNewWidth, tUserNewHeight)
-       ; Gdip_GraphicsClear(G2, "0x99FF1122")
-       Gdip_DeleteGraphics(G2)
+       G2 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap)
+       If G2
+       {
+          thisColor := makeRGBAcolor(OutlierFillColor, OutlierFillOpacity)
+          Gdip_GraphicsClear(G2, thisColor)
+          ; Gdip_SetClipRect(G2, tUserNewWidth//2, 0, tUserNewWidth, tUserNewHeight)
+          ; Gdip_GraphicsClear(G2, "0x99FFaa22")
+          ; Gdip_SetClipRect(G2, tUserNewWidth//1.25, 0, tUserNewWidth, tUserNewHeight)
+          ; Gdip_GraphicsClear(G2, "0x99FF1122")
+          Gdip_DeleteGraphics(G2)
+       } Else
+          addJournalEntry("Failed to fill the new image with the user defined background color. GDI+ object was not created.")
     }
 
     If (!currentFileIndex || !CurrentSLD || !maxFilesIndex)
@@ -47355,9 +47870,18 @@ BtnCreateNewImage() {
     imgIndexEditing := currentFileIndex
     currentImgModified := usrColorDepth := imgFxMode := 1
     vpIMGrotation := FlipImgH := FlipImgV := 0
+    UserMemBMP := newBitmap
+    INIaction(1, "FlipImgH", "General")
+    INIaction(1, "FlipImgV", "General")
+    INIaction(1, "usrColorDepth", "General")
+    INIaction(1, "imgFxMode", "General")
+    INIaction(1, "vpIMGrotation", "General")
     dropFilesSelection(1)
     RemoveTooltip()
-    RefreshImageFile()
+    If isImgOpen
+       wrapRecordUndoLevelNow(newBitmap)
+
+    dummyTimerDelayiedImageDisplay(5)
     SetTimer, createGUItoolbar, -100
     SetTimer, TriggerMenuBarUpdate, -90
     SetTimer, ResetImgLoadStatus, -50
@@ -47479,6 +48003,7 @@ updateUIdrawShapesPanel(actionu:=0, b:=0) {
     GuiControl, % actu, FillAreaEllipsePie
 
     actu := (FillAreaShape=7) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    GuiControl, % actu, btn1
     GuiControl, % actu, FillAreaClosedPath
     GuiControl, % actu, FillAreaCurveTension
     If (FillAreaShape=3)
@@ -48916,9 +49441,10 @@ BtnAdjustColorsImgSelectedArea() {
       BtnCloseWindow()
    Else
       of := ForceNoColorMatrix
+   
    ToggleEditImgSelection("show-edit")
    ForceNoColorMatrix := 0
-   AdjustColorsSelectedArea(o_imgFxMode)
+   AdjustColorsLegacySelectedArea(o_imgFxMode)
    ForceNoColorMatrix := of
    prevImgEditZeit := A_TickCount
 }
@@ -50222,6 +50748,10 @@ updateUIfimToneMappedIMG() {
 
    hFIFimgZ := hFIFimgD ? hFIFimgD : hFIFimgE
    pBitmap := ConvertFIMtoPBITMAP(hFIFimgZ)
+   If StrLen(pBitmap)>2
+      recordGdipBitmaps(pBitmap, A_ThisFunc)
+   Else Return
+
    tempBMP := trGdip_CreateBitmap(A_ThisFunc, uiBoxW, uiBoxH, coreDesiredPixFmt)
    If !validBMP(tempBMP)
    {
@@ -53155,7 +53685,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0) {
    hFIFimgA := externBMP ? externBMP : FreeImage_Load(imgPath, -1, loadArgs)
    If !hFIFimgA
    {
-      If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1)
+      If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1)
       {
          oBitmap := LoadWICimage(imgPath, 0, 0)
          If validBMP(oBitmap)
@@ -53169,6 +53699,9 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0) {
    FreeImage_GetImageDimensions(hFIFimgA, oImgW, oImgH)
    If (!hFIFimgA || !oImgW || !oImgH)
    {
+      If hFIFimgA
+         FreeImage_UnLoad(hFIFimgA)
+
       addJournalEntry("Failed to load file with FreeImage:`n" imgPath)
       Return -1
    }
@@ -54248,9 +54781,85 @@ combineImagesMultiPage(modus, animus, destFilePath) {
    ; fnOutputDebug("the end")
 }
 
+LoadBitmapAsFreeImage(imgPath, allowHDR, ByRef oImgW, ByRef oImgH, ByRef imgBPP) {
+   loadArgs := FIMdecideLoadArgs(imgPath, userHQraw, GFT)
+   hFIFimgA := FreeImage_Load(imgPath, -1, loadArgs)
+   If !hFIFimgA
+   {
+      If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1)
+      {
+         oBitmap := LoadWICimage(imgPath, 0, 0)
+         If validBMP(oBitmap)
+         {
+            hFIFimgA := ConvertPBITMAPtoFIM(oBitmap)
+            trGdip_DisposeImage(oBitmap)
+         }
+      }
+   }
+
+   FreeImage_GetImageDimensions(hFIFimgA, oImgW, oImgH)
+   If (!hFIFimgA || !oImgW || !oImgH)
+   {
+      If hFIFimgA
+         FreeImage_UnLoad(hFIFimgA)
+      addJournalEntry("Failed to load file with FreeImage:`n" imgPath)
+      Return
+   }
+
+   imgBPP := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
+   ColorsType := FreeImage_GetColorType(hFIFimgA)
+   imgType := FreeImage_GetImageType(hFIFimgA, 1)
+   imgIDtype := FreeImage_GetImageType(hFIFimgA)
+   If (allowHDR=-1)
+   {
+      hFIFimgA := FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, 1, hasAppliedToneMap)
+      imgBPP := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
+      ColorsType := FreeImage_GetColorType(hFIFimgA)
+      If (GFT=0 && InStr(ColorsType, "rgba"))
+      {
+         alphaBitmap := FreeImage_GetChannel(hFIFimgA, 4)
+         If (imgBPP!=32)
+            hFIFimgD := FreeImage_ConvertTo(hFIFimgA, "32Bits")
+
+         If hFIFimgD
+         {
+            FreeImage_UnLoad(hFIFimgA)
+            hFIFimgA := hFIFimgD
+         }
+
+         If (alphaBitmap!="")
+            FIMalphaChannelFix(alphaBitmap, hFIFimgA)
+      }
+
+      imgBPP := FreeImage_GetBPP(hFIFimgA)
+      ColorsType := FreeImage_GetColorType(hFIFimgA)
+      If (imgBPP!=24 && imgBPP!=32)
+      {
+         If InStr(ColorsType, "rgba")
+            hFIFimgD := FreeImage_ConvertTo(hFIFimgA, "32Bits")
+         Else
+            hFIFimgD := FreeImage_ConvertTo(hFIFimgA, "24Bits")
+
+         If hFIFimgD
+         {
+            FreeImage_UnLoad(hFIFimgA)
+            hFIFimgA := hFIFimgD
+         } Else
+         {
+            addJournalEntry(A_ThisFunc "(): Failed to convert imported image to 24/32-bits color depth.")
+            FreeImage_UnLoad(hFIFimgA)
+            hFIFimgA := ""
+         }
+      }
+   } Else If (allowHDR=0)
+      hFIFimgA := FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, 1, hasAppliedToneMap)
+
+   Return hFIFimgA
+}
+
 coreImgCombinerLoadFimFile(imgPath, modus, animus, ByRef otherFrames) {
   Critical, on
-  sTime := A_tickcount  
+  sTime := A_TickCount
 
   loadArgs := FIMdecideLoadArgs(imgPath, userHQraw, GFT)
   multiFlags := (GFT=25) ? 2 : 0
@@ -54406,12 +55015,16 @@ renewCurrentFilesList() {
    currentImgModified := allImagesWereSeen := 0
    interfaceThread.ahkassign("currentFilesListModified", currentFilesListModified)
    interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
-   discardSRCfileCaches()
-   destroyGDIfileCache()
-   discardViewPortCaches()
-   disposeCacheIMGs()
+   If (forceProtectLoadedImg!=1)
+   {
+      discardSRCfileCaches()
+      destroyGDIfileCache()
+      discardViewPortCaches()
+      disposeCacheIMGs()
+      terminateIMGediting()
+   }
+
    hudBTNfuncu := thisSearchString := userSearchString := ""
-   terminateIMGediting()
    If hSNDmedia
       StopMediaPlaying()
 }
@@ -56910,7 +57523,7 @@ createMenuImageEditSubMenus(modus:=0) {
       kMenu("PVimgFilters", "Add", "Desaturate color&s`tCtrl+G", "PanelDesatureSelectedArea", "grayscale effects")
       kMenu("PVimgFilters", "Add", "Ad&just image colors`tU", "PanelAdjustColorsSimpleWindow", "grayscale effects lightness contrast saturation levels brightness")
       If (AnyWindowOpen!=10)
-         kMenu("PVimgFilters", "Add", "Appl&y viewport color effects`tCtrl+Shift+U", "ApplyColorAdjustsSelectedArea")
+         kMenu("PVimgFilters", "Add", "Appl&y viewport color effects`tCtrl+Shift+U", "ApplyVPcolorAdjustSelectedArea")
 
       Menu, PVimgFilters, Add
       kMenu("PVimgFilters", "Add", "&Add noise", "PanelAddNoiserImage", "effects clouds plasma")
@@ -57241,10 +57854,14 @@ InvokeMenuBarEdit(manuID) {
             kMenu("pvMenuBarEdit", "Disable", "&Redo`tCtrl+Y")
          } Else
          {
-            kMenu("pvMenuBarEdit", "Add", "Levels: " groupDigits(undoLevelsRecorded), "dummy")
-            kMenu("pvMenuBarEdit", "Disable", "Levels: " groupDigits(undoLevelsRecorded))
+            kMenu("pvMenuBarEdit", "Add", "Levels: " currentUndoLevel "/" undoLevelsRecorded, "dummy")
+            kMenu("pvMenuBarEdit", "Disable", "Levels: " currentUndoLevel "/" undoLevelsRecorded)
          }
       }
+
+      kMenu("pvMenuBarEdit", "Add/Uncheck", "&Record undo levels", "TogglePreventUndos", "history")
+      If (preventUndoLevels!=1)
+         kMenu("pvMenuBarEdit", "Check", "&Record undo levels")
 
       Menu, pvMenuBarEdit, Add
       kMenu("pvMenuBarEdit", "Add", "C&ut selected area`tCtrl+X", "CutSelectedArea", "image editing")
@@ -58415,8 +59032,8 @@ createMenuImgVProtation() {
 
    If (vpIMGrotation>0)
    {
+      Menu, PVimgVProt, Add
       kMenu("PVimgVProt", "Add", "&Reset rotation`t\", "MenuResetVProtation",, " (image)")
-      Return
    }
 
    If (mustPreventMenus!=1)
@@ -58626,9 +59243,10 @@ createMenuImgSizeAdapt(dummy:=0) {
 
 createMenuMainPreferences() {
    kMenu("PVperfs", "Add/Uncheck", "&Limit memory usage", "ToggleLimitMemUsage")
-   kMenu("PVperfs", "Add/Uncheck", "&Do not record undo levels", "TogglePreventUndos", "history")
-   If (preventUndoLevels=1)
-      kMenu("PVperfs", "Check", "&Do not record undo levels")
+   kMenu("PVperfs", "Add/Uncheck", "&Record undo levels", "TogglePreventUndos", "history")
+   If (preventUndoLevels!=1)
+      kMenu("PVperfs", "Check", "&Record undo levels")
+
    kMenu("PVperfs", "Add/Uncheck", "&Multi-threaded processing", "PanelSetSystemCores")
    If (minimizeMemUsage=1)
       kMenu("PVperfs", "Disable", "&Multi-threaded processing")
@@ -59439,6 +60057,7 @@ createMenuImgColorsFX() {
 MenuDoOpenStartFolder() {
   If StrLen(mustOpenStartFolder)>3
      currentFileIndex := doOpenStartFolder()
+
    dummyTimerDelayiedImageDisplay(50)
    RemoveTooltip()
 }
@@ -59448,15 +60067,22 @@ MenuStartDrawingSelectionArea() {
 }
 
 MenuStartDrawingShapes() {
-   startDrawingShape("shape", 0, "draw")
+   modus := ((AnyWindowOpen=65 || AnyWindowOpen=23) && FillAreaShape=7) ? "resume" : 0
+   startDrawingShape("shape", modus, "draw", AnyWindowOpen)
 }
 
 MenuResumeDrawingShapes() {
-   startDrawingShape("selection", "resume")
+   If (AnyWindowOpen=65 && FillAreaShape=7)
+      MenuStartDrawingLines()
+   Else If (AnyWindowOpen=68 && FillAreaShape=7)
+      MenuStartDrawingShapes()
+   Else
+      startDrawingShape("selection", "resume")
 }
 
 MenuStartDrawingLines() {
-   startDrawingShape("line", 0, "draw")
+   modus := ((AnyWindowOpen=65 || AnyWindowOpen=23) && FillAreaShape=7) ? "resume" : 0
+   startDrawingShape("line", modus, "draw", AnyWindowOpen)
 }
 
 createMenuLiveTools(dummy:=0) {
@@ -59687,8 +60313,8 @@ BuildImgLiveEditMenu() {
       Menu, PVmenu, Add
       If (editingSelectionNow=1)
       {
-         kMenu("PVmenu", "Add", "Appl&y color effects inside selection`tCtrl+Shift+U", "ApplyColorAdjustsSelectedArea")
-         kMenu("PVmenu", "Add", "&... outside the selection", "ApplyColorAdjustsSelectedArea")
+         kMenu("PVmenu", "Add", "Appl&y color effects inside selection`tCtrl+Shift+U", "ApplyVPcolorAdjustSelectedArea")
+         kMenu("PVmenu", "Add", "&... outside the selection", "ApplyVPcolorAdjustSelectedArea")
       }
 
       kMenu("PVmenu", "Add/Uncheck", "&Activate viewport color adjustments`t\", "BtnToggleNoColorsFX")
@@ -59805,18 +60431,22 @@ BuildImgLiveEditMenu() {
       If (PasteInPlaceApplyColorFX=1)
          kMenu("PVmenu", "Check", "Color adjustments on object`tU")
 
-      kMenu("PVmenu", "Add/Uncheck", "Erase &initial area`tBackspace", "toggleErasePasteInPlace")
-      If (PasteInPlaceEraseInitial=1)
-         kMenu("PVmenu", "Check", "Erase &initial area`tBackspace")
-
-      If (PasteInPlaceToolMode=1 && (prevEllipseSelectMode>0 || prevVPselRotation!=0 || previnnerSelectionCavityX!=0 || previnnerSelectionCavityY!=0))
+      If (PasteInPlaceToolMode=1)
       {
-         kMenu("PVmenu", "Add/Uncheck", "Re&veal initial rect", "toggleRevealRectPasteInPlace")
-         If (PasteInPlaceRevealOriginal=1)
-            kMenu("PVmenu", "Check", "Re&veal initial rect")
-      }
+         kMenu("PVmenu", "Add/Uncheck", "Erase &initial area`tBackspace", "toggleErasePasteInPlace")
+         If (PasteInPlaceEraseInitial=1)
+            kMenu("PVmenu", "Check", "Erase &initial area`tBackspace")
+
+         If (PasteInPlaceToolMode=1 && (prevEllipseSelectMode>0 || prevVPselRotation!=0 || previnnerSelectionCavityX!=0 || previnnerSelectionCavityY!=0))
+         {
+            kMenu("PVmenu", "Add/Uncheck", "Re&veal initial rect", "toggleRevealRectPasteInPlace")
+            If (PasteInPlaceRevealOriginal=1)
+               kMenu("PVmenu", "Check", "Re&veal initial rect")
+         }
  
-      kMenu("PVmenu", "Add", "Reset to &initial position", "MenuResetTransformToolPos")
+         kMenu("PVmenu", "Add", "Reset to &initial position", "MenuResetTransformToolPos")
+      }
+
       If (shearImgX!=0 || shearImgY!=0)
          kMenu("PVmenu", "Add", "&Reset image skew offsets", "resetImgSkewOffsets")
    }
@@ -59900,8 +60530,8 @@ BuildSecondMenu(givenCoords:=0) {
       Menu, PVmenu, Add
       If (AnyWindowOpen=10)
       {
-         kMenu("PVmenu", "Add", "Apply vie&wport effects inside selection`tCtrl+Shift+U", "ApplyColorAdjustsSelectedArea")
-         kMenu("PVmenu", "Add", "&... outside the selection", "ApplyColorAdjustsSelectedArea")
+         kMenu("PVmenu", "Add", "Apply vie&wport effects inside selection`tCtrl+Shift+U", "ApplyVPcolorAdjustSelectedArea")
+         kMenu("PVmenu", "Add", "&... outside the selection", "ApplyVPcolorAdjustSelectedArea")
       } Else kMenu("PVmenu", "Add", "&Apply tool`tEnter", "applyIMGeditFunction")
 
       labelu := (AnyWindowOpen=10) ? "Close panel" : "Cancel tool"
@@ -60560,7 +61190,7 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
       mYz := Trim(rect.top)
       mH := max(rect.bottom, rect.top) - min(rect.bottom, rect.top)
       mW := max(rect.left, rect.right) - min(rect.left, rect.right)
-      interfaceThread.ahkFunction("ShowClickHalo", mX, mYz, mW, mH, 1)
+      interfaceThread.ahkFunction("ShowClickHalo", mX, mYz, mW, mH, 1, menarg, 1)
    }
 
    mouseTurnOFFtooltip()
@@ -62521,7 +63151,7 @@ ToggleTexyBGR() {
     usrTextureBGR := !usrTextureBGR
     INIaction(1, "usrTextureBGR", "General")
     friendly := (usrTextureBGR=1) ? ambiTexBrushSize " px" : "DEACTIVATED"
-    RefreshImageFile()
+    SetTimer, RefreshImageFile, -5
     showDelayedTooltip("Viewport ambiental texture: " friendly, A_ThisFunc, 1)
 }
 
@@ -62915,9 +63545,10 @@ ToggleLimitMemUsage() {
 TogglePreventUndos() {
     preventUndoLevels := !preventUndoLevels
     maxMemUndoLevels := (preventUndoLevels=1) ? 100 : 979394
-    friendly := (preventUndoLevels=1) ? "NO" : "YES"
-    showTOOLtip("Record undo levels: " friendly, A_ThisFunc, 1)
+    friendly := (preventUndoLevels=1) ? "DEACTIVATED" : "ACTIVATED"
+    showTOOLtip("Record image undo levels: " friendly, A_ThisFunc, 1)
     SetTimer, RemoveTooltip, % -msgDisplayTime
+    IniAction(1, "preventUndoLevels", "General", 1)
 }
 
 ToggleImgColorDepthDithering() {
@@ -64496,7 +65127,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
     ; If (winGDIcreated!=1)
     ;   createGDIwin()
     ; o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
-    extraID := ColorDepthDithering vpIMGrotation usrTextureBGR usrColorDepth bwDithering
+    extraID := ColorDepthDithering vpIMGrotation usrTextureBGR usrColorDepth bwDithering ; UserMemBMP currentUndoLevel undoLevelsRecorded
     IDthisImgPath := imgPath "-" userHQraw extraID
     If (imgPath!=prevImgPath || IDthisImgPath!=IDprevImgPath || !validBMP(gdiBitmap) || ForceIMGload=1)
     {
@@ -66086,15 +66717,36 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
      {
         trGdip_DisposeImage(rBitmap, 1)
         rBitmap := zBitmap
-        E := Gdip_BitmapSetColorDepth(rBitmap, "BW", 1)
+        zE := Gdip_BitmapSetColorDepth(rBitmap, "BW", 1)
+        If !zE
+        {
+           zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, rBitmap)
+           If validBMP(zBitmap)
+           {
+              trGdip_DisposeImage(rBitmap)
+              rBitmap := zBitmap
+           }
+        }
+        currIMGdetails.HasAlpha := 0
      }
   } Else If (usrColorDepth>1)
   {
      infoColorDepth := defineColorDepth()
      setWindowTitle("Converting image to " infoColorDepth)
      If (currIMGdetails.HasAlpha=1)
-        E := Gdip_BitmapSetColorDepth(rBitmap, 24, 1)
-     E := Gdip_BitmapSetColorDepth(rBitmap, internalColorDepth, ColorDepthDithering)
+        zE := Gdip_BitmapSetColorDepth(rBitmap, 24, 1)
+     If !zE
+        zE := Gdip_BitmapSetColorDepth(rBitmap, internalColorDepth, ColorDepthDithering)
+     If !zE
+     {
+        zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, rBitmap)
+        If validBMP(zBitmap)
+        {
+           trGdip_DisposeImage(rBitmap)
+           rBitmap := zBitmap
+        }
+     }
+     currIMGdetails.HasAlpha := 0
   }
 
   trGdip_GetImageDimensions(rBitmap, fimgW, fimgH)
@@ -68312,31 +68964,38 @@ decideAlphaMaskingFeaseable(userBias, doLimits:=0) {
    Return allowAlphaMasking
 }
 
+mergeViewPortRotationImgEditing() {
+   If ((usrColorDepth>1 || vpIMGrotation>0) && !viewportQPVimage.imgHandle && validBMP(useGdiBitmap()))
+   {
+      wrapRecordUndoLevelNow(trGdip_CloneBitmap(A_ThisFunc, useGdiBitmap()))
+      usrColorDepth := 1
+      vpIMGrotation := 0
+      INIaction(1, "usrColorDepth", "General")
+      INIaction(1, "vpIMGrotation", "General")
+      defineColorDepth()
+      Return 1
+   }
+}
+
 ActFloodFillNow() {
    Critical, on
    Static lastInvoked := 1, prevMX, prevMY, countClicks, HasTested
-
    If (A_TickCount - lastOtherWinClose<450) || (A_TickCount - lastInvoked<250)
       Return
 
-   If (usrColorDepth>1 || imgFxMode>1 || vpIMGrotation>0)
-   {
-      mergeViewPortEffectsImgEditing(A_ThisFunc)
-      dummyTimerDelayiedImageDisplay(25)
-      ; SoundBeep , 900, 100
-      Return
-   }
-
-   whichBitmap := useGdiBitmap("yes")
+   mergeViewPortEffectsImgEditing(A_ThisFunc)
+   whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
    trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
    If (!imgW || !imgH || !validBMP(whichBitmap))
    {
+      SetTimer, ResetImgLoadStatus, -25
       addJournalEntry(A_ThisFunc "(): Main bitmap malformed or missing.")
       Return
    }
 
    If (toolTipGuiCreated=2)
    {
+      SetTimer, ResetImgLoadStatus, -25
       RemoveTooltip()
       Return
    }
@@ -68347,7 +69006,12 @@ ActFloodFillNow() {
    mY := (FlipImgV=1) ? mainHeight - mY : mY
    MouseCoords2Image(mX, mY, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kY)
    If (kX>=imgW || kY>=imgH || kX<1 || kY<1)
+   {
+      showTOOLtip("Please click inside the image to perform flood fill")
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      SetTimer, ResetImgLoadStatus, -25
       Return
+   }
 
    hasCloned := 0
    allowAlphaMasking := decideAlphaMaskingFeaseable(FloodFillUseAlpha)
@@ -68371,6 +69035,7 @@ ActFloodFillNow() {
             Gdip_DeleteGraphics(G2)
          If (pPath!="")
             Gdip_DeletePath(pPath)
+
          trGdip_DisposeImage(thisBMP, 1)
          SetTimer, ResetImgLoadStatus, -250
          SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -68378,16 +69043,15 @@ ActFloodFillNow() {
       }
    } Else thisBMP := whichBitmap
 
-   If (undoLevelsRecorded<2)
-      recordUndoLevelNow("init", 0)
-
    If (FloodFillAltToler=3)
       showTOOLtip("Applying flood fill at the coordinates:`n" groupDigits(kX) ", " groupDigits(kY))
 
+   If (undoLevelsRecorded<2 && preventUndoLevels!=1)
+      recordUndoLevelNow("init", 0)
+
    ; newColor := (BrushToolUseSecondaryColor=1) ? BrushToolBcolor : BrushToolAcolor 
    r := QPV_FloodFill(thisBMP, kX, kY, "0x" Format("{:X}", FloodFillClrOpacity) FloodFillColor, FloodFillOpacity)
-
-   If (pPath!="" && G2!="" && allowSelectionCrop=1 && hasCloned=1) || (thisBMP!="" && allowAlphaMasking=1)
+   If (r>0 && (pPath!="" && G2!="" && allowSelectionCrop=1 && hasCloned=1) || (validBMP(thisBMP) && allowAlphaMasking=1))
    {
       If (allowAlphaMasking=1)
       {
@@ -68437,16 +69101,15 @@ ActFloodFillNow() {
       currIMGdetails.HasAlpha := 1
 
    lastInvoked := A_TickCount
-   If (r>1)
-   {
-      If !validBMP(UserMemBMP)
-         UserMemBMP := trGdip_CloneBitmap(A_ThisFunc, useGdiBitmap())
-      recordUndoLevelNow(0, useGdiBitmap())
-   }
+   whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
+   If (r>1 && validBMP(whichBitmap))
+      wrapRecordUndoLevelNow(whichBitmap)
 
+   dummyTimerDelayiedImageDisplay(10)
    SetTimer, MouseMoveResponder, -25
    SetTimer, wrapResizeImageGDIwin, -30
    SetTimer, RemoveTooltip, -10
+   SetTimer, ResetImgLoadStatus, -20
 }
 
 calcBrushSymmetryCoords(tkX, tkY, imgW, imgH, ByRef skX, ByRef skY) {
@@ -68494,18 +69157,19 @@ ActPaintBrushNow() {
    Critical, on
    Static lastInvoked := 1, prevMX, prevMY, countClicks, HasTested
 
-   If (usrColorDepth>1 || vpIMGrotation>0)
+   If mergeViewPortRotationImgEditing()
    {
-      mergeViewPortEffectsImgEditing(A_ThisFunc)
-      dummyTimerDelayiedImageDisplay(25)
-      ; SoundBeep , 900, 100
+      dummyTimerDelayiedImageDisplay(10)
+      SoundBeep 900, 100
       Return
    }
 
-   trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+   mergeViewPortEffectsImgEditing(A_ThisFunc)
+   whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
+   trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
    If (!imgW || !imgH)
    {
-      addJournalEntry("ERROR: main bitmap seems inexistent. Failure occured in " A_ThisFunc "()")
+      addJournalEntry("ERROR: Main bitmap seems to be inexistent. Failure occured in " A_ThisFunc "()")
       Return
    }
 
@@ -68531,7 +69195,24 @@ ActPaintBrushNow() {
    randomFactor := Randomizer(-950, 950, 2, 1)
    prevState := "a"
    liveDrawingBrushTool := 1
-   whichBitmap := useGdiBitmap("yes")
+   whichBitmap := useGdiBitmap()
+   If (whichBitmap=UserMemBMP)
+   {
+      ; it has to be gdiBitmap... otherwise no live preview
+      If (UserMemBMP=gdiBitmap)
+         addJournalEntry(A_ThisFunc "(): ERROR. Illegal inequality. UserMemBMP=gdiBitmap" )
+
+      If validBMP(gdiBitmap)
+      {
+         addJournalEntry(A_ThisFunc "(): ERROR. Illogical context. useGdiBitmap() returns UserMemBMP when gdiBitmap is valid!?" )
+         trGdip_DisposeImage(gdiBitmap)
+      }
+
+      gdiBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+      UserMemBMP := trGdip_DisposeImage(UserMemBMP)
+      whichBitmap := gdiBitmap
+   }
+
    trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
    kpi := (BrushToolType < 3) ? 1 : 0
    thisUseSecondaryColor := (kpi=1) ? BrushToolUseSecondaryColor : 0
@@ -68619,8 +69300,9 @@ ActPaintBrushNow() {
    Else ; simple solid
       gdipbrushu := Gdip_BrushCreateSolid(thisHexOpacity startToolColor)
 
-   If (!brushu && BrushToolType>1)
+   If (!validBMP(brushu) && BrushToolType>1)
    {
+      ; liveDrawingBrushTool := 0
       addJournalEntry("ERROR: no brush image. Failure occured in " A_ThisFunc "()")
       Return
    }
@@ -68631,17 +69313,26 @@ ActPaintBrushNow() {
    imgIndexEditing := currentFileIndex
    thisQuality := (BrushToolType>5) ? 7 : 5
    compositingQuality := (userimgGammaCorrect=1) ? 2 : 1
-   Gu := trGdip_GraphicsFromImage(A_ThisFunc, whichBitmap, thisQuality,,, compositingQuality)
+   ; we need a live view in the viewport of the bitmap; so we work with it directly [ useGdiBitmap == whichBitmap ]
+   metaBitmap := whichBitmap ; trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+   If validBMP(metaBitmap)
+      Gu := trGdip_GraphicsFromImage(A_ThisFunc, metaBitmap, thisQuality,,, compositingQuality)
+
    If !Gu
    {
+      ; liveDrawingBrushTool := 0
       trGdip_DisposeImage(brushu, 1)
       trGdip_DisposeImage(brushImg, 1)
       trGdip_DisposeImage(clonescu, 1)
       If gdipbrushu
          Gdip_DeleteBrush(gdipbrushu)
-      addJournalEntry("ERROR: failed to create graphics object on " whichBitmap ". Failure occured in " A_ThisFunc "()")
+
+      addJournalEntry(A_ThisFunc "(). ERROR. Failed to create graphics object on bmp=" whichBitmap)
       Return
    }
+
+   If ((A_TickCount - lastInvoked>350) && undoLevelsRecorded<2 && preventUndoLevels!=1)
+      recordUndoLevelNow("init", 0)
 
    Gdip_SetPixelOffsetMode(Gu, 2)
    If thisSelectionConstrain
@@ -68675,9 +69366,6 @@ ActPaintBrushNow() {
 
    thisEraseOpacity := (thisEraserMode=1) ? 255 - thisEraseOpacity : thisOpacity
    thisWet := 0.79 + (21 - thisWetness)/100
-   If ((A_TickCount - lastInvoked>350) && undoLevelsRecorded<2)
-      recordUndoLevelNow("init", 0)
-
    Gdip_GraphicsClear(2NDglPG, "0x00" WindowBgrColor)
    r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
    dryZeit := A_TickCount
@@ -68754,7 +69442,7 @@ ActPaintBrushNow() {
 
       mX := (FlipImgH=1) ? mainWidth - mX : mX
       mY := (FlipImgV=1) ? mainHeight - mY : mY
-      MouseCoords2Image(mX, mY, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kY, whichBitmap, 1, imgW, imgH)
+      MouseCoords2Image(mX, mY, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kY, metaBitmap, 1, imgW, imgH)
       ; ToolTip, % offX "-" offY "`n" kX "-" kY "`n" oMx "-" oMy , , , 2
       ; fnOutputDebug("size=" brushSize "|img coords: " kX "/" kY "|" plopa "|" mX "/" mY)
       If (brushSize>1)
@@ -68836,39 +69524,39 @@ ActPaintBrushNow() {
             If (BrushToolType=6)
             {
                ; smudge brush
-               brushImg := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, Round(tkX - brushSize/2 - smudgeX/2), Round(tkY - brushSize/2 - smudgeY/2), brushSize + thisBulgePinchFactor, brushSize + thisBulgePinchFactor, 0, 0, 1)
+               brushImg := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, Round(tkX - brushSize/2 - smudgeX/2), Round(tkY - brushSize/2 - smudgeY/2), brushSize + thisBulgePinchFactor, brushSize + thisBulgePinchFactor, 0, 0, 1)
                QPV_SetAlphaChannel(brushImg, brushu, 0)
             } Else If (BrushToolType>=7)
             {
                ; pinch/bulge brush
-               brushImg := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, Round(tkX - brushSize/2), Round(tkY - brushSize/2), brushSize, brushSize, 0, 0, 1)
+               brushImg := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, Round(tkX - brushSize/2), Round(tkY - brushSize/2), brushSize, brushSize, 0, 0, 1)
                QPV_SetAlphaChannel(brushImg, brushu, 0)
             } Else If (BrushToolType=5)
             {
                ; effects brush
-               performClrEffectsBrush(whichBitmap, clonescu, tkX, tkY, brushSize, brushu, thisFloatOpacity, Gu)
+               performClrEffectsBrush(metaBitmap, clonescu, tkX, tkY, brushSize, brushu, thisFloatOpacity, Gu)
                If (BrushToolSymmetryX=1 || BrushToolSymmetryY=1)
                {
                   calcBrushSymmetryCoords(tkX, tkY, imgW, imgH, skX, skY)
-                  performClrEffectsBrush(whichBitmap, clonescu, skX, skY, brushSize, brushu, thisFloatOpacity, Gu)
+                  performClrEffectsBrush(metaBitmap, clonescu, skX, skY, brushSize, brushu, thisFloatOpacity, Gu)
                   If (BrushToolSymmetryX=1 && BrushToolSymmetryY=1)
                   {
-                     performClrEffectsBrush(whichBitmap, clonescu, tkX, skY, brushSize, brushu, thisFloatOpacity, Gu)
-                     performClrEffectsBrush(whichBitmap, clonescu, skX, tkY, brushSize, brushu, thisFloatOpacity, Gu)
+                     performClrEffectsBrush(metaBitmap, clonescu, tkX, skY, brushSize, brushu, thisFloatOpacity, Gu)
+                     performClrEffectsBrush(metaBitmap, clonescu, skX, tkY, brushSize, brushu, thisFloatOpacity, Gu)
                   }
                }
             } Else If (BrushToolType=4)
             {
                ; eraser brush
-               performEraserBrush(tkX, tkY, brushSize, brushu, thisEraseOpacity, thisEraserMode, whichBitmap, Gu, thisSelectionConstrain, ImgSelPath, clonescu)
+               performEraserBrush(tkX, tkY, brushSize, brushu, thisEraseOpacity, thisEraserMode, metaBitmap, Gu, thisSelectionConstrain, ImgSelPath, clonescu)
                If (BrushToolSymmetryX=1 || BrushToolSymmetryY=1)
                {
                   calcBrushSymmetryCoords(tkX, tkY, imgW, imgH, skX, skY)
-                  performEraserBrush(skX, skY, brushSize, brushu, thisEraseOpacity, thisEraserMode, whichBitmap, Gu, thisSelectionConstrain, ImgSelPath, clonescu)
+                  performEraserBrush(skX, skY, brushSize, brushu, thisEraseOpacity, thisEraserMode, metaBitmap, Gu, thisSelectionConstrain, ImgSelPath, clonescu)
                   If (BrushToolSymmetryX=1 && BrushToolSymmetryY=1)
                   {
-                     performEraserBrush(tkX, skY, brushSize, brushu, thisEraseOpacity, thisEraserMode, whichBitmap, Gu, thisSelectionConstrain, ImgSelPath, clonescu)
-                     performEraserBrush(skX, tkY, brushSize, brushu, thisEraseOpacity, thisEraserMode, whichBitmap, Gu, thisSelectionConstrain, ImgSelPath, clonescu)
+                     performEraserBrush(tkX, skY, brushSize, brushu, thisEraseOpacity, thisEraserMode, metaBitmap, Gu, thisSelectionConstrain, ImgSelPath, clonescu)
+                     performEraserBrush(skX, tkY, brushSize, brushu, thisEraseOpacity, thisEraserMode, metaBitmap, Gu, thisSelectionConstrain, ImgSelPath, clonescu)
                   }
                }
             } Else If (advancedSoftBrush=1) ; BrushToolType=2
@@ -68878,7 +69566,7 @@ ActPaintBrushNow() {
                ofpy := tkY - brushSize/2
                If (BrushToolWetness>0)
                {
-                  coloruY := getPixelColorAvg(whichBitmap, tkX, tkY, "0xFF" o_startToolColor)
+                  coloruY := getPixelColorAvg(metaBitmap, tkX, tkY, "0xFF" o_startToolColor)
                   startToolColor := SubStr(MixARGB(coloruY, "0xFF" startToolColor, thisWet), 5)
                   g_startToolColor := RandomizeBrushColor(startToolColor)
                   overDraw := 1
@@ -68888,17 +69576,17 @@ ActPaintBrushNow() {
                   overDraw := (BrushToolRandomDark>0 || BrushToolRandomLight>0 || BrushToolRandomSat>0 || BrushToolRandomHue>0) ? 1 : BrushToolOverDraw
                }
 
-               QPV_ColourBrush(whichBitmap, brushu, 0, "0xFF" g_startToolColor, 0, thisMainOpacity, BrushToolBlendMode - 1, ofpx, ofpy, clonescu, opacityBMPmap, overDraw, BlendModesFlipped)
+               QPV_ColourBrush(metaBitmap, brushu, 0, "0xFF" g_startToolColor, 0, thisMainOpacity, BrushToolBlendMode - 1, ofpx, ofpy, clonescu, opacityBMPmap, overDraw, BlendModesFlipped)
                If (BrushToolSymmetryX=1 || BrushToolSymmetryY=1)
                {
                   calcBrushSymmetryCoords(tkX, tkY, imgW, imgH, skX, skY)
                   sofpx := skX - brushSize/2
                   sofpy := skY - brushSize/2
-                  QPV_ColourBrush(whichBitmap, brushu, 0, "0xFF" g_startToolColor, 0, thisMainOpacity, BrushToolBlendMode - 1, sofpx, sofpy, clonescu, opacityBMPmap, overDraw, BlendModesFlipped)
+                  QPV_ColourBrush(metaBitmap, brushu, 0, "0xFF" g_startToolColor, 0, thisMainOpacity, BrushToolBlendMode - 1, sofpx, sofpy, clonescu, opacityBMPmap, overDraw, BlendModesFlipped)
                   If (BrushToolSymmetryX=1 && BrushToolSymmetryY=1)
                   {
-                     QPV_ColourBrush(whichBitmap, brushu, 0, "0xFF" g_startToolColor, 0, thisMainOpacity, BrushToolBlendMode - 1, ofpx, sofpy, clonescu, opacityBMPmap, overDraw, BlendModesFlipped)
-                     QPV_ColourBrush(whichBitmap, brushu, 0, "0xFF" g_startToolColor, 0, thisMainOpacity, BrushToolBlendMode - 1, sofpx, ofpy, clonescu, opacityBMPmap, overDraw, BlendModesFlipped)
+                     QPV_ColourBrush(metaBitmap, brushu, 0, "0xFF" g_startToolColor, 0, thisMainOpacity, BrushToolBlendMode - 1, ofpx, sofpy, clonescu, opacityBMPmap, overDraw, BlendModesFlipped)
+                     QPV_ColourBrush(metaBitmap, brushu, 0, "0xFF" g_startToolColor, 0, thisMainOpacity, BrushToolBlendMode - 1, sofpx, ofpy, clonescu, opacityBMPmap, overDraw, BlendModesFlipped)
                   }
                }
             } Else If (BrushToolDynamicCloner=1 && BrushToolType=3) ; dynamic cloner mode
@@ -68909,7 +69597,7 @@ ActPaintBrushNow() {
             {
                ; wet soft edges brush
                brushu := trGdip_DisposeImage(brushu, 1)
-               coloruY := getPixelColorAvg(whichBitmap, kX, kY, "0xFF" o_startToolColor)
+               coloruY := getPixelColorAvg(metaBitmap, kX, kY, "0xFF" o_startToolColor)
                startToolColor := SubStr(MixARGB(coloruY, "0xFF" startToolColor, thisWet), 5)
                g_startToolColor := RandomizeBrushColor(startToolColor)
                brushu := createGradientBrushBitmap(g_startToolColor, 101 - thisToolSoftness, brushSize, thisToolAngle, thisToolAspectRatio)
@@ -68917,14 +69605,14 @@ ActPaintBrushNow() {
             {
                ; wet simple brush
                Gdip_DeleteBrush(gdipbrushu)
-               coloruY := getPixelColorAvg(whichBitmap, kX, kY, "0xFF" o_startToolColor)
+               coloruY := getPixelColorAvg(metaBitmap, kX, kY, "0xFF" o_startToolColor)
                startToolColor := SubStr(MixARGB(coloruY, "0xFF" startToolColor, thisWet), 5)
                thisHexOpacity := Format("{1:#x}", thisOpacity)
                g_startToolColor := RandomizeBrushColor(startToolColor)
                gdipbrushu := Gdip_BrushCreateSolid(thisHexOpacity g_startToolColor)
             }
 
-            ; draw the brushes into main image [ whichBitmap - Gu ]
+            ; draw the brushes into main image [ metaBitmap - Gu ]
             If (BrushToolType=1)
             {
                ; draw simple brush
@@ -69059,18 +69747,21 @@ ActPaintBrushNow() {
 
    setwhileLoopExec(0)
    Gdip_DeleteGraphics(Gu)
-   trGdip_DisposeImage(brushu, 1)
-   trGdip_DisposeImage(brushImg, 1)
-   trGdip_DisposeImage(clonescu, 1)
+   If validBMP(brushu)
+      trGdip_DisposeImage(brushu, 1)
+   If validBMP(brushImg)
+      trGdip_DisposeImage(brushImg, 1)
+   If validBMP(clonescu)
+      trGdip_DisposeImage(clonescu, 1)
    If gdipbrushu
       Gdip_DeleteBrush(gdipbrushu)
 
    MouseMoveResponder()
-   If (A_TickCount - lastInvoked>350)
+   If (((A_TickCount - lastInvoked>350) || preventUndoLevels=1) && validBMP(metaBitmap))
    {
-      If !validBMP(UserMemBMP)
-         UserMemBMP := trGdip_CloneBitmap(A_ThisFunc, useGdiBitmap())
-      recordUndoLevelNow(0, useGdiBitmap())
+      UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
+      UserMemBMP := trGdip_CloneBitmap(A_ThisFunc, metaBitmap)
+      recordUndoLevelNow(0, metaBitmap)
    }
 
    ; liveDrawingBrushTool := 0
@@ -69128,7 +69819,7 @@ ActDrawAlphaMaskBrushNow() {
    Else ; simple solid
       gdipbrushu := Gdip_BrushCreateSolid(thisHexOpacity startToolColor)
 
-   If (!brushu && BrushToolType>1)
+   If (!validBMP(brushu) && BrushToolType>1)
    {
       addJournalEntry("ERROR: no brush image. Failure occured in " A_ThisFunc "()")
       Return
@@ -69158,7 +69849,7 @@ ActDrawAlphaMaskBrushNow() {
 
    Gdip_GraphicsClear(2NDglPG, "0x00" WindowBgrColor)
    r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
-   If (A_TickCount - lastInvoked>250)
+   If ((A_TickCount - lastInvoked>250) && preventUndoLevels!=1)
    {
       trGdip_DisposeImage(userPrevAlphaMaskBmpPainted, 1)
       userPrevAlphaMaskBmpPainted := trGdip_CloneBitmap(A_ThisFunc, userAlphaMaskBmpPainted)
@@ -69854,6 +70545,10 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
     }
     ; ToolTip, % gmX "--" gmY , , , 2
     ; ToolTip, % tensionCurveCustomShape "=t" , , , 2
+    thisThick := InStr(postVectorWinOpen, "c") ? imgHUDbaseUnit//10 : DrawLineAreaContourThickness * zoomLevel
+    If (drawingVectorLiveMode=1)
+       Gdip_SetPenWidth(PenuDrawLive, thisThick)
+
     If (PenuDrawLive && isInRange(PointsListArray.Count(), 3, 4))
     {
        Gdip_SetPenWidth(pPen4, imgHUDbaseUnit//11)
@@ -70970,7 +71665,7 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
 
         If (o_operation!="faker")
         {
-           If ((vpImgPanningNow || doImgEditLivePreview!=1) && (AnyWindowOpen=23 || AnyWindowOpen=68))
+           If ((vpImgPanningNow || doImgEditLivePreview!=1) && isVarEqualTo(AnyWindowOpen, 23, 65, 68))
               ImgSelPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio)
            Else
               ImgSelPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, angleu, rotateSelBoundsKeepRatio, 0, 1, isAngleu, innerSelectionCavityX, innerSelectionCavityY)
@@ -71074,7 +71769,7 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
         If (objSel.selSmall=1)
            dotSize := dotSize/2
 
-        If ((vpImgPanningNow || doImgEditLivePreview!=1) && (AnyWindowOpen=23 || AnyWindowOpen=68))
+        If ((vpImgPanningNow || doImgEditLivePreview!=1) && isVarEqualTo(AnyWindowOpen, 23, 65, 68))
            ImgSelPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio)
         Else
            ImgSelPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, angleu, rotateSelBoundsKeepRatio, 0, 1, isAngleu, innerSelectionCavityX, innerSelectionCavityY)
@@ -72301,8 +72996,8 @@ selectEntireImage(act:=0) {
          Return
    } Else
    {
-      ImgSelX2 := imgW, imgSelY2 := imgH
       imgSelX1 := imgSelY1 := 0
+      ImgSelX2 := imgW, imgSelY2 := imgH
       defineRelativeSelCoords(imgW, imgH)
    }
 
@@ -78363,6 +79058,9 @@ PanelJpegPerformOperation() {
        {
           FlipImgV := FlipImgH := vpIMGrotation := 0
           showTOOLtip("Image rotation set to 0°")
+          INIaction(1, "FlipImgH", "General")
+          INIaction(1, "FlipImgV", "General")
+          INIaction(1, "vpIMGrotation", "General")
           RefreshImageFile()
           SetTimer, RemoveTooltip, % -msgDisplayTime
           Sleep, 250
@@ -78867,7 +79565,7 @@ coreColorsAdjusterWindow(modus:=0) {
     ; Gui, Add, Button, x+5 hp w%btnWid% gCopyImage2clip, &Copy to clipboard
     ; Gui, Add, Button, x+5 hp wp gBtnSaveIMGadjustPanel, &Save or copy
     Gui, Add, Button, x+5 hp wp+15 gBtnResetImageView vbtnReset, &Reset all
-    titlu := (idu=10) ? "Adjust viewport image view: " : "Adjust image colors: "
+    titlu := (idu=10) ? "Adjust viewport image view: " : "Adjust image colors (legacy): "
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, titlu appTitle, winPos)
     Sleep, 1
@@ -79083,7 +79781,7 @@ PanelAdjustColorsSimpleWindow() {
 
     dummyTimerDelayiedImageDisplay(150)
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
-    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Adjust image colors (simple): " appTitle, winPos)
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Adjust image colors: " appTitle, winPos)
     SetTimer, resetOpeningPanel, -100
     GuiRefreshSliders()
     SetTimer, RemoveTooltip, -100
@@ -79663,7 +80361,7 @@ performImgFmtConvert(modus:=0) {
 }
 
 WriteSettingsAdjustCanvasPanel() {
-    ReadSettingsAdjustCanvasPanel()
+    ReadSettingsAdjustCanvasPanel(1)
 }
 
 ReadSettingsAdjustCanvasPanel(act:=0) {
@@ -79714,8 +80412,8 @@ PanelAdjustImageCanvasSize() {
        }
     }
 
-    ReadSettingsAdjustCanvasPanel()
     thisBtnHeight := createSettingsGUI(28, A_ThisFunc)
+    ReadSettingsAdjustCanvasPanel()
     btnWid := 110
     txtWid := 265
     editWid := 45
@@ -79902,7 +80600,7 @@ BTNadjustCanvasAction() {
     }
 
     ToggleEditImgSelection("show-edit")
-    ChangeImageCanvasSize(ResultEditWidth, ResultEditHeight, userAddTop, userAddBottom, userAddLeft, userAddRight, userAddCenter, 0)
+    ChangeImageCanvasSize(ResultEditWidth, ResultEditHeight, userAddTop, userAddBottom, userAddLeft, userAddRight, userAddCenter)
 }
 
 PanelResizeImageWindow() {
@@ -85254,14 +85952,14 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
        } Else If (AnyWindowOpen=64)
        {
           clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
-       } Else If (AnyWindowOpen=23 && editingSelectionNow=1)
+       } Else If ((AnyWindowOpen=23 || AnyWindowOpen=68) && editingSelectionNow=1)
        {
-          If (FillAreaShape<=2)
-             EllipseSelectMode := 0
-          Else If (FillAreaShape=3)
+          If (FillAreaShape=3)
              EllipseSelectMode := 1
           Else If (FillAreaShape=7)
              EllipseSelectMode := 2
+          Else
+             EllipseSelectMode := 0
        }
 
        r2 := doLayeredWinUpdate(A_ThisFunc, hGDIwin, glHDC)
@@ -85278,8 +85976,12 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
        getImgOriginalSelectedAreaEdit("kill", 0, 0, 0, 0, 0, 0, 0)
        If (cleanCaches!=0)
        {
+          drawFillSelGradient("kill", 0, 0, 0, 0, 0, 0)
           corePasteInPlaceActNow("kill")
           coreFillSelectedArea("kill")
+          If oldSelectionArea[11]
+             FreeImage_UnLoad(oldSelectionArea[11])
+          oldSelectionArea := []
        }
        ; If (AnyWindowOpen=64)
        ; SetTimer, dummyRefreshImgSelectionWindow, -200
@@ -85669,6 +86371,7 @@ PanelImgAutoCrop() {
     If (vpIMGrotation>0)
     {
        vpIMGrotation := 0
+       INIaction(1, "vpIMGrotation", "General")
        showTOOLtip("Image rotation: 0°")
        RefreshImageFile()
        SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -85929,8 +86632,14 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
    }
 
    ; selCoords := StrSplit(selCoords, ",")
-   X1 := selCoords[1], Y1 := selCoords[2]
-   X2 := selCoords[3], Y2 := selCoords[4]
+   X1 := min(selCoords[1], selCoords[3])
+   Y1 := min(selCoords[2], selCoords[4])
+   X2 := max(selCoords[1], selCoords[3])
+   Y2 := max(selCoords[2], selCoords[4])
+   xa := clampInRange(X1, 0, Width - 1)
+   ya := clampInRange(Y1, 0, Height - 1)
+   xb := clampInRange(X2, xa + 1, Width)
+   yb := clampInRange(Y2, ya + 1, Height)
 
    If (silentMode=0)
    {
@@ -85941,15 +86650,15 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
 
    If (selMode=0)
    {
-      newW := X2 - X1
-      newH := Y2 - Y1
-      kBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, zBitmap, X1, Y1, newW, newH)
+      newW := xb - xa
+      newH := yb - ya
+      kBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, zBitmap, xa, ya, newW, newH)
       return kBitmap
    } Else
    {
       VPselRotation := innerSelectionCavityX := innerSelectionCavityY := EllipseSelectMode := 0
-      ImgSelX1 := X1, ImgSelY1 := Y1
-      ImgSelX2 := X2, ImgSelY2 := Y2
+      ImgSelX1 := xa, ImgSelY1 := ya
+      ImgSelX2 := xb, ImgSelY2 := yb
       defineRelativeSelCoords(Width, Height)
    }
 }
@@ -86520,29 +87229,9 @@ coreSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, Yscal
 
 coreFreeImageSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, YscaleImgFactor, doConversion:=0) {
     Sleep, 0
-    loadArgs := FIMdecideLoadArgs(imgPath, userHQraw, GFT)
-    hFIFimgA := FreeImage_Load(imgPath, GFT, loadArgs)
-    If !hFIFimgA
-    {
-       If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1)
-       {
-          oBitmap := LoadWICimage(imgPath, 0, 0)
-          If validBMP(oBitmap)
-          {
-             hFIFimgA := ConvertPBITMAPtoFIM(oBitmap)
-             trGdip_DisposeImage(oBitmap)
-          }
-       }
-    }
-
-    If hFIFimgA
-       FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
-
+    hFIFimgA := LoadBitmapAsFreeImage(imgPath, 1, imgW, imgH, bpp)
     If (!hFIFimgA || !imgW || !imgH)
-    {
-       addJournalEntry("Failed to load file with FreeImage:`n" imgPath)
        Return "err"
-    }
 
     If (SimpleOperationsDoCrop=1 && editingSelectionNow=1)
     {
@@ -86659,29 +87348,9 @@ coreFreeImageSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFact
 
 coreFreeImageSimpleColorsAdjust(imgPath, file2save) {
     Sleep, 0
-    loadArgs := FIMdecideLoadArgs(imgPath, userHQraw, GFT)
-    hFIFimgA := FreeImage_Load(imgPath, GFT, loadArgs)
-    If !hFIFimgA
-    {
-       If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1)
-       {
-          oBitmap := LoadWICimage(imgPath, 0, 0)
-          If validBMP(oBitmap)
-          {
-             hFIFimgA := ConvertPBITMAPtoFIM(oBitmap)
-             trGdip_DisposeImage(oBitmap)
-          }
-       }
-    }
-
-    If hFIFimgA
-       FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
-
+    hFIFimgA := LoadBitmapAsFreeImage(imgPath, 1, imgW, imgH, bpp)
     If (!hFIFimgA || !imgW || !imgH)
-    {
-       addJournalEntry("Failed to load file with FreeImage:`n" imgPath)
        Return "err"
-    }
 
     changeMcursor()
     bpp := FreeImage_GetBPP(hFIFimgA)
@@ -86697,6 +87366,7 @@ coreFreeImageSimpleColorsAdjust(imgPath, file2save) {
        ColorsType := FreeImage_GetColorType(hFIFimgA)
        imgType := FreeImage_GetImageType(hFIFimgA, 1)
        imgIDtype := FreeImage_GetImageType(hFIFimgA)
+       GFT := FreeImage_GetFileType(imgPath)
        hFIFimgA := FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, 1, hasAppliedToneMap)
        bpp := FreeImage_GetBPP(hFIFimgA)
        If (bpp!=24 && bpp!=32)
@@ -86771,7 +87441,10 @@ PanelSimpleResizeRotate(modus:="") {
     If (vpIMGrotation>0)
     {
        FlipImgV := FlipImgH := vpIMGrotation := 0
-       showTOOLtip("Image rotation: 0°")
+       INIaction(1, "FlipImgH", "General")
+       INIaction(1, "FlipImgV", "General")
+       INIaction(1, "vpIMGrotation", "General")
+       showTOOLtip("Image rotation set to 0°")
        RefreshImageFile()
        SetTimer, RemoveTooltip, % -msgDisplayTime
        Sleep, 250
@@ -87918,6 +88591,8 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
         } Else newBitmap := ConvertFIMtoPBITMAP(hFIFimgX)
 
         FreeImage_UnLoad(hFIFimgX)
+        If StrLen(newBitmap)>2
+           recordGdipBitmaps(newBitmap, A_ThisFunc)
      }
   }
 
@@ -87944,10 +88619,10 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
         FreeImage_GetImageDimensions(hFIFimgC, imgW, imgH)
      }
 
+     setWindowTitle("Converting FreeImage object to GDI+ image bitmap")
      If (noBPPconv=0 && noBMP=0 && GFT=0 && InStr(ColorsType, "rgba"))
         alphaBitmap := FreeImage_GetChannel(hFIFimgC, 4)
 
-     setWindowTitle("Converting FreeImage object to GDI+ image bitmap")
      imgBPPc := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgC), "-"))
      If (imgBPPc!=32)
         hFIFimgD := FreeImage_ConvertTo(hFIFimgC, "32Bits")
@@ -88693,10 +89368,6 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu) {
 }
 
 teleportWICtoFIM(imgW, imgH, bitsDepth) {
-  Static redMASK   := "0x00FF0000" ; FI_RGBA_RED_MASK;
-       , greenMASK := "0x0000FF00" ; FI_RGBA_GREEN_MASK;
-       , blueMASK  := "0x000000FF" ; FI_RGBA_BLUE_MASK;
-
    If memoryUsageWarning(imgW, imgH, bitsDepth, 1)
       Return 0
 
@@ -88728,7 +89399,7 @@ teleportWICtoFIM(imgW, imgH, bitsDepth) {
       buffer := DllCall(whichMainDLL "\WICgetBufferImage", "Int", okay, "Int", bitsDepth, "int", Stride, "int", bufferSize, "UPtr")
 
    If buffer
-      hFIFimgA := FreeImage_ConvertFromRawBitsEx(0, buffer, 1, imgW, imgH, Stride, bitsDepth, redMASK, greenMASK, blueMASK, 1)
+      hFIFimgA := FreeImage_ConvertFromRawBitsEx(0, buffer, 1, imgW, imgH, Stride, bitsDepth, "0x00FF0000", "0x0000FF00", "0x000000FF", 1)
    ; FreeImage_SetDPIresolution(hFIFimgA, dpiX, dpiY)
    If (hFIFimgA && buffer)
    {

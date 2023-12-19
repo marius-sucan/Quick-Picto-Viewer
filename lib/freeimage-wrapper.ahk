@@ -1180,10 +1180,11 @@ ConvertFIMtoPBITMAP(hFIFimgA) {
      {
         R := FreeImage_ConvertToRawBits(Scan0, hFIFimgA, pitch, 32, redMASK, greenMASK, blueMASK, 1)
         Gdip_UnlockBits(pBitmap, BitmapData)
-     }
-     FreeImage_GetDPIresolution(hFIFimgA, dpiX, dpiY)
-     Gdip_BitmapSetResolution(pBitmap, dpiX, dpiY)
-     Return pBitmap
+        FreeImage_GetDPIresolution(hFIFimgA, dpiX, dpiY)
+        Gdip_BitmapSetResolution(pBitmap, Round(dpiX), Round(dpiY))
+        Return pBitmap
+     } 
+     Gdip_DisposeImage(pBitmap)
   }
 }
 

@@ -2,16 +2,18 @@
    a) How Quick Picto Viewer initializes
    b) How a files list index is created
    c) Files index filtering
-   d) How an image is loaded and displayed on screen [simplified]
+   d) How an image is loaded and displayed on screen
    e) General considerations
    f) How slideshows happen
    g) Windows, AHK GUIs
    h) Input responses
-   i) Image live editing [soon]
+   i) Image live editing
    j) How to enable alpha masking for an image editing live tool
+   k) How vector shapes drawing works [soon]
+   l) How image duplicates identification works (soon)
 
 
-Deniere mise à jour: mardi 28 novembre 2023
+Deniere mise à jour: mardi 19 décembre 2023
 ================================================
 
 a) How Quick Picto Viewer initializes
@@ -63,7 +65,9 @@ a) How Quick Picto Viewer initializes
      maxUndoLevels := 2
      coreDesiredPixFmt := "0x21808" ;  24-RGB
      These are meant to limit memory usage as much as possible.
+
      Side note: the 32 bits edition is no longer actively tested.
+
 
 b) How a files list index is created
 =============================================
@@ -209,7 +213,8 @@ c) Files index filtering
    The function FilterFilesIndex() ends by invoking
    GenerateRandyList().
 
-d) How an image is loaded and displayed on screen [simplified]
+
+d) How an image is loaded and displayed on screen
 ==================================================================
 
    To display an image, one can invoke IDshowImage(given_file_index)
@@ -287,9 +292,10 @@ d) How an image is loaded and displayed on screen [simplified]
    using teleportWICtoFIM().
 
    LoadWICscreenImage() and LoadFimFile() can return to LoadBitmapForScreen()
-   the string "very-large", when an image over 536 mgpx was loaded. In this
-   context, the image is a FreeImage object and a dummy GDI+ bitmap
-   is created.
+   the string "very-large", when an image over 536 megapixels was loaded.
+   In this context, the image is a FreeImage object and the "gdiBitmap"
+   GDI+ bitmap is just a dummy. The object is "viewportQPVimage" and it is 
+   created via the "screenQPVimage" class.
 
    LoadBitmapForScreen() returns a GDI+ bitmap handle on success.
    When it is invoked by CloneMainBMP(), it has as argument
@@ -355,6 +361,7 @@ d) How an image is loaded and displayed on screen [simplified]
 
    See section g) for more details on what windows are created.
 
+
 e) General considerations
 =============================================
 
@@ -375,11 +382,20 @@ e) General considerations
    too often because it leads to «hangs». Therefore, in most 
    cases, I have the main thread ping the UI thread.
 
-   In most cases, if not all, I use "ahkPostFunction" to call 
+   In most cases, if not all, I use ahkPostFunction() to call 
    functions from the main thread, because I want to avoid locking
    the UI.
 
    For more details, please see section g).
+
+   The code is poorly structured and organized. It relies on many 
+   global variables... and is hard to follow. This is the result
+   of me having no prior experience in coding such large projects.
+
+   Many GDI+ functions are wrapped to keep track of the bitmaps 
+   created and to avoid memory leaks. These are prefixed with 
+   "trGdip_*".
+
 
 f) How slideshows happen
 =============================================
@@ -431,6 +447,7 @@ f) How slideshows happen
    function is called from the UI thread, and
    invokeExternalSlideshowHandler() to set there the timer
    for the next slide.
+
 
 g) Windows, AHK GUIs
 =============================================
@@ -540,9 +557,20 @@ g) Windows, AHK GUIs
    functions. This is meant to help make the viewport more
    accessible for users relying on screen readers.
 
+   The custom controls:
+   In the panels created with createSettingsGUI(), many controls,
+   even if not actually customized, are wrapped just for the
+   sake of improving accessibility for screen readers and add
+   tooltips, eg. GuiAddEdit().
+
+   The custom sliders are created with GuiAddSlider() and respond to
+   user input via GuiSlidersResponder(). When created, they are
+   usually set to invoke the panel's specific UI function prefixed
+   with "updateUI*".
+
 
 h) Input responses
-=============================================
+============================================================
 
    All keyboard shortcuts are «registered» through WM_KEYDOWN and
    WM_SYSKEYDOWN. Both, the main thread and the interface one, register
@@ -553,10 +581,11 @@ h) Input responses
    is where each keyboard shortcut is actually registered, where the code 
    gets to decide what functions to call based on the keyboard input,
    and the user context, in-app conditions. QPV allows custom defined
-   keyboard shortcuts. These are stored as an object: "userCustomKeysDefined".
-   The object is initialized by loadCustomUserKbds().
-   In KeyboardResponder(), if the user-pressed key is not customized [defined]
-   in the aforementioned object, the key is passed to processDefaultKbdCombos().
+   keyboard shortcuts. These are stored as an object:
+   "userCustomKeysDefined". The object is initialized by
+   loadCustomUserKbds(). In KeyboardResponder(), if the user-pressed
+   key is not customized [defined] in the aforementioned object,
+   the key is passed to processDefaultKbdCombos().
 
    Mouse input is mostly handled in the interface thread.
    The Window Messages for mouse buttons (e.g., WM_LBUTTONUP)
@@ -578,41 +607,117 @@ h) Input responses
    if it is visible. The toolbar is created by createGUItoolbar(),
    if "ShowAdvToolbar" equals 1.
 
-i) Image live editing [soon]
+
+i) Image live editing
 =======================================================================
+
+   The tool panels are created using createSettingsGUI() with the parameter
+   "isImgLiveEditor" set to 1. If the panel does indeed open, then 
+   "imgEditPanelOpened" global variable is set to 1. These can be invoked 
+   by keyboard shortcuts, menus or the toolbar.
+
+   When a live editor panel is opened, it can be collapsed into a small
+   widget. The widget is created with CreateCollapsedPanelWidget(). The 
+   viewport is also responsive to clicks and keyboard actions specific to
+   this mode. The toolbar is also updated with specific icons, based on the
+   active tool, via createGUItoolbar() and CoreGUItoolbar(). 
+
+   Such panels have their controls attached via g-labels to a
+   function prefixed with "updateUI*", eg. updateUIfillPanel(). Such
+   functions update the status of the different available controls: hides,
+   shows, disables, or enables controls.
+
+   The APPLY button in these panels is usually attached to
+   applyIMGeditFunction(). The function is just a wrapper which invokes 
+   a specific function for each tool, eg. BtnDrawShapeSelectedArea(),
+   based on the "AnyWindowOpen" value. Most of these functions are named
+   with this pattern: "Btn*SelectedArea". These functions invoke the
+   actual functions that output the final result, on the image itself.
+
+   The live preview in the viewport is handled by
+   corelivePreviewsImageEditing(). This is another wrapper that handles 
+   how the live preview is drawn on screen and other things. It invokes 
+   specific function for each tool, eg. livePreviewInsertTextinArea().
+   based on the "AnyWindowOpen" value. Most live preview functions 
+   that render the preview on screen have this prefix: "livePreview*".
+
+   Dedicated efforts have been put into generating live previews that do
+   not exceed the viewport area, in order to maintain the performance 
+   within acceptable levels, while maintaining fidelity as much as possible 
+   with the final output when the apply button is pushed by users. When 
+   it is pressed, mergeViewPortEffectsImgEditing() may also be called 
+   to apply any activated viewport color adjustments, before the actual 
+   tool function applies the modifications to the main bitmap.
+
+   Flood fill and the brush tool, even if labeled as live tools, they do 
+   not have live preview functions. The «action» functions are:
+   ActFloodFillNow() and ActPaintBrushNow().
+
+   Some tools allow users to paint in the alpha mask, live, eg., fill
+   selected area. When the user activates this option, 
+   toggleAlphaPaintingMode() is called. The live brush response during
+   painting is handled by ActDrawAlphaMaskBrushNow() together with 
+   the specific live preview function of the active tool. In this mode,
+   one undo level is recorded.
+
+   When images are edited, two images are continually updated:
+   "UserMemBMP" and gdiBitmap. "gdiBitmap" is used for the viewport.
+   "UserMemBMP" is the edited bitmap.
+
+   When editing images under 536 megapixels, 100 levels are recorded,
+   via wrapRecordUndoLevelNow(). Otherwise, one undo level is recorded 
+   by recordUndoLevelHugeImagesNow(). The undo/redo actions are handled 
+   by ImgUndoAction() and ImgRedoAction(). The array "undoLevelsArray"
+   holds the IDs of the different undo states and GDI+ bitmaps.
+
+   When editing images above 536 megapixels, the image data is handled 
+   through FreeImage and most of the tools have counterparts that work
+   on the FreeImage bitmap. "UserMemBMP" and "gdiBitmap" are not used.
+   The array "undoLevelsArray" is also not used with such large bitmaps.
+   The image data is accessible via "viewportQPVimage.imgHandle" property
+   and the methods of "screenQPVimage" class.
+
+   For images under 536 megapixels, the entire image is recorded for
+   every undo level and is always on 32-bits RGBA. But for bigger images,
+   only a subsection of the image is recorded, when possible, and it can
+   be at a color depth of 24-bits or 32-bits.
+
+   Many of the image editing tools rely on C++ functions invoked 
+   via DLL calls from qpvmain.dll written by me.
 
 
 j) How to enable alpha masking for an image editing live tool
 =======================================================================
 
-1. Add the window ID to isAlphaMaskWindow().
-   Window ID is AnyWindowOpen. The panels are created using createSettingsGUI().
-
-2. Add uiADDalphaMaskTabs(tab-ID-A, tab-ID-B, funcUIpanel) in the function
-creating the panel of the tool, eg., PanelFillSelectedArea(). This will add the 
-specific alpha masking options/controls in the panel.
-   tab-ID-A and B are the tab order in the panel created.
-   "funcUIpanel" is the reference to the function of the panel used to updatr
-   the user interface elements and the viewport, eg., updateUIfillPanel().
-
-3. Add in UItriggerBrushUpdate() a pointer to "funcUIpanel"(), as explained
-previously, based on the AnyWindowOpen ID. Do the same in: BtnToggleBrushColors().
-
-4. Add in "funcUIpanel"() calls to updateUIalphaMaskStuff(1) and 
-updateUIalphaMaskStuff(2) based on the "CurrentPanelTab". This will make the 
-alpha mask controls' options to show or hide as expected.
-
-5. Define the "viewportDynamicOBJcoords" object properties: x, y, w, h and zl.
-It must be defined inside the live preview drawing function of the tool itself, 
-eg., livePreviewAdjustColorsArea(). The object is used by MouseMoveResponder().
-
-6. The live preview drawing function must generate a bitmap and then pass it to
-realtimePasteInPlaceAlphaMasker() based on decideAlphaMaskingFeaseable().
-See livePreviewAdjustColorsArea() for an example. Alternatively, when alpha
-mask painting mode is activated, for performance considerations, a direct call to
-QPV_SetAlphaChannel() is suggested, as in livePreviewAdjustColorsArea().
-
-7. Update toggleAlphaPaintingMode(), the commented section «tools with no object
-as reference», and «create new bitmap for these tools». Add the AnyWindowOpen ID
-of the tool to isVarEqualTo(). The user alpha mask bitmap must be created based
-on the selection area dimensions.
+   1. Add the window ID to isAlphaMaskWindow().
+      Window ID is "AnyWindowOpen". The panels are created using createSettingsGUI().
+ 
+   2. Add uiADDalphaMaskTabs(tab-ID-A, tab-ID-B, funcUIpanel) in the function
+   creating the panel of the tool, eg., PanelFillSelectedArea(). This will add the 
+   specific alpha masking options/controls in the panel.
+      tab-ID-A and B are the tab order in the panel created.
+      "funcUIpanel" is the reference to the function of the panel used to updatr
+      the user interface elements and the viewport, eg., updateUIfillPanel().
+ 
+   3. Add in UItriggerBrushUpdate() a pointer to "funcUIpanel"(), as explained
+   previously, based on the "AnyWindowOpen" value.
+   Do the same in BtnToggleBrushColors().
+ 
+   4. Add in "funcUIpanel"() calls to updateUIalphaMaskStuff(1) and 
+   updateUIalphaMaskStuff(2) based on the "CurrentPanelTab". This will make the 
+   alpha mask controls' options to show or hide as expected.
+ 
+   5. Define the "viewportDynamicOBJcoords" object properties: x, y, w, h and zl.
+   It must be defined inside the live preview drawing function of the tool itself, 
+   eg., livePreviewAdjustColorsArea(). The object is used by MouseMoveResponder().
+ 
+   6. The live preview drawing function must generate a bitmap and then pass it to
+   realtimePasteInPlaceAlphaMasker() based on decideAlphaMaskingFeaseable().
+   See livePreviewAdjustColorsArea() for an example. Alternatively, when alpha
+   mask painting mode is activated, for performance considerations, a direct call to
+   QPV_SetAlphaChannel() is suggested, as in livePreviewAdjustColorsArea().
+ 
+   7. Update toggleAlphaPaintingMode(), the commented section «tools with no object
+   as reference», and «create new bitmap for these tools». Add the AnyWindowOpen ID
+   of the tool to isVarEqualTo(). The user alpha mask bitmap must be created based
+   on the selection area dimensions.

@@ -58,7 +58,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , statusBarTooltipVisible := 0, FloodFillSelectionAdj := 0, isToolbarKBDnav := 0, TLBRtwoColumns := 1
      , lastALclickX := 0, lastALclickY := 0, lastDoubleClickZeit := 1, TLBRverticalAlign := 1
      , hPic0, hPic1, hPic2, hPic3, hPic4, hPic5, hPic6, hPic7, hPic8, hPic9, hPic10, hPic11
-     , navKeysCounter := 0, lastSwipeZeitGesture := 1, hFlyBtn1, hFlyBtn2, hFlyBtn3
+     , navKeysCounter := 0, lastSwipeZeitGesture := 1, hFlyBtn1, hFlyBtn2, hFlyBtn3, AllowDarkModeForWindow
 
 If !A_IsCompiled
    Try Menu, Tray, Icon, %A_ScriptDir%\qpv-icon.ico
@@ -190,6 +190,8 @@ BuildGUI(params:=0) {
       FontBolded := externObj[16]
    }
 
+
+   ; setMenusTheme(1)
    calcHUDsize()
    MinGUISize := "+MinSize" A_ScreenWidth//4 "x" A_ScreenHeight//4
    initialWh := "w" A_ScreenWidth//1.7 " h" A_ScreenHeight//1.5
@@ -222,6 +224,7 @@ BuildGUI(params:=0) {
       Gui, 1: -Caption
 
    Gui, 1: Show, Maximize Hide Center %initialwh%, %appTitle%
+   ; setDarkWinAttribs(PVhwnd, 1)
    Try taskBarUI := new taskbarInterface(PVhwnd)
    UnregisterTouchWindow(PVhwnd)
    Loop, 4
@@ -1888,6 +1891,21 @@ IsNumber(Var) {
    Return 0
 }
 
+highLightMenuBar() {
+    hMenuBar := DllCall("GetMenu", "UPtr", PVhwnd, "UPtr")
+    If !hMenuBar
+       addJournalEntry("ERROR: Failed to get menu bar handle, from the main window.")
+
+    hMenuBar := "0x" Format("{:x}", hMenuBar)
+    rect := GetMenuItemRect(PVhwnd, hMenuBar, menuCurrentIndex - 1)
+    mX := Trim(rect.left)
+    mY := Trim(rect.bottom)
+    mYz := Trim(rect.top)
+    mH := max(rect.bottom, rect.top) - min(rect.bottom, rect.top)
+    mW := max(rect.left, rect.right) - min(rect.left, rect.right)
+    ShowClickHalo(mX, mYz, mW, mH, 1, menarg, 1)
+}
+
 menuFlyoutDisplay(actu, mX, mY, isOkay, darkMode:=0, thisHwnd:=0, idu:=0) {
    Critical, on
    lastOtherWinClose := A_TickCount
@@ -1901,6 +1919,8 @@ menuFlyoutDisplay(actu, mX, mY, isOkay, darkMode:=0, thisHwnd:=0, idu:=0) {
 
    If (idu="reset")
       menuCurrentIndex := 0
+   Else
+     SetTimer, highLightMenuBar, -50
 
    If (!isOkay && actu="yes")
       Return
@@ -1927,6 +1947,7 @@ dummyMenuFlyoutDisplay(actu, mX, mY) {
       {
           menusflyOutVisible := 0
           Gui, menuFlier: Hide
+          Gui, MclickH: Hide
           Return
       }
 
@@ -1939,7 +1960,7 @@ dummyMenuFlyoutDisplay(actu, mX, mY) {
          Gui, menuFlier: Show, AutoSize x%x% y%y% NoActivate
    } Else
    {
-      SetTimer, hideMenuFlyOut, -20
+      SetTimer, hideMenuFlyOut, -35
    }
 }
 
@@ -1952,9 +1973,10 @@ hideMenuFlyOut() {
     {
        menusflyOutVisible := 0
        Gui, menuFlier: Hide
+       Gui, MclickH: Hide
        SetTimer, hideMenuFlyOut, Off
     } Else If (menusflyOutVisible=1)
-       SetTimer, hideMenuFlyOut, -30
+       SetTimer, hideMenuFlyOut, -35
 }
 
 GetMenuWinHwnd(mX, mY, n) {
@@ -2063,14 +2085,14 @@ GetMenuItemRect(hwnd, hMenu, nPos) {
     VarSetCapacity(RECT, 16, 0)
     if DllCall("User32.dll\GetMenuItemRect", "Ptr", hwnd, "Ptr", hMenu, "UInt", nPos, "Ptr", &RECT)
     {
-       SoundBeep 
        objRect := { left   : numget( RECT,  0, "UInt" )
                   , top    : numget( RECT,  4, "UInt" )
                   , right  : numget( RECT,  8, "UInt" )
                   , bottom : numget( RECT, 12, "UInt" ) }
+       rect := ""
        return objRect
     }
-
+    rect := ""
     return 0
 }
 
@@ -2146,7 +2168,7 @@ isNowAlphaPainting() {
    Return (imgEditPanelOpened=1 && isAlphaMaskWindow()=1 && liveDrawingBrushTool=1 && editingSelectionNow=1) ? 1 : 0
 }
 
-BuildMenuBar(modus:=0) {
+BuildMenuBar(modus:=0, applyFilter:=0) {
    If (modus="welcome")
       menusList := menusListWelcome
    Else If (modus="freeform" || drawingShapeNow=1)
@@ -2163,6 +2185,17 @@ BuildMenuBar(modus:=0) {
    menuArray := []
    menuTotalIndex := 0
    menuHotkeys := "|"
+
+   If (applyFilter=1)
+   {
+      Menu, PVmenu, Add, >>, dummy
+      Gui, 1: Menu, PVmenu
+      ; GetClientSize(mainWidth, mainHeight, PVhwnd)
+   }
+
+   rr := 0
+   hMenuBar := DllCall("GetMenu", "UPtr", PVhwnd, "UPtr")
+   hMenuBar := "0x" Format("{:x}", hMenuBar)
    Loop, Parse, menusList, |
    {
       ; generate the list of hotkeys for the menu bar items: eg. alt + f
@@ -2170,15 +2203,27 @@ BuildMenuBar(modus:=0) {
       n := SubStr(k[1], 1, 1)
       n2 := SubStr(k[1], 2, 1)
       lbl := (forbiddenAltKeys(n) || InStr(menuHotkeys, "!" n "|")) ? k[1] : "&" k[1]
+      rr := kMenu(lbl, "invokeMenuBarItem", hMenuBar, applyFilter)
+      If (rr=-1)
+         Break
+
       If !InStr(lbl, "&")
       {
          lbl := (forbiddenAltKeys(n2) || InStr(menuHotkeys, "!" n2 "|")) ? k[1] : n "&" SubStr(k[1], 2)
          menuHotkeys .= (!InStr(menuHotkeys, "!" n2 "|") && InStr(lbl, "&")) ? "!" n2 "|" : ".|"
       } Else
          menuHotkeys .= (!InStr(menuHotkeys, "!" n "|") && InStr(lbl, "&")) ? "!" n "|" : ".|"
-
-      kMenu(lbl, "invokeMenuBarItem")
    }
+
+   If (applyFilter=1)
+      Menu, PVmenu, Delete, >>
+
+   If (rr=-1)
+      Menu, PVmenu, Add, >>, MenuBonusOptions
+}
+
+MenuBonusOptions() {
+  SoundBeep 
 }
 
 forbiddenAltKeys(n) {
@@ -2230,10 +2275,19 @@ invokeMenuBarItem(a,b) {
    Global menuCurrentIndex := b
    lastInvoked := A_TickCount
    MainExe.ahkPostFunction(funcu, b)
-   SetTimer, findMenuBarItemUnderMouse, 100
+   SetTimer, findMenuBarItemUnderMouse, 60
 }
 
-kMenu(labelu, funcu, mena:="PVmenu", actu:="add") {
+simpleGetMenuItemRect(hwnd, hMenuBar, indexu, ByRef mX, ByRef mY, ByRef mW, ByRef mH) {
+    rect := GetMenuItemRect(hwnd, hMenuBar, indexu - 1)
+    mX := Trim(rect.left)
+    mY := Trim(rect.bottom)
+    mYz := Trim(rect.top)
+    mH := max(rect.bottom, rect.top) - min(rect.bottom, rect.top)
+    mW := max(rect.left, rect.right) - min(rect.left, rect.right)
+}
+
+kMenu(labelu, funcu, hMenuBar, applyFilter, mena:="PVmenu", actu:="Add") {
    If (actu="add")
    {
       If (funcu="-")
@@ -2242,9 +2296,22 @@ kMenu(labelu, funcu, mena:="PVmenu", actu:="add") {
          Menu, % mena, % actu, % labelu, % funcu
 
       menuTotalIndex++
+      If (applyFilter=1)
+      {
+          simpleGetMenuItemRect(PVhwnd, hMenuBar, menuTotalIndex, mX, mY, mW, mH)
+          JEE_ScreenToClient(PVhwnd, mX, mY, mX, mY)
+          If (abs(mY)>3)
+          {
+             menuTotalIndex--
+             Menu, % mena, Delete, % labelu
+             Return -1
+          }
+      }
+
       t := StrReplace(labelu, "&")
       menuArray[menuTotalIndex] := [t, funcu, labelu, "Enable"]
       menuArray[t] := [funcu, menuTotalIndex, labelu]
+      ; fnOutDebug(A_ThisFunc "(" menuTotalIndex "): " mX + mW "|" mY "||" mW "|" mH "||" mainWidth)
    }
 }
 
@@ -2272,7 +2339,6 @@ clampInRange(value, min, max, reverse:=0) {
 
 findMenuBarItemUnderMouse() {
    Static prevLabel, lastH := 1, lastY := 1
-
    If (!identifyMenus() && (A_TickCount - lastMenuZeit>700))
    {
       ; ToolTip, % "killed" , , , 3
@@ -2386,7 +2452,6 @@ UpdateMenuBar(modus:=0) {
 
    lastMenuBarUpdate := A_TickCount
    Gui, 1: Menu, PVmanu
-   ; kMenu("-", "-", "PVmenu", "delete")
    Try Menu, PVmenu, Delete
    If (showMainMenuBar!=1)
    {
@@ -2395,14 +2460,15 @@ UpdateMenuBar(modus:=0) {
       Return
    }
 
-   Sleep, -1
-   BuildMenuBar(modus)
+   ; Sleep, -1
+   BuildMenuBar(modus, 0)
    MainExe.ahkassign("menuHotkeys", menuHotkeys)
    ; SetMenuInfo(MenuGetHandle("PVmenu"), 2, 1, 0, 1)
-   Sleep, -1
-   Gui, 1: Menu, PVmanu
+   ; Sleep, -1
+   ; Gui, 1: Menu, PVmanu
    Gui, 1: Menu, PVmenu
    lastMenuBarUpdate := A_TickCount
+
    prevState := thisState
    ; updateTlbrPosition()
    SetTimer, updateTlbrPosition, -300
@@ -2786,7 +2852,7 @@ constantMenuReader(modus:=0, externMode:=0) {
          msgu .= "`nSUBMENU CONTAINER"
 
       If !externMode
-         ShowClickHalo(coords.x, coords.y, coords.w, coords.h, 1)
+         ShowClickHalo(coords.x, coords.y, coords.w, coords.h, 1, accFocusName)
 
       If !externMode
          mouseCreateOSDinfoLine(msgu, PrefsLargeFonts, 0, coords)
@@ -2952,7 +3018,7 @@ adjustWin2MonLimits(winHwnd, winX, winY, ByRef rX, ByRef rY, ByRef Wid, ByRef He
    Return ResWidth
 }
 
-ShowClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu:="") {
+ShowClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu:="", stay:=0) {
     Static lastInvoked := 1, wasCreated := 0, hClickHalo
 
     Critical, On
@@ -2971,7 +3037,7 @@ ShowClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu:="") {
 
     If (wasCreated=1)
     {
-       displayClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu, hClickHalo)
+       displayClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu, hClickHalo, stay)
        Return
     }
 
@@ -2985,11 +3051,12 @@ ShowClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu:="") {
     If !msgu
        msgu := "QPV blip"
 
-    displayClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu, hClickHalo)
+    ; fnOutDebug(msgu "|" stay)
+    displayClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu, hClickHalo, stay)
     WinSet, Transparent, 128, ahk_id %hClickHalo%
 }
 
-displayClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu, hwnd) {
+displayClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu, hwnd, stay) {
     If (mX!="" && mY!="")
        Gui, MclickH: Show, NoActivate x%mX% y%mY% w%BoxW% h%BoxH%, %msgu% ; ahk_id %hClickHalo%
 
@@ -2999,7 +3066,8 @@ displayClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu, hwnd) {
        WinSet, Region,, ahk_id %hwnd%
 
     WinSet, AlwaysOnTop, On, ahk_id %hwnd%
-    SetTimer, DestroyClickHalo, -300
+    If !stay
+       SetTimer, DestroyClickHalo, -300
 }
 
 DestroyClickHalo() {
@@ -4384,6 +4452,7 @@ class taskbarInterface {
       DllCall("GetClientRect", "Ptr", hwnd, "Ptr", &rc)
       X2:=NumGet(rc,8,"Int")
       Y2:=NumGet(rc,12,"Int")
+      rc := ""
    }
 }
 
@@ -4641,13 +4710,18 @@ AccGetStateText(nState) {
 }
 
 setMenusTheme(modus) {
-   uxtheme := DllCall("GetModuleHandle", "str", "uxtheme", "ptr")
-   SetPreferredAppMode := DllCall("GetProcAddress", "ptr", uxtheme, "ptr", 135, "ptr")
-   ; AllowDarkModeForWindow := DllCall("GetProcAddress", "ptr", uxtheme, "ptr", 133, "ptr")
-   FlushMenuThemes := DllCall("GetProcAddress", "ptr", uxtheme, "ptr", 136, "ptr")
+   If (A_OSVersion="WIN_7" || A_OSVersion="WIN_XP")
+      Return
+
+   uxtheme := DllCall("GetModuleHandle", "str", "uxtheme", "uptr")
+   SetPreferredAppMode := DllCall("GetProcAddress", "uptr", uxtheme, "ptr", 135, "uptr")
+   global AllowDarkModeForWindow := DllCall("GetProcAddress", "uptr", uxtheme, "ptr", 133, "uptr")
+   FlushMenuThemes := DllCall("GetProcAddress", "uptr", uxtheme, "ptr", 136, "uptr")
    DllCall(SetPreferredAppMode, "int", modus) ; Dark
    DllCall(FlushMenuThemes)
+   interfaceThread.ahkPostFunction("setMenusTheme", modus)
 }
+
 
 AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0) {
 ; Description: AddTooltip v2.0
@@ -5042,5 +5116,20 @@ SetMenuInfo(hMenu, maxHeight:=0, autoDismiss:=0, modeLess:=0, noCheck:=0) {
    ; NumPut(dwMenuData, MENUINFO, 24, "UPtr") ; ULONG_PTR
 
    Return DllCall("User32\SetMenuInfo","Ptr", hMenu, "Ptr", &MENUINFO)
+}
+
+
+setDarkWinAttribs(hwndGUI, modus:=2) {
+   If (A_OSVersion="WIN_7" || A_OSVersion="WIN_XP")
+      Return
+
+   if (A_OSVersion >= "10.0.17763" && SubStr(A_OSVersion, 1, 4)>=10)
+   {
+       DWMWA_USE_IMMERSIVE_DARK_MODE := 19
+       if (A_OSVersion >= "10.0.18985")
+          DWMWA_USE_IMMERSIVE_DARK_MODE := 20
+       DllCall("dwmapi\DwmSetWindowAttribute", "UPtr", hwndGUI, "int", DWMWA_USE_IMMERSIVE_DARK_MODE, "int*", modus, "int", 4)
+   }
+   DllCall(AllowDarkModeForWindow, "UPtr", hwndGUI, "int", modus) ; Dark
 }
 

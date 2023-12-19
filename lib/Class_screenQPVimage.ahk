@@ -39,13 +39,13 @@ Class screenQPVimage {
       Return r
    }
 
-   DiscardImage() {
+   DiscardImage(disposeBuffer:=1) {
       If (This.imgHandle)
       {
          If (This.LoadedWith="FIM")
          {
             FreeImage_UnLoad(This.imgHandle)
-            If (This.FimBuffer!="")
+            If (This.FimBuffer!="" && disposeBuffer=1)
                DllCall("GlobalFree", "uptr", This.FimBuffer)
          } Else If (This.LoadedWith="WIC")
             r := DllCall(whichMainDLL "\WICdestroyPreloadedImage", "Int", 12, "Int")
@@ -53,6 +53,8 @@ Class screenQPVimage {
          This.imgHandle := ""
          This.ImgFile := ""
          killQPVscreenImgSection()
+         If (disposeBuffer!=1)
+            Return This.FimBuffer
       }
    }
 

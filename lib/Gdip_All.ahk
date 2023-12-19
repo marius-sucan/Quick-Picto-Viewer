@@ -3144,11 +3144,11 @@ Gdip_CreateBitmapFromClipboard() {
 
    pid := DllCall("GetCurrentProcessId","uint")
    hwnd := WinExist("ahk_pid " . pid)
-   if !DllCall("IsClipboardFormatAvailable", "uint", 8)  ; CF_DIB = 8
+   If !DllCall("IsClipboardFormatAvailable", "uint", 8)  ; CF_DIB = 8
    {
-      if DllCall("IsClipboardFormatAvailable", "uint", 2)  ; CF_BITMAP = 2
+      If DllCall("IsClipboardFormatAvailable", "uint", 2)  ; CF_BITMAP = 2
       {
-         if !DllCall("OpenClipboard", "UPtr", hwnd)
+         If !DllCall("OpenClipboard", "UPtr", hwnd)
             return -1
 
          hData := DllCall("User32.dll\GetClipboardData", "UInt", 0x0002, "UPtr")
@@ -3161,33 +3161,25 @@ Gdip_CreateBitmapFromClipboard() {
       return -2
    }
 
-   if !DllCall("OpenClipboard", "UPtr", hwnd)
+   If !DllCall("OpenClipboard", "UPtr", hwnd)
       return -1
 
    hBitmap := DllCall("GetClipboardData", "uint", 2, "UPtr")
-   if !hBitmap
-   {
-      DllCall("CloseClipboard")
-      return -3
-   }
-
    DllCall("CloseClipboard")
-   If hBitmap
-   {
-      pBitmap := Gdip_CreateARGBBitmapFromHBITMAP(hBitmap) ; this function can return a completely empty/transparent bitmap
-      If pBitmap
-         isUniform := Gdip_TestBitmapUniformity(pBitmap, 7, maxLevelIndex)
+   If !hBitmap
+      return -3
 
-      If (pBitmap && isUniform=1 && maxLevelIndex<=2)
-      {
-         Gdip_DisposeImage(pBitmap, 1)
-         pBitmap := Gdip_CreateBitmapFromHBITMAP(hBitmap)
-      }
-      DeleteObject(hBitmap)
-   }
-
+   pBitmap := Gdip_CreateARGBBitmapFromHBITMAP(hBitmap) ; this function can return a completely empty/transparent bitmap
+   DeleteObject(hBitmap)
    if !pBitmap
       return -4
+
+   isUniform := Gdip_TestBitmapUniformity(pBitmap, 7, maxLevelIndex)
+   If (isUniform=1 && maxLevelIndex<=2)
+   {
+      Gdip_DisposeImage(pBitmap, 1)
+      pBitmap := Gdip_CreateBitmapFromHBITMAP(hBitmap)
+   }
 
    return pBitmap
 }
@@ -5973,7 +5965,7 @@ Gdip_SetSmoothingMode(pGraphics, SmoothingMode) {
 Gdip_SetCompositingMode(pGraphics, CompositingMode) {
 ; CompositingMode_SourceOver = 0 (blended / default)
 ; CompositingMode_SourceCopy = 1 (overwrite)
-   If !pGraphics
+   If (pGraphics="")
       Return 2
 
    return DllCall("gdiplus\GdipSetCompositingMode", "UPtr", pGraphics, "int", CompositingMode)
@@ -5986,7 +5978,7 @@ Gdip_SetCompositingQuality(pGraphics, CompositionQuality) {
 ; 2 - Gamma correction is applied. Composition of high quality and speed.
 ; 3 - Gamma correction is applied.
 ; 4 - Gamma correction is not applied. Linear values are used.
-   If !pGraphics
+   If (pGraphics="")
       Return 2
 
    Return DllCall("gdiplus\GdipSetCompositingQuality", "UPtr", pGraphics, "int", CompositionQuality)
@@ -5996,7 +5988,7 @@ Gdip_SetPageScale(pGraphics, Scale) {
 ; Sets the scaling factor for the page transformation of a pGraphics object.
 ; The page transformation converts page coordinates to device coordinates.
 
-   If !pGraphics
+   If (pGraphics="")
       Return 2
 
    Return DllCall("gdiplus\GdipSetPageScale", "UPtr", pGraphics, "float", Scale)
@@ -6012,7 +6004,7 @@ Gdip_SetPageUnit(pGraphics, Unit) {
 ; 4 - A unit is 1 inch
 ; 5 - A unit is 1/300 inch
 ; 6 - A unit is 1 millimeter
-   If !pGraphics
+   If (pGraphics="")
       Return 2
 
    Return DllCall("gdiplus\GdipSetPageUnit", "UPtr", pGraphics, "int", Unit)
