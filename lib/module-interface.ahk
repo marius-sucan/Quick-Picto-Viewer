@@ -12,6 +12,7 @@ SetWinDelay, 1
 CoordMode, Mouse, Screen
 SetBatchLines, -1
 SetWorkingDir, %A_ScriptDir%
+CoordMode, Tooltip, Screen
 
 Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Quick Picto Viewer"
      , RegExFilesPattern := "i)^(.\:\\).*(\.(ico|dib|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif))$"
@@ -224,7 +225,7 @@ BuildGUI(params:=0) {
       Gui, 1: -Caption
 
    Gui, 1: Show, Maximize Hide Center %initialwh%, %appTitle%
-   ; setDarkWinAttribs(PVhwnd, 1)
+
    Try taskBarUI := new taskbarInterface(PVhwnd)
    UnregisterTouchWindow(PVhwnd)
    Loop, 4
@@ -927,6 +928,9 @@ WM_LBUTTONUP(wP, lP, msg, hwnd) {
     If (menusflyOutVisible=1)
     {
        MouseGetPos, , , OutputVarWin, hwnd, 2
+       If isVarEqualTo(hwnd, hFlyBtn1, hFlyBtn2, hFlyBtn3)
+          Gui, MclickH: Destroy
+
        If (hwnd=hFlyBtn1)
           PanelQuickSearchMenuOptions()
        Else If (hwnd=hFlyBtn2)
@@ -1452,18 +1456,23 @@ isDotInRect(mX, mY, x1, x2, y1, y2, modus:=0) {
 
 isQPVactive() {
     Static lastInvoked := 1, last := 1
-    If (A_TickCount - lastInvoked<450) && (last=0)
+    If ((A_TickCount - lastInvoked<450) && (last=0))
        Return last
 
     A := WinActive("A")
     lastInvoked := A_TickCount
-    last := (A=hSetWinGui && AnyWindowOpen || A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin || A=hGDIinfosWin || A=hGuiTip && mouseToolTipWinCreated=1 || A=hquickMenuSearchWin && VisibleQuickMenuSearchWin=1 || A=hQPVtoolbar && ShowAdvToolbar=1 || A=hfdTreeWinGui && folderTreeWinOpen=1) ? 1 : 0
+    ; last := (A=hSetWinGui && AnyWindowOpen || A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin || A=hGDIinfosWin || A=hGuiTip && mouseToolTipWinCreated=1 || A=hquickMenuSearchWin && VisibleQuickMenuSearchWin=1 || A=hQPVtoolbar && ShowAdvToolbar=1 || A=hfdTreeWinGui && folderTreeWinOpen=1) ? 1 : 0
+    last := (A=hSetWinGui && AnyWindowOpen || A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin || A=hGDIinfosWin || A=hGuiTip && mouseToolTipWinCreated=1 || A=hquickMenuSearchWin && VisibleQuickMenuSearchWin=1 || A=hQPVtoolbar && ShowAdvToolbar=1 || A=hfdTreeWinGui && folderTreeWinOpen=1 || A=hFlyOut && menusflyOutVisible=1) ? 1 : 0
     Return last
+}
+
+RemoveTooltip() {
+  Tooltip
 }
 
 showMouseTooltipStatusbar() {
     MouseGetPos, ,, OutputVarWin
-    If (LbtnDwn=1 || !lastWinStatus || !thumbsDisplaying) || (A_TickCount - lastZeitToolTip<1000) || (OutputVarWin!=PVhwnd)
+    If (LbtnDwn=1 || menusflyOutVisible=1 || !lastWinStatus || !thumbsDisplaying) || (A_TickCount - lastZeitToolTip<1000) || (OutputVarWin!=PVhwnd)
        Return
 
     thisSize := OSDfontSize//3.5 + 2
@@ -1473,7 +1482,7 @@ showMouseTooltipStatusbar() {
 }
 
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
-  Static lastInvoked := 1, prevPos, prevArrayPos := []
+  Static lastInvoked := 1, prevPos, lastTip := 1, prevArrayPos := []
   If ((A_TickCount - lastZeitPanCursor < 300) || !isQPVactive())
      Return
 
@@ -1508,6 +1517,23 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
 
   If (A_TickCount - scriptStartTime < 900)
      Return
+
+  If (menusflyOutVisible=1)
+  {
+     WinGetPos, xu, yu, ww, hh, ahk_id %hFlyOut%
+     If (xu && yu && ww && hh && (A_TickCount - lastTip>250))
+     {
+        MouseGetPos, , , OutputVarWin, hwnd, 2
+        yu += hh + 2
+        If (hwnd=hFlyBtn1)
+           Tooltip, Search options [ `; ], % xu, % yu
+        Else If (hwnd=hFlyBtn2)
+           Tooltip, Toolbar [ Shift+F10 ], % xu, % yu
+        Else If (hwnd=hFlyBtn3)
+           Tooltip, Menu bar [ F10 ], % xu, % yu
+        lastTip := A_TickCount
+     }
+  }
 
   thisPos := mX "-" mY
   prevArrayPos := [mX, mY]
@@ -1854,6 +1880,7 @@ kbdkeybcallKeysResponder(givenKey, thisWin) {
 destroyMenuFlyout() {
    wasMenuFlierCreated := 0
    Gui, menuFlier: Destroy
+   Tooltip
 }
 
 guiCreateMenuFlyout() {
@@ -1877,10 +1904,10 @@ guiCreateMenuFlyout() {
    Gui, menuFlier: Add, Text, %brd% Center +0x200 x0 y0 w%h% h%h% hwndhFlyBtn1 +TabStop, S
    Gui, menuFlier: Add, Text, %brd% Center +0x200 x+%m% wp hp hwndhFlyBtn2 +TabStop, T
    Gui, menuFlier: Add, Text, %brd% Center +0x200 x+%m% wp hp hwndhFlyBtn3 +TabStop, M
-   AddTooltip2Ctrl(hFlyBtn1, "Search through ther available options [ `; ]",, uiUseDarkMode)
-   AddTooltip2Ctrl(hFlyBtn2, "Toggle app toolbar [ Shift+F10 ]",, uiUseDarkMode)
-   AddTooltip2Ctrl(hFlyBtn3, "Toggle menu bar [ F10 ]",, uiUseDarkMode)
-   ; AddTooltip2Ctrl("AutoPop", 0.5)
+   ; AddTooltip2Ctrl(hFlyBtn1, "Search through the available options [ `; ]",, uiUseDarkMode)
+   ; AddTooltip2Ctrl(hFlyBtn2, "Toggle app toolbar [ Shift+F10 ]",, uiUseDarkMode)
+   ; AddTooltip2Ctrl(hFlyBtn3, "Toggle menu bar [ F10 ]",, uiUseDarkMode)
+   ; AddTooltip2Ctrl("AutoPop", 0.1)
    wasMenuFlierCreated := 1
 }
 
@@ -1945,6 +1972,7 @@ dummyMenuFlyoutDisplay(actu, mX, mY) {
       }
       If (!InStr(h[2], "32768") && !a)
       {
+          ToolTip
           menusflyOutVisible := 0
           Gui, menuFlier: Hide
           Gui, MclickH: Hide
@@ -1971,6 +1999,7 @@ hideMenuFlyOut() {
     ; ToolTip, % OutputVarWin "==" hFlyOut "`n" glassu "==" titlu , , , 2
     If (OutputVarWin!=hFlyOut && !identifyMenus())
     {
+       Tooltip
        menusflyOutVisible := 0
        Gui, menuFlier: Hide
        Gui, MclickH: Hide
@@ -4877,7 +4906,7 @@ AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0) {
             ,"Ptr",0                                    ;-- hMenu
             ,"Ptr",0                                    ;-- hInstance
             ,"Ptr",0                                    ;-- lpParam
-            ,"Ptr")                                     ;-- Return type
+            ,"UPtr")                                     ;-- Return type
 
         ;-- Disable visual style
         ;   Note: Uncomment the following to disable the visual style, i.e.
@@ -4929,8 +4958,8 @@ AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0) {
     cbSize := VarSetCapacity(TOOLINFO,(A_PtrSize=8) ? 64:44,0)
     NumPut(cbSize,      TOOLINFO,0,"UInt")              ;-- cbSize
     NumPut(uFlags,      TOOLINFO,4,"UInt")              ;-- uFlags
-    NumPut(HWND_DESKTOP,TOOLINFO,8,"Ptr")               ;-- hwnd
-    NumPut(p1,          TOOLINFO,(A_PtrSize=8) ? 16:12,"Ptr")
+    NumPut(HWND_DESKTOP,TOOLINFO,8,"UPtr")               ;-- hwnd
+    NumPut(p1,          TOOLINFO,(A_PtrSize=8) ? 16:12,"UPtr")
         ;-- uId
 
     ;-- Check to see if tool has already been registered for the control
@@ -4940,7 +4969,7 @@ AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0) {
     l_RegisteredTool := ErrorLevel
 
     ;-- Update the TOOLTIP structure
-    NumPut(&p2, TOOLINFO, (A_PtrSize=8) ? 48 : 36,"Ptr")
+    NumPut(&p2, TOOLINFO, (A_PtrSize=8) ? 48 : 36,"UPtr")
         ;-- lpszText
 
     ;-- Add, Update, or Delete tool
@@ -4956,7 +4985,7 @@ AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0) {
     }
 
     If (darkMode=1)
-       DllCall("uxtheme\SetWindowTheme", "ptr", HTT, "str", "DarkMode_Explorer", "ptr", 0)
+       DllCall("uxtheme\SetWindowTheme", "uptr", HTT, "str", "DarkMode_Explorer", "ptr", 0)
 
     ;-- Restore DetectHiddenWindows
     DetectHiddenWindows %l_DetectHiddenWindows%
@@ -5118,7 +5147,6 @@ SetMenuInfo(hMenu, maxHeight:=0, autoDismiss:=0, modeLess:=0, noCheck:=0) {
    Return DllCall("User32\SetMenuInfo","Ptr", hMenu, "Ptr", &MENUINFO)
 }
 
-
 setDarkWinAttribs(hwndGUI, modus:=2) {
    If (A_OSVersion="WIN_7" || A_OSVersion="WIN_XP")
       Return
@@ -5128,6 +5156,7 @@ setDarkWinAttribs(hwndGUI, modus:=2) {
        DWMWA_USE_IMMERSIVE_DARK_MODE := 19
        if (A_OSVersion >= "10.0.18985")
           DWMWA_USE_IMMERSIVE_DARK_MODE := 20
+
        DllCall("dwmapi\DwmSetWindowAttribute", "UPtr", hwndGUI, "int", DWMWA_USE_IMMERSIVE_DARK_MODE, "int*", modus, "int", 4)
    }
    DllCall(AllowDarkModeForWindow, "UPtr", hwndGUI, "int", modus) ; Dark

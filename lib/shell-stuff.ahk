@@ -2355,7 +2355,7 @@ AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0, largeFont:=0) {
     If (p1="reset")
     {
        If hTT
-          DllCall("DestroyWindow", "Ptr", hTT)
+          DllCall("DestroyWindow", "UPtr", hTT)
        hTT := ""
        Return
     }
@@ -2384,7 +2384,7 @@ AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0, largeFont:=0) {
             ,"Ptr",0                                    ;-- hMenu
             ,"Ptr",0                                    ;-- hInstance
             ,"Ptr",0                                    ;-- lpParam
-            ,"Ptr")                                     ;-- Return type
+            ,"UPtr")                                     ;-- Return type
 
         ;-- Disable visual style
         ;   Note: Uncomment the following to disable the visual style, i.e.
@@ -2394,7 +2394,7 @@ AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0, largeFont:=0) {
         ;   DllCall("uxtheme\SetWindowTheme","Ptr",hTT,"Ptr",0,"UIntP",0)
 
         If (darkMode=1)
-           DllCall("uxtheme\SetWindowTheme", "ptr", HTT, "str", "DarkMode_Explorer", "ptr", 0)
+           DllCall("uxtheme\SetWindowTheme", "uptr", HTT, "str", "DarkMode_Explorer", "ptr", 0)
         ;-- Set the maximum width for the tooltip window
         ;   Note: This message makes multi-line tooltips possible
         SendMessage, TTM_SETMAXTIPWIDTH, 0, A_ScreenWidth,, ahk_id %hTT%

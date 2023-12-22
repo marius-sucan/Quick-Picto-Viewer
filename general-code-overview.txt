@@ -5,15 +5,16 @@
    d) How an image is loaded and displayed on screen
    e) General considerations
    f) How slideshows happen
-   g) Windows, AHK GUIs
+   g) Windows, AHK GUIs, Menus
    h) Input responses
    i) Image live editing
    j) How to enable alpha masking for an image editing live tool
    k) How vector shapes drawing works [soon]
    l) How image duplicates identification works (soon)
+   m) How to add a new panel/tool (soon)
 
 
-Deniere mise à jour: mardi 19 décembre 2023
+Deniere mise à jour: vendredi 22 décembre 2023
 ================================================
 
 a) How Quick Picto Viewer initializes
@@ -449,7 +450,7 @@ f) How slideshows happen
    for the next slide.
 
 
-g) Windows, AHK GUIs
+g) Windows, AHK GUIs, Menus
 =============================================
 
    The application consists mainly of two threads. In the main
@@ -540,13 +541,18 @@ g) Windows, AHK GUIs
    5. createGUItoolbar() - custom toolbar
       hQPVtoolbar, OSDguiToolbar
 
+   6. CreateSoloSliderWidgetWin() - a sliders widget
+      hSliderWidget, SoloSliderWidgetGUIA
+      It is used a popup for some tools found in the
+      toolbar.
+
+   7. CreateCollapsedPanelWidget() - collapsed panel widget
+      collapseWidgetGUIA, collapseWidgetGUIA
+      It is invokable by collapsing the panel of a live tool.
+
+
    The main thread shows messages in the viewport using
    CreateOSDinfoLine() wrapped by showTOOLtip().
-
-   The main thread creates all the context menus via
-   InitGuiContextMenu(), InitSecondMenu() and others. 
-   The menus are displayed with showThisMenu() from
-   the main thread.
 
    The main GUI of the window, created in BuildGUI(),
    contains multiple static text controls. These are used
@@ -557,7 +563,7 @@ g) Windows, AHK GUIs
    functions. This is meant to help make the viewport more
    accessible for users relying on screen readers.
 
-   The custom controls:
+   *The custom controls:
    In the panels created with createSettingsGUI(), many controls,
    even if not actually customized, are wrapped just for the
    sake of improving accessibility for screen readers and add
@@ -567,6 +573,28 @@ g) Windows, AHK GUIs
    user input via GuiSlidersResponder(). When created, they are
    usually set to invoke the panel's specific UI function prefixed
    with "updateUI*".
+
+   *The menus:
+   The main thread creates all the context menus via
+   InitGuiContextMenu(), InitSecondMenu() and others. The menus are
+   displayed with showThisMenu() from the main thread, even the menu
+   bar.
+
+   All the menus, and the context menus, are created with the standard 
+   Menu command of AHK, however I created a wrapper function for it.
+   The list of menus is generated on the go, on demand, based on 
+   app/user context[s]. The wrapper helps keep track of the menus
+   generated: kMenu(). It records menu names, states and keywords.
+      objuA - menu items by index with properties objuA[menuIndex] := [prop1, prop2,... etc]
+      objuB - maps menu-names with menu items pairs to indexexes of objuA; objuB[menu "-" label] := menuIndex
+      objuC - menu-names and their properties objuC[menu] := [menu-name, container-menu, accelerator-key]
+
+   The menus are searchable via PanelQuickSearchMenuOptions() via
+   buildQuickSearchMenus(). The global variable "mustPreventMenus" is set
+   to 1 before generating the searchable list of the menus. When this is
+   used, some menu items are hidden, while others are added, and the
+   menus themselves are not invoked. When this variable is set to 1,
+   showThisMenu() does not display the menu on screen.
 
 
 h) Input responses
@@ -592,7 +620,14 @@ h) Input responses
    are registered and, broadly speaking, invoke WinClickAction(),
    which is a wrapper to the function with the same name from
    the main thread. The function handles most of the imagined
-   responses to mouse clicks, based on user context.
+   responses to mouse clicks, based on user context. Several
+   examples:
+     - thumbsListClickResponder()
+     - ActPaintBrushNow()
+     - ActDrawAlphaMaskBrushNow()
+     - addNewVectorShapePoints()
+     - updateTinyPreviewArea()
+     ... and many more: WinClickAction() has over 700 lines...
 
    WM_MOUSEMOVE message is registered in the interface thread 
    and it is associated with the function WM_MOUSEMOVE().
@@ -650,15 +685,20 @@ i) Image live editing
    tool function applies the modifications to the main bitmap.
 
    Flood fill and the brush tool, even if labeled as live tools, they do 
-   not have live preview functions. The «action» functions are:
-   ActFloodFillNow() and ActPaintBrushNow().
+   not have live preview functions. The actions are live themselves.
+   The functions are: ActFloodFillNow() and ActPaintBrushNow().
 
-   Some tools allow users to paint in the alpha mask, live, eg., fill
-   selected area. When the user activates this option, 
-   toggleAlphaPaintingMode() is called. The live brush response during
-   painting is handled by ActDrawAlphaMaskBrushNow() together with 
-   the specific live preview function of the active tool. In this mode,
-   one undo level is recorded.
+   Some tools allow users to paint in the alpha mask, eg., fill selected
+   area. When the user activates this option, toggleAlphaPaintingMode()
+   is called. The live brush response during painting is handled by
+   ActDrawAlphaMaskBrushNow() together with  the specific live preview
+   function of the active tool. In this mode, one undo level is recorded.
+
+   When drawing tools are used: "liveDrawingBrushTool" is set to 1.
+
+   The aforementioned functions, ActDrawAlphaMaskBrushNow(), ActFloodFillNow()
+   and ActPaintBrushNow() are invoked by WinClickAction() when users click 
+   on the canvas.
 
    When images are edited, two images are continually updated:
    "UserMemBMP" and gdiBitmap. "gdiBitmap" is used for the viewport.
