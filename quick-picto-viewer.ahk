@@ -1,17 +1,10 @@
-﻿; Original script details:
-;   Name:     AHK Picture Viewer
-;   Version:  1.0.0 on Oct 4, 2010 by SBC
-;   Platform: Windows XP or later
-;   Author:   SBC - http://sites.google.com/site/littlescripting/
-;   Found on: https://autohotkey.com/board/topic/58226-ahk-picture-viewer/
-;
-; New script details:
+﻿; Script details:
 ;   Name:     Quick Picto Viewer
-;   Version:  [see change logs file]
 ;   Platform: Windows 7 or later, preferred is Windows 10.
-;   Author:   Marius Șucan - http://marius.sucan.ro/
+;   Author:   Marius Șucan - https://marius.sucan.ro/
 ;   GitHub:   https://github.com/marius-sucan/Quick-Picto-Viewer
 ;   Requires: AHK-H v1.1.33.10.
+;   Code overview: https://raw.githubusercontent.com/marius-sucan/Quick-Picto-Viewer/master/general-code-overview.txt
 ;
 ; Quick Picto Viewer can run on Windows 7 and even on XP, but various features
 ; might not work. To this end, you may have to copy all the DLL files found
@@ -591,6 +584,7 @@ PreProcessKbdKey() {
 }
 
 decideBlockKbdKeys(Az, givenKey) {
+   Critical, on
    blockKey := 0
    If AnyWindowOpen
       GuiControlGet, OutputVname, SettingsGUIA: FocusV
@@ -610,7 +604,7 @@ decideBlockKbdKeys(Az, givenKey) {
       || (isVarEqualTo(givenKey, "^Up", "!Up", "!Left", "!BackSpace", "^x", "^c") && omniBoxMode=1)
          blockKey := 1
          GuiControlGet, OutputVname, SettingsGUIA: FocusV
-   } Else If (Az=hSetWinGui  && InStr(OutputVname, "customSliders") && isVarEqualTo(givenKey, "Left", "Right", "PgUp", "PgDn", "Home", "End", "BackSpace", "Delete"))
+   } Else If (Az=hSetWinGui && InStr(OutputVname, "customSliders") && isVarEqualTo(givenKey, "Left", "Right", "PgUp", "PgDn", "Home", "End", "BackSpace", "Delete"))
    {
       blockKey := 1
    } Else If (Az=hSetWinGui && isVarEqualTo(givenKey, "Up", "Down"))
@@ -1590,12 +1584,12 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     {
        allowLoop := 1
        If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1)
-          func2Call := ["ChangeZoom", 1, "WheelUp"]
+          func2Call := ["VPchangeZoom", 1, "WheelUp"]
     } Else If (givenKey="^WheelDown")
     {
        allowLoop := 1
        If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1)
-          func2Call := ["ChangeZoom", -1, "WheelDown"]
+          func2Call := ["VPchangeZoom", -1, "WheelDown"]
     } Else If (givenKey="!Left")
     {
        allowLoop := 1
@@ -2022,7 +2016,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        If (HKifs("imgsLoaded") && thumbsDisplaying=1)
           func2Call := ["ThumbsNavigator", "Upu", givenKey]
        Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1) && (IMGresizingMode=4 && thumbsDisplaying!=1)
-          func2Call := ["ChangeZoom", 1, "WheelUp"]
+          func2Call := ["VPchangeZoom", 1, "WheelUp"]
        Else If (HKifs("imgsLoaded"))
           func2Call := ["PreviousPicture", "key-" givenKey]
     } Else If (givenKey="WheelDown")
@@ -2030,7 +2024,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        If (HKifs("imgsLoaded") && thumbsDisplaying=1)
           func2Call := ["ThumbsNavigator", "Down", givenKey]
        Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1) && (IMGresizingMode=4 && thumbsDisplaying!=1)
-          func2Call := ["ChangeZoom", -1, "WheelDown"]
+          func2Call := ["VPchangeZoom", -1, "WheelDown"]
        Else If (HKifs("imgsLoaded"))
           func2Call := ["NextPicture", "key-" givenKey]
     } Else If (givenKey="Right" || givenKey="+Right")
@@ -3159,7 +3153,7 @@ copyMoveStructuredFolders(srcDir, finalDest) {
    startZeit := A_Now
    backCurrentSLD := CurrentSLD
    CurrentSLD := ""
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    Loop, % maxFilesIndex
    {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
@@ -3286,7 +3280,7 @@ copyMoveStructuredFolders(srcDir, finalDest) {
       }
    }
 
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    CurrentSLD := backCurrentSLD
    someErrors := "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
    If (SLDtypeLoaded=3)
@@ -5023,7 +5017,7 @@ panIMGonScrollBar(doX, doY) {
    scH := Round(mainHeight * (mainHeight / prevResizedVPimgH) / 2)
    scW := Round(mainWidth * (mainWidth / prevResizedVPimgW) / 2)
    oX := doX , oY := doY
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    While, (determineLClickState()=1)
    {
       zeitSillyPrevent := A_TickCount
@@ -5068,7 +5062,7 @@ panIMGonScrollBar(doX, doY) {
         Sleep, 70
    }
 
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    vpImgPanningNow := 0
    diffIMGdecX := diffIMGdecY := 0
    ; If (thisIndex>10) || (lastWasLowQuality=1)
@@ -5112,7 +5106,7 @@ ThumbsScrollbar() {
       doMapNow := 1
 
    GetMouseCoord2wind(PVhwnd, mX, mY)
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    startZeit := A_TickCount
    knobSize := getScrollWidth()
    ScrollRegionH := mainHeight - knobSize*1.5 - 4
@@ -5158,7 +5152,7 @@ ThumbsScrollbar() {
       }
    }
 
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    trGdip_DisposeImage(listMap[1])
    If (GetKeyState("Shift", "P"))
    {
@@ -5169,7 +5163,7 @@ ThumbsScrollbar() {
    dummyTimerDelayiedImageDisplay(250)
 }
 
-setwhileLoopExec(val) {
+setWhileLoopExec(val) {
    whileLoopExec := val
    interfaceThread.ahkassign("whileLoopExec", val)
 }
@@ -5192,7 +5186,7 @@ simplePanIMGonClick(modus:=0, doX:=1, doY:=1, bX:=0, bY:=0) {
    prevState := thisIndex := 0
    thisZL := (zoomLevel>8) ? 8 : 0.8 + zoomLevel
    ; ToolTip, % "l=" thisZL , , , 2
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    If (modus="scroll")
       wrapResizeImageGDIwin()
 
@@ -5267,7 +5261,7 @@ simplePanIMGonClick(modus:=0, doX:=1, doY:=1, bX:=0, bY:=0) {
       }
    }
 
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    If (bX && bY)
       doSetCursorPos(bX, bY)
 
@@ -5311,7 +5305,7 @@ winSwipeAction(thisCtrlClicked, mainParam) {
    lowerLimitRatio := (IMGresizingMode=4) ? 0.4 : 0.4
    GetPhysicalCursorPos(mX, mY)
    vpWinClientSize(mainWidth, mainHeight)
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    While, (determineLClickState()=1 || A_Index<2)
    {
       GetPhysicalCursorPos(mX, mY)
@@ -5356,7 +5350,7 @@ winSwipeAction(thisCtrlClicked, mainParam) {
          stepFactor := (diffy/mainHeight)*10 + 1.25
          ; ToolTip, % stepFactor " = " dirY , , , 2
          doZoomChange := dirY
-         ;  ChangeZoom(dirY, 0, stepFactor)
+         ;  VPchangeZoom(dirY, 0, stepFactor)
       } Else If (swipeAct=2 && infoImgEditingMode!=1)
       {
          If (dirX=1)
@@ -5399,7 +5393,7 @@ winSwipeAction(thisCtrlClicked, mainParam) {
       }
    }
 
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    lastSwipeZeitGesture := A_TickCount
    If (doFrameChange || doNextSlide || doPrevSlide || doZoomChange)
       interfaceThread.ahkassign("lastSwipeZeitGesture", lastSwipeZeitGesture)
@@ -5412,7 +5406,7 @@ winSwipeAction(thisCtrlClicked, mainParam) {
    Else If doPrevSlide
       GoPrevSlide()
    Else If doZoomChange
-      changeZoom(doZoomChange, 0, stepFactor)
+      VPchangeZoom(doZoomChange, 0, stepFactor)
    Else 
       didSomething := 0
 
@@ -5538,7 +5532,7 @@ setNewBrushSymmetryPoints() {
    trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
    thisZeit := kX := kY := 0
    BrushToolSymmetryX := SubStr(BrushToolSymmetryX, 1, 1)
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    While, (determineLClickState()=1)
    {
       GetMouseCoord2wind(PVhwnd, mX, mY)
@@ -5562,7 +5556,7 @@ setNewBrushSymmetryPoints() {
       GuiControl, SettingsGUIA:, BrushToolSymmetryX, 1
    }
 
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    endCaptureCloneBrush()
    If (panelWinCollapsed=1)
       toggleImgEditPanelWindow()
@@ -5646,7 +5640,7 @@ MouseMoveResponder(actu:=0) {
            If (prevMouseCoords[1] && prevMouseCoords[2]
            && !isDotInRect(mX, mY, prevMouseCoords[1] - 10, prevMouseCoords[1] + 10, prevMouseCoords[2] - 10, prevMouseCoords[2] + 10))
            {
-              newAngle := MouseDeltaAngle(prevMouseCoords[1], prevMouseCoords[2], mX, mY)
+              newAngle := MouseDeltaAngle180(prevMouseCoords[1], prevMouseCoords[2], mX, mY)
               If (newAngle<0)
                  newAngle := 360 - Abs(newAngle)/2
               If (prevMouseCoords[3]<90 && newAngle>270)
@@ -7643,7 +7637,7 @@ rescaleSelectedVectorPoints() {
    thisState := prevState := 0
    GetMouseCoord2wind(PVhwnd, omX, omY)
    newArrayu := customShapePoints.Clone()
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    minX := minY := 8823893348934389
    maxX := maxY := -8823893348934389
    If GetKeyState("Shift", "P")
@@ -7707,7 +7701,7 @@ rescaleSelectedVectorPoints() {
       Sleep, 5
    }
 
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    RemoveTooltip()
    newArrayu := []
    Return 1
@@ -7718,7 +7712,7 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
    mustSnapLiveDrawPoints := 0
    vpWinClientSize(mainWidth, mainHeight)
    c := customShapePoints[thisIndex]
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    startOperation := A_TickCount
 
    While, (determineLClickState()=1)
@@ -7845,7 +7839,7 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
         }
         Sleep, 2
    }
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    Return mustRem
 }
 
@@ -7980,7 +7974,7 @@ moveSelectedPointsInVectorPath(gmX, gmY) {
    thisState := prevState := 0
    GetMouseCoord2wind(PVhwnd, omX, omY)
    newArrayu := customShapePoints.Clone()
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    startOperation := A_TickCount
    While, (determineLClickState()=1)
    {
@@ -8013,7 +8007,7 @@ moveSelectedPointsInVectorPath(gmX, gmY) {
       }
       Sleep, 2
    }
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    RemoveTooltip()
    newArrayu := []
 }
@@ -8489,6 +8483,35 @@ initFreeHandClickResponse(mX, mY, imgW, imgH, mainWidth, mainHeight) {
    Return dotActiveObj
 }
 
+scaleVector(x1, y1, x2, y2, scaleFactor) {
+    vx := x2 - x1
+    vy := y2 - y1
+    scaled_vx := scaleFactor * vx
+    scaled_vy := scaleFactor * vy
+    new_x := x1 + scaled_vx
+    new_y := y1 + scaled_vy
+    return [new_x, new_y]
+}
+
+UIcalculateNewAngleOnMouseCoords(mXo, mYo, mX, mY, startValue, snap) {
+    newRotation := MouseDeltaAngle360(mXo, mYo, mX, mY)
+    If (newRotation<0)
+       newRotation += 360
+
+    newValue := startValue + newRotation
+    If (newValue>360)
+       newValue -= 360
+
+    newValue := snapToValues(newValue, 90, 180, snap, 0)
+    newValue := snapToValues(newValue, 270, 360, snap, 0)
+    newValue := snapToValues(newValue, 0, 360, snap, 0)
+    newValue := clampInRange(newValue, 0, 360)
+    If (newValue>=360)
+       newValue := 0
+    ; ToolTip, % weight " | " newRotation " -- " startValue " |" newValue  , , , 2
+    Return newValue
+}
+
 WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
    Critical, on
    Static thisZeit := 1, anotherZeit := 1, lastInvoked := 1, lastInvokedSwipe := 1
@@ -8557,7 +8580,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
    } Else If (AnyWindowOpen=23 && FillAreaColorMode=6 && mustCaptureCloneBrush=1 || AnyWindowOpen=81 && GetKeyState("Ctrl", "P") && hUserSymmetricaCenteringMode=0)
    {
       vpWinClientSize(mainWidth, mainHeight)
-      setwhileLoopExec(1)
+      setWhileLoopExec(1)
       While, (determineLClickState()=1)
       {
          GetMouseCoord2wind(PVhwnd, mX, mY)
@@ -8573,7 +8596,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
          }
       }
 
-      setwhileLoopExec(0)
+      setWhileLoopExec(0)
       endCaptureCloneBrush()
 
       SoundBeep , 900, 100
@@ -8592,7 +8615,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       If (dotActiveObj.n=0 || dotActiveObj.n=9)
       {
          RemoveTooltip()
-         setwhileLoopExec(1)
+         setWhileLoopExec(1)
          While, (determineLClickState()=1)
          {
             GetMouseCoord2wind(PVhwnd, mX, mY)
@@ -8607,7 +8630,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
             }
          }
          showTOOLtip("Symmetry point set to`n" kX " / " kY)
-         setwhileLoopExec(0)
+         setWhileLoopExec(0)
          dummyRefreshImgSelectionWindow()
          SetTimer, RemoveTooltip, % -msgDisplayTime//2
          Return
@@ -8615,13 +8638,13 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
    } Else If isVarEqualTo(AnyWindowOpen, 69, 43, 44, 26, 78, 79)
    {
       ; respond to clicks in viewport for panels with region based previews
-      setwhileLoopExec(1)
+      setWhileLoopExec(1)
       While, (determineLClickState()=1)
       {
          updateTinyPreviewArea(prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, 1)
          dummyRefreshImgSelectionWindow()
       }
-      setwhileLoopExec(0)
+      setWhileLoopExec(0)
       lastTimeToggleThumbs := A_TickCount 
       Return
    }
@@ -8834,9 +8857,10 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
             adjustGradientOffset := 1
       }
 
-      setwhileLoopExec(0)
+      setWhileLoopExec(0)
       ; JEE_ClientToScreen(hPicOnGui1, mX, mY, mXo, mYo)
       MouseGetPos, mXo, mYo
+      Critical, off
       While, (determineLClickState()=1 && o_imageLoading!=1 && dotActive)
       {
           MouseGetPos, mX, mY
@@ -8845,7 +8869,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
              ; MouseCoords2Image(mX, mY, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kY)
              ; freeHandPoints[3] := kX,     freeHandPoints[4] := kY
              freeHandPoints[5] := defineFreeHandFrame(mX, mY, mXo, mYo)
-             freeHandPoints[6] := MouseDeltaAngle(mXo, mYo, mX, mY)
+             freeHandPoints[6] := MouseDeltaAngle180(mXo, mYo, mX, mY)
           }
 
           skipLoop := isDotInRect(mX, mY, zX - 3, zX + 3, zY - 3, zY + 3) ? 1 : 0
@@ -8865,27 +8889,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
           If (dotActive=10)
           {
              ; center dot - selection rotation
-             weight := clampInRange((max(abs(changePosX), abs(changePosY)) / 1.5) / 250, 0, 1)
-             nVPselRotation := MouseDeltaAngle(mXo, mYo, mX, mY)
-             nVPselRotation := weighTwoValues(nVPselRotation, 0, weight)
-             If (nVPselRotation<0)
-                nVPselRotation += 360
-
-             VPselRotation := oVPselRotation + nVPselRotation
-             If (VPselRotation>360)
-                VPselRotation -= 360
-             ; ToolTip, % weight " | " nVPselRotation " -- " oVPselRotation " -- " VPselRotation  , , , 2
-             If (shiftState=1)
-                VPselRotation := oVPselRotation + 45
-             Else If (altState=1)
-                VPselRotation := 0
-
-             VPselRotation := snapToValues(VPselRotation, 90, 180, 2, 0)
-             VPselRotation := snapToValues(VPselRotation, 270, 360, 2, 0)
-             VPselRotation := snapToValues(VPselRotation, 0, 360, 2, 0)
-             VPselRotation := clampInRange(VPselRotation, 0, 360)
-             If (VPselRotation>=360)
-                VPselRotation := 0
+             VPselRotation := UIcalculateNewAngleOnMouseCoords(mXo, mYo, mX, mY, oVPselRotation, 5)
           } Else If (dotActive=9 && ctrlState=1 && adjustSelCavity=1)
           {
              coords := 10
@@ -9154,7 +9158,8 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
           }
       }
 
-      setwhileLoopExec(0)
+      Critical, on
+      setWhileLoopExec(0)
       adjustingSelDotNow := adjustNowSel := 0
       If dotActive
       {
@@ -9926,7 +9931,7 @@ ResetImageView() {
    If throwErrorNoImageLoaded()
       Return
 
-   ChangeLumos(2)
+   VPchangeLumos(2)
 }
 
 HardResetImageView() {
@@ -9935,7 +9940,7 @@ HardResetImageView() {
    If (!validBMP(useGdiBitmap()) && !CurrentSLD)
       Return
 
-   ChangeLumos(2, "k")
+   VPchangeLumos(2, "k")
    If (AnyWindowOpen=40 && thumbsDisplaying=1)
       updateUIthumbsView()
 }
@@ -10004,7 +10009,7 @@ coreResetIMGview(dummy:=0) {
   SetTimer, WriteSettingsColorAdjustments, -100
 }
 
-ChangeLumos(dir, dummy:=0) {
+VPchangeLumos(dir, dummy:=0) {
    Static prevValues, lastInvoked := 1
    If (thumbsDisplaying=1 && thumbsListViewMode>1)
       Return
@@ -10070,7 +10075,7 @@ ChangeLumos(dir, dummy:=0) {
       Return
 
    If (dir!=2)
-      SetTimer, dummySaveLumGammos, -70
+      SetTimer, dummySaveLumGammosSettings, -70
 
    prevValues := newValues
    If (o_bwDithering=1) ; && (thumbsDisplaying!=1)
@@ -10236,7 +10241,7 @@ blockBrokenIMGrefresh(allowThumbs:=0) {
    Return 0
 }
 
-ChangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
+VPchangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
    Static prevValues, lastInvoked := 1, lastInvoked2 := 1, prevNavKeysu := 0
    If InStr(key, "wheel")
    {
@@ -10352,7 +10357,7 @@ dummyDisplayZoomImgInfo() {
    ; dummyTimerDelayiedImageDisplay(25)
 }
 
-ChangeGammos(dir) {
+VPchangeGammos(dir) {
    Static prevValues, lastInvoked := 1
    If (thumbsDisplaying=1 && thumbsListViewMode>1)
       Return
@@ -10399,7 +10404,7 @@ ChangeGammos(dir) {
    If (prevValues=newValues)
       Return
 
-   SetTimer, dummySaveLumGammos, -70
+   SetTimer, dummySaveLumGammosSettings, -70
    prevValues := newValues
    If (o_bwDithering=1)
       SetTimer, RefreshImageFile, -50
@@ -10413,7 +10418,7 @@ ChangeGammos(dir) {
    }
 }
 
-dummySaveLumGammos() {
+dummySaveLumGammosSettings() {
    INIaction(1, "GammosAdjust", "General")
    INIaction(1, "GammosGrayAdjust", "General")
    INIaction(1, "lumosAdjust", "General")
@@ -10424,7 +10429,7 @@ dummySaveLumGammos() {
       INIaction(1, "zoomLevel", "General")
 }
 
-ChangeSaturation(dir) {
+VPchangeSaturation(dir) {
    Static prevValues
    If (thumbsDisplaying=1 && thumbsListViewMode>1)
       Return
@@ -10461,7 +10466,7 @@ ChangeSaturation(dir) {
    }
 }
 
-ChangeRealGamma(dir) {
+VPchangeRealGamma(dir) {
    Static prevValues
    If (thumbsDisplaying=1 && thumbsListViewMode>1)
       Return
@@ -10503,7 +10508,7 @@ ChangeRealGamma(dir) {
    }
 }
 
-ChangeVolume(dir) {
+ChangeSoundVolume(dir) {
    Static lastInvoked := 1
    If (A_TickCount - lastInvoked < 50)
       Return
@@ -10575,12 +10580,7 @@ postPonedWriteGifSpeed() {
    INIaction(1, "UserGIFsDelayu", "General")
 }
 
-changeTlbrSelRotation(dir) {
-   stepu := GetKeyState("Alt", "P") ? 1 : 15
-   changeSelRotation(dir, stepu)
-}
-
-changeSelRotation(dir, stepu:=1) {
+VPchangeSelRotation(dir, stepu:=1) {
    If (thumbsDisplaying=1 || editingSelectionNow!=1 || liveDrawingBrushTool=1)
       Return
 
@@ -10629,7 +10629,7 @@ changeLittleImgRotationInVP(dir) {
    changeImgRotationInVP(dir, 1)
 }
 
-changeImgRotationInVP(dir, stepu:=15, doReset:=0) {
+changeImgRotationInVP(dir, stepu:=5, doReset:=0) {
    If (thumbsDisplaying=1)
       Return
 
@@ -17895,6 +17895,7 @@ HugeImagesFlipHVinvert(modus) {
       currentImgModified := 1
       imgIndexEditing := currentFileIndex
       killQPVscreenImgSection()
+      viewportQPVimage.actions := Round(viewportQPVimage.actions + 1)
       dummyTimerDelayiedImageDisplay(250)
       SetTimer, RemoveTooltip, -500
    } Else
@@ -18063,7 +18064,6 @@ HugeImagesConvertClrDepth(modus) {
    {
       hFIFimgZ := FreeImage_ConvertTo(hFIFimgX, "24Bits")
       thisu := hFIFimgZ ? hFIFimgZ : hFIFimgX
-      msgbox , % "l=" hFIFimgZ
       If hFIFimgZ
       {
          discarded := 1
@@ -18101,6 +18101,7 @@ HugeImagesConvertClrDepth(modus) {
       ColorsType := FreeImage_GetColorType(hFIFimgA)
       imgType := FreeImage_GetImageType(hFIFimgA, 1)
       fileType := FreeImage_GetFileType(imgPath, 1)
+      actions := Round(viewportQPVimage.actions)
 
       tFrames := frameu := 1
       viewportQPVimage.DiscardImage()
@@ -18115,6 +18116,7 @@ HugeImagesConvertClrDepth(modus) {
       viewportQPVimage.RawFormat := fileType " | " imgType
       viewportQPVimage.PixelFormat := StrReplace(oimgBPP, "-", "+") "-" ColorsType
       viewportQPVimage.clrinfo := oimgBPP "-bit " ColorsType
+      viewportQPVimage.actions := actions
       RemoveTooltip()
       recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
       dummyTimerDelayiedImageDisplay(500)
@@ -18223,6 +18225,7 @@ HugeImagesApplyAutoColors() {
          killQPVscreenImgSection()
          currentImgModified := 1
          imgIndexEditing := currentFileIndex
+         viewportQPVimage.actions := Round(viewportQPVimage.actions + 1)
          dummyTimerDelayiedImageDisplay(500)
          SoundBeep, 900, 100
          RemoveTooltip()
@@ -18372,43 +18375,6 @@ HugeImagesApplyPasteInPlace() {
          FreeImage_FlipVertical(hFIFimgA)
       If (PasteInPlaceOrientFlipX=1)
          FreeImage_FlipHorizontal(hFIFimgA)
-
-/*
-      tFrames := frameu := 1
-      imgPath := viewportQPVimage.ImgFile
-      viewportQPVimage.DiscardImage()
-      killQPVscreenImgSection()
-      Sleep, 1
-      viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, [hFIFimgA, tFrames], 1)
-      If (modus="resize" || modus="rotate90")
-      {
-         oimgBPP := FreeImage_GetBPP(hFIFimgA)
-         ColorsType := FreeImage_GetColorType(hFIFimgA)
-         imgType := FreeImage_GetImageType(hFIFimgA, 1)
-         fileType := FreeImage_GetFileType(imgPath, 1)
-
-         currIMGdetails.HasAlpha := InStr(ColorsType, "rgba") ? 1 : 0
-         currIMGdetails.RawFormat := fileType " | " imgType
-         currIMGdetails.PixelFormat := StrReplace(oimgBPP, "-", "+") "-" ColorsType
-         viewportQPVimage.HasAlpha := InStr(ColorsType, "rgba") ? 1 : 0
-         viewportQPVimage.RawFormat := fileType " | " imgType
-         viewportQPVimage.PixelFormat := StrReplace(oimgBPP, "-", "+") "-" ColorsType
-         viewportQPVimage.clrinfo := oimgBPP "-bit " ColorsType
-      }
-
-      SoundBeep 900, 100
-      RemoveTooltip()
-      currentImgModified := 1
-      imgIndexEditing := currentFileIndex
-      If (editingSelectionNow=1)
-      {
-         VPselRotation := EllipseSelectMode := innerSelectionCavityX := innerSelectionCavityY := 0
-         selectEntireImage("r")
-      }
-      dummyTimerDelayiedImageDisplay(500)
-      Return
-*/
-
 
       If (PasteInPlaceEraseInitial=1 && PasteInPlaceToolMode=1 && r)
       {
@@ -18683,7 +18649,11 @@ HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0, wa
          QPV_PrepareSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, EraseAreaInvert)
          r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", 1, "int", 0, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "UPtr", 0, "int", 0, "int", 24, "int", 0, "int", 0)
          If InStr(modus, "initially")
+         {
+            If r
+               viewportQPVimage.actions := Round(viewportQPVimage.actions + 1)
             Return
+         }
       } Else If InStr(modus, "pixelize")
       {
          thisImgW := (BlurAreaInverted=1) ? Ceil(ImgW/blurAreaPixelizeAmount) : Ceil(obju.bImgSelW/blurAreaPixelizeAmount)
@@ -18757,6 +18727,7 @@ HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0, wa
          killQPVscreenImgSection()
          currentImgModified := 1
          imgIndexEditing := currentFileIndex
+         viewportQPVimage.actions := Round(viewportQPVimage.actions + 1)
          dummyTimerDelayiedImageDisplay(500)
          SoundBeep, 900, 100
          RemoveTooltip()
@@ -18821,6 +18792,7 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
 
       tFrames := frameu := 1
       imgPath := viewportQPVimage.ImgFile
+      actions := Round(viewportQPVimage.actions + 1)
       viewportQPVimage.DiscardImage()
       killQPVscreenImgSection()
       Sleep, 1
@@ -18845,6 +18817,7 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
       RemoveTooltip()
       currentImgModified := 1
       imgIndexEditing := currentFileIndex
+      viewportQPVimage.actions := actions
       If (editingSelectionNow=1)
       {
          VPselRotation := EllipseSelectMode := innerSelectionCavityX := innerSelectionCavityY := 0
@@ -19162,7 +19135,7 @@ coreDrawLinesSelectionArea(G2:=0, whichBitmap:=0) {
     {
        ; diagonals
        frame :=  defineFreeHandFrame("flip", FlipImgH, FlipImgV, freeHandPoints[5])
-       deg := MouseDeltaAngle(x1, y1, x2, y2)
+       deg := MouseDeltaAngle180(x1, y1, x2, y2)
        Gdip_StartPathFigure(pPathBrders)
        ; ToolTip, % frame " deg=" deg , , , 2
        If (freeHandSelectionMode=1 && DrawLineAreaSnapLine=1 && isInRange(deg, -5, 5) && (frame=1 || frame=2))
@@ -22178,7 +22151,7 @@ DragCollapsedWidget() {
    Dx := Dy := 0
    lastInvoked := A_TickCount
    ; ToolTip, % "l=" thisZL , , , 2
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    While, (determineLClickState()=1)
    {
       GetPhysicalCursorPos(mX, mY)
@@ -22188,7 +22161,7 @@ DragCollapsedWidget() {
       WinMove, ahk_id %hCollapseWidget%, , % winX + Dx, % winY + Dy
       Sleep, -1
    }
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    Sleep, 2
    WinActivate, ahk_id %PVhwnd%
 }
@@ -27840,7 +27813,7 @@ PasteFilesIntoGivenFolder(folderPath) {
    filezMoved := countTFilez := 0
    doStartLongOpDance()
    nullvara := askAboutFileCollision(0, 0, 1, 3, 0, nullvar)
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    backCurrentSLD := CurrentSLD
    CurrentSLD := ""
    Loop, Parse, listu, `n,`r
@@ -27942,7 +27915,7 @@ PasteFilesIntoGivenFolder(folderPath) {
       }
    }
 
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    CurrentSLD := backCurrentSLD
    someErrors := "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
    If (skippedFiles>0)
@@ -32881,7 +32854,7 @@ WorkLoadMultiCoresConvertFormat(maxList) {
   RegWrite, REG_SZ, %QPVregEntry%, Running, 1
   thisZeit := A_TickCount
   doStartLongOpDance()
-  setwhileLoopExec(1)
+  setWhileLoopExec(1)
   Loop
   {
       Loop, % systemCores
@@ -33012,7 +32985,7 @@ WorkLoadMultiCoresConvertFormat(maxList) {
         throwSQLqueryDBerror(A_ThisFunc)
   }
 
-  setwhileLoopExec(0)
+  setWhileLoopExec(0)
   zeitOperation := A_TickCount - startOperation
   percDone := " ( " Round((processedFiles / countTFilez) * 100) "% )"
   someErrors := "`nElapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)) percDone
@@ -35240,7 +35213,7 @@ batchFileDelete(dontAlterIndex:=0) {
    filesRemoved := abandonAll := failedFiles := skippedFiles := 0
    backCurrentSLD := CurrentSLD
    CurrentSLD := ""
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    Loop, % maxFilesIndex
    {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
@@ -35330,7 +35303,7 @@ batchFileDelete(dontAlterIndex:=0) {
          }
       } Else failedFiles++
    }
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    CurrentSLD := backCurrentSLD
    currentFilesListModified := 1
    If failedFiles
@@ -36048,7 +36021,7 @@ coreBatchMultiRenameFiles() {
 
      counterFilez := new hashtable()
      CurrentSLD := ""
-     setwhileLoopExec(1)
+     setWhileLoopExec(1)
      Loop, % maxFilesIndex
      {
          If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
@@ -36177,7 +36150,7 @@ coreBatchMultiRenameFiles() {
          }
      }
 
-     setwhileLoopExec(0)
+     setWhileLoopExec(0)
      counterFilez := someErrors := ""
      CurrentSLD := backCurrentSLD
      If (SLDtypeLoaded=3)
@@ -39210,7 +39183,7 @@ generateThumbsSheet() {
    frame := Round((userThumbsSheetFrame/100) * userThumbsSheetSpacing)
    px := py := frame
    cols := 1
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    Loop, % maxFilesIndex
    {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
@@ -39284,7 +39257,7 @@ generateThumbsSheet() {
       }
    }
 
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    If pBrush
       Gdip_DeleteBrush(pBrush)
    If shadeBrush
@@ -39993,9 +39966,21 @@ pointsOnCircle(radius, angle, cx, cy) {
     return obj
 }
 
-MouseDeltaAngle(X1,Y1,X2,Y2) {
+MouseDeltaAngle180(X1,Y1,X2,Y2) {
    ; from Bugz000
    return round((dllcall("msvcrt\atan2", "Double", (y2 - y1), "Double", (x2-x1), "CDECL Double") * (180/3.14159265358979323846264338327950288419716939937)),3)
+}
+
+MouseDeltaAngle360(X1,Y1,X2,Y2) {
+   Static 2p := 2*3.14159265358979
+   static TOdeg := 180/3.14159265358979
+   px := x2 - x1
+   py := y2 - y1
+
+   r := DllCall("msvcrt\atan2", "Double", py, "Double", px, "CDECL Double")
+   r := (r<0) ? r + 2p : r
+   zr := Round( r * TOdeg, 8 )
+   return zr
 }
 
 getAngleBetweenTwoPoints(x1, y1, x2, y2, mode:=1) {
@@ -42918,7 +42903,7 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
    interfaceThread.ahkassign("colorPickerMustEnd", colorPickerMustEnd)
    WinActivate, ahk_id %PVhwnd%
    createGUItoolbar()
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    While, (colorPickerModeNow=1)
    {
       If (errorOccured>700)
@@ -42965,7 +42950,7 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
    }
 
    h := showLEDgui("prev", pX, pY)
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    StopColorPicker()
    createGUItoolbar()
    If (panelWinCollapsed=1 && AnyWindowOpen && d!="leave-it")
@@ -43263,7 +43248,7 @@ addFluidPointsCustomShape() {
       dotsSize := SelDotsSize*3 + 2
 
    prevMX := prevMY := 0
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    While, (determineLClickState()=1)
    {
       If (mustSnapLiveDrawPoints=1)
@@ -43294,7 +43279,7 @@ addFluidPointsCustomShape() {
       dummyRefreshImgSelectionWindow()
    }
 
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    newArrayu := []
    SetTimer, addFluidPointsCustomShape, Off
 }
@@ -43307,7 +43292,7 @@ adjustAnchorPointsCustomShape(thisIndex:=0) {
     vpWinClientSize(mainWidth, mainHeight)
  
     prevState := thisState := prevMX := prevMY := 0
-    setwhileLoopExec(1)
+    setWhileLoopExec(1)
     mustSnapLiveDrawPoints := 0
     canDoSymmetry := isNowSymmetricVectorShape()
     totalCount := customShapePoints.Count()
@@ -43381,7 +43366,7 @@ adjustAnchorPointsCustomShape(thisIndex:=0) {
     }
 
     RemoveTooltip()
-    setwhileLoopExec(0)
+    setWhileLoopExec(0)
     SetTimer, adjustAnchorPointsCustomShape, Off
 }
 
@@ -45106,10 +45091,10 @@ toggleViewPortGridu(modus="") {
 
    If (modus="tlbr")
    {
-      setwhileLoopExec(1)
+      setWhileLoopExec(1)
       While, (determineLClickState()=1 || A_Index=1)
           Sleep, 5
-      setwhileLoopExec(0)
+      setWhileLoopExec(0)
    }
 }
 
@@ -45174,7 +45159,7 @@ PanelConfigVPgrid() {
     SetTimer, updateUIgridPanel, -50
 }
 
-changeGridSize(dir) {
+VPchangeGridSize(dir) {
    If (thumbsDisplaying=1)
       Return
 
@@ -47624,7 +47609,7 @@ OffsetSelProperPanel(dummy:=0) {
 
    cX := 0, cY := 0
    GetPhysicalCursorPos(oX, oY)
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    ToolTip, Move up/down relative to this point on screen to adjust %varu%
    While, (determineLClickState()=1 || A_Index=1)
    {
@@ -47664,7 +47649,7 @@ OffsetSelProperPanel(dummy:=0) {
          Break
    }
 
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    Tooltip
    lastInvoked := A_TickCount
    prevVaru := varu
@@ -48319,7 +48304,7 @@ gradientsPreviewResponder(thisHwnd:=0) {
       Return
 
    GetPhysicalCursorPos(zX, zY)
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    If (otherKeyState=1)
    {
       varXvalue := (winOpen!=23) ? alphaMaskCoffsetX : clrGradientCoffX
@@ -48384,7 +48369,7 @@ gradientsPreviewResponder(thisHwnd:=0) {
       }
    }
 
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    ; ToolTip, % vPosX "==" vPosY "`n" alphaMaskOffsetX "==" alphaMaskOffsetY , , , 2
    If (keysState=1 && winOpen=23)
       clrGradientOffX := clrGradientOffY := clrGradientCoffX := clrGradientCoffY := 0
@@ -48419,7 +48404,7 @@ PanelsPanIMGpreviewClick(a:=0) {
    thisZeit := A_TickCount
    startZeit := A_TickCount
    hasRun := 0
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    While, (determineLClickState()=1)
    {
       Sleep, 1
@@ -48454,7 +48439,7 @@ PanelsPanIMGpreviewClick(a:=0) {
          thisZeit := A_TickCount
       }
    }
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    If !keysState
       keysState := (GetKeyState("Shift", "P") || GetKeyState("Ctrl", "P")) ? 1 : 0
 
@@ -53291,7 +53276,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
    backCurrentSLD := CurrentSLD
    CurrentSLD := ""
    ; fnOutputDebug(groupingMode "|" relativeModePath "|" relativeStringPath "|" finalDest)
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    Loop, % maxFilesIndex
    {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
@@ -53446,7 +53431,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
       }
    }
 
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    CurrentSLD := backCurrentSLD
    someErrors := "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
    If (SLDtypeLoaded=3)
@@ -55755,12 +55740,13 @@ askAboutFileSave(msg:="", lvls:=1, dontOpen:=0) {
    If (preventUndoLevels=1)
       lvls := -1
 
-   If (validBMP(UserMemBMP) && undoLevelsRecorded>lvls && currentImgModified=1) && (A_TickCount - lastInvoked<300)
+   isOkay := (validBMP(UserMemBMP) && undoLevelsRecorded>lvls || viewportQPVimage.imgHandle && viewportQPVimage.actions>1) ? 1 : 0
+   If (isOkay=1 && currentImgModified=1) && (A_TickCount - lastInvoked<300)
       Return prevAnswer
 
    r := 0
    imgPath := getIDimage(imgIndexEditing)
-   If (validBMP(UserMemBMP) && imgPath && undoLevelsRecorded>lvls && currentImgModified=1)
+   If (isOkay=1 && imgPath && currentImgModified=1)
    {
       If (slideShowRunning=1)
          ToggleSlideShowu()
@@ -56675,7 +56661,7 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
       mainFoldersListu := getDynamicFoldersList()
       doStartLongOpDance()
       dropFilesSelection(1)
-      setwhileLoopExec(1)
+      setWhileLoopExec(1)
       showTOOLtip("Preparing to import dropped folders, please wait")
       If StrLen(filesFilter)>1
          remFilesListFilter("simple")
@@ -56743,7 +56729,7 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
          GenerateRandyList()
       }
 
-      setwhileLoopExec(0)
+      setWhileLoopExec(0)
       If !CurrentSLD
       {
          If FolderExist(StrReplace(Trimmer(DynamicFoldersList), "|"))
@@ -57231,7 +57217,7 @@ InitGuiContextMenu(keyu:=0, mX:="-", mY:=0, givenCoords:=0, ctrlu:=0) {
       If (okay!=1)
          Return 1
 
-      setwhileLoopExec(0)
+      setWhileLoopExec(0)
       If (slideShowRunning=1)
          ToggleSlideShowu()
 
@@ -58019,17 +58005,18 @@ InvokeMenuBarEdit(manuID) {
    {
       kMenu("pvMenuBarEdit", "Add", "&Undo`tCtrl+Z", "ImgUndoAction", "image edit")
       kMenu("pvMenuBarEdit", "Add", "&Redo`tCtrl+Y", "ImgRedoAction", "image edit")
-      If !(viewportQPVimage.imgHandle)
+      If (viewportQPVimage.imgHandle)
       {
-         If !(undoLevelsRecorded>1 && undoLevelsRecorded!="" && infoImgEditingNow=1)
-         {
-            kMenu("pvMenuBarEdit", "Disable", "&Undo`tCtrl+Z")
-            kMenu("pvMenuBarEdit", "Disable", "&Redo`tCtrl+Y")
-         } Else
-         {
-            kMenu("pvMenuBarEdit", "Add", "Levels: " currentUndoLevel "/" undoLevelsRecorded, "dummy")
-            kMenu("pvMenuBarEdit", "Disable", "Levels: " currentUndoLevel "/" undoLevelsRecorded)
-         }
+         kMenu("pvMenuBarEdit", "Add", "Actions: " Round(viewportQPVimage.actions), "dummy")
+         kMenu("pvMenuBarEdit", "Disable", "Actions: " Round(viewportQPVimage.actions))
+      } Else If !(undoLevelsRecorded>1 && undoLevelsRecorded!="" && infoImgEditingNow=1)
+      {
+         kMenu("pvMenuBarEdit", "Disable", "&Undo`tCtrl+Z")
+         kMenu("pvMenuBarEdit", "Disable", "&Redo`tCtrl+Y")
+      } Else
+      {
+         kMenu("pvMenuBarEdit", "Add", "Levels: " currentUndoLevel "/" undoLevelsRecorded, "dummy")
+         kMenu("pvMenuBarEdit", "Disable", "Levels: " currentUndoLevel "/" undoLevelsRecorded)
       }
 
       kMenu("pvMenuBarEdit", "Add/Uncheck", "&Record undo levels", "TogglePreventUndos", "history")
@@ -59134,28 +59121,28 @@ MenuResetVProtation() {
 }
 
 MenuChangeIncContrast() {
-   ChangeGammos(-1)
+   VPchangeGammos(-1)
 }
 MenuChangeDecContrast() {
-   ChangeGammos(1)
+   VPchangeGammos(1)
 }
 MenuChangeIncSaturat() {
-   ChangeSaturation(1)
+   VPchangeSaturation(1)
 }
 MenuChangeDecSaturat() {
-   ChangeSaturation(-1)
+   VPchangeSaturation(-1)
 }
 MenuChangeIncGamma() {
-   ChangeRealGamma(1)
+   VPchangeRealGamma(1)
 }
 MenuChangeDecGamma() {
-   ChangeRealGamma(-1)
+   VPchangeRealGamma(-1)
 }
 MenuChangeIncBright() {
-   ChangeLumos(1)
+   VPchangeLumos(1)
 }
 MenuChangeDecBright() {
-   ChangeLumos(-1)
+   VPchangeLumos(-1)
 }
 MenuIncBrushSize() {
    changeBrushSize(1)
@@ -59195,8 +59182,8 @@ MenuDecBrushOpacity() {
 }
 
 createMenuImgVProtation() {
-   kMenu("PVimgVProt", "Add", "&Rotate by +15°`t0", "MenuIncVProtation",, " (image)", 1)
-   kMenu("PVimgVProt", "Add", "R&otate by -15°`t9", "MenuDecVProtation",, " (image)", 1)
+   kMenu("PVimgVProt", "Add", "&Rotate by +5°`t0", "MenuIncVProtation",, " (image)", 1)
+   kMenu("PVimgVProt", "Add", "R&otate by -5°`t9", "MenuDecVProtation",, " (image)", 1)
    If (mustPreventMenus=1)
    {
       kMenu("PVimgVProt", "Add", "&Rotate by +1°`tAlt+0", "MenuLIncVProtation",, " (image)", 1)
@@ -60689,11 +60676,11 @@ MenuChangeOSDZoomPlus() {
 }
 
 MenuChangeImgZoomMinus() {
-   changeZoom(-1)
+   VPchangeZoom(-1)
 }
 
 MenuChangeImgZoomPlus() {
-   changeZoom(1)
+   VPchangeZoom(1)
 }
 
 BuildSecondMenu(givenCoords:=0) {
@@ -61598,11 +61585,11 @@ MenuSetSelectionShapeFreeform() {
 }
 
 MenuIncVPgridSize() {
-   changeGridSize(1)
+   VPchangeGridSize(1)
 }
 
 MenuDecVPgridSize() {
-   changeGridSize(-1)
+   VPchangeGridSize(-1)
 }
 
 MenuResetImageColorDepth() {
@@ -61659,19 +61646,19 @@ MenuSelectionFlipV() {
 }
 
 MenuSelIncRotation() {
-   changeSelRotation(1)
+   VPchangeSelRotation(1)
 }
 
 MenuSelDecRotation() {
-   changeSelRotation(-1)
+   VPchangeSelRotation(-1)
 }
 
 MenuSetVolumeDown() {
-   ChangeVolume(-1)
+   ChangeSoundVolume(-1)
 }
 
 MenuSetVolumeUp() {
-   ChangeVolume(1)
+   ChangeSoundVolume(1)
 }
 
 MenuSetImgZoom(a, b) {
@@ -67837,7 +67824,7 @@ ImageNavBoxClickResponder() {
    minX := (allowFreeIMGpanning=1) ? - HUDobjNavBoxu[1] : 0
    minY := (allowFreeIMGpanning=1) ? - HUDobjNavBoxu[2] : 0
    thisIndex := f := 0
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    While, (determineLClickState()=1 || A_Index<2)
    {
       GetMouseCoord2wind(PVhwnd, mX, mY)
@@ -67881,7 +67868,7 @@ ImageNavBoxClickResponder() {
       Sleep, 15
    }
 
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    vpImgPanningNow := diffIMGdecX := diffIMGdecY := 0
    If (thisIndex>10 || lastWasLowQuality=1)
       SetTimer, wrapResizeImageGDIwin, -60
@@ -69572,7 +69559,7 @@ ActPaintBrushNow() {
       prevMX := prevMY := 0
 
    offX := offY := 0
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    Static plopa := 0
    While, (determineLClickState()=1 || A_Index<2)
    {
@@ -69930,7 +69917,7 @@ ActPaintBrushNow() {
       trGdip_DisposeImage(opacityBMPmap)
    }
 
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    Gdip_DeleteGraphics(Gu)
    If validBMP(brushu)
       trGdip_DisposeImage(brushu, 1)
@@ -70055,7 +70042,7 @@ ActDrawAlphaMaskBrushNow() {
       prevMX := prevMY := 0
 
    offX := offY := 0
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    While, (determineLClickState()=1 || A_Index<2)
    {
       If (thisOpacity<0.005 || brushSize<2)
@@ -70170,7 +70157,7 @@ ActDrawAlphaMaskBrushNow() {
       }
    }
 
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    Gdip_DeleteGraphics(Gu)
    trGdip_DisposeImage(brushu, 1)
    If gdipbrushu
@@ -83090,7 +83077,7 @@ batchUndoFileActs(modus) {
    If (SLDtypeLoaded=3)
       activeSQLdb.Exec("BEGIN TRANSACTION;")
 
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    Loop, % totalu
    {
       executingCanceableOperation := A_TickCount
@@ -83342,7 +83329,7 @@ batchUndoFileActs(modus) {
       undoFileActUpdateIMGindex(imgPath)
    }
 
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    CurrentSLD := backCurrentSLD
    currentFilesListModified := 1
    ForceRefreshNowThumbsList()
@@ -85726,14 +85713,14 @@ BTNupdateSelectedStaticFolder() {
     If (SLDtypeLoaded=3 || SLDtypeLoaded=2 && allGood=1)
     {
        showTOOLtip("Updating static folders list")
-       setwhileLoopExec(1)
+       setWhileLoopExec(1)
        For foldar, indexu in foldersListArray
        {
            FileGetTime, dirDate, % foldar, M
            foldersListArray[foldar] := dirDate
        }
        updateCachedStaticFolders(foldersListArray, 1)
-       setwhileLoopExec(0)
+       setWhileLoopExec(0)
     }
 
     ResetImgLoadStatus()
@@ -90545,7 +90532,7 @@ tlbrChangeBrushWet(dir) {
 coreTlbrSlider(thisFunc, delayu, invertDir) {
    GetPhysicalCursorPos(oX, oY)
    cX := cY := lastIndex := thisIndex := lastInvoked := 0
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    lastInvoked := A_TickCount
    lastZeit := A_TickCount
    While, (determineLClickState()=1 || A_Index=1)
@@ -90584,7 +90571,59 @@ coreTlbrSlider(thisFunc, delayu, invertDir) {
          %thisFunc%(dir)
       thisIndex++
    }
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
+}
+
+tlbrChangeStuffRotation(modus) {
+   oVPselRotation := VPselRotation
+   ovpIMGrotation := vpIMGrotation
+   GetPhysicalCursorPos(mXo, mYo)
+   cX := cY := lastIndex := thisIndex := lastInvoked := 0
+   setWhileLoopExec(1)
+   lastInvoked := A_TickCount
+   lastZeit := A_TickCount
+   mouseMode := determineLClickState()
+   Critical, off
+   bonusMsg := (mouseMode=1) ? "°`nDrag the mouse around the toolbar icon`nHold Alt to deactivate snapping every 90°" : ""
+   While, (determineLClickState()=1 || !mouseMode && GetKeyState("enter", "P"))
+   {
+      If (mouseMode=1)
+      {
+         GetPhysicalCursorPos(mX, mY)
+         If isDotInRect(mX, mY, 5, 5, cX, cY, 1)
+            Continue
+      }
+
+      Sleep, 1
+      cX := mX, cY := mY
+      snap := GetKeyState("Alt", "P") ? 1 : 15
+      If !mouseMode
+      {
+         If (modus="sel")
+            VPselRotation := clampInRange(VPselRotation + 5, 0, 360, 1)
+         Else If (modus="vp-img")
+            vpIMGrotation := clampInRange(vpIMGrotation + 5, 0, 360, 1)
+         Sleep, 70
+      }
+
+      If (modus="sel")
+      {
+         If (mouseMode && A_Index>1)
+            VPselRotation := UIcalculateNewAngleOnMouseCoords(mXo, mYo, mX, mY, oVPselRotation, snap)
+         dummyRefreshImgSelectionWindow()
+         showTOOLtip("Selection rotation: " Round(VPselRotation, 1) bonusMsg)
+      } Else If (modus="vp-img")
+      {
+         If (mouseMode && A_Index>1)
+            vpIMGrotation := UIcalculateNewAngleOnMouseCoords(mXo, mYo, mX, mY, ovpIMGrotation, snap)
+         GdipCleanMain(4)
+         showTOOLtip("Image rotation: " Round(vpIMGrotation, 1) bonusMsg)
+      }
+   }
+
+   setWhileLoopExec(0)
+   RemoveTooltip()
+   dummyTimerDelayiedImageDisplay(50)
 }
 
 updateUIbrushSoloSlidersTool(ctrlu:=0,m:=0) {
@@ -90805,7 +90844,7 @@ tlbrViewPortGridu() {
       }
 
       vpImgPanningNow := 0 ;(allowFreeIMGpanning=1) ? 1 : 2
-      coreTlbrSlider("changeGridSize", 10, 0)
+      coreTlbrSlider("VPchangeGridSize", 10, 0)
    }
 }
 
@@ -90859,7 +90898,7 @@ tlbrZoomINout(dummy:=0) {
 
       GetPhysicalCursorPos(oX, oY)
       cX := cY := lastIndex := thisIndex := lastInvoked := 0
-      setwhileLoopExec(1)
+      setWhileLoopExec(1)
       vpImgPanningNow := (allowFreeIMGpanning=1) ? 1 : 2
       While, (determineLClickState()=1 || A_Index=1)
       {
@@ -90885,13 +90924,13 @@ tlbrZoomINout(dummy:=0) {
          }
          lastInvoked := A_TickCount
          cX := mX, cY := mY
-         ChangeZoom(dir, 0, 1, 1) 
+         VPChangeZoom(dir, 0, 1, 1) 
          Sleep, % (thumbsDisplaying=1 || InStr(dummy, "z")) ? 10 : -1
          thisIndex++
       }
       vpImgPanningNow := 0
       dummyTimerDelayiedImageDisplay(150)
-      setwhileLoopExec(0)
+      setWhileLoopExec(0)
    }
    Return "m"
 }
@@ -91013,13 +91052,13 @@ InvokeSelShapesMenu(givenCoords:=0) {
 }
 
 tlbrUndoAction() {
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    While, (determineLClickState()=1 || A_Index=1)
    {
       ImgUndoAction()
       Sleep, % (A_Index<10) ? 200 : 90
    }
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    Return "m"
 }
 
@@ -91052,13 +91091,13 @@ tlbrPanIMG() {
 }
 
 tlbrRedoAction() {
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    While, (determineLClickState()=1 || A_Index=1)
    {
       ImgRedoAction()
       Sleep, % (A_Index<10) ? 200 : 90
    }
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    Return "m"
 }
 
@@ -91194,19 +91233,17 @@ processToolbarFunctions(btnID, actu, simulacrum:=0) {
          func2Call := ["ResetImageView"]
       } Else If (btnID="BTNtlbrflipH")
       {
-         If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-            func2Call := ["VPflipImgH"]
-         Else If (isImgEditingNow()=1 && EllipseSelectMode=2 && editingSelectionNow=1 && drawingShapeNow!=1)
-            func2Call := ["flipWHcustomShape", "H"]
-         Else If (isImgEditingNow()=1 && editingSelectionNow=1 && drawingShapeNow!=1)
+         If (isImgEditingNow()=1 && editingSelectionNow=1 && drawingShapeNow!=1 && AnyWindowOpen && !isNowAlphaPainting())
+            func2Call := ["FlipSelectedAreaH"]
+         Else If ( (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+         || (isImgEditingNow()=1 && editingSelectionNow=1 && drawingShapeNow!=1) )
             func2Call := ["VPflipImgH"]
       } Else If (btnID="BTNtlbrflipV")
       {
-         If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-            func2Call := ["VPflipImgV"]
-         Else If (isImgEditingNow()=1 && EllipseSelectMode=2 && editingSelectionNow=1 && drawingShapeNow!=1)
-            func2Call := ["flipWHcustomShape", "V"]
-         Else If (isImgEditingNow()=1 && editingSelectionNow=1 && drawingShapeNow!=1)
+         If (isImgEditingNow()=1 && editingSelectionNow=1 && drawingShapeNow!=1 && AnyWindowOpen && !isNowAlphaPainting())
+            func2Call := ["FlipSelectedAreaV"]
+         Else If ( (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+         || (isImgEditingNow()=1 && editingSelectionNow=1 && drawingShapeNow!=1) )
             func2Call := ["VPflipImgV"]
       } Else If (btnID="BTNtransformArea")
       {
@@ -91575,7 +91612,7 @@ processToolbarFunctions(btnID, actu, simulacrum:=0) {
             func2Call := ["FlipHalphaMask"]
          Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
             func2Call := ["filesListFlipHimage"]
-         Else If (editing=1 && editingSelectionNow=1)
+         Else If (editing=1 && editingSelectionNow=1 && !AnyWindowOpen)
             func2Call := ["FlipSelectedAreaH"]
          Else If (editing=1)
             func2Call := ["VPflipImgH"]
@@ -91590,7 +91627,7 @@ processToolbarFunctions(btnID, actu, simulacrum:=0) {
             func2Call := ["FlipValphaMask"]
          Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
             func2Call := ["filesListFlipVimage"]
-         Else If (editing=1 && editingSelectionNow=1)
+         Else If (editing=1 && editingSelectionNow=1 && !AnyWindowOpen)
             func2Call := ["FlipSelectedAreaV"]
          Else If (editing=1)
             func2Call := ["VPflipImgV"]
@@ -91616,15 +91653,13 @@ processToolbarFunctions(btnID, actu, simulacrum:=0) {
             func2Call := ["resetSelectionRotation"]
          } Else If (editing=1 && editingSelectionNow=1 && !pp)
          {
-            func2Call :=  (simulacrum=1) ? ["MenuSelIncRotation"] : ["coreTlbrSlider", "changeTlbrSelRotation", 125, 0]
+            func2Call :=  (simulacrum=1) ? ["MenuSelIncRotation"] : ["tlbrChangeStuffRotation", "sel"]
          } Else If (editing=1)
          {
             If pp
                func2Call := (simulacrum=1) ? ["MenuIncVProtation"] : ["changeImgRotationInVP", 1, 45]
-            Else If GetKeyState("Alt", "P")
-               func2Call := ["coreTlbrSlider", "changeLittleImgRotationInVP", 2, 0]
             Else
-               func2Call := (simulacrum=1) ? ["MenuIncVProtation"] : ["coreTlbrSlider", "changeImgRotationInVP", 100, 0]
+               func2Call := (simulacrum=1) ? ["MenuIncVProtation"] : ["tlbrChangeStuffRotation", "vp-img"]
          }
       } Else If (btnID="BTNfillShape")
       {
@@ -91784,7 +91819,7 @@ processToolbarFunctions(btnID, actu, simulacrum:=0) {
             If (GetKeyState("Ctrl", "P") || GetKeyState("Shift", "P"))
                func2Call := ["toggleViewPortGridu", "tlbr"]
             Else
-               func2Call := (simulacrum=1) ? ["MenuIncVPgridSize"] : ["coreTlbrSlider", "changeGridSize", 10, 0]
+               func2Call := (simulacrum=1) ? ["MenuIncVPgridSize"] : ["coreTlbrSlider", "VPchangeGridSize", 10, 0]
          }
       } Else If (btnID="BTNthumbsList")
       {
@@ -92057,10 +92092,10 @@ CoreGUItoolbar(scopul:=0, whichList:=0) {
     If isWelcomeScreenu
        tlbrTotalIconz := 9
     Else If isTlbrViewModus()
-       tlbrTotalIconz := 21
+       tlbrTotalIconz := 21 ; arbitrary number
 
     sjk := isTlbrViewModus(1)
-    If sjk
+    If sjk ; must go for user customized list
        listuIcons := (thumbsDisplaying=1) ? StrSplit(userThumbsToolbarList, ",") : StrSplit(userImgViewToolbarList, ",")
 
     TouchToolbarGUIcreated := 1
@@ -92093,6 +92128,7 @@ CoreGUItoolbar(scopul:=0, whichList:=0) {
     tlbrAddNewIcon(BTNdragTlbr, handleWidth, draggyHeight, 0, 1, simpleRefresh)
     If (listuIcons.Count()>1 && sjk=1)
     {
+       ; user customized list; only for thumbs list and image view modes
        Loop, % listuIcons.Count()
        {
            thisu := Trimmer(listuIcons[A_Index])
@@ -92105,6 +92141,7 @@ CoreGUItoolbar(scopul:=0, whichList:=0) {
        }
     } Else If (tlbrTotalIconz=21)
     {
+       ; simple mode toolbar
        Static simpleThumbs := "BTNsettings|BtnReturnImgView|BTNopen|BTNsave|BTNcutImg|BTNcopyImg|BTNpasteImg|BTNnewImg|BTNfaves|BTNdeleteTool|BTNthumbsList|BTNselectShape|BTNsearch|BTNmodifyEntry|BTNsortList|BTNrefreshList|BTNfolderTree|BTNcalculate|BTNinfozHud|BTNpreviewBox"
        Static simpleView := "BTNsettings|BTNswitchThumbs|BTNopen|BTNcopyImg|BTNfaves|BTNplaySlides|BTNnavPrevImgu|BTNnavNextImgu|BTNnavFirstImgu|BTNnavLastImgu|BTNzoomOutIMG|BTNzoomInIMG|BTNrotateStuff|BTNalignVPimgu|BTNtlbrflipV|BTNtlbrflipH|BTNimgSizers|BTNadjustColors|BTNinfozHud|BTNdeleteTool"
        listu := (thumbsDisplaying=1) ? simpleThumbs : simpleView
@@ -92119,6 +92156,7 @@ CoreGUItoolbar(scopul:=0, whichList:=0) {
        }
     } Else
     {
+       ; advanced toolbar mode [thumbs list, image view and live edit mode]
        tlbrAddNewIcon(BTNsettings, ToolBarBtnWidth, ToolBarBtnWidth, IconSpacing, 0, simpleRefresh)
        thisu := (thumbsDisplaying!=1 && !AnyWindowOpen) ? BTNswitchThumbs : BtnReturnImgView
        If (AnyWindowOpen || drawingShapeNow=1)
@@ -92346,12 +92384,14 @@ GuiSlidersResponder(a, m_event, keyu) {
 
    If (m_event="uiLabel" && isActive=1)
    {
+      ; if m_event = "uiLabel" , it is a keyboard call
       frkA := (doFloat=1) ? 0.025 : 1
       frkB := (doFloat=1) ? 0.050 : 5
       If (rangeu>100)
       {
          frkA *= 2, frkB *= 2
       }
+
       If (rangeu>5000)
       {
          frkA *= 150, frkB *= 250
@@ -92359,28 +92399,29 @@ GuiSlidersResponder(a, m_event, keyu) {
       {
          frkA *= 5, frkB *= 10
       }
-
-      Sleep, 40
-      If (keyu="right" || keyu="WheelUp")
-         %givenVar% := clampInRange(varValue + frkA, minV, maxV, 1)
-      Else If (keyu="left" || keyu="WheelDown")
-         %givenVar% := clampInRange(varValue - frkA, minV, maxV, 1)
-      Else If (keyu="PgUp")
-         %givenVar% := clampInRange(varValue + frkB, minV, maxV, 1)
-      Else If (keyu="PgDn")
-         %givenVar% := clampInRange(varValue - frkB, minV, maxV, 1)
+      isGivenKey := 0
+      If (keyu="WheelUp")
+         %givenVar% := clampInRange(%givenVar% + frkA, minV, maxV, 1)
+      Else If (keyu="WheelDown")
+         %givenVar% := clampInRange(%givenVar% - frkA, minV, maxV, 1)
       Else If (keyu="end")
          %givenVar% := maxV
       Else If (keyu="home")
          %givenVar% := minV
-      Else
+      Else If (keyu="BackSpace" || keyu="Delete")
          %givenVar% := defVal
+      Else 
+         isGivenKey := 1
+
+      Sleep, 1
    } Else If (m_event="DoubleClick" && isActive=1)
    {
+      keyu := 0
       lastInvoked := A_TickCount
       %givenVar% := defVal
    } Else If (GetKeyState("Ctrl", "P")=1 && isActive=1)
    {
+      keyu := 0
       m_event := "uiLabel"
       %givenVar% := PanelAskSliderValue(whichSlider, minV, maxV, varValue, defVal, uiSlidersArray[whichSlider, 5])
       If InStr(whichSlider, "@")
@@ -92388,9 +92429,9 @@ GuiSlidersResponder(a, m_event, keyu) {
          %funcu%(SubStr(whichSlider, 2), "given")
          Return
       }
-   }
+   } Else keyu := 0
 
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    obju := []
    fsizeu := (PrefsLargeFonts=1) ? LargeUIfontValue - 3 : LargeUIfontValue - 7
    txtColor := (uiUseDarkMode=1) ? "FFffFF" : "000000"
@@ -92405,40 +92446,73 @@ GuiSlidersResponder(a, m_event, keyu) {
    If (updatePrevu=1)
       GuiUpdateSliders(StrReplace(prevu, "customSliders"), 0)
 
-   zx := zy := skipped := 0
    lastu := 1
+   zx := zy := skipped := 0
    mouseMode := determineLClickState()
+   isGivenKey := (keyu && mouseMode!=1 && isGivenKey=1 && isActive=1) ? 1 : 0
    clickStarted := A_TickCount
-   While, (determineLClickState()=1 || m_event="uiLabel")
+   occ := A_IsCritical
+   Critical, off
+   tinyPreview := isVarEqualTo(AnyWindowOpen, 26, 43, 44, 64, 69, 78, 79)
+   While, (determineLClickState()=1 || m_event="uiLabel" && A_Index=1 || GetKeyState(keyu, "P") && isGivenKey=1)
    {
+      ; if m_event = "uiLabel" , it is a keyboard call
       GetPhysicalCursorPos(mX, mY)
-      If (isInRange(mX, zX - 2, zX + 2) && isInRange(mY, zY - 2, zY + 2) && A_Index>1)
-         Continue
+      If (isGivenKey!=1 && mouseMode=1)
+      {
+         If (isInRange(mX, zX - 2, zX + 2) && isInRange(mY, zY - 2, zY + 2) && A_Index>1)
+            Continue
+      }
 
       GetMouseCoord2wind(hwnd, nX, nY)
       Sleep, -1
       zX := mX, zY := mY
       sk := (A_Index=1 && (m_event="DoubleClick" || m_event="uiLabel") || isActive!=1) ? 1 : 0
-      If (doFloat=1)
+      If (isGivenKey=1)
+      {
+         If (A_TickCount - clickStarted>4000)
+         {
+            Sleep, 25
+            If !InStr(uiSlidersArray[hwnd], "@")
+               GuiControl, SettingsGUIA: Focus, customSliders%whichSlider%
+         }
+         Else
+            Sleep, % (A_TickCount - clickStarted>2000) ? 50 : 100
+
+         If (keyu="right" || keyu="WheelUp")
+            %givenVar% := clampInRange(%givenVar% + frkA, minV, maxV, 1)
+         Else If (keyu="left" || keyu="WheelDown")
+            %givenVar% := clampInRange(%givenVar% - frkA, minV, maxV, 1)
+         Else If (keyu="PgUp")
+            %givenVar% := clampInRange(%givenVar% + frkB, minV, maxV, 1)
+         Else If (keyu="PgDn")
+            %givenVar% := clampInRange(%givenVar% - frkB, minV, maxV, 1)
+      } Else If (doFloat=1)
          newValue := clampInRange( Round( (nX / w) * rangeu + minV, 3) , minV, maxV)
       Else
          newValue := clampInRange( Round( (nX / w) * rangeu + minV) , minV, maxV)
 
-      If !sk
+      If (!sk && !isGivenKey)
          %givenVar% := newValue
       ; ToolTip, % wx "|" w "|" rangeu "|" newValue , , , 2
-      if (A_TickCount - lastu>50 || m_event="uiLabel")
+      If (A_TickCount - lastu>50)
       {
          p := GuiUpdateSliders(whichSlider, 0, obju)
-         %funcu%()
+         If (imgEditPanelOpened=1)
+            livePreviewsImageEditing()
+         Else If (tinyPreview=1)
+            coreUpdateLiveTinyPreviewsWindow()
+         Else
+            %funcu%()
+
          lastu := A_TickCount
          skipped := 0
-      } else skipped++
+      } Else skipped++
 
-      If sk
+      If (sk && !isGivenKey)
          Break
 
-      If ((A_TickCount - clickStarted>8000) && mouseMode=1)
+      If (A_TickCount - clickStarted>9500)
       {
          SoundBeep 900, 100
          skipped := 1
@@ -92446,10 +92520,22 @@ GuiSlidersResponder(a, m_event, keyu) {
       }
    }
 
-   if skipped
+   If (isGivenKey && !InStr(uiSlidersArray[hwnd], "@"))
    {
-      p := GuiUpdateSliders(whichSlider, 0, obju)
-      %funcu%()
+      Sleep, 100
+      GuiControl, SettingsGUIA: Focus, customSliders%whichSlider%
+   }
+
+   Sleep, -1
+   Critical, % occ
+   GuiUpdateSliderCtrlHiddenLabel(hwnd, whichSlider)
+   p := GuiUpdateSliders(whichSlider, 0, obju)
+   %funcu%()
+   If InStr(uiSlidersArray[hwnd], "@")
+   {
+      thisuv := uiSlidersArray[hwnd] ; StrReplace(whichSlider, "@")
+      If (uiSlidersArray[whichSlider, 6]="dummy")
+         GuiUpdateSliderCtrlHiddenLabel(hwnd, thisuv)
    }
 
    Gdip_DeleteGraphics(obju.G)
@@ -92458,7 +92544,13 @@ GuiSlidersResponder(a, m_event, keyu) {
    Gdip_DeleteFontFamily(hFontFamily)
    Gdip_DeleteBrush(obju.pBrush)
    trGdip_DisposeImage(obju.pBitmap)
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
+   If (isGivenKey && !InStr(uiSlidersArray[hwnd], "@"))
+   {
+      ; force refocus
+      Sleep, 10
+      GuiControl, SettingsGUIA: Focus, customSliders%whichSlider%
+   }
    ; ToolTip, % b "==" a "\w=" w "/" givenVar "|nX=" nX "|r=" rangeu , , , 2
 }
 
@@ -92688,8 +92780,11 @@ GuiUpdateSliders(whichSlider, isHwnd:=0, obju:=0) {
    }
 
    uiSlidersArray[whichSlider, 15] := str ".`n" factive "Slider range: " minV " to " maxV "." fkbd
-   fn := Func("GuiUpdateSliderLabel").Bind(hwnd, whichSlider)
-   SetTimer, % fn, -150
+   If !IsObject(obju)
+   {
+      fn := Func("GuiUpdateSliderCtrlHiddenLabel").Bind(hwnd, whichSlider)
+      SetTimer, % fn, -150
+   }
 
    hBitmap := trGdip_CreateHBITMAPFromBitmap(A_ThisFunc, pBitmap)
    SetImage(hwnd, hBitmap)
@@ -92705,10 +92800,10 @@ GuiUpdateSliders(whichSlider, isHwnd:=0, obju:=0) {
    }
 
    If (updateSibling=1)
-      GuiUpdateSliders(givenVar)
+      GuiUpdateSliders(givenVar, 0, obju)
 }
 
-GuiUpdateSliderLabel(hwnd, whichSlider) {
+GuiUpdateSliderCtrlHiddenLabel(hwnd, whichSlider) {
    Critical, off
    Static lastInvoked := 1 , prevu := 0
    msgu := uiSlidersArray[whichSlider, 15]
@@ -92724,8 +92819,9 @@ GuiUpdateSliderLabel(hwnd, whichSlider) {
 
    lastInvoked := A_TickCount
    WinSet, Style,-0x0E, ahk_id %hwnd%
-   GuiControl, SettingsGUIA:, customLblSliders%whichSlider%, % msgu
-   GuiControl, SettingsGUIA:, customSliders%whichSlider%, % msgu
+   guiu := InStr(whichSlider, "@") ? "SoloSliderWidgetGUIA" : "SettingsGUIA"
+   GuiControl, %guiu%:, customLblSliders%whichSlider%, % msgu
+   GuiControl, %guiu%:, customSliders%whichSlider%, % msgu
    ; ControlSetText , , % msgu, ahk_id %hwnd%
    WinSet, Style,+0x0E, ahk_id %hwnd%
    prevu := thisu
@@ -93191,24 +93287,24 @@ tlbrDecideTooltips(hwnd) {
    } Else If InStr(icoFile, "flip-h")
    {
       editing := isImgEditingNow()
-      If (editing=1 && isNowAlphaPainting())
+      alph := isNowAlphaPainting()
+      If (editing=1 && alph=1)
          msgu := "Alpha mask bitmap - flip horizontally «Shift + H»"
       Else If (editing=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
          msgu := "Image object - flip horizontally «Shift + H»"
       Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
          msgu := "Image file - flip horizontally «Shift + H»"
-      Else If (editing=1 && editingSelectionNow=1)
+      Else If (editing=1 && editingSelectionNow=1 && !AnyWindowOpen)
          msgu := "Image selected area - flip horizontally «Shift + H»"
       Else If (editing=1)
          msgu := "Viewport - flip horizontally «H»"
       Else
          msgu := "Flip horizontally"
 
-      If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-         msgu2 := "Viewport - flip horizontally «H»"
-      Else If (editing=1 && EllipseSelectMode=2 && editingSelectionNow=1)
-         msgu2 := "Freeform selection shape - flip horizontally"
-      Else If (editing=1 && editingSelectionNow=1)
+      If (editing=1 && editingSelectionNow=1 && AnyWindowOpen && !alph)
+         msgu2 := "Image selected area - flip horizontally «Shift + H»"
+      Else If ( (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+      || (editing=1 && alph=1) )
          msgu2 := "Viewport - flip horizontally «H»"
 
       If msgu2
@@ -93216,24 +93312,24 @@ tlbrDecideTooltips(hwnd) {
    } Else If InStr(icoFile, "flip-v")
    {
       editing := isImgEditingNow()
-      If (editing=1 && isNowAlphaPainting())
+      alph := isNowAlphaPainting()
+      If (editing=1 && alph=1)
          msgu := "Alpha mask bitmap - flip vertically «Shift + V»"
       Else If (editing=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
          msgu := "Image object - flip vertically «Shift + V»"
       Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
          msgu := "Image file - flip vertically «Shift + V»"
-      Else If (editing=1 && editingSelectionNow=1)
+      Else If (editing=1 && editingSelectionNow=1 && !AnyWindowOpen)
          msgu := "Image selected area - flip vertically «Shift + V»"
       Else If (editing=1)
          msgu := "Viewport - flip vertically «V»"
       Else
          msgu := "Flip vertically"
 
-      If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-         msgu2 := "Viewport - flip vertically «V»"
-      Else If (editing=1 && EllipseSelectMode=2 && editingSelectionNow=1)
-         msgu2 := "Freeform selection shape - flip vertically"
-      Else If (editing=1 && editingSelectionNow=1)
+      If (editing=1 && editingSelectionNow=1 && AnyWindowOpen && !alph)
+         msgu2 := "Image selected area - flip vertically «Shift + V»"
+      Else If ( (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
+      || (editing=1 && alph=1) )
          msgu2 := "Viewport - flip vertically «V»"
 
       If msgu2
@@ -93245,8 +93341,8 @@ tlbrDecideTooltips(hwnd) {
       friendly := (editingSelectionNow=1) ? "L: Image selection area:" : "L: Viewport:"
       keyu := (editingSelectionNow=1) ? " «Shift + 0»" : " «0»"
       keyu2 := (editingSelectionNow=1) ? " «Shift + \»" : " « \ »"
-      msgu := friendly " rotate by 15°" keyu "`nR: Reset rotation" keyu2
-      msgu .= "`nHold Alt to change rotation by 1° "
+      msgu := friendly " rotate by 5°" keyu "`nR: Reset rotation" keyu2
+      msgu .= "`nHold Alt to change rotation by 1°"
       If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
          msgu := "L: Rotate image file by +90° «Shift + 0»`nR: Rotate image file by -90° «Shift + 9»"
       Else If isTlbrViewModus()
@@ -93639,7 +93735,7 @@ tlbrDraggyNow() {
    Dx := Dy := 0
    lastInvoked := A_TickCount
    ; ToolTip, % "l=" thisZL , , , 2
-   setwhileLoopExec(1)
+   setWhileLoopExec(1)
    While, (determineLClickState()=1)
    {
       Global zeitSillyPrevent := A_TickCount
@@ -93650,7 +93746,7 @@ tlbrDraggyNow() {
       Sleep, -1
    }
 
-   setwhileLoopExec(0)
+   setWhileLoopExec(0)
    WinGetPos, winX, winY,,, ahk_id %hQPVtoolbar%
    UserToolbarY := winY
    UserToolbarX := winX

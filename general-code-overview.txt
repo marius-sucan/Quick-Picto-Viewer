@@ -5,7 +5,7 @@
    d) How an image is loaded and displayed on screen
    e) General considerations
    f) How slideshows happen
-   g) Windows, AHK GUIs, Menus
+   g) Windows, AHK GUIs, Menus, Toolbar
    h) Input responses
    i) Image live editing
    j) How to enable alpha masking for an image editing live tool
@@ -14,7 +14,7 @@
    m) How to add a new panel/tool (soon)
 
 
-Deniere mise à jour: vendredi 22 décembre 2023
+Deniere mise à jour: samedi 23 décembre 2023
 ================================================
 
 a) How Quick Picto Viewer initializes
@@ -25,10 +25,10 @@ a) How Quick Picto Viewer initializes
   to prevent excessive spawn of multiple instances.
 
   It first loads settings or stores default settings [if first start].
-   - loadMainSettings() or writeMainSettings()
-  These two functions load/write only the core settings.
-  Each panel within Quick Picto Viewer loads and stores settings
-  of its own only.
+   - loadMainSettings() or writeMainSettings(). These two functions
+  load and write only the core settings in an INI: quick-picto-viewer.ini.
+  Each panel [or tool] within QPV loads and stores settings
+  that pertain to it only, in the registry.
 
   If "Running" registry flag is set 2 by, supposedly, another
   QPV instance, it will start as an aid for batch processing
@@ -387,11 +387,12 @@ e) General considerations
    functions from the main thread, because I want to avoid locking
    the UI.
 
-   For more details, please see section g).
+   For more details about the interface, please see section g).
 
    The code is poorly structured and organized. It relies on many 
    global variables... and is hard to follow. This is the result
    of me having no prior experience in coding such large projects.
+   It is a miracle it all works... ^_^ 
 
    Many GDI+ functions are wrapped to keep track of the bitmaps 
    created and to avoid memory leaks. These are prefixed with 
@@ -450,7 +451,7 @@ f) How slideshows happen
    for the next slide.
 
 
-g) Windows, AHK GUIs, Menus
+g) Windows, AHK GUIs, Menus, Toolbar
 =============================================
 
    The application consists mainly of two threads. In the main
@@ -520,11 +521,14 @@ g) Windows, AHK GUIs, Menus
 
    The main thread creates on user demand the following AHK windows:
 
-   1. PanelFoldersTree()
+   1. PanelFoldersTree() - folders tree navigation and manager
       hfdTreeWinGui, fdTreeGuia
 
-   2. PanelQuickSearchMenuOptions()
+   2. PanelQuickSearchMenuOptions() - searchable menu options
       hquickMenuSearchWin, QuickMenuSearchGUIA
+
+      It can also function as a folders manager and navigation tool,
+      if a folder path is provided, instead of keywords.
 
    3. createSettingsGUI() - generalized panel, it is used by most
    of the panels users can see in QPV. Each panel has an ID,
@@ -535,15 +539,20 @@ g) Windows, AHK GUIs, Menus
       fakeWinCreator() which uses msgBoxWrapper() to create
       simple panels.
 
+      repositionWindowCenter() is called after any panel is created. 
+      This function repositions the window in the center of the
+      screen where the main QPV is found. It also applies the dark
+      mode theme on all its controls.
+
    4. msgBoxWrapper() - custom message boxes of all kinds
       MsgBox2hwnd, WinMsgBox
 
-   5. createGUItoolbar() - custom toolbar
+   5. createGUItoolbar() - customizable toolbar
       hQPVtoolbar, OSDguiToolbar
 
    6. CreateSoloSliderWidgetWin() - a sliders widget
       hSliderWidget, SoloSliderWidgetGUIA
-      It is used a popup for some tools found in the
+      It is used as a popup for some tools found in the
       toolbar.
 
    7. CreateCollapsedPanelWidget() - collapsed panel widget
@@ -554,7 +563,7 @@ g) Windows, AHK GUIs, Menus
    The main thread shows messages in the viewport using
    CreateOSDinfoLine() wrapped by showTOOLtip().
 
-   The main GUI of the window, created in BuildGUI(),
+   The main GUI of the QPV window, created in BuildGUI(),
    contains multiple static text controls. These are used
    as place holders. They are updated with texts pertaining
    to the various viewport elements. The functions that
@@ -563,22 +572,56 @@ g) Windows, AHK GUIs, Menus
    functions. This is meant to help make the viewport more
    accessible for users relying on screen readers.
 
-   *The custom controls:
+   \\Contexts:
+   Toolbar and menu related functions decide what options to display
+   based on the app/user context and user settings. Broadly speaking
+   there are several modes and their associated global variables:
+     - thumbnails list view
+       var: thumbsDisplaying = 1
+
+     - image view
+       var: thumbsDisplaying = 0
+       - live image editing tools
+         var: imgEditPanelOpened = 1, AnyWindowOpen > 0
+
+         - alpha masking brush mode (sub-mode of live image editing, never otherwise)
+           Detectable via: isNowAlphaPainting()
+
+       - freeform vector shapes editor (sub-mode of image view, never otherwise)
+         var: drawingShapeNow = 1
+
+   These contexts apply to the keyboard shortcuts as well.
+
+
+   \\The custom controls:
    In the panels created with createSettingsGUI(), many controls,
    even if not actually customized, are wrapped just for the
-   sake of improving accessibility for screen readers and add
-   tooltips, eg. GuiAddEdit().
+   sake of improving accessibility for screen readers and to add
+   tooltips easily, eg. GuiAddEdit().
 
    The custom sliders are created with GuiAddSlider() and respond to
    user input via GuiSlidersResponder(). When created, they are
    usually set to invoke the panel's specific UI function prefixed
    with "updateUI*".
 
-   *The menus:
+
+   \\The menus:
    The main thread creates all the context menus via
    InitGuiContextMenu(), InitSecondMenu() and others. The menus are
-   displayed with showThisMenu() from the main thread, even the menu
-   bar.
+   displayed with showThisMenu() from the main thread, The menu bar
+   itself is created in the interface thread, but it is a dummy, fake.
+   The menu bar items invoke functions from the main thread that display 
+   the sub-menu itself. ShowThisMenu() identifies the position of the
+   menu bar clicked item and positions the menu to be displayed. The 
+   menu bar functions in the main file begin with "InvokeMenuBar*".
+   The menu bar in the interface thread is generated with BuildMenuBar().
+   Why did I do it like this? I found no way to dynamically attach from 
+   the main thread the menus to the interface thread window. I hate 
+   when apps display all kinds of pointless options that are not
+   relevant to the current context, e.g., Text menu in Affinity Photo
+   when no text object is manipulated. It is all a clutter. As such,
+   I find it is imperative to generate the list of menus and sub-menus
+   dynamically, to only display what is relevant. 
 
    All the menus, and the context menus, are created with the standard 
    Menu command of AHK, however I created a wrapper function for it.
@@ -589,12 +632,52 @@ g) Windows, AHK GUIs, Menus
       objuB - maps menu-names with menu items pairs to indexexes of objuA; objuB[menu "-" label] := menuIndex
       objuC - menu-names and their properties objuC[menu] := [menu-name, container-menu, accelerator-key]
 
-   The menus are searchable via PanelQuickSearchMenuOptions() via
-   buildQuickSearchMenus(). The global variable "mustPreventMenus" is set
-   to 1 before generating the searchable list of the menus. When this is
-   used, some menu items are hidden, while others are added, and the
-   menus themselves are not invoked. When this variable is set to 1,
-   showThisMenu() does not display the menu on screen.
+   The menus are searchable via PanelQuickSearchMenuOptions() -->
+   PopulateQuickMenuSearch() --> buildQuickSearchMenus(). The global
+   variable "mustPreventMenus" is set to 1 before generating the
+   searchable list of the menus. When this is used, some menu items
+   are hidden, while others are added, and the menus themselves are
+   not invoked. When this variable is set to 1, showThisMenu() does
+   not display the menu on screen.
+
+
+   \\The toolbar:
+   The GUI of the toolbar is created by CoreGUItoolbar().
+   createGUItoolbar() is a wrapper that minimizes that filters the 
+   calls to the main function and loads the toolbar settings.
+
+   CoreGUItoolbar() holds the list of possible toolbar icons and 
+   their properties in the form of:
+     localStaticBtnID := [ico-file-name, 0, base-user-friendly-name, 0, button-ID, 0, menu-mode, modes-availability]
+
+   Buttons in the toolbar are added via tlbrAddNewIcon(). The list 
+   of those added is held in this object: "tlbrIconzList".
+     tlbrIconzList[btnID/hwnd/index] := [ctrl-hwnd, icoFile, btnName, btnType, indexBtn, function-to-call, icoW, icoH, param-func, btnID, menuMode]
+
+   The buttons are typical AHK / Win32 button controls customized 
+   using the ImageButton class. It is a class that assigns ImageLists
+   to push buttons using the ImageList_Create Win32 API function.
+
+   The toolbar can be customized by users via PanelCustomizeToolbar()
+   The custom toolbar is loaded only if userCustomizedToolbar equals 1.
+   "userThumbsToolbarList" and "userImgViewToolbarList" hold the lists
+   of user customized toolbar for thumbnails list and image view.
+   The other modes cannot be customized.
+
+   WM_MOUSEMOVE() from the main thread invokes tlbrDecideTooltips() 
+   to dynamically display tooltips for the toolbar buttons, which 
+   can change based on the context.
+
+   The toolbar buttons actions are invoked via tlbrInvokeFunction() -
+   a wrapper that utilized "tlbrIconzList" to decide what function 
+   has to be called. The decision is made primarily in
+   processToolbarFunctions().
+
+   The buttons can have left and right click actions associated.
+   Some of them invoke CreateSoloSliderWidgetWin(), eg.,
+   tlbrFloodFillSlidersInvoker(). These are pop-up sliders. Others,
+   allow users to click and drag to adjust a value, eg.,
+   tlbrChangeStuffRotation().
 
 
 h) Input responses
@@ -602,18 +685,24 @@ h) Input responses
 
    All keyboard shortcuts are «registered» through WM_KEYDOWN and
    WM_SYSKEYDOWN. Both, the main thread and the interface one, register
-   these Window Messages. The function invoked by these threads is
-   WM_KEYDOWN(). The function is meant to finish execution as
-   soon as possible. constructKbdKey() is called to convert the
-   virtual keys into readable form. In KeyboardResponder(), main thread,
-   is where each keyboard shortcut is actually registered, where the code 
-   gets to decide what functions to call based on the keyboard input,
-   and the user context, in-app conditions. QPV allows custom defined
-   keyboard shortcuts. These are stored as an object:
+   these Window Messages. The function invoked when the messages are
+   issued is, in both threads, WM_KEYDOWN(). The function is meant to
+   finish execution as soon as possible. constructKbdKey() is called to\
+   convert the virtual keys into readable form. In KeyboardResponder(),
+   main thread, is where each keyboard shortcut is actually registered,
+   where the code decides what functions to call based on the keyboard
+   input, and the user context, in-app conditions. QPV allows custom
+   defined keyboard shortcuts. These are stored as an object:
    "userCustomKeysDefined". The object is initialized by
    loadCustomUserKbds(). In KeyboardResponder(), if the user-pressed
-   key is not customized [defined] in the aforementioned object,
+   key is not customized [or defined] in the aforementioned object,
    the key is passed to processDefaultKbdCombos().
+
+   Users can define custom keyboard shortcuts through
+   PanelQuickSearchMenuOptions(), by right-clicking on any item found
+   in the search results list. PanelDefineKbdShortcut() is the panel
+   that allows users to define the new keyboard shortcut,
+   via BtnApplyNewKbdShortcut().
 
    Mouse input is mostly handled in the interface thread.
    The Window Messages for mouse buttons (e.g., WM_LBUTTONUP)
@@ -662,7 +751,7 @@ i) Image live editing
    functions update the status of the different available controls: hides,
    shows, disables, or enables controls.
 
-   The APPLY button in these panels is usually attached to
+   The Apply button in these panels is usually attached to
    applyIMGeditFunction(). The function is just a wrapper which invokes 
    a specific function for each tool, eg. BtnDrawShapeSelectedArea(),
    based on the "AnyWindowOpen" value. Most of these functions are named
@@ -715,7 +804,9 @@ i) Image live editing
    on the FreeImage bitmap. "UserMemBMP" and "gdiBitmap" are not used.
    The array "undoLevelsArray" is also not used with such large bitmaps.
    The image data is accessible via "viewportQPVimage.imgHandle" property
-   and the methods of "screenQPVimage" class.
+   and the methods of "screenQPVimage" class. The image editing functions 
+   that rely on FreeImage, for very large images, begin with the prefix
+   "HugeImages*".
 
    For images under 536 megapixels, the entire image is recorded for
    every undo level and is always on 32-bits RGBA. But for bigger images,
@@ -761,3 +852,20 @@ j) How to enable alpha masking for an image editing live tool
    as reference», and «create new bitmap for these tools». Add the AnyWindowOpen ID
    of the tool to isVarEqualTo(). The user alpha mask bitmap must be created based
    on the selection area dimensions.
+
+k) How vector shapes drawing works [soon]
+==========================================================================
+
+  startDrawingShape()
+  drawLiveCreateCustomShape()
+  stopDrawingShape()
+  addNewVectorShapePoints()
+  createContextMenuCustomShapeDrawing()
+
+  convertShapePointsStrToArray()
+  convertShapePointsArrayToStr()
+  convertCustomShape2givenArea()
+  convertCustomShape2relativeCoords()
+
+  getVPcustomShapePath()
+
