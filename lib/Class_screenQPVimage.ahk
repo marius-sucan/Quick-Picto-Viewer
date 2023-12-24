@@ -52,6 +52,7 @@ Class screenQPVimage {
 
          This.imgHandle := ""
          This.ImgFile := ""
+         This.actions := 0
          killQPVscreenImgSection()
          If (disposeBuffer!=1)
             Return This.FimBuffer
@@ -189,6 +190,7 @@ Class screenQPVimage {
      This.FIMtype := imgType
      This.FIMbpp := imgBPP
      This.FimBuffer := externHandle[3]
+     This.actions := 0
      Return 1
    } ; // LoadFimFile
 

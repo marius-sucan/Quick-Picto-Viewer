@@ -1607,44 +1607,73 @@ pBitmap and pBitmap2Blend must be the same width and height
 and in 32-ARGB format: PXF32ARGB - 0x26200A.
 */
 
-DLL_API int DLL_CALLCONV BlendBitmaps(int* bgrImageData, int* otherData, int w, int h, int blendMode, int flipLayers, int threadz) {
+DLL_API int DLL_CALLCONV BlendBitmaps(unsigned char* bgrImageData, unsigned char* otherData, int w, int h, int Stride, int bpp, int blendMode, int flipLayers, int faderMode, int linearGamma) {
+
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int x = 0; x < w; x++)
     {
         for (int y = 0; y < h; y++)
         {
-            UINT BGRcolor = bgrImageData[x + (y * w)];
-            if (BGRcolor != 0x0)
+            INT64 o = CalcPixOffset(x, y, Stride, bpp);
+            int aB = bgrImageData[3 + o];
+            int aO = otherData[3 + o];
+            if (aO < 1 || aB < 1)
             {
-                UINT colorO = otherData[x + (y * w)];
-                int aO = (colorO >> 24) & 0xFF;
-                int aB = (BGRcolor >> 24) & 0xFF;
-                int aX = min(aO, aB);
-                if (aX < 1)
-                {
-                    bgrImageData[x + (y * w)] = 0;
-                    continue;
-                }
-
-                int rO = (colorO >> 16) & 0xFF;
-                int gO = (colorO >> 8) & 0xFF;
-                int bO = colorO & 0xFF;
-
-                int rB = (BGRcolor >> 16) & 0xFF;
-                int gB = (BGRcolor >> 8) & 0xFF;
-                int bB = BGRcolor & 0xFF;
-
-                RGBColorI blended;
-                // int theGray = RGBtoGray(rO, gO, bO, 0);
-                if (flipLayers==1)
-                   blended = calculateBlendModes(rB, gB, bB, rO, gO, bO, blendMode);
-                else
-                   blended = calculateBlendModes(rO, gO, bO, rB, gB, bB, blendMode);
-
-                bgrImageData[x + (y * w)] = (aX << 24) | ((blended.r & 0xFF) << 16) | ((blended.g & 0xFF) << 8) | (blended.b & 0xFF);
+               if (faderMode==2)
+               {
+                  bgrImageData[3 + o] = otherData[3 + o];
+                  bgrImageData[2 + o] = otherData[2 + o];
+                  bgrImageData[1 + o] = otherData[1 + o];
+                  bgrImageData[o] = otherData[o];
+               }
+               continue;
             }
+
+            int rB = bgrImageData[2 + o];
+            int gB = bgrImageData[1 + o];
+            int bB = bgrImageData[o];
+
+            int rO = otherData[2 + o];
+            int gO = otherData[1 + o];
+            int bO = otherData[o];
+            if (faderMode==2)
+            {
+               bgrImageData[3 + o] = aO;
+               swap(rO, rB);
+               swap(gO, gB);
+               swap(bO, bB);
+               swap(aO, aB);
+            }
+
+            RGBColorI blended;
+            if (flipLayers==1)
+               blended = calculateBlendModes(rB, gB, bB, rO, gO, bO, blendMode);
+            else
+               blended = calculateBlendModes(rO, gO, bO, rB, gB, bB, blendMode);
+
+            int fR, fG, fB;
+            float fintensity = char_to_float[aO];
+            if (linearGamma==1)
+            {
+               fR = linear_to_gamma[weighTwoValues(gamma_to_linear[blended.r], gamma_to_linear[rB], fintensity)];
+               fG = linear_to_gamma[weighTwoValues(gamma_to_linear[blended.g], gamma_to_linear[gB], fintensity)];
+               fB = linear_to_gamma[weighTwoValues(gamma_to_linear[blended.b], gamma_to_linear[bB], fintensity)];
+            } else
+            {
+               fR = weighTwoValues(blended.r, rB, fintensity);
+               fG = weighTwoValues(blended.g, gB, fintensity);
+               fB = weighTwoValues(blended.b, bB, fintensity);
+            }
+
+            if (faderMode==1)
+               bgrImageData[3 + o] = min(aO, aB);
+
+            bgrImageData[2 + o] = fR;
+            bgrImageData[1 + o] = fG;
+            bgrImageData[o] = fB;
         }
     }
+
     return 1;
 }
 

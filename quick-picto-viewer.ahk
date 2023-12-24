@@ -366,6 +366,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , blurAreaApplyFX := 0, FillAreaDoBehind := 0, PasteInPlaceRevealOriginal := 0, PasteInPlaceCropDo := 0
    , PasteInPlaceCropAdaptImg := 1, PasteInPlaceOrientFlipX := 0, PasteInPlaceOrientFlipY := 0
    , freeHandSelectionMode := 0, DrawLineAreaBorderConnector := 1, DrawLineAreaSnapLine := 0
+   , DrawLineAreaBlendMode := 1
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -4005,7 +4006,7 @@ PanelOfferAlphaMaskMerger(oldBitmap, newBitmap) {
       r := QPV_BlendBitmaps(zBitmap, newBitmap, thisu, 0)
       if !r
       {
-         fnOutputDebug("Error occured when blending bitmaps. " A_ThisFunc "()")
+         addJournalEntry(A_ThisFunc "(): An error occured when blending the bitmaps.")
          SoundBeep , 300, 100
       }
       userAlphaMaskBmpPainted := zBitmap
@@ -12840,7 +12841,7 @@ QPV_FillBitmapHoles(pBitmap, newColor) {
   return r
 }
 
-QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, threads, flipLayers:=0) {
+QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, threads, flipLayers:=0, faderMode:=1) {
   initQPVmainDLL()
   If (!qpvMainDll || isWinXP=1)
   {
@@ -12853,12 +12854,15 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, threads, flipLayers:=0) {
   trGdip_GetImageDimensions(pBitmap2Blend, w2, h2)
   ; fnOutputDebug(A_ThisFunc "() " w "=" w2 "||" h "=" h2)
   If (w2!=w || h2!=h || !validBMP(pBitmap) || !validBMP(pBitmap2Blend) || !w ||)
+  {
+     addJournalEntry(A_ThisFunc "(): failed to apply blending modes; incorrect bitmaps provided")
      Return 0
+  }
 
   E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   E2 := Gdip_LockBits(pBitmap2Blend, 0, 0, w, h, stride, mScan, mData, 1)
   If (!E1 && !E2)
-     r := DllCall(whichMainDLL "\BlendBitmaps", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", blendMode, "int", flipLayers, "Int", threads)
+     r := DllCall(whichMainDLL "\BlendBitmaps", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", blendMode, "int", flipLayers, "int", faderMode, "int", userimgGammaCorrect)
   ; fnOutputDebug(A_ThisFunc "() " A_LastError " r=" r "=" func2exec "=" A_TickCount - thisStartZeit "|" blendMode)
 
   If !E1
@@ -16368,7 +16372,7 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
          If (FillAreaBlendMode>1)
          {
             o_glass := trGdip_CloneBitmap(A_ThisFunc, glassBitmap)
-            QPV_BlendBitmaps(glassBitmap, gradientsBMP, FillAreaBlendMode - 1, threads, BlendModesFlipped)
+            QPV_BlendBitmaps(glassBitmap, gradientsBMP, FillAreaBlendMode - 1, threads, BlendModesFlipped, 1)
          }
 
          If (FillAreaApplyColorFX=1 && FillAreaColorMode<5)
@@ -17639,14 +17643,14 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
       lastu := []
    }
 
-   If (imgSelPx="kill" ||preventUndoLevels=1)
+   If (imgSelPx="kill" || preventUndoLevels=1)
       Return
 
    recordSelUndoLevelNow()
    bpp := FreeImage_GetBPP(viewportQPVimage.imgHandle)
    If (viewportQPVimage.LoadedWith!="FIM" || !isVarEqualTo(bpp, 24, 32))
    {
-      addJournalEntry("Error. Unable to record undo level. Image not loaded into memory as a FreeImage bitmap.")
+      addJournalEntry("ERROR. Unable to record undo level. Image not loaded into memory as a FreeImage bitmap.")
       Return
    }
 
@@ -17656,7 +17660,6 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
       Return
    }
 
-
    FreeImage_GetImageDimensions(viewportQPVimage.imgHandle, imgW, imgH)
    If (imgSelPx="entire-vp" || invertArea=1)
    {
@@ -17665,6 +17668,8 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
 
       calcImgSelection2bmp(0, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2, 0, 0, "a")
       hFIFimgA := FreeImage_Copy(viewportQPVimage.imgHandle, 0, 0, imgW, imgH)
+      If !hFIFimgA
+         addJournalEntry("Failed to duplicate the main bitmap. Unable to record undo level.")
       If (invertArea=1)
          lastu := [hFIFimgA, "invertArea", imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, innerSelectionCavityX, innerSelectionCavityY]
       Else
@@ -17673,7 +17678,7 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
       Return hFIFimgA ? 1 : 0
    }
 
-   flastu :=  !isNumber(imgSelPx) ? imgSelPx : "img-crop"
+   flastu := !isNumber(imgSelPx) ? imgSelPx : "img-crop"
    If (flastu="img-crop")
    {
       If memoryUsageWarning(imgSelW, imgSelH, bpp, 3)
@@ -17686,6 +17691,7 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
       lastu := [hFIFimgA, flastu, imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, innerSelectionCavityX, innerSelectionCavityY]
    } Else
    {
+      ; undoable actions that do not rely on a bitmap, because they are bidirectional actions, eg. flip, invert
       calcImgSelection2bmp(0, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2, 0, 0, "a")
       If (editingSelectionNow=1)
          lastu := [0, flastu, imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, innerSelectionCavityX, innerSelectionCavityY]
@@ -18962,8 +18968,13 @@ DrawLinesInSelectedArea(modus) {
        hasRanExpand := performAutoExpandCanvas(imgW, imgH)
 
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
+    trGdip_GetImageDimensions(whichBitmap, rw, rh)
     compositingQuality := (userimgGammaCorrect=1) ? 2 : 1
-    newBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+    If (DrawLineAreaBlendMode>1)
+       newBitmap := trGdip_CreateBitmap(A_ThisFunc, rw, rh)
+    Else
+       newBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+
     If validBMP(newBitmap)
        G2 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap, 7, 4,, compositingQuality)
 
@@ -18995,6 +19006,9 @@ DrawLinesInSelectedArea(modus) {
        coreDrawShapesSelectionArea(G2, newBitmap)
 
     Gdip_DeleteGraphics(G2)
+    If (DrawLineAreaBlendMode>1)
+       r := QPV_BlendBitmaps(newBitmap, whichBitmap, DrawLineAreaBlendMode, 0, BlendModesFlipped, 2)
+
     If (rz!=-1)
        wrapRecordUndoLevelNow(newBitmap)
     Else
@@ -19155,6 +19169,7 @@ coreDrawLinesSelectionArea(G2:=0, whichBitmap:=0) {
           If (DrawLineAreaBorderTop=1)
              Gdip_AddPathLine(pPathBrders, x1, y2, x2, y1)
 
+          Gdip_StartPathFigure(pPathBrders)
           If (DrawLineAreaBorderLeft=1)
              Gdip_AddPathLine(pPathBrders, x1, y1, x2, y2)
        }
@@ -19529,6 +19544,7 @@ coreDrawShapesSelectionArea(G2:=0, whichBitmap:=0) {
        G2 := 2NDglPG ; preview mode
        If (doImgEditLivePreview!=1)
           Return
+
        ; trGdip_GraphicsClear(A_ThisFunc, 2NDglPG, "0x00" WindowBGRcolor)
        vpWinClientSize(mainWidth, mainHeight)
        trGdip_GetImageDimensions(useGdiBitmap(), qimgW, qimgH)
@@ -43935,6 +43951,14 @@ BtnResetBlendMode() {
       UserSymmetricaBlendMode := 1
       GuiControl, SettingsGUIA: Choose, UserSymmetricaBlendMode, % UserSymmetricaBlendMode
       updateUIsymmetricaPanel()
+   } Else If (AnyWindowOpen=65 || AnyWindowOpen=30)
+   {
+      DrawLineAreaBlendMode := 1
+      GuiControl, SettingsGUIA: Choose, DrawLineAreaBlendMode, % DrawLineAreaBlendMode
+      If (AnyWindowOpen=30)
+         updateUIDrawLinesPanel()
+      Else
+         updateUIdrawShapesPanel()
    } Else
    {
       BlurAreaBlendMode := 1
@@ -45048,10 +45072,13 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     Gui, Add, Checkbox, xs y+7 hp Checked%freeHandSelectionMode% vfreeHandSelectionMode gupdateUIdrawShapesPanel, &Freehand draw mode
 
     ml := (PrefsLargeFonts=1) ? 60 : 45
-    Gui, Add, Text, xs y+15 hp +0x200, Line color
-    GuiAddPickerColor("x+15 hp w25", "DrawLineAreaColor")
+    Gui, Add, Text, xs y+15 w%btnWid% hp +0x200, Line color
     GuiAddColor("x+5 hp w" ml, "DrawLineAreaColor", "Line color")
-    GuiAddSlider("DrawLineAreaOpacity", 3,255, 255, "Opacity", "updateUIdrawShapesPanel", 1, "x+5 w" btnWid " hp")
+    GuiAddPickerColor("x+2 hp w25", "DrawLineAreaColor")
+    GuiAddSlider("DrawLineAreaOpacity", 3,255, 255, "Color opacity", "updateUIdrawShapesPanel", 1, "xs y+5 w" btnWid*2 + 5 " hp")
+    Gui, Add, Text, xs y+15 w%btnWid% hp +0x200 gBtnResetBlendMode +hwndhTemp, Blending mode
+    GuiAddDropDownList("x+5 wp gupdateUIdrawShapesPanel AltSubmit Choose" DrawLineAreaBlendMode " vDrawLineAreaBlendMode", "None|" userBlendModesList, [hTemp])
+    GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIdrawShapesPanel")
 
     Gui, Add, Text, xs y+15 w%btnWid%, Alignment
     Gui, Add, Text, x+5 wp, Styling
@@ -45060,7 +45087,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     Gui, Add, Checkbox, xs y+6 wp h%btnHeight% +0x1000 Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIdrawShapesPanel, &Double line
     Gui, Add, Checkbox, x+5 wp hp +0x1000 gupdateUIdrawShapesPanel Checked%DrawLineAreaCapsStyle% vDrawLineAreaCapsStyle, &Round caps
     GuiAddSlider("DrawLineAreaContourThickness", 1,450, 5, "Line width: $€ pixels", "updateUIdrawShapesPanel", 1, "xs y+15 w" txtWid " hp")
-    Gui, Add, Checkbox, xs y+5 gupdateUIdrawShapesPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit selection area
+    Gui, Add, Checkbox, xs y+10 gupdateUIdrawShapesPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit selection area
 
     btnWid := (PrefsLargeFonts=1) ? 105 : 65
     ml := (PrefsLargeFonts=1) ? 35 : 25
@@ -45237,6 +45264,7 @@ ReadSettingsDrawLinesArea(act:=0) {
     RegAction(act, "DrawLineAreaDoubles",, 1)
     RegAction(act, "DrawLineAreaContourAlign",, 2, 1, 3)
     RegAction(act, "DrawLineAreaDashStyle",, 2, 1, 4)
+    RegAction(act, "DrawLineAreaBlendMode",, 2, 1, 23)
     RegAction(act, "DrawLineAreaContourThickness",, 2, 1, 450)
     RegAction(act, "DrawLineAreaBorderTop",, 1)
     RegAction(act, "DrawLineAreaBorderBottom",, 1)
@@ -45324,11 +45352,16 @@ PanelDrawLines() {
     Gui, Add, Checkbox, xs y+5 wp hp +0x1000 gupdateUIDrawLinesPanel Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles, Double line
 
     sml := (PrefsLargeFonts=1) ? 30 : 20
-    Gui, Add, Text, xs y+%sml% +0x200 hp, Color
-    GuiAddColor("x+10 wp+15 hp", "DrawLineAreaColor", "Line color")
+    ml := (PrefsLargeFonts=1) ? 72 : 25
+    Gui, Add, Text, xs y+%sml% w%ml% +0x200 hp, Color
+    ml := (PrefsLargeFonts=1) ? 56 : 42
+    GuiAddColor("x+10 w" ml " hp", "DrawLineAreaColor", "Line color")
     GuiAddPickerColor("x+1 hp w25", "DrawLineAreaColor")
     GuiAddSlider("DrawLineAreaOpacity", 3,255, 255, "Opacity", "updateUIDrawLinesPanel", 1, "x+10 w" btnWid " h" ha)
-    GuiAddSlider("DrawLineAreaContourThickness", 1,450, 5, "Line width: $€ pixels", "updateUIDrawLinesPanel", 1, "xs y+10 w" txtWid - 23 " hp")
+    Gui, Add, Text, xs y+15 w%btnWid% hp +0x200 gBtnResetBlendMode +hwndhTemp, Blending mode
+    GuiAddDropDownList("x+10 wp gupdateUIDrawLinesPanel AltSubmit Choose" DrawLineAreaBlendMode " vDrawLineAreaBlendMode", "None|" userBlendModesList, [hTemp])
+    GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIDrawLinesPanel")
+    GuiAddSlider("DrawLineAreaContourThickness", 1,450, 5, "Line width: $€ pixels", "updateUIDrawLinesPanel", 1, "xs y+10 w" btnWid*2 + 8 " hp")
 
     Gui, Tab
     btnWid := (PrefsLargeFonts=1) ? 105 : 65
@@ -66802,6 +66835,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
      trGdip_GetImageDimensions(oBitmap, imgW, imgH)
 
   totalIMGres := imgW + imgH
+  defineRelativeSelCoords(imgW, imgH)
   totalScreenRes := ResolutionWidth + ResolutionHeight
   thisImgQuality := (userimgQuality=1) ? 6 : 5
   If (minimizeMemUsage=1 && rawFmt!="MEMORYBMP")
@@ -67375,6 +67409,9 @@ groupDigits(nrIn) {
 }
 
 defineRelativeSelCoords(maxSelX, maxSelY) {
+   If (imgSelX2="C" || imgSelY2="C" || imgSelX2=-1 && imgSelY2=-1)
+      Return
+
    prcSelX1 := imgSelX1/maxSelX
    prcSelY1 := imgSelY1/maxSelY
    prcSelX2 := imgSelX2/maxSelX
@@ -73589,7 +73626,7 @@ createDefaultSizedSelectionArea(DestPosX, DestPosY, newW, newH, maxSelX, maxSelY
 
     If (imgSelX2="C" || imgSelY2="C")
     {
-       ; this never seems to be case anymore
+       ; this never seems to be the case anymore
        GetMouseCoord2wind(PVhwnd, mX, mY)
        MouseCoords2Image(mX - 200, mY - 200, 1, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, imgSelX1, imgSelY1)
        MouseCoords2Image(mX + 200, mY + 200, 1, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, imgSelX2, imgSelY2)

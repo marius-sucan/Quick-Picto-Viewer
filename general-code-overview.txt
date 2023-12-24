@@ -27,10 +27,11 @@ a) How Quick Picto Viewer initializes
   It first loads settings or stores default settings [if first start].
    - loadMainSettings() or writeMainSettings(). These two functions
   load and write only the core settings in an INI: quick-picto-viewer.ini.
-  Each panel [or tool] within QPV loads and stores settings
-  that pertain to it only, in the registry.
+  Each panel [or tool] within QPV loads and stores settings that
+  pertain only to that specific, in the registry. Such functions are
+  named using this pattern: "ReadSettings*Panel".
 
-  If "Running" registry flag is set 2 by, supposedly, another
+  If "Running" is set to 2 in the Registry by, supposedly, another
   QPV instance, it will start as an aid for batch processing
   image files. When it finishes, it exits. If it is not set to 2,
   it continues the auto-exec part.
@@ -738,7 +739,7 @@ i) Image live editing
    The tool panels are created using createSettingsGUI() with the parameter
    "isImgLiveEditor" set to 1. If the panel does indeed open, then 
    "imgEditPanelOpened" global variable is set to 1. These can be invoked 
-   by keyboard shortcuts, menus or the toolbar.
+   by keyboard shortcuts, menus or via the toolbar.
 
    When a live editor panel is opened, it can be collapsed into a small
    widget. The widget is created with CreateCollapsedPanelWidget(). The 

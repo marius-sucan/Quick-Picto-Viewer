@@ -1,4 +1,4 @@
-﻿
+
 SelectFolderEx(StartingFolder:="", DlgTitle:="", OwnerHwnd:=0, OkBtnLabel:="", comboList:="", desiredDefault:=1, comboLabel:="", CustomPlaces:="", pickFoldersOnly:=1, usrFilters:="", defIndexFilter:=1, FileMustExist:=1, defaultEditField:="") {
 ; ==================================================================================================================================
 ; Shows a dialog to select a folder.
@@ -2214,10 +2214,11 @@ GetComboBoxInfo(hwnd) {
    Return [HCBBEDIT, HCBBLIST, r]
 }
 
-GetWindowFromPos(X, Y, DetectHidden := 0) {
+GetWindowFromPos(X, Y, hwnd:=0, DetectHidden:=0) {
    ; by just me https://www.autohotkey.com/boards/viewtopic.php?p=80118
    ; CWP_ALL = 0x0000, CWP_SKIPINVISIBLE = 0x0001
-   Return DllCall("ChildWindowFromPointEx", "UPtr", DllCall("GetDesktopWindow", "UPtr")
+   hwnd := (hwnd=0) ? DllCall("GetDesktopWindow", "UPtr") : hwnd
+   Return DllCall("ChildWindowFromPointEx", "UPtr", hwnd
                                           , "Int64", (X & 0xFFFFFFFF) | ((Y & 0xFFFFFFFF) << 32)
                                           , "UInt", !DetectHidden, "UPtr")
 }

@@ -1482,7 +1482,7 @@ showMouseTooltipStatusbar() {
 }
 
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
-  Static lastInvoked := 1, prevPos, lastTip := 1, prevArrayPos := []
+  Static lastInvoked := 1, prevPos, lastTip := 1, prevArrayPos := [], darked := 0
   If ((A_TickCount - lastZeitPanCursor < 300) || !isQPVactive())
      Return
 
@@ -1532,7 +1532,17 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
         Else If (hwnd=hFlyBtn3)
            Tooltip, Menu bar [ F10 ], % xu, % yu
         lastTip := A_TickCount
-     }
+     } Else (uiUseDarkMode=1)
+     {
+        HTT := GetWindowFromPos(xu + 5, yu + hh + 5)
+        WinGetClass, classu, ahk_id %HTT%
+        If (InStr(classu, "tooltips") && HTT!=darked)
+        {
+           darked := HTT
+           DllCall("uxtheme\SetWindowTheme", "uptr", HTT, "str", "DarkMode_Explorer", "ptr", 0)
+        }
+        ; ToolTip, % "p=" classu "`n" xu "|" yu "`n" xu2 "|" yu2 , , , 2
+     } 
   }
 
   thisPos := mX "-" mY
@@ -5160,5 +5170,14 @@ setDarkWinAttribs(hwndGUI, modus:=2) {
        DllCall("dwmapi\DwmSetWindowAttribute", "UPtr", hwndGUI, "int", DWMWA_USE_IMMERSIVE_DARK_MODE, "int*", modus, "int", 4)
    }
    DllCall(AllowDarkModeForWindow, "UPtr", hwndGUI, "int", modus) ; Dark
+}
+
+GetWindowFromPos(X, Y, hwnd:=0, DetectHidden:=0) {
+   ; by just me https://www.autohotkey.com/boards/viewtopic.php?p=80118
+   ; CWP_ALL = 0x0000, CWP_SKIPINVISIBLE = 0x0001
+   hwnd := (hwnd=0) ? DllCall("GetDesktopWindow", "UPtr") : hwnd
+   Return DllCall("ChildWindowFromPointEx", "UPtr", hwnd
+                                          , "Int64", (X & 0xFFFFFFFF) | ((Y & 0xFFFFFFFF) << 32)
+                                          , "UInt", !DetectHidden, "UPtr")
 }
 
