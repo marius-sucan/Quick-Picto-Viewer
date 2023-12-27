@@ -275,7 +275,6 @@ bool isInsideRectOval(float ox, float oy, int modus) {
 
 
 /*
-Function written with help provided by Spawnova. Thank you very much.
 pBitmap and pBitmapMask must be the same width and height
 and in 32-ARGB format: PXF32ARGB - 0x26200A.
 
@@ -284,14 +283,14 @@ The alpha channel will be applied directly on the pBitmap provided.
 For best results, pBitmapMask should be grayscale.
 */
 
-DLL_API int DLL_CALLCONV SetAlphaChannel(unsigned char *imageData, unsigned char *maskData, int w, int h, int Stride, int bpp, int invert, int replaceAlpha, int whichChannel, int threadz) {
+DLL_API int DLL_CALLCONV SetBitmapAsAlphaChannel(unsigned char *imageData, unsigned char *maskData, int w, int h, int Stride, int bpp, int invert, int replaceAlpha, int whichChannel) {
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int x = 0; x < w; x++)
     {
         unsigned char alpha, alpha2;
         for (int y = 0; y < h; y++)
         {
-            int px = CalcPixOffset(x, y, Stride, bpp);
+            INT64 px = CalcPixOffset(x, y, Stride, bpp);
             if (whichChannel==2)
                alpha = maskData[px + 1]; // green
             else if (whichChannel==3)
@@ -324,7 +323,7 @@ DLL_API int DLL_CALLCONV SetColorAlphaChannel(int *imageData, int w, int h, int 
     {
         for (int y = 0; y < h; y++)
         {
-            int px = x + y * w;
+            INT64 px = x + y * w;
             unsigned char alpha1 = (imageData[px] >> 16) & 0xFF; // red
             alpha1 = (invert==1) ? 255 - alpha1 : alpha1;
             unsigned char alpha2 = (newColor >> 24) & 0xFF; // alpha
@@ -332,6 +331,26 @@ DLL_API int DLL_CALLCONV SetColorAlphaChannel(int *imageData, int w, int h, int 
             imageData[px] = (min(alpha1,alpha2) << 24) | (newColor & 0x00ffffff);
         }
     }
+    return 1;
+}
+
+DLL_API int DLL_CALLCONV AlterBitmapAlphaChanel(unsigned char *imageData, int w, int h, int Stride, int bpp, int level, int replaceAlpha) {
+    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+    for (int x = 0; x < w; x++)
+    {
+        for (int y = 0; y < h; y++)
+        {
+            INT64 px = CalcPixOffset(x, y, Stride, bpp);
+            if (imageData[px + 3]==0)
+               continue;
+
+            if (replaceAlpha==1)
+               imageData[px + 3] = level;
+            else
+               imageData[px + 3] = clamp(imageData[px + 3] + level, 0, 255);
+        }
+    }
+
     return 1;
 }
 
@@ -831,6 +850,219 @@ RGBColorI calculateBlendModes(int rO, int gO, int bO, int rB, int gB, int bB, in
     rT = clamp(rT, 0.0f, 1.0f);
     gT = clamp(gT, 0.0f, 1.0f);
     bT = clamp(bT, 0.0f, 1.0f); 
+    return {clamp((int)round(rT*255), 0, 255), clamp((int)round(gT*255), 0, 255), clamp((int)round(bT*255), 0, 255)};
+}
+
+RGBColorI NEWcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, int blendMode, int flipLayers, int linearGamma) {
+    float rT, gT, bT;
+    if (blendMode==23)
+    {
+       int fR, fG, fB;
+       float f = char_to_float[Orgb.a];
+       if (linearGamma==1)
+       {
+          fR = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.r], gamma_to_linear[Brgb.r], f)];
+          fG = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.g], gamma_to_linear[Brgb.g], f)];
+          fB = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.b], gamma_to_linear[Brgb.b], f)];
+       } else
+       {
+          fR = weighTwoValues(Orgb.r, Brgb.r, f);
+          fG = weighTwoValues(Orgb.g, Brgb.g, f);
+          fB = weighTwoValues(Orgb.b, Brgb.b, f);
+       }
+
+       return {fR, fG, fB};
+       // return {Orgb.r,Orgb.g,Orgb.b};
+    }
+
+    if (flipLayers==1)
+       swap(Orgb, Brgb);
+
+    float rOf = char_to_float[Orgb.r];
+    float gOf = char_to_float[Orgb.g];
+    float bOf = char_to_float[Orgb.b];
+    float rBf = char_to_float[Brgb.r];
+    float gBf = char_to_float[Brgb.g];
+    float bBf = char_to_float[Brgb.b];
+
+    if (blendMode == 1) { // darken
+        rT = min(rOf, rBf);
+        gT = min(gOf, gBf);
+        bT = min(bOf, bBf);
+    }
+    else if (blendMode == 2) { // multiply
+        rT = rOf * rBf;
+        gT = gOf * gBf;
+        bT = bOf * bBf;
+    }
+    else if (blendMode == 3) { // linear burn
+       rT = rOf + rBf - 1;
+       gT = gOf + gBf - 1;
+       bT = bOf + bBf - 1;
+    }
+    else if (blendMode == 4) { // color burn
+       rT = 1 - ((1 - rBf) / rOf);
+       gT = 1 - ((1 - gBf) / gOf);
+       bT = 1 - ((1 - bBf) / bOf);
+    }
+    else if (blendMode == 5) { // lighten
+        rT = max(rOf, rBf);
+        gT = max(gOf, gBf);
+        bT = max(bOf, bBf);
+    }
+    else if (blendMode == 6) { // screen
+        rT = 1 - ( (1 - rBf) * (1 - rOf) );
+        gT = 1 - ( (1 - gBf) * (1 - gOf) );
+        bT = 1 - ( (1 - bBf) * (1 - bOf) );
+    }
+    else if (blendMode == 7) { // linear dodge [add]
+        rT = rOf + rBf;
+        gT = gOf + gBf;
+        bT = bOf + bBf;
+    }
+    else if (blendMode == 8) { // hard light
+        rT = (rOf < 0.5) ? 2 * rOf * rBf : 1 - (2 * (1 - rOf) * (1 - rBf) );
+        gT = (gOf < 0.5) ? 2 * gOf * gBf : 1 - (2 * (1 - gOf) * (1 - gBf) );
+        bT = (bOf < 0.5) ? 2 * bOf * bBf : 1 - (2 * (1 - bOf) * (1 - bBf) );
+    }
+    // else if (blendMode == 9) { // soft light A
+    //     rT = (1 - 2*rOf) * pow(rBf, 2) + 2 * rOf * rBf;
+    //     gT = (1 - 2*gOf) * pow(gBf, 2) + 2 * gOf * gBf;
+    //     bT = (1 - 2*bOf) * pow(bBf, 2) + 2 * bOf * bBf;
+    // }
+    else if (blendMode == 9) { // soft light B
+        rT = (rOf < 0.5) ? (1 - 2*rOf) * (rBf*rBf) + 2 * rBf * rOf : 2 * rBf * (1 - rOf) + sqrt(rBf) * (2 * rOf - 1);
+        gT = (gOf < 0.5) ? (1 - 2*gOf) * (gBf*gBf) + 2 * gBf * gOf : 2 * gBf * (1 - gOf) + sqrt(gBf) * (2 * gOf - 1);
+        bT = (bOf < 0.5) ? (1 - 2*bOf) * (bBf*bBf) + 2 * bBf * bOf : 2 * bBf * (1 - bOf) + sqrt(bBf) * (2 * bOf - 1);
+    }
+    else if (blendMode == 10) { // overlay
+        rT = (rBf < 0.5) ? 2 * rOf * rBf : 1 - (2 * (1 - rOf) * (1 - rBf) );
+        gT = (gBf < 0.5) ? 2 * gOf * gBf : 1 - (2 * (1 - gOf) * (1 - gBf) );
+        bT = (bBf < 0.5) ? 2 * bOf * bBf : 1 - (2 * (1 - bOf) * (1 - bBf) );
+    }
+    else if (blendMode == 11) { // hard mix
+        rT = (rOf <= (1 - rBf)) ? 0 : 1;
+        gT = (gOf <= (1 - gBf)) ? 0 : 1;
+        bT = (bOf <= (1 - bBf)) ? 0 : 1;
+    }
+    else if (blendMode == 12) { // linear light
+        rT = rBf + (2 * rOf) - 1;
+        gT = gBf + (2 * gOf) - 1;
+        bT = bBf + (2 * bOf) - 1;
+    }
+    else if (blendMode == 13) { // color dodge
+        rT = rBf / (1 - rOf);
+        gT = gBf / (1 - gOf);
+        bT = bBf / (1 - bOf);
+    }
+    else if (blendMode == 14) { // vivid light 
+        // this blend mode combines Color Dodge and Color Burn (rescaled so that neutral colors become middle gray). Dodge applies when values in the top layer are lighter than middle gray, and burn applies to darker values
+        if (rOf < 0.5)
+           rT = 1 - (1 - rBf) / (2 * rOf);
+        else
+           rT = rBf / (2 * (1 - rOf));
+
+        if (gOf < 0.5)
+           gT = 1 - (1 - gBf) / (2 * gOf);
+        else
+           gT = gBf / (2 * (1 - gOf));
+
+        if (bOf < 0.5)
+           bT = 1 - (1 - bBf) / (2 * bOf);
+        else
+           bT = bBf / (2 * (1 - bOf));
+    }
+    else if (blendMode == 15) { // average
+        rT = (rBf + rOf)/2;
+        gT = (gBf + gOf)/2;
+        bT = (bBf + bOf)/2;
+    }
+    else if (blendMode == 16) { // divide
+        rT = rBf / rOf;
+        gT = gBf / gOf;
+        bT = bBf / bOf;
+    }
+    else if (blendMode == 17) { // exclusion
+        rT = rOf + rBf - 2 * (rOf * rBf);
+        gT = gOf + gBf - 2 * (gOf * gBf);
+        bT = bOf + bBf - 2 * (bOf * bBf);
+    }
+    else if (blendMode == 18) { // difference
+        rT = abs(rBf - rOf);
+        gT = abs(gBf - gOf);
+        bT = abs(bBf - bOf);
+    }
+    else if (blendMode == 19) { // substract
+        rT = rBf - rOf;
+        gT = gBf - gOf;
+        bT = bBf - bOf;
+    }
+    else if (blendMode == 20) { // luminosity
+        double lO = char_to_float[getGrayscale(Orgb.r, Orgb.g, Orgb.b)];
+        double lB = char_to_float[getGrayscale(Brgb.r, Brgb.g, Brgb.b)];
+        rT = lO + rBf - lB;
+        gT = lO + gBf - lB;
+        bT = lO + bBf - lB;
+
+        // HSLColor hslO = ConvertRGBtoHSL(rOf, gOf, bOf, 1);
+        // HSLColor hslB = ConvertRGBtoHSL(rBf, gBf, bBf, 1);
+        // // RGBColor rgbf = ConvertHSLtoRGB(hslB.h, hslB.s, hslB.l);
+        // RGBColor rgbf = ConvertHSLtoRGB(hslO.h, hslO.s, hslO.l);
+        // rT = rgbf.r/255.0f;
+        // gT = rgbf.g/255.0f;
+        // bT = rgbf.b/255.0f;
+    }
+    else if (blendMode == 21) { // ghosting
+        double lO = char_to_float[getGrayscale(Orgb.r, Orgb.g, Orgb.b)];
+        double lB = char_to_float[getGrayscale(Brgb.r, Brgb.g, Brgb.b)];
+        rT = lB - lO + rBf + rOf/5;
+        gT = lB - lO + gBf + gOf/5;
+        bT = lB - lO + bBf + bOf/5;
+    }
+    // else if (blendMode == 22) { // substract reverse
+    //     rT = rOf - rBf;
+    //     gT = gOf - gBf;
+    //     bT = bOf - bBf;
+    // }
+    else if (blendMode == 22) { // inverted difference
+        rT = (rOf > rBf) ? 1 - rOf - rBf : 1 - rBf - rOf;
+        gT = (gOf > gBf) ? 1 - gOf - gBf : 1 - gBf - gOf;
+        bT = (bOf > bBf) ? 1 - bOf - bBf : 1 - bBf - bOf;
+    }
+
+    rT = clamp(rT, 0.0f, 1.0f);
+    gT = clamp(gT, 0.0f, 1.0f);
+    bT = clamp(bT, 0.0f, 1.0f); 
+    if (flipLayers==1)
+    {
+       swap(Orgb.a, Brgb.a);
+       swap(rBf, rOf);
+       swap(gBf, gOf);
+       swap(bBf, bOf);
+    }
+
+    float fintensity;
+    if (Brgb.a>254)
+    {
+       fintensity = char_to_float[Orgb.a];
+       rT = weighTwoValues(rT, rBf, fintensity, 1);
+       gT = weighTwoValues(gT, gBf, fintensity, 1);
+       bT = weighTwoValues(bT, bBf, fintensity, 1);
+    } else
+    {
+       fintensity = char_to_float[Brgb.a];
+       if (Orgb.a<255)
+       {
+          float f = char_to_float[Orgb.a];
+          rT = weighTwoValues(rT, rBf, f, 1);
+          gT = weighTwoValues(gT, gBf, f, 1);
+          bT = weighTwoValues(bT, bBf, f, 1);
+       }
+       rT = weighTwoValues(rT, rOf, fintensity, 1);
+       gT = weighTwoValues(gT, gOf, fintensity, 1);
+       bT = weighTwoValues(bT, bOf, fintensity, 1);
+    }
+
     return {clamp((int)round(rT*255), 0, 255), clamp((int)round(gT*255), 0, 255), clamp((int)round(bT*255), 0, 255)};
 }
 
@@ -1556,11 +1788,16 @@ DLL_API int DLL_CALLCONV FillImageHoles(int *imageData, int w, int h, int newCol
     return 1;
 }
 
-DLL_API int DLL_CALLCONV SetGivenAlphaLevel(int *imageData, int w, int h, int givenLevel, int fillMissingOnly, int threadz) {
+DLL_API int DLL_CALLCONV PrepareAlphaChannelBlur(int *imageData, int w, int h, int givenLevel, int fillMissingOnly, int threadz) {
+/*
+; this function fills / replaces black pixels [and with opacity 0] with surrounding colors
+; this helps mitigate the dark hallows that emerge when applying blur on images with areas that are fully transparent 
+; the function can also be used to specify an opacity/alpha level of the image
+*/
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int x = 0; x < w; x++)
     {
-        int px, y = 0;
+        INT64 px, y = 0;
         int defaultColor = 0;
         UINT BGRcolor = imageData[x + y * w];
         if (BGRcolor!=0x0)
@@ -1607,21 +1844,29 @@ pBitmap and pBitmap2Blend must be the same width and height
 and in 32-ARGB format: PXF32ARGB - 0x26200A.
 */
 
-DLL_API int DLL_CALLCONV BlendBitmaps(unsigned char* bgrImageData, unsigned char* otherData, int w, int h, int Stride, int bpp, int blendMode, int flipLayers, int faderMode, int linearGamma) {
-
+DLL_API int DLL_CALLCONV BlendBitmaps(unsigned char* bgrImageData, unsigned char* otherData, int w, int h, int Stride, int bpp, int blendMode, int flipLayers, int faderMode, int keepAlpha, int linearGamma) {
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int x = 0; x < w; x++)
     {
         for (int y = 0; y < h; y++)
         {
+            int aO = 255;
+            int aB = 255;
+
             INT64 o = CalcPixOffset(x, y, Stride, bpp);
-            int aB = bgrImageData[3 + o];
-            int aO = otherData[3 + o];
-            if (aO < 1 || aB < 1)
+            if (bpp==32)
+            {
+               aB = bgrImageData[3 + o];
+               aO = otherData[3 + o];
+            }
+
+            if (aO < 1 && aB < 1 || aB<2 && faderMode==2)
             {
                if (faderMode==2)
                {
-                  bgrImageData[3 + o] = otherData[3 + o];
+                  // in this mode; the bgrImageData is actually otherData
+                  if (bpp==32)
+                     bgrImageData[3 + o] = otherData[3 + o];
                   bgrImageData[2 + o] = otherData[2 + o];
                   bgrImageData[1 + o] = otherData[1 + o];
                   bgrImageData[o] = otherData[o];
@@ -1629,48 +1874,21 @@ DLL_API int DLL_CALLCONV BlendBitmaps(unsigned char* bgrImageData, unsigned char
                continue;
             }
 
-            int rB = bgrImageData[2 + o];
-            int gB = bgrImageData[1 + o];
-            int bB = bgrImageData[o];
-
-            int rO = otherData[2 + o];
-            int gO = otherData[1 + o];
-            int bO = otherData[o];
+            RGBAColor Brgb = {bgrImageData[o], bgrImageData[o + 1], bgrImageData[o + 2], aB};
+            RGBAColor Orgb = {otherData[o], otherData[o + 1], otherData[o + 2], aO};
             if (faderMode==2)
-            {
-               bgrImageData[3 + o] = aO;
-               swap(rO, rB);
-               swap(gO, gB);
-               swap(bO, bB);
-               swap(aO, aB);
-            }
+               swap(Brgb, Orgb);
 
             RGBColorI blended;
-            if (flipLayers==1)
-               blended = calculateBlendModes(rB, gB, bB, rO, gO, bO, blendMode);
-            else
-               blended = calculateBlendModes(rO, gO, bO, rB, gB, bB, blendMode);
+            blended = NEWcalculateBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma);
+            if (bpp==32 && keepAlpha!=1 && blendMode!=23 || faderMode==1 && blendMode==23)
+               bgrImageData[3 + o] = (faderMode==1) ? min(aO, aB) : max(aO, aB);
+            else if (faderMode==2 && keepAlpha==1)
+               bgrImageData[3 + o] = otherData[3 + o];
 
-            int fR, fG, fB;
-            float fintensity = char_to_float[aO];
-            if (linearGamma==1)
-            {
-               fR = linear_to_gamma[weighTwoValues(gamma_to_linear[blended.r], gamma_to_linear[rB], fintensity)];
-               fG = linear_to_gamma[weighTwoValues(gamma_to_linear[blended.g], gamma_to_linear[gB], fintensity)];
-               fB = linear_to_gamma[weighTwoValues(gamma_to_linear[blended.b], gamma_to_linear[bB], fintensity)];
-            } else
-            {
-               fR = weighTwoValues(blended.r, rB, fintensity);
-               fG = weighTwoValues(blended.g, gB, fintensity);
-               fB = weighTwoValues(blended.b, bB, fintensity);
-            }
-
-            if (faderMode==1)
-               bgrImageData[3 + o] = min(aO, aB);
-
-            bgrImageData[2 + o] = fR;
-            bgrImageData[1 + o] = fG;
-            bgrImageData[o] = fB;
+            bgrImageData[2 + o] = blended.r;
+            bgrImageData[1 + o] = blended.g;
+            bgrImageData[o] = blended.b;
         }
     }
 
@@ -2028,6 +2246,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
                thisOpacity = (gBpp==32) ? colorBitmap[3 + oz] : opacity;
                if (opacityMultiplier>0 && gBpp==32)
                   thisOpacity = clamp(thisOpacity + opacityMultiplier, 0, 255);
+
                userColor.a = thisOpacity;
                userColor.r = colorBitmap[2 + oz];
                userColor.g = colorBitmap[1 + oz];
@@ -2042,11 +2261,13 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
                newColor = initialColor;
             }
 
+            int tA = 255;
             if (bpp==32)
             {
                oA = (eraser==-1) ? 0 : BitmapData[3 + o];
-               int tA = weighTwoValues(newColor.a, oA, fintensity);
-               BitmapData[3 + o] = (colorBitmap!=NULL) ? max(tA, oA) : tA;
+               tA = weighTwoValues(newColor.a, oA, fintensity);
+               tA = (colorBitmap!=NULL) ? max(tA, oA) : tA;
+               BitmapData[3 + o] = tA;
             }
 
             if (eraser!=1 || bpp!=32)
@@ -2058,7 +2279,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
 
             if (eraser!=1 || bpp!=32)
             {
-               if (blendMode>0 && eraser==0 && thisOpacity>0 && oA>0)
+               if (blendMode>0 && eraser==0 && tA>0)
                {
                   RGBColorI blended;
                   if (flipLayers==1)
@@ -2079,7 +2300,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
                   swap(oB, newColor.b);
                }
 
-               if (linearGamma==1 && eraser==0 && thisOpacity>0)
+               if (linearGamma==1 && eraser==0 && tA>0)
                {
                   BitmapData[2 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[newColor.r], gamma_to_linear[oR], fintensity)];
                   BitmapData[1 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[newColor.g], gamma_to_linear[oG], fintensity)];
