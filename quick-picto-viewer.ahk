@@ -5841,6 +5841,9 @@ LivePreviewAlphaMaskPasteInPlace() {
     Gdip_ResetClip(G2)
 
     obju := corePasteInPlaceActNow(0, 0, 1)
+    If (obju="too-large")
+       Return livePreviewAlphaMasking("live")
+
     hasRotated := obju[1]
     whichBitmap := obju[2]
     zBitmap := obju[3]
@@ -5874,10 +5877,25 @@ LivePreviewAlphaMaskPasteInPlace() {
        Gdip_SetClipPath(G2, pPath, 1)
     }
 
+    hasPainted := 0
     bgrBMP := obju[4]
     If (userimgGammaCorrect=1 && validBMP(bgrBMP))
     {
-       trGdip_DrawImage(A_ThisFunc, G2, bgrBMP, imgSelPx, imgSelPy, ResizedW, ResizedH)
+       If (currIMGdetails.HasAlpha=1)
+       {
+          ; Gdip_FillRectangle(G2, GDIPbrushHatch, imgSelPx, imgSelPy, imgSelW, imgSelH)
+          trGdip_GetImageDimensions(bgrBMP, kw, kh)
+          trGdip_GetImageDimensions(clipBMP, mw, mh)
+          ; ToolTip, % kw "|" kh "`n" mw "|" mh "`n" imgSelW "|" imgSelH , , , 2
+          clipBMP := resizeBitmapToGivenRef(clipBMP, 0, imgSelW, imgSelH, thisImgQuality)
+          bgrBMP := resizeBitmapToGivenRef(bgrBMP, 0, imgSelW, imgSelH, thisImgQuality)
+          thisOpacity := (PasteInPlaceOpacity>255) ? 0 : 255 - PasteInPlaceOpacity
+          QPV_MergeBitmapsWithMask(clipBMP, bgrBMP, 0, 0, thisOpacity)
+          r1 := trGdip_DrawImage(A_ThisFunc, G2, clipBMP, imgSelPx, imgSelPy)
+          trGdip_DisposeImage(clipBMP)
+          hasPainted := 1
+       } Else
+          trGdip_DrawImage(A_ThisFunc, G2, bgrBMP, imgSelPx, imgSelPy, imgSelW, imgSelH)
        Gdip_SetCompositingQuality(G2, 2)
     }
 
@@ -5886,7 +5904,8 @@ LivePreviewAlphaMaskPasteInPlace() {
 
     trGdip_DisposeImage(bgrBMP)
     ; ToolTip, % imgSelPx "," imgSelPy "," imgSelW "," imgSelH , , , 2
-    r1 := trGdip_DrawImage(A_ThisFunc, G2, clipBMP, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, oimgW, oimgH, thisOpacity)
+    If !hasPainted
+       r1 := trGdip_DrawImage(A_ThisFunc, G2, clipBMP, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, oimgW, oimgH, thisOpacity)
     If (userimgGammaCorrect=1)
        Gdip_SetCompositingQuality(G2, 1)
 
@@ -11760,11 +11779,8 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
 drawHistogram(dataArray, graphFocus, Scale, fgrColor, bgrColor, borderSize, infoBoxBMP) {
     Static graphHeight := 300 ; graph height
     stylu := (showHistogram=6) ? 3 : 2
-    r := BarChart(dataArray, lol, Round(296*Scale), 385, "", "DiagonBlackGreen", "DisplayValues:0, BarHeight:" Scale*1.5 ",BarHeightFactor:1, BarSpacing:" Scale/2 ",BarRoundness:0,TextSize:0,AutoCalculateHeight:1, BarColorDirection:" stylu ", BarPeaksColor:eeFFffFF, BgrStyle:3, BarBorderColor:0, MaxPercentValue:" graphFocus ", BarColorA:" fgrColor ", ChartBackColorA:dd" bgrColor)
-    If StrLen(r)>2
-       recordGdipBitmaps(r, A_ThisFunc "<-BarChart")
-
-    plotBMP := r
+    plotBMP := BarChart(dataArray, lol, Round(296*Scale), 385, "", "DiagonBlackGreen", "DisplayValues:0, BarHeight:" Scale*1.5 ",BarHeightFactor:1, BarSpacing:" Scale/2 ",BarRoundness:0,TextSize:0,AutoCalculateHeight:1, BarColorDirection:" stylu ", BarPeaksColor:eeFFffFF, BgrStyle:3, BarBorderColor:0, MaxPercentValue:" graphFocus ", BarColorA:" fgrColor ", ChartBackColorA:dd" bgrColor)
+    recordGdipBitmaps(plotBMP, A_ThisFunc "<-BarChart")
     If !validBMP(plotBMP)
     {
        addJournalEntry(A_ThisFunc "(): invalid bitmap to process")
@@ -12597,6 +12613,25 @@ QPV_PrepareSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, invertAre
    ; ToolTip, % round(xf, 2) "|" round(yf, 2) "|"  round(rotation, 2) "|" Round(exclusion, 2) , , , 2
    r := DllCall(whichMainDLL "\prepareSelectionArea", "int", x1, "int", y1, "int", x2, "int", y2, "int", w, "int", h,  "float", xf, "float", yf, "float", rotation, "int", mode, "int", doFlip, "float", exclusion, "int", invertArea)
    Return r
+}
+
+resizeBitmapToGivenRef(pBitmap, refBMP, nW:=0, nH:=0, thisImgQuality:=5, keepRatio:=0) {
+    If validBMP(pBitmap)
+       trGdip_GetImageDimensions(pBitmap, tW, tH)
+    If (validBMP(refBMP) && refBMP)
+       trGdip_GetImageDimensions(refBMP, nW, nH)
+
+    If ((tW!=nW || tH!=nH) && tW && tH && nW && nH)
+    {
+       ; fnOutputDebug("o_bgr resizing")
+       tempBMP := trGdip_ResizeBitmap(A_ThisFunc, pBitmap, nW, nH, keepRatio, thisImgQuality, 0, 0)
+       If validBMP(tempBMP)
+       {
+          trGdip_DisposeImage(pBitmap, 1)
+          pBitmap := tempBMP
+       }
+    }
+    Return pBitmap
 }
 
 QPV_MergeBitmapsWithMask(initialBitmap, newBitmap, alphaBitmap, invert, maskOpacity:=0, invertOpacity:=0, previewMode:=0) {
@@ -13478,15 +13513,13 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
        ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, thisW, thisH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
        opacityExtra := (PasteInPlaceOpacity>255) ? PasteInPlaceOpacity - 255 : 0 
        If (viewportQPVimage.imgHandle)
-           opacityExtra := (oldSelectionArea[10]=32 && PasteInPlaceOpacity>255) ? clampInRange(PasteInPlaceOpacity - 255, 0, 255)*256 : 0 
+          opacityExtra := (oldSelectionArea[10]=32 && PasteInPlaceOpacity>255) ? clampInRange(PasteInPlaceOpacity - 255, 0, 255)*256 : 0 
 
-       thisImgCall := "a" getIDimage(currentFileIndex) currentFileIndex viewportStampBMP viewportIDstampBMP PasteInPlaceOrientation VPselRotation PasteInPlaceBlurAmount PasteInPlaceLight PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceGamma PasteInPlaceApplyColorFX PasteInPlaceBlendMode PasteInPlaceBlurEdgesSoft brushingMode shearImgX shearImgY getAlphaMaskIDu() PasteInPlaceRevealOriginal userImgAdjustInvertColors userImgAdjustAltSat userImgAdjustAltBright opacityExtra PasteInPlaceOrientFlipX PasteInPlaceOrientFlipY
+       thisImgCall := "a" getIDimage(currentFileIndex) currentFileIndex viewportStampBMP viewportIDstampBMP PasteInPlaceOrientation VPselRotation PasteInPlaceBlurAmount PasteInPlaceLight PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceGamma PasteInPlaceApplyColorFX PasteInPlaceBlendMode PasteInPlaceBlurEdgesSoft brushingMode shearImgX shearImgY getAlphaMaskIDu(0) PasteInPlaceRevealOriginal userImgAdjustInvertColors userImgAdjustAltSat userImgAdjustAltBright opacityExtra PasteInPlaceOrientFlipX PasteInPlaceOrientFlipY
        If (prevImgCall=thisImgCall && validBMP(prevClipBMP))
        {
           hasCached := 1
           clipBMP := prevClipBMP
-          If (brushingMode=1)
-             Return [hasRotated, clipBMP]
        } Else
        {
           prevClipBMP := trGdip_DisposeImage(prevClipBMP, 1)
@@ -13574,6 +13607,14 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     VPmpx := Round((ResizedW * ResizedH)/1000000, 3)
     MAINmpx := Round((mainWidth * mainHeight)/1000000, 3) + 2
     allowPreviewThis := (previewMode!=1 || VPmpx<MAINmpx) ? 1 : 0
+    If (brushingMode=1 && previewMode=1 && allowPreviewThis!=1)
+    {
+       prevImgCall := thisImgCall
+       prevClipBMP := clipBMP
+       Gdip_DeletePath(pPath)
+       Return "too-large"
+    }
+
     If (PasteInPlaceBlendMode>1 && isNumber(PasteInPlaceBlendMode)) || (userimgGammaCorrect=1 && previewMode=1 && PasteInPlaceEraseInitial=0 && allowPreviewThis=1)
     {
        If (currIMGdetails.HasAlpha=1 && previewMode=1 && PasteInPlaceBlendMode>1 && !viewportQPVimage.imgHandle)
@@ -13584,36 +13625,11 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
           o_bgrBMP := getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, oImgW, oImgH, ResizedW, ResizedH, 0, ResizedW, ResizedH)
     }
 
+    thisImgQuality := (userimgQuality=1 && previewMode!=1) ? 3 : 5
     If (PasteInPlaceBlendMode>1 && isNumber(PasteInPlaceBlendMode) && allowPreviewThis=1)
     {
-       thisImgTempQuality := (userimgQuality=1 && previewMode!=1) ? 3 : 5
-       If (oImgW!=ResizedW || oImgH!=ResizedH)
-       {
-          ; fnOutputDebug("blend mode resizing")
-          tempBMP := trGdip_ResizeBitmap(A_ThisFunc, clipBMP, ResizedW, ResizedH, 0, thisImgQuality, 0, 0)
-          If validBMP(tempBMP)
-          {
-             trGdip_DisposeImage(clipBMP, 1)
-             clipBMP := tempBMP
-          }
-
-          trGdip_GetImageDimensions(clipBMP, oImgW, oImgH)
-       }
-
-       If validBMP(o_bgrBMP)
-          trGdip_GetImageDimensions(o_bgrBMP, dgimgW, dgimgH)
-
-       If ((dgImgW!=ResizedW || dgImgH!=ResizedH) && dgImgW && dgImgH)
-       {
-          ; fnOutputDebug("o_bgr resizing")
-          tempBMP := trGdip_ResizeBitmap(A_ThisFunc, o_bgrBMP, ResizedW, ResizedH, 0, thisImgQuality, 0, 0)
-          If validBMP(tempBMP)
-          {
-             trGdip_DisposeImage(o_bgrBMP, 1)
-             o_bgrBMP := tempBMP
-          }
-       }
-
+       clipBMP := resizeBitmapToGivenRef(clipBMP, 0, ResizedW, ResizedH, thisImgQuality)
+       o_bgrBMP := resizeBitmapToGivenRef(o_bgrBMP, 0, ResizedW, ResizedH, thisImgQuality)
        BlurAmount := blr[PasteInPlaceGlassy]
        If (imgSelOutViewPort=1 || vPobju.isLarger=1)
        {
@@ -13654,7 +13670,8 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     thisBMP := (validBMP(bgrBMP) && PasteInPlaceBlendMode>1) ? bgrBMP : clipBMP
     If (brushingMode=1 && previewMode=1)
     {
-       prevImgCall := ""
+       prevImgCall := thisImgCall
+       Gdip_DeletePath(pPath)
        prevClipBMP := clipBMP
        ; trGdip_DisposeImage(o_bgrBMP, 1)
        Return [hasRotated, thisBMP, bgrBMP, o_bgrBMP]
@@ -13667,15 +13684,26 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
        Gdip_SetClipPath(G2, pPath, 1)
     }
 
+    hasPainted := 0
+    allowPreviewThis := (previewMode!=1 || VPmpx<MAINmpx) ? 1 : 0
     If (allowPreviewThis=1 && userimgGammaCorrect=1 && previewMode=1)
     {
-       ; fnOutputDebug("gamma correct: " A_ThisFunc)
-       ; bgrBMPu := getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, oImgW, oImgH, ResizedW, ResizedH, 0, ResizedW, ResizedH)
-       If validBMP(o_bgrBMP)
+       If (validBMP(o_bgrBMP) && currIMGdetails.HasAlpha=1)
        {
-          Gdip_SetCompositingQuality(G2, 2)
+          Gdip_FillRectangle(G2, GDIPbrushHatch, imgSelPx, imgSelPy, ResizedW, ResizedH)
+          thisBMP := resizeBitmapToGivenRef(thisBMP, 0, ResizedW, ResizedH, thisImgQuality)
+          o_bgrBMP := resizeBitmapToGivenRef(o_bgrBMP, 0, ResizedW, ResizedH, thisImgQuality)
+          ; trGdip_GetImageDimensions(o_bgrBMP, kw, kh)
+          ; trGdip_GetImageDimensions(thisBMP, mw, mh)
+          ; ToolTip, % kw "|" kh "`n" mw "|" mh "`n" ResizedW "|" ResizedH , , , 2
+          thisOpacity := (PasteInPlaceOpacity>255) ? 0 : 255 - PasteInPlaceOpacity
+          QPV_MergeBitmapsWithMask(thisBMP, o_bgrBMP, 0, 0, thisOpacity)
+          r1 := trGdip_DrawImage(A_ThisFunc, G2, thisBMP, imgSelPx, imgSelPy)
+          trGdip_DisposeImage(thisBMP)
+          hasPainted := 1
+       } Else If validBMP(o_bgrBMP)
           trGdip_DrawImage(A_ThisFunc, G2, o_bgrBMP, imgSelPx, imgSelPy, ResizedW, ResizedH)
-       }
+       Gdip_SetCompositingQuality(G2, 2)
     }
 
     setWindowTitle("Scaling image to selection area")
@@ -13684,11 +13712,10 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
        thisOpacity := 1
 
     prevPasteInPlaceVPcoords := [imgSelPx, imgSelPy, ResizedW, ResizedH, hasRotated]
-    allowPreviewThis := (previewMode!=1 || VPmpx<MAINmpx) ? 1 : 0
-    If (validBMP(thisBMP) && G2 && allowPreviewThis=1)
+    If (validBMP(thisBMP) && G2 && allowPreviewThis=1 && hasPainted=0)
     {
        r1 := trGdip_DrawImage(A_ThisFunc, G2, thisBMP, imgSelPx, imgSelPy, ResizedW, ResizedH, , , , , thisOpacity)
-    } Else If (allowPreviewThis!=1)
+    } Else If (allowPreviewThis!=1 && previewMode=1)
     {
        If (bgrBMP=thisBMP && PasteInPlaceEraseInitial=1)
           PasteInPlaceEraseArea(G2, previewMode)
@@ -13908,17 +13935,9 @@ getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, oImgW, oImgH, imgSel
        {
           obj := retrieveQPVscreenImgSection("last", 0, 0, 0, 0, 0)
           pBitmap := obj[1]
-          trGdip_GetImageDimensions(obj[1], imgW, imgH)
-          If ((obj[4]!=imgW || obj[5]!=imgH) && obj[4] && obj[5])
-          {
-             tempBMP := trGdip_ResizeBitmap(A_ThisFunc, pBitmap, obj[4], obj[5], 0, thisImgQuality, 0, 0)
-             If validBMP(tempBMP)
-             {
-                trGdip_DisposeImage(pBitmap, 1)
-                pBitmap := tempBMP
-             }
-          }
-          fnOutputDebug(A_ThisFunc ": "  obj[4] "|" obj[5] "`n" imgW "|" imgH)
+          trGdip_GetImageDimensions(pBitmap, imgW, imgH)
+          pBitmap := resizeBitmapToGivenRef(pBitmap, 0, obj[4], obj[5], thisImgQuality)
+          ; fnOutputDebug(A_ThisFunc ": "  obj[4] "|" obj[5] "`n" imgW "|" imgH)
           thisu := max(fImgW, fImgH)
           calcIMGdimensions(imgW, imgH, thisu, thisu, ResizedW, ResizedH)
           If !isVPselLarger(mainWidth, mainHeight)
@@ -16100,8 +16119,9 @@ warnUserFatalBitmapError(pBitmap, funcu) {
     }
 }
 
-getAlphaMaskIDu() {
-   Return "a" alphaMaskBMPbright alphaMaskBMPchannel alphaMaskBMPcontrast alphaMaskClrAintensity alphaMaskClrBintensity alphaMaskCoffsetX alphaMaskCoffsetY alphaMaskColorReversed alphaMaskGradientAngle alphaMaskGradientPosA alphaMaskGradientPosB alphaMaskGradientScale alphaMaskGradientWrapped alphaMaskingMode alphaMaskOffsetX alphaMaskOffsetY alphaMaskRefBMP alphaMaskReplaceMode lastPaintEventID liveDrawingBrushTool userAlphaMaskBmpPainted userPrevAlphaMaskBmpPainted
+getAlphaMaskIDu(moar:=1) {
+   bonusOptions := (moar=1) ? "a" lastPaintEventID lastPaintEventID userAlphaMaskBmpPainted userPrevAlphaMaskBmpPainted : 0
+   Return "a" alphaMaskBMPbright alphaMaskBMPchannel alphaMaskBMPcontrast alphaMaskClrAintensity alphaMaskClrBintensity alphaMaskCoffsetX alphaMaskCoffsetY alphaMaskColorReversed alphaMaskGradientAngle alphaMaskGradientPosA alphaMaskGradientPosB alphaMaskGradientScale alphaMaskGradientWrapped alphaMaskingMode alphaMaskOffsetX alphaMaskOffsetY alphaMaskRefBMP alphaMaskReplaceMode liveDrawingBrushTool bonusOptions
 }
 
 getVPselIDs(what) {
@@ -16957,7 +16977,10 @@ EraseOrInvertOrGraySelectedArea(actionu, funcu) {
        clrMatrix := (EraseAreaFader=1) ? 1 - (EraseAreaOpacity / 255) : 0
     } Else If (actionu="behind")
     {
-       thisOpacity := (FillBehindOpacity>255) ? (FillBehindOpacity - 245)/10 : FillBehindOpacity/255
+       If (userimgGammaCorrect=1)
+          Gdip_SetCompositingQuality(G2, 2)
+
+       thisOpacity := FillBehindOpacity/255
        clrMatrix := (FillBehindOpacity!=255) ? thisOpacity : 1
        If (clrMatrix<1)
           ha := 1
@@ -20562,15 +20585,7 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
     }
 
     If (thisPixelize>1 && UserAddNoiseMode=2 && validBMP(noiseBMP))
-    {
-       newBitmap := trGdip_ResizeBitmap(A_ThisFunc, noiseBMP, imgSelW, imgSelH, 0, 5)
-       If validBMP(newBitmap)
-       {
-          trGdip_DisposeImage(noiseBMP, 1)
-          noiseBMP := newBitmap
-          newBitmap := ""
-       }
-    }
+       noiseBMP := resizeBitmapToGivenRef(noiseBMP, 0, imgSelW, imgSelH, 5)
 
     fBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
     If (thisBlurAmount>1 && blurAreaEqualXY=1 && UserAddNoiseMode>1)
@@ -24435,25 +24450,19 @@ PlotSeenHourStatsNow() {
    textu := "Seen images chart: HOURS.`nRange: 01:00 to 24:00.`nAverage: " avgu ". Peak at " maxKvalu "h: " groupDigits(maxValu)
    infoBoxBMP := drawTextInBox(textu, OSDFontName, OSDfontSize, w, h, OSDtextColor, OSDbgrColor, 1, 0)
    Scale := imgHUDbaseUnit/40
-
    ; hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
    tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
    tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
    borderSizeX := imgHUDbaseUnit//10 + tlbrBonusX
    borderSizeY := imgHUDbaseUnit//10 + tlbrBonusY
    plotBMP := BarChart(dataArray, namesLabel, Round(196*Scale), 385, "", "DiagonBlackGreen", "DisplayValues:2, BarHeight:" Scale*3.5 ",BarHeightFactor:1, BarSpacing:" Scale/2 ",BarRoundness:0,AutoCalculateHeight:1, BarColorDirection:2, BgrStyle:3, BarBorderColor:0,TextSize:" OSDfontSize//2+1 " BarTextColor:ff999999, BarColorA:ff" OSDtextColor ", ChartBackColorA:00" OSDbgrColor)
+   recordGdipBitmaps(plotBMP, A_ThisFunc "<-BarChart()")
    trGdip_GetImageDimensions(plotBMP, imgW, imgH)
    trGdip_GetImageDimensions(infoBoxBMP, boxW, boxH)
-
    If (imgH>H - boxH - borderSizeY*2)
    {
-      newBitmap := trGdip_ResizeBitmap(A_ThisFunc, plotBMP, imgW, H - boxH - borderSizeY*2, 1, 7)
-      If validBMP(newBitmap)
-      {
-         trGdip_DisposeImage(plotBMP)
-         plotBMP := newBitmap
-         trGdip_GetImageDimensions(plotBMP, imgW, imgH)
-      }
+      plotBMP := resizeBitmapToGivenRef(plotBMP, 0, imgW, H - boxH - borderSizeY*2, 7, 0)
+      trGdip_GetImageDimensions(plotBMP, imgW, imgH)
    }
 
    pBrush := Gdip_BrushCreateSolid("0xee" OSDbgrColor)
@@ -24562,18 +24571,14 @@ PlotSeenMonthsStatsNow() {
    Else
       plotBMP := BarChart(dataArray, namesLabel, Round(196*Scale), 385, "", "DiagonBlackGreen", "DisplayValues:2, BarHeight:" Scale*3.5 ",BarHeightFactor:1, BarSpacing:" Scale/2 ",BarRoundness:0,AutoCalculateHeight:1, BarColorDirection:2, BgrStyle:3, BarBorderColor:0,BarTextColor:ff999999, BarColorA:ff" OSDtextColor ", ChartBackColorA:00" OSDbgrColor)
 
+   recordGdipBitmaps(plotBMP, A_ThisFunc "<-BarChart()")
    Gdip_ImageRotateFlip(plotBMP, 6)
    trGdip_GetImageDimensions(plotBMP, imgW, imgH)
    trGdip_GetImageDimensions(infoBoxBMP, boxW, boxH)
    If (imgH>H - boxH - borderSizeY*2)
    {
-      newBitmap := trGdip_ResizeBitmap(A_ThisFunc, plotBMP, imgW, H - boxH - borderSizeY*2, 0, 7)
-      If validBMP(newBitmap)
-      {
-         trGdip_DisposeImage(plotBMP)
-         plotBMP := newBitmap
-         trGdip_GetImageDimensions(plotBMP, imgW, imgH)
-      }
+      plotBMP := resizeBitmapToGivenRef(plotBMP, 0, imgW, H - boxH - borderSizeY*2, 7, 0)
+      trGdip_GetImageDimensions(plotBMP, imgW, imgH)
    }
 
    pBrush := Gdip_BrushCreateSolid("0xee" OSDbgrColor)
@@ -24654,7 +24659,7 @@ PlotSeenDaysStatsNow(modus:=0) {
       }
 
       dateu := nYear "-" thisM "-" thisD
-      If (nYear thisM>20200401)
+      If (nYear . thisM>20200401)
          dataSkipped[dateu] := 1
 
       If (dateu=endPeriod)
@@ -24678,6 +24683,7 @@ PlotSeenDaysStatsNow(modus:=0) {
           LV_GetText(oindexu, aR, 2)
           If InStr(oindexu, "1999-")
              Continue
+
           ; oindexu := SubStr(oindexu, 1, 2)
           thisu := max(maxValu, valu)
           If (thisu!=maxValu)
@@ -24685,7 +24691,6 @@ PlotSeenDaysStatsNow(modus:=0) {
              maxValu := thisu
              maxKvalu := oindexu
           }
-
           counter++
           totalu += valu
           dataSkipped[oIndexu] := valu ? 0 : 1
@@ -24736,19 +24741,14 @@ PlotSeenDaysStatsNow(modus:=0) {
    Else
       plotBMP := BarChart(dataArray, namesLabel, Round(196*Scale), 385, "", "DiagonBlackGreen", "DisplayValues:2, BarHeight:" Scale*3.5 ",BarHeightFactor:1, BarSpacing:" Scale/2 ",BarRoundness:0,AutoCalculateHeight:1, BarColorDirection:2, BgrStyle:3, BarBorderColor:0,BarTextColor:ff999999, BarColorA:ff" OSDtextColor ", ChartBackColorA:00" OSDbgrColor)
 
+   recordGdipBitmaps(plotBMP, A_ThisFunc "<-BarChart()")
    Gdip_ImageRotateFlip(plotBMP, 6)
    trGdip_GetImageDimensions(plotBMP, imgW, imgH)
    trGdip_GetImageDimensions(infoBoxBMP, boxW, boxH)
    If (imgH>H - boxH - borderSizeY*2)
    {
-      newBitmap := trGdip_ResizeBitmap(A_ThisFunc, plotBMP, imgW, H - boxH - borderSizeY*2, 0, 7)
-      If validBMP(newBitmap)
-      {
-         trGdip_DisposeImage(plotBMP)
-         plotBMP := newBitmap
-         trGdip_GetImageDimensions(plotBMP, imgW, imgH)
-         newBitmap := ""
-      }
+      plotBMP := resizeBitmapToGivenRef(plotBMP, 0, imgW, H - boxH - borderSizeY*2, 7, 0)
+      trGdip_GetImageDimensions(plotBMP, imgW, imgH)
    }
 
    pBrush := Gdip_BrushCreateSolid("0xee" OSDbgrColor)
@@ -44886,7 +44886,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     bonusTabs := !(viewportQPVimage.imgHandle) ? "|Border|Alpha mask|Paint mask" : ""
     Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Main|Fill|Adjust colors%bonusTabs%
 
-    Gui, Tab, 1
+    Gui, Tab, 1 ; main options
     ml := (PrefsLargeFonts=1) ? 35 : 25
     GuiAddDropDownList("x+10 y+10 Section w" slideWid " AltSubmit Choose" FillAreaShape " vFillAreaShape gupdateUIfillPanel", "Rectangle|Rounded rectangle|Ellipse|Triangle|Right triangle|Rhombus|Custom shape", "Shape to fill")
     GuiAddDropDownList("x+5 wp-" ml + 5 " AltSubmit Choose" FillAreaCurveTension " vFillAreaCurveTension gupdateUIfillPanel", "Polygonal|Smooth corners|Curve|Round curve|Bézier", "Vector path type")
@@ -44897,20 +44897,19 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     GuiAddSlider("FillAreaBlurAmount", -255, 255, 0, "Object blur", "updateUIfillPanel", 2, "x+5 yp wp hp")
     zpl := slideWid + 5
     Gui, Add, Checkbox, xs y+7 Checked%freeHandSelectionMode% vfreeHandSelectionMode gupdateUIfillPanel, &Freehand draw mode
-    Gui, Add, Checkbox, xs y+5 hp Checked%FillAreaRemBGR% vFillAreaRemBGR gupdateUIfillPanel, &Erase background behind the object
-    Gui, Add, Checkbox, xs y+5 hp Checked%FillAreaInverted% vFillAreaInverted gupdateUIfillPanel, &Invert selection area
+    Gui, Add, Checkbox, xs y+5 Checked%FillAreaRemBGR% vFillAreaRemBGR gupdateUIfillPanel, &Erase background behind the object
     If (viewportQPVimage.imgHandle)
     {
-       Gui, Add, Checkbox, xs y+5 hp gupdateUIfillPanel Checked%FillAreaDoBehind% vFillAreaDoBehind, Fill &behind (semi-) transparent pixels
+       Gui, Add, Checkbox, xs y+5 gupdateUIfillPanel Checked%FillAreaDoBehind% vFillAreaDoBehind, Fill &behind (semi-) transparent pixels
        Gui, Add, Checkbox, xs y+5 w1 h1 gupdateUIfillPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas if outside
     } Else
     {
-       Gui, Add, Checkbox, xs y+5 hp gupdateUIfillPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas if outside
+       Gui, Add, Checkbox, xs y+5 gupdateUIfillPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas if outside
        Gui, Add, Checkbox, xs y+5 w1 h1 gupdateUIfillPanel Checked%FillAreaDoBehind% vFillAreaDoBehind, Fill &behind (semi-) transparent pixels
     }
 
     sml := slideWid  - 27
-    Gui, Add, Checkbox, xs y+1 Checked%userimgGammaCorrect% vuserimgGammaCorrect gupdateUIfillPanel, &Apply gamma corrections
+    Gui, Add, Checkbox, xs y+1 hp Checked%FillAreaInverted% vFillAreaInverted gupdateUIfillPanel, &Invert selection area
     Gui, Add, Text, xs y+10 hp +0x200 w%slideWid% +TabStop gBtnResetGlassFX vtxtLine1, Glass effect
     GuiAddDropDownList("x+1 w" slideWid - 27 " AltSubmit Choose" FillAreaGlassy " vFillAreaGlassy gupdateUIfillPanel", "Not activated|Weak|Mild|Moderate|Strong|Extreme", "Glass effect")
     GuiAddCheckbox("x+1 yp hp w26 gupdateUIfillPanel Checked" FillAreaCutGlass " vFillAreaCutGlass", "Transparentize glass", "T",, "Transparentize glass based on`nthe opacity of the fill color[s]")
@@ -44918,7 +44917,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIfillPanel")
     GuiAddDropDownList("x+1 w" slideWid " gupdateUIfillPanel AltSubmit Choose" FillAreaBlendMode " vFillAreaBlendMode", infoBlend "|" userBlendModesList, "Blending mode")
 
-    Gui, Tab, 2
+    Gui, Tab, 2 ; colors
     sml := (PrefsLargeFonts=1) ? 66 : 44
     wml := (PrefsLargeFonts=1) ? 112 : 75
     bonusDl := (viewportQPVimage.imgHandle) ? "" : "|Random patterns|Texture"
@@ -44942,9 +44941,10 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     GuiAddSlider("FillAreaGradientPosA", 0,200, 0, "Position A", "updateUIfillPanel", 3, "xs y+15 wp hp")
     GuiAddSlider("FillAreaGradientPosB", 0,200, 200, "Position B", "updateUIfillPanel", 3, "x+5 wp hp")
     GuiAddDropDownList("xs y+15 wp AltSubmit Choose" FillAreaGradientWrapped " vFillAreaGradientWrapped gupdateUIfillPanel", "Tiled gradient|Tiled - flip X|Tiled - flip Y|Tiled - flip X/Y|No gradient tiling", "Gradient tiling mode")
-    Gui, Add, Checkbox, x+5 wp hp +0x1000 Checked%FillAreaColorReversed% vFillAreaColorReversed gupdateUIfillPanel, &Reverse colors
+    Gui, Add, Checkbox, x+5 hp Checked%FillAreaColorReversed% vFillAreaColorReversed gupdateUIfillPanel, &Reverse colors
+    Gui, Add, Checkbox, xs y+8 hp Checked%userimgGammaCorrect% vuserimgGammaCorrect gupdateUIfillPanel, &Apply gamma corrections
 
-    Gui, Tab, 3
+    Gui, Tab, 3 ; apply fx
     Gui, Add, Checkbox, x+10 y+10 Section Checked%FillAreaApplyColorFX% vFillAreaApplyColorFX gupdateUIfillPanel, &Apply color adjustments
     GuiAddGeneralColorAdjustCtrls(txtWid, "updateUIfillPanel")
     If (viewportQPVimage.imgHandle)
@@ -44954,7 +44954,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
 
     If !(viewportQPVimage.imgHandle)
     {
-       Gui, Tab, 4
+       Gui, Tab, 4 ; draw border
        tml := (PrefsLargeFonts=1) ? 60 : 45
        Gui, Add, Checkbox, x+10 y+10 Section Checked%FillAreaDoContour% vFillAreaDoContour gupdateUIfillPanel, &Draw shape outline
        Gui, Add, Checkbox, x+15 hp gupdateUIfillPanel Checked%FillAreaClosedPath% vFillAreaClosedPath, &Closed path
@@ -44962,6 +44962,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
        GuiAddPickerColor("x+10 hp w25", "DrawLineAreaColor")
        GuiAddColor("x+5 hp w" tml, "DrawLineAreaColor", "Line color")
        GuiAddSlider("DrawLineAreaOpacity", 3,255, 255, "Opacity", "updateUIfillPanel", 1, "x+5 w" btnWid " hp")
+       GuiAddDropDownList("xs y+7 w" btnWid " gupdateUIfillPanel AltSubmit Choose" DrawLineAreaBlendMode " vDrawLineAreaBlendMode", "No blend mode|" userBlendModesList, "Blending mode")
 
        Gui, Add, Text, xs y+15 w%btnWid% vtxtLine3, Alignment
        Gui, Add, Text, x+10 wp vtxtLine4, Styling
@@ -46138,9 +46139,17 @@ livePreviewFillBehindArea(modus:=0) {
 
    If validBMP(pBitmap)
    {
+
       modus := (FillBehindInvert=1) ? 4 : 0
       Gdip_SetClipPath(2NDglPG, pPath, modus)
-      thisOpacity := (FillBehindOpacity>255) ? (FillBehindOpacity - 245)/10 : FillBehindOpacity/255
+      If (userimgGammaCorrect=1)
+      {
+         Gdip_SetCompositingQuality(2NDglPG, 2)
+         Gdip_FillPath(2NDglPG, GDIPbrushHatch, pPath)
+         ; trGdip_DrawImage(A_ThisFunc, 2NDglPG, pBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH)
+      }
+
+      thisOpacity := FillBehindOpacity/255
       If (FillBehindInvert=1)
          Gdip_FillRectangle(2NDglPG, thisBrush, imgSelPx, imgSelPy, imgSelW, imgSelH)
       Else
@@ -46149,6 +46158,8 @@ livePreviewFillBehindArea(modus:=0) {
       ; trGdip_GetImageDimensions(pBitmap, w, h)
       ; ToolTip, % w "|" h "`n" imgSelW "|" imgSelH , , , 2
       trGdip_DrawImage(A_ThisFunc, 2NDglPG, pBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, , , , , thisOpacity)
+      If (userimgGammaCorrect=1)
+         Gdip_SetCompositingQuality(2NDglPG, 1)
       Gdip_ResetClip(2NDglPG)
       trGdip_DisposeImage(pBitmap)
    }
@@ -49942,6 +49953,7 @@ updateUIfillPanel(actionu:=0) {
        GuiControl, % actu2, DrawLineAreaDoubles
        GuiControl, % actu2, DrawLineAreaContourAlign
        GuiControl, % actu2, DrawLineAreaDashStyle
+       GuiControl, % actu2, DrawLineAreaBlendMode
        GuiControl, % actu2, FillAreaClosedPath
        GuiControl, % actu2, txtLine3
        GuiControl, % actu2, txtLine4
@@ -89937,7 +89949,8 @@ recordGdipBitmaps(r, infoz, typu:="bmp") {
    If validBMP(r)
       addJournalEntry("ERROR: recorded a new bitmap ID that was not discarded. WTF? OLD=" createdGDIobjsArray["x" r, 4] ". NEW=" infoz)
 
-   createdGDIobjsArray["x" r] := [r, typu, 1, infoz]
+   If StrLen(r)>2
+      createdGDIobjsArray["x" r] := [r, typu, 1, infoz]
 }
 
 trGdip_CreateBitmapFromFile(funcu, sFile, useICM:=0) {

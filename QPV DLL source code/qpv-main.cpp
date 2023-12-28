@@ -1084,7 +1084,7 @@ void toRGB(float c, float m, float y, float k, float *rgb) {
   rgb[2] = -((y * (255.0 - k)) / 255.0 + k - 255.0);
 }
 
-int mixColors(int colorB, float *colorA, float f, int dynamicOpacity, int blendMode, float prevCLRindex, float tolerance, int alternateMode, float thisCLRindex, int linearGamma) {
+int mixColorsFloodFill(int colorB, float *colorA, float f, int dynamicOpacity, int blendMode, float prevCLRindex, float tolerance, int alternateMode, float thisCLRindex, int linearGamma) {
 // source https://stackoverflow.com/questions/10139833/adding-colours-colors-together-like-paint-blue-yellow-green-etc
 // http://www.easyrgb.com/en/math.php
  
@@ -1161,7 +1161,7 @@ int mixColors(int colorB, float *colorA, float f, int dynamicOpacity, int blendM
   return (aT << 24) | ((rT & 0xFF) << 16) | ((gT & 0xFF) << 8) | (bT & 0xFF);
 }
 
-int simpleMixColors(int colorB, float *colorA, float f, int blendMode, int linearGamma, int flipLayers) {
+int clrBrushMixColors(int colorB, float *colorA, float f, int blendMode, int linearGamma, int flipLayers) {
 // source https://stackoverflow.com/questions/10139833/adding-colours-colors-together-like-paint-blue-yellow-green-etc
 // http://www.easyrgb.com/en/math.php
  
@@ -1385,7 +1385,7 @@ int FloodFill8Stack(int *imageData, int w, int h, int x, int y, int newColor, fl
          if (cartoonMode==1)
             thisColor = oldColor;
          else
-            thisColor = mixColors(prevColor, nC, opacity, dynamicOpacity, blendMode, prevCLRindex, tolerance, alternateMode, indexes[pix], linearGamma);
+            thisColor = mixColorsFloodFill(prevColor, nC, opacity, dynamicOpacity, blendMode, prevCLRindex, tolerance, alternateMode, indexes[pix], linearGamma);
 
          imageData[pix] = thisColor;
       } else
@@ -1493,7 +1493,7 @@ int ReplaceGivenColor(int *imageData, int w, int h, int x, int y, int newColor, 
                   if (cartoonMode==1)
                      thisColor = oldColor;
                   else
-                     thisColor = mixColors(prevColor, nC, opacity, dynamicOpacity, blendMode, prevCLRindex, tolerance, alternateMode, index, linearGamma);
+                     thisColor = mixColorsFloodFill(prevColor, nC, opacity, dynamicOpacity, blendMode, prevCLRindex, tolerance, alternateMode, index, linearGamma);
                   imageData[zx + zy * w] = thisColor;
                } else
                {
@@ -1535,7 +1535,7 @@ DLL_API int DLL_CALLCONV FloodFillWrapper(int *imageData, int modus, int w, int 
 
     float opacity = char_to_float[fillOpacity];
     if (tolerance==0 && (opacity<1 || blendMode>0))
-       newColor = mixColors(prevColor, nC, opacity, 0, blendMode, 0, 0, 0, 0, linearGamma);
+       newColor = mixColorsFloodFill(prevColor, nC, opacity, 0, blendMode, 0, 0, 0, 0, linearGamma);
 
     int r;
     if (modus==1)
@@ -1763,7 +1763,7 @@ DLL_API int DLL_CALLCONV ColourBrush(int *opacityImgData, int *imageData, int *m
             if (fintensity<0 || clipFlag<2)
                fintensity = 0;
 
-            imageData[px] = simpleMixColors(BGRcolor, nC, fintensity, blendMode, linearGamma, flipLayers);
+            imageData[px] = clrBrushMixColors(BGRcolor, nC, fintensity, blendMode, linearGamma, flipLayers);
         }
     }
  
