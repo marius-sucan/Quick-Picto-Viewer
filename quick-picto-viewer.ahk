@@ -12693,7 +12693,7 @@ QPV_MergeBitmapsWithMask(initialBitmap, newBitmap, alphaBitmap, invert, maskOpac
   return r
 }
 
-QPV_ColorizeGrayImage(pBitmap, thisColorA, thisColorB) {
+QPV_ColorizeGrayImage(pBitmap, thisColorA, thisColorB, linearu) {
   ; thisStartZeit := A_TickCount
   initQPVmainDLL()
   If !qpvMainDll
@@ -12711,7 +12711,7 @@ QPV_ColorizeGrayImage(pBitmap, thisColorA, thisColorB) {
   E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, nScan, nData, 3)
   If !E1
   {
-     r := DllCall(whichMainDLL "\ColorizeGrayImage", "UPtr", nScan, "int", w, "int", h, "int", stride, "int", 32, "int", userimgGammaCorrect, "int", thisColorA, "int", thisColorB)
+     r := DllCall(whichMainDLL "\ColorizeGrayImage", "UPtr", nScan, "int", w, "int", h, "int", stride, "int", 32, "int", linearu, "int", thisColorA, "int", thisColorB)
      Gdip_UnlockBits(pBitmap, nData)
   }
   ; ToolTip, % r "|" E1 "|" thisColorA "|" thisColorB , , , 2
@@ -12917,7 +12917,7 @@ QPV_FillBitmapHoles(pBitmap, newColor) {
   return r
 }
 
-QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:=0, faderMode:=0) {
+QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:=0, gamma:=0, faderMode:=0) {
   initQPVmainDLL()
   If (!qpvMainDll || isWinXP=1)
   {
@@ -12938,7 +12938,7 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:
   E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   E2 := Gdip_LockBits(pBitmap2Blend, 0, 0, w, h, stride, mScan, mData, 1)
   If (!E1 && !E2)
-     r := DllCall(whichMainDLL "\BlendBitmaps", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", blendMode, "int", flipLayers, "int", faderMode, "int", protectAlpha, "int", userimgGammaCorrect)
+     r := DllCall(whichMainDLL "\BlendBitmaps", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", blendMode, "int", flipLayers, "int", faderMode, "int", protectAlpha, "int", gamma)
 
   ; fnOutputDebug(A_ThisFunc "() " A_LastError " r=" r "=" func2exec "=" A_TickCount - thisStartZeit "|" blendMode)
   If !E1
@@ -13935,6 +13935,9 @@ getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, oImgW, oImgH, imgSel
        {
           obj := retrieveQPVscreenImgSection("last", 0, 0, 0, 0, 0)
           pBitmap := obj[1]
+          If !validBMP(pBitmap)
+             Return
+
           trGdip_GetImageDimensions(pBitmap, imgW, imgH)
           pBitmap := resizeBitmapToGivenRef(pBitmap, 0, obj[4], obj[5], thisImgQuality)
           ; fnOutputDebug(A_ThisFunc ": "  obj[4] "|" obj[5] "`n" imgW "|" imgH)
@@ -16209,7 +16212,7 @@ livePreviewHugeImageFillSelArea() {
       {
          gBpp := 32
          getVPselSize(zW, zH, 1, FillAreaInverted)
-         gradientsBMP := drawFillSelGradient(zW, zH, 1, 0, 0, zW, zH)
+         gradientsBMP := drawFillSelGradient(zW, zH, 1, 0, 0, zW, zH, userimgGammaCorrect)
          If (validBMP(gradientsBMP) && (imgSelOutViewPort!=1 || FillAreaInverted=1))
          {
             wBitmap := getRectFromBitmap(gradientsBMP, objSel, 1)
@@ -16267,7 +16270,7 @@ livePreviewHugeImageFillSelArea() {
 
       bpp := FreeImage_GetBPP(viewportQPVimage.imgHandle)
       thisBehind := (FillAreaDoBehind=1 && bpp=32) ? 1 : 0
-      r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", iScan, "Int", imgW, "Int", imgH, "int", Stride, "int", 32, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", FillAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", gScan, "int", gStride, "int", gBpp, "int", thisBehind, "int", 0)
+      r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", iScan, "Int", imgW, "Int", imgH, "int", Stride, "int", 32, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", FillAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", gScan, "int", gStride, "int", gBpp, "int", thisBehind, "int", 0, "int", FillAreaCutGlass)
       Gdip_UnlockBits(zBitmap, iData)
       If validBMP(gradientsBMP)
       {
@@ -16278,7 +16281,7 @@ livePreviewHugeImageFillSelArea() {
       userImgAdjustHiPrecision := 1
       userImgAdjustNoClamp := (PasteInPlaceLight>1 && PasteInPlaceGamma<1) ? 1 : 0 
       thisOpacity := (FillAreaColorMode=1) ? FillAreaOpacity : max(FillAreaOpacity, FillArea2ndOpacity)
-      If (FillAreaApplyColorFX=1 && FillAreaBlendMode>1)
+      If (FillAreaApplyColorFX=1 && FillAreaBlendMode>1 && thisBehind!=1)
          QPV_AdjustImageColors(zBitmap, thisOpacity, userImgAdjustInvertColors, userImgAdjustAltSat, Round(PasteInPlaceSaturation*655.35), userImgAdjustAltBright, Round(PasteInPlaceLight*257), 0, Round(PasteInPlaceGamma*655.30), 0, 0, 0, PasteInPlaceHue, 0, 0, 0, 300, 0, 0, 0, 0, -1, -1, -1, -1, 0, FillAreaInverted, 0, 65535, 0, 0, -1)
 
       r1 := trGdip_DrawImage(A_ThisFunc, 2NDglPG, zBitmap, imgSelPx, imgSelPy)
@@ -16349,6 +16352,14 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
 
    offX := offY := 0
    offW := imgSelW,   offH := imgSelH
+   thisBlendMode := (FillAreaBlendMode=1 && FillAreaCutGlass=1 && FillAreaGlassy>1) ? 24 : FillAreaBlendMode 
+   thisObjBlurAmount := (previewMode=1) ? (Round(abs(FillAreaBlurAmount) * zoomLevel)) : abs(FillAreaBlurAmount)
+   exclmodus := (FillAreaInverted!=1) ? 4 : 0
+   ainvertus := (FillAreaBlurAmount>1) ? 0 : 1
+   bgrRM := (FillAreaRemBGR=1) ? 1 : 0
+   If (FillAreaRemBGR=1 && FillAreaInverted=1 && ainvertus=1)
+      bgrRM := 0
+
    If (previewMode=1)
    {
       offX := offY := offW := offH := 0
@@ -16363,19 +16374,40 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
       objSel.nw := imgSelW,    objSel.nh := imgSelH
       objSel.zw := zW,         objSel.zh := zH
       objSel.invertArea := FillAreaInverted
+      linearu := userimgGammaCorrect       ; (thisBlendMode>1 && thisBlendMode!=24) ? 0 : userimgGammaCorrect
+      thisBrush := (FillAreaRemBGR=1 && thisObjBlurAmount>1) ? GDIPbrushHatch : 0
+      gradientsBMP := drawFillSelGradient(zW, zH, 1, 0, 0, zW, zH, linearu, 0, 0, thisBrush)
+      If (thisObjBlurAmount>1 && validBMP(gradientsBMP))
+      {
+         fzx := zw/oImgW,              fzy := zh/oImgH
+         ; ToolTip, % fzx "|" fzy "`n" zzw "|" zzh "`n" zzw "|" zzh , , , 2
+         zzxa := imgSelX1*fzx,         zzya := imgSelY1*fzy
+         zzxb := imgSelX2*fzx,         zzyb := imgSelY2*fzy
+         zzw  := Round(zzxb - zzxa),   zzh  := Round(zzyb - zzya)
+         If (FillAreaInverted=1)
+            zPath := coreCreateFillAreaShape(zzxa, zzya, zzw, zzh, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio)
+         Else
+            zPath := coreCreateFillAreaShape(0, 0, zw, zh, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio)
 
-      gradientsBMP := drawFillSelGradient(zW, zH, 1, 0 , 0, zW, zH)
+         croppedOBJblurBMP := carvePathFromBitmap(gradientsBMP, zPath, 0, 0, exclmodus, 2, thisObjBlurAmount, 0, !FillAreaInverted, ainvertus, 0)
+         If validBMP(croppedOBJblurBMP)
+            croppedOBJblurBMP := trGdip_DisposeImage(croppedOBJblurBMP)
+         Gdip_DeletePath(zPath)
+      }
+
       If (validBMP(gradientsBMP) && (imgSelOutViewPort!=1 || FillAreaInverted=1))
       {
          wBitmap := getRectFromBitmap(gradientsBMP, objSel, 1)
          If validBMP(wBitmap)
          {
-            trGdip_DisposeImage(gradientsBMP)
+            gradientsBMP := trGdip_DisposeImage(gradientsBMP)
             gradientsBMP := wBitmap
-         }
+         } Else addJournalEntry(A_ThisFunc "(): failed to get rect from gradients bitmap")
       }
    } Else
-      gradientsBMP := drawFillSelGradient(imgSelW, imgSelH, previewMode, offX, offY, offW, offH)
+   {
+      gradientsBMP := drawFillSelGradient(imgSelW, imgSelH, previewMode, offX, offY, offW, offH, userimgGammaCorrect)
+   }
 
    trGdip_GetImageDimensions(gradientsBMP, imgSelW, imgSelH)
    ; ToolTip, % imgSelW "|" imgSelH "`n" zW "|" zH , , , 2
@@ -16401,12 +16433,57 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
    If (FillAreaApplyColorFX=1 && FillAreaColorMode>4)
       applyPersonalizedColorsBMP(gradientsBMP, 0, 0, FillAreaApplyColorFX)
 
+   If (thisObjBlurAmount>1 && previewMode=0)
+   {
+      croppedOBJblurBMP := carvePathFromBitmap(gradientsBMP, pPath, imgSelPx, imgSelPy, exclmodus, 2, thisObjBlurAmount, 0, !FillAreaInverted, ainvertus, 1)
+      If (validBMP(croppedOBJblurBMP) && FillAreaRemBGR=1)
+      {
+         If (FillAreaInverted=1)
+         {
+            If (FillAreaBlurAmount<0)
+            {
+               hG := Gdip_GraphicsFromImage(croppedOBJblurBMP)
+               Gdip_SetClipPath(hG, pPath)
+               Gdip_GraphicsClear(hG, "0xFFffFFff")
+               Gdip_DeleteGraphics(hG)
+            }
+            QPV_SetBitmapAsAlphaChannel(whichBitmap, croppedOBJblurBMP, !ainvertus)
+         } Else
+         {
+            krpBmp := trGdip_CreateBitmap(A_ThisFunc, oImgW, oImgH)
+            hG := Gdip_GraphicsFromImage(krpBmp)
+            Gdip_GraphicsClear(hG, "0xFF000000")
+            Gdip_DrawImageFast(hG, croppedOBJblurBMP, imgSelPx, imgSelPy)
+            If (FillAreaBlurAmount<0)
+            {
+               Gdip_SetClipPath(hG, pPath, 4)
+               Gdip_GraphicsClear(hG, "0xFFffFFff")
+            }
+            Gdip_DeleteGraphics(hG)
+            QPV_SetBitmapAsAlphaChannel(whichBitmap, krpBmp, !ainvertus)
+            krpBmp := trGdip_DisposeImage(krpBmp)
+            ; carvePathFromBitmap(whichBitmap, pPath, 0, 0, exclmodus, 2, thisObjBlurAmount, 0, -1, 1, 0)
+         }
+
+         currIMGdetails.HasAlpha := 1
+         bgrRM := 2
+      }
+
+      If validBMP(croppedOBJblurBMP)
+         croppedOBJblurBMP := trGdip_DisposeImage(croppedOBJblurBMP)
+   }
+
    Gdip_ResetClip(G2)
    modus := (FillAreaInverted=1) ? 4 : 0
    If (imgSelOutViewPort!=1 || previewMode!=1)
       Gdip_SetClipPath(G2, pPath, modus)
 
-   opacityLevels := (FillAreaColorMode=1 && FillAreaOpacity<253) || (FillAreaColorMode>1 && (FillAreaOpacity<253 || FillArea2ndOpacity<253)) ? 1 : 0
+   opacityLevels := (FillAreaColorMode=1 && FillAreaOpacity<254) || (FillAreaColorMode>1 && (FillAreaOpacity<254 || FillArea2ndOpacity<254)) ? 1 : 0
+   If (FillAreaCutGlass=1 && (FillAreaColorMode=1 && FillAreaOpacity<2) || (FillAreaColorMode>1 && (FillAreaOpacity<2 || FillArea2ndOpacity<2)))
+      opacityLevels := 0
+   Else If (FillAreaCutGlass=0 && FillAreaBlurAmount!=0)
+      opacityLevels := 1
+
    BlurAmount := blr[FillAreaGlassy]
    kimgSelW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
    kimgSelH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
@@ -16415,21 +16492,16 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
    If (previewMode=1)
       BlurAmount := (Round(BlurAmount * (rsize / msize)))
 
-   thisObjBlurAmount := (previewMode=1) ? (Round(abs(FillAreaBlurAmount) * (rsize / msize))) : abs(FillAreaBlurAmount)
-   If (FillAreaRemBGR=1)
+   If (FillAreaRemBGR=1 && thisObjBlurAmount=0)
    {
-      If (previewMode=1 && thisObjBlurAmount<2)
-      {
-         If (FillAreaInverted=1)
-            Gdip_FillRectangle(G2, GDIPbrushHatch, imgSelPx, imgSelPy, imgSelW, imgSelH)
-         Else
-            Gdip_FillPath(G2, GDIPbrushHatch, pPath)
-      } Else If (thisObjBlurAmount>1)
-         Sleep, -1
-      Else
+      If (bgrRM!=2 && previewMode=0)
          Gdip_GraphicsClear(G2)
+      Else If (FillAreaInverted=1 && previewMode=1)
+         Gdip_FillRectangle(G2, GDIPbrushHatch, imgSelPx, imgSelPy, imgSelW, imgSelH)
+      Else If (previewMode=1)
+         Gdip_FillPath(G2, GDIPbrushHatch, pPath)
       ; ToolTip, % previewMode "=" pPath "=" g2 "`n" imgSelPx "=" imgSelPy "=" imgSelW "=" imgSelH "=" FillAreaShape "=" VPselRotation "=" rotateSelBoundsKeepRatio , , , 2
-   } Else If (FillAreaGlassy>1 && FillAreaRemBGR=0 && opacityLevels=1 && BlurAmount>1 || FillAreaBlendMode>1)
+   } Else If (FillAreaGlassy>1 && FillAreaRemBGR=0 && opacityLevels=1 && BlurAmount>1 || thisBlendMode>1)
    {
       thisQuality := (previewMode=1) ? 5 : 3
       canBlur := (previewMode=1 && doImgEditLivePreview=1 || previewMode=0) ? 1 : 0
@@ -16438,32 +16510,32 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
       {
          partu := (FillAreaInverted=1) ? "a" : getVPselIDs("saiz-vpos-xy") VPselRotation EllipseSelectMode imgSelW imgSelH
          thisFXstate := "a" whichBitmap partu previewMode BlurAmount currentFileIndex getIDimage(currentFileIndex) oImgW oImgH currentUndoLevel undoLevelsRecorded currentSelUndoLevel FlipImgH FlipImgV IMGresizingMode imageAligned zoomLevel prevDestPosX prevDestPosY mainWidth mainHeight useGdiBitmap() prevResizedVPimgW prevResizedVPimgH PasteInPlaceAdaptMode UserMemBMP ViewPortBMPcache getIDvpFX()
-         If (currIMGdetails.HasAlpha=1 && previewMode=1 && FillAreaBlendMode>1)
+         If (currIMGdetails.HasAlpha=1 && previewMode=1 && thisBlendMode>1)
             bgrBMPu := getImgOriginalSelectedAreaEdit(2, imgSelPx, imgSelPy, imgSelW, imgSelH, mainWidth, mainHeight, 0)
          Else
             bgrBMPu := getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, imgSelW, imgSelH, imgSelW, imgSelH, 0, imgSelW, imgSelH)
 
          trGdip_GetImageDimensions(bgrBMPu, zImgW, zImgH)
          sizeu := (imgSelW=zImgW && imgSelH=zImgH) ? 1 : 0
-         doFX := ((FillAreaGlassy>1 && opacityLevels=1 || FillAreaBlendMode>1) && BlurAmount>1) ? 1 : 0
+         doFX := ((FillAreaGlassy>1 && opacityLevels=1 || thisBlendMode>1) && BlurAmount>1) ? 1 : 0
          If (validBMP(bgrBMPu) && (doFX=1 || sizeu!=1))
             glassBitmap := applyVPeffectsAdvOnBMP(bgrBMPu, previewMode, thisFXstate, imgSelW, imgSelH, BlurAmount, 0)
          Else If validBMP(bgrBMPu)
             glassBitmap := trGdip_CloneBitmap(A_ThisFunc, bgrBMPu)
 
          ; ToolTip, % sizeu "=" doFX "=" glassBitmap , , , 2
-         If (FillAreaBlendMode>1)
+         If (thisBlendMode>1)
          {
             o_glass := trGdip_CloneBitmap(A_ThisFunc, glassBitmap)
             thisAlphaMode := (FillAreaGlassy=1) ? FillAreaCutGlass : !FillAreaCutGlass
             thisu := (FillAreaGlassy>1) ? 1 : 0
-            QPV_BlendBitmaps(glassBitmap, gradientsBMP, FillAreaBlendMode - 1, thisAlphaMode, BlendModesFlipped, thisu)
+            QPV_BlendBitmaps(glassBitmap, gradientsBMP, thisBlendMode - 1, thisAlphaMode, BlendModesFlipped, 0, thisu)
          }
 
          If (FillAreaApplyColorFX=1 && FillAreaColorMode<5)
             applyPersonalizedColorsBMP(glassBitmap, 0, 0, FillAreaApplyColorFX)
 
-         If (FillAreaBlendMode=1)
+         If (thisBlendMode=1)
          {
             G5 := Gdip_GraphicsFromImage(glassBitmap)
             If (userimgGammaCorrect=1)
@@ -16484,32 +16556,36 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
                tzGdip_DrawImage(G5, o_glass, 0, 0, imgSelW, imgSelH, , , , , thisOpacity/2)
                tzGdip_DrawImage(G5, glassBitmap, 0, 0, imgSelW, imgSelH)
                Gdip_DeleteGraphics(G5)
-               trGdip_DisposeImage(glassBitmap, 1)
+               glassBitmap := trGdip_DisposeImage(glassBitmap, 1)
                glassBitmap := zBitmap
             }
          }
-         trGdip_DisposeImage(o_glass, 1)
+         If validBMP(o_glass)
+            o_glass := trGdip_DisposeImage(o_glass, 1)
          gradientsBMP := trGdip_DisposeImage(gradientsBMP, 1)
       }
    }
 
-   If (userimgGammaCorrect=1 && !validBMP(bgrBMPu) && previewMode=1 && FillAreaRemBGR=0 && FillAreaBlendMode=1)
-      bgrBMPu := getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, imgSelW, imgSelH, imgSelW, imgSelH, 0, imgSelW, imgSelH)
-
-   If (userimgGammaCorrect=1 && validBMP(bgrBMPu) && previewMode=1 && FillAreaBlendMode=1)
+   If (userimgGammaCorrect=1 && previewMode=1 && thisBlendMode=1)
    {
-      Gdip_ResetClip(G2)
-      trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx, imgSelPy, imgSelW, imgSelH)
-      Gdip_SetClipPath(G2, pPath, modus)
+      If (!validBMP(bgrBMPu) && FillAreaRemBGR=0)
+         bgrBMPu := getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, imgSelW, imgSelH, imgSelW, imgSelH, 0, imgSelW, imgSelH)
+
+      If validBMP(bgrBMPu)
+      {
+         Gdip_ResetClip(G2)
+         trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx, imgSelPy, imgSelW, imgSelH)
+         Gdip_SetClipPath(G2, pPath, modus)
+      }
    }
 
-   If (userimgGammaCorrect=1 && FillAreaBlendMode=1)
+   If (userimgGammaCorrect=1 && thisBlendMode=1)
       Gdip_SetCompositingQuality(G2, 2)
 
-   bgrBMPu := trGdip_DisposeImage(bgrBMPu, 1)
+   If validBMP(bgrBMPu)
+      bgrBMPu := trGdip_DisposeImage(bgrBMPu, 1)
    fBitmapA := validBMP(glassBitmap) ? glassBitmap : gradientsBMP
-   fBitmapB := validBMP(glassBitmap) ? gradientsBMP : glassBitmap
-   ; ToolTip, % "lol=" brushingMode , , , 2
+   ; fnOutputDebug("crp=" validBMP(croppedOBJblurBMP) "=" croppedOBJblurBMP "|fba=" validBMP(fBitmapA) "=" fBitmapA "|gla=" validBMP(glassBitmap) "=" glassBitmap "|grd=" gradientsBMP "=" validBMP(gradientsBMP))
    If (alphaMaskingMode>1 && brushingMode=1)
    {
       trGdip_GetImageDimensions(userAlphaMaskBmpPainted, zImgW, zImgH)
@@ -16525,9 +16601,9 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
          trGdip_DisposeImage(wBitmap, 1)
    } Else If (alphaMaskingMode>1)
    {
-      moreStuff := (FillAreaGlassy>1 || FillAreaBlendMode>1) ? "a" imgSelPx imgSelPy : ""
+      moreStuff := (FillAreaGlassy>1 || thisBlendMode>1) ? "a" imgSelPx imgSelPy : ""
       partu := (FillAreaInverted=1) ? "a" : getVPselIDs("saiz-vpos-xy") VPselRotation EllipseSelectMode imgSelW imgSelH
-      thisIDu := "a" previewMode FillAreaRemBGR FillAreaInverted userimgGammaCorrect FillAreaGlassy FillAreaBlendMode FillAreaColor FillAreaColorMode FillArea2ndColor FillAreaOpacity FillArea2ndOpacity FillAreaGradientWrapped FillAreaGradientAngle FillAreaGradientPosB FillAreaGradientPosA FillAreaColorReversed FillAreaGradientScale VPselRotation zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY BlendModesFlipped partu moreStuff FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY undoLevelsRecorded currentUndoLevel useGdiBitmap() getAlphaMaskIDu() prevDestPosX prevDestPosY
+      thisIDu := "a" previewMode FillAreaRemBGR FillAreaInverted userimgGammaCorrect FillAreaGlassy thisBlendMode FillAreaColor FillAreaColorMode FillArea2ndColor FillAreaOpacity FillArea2ndOpacity FillAreaGradientWrapped FillAreaGradientAngle FillAreaGradientPosB FillAreaGradientPosA FillAreaColorReversed FillAreaGradientScale VPselRotation zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY BlendModesFlipped partu moreStuff FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY undoLevelsRecorded currentUndoLevel useGdiBitmap() getAlphaMaskIDu() prevDestPosX prevDestPosY
       If (previewMode=1)
          realtimePasteInPlaceAlphaMasker(previewMode, fBitmapA, thisIDu, newBitmap, objSel, 0, 0, 0)
       Else
@@ -16535,59 +16611,17 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
 
       If validBMP(newBitmap)
       {
-         trGdip_DisposeImage(fBitmapA, 1)
+         fBitmapA := trGdip_DisposeImage(fBitmapA, 1)
          fBitmapA := newBitmap
       }
    }
 
    thisOpacity := (FillAreaColorMode>4) ? FillAreaOpacity/255 : 1
-   If (thisObjBlurAmount>1)
-   {
-      nodus := (FillAreaInverted!=1) ? 4 : 0
-      invertus := (FillAreaBlurAmount>1) ? 0 : 1
-      brm := (FillAreaRemBGR=1) ? 1 : 0
-      If (FillAreaRemBGR=1 && FillAreaInverted=1 && invertus=1)
-         brm := 0
-   
-      newAlpha := carvePathFromBitmap(fBitmapA, pPath, imgSelPx, imgSelPy, nodus, 2, thisObjBlurAmount, 0, !FillAreaInverted, invertus, brm)
-      If (brm=1 && newAlpha)
-      {
-         If (previewMode=1)
-         {
-            trGdip_GetImageDimensions(fBitmapA, tW, tH)
-            mooBitmap := trGdip_CreateBitmap(A_ThisFunc, tW, tH, "0xE200B")
-            G4 := trGdip_GraphicsFromImage(A_ThisFunc, mooBitmap)
-            ; thisBlush := createHatchBrush(0)
-            Gdip_FillRectangle(G4, GDIPbrushHatch, 0, 0, tW, tH)
-            Gdip_DeleteGraphics(G4)
-            r0 := QPV_SetBitmapAsAlphaChannel(mooBitmap, newAlpha, invertus)
-            trGdip_DisposeImage(newAlpha)
-            trGdip_DrawImage(A_ThisFunc, G2, mooBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH)
-            trGdip_DisposeImage(mooBitmap)
-         } Else
-         {
-            mooBitmap := trGdip_CreateBitmap(A_ThisFunc, oimgW, oimgH, "0xE200B")
-            G4 := trGdip_GraphicsFromImage(A_ThisFunc, mooBitmap)
-            r2 := trGdip_GraphicsClear(A_ThisFunc, G4, "0xFF000000")
-            trGdip_DrawImage(A_ThisFunc, G4, newAlpha, imgSelPx, imgSelPy, imgSelW, imgSelH)
-            If (invertus=1)
-            {
-               Gdip_SetClipPath(G4, pPath, 4)
-               r2 := trGdip_GraphicsClear(A_ThisFunc, G4, "0xFFffFFff")
-            }
-
-            Gdip_DeleteGraphics(G4)
-            trGdip_DisposeImage(newAlpha)
-            r0 := QPV_SetBitmapAsAlphaChannel(whichBitmap, mooBitmap, !invertus)
-            trGdip_DisposeImage(mooBitmap)
-         }
-      }
-
-      If (invertus!=1)
-         Gdip_ResetClip(G2)
-   }
+   If (FillAreaInverted=1 && thisObjBlurAmount>1 && FillAreaBlurAmount>0)
+      Gdip_ResetClip(G2)
 
    ; ToolTip, % "g2=" g2 " bmp="  fBitmapA " g=" gradientsBMP " o=" thisOpacity " p=" pPath , , , 2
+   ; fnOutputDebug("crp=" validBMP(croppedOBJblurBMP) "=" croppedOBJblurBMP "|fba=" validBMP(fBitmapA) "=" fBitmapA "|gla=" validBMP(glassBitmap) "=" glassBitmap "|grd=" gradientsBMP "=" validBMP(gradientsBMP))
    rz := trGdip_DrawImage(A_ThisFunc, G2, fBitmapA, imgSelPx, imgSelPy, imgSelW, imgSelH, , , , , thisOpacity)
    If (userimgGammaCorrect=1)
       Gdip_SetCompositingQuality(G2, 1)
@@ -16597,7 +16631,8 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
 
    Gdip_ResetClip(G2)
    trGdip_DisposeImage(fBitmapA, 1)
-   trGdip_DisposeImage(fBitmapB, 1)
+   If validBMP(glassBitmap)
+      trGdip_DisposeImage(glassBitmap, 1)
    If (FillAreaDoContour=1 && previewMode=1)
       coreDrawShapesSelectionArea()
    Return rz
@@ -16615,7 +16650,7 @@ makeRGBAcolor(clr, opacity) {
     Return Format("{1:#x}", opacity) clr
 }
 
-drawFillSelGradient(imgSelW, imgSelH, previewMode, offX, offY, offW, offH, zX:=0, zY:=0) {
+drawFillSelGradient(imgSelW, imgSelH, previewMode, offX, offY, offW, offH, linearu:=1, zX:=0, zY:=0, bgrBrush:=0) {
     Static prevBMPu, prevState
     If (imgSelW="kill")
     {
@@ -16625,7 +16660,7 @@ drawFillSelGradient(imgSelW, imgSelH, previewMode, offX, offY, offW, offH, zX:=0
     }
 
     thisu := (FillAreaInverted=1) ? 0 : "a" getVPselIDs("saiz-vpos") VPselRotation
-    thisState := "a" previewMode thisu FillAreaInverted userimgGammaCorrect FillAreaColor FillAreaColorMode FillArea2ndColor FillAreaOpacity FillArea2ndOpacity FillAreaGradientWrapped FillAreaGradientAngle FillAreaGradientPosB FillAreaGradientPosA FillAreaColorReversed FillAreaGradientScale tinyPrevAreaCoordX tinyPrevAreaCoordY clrGradientOffX clrGradientOffY prevDestPosX prevDestPosY zoomLevel FillAreaWelcomePattern clrGradientCoffX clrGradientCoffY
+    thisState := "a" previewMode thisu FillAreaInverted userimgGammaCorrect FillAreaColor FillAreaColorMode FillArea2ndColor FillAreaOpacity FillArea2ndOpacity FillAreaGradientWrapped FillAreaGradientAngle FillAreaGradientPosB FillAreaGradientPosA FillAreaColorReversed FillAreaGradientScale tinyPrevAreaCoordX tinyPrevAreaCoordY clrGradientOffX clrGradientOffY prevDestPosX prevDestPosY zoomLevel FillAreaWelcomePattern clrGradientCoffX clrGradientCoffY linearu bgrBrush
     ; ToolTip, % thisState , , , 2
     If (thisState=prevState && validBMP(prevBMPu))
        Return trGdip_CloneBitmap(A_ThisFunc, prevBMPu)
@@ -16669,7 +16704,7 @@ drawFillSelGradient(imgSelW, imgSelH, previewMode, offX, offY, offW, offH, zX:=0
        Brush := Gdip_CreateLinearGrBrushFromRect(brimgSelPx + cX, brimgSelPy + cY, brimgSelW, brimgSelH, thisColorA, thisColorB, 1, clampInRange(FillAreaGradientWrapped - 1, 0, 3, 1))
        ; ToolTip, % brush "|" brImgSelW "|" brImgSelH "|" brimgSelPx "|" brimgSelPy "|" cX "|" cY "|" ImgSelW "|" ImgSelH "|" imgSelPx "|" imgSelPy "|" FillAreaGradientScale "|" clrGradientOffX "|" clrGradientOffY  , , , 2
        Gdip_RotateLinearGrBrushAtCenter(Brush, Mod(Round(angelu + VPselRotation), 360), 1)
-       Gdip_SetLinearGrBrushGammaCorrection(Brush, userimgGammaCorrect)
+       Gdip_SetLinearGrBrushGammaCorrection(Brush, linearu)
        Gdip_SetLinearGrBrushPresetBlend(Brush, [FillAreaGradientPosA/200, FillAreaGradientPosB/200], [thisColorA, thisColorB])
     } Else If (FillAreaColorMode=3 || FillAreaColorMode=4)
     {
@@ -16689,7 +16724,7 @@ drawFillSelGradient(imgSelW, imgSelH, previewMode, offX, offY, offW, offH, zX:=0
        thisColorY := makeRGBAcolor("ffFFff", 255)
        thisColorX := makeRGBAcolor("000000", 255)
        Gdip_PathGradientSetCenterPoint(Brush, cX, cY)
-       ; Gdip_SetLinearGrBrushGammaCorrection(Brush, userimgGammaCorrect)
+       ; Gdip_SetLinearGrBrushGammaCorrection(Brush, linearu)
        Gdip_SetLinearGrBrushPresetBlend(Brush, [FillAreaGradientPosA/200, FillAreaGradientPosB/200], [thisColorY, thisColorX])
        Gdip_RotatePathGradientAtCenter(Brush, Mod(Round(angelu + VPselRotation), 360), 1)
        Gdip_PathGradientSetWrapMode(Brush, FillAreaGradientWrapped - 1)
@@ -16742,7 +16777,7 @@ drawFillSelGradient(imgSelW, imgSelH, previewMode, offX, offY, offW, offH, zX:=0
     Gdip_FillRectangle(G2, Brush, 0, 0, imgSelW, imgSelH)
     If validBMP(zBitmap)
     {
-       If (userimgGammaCorrect=1)
+       If (linearu=1)
           Gdip_SetCompositingQuality(G2, 2)
        trGdip_DrawImage(A_ThisFunc, G2, zBitmap, 0, 0, imgSelW, imgSelH)
        trGdip_DisposeImage(zBitmap, 1)
@@ -16751,7 +16786,23 @@ drawFillSelGradient(imgSelW, imgSelH, previewMode, offX, offY, offW, offH, zX:=0
     Gdip_DeleteGraphics(G2)
     Gdip_DeleteBrush(Brush)
     If ((FillAreaColorMode=3 || FillAreaColorMode=4) && Brush2)
-       QPV_ColorizeGrayImage(pBitmap, thisColorA, thisColorB)
+       QPV_ColorizeGrayImage(pBitmap, thisColorA, thisColorB, linearu)
+
+    If (bgrBrush && (FillAreaColor<254 || FillArea2ndColor<254))
+    {
+       bgrStuff := trGdip_CreateBitmap(A_ThisFunc, imgSelW, imgSelH)
+       If validBMP(bgrStuff)
+       {
+          ; ToolTip, % bgrBrush "|" bgrStuff , , , 2
+          zG := Gdip_GraphicsFromImage(bgrStuff)
+          Gdip_FillRectangle(zG, bgrBrush, 0, 0, imgSelW, imgSelH)
+          Gdip_DrawImageFast(zG, pBitmap)
+          Gdip_DeleteGraphics(zG)
+          trGdip_DisposeImage(pBitmap)
+          pBitmap := bgrStuff
+       }
+    }
+
     prevState := (minimizeMemUsage=0) ? thisState : 0
     prevBMPu := (minimizeMemUsage=0) ? trGdip_CloneBitmap(A_ThisFunc, pBitmap) : 0
     Return pBitmap
@@ -16761,7 +16812,12 @@ carvePathFromBitmap(ByRef pBitmap, pPath, cX, cY, modus, safeWay:=0, blurLevel:=
     If (safeWay=2 && blurLevel>1)
     {
        trGdip_GetImageDimensions(pBitmap, imgW, imgH)
-       newBitmap := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH, "0xE200B")
+       If (imgW && imgH)
+          newBitmap := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH, "0xE200B")
+
+       If !validBMP(newBitmap)
+          Return
+
        G3 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap)
        r2 := trGdip_GraphicsClear(A_ThisFunc, G3, "0xFFFFFFFF")
 
@@ -18601,7 +18657,7 @@ HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0, wa
                Return
             }
 
-            gradientsBMP := drawFillSelGradient(ResizedW, ResizedH, 0, 0, 0, ResizedW, ResizedH)
+            gradientsBMP := drawFillSelGradient(ResizedW, ResizedH, 0, 0, 0, ResizedW, ResizedH, userimgGammaCorrect)
             azX := (imgSelX1<0) ? abs(ImgSelX1) : 0
             azY := (imgSelY1<0) ? abs(ImgSelY1) : 0
             szW := (ImgSelX2>imgW) ? imgSelX2 - imgW : 0
@@ -18701,7 +18757,8 @@ HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0, wa
          showTOOLtip("Applying " modus "`nProcessing main bitmap, please wait", 1)
          recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, thisInvert)
          QPV_PrepareSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, thisInvert)
-         r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", blending, "int", BlendModesFlipped, "UPtr", mScan, "int", mStride, "UPtr", gScan, "int", gStride, "int", gBpp, "int", doBehind, "int", opacityExtra)
+         thisKeepAlpha := (transformTool=1) ? BlendModesPreserveAlpha : FillAreaCutGlass
+         r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", blending, "int", BlendModesFlipped, "UPtr", mScan, "int", mStride, "UPtr", gScan, "int", gStride, "int", gBpp, "int", doBehind, "int", opacityExtra, "int", thisKeepAlpha)
          If hFIFimgRealGradient
             FreeImage_UnLoad(hFIFimgRealGradient)
          If (hFIFimgExtern && r=1)
@@ -18740,7 +18797,7 @@ HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0, wa
             recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, EraseAreaInvert)
 
          QPV_PrepareSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, EraseAreaInvert)
-         r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", 1, "int", 0, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "UPtr", 0, "int", 0, "int", 24, "int", 0, "int", 0)
+         r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", 1, "int", 0, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "UPtr", 0, "int", 0, "int", 24, "int", 0, "int", 0, "int", 0)
          If InStr(modus, "initially")
          {
             If r
@@ -18780,7 +18837,7 @@ HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0, wa
             recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, BlurAreaInverted)
             QPV_PrepareSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, BlurAreaInverted)
             showTOOLtip("Applying " modus "`nPhase 3/3...", 1)
-            r := DllCall(whichMainDLL "\PixelateHugeBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", blurAreaOpacity, "int", BlurAreaBlendMode - 1, "int", BlendModesFlipped, "int", userimgGammaCorrect, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", thisSelW, "int", thisSelH, "UPtr", mScan, "int", mStride)
+            r := DllCall(whichMainDLL "\PixelateHugeBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", blurAreaOpacity, "int", BlurAreaBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", thisSelW, "int", thisSelH, "UPtr", mScan, "int", mStride)
             FreeImage_UnLoad(hFIFimgZ)
          } Else
          {
@@ -19620,6 +19677,7 @@ createDrawLinesPen(thisThick) {
 coreDrawShapesSelectionArea(G2:=0, whichBitmap:=0) {
     If (G2)
     {
+       previewMode := 0
        trGdip_GetImageDimensions(whichBitmap, oimgW, oimgH)
        calcImgSelection2bmp(!LimitSelectBoundsImg, oimgW, oimgH, oimgW, oimgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
        maxLength := min(imgSelW, imgSelH)//2
@@ -19633,22 +19691,34 @@ coreDrawShapesSelectionArea(G2:=0, whichBitmap:=0) {
           Return
 
        ; trGdip_GraphicsClear(A_ThisFunc, 2NDglPG, "0x00" WindowBGRcolor)
+       previewMode := 1
        vpWinClientSize(mainWidth, mainHeight)
        trGdip_GetImageDimensions(useGdiBitmap(), qimgW, qimgH)
        ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, qImgW, qImgH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
        maxLength := Round( (imgSelW + imgSelH)/2 )
        thisThick := (DrawLineAreaContourThickness>maxLength//1.05) ? maxLength//1.05 : DrawLineAreaContourThickness
        thisThick := thisThick*zoomLevel
-       tk := (DrawLineAreaContourAlign=2) ? tk//2 : tk
+       tk := (DrawLineAreaContourAlign=2) ? thisThick//2 : thisThick
        If (DrawLineAreaContourAlign=1)
           tk := 0
 
-       If (userimgGammaCorrect=1 && AnyWindowOpen!=23)
+       dw := Round(imgSelW + tk * 2)
+       dh := Round(imgSelH + tk * 2)
+       o_imgSelPx := imgSelPx
+       o_imgSelPy := imgSelPy
+       If (DrawLineAreaBlendMode>1)
        {
-          bgrBMPu := getImgSelectedAreaEditMode(1, imgSelPx - tk, imgSelPy - tk, imgSelW + tk * 2, imgSelH + tk * 2, imgSelW + tk * 2, imgSelH + tk * 2, 0, imgSelW + tk * 2, imgSelH + tk * 2)
-          trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx - tk, imgSelPy - tk, imgSelW + tk * 2, imgSelH + tk * 2)
+          previewMode := 2
+          xBitmap := trGdip_CreateBitmap(A_ThisFunc, dw, dh)
+          bgrBMPu := getImgSelectedAreaEditMode(1, imgSelPx - tk, imgSelPy - tk, dw, dh, dw, dh, 0, dw, dh)
+          G2 := trGdip_GraphicsFromImage(A_ThisFunc, xBitmap)
+          imgSelPx :=  imgSelPy := tk
+       } Else If (userimgGammaCorrect=1 && AnyWindowOpen!=23)
+       {
+          bgrBMPu := getImgSelectedAreaEditMode(1, imgSelPx - tk, imgSelPy - tk, dw, dh, dw, dh, 0, dw, dh)
+          trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx - tk, imgSelPy - tk, dw, dh)
           Gdip_SetCompositingQuality(G2, 2)
-          trGdip_DisposeImage(bgrBMPu)
+          ; trGdip_DisposeImage(bgrBMPu)
        }
     }
 
@@ -19676,6 +19746,18 @@ coreDrawShapesSelectionArea(G2:=0, whichBitmap:=0) {
     Gdip_DeletePen(thisPen)
     If (userimgGammaCorrect=1)
        Gdip_SetCompositingQuality(G2, 1)
+
+    If (previewMode=2)
+    {
+       Gdip_ResetClip(2NDglPG)
+       Gdip_DeleteGraphics(G2)
+       QPV_BlendBitmaps(bgrBMPu, xBitmap, DrawLineAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped)
+       trGdip_DrawImage(A_ThisFunc, 2NDglPG, bgrBMPu, o_imgSelPx - tk, o_imgSelPy - tk, dw, dh)
+       trGdip_DisposeImage(xBitmap)
+    }
+
+    If validBMP(bgrBMPu)
+       trGdip_DisposeImage(bgrBMPu)
 }
 
 createPiePath(imgSelPx, imgSelPy, imgSelW, imgSelH, err:=0, pPath:=0) {
@@ -20073,7 +20155,7 @@ BlurSelectedArea(modus:="") {
           ou := trGdip_CloneBitmap(A_ThisFunc, bgrBMPu)
 
        applyBlurColorsFX(zBitmap)
-       rz := QPV_BlendBitmaps(bgrBMPu, zBitmap, BlurAreaBlendMode - 1, 0, BlendModesFlipped)
+       rz := QPV_BlendBitmaps(bgrBMPu, zBitmap, BlurAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped)
        If (allowAlphaMasking=1)
           trGdip_DisposeImage(zBitmap)
        Else
@@ -22497,7 +22579,10 @@ GuiAddDropDownList(options, listu, labelu:="", tipu:="", guiu:="SettingsGUIA") {
           }
 
           ; GuiControl, %guiu%: MoveDraw, %tipu%, w%w% h%h%
-          labelu := tipu := ""
+          If labelu[3]
+             labelu := labelu[3]
+          Else
+             labelu := tipu := ""
        }
     }
 
@@ -42588,8 +42673,9 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0) {
     GuiAddFlipBlendLayers("x+1 yp hp w" widu " gupdateUIpastePanel")
     GuiAddDropDownList("x+2 w" txtWid2 - widu - 3 " AltSubmit Choose" PasteInPlaceGlassy " vPasteInPlaceGlassy gupdateUIpastePanel", "No glass effect|Weak|Mild|Moderate|Strong|Extreme", "Glass effect")
     GuiAddSlider("PasteInPlaceOpacity", 1,512, 255, ".updateLabelPasteImgOpacity", "updateUIpastePanel", 1, "xs y+10 w" txtWid - widu - 2 " hp", "Opacity above 100% allows user to restore partially`nvisible pixels in the manipulated image object.")
-    GuiAddCheckbox("x+1 hp w" widu " gupdateUIpastePanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the`nbackground image unaltered by blend modes")
-    Gui, Add, Checkbox, xs y+15 hp gupdateUIpastePanel Checked%PasteInPlaceApplyColorFX% vPasteInPlaceApplyColorFX, Apply color adjustments on the image
+    GuiAddCheckbox("x+1 hp w" widu " gupdateUIpastePanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
+    Gui, Add, Checkbox, xs y+15 w%txtWid2% hp gupdateUIpastePanel Checked%PasteInPlaceApplyColorFX% vPasteInPlaceApplyColorFX, Color adjustments
+    Gui, Add, Checkbox, x+5 wp hp gupdateUIpastePanel Checked%userimgGammaCorrect% vuserimgGammaCorrect, Gamma correction
     GuiAddGeneralColorAdjustCtrls(txtWid, "updateUIpastePanel")
 
     uiADDalphaMaskTabs(4, 5, "updateUIpastePanel")
@@ -44942,7 +45028,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     GuiAddSlider("FillAreaGradientPosB", 0,200, 200, "Position B", "updateUIfillPanel", 3, "x+5 wp hp")
     GuiAddDropDownList("xs y+15 wp AltSubmit Choose" FillAreaGradientWrapped " vFillAreaGradientWrapped gupdateUIfillPanel", "Tiled gradient|Tiled - flip X|Tiled - flip Y|Tiled - flip X/Y|No gradient tiling", "Gradient tiling mode")
     Gui, Add, Checkbox, x+5 hp Checked%FillAreaColorReversed% vFillAreaColorReversed gupdateUIfillPanel, &Reverse colors
-    Gui, Add, Checkbox, xs y+8 hp Checked%userimgGammaCorrect% vuserimgGammaCorrect gupdateUIfillPanel, &Apply gamma corrections
+    Gui, Add, Checkbox, xs y+8 hp Checked%userimgGammaCorrect% vuserimgGammaCorrect gupdateUIfillPanel, &Gamma correction
 
     Gui, Tab, 3 ; apply fx
     Gui, Add, Checkbox, x+10 y+10 Section Checked%FillAreaApplyColorFX% vFillAreaApplyColorFX gupdateUIfillPanel, &Apply color adjustments
@@ -45146,7 +45232,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     GuiAddColor("x+5 hp w" ml, "DrawLineAreaColor", "Line color")
     GuiAddPickerColor("x+2 hp w25", "DrawLineAreaColor")
     GuiAddSlider("DrawLineAreaOpacity", 3,255, 255, "Color opacity", "updateUIdrawShapesPanel", 1, "xs y+5 w" btnWid*2 + 5 " hp")
-    GuiAddCheckbox("x+1 hp w26 gupdateUIdrawShapesPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the`nbackground image unaltered by blend modes")
+    GuiAddCheckbox("x+1 hp w26 gupdateUIdrawShapesPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
     Gui, Add, Text, xs y+15 w%btnWid% hp +0x200 gBtnResetBlendMode +hwndhTemp, Blending mode
     GuiAddDropDownList("x+5 wp gupdateUIdrawShapesPanel AltSubmit Choose" DrawLineAreaBlendMode " vDrawLineAreaBlendMode", "None|" userBlendModesList, [hTemp])
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIdrawShapesPanel")
@@ -45157,7 +45243,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaDashStyle " vDrawLineAreaDashStyle gupdateUIdrawShapesPanel", "Continous|Dashes|Dots|Dashes and dots", "Line style")
     Gui, Add, Checkbox, xs y+6 wp h%btnHeight% +0x1000 Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIdrawShapesPanel, &Double line
     Gui, Add, Checkbox, x+5 wp hp +0x1000 gupdateUIdrawShapesPanel Checked%DrawLineAreaCapsStyle% vDrawLineAreaCapsStyle, &Round caps
-    GuiAddSlider("DrawLineAreaContourThickness", 1,450, 5, "Line width: $€ pixels", "updateUIdrawShapesPanel", 1, "xs y+15 w" txtWid " hp")
+    GuiAddSlider("DrawLineAreaContourThickness", 1,450, 45, "Line width: $€ pixels", "updateUIdrawShapesPanel", 1, "xs y+15 w" txtWid " hp")
     Gui, Add, Checkbox, xs y+10 gupdateUIdrawShapesPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit selection area
 
     btnWid := (PrefsLargeFonts=1) ? 105 : 65
@@ -45429,7 +45515,7 @@ PanelDrawLines() {
     GuiAddColor("x+10 w" ml " hp", "DrawLineAreaColor", "Line color")
     GuiAddPickerColor("x+1 hp w25", "DrawLineAreaColor")
     GuiAddSlider("DrawLineAreaOpacity", 3,255, 255, "Opacity", "updateUIDrawLinesPanel", 1, "x+10 w" btnWid " h" ha)
-    GuiAddCheckbox("x+1 hp w26 gupdateUIDrawLinesPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the`nbackground image unaltered by blend modes")
+    GuiAddCheckbox("x+1 hp w26 gupdateUIDrawLinesPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
     Gui, Add, Text, xs y+15 w%btnWid% hp +0x200 gBtnResetBlendMode +hwndhTemp, Blending mode
     GuiAddDropDownList("x+10 wp gupdateUIDrawLinesPanel AltSubmit Choose" DrawLineAreaBlendMode " vDrawLineAreaBlendMode", "None|" userBlendModesList, [hTemp])
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIDrawLinesPanel")
@@ -46291,7 +46377,7 @@ ReadSettingsZoomBlurPanel(act:=0) {
     RegAction(act, "BlurAreaAlphaMask",, 1)
     RegAction(act, "blurAreaOpacity",, 2, 3, 255)
     RegAction(act, "BlurAreaInverted",, 1)
-    RegAction(act, "BlurAreaBlendMode",, 2, 1, 23)
+    RegAction(act, "BlurAreaBlendMode",, 2, 1, 24)
     RegAction(act, "BlurAreaGamma",, 2, -100, 100)
     RegAction(act, "BlurAreaHue",, 2, -180, 180)
     RegAction(act, "BlurAreaLight",, 2, -255, 255)
@@ -46308,13 +46394,13 @@ ReadSettingsBlurPanel(act:=0) {
     RegAction(act, "blurAreaYamount",, 2, 0, 255)
     RegAction(act, "blurAreaEqualXY",, 1)
     RegAction(act, "blurAreaMode",, 2, 1, 8)
-    RegAction(act, "blurAreaPixelizeAmount",, 2, 0, 1024)
+    RegAction(act, "blurAreaPixelizeAmount",, 2, 0, 6789)
     RegAction(act, "blurAreaPixelizeMethod",, 2, 1, 3)
     RegAction(act, "blurAreaOpacity",, 2, 3, 255)
     RegAction(act, "BlurAreaInverted",, 1)
     RegAction(act, "blurAreaSoftEdges",, 1)
     RegAction(act, "blurAreaSoftLevel",, 2, 1, 7)
-    RegAction(act, "BlurAreaBlendMode",, 2, 1, 23)
+    RegAction(act, "BlurAreaBlendMode",, 2, 1, 24)
     RegAction(act, "blurAreaTwice",, 1)
     RegAction(act, "BlurAreaAlphaMask",, 1)
     RegAction(act, "blurAreaApplyFX",, 1)
@@ -46466,13 +46552,25 @@ PanelPixelizeSelectedArea() {
     If !testAllowSelInvert()
        BlurAreaInverted := 0
 
+    trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+    mpxu := Round((imgW * imgH)/1000000, 1)
+    maxu := (mpxu > 530) ? 2048 : 1024
+    If (mpxu > 5250)
+       maxu := 6785
+    Else If (mpxu > 4250)
+       maxu := 5630
+    Else If (mpxu > 2250)
+       maxu := 4315
+    Else If (mpxu > 1250)
+       maxu := 3000
+
     Gui, +DPIScale
     Gui, Add, Tab3, %tabzDarkModus% x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
     Gui, Tab, 1
     Gui, Add, Text, x+10 y+10 Section w%thisW%, Pixelization mode:
     listu := (viewportQPVimage.imgHandle) ? "Rescale (Nearest neighbour)|Rescale (Bicubic)|Rescale (Bilinear)" : "Loose fitting|Rescale (Nearest neighbour)|Rescale (Bicubic)"
     GuiAddDropDownList("xs y+10 wp AltSubmit Choose" blurAreaPixelizeMethod " gupdateUIblurPanel vblurAreaPixelizeMethod", listu)
-    GuiAddSlider("blurAreaPixelizeAmount", 0,1024, 15, "Pixelize amount: $€", "updateUIblurPanel", 1, "xs y+10 wp hp")
+    GuiAddSlider("blurAreaPixelizeAmount", 0,maxu, 15, "Pixelize amount: $€", "updateUIblurPanel", 1, "xs y+10 wp hp")
     GuiAddSlider("blurAreaAmount", 0,255, 0, "Blur radius: $€", "updateUIblurPanel", 1, "xs y+10 wp hp")
     GuiAddSlider("blurAreaOpacity", 3,255, 255, "Opacity", "updateUIblurPanel", 1, "xs y+10 wp hp")
     Gui, Add, Checkbox, xs y+10 wp Checked%BlurAreaAlphaMask% vBlurAreaAlphaMask gupdateUIblurPanel, Apply alpha mas&k
@@ -46486,8 +46584,9 @@ PanelPixelizeSelectedArea() {
     Gui, Tab, 2
     sml := (PrefsLargeFonts=1) ? 30 : 20
     Gui, Add, Text, x+10 y+10 Section w%thisW% gBtnResetBlendMode +TabStop, Blending mode: 
-    GuiAddDropDownList("xs y+10 wp" - sml " gupdateUIblurPanel AltSubmit Choose" BlurAreaBlendMode " vBlurAreaBlendMode", infoBlend "|" userBlendModesList)
-    GuiAddFlipBlendLayers("x+1 yp hp w" sml " gupdateUIblurPanel")
+    GuiAddDropDownList("xs y+10 wp" - sml*2 " gupdateUIblurPanel AltSubmit Choose" BlurAreaBlendMode " vBlurAreaBlendMode", infoBlend "|" userBlendModesList)
+    GuiAddFlipBlendLayers("x+1 hp w" sml " gupdateUIblurPanel")
+    GuiAddCheckbox("x+1 hp wp gupdateUIblurPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
     Gui, Add, Checkbox, xs y+10 Checked%BlurAreaApplyFX% vBlurAreaApplyFX gupdateUIblurPanel, &Apply color adjustments
     If (viewportQPVimage.imgHandle)
        thisW -= sml
@@ -46613,8 +46712,9 @@ PanelBlurSelectedArea() {
     GuiAddDropDownList("x+5 wp-25 gupdateUIblurPanel AltSubmit Choose" BlurAreaBlendMode " vBlurAreaBlendMode", infoBlend "|" userBlendModesList, [hTemp])
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIblurPanel")
     Gui, Add, Checkbox, xs y+10 Checked%BlurAreaApplyFX% vBlurAreaApplyFX gupdateUIblurPanel, &Apply color adjustments
-    GuiAddSlider("blurAreaOpacity", 3,255, 255, "Opacity", "updateUIblurPanel", 1, "xs y+15 w" txtWid " hp")
-    GuiAddSlider("BlurAreaHue", -180,180, 0, "Hue: $€°", "updateUIblurPanel", 2, "xs y+15 wp hp")
+    GuiAddSlider("blurAreaOpacity", 3,255, 255, "Opacity", "updateUIblurPanel", 1, "xs y+15 w" txtWid - 27 " hp")
+    GuiAddCheckbox("x+1 hp w26 gupdateUIblurPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
+    GuiAddSlider("BlurAreaHue", -180,180, 0, "Hue: $€°", "updateUIblurPanel", 2, "xs y+15 w" txtWid " hp")
     GuiAddSlider("BlurAreaSaturation", -100,100, 0, "Saturation", "updateUIblurPanel", 2, "xs y+10 wp hp")
     GuiAddSlider("BlurAreaLight", -255,255, 0, "Brightness", "updateUIblurPanel", 2, "xs y+10 wp hp")
     GuiAddSlider("BlurAreaGamma", -100,100, 0, "Contrast", "updateUIblurPanel", 2, "xs y+10 wp hp")
@@ -49964,7 +50064,11 @@ updateUIfillPanel(actionu:=0) {
           GuiControl, SettingsGUIA: Disable, FillAreaDoContour
     } Else If (CurrentPanelTab=3)
     {
-       actu := (FillAreaGlassy>1 || FillAreaColorMode>=5 || FillAreaBlendMode>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+       If (viewportQPVimage.imgHandle)
+          bpp := FreeImage_GetBPP(viewportQPVimage.imgHandle)
+
+       thisBehind := (FillAreaDoBehind=1 && bpp=32) ? 1 : 0
+       actu := (FillAreaGlassy>1 || FillAreaColorMode>=5 || FillAreaBlendMode>1 && thisBehind!=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu, FillAreaApplyColorFX
 
        actu := (FillAreaApplyColorFX=1 && InStr(actu, "enable")) ? 1 : 0
@@ -63724,7 +63828,7 @@ toggleImgEditGammaCorrect() {
     friendly := (userimgGammaCorrect=1) ? "ACTIVATED" : "DEACTIVATED"
     showTOOLtip("Gamma correction for image editing: " friendly, A_ThisFunc, 1)
     SetTimer, RemoveTooltip, % -msgDisplayTime
-    If (AnyWindowOpen=23 || AnyWindowOpen=32)
+    If isVarEqualTo(AnyWindowOpen, 23, 24, 31, 32)
        GuiControl, SettingsGUIA:, userimgGammaCorrect, % userimgGammaCorrect
     Else If (imgEditPanelOpened=1 && AnyWindowOpen>0)
        livePreviewsImageEditing()
@@ -94280,3 +94384,25 @@ return
 return
 
 #if
+/*
+LButton::
+SetTimer, doClicku, -150
+SoundBeep 900, 20
+Return 
+*/
+
+doClicku() {
+      SendEvent, {LButton}
+/*
+      SendEvent, {LButton down}
+   While, GetKeyState("capslock", "T")
+   {
+      sleep, 1
+   }
+      Sleep, 2
+   SendEvent, {LButton up}
+      Sleep, 2
+   SendEvent, {LButton up}
+   */
+
+}

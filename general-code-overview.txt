@@ -14,11 +14,37 @@
    m) How to add a new panel/tool (soon)
 
 
-Deniere mise à jour: samedi 23 décembre 2023
-================================================
+Deniere mise à jour: mardi 2 janvier 2024
+=====================================================================
+
+-) Introduction
+
+   The code of QPV is poorly structured and organized. It relies on
+   many global variables... and is hard to follow. This is the result
+   of me having no prior experience in coding such large projects.
+   It is a miracle it all works... ^_^ I should have used classes 
+   to define objects such as «file list», «indexed item», «viewport
+   image», et cetera, and have constructors for the different kind of
+   tools. This document is meant to help people get their mittens into
+   the code of Quick Picto Viewer by offering pointers to the main
+   functions and how things connect / work.
+
+   Another big problem of the project is the reliance on GDI+. This 
+   hinders the performance of the application. I should have used 
+   Direct2D and shaders. In addition to this, I find it likely there
+   are better image libraries than FreeImage, eg., OpenCV perhaps.
+
+   And finally, AHK v1.1 is fundamentally not a wise choice to be
+   coding such a big application.
+
+   QPV v6.0 is the last major development push that I plan. This 
+   version brings full support for images above 536 megapixels
+   (the limit of GDI+), through FreeImage, which includes image
+   editing tools that work with such images - via the "qpvmain.dll". 
+
 
 a) How Quick Picto Viewer initializes
-=============================================
+=====================================================================
 
   QPV checks in the registry if another instance started before,
   if it did less than 600 miliseconds ago, it exits; this is meant
@@ -72,7 +98,7 @@ a) How Quick Picto Viewer initializes
 
 
 b) How a files list index is created
-=============================================
+=====================================================================
 
   If a single file is loaded, QPV will set internally the variable
   "mustOpenStartFolder" to the folder path where the image is from.
@@ -217,7 +243,7 @@ c) Files index filtering
 
 
 d) How an image is loaded and displayed on screen
-==================================================================
+=====================================================================
 
    To display an image, one can invoke IDshowImage(given_file_index)
    or ShowTheImage(imgPath).
@@ -365,7 +391,7 @@ d) How an image is loaded and displayed on screen
 
 
 e) General considerations
-=============================================
+=====================================================================
 
    When actions are performed or somehow the main core is about 
    to get busy, changeMcursor() and/or setImageLoading() are called.
@@ -390,18 +416,13 @@ e) General considerations
 
    For more details about the interface, please see section g).
 
-   The code is poorly structured and organized. It relies on many 
-   global variables... and is hard to follow. This is the result
-   of me having no prior experience in coding such large projects.
-   It is a miracle it all works... ^_^ 
-
    Many GDI+ functions are wrapped to keep track of the bitmaps 
    created and to avoid memory leaks. These are prefixed with 
    "trGdip_*".
 
 
 f) How slideshows happen
-=============================================
+=====================================================================
 
    When the user starts a slideshow, dummyInfoToggleSlideShowu()
    is called. It gives the user information about the slideshow.
@@ -453,7 +474,7 @@ f) How slideshows happen
 
 
 g) Windows, AHK GUIs, Menus, Toolbar
-=============================================
+=====================================================================
 
    The application consists mainly of two threads. In the main
    thread, all the processing happens. The other thread is 
@@ -682,7 +703,7 @@ g) Windows, AHK GUIs, Menus, Toolbar
 
 
 h) Input responses
-============================================================
+=====================================================================
 
    All keyboard shortcuts are «registered» through WM_KEYDOWN and
    WM_SYSKEYDOWN. Both, the main thread and the interface one, register
@@ -734,18 +755,18 @@ h) Input responses
 
 
 i) Image live editing
-=======================================================================
+=====================================================================
 
-   The tool panels are created using createSettingsGUI() with the parameter
-   "isImgLiveEditor" set to 1. If the panel does indeed open, then 
-   "imgEditPanelOpened" global variable is set to 1. These can be invoked 
-   by keyboard shortcuts, menus or via the toolbar.
+   The tool panels are created using createSettingsGUI() with the
+   parameter "isImgLiveEditor" set to 1. If the panel does indeed open,
+   then "imgEditPanelOpened" global variable is set to 1. These can be
+   invoked by keyboard shortcuts, menus or via the toolbar.
 
    When a live editor panel is opened, it can be collapsed into a small
    widget. The widget is created with CreateCollapsedPanelWidget(). The 
-   viewport is also responsive to clicks and keyboard actions specific to
-   this mode. The toolbar is also updated with specific icons, based on the
-   active tool, via createGUItoolbar() and CoreGUItoolbar(). 
+   viewport is also responsive to clicks and keyboard actions specific
+   to this mode. The toolbar is also updated with specific icons, based
+   on the active tool, via createGUItoolbar() and CoreGUItoolbar(). 
 
    Such panels have their controls attached via g-labels to a
    function prefixed with "updateUI*", eg. updateUIfillPanel(). Such
@@ -769,10 +790,14 @@ i) Image live editing
    Dedicated efforts have been put into generating live previews that do
    not exceed the viewport area, in order to maintain the performance 
    within acceptable levels, while maintaining fidelity as much as possible 
-   with the final output when the apply button is pushed by users. When 
-   it is pressed, mergeViewPortEffectsImgEditing() may also be called 
-   to apply any activated viewport color adjustments, before the actual 
-   tool function applies the modifications to the main bitmap.
+   with the final output when the apply button is pushed by users. Many 
+   functions cache generated bitmaps to avoid re-rendering everything, 
+   e.g., generateAlphaMaskBitma() will reuse the cached bitmap  when the
+   preview  relies on the same alpha mask options.
+
+   When viewport color adjustments are activated 
+   mergeViewPortEffectsImgEditing() is called first, before the actual 
+   function of the tool that applies the modifications to the main bitmap.
 
    Flood fill and the brush tool, even if labeled as live tools, they do 
    not have live preview functions. The actions are live themselves.
@@ -804,58 +829,67 @@ i) Image live editing
    through FreeImage and most of the tools have counterparts that work
    on the FreeImage bitmap. "UserMemBMP" and "gdiBitmap" are not used.
    The array "undoLevelsArray" is also not used with such large bitmaps.
-   The image data is accessible via "viewportQPVimage.imgHandle" property
-   and the methods of "screenQPVimage" class. The image editing functions 
-   that rely on FreeImage, for very large images, begin with the prefix
-   "HugeImages*".
+   The image data is accessible via "viewportQPVimage.imgHandle"
+   property and the methods of "screenQPVimage" class. The image editing
+   functions that rely on FreeImage, for very large images, begin with
+   the prefix "HugeImages*".
 
    For images under 536 megapixels, the entire image is recorded for
    every undo level and is always on 32-bits RGBA. But for bigger images,
    only a subsection of the image is recorded, when possible, and it can
    be at a color depth of 24-bits or 32-bits.
 
-   Many of the image editing tools rely on C++ functions invoked 
-   via DLL calls from qpvmain.dll written by me.
+   Many of the image editing tools rely on C++ functions invoked via
+   DLL calls from "qpvmain.dll" written by me.
 
 
 j) How to enable alpha masking for an image editing live tool
-=======================================================================
+=====================================================================
 
    1. Add the window ID to isAlphaMaskWindow().
-      Window ID is "AnyWindowOpen". The panels are created using createSettingsGUI().
+      Window ID is "AnyWindowOpen". The panels are created using
+      createSettingsGUI().
  
-   2. Add uiADDalphaMaskTabs(tab-ID-A, tab-ID-B, funcUIpanel) in the function
-   creating the panel of the tool, eg., PanelFillSelectedArea(). This will add the 
-   specific alpha masking options/controls in the panel.
+   2. Add uiADDalphaMaskTabs(tab-ID-A, tab-ID-B, funcUIpanel) in the
+   function creating the panel of the tool, eg.,
+   PanelFillSelectedArea(). This will add the specific alpha masking
+   options/controls in the panel.
       tab-ID-A and B are the tab order in the panel created.
-      "funcUIpanel" is the reference to the function of the panel used to updatr
-      the user interface elements and the viewport, eg., updateUIfillPanel().
+      "funcUIpanel" is the reference to the function of the panel
+      used to update the user interface elements and the viewport,
+      eg., updateUIfillPanel().
  
-   3. Add in UItriggerBrushUpdate() a pointer to "funcUIpanel"(), as explained
-   previously, based on the "AnyWindowOpen" value.
+   3. Add in UItriggerBrushUpdate() a pointer to "funcUIpanel"(),
+   as explained previously, based on the "AnyWindowOpen" value.
    Do the same in BtnToggleBrushColors().
  
    4. Add in "funcUIpanel"() calls to updateUIalphaMaskStuff(1) and 
-   updateUIalphaMaskStuff(2) based on the "CurrentPanelTab". This will make the 
-   alpha mask controls' options to show or hide as expected.
+   updateUIalphaMaskStuff(2) based on the "CurrentPanelTab". This
+   will make the alpha mask controls' options to show or hide
+   as expected by users.
  
-   5. Define the "viewportDynamicOBJcoords" object properties: x, y, w, h and zl.
-   It must be defined inside the live preview drawing function of the tool itself, 
-   eg., livePreviewAdjustColorsArea(). The object is used by MouseMoveResponder().
+   5. Define the "viewportDynamicOBJcoords" object properties: x, y,
+   w, h and zl. It must be defined inside the live preview drawing
+   function of the tool itself, eg., livePreviewAdjustColorsArea().
+   The object is used by MouseMoveResponder().
  
-   6. The live preview drawing function must generate a bitmap and then pass it to
-   realtimePasteInPlaceAlphaMasker() based on decideAlphaMaskingFeaseable().
-   See livePreviewAdjustColorsArea() for an example. Alternatively, when alpha
-   mask painting mode is activated, for performance considerations, a direct call to
-   QPV_SetAlphaChannel() is suggested, as in livePreviewAdjustColorsArea().
+   6. The live preview drawing function must generate a bitmap and
+   then pass it to realtimePasteInPlaceAlphaMasker() based on
+   decideAlphaMaskingFeaseable(). See livePreviewAdjustColorsArea()
+   as an example. Alternatively, when alpha mask painting mode is
+   activated, for performance considerations, a direct call to
+   QPV_SetAlphaChannel() is suggested, as in
+   livePreviewAdjustColorsArea().
  
-   7. Update toggleAlphaPaintingMode(), the commented section «tools with no object
-   as reference», and «create new bitmap for these tools». Add the AnyWindowOpen ID
-   of the tool to isVarEqualTo(). The user alpha mask bitmap must be created based
-   on the selection area dimensions.
+   7. Update toggleAlphaPaintingMode(), the commented section «tools
+   with no object as reference», and «create new bitmap for these
+   tools». Add the AnyWindowOpen ID of the tool to the isVarEqualTo()
+   if condition. The user alpha mask bitmap must be created based on
+   the selection area dimensions.
+
 
 k) How vector shapes drawing works [soon]
-==========================================================================
+=====================================================================
 
   startDrawingShape()
   drawLiveCreateCustomShape()
@@ -869,4 +903,5 @@ k) How vector shapes drawing works [soon]
   convertCustomShape2relativeCoords()
 
   getVPcustomShapePath()
+
 

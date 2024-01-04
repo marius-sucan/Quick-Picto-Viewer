@@ -854,6 +854,7 @@ RGBColorI calculateBlendModes(int rO, int gO, int bO, int rB, int gB, int bB, in
 }
 
 RGBColorI NEWcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, int blendMode, int flipLayers, int linearGamma) {
+    // TO-DO this function must supersede/replace calculateBlendModes() used by ColourBrush() and FloodFill()
     float rT, gT, bT;
     if (blendMode==23)
     {
@@ -1048,10 +1049,10 @@ RGBColorI NEWcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, int blendMode, 
        rT = weighTwoValues(rT, rBf, fintensity, 1);
        gT = weighTwoValues(gT, gBf, fintensity, 1);
        bT = weighTwoValues(bT, bBf, fintensity, 1);
-    } else
+    } else if (Brgb.a<255 && Orgb.a>0)
     {
        fintensity = char_to_float[Brgb.a];
-       if (Orgb.a<255)
+       if (Orgb.a<255 && Orgb.a>0)
        {
           float f = char_to_float[Orgb.a];
           rT = weighTwoValues(rT, rBf, f, 1);
@@ -1061,6 +1062,13 @@ RGBColorI NEWcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, int blendMode, 
        rT = weighTwoValues(rT, rOf, fintensity, 1);
        gT = weighTwoValues(gT, gOf, fintensity, 1);
        bT = weighTwoValues(bT, bOf, fintensity, 1);
+    }
+
+    if (linearGamma==1)
+    {
+       rT = pow(rT, 0.6f);
+       gT = pow(gT, 0.6f);
+       bT = pow(bT, 0.6f);
     }
 
     return {clamp((int)round(rT*255), 0, 255), clamp((int)round(gT*255), 0, 255), clamp((int)round(bT*255), 0, 255)};
@@ -1841,7 +1849,7 @@ DLL_API int DLL_CALLCONV PrepareAlphaChannelBlur(int *imageData, int w, int h, i
 
 /*
 pBitmap and pBitmap2Blend must be the same width and height
-and in 32-ARGB format: PXF32ARGB - 0x26200A.
+and in 32-ARGB or 24-RGB format.
 */
 
 DLL_API int DLL_CALLCONV BlendBitmaps(unsigned char* bgrImageData, unsigned char* otherData, int w, int h, int Stride, int bpp, int blendMode, int flipLayers, int faderMode, int keepAlpha, int linearGamma) {
@@ -1852,7 +1860,6 @@ DLL_API int DLL_CALLCONV BlendBitmaps(unsigned char* bgrImageData, unsigned char
         {
             int aO = 255;
             int aB = 255;
-
             INT64 o = CalcPixOffset(x, y, Stride, bpp);
             if (bpp==32)
             {
@@ -1883,7 +1890,7 @@ DLL_API int DLL_CALLCONV BlendBitmaps(unsigned char* bgrImageData, unsigned char
             blended = NEWcalculateBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma);
             if (bpp==32 && keepAlpha!=1 && blendMode!=23 || faderMode==1 && blendMode==23)
                bgrImageData[3 + o] = (faderMode==1) ? min(aO, aB) : max(aO, aB);
-            else if (faderMode==2 && keepAlpha==1)
+            else if (bpp==32 && faderMode==2 && keepAlpha==1)
                bgrImageData[3 + o] = otherData[3 + o];
 
             bgrImageData[2 + o] = blended.r;
@@ -2209,7 +2216,7 @@ DLL_API int DLL_CALLCONV ConvertToGrayScale(unsigned char *BitmapData, const int
     return 1;
 }
 
-DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h, int Stride, int bpp, int color, int opacity, int eraser, int linearGamma, int blendMode, int flipLayers, unsigned char *maskBitmap, int mStride, unsigned char *colorBitmap, int gStride, int gBpp, int fillBehind, int opacityMultiplier) {
+DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h, int Stride, int bpp, int color, int opacity, int eraser, int linearGamma, int blendMode, int flipLayers, unsigned char *maskBitmap, int mStride, unsigned char *colorBitmap, int gStride, int gBpp, int fillBehind, int opacityMultiplier, int keepAlpha) {
     // fnOutputDebug("FillSelectArea mStride=" + std::to_string(mStride));
     // fnOutputDebug("clipMaskFilter=zx=" + std::to_string(zx1) + "/" + std::to_string(zx2) + "=w=" + std::to_string(max(zx1, zx2) - min(zx1, zx2)));
     // fnOutputDebug("clipMaskFilter=zy=" + std::to_string(zy1) + "/" + std::to_string(zy2) + "=h=" + std::to_string(max(zy1, zy2) - min(zy1, zy2)));
@@ -2233,7 +2240,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
             float fintensity;
             RGBAColor newColor;
             RGBAColor userColor;
-            int thisOpacity, oA, oR, oG, oB;
+            int thisOpacity, oR, oG, oB;
             if (clipMaskFilter(x, y, maskBitmap, mStride)==1)
                continue;
 
@@ -2262,6 +2269,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
             }
 
             int tA = 255;
+            int oA = 255;
             if (bpp==32)
             {
                oA = (eraser==-1) ? 0 : BitmapData[3 + o];
@@ -2281,11 +2289,17 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
             {
                if (blendMode>0 && eraser==0 && tA>0)
                {
+                  RGBAColor Orgb = {userColor.b, userColor.g, userColor.r, userColor.a};
+                  RGBAColor Brgb = {oB, oG, oR, oA};
+
                   RGBColorI blended;
-                  if (flipLayers==1)
-                     blended = calculateBlendModes(oR, oG, oB, userColor.r, userColor.g, userColor.b, blendMode);
-                  else
-                     blended = calculateBlendModes(userColor.r, userColor.g, userColor.b, oR, oG, oB, blendMode);
+                  blended = NEWcalculateBlendModes(Orgb, Brgb, blendMode, flipLayers, 0);
+                  if (keepAlpha!=1 && blendMode!=23 && bpp==32 && fillBehind!=1)
+                  {
+                     tA = max(userColor.a, oA, tA);   
+                     BitmapData[3 + o] = tA;
+                  } else if ((keepAlpha==1 || blendMode==23) && bpp==32 && fillBehind!=1)
+                     BitmapData[3 + o] = oA;
 
                   newColor.r = blended.r;
                   newColor.g = blended.g;
@@ -2702,9 +2716,9 @@ DLL_API int DLL_CALLCONV MergeBitmapsWithMask(unsigned char *originalData, unsig
     return 1;
 }
 
-DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, int h, int Stride, int bpp, int maskOpacity, int blendMode, int flipLayers, int linearGamma, unsigned char *newBitmap, int StrideMini, int mw, int mh, int bImgSelW, int bImgSelH, unsigned char *maskBitmap, int mStride) {
+DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, int h, int Stride, int bpp, int maskOpacity, int blendMode, int flipLayers, int keepAlpha, int linearGamma, unsigned char *newBitmap, int StrideMini, int mw, int mh, int bImgSelW, int bImgSelH, unsigned char *maskBitmap, int mStride) {
     if (maskOpacity<2)
-        return 1;
+       return 1;
 
     std::vector<int> pixelzMapW(w, 0);
     std::vector<int> pixelzMapH(h, 0);
@@ -2726,8 +2740,8 @@ DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, 
     {
         for (int y = 0; y < h; y++)
         {
-            int nA = 1;
-            int oA = 1;
+            int nA = 255;
+            int oA = 255;
             if (clipMaskFilter(x, y, maskBitmap, mStride)==1)
                continue;
 
@@ -2747,11 +2761,13 @@ DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, 
 
             if (blendMode>0)
             {
+               RGBAColor Orgb = {nB, nG, nR, nA};
+               RGBAColor Brgb = {oB, oG, oR, oA};   
+
                RGBColorI blended;
-               if (flipLayers=1)
-                  blended = calculateBlendModes(oR, oG, oB, nR, nG, nB, blendMode);
-               else
-                  blended = calculateBlendModes(oR, oG, oB, nR, nG, nB, blendMode);
+               blended = NEWcalculateBlendModes(Orgb, Brgb, blendMode, flipLayers, 0);
+               if (keepAlpha!=1 && blendMode!=23 && bpp==32)
+                  nA = max(nA, oA);
 
                nR = blended.r;
                nG = blended.g;
