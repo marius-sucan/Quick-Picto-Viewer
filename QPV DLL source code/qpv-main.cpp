@@ -876,6 +876,9 @@ RGBColorI NEWcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, int blendMode, 
        // return {Orgb.r,Orgb.g,Orgb.b};
     }
 
+    if (Orgb.a<1)
+       return {Brgb.r, Brgb.g, Brgb.b};
+
     if (flipLayers==1)
        swap(Orgb, Brgb);
 

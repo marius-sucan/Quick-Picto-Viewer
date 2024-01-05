@@ -19199,16 +19199,32 @@ coreDrawLinesSelectionArea(G2:=0, whichBitmap:=0) {
        maxLength := Round( (imgSelW + imgSelH)/2 )
        thisThick := (DrawLineAreaContourThickness > maxLength//1.5) ? maxLength//1.5 : DrawLineAreaContourThickness
        thisThick := thisThick * zoomLevel
-       tk := (DrawLineAreaContourAlign=2) ? tk//2 : tk
+       tk := (DrawLineAreaContourAlign=2) ? thisThick//2 : thisThick
        If (DrawLineAreaContourAlign=1)
           tk := 0
 
-       If (userimgGammaCorrect=1)
+       dw := Round(imgSelW + tk * 2)
+       dh := Round(imgSelH + tk * 2)
+       o_imgSelPx := imgSelPx
+       o_imgSelPy := imgSelPy
+       VPmpx := Round((ResizedW * ResizedH)/1000000, 3)
+       MAINmpx := Round((mainWidth * mainHeight)/1000000, 3) + 2
+       sizeOkay := (VPmpx < MAINmpx + 2) ? 1 : 0
+       If (DrawLineAreaBlendMode>1 && sizeOkay=1)
        {
-          bgrBMPu := getImgSelectedAreaEditMode(1, imgSelPx - tk, imgSelPy - tk, imgSelW + tk * 2, imgSelH + tk * 2, imgSelW + tk * 2, imgSelH + tk * 2, 0, imgSelW + tk * 2, imgSelH + tk * 2)
-          trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx - tk, imgSelPy - tk, imgSelW + tk * 2, imgSelH + tk * 2)
+          previewMode := 2
+          xBitmap := trGdip_CreateBitmap(A_ThisFunc, dw, dh, "0x26200A")
+          If (currIMGdetails.HasAlpha=1 && !viewportQPVimage.imgHandle)
+             bgrBMPu := getImgOriginalSelectedAreaEdit(2, imgSelPx - tk, imgSelPy - tk, dw, dh, mainWidth, mainHeight, 0)
+          Else
+             bgrBMPu := getImgSelectedAreaEditMode(1, imgSelPx - tk, imgSelPy - tk, dw, dh, dw, dh, 0, dw, dh)
+          G2 := trGdip_GraphicsFromImage(A_ThisFunc, xBitmap)
+          imgSelPx :=  imgSelPy := tk
+       } Else If (userimgGammaCorrect=1 && AnyWindowOpen!=23 && sizeOkay=1)
+       {
+          bgrBMPu := getImgSelectedAreaEditMode(1, imgSelPx - tk, imgSelPy - tk, dw, dh, dw, dh, 0, dw, dh)
+          trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx - tk, imgSelPy - tk, dw, dh)
           Gdip_SetCompositingQuality(G2, 2)
-          trGdip_DisposeImage(bgrBMPu)
        }
     }
 
@@ -19320,7 +19336,7 @@ coreDrawLinesSelectionArea(G2:=0, whichBitmap:=0) {
     }
 
     rz := Gdip_GetPathPointsCount(pPathBrders) + Gdip_GetPathPointsCount(pPathArcs) 
-    If (DrawLineAreaBorderCenter<4 && !rz && previewMode!=1)
+    If (DrawLineAreaBorderCenter<4 && !rz && previewMode=0)
     {
        showTOOLtip("WARNING: No lines configured to draw.`nIs this what they call a draw?")
        SoundBeep 300, 100
@@ -19655,6 +19671,21 @@ coreDrawLinesSelectionArea(G2:=0, whichBitmap:=0) {
     Gdip_DeletePen(thisPen)
     If (userimgGammaCorrect=1)
        Gdip_SetCompositingQuality(G2, 1)
+
+    If (previewMode=2)
+    {
+       Gdip_ResetClip(2NDglPG)
+       Gdip_DeleteGraphics(G2)
+       QPV_BlendBitmaps(bgrBMPu, xBitmap, DrawLineAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped)
+       If (currIMGdetails.HasAlpha=1)
+          Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, o_imgSelPx - tk, o_imgSelPy - tk, dw, dh)
+       trGdip_DrawImage(A_ThisFunc, 2NDglPG, bgrBMPu, o_imgSelPx - tk, o_imgSelPy - tk, dw, dh)
+       trGdip_DisposeImage(xBitmap)
+    }
+
+    If validBMP(bgrBMPu)
+       trGdip_DisposeImage(bgrBMPu)
+
 } ; // coreDrawLinesSelectionArea()
 
 createDrawLinesPen(thisThick) {
@@ -19706,19 +19737,24 @@ coreDrawShapesSelectionArea(G2:=0, whichBitmap:=0) {
        dh := Round(imgSelH + tk * 2)
        o_imgSelPx := imgSelPx
        o_imgSelPy := imgSelPy
-       If (DrawLineAreaBlendMode>1)
+       VPmpx := Round((ResizedW * ResizedH)/1000000, 3)
+       MAINmpx := Round((mainWidth * mainHeight)/1000000, 3) + 2
+       sizeOkay := (VPmpx < MAINmpx + 2) ? 1 : 0
+       If (DrawLineAreaBlendMode>1 && sizeOkay=1)
        {
           previewMode := 2
-          xBitmap := trGdip_CreateBitmap(A_ThisFunc, dw, dh)
-          bgrBMPu := getImgSelectedAreaEditMode(1, imgSelPx - tk, imgSelPy - tk, dw, dh, dw, dh, 0, dw, dh)
+          xBitmap := trGdip_CreateBitmap(A_ThisFunc, dw, dh, "0x26200A")
+          If (currIMGdetails.HasAlpha=1 && !viewportQPVimage.imgHandle)
+             bgrBMPu := getImgOriginalSelectedAreaEdit(2, imgSelPx - tk, imgSelPy - tk, dw, dh, mainWidth, mainHeight, 0)
+          Else
+             bgrBMPu := getImgSelectedAreaEditMode(1, imgSelPx - tk, imgSelPy - tk, dw, dh, dw, dh, 0, dw, dh)
           G2 := trGdip_GraphicsFromImage(A_ThisFunc, xBitmap)
           imgSelPx :=  imgSelPy := tk
-       } Else If (userimgGammaCorrect=1 && AnyWindowOpen!=23)
+       } Else If (userimgGammaCorrect=1 && AnyWindowOpen!=23 && sizeOkay=1)
        {
           bgrBMPu := getImgSelectedAreaEditMode(1, imgSelPx - tk, imgSelPy - tk, dw, dh, dw, dh, 0, dw, dh)
           trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx - tk, imgSelPy - tk, dw, dh)
           Gdip_SetCompositingQuality(G2, 2)
-          ; trGdip_DisposeImage(bgrBMPu)
        }
     }
 
@@ -19752,6 +19788,8 @@ coreDrawShapesSelectionArea(G2:=0, whichBitmap:=0) {
        Gdip_ResetClip(2NDglPG)
        Gdip_DeleteGraphics(G2)
        QPV_BlendBitmaps(bgrBMPu, xBitmap, DrawLineAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped)
+       If (currIMGdetails.HasAlpha=1)
+          Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, o_imgSelPx - tk, o_imgSelPy - tk, dw, dh)
        trGdip_DrawImage(A_ThisFunc, 2NDglPG, bgrBMPu, o_imgSelPx - tk, o_imgSelPy - tk, dw, dh)
        trGdip_DisposeImage(xBitmap)
     }
@@ -45243,7 +45281,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaDashStyle " vDrawLineAreaDashStyle gupdateUIdrawShapesPanel", "Continous|Dashes|Dots|Dashes and dots", "Line style")
     Gui, Add, Checkbox, xs y+6 wp h%btnHeight% +0x1000 Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIdrawShapesPanel, &Double line
     Gui, Add, Checkbox, x+5 wp hp +0x1000 gupdateUIdrawShapesPanel Checked%DrawLineAreaCapsStyle% vDrawLineAreaCapsStyle, &Round caps
-    GuiAddSlider("DrawLineAreaContourThickness", 1,450, 45, "Line width: $€ pixels", "updateUIdrawShapesPanel", 1, "xs y+15 w" txtWid " hp")
+    GuiAddSlider("DrawLineAreaContourThickness", 1,950, 45, "Line width: $€ pixels", "updateUIdrawShapesPanel", 1, "xs y+15 w" txtWid " hp")
     Gui, Add, Checkbox, xs y+10 gupdateUIdrawShapesPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit selection area
 
     btnWid := (PrefsLargeFonts=1) ? 105 : 65
@@ -92619,13 +92657,20 @@ GuiSlidersResponder(a, m_event, keyu) {
          frkA *= 2, frkB *= 2
       }
 
-      If (rangeu>5000)
+      If (varValue<21 && doFloat!=1)
+      {
+         frkA := 1, frkB := 2
+      } Else If (varValue<51 && doFloat!=1)
+      {
+         frkA := 2, frkB := 4
+      } Else If (rangeu>5000)
       {
          frkA *= 150, frkB *= 250
       } Else If (rangeu>500)
       {
          frkA *= 5, frkB *= 10
       }
+
       isGivenKey := 0
       If (keyu="WheelUp")
          %givenVar% := clampInRange(%givenVar% + frkA, minV, maxV, 1)
