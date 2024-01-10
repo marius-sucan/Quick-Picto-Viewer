@@ -42,13 +42,17 @@ IWICBitmapFrameDecode *pWICclassFrameDecoded;
 // IWICFormatConverter *pWICclassConverter;
 IWICBitmapSource *pWICclassPixelsBitmapSource;
 
+// std::vector<INT64>  polygonMapMax;
+std::vector<bool>  polygonMaskMap;
+std::vector<INT64>  polygonMapMin;
+std::vector<std::vector<INT64>>  polygonMapEdges;
+
 std::vector<UINT>  dupesListIDsA(1);
 std::vector<UINT>  dupesListIDsB(1);
 std::vector<UINT>  dupesListIDsC(1);
 // std::unordered_map<UINT, unsigned char>  brushMoveImgData(1);
 
 std::array<double, 1025>  DCTcoeffs;
-
 
 struct RGBColor {
     double r;

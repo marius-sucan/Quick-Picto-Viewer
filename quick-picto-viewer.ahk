@@ -941,11 +941,13 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
            func2Call := ["OpenDialogFiles"]
     } Else If (givenKey="w")
     {
-        ; w ; to-do
+        ; w - to-do
         If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1 && thumbsDisplaying!=1)
            func2Call := ["flipSelectionWH"]
         Else If (thumbsDisplaying=1 && maxFilesIndex>10 && CurrentSLD && !z)
            func2Call := ["invokeFilesListMapNow"]
+
+           ; testCreateMask()
     } Else If (givenKey="+^n")
     {
         If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
@@ -12532,6 +12534,7 @@ QPV_PrepareSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, invertAre
       Return
    }
 
+   PointsCount := PointsF := 0
    if ((mode=0 || mode=1) && rotation!=0)
    {
       If (mode=1)
@@ -12592,6 +12595,21 @@ QPV_PrepareSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, invertAre
          xf := rw/w
          yf := rh/h
       }
+   } Else If (mode=2)
+   {
+      pPath := createImgSelPath(0, 0, w, h, 2, rotation, rotateSelBoundsKeepRatio, 0, 1, 1, 0, 0, 0)
+      pMatrix := Gdip_CreateMatrix()
+      Gdip_ScaleMatrix(pMatrix, 1, -1)
+      Gdip_TranslateMatrix(pMatrix, 0, -h)
+      E := Gdip_TransformPath(pPath, pMatrix)
+      Gdip_DeleteMatrix(pMatrix)
+      If (bezierSplineCustomShape=1 || FillAreaCurveTension>1)
+         Gdip_FlattenPath(pPath, 0.1)
+
+      PointsCount := Gdip_GetPathPointsCount(pPath)
+      VarSetCapacity(PointsF, 8 * PointsCount, 0)
+      gdipLastError := DllCall("gdiplus\GdipGetPathPoints", "UPtr", pPath, "UPtr", &PointsF, "intP", PointsCount)
+      xf := yf := 1
    } Else 
    {
       xf := yf := 1
@@ -12608,10 +12626,14 @@ QPV_PrepareSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, invertAre
       exclusion := (1 + avgu) ** 7
       exclusion := weighTwoValues(exclusion, 1.015, avgu*1.95)
    }
+
    ; ToolTip, % Round(innerSelectionCavityX, 2) "|" Round(innerSelectionCavityY, 2) "|" Round(exclusion, 2) , , , 2
    ; ToolTip, % round(w/h, 2) "|" round(mod(rotation, 45), 2) "°|" w "|" h "`n"  rw "|" rh "`n" Round(xf, 2) "|" Round(yf, 2) , , , 2
    ; ToolTip, % round(xf, 2) "|" round(yf, 2) "|"  round(rotation, 2) "|" Round(exclusion, 2) , , , 2
-   r := DllCall(whichMainDLL "\prepareSelectionArea", "int", x1, "int", y1, "int", x2, "int", y2, "int", w, "int", h,  "float", xf, "float", yf, "float", rotation, "int", mode, "int", doFlip, "float", exclusion, "int", invertArea)
+   r := DllCall(whichMainDLL "\prepareSelectionArea", "int", x1, "int", y1, "int", x2, "int", y2, "int", w, "int", h,  "float", xf, "float", yf, "float", rotation, "int", mode, "int", doFlip, "float", exclusion, "int", invertArea, "UPtr", &PointsF, "int", PointsCount)
+   PointsF := ""
+   If (pPath!="")
+      Gdip_DeletePath(pPath)
    Return r
 }
 
@@ -71812,7 +71834,7 @@ createBitmapSelPath(advancedMode, imgW, imgH, shapeu:=0, angle:=0, keepBounds:=0
    obju.imgZelH := bmpH
    If (isImgSizeTooLarge(bmpW, bmpH) || EllipseSelectMode!=2 && advancedMode=0 || isVarEqualTo(shapeu, 0, 1, 3) && advancedMode=1)
       abandoned := 1
-
+abandoned := 1
    If !abandoned
       pBitmap := trGdip_CreateBitmap(A_ThisFunc, bmpW, bmpH, "0x21808")
    ; ToolTip, % shapeu "|" abandoned "|" pBitmape , , , 2
@@ -71875,16 +71897,16 @@ createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepB
    If (ImgSelPath="")
       Return
 
-   If (viewportQPVimage.imgHandle && EllipseSelectMode=2)
-   {
-      zW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
-      zH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
-      If isImgSizeTooLarge(zW, zH)
-      {
-         Gdip_AddPathRectangle(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
-         Return ImgSelPath
-      }
-   }
+   ; If (viewportQPVimage.imgHandle && EllipseSelectMode=2)
+   ; {
+   ;    zW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
+   ;    zH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
+   ;    If isImgSizeTooLarge(zW, zH)
+   ;    {
+   ;       Gdip_AddPathRectangle(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
+   ;       Return ImgSelPath
+   ;    }
+   ; }
 
    If (ellipse=2)
    {
@@ -94449,5 +94471,50 @@ doClicku() {
       Sleep, 2
    SendEvent, {LButton up}
    */
+
+}
+
+
+
+
+
+
+testCreateMask() {
+initQPVmainDLL()
+   trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+   calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2, 0, 0, "a")
+   pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY, 0)
+If (bezierSplineCustomShape=1 || FillAreaCurveTension>1)
+   Gdip_FlattenPath(pPath, 0.1)
+
+   PointsCount := Gdip_GetPathPointsCount(pPath)
+
+   VarSetCapacity(PointsF, 8 * PointsCount, 0)
+   gdipLastError := DllCall("gdiplus\GdipGetPathPoints", "UPtr", pPath, "UPtr", &PointsF, "intP", PointsCount)
+
+
+hFIFimgA := viewportQPVimage.imgHandle
+
+   ; pBits := FreeImage_GetBits(hFIFimgA)
+   ; stride := FreeImage_GetStride(hFIFimgA)
+   ; bpp := FreeImage_GetBPP(hFIFimgA)
+
+EZ := Gdip_LockBits(useGdiBitmap(), 0, 0, imgW, imgH, Stride, pBits, gData)
+bpp := 32
+fnOutputDebug(A_ThisFunc "(): " PointsCount)
+   r := DllCall(whichMainDLL "\FillPolygon", "UPtr", pBits, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "UPtr", &PointsF, "int", PointsCount)
+; r := DllCall(whichMainDLL "\GenerateRandomNoise", "UPtr", pBits, "Int", imgW, "Int", imgH, "Int", 10, "Int", 0, "Int", 0, "Int", 0)
+Gdip_UnlockBits(useGdiBitmap(), gData)
+PointsList := Gdip_GetPathPoints(pPath)
+Gdip_DeletePath(pPath)
+fnOutputDebug(PointsList)
+         ; killQPVscreenImgSection()
+         ; currentImgModified := 1
+         ; imgIndexEditing := currentFileIndex
+         ; viewportQPVimage.actions := Round(viewportQPVimage.actions + 1)
+         ; dummyTimerDelayiedImageDisplay(500)
+         SoundBeep, 900, 100
+         RemoveTooltip()
+
 
 }

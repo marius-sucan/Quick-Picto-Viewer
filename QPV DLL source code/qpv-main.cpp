@@ -203,27 +203,6 @@ inline INT64 CalcPixOffset(int x, int y, INT64 Stride, INT64 bitsPerPixel) {
     return y * Stride + x * (bitsPerPixel / 8);
 }
 
-DLL_API int DLL_CALLCONV prepareSelectionArea(int x1, int y1, int x2, int y2, int w, int h, float xf, float yf, float angle, int mode, int flip, float exclusion, int invertArea) {
-    imgSelX1 = x1;
-    imgSelY1 = y1;
-    imgSelX2 = x2;
-    imgSelY2 = y2;
-    imgSelW = w;
-    imgSelH = h;
-    imgSelXscale = xf;
-    imgSelYscale = yf;
-    hImgSelW = w / 2.0f;
-    hImgSelH = h / 2.0f;
-    EllipseSelectMode = mode;
-    flippedSelection = flip;
-    invertSelection = invertArea;
-    excludeSelectScale = exclusion;
-    vpSelRotation = (angle * M_PI) / 180.0f; // convert to radians
-    cosVPselRotation = cos(vpSelRotation);
-    sinVPselRotation = sin(vpSelRotation);
-    return 1;
-}
-
 bool isInsideRectOval(float ox, float oy, int modus) {
     // Translate the coordinates
     float tw = hImgSelW;
@@ -352,6 +331,305 @@ DLL_API int DLL_CALLCONV AlterBitmapAlphaChanel(unsigned char *imageData, int w,
     }
 
     return 1;
+}
+
+void dumbFillPixel(int x, int y, int r, int g, int b, unsigned char *imageData, int Stride, int bpp, int w, int h) {
+    if (!inRange(0, w - 1, x))
+       return;
+    if (!inRange(0, h - 1, y))
+       return;
+
+    INT64 px = CalcPixOffset(x, y, Stride, bpp);
+    imageData[px] = b;
+    imageData[px + 1] = g;
+    imageData[px + 2] = r;
+    if (bpp==32)
+       imageData[px + 3] = 255;
+}
+
+void plotLineSetPixel(int width, int height, int nx, int ny) {
+    if (ny<0 || ny>height*2)
+       return;
+
+    // polygonMapMax[ny] = max(polygonMapMax[ny], nx);
+    polygonMapMin[ny] = min(polygonMapMin[ny], nx);
+    // fnOutputDebug("maxu=" + std::to_string(polygonMapMax[ny]) + " | minu=" + std::to_string(polygonMapMin[ny]));
+
+    if (nx>=width || ny>=height || nx<0 || ny<0)
+       return;
+
+    polygonMaskMap[ny * width + nx] = 1;
+
+    // dumbFillPixel(nx, ny, 255, 255, 0, imageData, Stride, bpp, width, height);
+}
+
+void plotLineLow(int w, int h, int x0, int y0, int x1, int y1) {
+    int dx = x1 - x0;
+    int dy = y1 - y0;
+    int yi = 1;
+    if (dy < 0)
+    {
+        yi = -1;
+        dy = -dy;
+    }
+
+    int D = (2 * dy) - dx;
+    int y = y0;
+    for (int x=x0; x<=x1; x++)
+    {
+        plotLineSetPixel(w, h, x, y);
+        if (D > 0)
+        {
+            y = y + yi;
+            D = D + (2 * (dy - dx));
+        } else
+        {
+            D = D + 2*dy;
+        }
+    }
+}
+
+void plotLineHigh(int w, int h, int x0, int y0, int x1, int y1) {
+    int dx = x1 - x0;
+    int dy = y1 - y0;
+    int xi = 1;
+    if (dx < 0)
+    {
+        xi = -1;
+        dx = -dx;
+    }
+
+    int D = (2 * dx) - dy;
+    int x = x0;
+    for (int y=y0; y<=y1; y++)
+    {
+        plotLineSetPixel(w, h, x, y);
+        if (D > 0)
+        {
+            x = x + xi;
+            D = D + (2 * (dx - dy));
+        } else
+        {
+            D = D + 2*dx;
+        }
+    }
+}
+
+void bresenham_line_algo(int w, int h, int x0, int y0, int x1, int y1) {
+// code adapted from https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
+
+    if (abs(y1 - y0) < abs(x1 - x0))
+    {
+        if (x0 > x1)
+           plotLineLow(w, h, x1, y1, x0, y0);
+        else
+           plotLineLow(w, h, x0, y0, x1, y1);
+    } else
+    {
+        if (y0 > y1)
+           plotLineHigh(w, h, x1, y1, x0, y0);
+        else
+           plotLineHigh(w, h, x0, y0, x1, y1);
+    }
+}
+
+bool isPointInPolygon(INT64 pX, INT64 pY, float* PointsList, int PointsCount) {
+// based on https://stackoverflow.com/questions/217578/how-can-i-determine-whether-a-2d-point-is-within-a-polygon
+// https://wrf.ecse.rpi.edu/Research/Short_Notes/pnpoly.html
+// thank you VERY MUCH , Michael Katz <3
+
+    bool inside = false;
+    for ( int i = 0; i < PointsCount*2; i+=2)
+    {
+        int j = i - 2;
+        if (j<0)
+           j = PointsCount*2 - 2;
+
+        INT64 xi = PointsList[i];
+        INT64 yi = PointsList[i + 1];
+        INT64 xj = PointsList[j];
+        INT64 yj = PointsList[j + 1];
+        // fnOutputDebug("xi/yi=" + std::to_string(xi) + "/" + std::to_string(yi));
+        // fnOutputDebug("xj/yj=" + std::to_string(xj) + "/" + std::to_string(yj));
+        if ( ( yi > pY ) != ( yj > pY ) && pX < ( xj - xi ) * ( pY - yi ) / ( yj - yi ) + xi )
+           inside = !inside;
+    }
+    return inside;
+}
+
+void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount) {
+
+    fnOutputDebug("intro FillMaskPolygon");
+    polygonMapMin.clear();
+    polygonMapMin.shrink_to_fit();
+    polygonMaskMap.clear();
+    polygonMaskMap.resize(w*h + 2, 0);
+    polygonMaskMap.shrink_to_fit();
+    polygonMapEdges.clear();
+    polygonMapEdges.shrink_to_fit();
+    for (UINT64 i=0; i<=h; i++)
+    {
+        polygonMapEdges.emplace_back();
+    }
+
+    int i = 2;
+    INT64 xa = PointsList[0];
+    INT64 ya = PointsList[1];
+    for (int pts = 0; pts < PointsCount;)
+    {
+        polygonMapMin.assign(h,INT_MAX);
+        INT64 xb = PointsList[i];
+        i++;
+        INT64 yb = PointsList[i];
+        i++;
+        if (pts==PointsCount - 1)
+        {
+           xb = PointsList[0];
+           yb = PointsList[1];
+        }
+        pts++;
+
+        if ((max(xa, xb)<0 || max(ya, yb)<0) || (min(xa, xb)>w || min(ya, yb)>h))
+        {
+           fnOutputDebug(" poly segment skipped=" + std::to_string(pts));
+           xa = xb;
+           ya = yb;
+           continue;
+        }
+
+        // fnOutputDebug("seg[ " + std::to_string(i) + "@" + std::to_string(pts) + " ]=( " + std::to_string(xa) + " | " + std::to_string(ya) + ", " + std::to_string(xb) + " | " + std::to_string(yb) + ");");
+        bresenham_line_algo(w, h, xa, ya, xb, yb);
+        INT64 maxu = (max(ya, yb) > h) ? h : max(ya, yb);
+        INT64 minu = (min(ya, yb) < 0) ? 0 : min(ya, yb);
+        for (INT64 iz = minu; iz <= max(maxu, h); iz++)
+        {
+            polygonMapEdges[iz].push_back( polygonMapMin[iz] );
+        }
+
+        xa = xb;
+        ya = yb;
+        if (pts>=PointsCount || i>PointsCount*2)
+           break;
+    }
+
+    fnOutputDebug("fill image; for real");
+    for (INT64 y = 0; y < h; ++y)
+    {
+        if (polygonMapEdges[y].empty())
+        {
+           // fnOutputDebug("empty Y=" + std::to_string(y));
+           continue;
+        }
+
+        std::vector<INT64> &listu = polygonMapEdges[y];
+        if (listu.empty())
+        {
+           // fnOutputDebug("empty list at Y=" + std::to_string(y));
+           continue;
+        }
+
+        // std::stringstream ss;
+        // fnOutputDebug(std::to_string(h) + "=h ; " + std::to_string(listu.size()) + " list size Y=" + std::to_string(y));
+        if (listu.size()==1)
+        {
+           INT64 xa = listu.back();
+           listu.push_back(xa);
+           fnOutputDebug(" one element list at Y=" + std::to_string(y));
+        }
+
+        sort(listu.begin(), listu.end()); 
+        for (INT64 i = 0; i < listu.size() - 1; i++)
+        {
+             INT64 xa = listu[i];
+             INT64 xb = listu[i + 1];
+             if (xb==xa)
+             {
+                // fnOutputDebug("skipped identical xa/xb, Y=" + std::to_string(y));
+                continue;
+             }
+
+             int midX = (xa+xb)/2;
+             if (listu.size()>2)
+             {
+                 if (!isPointInPolygon(midX, y, PointsList, PointsCount))
+                    continue;
+
+                 // dumbFillPixel(midX, y, 200, 200, 255, imageData, Stride, bpp, w, h);
+             }
+
+             // ss << " i= " << std::to_string(i);
+             // ss << " a= " << std::to_string(xa);
+             // ss << " b= " << std::to_string(xb);
+             if (xb<xa)
+                swap(xa,xb);
+
+             // fnOutputDebug(std::to_string(midX) + "=midX == yaaaaay");
+             for (INT64 x = xa; x <= xb; x++)
+             {
+                  // if (x==xa || x==xb)
+                  //    dumbFillPixel(x, y, 255, 0, 255, imageData, Stride, bpp, w, h);
+                  // else
+                  //    dumbFillPixel(x, y, 128, 0, 10, imageData, Stride, bpp, w, h);
+                  polygonMaskMap[y * w + x] = 1;
+             }
+             // if (listu.size()>2)
+             //    dumbFillPixel(midX, y, 0, 255, 255, imageData, Stride, bpp, w, h);
+        }
+        // OutputDebugStringA(ss.str().data());
+    }
+    fnOutputDebug("fill image done");
+
+    // polygonMapMax.clear();
+    // polygonMapMax.shrink_to_fit();
+    polygonMapMin.clear();
+    polygonMapMin.shrink_to_fit();
+    polygonMapEdges.clear();
+    polygonMapEdges.shrink_to_fit();
+    // return 1;
+}
+
+bool clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
+    if (invertSelection==1)
+    {
+       if (inRange(imgSelX1, imgSelX2, x) && inRange(imgSelY1, imgSelY2, y))
+       {
+          if (maskBitmap!=NULL)
+          {
+             INT64 mo = CalcPixOffset(x - imgSelX1, y - imgSelY1, mStride, 24);
+             if (maskBitmap[mo]>128)
+                return 1;
+          } else if (EllipseSelectMode==2)
+          {
+             bool r = (polygonMaskMap[(y - imgSelY1) * imgSelW + x - imgSelX1]) ? 1 : 0;
+             return r;
+          } else if (EllipseSelectMode==1 || EllipseSelectMode==0 && (vpSelRotation!=0 || excludeSelectScale!=0))
+          {
+             return isInsideRectOval(x - imgSelX1, y - imgSelY1, 1);
+          } else 
+          {
+             return 1;
+          }
+       }
+    } else
+    {
+       if (!inRange(imgSelX1, imgSelX2, x) || !inRange(imgSelY1, imgSelY2, y))
+          return 1;
+
+       if (maskBitmap!=NULL)
+       {
+          INT64 mo = CalcPixOffset(x - imgSelX1, y - imgSelY1, mStride, 24);
+          if (maskBitmap[mo]<128)
+             return 1;
+       } else if (EllipseSelectMode==2)
+       {
+          bool r = (polygonMaskMap[(y - imgSelY1) * imgSelW + x - imgSelX1]) ? 0 : 1;
+          return r;
+       } else if (EllipseSelectMode==1 || EllipseSelectMode==0 && (vpSelRotation!=0 || excludeSelectScale!=0))
+       {
+          return !isInsideRectOval(x - imgSelX1, y - imgSelY1, 1);
+       }
+    }
+    return 0;
 }
 
 double inverseGamma(double X) {
@@ -1233,42 +1511,30 @@ int clrBrushMixColors(int colorB, float *colorA, float f, int blendMode, int lin
   return (aT << 24) | ((rT & 0xFF) << 16) | ((gT & 0xFF) << 8) | (bT & 0xFF);
 }
 
-bool clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
-    if (invertSelection==1)
-    {
-       if (inRange(imgSelX1, imgSelX2, x) && inRange(imgSelY1, imgSelY2, y))
-       {
-          if (maskBitmap!=NULL)
-          {
-             INT64 mo = CalcPixOffset(x - imgSelX1, y - imgSelY1, mStride, 24);
-             if (maskBitmap[mo]>128)
-                return 1;
-          } else if (EllipseSelectMode==1 || EllipseSelectMode==0 && (vpSelRotation!=0 || excludeSelectScale!=0))
-          {
-             return isInsideRectOval(x - imgSelX1, y - imgSelY1, 1);
-          } else 
-          {
-             return 1;
-          }
-       }
-    } else
-    {
-       if (!inRange(imgSelX1, imgSelX2, x) || !inRange(imgSelY1, imgSelY2, y))
-          return 1;
 
-       if (maskBitmap!=NULL)
-       {
-          INT64 mo = CalcPixOffset(x - imgSelX1, y - imgSelY1, mStride, 24);
-          if (maskBitmap[mo]<128)
-             return 1;
-       } else if (EllipseSelectMode==1 || EllipseSelectMode==0 && (vpSelRotation!=0 || excludeSelectScale!=0))
-       {
-          return !isInsideRectOval(x - imgSelX1, y - imgSelY1, 1);
-       }
-    }
-    return 0;
+DLL_API int DLL_CALLCONV prepareSelectionArea(int x1, int y1, int x2, int y2, int w, int h, float xf, float yf, float angle, int mode, int flip, float exclusion, int invertArea, float* PointsList, int PointsCount) {
+    imgSelX1 = x1;
+    imgSelY1 = y1;
+    imgSelX2 = x2;
+    imgSelY2 = y2;
+    imgSelW = w;
+    imgSelH = h;
+    imgSelXscale = xf;
+    imgSelYscale = yf;
+    hImgSelW = w / 2.0f;
+    hImgSelH = h / 2.0f;
+    EllipseSelectMode = mode;
+    flippedSelection = flip;
+    invertSelection = invertArea;
+    excludeSelectScale = exclusion;
+    vpSelRotation = (angle * M_PI) / 180.0f; // convert to radians
+    cosVPselRotation = cos(vpSelRotation);
+    sinVPselRotation = sin(vpSelRotation);
+    if (mode==2 && PointsList!=NULL)
+       FillMaskPolygon(w, h, PointsList, PointsCount);
+
+    return 1;
 }
-
 
 bool decideColorsEqual(int newColor, int oldColor, float tolerance, float prevCLRindex, int alternateMode, float *nC, float& index) {
     // should use , CIEDE2000
