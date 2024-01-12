@@ -348,18 +348,18 @@ void dumbFillPixel(int x, int y, int r, int g, int b, unsigned char *imageData, 
 }
 
 void plotLineSetPixel(int width, int height, int nx, int ny) {
-    if (ny<0 || ny>height*2)
+    if (ny<0 || ny>height)
        return;
 
     // polygonMapMax[ny] = max(polygonMapMax[ny], nx);
     polygonMapMin[ny] = min(polygonMapMin[ny], nx);
+    // polygonMapTempMin[ny] = min(polygonMapTempMin[ny], nx);
     // fnOutputDebug("maxu=" + std::to_string(polygonMapMax[ny]) + " | minu=" + std::to_string(polygonMapMin[ny]));
 
     if (nx>=width || ny>=height || nx<0 || ny<0)
        return;
 
-    polygonMaskMap[ny * width + nx] = 1;
-
+    polygonMaskMap[(INT64)ny * width + nx] = 1;
     // dumbFillPixel(nx, ny, 255, 255, 0, imageData, Stride, bpp, width, height);
 }
 
@@ -445,10 +445,10 @@ bool isPointInPolygon(INT64 pX, INT64 pY, float* PointsList, int PointsCount) {
         if (j<0)
            j = PointsCount*2 - 2;
 
-        INT64 xi = PointsList[i];
-        INT64 yi = PointsList[i + 1];
-        INT64 xj = PointsList[j];
-        INT64 yj = PointsList[j + 1];
+        int xi = PointsList[i];
+        int yi = PointsList[i + 1];
+        int xj = PointsList[j];
+        int yj = PointsList[j + 1];
         // fnOutputDebug("xi/yi=" + std::to_string(xi) + "/" + std::to_string(yi));
         // fnOutputDebug("xj/yj=" + std::to_string(xj) + "/" + std::to_string(yj));
         if ( ( yi > pY ) != ( yj > pY ) && pX < ( xj - xi ) * ( pY - yi ) / ( yj - yi ) + xi )
@@ -459,28 +459,50 @@ bool isPointInPolygon(INT64 pX, INT64 pY, float* PointsList, int PointsCount) {
 
 void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount) {
 
-    fnOutputDebug("intro FillMaskPolygon");
+    fnOutputDebug("FillMaskPolygon - trace shape with bresenham; PointsCount=" + std::to_string(PointsCount));
     polygonMapMin.clear();
     polygonMapMin.shrink_to_fit();
     polygonMaskMap.clear();
-    polygonMaskMap.resize(w*h + 2, 0);
     polygonMaskMap.shrink_to_fit();
-    polygonMapEdges.clear();
-    polygonMapEdges.shrink_to_fit();
-    for (UINT64 i=0; i<=h; i++)
+    polygonMaskMap.resize((INT64)w*h + 2, 0);
+    fnOutputDebug("polygonMaskMap=" + std::to_string((INT64)w*h));
+
+    int boundMaxX = 0;
+    int boundMaxY = 0;
+    int boundMinX = INT_MAX;
+    int boundMinY = INT_MAX;
+    for ( int i = 0; i < PointsCount*2; i+=2)
+    {
+        PointsList[i] = clamp(round(PointsList[i]), 0.0f, (float)w);
+        PointsList[i + 1] = clamp(round(PointsList[i + 1]), 0.0f, (float)h);
+        boundMaxX = max(PointsList[i], boundMaxX);
+        boundMaxY = max(PointsList[i + 1], boundMaxY);
+        boundMinX = min(PointsList[i], boundMinX);
+        boundMinY = min(PointsList[i + 1], boundMinY);
+    }
+
+    std::vector<std::unordered_set<int>>  polygonMapEdges;
+    int hmax = max(boundMaxY, h) + 1;
+    fnOutputDebug(std::to_string(hmax) + "=hmax; bound rect={" + std::to_string(boundMinX) + "," + std::to_string(boundMinY) + "," + std::to_string(boundMaxX) + "," + std::to_string(boundMaxY) + "}");
+    polygonMapMin.reserve(hmax);
+    fnOutputDebug("bound rect={" + std::to_string(boundMinX) + "," + std::to_string(boundMinY) + "," + std::to_string(boundMaxX) + "," + std::to_string(boundMaxY) + "}");
+    polygonMapEdges.reserve(hmax);
+    for (int i=0; i<hmax; i++)
     {
         polygonMapEdges.emplace_back();
     }
+    fnOutputDebug("bound rect={" + std::to_string(boundMinX) + "," + std::to_string(boundMinY) + "," + std::to_string(boundMaxX) + "," + std::to_string(boundMaxY) + "}");
+    fnOutputDebug("final bound rect={" + std::to_string(boundMinX) + "," + std::to_string(boundMinY) + "," + std::to_string(boundMaxX) + "," + std::to_string(boundMaxY) + "}");
 
     int i = 2;
-    INT64 xa = PointsList[0];
-    INT64 ya = PointsList[1];
+    int xa = PointsList[0];
+    int ya = PointsList[1];
     for (int pts = 0; pts < PointsCount;)
     {
-        polygonMapMin.assign(h,INT_MAX);
-        INT64 xb = PointsList[i];
+        polygonMapMin.assign(h, INT_MAX);
+        int xb = PointsList[i];
         i++;
-        INT64 yb = PointsList[i];
+        int yb = PointsList[i];
         i++;
         if (pts==PointsCount - 1)
         {
@@ -499,11 +521,12 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount) {
 
         // fnOutputDebug("seg[ " + std::to_string(i) + "@" + std::to_string(pts) + " ]=( " + std::to_string(xa) + " | " + std::to_string(ya) + ", " + std::to_string(xb) + " | " + std::to_string(yb) + ");");
         bresenham_line_algo(w, h, xa, ya, xb, yb);
-        INT64 maxu = (max(ya, yb) > h) ? h : max(ya, yb);
-        INT64 minu = (min(ya, yb) < 0) ? 0 : min(ya, yb);
-        for (INT64 iz = minu; iz <= max(maxu, h); iz++)
+        int maxu = (max(ya, yb) >= h) ? h-1 : max(ya, yb);
+        int minu = (min(ya, yb) <= 0) ? 0 : min(ya, yb);
+        for (int yy = minu; yy <= max(maxu, h); yy++)
         {
-            polygonMapEdges[iz].push_back( polygonMapMin[iz] );
+            if (polygonMapMin[yy]!=INT_MAX)
+               polygonMapEdges[yy].emplace( polygonMapMin[yy] );
         }
 
         xa = xb;
@@ -512,8 +535,14 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount) {
            break;
     }
 
-    fnOutputDebug("fill image; for real");
-    for (INT64 y = 0; y < h; ++y)
+    fnOutputDebug("fill mask image - cleanup polygonMapMin");
+    polygonMapMin.clear();
+    polygonMapMin.shrink_to_fit();
+
+    fnOutputDebug("fill mask image - now");
+    int countPIPcalls = 0;
+    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+    for (int y = 0; y < h; ++y)
     {
         if (polygonMapEdges[y].empty())
         {
@@ -521,7 +550,8 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount) {
            continue;
         }
 
-        std::vector<INT64> &listu = polygonMapEdges[y];
+        std::vector<int> listu;
+        listu.assign(polygonMapEdges[y].begin(), polygonMapEdges[y].end());
         if (listu.empty())
         {
            // fnOutputDebug("empty list at Y=" + std::to_string(y));
@@ -532,9 +562,8 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount) {
         // fnOutputDebug(std::to_string(h) + "=h ; " + std::to_string(listu.size()) + " list size Y=" + std::to_string(y));
         if (listu.size()==1)
         {
-           INT64 xa = listu.back();
-           listu.push_back(xa);
            fnOutputDebug(" one element list at Y=" + std::to_string(y));
+           continue;
         }
 
         sort(listu.begin(), listu.end()); 
@@ -542,49 +571,51 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount) {
         {
              INT64 xa = listu[i];
              INT64 xb = listu[i + 1];
-             if (xb==xa)
+             if (xb==xa || max(xa,xb)<0 || min(xa,xb)>=w)
              {
                 // fnOutputDebug("skipped identical xa/xb, Y=" + std::to_string(y));
                 continue;
              }
 
-             int midX = (xa+xb)/2;
+             // we could always say these are to be filled [the first pair with (i>0) and the last pair (i=listu.size - 1)]
+             // but there are corner cases which screw it up
              if (listu.size()>2)
              {
-                 if (!isPointInPolygon(midX, y, PointsList, PointsCount))
+                 // countPIPcalls++;
+                 if (!isPointInPolygon((xa + xb)/2, y, PointsList, PointsCount))
                     continue;
 
                  // dumbFillPixel(midX, y, 200, 200, 255, imageData, Stride, bpp, w, h);
              }
 
-             // ss << " i= " << std::to_string(i);
-             // ss << " a= " << std::to_string(xa);
-             // ss << " b= " << std::to_string(xb);
              if (xb<xa)
                 swap(xa,xb);
 
              // fnOutputDebug(std::to_string(midX) + "=midX == yaaaaay");
              for (INT64 x = xa; x <= xb; x++)
              {
+                  if (x<0 || x>=w)
+                     continue;
+
                   // if (x==xa || x==xb)
                   //    dumbFillPixel(x, y, 255, 0, 255, imageData, Stride, bpp, w, h);
                   // else
                   //    dumbFillPixel(x, y, 128, 0, 10, imageData, Stride, bpp, w, h);
-                  polygonMaskMap[y * w + x] = 1;
+                  polygonMaskMap[(INT64)y * w + x] = 1;
              }
              // if (listu.size()>2)
              //    dumbFillPixel(midX, y, 0, 255, 255, imageData, Stride, bpp, w, h);
         }
         // OutputDebugStringA(ss.str().data());
     }
-    fnOutputDebug("fill image done");
+    fnOutputDebug("fill mask image - done; countPIPcalls==" + std::to_string(countPIPcalls));
 
     // polygonMapMax.clear();
     // polygonMapMax.shrink_to_fit();
-    polygonMapMin.clear();
-    polygonMapMin.shrink_to_fit();
     polygonMapEdges.clear();
     polygonMapEdges.shrink_to_fit();
+    fnOutputDebug("fill mask image - cleanup polygonMapEdges");
+    fnOutputDebug("fill mask image - cleanup");
     // return 1;
 }
 
@@ -600,7 +631,7 @@ bool clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
                 return 1;
           } else if (EllipseSelectMode==2)
           {
-             bool r = (polygonMaskMap[(y - imgSelY1) * imgSelW + x - imgSelX1]) ? 1 : 0;
+             bool r = (polygonMaskMap[(INT64)(y - imgSelY1) * imgSelW + x - imgSelX1]) ? 1 : 0;
              return r;
           } else if (EllipseSelectMode==1 || EllipseSelectMode==0 && (vpSelRotation!=0 || excludeSelectScale!=0))
           {
@@ -622,7 +653,7 @@ bool clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
              return 1;
        } else if (EllipseSelectMode==2)
        {
-          bool r = (polygonMaskMap[(y - imgSelY1) * imgSelW + x - imgSelX1]) ? 0 : 1;
+          bool r = (polygonMaskMap[(INT64)(y - imgSelY1) * imgSelW + x - imgSelX1]) ? 0 : 1;
           return r;
        } else if (EllipseSelectMode==1 || EllipseSelectMode==0 && (vpSelRotation!=0 || excludeSelectScale!=0))
        {
@@ -1757,8 +1788,8 @@ int ReplaceGivenColor(int *imageData, int w, int h, int x, int y, int newColor, 
     #pragma omp parallel for schedule(static) default(none) // num_threads(3)
     for (int zx = 0; zx < w; zx++)
     {
-        int oldColor = prevColor;
         float index;
+        int oldColor = prevColor;
         int thisColor = 0;
         for (int zy = 0; zy < h; zy++)
         {

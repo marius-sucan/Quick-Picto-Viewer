@@ -12533,7 +12533,7 @@ QPV_PrepareSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, invertAre
       r := DllCall(whichMainDLL "\prepareSelectionArea", "int", x1, "int", y1, "int", x2, "int", y2, "int", w, "int", h,  "float", 1, "float", 1, "float", 0, "int", 0, "int", 0, "float", 0, "int", 0)
       Return
    }
-
+   startZeit := A_TickCount
    PointsCount := PointsF := 0
    if ((mode=0 || mode=1) && rotation!=0)
    {
@@ -12607,7 +12607,7 @@ QPV_PrepareSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, invertAre
          Gdip_FlattenPath(pPath, 0.1)
 
       PointsCount := Gdip_GetPathPointsCount(pPath)
-      VarSetCapacity(PointsF, 8 * PointsCount, 0)
+      VarSetCapacity(PointsF, 8 * (PointsCount + 1), 0)
       gdipLastError := DllCall("gdiplus\GdipGetPathPoints", "UPtr", pPath, "UPtr", &PointsF, "intP", PointsCount)
       xf := yf := 1
    } Else 
@@ -12634,6 +12634,7 @@ QPV_PrepareSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, invertAre
    PointsF := ""
    If (pPath!="")
       Gdip_DeletePath(pPath)
+   ; ToolTip, % PointsCount "|" A_TickCount - startZeit , , , 2
    Return r
 }
 
@@ -57742,7 +57743,7 @@ createMenuSelectSizeShapes(dummy:=0, b:=0) {
    If (dummy!="mnb" && b!="mnb")
    {
       Menu, PVselSize, Add
-      kMenu("PVselSize", "Add", friendly "Load custom shapes", "PanelManageVectorShapes", "freeform presets premade forms triangle moon cloud crescent heart water droplet rhombus star christian cross callout")
+      kMenu("PVselSize", "Add", friendly "Load custom shapes", "PanelManageVectorShapes", "freeform presets vector restore premade forms triangle moon cloud crescent heart water droplet rhombus star christian cross callout")
    }
 
    infoKbd := (EllipseSelectMode!=2) ? "`tShift+L" : ""
@@ -71239,7 +71240,7 @@ convertCustomShape2givenArea(PointsListArray, refX, refY, refW, refH, returnArra
        c := PointsListArray[A_Index]
        xu := refW * c[1] + refX
        yu := refH * c[2] + refY
-       puf := "a" Round(xu, 1) "|" Round(yu, 1)
+       puf := "a" Round(xu, 5) "|" Round(yu, 5)
        If (xu="" || yu="" || deduper[puf]=1)
        {
           ; fnOutputDebug(A_Index "|"  c[1] "|" c[2] "| excluded: " puf)
@@ -71278,7 +71279,7 @@ convertShapePointsArrayToStr(PointsListArray) {
        If (c[1]="" || c[2]="")
           Continue
 
-       newShape .= c[1] "," c[2] "|"
+       newShape .= clampInRange(c[1], 0, 1) "," clampInRange(c[2], 0, 1) "|"
     }
 
     Return Trimmer(newShape, "|")
@@ -71897,17 +71898,6 @@ createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepB
    If (ImgSelPath="")
       Return
 
-   ; If (viewportQPVimage.imgHandle && EllipseSelectMode=2)
-   ; {
-   ;    zW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
-   ;    zH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
-   ;    If isImgSizeTooLarge(zW, zH)
-   ;    {
-   ;       Gdip_AddPathRectangle(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
-   ;       Return ImgSelPath
-   ;    }
-   ; }
-
    If (ellipse=2)
    {
       PointsList := convertCustomShape2givenArea(customShapePoints, imgSelPx, imgSelPy, imgSelW, imgSelH, 1, !bezierSplineCustomShape, bezierSplineCustomShape)
@@ -71941,6 +71931,9 @@ createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepB
 
       Gdip_AddPathRectangle(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
    }
+
+   If (viewportQPVimage.imgHandle && ellipse=2)
+      allowCavity := 0
 
    If (selCavityX>0.01 && selCavityY>0.01 && allowCavity=1)
    {

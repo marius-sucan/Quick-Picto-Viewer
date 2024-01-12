@@ -42,10 +42,8 @@ IWICBitmapFrameDecode *pWICclassFrameDecoded;
 // IWICFormatConverter *pWICclassConverter;
 IWICBitmapSource *pWICclassPixelsBitmapSource;
 
-// std::vector<INT64>  polygonMapMax;
 std::vector<bool>  polygonMaskMap;
-std::vector<INT64>  polygonMapMin;
-std::vector<std::vector<INT64>>  polygonMapEdges;
+std::vector<int>  polygonMapMin;
 
 std::vector<UINT>  dupesListIDsA(1);
 std::vector<UINT>  dupesListIDsB(1);
