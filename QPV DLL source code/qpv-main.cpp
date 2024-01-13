@@ -459,13 +459,13 @@ bool isPointInPolygon(INT64 pX, INT64 pY, float* PointsList, int PointsCount) {
 
 void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount) {
 
-    fnOutputDebug("FillMaskPolygon - trace shape with bresenham; PointsCount=" + std::to_string(PointsCount));
+    fnOutputDebug("FillMaskPolygon() invoked; PointsCount=" + std::to_string(PointsCount));
     polygonMapMin.clear();
     polygonMapMin.shrink_to_fit();
     polygonMaskMap.clear();
     polygonMaskMap.shrink_to_fit();
     polygonMaskMap.resize((INT64)w*h + 2, 0);
-    fnOutputDebug("polygonMaskMap=" + std::to_string((INT64)w*h));
+    fnOutputDebug("polygonMaskMap size=" + std::to_string((INT64)w*h));
 
     int boundMaxX = 0;
     int boundMaxY = 0;
@@ -485,15 +485,15 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount) {
     int hmax = max(boundMaxY, h) + 1;
     fnOutputDebug(std::to_string(hmax) + "=hmax; bound rect={" + std::to_string(boundMinX) + "," + std::to_string(boundMinY) + "," + std::to_string(boundMaxX) + "," + std::to_string(boundMaxY) + "}");
     polygonMapMin.reserve(hmax);
-    fnOutputDebug("bound rect={" + std::to_string(boundMinX) + "," + std::to_string(boundMinY) + "," + std::to_string(boundMaxX) + "," + std::to_string(boundMaxY) + "}");
+    fnOutputDebug("polygonMapMin reserved");
     polygonMapEdges.reserve(hmax);
     for (int i=0; i<hmax; i++)
     {
         polygonMapEdges.emplace_back();
     }
-    fnOutputDebug("bound rect={" + std::to_string(boundMinX) + "," + std::to_string(boundMinY) + "," + std::to_string(boundMaxX) + "," + std::to_string(boundMaxY) + "}");
-    fnOutputDebug("final bound rect={" + std::to_string(boundMinX) + "," + std::to_string(boundMinY) + "," + std::to_string(boundMaxX) + "," + std::to_string(boundMaxY) + "}");
 
+    fnOutputDebug("polygonMapEdges reserved");
+    fnOutputDebug("tracing polygonal path with bresenham algo");
     int i = 2;
     int xa = PointsList[0];
     int ya = PointsList[1];
@@ -535,11 +535,11 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount) {
            break;
     }
 
-    fnOutputDebug("fill mask image - cleanup polygonMapMin");
+    fnOutputDebug("discard polygonMapMin");
     polygonMapMin.clear();
     polygonMapMin.shrink_to_fit();
 
-    fnOutputDebug("fill mask image - now");
+    fnOutputDebug("fill mask image using the list of x-pairs identified and stored in polygonMapEdges");
     int countPIPcalls = 0;
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int y = 0; y < h; ++y)
@@ -608,14 +608,11 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount) {
         }
         // OutputDebugStringA(ss.str().data());
     }
-    fnOutputDebug("fill mask image - done; countPIPcalls==" + std::to_string(countPIPcalls));
+    fnOutputDebug("fill mask image - done; calls to isPointInPolygon() executed: " + std::to_string(countPIPcalls));
 
-    // polygonMapMax.clear();
-    // polygonMapMax.shrink_to_fit();
     polygonMapEdges.clear();
     polygonMapEdges.shrink_to_fit();
-    fnOutputDebug("fill mask image - cleanup polygonMapEdges");
-    fnOutputDebug("fill mask image - cleanup");
+    fnOutputDebug("polygonMapEdges discarded");
     // return 1;
 }
 

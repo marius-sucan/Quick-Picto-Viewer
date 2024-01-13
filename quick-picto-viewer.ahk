@@ -21560,11 +21560,29 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
        Return
     }
 
+
     isImgOpen := 1
     If isImgEditingNow()
        isImgOpen := 2
     Else If (!currentFileIndex || !CurrentSLD || !maxFilesIndex || !imgPath)
        isImgOpen := 0
+
+    If (viewportQPVimage.imgHandle)
+    {
+       If askAboutFileSave(" and the image from the clipboard will be pasted")
+       {
+          trGdip_DisposeImage(clipBMP)
+          ResetImgLoadStatus()
+          Return
+       }
+
+       discardSRCfileCaches()
+       destroyGDIfileCache()
+       discardViewPortCaches()
+       disposeCacheIMGs()
+       terminateIMGediting()
+       isImgOpen := 1
+    }
 
     clippyCount++
     If (editingSelectionNow=1)
@@ -48226,11 +48244,21 @@ BtnCreateNewImage() {
     RegAction(1, "NewImageReverseDimensions")
     DestroyGIFuWin()
     BtnCloseWindow()
-    ; If askAboutFileSave(" and new image will be created")
-    ;    Return
+    isImgOpen := isImgEditingNow()
+    If (viewportQPVimage.imgHandle)
+    {
+       If askAboutFileSave(" and new image will be created")
+          Return
+
+       discardSRCfileCaches()
+       destroyGDIfileCache()
+       discardViewPortCaches()
+       disposeCacheIMGs()
+       terminateIMGediting()
+       isImgOpen := 0
+    }
 
     showTOOLtip("Creating the new image, please wait")
-    isImgOpen := isImgEditingNow()
     PredefinedDocsSizes := 13
     setImageLoading()
     calcScreenLimits()
@@ -48289,6 +48317,7 @@ BtnCreateNewImage() {
     currentImgModified := usrColorDepth := imgFxMode := 1
     vpIMGrotation := FlipImgH := FlipImgV := 0
     UserMemBMP := newBitmap
+    resetImgSelection()
     INIaction(1, "FlipImgH", "General")
     INIaction(1, "FlipImgV", "General")
     INIaction(1, "usrColorDepth", "General")
@@ -48298,6 +48327,8 @@ BtnCreateNewImage() {
     RemoveTooltip()
     If isImgOpen
        wrapRecordUndoLevelNow(newBitmap)
+    Else
+       gdiBitmap := trGdip_CloneBitmap(A_ThisFunc, newBitmap)
 
     dummyTimerDelayiedImageDisplay(5)
     SetTimer, createGUItoolbar, -100
@@ -71592,10 +71623,10 @@ ViewPortSelectionManageCoords(mainWidth, mainHeight, dpX, dpY, maxSelX, maxSelY,
 
      ; If (editingSelectionNow=1)
      ;    defineRelativeSelCoords(maxSelX, maxSelY)
-     zImgSelX1 := Round(nImgSelX1*zoomLevel)
-     zImgSelX2 := Round(nImgSelX2*zoomLevel)
-     zImgSelY1 := Round(nImgSelY1*zoomLevel)
-     zImgSelY2 := Round(nImgSelY2*zoomLevel)
+     zImgSelX1 := nImgSelX1*zoomLevel
+     zImgSelX2 := nImgSelX2*zoomLevel
+     zImgSelY1 := nImgSelY1*zoomLevel
+     zImgSelY2 := nImgSelY2*zoomLevel
 
      minSelSizu := SelDotsSize//2 
      vPimgSelW := max(zImgSelX1, zImgSelX2) - min(zImgSelX1, zImgSelX2)
@@ -71646,13 +71677,20 @@ ViewPortSelectionManageCoords(mainWidth, mainHeight, dpX, dpY, maxSelX, maxSelY,
      If (LimitSelectBoundsImg=-1)
         imgSelOutViewPort := ozpl
 
-     vPimgSelPx := Floor(vPimgSelPx)
-     vPimgSelW := Floor(vPimgSelW)
-     vPimgSelPy := Floor(vPimgSelPy)
-     vPimgSelH := Floor(vPimgSelH)
+     vPimgSelPx := Round(vPimgSelPx)
+     vPimgSelW := Round(vPimgSelW)
+     vPimgSelPy := Round(vPimgSelPy)
+     vPimgSelH := Round(vPimgSelH)
+     zImgSelX1 := Round(zImgSelX1)
+     zImgSelX2 := Round(zImgSelX2)
+     zImgSelY1 := Round(zImgSelY1)
+     zImgSelY2 := Round(zImgSelY2)
+
      If (LimitSelectBoundsImg!=-1)
      {
         dotsSize := SelDotsSize//2
+        selDotX := vPimgSelPx - dotsSize
+        selDotY := vPimgSelPy - dotsSize
         selDotX := vPimgSelPx - dotsSize
         selDotY := vPimgSelPy - dotsSize
         selDotAx := vPimgSelPx + vPimgSelW - dotsSize
@@ -75846,8 +75884,8 @@ calcIMGcoordsInVP(mainWidth, mainHeight, newW, newH, zL, oIMGdecX, oIMGdecY, ByR
     imgDecLX := LX := mainWidth - newW
     imgDecLY := LY := mainHeight - newH
     ; vpCenterX := 1, vpCenterY := 1
-    CX := Round(mainWidth/2 - newW/2)
-    CY := Round(mainHeight/2 - newH/2)
+    CX := mainWidth/2 - newW/2
+    CY := mainHeight/2 - newH/2
     If ((imageAligned=1) || (allowFreeIMGpanning=1 && IMGresizingMode=4) && thumbsDisplaying=0)
     {
        DestPosX := DestPosY := 0
@@ -75872,12 +75910,12 @@ calcIMGcoordsInVP(mainWidth, mainHeight, newW, newH, zL, oIMGdecX, oIMGdecY, ByR
        If (prevZoom!=zL)
        {
           If prevCX
-             IMGdecX := -1 * Round(newW * prevCX) + o_mW//2
+             IMGdecX := -1 * (newW * prevCX) + o_mW//2
           Else
              IMGdecX := oIMGdecX
 
           If prevCY
-             IMGdecY := -1 * Round(newH * prevCY) + o_mH//2
+             IMGdecY := -1 * (newH * prevCY) + o_mH//2
           Else
              IMGdecY := oIMGdecY
 
@@ -75904,12 +75942,12 @@ calcIMGcoordsInVP(mainWidth, mainHeight, newW, newH, zL, oIMGdecX, oIMGdecY, ByR
        minTopCornerX := (allowFreeIMGpanning=1) ? o_mW : 0
        minTopCornerY := (allowFreeIMGpanning=1) ? o_mH : 0
        If (newW - 2 > mainWidth)
-          DestPosX := DestPosX + Round(IMGdecX)
+          DestPosX := DestPosX + IMGdecX
        Else
           IMGdecX := minTopCornerX
 
        If (newH - 2 > mainHeight)
-          DestPosY := DestPosY + Round(IMGdecY)
+          DestPosY := DestPosY + IMGdecY
        Else
           IMGdecY := minTopCornerY
 
@@ -75922,10 +75960,15 @@ calcIMGcoordsInVP(mainWidth, mainHeight, newW, newH, zL, oIMGdecX, oIMGdecY, ByR
        ; ToolTip, % IMGdecX "|" IMGdecY "`n" LX//2 "|" LY//2 , , , 2
     }
 
+    DestPosX := Round(DestPosX)
+    IMGdecX := Round(IMGdecX)
+    DestPosY := Round(DestPosY)
+    IMGdecY := Round(IMGdecY)
+
     prevCX := (DestPosX<0) ? abs(DestPosX) + o_mW/2 : -1*(DestPosX - o_mW/2)
     prevCY := (DestPosY<0) ? abs(DestPosY) + o_mH/2 : -1*(DestPosY - o_mH/2)
-    prevCX := Round(prevCX/newW, 5)
-    prevCY := Round(prevCY/newH, 5)
+    prevCX := Round(prevCX/newW, 8)
+    prevCY := Round(prevCY/newH, 8)
     If (newW<o_mW && imageAligned=1 && allowFreeIMGpanning=0)
        prevCX := 0.01
     If (newH<o_mH && imageAligned=1 && allowFreeIMGpanning=0)
