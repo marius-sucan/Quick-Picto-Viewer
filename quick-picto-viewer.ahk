@@ -6081,20 +6081,30 @@ clampValuesToWindow(imgSelPx, imgSelPy, imgSelW, imgSelH, mainWidth, mainHeight)
 
 VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, angleu, isAngleu, mainWidth, mainHeight) {
      Static prevState := 0, prevPath := 0
-     tooBig := ((imgSelW>mainWidth*1.5 && imgSelH>mainHeight*1.5 || imgSelW>mainWidth*2.5 || imgSelH>mainHeight*2.5) && EllipseSelectMode=2 && customShapeCountPoints>100) ? 1 : 0
-     simpleRect := (tooBig=1 || EllipseSelectMode=0 && angleu=0 && innerSelectionCavityX=0 && innerSelectionCavityY=0 || imgSelOutViewPort=1 || isSelEntireOutside(mainWidth, mainHeight)) ? 1 : 0
-     ; fnOutputDebug(A_ThisFunc "(): tooBig=" tooBig "| simpleRect=" simpleRect "| EllipseSelectMode=" EllipseSelectMode "| customShapeCountPoints=" customShapeCountPoints)
-     If (simpleRect=1)
+     If (imgSelPx="kill")
      {
+        prevState := ""
+        If (prevPath)
+           Gdip_DeletePath(prevPath)
+        Return
+     }
+     tooBig := ((imgSelW>mainWidth*1.5 && imgSelH>mainHeight*1.5 || imgSelW>mainWidth*2.5 || imgSelH>mainHeight*2.5) && EllipseSelectMode=2 && customShapeCountPoints>2100) ? 1 : 0
+     advancedShape := (  (vpImgPanningNow || doImgEditLivePreview!=1) && isVarEqualTo(AnyWindowOpen, 23, 65, 68)  ) ? 1 : 0
+     simpleRect := ((advancedShape=1 && FillAreaShape=1 || EllipseSelectMode=0 && advancedShape=0) && angleu=0 && innerSelectionCavityX=0 && innerSelectionCavityY=0 || isSelEntireOutside(mainWidth, mainHeight)) ? 1 : 0
+     ; simpleRect := (tooBig=1 || EllipseSelectMode=0 && angleu=0 && innerSelectionCavityX=0 && innerSelectionCavityY=0 || imgSelOutViewPort=1 || isSelEntireOutside(mainWidth, mainHeight)) ? 1 : 0
+     ; fnOutputDebug(A_ThisFunc "(): tooBig=" tooBig "| simpleRect=" simpleRect "| EllipseSelectMode=" EllipseSelectMode "| customShapeCountPoints=" customShapeCountPoints)
+     If (simpleRect=1 || advancedShape!=1 && AnyWindowOpen && doImgEditLivePreview=1)
+     {
+        ; ToolTip, % "lool" , , , 2
         thisu := clampValuesToWindow(imgSelPx, imgSelPy, imgSelW, imgSelH, mainWidth, mainHeight)
         ImgSelPath := createImgSelPath(thisu.X, thisu.Y, thisu.W, thisu.H, 0, 0, rotateSelBoundsKeepRatio, 0, 1, 0, 0, 0)
         Return ImgSelPath
      }
 
-     advancedShape := (  (vpImgPanningNow || doImgEditLivePreview!=1) && isVarEqualTo(AnyWindowOpen, 23, 65, 68)  ) ? 1 : 0
-     thisState := "a" imgSelW imgSelH angleu isAngleu advancedShape EllipseSelectMode VPselRotation innerSelectionCavityX innerSelectionCavityY customShapePoints bezierSplineCustomShape FillAreaCurveTension
+     thisState := "a" imgSelW imgSelH angleu isAngleu EllipseSelectMode VPselRotation innerSelectionCavityX innerSelectionCavityY customShapePoints bezierSplineCustomShape FillAreaCurveTension doImgEditLivePreview AnyWindowOpen advancedShape FillAreaShape
      If (thisState=prevState && prevPath)
      {
+        ; ToolTip, % "cached" , , , 2
         ImgSelPath := Gdip_ClonePath(prevPath)
         Gdip_TranslatePath(ImgSelPath, imgSelPx, imgSelPy)
         Return ImgSelPath
@@ -6103,11 +6113,12 @@ VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, angleu, isAngleu, mainWidt
      If prevPath
         Gdip_DeletePath(prevPath)
 
+     startZeit := A_TickCount
      If (advancedShape=1)
-        ImgSelPath := coreCreateFillAreaShape(0, 0, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio)
+        ImgSelPath := coreCreateFillAreaShape(0, 0, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, 2)
      Else
-        ImgSelPath := createImgSelPath(0, 0, imgSelW, imgSelH, EllipseSelectMode, angleu, rotateSelBoundsKeepRatio, 0, 1, isAngleu, innerSelectionCavityX, innerSelectionCavityY)
-
+        ImgSelPath := createImgSelPath(0, 0, imgSelW, imgSelH, EllipseSelectMode, angleu, rotateSelBoundsKeepRatio, 0, 2, isAngleu, innerSelectionCavityX, innerSelectionCavityY)
+     ; ToolTip, % "a=" A_TickCount - startZeit , , , 2
      prevState := thisState
      prevPath := Gdip_ClonePath(ImgSelPath)
      Gdip_TranslatePath(ImgSelPath, imgSelPx, imgSelPy)
@@ -6122,10 +6133,8 @@ SkeletDrawSelectionBox(paintAlphaMask:=0) {
    vPimgSelY := min(selDotY, selDotAy) + dotsSize//2
    vpWinClientSize(mainWidth, mainHeight)
    tooBig := (vPimgSelW>mainWidth*1.5 && vPimgSelH>mainHeight*1.5 || vPimgSelW>mainWidth*2.5 || vPimgSelH>mainHeight*2.5) ? 1 : 0
-   If (imgSelLargerViewPort=1 || imgSelOutViewPort=1 || isSelEntireOutside(mainWidth, mainHeight) || tooBig=1)
-      Return
- 
-   If (VPselRotation!=0)
+   simpleRect := (imgSelLargerViewPort=1 || imgSelOutViewPort=1 || isSelEntireOutside(mainWidth, mainHeight) || tooBig=1) ? 1 : 0
+    If (VPselRotation!=0)
       Gdip_FillEllipse(2NDglPG, pBrushD, SelDotDx - dotsSize/3.5, SelDotDy - dotsSize/3.5, dotsSize*1.5, dotsSize*1.5)
 
    If (imgEditPanelOpened=1)
@@ -6138,25 +6147,26 @@ SkeletDrawSelectionBox(paintAlphaMask:=0) {
    Gdip_SetPenWidth(pPen4, thisThick)
    Gdip_SetPenWidth(pPen1d, thisThick)
    decideLiveSelectionBasedOnWindow(angleu, isAngleu)
-   If (paintAlphaMask=1)
+   advancedShape := (  (vpImgPanningNow || doImgEditLivePreview!=1) && isVarEqualTo(AnyWindowOpen, 23, 65, 68)  ) ? 1 : 0
+   If (paintAlphaMask=1 || advancedShape!=1 && AnyWindowOpen && doImgEditLivePreview=1)
    {
       ImgSelPath := Gdip_CreatePath()
-      Gdip_AddPathRectangle(ImgSelPath, vPimgSelX, vPimgSelY, vPimgSelW, vPimgSelH)
+      thisu := clampValuesToWindow(vPimgSelX, vPimgSelY, vPimgSelW, vPimgSelH, mainWidth, mainHeight)
+      Gdip_AddPathRectangle(ImgSelPath, thisu.X, thisu.Y, thisu.W, thisu.H)
+      If (imgSelLargerViewPort=1)
+         Gdip_DrawRectangle(2NDglPG, pPen1d, mainWidth*0.15, mainHeight*0.15, mainWidth - mainWidth*0.3, mainHeight - mainHeight*0.3)
    } Else 
    {
-      If (AnyWindowOpen=23 || AnyWindowOpen=68)
-         ImgSelPath := coreCreateFillAreaShape(vPimgSelX, vPimgSelY, vPimgSelW, vPimgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio)
-      Else
-         ImgSelPath := createImgSelPath(vPimgSelX, vPimgSelY, vPimgSelW, vPimgSelH, EllipseSelectMode, angleu, rotateSelBoundsKeepRatio, 0, 1, isAngleu, innerSelectionCavityX, innerSelectionCavityY)
+      ImgSelPath := VPcreateSelPath(vPimgSelX, vPimgSelY, vPimgSelW, vPimgSelH, angleu, isAngleu, mainWidth, mainHeight)
    }
 
-   ; If isAngleu
-   ;    Gdip_DrawPath(2NDglPG, pPen4, ImgSelPath)
+   zPen := Gdip_CreatePen("0x88456345", imgHUDbaseUnit//16)
    thisu := clampValuesToWindow(vPimgSelX + thisThick//3, vPimgSelY + thisThick//3, vPimgSelW, vPimgSelH, mainWidth, mainHeight)
    Gdip_DrawRectangle(2NDglPG, pPen4, thisu.X, thisu.Y, thisu.W, thisu.H)
-   Gdip_DrawPath(2NDglPG, pPen1d, ImgSelPath)
+   Gdip_DrawPath(2NDglPG, zPen, ImgSelPath)
    thisu := clampValuesToWindow(vPimgSelX + thisThick//2, vPimgSelY + thisThick//2, vPimgSelW, vPimgSelH, mainWidth, mainHeight)
    Gdip_DrawRectangle(2NDglPG, pPen4, thisu.X, thisu.Y, thisu.W, thisu.H)
+   Gdip_DeletePen(zPen)
    If (paintAlphaMask=1 && AnyWindowOpen!=70)
    {
       livePreviewAlphaMasking()
@@ -15869,7 +15879,7 @@ dummyInnerCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, shape, pPath
     }
 }
 
-coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, shape, angleu:=0, keepBounds:=0, allowSelectionCenter:=1) {
+coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, shape, angleu:=0, keepBounds:=0, allowSelectionCenter:=2) {
     pPath := Gdip_CreatePath()
     dummyInnerCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, shape, pPath)
     If (innerSelectionCavityX>0.01 && innerSelectionCavityY>0.01)
@@ -15907,8 +15917,8 @@ coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, shape, angleu:=0, 
           trGdip_RotatePathAtCenter(pPath, angleu, 1, 1, keepBounds, 1)
     }
 
-    If ((shape=7 || shape=5 || shape=4) && pPath && allowSelectionCenter=1)
-       centerPath2bounds(pPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
+    If ((shape=7 || shape=5 || shape=4) && pPath && allowSelectionCenter>=1)
+       centerPath2bounds(pPath, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, doPrecise)
  
     Return pPath
 }
@@ -16426,16 +16436,17 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
       calcImgSelection2bmp(!LimitSelectBoundsImg, oimgW, oimgH, oimgW, oimgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
 
    thisVPid := "a" oImgW oImgH currentFileIndex IMGlargerViewPort imgSelLargerViewPort IMGdecalageX IMGdecalageY zoomLevel prevResizedVPimgW prevResizedVPimgH prevDestPosX prevDestPosY imageAligned
+   pathQuality := (previewMode=1) ? 1 : 1
    If (FillAreaInverted=1)
    {
-      pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio)
+      pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, pathQuality)
       imgSelPx := imgSelPy := 0
       imgSelW  := oimgW,      imgSelH := oimgH
       prevVPid := ""
    }
    ; ToolTip, % imgSelW "=" imgSelH "`n" zImgSelW "=" zImgSelH "`n" qImgSelW "=" qImgSelH  , , , 2
    If (FillAreaInverted=0)
-      pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio)
+      pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, pathQuality)
 
    offX := offY := 0
    offW := imgSelW,   offH := imgSelH
@@ -43420,6 +43431,7 @@ stopDrawingShape(dummy:="") {
        Return
 
     zeitSillyPrevent := A_TickCount
+    VPcreateSelPath("kill", 0, 0, 0, 0, 0, 0, 0)
     If (dummy="cancel")
     {
        VPselRotation := vpFreeformShapeOffset[4]
@@ -43907,17 +43919,15 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
         RegAction(0, "DrawLineAreaColor",, 3)
         RegAction(0, "DrawLineAreaOpacity",, 2, 1, 255)
         RegAction(0, "DrawLineAreaCapsStyle",, 1)
-        RegAction(0, "DrawLineAreaDoubles",, 1)
-        RegAction(0, "DrawLineAreaDashStyle",, 2, 1, 4)
         RegAction(0, "DrawLineAreaContourThickness",, 2, 1, 450)
+        DrawLineAreaDoubles := 0
+        DrawLineAreaDashStyle := 1
+        RegAction(1, "DrawLineAreaDoubles",, 1)
+        RegAction(1, "DrawLineAreaDashStyle",, 2, 1, 4)
         If (InStr(postVectorWinOpen, "c") || dummy!="resume" || brr=1)
         {
            DrawLineAreaOpacity := clampInRange(DrawLineAreaOpacity, 128, 255)
-           DrawLineAreaDoubles := 0
-           DrawLineAreaDashStyle := 1
            RegAction(1, "DrawLineAreaOpacity",, 2, 1, 255)
-           RegAction(1, "DrawLineAreaDoubles",, 1)
-           RegAction(1, "DrawLineAreaDashStyle",, 2, 1, 4)
         }
 
         thisThick := InStr(postVectorWinOpen, "c") ? imgHUDbaseUnit//10 : DrawLineAreaContourThickness * zoomLevel
@@ -49306,7 +49316,10 @@ livePreviewAdjustColorsArea(modus:=0) {
    }
 
    If (doImgEditLivePreview!=1 || imgFxMode=1)
+   {
+      SetTimer, dummyRefreshImgSelectionWindow, -150
       Return
+   }
 
    vpWinClientSize(mainWidth, mainHeight)
    trGdip_GetImageDimensions(useGdiBitmap(), thisW, thisH)
@@ -49531,7 +49544,10 @@ livePreviewSymmetricaImgArea(modus:=0) {
    lastSymmetryCoords := [tinyPrevAreaCoordX, tinyPrevAreaCoordY]
    Gdip_ResetClip(2NDglPG)
    If (doImgEditLivePreview!=1)
+   {
+      SetTimer, dummyRefreshImgSelectionWindow, -150
       Return
+   }
    ; trGdip_GetImageDimensions(useGdiBitmap(), qimgW, qimgH)
    vpWinClientSize(mainWidth, mainHeight)
    pBitmap := useGdiBitmap()
@@ -49656,7 +49672,13 @@ livePreviewDesaturateArea(modus:=0) {
    Critical, on
    Static bitsOptions := {0:0, 1:0, 2:2, 3:3, 4:4, 5:5, 6:6, 7:7, 8:8}
    Gdip_ResetClip(2NDglPG)
-   If (doImgEditLivePreview!=1 || testSelectOutsideImgEntirely(useGdiBitmap()) || EraseAreaInvert=0 && imgSelOutViewPort=1)
+   If (doImgEditLivePreview!=1)
+   {
+      SetTimer, dummyRefreshImgSelectionWindow, -150
+      Return
+   }
+
+   If (testSelectOutsideImgEntirely(useGdiBitmap()) || EraseAreaInvert=0 && imgSelOutViewPort=1)
       Return
 
    thisBitsDepth := bitsOptions[DesaturateAreaLevels]
@@ -49790,7 +49812,13 @@ livePreviewSimpleColorsAdjustImage(modus:=0) {
    }
 
    Gdip_ResetClip(2NDglPG)
-   If (doImgEditLivePreview!=1 || testSelectOutsideImgEntirely(useGdiBitmap()) && PasteInPlaceAutoExpandIMG=0 || userImgAdjustInvertArea=0 && imgSelOutViewPort=1)
+   If (doImgEditLivePreview!=1)
+   {
+      SetTimer, dummyRefreshImgSelectionWindow, -150
+      Return
+   }
+
+   If (testSelectOutsideImgEntirely(useGdiBitmap()) && PasteInPlaceAutoExpandIMG=0 || userImgAdjustInvertArea=0 && imgSelOutViewPort=1)
       Return
 
    If markedSelectFile
@@ -70717,12 +70745,14 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
     {
        ; highlight action areas
        thisThick := imgHUDbaseUnit//11
-       If (showSelectionGrid=1 || imgSelLargerViewPort=1) && (editingSelectionNow=1)
+       If (showSelectionGrid=1 || imgSelLargerViewPort=1 || IMGlargerViewPort=1) && (editingSelectionNow=1)
        {
           Gdip_SetPenWidth(pPen4, thisThick)
           thisu := clampValuesToWindow(DestPosX, DestPosY, newW//2, newH, mainWidth, mainHeight)
           Gdip_DrawRectangle(glPG, pPen4, thisu.X, thisu.Y, thisu.W, thisu.H)
-          thisu := clampValuesToWindow(DestPosX, DestPosY + newH//2, newW, newH + thisThick*2, mainWidth, mainHeight)
+          thisu := clampValuesToWindow(DestPosX, DestPosY + newH//2, newW, newH//2 + thisThick*2, mainWidth, mainHeight)
+          Gdip_DrawRectangle(glPG, pPen4, thisu.X, thisu.Y, thisu.W, thisu.H)
+          thisu := clampValuesToWindow(DestPosX, DestPosY, newW, newH + thisThick*2, mainWidth, mainHeight)
           Gdip_DrawRectangle(glPG, pPen4, thisu.X, thisu.Y, thisu.W, thisu.H)
        }
 
@@ -71208,7 +71238,7 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
 
     doNormalCursor := (dontAddPoint!=0 || vpImgPanningNow=1) ? 1 : 0
     interfaceThread.ahkassign("doNormalCursor", doNormalCursor)
-}
+} ; // drawLiveCreateCustomShape()
 
 getVPcustomShapePath(PointsListArray) {
     thisIndex := 0
@@ -72069,16 +72099,17 @@ createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepB
    If angleu
       trGdip_RotatePathAtCenter(ImgSelPath, angleu, 1, 1, keepBounds, 1)
 
-   If (ellipse=2 && allowSelectionCenter=1)
-      vpFreeformShapeOffset := centerPath2bounds(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
+   If (ellipse=2 && allowSelectionCenter>=1)
+      vpFreeformShapeOffset := centerPath2bounds(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 1, allowSelectionCenter)
 
    ; Sleep, -1
    Return ImgSelPath
 }
 
-centerPath2bounds(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH, destinationPath:=0, scaleUniform:=1) {
+centerPath2bounds(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH, destinationPath:=0, scaleUniform:=1, doPrecise:=2) {
    ; resize to bounding box
-   Rect := getAccuratePathBounds(ImgSelPath)
+   startZeit := A_TickCount
+   Rect := getAccuratePathBounds(ImgSelPath, 0, doPrecise)
    pMatrix := Gdip_CreateMatrix()
    If (scaleUniform=1)
    {
@@ -72092,7 +72123,7 @@ centerPath2bounds(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH, destinationP
    Gdip_DeleteMatrix(pMatrix)
 
    ; center to bounding box
-   Rect := getAccuratePathBounds(ImgSelPath)
+   Rect := getAccuratePathBounds(ImgSelPath, 0, doPrecise)
    cX := imgSelPx + imgSelW/2
    cY := imgSelPy + imgSelH/2
    rX := Rect.x + Rect.w/2
@@ -72111,17 +72142,23 @@ centerPath2bounds(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH, destinationP
       E := Gdip_TransformPath(destinationPath, pMatrix)
 
    Gdip_DeleteMatrix(pMatrix)
+   ; fnOutputDebug(A_ThisFunc "(): " A_TickCount - startZeit)
    ; RectE := getAccuratePathBounds(ImgSelPath)
    ; Gdip_GetPathLastPoint(ImgSelPath, zX, zY)
    ; obju := [nX, nY, scaleu, VPselRotation, RectE.x, RectE.y, RectE.w, RectE.h, zX, zY]
    Return obju
 }
 
-getAccuratePathBounds(pPath, doRound:=0) {
-   Gdip_ResetClip(dummyGu)
-   Gdip_SetClipPath(dummyGu, pPath)
-   Rect := Gdip_GetClipBounds(dummyGu)
-   If (!Rect.w || !Rect.h)
+getAccuratePathBounds(pPath, doRound:=0, doPrecise:=1) {
+   startZeit := A_TickCount
+   If (doPrecise=1)
+   {
+      Gdip_ResetClip(dummyGu)
+      Gdip_SetClipPath(dummyGu, pPath)
+      Rect := Gdip_GetClipBounds(dummyGu)
+      If (!Rect.w || !Rect.h)
+         Rect := Gdip_GetPathWorldBounds(pPath)
+   } Else
       Rect := Gdip_GetPathWorldBounds(pPath)
 
    If (doRound=1)
@@ -72131,6 +72168,7 @@ getAccuratePathBounds(pPath, doRound:=0) {
       Rect.w := Round(Rect.w)
       Rect.h := Round(Rect.h)
    }
+   ; fnOutputDebug(A_ThisFunc "( " doPrecise " ): " A_TickCount - startZeit)
    Return Rect
 }
 
@@ -72167,7 +72205,10 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
         ; clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
      }
 
-     zPen := Gdip_CreatePen("0x99446644", imgHUDbaseUnit//9)
+     opacity := (operation="live") ? "0xAA" : "0x77"
+     wPen := Gdip_CreatePen(opacity "CCccCC", imgHUDbaseUnit//14)
+     dPen := Gdip_CreatePen(opacity "223322", imgHUDbaseUnit//6)
+     zPen := Gdip_CreatePen(opacity "456345", imgHUDbaseUnit//9)
      redPen := Gdip_CreatePen("0xAAFF6600", imgHUDbaseUnit//7)
      If (operation="init")
      {
@@ -72179,36 +72220,29 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
         ; Gdip_ResetWorldTransform(2NDglPG)
         setMainCanvasTransform(mainWidth, mainHeight, 2NDglPG)
         InfoW := InfoH := ""
-        lineThickns := imgHUDbaseUnit//9
-        Gdip_SetPenWidth(zPen, imgHUDbaseUnit//13)
      } Else If (operation="prev")
      {
         createDefaultSizedSelectionArea(DestPosX, DestPosY, newW, newH, maxSelX, maxSelY, mainWidth, mainHeight)
         clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
         prevNewH := newH, prevNewW := newW
         prevuDPx := DestPosX, prevuDPy := DestPosY
-        lineThickns :=  imgHUDbaseUnit//10
-        Gdip_SetPenWidth(pPen1, lineThickns)
         objSel := ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, maxSelX, maxSelY, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
         If (objSel.selSmall=1)
            dotSize := dotSize/2
 
         ImgSelPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, angleu, rotateSelBoundsKeepRatio, 0, 1, isAngleu, innerSelectionCavityX, innerSelectionCavityY)
         Gdip_SetClipRect(2NDglPG, 0, 0, mainWidth, mainHeight)
-        Gdip_SetPenWidth(zPen, imgHUDbaseUnit//7)
-        Gdip_DrawPath(2NDglPG, zPen, ImgSelPath)
-        Gdip_DrawPath(2NDglPG, pPen1, ImgSelPath)
+        Gdip_DrawPath(2NDglPG, wPen, ImgSelPath)
+        Gdip_DrawPath(2NDglPG, dPen, ImgSelPath)
         Gdip_ResetClip(2NDglPG)
         If StrLen(ImgSelPath)>2
            Gdip_DeletePath(ImgSelPath)
      } Else If (operation="active")
      {
-        ; startZeit := A_TickCount
+        startZeit := A_TickCount
         prevNewH := newH, prevNewW := newW
         prevuDPx := DestPosX, prevuDPy := DestPosY
-        lineThickns := imgHUDbaseUnit//9
-
-        Gdip_SetPenWidth(zPen, imgHUDbaseUnit//9)
+        Gdip_SetPenWidth(pPen1d, imgHUDbaseUnit//9)
         createDefaultSizedSelectionArea(DestPosX, DestPosY, newW, newH, maxSelX, maxSelY, mainWidth, mainHeight)
         objSel.selSmall := ViewPortSelectionManageCoords(mainWidth, mainHeight, DestPosX, DestPosY, maxSelX, maxSelY, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
         imgSelX1 := nImgSelX1, imgSelY1 := nImgSelY1 
@@ -72217,8 +72251,6 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
            dotSize := dotSize/2
 
         tooBig := (imgSelW>mainWidth*1.5 && imgSelH>mainHeight*1.5 || imgSelW>mainWidth*2.5 || imgSelH>mainHeight*2.5) ? 1 : 0
-        pPen := (editingSelectionNow=1 && imgSelLargerViewPort!=1 && tooBig!=1) ? pPen1d : pPen1
-        Gdip_SetPenWidth(pPen, lineThickns)
         If (o_operation!="faker")
         {
            ImgSelPath := VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, angleu, isAngleu, mainWidth, mainHeight)
@@ -72231,34 +72263,24 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
            }
 
            Gdip_SetClipRect(2NDglPG, 0, 0, mainWidth, mainHeight)
-           ; Gdip_FillRectangle(2NDglPG, pBrushC, imgSelPx, imgSelPy, imgSelW, imgSelH)
-           whichPen := (EllipseSelectMode>0) ? zPen : pPen
-           If (imgEditPanelOpened=1 && (AnyWindowOpen=66 || AnyWindowOpen=64))
-              Gdip_DrawPath(2NDglPG, pPen3, ImgSelPath)
-   
-           Gdip_DrawPath(2NDglPG, whichPen, ImgSelPath)
-           If (EllipseSelectMode>0 && AnyWindowOpen!=23 && pPen!=whichPen && imgSelLargerViewPort!=1 && tooBig!=1)
-              Gdip_DrawPath(2NDglPG, pPen, ImgSelPath)
-
-           Gdip_SetClipPath(2NDglPG, ImgSelPath, 4)
-           If (imgEditPanelOpened!=1)
-              Gdip_FillRectangle(2NDglPG, pBrushF, 0, 0, mainWidth, mainHeight)
-
-           If (AnyWindowOpen=17 || AnyWindowOpen=12)
-              Gdip_FillRectangle(2NDglPG, pBrushE, 0, 0, mainWidth, mainHeight)
-
+           Gdip_DrawPath(2NDglPG, dPen, ImgSelPath)
+           Gdip_DrawPath(2NDglPG, wPen, ImgSelPath)
            If (allowControls=1)
-              Gdip_DrawRectangle(2NDglPG, zPen, imgSelPx, imgSelPy, imgSelW, imgSelH)
+           {
+              thisu := clampValuesToWindow(imgSelPx, imgSelPy, imgSelW, imgSelH, mainWidth, mainHeight)
+              Gdip_DrawRectangle(2NDglPG, zPen, thisu.X, thisu.Y, thisu.W, thisu.H)
+           }
+
            If (imgEditPanelOpened!=1 && showSelectionGrid=1 && allowControls=1 && imgSelLargerViewPort!=1 && tooBig!=1)
               Gdip_DrawRectangle(2NDglPG, zPen, pathBounds.x, pathBounds.y, pathBounds.w, pathBounds.h)
         }
 
-        Gdip_ResetClip(2NDglPG)
         If ((showSelectionGrid=1) || (imgSelLargerViewPort=1 && allowControls=1)) && (o_operation!="faker")
         {
            If (imgSelLargerViewPort=1)
            {
               ; Gdip_DrawRectangle(2NDglPG, whichPen, 1, 1, mainWidth - 1, mainHeight - 1)
+              Gdip_DrawRectangle(2NDglPG, dPen, mainWidth*0.15, mainHeight*0.15, mainWidth - mainWidth*0.3, mainHeight - mainHeight*0.3)
               Gdip_DrawRectangle(2NDglPG, pPen1d, mainWidth*0.15, mainHeight*0.15, mainWidth - mainWidth*0.3, mainHeight - mainHeight*0.3)
            }
 
@@ -72268,9 +72290,9 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
            Gdip_DrawRectangle(2NDglPG, zPen, thisu.X, thisu.Y, thisu.W, thisu.H)
            thisu := clampValuesToWindow(imgSelPx - 900, imgSelPy + Round(imgSelH * 0.33), imgSelW + 2000, imgSelH - Round(imgSelH * 0.33) * 2, mainWidth, mainHeight)
            Gdip_DrawRectangle(2NDglPG, zPen, thisu.X, thisu.Y, thisu.W, thisu.H)
-           Gdip_ResetClip(2NDglPG)
         }
 
+        Gdip_ResetClip(2NDglPG)
         If (FlipImgV=1)
            imgSelPy := mainHeight - imgSelPy - imgSelH
         If (FlipImgH=1)
@@ -72313,12 +72335,12 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
         }
         If ImgSelPath
            Gdip_DeletePath(ImgSelPath)
-        ; ToolTip, % A_TickCount - startZeit , , , 2
+        ; ToolTip, % "a=" A_TickCount - startZeit , , , 2
      } Else If (operation="live")
      {
         Sleep, 1
         startZeit := A_TickCount
-        lineThickns := imgHUDbaseUnit/9
+        Gdip_SetPenWidth(pPen1d, imgHUDbaseUnit//9)
         Gdip_GraphicsClear(2NDglPG, "0x00" WindowBGRcolor)
         objSel.selSmall := ViewPortSelectionManageCoords(mainWidth, mainHeight, prevuDPx, prevuDPy, maxSelX, maxSelY, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
         imgSelX1 := nImgSelX1, imgSelY1 := nImgSelY1 
@@ -72328,39 +72350,31 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
 
         ImgSelPath := VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, angleu, isAngleu, mainWidth, mainHeight)
         tooBig := (imgSelW>mainWidth*1.5 && imgSelH>mainHeight*1.5 || imgSelW>mainWidth*2.5 || imgSelH>mainHeight*2.5) ? 1 : 0
-        Gdip_SetPenWidth(pPen1d, lineThickns//2 + 1)
         If (imgSelLargerViewPort!=1 && tooBig!=1)
         {
            Gdip_SetClipPath(2NDglPG, ImgSelPath, 0)
            pathBounds := Gdip_GetClipBounds(2NDglPG)
         }
- 
-        Gdip_ResetClip(2NDglPG)
-        Gdip_DrawPath(2NDglPG, zPen, ImgSelPath)
-        Gdip_SetClipPath(2NDglPG, ImgSelPath, 4)
-        If (imgEditPanelOpened!=1)
-           Gdip_FillRectangle(2NDglPG, pBrushE, 0, 0, mainWidth, mainHeight)
 
+        Gdip_SetClipRect(2NDglPG, 0, 0, mainWidth, mainHeight)
+        Gdip_DrawPath(2NDglPG, dPen, ImgSelPath)
+        Gdip_DrawPath(2NDglPG, wPen, ImgSelPath)
         If (imgSelLargerViewPort!=1 && tooBig!=1)
         {
            ; ToolTip, lol , , , 2
-           Gdip_SetClipRect(2NDglPG, 0, 0, mainWidth, mainHeight, 0)
            Gdip_DrawLine(2NDglPG, zPen, zImgSelX1 + prevDestPosX, 0, zImgSelX1 + prevDestPosX, mainHeight)
            Gdip_DrawLine(2NDglPG, zPen, 0, zImgSelY1 + prevDestPosY, mainWidth, zImgSelY1 + prevDestPosY)
            Gdip_DrawLine(2NDglPG, zPen, zImgSelX2 + prevDestPosX, 0, zImgSelX2 + prevDestPosX, mainHeight)
            Gdip_DrawLine(2NDglPG, zPen, 0, zImgSelY2 + prevDestPosY, mainWidth, zImgSelY2 + prevDestPosY)
-           Gdip_DrawRectangle(2NDglPG, pPen1d, imgSelPx, imgSelPy, imgSelW, imgSelH)
         }
-        ; pathBounds := Gdip_GetPathWorldBounds(ImgSelPath)
         ; ToolTip, % pathBounds.x "=" pathBounds.y "`n" pathBounds.w "=" pathBounds.h , , , 2
-        Gdip_ResetClip(2NDglPG)
         If (imgSelLargerViewPort!=1 && tooBig!=1)
         {
            Gdip_DrawRectangle(2NDglPG, zPen, pathBounds.x, pathBounds.y, pathBounds.w, pathBounds.h)
         } Else
         {
            thisu := clampValuesToWindow(imgSelPx, imgSelPy, imgSelW, imgSelH, mainWidth, mainHeight)
-           Gdip_DrawRectangle(2NDglPG, zPen, thisu.X, thisu.Y, thisu.W, thisu.H)
+           Gdip_DrawRectangle(2NDglPG, pPen1d, thisu.X, thisu.Y, thisu.W, thisu.H)
         }
 
         thisu := clampValuesToWindow(prevuDPx, prevuDPy, prevResizedVPimgW, prevResizedVPimgH, mainWidth, mainHeight)
@@ -72424,6 +72438,10 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
               GetMouseCoord2wind(PVhwnd, infoPosX, infoPosY)
               infoPosX += imgHUDbaseUnit//3
               infoPosY += imgHUDbaseUnit//3
+              If (FlipImgH=1)
+                 infoPosY := mainHeight - infoPosY
+              If (FlipImgV=1)
+                 infoPosX := mainWidth - infoPosX
            }
 
            If colorBox
@@ -72435,18 +72453,6 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
            trGdip_DrawImage(A_ThisFunc, 2NDglPG, infoBoxBMP, infoPosX, infoPosY,,,,,,, 0.97)
            infoBoxBMP := trGdip_DisposeImage(infoBoxBMP, 1)
         }
-
-        ; Gdip_FillRectangle(2NDglPG, pBrushC, imgSelPx, imgSelPy, imgSelW, imgSelH)
-        If (showSelectionGrid=1 || imgSelLargerViewPort=1 || EllipseSelectMode>0)
-        {
-           whichPen := (EllipseSelectMode>0) ? pPen : zPen
-           ; Gdip_DrawEllipse(2NDglPG, zPen, imgSelPx, imgSelPy, imgSelW, imgSelH)
-        }
-
-        pPen := (editingSelectionNow=1 && imgSelLargerViewPort!=1 && tooBig!=1) ? pPen1d : pPen1
-        Gdip_SetPenWidth(pPen, lineThickns)
-        If ((EllipseSelectMode>0 || VPselRotation>0) && AnyWindowOpen!=23)
-           Gdip_DrawPath(2NDglPG, pPen, ImgSelPath)
 
         If (showSelectionGrid=1 || imgSelLargerViewPort=1)
         {
@@ -72461,12 +72467,12 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
 
         If (imgSelLargerViewPort!=1)
         {
-           Gdip_FillRectangle(2NDglPG, pBrushD, selDotX, selDotY, dotsSize, dotsSize)
-           Gdip_FillRectangle(2NDglPG, pBrushD, SelDotAx, SelDotAy, dotsSize, dotsSize)
+           Gdip_FillRectangle(2NDglPG, pBrushF, selDotX, selDotY, dotsSize, dotsSize)
+           Gdip_FillRectangle(2NDglPG, pBrushF, SelDotAx, SelDotAy, dotsSize, dotsSize)
            If (partialCtrls!=1)
            {
-              Gdip_FillRectangle(2NDglPG, pBrushD, SelDotBx, SelDotBy, dotsSize, dotsSize)
-              Gdip_FillRectangle(2NDglPG, pBrushD, SelDotCx, SelDotCy, dotsSize, dotsSize)
+              Gdip_FillRectangle(2NDglPG, pBrushF, SelDotBx, SelDotBy, dotsSize, dotsSize)
+              Gdip_FillRectangle(2NDglPG, pBrushF, SelDotCx, SelDotCy, dotsSize, dotsSize)
            }
         }
 
@@ -72480,14 +72486,11 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
         }
 
         If (dotActive=10)
-        {
-            ; Gdip_FillEllipse(2NDglPG, pBrushD, SelDotDx, SelDotDy, dotsSize*2, dotsSize*2)
-            Gdip_FillEllipse(2NDglPG, pBrushD, SelDotDx, SelDotDy, dotsSize, dotsSize)
-        }
+           Gdip_FillEllipse(2NDglPG, pBrushD, SelDotDx, SelDotDy, dotsSize, dotsSize)
 
+        Gdip_SetClipRect(2NDglPG, 0, 0, mainWidth, mainHeight)
         If StrLen(ImgSelPath)>2
            Gdip_DeletePath(ImgSelPath)
-
         ; ToolTip, % "br=" A_TickCount - startZeit , , , 2
         If (imgEditPanelOpened=1 && AnyWindowOpen!=10)
         {
@@ -72499,7 +72502,6 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
         trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
         defineRelativeSelCoords(imgW, imgH)
         InfoW := InfoH := ""
-        zPen := redPen := ""
         ; Gdip_ResetWorldTransform(2NDglPG)
         infoBoxBMP := trGdip_DisposeImage(infoBoxBMP, 1)
         Gdip_ResetWorldTransform(2NDglPG)
@@ -72507,6 +72509,8 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
      }
 
      Gdip_DeletePen(zPen)
+     Gdip_DeletePen(wPen)
+     Gdip_DeletePen(dPen)
      Gdip_DeletePen(redPen)
 } ; // drawImgSelectionOnWindow()
 
