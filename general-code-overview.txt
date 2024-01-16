@@ -902,6 +902,7 @@ k) How vector shapes drawing works [soon]
   convertCustomShape2givenArea()
   convertCustomShape2relativeCoords()
 
+  resumeCustomShapeSelection()
   getVPcustomShapePath()
 
 

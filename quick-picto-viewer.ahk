@@ -5569,7 +5569,14 @@ setNewBrushSymmetryPoints() {
    SetTimer, RemoveTooltip, % -msgDisplayTime//2
 }
 
-krillSelArea() {
+drawInactiveSelArea() {
+   If identifyThisWin()
+   {
+      lastZeitFileSelect := A_TickCount//2
+      dummyRefreshImgSelectionWindow()
+      Return
+   }
+
    Gdip_GraphicsClear(2NDglPG, "0x00" WindowBgrColor)
    ; clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
    vpWinClientSize(mainWidth, mainHeight)
@@ -5603,10 +5610,10 @@ MouseMoveResponder(actu:=0) {
   brushingMode := (liveDrawingBrushTool=1 && AnyWindowOpen=64) || (FloodFillSelectionAdj!=1 && AnyWindowOpen=66) ? 1 : 0
   If (editingSelectionNow=1 && thumbsDisplaying=0 && actu="krill" && drawingShapeNow!=1 && (A_TickCount - lastMenuZeit>250))
   {
-     If (AnyWindowOpen!=12)
-        SetTimer, krillSelArea, -150
      If identifyThisWin()
         SetTimer, dummyRefreshImgSelectionWindow, -150
+     Else If (AnyWindowOpen!=12)
+        SetTimer, drawInactiveSelArea, -150
   } Else If (drawingShapeNow=1)
   {
      ; Sleep, -1
@@ -6088,6 +6095,7 @@ VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, angleu, isAngleu, mainWidt
            Gdip_DeletePath(prevPath)
         Return
      }
+
      tooBig := ((imgSelW>mainWidth*1.5 && imgSelH>mainHeight*1.5 || imgSelW>mainWidth*2.5 || imgSelH>mainHeight*2.5) && EllipseSelectMode=2 && customShapeCountPoints>2100) ? 1 : 0
      advancedShape := (  (vpImgPanningNow || doImgEditLivePreview!=1) && isVarEqualTo(AnyWindowOpen, 23, 65, 68)  ) ? 1 : 0
      simpleRect := ((advancedShape=1 && FillAreaShape=1 || EllipseSelectMode=0 && advancedShape=0) && angleu=0 && innerSelectionCavityX=0 && innerSelectionCavityY=0 || isSelEntireOutside(mainWidth, mainHeight)) ? 1 : 0
@@ -6101,7 +6109,7 @@ VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, angleu, isAngleu, mainWidt
         Return ImgSelPath
      }
 
-     thisState := "a" imgSelW imgSelH angleu isAngleu EllipseSelectMode VPselRotation innerSelectionCavityX innerSelectionCavityY customShapePoints bezierSplineCustomShape FillAreaCurveTension doImgEditLivePreview AnyWindowOpen advancedShape FillAreaShape
+     thisState := "a" imgSelW imgSelH angleu isAngleu EllipseSelectMode VPselRotation innerSelectionCavityX innerSelectionCavityY customShapePoints bezierSplineCustomShape FillAreaCurveTension doImgEditLivePreview AnyWindowOpen advancedShape FillAreaShape rotateSelBoundsKeepRatio closedLineCustomShape
      If (thisState=prevState && prevPath)
      {
         ; ToolTip, % "cached" , , , 2
@@ -6134,7 +6142,7 @@ SkeletDrawSelectionBox(paintAlphaMask:=0) {
    vpWinClientSize(mainWidth, mainHeight)
    tooBig := (vPimgSelW>mainWidth*1.5 && vPimgSelH>mainHeight*1.5 || vPimgSelW>mainWidth*2.5 || vPimgSelH>mainHeight*2.5) ? 1 : 0
    simpleRect := (imgSelLargerViewPort=1 || imgSelOutViewPort=1 || isSelEntireOutside(mainWidth, mainHeight) || tooBig=1) ? 1 : 0
-    If (VPselRotation!=0)
+   If (VPselRotation!=0)
       Gdip_FillEllipse(2NDglPG, pBrushD, SelDotDx - dotsSize/3.5, SelDotDy - dotsSize/3.5, dotsSize*1.5, dotsSize*1.5)
 
    If (imgEditPanelOpened=1)
@@ -6568,7 +6576,7 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
 
       ; kMenu("PVnav", "Add", "Make the shape symmetrical", "MenuCreateShapeSymmetricalVectorShape")
       createMenuSelectShapeTension()
-      kMenu("PVnav", "Add", "&Smoothness level", ":PVshapeTension")
+      kMenu("PVnav", "Add", "&Path type / smoothness", ":PVshapeTension")
       If (bezierSplineCustomShape!=1)
       {
          kMenu("PVnav", "Add/Uncheck", "&Preview new point`tP", "togglePreviewVectorNewPoint")
@@ -15874,6 +15882,7 @@ dummyInnerCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, shape, pPath
        Gdip_AddPathPolygon(pPath, [cX1, cY1, cX2, cY2, cX3, cY3, cX4, cY4])
     } Else If (shape=7)
     {
+       ; createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepBounds:=0, zeroTension:=0, allowSelectionCenter:=1, allowCavity:=1, selCavityX:=0, selCavityY:=0, allowErrMargin:=1)
        PointsList := convertCustomShape2givenArea(customShapePoints, imgSelPx + 1, imgSelPy + 1, imgSelW, imgSelH, 1, !bezierSplineCustomShape)
        createPathVectorCustomShape(pPath, PointsList, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape, 0)
     }
@@ -15918,7 +15927,7 @@ coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, shape, angleu:=0, 
     }
 
     If ((shape=7 || shape=5 || shape=4) && pPath && allowSelectionCenter>=1)
-       centerPath2bounds(pPath, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, doPrecise)
+       centerPath2bounds(pPath, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0)
  
     Return pPath
 }
@@ -43710,121 +43719,10 @@ resumeCustomShapeSelection(thisZL) {
    vPimgSelW := max(zImgSelX1, zImgSelX2) - min(zImgSelX1, zImgSelX2)
    vPimgSelH := max(zImgSelY1, zImgSelY2) - min(zImgSelY1, zImgSelY2)
    offX := offY := 0
-   If (VPselRotation>0)
-   {
-      If (rotateSelBoundsKeepRatio=0 && FillAreaCurveTension>1)
-      {
-         doDeduping := (bezierSplineCustomShape=1) ? 0 : 1
-         PointsListu := convertCustomShape2givenArea(customShapePoints, vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, 1, doDeduping, bezierSplineCustomShape)
-         If (bezierSplineCustomShape=1)
-            rz := simpleFixBrokenBezierPath(PointsListu)
-         ; fnOutputDebug(rz "yay=" PointsListu.Count())
-         pPathA := Gdip_CreatePath()
-         pPathB := Gdip_CreatePath()
-         Gdip_AddPathPolygon(pPathA, PointsListu)
-         If (bezierSplineCustomShape=1)
-            Gdip_AddPathBeziers(pPathB, PointsListu)
-         Else
-            Gdip_AddPathClosedCurve(pPathB, PointsListu, tensionCurveCustomShape)
-
-         withinBounds := !rotateSelBoundsKeepRatio
-         withinBkeepRatio := rotateSelBoundsKeepRatio
-         scaleUniform := 0
-         trGdip_RotatePathAtCenter(pPathA, VPselRotation, 1, withinBounds, withinBkeepRatio, 0)
-         trGdip_RotatePathAtCenter(pPathB, VPselRotation, 1, withinBounds, withinBkeepRatio, 0)
-         centerPath2bounds(pPathB, vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, pPathA, 1)
-         PointsList := Gdip_GetPathPoints(pPathA)
-         ptCount := (ST_Count(PointsList, "|") + 1) * 2
-         If (bezierSplineCustomShape=1 && (ptCount + 2)=PointsListu.Count())
-            PointsList .= "|" SubStr(PointsList, 1, InStr(PointsList, "|") - 1)
-
-         ; fnOutputDebug("counter" ptCount " | " PointsListu.Count())
-         pPathC := Gdip_CreatePath()
-         If (bezierSplineCustomShape=1)
-            Gdip_AddPathBeziers(pPathC, PointsList)
-         Else
-            Gdip_AddPathClosedCurve(pPathC, PointsList, tensionCurveCustomShape)
-
-         RectA := getAccuratePathBounds(pPathA, 1)
-         RectB := getAccuratePathBounds(pPathB, 1)
-         RectC := getAccuratePathBounds(pPathC, 1)
-         offW := vPimgSelW / RectC.w
-         offH := vPimgSelH / RectC.h
-         Gdip_ScalePath(pPathA, offW, offH)
-
-         PointsList := Gdip_GetPathPoints(pPathA)
-         ptCount := (ST_Count(PointsList, "|") + 1) * 2
-         If (bezierSplineCustomShape=1 && (ptCount + 2)=PointsListu.Count())
-            PointsList .= "|" SubStr(PointsList, 1, InStr(PointsList, "|") - 1)
-         ; fnOutputDebug("counter" ptCount " | " PointsListu.Count())
-         pPathD := Gdip_CreatePath()
-         If (bezierSplineCustomShape=1)
-            Gdip_AddPathBeziers(pPathD, PointsList)
-         Else
-            Gdip_AddPathClosedCurve(pPathD, PointsList, tensionCurveCustomShape)
-
-         RectD := getAccuratePathBounds(pPathD, 1)
-         offX := vPimgSelPx - RectD.x
-         offY := vPimgSelPy - RectD.y
-
-         ; infoz := Round(vPimgSelPx) "=" Round(vPimgSelPy) " | " Round(vPimgSelW) "=" Round(vPimgSelH)
-         ; infoz .= "`n" RectA.X + Round(offX) "=" RectA.Y + Round(offY) " | " RectA.W "=" RectA.H
-         ; infoz .= "`n" RectB.X "=" RectB.Y " | " RectB.W "=" RectB.H
-         ; infoz .= "`n" RectC.X "=" RectC.Y " | " RectC.W "=" RectC.H
-         ; infoz .= "`n" RectD.X "=" RectD.Y " | " RectD.W "=" RectD.H
-         ; infoz .= "`n" Round(offX) "=" Round(offY)
-         ; ToolTip, % infoz , , , 2
-         Gdip_DeletePath(pPathA)
-         Gdip_DeletePath(pPathB)
-         Gdip_DeletePath(pPathC)
-         Gdip_DeletePath(pPathD)
-      } Else If (FillAreaCurveTension>1)
-      {
-         doDeduping := (bezierSplineCustomShape=1) ? 0 : 1
-         PointsListu := convertCustomShape2givenArea(customShapePoints, vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, 1, doDeduping)
-         If (bezierSplineCustomShape=1)
-            simpleFixBrokenBezierPath(PointsListu)
-
-         pPathA := Gdip_CreatePath()
-         pPathB := Gdip_CreatePath()
-         Gdip_AddPathPolygon(pPathA, PointsListu)
-         If (bezierSplineCustomShape=1)
-            Gdip_AddPathBeziers(pPathB, PointsListu)
-         Else
-            Gdip_AddPathClosedCurve(pPathB, PointsListu, tensionCurveCustomShape)
-
-         withinBounds := !rotateSelBoundsKeepRatio
-         withinBkeepRatio := rotateSelBoundsKeepRatio
-         scaleUniform := rotateSelBoundsKeepRatio
-         trGdip_RotatePathAtCenter(pPathA, VPselRotation, 1, withinBounds, withinBkeepRatio, 0)
-         trGdip_RotatePathAtCenter(pPathB, VPselRotation, 1, withinBounds, withinBkeepRatio, 0)
-         centerPath2bounds(pPathB, vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, pPathA, 1)
-         PointsList := Gdip_GetPathPoints(pPathA)
-         ptCount := (ST_Count(PointsList, "|") + 1) * 2
-         If (bezierSplineCustomShape=1 && (ptCount + 2)=PointsListu.Count())
-            PointsList .= "|" SubStr(PointsList, 1, InStr(PointsList, "|") - 1)
-
-         pPathC := Gdip_CreatePath()
-         If (bezierSplineCustomShape=1)
-            Gdip_AddPathBeziers(pPathC, PointsList)
-         Else
-            Gdip_AddPathClosedCurve(pPathC, PointsList, tensionCurveCustomShape)
-
-         RectC := getAccuratePathBounds(pPathC)
-         RectB := getAccuratePathBounds(pPathB)
-         offX := RectB.x - RectC.x
-         offY := RectB.y - RectC.y
-         ; ToolTip, % vPimgSelPx "=" vPimgSelPy "`n" RectC.X "=" RectC.Y  "`n" RectB.X "=" RectB.Y , , , 2
-         Gdip_DeletePath(pPathA)
-         Gdip_DeletePath(pPathB)
-         Gdip_DeletePath(pPathC)
-      } Else
-      {
-         pPath := createImgSelPath(vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, 2, VPselRotation, rotateSelBoundsKeepRatio, 1, 1, 0, 0, 0)
-         PointsList := Gdip_GetPathPoints(pPath)
-         Gdip_DeletePath(pPath)
-      }
-   } Else PointsList := convertCustomShape2givenArea(customShapePoints, vPimgSelPx*fS + fX, vPimgSelPy*fS + fY, VPimgSelW*fS, VPimgSelH*fS, 0)
+   ; retrieve the path as a polygonal shape
+   pPath := createImgSelPath(vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, 2, VPselRotation, rotateSelBoundsKeepRatio, 1, 1, 0, 0, 0, 2)
+   PointsList := Gdip_GetPathPoints(pPath)
+   Gdip_DeletePath(pPath)
 
    customShapePoints := convertShapePointsStrToArray(PointsList, offX, offY)
    If (prevVectorShapeSymmetryMode[1, 2]=1)
@@ -58238,7 +58136,7 @@ InvokeMenuBarVectorEdit(manuID) {
    } 
 
    createMenuSelectShapeTension()
-   kMenu("pvMenuBarEdit", "Add", "&Path smoothness", ":PVshapeTension")
+   kMenu("pvMenuBarEdit", "Add", "&Path type / smoothness", ":PVshapeTension")
    If (bezierSplineCustomShape!=1)
    {
       kMenu("pvMenuBarEdit", "Add/Uncheck", "&Preview new point`tP", "togglePreviewVectorNewPoint")
@@ -71938,6 +71836,7 @@ createPathVectorCustomShape(ImgSelPath, ByRef PointsList, tension, isClosed, isB
       Gdip_AddPathClosedCurve(ImgSelPath, PointsList, tensionCurveCustomShape)
    Else
       Gdip_AddPathCurve(ImgSelPath, PointsList, tensionCurveCustomShape)
+   Return 
 }
 
 createBitmapSelPath(advancedMode, imgW, imgH, shapeu:=0, angle:=0, keepBounds:=0) {
@@ -72032,10 +71931,24 @@ createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepB
    If (ImgSelPath="")
       Return
 
+   tempPath := 0
    If (ellipse=2)
    {
       PointsList := convertCustomShape2givenArea(customShapePoints, imgSelPx, imgSelPy, imgSelW, imgSelH, 1, !bezierSplineCustomShape, bezierSplineCustomShape)
-      createPathVectorCustomShape(ImgSelPath, PointsList, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape, zeroTension)
+      If (!(FillAreaCurveTension=1 || zeroTension=1) || bezierSplineCustomShape=1 || allowErrMargin=2)
+      {
+         alreadySorted := 1
+         tempPath := Gdip_CreatePath()
+         Gdip_AddPathPolygon(tempPath, PointsList)
+         If (angleu!=0)
+            trGdip_RotatePathAtCenter(tempPath, angleu, 1, 1, keepBounds, 1)
+         If (allowSelectionCenter>=1)
+            vpFreeformShapeOffset := centerPath2bounds(tempPath, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 1, allowSelectionCenter)
+         PointsList := Gdip_GetPathPoints(tempPath, 1)
+         ; Gdip_DeletePath(tempPath)
+      }
+
+      createPathVectorCustomShape(ImgSelPath, PointsList, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape, 0, 1, 1)
    } Else If (ellipse=1)
    {
       Gdip_AddPathEllipse(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
@@ -72069,7 +71982,7 @@ createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepB
    If (viewportQPVimage.imgHandle && ellipse=2)
       allowCavity := 0
 
-   If (selCavityX>0.01 && selCavityY>0.01 && allowCavity=1)
+   If (selCavityX>0.01 && selCavityY>0.01 && allowCavity=1 && allowErrMargin!=2)
    {
       avguX := avguY := (selCavityX + selCavityY)/2
       if (ellipse!=1 && !viewportQPVimage.imgHandle)
@@ -72085,7 +71998,6 @@ createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepB
       zY := imgSelH * avguY ; selCavityY
       nimgSelPx := imgSelPx + zX , nimgSelPy := imgSelPy + zY
       nimgSelW := imgSelW - zX*2 , nimgSelH := imgSelH - zY*2
-
       If (ellipse=2)
       {
          PointsList := convertCustomShape2givenArea(customShapePoints, nimgSelPx, nimgSelPy, nimgSelW, nimgSelH, 1, !bezierSplineCustomShape)
@@ -72096,14 +72008,24 @@ createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepB
          Gdip_AddPathRectangle(ImgSelPath, nimgSelPx, nimgSelPy, nimgSelW, nimgSelH)
    }
 
-   If angleu
+   If (angleu!=0 && alreadySorted!=1)
       trGdip_RotatePathAtCenter(ImgSelPath, angleu, 1, 1, keepBounds, 1)
 
-   If (ellipse=2 && allowSelectionCenter>=1)
-      vpFreeformShapeOffset := centerPath2bounds(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 1, allowSelectionCenter)
+   thisPath := (allowErrMargin=2) ? tempPath : 0
+   If (ellipse=2)
+      vpFreeformShapeOffset := centerPath2bounds(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH, thisPath, 1, allowSelectionCenter)
 
+   ; ToolTip, % tempPath "|" allowErrMargin , , , 2
    ; Sleep, -1
-   Return ImgSelPath
+   If (allowErrMargin=2)
+   {
+      Gdip_DeletePath(ImgSelPath)
+      Return tempPath
+   } Else
+   {
+      Gdip_DeletePath(tempPath)
+      Return ImgSelPath
+   }
 }
 
 centerPath2bounds(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH, destinationPath:=0, scaleUniform:=1, doPrecise:=2) {
@@ -72132,7 +72054,7 @@ centerPath2bounds(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH, destinationP
    nY := max(cY, rY) - min(cY, rY)
    nX := (rX>cX) ? -nX : nX
    nY := (rY>cY) ? -nY : nY
-   ; ToolTip, % nX "=" nY , , , 2
+   ; ToolTip, % nX "=" nY "|" scaleu , , , 2
    obju := []
    pMatrix := Gdip_CreateMatrix()
    obju := [nX, nY, scaleu, VPselRotation, innerSelectionCavityX, innerSelectionCavityY, EllipseSelectMode, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape]
@@ -72149,9 +72071,9 @@ centerPath2bounds(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH, destinationP
    Return obju
 }
 
-getAccuratePathBounds(pPath, doRound:=0, doPrecise:=1) {
+getAccuratePathBounds(pPath, doRound:=0, doPrecise:=0) {
    startZeit := A_TickCount
-   If (doPrecise=1)
+   If (doPrecise=21)
    {
       Gdip_ResetClip(dummyGu)
       Gdip_SetClipPath(dummyGu, pPath)
@@ -72263,6 +72185,8 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
            }
 
            Gdip_SetClipRect(2NDglPG, 0, 0, mainWidth, mainHeight)
+           If !AnyWindowOpen
+              Gdip_FillPath(2NDglPG, pBrushF, ImgSelPath)
            Gdip_DrawPath(2NDglPG, dPen, ImgSelPath)
            Gdip_DrawPath(2NDglPG, wPen, ImgSelPath)
            If (allowControls=1)
@@ -72467,12 +72391,12 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
 
         If (imgSelLargerViewPort!=1)
         {
-           Gdip_FillRectangle(2NDglPG, pBrushF, selDotX, selDotY, dotsSize, dotsSize)
-           Gdip_FillRectangle(2NDglPG, pBrushF, SelDotAx, SelDotAy, dotsSize, dotsSize)
+           Gdip_FillRectangle(2NDglPG, pBrushC, selDotX, selDotY, dotsSize, dotsSize)
+           Gdip_FillRectangle(2NDglPG, pBrushC, SelDotAx, SelDotAy, dotsSize, dotsSize)
            If (partialCtrls!=1)
            {
-              Gdip_FillRectangle(2NDglPG, pBrushF, SelDotBx, SelDotBy, dotsSize, dotsSize)
-              Gdip_FillRectangle(2NDglPG, pBrushF, SelDotCx, SelDotCy, dotsSize, dotsSize)
+              Gdip_FillRectangle(2NDglPG, pBrushC, SelDotBx, SelDotBy, dotsSize, dotsSize)
+              Gdip_FillRectangle(2NDglPG, pBrushC, SelDotCx, SelDotCy, dotsSize, dotsSize)
            }
         }
 
