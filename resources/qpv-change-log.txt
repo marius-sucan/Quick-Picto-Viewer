@@ -8,9 +8,12 @@
   - [new] «Adjust image colors» tool reimplemented from scratch, with more capabilities; it can be applied in batch, on multiple images in one go
   - [new] freehand draw mode for fill selection area, draw lines and shapes tools
   - [new] option to join arcs and lines in the «Draw parametric lines» panel, for the margins generator
+  - [new] blending modes option for draw lines and shapes tools
   - overhauled the «Desature image colors» tool; it now has brightness and contrast options
   - fill behind now allows to users to fill triangles, rounded rectangles and other shapes
   - improvements for the "Image selection area properties" panel; added shape cavity and rotation options, and the ability to Ctrl+L-Click on X1,X2, etc, to manually set the coordinates; also added copy/paste selection properties
+  - improvements to how selection areas and vector shapes are handled; dramatic performance improvements when dealing with huge images
+  - blend modes improvements; now blend modes work as in other apps when dealing with layer transparencies
   - images exceeding 536 mgpx can be resized, cropped, rotated by 90°, or flipped H/V; colors invert is also available; image selected area can be copied to clipboard
   - increased the limit from 32567 to 234950 pixels in width or height for images in the viewport that can be edited with any available tool
   - [...] more to be decided 

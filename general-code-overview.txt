@@ -891,6 +891,7 @@ j) How to enable alpha masking for an image editing live tool
 k) How vector shapes drawing works [soon]
 =====================================================================
 
+  PanelManageVectorShapes()
   startDrawingShape()
   drawLiveCreateCustomShape()
   stopDrawingShape()

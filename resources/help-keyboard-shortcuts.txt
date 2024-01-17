@@ -33,8 +33,8 @@ Alt + A|Adjust image canvas size|Image view|Panel
 Alt + Backspace|Fill shapes or draw outlines of shapes|Image selection area|Panel
 Alt + Delete|Remove active file index entry|Anywhere|-
 Ctrl + Delete|Delete active file|Anywhere|-
-Alt + E|Selection properties|Image selection area|Panel
-Alt + E|Open in QPV containing folder|Anywhere|-
+Alt + E|Selection properties|Image view|Panel
+Alt + E|Open in QPV containing folder|Files list|-
 Alt + U|Manage dynamic folder(s) list|Anywhere|Panel
 Alt + Y|Automatic image crop|Image view|Panel
 Alt + Arrow keys|Adjust image selection: top-left corner position|Image selection area|-
@@ -196,6 +196,7 @@ Shift + E|Cycle image selection area modes: rect, ellipse, freeform|Image select
 Ctrl + NumPad keys|Align image selection area: top, bottom, left, right, more|Image selection area|-
 Ctrl + NumPad - / +|Shrink/enlarge selection area|Image selection area|-
 Ctrl + NumPad * / /|Increase or decrease selection area exclusion|Image selection area|-
+Ctrl + L-Click|Increase or decrease selection area exclusion|Image selection area|-
 Ctrl + , / .|Increase or decrease selection area exclusion|Image selection area|-
 Alt + \|Reset selection area rotation and exclusion|Image selection area|-
 Alt + =|Increase viewport grid size|Image view|-
