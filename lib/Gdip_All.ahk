@@ -5669,6 +5669,7 @@ Gdip_AddPathPath(pPathA, pPathB, fConnect) {
 
 Gdip_AddPathToPath(pPathA, pPathB, fConnect) {
 ; Adds a path into another path.
+; pathB will be added / inserted into pathA
 ;
 ; Parameters:
 ; pPathA and pPathB - Pointers to GraphicsPath objects
@@ -6394,6 +6395,7 @@ Gdip_SetClipRect(pGraphics, x, y, w, h, CombineMode:=0) {
 }
 
 Gdip_SetClipPath(pGraphics, pPath, CombineMode:=0) {
+   ; this can become very slow with very large paths
    return DllCall("gdiplus\GdipSetClipPath", "UPtr", pGraphics, "UPtr", pPath, "int", CombineMode)
 }
 
@@ -7476,6 +7478,24 @@ Gdip_RotatePathAtCenter(pPath, Angle, MatrixOrder:=1, withinBounds:=0, withinBke
      Gdip_DisposeImage(thisBMP)
   }
 
+  Return E
+}
+
+Gdip_ScalePathAtCenter(pPath, ScaleX, ScaleY) {
+  ; Calculate center of bounding rectangle which will be the center of the graphics path
+  Rect := Gdip_GetPathWorldBounds(pPath)
+  cX := Rect.x + (Rect.w / 2)
+  cY := Rect.y + (Rect.h / 2)
+  
+  ; Create a Matrix for the transformations
+  pMatrix := Gdip_CreateMatrix()
+  Gdip_TranslateMatrix(pMatrix, cX , cY)
+  Gdip_ScaleMatrix(pMatrix, ScaleX, ScaleY)
+  Gdip_TranslateMatrix(pMatrix, -cX, -cY)
+
+  ; Apply the transformations
+  E := Gdip_TransformPath(pPath, pMatrix)
+  Gdip_DeleteMatrix(pMatrix)
   Return E
 }
 

@@ -205,17 +205,18 @@ inline INT64 CalcPixOffset(int x, int y, INT64 Stride, INT64 bitsPerPixel) {
 
 bool isInsideRectOval(float ox, float oy, int modus) {
     // Translate the coordinates
-    float tw = hImgSelW;
-    float th = hImgSelH;
-    float x = ox - tw;
-    float y = oy - th;
+    // if (excludeSelectScale!=0)
+    // {
+    //    if (inRange(imgSelX1 + imgSelExclX, imgSelX1 + imgSelW - imgSelExclX*2, ox) || inRange(imgSelY1 + imgSelExclY, imgSelY1 + imgSelH - imgSelExclY*2, oy))
+    //       return 0;
+    // }
+
+    float tw = (modus==2) ? imgSelExclW : hImgSelW;
+    float th = (modus==2) ? imgSelExclH : hImgSelH;
+    float x = (modus==2) ? ox - tw - imgSelExclX : ox - tw;
+    float y = (modus==2) ? oy - th - imgSelExclY : oy - th;
     x *= imgSelXscale;
     y *= imgSelYscale;
-    if (modus==2)
-    {
-       x *= excludeSelectScale;
-       y *= excludeSelectScale;
-    }
 
     // Apply rotation to the coordinates
     float rotatedX, rotatedY;
@@ -1547,6 +1548,10 @@ DLL_API int DLL_CALLCONV prepareSelectionArea(int x1, int y1, int x2, int y2, in
     imgSelY2 = y2;
     imgSelW = w;
     imgSelH = h;
+    imgSelExclX = w - (w*exclusion);
+    imgSelExclY = h - (h*exclusion);
+    imgSelExclW = (w - imgSelExclX*2) / 2.0f;
+    imgSelExclH = (h - imgSelExclY*2) / 2.0f;
     imgSelXscale = xf;
     imgSelYscale = yf;
     hImgSelW = w / 2.0f;
