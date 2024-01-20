@@ -367,6 +367,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , PasteInPlaceCropAdaptImg := 1, PasteInPlaceOrientFlipX := 0, PasteInPlaceOrientFlipY := 0
    , freeHandSelectionMode := 0, DrawLineAreaBorderConnector := 1, DrawLineAreaSnapLine := 0
    , DrawLineAreaBlendMode := 1, BlendModesPreserveAlpha := 0, FillAreaCutGlass := 0
+   , userImgChannelAlphaAdd := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -12988,10 +12989,6 @@ QPV_PrepareAlphaChannelBlur(pBitmap, givenLevel, fillMissingOnly) {
 }
 
 QPV_AlterAlphaChannel(pBitmap, givenLevel, replaceAll) {
-; this function fills / replaces black pixels [and with opacity 0] with surrounding colors
-; this helps mitigate the dark hallows that emerge when applying blur on images with areas that are fully transparent 
-; the function can also be used to specify an opacity/alpha level of the image
-
   ; thisStartZeit := A_TickCount
   If (givenLevel=0 && replaceAll=0)
      Return 1
@@ -13014,7 +13011,7 @@ QPV_AlterAlphaChannel(pBitmap, givenLevel, replaceAll) {
   E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If !E1
   {
-     r := DllCall(whichMainDLL "\AlterBitmapAlphaChanel", "UPtr", iScan, "Int", w, "Int", h, "int", stride, "int", 32, "Int", givenLevel, "int", replaceAll)
+     r := DllCall(whichMainDLL "\AlterBitmapAlphaChannel", "UPtr", iScan, "Int", w, "Int", h, "int", stride, "int", 32, "Int", givenLevel, "int", replaceAll)
      Gdip_UnlockBits(pBitmap, iData)
   } Else 
      addJournalEntry(A_ThisFunc "(): failed - unable to lock the bitmap bits")
@@ -13500,7 +13497,7 @@ realtimePasteInPlaceAlphaMasker(previewMode, clipBMP, givenID, ByRef newBitmap, 
        ; ToolTip, % "cropping" , , , 2
        vpWinClientSize(mainWidth, mainHeight)
        thisu := ((offX.sw != offX.dh || offX.sh != offX.dh) && offX.invertArea=0) ? 1 : 0
-       If (!isSelEntireVisible(mainWidth, mainHeight) && offX.invertArea=0 || offX.invertArea=1 || thisu=1)
+       If ((!isSelWithinIMGbounds() || !isSelEntireVisible(mainWidth, mainHeight)) && offX.invertArea=0 || offX.invertArea=1 || thisu=1)
        {
           thisAlphaBitmap := getRectFromBitmap(alphaMaskGray, offX, 1)
           If validBMP(thisAlphaBitmap)
@@ -15297,13 +15294,15 @@ AdjustColorsLegacySelectedArea(prevFXmode:=0) {
     If (imgColorsFXopacity>253 && allowAlphaMasking!=1)
        r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
 
-    zBitmap := applyVPeffectsOnBMP(zBitmap)
     If (thisBitsDepth>1 && DesaturateAreaLevels>1 && imgFxMode>1)
     {
        E := Gdip_BitmapSetColorDepth(zBitmap, thisBitsDepth, DesaturateAreaDither)
        Gdip_BitmapSetColorDepth(zBitmap, 32)
     }
 
+    zBitmap := applyVPeffectsOnBMP(zBitmap)
+    If (userImgChannelAlphaAdd>0)
+       QPV_AlterAlphaChannel(zBitmap, userImgChannelAlphaAdd, 0)
     If (allowAlphaMasking=1)
     {
        realtimePasteInPlaceAlphaMasker(0, zBitmap, "lol", nowBitmap, 0, 0, 0, 0, 0, xBitmap, 255 - imgColorsFXopacity)
@@ -15314,6 +15313,7 @@ AdjustColorsLegacySelectedArea(prevFXmode:=0) {
        }
     } Else
        QPV_MergeBitmapsWithMask(zBitmap, xBitmap, 0, 0, 255 - imgColorsFXopacity)
+
 
     r0 := trGdip_GraphicsClear(funcu, G2)
     r1 := trGdip_DrawImage(A_ThisFunc, G2, zBitmap, imgSelPx, imgSelPy) ; ,,,,,,, thisOpacity)
@@ -16270,6 +16270,12 @@ getVPselIDs(what) {
 
 isSelEntireVisible(mw, mh) {
    r := (selDotX<=mw && selDotY<=mh && selDotX>=0 && selDotY>=0 && selDotAx<=mw && selDotAy<=mh && selDotAx>=0 && selDotAy>=0) ? 1 : 0
+   Return r
+}
+
+isSelWithinIMGbounds() {
+   trGdip_GetImageDimensions(useGdiBitmap(), w, h)
+   r := (imgSelX1<0 || imgSelY1<0 || imgSelX2>w || imgSelY2>h) ? 0 : 1
    Return r
 }
 
@@ -24129,7 +24135,6 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
 
     If (VisibleQuickMenuSearchWin=1)
        closeQuickSearch()
-
 
     Sleep, 15
     Gui, SettingsGUIA: Default
@@ -49244,98 +49249,7 @@ BtnFillBehindSelectedArea() {
 }
 
 livePreviewAdjustColorsArea(modus:=0) {
-   Critical, on
-   Static bitsOptions := {0:0, 1:0, 2:2, 3:3, 4:4, 5:5, 6:6, 7:7, 8:8, 9:16}
-   If (modus="kill")
-   {
-      getImgOriginalSelectedAreaEdit("kill", 0, 0, 0, 0, 0, 0, 0)
-      Return
-   }
-
-   If (forceLiveAlphaPreviewMode=1 && liveDrawingBrushTool=1)
-   {
-      livePreviewAlphaMasking("live")
-      Return
-   }
-
-   If (doImgEditLivePreview!=1 || imgFxMode=1)
-      Return
-
-   vpWinClientSize(mainWidth, mainHeight)
-   trGdip_GetImageDimensions(useGdiBitmap(), thisW, thisH)
-   ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, thisW, thisH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
-   ; pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
-   pPath := VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, VPselRotation, 1, mainWidth, mainHeight, 0)
-   If (EraseAreaInvert=1)
-      getClampedVPimgBounds(imgSelPx, imgSelPy, kX, kY, imgSelW, imgSelH)
-
-   ; trGdip_GraphicsClear(A_ThisFunc, 2NDglPG, "0x00" WindowBGRcolor)
-   Gdip_ResetClip(2NDglPG)
-   VPmpx := Round((imgSelW * imgSelH)/1000000, 3)
-   MAINmpx := Round((mainWidth * mainHeight)/1000000, 3) + 0.01
-   If (VPmpx<MAINmpx*1.5 || imgSelLargerViewPort!=1)
-   {
-      If (currIMGdetails.HasAlpha=1)
-         pBitmap := getImgOriginalSelectedAreaEdit(EraseAreaInvert, imgSelPx, imgSelPy, imgSelW, imgSelH, mainWidth, mainHeight, 0)
-      Else
-         pBitmap := getImgSelectedAreaEditMode(1, imgSelPx, imgSelPy, imgSelW, imgSelH, imgSelW, imgSelH, 0, imgSelW, imgSelH, 0)
-   }
-
-   If !validBMP(pBitmap)
-   {
-      Gdip_DeletePath(pPath)
-      Return
-   }
-
-   modus := (EraseAreaInvert=1) ? 4 : 0
-   Gdip_SetClipPath(2NDglPG, pPath, modus)
-   If (currIMGdetails.HasAlpha=1)
-      Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, imgSelPx, imgSelPy, imgSelW, imgSelH)
-
-   zBitmap := applyVPeffectsOnBMP(trGdip_CloneBitmap(A_ThisFunc, pBitmap))
-   If (alphaMaskingMode>1 && liveDrawingBrushTool=1 && AnyWindowOpen=74 && validBMP(zBitmap))
-   {
-      trGdip_GetImageDimensions(userAlphaMaskBmpPainted, zImgW, zImgH)
-      viewportDynamicOBJcoords.x := imgSelPx, viewportDynamicOBJcoords.y := imgSelPy
-      viewportDynamicOBJcoords.w := imgSelW,  viewportDynamicOBJcoords.h := imgSelH
-      viewportDynamicOBJcoords.zl := (imgSelW/zImgW + imgSelH/zImgH)/2 + 0.0001
-      trGdip_GetImageDimensions(zBitmap, oImgW, oImgH)
-      If (oImgW!=zImgW || oImgH!=zImgH)
-      {
-         alphaMaskGray := trGdip_ResizeBitmap(A_ThisFunc, userAlphaMaskBmpPainted, oimgW, oimgH, 0, 5, -1)
-         hasResized := 1
-      } Else alphaMaskGray := userAlphaMaskBmpPainted
-
-      ; QPV_SetBitmapAsAlphaChannel(zBitmap, alphaMaskGray, alphaMaskColorReversed, alphaMaskReplaceMode, alphaMaskBMPchannel, 3)
-      QPV_MergeBitmapsWithMask(zBitmap, pBitmap, alphaMaskGray, !alphaMaskColorReversed, 255 - imgColorsFXopacity, 1)
-      If hasResized
-         trGdip_DisposeImage(alphaMaskGray, 1)
-   } Else allowAlphaMasking := decideAlphaMaskingFeaseable(1)
-
-   If (allowAlphaMasking=1 && validBMP(zBitmap))
-   {
-      thisIDu := "a" VPselRotation EllipseSelectMode imgSelPx imgSelPy imgSelW imgSelH EraseAreaInvert getIDvpFX() DesaturateAreaLevels DesaturateAreaDither currentUndoLevel undoLevelsRecorded userimgGammaCorrect useGdiBitmap() getAlphaMaskIDu()
-      realtimePasteInPlaceAlphaMasker(1, zBitmap, thisIDu, newBitmap, 0, 0, 0, 0, 0, pBitmap, 255 - imgColorsFXopacity)
-      ; fnOutputDebug(thisIDu)
-      If validBMP(newBitmap)
-      {
-         trGdip_DisposeImage(zBitmap, 1)
-         zBitmap := newBitmap
-      }
-   } Else If !(alphaMaskingMode>1 && liveDrawingBrushTool=1)
-      QPV_MergeBitmapsWithMask(zBitmap, pBitmap, 0, 0, 255 - imgColorsFXopacity)
-
-   r1 := trGdip_DrawImage(A_ThisFunc, 2NDglPG, zBitmap, imgSelPx, imgSelPy) ; ,,,,,,, imgColorsFXopacity/255)
-   If (userimgGammaCorrect=1)
-      Gdip_SetCompositingQuality(2NDglPG, 1)
-
-   ; r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectWin, 2NDglHDC)
-   If (currIMGdetails.HasAlpha!=1)
-      trGdip_DisposeImage(pBitmap, 1)
-   ; pBitmap is disposed when this function is invoked with the «kill» option
-   Gdip_ResetClip(2NDglPG)
-   Gdip_DeletePath(pPath)
-   trGdip_DisposeImage(zBitmap, 1)
+   livePreviewSimpleColorsAdjustImage(modus, "vp-colors")
 }
 
 coreSymmetricaImageGenerator(zBitmap) {
@@ -49669,6 +49583,7 @@ getRectFromBitmap(oBitmap, selObj, doResize) {
    now := nx2 - nx1
    If (now<3)
       now := 2
+
    noh := ny2 - ny1
    If (noh<3)
       noh := 2
@@ -49685,6 +49600,7 @@ getRectFromBitmap(oBitmap, selObj, doResize) {
       ; trGdip_GetImageDimensions(gBitmap, fw, fh)
       trGdip_DisposeImage(nBitmap)
    } Else gBitmap := nBitmap
+
    ; fnOutputDebug(A_ThisFunc "(): " now "|" noh " || " selObj.nw "|" selObj.nh " || " fw "|" fh " || " imgW "|" imgH)
    ; ToolTip, % nx1 "|" ny1 "`n" nx2 "|" ny2 , , , 2
    Return gBitmap
@@ -49693,6 +49609,7 @@ getRectFromBitmap(oBitmap, selObj, doResize) {
 livePreviewSimpleColorsAdjustImage(modus:=0, extraMode:=0) {
    Critical, on
    Static prevBMP, prevIDu
+   Static bitsOptions := {0:0, 1:0, 2:2, 3:3, 4:4, 5:5, 6:6, 7:7, 8:8, 9:16}
    If (modus="kill")
    {
       trGdip_DisposeImage(prevBMP, 1)
@@ -49708,7 +49625,7 @@ livePreviewSimpleColorsAdjustImage(modus:=0, extraMode:=0) {
       Return
    }
 
-   thisInvertArea := (extraMode="desaturate") ? EraseAreaInvert : userImgAdjustInvertArea
+   thisInvertArea := isVarEqualTo(extraMode, "vp-colors", "desaturate") ? EraseAreaInvert : userImgAdjustInvertArea
    Gdip_ResetClip(2NDglPG)
    If (doImgEditLivePreview!=1 || testSelectOutsideImgEntirely(useGdiBitmap()) && PasteInPlaceAutoExpandIMG=0 || thisInvertArea=0 && imgSelOutViewPort=1)
       Return
@@ -49755,17 +49672,17 @@ livePreviewSimpleColorsAdjustImage(modus:=0, extraMode:=0) {
       If (alphaMaskingMode>1 && liveDrawingBrushTool=1 && AnyWindowOpen=89)
          live := 1
       Else
-         allowAlphaMasking := decideAlphaMaskingFeaseable(1)
+         allowAlphaMasking := (extraMode="desaturate") ?  decideAlphaMaskingFeaseable(EraseAreaUseAlpha) : decideAlphaMaskingFeaseable(1)
 
       modus := (thisInvertArea=1) ? 4 : 0
       Gdip_SetClipRect(2NDglPG, 0, 0, mainWidth, mainHeight)
-      zBitmap := applyVPeffectsOnBMP(zBitmap)
-      If (allowAlphaMasking=1 || live=1)
+      If (extraMode!="vp-colors")
+         zBitmap := applyVPeffectsOnBMP(zBitmap)
+      If (allowAlphaMasking=1 || live=1 || extraMode="vp-colors" && imgColorsFXopacity<255)
          pBitmap := trGdip_CloneBitmap(A_ThisFunc, zBitmap)
 
-      If (!viewportQPVimage.imgHandle)
-         liveCarvePathFromBitmap(pPath, zBitmap, imgSelPx, imgSelPy, thisInvertArea)
-
+      thisBitsDepth := bitsOptions[DesaturateAreaLevels]
+      doClrDepths := (isVarEqualTo(extraMode,"vp-colors", "desaturate") && thisBitsDepth>1) ? 1 : 0
       If (currIMGdetails.HasAlpha=1)
       {
          ; Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, imgSelPx, imgSelPy, imgSelW, imgSelH)
@@ -49775,20 +49692,37 @@ livePreviewSimpleColorsAdjustImage(modus:=0, extraMode:=0) {
       threB := (userImgAdjustLinkThresholds=1) ? userImgAdjustThreR : userImgAdjustThreB
       threG := (userImgAdjustLinkThresholds=1) ? userImgAdjustThreR : userImgAdjustThreG
       partu := getVPselIDs("saiz-vpos-xy") VPselRotation EllipseSelectMode imgSelW imgSelH innerSelectionCavityX innerSelectionCavityY rotateSelBoundsKeepRatio zoomLevel prevDestPosX prevDestPosY
-      thisIDu := "a" getIDvpFX() imgColorsFXopacity userImgAdjustInvertColors userImgAdjustAltSat userImgAdjustSat userImgAdjustAltBright userImgAdjustBright userImgAdjustAltContra userImgAdjustContra userImgAdjustAltHiLows userImgAdjustShadows userImgAdjustHighs userImgAdjustHue userImgAdjustTintDeg userImgAdjustTintAmount userImgAdjustAltTint userImgAdjustGamma userImgAdjustOffR userImgAdjustOffG userImgAdjustOffB userImgAdjustOffA userImgAdjustThreR ThreG ThreB userImgAdjustThreA userImgAdjustSeeThrough userImgAdjustNoClamp userImgAdjustHiPrecision userImgAdjustWhitePoint userImgAdjustBlackPoint userImgAdjustNoisePoints userimgGammaCorrect DesaturateAreaAmount DesaturateAreaInvert DesaturateAreaChannel DesaturateAreaBright DesaturateAreaContra DesaturateAreaHue partu thisInvertArea
+      thisIDu := "a" getIDvpFX() imgColorsFXopacity userImgAdjustInvertColors userImgAdjustAltSat userImgAdjustSat userImgAdjustAltBright userImgAdjustBright userImgAdjustAltContra userImgAdjustContra userImgAdjustAltHiLows userImgAdjustShadows userImgAdjustHighs userImgAdjustHue userImgAdjustTintDeg userImgAdjustTintAmount userImgAdjustAltTint userImgAdjustGamma userImgAdjustOffR userImgAdjustOffG userImgAdjustOffB userImgAdjustOffA userImgAdjustThreR ThreG ThreB userImgAdjustThreA userImgAdjustSeeThrough userImgAdjustNoClamp userImgAdjustHiPrecision userImgAdjustWhitePoint userImgAdjustBlackPoint userImgAdjustNoisePoints userimgGammaCorrect DesaturateAreaLevels DesaturateAreaDither DesaturateAreaAmount DesaturateAreaInvert DesaturateAreaChannel DesaturateAreaBright DesaturateAreaContra DesaturateAreaHue partu thisInvertArea userImgChannelAlphaAdd
       trGdip_GetImageDimensions(zBitmap, oImgW, oImgH)
+      ; ToolTip, % oImgW "|" oImgH "`n" imgSelW "|" imgSelH , , , 2
       objSel.dw := imgSelW,    objSel.dh := imgSelH
       objSel.dx := imgSelPx,   objSel.dy := imgSelPy
       objSel.nw := oImgW,      objSel.nh := oImgH
       If (thisIDu!=prevIDu || !validBMP(prevBMP))
       {
-         fnOutputDebug("redraw: " A_ThisFunc " : QPV_AdjustImageColors")
          trGdip_DisposeImage(prevBMP, 1)
-         livePreviewPrepareSelectionArea(objSel, userImgAdjustInvertArea)
-         If (extraMode="desaturate")
+         fnOutputDebug("redraw: " A_ThisFunc " : QPV_AdjustImageColors")
+         If (doClrDepths=1)
+         {
+            Gdip_BitmapSetColorDepth(zBitmap, thisBitsDepth, DesaturateAreaDither)
+            Gdip_BitmapSetColorDepth(zBitmap, 32)
+         }
+
+         livePreviewPrepareSelectionArea(objSel, thisInvertArea)
+         If (extraMode="vp-colors")
+         {
+            zBitmap := applyVPeffectsOnBMP(zBitmap)
+            If (imgColorsFXopacity<255)
+               QPV_MergeBitmapsWithMask(zBitmap, pBitmap, 0, 0, 255 - imgColorsFXopacity)
+            If (userImgChannelAlphaAdd>0)
+               QPV_AlterAlphaChannel(zBitmap, userImgChannelAlphaAdd, 0)
+         } Else If (extraMode="desaturate")
             QPV_AdjustImageColors(zBitmap, DesaturateAreaAmount, DesaturateAreaInvert, DesaturateAreaChannel - 1, -65535, 1, DesaturateAreaBright, 0, DesaturateAreaContra, 0, 0, 0, DesaturateAreaHue, 0, 0, 0, 300, 0, 0, 0, 0, -1, -1, -1, -1, 1, 0, 0, 65535, 0, 0, -1)
          Else
             QPV_AdjustImageColors(zBitmap, imgColorsFXopacity, userImgAdjustInvertColors, userImgAdjustAltSat, userImgAdjustSat, userImgAdjustAltBright, userImgAdjustBright, userImgAdjustAltContra, userImgAdjustContra, userImgAdjustAltHiLows, userImgAdjustShadows, userImgAdjustHighs, userImgAdjustHue, userImgAdjustTintDeg, userImgAdjustTintAmount, userImgAdjustAltTint, userImgAdjustGamma, userImgAdjustOffR, userImgAdjustOffG, userImgAdjustOffB, userImgAdjustOffA, userImgAdjustThreR, ThreG, ThreB, userImgAdjustThreA, userImgAdjustSeeThrough, userImgAdjustInvertArea, userImgAdjustNoClamp, userImgAdjustWhitePoint, userImgAdjustBlackPoint, userImgAdjustNoisePoints, -1)
+
+         If (!viewportQPVimage.imgHandle && allowAlphaMasking!=1)
+            liveCarvePathFromBitmap(pPath, zBitmap, imgSelPx, imgSelPy, thisInvertArea)
 
          prevBMP := trGdip_CloneBitmap(A_ThisFunc, zBitmap)
          prevIDu := thisIDu
@@ -49826,6 +49760,8 @@ livePreviewSimpleColorsAdjustImage(modus:=0, extraMode:=0) {
             zBitmap := newBitmap
          }
       }
+      If (!viewportQPVimage.imgHandle && allowAlphaMasking=1)
+         liveCarvePathFromBitmap(pPath, zBitmap, imgSelPx, imgSelPy, thisInvertArea)
 
       r1 := trGdip_DrawImage(A_ThisFunc, 2NDglPG, zBitmap, imgSelPx, imgSelPy)
       Gdip_ResetClip(2NDglPG)
@@ -79980,6 +79916,7 @@ coreColorsAdjusterWindow(modus:=0) {
     UIimgFxMode := (imgFxMode>3) ? imgFxMode - 1 : imgFxMode
     If (idu=74)
     {
+       userImgChannelAlvl := 1
        DesaturateAreaLevels := usrColorDepth
        DesaturateAreaDither := ColorDepthDithering
        If (usrColorDepth>1)
@@ -80030,7 +79967,11 @@ coreColorsAdjusterWindow(modus:=0) {
 
     Gui, Tab, 2 ; more
     GuiAddDropDownList("x+15 y+15 Section w" slide3Wid " gUpdateUIadjustVPcolors AltSubmit Choose" specialColorFXmode " vspecialColorFXmode", "None|Brightness / Contrast|Hue / Saturation / Lightness|Levels adjust|Color tint|Colors balance|Color curve per channel", "Additional colors adjustments")
-    GuiAddSlider("userImgChannelAlvl", 1.0,30.0, "1.0f", "Alpha multiplier: $€x", "UpdateUIadjustVPcolors", 1, "x+5 wp hp")
+    If (idu=10)
+       GuiAddSlider("userImgChannelAlvl", 1.0,30.0, "1.0f", "Alpha multiplier: $€x", "UpdateUIadjustVPcolors", 1, "x+5 wp hp")
+    Else
+       GuiAddSlider("userImgChannelAlphaAdd", 0,255, 0, "Alpha channel: +$€", "UpdateUIadjustVPcolors", 1, "x+5 wp hp")
+
     GuiAddDropDownList("xs y+2 wp gUpdateUIadjustVPcolors AltSubmit Choose" uiColorCurveFXmode " vuiColorCurveFXmode", "Brightness (density)|Contrast|Highlights|Shadows|Mid-tones|White saturation|Black saturation", "Color curve mode")
     GuiAddDropDownList("x+5 wp gUpdateUIadjustVPcolors AltSubmit Choose" uiColorCurveFXchannel " vuiColorCurveFXchannel", "Red|Green|Blue|All", "Color channel")
 
@@ -80082,13 +80023,13 @@ coreColorsAdjusterWindow(modus:=0) {
        GuiAddButton("xs-10 y+15 h" thisBtnHeight " w" ml " gBtnPrevImg", "<<", "Previous image")
        GuiAddButton("x+5 hp wp gBtnNextImg", ">>", "Next image")
        GuiAddCollapseBtn("x+5 hp wp")
-       GuiAddToggleLivePreview("x+5 yp hp wp gBtnToggleNoColorsFX")
+       GuiAddToggleLivePreview("x+5 yp hp wp gUpdateUIadjustVPcolors")
        Gui, Add, Button, x+5 hp w%jk% Default gBtnCloseWindow, &Close
     } Else
     {
        GuiAddCollapseBtn("xs-10 y+15 h" thisBtnHeight " w" ml)
        GuiAddCloseOnApply("x+5 yp hp wp")
-       GuiAddToggleLivePreview("x+5 yp hp wp gBtnToggleNoColorsFX")
+       GuiAddToggleLivePreview("x+5 yp hp wp gUpdateUIadjustVPcolors")
        Gui, Add, Button, x+5 hp w%jk% Default gapplyIMGeditFunction vbtnLiveApplyTool, &Apply
        Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
        dummyTimerDelayiedImageDisplay(150)
@@ -80719,7 +80660,6 @@ UpdateUIadjustVPcolors(dummy:=0) {
    }
 
    defineColorDepth()
-   ; ForceNoColorMatrix := 0
    If (vpIMGrotation=1 || vpIMGrotation>358)
       vpIMGrotation := 0
 
@@ -80758,10 +80698,36 @@ UpdateUIadjustVPcolors(dummy:=0) {
       GuiControl, SettingsGUIA:, bwDithering, 0
    }
 
-   filterDelayiedImageDisplay()
+   If (AnyWindowOpen=10)
+      filterDelayiedImageDisplay()
+   Else
+      livePreviewsImageEditing(0, A_ThisFunc, actionu, b)
+
    If (AnyWindowOpen=74)
       RegAction(1, "imgColorsFXopacity")
    SetTimer, WriteSettingsColorAdjustments, -150
+}
+
+livePreviewColorsAdjustVP() {
+   imgThreshold := Round(userImgVPthreshold/200, 3)
+   realGammos := (userImgVPgammaLevel>0) ? (userImgVPgammaLevel + 1)**3.32 : userImgVPgammaLevel + 1
+   If isInRange(imgFxMode, 1, 3)
+   {
+      lumosAdjust := (userImgClrMtrxBrightness>0) ? (userImgClrMtrxBrightness + 1)**3.9 : userImgClrMtrxBrightness + 1
+      GammosAdjust := (userImgClrMtrxContrast>0) ? -1*((userImgClrMtrxContrast + 1)**3.8 - 1) : -1*userImgClrMtrxContrast
+   } Else If (imgFxMode=4)
+   {
+      lumosGrayAdjust := (userImgClrMtrxBrightness>0) ? (userImgClrMtrxBrightness + 1)**3.9 : userImgClrMtrxBrightness + 1
+      GammosGrayAdjust := (userImgClrMtrxContrast>0) ? -1*((userImgClrMtrxContrast + 1)**3.8 - 1) : -1*userImgClrMtrxContrast
+   }
+
+   satAdjust := (userImgClrMtrxSaturation>0) ? (userImgClrMtrxSaturation + 1)**2.32 : userImgClrMtrxSaturation + 1
+   chnRdecalage := Round(userImgChannelRlvl/100, 3)
+   chnGdecalage := Round(userImgChannelGlvl/100, 3)
+   chnBdecalage := Round(userImgChannelBlvl/100, 3)
+   ; ToolTip, % chnRdecalage "|" chnGdecalage "|"  chnBdecalage "`n" userImgChannelRlvl "|" userImgChannelGlvl "|" userImgChannelBlvl , , , 2
+   IntensityAlphaChannel := userImgChannelAlvl
+   dummyResizeImageGDIwin()
 }
 
 PanelFileFormatConverter() {
@@ -92904,7 +92870,9 @@ GuiSlidersResponder(a, m_event, keyu) {
       If (A_TickCount - lastu>50)
       {
          p := GuiUpdateSliders(whichSlider, 0, obju)
-         If (imgEditPanelOpened=1)
+         If (AnyWindowOpen=10 || AnyWindowOpen=74)
+            livePreviewColorsAdjustVP()
+         Else If (imgEditPanelOpened=1)
             livePreviewsImageEditing()
          Else If (tinyPreview=1)
             coreUpdateLiveTinyPreviewsWindow()

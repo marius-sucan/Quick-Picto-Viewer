@@ -314,7 +314,7 @@ DLL_API int DLL_CALLCONV SetColorAlphaChannel(int *imageData, int w, int h, int 
     return 1;
 }
 
-DLL_API int DLL_CALLCONV AlterBitmapAlphaChanel(unsigned char *imageData, int w, int h, int Stride, int bpp, int level, int replaceAlpha) {
+DLL_API int DLL_CALLCONV AlterBitmapAlphaChannel(unsigned char *imageData, int w, int h, int Stride, int bpp, int level, int replaceAlpha) {
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int x = 0; x < w; x++)
     {
