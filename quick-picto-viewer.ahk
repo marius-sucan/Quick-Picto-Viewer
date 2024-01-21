@@ -6015,13 +6015,13 @@ corelivePreviewsImageEditing(modus:=0) {
       Else If (AnyWindowOpen=25 && okayu=1)
          livePreviewEraseArea()
       Else If (AnyWindowOpen=30 && okayu=1)
-         coreDrawLinesSelectionArea()
+         coreDrawLinesStuffTool("parametric")
       Else If (AnyWindowOpen=32 && (okayu=1 || liveDrawingBrushTool=1))
          livePreviewInsertTextinArea(0, liveDrawingBrushTool)
       Else If (AnyWindowOpen=55 && okayu=1)
          livePreviewDesaturateArea()
       Else If (AnyWindowOpen=65 && okayu=1)
-         coreDrawShapesSelectionArea()
+         coreDrawLinesStuffTool("shapes")
       Else If (AnyWindowOpen=68 && okayu=1)
          livePreviewFillBehindArea()
       Else If (AnyWindowOpen=70 && (okayu=1 || liveDrawingBrushTool=1))
@@ -16793,8 +16793,12 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
    If validBMP(glassBitmap)
       trGdip_DisposeImage(glassBitmap, 1)
    If (FillAreaDoContour=1 && previewMode=1)
-      coreDrawShapesSelectionArea()
+      coreDrawLinesStuffTool("shapes")
    Return rz
+}
+
+weighTwoValues(A, B, w) {
+    return A*w + B*(1-w)
 }
 
 flipVars(ByRef a, ByRef b) {
@@ -19305,12 +19309,12 @@ DrawLinesInSelectedArea(modus) {
     }
 
     If (modus=1)
-       rz := coreDrawLinesSelectionArea(G2, newBitmap)
+       rz := coreDrawLinesStuffTool("parametric", G2, newBitmap)
     Else
-       coreDrawShapesSelectionArea(G2, newBitmap)
+       rz := coreDrawLinesStuffTool("shapes", G2, newBitmap)
 
     Gdip_DeleteGraphics(G2)
-    If (DrawLineAreaBlendMode>1)
+    If (DrawLineAreaBlendMode>1 && rz!=-1)
        r := QPV_BlendBitmaps(newBitmap, whichBitmap, DrawLineAreaBlendMode, BlendModesPreserveAlpha, BlendModesFlipped, 2)
 
     If (rz!=-1)
@@ -19332,62 +19336,7 @@ DrawLinesInSelectedArea(modus) {
     }
 }
 
-weighTwoValues(A, B, w) {
-    return A*w + B*(1-w)
-}
-
-coreDrawLinesSelectionArea(G2:=0, whichBitmap:=0) {
-    If (G2)
-    {
-       previewMode := 0
-       trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
-       calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-       maxLength := (imgSelW + imgSelH)//2
-       thisThick := (DrawLineAreaContourThickness>maxLength//1.5) ? maxLength//1.5 : DrawLineAreaContourThickness
-       If (userimgGammaCorrect=1)
-          Gdip_SetCompositingQuality(G2, 2)
-    } Else
-    {
-       G2 := 2NDglPG ; preview mode ;-)
-       If (doImgEditLivePreview!=1)
-          Return
-
-       previewMode := 1
-       vpWinClientSize(mainWidth, mainHeight)
-       trGdip_GetImageDimensions(useGdiBitmap(), qimgW, qimgH)
-       ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, qImgW, qImgH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
-       maxLength := Round( (imgSelW + imgSelH)/2 )
-       thisThick := (DrawLineAreaContourThickness > maxLength//1.5) ? maxLength//1.5 : DrawLineAreaContourThickness
-       thisThick := thisThick * zoomLevel
-       tk := (DrawLineAreaContourAlign=2) ? thisThick//2 : thisThick
-       If (DrawLineAreaContourAlign=1)
-          tk := 0
-
-       dw := Round(imgSelW + tk * 2)
-       dh := Round(imgSelH + tk * 2)
-       o_imgSelPx := imgSelPx
-       o_imgSelPy := imgSelPy
-       VPmpx := Round((ResizedW * ResizedH)/1000000, 3)
-       MAINmpx := Round((mainWidth * mainHeight)/1000000, 3) + 2
-       sizeOkay := (VPmpx < MAINmpx + 2) ? 1 : 0
-       If (DrawLineAreaBlendMode>1 && sizeOkay=1)
-       {
-          previewMode := 2
-          xBitmap := trGdip_CreateBitmap(A_ThisFunc, dw, dh, "0x26200A")
-          If (currIMGdetails.HasAlpha=1 && !viewportQPVimage.imgHandle)
-             bgrBMPu := getImgOriginalSelectedAreaEdit(2, imgSelPx - tk, imgSelPy - tk, dw, dh, mainWidth, mainHeight, 0)
-          Else
-             bgrBMPu := getImgSelectedAreaEditMode(1, imgSelPx - tk, imgSelPy - tk, dw, dh, dw, dh, 0, dw, dh)
-          G2 := trGdip_GraphicsFromImage(A_ThisFunc, xBitmap)
-          imgSelPx :=  imgSelPy := tk
-       } Else If (userimgGammaCorrect=1 && AnyWindowOpen!=23 && sizeOkay=1)
-       {
-          bgrBMPu := getImgSelectedAreaEditMode(1, imgSelPx - tk, imgSelPy - tk, dw, dh, dw, dh, 0, dw, dh)
-          trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx - tk, imgSelPy - tk, dw, dh)
-          Gdip_SetCompositingQuality(G2, 2)
-       }
-    }
-
+coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgSelW, imgSelH) {
     dR := (DrawLineAreaContourAlign=3) ? thisThick//2 : 0
     If (DrawLineAreaContourAlign=1)
        dR := -thisThick//2
@@ -19468,18 +19417,34 @@ coreDrawLinesSelectionArea(G2:=0, whichBitmap:=0) {
     If (DrawLineAreaBorderCenter=3)
     {
        ; diagonals
-       frame :=  defineFreeHandFrame("flip", FlipImgH, FlipImgV, freeHandPoints[5])
-       deg := MouseDeltaAngle180(x1, y1, x2, y2)
+       frame := defineFreeHandFrame("flip", FlipImgH, FlipImgV, freeHandPoints[5])
+       deg := MouseDeltaAngle360(x1, y1, x2, y2)
+
+       zSelW := ( max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2) ) * zoomLevel
+       zSelH := ( max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2) ) * zoomLevel
+       tt :=  (DrawLineAreaContourThickness<15) ?  DrawLineAreaContourThickness : DrawLineAreaContourThickness*zoomLevel
+       If (DrawLineAreaContourAlign=2 && DrawLineAreaContourThickness>30)
+          tt := tt/2
+
+       tt := (tt<24) ? tt * 1.5 : tt * 0.9
+       If (tt<5)
+          tt := 5
+
+       If (zSelW<tt && zSelH>tt)
+          snapping := "h"
+       Else If (zSelH<tt && zSelW>tt)
+          snapping := "v"
+
        Gdip_StartPathFigure(pPathBrders)
-       ; ToolTip, % frame " deg=" deg , , , 2
-       If (freeHandSelectionMode=1 && DrawLineAreaSnapLine=1 && isInRange(deg, -5, 5) && (frame=1 || frame=2))
+       ; ToolTip, % thisThick "|" snapping "=" frame " deg=" deg , , , 2
+       If (freeHandSelectionMode=1 && DrawLineAreaSnapLine=1 && snapping="v" && (frame=1 || frame=2))
           Gdip_AddPathLine(pPathBrders, x1, y2, x2, y2)
-       Else If (freeHandSelectionMode=1 && DrawLineAreaSnapLine=1 && isInRange(deg, 0, 5) && (frame=3 || frame=4))
+       Else If (freeHandSelectionMode=1 && DrawLineAreaSnapLine=1 && snapping="v" && (frame=3 || frame=4))
           Gdip_AddPathLine(pPathBrders, x1, y1, x2, y1)
-       Else If (freeHandSelectionMode=1 && DrawLineAreaSnapLine=1 && isInRange(abs(deg), 85, 90) && (frame=1 || frame=3))
+       Else If (freeHandSelectionMode=1 && DrawLineAreaSnapLine=1 && snapping="h" && (frame=1 || frame=3))
           Gdip_AddPathLine(pPathBrders, x2, y1, x2, y2)
-       Else If (freeHandSelectionMode=1 && DrawLineAreaSnapLine=1 && isInRange(abs(deg), 85, 95) && (frame=4 || frame=2))
-          Gdip_AddPathLine(pPathBrders, x1, y2, x1, y1)
+       Else If (freeHandSelectionMode=1 && DrawLineAreaSnapLine=1 && snapping="h" && (frame=2 || frame=4))
+          Gdip_AddPathLine(pPathBrders, x1, y1, x1, y2)
        Else If (freeHandSelectionMode=1 && (frame=1 || frame=4))
           Gdip_AddPathLine(pPathBrders, x1, y1, x2, y2)
        Else If (freeHandSelectionMode=1 && (frame=2 || frame=3))
@@ -19496,7 +19461,7 @@ coreDrawLinesSelectionArea(G2:=0, whichBitmap:=0) {
     }
 
     rz := Gdip_GetPathPointsCount(pPathBrders) + Gdip_GetPathPointsCount(pPathArcs) 
-    If (DrawLineAreaBorderCenter<4 && !rz && previewMode=0)
+    If (DrawLineAreaBorderCenter<2 && !rz && previewMode=0)
     {
        showTOOLtip("WARNING: No lines configured to draw.`nIs this what they call a draw?")
        SoundBeep 300, 100
@@ -19826,27 +19791,9 @@ coreDrawLinesSelectionArea(G2:=0, whichBitmap:=0) {
        Gdip_DrawPath(G2, thisPen, pPath)
        Gdip_DeletePath(pPath)
     }
-
-    Gdip_ResetClip(G2)
     Gdip_DeletePen(thisPen)
-    If (userimgGammaCorrect=1)
-       Gdip_SetCompositingQuality(G2, 1)
+} ; // coreDrawParametricLinesTool()
 
-    If (previewMode=2)
-    {
-       Gdip_ResetClip(2NDglPG)
-       Gdip_DeleteGraphics(G2)
-       QPV_BlendBitmaps(bgrBMPu, xBitmap, DrawLineAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped)
-       If (currIMGdetails.HasAlpha=1)
-          Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, o_imgSelPx - tk, o_imgSelPy - tk, dw, dh)
-       trGdip_DrawImage(A_ThisFunc, 2NDglPG, bgrBMPu, o_imgSelPx - tk, o_imgSelPy - tk, dw, dh)
-       trGdip_DisposeImage(xBitmap)
-    }
-
-    If validBMP(bgrBMPu)
-       trGdip_DisposeImage(bgrBMPu)
-
-} ; // coreDrawLinesSelectionArea()
 
 createDrawLinesPen(thisThick) {
     Static compoundArray := "0.0|0.33|0.67|1.0"
@@ -19855,6 +19802,7 @@ createDrawLinesPen(thisThick) {
 
     thisColor := makeRGBAcolor(DrawLineAreaColor, DrawLineAreaOpacity)
     thisPen := Gdip_CreatePen(thisColor, thisThick)
+    Gdip_SetPenUnit(thisPen, 2)
     Gdip_SetPenDashStyle(thisPen, DrawLineAreaDashStyle - 1)
     If (DrawLineAreaCapsStyle=1)
        Gdip_SetPenLineCaps(thisPen, 2, 2, 2)
@@ -19865,7 +19813,7 @@ createDrawLinesPen(thisThick) {
     Return thisPen
 }
 
-coreDrawShapesSelectionArea(G2:=0, whichBitmap:=0) {
+coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
     If (G2)
     {
        previewMode := 0
@@ -19873,59 +19821,111 @@ coreDrawShapesSelectionArea(G2:=0, whichBitmap:=0) {
        calcImgSelection2bmp(!LimitSelectBoundsImg, oimgW, oimgH, oimgW, oimgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
        maxLength := min(imgSelW, imgSelH)//2
        thisThick := (DrawLineAreaContourThickness>maxLength//1.05) ? maxLength//1.05 : DrawLineAreaContourThickness
+       If (modus!="shapes" && (DrawLineAreaBorderCenter=2 || DrawLineAreaBorderCenter=3))
+          thisThick := DrawLineAreaContourThickness
+
        If (userimgGammaCorrect=1)
           Gdip_SetCompositingQuality(G2, 2)
     } Else
     {
        G2 := 2NDglPG ; preview mode
-       If (doImgEditLivePreview!=1)
+       If (doImgEditLivePreview!=1 || testSelectOutsideImgEntirely(useGdiBitmap()) && PasteInPlaceAutoExpandIMG!=1)
           Return
 
        ; trGdip_GraphicsClear(A_ThisFunc, 2NDglPG, "0x00" WindowBGRcolor)
        previewMode := 1
        vpWinClientSize(mainWidth, mainHeight)
        trGdip_GetImageDimensions(useGdiBitmap(), qimgW, qimgH)
-       ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, qImgW, qImgH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
-       maxLength := Round( (imgSelW + imgSelH)/2 )
+       calcImgSelection2bmp(!LimitSelectBoundsImg, qimgW, qimgH, qimgW, qimgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
+       maxLength := min(imgSelW, imgSelH)//2
        thisThick := (DrawLineAreaContourThickness>maxLength//1.05) ? maxLength//1.05 : DrawLineAreaContourThickness
+       If (modus!="shapes" && (DrawLineAreaBorderCenter=2 || DrawLineAreaBorderCenter=3))
+          thisThick := DrawLineAreaContourThickness
+
        thisThick := thisThick*zoomLevel
+       ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, qImgW, qImgH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
        tk := (DrawLineAreaContourAlign=2) ? thisThick//2 : thisThick
        If (DrawLineAreaContourAlign=1)
           tk := 0
 
-       dw := Round(imgSelW + tk * 2)
-       dh := Round(imgSelH + tk * 2)
-       o_imgSelPx := imgSelPx
-       o_imgSelPy := imgSelPy
-       VPmpx := Round((ResizedW * ResizedH)/1000000, 3)
-       MAINmpx := Round((mainWidth * mainHeight)/1000000, 3) + 2
-       sizeOkay := (VPmpx < MAINmpx + 2) ? 1 : 0
-       If (DrawLineAreaBlendMode>1 && sizeOkay=1)
+       o_imgSelPx := imgSelPx,        o_imgSelPy := imgSelPy
+       o_imgSelW  := imgSelW,         o_imgSelH  := imgSelH
+       getClampedVPselToWindow(1, mainWidth, mainHeight, qimgW, qimgH, imgSelPx, imgSelPy, imgSelW, imgSelH)
+       dw := (o_imgSelW>mainWidth) ? imgSelW : Round(imgSelW + tk * 2)
+       dh := (o_imgSelH>mainHeight) ? imgSelH : Round(imgSelH + tk * 2)
+       If (dw<3)
+          dw := 3
+       If (dh<3)
+          dh := 3
+
+       tkx := (o_imgSelW>mainWidth) ? 0 : tk
+       tky := (o_imgSelH>mainHeight) ? 0 : tk
+       bx := by := 0
+       If (DrawLineAreaBlendMode>1 && !testSelectOutsideImgEntirely(useGdiBitmap()))
        {
           previewMode := 2
           xBitmap := trGdip_CreateBitmap(A_ThisFunc, dw, dh, "0x26200A")
           If (currIMGdetails.HasAlpha=1 && !viewportQPVimage.imgHandle)
-             bgrBMPu := getImgOriginalSelectedAreaEdit(2, imgSelPx - tk, imgSelPy - tk, dw, dh, mainWidth, mainHeight, 0)
+             bgrBMPu := getImgOriginalSelectedAreaEdit(0, imgSelPx - tkx, imgSelPy - tky, dw, dh, mainWidth, mainHeight, 0)
           Else
-             bgrBMPu := getImgSelectedAreaEditMode(1, imgSelPx - tk, imgSelPy - tk, dw, dh, dw, dh, 0, dw, dh)
-          G2 := trGdip_GraphicsFromImage(A_ThisFunc, xBitmap)
-          imgSelPx :=  imgSelPy := tk
-       } Else If (userimgGammaCorrect=1 && AnyWindowOpen!=23 && sizeOkay=1)
+             bgrBMPu := getImgSelectedAreaEditMode(1, imgSelPx - tkx, imgSelPy - tky, dw, dh, dw, dh, 0, dw, dh)
+
+          G2 := Gdip_GraphicsFromImage(xBitmap, 5, 1, 2, 1)
+          Gdip_SetPixelOffsetMode(G2, 1)
+          bx := (prevDestPosX>=o_imgSelPx && prevDestPosX>=0) ? prevDestPosX - o_imgSelPx : 0
+          by := (prevDestPosY>=o_imgSelPy && prevDestPosY>=0) ? prevDestPosY - o_imgSelPy : 0
+          bx := (o_imgSelPx<=0 && prevDestPosX<=0) ? abs(o_imgSelPx) : bx
+          by := (o_imgSelPy<=0 && prevDestPosY<=0) ? abs(o_imgSelPy) : by
+          imgSelPx := tkx - bx
+          imgSelPy := tky - by
+       } Else If (userimgGammaCorrect=1 && AnyWindowOpen!=23)
        {
-          bgrBMPu := getImgSelectedAreaEditMode(1, imgSelPx - tk, imgSelPy - tk, dw, dh, dw, dh, 0, dw, dh)
-          trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx - tk, imgSelPy - tk, dw, dh)
+          bgrBMPu := getImgSelectedAreaEditMode(1, imgSelPx - tkx, imgSelPy - tky, dw, dh, dw, dh, 0, dw, dh)
+          trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx - tkx, imgSelPy - tky, dw, dh)
           Gdip_SetCompositingQuality(G2, 2)
+          imgSelPx := o_imgSelPx,        imgSelPy := o_imgSelPy
+       } Else
+       {
+          imgSelPx := o_imgSelPx,        imgSelPy := o_imgSelPy
        }
+       imgSelW  := o_imgSelW,         imgSelH  := o_imgSelH
     }
 
+    Gdip_ResetClip(G2)
+    If (previewMode>0)
+       Gdip_SetClipRect(G2, 0, 0, mainWidth, mainHeight, 0)
+
+    If (modus="shapes")
+       rz := coreDrawShapesLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgSelW, imgSelH)
+    Else
+       rz := coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgSelW, imgSelH)
+
+    Gdip_ResetClip(G2)
+    If (userimgGammaCorrect=1)
+       Gdip_SetCompositingQuality(G2, 1)
+
+    If (previewMode=2)
+    {
+       Gdip_DeleteGraphics(G2)
+       Gdip_ResetClip(2NDglPG)
+       QPV_BlendBitmaps(bgrBMPu, xBitmap, DrawLineAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped)
+       If (currIMGdetails.HasAlpha=1)
+          Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, o_imgSelPx - tkx + bx, o_imgSelPy - tky + by, dw, dh)
+       trGdip_DrawImage(A_ThisFunc, 2NDglPG, bgrBMPu, o_imgSelPx - tkx + bx, o_imgSelPy - tky + by, dw, dh)
+       trGdip_DisposeImage(xBitmap)
+    }
+
+    If validBMP(bgrBMPu)
+       trGdip_DisposeImage(bgrBMPu)
+    Return rz
+}
+
+coreDrawShapesLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgSelW, imgSelH) {
     thisPen := createDrawLinesPen(thisThick)
     pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio)
     modus := (DrawLineAreaContourAlign=1) ? 0 : 4
     If (DrawLineAreaContourAlign!=2)
-    {
-       Gdip_ResetClip(G2)
        Gdip_SetClipPath(G2, pPath, modus)
-    }
 
     If (FillAreaEllipseSection<848 && FillAreaShape=3 && FillAreaEllipsePie=0)
     {
@@ -19934,29 +19934,17 @@ coreDrawShapesSelectionArea(G2:=0, whichBitmap:=0) {
        Gdip_DeletePath(nPath)
     }
 
-    Gdip_DrawPath(G2, thisPen, pPath)
-    If (DrawLineAreaContourAlign!=2)
-       Gdip_ResetClip(G2)
-
-    Gdip_DeletePath(pPath)
-    Gdip_DeletePen(thisPen)
-    If (userimgGammaCorrect=1)
-       Gdip_SetCompositingQuality(G2, 1)
-
-    If (previewMode=2)
+    If (previewMode>0)
     {
-       Gdip_ResetClip(2NDglPG)
-       Gdip_DeleteGraphics(G2)
-       QPV_BlendBitmaps(bgrBMPu, xBitmap, DrawLineAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped)
-       If (currIMGdetails.HasAlpha=1)
-          Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, o_imgSelPx - tk, o_imgSelPy - tk, dw, dh)
-       trGdip_DrawImage(A_ThisFunc, 2NDglPG, bgrBMPu, o_imgSelPx - tk, o_imgSelPy - tk, dw, dh)
-       trGdip_DisposeImage(xBitmap)
+       vpWinClientSize(mainWidth, mainHeight)
+       Gdip_SetClipRect(G2, 0, 0, mainWidth, mainHeight, 1)
     }
 
-    If validBMP(bgrBMPu)
-       trGdip_DisposeImage(bgrBMPu)
+    Gdip_DrawPath(G2, thisPen, pPath)
+    Gdip_DeletePath(pPath)
+    Gdip_DeletePen(thisPen)
 }
+
 
 createPiePath(imgSelPx, imgSelPy, imgSelW, imgSelH, err:=0, pPath:=0) {
     nPath := pPath ? pPath : Gdip_CreatePath()
@@ -46088,9 +46076,9 @@ getClampedVPselToWindow(clampToImage, mainWidth, mainHeight, thisW, thisH, ByRef
    selW := max(dpX, kX) - min(dpX, kX)
    selH := max(dpY, kY) - min(dpY, kY)
    If (selW < 3)
-      selW := 2
+      selW := 3
    If (selH < 3)
-      selH := 2
+      selH := 3
 }
 
 livePreviewEraseArea() {
@@ -46385,16 +46373,19 @@ getImgOriginalSelectedAreaEdit(doInvert, imgSelPx, imgSelPy, imgSelW, imgSelH, m
       mainBMP := useGdiBitmap()
       MouseCoords2Image(1, 1, 1, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, xa, ya)
       MouseCoords2Image(mainWidth, mainHeight, 1, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, xb, yb)
-      nnw := xb - xa,       nnh := yb - ya
+      nnw := clampInRange(xb - xa, 3, xb)
+      nnh := clampInRange(yb - ya, 3, yb)
       pBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, mainBMP, xa, ya, nnw, nnh, 0, 0, 1)
       If (allowFX=1)
          pBitmap := applyVPeffectsOnBMP(pBitmap)
 
       nnw := Round(nnw * zoomLevel),       nnh := Round(nnh * zoomLevel)
+      nnw := clampInRange(nnw, 3, 23000)
+      nnh := clampInRange(nnh, 3, 23000)
       pBitmap := resizeBitmapToGivenRef(pBitmap, 0, nnw, nnh, 5, 0)
       prevBMP := validBMP(pBitmap) ? trGdip_CloneBitmap(A_ThisFunc, pBitmap) : ""
       prevState := validBMP(prevBMP) ? thisState : 0
-      ; ToolTip, % imgSelW "=" imgSelH "`n" w "=" h , , , 2
+      ; fnOutputDebug(A_ThisFunc "(recache): " imgSelW "=" imgSelH "`n" nnw "=" nnh)
    } Else If validBMP(prevBMP)
       pBitmap := trGdip_CloneBitmap(A_ThisFunc, prevBMP)
 
@@ -46403,9 +46394,10 @@ getImgOriginalSelectedAreaEdit(doInvert, imgSelPx, imgSelPy, imgSelW, imgSelH, m
       Return pBitmap
    } Else
    {
-      tx := (prevDestPosX>0) ? prevDestPosX : 0
-      ty := (prevDestPosY>0) ? prevDestPosY : 0
-      zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, pBitmap, imgSelPx - tx, imgSelPy - ty, imgSelW, imgSelH, 0, 0, 1)
+      tx := (prevDestPosX>0) ? imgSelPx - prevDestPosX : imgSelPx
+      ty := (prevDestPosY>0) ? imgSelPy - prevDestPosY : imgSelPy
+      zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, pBitmap, tx, ty, imgSelW, imgSelH, 0, 0, 1)
+      ; fnOutputDebug(A_ThisFunc "(cached): " imgSelW "=" imgSelH "`n" tx "=" ty)
       If validBMP(zBitmap)
       {
          trGdip_DisposeImage(pBitmap)
@@ -64840,6 +64832,29 @@ useGdiHatchedBrush(dummy:=0) {
       Return Gdi_GetStockObject(4)
    Else 
       Return GDIbrushHatch
+}
+
+createGDIbitmap(w, h) {
+   hDC := Gdi_CreateCompatibleDC()
+   hbitmap := Gdi_CreateDIBSection(w, h)
+   OBM := Gdi_SelectObject(hDC, Hbitmap)
+   PG := Gdip_GraphicsFromHDC(hDC, 0, 5, 1, 2, 1)
+   Return [hDC, hBitmap, OBM, PG]
+}
+
+discardGDIbitmap(objBMP) {
+    If !IsObject(objBMP)
+       Return
+
+    Gdi_SelectObject(objBMP[1], objBMP[3])
+    If objBMP[4]
+       Gdip_DeleteGraphics(objBMP[4])
+    If objBMP[2]
+       Gdi_DeleteObject(objBMP[2])
+    If objBMP[3]
+       Gdi_DeleteObject(objBMP[3])
+    If objBMP[1]
+       Gdi_DeleteDC(objBMP[1])
 }
 
 ToggleSeenIMGstatus() {
