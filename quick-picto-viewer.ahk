@@ -16621,7 +16621,6 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
             Gdip_DeleteGraphics(hG)
             QPV_SetBitmapAsAlphaChannel(whichBitmap, krpBmp, !ainvertus)
             krpBmp := trGdip_DisposeImage(krpBmp)
-            ; carvePathFromBitmap(whichBitmap, pPath, 0, 0, exclmodus, 2, thisObjBlurAmount, 0, -1, 1, 0)
          }
 
          currIMGdetails.HasAlpha := 1
@@ -19418,8 +19417,7 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
     {
        ; diagonals
        frame := defineFreeHandFrame("flip", FlipImgH, FlipImgV, freeHandPoints[5])
-       deg := MouseDeltaAngle360(x1, y1, x2, y2)
-
+       ; deg := MouseDeltaAngle360(x1, y1, x2, y2)
        zSelW := ( max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2) ) * zoomLevel
        zSelH := ( max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2) ) * zoomLevel
        tt :=  (DrawLineAreaContourThickness<15) ?  DrawLineAreaContourThickness : DrawLineAreaContourThickness*zoomLevel
@@ -20734,7 +20732,6 @@ coreDetectEdgesSelectedArea(whichBitmap, previewMode, Gu:=0) {
        {
           modus := (BlurAreaInverted=1) ? 4 : 0
           Gdip_SetClipPath(G2, pPath, modus)
-          ; carvePathFromBitmap(thisBMP, pPath, pB.x, pB.y, 4)
        }
 
        r1 := trGdip_DrawImage(A_ThisFunc, G2, thisBMP, imgSelPx, imgSelPy, imgSelW, imgSelH,,,,, thisOpacity)
@@ -46053,10 +46050,10 @@ getClampedVPimgBounds(ByRef dpX, ByRef dpY, ByRef kX, ByRef kY, ByRef kW, ByRef 
    kY := clampInRange(prevDestPosY + prevResizedVPimgH, 2, mainHeight)
    kW := max(dpX, kX) - min(dpX, kX)
    kH := max(dpY, kY) - min(dpY, kY)
-   If (kW < 3)
-      kW := 2
-   If (kH < 3)
-      kH := 2
+   If (kW < 1)
+      kW := 1
+   If (kH < 1)
+      kH := 1
 }
 
 getClampedVPselToWindow(clampToImage, mainWidth, mainHeight, thisW, thisH, ByRef dpX, ByRef dpY, ByRef selW, ByRef selH) {
@@ -46075,10 +46072,10 @@ getClampedVPselToWindow(clampToImage, mainWidth, mainHeight, thisW, thisH, ByRef
    kY := clampInRange(dpY - offY + selH, 2, mainHeight)
    selW := max(dpX, kX) - min(dpX, kX)
    selH := max(dpY, kY) - min(dpY, kY)
-   If (selW < 3)
-      selW := 3
-   If (selH < 3)
-      selH := 3
+   If (selW < 1)
+      selW := 1
+   If (selH < 1)
+      selH := 1
 }
 
 livePreviewEraseArea() {
@@ -46088,9 +46085,8 @@ livePreviewEraseArea() {
 
    vpWinClientSize(mainWidth, mainHeight)
    trGdip_GetImageDimensions(useGdiBitmap(), thisW, thisH)
-   ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, thisW, thisH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
+   objSel := ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, thisW, thisH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
    ; trGdip_GraphicsClear(A_ThisFunc, 2NDglPG, "0x00" WindowBGRcolor)
-   ; pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
    pPath := VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, VPselRotation, 1, mainWidth, mainHeight, 0)
    invertPath := Gdip_ClonePath(pPath)
    Gdip_SetClipRect(2NDglPG, 0, 0, mainWidth, mainHeight)
@@ -46099,7 +46095,15 @@ livePreviewEraseArea() {
    twx := ((imgSelPx + imgSelW) > (prevDestPosX + prevResizedVPimgW)) ? prevDestPosX + prevResizedVPimgW : max(imgSelPx + imgSelW, prevDestPosX + prevResizedVPimgW)
    twy := ((imgSelPy + imgSelH) > (prevDestPosY + prevResizedVPimgH)) ? prevDestPosY + prevResizedVPimgH : max(imgSelPy + imgSelH, prevDestPosY + prevResizedVPimgH)
    Gdip_AddPathRectangle(invertPath, tx, ty, twx - tx, twy - ty)
+   If (EraseAreaInvert=1)
+      getClampedVPimgBounds(imgSelPx, imgSelPy, kX, kY, imgSelW, imgSelH)
+   Else
+      getClampedVPselToWindow(1, mainWidth, mainHeight, thisW, thisH, imgSelPx, imgSelPy, imgSelW, imgSelH)
+
    allowAlphaMasking := decideAlphaMaskingFeaseable(EraseAreaUseAlpha)
+   If viewportQPVimage.imgHandle
+      allowAlphaMasking := 0
+
    fnOutputDebug("redraw: " A_ThisFunc)
    ; sizu := (EraseAreaFader=1 && allowAlphaMasking=0) ? 10 : 4
    thisuuby := GDIcreateCheckersBrush(4, 1)
@@ -46119,50 +46123,47 @@ livePreviewEraseArea() {
    }
 
    whichPath := (EraseAreaInvert=1) ? invertPath : pPath
-   If (allowAlphaMasking=1 && !viewportQPVimage.imgHandle)
+   If (allowAlphaMasking=1)
    {
-      If (EraseAreaInvert=1)
-      {
-         imgSelPx := prevDestPosX    , imgSelPy := prevDestPosY
-         imgSelW := prevResizedVPimgW, imgSelH := prevResizedVPimgH
-      }
+      getVPselSize(zW, zH, 1, EraseAreaInvert)
+      ; ToolTip, % oImgW "|" oImgH "`n" imgSelW "|" imgSelH , , , 2
+      objSel.dw := imgSelW,    objSel.dh := imgSelH
+      objSel.dx := imgSelPx,   objSel.dy := imgSelPy
+      objSel.nw := imgSelW,    objSel.nh := imgSelH
+      objSel.zw := zw,         objSel.zh := zh
+      objSel.invertArea := EraseAreaInvert
 
-      zBitmap := trGdip_CreateBitmap(A_ThisFunc, imgSelW//3 + 2, imgSelH//3 + 2)
+      zBitmap := trGdip_CreateBitmap(A_ThisFunc, imgSelW, imgSelH)
       G3 := trGdip_GraphicsFromImage(A_ThisFunc, zBitmap)
-      Gdip_FillRectangle(G3, thisuuby, 0, 0, imgSelW//3 + 2, imgSelH//3 + 2)
+      pMatrix := Gdip_CreateMatrix()
+      Gdip_TranslateMatrix(pMatrix, -imgSelPx , -imgSelPy)
+      E := Gdip_TransformPath(whichPath, pMatrix)
+      Gdip_FillPath(G3, GDIPbrushHatch, whichPath)
+      Gdip_DeleteMatrix(zPath)
       Gdip_DeleteGraphics(G3)
-   } Else If (EraseAreaInvert=1)
-   {
-      ; getClampedVPimgBounds(dpX, dpY, kX, kY, kW, kH)
-      Gdip_FillPath(2NDglPG, thisBrush, invertPath)
-      Gdip_ResetClip(2NDglPG)
-   } Else Gdip_FillPath(2NDglPG, thisBrush, pPath)
-
-   If (allowAlphaMasking=1 && validBMP(zBitmap))
-   {
       modus := (EraseAreaInvert=1) ? 4 : 0
-      ; Gdip_SetClipPath(2NDglPG, pPath, modus)
-      liveCarvePathFromBitmap(pPath, zBitmap, imgSelPx, imgSelPy, EraseAreaInvert)
       og := alphaMaskColorReversed
       alphaMaskColorReversed := !og
-      thisIDu := "a" alphaMaskColorReversed alphaMaskingMode userAlphaMaskBmpPainted VPselRotation imgSelPx imgSelPy imgSelW imgSelH EraseAreaInvert EraseAreaOpacity EraseAreaFader
-      realtimePasteInPlaceAlphaMasker(1, zBitmap, thisIDu, newBitmap, 0, 0, 0, 0)
+      partu := getVPselIDs("saiz-vpos-xy") VPselRotation EllipseSelectMode imgSelW imgSelH rotateSelBoundsKeepRatio innerSelectionCavityX innerSelectionCavityY prevDestPosX prevDestPosY zoomLevel
+      thisIDu := "a" alphaMaskColorReversed alphaMaskingMode userAlphaMaskBmpPainted VPselRotation imgSelPx imgSelPy imgSelW imgSelH EraseAreaInvert EraseAreaOpacity EraseAreaFader partu
+      ; realtimePasteInPlaceAlphaMasker(1, zBitmap, thisIDu, newBitmap, 0, 0, 0, 0)
+      realtimePasteInPlaceAlphaMasker(1, zBitmap, thisIDu, newBitmap, objSel, 0, 0, 0, 0, 0, 0)
       If validBMP(newBitmap)
       {
          trGdip_DisposeImage(zBitmap, 1)
          zBitmap := newBitmap
       }
 
-      thisOpacity := 1
       alphaMaskColorReversed := og
+      thisOpacity := (EraseAreaFader=1) ? EraseAreaOpacity/255 : 1
       r1 := trGdip_DrawImage(A_ThisFunc, 2NDglPG, zBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH,,,,, thisOpacity)
-      If (EraseAreaFader=1)
-         Gdip_FillPath(2NDglPG, thisBrush2, whichPath)
       trGdip_DisposeImage(zBitmap, 1)
-   }
+   } Else
+      Gdip_FillPath(2NDglPG, thisBrush, whichPath)
 
    Gdip_ResetClip(2NDglPG)
    Gdip_DeletePath(pPath)
+   Gdip_DeletePath(invertPath)
    If (blackBrush && blackBrush=thisub)
    {
       Gdip_DeleteBrush(blackBrush)
@@ -46193,7 +46194,7 @@ livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
    ; fnOutputDebug("redraw: " A_ThisFunc)
    vpWinClientSize(mainWidth, mainHeight)
    trGdip_GetImageDimensions(useGdiBitmap(), thisW, thisH)
-   ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, thisW, thisH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, vPimgSelW, vPimgSelH, vPimgSelX, vPimgSelY)
+   objSel := ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, thisW, thisH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, vPimgSelW, vPimgSelH, vPimgSelX, vPimgSelY)
    doInvertPreview := (AnyWindowOpen=66 && FloodFillUseAlpha=1 && (BrushToolOutsideSelection=1 || BrushToolOutsideSelection=3)) || (AnyWindowOpen=23 && FillAreaInverted=1) || ((AnyWindowOpen=25 || AnyWindowOpen=55) && EraseAreaInvert=1) ? 1 : 0
    If (doInvertPreview=1 && dummy!="live")
    {
@@ -46201,19 +46202,27 @@ livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
          pPath := createImgSelPath(vPimgSelX, vPimgSelY, vPimgSelW, vPimgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
 
       getClampedVPimgBounds(vPimgSelX, vPimgSelY, kX, kY, vPimgSelW, vPimgSelH)
-   }
+   } Else
+      getClampedVPselToWindow(1, mainWidth, mainHeight, thisW, thisH, vPimgSelX, vPimgSelY, vPimgSelW, vPimgSelH)
 
-   tlbrBonusX := tlbrBonusY := 0
    If (dummy!="live")
    {
       Sleep, -1
    } Else If validBMP(userAlphaMaskBmpPainted)
    {
       trGdip_GetImageDimensions(userAlphaMaskBmpPainted, w, h)
-      viewportDynamicOBJcoords.x := vPimgSelX, viewportDynamicOBJcoords.y := vPimgSelY
-      viewportDynamicOBJcoords.w := vPimgSelW,  viewportDynamicOBJcoords.h := vPimgSelH
-      viewportDynamicOBJcoords.zl := (vPimgSelW/w + vPimgSelH/h)/2 + 0.0001
+      viewportDynamicOBJcoords.x := objSel.sx,  viewportDynamicOBJcoords.y := objSel.sy
+      viewportDynamicOBJcoords.w := objSel.sw,  viewportDynamicOBJcoords.h := objSel.sH
+      viewportDynamicOBJcoords.zl := (objSel.sw/w + objSel.sh/h)/2 + 0.0001
    }
+
+   ; ToolTip, % oImgW "|" oImgH "`n" imgSelW "|" imgSelH , , , 2
+   getVPselSize(zW, zH, 1, 0)
+   objSel.dw := vPimgSelW,    objSel.dh := vPimgSelH
+   objSel.dx := vPimgSelX,    objSel.dy := vPimgSelY
+   objSel.zw := zw,           objSel.zh := zh
+   objSel.nw := zw,           objSel.nh := zh
+   objSel.invertArea := (doInvertPreview=1 && dummy!="live") ? 1 : 0
 
    imgSelW := Round( max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2) )
    imgSelH := Round( max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2) )
@@ -46225,11 +46234,11 @@ livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
    clrMatrix := (alphaMaskColorReversed=1) ? GenerateColorMatrix(6, a, b, c, thisOpacity) : thisOpacity
    If isNowAlphaPainting()
    {
-      pBitmap := trGdip_ResizeBitmap(A_ThisFunc, userAlphaMaskBmpPainted, vPimgSelW, vPimgSelH, 0, 5)
-      ; If (alphaMaskingMode=5 && alphaMaskBMPchannel!=5)
-      ;    Gdip_BitmapApplyEffect(pBitmap, pEffectGray)
-      trGdip_DrawImage(A_ThisFunc, 2NDglPG, pBitmap, vPimgSelX, vPimgSelY, vPimgSelW, vPimgSelH,,,,, clrMatrix)
-      trGdip_DisposeImage(pBitmap)
+      trGdip_GetImageDimensions(userAlphaMaskBmpPainted, oImgW, oImgH)
+      objSel.nw := oImgW,      objSel.nh := oImgH
+      wBitmap := getRectFromBitmap(userAlphaMaskBmpPainted, objSel, 1)
+      trGdip_DrawImage(A_ThisFunc, 2NDglPG, wBitmap, vPimgSelX, vPimgSelY, vPimgSelW, vPimgSelH,,,,, clrMatrix)
+      trGdip_DisposeImage(wBitmap)
       trGdip_GetImageDimensions(userAlphaMaskBmpPainted, w, h)
       msg := "Alpha mask type: user painted bitmap (raw)`nDimensions: " groupDigits(w) " x " groupDigits(h) " (" Round(w/h, 2) ")`nSelection area: " groupDigits(imgSelW) " x " groupDigits(imgSelH) " (" Round(imgSelW/imgSelH, 2) ")"
    } Else
@@ -46242,20 +46251,24 @@ livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
       Else If InStr(friendly, "transformed")
          trGdip_GetImageDimensions(userClipBMPpaste, w, h)
 
-      kImgSelW := ImgSelW, kImgSelH := ImgSelH
-      thisIDu := "a" alphaMaskingMode alphaMaskColorReversed userAlphaMaskBmpPainted kImgSelW kImgSelH VPselRotation zoomLevel userPrevAlphaMaskBmpPainted
+      thisIDu := "a" alphaMaskingMode alphaMaskColorReversed userAlphaMaskBmpPainted ImgSelW ImgSelH VPselRotation zoomLevel userPrevAlphaMaskBmpPainted
       transformTool := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
-      alphaMaskGray := generateAlphaMaskBitmap(0, 1, vPimgSelW//2 + 1, vPimgSelH//2 + 1, 0, 0, thisIDu, 1, transformTool)
+      alphaMaskGray := generateAlphaMaskBitmap(0, 1, zw, zh, 0, 0, thisIDu, 1, transformTool)
       msg := "Alpha mask type: " friendly "`nDimensions: " groupDigits(w) " x " groupDigits(h) " (" Round(w/h, 2) ")`nSelection dimensions: " groupDigits(imgSelW) " x " groupDigits(imgSelH) " (" Round(imgSelW / imgSelH, 2) ")"
       If validBMP(alphaMaskGray)
       {
-         ; ToolTip, % msg , , , 2
-         ; If (alphaMaskingMode=5 && alphaMaskBMPchannel!=5)
-         ;    QPV_ConvertToGrayscale(alphaMaskGray, alphaMaskBMPchannel, 0)
-            ; Gdip_BitmapApplyEffect(alphaMaskGray, pEffectGray)
+         vpWinClientSize(mainWidth, mainHeight)
+         thisu := ((objSel.sw != objSel.dh || objSel.sh != objSel.dh) && objSel.invertArea=0) ? 0 : 0
+         If ((!isSelWithinIMGbounds() || !isSelEntireVisible(mainWidth, mainHeight)) && objSel.invertArea=0 || objSel.invertArea=1 || thisu=1)
+         {
+            thisAlphaBitmap := getRectFromBitmap(alphaMaskGray, objSel, 1)
+            If validBMP(thisAlphaBitmap)
+               alphaMaskGray := thisAlphaBitmap
+         }
+
          trGdip_DrawImage(A_ThisFunc, 2NDglPG, alphaMaskGray, vPimgSelX, vPimgSelY, vPimgSelW, vPimgSelH,,,,, clrMatrix)
          ; trGdip_DisposeImage(alphaMaskGray)
-         If (dummy!="live")
+         If (dummy!="live" && !AnyWindowOpen)
             generateAlphaMaskBitmap("kill", 0)
          Else
             toolTipGuiCreated := 2
@@ -46271,9 +46284,10 @@ livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
          ; Gdip_DeleteBrush(thisBrush)
          Gdip_DeletePath(pPath)
       }
+
       Gdip_ResetWorldTransform(2NDglPG)
       BoxBMP := drawTextInBox(msg, OSDFontName, OSDfontSize, mainWidth, mainHeight, OSDtextColor, OSDbgrColor, 0, 0)
-      trGdip_DrawImage(A_ThisFunc, 2NDglPG, BoxBMP, tlbrBonusX, tlbrBonusY)
+      trGdip_DrawImage(A_ThisFunc, 2NDglPG, BoxBMP, 0, 0)
       trGdip_DisposeImage(BoxBMP, 1)
    }
    ; Gdip_DisposeEffect(pEffectGray)
@@ -49529,12 +49543,12 @@ liveCarvePathFromBitmap(pPath, pBitmap, cX, cY, invertArea) {
    zPath := Gdip_ClonePath(pPath)
    pMatrix := Gdip_CreateMatrix()
    Gdip_TranslateMatrix(pMatrix, -cX , -cY)
-   ; Gdip_TranslateMatrix(pMatrix, blurLevel , blurLevel)
    E := Gdip_TransformPath(zPath, pMatrix)
    Gdip_FillPath(Gu, br, zPath)
    Gdip_DeleteGraphics(Gu)
    Gdip_DeleteBrush(br)
    Gdip_DeletePath(zPath)
+   Gdip_DeleteMatrix(zPath)
    r := QPV_SetBitmapAsAlphaChannel(pBitmap, nBitmap, invertArea)
    If !r
       addJournalEntry(A_ThisFunc "(): failed to process the bitmap")
@@ -71883,7 +71897,6 @@ abandoned := 1
    obju.bX1 := X1,   obju.bY1 := Y1
    obju.bX2 := X2,   obju.bY2 := Y2
    obju.bImgSelW := imgSelW,   obju.bImgSelH := imgSelH
-
    If !validBMP(pBitmap)
    {
       If !abandoned
