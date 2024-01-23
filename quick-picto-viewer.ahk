@@ -16497,24 +16497,32 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
       calcImgSelection2bmp(!LimitSelectBoundsImg, oimgW, oimgH, oimgW, oimgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
 
    thisVPid := "a" oImgW oImgH currentFileIndex IMGlargerViewPort imgSelLargerViewPort IMGdecalageX IMGdecalageY zoomLevel prevResizedVPimgW prevResizedVPimgH prevDestPosX prevDestPosY imageAligned
-   pathQuality := (previewMode=1) ? 1 : 1
+   pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, 1)
+   tx := (imgSelPx > prevDestPosX) ? prevDestPosX : max(imgSelPx, prevDestPosX)
+   ty := (imgSelPy > prevDestPosY) ? prevDestPosY : max(imgSelPy, prevDestPosY)
+   twx := ((imgSelPx + imgSelW) > (prevDestPosX + prevResizedVPimgW)) ? prevDestPosX + prevResizedVPimgW : max(imgSelPx + imgSelW, prevDestPosX + prevResizedVPimgW)
+   twy := ((imgSelPy + imgSelH) > (prevDestPosY + prevResizedVPimgH)) ? prevDestPosY + prevResizedVPimgH : max(imgSelPy + imgSelH, prevDestPosY + prevResizedVPimgH)
+   invertPath := Gdip_ClonePath(pPath)
+   Gdip_AddPathRectangle(invertPath, tx, ty, twx - tx, twy - ty)
+   whichPath := (FillAreaInverted=1) ? invertPath : pPath
    If (FillAreaInverted=1)
    {
-      pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, pathQuality)
       imgSelPx := imgSelPy := 0
       imgSelW  := oimgW,      imgSelH := oimgH
       prevVPid := ""
    }
    ; ToolTip, % imgSelW "=" imgSelH "`n" zImgSelW "=" zImgSelH "`n" qImgSelW "=" qImgSelH  , , , 2
-   If (FillAreaInverted=0)
-      pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, pathQuality)
-
    offX := offY := 0
    offW := imgSelW,   offH := imgSelH
    thisBlendMode := (FillAreaBlendMode=1 && FillAreaCutGlass=1 && FillAreaGlassy>1) ? 24 : FillAreaBlendMode 
    thisObjBlurAmount := (previewMode=1) ? (Round(abs(FillAreaBlurAmount) * zoomLevel)) : abs(FillAreaBlurAmount)
-   exclmodus := (FillAreaInverted!=1) ? 4 : 0
-   ainvertus := (FillAreaBlurAmount>1) ? 0 : 1
+   If (FillAreaRemBGR=1)
+      thisObjBlurAmount := 0
+
+   ainvertus := (FillAreaBlurAmount>1) ? 1 : 0
+   If (FillAreaInverted=1)
+      ainvertus := !ainvertus
+
    bgrRM := (FillAreaRemBGR=1) ? 1 : 0
    If (FillAreaRemBGR=1 && FillAreaInverted=1 && ainvertus=1)
       bgrRM := 0
@@ -16534,9 +16542,9 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
       objSel.zw := zW,         objSel.zh := zH
       objSel.invertArea := FillAreaInverted
       linearu := userimgGammaCorrect       ; (thisBlendMode>1 && thisBlendMode!=24) ? 0 : userimgGammaCorrect
-      thisBrush := (FillAreaRemBGR=1 && thisObjBlurAmount>1) ? GDIPbrushHatch : 0
+      thisBrush := (FillAreaRemBGR=1 && thisObjBlurAmount>0) ? GDIPbrushHatch : 0
       gradientsBMP := drawFillSelGradient(zW, zH, 1, 0, 0, zW, zH, linearu, 0, 0, thisBrush)
-      If (thisObjBlurAmount>1 && validBMP(gradientsBMP))
+      If (thisObjBlurAmount>0 && validBMP(gradientsBMP) && FillAreaRemBGR!=1)
       {
          fzx := zw/oImgW,              fzy := zh/oImgH
          ; ToolTip, % fzx "|" fzy "`n" zzw "|" zzh "`n" zzw "|" zzh , , , 2
@@ -16548,7 +16556,7 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
          Else
             zPath := coreCreateFillAreaShape(0, 0, zw, zh, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio)
 
-         croppedOBJblurBMP := carvePathFromBitmap(gradientsBMP, zPath, 0, 0, exclmodus, 2, thisObjBlurAmount, 0, !FillAreaInverted, ainvertus, 0)
+         croppedOBJblurBMP := carvePathFromBitmap(gradientsBMP, zPath, 0, 0, 0, 2, thisObjBlurAmount, 0, !FillAreaInverted, ainvertus, 0)
          If validBMP(croppedOBJblurBMP)
             croppedOBJblurBMP := trGdip_DisposeImage(croppedOBJblurBMP)
          Gdip_DeletePath(zPath)
@@ -16576,6 +16584,8 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
          Gdip_DeleteGraphics(G2)
       If pPath
          Gdip_DeletePath(pPath)
+      If invertPath
+         Gdip_DeletePath(invertPath)
 
       If (previewMode=1)
       {
@@ -16592,18 +16602,19 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
    If (FillAreaApplyColorFX=1 && FillAreaColorMode>4)
       applyPersonalizedColorsBMP(gradientsBMP, 0, 0, FillAreaApplyColorFX)
 
-   If (thisObjBlurAmount>1 && previewMode=0)
+   If (thisObjBlurAmount>0 && previewMode=0 && FillAreaRemBGR!=1)
    {
-      croppedOBJblurBMP := carvePathFromBitmap(gradientsBMP, pPath, imgSelPx, imgSelPy, exclmodus, 2, thisObjBlurAmount, 0, !FillAreaInverted, ainvertus, 1)
+      croppedOBJblurBMP := carvePathFromBitmap(gradientsBMP, pPath, imgSelPx, imgSelPy, 0, 2, thisObjBlurAmount, 0, !FillAreaInverted, ainvertus, 1)
       If (validBMP(croppedOBJblurBMP) && FillAreaRemBGR=1)
       {
+         bruW := Gdip_BrushCreateSolid("0xffFFffFF")
+         bruD := Gdip_BrushCreateSolid("0xff000000")
          If (FillAreaInverted=1)
          {
             If (FillAreaBlurAmount<0)
             {
                hG := Gdip_GraphicsFromImage(croppedOBJblurBMP)
-               Gdip_SetClipPath(hG, pPath)
-               Gdip_GraphicsClear(hG, "0xFFffFFff")
+               Gdip_FillPath(hG, bruW, pPath)
                Gdip_DeleteGraphics(hG)
             }
             QPV_SetBitmapAsAlphaChannel(whichBitmap, croppedOBJblurBMP, !ainvertus)
@@ -16611,30 +16622,29 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
          {
             krpBmp := trGdip_CreateBitmap(A_ThisFunc, oImgW, oImgH)
             hG := Gdip_GraphicsFromImage(krpBmp)
-            Gdip_GraphicsClear(hG, "0xFF000000")
+            Gdip_GraphicsClear(hG, "0xFFffFFff")
             Gdip_DrawImageFast(hG, croppedOBJblurBMP, imgSelPx, imgSelPy)
             If (FillAreaBlurAmount<0)
-            {
-               Gdip_SetClipPath(hG, pPath, 4)
-               Gdip_GraphicsClear(hG, "0xFFffFFff")
-            }
+               Gdip_FillPath(hG, bruD, pPath)
+
             Gdip_DeleteGraphics(hG)
             QPV_SetBitmapAsAlphaChannel(whichBitmap, krpBmp, !ainvertus)
             krpBmp := trGdip_DisposeImage(krpBmp)
          }
 
+         Gdip_DeleteBrush(bruW)
+         Gdip_DeleteBrush(bruD)
          currIMGdetails.HasAlpha := 1
          bgrRM := 2
       }
-
       If validBMP(croppedOBJblurBMP)
          croppedOBJblurBMP := trGdip_DisposeImage(croppedOBJblurBMP)
    }
 
    Gdip_ResetClip(G2)
    modus := (FillAreaInverted=1) ? 4 : 0
-   If (imgSelOutViewPort!=1 || previewMode!=1)
-      Gdip_SetClipPath(G2, pPath, modus)
+   ; If (imgSelOutViewPort!=1 || previewMode!=1)
+      ; Gdip_SetClipPath(G2, pPath, modus)
 
    opacityLevels := (FillAreaColorMode=1 && FillAreaOpacity<254) || (FillAreaColorMode>1 && (FillAreaOpacity<254 || FillArea2ndOpacity<254)) ? 1 : 0
    If (FillAreaCutGlass=1 && (FillAreaColorMode=1 && FillAreaOpacity<2) || (FillAreaColorMode>1 && (FillAreaOpacity<2 || FillArea2ndOpacity<2)))
@@ -16650,14 +16660,12 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
    If (previewMode=1)
       BlurAmount := (Round(BlurAmount * (rsize / msize)))
 
-   If (FillAreaRemBGR=1 && thisObjBlurAmount=0)
+   If (FillAreaRemBGR=1)
    {
       If (bgrRM!=2 && previewMode=0)
          Gdip_GraphicsClear(G2)
-      Else If (FillAreaInverted=1 && previewMode=1)
-         Gdip_FillRectangle(G2, GDIPbrushHatch, imgSelPx, imgSelPy, imgSelW, imgSelH)
       Else If (previewMode=1)
-         Gdip_FillPath(G2, GDIPbrushHatch, pPath)
+         Gdip_FillPath(G2, GDIPbrushHatch, whichPath)
       ; ToolTip, % previewMode "=" pPath "=" g2 "`n" imgSelPx "=" imgSelPy "=" imgSelW "=" imgSelH "=" FillAreaShape "=" VPselRotation "=" rotateSelBoundsKeepRatio , , , 2
    } Else If (FillAreaGlassy>1 && FillAreaRemBGR=0 && opacityLevels=1 && BlurAmount>1 || thisBlendMode>1)
    {
@@ -16718,6 +16726,17 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
                glassBitmap := zBitmap
             }
          }
+
+         If (thisObjBlurAmount>0 && FillAreaRemBGR!=1 && FillAreaInverted=0)
+         {
+            tiu := (FillAreaBlurAmount>0 && (FillAreaCutGlass=1 || thisBlendMode>1 || FillAreaGlassy>1)) ? 1 : 0
+            ; zPath := coreCreateFillAreaShape(0, 0, zImgW, zImgH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio)
+            croppedOBJblurBMP := carvePathFromBitmap(glassBitmap, pPath, imgSelPx, imgSelPy, 0, 2, thisObjBlurAmount, 0, !FillAreaInverted, tiu, 0)
+            If validBMP(croppedOBJblurBMP)
+               croppedOBJblurBMP := trGdip_DisposeImage(croppedOBJblurBMP)
+            ; Gdip_DeletePath(zPath)
+         }
+
          If validBMP(o_glass)
             o_glass := trGdip_DisposeImage(o_glass, 1)
          gradientsBMP := trGdip_DisposeImage(gradientsBMP, 1)
@@ -16733,7 +16752,7 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
       {
          Gdip_ResetClip(G2)
          trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx, imgSelPy, imgSelW, imgSelH)
-         Gdip_SetClipPath(G2, pPath, modus)
+         ; Gdip_SetClipPath(G2, pPath, modus)
       }
    }
 
@@ -16742,7 +16761,24 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
 
    If validBMP(bgrBMPu)
       bgrBMPu := trGdip_DisposeImage(bgrBMPu, 1)
+
    fBitmapA := validBMP(glassBitmap) ? glassBitmap : gradientsBMP
+   If (thisObjBlurAmount>0 && FillAreaRemBGR!=1 && FillAreaInverted=1 && (FillAreaGlassy>1 || FillAreaBlendMode>1))
+   {
+      trGdip_GetImageDimensions(fBitmapA, zImgW, zImgH)
+      tiu := (FillAreaBlurAmount<0) ? 1 : 0
+      croppedOBJblurBMP := carvePathFromBitmap(fBitmapA, pPath, 0, 0, 0, 2, thisObjBlurAmount, 0, !FillAreaInverted, tiu, 0)
+      If validBMP(croppedOBJblurBMP)
+         croppedOBJblurBMP := trGdip_DisposeImage(croppedOBJblurBMP)
+   } 
+
+   If (FillAreaInverted=1 && FillAreaBlurAmount<0 && FillAreaRemBGR!=1)
+      liveCarvePathBitmap(pPath, fBitmapA, imgSelPx, imgSelPy, 1)
+   Else If (FillAreaInverted=0 && FillAreaBlurAmount<0 && FillAreaRemBGR!=1)
+      liveCarvePathBitmap(pPath, fBitmapA, imgSelPx, imgSelPy, 0)
+   Else If (thisObjBlurAmount=0 || FillAreaRemBGR=1)
+      liveCarvePathBitmap(pPath, fBitmapA, imgSelPx, imgSelPy, FillAreaInverted)
+
    ; fnOutputDebug("crp=" validBMP(croppedOBJblurBMP) "=" croppedOBJblurBMP "|fba=" validBMP(fBitmapA) "=" fBitmapA "|gla=" validBMP(glassBitmap) "=" glassBitmap "|grd=" gradientsBMP "=" validBMP(gradientsBMP))
    If (alphaMaskingMode>1 && brushingMode=1)
    {
@@ -16761,7 +16797,7 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
    {
       moreStuff := (FillAreaGlassy>1 || thisBlendMode>1) ? "a" imgSelPx imgSelPy : ""
       partu := (FillAreaInverted=1) ? "a" : getVPselIDs("saiz-vpos-xy") VPselRotation EllipseSelectMode imgSelW imgSelH
-      thisIDu := "a" previewMode FillAreaRemBGR FillAreaInverted userimgGammaCorrect FillAreaGlassy thisBlendMode FillAreaColor FillAreaColorMode FillArea2ndColor FillAreaOpacity FillArea2ndOpacity FillAreaGradientWrapped FillAreaGradientAngle FillAreaGradientPosB FillAreaGradientPosA FillAreaColorReversed FillAreaGradientScale VPselRotation zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY BlendModesFlipped partu moreStuff FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY undoLevelsRecorded currentUndoLevel useGdiBitmap() getAlphaMaskIDu() prevDestPosX prevDestPosY
+      thisIDu := "a" previewMode FillAreaRemBGR FillAreaInverted userimgGammaCorrect FillAreaGlassy thisBlendMode FillAreaColor FillAreaColorMode FillArea2ndColor FillAreaOpacity FillArea2ndOpacity FillAreaGradientWrapped FillAreaGradientAngle FillAreaGradientPosB FillAreaGradientPosA FillAreaColorReversed FillAreaGradientScale VPselRotation zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY BlendModesFlipped partu moreStuff FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY undoLevelsRecorded currentUndoLevel useGdiBitmap() getAlphaMaskIDu() prevDestPosX prevDestPosY thisObjBlurAmount
       If (previewMode=1)
          realtimePasteInPlaceAlphaMasker(previewMode, fBitmapA, thisIDu, newBitmap, objSel, 0, 0, 0)
       Else
@@ -16789,6 +16825,8 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
 
    Gdip_ResetClip(G2)
    trGdip_DisposeImage(fBitmapA, 1)
+   Gdip_DeletePath(pPath)
+   Gdip_DeletePath(invertPath)
    If validBMP(glassBitmap)
       trGdip_DisposeImage(glassBitmap, 1)
    If (FillAreaDoContour=1 && previewMode=1)
@@ -16989,11 +17027,116 @@ carvePathFromBitmap(ByRef pBitmap, pPath, cX, cY, modus, safeWay:=0, blurLevel:=
        ; Gdip_TranslateMatrix(pMatrix, blurLevel , blurLevel)
        E := Gdip_TransformPath(zPath, pMatrix)
 
+       BrushB := Gdip_BrushCreateSolid("0xFF000000")
+       Gdip_FillPath(G3, BrushB, zPath)
+       If (doDecalage=1)
+       {
+          kBitmap := trGdip_CloneBitmap(A_ThisFunc, newBitmap)
+          r2 := trGdip_GraphicsClear(A_ThisFunc, G3, "0xFFffFFff")
+          tzGdip_DrawImage(G3, kBitmap, blurLevel, blurLevel, imgW - blurLevel*2, imgH - blurLevel*2)
+          trGdip_DisposeImage(kBitmap, 1)
+       } Else If (doBorder=1)
+       {
+          Gdip_SetClipRect(G3, blurLevel, blurLevel, imgW - blurLevel*2, imgH - blurLevel*2, 4)
+          Gdip_GraphicsClear(G3, "0xFFffFFff")
+       }
+
+       Gdip_DeleteGraphics(G3)
+       thisAmount := clampInRange(blurLevel, 1, 255)
+       QPV_BoxBlurBitmap(newBitmap, thisAmount, thisAmount, 0)
+       If (blurLevel>257)
+       {
+          thisAmount := clampInRange(blurLevel - 255, 1, 255)
+          QPV_BoxBlurBitmap(newBitmap, thisAmount, thisAmount, 0)
+       }
+
+       r0 := QPV_SetBitmapAsAlphaChannel(pBitmap, newBitmap, invertus)
+       Gdip_DeletePath(zPath)
+       Gdip_DeleteBrush(BrushB)
+       Gdip_DeleteMatrix(pMatrix)
+       If (giveAlpha=1)
+          Return newBitmap
+
+       trGdip_DisposeImage(newBitmap, 1)
+       ; ToolTip, % newBitmap "==" G3 "==" BrushB "`n" r2 "==" r3 "==" r0 , , , 2
+       Return
+    } Else safeWay := 0
+
+    If (safeWay=1)
+    {
+       trGdip_GetImageDimensions(pBitmap, imgW, imgH)
+       newBitmap := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH, "0x26200A")
+       G3 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap)
+    } Else
+       G3 := trGdip_GraphicsFromImage(A_ThisFunc, pBitmap)
+
+    If (G3 && (validBMP(newBitmap) || safeWay!=1))
+    {
+       ; trGdip_GetImageDimensions(pBitmap, qImgW, qImgH)
+       zPath := Gdip_ClonePath(pPath)
+       pMatrix := Gdip_CreateMatrix()
+       Gdip_TranslateMatrix(pMatrix, -cX , -cY)
+       E := Gdip_TransformPath(zPath, pMatrix)
+       If (safeWay=1)
+       {
+          Gdip_SetCompositingQuality(G3, 4)
+          Gdip_SetCompositingMode(G3, 1)
+          Gdip_SetPixelOffsetMode(G3, 4)
+          thinBMP := Gdip_CloneBmpPargbArea(A_ThisFunc, pBitmap,,,,, "0x26200A")
+          pEffect := Gdip_CreateEffect(5, -25, 0, 0)
+          Gdip_BitmapApplyEffect(thinBMP, pEffect)
+
+          QPV_PrepareAlphaChannelBlur(thinBMP, 1, 0)
+          trGdip_DrawImage(A_ThisFunc, G3, thinBMP) ; ,,,,,,,,,10)
+          modus := (modus=4) ? 0 : 4
+       }
+
+       Gdip_SetClipPath(G3, zPath, modus)
+       If (safeWay!=1)
+          r1 := trGdip_GraphicsClear(A_ThisFunc, G3)
+
+       r2 := trGdip_DrawImage(A_ThisFunc, G3, pBitmap)
+       Gdip_DeletePath(zPath)
+       Gdip_DeleteMatrix(pMatrix)
+       Gdip_DeleteGraphics(G3)
+       If (safeWay=1)
+       {
+          trGdip_DisposeImage(thinBMP, 1)
+          If !r2
+          {
+             trGdip_DisposeImage(pBitmap, 1)
+             pBitmap := newBitmap
+          } Else Return "Fail"
+       }
+    }
+
+    If (!G3 || r1="fail")
+       Return "fail"
+}
+
+oldcarvePathFromBitmap(ByRef pBitmap, pPath, cX, cY, modus, safeWay:=0, blurLevel:=0, doBorder:=1, doDecalage:=1, invertus:=0, giveAlpha:=0) {
+    If (safeWay=2 && blurLevel>1)
+    {
+       trGdip_GetImageDimensions(pBitmap, imgW, imgH)
+       If (imgW && imgH)
+          newBitmap := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH, "0xE200B")
+
+       If !validBMP(newBitmap)
+          Return
+
+       G3 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap)
+       r2 := trGdip_GraphicsClear(A_ThisFunc, G3, "0xFFFFFFFF")
+
+       zPath := Gdip_ClonePath(pPath)
+       pMatrix := Gdip_CreateMatrix()
+       Gdip_TranslateMatrix(pMatrix, -cX , -cY)
+       ; Gdip_TranslateMatrix(pMatrix, blurLevel , blurLevel)
+       E := Gdip_TransformPath(zPath, pMatrix)
+
        Gdip_SetClipPath(G3, zPath, modus)
        BrushB := Gdip_BrushCreateSolid("0xFF000000")
        Gdip_GraphicsClear(G3, "0xFF000000")
        Gdip_ResetClip(G3)
-
        If (doDecalage=1)
        {
           kBitmap := trGdip_CloneBitmap(A_ThisFunc, newBitmap)
@@ -49532,8 +49675,8 @@ livePreviewDesaturateArea(modus:=0) {
    livePreviewSimpleColorsAdjustImage(modus, "desaturate")
 }
 
-liveCarvePathFromBitmap(pPath, pBitmap, cX, cY, invertArea) {
-   ; this function is used instead of Gdip_SetClipPath(); the gdi+ function gets insanely slow with very large selection areas
+liveCarvePathBitmap(pPath, pBitmap, cX, cY, invertArea) {
+   ; this function is used instead of Gdip_SetClipPath(); the GDI+ function gets insanely slow with very large selection areas
    startZeit := A_TickCount
    trGdip_GetImageDimensions(pBitmap, w, h)
    nBitmap := trGdip_CreateBitmap(A_ThisFunc, w, h)
@@ -49548,7 +49691,7 @@ liveCarvePathFromBitmap(pPath, pBitmap, cX, cY, invertArea) {
    Gdip_DeleteGraphics(Gu)
    Gdip_DeleteBrush(br)
    Gdip_DeletePath(zPath)
-   Gdip_DeleteMatrix(zPath)
+   Gdip_DeleteMatrix(pMatrix)
    r := QPV_SetBitmapAsAlphaChannel(pBitmap, nBitmap, invertArea)
    If !r
       addJournalEntry(A_ThisFunc "(): failed to process the bitmap")
@@ -49647,13 +49790,12 @@ livePreviewSimpleColorsAdjustImage(modus:=0, extraMode:=0) {
    trGdip_GetImageDimensions(useGdiBitmap(), thisW, thisH)
    objSel := ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, thisW, thisH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
    pPath := VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, VPselRotation, 1, mainWidth, mainHeight, 0)
-   tx := (imgSelPx > prevDestPosX) ? prevDestPosX : max(imgSelPx, prevDestPosX)
-   ty := (imgSelPy > prevDestPosY) ? prevDestPosY : max(imgSelPy, prevDestPosY)
-   twx := ((imgSelPx + imgSelW) > (prevDestPosX + prevResizedVPimgW)) ? prevDestPosX + prevResizedVPimgW : max(imgSelPx + imgSelW, prevDestPosX + prevResizedVPimgW)
-   twy := ((imgSelPy + imgSelH) > (prevDestPosY + prevResizedVPimgH)) ? prevDestPosY + prevResizedVPimgH : max(imgSelPy + imgSelH, prevDestPosY + prevResizedVPimgH)
-
    If (thisInvertArea=1)
    {
+      tx := (imgSelPx > prevDestPosX) ? prevDestPosX : max(imgSelPx, prevDestPosX)
+      ty := (imgSelPy > prevDestPosY) ? prevDestPosY : max(imgSelPy, prevDestPosY)
+      twx := ((imgSelPx + imgSelW) > (prevDestPosX + prevResizedVPimgW)) ? prevDestPosX + prevResizedVPimgW : max(imgSelPx + imgSelW, prevDestPosX + prevResizedVPimgW)
+      twy := ((imgSelPy + imgSelH) > (prevDestPosY + prevResizedVPimgH)) ? prevDestPosY + prevResizedVPimgH : max(imgSelPy + imgSelH, prevDestPosY + prevResizedVPimgH)
       invertPath := Gdip_ClonePath(pPath)
       Gdip_AddPathRectangle(invertPath, tx, ty, twx - tx, twy - ty)
       getClampedVPimgBounds(imgSelPx, imgSelPy, kX, kY, imgSelW, imgSelH)
@@ -49728,7 +49870,7 @@ livePreviewSimpleColorsAdjustImage(modus:=0, extraMode:=0) {
             QPV_AdjustImageColors(zBitmap, imgColorsFXopacity, userImgAdjustInvertColors, userImgAdjustAltSat, userImgAdjustSat, userImgAdjustAltBright, userImgAdjustBright, userImgAdjustAltContra, userImgAdjustContra, userImgAdjustAltHiLows, userImgAdjustShadows, userImgAdjustHighs, userImgAdjustHue, userImgAdjustTintDeg, userImgAdjustTintAmount, userImgAdjustAltTint, userImgAdjustGamma, userImgAdjustOffR, userImgAdjustOffG, userImgAdjustOffB, userImgAdjustOffA, userImgAdjustThreR, ThreG, ThreB, userImgAdjustThreA, userImgAdjustSeeThrough, userImgAdjustInvertArea, userImgAdjustNoClamp, userImgAdjustWhitePoint, userImgAdjustBlackPoint, userImgAdjustNoisePoints, -1)
 
          If (!viewportQPVimage.imgHandle && allowAlphaMasking!=1)
-            liveCarvePathFromBitmap(pPath, zBitmap, imgSelPx, imgSelPy, thisInvertArea)
+            liveCarvePathBitmap(pPath, zBitmap, imgSelPx, imgSelPy, thisInvertArea)
 
          prevBMP := trGdip_CloneBitmap(A_ThisFunc, zBitmap)
          prevIDu := thisIDu
@@ -49767,7 +49909,7 @@ livePreviewSimpleColorsAdjustImage(modus:=0, extraMode:=0) {
          }
       }
       If (!viewportQPVimage.imgHandle && allowAlphaMasking=1)
-         liveCarvePathFromBitmap(pPath, zBitmap, imgSelPx, imgSelPy, thisInvertArea)
+         liveCarvePathBitmap(pPath, zBitmap, imgSelPx, imgSelPy, thisInvertArea)
 
       r1 := trGdip_DrawImage(A_ThisFunc, 2NDglPG, zBitmap, imgSelPx, imgSelPy)
       Gdip_ResetClip(2NDglPG)
