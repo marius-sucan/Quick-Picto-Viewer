@@ -287,7 +287,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , QuickFileActAfter6 := 1, QuickFileActFolder6 := "", userFilterWhat := 1, userFilterStringPos := 1
    , userFilterStringIsNot := 0, userFilterDoString := 1, UsrEditFilter, QuickFileActConflict := 4
    , preventDBentryRemoval := 0, findDupesPrecision := 5, DesaturateAreaAmount := 255, PrintPaperOrient := 1
-   , DesaturateAreaHue := 0, DesatureAreaAlternate := 0, skipSeenImageSlides := 0, blurAreaSoftLevel := 2
+   , DesaturateAreaHue := 0, DesatureAreaAlternate := 0, skipSeenImageSlides := 0, blurAreaSoftLevel := 1
    , BlurAreaBlendMode := 1, PasteInPlaceBlurEdgesSoft := 0, preventDeleteMatchingSearch := 0
    , protectedFolderPath := "", preventDeleteFromProtectedPath := 0, preventDeleteFromProtectedSubPaths := 0
    , excludePreviousDupesFromList := 0, userFindDupesHamDistLvl := 1, userFindDupesFilterHamDist := 1
@@ -11626,23 +11626,36 @@ Gdi_DrawTextInBox(theString, hFont, txtColor, bgrColor, borderSize:=0, scaleuPre
     Return [pBitmap, pBitmap2, r_Width, r_Height]
 }
 
-coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
-    Static OBJ_FONT := 6, testString := "This is going to be a test"
-         , leetSpeakDict := {"A":"4", "B":"8", "C":"¢", "D":"Ð", "E":"3", "F":"F", "G":"6", "H":"#", "I":"1", "J":"J", "K":"K", "L":"£", "M":"M", "N":"Π", "O":"0", "P":"P", "Q":"Q", "R":"Я", "S":"5", "T":"7", "U":"µ", "V":"W", "W":"V", "X":"χ", "Y":"¥", "Z":"2", "1":"I", "2":"Z", "3":"E", "4":"A", "5":"S", "6":"G", "7":"T", "8":"B", "9":"9", "0":"O", "?":"¿", "!":"¡"}
-
-    startZeit := A_TickCount
-    If (TextInAreaCaseTransform=2)
+applyTextTransform(theString, caseTransform) {
+    Static leetSpeakDict := {"A":"4", "B":"8", "C":"¢", "D":"Ð", "E":"3", "F":"F", "G":"6", "H":"#", "I":"1", "J":"J", "K":"K", "L":"£", "M":"M", "N":"Π", "O":"0", "P":"P", "Q":"Q", "R":"Я", "S":"5", "T":"7", "U":"µ", "V":"W", "W":"V", "X":"χ", "Y":"¥", "Z":"2", "1":"I", "2":"Z", "3":"E", "4":"A", "5":"S", "6":"G", "7":"T", "8":"B", "9":"9", "0":"O", "?":"¿", "!":"¡"}
+    If (caseTransform=2)
        StringUpper, theString, % theString
-    Else If (TextInAreaCaseTransform=3)
+    Else If (caseTransform=3)
        StringLower, theString, % theString
-    Else If (TextInAreaCaseTransform=4)
+    Else If (caseTransform=4)
        StringUpper, theString, % theString, T
-    Else If (TextInAreaCaseTransform=5)
+    Else If (caseTransform=5)
     {
        For Key, Value in leetSpeakDict
           theString := StrReplace(theString, key, value)
     }
+    Return theString
+}
 
+BTNapplyCaseTransfm() {
+   Gui, SettingsGUIA: Default
+   GuiControlGet, UserTextArea
+   GuiControlGet, TextInAreaCaseTransform
+   theString := applyTextTransform(UserTextArea, TextInAreaCaseTransform)
+   GuiControl, SettingsGUIA:, UserTextArea, % theString
+   TextInAreaCaseTransform := 1
+   GuiControl, SettingsGUIA: Choose, TextInAreaCaseTransform, 1
+}
+
+coreInsertTextInAreaBox(theString, maxW, maxH, previewMode) {
+    Static OBJ_FONT := 6, testString := "This is going to be a test"
+    startZeit := A_TickCount
+    theString := applyTextTransform(theString, TextInAreaCaseTransform)
     txtColor := makeRGBAcolor(TextInAreaFontColor, TextInAreaFontOpacity)
     bgrColor := makeRGBAcolor(TextInAreaBgrColor, TextInAreaBgrOpacity)
     borderColor := makeRGBAcolor(TextInAreaBorderColor, TextInAreaBorderOpacity)
@@ -12309,7 +12322,8 @@ realtimePasteInPlaceBlurrator(previewMode, clipBMP, ByRef newBitmap) {
        pPath := createImgSelPath(0, 0, eImgW, eImgH, prevEllipseSelectMode, prevVPselRotation, prevrotateSelBoundsKeepRatio, 0, 1, 1, previnnerSelectionCavityX, previnnerSelectionCavityY)
        If pPath
        {
-          carvePathFromBitmap(clipBMP, pPath, -decX, -decY, 4, PasteInPlaceBlurEdgesSoft + 1, thisAmount)
+          thisAmount := (PasteInPlaceBlurEdgesSoft=1) ? thisAmount//4 + 4 : 0
+          carvePathFromBitmap(clipBMP, pPath, -decX, -decY, 0, 2, thisAmount, 0, PasteInPlaceBlurEdgesSoft, 1)
           Gdip_DeletePath(pPath)
        }
     }
@@ -16516,7 +16530,7 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
    offW := imgSelW,   offH := imgSelH
    thisBlendMode := (FillAreaBlendMode=1 && FillAreaCutGlass=1 && FillAreaGlassy>1) ? 24 : FillAreaBlendMode 
    thisObjBlurAmount := (previewMode=1) ? (Round(abs(FillAreaBlurAmount) * zoomLevel)) : abs(FillAreaBlurAmount)
-   If (FillAreaRemBGR=1)
+   If (FillAreaRemBGR=1 || zoomLevel>2 && previewMode=1 || imgSelLargerViewPort=1 && previewMode=1)
       thisObjBlurAmount := 0
 
    ainvertus := (FillAreaBlurAmount>1) ? 1 : 0
@@ -16649,7 +16663,7 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
    opacityLevels := (FillAreaColorMode=1 && FillAreaOpacity<254) || (FillAreaColorMode>1 && (FillAreaOpacity<254 || FillArea2ndOpacity<254)) ? 1 : 0
    If (FillAreaCutGlass=1 && (FillAreaColorMode=1 && FillAreaOpacity<2) || (FillAreaColorMode>1 && (FillAreaOpacity<2 || FillArea2ndOpacity<2)))
       opacityLevels := 0
-   Else If (FillAreaCutGlass=0 && FillAreaBlurAmount!=0)
+   Else If (FillAreaCutGlass=0 && thisObjBlurAmount!=0)
       opacityLevels := 1
 
    BlurAmount := blr[FillAreaGlassy]
@@ -16767,14 +16781,14 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
    {
       trGdip_GetImageDimensions(fBitmapA, zImgW, zImgH)
       tiu := (FillAreaBlurAmount<0) ? 1 : 0
-      croppedOBJblurBMP := carvePathFromBitmap(fBitmapA, pPath, 0, 0, 0, 2, thisObjBlurAmount, 0, !FillAreaInverted, tiu, 0)
+      croppedOBJblurBMP := carvePathFromBitmap(fBitmapA, pPath, imgSelPx, imgSelPy, 0, 2, thisObjBlurAmount, 0, !FillAreaInverted, tiu, 0)
       If validBMP(croppedOBJblurBMP)
          croppedOBJblurBMP := trGdip_DisposeImage(croppedOBJblurBMP)
    } 
 
-   If (FillAreaInverted=1 && FillAreaBlurAmount<0 && FillAreaRemBGR!=1)
+   If (FillAreaInverted=1 && thisObjBlurAmount<0 && FillAreaRemBGR!=1)
       liveCarvePathBitmap(pPath, fBitmapA, imgSelPx, imgSelPy, 1)
-   Else If (FillAreaInverted=0 && FillAreaBlurAmount<0 && FillAreaRemBGR!=1)
+   Else If (FillAreaInverted=0 && thisObjBlurAmount<0 && FillAreaRemBGR!=1)
       liveCarvePathBitmap(pPath, fBitmapA, imgSelPx, imgSelPy, 0)
    Else If (thisObjBlurAmount=0 || FillAreaRemBGR=1)
       liveCarvePathBitmap(pPath, fBitmapA, imgSelPx, imgSelPy, FillAreaInverted)
@@ -17009,7 +17023,7 @@ drawFillSelGradient(imgSelW, imgSelH, previewMode, offX, offY, offW, offH, linea
 }
 
 carvePathFromBitmap(ByRef pBitmap, pPath, cX, cY, modus, safeWay:=0, blurLevel:=0, doBorder:=1, doDecalage:=1, invertus:=0, giveAlpha:=0) {
-    If (safeWay=2 && blurLevel>1)
+    If (safeWay=2)
     {
        trGdip_GetImageDimensions(pBitmap, imgW, imgH)
        If (imgW && imgH)
@@ -17042,125 +17056,26 @@ carvePathFromBitmap(ByRef pBitmap, pPath, cX, cY, modus, safeWay:=0, blurLevel:=
        }
 
        Gdip_DeleteGraphics(G3)
-       thisAmount := clampInRange(blurLevel, 1, 255)
-       QPV_BoxBlurBitmap(newBitmap, thisAmount, thisAmount, 0)
-       If (blurLevel>257)
+       If (blurLevel>1)
        {
-          thisAmount := clampInRange(blurLevel - 255, 1, 255)
+          thisAmount := clampInRange(blurLevel, 1, 255)
           QPV_BoxBlurBitmap(newBitmap, thisAmount, thisAmount, 0)
-       }
-
-       r0 := QPV_SetBitmapAsAlphaChannel(pBitmap, newBitmap, invertus)
-       Gdip_DeletePath(zPath)
-       Gdip_DeleteBrush(BrushB)
-       Gdip_DeleteMatrix(pMatrix)
-       If (giveAlpha=1)
-          Return newBitmap
-
-       trGdip_DisposeImage(newBitmap, 1)
-       ; ToolTip, % newBitmap "==" G3 "==" BrushB "`n" r2 "==" r3 "==" r0 , , , 2
-       Return
-    } Else safeWay := 0
-
-    If (safeWay=1)
-    {
-       trGdip_GetImageDimensions(pBitmap, imgW, imgH)
-       newBitmap := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH, "0x26200A")
-       G3 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap)
-    } Else
-       G3 := trGdip_GraphicsFromImage(A_ThisFunc, pBitmap)
-
-    If (G3 && (validBMP(newBitmap) || safeWay!=1))
-    {
-       ; trGdip_GetImageDimensions(pBitmap, qImgW, qImgH)
-       zPath := Gdip_ClonePath(pPath)
-       pMatrix := Gdip_CreateMatrix()
-       Gdip_TranslateMatrix(pMatrix, -cX , -cY)
-       E := Gdip_TransformPath(zPath, pMatrix)
-       If (safeWay=1)
-       {
-          Gdip_SetCompositingQuality(G3, 4)
-          Gdip_SetCompositingMode(G3, 1)
-          Gdip_SetPixelOffsetMode(G3, 4)
-          thinBMP := Gdip_CloneBmpPargbArea(A_ThisFunc, pBitmap,,,,, "0x26200A")
-          pEffect := Gdip_CreateEffect(5, -25, 0, 0)
-          Gdip_BitmapApplyEffect(thinBMP, pEffect)
-
-          QPV_PrepareAlphaChannelBlur(thinBMP, 1, 0)
-          trGdip_DrawImage(A_ThisFunc, G3, thinBMP) ; ,,,,,,,,,10)
-          modus := (modus=4) ? 0 : 4
-       }
-
-       Gdip_SetClipPath(G3, zPath, modus)
-       If (safeWay!=1)
-          r1 := trGdip_GraphicsClear(A_ThisFunc, G3)
-
-       r2 := trGdip_DrawImage(A_ThisFunc, G3, pBitmap)
-       Gdip_DeletePath(zPath)
-       Gdip_DeleteMatrix(pMatrix)
-       Gdip_DeleteGraphics(G3)
-       If (safeWay=1)
-       {
-          trGdip_DisposeImage(thinBMP, 1)
-          If !r2
+          If (blurLevel>257)
           {
-             trGdip_DisposeImage(pBitmap, 1)
-             pBitmap := newBitmap
-          } Else Return "Fail"
-       }
-    }
+             thisAmount := clampInRange(blurLevel - 255, 1, 255)
+             QPV_BoxBlurBitmap(newBitmap, thisAmount, thisAmount, 0)
+          }
 
-    If (!G3 || r1="fail")
-       Return "fail"
-}
-
-oldcarvePathFromBitmap(ByRef pBitmap, pPath, cX, cY, modus, safeWay:=0, blurLevel:=0, doBorder:=1, doDecalage:=1, invertus:=0, giveAlpha:=0) {
-    If (safeWay=2 && blurLevel>1)
-    {
-       trGdip_GetImageDimensions(pBitmap, imgW, imgH)
-       If (imgW && imgH)
-          newBitmap := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH, "0xE200B")
-
-       If !validBMP(newBitmap)
-          Return
-
-       G3 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap)
-       r2 := trGdip_GraphicsClear(A_ThisFunc, G3, "0xFFFFFFFF")
-
-       zPath := Gdip_ClonePath(pPath)
-       pMatrix := Gdip_CreateMatrix()
-       Gdip_TranslateMatrix(pMatrix, -cX , -cY)
-       ; Gdip_TranslateMatrix(pMatrix, blurLevel , blurLevel)
-       E := Gdip_TransformPath(zPath, pMatrix)
-
-       Gdip_SetClipPath(G3, zPath, modus)
-       BrushB := Gdip_BrushCreateSolid("0xFF000000")
-       Gdip_GraphicsClear(G3, "0xFF000000")
-       Gdip_ResetClip(G3)
-       If (doDecalage=1)
-       {
-          kBitmap := trGdip_CloneBitmap(A_ThisFunc, newBitmap)
-          r2 := trGdip_GraphicsClear(A_ThisFunc, G3, "0xFF000000")
-          tzGdip_DrawImage(G3, kBitmap, blurLevel, blurLevel, imgW - blurLevel*2, imgH - blurLevel*2)
-          trGdip_DisposeImage(kBitmap, 1)
-       }
-
-       Gdip_SetClipRect(G3, blurLevel, blurLevel, imgW - blurLevel*2, imgH - blurLevel*2, 4)
-       If (doBorder=1)
-          Gdip_GraphicsClear(G3, "0xFF000000")
-
-       Gdip_DeleteGraphics(G3)
-       thisAmount := clampInRange(blurLevel, 1, 255)
-       QPV_BoxBlurBitmap(newBitmap, thisAmount, thisAmount, 0)
-       If (blurLevel>257)
-       {
-          thisAmount := clampInRange(blurLevel - 255, 1, 255)
-          QPV_BoxBlurBitmap(newBitmap, thisAmount, thisAmount, 0)
+          If (doBorder=2 && doDecalage!=1 && blurLevel>2)
+          {
+             G3 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap)
+             Gdip_FillPath(G3, BrushB, zPath)
+             Gdip_DeleteGraphics(G3)
+          }
        }
 
        r0 := QPV_SetBitmapAsAlphaChannel(pBitmap, newBitmap, invertus)
        Gdip_DeletePath(zPath)
-       Gdip_DeletePath(wPath)
        Gdip_DeleteBrush(BrushB)
        Gdip_DeleteMatrix(pMatrix)
        If (giveAlpha=1)
@@ -20468,11 +20383,9 @@ BlurSelectedArea(modus:="") {
     If (blurAreaSoftEdges=1 && modus!="pixelize")
     {
        setWindowTitle("APPLYING SOFT EDGES MASK, please wait", 1)
-       kpl := max(o_blurAreaAmount, o_blurAreaYamount)
-       thisAmount := (blurAreaTwice=1) ? kpl*2 : kpl
+       thisAmount := (o_blurAreaAmount + o_blurAreaYamount)/2
        thisAmount := (blurAreaSoftLevel>3) ? Round(thisAmount*(blurAreaSoftLevel - 1)) : Round(thisAmount*(blurAreaSoftLevel/3))
-       nodus := (BlurAreaInverted!=1) ? 4 : 0
-       carvePathFromBitmap(zBitmap, pPath, imgSelPx, imgSelPy, nodus, 2, thisAmount, !BlurAreaInverted)
+       carvePathFromBitmap(zBitmap, pPath, imgSelPx, imgSelPy, 0, 2, thisAmount, 0, 1, !BlurAreaInverted)
     }
 
     If (BlurAreaBlendMode>1)
@@ -46649,7 +46562,7 @@ ReadSettingsBlurPanel(act:=0) {
     RegAction(act, "blurAreaOpacity",, 2, 3, 255)
     RegAction(act, "BlurAreaInverted",, 1)
     RegAction(act, "blurAreaSoftEdges",, 1)
-    RegAction(act, "blurAreaSoftLevel",, 2, 1, 7)
+    RegAction(act, "blurAreaSoftLevel",, 2, 1, 6)
     RegAction(act, "BlurAreaBlendMode",, 2, 1, 24)
     RegAction(act, "blurAreaTwice",, 1)
     RegAction(act, "BlurAreaAlphaMask",, 1)
@@ -46933,7 +46846,7 @@ PanelBlurSelectedArea() {
     Gui, Add, Tab3, %tabzDarkModus% x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
     Gui, Tab, 1
     Gui, Add, Checkbox, x+10 y+10 w%thisW% Section Checked%blurAreaSoftEdges% vblurAreaSoftEdges gupdateUIblurPanel +hwndhTemp, &Soft edges%friendly%
-    GuiAddDropDownList("x+5 w60 AltSubmit Choose" blurAreaSoftLevel " gupdateUIblurPanel vblurAreaSoftLevel", "0.3x|0.6x|1x|2x|3x|4x|5x", "Edges softness level", [hTemp])
+    GuiAddDropDownList("x+5 w60 AltSubmit Choose" blurAreaSoftLevel " gupdateUIblurPanel vblurAreaSoftLevel", "0.3x|0.6x|1x|2x|3x|4x", "Edges softness level")
     Gui, Add, Checkbox, xs y+5 hp Checked%blurAreaTwice% vblurAreaTwice gupdateUIblurPanel, &Blur twice in one go (for large images)
     Gui, Add, Text, xs y+15 w%thisW% hp +0x200 -wrap +hwndhTemp, Blur mode:
     GuiAddDropDownList("x+5 wp AltSubmit Choose" blurAreaMode " gupdateUIblurPanel vblurAreaMode", "Gaussian (GDI+)" friendly "|Gaussian (cImg)|Box blur|Dilate|Erode|Open|Close|Dissolve", [hTemp])
@@ -50122,7 +50035,6 @@ updateUIfillPanel(actionu:=0) {
        GuiControl, % actu, FillAreaBlendMode
        GuiControl, % actu, FillAreaCutGlass
        GuiControl, % actu, BlendModesFlipped
-
        actu := (viewportQPVimage.imgHandle) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu, FillAreaDoBehind
 
@@ -50132,7 +50044,7 @@ updateUIfillPanel(actionu:=0) {
        actu := (viewportQPVimage.imgHandle || FillAreaRemBGR=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
        GuiControl, % actu, txtLine1
        GuiControl, % actu, FillAreaGlassy
-       uiSlidersArray["FillAreaBlurAmount", 10] := (viewportQPVimage.imgHandle) ? 0 : 1
+       uiSlidersArray["FillAreaBlurAmount", 10] := (viewportQPVimage.imgHandle || FillAreaRemBGR=1) ? 0 : 1
        If (coreDesiredPixFmt="0x21808")
           GuiControl, SettingsGUIA: Disable, FillAreaBlendMode
     } Else If (CurrentPanelTab=2)
@@ -50722,8 +50634,9 @@ PanelInsertTextArea() {
     ; GuiAddDropDownList("x+5 w" ddWid " Sort Choose1 gupdateUIInsertTextPanel vTextInAreaFontName", TextInAreaFontName)
     Gui, Add, Checkbox, x+5 hp +0x1000 gupdateUIInsertTextPanel Checked%TextInAreaAutoWrap% vTextInAreaAutoWrap, Word-&wrap
     GuiAddDropDownList("xs y+5 wp+20 gupdateUIInsertTextPanel Choose" TextInAreaCaseTransform " AltSubmit vTextInAreaCaseTransform", "No transform|CAPITALIZED|lowercase|Title Case|Leet speak", "Text case transformation")
-    GuiAddCheckbox("x+5 wp-25 hp+1 gupdateUIInsertTextPanel Checked" TextInAreaFlipV " vTextInAreaFlipV", "Flip text vertically", "Flip V")
+    GuiAddCheckbox("x+5 wp-35 hp+1 gupdateUIInsertTextPanel Checked" TextInAreaFlipV " vTextInAreaFlipV", "Flip text vertically", "Flip V")
     GuiAddCheckbox("x+5 wp hp gupdateUIInsertTextPanel Checked" TextInAreaFlipH " vTextInAreaFlipH", "Flip text horizontally", "Flip H")
+    GuiAddButton("x+5 hp w" ml " gBTNapplyCaseTransfm vbtn5", ">", "Apply test case transformation in the edit field")
 
     ha := (PrefsLargeFonts=1) ? 27 : 18
     wa := (PrefsLargeFonts=1) ? 145 : 100
@@ -50962,6 +50875,8 @@ updateUIInsertTextPanel(actionu:=0, b:=0) {
     {
        UserTextArea := Trimmer(UserTextArea)
        UserTextArea := allowCtrlBkspEdit(hEditField, UserTextArea)
+       actu := (TextInAreaCaseTransform!=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+       GuiControl, % actu, btn5
     } Else If (CurrentPanelTab=2)
     {
        actu := (TextInAreaPaintBgr=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
@@ -93037,6 +92952,14 @@ GuiSlidersResponder(a, m_event, keyu) {
       If (!sk && !isGivenKey)
          %givenVar% := newValue
       ; ToolTip, % wx "|" w "|" rangeu "|" newValue , , , 2
+      If (whichSlider="userUIshapeCavity")
+      {
+         If (newValue<2)
+            innerSelectionCavityX := innerSelectionCavityY := 0
+         Else
+            innerSelectionCavityX := innerSelectionCavityY := clampInRange(newValue/400, 0, 0.99)
+      }
+
       If (A_TickCount - lastu>50)
       {
          p := GuiUpdateSliders(whichSlider, 0, obju)
