@@ -212,7 +212,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , sillySeparator :=  "▪", menuCustomNames := new hashtable(), clrGradientCoffX := 0, clrGradientCoffY := 0
    , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*|Background clipper*"
    , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := [], prevPasteInPlaceVPcoords := []
-   , freeHandPoints := [], customShapeCountPoints := 0
+   , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
    , appVersion := "5.9.97", vReleaseDate := "2023/12/13" ; yyyy-mm-dd
 
@@ -5855,97 +5855,9 @@ applyIMGeditFunction() {
        GuiControl, SettingsGUIA: Enable, btnLiveApplyTool
 }
 
-LivePreviewAlphaMaskPasteInPlace() {
-    Critical, on
-    G2 := 2NDglPG
-    Gdip_ResetClip(G2)
-
-    obju := corePasteInPlaceActNow(0, 0, 1)
-    If (obju="too-large")
-       Return livePreviewAlphaMasking("live")
-
-    hasRotated := obju[1]
-    whichBitmap := obju[2]
-    zBitmap := obju[3]
-
-    vpWinClientSize(mainWidth, mainHeight)
-    trGdip_GetImageDimensions(useGdiBitmap(), fimgW, fimgH)
-    ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, fImgW, fImgH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
-    trGdip_GetImageDimensions(whichBitmap, oImgW, oImgH)
-    trGdip_GetImageDimensions(userAlphaMaskBmpPainted, zImgW, zImgH)
-    PasteInPlaceCalcObjSize(1, hasRotated, oImgW, oImgH, imgSelW, imgSelH, VPselRotation, 1, ResizedW, ResizedH)
-    PasteInPlaceCalcObjCoords(imgSelW, imgSelH, ResizedW, ResizedH, imgSelPx, imgSelPy)
-    imgSelW := ResizedW, imgSelH := ResizedH
-    viewportDynamicOBJcoords.x := imgSelPx, viewportDynamicOBJcoords.y := imgSelPy
-    viewportDynamicOBJcoords.w := imgSelW,  viewportDynamicOBJcoords.h := imgSelH
-    viewportDynamicOBJcoords.zl := (imgSelW/zImgW + imgSelH/zImgH)/2 + 0.0001
-    thisOpacity := (PasteInPlaceOpacity>255) ? (PasteInPlaceOpacity - 245)/10 : PasteInPlaceOpacity/255
-    If (oImgW!=zImgW || oImgH!=zImgH)
-    {
-       alphaMaskGray := trGdip_ResizeBitmap(A_ThisFunc, userAlphaMaskBmpPainted, oimgW, oimgH, 0, 5, -1)
-       hasResized := 1
-    } Else alphaMaskGray := userAlphaMaskBmpPainted
-
-    clipBMP := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
-    QPV_SetBitmapAsAlphaChannel(clipBMP, alphaMaskGray, alphaMaskColorReversed, alphaMaskReplaceMode, alphaMaskBMPchannel)
-    vPobju := testSelectionLargerThanViewport()
-    Gdip_SetClipRect(G2, 0, 0, vPobju.mainWidth, vPobju.mainHeight, 0)
-    If (PasteInPlaceCropDo=1)
-    {
-       pra := (PasteInPlaceCropAngular>0) ? PasteInPlaceCropAngular : 360 + PasteInPlaceCropAngular
-       pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, PasteInPlaceCropSel, VPselRotation + pra, rotateSelBoundsKeepRatio)
-       Gdip_SetClipPath(G2, pPath, 1)
-    }
-
-    hasPainted := 0
-    bgrBMP := obju[4]
-    If (userimgGammaCorrect=1 && validBMP(bgrBMP))
-    {
-       If (currIMGdetails.HasAlpha=1)
-       {
-          ; Gdip_FillRectangle(G2, GDIPbrushHatch, imgSelPx, imgSelPy, imgSelW, imgSelH)
-          trGdip_GetImageDimensions(bgrBMP, kw, kh)
-          trGdip_GetImageDimensions(clipBMP, mw, mh)
-          ; ToolTip, % kw "|" kh "`n" mw "|" mh "`n" imgSelW "|" imgSelH , , , 2
-          clipBMP := resizeBitmapToGivenRef(clipBMP, 0, imgSelW, imgSelH, thisImgQuality)
-          bgrBMP := resizeBitmapToGivenRef(bgrBMP, 0, imgSelW, imgSelH, thisImgQuality)
-          thisOpacity := (PasteInPlaceOpacity>255) ? 0 : 255 - PasteInPlaceOpacity
-          QPV_MergeBitmapsWithMask(clipBMP, bgrBMP, 0, 0, thisOpacity)
-          r1 := trGdip_DrawImage(A_ThisFunc, G2, clipBMP, imgSelPx, imgSelPy)
-          trGdip_DisposeImage(clipBMP)
-          hasPainted := 1
-       } Else
-          trGdip_DrawImage(A_ThisFunc, G2, bgrBMP, imgSelPx, imgSelPy, imgSelW, imgSelH)
-       Gdip_SetCompositingQuality(G2, 2)
-    }
-
-    If (PasteInPlaceEraseInitial=1 && PasteInPlaceBlendMode=1)
-       PasteInPlaceEraseArea(G2, 1)
-
-    trGdip_DisposeImage(bgrBMP)
-    ; ToolTip, % imgSelPx "," imgSelPy "," imgSelW "," imgSelH , , , 2
-    If !hasPainted
-       r1 := trGdip_DrawImage(A_ThisFunc, G2, clipBMP, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, oimgW, oimgH, thisOpacity)
-    If (userimgGammaCorrect=1)
-       Gdip_SetCompositingQuality(G2, 1)
-
-    If (PasteInPlaceEraseInitial=1 && PasteInPlaceBlendMode>1 && r1!="fail")
-       PasteInPlaceEraseArea(G2, 1)
-
-    trGdip_DisposeImage(clipBMP, 1)
-    trGdip_DisposeImage(zBitmap, 1)
-    If hasResized
-       trGdip_DisposeImage(alphaMaskGray, 1)
-    Gdip_DeletePath(pPath)
-    doLayeredWinUpdate(A_ThisFunc, hGDIwin, 2NDglHDC)
-    Return r1
-}
-
 livePreviewPasteInPlace() {
    If (forceLiveAlphaPreviewMode=1 && liveDrawingBrushTool=1)
       livePreviewAlphaMasking("live")
-   Else If (liveDrawingBrushTool=1)
-      LivePreviewAlphaMaskPasteInPlace()
    Else
       corePasteInPlaceActNow(0, 0)
 }
@@ -12291,9 +12203,10 @@ realtimePasteInPlaceBlurrator(previewMode, clipBMP, ByRef newBitmap) {
     If (thisAmount>1 && !viewportQPVimage.imgHandle)
     {
        If (previewMode!=1)
-          QPV_PrepareAlphaChannelBlur(clipBMP, 1, 1)
-       Else If (previewMode!=1)
+       {
           setWindowTitle("Applying blur filter on image")
+          QPV_PrepareAlphaChannelBlur(clipBMP, 1, 1)
+       }
 
        ; ToolTip, % thisAmount "=" fScale  , , , 2
        QPV_BoxBlurBitmap(clipBMP, thisAmount, thisAmount, 0)
@@ -12345,7 +12258,7 @@ realtimePasteInPlaceAlphaMaskRotator(previewMode, userAlphaBMP, rImgW, rImgH, th
     }
 
     thisBMP := userAlphaBMP
-    thisState := "a" previewMode alphaMaskRefBMP getIDimage(currentFileIndex) currentFileIndex alphaMaskGradientAngle lastPaintEventID VPselRotation rImgW rImgH
+    thisState := "a" previewMode alphaMaskRefBMP getIDimage(currentFileIndex) currentFileIndex alphaMaskGradientAngle lastPaintEventID VPselRotation rImgW rImgH brushZeitung
     If (thisState=prevState && validBMP(prevBMPu))
     {
        newBitmap := trGdip_CloneBitmap(A_ThisFunc, prevBMPu)
@@ -12785,7 +12698,7 @@ resizeBitmapToGivenRef(pBitmap, refBMP, nW:=0, nH:=0, thisImgQuality:=5, keepRat
     Return pBitmap
 }
 
-QPV_MergeBitmapsWithMask(initialBitmap, newBitmap, alphaBitmap, invert, maskOpacity:=0, invertOpacity:=0, previewMode:=0) {
+QPV_MergeBitmapsWithMask(initialBitmap, newBitmap, alphaBitmap, invert, maskOpacity:=0, invertOpacity:=0, previewMode:=0, whichChannel:=0) {
   ; thisStartZeit := A_TickCount
   initQPVmainDLL()
   If !qpvMainDll
@@ -12830,7 +12743,7 @@ QPV_MergeBitmapsWithMask(initialBitmap, newBitmap, alphaBitmap, invert, maskOpac
   } Else alphaBitmap := 0
 
   If (!E1 && !E2)
-     r := DllCall(whichMainDLL "\MergeBitmapsWithMask", "UPtr", iScan, "UPtr", nScan, "UPtr", mScan, "int", invert, "Int", w, "Int", h, "int", maskOpacity, "int", invertOpacity, "int", stride, "int", 32, "int", userimgGammaCorrect)
+     r := DllCall(whichMainDLL "\MergeBitmapsWithMask", "UPtr", iScan, "UPtr", nScan, "UPtr", mScan, "int", invert, "Int", w, "Int", h, "int", maskOpacity, "int", invertOpacity, "int", stride, "int", 32, "int", userimgGammaCorrect, "int", whichChannel)
 
   ; ToolTip, % A_PtrSize "=" A_LastError "==" r "=" func2exec "=" SecToHHMMSS(Round(zeitOperation/1000, 3)) , , , 2
   If !E1
@@ -12970,7 +12883,7 @@ QPV_ColourBrush(pBitmap, pBitmapMask, invertAlphaMask, newColor, replaceMode, le
 }
 
 QPV_PrepareAlphaChannelBlur(pBitmap, givenLevel, fillMissingOnly) {
-; this function fills / replaces black pixels [and with opacity 0] with surrounding colors
+; this function fills / replaces black pixels [and opacity 0] with surrounding colors
 ; this helps mitigate the dark hallows that emerge when applying blur on images with areas that are fully transparent 
 ; the function can also be used to specify an opacity/alpha level of the image
 
@@ -13219,7 +13132,13 @@ QPV_CreatePlasmaBMP(W, H, intensity, details, scaleu, doGray, blurX, blurY, doBl
 
 generateAlphaMaskBitmap(clipBMP, previewMode, offX:=0, offY:=0, offW:=0, offH:=0, sizeIDu:=0, doGrayScale:=0, transformTool:=0) {
     Static prevBMPu, prevState
-    If (clipBMP="kill")
+    If (clipBMP="last")
+    {
+       If !validBMP(prevBMPu)
+          Return
+
+       Return trGdip_CloneBitmap(A_ThisFunc, prevBMPu)
+    } Else If (clipBMP="kill")
     {
        prevState := 0
        prevBMPu := trGdip_DisposeImage(prevBMPu, 1)
@@ -13273,7 +13192,7 @@ generateAlphaMaskBitmap(clipBMP, previewMode, offX:=0, offY:=0, offW:=0, offH:=0
        pa := "a" oW oH
     }
 
-    thisState := "a" externBMP previewMode thisAlphaFile VPselRotation sizeIDu getAlphaMaskIDu() pa
+    thisState := "a" externBMP previewMode thisAlphaFile VPselRotation sizeIDu getAlphaMaskIDu() pa brushZeitung
     If (thisState=prevState && validBMP(prevBMPu))
     {
        ; fnOutputDebug("cached alpha mask bitmap used")
@@ -13479,7 +13398,7 @@ realtimePasteInPlaceAlphaMasker(previewMode, clipBMP, givenID, ByRef newBitmap, 
        pa := "a" oW oH
     }
 
-    thisState := givenID oImgW oImgH maskOpacity doMerger pa
+    thisState := "a" givenID oImgW oImgH maskOpacity doMerger pa brushZeitung
     If (thisState=prevState && validBMP(prevBMPu))
     {
        newBitmap := trGdip_CloneBitmap(A_ThisFunc, prevBMPu)
@@ -13654,6 +13573,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
        G2 := 2NDglPG
        thisImgQuality := 5
        previewMode := 1
+       brushingMode := isNowAlphaPainting()
        Gdip_ResetClip(G2)
        ; trGdip_GraphicsClear(A_ThisFunc, G2, "0x00" WindowBGRcolor)
        vpWinClientSize(mainWidth, mainHeight)
@@ -13703,7 +13623,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
           }
        } Else hasRotated := 0
 
-       If (alphaMaskingMode>1 && brushingMode!=1 && !viewportQPVimage.imgHandle)
+       If (alphaMaskingMode>1 && brushingMode!=1 && !viewportQPVimage.imgHandle && PasteInPlaceBlendMode=1)
        {
           ; thisStartZeit := A_TickCount
           thisIDu := "a" previewMode PasteInPlaceBlurAmount PasteInPlaceToolMode PasteInPlaceOrientation VPselRotation getAlphaMaskIDu() opacityExtra
@@ -13741,10 +13661,10 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
 
     Gdip_ResetClip(G2)
     vPobju := testSelectionLargerThanViewport()
-    If (previewMode=1 && brushingMode!=1)
-       Gdip_SetClipRect(G2, 0, 0, vPobju.mainWidth, vPobju.mainHeight, 0)
+    If (previewMode=1)
+       Gdip_SetClipRect(G2, 0, 0, mainWidth, mainHeight, 0)
 
-    If (PasteInPlaceCropDo=1 && brushingMode!=1 && PasteInPlaceCropAdaptImg=0 && !viewportQPVimage.imgHandle)
+    If (PasteInPlaceCropDo=1 && PasteInPlaceCropAdaptImg=0 && !viewportQPVimage.imgHandle)
     {
        pra := (PasteInPlaceCropAngular>0) ? PasteInPlaceCropAngular : 360 + PasteInPlaceCropAngular
        pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, PasteInPlaceCropSel, VPselRotation + pra, rotateSelBoundsKeepRatio)
@@ -13755,15 +13675,15 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     VPmpx := Round((ResizedW * ResizedH)/1000000, 3)
     MAINmpx := Round((mainWidth * mainHeight)/1000000, 3) + 2
     allowPreviewThis := (previewMode!=1 || VPmpx<MAINmpx) ? 1 : 0
-    If (brushingMode=1 && previewMode=1 && allowPreviewThis!=1)
-    {
-       prevImgCall := thisImgCall
-       prevClipBMP := clipBMP
-       Gdip_DeletePath(pPath)
-       Return "too-large"
-    }
+    ; If (brushingMode=1 && previewMode=1 && allowPreviewThis!=1)
+    ; {
+    ;    prevImgCall := thisImgCall
+    ;    prevClipBMP := clipBMP
+    ;    Gdip_DeletePath(pPath)
+    ;    Return "too-large"
+    ; }
 
-    If (PasteInPlaceBlendMode>1 && isNumber(PasteInPlaceBlendMode)) || (userimgGammaCorrect=1 && previewMode=1 && PasteInPlaceEraseInitial=0 && allowPreviewThis=1)
+    If ((PasteInPlaceBlendMode>1) || (userimgGammaCorrect=1 && previewMode=1 && PasteInPlaceEraseInitial=0 && allowPreviewThis=1))
     {
        If (currIMGdetails.HasAlpha=1 && previewMode=1 && PasteInPlaceBlendMode>1 && !viewportQPVimage.imgHandle)
        {
@@ -13774,12 +13694,12 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     }
 
     thisImgQuality := (userimgQuality=1 && previewMode!=1) ? 3 : 5
-    If (PasteInPlaceBlendMode>1 && isNumber(PasteInPlaceBlendMode) && allowPreviewThis=1)
+    If (PasteInPlaceBlendMode>1 && allowPreviewThis=1)
     {
        clipBMP := resizeBitmapToGivenRef(clipBMP, 0, ResizedW, ResizedH, thisImgQuality)
        o_bgrBMP := resizeBitmapToGivenRef(o_bgrBMP, 0, ResizedW, ResizedH, thisImgQuality)
        BlurAmount := blr[PasteInPlaceGlassy]
-       If (imgSelOutViewPort=1 || vPobju.isLarger=1)
+       If (imgSelOutViewPort=1 || vPobju.isLarger=1 && previewMode=1)
        {
           BlurAmount := 0
        } Else If (previewMode=1)
@@ -13791,6 +13711,8 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
           msize := (kimgSelW + kimgSelH)//2
           rsize := (ResizedW + ResizedH)//2
           BlurAmount := Round(BlurAmount * (rsize / msize))
+          If (zoomLevel>2 && !isSelEntireVisible(mainWidth, mainHeight) || imgSelLargerViewPort=1)
+             BlurAmount := 0
        }
 
        thisFXstate := "a" whichBitmap getVPselIDs("saiz-vpos") previewMode BlurAmount "a" imgSelPx imgSelPy imgSelW imgSelH currentFileIndex getIDimage(currentFileIndex) oImgW oImgH currentUndoLevel currentSelUndoLevel FlipImgH FlipImgV IMGresizingMode imageAligned zoomLevel prevDestPosX prevDestPosY mainWidth mainHeight useGdiBitmap() prevResizedVPimgW prevResizedVPimgH PasteInPlaceAdaptMode undoLevelsRecorded UserMemBMP ViewPortBMPcache getIDvpFX()
@@ -13816,16 +13738,27 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     ; trGdip_GetImageDimensions(bgrBMP, wgimgW, wgimgH)
     ; fnOutputDebug("[" clipBMP "] " gImgW "==" gImgH " | [" bgrBMP "] "  wgImgW "==" wgImgH " | [" o_bgrBMP "] " dgImgW "==" dgImgH " | [target] " ResizedW "==" ResizedH)
     thisBMP := (validBMP(bgrBMP) && PasteInPlaceBlendMode>1) ? bgrBMP : clipBMP
-    If (brushingMode=1 && previewMode=1)
+    If (alphaMaskingMode>1 && !viewportQPVimage.imgHandle && (PasteInPlaceBlendMode>1 || brushingMode=1))
     {
-       prevImgCall := thisImgCall
-       Gdip_DeletePath(pPath)
-       prevClipBMP := clipBMP
-       ; trGdip_DisposeImage(o_bgrBMP, 1)
-       Return [hasRotated, thisBMP, bgrBMP, o_bgrBMP]
+       If (brushingMode=1)
+       {
+          trGdip_GetImageDimensions(userAlphaMaskBmpPainted, zImgW, zImgH)
+          viewportDynamicOBJcoords.x := imgSelPx, viewportDynamicOBJcoords.y := imgSelPy
+          viewportDynamicOBJcoords.w := ResizedW,  viewportDynamicOBJcoords.h := ResizedH
+          viewportDynamicOBJcoords.zl := (ResizedW/zImgW + ResizedH/zImgH)/2 + 0.0001
+       }
+       ; thisStartZeit := A_TickCount
+       thisIDu := "a" previewMode PasteInPlaceBlurAmount PasteInPlaceToolMode PasteInPlaceOrientation VPselRotation getAlphaMaskIDu() opacityExtra thisImgCall thisFXstate BlendModesPreserveAlpha BlendModesFlipped userimgGammaCorrect brushZeitung
+       realtimePasteInPlaceAlphaMasker(previewMode, thisBMP, thisIDu, newBitmap, 0, 0, 0, 0, 1, o_bgrBMP)
+       ; ToolTip, % brushZeitung "|" A_TickCount - thisStartZeit, , , 2
+       If validBMP(newBitmap)
+       {
+          trGdip_DisposeImage(thisBMP, 1)
+          thisBMP := newBitmap
+       }
     }
 
-    If (PasteInPlaceCropDo=1 && brushingMode!=1 && PasteInPlaceCropAdaptImg=1)
+    If (PasteInPlaceCropDo=1 && PasteInPlaceCropAdaptImg=1)
     {
        pra := (PasteInPlaceCropAngular>0) ? PasteInPlaceCropAngular : 360 + PasteInPlaceCropAngular
        pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, ResizedW, ResizedH, PasteInPlaceCropSel, VPselRotation + pra, rotateSelBoundsKeepRatio)
@@ -13834,7 +13767,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
 
     hasPainted := 0
     allowPreviewThis := (previewMode!=1 || VPmpx<MAINmpx) ? 1 : 0
-    If (allowPreviewThis=1 && userimgGammaCorrect=1 && previewMode=1)
+    If (allowPreviewThis=1 && previewMode=1)
     {
        If (validBMP(o_bgrBMP) && currIMGdetails.HasAlpha=1)
        {
@@ -13889,7 +13822,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     setWindowTitle(pVwinTitle, 1)
     If (previewMode=1)
     {
-       If (PasteInPlaceCropDo=1)
+       If (PasteInPlaceCropDo=1 && pPath)
        {
           Gdip_SetPenWidth(pPen1d, imgHUDbaseUnit//11)
           Gdip_DrawPath(G2, pPen1d, pPath)
@@ -13899,8 +13832,12 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
        thisImgQuality := (userimgQuality=1) ? 7 : 5
        prevImgCall := thisImgCall
        prevClipBMP := clipBMP
+       ; If (brushingMode=1)
+       ; {
+       ;    doLayeredWinUpdate(A_ThisFunc, hGDIwin, 2NDglHDC)
+       ;    doLayeredWinUpdate(A_ThisFunc, hGDIselectWin, 2NDglHDC)
+       ; }
        ; trGdip_DisposeImage(clipBMP, 1)
-       ; r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectWin, 2NDglHDC)
     } Else
     {
        trGdip_DisposeImage(clipBMP, 1)
@@ -16530,7 +16467,7 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
    offW := imgSelW,   offH := imgSelH
    thisBlendMode := (FillAreaBlendMode=1 && FillAreaCutGlass=1 && FillAreaGlassy>1) ? 24 : FillAreaBlendMode 
    thisObjBlurAmount := (previewMode=1) ? (Round(abs(FillAreaBlurAmount) * zoomLevel)) : abs(FillAreaBlurAmount)
-   If (FillAreaRemBGR=1 || zoomLevel>2 && previewMode=1 || imgSelLargerViewPort=1 && previewMode=1)
+   If (FillAreaRemBGR=1 || zoomLevel>2 && previewMode=1 && !isSelEntireVisible(mainWidth, mainHeight) || imgSelLargerViewPort=1 && previewMode=1)
       thisObjBlurAmount := 0
 
    ainvertus := (FillAreaBlurAmount>1) ? 1 : 0
@@ -42525,6 +42462,7 @@ ReadSettingsPasteInPlace(act:=0) {
     RegAction(act, "PasteInPlaceOrientFlipY",, 1)
     RegAction(act, "PasteInPlaceQuality",, 1)
     RegAction(act, "PasteInPlaceAutoExpandIMG",, 1)
+    RegAction(act, "userimgGammaCorrect",, 1)
 }
 
 togglePasteInPlaceAdaptModes() {
@@ -42932,6 +42870,8 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0) {
     Gui, Add, Checkbox, xs y+15 w%txtWid2% hp gupdateUIpastePanel Checked%PasteInPlaceApplyColorFX% vPasteInPlaceApplyColorFX, Color adjustments
     Gui, Add, Checkbox, x+5 wp hp gupdateUIpastePanel Checked%userimgGammaCorrect% vuserimgGammaCorrect, Gamma correction
     GuiAddGeneralColorAdjustCtrls(txtWid, "updateUIpastePanel")
+    If (currIMGdetails.HasAlpha!=1)
+       GuiControl, SettingsGUIA: Disable, BlendModesPreserveAlpha
 
     uiADDalphaMaskTabs(4, 5, "updateUIpastePanel")
     Gui, Tab
@@ -42952,7 +42892,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0) {
 }
 
 BtnHelpTransform() {
-    msgBoxWrapper(appTitle ": HELP", "The transform panel host a multi-functional tool. You can clone, crop, resize, rotate, align images side by side, colour adjust and/or blend images with this tool.`n`nClone image area. Once you have selected an area in the image and opened this panel, deselect «Erase initially selected area» found in the Main tab.`n`nRotate the image. Locate the dot in the center of the selection area with the mouse cursor in the viewport, and click 'n drag to adjust the rotation angle. Alternatively, set the object orientation angle found in the Main tab.`n`nCrop an image. Set the first drop-down found in the Main tab, to «Original image size», make the selection as small as you need it to be and set the alignment of the pivot (Main tab). Then go to the Crop tab and set to the preferences available: crop shape, angle and so on.`n`nAdjust colors and blend images. In the «Adjust colors» tab one can activate the colour adjustments check-box, adjust opacity and choose different blending modes.`n`nWhen alpha masking is activated and the tab pertaining to this is also activated, users can click 'n drag inside the selection area to adjust the mask's gradient center. To reset the position, press Alt+L-Click inside the selection area.", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "The transform panel hosts a multitude of functions: clone, crop, resize, skew, rotate, align images side by side, color adjust and/or blend images.`n`nClone image area. Once you have selected an area in the image and opened this panel, deselect «Erase initially selected area» found in the Main tab.`n`nRotate the image. Locate the dot in the center of the selection area with the mouse cursor in the viewport, and click 'n drag to adjust the rotation angle. Alternatively, set the object orientation angle found in the Main tab.`n`nCrop an image. Set the first drop-down found in the Main tab, to «Original image size», make the selection as small as you need it to be and set the alignment of the pivot (Main tab). Then go to the Crop tab and set to the preferences available: crop shape, angle and so on.`n`nAdjust colors and blend images. In the «Adjust colors» tab one can activate the colour adjustments check-box, adjust opacity and choose different blending modes.`n`nWhen alpha masking is activated and the tab pertaining to this is also activated, users can click 'n drag inside the selection area to adjust the mask's gradient center. To reset the position, press Alt+L-Click inside the selection area.", -1, 0, 0)
 }
 
 MenuResetTransformToolPos() {
@@ -70504,6 +70444,7 @@ ActDrawAlphaMaskBrushNow() {
          prevState := thisState
          prevMX := kX, prevMY := kY
          zeitSillyPrevent := A_TickCount
+         brushZeitung := A_TickCount randomFactor kX kY
          If (thisIndex=1)
             oMx := tkX, oMy := tkY
 
