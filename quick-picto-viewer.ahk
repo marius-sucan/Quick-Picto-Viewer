@@ -212,7 +212,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , sillySeparator :=  "▪", menuCustomNames := new hashtable(), clrGradientCoffX := 0, clrGradientCoffY := 0
    , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*|Background clipper*"
    , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := [], prevPasteInPlaceVPcoords := []
-   , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0
+   , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
    , appVersion := "5.9.97", vReleaseDate := "2023/12/13" ; yyyy-mm-dd
 
@@ -6056,6 +6056,7 @@ SkeletDrawSelectionBox(paintAlphaMask:=0) {
    vPimgSelH := max(selDotY, selDotAy) - min(selDotY, selDotAy)
    vPimgSelX := min(selDotX, selDotAx) + dotsSize//2
    vPimgSelY := min(selDotY, selDotAy) + dotsSize//2
+
    vpWinClientSize(mainWidth, mainHeight)
    tooBig := (vPimgSelW>mainWidth*1.5 && vPimgSelH>mainHeight*1.5 || vPimgSelW>mainWidth*2.5 || vPimgSelH>mainHeight*2.5) ? 1 : 0
    simpleRect := (imgSelLargerViewPort=1 || imgSelOutViewPort=1 || isSelEntireOutside(mainWidth, mainHeight) || tooBig=1) ? 1 : 0
@@ -11680,7 +11681,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
 
        wasCachedLine := 0
        thisuString := StrReplace(A_LoopField, "┘", " `n")
-       lineVisible := (((thisY + imgH<=cropYa) || thisY>=cropYb) && previewMode=1) ? 0 : 1
+       lineVisible := (((thisY + imgH<=cropYa) || thisY>=cropYb) && previewMode=1 && VPselRotation=0) ? 0 : 1
        thisTXTid := "a" thisuString borderSize scaleuPreview TextInAreaFlipH TextInAreaFlipV TextInAreaCharSpacing TextInAreaLineAngle TextInAreaOnlyBorder TextInAreaBorderOut TextInAreaBorderSize "||" TextInAreaFontName TextInAreaFontSize fntWeight TextInAreaFontItalic TextInAreaFontStrike TextInAreaFontUline fntQuality thisLineAngle
        thisPartialTXTid := "a" thisuString borderSize scaleuPreview TextInAreaCharSpacing TextInAreaLineAngle TextInAreaBorderSize "||" TextInAreaFontSize fntWeight thisLineAngle
        If ((cachedRawTXTbmps[A_Index, 3]=thisTXTid && lineVisible=1 || cachedRawTXTbmps[A_Index, 4]=thisPartialTXTid && lineVisible=0) && previewMode=1)
@@ -13507,7 +13508,7 @@ realtimePasteInPlaceAlphaMasker(previewMode, clipBMP, givenID, ByRef newBitmap, 
        ; ToolTip, % "cropping" , , , 2
        vpWinClientSize(mainWidth, mainHeight)
        thisu := ((offX.sw != offX.dh || offX.sh != offX.dh) && offX.invertArea=0) ? 1 : 0
-       If ((!isSelEntirelyWithinIMGbounds() || !isSelEntireVisible(mainWidth, mainHeight)) && offX.invertArea=0 || offX.invertArea=1 || thisu=1)
+       If ((!isSelEntirelyWithinIMGbounds() || !isSelEntireVisible(mainWidth, mainHeight)) && offX.invertArea=0 || offX.invertArea=1 || offX.forceRect=1 || thisu=1)
        {
           thisAlphaBitmap := getRectFromBitmap(alphaMaskGray, offX, 1)
           If validBMP(thisAlphaBitmap)
@@ -13756,6 +13757,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     }
 
     PasteInPlaceCalcObjCoords(imgSelW, imgSelH, ResizedW, ResizedH, imgSelPx, imgSelPy)
+    prevAlphaMaskCoordsPreview := [imgSelPx, imgSelPy, ResizedW, ResizedH]
     VPmpx := Round((ResizedW * ResizedH)/1000000, 3)
     MAINmpx := Round((mainWidth * mainHeight)/1000000, 3) + 2
     allowPreviewThis := (previewMode!=1 || VPmpx<MAINmpx || forceSlowLivePreviewMode=1) ? 1 : 0
@@ -15536,45 +15538,39 @@ InsertTextSelectedArea() {
     }
 
     coreDesiredPixFmt := o_coreFmt
-    trGdip_GetImageDimensions(textBoxu, zImgW, zImgH)
-    Gdip_GetRotatedDimensions(zImgW, zImgH, VPselRotation, rnImgW, rnImgH)
-    If (TextInAreaAlign=3)
-       imgSelPx := X2 - rnImgW
-    Else If (TextInAreaAlign=2)
-       imgSelPx := imgSelPx + imgSelW//2 - rnImgW//2
-
-    If (TextInAreaValign=3)
-       imgSelPy := Y2 - rnImgH
-    Else If (TextInAreaValign=2)
-       imgSelPy := imgSelPy + imgSelH//2 - rnImgH//2
-
+    trGdip_GetImageDimensions(textBoxu, nImgW, nImgH)
     If (VPselRotation>0)
     {
-       xBitmap := trGdip_RotateBitmapAtCenter(A_ThisFunc, textBoxu, VPselRotation, ".")
+       xBitmap := trGdip_RotateBitmapAtCenter(A_ThisFunc, textBoxu, VPselRotation, "-", 7)
+       trGdip_GetImageDimensions(textBoxu, kW, kH)
+       bW := (kW>imgSelW) ? imgSelW : max(kW, kH)
+       bH := (kH>imgSelH) ? imgSelH : max(kW, kH)
+       bW := (bW>imgSelW) ? imgSelW : bW
+       bH := (bH>imgSelH) ? imgSelH : bH
+       If validBMP(xBitmap)
+          xBitmap := resizeBitmapToGivenRef(xBitmap, 0, bW, bH, 7, 1)
+          ; xBitmap := resizeBitmapToGivenRef(xBitmap, 0, nImgW, nImgH, 5, 1)
        If validBMP(xBitmap)
        {
           trGdip_DisposeImage(textBoxu, 1)
           textBoxu := xBitmap
-          trGdip_GetImageDimensions(textBoxu, zimgW, zimgH)
        }
+       trGdip_GetImageDimensions(textBoxu, nImgW, nImgH)
     }
 
-    tX := min(o_imgSelPx, imgSelPx)
-    tY := min(o_imgSelPy, imgSelPy)
-    wX := max(o_imgSelPx + o_imgSelW, imgSelPx + zImgW)
-    hY := max(o_imgSelPy + o_imgSelH, imgSelPy + zImgH)
-    tW := wX - tX
-    tH := hY - tY
-    If (EllipseSelectMode=0 && TextInAreaRoundBoxBgr=0)
-    {
-       If testEntireImgSelected()
-       {
-          tX := tY := -2
-          tW += 6
-          tH += 6
-       }
-    }
+    zImgW := nImgW,    zImgH := nImgH
+    If (TextInAreaAlign=3)
+       imgSelPx := imgSelPx := imgSelPx + imgSelW - zImgW
+    Else If (TextInAreaAlign=2)
+       imgSelPx := imgSelPx := imgSelPx + Round(imgSelW/2 - zImgW/2)
 
+    If (TextInAreaValign=3)
+       imgSelPy := imgSelPy + imgSelH - zImgH
+    Else If (TextInAreaValign=2)
+       imgSelPy := imgSelPy + Round(imgSelH/2 - zImgH/2)
+
+    tX := imgSelPx,    tY := imgSelPy
+    tW := zImgW,       tH := zImgH
     ; fnOutputDebug(A_ThisFunc "(): " tX "," tY "," wX "," hY "," tW "," tH)
     If (TextInAreaBlendMode>1 || alphaMaskingMode>1)
     {
@@ -15714,53 +15710,51 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
     Gdip_SetClipRect(G2, 0, 0, mainWidth, mainHeight)
     trGdip_GetImageDimensions(useGdiBitmap(), thisW, thisH)
     objSel := ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, thisW, thisH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
-    o_imgSelPx := imgSelPx,    o_imgSelPy := imgSelPy
-    o_imgSelW := imgSelW,      o_imgSelH := imgSelH
-
-    trGdip_GetImageDimensions(textBoxu, nimgW, nimgH)
-    zImgW := Round((nImgW * zoomLevel) * scaleuPreview)
-    zImgH := Round((nImgH * zoomLevel) * scaleuPreview)
-
-    Gdip_GetRotatedDimensions(zImgW, zImgH, VPselRotation, rnImgW, rnImgH)
-    If (TextInAreaAlign=3)
-       imgSelPx := imgSelPx + imgSelW - rnImgW
-    Else If (TextInAreaAlign=2)
-       imgSelPx := imgSelPx + Round(imgSelW/2 - rnImgW/2)
-
-    If (TextInAreaValign=3)
-       imgSelPy := imgSelPy + imgSelH - rnImgH
-    Else If (TextInAreaValign=2)
-       imgSelPy := imgSelPy + Round(imgSelH/2 - rnImgH/2)
-
+    trGdip_GetImageDimensions(textBoxu, nImgW, nImgH)
+    zbw := 1
     If (VPselRotation>0)
     {
        xBitmap := trGdip_RotateBitmapAtCenter(A_ThisFunc, textBoxu, VPselRotation, "-", 5)
+       trGdip_GetImageDimensions(textBoxu, kW, kH)
+       ppw := max(kW, kH)
+       bW := (kW>imgSelW) ? imgSelW : ppw
+       bH := (kH>imgSelH) ? imgSelH : ppw
+       zbw := (kW>imgSelW || kH>imgSelH) ? 0 : 1
+       If validBMP(xBitmap)
+          xBitmap := resizeBitmapToGivenRef(xBitmap, 0, bW, bH, 5, 1)
+          ; xBitmap := resizeBitmapToGivenRef(xBitmap, 0, nImgW, nImgH, 5, 1)
        If validBMP(xBitmap)
        {
           trGdip_DisposeImage(textBoxu, 1)
           textBoxu := xBitmap
        }
-       trGdip_GetImageDimensions(textBoxu, nimgW, nimgH)
-       zImgW := Round((nImgW*zoomLevel)*scaleuPreview)
-       zImgH := Round((nImgH*zoomLevel)*scaleuPreview)
+       trGdip_GetImageDimensions(textBoxu, nImgW, nImgH)
     }
 
-    tX := min(o_imgSelPx, imgSelPx)
-    tY := min(o_imgSelPy, imgSelPy)
-    wX := max(o_imgSelPx + o_imgSelW, imgSelPx + zImgW)
-    hY := max(o_imgSelPy + o_imgSelH, imgSelPy + zImgH)
-    tW := wX - tX
-    tH := hY - tY
-    objSel.sw := tW,   objSel.sh := th
-    objSel.sx := tX,   objSel.sy := tY
+    zImgW := (zbw=1) ? Round((nImgW * zoomLevel) * scaleuPreview) : nImgW
+    zImgH := (zbw=1) ? Round((nImgH * zoomLevel) * scaleuPreview) : nImgH
+    If (TextInAreaAlign=3)
+       imgSelPx := imgSelPx := imgSelPx + imgSelW - zImgW
+    Else If (TextInAreaAlign=2)
+       imgSelPx := imgSelPx := imgSelPx + Round(imgSelW/2 - zImgW/2)
 
+    If (TextInAreaValign=3)
+       imgSelPy := imgSelPy + imgSelH - zImgH
+    Else If (TextInAreaValign=2)
+       imgSelPy := imgSelPy + Round(imgSelH/2 - zImgH/2)
+
+    tX := imgSelPx,    tY := imgSelPy
+    tW := zImgW,       tH := zImgH
+    objSel.sw := tW,   objSel.sh := tH
+    objSel.sx := tX,   objSel.sy := tY
+    prevAlphaMaskCoordsPreview := [tX, tY, zImgW, zImgH]
     If (userimgGammaCorrect=1 || TextInAreaBlendMode>1 || alphaMaskingMode>1)
     {
        If (TextInAreaBlendMode>1 || alphaMaskingMode>1)
        {
           otx := tX, oty := tY
           otw := tW, oth := tH
-          getClampedVPselToWindow(1, mainWidth, mainHeight, thisW, thisH, tX, tY, tW, tH)
+          getClampedVPselToWindow(0, mainWidth, mainHeight, thisW, thisH, tX, tY, tW, tH)
           ptx := tX - otx, pty := tY - oty
           ptw := tW - otw, pth := tH - oth
           objSel.dw := tW,   objSel.dh := tH
@@ -15768,6 +15762,7 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
        }
 
        bgrBMPu := getImgSelectedAreaEditMode(1, tX, tY, tW, tH, tW, tH, 0, tW, tH)
+       ; ToolTip, % tw "|" tH , , , 2
     }
 
     objSel.invertArea := 0
@@ -15807,7 +15802,6 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
           viewportDynamicOBJcoords.x := objSel.sx,  viewportDynamicOBJcoords.y := objSel.sy
           viewportDynamicOBJcoords.w := objSel.sw,  viewportDynamicOBJcoords.h := objSel.sH
           viewportDynamicOBJcoords.zl := (objSel.sw/zImgW + objSel.sh/zImgH)/2 + 0.0001
-          trGdip_GetImageDimensions(fBitmap, oImgW, oImgH)
           wBitmap := getRectFromBitmap(userAlphaMaskBmpPainted, objSel, 1)
           alphaMaskGray := validBMP(wBitmap) ? wBitmap : userAlphaMaskBmpPainted
           QPV_SetBitmapAsAlphaChannel(fBitmap, alphaMaskGray, alphaMaskColorReversed, alphaMaskReplaceMode, alphaMaskBMPchannel)
@@ -15817,6 +15811,7 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
        {
           getVPselSize(zW, zH, 1, 0)
           objSel.zw := zw,        objSel.zh := zh
+          objSel.forceRect := (VPselRotation>0) ? 1 : 0
           thisIDu := "a" previewMode VPselRotation zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY getVPselIDs("saiz-vpos") FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY TextInAreaFlipV TextInAreaFlipV TextInAreaAlign TextInAreaLineAngle TextInAreaCharSpacing TextInAreaBlendMode TextInAreaValign TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaFillSelArea TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName
           thisIDu .= "b" TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr TextInAreaAutoWrap TextInAreaCaseTransform userimgGammaCorrect undoLevelsRecorded currentUndoLevel useGdiBitmap() getAlphaMaskIDu()
           realtimePasteInPlaceAlphaMasker(previewMode, fBitmap, thisIDu, maskedBitmap, objSel)
@@ -15847,14 +15842,9 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
     If (userimgGammaCorrect=1)
        Gdip_SetCompositingQuality(G2, 1)
 
-    ; SkeletDrawSelectionBox()
-    ; r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectWin, 2NDglHDC)
-    ; If (A_TickCount - startZeit<65) && (mustGoTimer=1)
-    ;    livePreviewsImageEditing()
     If (mustGoTimer=1 && brushingMode=0)
        SetTimer, livePreviewsImageEditing, -100
-    ; Else
-       ; SetTimer, ResetImgLoadStatus, -200
+
     lastInvoked := A_TickCount
 }
 
@@ -46308,6 +46298,17 @@ livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
    vpWinClientSize(mainWidth, mainHeight)
    trGdip_GetImageDimensions(useGdiBitmap(), thisW, thisH)
    objSel := ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, thisW, thisH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, vPimgSelW, vPimgSelH, vPimgSelX, vPimgSelY)
+   transformTool := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
+   If ((AnyWindowOpen=32 || transformTool=1) && doImgEditLivePreview=1) ; insert text and transform tools
+   {
+      vPimgSelX := prevAlphaMaskCoordsPreview[1],  vPimgSelY := prevAlphaMaskCoordsPreview[2]
+      vPimgSelW := prevAlphaMaskCoordsPreview[3],  vPimgSelH := prevAlphaMaskCoordsPreview[4]
+      objSel.sw := vPimgSelW,   objSel.sh := vPimgSelH
+      objSel.sx := vPimgSelX,   objSel.sy := vPimgSelY
+      ; ToolTip, %  vPimgSelX "|" vPimgSelY , , , 2
+      doClamping := 0
+   } Else doClamping := 1
+
    doInvertPreview := (AnyWindowOpen=66 && FloodFillUseAlpha=1 && (BrushToolOutsideSelection=1 || BrushToolOutsideSelection=3)) || (AnyWindowOpen=23 && FillAreaInverted=1) || ((AnyWindowOpen=25 || AnyWindowOpen=55) && EraseAreaInvert=1) ? 1 : 0
    If (doInvertPreview=1 && dummy!="live")
    {
@@ -46316,7 +46317,7 @@ livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
 
       getClampedVPimgBounds(vPimgSelX, vPimgSelY, kX, kY, vPimgSelW, vPimgSelH)
    } Else
-      getClampedVPselToWindow(1, mainWidth, mainHeight, thisW, thisH, vPimgSelX, vPimgSelY, vPimgSelW, vPimgSelH)
+      getClampedVPselToWindow(doClamping, mainWidth, mainHeight, thisW, thisH, vPimgSelX, vPimgSelY, vPimgSelW, vPimgSelH)
 
    If (dummy!="live")
    {
@@ -71759,14 +71760,14 @@ ViewPortSelectionManageCoords(mainWidth, mainHeight, dpX, dpY, maxSelX, maxSelY,
      If (vPimgSelH<minSelSizu)
         vPimgSelH := minSelSizu
 
-     objSel.oSelW := vPimgSelW
-     objSel.oSelH := vPimgSelH
+     objSel.oSelW := Round(vPimgSelW)
+     objSel.oSelH := Round(vPimgSelH)
      minSizu := SelDotsSize*2
      objSel.selSmall := (vPimgSelW<minSizu*1.55 || vPimgSelH<minSizu*1.55) ? 1 : 0
      vPimgSelPx := dpX + min(zImgSelX1, zImgSelX2)
      vPimgSelPy := dpY + min(zImgSelY1, zImgSelY2)
-     objSel.oSelX := vPimgSelPx
-     objSel.oSelY := vPimgSelPy
+     objSel.oSelX := Round(vPimgSelPx)
+     objSel.oSelY := Round(vPimgSelPy)
      ; fnOutputDebug(A_ThisFunc ": " vPimgSelPx "|" vPimgSelPy "=" dpX "|" dpY "=" vPimgSelW "|" vPimgSelH)
      If (LimitSelectBoundsImg!=-1)
      {
