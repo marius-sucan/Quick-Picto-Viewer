@@ -11623,14 +11623,15 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
     If (previewMode=1)
        borderSize := Round(borderSize/scaleuPreview)
 
-    cropYa := Round(cropYa / scaleuPreview)
-    cropYb := Round(cropYb / scaleuPreview)
     maxW := Round(maxW / scaleuPreview)
     maxH := Round(maxH / scaleuPreview)
-    p := capIMGdimensionsFormatlimits("gdip", 0, maxW, maxH)
+    cropYa := Round(cropYa / scaleuPreview)
+    cropYb := Round(cropYb / scaleuPreview)
+    ; p := capIMGdimensionsFormatlimits("gdip", 0, maxW, maxH)
     scaleuBlrPreview := (previewMode=1) ? (borderSize*4 + testWb + testHb)/(obs*4 + testWa + testHa) : 1
     If (isImgSizeTooLarge(maxW, maxH) && previewMode=1)
     {
+       addJournalEntry(A_ThisFunc "(). ERROR. Cannot generate text preview. Bitmap too large: " maxW " x " maxH)
        Gdi_DeleteObject(hFont)
        Gdi_DeleteObject(hFontPreview)
        Return "fail"
@@ -11669,6 +11670,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
     doConturDraw := (TextInAreaBorderSize>0 && TextInAreaBorderOut>1) ? 1 : 0
 
     rescaleWidthCharSpacing := (TextInAreaCharSpacing<0) ? (100 - Abs(TextInAreaCharSpacing))/90 : 1
+    allowOpti := (previewMode!=1 || VPselRotation!=0 || TextInAreaValign=2) ? 0 : 1
     thisHFont := (previewMode=1) ? hFontPreview : hFont
     threads := (previewMode=1) ? realSystemCores : 0
     prevImgH := imgH := (previewMode=1) ? testHb : testHa
@@ -11681,9 +11683,10 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
 
        wasCachedLine := 0
        thisuString := StrReplace(A_LoopField, "┘", " `n")
-       lineVisible := (((thisY + imgH<=cropYa) || thisY>=cropYb) && previewMode=1 && VPselRotation=0) ? 0 : 1
-       thisTXTid := "a" thisuString borderSize scaleuPreview TextInAreaFlipH TextInAreaFlipV TextInAreaCharSpacing TextInAreaLineAngle TextInAreaOnlyBorder TextInAreaBorderOut TextInAreaBorderSize "||" TextInAreaFontName TextInAreaFontSize fntWeight TextInAreaFontItalic TextInAreaFontStrike TextInAreaFontUline fntQuality thisLineAngle
-       thisPartialTXTid := "a" thisuString borderSize scaleuPreview TextInAreaCharSpacing TextInAreaLineAngle TextInAreaBorderSize "||" TextInAreaFontSize fntWeight thisLineAngle
+       pzY := thisY ; (TextInAreaValign=1) ? thisY : maxH - thisY
+       lineVisible := (((pzY + imgH<=cropYa) || pzY>=cropYb) && allowOpti=1) ? 0 : 1
+       thisTXTid := "a" thisuString borderSize scaleuPreview TextInAreaFlipH TextInAreaFlipV TextInAreaCharSpacing TextInAreaLineAngle TextInAreaOnlyBorder TextInAreaBorderOut TextInAreaBorderSize "||" TextInAreaFontName TextInAreaFontSize fntWeight TextInAreaFontItalic TextInAreaFontStrike TextInAreaFontUline fntQuality thisLineAngle TextInAreaCaseTransform TextInAreaValign
+       thisPartialTXTid := "a" thisuString borderSize scaleuPreview TextInAreaCharSpacing TextInAreaLineAngle TextInAreaBorderSize "||" TextInAreaFontSize fntWeight thisLineAngle TextInAreaValign
        If ((cachedRawTXTbmps[A_Index, 3]=thisTXTid && lineVisible=1 || cachedRawTXTbmps[A_Index, 4]=thisPartialTXTid && lineVisible=0) && previewMode=1)
        {
           aa := validBMP(cachedRawTXTbmps[A_Index, 1]) ? trGdip_CloneBitmap(A_ThisFunc, cachedRawTXTbmps[A_Index, 1]) : 0
@@ -11721,6 +11724,14 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
 
        thisBMP := pBitmap
        pBitmapContours := objBMPs[2]
+       If (imgW>maxW && validBMP(thisBMP))
+       {
+          thisBMP := resizeBitmapToGivenRef(thisBMP, 0, maxW, imgH, 5, 1)
+          trGdip_GetImageDimensions(thisBMP, imgW, imgH)
+          If validBMP(pBitmapContours)
+             pBitmapContours := resizeBitmapToGivenRef(pBitmapContours, 0, maxW, imgH, 5, 1)
+       }
+
        If !validBMP(thisBMP)
        {
           fnOutputDebug(A_ThisFunc "(): an error occured rendering txt line=" A_Index)
@@ -13484,9 +13495,6 @@ realtimePasteInPlaceAlphaMasker(previewMode, clipBMP, givenID, ByRef newBitmap, 
     }
 
     prevState := 0
-    If (previewMode!=1)
-       setWindowTitle("Applying alpha mask to image")
-
     prevBMPu := trGdip_DisposeImage(prevBMPu, 1)
     newBitmap := (doMerger=1) ? trGdip_CloneBitmap(A_ThisFunc, initialBitmap) : trGdip_CloneBitmap(A_ThisFunc, clipBMP)
     If !validBMP(newBitmap)
@@ -15539,26 +15547,31 @@ InsertTextSelectedArea() {
 
     coreDesiredPixFmt := o_coreFmt
     trGdip_GetImageDimensions(textBoxu, nImgW, nImgH)
-    If (VPselRotation>0)
+    Gdip_GetRotatedDimensions(nImgW, nImgH, VPselRotation, rrImgW, rrImgH)
+    mpx := Round((rrImgW * rrImgH)/1000000, 1)
+    If (VPselRotation>0 && mpx<536.4)
     {
        xBitmap := trGdip_RotateBitmapAtCenter(A_ThisFunc, textBoxu, VPselRotation, "-", 7)
-       trGdip_GetImageDimensions(textBoxu, kW, kH)
-       bW := (kW>imgSelW) ? imgSelW : max(kW, kH)
-       bH := (kH>imgSelH) ? imgSelH : max(kW, kH)
-       bW := (bW>imgSelW) ? imgSelW : bW
-       bH := (bH>imgSelH) ? imgSelH : bH
-       If validBMP(xBitmap)
-          xBitmap := resizeBitmapToGivenRef(xBitmap, 0, bW, bH, 7, 1)
-          ; xBitmap := resizeBitmapToGivenRef(xBitmap, 0, nImgW, nImgH, 5, 1)
        If validBMP(xBitmap)
        {
+          trGdip_GetImageDimensions(xBitmap, kW, kH)
+          zz := (kW>imgSelW || kH>imgSelH) ? 1 : 0
+          bW := (kW>imgSelW) ? imgSelW : max(kW, kH)
+          bH := (kH>imgSelH) ? imgSelH : max(kW, kH)
+          bW := (bW>imgSelW) ? imgSelW : bW
+          bH := (bH>imgSelH) ? imgSelH : bH
+          calcIMGdimensions(kW, kH, bW, bH, zbw, zbh)
           trGdip_DisposeImage(textBoxu, 1)
           textBoxu := xBitmap
        }
-       trGdip_GetImageDimensions(textBoxu, nImgW, nImgH)
     }
 
-    zImgW := nImgW,    zImgH := nImgH
+    If (VPselRotation>0 && mpx>536.4)
+       addJournalEntry(A_ThisFunc "(). ERROR. Unable to rotate the text bitmap. It exceeds 536 megapixels.")
+
+    trGdip_GetImageDimensions(textBoxu, nImgW, nImgH)
+    zImgW := (zz=1) ? zbw : nImgW
+    zImgH := (zz=1) ? zbh : nImgH
     If (TextInAreaAlign=3)
        imgSelPx := imgSelPx := imgSelPx + imgSelW - zImgW
     Else If (TextInAreaAlign=2)
@@ -15691,7 +15704,9 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
        ; ToolTip, % mainHeight "|" imgSelPy "|" imgSelH , , , 2
        MouseCoords2Image(1, 1, 1, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kYa)
        MouseCoords2Image(mainWidth + 2, mainHeight + 2, 1, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kYb)
-       obju := coreInsertTextInAreaBox(UserTextArea, imgSelW, imgSelH, 1, kYa - imgSelY1, kYb - imgSelPy)
+       kYa := (TextInAreaValign=3) ? thisH - kYa - imgSelY1 : kYa - imgSelY1
+       kYb := (TextInAreaValign=3) ? thisH - kYb - imgSelY1 : kYb - imgSelY1
+       obju := coreInsertTextInAreaBox(UserTextArea, imgSelW, imgSelH, 1, kYa, kYb)
        If validBMP(obju[1])
        {
           prevState := thisState
@@ -15710,29 +15725,32 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
     Gdip_SetClipRect(G2, 0, 0, mainWidth, mainHeight)
     trGdip_GetImageDimensions(useGdiBitmap(), thisW, thisH)
     objSel := ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, thisW, thisH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
-    trGdip_GetImageDimensions(textBoxu, nImgW, nImgH)
-    zbw := 1
-    If (VPselRotation>0)
+    trGdip_GetImageDimensions(textBoxu, onImgW, onImgH)
+    Gdip_GetRotatedDimensions(onImgW, onImgH, VPselRotation, rrImgW, rrImgH)
+    mpx := Round((rrImgW * rrImgH)/1000000, 1)
+    If (VPselRotation>0 && mpx<536.4)
     {
+       zz := 1
        xBitmap := trGdip_RotateBitmapAtCenter(A_ThisFunc, textBoxu, VPselRotation, "-", 5)
-       trGdip_GetImageDimensions(textBoxu, kW, kH)
-       ppw := max(kW, kH)
+       trGdip_GetImageDimensions(xBitmap, kW, kH)
+       ppw := Round((max(kW, kH) * zoomLevel) * scaleuPreview)
        bW := (kW>imgSelW) ? imgSelW : ppw
        bH := (kH>imgSelH) ? imgSelH : ppw
-       zbw := (kW>imgSelW || kH>imgSelH) ? 0 : 1
-       If validBMP(xBitmap)
-          xBitmap := resizeBitmapToGivenRef(xBitmap, 0, bW, bH, 5, 1)
-          ; xBitmap := resizeBitmapToGivenRef(xBitmap, 0, nImgW, nImgH, 5, 1)
+       bW := (bW>imgSelW) ? imgSelW : bW
+       bH := (bH>imgSelH) ? imgSelH : bH
+       calcIMGdimensions(kW, kH, bW, bH, zbw, zbh)
        If validBMP(xBitmap)
        {
           trGdip_DisposeImage(textBoxu, 1)
           textBoxu := xBitmap
        }
-       trGdip_GetImageDimensions(textBoxu, nImgW, nImgH)
-    }
+    } Else zz := 0
 
-    zImgW := (zbw=1) ? Round((nImgW * zoomLevel) * scaleuPreview) : nImgW
-    zImgH := (zbw=1) ? Round((nImgH * zoomLevel) * scaleuPreview) : nImgH
+    trGdip_GetImageDimensions(textBoxu, nImgW, nImgH)
+    zImgW := (zz=1) ? Round(zbw) : Round((nImgW * zoomLevel) * scaleuPreview)
+    zImgH := (zz=1) ? Round(zbh) : Round((nImgH * zoomLevel) * scaleuPreview)
+    ; ToolTip, % "on=" onImgW "|" onImgH "|" zz "`nk==" kW "|" kH "`nsel" imgSelW "|" imgSelH "`nNim" nImgW "|" nImgH  "`nZim" zImgW "|" zImgH  , , , 2
+
     If (TextInAreaAlign=3)
        imgSelPx := imgSelPx := imgSelPx + imgSelW - zImgW
     Else If (TextInAreaAlign=2)
@@ -15811,7 +15829,7 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
        {
           getVPselSize(zW, zH, 1, 0)
           objSel.zw := zw,        objSel.zh := zh
-          objSel.forceRect := (VPselRotation>0) ? 1 : 0
+          ; objSel.forceRect := (VPselRotation>0) ? 1 : 0
           thisIDu := "a" previewMode VPselRotation zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY getVPselIDs("saiz-vpos") FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY TextInAreaFlipV TextInAreaFlipV TextInAreaAlign TextInAreaLineAngle TextInAreaCharSpacing TextInAreaBlendMode TextInAreaValign TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaFillSelArea TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName
           thisIDu .= "b" TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr TextInAreaAutoWrap TextInAreaCaseTransform userimgGammaCorrect undoLevelsRecorded currentUndoLevel useGdiBitmap() getAlphaMaskIDu()
           realtimePasteInPlaceAlphaMasker(previewMode, fBitmap, thisIDu, maskedBitmap, objSel)
