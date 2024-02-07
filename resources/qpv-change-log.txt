@@ -10,6 +10,8 @@
   - [new] option to join arcs and lines in the «Draw parametric lines» panel, for the margins generator
   - [new] blending modes option for draw lines and shapes tools
   - overhauled the «Desature image colors» tool; it now has brightness and contrast options
+  - improvements and optimisations to all the tools with live preview in the viewport
+  - fixes and improvements for the «insert text» tool
   - fill behind now allows to users to fill triangles, rounded rectangles and other shapes
   - improvements for the "Image selection area properties" panel; added shape cavity and rotation options, and the ability to Ctrl+L-Click on X1,X2, etc, to manually set the coordinates; also added copy/paste selection properties
   - improvements to how selection areas and vector shapes are handled; dramatic performance improvements when dealing with huge images

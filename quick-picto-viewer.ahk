@@ -298,7 +298,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , BrushToolAopacity := 200, BrushToolBopacity := 120, BrushToolAcolor := "ff9900", BrushToolBcolor := "3399FF"
    , BrushToolSoftness := 60, BrushToolWetness := 0, BrushToolDryingRate := 0, BrushToolType := 1
    , BrushToolUseSecondaryColor := 0, BrushToolAspectRatio := 0, BrushToolAngle := 0, BrushToolOutsideSelection := 1
-   , BrushToolBlurStrength := 0, brushToolStepping := 0, brushToolDoubleSize := 0, BrushToolOverDraw := 1
+   , BrushToolBlurStrength := 0, brushToolStepping := 0, BrushToolDoubleSize := 0, BrushToolOverDraw := 1
    , BrushToolDynamicCloner := 0, BrushToolEraserRestore := 0, BrushToolRandomSize := 0, BrushToolRandomSoftness := 0
    , BrushToolRandomAspectRatio := 0, BrushToolRandomAngle := 0, BrushToolRandomPosX := 0, BrushToolRandomPosY := 0
    , BrushToolRandomHue := 0, BrushToolRandomSat := 0, BrushToolRandomLight := 0, BrushToolRandomDark := 0 
@@ -5622,7 +5622,7 @@ MouseMoveResponder(actu:=0) {
      SetTimer, dummyRefreshImgSelectionWindow, -2
   } Else If (liveDrawingBrushTool=1 && AnyWindowOpen && AnyWindowOpen!=66)
   {
-     brushSize := (brushToolDoubleSize=1) ? brushToolSize*2 : brushToolSize
+     brushSize := (BrushToolDoubleSize=1) ? brushToolSize*2 : brushToolSize
      thisSize := (AnyWindowOpen=64) ? brushSize * zoomLevel : brushSize * viewportDynamicOBJcoords.zl
      Gdip_ResetClip(2NDglPG)
      vpWinClientSize(mainWidth, mainHeight)
@@ -11358,7 +11358,7 @@ TextuToGraphics(pGraphics, Text, OptionsObj, Font:="Arial", initMode:=0, Unit:=0
    return _E ? _E : ReturnRC
 }
 
-HardWrapTextFontBased(TextToWrap, hFont, maxW, maxH, lineHeight) {
+HardWrapTextFontBased(TextToWrap, hFont, maxW, maxH, lineHeight, vAlign) {
    ; Critical, on
    Static RegExDelimiters := "(\||\*|\!|\]|\[|\\|\/|\.|\=|\:|\;|\?|\@|\-|\_|\)|\(|\{|\}|\s)"
         , maxCharsInWidth := 2048
@@ -11375,7 +11375,7 @@ HardWrapTextFontBased(TextToWrap, hFont, maxW, maxH, lineHeight) {
    thisCharSpacing := (TextInAreaCharSpacing>0) ? TextInAreaCharSpacing : 0
    Loop, Parse, TextToWrap
    {
-       If (maxLinez<linez && linez>1)
+       If (maxLinez<linez && linez>1 && vAlign!=3)
           Break
 
        thisIndex++
@@ -11616,7 +11616,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
     theString := StrReplace(theString, "`n`n", "`n┘")
     thisLnHeight := testHa + TextInAreaFontLineSpacing
     If (TextInAreaAutoWrap=1)
-       theString := Trimmer(HardWrapTextFontBased(theString, hFont, maxW - borderSize * 2, maxH + 2, thisLnHeight))
+       theString := Trimmer(HardWrapTextFontBased(theString, hFont, maxW - borderSize * 2, maxH + 2, thisLnHeight, TextInAreaValign))
     Else
        theString := Trimmer(theString)
 
@@ -11664,7 +11664,8 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
        trGdip_GraphicsClear(A_ThisFunc, G, "0xFF000000")
     }
 
-    thisY := thisX := 0
+    thisY := (TextInAreaValign=3) ? maxH : 0
+    thisX := 0
     maxedW := maxedH := 0
     minedX := maxW, minedY := maxH
     doConturDraw := (TextInAreaBorderSize>0 && TextInAreaBorderOut>1) ? 1 : 0
@@ -11676,15 +11677,19 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
     prevImgH := imgH := (previewMode=1) ? testHb : testHa
     prevImgW := imgW := (previewMode=1) ? testWb : testWa
     skippedLines := 0
-    Loop, Parse, theString, `n
+    textArray := StrSplit(theString, "`n")
+    totalLinez :=  textArray.Count()
+    Loop, % totalLinez
     {
-       If !Trimmer(A_LoopField)
+       thisuString := (TextInAreaValign=3) ? textArray[totalLinez - A_Index + 1] : textArray[A_Index]
+       If !Trimmer(thisuString)
           Continue
 
        wasCachedLine := 0
-       thisuString := StrReplace(A_LoopField, "┘", " `n")
-       pzY := thisY ; (TextInAreaValign=1) ? thisY : maxH - thisY
-       lineVisible := (((pzY + imgH<=cropYa) || pzY>=cropYb) && allowOpti=1) ? 0 : 1
+       thisuString := StrReplace(thisuString, "┘", " `n")
+       pzYa := (TextInAreaValign=3) ? thisY : thisY + prevImgH
+       pzYb := (TextInAreaValign=3) ? thisY - prevImgH : thisY
+       lineVisible := (((pzYa<=cropYa) || pzYb>=cropYb) && allowOpti=1) ? 0 : 1
        thisTXTid := "a" thisuString borderSize scaleuPreview TextInAreaFlipH TextInAreaFlipV TextInAreaCharSpacing TextInAreaLineAngle TextInAreaOnlyBorder TextInAreaBorderOut TextInAreaBorderSize "||" TextInAreaFontName TextInAreaFontSize fntWeight TextInAreaFontItalic TextInAreaFontStrike TextInAreaFontUline fntQuality thisLineAngle TextInAreaCaseTransform TextInAreaValign
        thisPartialTXTid := "a" thisuString borderSize scaleuPreview TextInAreaCharSpacing TextInAreaLineAngle TextInAreaBorderSize "||" TextInAreaFontSize fntWeight thisLineAngle TextInAreaValign
        If ((cachedRawTXTbmps[A_Index, 3]=thisTXTid && lineVisible=1 || cachedRawTXTbmps[A_Index, 4]=thisPartialTXTid && lineVisible=0) && previewMode=1)
@@ -11770,6 +11775,9 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
        Else If (TextInAreaAlign=3)
           thisX := maxW - imgW + thisXbonus
 
+       If (TextInAreaValign=3)
+          thisY := thisY - imgH - lnSpace
+
        isOkay := (thisuString=" `n" && TextInAreaPaintBgr=1 && TextInAreaBgrEntire=0 && TextInAreaBgrUnified=0) ? 0 : 1
        If (TextInAreaBgrUnified!=1 && TextInAreaPaintBgr=1 && lineVisible=1 && validBMP(thisBMP))
        {
@@ -11803,7 +11811,10 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
        If (isOkay && lineVisible=1 && validBMP(thisBMP))
           drawFail := trGdip_DrawImage(A_ThisFunc, G, thisBMP, thisX, thisY, forceW, imgH,,,,, thisOpacity)
 
-       thisY += imgH + lnSpace
+       If (TextInAreaValign!=3)
+          thisY += imgH + lnSpace
+
+       ; fnOutputDebug("line #/Y:" A_Index "|" thisY "|" maxH "|" thisuString)
        thisBMP := trGdip_DisposeImage(thisBMP, 1)
        If validBMP(pBitmapContours)
           pBitmapContours := trGdip_DisposeImage(pBitmapContours, 1)
@@ -11815,12 +11826,12 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
        }
 
        ; fnOutputDebug("thisY=" thisY "|| " (cropH + cropY)*scaleuPreview "||" maxH)
-       If (thisY>maxH)
+       prevImgW := imgW,       prevImgH := imgH
+       If (thisY>maxH && TextInAreaValign!=3 || thisY<0 && TextInAreaValign=3)
        {
           fnOutputDebug("text outside selection boundaries: " thisY "||" maxH)
           Break
        }
-       prevImgW := imgW,       prevImgH := imgH
     }
 
     If (fattalErr=1)
@@ -11832,8 +11843,11 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
     minedY := clampInRange(minedY, 0, maxH)
     maxedW := clampInRange(maxedW, 1, maxW)
     maxedH := clampInRange(maxedH, 1, maxH)
-    Gdip_DeleteGraphics(G)
+    If (TextInAreaValign=3)
+       maxedH := clampInRange(maxedH - minedY, 1, maxH)
+
     newBMP := "-"
+    Gdip_DeleteGraphics(G)
     ; ToolTip, % maxedW "==" maxedH " = " minedX "==" minedY , , , 2
     If (TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1)
     {
@@ -15544,38 +15558,41 @@ InsertTextSelectedArea() {
        textBoxu := Gdip_CloneBmpPargbArea(A_ThisFunc, obju[1], obju[2], obju[3], obju[4], obju[5],,, 1)
        trGdip_DisposeImage(obju[1], 1)
     }
-
+ 
+    zz := 0
     coreDesiredPixFmt := o_coreFmt
     trGdip_GetImageDimensions(textBoxu, nImgW, nImgH)
     Gdip_GetRotatedDimensions(nImgW, nImgH, VPselRotation, rrImgW, rrImgH)
     mpx := Round((rrImgW * rrImgH)/1000000, 1)
-    If (VPselRotation>0 && mpx<536.4)
+    If (VPselRotation>0)
     {
-       xBitmap := trGdip_RotateBitmapAtCenter(A_ThisFunc, textBoxu, VPselRotation, "-", 7)
-       If validBMP(xBitmap)
+       xBitmap := trGdip_RotateBitmapAtCenter(A_ThisFunc, textBoxu, VPselRotation, "-", 7, 0, 1)
+       If (validBMP(xBitmap) || (xBitmap="ok"))
        {
-          trGdip_GetImageDimensions(xBitmap, kW, kH)
+          pkpl := (xbitmap="ok") ? textBoxu : xBitmap
+          trGdip_GetImageDimensions(pkpl, kW, kH)
           zz := (kW>imgSelW || kH>imgSelH) ? 1 : 0
           bW := (kW>imgSelW) ? imgSelW : max(kW, kH)
           bH := (kH>imgSelH) ? imgSelH : max(kW, kH)
           bW := (bW>imgSelW) ? imgSelW : bW
           bH := (bH>imgSelH) ? imgSelH : bH
           calcIMGdimensions(kW, kH, bW, bH, zbw, zbh)
-          trGdip_DisposeImage(textBoxu, 1)
-          textBoxu := xBitmap
-       }
+          If (xBitmap!="ok")
+          {
+             trGdip_DisposeImage(textBoxu, 1)
+             textBoxu := xBitmap
+          }
+       } Else
+          addJournalEntry(A_ThisFunc "(). ERROR. Unable to rotate the text bitmap. It exceeds 536 megapixels or another error occured.")
     }
-
-    If (VPselRotation>0 && mpx>536.4)
-       addJournalEntry(A_ThisFunc "(). ERROR. Unable to rotate the text bitmap. It exceeds 536 megapixels.")
 
     trGdip_GetImageDimensions(textBoxu, nImgW, nImgH)
     zImgW := (zz=1) ? zbw : nImgW
     zImgH := (zz=1) ? zbh : nImgH
     If (TextInAreaAlign=3)
-       imgSelPx := imgSelPx := imgSelPx + imgSelW - zImgW
+       imgSelPx := imgSelPx + imgSelW - zImgW
     Else If (TextInAreaAlign=2)
-       imgSelPx := imgSelPx := imgSelPx + Round(imgSelW/2 - zImgW/2)
+       imgSelPx := imgSelPx + Round(imgSelW/2 - zImgW/2)
 
     If (TextInAreaValign=3)
        imgSelPy := imgSelPy + imgSelH - zImgH
@@ -15704,8 +15721,8 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
        ; ToolTip, % mainHeight "|" imgSelPy "|" imgSelH , , , 2
        MouseCoords2Image(1, 1, 1, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kYa)
        MouseCoords2Image(mainWidth + 2, mainHeight + 2, 1, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kYb)
-       kYa := (TextInAreaValign=3) ? thisH - kYa - imgSelY1 : kYa - imgSelY1
-       kYb := (TextInAreaValign=3) ? thisH - kYb - imgSelY1 : kYb - imgSelY1
+       kYa := (TextInAreaValign=13) ? thisH - kYa - imgSelY1 : kYa - imgSelY1
+       kYb := (TextInAreaValign=13) ? thisH - kYb - imgSelY1 : kYb - imgSelY1
        obju := coreInsertTextInAreaBox(UserTextArea, imgSelW, imgSelH, 1, kYa, kYb)
        If validBMP(obju[1])
        {
@@ -15728,11 +15745,12 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
     trGdip_GetImageDimensions(textBoxu, onImgW, onImgH)
     Gdip_GetRotatedDimensions(onImgW, onImgH, VPselRotation, rrImgW, rrImgH)
     mpx := Round((rrImgW * rrImgH)/1000000, 1)
-    If (VPselRotation>0 && mpx<536.4)
+    If (VPselRotation>0)
     {
        zz := 1
-       xBitmap := trGdip_RotateBitmapAtCenter(A_ThisFunc, textBoxu, VPselRotation, "-", 5)
-       trGdip_GetImageDimensions(xBitmap, kW, kH)
+       xBitmap := trGdip_RotateBitmapAtCenter(A_ThisFunc, textBoxu, VPselRotation, "-", 5, 0, 1)
+       pkpl := (xbitmap="ok") ? textBoxu : xBitmap
+       trGdip_GetImageDimensions(pkpl, kW, kH)
        ppw := Round((max(kW, kH) * zoomLevel) * scaleuPreview)
        bW := (kW>imgSelW) ? imgSelW : ppw
        bH := (kH>imgSelH) ? imgSelH : ppw
@@ -16870,7 +16888,7 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
    {
       moreStuff := (FillAreaGlassy>1 || thisBlendMode>1) ? "a" imgSelPx imgSelPy : ""
       partu := (FillAreaInverted=1) ? "a" : getVPselIDs("saiz-vpos-xy") VPselRotation EllipseSelectMode imgSelW imgSelH
-      thisIDu := "a" previewMode FillAreaRemBGR FillAreaInverted userimgGammaCorrect FillAreaGlassy thisBlendMode FillAreaColor FillAreaColorMode FillArea2ndColor FillAreaOpacity FillArea2ndOpacity FillAreaGradientWrapped FillAreaGradientAngle FillAreaGradientPosB FillAreaGradientPosA FillAreaColorReversed FillAreaGradientScale VPselRotation zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY BlendModesFlipped partu moreStuff FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY undoLevelsRecorded currentUndoLevel useGdiBitmap() getAlphaMaskIDu() prevDestPosX prevDestPosY thisObjBlurAmount
+      thisIDu := "a" previewMode FillAreaRemBGR FillAreaInverted userimgGammaCorrect FillAreaGlassy thisBlendMode FillAreaColor FillAreaColorMode FillArea2ndColor FillAreaOpacity FillArea2ndOpacity FillAreaGradientWrapped FillAreaGradientAngle FillAreaGradientPosB FillAreaGradientPosA FillAreaColorReversed FillAreaGradientScale VPselRotation zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY BlendModesFlipped partu moreStuff FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY undoLevelsRecorded currentUndoLevel useGdiBitmap() getAlphaMaskIDu() prevDestPosX prevDestPosY thisObjBlurAmount userUIshapeCavity innerSelectionCavityX innerSelectionCavityY
       If (previewMode=1)
          realtimePasteInPlaceAlphaMasker(previewMode, fBitmapA, thisIDu, newBitmap, objSel, 0, 0, 0)
       Else
@@ -40205,7 +40223,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
     GuiAddPickerColor("x+5 hp w" sml, "BrushToolBcolor")
     GuiAddColor("x+5 hp w60", "BrushToolBcolor")
     GuiAddSlider("BrushToolBopacity", 2,255, 255, "Opacity", "updateUIbrushTool", 1, "x+5 w" opaciSlideW " hp")
-    Gui, Add, Checkbox, x+5 hp wp gupdateUIbrushTool Checked%brushToolDoubleSize% vbrushToolDoubleSize, Size × 2
+    Gui, Add, Checkbox, x+5 hp wp gupdateUIbrushTool Checked%BrushToolDoubleSize% vBrushToolDoubleSize, Size × 2
 
     GuiAddSlider("BrushToolSize", 1,950, 25, "Brush size: $€", "updateUIbrushTool", 1, "xs y+15 w" slideWid " hp")
     GuiAddSlider("BrushToolStepping", 0,251, 0, ".updateLabelBrushStep", "updateUIbrushTool", 1, "x+10 wp hp")
@@ -40741,7 +40759,7 @@ updateUIbrushTool() {
       actu := (BrushToolType=4) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
       GuiControl, % actu, BrushToolEraserRestore
 
-      theSizeLabel := (brushToolDoubleSize!=1) ? "Diameter: $€ px" : "Radius: $€ px"
+      theSizeLabel := (BrushToolDoubleSize!=1) ? "Diameter: $€ px" : "Radius: $€ px"
       uiSlidersArray["BrushToolAngle", 10] := !BrushToolAutoAngle
       uiSlidersArray["BrushToolSize", 5] := theSizeLabel
 
@@ -40827,19 +40845,36 @@ UItriggerBrushUpdate(actu:="noPreview", delayu:=100) {
    }
 }
 
-createBrushShapePath(brushSize, tkX, tkY, thisAR, angleu) {
+createBrushShapePath(brushSize, tkX, tkY, thisAR, angleu, obju:=0) {
    If (brushSize=1)
       brushSize := 1.25
+
+   If (obju.arVP!=obju.arImg && IsObject(obju))
+   {
+      mustRotate := (angleu!=0 && thisAR!=0) ? 1 : 0
+      brushSizeW := Round(brushSize * (obju.imgW / obju.pVPimgW), 5)
+      brushSizeH := Round(brushSize * (obju.imgH / obju.pVPimgH), 5)
+      brushSize := 0 ; max(brushSizeW, brushSizeH)
+      ; ToolTip, % brushSize "||" brImgSelW "|" brImgSelH , , , 2
+      ; brimgSelPx := 0 - Round(brushSize/2 - brImgSelW/2)
+      ; brimgSelPy := 0 - Round(brushSize/2 - brImgSelH/2)
+      ; ToolTip, % arVP "|" arImg "`n" scfX "|" scfY "|" brushSize , , , 2
+   } Else
+   {
+      mustRotate := (angleu!=0 && brushSize>1 && thisAR!=0) ? 1 : 0
+      brushSizeW := brushSizeH := brushSize
+   }
+
    thisAR := 1 - Abs(thisAR)/105
-   brImgSelW := (BrushToolAspectRatio>0) ? brushSize * thisAR : brushSize
-   brImgSelH := (BrushToolAspectRatio<0) ? brushSize * thisAR : brushSize
+   brImgSelW := (BrushToolAspectRatio>0) ? brushSizeW * thisAR : brushSizeW
+   brImgSelH := (BrushToolAspectRatio<0) ? brushSizeH * thisAR : brushSizeH
    brimgSelPx := 0 - (brImgSelW - brushSize)/2
    brimgSelPy := 0 - (brImgSelH - brushSize)/2
    tmpMatrix := Gdip_CreateMatrix()
    tmpPath := Gdip_CreatePath()
-   ; ToolTip, % brushSize "||" brImgSelW "|" brImgSelH , , , 2
+
    Gdip_AddPathEllipse(tmpPath, brimgSelPx, brimgSelPy, brimgSelW, brimgSelH)
-   If (brushSize>1)
+   If (mustRotate=1)
       trGdip_RotatePathAtCenter(tmpPath, angleu)
 
    If (brushSize<2)
@@ -40868,7 +40903,7 @@ createLivePreviewBrush() {
     }
 
     Gdip_GraphicsClear(G, "0xFF888888")
-    brushSize := (brushToolDoubleSize=1) ? brushToolSize*2 : brushToolSize
+    brushSize := (BrushToolDoubleSize=1) ? brushToolSize*2 : brushToolSize
     whichBitmap := useGdiBitmap()
     If ((BrushToolType=3 || BrushToolType=5) && CurrentPanelTab=2)
     {
@@ -40896,7 +40931,7 @@ createLivePreviewBrush() {
     }
 
     tzGdip_DrawImage(G, brushu, 2, 2, 95, 95, , , , , thisMainOpacity)
-    thisX := (brushToolDoubleSize=1) ? imgBoxSize//2 : 0
+    thisX := (BrushToolDoubleSize=1) ? imgBoxSize//2 : 0
     If (BrushToolAngle=0 && BrushToolAspectRatio=0)
        Gdip_FillRectangle(G, pBrushD, thisX, imgBoxSize//2 - 2, imgBoxSize, 4)
 
@@ -42301,7 +42336,7 @@ updateUIalphaMaskStuff(tabu) {
        Else
           uiSlidersArray["BrushToolSoftness", 10] := (liveDrawingBrushTool=1) ? 1 : 0
 
-       theSizeLabel := (brushToolDoubleSize!=1) ? "Diameter: $€ px" : "Radius: $€ px"
+       theSizeLabel := (BrushToolDoubleSize!=1) ? "Diameter: $€ px" : "Radius: $€ px"
        uiSlidersArray["BrushToolSize", 5] := theSizeLabel
        If (BrushToolUseSecondaryColor=1)
        {
@@ -43260,6 +43295,9 @@ ReadSettingsAlphaMaskPanel(act:=0) {
           RegAction(0, "FillAreaCurveTension",, 2, 1, 5)
     }
 
+    RegAction(act, "BrushToolDoubleSize",, 1)
+    RegAction(act, "BrushToolOverDraw",, 1)
+    RegAction(act, "BrushToolAutoAngle",, 1)
     RegAction(act, "alphaMaskReplaceMode",, 1)
     RegAction(act, "alphaMaskColorReversed",, 1)
     RegAction(act, "alphaMaskGradientWrapped",, 2, 1, 5)
@@ -43279,8 +43317,9 @@ ReadSettingsBrushPanel(act:=0) {
    ; If (ShowAdvToolbar=1)
       delayedWriteTlbrColors(act)
 
-   RegAction(act, "brushToolSize",, 2, 2, 950)
-   RegAction(act, "brushToolDoubleSize",, 1)
+   RegAction(act, "BrushToolSize",, 2, 2, 950)
+   RegAction(act, "BrushToolAutoAngle",, 1)
+   RegAction(act, "BrushToolDoubleSize",, 1)
    RegAction(act, "BrushToolSoftness",, 2, 1, 100)
    RegAction(act, "brushToolStepping",, 2, 0, 251)
    RegAction(act, "BrushToolType",, 2, 1, 8)
@@ -43291,7 +43330,6 @@ ReadSettingsBrushPanel(act:=0) {
    If (AnyWindowOpen=64)
    {
       RegAction(act, "BrushToolTexture",, 2, 1, 9)
-      RegAction(act, "BrushToolAutoAngle",, 1)
       RegAction(act, "BrushToolBlurStrength",, 2, 0, 99)
       RegAction(act, "BrushToolDynamicCloner",, 1)
       RegAction(act, "BrushToolEraserRestore",, 1)
@@ -50868,7 +50906,7 @@ uiADDalphaMaskTabs(t1, t2, labelu) {
     GuiAddPickerColor("x+5 hp w" sml, "BrushToolBcolor")
     GuiAddColor("x+5 hp w60", "BrushToolBcolor")
     GuiAddSlider("BrushToolBopacity", 2,255, 255, "Opacity", labelu, 1, "x+5 w" opaciSlideW " hp")
-    Gui, Add, Checkbox, x+5 hp wp +0x1000 g%labelu% Checked%brushToolDoubleSize% vbrushToolDoubleSize, Size × 2
+    Gui, Add, Checkbox, x+5 hp wp +0x1000 g%labelu% Checked%BrushToolDoubleSize% vBrushToolDoubleSize, Size × 2
 
     ToolTip2ctrl(hBtnTglClrA, "Toggle active color")
     ToolTip2ctrl(hBtnTglClrB, "Toggle active color")
@@ -68343,13 +68381,13 @@ getPixelColorAvg(pBitmap, kX, kY, startToolColor) {
 }
 
 toggleBrushDoubleSize() {
-   brushToolDoubleSize := !brushToolDoubleSize
-   friendly := (brushToolDoubleSize=1) ? "RADIUS" : "DIAMETER"
+   BrushToolDoubleSize := !BrushToolDoubleSize
+   friendly := (BrushToolDoubleSize=1) ? "RADIUS" : "DIAMETER"
    showTOOLtip("Brush " friendly " size: " brushToolSize " px", A_ThisFunc, 1, brushToolSize/950)
    If isVarEqualTo(AnyWindowOpen, 64, 24, 31)
    {
       GuiControl, SettingsGUIA:, BrushToolDoubleSize, % BrushToolDoubleSize
-      theSizeLabel := (brushToolDoubleSize!=1) ? "Diameter: $€ px" : "Radius: $€ px"
+      theSizeLabel := (BrushToolDoubleSize!=1) ? "Diameter: $€ px" : "Radius: $€ px"
       uiSlidersArray["BrushToolSize", 5] := theSizeLabel
       GuiUpdateSliders("brushToolSize")
    }
@@ -68606,13 +68644,13 @@ toggleAlphaPaintingMode() {
       BrushToolBcolor := (brushBclrAlpha!="") ? brushBclrAlpha : convertColorToGrayscale(BrushToolBcolor)
       updateColoredRectCtrl(BrushToolAcolor, "BrushToolAcolor")
       updateColoredRectCtrl(BrushToolBcolor, "BrushToolBcolor")
-      BrushToolType := 2
+      BrushToolType := (BrushToolType=1) ? 1 : 2
       alphaMaskingMode := 5
       alphaMaskBMPchannel := maybeColors ? 5 : 1
       GuiControl, SettingsGUIA: Choose, alphaMaskBMPchannel, % alphaMaskBMPchannel
       GuiControl, SettingsGUIA: Choose, alphaMaskingMode, 5
       GuiControl, SettingsGUIA: Choose, alphaMaskRefBMP, 1
-      GuiControl, SettingsGUIA: Choose, BrushToolType, 2
+      GuiControl, SettingsGUIA: Choose, BrushToolType, % BrushToolType
       doImgEditLivePreview := 1
       GuiControl, SettingsGUIA:, doImgEditLivePreview, 1
       GuiControl, SettingsGUIA: Disable, doImgEditLivePreview
@@ -69046,7 +69084,7 @@ changeBrushSize(dir) {
    showTOOLtip("Brush " friendly " size: " groupDigits(brushToolSize) " px", A_ThisFunc, 2, brushToolSize/950)
    If (AnyWindowOpen=64 || isAlphaMaskWindow()=1)
    {
-      theSize := (brushToolDoubleSize!=1) ? "Diameter: $€ px." : "Radius: $€ px."
+      theSize := (BrushToolDoubleSize!=1) ? "Diameter: $€ px." : "Radius: $€ px."
       uiSlidersArray["BrushToolSize", 5] := theSize
       GuiUpdateSliders("BrushToolSize")
    }
@@ -69846,7 +69884,7 @@ ActPaintBrushNow() {
 
    oMx := kX, oMy := kY
    thisSelectionConstrain := (editingSelectionNow=1) ? BrushToolOutsideSelection - 1 : 0
-   o_brushSize := brushSize := (brushToolDoubleSize=1) ? brushToolSize*2 : brushToolSize
+   o_brushSize := brushSize := (BrushToolDoubleSize=1) ? brushToolSize*2 : brushToolSize
    If (BrushToolType>=6 && brushSize<5)
       brushSize := 5
 
@@ -70417,15 +70455,47 @@ ActDrawAlphaMaskBrushNow() {
    pDPX := viewportDynamicOBJcoords.x,     pDPY := viewportDynamicOBJcoords.y
    pVPimgW := viewportDynamicOBJcoords.w,  pVPimgH := viewportDynamicOBJcoords.h
    MouseCoords2Image(mX, mY, 0, pDPX, pDPY, pVPimgW, pVPimgH, kX, kY, whichBitmap, 1, imgW, imgH)
-
    oMx := kX, oMy := kY
-   brushSize := (brushToolDoubleSize=1) ? brushToolSize*2 : brushToolSize
+   brushSize := (BrushToolDoubleSize=1) ? brushToolSize*2 : brushToolSize
+   arVP := Round(pVPimgW / pVPimgH, 2)
+   arImg := Round(imgW / imgH, 2)
 
    ; create base brush element / bitmap
    If (BrushToolType>1) ; soft edges
+   {
       brushu := createGradientBrushBitmap(startToolColor, 101 - BrushToolSoftness, brushSize, BrushToolAngle + 180, BrushToolAspectRatio)
-   Else ; simple solid
+      If (arVP!=arImg)
+      {
+         scfX := Round(brushSize * (imgW / pVPimgW))
+         scfY := Round(brushSize * (imgH / pVPimgH))
+         brushu := resizeBitmapToGivenRef(brushu, 0, scfX, scfY, 5, 0)
+         brushSize := max(scfX, scfY)
+         abrush := trGdip_CreateBitmap(A_ThisFunc, brushSize, brushSize)
+         If validBMP(abrush)
+         {
+            pGU := Gdip_GraphicsFromImage(abrush)
+            Gdip_GraphicsClear(pGU, "0xFF" Gdip_GetPixelColor(brushu, 1, 1, 4))
+            ppx := Round(brushSize/2 - scfX/2)
+            ppy := Round(brushSize/2 - scfY/2)
+            Gdip_DrawImage(pGU, brushu, ppx, ppy, scfX, scfY)
+            Gdip_DeleteGraphics(pGU)
+            trGdip_DisposeImage(brushu)
+            brushu := abrush
+         }
+         ; ToolTip, % arVP "|" arImg "`n" scfX "|" scfY "|" brushSize , , , 2
+      }
+   } Else
+   {
+      ; simple solid
       gdipbrushu := Gdip_BrushCreateSolid(thisHexOpacity startToolColor)
+      objuAR := []
+      objuAR.arVP := arVP
+      objuAR.arImg := arImg
+      objuAR.imgW := imgW
+      objuAR.imgH := imgH
+      objuAR.pVPimgW := pVPimgW
+      objuAR.pVPimgH := pVPimgH
+   }
 
    If (!validBMP(brushu) && BrushToolType>1)
    {
@@ -70454,7 +70524,6 @@ ActDrawAlphaMaskBrushNow() {
 
    thisEraseOpacity := (thisEraserMode=1) ? 255 - thisEraseOpacity : thisEraseOpacity
    thisWet := 0.79 + (21 - thisWetness)/100
-
    Gdip_GraphicsClear(2NDglPG, "0x00" WindowBgrColor)
    r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
    If ((A_TickCount - lastInvoked>250) && preventUndoLevels!=1)
@@ -70553,7 +70622,7 @@ ActDrawAlphaMaskBrushNow() {
             If (BrushToolType=1)
             {
                ; draw simple brush
-               tmpPath := createBrushShapePath(brushSize, tkX, tkY, BrushToolAspectRatio, BrushToolAngle + 180)
+               tmpPath := createBrushShapePath(brushSize, tkX, tkY, BrushToolAspectRatio, BrushToolAngle + 180, objuAR)
                Gdip_FillPath(Gu, gdipbrushu, tmpPath)
                If (BrushToolOverDraw=0)
                   Gdip_SetClipPath(Gu, tmpPath, 4)
@@ -90531,11 +90600,36 @@ trGdip_ResizeBitmap(funcu, pBitmap, givenW, givenH, KeepRatio, InterpolationMode
     Return r
 }
 
-trGdip_RotateBitmapAtCenter(funcu, pBitmap, Angle, pBrush:=0, InterpolationMode:=7, PixelFormat:=0) {
+trGdip_RotateBitmapAtCenter(funcu, pBitmap, Angle, pBrush:=0, InterpolationMode:=7, PixelFormat:=0,snapRotation:=0) {
     If !validBMP(pBitmap)
     {
        addJournalEntry(A_ThisFunc "(): ERROR. Invalid bitmap to rotate, function invoked by " funcu "(). pBitmap = " pBitmap)
        Return
+    }
+
+    If (snapRotation=1)
+    {
+       zrr := 0
+       If isInRange(Angle, 89, 91)
+       {
+          zrr := 1
+          Gdip_ImageRotateFlip(pBitmap, 1)
+       } Else If isInRange(Angle, 179, 181)
+       {
+          zrr := 1
+          Gdip_ImageRotateFlip(pBitmap, 2)
+       } Else If isInRange(Angle, 269, 271)
+       {
+          zrr := 1
+          Gdip_ImageRotateFlip(pBitmap, 3)
+       } Else If (isInRange(Angle, 359, 361) || isInRange(Angle, -1, 1))
+       {
+          zrr := 1
+          Sleep, 1
+       }
+
+       If (zrr=1)
+          Return "ok"
     }
 
     If !Angle
@@ -93954,8 +94048,8 @@ tlbrDecideTooltips(hwnd) {
       }
    } Else If InStr(icoFile, "brush-set-size")
    {
-      friendly := (brushToolDoubleSize=1) ? "RADIUS" : "DIAMETER"
-      friendly2 := (brushToolDoubleSize!=1) ? "RADIUS" : "DIAMETER"
+      friendly := (BrushToolDoubleSize=1) ? "RADIUS" : "DIAMETER"
+      friendly2 := (BrushToolDoubleSize!=1) ? "RADIUS" : "DIAMETER"
       msgu := "L: Brush " friendly ": " brushToolSize " px « [ » `nR: Switch to " friendly2 " mode «Shift + S»"
    } Else If InStr(icoFile, "brush-set-angle")
    {

@@ -2955,7 +2955,7 @@ DLL_API int DLL_CALLCONV AdjustImageColors(unsigned char *BitmapData, int w, int
     return 1;
 }
 
-DLL_API int DLL_CALLCONV MergeBitmapsWithMask(unsigned char *originalData, unsigned char *newBitmap, unsigned char *maskBitmap, int invert, int w, int h, int maskOpacity, int invertMaskOpacity, int Stride, int bpp, int linearGamma) {
+DLL_API int DLL_CALLCONV MergeBitmapsWithMask(unsigned char *originalData, unsigned char *newBitmap, unsigned char *maskBitmap, int invert, int w, int h, int maskOpacity, int invertMaskOpacity, int Stride, int bpp, int linearGamma, int whichChannel) {
     #pragma omp parallel for schedule(dynamic) default(none)
     for (int x = 0; x < w; x++)
     {
@@ -2967,7 +2967,7 @@ DLL_API int DLL_CALLCONV MergeBitmapsWithMask(unsigned char *originalData, unsig
             INT64 o = CalcPixOffset(x, y, Stride, bpp);
             if (maskBitmap!=NULL)
             {
-               intensity = (invert==1) ? 255 - maskBitmap[o] : maskBitmap[o];
+               intensity = (invert==1) ? 255 - maskBitmap[o + whichChannel] : maskBitmap[o + whichChannel];
                if (maskOpacity!=0)
                {
                   intensity = (invertMaskOpacity==1) ? intensity + maskOpacity : intensity - maskOpacity;
