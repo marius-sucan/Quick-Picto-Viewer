@@ -17846,7 +17846,7 @@ SymmetrySelectedArea() {
     If (UserSymmetricaBlendMode>1)
     {
        bgrBMP := (UserSymmetricaInvertArea=1) ? trGdip_CloneBitmap(A_ThisFunc, metaBitmap) : Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, nx, ny, nw, nh, 0, 0, 1)
-       zr := QPV_BlendBitmaps(bgrBMP, zBitmap, UserSymmetricaBlendMode - 1, 0, BlendModesFlipped)
+       zr := QPV_BlendBitmaps(bgrBMP, zBitmap, UserSymmetricaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped)
        If zr
        {
           hasApplied := 1
@@ -45913,9 +45913,11 @@ PanelSymmetricaImage() {
     Gui, Add, Checkbox, x+15 Checked%UserSymmetricaUseAlpha% gupdateUIsymmetricaPanel vUserSymmetricaUseAlpha, Use alpha mas&k
 
     Gui, Tab, 2
+    ml := (PrefsLargeFonts=1) ? 35 : 25
     Gui, Add, Text, x+15 y+15 Section gBtnResetBlendMode +TabStop +hwndhTemp, Blending mode: 
     GuiAddDropDownList("x+10 wp+15 gupdateUIsymmetricaPanel AltSubmit Choose" UserSymmetricaBlendMode " vUserSymmetricaBlendMode", infoBlend "|" userBlendModesList, [hTemp])
-    GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIsymmetricaPanel")
+    GuiAddFlipBlendLayers("x+1 yp hp w" ml " gupdateUIsymmetricaPanel")
+    GuiAddCheckbox("x+1 hp wp gupdateUIsymmetricaPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
     GuiAddSlider("UserSymmetricaOpacity", 3,255, 255, "Opacity", "updateUIsymmetricaPanel", 1, "xs y+15 w" txtWid " hp")
 
     Gui, Add, Checkbox, xs y+15 hp Checked%BlurAreaApplyFX% gupdateUIsymmetricaPanel vBlurAreaApplyFX, &Apply color adjustments
@@ -45925,7 +45927,6 @@ PanelSymmetricaImage() {
     GuiAddSlider("BlurAreaGamma", -100,100, 0, "Contrast", "updateUIsymmetricaPanel", 2, "xs y+10 wp hp")
 
     Gui, Tab
-    ml := (PrefsLargeFonts=1) ? 35 : 25
     GuiAddCollapseBtn("xm+0 y+30 h" thisBtnHeight " w" ml)
     GuiAddCloseOnApply("x+5 yp hp wp")
     GuiAddToggleLivePreview("x+5 yp hp wp gupdateUIsymmetricaPanel")
@@ -46365,7 +46366,7 @@ livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
       doClamping := 0
    } Else doClamping := 1
 
-   doInvertPreview := (AnyWindowOpen=66 && FloodFillUseAlpha=1 && (BrushToolOutsideSelection=1 || BrushToolOutsideSelection=3)) || (AnyWindowOpen=23 && FillAreaInverted=1) || ((AnyWindowOpen=25 || AnyWindowOpen=55) && EraseAreaInvert=1) ? 1 : 0
+   doInvertPreview := (AnyWindowOpen=81 && UserSymmetricaInvertArea=1) || (AnyWindowOpen=66 && FloodFillUseAlpha=1 && (BrushToolOutsideSelection=1 || BrushToolOutsideSelection=3)) || (AnyWindowOpen=23 && FillAreaInverted=1) || ((AnyWindowOpen=25 || AnyWindowOpen=55) && EraseAreaInvert=1) ? 1 : 0
    If (doInvertPreview=1 && dummy!="live")
    {
       If (AnyWindowOpen=66 && FloodFillUseAlpha=1 && BrushToolOutsideSelection=3)|| (AnyWindowOpen=23 && FillAreaInverted=1) || ((AnyWindowOpen=25 || AnyWindowOpen=55) && EraseAreaInvert=1)
@@ -49578,35 +49579,35 @@ livePreviewSymmetricaImgArea(modus:=0) {
       Return
 
    ; trGdip_GetImageDimensions(useGdiBitmap(), qimgW, qimgH)
+   whichBitmap := useGdiBitmap()
    vpWinClientSize(mainWidth, mainHeight)
-   pBitmap := useGdiBitmap()
-   trGdip_GetImageDimensions(pBitmap, mW, mH)
-   ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, mW, mH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
+   trGdip_GetImageDimensions(whichBitmap, mW, mH)
+   objSel := ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, mW, mH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
+   pPath := VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, VPselRotation, 1, mainWidth, mainHeight, 0)
    ; If (UserSymmetricaInvertArea=1)
    ;    getClampedVPimgBounds(imgSelPx, imgSelPy, kX, kY, imgSelW, imgSelH)
    ; thisState := "a" imgSelPx imgSelPy imgSelW imgSelH mainWidth mainHeight zoomLevel prevDestPosX prevDestPosY IMGresizingMode imageAligned getIDvpFX() useGdiBitmap() currentUndoLevel  undoLevelsRecorded
-   thisState := "a" getIDvpFX() useGdiBitmap() currentUndoLevel undoLevelsRecorded zoomLevel prevResizedVPimgW prevResizedVPimgH
-   hasResized := 0
+   If (prevResizedVPimgW<mainWidth && prevResizedVPimgH<mainHeight)
+      calcIMGdimensions(mW, mH, prevResizedVPimgW, prevResizedVPimgH, ResizedW, ResizedH)
+   Else If (IMGlargerViewPort=1)
+      calcIMGdimensions(mW, mH, prevResizedVPimgW//3, prevResizedVPimgH//3, ResizedW, ResizedH)
+   Else
+      calcIMGdimensions(mW, mH, prevResizedVPimgW//2, prevResizedVPimgH//2, ResizedW, ResizedH)
+
+   If (ResizedW*ResizedH>19000000 || ResizedW>10000 || ResizedH>10000)
+      calcIMGdimensions(mW, mH, 4000, 4000, ResizedW, ResizedH)
+
+   thisState := "a" getIDvpFX() useGdiBitmap() currentUndoLevel undoLevelsRecorded ResizedW ResizedH mW mH
    If (prevState!=thisState || !validBMP(prevBMP))
    {
+      ; the viewport original sized bitmap is rescaled to a small size and cached
       fnOutputDebug("redraw: " A_ThisFunc)
       prevBMP := trGdip_DisposeImage(prevBMP, 1)
-      If (prevResizedVPimgW<mainWidth && prevResizedVPimgH<mainHeight)
-         calcIMGdimensions(mW, mH, prevResizedVPimgW, prevResizedVPimgH, ResizedW, ResizedH)
-      Else If (IMGlargerViewPort=1)
-         calcIMGdimensions(mW, mH, prevResizedVPimgW//3, prevResizedVPimgH//3, ResizedW, ResizedH)
-      Else
-         calcIMGdimensions(mW, mH, prevResizedVPimgW//2, prevResizedVPimgH//2, ResizedW, ResizedH)
-
-      If (ResizedW*ResizedH>19000000 || ResizedW>10000 || ResizedH>10000)
-         calcIMGdimensions(mW, mH, 4000, 4000, ResizedW, ResizedH)
-
       If (mW!=ResizedW || mH!=ResizedH)
       {
-         zBitmap := trGdip_ResizeBitmap(A_ThisFunc, pBitmap, ResizedW, ResizedH, 0, 5)
+         zBitmap := trGdip_ResizeBitmap(A_ThisFunc, whichBitmap, ResizedW, ResizedH, 0, 5)
          pBitmap := validBMP(zBitmap) ? zBitmap : ""
-         hasResized := 1
-      } Else pBitmap := trGdip_CloneBitmap(A_ThisFunc, pBitmap)
+      } Else pBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
 
       pBitmap := applyVPeffectsOnBMP(pBitmap)
       prevBMP := pBitmap
@@ -49618,26 +49619,26 @@ livePreviewSymmetricaImgArea(modus:=0) {
    If !validBMP(pBitmap)
    {
       addJournalEntry(A_ThisFunc "(): invalid bitmap to process as a live preview")
+      Gdip_DeletePath(pPath)
       Return
    }
 
    ; pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
-   pPath := VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, VPselRotation, 1, mainWidth, mainHeight, 0)
    ; trGdip_GraphicsClear(A_ThisFunc, 2NDglPG, "0x00" WindowBGRcolor)
    modus := (UserSymmetricaInvertArea=1) ? 4 : 0
-   Gdip_SetClipPath(2NDglPG, pPath, modus)
+   ; Gdip_SetClipPath(2NDglPG, pPath, modus)
    zBitmap := coreSymmetricaImageGenerator(trGdip_CloneBitmap(A_ThisFunc, pBitmap))
    trGdip_GetImageDimensions(zBitmap, zw, zh)
    ; ToolTip, % nw "|" nh "`n" zw "|" zh "`n" mW "=" mH "`n" ResizedW "=" ResizedH "||" hasResized  , , , 2
    If (UserSymmetricaInvertArea!=1)
    {
-      ozw := zw, ozh := zh
+      ozw := zw,                       ozh := zh
       fx := zw/prevResizedVPimgW,      fy := zh/prevResizedVPimgH
       zfx := zw/mw,                    zfy := zh/mh
       xx := Round(min(imgSelX1, imgSelX2) * zfx)
       yy := Round(min(imgSelY1, imgSelY2) * zfy)
-      zw := Round(imgSelW * fx)
-      zh := Round(imgSelH * fy)
+      zw := imgSelW * fx
+      zh := imgSelH * fy
 
       mxz := clampInRange(ozw - zw, 0, zw)
       tx := Round(zw * (UserSymmetricaSelOffX/200))
@@ -49648,6 +49649,7 @@ livePreviewSymmetricaImgArea(modus:=0) {
       ; ToolTip, % xx "|" zw "|" mxz "|" offX , , , 2
       bx := (UserSymmetricaSelAligned=1) ? offX : xx
       by := (UserSymmetricaSelAligned=1) ? offY : yy
+      zw := Round(zw),      zh := Round(zh)
       kBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, zBitmap, bx, by, zw, zh, 0, 0, 1)
       If validBMP(kBitmap)
       {
@@ -49657,17 +49659,48 @@ livePreviewSymmetricaImgArea(modus:=0) {
       ; fnOutputDebug(nx "==" ny "|" nw "==" nh)
    }
 
+   If (UserSymmetricaInvertArea=1)
+   {
+      tx := (imgSelPx > prevDestPosX) ? prevDestPosX : max(imgSelPx, prevDestPosX)
+      ty := (imgSelPy > prevDestPosY) ? prevDestPosY : max(imgSelPy, prevDestPosY)
+      twx := ((imgSelPx + imgSelW) > (prevDestPosX + prevResizedVPimgW)) ? prevDestPosX + prevResizedVPimgW : max(imgSelPx + imgSelW, prevDestPosX + prevResizedVPimgW)
+      twy := ((imgSelPy + imgSelH) > (prevDestPosY + prevResizedVPimgH)) ? prevDestPosY + prevResizedVPimgH : max(imgSelPy + imgSelH, prevDestPosY + prevResizedVPimgH)
+      invertPath := Gdip_ClonePath(pPath)
+      Gdip_AddPathRectangle(invertPath, tx, ty, twx - tx, twy - ty)
+      getClampedVPimgBounds(imgSelPx, imgSelPy, kX, kY, imgSelW, imgSelH)
+      whichPath := invertPath
+   } Else
+   {
+      whichPath := pPath
+      getClampedVPselToWindow(1, mainWidth, mainHeight, mw, mH, imgSelPx, imgSelPy, imgSelW, imgSelH)
+   }
+
+   trGdip_GetImageDimensions(zBitmap, oImgW, oImgH)
+   objSel.dw := imgSelW,    objSel.dh := imgSelH
+   objSel.dx := imgSelPx,   objSel.dy := imgSelPy
+   objSel.nw := imgSelW,      objSel.nh := imgSelH
+   getVPselSize(zW, zH, 1, UserSymmetricaInvertArea)
+   objSel.zw := zw,        objSel.zh := zh
+   objSel.invertArea := UserSymmetricaInvertArea
+   wBitmap := getRectFromBitmap(zBitmap, objSel, 1)
+   If validBMP(wBitmap)
+   {
+      zBitmap := trGdip_DisposeImage(zBitmap)
+      zBitmap := wBitmap
+   } Else addJournalEntry(A_ThisFunc "(): failed to get rect from gradients bitmap")
+
+   trGdip_GetImageDimensions(zBitmap, bW, bH)
+   ; ToolTip, % imgSelW "|" imgSelH "`n" bW "|" bH "`n" oImgW "|" oImgH , , , 2
    applyBlurColorsFX(zBitmap)
    If (UserSymmetricaBlendMode>1)
    {
-      threads := (previewMode=1) ? realSystemCores : 0
-      If (UserSymmetricaInvertArea=1)
-         bgrBMP := trGdip_CloneBitmap(A_ThisFunc, pBitmap)
+      If (currIMGdetails.HasAlpha=1 && !viewportQPVimage.imgHandle)
+         bgrBMP := getImgOriginalSelectedAreaEdit(0, imgSelPx, imgSelPy, imgSelW, imgSelH, mainWidth, mainHeight, 1)
       Else
-         bgrBMP := getImgSelectedAreaEditMode(1, imgSelPx, imgSelPy, imgSelW, imgSelH, imgSelW, imgSelH, 0, zw, zh, 0)
+         bgrBMP := getImgSelectedAreaEditMode(1, imgSelPx, imgSelPy, imgSelW, imgSelH, imgSelW, imgSelH, 0, imgSelW, imgSelH, 0)
 
-      zr := QPV_BlendBitmaps(bgrBMP, zBitmap, UserSymmetricaBlendMode - 1, 0, BlendModesFlipped)
-      if zr
+      zr := QPV_BlendBitmaps(bgrBMP, zBitmap, UserSymmetricaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped)
+      If zr
       {
          trGdip_DisposeImage(zBitmap)
          zBitmap := bgrBMP
@@ -49678,8 +49711,8 @@ livePreviewSymmetricaImgArea(modus:=0) {
    allowAlphaMasking := decideAlphaMaskingFeaseable(UserSymmetricaUseAlpha)
    If (allowAlphaMasking=1 && validBMP(zBitmap))
    {
-      thisIDu := "a" alphaMaskColorReversed alphaMaskingMode userAlphaMaskBmpPainted VPselRotation EllipseSelectMode imgSelPx imgSelPy imgSelW imgSelH UserSymmetricaInvertArea currentUndoLevel undoLevelsRecorded useGdiBitmap()
-      realtimePasteInPlaceAlphaMasker(1, zBitmap, thisIDu, newBitmap, 0, 0, 0, 0)
+      thisIDu := "a" alphaMaskColorReversed alphaMaskingMode userAlphaMaskBmpPainted VPselRotation EllipseSelectMode imgSelPx imgSelPy imgSelW imgSelH UserSymmetricaInvertArea currentUndoLevel undoLevelsRecorded useGdiBitmap() prevDestPosX prevDestPosY prevResizedVPimgW prevResizedVPimgH UserSymmetricaBlendMode tinyPrevAreaCoordX tinyPrevAreaCoordY blurAreaApplyFX BlurAreaHue BlurAreaSaturation BlurAreaLight BlurAreaGamma BlendModesFlipped BlendModesPreserveAlpha UserSymmetricaMode UserSymmetricaScaleX UserSymmetricaScaleY UserSymmetricaSrcAlign UserSymmetricaSelAligned UserSymmetricaSrcFlipX UserSymmetricaSrcFlipY UserSymmetricaSrcRotated UserSymmetricaSelOffX UserSymmetricaSelOffY
+      realtimePasteInPlaceAlphaMasker(1, zBitmap, thisIDu, newBitmap, objSel, 0, 0, 0)
       If validBMP(newBitmap)
       {
          trGdip_DisposeImage(zBitmap, 1)
@@ -49687,14 +49720,14 @@ livePreviewSymmetricaImgArea(modus:=0) {
       }
    }
 
-   px := (UserSymmetricaInvertArea=1) ? prevDestPosX : imgSelPx
-   py := (UserSymmetricaInvertArea=1) ? prevDestPosY : imgSelPy
-   pw := (UserSymmetricaInvertArea=1) ? prevResizedVPimgW : imgSelW
-   ph := (UserSymmetricaInvertArea=1) ? prevResizedVPimgH : imgSelH
+   liveCarvePathBitmap(pPath, zBitmap, imgSelPx, imgSelPy, UserSymmetricaInvertArea)
+   px := imgSelPx,    py := imgSelPy
+   pw := imgSelW,     ph := imgSelH
    r1 := trGdip_DrawImage(A_ThisFunc, 2NDglPG, zBitmap, px, py, pw, ph,,,,, UserSymmetricaOpacity/255)
    ; r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectWin, 2NDglHDC)
    Gdip_ResetClip(2NDglPG)
    Gdip_DeletePath(pPath)
+   Gdip_DeletePath(invertPath)
    trGdip_DisposeImage(zBitmap, 1)
 }
 
