@@ -12599,9 +12599,9 @@ QPV_ConvertToGrayscale(pBitmap, modus, intensity, previewMode) {
   If !E1
   {
      If (previewMode=1)
-        QPV_PrepareSelectionArea(0, 0, w, h, w, h, EllipseSelectMode, VPselRotation, 1, invertArea)
+        QPV_PrepareHugeImgSelectionArea(0, 0, w, h, w, h, EllipseSelectMode, VPselRotation, 1, invertArea)
      Else
-        QPV_PrepareSelectionArea(0, 0, w, h, w, h, -1, 0, 0, 0)
+        QPV_PrepareHugeImgSelectionArea(0, 0, w, h, w, h, -1, 0, 0, 0)
      r := DllCall(whichMainDLL "\ConvertToGrayScale", "UPtr", iScan, "Int", w, "Int", h, "int", modus, "int", intensity, "int", stride, "int", 32, "UPtr", 0, "int", 0)
      Gdip_UnlockBits(pBitmap, iData)
   }
@@ -12628,9 +12628,9 @@ QPV_AdjustImageColors(pBitmap, thisOpacity, InvertColors, AltSat, Sat, AltBright
   If !E1
   {
      If (previewMode=1)
-        QPV_PrepareSelectionArea(0, 0, w, h, w, h, EllipseSelectMode, VPselRotation, 1, invertArea)
+        QPV_PrepareHugeImgSelectionArea(0, 0, w, h, w, h, EllipseSelectMode, VPselRotation, 1, invertArea)
      Else If (previewMode!=-1)
-        QPV_PrepareSelectionArea(0, 0, w, h, w, h, -1, 0, 0, 0)
+        QPV_PrepareHugeImgSelectionArea(0, 0, w, h, w, h, -1, 0, 0, 0)
 
      this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
      r := DllCall(whichMainDLL "\AdjustImageColors" this, "UPtr", iScan, "Int", w, "Int", h, "int", stride, "int", 32, "int", thisOpacity, "int", InvertColors, "int", AltSat, "int", Sat, "int", AltBright, "int", Bright, "int", AltContra, "int", Contra, "int", AltHiLows, "int", Shadows, "int", Highs, "int", Hue, "int", TintDeg, "int", TintAmount, "int", AltTint, "int", Gamma, "int", OffR, "int", OffG, "int", OffB, "int", OffA, "int", ThreR, "int", ThreG, "int", ThreB, "int", ThreA, "int", SeeThrough, "int", userimgGammaCorrect, "int", NoClamp, "int", WhitePoint, "int", BlackPoint, "int", NoisePoints, "UPtr", 0, "int", 0)
@@ -12652,14 +12652,14 @@ livePreviewPrepareSelectionArea(objSel, invertArea) {
    py := (prevDestPosY<0) ? 0 : - prevDestPosY
    ; ToolTip, % oImgW "|" oImgH "`n" imgSelW "|" imgSelH "`n" mainWidth "|" mainHeight , , , 2
    If (viewportQPVimage.imgHandle && invertArea=1)
-      QPV_PrepareSelectionArea(objSel.sx + px, objSel.sy + py, objSel.sw + objSel.sx + px, objSel.sh + objSel.sy + py, objSel.sw, objSel.sh, EllipseSelectMode, VPselRotation, 1, invertArea)
+      QPV_PrepareHugeImgSelectionArea(objSel.sx + px, objSel.sy + py, objSel.sw + objSel.sx + px, objSel.sh + objSel.sy + py, objSel.sw, objSel.sh, EllipseSelectMode, VPselRotation, 1, invertArea)
    Else If (viewportQPVimage.imgHandle)
-      QPV_PrepareSelectionArea(tx, ty, oImgW + tw, oImgH + th, oImgW + tw, oImgH + th, EllipseSelectMode, VPselRotation, 1, 0)
+      QPV_PrepareHugeImgSelectionArea(tx, ty, oImgW + tw, oImgH + th, oImgW + tw, oImgH + th, EllipseSelectMode, VPselRotation, 1, 0)
    Else 
-      QPV_PrepareSelectionArea(0, 0, oImgW, oImgH, oImgW, oImgH, -1, 0, 0, 0)
+      QPV_PrepareHugeImgSelectionArea(0, 0, oImgW, oImgH, oImgW, oImgH, -1, 0, 0, 0)
 }
 
-QPV_PrepareSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, invertArea, cavityX:="a", cavityY:="a") {
+QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, invertArea, cavityX:="a", cavityY:="a") {
    Static pi := 3.141592653
    ; mode is EllipseSelectMode [the shape]
 
@@ -13752,7 +13752,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
              opacityExtra := (PasteInPlaceOpacity>255) ? PasteInPlaceOpacity - 255 : 0
 
           trGdip_GetImageDimensions(clipBMP, tw, th)
-          QPV_PrepareSelectionArea(0, 0, tW, tH, tW, tH, 0, 0, 0, 0, 0, 0)
+          QPV_PrepareHugeImgSelectionArea(0, 0, tW, tH, tW, tH, 0, 0, 0, 0, 0, 0)
           If (PasteInPlaceApplyColorFX=1)
              QPV_AdjustImageColors(clipBMP, 255, userImgAdjustInvertColors, userImgAdjustAltSat, Round(PasteInPlaceSaturation*655.35), userImgAdjustAltBright, Round(PasteInPlaceLight*257), 0, Round(PasteInPlaceGamma*655.30), 0, 0, 0, PasteInPlaceHue, 0, 0, 0, 300, 0, 0, 0, opacityExtra, -1, -1, -1, -1, 0, 0, 0, 65535, 0, 0, -1)
           Else If (opacityExtra!=0)
@@ -15915,7 +15915,25 @@ FillSelectedArea() {
 
     startZeit := A_TickCount
     If (allowOutside=1)
+    {
+       xa := imgSelX1, ya := imgSelY1
+       xb := imgSelX2, yb := imgSelY2
+       zW := Round( ( max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2) ) )
+       zH := Round( ( max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2) ) )
+       pPath := coreCreateFillAreaShape(0, 0, zW, zH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, 2, 0)
+       bounds := getAccuratePathBounds(pPath, 1)
+       imgSelX1 += bounds.x
+       imgSelY1 += bounds.y
+       imgSelX2 := imgSelX1 + bounds.w
+       imgSelY2 := imgSelY1 + bounds.h
+       zX := (imgSelX1<0) ? abs(imgSelX1) : 0,  zY := (imgSelY1<0) ? abs(imgSelY1) : 0
+       defineRelativeSelCoords(imgW, imgH)
        hasRanExpand := performAutoExpandCanvas(imgW, imgH)
+       imgSelX1 := xa + zX, imgSelY1 := ya + zY
+       imgSelX2 := xb + zX, imgSelY2 := yb + zY
+       defineRelativeSelCoords(imgW, imgH)
+       Gdip_DeletePath(pPath)
+    }
 
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
@@ -16511,11 +16529,11 @@ livePreviewHugeImageFillSelArea() {
       }
 
       If (isImgSizeTooLarge(zW, zH) && FillAreaShape!=1 && FillAreaShape!=3)
-         QPV_PrepareSelectionArea(0, 0, imgW, imgH, imgW, imgH, 0, VPselRotation, 1, 0)
+         QPV_PrepareHugeImgSelectionArea(0, 0, imgW, imgH, imgW, imgH, 0, VPselRotation, 1, 0)
       Else If (FillAreaShape!=1 && FillAreaShape!=3 || FillAreaInverted=1)
-         QPV_PrepareSelectionArea(0, 0, imgW, imgH, imgW, imgH, 0, 0, 1, 0, 0, 0)
+         QPV_PrepareHugeImgSelectionArea(0, 0, imgW, imgH, imgW, imgH, 0, 0, 1, 0, 0, 0)
       Else
-         QPV_PrepareSelectionArea(0, 0, imgW, imgH, imgW, imgH, EllipseSelectMode, VPselRotation, 1, FillAreaInverted)
+         QPV_PrepareHugeImgSelectionArea(0, 0, imgW, imgH, imgW, imgH, EllipseSelectMode, VPselRotation, 1, FillAreaInverted)
 
       bpp := FreeImage_GetBPP(viewportQPVimage.imgHandle)
       thisBehind := (FillAreaDoBehind=1 && bpp=32) ? 1 : 0
@@ -17636,7 +17654,7 @@ QPV_autoContrastBitmap(pBitmap, typeu, whichBitmap:=0, entireImg:=0) {
   Else
      E3 := -1
 
-  QPV_PrepareSelectionArea(0, 0, w, h, w, h, 0, 0, 1, 0)
+  QPV_PrepareHugeImgSelectionArea(0, 0, w, h, w, h, 0, 0, 1, 0)
   If (!E1 && !E3)
      r := DllCall(whichMainDLL "\autoContrastBitmap", "UPtr", iScan, "UPtr", amScan, "Int", w, "Int", h, "int", mw, "int", mh, "int", typeu, "int", userAutoColorIntensity, "int", userimgGammaCorrect, "int", Stride, "int", strideMini, "int", 32, "UPtr", 0, "int", 0)
 
@@ -18619,7 +18637,7 @@ HugeImagesApplyAutoColors() {
 
       showTOOLtip("Applying auto-adjust image colors, please wait...")
       setImageLoading()
-      obju := createBitmapSelPath(0, imgW, imgH)
+      obju := InitHugeImgSelPath(0, imgW, imgH)
       If validBMP(obju.alphaMaskGray)
       {
          EZ := Gdip_LockBits(obju.alphaMaskGray, 0, 0, obju.imgZelW, obju.imgZelH, mStride, mScan, mData, 3, "0x21808")
@@ -18650,7 +18668,7 @@ HugeImagesApplyAutoColors() {
       pBitsMini := FreeImage_GetBits(hFIFimgA)
       strideMini := FreeImage_GetStride(hFIFimgA)
       recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
-      QPV_PrepareSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, EllipseSelectMode, VPselRotation, 0, 0)
+      QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, EllipseSelectMode, VPselRotation, 0, 0)
       If (userAutoColorAdjustMode=3)
       {
          r := DllCall(whichMainDLL "\autoContrastBitmap", "UPtr", pBitsAll, "UPtr", pBitsMini, "Int", imgW, "Int", imgH, "int", mw, "int", mh, "int", 1, "int", userAutoColorIntensity, "int", userimgGammaCorrect, "int", Stride, "int", strideMini, "int", bpp, "UPtr", mScan, "int", mStride)
@@ -18871,7 +18889,7 @@ HugeImagesApplyCLRfxPasteInPlace(hFIFimgA, friendly) {
    Stride := FreeImage_GetStride(hFIFimgA)
    bpp := FreeImage_GetBPP(hFIFimgA)
    FreeImage_GetImageDimensions(hFIFimgA, tW, tH)
-   QPV_PrepareSelectionArea(0, 0, tW, tH, tW, tH, -1, 0, 0, 0, 0, 0)
+   QPV_PrepareHugeImgSelectionArea(0, 0, tW, tH, tW, tH, -1, 0, 0, 0, 0, 0)
    r := DllCall(whichMainDLL "\AdjustImageColorsPrecise", "UPtr", pBitsAll, "Int", tW, "Int", tH, "int", Stride, "int", bpp, "int", 255, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", Round(PasteInPlaceSaturation*655.35), "int", userImgAdjustAltBright, "int", Round(PasteInPlaceLight*257), "int", 0, "int", Round(PasteInPlaceGamma*655.30), "int", 0, "int", 0, "int", 0, "int", PasteInPlaceHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", 65535, "int", 0, "int", 0, "UPtr", 0, "int", 1)
    Return r
 }
@@ -18898,11 +18916,11 @@ HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0, wa
       thisRotation := (PasteInPlaceCropAngular>0) ? PasteInPlaceCropAngular : PasteInPlaceCropAngular + 360
       advancedMode := (InStr(modus, "fill") || InStr(modus, "transform") || InStr(modus, "paste in place")) ? 1 : 0
       If (InStr(modus, "transform") || InStr(modus, "paste in place"))
-         obju := createBitmapSelPath(1, imgW, imgH, PasteInPlaceCropSel, thisRotation + VPselRotation, rotateSelBoundsKeepRatio)
+         obju := InitHugeImgSelPath(1, imgW, imgH, PasteInPlaceCropSel, thisRotation + VPselRotation, rotateSelBoundsKeepRatio)
       Else If InStr(modus, "fill")
-         obju := createBitmapSelPath(1, imgW, imgH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio)
+         obju := InitHugeImgSelPath(1, imgW, imgH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio)
       Else
-         obju := createBitmapSelPath(0, imgW, imgH)
+         obju := InitHugeImgSelPath(0, imgW, imgH)
 
       If validBMP(obju.alphaMaskGray)
       {
@@ -19054,7 +19072,7 @@ HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0, wa
          ; fnOutputDebug(t "|" A_ThisFunc ": " obju.x1 "|" obju.y1 "|" obju.x2 "|" obju.y2 "|" obju.imgSelW "|" obju.imgSelH)
          showTOOLtip("Applying " modus "`nProcessing main bitmap, please wait", 1)
          recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, thisInvert)
-         QPV_PrepareSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, shapeu, VPselRotation, 0, thisInvert)
+         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, shapeu, VPselRotation, 0, thisInvert)
          thisKeepAlpha := (transformTool=1) ? BlendModesPreserveAlpha : FillAreaCutGlass
          r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", blending, "int", BlendModesFlipped, "UPtr", mScan, "int", mStride, "UPtr", gScan, "int", gStride, "int", gBpp, "int", doBehind, "int", opacityExtra, "int", thisKeepAlpha)
          If hFIFimgRealGradient
@@ -19094,7 +19112,7 @@ HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0, wa
          If (allowRecord=1)
             recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, EraseAreaInvert)
 
-         QPV_PrepareSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, EraseAreaInvert)
+         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, EraseAreaInvert)
          r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", 1, "int", 0, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "UPtr", 0, "int", 0, "int", 24, "int", 0, "int", 0, "int", 0)
          If InStr(modus, "initially")
          {
@@ -19128,12 +19146,12 @@ HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0, wa
                userImgAdjustNoClamp := (PasteInPlaceLight>1 && PasteInPlaceGamma<1) ? 1 : 0 
                this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
                showTOOLtip("Applying " modus "`nPhase 2/3...", 1)
-               QPV_PrepareSelectionArea(0, 0, thisImgW, thisImgH, thisImgW, thisImgH, 0, 0, 0, 0)
+               QPV_PrepareHugeImgSelectionArea(0, 0, thisImgW, thisImgH, thisImgW, thisImgH, 0, 0, 0, 0)
                r := DllCall(whichMainDLL "\AdjustImageColors" this, "UPtr", pBitsMini, "Int", thisImgW, "Int", thisImgH, "int", strideMini, "int", bpp, "int", blurAreaOpacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", Round(BlurAreaSaturation*655.35), "int", userImgAdjustAltBright, "int", Round(BlurAreaLight*257), "int", 0, "int", Round(BlurAreaGamma*655.30), "int", 0, "int", 0, "int", 0, "int", BlurAreaHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", 65535, "int", 0, "int", 0, "UPtr", 0, "int", 0)
             }
 
             recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, BlurAreaInverted)
-            QPV_PrepareSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, BlurAreaInverted)
+            QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, BlurAreaInverted)
             showTOOLtip("Applying " modus "`nPhase 3/3...", 1)
             r := DllCall(whichMainDLL "\PixelateHugeBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", blurAreaOpacity, "int", BlurAreaBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", thisSelW, "int", thisSelH, "UPtr", mScan, "int", mStride)
             FreeImage_UnLoad(hFIFimgZ)
@@ -19145,19 +19163,19 @@ HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0, wa
       } Else If InStr(modus, "invert")
       {
          recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
-         QPV_PrepareSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0)
+         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0)
          r := DllCall(whichMainDLL "\AdjustImageColors", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 255, "int", 1, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", 0, "int", 0, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
       } Else If InStr(modus, "color")
       {
          this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
          recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, userImgAdjustInvertArea)
-         QPV_PrepareSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, userImgAdjustInvertArea)
+         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, userImgAdjustInvertArea)
          r := DllCall(whichMainDLL "\AdjustImageColors" this, "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", imgColorsFXopacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", userImgAdjustSat, "int", userImgAdjustAltBright, "int", userImgAdjustBright, "int", userImgAdjustAltContra, "int", userImgAdjustContra, "int", userImgAdjustAltHiLows, "int", userImgAdjustShadows, "int", userImgAdjustHighs, "int", userImgAdjustHue, "int", userImgAdjustTintDeg, "int", userImgAdjustTintAmount, "int", userImgAdjustAltTint, "int", userImgAdjustGamma, "int", userImgAdjustOffR, "int", userImgAdjustOffG, "int", userImgAdjustOffB, "int", userImgAdjustOffA, "int", userImgAdjustThreR, "int", userImgAdjustThreG, "int", userImgAdjustThreB, "int", userImgAdjustThreA, "int", userImgAdjustSeeThrough, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", userImgAdjustWhitePoint, "int", userImgAdjustBlackPoint, "int", userImgAdjustNoisePoints, "UPtr", mScan, "int", mStride)
       } Else ; grayscale mode
       {
          this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
          recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, EraseAreaInvert)
-         QPV_PrepareSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, EraseAreaInvert)
+         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, EraseAreaInvert)
          r := DllCall(whichMainDLL "\AdjustImageColors" this, "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", DesaturateAreaAmount, "int", DesaturateAreaInvert, "int", DesaturateAreaChannel - 1, "int", -65535, "int", 1, "int", DesaturateAreaBright, "int", 0, "int", DesaturateAreaContra, "int", 0, "int", 0, "int", 0, "int", DesaturateAreaHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 1, "int", userimgGammaCorrect, "int", 0, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
          ; r := DllCall(whichMainDLL "\ConvertToGrayScale", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", DesaturateAreaChannel, "int", DesaturateAreaAmount, "int", stride, "int", bpp, "UPtr", mScan, "int", mStride)
       }
@@ -49430,7 +49448,7 @@ livePreviewAdjustColorsArea(modus:=0) {
 }
 
 coreSymmetricaImageGenerator(zBitmap) {
-   Static lim := 10
+   Static lim := 3
    trGdip_GetImageDimensions(zBitmap, rImgW, rImgH)
    If (UserSymmetricaSrcFlipX=1 && UserSymmetricaSrcFlipY=1)
       Gdip_ImageRotateFlip(zBitmap, 2)
@@ -49445,11 +49463,21 @@ coreSymmetricaImageGenerator(zBitmap) {
    trGdip_GetImageDimensions(zBitmap, imgW, imgH)
    trGdip_GetImageDimensions(useGdiBitmap(), oImgW, oImgH)
    fx := imgW/oImgW,  fy := imgH/oImgH
-   scX := Round(tinyPrevAreaCoordX * fX),   scY := Round(tinyPrevAreaCoordY * fY)
+   scX := Round(tinyPrevAreaCoordX * fX)
+   scY := Round(tinyPrevAreaCoordY * fY)
    maxX := ImgW - 2, maxY := ImgH - 2
    coordsX := clampInRange(scX, lim, maxX)
    coordsY := clampInRange(scY, lim, maxY)
-   ; ToolTip, % scX "|" scY "=" maxX "|" maxY "`n" tinyPrevAreaCoordX "|" tinyPrevAreaCoordY , , , 2
+   If (scX<3 || scY<3)
+   {
+      ; when the reference tile is very small, we just fill with a color
+      ; ToolTip, % scX "|" scY "=" maxX "|" maxY "`n" tinyPrevAreaCoordX "|" tinyPrevAreaCoordY , , , 2
+      coloru := getPixelColorAvg(zBitmap, 1, 1, "0xFF" Gdip_GetPixelColor(zBitmap, 2, 2, 4))
+      pGU := Gdip_GraphicsFromImage(zBitmap)
+      Gdip_GraphicsClear(pGU, coloru)
+      Gdip_DeleteGraphics(pGU)
+      Return zBitmap
+   }
    ; ToolTip, % fx "|" fy "|" coordsX "|" coordsY "`n" imgW "|" imgH "=" oImgW "|" oImgH , , , 2
    ; fnOutputDebug(imgW "|" imgH "=" oImgW "|" oImgH)
    If (UserSymmetricaMode>3)
@@ -49584,9 +49612,7 @@ livePreviewSymmetricaImgArea(modus:=0) {
    trGdip_GetImageDimensions(whichBitmap, mW, mH)
    objSel := ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, mW, mH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
    pPath := VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, VPselRotation, 1, mainWidth, mainHeight, 0)
-   ; If (UserSymmetricaInvertArea=1)
-   ;    getClampedVPimgBounds(imgSelPx, imgSelPy, kX, kY, imgSelW, imgSelH)
-   ; thisState := "a" imgSelPx imgSelPy imgSelW imgSelH mainWidth mainHeight zoomLevel prevDestPosX prevDestPosY IMGresizingMode imageAligned getIDvpFX() useGdiBitmap() currentUndoLevel  undoLevelsRecorded
+
    If (prevResizedVPimgW<mainWidth && prevResizedVPimgH<mainHeight)
       calcIMGdimensions(mW, mH, prevResizedVPimgW, prevResizedVPimgH, ResizedW, ResizedH)
    Else If (IMGlargerViewPort=1)
@@ -49597,6 +49623,7 @@ livePreviewSymmetricaImgArea(modus:=0) {
    If (ResizedW*ResizedH>19000000 || ResizedW>10000 || ResizedH>10000)
       calcIMGdimensions(mW, mH, 4000, 4000, ResizedW, ResizedH)
 
+   ; ToolTip, % mW "|" mH "`n" tinyPrevAreaCoordX "|" tinyPrevAreaCoordY , , , 2
    thisState := "a" getIDvpFX() useGdiBitmap() currentUndoLevel undoLevelsRecorded ResizedW ResizedH mW mH
    If (prevState!=thisState || !validBMP(prevBMP))
    {
@@ -68393,6 +68420,9 @@ wrapResizeImageGDIwin() {
 }
 
 getPixelColorAvg(pBitmap, kX, kY, startToolColor) {
+   If !validBMP(pBitmap)
+      Return
+
    coloruA := Gdip_GetPixelColor(pBitmap, kX, kY, 1)
    coloruB := Gdip_GetPixelColor(pBitmap, kX + 2, kY + 2, 1)
    coloruD := Gdip_GetPixelColor(pBitmap, kX - 2, kY - 2, 1)
@@ -72092,7 +72122,61 @@ createPathVectorCustomShape(ImgSelPath, ByRef PointsList, tension, isClosed, isB
    Return 
 }
 
+InitHugeImgSelPath(advancedMode, imgW, imgH, shapeu:=0, angle:=0, keepBounds:=0) {
+; this function should probably deleted, it is the husk of createBitmapSelPath()
+; to-do ; delete this ; check dependencies
+
+   obju := []
+   If !(editingSelectionNow=1 && testAllowSelInvert())
+   {
+      obju.x1 := 0,          obju.y1 := 0
+      obju.x2 := imgW,       obju.y2 := imgH
+      obju.imgSelW := imgW,  obju.imgSelH := imgH
+      obju.imgZelW := imgW,  obju.imgZelH := imgH
+      obju.bImgSelPx := 0,   obju.bImgSelPy := 0
+      obju.bX1 := 0,         obju.bY1 := 0
+      obju.bX2 := imgW,      obju.bY2 := imgH
+      obju.bImgSelW := imgW, obju.bImgSelH := imgH
+      Return obju
+   }
+
+   zW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
+   zH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
+   szW := (ImgSelX2>imgW) ? imgSelX2 - imgW : 0
+   szH := (ImgSelY2>imgH) ? imgSelY2 - imgH : 0
+   aX1 := (ImgSelX1<0) ? abs(ImgSelX1) : 0
+   aY1 := (ImgSelY1<0) ? abs(ImgSelY1) : 0
+   bmpW := zW - aX1 - szW
+   bmpH := zH - aY1 - szH
+   ; fnOutputDebug(A_ThisFunc ": bmpW=" bmpW "|" zW "|" aX1 "|" szW "|img=" imgW)
+   ; fnOutputDebug(A_ThisFunc ": bmpH=" bmpH "|" zH "|" aY1 "|" szH "|img=" imgH)
+   obju.imgZelW := bmpW
+   obju.imgZelH := bmpH
+
+   boundLess := validBMP(pBitmap) ? 0 : 1
+   calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2, 0, 0, "a")
+   Y1 := imgH - imgSelPy
+   Y2 := Y1 - imgSelH
+   flipVars(Y1, Y2)
+   obju.X1 := X1,   obju.Y1 := Y1
+   obju.X2 := X2,   obju.Y2 := Y2
+   obju.imgSelW := imgSelW,   obju.imgSelH := imgSelH
+
+   calcImgSelection2bmp(0, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2, 0, 0, "a")
+   Y1 := imgH - imgSelPy
+   Y2 := Y1 - imgSelH
+   flipVars(Y1, Y2)
+   obju.bImgSelPx := imgSelPx
+   obju.bImgSelPy := imgSelPy
+   obju.bX1 := X1,   obju.bY1 := Y1
+   obju.bX2 := X2,   obju.bY2 := Y2
+   obju.bImgSelW := imgSelW,   obju.bImgSelH := imgSelH
+   Return obju
+}
+
 createBitmapSelPath(advancedMode, imgW, imgH, shapeu:=0, angle:=0, keepBounds:=0) {
+; function no longer used; it was rendered by InitHugeImgSelPath() and QPV_PrepareHugeImgSelectionArea()
+
    obju := []
    If !(editingSelectionNow=1 && testAllowSelInvert())
    {
@@ -72121,7 +72205,7 @@ createBitmapSelPath(advancedMode, imgW, imgH, shapeu:=0, angle:=0, keepBounds:=0
    obju.imgZelH := bmpH
    If (isImgSizeTooLarge(bmpW, bmpH) || EllipseSelectMode!=2 && advancedMode=0 || isVarEqualTo(shapeu, 0, 1, 3) && advancedMode=1)
       abandoned := 1
-abandoned := 1
+
    If !abandoned
       pBitmap := trGdip_CreateBitmap(A_ThisFunc, bmpW, bmpH, "0x21808")
    ; ToolTip, % shapeu "|" abandoned "|" pBitmape , , , 2
@@ -72176,6 +72260,7 @@ abandoned := 1
       addJournalEntry(A_ThisFunc ": failed to create selection path for the clip mask")
 
    Return obju
+
 }
 
 createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepBounds:=0, zeroTension:=0, allowSelectionCenter:=1, allowCavity:=1, selCavityX:=0, selCavityY:=0, allowErrMargin:=1) {
@@ -72565,7 +72650,7 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
            infoBoxBMP := drawTextInBox(theMsg, OSDFontName, OSDfontSize//fScale, mainWidth//2, mainHeight//2, OSDtextColor, OSDbgrColor, 1, 1)
            colorBoxH := colorBox ? imgHUDbaseUnit//7 : 1
            trGdip_GetImageDimensions(infoBoxBMP, infoW, infoH)
-           If (imgSelLargerViewPort!=1)
+           If (imgSelLargerViewPort!=1 && dotActive!=9)
            {
               If (imgSelPy + imgSelH + 5 < mainHeight - infoH)
               {
@@ -88169,7 +88254,7 @@ coreFreeImageSimpleColorsAdjust(imgPath, file2save) {
     pBitsAll := FreeImage_GetBits(hFIFimgA)
     Stride := FreeImage_GetStride(hFIFimgA)
     this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
-    QPV_PrepareSelectionArea(0, 0, imgW, imgH, imgW, imgH, 0, 0, 0, 0)
+    QPV_PrepareHugeImgSelectionArea(0, 0, imgW, imgH, imgW, imgH, 0, 0, 0, 0)
     r := DllCall(whichMainDLL "\AdjustImageColors" this, "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", imgColorsFXopacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", userImgAdjustSat, "int", userImgAdjustAltBright, "int", userImgAdjustBright, "int", userImgAdjustAltContra, "int", userImgAdjustContra, "int", userImgAdjustAltHiLows, "int", userImgAdjustShadows, "int", userImgAdjustHighs, "int", userImgAdjustHue, "int", userImgAdjustTintDeg, "int", userImgAdjustTintAmount, "int", userImgAdjustAltTint, "int", userImgAdjustGamma, "int", userImgAdjustOffR, "int", userImgAdjustOffG, "int", userImgAdjustOffB, "int", userImgAdjustOffA, "int", userImgAdjustThreR, "int", userImgAdjustThreG, "int", userImgAdjustThreB, "int", userImgAdjustThreA, "int", userImgAdjustSeeThrough, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", userImgAdjustWhitePoint, "int", userImgAdjustBlackPoint, "int", userImgAdjustNoisePoints, "UPtr", 0, "int", 0)
     If (r!=1)
     {
