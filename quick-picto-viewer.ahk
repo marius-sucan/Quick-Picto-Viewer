@@ -12642,7 +12642,7 @@ QPV_AdjustImageColors(pBitmap, thisOpacity, InvertColors, AltSat, Sat, AltBright
   return r
 }
 
-livePreviewPrepareSelectionArea(objSel, invertArea) {
+livePreviewPrepareSelectionArea(objSel, invertArea, shapeMode) {
    oImgW := objSel.nw,   oImgH := objSel.nh
    tw := objSel.sw - objSel.nw 
    th := objSel.sh - objSel.nh 
@@ -12650,16 +12650,30 @@ livePreviewPrepareSelectionArea(objSel, invertArea) {
    ty := objSel.sy - objSel.dy
    px := (prevDestPosX<0) ? 0 : - prevDestPosX
    py := (prevDestPosY<0) ? 0 : - prevDestPosY
+   If (invertArea=1)
+   {
+      tx := objSel.sx + px
+      ty := objSel.sy + py
+   }
+
+   txb := (invertArea=1) ? objSel.sw + objSel.sx + px : oImgW + tw
+   tyb := (invertArea=1) ? objSel.sh + objSel.sy + py : oImgH + th
+   zx := (tX<0) ? abs(tX) : 0
+   zy := (tY<0) ? abs(tY) : 0
+   bzx := clampInRange(zx + objSel.mainW, 0, txb)
+   bzy := clampInRange(zy + objSel.mainH, 0, tyb)
+   ppo := [zx, zy, bzx, bzy]
+   ; ToolTip, % tx "|" ty "`n" zx "|" zy "`n" bzx "|" bzy "`n" txb "|" tyb , , , 2
    ; ToolTip, % oImgW "|" oImgH "`n" imgSelW "|" imgSelH "`n" mainWidth "|" mainHeight , , , 2
    If (viewportQPVimage.imgHandle && invertArea=1)
-      QPV_PrepareHugeImgSelectionArea(objSel.sx + px, objSel.sy + py, objSel.sw + objSel.sx + px, objSel.sh + objSel.sy + py, objSel.sw, objSel.sh, EllipseSelectMode, VPselRotation, 1, invertArea)
+      QPV_PrepareHugeImgSelectionArea(tx, ty, txb, tyb, objSel.sw, objSel.sh, shapeMode, VPselRotation, 1, invertArea, "a", "a", ppo)
    Else If (viewportQPVimage.imgHandle)
-      QPV_PrepareHugeImgSelectionArea(tx, ty, oImgW + tw, oImgH + th, oImgW + tw, oImgH + th, EllipseSelectMode, VPselRotation, 1, 0)
+      QPV_PrepareHugeImgSelectionArea(tx, ty, txb, tyb, txb, tyb, shapeMode, VPselRotation, 1, 0, "a", "a", ppo)
    Else 
       QPV_PrepareHugeImgSelectionArea(0, 0, oImgW, oImgH, oImgW, oImgH, -1, 0, 0, 0)
 }
 
-QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, invertArea, cavityX:="a", cavityY:="a") {
+QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, invertArea, cavityX:="a", cavityY:="a", ppo:=0) {
    Static pi := 3.141592653
    ; mode is EllipseSelectMode [the shape]
 
@@ -12680,7 +12694,22 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
    {
       If (mode=1)
       {
+         pPath := createImgSelPath(0, 0, w, h, 1, rotation, rotateSelBoundsKeepRatio, 0, 2, 0, 0, 0, 0)
+         ba := getAccuratePathBounds(pPath, 1, 21)
+         ra := (w>h) ? ba.h / h : ba.w / w
+         rw := w * ra
+         rh := h * ra
+         x1 := x1 + (w - rw)//2
+         y1 := y1 + (h - rh)//2
+         x2 := x1 + Round(rw)
+         y2 := y1 + Round(rh)
+         w := Round(rw)
+         h := Round(rh)
          Gdip_GetRotatedEllipseDimensions(w, h, rotation, rw, rh)
+         rw := Round(rw)
+         rh := Round(rh)
+         ; ToolTip, % rw "|" rh "`n" ba.w "|" ba.h "`n" ra , , , 2
+         Gdip_DeletePath(pPath)
       } Else If (rotateSelBoundsKeepRatio=0 && mode=0)
       {
          Gdip_GetRotatedDimensions(w, h, rotation, rw, rh)
@@ -12771,10 +12800,20 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
    Else
       exclusion := 0.995 - ( 1 -  (cavityX + cavityY)/2 ) / 2
 
+   If IsObject(ppo)
+   {
+      ppx1 := ppo[1], ppy1 := ppo[2]
+      ppx2 := ppo[3], ppy2 := ppo[4]
+   } else
+   {
+      ppx1 := x1, ppy1 := y1
+      ppx2 := x2, ppy2 := y2
+   }
+
    ; ToolTip, % Round(innerSelectionCavityX, 2) "|" Round(innerSelectionCavityY, 2) "|" Round(exclusion, 2) , , , 2
    ; ToolTip, % round(w/h, 2) "|" round(mod(rotation, 45), 2) "°|" w "|" h "`n"  rw "|" rh "`n" Round(xf, 2) "|" Round(yf, 2) , , , 2
    ; ToolTip, % round(xf, 2) "|" round(yf, 2) "|"  round(rotation, 2) "|" Round(exclusion, 2) , , , 2
-   r := DllCall(whichMainDLL "\prepareSelectionArea", "int", x1, "int", y1, "int", x2, "int", y2, "int", w, "int", h,  "float", xf, "float", yf, "float", rotation, "int", mode, "int", doFlip, "float", exclusion, "int", invertArea, "UPtr", &PointsF, "int", PointsCount)
+   r := DllCall(whichMainDLL "\prepareSelectionArea", "int", x1, "int", y1, "int", x2, "int", y2, "int", w, "int", h, "float", xf, "float", yf, "float", rotation, "int", mode, "int", doFlip, "float", exclusion, "int", invertArea, "UPtr", &PointsF, "int", PointsCount, "int", ppx1, "int", ppy1, "int", ppx2, "int", ppy2)
    PointsF := ""
    If (pPath!="")
       Gdip_DeletePath(pPath)
@@ -16445,11 +16484,17 @@ livePreviewHugeImageFillSelArea() {
    If (doImgEditLivePreview!=1 || testSelectOutsideImgEntirely(useGdiBitmap()) || FillAreaInverted=0 && imgSelOutViewPort=1)
       Return
 
-   ; trGdip_GetImageDimensions(useGdiBitmap(), qimgW, qimgH)
+   ozeit := A_TickCount
    vpWinClientSize(mainWidth, mainHeight)
    trGdip_GetImageDimensions(useGdiBitmap(), thisW, thisH)
    objSel := ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, thisW, thisH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
    pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio)
+   invertPath := Gdip_ClonePath(pPath)
+   tx := (imgSelPx > prevDestPosX) ? prevDestPosX : max(imgSelPx, prevDestPosX)
+   ty := (imgSelPy > prevDestPosY) ? prevDestPosY : max(imgSelPy, prevDestPosY)
+   twx := ((imgSelPx + imgSelW) > (prevDestPosX + prevResizedVPimgW)) ? prevDestPosX + prevResizedVPimgW : max(imgSelPx + imgSelW, prevDestPosX + prevResizedVPimgW)
+   twy := ((imgSelPy + imgSelH) > (prevDestPosY + prevResizedVPimgH)) ? prevDestPosY + prevResizedVPimgH : max(imgSelPy + imgSelH, prevDestPosY + prevResizedVPimgH)
+   Gdip_AddPathRectangle(invertPath, tx, ty, twx - tx, twy - ty)
    If (FillAreaInverted=1)
       getClampedVPimgBounds(imgSelPx, imgSelPy, kX, kY, imgSelW, imgSelH)
    Else
@@ -16510,32 +16555,24 @@ livePreviewHugeImageFillSelArea() {
       }
 
       modus := (FillAreaInverted=1) ? 4 : 0
-      If (FillAreaShape!=1 && FillAreaShape!=3 || FillAreaInverted=1 && imgSelOutViewPort!=1)
-         Gdip_SetClipPath(2NDglPG, pPath, modus)
+      ; If (FillAreaShape!=1 && FillAreaShape!=3 || FillAreaInverted=1 && imgSelOutViewPort!=1)
+      ; If (FillAreaInverted=1 && imgSelOutViewPort!=1)
+      ;    Gdip_SetClipPath(2NDglPG, pPath, modus)
 
       newColor := "0xFF" FillAreaColor
       thisOpacity := FillAreaOpacity
       eraser := (FillAreaRemBGR=1 && FillAreaDoBehind=0) ? -1 : 0
       bpp := FreeImage_GetBPP(viewportQPVimage.imgHandle)
+      whichPath := (FillAreaInverted=1) ? invertPath : pPath
       If (FillAreaRemBGR=1 && FillAreaDoBehind=0)
       {
          blackBrush := Gdip_BrushCreateSolid("0xFF000000")
-         thisBrush := (currIMGdetails.HasAlpha=1) ? GDIPbrushHatch : blackBrush
-         If (FillAreaInverted=1)
-            Gdip_FillRectangle(2NDglPG, thisBrush, imgSelPx, imgSelPy, imgSelW, imgSelH)
-         Else
-            Gdip_FillPath(2NDglPG, thisBrush, pPath)
+         thisBrush := (currIMGdetails.HasAlpha=1 || bpp=32) ? pBrushHatchLow : blackBrush
+         Gdip_FillPath(2NDglPG, thisBrush, whichPath)
          Gdip_DeleteBrush(blackBrush)
       }
 
-      If (isImgSizeTooLarge(zW, zH) && FillAreaShape!=1 && FillAreaShape!=3)
-         QPV_PrepareHugeImgSelectionArea(0, 0, imgW, imgH, imgW, imgH, 0, VPselRotation, 1, 0)
-      Else If (FillAreaShape!=1 && FillAreaShape!=3 || FillAreaInverted=1)
-         QPV_PrepareHugeImgSelectionArea(0, 0, imgW, imgH, imgW, imgH, 0, 0, 1, 0, 0, 0)
-      Else
-         QPV_PrepareHugeImgSelectionArea(0, 0, imgW, imgH, imgW, imgH, EllipseSelectMode, VPselRotation, 1, FillAreaInverted)
-
-      bpp := FreeImage_GetBPP(viewportQPVimage.imgHandle)
+      livePreviewPrepareSelectionArea(objSel, FillAreaInverted, 3)
       thisBehind := (FillAreaDoBehind=1 && bpp=32) ? 1 : 0
       r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", iScan, "Int", imgW, "Int", imgH, "int", Stride, "int", 32, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", FillAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", gScan, "int", gStride, "int", gBpp, "int", thisBehind, "int", 0, "int", FillAreaCutGlass)
       Gdip_UnlockBits(zBitmap, iData)
@@ -16555,10 +16592,12 @@ livePreviewHugeImageFillSelArea() {
       ; r1 := trGdip_DrawImage(A_ThisFunc, 2NDglPG, zBitmap, imgSelPx, imgSelPy)
       Gdip_ResetClip(2NDglPG)
       trGdip_DisposeImage(zBitmap, 1)
+
    } Else
       addJournalEntry(A_ThisFunc "(): Failed to capture viewport bitmap required for the live preview.")
 
    Gdip_DeletePath(pPath)
+   fnOutputDebug("step END: " A_TickCount - ozeit)
 }
 
 coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
@@ -44930,6 +44969,7 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
          Return
       }
 
+      VPcreateSelPath("kill", 0, 0, 0, 0, 0, 0, 0, 0)
       EllipseSelectMode := 2
       bezierSplineCustomShape := 0
       closedLineCustomShape := 1
@@ -44983,6 +45023,7 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
       Return
    }
 
+   VPcreateSelPath("kill", 0, 0, 0, 0, 0, 0, 0, 0)
    obju := StrSplit(contentu, "`n", "`r `t")
    newArrayu := convertShapePointsStrToArray(obju[1])
    If (newArrayu.Count()<3)
@@ -49943,7 +49984,7 @@ livePreviewSimpleColorsAdjustImage(modus:=0, extraMode:=0) {
             Gdip_BitmapSetColorDepth(zBitmap, 32)
          }
 
-         livePreviewPrepareSelectionArea(objSel, thisInvertArea)
+         livePreviewPrepareSelectionArea(objSel, thisInvertArea, EllipseSelectMode)
          If (extraMode="vp-colors")
          {
             zBitmap := applyVPeffectsOnBMP(zBitmap)
@@ -71918,6 +71959,8 @@ ViewPortSelectionManageCoords(mainWidth, mainHeight, dpX, dpY, maxSelX, maxSelY,
      vPimgSelPy := dpY + min(zImgSelY1, zImgSelY2)
      objSel.oSelX := Round(vPimgSelPx)
      objSel.oSelY := Round(vPimgSelPy)
+     objSel.mainW := mainWidth
+     objSel.mainH := mainHeight
      ; fnOutputDebug(A_ThisFunc ": " vPimgSelPx "|" vPimgSelPy "=" dpX "|" dpY "=" vPimgSelW "|" vPimgSelH)
      If (LimitSelectBoundsImg!=-1)
      {

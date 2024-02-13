@@ -357,10 +357,11 @@ void plotLineSetPixel(int width, int height, int nx, int ny) {
     // polygonMapTempMin[ny] = min(polygonMapTempMin[ny], nx);
     // fnOutputDebug("maxu=" + std::to_string(polygonMapMax[ny]) + " | minu=" + std::to_string(polygonMapMin[ny]));
 
-    if (nx>=width || ny>=height || nx<0 || ny<0)
+    if (nx>=polyW || ny>=polyH || nx<polyX || ny<polyY || nx>=width || ny>=height || nx<0 || ny<0)
        return;
 
-    polygonMaskMap[(INT64)ny * width + nx] = 1;
+    polygonMaskMap[(INT64)(ny - polyY) * polyW + (nx - polyX)] = 1;
+    // polygonMaskMap[(INT64)ny * width + nx] = 1;
     // dumbFillPixel(nx, ny, 255, 255, 0, imageData, Stride, bpp, width, height);
 }
 
@@ -458,15 +459,34 @@ bool isPointInPolygon(INT64 pX, INT64 pY, float* PointsList, int PointsCount) {
     return inside;
 }
 
-void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount) {
+void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1, int ppy1, int ppx2, int ppy2) {
 
     fnOutputDebug("FillMaskPolygon() invoked; PointsCount=" + std::to_string(PointsCount));
     polygonMapMin.clear();
     polygonMapMin.shrink_to_fit();
-    polygonMaskMap.clear();
-    polygonMaskMap.shrink_to_fit();
-    polygonMaskMap.resize((INT64)w*h + 2, 0);
-    fnOutputDebug("polygonMaskMap size=" + std::to_string((INT64)w*h));
+    INT64 s = (INT64)polyW * polyH + 2;
+    if (s!=polygonMaskMap.size())
+    {
+       polygonMaskMap.clear();
+       polygonMaskMap.shrink_to_fit();
+       try {
+           polygonMaskMap.resize(s, 0);
+       } catch(const std::bad_alloc& e) {
+          EllipseSelectMode = 0;
+          fnOutputDebug("polygonMaskMap failed. bad_alloc =" + std::to_string(s));
+          return;
+       } catch(const std::length_error& e) {
+          EllipseSelectMode = 0;
+          fnOutputDebug("polygonMaskMap failed. length_error =" + std::to_string(s));
+          return;
+       }
+
+       fnOutputDebug("polygonMaskMap RESIZED=" + std::to_string(s) + "||" + std::to_string(polygonMaskMap.size()));
+    } else
+    {
+       fill(polygonMaskMap.begin(), polygonMaskMap.end(), 0);
+       fnOutputDebug("polygonMaskMap size=" + std::to_string(s) + "||" + std::to_string(polygonMaskMap.size()));
+    }
 
     int boundMaxX = 0;
     int boundMaxY = 0;
@@ -511,10 +531,11 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount) {
            yb = PointsList[1];
         }
         pts++;
-
-        if ((max(xa, xb)<0 || max(ya, yb)<0) || (min(xa, xb)>w || min(ya, yb)>h))
+        
+        if (max(ya, yb)<ppy1 || min(ya, yb)>ppy2)
+        // if ((max(xa, xb)<ppx1 || max(ya, yb)<ppy1) || (min(xa, xb)>ppx2 || min(ya, yb)>ppy2))
         {
-           fnOutputDebug(" poly segment skipped=" + std::to_string(pts));
+           // fnOutputDebug(" poly segment skipped=" + std::to_string(pts));
            xa = xb;
            ya = yb;
            continue;
@@ -522,8 +543,8 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount) {
 
         // fnOutputDebug("seg[ " + std::to_string(i) + "@" + std::to_string(pts) + " ]=( " + std::to_string(xa) + " | " + std::to_string(ya) + ", " + std::to_string(xb) + " | " + std::to_string(yb) + ");");
         bresenham_line_algo(w, h, xa, ya, xb, yb);
-        int maxu = (max(ya, yb) >= h) ? h-1 : max(ya, yb);
-        int minu = (min(ya, yb) <= 0) ? 0 : min(ya, yb);
+        int maxu = (max(ya, yb) >= ppy2) ? ppy2 - 1 : max(ya, yb);
+        int minu = (min(ya, yb) <= ppy1) ? ppy1 : min(ya, yb);
         for (int yy = minu; yy <= max(maxu, h); yy++)
         {
             if (polygonMapMin[yy]!=INT_MAX)
@@ -539,13 +560,12 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount) {
     fnOutputDebug("discard polygonMapMin");
     polygonMapMin.clear();
     polygonMapMin.shrink_to_fit();
-
     fnOutputDebug("fill mask image using the list of x-pairs identified and stored in polygonMapEdges");
     int countPIPcalls = 0;
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int y = 0; y < h; ++y)
     {
-        if (polygonMapEdges[y].empty())
+        if (polygonMapEdges[y].empty() || y<=ppy1 || y>=ppy2)
         {
            // fnOutputDebug("empty Y=" + std::to_string(y));
            continue;
@@ -572,7 +592,7 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount) {
         {
              INT64 xa = listu[i];
              INT64 xb = listu[i + 1];
-             if (xb==xa || max(xa,xb)<0 || min(xa,xb)>=w)
+             if (xb==xa || max(xa,xb)<ppx1 || min(xa,xb)>=ppx2)
              {
                 // fnOutputDebug("skipped identical xa/xb, Y=" + std::to_string(y));
                 continue;
@@ -595,22 +615,23 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount) {
              // fnOutputDebug(std::to_string(midX) + "=midX == yaaaaay");
              for (INT64 x = xa; x <= xb; x++)
              {
-                  if (x<0 || x>=w)
+                  if (x<=ppx1 || x>=ppx2)
                      continue;
 
                   // if (x==xa || x==xb)
                   //    dumbFillPixel(x, y, 255, 0, 255, imageData, Stride, bpp, w, h);
                   // else
                   //    dumbFillPixel(x, y, 128, 0, 10, imageData, Stride, bpp, w, h);
-                  polygonMaskMap[(INT64)y * w + x] = 1;
+
+                  polygonMaskMap[(INT64)(y - polyY) * polyW + x - polyX] = 1;
              }
              // if (listu.size()>2)
              //    dumbFillPixel(midX, y, 0, 255, 255, imageData, Stride, bpp, w, h);
         }
         // OutputDebugStringA(ss.str().data());
     }
-    fnOutputDebug("fill mask image - done; calls to isPointInPolygon() executed: " + std::to_string(countPIPcalls));
 
+    fnOutputDebug("fill mask image - done; calls to isPointInPolygon() executed: " + std::to_string(countPIPcalls));
     polygonMapEdges.clear();
     polygonMapEdges.shrink_to_fit();
     fnOutputDebug("polygonMapEdges discarded");
@@ -629,7 +650,9 @@ bool clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
                 return 1;
           } else if (EllipseSelectMode==2)
           {
-             bool r = (polygonMaskMap[(INT64)(y - imgSelY1) * imgSelW + x - imgSelX1]) ? 1 : 0;
+             bool r = 0;
+             if (inRange(0, polyH - 1, y - imgSelY1 - polyY) && inRange(0, polyW - 1, x - imgSelX1 - polyX))
+                r = (polygonMaskMap[(INT64)(y - imgSelY1 - polyY) * polyW + x - imgSelX1 - polyX]) ? 1 : 0;
              return r;
           } else if (EllipseSelectMode==1 || EllipseSelectMode==0 && (vpSelRotation!=0 || excludeSelectScale!=0))
           {
@@ -651,7 +674,9 @@ bool clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
              return 1;
        } else if (EllipseSelectMode==2)
        {
-          bool r = (polygonMaskMap[(INT64)(y - imgSelY1) * imgSelW + x - imgSelX1]) ? 0 : 1;
+          bool r = 1;
+          if (inRange(0, polyH - 1, y - imgSelY1 - polyY) && inRange(0, polyW - 1, x - imgSelX1 - polyX))
+             r = (polygonMaskMap[(INT64)(y - imgSelY1 - polyY) * polyW + x - imgSelX1 - polyX]) ? 0 : 1;
           return r;
        } else if (EllipseSelectMode==1 || EllipseSelectMode==0 && (vpSelRotation!=0 || excludeSelectScale!=0))
        {
@@ -1540,8 +1565,7 @@ int clrBrushMixColors(int colorB, float *colorA, float f, int blendMode, int lin
   return (aT << 24) | ((rT & 0xFF) << 16) | ((gT & 0xFF) << 8) | (bT & 0xFF);
 }
 
-
-DLL_API int DLL_CALLCONV prepareSelectionArea(int x1, int y1, int x2, int y2, int w, int h, float xf, float yf, float angle, int mode, int flip, float exclusion, int invertArea, float* PointsList, int PointsCount) {
+DLL_API int DLL_CALLCONV prepareSelectionArea(int x1, int y1, int x2, int y2, int w, int h, float xf, float yf, float angle, int mode, int flip, float exclusion, int invertArea, float* PointsList, int PointsCount, int ppx1, int ppy1, int ppx2, int ppy2) {
     imgSelX1 = x1;
     imgSelY1 = y1;
     imgSelX2 = x2;
@@ -1563,8 +1587,13 @@ DLL_API int DLL_CALLCONV prepareSelectionArea(int x1, int y1, int x2, int y2, in
     vpSelRotation = (angle * M_PI) / 180.0f; // convert to radians
     cosVPselRotation = cos(vpSelRotation);
     sinVPselRotation = sin(vpSelRotation);
+    polyW = ppx2 - ppx1;
+    polyH = ppy2 - ppy1;
+    polyX = ppx1;
+    polyY = ppy1;
+
     if (mode==2 && PointsList!=NULL)
-       FillMaskPolygon(w, h, PointsList, PointsCount);
+       FillMaskPolygon(w, h, PointsList, PointsCount, ppx1, ppy1, ppx2, ppy2);
 
     return 1;
 }
@@ -3835,8 +3864,8 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV WICgetRectImage(int x, int y, int w, int
       if (SUCCEEDED(hr))
       {
           BYTE *m_pbBuffer = NULL;  // the GDI+ bitmap buffer
-          m_pbBuffer = new BYTE[cbBufferSize];
-          hr = (m_pbBuffer) ? S_OK : E_FAIL;
+          m_pbBuffer = new (std::nothrow) BYTE[cbBufferSize];
+          hr = (m_pbBuffer!=nullptr) ? S_OK : E_FAIL;
           if (SUCCEEDED(hr))
           {
               fnOutputDebug("WIC gdi+ obj buffer");
@@ -3863,8 +3892,8 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV WICgetRectImage(int x, int y, int w, int
                  if (SUCCEEDED(hr))
                     fnOutputDebug("WIC gdi+ obj created");
               }
+              delete[] m_pbBuffer;
           }
-          delete[] m_pbBuffer;
           m_pbBuffer = NULL; 
       }
   }
@@ -3903,8 +3932,8 @@ DLL_API BYTE* DLL_CALLCONV WICgetLargeBufferImage(int okay, int bitsDepth, UINT6
      hr = pConverter->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void **>(&pFinalBitmapSource));
 
   BYTE *m_pbBuffer = NULL;
-  m_pbBuffer = new BYTE[cbBufferSize];
-  hr = (m_pbBuffer) ? S_OK : E_FAIL;
+  m_pbBuffer = new (std::nothrow) BYTE[cbBufferSize];
+  hr = (m_pbBuffer!=nullptr) ? S_OK : E_FAIL;
 
   int y = 0;
   int indexu = 0;
@@ -3974,8 +4003,8 @@ DLL_API BYTE* DLL_CALLCONV WICgetBufferImage(int okay, int bitsDepth, UINT64 cbS
      hr = pConverter->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void **>(&pFinalBitmapSource));
 
   BYTE *m_pbBuffer = NULL;
-  m_pbBuffer = new BYTE[cbBufferSize];
-  hr = (m_pbBuffer) ? S_OK : E_FAIL;
+  m_pbBuffer = new (std::nothrow) BYTE[cbBufferSize];
+  hr = (m_pbBuffer!=nullptr) ? S_OK : E_FAIL;
   if (SUCCEEDED(hr))
   {
       fnOutputDebug("WIC buffer created: " + std::to_string(cbBufferSize));
@@ -4337,13 +4366,12 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
             if (SUCCEEDED(hr))
             {
                 BYTE *m_pbBuffer = NULL;  // the GDI+ bitmap buffer
-                m_pbBuffer = new BYTE[cbBufferSize];
-                hr = (m_pbBuffer) ? S_OK : E_FAIL;
+                m_pbBuffer = new (std::nothrow) BYTE[cbBufferSize];
+                hr = (m_pbBuffer!=nullptr) ? S_OK : E_FAIL;
 
                 // std::stringstream ss;
                 // ss << "qpv: threadu - " << threadIDu << " prepared dib format buffer ";
                 // OutputDebugStringA(ss.str().data());
-
                 if (SUCCEEDED(hr))
                 {
                     // WICRect rc = { 0, 0, width, height };
@@ -4549,11 +4577,13 @@ Gdiplus::GpBitmap* CreateGdipBitmapFromCImg(CImg<float> & img, int width, int he
     UIntMult(cbStride, height, &cbBufferSize);
 
     Gdiplus::GpBitmap  *myBitmap = NULL;
-    Gdiplus::DllExports::GdipCreateBitmapFromScan0(width, height, cbStride, PixelFormat32bppARGB, NULL, &myBitmap);
     BYTE *m_pbBuffer = NULL;  // the GDI+ bitmap buffer
-    m_pbBuffer = new BYTE[cbBufferSize];
-    // fnOutputDebug("gdip bmp created, yay");
+    m_pbBuffer = new (std::nothrow) BYTE[cbBufferSize];
+    if (m_pbBuffer==nullptr)
+       return myBitmap;
 
+    // fnOutputDebug("gdip bmp created, yay");
+    Gdiplus::DllExports::GdipCreateBitmapFromScan0(width, height, cbStride, PixelFormat32bppARGB, NULL, &myBitmap);
     Gdiplus::Rect rectu(0, 0, width, height);
     Gdiplus::BitmapData bitmapDatu;
     bitmapDatu.Width = width;

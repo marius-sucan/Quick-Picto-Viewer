@@ -40,14 +40,18 @@ float hImgSelW = 0.0f;
 float hImgSelH = 0.0f;
 float imgSelXscale = 0.0f;
 float imgSelYscale = 0.0f;
+INT64 polyW = 0;
+INT64 polyH = 0;
+INT64 polyX = 0;
+INT64 polyY = 0;
 
-IWICBitmapDecoder *pWICclassDecoder;
-IWICBitmapFrameDecode *pWICclassFrameDecoded;
+IWICBitmapDecoder      *pWICclassDecoder;
+IWICBitmapFrameDecode  *pWICclassFrameDecoded;
 // IWICFormatConverter *pWICclassConverter;
-IWICBitmapSource *pWICclassPixelsBitmapSource;
+IWICBitmapSource       *pWICclassPixelsBitmapSource;
 
 std::vector<bool>  polygonMaskMap;
-std::vector<int>  polygonMapMin;
+std::vector<int>   polygonMapMin;
 
 std::vector<UINT>  dupesListIDsA(1);
 std::vector<UINT>  dupesListIDsB(1);
