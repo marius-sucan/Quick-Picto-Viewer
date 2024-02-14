@@ -462,15 +462,11 @@ bool isPointInPolygon(INT64 pX, INT64 pY, float* PointsList, int PointsCount) {
 void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1, int ppy1, int ppx2, int ppy2) {
 
     fnOutputDebug("FillMaskPolygon() invoked; PointsCount=" + std::to_string(PointsCount));
-    polygonMapMin.clear();
-    polygonMapMin.shrink_to_fit();
     INT64 s = (INT64)polyW * polyH + 2;
     if (s!=polygonMaskMap.size())
     {
-       polygonMaskMap.clear();
-       polygonMaskMap.shrink_to_fit();
        try {
-           polygonMaskMap.resize(s, 0);
+          polygonMaskMap.resize(s);
        } catch(const std::bad_alloc& e) {
           EllipseSelectMode = 0;
           fnOutputDebug("polygonMaskMap failed. bad_alloc =" + std::to_string(s));
@@ -484,9 +480,11 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1,
        fnOutputDebug("polygonMaskMap RESIZED=" + std::to_string(s) + "||" + std::to_string(polygonMaskMap.size()));
     } else
     {
-       fill(polygonMaskMap.begin(), polygonMaskMap.end(), 0);
        fnOutputDebug("polygonMaskMap size=" + std::to_string(s) + "||" + std::to_string(polygonMaskMap.size()));
     }
+
+    fill(polygonMaskMap.begin(), polygonMaskMap.end(), 0);
+    fnOutputDebug("polygonMaskMap refilled to zero ; size = " + std::to_string(s));
 
     int boundMaxX = 0;
     int boundMaxY = 0;
@@ -505,7 +503,7 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1,
     std::vector<std::unordered_set<int>>  polygonMapEdges;
     int hmax = max(boundMaxY, h) + 1;
     fnOutputDebug(std::to_string(hmax) + "=hmax; bound rect={" + std::to_string(boundMinX) + "," + std::to_string(boundMinY) + "," + std::to_string(boundMaxX) + "," + std::to_string(boundMaxY) + "}");
-    polygonMapMin.reserve(hmax);
+    polygonMapMin.resize(hmax);
     fnOutputDebug("polygonMapMin reserved");
     polygonMapEdges.reserve(hmax);
     for (int i=0; i<hmax; i++)
@@ -533,6 +531,7 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1,
         pts++;
         
         if (max(ya, yb)<ppy1 || min(ya, yb)>ppy2)
+        // if (max(ya, yb)<ppy1 || min(ya, yb)>ppy2 || min(xa, xb)>ppx2 && polygonMapMin[ya]!=INT_MAX && polygonMapMin[yb]!=INT_MAX)
         // if ((max(xa, xb)<ppx1 || max(ya, yb)<ppy1) || (min(xa, xb)>ppx2 || min(ya, yb)>ppy2))
         {
            // fnOutputDebug(" poly segment skipped=" + std::to_string(pts));
@@ -557,9 +556,6 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1,
            break;
     }
 
-    fnOutputDebug("discard polygonMapMin");
-    polygonMapMin.clear();
-    polygonMapMin.shrink_to_fit();
     fnOutputDebug("fill mask image using the list of x-pairs identified and stored in polygonMapEdges");
     int countPIPcalls = 0;
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
@@ -636,6 +632,14 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1,
     polygonMapEdges.shrink_to_fit();
     fnOutputDebug("polygonMapEdges discarded");
     // return 1;
+}
+
+DLL_API int DLL_CALLCONV discardFilledPolygonCache(int m) {
+    polygonMapMin.clear();
+    polygonMapMin.shrink_to_fit();
+    polygonMaskMap.clear();
+    polygonMaskMap.shrink_to_fit();
+    return 1;
 }
 
 bool clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
@@ -1565,7 +1569,7 @@ int clrBrushMixColors(int colorB, float *colorA, float f, int blendMode, int lin
   return (aT << 24) | ((rT & 0xFF) << 16) | ((gT & 0xFF) << 8) | (bT & 0xFF);
 }
 
-DLL_API int DLL_CALLCONV prepareSelectionArea(int x1, int y1, int x2, int y2, int w, int h, float xf, float yf, float angle, int mode, int flip, float exclusion, int invertArea, float* PointsList, int PointsCount, int ppx1, int ppy1, int ppx2, int ppy2) {
+DLL_API int DLL_CALLCONV prepareSelectionArea(int x1, int y1, int x2, int y2, int w, int h, float xf, float yf, float angle, int mode, int flip, float exclusion, int invertArea, float* PointsList, int PointsCount, int ppx1, int ppy1, int ppx2, int ppy2, int useCache) {
     imgSelX1 = x1;
     imgSelY1 = y1;
     imgSelX2 = x2;
@@ -1591,8 +1595,10 @@ DLL_API int DLL_CALLCONV prepareSelectionArea(int x1, int y1, int x2, int y2, in
     polyH = ppy2 - ppy1;
     polyX = ppx1;
     polyY = ppy1;
+    if (polygonMaskMap.size()<2000 || polygonMapMin.size()<100)
+       useCache = 0;
 
-    if (mode==2 && PointsList!=NULL)
+    if (mode==2 && PointsList!=NULL && useCache!=1)
        FillMaskPolygon(w, h, PointsList, PointsCount, ppx1, ppy1, ppx2, ppy2);
 
     return 1;
