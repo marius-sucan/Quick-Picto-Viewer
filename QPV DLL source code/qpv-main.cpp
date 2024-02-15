@@ -360,7 +360,16 @@ void plotLineSetPixel(int width, int height, int nx, int ny) {
     if (nx>=polyW || ny>=polyH || nx<polyX || ny<polyY || nx>=width || ny>=height || nx<0 || ny<0)
        return;
 
-    polygonMaskMap[(INT64)(ny - polyY) * polyW + (nx - polyX)] = 1;
+    // UINT64 index = (UINT64)(ny - polyY) * polyW + (nx - polyX);
+    polygonMaskMap[(UINT64)(ny - polyY) * polyW + (nx - polyX)] = 1;
+
+
+    // try {
+    //     int value = polygonMaskMap.at(index); // Check if defined at index
+    // } catch (const std::out_of_range& e) {
+    //     fnOutputDebug(std::to_string(index) + "= error plotLineSetPixel: " + std::to_string(nx) + " // " + std::to_string(ny));
+    // }
+
     // polygonMaskMap[(INT64)ny * width + nx] = 1;
     // dumbFillPixel(nx, ny, 255, 255, 0, imageData, Stride, bpp, width, height);
 }
@@ -484,7 +493,7 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1,
     }
 
     fill(polygonMaskMap.begin(), polygonMaskMap.end(), 0);
-    fnOutputDebug("polygonMaskMap refilled to zero ; size = " + std::to_string(s));
+    fnOutputDebug("polygonMaskMap refilled to zero ; size = " + std::to_string(s) + "|" + std::to_string(polyW) + " x " + std::to_string(polyH) + "|" + std::to_string(polyX) + " x " + std::to_string(polyY));
 
     int boundMaxX = 0;
     int boundMaxY = 0;
@@ -544,7 +553,7 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1,
         bresenham_line_algo(w, h, xa, ya, xb, yb);
         int maxu = (max(ya, yb) >= ppy2) ? ppy2 - 1 : max(ya, yb);
         int minu = (min(ya, yb) <= ppy1) ? ppy1 : min(ya, yb);
-        for (int yy = minu; yy <= max(maxu, h); yy++)
+        for (int yy = minu; yy <= maxu; yy++)
         {
             if (polygonMapMin[yy]!=INT_MAX)
                polygonMapEdges[yy].emplace( polygonMapMin[yy] );
@@ -561,9 +570,15 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1,
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int y = 0; y < h; ++y)
     {
-        if (polygonMapEdges[y].empty() || y<=ppy1 || y>=ppy2)
+        if (polygonMapEdges[y].empty())
         {
            // fnOutputDebug("empty Y=" + std::to_string(y));
+           continue;
+        }
+
+        if (y<=ppy1 || y>=ppy2)
+        {
+           // fnOutputDebug("out of ppy range; Y=" + std::to_string(y));
            continue;
         }
 
@@ -588,9 +603,15 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1,
         {
              INT64 xa = listu[i];
              INT64 xb = listu[i + 1];
-             if (xb==xa || max(xa,xb)<ppx1 || min(xa,xb)>=ppx2)
+             if (xb==xa)
              {
                 // fnOutputDebug("skipped identical xa/xb, Y=" + std::to_string(y));
+                continue;
+             }
+
+             if (max(xa,xb)<ppx1 || min(xa,xb)>=ppx2)
+             {
+                // fnOutputDebug("xa/xb out of ppx range; skipped Y=" + std::to_string(y));
                 continue;
              }
 
@@ -612,7 +633,11 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1,
              for (INT64 x = xa; x <= xb; x++)
              {
                   if (x<=ppx1 || x>=ppx2)
+                  {
+                     // if (x>=ppx2)
+                     //    fnOutputDebug("x out of ppx range; x=" + std::to_string(x));
                      continue;
+                  }
 
                   // if (x==xa || x==xb)
                   //    dumbFillPixel(x, y, 255, 0, 255, imageData, Stride, bpp, w, h);
@@ -640,6 +665,13 @@ DLL_API int DLL_CALLCONV discardFilledPolygonCache(int m) {
     polygonMaskMap.clear();
     polygonMaskMap.shrink_to_fit();
     return 1;
+}
+
+DLL_API int DLL_CALLCONV testFilledPolygonCache(int m) {
+    int r = 1;
+    if (polygonMaskMap.size()<2000 || polygonMapMin.size()<100)
+       r = 0;
+    return r;
 }
 
 bool clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
@@ -1598,8 +1630,10 @@ DLL_API int DLL_CALLCONV prepareSelectionArea(int x1, int y1, int x2, int y2, in
     if (polygonMaskMap.size()<2000 || polygonMapMin.size()<100)
        useCache = 0;
 
-    if (mode==2 && PointsList!=NULL && useCache!=1)
+    if (mode==2 && PointsList!=NULL && useCache!=1 && polyW>1 && polyH>1)
        FillMaskPolygon(w, h, PointsList, PointsCount, ppx1, ppy1, ppx2, ppy2);
+    else if (mode==2)
+       EllipseSelectMode = 0;
 
     return 1;
 }
