@@ -12825,20 +12825,30 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
    {
       ppx1 := ppo[1], ppy1 := ppo[2]
       ppx2 := ppo[3], ppy2 := ppo[4]
+      ppofYa := ppofYb := 0
    } else if (ppo=1)
    {
       trGdip_GetImageDimensions(useGdiBitmap(), zkw, zkh)
       ppx1 := (imgSelX1<0) ? abs(x1) : 0
-      ppy1 := (imgSelY1<0) ? abs(y1) : 0
-      ppx2 := (imgSelX2>zkw) ? zkw - imgSelX1 - ppx1 : x2
-      ppy2 := (imgSelY2>zkh) ? zkh - imgSelY1 - ppy1 : y2
-      If (imgSelX1<0)
+      ppy1 := (imgSelY1<0) ? abs(imgSelY1) : 0
+      ppx2 := (imgSelX2>zkw) ? zkw - imgSelX1 - ppx1 : imgSelX2 - imgSelX1
+      ppy2 := (imgSelY2>zkh) ? zkh - imgSelY1 - ppy1 : imgSelY2 - imgSelY1
+      If (imgSelX1<0 && imgSelX2>zkw)
          ppx2 += abs(x1)
-      If (imgSelY1<0)
-         ppy2 += abs(y1)
+      ; If (imgSelY1<0)
+      ;    ppy2 += abs(y1)
+      ppofYa := (imgSelY1<0) ? abs(imgSelY1) - 1 : 0
+      ppofYb := (imgSelY2>zkh) ? imgSelY2 - zkh : 0
+      y1 += ppofYb
+      If (imgSelY1<0 && imgSelY2>zkh)
+      {
+         y1 += abs(imgSelY1)
+         ppofYb += abs(imgSelY1)
+         ppy1 := 0
+      }
    } else
    {
-      ppx1 := ppy1 := 0
+      ppofYa := ppofYb := ppx1 := ppy1 := 0
       ppx2 := w
       ppy2 := h
    }
@@ -12846,11 +12856,11 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
    fnOutputDebug(ppo " mode=" mode "; useCache=" useCache)
    fnOutputDebug("xxxcoords = " x1 "|" y1 "|" x2 "|" y2)
    fnOutputDebug("selcoords = " imgSelX1 "|" imgSelY1 "|" imgSelX2 "|" imgSelY2)
-   fnOutputDebug("pppcoords = " ppx1 "|" ppy1 "|" ppx2 "|" ppy2)
+   fnOutputDebug("pppcoords = " ppx1 "|" ppy1 "|" ppx2 "|" ppy2 "||" ppx2 - ppx1 "//" ppy2 - ppy1)
    ; ToolTip, % Round(innerSelectionCavityX, 2) "|" Round(innerSelectionCavityY, 2) "|" Round(exclusion, 2) , , , 2
    ; ToolTip, % round(w/h, 2) "|" round(mod(rotation, 45), 2) "°|" w "|" h "`n"  rw "|" rh "`n" Round(xf, 2) "|" Round(yf, 2) , , , 2
    ; ToolTip, % round(xf, 2) "|" round(yf, 2) "|"  round(rotation, 2) "|" Round(exclusion, 2) , , , 2
-   r := DllCall(whichMainDLL "\prepareSelectionArea", "int", x1, "int", y1, "int", x2, "int", y2, "int", w, "int", h, "float", xf, "float", yf, "float", rotation, "int", mode, "int", doFlip, "float", exclusion, "int", invertArea, "UPtr", &PointsF, "int", PointsCount, "int", ppx1, "int", ppy1, "int", ppx2, "int", ppy2, "int", useCache)
+   r := DllCall(whichMainDLL "\prepareSelectionArea", "int", x1, "int", y1, "int", x2, "int", y2, "int", w, "int", h, "float", xf, "float", yf, "float", rotation, "int", mode, "int", doFlip, "float", exclusion, "int", invertArea, "UPtr", &PointsF, "int", PointsCount, "int", ppx1, "int", ppy1, "int", ppx2, "int", ppy2, "int", useCache, "int", ppofYa, "int", ppofYb)
    PointsF := ""
    If (pPath!="")
       Gdip_DeletePath(pPath)
@@ -50309,6 +50319,7 @@ updateUIfillPanel(actionu:=0) {
        actu := (viewportQPVimage.imgHandle || FillAreaRemBGR=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
        GuiControl, % actu, txtLine1
        GuiControl, % actu, FillAreaGlassy
+       uiSlidersArray["userUIshapeCavity", 10] := (viewportQPVimage.imgHandle && FillAreaShape=7) ? 0 : 1
        uiSlidersArray["FillAreaBlurAmount", 10] := (viewportQPVimage.imgHandle || FillAreaRemBGR=1) ? 0 : 1
        If (coreDesiredPixFmt="0x21808")
           GuiControl, SettingsGUIA: Disable, FillAreaBlendMode

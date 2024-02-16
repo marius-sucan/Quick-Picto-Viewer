@@ -44,6 +44,8 @@ INT64 polyW = 0;
 INT64 polyH = 0;
 INT64 polyX = 0;
 INT64 polyY = 0;
+INT64 polyOffYa = 0;
+INT64 polyOffYb = 0;
 
 IWICBitmapDecoder      *pWICclassDecoder;
 IWICBitmapFrameDecode  *pWICclassFrameDecoded;

@@ -363,7 +363,6 @@ void plotLineSetPixel(int width, int height, int nx, int ny) {
     // UINT64 index = (UINT64)(ny - polyY) * polyW + (nx - polyX);
     polygonMaskMap[(UINT64)(ny - polyY) * polyW + (nx - polyX)] = 1;
 
-
     // try {
     //     int value = polygonMaskMap.at(index); // Check if defined at index
     // } catch (const std::out_of_range& e) {
@@ -502,7 +501,7 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1,
     for ( int i = 0; i < PointsCount*2; i+=2)
     {
         PointsList[i] = clamp(round(PointsList[i]), 0.0f, (float)w);
-        PointsList[i + 1] = clamp(round(PointsList[i + 1]), 0.0f, (float)h);
+        PointsList[i + 1] = clamp(round(PointsList[i + 1]) + polyOffYa - polyOffYb, 0.0f, (float)h);
         boundMaxX = max(PointsList[i], boundMaxX);
         boundMaxY = max(PointsList[i + 1], boundMaxY);
         boundMinX = min(PointsList[i], boundMinX);
@@ -537,8 +536,8 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1,
            xb = PointsList[0];
            yb = PointsList[1];
         }
+
         pts++;
-        
         if (max(ya, yb)<ppy1 || min(ya, yb)>ppy2)
         // if (max(ya, yb)<ppy1 || min(ya, yb)>ppy2 || min(xa, xb)>ppx2 && polygonMapMin[ya]!=INT_MAX && polygonMapMin[yb]!=INT_MAX)
         // if ((max(xa, xb)<ppx1 || max(ya, yb)<ppy1) || (min(xa, xb)>ppx2 || min(ya, yb)>ppy2))
@@ -594,7 +593,7 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1,
         // fnOutputDebug(std::to_string(h) + "=h ; " + std::to_string(listu.size()) + " list size Y=" + std::to_string(y));
         if (listu.size()==1)
         {
-           fnOutputDebug(" one element list at Y=" + std::to_string(y));
+           // fnOutputDebug(" one element list at Y=" + std::to_string(y));
            continue;
         }
 
@@ -700,7 +699,7 @@ bool clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
        }
     } else
     {
-       if (!inRange(imgSelX1, imgSelX2, x) || !inRange(imgSelY1, imgSelY2, y))
+       if (!inRange(imgSelX1, imgSelX2, x) || !inRange(imgSelY1 - polyOffYa, imgSelY2, y))
           return 1;
 
        if (maskBitmap!=NULL)
@@ -711,8 +710,10 @@ bool clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
        } else if (EllipseSelectMode==2)
        {
           bool r = 1;
-          if (inRange(0, polyH - 1, y - imgSelY1 - polyY) && inRange(0, polyW - 1, x - imgSelX1 - polyX))
-             r = (polygonMaskMap[(INT64)(y - imgSelY1 - polyY) * polyW + x - imgSelX1 - polyX]) ? 0 : 1;
+          if (inRange(0, polyH - 1, y - imgSelY1 - polyY + polyOffYa) && inRange(0, polyW - 1, x - imgSelX1 - polyX))
+             r = (polygonMaskMap[(INT64)(y - imgSelY1 - polyY + polyOffYa) * polyW + x - imgSelX1 - polyX]) ? 0 : 1;
+
+           // fnOutputDebug("clipMaskFilter y=" + std::to_string(y - imgSelY1 - polyY + polyOffYa));
           return r;
        } else if (EllipseSelectMode==1 || EllipseSelectMode==0 && (vpSelRotation!=0 || excludeSelectScale!=0))
        {
@@ -1601,7 +1602,7 @@ int clrBrushMixColors(int colorB, float *colorA, float f, int blendMode, int lin
   return (aT << 24) | ((rT & 0xFF) << 16) | ((gT & 0xFF) << 8) | (bT & 0xFF);
 }
 
-DLL_API int DLL_CALLCONV prepareSelectionArea(int x1, int y1, int x2, int y2, int w, int h, float xf, float yf, float angle, int mode, int flip, float exclusion, int invertArea, float* PointsList, int PointsCount, int ppx1, int ppy1, int ppx2, int ppy2, int useCache) {
+DLL_API int DLL_CALLCONV prepareSelectionArea(int x1, int y1, int x2, int y2, int w, int h, float xf, float yf, float angle, int mode, int flip, float exclusion, int invertArea, float* PointsList, int PointsCount, int ppx1, int ppy1, int ppx2, int ppy2, int useCache, int ppofYa, int ppofYb) {
     imgSelX1 = x1;
     imgSelY1 = y1;
     imgSelX2 = x2;
@@ -1623,16 +1624,18 @@ DLL_API int DLL_CALLCONV prepareSelectionArea(int x1, int y1, int x2, int y2, in
     vpSelRotation = (angle * M_PI) / 180.0f; // convert to radians
     cosVPselRotation = cos(vpSelRotation);
     sinVPselRotation = sin(vpSelRotation);
-    polyW = ppx2 - ppx1;
-    polyH = ppy2 - ppy1;
     polyX = ppx1;
     polyY = ppy1;
+    polyW = ppx2 - ppx1;
+    polyH = ppy2 - ppy1;
+    polyOffYa = ppofYa;
+    polyOffYb = ppofYb;
     if (polygonMaskMap.size()<2000 || polygonMapMin.size()<100)
        useCache = 0;
 
     if (mode==2 && PointsList!=NULL && useCache!=1 && polyW>1 && polyH>1)
        FillMaskPolygon(w, h, PointsList, PointsCount, ppx1, ppy1, ppx2, ppy2);
-    else if (mode==2)
+    else if (mode==2 && useCache!=1)
        EllipseSelectMode = 0;
 
     return 1;
