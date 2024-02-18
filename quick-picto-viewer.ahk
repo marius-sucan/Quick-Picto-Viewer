@@ -2278,7 +2278,7 @@ initQPVmainDLL(modus:=0) {
    If !dupesDCTcoeffsInit
       addJournalEntry("ERROR: Failed to initialize DCT coefficients required for identifying image duplicates. This feature will not work.")
 
-   WICmoduleHasInit := DllCall(whichMainDLL "\initWICnow", "int", 1, "int", 0)
+   WICmoduleHasInit := DllCall(whichMainDLL "\initWICnow", "int", debugModa, "int", 0)
    ; MsgBox, % r "=" WICmoduleHasInit
    If WICmoduleHasInit
    {
@@ -6029,7 +6029,7 @@ VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, angleu, isAngleu, mainWidt
         Return ImgSelPath
      }
 
-     thisState := "a" imgSelW imgSelH angleu isAngleu EllipseSelectMode VPselRotation innerSelectionCavityX innerSelectionCavityY customShapePoints bezierSplineCustomShape FillAreaCurveTension doImgEditLivePreview AnyWindowOpen advancedShape FillAreaShape rotateSelBoundsKeepRatio closedLineCustomShape
+     thisState := "a" imgSelW imgSelH angleu isAngleu EllipseSelectMode VPselRotation innerSelectionCavityX innerSelectionCavityY customShapePoints bezierSplineCustomShape FillAreaCurveTension doImgEditLivePreview AnyWindowOpen advancedShape FillAreaShape rotateSelBoundsKeepRatio closedLineCustomShape FillAreaRectRoundness FillAreaEllipsePie FillAreaEllipseSection
      If (thisState=prevState && prevPath)
      {
         ; ToolTip, % "cached" , , , 2
@@ -10252,7 +10252,7 @@ decideNewVPzoomLevel(zl, key, dir, stepFactor) {
    trGdip_GetImageDimensions(useGdiBitmap(), W, H)
    mpx := Round((W * H)/1000000, 1)
    zl := (mpx>1000) ? clampInRange(zl, 0.005, 15) : clampInRange(zl, 0.005, 20)
-   If (mpx>2500 && zl > 10)
+   If (mpx>4500 && zl > 10)
       zl := 10
 
    Return zl 
@@ -12664,7 +12664,7 @@ livePreviewPrepareSelectionArea(objSel, invertArea, shapeMode) {
    zy := (tY<0) ? abs(tY) : 0
    bzx := clampInRange(zx + objSel.mainW, 0, txb)
    bzy := clampInRange(zy + objSel.mainH, 0, tyb)
-   ppo := [zx, zy, bzx, bzy]
+   ppo := [zx, zy, bzx, bzy, 1]
    If (invertArea=1)
    {
       tx := objSel.sx + px
@@ -12690,6 +12690,7 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
 
    If (editingSelectionNow!=1)
    {
+      lastState :=""
       r := DllCall(whichMainDLL "\prepareSelectionArea", "int", x1, "int", y1, "int", x2, "int", y2, "int", w, "int", h,  "float", 1, "float", 1, "float", 0, "int", 0, "int", 0, "float", 0, "int", 0)
       Return
    }
@@ -12703,6 +12704,7 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
    PointsCount := PointsF := useCache := 0
    if ((mode=0 || mode=1) && rotation!=0)
    {
+      lastState :=""
       If (mode=1)
       {
          pPath := createImgSelPath(0, 0, w, h, 1, rotation, rotateSelBoundsKeepRatio, 0, 2, 0, 0, 0, 0)
@@ -12784,21 +12786,35 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
       thisState := "a" selID x1 y1 x2 y2 w h mode rotation doFlip invertArea cavityX cavityY zpklo currentFileIndex getIDimage(currentFileIndex) AnyWindowOpen
       If (thisState!=lastState || rzu!=1)
       {
+         trGdip_GetImageDimensions(useGdiBitmap(), zkw, zkh)
+         sfs := (Round((zkw * zkh)/1000000, 1) > 5500) ? 0.5 : 0.7
+         zsf := ((w>zkw*sfs || h>zkh*sfs) && ppo[5]=1 && (bezierSplineCustomShape=1 || FillAreaCurveTension>1)) ? 1 : 0
+         mw := (zsf=1) ? zkw*sfs : w
+         mh := (zsf=1) ? zkh*sfs : h
          If (mode=3)
-            pPath := coreCreateFillAreaShape(0, 0, w, h, FillAreaShape, rotation, rotateSelBoundsKeepRatio, 2, 1)
+            pPath := coreCreateFillAreaShape(0, 0, mw, mh, FillAreaShape, rotation, rotateSelBoundsKeepRatio, 2, 0)
          Else
-            pPath := createImgSelPath(0, 0, w, h, 2, rotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY, 0)
+            pPath := createImgSelPath(0, 0, mw, mh, 2, rotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY, 0)
 
          if (doFlip!=1)
          {
             pMatrix := Gdip_CreateMatrix()
             Gdip_ScaleMatrix(pMatrix, 1, -1)
-            Gdip_TranslateMatrix(pMatrix, 0, -h)
+            Gdip_TranslateMatrix(pMatrix, 0, -mh)
             E := Gdip_TransformPath(pPath, pMatrix)
             Gdip_DeleteMatrix(pMatrix)
          }
+
          If (bezierSplineCustomShape=1 || FillAreaCurveTension>1)
             Gdip_FlattenPath(pPath, 0.1)
+
+         If (zsf=1)
+         {
+            pMatrix := Gdip_CreateMatrix()
+            Gdip_ScaleMatrix(pMatrix, w/mw, h/mh)
+            Gdip_TransformPath(pPath, pMatrix)
+            Gdip_DeleteMatrix(pMatrix)
+         }
 
          PointsCount := Gdip_GetPathPointsCount(pPath)
          VarSetCapacity(PointsF, 8 * (PointsCount + 1), 0)
@@ -12816,7 +12832,7 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
 
    cavityX := (cavityX="a") ? innerSelectionCavityX : cavityX
    cavityY := (cavityY="a") ? innerSelectionCavityY : cavityY
-   If (cavityX=0 && cavityY=0)
+   If (cavityX=0 && cavityY=0 || mode>=2)
       exclusion := 0
    Else
       exclusion := 0.995 - ( 1 -  (cavityX + cavityY)/2 ) / 2
@@ -12835,8 +12851,7 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
       ppy2 := (imgSelY2>zkh) ? zkh - imgSelY1 - ppy1 : imgSelY2 - imgSelY1
       If (imgSelX1<0 && imgSelX2>zkw)
          ppx2 += abs(x1)
-      ; If (imgSelY1<0)
-      ;    ppy2 += abs(y1)
+
       ppofYa := (imgSelY1<0) ? abs(imgSelY1) - 1 : 0
       ppofYb := (imgSelY2>zkh) ? imgSelY2 - zkh : 0
       y1 += ppofYb
@@ -12853,10 +12868,10 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
       ppy2 := h
    }
 
-   fnOutputDebug(ppo " mode=" mode "; useCache=" useCache)
-   fnOutputDebug("xxxcoords = " x1 "|" y1 "|" x2 "|" y2)
-   fnOutputDebug("selcoords = " imgSelX1 "|" imgSelY1 "|" imgSelX2 "|" imgSelY2)
-   fnOutputDebug("pppcoords = " ppx1 "|" ppy1 "|" ppx2 "|" ppy2 "||" ppx2 - ppx1 "//" ppy2 - ppy1)
+   ; fnOutputDebug(ppo " mode=" mode "; useCache=" useCache)
+   ; fnOutputDebug("xxxcoords = " x1 "|" y1 "|" x2 "|" y2)
+   ; fnOutputDebug("selcoords = " imgSelX1 "|" imgSelY1 "|" imgSelX2 "|" imgSelY2)
+   ; fnOutputDebug("pppcoords = " ppx1 "|" ppy1 "|" ppx2 "|" ppy2 "||" ppx2 - ppx1 "//" ppy2 - ppy1)
    ; ToolTip, % Round(innerSelectionCavityX, 2) "|" Round(innerSelectionCavityY, 2) "|" Round(exclusion, 2) , , , 2
    ; ToolTip, % round(w/h, 2) "|" round(mod(rotation, 45), 2) "°|" w "|" h "`n"  rw "|" rh "`n" Round(xf, 2) "|" Round(yf, 2) , , , 2
    ; ToolTip, % round(xf, 2) "|" round(yf, 2) "|"  round(rotation, 2) "|" Round(exclusion, 2) , , , 2
@@ -13976,10 +13991,12 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
           o_bgrBMP := resizeBitmapToGivenRef(o_bgrBMP, 0, ResizedW, ResizedH, thisImgQuality)
           ; trGdip_GetImageDimensions(o_bgrBMP, kw, kh)
           ; trGdip_GetImageDimensions(thisBMP, mw, mh)
-          ; ToolTip, % kw "|" kh "`n" mw "|" mh "`n" ResizedW "|" ResizedH , , , 2
           thisOpacity := (PasteInPlaceOpacity>255) ? 0 : 255 - PasteInPlaceOpacity
-          QPV_MergeBitmapsWithMask(thisBMP, o_bgrBMP, 0, 0, thisOpacity)
-          r1 := trGdip_DrawImage(A_ThisFunc, G2, thisBMP, imgSelPx, imgSelPy)
+          ; r1 := QPV_MergeBitmapsWithMask(thisBMP, o_bgrBMP, 0, 0, thisOpacity)
+          ; ToolTip, % r1 "|" kw "|" kh "`n" mw "|" mh "`n" ResizedW "|" ResizedH , , , 2
+          r1 := trGdip_DrawImage(A_ThisFunc, G2, o_bgrBMP, imgSelPx, imgSelPy)
+          thisOpacity := (PasteInPlaceOpacity>255) ? 1 : PasteInPlaceOpacity/255
+          r1 := trGdip_DrawImage(A_ThisFunc, G2, thisBMP, imgSelPx, imgSelPy,,,,,,, thisOpacity)
           trGdip_DisposeImage(thisBMP)
           hasPainted := 1
        } Else If validBMP(o_bgrBMP)
@@ -16603,11 +16620,6 @@ livePreviewHugeImageFillSelArea() {
             addJournalEntry(A_ThisFunc "(): Failed to generate the gradient bitmap for live preview.")
       }
 
-      ; modus := (FillAreaInverted=1) ? 4 : 0
-      ; If (FillAreaShape!=1 && FillAreaShape!=3 || FillAreaInverted=1 && imgSelOutViewPort!=1)
-      ; If (FillAreaInverted=1 && imgSelOutViewPort!=1)
-      ;    Gdip_SetClipPath(2NDglPG, pPath, modus)
-
       newColor := "0xFF" FillAreaColor
       thisOpacity := FillAreaOpacity
       eraser := (FillAreaRemBGR=1 && FillAreaDoBehind=0) ? -1 : 0
@@ -16630,6 +16642,9 @@ livePreviewHugeImageFillSelArea() {
          Gdip_UnlockBits(gradientsBMP, gData)
          trGdip_DisposeImage(gradientsBMP)
       }
+
+      If ((currIMGdetails.HasAlpha=1 || bpp=32) && !thisBrush)
+         Gdip_FillRectangle(2NDglPG, pBrushHatchLow, imgSelPx, imgSelPy, imgW, imgH)
 
       userImgAdjustHiPrecision := 1
       userImgAdjustNoClamp := (PasteInPlaceLight>1 && PasteInPlaceGamma<1) ? 1 : 0 
@@ -45368,7 +45383,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     Gui, Add, Checkbox, xs y+1 hp Checked%FillAreaInverted% vFillAreaInverted gupdateUIfillPanel, &Invert selection area
     Gui, Add, Text, xs y+10 hp +0x200 w%slideWid% +TabStop gBtnResetGlassFX vtxtLine1, Glass effect
     GuiAddDropDownList("x+1 w" slideWid - 27 " AltSubmit Choose" FillAreaGlassy " vFillAreaGlassy gupdateUIfillPanel", "Not activated|Weak|Mild|Moderate|Strong|Extreme", "Glass effect")
-    GuiAddCheckbox("x+1 yp hp w26 gupdateUIfillPanel Checked" FillAreaCutGlass " vFillAreaCutGlass", "Transparentize glass", "T",, "Transparentize glass based on`nthe opacity of the fill color[s]")
+    GuiAddCheckbox("x+1 yp hp w26 gupdateUIfillPanel Checked" FillAreaCutGlass " vFillAreaCutGlass", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
     Gui, Add, Text, xs y+7 w%sml% hp +TabStop gBtnResetBlendMode vtxtLine2, Blending mode
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIfillPanel")
     GuiAddDropDownList("x+1 w" slideWid " gupdateUIfillPanel AltSubmit Choose" FillAreaBlendMode " vFillAreaBlendMode", infoBlend "|" userBlendModesList, "Blending mode")
@@ -46358,7 +46373,6 @@ getClampedVPselToWindow(clampToImage, mainWidth, mainHeight, thisW, thisH, ByRef
 }
 
 livePreviewEraseArea() {
-   Critical, on
    If (doImgEditLivePreview!=1)
       Return
 
@@ -46385,8 +46399,7 @@ livePreviewEraseArea() {
 
    fnOutputDebug("redraw: " A_ThisFunc)
    ; sizu := (EraseAreaFader=1 && allowAlphaMasking=0) ? 10 : 4
-   thisuuby := GDIcreateCheckersBrush(4, 1)
-   thisub := GDIcreateCheckersBrush(10, 1, EraseAreaOpacity)
+   thisub := GDIcreateCheckersBrush(4, 1, EraseAreaOpacity)
    thisBrush := (EraseAreaFader=1 && allowAlphaMasking=0) ? thisub : GDIPbrushHatch
    thisOpacity := (EraseAreaFader=1) ? 255 - EraseAreaOpacity : 0
    thisBrush2 := (EraseAreaFader=1) ? thisub : GDIPbrushHatch
@@ -46444,13 +46457,9 @@ livePreviewEraseArea() {
    Gdip_DeletePath(pPath)
    Gdip_DeletePath(invertPath)
    If (blackBrush && blackBrush=thisub)
-   {
       Gdip_DeleteBrush(blackBrush)
-   } Else
-   {
+   Else
       Gdip_DeleteBrush(thisub)
-      Gdip_DeleteBrush(thisuuby)
-   }
 }
 
 livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
@@ -50319,7 +50328,7 @@ updateUIfillPanel(actionu:=0) {
        actu := (viewportQPVimage.imgHandle || FillAreaRemBGR=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
        GuiControl, % actu, txtLine1
        GuiControl, % actu, FillAreaGlassy
-       uiSlidersArray["userUIshapeCavity", 10] := (viewportQPVimage.imgHandle && FillAreaShape=7) ? 0 : 1
+       uiSlidersArray["userUIshapeCavity", 10] := (viewportQPVimage.imgHandle && !(FillAreaShape=1 || FillAreaShape=3)) ? 0 : 1
        uiSlidersArray["FillAreaBlurAmount", 10] := (viewportQPVimage.imgHandle || FillAreaRemBGR=1) ? 0 : 1
        If (coreDesiredPixFmt="0x21808")
           GuiControl, SettingsGUIA: Disable, FillAreaBlendMode
@@ -65105,13 +65114,38 @@ InitGDIpStuff() {
    ; Loop, 6
       ; r := Gdip_SetPenAlignment(pPen%A_Index%, 1)
    ; ToolTip, % "0x" rgb2bgr(WindowBgrColor) "`n" WindowBgrColor , , , 2
-   GDIbrushHatch := GDIcreateCheckersBrush(20, 0)
-   GDIPbrushHatch := GDIcreateCheckersBrush(10, 1)
+   ; GDIbrushHatch := GDIcreateCheckersBrush(20, 0)
+   ; GDIPbrushHatch := GDIcreateCheckersBrush(10, 1)
    Gdi_SetBgrColor(glHDC, "0x" rgb2bgr(WindowBgrColor))
-   pBrushHatchLow := Gdip_BrushCreateHatch("0xff999999", "0xff111111", 50)
+   pBrushHatchLow := Gdip_BrushCreateHatch("0xffeeEEee", "0xff111111", 50)
+   GDIPbrushHatch := Gdip_BrushCreateHatch("0xffeeEEee", "0xff111111", 50)
+   GDIbrushHatch := convertGDIPbrushGDI(pBrushHatchLow, 8)
    pBrushWinBGR := Gdip_BrushCreateSolid("0xFF" WindowBgrColor)
    GDIbrushWinBGR := Gdi_CreateSolidBrush("0x" rgb2bgr(WindowBgrColor))
    OSDwinFadedBrushBGR := Gdip_BrushCreateSolid("0xEE" OSDbgrColor)
+}
+
+convertGDIPbrushGDI(pBrush, size) {
+   pBitmap := trGdip_CreateBitmap(A_ThisFunc, size, size, coreDesiredPixFmt)
+   If !validBMP(pBitmap)
+      Return
+
+   Gu := Gdip_GraphicsFromImage(pBitmap)
+   Gdip_FillRectangle(Gu, pBrush, 0, 0, size, size)
+   Gdip_DeleteGraphics(Gu)
+   brushu := createGDIbrushPbitmap(pBitmap)
+   trGdip_DisposeImage(pBitmap, 1)
+   Return brushu
+}
+
+createGDIbrushPbitmap(pBitmap) {
+    hBitmap := trGdip_CreateHBITMAPFromBitmap(A_ThisFunc, pBitmap)
+    If StrLen(hBitmap)>1
+    {
+       gdiBrushu := Gdi_CreatePatternBrush(hBitmap)
+       Gdi_DeleteObject(hBitmap)
+       Return gdiBrushu
+    }
 }
 
 GDIcreateCheckersBrush(size, gdip, opacity:=255) {
@@ -65120,8 +65154,8 @@ GDIcreateCheckersBrush(size, gdip, opacity:=255) {
       Return
 
    pBr1 := Gdip_BrushCreateSolid("0x99ffFFff")
-   pBr2 := Gdip_BrushCreateSolid("0x99515151")
-   pBr3 := Gdip_BrushCreateHatch("0xff999999", "0xff111111", 50)
+   pBr2 := Gdip_BrushCreateSolid("0x99112111")
+   pBr3 := Gdip_BrushCreateHatch("0xffeeEEee", "0xff010101", 50)
 
    G := trGdip_GraphicsFromImage(A_ThisFunc, pBitmap)
    Gdip_FillRectangle(G, pBr3, 0, 0, size, size)
@@ -67571,16 +67605,6 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   }
   imgW := newW, imgH := newH
   ; msgbox, % a_thisfunc "=" totalFramesIndex
-}
-
-createGDIbrushPbitmap(pBitmap) {
-    hBitmap := trGdip_CreateHBITMAPFromBitmap(A_ThisFunc, pBitmap)
-    If StrLen(hBitmap)>1
-    {
-       gdiBrushu := Gdi_CreatePatternBrush(hBitmap)
-       Gdi_DeleteObject(hBitmap)
-       Return gdiBrushu
-    }
 }
 
 extractAmbientalTexture(abortImgLoad:=0) {

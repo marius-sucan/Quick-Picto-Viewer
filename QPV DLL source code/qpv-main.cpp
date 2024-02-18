@@ -54,9 +54,12 @@ using namespace std;
 using namespace cimg_library;
 #define DLL_API extern "C" __declspec(dllexport)
 #define DLL_CALLCONV __stdcall
-
+int debugInfos = 0;
 
 void fnOutputDebug(std::string input) {
+    if (debugInfos!=1)
+       return;
+
     std::stringstream ss;
     ss << "qpv: " << input;
     OutputDebugStringA(ss.str().data());
@@ -115,8 +118,8 @@ IWICImagingFactory *m_pIWICFactory;
 
 DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
     HRESULT hr = S_OK;
-    // to do - fix this; make it work on Windows 7 
-
+    // to-do to do - fix this; make it work on Windows 7 
+    debugInfos = modus;
     if (SUCCEEDED(hr))
     {
        hr = CoCreateInstance(CLSID_WICImagingFactory,
@@ -468,7 +471,7 @@ bool isPointInPolygon(INT64 pX, INT64 pY, float* PointsList, int PointsCount) {
 }
 
 void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1, int ppy1, int ppx2, int ppy2) {
-
+    // see comments for prepareSelectionArea()
     fnOutputDebug("FillMaskPolygon() invoked; PointsCount=" + std::to_string(PointsCount));
     INT64 s = (INT64)polyW * polyH + 2;
     if (s!=polygonMaskMap.size())
@@ -674,6 +677,7 @@ DLL_API int DLL_CALLCONV testFilledPolygonCache(int m) {
 }
 
 bool clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
+    // see comments for prepareSelectionArea()
     if (invertSelection==1)
     {
        if (inRange(imgSelX1, imgSelX2, x) && inRange(imgSelY1, imgSelY2, y))
@@ -1603,6 +1607,45 @@ int clrBrushMixColors(int colorB, float *colorA, float f, int blendMode, int lin
 }
 
 DLL_API int DLL_CALLCONV prepareSelectionArea(int x1, int y1, int x2, int y2, int w, int h, float xf, float yf, float angle, int mode, int flip, float exclusion, int invertArea, float* PointsList, int PointsCount, int ppx1, int ppy1, int ppx2, int ppy2, int useCache, int ppofYa, int ppofYb) {
+/*
+This function is called from AHK, from QPV_PrepareHugeImgSelectionArea().
+The AHK wrapper function calculates the coordinates this function receives.
+x1, y1, x2, y2, w, h   / these are the coordinates of the image selection area bounding box, within the image
+xf, yf                 / selection area scailing factors on X and Y used when the selection area is rotated; with these scales, i can ensure that the viewport selection area in QPV created via GDI+ matches with the c++ results 
+angle                  / selection area rotation angle ; it applies for ellipses and rectangles only
+mode                   / the selection area shapes: 0 = rect; 1 = ellipse; 2 = freeform polygonal shape
+flip                   / FreeImage works with images flipped on Y; this parameter is used to accomodate this when using rotated ellipses and rectangles; otherwise it does not apply; freeform polygonal shapes are Y-flipped in QPV_PrepareHugeImgSelectionArea()
+exclusion              / used to create a cavity/hole in the selection area; eg. an ellipse can be turned into a torus; parameter does not apply to mode==2
+invertArea             / invert selection area
+PointsList             / a pointer to a freeform polygonal shape created with GDI+
+PointsCount            / number of points the vector shape has 
+ppx1, ppy1, ppx2, ppy2 / the coordinates of the subsection of the selection area bounding box intended to be drawn; it is used primarily when dealing with viewport live previews, but also when the selection area exceeds the image bounding box; with these coordinates i can avoid excessive memory usage and drastically reduce computations
+useCache               / relevant only for freeform polygonal shapes; if TRUE then polygonMaskMap will  be reused
+ppofYa, ppofYb         / Y offsets used to accomodate FreeImage's Y-flipped crap; only applies when using freeform polygonal selection area shapes
+
+How selection areas work:
+Almost any image editing tool in QPV will invoke QPV_PrepareHugeImgSelectionArea() which
+will call this function from the compiled DLL: prepareSelectionArea().
+
+Only the C++ image editing functions I wrote rely on this, eg, FillSelectArea().
+Such functions rely on clipMaskFilter() in the For loop that traverses the image 
+being edited. The function determines if any given pixel within the image bounds is to 
+be modified or not. It works with different types of selection areas or sources: rects,
+ellipses, polygonal shapes, and bitmaps.
+
+When (mode==2) a polygonal shape is used, FillMaskPolygon() is invoked by prepareSelectionArea().
+FillMaskPolygon() fills the polygonMaskMap boolean vector with 0/1 values. The vector is 
+sized according to the ppxy subsection coordinates in order to minimize memory usage.
+
+When clipMaskFilter() is called, it uses the polygonMaskMap vector precalculated data.
+
+If the selection area shape is set to be a rect or an ellipse, isInsideRectOval() is used
+to determine if the pixel is to be modified or not, in clipMaskFilter(). In this case, no 
+precalculated data is used.
+
+clipMaskFilter() can also rely on a bitmap, but it must be passed directly to it.
+*/
+
     imgSelX1 = x1;
     imgSelY1 = y1;
     imgSelX2 = x2;
