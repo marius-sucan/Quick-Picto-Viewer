@@ -8865,7 +8865,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       adjustSkewImg := adjustGradientOffset := adjustSelCavity := 0
       parametricWin := (dotActive=9 && AnyWindowOpen=30 && isVarEqualTo(DrawLineAreaBorderCenter, 4, 5, 6) && ctrlState!=1 && shiftState!=1 && userAllowsGradientRecentering=1) ? 1 : 0
       selLim := (viewportQPVimage.imgHandle) ? 9876543210 : 199000
-      If (isInRange(dotActive, 11, 14) && ctrlState!=1 && shiftState!=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
+      If (isInRange(dotActive, 11, 14) && ctrlState!=1 && shiftState!=1 && (AnyWindowOpen=31 || AnyWindowOpen=24) && !viewportQPVimage.imgHandle)
       {
          adjustSkewImg := 1
       } Else If (dotActive=9 && AnyWindowOpen=23 && ctrlState!=1 && shiftState!=1 && userAllowClrGradientRecenter=1)
@@ -12695,9 +12695,9 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
       Return
    }
 
-   If (mode=3 && FillAreaShape=1)
+   If (mode=3 && FillAreaShape=1 || mode=4 && PasteInPlaceCropSel=1)
       mode := 0
-   Else If (mode=3 && FillAreaShape=3)
+   Else If (mode=3 && FillAreaShape=3 || mode=4 && PasteInPlaceCropSel=3)
       mode := 1
 
    startZeit := A_TickCount
@@ -12791,7 +12791,9 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
          zsf := ((w>zkw*sfs || h>zkh*sfs) && ppo[5]=1 && (bezierSplineCustomShape=1 || FillAreaCurveTension>1)) ? 1 : 0
          mw := (zsf=1) ? zkw*sfs : w
          mh := (zsf=1) ? zkh*sfs : h
-         If (mode=3)
+         If (mode=4)
+            pPath := coreCreateFillAreaShape(0, 0, mw, mh, PasteInPlaceCropSel, rotation, rotateSelBoundsKeepRatio, 2, 0)
+         Else If (mode=3)
             pPath := coreCreateFillAreaShape(0, 0, mw, mh, FillAreaShape, rotation, rotateSelBoundsKeepRatio, 2, 0)
          Else
             pPath := createImgSelPath(0, 0, mw, mh, 2, rotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY, 0)
@@ -13863,11 +13865,11 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
           applyPersonalizedColorsBMP(clipBMP, 0, 0, PasteInPlaceApplyColorFX)
     }
 
-    trGdip_GetImageDimensions(clipBMP, oImgW, oImgH)
     capped := (viewportQPVimage.imgHandle) ? 0 : 1
+    trGdip_GetImageDimensions(clipBMP, oImgW, oImgH)
     PasteInPlaceCalcObjSize(previewMode, hasRotated, oImgW, oImgH, imgSelW, imgSelH, VPselRotation, capped, ResizedW, ResizedH)
-    Gdip_ResetClip(G2)
     vPobju := testSelectionLargerThanViewport()
+    Gdip_ResetClip(G2)
     If (previewMode=1)
        Gdip_SetClipRect(G2, 0, 0, mainWidth, mainHeight, 0)
 
@@ -13976,10 +13978,14 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
 
     If (PasteInPlaceCropDo=1 && PasteInPlaceCropAdaptImg=1)
     {
-       pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, ResizedW, ResizedH, PasteInPlaceCropSel, VPselRotation + praz, rotateSelBoundsKeepRatio)
+       allowCavity := (viewportQPVimage.imgHandle && !(PasteInPlaceCropSel=1 || PasteInPlaceCropSel=3)) ? 0 : 1
+       pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, ResizedW, ResizedH, PasteInPlaceCropSel, VPselRotation + praz, rotateSelBoundsKeepRatio, 2, allowCavity)
        If (allowPreviewThis=1)
           Gdip_SetClipPath(G2, pPath, 1)
     }
+
+    If (userimgGammaCorrect=1)
+       Gdip_SetCompositingQuality(G2, 2)
 
     hasPainted := 0
     If (allowPreviewThis=1 && previewMode=1)
@@ -13993,7 +13999,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
           ; trGdip_GetImageDimensions(thisBMP, mw, mh)
           thisOpacity := (PasteInPlaceOpacity>255) ? 0 : 255 - PasteInPlaceOpacity
           ; r1 := QPV_MergeBitmapsWithMask(thisBMP, o_bgrBMP, 0, 0, thisOpacity)
-          ; ToolTip, % r1 "|" kw "|" kh "`n" mw "|" mh "`n" ResizedW "|" ResizedH , , , 2
+          ; ToolTip, % "hmm="  "|" kw "|" kh "`n" mw "|" mh "`n" ResizedW "|" ResizedH , , , 2
           r1 := trGdip_DrawImage(A_ThisFunc, G2, o_bgrBMP, imgSelPx, imgSelPy)
           thisOpacity := (PasteInPlaceOpacity>255) ? 1 : PasteInPlaceOpacity/255
           r1 := trGdip_DrawImage(A_ThisFunc, G2, thisBMP, imgSelPx, imgSelPy,,,,,,, thisOpacity)
@@ -14001,7 +14007,6 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
           hasPainted := 1
        } Else If validBMP(o_bgrBMP)
           trGdip_DrawImage(A_ThisFunc, G2, o_bgrBMP, imgSelPx, imgSelPy, ResizedW, ResizedH)
-       Gdip_SetCompositingQuality(G2, 2)
     }
 
     setWindowTitle("Scaling image to selection area")
@@ -14012,6 +14017,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     prevPasteInPlaceVPcoords := [imgSelPx, imgSelPy, ResizedW, ResizedH, hasRotated]
     If (validBMP(thisBMP) && G2 && allowPreviewThis=1 && hasPainted=0)
     {
+       ; ToolTip, % validBMP(o_bgrBMP) " | " hasPainted  " opacity=" thisOpacity , , , 2
        r1 := trGdip_DrawImage(A_ThisFunc, G2, thisBMP, imgSelPx, imgSelPy, ResizedW, ResizedH, , , , , thisOpacity)
     } Else If (allowPreviewThis!=1 && previewMode=1)
     {
@@ -18818,6 +18824,9 @@ terminatePasteInPlace() {
 }
 
 HugeImagesApplyPasteInPlace() {
+; to-do; to do; possible optimization: if PasteInPlaceCropDo=1 and / or PasteInPlaceEraseInitial=1 and / or PasteInPlaceApplyColorFX=1
+; and PasteInPlaceCropSel=7 [vector polygonal shape] is used, do not recreate the clip mask by reinvoking 
+; QPV_PrepareHugeImgSelectionArea() in-between operations; keep the cache
       If warnHugeImageNotFIM()
       {
          terminatePasteInPlace()
@@ -18837,6 +18846,12 @@ HugeImagesApplyPasteInPlace() {
          Return
       }
 
+      If (PasteInPlaceCropDo!=1)
+      {
+         EllipseSelectMode := VPselRotation := PasteInPlaceCropAngular := innerSelectionCavityX := innerSelectionCavityY := 0
+         PasteInPlaceCropSel := 1
+      }
+
       friendly := (PasteInPlaceToolMode=1) ? "transform selected area" : "paste in place"
       trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
       vpWinClientSize(mainWidth, mainHeight)
@@ -18846,7 +18861,7 @@ HugeImagesApplyPasteInPlace() {
       prevEllipseSelectMode := EllipseSelectMode
       previnnerSelectionCavityX := innerSelectionCavityX
       previnnerSelectionCavityY := innerSelectionCavityY
-      
+
       x1 := clampInRange(prevImgSelX1, 0, imgW - 1)
       y1 := clampInRange(prevImgSelY1, 0, imgH - 1)
       x2 := clampInRange(prevImgSelX2, prevImgSelX1 + 1, imgW)
@@ -18959,6 +18974,7 @@ HugeImagesApplyPasteInPlace() {
          imgSelY1 := oldSelectionArea[2],            imgSelY2 := oldSelectionArea[4]
          defineRelativeSelCoords(imgW, imgH)
          r := HugeImagesApplyDesaturateFillSelArea("erase initially selected area", 0, 0, 0)
+         DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
       }
 
       rotateSelBoundsKeepRatio := prevrotateSelBoundsKeepRatio
@@ -19175,13 +19191,17 @@ HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0, wa
          doBehind := (fillTool=1) ? FillAreaDoBehind : 0
          thisInvert := (fillTool=1) ? FillAreaInverted : 0
          shapeu := (fillTool=1) ? 3 : EllipseSelectMode
+         thisRotation := (PasteInPlaceCropAngular>0) ? PasteInPlaceCropAngular : PasteInPlaceCropAngular + 360
+         thisRotation := (transformTool=1 && PasteInPlaceCropDo=1) ? thisRotation + VPselRotation : VPselRotation
+         If (transformTool=1 && PasteInPlaceCropDo=1)
+            shapeu := 4
          ; fnOutputDebug(A_ThisFunc ": " stride "|" pBitsAll "|" imgW "|" imgH "|" thisInvert "|" blending "|" eraser "|" doBehind "|" thisOpacity "|" newColor "|" gBpp "|" VPselRotation "|" EllipseSelectMode "`n" obju.imgZelW "|" obju.imgZelH "`n" tw "|" th "|" gStride)
          ; TulTip(1, " | ", obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, thisInvert)
          ; t := validBMP(obju.alphaMaskGray)
          ; fnOutputDebug(t "|" A_ThisFunc ": " obju.x1 "|" obju.y1 "|" obju.x2 "|" obju.y2 "|" obju.imgSelW "|" obju.imgSelH)
          showTOOLtip("Applying " modus "`nProcessing main bitmap, please wait", 1)
          recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, thisInvert)
-         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, shapeu, VPselRotation, 0, thisInvert, "a", "a", 1)
+         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, shapeu, thisRotation, 0, thisInvert, "a", "a", 1)
          thisKeepAlpha := (transformTool=1) ? BlendModesPreserveAlpha : FillAreaCutGlass
          r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", blending, "int", BlendModesFlipped, "UPtr", mScan, "int", mStride, "UPtr", gScan, "int", gStride, "int", gBpp, "int", doBehind, "int", opacityExtra, "int", thisKeepAlpha)
          If hFIFimgRealGradient
@@ -42349,7 +42369,7 @@ updateUIpastePanel(actionu:=0, b:=0) {
        uiSlidersArray["PasteInPlaceCropAngular", 10] := PasteInPlaceCropDo
        uiSlidersArray["FillAreaRectRoundness", 10] := PasteInPlaceCropDo
        uiSlidersArray["FillAreaEllipseSection", 10] := PasteInPlaceCropDo
-       uiSlidersArray["userUIshapeCavity", 10] := PasteInPlaceCropDo
+       uiSlidersArray["userUIshapeCavity", 10] :=  (viewportQPVimage.imgHandle && !(PasteInPlaceCropSel=1 || PasteInPlaceCropSel=3)) ? 0 : PasteInPlaceCropDo
 
        actu := (PasteInPlaceCropDo=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu, PasteInPlaceCropSel
@@ -43184,7 +43204,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0) {
 }
 
 BtnHelpTransform() {
-    msgBoxWrapper(appTitle ": HELP", "The transform panel hosts a multitude of functions: clone, crop, resize, skew, rotate, align images side by side, color adjust and/or blend images.`n`nClone image area. Once you have selected an area in the image and opened this panel, deselect «Erase initially selected area» found in the Main tab.`n`nRotate the image. Locate the dot in the center of the selection area with the mouse cursor in the viewport, and click 'n drag to adjust the rotation angle. Alternatively, set the object orientation angle found in the Main tab.`n`nCrop an image. Set the first drop-down found in the Main tab, to «Original image size», make the selection as small as you need it to be and set the alignment of the pivot (Main tab). Then go to the Crop tab and set to the preferences available: crop shape, angle and so on.`n`nAdjust colors and blend images. In the «Adjust colors» tab one can activate the colour adjustments check-box, adjust opacity and choose different blending modes.`n`nWhen alpha masking is activated and the tab pertaining to this is also activated, users can click 'n drag inside the selection area to adjust the mask's gradient center. To reset the position, press Alt+L-Click inside the selection area.", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "The transform panel hosts a multitude of functions: clone, crop, resize, skew, rotate, align images side by side, color adjust and/or blend images.`n`nClone image area. Select an image area and open this panel and make sure effects are applied by clicking on the Reset button.`n`nRotate the image. Locate the dot in the center of the selection area with the mouse cursor in the viewport, and click 'n drag to adjust the rotation angle. Alternatively, set the object orientation angle found in the Main tab.`n`nCrop an image. Set the first drop-down found in the Main tab, to «Original image size», make the selection as small as you need it to be and set the alignment of the pivot (Main tab). Then go to the Crop tab and set to the preferences available: crop shape, angle and so on.`n`nAdjust colors and blend images. In the «Adjust colors» tab one can activate the colour adjustments check-box, adjust opacity and choose different blending modes.`n`nWhen alpha masking is activated and the tab pertaining to this is also activated, users can click 'n drag inside the selection area to adjust the mask's gradient center. To reset the position, press Alt+L-Click inside the selection area.", -1, 0, 0)
 }
 
 MenuResetTransformToolPos() {
@@ -72806,12 +72826,13 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
               }
            } Else 
            {
-              GetMouseCoord2wind(PVhwnd, infoPosX, infoPosY)
-              infoPosX += imgHUDbaseUnit//3
-              infoPosY += imgHUDbaseUnit//3
-              If (FlipImgH=1)
-                 infoPosY := mainHeight - infoPosY
+              mouseu := 1
+              GetMouseCoord2wind(PVhwnd, oinfoPosX, oinfoPosY)
+              infoPosX := (FlipImgH=1) ? oinfoPosX - imgHUDbaseUnit//3 : oinfoPosX + imgHUDbaseUnit//3
+              infoPosY := (FlipImgV=1) ? oinfoPosY - imgHUDbaseUnit//3 : oinfoPosY + imgHUDbaseUnit//3
               If (FlipImgV=1)
+                 infoPosY := mainHeight - infoPosY
+              If (FlipImgH=1)
                  infoPosX := mainWidth - infoPosX
            }
 
@@ -72825,6 +72846,22 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
            infoBoxBMP := trGdip_DisposeImage(infoBoxBMP, 1)
         }
 
+        If (dotActive=10)
+        {
+           ; draw line tracking mouse when in rotation mode
+           If !mouseu
+           {
+              GetMouseCoord2wind(PVhwnd, infoPosX, infoPosY)
+              If (FlipImgV=1)
+                 infoPosY := mainHeight - infoPosY
+              If (FlipImgH=1)
+                 infoPosX := mainWidth - infoPosX
+           }
+
+           Gdip_DrawLine(2NDglPG, pPen3, imgSelPx + imgSelW//2, imgSelPy + imgSelH//2, infoPosX, infoPosY)
+           Gdip_DrawLine(2NDglPG, pPen4, imgSelPx + imgSelW//2, imgSelPy + imgSelH//2, infoPosX, infoPosY)
+        }
+ 
         If (showSelectionGrid=1 || imgSelLargerViewPort=1)
         {
            thisu := clampValuesToWindow(imgSelPx, imgSelPy, imgSelW, imgSelH, mainWidth, mainHeight)
