@@ -86,7 +86,7 @@ SetWinDelay, 1
 SetBatchLines, -1
 
 Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", pPen6 := "", unCompiledExePath := "", pBrushZ := ""
-   , glPG := "", glOBM := "", glHbitmap := "", glHDC := "", pPen1 := "", pPen1d, pPen2 := "", pPen3 := ""
+   , glPG := "", glOBM := "", glHbitmap := "", glHDC := "", pPen1 := "", pPen1d, pPen2 := "", pPen3 := "", pPen8 := ""
    , pBrushHatch := "", pBrushWinBGR := "", pBrushA := "", pBrushB := "", pBrushC := "", pBrushD := "", currentPixFmt := ""
    , pBrushE := "", pBrushHatchLow, hGuiTip := 1, hSetWinGui := 1, undoSelLevelsArray := [], QPVerrJournal := []
    , prevFullThumbsUpdate := 1, winGDIcreated := 0, ThumbsWinGDIcreated := 0, currentFilesListModified := 0
@@ -4324,7 +4324,7 @@ TrueCleanup() {
    Gdi_DeleteObject(gdiAmbientalTexBrush)
    Gdi_DeleteObject(GDIbrushWinBGR)
    Gdip_DeletePen(pPen1d)
-   Loop, 7
+   Loop, 8
       Gdip_DeletePen(pPen%A_Index%)
 
    mainGdipWinThumbsGrid(1)
@@ -5824,6 +5824,8 @@ applyIMGeditFunction() {
        GuiControl, SettingsGUIA: Enable, btnLiveApplyTool
        Return
     }
+    If (viewportQPVimage.imgHandle)
+       imgFxMode := 1
 
     If (AnyWindowOpen=24 || AnyWindowOpen=31)
        BtnPasteInSelectedArea()
@@ -6401,9 +6403,12 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
       kMenu("PVnav", "Disable", fr "[" indexu "] = X: " mX " Y: " mY, "dummy")
    } Else
    {
+      If (dontAddPoint!=1)
+         kMenu("PVnav", "Add", "Add new point", "MenuAddUnorderedVectorPoint")
       kMenu("PVnav", "Add", "X: " mX " Y: " mY, "dummy")
       kMenu("PVnav", "Disable", "X: " mX " Y: " mY, "dummy")
    }
+
    If (bezierSplineCustomShape=1)
       infoLine := "Bézier"
    Else If (FillAreaCurveTension=1)
@@ -7012,6 +7017,95 @@ MenuSelVectorPoint() {
   SetTimer, dummyRefreshImgSelectionWindow, -10
 }
 
+MenuAddUnorderedVectorPoint() {
+   lastOtherWinClose := 1
+   vpWinClientSize(mainWidth, mainHeight)
+   lastZeitFileSelect := A_TickCount
+   mX := lastUserRclickVPx, mY := lastUserRclickVPy
+
+   gmX := (FlipImgH=1) ? mainWidth - mX : mX
+   gmY := (FlipImgV=1) ? mainHeight - mY : mY
+   selu := oppoIndex := doSpecialAct := dontAddPoint := dotRemoved := 0
+   hasFoundDot := k := thisIndex := 0
+   totalCount := customShapePoints.Count()
+   canDoSymmetry := isNowSymmetricVectorShape()
+   listu := ""
+   kPoints := []
+   Loop, % totalCount
+   {
+       ; determine the closest vector point to the mouse click location: mx/my
+       getVPcoordsVectorPoint(A_Index, xu, yu)
+       If (bezierSplineCustomShape=1)
+          k := clampInRange(k + 1, 1, 3, 1)
+       Else 
+          k :=1
+
+       If (k=1)
+       {
+          thisIndex++
+          kPoints[thisIndex] := A_Index
+          distu := distanceBetweenTwoPoints(xu, yu, gmx, gmy)
+          listu .= distu "|" A_Index "|" thisIndex "`n"
+       }
+   }
+
+   Sort, listu, ND`n
+   listuArray := StrSplit(listu, "`n")
+   mainPoint := StrSplit(listuArray[1], "|")
+   startIndex := clampInRange(mainPoint[3] - 4, 1, mainPoint[2])
+
+   getVPcoordsVectorPoint(mainPoint[2], mxu, myu)
+   nextp := mainPoint[3] + 1
+   prevp := mainPoint[3] - 1
+   sl := imgHUDbaseUnit//3 
+   If (sl<8)
+      sl := 8
+
+   If prevp
+   {
+      getVPcoordsVectorPoint(kPoints[ mainPoint[3] - 1 ], pxu, pyu)
+      min_dist(mxu, pxu, sl)
+      min_dist(myu, pyu, sl)
+      rectprevp := isDotInRect(gmx, gmy, mxu, pxu, myu, pyu)
+Gdip_DrawLines(2NDglPG, pPen5, [mxu, myu, pxu, pyu])
+   }
+
+   If nextp
+   {
+      getVPcoordsVectorPoint(mainPoint[2], mxu, myu)
+      getVPcoordsVectorPoint(kPoints[ mainPoint[3] + 1 ], bxu, byu)
+      min_dist(mxu, bxu, sl)
+      min_dist(myu, byu, sl)
+      rectnextp := isDotInRect(gmx, gmy, mxu, bxu, myu, byu)
+Gdip_DrawLines(2NDglPG, pPen6, [mxu, myu, bxu, byu])
+   }
+
+doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+; Sleep, 2000
+SoundBeep 300, 1000
+
+   ; ToolTip, % mouseOutline "|" startIndex "|" mainPoint[2] "|" mainPoint[3] "|`n" rectprevp "|" rectnextp , , , 2
+   ; try Clipboard := mouseOutline "|" startIndex "|" mainPoint[2] "|" mainPoint[3] "|`n" listu
+   SetTimer, dummyRefreshImgSelectionWindow, -10
+}
+
+min_dist(ByRef va, ByRef vb, distu) {
+   If (d := abs(va - vb)<=distu)
+      Return
+
+   dp := distu - d
+   k := (dp//2 = dp/2) ? 0 : 1
+   If (va<vb)
+   {
+      va -= dp//2
+      vb += dp//2 + k
+   } Else
+   {
+      va += dp//2 + k
+      vb -= dp//2
+   }
+}
+
 MenuCollapseVectorPoint() {
   lastOtherWinClose := 1
   vpWinClientSize(mainWidth, mainHeight)
@@ -7125,7 +7219,7 @@ addNewVectorShapePoints(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, shi
 
    Critical, on
    Static lastIndex
-   If (mainParam="setStart") || (A_TickCount - lastOtherWinClose<250)
+   If ((mainParam="setStart") || (A_TickCount - lastOtherWinClose<250))
       Return lastIndex
 
    ; fnOutputDebug(A_ThisFunc "(): " lastIndex " | " mX "=" mY " || " mainParam)
@@ -12870,7 +12964,7 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
       ppy2 := h
    }
 
-   ; fnOutputDebug(ppo " mode=" mode "; useCache=" useCache)
+   fnOutputDebug(ppo " mode=" mode "; useCache=" useCache " | angle=" rotation " doFlip=" doFlip)
    ; fnOutputDebug("xxxcoords = " x1 "|" y1 "|" x2 "|" y2)
    ; fnOutputDebug("selcoords = " imgSelX1 "|" imgSelY1 "|" imgSelX2 "|" imgSelY2)
    ; fnOutputDebug("pppcoords = " ppx1 "|" ppy1 "|" ppx2 "|" ppy2 "||" ppx2 - ppx1 "//" ppy2 - ppy1)
@@ -13875,6 +13969,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
 
     mustClip := 0
     praz := (PasteInPlaceCropAngular>0) ? PasteInPlaceCropAngular : 360 + PasteInPlaceCropAngular
+    ; ToolTip, % praz "|" VPselRotation "|" praz + VPselRotation , , , 2
     If (PasteInPlaceCropDo=1 && PasteInPlaceCropAdaptImg=0 && !viewportQPVimage.imgHandle)
     {
        pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, PasteInPlaceCropSel, VPselRotation + praz, rotateSelBoundsKeepRatio)
@@ -14546,6 +14641,7 @@ recordSelUndoLevelNow() {
       currentSelUndoLevel := totalSelUndos + 1
       totalSelUndos++
    }
+
    undoSelLevelsArray := []
    undoSelLevelsArray := newArray.Clone()
    newArray := []
@@ -14852,11 +14948,12 @@ coreChangeImgUndoLevel(levelu) {
 
 ImgSelUndoAct(dummy:=0) {
    Critical, on
-   If (!validBMP(UserMemBMP) || thumbsDisplaying=1 || editingSelectionNow!=1 || liveDrawingBrushTool=1)
+   isOkay := (validBMP(UserMemBMP) || viewportQPVimage.imgHandle && viewportQPVimage.actions>0) ? 1 : 0
+   totalSelUndos := Round(undoSelLevelsArray.Count())
+   If (isOkay!=1 || totalSelUndos<1 || thumbsDisplaying=1 || editingSelectionNow!=1 || liveDrawingBrushTool=1)
       Return
 
-   totalSelUndos := Round(undoSelLevelsArray.Count())
-   If (StrLen(undoSelLevelsArray[currentSelUndoLevel - 1])<3 || imageLoading=1 || thumbsDisplaying=1)
+   If (StrLen(undoSelLevelsArray[currentSelUndoLevel - 1])<3 && totalSelUndos!=1 || imageLoading=1 || thumbsDisplaying=1)
    {
       showTOOLtip("Selection undo [ " currentSelUndoLevel " / " totalSelUndos " ]", 0, 0, currentSelUndoLevel/totalSelUndos)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
@@ -14875,11 +14972,12 @@ ImgSelUndoAct(dummy:=0) {
 
 ImgSelRedoAct(dummy:=0) {
    Critical, on
-   If (!validBMP(UserMemBMP) || thumbsDisplaying=1 || editingSelectionNow!=1 || liveDrawingBrushTool=1)
+   totalSelUndos := Round(undoSelLevelsArray.Count())
+   isOkay := (validBMP(UserMemBMP) || viewportQPVimage.imgHandle && viewportQPVimage.actions>0) ? 1 : 0
+   If (isOkay!=1 || totalSelUndos<1 || thumbsDisplaying=1 || editingSelectionNow!=1 || liveDrawingBrushTool=1)
       Return
 
-   totalSelUndos := Round(undoSelLevelsArray.Count())
-   If (StrLen(undoSelLevelsArray[currentSelUndoLevel + 1])<3 || imageLoading=1 || thumbsDisplaying=1)
+   If (StrLen(undoSelLevelsArray[currentSelUndoLevel + 1])<3 && totalSelUndos!=1 || imageLoading=1 || thumbsDisplaying=1)
    {
       showTOOLtip("Selection redo [ " currentSelUndoLevel " / " totalSelUndos " ]", 0, 0, currentSelUndoLevel/totalSelUndos)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
@@ -19001,6 +19099,9 @@ HugeImagesApplyPasteInPlace() {
          r := HugeImagesApplyDesaturateFillSelArea(friendly, 1, hFIFimgA, 0)
 
       terminatePasteInPlace()
+      If (!(PasteInPlaceCropSel=1 || PasteInPlaceCropSel=3) && PasteInPlaceCropDo=1)
+         innerSelectionCavityX := innerSelectionCavityY := 0
+
       DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
       If (r!=1)
          FreeImage_UnLoad(hFIFimgA)
@@ -19191,14 +19292,14 @@ HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0, wa
          doBehind := (fillTool=1) ? FillAreaDoBehind : 0
          thisInvert := (fillTool=1) ? FillAreaInverted : 0
          shapeu := (fillTool=1) ? 3 : EllipseSelectMode
-         thisRotation := (PasteInPlaceCropAngular>0) ? PasteInPlaceCropAngular : PasteInPlaceCropAngular + 360
-         thisRotation := (transformTool=1 && PasteInPlaceCropDo=1) ? thisRotation + VPselRotation : VPselRotation
+         ; thisRotation := (PasteInPlaceCropAngular>0) ? PasteInPlaceCropAngular : PasteInPlaceCropAngular + 360
+         thisRotation := VPselRotation ; (transformTool=1 && PasteInPlaceCropDo=1) ? thisRotation + VPselRotation : VPselRotation
          If (transformTool=1 && PasteInPlaceCropDo=1)
             shapeu := 4
          ; fnOutputDebug(A_ThisFunc ": " stride "|" pBitsAll "|" imgW "|" imgH "|" thisInvert "|" blending "|" eraser "|" doBehind "|" thisOpacity "|" newColor "|" gBpp "|" VPselRotation "|" EllipseSelectMode "`n" obju.imgZelW "|" obju.imgZelH "`n" tw "|" th "|" gStride)
          ; TulTip(1, " | ", obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, thisInvert)
          ; t := validBMP(obju.alphaMaskGray)
-         ; fnOutputDebug(t "|" A_ThisFunc ": " obju.x1 "|" obju.y1 "|" obju.x2 "|" obju.y2 "|" obju.imgSelW "|" obju.imgSelH)
+         ; fnOutputDebug(thisRotation "|" A_ThisFunc ": " obju.x1 "|" obju.y1 "|" obju.x2 "|" obju.y2 "|" obju.imgSelW "|" obju.imgSelH)
          showTOOLtip("Applying " modus "`nProcessing main bitmap, please wait", 1)
          recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, thisInvert)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, shapeu, thisRotation, 0, thisInvert, "a", "a", 1)
@@ -44149,6 +44250,7 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
         ToggleEditImgSelection("show-edit")
      }
 
+     Gdip_SetPenWidth(pPen8, SelDotsSize)
      RegAction(0, "FillAreaColor",, 3)
      RegAction(0, "FillBehindColor",, 3)
      RegAction(0, "FillAreaCurveTension",, 2, 1, 5)
@@ -58166,6 +58268,13 @@ MenuSearchPrevIndex() {
    searchNextIndex(-1)
 }
 
+testUndoImgSelections() {
+   totalSelUndos := Round(undoSelLevelsArray.Count())
+   isOkay := (validBMP(UserMemBMP) || viewportQPVimage.imgHandle && viewportQPVimage.actions>0) ? 1 : 0
+   r := ((undoLevelsRecorded>1 && undoLevelsRecorded!="" || isOkay=1) && totalSelUndos>0 && editingSelectionNow=1) ? 1 :
+   Return r
+}
+
 createMenuSelectionArea(modus:=0) {
    If (modus="DoubleClick")
    {
@@ -58174,7 +58283,7 @@ createMenuSelectionArea(modus:=0) {
    }
 
    infoImgEditingNow := isImgEditingNow()
-   If (undoLevelsRecorded>1 && undoLevelsRecorded!="" && infoImgEditingNow=1 && editingSelectionNow=1)
+   If (infoImgEditingNow=1 && testUndoImgSelections()=1)
    {
       friendly := (modus="DoubleClick") ? " selection" : ""
       f := (modus="DoubleClick") ? "" : " (selection area)"
@@ -58792,7 +58901,7 @@ InvokeMenuBarEditorSelection(manuID) {
    infoImgEditingNow := isImgEditingNow()
    kMenu("PVselv", "Add", "&Undo`tCtrl+Shift+Z", "ImgSelUndoAct")
    kMenu("PVselv", "Add", "&Redo`tCtrl+Shift+Y", "ImgSelRedoAct")
-   If !(undoLevelsRecorded>1 && undoLevelsRecorded!="" && infoImgEditingNow=1 && editingSelectionNow=1)
+   If !(infoImgEditingNow=1 && testUndoImgSelections()=1)
    {
       kMenu("PVselv", "Disable", "&Undo`tCtrl+Shift+Z")
       kMenu("PVselv", "Disable", "&Redo`tCtrl+Shift+Y")
@@ -58901,7 +59010,7 @@ InvokeMenuBarSelection(manuID) {
       infoImgEditingNow := isImgEditingNow()
       kMenu("pvMenuBarSelection", "Add", "&Undo`tCtrl+Shift+Z", "ImgSelUndoAct")
       kMenu("pvMenuBarSelection", "Add", "&Redo`tCtrl+Shift+Y", "ImgSelRedoAct")
-      If !(undoLevelsRecorded>1 && undoLevelsRecorded!="" && infoImgEditingNow=1 && editingSelectionNow=1)
+      If !(infoImgEditingNow=1 && testUndoImgSelections()=1)
       {
          kMenu("pvMenuBarSelection", "Disable", "&Undo`tCtrl+Shift+Z")
          kMenu("pvMenuBarSelection", "Disable", "&Redo`tCtrl+Shift+Y")
@@ -61028,7 +61137,7 @@ createMenuLiveEditSelectionArea(isToolGood, isWinCustomShapeFriendly) {
    }
 
    kMenu("PVselv", "Add", "&Reset selection area", "newImgSelection")
-   If (undoLevelsRecorded>1 && undoLevelsRecorded!="" && editingSelectionNow=1)
+   If testUndoImgSelections()
    {
       Menu, PVselv, Add
       kMenu("PVselv", "Add", "&Undo selection`tCtrl+Shift+Z", "ImgSelUndoAct")
@@ -65123,6 +65232,7 @@ InitGDIpStuff() {
    pPen5 := Gdip_CreatePen("0x880088FF", imgHUDbaseUnit//11.5)
    pPen6 := Gdip_CreatePen("0xDD998822", imgHUDbaseUnit//6)
    pPen7 := Gdip_CreatePen("0xDDFFeeFF", imgHUDbaseUnit//6)
+   pPen8 := Gdip_CreatePen("0xAAFFeeFF", imgHUDbaseUnit//6)
    Gdip_SetPenDashArray(pPen4, "0.5|0.5")
    pBrushA := Gdip_BrushCreateSolid("0x90898898")
    pBrushB := Gdip_BrushCreateSolid("0xBB898898")
@@ -71456,6 +71566,7 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
           Gdip_DrawPath(Gu, PenuDrawLive, thisPath)
        Else
           Gdip_FillPath(Gu, PenuDrawLive, thisPath)
+
        Gdip_DeletePath(thisPath)
     }
 
@@ -86955,6 +87066,9 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
     killToneMapImageCacheObj()
     If (imgEditPanelOpened=1)
     {
+       If (viewportQPVimage.imgHandle)
+          imgFxMode := 1
+
        If (VisibleQuickMenuSearchWin=1)
           closeQuickSearch()
        ; coreDesiredPixFmt := validBMP(UserMemBMP) ? "0x26200A" : "0xE200B" ; 32-ARGB // 32-PARGB
@@ -95152,6 +95266,5 @@ fnOutputDebug(PointsList)
          ; dummyTimerDelayiedImageDisplay(500)
          SoundBeep, 900, 100
          RemoveTooltip()
-
-
 }
+
