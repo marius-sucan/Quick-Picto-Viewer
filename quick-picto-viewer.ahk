@@ -7028,7 +7028,189 @@ MenuAddUnorderedVectorPoint() {
    selu := oppoIndex := doSpecialAct := dontAddPoint := dotRemoved := 0
    hasFoundDot := k := thisIndex := 0
    totalCount := customShapePoints.Count()
+   listu := ""
+   kPoints := []
+   Loop, % totalCount
+   {
+       ; determine the list of relevant points
+       getVPcoordsVectorPoint(A_Index, xu, yu)
+       k := (bezierSplineCustomShape=1) ? clampInRange(k + 1, 1, 3, 1) : 1
+       If (k=1)
+       {
+          thisIndex++
+          ; distu := distanceBetweenTwoPoints(xu, yu, gmx, gmy)
+          ; listu .= distu "|" A_Index "|" thisIndex "`n"
+          kPoints[thisIndex] := [A_Index, xu, yu, distu]
+       }
+   }
+
+   kPoints[thisIndex + 1] := kPoints[1].Clone()
+   kTotals := thisIndex
+   thisIndex := drects := 0
+   rectArraySizes := []
+   rectListuSizes := ""
+   sl := imgHUDbaseUnit/2.5
+   If (sl<8)
+      sl := 8
+
+   Loop, % kTotals + 1 ; whatever 
+   {
+       ; determine the smallest rect containing the mouse click location: gmx/gmy
+       xux := kPoints[thisIndex, 2],       yuy := kPoints[thisIndex, 3]
+       ; getVPcoordsVectorPoint(kPoints[thisIndex, 1], xux, yuy)
+       thisIndex++
+       If (thisIndex>kTotals)
+       {
+          xwx := kPoints[1, 2],       ywy := kPoints[1, 3]
+       } Else
+       {
+          xwx := kPoints[thisIndex, 2],       ywy := kPoints[thisIndex, 3]
+          ; getVPcoordsVectorPoint(kPoints[thisIndex, 1], xwx, ywy)
+       }
+
+       nx1 := min(xux, xwx)
+       ny1 := min(yuy, ywy)
+       nx2 := max(xux, xwx)
+       ny2 := max(yuy, ywy)
+       min_dist(nx1, nx2, sl)
+       min_dist(ny1, ny2, sl)
+       ww := abs(nx1 - nx2)
+       hh := abs(ny1 - ny2)
+       inn := isDotInRect(gmx, gmy, nx1, nx2, ny1, ny2)
+       ; Gdip_GraphicsClear(2NDglPG)
+       ; Gdip_FillRectangle(2NDglPG, pBrushB, nx1, ny1, ww, hh)
+       ; Gdip_FillRectangle(2NDglPG, pBrushB, xux - SelDotsSize, yuy - SelDotsSize, SelDotsSize*2, SelDotsSize*2)
+       ; Gdip_FillRectangle(2NDglPG, pBrushB, xwx - SelDotsSize, ywy - SelDotsSize, SelDotsSize*2, SelDotsSize*2)
+       ; Gdip_FillRectangle(2NDglPG, pBrushB, xux - SelDotsSize, yuy - SelDotsSize, SelDotsSize*2, SelDotsSize*2)
+       ; Gdip_FillRectangle(2NDglPG, pBrushB, xwx - SelDotsSize, ywy - SelDotsSize, SelDotsSize*2, SelDotsSize*2)
+       ; doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+       ; fnOutputDebug(A_Index "==" ww "|" hh "|" sl " | in rect=" inn)
+       shapeIndex := kPoints[thisIndex - 1, 1]
+       otherIndex := kPoints[thisIndex, 1]
+       distu := distanceBetweenTwoPoints(nx1 + ww//2, ny1 + hh//2, gmx, gmy)
+       listu .= distu "|" shapeIndex "|" otherIndex "`n"
+       ; Sleep, 100
+       If (inn=1)
+       {
+          drects++
+          area := Round(ww * hh, 4)
+          rectListuSizes .= area "|" drects "|" thisIndex - 1 "|" shapeIndex "|" otherIndex "`n"
+          rectSizes[drects] := [thisIndex - 1, ww, hh, area, shapeIndex, otherIndex]
+       }
+   }
+
+   Sort, rectListuSizes, ND`n
+   listuArray := StrSplit(rectListuSizes, "`n")
+   thisThick := InStr(postVectorWinOpen, "c") ? imgHUDbaseUnit/9.5 : DrawLineAreaContourThickness * zoomLevel
+   Gdip_SetPenWidth(pPen8, thisThick)
+   hasFoundDot := coreAddUnorderedVectorPoint(listuArray, totalCount, gmx, gmy, 1)
+   If (!hasFoundDot && (FillAreaCurveTension>1 || bezierSplineCustomShape=1))
+   {
+      Sort, listu, ND`n
+      listuArray := StrSplit(listu, "`n")
+      hasFoundDot := coreAddUnorderedVectorPoint(listuArray, totalCount, gmx, gmy, 2)
+      If hasFoundDot
+         mainPoint := StrSplit(listuArray[hasFoundDot], "|")
+
+      foundDot := hasFoundDot ? mainPoint[2] : 0
+      foundOtherDot := hasFoundDot ? mainPoint[3] : 0
+   } Else If hasFoundDot
+   {
+      mainPoint := StrSplit(listuArray[hasFoundDot], "|")
+      foundDot := hasFoundDot ? mainPoint[4] : 0
+      foundOtherDot := hasFoundDot ? mainPoint[5] : 0
+   }
+
+   oppoIndex := (canDoSymmetry=1) ? totalCount - foundDot + 1 : -1
    canDoSymmetry := isNowSymmetricVectorShape()
+   ; splitPointGivenInPath("n", totalCount, dotIndex, oppoIndex, canDoSymmetry, gmX, gmY)
+
+   ToolTip, % "dot=" foundDot "/" foundOtherDot " | o=" outline " rects=" drects " kTotals=" kTotals , , , 2
+   doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+   ; Sleep, 2000
+   ; SoundBeep 300, 1000
+
+   ; ToolTip, % mouseOutline "|" startIndex "|" mainPoint[2] "|" mainPoint[3] "|`n" rectprevp "|" rectnextp , , , 2
+   ; try Clipboard := rectListuSizes
+   SetTimer, dummyRefreshImgSelectionWindow, -10
+}
+
+coreAddUnorderedVectorPoint(listuArray, totalCount, gmx, gmy, mode) {
+   hasFoundDot := 0
+   Loop, 5
+   {
+      hasLooped := 0
+      PointsListArray := []
+      If !InStr(listuArray[A_Index], "|")
+         Continue
+
+      mainPoint := StrSplit(listuArray[A_Index], "|")
+      initialIndex := startIndex := (mode=1) ? mainPoint[4] : mainPoint[2]
+      mm := A_Index
+      Loop, 7
+      {
+           startIndex--
+           If (startIndex<0)
+           {
+              startIndex := totalCount
+              If (hasLooped=1)
+                 Break
+
+              hasLooped := 1
+           }
+      }
+
+      hasLooped := 0
+      Loop, 16
+      {
+            startIndex++
+            If (startIndex>totalCount)
+            {
+               startIndex -= totalCount
+               If (hasLooped=1)
+                  Break
+  
+               hasLooped := 1
+            }
+           
+            getVPcoordsVectorPoint(startIndex, xu, yu)
+            PointsListArray[A_Index*2 - 1] := xu
+            PointsListArray[A_Index*2] := yu
+            If (A_Index>1)
+            {
+               ; Gdip_GraphicsClear(2NDglPG)
+               thisPath := Gdip_CreatePath()
+               createPathVectorCustomShape(thisPath, PointsListArray, FillAreaCurveTension, 0, bezierSplineCustomShape, 0, 1, 0)
+               ; Gdip_DrawPath(2NDglPG, pPen6, thisPath)
+               outline := Gdip_IsOutlineVisiblePathPoint(2NDglPG, thisPath, pPen8, gmX, gmY)
+               If (outline=1 && hasFoundDot=0)
+               {
+                  hasFoundDot := mm
+                  Break
+               }
+
+               ; doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+               Gdip_DeletePath(thisPath)
+               ; Sleep, 25
+            }
+      }
+      If hasFoundDot
+         Break
+   }
+   Return hasFoundDot
+}
+
+oldMenuAddUnorderedVectorPoint() {
+   lastOtherWinClose := 1
+   vpWinClientSize(mainWidth, mainHeight)
+   lastZeitFileSelect := A_TickCount
+   mX := lastUserRclickVPx, mY := lastUserRclickVPy
+
+   gmX := (FlipImgH=1) ? mainWidth - mX : mX
+   gmY := (FlipImgV=1) ? mainHeight - mY : mY
+   selu := oppoIndex := doSpecialAct := dontAddPoint := dotRemoved := 0
+   hasFoundDot := k := thisIndex := 0
+   totalCount := customShapePoints.Count()
    listu := ""
    kPoints := []
    Loop, % totalCount
@@ -7038,7 +7220,7 @@ MenuAddUnorderedVectorPoint() {
        If (bezierSplineCustomShape=1)
           k := clampInRange(k + 1, 1, 3, 1)
        Else 
-          k :=1
+          k := 1
 
        If (k=1)
        {
@@ -7050,10 +7232,60 @@ MenuAddUnorderedVectorPoint() {
    }
 
    Sort, listu, ND`n
+   PointsListArray := []
    listuArray := StrSplit(listu, "`n")
-   mainPoint := StrSplit(listuArray[1], "|")
-   startIndex := clampInRange(mainPoint[3] - 4, 1, mainPoint[2])
+   Gdip_SetPenWidth(pPen8, imgHUDbaseUnit/2.5)
+   Loop, 3
+   {
+      PointsListArray := []
+      mainPoint := StrSplit(listuArray[A_Index], "|")
+      startIndex := mainPoint[2]
+      Loop, 7
+      {
+           startIndex--
+           If (startIndex<0)
+              startIndex := totalCount
+      }
 
+      Loop, 16
+      {
+            startIndex++
+            If (startIndex>totalCount)
+               startIndex -= totalCount
+           
+            getVPcoordsVectorPoint(startIndex, xu, yu)
+            PointsListArray[A_Index*2 - 1] := xu
+            PointsListArray[A_Index*2] := yu
+            If (A_Index>1)
+            {
+               Gdip_GraphicsClear(2NDglPG)
+               thisPath := Gdip_CreatePath()
+               createPathVectorCustomShape(thisPath, PointsListArray, FillAreaCurveTension, 0, bezierSplineCustomShape, 0, 1, 0)
+               Gdip_DrawPath(2NDglPG, pPen6, thisPath)
+               outline := Gdip_IsOutlineVisiblePathPoint(2NDglPG, thisPath, pPen8, gmX, gmY)
+               If (outline=1 && hasFoundDot=0)
+               {
+                  hasFoundDot := startIndex
+                  Break
+               }
+
+               doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+               Gdip_DeletePath(thisPath)
+               Sleep, 25
+            }
+      }
+      If hasFoundDot
+         Break
+   }
+
+   dotIndex := hasFoundDot
+   oppoIndex := (canDoSymmetry=1) ? totalCount - dotIndex + 1 : -1
+   canDoSymmetry := isNowSymmetricVectorShape()
+   ; splitPointGivenInPath("n", totalCount, dotIndex, oppoIndex, canDoSymmetry, gmX, gmY)
+
+      ToolTip, % hasFoundDot " o=" outline , , , 2
+
+/*
    getVPcoordsVectorPoint(mainPoint[2], mxu, myu)
    nextp := mainPoint[3] + 1
    prevp := mainPoint[3] - 1
@@ -7079,10 +7311,11 @@ Gdip_DrawLines(2NDglPG, pPen5, [mxu, myu, pxu, pyu])
       rectnextp := isDotInRect(gmx, gmy, mxu, bxu, myu, byu)
 Gdip_DrawLines(2NDglPG, pPen6, [mxu, myu, bxu, byu])
    }
+*/
 
 doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
 ; Sleep, 2000
-SoundBeep 300, 1000
+; SoundBeep 300, 1000
 
    ; ToolTip, % mouseOutline "|" startIndex "|" mainPoint[2] "|" mainPoint[3] "|`n" rectprevp "|" rectnextp , , , 2
    ; try Clipboard := mouseOutline "|" startIndex "|" mainPoint[2] "|" mainPoint[3] "|`n" listu
@@ -7090,7 +7323,8 @@ SoundBeep 300, 1000
 }
 
 min_dist(ByRef va, ByRef vb, distu) {
-   If (d := abs(va - vb)<=distu)
+   d := abs(va - vb)
+   If (d>=distu)
       Return
 
    dp := distu - d
@@ -7104,6 +7338,7 @@ min_dist(ByRef va, ByRef vb, distu) {
       va += dp//2 + k
       vb -= dp//2
    }
+   ;  fnOutputDebug(A_ThisFunc ": after = " va "|" vb "|d=" abs(va - vb))
 }
 
 MenuCollapseVectorPoint() {
@@ -71579,8 +71814,8 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
        {
           ; draw snap indicator
           Gdip_SetPenWidth(pPen1d, thisThick)
-          thisPx :=  (customShapeHasSelectedPoints=1) ? firstPx : lastPx
-          thisPy :=  (customShapeHasSelectedPoints=1) ? firstPy : lastPy
+          thisPx := (customShapeHasSelectedPoints=1) ? firstPx : lastPx
+          thisPy := (customShapeHasSelectedPoints=1) ? firstPy : lastPy
           Gdip_DrawLine(Gu, pPen1d, thisPx - sz, thisPy, thisPx + sz, thisPy)
           Gdip_DrawLine(Gu, pPen1d, thisPx, thisPy - sz, thisPx, thisPy + sz)
        }
@@ -71595,7 +71830,7 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
            ; draw the vector points
            xu := PointsListArray[A_Index*2 - 1], yu := PointsListArray[A_Index*2]
            k := (bezierSplineCustomShape=1) ? clampInRange(k + 1, 1, 3, 1) : 1
-           sl := (k=1) ? SelDotsSize : SelDotsSize//2 + 1
+           sl := (k=1) ? SelDotsSize : SelDotsSize//2 + 1   ; keys or anchors
            slz := sl//2 + 1
            j := 0
            If (k=1 && A_Index>1 && A_Index<totalz)
