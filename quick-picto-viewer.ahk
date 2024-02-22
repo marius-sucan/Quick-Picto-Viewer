@@ -7017,7 +7017,8 @@ MenuSelVectorPoint() {
   SetTimer, dummyRefreshImgSelectionWindow, -10
 }
 
-MenuAddUnorderedVectorPoint() {
+MenuAddUnorderedVectorPoint(zzx:=0, zzy:=0, mo:=0) {
+   startZeit := A_TickCount
    lastOtherWinClose := 1
    vpWinClientSize(mainWidth, mainHeight)
    lastZeitFileSelect := A_TickCount
@@ -7025,10 +7026,15 @@ MenuAddUnorderedVectorPoint() {
 
    gmX := (FlipImgH=1) ? mainWidth - mX : mX
    gmY := (FlipImgV=1) ? mainHeight - mY : mY
+   If (mo="given")
+   {
+      gmX := zzx,    gmY := zzy
+   }
+
    selu := oppoIndex := doSpecialAct := dontAddPoint := dotRemoved := 0
    hasFoundDot := k := thisIndex := 0
    totalCount := customShapePoints.Count()
-   listu := ""
+   listu := otherList := ""
    kPoints := []
    Loop, % totalCount
    {
@@ -7038,8 +7044,8 @@ MenuAddUnorderedVectorPoint() {
        If (k=1)
        {
           thisIndex++
-          ; distu := distanceBetweenTwoPoints(xu, yu, gmx, gmy)
-          ; listu .= distu "|" A_Index "|" thisIndex "`n"
+          distu := distanceBetweenTwoPoints(xu, yu, gmx, gmy)
+          otherList .= distu "|" A_Index "|" A_Index + 1 "|" thisIndex "`n"
           kPoints[thisIndex] := [A_Index, xu, yu, distu]
        }
    }
@@ -7101,8 +7107,7 @@ MenuAddUnorderedVectorPoint() {
 
    Sort, rectListuSizes, ND`n
    listuArray := StrSplit(rectListuSizes, "`n")
-   thisThick := InStr(postVectorWinOpen, "c") ? imgHUDbaseUnit/9.5 : DrawLineAreaContourThickness * zoomLevel
-   Gdip_SetPenWidth(pPen8, thisThick)
+   Gdip_SetPenWidth(pPen8, Gdip_GetPenWidth(PenuDrawLive) + 2)
    hasFoundDot := coreAddUnorderedVectorPoint(listuArray, totalCount, gmx, gmy, 1)
    If (!hasFoundDot && (FillAreaCurveTension>1 || bezierSplineCustomShape=1))
    {
@@ -7110,7 +7115,16 @@ MenuAddUnorderedVectorPoint() {
       listuArray := StrSplit(listu, "`n")
       hasFoundDot := coreAddUnorderedVectorPoint(listuArray, totalCount, gmx, gmy, 2)
       If hasFoundDot
+      {
          mainPoint := StrSplit(listuArray[hasFoundDot], "|")
+      } Else
+      {
+         Sort, otherList, ND`n
+         listuArray := StrSplit(otherList, "`n")
+         hasFoundDot := coreAddUnorderedVectorPoint(listuArray, totalCount, gmx, gmy, 3)
+         If hasFoundDot
+            mainPoint := StrSplit(listuArray[hasFoundDot], "|")
+      }
 
       foundDot := hasFoundDot ? mainPoint[2] : 0
       foundOtherDot := hasFoundDot ? mainPoint[3] : 0
@@ -7123,9 +7137,12 @@ MenuAddUnorderedVectorPoint() {
 
    oppoIndex := (canDoSymmetry=1) ? totalCount - foundDot + 1 : -1
    canDoSymmetry := isNowSymmetricVectorShape()
-   ; splitPointGivenInPath("n", totalCount, dotIndex, oppoIndex, canDoSymmetry, gmX, gmY)
+   If foundDot
+      pushAtGivenVectorPoint(foundDot + 1, gmX, gmY)
 
-   ToolTip, % "dot=" foundDot "/" foundOtherDot " | o=" outline " rects=" drects " kTotals=" kTotals , , , 2
+      ; splitPointGivenInPath(1, totalCount, foundDot, oppoIndex, canDoSymmetry, gmX, gmY)
+
+   ; ToolTip, % A_TickCount - startZeit " ms loops=" hasFoundDot "| dot=" foundDot "/" foundOtherDot " | o=" outline " rects=" drects " kTotals=" kTotals , , , 2
    doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
    ; Sleep, 2000
    ; SoundBeep 300, 1000
@@ -7137,17 +7154,24 @@ MenuAddUnorderedVectorPoint() {
 
 coreAddUnorderedVectorPoint(listuArray, totalCount, gmx, gmy, mode) {
    hasFoundDot := 0
-   Loop, 5
+   lpsA := (bezierSplineCustomShape=1) ? 7 : 3
+   lpsB := (bezierSplineCustomShape=1) ? 16 : 7
+   lpz := (mode=3) ? 500 : 30
+   If (lpz>listuArray.Count())
+      lpz := listuArray.Count() + 1
+
+   Loop, % lpz
    {
-      hasLooped := 0
-      PointsListArray := []
       If !InStr(listuArray[A_Index], "|")
          Continue
 
+      hasLooped := 0
+      PointsListArray := []
       mainPoint := StrSplit(listuArray[A_Index], "|")
       initialIndex := startIndex := (mode=1) ? mainPoint[4] : mainPoint[2]
+      otherIndex := (mode=1) ? mainPoint[5] : mainPoint[3]
       mm := A_Index
-      Loop, 7
+      Loop, % lpsA
       {
            startIndex--
            If (startIndex<0)
@@ -7160,8 +7184,8 @@ coreAddUnorderedVectorPoint(listuArray, totalCount, gmx, gmy, mode) {
            }
       }
 
-      hasLooped := 0
-      Loop, 16
+      dotExists := hasLooped := 0
+      Loop, % lpsB
       {
             startIndex++
             If (startIndex>totalCount)
@@ -7176,26 +7200,28 @@ coreAddUnorderedVectorPoint(listuArray, totalCount, gmx, gmy, mode) {
             getVPcoordsVectorPoint(startIndex, xu, yu)
             PointsListArray[A_Index*2 - 1] := xu
             PointsListArray[A_Index*2] := yu
-            If (A_Index>1)
-            {
-               ; Gdip_GraphicsClear(2NDglPG)
-               thisPath := Gdip_CreatePath()
-               createPathVectorCustomShape(thisPath, PointsListArray, FillAreaCurveTension, 0, bezierSplineCustomShape, 0, 1, 0)
-               ; Gdip_DrawPath(2NDglPG, pPen6, thisPath)
-               outline := Gdip_IsOutlineVisiblePathPoint(2NDglPG, thisPath, pPen8, gmX, gmY)
-               If (outline=1 && hasFoundDot=0)
-               {
-                  hasFoundDot := mm
-                  Break
-               }
-
-               ; doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
-               Gdip_DeletePath(thisPath)
-               ; Sleep, 25
-            }
+            If (otherIndex=startIndex || initialIndex=startIndex)
+               dotExists := 1
       }
-      If hasFoundDot
+
+
+      thisPath := Gdip_CreatePath()
+      createPathVectorCustomShape(thisPath, PointsListArray, FillAreaCurveTension, 0, bezierSplineCustomShape, 0, 1, 0)
+      outline := Gdip_IsOutlineVisiblePathPoint(2NDglPG, thisPath, pPen8, gmX, gmY)
+      ; Sleep, 25
+      If (outline=1 && hasFoundDot=0 && dotExists=1)
+      {
+         Gdip_GraphicsClear(2NDglPG)
+         Gdip_DrawPath(2NDglPG, pPen8, thisPath)
+         doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+         Gdip_DeletePath(thisPath)
+         ; ToolTip, % mode "|" mm "|" A_Index , , , 2
+         SoundBeep 900, 100
+         Sleep, 350
+         hasFoundDot := mm
          Break
+      }
+      Gdip_DeletePath(thisPath)
    }
    Return hasFoundDot
 }
@@ -7629,7 +7655,8 @@ addNewVectorShapePoints(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, shi
          SetTimer, % fn, -20
       } Else If (hasSymmetry!=1 && shiftState=0 && bezierSplineCustomShape=0)
          SetTimer, addFluidPointsCustomShape, -200
-   }
+   } Else If (mainParam!="remClick" && mainParam!="rClick" && ctrlState=0 && altState=1 && shiftState=0 && !hasFoundDot)
+      MenuAddUnorderedVectorPoint(gmX, gmY, "given")
 
    If (preventUndoLevels!=1)
       recordVectorUndoLevels(customShapePoints.Clone(), initialDrawingStartCoords.Clone())
@@ -10107,7 +10134,7 @@ ToggleImgFX(dir:=0) {
         , curvesFX := {1:"Brightness (density)", 2:"Contrast", 3:"Highlights", 4:"Shadows", 5:"Midtones", 6:"White saturation", 7:"Black saturation"}
         , curvesChannels := {1:"Red", 2:"Green", 3:"Blue", 4:"All"}
 
-   If (A_TickCount - lastInvoked < 50) || (thumbsDisplaying=1 && showHUDnavIMG!=1)
+   If (A_TickCount - lastInvoked < 50) ; || (thumbsDisplaying=1 && showHUDnavIMG!=1)
       Return
 
    lastInvoked := A_TickCount
@@ -10127,6 +10154,15 @@ ToggleImgFX(dir:=0) {
          imgFxMode--
    }
 
+   If (thumbsDisplaying=1 && imgFxMode=8)
+   {
+      If (dir=1)
+         imgFxMode++
+      Else
+         imgFxMode--
+   }
+
+   ; ToolTip, % " l = " imgFxMode , , , 2
    imgFxMode := clampInRange(imgFxMode, 1, 10, 1)
    friendly := DefineFXmodes()
    If (imgFxMode=4)
@@ -44135,6 +44171,11 @@ stopDrawingShape(dummy:="") {
        closedLineCustomShape := vpFreeformShapeOffset[9]
        bezierSplineCustomShape := vpFreeformShapeOffset[10]
        customShapePoints := oldCustomShapePoints.Clone()
+       RegAction(1, "FillAreaCurveTension",, 2, 1, 5)
+       RegAction(1, "closedLineCustomShape",, 1)
+       decideCustomShapeStyle()
+       If (bezierSplineCustomShape=1)
+          closedLineCustomShape := 0
     } Else
     {
        prevVectorShapeSymmetryMode[1, 2] := CustomShapeSymmetry
@@ -65467,7 +65508,7 @@ InitGDIpStuff() {
    pPen5 := Gdip_CreatePen("0x880088FF", imgHUDbaseUnit//11.5)
    pPen6 := Gdip_CreatePen("0xDD998822", imgHUDbaseUnit//6)
    pPen7 := Gdip_CreatePen("0xDDFFeeFF", imgHUDbaseUnit//6)
-   pPen8 := Gdip_CreatePen("0xAAFFeeFF", imgHUDbaseUnit//6)
+   pPen8 := Gdip_CreatePen("0xAAaaAAaa", imgHUDbaseUnit//6)
    Gdip_SetPenDashArray(pPen4, "0.5|0.5")
    pBrushA := Gdip_BrushCreateSolid("0x90898898")
    pBrushB := Gdip_BrushCreateSolid("0xBB898898")
