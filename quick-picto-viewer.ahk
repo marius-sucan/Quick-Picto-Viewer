@@ -7082,18 +7082,100 @@ coreAddUnorderedVectorPointCurveMode(gmx, gmy, sl) {
       Return
 
 ToolTip, % " please wait " , , , 2
-   kPoints := new hashtable()
-   PointsListArray := []
+   ; kPoints := new hashtable()
+   ; PointsListArray := []
+   ; Loop, % totalCount
+   ; {
+   ;     getVPcoordsVectorPoint(A_Index, xu, yu)
+   ;     xu := Round(xu),    yu := Round(yu)
+   ;     apz := "a" xu "|" yu
+   ;     kPoints[apz] := A_Index
+   ;     PointsListArray[A_Index*2 - 1] := xu
+   ;     PointsListArray[A_Index*2] := yu
+   ; }
+ 
+thisIndex := 1
+vpWinClientSize(mainWidth, mainHeight)
+strList := ""
    Loop, % totalCount
    {
-       getVPcoordsVectorPoint(A_Index, xu, yu)
-       xu := Round(xu),    yu := Round(yu)
-       apz := "a" xu "|" yu
-       kPoints[apz] := A_Index
-       PointsListArray[A_Index*2 - 1] := xu
-       PointsListArray[A_Index*2] := yu
+       aa := bb := 0
+       getVPcoordsVectorPoint(thisIndex, axu, ayu)
+       thisIndex++
+       getVPcoordsVectorPoint(thisIndex, bxu, byu)
+       axu := Round(axu),    ayu := Round(ayu)
+       bxu := Round(bxu),    byu := Round(byu)
+       If (isInRange(axu, 0, mainWidth) && isInRange(ayu, 0, mainHeight))
+       {
+          aa := 1
+          strList .= thisIndex - 1 "|"
+       }
+       If (isInRange(bxu, 0, mainWidth) && isInRange(byu, 0, mainHeight))
+       {
+          bb := 1
+          strList .= thisIndex "|"
+       }
+
+       If (aa=1 && bb=1)
+          Continue
+
+       If (axu<0 && bxu>0 && isInRange(byu, 0, mainHeight))
+          strList .= thisIndex - 1 "|" thisIndex "|"
+       If (ayu<0 && byu>0 && isInRange(bxu, 0, mainWidth))
+          strList .= thisIndex - 1 "|" thisIndex "|"
+
+       If (axu<mainWidth && bxu>mainWidth && isInRange(byu, 0, mainHeight))
+          strList .= thisIndex - 1 "|" thisIndex "|"
+       If (ayu<mainHeight && byu>mainHeight && isInRange(bxu, 0, mainWidth))
+          strList .= thisIndex - 1 "|" thisIndex "|"
+
    }
  
+Sort, strList, UND|
+strArray := StrSplit(Trim(strList, "|"), "|")
+
+bstr := strList
+   Loop, % strArray.Count()
+   {
+       indu := strArray[A_Index]
+       fnOutputDebug("astr=" A_Index "/" indu)
+       If (strArray[A_Index - 1] != indu - 1)
+          bstr .= indu - 2 "|" indu - 1 "|"
+       If (strArray[A_Index + 1] != indu + 1)
+          bstr .= indu + 1 "|" indu + 2 "|"
+   }
+
+Sort, bstr, UND|
+strArray := StrSplit(Trim(bstr, "|"), "|")
+
+
+   kPoints := new hashtable()
+   PointsListArray := []
+   thisIndex := 0
+   Loop, % strArray.Count()
+   {
+       indu := strArray[A_Index]
+       fnOutputDebug("bstr=" A_Index "/" indu)
+       If (indu<=0)
+          Continue
+
+       thisIndex++
+       getVPcoordsVectorPoint(indu, xu, yu)
+       xu := Round(xu),    yu := Round(yu)
+       apz := "a" xu "|" yu
+       kPoints[apz] := indu
+       PointsListArray[thisIndex*2 - 1] := xu
+       PointsListArray[thisIndex*2] := yu
+   }
+ 
+fnOutputDebug("BRRRRRRR l=" strArray.Count() " | " totalCount)
+
+
+
+
+
+
+
    thisPath := Gdip_CreatePath()
    createPathVectorCustomShape(thisPath, PointsListArray, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape, 0, 1, 0)
    outline := 1 ; this is too slow >>> Gdip_IsOutlineVisiblePathPoint(2NDglPG, thisPath, pPen8, gmX, gmY)
@@ -22496,6 +22578,7 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
        resultedFilesList[currentFileIndex, 1] := "\Temporary Memory Object\" labelu "-" clippyCount ".img"
     }
 
+    zoomLevel := IMGresizingMode := 1
     If (modus!="scanner")
     {
        currIMGdetails.HasAlpha := 1
@@ -49133,6 +49216,7 @@ BtnCreateNewImage() {
        Return
     }
 
+    zoomLevel := IMGresizingMode := 1
     Gdip_BitmapSetResolution(newBitmap, UserNewDPI, UserNewDPI)
     If (NewDocUseColor=1)
     {
@@ -68645,7 +68729,7 @@ VPnavBoxWrapper(mainWidth, mainHeight, Gu) {
     If navBoxu
        ERR := trGdip_DrawImage(A_ThisFunc, Gu, navBoxu, thisPosX, thisPosY)
 
-    hasDrawnImageMap := (navBoxu && !ERR) ? 1 : 0
+    hasDrawnImageMap := (navBoxu && !ERR && IMGlargerViewPort=1) ? 1 : 0
     thisPosX := (FlipImgH=1 && scrbV>0) ? tlbrBonusX + scrbV : tlbrBonusX
     thisPosY := (FlipImgV=0 && scrbH>0 && thumbsDisplaying!=1) ? mainHeight - scrbH - imgH - tlbrBonusY : mainHeight - imgH - tlbrBonusY
     If (thumbsDisplaying=0)
@@ -71967,6 +72051,11 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
     }
     ; ToolTip, % gmX "--" gmY , , , 2
     ; ToolTip, % tensionCurveCustomShape "=t" , , , 2
+    pzx := (FlipImgH=1) ? scrollBarVx : 0
+    pzy := (FlipImgV=1) ? scrollBarHy : 0
+    pzw := (FlipImgH=1) ? mainWidth : mainWidth - scrollBarVx
+    pzh := (FlipImgV=1) ? mainHeight : mainHeight - scrollBarHy
+    Gdip_SetClipRect(Gu, pzx, pzy, pzw, pzh)
     thisThick := InStr(postVectorWinOpen, "c") ? imgHUDbaseUnit//10 : DrawLineAreaContourThickness * zoomLevel
     If (drawingVectorLiveMode=1)
        Gdip_SetPenWidth(PenuDrawLive, thisThick)
@@ -72104,22 +72193,24 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
              msgu := "SHIFT: Add new point snapped every 45° degrees and extend path"
        }
 
-       thisIDu := msgu "a" altState ctrlState shiftState canDoSymmetry 
+       thisIDu := msgu "a" altState ctrlState shiftState canDoSymmetry FlipImgH FlipImgV scrollBarVx hasDrawnImageMap scrollBarHy
        If (thisIDu=prevMsg && validBMP(prevBMP))
        {
           BoxBMP := trGdip_CloneBitmap(A_ThisFunc, prevBMP)
        } Else
        {
-          BoxBMP := drawTextInBox(msgu, OSDFontName, OSDfontSize*0.7, mainWidth, mainHeight, OSDtextColor, OSDbgrColor, 0)
+          BoxBMP := drawTextInBox(msgu, OSDFontName, Round(OSDfontSize*0.7), mainWidth, mainHeight, OSDtextColor, OSDbgrColor, 0, 1)
           prevBMP := trGdip_DisposeImage(prevBMP)
           prevBMP := trGdip_CloneBitmap(A_ThisFunc, BoxBMP)
        }
 
        If validBMP(BoxBMP)
        {
-          posXu := 0
           trGdip_GetImageDimensions(BoxBMP, w, h)
-          posYu := mainHeight - h
+          posXu := (FlipImgH=1) ? scrollBarVx : 0
+          If (FlipImgH=0 && hasDrawnImageMap=1 && IMGlargerViewPort=1)
+             posXu := Round(HUDobjNavBoxu[1])
+          posYu := (FlipImgV=1) ? scrollBarHy : mainHeight - h - scrollBarHy
           tzGdip_DrawImage(Gu, BoxBMP, posXu, posYu, w, h)
           trGdip_DisposeImage(BoxBMP)
           prevMsg := thisIDu
@@ -72368,9 +72459,13 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
     }
 
     If (showImgAnnotations=1 && !AnyWindowOpen && drawingShapeNow!=1 && currentUndoLevel<3)
+    {
        drawAnnotationBox(mainWidth, mainHeight, 2NDglPG)
-    Else
+    } Else
+    {
        interfaceThread.ahkPostFunction("uiAccessUpdateAnnoBox", "hide", 1, 1, 0, 0)
+       hasDrawnAnnoBox := 0
+    }
 
     If (showInfoBoxHUD>=1 && drawingShapeNow!=1)
        drawinfoBox(mainWidth, mainHeight, directRefresh, 2NDglPG)
@@ -72378,9 +72473,13 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
        interfaceThread.ahkPostFunction("uiAccessUpdateInfoBox", "hide", 1, 1, 0, 0)
 
     If (showHUDnavIMG=1 && IMGlargerViewPort=1 && slideShowRunning!=1)
+    {
        VPnavBoxWrapper(mainWidth, mainHeight, 2NDglPG)
-    Else
+    } Else
+    {
        interfaceThread.ahkPostFunction("uiAccessUpdateNavBox", "hide", 1, 1, 0, 0)
+       hasDrawnImageMap := 0
+    }
 
     thisThick := imgHUDbaseUnit//11
     Gdip_SetPenWidth(pPen4, thisThick)
@@ -75946,11 +76045,16 @@ mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:=""
           listInfos := "Files list container: " maxItemsPage " elements in view. Listing mode: " defineListViewModes() ". Tap and hold, or Control+Left-Click, on any listed item to select it. Items listed:`n" listedItems
           If (actu!="scroll")
              interfaceThread.ahkPostFunction("uiAccessUpdateUiStatusBar", theMSG2, ThumbsStatusBarH, 0, listInfos, OSDfontSize, maxFilesIndex)
+
           trGdip_DisposeImage(infoBoxBMP, 1)
           If (showHUDnavIMG=1 && actu!="scroll") ;  && (thumbsListViewMode>1 || isDupesList=1))
+          {
              VPnavBoxWrapper(mainWidth, mainHeight - ThumbsStatusBarH, 2NDglPG)
-          Else If (actu!="scroll")
+          } Else If (actu!="scroll")
+          {
              interfaceThread.ahkPostFunction("uiAccessUpdateNavBox", "hide", 1, 1, 0, 0)
+             hasDrawnImageMap := 0
+          }
        }
     }
 
