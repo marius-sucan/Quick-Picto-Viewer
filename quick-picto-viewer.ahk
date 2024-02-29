@@ -138,7 +138,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , SelDotsSize := imgHUDbaseUnit//4, ViewPortBMPcache := "", startZeitIMGload := 0, cachedAllSessionsSeen := new hashtable()
    , imageLoading := 0, PrevGuiSizeEvent := 0, imgSelOutViewPort := 0, prevLastImg := [], userUIshapeCavity := 0
    , imgEditPanelOpened := 0, jpegDesiredOperation := 1, copyMoveDoLastOption := 4, alphaMaskCoffsetY := 0
-   , rDesireWriteFMT := "jpg", FIMfailed2init := 0, prevDestPosX := "", prevDestPosY := ""
+   , rDesireWriteFMT := "jpg", FIMfailed2init := 0, prevDestPosX := "", prevDestPosY := "", hGuiBtn
    , CCLVO := " gInvokeStandardDialogColorPicker -E0x200 +Border -Hdr -Multi +ReadOnly Report AltSubmit ", FontList := []
    , totalFramesIndex := 0, pVwinTitle := "", AprevImgCall := "", BprevImgCall := "", prevSetWinPosX := "", prevSetWinPosY := ""
    , coreIMGzeitLoad := 0, desiredFrameIndex := 0, prevDrawingMode := 0, sqlFailedInit := 0, currentImgModified := 0
@@ -449,6 +449,7 @@ If !InStr(initGUI, "|")
    Return
 } Else
 {
+   interfaceThread.ahkassign("RegExFilesPattern", RegExFilesPattern)
    handleUIhwnd(initGui)
    externObj := ""
 }
@@ -2316,6 +2317,7 @@ initQPVmainDLL(modus:=0) {
       Sort, RegExAllFilesPattern, UD|
       extensionsList := Trimmer(RegExAllFilesPattern, "|")
       RegExFilesPattern := "i)^(.\:\\).*(\.(" RegExAllFilesPattern "))$"
+      ; interfaceThread.ahkassign("RegExFilesPattern", RegExFilesPattern)
       allFormats := "*.jpeg;*.ico;" openFptrn3 openFptrn1 openFptrn2 openFptrn4 ";"
       Loop, Parse, extensionsList, |
       {
@@ -2326,6 +2328,8 @@ initQPVmainDLL(modus:=0) {
       fnOutputDebug("WIC init formats: " openFptrnWIC)
    } Else addJournalEntry("ERROR: Failed to initialize WIC module. Some image formats may not be supported.")
 
+   ; interfaceThread.ahkassign("RegExFilesPattern", RegExFilesPattern)
+   RegWrite, REG_SZ, %QPVregEntry%, RegExFilesPattern, % RegExFilesPattern
    ; MsgBox, % WICmoduleHasInit "==" CLSIDlist "`n" extensionsList
    ; ToolTip, % WICmoduleHasInit " | " A_LastError "==" qpvMainDll "`n" DllPath , , , 2
 }
@@ -6396,6 +6400,13 @@ determineSelAreaClickRect(mX, mY, dotsSize, mainWidth, mainHeight, doFlips) {
 
 createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoords:=0) {
    deleteMenus()
+   If (dontAddPoint!=1)
+   {
+      kMenu("PVnav", "Add", "&Done / apply changes`tEnter", "stopDrawingShape")
+      kMenu("PVnav", "Add", "&Cancel / exit pen tool`tEscape", "MenuCancelDrawingShape")
+      kMenu("PVnav", "AddSeparator", 0)
+   }
+
    If (indexu)
    {
       fr := (bK!=1 && bezierSplineCustomShape=1) ? "P'" : "P"
@@ -6488,9 +6499,6 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
    If (dontAddPoint!=1)
    {
       kMenu("PVnav", "AddSeparator", 0)
-      kMenu("PVnav", "Add", "&Done`tEnter", "stopDrawingShape")
-      kMenu("PVnav", "Add", "&Cancel / exit pen tool`tEscape", "MenuCancelDrawingShape")
-      kMenu("PVnav", "AddSeparator", 0)
       kMenu("PVnav", "Add", "&Remove last point`tBackspace", "reduceCustomShapelength")
       If (customShapePoints.Count()<2)
       {
@@ -6517,29 +6525,26 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
             kMenu("PVnav", "Check", "Symmetrical anchors`tR")
       }
 
-      kMenu("PVnav", "Add/Uncheck", "Show status &bar`tI", "ToggleContextStatusBar")
-      If (showContextualStatusBar=1)
-         kMenu("PVnav", "Check", "Show status &bar`tI")
-
-      kMenu("PVnav", "Add/Uncheck", "Show viewport &grid`tG", "toggleViewPortGridu")
-      If (showViewPortGrid=1)
-         kMenu("PVnav", "Check", "Show viewport &grid`tG")
-
-      kMenu("PVnav", "Add/UnCheck", "&Show toolbar`tShift+F10", "toggleAppToolbar")
-      If (ShowAdvToolbar=1)
-         kMenu("PVnav", "Check", "&Show toolbar`tShift+F10")
-
       kMenu("PVnav", "Add/Uncheck", "&Open ended path`tO", "toggleOpenClosedLineCustomShape", "opened closed vector")
       If (closedLineCustomShape=0)
          kMenu("PVnav", "Check", "&Open ended path`tO")
 
+      kMenu("PVnav", "AddSeparator", 0)
       If (mustPreventMenus=1 || showMainMenuBar!=1)
       {
-         kMenu("PVnav", "AddSeparator", 0)
          createMenuInterfaceOptions()
          InvokeMenuBarVectorView(0, "extern")
          kMenu("PVnav", "Add", "Interface", ":PvUIprefs")
-         kMenu("PVnav", "Add", "Vie&w options", ":pvMenuBarView")
+         kMenu("PVnav", "Add", "Vie&wport", ":pvMenuBarView")
+      } Else
+      {
+         kMenu("PVnav", "Add/Uncheck", "Show viewport &grid`tG", "toggleViewPortGridu")
+         If (showViewPortGrid=1)
+            kMenu("PVnav", "Check", "Show viewport &grid`tG")
+
+         kMenu("PVnav", "Add/UnCheck", "&Show toolbar`tShift+F10", "toggleAppToolbar")
+         If (ShowAdvToolbar=1)
+            kMenu("PVnav", "Check", "&Show toolbar`tShift+F10")
       }
    }
 
@@ -7053,19 +7058,23 @@ MenuAddUnorderedVectorPoint(zzx:=0, zzy:=0, mo:=0) {
    oppoIndex := (canDoSymmetry=1) ? totalCount - foundDot + 1 : -1
    canDoSymmetry := isNowSymmetricVectorShape()
    zzz := min(foundDot, foundOtherDot) + 1
-   If (max(foundDot, foundOtherDot)>=totalCount)
+   If (max(foundDot, foundOtherDot)>=totalCount && FillAreaCurveTension=1)
       zzz := totalCount + 1
 
-   If (foundDot=totalCount && FillAreaCurveTension>1)
-      zzz := totalCount
-   Else If (foundDot=(totalCount - 1) && FillAreaCurveTension=1)
+   If (foundDot=(totalCount - 1) && FillAreaCurveTension=1)
       zzz := totalCount
 
    If foundDot
+   {
+      rr := "yes"
       pushAtGivenVectorPoint(zzz, gmX, gmY)
+      If (preventUndoLevels!=1 && mo!="given")
+         recordVectorUndoLevels(customShapePoints.Clone(), initialDrawingStartCoords.Clone())
+   } Else
+      rr := "no"
       ; splitPointGivenInPath(1, totalCount, foundDot, oppoIndex, canDoSymmetry, gmX, gmY)
 
-   ToolTip, % totalCount " | dot=" foundDot "/" foundOtherDot "|" zzz "|" A_TickCount - startZeit , , , 2
+   ; ToolTip, % totalCount " | dot=" foundDot "/" foundOtherDot "|" zzz "|" A_TickCount - startZeit , , , 2
    ; ToolTip, % A_TickCount - startZeit " ms loops=" hasFoundDot "| dot=" foundDot "/" foundOtherDot " | o=" outline " rects=" drects " kTotals=" kTotals , , , 2
    doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
    SetTimer, dummyRefreshImgSelectionWindow, -25
@@ -7081,112 +7090,149 @@ coreAddUnorderedVectorPointCurveMode(gmx, gmy, sl) {
    If (totalCount<3)
       Return
 
-ToolTip, % " please wait " , , , 2
-   ; kPoints := new hashtable()
-   ; PointsListArray := []
-   ; Loop, % totalCount
-   ; {
-   ;     getVPcoordsVectorPoint(A_Index, xu, yu)
-   ;     xu := Round(xu),    yu := Round(yu)
-   ;     apz := "a" xu "|" yu
-   ;     kPoints[apz] := A_Index
-   ;     PointsListArray[A_Index*2 - 1] := xu
-   ;     PointsListArray[A_Index*2] := yu
-   ; }
- 
-thisIndex := 1
-vpWinClientSize(mainWidth, mainHeight)
-strList := ""
+   decideCustomShapeStyle()
+   vpWinClientSize(mainWidth, mainHeight)
+   PointsListArray := []
    Loop, % totalCount
    {
-       aa := bb := 0
-       getVPcoordsVectorPoint(thisIndex, axu, ayu)
-       thisIndex++
-       getVPcoordsVectorPoint(thisIndex, bxu, byu)
-       axu := Round(axu),    ayu := Round(ayu)
-       bxu := Round(bxu),    byu := Round(byu)
-       If (isInRange(axu, 0, mainWidth) && isInRange(ayu, 0, mainHeight))
-       {
-          aa := 1
-          strList .= thisIndex - 1 "|"
-       }
-       If (isInRange(bxu, 0, mainWidth) && isInRange(byu, 0, mainHeight))
-       {
-          bb := 1
-          strList .= thisIndex "|"
-       }
-
-       If (aa=1 && bb=1)
-          Continue
-
-       If (axu<0 && bxu>0 && isInRange(byu, 0, mainHeight))
-          strList .= thisIndex - 1 "|" thisIndex "|"
-       If (ayu<0 && byu>0 && isInRange(bxu, 0, mainWidth))
-          strList .= thisIndex - 1 "|" thisIndex "|"
-
-       If (axu<mainWidth && bxu>mainWidth && isInRange(byu, 0, mainHeight))
-          strList .= thisIndex - 1 "|" thisIndex "|"
-       If (ayu<mainHeight && byu>mainHeight && isInRange(bxu, 0, mainWidth))
-          strList .= thisIndex - 1 "|" thisIndex "|"
-
-   }
- 
-Sort, strList, UND|
-strArray := StrSplit(Trim(strList, "|"), "|")
-
-bstr := strList
-   Loop, % strArray.Count()
-   {
-       indu := strArray[A_Index]
-       fnOutputDebug("astr=" A_Index "/" indu)
-       If (strArray[A_Index - 1] != indu - 1)
-          bstr .= indu - 2 "|" indu - 1 "|"
-       If (strArray[A_Index + 1] != indu + 1)
-          bstr .= indu + 1 "|" indu + 2 "|"
-   }
-
-Sort, bstr, UND|
-strArray := StrSplit(Trim(bstr, "|"), "|")
-
-
-   kPoints := new hashtable()
-   PointsListArray := []
-   thisIndex := 0
-   Loop, % strArray.Count()
-   {
-       indu := strArray[A_Index]
-       fnOutputDebug("bstr=" A_Index "/" indu)
-       If (indu<=0)
-          Continue
-
-       thisIndex++
-       getVPcoordsVectorPoint(indu, xu, yu)
+       getVPcoordsVectorPoint(A_Index, xu, yu)
        xu := Round(xu),    yu := Round(yu)
        apz := "a" xu "|" yu
-       kPoints[apz] := indu
-       PointsListArray[thisIndex*2 - 1] := xu
-       PointsListArray[thisIndex*2] := yu
+       PointsListArray[A_Index*2 - 1] := xu
+       PointsListArray[A_Index*2] := yu
    }
- 
-fnOutputDebug("BRRRRRRR l=" strArray.Count() " | " totalCount)
-
-
-
-
-
-
 
    thisPath := Gdip_CreatePath()
    createPathVectorCustomShape(thisPath, PointsListArray, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape, 0, 1, 0)
-   outline := 1 ; this is too slow >>> Gdip_IsOutlineVisiblePathPoint(2NDglPG, thisPath, pPen8, gmX, gmY)
+   pBitmap := trGdip_CreateBitmap(A_ThisFunc, gmx + 5, gmy + 5)
+   If validBMP(pBitmap)
+   {
+      zg := Gdip_GraphicsFromImage(pBitmap)
+      Gdip_GraphicsClear(zg, "0xFF000000")
+      fnOutputDebug(pBitmap "|" zg)
+      Gdip_DrawPath(zg, pPen8, thisPath)
+      ; Gdip_DrawImageFast(2NDglPG, pBitmap)
+      clr := Gdip_GetPixelColor(pBitmap, gmx, gmy, 2)
+      ; fnOutputDebug("clr=" clr[2])
+      ; doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+      Gdip_DeleteGraphics(zg)
+      trGdip_DisposeImage(pBitmap)
+   }
+
+   outline := 1 ; (clr[2]>1) ? 1 : 0 ; this is too slow >>> Gdip_IsOutlineVisiblePathPoint(2NDglPG, thisPath, pPen8, gmX, gmY)
    If (outline=1)
    {
+      If (closedLineCustomShape=1)
+      {
+         PointsListArray[(totalCount + 1)*2 - 1] := PointsListArray[1]
+         PointsListArray[(totalCount + 1)*2] := PointsListArray[2]
+      }
+
+      prevPointsCount := CreatePointsF(prevPointsF, PointsListArray)
+      startZeit := A_TickCount
       Gdip_FlattenPath(thisPath, 0.2)
       PointsCount := Gdip_GetPathPointsCount(thisPath)
       VarSetCapacity(PointsF, 8 * (PointsCount + 1), 0)
-      fnOutputDebug(A_ThisFunc ": " outline "|" PointsCount )
+      ; fnOutputDebug(A_ThisFunc ": " outline "|" PointsCount "|" totalCount "|" prevPointsCount )
       finalIndex := lastIndex := hasFound := outline := 0
-      gdipLastError := DllCall("gdiplus\GdipGetPathPoints", "UPtr", thisPath, "UPtr", &PointsF, "intP", PointsCount)
+      zaa := zbb := firstu := lastu := -1
+
+      gdipLastError := DllCall("gdiplus\GdipGetPathPoints", "UPtr", thisPath, "UPtr", &PointsF, "int*", PointsCount)
+      zz := DllCall(whichMainDLL "\traverseCurvedPath", "UPtr", &prevPointsF, "Int", prevPointsCount - 1, "UPtr", &PointsF, "Int", PointsCount - 1, "Int", gmx, "Int", gmy, "int", sl, "UPtr", pPen8, "int*", zaa, "int*", zbb, "int*", firstu, "int*", lastu)
+      If (zz=2)
+         hasFound := 1
+      If (!zz)
+         addJournalEntry(A_ThisFunc "(): Failed to execute traverseCurvedPath() from the main DLL.")
+      Else
+         fnOutputDebug("zeitung=" A_TickCount - startZeit " ms ||" zaa "|" zbb "||" firstu "|" lastu)
+   }
+
+   Gdip_DeletePath(thisPath)
+   PointsListArray := []
+   Gdip_GraphicsClear(2NDglPG)
+   If (hasFound)
+   {
+      diffu := abs(lastu - firstu)
+      Loop, % diffu
+      {
+          ti := firstu + A_Index - 1
+          ax := NumGet(&PointsF, 8 * (ti - 1), "float")
+          ay := NumGet(&PointsF, (8 * (ti - 1)) + 4, "float")
+          ; fnOutputDebug(ax "|" ay)
+          If (ti>PointsCount)
+             Break
+
+          PointsListArray[A_Index*2 - 1] := ax
+          PointsListArray[A_Index*2] := ay
+      }
+
+      thisPath := Gdip_CreatePath()
+      Gdip_AddPathLines(thisPath, PointsListArray)
+      setMainCanvasTransform(mainWidth, mainHeight, 2NDglPG)
+      Gdip_DrawPath(2NDglPG, pPen8, thisPath)
+      doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+      Gdip_ResetWorldTransform(2NDglPG)
+      Gdip_DeletePath(thisPath)
+   }
+
+   PointsF := ""
+   prevPointsF := ""
+   foundDots := []
+   If (hasFound)
+      foundDots := [zaa, zbb]
+   Return foundDots
+}
+
+oldcoreAddUnorderedVectorPointCurveMode(gmx, gmy, sl) {
+   totalCount := customShapePoints.Count()
+   If (totalCount<3)
+      Return
+
+   decideCustomShapeStyle()
+   vpWinClientSize(mainWidth, mainHeight)
+   ToolTip, % " please wait " , , , 2
+   kPoints := new hashtable()
+   PointsListArray := []
+   Loop, % totalCount
+   {
+       getVPcoordsVectorPoint(A_Index, xu, yu)
+       xu := Round(xu),    yu := Round(yu)
+       apz := "a" xu "|" yu
+       kPoints[apz] := A_Index
+       PointsListArray[A_Index*2 - 1] := xu
+       PointsListArray[A_Index*2] := yu
+   }
+
+   thisPath := Gdip_CreatePath()
+   createPathVectorCustomShape(thisPath, PointsListArray, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape, 0, 1, 0)
+   pBitmap := trGdip_CreateBitmap(A_ThisFunc, gmx + 5, gmy + 5)
+   If validBMP(pBitmap)
+   {
+      zg := Gdip_GraphicsFromImage(pBitmap)
+      Gdip_GraphicsClear(zg, "0xFF000000")
+      fnOutputDebug(pBitmap "|" zg)
+      Gdip_DrawPath(zg, pPen8, thisPath)
+      ; Gdip_DrawImageFast(2NDglPG, pBitmap)
+      clr := Gdip_GetPixelColor(pBitmap, gmx, gmy, 2)
+      ; fnOutputDebug("clr=" clr[2])
+      ; doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+      Gdip_DeleteGraphics(zg)
+      trGdip_DisposeImage(pBitmap)
+   }
+
+   outline := 1 ; (clr[2]>1) ? 1 : 0 ; this is too slow >>> Gdip_IsOutlineVisiblePathPoint(2NDglPG, thisPath, pPen8, gmX, gmY)
+   If (outline=1)
+   {
+      startZeit := A_TickCount
+      Gdip_FlattenPath(thisPath, 0.2)
+      PointsCount := Gdip_GetPathPointsCount(thisPath)
+      VarSetCapacity(PointsF, 8 * (PointsCount + 1), 0)
+      fnOutputDebug(A_ThisFunc ": " outline "|" PointsCount "|" totalCount "|" prevPointsCount )
+      finalIndex := lastIndex := hasFound := outline := 0
+      zaa := zbb := -1
+
+      gdipLastError := DllCall("gdiplus\GdipGetPathPoints", "UPtr", thisPath, "UPtr", &PointsF, "int*", PointsCount)
+      fnOutputDebug("zeitung=" A_TickCount - startZeit "||" zaa "|" zbb)
       newArray := []
       Loop, %PointsCount%
       {
@@ -7228,13 +7274,15 @@ fnOutputDebug("BRRRRRRR l=" strArray.Count() " | " totalCount)
 
              kPath := Gdip_CreatePath()
              DllCall("gdiplus\GdipAddPathLine", "UPtr", kPath, "float", ax, "float", ay, "float", bx, "float", by)
-             outline := Gdip_IsOutlineVisiblePathPoint(2NDglPG, kPath, pPen8, gmX, gmY)
+             outline := Gdip_IsOutlineVisiblePathPoint(0, kPath, pPen8, gmX, gmY)
              If (outline=1)
              {
-                Gdip_GraphicsClear(2NDglPG)
-                Gdip_DrawPath(2NDglPG, pPen8, kPath)
-                doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
-                Gdip_DeletePath(kPath)
+                ; Gdip_GraphicsClear(2NDglPG)
+                ; setMainCanvasTransform(mainWidth, mainHeight, 2NDglPG)
+                ; Gdip_DrawPath(2NDglPG, pPen8, kPath)
+                ; doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+                ; Gdip_DeletePath(kPath)
+                ; Gdip_ResetWorldTransform(2NDglPG)
                 ; foundDots := [A_Index - 1, A_Index]
                 hasFound := A_Index
                 ; Break
@@ -7256,6 +7304,7 @@ fnOutputDebug("BRRRRRRR l=" strArray.Count() " | " totalCount)
 
    Gdip_DeletePath(thisPath)
    PointsListArray := []
+   Gdip_GraphicsClear(2NDglPG)
    If (hasFound)
    {
       Loop, % newArray.Count()
@@ -7270,16 +7319,18 @@ fnOutputDebug("BRRRRRRR l=" strArray.Count() " | " totalCount)
           PointsListArray[A_Index*2] := ay
       }
 
-
       thisPath := Gdip_CreatePath()
       createPathVectorCustomShape(thisPath, PointsListArray, FillAreaCurveTension, 0, bezierSplineCustomShape, 0, 1, 0)
+      setMainCanvasTransform(mainWidth, mainHeight, 2NDglPG)
       Gdip_DrawPath(2NDglPG, pPen8, thisPath)
       doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+      Gdip_ResetWorldTransform(2NDglPG)
       Gdip_DeletePath(thisPath)
    }
 
    kPoints := ""
    PointsF := ""
+   prevPointsF := ""
    foundDots := []
    foundDots := [finalIndex[2], lastIndex[2]]
    Return foundDots
@@ -7314,7 +7365,7 @@ coreAddUnorderedVectorPointPolyMode(gmx, gmy, sl) {
           getVPcoordsVectorPoint(aIndex, ax, ay)
           getVPcoordsVectorPoint(bIndex, bx, by)
           DllCall("gdiplus\GdipAddPathLine", "UPtr", pPath, "float", ax, "float", ay, "float", bx, "float", by)
-          outline := Gdip_IsOutlineVisiblePathPoint(2NDglPG, pPath, pPen8, gmX, gmY)
+          outline := Gdip_IsOutlineVisiblePathPoint(0, pPath, pPen8, gmX, gmY)
           If (outline=1)
           {
              ; Gdip_GraphicsClear(2NDglPG)
@@ -7328,226 +7379,6 @@ coreAddUnorderedVectorPointPolyMode(gmx, gmy, sl) {
        }
    }
    Return foundDots
-}
-
-
-ooolldddMenuAddUnorderedVectorPoint(zzx:=0, zzy:=0, mo:=0) {
-; unused
-   startZeit := A_TickCount
-   lastOtherWinClose := 1
-   vpWinClientSize(mainWidth, mainHeight)
-   lastZeitFileSelect := A_TickCount
-   mX := lastUserRclickVPx, mY := lastUserRclickVPy
-
-   gmX := (FlipImgH=1) ? mainWidth - mX : mX
-   gmY := (FlipImgV=1) ? mainHeight - mY : mY
-   If (mo="given")
-   {
-      gmX := zzx,    gmY := zzy
-   }
-
-   selu := oppoIndex := doSpecialAct := dontAddPoint := dotRemoved := 0
-   hasFoundDot := k := thisIndex := 0
-   totalCount := customShapePoints.Count()
-   listu := otherList := ""
-   kPoints := []
-   Loop, % totalCount
-   {
-       ; determine the list of relevant points
-       getVPcoordsVectorPoint(A_Index, xu, yu)
-       k := (bezierSplineCustomShape=1) ? clampInRange(k + 1, 1, 3, 1) : 1
-       If (k=1)
-       {
-          thisIndex++
-          distu := distanceBetweenTwoPoints(xu, yu, gmx, gmy)
-          otherList .= distu "|" A_Index "|" A_Index + 1 "|" thisIndex "`n"
-          kPoints[thisIndex] := [A_Index, xu, yu, distu]
-       }
-   }
-
-   kPoints[thisIndex + 1] := kPoints[1].Clone()
-   kTotals := thisIndex
-   thisIndex := drects := 0
-   rectArraySizes := []
-   rectListuSizes := ""
-   sl := imgHUDbaseUnit/2.5
-   If (sl<8)
-      sl := 8
-
-   Loop, % kTotals + 1 ; whatever 
-   {
-       ; determine the smallest rect containing the mouse click location: gmx/gmy
-       xux := kPoints[thisIndex, 2],       yuy := kPoints[thisIndex, 3]
-       ; getVPcoordsVectorPoint(kPoints[thisIndex, 1], xux, yuy)
-       thisIndex++
-       If (thisIndex>kTotals)
-       {
-          xwx := kPoints[1, 2],       ywy := kPoints[1, 3]
-       } Else
-       {
-          xwx := kPoints[thisIndex, 2],       ywy := kPoints[thisIndex, 3]
-          ; getVPcoordsVectorPoint(kPoints[thisIndex, 1], xwx, ywy)
-       }
-
-       nx1 := min(xux, xwx)
-       ny1 := min(yuy, ywy)
-       nx2 := max(xux, xwx)
-       ny2 := max(yuy, ywy)
-       min_dist(nx1, nx2, sl)
-       min_dist(ny1, ny2, sl)
-       ww := abs(nx1 - nx2)
-       hh := abs(ny1 - ny2)
-       inn := isDotInRect(gmx, gmy, nx1, nx2, ny1, ny2)
-       ; Gdip_GraphicsClear(2NDglPG)
-       ; Gdip_FillRectangle(2NDglPG, pBrushB, nx1, ny1, ww, hh)
-       ; Gdip_FillRectangle(2NDglPG, pBrushB, xux - SelDotsSize, yuy - SelDotsSize, SelDotsSize*2, SelDotsSize*2)
-       ; Gdip_FillRectangle(2NDglPG, pBrushB, xwx - SelDotsSize, ywy - SelDotsSize, SelDotsSize*2, SelDotsSize*2)
-       ; Gdip_FillRectangle(2NDglPG, pBrushB, xux - SelDotsSize, yuy - SelDotsSize, SelDotsSize*2, SelDotsSize*2)
-       ; Gdip_FillRectangle(2NDglPG, pBrushB, xwx - SelDotsSize, ywy - SelDotsSize, SelDotsSize*2, SelDotsSize*2)
-       ; doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
-       ; fnOutputDebug(A_Index "==" ww "|" hh "|" sl " | in rect=" inn)
-       shapeIndex := kPoints[thisIndex - 1, 1]
-       otherIndex := kPoints[thisIndex, 1]
-       distu := distanceBetweenTwoPoints(nx1 + ww//2, ny1 + hh//2, gmx, gmy)
-       listu .= distu "|" shapeIndex "|" otherIndex "`n"
-       ; Sleep, 100
-       If (inn=1)
-       {
-          drects++
-          area := Round(ww * hh, 4)
-          rectListuSizes .= area "|" drects "|" thisIndex - 1 "|" shapeIndex "|" otherIndex "`n"
-          rectSizes[drects] := [thisIndex - 1, ww, hh, area, shapeIndex, otherIndex]
-       }
-   }
-
-   moda := 0
-   Sort, rectListuSizes, ND`n
-   listuArray := StrSplit(rectListuSizes, "`n")
-   Gdip_SetPenWidth(pPen8, Gdip_GetPenWidth(PenuDrawLive) + 2)
-   ; hasFoundDot := coreAddUnorderedVectorPoint(listuArray, totalCount, gmx, gmy, 1)
-   If (!hasFoundDot && (FillAreaCurveTension>1 || bezierSplineCustomShape=1))
-   {
-      Sort, listu, ND`n
-      listuArray := StrSplit(listu, "`n")
-      ; hasFoundDot := coreAddUnorderedVectorPoint(listuArray, totalCount, gmx, gmy, 2)
-      If hasFoundDot
-      {
-         moda := 2
-         mainPoint := StrSplit(listuArray[hasFoundDot], "|")
-      } Else
-      {
-         Sort, otherList, ND`n
-         listuArray := StrSplit(otherList, "`n")
-         ; hasFoundDot := coreAddUnorderedVectorPoint(listuArray, totalCount, gmx, gmy, 3)
-         If hasFoundDot
-         {
-            moda := 3
-            mainPoint := StrSplit(listuArray[hasFoundDot], "|")
-         }
-      }
-
-      foundDot := hasFoundDot ? mainPoint[2] : 0
-      foundOtherDot := hasFoundDot ? mainPoint[3] : 0
-   } Else If hasFoundDot
-   {
-      moda := 1
-      mainPoint := StrSplit(listuArray[hasFoundDot], "|")
-      foundDot := hasFoundDot ? mainPoint[4] : 0
-      foundOtherDot := hasFoundDot ? mainPoint[5] : 0
-   }
-
-   oppoIndex := (canDoSymmetry=1) ? totalCount - foundDot + 1 : -1
-   canDoSymmetry := isNowSymmetricVectorShape()
-   zzz := min(foundDot, foundOtherDot) + 1
-   ; If foundDot
-   ;    pushAtGivenVectorPoint(zzz, gmX, gmY)
-
-      ; splitPointGivenInPath(1, totalCount, foundDot, oppoIndex, canDoSymmetry, gmX, gmY)
-
-   ToolTip, % "m=" moda "loops=" hasFoundDot "| dot=" foundDot "/" foundOtherDot " | z=" zzz " rects=" drects " kTotals=" kTotals "`n" rectListuSizes  , , , 2
-   ; ToolTip, % A_TickCount - startZeit " ms loops=" hasFoundDot "| dot=" foundDot "/" foundOtherDot " | o=" outline " rects=" drects " kTotals=" kTotals , , , 2
-   doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
-   ; Sleep, 2000
-   ; SoundBeep 300, 1000
-
-   ; ToolTip, % mouseOutline "|" startIndex "|" mainPoint[2] "|" mainPoint[3] "|`n" rectprevp "|" rectnextp , , , 2
-   ; try Clipboard := rectListuSizes
-   SetTimer, dummyRefreshImgSelectionWindow, -10
-}
-
-
-codrftreAddUnorderedVectorPoint(listuArray, totalCount, gmx, gmy, mode) {
-; unused
-   hasFoundDot := 0
-   lpsA := (bezierSplineCustomShape=1) ? 7 : 3
-   lpsB := (bezierSplineCustomShape=1) ? 16 : 7
-   lpz := (mode=3) ? 500 : 30
-   If (lpz>listuArray.Count())
-      lpz := listuArray.Count() + 1
-
-   Loop, % lpz
-   {
-      If !InStr(listuArray[A_Index], "|")
-         Continue
-
-      hasLooped := 0
-      PointsListArray := []
-      mainPoint := StrSplit(listuArray[A_Index], "|")
-      initialIndex := startIndex := (mode=1) ? mainPoint[4] : mainPoint[2]
-      otherIndex := (mode=1) ? mainPoint[5] : mainPoint[3]
-      mm := A_Index
-      Loop, % lpsA
-      {
-           startIndex--
-           If (startIndex<0)
-           {
-              startIndex := totalCount
-              If (hasLooped=1)
-                 Break
-
-              hasLooped := 1
-           }
-      }
-
-      dotExists := hasLooped := 0
-      Loop, % lpsB
-      {
-            startIndex++
-            If (startIndex>totalCount)
-            {
-               startIndex -= totalCount
-               If (hasLooped=1)
-                  Break
-  
-               hasLooped := 1
-            }
-           
-            getVPcoordsVectorPoint(startIndex, xu, yu)
-            PointsListArray[A_Index*2 - 1] := xu
-            PointsListArray[A_Index*2] := yu
-            If (otherIndex=startIndex || initialIndex=startIndex)
-               dotExists := 1
-      }
-
-
-      thisPath := Gdip_CreatePath()
-      createPathVectorCustomShape(thisPath, PointsListArray, FillAreaCurveTension, 0, bezierSplineCustomShape, 0, 1, 0)
-      outline := Gdip_IsOutlineVisiblePathPoint(2NDglPG, thisPath, pPen8, gmX, gmY)
-      ; Sleep, 25
-      If (outline=1 && hasFoundDot=0 && dotExists=1)
-      {
-         Gdip_GraphicsClear(2NDglPG)
-         Gdip_DrawPath(2NDglPG, pPen8, thisPath)
-         doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
-         Gdip_DeletePath(thisPath)
-         ; ToolTip, % mode "|" mm "|" A_Index , , , 2
-         ; SoundBeep 900, 90
-         hasFoundDot := mm
-         Break
-      }
-      Gdip_DeletePath(thisPath)
-   }
-   Return hasFoundDot
 }
 
 min_dist(ByRef va, ByRef vb, distu) {
@@ -7756,6 +7587,7 @@ addNewVectorShapePoints(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, shi
          dontAddPoint := 1
          lastZeitFileSelect := A_TickCount
          selectGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, mainParam, gmX, gmY)
+         rrz := "no"
       } Else If (mainParam="collapseClick")
       {
          doSpecialAct := dontAddPoint := 1
@@ -7783,9 +7615,15 @@ addNewVectorShapePoints(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, shi
          { 
             dontAddPoint := 1
             mustRem := moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY, altState)
+            rrz := (mustRem=1) ? "" : "no" 
          }
       }
-   } Else thisIndex := 0
+   } Else
+   {
+      If (ctrlState=1 || altState=1)
+         rrz := "no"
+      thisIndex := 0
+   }
 
    If (dontAddPoint && thisIndex)
       lastIndex := thisIndex
@@ -7803,9 +7641,13 @@ addNewVectorShapePoints(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, shi
    {
       dontAddPoint := 1
       If (mainParam="DoubleClick" && customShapeHasSelectedPoints=1)
+      {
          SetTimer, MenuSelNoVectorPoints, -50
-      Else
-         rescaleSelectedVectorPoints()
+      } Else
+      {
+         zpr := rescaleSelectedVectorPoints()
+         rrz := (zpr=0) ? "no" : ""
+      }
    }
 
    ; If (FlipImgH=1 || FlipImgV=1)
@@ -7858,9 +7700,9 @@ addNewVectorShapePoints(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, shi
       } Else If (hasSymmetry!=1 && shiftState=0 && bezierSplineCustomShape=0)
          SetTimer, addFluidPointsCustomShape, -200
    } Else If (mainParam!="remClick" && mainParam!="rClick" && ctrlState=0 && altState=1 && shiftState=0 && !hasFoundDot)
-      MenuAddUnorderedVectorPoint(gmX, gmY, "given")
+      rrz := MenuAddUnorderedVectorPoint(gmX, gmY, "given")
 
-   If (preventUndoLevels!=1)
+   If (preventUndoLevels!=1 && rrz!="no")
       recordVectorUndoLevels(customShapePoints.Clone(), initialDrawingStartCoords.Clone())
 
    SetTimer, dummyRefreshImgSelectionWindow, -5
@@ -8239,6 +8081,7 @@ rescaleSelectedVectorPoints() {
    avgY := (minY + maxY)//2
 
    startOperation := A_TickCount
+   hasLooped := 0
    While, (determineLClickState()=1)
    {
       If (A_TickCount - startOperation<125)
@@ -8254,6 +8097,7 @@ rescaleSelectedVectorPoints() {
       GetMouseCoord2wind(PVhwnd, mX, mY)
       gmX := omX/mX
       gmY := omY/mY
+      hasLooped := 1
       If (lockedAR=1)
          gmX := gmY := max(gmX, gmY)
 
@@ -8283,7 +8127,7 @@ rescaleSelectedVectorPoints() {
    setWhileLoopExec(0)
    RemoveTooltip()
    newArrayu := []
-   Return 1
+   Return hasLooped
 }
 
 moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY, altState) {
@@ -8418,6 +8262,7 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
         }
         Sleep, 2
    }
+
    setWhileLoopExec(0)
    Return mustRem
 }
@@ -13387,7 +13232,7 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
 
          PointsCount := Gdip_GetPathPointsCount(pPath)
          VarSetCapacity(PointsF, 8 * (PointsCount + 1), 0)
-         gdipLastError := DllCall("gdiplus\GdipGetPathPoints", "UPtr", pPath, "UPtr", &PointsF, "intP", PointsCount)
+         gdipLastError := DllCall("gdiplus\GdipGetPathPoints", "UPtr", pPath, "UPtr", &PointsF, "int*", PointsCount)
          lastState := thisState
          useCache := 0
       } Else useCache := 1
@@ -24603,7 +24448,10 @@ CreateTempGuiButton(btnList, killWin:=0, delayu:=950) {
     lastCreated := A_TickCount
 }
 
-RepositionTempBtnGui() {
+RepositionTempBtnGui(mm:=0) {
+    Static lastSize := []
+    If (mm="getLast")
+       Return lastSize
     If (tempBtnVisible="null")
        Return
 
@@ -24627,11 +24475,13 @@ RepositionTempBtnGui() {
     tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
     ; ToolTip, % tlbrBonusX "|" hasTrans , , , 2
     Final_x := winPosX + thisFntSize * 2 + tlbrBonusX
-    WinSet, Transparent, 231, ahk_id %hGuiBtn%
+    WinSet, Transparent, 230, ahk_id %hGuiBtn%
     ; WinSet, AlwaysOnTop, On, ahk_id %hGuiBtn%
     roundedCsize := Round(thisFntSize/1.7) + 15
     WinSet, Region, 0-0 R%roundedCsize%-%roundedCsize% w%gWid% h%gHeig%, QPVGuiActionBtn
     Gui, TempBtnGui: Show, NoActivate AutoSize x%Final_x% y%Final_y%, GuiActionBtn
+    WinGetPos, x, y, ,, ahk_id %hGuiBtn%
+    lastSize := [Final_x, Final_y, Wid, Heig, x, y]
 }
 
 tempGuiBtnCall1() {
@@ -45664,6 +45514,9 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
       saveVectorShapeInRegistry()
       dummyTimerDelayiedImageDisplay(100)
       BTNopenPrevPanel(mustOpenWin, "yes")
+      undoVectorShapesLevelsArray := []
+      currentVectorUndoLevel := 1
+      customShapeHasSelectedPoints := 0
       Return
    }
 
@@ -45701,6 +45554,9 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
       Return
    }
 
+   undoVectorShapesLevelsArray := []
+   currentVectorUndoLevel := 1
+   customShapeHasSelectedPoints := 0
    VPcreateSelPath("kill", 0, 0, 0, 0, 0, 0, 0, 0)
    obju := StrSplit(contentu, "`n", "`r `t")
    newArrayu := convertShapePointsStrToArray(obju[1])
@@ -63270,7 +63126,7 @@ createMenuInterfaceOptions() {
       }
 
       Menu, PvUIprefs, Add
-   } Else 
+   } Else
       kMenu("PvUIprefs", "Add", "&Search menu options`t;", "PanelQuickSearchMenuOptions")
 
    If (isNowAlphaPainting()!=1)
@@ -63323,6 +63179,11 @@ createMenuInterfaceOptions() {
       kMenu("PvUIprefs", "Add/Uncheck", "Show &menu bar`tF10", "ToggleMenuBaru", "toolbar" keyword)
       If (showMainMenuBar=1)
          kMenu("PvUIprefs", "Check", "Show &menu bar`tF10")
+   } Else
+   {
+      kMenu("PvUIprefs", "Add/Uncheck", "Show status &bar`tI", "ToggleContextStatusBar", "help")
+      If (showContextualStatusBar=1)
+         kMenu("PvUIprefs", "Check", "Show status &bar`tI")
    }
 
    keyword := (ShowAdvToolbar=1) ? "hide" : "display"
@@ -72159,6 +72020,8 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
 
               If (A_Index=1)
                  Gdip_FillEllipse(Gu, pBrushZ, xu - SelDotsSize//4, yu - SelDotsSize//4, SelDotsSize//2, SelDotsSize//2)
+              Else If (A_Index=totalz)
+                 Gdip_DrawEllipse(Gu, pPen6, xu - SelDotsSize//4, yu - SelDotsSize//4, SelDotsSize//2, SelDotsSize//2)
 
            } ; Else skipped++
        }
@@ -72176,10 +72039,10 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
        }
     } 
 
-    If (vpImgPanningNow!=1 && showContextualStatusBar=1)
+    If (vpImgPanningNow!=1 && showContextualStatusBar=1 && dontAddPoint!=-1)
     {
        canDoSymmetry := isNowSymmetricVectorShape()
-       msgu := (dontAddPoint!=0) ? "Move existing point P[" dontAddPoint "]. Double click to split in two" : "Add new point and extend path. Hold Alt, Ctrl or Shift for other modes. Escape to cancel."
+       msgu := (dontAddPoint!=0) ? "Move existing point P[" dontAddPoint "]. Double click to split in two" : "Click to add new point and extend path. Hold Alt, Ctrl or Shift for other modes."
        If altState
           msgu := (dontAddPoint=0 || !canDoSymmetry) ? "ALT: Add new point on existing edge" : "ALT: Move point ignoring symmetry P[" dontAddPoint "]"
        Else If ctrlState
@@ -72190,7 +72053,7 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
           If (dontAddPoint!=0)
              msgu := (selu=1) ? "SHIFT: Deselect point P[" dontAddPoint "]" : "SHIFT: Select point P[" dontAddPoint "]"
           Else
-             msgu := "SHIFT: Add new point snapped every 45° degrees and extend path"
+             msgu := "SHIFT: Click to add new point snapped every 45° degrees and extend path"
        }
 
        thisIDu := msgu "a" altState ctrlState shiftState canDoSymmetry FlipImgH FlipImgV scrollBarVx hasDrawnImageMap scrollBarHy
@@ -72210,7 +72073,15 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
           posXu := (FlipImgH=1) ? scrollBarVx : 0
           If (FlipImgH=0 && hasDrawnImageMap=1 && IMGlargerViewPort=1)
              posXu := Round(HUDobjNavBoxu[1])
+
           posYu := (FlipImgV=1) ? scrollBarHy : mainHeight - h - scrollBarHy
+          If (tempBtnVisible=hGuiBtn && showMainMenuBar!=1 && FlipImgV=0)
+          {
+             ; lastSize := RepositionTempBtnGui("getLast")
+             ; MouseCoords2Image(lastSize[5], lastSize[6], 1, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kY)
+             posYu := 0
+             ; ToolTip, % kY " kl=" lastSize[2] "|" h "|" posYu , , , 2
+          }
           tzGdip_DrawImage(Gu, BoxBMP, posXu, posYu, w, h)
           trGdip_DisposeImage(BoxBMP)
           prevMsg := thisIDu
@@ -72923,6 +72794,15 @@ createPathVectorCustomShape(ImgSelPath, ByRef PointsList, tension, isClosed, isB
          }
       }
    }
+
+   If (FillAreaCurveTension=4)
+      tensionCurveCustomShape := 0.95
+   Else If (FillAreaCurveTension=3)
+      tensionCurveCustomShape := 0.5
+   Else If (FillAreaCurveTension=2)
+      tensionCurveCustomShape := 0.2
+   Else
+      tensionCurveCustomShape := 0.1
 
    If (isBezier=1)
       Gdip_AddPathBeziers(ImgSelPath, PointsList)
@@ -77696,7 +77576,7 @@ InitSQLgetTable(SQL, dbHandle, ByRef errMsg, ByRef Rows, ByRef Cols, ByRef hTabl
    errMsg := hTable := 0 ; the sql output
    activeSQLdb._StrToUTF8(SQL, UTF8)
    RC := DllCall("SQlite3.dll\sqlite3_get_table", "Ptr", dbHandle, "Ptr", &UTF8, "PtrP", hTable
-               , "IntP", Rows, "IntP", Cols, "PtrP", Err, "Cdecl Int")
+               , "Int*", Rows, "Int*", Cols, "PtrP", Err, "Cdecl Int")
    If ErrorLevel
    {
       errMsg := "DLLCall sqlite3_get_table failed! Code: " ErrorLevel
@@ -95802,7 +95682,7 @@ If (bezierSplineCustomShape=1 || FillAreaCurveTension>1)
    PointsCount := Gdip_GetPathPointsCount(pPath)
 
    VarSetCapacity(PointsF, 8 * PointsCount, 0)
-   gdipLastError := DllCall("gdiplus\GdipGetPathPoints", "UPtr", pPath, "UPtr", &PointsF, "intP", PointsCount)
+   gdipLastError := DllCall("gdiplus\GdipGetPathPoints", "UPtr", pPath, "UPtr", &PointsF, "int*", PointsCount)
 
 
 hFIFimgA := viewportQPVimage.imgHandle

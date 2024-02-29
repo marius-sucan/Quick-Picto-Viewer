@@ -15,7 +15,7 @@ SetWorkingDir, %A_ScriptDir%
 CoordMode, Tooltip, Screen
 
 Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Quick Picto Viewer"
-     , RegExFilesPattern := "i)^(.\:\\).*(\.(ico|dib|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif))$"
+     , RegExFilesPattern := "i)^(.\:\\).*(\.(ico))$", QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
      , PVhwnd, hGDIwin, hGDIthumbsWin, WindowBgrColor, mainCompiledPath, hfdTreeWinGui
      , winGDIcreated := 0, ThumbsWinGDIcreated := 0, MainExe := AhkExported(), omniBoxMode := 0
      , AnyWindowOpen := 0, lastOtherWinClose := 1, wasMenuFlierCreated := 0, ImgAnnoBox
@@ -191,7 +191,7 @@ BuildGUI(params:=0) {
       FontBolded := externObj[16]
    }
 
-
+   RegRead, RegExFilesPattern, %QPVregEntry%, RegExFilesPattern
    ; setMenusTheme(1)
    calcHUDsize()
    MinGUISize := "+MinSize" A_ScreenWidth//4 "x" A_ScreenHeight//4
@@ -1657,6 +1657,7 @@ dummyTimerProccessDroppedFiles() {
    If (!totalGroppy || (A_TickCount - lastInvoked<400))
       Return
 
+   RegRead, RegExFilesPattern, %QPVregEntry%, RegExFilesPattern
    isCtrlDown := GetKeyState("Ctrl", "P")
    lastInvoked := A_TickCount
    vectorShape := imgFiles := foldersList := sldFile := ""
@@ -1695,6 +1696,7 @@ dummyTimerProccessDroppedFiles() {
       }
    }
 
+   fnOutDebug("regex: " RegExFilesPattern)
    If (countFiles>1 || countF>1)
       sldFile := ""
 

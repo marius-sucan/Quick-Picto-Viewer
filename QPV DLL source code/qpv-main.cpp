@@ -669,6 +669,144 @@ DLL_API int DLL_CALLCONV discardFilledPolygonCache(int m) {
     return 1;
 }
 
+bool inline isDotInRect(int mX, int mY, int x1, int x2, int y1, int y2) {
+   return ( (min(x1, x2) <= mX && mX <= max(x1, x2))  &&  (min(y1, y2) <= mY && mY <= max(y1, y2)) ) ? 1 : 0;
+}
+
+void inline min_diff(int& va, int& vb, int diff) {
+    int d = abs(va - vb);
+    if (d < diff) {
+       int dp = diff - d;
+       int k = (floor(dp/2.0f) == dp/2.0f) ? 0 : 1;
+       if (va<vb)
+       {
+          va -= dp/2;
+          vb += dp/2 + k;
+       } else
+       {
+          va += dp/2 + k;
+          vb -= dp/2;
+       }
+    }
+}
+
+DLL_API int DLL_CALLCONV traverseCurvedPath(float* oPointsList, int oPointsCount, float* fPointsList, int fPointsCount, int gmx, int gmy, int sl, Gdiplus::GpPen *pPen, int* za, int* zb, int* f, int* l) {
+    std::vector<int> PathsMap(fPointsCount + 3);
+fnOutputDebug("step 0: " + std::to_string(oPointsCount) + " / " + std::to_string(fPointsCount));
+    for ( int i = 0; i < oPointsCount*2; i+=2)
+    {
+        oPointsList[i] = round( oPointsList[i] );
+        oPointsList[i + 1] = round( oPointsList[i + 1] );
+        // fnOutputDebug("step 0b=" + std::to_string(oPointsList[i]) + " / " + std::to_string(oPointsList[i + 1]));
+    }
+fnOutputDebug("step 1");
+    int mapIndex = 0;
+    int aIndex = 0;
+    int bIndex = 0;
+    for ( int i = 0; i < fPointsCount*2; i+=2)
+    {
+        aIndex++;
+        fPointsList[i] = round( fPointsList[i] );
+        fPointsList[i + 1] = round( fPointsList[i + 1] );
+        int ax = fPointsList[i];
+        int ay = fPointsList[i + 1];
+        // fnOutputDebug("step 1a=" + std::to_string(ax) + " / " + std::to_string(ay));
+        for ( int z = 0; z < oPointsCount*2; z+=2)
+        {
+            bIndex++;
+            int bx = oPointsList[z];
+            int by = oPointsList[z + 1];
+            if (ax==bx && ay==by)
+               mapIndex = bIndex;
+        }
+
+        PathsMap[aIndex] = mapIndex;
+        bIndex = 0;
+        // fnOutputDebug("step 1=" + std::to_string(aIndex) + " / " + std::to_string(mapIndex));
+    }
+
+fnOutputDebug("step 2=" + std::to_string(gmx) + " / " + std::to_string(gmy));
+    aIndex = 0;
+    int hasFound = -1;
+    for ( int i = 0; i < fPointsCount*2; i+=2)
+    {
+        aIndex++;
+        int ax = fPointsList[i];
+        int ay = fPointsList[i + 1];
+        int bx = fPointsList[i + 2];
+        int by = fPointsList[i + 3];
+
+        min_diff(ax, bx, sl);
+        min_diff(ay, by, sl);
+        int inn = isDotInRect(gmx, gmy, ax, bx, ay, by);
+        if (inn==1)
+        {
+           ax = fPointsList[i];
+           ay = fPointsList[i + 1];
+           bx = fPointsList[i + 2];
+           by = fPointsList[i + 3];
+           BOOL r = NULL;
+           // fnOutputDebug("inn");
+           Gdiplus::GpPath *pPath = NULL;
+           Gdiplus::DllExports::GdipCreatePath(Gdiplus::FillModeAlternate, &pPath);
+           // fnOutputDebug("inn: path created");
+           Gdiplus::DllExports::GdipAddPathLine(pPath, ax, ay, bx, by);
+           // fnOutputDebug("inn: line added");
+           Gdiplus::DllExports::GdipIsOutlineVisiblePathPoint(pPath, gmx, gmy, pPen, NULL, &r);
+           // fnOutputDebug("inn: is outline");
+           Gdiplus::DllExports::GdipDeletePath(pPath);
+           // fnOutputDebug("inn: deleted path");
+           // fnOutputDebug("inn: r=" + std::to_string(r));
+           if (r)
+           {
+               hasFound = aIndex;
+               break;
+           }
+        }
+    }
+
+fnOutputDebug("step 3 aIndex=" + std::to_string(aIndex));
+    int last = (hasFound>=0) ? hasFound : -1;
+    int first = (hasFound>=0) ? hasFound : -1;
+    if (hasFound>=0)
+    {
+        for ( int i = hasFound; i < fPointsCount; i++)
+        {
+            if (PathsMap[i]!=PathsMap[last])
+            {
+                last = i - 1;
+                break;
+            }
+        }
+        for ( int i = hasFound; i >= 0; i--)
+        {
+            if (PathsMap[i]!=PathsMap[first])
+            {
+                first = i + 1;
+                break;
+            }
+        }
+    }
+
+    int zza = PathsMap[hasFound];
+    int zzb = (last==hasFound) ? zza + 1 : PathsMap[last + 1];
+    if (last==hasFound)
+       last = fPointsCount;
+    int r = 1;
+    if (hasFound>=0)
+    {
+        r = 2;
+        *za = zza;
+        *zb = zzb;
+        *f = first;
+        *l = last;
+    }
+
+    fnOutputDebug("a=" + std::to_string(zza) + "; b=" + std::to_string(zzb) + "; f=" + std::to_string(first) + "; l=" + std::to_string(last));
+    // fnOutputDebug("f=" + std::to_string(first) + "; h=" + std::to_string(hasFound) + "; l=" + std::to_string(last));
+    return r;
+}
+
 DLL_API int DLL_CALLCONV testFilledPolygonCache(int m) {
     int r = 1;
     if (polygonMaskMap.size()<2000 || polygonMapMin.size()<100)

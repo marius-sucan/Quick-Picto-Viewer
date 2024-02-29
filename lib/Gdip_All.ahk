@@ -3377,7 +3377,7 @@ Gdip_ImageRotateFlip(pBitmap, RotateFlipType:=1) {
 Gdip_RotateBitmapAtCenter(pBitmap, Angle, pBrush:=0, InterpolationMode:=7, PixelFormat:=0) {
 ; the pBrush will be used to fill the background of the image
 ; by default, it is black.
-; It returns the pointer to a new pBitmap.
+; The function returns the pointer to a new pBitmap.
     If !pBitmap
        Return
 
@@ -3387,7 +3387,8 @@ Gdip_RotateBitmapAtCenter(pBitmap, Angle, pBrush:=0, InterpolationMode:=7, Pixel
     Gdip_GetImageDimensions(pBitmap, Width, Height)
     Gdip_GetRotatedDimensions(Width, Height, Angle, RWidth, RHeight)
     Gdip_GetRotatedTranslation(Width, Height, Angle, xTranslation, yTranslation)
-    If (RWidth*RHeight>536847512) || (Rwidth>32750) || (RHeight>32750)
+    mpx := Round((RWidth * RHeight)/1000000, 1)
+    If (mpx>536.4 || RWidth>32750 || RHeight>32750)
        Return
 
     PixelFormatReadable := Gdip_GetImagePixelFormat(pBitmap, 2)
@@ -5869,6 +5870,7 @@ Gdip_ReversePath(pPath) {
 }
 
 Gdip_IsOutlineVisiblePathPoint(pGraphics, pPath, pPen, X, Y) {
+; pGraphics is optional; you can pass 0 for pGraphics
    result := 0
    E := DllCall("gdiplus\GdipIsOutlineVisiblePathPoint", "UPtr", pPath, "float", X, "float", Y, "UPtr", pPen, "UPtr", pGraphics, "int*", result)
    If E 
@@ -9250,6 +9252,10 @@ calcIMGdimensions(imgW, imgH, givenW, givenH, ByRef ResizedW, ByRef ResizedH) {
       ResizedH := (imgH >= givenH) ? givenH : imgH
       ResizedW := Round(ResizedH * PicRatio)
    }
+   If (ResizedW<1)
+      ResizedW := 1
+   If (ResizedH<1)
+      ResizedH := 1
 }
 
 GetWindowRect(hwnd, ByRef W, ByRef H) {
