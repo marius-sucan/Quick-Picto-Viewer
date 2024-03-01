@@ -669,6 +669,18 @@ DLL_API int DLL_CALLCONV discardFilledPolygonCache(int m) {
     return 1;
 }
 
+DLL_API int DLL_CALLCONV publicIsDotInRect(int mX, int mY, int x1, int x2, int y1, int y2, int modus) {
+    if (modus==1)
+    {
+       int a = y1 - x1;
+       int b = y1 + x2;
+       int c = y2 - x1;
+       int d = y2 + x2;
+       return ( (min(a, b) <= mX && mX <= max(a, b))  &&  (min(c, d) <= mY && mY <= max(c, d)) ) ? 1 : 0;
+    } else
+       return ( (min(x1, x2) <= mX && mX <= max(x1, x2))  &&  (min(y1, y2) <= mY && mY <= max(y1, y2)) ) ? 1 : 0;
+}
+
 bool inline isDotInRect(int mX, int mY, int x1, int x2, int y1, int y2) {
    return ( (min(x1, x2) <= mX && mX <= max(x1, x2))  &&  (min(y1, y2) <= mY && mY <= max(y1, y2)) ) ? 1 : 0;
 }

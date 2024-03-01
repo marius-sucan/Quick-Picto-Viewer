@@ -449,7 +449,6 @@ If !InStr(initGUI, "|")
    Return
 } Else
 {
-   interfaceThread.ahkassign("RegExFilesPattern", RegExFilesPattern)
    handleUIhwnd(initGui)
    externObj := ""
 }
@@ -6149,11 +6148,11 @@ selectFileLongTap() {
 }
 
 isDotInRect(mX, mY, x1, x2, y1, y2, modus:=0) {
-   If (modus=1)
-      r := (isInRange(mX, y1 - x1, y1 + x2) && isInRange(mY, y2 - x1, y2 + x2)) ? 1 : 0
-   Else
-      r := (isInRange(mX, x1, x2) && isInRange(mY, y1, y2)) ? 1 : 0
-   Return r
+   Return DllCall(whichMainDLL "\publicIsDotInRect", "int", mX, "int", mY, "int", x1, "int", x2, "int", y1, "int", y2, "int", modus)
+   ; If (modus=1)
+   ;    Return (isInRange(mX, y1 - x1, y1 + x2) && isInRange(mY, y2 - x1, y2 + x2)) ? 1 : 0
+   ; Else
+   ;    Return (isInRange(mX, x1, x2) && isInRange(mY, y1, y2)) ? 1 : 0
 }
 
 determineSelAreaClickRect(mX, mY, dotsSize, mainWidth, mainHeight, doFlips) {
@@ -6417,7 +6416,7 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
    } Else
    {
       If (dontAddPoint!=1)
-         kMenu("PVnav", "Add", "Add new point", "MenuAddUnorderedVectorPoint")
+         kMenu("PVnav", "Add", "Add new point`tAlt+Click", "MenuAddUnorderedVectorPoint")
       kMenu("PVnav", "Add", "X: " mX " Y: " mY, "dummy")
       kMenu("PVnav", "Disable", "X: " mX " Y: " mY, "dummy")
    }
@@ -7028,6 +7027,68 @@ MenuSelVectorPoint() {
   SetTimer, dummyRefreshImgSelectionWindow, -10
 }
 
+MenuConvertShapeToPoly() {
+   ; blends := {1:0.1, 2:0.2, 3:0.3, 4:0,4}
+   totalCount := customShapePoints.Count()
+   If (totalCount<3)
+      Return
+
+   widthu := (PrefsLargeFonts=1) ? 600 : 300
+   msgResult := msgBoxWrapper("Convert curved shape to polygonal: " appTitle, "Please select the level of detail for the resulted polygonal shape.", "&Convert shape|&Cancel", 1, "image", nullCheckBox, 0, "90`%`f80`%`f`f70`%`f60`%`f50`%`f40`%`f30`%`f20`%`f10`%","",,, widthu)
+   If InStr(msgResult.btn, "convert")
+   {
+      thisLevel := msgResult.list / 10
+      PointsListArray := []
+      Loop, % totalCount
+      {
+          getVPcoordsVectorPoint(A_Index, xu, yu)
+          PointsListArray[A_Index*2 - 1] := xu
+          PointsListArray[A_Index*2] := yu
+      }
+
+      thisPath := Gdip_CreatePath()
+      createPathVectorCustomShape(thisPath, PointsListArray, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape, 0, 1, 0)
+      r1 := Gdip_FlattenPath(thisPath, thisLevel)
+      PointsCount := Gdip_GetPathPointsCount(thisPath)
+      VarSetCapacity(PointsF, 8 * (PointsCount + 1), 0)
+      r2 := DllCall("gdiplus\GdipGetPathPoints", "UPtr", thisPath, "UPtr", &PointsF, "int*", PointsCount)
+      If (r1!=0 || r1!=0 || PointsCount<totalCount)
+      {
+         showTOOLtip("ERROR: Failed to convert curved shape to polygonal.")
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         PointsF := ""
+         Gdip_DeletePath(thisPath)
+         PointsListArray := ""
+         Return
+      }
+
+      customShapeHasSelectedPoints := 0
+      customShapePoints := []
+      initialDrawingStartCoords := []
+      Loop, % PointsCount
+      {
+          x := NumGet(&PointsF, 8*(A_Index-1), "float")
+          y := NumGet(&PointsF, (8*(A_Index-1))+4, "float")
+          customShapePoints[A_Index] := [x, y]
+          initialDrawingStartCoords[A_Index] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH, 0]
+      }
+
+      customShapeCountPoints := PointsCount
+      FillAreaCurveTension := 1
+      bezierSplineCustomShape := 0
+      decideCustomShapeStyle()
+      PointsF := ""
+      PointsListArray := ""
+      Gdip_DeletePath(thisPath)
+      showTOOLtip("Curved vector shape converted to polygonal shape:`nInitial number of points: " groupDigits(totalCount) "`nAfter conversion: " groupDigits(PointsCount))
+      If (preventUndoLevels!=1)
+         recordVectorUndoLevels(customShapePoints.Clone(), initialDrawingStartCoords.Clone())
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      SetTimer, dummyRefreshImgSelectionWindow, -50
+   }
+}
+
 MenuAddUnorderedVectorPoint(zzx:=0, zzy:=0, mo:=0) {
    startZeit := A_TickCount
    lastOtherWinClose := 1
@@ -7075,6 +7136,7 @@ MenuAddUnorderedVectorPoint(zzx:=0, zzy:=0, mo:=0) {
       ; splitPointGivenInPath(1, totalCount, foundDot, oppoIndex, canDoSymmetry, gmX, gmY)
 
    ; ToolTip, % totalCount " | dot=" foundDot "/" foundOtherDot "|" zzz "|" A_TickCount - startZeit , , , 2
+   fnOutputDebug(A_ThisFunc "(): "  A_TickCount - startZeit " ms ")
    ; ToolTip, % A_TickCount - startZeit " ms loops=" hasFoundDot "| dot=" foundDot "/" foundOtherDot " | o=" outline " rects=" drects " kTotals=" kTotals , , , 2
    doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
    SetTimer, dummyRefreshImgSelectionWindow, -25
@@ -7119,7 +7181,7 @@ coreAddUnorderedVectorPointCurveMode(gmx, gmy, sl) {
       trGdip_DisposeImage(pBitmap)
    }
 
-   outline := 1 ; (clr[2]>1) ? 1 : 0 ; this is too slow >>> Gdip_IsOutlineVisiblePathPoint(2NDglPG, thisPath, pPen8, gmX, gmY)
+   outline := (clr[2]>1) ? 1 : 0 ; this is too slow >>> Gdip_IsOutlineVisiblePathPoint(2NDglPG, thisPath, pPen8, gmX, gmY)
    If (outline=1)
    {
       If (closedLineCustomShape=1)
@@ -7970,11 +8032,11 @@ reflectGivenAnchorInAltPath(ByRef PointsList, thisIndex, indexu, whichIndex) {
 }
 
 getVPcoordsVectorPoint(whichIndex, ByRef X, ByRef Y) {
-   cA := customShapePoints[whichIndex]
+   ; cA := customShapePoints[whichIndex]
    fX := prevResizedVPimgW/initialDrawingStartCoords[whichIndex, 4]
    fY := prevResizedVPimgH/initialDrawingStartCoords[whichIndex, 5]
-   x := cA[1]*fX - (initialDrawingStartCoords[whichIndex, 1]*fX - prevDestPosX)
-   y := cA[2]*fY - (initialDrawingStartCoords[whichIndex, 2]*fY - prevDestPosY)
+   x := customShapePoints[whichIndex, 1]*fX - (initialDrawingStartCoords[whichIndex, 1]*fX - prevDestPosX)
+   y := customShapePoints[whichIndex, 2]*fY - (initialDrawingStartCoords[whichIndex, 2]*fY - prevDestPosY)
 }
 
 collapseGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry) {
@@ -58505,6 +58567,12 @@ createMenuSelectShapeTension() {
    ; kMenu("PVshapeTension", "Disable", "&Cycle smoothness levels" keyuB, "togglePathCurveTension", "shape tension")
    If (bezierSplineCustomShape=1)
       kMenu("PVshapeTension", "Check", "Bézier spline" keyuA)
+
+   If (bezierSplineCustomShape=1 || FillAreaCurveTension>1)
+   {
+      Menu, PVshapeTension, Add
+      kMenu("PVshapeTension", "Add", "Convert to polygonal shape", "MenuConvertShapeToPoly")
+   }
 }
 
 createMenuSelectSizeShapes(dummy:=0, b:=0) {
@@ -71770,7 +71838,7 @@ fAddPathLine(pPath, x1, y1, x2, y2, err) {
 }
 
 drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
-    Static pWhite, prevBMP
+    Static pWhite, prevBMP, prevCstate, prevpx, prevpy, prevMousePoint
     If (mainWidth="kill")
     {
        If pWhite
@@ -71788,6 +71856,7 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
     If validBMP(HistogramBMP)
        HistogramBMP := trGdip_DisposeImage(HistogramBMP, 1)
 
+    startZeit := A_TickCount
     GetMouseCoord2wind(PVhwnd, mX, mY)
     gmX := (FlipImgH=1) ? mainWidth - mX : mX
     gmY := (FlipImgV=1) ? mainHeight - mY : mY
@@ -71797,57 +71866,98 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
     {
        ; handle H/V scrollbars for images larger than the viewport
        knobSize := getScrollWidth()
-       If (scrollBarHy>1 && mY>(mainHeight - knobSize))
-       || (scrollBarVx>1 && mX>(mainWidth - knobSize))
+       If ( (scrollBarHy>1 && mY>(mainHeight - knobSize))
+       || (scrollBarVx>1 && mX>(mainWidth - knobSize)) )
           dontAddPoint := -1
     }
 
     If (dontAddPoint!=-1)
     {
        MouseGetPos, , , OutputVarWin
-       If GetKeyState("Space", "P") || (showHUDnavIMG=1 && IMGlargerViewPort=1 && hasDrawnImageMap=1 && isDotInRect(mX, mY, HUDobjNavBoxu[7], HUDobjNavBoxu[5] + HUDobjNavBoxu[7], HUDobjNavBoxu[8], HUDobjNavBoxu[6] + HUDobjNavBoxu[8]))
-       || (OutputVarWin!=PVhwnd) || (A_TickCount - zeitSillyPrevent<100)
+       If ( GetKeyState("Space", "P") || (showHUDnavIMG=1 && IMGlargerViewPort=1 && hasDrawnImageMap=1 && isDotInRect(mX, mY, HUDobjNavBoxu[7], HUDobjNavBoxu[5] + HUDobjNavBoxu[7], HUDobjNavBoxu[8], HUDobjNavBoxu[6] + HUDobjNavBoxu[8]))
+       || (OutputVarWin!=PVhwnd) || (A_TickCount - zeitSillyPrevent<100) )
           dontAddPoint := -1
     }
 
     PointsListArray := [] ; flatten
     customShapeHasSelectedPoints := 0
-    k := firstPx := firstPy := 0
+    ptz := k := firstPx := firstPy := 0
     totalz := customShapePoints.Count()
+    Static cachedListu := []
+    fnOutputDebug(prevState)
+    thisState := "a" mainWidth mainHeight closedLineCustomShape tensionCurveCustomShape cardinalCurveCustomShape customShapePoints.Count() lastZeitFileSelect imgSelX1 imgSelY1 imgSelX2 imgSelY2 bezierSplineCustomShape zoomLevel currentVectorUndoLevel prevDestPosX prevDestPosY
+    fnOutputDebug(thisState)
+    If (thisState!=prevCstate)
+    {
+       prevpx := prevDestPosX
+       prevpy := prevDestPosY
+       cachedListu := []
+    } Else If (cachedListu.Count() > totalz*2 - 10)
+       isCached := 1
+
     Loop, % totalz
     {
        ; convert and normalize points coordinates to current viewport conditions
-       getVPcoordsVectorPoint(A_Index, xu, yu)
+       ; getVPcoordsVectorPoint(A_Index, xu, yu)
+       If (isCached=1)
+       {
+          xu := cachedListu[A_Index*2 - 1]
+          yu := cachedListu[A_Index*2]
+          If (A_Index=prevMousePoint)
+             getVPcoordsVectorPoint(A_Index, xu, yu)
+       } Else
+       {
+          fX := prevResizedVPimgW/initialDrawingStartCoords[A_Index, 4]
+          fY := prevResizedVPimgH/initialDrawingStartCoords[A_Index, 5]
+          xu := customShapePoints[A_Index, 1]*fX - (initialDrawingStartCoords[A_Index, 1]*fX - prevDestPosX)
+          yu := customShapePoints[A_Index, 2]*fY - (initialDrawingStartCoords[A_Index, 2]*fY - prevDestPosY)
+       }
+
        If (initialDrawingStartCoords[A_Index, 3])
        {
           firstPx := xu  ,  firstPy := yu
           customShapeHasSelectedPoints := 1
        }
 
-       If (A_Index=1 && !vpSymmetryPointX && !vpSymmetryPointY && totalz=1 && bezierSplineCustomShape=0)
-       || (A_Index=2 && !vpSymmetryPointX && !vpSymmetryPointY && totalz=2 && bezierSplineCustomShape=1)
+       If (totalz<3)
        {
-          fX := prevResizedVPimgW/initialDrawingStartCoords[A_Index, 4]
-          fY := prevResizedVPimgH/initialDrawingStartCoords[A_Index, 5]
-          vpSymmetryPointX := customShapePoints[A_Index, 1]*fX
-          vpSymmetryPointY := customShapePoints[A_Index, 2]*fY
-          vpSymmetryPointXdp := initialDrawingStartCoords[A_Index, 1]
-          vpSymmetryPointYdp := initialDrawingStartCoords[A_Index, 2]
-          prevVectorShapeSymmetryMode[1] := [1, 0]
+          If (A_Index=1 && !vpSymmetryPointX && !vpSymmetryPointY && totalz=1 && bezierSplineCustomShape=0)
+          || (A_Index=2 && !vpSymmetryPointX && !vpSymmetryPointY && totalz=2 && bezierSplineCustomShape=1)
+          {
+             fX := prevResizedVPimgW/initialDrawingStartCoords[A_Index, 4]
+             fY := prevResizedVPimgH/initialDrawingStartCoords[A_Index, 5]
+             vpSymmetryPointX := customShapePoints[A_Index, 1]*fX
+             vpSymmetryPointY := customShapePoints[A_Index, 2]*fY
+             vpSymmetryPointXdp := initialDrawingStartCoords[A_Index, 1]
+             vpSymmetryPointYdp := initialDrawingStartCoords[A_Index, 2]
+             prevVectorShapeSymmetryMode[1] := [1, 0]
+          }
        }
 
        ; k := (bezierSplineCustomShape=1) ? clampInRange(k + 1, 1, 3, 1) : 1
        ; newArrayu[A_Index] := [xu, yu, k]
        PointsListArray[A_Index*2 - 1] := xu
        PointsListArray[A_Index*2] := yu
+       If (A_Index<10)
+          ptz++
        ; test if mouse location is hovering one of the points in the vector path
        If (dontAddPoint!=-1)
        {
-          If isDotInRect(gmX, gmY, SelDotsSize, SelDotsSize, PointsListArray[A_Index*2 - 1], PointsListArray[A_Index*2], 1)
+          ; If isDotInRect(gmX, gmY, SelDotsSize, SelDotsSize, PointsListArray[A_Index*2 - 1], PointsListArray[A_Index*2], 1)
+          If DllCall(whichMainDLL "\publicIsDotInRect", "int", gmX, "int", gmY, "int", SelDotsSize, "int", SelDotsSize, "int", xu, "int", yu, "int", 1)
              dontAddPoint := A_Index
        }
     }
 
+    If (isCached!=1)
+    {
+       prevCstate := thisState
+       cachedListu := PointsListArray.Clone()
+    }
+
+    If (dontAddPoint>0)
+       prevMousePoint := dontAddPoint
+fnOutputDebug(isCached "|" dontAddPoint " | " A_ThisFunc " interim A: " A_TickCount - startZeit " ms")
     lastPx := xu,    lastPy := yu
     If (totalz<=2 && bezierSplineCustomShape=0 || totalz=3 && bezierSplineCustomShape=1)
     {
@@ -71921,11 +72031,11 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
     If (drawingVectorLiveMode=1)
        Gdip_SetPenWidth(PenuDrawLive, thisThick)
 
-    If (PenuDrawLive && isInRange(PointsListArray.Count(), 3, 4))
+    If (PenuDrawLive && isInRange(ptz, 3, 4))
     {
        Gdip_SetPenWidth(pPen4, imgHUDbaseUnit//11)
        Gdip_DrawLines(Gu, pPen4, PointsListArray)
-    } Else If (PenuDrawLive && PointsListArray.Count()>4)
+    } Else If (PenuDrawLive && ptz>4)
     {
        thisPath := Gdip_CreatePath()
        createPathVectorCustomShape(thisPath, PointsListArray, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape, 0, 0, 0)
@@ -71935,8 +72045,10 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
           Gdip_FillPath(Gu, PenuDrawLive, thisPath)
 
        Gdip_DeletePath(thisPath)
+       thisPath := ""
     }
 
+fnOutputDebug(A_ThisFunc " interim B: " A_TickCount - startZeit " ms")
     If (dontAddPoint!=-1 && vpImgPanningNow=0)
     {
        If (customShapeHasSelectedPoints=1)
@@ -71956,18 +72068,21 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
           thisPath := Gdip_CreatePath()
 
        skipped := skippedLines := k := 0
+       slp := SelDotsSize//2 + 1
+       sl := SelDotsSize
+       slz := sl//2 + 1
        overDrawFilter := new hashtable()
        Loop, % totalz
        {
            ; draw the vector points
            xu := PointsListArray[A_Index*2 - 1], yu := PointsListArray[A_Index*2]
            k := (bezierSplineCustomShape=1) ? clampInRange(k + 1, 1, 3, 1) : 1
-           sl := (k=1) ? SelDotsSize : SelDotsSize//2 + 1   ; keys or anchors
-           slz := sl//2 + 1
            j := 0
-           If (k=1 && A_Index>1 && A_Index<totalz)
+           If (k=1 && A_Index>1 && A_Index<totalz && bezierSplineCustomShape=1)
            {
               ; prepare the list of lines to draw formed by anchors connected to the main/key points
+              sl := (k=1) ? SelDotsSize : slp   ; keys or anchors
+              slz := sl//2 + 1
               xA := PointsListArray[(A_Index + 1)*2 - 1], yA := PointsListArray[(A_Index + 1)*2]
               xB := PointsListArray[(A_Index + 3)*2 - 1], yB := PointsListArray[(A_Index + 3)*2]
               xC := PointsListArray[(A_Index - 1)*2 - 1], yC := PointsListArray[(A_Index - 1)*2]
@@ -71986,7 +72101,6 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
               ;    skippedLines++
            }
 
-           selu := initialDrawingStartCoords[A_Index, 3]
            thisState := "a" xu yu
            highl := 0
            If (prevState=thisState)
@@ -71997,6 +72111,7 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
 
            If (prevState!=thisState || counter<3 && k=1)
            {
+              selu := initialDrawingStartCoords[A_Index, 3]
               pselu := (A_Index=dontAddPoint) ? 1 : 0
               prevState := thisState
               If (A_Index=dontAddPoint || highl=1)
@@ -72004,19 +72119,23 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
 
               tx := floor(xu - sl/2)
               ty := floor(yu - sl/2)
-              bz := tx//slz "|" ty//slz
               whichBrush := (selu=1) ? pBrushA : pBrushD
-              If (overDrawFilter[bz]!=1 && isDotInRect(tX, tY, 0, mainWidth, 0, mainHeight))
+              If DllCall(whichMainDLL "\publicIsDotInRect", "int", tX, "int", tY, "int", 0, "int", mainWidth, "int", 0, "int", mainHeight, "int", 0)
               {
-                 If (A_Index=dontAddPoint || highl=1)
-                    Gdip_FillRectangle(Gu, pWhite, tx, ty, sl, sl)
-                 Else
-                    Gdip_FillRectangle(Gu, whichBrush, tx, ty, sl, sl)
+                 bz := tx//slz "|" ty//slz
+                 ; If (overDrawFilter[bz]!=1 && isDotInRect(tX, tY, 0, mainWidth, 0, mainHeight))
+                 If (overDrawFilter[bz]!=1)
+                 {
+                    If (A_Index=dontAddPoint || highl=1)
+                       Gdip_FillRectangle(Gu, pWhite, tx, ty, sl, sl)
+                    Else
+                       Gdip_FillRectangle(Gu, whichBrush, tx, ty, sl, sl)
 
-                 If (selu=1) ; || highl=1)
-                    Gdip_DrawRectangle(Gu, pPen7, tx, ty, sl, sl)
-                 overDrawFilter[bz] := 1
-              } ; Else skipped++
+                    If (selu=1) ; || highl=1)
+                       Gdip_DrawRectangle(Gu, pPen7, tx, ty, sl, sl)
+                    overDrawFilter[bz] := 1
+                 } ; Else skipped++
+              }
 
               If (A_Index=1)
                  Gdip_FillEllipse(Gu, pBrushZ, xu - SelDotsSize//4, yu - SelDotsSize//4, SelDotsSize//2, SelDotsSize//2)
@@ -72031,7 +72150,7 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
        {
           ; draw the lines formed by anchors and the main/key points
           Gdip_SetPenWidth(pPen1d, SelDotsSize//5 + 1)
-          Gdip_AddPathLine(thisPath, PointsListArray[1*2 - 1], PointsListArray[1*2], PointsListArray[2*2 - 1], PointsListArray[2*2]) ; first anchor
+          Gdip_AddPathLine(thisPath, PointsListArray[1], PointsListArray[2], PointsListArray[3], PointsListArray[4]) ; first anchor
           Gdip_StartPathFigure(thisPath)
           Gdip_AddPathLine(thisPath, PointsListArray[totalz * 2 - 3], PointsListArray[totalz * 2 - 2], PointsListArray[totalz * 2 - 1], PointsListArray[totalz * 2]) ; last anchor
           Gdip_DrawPath(Gu, pPen1d, thisPath)
@@ -72087,7 +72206,7 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu) {
           prevMsg := thisIDu
        }
     }
-
+    fnOutputDebug(A_ThisFunc "(): redraw in " A_TickCount - startZeit "ms ")
     ; MenuAddUnorderedVectorPoint(gmx, gmy, "given")
     doNormalCursor := (dontAddPoint!=0 || vpImgPanningNow=1) ? 1 : 0
     interfaceThread.ahkassign("doNormalCursor", doNormalCursor)
