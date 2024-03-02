@@ -704,17 +704,18 @@ void inline min_diff(int& va, int& vb, int diff) {
 
 DLL_API int DLL_CALLCONV traverseCurvedPath(float* oPointsList, int oPointsCount, float* fPointsList, int fPointsCount, int gmx, int gmy, int sl, Gdiplus::GpPen *pPen, int* za, int* zb, int* f, int* l) {
     std::vector<int> PathsMap(fPointsCount + 3);
-fnOutputDebug("step 0: " + std::to_string(oPointsCount) + " / " + std::to_string(fPointsCount));
+    fnOutputDebug("step 0: " + std::to_string(oPointsCount) + " / " + std::to_string(fPointsCount));
     for ( int i = 0; i < oPointsCount*2; i+=2)
     {
         oPointsList[i] = round( oPointsList[i] );
         oPointsList[i + 1] = round( oPointsList[i + 1] );
         // fnOutputDebug("step 0b=" + std::to_string(oPointsList[i]) + " / " + std::to_string(oPointsList[i + 1]));
     }
-fnOutputDebug("step 1");
+
     int mapIndex = 0;
     int aIndex = 0;
     int bIndex = 0;
+    int las = 0;
     for ( int i = 0; i < fPointsCount*2; i+=2)
     {
         aIndex++;
@@ -723,21 +724,25 @@ fnOutputDebug("step 1");
         int ax = fPointsList[i];
         int ay = fPointsList[i + 1];
         // fnOutputDebug("step 1a=" + std::to_string(ax) + " / " + std::to_string(ay));
-        for ( int z = 0; z < oPointsCount*2; z+=2)
+        for ( int z = las; z < oPointsCount*2; z+=2)
         {
             bIndex++;
             int bx = oPointsList[z];
             int by = oPointsList[z + 1];
             if (ax==bx && ay==by)
+            {
                mapIndex = bIndex;
+               las = z;
+               break;
+            }
         }
 
         PathsMap[aIndex] = mapIndex;
-        bIndex = 0;
+        bIndex = mapIndex - 1;
         // fnOutputDebug("step 1=" + std::to_string(aIndex) + " / " + std::to_string(mapIndex));
     }
 
-fnOutputDebug("step 2=" + std::to_string(gmx) + " / " + std::to_string(gmy));
+    // fnOutputDebug("step 2=" + std::to_string(gmx) + " / " + std::to_string(gmy));
     aIndex = 0;
     int hasFound = -1;
     for ( int i = 0; i < fPointsCount*2; i+=2)
@@ -777,7 +782,7 @@ fnOutputDebug("step 2=" + std::to_string(gmx) + " / " + std::to_string(gmy));
         }
     }
 
-fnOutputDebug("step 3 aIndex=" + std::to_string(aIndex));
+    // fnOutputDebug("step 3 aIndex=" + std::to_string(aIndex));
     int last = (hasFound>=0) ? hasFound : -1;
     int first = (hasFound>=0) ? hasFound : -1;
     if (hasFound>=0)
@@ -786,7 +791,7 @@ fnOutputDebug("step 3 aIndex=" + std::to_string(aIndex));
         {
             if (PathsMap[i]!=PathsMap[last])
             {
-                last = i - 1;
+                last = i;
                 break;
             }
         }
@@ -794,7 +799,7 @@ fnOutputDebug("step 3 aIndex=" + std::to_string(aIndex));
         {
             if (PathsMap[i]!=PathsMap[first])
             {
-                first = i + 1;
+                first = i;
                 break;
             }
         }
