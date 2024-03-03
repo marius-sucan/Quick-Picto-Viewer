@@ -894,9 +894,10 @@ k) How vector shapes drawing works [soon]
   PanelManageVectorShapes()
   startDrawingShape()
   drawLiveCreateCustomShape()
+  drawVisibleVectorPoints()
   stopDrawingShape()
-  addNewVectorShapePoints() invoked by WinClickAction() and by some context menu options listed by createContextMenuCustomShapeDrawing()
-  createContextMenuCustomShapeDrawing() invoked by BuildMainMenu()  and addNewVectorShapePoints() on right click
+  PerformVectorShapeActions() invoked by WinClickAction() and by some context menu options listed by createContextMenuCustomShapeDrawing()
+  createContextMenuCustomShapeDrawing() invoked by BuildMainMenu()  and PerformVectorShapeActions() on right click
 
   convertShapePointsStrToArray()
   convertShapePointsArrayToStr()
