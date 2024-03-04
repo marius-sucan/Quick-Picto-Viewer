@@ -6476,7 +6476,7 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
       labelu := (bk=1 && bezierSplineCustomShape=1 || bezierSplineCustomShape!=1) ? "&Remove point" : "Collapse &anchor"
       kMenu("PVnav", "Add", labelu "`tCtrl+Click", "MenuRemVectorPoint")
       kMenu("PVnav", "Add", "S&elect point`tShift+Click", "MenuSelVectorPoint")
-      If (!CustomShapeSymmetry && !CustomShapeLockedSymmetry)
+      If !isNowSymmetricVectorShape()
       {
          If (bezierSplineCustomShape!=1)
             kMenu("PVnav", "Add", "Paste points here", "MenuPasteVectorPoints")
@@ -6514,7 +6514,7 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
       } Else If (CustomShapeLockedSymmetry)
       {
          kMenu("PVnav", "Add/Uncheck", "Toggle symmetry mode`tY", "toggleBrushSymmetryModes")
-         If CustomShapeSymmetry
+         If isNowSymmetricVectorShape()
             kMenu("PVnav", "Check", "Toggle symmetry mode`tY")
       } 
 
@@ -6689,18 +6689,21 @@ configVectorShapeSymmetryPoint(modus, silentu, givenIndex) {
       Return
    }
 
-   cA := customShapePoints[thisIndex]
-   fX := prevResizedVPimgW/initialDrawingStartCoords[thisIndex, 4]
-   fY := prevResizedVPimgH/initialDrawingStartCoords[thisIndex, 5]
-   vpSymmetryPointX := cA[1]*fX
-   vpSymmetryPointY := cA[2]*fY
-   vpSymmetryPointXdp := initialDrawingStartCoords[thisIndex, 1]
-   vpSymmetryPointYdp := initialDrawingStartCoords[thisIndex, 2]
    thisu := (modus="x") ? 1 : 2
    CustomShapeSymmetry := CustomShapeLockedSymmetry := thisu
+   coreSetVPsymmetryPoint(thisIndex)
    ; vpFreeformShapeOffset := []
-   prevVectorShapeSymmetryMode[1] := [thisIndex, thisu]
    SetTimer, dummyRefreshImgSelectionWindow, -10
+}
+
+coreSetVPsymmetryPoint(thisIndex) {
+   fX := prevResizedVPimgW/initialDrawingStartCoords[thisIndex, 4]
+   fY := prevResizedVPimgH/initialDrawingStartCoords[thisIndex, 5]
+   vpSymmetryPointX := customShapePoints[thisIndex, 1] * fX
+   vpSymmetryPointY := customShapePoints[thisIndex, 2] * fY
+   vpSymmetryPointXdp := initialDrawingStartCoords[thisIndex, 1]
+   vpSymmetryPointYdp := initialDrawingStartCoords[thisIndex, 2]
+   prevVectorShapeSymmetryMode[1] := [thisIndex, CustomShapeSymmetry]
 }
 
 MenuExpandSelectedAnchorPoints() {
@@ -6893,7 +6896,7 @@ MenuRemSelVectorPoints() {
     newArrayu := []
     newuArrayu := []
     thisIndex := thePoint := 0
-    If CustomShapeSymmetry
+    If isNowSymmetricVectorShape()
     {
        hasSymmetry := 1
        thePoint := prevVectorShapeSymmetryMode[1, 1]
@@ -6927,7 +6930,6 @@ MenuRemSelVectorPoints() {
     customShapePoints := newArrayu.Clone()
     initialDrawingStartCoords := newuArrayu.Clone()
     customShapeHasSelectedPoints := 0
-
     If (preventUndoLevels!=1)
        recordVectorUndoLevels(customShapePoints.Clone(), initialDrawingStartCoords.Clone())
 
@@ -7126,7 +7128,6 @@ MenuAddUnorderedVectorPoint(zzx:=0, zzy:=0, mo:=0) {
 
    foundDot := foundStuff[1]
    foundOtherDot := foundStuff[2]
-   oppoIndex := (canDoSymmetry=1) ? totalCount - foundDot + 1 : -1
    canDoSymmetry := isNowSymmetricVectorShape()
    zzz := min(foundDot, foundOtherDot) + 1
    If (max(foundDot, foundOtherDot)>=totalCount && FillAreaCurveTension=1)
@@ -7139,6 +7140,26 @@ MenuAddUnorderedVectorPoint(zzx:=0, zzy:=0, mo:=0) {
    {
       rr := "yes"
       pushAtGivenVectorPoint(zzz, gmX, gmY)
+      oppoIndex := (canDoSymmetry=1) ? totalCount - zzz + 1 : 0
+      If (oppoIndex!=foundDot && canDoSymmetry=1 && oppoIndex>0)
+      {
+         calculateSymmetricVectorPoint(gmX, gmY, nX, nY)
+         If (foundDot < oppoIndex)
+            oppoIndex++
+
+         If (bezierSplineCustomShape!=1)
+            oppoIndex++
+
+         If (k=3 && bezierSplineCustomShape=1 || bezierSplineCustomShape!=1)
+            pushed := pushAtGivenVectorPoint(oppoIndex, nX, nY)
+         Else If (k=1 && bezierSplineCustomShape=1 && foundDot!=1)
+            pushed := pushAtGivenVectorPoint(oppoIndex - 1, nX, nY)
+         Else If (k=2 && bezierSplineCustomShape=1)
+            pushed := pushAtGivenVectorPoint(oppoIndex + 1, nX, nY)
+
+         prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] + pushed
+      }
+
       If (preventUndoLevels!=1 && mo!="given")
          recordVectorUndoLevels(customShapePoints.Clone(), initialDrawingStartCoords.Clone())
    } Else
@@ -7505,13 +7526,18 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
    If hasFoundDot
    {
       ; perform action[s] on thisIndex point from customShapePoints
-      If (mainParam="DoubleClick" && totalCount>2 && shiftState=0 && ctrlState=0 && altState=0)
+      If (mainParam="DoubleClick" && totalCount>2 && shiftState=0 && ctrlState=0)
       {
          dontAddPoint := 1
          If (k!=1 && bezierSplineCustomShape=1)
             collapseGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry)
-         Else
+         Else If (bezierSplineCustomShape!=1)
             splitPointGivenInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
+         Else If (altState=1 && bezierSplineCustomShape=1 && k=1)
+         {
+            doSpecialAct := dontAddPoint := 1
+            expandGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
+         }
       } Else If (shiftState=1 || mainParam="selClick")
       {
          dontAddPoint := 1
@@ -7534,7 +7560,7 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
       {
          dotRemoved := 1
          removeGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
-      } Else If (mainParam!="remClick" && mainParam!="rClick" && ctrlState=0 && altState=0 && shiftState=0)
+      } Else If (mainParam!="remClick" && mainParam!="rClick" && ctrlState=0 && shiftState=0)
       {
          If (customShapeHasSelectedPoints=1 && selu=1)
          {
@@ -7718,16 +7744,16 @@ splitPointGivenInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, g
       }
    }
 
-   Random, slx, % SelDotsSize//2 + 1, SelDotsSize*3
-   Random, sly, % SelDotsSize//2 + 1, SelDotsSize*3
+   Random, slx, % SelDotsSize//2 + 1, SelDotsSize*4
+   Random, sly, % SelDotsSize//2 + 1, SelDotsSize*4
    Random, r1, -1, 1
    Random, r2, -1, 1
    slx := (r1<0) ? -1*slx : slx
    sly := (r2<0) ? -1*sly : sly
 
-   selu := initialDrawingStartCoords[thisIndex, 3]
-   customShapePoints[thisIndex] := [gmX, gmY]
-   initialDrawingStartCoords[thisIndex] := [prevDestPosX, prevDestPosY, selu, prevResizedVPimgW, prevResizedVPimgH]
+   ; selu := initialDrawingStartCoords[thisIndex, 3]
+   ; customShapePoints[thisIndex] := [gmX, gmY]
+   ; initialDrawingStartCoords[thisIndex] := [prevDestPosX, prevDestPosY, selu, prevResizedVPimgW, prevResizedVPimgH]
    If (k=3 && bezierSplineCustomShape=1 || bezierSplineCustomShape!=1)
       pushAtGivenVectorPoint(thisIndex, gmX - slx, gmY - sly)
    Else If (k=1 && bezierSplineCustomShape=1 && thisIndex!=1)
@@ -7737,13 +7763,16 @@ splitPointGivenInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, g
 
    If (oppoIndex!=thisIndex && canDoSymmetry=1)
    {
-      calculateSymmetricVectorPoint(gmX, gmY, nX, nY)
+      calculateSymmetricVectorPoint(gmX - slx, gmY - sly, nX, nY)
       If (thisIndex < oppoIndex)
          oppoIndex++
 
-      customShapePoints[oppoIndex] := [nX, nY]
-      initialDrawingStartCoords[oppoIndex] := [prevDestPosX, prevDestPosY, selu, prevResizedVPimgW, prevResizedVPimgH]
-      calculateSymmetricVectorPoint(gmX - slx, gmY - sly, nX, nY)
+      If (bezierSplineCustomShape!=1)
+         oppoIndex++
+
+      ; customShapePoints[oppoIndex] := [nX, nY]
+      ; initialDrawingStartCoords[oppoIndex] := [prevDestPosX, prevDestPosY, selu, prevResizedVPimgW, prevResizedVPimgH]
+      ; calculateSymmetricVectorPoint(gmX - slx, gmY - sly, nX, nY)
       If (k=3 && bezierSplineCustomShape=1 || bezierSplineCustomShape!=1)
          pushed := pushAtGivenVectorPoint(oppoIndex, nX, nY)
       Else If (k=1 && bezierSplineCustomShape=1 && thisIndex!=1)
@@ -7757,6 +7786,9 @@ splitPointGivenInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, g
       prevVectorShapeSymmetryMode[1, 2] := 0
       CustomShapeLockedSymmetry := 0
    }
+
+   lastZeitFileSelect := A_TickCount
+   drawLiveCreateCustomShape("kill", 0, 0)
    dummyRefreshImgSelectionWindow()
 }
 
@@ -8076,7 +8108,7 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
 
    While, (determineLClickState()=1)
    {
-        If (A_TickCount - startOperation<150)
+        If (A_TickCount - startOperation<200)
            Continue
 
         If (hasLooped=0)
@@ -8105,7 +8137,7 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
            }
 
            initialDrawingStartCoords[thisIndex] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
-           If ((CustomShapeSymmetry=1 && vpSymmetryPointX) || (CustomShapeSymmetry=1 && vpSymmetryPointX)) && (altState=0)
+           If (isNowSymmetricVectorShape() && altState=0)
               initialDrawingStartCoords[oppoIndex] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
 
            If (bezierSplineCustomShape=1)
@@ -8198,6 +8230,12 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
            ; dummyRefreshImgSelectionWindow()
         }
         Sleep, 2
+   }
+
+   If (!hasLooped && altState=1 && bezierSplineCustomShape=0)
+   {
+      mustRem := 1
+      splitPointGivenInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
    }
 
    setWhileLoopExec(0)
@@ -8338,6 +8376,18 @@ moveSelectedPointsInVectorPath(gmX, gmY) {
    newArrayu := customShapePoints.Clone()
    setWhileLoopExec(1)
    startOperation := A_TickCount
+   listPoints := []
+   showTOOLtip("Move selected points:`n---, ---")
+   Loop, % customShapePoints.Count()
+   {
+      c := newArrayu[A_Index]
+      If (c[1]="" || c[2]="" || initialDrawingStartCoords[A_Index, 3]!=1)
+         Continue
+
+      listPoints[A_Index] := 1
+   }
+
+   startOperation := A_TickCount
    While, (determineLClickState()=1)
    {
       If (A_TickCount - startOperation<150)
@@ -8347,26 +8397,25 @@ moveSelectedPointsInVectorPath(gmX, gmY) {
       GetMouseCoord2wind(PVhwnd, mX, mY)
       gmX := omX - mX
       gmY := omY - mY
+      vpImgPanningNow := 1
       thisState := "a" gmX "=" gmY
       If (thisState!=prevState)
       {
          prevState := thisState
-         Loop, % customShapePoints.Count()
+         For Key, Value in listPoints
          {
-            c := newArrayu[A_Index]
-            selu := initialDrawingStartCoords[A_Index, 3]
-            If (c[1]="" || c[2]="" || selu!=1)
+            c := newArrayu[Key]
+            If (c[1]="" || c[2]="" || initialDrawingStartCoords[Key, 3]!=1)
                Continue
 
-            ; fX := prevResizedVPimgW/initialDrawingStartCoords[A_Index, 4]
-            ; fY := prevResizedVPimgH/initialDrawingStartCoords[A_Index, 5]
-            xu := c[1] - gmX ; *fX
-            yu := c[2] - gmY ; *fY
-            customShapePoints[A_Index] := [xu, yu]
+            customShapePoints[Key] := [c[1] - gmX, c[2] - gmY]
+
          }
          showTOOLtip("Move selected points:`nX=" -1*gmX ", Y=" -1*gmY)
+         lastZeitFileSelect := A_TickCount
          dummyRefreshImgSelectionWindow()
       }
+      vpImgPanningNow := 0
       Sleep, 2
    }
 
@@ -9613,7 +9662,7 @@ ToggleImageSizingMode(modus:=0) {
     o_friendly := DefineImgSizing(0)
     If (drawingShapeNow=1)
     {
-       If (CustomShapeSymmetry || CustomShapeLockedSymmetry) && (vpSymmetryPointX || vpSymmetryPointY)
+       If isNowSymmetricVectorShape()
           MouseCoords2Image(vpSymmetryPointX, vpSymmetryPointY, 0, vpSymmetryPointXdp, vpSymmetryPointYdp, prevResizedVPimgW, prevResizedVPimgH, newVPx, newVPy, 0, 0)
        ; customShapePoints := convertCustomShape2relativeCoords(customShapePoints)
     }
@@ -9681,13 +9730,14 @@ ToggleImageSizingMode(modus:=0) {
     SetTimer, RemoveTooltip, % -msgDisplayTime
     If (drawingShapeNow=1)
     {
-       adaptCustomShapeNewZoomLevel()
+       dummyResizeImageGDIwin()
        If (newVPx!="" && newVPy!="")
        {
           ImageCoords2Window(newVPx, newVPy, prevDestPosX, prevDestPosY, 0, vpSymmetryPointX, vpSymmetryPointY, 0)
           vpSymmetryPointXdp := prevDestPosX
           vpSymmetryPointYdp := prevDestPosY
        }
+       SetTimer, dummyForcedRefreshImgSelectionWindow, -100
        Return
     }
 
@@ -10221,27 +10271,19 @@ ToggleIMGalign() {
    showTOOLtip("Image alignment: " defineImgAlign(), A_ThisFunc, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
    INIaction(1, "imageAligned", "General")
-   If (drawingShapeNow=1)
-   {
-      If (CustomShapeSymmetry || CustomShapeLockedSymmetry) && (vpSymmetryPointX || vpSymmetryPointY)
-         MouseCoords2Image(vpSymmetryPointX, vpSymmetryPointY, 0, vpSymmetryPointXdp, vpSymmetryPointYdp, prevResizedVPimgW, prevResizedVPimgH, newVPx, newVPy, 0, 0)
-      
-      ; customShapePoints := convertCustomShape2relativeCoords(customShapePoints)
-      adaptCustomShapeNewZoomLevel()
-      If (newVPx!="" && newVPy!="")
-      {
-         ImageCoords2Window(newVPx, newVPy, prevDestPosX, prevDestPosY, 0, vpSymmetryPointX, vpSymmetryPointY, 0)
-         vpSymmetryPointXdp := prevDestPosX
-         vpSymmetryPointYdp := prevDestPosY
-      }
-      Return
-   }
-
    IMGdecalageX := IMGdecalageY := 1
    If (IMGresizingMode=4)
       PrintPosX := "X"
 
    dummyTimerReloadThisPicture(50)
+   If (drawingShapeNow=1)
+   {
+      If isNowSymmetricVectorShape()
+         coreSetVPsymmetryPoint(prevVectorShapeSymmetryMode[1, 1])
+      SetTimer, dummyForcedRefreshImgSelectionWindow, -100
+      Return
+   }
+
    uiPanelOpenCloseEvent()
    If (AnyWindowOpen=10 && imgEditPanelOpened=1)
    {
@@ -10623,6 +10665,10 @@ blockBrokenIMGrefresh(allowThumbs:=0) {
    Return 0
 }
 
+dummyForcedRefreshImgSelectionWindow() {
+   dummyRefreshImgSelectionWindow("forced")
+}
+
 VPchangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
    Static prevValues, lastInvoked := 1, lastInvoked2 := 1, prevNavKeysu := 0
    If InStr(key, "wheel")
@@ -10644,7 +10690,7 @@ VPchangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
 
    If (drawingShapeNow=1)
    {
-      If (CustomShapeSymmetry || CustomShapeLockedSymmetry) && (vpSymmetryPointX || vpSymmetryPointY)
+      If isNowSymmetricVectorShape()
          MouseCoords2Image(vpSymmetryPointX, vpSymmetryPointY, 0, vpSymmetryPointXdp, vpSymmetryPointYdp, prevResizedVPimgW, prevResizedVPimgH, newVPx, newVPy, 0, 0)
       ; customShapePoints := convertCustomShape2relativeCoords(customShapePoints)
    }
@@ -10664,13 +10710,14 @@ VPchangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
    If (drawingShapeNow=1)
    {
       newValues := "a"
-      adaptCustomShapeNewZoomLevel()
+      dummyResizeImageGDIwin()
       If (newVPx!="" && newVPy!="")
       {
          ImageCoords2Window(newVPx, newVPy, prevDestPosX, prevDestPosY, 0, vpSymmetryPointX, vpSymmetryPointY, 0)
          vpSymmetryPointXdp := prevDestPosX
          vpSymmetryPointYdp := prevDestPosY
       }
+      SetTimer, dummyForcedRefreshImgSelectionWindow, -100
       ; ToolTip, % customShapePoints.Count() "=l=" drawingVectorLiveMode , , , 2
       Return
    }
@@ -10706,13 +10753,6 @@ VPchangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
       dummyResizeImageGDIwin()
    Else 
       SetTimer, dummyResizeImageGDIwin, -50
-}
-
-adaptCustomShapeNewZoomLevel() {
-   ; dummy function; silliness
-   r := dummyResizeImageGDIwin()
-   If !InStr(r, "error")
-      SetTimer, dummyRefreshImgSelectionWindow, -150
 }
 
 dummyResizeImageGDIwin() {
@@ -44644,7 +44684,7 @@ reduceCustomShapelength() {
       }
    }
 
-   If CustomShapeSymmetry
+   If isNowSymmetricVectorShape()
    {
       customShapePoints.RemoveAt(1)
       initialDrawingStartCoords.RemoveAt(1)
@@ -44661,7 +44701,7 @@ reduceCustomShapelength() {
             prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] - 1
          }
       }
-   } Else CustomShapeLockedSymmetry := 0
+   } ; Else CustomShapeLockedSymmetry := 0
 
    If (customShapePoints.Count()<3)
       CustomShapeLockedSymmetry := vpSymmetryPointX := vpSymmetryPointY := 0
@@ -58857,7 +58897,7 @@ InvokeMenuBarVectorEdit(manuID) {
    } Else If (CustomShapeLockedSymmetry)
    {
       kMenu("pvMenuBarEdit", "Add/Uncheck", "Toggle symmetry mode`tY", "toggleBrushSymmetryModes")
-      If CustomShapeSymmetry
+      If isNowSymmetricVectorShape()
          kMenu("pvMenuBarEdit", "Check", "Toggle symmetry mode`tY")
    } 
 
@@ -71892,6 +71932,7 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0) {
        pWhite := ""
        prevBMP := trGdip_DisposeImage(prevBMP)
        vectorVisiblePoints := []
+       PointsListArray := []
        Return
     } Else If (mainWidth="getPoints")
        Return vectorVisiblePoints
@@ -71906,14 +71947,14 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0) {
     GetMouseCoord2wind(PVhwnd, mX, mY)
     gmX := (FlipImgH=1) ? mainWidth - mX : mX
     gmY := (FlipImgV=1) ? mainHeight - mY : mY
+    canDoSymmetry := isNowSymmetricVectorShape()
     totalz := customShapePoints.Count()
     If (actu="point-new-end" && whichPoint>0 && PointsListArray.Count()>10 && prevCstate)
     {
-       pp := totalz
-       canDoSymmetry := isNowSymmetricVectorShape()
        If (canDoSymmetry)
           Return
 
+       pp := totalz
        Loop, % whichPoint
        {
           vectorVisiblePoints[pp + A_Index - whichPoint] := vectorVisiblePoints[pp + A_Index - 1 - whichPoint].Clone()
@@ -71926,6 +71967,9 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0) {
        cacheRefresh := 1
     } Else If (actu="point-rem-last" && whichPoint>0 && PointsListArray.Count()>10 && prevCstate)
     {
+       If (canDoSymmetry)
+          Return
+
        pp := totalz + whichPoint
        Loop, % whichPoint
        {
@@ -71934,13 +71978,6 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0) {
           PointsListArray.Pop()
           pp--
           totalz--
-          If CustomShapeSymmetry
-          {
-             totalz--
-             PointsListArray.RemoveAt(1)
-             PointsListArray.RemoveAt(1)
-             vectorVisiblePoints[A_Index] := 0
-          }
        }
 
        updateCachedLiveDrawPath(totalz, vectorVisiblePoints, PointsListArray)
@@ -71958,24 +71995,15 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0) {
           updateCachedLiveDrawPath(totalz - 1, vectorVisiblePoints, PointsListArray)
        } Else
        {
-          canDoSymmetry := isNowSymmetricVectorShape()
           oppoIndex := (canDoSymmetry=1) ? totalz - whichPoint + 1 : 0
           whichPoint--
           Loop, 3
           {
              updateCachedLiveDrawPath(whichPoint, vectorVisiblePoints, PointsListArray)
+             oppoIndex := (canDoSymmetry=1) ? totalz - whichPoint + 1 : 0
+             If oppoIndex
+                updateCachedLiveDrawPath(oppoIndex, vectorVisiblePoints, PointsListArray)
              whichPoint++
-          }
-
-          If oppoIndex
-          {
-             oppoIndex := whichPoint
-             whichPoint--
-             Loop, 3
-             {
-                updateCachedLiveDrawPath(whichPoint, vectorVisiblePoints, PointsListArray)
-                whichPoint++
-             }
           }
        }
 
@@ -71984,10 +72012,10 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0) {
        cacheRefresh := 1
     }
 
-    SelDotsSize := dotsSize := (PrefsLargeFonts=1) ? imgHUDbaseUnit//3 : imgHUDbaseUnit//3.25
     ptz := k := firstPx := firstPy := 0
+    SelDotsSize := dotsSize := (PrefsLargeFonts=1) ? imgHUDbaseUnit//3 : imgHUDbaseUnit//3.25
     thisState := (cacheRefresh=1) ? prevCstate : "a" mainWidth mainHeight FillAreaCurveTension closedLineCustomShape tensionCurveCustomShape cardinalCurveCustomShape customShapePoints.Count() lastZeitFileSelect imgSelX1 imgSelY1 imgSelX2 imgSelY2 bezierSplineCustomShape zoomLevel currentVectorUndoLevel prevDestPosX prevDestPosY getIDimage(currentFileIndex) currentFileIndex
-    If (thisState=prevCstate && validBMP(prevBMP) && !cacheRefresh)
+    If (thisState=prevCstate && validBMP(prevBMP) && !cacheRefresh && vectorVisiblePoints.Count()>3)
     {
        Gdip_DrawImageFast(Gu, prevBMP)
        drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHeight, vectorVisiblePoints)
@@ -72022,21 +72050,6 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0) {
           If (initialDrawingStartCoords[A_Index, 3])
              customShapeHasSelectedPoints := 1
 
-          If (totalz<3)
-          {
-             If (A_Index=1 && !vpSymmetryPointX && !vpSymmetryPointY && totalz=1 && bezierSplineCustomShape=0)
-             || (A_Index=2 && !vpSymmetryPointX && !vpSymmetryPointY && totalz=2 && bezierSplineCustomShape=1)
-             {
-                fX := prevResizedVPimgW/initialDrawingStartCoords[A_Index, 4]
-                fY := prevResizedVPimgH/initialDrawingStartCoords[A_Index, 5]
-                vpSymmetryPointX := customShapePoints[A_Index, 1]*fX
-                vpSymmetryPointY := customShapePoints[A_Index, 2]*fY
-                vpSymmetryPointXdp := initialDrawingStartCoords[A_Index, 1]
-                vpSymmetryPointYdp := initialDrawingStartCoords[A_Index, 2]
-                prevVectorShapeSymmetryMode[1] := [1, 0]
-             }
-          }
-
           thizState := "a" xu yu
           If (thizState!=prevState)
           {
@@ -72057,11 +72070,17 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0) {
        overDrawFilter := ""
        prevCstate := thisState
        fnOutputDebug(A_ThisFunc " interim A: " A_TickCount - startZeit " ms")
-       If (totalz<=2 && bezierSplineCustomShape=0 || totalz=3 && bezierSplineCustomShape=1)
-       {
-          vpFreeformShapeOffset[1] := 0, vpFreeformShapeOffset[2] := 0, vpFreeformShapeOffset[3] := 0
-          CustomShapeLockedSymmetry := CustomShapeSymmetry
-       }
+    }
+
+    If (!vpSymmetryPointX && !vpSymmetryPointY && totalz=1 && bezierSplineCustomShape=0)
+       coreSetVPsymmetryPoint(1)
+    Else If (!vpSymmetryPointX && !vpSymmetryPointY && totalz=2 && bezierSplineCustomShape=1)
+       coreSetVPsymmetryPoint(2)
+
+    If (totalz<=2 && bezierSplineCustomShape=0 || totalz=3 && bezierSplineCustomShape=1)
+    {
+       vpFreeformShapeOffset[1] := 0, vpFreeformShapeOffset[2] := 0, vpFreeformShapeOffset[3] := 0
+       CustomShapeLockedSymmetry := CustomShapeSymmetry
     }
 
     prevCstate := thisState
@@ -72173,6 +72192,7 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0) {
     r := Gdip_DrawImageFast(Gu, prevBMP)
     If !cacheRefresh
        drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHeight, vectorVisiblePoints)
+
     If (cacheRefresh=1 && actu="point-update")
     {
        Gdip_ResetWorldTransform(Gu)
@@ -72281,6 +72301,10 @@ adjustCustomShapePositionLive(dir:=0) {
        yu := c[2] - tstepuY
        newArrayu[thisIndex] := [xu, yu]
     }
+    ; customShapePoints := convertCustomShape2relativeCoords(customShapePoints)
+    dummyResizeImageGDIwin()
+    If isNowSymmetricVectorShape()
+       coreSetVPsymmetryPoint(prevVectorShapeSymmetryMode[1, 1])
 
     lastZeitFileSelect := A_TickCount
     If (thisIndex>2)
@@ -73558,7 +73582,7 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
      Gdip_DeletePen(redPen)
 } ; // drawImgSelectionOnWindow()
 
-dummyRefreshImgSelectionWindow() {
+dummyRefreshImgSelectionWindow(mm:=0) {
      Static prevStatus, loopsOccured := 0
      If (thumbsDisplaying=1)
         Return
@@ -73581,8 +73605,8 @@ dummyRefreshImgSelectionWindow() {
      If (drawingShapeNow=1)
         GetMouseCoord2wind(PVhwnd, mX, mY)
 
-     thisState := "a" mX mY mainWidth mainHeight closedLineCustomShape tensionCurveCustomShape cardinalCurveCustomShape customShapePoints.Count() lastZeitFileSelect imgSelX1 imgSelY1 imgSelX2 imgSelY2 BrushToolSymmetryX BrushToolSymmetryY BrushToolSymmetryPointX BrushToolSymmetryPointY customShapeHasSelectedPoints showNewVectorPointPreview vpGridSize showViewPortGrid bezierSplineCustomShape showContextualStatusBar
-     If (thisState!=prevStatus || drawingShapeNow!=1)
+     thisState := "a" mX mY mainWidth mainHeight closedLineCustomShape tensionCurveCustomShape cardinalCurveCustomShape customShapePoints.Count() lastZeitFileSelect imgSelX1 imgSelY1 imgSelX2 imgSelY2 BrushToolSymmetryX BrushToolSymmetryY BrushToolSymmetryPointX BrushToolSymmetryPointY customShapeHasSelectedPoints showNewVectorPointPreview vpGridSize showViewPortGrid bezierSplineCustomShape showContextualStatusBar CustomShapeSymmetry CustomShapeLockedSymmetry FillAreaCurveTension
+     If (thisState!=prevStatus || drawingShapeNow!=1 || mm="forced")
      {
         loopsOccured++
         ; ToolTip, % loopsOccured "==" thisState " -- " A_TickCount , , , 2
@@ -74944,7 +74968,9 @@ arrowKeysAdjustPrevPointPath(direction, modus) {
 
     customShapePoints[maxu, 1] := cX1
     customShapePoints[maxu, 2] := cY1
-    lastZeitFileSelect := A_TickCount
+    vpWinClientSize(mainWidth, mainHeight)
+    drawLiveCreateCustomShape(mainWidth, mainHeight, 2NDglPG, "point-update", maxu)
+    ; lastZeitFileSelect := A_TickCount
     dummyRefreshImgSelectionWindow()
     lastInvoked := A_TickCount
 }
@@ -95757,48 +95783,5 @@ doClicku() {
    SendEvent, {LButton up}
    */
 
-}
-
-
-
-
-
-
-testCreateMask() {
-initQPVmainDLL()
-   trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
-   calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2, 0, 0, "a")
-   pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY, 0)
-If (bezierSplineCustomShape=1 || FillAreaCurveTension>1)
-   Gdip_FlattenPath(pPath, 0.1)
-
-   PointsCount := Gdip_GetPathPointsCount(pPath)
-
-   VarSetCapacity(PointsF, 8 * PointsCount, 0)
-   gdipLastError := DllCall("gdiplus\GdipGetPathPoints", "UPtr", pPath, "UPtr", &PointsF, "int*", PointsCount)
-
-
-hFIFimgA := viewportQPVimage.imgHandle
-
-   ; pBits := FreeImage_GetBits(hFIFimgA)
-   ; stride := FreeImage_GetStride(hFIFimgA)
-   ; bpp := FreeImage_GetBPP(hFIFimgA)
-
-EZ := Gdip_LockBits(useGdiBitmap(), 0, 0, imgW, imgH, Stride, pBits, gData)
-bpp := 32
-fnOutputDebug(A_ThisFunc "(): " PointsCount)
-   r := DllCall(whichMainDLL "\FillPolygon", "UPtr", pBits, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "UPtr", &PointsF, "int", PointsCount)
-; r := DllCall(whichMainDLL "\GenerateRandomNoise", "UPtr", pBits, "Int", imgW, "Int", imgH, "Int", 10, "Int", 0, "Int", 0, "Int", 0)
-Gdip_UnlockBits(useGdiBitmap(), gData)
-PointsList := Gdip_GetPathPoints(pPath)
-Gdip_DeletePath(pPath)
-fnOutputDebug(PointsList)
-         ; killQPVscreenImgSection()
-         ; currentImgModified := 1
-         ; imgIndexEditing := currentFileIndex
-         ; viewportQPVimage.actions := Round(viewportQPVimage.actions + 1)
-         ; dummyTimerDelayiedImageDisplay(500)
-         SoundBeep, 900, 100
-         RemoveTooltip()
 }
 
