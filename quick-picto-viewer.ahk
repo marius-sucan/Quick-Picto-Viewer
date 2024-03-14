@@ -6462,16 +6462,7 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
       } Else If (bk!=1 && bezierSplineCustomShape=1)
          kMenu("PVnav", "Add", "Separate &fused anchors`tAlt-Click", "MenuExpandVectorPointAnchors")
 
-      canReflect := 0
-      If (k!=1 && isInRange(thisIndex, 3, totalCount - 3))
-      {
-         canReflect := 1
-         whichIndex := (k=2) ? thisIndex - 1 : thisIndex + 1
-         If (whichIndex=prevVectorShapeSymmetryMode[1, 1])
-            canReflect := 0
-      }
-
-      If (bk!=1 && bezierSplineCustomShape=1 && canReflect=1)
+      If (bk!=1 && bezierSplineCustomShape=1)
          kMenu("PVnav", "Add", "&Reflect anchor", "MenuReflectAnchorVectorPoint")
       labelu := (bk=1 && bezierSplineCustomShape=1 || bezierSplineCustomShape!=1) ? "&Remove point" : "Collapse &anchor"
       kMenu("PVnav", "Add", labelu "`tCtrl+Click", "MenuRemVectorPoint")
@@ -6502,7 +6493,7 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
       kMenu("PVnav", "Add", "Deselect points`tCtrl+D", "MenuSelNoVectorPoints")
       kMenu("PVnav", "Add", "In&vert points selection`tShift+I", "MenuSelInvertVectorPoints")
       kMenu("PVnav", "Add", "&Delete selected points`tDelete", "MenuRemSelVectorPoints")
-      If (bezierSplineCustomShape=1)
+      If (bezierSplineCustomShape=1 && customShapePoints.Count()>3)
       {
          kMenu("PVnav", "Add", "&Collapse anchors for selected points", "MenuCollapseSelectedAnchorPoints")
          kMenu("PVnav", "Add", "&Expand anchors for selected points", "MenuExpandSelectedAnchorPoints")
@@ -6517,12 +6508,11 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
       ; kMenu("PVnav", "Add", "Make the shape symmetrical", "MenuCreateShapeSymmetricalVectorShape")
       createMenuSelectShapeTension()
       kMenu("PVnav", "Add", "&Path type / smoothness", ":PVshapeTension")
-      If (bezierSplineCustomShape!=1)
-      {
-         kMenu("PVnav", "Add/Uncheck", "&Preview new point`tP", "togglePreviewVectorNewPoint")
-         If (showNewVectorPointPreview=1)
-            kMenu("PVnav", "Check", "&Preview new point`tP")
-      } Else
+      kMenu("PVnav", "Add/Uncheck", "&Preview new point`tP", "togglePreviewVectorNewPoint")
+      If (showNewVectorPointPreview=1)
+         kMenu("PVnav", "Check", "&Preview new point`tP")
+
+      If (bezierSplineCustomShape=1)
       {
          kMenu("PVnav", "Add/Uncheck", "Symmetrical anchors`tR", "toggleAutoReflectAnchors")
          If (autoReflectVectorAnchors=1)
@@ -6617,7 +6607,7 @@ configVectorShapeSymmetryPoint(modus, silentu, givenIndex, noChecks:=0) {
    If (bezierSplineCustomShape=1)
    {
       ignorePoints := []
-      listuArray := getPointsSameCoordsVectorPath(totalLoops, thisIndex, gX, gY)
+      listuArray := getPointsSameCoordsVectorPath(totalLoops, k, thisIndex, gX, gY)
       Loop, % listuArray.Count()
       {
          p := listuArray[A_Index, 1]
@@ -7902,8 +7892,8 @@ expandGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX,
    endsConnected := ((thisIndex=1 || thisIndex=totalCount) && testIsBezierPathClosed()=1) ? 1 : 0
    If (endsConnected=1 && dummy!="no")
    {
-      w := getPointsSameCoordsVectorPath(totalCount, 1, gmX, gmY)
-      g := getPointsSameCoordsVectorPath(totalCount, totalCount - 2, gmX, gmY)
+      w := getPointsSameCoordsVectorPath(totalCount, 1, 1, gmX, gmY)
+      g := getPointsSameCoordsVectorPath(totalCount, 2, totalCount - 2, gmX, gmY)
       Loop, % w.Count()
          g.Push(w[A_Index])
 
@@ -7918,11 +7908,11 @@ expandGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX,
    } Else
    {
       nextK := getAssociatedBezierPoints(k, totalCount, thisIndex, A, B)
-      auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, thisIndex, gmX, gmY)
+      auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, k, thisIndex, gmX, gmY)
    }
 
    If (auxiliaryPoints.Count()<1 && endsConnected=1 || !endsConnected || dummy="no")
-      auxiliaryPoints2 := getPointsSameCoordsVectorPath(totalCount, nextK, customShapePoints[nextK, 1], customShapePoints[nextK, 2])
+      auxiliaryPoints2 := getPointsSameCoordsVectorPath(totalCount, 1, nextK, customShapePoints[nextK, 1], customShapePoints[nextK, 2])
 
    initial := auxiliaryPoints.Count()
    Loop, % auxiliaryPoints2.Count()
@@ -7970,9 +7960,13 @@ expandGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX,
    If (k=1 && bezierSplineCustomShape=1 && thisIndex>1 && hasLooped=1)
       reflectGivenAnchorInPath(3, totalCount, thisIndex - 1, canDoSymmetry)
 
-   vpWinClientSize(mainWidth, mainHeight)
-   drawLiveCreateCustomShape(mainWidth, mainHeight, 2NDglPG, "point-update", thisIndex)
-   SetTimer, dummyRefreshImgSelectionWindow, -50
+   If hasLooped
+   {
+      vpWinClientSize(mainWidth, mainHeight)
+      drawLiveCreateCustomShape(mainWidth, mainHeight, 2NDglPG, "point-update", thisIndex)
+      SetTimer, dummyRefreshImgSelectionWindow, -50
+   }
+
    Return hasLooped
 }
 
@@ -8136,6 +8130,10 @@ collapseGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry) {
 }
 
 rescaleSelectedVectorPoints() {
+   ttlz := customShapePoints.Count()
+   If (ttlz<4 && bezierSplineCustomShape=1 || ttlz<2)
+      Return
+
    thisState := prevState := 0
    GetMouseCoord2wind(PVhwnd, omX, omY)
    newArrayu := customShapePoints.Clone()
@@ -8145,7 +8143,7 @@ rescaleSelectedVectorPoints() {
    If GetKeyState("Shift", "P")
       lockedAR := 1
 
-   Loop, % customShapePoints.Count()
+   Loop, % ttlz
    {
       c := newArrayu[A_Index]
       selu := initialDrawingStartCoords[A_Index, 3]
@@ -8213,13 +8211,19 @@ rescaleSelectedVectorPoints() {
 moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY, altState) {
    soX := soY := doX := doY := poX := poY := hasLooped := mustRem := 0
    vpWinClientSize(mainWidth, mainHeight)
-   c := customShapePoints[thisIndex]
+   If (k=1 || bezierSplineCustomShape!=1) ; reference point for snapping at angles
+      c := customShapePoints[thisIndex]
+   Else If (k=2)
+      c := customShapePoints[thisIndex - 1]
+   Else
+      c := customShapePoints[thisIndex + 1]
+
    setWhileLoopExec(1)
    startOperation := A_TickCount
    canDoSymmetry := isNowSymmetricVectorShape()
    While, (determineLClickState()=1 || altState="forced" && A_Index<3)
    {
-        If (A_TickCount - startOperation<200 && altState!="forced")
+        If (A_TickCount - startOperation<250 && altState!="forced")
            Continue
 
         If (hasLooped=0)
@@ -8253,7 +8257,7 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
 
            If (bezierSplineCustomShape=1)
            {
-              auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, thisIndex, gmX, gmY)
+              auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, k, thisIndex, gmX, gmY)
               ; ToolTip, % auxiliaryPoints[1, 1] "==" auxiliaryPoints.Count() , , , 2
               Loop, % auxiliaryPoints.Count()
               {
@@ -8344,7 +8348,7 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
         Sleep, 2
    }
 
-   zpp := (isNowSymmetricVectorShape() && thisIndex=prevVectorShapeSymmetryMode[1, 1]) ? 1 : 0
+   zpp := (isNowSymmetricVectorShape() && thisIndex=(totalCount//2 + 1)) ? 1 : 0
    If (!hasLooped && altState=1 && bezierSplineCustomShape=0 && !zpp)
    {
       mustRem := 1
@@ -8420,7 +8424,7 @@ removeGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry,
 
    If (bezierSplineCustomShape=1)
    {
-      auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, thisIndex, gmX, gmY)
+      auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, k, thisIndex, gmX, gmY)
       Loop, % auxiliaryPoints.Count()
       {
          If auxiliaryPoints[A_Index, 1]
@@ -8445,58 +8449,33 @@ removeGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry,
    }
 }
 
-getPointsSameCoordsVectorPath(totalCount, givenIndex, gmX, gmY, mainParam:=0) {
+getPointsSameCoordsVectorPath(totalCount, k, givenIndex, gmX, gmY) {
    newArrayu := []
-   loops := (mainParam="DoubleClick") ? totalCount : 7
-   If (mainParam="DoubleClick")
-      givenIndex := 6
-
-   Loop, % loops
+   getAssociatedBezierPoints(k, totalCount, givenIndex, A, B)
+   If A
    {
-       ; determine user clicked point from the entire path
-       thisIndex := givenIndex - 6 +  A_Index
-       If (!IsObject(customShapePoints[thisIndex]) || thisIndex=givenIndex)
-          Continue
+      oppoIndex := totalCount - A + 1
+      getVPcoordsVectorPoint(A, xu, yu)
+      If isDotInRect(gmX, gmY, SelDotsSize, SelDotsSize, xu, yu, 1)
+         newArrayu.Push([A, oppoIndex])
+   }
 
-       oppoIndex := totalCount - thisIndex + 1
-       getVPcoordsVectorPoint(thisIndex, xu, yu)
-       If isDotInRect(gmX, gmY, SelDotsSize, SelDotsSize, xu, yu, 1)
-          newArrayu.Push([thisIndex, oppoIndex])
-    }
+   If B
+   {
+      oppoIndex := totalCount - B + 1
+      getVPcoordsVectorPoint(B, xu, yu)
+      If isDotInRect(gmX, gmY, SelDotsSize, SelDotsSize, xu, yu, 1)
+         newArrayu.Push([B, oppoIndex])
+   }
 
-    If (givenIndex<=2 || givenIndex>=(totalCount - 1))
-    {
-       Loop, 2
-       {
-           ; determine user clicked point from the entire path
-           thisIndex := A_Index
-           If (!IsObject(customShapePoints[thisIndex]) || thisIndex=givenIndex)
-              Continue
- 
-           oppoIndex := totalCount - thisIndex + 1
-           getVPcoordsVectorPoint(thisIndex, xu, yu)
-           If isDotInRect(gmX, gmY, SelDotsSize, SelDotsSize, xu, yu, 1)
-              newArrayu.Push([thisIndex, oppoIndex])
-       }
-
-       Loop, 3
-       {
-           ; determine user clicked point from the entire path
-           thisIndex := totalCount - 3 + A_Index
-           If (!IsObject(customShapePoints[thisIndex]) || thisIndex=givenIndex)
-              Continue
- 
-           oppoIndex := totalCount - thisIndex + 1
-           getVPcoordsVectorPoint(thisIndex, xu, yu)
-           If isDotInRect(gmX, gmY, SelDotsSize, SelDotsSize, xu, yu, 1)
-              newArrayu.Push([thisIndex, oppoIndex])
-       }
-    }
-
-    Return newArrayu
+   Return newArrayu
 }
 
 moveSelectedPointsInVectorPath(gmX, gmY) {
+   ttlz := customShapePoints.Count()
+   If (ttlz<4 && bezierSplineCustomShape=1 || ttlz<2)
+      Return
+
    thisState := prevState := 0
    GetMouseCoord2wind(PVhwnd, omX, omY)
    newArrayu := customShapePoints.Clone()
@@ -8504,7 +8483,7 @@ moveSelectedPointsInVectorPath(gmX, gmY) {
    startOperation := A_TickCount
    listPoints := []
    showTOOLtip("Move selected points:`n---, ---")
-   Loop, % customShapePoints.Count()
+   Loop, % ttlz
    {
       c := newArrayu[A_Index]
       If (c[1]="" || c[2]="" || initialDrawingStartCoords[A_Index, 3]!=1)
@@ -8574,7 +8553,7 @@ selectGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry,
 
     ; ToolTip, % " k = " k , , , 2
     If (bezierSplineCustomShape=1) ; || mainParam="DoubleClick")
-       auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, thisIndex, gmX, gmY, 0)
+       auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, k, thisIndex, gmX, gmY)
 
     If (oppoIndex!=thisIndex && canDoSymmetry=1 && a!=thisIndex && b!=thisIndex && a!=oppoIndex && b!=oppoIndex)
     {
@@ -44839,11 +44818,20 @@ reduceCustomShapelength() {
       }
    } ; Else CustomShapeLockedSymmetry := 0
 
+   If (customShapePoints.Count()<7)
+      lastZeitFileSelect := A_TickCount
+   Else 
+      fr := 1
+
    If (customShapePoints.Count()<3)
       CustomShapeSymmetry := CustomShapeLockedSymmetry := vpSymmetryPointX := vpSymmetryPointY := 0
 
-   vpWinClientSize(mainWidth, mainHeight)
-   drawLiveCreateCustomShape(mainWidth, mainHeight, 2NDglPG, "point-rem-last", zr)
+   If fr
+   {
+      vpWinClientSize(mainWidth, mainHeight)
+      drawLiveCreateCustomShape(mainWidth, mainHeight, 2NDglPG, "point-rem-last", zr)
+   }
+
    If (drawingShapeNow=1)
       showQuickActionButtonsDrawingShape()
 
@@ -44924,14 +44912,6 @@ toggleAutoReflectAnchors() {
 }
 
 togglePreviewVectorNewPoint() {
-   If (bezierSplineCustomShape=1)
-   {
-      showTOOLtip("WARNING: This option does not apply for Bézier paths")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
-
    showNewVectorPointPreview := !showNewVectorPointPreview
    RegAction(1, "showNewVectorPointPreview")
    friendly := (showNewVectorPointPreview=1) ? "ACTIVATED" : "DEACTIVATED"
@@ -69214,13 +69194,19 @@ MenuSetVectAutoSymmetryX() {
    totalz := customShapePoints.Count()
    If (totalz/2=totalz//2)
    {
-      showTOOLtip("WARNING: The vector path has an even number of points.`nPlease add one additional point.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return 0
+      If (bezierSplineCustomShape=1 && totalz=2)
+      {
+         pp := 1
+      } Else
+      {
+         showTOOLtip("WARNING: The vector path has an even number of points: " groupDigits(totalz) ".`nPlease add one additional point.")
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return 0
+      }
    }
 
-   pp := totalz//2 + 1
+   pp := pp ? pp : totalz//2 + 1
    configVectorShapeSymmetryPoint("x", 0, pp, 1)
    Return isNowSymmetricVectorShape()
 }
@@ -69229,13 +69215,19 @@ MenuSetVectAutoSymmetryY() {
    totalz := customShapePoints.Count()
    If (totalz/2=totalz//2)
    {
-      showTOOLtip("WARNING: The vector path has an even number of points.`nPlease add one additional point.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return 0
+      If (bezierSplineCustomShape=1 && totalz=2)
+      {
+         pp := 1
+      } Else
+      {
+         showTOOLtip("WARNING: The vector path has an even number of points: " groupDigits(totalz) ".`nPlease add one additional point.")
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return 0
+      }
    }
 
-   pp := totalz//2 + 1
+   pp := pp ? pp : totalz//2 + 1
    configVectorShapeSymmetryPoint("y", 0, pp, 1)
    Return isNowSymmetricVectorShape()
 }
@@ -71892,9 +71884,9 @@ snapPointsAtAngles(gmX, gmY, dulaX, dulaY, ByRef guX, ByRef guY) {
 ; dulaX, dulaY     = coords of the fixed point [P1]
 ; gmX, gmY         = coords of the 2nd point [P2], the point to be placed at 90/45/0°
 
-    guY := gmY, guX := gmX
-    zY := Abs(gmY),   zX := Abs(gmX)
-    wY := Abs(dulaY), wX := Abs(dulaX)
+    guY  := gmY,          guX := gmX
+    zY   := Abs(gmY),      zX := Abs(gmX)
+    wY   := Abs(dulaY),    wX := Abs(dulaX)
     maxX := max(zX, wX), maxY := max(zY, wY)
     minX := min(zX, wX), minY := min(zY, wY)
     lenX := maxX - minX
@@ -72113,7 +72105,7 @@ drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHei
       } Else
          lastSnap := []
 
-      If (Gu && showNewVectorPointPreview=1)
+      If (Gu && (showNewVectorPointPreview=1 || shiftState=1))
       {
          getVPcoordsVectorPoint(1, xua, yua)
          If (shiftState=1)
