@@ -1481,6 +1481,8 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
           func2Call := ["toggleBrushTypeFX"]
        Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
           func2Call := ["ToggleImgColorDepth", 1]
+       Else If (isImgEditingNow() && drawingShapeNow=1)
+          func2Call := ["MenuCycleVectToolMode"]
     } Else If (givenKey="Delete")
     {
        isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
@@ -6409,6 +6411,8 @@ determineSelAreaClickRect(mX, mY, dotsSize, mainWidth, mainHeight, doFlips) {
 
 createVectorMenuToolModes() {
    Try Menu, pvVectModes, Delete 
+   kMenu("pvVectModes", "Add", "Cycle tool modes`tQ", "MenuCycleVectToolMode")
+   Menu, pvVectModes, Add
    kMenu("pvVectModes", "Add/Uncheck", "Mixed", "MenuSetVectToolModeMixed")
    kMenu("pvVectModes", "Add/Uncheck", "Add", "MenuSetVectToolModeAdd")
    kMenu("pvVectModes", "Add/Uncheck", "Remove", "MenuSetVectToolModeRemove")
@@ -6424,6 +6428,18 @@ createVectorMenuToolModes() {
       kMenu("pvVectModes", "Check", "Select")
    Else If (vectorToolModus=5)
       kMenu("pvVectModes", "Check", "Adjust")
+}
+
+MenuCycleVectToolMode() {
+   vectorToolModus := clampInRange(vectorToolModus + 1, 1, 5, 1)
+   showTOOLtip("Vector tool mode: " Format("{:U}", defineVectToolMode()), A_ThisFunc, 2, (vectorToolModus + 0.05 - 1) / 4.1)
+   SetTimer, dummyForcedRefreshImgSelectionWindow, -100
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+defineVectToolMode() {
+   Static pp := {1:"Mixed", 2:"Add", 3:"Remove", 4:"Select", 5:"Adjust"}
+   Return pp[vectorToolModus]
 }
 
 MenuSetVectToolModeMixed() {
@@ -6554,9 +6570,12 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
       ; kMenu("PVnav", "Add", "Make the shape symmetrical", "MenuCreateShapeSymmetricalVectorShape")
       createMenuSelectShapeTension()
       kMenu("PVnav", "Add", "&Path type / smoothness", ":PVshapeTension")
-      kMenu("PVnav", "Add/Uncheck", "&Preview new point`tP", "togglePreviewVectorNewPoint")
-      If (showNewVectorPointPreview=1)
-         kMenu("PVnav", "Check", "&Preview new point`tP")
+      If (vectorToolModus<3)
+      {
+         kMenu("PVnav", "Add/Uncheck", "&Preview new point`tP", "togglePreviewVectorNewPoint")
+         If (showNewVectorPointPreview=1)
+            kMenu("PVnav", "Check", "&Preview new point`tP")
+      }
 
       If (bezierSplineCustomShape=1)
       {
@@ -6597,7 +6616,7 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
 MenuSplitVectorPoint() {
   lastOtherWinClose := 1
   vpWinClientSize(mainWidth, mainHeight)
-  PerformVectorShapeActions(lastUserRclickVPx, lastUserRclickVPy, mainWidth, mainHeight, "DoubleClick", 0, 0)
+  PerformVectorShapeActions(lastUserRclickVPx, lastUserRclickVPy, mainWidth, mainHeight, "splitPoint", 0, 0)
 }
 
 MenuRemVectorPoint() {
@@ -7616,6 +7635,8 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
    totalCount := customShapePoints.Count()
    canDoSymmetry := isNowSymmetricVectorShape()
    sl := SelDotsSize//2 + 1
+   If (totalCount<3)
+      vectorToolModus := 1
 
    ; determine user clicked point from the entire path
    vectorVisiblePoints := drawLiveCreateCustomShape("getPoints", 0, 0)
@@ -7651,18 +7672,18 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
       }
       dontAddPoint := 1
    }
-
+   ; ToolTip, % "l=" mainParam , , , 2
    If hasFoundDot
    {
       ; perform action[s] on thisIndex point from customShapePoints
-      If (mainParam="DoubleClick" && totalCount>2 && shiftState=0 && ctrlState=0)
+      If (mainParam="DoubleClick" && totalCount>2 && shiftState=0 && ctrlState=0 && vectorToolModus!=3)
       {
          dontAddPoint := 1
          If (vectorToolModus=4)
             selectGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, mainParam, gmX, gmY)
          Else If (k!=1 && bezierSplineCustomShape=1)
             collapseGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry)
-         Else If (k=1 && altState=0 && bezierSplineCustomShape=1 || bezierSplineCustomShape!=1)
+         Else If ((k=1 && altState=0 && bezierSplineCustomShape=1 || bezierSplineCustomShape!=1) && vectorToolModus!=5)
             splitPointGivenInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
          Else If (altState=1 && bezierSplineCustomShape=1 && k=1)
          {
@@ -7675,7 +7696,7 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
             }
             rrz := (rrz=1) ? "" : "no" 
          }
-      } Else If (shiftState=1 && !isVarEqualTo(vectorToolModus,2,3) || mainParam="selClick" || vectorToolModus=4)
+      } Else If (shiftState=1 && !isVarEqualTo(vectorToolModus,2,3) || mainParam="selClick" || vectorToolModus=4 && mainParam="normal" && ctrlState=0)
       {
          dontAddPoint := 1
          ; lastZeitFileSelect := A_TickCount
@@ -7686,6 +7707,10 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
       {
          doSpecialAct := dontAddPoint := 1
          collapseGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry)
+      } Else If (mainParam="splitPoint")
+      {
+         dontAddPoint := 1
+         splitPointGivenInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
       } Else If (mainParam="reflectAnchor")
       {
          doSpecialAct := dontAddPoint := 1
@@ -7695,7 +7720,7 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
          doSpecialAct := dontAddPoint := 1
          rrz := expandGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
          rrz := (rrz=1) ? "" : "no" 
-      } Else If (ctrlState=1 && vectorToolModus!=2 || mainParam="remClick" || vectorToolModus=3)
+      } Else If (ctrlState=1 || mainParam="remClick" || vectorToolModus=3 && mainParam="normal")
       {
          dotRemoved := 1
          removeGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
@@ -7715,10 +7740,17 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
       }
    } Else
    {
-      If (!shiftState && vectorToolModus=4 && mainParam="DoubleClick")
-         MenuSelNoVectorPoints()
       If (ctrlState=1 || altState=1)
          rrz := "no"
+     
+      If (vectorToolModus=4)
+      {
+         If (!shiftState && mainParam="DoubleClick")
+            MenuSelNoVectorPoints()
+         Else If ((shiftState=1 || ctrlState=1) && mainParam="Normal")
+            selectPathPointsInRect(gmX, gmY, shiftState, ctrlState)
+         rrz := "no"
+      }
       thisIndex := 0
    }
 
@@ -7801,7 +7833,7 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
          SetTimer, % fn, -20
       } Else If (hasSymmetry!=1 && shiftState=0 && bezierSplineCustomShape=0)
          SetTimer, addFluidPointsCustomShape, -200
-   } Else If (mainParam!="remClick" && mainParam!="rClick" && ctrlState=0 && altState=1 && shiftState=0 && !hasFoundDot)
+   } Else If (mainParam!="remClick" && mainParam!="rClick" && ctrlState=0 && altState=1 && shiftState=0 && !hasFoundDot && vectorToolModus<3)
       rrz := MenuAddUnorderedVectorPoint(gmX, gmY, "given")
 
    If (preventUndoLevels!=1 && rrz!="no")
@@ -8410,6 +8442,42 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
    setWhileLoopExec(0)
    SetTimer, dummyForcedRefreshImgSelectionWindow, -50
    Return mustRem
+}
+
+selectPathPointsInRect(gmX, gmY, shiftState, ctrlState) {
+   nmX := nmY := tx := ty := mw := mh := hasLooped := 0
+   vpWinClientSize(mainWidth, mainHeight)
+   setWhileLoopExec(1)
+   startOperation := A_TickCount
+   ; ToolTip, % thisReflctAnchr "|" prevVectorShapeSymmetryMode[1,1] "|" symPoint , , , 2
+   While, (determineLClickState()=1)
+   {
+        If (A_TickCount - startOperation<150)
+           Continue
+
+        zeitSillyPrevent := A_TickCount
+        GetMouseCoord2wind(PVhwnd, mX, mY)
+        nmX := (FlipImgH=1) ? mainWidth - mX : mX
+        nmY := (FlipImgV=1) ? mainHeight - mY : mY
+        mw := abs(gmX - nmX), mh := abs(gmY - nmY)
+        thisState := "a" gmX gmY mw mh
+        If (thisState!=prevState)
+        {
+           tx := min(gmX, nmX)
+           ty := min(gmY, nmY)
+           ; ToolTip, % mw "|" mh , , , 2
+           prevState := thisState
+           drawLiveCreateCustomShape(mainWidth, mainHeight, 2NDglPG, "sel-rect", [tX, tY, mw, mh])
+           ; dummyRefreshImgSelectionWindow()
+        }
+        Sleep, 2
+   }
+
+   MouseMove, 2, 0, 2, R
+   MouseMove, -2, 0, 2, R
+   setWhileLoopExec(0)
+   SetTimer, dummyForcedRefreshImgSelectionWindow, -50
+   Return hasLooped
 }
 
 removeGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY) {
@@ -44368,6 +44436,7 @@ stopDrawingShape(dummy:="") {
     If (drawingShapeNow!=1)
        Return
 
+    vectorToolModus := 1
     zeitSillyPrevent := A_TickCount
     VPcreateSelPath("kill", 0, 0, 0, 0, 0, 0, 0, 0)
     drawLiveCreateCustomShape("kill", 0, 0)
@@ -44702,6 +44771,7 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
      If (VisibleQuickMenuSearchWin=1)
         closeQuickSearch()
 
+     vectorToolModus := 1
      postVectorWinOpen := 0
      If (AnyWindowOpen && imgEditPanelOpened=1)
      {
@@ -58991,6 +59061,10 @@ InvokeMenuBarVectorFile(manuID) {
 
    kMenu("pvMenuBarFile", "Add", "Vector drawing mode", "dummy")
    kMenu("pvMenuBarFile", "Disable", "Vector drawing mode")
+   Menu, pvMenuBarFile, Add
+   createVectorMenuToolModes()
+   kMenu("pvMenuBarFile", "Add", "&Tool mode", ":pvVectModes")
+   Menu, pvMenuBarFile, Add
    kMenu("pvMenuBarFile", "Add", "&Apply / done`tEnter", "stopDrawingShape")
    kMenu("pvMenuBarFile", "Add", "&Exit pen tool mode`tEscape", "MenuCancelDrawingShape")
    showThisMenu("pvMenuBarFile", 0, 1, manuID)
@@ -59077,24 +59151,17 @@ InvokeMenuBarVectorEdit(manuID) {
    }
 
    kMenu("pvMenuBarEdit", "Add", "&Remove last point`tBackspace", "reduceCustomShapelength")
-   If (customShapePoints.Count()<2)
-   {
-      kMenu("pvMenuBarEdit", "Add", "C&ycle symmetry modes`tY", "toggleBrushSymmetryModes")
-   } Else If (CustomShapeLockedSymmetry)
-   {
-      kMenu("pvMenuBarEdit", "Add/Uncheck", "Toggle symmetry mode`tY", "toggleBrushSymmetryModes")
-      If isNowSymmetricVectorShape()
-         kMenu("pvMenuBarEdit", "Check", "Toggle symmetry mode`tY")
-   } 
-
+   kMenu("pvMenuBarEdit", "Add", "C&ycle symmetry modes`tY", "toggleBrushSymmetryModes")
    createMenuSelectShapeTension()
    kMenu("pvMenuBarEdit", "Add", "&Path type / smoothness", ":PVshapeTension")
-   If (bezierSplineCustomShape!=1)
+   If (vectorToolModus<3)
    {
       kMenu("pvMenuBarEdit", "Add/Uncheck", "&Preview new point`tP", "togglePreviewVectorNewPoint")
       If (showNewVectorPointPreview=1)
          kMenu("pvMenuBarEdit", "Check", "&Preview new point`tP")
-   } Else
+   }
+
+   If (bezierSplineCustomShape=1)
    {
       kMenu("pvMenuBarEdit", "Add/Uncheck", "Symmetrical anchors`tR", "toggleAutoReflectAnchors")
       If (autoReflectVectorAnchors=1)
@@ -72054,7 +72121,70 @@ generateVPbezierAnchorPaths(mainWidth, mainHeight, ByRef PointsListArray, ByRef 
    Return bezierLinesPath
 }
 
-drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHeight, ByRef vectorVisiblePoints, bezierLinesPath) {
+defineVectorEditorStatusBar(ByRef mousePoint, ByRef dontAddPoint, canDoSymmetry, altState, ctrlState, shiftState) {
+   dontAddPoint := mousePoint[1]
+   If (dontAddPoint=1)
+      dontAddPoint := mousePoint[1] " | Path start point"
+   Else If (dontAddPoint=customShapePoints.Count())
+      dontAddPoint := mousePoint[1] " | Path end point"
+   Else If (dontAddPoint=symPoint && canDoSymmetry)
+      dontAddPoint := mousePoint[1] " | Symmetry reference point"
+
+   If (vectorToolModus<3)
+   {
+      msgu := (dontAddPoint!=0) ? "Move existing point P[" dontAddPoint "]. Double click to split in two" : "Click to add new point and extend path. Hold Alt, Ctrl or Shift for other modes."
+      If altState
+         msgu := (dontAddPoint=0 || !canDoSymmetry) ? "ALT: Add new point on existing edge" : "ALT: Move point ignoring symmetry P[" dontAddPoint "]"
+      Else If ctrlState
+         msgu := (dontAddPoint=0) ? "CTRL: Remove point(s)" : "CTRL: Remove point P[" dontAddPoint "]"
+      Else If shiftState
+      {
+         selu := initialDrawingStartCoords[dontAddPoint, 3]
+         If (dontAddPoint!=0 && vectorToolModus!=2)
+            msgu := (selu=1) ? "SHIFT: Deselect point P[" dontAddPoint "]" : "SHIFT: Select point P[" dontAddPoint "]"
+         Else If (dontAddPoint=0)
+            msgu := "SHIFT: Click to add new point snapped every 45° degrees and extend path"
+         Else
+            msgu := "SHIFT: P[" dontAddPoint "]. No action."
+      }
+
+      If (customShapePoints.Count()<1)
+      {
+         msgu := "Click to add the start point of the new " Format("{:U}", defineVectorPathType()) " vector shape. Press Escape to cancel."
+      } Else If (mousePoint[4]!=1 && bezierSplineCustomShape=1 && varContains(msgu, "remove point", "move existing point", "move point", "select point"))
+      {
+         If !InStr(msgu, "remove point(s)")
+            msgu := StrReplace(msgu, " point", " anchor point")
+         If InStr(msgu, "remove anchor")
+            msgu := StrReplace(msgu, "Remove", "Collapse")
+         If (InStr(msgu, "move existing anchor") && InStr(msgu, "double click to"))
+            msgu := SubStr(msgu, 1, InStr(msgu, ".") + 1) "Double click to collapse it."
+      }
+   } Else If (vectorToolModus=3)
+   {
+      msgu := (dontAddPoint=0) ? "Tool mode: REMOVE. Click on any point to remove it." : "Tool mode: REMOVE. Remove point P[" dontAddPoint "]"
+      If (bezierSplineCustomShape=1 && dontAddPoint=0)
+         msgu .= " Click anchor points to collapse them."
+      Else If (mousePoint[4]!=1 && bezierSplineCustomShape=1 && dontAddPoint!=0)
+         msgu := "Tool mode: REMOVE. Collapse anchor point P[" dontAddPoint "]"
+   } Else If (vectorToolModus=4)
+   {
+      If (mousePoint[4]!=1 && bezierSplineCustomShape=1)
+         pk := "anchor "
+
+      selu := initialDrawingStartCoords[dontAddPoint, 3]
+      If ctrlState
+         msgu := (dontAddPoint=0) ? "CTRL: Remove point(s)" : "CTRL: Remove " pk "point P[" dontAddPoint "]"
+      Else If (dontAddPoint!=0 && vectorToolModus!=2)
+         msgu := (selu=1) ? "Tool mode: SELECT. Deselect " pk "point P[" dontAddPoint "]" : "Tool mode: SELECT. Select " pk "point P[" dontAddPoint "]"
+      Else
+         msgu := "Tool mode: SELECT. Click on any point to select it. Double click elsewhere to deselect all points."
+   }
+
+   Return msgu
+}
+
+drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHeight, ByRef vectorVisiblePoints, bezierLinesPath, rect:=0) {
    Static prevMsg, prevBMP, lastSnap := []
    If (gmx="snap")
       Return lastSnap
@@ -72062,7 +72192,7 @@ drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHei
    If (vpImgPanningNow)
       Return
 
-   If (pWhite!="clicky")
+   If (pWhite!="clicky" && !IsObject(rect))
    {
       dontAddPoint := (mX<0 || mY<0) ? -1 : 0
       If (dontAddPoint!=-1 && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && (scrollBarHy>1 || scrollBarVx>1))
@@ -72196,44 +72326,19 @@ drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHei
        Gdip_DrawPath(Gu, pPen1d, bezierLinesPath)
     }
 
+    If (Gu && IsObject(rect))
+    {
+       doRedraw := 1
+       Gdip_FillRectangle(Gu, pBrushC, rect[1], rect[2], rect[3], rect[4])
+       Gdip_DrawRectangle(Gu, pPen4, rect[1], rect[2], rect[3], rect[4])
+       ; fnOutputDebug("yaaaaaaaay=" rect[1] ";" rect[2] "|" rect[3] ";" rect[4])
+    } 
+       ; fnOutputDebug("noooooo=" rect[1] ";" rect[2] "|" rect[3] ";" rect[4])
+
     If (vpImgPanningNow!=1 && showContextualStatusBar=1 && Gu)
     {
        ; draw the status bar
-       dontAddPoint := mousePoint[1]
-       If (dontAddPoint=1)
-          dontAddPoint := mousePoint[1] " | Path start point"
-       Else If (dontAddPoint=customShapePoints.Count())
-          dontAddPoint := mousePoint[1] " | Path end point"
-       Else If (dontAddPoint=symPoint && canDoSymmetry)
-          dontAddPoint := mousePoint[1] " | Symmetry reference point"
-
-       msgu := (dontAddPoint!=0) ? "Move existing point P[" dontAddPoint "]. Double click to split in two" : "Click to add new point and extend path. Hold Alt, Ctrl or Shift for other modes."
-       If altState
-          msgu := (dontAddPoint=0 || !canDoSymmetry) ? "ALT: Add new point on existing edge" : "ALT: Move point ignoring symmetry P[" dontAddPoint "]"
-       Else If ctrlState
-          msgu := (dontAddPoint=0) ? "CTRL: Remove point(s)" : "CTRL: Remove point P[" dontAddPoint "]"
-       Else If shiftState
-       {
-          selu := initialDrawingStartCoords[dontAddPoint, 3]
-          If (dontAddPoint!=0)
-             msgu := (selu=1) ? "SHIFT: Deselect point P[" dontAddPoint "]" : "SHIFT: Select point P[" dontAddPoint "]"
-          Else
-             msgu := "SHIFT: Click to add new point snapped every 45° degrees and extend path"
-       }
-
-       If (customShapePoints.Count()<1)
-       {
-          msgu := "Click to add the start point of the new " Format("{:U}", defineVectorPathType()) " vector shape. Press Escape to cancel."
-       } Else If (mousePoint[4]!=1 && bezierSplineCustomShape=1 && varContains(msgu, "remove point", "move existing point", "move point", "select point"))
-       {
-          If !InStr(msgu, "remove point(s)")
-             msgu := StrReplace(msgu, " point", " anchor point")
-          If InStr(msgu, "remove anchor")
-             msgu := StrReplace(msgu, "Remove", "Collapse")
-          If (InStr(msgu, "move existing anchor") && InStr(msgu, "double click to"))
-             msgu := SubStr(msgu, 1, InStr(msgu, ".") + 1) "Double click to collapse it."
-       }
-
+       msgu := defineVectorEditorStatusBar(mousePoint, dontAddPoint, canDoSymmetry, altState, ctrlState, shiftState)
        thisIDu := msgu "a" altState ctrlState shiftState canDoSymmetry FlipImgH FlipImgV scrollBarVx hasDrawnImageMap scrollBarHy
        If (thisIDu=prevMsg && validBMP(prevBMP))
        {
@@ -72265,6 +72370,8 @@ drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHei
           prevMsg := thisIDu
        }
     }
+    If (doRedraw=1)
+       r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectwin, 2NDglHDC)
 
     doNormalCursor := (dontAddPoint!=0 || vpImgPanningNow=1) ? 1 : 0
     interfaceThread.ahkassign("doNormalCursor", doNormalCursor)
@@ -72434,12 +72541,18 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0, kpp
        prevCstate := "a" mainWidth mainHeight FillAreaCurveTension closedLineCustomShape tensionCurveCustomShape cardinalCurveCustomShape customShapePoints.Count() lastZeitFileSelect imgSelX1 imgSelY1 imgSelX2 imgSelY2 bezierSplineCustomShape zoomLevel (currentVectorUndoLevel + 1) prevDestPosX prevDestPosY getIDimage(currentFileIndex) currentFileIndex
        thisPartialState := "a" mainWidth mainHeight bzr customShapePoints.Count() lastZeitFileSelect imgSelX1 imgSelY1 imgSelX2 imgSelY2 bezierSplineCustomShape zoomLevel (currentVectorUndoLevel + 1) prevDestPosX prevDestPosY getIDimage(currentFileIndex) currentFileIndex
        cacheRefresh := 1
+    } Else If (actu="sel-rect" && IsObject(whichPoint) && prevCstate)
+    {
+       Gdip_GraphicsClear(Gu)
+       prevCstate := "a" mainWidth mainHeight FillAreaCurveTension closedLineCustomShape tensionCurveCustomShape cardinalCurveCustomShape customShapePoints.Count() lastZeitFileSelect imgSelX1 imgSelY1 imgSelX2 imgSelY2 bezierSplineCustomShape zoomLevel (currentVectorUndoLevel + 1) prevDestPosX prevDestPosY getIDimage(currentFileIndex) currentFileIndex
+       thisPartialState := "a" mainWidth mainHeight bzr customShapePoints.Count() lastZeitFileSelect imgSelX1 imgSelY1 imgSelX2 imgSelY2 bezierSplineCustomShape zoomLevel (currentVectorUndoLevel + 1) prevDestPosX prevDestPosY getIDimage(currentFileIndex) currentFileIndex
+       cacheRefresh := 0
     }
 
     ptz := k := firstPx := firstPy := 0
     SelDotsSize := dotsSize := (PrefsLargeFonts=1) ? imgHUDbaseUnit//3 : imgHUDbaseUnit//3.25
     thisState := (cacheRefresh=1) ? prevCstate : "a" mainWidth mainHeight FillAreaCurveTension closedLineCustomShape tensionCurveCustomShape cardinalCurveCustomShape customShapePoints.Count() lastZeitFileSelect imgSelX1 imgSelY1 imgSelX2 imgSelY2 bezierSplineCustomShape zoomLevel currentVectorUndoLevel prevDestPosX prevDestPosY getIDimage(currentFileIndex) currentFileIndex
-    If (thisState=prevCstate && validBMP(prevBMP) && !cacheRefresh && vectorVisiblePoints.Count()>3)
+    If (thisState=prevCstate && validBMP(prevBMP) && !cacheRefresh && vectorVisiblePoints.Count()>3 || actu="sel-rect")
     {
        Gdip_DrawImageFast(Gu, prevBMP)
        If (bezierAnchorsLinesUpdated=0 && bezierSplineCustomShape=1)
@@ -72449,7 +72562,7 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0, kpp
           bezierAnchorsLinesUpdated := 1
        }
 
-       drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHeight, vectorVisiblePoints, bezierLinesPath)
+       drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHeight, vectorVisiblePoints, bezierLinesPath, whichPoint)
        fnOutputDebug(A_ThisFunc "(): redraw cached in " A_TickCount - startZeit "ms | " vectorVisiblePoints.Count())
        Return
     }
