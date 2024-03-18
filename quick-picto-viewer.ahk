@@ -6486,8 +6486,9 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
       kMenu("PVnav", "Disable", fr "[" indexu "] = X: " mX " Y: " mY, "dummy")
    } Else
    {
+      keyu := (vectorToolModus=1) ? "`tAlt+Click" : ""
       If (dontAddPoint!=1)
-         kMenu("PVnav", "Add", "Add new point on edge`tAlt+Click", "MenuAddUnorderedVectorPoint")
+         kMenu("PVnav", "Add", "Add new point on edge" keyu, "MenuAddUnorderedVectorPoint")
       kMenu("PVnav", "Add", "X: " mX " Y: " mY, "dummy")
       kMenu("PVnav", "Disable", "X: " mX " Y: " mY, "dummy")
    }
@@ -6510,25 +6511,29 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
 
    If (dontAddPoint=1)
    {
+      keyu := (vectorToolModus<3) ? "`tDbl-Click" : ""
       canDoSymmetry := isNowSymmetricVectorShape()
       symPoint := prevVectorShapeSymmetryMode[1, 1]
       If (indexu=symPoint && canDoSymmetry)
          kMenu("PVnav", "Add", "Discard as symmetry reference`tY", "MenuSetVectorPathNoSymmetryMode")
       Else If (bk=1)
-         kMenu("PVnav", "Add", "&Divide point`tDbl-Click", "MenuSplitVectorPoint")
+         kMenu("PVnav", "Add", "&Divide point" keyu, "MenuSplitVectorPoint")
 
+      keyu := (vectorToolModus<3 || vectorToolModus=5) ? "`tAlt+Click" : ""
       If (bk=1 && bezierSplineCustomShape=1)
       {
-         kMenu("PVnav", "Add", "E&xpand anchors`tAlt-Click", "MenuExpandVectorPointAnchors")
+         kMenu("PVnav", "Add", "E&xpand anchors" keyu, "MenuExpandVectorPointAnchors")
          kMenu("PVnav", "Add", "&Collapse anchors", "MenuCollapseVectorPoint")
       } Else If (bk!=1 && bezierSplineCustomShape=1)
-         kMenu("PVnav", "Add", "Separate &fused anchors`tAlt-Click", "MenuExpandVectorPointAnchors")
+         kMenu("PVnav", "Add", "Separate &fused anchors" keyu, "MenuExpandVectorPointAnchors")
 
+      keyu := (vectorToolModus<3) ? "`tCtrl+Click" : ""
       If (bk!=1 && bezierSplineCustomShape=1)
          kMenu("PVnav", "Add", "&Reflect anchor", "MenuReflectAnchorVectorPoint")
       labelu := (bk=1 && bezierSplineCustomShape=1 || bezierSplineCustomShape!=1) ? "&Remove point" : "Collapse &anchor"
-      kMenu("PVnav", "Add", labelu "`tCtrl+Click", "MenuRemVectorPoint")
-      kMenu("PVnav", "Add", "S&elect point`tShift+Click", "MenuSelVectorPoint")
+      kMenu("PVnav", "Add", labelu keyu, "MenuRemVectorPoint")
+      keyu := (vectorToolModus=1 || vectorToolModus=5) ? "`tShift+Click" : ""
+      kMenu("PVnav", "Add", "S&elect point" keyu, "MenuSelVectorPoint")
       If !isNowSymmetricVectorShape()
       {
          If (bezierSplineCustomShape!=1)
@@ -7720,7 +7725,7 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
          doSpecialAct := dontAddPoint := 1
          rrz := expandGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
          rrz := (rrz=1) ? "" : "no" 
-      } Else If (ctrlState=1 || mainParam="remClick" || vectorToolModus=3 && mainParam="normal")
+      } Else If (ctrlState=1 && vectorToolModus<4 || mainParam="remClick" || vectorToolModus=3 && mainParam="normal")
       {
          dotRemoved := 1
          removeGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
@@ -8459,10 +8464,10 @@ selectPathPointsInRect(gmX, gmY, shiftState, ctrlState) {
         GetMouseCoord2wind(PVhwnd, mX, mY)
         nmX := (FlipImgH=1) ? mainWidth - mX : mX
         nmY := (FlipImgV=1) ? mainHeight - mY : mY
-        mw := abs(gmX - nmX), mh := abs(gmY - nmY)
-        thisState := "a" gmX gmY mw mh
+        thisState := "a" gmX gmY nmX nmY
         If (thisState!=prevState)
         {
+           mw := abs(gmX - nmX), mh := abs(gmY - nmY)
            tx := min(gmX, nmX)
            ty := min(gmY, nmY)
            ; ToolTip, % mw "|" mh , , , 2
@@ -8471,6 +8476,16 @@ selectPathPointsInRect(gmX, gmY, shiftState, ctrlState) {
            ; dummyRefreshImgSelectionWindow()
         }
         Sleep, 2
+   }
+
+   m := ctrlState ? 0 : 1
+   PointsListArray := drawLiveCreateCustomShape("getAllPoints", 0, 0)
+   Loop, % customShapePoints.Count()
+   {
+        xu := PointsListArray[A_Index*2 - 1]
+        yu := PointsListArray[A_Index*2]
+        If isDotInRect(xu, yu, gmx, nmx, gmy, nmy)
+           initialDrawingStartCoords[A_Index, 3] := m
    }
 
    MouseMove, 2, 0, 2, R
@@ -59150,7 +59165,7 @@ InvokeMenuBarVectorEdit(manuID) {
       Menu, pvMenuBarEdit, Add
    }
 
-   kMenu("pvMenuBarEdit", "Add", "&Remove last point`tBackspace", "reduceCustomShapelength")
+   kMenu("pvMenuBarEdit", "Add", "&Remove end point`tBackspace", "reduceCustomShapelength")
    kMenu("pvMenuBarEdit", "Add", "C&ycle symmetry modes`tY", "toggleBrushSymmetryModes")
    createMenuSelectShapeTension()
    kMenu("pvMenuBarEdit", "Add", "&Path type / smoothness", ":PVshapeTension")
@@ -72130,36 +72145,58 @@ defineVectorEditorStatusBar(ByRef mousePoint, ByRef dontAddPoint, canDoSymmetry,
    Else If (dontAddPoint=symPoint && canDoSymmetry)
       dontAddPoint := mousePoint[1] " | Symmetry reference point"
 
-   If (vectorToolModus<3)
+   If (vectorToolModus<3 || vectorToolModus=5)
    {
-      msgu := (dontAddPoint!=0) ? "Move existing point P[" dontAddPoint "]. Double click to split in two" : "Click to add new point and extend path. Hold Alt, Ctrl or Shift for other modes."
-      If altState
-         msgu := (dontAddPoint=0 || !canDoSymmetry) ? "ALT: Add new point on existing edge" : "ALT: Move point ignoring symmetry P[" dontAddPoint "]"
-      Else If ctrlState
-         msgu := (dontAddPoint=0) ? "CTRL: Remove point(s)" : "CTRL: Remove point P[" dontAddPoint "]"
+      If (mousePoint[4]!=1 && bezierSplineCustomShape=1)
+         pk := "anchor "
+
+      selu := initialDrawingStartCoords[dontAddPoint, 3]
+      If (vectorToolModus=5)
+      {
+         If (customShapeHasSelectedPoints=1)
+         {
+            msgu := "Click and drag to rescale selected points."
+            If (dontAddPoint!=0 && selu=1)
+               msgu := "Click and drag to move selected points. Shift + L-Click to deselect " pk "P[" dontAddPoint "]." 
+            Else If (dontAddPoint!=0)
+               msgu :=  "Move " pk "point P[" dontAddPoint "]" 
+         } Else
+            msgu := (dontAddPoint!=0) ? "Move " pk "point P[" dontAddPoint "]" : "Click and drag points to adjust the path."
+      } Else
+      {
+         msgu := (dontAddPoint!=0) ? "Move existing " pk "point P[" dontAddPoint "]. Double click to divide in two." : "Click to add new point and extend path. Hold Alt, Ctrl or Shift for other modes."
+         If (dontAddPoint!=0 && customShapeHasSelectedPoints=1)
+            msgu := "Click and drag to move selected points. Shift + L-Click to deselect " pk "P[" dontAddPoint "]."
+      }
+
+      If (altState && vectorToolModus!=5)
+         msgu := (dontAddPoint=0 || !canDoSymmetry) ? "ALT: Add new point on existing edge" : "ALT: Move point ignoring symmetry " pk "P[" dontAddPoint "]"
+      Else If (ctrlState && vectorToolModus!=5)
+         msgu := (dontAddPoint=0) ? "CTRL: Remove point(s)" : "CTRL: Remove " pk "point P[" dontAddPoint "]"
       Else If shiftState
       {
-         selu := initialDrawingStartCoords[dontAddPoint, 3]
          If (dontAddPoint!=0 && vectorToolModus!=2)
-            msgu := (selu=1) ? "SHIFT: Deselect point P[" dontAddPoint "]" : "SHIFT: Select point P[" dontAddPoint "]"
-         Else If (dontAddPoint=0)
+            msgu := (selu=1) ? "SHIFT: Deselect " pk "point P[" dontAddPoint "]" : "SHIFT: Select " pk "point P[" dontAddPoint "]"
+         Else If (dontAddPoint=0 && vectorToolModus!=5)
             msgu := "SHIFT: Click to add new point snapped every 45° degrees and extend path"
+         Else If (dontAddPoint=0 && vectorToolModus=5 && customShapeHasSelectedPoints=1)
+            msgu := "SHIFT: Click and drag to uniformly rescale the selected points."
          Else
-            msgu := "SHIFT: P[" dontAddPoint "]. No action."
+            msgu := (dontAddPoint=0) ? "SHIFT: No action" : "SHIFT: P[" dontAddPoint "]. No action."
       }
 
       If (customShapePoints.Count()<1)
       {
-         msgu := "Click to add the start point of the new " Format("{:U}", defineVectorPathType()) " vector shape. Press Escape to cancel."
-      } Else If (mousePoint[4]!=1 && bezierSplineCustomShape=1 && varContains(msgu, "remove point", "move existing point", "move point", "select point"))
+         msgu := "Path type: " Format("{:U}", defineVectorPathType()) ". Click to add the start point of the new vector shape. Press Escape to cancel."
+      } Else If (mousePoint[4]!=1 && bezierSplineCustomShape=1)
       {
-         If !InStr(msgu, "remove point(s)")
-            msgu := StrReplace(msgu, " point", " anchor point")
          If InStr(msgu, "remove anchor")
             msgu := StrReplace(msgu, "Remove", "Collapse")
          If (InStr(msgu, "move existing anchor") && InStr(msgu, "double click to"))
             msgu := SubStr(msgu, 1, InStr(msgu, ".") + 1) "Double click to collapse it."
       }
+      If (vectorToolModus>1)
+         msgu := "Tool mode: " Format("{:U}", defineVectToolMode()) ". " msgu
    } Else If (vectorToolModus=3)
    {
       msgu := (dontAddPoint=0) ? "Tool mode: REMOVE. Click on any point to remove it." : "Tool mode: REMOVE. Remove point P[" dontAddPoint "]"
@@ -72169,16 +72206,15 @@ defineVectorEditorStatusBar(ByRef mousePoint, ByRef dontAddPoint, canDoSymmetry,
          msgu := "Tool mode: REMOVE. Collapse anchor point P[" dontAddPoint "]"
    } Else If (vectorToolModus=4)
    {
-      If (mousePoint[4]!=1 && bezierSplineCustomShape=1)
-         pk := "anchor "
-
       selu := initialDrawingStartCoords[dontAddPoint, 3]
-      If ctrlState
+      If (shiftState && dontAddPoint=0)
+         msgu := "Tool mode: SELECT. SHIFT: Click and drag to create a rectangular selection of points. Hold Ctrl additionally to deselect points."
+      Else If ctrlState
          msgu := (dontAddPoint=0) ? "CTRL: Remove point(s)" : "CTRL: Remove " pk "point P[" dontAddPoint "]"
       Else If (dontAddPoint!=0 && vectorToolModus!=2)
          msgu := (selu=1) ? "Tool mode: SELECT. Deselect " pk "point P[" dontAddPoint "]" : "Tool mode: SELECT. Select " pk "point P[" dontAddPoint "]"
       Else
-         msgu := "Tool mode: SELECT. Click on any point to select it. Double click elsewhere to deselect all points."
+         msgu := "Tool mode: SELECT. Click on any point to select it. Double click elsewhere to deselect all points. Use Shift to select multiple points."
    }
 
    Return msgu
@@ -72331,9 +72367,7 @@ drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHei
        doRedraw := 1
        Gdip_FillRectangle(Gu, pBrushC, rect[1], rect[2], rect[3], rect[4])
        Gdip_DrawRectangle(Gu, pPen4, rect[1], rect[2], rect[3], rect[4])
-       ; fnOutputDebug("yaaaaaaaay=" rect[1] ";" rect[2] "|" rect[3] ";" rect[4])
     } 
-       ; fnOutputDebug("noooooo=" rect[1] ";" rect[2] "|" rect[3] ";" rect[4])
 
     If (vpImgPanningNow!=1 && showContextualStatusBar=1 && Gu)
     {
@@ -72441,6 +72475,8 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0, kpp
        Return
     } Else If (mainWidth="getPoints")
        Return vectorVisiblePoints
+    Else If (mainWidth="getAllPoints")
+       Return PointsListArray
 
     If !pWhite
        pWhite := Gdip_BrushCreateSolid("0xDDeeFFaa")
@@ -95421,7 +95457,7 @@ tlbrDecideTooltips(hwnd) {
       msgu := "Delete selected points «Delete»"
    } Else If (btnID="BTNvectRemLast")
    {
-      msgu := "Remove last added point «Backspace»"
+      msgu := "Remove end point «Backspace»"
    } Else If (btnID="BTNvectSelAll")
    {
       msgu := "L: Select all points «Ctrl + A»`nR: Deselect all points «Ctrl + D»"
