@@ -9,12 +9,12 @@
    h) Input responses
    i) Image live editing
    j) How to enable alpha masking for an image editing live tool
-   k) How vector shapes drawing works [soon]
+   k) How vector shapes drawing works
    l) How image duplicates identification works (soon)
    m) How to add a new panel/tool (soon)
 
 
-Deniere mise à jour: mardi 2 janvier 2024
+Deniere mise à jour: vendredi 22 mars 2024
 =====================================================================
 
 -) Introduction
@@ -35,7 +35,11 @@ Deniere mise à jour: mardi 2 janvier 2024
    are better image libraries than FreeImage, eg., OpenCV perhaps.
 
    And finally, AHK v1.1 is fundamentally not a wise choice to be
-   coding such a big application.
+   coding such a big application, even if I would have used classes 
+   to better structure the code. AHK's loops are utterly slow, 
+   rendering any processing of large amounts of data... a pain.
+   I circumvented this by creating my own DLL in C++ which I rely 
+   on to process data.
 
    QPV v6.0 is the last major development push that I plan. This 
    version brings full support for images above 536 megapixels
@@ -891,20 +895,53 @@ j) How to enable alpha masking for an image editing live tool
 k) How vector shapes drawing works [soon]
 =====================================================================
 
-  PanelManageVectorShapes()
-  startDrawingShape()
-  drawLiveCreateCustomShape()
-  drawVisibleVectorPoints()
-  stopDrawingShape()
-  PerformVectorShapeActions() invoked by WinClickAction() and by some context menu options listed by createContextMenuCustomShapeDrawing()
-  createContextMenuCustomShapeDrawing() invoked by BuildMainMenu()  and PerformVectorShapeActions() on right click
+   When users start drawing a vector shape, startDrawingShape() is 
+   invoked. The function prepares a bunch of things. 
+   The global variable named "drawingShapeNow" is set to 1. If the 
+   selection area has a vector shape already defined,
+   resumeCustomShapeSelection() is invoked to convert the points 
+   data to the edit mode data.
 
-  convertShapePointsStrToArray()
-  convertShapePointsArrayToStr()
-  convertCustomShape2givenArea()
-  convertCustomShape2relativeCoords()
+   At every mouse move drawLiveCreateCustomShape() is invoked to 
+   refresh the window. The function caches the points data. When 
+   the data is cached it is rendered by drawVisibleVectorPoints(). 
 
-  resumeCustomShapeSelection()
-  getVPcustomShapePath()
+   When the user clicks in the viewport, WinClickAction() invokes 
+   PerformVectorShapeActions(). This function is also called by
+   some context menu options listed by 
+   createContextMenuCustomShapeDrawing().
+
+   When the user exits the tool, stopDrawingShape() is called.
+   This function converts and saves the points data for later use.
+
+   Users can load and save vector shapes through PanelManageVectorShapes().
+
+
+   Technicalities:
+   
+   The points in edit mode are stored in array object:
+   customShapePoints[index] := [x, y]
+
+   X and Y values are floating points based on the dimensions of
+   image painted in the viewport, at current zoom level. The values 
+   are not capped in the range of 0 to 1.
+
+   The top/left corner is defined by "prevDestPosX" and "prevDestPosY".
+   These two variables designate where was last painted the image in
+   the viewport, according to the current zoom level and panning.
+
+   getVectorCoordsFromVPpoint() and getVPcoordsVectorPoint()
+   to see the exact formulas.
+
+   Outside edit mode:
+   The vector points are stored as floating points from 0 to 1.
+   The values are used to calculate the coordinates of the points 
+   for GDI+ based on the width and height of the viewport selectionn
+   area bounding box. When I draw on screen with GDI+, I must use the
+   viewport coordinates to match with client window. 
+   One of the relevant functions is convertCustomShape2givenArea().
+
+   In this format I store the points on the disk and in customShapePoints
+   when the user is not editing the shape.
 
 
