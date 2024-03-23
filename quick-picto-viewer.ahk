@@ -162,7 +162,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , zeitSillyPrevent := 1, PrintPosX, PrintPosY, PrintPosW, PrintPosH, tinyPrevAreaCoordX := 1, UsrEditFileDestination := ""
    , hLVmainu := 0, tempBtnVisible := "null", tempBtnGuiBtnArray := [], userMultiCoresLimit := 100
    , drawingShapeNow := 0, customShapePoints := [], prevResizedVPimgW := "", prevResizedVPimgH := "", PenuDrawLive := ""
-   , initialDrawingStartCoords := [], drawingVectorLiveMode := 0, cardinalCurveCustomShape := 0, openingPanelNow := 0
+   , customShapePropPoints := [], drawingVectorLiveMode := 0, cardinalCurveCustomShape := 0, openingPanelNow := 0
    , closedLineCustomShape := 1, tensionCurveCustomShape := 0.5, userDefinedSelCoords := 0, thisSearchString := ""
    , SelectionCoordsType := 1, alphaMaskRefBMP := 1, infoBoxGdiCached := "", watchFolderDetails := "", isNowFakeWinOpen := 0
    , FilteruMinRange, FilteruMaxRange, userFilterSizeProperty := 1, qpvCanvasHasInit := 0, coreDesiredPixFmt := "0xE200B"
@@ -6657,8 +6657,8 @@ MenuRemVectorPoint() {
 }
 
 MenuSelAllVectorPoints() {
-   Loop, % initialDrawingStartCoords.Count()
-       initialDrawingStartCoords[A_Index, 1] := 1
+   Loop, % customShapePropPoints.Count()
+       customShapePropPoints[A_Index, 1] := 1
 
    customShapeHasSelectedPoints := 1
    ; lastZeitFileSelect := A_TickCount
@@ -6668,8 +6668,8 @@ MenuSelAllVectorPoints() {
 }
 
 MenuSelNoVectorPoints() {
-   Loop, % initialDrawingStartCoords.Count()
-       initialDrawingStartCoords[A_Index, 1] := 0
+   Loop, % customShapePropPoints.Count()
+       customShapePropPoints[A_Index, 1] := 0
 
    customShapeHasSelectedPoints := 0
    ; lastZeitFileSelect := A_TickCount
@@ -6792,8 +6792,8 @@ configVectorShapeSymmetryPoint(modus, silentu, givenIndex, noChecks:=0, allowRei
    If customShapeHasSelectedPoints
    {
       ; must deselect points to avoid some edge cases
-      Loop, % initialDrawingStartCoords.Count()
-          initialDrawingStartCoords[A_Index, 1] := 0
+      Loop, % customShapePropPoints.Count()
+          customShapePropPoints[A_Index, 1] := 0
    }
 
    thisu := (modus="x") ? 1 : 2
@@ -6804,7 +6804,7 @@ configVectorShapeSymmetryPoint(modus, silentu, givenIndex, noChecks:=0, allowRei
 }
 
 MenuSetVectorPathNoSymmetryMode() {
-   CustomShapeSymmetry := CustomShapeLockedSymmetry := 0
+   CustomShapeSymmetry := CustomShapeLockedSymmetry := vpSymmetryPointXdp := vpSymmetryPointYdp := 0
    prevVectorShapeSymmetryMode := []
    SetTimer, dummyRefreshImgSelectionWindow, -10
 }
@@ -6821,7 +6821,7 @@ MenuExpandSelectedAnchorPoints() {
     Loop, % totalCount
     {
         thisIndex := A_Index
-        selu := initialDrawingStartCoords[thisIndex, 1]
+        selu := customShapePropPoints[thisIndex, 1]
         c := customShapePoints[thisIndex]
         k := clampInRange(k + 1, 1, 3, 1)
         If (c[1]="" || c[2]="" || selu!=1 || lol[thisIndex]=1 || k!=1)
@@ -6845,7 +6845,7 @@ MenuCollapseSelectedAnchorPoints() {
     Loop, % totalCount
     {
         thisIndex := A_Index
-        selu := initialDrawingStartCoords[thisIndex, 1]
+        selu := customShapePropPoints[thisIndex, 1]
         c := customShapePoints[thisIndex]
         k := clampInRange(k + 1, 1, 3, 1)
         If (c[1]="" || c[2]="" || selu!=1 || lol[thisIndex]=1)
@@ -6857,11 +6857,11 @@ MenuCollapseSelectedAnchorPoints() {
         If (k!=1)
         {
            ; collapse anchors on «delete»
-           initialDrawingStartCoords[thisIndex, 1] := 0
+           customShapePropPoints[thisIndex, 1] := 0
            If (oppoIndex!=thisIndex && canDoSymmetry=1)
            {
               lol[oppoIndex] := 1
-              initialDrawingStartCoords[oppoIndex, 1] := 0
+              customShapePropPoints[oppoIndex, 1] := 0
            }
         } Else
         {
@@ -6871,13 +6871,13 @@ MenuCollapseSelectedAnchorPoints() {
            If A
            {
               lol[a] := 1
-              initialDrawingStartCoords[A, 1] := 1
+              customShapePropPoints[A, 1] := 1
            }
 
            If B
            {
               lol[b] := 1
-              initialDrawingStartCoords[B, 1] := 1
+              customShapePropPoints[B, 1] := 1
            }
 
            If (oppoIndex!=thisIndex && canDoSymmetry=1 && a!=thisIndex && b!=thisIndex && a!=oppoIndex && b!=oppoIndex)
@@ -6886,13 +6886,13 @@ MenuCollapseSelectedAnchorPoints() {
               zb .= totalCount - b + 1
               If (a!=za && za!=zb && a)
               {
-                 initialDrawingStartCoords[za, 1] := 1
+                 customShapePropPoints[za, 1] := 1
                  lol[za] := 1
               }
 
               If (b!=zb && za!=zb && b)
               {
-                 initialDrawingStartCoords[zb, 1] := 1
+                 customShapePropPoints[zb, 1] := 1
                  lol[zb] := 1
               }
            }
@@ -6902,7 +6902,7 @@ MenuCollapseSelectedAnchorPoints() {
     customShapeHasSelectedPoints := 0
     Loop, % totalCount
     {
-        If initialDrawingStartCoords[A_Index, 1]
+        If customShapePropPoints[A_Index, 1]
         {
            customShapeHasSelectedPoints := 1
            Break
@@ -6932,7 +6932,7 @@ MenuRemSelVectorPoints() {
        Loop, % totalCount
        {
            thisIndex := A_Index
-           selu := initialDrawingStartCoords[thisIndex, 1]
+           selu := customShapePropPoints[thisIndex, 1]
            c := customShapePoints[thisIndex]
            k := clampInRange(k + 1, 1, 3, 1)
            If (c[1]="" || c[2]="" || selu!=1 || lol[thisIndex]=1)
@@ -6946,12 +6946,12 @@ MenuRemSelVectorPoints() {
            {
               ; collapse anchors on «delete»
               collapseGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry)
-              initialDrawingStartCoords[thisIndex, 1] := 0
+              customShapePropPoints[thisIndex, 1] := 0
               lol[thisIndex] := 1
               If (oppoIndex!=thisIndex && canDoSymmetry=1)
               {
                  lol[oppoIndex] := 1
-                 initialDrawingStartCoords[oppoIndex, 1] := 0
+                 customShapePropPoints[oppoIndex, 1] := 0
               }
            } Else
            {
@@ -6962,13 +6962,13 @@ MenuRemSelVectorPoints() {
               If A
               {
                  lol[a] := 1
-                 initialDrawingStartCoords[A, 1] := 1
+                 customShapePropPoints[A, 1] := 1
               }
 
               If B
               {
                  lol[b] := 1
-                 initialDrawingStartCoords[B, 1] := 1
+                 customShapePropPoints[B, 1] := 1
               }
 
               If (oppoIndex!=thisIndex && canDoSymmetry=1 && a!=thisIndex && b!=thisIndex && a!=oppoIndex && b!=oppoIndex)
@@ -6977,13 +6977,13 @@ MenuRemSelVectorPoints() {
                  zb .= totalCount - b + 1
                  If (a!=za && za!=zb && a)
                  {
-                    initialDrawingStartCoords[za, 1] := 1
+                    customShapePropPoints[za, 1] := 1
                     lol[za] := 1
                  }
  
                  If (b!=zb && za!=zb && b)
                  {
-                    initialDrawingStartCoords[zb, 1] := 1
+                    customShapePropPoints[zb, 1] := 1
                     lol[zb] := 1
                  }
               }
@@ -7015,7 +7015,7 @@ MenuRemSelVectorPoints() {
     Loop, % customShapePoints.Count()
     {
        c := customShapePoints[A_Index]
-       selu := initialDrawingStartCoords[A_Index, 1]
+       selu := customShapePropPoints[A_Index, 1]
        If (hasSymmetry=1 && selu=1 && symPoint=A_Index)
           zpp := 1
 
@@ -7028,7 +7028,7 @@ MenuRemSelVectorPoints() {
        }
 
        thisIndex++
-       newuArrayu[thisIndex] := initialDrawingStartCoords[A_Index]
+       newuArrayu[thisIndex] := customShapePropPoints[A_Index]
        newArrayu[thisIndex] := c
     }
 
@@ -7043,7 +7043,7 @@ MenuRemSelVectorPoints() {
     ; nz := prevVectorShapeSymmetryMode[1, 1]
     ; ToolTip, % initial "=l=" thePoint "=" nz , , , 2
     customShapePoints := newArrayu.Clone()
-    initialDrawingStartCoords := newuArrayu.Clone()
+    customShapePropPoints := newuArrayu.Clone()
     customShapeHasSelectedPoints := 0
     recordVectorUndoLevels()
     lastZeitFileSelect := A_TickCount
@@ -7067,8 +7067,8 @@ MenuCopyVectorPoints(modus:=0, givenIndex:=0) {
        If (!isNumber(givenIndex) || clipVectorPoints.Count()<3)
           Return
 
-       Loop, % initialDrawingStartCoords.Count()
-             initialDrawingStartCoords[A_Index, 1] := 0
+       Loop, % customShapePropPoints.Count()
+             customShapePropPoints[A_Index, 1] := 0
 
        recordVectorUndoLevels()
        If (vectorToolModus=3 || vectorToolModus=4)
@@ -7081,7 +7081,7 @@ MenuCopyVectorPoints(modus:=0, givenIndex:=0) {
           c[2] += pzy
           thisIndex++
           customShapePoints.InsertAt(givenIndex, c)
-          initialDrawingStartCoords.InsertAt(givenIndex, [1, 0])
+          customShapePropPoints.InsertAt(givenIndex, [1, 0])
        }
 
        CustomShapeLockedSymmetry := CustomShapeSymmetry := vpSymmetryPointXdp := vpSymmetryPointYdp := 0
@@ -7099,12 +7099,12 @@ MenuCopyVectorPoints(modus:=0, givenIndex:=0) {
     Loop, % customShapePoints.Count()
     {
        c := customShapePoints[A_Index]
-       selu := initialDrawingStartCoords[A_Index, 1]
+       selu := customShapePropPoints[A_Index, 1]
        If (c[1] && c[2] && selu=1)
        {
           thisIndex++
           nVpoints[thisIndex] := c
-          nVcoords[thisIndex] := initialDrawingStartCoords[A_Index]
+          nVcoords[thisIndex] := customShapePropPoints[A_Index]
        }
     }
 
@@ -7126,10 +7126,10 @@ MenuCopyVectorPoints(modus:=0, givenIndex:=0) {
 MenuSelInvertVectorPoints() {
    thisCounter := 0
    customShapeHasSelectedPoints := 1
-   Loop, % initialDrawingStartCoords.Count()
+   Loop, % customShapePropPoints.Count()
    {
-       initialDrawingStartCoords[A_Index, 1] := !initialDrawingStartCoords[A_Index, 1]
-       If initialDrawingStartCoords[A_Index, 1]
+       customShapePropPoints[A_Index, 1] := !customShapePropPoints[A_Index, 1]
+       If customShapePropPoints[A_Index, 1]
        {
           thisCounter++
           customShapeHasSelectedPoints := 1
@@ -7202,14 +7202,14 @@ MenuConvertShapeToPoly() {
 
       customShapeHasSelectedPoints := 0
       customShapePoints := []
-      initialDrawingStartCoords := []
+      customShapePropPoints := []
       Loop, % PointsCount
       {
           x := NumGet(&PointsF, 8*(A_Index-1), "float")
           y := NumGet(&PointsF, (8*(A_Index-1))+4, "float")
           ; getVectorCoordsFromVPpoint(x, y, nX, nY)
           customShapePoints[A_Index] := [(x - prevDestPosX)/prevResizedVPimgW, (y - prevDestPosY)/prevResizedVPimgH]
-          initialDrawingStartCoords[A_Index] := [0, 0]
+          customShapePropPoints[A_Index] := [0, 0]
       }
 
       customShapeCountPoints := PointsCount
@@ -7532,7 +7532,7 @@ MenuSetStartVectorPoint(given:=0, isGiven:=0) {
      Return
   }
 
-  totalLoops := initialDrawingStartCoords.Count()
+  totalLoops := customShapePropPoints.Count()
   If (totalLoops<3)
      Return
 
@@ -7548,10 +7548,10 @@ MenuSetStartVectorPoint(given:=0, isGiven:=0) {
 
   newStartCoords := []
   Loop, % totalLoops - newStartPoint
-      newStartCoords[A_Index] := initialDrawingStartCoords[A_Index + newStartPoint - 1]
+      newStartCoords[A_Index] := customShapePropPoints[A_Index + newStartPoint - 1]
   Loop, % newStartPoint - 1
-      newStartCoords[A_Index + totalLoops - newStartPoint] := initialDrawingStartCoords[A_Index]
-  newStartCoords.InsertAt(1 + totalLoops - newStartPoint, initialDrawingStartCoords[totalLoops])
+      newStartCoords[A_Index + totalLoops - newStartPoint] := customShapePropPoints[A_Index]
+  newStartCoords.InsertAt(1 + totalLoops - newStartPoint, customShapePropPoints[totalLoops])
 
   newArrayu := []
   totalLoops := customShapePoints.Count()
@@ -7567,7 +7567,7 @@ MenuSetStartVectorPoint(given:=0, isGiven:=0) {
   ; f := d + totalLoops - newStartPoint
   ; newu := newArrayu.Count()
   ; ToolTip, % totalLoops "==" newu "|" r "|" d "|" e "|" f , , , 2
-  initialDrawingStartCoords := newStartCoords.Clone()
+  customShapePropPoints := newStartCoords.Clone()
   customShapePoints := newArrayu.Clone()
   recordVectorUndoLevels()
   lastZeitFileSelect := A_TickCount
@@ -7599,7 +7599,7 @@ performBezierActivePathAutoFixNow() {
       r := mod(PointsCount, 3)
       ; ToolTip, % "r=" r, , , 2
       c := customShapePoints[PointsCount]
-      d := initialDrawingStartCoords[PointsCount]
+      d := customShapePropPoints[PointsCount]
       loops := (r=2) ? 2 : 1
       If (r=1)
          loops := 0
@@ -7607,7 +7607,7 @@ performBezierActivePathAutoFixNow() {
       Loop, % loops
       {
          customShapePoints.Push(c.Clone())
-         initialDrawingStartCoords.Push(d.Clone())
+         customShapePropPoints.Push(d.Clone())
       }
       ; ToolTip, % "l=" loops , , , 2
    }
@@ -7615,7 +7615,7 @@ performBezierActivePathAutoFixNow() {
 
 PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, shiftState, altState:=0) {
 ; the following array is used when editing the vector shape to hold details about viewport conditions when user added/modified points:
-   ; initialDrawingStartCoords[A_Index] := [prevDestPosX, prevDestPosY, isSelected, prevResizedVPimgW, prevResizedVPimgH]
+   ; customShapePropPoints[A_Index] := [prevDestPosX, prevDestPosY, isSelected, prevResizedVPimgW, prevResizedVPimgH]
 
 ; the main array is:
    ; customShapePoints[A_Index] := [x, y]
@@ -7655,7 +7655,7 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
    thisObjIndex := drawVisibleVectorPoints(gmX, gmY, mX, mY, "clicky", totalCount, 0, mainWidth, mainHeight, vectorVisiblePoints, "")
    thisIndex := thisObjIndex[1]
    oppoIndex := (canDoSymmetry=1) ? totalCount - thisIndex + 1 : -1
-   selu := initialDrawingStartCoords[thisIndex, 1]
+   selu := customShapePropPoints[thisIndex, 1]
    k := (bezierSplineCustomShape=1) ? thisObjIndex[4] : 1
    getVPcoordsVectorPoint(thisIndex, xu, yu)
    If isDotInRect(gmX, gmY, SelDotsSize, SelDotsSize, xu, yu, 1)
@@ -7680,7 +7680,7 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
             getVPcoordsVectorPoint(thisIndex, xu, yu)
             k := 1
             If !selu
-               selu := initialDrawingStartCoords[thisIndex, 1]
+               selu := customShapePropPoints[thisIndex, 1]
          }
       }
       dontAddPoint := 1
@@ -7754,7 +7754,7 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
          If (customShapeHasSelectedPoints=1 && selu=1)
          {
             ; drag/move selected points
-            moveSelectedPointsInVectorPath(gmX, gmY)
+            moveSelectedPointsInVectorPath(gmX, gmY, altState)
             dontAddPoint := doSpecialAct := 1
          } Else
          { 
@@ -7826,8 +7826,17 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
 
       hasSymmetry := calculateSymmetricVectorPoint(gmX, gmY, nX, nY)
       If hasSymmetry
+      {
+         doFlippuX := (gmX<vpSymmetryPointXdp && CustomShapeSymmetry=1) ? 1 : 0
+         doFlippuY := (gmY<vpSymmetryPointYdp && CustomShapeSymmetry=2) ? 1 : 0
+         ; ToolTip, % doFlippuX "|" doFlippuY , , , 2
+         If (doFlippuX || doFlippuY)
+         {
+            swapVars(gmX, nX)
+            swapVars(gmY, nY)
+         }
          pushAtGivenVectorPoint(1, nX, nY)
-      Else If (customShapePoints.Count()>2)
+      } Else If (customShapePoints.Count()>2)
          CustomShapeSymmetry := CustomShapeLockedSymmetry := 0
 
       thisIndex := pushEndNewVectorPoint(gmX, gmY)
@@ -7875,20 +7884,20 @@ pushEndNewVectorPoint(ogmX, ogmY, noCloseTest:=0) {
    zr := 1
    getVectorCoordsFromVPpoint(ogmX, ogmY, gmX, gmY)
    customShapePoints.Push([gmX, gmY])
-   initialDrawingStartCoords.Push([0, 0])
+   customShapePropPoints.Push([0, 0])
    prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] + 1
    thisIndex := customShapePoints.MaxIndex()
    If (bezierSplineCustomShape=1)
    {
       zr := 2
       customShapePoints.Push([gmX, gmY])
-      initialDrawingStartCoords.Push([0, 0])
+      customShapePropPoints.Push([0, 0])
       prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] + 1
       If (thisIndex>4)
       {
          zr := 3
          customShapePoints.Push([gmX, gmY])
-         initialDrawingStartCoords.Push([0, 0])
+         customShapePropPoints.Push([0, 0])
          prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] + 1
       }
    }
@@ -7910,18 +7919,18 @@ pushAtGivenVectorPoint(givenIndex, ogmX, ogmY) {
    pushed := 1
    getVectorCoordsFromVPpoint(ogmX, ogmY, gmX, gmY)
    customShapePoints.InsertAt(givenIndex, [gmX, gmY])
-   initialDrawingStartCoords.InsertAt(givenIndex, [0, 0])
+   customShapePropPoints.InsertAt(givenIndex, [0, 0])
    thisIndex := customShapePoints.MaxIndex()
    If (bezierSplineCustomShape=1)
    {
       customShapePoints.InsertAt(givenIndex, [gmX, gmY])
-      initialDrawingStartCoords.InsertAt(givenIndex, [0, 0])
+      customShapePropPoints.InsertAt(givenIndex, [0, 0])
       pushed++
       If (thisIndex>4)
       {
          pushed++
          customShapePoints.InsertAt(givenIndex, [gmX, gmY])
-         initialDrawingStartCoords.InsertAt(givenIndex, [0, 0])
+         customShapePropPoints.InsertAt(givenIndex, [0, 0])
       }
    }
    Return pushed
@@ -7933,6 +7942,7 @@ alignPointsWithPointInPath(modus, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
    calculateSymmetricVectorPoint(xa, ya, nX, nY)
    getVectorCoordsFromVPpoint(nX, nY, nX, nY)
    p := customShapePoints[thisIndex]
+   pzx := p[1],    pzy := p[2]
    totalCount := customShapePoints.Count()
    ; ToolTip, % thisIndex "|" modus , , , 2
    setWhileLoopExec(1)
@@ -7947,7 +7957,7 @@ alignPointsWithPointInPath(modus, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
 
         If (k=1)
         {
-           If (initialDrawingStartCoords[A_Index, 1]!=1)
+           If (customShapePropPoints[A_Index, 1]!=1)
               Continue
 
            hasLooped := 1
@@ -7956,7 +7966,7 @@ alignPointsWithPointInPath(modus, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
 
            If (modus="align-x")
            {
-              customShapePoints[A_Index, 1] := p[1]
+              customShapePoints[A_Index, 1] := pzx
               ; customShapePoints[A_Index, 2] := PointsListArray[A_Index*2]
               ; PointsListArray[A_Index*2 - 1] := px
               ; If (bezierSplineCustomShape=1)
@@ -7964,13 +7974,13 @@ alignPointsWithPointInPath(modus, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
            } Else
            {
               ; customShapePoints[A_Index, 1] := PointsListArray[A_Index*2 - 1]
-              customShapePoints[A_Index, 2] := p[2]
+              customShapePoints[A_Index, 2] := pzy
               ; PointsListArray[A_Index*2] := py
               ; If (bezierSplineCustomShape=1)
               ;    kOnes[A_Index, 1] := py
            }
 
-           ; initialDrawingStartCoords[A_Index] := [prevDestPosX, prevDestPosY, 1, prevResizedVPimgW, prevResizedVPimgH]
+           ; customShapePropPoints[A_Index] := [prevDestPosX, prevDestPosY, 1, prevResizedVPimgW, prevResizedVPimgH]
            oppoIndex := (canDoSymmetry=1) ? totalCount - A_Index + 1 : 0
            If (oppoIndex && canDoSymmetry)
            {
@@ -7983,7 +7993,7 @@ alignPointsWithPointInPath(modus, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
                  ; customShapePoints[oppoIndex, 1] := PointsListArray[oppoIndex*2 - 1]
                  customShapePoints[oppoIndex, 2] := nY
               }
-              ; initialDrawingStartCoords[oppoIndex] := [prevDestPosX, prevDestPosY, 1, prevResizedVPimgW, prevResizedVPimgH]
+              ; customShapePropPoints[oppoIndex] := [prevDestPosX, prevDestPosY, 1, prevResizedVPimgW, prevResizedVPimgH]
            }
         }
    }
@@ -8304,8 +8314,9 @@ rescaleSelectedVectorPoints(shiftState) {
    Loop, % ttlz
    {
       c := newArrayu[A_Index]
-      If (c[1]="" || c[2]="" || initialDrawingStartCoords[A_Index, 1]!=1)
+      If (c[1]="" || c[2]="" || customShapePropPoints[A_Index, 1]!=1)
          Continue
+
       pp++
       minX := min(minX, c[1])
       minY := min(minY, c[2])
@@ -8328,7 +8339,7 @@ rescaleSelectedVectorPoints(shiftState) {
    Loop, % ttlz
    {
       c := newArrayu[A_Index]
-      If (c[1]="" || c[2]="" || initialDrawingStartCoords[A_Index, 1]!=1)
+      If (c[1]="" || c[2]="" || customShapePropPoints[A_Index, 1]!=1)
          Continue
 
       xu := c[1] - (avgX + ominX)
@@ -8344,6 +8355,7 @@ rescaleSelectedVectorPoints(shiftState) {
    avgY := (minY + maxY)/2
    hasLooped := 0
    ToolTip, , , , 2
+   canDoSymmetry := isNowSymmetricVectorShape()
    While, (determineLClickState()=1)
    {
       If (A_TickCount - startOperation<125)
@@ -8369,8 +8381,11 @@ rescaleSelectedVectorPoints(shiftState) {
          prevState := thisState
          Loop, % customShapePoints.Count()
          {
+            If (pp[A_Index]=1)
+               Continue
+
             c := newArrayu[A_Index]
-            selu := initialDrawingStartCoords[A_Index, 1]
+            selu := customShapePropPoints[A_Index, 1]
             If (c[1]="" || c[2]="" || selu!=1)
                Continue
 
@@ -8379,6 +8394,19 @@ rescaleSelectedVectorPoints(shiftState) {
             xu := c[1] * gmX - diffX
             yu := c[2] * gmY - diffY
             customShapePoints[A_Index] := [xu, yu]
+            If canDoSymmetry
+            {
+               oppoIndex := ttlz - A_Index + 1
+               If (oppoIndex && oppoIndex!=A_Index && pp[A_Index]!=1)
+               {
+                  getVPcoordsVectorPoint(A_Index, fzX, fzY)
+                  calculateSymmetricVectorPoint(fzX, fzY, nX, nY)
+                  getVectorCoordsFromVPpoint(nX, nY, nX, nY)
+                  customShapePoints[oppoIndex] := [nX, nY]
+                  pp[oppoIndex] := 1
+               }
+            }
+
          }
          lastZeitFileSelect := A_TickCount
          showTOOLtip("Scale selected points:`nX=" Round(gmX, 3) ", Y=" Round(gmY, 3))
@@ -8386,6 +8414,9 @@ rescaleSelectedVectorPoints(shiftState) {
       }
       Sleep, 5
    }
+
+   If canDoSymmetry
+      coreSetVPsymmetryPoint(( customShapePoints.Count() ) // 2 + 1)
 
    setWhileLoopExec(0)
    RemoveTooltip()
@@ -8492,7 +8523,7 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
            Loop, % auxiliaryPoints.Count()
                customShapePoints[auxiliaryPoints[A_Index, 2]] := [nX, nY]
 
-           ; initialDrawingStartCoords[oppoIndex] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
+           ; customShapePropPoints[oppoIndex] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
            If (thisIndex=1)
            {
               getVPcoordsVectorPoint(2, pzX, pzY)
@@ -8580,7 +8611,7 @@ selectPathPointsInRect(gmX, gmY, shiftState, ctrlState) {
            xu := PointsListArray[A_Index*2 - 1]
            yu := PointsListArray[A_Index*2]
            If isDotInRect(xu, yu, gmx, nmx, gmy, nmy)
-              initialDrawingStartCoords[A_Index, 1] := m
+              customShapePropPoints[A_Index, 1] := m
       }
       MouseMove, 2, 0, 2, R
       MouseMove, -2, 0, 2, R
@@ -8646,7 +8677,7 @@ removeGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry,
          Continue
 
       customShapePoints.RemoveAt(A_LoopField)
-      initialDrawingStartCoords.RemoveAt(A_LoopField)
+      customShapePropPoints.RemoveAt(A_LoopField)
       If (A_LoopField < prevVectorShapeSymmetryMode[1, 1])
          prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] - 1
    }
@@ -8740,7 +8771,7 @@ getPointsSameCoordsVectorPath(totalCount, k, givenIndex, gmX, gmY) {
    Return newArrayu
 }
 
-moveSelectedPointsInVectorPath(gmX, gmY) {
+moveSelectedPointsInVectorPath(gmX, gmY, altState) {
    ttlz := customShapePoints.Count()
    If (ttlz<4 && bezierSplineCustomShape=1 || ttlz<2)
       Return
@@ -8752,15 +8783,26 @@ moveSelectedPointsInVectorPath(gmX, gmY) {
    startOperation := A_TickCount
    listPoints := []
    showTOOLtip("Move selected points:`n---, ---")
+   pp := new hashtable()
+   canDoSymmetry := altState ? 0 : isNowSymmetricVectorShape()
    Loop, % ttlz
    {
       c := newArrayu[A_Index]
-      If (c[1]="" || c[2]="" || initialDrawingStartCoords[A_Index, 1]!=1)
+      If (c[1]="" || c[2]="" || customShapePropPoints[A_Index, 1]!=1)
          Continue
 
-      listPoints[A_Index] := 1
+      If (pp[A_Index]!=1)
+         listPoints[A_Index] := 1
+
+      If canDoSymmetry
+      {
+         oppoIndex := ttlz - A_Index + 1
+         If (oppoIndex && pp[A_Index]!=1)
+            pp[oppoIndex] := 1
+      }
    }
 
+   pp := ""
    vpImgPanningNow := 1
    startOperation := A_TickCount
    zx := (FlipImgV=1) ? -1 : 1
@@ -8781,10 +8823,21 @@ moveSelectedPointsInVectorPath(gmX, gmY) {
          For Key, Value in listPoints
          {
             c := newArrayu[Key]
-            If (c[1]="" || c[2]="" || initialDrawingStartCoords[Key, 1]!=1)
+            If (c[1]="" || c[2]="" || customShapePropPoints[Key, 1]!=1)
                Continue
 
             customShapePoints[Key] := [c[1] - gmX/prevResizedVPimgW * zx, c[2] - gmY/prevResizedVPimgH * zy]
+            If canDoSymmetry
+            {
+               oppoIndex := ttlz - Key + 1
+               If (oppoIndex && oppoIndex!=key)
+               {
+                  getVPcoordsVectorPoint(Key, gX, gY)
+                  calculateSymmetricVectorPoint(gX, gY, nX, nY)
+                  getVectorCoordsFromVPpoint(nX, nY, nX, nY)
+                  customShapePoints[oppoIndex] := [nX, nY]
+               }
+            }
          }
 
          showTOOLtip("Move selected points:`nX=" -1*gmX ", Y=" -1*gmY)
@@ -8805,7 +8858,7 @@ moveSelectedPointsInVectorPath(gmX, gmY) {
 
 selectGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, mainParam, gmX, gmY) {
     Static lastAmount := 0, lastInvoked := 1, lastIndexu := -1
-    actu := !initialDrawingStartCoords[thisIndex, 1]
+    actu := !customShapePropPoints[thisIndex, 1]
     listu := thisIndex "|"
     If (bezierSplineCustomShape=1 && (mainParam="selclickAnchors" || mainParam="DoubleClick"))
     {
@@ -8851,9 +8904,9 @@ selectGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry,
    If (bezierSplineCustomShape=1 && (mainParam="selclickAnchors" || mainParam="DoubleClick"))
    {
       If (newArrayu[2]!=thisIndex && newArrayu[2])
-         actu := !initialDrawingStartCoords[newArrayu[2], 1]
+         actu := !customShapePropPoints[newArrayu[2], 1]
       Else If (newArrayu[3]!=thisIndex && newArrayu[3])
-         actu := !initialDrawingStartCoords[newArrayu[3], 1]
+         actu := !customShapePropPoints[newArrayu[3], 1]
    }
 
    If (lastAmount!=newArrayu.Count() && mainParam="DoubleClick")
@@ -8864,7 +8917,7 @@ selectGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry,
       If !newArrayu[A_Index]
          Continue
 
-      initialDrawingStartCoords[newArrayu[A_Index], 1] := actu
+      customShapePropPoints[newArrayu[A_Index], 1] := actu
    }
 
    lastAmount := newArrayu.Count()
@@ -15701,7 +15754,7 @@ recordVectorUndoLevels() {
 
    bonus := 0
    mainArray := customShapePoints.Clone()
-   VPcoordsArray := initialDrawingStartCoords.Clone()
+   VPstuffArray := customShapePropPoints.Clone()
    undos := undoVectorShapesLevelsArray.Count()
    If (currentVectorUndoLevel<undos && undos>0)
    {
@@ -15719,8 +15772,7 @@ recordVectorUndoLevels() {
    If (currentVectorUndoLevel>maxVectorUndoLevels)
       undoVectorShapesLevelsArray.RemoveAt(1)
 
-   symmetryPointIndex := prevVectorShapeSymmetryMode[1, 1]
-   newArrayu := [mainArray, VPcoordsArray, zoomLevel, IMGdecalageX, IMGdecalageY, imageAligned, IMGresizingMode, CustomShapeSymmetry, vpSymmetryPointX, vpSymmetryPointXdp, vpSymmetryPointY, vpSymmetryPointYdp, CustomShapeLockedSymmetry, customShapeHasSelectedPoints, symmetryPointIndex, bezierSplineCustomShape]
+   newArrayu := [mainArray, VPstuffArray, CustomShapeSymmetry, CustomShapeLockedSymmetry, customShapeHasSelectedPoints,  bezierSplineCustomShape, FillAreaCurveTension, closedLineCustomShape]
    undoVectorShapesLevelsArray.Push(newArrayu)
    currentVectorUndoLevel := undoVectorShapesLevelsArray.Count()
    ; ToolTip, % "l=" currentVectorUndoLevel , , , 2
@@ -15734,12 +15786,14 @@ restoreGivenVectorUndoLevel(levelu) {
    a := undoVectorShapesLevelsArray[levelu, 1]
    b := undoVectorShapesLevelsArray[levelu, 2]
    customShapePoints := a.Clone()
-   initialDrawingStartCoords := b.Clone()
-   CustomShapeSymmetry := undoVectorShapesLevelsArray[levelu, 8]
-   CustomShapeLockedSymmetry := undoVectorShapesLevelsArray[levelu, 13]
-   customShapeHasSelectedPoints := undoVectorShapesLevelsArray[levelu, 14]
-   prevVectorShapeSymmetryMode[1, 1] := ( customShapePoints.Count() ) // 2 + 1 ; undoVectorShapesLevelsArray[levelu, 15]
-   bezierSplineCustomShape := undoVectorShapesLevelsArray[levelu, 16]
+   customShapePropPoints := b.Clone()
+   CustomShapeSymmetry := undoVectorShapesLevelsArray[levelu, 3]
+   CustomShapeLockedSymmetry := undoVectorShapesLevelsArray[levelu, 4]
+   customShapeHasSelectedPoints := undoVectorShapesLevelsArray[levelu, 5]
+   bezierSplineCustomShape := undoVectorShapesLevelsArray[levelu, 6]
+   FillAreaCurveTension := undoVectorShapesLevelsArray[levelu, 7]
+   closedLineCustomShape := undoVectorShapesLevelsArray[levelu, 8]
+   prevVectorShapeSymmetryMode[1, 1] := ( customShapePoints.Count() ) // 2 + 1
    If CustomShapeSymmetry
       coreSetVPsymmetryPoint(( customShapePoints.Count() ) // 2 + 1)
    dummyTimerDelayiedImageDisplay(100)
@@ -44711,7 +44765,7 @@ addFluidPointsCustomShape() {
       getVectorCoordsFromVPpoint(ogmX, ogmY, gmX, gmY)
       customShapePoints.Push([gmX, gmY])
       thisIndex := customShapePoints.MaxIndex()
-      initialDrawingStartCoords[thisIndex] := [0, 0]
+      customShapePropPoints[thisIndex] := [0, 0]
       lastInvoked := A_TickCount
       newArrayu[ogmX ogmY] := 1
       newArrayu[ogmX + 1 ogmY + 1] := 1
@@ -44740,8 +44794,10 @@ adjustAnchorPointsCustomShape(thisIndex:=0) {
     canDoSymmetry := isNowSymmetricVectorShape()
     totalCount := customShapePoints.Count()
     GetMouseCoord2wind(PVhwnd, mX, mY)
-    doFlippuX := (mX<vpSymmetryPointXdp && CustomShapeSymmetry=1) ? 1 : 0
-    doFlippuY := (mY<vpSymmetryPointYdp && CustomShapeSymmetry=2) ? 1 : 0
+    zmX := (FlipImgH=1) ? mainWidth - mX : mX
+    zmY := (FlipImgV=1) ? mainHeight - mY : mY
+    doFlippuX := (zmX<vpSymmetryPointXdp && CustomShapeSymmetry=1) ? 1 : 0
+    doFlippuY := (zmY<vpSymmetryPointYdp && CustomShapeSymmetry=2) ? 1 : 0
     cB := customShapePoints[thisIndex]
     t := (autoReflectVectorAnchors=1 && totalCount>4) ? thisIndex : thisIndex - 1
     thisNode := (doFlippuX || doFlippuY) ? 5 : thisIndex - 3
@@ -44790,14 +44846,14 @@ adjustAnchorPointsCustomShape(thisIndex:=0) {
             If (thisIndex>4 && autoReflectVectorAnchors=0)
             {
                customShapePoints[2] := [pmX, pmY]
-               calculateSymmetricVectorPoint(gmX + SelDotsSize, gmY + SelDotsSize, nX, nY)
+               calculateSymmetricVectorPoint(ogmX + SelDotsSize, ogmY + SelDotsSize, nX, nY)
                getVectorCoordsFromVPpoint(nX, nY, nX, nY)
                customShapePoints[totalCount - 2 + 1] := [nX, nY]
             }
-            ; ToolTip, % t "=lol" , , , 2
+            ; ToolTip, % thisIndex "|" t "=lol" , , , 2
          } Else 
          {
-            ; ToolTip, % t "=looooooooool" , , , 2
+            ; ToolTip, % thisIndex "|" t "=looooooooool" , , , 2
             customShapePoints[t] := [gmX, gmY]
             If (canDoSymmetry && totalCount>2)
                customShapePoints[oppoIndex] := [nX, nY]
@@ -44807,9 +44863,9 @@ adjustAnchorPointsCustomShape(thisIndex:=0) {
                customShapePoints[thisIndex] := [pmX, pmY]
                If (canDoSymmetry && totalCount>2)
                {
-                  calculateSymmetricVectorPoint(gmX + SelDotsSize, gmY + SelDotsSize, nX, nY)
+                  calculateSymmetricVectorPoint(ogmX + SelDotsSize, ogmY + SelDotsSize, nX, nY)
                   getVectorCoordsFromVPpoint(nX, nY, nX, nY)
-                  customShapePoints[totalCount - thisindex + 1] := [nX, nY]
+                  customShapePoints[totalCount - thisIndex + 1] := [nX, nY]
                }
             }
          }
@@ -44985,9 +45041,9 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
      EllipseSelectMode := 2
      ; ToolTip, % modus "==" drawingVectorLiveMode , , , 2
      customShapeHasSelectedPoints := 0
-     initialDrawingStartCoords := []
+     customShapePropPoints := []
      Loop, % customShapePoints.Count()
-        initialDrawingStartCoords[A_Index] := [0, 0]
+        customShapePropPoints[A_Index] := [0, 0]
 
      LabelCurve := defineVectorPathType()
      LabelType := (drawingVectorLiveMode=1) ? "path" : "filled shape"
@@ -45033,7 +45089,7 @@ reduceCustomShapelength() {
       r := testIsBezierPathClosed()
 
    customShapePoints.Pop()
-   initialDrawingStartCoords.Pop()
+   customShapePropPoints.Pop()
    zr := 1
    If (bezierSplineCustomShape=1)
    {
@@ -45044,30 +45100,30 @@ reduceCustomShapelength() {
       }
 
       customShapePoints.Pop()
-      initialDrawingStartCoords.Pop()
+      customShapePropPoints.Pop()
       zr := 2
       If (customShapePoints.Count()>=4)
       {
          zr := 3
          customShapePoints.Pop()
-         initialDrawingStartCoords.Pop()
+         customShapePropPoints.Pop()
       }
    }
 
    If isNowSymmetricVectorShape()
    {
       customShapePoints.RemoveAt(1)
-      initialDrawingStartCoords.RemoveAt(1)
+      customShapePropPoints.RemoveAt(1)
       prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] - 1
       If (bezierSplineCustomShape=1)
       {
          customShapePoints.RemoveAt(1)
-         initialDrawingStartCoords.RemoveAt(1)
+         customShapePropPoints.RemoveAt(1)
          prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] - 1
          If (customShapePoints.Count()>=4)
          {
             customShapePoints.RemoveAt(1)
-            initialDrawingStartCoords.RemoveAt(1)
+            customShapePropPoints.RemoveAt(1)
             prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] - 1
          }
       }
@@ -45861,11 +45917,11 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
       prevVectorShapeSymmetryMode := []
       customShapePoints := []
       VPselRotation := innerSelectionCavityX := innerSelectionCavityY := 0
-      initialDrawingStartCoords := []
+      customShapePropPoints := []
       prevNameSavedVectorShape := ""
       predefinedVectorShapes(SubStr(whichShape, 2))
       Loop, % customShapePoints.Count()
-           initialDrawingStartCoords[A_Index] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
+           customShapePropPoints[A_Index] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
 
       saveVectorShapeInRegistry()
       dummyTimerDelayiedImageDisplay(100)
@@ -45930,9 +45986,9 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
    If (editingSelectionNow!=1)
       ToggleEditImgSelection()
 
-   initialDrawingStartCoords := []
+   customShapePropPoints := []
    Loop, % newArrayu.Count()
-        initialDrawingStartCoords[A_Index] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
+        customShapePropPoints[A_Index] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
 
    EllipseSelectMode := 2
    vpFreeformShapeOffset := []
@@ -65810,7 +65866,9 @@ destroyGDIPcanvas() {
 createGDIPcanvas(W:=0, H:=0, forceIT:=0) {
    Critical, on
    Static prevDimensions, hasInit
-   If (A_TickCount - lastMenuBarUpdated<500) && (forceIT=0)
+   WinGet, p, MinMax, ahk_id %PVhwnd%
+   z := DllCall("IsIconic", "UPtr", PVhwnd) ; detect if window is minimized
+   If ((A_TickCount - lastMenuBarUpdated<500) && (forceIT=0) || z=1 || p=-1)
       Return
 
    If (!W || !H)
@@ -69516,8 +69574,8 @@ toggleBrushSymmetryModes() {
 
       If ((CustomShapeSymmetry=1 || CustomShapeSymmetry=2) && customShapeHasSelectedPoints)
       {
-         Loop, % initialDrawingStartCoords.Count()
-             initialDrawingStartCoords[A_Index, 1] := 0
+         Loop, % customShapePropPoints.Count()
+             customShapePropPoints[A_Index, 1] := 0
       }
       ; ToolTip, % CustomShapeSymmetry "==" CustomShapeLockedSymmetry , , , 2
       showTOOLtip("Shape symmetry: " friendly moreInfo, A_ThisFunc, 1, CustomShapeSymmetry/3)
@@ -72251,7 +72309,7 @@ defineVectorEditorStatusBar(ByRef mousePoint, ByRef dontAddPoint, canDoSymmetry,
       If (mousePoint[4]!=1 && bezierSplineCustomShape=1)
          pk := "anchor "
 
-      selu := initialDrawingStartCoords[dontAddPoint, 1]
+      selu := customShapePropPoints[dontAddPoint, 1]
       If (vectorToolModus=5)
       {
          If (customShapeHasSelectedPoints=1)
@@ -72307,7 +72365,7 @@ defineVectorEditorStatusBar(ByRef mousePoint, ByRef dontAddPoint, canDoSymmetry,
          msgu := "Tool mode: REMOVE. Collapse anchor point P[" dontAddPoint "]"
    } Else If (vectorToolModus=4)
    {
-      selu := initialDrawingStartCoords[dontAddPoint, 1]
+      selu := customShapePropPoints[dontAddPoint, 1]
       If (shiftState && dontAddPoint=0)
          msgu := "Tool mode: SELECT. SHIFT: Click and drag to create a rectangular selection of points. Hold Ctrl additionally to deselect points."
       Else If ctrlState
@@ -72350,7 +72408,11 @@ drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHei
       }
 
       If (dontAddPoint=-1)
+      {
+         doNormalCursor := (dontAddPoint!=0 || vpImgPanningNow=1) ? 1 : 0
+         interfaceThread.ahkassign("doNormalCursor", doNormalCursor)
          Return
+      }
    }
 
    If (Gu)
@@ -72391,7 +72453,7 @@ drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHei
        tx := floor(vObj[1]),       ty := floor(vObj[2])
        ; bz := tx//vObj[7] "|" ty//vObj[7]
        ; If (overDrawFilter[bz]!=1 && Gu)
-       selu := initialDrawingStartCoords[KeyPoint, 1]
+       selu := customShapePropPoints[KeyPoint, 1]
        If selu 
           customShapeHasSelectedPoints := 1
 
@@ -72758,7 +72820,7 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0, kpp
  
            ; NumPut(xu, &PointsList, 4 * ((A_Index - 1) * 2), "Float")
            ; NumPut(yu, &PointsList, 4 * ((A_Index - 1) * 2 + 1), "Float")
-           If (initialDrawingStartCoords[A_Index, 1])
+           If (customShapePropPoints[A_Index, 1])
               customShapeHasSelectedPoints := 1
  
            thizState := "a" xu yu
@@ -73055,29 +73117,39 @@ adjustCustomShapePositionLive(dir:=0) {
        stepuY *= 2
     }
 
-    newArrayu := []
-    Loop, % customShapePoints.Count()
+    stepuX := stepuX/prevResizedVPimgW
+    stepuY := stepuY/prevResizedVPimgH
+    canDoSymmetry := isNowSymmetricVectorShape()
+    totalCount := customShapePoints.Count()
+    pp := new hashtable()
+    Loop, % totalCount
     {
+       If (pp[A_Index]=1)
+          Continue
+ 
        c := customShapePoints[A_Index]
-       If (c[1]="" || c[2]="")
+       If (c[1]="" || c[2]="" || customShapePropPoints[A_Index, 1]!=1 && customShapeHasSelectedPoints=1)
           Continue
 
-       thisIndex++
-       selu := initialDrawingStartCoords[A_Index, 1]
-       tstepuX := (customShapeHasSelectedPoints=1 && selu=1 || customShapeHasSelectedPoints!=1) ? stepuX : 0
-       tstepuY := (customShapeHasSelectedPoints=1 && selu=1 || customShapeHasSelectedPoints!=1) ? stepuY : 0
-       xu := c[1] - tstepuX
-       yu := c[2] - tstepuY
-       newArrayu[thisIndex] := [xu, yu]
+       customShapePoints[A_Index] := [c[1] + stepuX, c[2] + stepuY]
+       If canDoSymmetry
+       {
+          oppoIndex := totalCount - A_Index + 1
+          If (oppoIndex && A_Index!=oppoIndex && pp[A_Index]!=1)
+          {
+             getVPcoordsVectorPoint(A_Index, gmX, gmY)
+             calculateSymmetricVectorPoint(gmX, gmY, nX, nY)
+             getVectorCoordsFromVPpoint(nX, nY, nX, nY)
+             customShapePoints[oppoIndex] := [nX, nY]
+             pp[oppoIndex] := 1
+          }
+       }
     }
-    ; customShapePoints := convertCustomShape2relativeCoords(customShapePoints)
-    dummyResizeImageGDIwin()
+    pp := ""
     If isNowSymmetricVectorShape()
        coreSetVPsymmetryPoint(( customShapePoints.Count() ) // 2 + 1)
 
     lastZeitFileSelect := A_TickCount
-    If (thisIndex>2)
-       customShapePoints := newArrayu.Clone()
     lastInvoked := A_TickCount
     SetTimer, dummyRefreshImgSelectionWindow, -10
 }
@@ -75748,23 +75820,33 @@ arrowKeysAdjustPrevPointPath(direction, modus) {
     Static lastInvoked := 1
     If (drawingShapeNow!=1)
        Return
+    stepu := (A_TickCount - lastInvoked<400) ? 1 : 3
+    stepuX := stepu/prevResizedVPimgW
+    stepuY := stepu/prevResizedVPimgH
 
     maxu := (modus=1) ? 1 : customShapePoints.Count()
     cX1 := customShapePoints[maxu, 1]
     cY1 := customShapePoints[maxu, 2]
-
-    stepu := (A_TickCount - lastInvoked<400) ? 1 : 2
     If (direction=1)
-       cX1 += stepu
+       cX1 += stepuX
     Else If (direction=-1)
-       cX1 -= stepu
+       cX1 -= stepuX
     Else If (direction=2)
-       cY1 += stepu
+       cY1 += stepuY
     Else If (direction=-2)
-       cY1 -= stepu
+       cY1 -= stepuY
 
     customShapePoints[maxu, 1] := cX1
     customShapePoints[maxu, 2] := cY1
+    If isNowSymmetricVectorShape()
+    {
+       getVPcoordsVectorPoint(maxu, gmX, gmY)
+       calculateSymmetricVectorPoint(gmX, gmY, nX, nY)
+       getVectorCoordsFromVPpoint(nX, nY, nX, nY)
+       maxu := (modus!=1) ? 1 : customShapePoints.Count()
+       customShapePoints[maxu] := [nX, nY]
+    }
+
     vpWinClientSize(mainWidth, mainHeight)
     drawLiveCreateCustomShape(mainWidth, mainHeight, 2NDglPG, "point-update", maxu)
     ; lastZeitFileSelect := A_TickCount
@@ -77974,8 +78056,6 @@ GuiGDIupdaterResize(eventu:=0) {
    If (A_TickCount - scriptStartTime<1950)
       Return
 
-   If (drawingShapeNow=1)
-      stopDrawingShape()
    If (toolTipGuiCreated=1)
       RemoveTooltip()
    If (tempBtnVisible!="null")

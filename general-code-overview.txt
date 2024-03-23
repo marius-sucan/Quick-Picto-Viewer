@@ -902,9 +902,10 @@ k) How vector shapes drawing works [soon]
    resumeCustomShapeSelection() is invoked to convert the points 
    data to the edit mode data.
 
-   At every mouse move drawLiveCreateCustomShape() is invoked to 
-   refresh the window. The function caches the points data. When 
-   the data is cached it is rendered by drawVisibleVectorPoints(). 
+   At every mouse move drawLiveCreateCustomShape() is invoked by 
+   additionalHUDelements() to refresh the window. The function
+   caches the points data. When the data is cached. it is rendered
+   by drawVisibleVectorPoints() invoked from drawLiveCreateCustomShape(). 
 
    When the user clicks in the viewport, WinClickAction() invokes 
    PerformVectorShapeActions(). This function is also called by
@@ -919,29 +920,28 @@ k) How vector shapes drawing works [soon]
 
    Technicalities:
    
-   The points in edit mode are stored in array object:
+   The points in edit mode are stored in an array object:
    customShapePoints[index] := [x, y]
 
-   X and Y values are floating points based on the dimensions of
+   X and Y values are floating points based on the dimensions of the
    image painted in the viewport, at current zoom level. The values 
    are not capped in the range of 0 to 1.
 
    The top/left corner is defined by "prevDestPosX" and "prevDestPosY".
-   These two variables designate where was last painted the image in
-   the viewport, according to the current zoom level and panning.
+   These two variables designate where in the viewport was last painted 
+   the image according to the current zoom level and panning.
 
-   getVectorCoordsFromVPpoint() and getVPcoordsVectorPoint()
-   to see the exact formulas.
+   Please see getVectorCoordsFromVPpoint() and getVPcoordsVectorPoint()
+   to find out the exact formulas.
 
    Outside edit mode:
-   The vector points are stored as floating points from 0 to 1.
-   The values are used to calculate the coordinates of the points 
-   for GDI+ based on the width and height of the viewport selectionn
-   area bounding box. When I draw on screen with GDI+, I must use the
-   viewport coordinates to match with client window. 
-   One of the relevant functions is convertCustomShape2givenArea().
+   The vector points are stored as floating points from 0 to 1 in the same
+   array object: customShapePoints. The values are used to calculate the
+   coordinates of the points for GDI+, based on the width and height of
+   the viewport selectionn area bounding box. When one draws on screen with
+   GDI+, one must use the viewport coordinates to match with client window. 
+   One of the relevant functions is convertCustomShape2givenArea() called 
+   by createImgSelPath().
 
-   In this format I store the points on the disk and in customShapePoints
-   when the user is not editing the shape.
-
-
+   In the same format, the points are stored when a user chooses to save
+   to disk a vector shape.
