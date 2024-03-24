@@ -14,7 +14,7 @@
    m) How to add a new panel/tool (soon)
 
 
-Deniere mise à jour: vendredi 22 mars 2024
+Deniere mise à jour: dimanche 24 mars 2024
 =====================================================================
 
 -) Introduction
@@ -796,8 +796,8 @@ i) Image live editing
    within acceptable levels, while maintaining fidelity as much as possible 
    with the final output when the apply button is pushed by users. Many 
    functions cache generated bitmaps to avoid re-rendering everything, 
-   e.g., generateAlphaMaskBitma() will reuse the cached bitmap  when the
-   preview  relies on the same alpha mask options.
+   e.g., generateAlphaMaskBitma() will reuse the cached bitmap when the
+   preview relies on the same alpha mask options.
 
    When viewport color adjustments are activated 
    mergeViewPortEffectsImgEditing() is called first, before the actual 
@@ -892,7 +892,7 @@ j) How to enable alpha masking for an image editing live tool
    the selection area dimensions.
 
 
-k) How vector shapes drawing works [soon]
+k) How vector shapes drawing works
 =====================================================================
 
    When users start drawing a vector shape, startDrawingShape() is 
@@ -917,8 +917,10 @@ k) How vector shapes drawing works [soon]
 
    Users can load and save vector shapes through PanelManageVectorShapes().
 
+   Undo levels in the vector editor mode are handled by
+   recordVectorUndoLevels() and restoreGivenVectorUndoLevel().
 
-   Technicalities:
+   \\Technicalities:
    
    The points in edit mode are stored in an array object:
    customShapePoints[index] := [x, y]
@@ -945,3 +947,25 @@ k) How vector shapes drawing works [soon]
 
    In the same format, the points are stored when a user chooses to save
    to disk a vector shape.
+
+
+l) How image duplicates identification works (soon)
+=====================================================================
+
+   PanelFindDupes()
+   retrieveDupesByProperties()
+   OpenSLDBdataBase()
+   collectImageInfosNow()
+   collectSQLFileInfosNow()
+   generateSQLimageFingerPrintHash()
+   filterDupeResultsByHdist()
+   corefilterDupeResultsByHdist()
+   changeHdistLevelCached()
+   sortDupeGroups()
+   PanelAutoSelectDupes()
+   autoSelectDupesInGroups()
+
+
+m) How to add a new panel/tool (soon)
+=====================================================================
+
