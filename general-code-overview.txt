@@ -946,7 +946,7 @@ k) How vector shapes drawing works
    by createImgSelPath().
 
    In the same format, the points are stored when a user chooses to save
-   to disk a vector shape.
+   to disk a vector shape via saveCurrentVectorShape().
 
 
 l) How image duplicates identification works (soon)

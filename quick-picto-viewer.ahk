@@ -945,7 +945,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     {
         imgPath := getIDimage(currentFileIndex)
         If (isImgEditingNow()=1 && drawingShapeNow=1)
-           func2Call := ["toggleOpenClosedLineCustomShape"]
+           func2Call := ["toggleOpenClosedLineEditorCustomShape"]
         Else If HKifs("imgsLoaded")
            func2Call := ["OpenThisFileMenu"]
         Else If ((HKifs("general") && (!CurrentSLD || !validBMP(gdiBitmap))) && !FileRexists(imgPath))
@@ -1872,7 +1872,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     } Else If (givenKey="BackSpace")
     {
        If (isImgEditingNow()=1 && drawingShapeNow=1)
-         func2Call := ["reduceCustomShapelength"]
+         func2Call := ["reduceCustomShapeLength"]
        Else If (HKifs("liveEdit") && (AnyWindowOpen=31 || AnyWindowOpen=24))
          func2Call := ["toggleErasePasteInPlace"]
        Else If HKifs("imgsLoaded")
@@ -6584,7 +6584,7 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
    If (dontAddPoint!=1)
    {
       kMenu("PVnav", "AddSeparator", 0)
-      kMenu("PVnav", "Add", "&Remove end point`tBackspace", "reduceCustomShapelength")
+      kMenu("PVnav", "Add", "&Remove end point`tBackspace", "reduceCustomShapeLength")
       kMenu("PVnav", "Add", "C&ycle symmetry modes`tY", "toggleBrushSymmetryModes")
       ; kMenu("PVnav", "Add", "Make the shape symmetrical", "MenuCreateShapeSymmetricalVectorShape")
       createMenuSelectShapeTension()
@@ -6603,7 +6603,7 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
             kMenu("PVnav", "Check", "Symmetrical anchors`tR")
       }
 
-      kMenu("PVnav", "Add/Uncheck", "&Open ended path`tO", "toggleOpenClosedLineCustomShape", "opened closed vector")
+      kMenu("PVnav", "Add/Uncheck", "&Open ended path`tO", "toggleOpenClosedLineEditorCustomShape", "opened closed vector")
       If (closedLineCustomShape=0)
          kMenu("PVnav", "Check", "&Open ended path`tO")
 
@@ -7866,13 +7866,13 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
 } ; // PerformVectorShapeActions()
 
 autoDeactivateClosedBezier() {
-   r := testIsBezierPathClosed()
+   r := testIsEditorBezierPathClosed()
    If (r=1)
    {
       closedLineCustomShape := 0
-      reduceCustomShapelength()
-      If (testIsBezierPathClosed()=1)
-         reduceCustomShapelength()
+      reduceCustomShapeLength()
+      If (testIsEditorBezierPathClosed()=1)
+         reduceCustomShapeLength()
 
       RegAction(1, "closedLineCustomShape")
       If (drawingShapeNow=1)
@@ -7880,11 +7880,12 @@ autoDeactivateClosedBezier() {
    }
 }
 
-pushEndNewVectorPoint(ogmX, ogmY, noCloseTest:=0) {
+pushEndNewVectorPoint(ogmX, ogmY, noCloseTest:=0, zz:=0) {
    If (bezierSplineCustomShape=1 && noCloseTest=0)
       autoDeactivateClosedBezier()
 
    zr := 1
+   handleOpenCloseBezier("kill")
    getVectorCoordsFromVPpoint(ogmX, ogmY, gmX, gmY)
    customShapePoints.Push([gmX, gmY])
    customShapePropPoints.Push([0, 0])
@@ -7908,7 +7909,7 @@ pushEndNewVectorPoint(ogmX, ogmY, noCloseTest:=0) {
    If (isNowSymmetricVectorShape() && bezierSplineCustomShape=1)
    {
       lastZeitFileSelect := A_TickCount
-   } Else
+   } Else If (zz!=1)
    {
       vpWinClientSize(mainWidth, mainHeight)
       drawLiveCreateCustomShape(mainWidth, mainHeight, 2NDglPG, "point-new-end", zr)
@@ -7920,6 +7921,9 @@ pushEndNewVectorPoint(ogmX, ogmY, noCloseTest:=0) {
 
 pushAtGivenVectorPoint(givenIndex, ogmX, ogmY) {
    pushed := 1
+   If (givenIndex<4 || givenIndex>(customShapePoints.Count() - 3))
+      handleOpenCloseBezier("kill")
+
    getVectorCoordsFromVPpoint(ogmX, ogmY, gmX, gmY)
    customShapePoints.InsertAt(givenIndex, [gmX, gmY])
    customShapePropPoints.InsertAt(givenIndex, [0, 0])
@@ -7986,6 +7990,7 @@ splitPointGivenInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, g
       If endsConnected
       {
          SoundBeep ,300, 100
+         handleOpenCloseBezier("kill")
          expandGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
          expandGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY, "no")
          closedLineCustomShape := 0
@@ -8005,6 +8010,8 @@ splitPointGivenInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, g
       Return
    }
 
+   If (thisIndex<4 || thisIndex>(customShapePoints.Count() - 3))
+      handleOpenCloseBezier("kill")
    Random, slx, % SelDotsSize//2 + 1, SelDotsSize*4
    Random, sly, % SelDotsSize//2 + 1, SelDotsSize*4
    Random, r1, -1, 1
@@ -8072,10 +8079,13 @@ splitPointGivenInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, g
 }
 
 areEndsConnectedBezierPath(thisIndex, totalCount) {
-   Return ((thisIndex<3 || thisIndex>totalCount - 2) && testIsBezierPathClosed()=1) ? 1 : 0
+   Return ((thisIndex<3 || thisIndex>totalCount - 2) && testIsEditorBezierPathClosed()=1) ? 1 : 0
 }
 
 expandGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY, dummy:=0) {
+   If (thisIndex<4 || thisIndex>(customShapePoints.Count() - 3))
+      handleOpenCloseBezier("kill")
+
    endsConnected := areEndsConnectedBezierPath(thisIndex, totalCount)
    nextK := getAssociatedBezierPoints(k, totalCount, thisIndex, A, B)
    auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, k, thisIndex, gmX, gmY)
@@ -8144,7 +8154,7 @@ reflectGivenAnchorInPath(k, totalCount, thisIndex, canDoSymmetry, forceIT:=0, do
    {
       If (thisIndex=2 || thisIndex=(totalCount - 1))
       {
-         r := testIsBezierPathClosed()
+         r := testIsEditorBezierPathClosed()
          If (r!=1)
             Return
       }
@@ -8229,6 +8239,9 @@ getVPcoordsVectorPoint(whichIndex, ByRef X, ByRef Y) {
 }
 
 collapseGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry) {
+   If (thisIndex<4 || thisIndex>(customShapePoints.Count() - 3))
+      handleOpenCloseBezier("kill")
+
    If (k=2)
    {
       c := customShapePoints[thisIndex - 1]
@@ -8249,7 +8262,7 @@ collapseGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry) {
       }
    } Else If (k=1)
    {
-      endsConnected := ((thisIndex=1 || thisIndex=totalCount) && testIsBezierPathClosed()=1) ? 1 : 0
+      endsConnected := ((thisIndex=1 || thisIndex=totalCount) && testIsEditorBezierPathClosed()=1) ? 1 : 0
       If endsConnected
       {
          c := customShapePoints[1]
@@ -8287,6 +8300,7 @@ rescaleSelectedVectorPoints(shiftState) {
    If (ttlz<4 && bezierSplineCustomShape=1 || ttlz<2)
       Return
 
+   handleOpenCloseBezier("kill")
    thisState := prevState := 0
    GetMouseCoord2wind(PVhwnd, omX, omY)
    newArrayu := customShapePoints.Clone()
@@ -8423,6 +8437,9 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
       getVPcoordsVectorPoint(thisIndex - 1, refX, refY)
    Else
       getVPcoordsVectorPoint(thisIndex + 1, refX, refY)
+
+   If (thisIndex<4 || thisIndex>(customShapePoints.Count() - 3))
+      handleOpenCloseBezier("kill")
 
    setWhileLoopExec(1)
    startOperation := A_TickCount
@@ -8614,6 +8631,9 @@ selectPathPointsInRect(gmX, gmY, shiftState, ctrlState) {
 }
 
 removeGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY) {
+   If (thisIndex<4 || thisIndex>(customShapePoints.Count() - 3))
+      handleOpenCloseBezier("kill")
+
    If (k!=1 && bezierSplineCustomShape=1)
    {
       collapseGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry)
@@ -8718,7 +8738,7 @@ getPointsSameCoordsVectorPath(totalCount, k, givenIndex, gmX, gmY) {
          newArrayu.Push([B, oppoIndex])
    }
 
-   If ((givenIndex<3 || givenIndex>totalCount - 3) && bezierSplineCustomShape=1 && testIsBezierPathClosed())
+   If ((givenIndex<3 || givenIndex>totalCount - 3) && bezierSplineCustomShape=1 && testIsEditorBezierPathClosed())
    {
       If (givenIndex<3)
       {
@@ -8766,6 +8786,7 @@ moveSelectedPointsInVectorPath(gmX, gmY, altState) {
    If (ttlz<4 && bezierSplineCustomShape=1 || ttlz<2)
       Return
 
+   handleOpenCloseBezier("kill")
    thisState := prevState := 0
    GetMouseCoord2wind(PVhwnd, omX, omY)
    newArrayu := customShapePoints.Clone()
@@ -8854,7 +8875,7 @@ selectGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry,
     If (bezierSplineCustomShape=1 && (mainParam="selclickAnchors" || mainParam="DoubleClick"))
     {
        If (bezierSplineCustomShape=1)
-          endsConnected := ((thisIndex<=2 || thisIndex>=(totalCount - 1)) && testIsBezierPathClosed()=1) ? 1 : 0
+          endsConnected := ((thisIndex<=2 || thisIndex>=(totalCount - 1)) && testIsEditorBezierPathClosed()=1) ? 1 : 0
 
        If (endsConnected=1)
           listu .= "1|2|" totalCount "|" totalCount - 1 "|"
@@ -16930,7 +16951,6 @@ dummyInnerCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, shape, pPath
        Gdip_AddPathPolygon(pPath, [cX1, cY1, cX2, cY2, cX3, cY3, cX4, cY4])
     } Else If (shape=7)
     {
-       ; createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepBounds:=0, zeroTension:=0, allowSelectionCenter:=1, allowCavity:=1, selCavityX:=0, selCavityY:=0, allowErrMargin:=1)
        PointsList := convertCustomShape2givenArea(customShapePoints, imgSelPx + 1, imgSelPy + 1, imgSelW, imgSelH, 1, !bezierSplineCustomShape)
        createPathVectorCustomShape(pPath, PointsList, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape, 0)
     }
@@ -24886,7 +24906,7 @@ tempGuiBtnCall6() {
 }
 
 coretempGuiBtnCalls(indexu) {
-    Static listu := ",reduceCustomShapelength,ImgVectorUndoAct,togglePathCurveTension,toggleOpenClosedLineCustomShape,"
+    Static listu := ",reduceCustomShapeLength,ImgVectorUndoAct,togglePathCurveTension,toggleOpenClosedLineEditorCustomShape,"
     thisFunc := tempBtnGuiBtnArray[indexu]
     z := InStr(listu, "," thisFunc ",")
     If !z
@@ -42535,7 +42555,6 @@ SearchIndexSelectAll(modus:="") {
 }
 
 SelectFilesDead() {
-
    showTOOLtip("Identifying inexistent files:`n" groupDigits(maxFilesIndex))
    getSelectedFiles(0, 1)
    If (markedSelectFile>2)
@@ -44589,6 +44608,7 @@ stopDrawingShape(dummy:="") {
        Return
 
     vectorToolModus := 1
+    handleOpenCloseBezier("kill")
     zeitSillyPrevent := A_TickCount
     VPcreateSelPath("kill", 0, 0, 0, 0, 0, 0, 0, 0)
     drawLiveCreateCustomShape("kill", 0, 0)
@@ -44612,6 +44632,7 @@ stopDrawingShape(dummy:="") {
     {
        prevVectorShapeSymmetryMode[1, 2] := CustomShapeSymmetry
        customShapePoints := convertCustomShape2relativeCoords(customShapePoints, 1)
+       customShapeCountPoints := customShapePoints.Count()
     }
 
     ; ToolTip, % "l=" postVectorWinOpen , , , 2
@@ -44778,6 +44799,7 @@ adjustAnchorPointsCustomShape(thisIndex:=0) {
     If (drawingShapeNow!=1)
        Return
 
+    handleOpenCloseBezier("kill")
     lastInvoked := A_TickCount
     vpWinClientSize(mainWidth, mainHeight)
     prevState := thisState := prevMX := prevMY := 0
@@ -45054,7 +45076,7 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
      If (dummy="resume")
      {
         If (customShapePoints.Count()>4 && bezierSplineCustomShape=1)
-           closedLineCustomShape := testIsBezierPathClosed()
+           closedLineCustomShape := testIsEditorBezierPathClosed()
         Else If (bezierSplineCustomShape=1)
            closedLineCustomShape := 0
 
@@ -45072,12 +45094,17 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
      SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
-reduceCustomShapelength() {
+reduceCustomShapeLength(k:=0) {
    ; foundPos := InStr(customShapePoints, "|", 0, -1)
    ; customShapePoints := SubStr(customShapePoints, 1, foundPos)
-   recordVectorUndoLevels()
+   If (k!="z")
+   {
+      recordVectorUndoLevels()
+      handleOpenCloseBezier("kill")
+   }
+
    If (bezierSplineCustomShape=1)
-      r := testIsBezierPathClosed()
+      r := testIsEditorBezierPathClosed()
 
    customShapePoints.Pop()
    customShapePropPoints.Pop()
@@ -45128,25 +45155,25 @@ reduceCustomShapelength() {
    If (customShapePoints.Count()<1 && bezierSplineCustomShape=0 || customShapePoints.Count()<2 && bezierSplineCustomShape=1)
       CustomShapeSymmetry := CustomShapeLockedSymmetry := vpSymmetryPointXdp := vpSymmetryPointYdp := 0
 
-   If fr
+   If (fr && k!="z")
    {
       vpWinClientSize(mainWidth, mainHeight)
       drawLiveCreateCustomShape(mainWidth, mainHeight, 2NDglPG, "point-rem-last", zr)
    }
 
-   If (drawingShapeNow=1)
+   If (drawingShapeNow=1 && k!="z")
       showQuickActionButtonsDrawingShape()
 
    SetTimer, dummyRefreshImgSelectionWindow, -150
 }
 
-toggleOpenClosedAnyCustomShape() {
+toggleOpenClosedViewerCustomShape() {
    closedLineCustomShape := !closedLineCustomShape
    RegAction(1, "closedLineCustomShape")
    SetTimer, dummyRefreshImgSelectionWindow, -100
 }
 
-toggleOpenClosedLineCustomShape() {
+toggleOpenClosedLineEditorCustomShape() {
    closedLineCustomShape := !closedLineCustomShape
    RegAction(1, "closedLineCustomShape")
    If (drawingShapeNow=1)
@@ -45156,34 +45183,107 @@ toggleOpenClosedLineCustomShape() {
    SetTimer, dummyRefreshImgSelectionWindow, -150
 }
 
-handleOpenCloseBezier() {
-   If (bezierSplineCustomShape!=1)
+handleOpenCloseBezier(mm:=0) {
+   Static prevEndsOpen, prevEndsClosed, prevEndsAny, prevPoints := []
+   If (mm="kill" || bezierSplineCustomShape!=1)
+   {
+      prevPoints := []
+      prevEndsOpen := prevEndsClosed := prevEndsAny := ""
       Return
+   }
 
    If isNowSymmetricVectorShape()
       CustomShapeSymmetry := CustomShapeLockedSymmetry := vpSymmetryPointXdp := vpSymmetryPointYdp := 0
 
-   r := testIsBezierPathClosed()
-   If (closedLineCustomShape=1 && r=0)
+   isClosed := testIsEditorBezierPathClosed()
+   firstu := testBezierFirstLastPointsCollapsed("first")
+   lastu := testBezierFirstLastPointsCollapsed("last")
+   totalz := customShapePoints.Count()
+   f  := customShapePoints[1],   l := customShapePoints[totalz]
+   fi := customShapePoints[2],  li := customShapePoints[totalz - 1]
+
+   pz := (lastu=1 && firstu=1) ? 1 : 0
+   zthisID := f[1] "|" f[2] "|" fi[1] "|" fi[2] "|" li[1] "|" li[2] "|" l[1] "|" l[2]
+   If isClosed
+      prevEndsClosed := zthisID
+   Else
+      prevEndsOpen := zthisID
+
+   If (prevEndsAny>=1)
    {
-      thisIndex := customShapePoints.Count() - 1
+      ; ToolTip, % "yaaaaaay" , , , 2
+      totalUndos := Round(undoVectorShapesLevelsArray.Count())
+      currentVectorUndoLevel := clampInRange(currentVectorUndoLevel - 1, 1, totalUndos)
+      restoreGivenVectorUndoLevel(currentVectorUndoLevel)
+      closedLineCustomShape := testIsEditorBezierPathClosed()
+      SetTimer, dummyRefreshImgSelectionWindow, -150
+   } Else If (prevEndsOpen=zthisID && closedLineCustomShape=1 && isClosed=0 && prevEndsClosed)
+   {
+      ; ToolTip, % "open" , , , 2
+      p := StrSplit(prevEndsClosed, "|")
+      customShapePoints[1] := [p[1], p[2]],  customShapePoints[totalz - 1] := [p[5], p[6]]
+      customShapePoints[2] := [p[3], p[4]],  customShapePoints[totalz] := [p[7], p[8]]
+   } Else If (prevEndsClosed=zthisID && closedLineCustomShape=0 && isClosed=1 && prevEndsOpen)
+   {
+      ; ToolTip, % "closed" , , , 2
+      p := StrSplit(prevEndsOpen, "|")
+      customShapePoints[1] := [p[1], p[2]],  customShapePoints[totalz - 1] := [p[5], p[6]]
+      customShapePoints[2] := [p[3], p[4]],  customShapePoints[totalz] := [p[7], p[8]]
+   } Else If ((firstu=1 || lastu=1) && (closedLineCustomShape=1 && isClosed=0) && pk!=1)
+   {
+      ; ToolTip, % isClosed "|bt" totalz "|" firstu "|" lastu , , , 2
+      If lastu 
+         customShapePoints[totalz] := [f[1], f[2]]
+      Else
+         customShapePoints[1] := [l[1], l[2]]
+   } Else If ((firstu!=1 || lastu!=1) && (closedLineCustomShape=0 && isClosed=1))
+   {
+      ; ToolTip, %  isClosed "|at" totalz "|" firstu "|" lastu , , , 2
+      If !lastu 
+         customShapePoints[totalz] := [li[1], li[2]]
+      Else
+         customShapePoints[1] := [fi[1], fi[2]]
+   } Else If (closedLineCustomShape=1 && isClosed=0)
+   {
       ; ToolTip, % thisIndex "=l" , , , 2
+      thisIndex := customShapePoints.Count() - 1
       getVPcoordsVectorPoint(1, mX, mY)
-      pushEndNewVectorPoint(mX, mY, 1)
-      reflectGivenAnchorInPath(2, customShapePoints.Count(), 2, 0, 0)
-      reflectGivenAnchorInPath(3, customShapePoints.Count(), thisIndex, 0, 0)
-   } Else If (closedLineCustomShape=0 && r=1)
+      pushEndNewVectorPoint(mX, mY, 1, 1)
+      reflectGivenAnchorInPath(2, customShapePoints.Count(), 2, 0, 0, 0)
+      reflectGivenAnchorInPath(3, customShapePoints.Count(), thisIndex, 0, 0, 0)
+      recordVectorUndoLevels()
+      actz := 1
+   } Else If (closedLineCustomShape=0 && isClosed=1)
    {
-      reduceCustomShapelength()
-      If (testIsBezierPathClosed()=1)
-         reduceCustomShapelength()
+      reduceCustomShapeLength("K")
+      If (testIsEditorBezierPathClosed()=1)
+         reduceCustomShapeLength("K")
+      recordVectorUndoLevels()
+      actz := 2
    }
+
    Sleep, 2
+   isClosed := testIsEditorBezierPathClosed()
+   ntotalz := customShapePoints.Count()
+   zf  := customShapePoints[1],   lz := customShapePoints[ntotalz]
+   zfi := customShapePoints[2],  liz := customShapePoints[ntotalz - 1]
+   thisID := zf[1] "|" zf[2] "|" zfi[1] "|" zfi[2] "|" liz[1] "|" liz[2] "|" lz[1] "|" lz[2]
+   If isClosed
+      prevEndsClosed := thisID
+   Else
+      prevEndsOpen := thisID
+
+   If (totalz!=ntotalz && actz>=1)
+   {
+      prevEndsAny := actz
+      prevEndsClosed := prevEndsOpen := ""
+   } Else
+      prevEndsAny := 0
+
    lastZeitFileSelect := A_TickCount
-   recordVectorUndoLevels()
 }
 
-testIsBezierPathClosed() {
+testIsEditorBezierPathClosed() {
     ; this assumes drawingShapeNow = 1 ;
     totalz := customShapePoints.Count()
     If (totalz<4)
@@ -45196,12 +45296,37 @@ testIsBezierPathClosed() {
     Return r
 }
 
-testIsBezierAltPathClosed(ByRef PointsList) {
+testIsBezierViewPathClosed(ByRef PointsList) {
     ; this assumes drawingShapeNow = 0 ;
     totalz := PointsList.Count()//2
     xA := PointsList[1],                  yA := PointsList[2]
     xB := PointsList[totalz*2 - 1],       yB := PointsList[totalz*2]
     ; ToolTip, % xA "==" yA "`n" xB "==" yB "`n" totalz, , , 2
+    r := (xA=xB && yA=yB) ? 1 : 0
+    Return r
+}
+
+testIsBezierAltViewPathClosed() {
+    totalz := customShapePoints.Count()
+    If (totalz<4)
+       Return -1
+
+    ; this assumes drawingShapeNow = 0 ;
+    xA := customShapePoints[1, 1],        yA := customShapePoints[1, 2]
+    xB := customShapePoints[totalz, 1],   yB := customShapePoints[totalz, 2]
+    r := (xA=xB && yA=yB) ? 1 : 0
+    Return r
+}
+
+testBezierFirstLastPointsCollapsed(modus) {
+    totalz := customShapePoints.Count()
+    If (totalz<4)
+       Return -1
+
+    ; this assumes drawingShapeNow = 0 ;
+    f := (modus="first") ? 2 : totalz
+    xA := customShapePoints[f - 1, 1],        yA := customShapePoints[f - 1, 2]
+    xB := customShapePoints[f, 1],            yB := customShapePoints[f, 2]
     r := (xA=xB && yA=yB) ? 1 : 0
     Return r
 }
@@ -45238,7 +45363,7 @@ showQuickActionButtonsDrawingShape() {
 
   LabelCurve := defineVectorPathType()
   LabelOpenLine := (closedLineCustomShape=1) ? "Open path" : "Closed path"
-  btnOpenLine := "||" LabelOpenLine ",,toggleOpenClosedLineCustomShape"
+  btnOpenLine := "||" LabelOpenLine ",,toggleOpenClosedLineEditorCustomShape"
   If (FillAreaCurveTension=1)
      ll := "Polygonal"
   Else If (FillAreaCurveTension=5)
@@ -58956,7 +59081,7 @@ createMenuSelectSizeShapes(dummy:=0, b:=0) {
       kMenu("PVselSize", "Add", "Flip shape &horizontally" keyu, "MenuSelectionFlipH")
       keyu := (AnyWindowOpen) ? "`tShift+V" : ""
       kMenu("PVselSize", "Add", "&Flip shape vertically" keyu, "MenuSelectionFlipV")
-      kMenu("PVselSize", "Add/Uncheck", "&Open ended path", "toggleOpenClosedAnyCustomShape", "opened closed vector")
+      kMenu("PVselSize", "Add/Uncheck", "&Open ended path", "toggleOpenClosedViewerCustomShape", "opened closed vector")
       kMenu("PVselSize", "Add", "Set &points tension", ":PVshapeTension")
       If (closedLineCustomShape=0)
          kMenu("PVselSize", "Check", "&Open ended path")
@@ -59313,7 +59438,7 @@ InvokeMenuBarVectorEdit(manuID) {
       Menu, pvMenuBarEdit, Add
    }
 
-   kMenu("pvMenuBarEdit", "Add", "&Remove end point`tBackspace", "reduceCustomShapelength")
+   kMenu("pvMenuBarEdit", "Add", "&Remove end point`tBackspace", "reduceCustomShapeLength")
    kMenu("pvMenuBarEdit", "Add", "C&ycle symmetry modes`tY", "toggleBrushSymmetryModes")
    createMenuSelectShapeTension()
    kMenu("pvMenuBarEdit", "Add", "&Path type / smoothness", ":PVshapeTension")
@@ -59331,7 +59456,7 @@ InvokeMenuBarVectorEdit(manuID) {
          kMenu("pvMenuBarEdit", "Check", "Symmetrical anchors`tR")
    }
 
-   kMenu("pvMenuBarEdit", "Add/Uncheck", "&Open ended path`tO", "toggleOpenClosedLineCustomShape", "opened closed vector")
+   kMenu("pvMenuBarEdit", "Add/Uncheck", "&Open ended path`tO", "toggleOpenClosedLineEditorCustomShape", "opened closed vector")
    If (closedLineCustomShape=0)
       kMenu("pvMenuBarEdit", "Check", "&Open ended path`tO")
 
@@ -69538,6 +69663,7 @@ toggleBrushSymmetryModes() {
    Static hasRan := 0
    If (drawingShapeNow=1)
    {
+      handleOpenCloseBezier("kill")
       CustomShapeSymmetry := clampInRange(CustomShapeSymmetry + 1, 0, 2, 1)
       If (customShapePoints.Count()>1 && CustomShapeSymmetry>0)
       {
@@ -72565,6 +72691,7 @@ drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHei
           prevMsg := thisIDu
        }
     }
+
     If (doRedraw=1)
        r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectwin, 2NDglHDC)
 
@@ -72772,7 +72899,7 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0, kpp
        drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHeight, vectorVisiblePoints, bezierLinesPath, whichPoint)
        If (actu="sel-rect")
           Gdip_ResetWorldTransform(Gu)
-       ; fnOutputDebug(A_ThisFunc "(): redraw cached in " A_TickCount - startZeit "ms | " vectorVisiblePoints.Count())
+       fnOutputDebug(A_ThisFunc "(): redraw cached in " A_TickCount - startZeit "ms | " vectorVisiblePoints.Count())
        Return
     }
 
@@ -73028,11 +73155,10 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0, kpp
        r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectwin, 2NDglHDC)
     }
     ; ToolTip, % r "|" pp "|" iCount "|" zGu "|" Gu "|" prevBMP "|" gmx "|" gmy  , , , 2
-    ; fnOutputDebug(doCompleteRefresh "|" cacheRefresh " | " A_ThisFunc "(): redraw in " A_TickCount - startZeit "ms ")
+    fnOutputDebug(doCompleteRefresh "|" cacheRefresh " | " A_ThisFunc "(): redraw in " A_TickCount - startZeit "ms ")
 } ; // drawLiveCreateCustomShape()
 
 getVPcustomShapePath(PointsListArray) {
-    thisIndex := 0
     newArrayu := []
     Loop, % PointsListArray.Count()
     {
@@ -73072,21 +73198,21 @@ convertCustomShape2relativeCoords(PointsListArray, editorMode:=0) {
     mW := Rect.W
     mH := maxYu - minYu
 
+    ; pp := Gdip_GetPathPointsCount(pPath)
+    ; ToolTip, % "l=" pp "|" PointsListArray.Count() , , , 2
+    ; Gdip_GraphicsClear(2NDglPG)
+    ; Gdip_DrawPath(2NDglPG, pPen5, pPath)
+    ; doLayeredWinUpdate(A_ThisFunc, hGDIselectwin, 2NDglHDC)
     newShape := []
-    thisIndex := 0
-    maxindexu := newArrayu.Count()
-    Loop
+    Gdip_DeletePath(pPath)
+    Loop, % PointsListArray.Count()
     {
-       thisIndex++
-       xu := (newArrayu[thisIndex] - minXu) / Rect.W
-
-       thisIndex++
-       yu := (newArrayu[thisIndex] - minYu) / Rect.H
+       xu := (newArrayu[A_Index*2 - 1] - minXu) / Rect.W
+       yu := (newArrayu[A_Index*2]     - minYu) / Rect.H
        newShape[A_Index] := [xu, yu]
-       If (thisIndex>=maxIndexu)
-          Break
     }
 
+    Sleep, 1500
     Return newShape
 }
 
@@ -73159,26 +73285,19 @@ convertCustomShape2givenArea(PointsListArray, refX, refY, refW, refH, returnArra
     Else
        newShape := ""
 
-    If (filterPointDupes=1)
-       deduper := new hashtable()
-
     k := thisIndex := 0
     Loop, % PointsListArray.Count()
     {
        c := PointsListArray[A_Index]
-       xu := refW * c[1] + refX
-       yu := refH * c[2] + refY
-       puf := "a" Round(xu, 5) "|" Round(yu, 5)
-       If (xu="" || yu="" || deduper[puf]=1)
+       If (c[1]="" || c[2]="")
        {
           ; fnOutputDebug(A_Index "|"  c[1] "|" c[2] "| excluded: " puf)
           Continue
        }
 
        thisIndex++
-       If (filterPointDupes=1)
-          deduper[puf] := 1
-
+       xu := refW * c[1] + refX
+       yu := refH * c[2] + refY
        If (returnArray=1)
        {
           newArrayu[thisIndex*2 - 1] := xu
@@ -73189,7 +73308,6 @@ convertCustomShape2givenArea(PointsListArray, refX, refY, refW, refH, returnArra
     customShapeCountPoints := thisIndex
     ; fnOutputDebug(A_ThisFunc ": " k)
     ; ToolTip, % "l=" newShape , , , 2
-    deduper := ""
     If (returnArray=1)
        Return newArrayu
     Else
@@ -73734,7 +73852,7 @@ createPathVectorCustomShape(ImgSelPath, ByRef PointsList, tension, isClosed, isB
 
    If (allowCloseOpenAuto=1)
    {
-      r := testIsBezierAltPathClosed(PointsList)
+      r := testIsBezierViewPathClosed(PointsList)
       If (isClosed=1 && r=0 && isBezier=1)
       {
          thisIndex := PointsList.Count()//2 - 1
@@ -73756,7 +73874,7 @@ createPathVectorCustomShape(ImgSelPath, ByRef PointsList, tension, isClosed, isB
          Loop, % loops * 2
             PointsList.Pop()
 
-         While, (testIsBezierAltPathClosed(PointsList)=1)
+         While, (testIsBezierViewPathClosed(PointsList)=1)
          {
             loops := ((PointsList.Count()//2 - 2) >= 4) ? 3 : 2
             If (isBezier!=1)
@@ -73931,7 +74049,6 @@ createBitmapSelPath(advancedMode, imgW, imgH, shapeu:=0, angle:=0, keepBounds:=0
       addJournalEntry(A_ThisFunc ": failed to create selection path for the clip mask")
 
    Return obju
-
 }
 
 createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepBounds:=0, zeroTension:=0, allowSelectionCenter:=1, allowCavity:=1, selCavityX:=0, selCavityY:=0, allowErrMargin:=1) {
@@ -73953,10 +74070,20 @@ createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepB
             trGdip_RotatePathAtCenter(tempPath, angleu, 1, 1, keepBounds, 1)
          If (allowSelectionCenter>=1)
             vpFreeformShapeOffset := centerPath2bounds(tempPath, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 1, allowSelectionCenter)
+
          PointsList := Gdip_GetPathPoints(tempPath, 1)
+         pp := Gdip_GetPathPointsCount(tempPath)
+         zpp := (pp=customShapePoints.Count()) ? 0 : 1
+         If (bezierSplineCustomShape=1 && testIsBezierAltViewPathClosed()=1 && closedLineCustomShape=1 && zpp=1)
+         {
+            apz := 1
+            PointsList.Push(PointsList[1], PointsList[2])
+         }
       }
 
       createPathVectorCustomShape(ImgSelPath, PointsList, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape, 0, 1, 1)
+      ; xp := Gdip_GetPathPointsCount(ImgSelPath)
+      ; ToolTip, %  "l=" pp "|" xp "|" customShapePoints.Count() "|" apz , , , 2
    } Else If (ellipse=1)
    {
       Gdip_AddPathEllipse(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
@@ -94248,13 +94375,13 @@ processToolbarFunctions(btnID, actu, simulacrum:=0) {
       Else If (btnID="BTNvectSymAnchr")
          func2Call := ["toggleAutoReflectAnchors"]
       Else If (btnID="BTNvectRemLast")
-         func2Call := ["reduceCustomShapelength"]
+         func2Call := ["reduceCustomShapeLength"]
       Else If (btnID="BTNvectRemPoints")
          func2Call := ["MenuRemSelVectorPoints"]
       Else If (btnID="BTNvectSelInvert")
          func2Call := ["MenuSelInvertVectorPoints"]
       Else If (btnID="BTNvectOpenPath")
-         func2Call := ["toggleOpenClosedLineCustomShape"]
+         func2Call := ["toggleOpenClosedLineEditorCustomShape"]
       Else If (btnID="BTNvectSelAll")
          func2Call := ["tlbrSelAllVectorPoints"]
       Else If (btnID="BTNpaintSelection")
