@@ -2516,6 +2516,61 @@ DLL_API int DLL_CALLCONV GenerateRandomNoise(int* bgrImageData, int w, int h, in
     return 1;
 }
 
+DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData, int w, int h, int Stride, int bpp, int intensity, int opacity, int brightness, int doGrayScale, int blendMode, int flipLayers) {
+    // srand (time(NULL));
+    // #pragma omp parallel for default(none) num_threads(threadz)
+    time_t nTime;
+    srand((unsigned) time(&nTime));
+    const float fintensity = char_to_float[opacity];
+    for (int x = 0; x < w; x++)
+    {
+        for (int y = 0; y < h; y++)
+        {
+            unsigned char nR, nG, nB;
+            unsigned char z = rand() % 101;
+            if (z<intensity)
+               continue;
+
+            if (clipMaskFilter(x, y, NULL, 0)==1)
+               continue;
+
+            INT64 o = CalcPixOffset(x, y, Stride, bpp);
+            if (doGrayScale!=1)
+            {
+               nR = clamp(rand() % 256 + brightness, 0, 255);
+               nG = clamp(rand() % 256 + brightness, 0, 255);
+               nB = clamp(rand() % 256 + brightness, 0, 255);
+            } else
+            {
+               unsigned char zT = clamp(rand() % 256 + brightness, 0, 255);
+               nR = zT;
+               nG = zT;
+               nB = zT;
+            }
+ 
+            int oR = bgrImageData[2 + o];
+            int oG = bgrImageData[1 + o];
+            int oB = bgrImageData[o];
+            if (blendMode>0)
+            {
+               RGBAColor Orgb = {nB, nG, nR, 255};
+               RGBAColor Brgb = {oB, oG, oR, 255};   
+               RGBColorI blended;
+               blended = NEWcalculateBlendModes(Orgb, Brgb, blendMode, flipLayers, 0);
+               nR = blended.r;
+               nG = blended.g;
+               nB = blended.b;
+            }
+
+            bgrImageData[2 + o] = weighTwoValues(nR, oR, fintensity);
+            bgrImageData[1 + o] = weighTwoValues(nG, oG, fintensity);
+            bgrImageData[o]     = weighTwoValues(nB, oB, fintensity);
+        }
+    }
+
+    return 1;
+}
+
 
 DLL_API int DLL_CALLCONV getPBitmapistoInfos(Gdiplus::GpBitmap* pBitmap, int w, int h, UINT* resultsArray) {
 // unused function

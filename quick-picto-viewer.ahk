@@ -8078,8 +8078,8 @@ splitPointGivenInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, g
    dummyRefreshImgSelectionWindow()
 }
 
-areEndsConnectedBezierPath(thisIndex, totalCount) {
-   Return ((thisIndex<3 || thisIndex>totalCount - 2) && testIsEditorBezierPathClosed()=1) ? 1 : 0
+areEndsConnectedBezierPath(thisIndex, totalCount, m:=0) {
+   Return ((thisIndex<3 || thisIndex>totalCount - 2) && testIsEditorBezierPathClosed(m)=1) ? 1 : 0
 }
 
 expandGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY, dummy:=0) {
@@ -8457,7 +8457,7 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
         {
            hasLooped := 1
            If (k=1 && thisReflctAnchr=1 && bezierSplineCustomShape=1)
-              endsConnected := areEndsConnectedBezierPath(thisIndex, totalCount)
+              endsConnected := areEndsConnectedBezierPath(thisIndex, totalCount, 1)
 
            getVPcoordsVectorPoint(thisIndex, soX, soY)
            If (endsConnected=1)
@@ -8738,7 +8738,7 @@ getPointsSameCoordsVectorPath(totalCount, k, givenIndex, gmX, gmY) {
          newArrayu.Push([B, oppoIndex])
    }
 
-   If ((givenIndex<3 || givenIndex>totalCount - 3) && bezierSplineCustomShape=1 && testIsEditorBezierPathClosed())
+   If ((givenIndex<3 || givenIndex>totalCount - 3) && bezierSplineCustomShape=1 && testIsEditorBezierPathClosed(1)=1)
    {
       If (givenIndex<3)
       {
@@ -20114,6 +20114,11 @@ HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0, wa
          recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
          r := DllCall(whichMainDLL "\AdjustImageColors", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 255, "int", 1, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", 0, "int", 0, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
+      } Else If InStr(modus, "noise")
+      {
+         recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
+         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
+         r := DllCall(whichMainDLL "\GenerateRandomNoiseOnBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha)
       } Else If InStr(modus, "color")
       {
          this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
@@ -22103,7 +22108,17 @@ livePreviewAddNoiser(modus:=0) {
     } Else If (modus="none")
     {
        Sleep, 0
-    } Else r0 := coreAddNoiseSelectedArea(cornersBMP, 1)
+    } Else
+    {
+       If (viewportQPVimage.imgHandle)
+       {
+          QPV_PrepareHugeImgSelectionArea(0, 0, imgBoxSizeW - 1, imgBoxSizeH - 1, imgBoxSizeW, imgBoxSizeH, 0, 0, 0, 0, 0, 0, 1)
+          E1 := Gdip_LockBits(cornersBMP, 0, 0, imgBoxSizeW, imgBoxSizeH, stride, iScan, iData)
+          r0 := DllCall(whichMainDLL "\GenerateRandomNoiseOnBitmap", "UPtr", iScan, "Int", imgBoxSizeW, "Int", imgBoxSizeH, "int", stride, "int", 32, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha)
+          Gdip_UnlockBits(cornersBMP, iData)
+       } Else
+          r0 := coreAddNoiseSelectedArea(cornersBMP, 1)
+    }
 
     flipBitmapAccordingToViewPort(cornersBMP, 1)
     Gdip_SetPbitmapCtrl(hCropCornersPic, cornersBMP)
@@ -44608,6 +44623,8 @@ stopDrawingShape(dummy:="") {
        Return
 
     vectorToolModus := 1
+    If (customShapePoints.Count()>2000)
+       showTOOLtip("Exiting vector tool mode...")
     handleOpenCloseBezier("kill")
     zeitSillyPrevent := A_TickCount
     VPcreateSelPath("kill", 0, 0, 0, 0, 0, 0, 0, 0)
@@ -44626,12 +44643,10 @@ stopDrawingShape(dummy:="") {
        RegAction(1, "FillAreaCurveTension",, 2, 1, 5)
        RegAction(1, "closedLineCustomShape",, 1)
        decideCustomShapeStyle()
-       If (bezierSplineCustomShape=1)
-          closedLineCustomShape := 0
     } Else
     {
        prevVectorShapeSymmetryMode[1, 2] := CustomShapeSymmetry
-       customShapePoints := convertCustomShape2relativeCoords(customShapePoints, 1)
+       customShapePoints := convertEditorCustomShape2viewerCoords(customShapePoints, 1)
        customShapeCountPoints := customShapePoints.Count()
     }
 
@@ -44919,11 +44934,38 @@ resumeCustomShapeSelection(thisZL) {
    vPimgSelH := max(zImgSelY1, zImgSelY2) - min(zImgSelY1, zImgSelY2)
    offX := offY := 0
    ; retrieve the path as a polygonal shape
-   pPath := createImgSelPath(vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, 2, VPselRotation, rotateSelBoundsKeepRatio, 1, 1, 0, 0, 0, 2)
-   PointsList := Gdip_GetPathPoints(pPath)
-   Gdip_DeletePath(pPath)
+   ; pPath := createImgSelPath(vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, 2, VPselRotation, rotateSelBoundsKeepRatio, 1, 1, 0, 0, 0, 2)
+   ; PointsList := Gdip_GetPathPoints(pPath)
+   ; Gdip_DeletePath(pPath)
 
-   customShapePoints := convertShapePointsStrToEditPoints(PointsList, offX, offY)
+
+         PointsList := convertCustomShape2givenArea(customShapePoints, vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, 1, !bezierSplineCustomShape, bezierSplineCustomShape)
+         tempPath := Gdip_CreatePath()
+         Gdip_AddPathPolygon(tempPath, PointsList)
+         If (VPselRotation!=0)
+            trGdip_RotatePathAtCenter(tempPath, VPselRotation, 1, 1, rotateSelBoundsKeepRatio, 1)
+
+         vpFreeformShapeOffset := centerPath2bounds(tempPath, vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, 0, 1, 2)
+         PointsList := Gdip_GetPathPoints(tempPath, 1)
+         pp := Gdip_GetPathPointsCount(tempPath)
+         Gdip_DeletePath(tempPath)
+         zpp := (pp=customShapePoints.Count()) ? 0 : 1
+         If (bezierSplineCustomShape=1 && zpp=1)
+         {
+            If (testIsBezierAltViewPathClosed()=1 && closedLineCustomShape=1)
+               PointsList.Push(PointsList[1], PointsList[2])
+            Else
+               PointsList.Push(PointsList[pp*2 - 1], PointsList[pp*2])
+         }
+
+         If (bezierSplineCustomShape=1)
+         {
+            simpleFixBrokenBezierPath(PointsList)
+            viewerAutoCloseOpenPath(PointsList, closedLineCustomShape, 22)
+            ; ToolTip, % PointsList.Count() "==zz" , , , 2
+         }
+
+   customShapePoints := convertShapePointsViewerToEditPoints(PointsList, PointsList.Count()//2)
    If (prevVectorShapeSymmetryMode[1, 2]=1)
       configVectorShapeSymmetryPoint("x", 1, ( customShapePoints.Count() ) // 2 + 1, 0, 0)
    Else If (prevVectorShapeSymmetryMode[1, 2]=2)
@@ -44971,6 +45013,8 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
      }
 
      Sleep, 5
+     If (customShapePoints.Count()>2000)
+        showTOOLtip("Entering vector editor mode...")
      If (editingSelectionNow=1)
         recordSelUndoLevelNow()
 
@@ -45283,7 +45327,7 @@ handleOpenCloseBezier(mm:=0) {
    lastZeitFileSelect := A_TickCount
 }
 
-testIsEditorBezierPathClosed() {
+testIsEditorBezierPathClosed(m:=0) {
     ; this assumes drawingShapeNow = 1 ;
     totalz := customShapePoints.Count()
     If (totalz<4)
@@ -45291,8 +45335,12 @@ testIsEditorBezierPathClosed() {
 
     getVPcoordsVectorPoint(1, mX, mY)
     getVPcoordsVectorPoint(totalz, nX, nY)
-    ; r := isDotInRect(mX, nY, 3, 3, nX, nY, 1) ; too loose
-    r := (mX=nX && mY=nY) ? 1 : 0
+    If (m=1)
+       r := isDotInRect(mX, mY, SelDotsSize/2, SelDotsSize/2, nX, nY, 1) ; too loose
+    Else
+       r := (mX=nX && mY=nY) ? 1 : 0
+
+    ; ToolTip, % r "|" m "|" SelDotsSize//2 , , , 2
     Return r
 }
 
@@ -45982,7 +46030,7 @@ BTNrenameCustomShape() {
 }
 
 saveVectorShapeInRegistry() {
-    FillAreaCustomShape := convertShapePointsArrayToStr(customShapePoints)
+    FillAreaCustomShape := convertShapePointsArrayToStr(customShapePoints, 65305)
     RegAction(1, "FillAreaCustomShape")
     RegAction(1, "FillAreaCurveTension")
     RegAction(1, "closedLineCustomShape")
@@ -46191,7 +46239,7 @@ BtnSaveVectorShape() {
    }
 }
 
-saveCurrentVectorShape(givenName) {
+saveCurrentVectorShape(givenName, allowMsg:=1) {
    If (EllipseSelectMode!=2)
       Return
 
@@ -46205,7 +46253,7 @@ saveCurrentVectorShape(givenName) {
    }
 
    thisFile := mainCompiledPath "\resources\vector-shapes\" givenName ".vqpv"
-   If FileExist(thisFile)
+   If (FileExist(thisFile) && allowMsg=1)
    {
       msgResult := msgBoxWrapper(appTitle ": Confirmation", "A vector shape was already defined with the provided name: " givenName ". Do you want to overwrite it? This action is irreversible.", "&Overwrite|&Cancel", 2, "exclamation")
       If (msgResult!="overwrite")
@@ -46219,12 +46267,15 @@ saveCurrentVectorShape(givenName) {
    If ErrorLevel
       errorOccured := 1
 
-   If (errorOccured=1)
+   If (allowMsg=1)
    {
-      showTOOLtip("Failed to save vector shape into:`n" mainCompiledPath "\")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-   } Else prevNameSavedVectorShape := givenName
+      If (errorOccured=1)
+      {
+         showTOOLtip("Failed to save vector shape into:`n" mainCompiledPath "\")
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+      } Else prevNameSavedVectorShape := givenName
+   }
 
    Return errorOccured
 }
@@ -48355,10 +48406,14 @@ PanelAddNoiserImage() {
     If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
        BlurAreaAlphaMask := 0
 
+    If (viewportQPVimage.imgHandle)
+       UserAddNoiseMode := 1
+
     sml := (PrefsLargeFonts=1) ? 30 : 20
     Gui, Add, Text, x+20 ys w%2ndcol% Section -wrap +hwndhTemp, Noise type:
     GuiAddDropDownList("x+7 wp-30 AltSubmit gupdateUIaddNoisePanel Choose" UserAddNoiseMode " vUserAddNoiseMode", "Gaussian noise|Dynamic noise|Plasma / clouds", [hTemp])
-    GuiAddButton("x+1 w" sml " hp gBtnUIpresetsClouds", "D", "Reset to default presets: noise or clouds")
+    If (!viewportQPVimage.imgHandle)
+       GuiAddButton("x+1 w" sml " hp gBtnUIpresetsClouds", "D", "Reset to default presets: noise or clouds")
     GuiAddSlider("UserAddNoiseIntensity", 1,100, 30, "Noise cut-off", "updateUIaddNoisePanel", 1, "xs y+10 w" txtWid//2 - 4 " hp")
     GuiAddSlider("UserAddNoiseDetails", 1,100, 20, "Plasmagon", "updateUIaddNoisePanel", 1, "x+5 wp hp")
     GuiAddSlider("IDedgesEmphasis", -255,255, 0, "Brightness", "updateUIaddNoisePanel", 2, "xs y+8 w" txtWid - 2 " hp")
@@ -48399,12 +48454,12 @@ BtnIDedgesNow() {
 }
 
 BtnAddNoiseNow() {
-    If (downscaleHugeImagesForEditing()<0)
-       Return
-
-    updateUIaddNoisePanel("no")
-    CloseWindow()
-    addNoiseSelectedArea()
+   updateUIaddNoisePanel("no")
+   CloseWindow()
+   If (viewportQPVimage.imgHandle)
+      HugeImagesApplyDesaturateFillSelArea("noise filter")
+   Else
+      addNoiseSelectedArea()
 }
 
 updateUIedgesPanel(dummy:=0, b:=0) {
@@ -48454,11 +48509,18 @@ updateUIaddNoisePanel(dummy:=0, b:=0) {
     uiSlidersArray["IDedgesEmphasis", 10] := actu
     uiSlidersArray["UserAddNoiseBlurAmount", 10] := actu
     uiSlidersArray["UserAddNoisePixelizeAmount", 10] := actu
+    If (viewportQPVimage.imgHandle)
+    {
+       uiSlidersArray["IDedgesEmphasis", 10] := 1
+       GuiControl, SettingsGUIA: Disable, UserAddNoiseMode
+    }
+
+    actu := (UserAddNoiseMode>1 || viewportQPVimage.imgHandle) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    GuiControl, % actu, IDedgesBlendMode
+    GuiControl, % actu, UserAddNoiseGrays
 
     actu := (UserAddNoiseMode>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
-    GuiControl, % actu, IDedgesBlendMode
     GuiControl, % actu, IDedgesInvert
-    GuiControl, % actu, UserAddNoiseGrays
     GuiControl, % actu, UserAddNoiseTransparent
     GuiControl, % actu, blurAreaEqualXY
     GuiRefreshSliders()
@@ -63909,7 +63971,12 @@ INIaction(act, var, section, type:=0, mini:=0, maxy:=0, forcedDef:="", iniFile:=
    If (act=1)
    {
       If (var="FillAreaCustomShape")
-         varValue := SubStr(varValue, 1, 64321)
+      {
+         If (StrLen(FillAreaCustomShape)>65300)
+            saveCurrentVectorShape("_previous_huge_path", 0)
+
+         varValue := SubStr(varValue, 1, 65300)
+      }
 
       If (storeReg=1)
          RegWrite, REG_SZ, % QPVregEntry "\" section, %var%, %varValue%
@@ -73175,7 +73242,7 @@ getVPcustomShapePath(PointsListArray) {
     Return [pPath, newArrayu]
 }
 
-convertCustomShape2relativeCoords(PointsListArray, editorMode:=0) {
+convertEditorCustomShape2viewerCoords(PointsListArray, editorMode:=0) {
     ; this function is executed when user exits vector path editing mode
     ; called from stopDrawingShape()
     If (PointsListArray.Count()<3)
@@ -73203,6 +73270,7 @@ convertCustomShape2relativeCoords(PointsListArray, editorMode:=0) {
     ; Gdip_GraphicsClear(2NDglPG)
     ; Gdip_DrawPath(2NDglPG, pPen5, pPath)
     ; doLayeredWinUpdate(A_ThisFunc, hGDIselectwin, 2NDglHDC)
+    ; Sleep, 800
     newShape := []
     Gdip_DeletePath(pPath)
     Loop, % PointsListArray.Count()
@@ -73212,7 +73280,6 @@ convertCustomShape2relativeCoords(PointsListArray, editorMode:=0) {
        newShape[A_Index] := [xu, yu]
     }
 
-    Sleep, 1500
     Return newShape
 }
 
@@ -73314,7 +73381,7 @@ convertCustomShape2givenArea(PointsListArray, refX, refY, refW, refH, returnArra
        Return Trimmer(newShape, "|")
 }
 
-convertShapePointsArrayToStr(PointsListArray) {
+convertShapePointsArrayToStr(PointsListArray, limited:=0) {
     If (PointsListArray.Count()<3)
        Return
 
@@ -73326,6 +73393,11 @@ convertShapePointsArrayToStr(PointsListArray) {
           Continue
 
        newShape .= clampInRange(c[1], 0, 1) "," clampInRange(c[2], 0, 1) "|"
+       If (limited>0)
+       {
+          If (StrLen(newShape)>limited)
+             Break
+       }
     }
 
     Return Trimmer(newShape, "|")
@@ -73359,27 +73431,31 @@ convertShapePointsStrToArray(PointsList, offX:=0, offY:=0) {
     Return newShape
 }
 
-convertShapePointsStrToEditPoints(PointsList, offX:=0, offY:=0) {
-    If !InStr(PointsList, "|")
-       Return
-
+convertShapePointsViewerToEditPoints(PointsList, totalz) {
     newShape := []
-    ; newArrayu := new hashtable()
-    ogmX := ogmY := 0
-    Loop, Parse, PointsList, |
+    If IsObject(PointsList)
     {
-       c := StrSplit(A_LoopField, ",")
-       ogmX := c[1]
-       ogmY := c[2]
-       If (ogmX="" || ogmY="") ; || newArrayu[ogmX ogmY]=1)
-          Continue
+       Loop, % totalz
+       {
+          getVectorCoordsFromVPpoint(PointsList[A_Index*2 - 1], PointsList[A_Index*2], gmX, gmY)
+          newShape[A_Index] := [gmX, gmY]
+       }
+    } Else 
+    {
+       Loop, Parse, PointsList, |
+       {
+          c := StrSplit(A_LoopField, ",")
+          If (c[1]="" || c[2]="") ; || newArrayu[ogmX ogmY]=1)
+             Continue
 
-       thisIndex++
-       getVectorCoordsFromVPpoint(ogmX + offX, ogmY + offY, gmX, gmY)
-       newShape[thisIndex] := [gmX, gmY]
+          thisIndex++
+          getVectorCoordsFromVPpoint(c[1], c[2], gmX, gmY)
+          newShape[thisIndex] := [gmX, gmY]
+       }
+
     }
 
-    customShapeCountPoints := thisIndex
+    customShapeCountPoints := newShape.Count()
     ; fnOutputDebug(A_ThisFunc "=" thisIndex "=" ogmX "=" ogmY "n" FillAreaCurveTension "=" tensionCurveCustomShape)
     If (newShape.Count()<3)
        Return
@@ -73846,48 +73922,46 @@ simpleFixBrokenBezierPath(ByRef PointsList, doa:=0) {
    Return r
 }
 
+viewerAutoCloseOpenPath(ByRef PointsList, isClosed, bb:=0) {
+   r := testIsBezierViewPathClosed(PointsList)
+   ; ToolTip, % isClosed "|" r "||" bb , , , 2
+   If (isClosed=1 && r=0)
+   {
+      thisIndex := PointsList.Count()//2 - 1
+      xA := PointsList[1]
+      yA := PointsList[2]
+      PointsList.Push(xA, yA)
+      loops := (PointsList.Count()//2 > 4) ? 2 : 1
+      Loop, % loops
+         PointsList.Push(xA, yA)
+
+      ; ToolTip, %  thisIndex "=l=" PointsList.Count()//2 "`n" xA "==" yA , , , 2
+      reflectGivenAnchorInAltPath(PointsList, 2, PointsList.Count()//2 - 1, 1)
+      reflectGivenAnchorInAltPath(PointsList, thisIndex, thisIndex + 2, thisIndex + 1)
+   } Else If (isClosed=0 && r=1)
+   {
+      loops := ((PointsList.Count()//2 - 2) >= 4) ? 3 : 2
+      Loop, % loops * 2
+         PointsList.Pop()
+
+      While, (testIsBezierViewPathClosed(PointsList)=1)
+      {
+         loops := ((PointsList.Count()//2 - 2) >= 4) ? 3 : 2
+         Loop, % loops * 2
+            PointsList.Pop()
+
+         If (A_Index>10)
+            Break
+      }
+   }
+}
+
 createPathVectorCustomShape(ImgSelPath, ByRef PointsList, tension, isClosed, isBezier, zeroTension:=0, allowAutoFix:=1, allowCloseOpenAuto:=1) {
    If (allowAutoFix=1 && isBezier=1)
       r := simpleFixBrokenBezierPath(PointsList)
 
-   If (allowCloseOpenAuto=1)
-   {
-      r := testIsBezierViewPathClosed(PointsList)
-      If (isClosed=1 && r=0 && isBezier=1)
-      {
-         thisIndex := PointsList.Count()//2 - 1
-         xA := PointsList[1],            yA := PointsList[2]
-         PointsList.Push(xA, yA)
-         loops := (PointsList.Count()//2 > 4) ? 2 : 1
-         Loop, % loops
-            PointsList.Push(xA, yA)
-
-         ; ToolTip, %  thisIndex "=l=" PointsList.Count()//2 "`n" xA "==" yA , , , 2
-         reflectGivenAnchorInAltPath(PointsList, 2, PointsList.Count()//2 - 1, 1)
-         reflectGivenAnchorInAltPath(PointsList, thisIndex, thisIndex + 2, thisIndex + 1)
-      } Else If (isClosed=0 && r=1)
-      {
-         loops := ((PointsList.Count()//2 - 2) >= 4) ? 3 : 2
-         If (isBezier!=1)
-            loops := 1
-
-         Loop, % loops * 2
-            PointsList.Pop()
-
-         While, (testIsBezierViewPathClosed(PointsList)=1)
-         {
-            loops := ((PointsList.Count()//2 - 2) >= 4) ? 3 : 2
-            If (isBezier!=1)
-               loops := 1
-
-            Loop, % loops * 2
-               PointsList.Pop()
-
-            If (A_Index>10)
-               Break
-         }
-      }
-   }
+   If (allowCloseOpenAuto=1 && isBezier=1)
+      viewerAutoCloseOpenPath(PointsList, isClosed)
 
    If (FillAreaCurveTension=4)
       tensionCurveCustomShape := 0.95
@@ -73897,7 +73971,7 @@ createPathVectorCustomShape(ImgSelPath, ByRef PointsList, tension, isClosed, isB
       tensionCurveCustomShape := 0.2
    Else
       tensionCurveCustomShape := 0.1
-
+   ; ToolTip, % PointsList.Count() "==R" , , , 2
    If (isBezier=1)
       Gdip_AddPathBeziers(ImgSelPath, PointsList)
    Else If ((tension=1 || zeroTension=1) && isClosed=1)
@@ -74075,10 +74149,7 @@ createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepB
          pp := Gdip_GetPathPointsCount(tempPath)
          zpp := (pp=customShapePoints.Count()) ? 0 : 1
          If (bezierSplineCustomShape=1 && testIsBezierAltViewPathClosed()=1 && closedLineCustomShape=1 && zpp=1)
-         {
-            apz := 1
             PointsList.Push(PointsList[1], PointsList[2])
-         }
       }
 
       createPathVectorCustomShape(ImgSelPath, PointsList, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape, 0, 1, 1)
