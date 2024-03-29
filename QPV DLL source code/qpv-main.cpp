@@ -2516,12 +2516,102 @@ DLL_API int DLL_CALLCONV GenerateRandomNoise(int* bgrImageData, int w, int h, in
     return 1;
 }
 
-DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData, int w, int h, int Stride, int bpp, int intensity, int opacity, int brightness, int doGrayScale, int blendMode, int flipLayers) {
-    // srand (time(NULL));
-    // #pragma omp parallel for default(none) num_threads(threadz)
+DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData, int w, int h, int Stride, int bpp, int intensity, int opacity, int brightness, int doGrayScale, int pixelize, unsigned char *newBitmap, int StrideMini, int mw, int mh, int bImgSelW, int bImgSelH, int blendMode, int flipLayers) {
+    const float fintensity = char_to_float[opacity];
     time_t nTime;
     srand((unsigned) time(&nTime));
-    const float fintensity = char_to_float[opacity];
+    if (pixelize>0)
+    {
+        std::vector<int> pixelzMapW(w + 2, 0);
+        std::vector<int> pixelzMapH(h + 2, 0);
+        const int bmpX = (imgSelX1<0 || invertSelection==1) ? 0 : imgSelX1;
+        const int bmpY = (imgSelY1<0 || invertSelection==1) ? 0 : imgSelY1;
+        for (int x = 0; x < w + 2; x++)
+        {
+            pixelzMapW[x] = (float)mw*((x - bmpX)/(float)bImgSelW);
+        }
+
+        for (int y = 0; y < h + 2; y++)
+        {
+            pixelzMapH[y] = (float)mh*((y - bmpY)/(float)bImgSelH);
+        }
+
+        fnOutputDebug("add noise step 0");
+        #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+        for (int x = 0; x < mw; x++)
+        {
+            // prepare the noise bitmap
+            for (int y = 0; y < mh; y++)
+            {
+                unsigned char z = rand() % 101;
+                INT64 o = CalcPixOffset(x, y, StrideMini, 24);
+                if (z<intensity)
+                {
+                   newBitmap[2 + o] = 128;
+                   newBitmap[1 + o] = 128;
+                   newBitmap[o] = 128;
+                   continue;
+                }
+
+                if (doGrayScale!=1)
+                {
+                   newBitmap[2 + o] = clamp(rand() % 256 + brightness, 0, 255);
+                   newBitmap[1 + o] = clamp(rand() % 256 + brightness, 0, 255);
+                   newBitmap[o] = clamp(rand() % 256 + brightness, 0, 255);
+                } else
+                {
+                   unsigned char zT = clamp(rand() % 256 + brightness, 0, 255);
+                   newBitmap[2 + o] = zT;
+                   newBitmap[1 + o] = zT;
+                   newBitmap[o] = zT;
+                }
+            }
+        }
+
+        fnOutputDebug("add noise step 1");
+        #pragma omp parallel for schedule(dynamic) default(none)
+        for (int x = 0; x < w; x++)
+        {
+            for (int y = 0; y < h; y++)
+            {
+                if (clipMaskFilter(x, y, NULL, 0)==1)
+                   continue;
+
+                INT64 on = CalcPixOffset(pixelzMapW[x], pixelzMapH[y], StrideMini, bpp);
+                int nR = newBitmap[2 + on];
+                int nG = newBitmap[1 + on];
+                int nB = newBitmap[on];
+                if (nR==128 && nG==128 && nB==128)
+                   continue;
+     
+                INT64 o = CalcPixOffset(x, y, Stride, bpp);
+                int oR = bgrImageData[2 + o];
+                int oG = bgrImageData[1 + o];
+                int oB = bgrImageData[o];
+
+                if (blendMode>0)
+                {
+                   RGBAColor Orgb = {nB, nG, nR, 255};
+                   RGBAColor Brgb = {oB, oG, oR, 255};   
+
+                   RGBColorI blended;
+                   blended = NEWcalculateBlendModes(Orgb, Brgb, blendMode, flipLayers, 0);
+                   nR = blended.r;
+                   nG = blended.g;
+                   nB = blended.b;
+                }
+
+                bgrImageData[2 + o] = weighTwoValues(nR, oR, fintensity);
+                bgrImageData[1 + o] = weighTwoValues(nG, oG, fintensity);
+                bgrImageData[o]     = weighTwoValues(nB, oB, fintensity);
+            }
+        }
+
+        fnOutputDebug("add noise step 2");
+        return 1;
+    }
+
+    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int x = 0; x < w; x++)
     {
         for (int y = 0; y < h; y++)

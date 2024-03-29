@@ -958,7 +958,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
         Else If (thumbsDisplaying=1 && maxFilesIndex>10 && CurrentSLD && !z)
            func2Call := ["invokeFilesListMapNow"]
 
-           ; testCreateMask()
+        ; testCreateMask()
     } Else If (givenKey="+^n")
     {
         If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
@@ -5999,10 +5999,20 @@ isVPselLarger(mainWidth:=0, mainHeight:=0) {
    If (!mainWidth || !mainHeight)
       vpWinClientSize(mainWidth, mainHeight)
 
-   vPimgSelW := max(selDotX, selDotAx) - min(selDotX, selDotAx)
-   vPimgSelH := max(selDotY, selDotAy) - min(selDotY, selDotAy)
-   vPimgSelX := min(selDotX, selDotAx) + dotsSize//2
-   vPimgSelY := min(selDotY, selDotAy) + dotsSize//2
+   nImgSelX1 := min(imgSelX1, imgSelX2)
+   nImgSelY1 := min(imgSelY1, imgSelY2)
+   nImgSelX2 := max(imgSelX1, imgSelX2)
+   nImgSelY2 := max(imgSelY1, imgSelY2)
+
+   zImgSelX1 := prevDestPosX + Round(nImgSelX1*zoomLevel)
+   zImgSelY1 := prevDestPosY + Round(nImgSelY1*zoomLevel)
+   zImgSelX2 := prevDestPosX + Round(nImgSelX2*zoomLevel)
+   zImgSelY2 := prevDestPosY + Round(nImgSelY2*zoomLevel)
+
+   vPimgSelW := max(zImgSelX1, zImgSelX2) - min(zImgSelX1, zImgSelX2)
+   vPimgSelH := max(zImgSelY1, zImgSelY2) - min(zImgSelY1, zImgSelY2)
+   vPimgSelX := min(zImgSelX1, zImgSelX2) + dotsSize//2
+   vPimgSelY := min(zImgSelY1, zImgSelY2) + dotsSize//2
 
    larger := (vPimgSelH>mainHeight*2 || vPimgSelW>mainWidth*2) ? 1 : 0
    If !larger
@@ -6133,6 +6143,9 @@ SkeletDrawSelectionBox(paintAlphaMask:=0) {
 }
 
 defineCurrentAlphaMask() {
+   If (viewportQPVimage.imgHandle)
+      return "none"
+
    az := validBMP(userClipBMPpaste) ? "(referenced bitmap)" : "(inexistent reference)"
    bc := validBMP(useGdiBitmap()) ? "(referenced bitmap)" : "(inexistent reference)"
    cz := validBMP(userAlphaMaskBmpPainted) ? "(effects may apply)" : "(inexistent reference)"
@@ -11038,6 +11051,7 @@ ChangeThumbsZoom(dir) {
    recalculateThumbsSizes()
    If (thumbsListViewMode=1)
       ForceRefreshNowThumbsList()
+
    INIaction(1, "thumbsZoomLevel", "General")
    INIaction(1, "thumbsColumns", "General")
    ; INIaction(1, "dynamicThumbsColumns", "General")
@@ -17299,8 +17313,21 @@ getVPselIDs(what) {
    Return r
 }
 
-isSelEntireVisible(mw, mh) {
-   r := (selDotX<=mw && selDotY<=mh && selDotX>=0 && selDotY>=0 && selDotAx<=mw && selDotAy<=mh && selDotAx>=0 && selDotAy>=0) ? 1 : 0
+isSelEntireVisible(mw:=0, mh:=0) {
+   If (!mw || !mh)
+      vpWinClientSize(mw, mh)
+
+   nImgSelX1 := min(imgSelX1, imgSelX2)
+   nImgSelY1 := min(imgSelY1, imgSelY2)
+   nImgSelX2 := max(imgSelX1, imgSelX2)
+   nImgSelY2 := max(imgSelY1, imgSelY2)
+
+   zImgSelX1 := prevDestPosX + Round(nImgSelX1*zoomLevel)
+   zImgSelY1 := prevDestPosY + Round(nImgSelY1*zoomLevel)
+   zImgSelX2 := prevDestPosX + Round(nImgSelX2*zoomLevel)
+   zImgSelY2 := prevDestPosY + Round(nImgSelY2*zoomLevel)
+
+   r := (zImgSelX1<=mw && zImgSelY1<=mh && zImgSelX1>=0 && zImgSelY1>=0 && zImgSelX2<=mw && zImgSelY2<=mh && zImgSelX2>=0 && zImgSelY2>=0) ? 1 : 0
    Return r
 }
 
@@ -17310,20 +17337,37 @@ isSelEntirelyWithinIMGbounds() {
    Return r
 }
 
-isSelEntireOutside(mw, mh) {
-   rAx := isInRange(selDotX, 0, mw)
-   rAy := isInRange(selDotY, 0, mh)
-   ra := (rAx=1 && rAy=1) ? 1 : 0
+isSelEntireOutside(mw:=0, mh:=0) {
+   If (!mw || !mh)
+      vpWinClientSize(mw, mh)
 
-   rBx := isInRange(selDotAx, 0, mw)
-   rBy := isInRange(selDotAy, 0, mh)
-   rb := (rBx=1 && rBy=1) ? 1 : 0
-   If (ra=1 || rb=1)
+   nImgSelX1 := min(imgSelX1, imgSelX2)
+   nImgSelY1 := min(imgSelY1, imgSelY2)
+   nImgSelX2 := max(imgSelX1, imgSelX2)
+   nImgSelY2 := max(imgSelY1, imgSelY2)
+
+   zImgSelX1 := prevDestPosX + Round(nImgSelX1*zoomLevel)
+   zImgSelY1 := prevDestPosY + Round(nImgSelY1*zoomLevel)
+   zImgSelX2 := prevDestPosX + Round(nImgSelX2*zoomLevel)
+   zImgSelY2 := prevDestPosY + Round(nImgSelY2*zoomLevel)
+   vPimgSelW := max(zImgSelX1, zImgSelX2) - min(zImgSelX1, zImgSelX2)
+   vPimgSelH := max(zImgSelY1, zImgSelY2) - min(zImgSelY1, zImgSelY2)
+
+   a := isDotInRect(zImgSelX1, zImgSelY1, 0, mw, 0, mh)
+   b := isDotInRect(zImgSelX2, zImgSelY2, 0, mw, 0, mh)
+   c := isDotInRect(zImgSelX1, zImgSelY1 + vPimgSelH, 0, mw, 0, mh)
+   d := isDotInRect(zImgSelX1 + vPimgSelW, zImgSelY1, 0, mw, 0, mh)
+   e := isDotInRect(zImgSelX1 + vPimgSelW//2, zImgSelY1 + vPimgSelH//2, 0, mw, 0, mh)
+   If (a || b || c || d || e)
       Return 0
 
-   If (max(selDotX, selDotAx)<0 || min(selDotX, selDotAx)>mw || max(selDotY, selDotAy)<0 || min(selDotY, selDotAy)>mh)
-      Return 1
-   Return 0
+   a := isDotInRect(0, 0, zImgSelX1, zImgSelX2, zImgSelY1, zImgSelY2)
+   b := isDotInRect(mw, mh, zImgSelX1, zImgSelX2, zImgSelY1, zImgSelY2)
+   c := isDotInRect(mw//2, mh//2, zImgSelX1, zImgSelX2, zImgSelY1, zImgSelY2)
+   If (a || b || c)
+      Return 0
+
+   Return 1
 }
 
 isTriangleEntirelyOutsideVP(x1, y1, x2, y2, x3, y3, mw, mh) {
@@ -20070,7 +20114,7 @@ HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0, wa
       {
          thisImgW := (BlurAreaInverted=1) ? Ceil(ImgW/blurAreaPixelizeAmount) : Ceil(obju.bImgSelW/blurAreaPixelizeAmount)
          thisImgH := (BlurAreaInverted=1) ? Ceil(ImgH/blurAreaPixelizeAmount) : Ceil(obju.bImgSelH/blurAreaPixelizeAmount)
-         If memoryUsageWarning(thisIimgW, thisImgH, bpp)
+         If memoryUsageWarning(thisImgW, thisImgH, bpp)
          {
             DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
             Return
@@ -20116,9 +20160,29 @@ HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0, wa
          r := DllCall(whichMainDLL "\AdjustImageColors", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 255, "int", 1, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", 0, "int", 0, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
       } Else If InStr(modus, "noise")
       {
+         If (UserAddNoisePixelizeAmount>0)
+         {
+            thisImgW := (BlurAreaInverted=1) ? Ceil(ImgW/UserAddNoisePixelizeAmount) : Ceil(obju.bImgSelW/UserAddNoisePixelizeAmount)
+            thisImgH := (BlurAreaInverted=1) ? Ceil(ImgH/UserAddNoisePixelizeAmount) : Ceil(obju.bImgSelH/UserAddNoisePixelizeAmount)
+            If memoryUsageWarning(thisImgW, thisImgH, bpp)
+            {
+               DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+               Return
+            }
+
+            hFIFimgZ := FreeImage_Allocate(thisImgW, thisImgH, 24)
+            FreeImage_GetImageDimensions(hFIFimgZ, thisImgW, thisImgH)
+            thisSelW := (BlurAreaInverted=1) ? imgW : obju.bImgSelW
+            thisSelH := (BlurAreaInverted=1) ? imgH : obju.bImgSelH
+            pBitsMini := FreeImage_GetBits(hFIFimgZ)
+            strideMini := FreeImage_GetStride(hFIFimgZ)
+         }
+
          recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
-         r := DllCall(whichMainDLL "\GenerateRandomNoiseOnBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha)
+         r := DllCall(whichMainDLL "\GenerateRandomNoiseOnBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", thisSelW, "int", thisSelH, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha)
+         If (UserAddNoisePixelizeAmount>0)
+            FreeImage_UnLoad(hFIFimgZ)
       } Else If InStr(modus, "color")
       {
          this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
@@ -22112,10 +22176,25 @@ livePreviewAddNoiser(modus:=0) {
     {
        If (viewportQPVimage.imgHandle)
        {
+          If (UserAddNoisePixelizeAmount>0)
+          {
+             thisImgW := Ceil(imgBoxSizeW/UserAddNoisePixelizeAmount)
+             thisImgH := Ceil(imgBoxSizeH/UserAddNoisePixelizeAmount)
+             hFIFimgZ := FreeImage_Allocate(thisImgW, thisImgH, 24)
+             FreeImage_GetImageDimensions(hFIFimgZ, thisImgW, thisImgH)
+             thisSelW := imgBoxSizeW
+             thisSelH := imgBoxSizeH
+             pBitsMini := FreeImage_GetBits(hFIFimgZ)
+             strideMini := FreeImage_GetStride(hFIFimgZ)
+             ; fnOutputDebug("i" thisImgW "|" thisImgH "s" thisSelW "|" thisSelH)
+          }
+
           QPV_PrepareHugeImgSelectionArea(0, 0, imgBoxSizeW - 1, imgBoxSizeH - 1, imgBoxSizeW, imgBoxSizeH, 0, 0, 0, 0, 0, 0, 1)
           E1 := Gdip_LockBits(cornersBMP, 0, 0, imgBoxSizeW, imgBoxSizeH, stride, iScan, iData)
-          r0 := DllCall(whichMainDLL "\GenerateRandomNoiseOnBitmap", "UPtr", iScan, "Int", imgBoxSizeW, "Int", imgBoxSizeH, "int", stride, "int", 32, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha)
+          r0 := DllCall(whichMainDLL "\GenerateRandomNoiseOnBitmap", "UPtr", iScan, "Int", imgBoxSizeW, "Int", imgBoxSizeH, "int", stride, "int", 32, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", thisSelW, "int", thisSelH, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha)
           Gdip_UnlockBits(cornersBMP, iData)
+          If (UserAddNoisePixelizeAmount>0)
+             FreeImage_UnLoad(hFIFimgZ)
        } Else
           r0 := coreAddNoiseSelectedArea(cornersBMP, 1)
     }
@@ -39104,23 +39183,10 @@ Version 1.0 (Thursday, April 23, 2020)
 Created: Thursday, April 23, 2020
 Author: tidbit
 
-Description:
-   a loose fuzzy search. 
-
+Description: a loose fuzzy search. 
    fuzz   = string to look for, in order
    master = where to look in
-   
    returns a percentage. if half of the letters we found in the proper order, returns 0.5
-   fuzzybit("abc", "abc") = 1.0
-   fuzzybit("aac", "abc") = 0.6667 ; contains the 'a' and 'c' in proper order, but no 'b'
-   fuzzybit("bac", "abc") = 0.6667 ; all the letters exist, but not in a proper order
-
-out:="abc `t abc`t=`t" fuzzybit("abc", "abc")
-. "`nalffp `t A_LoopFileFullPath`t=`t" fuzzybit("alffp", "A_LoopFileFullPath")
-. "`nalffd `t A_LoopFileFullPath`t=`t" fuzzybit("alffd", "A_LoopFileFullPath")
-msgbox % fuzzybit("aloo", "A_LoopFileFullPath")
-msgbox % fuzzybit("aloog", "A_LoopFileFullPath")
-msgbox % fuzzybit("alog", "A_LoopFileFullPath")
 ; modified by Marius Șucan   
 */
 
@@ -48407,10 +48473,13 @@ PanelAddNoiserImage() {
        BlurAreaAlphaMask := 0
 
     If (viewportQPVimage.imgHandle)
+    {
        UserAddNoiseMode := 1
+       ppk := "+Disabled"
+    }
 
     sml := (PrefsLargeFonts=1) ? 30 : 20
-    Gui, Add, Text, x+20 ys w%2ndcol% Section -wrap +hwndhTemp, Noise type:
+    Gui, Add, Text, x+20 ys w%2ndcol% Section -wrap +hwndhTemp %ppk%, Noise type:
     GuiAddDropDownList("x+7 wp-30 AltSubmit gupdateUIaddNoisePanel Choose" UserAddNoiseMode " vUserAddNoiseMode", "Gaussian noise|Dynamic noise|Plasma / clouds", [hTemp])
     If (!viewportQPVimage.imgHandle)
        GuiAddButton("x+1 w" sml " hp gBtnUIpresetsClouds", "D", "Reset to default presets: noise or clouds")
@@ -48435,9 +48504,12 @@ PanelAddNoiserImage() {
     thisW := (PrefsLargeFonts=1) ? 85 : 65
     Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default gBtnAddNoiseNow w%btnWid%, &Add noise
     Gui, Add, Button, x+5 hp w%thisW% gBtnCloseWindow, &Cancel
-    Gui, Add, Checkbox, x+5 hp Checked%BlurAreaAlphaMask% vBlurAreaAlphaMask gupdateUIaddNoisePanel, Use alpha mas&k
-    If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
-       GuiControl, Disable, BlurAreaAlphaMask
+    If (!viewportQPVimage.imgHandle)
+    {
+       Gui, Add, Checkbox, x+5 hp Checked%BlurAreaAlphaMask% vBlurAreaAlphaMask gupdateUIaddNoisePanel, Use alpha mas&k
+       If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
+          GuiControl, Disable, BlurAreaAlphaMask
+    }
 
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Add noise in selected area: " appTitle, winPos)
@@ -48512,6 +48584,7 @@ updateUIaddNoisePanel(dummy:=0, b:=0) {
     If (viewportQPVimage.imgHandle)
     {
        uiSlidersArray["IDedgesEmphasis", 10] := 1
+       uiSlidersArray["UserAddNoisePixelizeAmount", 10] := 1
        GuiControl, SettingsGUIA: Disable, UserAddNoiseMode
     }
 
@@ -59260,6 +59333,8 @@ createMenuSelectionArea(modus:=0) {
       kMenu("PVselv", "Add", "Ali&gnment", ":PVselAlign")
       kMenu("PVselv", "Add", "Rotation and &aspect ratio", ":PVselRatio")
       Menu, PVselv, Add, 
+      If isSelEntireOutside()
+         kMenu("PVselv", "Add", "Focus selection area", "focusImgSelArea", "find viewport", " (selection area)")
       keyword := (editingSelectionNow=1) ? "hide" : " display"
       kMenu("PVselv", "Add/Uncheck", "Sho&w grid", "ToggleSelectGrid", keyword, " (selection area)")
       If (showSelectionGrid=1)
@@ -64832,6 +64907,29 @@ ToggleRecordOpenHistory() {
    SetTimer, RemoveTooltip, % -msgDisplayTime
    ; If !allowRecordHistory
    ;    EraseOpenedHistory()
+}
+
+focusImgSelArea() {
+   nImgSelX1 := min(imgSelX1, imgSelX2)
+   nImgSelY1 := min(imgSelY1, imgSelY2)
+   nImgSelX2 := max(imgSelX1, imgSelX2)
+   nImgSelY2 := max(imgSelY1, imgSelY2)
+
+   zImgSelX1 := prevDestPosX + Round(nImgSelX1*zoomLevel)
+   zImgSelY1 := prevDestPosY + Round(nImgSelY1*zoomLevel)
+   zImgSelX2 := prevDestPosX + Round(nImgSelX2*zoomLevel)
+   zImgSelY2 := prevDestPosY + Round(nImgSelY2*zoomLevel)
+   vPimgSelW := max(zImgSelX1, zImgSelX2) - min(zImgSelX1, zImgSelX2)
+   vPimgSelH := max(zImgSelY1, zImgSelY2) - min(zImgSelY1, zImgSelY2)
+   vpWinClientSize(mainWidth, mainHeight)
+   ; zpp := (zImgSelX2>5 && zImgSelX2<mainWidth - 5) || (zImgSelY2>5 && zImgSelY2<mainHeight - 5) ? 1 : 0
+   If (zImgSelX1<10 || zImgSelX1>mainWidth - 10)
+      IMGdecalageX += abs(zImgSelX1) + 200
+   If (zImgSelY1<10 || zImgSelY1>mainHeight)
+      IMGdecalageY += abs(zImgSelY1) + 200
+
+   dummyTimerDelayiedImageDisplay(50)
+   ; ToolTip, % selDotX "|" selDotY "`n" selDotAx "|" selDotAy "||`n" zImgSelX1 "|" zImgSelY1 "`n" zImgSelX2 "|" zImgSelY2 , , , 2
 }
 
 toggleLimitSelection() {
@@ -74839,28 +74937,6 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
        prevVPcachePos := "", prevVPcacheZoom := []
        Return r
     }
-/* 
-    Else if (whichBitmap && userimgQuality=1 && allowVPcacheOptimizations=1)
-    {
-       ; to-do todo use freeimage to rescale image in the viewport when high quality is activated;  define rect to resize, not the entire image [just like retrieveQPVscreenImgSection()]
-       lolBMP := QPV_ViewportResizeBitmap(gdiBitmap, newW, newH, 1)
-       Gdip_GraphicsClear(glPG)
-       trGdip_GetImageDimensions(lolBMP, imgW, imgH)
-       ; ToolTip, % sfPosX1 "/" sfPosY1 "`n" sfPosX2 "/" sfPosY2 "`n" imgW "/" imgH "`n" kW "/" kH "`n" sfW "/" sfH , , , 2
- 
-       lolBMP := applyVPeffectsOnBMP(lolBMP, 1)
-       setMainCanvasTransform(mainWidth, mainHeight)
-       tzGdip_DrawImage(glPG, lolBMP, DestPosX, DestPosY)
-       trGdip_DisposeImage(lolBMP)
- 
-       ; thisModus := (mustPlayAnim=0 && thisUSRimgQuality=0 && userimgQuality=1 && mustGoIntoLowQuality!=2) ? 2 : 1
-       drawHUDelements(1, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, viewportQPVimage.ImgFile)
-       Gdip_ResetWorldTransform(glPG)
-       whichWin := (imgEditPanelOpened=1 && AnyWindowOpen!=10) ? hGDIthumbsWin : hGDIwin
-       r2 := doLayeredWinUpdate(A_ThisFunc, whichWin, glHDC)
-       return
-    }
-*/
 
     ; calculate in viewport coords
     errMargin := (mustPlayAnim=1) ? 0 : 5
@@ -75619,6 +75695,7 @@ ToggleEditImgSelection(modus:=0) {
   If (r!=-1 && editingSelectionNow=1)
      recordSelUndoLevelNow()
 
+  ojk := editingSelectionNow
   editingSelectionNow := (modus="show-edit" && r!=-1) ? 1 : !editingSelectionNow
   If (AnyWindowOpen=12 || r=-1)
      EllipseSelectMode := 0
@@ -75630,9 +75707,9 @@ ToggleEditImgSelection(modus:=0) {
   If (ShowAdvToolbar=1 && lockToolbar2Win=1 && editingSelectionNow=1)
      DelayiedImageDisplay()
 
+  vpWinClientSize(mainWidth, mainHeight)
   If ((imgSelX2=-1 || ImgSelX2="C") && editingSelectionNow=1)
   {
-     vpWinClientSize(mainWidth, mainHeight)
      trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
      createDefaultSizedSelectionArea(prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, imgW, imgH, mainWidth, mainHeight)
      ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, imgW, imgH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
@@ -75646,7 +75723,8 @@ ToggleEditImgSelection(modus:=0) {
   If (modus="key" && editingSelectionNow=1)
      CreateTempGuiButton("Selection options,,invokeSelectionAreaMenu", 0, msgDisplayTime//1.5 + 500)
 
-  ; ToolTip, % prcSelX2 "|" prcSelY2 , , , 2
+  If (!ojk && editingSelectionNow=1 && isSelEntireOutside())
+     SetTimer, focusImgSelArea, -100
   SetTimer, MouseMoveResponder, -90
   SetTimer, dummyRefreshImgSelectionWindow, -25
   ; dummyTimerDelayiedImageDisplay(25)
