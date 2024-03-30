@@ -43,8 +43,9 @@ Deniere mise à jour: dimanche 24 mars 2024
 
    QPV v6.0 is the last major development push that I plan. This 
    version brings full support for images above 536 megapixels
-   (the limit of GDI+), through FreeImage, which includes image
-   editing tools that work with such images - via the "qpvmain.dll". 
+   (the limit of GDI+), through FreeImage. Most of the image
+   editing tools will work with such images - through my own DLL:
+   "qpvmain.dll". 
 
 
 a) How Quick Picto Viewer initializes
