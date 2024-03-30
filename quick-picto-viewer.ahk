@@ -953,7 +953,9 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     } Else If (givenKey="w")
     {
         ; w - to-do
-        If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1 && thumbsDisplaying!=1)
+        If (isImgEditingNow()=1 && drawingShapeNow=1)
+           func2Call := ["focusVectorEndPoint"]
+        Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1 && thumbsDisplaying!=1)
            func2Call := ["flipSelectionWH"]
         Else If (thumbsDisplaying=1 && maxFilesIndex>10 && CurrentSLD && !z)
            func2Call := ["invokeFilesListMapNow"]
@@ -1207,14 +1209,14 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        allowLoop := 1 
        If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
           func2Call := ["MenuDecBrushSize"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow()=1)
           func2Call := ["MenuChangeDecBright"]
     } Else If (givenKey="RBRACKET")
     {
        allowLoop := 1 
        If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
           func2Call := ["MenuIncBrushSize"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow()=1)
           func2Call := ["MenuChangeIncBright"]
     } Else If (givenKey="+LBRACKET")
     {
@@ -1260,7 +1262,9 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
           func2Call := ["MenuChangeDecGamma"]
     } Else If (givenKey="BSLASH")
     {
-       If (HKifs("liveEdit") && (AnyWindowOpen=10 || AnyWindowOpen=74))
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["ResetImageView"]
+       Else If (HKifs("liveEdit") && (AnyWindowOpen=10 || AnyWindowOpen=74))
           func2Call := ["BtnToggleNoColorsFX"]
        Else If ((HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && vpIMGrotation!=0)
           func2Call := ["MenuResetVProtation"]
@@ -1268,13 +1272,18 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
           func2Call := ["ResetImageView"]
     } Else If (givenKey="^BSLASH")
     {
-       If (HKifs("liveEdit") && AnyWindowOpen=10)
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+          func2Call := ["HardResetImageView"]
+       Else If (HKifs("liveEdit") && AnyWindowOpen=10)
           func2Call := ["btnResetImageView"]
        Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
           func2Call := ["HardResetImageView"]
     } Else If (givenKey="+BSLASH")
     {
-       If HKifs("liveEdit")
+       If (isImgEditingNow()=1 && drawingShapeNow=1)
+       {
+          func2Call := ["toggleColorAdjustments"]
+       } Else If HKifs("liveEdit")
        {
           If (innerSelectionCavityX>0 && innerSelectionCavityY>0)
              func2Call := ["resetSelectionAreaCavity"]
@@ -12590,12 +12599,10 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
           If (TextInAreaCutOutMode=1 && TextInAreaPaintBgr=1 && TextInAreaBgrUnified!=1)
           {
              QPV_SetColorAlphaChannel(thisBMP, bgrColor, 1)
-             thisOpacity := 1
           } Else
           {
              thisColor := (TextInAreaOnlyBorder=1 && TextInAreaBorderOut>1) ? borderColor : txtColor
              QPV_SetColorAlphaChannel(thisBMP, thisColor, 0)
-             thisOpacity := 1
           }
        }
 
@@ -12637,7 +12644,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
              QPV_BoxBlurBitmap(pBitmapContours, thisBorderBlur, thisBorderBlur, 0)
 
           QPV_SetColorAlphaChannel(pBitmapContours, borderColor, 0)
-          trGdip_DrawImage(A_ThisFunc, G, pBitmapContours, thisX, thisY, forceW, imgH,,,,, thisOpacity)
+          trGdip_DrawImage(A_ThisFunc, G, pBitmapContours, thisX, thisY, forceW, imgH)
           pBitmapContours := trGdip_DisposeImage(pBitmapContours, 1)
        }
 
@@ -12646,7 +12653,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
        minedX := min(thisX, minedX)
        minedY := min(thisY, minedY)
        If (isOkay && lineVisible=1 && validBMP(thisBMP))
-          drawFail := trGdip_DrawImage(A_ThisFunc, G, thisBMP, thisX, thisY, forceW, imgH,,,,, thisOpacity)
+          drawFail := trGdip_DrawImage(A_ThisFunc, G, thisBMP, thisX, thisY, forceW, imgH)
 
        If (TextInAreaValign!=3)
           thisY += imgH + lnSpace
@@ -12729,6 +12736,178 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
     obju := [mainBMP, minedX, minedY, maxedW, maxedH, scaleuPreview, skippedLines]
     fnOutputDebug(A_ThisFunc "(): text rendered in: " A_TickCount - startZeit)
     Return obju
+}
+
+coreInsertTextHugeImages(theString, maxW, maxH) {
+    Static OBJ_FONT := 6, testString := "This is going to be a test"
+    startZeit := A_TickCount
+    theString := applyTextTransform(theString, TextInAreaCaseTransform)
+    txtColor := makeRGBAcolor(TextInAreaFontColor, TextInAreaFontOpacity)
+    bgrColor := makeRGBAcolor(TextInAreaBgrColor, TextInAreaBgrOpacity)
+    borderColor := makeRGBAcolor(TextInAreaBorderColor, TextInAreaBorderOpacity)
+
+    fntQuality := 4
+    thisLineAngle := 0
+    thisFactor := scaleuPreview := scaleuBlrPreview := 1
+    fntWeight := (TextInAreaFontBold=1) ? 800 : 400
+    hFont := Gdi_CreateFontByName(TextInAreaFontName, TextInAreaFontSize, fntWeight, TextInAreaFontItalic, TextInAreaFontStrike, TextInAreaFontUline, fntQuality, thisLineAngle)
+    If (Gdi_GetObjectType(hFont)!="FONT")
+       Return "fail"
+
+    hFontPreview := (thisFactor=1) ? Gdi_CloneFont(hFont) : Gdi_CreateFontByName(TextInAreaFontName, TextInAreaFontSize//thisFactor, fntWeight, TextInAreaFontItalic, TextInAreaFontStrike, TextInAreaFontUline, fntQuality, thisLineAngle)
+    thisBlurAmount := max(TextInAreaBlurAmount, TextInAreaBlurBorderAmount) // 2
+    obs := borderSize := (TextInAreaUsrMarginz>0) ? TextInAreaUsrMarginz : TextInAreaBorderSize//2 + thisBlurAmount
+    Gdi_MeasureString(hFont, testString, 1, testWa, testHa)
+    Gdi_MeasureString(hFontPreview, testString, 1, testWb, testHb)
+    lnSpace := TextInAreaFontLineSpacing
+    theString := StrReplace(theString, "`n`n", "`n┘")
+    thisLnHeight := testHa + TextInAreaFontLineSpacing
+    If (TextInAreaAutoWrap=1)
+       theString := Trimmer(HardWrapTextFontBased(theString, hFont, maxW - borderSize * 2, maxH + 2, thisLnHeight, TextInAreaValign))
+    Else
+       theString := Trimmer(theString)
+
+    maxW := Round(maxW / scaleuPreview)
+    maxH := Round(maxH / scaleuPreview)
+    ; ToolTip, % thisFactor "==" scaleuPreview "|" maxW "|" maxH , , , 2
+    ; ToolTip, % testWa "==" testHa "`n" testWb "==" testHb "`n" testWa/testWb , , , 2
+    thisBlur := Round(TextInAreaBlurAmount * scaleuBlrPreview)
+    doEffect := (thisBlur>0 && TextInAreaDoBlurs=1 && !isWinXP) ? 1 : 0
+    ; ToolTip, % thisBlur "`n" scaleuBlrPreview "`n" scaleuPreview , , , 2
+    thisBorderBlur := Round(TextInAreaBlurBorderAmount * scaleuBlrPreview)
+    zBrush := Gdip_BrushCreateSolid(bgrColor)
+    If (TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1 && doEffect)
+    {
+       o_txtColor := txtColor
+       txtColor := "0xFFffFFff"
+    }
+
+    thisY := (TextInAreaValign=3) ? maxH : 0
+    rendered := thisX := maxedW := maxedH := 0
+    minedX := maxW, minedY := maxH
+    doConturDraw := (TextInAreaBorderSize>0 && TextInAreaBorderOut>1) ? 1 : 0
+    rescaleWidthCharSpacing := (TextInAreaCharSpacing<0) ? (100 - Abs(TextInAreaCharSpacing))/90 : 1
+    thisHFont := hFont
+    textArray := StrSplit(theString, "`n")
+    totalLinez := textArray.Count()
+    cachedRawTXTbmps := []
+    Loop, % totalLinez
+    {
+       thisuString := (TextInAreaValign=3) ? textArray[totalLinez - A_Index + 1] : textArray[A_Index]
+       If !Trimmer(thisuString)
+          Continue
+
+       thisuString := StrReplace(thisuString, "┘", " `n")
+       fnOutputDebug("render txt line=" A_Index " | visible= " lineVisible)
+       objBMPs := Gdi_DrawTextInBox(srr, thisHFont, "FFffFF", "000000", borderSize, scaleuPreview, TextInAreaFlipH, TextInAreaFlipV, TextInAreaCharSpacing, TextInAreaLineAngle, TextInAreaOnlyBorder, TextInAreaBorderOut, TextInAreaBorderSize)
+       If validBMP(objBMPs[1])
+          trGdip_GetImageDimensions(objBMPs[1], imgW, imgH)
+       Else
+          trGdip_GetImageDimensions(objBMPs[2], imgW, imgH)
+
+       pBitmap := (doConturDraw=1 && TextInAreaOnlyBorder=1 && validBMP(objBMPs[2])) ? objBMPs[2] : objBMPs[1]
+       If (doConturDraw=1 && validBMP(objBMPs[1]) && TextInAreaOnlyBorder=1 && pBitmap!=objBMPs[1])
+          trGdip_DisposeImage(objBMPs[1])
+
+       thisBMP := pBitmap
+       pBitmapContours := objBMPs[2]
+       If (imgW>maxW && validBMP(thisBMP))
+       {
+          thisBMP := resizeBitmapToGivenRef(thisBMP, 0, maxW, imgH, 5, 1)
+          trGdip_GetImageDimensions(thisBMP, imgW, imgH)
+          If validBMP(pBitmapContours)
+             pBitmapContours := resizeBitmapToGivenRef(pBitmapContours, 0, maxW, imgH, 5, 1)
+       }
+
+       If !validBMP(thisBMP)
+       {
+          fnOutputDebug(A_ThisFunc "(): an error occured rendering txt line=" A_Index)
+       } Else
+       {
+          If (doEffect && (TextInAreaBgrUnified!=1 || TextInAreaPaintBgr!=1))
+             QPV_BoxBlurBitmap(thisBMP, thisBlur, thisBlur, 0)
+          Gdip_BitmapConvertFormat(thisBMP, 0xE200B, 2, 1, 0, 0, 0, 0, 0)
+          ; fnOutputDebug(Gdip_GetImagePixelFormat(pBitmap, 3))
+          If (TextInAreaCutOutMode=1 && TextInAreaPaintBgr=1 && TextInAreaBgrUnified!=1)
+          {
+             QPV_SetColorAlphaChannel(thisBMP, bgrColor, 1)
+          } Else
+          {
+             thisColor := (TextInAreaOnlyBorder=1 && TextInAreaBorderOut>1) ? borderColor : txtColor
+             QPV_SetColorAlphaChannel(thisBMP, thisColor, 0)
+          }
+       }
+
+       forceW := (imgW>maxW) ? maxW : imgW
+       thisXbonus := (imgW>maxW) ? imgW - maxW : 0
+       If (rescaleWidthCharSpacing<1)
+       {
+          phorceW := Round(forceW*rescaleWidthCharSpacing)
+          forceW -= (forceW - phorceW)//2.5
+       }
+
+       If (TextInAreaAlign=2)
+          thisX := Round(maxW/2 - imgW/2 + thisXbonus/2)
+       Else If (TextInAreaAlign=3)
+          thisX := maxW - imgW + thisXbonus
+
+       If (TextInAreaValign=3)
+          thisY := thisY - imgH - lnSpace
+
+       isOkay := (thisuString=" `n" && TextInAreaPaintBgr=1 && TextInAreaBgrEntire=0 && TextInAreaBgrUnified=0) ? 0 : 1
+       If (doConturDraw=1 && TextInAreaOnlyBorder!=1 && validBMP(pBitmapContours))
+       {
+          Gdip_BitmapConvertFormat(pBitmapContours, 0xE200B, 2, 1, 0, 0, 0, 0, 0)
+          If (thisBorderBlur>0 && TextInAreaDoBlurs=1 && !isWinXP)
+             QPV_BoxBlurBitmap(pBitmapContours, thisBorderBlur, thisBorderBlur, 0)
+
+          QPV_SetColorAlphaChannel(pBitmapContours, borderColor, 0)
+       }
+
+       maxedW := max(forceW, maxedW)
+       maxedH := max(thisY + imgH, maxedH)
+       minedX := min(thisX, minedX)
+       minedY := min(thisY, minedY)
+       If (validBMP(thisBMP) || validBMP(pBitmapContours))
+       {
+          rendered++
+          cachedRawTXTbmps[rendered] := [thisBMP, pBitmapContours, thisX, thisY, forceW, imgH]
+       }
+
+       If (TextInAreaValign!=3)
+          thisY += imgH + lnSpace
+
+       ; fnOutputDebug("line #/Y:" A_Index "|" thisY "|" maxH "|" thisuString)
+       If (drawFail="fail")
+       {
+          fattalErr := 1
+          Break
+       }
+
+       ; fnOutputDebug("thisY=" thisY "|| " (cropH + cropY)*scaleuPreview "||" maxH)
+       If (thisY>maxH && TextInAreaValign!=3 || thisY<0 && TextInAreaValign=3)
+       {
+          fnOutputDebug("text outside selection boundaries: " thisY "||" maxH)
+          Break
+       }
+    }
+
+    If (fattalErr=1)
+       warnUserFatalBitmapError("no-gdip", A_ThisFunc)
+
+    Gdi_DeleteObject(hFont)
+    Gdi_DeleteObject(hFontPreview)
+    minedX := clampInRange(minedX, 0, maxW)
+    minedY := clampInRange(minedY, 0, maxH)
+    maxedW := clampInRange(maxedW, 1, maxW)
+    maxedH := clampInRange(maxedH, 1, maxH)
+    If (TextInAreaValign=3)
+       maxedH := clampInRange(maxedH - minedY, 1, maxH)
+
+    Gdip_DeleteBrush(zBrush)
+    cachedRawTXTbmps["a"] := [rendered, minedX, minedY, maxedW, maxedH]
+    fnOutputDebug(A_ThisFunc "(): text rendered in: " A_TickCount - startZeit)
+    Return cachedRawTXTbmps
 }
 
 drawHistogram(dataArray, graphFocus, Scale, fgrColor, bgrColor, borderSize, infoBoxBMP) {
@@ -14752,7 +14931,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
        BlurAmount := (testSelectOutsideImgEntirely(useGdiBitmap()) || viewportQPVimage.imgHandle) ? 0 : blr[PasteInPlaceGlassy]
        If (previewMode=1)
        {
-          MouseCoords2Image(imgSelPx, imgSelPx, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX1, kY1)
+          MouseCoords2Image(imgSelPx, imgSelPy, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX1, kY1)
           MouseCoords2Image(imgSelPx + ResizedW, imgSelPy + ResizedH, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX2, kY2)
           kimgSelW := max(kX1, kX2) - min(kX1, kX2)
           kimgSelH := max(kY1, kY2) - min(kY1, kY2)
@@ -19275,7 +19454,7 @@ HugeImagesFlipHVinvert(modus) {
       isOkay := (EllipseSelectMode>0 || VPselRotation!=0 || innerSelectionCavityX!=0 || innerSelectionCavityY!=0)
       If ((bpp=24 || bpp=32) && isOkay=1)
       {
-         HugeImagesApplyDesaturateFillSelArea("invert colors")
+         HugeImagesApplyGenericFilters("invert colors")
          Return
       }
 
@@ -19673,6 +19852,89 @@ HugeImagesApplyAutoColors() {
       ResetImgLoadStatus()
 }
 
+HugeImagesApplyInsertText() {
+      If warnHugeImageNotFIM()
+         Return
+
+      If (editingSelectionNow=1)
+      {
+         If throwErrorSelectionOutsideBounds()
+            Return "out-bounds"
+      }
+
+      hFIFimgX := viewportQPVimage.imgHandle
+      bpp := FreeImage_GetBPP(hFIFimgX)
+      If warnIncorrectColorDepthHugeImage(bpp, 1)
+         Return
+
+      trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+      showTOOLtip("Applying insert text, please wait...")
+      setImageLoading()
+      obju := InitHugeImgSelPath(0, imgW, imgH)
+      pBitsAll := FreeImage_GetBits(hFIFimgX)
+      Stride := FreeImage_GetStride(hFIFimgX)
+
+      recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
+      QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
+      textLinezObj := coreInsertTextHugeImages(UserTextArea, obju.bImgSelW, obju.bImgSelH)
+      linesz := textLinezObj["a", 1]
+      Loop, % linesz
+      {
+         txtBitmap := textLinezObj[A_Index, 1]
+         If validBMP(txtBitmap)
+         {
+            Gdip_GetImageDimensions(txtBitmap, mw, mh)
+            mx := textLinezObj[A_Index, 3],    my := textLinezObj[A_Index, 4]
+            EZ := Gdip_LockBits(txtBitmap, 0, 0, mw, mh, mStride, mScan, mData, 1)
+            If !EZ
+            {
+               r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisOpacity, userimgGammaCorrect, "int", blending, "int", BlendModesFlipped, "UPtr", mScan, "int", mStride, "int", 32, "int", mx, "int", my, "int", mw, "int", mh)
+               Gdip_UnlockBits(txtBitmap, mData)
+               trGdip_DisposeImage(txtBitmap)
+            }
+         }
+
+         txtBitmap := textLinezObj[A_Index, 2]
+         If validBMP(txtBitmap)
+         {
+            Gdip_GetImageDimensions(txtBitmap, mw, mh)
+            mx := textLinezObj[A_Index, 3],    my := textLinezObj[A_Index, 4]
+            EZ := Gdip_LockBits(txtBitmap, 0, 0, mw, mh, mStride, mScan, mData, 1)
+            If !EZ
+            {
+               r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisOpacity, userimgGammaCorrect, "int", blending, "int", BlendModesFlipped, "UPtr", mScan, "int", mStride, "int", 32, "int", mx, "int", my, "int", mw, "int", mh)
+               Gdip_UnlockBits(txtBitmap, mData)
+               trGdip_DisposeImage(txtBitmap)
+            }
+         }
+      }
+
+      DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+      If (editingSelectionNow=1 && validBMP(obju.alphaMaskGray))
+      {
+         trGdip_DisposeImage(obju.alphaMaskGray)
+         Gdip_UnlockBits(obju.alphaMaskGray, mData)
+      }
+
+      If r 
+      {
+         killQPVscreenImgSection()
+         currentImgModified := 1
+         imgIndexEditing := currentFileIndex
+         viewportQPVimage.actions := Round(viewportQPVimage.actions + 1)
+         dummyTimerDelayiedImageDisplay(500)
+         SoundBeep, 900, 100
+         RemoveTooltip()
+      } Else
+      {
+         recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
+         showTOOLtip("ERROR: Failed to auto-adjust the image colors")
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+      }
+      ResetImgLoadStatus()
+}
+
 terminatePasteInPlace() {
    corePasteInPlaceActNow("kill")
    coreFillSelectedArea("kill")
@@ -19830,7 +20092,7 @@ HugeImagesApplyPasteInPlace() {
          imgSelX1 := oldSelectionArea[1],            imgSelX2 := oldSelectionArea[3]
          imgSelY1 := oldSelectionArea[2],            imgSelY2 := oldSelectionArea[4]
          defineRelativeSelCoords(imgW, imgH)
-         r := HugeImagesApplyDesaturateFillSelArea("erase initially selected area", 0, 0, 0)
+         r := HugeImagesApplyGenericFilters("erase initially selected area", 0, 0, 0)
          DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
       }
 
@@ -19853,9 +20115,9 @@ HugeImagesApplyPasteInPlace() {
          VPselRotation := 0
 
       If (PasteInPlaceToolMode=1)
-         r := HugeImagesApplyDesaturateFillSelArea(friendly, 1, hFIFimgA, 0)
+         r := HugeImagesApplyGenericFilters(friendly, 1, hFIFimgA, 0)
       Else
-         r := HugeImagesApplyDesaturateFillSelArea(friendly, 1, hFIFimgA, 0)
+         r := HugeImagesApplyGenericFilters(friendly, 1, hFIFimgA, 0)
 
       terminatePasteInPlace()
       If (!(PasteInPlaceCropSel=1 || PasteInPlaceCropSel=3) && PasteInPlaceCropDo=1)
@@ -19878,7 +20140,7 @@ HugeImagesApplyCLRfxPasteInPlace(hFIFimgA, friendly) {
    Return r
 }
 
-HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=1) {
+HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=1) {
       If warnHugeImageNotFIM()
          Return
 
@@ -20226,7 +20488,7 @@ HugeImagesApplyDesaturateFillSelArea(modus, allowRecord:=1, hFIFimgExtern:=0, wa
 
       ResetImgLoadStatus()
       Return r
-} ; // HugeImagesApplyDesaturateFillSelArea()
+} ; // HugeImagesApplyGenericFilters()
 
 HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=0, allowUndo:=1) {
    If warnHugeImageNotFIM()
@@ -48529,7 +48791,7 @@ BtnAddNoiseNow() {
    updateUIaddNoisePanel("no")
    CloseWindow()
    If (viewportQPVimage.imgHandle)
-      HugeImagesApplyDesaturateFillSelArea("noise filter")
+      HugeImagesApplyGenericFilters("noise filter")
    Else
       addNoiseSelectedArea()
 }
@@ -50654,7 +50916,7 @@ BtnEraseSelectedArea() {
    prevImgEditZeit := A_TickCount
    ToggleEditImgSelection("show-edit")
    If (viewportQPVimage.imgHandle)
-      HugeImagesApplyDesaturateFillSelArea("erase selected area")
+      HugeImagesApplyGenericFilters("erase selected area")
    Else
       EraseSelectedArea()
    prevImgEditZeit := A_TickCount
@@ -51267,7 +51529,7 @@ BtnGraySelectedArea() {
  
    ToggleEditImgSelection("show-edit")
    If (viewportQPVimage.imgHandle)
-      HugeImagesApplyDesaturateFillSelArea("grayscale filter")
+      HugeImagesApplyGenericFilters("grayscale filter")
    Else
       GraySelectedArea()
    prevImgEditZeit := A_TickCount
@@ -51357,7 +51619,7 @@ BtnAdjustColorsSimpleImgSelArea() {
 
    ToggleEditImgSelection("show-edit")
    If (viewportQPVimage.imgHandle)
-      HugeImagesApplyDesaturateFillSelArea("color filters")
+      HugeImagesApplyGenericFilters("color filters")
    Else
       AdjustColorsSimpleSelectedArea()
 
@@ -51382,7 +51644,7 @@ BtnPixelizeSelectedArea() {
    BtnCloseWindow()
    If (viewportQPVimage.imgHandle)
    {
-      HugeImagesApplyDesaturateFillSelArea("pixelize")
+      HugeImagesApplyGenericFilters("pixelize")
       Return
    }
 
@@ -51679,7 +51941,7 @@ BtnFillSelectedArea() {
     modus := (FillAreaDoBehind=1) ? " behind " : A_Space
     ToggleEditImgSelection("show-edit")
     If (viewportQPVimage.imgHandle)
-       HugeImagesApplyDesaturateFillSelArea("fill" modus "selected area")
+       HugeImagesApplyGenericFilters("fill" modus "selected area")
     Else
        FillSelectedArea()
     prevImgEditZeit := A_TickCount
@@ -59340,6 +59602,7 @@ createMenuSelectionArea(modus:=0) {
       If (showSelectionGrid=1)
          kMenu("PVselv", "Check", "Sho&w grid",,, " (selection area)")
    }
+
    If (infoImgEditingNow=1)
       kMenu("PVselv", "Add", "Selection properties`tAlt+E", "PanelIMGselProperties")
 
@@ -59513,6 +59776,7 @@ InvokeMenuBarVectorView(manuID, modus:=0) {
    kMenu("pvMenuBarView", "Add", "Colors F&X and display modes", ":PVimgColorsFX")
    kMenu("pvMenuBarView", "Add", "Reset vie&wport adjustments`t\", "ResetImageView", "image")
    Menu, pvMenuBarView, Add
+   kMenu("pvMenuBarView", "Add", "Focus end point/first selected`tW", "focusVectorEndPoint")
    kMenu("pvMenuBarView", "Add/Uncheck", "Show viewport &grid`tG", "toggleViewPortGridu")
    kMenu("pvMenuBarView", "Add/Uncheck", "Fi&xed grid size", "toggleGridFixedSize")
    If (vpGridFixedSize=1)
@@ -59977,6 +60241,8 @@ InvokeMenuBarEditorSelection(manuID) {
          kMenu("PVselv", "Check", "&Limit selection to image area`tL")
 
       kMenu("PVselv", "Add", "&Reset selection area", "newImgSelection")
+      If isSelEntireOutside()
+         kMenu("PVselv", "Add", "Focus selection area", "focusImgSelArea", "find viewport", " (selection area)")
       kMenu("PVselv", "Add/Uncheck", "Sho&w grid", "ToggleSelectGrid",, " (selection area)")
       If (showSelectionGrid=1)
          kMenu("PVselv", "Check", "Sho&w grid",,, " (selection area)")
@@ -60063,7 +60329,11 @@ InvokeMenuBarSelection(manuID) {
          createMenuSelectionAlign()
          If (innerSelectionCavityX>0 && innerSelectionCavityY>0)
             kMenu("pvMenuBarSelection", "Add", "R&eset exclude area`tShift+\", "resetSelectionAreaCavity")
+
          kMenu("pvMenuBarSelection", "Add", "&Drop and reset`tCtrl+D", "resetImgSelection", "hide")
+         If isSelEntireOutside()
+            kMenu("pvMenuBarSelection", "Add", "Focus selection area", "focusImgSelArea", "find viewport", " (selection area)")
+
          kMenu("pvMenuBarSelection", "Add/Uncheck", "Limit to image bo&undaries`tL", "toggleLimitSelection")
          kMenu("pvMenuBarSelection", "Add", "Flip width / &height`tW", "flipSelectionWH")
          If (LimitSelectBoundsImg=1)
@@ -62159,6 +62429,9 @@ createMenuLiveEditSelectionArea(isToolGood, isWinCustomShapeFriendly) {
    kMenu("PVselv", "Add", "&Select all`tCtrl+A", "selectEntireImage",, " (image canvas)")
    If (innerSelectionCavityX>0 && innerSelectionCavityY>0)
       kMenu("PVselv", "Add", "R&eset exclude area`tShift+\", "resetSelectionAreaCavity")
+
+   If isSelEntireOutside()
+      kMenu("PVselv", "Add", "Focus selection area", "focusImgSelArea", "find viewport", " (selection area)")
 
    kMenu("PVselv", "Add", "&Flip selection area W/H`tW", "flipSelectionWH")
    kMenu("PVselv", "Add/Uncheck", "&Limit selection to image area`tL", "toggleLimitSelection")
@@ -64903,33 +65176,76 @@ ToggleRecordOpenHistory() {
    allowRecordHistory := !allowRecordHistory
    INIaction(1, "allowRecordHistory", "General")
    friendly := (allowRecordHistory=1) ? "ACTIVATED" : "DEACTIVATED"
-   showTOOLtip("Keep history of opened files and folders: " friendly, A_ThisFunc, 1)
+   showTOOLtip("Record history of opened files and folders: " friendly, A_ThisFunc, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
    ; If !allowRecordHistory
    ;    EraseOpenedHistory()
 }
 
-focusImgSelArea() {
+focusVectorEndPoint() {
+   zn := 0
+   getVPcoordsVectorPoint(customShapePoints.Count(), kx, ky)
+   p := focusImgSelArea(kx - prevDestPosX, ky - prevDestPosY, "yes", 1)
+   If (!p && customShapeHasSelectedPoints=1)
+   {
+      Loop, % customShapePoints.Count()
+      {
+         If (customShapePropPoints[A_Index, 1]=1)
+         {
+            zn := A_Index
+            Break
+         }
+      }
+
+      If zn 
+      {
+         getVPcoordsVectorPoint(zn, kx, ky)
+         focusImgSelArea(kx - prevDestPosX, ky - prevDestPosY, "yes", 1)
+      }
+   }
+}
+
+focusImgSelArea(zx:=0, zy:=0, isGiven:=0, doCenter:=0) {
    nImgSelX1 := min(imgSelX1, imgSelX2)
    nImgSelY1 := min(imgSelY1, imgSelY2)
-   nImgSelX2 := max(imgSelX1, imgSelX2)
-   nImgSelY2 := max(imgSelY1, imgSelY2)
+   gX := Round(nImgSelX1*zoomLevel)
+   gY := Round(nImgSelY1*zoomLevel)
 
    zImgSelX1 := prevDestPosX + Round(nImgSelX1*zoomLevel)
    zImgSelY1 := prevDestPosY + Round(nImgSelY1*zoomLevel)
-   zImgSelX2 := prevDestPosX + Round(nImgSelX2*zoomLevel)
-   zImgSelY2 := prevDestPosY + Round(nImgSelY2*zoomLevel)
-   vPimgSelW := max(zImgSelX1, zImgSelX2) - min(zImgSelX1, zImgSelX2)
-   vPimgSelH := max(zImgSelY1, zImgSelY2) - min(zImgSelY1, zImgSelY2)
-   vpWinClientSize(mainWidth, mainHeight)
-   ; zpp := (zImgSelX2>5 && zImgSelX2<mainWidth - 5) || (zImgSelY2>5 && zImgSelY2<mainHeight - 5) ? 1 : 0
-   If (zImgSelX1<10 || zImgSelX1>mainWidth - 10)
-      IMGdecalageX += abs(zImgSelX1) + 200
-   If (zImgSelY1<10 || zImgSelY1>mainHeight)
-      IMGdecalageY += abs(zImgSelY1) + 200
+   If (isGiven="yes")
+   {
+      gX := zx
+      gY := zy
+      zImgSelX1 := prevDestPosX + zx
+      zImgSelY1 := prevDestPosY + zy
+   }
 
+   vpWinClientSize(mainWidth, mainHeight)
+   cX := (doCenter=1) ? mainWidth//2 : 150
+   cY := (doCenter=1) ? mainHeight//2 : 150
+   If (zImgSelX1<10 || zImgSelX1>mainWidth - 10)
+   {
+      hasu := 1
+      IMGdecalageX := -(gX - cX)
+   }
+
+   If (zImgSelY1<10 || zImgSelY1>mainHeight)
+   {
+      hasu := 1
+      IMGdecalageY := -(gY - cY)
+   }
+
+   If (forced=1)
+   {
+      IMGdecalageX := -(gX - cX)
+      IMGdecalageY := -(gY - cY)
+   }
+   ; ToolTip, % gX "|" gY "|" zImgSelX1 "|" zImgSelY1 "|" imageAligned "|" tX "|" tY , , , 2
+   ; ToolTip, % IMGdecalageX "|" IMGdecalageY "|" imageAligned "|" tX "|" tY "`n" prevDestPosX "|" prevDestPosY "|" prevResizedVPimgW "|" prevResizedVPimgH  , , , 2
    dummyTimerDelayiedImageDisplay(50)
    ; ToolTip, % selDotX "|" selDotY "`n" selDotAx "|" selDotAy "||`n" zImgSelX1 "|" zImgSelY1 "`n" zImgSelX2 "|" zImgSelY2 , , , 2
+   Return hasu
 }
 
 toggleLimitSelection() {
@@ -72749,8 +73065,10 @@ drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHei
           If (KeyPoint=1)
              Gdip_FillEllipse(Gu, pBrushZ, vObj[3] - SelDotsSize//4, vObj[4] - SelDotsSize//4, SelDotsSize//2, SelDotsSize//2)
           Else If (KeyPoint=totalz)
-             Gdip_DrawEllipse(Gu, pPen6, vObj[3] - SelDotsSize//4, vObj[4] - SelDotsSize//4, SelDotsSize//2, SelDotsSize//2)
-          Else If (KeyPoint=symPoint && canDoSymmetry)
+          {
+             Gdip_FillEllipse(Gu, pBrushE, vObj[3] - SelDotsSize//4, vObj[4] - SelDotsSize//4, SelDotsSize//2, SelDotsSize//2)
+             Gdip_DrawEllipse(Gu, pPen6, tx, ty, sl, sl) 
+          } Else If (KeyPoint=symPoint && canDoSymmetry)
              Gdip_DrawEllipse(Gu, pPen3, vObj[3] - SelDotsSize//4, vObj[4] - SelDotsSize//4, SelDotsSize//2, SelDotsSize//2)
        }
    }
@@ -72775,7 +73093,7 @@ drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHei
    ctrlState := GetKeyState("Ctrl", "P")
    altState := GetKeyState("Alt", "P")
    shiftState := GetKeyState("Shift", "P")
-   If (mousePoint[1]=0 && totalz>0 && vpImgPanningNow=0 && customShapeHasSelectedPoints=0 && ctrlState=0 && altState=0 && vectorToolModus<3)
+   If (mousePoint[1]=0 && totalz>0 && vpImgPanningNow=0 && ctrlState=0 && altState=0 && vectorToolModus<3)
    {
       ; draw the new line and handle snapping new points to angles
       tx := gmx, ty := gmy
@@ -74084,7 +74402,7 @@ createPathVectorCustomShape(ImgSelPath, ByRef PointsList, tension, isClosed, isB
 }
 
 InitHugeImgSelPath(advancedMode, imgW, imgH, shapeu:=0, angle:=0, keepBounds:=0) {
-; this function should probably deleted, it is the husk of createBitmapSelPath()
+; this function should probably be deleted, it is the husk of createBitmapSelPath()
 ; to-do ; delete this ; check dependencies
 
    obju := []
@@ -78178,6 +78496,114 @@ calcIMGcoordsInVP(mainWidth, mainHeight, newW, newH, zL, oIMGdecX, oIMGdecY, ByR
        Return
     }
 
+    o_mW := mainWidth
+    o_mH := mainHeight
+    If (allowFreeIMGpanning=1 && IMGresizingMode=4)
+       mainWidth := mainHeight := 1
+
+    imgDecLX := LX := mainWidth - newW
+    imgDecLY := LY := mainHeight - newH
+    ; vpCenterX := 1, vpCenterY := 1
+    CX := mainWidth/2 - newW/2
+    CY := mainHeight/2 - newH/2
+    If ((imageAligned=1) || (allowFreeIMGpanning=1 && IMGresizingMode=4) && thumbsDisplaying=0)
+    {
+       DestPosX := DestPosY := 0
+    } Else If (imageAligned=5)
+    {
+       DestPosX := DestPosY := 0
+       If (newW<o_mW)
+          DestPosX := CX
+       If (newH<o_mH)
+          DestPosY := CY
+    } 
+
+    If ((IMGlargerViewPort!=1 && allowFreeIMGpanning=0) || (IMGresizingMode!=4 && allowFreeIMGpanning=1) || (PrintPosX="X" && allowFreeIMGpanning=1))
+    {
+       IMGdecX := IMGdecY := 1
+       ; SoundBeep 900, 1000
+    } Else If (IMGresizingMode=4 && thumbsDisplaying!=1)
+    {
+       If (allowFreeIMGpanning=1 && imageAligned=5 && PrintPosX="C")
+          prevCX := prevCY := 0.5
+
+       If (prevZoom!=zL)
+       {
+          If prevCX
+             IMGdecX := -1 * (newW * prevCX) + o_mW//2
+          Else
+             IMGdecX := oIMGdecX
+
+          If prevCY
+             IMGdecY := -1 * (newH * prevCY) + o_mH//2
+          Else
+             IMGdecY := oIMGdecY
+
+          If (isInRange(prevDestPosX, -10, 10) && allowFreeIMGpanning=1 && imageAligned=1)
+          || (IMGdecX>0 && oIMGdecX<0 && allowFreeIMGpanning=1 && imageAligned=1)
+             IMGdecX := 0
+
+          If (isInRange(prevDestPosY, -10, 10) && allowFreeIMGpanning=1 && imageAligned=1)
+          || (IMGdecY>0 && oIMGdecY<0 && allowFreeIMGpanning=1 && imageAligned=1)
+             IMGdecY := 0
+
+          prevZoom := zL
+       } Else
+       {
+          IMGdecX := oIMGdecX
+          IMGdecY := oIMGdecY
+       }
+
+       If (IMGdecalageX<LX && newW>mainWidth)
+          IMGdecX := LX
+       If (IMGdecalageY<LY && newH>mainHeight)
+          IMGdecY := LY
+
+       minTopCornerX := (allowFreeIMGpanning=1) ? o_mW : 0
+       minTopCornerY := (allowFreeIMGpanning=1) ? o_mH : 0
+       If (newW - 2 > mainWidth)
+          DestPosX := DestPosX + IMGdecX
+       Else
+          IMGdecX := minTopCornerX
+
+       If (newH - 2 > mainHeight)
+          DestPosY := DestPosY + IMGdecY
+       Else
+          IMGdecY := minTopCornerY
+
+       If (DestPosX>minTopCornerX && newW>mainWidth)
+          IMGdecX := DestPosX := minTopCornerX
+
+       If (DestPosY>minTopCornerY && newH>mainHeight)
+          IMGdecY := DestPosY := minTopCornerY
+
+       ; ToolTip, % IMGdecX "|" IMGdecY "`n" LX//2 "|" LY//2 , , , 2
+    }
+
+    DestPosX := Round(DestPosX)
+    IMGdecX := Round(IMGdecX)
+    DestPosY := Round(DestPosY)
+    IMGdecY := Round(IMGdecY)
+
+    prevCX := (DestPosX<0) ? abs(DestPosX) + o_mW/2 : -1*(DestPosX - o_mW/2)
+    prevCY := (DestPosY<0) ? abs(DestPosY) + o_mH/2 : -1*(DestPosY - o_mH/2)
+    prevCX := Round(prevCX/newW, 8)
+    prevCY := Round(prevCY/newH, 8)
+    If (newW<o_mW && imageAligned=1 && allowFreeIMGpanning=0)
+       prevCX := 0.01
+    If (newH<o_mH && imageAligned=1 && allowFreeIMGpanning=0)
+       prevCY := 0.01
+
+    ; ToolTip, % oIMGdecX "|" oIMGdecY "`n" IMGdecX "|" IMGdecY "`n" prevCX "|" prevCY "`n" prevZoom "|" zL , , , 2
+    ; ToolTip, % DestPosX "=" DestPosY "`n" IMGdecalageX "=" IMGdecalageY , , , 2
+    prevResizedVPimgW := newW
+    prevResizedVPimgH := newH
+    PrintPosX := ""
+}
+
+simulateCalcImageCoordsInVP(mainWidth, mainHeight, newW, newH, zL, oIMGdecX, oIMGdecY) {
+    Static orderu := {1:7, 2:8, 3:9, 4:4, 5:5, 6:6, 7:1, 8:2, 9:3}
+         , prevZoom := "-", prevCX, prevCY
     o_mW := mainWidth
     o_mH := mainHeight
     If (allowFreeIMGpanning=1 && IMGresizingMode=4)
