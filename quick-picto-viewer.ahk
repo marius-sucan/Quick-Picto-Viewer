@@ -12791,6 +12791,13 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
     textArray := StrSplit(theString, "`n")
     totalLinez := textArray.Count()
     cachedRawTXTbmps := []
+
+    hFIFimgX := viewportQPVimage.imgHandle
+    FreeImage_GetImageDimensions(hFIFimgX, mImgW, mImgH)
+    bpp := FreeImage_GetBPP(hFIFimgX)
+    pBitsAll := FreeImage_GetBits(hFIFimgX)
+    Stride := FreeImage_GetStride(hFIFimgX)
+
     Loop, % totalLinez
     {
        thisuString := (TextInAreaValign=3) ? textArray[totalLinez - A_Index + 1] : textArray[A_Index]
@@ -12798,8 +12805,8 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
           Continue
 
        thisuString := StrReplace(thisuString, "┘", " `n")
-       fnOutputDebug("render txt line=" A_Index " | visible= " lineVisible)
-       objBMPs := Gdi_DrawTextInBox(srr, thisHFont, "FFffFF", "000000", borderSize, scaleuPreview, TextInAreaFlipH, TextInAreaFlipV, TextInAreaCharSpacing, TextInAreaLineAngle, TextInAreaOnlyBorder, TextInAreaBorderOut, TextInAreaBorderSize)
+       fnOutputDebug("render txt line=" A_Index)
+       objBMPs := Gdi_DrawTextInBox(thisuString, thisHFont, "FFffFF", "000000", borderSize, scaleuPreview, TextInAreaFlipH, TextInAreaFlipV, TextInAreaCharSpacing, TextInAreaLineAngle, TextInAreaOnlyBorder, TextInAreaBorderOut, TextInAreaBorderSize)
        If validBMP(objBMPs[1])
           trGdip_GetImageDimensions(objBMPs[1], imgW, imgH)
        Else
@@ -12872,6 +12879,31 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
        {
           rendered++
           cachedRawTXTbmps[rendered] := [thisBMP, pBitmapContours, thisX, thisY, forceW, imgH]
+          If validBMP(thisBMP)
+          {
+             Gdip_GetImageDimensions(thisBMP, mw, mh)
+             EZ := Gdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
+             If !EZ
+             {
+                r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255, "int", userimgGammaCorrect, "int", TextInAreaBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
+                fnOutputDebug(A_Index " rendered thisBMP")
+                Gdip_UnlockBits(thisBMP, mData)
+                thisBMP := trGdip_DisposeImage(thisBMP)
+             }
+          }
+
+          If validBMP(pBitmapContours)
+          {
+             Gdip_GetImageDimensions(pBitmapContours, mw, mh)
+             EZ := Gdip_LockBits(pBitmapContours, 0, 0, mw, mh, mStride, mScan, mData, 1)
+             If !EZ
+             {
+                fnOutputDebug(A_Index " rendered pBitmapContours")
+                r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255, "int", userimgGammaCorrect, "int", TextInAreaBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
+                Gdip_UnlockBits(pBitmapContours, mData)
+                pBitmapContours := trGdip_DisposeImage(pBitmapContours)
+             }
+          }
        }
 
        If (TextInAreaValign!=3)
@@ -19878,6 +19910,8 @@ HugeImagesApplyInsertText() {
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
       textLinezObj := coreInsertTextHugeImages(UserTextArea, obju.bImgSelW, obju.bImgSelH)
       linesz := textLinezObj["a", 1]
+      r := 1
+/*
       Loop, % linesz
       {
          txtBitmap := textLinezObj[A_Index, 1]
@@ -19888,7 +19922,7 @@ HugeImagesApplyInsertText() {
             EZ := Gdip_LockBits(txtBitmap, 0, 0, mw, mh, mStride, mScan, mData, 1)
             If !EZ
             {
-               r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisOpacity, userimgGammaCorrect, "int", blending, "int", BlendModesFlipped, "UPtr", mScan, "int", mStride, "int", 32, "int", mx, "int", my, "int", mw, "int", mh)
+               r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisOpacity, userimgGammaCorrect, "int", blending, "int", BlendModesFlipped, , "int"" BlendModesPreserveAlphaUPtr", mScan, "int", mStride, "int", 32, "int", mx, "int", my, "int", mw, "int", mh)
                Gdip_UnlockBits(txtBitmap, mData)
                trGdip_DisposeImage(txtBitmap)
             }
@@ -19902,12 +19936,13 @@ HugeImagesApplyInsertText() {
             EZ := Gdip_LockBits(txtBitmap, 0, 0, mw, mh, mStride, mScan, mData, 1)
             If !EZ
             {
-               r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisOpacity, userimgGammaCorrect, "int", blending, "int", BlendModesFlipped, "UPtr", mScan, "int", mStride, "int", 32, "int", mx, "int", my, "int", mw, "int", mh)
+               r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisOpacity, userimgGammaCorrect, "int", blending, "int", BlendModesFlipped, , "int"" BlendModesPreserveAlphaUPtr", mScan, "int", mStride, "int", 32, "int", mx, "int", my, "int", mw, "int", mh)
                Gdip_UnlockBits(txtBitmap, mData)
                trGdip_DisposeImage(txtBitmap)
             }
          }
       }
+*/
 
       DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
       If (editingSelectionNow=1 && validBMP(obju.alphaMaskGray))
@@ -19928,7 +19963,7 @@ HugeImagesApplyInsertText() {
       } Else
       {
          recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
-         showTOOLtip("ERROR: Failed to auto-adjust the image colors")
+         showTOOLtip("ERROR: Failed to draw the text on the image")
          SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
       }
@@ -25510,7 +25545,7 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
           Return
        }
 
-       rzx := isVarEqualTo(IDwin, 12, 23, 24, 25, 31, 55, 70, 89) ? 0 : downscaleHugeImagesForEditing()
+       rzx := isVarEqualTo(IDwin, 12, 23, 24, 25, 31, 32, 55, 70, 89) ? 0 : downscaleHugeImagesForEditing()
        If (rzx<0 || rzx=1)
        {
           openingPanelNow := 0
@@ -45261,37 +45296,32 @@ resumeCustomShapeSelection(thisZL) {
    vPimgSelW := max(zImgSelX1, zImgSelX2) - min(zImgSelX1, zImgSelX2)
    vPimgSelH := max(zImgSelY1, zImgSelY2) - min(zImgSelY1, zImgSelY2)
    offX := offY := 0
-   ; retrieve the path as a polygonal shape
-   ; pPath := createImgSelPath(vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, 2, VPselRotation, rotateSelBoundsKeepRatio, 1, 1, 0, 0, 0, 2)
-   ; PointsList := Gdip_GetPathPoints(pPath)
-   ; Gdip_DeletePath(pPath)
 
+   PointsList := convertCustomShape2givenArea(customShapePoints, vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, 1, !bezierSplineCustomShape, bezierSplineCustomShape)
+   tempPath := Gdip_CreatePath()
+   Gdip_AddPathPolygon(tempPath, PointsList)
+   If (VPselRotation!=0)
+      trGdip_RotatePathAtCenter(tempPath, VPselRotation, 1, 1, rotateSelBoundsKeepRatio, 1)
 
-         PointsList := convertCustomShape2givenArea(customShapePoints, vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, 1, !bezierSplineCustomShape, bezierSplineCustomShape)
-         tempPath := Gdip_CreatePath()
-         Gdip_AddPathPolygon(tempPath, PointsList)
-         If (VPselRotation!=0)
-            trGdip_RotatePathAtCenter(tempPath, VPselRotation, 1, 1, rotateSelBoundsKeepRatio, 1)
+   vpFreeformShapeOffset := centerPath2bounds(tempPath, vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, 0, 1, 2)
+   PointsList := Gdip_GetPathPoints(tempPath, 1)
+   pp := Gdip_GetPathPointsCount(tempPath)
+   Gdip_DeletePath(tempPath)
+   zpp := (pp=customShapePoints.Count()) ? 0 : 1
+   If (bezierSplineCustomShape=1 && zpp=1)
+   {
+      If (testIsBezierAltViewPathClosed()=1 && closedLineCustomShape=1)
+         PointsList.Push(PointsList[1], PointsList[2])
+      Else
+         PointsList.Push(PointsList[pp*2 - 1], PointsList[pp*2])
+   }
 
-         vpFreeformShapeOffset := centerPath2bounds(tempPath, vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, 0, 1, 2)
-         PointsList := Gdip_GetPathPoints(tempPath, 1)
-         pp := Gdip_GetPathPointsCount(tempPath)
-         Gdip_DeletePath(tempPath)
-         zpp := (pp=customShapePoints.Count()) ? 0 : 1
-         If (bezierSplineCustomShape=1 && zpp=1)
-         {
-            If (testIsBezierAltViewPathClosed()=1 && closedLineCustomShape=1)
-               PointsList.Push(PointsList[1], PointsList[2])
-            Else
-               PointsList.Push(PointsList[pp*2 - 1], PointsList[pp*2])
-         }
-
-         If (bezierSplineCustomShape=1)
-         {
-            simpleFixBrokenBezierPath(PointsList)
-            viewerAutoCloseOpenPath(PointsList, closedLineCustomShape, 22)
-            ; ToolTip, % PointsList.Count() "==zz" , , , 2
-         }
+   If (bezierSplineCustomShape=1)
+   {
+      simpleFixBrokenBezierPath(PointsList)
+      viewerAutoCloseOpenPath(PointsList, closedLineCustomShape, 22)
+      ; ToolTip, % PointsList.Count() "==zz" , , , 2
+   }
 
    customShapePoints := convertShapePointsViewerToEditPoints(PointsList, PointsList.Count()//2)
    If (prevVectorShapeSymmetryMode[1, 2]=1)
@@ -51984,7 +52014,10 @@ BtnInsertTextSelectedArea() {
     ; Sleep, 1
     prevImgEditZeit := A_TickCount
     ToggleEditImgSelection("show-edit")
-    InsertTextSelectedArea()
+    If (viewportQPVimage.imgHandle)
+       HugeImagesApplyInsertText()
+    Else
+       InsertTextSelectedArea()
     prevImgEditZeit := A_TickCount
     SetTimer, RemoveTooltip, -250
 }

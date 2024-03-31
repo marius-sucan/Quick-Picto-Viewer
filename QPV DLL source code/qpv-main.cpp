@@ -3510,6 +3510,69 @@ DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, 
     return 1;
 }
 
+DLL_API int DLL_CALLCONV DrawBitmapInPlace(unsigned char *originalData, int w, int h, int Stride, int bpp, int opacity, int linearGamma, int blendMode, int flipLayers, int keepAlpha, unsigned char *newBitmap, int StrideMini, int nbpp, int imgX, int imgY, int imgW, int imgH) {
+    const float fintensity = char_to_float[opacity];
+    const INT64 data = CalcPixOffset(w - 1, h - 1, Stride, bpp);
+fnOutputDebug("yay DrawBitmapInPlace");
+    #pragma omp parallel for schedule(dynamic) default(none)
+    for (int x = 0; x < imgW; x++)
+    {
+        for (int y = 0; y < imgH; y++)
+        {
+            int nA = 255;
+            int oA = 255;
+            INT64 o = CalcPixOffset(imgX + x, imgY + y, Stride, bpp);
+            if (o>=data || o<0)
+               continue;
+
+            INT64 on = CalcPixOffset(x, y, StrideMini, nbpp);
+            if (nbpp==32)
+               nA = newBitmap[3 + on];
+            int nR = newBitmap[2 + on];
+            int nG = newBitmap[1 + on];
+            int nB = newBitmap[on];
+ 
+            if (bpp==32)
+               oA = originalData[3 + o];
+            int oR = originalData[2 + o];
+            int oG = originalData[1 + o];
+            int oB = originalData[o];
+
+            if (blendMode>0)
+            {
+               RGBAColor Orgb = {nB, nG, nR, nA};
+               RGBAColor Brgb = {oB, oG, oR, oA};   
+
+               RGBColorI blended;
+               blended = NEWcalculateBlendModes(Orgb, Brgb, blendMode, flipLayers, 0);
+               if (keepAlpha!=1 && blendMode!=23 && bpp==32)
+                  nA = max(nA, oA);
+
+               nR = blended.r;
+               nG = blended.g;
+               nB = blended.b;
+            }
+
+            if (linearGamma==1)
+            {
+               originalData[2 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[nR], gamma_to_linear[oR], fintensity)];
+               originalData[1 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[nG], gamma_to_linear[oG], fintensity)];
+               originalData[o]     = linear_to_gamma[weighTwoValues(gamma_to_linear[nB], gamma_to_linear[oB], fintensity)];
+            } else
+            {
+               originalData[2 + o] = weighTwoValues(nR, oR, fintensity);
+               originalData[1 + o] = weighTwoValues(nG, oG, fintensity);
+               originalData[o]     = weighTwoValues(nB, oB, fintensity);
+            }
+
+            if (bpp==32)
+               originalData[3 + o] = weighTwoValues(nA, oA, fintensity);
+        }
+    }
+fnOutputDebug("be back later  DrawBitmapInPlace");
+    return 1;
+}
+
 DLL_API int DLL_CALLCONV UndoAiderSwapPixelRegions(unsigned char* BitmapData, int w, int h, const INT64 Stride, unsigned char* otherData, const INT64 mStride, int bpp, const int x1, const int y1, const int x2, const int y2) {
 
     const INT64 bytesPerPixel = (bpp==32) ? 4 : 3;
