@@ -3510,28 +3510,81 @@ DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, 
     return 1;
 }
 
+DLL_API int DLL_CALLCONV publicMixRGBcolors(int colorA, int colorB, int opacity, int linearGamma, int* fR, int* fG, int* fB) {
+    // const int nA = (colorB >> 24) & 0xFF;
+    const int nR = (colorB >> 16) & 0xFF;
+    const int nG = (colorB >> 8) & 0xFF;
+    const int nB = colorB & 0xFF;
+
+    // const int oA = (colorA >> 24) & 0xFF;
+    const int oR = (colorA >> 16) & 0xFF;
+    const int oG = (colorA >> 8) & 0xFF;
+    const int oB = colorA & 0xFF;
+
+    float fintensity = char_to_float[opacity];
+    if (linearGamma==1)
+    {
+       fR = linear_to_gamma[weighTwoValues(gamma_to_linear[nR], gamma_to_linear[oR], fintensity)];
+       fG = linear_to_gamma[weighTwoValues(gamma_to_linear[nG], gamma_to_linear[oG], fintensity)];
+       fB = linear_to_gamma[weighTwoValues(gamma_to_linear[nB], gamma_to_linear[oB], fintensity)];
+    } else
+    {
+       fR = weighTwoValues(nR, oR, fintensity);
+       fG = weighTwoValues(nG, oG, fintensity);
+       fB = weighTwoValues(nB, oB, fintensity);
+    }
+
+    return 1;
+}
+
 DLL_API int DLL_CALLCONV DrawBitmapInPlace(unsigned char *originalData, int w, int h, int Stride, int bpp, int opacity, int linearGamma, int blendMode, int flipLayers, int keepAlpha, unsigned char *newBitmap, int StrideMini, int nbpp, int imgX, int imgY, int imgW, int imgH) {
-    const float fintensity = char_to_float[opacity];
+    const int aA = (StrideMini >> 24) & 0xFF;
+    const int rA = (StrideMini >> 16) & 0xFF;
+    const int gA = (StrideMini >> 8) & 0xFF;
+    const int bA = StrideMini & 0xFF;
+
     const INT64 data = CalcPixOffset(w - 1, h - 1, Stride, bpp);
-fnOutputDebug("yay DrawBitmapInPlace");
+fnOutputDebug("yay DrawBitmapInPlace; y = " + std::to_string(imgY));
     #pragma omp parallel for schedule(dynamic) default(none)
     for (int x = 0; x < imgW; x++)
     {
         for (int y = 0; y < imgH; y++)
         {
+            int nR, nG, nB;
             int nA = 255;
             int oA = 255;
-            INT64 o = CalcPixOffset(imgX + x, imgY + y, Stride, bpp);
+            int intensity = 0;
+            INT64 o = CalcPixOffset(imgX + x, h - imgY + y - imgH, Stride, bpp);
             if (o>=data || o<0)
                continue;
 
-            INT64 on = CalcPixOffset(x, y, StrideMini, nbpp);
-            if (nbpp==32)
-               nA = newBitmap[3 + on];
-            int nR = newBitmap[2 + on];
-            int nG = newBitmap[1 + on];
-            int nB = newBitmap[on];
- 
+            if (newBitmap!=NULL)
+            {
+                INT64 on = CalcPixOffset(x, y, StrideMini, nbpp);
+                if (nbpp==32)
+                {
+                   nA = newBitmap[on + 3];
+
+                }
+
+                nR = newBitmap[2 + on];
+                nG = newBitmap[1 + on];
+                nB = newBitmap[on];
+            } else
+            {
+                nR = rA;
+                nG = gA;
+                nB = bA;
+                nA = aA;
+            }
+
+            intensity = nA;
+            if (opacity!=255)
+            {
+               intensity = intensity - (255 - opacity);
+               intensity = clamp(intensity, 0, 255);
+            }     
+
             if (bpp==32)
                oA = originalData[3 + o];
             int oR = originalData[2 + o];
@@ -3553,6 +3606,7 @@ fnOutputDebug("yay DrawBitmapInPlace");
                nB = blended.b;
             }
 
+            float fintensity = char_to_float[intensity];
             if (linearGamma==1)
             {
                originalData[2 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[nR], gamma_to_linear[oR], fintensity)];
@@ -3566,7 +3620,7 @@ fnOutputDebug("yay DrawBitmapInPlace");
             }
 
             if (bpp==32)
-               originalData[3 + o] = weighTwoValues(nA, oA, fintensity);
+               originalData[3 + o] = clamp(oA + clamp(nA -  (255 - opacity), 0, 255), 0, 255);
         }
     }
 fnOutputDebug("be back later  DrawBitmapInPlace");
@@ -3611,7 +3665,6 @@ DLL_API int DLL_CALLCONV ColorizeGrayImage(unsigned char *originalData, int w, i
         {
             INT64 o = CalcPixOffset(x, y, Stride, bpp);
             float fintensity = char_to_float[originalData[o]];
-            // float f = char_to_float[originalData[o]];
             if (linearGamma==1)
             {
                originalData[2 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[rA], gamma_to_linear[rB], fintensity)];
