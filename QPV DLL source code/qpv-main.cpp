@@ -3510,33 +3510,6 @@ DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, 
     return 1;
 }
 
-DLL_API int DLL_CALLCONV publicMixRGBcolors(int colorA, int colorB, int opacity, int linearGamma, int* fR, int* fG, int* fB) {
-    // const int nA = (colorB >> 24) & 0xFF;
-    const int nR = (colorB >> 16) & 0xFF;
-    const int nG = (colorB >> 8) & 0xFF;
-    const int nB = colorB & 0xFF;
-
-    // const int oA = (colorA >> 24) & 0xFF;
-    const int oR = (colorA >> 16) & 0xFF;
-    const int oG = (colorA >> 8) & 0xFF;
-    const int oB = colorA & 0xFF;
-
-    float fintensity = char_to_float[opacity];
-    if (linearGamma==1)
-    {
-       fR = linear_to_gamma[weighTwoValues(gamma_to_linear[nR], gamma_to_linear[oR], fintensity)];
-       fG = linear_to_gamma[weighTwoValues(gamma_to_linear[nG], gamma_to_linear[oG], fintensity)];
-       fB = linear_to_gamma[weighTwoValues(gamma_to_linear[nB], gamma_to_linear[oB], fintensity)];
-    } else
-    {
-       fR = weighTwoValues(nR, oR, fintensity);
-       fG = weighTwoValues(nG, oG, fintensity);
-       fB = weighTwoValues(nB, oB, fintensity);
-    }
-
-    return 1;
-}
-
 DLL_API int DLL_CALLCONV DrawBitmapInPlace(unsigned char *originalData, int w, int h, int Stride, int bpp, int opacity, int linearGamma, int blendMode, int flipLayers, int keepAlpha, unsigned char *newBitmap, int StrideMini, int nbpp, int imgX, int imgY, int imgW, int imgH) {
     const int aA = (StrideMini >> 24) & 0xFF;
     const int rA = (StrideMini >> 16) & 0xFF;
@@ -3562,10 +3535,7 @@ fnOutputDebug("yay DrawBitmapInPlace; y = " + std::to_string(imgY));
             {
                 INT64 on = CalcPixOffset(x, y, StrideMini, nbpp);
                 if (nbpp==32)
-                {
                    nA = newBitmap[on + 3];
-
-                }
 
                 nR = newBitmap[2 + on];
                 nG = newBitmap[1 + on];
@@ -3590,6 +3560,14 @@ fnOutputDebug("yay DrawBitmapInPlace; y = " + std::to_string(imgY));
             int oR = originalData[2 + o];
             int oG = originalData[1 + o];
             int oB = originalData[o];
+            if (oA<2 && bpp==32)
+            {
+                originalData[3 + o] = clamp(oA + clamp(nA -  (255 - opacity), 0, 255), 0, 255);
+                originalData[2 + o] = nR;
+                originalData[1 + o] = nG;
+                originalData[o] = nB;
+                continue;
+            }
 
             if (blendMode>0)
             {
