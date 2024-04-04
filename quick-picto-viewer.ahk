@@ -12204,7 +12204,7 @@ TextuToGraphics(pGraphics, Text, OptionsObj, Font:="Arial", initMode:=0, Unit:=0
    return _E ? _E : ReturnRC
 }
 
-HardWrapTextFontBased(TextToWrap, hFont, maxW, maxH, lineHeight, vAlign) {
+HardWrapTextFontBased(TextToWrap, hFont, maxW, maxH, lineHeight, vAlign, scaleuPreview) {
    ; Critical, on
    Static RegExDelimiters := "(\||\*|\!|\]|\[|\\|\/|\.|\=|\:|\;|\?|\@|\-|\_|\)|\(|\{|\}|\s)"
         , maxCharsInWidth := 2048
@@ -12246,9 +12246,10 @@ HardWrapTextFontBased(TextToWrap, hFont, maxW, maxH, lineHeight, vAlign) {
 
        ; thisObj := Gdi_TruncateStringToFitWidth(hFont, A_Space thisLineu A_Space, maxW - TextInAreaCharSpacing * (StrLen(thisLineu) + 1))
        E := Gdi_GetTextExtentExPoint(hDC, A_Space thisLineu A_Space, maxW - thisCharSpacing * (StrLen(thisLineu) + 1), fitLength, w, h)
+       fnOutputDebug(A_ThisFunc "(): " ww " x " hh " || " w " x " h)
        ; ToolTip, % thisObj.fitLength "==" thisObj.width "==" thisObj.height "==" thisObj.stringLength "`n" thisLineu, , , 2
        stringLength := StrLen(thisLineu) + 1
-       If (hasMatchedRegEx=1 && (stringLength>fitLength || stringLength>maxCharsInWidth))
+       If (hasMatchedRegEx=1 && (stringLength>fitLength || stringLength>maxCharsInWidth) && !isImgSizeTooLarge(w, h))
        {
           linez++
           offsetu++
@@ -12468,7 +12469,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
        thisLnHeight := 1
     ; ToolTip, % lnSpace "|" thisLnHeight , , , 2
     If (TextInAreaAutoWrap=1)
-       theString := Trimmer(HardWrapTextFontBased(theString, hFont, maxW - borderSize * 2, maxH + 2, thisLnHeight, TextInAreaValign))
+       theString := Trimmer(HardWrapTextFontBased(theString, hFont, maxW - borderSize * 2, maxH + 2, thisLnHeight, TextInAreaValign, scaleuPreview))
     Else
        theString := Trimmer(theString)
 
@@ -12794,7 +12795,7 @@ coreInsertTextHugeImages(theString, maxW, maxH, hFIFimgX) {
        thisLnHeight := 1
 
     If (TextInAreaAutoWrap=1)
-       theString := Trimmer(HardWrapTextFontBased(theString, hFont, maxW - borderSize * 2, maxH + 2, thisLnHeight, TextInAreaValign))
+       theString := Trimmer(HardWrapTextFontBased(theString, hFont, maxW - borderSize * 2, maxH + 2, thisLnHeight, TextInAreaValign, scaleuPreview))
     Else
        theString := Trimmer(theString)
 
@@ -12830,32 +12831,50 @@ coreInsertTextHugeImages(theString, maxW, maxH, hFIFimgX) {
 
        thisuString := StrReplace(thisuString, "┘", " `n")
        fnOutputDebug("render txt line=" A_Index)
-       objBMPs := Gdi_DrawTextInBox(thisuString, thisHFont, "FFffFF", "000000", borderSize, scaleuPreview, TextInAreaFlipH, TextInAreaFlipV, TextInAreaCharSpacing, TextInAreaLineAngle, 0, 1, TextInAreaBorderSize)
+       objBMPs := Gdi_DrawTextInBox(thisuString, thisHFont, "FFffFF", "000000", borderSize, scaleuPreview, TextInAreaFlipH, TextInAreaFlipV, TextInAreaCharSpacing, TextInAreaLineAngle, TextInAreaOnlyBorder, TextInAreaBorderOut, TextInAreaBorderSize)
        thisBMP := objBMPs[1]
-       trGdip_GetImageDimensions(thisBMP, imgW, imgH)
-       If (imgW>maxW && validBMP(thisBMP))
-       {
-          thisBMP := resizeBitmapToGivenRef(thisBMP, 0, maxW, imgH, 5, 1)
+       pBitmapContours := objBMPs[2]
+       If validBMP(thisBMP)
           trGdip_GetImageDimensions(thisBMP, imgW, imgH)
-       }
+       Else
+          trGdip_GetImageDimensions(pBitmapContours, imgW, imgH)
 
-       If !validBMP(thisBMP)
+       If (!validBMP(thisBMP) && !validBMP(pBitmapContours))
        {
           fnOutputDebug(A_ThisFunc "(): an error occured rendering txt line=" A_Index)
        } Else
        {
-          If (doEffect && (TextInAreaBgrUnified!=1 || TextInAreaPaintBgr!=1))
-             QPV_BoxBlurBitmap(thisBMP, thisBlur, thisBlur, 0)
-          ; fnOutputDebug(Gdip_GetImagePixelFormat(pBitmap, 3))
-          ; ToolTip, % txtColor "|" bgrColor , , , 2
-          Gdip_BitmapSetColorDepth(thisBMP, 32)
-          Gdip_ImageRotateFlip(thisBMP, 6)
-          If (TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1)
-             Sleep, -1
-          Else If (TextInAreaCutOutMode=1 && TextInAreaPaintBgr=1)
-             QPV_ColorizeGrayImage(thisBMP, "0x00" TextInAreaBgrColor, bgrColor, 0)
-          Else
-             QPV_ColorizeGrayImage(thisBMP, "0xFF" TextInAreaFontColor, "0x00" TextInAreaFontColor, 0)
+          If (imgW>maxW)
+          {
+             thisBMP := resizeBitmapToGivenRef(thisBMP, 0, maxW, imgH, 5, 1)
+             pBitmapContours := resizeBitmapToGivenRef(pBitmapContours, 0, maxW, imgH, 5, 1)
+             trGdip_GetImageDimensions(thisBMP, imgW, imgH)
+          }
+
+          If validBMP(pBitmapContours)
+          {
+             If (thisBorderBlur>0 && TextInAreaDoBlurs=1 && !isWinXP)
+                QPV_BoxBlurBitmap(thisBMP, thisBorderBlur, thisBorderBlur, 0)
+
+             Gdip_ImageRotateFlip(pBitmapContours, 6)
+             Gdip_BitmapSetColorDepth(pBitmapContours, 32)
+          }
+
+          If validBMP(thisBMP)
+          {
+             If doEffect
+                QPV_BoxBlurBitmap(thisBMP, thisBlur, thisBlur, 0)
+             ; fnOutputDebug(Gdip_GetImagePixelFormat(pBitmap, 3))
+             ; ToolTip, % txtColor "|" bgrColor , , , 2
+             Gdip_ImageRotateFlip(thisBMP, 6)
+             Gdip_BitmapSetColorDepth(thisBMP, 32)
+             If (TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1)
+                Sleep, -1
+             Else If (TextInAreaCutOutMode=1 && TextInAreaPaintBgr=1)
+                QPV_ColorizeGrayImage(thisBMP, "0x00" TextInAreaBgrColor, bgrColor, 0)
+             Else
+                QPV_ColorizeGrayImage(thisBMP, "0xFF" TextInAreaFontColor, "0x00" TextInAreaFontColor, 0)
+          }
        }
 
        forceW := (imgW>maxW) ? maxW : imgW
@@ -12882,31 +12901,52 @@ coreInsertTextHugeImages(theString, maxW, maxH, hFIFimgX) {
        maxedH := max(thisY + imgH, maxedH)
        minedX := min(thisX, minedX)
        minedY := min(thisY, minedY)
-       If validBMP(thisBMP)
+       If (validBMP(thisBMP) || validBMP(pBitmapContours))
        {
           rendered++
-          cachedRawTXTbmps[rendered] := [thisBMP, 0, thisX, thisY, forceW, imgH]
+          mw := imgW,  mh := imgH
+          cachedRawTXTbmps[rendered] := [pBitmapContours, thisX, thisY]
+          If (TextInAreaPaintBgr=1 && TextInAreaCutOutMode!=1 && TextInAreaBgrUnified!=1)
+             r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255, "int", userimgGammaCorrect, "int", 0, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "UPtr", 0, "int", bgrColor, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
+
           If validBMP(thisBMP)
           {
-             ; Gdip_GraphicsClear(2NDglPG, "0xff887788")
-             ; Gdip_DrawImageFast(2NDglPG, thisBMP)
-             ; doLayeredWinUpdate(A_ThisFunc, hGDIselectwin, 2NDglHDC)
-             ; Sleep, 950
-             Gdip_GetImageDimensions(thisBMP, mw, mh)
-             If (TextInAreaPaintBgr=1 && TextInAreaCutOutMode!=1 && TextInAreaBgrUnified!=1)
-                r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255, "int", userimgGammaCorrect, "int", 0, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "UPtr", 0, "int", bgrColor, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
+             EZ := 1
+             If !(TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1 && TextInAreaCutOutMode=1 && TextInAreaOnlyBorder=1 && TextInAreaBorderOut>1)
+                EZ := Gdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
 
-             EZ := Gdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
              If !EZ
              {
                 bmpOpacity := (TextInAreaCutOutMode=1 && TextInAreaPaintBgr=1 || TextInAreaBgrUnified=1) ? 255 : TextInAreaFontOpacity
                 thisBlendMode := (TextInAreaBgrUnified=1) ? 5 : 0
                 r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", bmpOpacity, "int", userimgGammaCorrect, "int", thisBlendMode, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
-                fnOutputDebug(A_Index " rendered thisBMP")
+                ; fnOutputDebug(A_Index " rendered thisBMP")
+                Gdip_UnlockBits(thisBMP, mData)
+             }
+             thisBMP := trGdip_DisposeImage(thisBMP)
+          }
+
+          ; render the pBitmapContours bitmaps
+          thisBMP := pBitmapContours
+          If (validBMP(thisBMP) && TextInAreaBgrUnified!=1)
+          {
+             If (TextInAreaCutOutMode=1 && TextInAreaOnlyBorder=1 && TextInAreaBorderOut>1 && TextInAreaPaintBgr=1 && TextInAreaBgrUnified=0)
+                QPV_ColorizeGrayImage(thisBMP, "0x00" TextInAreaBgrColor, "0xFF" TextInAreaBgrColor, 0)
+             Else If !(TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1)
+                QPV_ColorizeGrayImage(thisBMP, "0xFF" TextInAreaBorderColor, "0x00" TextInAreaBorderColor, 0)
+
+             EZ := Gdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
+             If !EZ
+             {
+                bmpOpacity := (TextInAreaBgrUnified=1) ? 255 : TextInAreaBorderOpacity
+                thisBlendMode := (TextInAreaBgrUnified=1) ? 5 : 0
+                r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", bmpOpacity, "int", userimgGammaCorrect, "int", thisBlendMode, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
+                ; fnOutputDebug(A_Index " rendered contour bitmap")
                 Gdip_UnlockBits(thisBMP, mData)
                 thisBMP := trGdip_DisposeImage(thisBMP)
              }
           }
+
        }
 
        If (TextInAreaValign!=3)
@@ -12932,13 +12972,64 @@ coreInsertTextHugeImages(theString, maxW, maxH, hFIFimgX) {
        }
     }
 
+    modusContour := (TextInAreaCutOutMode=1 && TextInAreaOnlyBorder=1 || TextInAreaCutOutMode=0) ? 1 : 0
+    If (TextInAreaCutOutMode=1 && TextInAreaOnlyBorder=1 && TextInAreaBgrUnified=1 && TextInAreaPaintBgr=1 && TextInAreaBorderOut>1)
+       modusContour := 0
+    Else If (TextInAreaCutOutMode=1 && TextInAreaOnlyBorder=0 && TextInAreaBgrUnified=1 && TextInAreaPaintBgr=1 && TextInAreaBorderOut>1)
+       modusContour := 1
+
     If (TextInAreaBgrUnified=1 && TextInAreaPaintBgr=1)
     {
        r := DllCall(whichMainDLL "\FillImageHoles", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", "0xFF000000")
+       If (TextInAreaBgrUnified=1 && TextInAreaPaintBgr=1 && modusContour=0 && TextInAreaBorderOut>1)
+       {
+          fnOutputDebug("pre-unified processing")
+          Loop, % rendered
+          {
+             ; render the pBitmapContours bitmaps
+             thisBMP := cachedRawTXTbmps[A_Index, 1]
+             If validBMP(thisBMP)
+             {
+                thisX := cachedRawTXTbmps[A_Index, 2],    thisY := cachedRawTXTbmps[A_Index, 3]
+                Gdip_GetImageDimensions(thisBMP, mw, mh)
+                EZ := Gdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
+                If !EZ
+                {
+                   r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255, "int", userimgGammaCorrect, "int", 5, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
+                   Gdip_UnlockBits(thisBMP, mData)
+                   thisBMP := trGdip_DisposeImage(thisBMP)
+                }
+             }
+          }
+       }
+
        If (TextInAreaCutOutMode=1)
           r := DllCall(whichMainDLL "\ColorizeGrayImage", "UPtr", pBitsAll, "int", mImgW, "int", mImgH, "int", Stride, "int", 32, "int", 0, "int", "0x00" TextInAreaBgrColor, "int", bgrColor)
        Else
           r := DllCall(whichMainDLL "\ColorizeGrayImage", "UPtr", pBitsAll, "int", mImgW, "int", mImgH, "int", Stride, "int", 32, "int", userimgGammaCorrect, "int", txtColor, "int", bgrColor)
+    }
+
+    If (TextInAreaBgrUnified=1 && TextInAreaPaintBgr=1 && modusContour=1 && TextInAreaBorderOut>1)
+    {
+       fnOutputDebug("post-unified processing")
+       Loop, % rendered
+       {
+          ; render the pBitmapContours bitmaps
+          thisBMP := cachedRawTXTbmps[A_Index, 1]
+          If validBMP(thisBMP)
+          {
+             thisX := cachedRawTXTbmps[A_Index, 2],    thisY := cachedRawTXTbmps[A_Index, 3]
+             QPV_ColorizeGrayImage(thisBMP, "0xFF" TextInAreaBorderColor, "0x00" TextInAreaBorderColor, 0)
+             Gdip_GetImageDimensions(thisBMP, mw, mh)
+             EZ := Gdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
+             If !EZ
+             {
+                r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", TextInAreaBorderOpacity, "int", userimgGammaCorrect, "int", 0, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
+                Gdip_UnlockBits(thisBMP, mData)
+                thisBMP := trGdip_DisposeImage(thisBMP)
+             }
+          }
+       }
     }
 
     If (fattalErr=1)
@@ -13947,7 +14038,7 @@ resizeBitmapToGivenRef(pBitmap, refBMP, nW:=0, nH:=0, thisImgQuality:=5, keepRat
     If (validBMP(refBMP) && refBMP)
        trGdip_GetImageDimensions(refBMP, nW, nH)
 
-    If ((tW!=nW || tH!=nH) && tW && tH && nW && nH)
+    If ((tW!=nW || tH!=nH) && tW && tH && nW && nH && validBMP(pBitmap))
     {
        ; fnOutputDebug("o_bgr resizing")
        tempBMP := trGdip_ResizeBitmap(A_ThisFunc, pBitmap, nW, nH, keepRatio, thisImgQuality, 0, 0)
@@ -19930,6 +20021,7 @@ HugeImagesApplyInsertText() {
       mStride := FreeImage_GetStride(hFIFimgA)
       mBpp := FreeImage_GetBPP(hFIFimgA)
       ; linesz := textLinezObj["a", 1]
+      showTOOLtip("Applying insert text, please wait...`nPhase 2")
       r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 0, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", TextInAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", pBits, "int", mStride, "int", mBpp, "int", 0, "int", 0, "int", BlendModesPreserveAlpha)
       FreeImage_UnLoad(hFIFimgA)
 
@@ -48950,7 +49042,7 @@ ReadSettingsThumbsSheetPanel(act:=0) {
     RegAction(act, "TextInAreaFontBold",, 1)
     RegAction(act, "TextInAreaFontItalic",, 1)
     RegAction(act, "TextInAreaFontUline",, 1)
-    RegAction(act, "TextInAreaFontSize",, 2, 5, 950)
+    RegAction(act, "TextInAreaFontSize",, 2, 5, 995)
     RegAction(act, "userThumbsSheetWidth",, 2, 32, 1024)
     RegAction(act, "userThumbsSheetHeight",, 2, 32, 1024)
     RegAction(act, "userThumbsSheetColumns",, 2, 1, 256)
@@ -52247,7 +52339,7 @@ ReadSettingsTextInArea(act:=0) {
     RegAction(act, "TextInAreaFontName",, 5)
     RegAction(act, "TextInAreaFontLineSpacing",, 2, -950, 950)
     RegAction(act, "TextInAreaFontOpacity",, 2, 3, 255)
-    RegAction(act, "TextInAreaFontSize",, 2, 5, 950)
+    RegAction(act, "TextInAreaFontSize",, 2, 5, 995)
     RegAction(act, "TextInAreaFontStrike",, 1)
     RegAction(act, "TextInAreaFontUline",, 1)
     RegAction(act, "TextInAreaOnlyBorder",, 1)
@@ -52307,6 +52399,9 @@ PanelInsertTextArea() {
     Global editF1, editF2, editF3, editF4, editF5, editF6,  editF7, editF8, editF9, editF10, editF11
          , editF12, PickuTextInAreaFontColor, PickuTextInAreaBgrColor, PickuTextInAreaBorderColor, uiPasteInPlaceAlphaDrawMode
 
+    If (viewportQPVimage.imgHandle)
+       PasteInPlaceAutoExpandIMG := TextInAreaLineAngle := 0
+
     widu := (PrefsLargeFonts=1) ? 55 : 40
     ml := (PrefsLargeFonts=1) ? 35 : 24
     bonusTabs := (viewportQPVimage.imgHandle) ? "" : "|Alpha mask|Paint mask"
@@ -52315,7 +52410,7 @@ PanelInsertTextArea() {
     hEditField := GuiAddEdit("x+15 y+15 Section w" txtWid " r10 gupdateUIInsertTextPanel vUserTextArea", UserTextArea, "Text to draw")
     Gui, Add, Button, gBtnFntDlgInsertText, Font options
     GuiAddEdit("x+2 hp w" widu " gupdateUIInsertTextPanel limit3 -multi number -wantCtrlA -wantTab -wrap veditF1", TextInAreaFontSize, "Font size")
-    Gui, Add, UpDown, vTextInAreaFontSize Range5-950, % TextInAreaFontSize
+    Gui, Add, UpDown, vTextInAreaFontSize Range5-995, % TextInAreaFontSize
     widu := (PrefsLargeFonts=1) ? 30 : 25
     GuiAddCheckbox("x+2 yp hp+1 w" widu " gupdateUIInsertTextPanel Checked" TextInAreaFontBold " vTextInAreaFontBold", "Bold", "B")
     GuiAddCheckbox("x+2 yp hp wp gupdateUIInsertTextPanel Checked" TextInAreaFontItalic " vTextInAreaFontItalic", "Italic", "I")
@@ -52353,6 +52448,8 @@ PanelInsertTextArea() {
     Gui, Add, Checkbox, xs yp+%ml% w%opaciSlideW% gupdateUIInsertTextPanel Checked%TextInAreaCutOutMode% vTextInAreaCutOutMode, Cut-out mode
     Gui, Add, Checkbox, x+1 yp hp gupdateUIInsertTextPanel Checked%TextInAreaBgrEntire% vTextInAreaBgrEntire, Fill entire line(s)
     Gui, Add, Checkbox, xs yp+%ml% gupdateUIInsertTextPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit selection area
+    If (viewportQPVimage.imgHandle)
+       GuiControl, Disable, PasteInPlaceAutoExpandIMG
 
     Gui, Tab, 3
     clrW := (PrefsLargeFonts=1) ? 65 : 45
