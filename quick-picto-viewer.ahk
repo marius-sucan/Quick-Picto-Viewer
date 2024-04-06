@@ -38,9 +38,9 @@
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
 ;@Ahk2Exe-UpdateManifest 0, Quick Picto Viewer
 ;@Ahk2Exe-SetOrigFilename Quick-Picto-Viewer.exe
-;@Ahk2Exe-SetVersion 5.9.97
-;@Ahk2Exe-SetProductVersion 5.9.97
-;@Ahk2Exe-SetCopyright Marius Şucan (2019-2023)
+;@Ahk2Exe-SetVersion 5.9.98
+;@Ahk2Exe-SetProductVersion 5.9.98
+;@Ahk2Exe-SetCopyright Marius Şucan (2019-2024)
 ;@Ahk2Exe-SetCompanyName https://marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
 ;___________ Auto Execute Section ____
@@ -213,8 +213,8 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*|Background clipper*"
    , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := [], prevPasteInPlaceVPcoords := []
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
-   , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-   , appVersion := "5.9.97", vReleaseDate := "2023/12/13" ; yyyy-mm-dd
+   , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := "ALPHA"
+   , appVersion := "5.9.98", vReleaseDate := "2024/04/07" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -4408,7 +4408,7 @@ setWindowTitle(msg, forceThis:=0, useLast:=0) {
     If (prevSet!=thisMsg && runningLongOperation!=1 && infoSlideDelay=0 && animGIFplaying!=1 && hasInitSpecialMode!=1) || (forceThis=1)
     {
        prevSet := thisMsg
-       WinSetTitle, ahk_id %PVhwnd%,, % thisMsg " | QPV"
+       WinSetTitle, ahk_id %PVhwnd%,, % verType "|" thisMsg " | QPV"
        ; fnOutputDebug("WinTitle: " thisMsg)
        lastInvoked := A_TickCount
     }
@@ -81407,7 +81407,7 @@ PanelAboutWindow() {
     Gui, -DPIScale
     Gui, Font, s19 Bold, Arial, -wrap
     Gui, Add, Picture, x+2 y+2 w%ml%  h-1 +0x3 gOpenGitHub, qpv-icon.ico
-    Gui, Add, Text, x+20 yp, %appTitle% v%appVersion%
+    Gui, Add, Text, x+20 yp, %appTitle% v%appVersion% %verType%
     Gui, Font, s10 Bold, Arial, -wrap
     Gui, Add, Link, y+10 wp +0x200, Developed by: <a href="https://marius.sucan.ro/">Marius Șucan</a>.
     Gui, Add, Text, y+20 wp +0x200, Release date: %vReleaseDate%.
@@ -81454,7 +81454,7 @@ PanelAboutWindow() {
     Gui, Add, Button, x+5 hp wp gPanelJournalWindow, &Journal
     Gui, Add, Button, x+5 hp wp Default gBtnCloseWindow, &Close
     Gui, Add, Button, x+5 hp gcheckForUpdatesNow, &Check for updates
-    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "About " appTitle " v" appVersion)
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "About " appTitle " v" appVersion A_Space verType)
     PopulateAboutKbdShortcutsList()
     checkDLLfiles()
     ; ToolTip, % "l=" A_ScriptFullPath , , , 2
