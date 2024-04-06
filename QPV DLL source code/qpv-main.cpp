@@ -2976,7 +2976,8 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
                userColor.g = colorBitmap[1 + oz];
                userColor.b = colorBitmap[oz];
                newColor = userColor;
-               fintensity = char_to_float[thisOpacity];
+               int kOpacity = clamp(thisOpacity - (255 - opacity), 0, 255);
+               fintensity = char_to_float[kOpacity];
             } else
             {
                fintensity = fi;
@@ -3517,7 +3518,7 @@ DLL_API int DLL_CALLCONV DrawBitmapInPlace(unsigned char *originalData, int w, i
     const int bA = StrideMini & 0xFF;
 
     const INT64 data = CalcPixOffset(w - 1, h - 1, Stride, bpp);
-fnOutputDebug("yay DrawBitmapInPlace; y = " + std::to_string(imgY));
+    // fnOutputDebug("yay DrawBitmapInPlace; y = " + std::to_string(imgY));
     #pragma omp parallel for schedule(dynamic) default(none)
     for (int x = 0; x < imgW; x++)
     {
@@ -3601,7 +3602,6 @@ fnOutputDebug("yay DrawBitmapInPlace; y = " + std::to_string(imgY));
                originalData[3 + o] = clamp(oA + clamp(nA -  (255 - opacity), 0, 255), 0, 255);
         }
     }
-fnOutputDebug("be back later  DrawBitmapInPlace");
     return 1;
 }
 
