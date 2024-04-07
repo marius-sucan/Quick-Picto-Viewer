@@ -14021,7 +14021,7 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
       ppx1 := ppo[1], ppy1 := ppo[2]
       ppx2 := ppo[3], ppy2 := ppo[4]
       ppofYa := ppofYb := 0
-   } else if (ppo=1)
+   } else if (ppo=1 && mode=2)
    {
       trGdip_GetImageDimensions(useGdiBitmap(), zkw, zkh)
       ppx1 := (imgSelX1<0) ? abs(x1) : 0
@@ -14048,9 +14048,9 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
    }
 
    fnOutputDebug(ppo " mode=" mode "; useCache=" useCache " | angle=" rotation " doFlip=" doFlip)
-   ; fnOutputDebug("xxxcoords = " x1 "|" y1 "|" x2 "|" y2)
-   ; fnOutputDebug("selcoords = " imgSelX1 "|" imgSelY1 "|" imgSelX2 "|" imgSelY2)
-   ; fnOutputDebug("pppcoords = " ppx1 "|" ppy1 "|" ppx2 "|" ppy2 "||" ppx2 - ppx1 "//" ppy2 - ppy1)
+   fnOutputDebug("xxxcoords = " x1 "|" y1 "|" x2 "|" y2 "||" xf "|" yf)
+   fnOutputDebug("selcoords = " imgSelX1 "|" imgSelY1 "|" imgSelX2 "|" imgSelY2)
+   fnOutputDebug("pppcoords = " ppx1 "|" ppy1 "|" ppx2 "|" ppy2 "||" ppx2 - ppx1 "//" ppy2 - ppy1 " | Z | " ppofYa "|" ppofYb)
    ; ToolTip, % Round(innerSelectionCavityX, 2) "|" Round(innerSelectionCavityY, 2) "|" Round(exclusion, 2) , , , 2
    ; ToolTip, % round(w/h, 2) "|" round(mod(rotation, 45), 2) "°|" w "|" h "`n"  rw "|" rh "`n" Round(xf, 2) "|" Round(yf, 2) , , , 2
    ; ToolTip, % round(xf, 2) "|" round(yf, 2) "|"  round(rotation, 2) "|" Round(exclusion, 2) , , , 2

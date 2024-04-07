@@ -495,7 +495,7 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1,
     }
 
     fill(polygonMaskMap.begin(), polygonMaskMap.end(), 0);
-    fnOutputDebug("polygonMaskMap refilled to zero ; size = " + std::to_string(s) + "|" + std::to_string(polyW) + " x " + std::to_string(polyH) + "|" + std::to_string(polyX) + " x " + std::to_string(polyY));
+    // fnOutputDebug("polygonMaskMap refilled to zero ; size = " + std::to_string(s) + "|" + std::to_string(polyW) + " x " + std::to_string(polyH) + "|" + std::to_string(polyX) + " x " + std::to_string(polyY));
 
     int boundMaxX = 0;
     int boundMaxY = 0;
@@ -640,16 +640,8 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1,
                      //    fnOutputDebug("x out of ppx range; x=" + std::to_string(x));
                      continue;
                   }
-
-                  // if (x==xa || x==xb)
-                  //    dumbFillPixel(x, y, 255, 0, 255, imageData, Stride, bpp, w, h);
-                  // else
-                  //    dumbFillPixel(x, y, 128, 0, 10, imageData, Stride, bpp, w, h);
-
                   polygonMaskMap[(INT64)(y - polyY) * polyW + x - polyX] = 1;
              }
-             // if (listu.size()>2)
-             //    dumbFillPixel(midX, y, 0, 255, 255, imageData, Stride, bpp, w, h);
         }
         // OutputDebugStringA(ss.str().data());
     }
@@ -657,7 +649,7 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1,
     fnOutputDebug("fill mask image - done; calls to isPointInPolygon() executed: " + std::to_string(countPIPcalls));
     polygonMapEdges.clear();
     polygonMapEdges.shrink_to_fit();
-    fnOutputDebug("polygonMapEdges discarded");
+    // fnOutputDebug("polygonMapEdges discarded");
     // return 1;
 }
 
@@ -1765,25 +1757,29 @@ DLL_API int DLL_CALLCONV prepareSelectionArea(int x1, int y1, int x2, int y2, in
 /*
 This function is called from AHK, from QPV_PrepareHugeImgSelectionArea().
 The AHK wrapper function calculates the coordinates this function receives.
-x1, y1, x2, y2, w, h   / these are the coordinates of the image selection area bounding box, within the image
-xf, yf                 / selection area scailing factors on X and Y used when the selection area is rotated; with these scales, i can ensure that the viewport selection area in QPV created via GDI+ matches with the c++ results 
-angle                  / selection area rotation angle ; it applies for ellipses and rectangles only
-mode                   / the selection area shapes: 0 = rect; 1 = ellipse; 2 = freeform polygonal shape
-flip                   / FreeImage works with images flipped on Y; this parameter is used to accomodate this when using rotated ellipses and rectangles; otherwise it does not apply; freeform polygonal shapes are Y-flipped in QPV_PrepareHugeImgSelectionArea()
-exclusion              / used to create a cavity/hole in the selection area; eg. an ellipse can be turned into a torus; parameter does not apply to mode==2
-invertArea             / invert selection area
-PointsList             / a pointer to a freeform polygonal shape created with GDI+
-PointsCount            / number of points the vector shape has 
-ppx1, ppy1, ppx2, ppy2 / the coordinates of the subsection of the selection area bounding box intended to be drawn; it is used primarily when dealing with viewport live previews, but also when the selection area exceeds the image bounding box; with these coordinates i can avoid excessive memory usage and drastically reduce computations
-useCache               / relevant only for freeform polygonal shapes; if TRUE then polygonMaskMap will  be reused
-ppofYa, ppofYb         / Y offsets used to accomodate FreeImage's Y-flipped crap; only applies when using freeform polygonal selection area shapes
+
+Parameters:
+    x1, y1, x2, y2, w, h   / these are the coordinates of the image selection area bounding box, within the image
+    xf, yf                 / selection area scale factors on X and Y used when the selection area is rotated; with these scales, i can ensure that the viewport selection area in QPV created via GDI+ matches with the c++ results 
+    angle                  / selection area rotation angle ; it applies for ellipses and rectangles only
+    mode                   / the selection area shapes: 0 = rect; 1 = ellipse; 2 = freeform polygonal shape
+    flip                   / FreeImage works with images flipped on Y; this parameter is used to accomodate this when using rotated ellipses and rectangles; otherwise it does not apply; freeform polygonal shapes are Y-flipped in QPV_PrepareHugeImgSelectionArea()
+    exclusion              / used to create a cavity/hole in the selection area; eg. an ellipse can be turned into a torus; parameter does not apply to mode==2
+    invertArea             / invert selection area
+
+Parameters relevant only for selection areas based on freeform vector paths:
+    PointsList             / a pointer to a freeform polygonal shape created with GDI+
+    PointsCount            / the number of points the vector shape has 
+    ppx1, ppy1, ppx2, ppy2 / the coordinates of the subsection of the selection area bounding box intended to be drawn; it is used primarily when dealing with viewport live previews, but also when the selection area exceeds the image bounding box; with these coordinates i can avoid excessive memory usage and drastically reduce computations
+    useCache               / if TRUE then polygonMaskMap[] will be reused
+    ppofYa, ppofYb         / Y offsets used to accomodate FreeImage's Y-flipped crap
 
 How selection areas work:
 Almost any image editing tool in QPV will invoke QPV_PrepareHugeImgSelectionArea() which
 will call this function from the compiled DLL: prepareSelectionArea().
 
 Only the C++ image editing functions I wrote rely on this, eg, FillSelectArea().
-Such functions rely on clipMaskFilter() in the For loop that traverses the image 
+Such functions rely on clipMaskFilter() in the For Loop that traverses the image 
 being edited. The function determines if any given pixel within the image bounds is to 
 be modified or not. It works with different types of selection areas or sources: rects,
 ellipses, polygonal shapes, and bitmaps.
@@ -2947,6 +2943,8 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
     const int gbpc = gBpp/8;
     const int bmpX = (imgSelX1<0 || invertSelection==1) ? 0 : imgSelX1;
     const int bmpY = (imgSelY1<0 || invertSelection==1) ? 0 : imgSelY1;
+    const int offY = (EllipseSelectMode==2) ? polyOffYa : 0;
+fnOutputDebug("offsets: " + std::to_string(bmpY) + "|" + std::to_string(offY));
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(8)
     for (int x = 0; x < w; x++)
     {
@@ -2967,6 +2965,8 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
             {
                // INT64 oz = CalcPixOffset(x - zx1, y - zy1, gStride, 32);
                INT64 oz = (INT64)(y - bmpY) * gStride + kzx;
+// if (EllipseSelectMode==2)
+//     fnOutputDebug("y=" + std::to_string(y - bmpY));
                thisOpacity = (gBpp==32) ? colorBitmap[3 + oz] : opacity;
                if (opacityMultiplier>0 && gBpp==32)
                   thisOpacity = clamp(thisOpacity + opacityMultiplier, 0, 255);
