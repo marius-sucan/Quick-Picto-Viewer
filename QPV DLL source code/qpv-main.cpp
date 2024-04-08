@@ -2522,6 +2522,7 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
         std::vector<int> pixelzMapH(h + 2, 0);
         const int bmpX = (imgSelX1<0 || invertSelection==1) ? 0 : imgSelX1;
         const int bmpY = (imgSelY1<0 || invertSelection==1) ? 0 : imgSelY1;
+        fnOutputDebug("add noise step -1");
         for (int x = 0; x < w + 2; x++)
         {
             pixelzMapW[x] = (float)mw*((x - bmpX)/(float)bImgSelW);
@@ -2607,6 +2608,7 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
         return 1;
     }
 
+    fnOutputDebug("add noise step 3");
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int x = 0; x < w; x++)
     {
@@ -2654,6 +2656,7 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
         }
     }
 
+    fnOutputDebug("add noise step DONE");
     return 1;
 }
 
@@ -2929,7 +2932,7 @@ DLL_API int DLL_CALLCONV ConvertToGrayScale(unsigned char *BitmapData, const int
     return 1;
 }
 
-DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h, int Stride, int bpp, int color, int opacity, int eraser, int linearGamma, int blendMode, int flipLayers, unsigned char *maskBitmap, int mStride, unsigned char *colorBitmap, int gStride, int gBpp, int fillBehind, int opacityMultiplier, int keepAlpha) {
+DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h, int Stride, int bpp, int color, int opacity, int eraser, int linearGamma, int blendMode, int flipLayers, unsigned char *maskBitmap, int mStride, unsigned char *colorBitmap, int gStride, int gBpp, int fillBehind, int opacityMultiplier, int keepAlpha, int nBmpW, int nBmpH) {
     // fnOutputDebug("FillSelectArea mStride=" + std::to_string(mStride));
     // fnOutputDebug("clipMaskFilter=zx=" + std::to_string(zx1) + "/" + std::to_string(zx2) + "=w=" + std::to_string(max(zx1, zx2) - min(zx1, zx2)));
     // fnOutputDebug("clipMaskFilter=zy=" + std::to_string(zy1) + "/" + std::to_string(zy2) + "=h=" + std::to_string(max(zy1, zy2) - min(zy1, zy2)));
@@ -2943,8 +2946,8 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
     const int gbpc = gBpp/8;
     const int bmpX = (imgSelX1<0 || invertSelection==1) ? 0 : imgSelX1;
     const int bmpY = (imgSelY1<0 || invertSelection==1) ? 0 : imgSelY1;
-    const int offY = (EllipseSelectMode==2) ? polyOffYa : 0;
-fnOutputDebug("offsets: " + std::to_string(bmpY) + "|" + std::to_string(offY));
+    // fnOutputDebug("offsets X/Y: " + std::to_string(bmpX) + "|" + std::to_string(bmpY));
+    // fnOutputDebug("colorBitmap W/H: " + std::to_string(nBmpW) + "|" + std::to_string(nBmpH));
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(8)
     for (int x = 0; x < w; x++)
     {
@@ -2964,9 +2967,11 @@ fnOutputDebug("offsets: " + std::to_string(bmpY) + "|" + std::to_string(offY));
             if (colorBitmap!=NULL)
             {
                // INT64 oz = CalcPixOffset(x - zx1, y - zy1, gStride, 32);
+                if ((y - bmpY)>=nBmpH || (x - bmpX)>=nBmpW)
+                   continue;
+
                INT64 oz = (INT64)(y - bmpY) * gStride + kzx;
-// if (EllipseSelectMode==2)
-//     fnOutputDebug("y=" + std::to_string(y - bmpY));
+               // fnOutputDebug("y=" + std::to_string(y - bmpY));
                thisOpacity = (gBpp==32) ? colorBitmap[3 + oz] : opacity;
                if (opacityMultiplier>0 && gBpp==32)
                   thisOpacity = clamp(thisOpacity + opacityMultiplier, 0, 255);

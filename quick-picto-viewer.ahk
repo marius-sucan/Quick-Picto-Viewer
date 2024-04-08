@@ -17804,6 +17804,7 @@ livePreviewHugeImageFillSelArea() {
          gradientsBMP := drawFillSelGradient(zW, zH, 1, 0, 0, zW, zH, userimgGammaCorrect)
          If (validBMP(gradientsBMP) && (imgSelOutViewPort!=1 || FillAreaInverted=1))
          {
+            Gdip_ImageRotateFlip(gradientsBMP, 6)
             wBitmap := getRectFromBitmap(gradientsBMP, objSel, 1)
             If validBMP(wBitmap)
             {
@@ -17816,6 +17817,7 @@ livePreviewHugeImageFillSelArea() {
          {
             trGdip_GetImageDimensions(gradientsBMP, zW, zH)
             imgW := min(zW, imgW),   imgH := min(zH, imgH)
+            ; ToolTip, % zw "|" zh "`n" imgW "|" imgH , , , 2
             EZ := Gdip_LockBits(gradientsBMP, 0, 0, imgW, imgH, gStride, gScan, gData)
             If EZ
             {
@@ -17846,7 +17848,8 @@ livePreviewHugeImageFillSelArea() {
 
       livePreviewPrepareSelectionArea(objSel, FillAreaInverted, 3)
       thisBehind := (FillAreaDoBehind=1 && bpp=32) ? 1 : 0
-      r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", iScan, "Int", imgW, "Int", imgH, "int", Stride, "int", 32, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", FillAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", gScan, "int", gStride, "int", gBpp, "int", thisBehind, "int", 0, "int", FillAreaCutGlass)
+      r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", iScan, "Int", imgW, "Int", imgH, "int", Stride, "int", 32, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", FillAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", gScan, "int", gStride, "int", gBpp, "int", thisBehind, "int", 0, "int", FillAreaCutGlass, "int", imgW, "int", imgH)
+      ; ToolTip, % r "|" imgW "|" imgH , , , 2
       Gdip_UnlockBits(zBitmap, iData)
       If validBMP(gradientsBMP)
       {
@@ -20360,6 +20363,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
       Stride := FreeImage_GetStride(hFIFimgX)
       If advancedMode
       {
+         nBmpW := nBmpH := 0
          fillTool := InStr(modus, "fill") ? 1 : 0
          transformTool := (InStr(modus, "transform") || InStr(modus, "paste in place")) ? 1 : 0
          If (isInRange(FillAreaColorMode, 2, 4) && fillTool=1 && obju.imgZelW && obju.imgZelH) ; && FillAreaInverted=0 && !isImgSizeTooLarge(zW, zH))
@@ -20377,7 +20381,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             {
                ResizedW := (FillAreaInverted=1) ? imgW : obju.imgSelW
                ResizedH := (FillAreaInverted=1) ? imgH : obju.imgSelH
-               ; fnOutputDebug(A_ThisFunc " gradient bitmap size matches selection area dimensions")
+               fnOutputDebug(A_ThisFunc " gradient bitmap size matches selection area dimensions: " ResizedW " | " ResizedH)
             }
 
             Strode := (32 * obju.ImgZelW) / 8
@@ -20399,6 +20403,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             gradientsBMP := drawFillSelGradient(ResizedW, ResizedH, 0, 0, 0, ResizedW, ResizedH, userimgGammaCorrect)
             azX := (imgSelX1<0) ? abs(ImgSelX1) : 0
             azY := (imgSelY1<0) ? abs(ImgSelY1) : 0
+            sazY := (ImgSelY2>imgH) ? imgSelY2 - imgH : 0
             szW := (ImgSelX2>imgW) ? imgSelX2 - imgW : 0
             szH := (ImgSelY2>imgH) ? imgSelY2 - imgH : 0
             If ((szW || szH || azX || azY) && validBMP(gradientsBMP) && FillAreaInverted=0)
@@ -20410,8 +20415,9 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
                szW := Ceil(szW*xf) + 1,           szH := Ceil(szH*yf) + 1
                rw := clampInRange(ResizedW - szX - szW, 2, ResizedW)
                rh := clampInRange(ResizedH - szY - szH, 2, ResizedH)
-               kBitmap := trGdip_CloneBitmapArea(A_ThisFunc, gradientsBMP, zX, zY, rw, rh)
-               ; fnOutputDebug(A_ThisFunc ": " zX "|" zY "||" szX "|" szY " | crop top/left bounds from gradient rw, rh=" rw "|" rh)
+               pZy := (imgSelY1<0) ? 0 : Floor(sazY*yf)
+               kBitmap := trGdip_CloneBitmapArea(A_ThisFunc, gradientsBMP, zX, pZy, rw, rh)
+               fnOutputDebug(A_ThisFunc ": " zX "|" zY "||" szX "|" szY " | crop top/left bounds from gradient rw, rh=" rw "|" rh)
                If validBMP(kBitmap)
                {
                   trGdip_DisposeImage(gradientsBMP, 1)
@@ -20426,6 +20432,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
                {
                   ; fnOutputDebug(A_ThisFunc ": convert small gradient bitmap to FreeImage")
                   showTOOLtip("Applying " modus "`nRescaling gradient bitmap, please wait", 1)
+                  Gdip_ImageRotateFlip(gradientsBMP, 6)
                   hFIFimgGradient := ConvertPBITMAPtoFIM(gradientsBMP)
                   gradientsBMP := trGdip_DisposeImage(gradientsBMP)
                   If hFIFimgGradient
@@ -20439,13 +20446,15 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
                      gScan := FreeImage_GetBits(hFIFimgRealGradient)
                      gStride := FreeImage_GetStride(hFIFimgRealGradient)
                      gBpp := FreeImage_GetBPP(hFIFimgRealGradient)
+                     FreeImage_GetImageDimensions(hFIFimgRealGradient, nBmpW, nBmpH)
+                     ; fnOutputDebug(A_ThisFunc ": freeimage resized gradient " nBmpW "||" nBmpH)
                      FreeImage_UnLoad(hFIFimgGradient)
                   }
                } Else
                {
-                  ; fnOutputDebug(A_ThisFunc ": locking gradient bits with gdi+")
-                  trGdip_GetImageDimensions(gradientsBMP, ResizedW, ResizedH)
-                  EZ := Gdip_LockBits(gradientsBMP, 0, 0, ResizedW, ResizedH, gStride, gScan, gData)
+                  trGdip_GetImageDimensions(gradientsBMP, nBmpW, nBmpH)
+                  ; fnOutputDebug(A_ThisFunc ": locking gradient bits with gdi+ " ResizedW "||" ResizedH)
+                  EZ := Gdip_LockBits(gradientsBMP, 0, 0, nBmpW, nBmpH, gStride, gScan, gData)
                   gBpp := 32
                   mustUnlock := 1
                }
@@ -20479,6 +20488,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             gScan := FreeImage_GetBits(hFIFimgExtern)
             gStride := FreeImage_GetStride(hFIFimgExtern)
             gBpp := FreeImage_GetBPP(hFIFimgExtern)
+            FreeImage_GetImageDimensions(hFIFimgExtern, nBmpW, nBmpH)
             ; TulTip(A_ThisFunc, "|", zxa, zya, wz, hz, obju.imgZelW, obju.imgZelH)
          }
 
@@ -20505,7 +20515,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, thisInvert)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, shapeu, thisRotation, 0, thisInvert, "a", "a", 1)
          thisKeepAlpha := (transformTool=1) ? BlendModesPreserveAlpha : FillAreaCutGlass
-         r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", blending, "int", BlendModesFlipped, "UPtr", mScan, "int", mStride, "UPtr", gScan, "int", gStride, "int", gBpp, "int", doBehind, "int", opacityExtra, "int", thisKeepAlpha)
+         r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", blending, "int", BlendModesFlipped, "UPtr", mScan, "int", mStride, "UPtr", gScan, "int", gStride, "int", gBpp, "int", doBehind, "int", opacityExtra, "int", thisKeepAlpha, "int", nBmpW, "int", nBmpH)
          If hFIFimgRealGradient
             FreeImage_UnLoad(hFIFimgRealGradient)
          If (hFIFimgExtern && r=1)
@@ -20619,6 +20629,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             pBitsMini := FreeImage_GetBits(hFIFimgZ)
             strideMini := FreeImage_GetStride(hFIFimgZ)
          }
+         fnOutputDebug(imgSelX1 "|" imgSelY1 "||" imgSelX2 "|" imgSelY2)
 
          recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
