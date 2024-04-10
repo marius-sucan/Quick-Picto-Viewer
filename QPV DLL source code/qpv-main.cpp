@@ -360,7 +360,7 @@ void plotLineSetPixel(int width, int height, int nx, int ny) {
     // polygonMapTempMin[ny] = min(polygonMapTempMin[ny], nx);
     // fnOutputDebug("maxu=" + std::to_string(polygonMapMax[ny]) + " | minu=" + std::to_string(polygonMapMin[ny]));
 
-    if (nx>=polyW || ny>=polyH || nx<polyX || ny<polyY || nx>=width || ny>=height || nx<0 || ny<0)
+    if ((nx - polyX)>=polyW || (ny - polyY)>=polyH || (nx - polyX)<polyX || (ny - polyY)<polyY || nx<0 || ny<0)
        return;
 
     // UINT64 index = (UINT64)(ny - polyY) * polyW + (nx - polyX);
@@ -497,23 +497,24 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1,
     fill(polygonMaskMap.begin(), polygonMaskMap.end(), 0);
     // fnOutputDebug("polygonMaskMap refilled to zero ; size = " + std::to_string(s) + "|" + std::to_string(polyW) + " x " + std::to_string(polyH) + "|" + std::to_string(polyX) + " x " + std::to_string(polyY));
 
-    int boundMaxX = 0;
+    // int boundMaxX = 0;
     int boundMaxY = 0;
     int boundMinX = INT_MAX;
     int boundMinY = INT_MAX;
     for ( int i = 0; i < PointsCount*2; i+=2)
     {
-        PointsList[i] = clamp(round(PointsList[i]), 0.0f, (float)w);
-        PointsList[i + 1] = clamp(round(PointsList[i + 1]) + polyOffYa - polyOffYb, 0.0f, (float)h);
-        boundMaxX = max(PointsList[i], boundMaxX);
+        // prepare points list and identify boundaries
+        PointsList[i] = round(PointsList[i]);
+        PointsList[i + 1] = round(PointsList[i + 1]) + polyOffYa - polyOffYb;
+        // boundMaxX = max(PointsList[i], boundMaxX);
         boundMaxY = max(PointsList[i + 1], boundMaxY);
-        boundMinX = min(PointsList[i], boundMinX);
-        boundMinY = min(PointsList[i + 1], boundMinY);
+        // boundMinX = min(PointsList[i], boundMinX);
+        // boundMinY = min(PointsList[i + 1], boundMinY);
     }
 
     std::vector<std::unordered_set<int>>  polygonMapEdges;
     int hmax = max(boundMaxY, h) + 1;
-    fnOutputDebug(std::to_string(hmax) + "=hmax; bound rect={" + std::to_string(boundMinX) + "," + std::to_string(boundMinY) + "," + std::to_string(boundMaxX) + "," + std::to_string(boundMaxY) + "}");
+    // fnOutputDebug(std::to_string(hmax) + "=hmax; bound rect={" + std::to_string(boundMinX) + "," + std::to_string(boundMinY) + "," + std::to_string(boundMaxX) + "," + std::to_string(boundMaxY) + "}");
     polygonMapMin.resize(hmax);
     fnOutputDebug("polygonMapMin reserved");
     polygonMapEdges.reserve(hmax);
@@ -522,11 +523,11 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1,
         polygonMapEdges.emplace_back();
     }
 
-    fnOutputDebug("polygonMapEdges reserved");
-    fnOutputDebug("tracing polygonal path with bresenham algo");
     int i = 2;
     int xa = PointsList[0];
     int ya = PointsList[1];
+    fnOutputDebug("polygonMapEdges reserved");
+    fnOutputDebug("tracing polygonal path with bresenham algo");
     for (int pts = 0; pts < PointsCount;)
     {
         polygonMapMin.assign(h, INT_MAX);
@@ -2525,12 +2526,12 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
         fnOutputDebug("add noise step -1");
         for (int x = 0; x < w + 2; x++)
         {
-            pixelzMapW[x] = (float)mw*((x - bmpX)/(float)bImgSelW);
+            pixelzMapW[x] = (float)mw*((x - bmpX)/(float)w);
         }
 
         for (int y = 0; y < h + 2; y++)
         {
-            pixelzMapH[y] = (float)mh*((y - bmpY)/(float)bImgSelH);
+            pixelzMapH[y] = (float)mh*((y - bmpY)/(float)h);
         }
 
         fnOutputDebug("add noise step 0");
@@ -2574,6 +2575,9 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
                 if (clipMaskFilter(x, y, NULL, 0)==1)
                    continue;
 
+                if (pixelzMapW[x]>=mw || pixelzMapH[y]>=mh || pixelzMapW[x]<0 || pixelzMapH[y]<0)
+                   continue;
+
                 INT64 on = CalcPixOffset(pixelzMapW[x], pixelzMapH[y], StrideMini, bpp);
                 int nR = newBitmap[2 + on];
                 int nG = newBitmap[1 + on];
@@ -2585,7 +2589,6 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
                 int oR = bgrImageData[2 + o];
                 int oG = bgrImageData[1 + o];
                 int oB = bgrImageData[o];
-
                 if (blendMode>0)
                 {
                    RGBAColor Orgb = {nB, nG, nR, 255};
@@ -3439,7 +3442,7 @@ DLL_API int DLL_CALLCONV MergeBitmapsWithMask(unsigned char *originalData, unsig
     return 1;
 }
 
-DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, int h, int Stride, int bpp, int maskOpacity, int blendMode, int flipLayers, int keepAlpha, int linearGamma, unsigned char *newBitmap, int StrideMini, int mw, int mh, int bImgSelW, int bImgSelH, unsigned char *maskBitmap, int mStride) {
+DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, int h, int Stride, int bpp, int maskOpacity, int blendMode, int flipLayers, int keepAlpha, int linearGamma, unsigned char *newBitmap, int StrideMini, int mw, int mh, unsigned char *maskBitmap, int mStride) {
     if (maskOpacity<2)
        return 1;
 
@@ -3449,12 +3452,12 @@ DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, 
     const int bmpY = (imgSelY1<0 || invertSelection==1) ? 0 : imgSelY1;
     for (int x = 0; x < w; x++)
     {
-        pixelzMapW[x] = (float)mw*((x - bmpX)/(float)bImgSelW);
+        pixelzMapW[x] = (float)mw*((x - bmpX)/(float)w);
     }
 
     for (int y = 0; y < h; y++)
     {
-        pixelzMapH[y] = (float)mh*((y - bmpY)/(float)bImgSelH);
+        pixelzMapH[y] = (float)mh*((y - bmpY)/(float)h);
     }
 
     const float fintensity = char_to_float[maskOpacity];
@@ -3466,6 +3469,9 @@ DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, 
             int nA = 255;
             int oA = 255;
             if (clipMaskFilter(x, y, maskBitmap, mStride)==1)
+               continue;
+
+            if (pixelzMapW[x]>=mw || pixelzMapH[y]>=mh)
                continue;
 
             INT64 on = CalcPixOffset(pixelzMapW[x], pixelzMapH[y], StrideMini, bpp);

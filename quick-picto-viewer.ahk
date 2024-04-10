@@ -14047,10 +14047,10 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
       ppy2 := h
    }
 
-   fnOutputDebug(ppo " mode=" mode "; useCache=" useCache " | angle=" rotation " doFlip=" doFlip)
-   fnOutputDebug("xxxcoords = " x1 "|" y1 "|" x2 "|" y2 "||" xf "|" yf)
-   fnOutputDebug("selcoords = " imgSelX1 "|" imgSelY1 "|" imgSelX2 "|" imgSelY2)
-   fnOutputDebug("pppcoords = " ppx1 "|" ppy1 "|" ppx2 "|" ppy2 "||" ppx2 - ppx1 "//" ppy2 - ppy1 " | Z | " ppofYa "|" ppofYb)
+   ; fnOutputDebug(ppo " mode=" mode "; useCache=" useCache " | angle=" rotation " doFlip=" doFlip)
+   ; fnOutputDebug("xxxcoords = " x1 "|" y1 "|" x2 "|" y2 "||" xf "|" yf)
+   ; fnOutputDebug("selcoords = " imgSelX1 "|" imgSelY1 "|" imgSelX2 "|" imgSelY2)
+   ; fnOutputDebug("pppcoords = " ppx1 "|" ppy1 "|" ppx2 "|" ppy2 "||" ppx2 - ppx1 "//" ppy2 - ppy1 " | Z | " ppofYa "|" ppofYb)
    ; ToolTip, % Round(innerSelectionCavityX, 2) "|" Round(innerSelectionCavityY, 2) "|" Round(exclusion, 2) , , , 2
    ; ToolTip, % round(w/h, 2) "|" round(mod(rotation, 45), 2) "°|" w "|" h "`n"  rw "|" rh "`n" Round(xf, 2) "|" Round(yf, 2) , , , 2
    ; ToolTip, % round(xf, 2) "|" round(yf, 2) "|"  round(rotation, 2) "|" Round(exclusion, 2) , , , 2
@@ -20416,8 +20416,14 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
                rw := clampInRange(ResizedW - szX - szW, 2, ResizedW)
                rh := clampInRange(ResizedH - szY - szH, 2, ResizedH)
                pZy := (imgSelY1<0) ? 0 : Floor(sazY*yf)
-               kBitmap := trGdip_CloneBitmapArea(A_ThisFunc, gradientsBMP, zX, pZy, rw, rh)
-               fnOutputDebug(A_ThisFunc ": " zX "|" zY "||" szX "|" szY " | crop top/left bounds from gradient rw, rh=" rw "|" rh)
+               If (imgSelY1<0 && imgSelY2>imgH)
+                  pZy += abs(Round(imgSelY2 - imgH)*yf)
+               ; ToolTip, % "l=" pZy  , , , 2
+               ; Gux := Gdip_GraphicsFromImage(gradientsBMP)
+               ; Gdip_DrawRectangle(Gux, pPen7, zX, pZy, rw, rh)
+               ; Gdip_DeleteGraphics(Gux)
+               kBitmap := trGdip_CloneBitmapArea(A_ThisFunc, gradientsBMP, zX, Round(pZy), rw, rh)
+               ; fnOutputDebug(A_ThisFunc ": " zX "|" zY "||" szX "|" szY " | crop top/left bounds from gradient rw, rh=" rw "|" rh)
                If validBMP(kBitmap)
                {
                   trGdip_DisposeImage(gradientsBMP, 1)
@@ -20475,8 +20481,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             zya := (imgSelY1<0) ? abs(ImgSelY1) : 0
             zxb := (ImgSelX2>imgW) ? tw - (imgSelX2 - imgW) : tw
             zyb := (ImgSelY2>imgH) ? th - (imgSelY2 - imgH) : th
-            wz := zxb - zxa
-            hz := zyb - zya
+            ; wz := zxb - zxa,    hz := zyb - zya
             If (zxa || zya || zxb!=tw || zyb!=th)
             {
                ; crop top/left out of bounds
@@ -20581,8 +20586,6 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          If hFIFimgZ
          {
             FreeImage_GetImageDimensions(hFIFimgZ, thisImgW, thisImgH)
-            thisSelW := (BlurAreaInverted=1) ? imgW : obju.bImgSelW
-            thisSelH := (BlurAreaInverted=1) ? imgH : obju.bImgSelH
             pBitsMini := FreeImage_GetBits(hFIFimgZ)
             strideMini := FreeImage_GetStride(hFIFimgZ)
             If (BlurAreaBlendMode>1 && blurAreaApplyFX=1)
@@ -20598,7 +20601,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, BlurAreaInverted)
             QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, BlurAreaInverted, "a", "a", 1)
             showTOOLtip("Applying " modus "`nPhase 3/3...", 1)
-            r := DllCall(whichMainDLL "\PixelateHugeBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", blurAreaOpacity, "int", BlurAreaBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", thisSelW, "int", thisSelH, "UPtr", mScan, "int", mStride)
+            r := DllCall(whichMainDLL "\PixelateHugeBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", blurAreaOpacity, "int", BlurAreaBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "UPtr", mScan, "int", mStride)
             FreeImage_UnLoad(hFIFimgZ)
          } Else
          {
@@ -20624,16 +20627,14 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
 
             hFIFimgZ := FreeImage_Allocate(thisImgW, thisImgH, 24)
             FreeImage_GetImageDimensions(hFIFimgZ, thisImgW, thisImgH)
-            thisSelW := (BlurAreaInverted=1) ? imgW : obju.bImgSelW
-            thisSelH := (BlurAreaInverted=1) ? imgH : obju.bImgSelH
             pBitsMini := FreeImage_GetBits(hFIFimgZ)
             strideMini := FreeImage_GetStride(hFIFimgZ)
          }
-         fnOutputDebug(imgSelX1 "|" imgSelY1 "||" imgSelX2 "|" imgSelY2)
 
+         ; fnOutputDebug(imgSelX1 "|" imgSelY1 "||" imgSelX2 "|" imgSelY2 "||" thisSelW "|" thisSelH)
          recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
-         r := DllCall(whichMainDLL "\GenerateRandomNoiseOnBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", thisSelW, "int", thisSelH, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha)
+         r := DllCall(whichMainDLL "\GenerateRandomNoiseOnBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha)
          If (UserAddNoisePixelizeAmount>0)
             FreeImage_UnLoad(hFIFimgZ)
       } Else If InStr(modus, "color")
@@ -22644,7 +22645,7 @@ livePreviewAddNoiser(modus:=0) {
 
           QPV_PrepareHugeImgSelectionArea(0, 0, imgBoxSizeW - 1, imgBoxSizeH - 1, imgBoxSizeW, imgBoxSizeH, 0, 0, 0, 0, 0, 0, 1)
           E1 := Gdip_LockBits(cornersBMP, 0, 0, imgBoxSizeW, imgBoxSizeH, stride, iScan, iData)
-          r0 := DllCall(whichMainDLL "\GenerateRandomNoiseOnBitmap", "UPtr", iScan, "Int", imgBoxSizeW, "Int", imgBoxSizeH, "int", stride, "int", 32, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", thisSelW, "int", thisSelH, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha)
+          r0 := DllCall(whichMainDLL "\GenerateRandomNoiseOnBitmap", "UPtr", iScan, "Int", imgBoxSizeW, "Int", imgBoxSizeH, "int", stride, "int", 32, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha)
           Gdip_UnlockBits(cornersBMP, iData)
           If (UserAddNoisePixelizeAmount>0)
              FreeImage_UnLoad(hFIFimgZ)
