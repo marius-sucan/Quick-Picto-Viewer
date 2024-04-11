@@ -12694,7 +12694,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
 
        ; fnOutputDebug("thisY=" thisY "|| " (cropH + cropY)*scaleuPreview "||" maxH)
        prevImgW := imgW,       prevImgH := imgH
-       If (thisY>maxH && TextInAreaValign!=3 || thisY<0 && TextInAreaValign=3)
+       If (thisY>maxH && TextInAreaValign!=3 || (thisY + imgH)<0 && TextInAreaValign=3)
        {
           fnOutputDebug("text outside selection boundaries: " thisY "||" maxH)
           Break
@@ -12925,10 +12925,13 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
     minedY := clampInRange(minedY, 0, maxH)
     maxedW := clampInRange(maxedW, 1, maxW)
     maxedH := clampInRange(maxedH, 1, maxH)
+    hha := maxedH
     If (TextInAreaValign=3)
     {
        maxedH := clampInRange(maxedH - minedY, 1, maxH)
        maxedH -= Round(lnSpace)
+       hha := maxedH
+       maxedH := clampInRange(maxedH, 1, maxH)
     }
 
     hFIFimgA := FreeImage_Allocate(maxedW, maxedH, 32)
@@ -12948,7 +12951,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
        imgW := mw := cachedRawTXTbmps[A_Index, 5]
        imgH := mh := cachedRawTXTbmps[A_Index, 6]
        thisX := cachedRawTXTbmps[A_Index, 3] - minedX
-       thisY := cachedRawTXTbmps[A_Index, 4] - minedY
+       thisY := cachedRawTXTbmps[A_Index, 4] - minedY - abs(maxedH - hha)
        fnOutputDebug(A_ThisFunc " loop rendered " A_Index "|" mw "|" mh "|" thisX "|" thisY)
        If validBMP(thisBMP)
        {
@@ -20042,21 +20045,19 @@ HugeImagesApplyInsertText() {
       trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
       showTOOLtip("Applying insert text, please wait...")
       setImageLoading()
-      obju := InitHugeImgSelPath(0, imgW, imgH)
+      ; obju := InitHugeImgSelPath(0, imgW, imgH)
       pBitsAll := FreeImage_GetBits(hFIFimgX)
       Stride := FreeImage_GetStride(hFIFimgX)
-
-      ; hFIFimgA := FreeImage_Allocate(obju.bImgSelW, obju.bImgSelH, 32)
-      tobju := coreInsertTextHugeImages(UserTextArea, obju.bImgSelW, obju.bImgSelH)
+      imgSelH := max(imgSelY2, imgSelY1) - min(imgSelY2, imgSelY1)
+      imgSelW := max(imgSelX2, imgSelX1) - min(imgSelX2, imgSelX1)
+      tobju := coreInsertTextHugeImages(UserTextArea, ImgSelW, ImgSelH)
       If IsObject(tobju)
       {
          hFIFimgA   := tobju[1]
          minedX     := tobju[2],    minedY := tobju[3]
          mW         := tobju[4],    mH := tobju[5]
-fnOutputDebug("0: " imgSelX1 "|" imgSelY1 "|" imgSelX2 "|" imgSelY2)
-
-fnOutputDebug("A: " minedX "|" minedY "|" mw "|" mH)
-         imgSelH := imgSelY2 - imgSelY1
+         fnOutputDebug("0: " imgSelX1 "|" imgSelY1 "|" imgSelX2 "|" imgSelY2 "||" imgSelW "|" imgSelH)
+         fnOutputDebug("A: " minedX "|" minedY "|" mw "|" mH)
          o_imgSelX1 := imgSelX1,    o_imgSelY1 := imgSelY1
          o_imgSelX2 := imgSelX2,    o_imgSelY2 := imgSelY2
          imgSelPx := imgSelX1 := imgSelX1 + minedX
@@ -20067,7 +20068,7 @@ fnOutputDebug("A: " minedX "|" minedY "|" mw "|" mH)
          Else If (TextInAreaAlign=2)
             imgSelPx := imgSelPx + Round(mW/2 - nImgW/2)
      
-fnOutputDebug("B: " imgSelPx "|" imgSelPy "|" nImgW "|" nImgH "|||" mW "|" mH)
+         fnOutputDebug("B: " imgSelPx "|" imgSelPy "|" nImgW "|" nImgH "|||" mW "|" mH)
          If (TextInAreaValign=3)
             imgSelPy := clampInRange(imgSelY2 - nImgH, imgSelY1, imgSelY2)
          Else If (TextInAreaValign=2)
@@ -20078,24 +20079,25 @@ fnOutputDebug("B: " imgSelPx "|" imgSelPy "|" nImgW "|" nImgH "|||" mW "|" mH)
          imgSelX2 := imgSelPx + nImgW
          imgSelY2 := imgSelPy + nImgH
          defineRelativeSelCoords(imgW, imgH)
-
-fnOutputDebug("C: " imgSelPx "|" imgSelPy "|" imgSelX2 "|" imgSelY2)
+         ; fnOutputDebug("C: " imgSelPx "|" imgSelPy "|" imgSelX2 "|" imgSelY2)
          pBits := FreeImage_GetBits(hFIFimgA)
          mStride := FreeImage_GetStride(hFIFimgA)
          mBpp := FreeImage_GetBPP(hFIFimgA)
-fnOutputDebug("D: " pBits "|" mStride "|" mBpp "|" hFIFimgA "|" nImgW "|" nImgH)
+         ; fnOutputDebug("D: " pBits "|" mStride "|" mBpp "|" hFIFimgA "|" nImgW "|" nImgH)
 
+         ; r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBits, "Int", nImgW, "Int", nImgH, "int", mStride, "int", mbpp, "int", 255, "int", userimgGammaCorrect, "int", 0, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "UPtr", 0, "int", "0xFF0011ff", "int", 32, "int", 1, "int", 1, "int", nImgW, "int", nImgH)
          obju := InitHugeImgSelPath(0, imgW, imgH)
          recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
-
-fnOutputDebug("E: " obju.x1 "|" obju.y1 "|" obju.x2 - 1 "|" obju.y2 - 1 "|" obju.ImgSelW "|" obju.ImgSelH "|" obju.bImgSelW "|" obju.bImgSelH)
+         ; r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBitsAll, "Int", ImgW, "Int", ImgH, "int", Stride, "int", bpp, "int", 255, "int", userimgGammaCorrect, "int", 0, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "UPtr", 0, "int", "0xFFee2200", "int", 32, "int", imgSelPx, "int", imgSelPy, "int", nImgW, "int", 10)
+         ; r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBitsAll, "Int", ImgW, "Int", ImgH, "int", Stride, "int", bpp, "int", 255, "int", userimgGammaCorrect, "int", 0, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "UPtr", 0, "int", "0xFFee2200", "int", 32, "int", imgSelPx, "int", imgSelPy + nImgH - 10, "int", nImgW, "int", 10)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
          showTOOLtip("Applying insert text, please wait...`nFinalizing")
-         r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 0, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", TextInAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", pBits, "int", mStride, "int", mBpp, "int", 0, "int", 0, "int", BlendModesPreserveAlpha)
+         r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 0, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", TextInAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", pBits, "int", mStride, "int", mBpp, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", nImgW, "int", nImgH)
+         ; fnOutputDebug(r "E: " obju.x1 "|" obju.y1 "|" obju.x2 - 1 "|" obju.y2 - 1 "|" obju.ImgSelW "|" obju.ImgSelH "|" obju.bImgSelW "|" obju.bImgSelH)
          FreeImage_UnLoad(hFIFimgA)
-         ; imgSelX1 := o_imgSelX1,    imgSelY1 := o_imgSelY1
-         ; imgSelX2 := o_imgSelX2,    imgSelY2 := o_imgSelY2
-         ; defineRelativeSelCoords(imgW, imgH)
+         imgSelX1 := o_imgSelX1,    imgSelY1 := o_imgSelY1
+         imgSelX2 := o_imgSelX2,    imgSelY2 := o_imgSelY2
+         defineRelativeSelCoords(imgW, imgH)
       }
 
       DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
