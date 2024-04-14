@@ -12734,7 +12734,25 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
 
     If validBMP(newBMP)
     {
-       o_txtColor := (TextInAreaCutOutMode=1) ? "0x00" TextInAreaBgrColor : o_txtColor
+       If (TextInAreaBgrOpacity>4)
+       {
+          thisColoru := MixARGB(bgrColor, "0xFF" TextInAreaFontColor, TextInAreaFontOpacity/255)
+       } Else If (TextInAreaBgrOpacity>3)
+       {
+          thisColorA := MixARGB(bgrColor, "0xFF" TextInAreaFontColor, TextInAreaFontOpacity/255)
+          thisColoru := MixARGB(o_txtColor, thisColorA, 0.75)
+       } Else If (TextInAreaBgrOpacity>2)
+       {
+          thisColorA := MixARGB(bgrColor, "0xFF" TextInAreaFontColor, TextInAreaFontOpacity/255)
+          thisColoru := MixARGB(o_txtColor, thisColorA, 0.5)
+       } Else If (TextInAreaBgrOpacity>1)
+       {
+          thisColorA := MixARGB(bgrColor, "0xFF" TextInAreaFontColor, TextInAreaFontOpacity/255)
+          thisColoru := MixARGB(o_txtColor, thisColorA, 0.25)
+       } Else
+          thisColoru := o_txtColor
+
+       o_txtColor := (TextInAreaCutOutMode=1) ? "0x00" TextInAreaBgrColor : thisColoru
        If (doConturDraw=1 && TextInAreaOnlyBorder=1)
           o_txtColor := (TextInAreaCutOutMode=1) ? "0x00" TextInAreaBgrColor : borderColor
 
@@ -12832,7 +12850,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
           Continue
 
        thisuString := StrReplace(thisuString, "┘", " `n")
-       fnOutputDebug("render txt line=" A_Index)
+       ; fnOutputDebug("render txt line=" A_Index)
        objBMPs := Gdi_DrawTextInBox(thisuString, thisHFont, "FFffFF", "000000", borderSize, scaleuPreview, TextInAreaFlipH, TextInAreaFlipV, TextInAreaCharSpacing, TextInAreaLineAngle, TextInAreaOnlyBorder, TextInAreaBorderOut, TextInAreaBorderSize)
        thisBMP := objBMPs[1]
        pBitmapContours := objBMPs[2]
@@ -12959,7 +12977,9 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
        imgH := mh := cachedRawTXTbmps[A_Index, 6]
        thisX := cachedRawTXTbmps[A_Index, 3] - minedX
        thisY := cachedRawTXTbmps[A_Index, 4] - minedY - abs(maxedH - hha)
-       fnOutputDebug(A_ThisFunc " loop rendered " A_Index "|" mw "|" mh "|" thisX "|" thisY)
+       cachedRawTXTbmps[A_Index, 3] := thisX
+       cachedRawTXTbmps[A_Index, 4] := thisY
+       ; fnOutputDebug(A_ThisFunc " loop rendered " A_Index "|" mw "|" mh "|" thisX "|" thisY)
        If validBMP(thisBMP)
        {
           If (TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1)
@@ -12986,7 +13006,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
                 bmpOpacity := (TextInAreaCutOutMode=1 && TextInAreaPaintBgr=1 || TextInAreaBgrUnified=1) ? 255 : TextInAreaFontOpacity
                 thisBlendMode := (TextInAreaBgrUnified=1) ? 5 : 0
                 r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", bmpOpacity, "int", userimgGammaCorrect, "int", thisBlendMode, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
-                fnOutputDebug(A_Index " rendered thisBMP")
+                ; fnOutputDebug(A_Index " rendered thisBMP")
                 Gdip_UnlockBits(thisBMP, mData)
              }
              thisBMP := trGdip_DisposeImage(thisBMP)
@@ -13006,7 +13026,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
                 bmpOpacity := (TextInAreaBgrUnified=1) ? 255 : TextInAreaBorderOpacity
                 thisBlendMode := (TextInAreaBgrUnified=1) ? 5 : 0
                 r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", bmpOpacity, "int", userimgGammaCorrect, "int", thisBlendMode, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
-                fnOutputDebug(A_Index " rendered contour bitmap")
+                ; fnOutputDebug(A_Index " rendered contour bitmap")
                 Gdip_UnlockBits(thisBMP, mData)
                 thisBMP := trGdip_DisposeImage(thisBMP)
              }
@@ -13026,14 +13046,14 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
        r := DllCall(whichMainDLL "\FillImageHoles", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", "0xFF000000")
        If (TextInAreaBgrUnified=1 && TextInAreaPaintBgr=1 && modusContour=0 && TextInAreaBorderOut>1)
        {
-          fnOutputDebug("pre-unified processing")
+          fnOutputDebug("pre-unified processing with borders")
           Loop, % rendered
           {
              ; render the pBitmapContours bitmaps
-             thisBMP := cachedRawTXTbmps[A_Index, 1]
+             thisBMP := cachedRawTXTbmps[A_Index, 2]
              If validBMP(thisBMP)
              {
-                thisX := cachedRawTXTbmps[A_Index, 2],    thisY := cachedRawTXTbmps[A_Index, 3]
+                thisX := cachedRawTXTbmps[A_Index, 3],    thisY := cachedRawTXTbmps[A_Index, 4]
                 Gdip_GetImageDimensions(thisBMP, mw, mh)
                 EZ := Gdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
                 If !EZ
@@ -13047,21 +13067,43 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
        }
 
        If (TextInAreaCutOutMode=1)
+       {
           r := DllCall(whichMainDLL "\ColorizeGrayImage", "UPtr", pBitsAll, "int", mImgW, "int", mImgH, "int", Stride, "int", 32, "int", 0, "int", "0x00" TextInAreaBgrColor, "int", bgrColor)
-       Else
-          r := DllCall(whichMainDLL "\ColorizeGrayImage", "UPtr", pBitsAll, "int", mImgW, "int", mImgH, "int", Stride, "int", 32, "int", userimgGammaCorrect, "int", txtColor, "int", bgrColor)
+       } Else
+       {
+          If (TextInAreaBgrOpacity>4)
+          {
+             thisColoru := MixARGB(bgrColor, "0xFF" TextInAreaFontColor, TextInAreaFontOpacity/255)
+          } Else If (TextInAreaBgrOpacity>3)
+          {
+             thisColorA := MixARGB(bgrColor, "0xFF" TextInAreaFontColor, TextInAreaFontOpacity/255)
+             thisColoru := MixARGB(txtColor, thisColorA, 0.75)
+          } Else If (TextInAreaBgrOpacity>2)
+          {
+             thisColorA := MixARGB(bgrColor, "0xFF" TextInAreaFontColor, TextInAreaFontOpacity/255)
+             thisColoru := MixARGB(txtColor, thisColorA, 0.5)
+          } Else If (TextInAreaBgrOpacity>1)
+          {
+             thisColorA := MixARGB(bgrColor, "0xFF" TextInAreaFontColor, TextInAreaFontOpacity/255)
+             thisColoru := MixARGB(txtColor, thisColorA, 0.25)
+          } Else
+             thisColoru := txtColor
+
+          ntxtColor := (TextInAreaCutOutMode=1) ? "0x00" TextInAreaBgrColor : thisColoru
+          r := DllCall(whichMainDLL "\ColorizeGrayImage", "UPtr", pBitsAll, "int", mImgW, "int", mImgH, "int", Stride, "int", 32, "int", userimgGammaCorrect, "int", ntxtColor, "int", bgrColor)
+       }
     }
 
     If (TextInAreaBgrUnified=1 && TextInAreaPaintBgr=1 && modusContour=1 && TextInAreaBorderOut>1 && fattalErr!=1)
     {
-       fnOutputDebug("post-unified processing")
+       fnOutputDebug("post-unified processing with borders")
        Loop, % rendered
        {
           ; render the pBitmapContours bitmaps
-          thisBMP := cachedRawTXTbmps[A_Index, 1]
+          thisBMP := cachedRawTXTbmps[A_Index, 2]
           If validBMP(thisBMP)
           {
-             thisX := cachedRawTXTbmps[A_Index, 2],    thisY := cachedRawTXTbmps[A_Index, 3]
+             thisX := cachedRawTXTbmps[A_Index, 3],    thisY := cachedRawTXTbmps[A_Index, 4]
              QPV_ColorizeGrayImage(thisBMP, "0xFF" TextInAreaBorderColor, "0x00" TextInAreaBorderColor, 0)
              Gdip_GetImageDimensions(thisBMP, mw, mh)
              EZ := Gdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
