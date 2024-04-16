@@ -264,7 +264,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , TextInAreaFontColor := "eeFFaa", TextInAreaFontOpacity := 250, TextInAreaRoundBoxBgr := 1, TextInAreaValign := 1
    , TextInAreaBgrColor := "229933", TextInAreaBgrOpacity := 100, TextInAreaOnlyBorder := 0, TextInAreaBlurAmount := 0
    , TextInAreaBorderOut := 1, TextInAreaBorderColor := "334400", TextInAreaBorderOpacity := 200, TextInAreaCharSpacing := 0
-   , TextInAreaUsrMarginz := 0, TextInAreaBlurBorderAmount := 0, TextInAreaDoBlurs := 0, TextInAreaLineAngle := 0
+   , TextInAreaUsrMarginz := 0, TextInAreaBlurBorderAmount := 0, TextInAreaDoBlurs := 0
    , TextInAreaFontLineSpacing := 0, TextInAreaCutOutMode := 0, TextInAreaBgrEntire := 0, TextInAreaFontStrike := 0
    , showMainMenuBar := 1, markSearchMatches := 1, showSelectionGrid := 0, blurAreaTwice := 0, TextInAreaFlipV := 0
    , allowRecordHistory := 1, TextInAreaPaintBgr := 1, rotateSelBoundsKeepRatio := 1, TextInAreaFlipH := 0
@@ -313,7 +313,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , showFolderTreeDetails := 0, userSaveBitsDepth := 1, uiUseDarkMode := 0, uiPreferedFileStats := 1
    , hamDistLBorderCrop := 0, hamDistRBorderCrop := 0, userpHashMode := 0, graylevelCompressor := 1
    , findInvertedDupes := 0, PerformMSDonDupes := 0, userFindDupesMSElvl := 50, FloodFillColor := "aa0099"
-   , dupesApplyBlur := 0, BreakDupesGroups := 0, fadeOtherDupeGroups := 1, TextInAreaFillSelArea := 0
+   , dupesApplyBlur := 0, BreakDupesGroups := 0, fadeOtherDupeGroups := 1
    , keepUserPaintAlphaMask := 0, alphaMaskColorReversed := 0, alphaMaskGradientScale := 100
    , alphaMaskGradientPosA := 0, alphaMaskGradientPosB := 100, alphaMaskGradientWrapped := 5
    , FillBehindClrOpacity  := 200, FillBehindOpacity := 255, FillBehindColor := "ff4400", allowCustomKeys := 0
@@ -12451,22 +12451,24 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
        thisFactor := clampInRange(thisFactor, 1.3, 13)
     ; ToolTip, % "z=" thisFactor "|" zoomLevel , , , 2
 
-    thisLineAngle := (TextInAreaLineAngle<0) ? 3600 + TextInAreaLineAngle : TextInAreaLineAngle
-    If !isNumber(thisLineAngle)
-       thisLineAngle := 0
-
+    thisLineAngle := 0
     hFont := Gdi_CreateFontByName(TextInAreaFontName, TextInAreaFontSize, fntWeight, TextInAreaFontItalic, TextInAreaFontStrike, TextInAreaFontUline, fntQuality, thisLineAngle)
     If (Gdi_GetObjectType(hFont)!="FONT")
        Return "fail"
 
     hFontPreview := (thisFactor=1) ? Gdi_CloneFont(hFont) : Gdi_CreateFontByName(TextInAreaFontName, TextInAreaFontSize//thisFactor, fntWeight, TextInAreaFontItalic, TextInAreaFontStrike, TextInAreaFontUline, fntQuality, thisLineAngle)
     thisBlurAmount := (TextInAreaDoBlurs=1) ? max(TextInAreaBlurAmount, TextInAreaBlurBorderAmount) // 2 : 0
-    obs := borderSize := (TextInAreaUsrMarginz>0) ? TextInAreaUsrMarginz : TextInAreaBorderSize//2 + thisBlurAmount
+    obs := borderSize := (TextInAreaBorderOut>1) ? TextInAreaBorderSize//2 + thisBlurAmount : thisBlurAmount
+    If (TextInAreaUsrMarginz>1)
+       obs := borderSize := TextInAreaUsrMarginz 
     Gdi_MeasureString(hFont, testString, 1, testWa, testHa)
     Gdi_MeasureString(hFontPreview, testString, 1, testWb, testHb)
     ; ToolTip, % "l=" testWa "|" testWb , , , 2
     scaleuPreview := (previewMode=1 && thisFactor!=1) ? testWa/testWb : 1
-    lnSpace := (previewMode=1) ? Round(TextInAreaFontLineSpacing / scaleuPreview) : TextInAreaFontLineSpacing
+    If (TextInAreaPaintBgr=1 && TextInAreaBgrUnified!=1)
+       lnSpace := (previewMode=1) ? Round(TextInAreaFontLineSpacing / scaleuPreview) : TextInAreaFontLineSpacing
+    Else
+       lnSpace := (previewMode=1) ? Round((TextInAreaFontLineSpacing - borderSize*2) / scaleuPreview) : TextInAreaFontLineSpacing - borderSize * 2
     theString := StrReplace(theString, "`n`n", "`n┘")
     thisLnHeight := (previewMode=1) ? testHb + lnSpace : testHa + lnSpace
     If (thisLnHeight<1)
@@ -12551,8 +12553,8 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
        pzYa := (TextInAreaValign=3) ? thisY : thisY + prevImgH
        pzYb := (TextInAreaValign=3) ? thisY - prevImgH : thisY
        lineVisible := (((pzYa<=cropYa) || pzYb>=cropYb) && allowOpti=1 && allowCrop=1) ? 0 : 1
-       thisTXTid := "a" thisuString borderSize scaleuPreview TextInAreaFlipH TextInAreaFlipV TextInAreaCharSpacing TextInAreaLineAngle TextInAreaOnlyBorder TextInAreaBorderOut TextInAreaBorderSize "||" TextInAreaFontName TextInAreaFontSize fntWeight TextInAreaFontItalic TextInAreaFontStrike TextInAreaFontUline fntQuality thisLineAngle TextInAreaCaseTransform TextInAreaValign
-       thisPartialTXTid := "a" thisuString borderSize scaleuPreview TextInAreaCharSpacing TextInAreaLineAngle TextInAreaBorderSize "||" TextInAreaFontSize fntWeight thisLineAngle TextInAreaValign
+       thisTXTid := "a" thisuString borderSize scaleuPreview TextInAreaFlipH TextInAreaFlipV TextInAreaCharSpacing TextInAreaOnlyBorder TextInAreaBorderOut TextInAreaBorderSize "||" TextInAreaFontName TextInAreaFontSize fntWeight TextInAreaFontItalic TextInAreaFontStrike TextInAreaFontUline fntQuality thisLineAngle TextInAreaCaseTransform TextInAreaValign
+       thisPartialTXTid := "a" thisuString borderSize scaleuPreview TextInAreaCharSpacing TextInAreaBorderSize "||" TextInAreaFontSize fntWeight thisLineAngle TextInAreaValign
        If ((cachedRawTXTbmps[A_Index, 3]=thisTXTid && lineVisible=1 || cachedRawTXTbmps[A_Index, 4]=thisPartialTXTid && lineVisible=0) && previewMode=1)
        {
           aa := validBMP(cachedRawTXTbmps[A_Index, 1]) ? trGdip_CloneBitmap(A_ThisFunc, cachedRawTXTbmps[A_Index, 1]) : 0
@@ -12570,11 +12572,11 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
           cachedRawTXTbmps[A_Index, 2] := trGdip_DisposeImage(cachedRawTXTbmps[A_Index, 2])
           srr := (lineVisible=1) ? thisuString : SubStr(thisuString, 1, 2)
           fnOutputDebug("render txt line=" A_Index " / " totalLinez " | visible= " lineVisible)
-          objBMPs := Gdi_DrawTextInBox(srr, thisHFont, "FFffFF", "000000", borderSize, scaleuPreview, TextInAreaFlipH, TextInAreaFlipV, TextInAreaCharSpacing, TextInAreaLineAngle, TextInAreaOnlyBorder, TextInAreaBorderOut, TextInAreaBorderSize)
+          objBMPs := Gdi_DrawTextInBox(srr, thisHFont, "FFffFF", "000000", borderSize, scaleuPreview, TextInAreaFlipH, TextInAreaFlipV, TextInAreaCharSpacing, 0, TextInAreaOnlyBorder, TextInAreaBorderOut, TextInAreaBorderSize)
           If (previewMode=1)
           {
-             thisPartialTXTid := "a" srr borderSize scaleuPreview TextInAreaCharSpacing TextInAreaLineAngle TextInAreaBorderSize "||" TextInAreaFontSize fntWeight thisLineAngle TextInAreaValign
-             thisTXTid := "a" srr borderSize scaleuPreview TextInAreaFlipH TextInAreaFlipV TextInAreaCharSpacing TextInAreaLineAngle TextInAreaOnlyBorder TextInAreaBorderOut TextInAreaBorderSize "||" TextInAreaFontName TextInAreaFontSize fntWeight TextInAreaFontItalic TextInAreaFontStrike TextInAreaFontUline fntQuality thisLineAngle TextInAreaCaseTransform TextInAreaValign
+             thisPartialTXTid := "a" srr borderSize scaleuPreview TextInAreaCharSpacing TextInAreaBorderSize "||" TextInAreaFontSize fntWeight thisLineAngle TextInAreaValign
+             thisTXTid := "a" srr borderSize scaleuPreview TextInAreaFlipH TextInAreaFlipV TextInAreaCharSpacing TextInAreaOnlyBorder TextInAreaBorderOut TextInAreaBorderSize "||" TextInAreaFontName TextInAreaFontSize fntWeight TextInAreaFontItalic TextInAreaFontStrike TextInAreaFontUline fntQuality thisLineAngle TextInAreaCaseTransform TextInAreaValign
              aa := validBMP(objBMPs[1]) ? trGdip_CloneBitmap(A_ThisFunc, objBMPs[1]) : 0
              bb := validBMP(objBMPs[2]) ? trGdip_CloneBitmap(A_ThisFunc, objBMPs[2]) : 0
              cachedRawTXTbmps[A_Index] := [aa, bb, thisTXTid, thisPartialTXTid]
@@ -12811,9 +12813,11 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
        Return "fail"
 
     thisBlurAmount := (TextInAreaDoBlurs=1) ? max(TextInAreaBlurAmount, TextInAreaBlurBorderAmount) // 2 : 0
-    obs := borderSize := (TextInAreaUsrMarginz>0) ? TextInAreaUsrMarginz : TextInAreaBorderSize//2 + thisBlurAmount
+    obs := borderSize := (TextInAreaBorderOut>1) ? TextInAreaBorderSize//2 + thisBlurAmount : thisBlurAmount
+    If (TextInAreaUsrMarginz>1)
+       obs := borderSize := TextInAreaUsrMarginz 
     Gdi_MeasureString(hFont, testString, 1, testWa, testHa)
-    lnSpace := TextInAreaFontLineSpacing
+    lnSpace := (TextInAreaPaintBgr=1 && TextInAreaBgrUnified!=1) ? TextInAreaFontLineSpacing : TextInAreaFontLineSpacing - borderSize*2
     theString := StrReplace(theString, "`n`n", "`n┘")
     thisLnHeight := testHa + lnSpace
     If (thisLnHeight<1)
@@ -12851,7 +12855,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
 
        thisuString := StrReplace(thisuString, "┘", " `n")
        ; fnOutputDebug("render txt line=" A_Index)
-       objBMPs := Gdi_DrawTextInBox(thisuString, thisHFont, "FFffFF", "000000", borderSize, scaleuPreview, TextInAreaFlipH, TextInAreaFlipV, TextInAreaCharSpacing, TextInAreaLineAngle, TextInAreaOnlyBorder, TextInAreaBorderOut, TextInAreaBorderSize)
+       objBMPs := Gdi_DrawTextInBox(thisuString, thisHFont, "FFffFF", "000000", borderSize, scaleuPreview, TextInAreaFlipH, TextInAreaFlipV, TextInAreaCharSpacing, 0, TextInAreaOnlyBorder, TextInAreaBorderOut, TextInAreaBorderSize)
        thisBMP := objBMPs[1]
        pBitmapContours := objBMPs[2]
        If validBMP(thisBMP)
@@ -16862,6 +16866,8 @@ InsertTextSelectedArea() {
     If (allowOutside=1)
        hasRanExpand := performAutoExpandCanvas(imgW, imgH)
 
+
+
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
@@ -16869,7 +16875,7 @@ InsertTextSelectedArea() {
     metaBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
     If validBMP(metaBitmap)
        G2 := trGdip_GraphicsFromImage(A_ThisFunc, metaBitmap, 7, 4,, compositingQuality)
-
+ 
     If !G2
     {
        If validBMP(metaBitmap)
@@ -16882,13 +16888,12 @@ InsertTextSelectedArea() {
        Return
     }
 
+    o_coreFmt := coreDesiredPixFmt
+    coreDesiredPixFmt := "0xE200B"
     o_imgSelPx := imgSelPx, o_imgSelPy := imgSelPy
     o_imgSelW := imgSelW, o_imgSelH := imgSelH
     bgrColor := makeRGBAcolor(TextInAreaBgrColor, TextInAreaBgrOpacity)
     zBrush := Gdip_BrushCreateSolid(bgrColor)
-
-    o_coreFmt := coreDesiredPixFmt
-    coreDesiredPixFmt := "0xE200B"
     obju := coreInsertTextInAreaBox(UserTextArea, imgSelW, imgSelH, 0)
     If validBMP(obju[1])
     {
@@ -16899,11 +16904,12 @@ InsertTextSelectedArea() {
     zz := 0
     coreDesiredPixFmt := o_coreFmt
     trGdip_GetImageDimensions(textBoxu, nImgW, nImgH)
-    Gdip_GetRotatedDimensions(nImgW, nImgH, VPselRotation, rrImgW, rrImgH)
+    thisRotation := (TextInAreaVerticalia=1) ? VPselRotation + 90 : VPselRotation
+    Gdip_GetRotatedDimensions(nImgW, nImgH, thisRotation, rrImgW, rrImgH)
     mpx := Round((rrImgW * rrImgH)/1000000, 1)
-    If (VPselRotation>0)
+    If (thisRotation>0)
     {
-       xBitmap := trGdip_RotateBitmapAtCenter(A_ThisFunc, textBoxu, VPselRotation, "-", 7, 0, 1)
+       xBitmap := trGdip_RotateBitmapAtCenter(A_ThisFunc, textBoxu, thisRotation, "-", 7, 0, 1)
        If (validBMP(xBitmap) || (xBitmap="ok"))
        {
           pkpl := (xbitmap="ok") ? textBoxu : xBitmap
@@ -16949,11 +16955,6 @@ InsertTextSelectedArea() {
        If (userimgGammaCorrect=1)
           Gdip_SetCompositingQuality(Gr, 2)
 
-       If (TextInAreaRoundBoxBgr=1 && TextInAreaFillSelArea=1)
-          Gdip_FillRoundedRectanglePath(Gr, zBrush, 0, 0, tW, tH, min(tW, tH)//6)
-       Else If (TextInAreaFillSelArea=1)
-          Gdip_FillRectangle(Gr, zBrush, 0, 0, tW, tH)
-
        r1 := trGdip_DrawImage(A_ThisFunc, Gr, textBoxu, imgSelPx - tX, imgSelPy - tY, zimgW, zimgH)
        Gdip_DeleteGraphics(Gr)
        If (TextInAreaBlendMode>1)
@@ -16974,11 +16975,6 @@ InsertTextSelectedArea() {
        trGdip_DisposeImage(maskedBitmap, 1)
     } Else
     {
-       If (TextInAreaRoundBoxBgr=1 && TextInAreaFillSelArea=1)
-          Gdip_FillRoundedRectanglePath(G2, zBrush, tX, tY, tW, tH, min(tW, tH)//6)
-       Else If (TextInAreaFillSelArea=1)
-          Gdip_FillRectangle(G2, zBrush, tX, tY, tW, tH)
-
        r1 := trGdip_DrawImage(A_ThisFunc, G2, textBoxu, imgSelPx, imgSelPy, zimgW, zimgH)
     }
 
@@ -17045,7 +17041,7 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
     trGdip_GetImageDimensions(useGdiBitmap(), thisW, thisH)
     calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
     thisPos := (skippedLines>0) ? "a" prevDestPosY zoomLevel : 0
-    thisState := "a" UserTextArea TextInAreaAlign TextInAreaValign TextInAreaDoBlurs TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr imgSelW imgSelH mainWidth mainHeight TextInAreaLineAngle TextInAreaCharSpacing TextInAreaAutoWrap TextInAreaCaseTransform TextInAreaFlipH TextInAreaFlipV userimgGammaCorrect thisW thisH thisPos
+    thisState := "a" UserTextArea TextInAreaAlign TextInAreaValign TextInAreaDoBlurs TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr imgSelW imgSelH mainWidth mainHeight TextInAreaCharSpacing TextInAreaAutoWrap TextInAreaCaseTransform TextInAreaFlipH TextInAreaFlipV userimgGammaCorrect thisW thisH thisPos
     o_coreFmt := coreDesiredPixFmt
     coreDesiredPixFmt := "0xE200B"
     If (((A_TickCount - lastInvoked < 50) || (thisState=prevState)) && validBMP(prevBMPu))
@@ -17081,12 +17077,16 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
     trGdip_GetImageDimensions(useGdiBitmap(), thisW, thisH)
     objSel := ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, thisW, thisH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
     trGdip_GetImageDimensions(textBoxu, onImgW, onImgH)
-    Gdip_GetRotatedDimensions(onImgW, onImgH, VPselRotation, rrImgW, rrImgH)
+    thisRotation := (TextInAreaVerticalia=1) ? VPselRotation + 90 : VPselRotation
+    If (viewportQPVimage.imgHandle)
+       thisRotation := (TextInAreaVerticalia=1) ? 90 : 0
+
+    Gdip_GetRotatedDimensions(onImgW, onImgH, thisRotation, rrImgW, rrImgH)
     mpx := Round((rrImgW * rrImgH)/1000000, 1)
-    If (VPselRotation>0)
+    If (thisRotation>0)
     {
        zz := 1
-       xBitmap := trGdip_RotateBitmapAtCenter(A_ThisFunc, textBoxu, VPselRotation, "-", 5, 0, 1)
+       xBitmap := trGdip_RotateBitmapAtCenter(A_ThisFunc, textBoxu, thisRotation, "-", 5, 0, 1)
        pkpl := (xbitmap="ok") ? textBoxu : xBitmap
        trGdip_GetImageDimensions(pkpl, kW, kH)
        ppw := Round((max(kW, kH) * zoomLevel) * scaleuPreview)
@@ -17159,11 +17159,6 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
        If (userimgGammaCorrect=1)
           Gdip_SetCompositingQuality(Gr, 2)
 
-       If (TextInAreaRoundBoxBgr=1 && TextInAreaFillSelArea=1)
-          Gdip_FillRoundedRectanglePath(Gr, zBrush, -ptx, -pty, otw, oth, min(otW, otH)//6)
-       Else If (TextInAreaFillSelArea=1)
-          Gdip_FillRectangle(Gr, zBrush, -ptx, -pty, otw, oth)
-
        r1 := trGdip_DrawImage(A_ThisFunc, Gr, textBoxu, imgSelPx - tX, imgSelPy - tY, zimgW, zimgH, 0, 0, nimgW, nimgH)
        Gdip_DeleteGraphics(Gr)
        If (TextInAreaBlendMode>1)
@@ -17186,7 +17181,7 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
           getVPselSize(zW, zH, 1, 0)
           objSel.zw := zw,        objSel.zh := zh
           ; objSel.forceRect := (VPselRotation>0) ? 1 : 0
-          thisIDu := "a" previewMode VPselRotation zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY getVPselIDs("saiz-vpos") FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY TextInAreaFlipV TextInAreaFlipV TextInAreaAlign TextInAreaLineAngle TextInAreaCharSpacing TextInAreaBlendMode TextInAreaValign TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaFillSelArea TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName
+          thisIDu := "a" previewMode VPselRotation zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY getVPselIDs("saiz-vpos") FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY TextInAreaFlipV TextInAreaFlipV TextInAreaAlign TextInAreaCharSpacing TextInAreaBlendMode TextInAreaValign TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName
           thisIDu .= "b" TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr TextInAreaAutoWrap TextInAreaCaseTransform userimgGammaCorrect undoLevelsRecorded currentUndoLevel useGdiBitmap() getAlphaMaskIDu()
           realtimePasteInPlaceAlphaMasker(previewMode, fBitmap, thisIDu, maskedBitmap, objSel)
        }
@@ -17202,10 +17197,6 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
           trGdip_DisposeImage(maskedBitmap, 1)
     } Else
     {
-       If (TextInAreaRoundBoxBgr=1 && TextInAreaFillSelArea=1)
-          Gdip_FillRoundedRectanglePath(G2, zBrush, tX, tY, tW, tH, min(tW, tH)//6)
-       Else If (TextInAreaFillSelArea=1)
-          Gdip_FillRectangle(G2, zBrush, tX, tY, tW, tH)
        r1 := trGdip_DrawImage(A_ThisFunc, G2, textBoxu, imgSelPx, imgSelPy, zimgW, zimgH, 0, 0, nimgW, nimgH)
     }
 
@@ -25731,7 +25722,11 @@ repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:=
            {
               doAttachCtlColor := -2
               ; almost working, but the texts are black on black ;[
+              ; I need to somehow set the text color to white of the hDC of the List View Header
+              ; hDC := Gdi_GetDC(strControlHwnd)
+              ; ll := Gdi_SetTextColor(hDC, "0xffFFff")
               ; DllCall("uxtheme\SetWindowTheme", "uptr", strControlHwnd, "str", "DarkMode_ItemsView", "ptr", 0)
+              ; ToolTip, % hDC " l=" ll , , , 2
            } Else If InStr(CtrlClass, "Edit")
            {
               doAttachCtlColor := -1
@@ -46911,10 +46906,6 @@ saveCurrentVectorShape(givenName, allowMsg:=1) {
    Return errorOccured
 }
 
-updateLabelTextLineAngle() {
-   Return "Line angle: " Round(TextInAreaLineAngle/10) "°"
-}
-
 updateLabelPasteImgOpacity() {
    Return "Image opacity: " Round(PasteInPlaceOpacity / 255 * 100) "%"
 }
@@ -52511,7 +52502,6 @@ ReadSettingsTextInArea(act:=0) {
     RegAction(act, "TextInAreaFlipV",, 1)
     RegAction(act, "TextInAreaFlipV",, 1)
     RegAction(act, "TextInAreaAlign",, 2, 1, 3)
-    RegAction(act, "TextInAreaLineAngle",, 2, -900, 900)
     RegAction(act, "TextInAreaCharSpacing",, 2, -100, 255)
     RegAction(act, "TextInAreaBlendMode",, 2, 1, 23)
     RegAction(act, "TextInAreaValign",, 2, 1, 3)
@@ -52521,7 +52511,6 @@ ReadSettingsTextInArea(act:=0) {
     RegAction(act, "TextInAreaBgrColor",, 3)
     RegAction(act, "TextInAreaBgrEntire",, 1)
     RegAction(act, "TextInAreaBgrUnified",, 1)
-    RegAction(act, "TextInAreaFillSelArea",, 1)
     RegAction(act, "TextInAreaCutOutMode",, 1)
     RegAction(act, "TextInAreaBgrOpacity",, 2, 3, 255)
     RegAction(act, "TextInAreaBorderSize",, 2, 1, 650)
@@ -52595,7 +52584,7 @@ PanelInsertTextArea() {
          , editF12, PickuTextInAreaFontColor, PickuTextInAreaBgrColor, PickuTextInAreaBorderColor, uiPasteInPlaceAlphaDrawMode
 
     If (viewportQPVimage.imgHandle)
-       PasteInPlaceAutoExpandIMG := TextInAreaLineAngle := 0
+       PasteInPlaceAutoExpandIMG := 0
 
     widu := (PrefsLargeFonts=1) ? 55 : 40
     ml := (PrefsLargeFonts=1) ? 35 : 24
@@ -52624,10 +52613,7 @@ PanelInsertTextArea() {
     opaciSlideW := Round(opaciSlideW*1.7)
 
     Gui, Tab, 2
-    If (viewportQPVimage.imgHandle)
-       Gui, Add, Checkbox, x+15 y+15 w%opaciSlideW% h%ha% gupdateUIInsertTextPanel Checked%TextInAreaVerticalia% vTextInAreaVerticalia, Vertical orientation
-    Else
-       GuiAddSlider("TextInAreaLineAngle", -900,900, 0, ".updateLabelTextLineAngle", "updateUIInsertTextPanel", 2, "x+15 y+15 Section w" opaciSlideW " h" ha)
+    Gui, Add, Checkbox, x+15 y+15 w%opaciSlideW% h%ha% gupdateUIInsertTextPanel Checked%TextInAreaVerticalia% vTextInAreaVerticalia, Rotated by 90°
     GuiAddSlider("TextInAreaCharSpacing", -100,255, 0, "Letters spacing: $€", "updateUIInsertTextPanel", 3, "x+5 wp hp")
     GuiAddSlider("TextInAreaFontLineSpacing", -950,950, 0, "Line spacing: $€ px", "updateUIInsertTextPanel", 2, "xs y+10 wp hp")
     GuiAddSlider("TextInAreaUsrMarginz", 0,500, 0, "Text margins: $€ px", "updateUIInsertTextPanel", 1, "x+5 wp hp")
@@ -52640,7 +52626,6 @@ PanelInsertTextArea() {
     GuiAddDropDownList("x+5 wp gupdateUIInsertTextPanel Choose" TextInAreaValign " AltSubmit vTextInAreaValign", "Top|Center|Bottom", "Text vertical alignment")
 
     Gui, Add, Checkbox, xm+15 yp+%ml% w%opaciSlideW% Section gupdateUIInsertTextPanel Checked%TextInAreaPaintBgr% vTextInAreaPaintBgr, Draw background
-    Gui, Add, Checkbox, x+1 yp hp gupdateUIInsertTextPanel Checked%TextInAreaFillSelArea% vTextInAreaFillSelArea, Fill selection area
     Gui, Add, Checkbox, xs yp+%ml% w%opaciSlideW% gupdateUIInsertTextPanel Checked%TextInAreaBgrUnified% vTextInAreaBgrUnified, Unified block
     Gui, Add, Checkbox, x+1 yp hp gupdateUIInsertTextPanel Checked%TextInAreaRoundBoxBgr% vTextInAreaRoundBoxBgr, Rounded corners
     Gui, Add, Checkbox, xs yp+%ml% w%opaciSlideW% gupdateUIInsertTextPanel Checked%TextInAreaCutOutMode% vTextInAreaCutOutMode, Cut-out mode
@@ -52878,7 +52863,7 @@ updateUIInsertTextPanel(actionu:=0, b:=0) {
        actu := (TextInAreaPaintBgr=1 && TextInAreaBgrUnified!=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu, TextInAreaBgrEntire
 
-       actu2 := (TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1 || TextInAreaFillSelArea=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+       actu2 := (TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu2, TextInAreaRoundBoxBgr
 
        uiSlidersArray["TextInAreaBorderSize", 3] := TextInAreaFontSize*2
@@ -52902,12 +52887,12 @@ updateUIInsertTextPanel(actionu:=0, b:=0) {
        actu := (pku=1) ? "SettingsGUIA: Hide" : "SettingsGUIA: Show"
        GuiControl, % actu, TextInAreaFontColor
 
-       actu := (TextInAreaPaintBgr=1 || TextInAreaFillSelArea=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+       actu := (TextInAreaPaintBgr=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu, txtLine2
        GuiControl, % actu, PickuTextInAreaBgrColor
-       uiSlidersArray["TextInAreaBgrOpacity", 10] := (TextInAreaPaintBgr=1 || TextInAreaFillSelArea=1) ? 1 : 0
+       uiSlidersArray["TextInAreaBgrOpacity", 10] := TextInAreaPaintBgr
 
-       actu := (TextInAreaPaintBgr=1 || TextInAreaFillSelArea=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+       actu := (TextInAreaPaintBgr=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
        GuiControl, % actu, TextInAreaBgrColor
 
        actu2 := (TextInAreaBorderOut>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
@@ -52926,7 +52911,7 @@ updateUIInsertTextPanel(actionu:=0, b:=0) {
        livePreviewsImageEditing(0, A_ThisFunc, actionu, b)
 
     thisOpa := (BrushToolUseSecondaryColor=1) ? "BrushToolBopacity" : "BrushToolAopacity"
-    If (liveDrawingBrushTool!=1 && ShowAdvToolbar=1 && (TextInAreaPaintBgr=1 && TextInAreaCutOutMode=1 && TextInAreaBgrUnified=0 || TextInAreaFillSelArea=1))
+    If (liveDrawingBrushTool!=1 && ShowAdvToolbar=1 && (TextInAreaPaintBgr=1 && TextInAreaCutOutMode=1 && TextInAreaBgrUnified=0))
     {
        %thisOpa% := TextInAreaBgrOpacity
     } Else If (liveDrawingBrushTool!=1 && ShowAdvToolbar=1 && TextInAreaPaintBgr=0)
