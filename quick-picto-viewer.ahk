@@ -12212,8 +12212,18 @@ HardWrapTextFontBased(TextToWrap, hFont, maxW, maxH, lineHeight, vAlign, scaleuP
    If (StrLen(TextToWrap)<=2)
       Return TextToWrap
 
-   cH := 0
    TextToWrap := Trimmer(TextToWrap)
+   If (maxW<5)
+   {
+      kk := ""
+      pp := StrSplit(TextToWrap)
+      Loop, % pp.Count()
+         kk .= pp[A_Index] "`n" 
+
+      Return kk
+   }
+
+   cH := 0
    thisIndex := thisH := linez := hasMatchedRegEx := offsetu := 0
    whereHasMatched := newLinez := ""
    hDC := Gdi_GetDC()
@@ -12268,6 +12278,7 @@ HardWrapTextFontBased(TextToWrap, hFont, maxW, maxH, lineHeight, vAlign, scaleuP
           thisIndex := hasMatchedRegEx := 0
        }
    }
+   ; ToolTip, % maxW "|" newLinez , , , 2
    w := Gdi_SelectObject(hDC, old_hFont)
    g := Gdi_ReleaseDC(hDC, 0)
    ; ToolTip, % w "|" g "." foundPos "==" startPos, , , 2
@@ -12480,13 +12491,21 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
        theString := Trimmer(theString)
        ; theString := Trimmer(HardWrapTextFontBased(theString, hFont, 42600 - borderSize * 2, 42600, thisLnHeight, TextInAreaValign, scaleuPreview))
 
-    If (previewMode=1)
-       borderSize := Round(borderSize/scaleuPreview)
-
+    textArray := StrSplit(theString, "`n")
+    totalLinez := textArray.Count()
     maxW := Round(maxW / scaleuPreview)
     maxH := Round(maxH / scaleuPreview)
+    If (totalLinez=1 && TextInAreaValign=2)
+    {
+       oneLiner := 1
+       omH := maxH
+       maxH := (previewMode=1) ? Round((testHa + borderSize*2) / scaleuPreview) : testHa + borderSize*2
+    }
+    ; ToolTip, % maxH "|" testHa "|" borderSize , , , 2
     cropYa := Round(cropYa / scaleuPreview)
     cropYb := Round(cropYb / scaleuPreview)
+    If (previewMode=1)
+       borderSize := Round(borderSize/scaleuPreview)
     ; p := capIMGdimensionsFormatlimits("gdip", 0, maxW, maxH)
     scaleuBlrPreview := (previewMode=1) ? (borderSize*4 + testWb + testHb)/(obs*4 + testWa + testHa) : 1
     If (isImgSizeTooLarge(maxW, maxH) && previewMode=1)
@@ -12540,8 +12559,6 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
     threads := (previewMode=1) ? realSystemCores : 0
     prevImgH := imgH := (previewMode=1) ? testHb : testHa
     prevImgW := imgW := (previewMode=1) ? testWb : testWa
-    textArray := StrSplit(theString, "`n")
-    totalLinez := textArray.Count()
     Loop, % totalLinez
     {
        thisuString := (TextInAreaValign=3) ? textArray[totalLinez - A_Index + 1] : textArray[A_Index]
@@ -12552,7 +12569,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
        thisuString := StrReplace(thisuString, "┘", " `n")
        pzYa := (TextInAreaValign=3) ? thisY : thisY + prevImgH
        pzYb := (TextInAreaValign=3) ? thisY - prevImgH : thisY
-       lineVisible := (((pzYa<=cropYa) || pzYb>=cropYb) && allowOpti=1 && allowCrop=1) ? 0 : 1
+       lineVisible := (((pzYa<=cropYa) || pzYb>=cropYb) && allowOpti=1 && allowCrop=1 && A_Index>1) ? 0 : 1
        thisTXTid := "a" thisuString borderSize scaleuPreview TextInAreaFlipH TextInAreaFlipV TextInAreaCharSpacing TextInAreaOnlyBorder TextInAreaBorderOut TextInAreaBorderSize "||" TextInAreaFontName TextInAreaFontSize fntWeight TextInAreaFontItalic TextInAreaFontStrike TextInAreaFontUline fntQuality thisLineAngle TextInAreaCaseTransform TextInAreaValign
        thisPartialTXTid := "a" thisuString borderSize scaleuPreview TextInAreaCharSpacing TextInAreaBorderSize "||" TextInAreaFontSize fntWeight thisLineAngle TextInAreaValign
        If ((cachedRawTXTbmps[A_Index, 3]=thisTXTid && lineVisible=1 || cachedRawTXTbmps[A_Index, 4]=thisPartialTXTid && lineVisible=0) && previewMode=1)
@@ -12722,6 +12739,12 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
     If (TextInAreaValign=3)
        maxedH := clampInRange(maxedH - minedY, 1, maxH)
 
+    If (oneLiner=1 && omH<maxH)
+    {
+       minedY := (maxH - omH)/2
+       maxedH := clampInRange(maxedH - (maxH - omH), omH, maxedH)
+    }
+
     If (Gz || contoursBMP)
        Gdip_DeleteGraphics(Gz)
 
@@ -12828,23 +12851,28 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
     Else
        theString := Trimmer(theString)
 
-    maxW := Round(maxW / scaleuPreview)
-    maxH := Round(maxH / scaleuPreview)
+    textArray := StrSplit(theString, "`n")
+    totalLinez := textArray.Count()
+    maxW := Round(maxW)
+    maxH := Round(maxH)
+    If (totalLinez=1 && TextInAreaValign=2)
+    {
+       oneLiner := 1
+       omH := maxH
+    }
+
     ; ToolTip, % thisFactor "==" scaleuPreview "|" maxW "|" maxH , , , 2
     ; ToolTip, % testWa "==" testHa "`n" testWb "==" testHb "`n" testWa/testWb , , , 2
     thisBlur := Round(TextInAreaBlurAmount * scaleuBlrPreview)
     doEffect := (thisBlur>0 && TextInAreaDoBlurs=1 && !isWinXP) ? 1 : 0
     ; ToolTip, % thisBlur "`n" scaleuBlrPreview "`n" scaleuPreview , , , 2
     thisBorderBlur := Round(TextInAreaBlurBorderAmount * scaleuBlrPreview)
-    zBrush := Gdip_BrushCreateSolid(bgrColor)
     prevY := thisY := (TextInAreaValign=3) ? maxH : 0
     rendered := thisX := maxedW := maxedH := 0
     minedX := maxW, minedY := maxH
     doConturDraw := (TextInAreaBorderSize>0 && TextInAreaBorderOut>1) ? 1 : 0
     rescaleWidthCharSpacing := (TextInAreaCharSpacing<0) ? (100 - Abs(TextInAreaCharSpacing))/90 : 1
     thisHFont := hFont
-    textArray := StrSplit(theString, "`n")
-    totalLinez := textArray.Count()
     cachedRawTXTbmps := []
     showTOOLtip("Applying insert text, please wait...`nRendering text lines")
     Loop, % totalLinez
@@ -12955,12 +12983,17 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
     maxedW := clampInRange(maxedW, 1, maxW)
     maxedH := clampInRange(maxedH, 1, maxH)
     hha := maxedH
+    nmaxH := testHa + borderSize*2
     If (TextInAreaValign=3)
     {
        maxedH := clampInRange(maxedH - minedY, 1, maxH)
        maxedH -= Round(lnSpace)
        hha := maxedH
        maxedH := clampInRange(maxedH, 1, maxH)
+    } Else If (oneLiner=1 && omH<nmaxH)
+    {
+       oneLiner := 2
+       minedY := (nmaxH - omH)//2
     }
 
     hFIFimgA := FreeImage_Allocate(maxedW, maxedH, 32)
@@ -13122,12 +13155,13 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
     }
 
     Gdi_DeleteObject(hFont)
-    Gdip_DeleteBrush(zBrush)
     If (fattalErr=1)
        Return
 
     If (TextInAreaValign=3)
        minedY += lnSpace
+    Else If (oneLiner=2)
+       minedY -= (nmaxH - omH)//2
 
     cachedRawTXTbmps := []
     cachedRawTXTbmps := [hFIFimgA, minedX, minedY, maxedW, maxedH, rendered, lnSpace]
@@ -20097,17 +20131,38 @@ HugeImagesApplyInsertText() {
          hFIFimgA   := tobju[1]
          minedX     := tobju[2],    minedY := tobju[3]
          mW         := tobju[4],    mH := tobju[5]
+         If (TextInAreaVerticalia=1)
+            hFIFimgW := FreeImage_Rotate(hFIFimgA, -90)
+
+         If hFIFimgW
+         {
+            FreeImage_UnLoad(hFIFimgA)
+            hFIFimgA := hFIFimgW
+            FreeImage_GetImageDimensions(hFIFimgA, nImgW, nImgH)
+            If (nImgW>imgSelW || nImgH>imgSelH)
+            {
+               calcIMGdimensions(nImgW, nImgH, imgSelW, imgSelH, zbw, zbh)
+               hFIFimgW := FreeImage_Rescale(hFIFimgA, zbw, zbh)
+               If hFIFimgW
+               {
+                  FreeImage_UnLoad(hFIFimgA)
+                  hFIFimgA := hFIFimgW
+               }
+            }
+         } Else If (TextInAreaVerticalia=1)
+            addJournalEntry(A_ThisFunc "(): ERROR. Failed to rotate text bitmap to 90 degrees.")
+
          ; fnOutputDebug("0: " imgSelX1 "|" imgSelY1 "|" imgSelX2 "|" imgSelY2 "||" imgSelW "|" imgSelH)
          ; fnOutputDebug("A: " minedX "|" minedY "|" mw "|" mH)
+         FreeImage_GetImageDimensions(hFIFimgA, nImgW, nImgH)
          o_imgSelX1 := imgSelX1,    o_imgSelY1 := imgSelY1
          o_imgSelX2 := imgSelX2,    o_imgSelY2 := imgSelY2
-         imgSelPx := imgSelX1 := imgSelX1 + minedX
-         imgSelPy := imgSelY1 := imgSelY1 + minedY
-         FreeImage_GetImageDimensions(hFIFimgA, nImgW, nImgH)
+         imgSelPx := imgSelX1 := imgSelX1 ; + minedX
+         imgSelPy := imgSelY1 := imgSelY1 ; + minedY
          If (TextInAreaAlign=3)
-            imgSelPx := imgSelPx + mW - nImgW
+            imgSelPx := imgSelPx + imgSelW - nImgW
          Else If (TextInAreaAlign=2)
-            imgSelPx := imgSelPx + Round(mW/2 - nImgW/2)
+            imgSelPx := imgSelPx + Round(imgSelW/2 - nImgW/2)
      
          ; fnOutputDebug("B: " imgSelPx "|" imgSelPy "|" nImgW "|" nImgH "|||" mW "|" mH)
          If (TextInAreaValign=3)
@@ -25854,7 +25909,10 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
     If (imgEditPanelOpened=1)
     {
        If (viewportQPVimage.imgHandle)
+       {
           imgFxMode := 1
+          dummyTimerDelayiedImageDisplay(250)
+       }
 
        doImgEditLivePreview := 1
        ; trGdip_GraphicsClear(A_ThisFunc, 2NDglPG, "0x00" WindowBGRcolor, 1)
@@ -52613,10 +52671,10 @@ PanelInsertTextArea() {
     opaciSlideW := Round(opaciSlideW*1.7)
 
     Gui, Tab, 2
-    Gui, Add, Checkbox, x+15 y+15 w%opaciSlideW% h%ha% gupdateUIInsertTextPanel Checked%TextInAreaVerticalia% vTextInAreaVerticalia, Rotated by 90°
+    GuiAddSlider("TextInAreaUsrMarginz", 0,500, 0, "Text margins: $€ px", "updateUIInsertTextPanel", 1, "x+15 y+15 Section w" opaciSlideW " h" ha)
     GuiAddSlider("TextInAreaCharSpacing", -100,255, 0, "Letters spacing: $€", "updateUIInsertTextPanel", 3, "x+5 wp hp")
     GuiAddSlider("TextInAreaFontLineSpacing", -950,950, 0, "Line spacing: $€ px", "updateUIInsertTextPanel", 2, "xs y+10 wp hp")
-    GuiAddSlider("TextInAreaUsrMarginz", 0,500, 0, "Text margins: $€ px", "updateUIInsertTextPanel", 1, "x+5 wp hp")
+    Gui, Add, Checkbox, x+5 yp hp gupdateUIInsertTextPanel Checked%TextInAreaOnlyBorder% vTextInAreaOnlyBorder, &Draw only the border
 
     GuiAddDropDownList("xs y+10 wp gupdateUIInsertTextPanel Altsubmit Choose" TextInAreaBorderOut " vTextInAreaBorderOut", "No border|Centered|Contour", "Text border type")
     GuiAddSlider("TextInAreaBorderSize", 1,650, 1, "Border thickness: $€ px", "updateUIInsertTextPanel", 1, "x+5 wp h" ha)
@@ -52626,6 +52684,7 @@ PanelInsertTextArea() {
     GuiAddDropDownList("x+5 wp gupdateUIInsertTextPanel Choose" TextInAreaValign " AltSubmit vTextInAreaValign", "Top|Center|Bottom", "Text vertical alignment")
 
     Gui, Add, Checkbox, xm+15 yp+%ml% w%opaciSlideW% Section gupdateUIInsertTextPanel Checked%TextInAreaPaintBgr% vTextInAreaPaintBgr, Draw background
+    Gui, Add, Checkbox, x+1 yp hp gupdateUIInsertTextPanel Checked%TextInAreaVerticalia% vTextInAreaVerticalia, Rotate text by 90°
     Gui, Add, Checkbox, xs yp+%ml% w%opaciSlideW% gupdateUIInsertTextPanel Checked%TextInAreaBgrUnified% vTextInAreaBgrUnified, Unified block
     Gui, Add, Checkbox, x+1 yp hp gupdateUIInsertTextPanel Checked%TextInAreaRoundBoxBgr% vTextInAreaRoundBoxBgr, Rounded corners
     Gui, Add, Checkbox, xs yp+%ml% w%opaciSlideW% gupdateUIInsertTextPanel Checked%TextInAreaCutOutMode% vTextInAreaCutOutMode, Cut-out mode
@@ -52648,7 +52707,6 @@ PanelInsertTextArea() {
     GuiAddPickerColor("x+1 hp w27", "TextInAreaBorderColor")
     GuiAddColor("x+2 w" clrW " hp", "TextInAreaBorderColor", "Border color")
     GuiAddSlider("TextInAreaBorderOpacity", 2,255, 255, "Opacity", "updateUIInsertTextPanel", 1, "x+5 w" opaciSlideW " hp")
-    Gui, Add, Checkbox, xs+%wa% y+5 hp gupdateUIInsertTextPanel Checked%TextInAreaOnlyBorder% vTextInAreaOnlyBorder, &Draw only the border
 
     Gui, Add, Text, xs y+%ml% h%ha% w%wa% +0x200 vtxtLine2, Background
     GuiAddPickerColor("x+1 hp w27", "TextInAreaBgrColor")
@@ -52866,6 +52924,9 @@ updateUIInsertTextPanel(actionu:=0, b:=0) {
        actu2 := (TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu2, TextInAreaRoundBoxBgr
 
+       actu2 := (TextInAreaBorderOut>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+       GuiControl, % actu2, TextInAreaOnlyBorder
+
        uiSlidersArray["TextInAreaBorderSize", 3] := TextInAreaFontSize*2
        uiSlidersArray["TextInAreaBorderSize", 10] := (TextInAreaBorderOut>1) ? 1 : 0
     } Else If (CurrentPanelTab=3)
@@ -52894,9 +52955,6 @@ updateUIInsertTextPanel(actionu:=0, b:=0) {
 
        actu := (TextInAreaPaintBgr=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
        GuiControl, % actu, TextInAreaBgrColor
-
-       actu2 := (TextInAreaBorderOut>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
-       GuiControl, % actu2, TextInAreaOnlyBorder
 
        uiSlidersArray["TextInAreaBlurBorderAmount", 10] := (TextInAreaDoBlurs=1 && TextInAreaBorderOut>1) ? 1 : 0
        uiSlidersArray["TextInAreaBlurAmount", 10] := (TextInAreaDoBlurs=1) ? 1 : 0
