@@ -1616,18 +1616,19 @@ void toRGB(float c, float m, float y, float k, float *rgb) {
   rgb[2] = -((y * (255.0 - k)) / 255.0 + k - 255.0);
 }
 
-int mixColorsFloodFill(int colorB, float *colorA, float f, int dynamicOpacity, int blendMode, float prevCLRindex, float tolerance, int alternateMode, float thisCLRindex, int linearGamma) {
+RGBAColor mixColorsFloodFill(RGBAColor colorB, RGBAColor colorA, float f, int dynamicOpacity, int blendMode, float prevCLRindex, float tolerance, int alternateMode, float thisCLRindex, int linearGamma, int flipLayers) {
 // source https://stackoverflow.com/questions/10139833/adding-colours-colors-together-like-paint-blue-yellow-green-etc
 // http://www.easyrgb.com/en/math.php
  
-  int aB = (colorB >> 24) & 0xFF;
-  int rB = (colorB >> 16) & 0xFF;
-  int gB = (colorB >> 8) & 0xFF;
-  int bB = colorB & 0xFF;
-  int aO = colorA[0];
-  int rO = colorA[1];
-  int gO = colorA[2];
-  int bO = colorA[3];
+  int aB = colorB.a;
+  int rB = colorB.r;
+  int gB = colorB.g;
+  int bB = colorB.b;
+
+  int aO = colorA.a;
+  int rO = colorA.r;
+  int gO = colorA.g;
+  int bO = colorA.b;
 
   int aBf, rBf, gBf, bBf, aOf, rOf, gOf, bOf;
   aBf = (linearGamma==1) ? gamma_to_linear[aB] : aB;
@@ -1656,7 +1657,7 @@ int mixColorsFloodFill(int colorB, float *colorA, float f, int dynamicOpacity, i
 
   if (blendMode>0)
   {
-     RGBColorI blended = calculateBlendModes(rO, gO, bO, rB, gB, bB, blendMode);
+     RGBColorI blended = NEWcalculateBlendModes(colorA, colorB, blendMode, flipLayers, linearGamma);
      rOf = (linearGamma==1) ? gamma_to_linear[blended.r] : blended.r;
      gOf = (linearGamma==1) ? gamma_to_linear[blended.g] : blended.g;
      bOf = (linearGamma==1) ? gamma_to_linear[blended.b] : blended.b;
@@ -1679,18 +1680,18 @@ int mixColorsFloodFill(int colorB, float *colorA, float f, int dynamicOpacity, i
      bT = linear_to_gamma[bT];
   }
 
-    // std::stringstream ss;
-    // ss << "qpv: opacity = " << f;
-    // ss << " rA=" << rA;
-    // ss << "rB=" << rB;
-    // ss << "rT=" << rT;
-    // ss << " | gA=" << gA;
-    // ss << "gB=" << gB;
-    // ss << "gT=" << gT;
-    // // ss << " r = " << result;
-    // OutputDebugStringA(ss.str().data());
+  // std::stringstream ss;
+  // ss << "qpv: opacity = " << f;
+  // ss << " rA=" << rA;
+  // ss << "rB=" << rB;
+  // ss << "rT=" << rT;
+  // ss << " | gA=" << gA;
+  // ss << "gB=" << gB;
+  // ss << "gT=" << gT;
+  // // ss << " r = " << result;
+  // OutputDebugStringA(ss.str().data());
 
-  return (aT << 24) | ((rT & 0xFF) << 16) | ((gT & 0xFF) << 8) | (bT & 0xFF);
+  return {bT, gT, rT, aT};
 }
 
 int clrBrushMixColors(int colorB, float *colorA, float f, int blendMode, int linearGamma, int flipLayers) {
@@ -1836,29 +1837,22 @@ clipMaskFilter() can also rely on a bitmap, but it must be passed directly to it
     return 1;
 }
 
-bool decideColorsEqual(int newColor, int oldColor, float tolerance, float prevCLRindex, int alternateMode, float *nC, float& index) {
+bool decideColorsEqual(RGBAColor newColor, RGBAColor oldColor, float tolerance, float prevCLRindex, int alternateMode, float *nC, float& index) {
     // should use , CIEDE2000
-    if (oldColor==newColor)
+    if (oldColor.r == newColor.r && oldColor.g == newColor.g && oldColor.b == newColor.b)
        return 1;
     else if (tolerance<1)
        return 0;
 
-    // int aB = (newColor >> 24) & 0xFF;
-    int rB = (newColor >> 16) & 0xFF;
-    int gB = (newColor >> 8) & 0xFF;
-    int bB = newColor & 0xFF;
     bool result;
-    // float index;
-    // int index = float(rB*0.299 + gB*0.587 + bB*0.115);
     if (alternateMode==3)
     {
-       // auto LabA = RGBtoLAB(nC[1], nC[2], nC[3]);
-       auto LabB = RGBtoLAB(rB, gB, bB);
+       auto LabB = RGBtoLAB(newColor.r, newColor.g, newColor.b);
        index = CIEdeltaE2000(nC[4], nC[5], nC[6], LabB[0], LabB[1], LabB[2], 1, 1, 1);
        result = (index<=tolerance) ? 1 : 0;
     } else
     {
-       index = RGBtoGray(rB, gB, bB, alternateMode);
+       index = RGBtoGray(newColor.r, newColor.g, newColor.b, alternateMode);
        result = inRange(index - tolerance, index + tolerance, prevCLRindex);
     }
     return result;
@@ -1872,6 +1866,7 @@ int wrapRGBtoGray(int color, int mode) {
     return index;
 }
 
+/*
 int FloodFill8Stack(int *imageData, int w, int h, int x, int y, int newColor, float *nC, int oldColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay, int linearGamma) {
 // based on https://lodev.org/cgtutor/floodfill.html
 // by Lode Vandevenne
@@ -1976,17 +1971,27 @@ int FloodFill8Stack(int *imageData, int w, int h, int x, int y, int newColor, fl
   // OutputDebugStringA(ss.str().data());
   return suchAppliedDeviations;
 }
+*/
 
-int FloodFillScanlineStack(int *imageData, int w, int h, int x, int y, int newColor, int oldColor) {
+int FloodFillScanlineStack(unsigned char *imageData, int w, int h, int x, int y, RGBAColor newColor, RGBAColor oldColor, int Stride, int bpp) {
 // based on https://lodev.org/cgtutor/floodfill.html
 // by Lode Vandevenne
-  if (oldColor == newColor)
+  if (oldColor.r == newColor.r && oldColor.g == newColor.g && oldColor.b == newColor.b)
      return 0;
 
+  fnOutputDebug("FloodFillScanlineStack()");
   int x1;
   bool spanAbove, spanBelow;
   UINT maxPixels = w*h + w;
   UINT loopsOccured = 0;
+  int oR = oldColor.r;
+  int oG = oldColor.g;
+  int oB = oldColor.b;
+  int oA = oldColor.a;
+  int nA = newColor.a;
+  int nR = newColor.r;
+  int nG = newColor.g;
+  int nB = newColor.b;
 
   // std::vector<int> stack;
   // push(stack, x, y);
@@ -2001,9 +2006,13 @@ int FloodFillScanlineStack(int *imageData, int w, int h, int x, int y, int newCo
     int y = starkY.top();
     x1 = x;
 
-    while (x1 >= 0 && imageData[y * w + x1] == oldColor)
+    while (x1 >= 0)
     {
-       x1--;
+       INT64 o = CalcPixOffset(x1, y, Stride, bpp);
+       if (imageData[o + 2] == oR && imageData[o + 1] == oG && imageData[o] == oB)
+          x1--;
+       else 
+          break;
     }
 
     x1++;
@@ -2011,35 +2020,38 @@ int FloodFillScanlineStack(int *imageData, int w, int h, int x, int y, int newCo
     starkX.pop();
     starkY.pop();
 
-    while (x1 < w && imageData[y * w + x1] == oldColor)
+    while (x1 < w)
     {
-       imageData[y * w + x1] = newColor;
+       INT64 o = CalcPixOffset(x1, y, Stride, bpp);
+       if (!(imageData[o + 2] == oR && imageData[o + 1] == oG && imageData[o] == oB))
+          break;
+
+       imageData[o + 3] = nA;
+       imageData[o + 2] = nR;
+       imageData[o + 1] = nG;
+       imageData[o] = nB;
        if (maxPixels<loopsOccured)
           break;
 
        loopsOccured++;
-       // int clrA = imageData[(y - 1) * w + x1];
-       // int clrB = imageData[(y + 1) * w + x1];
-       if (!spanAbove && y > 0 && imageData[(y - 1) * w + x1] == oldColor)
-       // if (spanAbove==0 && y>0 && clrA==oldColor)
+       INT64 clrA = CalcPixOffset(x1, y - 1, Stride, bpp); // imageData[(y - 1) * w + x1];
+       INT64 clrB = CalcPixOffset(x1, y + 1, Stride, bpp); // imageData[(y + 1) * w + x1];
+       if (!spanAbove && y>0 && imageData[clrA + 2] == oR && imageData[clrA + 1] == oG && imageData[clrA] == oB)
        {
           starkX.push(x1);
           starkY.push(y - 1);
           spanAbove = 1;
-       } else if (spanAbove && y > 0 && imageData[(y - 1) * w + x1] != oldColor)
-       // } else if (spanAbove==1 && y>0 && clrA!=oldColor)
+       } else if (spanAbove && y>0)
        {
           spanAbove = 0;
        }
 
-       if (!spanBelow && y < h - 1 && imageData[(y + 1) * w + x1] == oldColor)
-       // if (spanBelow==0 && y<(h-1) && clrB==oldColor)
+       if (!spanBelow && (y<h-1) && imageData[clrB + 2] == oR && imageData[clrB + 1] == oG && imageData[clrB] == oB)
        {
           starkX.push(x1);
           starkY.push(y + 1);
           spanBelow = 1;
-       // } else if (spanBelow==1 && y<(h-1) && clrB!=oldColor)
-       } else if (spanBelow && y < h - 1 && imageData[(y + 1) * w + x1] != oldColor)
+       } else if (spanBelow && (y<h-1))
        {
           spanBelow = 0;
        }
@@ -2049,7 +2061,7 @@ int FloodFillScanlineStack(int *imageData, int w, int h, int x, int y, int newCo
   return loopsOccured;
 }
 
-int ReplaceGivenColor(int *imageData, int w, int h, int x, int y, int newColor, float *nC, int prevColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int linearGamma) {
+int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBAColor newColor, RGBAColor nC, RGBAColor prevColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int linearGamma, float *labClr, int flipLayers, int Stride, int bpp) {
     if ((x < 0) || (x >= (w-1)) || (y < 0) || (y >= (h-1)))  // out of bounds
        return 0;
 
@@ -2058,23 +2070,38 @@ int ReplaceGivenColor(int *imageData, int w, int h, int x, int y, int newColor, 
     for (int zx = 0; zx < w; zx++)
     {
         float index;
-        int oldColor = prevColor;
-        int thisColor = 0;
+        RGBAColor oldColor = prevColor;
+        RGBAColor thisColor = {0, 0, 0, 0};
         for (int zy = 0; zy < h; zy++)
         {
-            if (decideColorsEqual(imageData[zx + zy * w], prevColor, tolerance, prevCLRindex, alternateMode, nC, index))
+            INT64 o = CalcPixOffset(zx, zy, Stride, bpp);
+            int oA = (bpp==32) ? 255 : imageData[3 + o];
+            int oR = imageData[2 + o];
+            int oG = imageData[1 + o];
+            int oB = imageData[o];
+            RGBAColor clr = {oB, oG, oR, oA};
+            if (decideColorsEqual(clr, prevColor, tolerance, prevCLRindex, alternateMode, labClr, index))
             {
                if (tolerance>0 && (opacity<1 || dynamicOpacity==1 || blendMode>0 || cartoonMode==1))
                {
-                  int prevColor = imageData[zx + zy * w];
+                  RGBAColor prevColor = clr;
                   if (cartoonMode==1)
                      thisColor = oldColor;
                   else
-                     thisColor = mixColorsFloodFill(prevColor, nC, opacity, dynamicOpacity, blendMode, prevCLRindex, tolerance, alternateMode, index, linearGamma);
-                  imageData[zx + zy * w] = thisColor;
+                     thisColor = mixColorsFloodFill(prevColor, nC, opacity, dynamicOpacity, blendMode, prevCLRindex, tolerance, alternateMode, index, linearGamma, flipLayers);
+
+                  if (bpp==32)
+                     imageData[3 + o] = thisColor.a;
+                  imageData[2 + o] = thisColor.r;
+                  imageData[1 + o] = thisColor.g;
+                  imageData[o] = thisColor.b;
                } else
                {
-                  imageData[zx + zy * w] = newColor;
+                  if (bpp==32)
+                     imageData[3 + o] = newColor.a;
+                  imageData[2 + o] = newColor.r;
+                  imageData[1 + o] = newColor.g;
+                  imageData[o] = newColor.b;
                }
                loopsOccured++;
             }
@@ -2083,16 +2110,17 @@ int ReplaceGivenColor(int *imageData, int w, int h, int x, int y, int newColor, 
     return loopsOccured;
 }
 
-DLL_API int DLL_CALLCONV FloodFillWrapper(int *imageData, int modus, int w, int h, int x, int y, int newColor, int tolerance, int fillOpacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay, int linearGamma) {
+DLL_API int DLL_CALLCONV FloodFillWrapper(unsigned char *imageData, int modus, int w, int h, int x, int y, int newColor, int tolerance, int fillOpacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay, int linearGamma, int flipLayers, int Stride, int bpp) {
     if ((x < 0) || (x >= (w-1)) || (y < 0) || (y >= (h-1)))  // out of bounds
        return 0;
 
     float toleranza = (alternateMode==3) ? (float)tolerance/10.0 + 1 : tolerance;
-    int prevColor = imageData[x + y * w];
-    int aB = (prevColor >> 24) & 0xFF;
-    int rB = (prevColor >> 16) & 0xFF;
-    int gB = (prevColor >> 8) & 0xFF;
-    int bB = prevColor & 0xFF;
+    INT64 oc = CalcPixOffset(x, y, Stride, bpp);
+    int aB = (bpp==32) ? 255 : imageData[oc + 3];
+    int rB = imageData[oc + 2];
+    int gB = imageData[oc + 1];
+    int bB = imageData[oc];
+    RGBAColor prevColor = {bB, gB, rB, aB};
     float prevCLRindex = RGBtoGray(rB, gB, bB, alternateMode);
 
     float nC[7];
@@ -2105,22 +2133,22 @@ DLL_API int DLL_CALLCONV FloodFillWrapper(int *imageData, int modus, int w, int 
     nC[4] = LabA[0];
     nC[5] = LabA[1];
     nC[6] = LabA[2];
+    RGBAColor newColorI = {nC[3], nC[2], nC[1], nC[0]};
 
     // auto LabB = RGBtoLAB(rB, gB, bB);
     // float CIE = CIEdeltaE2000(LabA[0], LabA[1], LabA[2], LabB[0], LabB[1], LabB[2], 1, 1, 1);
     // float CIE2 = testCIEdeltaE2000(LabA[0], LabA[1], LabA[2], LabB[0], LabB[1], LabB[2], 1, 1, 1);
-
     float opacity = char_to_float[fillOpacity];
     if (tolerance==0 && (opacity<1 || blendMode>0))
-       newColor = mixColorsFloodFill(prevColor, nC, opacity, 0, blendMode, 0, 0, 0, 0, linearGamma);
+       newColorI = mixColorsFloodFill(prevColor, newColorI, opacity, 0, blendMode, 0, 0, 0, 0, linearGamma, flipLayers);
 
     int r;
     if (modus==1)
-       r = ReplaceGivenColor(imageData, w, h, x, y, newColor, nC, prevColor, toleranza, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma);
-    else if (toleranza>0)
-       r = FloodFill8Stack(imageData, w, h, x, y, newColor, nC, prevColor, toleranza, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, eightWay, linearGamma);
+       r = ReplaceGivenColor(imageData, w, h, x, y, newColorI, newColorI, prevColor, toleranza, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, nC, flipLayers, Stride, bpp);
+    // else if (toleranza>0)
+    //    r = FloodFill8Stack(imageData, w, h, x, y, newColorI, nC, prevColor, toleranza, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, eightWay, linearGamma);
     else
-       r = FloodFillScanlineStack(imageData, w, h, x, y, newColor, prevColor);
+       r = FloodFillScanlineStack(imageData, w, h, x, y, newColorI, prevColor, Stride, bpp);
 
     // std::stringstream ss;
     // ss << "qpv: opacity = " << opacity;

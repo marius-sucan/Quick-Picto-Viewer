@@ -12791,11 +12791,11 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
 
        If (TextInAreaRoundBoxBgr=1)
        {
-          radius := Round(((maxedW + borderSize*2 + maxedH)//2.5)*0.1) + 1
-          kPath := Gdip_CreatePath()
-          Gdip_AddPathRoundedRectangle(kPath, minedX, minedY, maxedW, maxedH, radius)
+          oor := FillAreaRectRoundness
+          FillAreaRectRoundness := 33
+          kPath := coreCreateFillAreaShape(minedX, minedY, maxedW, maxedH, 2, 0, 0, 2, 0)
+          FillAreaRectRoundness := oor
           Gdip_SetClipPath(G3, kPath)
-          ; trGdip_GraphicsClear(A_ThisFunc, G3, bgrColor)
           Gdip_DeletePath(kPath)
        } Else
        {
@@ -13830,23 +13830,16 @@ QPV_FloodFill(pBitmap, x, y, newColor, fillOpacity) {
   If (!w || !h || !validBMP(pBitmap) || !isInRange(x, 0, w) || !isInRange(y, 0, h))
      Return 0
 
-  ; If (fillOpacity<254)
-  ; {
-  ;    oldColorHex := Gdip_GetPixelColor(pBitmap, x, y, 1)
-  ;    ; ToolTip, % oldColorHex "`n" newColor , , , 2
-  ;    newColor := MixARGB(oldColorHex, newColor, fillOpacity/255)
-  ; }
-
   Gdip_FromARGB(newColor, A, R, G, B)
   newColor := Gdip_ToARGB(A, R, G, B)
   if (FloodFillTolerance<3)
      FloodFillCartoonMode := 0
 
   ; oldColor := Gdip_GetPixel(pBitmap, x, y)
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
+  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, Stride, iScan, iData, 3)
   tolerance := (FloodFillAltToler=1) ? Ceil(FloodFillTolerance*0.7) + 1 : FloodFillTolerance
   If !E1
-     r := DllCall(whichMainDLL "\FloodFillWrapper", "UPtr", iScan, "Int", FloodFillModus, "Int", w, "Int", h, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", fillOpacity, "int", FloodFillDynamicOpacity, "int", FloodFillBlendMode - 1, "int", FloodFillCartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays, "int", userimgGammaCorrect)
+     r := DllCall(whichMainDLL "\FloodFillWrapper", "UPtr", iScan, "Int", FloodFillModus, "Int", w, "Int", h, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", fillOpacity, "int", FloodFillDynamicOpacity, "int", FloodFillBlendMode - 1, "int", FloodFillCartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays, "int", userimgGammaCorrect, "int", BlendModesFlipped, "int", Stride, "int", 32)
   ; ToolTip, % A_PtrSize "=" A_LastError "==" r "=" func2exec "=" SecToHHMMSS(Round(zeitOperation/1000, 3)) , , , 2
 
   If !E1
@@ -14074,7 +14067,8 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
             Gdip_DeleteMatrix(pMatrix)
          }
 
-         If (bezierSplineCustomShape=1 || FillAreaCurveTension>1)
+         kkz := (mode=4 && PasteInPlaceCropSel=2 || mode=3 && FillAreaShape=2) ? 1 : 0
+         If (bezierSplineCustomShape=1 || FillAreaCurveTension>1 || kkz=1)
             Gdip_FlattenPath(pPath, 0.1)
 
          If (zsf=1)
@@ -20180,48 +20174,24 @@ HugeImagesApplyInsertText() {
 
          If (imgSelY2>imgH && failure=0)
          {
-            nh := nImgH - (imgSelY2 - imgH)
-            If (nh<2)
-               failure++
-            hFIFimgZ := FreeImage_Crop(hFIFimgA, 0, 0, nImgW, nh)
+            hFIFimgZ := FreeImage_Copy(hFIFimgA, 0, 0, nImgW, nImgH - (imgSelY2 - imgH))
             If hFIFimgZ
             {
                FreeImage_UnLoad(hFIFimgA)
                hFIFimgA := hFIFimgZ
-               imgSelY2 := imgSelPy + nh
-               nImgH := nh
-            }
-         }
-
-         If (imgSelX2>imgW && failure=0)
-         {
-            nw := nImgW - (imgSelX2 - imgW)
-            If (nw<2)
-               failure++
-            hFIFimgZ := FreeImage_Crop(hFIFimgA, 0, 0, nW, nImgH)
-            If hFIFimgZ
-            {
-               FreeImage_UnLoad(hFIFimgA)
-               hFIFimgA := hFIFimgZ
-               imgSelX2 := imgSelPx + nw
-               nImgW := nw
-            }
+               FreeImage_GetImageDimensions(hFIFimgA, nImgW, nImgH)
+            } else failure++
          }
 
          If (imgSelX1<0 && failure=0)
          {
-            nw := nImgW - abs(imgSelX1)
-            If (nw<2)
-               failure++
-            hFIFimgZ := FreeImage_Crop(hFIFimgA, abs(imgSelX1), 0, nw, nImgH)
+            hFIFimgZ := FreeImage_Copy(hFIFimgA, abs(imgSelX1), 0, nImgW, nImgH)
             If hFIFimgZ
             {
                FreeImage_UnLoad(hFIFimgA)
                hFIFimgA := hFIFimgZ
-               imgSelX1 := 0
-               imgSelX2 := imgSelX1 + nw
-               nImgW := nw
-            }
+               FreeImage_GetImageDimensions(hFIFimgA, nImgW, nImgH)
+            } else failure++
          }
 
          If (failure=0)
@@ -20235,11 +20205,17 @@ HugeImagesApplyInsertText() {
             ; r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBits, "Int", nImgW, "Int", nImgH, "int", mStride, "int", mbpp, "int", 255, "int", userimgGammaCorrect, "int", 0, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "UPtr", 0, "int", "0xFF0011ff", "int", 32, "int", 1, "int", 1, "int", nImgW, "int", nImgH)
             obju := InitHugeImgSelPath(0, imgW, imgH)
             recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
+            orr := FillAreaShape
+            FillAreaShape := 2
+            FillAreaRectRoundness := 33
+            VPselRotation := innerSelectionCavityX := innerSelectionCavityY := 0
             ; r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBitsAll, "Int", ImgW, "Int", ImgH, "int", Stride, "int", bpp, "int", 255, "int", userimgGammaCorrect, "int", 0, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "UPtr", 0, "int", "0xFFee2200", "int", 32, "int", imgSelPx, "int", imgSelPy, "int", nImgW, "int", 10)
             ; r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBitsAll, "Int", ImgW, "Int", ImgH, "int", Stride, "int", bpp, "int", 255, "int", userimgGammaCorrect, "int", 0, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "UPtr", 0, "int", "0xFFee2200", "int", 32, "int", imgSelPx, "int", imgSelPy + nImgH - 10, "int", nImgW, "int", 10)
-            QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
+            shapeu := (TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1 && TextInAreaRoundBoxBgr=1) ? 3 : 0
+            QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, shapeu, 0, 0, 0, 0, 0, 1)
             showTOOLtip("Applying insert text, please wait...`nFinalizing")
             r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 0, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", TextInAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", pBits, "int", mStride, "int", mBpp, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", nImgW, "int", nImgH)
+            FillAreaShape := orr
             ; fnOutputDebug(r "E: " obju.x1 "|" obju.y1 "|" obju.x2 - 1 "|" obju.y2 - 1 "|" obju.ImgSelW "|" obju.ImgSelH "|" obju.bImgSelW "|" obju.bImgSelH)
          } Else
          {
@@ -42284,6 +42260,7 @@ updateUIfloodFillPanel() {
    GuiControl, % actu, FloodFillCartoonMode
    GuiControl, % actu, FloodFillEightWays
    GuiControl, % actu, FloodFillAltToler
+
    If (FloodFillTolerance<3)
    {
       FloodFillCartoonMode := 0
@@ -42293,8 +42270,10 @@ updateUIfloodFillPanel() {
    uiSlidersArray["FloodFillOpacity", 10] := !FloodFillCartoonMode
    uiSlidersArray["FloodFillClrOpacity", 10] := !FloodFillCartoonMode
 
-   actu := (FloodFillCartoonMode=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
+   actu := (FloodFillCartoonMode=1 || FloodFillTolerance<3) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
    GuiControl, % actu, FloodFillDynamicOpacity
+
+   actu := (FloodFillCartoonMode=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
    GuiControl, % actu, FloodFillBlendMode
    GuiControl, % actu, PickuFloodFillColor
    actu := (FloodFillCartoonMode=1) ? "SettingsGUIA: Hide" : "SettingsGUIA: Show"
@@ -47596,7 +47575,7 @@ PanelDrawLines() {
     GuiAddSlider("DrawLineAreaSpiralLength", 50,5678, 900, "Spiral frequency", "updateUIDrawLinesPanel", 1, "xs ys wp hp")
     GuiAddSlider("DrawLineAreaAltRays", 0,200, 0, "Alternate radius", "updateUIDrawLinesPanel", 1, "xs y+10 wp hp")
     GuiAddSlider("DrawLineAreaCenterCut", -1,350, 0, "Cut-off limit: $€", "updateUIDrawLinesPanel", 1, "x+10 yp wp hp")
-    Gui, Add, Checkbox, xp yp gupdateUIDrawLinesPanel Checked%DrawLineAreaBorderConnector% vDrawLineAreaBorderConnector, &Join lines with arcs
+    Gui, Add, Checkbox, xp yp gupdateUIDrawLinesPanel Checked%DrawLineAreaBorderConnector% vDrawLineAreaBorderConnector, &Join lines using arcs
     Gui, Add, Checkbox, xp yp gupdateUIDrawLinesPanel Checked%DrawLineAreaSnapLine% vDrawLineAreaSnapLine, &Snap lines to 0/90°
     Gui, Add, Checkbox, xs y+50 gupdateUIDrawLinesPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit selection area
     Gui, Add, Checkbox, xs y+10 gupdateUIDrawLinesPanel Checked%freeHandSelectionMode% vfreeHandSelectionMode, &Freehand draw mode
@@ -47870,6 +47849,7 @@ PanelFloodFillTool() {
     pw := (PrefsLargeFonts=1) ? xCol - 42 : xCol - 42
     GuiAddSlider("FloodFillOpacity", 3,255, 255, "Flooding opacity", "updateUIfloodFillPanel", 1, "xs+15 y+15 w" pw " hp")
     GuiAddDropDownList("x" xCol " yp+0 wp-25 gupdateUIfloodFillPanel AltSubmit Choose" FloodFillBlendMode " vFloodFillBlendMode", "No blend mode|" StrReplace(userBlendModesList, "*"), "Blending mode")
+    GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIfloodFillPanel")
     Gui, Add, Checkbox, xs+14 y+8 hp gupdateUIfloodFillPanel Checked%FloodFillDynamicOpacity% vFloodFillDynamicOpacity, Reduce flooding opacity based on color similarity
 
     kl := (PrefsLargeFonts=1) ? 335 : 225
