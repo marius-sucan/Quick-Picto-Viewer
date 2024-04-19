@@ -13832,14 +13832,14 @@ QPV_FloodFill(pBitmap, x, y, newColor, fillOpacity) {
 
   Gdip_FromARGB(newColor, A, R, G, B)
   newColor := Gdip_ToARGB(A, R, G, B)
-  if (FloodFillTolerance<3)
+  If (FloodFillTolerance<3)
      FloodFillCartoonMode := 0
 
   ; oldColor := Gdip_GetPixel(pBitmap, x, y)
   E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, Stride, iScan, iData, 3)
   tolerance := (FloodFillAltToler=1) ? Ceil(FloodFillTolerance*0.7) + 1 : FloodFillTolerance
   If !E1
-     r := DllCall(whichMainDLL "\FloodFillWrapper", "UPtr", iScan, "Int", FloodFillModus, "Int", w, "Int", h, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", fillOpacity, "int", FloodFillDynamicOpacity, "int", FloodFillBlendMode - 1, "int", FloodFillCartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays, "int", userimgGammaCorrect, "int", BlendModesFlipped, "int", Stride, "int", 32)
+     r := DllCall(whichMainDLL "\FloodFillWrapper", "UPtr", iScan, "Int", FloodFillModus, "Int", w, "Int", h, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", fillOpacity, "int", FloodFillDynamicOpacity, "int", FloodFillBlendMode - 1, "int", FloodFillCartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays, "int", userimgGammaCorrect, "int", BlendModesFlipped, "int", Stride, "int", 32, "int", 0, "int", 0)
   ; ToolTip, % A_PtrSize "=" A_LastError "==" r "=" func2exec "=" SecToHHMMSS(Round(zeitOperation/1000, 3)) , , , 2
 
   If !E1
@@ -20476,10 +20476,10 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
       setImageLoading()
       startOperation := A_TickCount
       thisRotation := (PasteInPlaceCropAngular>0) ? PasteInPlaceCropAngular : PasteInPlaceCropAngular + 360
-      advancedMode := (InStr(modus, "fill") || InStr(modus, "transform") || InStr(modus, "paste in place")) ? 1 : 0
+      advancedMode := (InStr(modus, "fill") && !InStr(modus, "flood") || InStr(modus, "transform") || InStr(modus, "paste in place")) ? 1 : 0
       If (InStr(modus, "transform") || InStr(modus, "paste in place"))
          obju := InitHugeImgSelPath(1, imgW, imgH, PasteInPlaceCropSel, thisRotation + VPselRotation, rotateSelBoundsKeepRatio)
-      Else If InStr(modus, "fill")
+      Else If (InStr(modus, "fill") && !InStr(modus, "flood"))
          obju := InitHugeImgSelPath(1, imgW, imgH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio)
       Else
          obju := InitHugeImgSelPath(0, imgW, imgH)
@@ -20749,6 +20749,21 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, 0)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
          r := DllCall(whichMainDLL "\AdjustImageColors", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 255, "int", 1, "int", 0, "int", 0, "int", 1, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 1, "int", 0, "int", 0, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
+      } Else If InStr(modus, "flood")
+      {
+         newColor := "0x" Format("{:X}", FloodFillClrOpacity) FloodFillColor
+         Gdip_FromARGB(newColor, A, R, G, B)
+         newColor := Gdip_ToARGB(A, R, G, B)
+         If (FloodFillTolerance<3)
+            FloodFillCartoonMode := 0
+
+         x := hFIFimgExtern[1], y := imgH - hFIFimgExtern[2]
+         tolerance := (FloodFillAltToler=1) ? Ceil(FloodFillTolerance*0.7) + 1 : FloodFillTolerance
+         recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, 0)
+         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
+         use := (BrushToolOutsideSelection>1 && editingSelectionNow=1) ? 1 : 0
+         inverter := (BrushToolOutsideSelection=3) ? 1 : 0
+         r := DllCall(whichMainDLL "\FloodFillWrapper", "UPtr", pBitsAll, "Int", FloodFillModus, "Int", imgW, "Int", imgH, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", FloodFillOpacity, "int", FloodFillDynamicOpacity, "int", FloodFillBlendMode - 1, "int", FloodFillCartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays, "int", userimgGammaCorrect, "int", BlendModesFlipped, "int", Stride, "int", bpp, "int", use, "int", inverter)
       } Else If InStr(modus, "noise")
       {
          If (UserAddNoisePixelizeAmount>0)
@@ -25842,7 +25857,7 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
           Return
        }
 
-       rzx := isVarEqualTo(IDwin, 12, 23, 24, 25, 31, 32, 55, 70, 89) ? 0 : downscaleHugeImagesForEditing()
+       rzx := isVarEqualTo(IDwin, 12, 23, 24, 25, 31, 32, 55, 66, 70, 89) ? 0 : downscaleHugeImagesForEditing()
        If (rzx<0 || rzx=1)
        {
           openingPanelNow := 0
@@ -42284,6 +42299,8 @@ updateUIfloodFillPanel() {
 
    actu := (FloodFillModus!=1 && FloodFillTolerance>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, FloodFillEightWays
+   If (viewportQPVimage.imgHandle)
+      GuiControl, SettingsGUIA: Disable, FloodFillUseAlpha
 
    thisOpa := (BrushToolUseSecondaryColor=1) ? "BrushToolBopacity" : "BrushToolAopacity"
    %thisOpa% := FloodFillClrOpacity
@@ -71709,7 +71726,8 @@ ActFloodFillNow() {
    If (A_TickCount - lastOtherWinClose<450) || (A_TickCount - lastInvoked<250)
       Return
 
-   mergeViewPortEffectsImgEditing(A_ThisFunc)
+   If !(viewportQPVimage.imgHandle)
+      mergeViewPortEffectsImgEditing(A_ThisFunc)
    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
    trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
    If (!imgW || !imgH || !validBMP(whichBitmap))
@@ -71736,6 +71754,12 @@ ActFloodFillNow() {
       showTOOLtip("Please click inside the image to perform flood fill")
       SetTimer, RemoveTooltip, % -msgDisplayTime
       SetTimer, ResetImgLoadStatus, -25
+      Return
+   }
+
+   If (viewportQPVimage.imgHandle)
+   {
+      HugeImagesApplyGenericFilters("flood fill", 1, [kX, kY])
       Return
    }
 

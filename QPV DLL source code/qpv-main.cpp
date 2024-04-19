@@ -1866,12 +1866,12 @@ int wrapRGBtoGray(int color, int mode) {
     return index;
 }
 
-/*
-int FloodFill8Stack(int *imageData, int w, int h, int x, int y, int newColor, float *nC, int oldColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay, int linearGamma) {
+
+int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBAColor newColor, float *nC, RGBAColor oldColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay, int linearGamma, int flipLayers, int Stride, int bpp, int useSelArea) {
 // based on https://lodev.org/cgtutor/floodfill.html
 // by Lode Vandevenne
 
-  if (newColor==oldColor)
+  if (newColor.r==oldColor.r && newColor.g==oldColor.g && newColor.b==oldColor.b)
      return 0; //avoid infinite loop
 
   static const int dx[8] = {0, 1, 1, 1, 0, -1, -1, -1}; // relative neighbor x coordinates
@@ -1879,7 +1879,7 @@ int FloodFill8Stack(int *imageData, int w, int h, int x, int y, int newColor, fl
   static const int gx[4] = {0, 1, 0, -1}; // relative neighbor x coordinates
   static const int gy[4] = {-1, 0, 1, 0}; // relative neighbor y coordinates
 
-  UINT maxPixels = w*h + w;
+  INT64 maxPixels = CalcPixOffset(w - 1, h - 1, Stride, bpp);;
   UINT loopsOccured = 0;
   UINT suchDeviations = 0;
   int suchAppliedDeviations = 0;
@@ -1888,13 +1888,14 @@ int FloodFill8Stack(int *imageData, int w, int h, int x, int y, int newColor, fl
   std::stack<int> starkX;
   std::stack<int> starkY;
 
-  int px = y * w + x;
+  INT64 px = CalcPixOffset(x, y, Stride, bpp);
   pixelzMap[px] = 1;
   starkX.push(x);
   starkY.push(y);
   int k = (eightWay==1) ? 8 : 4;
   float defIndex = (alternateMode==3) ? 0 : prevCLRindex;
   float index;
+  fnOutputDebug("FloodFill8Stack()");
   while (starkX.size())
   {
      if (maxPixels<loopsOccured)
@@ -1910,15 +1911,21 @@ int FloodFill8Stack(int *imageData, int w, int h, int x, int y, int newColor, fl
      {
         int nx = (eightWay==1) ? x + dx[i] : x + gx[i] ;
         int ny = (eightWay==1) ? y + dy[i] : y + gy[i];
-
         if (nx>=0 && nx<w && ny>=0 && ny<h)
         {
-           int tpx = ny * w + nx;
+           if (useSelArea==1)
+           {
+              if (clipMaskFilter(nx, ny, NULL, 0)==1)
+                 continue;
+           }
+
+           INT64 tpx = CalcPixOffset(nx, ny, Stride, bpp);
            if (pixelzMap[tpx]==1)
               continue;
 
-           int thisColor = imageData[tpx];
-           if (thisColor==oldColor)
+           int tcA = (bpp==32) ? imageData[tpx + 3] : 255;
+           RGBAColor thisColor = {imageData[tpx], imageData[tpx + 1], imageData[tpx + 2], tcA};
+           if (thisColor.r==oldColor.r && thisColor.g==oldColor.g && thisColor.b==oldColor.b)
            {
               pixelzMap[tpx] = 1;
               indexes[tpx] = defIndex;
@@ -1930,7 +1937,6 @@ int FloodFill8Stack(int *imageData, int w, int h, int x, int y, int newColor, fl
               {
                  pixelzMap[tpx] = 1;
                  indexes[tpx] = index;
-                 // pixelzMap.insert( std::pair<int, bool>(tpx, 1) );
                  starkX.push(nx);
                  starkY.push(ny);
                  suchDeviations++;
@@ -1940,10 +1946,8 @@ int FloodFill8Stack(int *imageData, int w, int h, int x, int y, int newColor, fl
      }
   }
 
-  // std::stringstream ss;
-  // ss << "qpv: suchDeviations = " << suchDeviations;
-
-  int thisColor = 0;
+  fnOutputDebug("suchDeviations==" + std::to_string(suchDeviations));
+  RGBAColor thisColor = {0, 0, 0, 0};
   for (std::size_t pix = 0; pix < pixelzMap.size(); ++pix)
   {
       if (pixelzMap[pix]!=1)
@@ -1953,27 +1957,35 @@ int FloodFill8Stack(int *imageData, int w, int h, int x, int y, int newColor, fl
       suchAppliedDeviations++;
       if (tolerance>0 && (opacity<1 || dynamicOpacity==1 || blendMode>0 || cartoonMode==1))
       {
-         int prevColor = imageData[pix];
+         int tcA = (bpp==32) ? imageData[pix + 3] : 255;
+         RGBAColor prevColor = {imageData[pix], imageData[pix + 1], imageData[pix + 2], tcA};
          if (cartoonMode==1)
             thisColor = oldColor;
          else
-            thisColor = mixColorsFloodFill(prevColor, nC, opacity, dynamicOpacity, blendMode, prevCLRindex, tolerance, alternateMode, indexes[pix], linearGamma);
+            thisColor = mixColorsFloodFill(prevColor, newColor, opacity, dynamicOpacity, blendMode, prevCLRindex, tolerance, alternateMode, indexes[pix], linearGamma, flipLayers);
 
-         imageData[pix] = thisColor;
+         imageData[pix] = thisColor.b;
+         imageData[pix + 1] = thisColor.g;
+         imageData[pix + 2] = thisColor.r;
+         if (bpp==32)
+            imageData[pix + 3] = thisColor.a;
       } else
       {
-         imageData[pix] = newColor;   // second element , the colour, will be used to mix colours; to-do
+         imageData[pix] = newColor.b;
+         imageData[pix + 1] = newColor.g;
+         imageData[pix + 2] = newColor.r;
+         if (bpp==32)
+            imageData[pix + 3] = newColor.a;
+         // imageData[pix] = newColor;
+         // second element , the colour, will be used to mix colours; to-do
       }
   }
-  
-  // ss << " suchAppliedDeviations = " << suchAppliedDeviations;
-  // ss << " mapSize = " << pixelzMap.size();
-  // OutputDebugStringA(ss.str().data());
+
+  fnOutputDebug("suchAppliedDeviations==" + std::to_string(suchAppliedDeviations));
   return suchAppliedDeviations;
 }
-*/
 
-int FloodFillScanlineStack(unsigned char *imageData, int w, int h, int x, int y, RGBAColor newColor, RGBAColor oldColor, int Stride, int bpp) {
+int FloodFillScanlineStack(unsigned char *imageData, int w, int h, int x, int y, RGBAColor newColor, RGBAColor oldColor, int Stride, int bpp, int useSelArea) {
 // based on https://lodev.org/cgtutor/floodfill.html
 // by Lode Vandevenne
   if (oldColor.r == newColor.r && oldColor.g == newColor.g && oldColor.b == newColor.b)
@@ -2022,6 +2034,16 @@ int FloodFillScanlineStack(unsigned char *imageData, int w, int h, int x, int y,
 
     while (x1 < w)
     {
+       if (maxPixels<loopsOccured)
+          break;
+
+       loopsOccured++;
+       if (useSelArea==1)
+       {
+          if (clipMaskFilter(x1, y, NULL, 0)==1)
+             continue;
+       }
+
        INT64 o = CalcPixOffset(x1, y, Stride, bpp);
        if (!(imageData[o + 2] == oR && imageData[o + 1] == oG && imageData[o] == oB))
           break;
@@ -2030,10 +2052,6 @@ int FloodFillScanlineStack(unsigned char *imageData, int w, int h, int x, int y,
        imageData[o + 2] = nR;
        imageData[o + 1] = nG;
        imageData[o] = nB;
-       if (maxPixels<loopsOccured)
-          break;
-
-       loopsOccured++;
        INT64 clrA = CalcPixOffset(x1, y - 1, Stride, bpp); // imageData[(y - 1) * w + x1];
        INT64 clrB = CalcPixOffset(x1, y + 1, Stride, bpp); // imageData[(y + 1) * w + x1];
        if (!spanAbove && y>0 && imageData[clrA + 2] == oR && imageData[clrA + 1] == oG && imageData[clrA] == oB)
@@ -2061,7 +2079,7 @@ int FloodFillScanlineStack(unsigned char *imageData, int w, int h, int x, int y,
   return loopsOccured;
 }
 
-int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBAColor newColor, RGBAColor nC, RGBAColor prevColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int linearGamma, float *labClr, int flipLayers, int Stride, int bpp) {
+int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBAColor newColor, RGBAColor nC, RGBAColor prevColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int linearGamma, float *labClr, int flipLayers, int Stride, int bpp, int useSelArea) {
     if ((x < 0) || (x >= (w-1)) || (y < 0) || (y >= (h-1)))  // out of bounds
        return 0;
 
@@ -2074,6 +2092,12 @@ int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBA
         RGBAColor thisColor = {0, 0, 0, 0};
         for (int zy = 0; zy < h; zy++)
         {
+            if (useSelArea==1)
+            {
+               if (clipMaskFilter(zx, zy, NULL, 0)==1)
+                  continue;
+            }
+
             INT64 o = CalcPixOffset(zx, zy, Stride, bpp);
             int oA = (bpp==32) ? 255 : imageData[3 + o];
             int oR = imageData[2 + o];
@@ -2110,10 +2134,11 @@ int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBA
     return loopsOccured;
 }
 
-DLL_API int DLL_CALLCONV FloodFillWrapper(unsigned char *imageData, int modus, int w, int h, int x, int y, int newColor, int tolerance, int fillOpacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay, int linearGamma, int flipLayers, int Stride, int bpp) {
+DLL_API int DLL_CALLCONV FloodFillWrapper(unsigned char *imageData, int modus, int w, int h, int x, int y, int newColor, int tolerance, int fillOpacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay, int linearGamma, int flipLayers, int Stride, int bpp, int useSelArea, int invertSel) {
     if ((x < 0) || (x >= (w-1)) || (y < 0) || (y >= (h-1)))  // out of bounds
        return 0;
 
+    invertSelection = invertSelection;
     float toleranza = (alternateMode==3) ? (float)tolerance/10.0 + 1 : tolerance;
     INT64 oc = CalcPixOffset(x, y, Stride, bpp);
     int aB = (bpp==32) ? 255 : imageData[oc + 3];
@@ -2144,11 +2169,11 @@ DLL_API int DLL_CALLCONV FloodFillWrapper(unsigned char *imageData, int modus, i
 
     int r;
     if (modus==1)
-       r = ReplaceGivenColor(imageData, w, h, x, y, newColorI, newColorI, prevColor, toleranza, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, nC, flipLayers, Stride, bpp);
-    // else if (toleranza>0)
-    //    r = FloodFill8Stack(imageData, w, h, x, y, newColorI, nC, prevColor, toleranza, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, eightWay, linearGamma);
+       r = ReplaceGivenColor(imageData, w, h, x, y, newColorI, newColorI, prevColor, toleranza, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, nC, flipLayers, Stride, bpp, useSelArea);
+    else if (toleranza>0)
+       r = FloodFill8Stack(imageData, w, h, x, y, newColorI, nC, prevColor, toleranza, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, eightWay, linearGamma, flipLayers, Stride, bpp, useSelArea);
     else
-       r = FloodFillScanlineStack(imageData, w, h, x, y, newColorI, prevColor, Stride, bpp);
+       r = FloodFillScanlineStack(imageData, w, h, x, y, newColorI, prevColor, Stride, bpp, useSelArea);
 
     // std::stringstream ss;
     // ss << "qpv: opacity = " << opacity;
