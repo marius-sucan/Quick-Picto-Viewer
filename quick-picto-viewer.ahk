@@ -6058,26 +6058,28 @@ VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, angleu, isAngleu, mainWidt
      tooBig := ((imgSelW>mainWidth*1.5 && imgSelH>mainHeight*1.5 || imgSelW>mainWidth*2.5 || imgSelH>mainHeight*2.5) && EllipseSelectMode=2 && customShapeCountPoints>2100) ? 1 : 0
      advancedShape := (  (vpImgPanningNow || forceAdvanced=1 || doImgEditLivePreview!=1 || allowSimple=0 && doImgEditLivePreview=1) && isVarEqualTo(AnyWindowOpen, 23, 65, 68)  ) ? 1 : 0
      simpleRect := ((advancedShape=1 && FillAreaShape=1 || EllipseSelectMode=0 && advancedShape=0) && angleu=0 && innerSelectionCavityX=0 && innerSelectionCavityY=0 || isSelEntireOutside(mainWidth, mainHeight)) ? 1 : 0
+     selOptionalInTool := (AnyWindowOpen=66 || AnyWindowOpen=64) ? 1 : 0
      ; simpleRect := (tooBig=1 || EllipseSelectMode=0 && angleu=0 && innerSelectionCavityX=0 && innerSelectionCavityY=0 || imgSelOutViewPort=1 || isSelEntireOutside(mainWidth, mainHeight)) ? 1 : 0
      ; fnOutputDebug(A_ThisFunc "(): tooBig=" tooBig "| simpleRect=" simpleRect "| EllipseSelectMode=" EllipseSelectMode "| customShapeCountPoints=" customShapeCountPoints)
-     If (simpleRect=1 || advancedShape!=1 && AnyWindowOpen && doImgEditLivePreview=1 && allowSimple=1)
+     If (simpleRect=1 || advancedShape!=1 && AnyWindowOpen && doImgEditLivePreview=1 && allowSimple=1 && selOptionalInTool=0)
      {
-        ; ToolTip, % "lool" , , , 2
         thisu := clampValuesToWindow(imgSelPx, imgSelPy, imgSelW, imgSelH, mainWidth, mainHeight)
         ImgSelPath := Gdip_CreatePath()
         Gdip_AddPathRectangle(ImgSelPath, thisu.X, thisu.Y, thisu.W, thisu.H)
+        fnOutputDebug("lool=" simpleRect "|" advancedShape "|" allowSimple)
         Return ImgSelPath
      }
 
      thisState := "a" imgSelW imgSelH angleu isAngleu EllipseSelectMode VPselRotation innerSelectionCavityX innerSelectionCavityY customShapePoints bezierSplineCustomShape FillAreaCurveTension doImgEditLivePreview AnyWindowOpen advancedShape FillAreaShape rotateSelBoundsKeepRatio closedLineCustomShape FillAreaRectRoundness FillAreaEllipsePie FillAreaEllipseSection
      If (thisState=prevState && prevPath)
      {
-        ; ToolTip, % "cached" , , , 2
         ImgSelPath := Gdip_ClonePath(prevPath)
         Gdip_TranslatePath(ImgSelPath, imgSelPx, imgSelPy)
+        fnOutputDebug("cached=" simpleRect "|" advancedShape "|" allowSimple)
         Return ImgSelPath
      }
 
+     fnOutputDebug("no cache=" simpleRect "|" advancedShape "|" allowSimple)
      If prevPath
         Gdip_DeletePath(prevPath)
 
@@ -70636,9 +70638,6 @@ toggleAlphaPaintingMode() {
    If !isImgEditingNow()
       Return
 
-   If throwWarningHugeImagesFeatureNotAvailable()
-      Return
-
    forceLiveAlphaPreviewMode := userAllowsGradientRecentering := userAllowClrGradientRecenter := 0
    If (AnyWindowOpen=66 || AnyWindowOpen=64)
    {
@@ -70681,6 +70680,9 @@ toggleAlphaPaintingMode() {
       StopCaptureClickStuff(dummy)
       Return
    }
+
+   If throwWarningHugeImagesFeatureNotAvailable()
+      Return
 
    FloodFillSelectionAdj := 0
    liveDrawingBrushTool := !liveDrawingBrushTool

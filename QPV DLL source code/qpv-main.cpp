@@ -2138,7 +2138,7 @@ DLL_API int DLL_CALLCONV FloodFillWrapper(unsigned char *imageData, int modus, i
     if ((x < 0) || (x >= (w-1)) || (y < 0) || (y >= (h-1)))  // out of bounds
        return 0;
 
-    invertSelection = invertSelection;
+    invertSelection = invertSel;
     float toleranza = (alternateMode==3) ? (float)tolerance/10.0 + 1 : tolerance;
     INT64 oc = CalcPixOffset(x, y, Stride, bpp);
     int aB = (bpp==32) ? 255 : imageData[oc + 3];
