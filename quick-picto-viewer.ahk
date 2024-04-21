@@ -6066,7 +6066,7 @@ VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, angleu, isAngleu, mainWidt
         thisu := clampValuesToWindow(imgSelPx, imgSelPy, imgSelW, imgSelH, mainWidth, mainHeight)
         ImgSelPath := Gdip_CreatePath()
         Gdip_AddPathRectangle(ImgSelPath, thisu.X, thisu.Y, thisu.W, thisu.H)
-        fnOutputDebug("lool=" simpleRect "|" advancedShape "|" allowSimple)
+        ; fnOutputDebug("lool=" simpleRect "|" advancedShape "|" allowSimple)
         Return ImgSelPath
      }
 
@@ -6075,11 +6075,11 @@ VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, angleu, isAngleu, mainWidt
      {
         ImgSelPath := Gdip_ClonePath(prevPath)
         Gdip_TranslatePath(ImgSelPath, imgSelPx, imgSelPy)
-        fnOutputDebug("cached=" simpleRect "|" advancedShape "|" allowSimple)
+        ; fnOutputDebug("cached=" simpleRect "|" advancedShape "|" allowSimple)
         Return ImgSelPath
      }
 
-     fnOutputDebug("no cache=" simpleRect "|" advancedShape "|" allowSimple)
+     ; fnOutputDebug("no cache=" simpleRect "|" advancedShape "|" allowSimple)
      If prevPath
         Gdip_DeletePath(prevPath)
 
@@ -15153,7 +15153,17 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     If (VPmpx>530 && previewMode=1)
        allowPreviewThis := 0
 
-    If (brushingMode=1 && previewMode=1 && allowPreviewThis!=1)
+    If (brushingMode=1 && previewMode=1)
+    {
+       trGdip_GetImageDimensions(userAlphaMaskBmpPainted, zImgW, zImgH)
+       viewportDynamicOBJcoords.x := imgSelPx, viewportDynamicOBJcoords.y := imgSelPy
+       viewportDynamicOBJcoords.w := ResizedW, viewportDynamicOBJcoords.h := ResizedH
+       viewportDynamicOBJcoords.zl := (ResizedW/zImgW + ResizedH/zImgH)/2 + 0.0001
+       ; ToolTip, % zImgW "|" zImgH , , , 2
+    }
+
+    prevPasteInPlaceVPcoords := [imgSelPx, imgSelPy, ResizedW, ResizedH, hasRotated]
+    If (brushingMode=1 && previewMode=1 && (allowPreviewThis!=1 || forceLiveAlphaPreviewMode=1))
     {
        prevImgCall := thisImgCall
        prevClipBMP := clipBMP
@@ -15220,15 +15230,8 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     ; trGdip_GetImageDimensions(bgrBMP, wgimgW, wgimgH)
     ; fnOutputDebug("[" clipBMP "] " gImgW "==" gImgH " | [" bgrBMP "] "  wgImgW "==" wgImgH " | [" o_bgrBMP "] " dgImgW "==" dgImgH " | [target] " ResizedW "==" ResizedH)
     thisBMP := (validBMP(bgrBMP) && PasteInPlaceBlendMode>1) ? bgrBMP : clipBMP
-    If (alphaMaskingMode>1 && !viewportQPVimage.imgHandle && (PasteInPlaceBlendMode>1 || brushingMode=1))
+    If (alphaMaskingMode>1 && !viewportQPVimage.imgHandle && (PasteInPlaceBlendMode>1 || brushingMode=1 && previewMode=1))
     {
-       If (brushingMode=1)
-       {
-          trGdip_GetImageDimensions(userAlphaMaskBmpPainted, zImgW, zImgH)
-          viewportDynamicOBJcoords.x := imgSelPx, viewportDynamicOBJcoords.y := imgSelPy
-          viewportDynamicOBJcoords.w := ResizedW,  viewportDynamicOBJcoords.h := ResizedH
-          viewportDynamicOBJcoords.zl := (ResizedW/zImgW + ResizedH/zImgH)/2 + 0.0001
-       }
        ; thisStartZeit := A_TickCount
        thisIDu := "a" previewMode PasteInPlaceBlurAmount PasteInPlaceToolMode PasteInPlaceOrientation VPselRotation getAlphaMaskIDu() opacityExtra thisImgCall thisFXstate BlendModesPreserveAlpha BlendModesFlipped userimgGammaCorrect brushZeitung
        realtimePasteInPlaceAlphaMasker(previewMode, thisBMP, thisIDu, newBitmap, 0, 0, 0, 0, 1, o_bgrBMP)
@@ -15278,7 +15281,6 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     If (viewportQPVimage.imgHandle && previewMode=1 && PasteInPlaceOpacity>255 || !viewportQPVimage.imgHandle && PasteInPlaceOpacity>255)
        thisOpacity := 1
 
-    prevPasteInPlaceVPcoords := [imgSelPx, imgSelPy, ResizedW, ResizedH, hasRotated]
     If (validBMP(thisBMP) && G2 && allowPreviewThis=1 && hasPainted=0)
     {
        ; ToolTip, % validBMP(o_bgrBMP) " | " hasPainted  " opacity=" thisOpacity , , , 2
@@ -18300,7 +18302,7 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
    {
       moreStuff := (FillAreaGlassy>1 || thisBlendMode>1) ? "a" imgSelPx imgSelPy : ""
       partu := (FillAreaInverted=1) ? "a" : getVPselIDs("saiz-vpos-xy") VPselRotation EllipseSelectMode imgSelW imgSelH
-      thisIDu := "a" previewMode FillAreaRemBGR FillAreaInverted userimgGammaCorrect FillAreaGlassy thisBlendMode FillAreaColor FillAreaColorMode FillArea2ndColor FillAreaOpacity FillArea2ndOpacity FillAreaGradientWrapped FillAreaGradientAngle FillAreaGradientPosB FillAreaGradientPosA FillAreaColorReversed FillAreaGradientScale VPselRotation zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY BlendModesFlipped partu moreStuff FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY undoLevelsRecorded currentUndoLevel useGdiBitmap() getAlphaMaskIDu() prevDestPosX prevDestPosY thisObjBlurAmount userUIshapeCavity innerSelectionCavityX innerSelectionCavityY
+      thisIDu := "a" previewMode FillAreaRemBGR FillAreaInverted userimgGammaCorrect FillAreaGlassy thisBlendMode FillAreaColor FillAreaColorMode FillArea2ndColor FillAreaOpacity FillArea2ndOpacity FillAreaGradientWrapped FillAreaGradientAngle FillAreaGradientPosB FillAreaGradientPosA FillAreaColorReversed FillAreaGradientScale VPselRotation zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY BlendModesFlipped partu moreStuff FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY undoLevelsRecorded currentUndoLevel useGdiBitmap() getAlphaMaskIDu() prevDestPosX prevDestPosY thisObjBlurAmount userUIshapeCavity innerSelectionCavityX innerSelectionCavityY FillAreaShape
       If (previewMode=1)
          realtimePasteInPlaceAlphaMasker(previewMode, fBitmapA, thisIDu, newBitmap, objSel, 0, 0, 0)
       Else
@@ -20504,6 +20506,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          nBmpW := nBmpH := 0
          fillTool := InStr(modus, "fill") ? 1 : 0
          transformTool := (InStr(modus, "transform") || InStr(modus, "paste in place")) ? 1 : 0
+
          If (isInRange(FillAreaColorMode, 2, 4) && fillTool=1 && obju.imgZelW && obju.imgZelH) ; && FillAreaInverted=0 && !isImgSizeTooLarge(zW, zH))
          {
             showTOOLtip("Applying " modus "`nGenerating gradient bitmap, please wait", 1)
@@ -20633,6 +20636,13 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             gBpp := FreeImage_GetBPP(hFIFimgExtern)
             FreeImage_GetImageDimensions(hFIFimgExtern, nBmpW, nBmpH)
             ; TulTip(A_ThisFunc, "|", zxa, zya, wz, hz, obju.imgZelW, obju.imgZelH)
+         }
+
+         If (imgSelY1<0 && FillAreaInverted=1 && fillTool=1)
+         {
+            ; I do not know why i have to do this adjustment for the fill tool only; too lazy to dig to understand it
+            obju.Y1 -= abs(imgselY1)
+            obju.Y2 -= abs(imgselY1)
          }
 
          newColor := "0xFF" FillAreaColor
@@ -48253,6 +48263,8 @@ livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
       trGdip_GetImageDimensions(userAlphaMaskBmpPainted, oImgW, oImgH)
       objSel.nw := oImgW,      objSel.nh := oImgH
       wBitmap := getRectFromBitmap(userAlphaMaskBmpPainted, objSel, 1)
+      ; trGdip_GetImageDimensions(wBitmap, ww, hh)
+      ; fnOutputDebug(A_ThisFunc "(): " zkw "|" zkh "||" ww "|" hh "||" oImgW "|" oImgH)
       trGdip_DrawImage(A_ThisFunc, 2NDglPG, wBitmap, vPimgSelX, vPimgSelY, vPimgSelW, vPimgSelH,,,,, clrMatrix)
       trGdip_DisposeImage(wBitmap)
       trGdip_GetImageDimensions(userAlphaMaskBmpPainted, w, h)
@@ -48298,7 +48310,6 @@ livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
          ; thisBrush := createHatchBrush(1)
          Gdip_FillPath(2NDglPG, GDIPbrushHatch, pPath)
          ; Gdip_DeleteBrush(thisBrush)
-         Gdip_DeletePath(pPath)
       }
 
       Gdip_ResetWorldTransform(2NDglPG)
@@ -48306,6 +48317,8 @@ livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
       trGdip_DrawImage(A_ThisFunc, 2NDglPG, BoxBMP, 0, 0)
       trGdip_DisposeImage(BoxBMP, 1)
    }
+   If pPath
+      Gdip_DeletePath(pPath)
    ; Gdip_DisposeEffect(pEffectGray)
 }
 
@@ -51841,7 +51854,8 @@ livePreviewSimpleColorsAdjustImage(modus:=0, extraMode:=0) {
             zBitmap := newBitmap
          }
       }
-      If (!viewportQPVimage.imgHandle && allowAlphaMasking=1)
+
+      If (!viewportQPVimage.imgHandle && EllipseSelectMode>0)
          liveCarvePathBitmap(pPath, zBitmap, imgSelPx, imgSelPy, thisInvertArea)
 
       r1 := trGdip_DrawImage(A_ThisFunc, 2NDglPG, zBitmap, imgSelPx, imgSelPy)
@@ -54977,6 +54991,8 @@ PanelSharpenImage() {
 
 testAllowSelInvert(imgW:=0, imgH:=0) {
     r := (EllipseSelectMode=0 && VPselRotation=0 && innerSelectionCavityX=0 && innerSelectionCavityY=0 && testEntireImgSelected(imgW, imgH)) ? 0 : 1
+    If ((AnyWindowOpen=23 || AnyWindowOpen=68) && FillAreaShape>1)
+       r := 1
     Return r
 }
 
