@@ -14981,6 +14981,30 @@ applyPersonalizedColorsBMP(clipBMP, doBlur, blurStrength, applyColorFX) {
     }
 }
 
+getPrevAlphaMaskCoords(ByRef imgSelPx, ByRef imgSelPy, ByRef ResizedW, ByRef ResizedH, vPimgSelW, vPimgSelH, vPimgSelX, vPimgSelY) {
+   ; imgSelW := Round( max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2) )
+   ; imgSelH := Round( max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2) )
+   imgSelPx := Round(vpImgSelX + vpImgSelW * prevAlphaMaskCoordsPreview[1])
+   imgSelPy := Round(vpImgSelY + vpImgSelH * prevAlphaMaskCoordsPreview[2])
+   imgSelPax := Round(vpImgSelX + vpImgSelW * prevAlphaMaskCoordsPreview[3])
+   imgSelPay := Round(vpImgSelY + vpImgSelH * prevAlphaMaskCoordsPreview[4])
+   ResizedW := imgSelPax - imgSelPx
+   ResizedH := imgSelPay - imgSelPy
+   ; ToolTip, % imgSelPx "|" imgSelPy "||" imgSelPax "|" imgSelPay "||" ResizedW "|" ResizedH , , , 2
+}
+
+recordPrevAlphaMaskCoords(imgSelPx, imgSelPy, ResizedW, ResizedH) {
+   ImageCoords2Window(imgSelX1, imgSelY1, prevDestPosX, prevDestPosY, 1, outX, outY)
+   getVPselSize(imgSelW, imgSelH, 0, 0)
+   xx := (imgSelPx - outX) / imgSelW
+   yy := (imgSelPy - outY) / imgSelH
+   x := (imgSelPx + ResizedW - outX) / imgSelW
+   y := (imgSelPy + ResizedH - outY) / imgSelH
+   prevAlphaMaskCoordsPreview := [xx, yy, x, y]
+   ; ToolTip, % xx "|" yy "|" x "|" y , , , 2
+   ; prevAlphaMaskCoordsPreview := [imgSelPx, imgSelPy, ResizedW, ResizedH]
+}
+
 corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     Critical, on
     Static prevImgCall, prevClipBMP, eImgW, eImgH, hasRotated, thisHasRan
@@ -15146,7 +15170,6 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     }
 
     PasteInPlaceCalcObjCoords(imgSelW, imgSelH, ResizedW, ResizedH, imgSelPx, imgSelPy)
-    prevAlphaMaskCoordsPreview := [imgSelPx, imgSelPy, ResizedW, ResizedH]
     VPmpx := Round((ResizedW * ResizedH)/1000000, 3)
     MAINmpx := Round((mainWidth * mainHeight)/1000000, 3) + 2
     allowPreviewThis := (previewMode!=1 || VPmpx<MAINmpx || forceSlowLivePreviewMode=1) ? 1 : 0
@@ -15162,6 +15185,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
        ; ToolTip, % zImgW "|" zImgH , , , 2
     }
 
+    recordPrevAlphaMaskCoords(imgSelPx, imgSelPy, ResizedW, ResizedH)
     prevPasteInPlaceVPcoords := [imgSelPx, imgSelPy, ResizedW, ResizedH, hasRotated]
     If (brushingMode=1 && previewMode=1 && (allowPreviewThis!=1 || forceLiveAlphaPreviewMode=1))
     {
@@ -17153,7 +17177,7 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
     tW := zImgW,       tH := zImgH
     objSel.sw := tW,   objSel.sh := tH
     objSel.sx := tX,   objSel.sy := tY
-    prevAlphaMaskCoordsPreview := [tX, tY, zImgW, zImgH]
+    recordPrevAlphaMaskCoords(tX, tY, zImgW, zImgH)
     If (userimgGammaCorrect=1 || TextInAreaBlendMode>1 || alphaMaskingMode>1)
     {
        If (TextInAreaBlendMode>1 || alphaMaskingMode>1)
@@ -48213,8 +48237,9 @@ livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
    transformTool := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
    If ((AnyWindowOpen=32 || transformTool=1) && doImgEditLivePreview=1) ; insert text and transform tools
    {
-      vPimgSelX := prevAlphaMaskCoordsPreview[1],  vPimgSelY := prevAlphaMaskCoordsPreview[2]
-      vPimgSelW := prevAlphaMaskCoordsPreview[3],  vPimgSelH := prevAlphaMaskCoordsPreview[4]
+      getPrevAlphaMaskCoords(xa, ya, ww, hh, vPimgSelW, vPimgSelH, vPimgSelX, vPimgSelY)
+      vPimgSelX := xa,  vPimgSelY := ya
+      vPimgSelW := ww,  vPimgSelH := hh
       objSel.sw := vPimgSelW,   objSel.sh := vPimgSelH
       objSel.sx := vPimgSelX,   objSel.sy := vPimgSelY
       ; ToolTip, %  vPimgSelX "|" vPimgSelY , , , 2
