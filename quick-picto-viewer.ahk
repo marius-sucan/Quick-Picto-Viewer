@@ -14912,8 +14912,8 @@ realtimePasteInPlaceAlphaMasker(previewMode, clipBMP, givenID, ByRef newBitmap, 
     If !r
        addJournalEntry(A_ThisFunc "(): Failed to apply alpha mask to bitmap")
 
+    ; fnOutputDebug(A_ThisFunc "(): transformTool=" transformTool " | merger=" doMerger  " | preview=" previewMode)
     trGdip_DisposeImage(thisAlphaBitmap, 1)
-    ; fnOutputDebug(A_ThisFunc "(): transformTool=" transformTool " | merger=" doMerger )
     If (previewMode!=1)
     {
        trGdip_DisposeImage(alphaMaskGray, 1)
@@ -15253,6 +15253,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     ; trGdip_GetImageDimensions(clipBMP, gimgW, gimgH)
     ; trGdip_GetImageDimensions(bgrBMP, wgimgW, wgimgH)
     ; fnOutputDebug("[" clipBMP "] " gImgW "==" gImgH " | [" bgrBMP "] "  wgImgW "==" wgImgH " | [" o_bgrBMP "] " dgImgW "==" dgImgH " | [target] " ResizedW "==" ResizedH)
+    hasMasked := 0
     thisBMP := (validBMP(bgrBMP) && PasteInPlaceBlendMode>1) ? bgrBMP : clipBMP
     If (alphaMaskingMode>1 && !viewportQPVimage.imgHandle && (PasteInPlaceBlendMode>1 || brushingMode=1 && previewMode=1))
     {
@@ -15262,6 +15263,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
        ; ToolTip, % brushZeitung "|" A_TickCount - thisStartZeit, , , 2
        If validBMP(newBitmap)
        {
+          hasMasked := 1
           trGdip_DisposeImage(thisBMP, 1)
           thisBMP := newBitmap
        }
@@ -15326,9 +15328,11 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     If (userimgGammaCorrect=1)
        Gdip_SetCompositingQuality(G2, 1)
 
-    trGdip_DisposeImage(o_bgrBMP, 1)
     Gdip_ResetClip(G2)
     trGdip_DisposeImage(bgrBMP, 1)
+    trGdip_DisposeImage(o_bgrBMP, 1)
+    If hasMasked
+       trGdip_DisposeImage(thisBMP, 1)
     If (PasteInPlaceEraseInitial=1 && allowPreviewThis=1 && previewMode=1 && mustEraseAreaAfter=1)
        PasteInPlaceEraseArea(G2, previewMode)
 
@@ -17091,6 +17095,7 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
 
     ; setImageLoading()
     G2 := 2NDglPG
+    previewMode := 1
     Gdip_ResetClip(G2)
     ; trGdip_GraphicsClear(A_ThisFunc, G2, "0x00" WindowBGRcolor)
     vpWinClientSize(mainWidth, mainHeight)
@@ -17237,8 +17242,9 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
           getVPselSize(zW, zH, 1, 0)
           objSel.zw := zw,        objSel.zh := zh
           ; objSel.forceRect := (VPselRotation>0) ? 1 : 0
+          ppk := (TextInAreaBlendMode>1) ? "a" imgSelX1 imgSelY1 : 0
           thisIDu := "a" previewMode VPselRotation zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY getVPselIDs("saiz-vpos") FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY TextInAreaFlipV TextInAreaFlipV TextInAreaAlign TextInAreaCharSpacing TextInAreaBlendMode TextInAreaValign TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName
-          thisIDu .= "b" TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr TextInAreaAutoWrap TextInAreaCaseTransform userimgGammaCorrect undoLevelsRecorded currentUndoLevel useGdiBitmap() getAlphaMaskIDu()
+          thisIDu .= "b" TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr TextInAreaAutoWrap TextInAreaCaseTransform userimgGammaCorrect undoLevelsRecorded currentUndoLevel useGdiBitmap() getAlphaMaskIDu() ppk
           realtimePasteInPlaceAlphaMasker(previewMode, fBitmap, thisIDu, maskedBitmap, objSel)
        }
 
@@ -65796,6 +65802,22 @@ ToggleTitleBaru() {
 }
 
 ToggleLargeUIfonts() {
+    If (AnyWindowOpen=31 || AnyWindowOpen=24)
+    {
+       showTOOLtip("WARNING: This option cannot be changed while the transform tool is activated.")
+       SoundBeep 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
+
+    If isNowAlphaPainting()
+    {
+       showTOOLtip("WARNING: This option cannot be changed while alpha mask painting mode is activated.")
+       SoundBeep 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
+
     PrefsLargeFonts := !PrefsLargeFonts
     calcHUDsize()
     INIaction(1, "PrefsLargeFonts", "General")
@@ -65844,6 +65866,22 @@ ToggleCustomKBDsMode() {
 }
 
 ToggleDarkModus() {
+    If (AnyWindowOpen=31 || AnyWindowOpen=24)
+    {
+       showTOOLtip("WARNING: This option cannot be changed while the transform tool is activated.")
+       SoundBeep 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
+
+    If isNowAlphaPainting()
+    {
+       showTOOLtip("WARNING: This option cannot be changed while alpha mask painting mode is activated.")
+       SoundBeep 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
+
     uiUseDarkMode := !uiUseDarkMode
     If ((isWinXP=1 || A_OSVersion="WIN_7") && uiUseDarkMode=1)
        msgBoxWrapper(appTitle ": WARNING", "This option was not optimized for your operating system.", 0, 0, "exclamation")
@@ -93318,7 +93356,15 @@ recordGdipBitmaps(r, infoz, typu:="bmp") {
       addJournalEntry("ERROR: recorded a new bitmap ID that was not discarded. WTF? OLD=" createdGDIobjsArray["x" r, 4] ". NEW=" infoz)
 
    If StrLen(r)>2
-      createdGDIobjsArray["x" r] := [r, typu, 1, infoz]
+      createdGDIobjsArray["x" r] := [r, typu, 1, infoz "|" AnyWindowOpen "|"]
+
+   ; ppp := 0 ; useful to identify memory leaks related to bitmap objects
+   ; For Key, Value in createdGDIobjsArray
+   ; {
+   ;    If Value[3]
+   ;       ppp++
+   ; }
+   ; ToolTip, % "l=" ppp , , , 2
 }
 
 trGdip_CreateBitmapFromFile(funcu, sFile, useICM:=0) {
