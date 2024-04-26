@@ -69073,15 +69073,6 @@ LoadBitmapFromFileu(imgPath, noBPPconv:=0, forceGDIp:=0, frameu:=0, sizesDesired
   Return oBitmap
 }
 
-RotateBMP2exifOrientation(oBitmap) {
-   Static orient := {6:1, 8:3, 3:2, 2:4, 5:5, 4:6, 7:7}
-   exifOrientation := Gdip_GetPropertyItem(oBitmap, 0x112)
-   orientation := orient[exifOrientation.Value]
-   ; MsgBox, % orientation
-   If (orientation>0)
-      Gdip_ImageRotateFlip(oBitmap, orientation)
-}
-
 Gdip_CloneBmpPargbArea(funcu, pBitmap, x:="", y:="", w:=0, h:=0, PixelFormat:=0, KeepPixelFormat:=0, ignoreBounds:=0, addBgr:=0) {
    thisPixFmt := !PixelFormat ? coreDesiredPixFmt : PixelFormat
    ; If (thisPixFmt="0xE200B" && userimgQuality=0)
@@ -69378,9 +69369,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   {
      totalFramesIndex := currIMGdetails.Frames
      multiFrameImg := 1
-  } Else If (rawFmt="JPEG")
-     RotateBMP2exifOrientation(oBitmap)
-  Else If (rawFmt="MEMORYBMP")
+  } Else If (rawFmt="MEMORYBMP")
      GDIbmpFileConnected := 0
 
   If ((InStr(currIMGdetails.RawFormat, "webp") || InStr(currIMGdetails.RawFormat, "gif")) && totalFramesIndex>0)
@@ -81177,9 +81166,6 @@ coreResizeIMG(imgPath, newW, newH, file2save, goFX, toClippy, rotateAngle, soloM
        {
           trGdip_GetImageDimensions(oBitmap, imgW, imgH)
           rawFmt := Gdip_GetImageRawFormat(oBitmap)
-          If (rawFmt="JPEG")
-             RotateBMP2exifOrientation(oBitmap)
-
           If (!newW || !newH)
              mustDoRotateCoord := 1
 
