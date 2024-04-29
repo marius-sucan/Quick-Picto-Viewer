@@ -13779,7 +13779,8 @@ QPV_SetBitmapAsAlphaChannel(pBitmap, pBitmapMask, invertAlphaMask:=0, replaceSou
   {
      addJournalEntry(A_ThisFunc "(): ERROR. Bitmaps dimensions mismatched." w2 "/" h2 " | " w "/" h)
      Return 0
-  }
+  } ; Else
+     ; addJournalEntry(A_ThisFunc "(): Bitmaps dimensions. " w2 "/" h2 " | " w "/" h)
 
   E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   E2 := Gdip_LockBits(pBitmapMask, 0, 0, w, h, mStride, mScan, mData, 1)
@@ -14195,9 +14196,10 @@ QPV_MergeBitmapsWithMask(initialBitmap, newBitmap, alphaBitmap, invert, maskOpac
 
   If (!w || !h || !w2 || !h2 || !isOkay || !tisOkay)
   {
-     addJournalEntry(A_ThisFunc "(): ERROR. Bitmaps dimensions mismatched." w3 "/" h3 " | " w2 "/" h2 " | " w "/" h)
+     addJournalEntry(A_ThisFunc "(): ERROR. Bitmaps dimensions mismatched. " w3 "/" h3 " | " w2 "/" h2 " | " w "/" h)
      Return 0
-  }
+  } ; Else
+     ; addJournalEntry(A_ThisFunc "(): Bitmaps dimensions. " w3 "/" h3 " | " w2 "/" h2 " | " w "/" h)
 
   E1 := Gdip_LockBits(initialBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   E2 := Gdip_LockBits(newBitmap, 0, 0, w, h, nstride, nScan, nData, 1)
@@ -14871,6 +14873,9 @@ realtimePasteInPlaceAlphaMasker(previewMode, clipBMP, givenID, ByRef newBitmap, 
     If (thisState=prevState && validBMP(prevBMPu))
     {
        newBitmap := trGdip_CloneBitmap(A_ThisFunc, prevBMPu)
+       If !validBMP(newBitmap)
+          addJournalEntry("An error occured in " A_ThisFunc "(). Invalid cached bitmap cloned.")
+
        Return
     }
 
@@ -14879,7 +14884,7 @@ realtimePasteInPlaceAlphaMasker(previewMode, clipBMP, givenID, ByRef newBitmap, 
     newBitmap := (doMerger=1) ? trGdip_CloneBitmap(A_ThisFunc, initialBitmap) : trGdip_CloneBitmap(A_ThisFunc, clipBMP)
     If !validBMP(newBitmap)
     {
-       addJournalEntry("An error occured in " A_ThisFunc "(). Invalid bitmap to process.")
+       addJournalEntry("An error occured in " A_ThisFunc "(). Invalid bitmap to process. doMerger=" doMerger)
        Return
     }
 
@@ -15124,10 +15129,10 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
 
        If (alphaMaskingMode>1 && brushingMode!=1 && !viewportQPVimage.imgHandle && PasteInPlaceBlendMode=1)
        {
-          ; thisStartZeit := A_TickCount
+          thisStartZeit := A_TickCount
           thisIDu := "a" previewMode PasteInPlaceBlurAmount PasteInPlaceToolMode PasteInPlaceOrientation VPselRotation getAlphaMaskIDu() opacityExtra
           realtimePasteInPlaceAlphaMasker(previewMode, clipBMP, thisIDu, newBitmap, 0, 0, 0, 0, 1)
-          ; ToolTip, % A_TickCount - thisStartZeit, , , 2
+          fnOutputDebug("before=" A_TickCount - thisStartZeit)
           If validBMP(newBitmap)
           {
              trGdip_DisposeImage(clipBMP, 1)
@@ -15254,13 +15259,16 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     ; trGdip_GetImageDimensions(bgrBMP, wgimgW, wgimgH)
     ; fnOutputDebug("[" clipBMP "] " gImgW "==" gImgH " | [" bgrBMP "] "  wgImgW "==" wgImgH " | [" o_bgrBMP "] " dgImgW "==" dgImgH " | [target] " ResizedW "==" ResizedH)
     hasMasked := 0
-    thisBMP := (validBMP(bgrBMP) && PasteInPlaceBlendMode>1) ? bgrBMP : clipBMP
+    thisBMP := (validBMP(bgrBMP) && PasteInPlaceBlendMode>1) ? bgrBMP : trGdip_CloneBitmap(A_ThisFunc, clipBMP)
     If (alphaMaskingMode>1 && !viewportQPVimage.imgHandle && (PasteInPlaceBlendMode>1 || brushingMode=1 && previewMode=1))
     {
-       ; thisStartZeit := A_TickCount
+       thisStartZeit := A_TickCount
+       If (PasteInPlaceBlendMode=1)
+          thisBMP := resizeBitmapToGivenRef(thisBMP, 0, ResizedW, ResizedH, thisImgQuality)
+
        thisIDu := "a" previewMode PasteInPlaceBlurAmount PasteInPlaceToolMode PasteInPlaceOrientation VPselRotation getAlphaMaskIDu() opacityExtra thisImgCall thisFXstate BlendModesPreserveAlpha BlendModesFlipped userimgGammaCorrect brushZeitung
        realtimePasteInPlaceAlphaMasker(previewMode, thisBMP, thisIDu, newBitmap, 0, 0, 0, 0, 1, o_bgrBMP)
-       ; ToolTip, % brushZeitung "|" A_TickCount - thisStartZeit, , , 2
+       fnOutputDebug(brushZeitung " after|" A_TickCount - thisStartZeit)
        If validBMP(newBitmap)
        {
           hasMasked := 1
@@ -15331,7 +15339,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     Gdip_ResetClip(G2)
     trGdip_DisposeImage(bgrBMP, 1)
     trGdip_DisposeImage(o_bgrBMP, 1)
-    If hasMasked
+    ; If hasMasked
        trGdip_DisposeImage(thisBMP, 1)
     If (PasteInPlaceEraseInitial=1 && allowPreviewThis=1 && previewMode=1 && mustEraseAreaAfter=1)
        PasteInPlaceEraseArea(G2, previewMode)
