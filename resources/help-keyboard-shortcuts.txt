@@ -261,6 +261,7 @@ G|Toggle viewport grid|Vector drawing|-
 Double L-Click on dot|Insert a new dot next to the double-clicked one|Vector drawing|-
 Ctrl + L-Click on dot|Remove the dot clicked on|Vector drawing|-
 Alt + L-Click on dot|Move dot ignoring symmetry|Vector drawing|-
+Alt + L-Click on edge|Add new dot|Vector drawing|-
 Shift + L-Click|Add new dot in the path constrained every 45 degrees|Vector drawing|-
 Shift + L-Click on dot|Select dot|Vector drawing|-
 R-Click|Options menu|Vector drawing|Menu
@@ -270,6 +271,8 @@ Ctrl + D|Deselect all points in the path|Vector drawing|-
 Delete|Remove selected points in the path|Vector drawing|-
 Ctrl + Z|Undo last shape action|Vector drawing|-
 Ctrl + Y|Redo last shape action|Vector drawing|-
+Page up/down|Adjust shape or selected points X coordinates|Vector drawing|-
+Home/end|Adjust shape or selected points Y coordinates|Vector drawing|-
 Y|Cycle shape symmetry modes|Vector drawing|-
 Enter|Finish freeform path drawing|Vector drawing|-
 Esc|Cancel freeform path drawing|Vector drawing|-

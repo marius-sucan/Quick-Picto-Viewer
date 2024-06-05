@@ -16,6 +16,7 @@
 #include <shobjidl.h>
 #include <oleidl.h>
 #include <string>
+#include <thread>
 #include <sstream>
 #include <vector>
 #include <stack>
@@ -662,18 +663,6 @@ DLL_API int DLL_CALLCONV discardFilledPolygonCache(int m) {
     return 1;
 }
 
-DLL_API int DLL_CALLCONV publicIsDotInRect(int mX, int mY, int x1, int x2, int y1, int y2, int modus) {
-    if (modus==1)
-    {
-       int a = y1 - x1;
-       int b = y1 + x2;
-       int c = y2 - x1;
-       int d = y2 + x2;
-       return ( (min(a, b) <= mX && mX <= max(a, b))  &&  (min(c, d) <= mY && mY <= max(c, d)) ) ? 1 : 0;
-    } else
-       return ( (min(x1, x2) <= mX && mX <= max(x1, x2))  &&  (min(y1, y2) <= mY && mY <= max(y1, y2)) ) ? 1 : 0;
-}
-
 bool inline isDotInRect(int mX, int mY, int x1, int x2, int y1, int y2) {
    return ( (min(x1, x2) <= mX && mX <= max(x1, x2))  &&  (min(y1, y2) <= mY && mY <= max(y1, y2)) ) ? 1 : 0;
 }
@@ -822,6 +811,296 @@ DLL_API int DLL_CALLCONV testFilledPolygonCache(int m) {
     if (polygonMaskMap.size()<2000 || polygonMapMin.size()<100)
        r = 0;
     return r;
+}
+
+void drawLineSetPixelColorAA(int x, int y, int opacity, unsigned char* imageData, int width, int height, int Stride, int bpp, RGBAColor color) {
+    if (x<0 || y<0 || x>=width || y>=height)
+       return;
+
+    INT64 index = CalcPixOffset(x, height - y, Stride, bpp);
+    imageData[index] = color.b; // Blue component
+    imageData[index + 1] = color.g; // Green component
+    imageData[index + 2] = color.r; // Red component
+    imageData[index + 3] = color.a; // Red component
+}
+
+std::pair<std::pair<double, double>, std::pair<double, double>> calculateParallelPoints(
+    double x1, double y1, double x2, double y2, double distance) {
+    // Check if the input points are the same
+    if (x1 == x2 && y1 == y2) {
+        // If the points are the same, create two new points along the x-axis
+        double newX1 = x1 - distance / 2;
+        double newY1 = y1;
+        double newX2 = x2 + distance / 2;
+        double newY2 = y2;
+        return std::make_pair(std::make_pair(newX1, newY1), std::make_pair(newX2, newY2));
+    }
+
+    // Calculate the slope of the line
+    double slope = (y2 - y1) / (x2 - x1);
+    double perpSlope = -1 / slope;  // Slope of the perpendicular line
+
+    // Calculate the distance between the parallel lines
+    double dist = distance / std::sqrt(1 + perpSlope * perpSlope);
+
+    // Calculate the new parallel line points
+    double newX1 = x1 + dist * std::cos(std::atan(perpSlope));
+    double newY1 = y1 + dist * std::sin(std::atan(perpSlope));
+    double newX2 = x2 + dist * std::cos(std::atan(perpSlope));
+    double newY2 = y2 + dist * std::sin(std::atan(perpSlope));
+
+    return std::make_pair(std::make_pair(newX1, newY1), std::make_pair(newX2, newY2));
+}
+
+DLL_API int DLL_CALLCONV drawLineSegmentImage(unsigned char* imageData, int width, int height, int x0, int y0, int x1, int y1, int color, double th, int Stride, int bpp) {
+// based on https://zingl.github.io/bresenham.html
+//          https://github.com/zingl/Bresenham
+// by Zingl Alois
+
+   RGBAColor nC;
+   nC.a = (color >> 24) & 0xFF;
+   nC.r = (color >> 16) & 0xFF;
+   nC.g = (color >> 8) & 0xFF;
+   nC.b = color & 0xFF;
+   if (nC.a<2)
+      return 1;
+
+   double dx =  abs(x1-x0), sx = (x0<x1) ? 1 : -1;
+   double dy = -abs(y1-y0), sy = (y0<y1) ? 1 : -1;
+   double err = dx + dy, e2;                              /* error value e_xy */
+
+   for (;;) {                                                         /* loop */
+      drawLineSetPixelColorAA(x0, y0, 255, imageData, width, height, Stride, bpp, nC);
+      if (x0 == x1 && y0 == y1) break;
+
+      e2 = 2*err;
+      if (e2 >= dy) { err += dy; x0 += sx; }                        /* x step */
+      if (e2 <= dx) { err += dx; y0 += sy; }                        /* y step */
+   }
+
+   return 1;
+}
+
+DLL_API int DLL_CALLCONV oopdrawLineSegmentImage(unsigned char* imageData, int width, int height, int x0, int y0, int x1, int y1, int color, double th, int Stride, int bpp) {
+// based on https://zingl.github.io/bresenham.html
+//          https://github.com/zingl/Bresenham
+// by Zingl Alois
+
+   /* plot an anti-aliased line of width wd */
+   RGBAColor nC;
+   nC.a = (color >> 24) & 0xFF;
+   nC.r = (color >> 16) & 0xFF;
+   nC.g = (color >> 8) & 0xFF;
+   nC.b = color & 0xFF;
+   if (nC.a<2)
+      return 1;
+
+   double dx = abs(x1-x0), sx = x0 < x1 ? 1 : -1; 
+   double dy = abs(y1-y0), sy = y0 < y1 ? 1 : -1; 
+   double err, e2 = sqrt(dx*dx+dy*dy);                               /* length */
+   // if (th <= 1 || e2 == 0)
+   //    return plotLineAA(x0,y0, x1,y1);
+
+   dx *= 255/e2; dy *= 255/e2; th = 255*(th-1);               /* scale values */
+   if (dx < dy) {                                               /* steep line */
+      x1 = round((e2+th/2)/dy);                               /* start offset */
+      err = x1*dy-th/2;                  /* shift error value to offset width */
+      for (x0 -= x1*sx; ; y0 += sy) {
+         drawLineSetPixelColorAA(x1 = x0, y0, err, imageData, width, height, Stride, bpp, nC);
+         // setPixelAA(x1 = x0, y0, err);                  /* aliasing pre-pixel */
+         for (e2 = dy-err-th; e2+dy < 255; e2 += dy)  
+            drawLineSetPixelColorAA(x1 += sx, y0, 255, imageData, width, height, Stride, bpp, nC);
+            // setPixel(x1 += sx, y0);                      /* pixel on the line */
+         // setPixelAA(x1+sx, y0, e2);                    /* aliasing post-pixel */
+         drawLineSetPixelColorAA(x1 + sx, y0, e2, imageData, width, height, Stride, bpp, nC);
+         if (y0 == y1)
+            break;
+
+         err += dx;                                                 /* y-step */
+         if (err > 255)
+            { err -= dy; x0 += sx; }                                /* x-step */ 
+      }
+   } else {                                                      /* flat line */
+      y1 = round((e2+th/2)/dx);                               /* start offset */
+      err = y1*dx-th/2;                  /* shift error value to offset width */
+      for (y0 -= y1*sy; ; x0 += sx) {
+         drawLineSetPixelColorAA(x0, y1 = y0, err, imageData, width, height, Stride, bpp, nC);
+         // setPixelAA(x0, y1 = y0, err);                  /* aliasing pre-pixel */
+         for (e2 = dx-err-th; e2+dx < 255; e2 += dx) 
+            drawLineSetPixelColorAA(x0, y1 += sy, 255, imageData, width, height, Stride, bpp, nC);
+            // setPixel(x0, y1 += sy);                      /* pixel on the line */
+         // setPixelAA(x0, y1+sy, e2);                    /* aliasing post-pixel */
+         drawLineSetPixelColorAA(x0, y1 + sy, e2, imageData, width, height, Stride, bpp, nC);
+         if (x0 == x1)
+            break;
+
+         err += dy;                                                 /* x-step */ 
+         if (err > 255)
+            { err -= dx; y0 += sy; }                                /* y-step */
+      } 
+   }
+
+   // fnOutputDebug("B thickness = " + std::to_string(wd));
+   return 1;
+}
+
+DLL_API int DLL_CALLCONV YAYdrawLineSegmentImage(unsigned char* imageData, int width, int height, int x0, int y0, int x1, int y1, int color, float wd, int Stride, int bpp) {
+// based on https://zingl.github.io/bresenham.html
+//          https://github.com/zingl/Bresenham
+// by Zingl Alois
+
+   /* plot an anti-aliased line of width wd */
+   RGBAColor nC;
+   nC.a = (color >> 24) & 0xFF;
+   nC.r = (color >> 16) & 0xFF;
+   nC.g = (color >> 8) & 0xFF;
+   nC.b = color & 0xFF;
+   if (nC.a<2)
+      return 1;
+
+   int sx = (x0 < x1) ? 1 : -1;
+   int sy = (y0 < y1) ? 1 : -1;
+   int dx = abs(x1-x0);
+   int dy = abs(y1-y0);
+   int err = dx-dy, e2, x2, y2;                           /* error value e_xy */
+   float ed = (dx+dy == 0) ? 1 : sqrt((float)dx*dx+(float)dy*dy);
+
+   for (wd = (wd+1)/2; ; ) {                                    /* pixel loop */
+      drawLineSetPixelColorAA(x0, y0, max(0,255*(abs(err-dx+dy)/ed-wd+1)), imageData, width, height, Stride, bpp, nC);
+      e2 = err; x2 = x0;
+      if (2*e2 >= -dx) {                                            /* x step */
+         for (e2 += dy, y2 = y0; e2 < ed*wd && (y1 != y2 || dx > dy); e2 += dx)
+            drawLineSetPixelColorAA(x0, y2 += sy, max(0,255*(abs(e2)/ed-wd+1)), imageData, width, height, Stride, bpp, nC);
+
+         if (x0 == x1)
+            break;
+         e2 = err; err -= dy; x0 += sx;
+      }
+
+      if (2*e2 <= dy) {                                             /* y step */
+         for (e2 = dx-e2; e2 < ed*wd && (x1 != x2 || dx < dy); e2 += dy)
+            drawLineSetPixelColorAA(x2 += sx, y0, max(0,255*(abs(e2)/ed-wd+1)), imageData, width, height, Stride, bpp, nC);
+
+         if (y0 == y1)
+            break;
+         err += dx; y0 += sy;
+      }
+   }
+   // fnOutputDebug("B thickness = " + std::to_string(wd));
+   return 1;
+}
+
+DLL_API int DLL_CALLCONV blahLineSegmentImage(unsigned char* imageData, int width, int height, int startX, int startY, int endX, int endY, int color, int lineThickness, int Stride, int bpp) {
+  // Check for valid image dimensions and coordinates
+fnOutputDebug("blahLineSegmentImage step 0");
+  if (width <= 0 || height <= 0 || startX < 0 || startY < 0 || endX < 0 || endY < 0 || startX >= width || startY >= height || endX >= width || endY >= height) {
+    return 0;
+  }
+fnOutputDebug("blahLineSegmentImage step 1");
+  // Check for supported color depth (24 or 32 bits)
+  int bytesPerPixel = (imageData[0] == 0) ? 4 : 3; // Assuming little-endian format for 32-bit images
+  if (bytesPerPixel != 3 && bytesPerPixel != 4) {
+    return 0;
+  }
+fnOutputDebug("blahLineSegmentImage step 2 = " + std::to_string(startX) + "/" + std::to_string(startY) + "|" + std::to_string(endX) + "/" + std::to_string(endY));
+
+  // Bresenham's line algorithm for efficient line drawing
+  int dx = endX - startX;
+  int dy = endY - startY;
+  int stepX = 1;
+  int stepY = 1;
+  int diff = dx - 2 * dy;
+  int x = startX;
+  int y = startY;
+
+  // Handle negative slopes
+  if (dy < 0) {
+    dy = -dy;
+    stepY = -1;
+  }
+
+  // Handle lines with steeper slope than 45 degrees (faster for these cases)
+  if (dx < 0) {
+    dx = -dx;
+    stepX = -1;
+    if (dy > dx) {
+      std::swap(dx, dy);
+      std::swap(stepX, stepY);
+      x = endX;
+      y = endY;
+    }
+  } else if (dy > dx) {
+    std::swap(dx, dy);
+    std::swap(stepX, stepY);
+  }
+
+fnOutputDebug("blahLineSegmentImage step 3 " + std::to_string(stepX) + "///" + std::to_string(stepY) + "/d/"+ std::to_string(dx) + "//"+ std::to_string(dy));
+  // Draw the line using pixel manipulation
+  for (int i = 0; i <= dx; ++i) {
+    int offset = y * width + x;
+    for (int j = 0; j < lineThickness; ++j) {
+      if (offset + j >= 0 && offset + j < width * height) {
+        // Set pixel color based on bytes per pixel (24 or 32 bits)
+        if (bytesPerPixel == 3) {
+          imageData[offset * bytesPerPixel + j] = (color >> 16) & 0xFF; // Blue
+          imageData[offset * bytesPerPixel + j + 1] = (color >> 8) & 0xFF; // Green
+          imageData[offset * bytesPerPixel + j + 2] = color & 0xFF; // Red
+        } else {
+          imageData[offset * bytesPerPixel + j] = (color >> 24) & 0xFF; // Alpha (ignore for now)
+          imageData[offset * bytesPerPixel + j + 1] = (color >> 16) & 0xFF; // Blue
+          imageData[offset * bytesPerPixel + j + 2] = (color >> 8) & 0xFF; // Green
+          imageData[offset * bytesPerPixel + j + 3] = color & 0xFF; // Red
+        }
+      }
+    }
+    x += stepX;
+
+    // Update difference term for Bresenham's algorithm
+    if (diff < 0) {
+      diff += 2 * stepX;
+    } else {
+      diff += 2 * (stepX - stepY);
+      y += stepY;
+    }
+  }
+
+  return 1;
+}
+
+DLL_API int DLL_CALLCONV OLDdrawLineSegmentImage(unsigned char* imageData, int width, int height, int lineThickness, int startX, int startY, int endX, int endY, int Stride, int bpp) {
+
+    // Draw the line using Bresenham's line algorithm
+    float dx = endX - startX;
+    float dy = endY - startY;
+    float steps = max(abs(dx), abs(dy));
+    float deltaX = dx / steps;
+    float deltaY = dy / steps;
+    int x = startX;
+    int y = startY;
+
+    INT64 imageSize = CalcPixOffset(width - 1, height - 1, Stride, bpp);
+    for (int i = 0; i < steps; ++i) {
+        int pixelX = x;
+        int pixelY = y;
+
+        // Draw the line
+        for (int j = -lineThickness / 2; j <= lineThickness / 2; ++j) {
+            for (int k = -lineThickness / 2; k <= lineThickness / 2; ++k) {
+                INT64 index = CalcPixOffset(pixelX + j, height - pixelY + k, Stride, bpp);
+                if (index >= 0 && index < imageSize) {
+                    imageData[index] = 255; // Blue component
+                    imageData[index + 1] = 255; // Green component
+                    imageData[index + 2] = 255; // Red component
+                }
+            }
+        }
+
+        x += deltaX;
+        y += deltaY;
+    }
+    fnOutputDebug("steps=" + std::to_string(steps) + "; dx/dy=" + std::to_string(dx) + "//" + std::to_string(dy));
+    fnOutputDebug("line=" + std::to_string(startX) + "//" + std::to_string(startY) + "||" + std::to_string(endX) + "//" + std::to_string(endY));
+    return 1;
 }
 
 bool clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
@@ -1074,7 +1353,7 @@ float CIEdeltaE2000(double Cl_1, double Ca_1, double Cb_1, double Cl_2, double C
 // WHT_L, WHT_C, WHT_H  - Weight factors: luminance, chroma and hue
 // tested against http://www.brucelindbloom.com/index.html?ColorDifferenceCalc.html
 // https://getreuer.info/posts/colorspace/index.html
-// http://www.easyrgb.com/en/math.php
+// https://www.easyrgb.com/en/math.php
 // https://zschuessler.github.io/DeltaE/demos/
 
   const double pwr = 6103515625; // 25^7;
@@ -1866,10 +2145,38 @@ int wrapRGBtoGray(int color, int mode) {
     return index;
 }
 
+void goPixelFloodFill8Stack(unsigned char *imageData, INT64 pix, float index, RGBAColor newColor, RGBAColor oldColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int linearGamma, int flipLayers, int bpp) {
+  RGBAColor thisColor = {0, 0, 0, 0};
+  if (tolerance>0 && (opacity<1 || dynamicOpacity==1 || blendMode>0 || cartoonMode==1))
+  {
+     int tcA = (bpp==32) ? imageData[pix + 3] : 255;
+     RGBAColor prevColor = {imageData[pix], imageData[pix + 1], imageData[pix + 2], tcA};
+     if (cartoonMode==1)
+        thisColor = oldColor;
+     else
+        thisColor = mixColorsFloodFill(prevColor, newColor, opacity, dynamicOpacity, blendMode, prevCLRindex, tolerance, alternateMode, index, linearGamma, flipLayers);
+
+     imageData[pix] = thisColor.b;
+     imageData[pix + 1] = thisColor.g;
+     imageData[pix + 2] = thisColor.r;
+     if (bpp==32)
+        imageData[pix + 3] = thisColor.a;
+  } else
+  {
+     imageData[pix] = newColor.b;
+     imageData[pix + 1] = newColor.g;
+     imageData[pix + 2] = newColor.r;
+     if (bpp==32)
+        imageData[pix + 3] = newColor.a;
+     // imageData[pix] = newColor;
+     // second element , the colour, will be used to mix colours; to-do
+  }
+}
 
 int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBAColor newColor, float *nC, RGBAColor oldColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay, int linearGamma, int flipLayers, int Stride, int bpp, int useSelArea) {
 // based on https://lodev.org/cgtutor/floodfill.html
 // by Lode Vandevenne
+// to-do: parallelize the algorithm? make it faster?
 
   if (newColor.r==oldColor.r && newColor.g==oldColor.g && newColor.b==oldColor.b)
      return 0; //avoid infinite loop
@@ -1884,7 +2191,6 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
   UINT suchDeviations = 0;
   int suchAppliedDeviations = 0;
   std::vector<bool> pixelzMap(maxPixels, 0);
-  std::vector<float> indexes(maxPixels, 0);
   std::stack<int> starkX;
   std::stack<int> starkY;
 
@@ -1928,15 +2234,16 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
            if (thisColor.r==oldColor.r && thisColor.g==oldColor.g && thisColor.b==oldColor.b)
            {
               pixelzMap[tpx] = 1;
-              indexes[tpx] = defIndex;
+              goPixelFloodFill8Stack(imageData, tpx, defIndex, newColor, oldColor, tolerance, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, flipLayers, bpp);
               starkX.push(nx);
               starkY.push(ny);
+              suchDeviations++;
            } else if (tolerance>0)
            {
               if (decideColorsEqual(thisColor, oldColor, tolerance, prevCLRindex, alternateMode, nC, index))
               {
                  pixelzMap[tpx] = 1;
-                 indexes[tpx] = index;
+                 goPixelFloodFill8Stack(imageData, tpx, index, newColor, oldColor, tolerance, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, flipLayers, bpp);
                  starkX.push(nx);
                  starkY.push(ny);
                  suchDeviations++;
@@ -1947,42 +2254,17 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
   }
 
   fnOutputDebug("suchDeviations==" + std::to_string(suchDeviations));
-  RGBAColor thisColor = {0, 0, 0, 0};
-  for (std::size_t pix = 0; pix < pixelzMap.size(); ++pix)
-  {
-      if (pixelzMap[pix]!=1)
-         continue;
-
-      // std::cout << it->first << " => " << it->second << '\n';
-      suchAppliedDeviations++;
-      if (tolerance>0 && (opacity<1 || dynamicOpacity==1 || blendMode>0 || cartoonMode==1))
-      {
-         int tcA = (bpp==32) ? imageData[pix + 3] : 255;
-         RGBAColor prevColor = {imageData[pix], imageData[pix + 1], imageData[pix + 2], tcA};
-         if (cartoonMode==1)
-            thisColor = oldColor;
-         else
-            thisColor = mixColorsFloodFill(prevColor, newColor, opacity, dynamicOpacity, blendMode, prevCLRindex, tolerance, alternateMode, indexes[pix], linearGamma, flipLayers);
-
-         imageData[pix] = thisColor.b;
-         imageData[pix + 1] = thisColor.g;
-         imageData[pix + 2] = thisColor.r;
-         if (bpp==32)
-            imageData[pix + 3] = thisColor.a;
-      } else
-      {
-         imageData[pix] = newColor.b;
-         imageData[pix + 1] = newColor.g;
-         imageData[pix + 2] = newColor.r;
-         if (bpp==32)
-            imageData[pix + 3] = newColor.a;
-         // imageData[pix] = newColor;
-         // second element , the colour, will be used to mix colours; to-do
-      }
-  }
-
-  fnOutputDebug("suchAppliedDeviations==" + std::to_string(suchAppliedDeviations));
-  return suchAppliedDeviations;
+  // #pragma omp parallel for schedule(static) default(none)
+  // for (INT64 pix = 0; pix < pixelzMap.size(); ++pix)
+  // {
+  //     if (pixelzMap[pix]==0)
+  //        continue;
+  //     // std::cout << it->first << " => " << it->second << '\n';
+  //     suchAppliedDeviations++;
+  //     goPixelFloodFill8Stack(imageData, pix, pixelzMap[pix], newColor, oldColor, tolerance, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, flipLayers, bpp);
+  // }
+  // fnOutputDebug("suchAppliedDeviations==" + std::to_string(suchAppliedDeviations));
+  return suchDeviations;
 }
 
 int FloodFillScanlineStack(unsigned char *imageData, int w, int h, int x, int y, RGBAColor newColor, RGBAColor oldColor, int Stride, int bpp, int useSelArea) {

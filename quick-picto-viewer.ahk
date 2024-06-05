@@ -38,8 +38,8 @@
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
 ;@Ahk2Exe-UpdateManifest 0, Quick Picto Viewer
 ;@Ahk2Exe-SetOrigFilename Quick-Picto-Viewer.exe
-;@Ahk2Exe-SetVersion 5.9.98
-;@Ahk2Exe-SetProductVersion 5.9.98
+;@Ahk2Exe-SetVersion 6.0.00
+;@Ahk2Exe-SetProductVersion 6.0.00
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2024)
 ;@Ahk2Exe-SetCompanyName https://marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -213,8 +213,8 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*|Background clipper*"
    , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := [], prevPasteInPlaceVPcoords := []
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
-   , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := "ALPHA"
-   , appVersion := "5.9.98", vReleaseDate := "2024/04/07" ; yyyy-mm-dd
+   , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := ""
+   , appVersion := "6.0.00", vReleaseDate := "2024/06/05" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -4408,7 +4408,7 @@ setWindowTitle(msg, forceThis:=0, useLast:=0) {
     If (prevSet!=thisMsg && runningLongOperation!=1 && infoSlideDelay=0 && animGIFplaying!=1 && hasInitSpecialMode!=1) || (forceThis=1)
     {
        prevSet := thisMsg
-       WinSetTitle, ahk_id %PVhwnd%,, % verType "|" thisMsg " | QPV"
+       WinSetTitle, ahk_id %PVhwnd%,, % verType thisMsg " | QPV"
        ; fnOutputDebug("WinTitle: " thisMsg)
        lastInvoked := A_TickCount
     }
@@ -6186,7 +6186,6 @@ selectFileLongTap() {
 }
 
 isDotInRect(mX, mY, x1, x2, y1, y2, modus:=0) {
-   ; Return DllCall(whichMainDLL "\publicIsDotInRect", "int", mX, "int", mY, "int", x1, "int", x2, "int", y1, "int", y2, "int", modus)
    If (modus=1)
       Return (isInRange(mX, y1 - x1, y1 + x2) && isInRange(mY, y2 - x1, y2 + x2)) ? 1 : 0
    Else
@@ -16438,7 +16437,7 @@ downscaleHugeImagesForEditing() {
    nmgpx := Round((w * h)/1000000, 1)
    If (mgpx>536.7)
    {
-      msgResult := msgBoxWrapper(appTitle ": WARNING", "The image currently opened has " mgpx " megapixels. Image editing is limited to 536 megapixels. The image will be automatically down-scaled to: " w " x " h " pixels (" nmgpx " megapixels).`n`nDo you want to continue?", "&Yes|&No", 1, "exclamation")
+      msgResult := msgBoxWrapper(appTitle ": WARNING", "The image currently opened has " mgpx " megapixels. The image editing tool you intend to use does not work with images above 536 MPx. Do you want to down-scale the image?`n`nThe image will be down-scaled to:`n" w " x " h " pixels`n" nmgpx " megapixels.", "&Yes|&No", 1, "exclamation")
       If (msgResult!="yes")
          Return -1
    }
@@ -20296,6 +20295,111 @@ HugeImagesApplyInsertText() {
       ResetImgLoadStatus()
 }
 
+HugeImagesDrawLineShapes() {
+      If warnHugeImageNotFIM()
+         Return
+
+      If (editingSelectionNow=1)
+      {
+         If throwErrorSelectionOutsideBounds()
+            Return "out-bounds"
+      }
+
+      hFIFimgX := viewportQPVimage.imgHandle
+      bpp := FreeImage_GetBPP(hFIFimgX)
+      If warnIncorrectColorDepthHugeImage(bpp, 1)
+         Return
+
+      showTOOLtip("Preparing to draw lines, please wait...")
+      trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+      setImageLoading()
+      ; obju := InitHugeImgSelPath(0, imgW, imgH)
+      pBitsAll := FreeImage_GetBits(hFIFimgX)
+      Stride := FreeImage_GetStride(hFIFimgX)
+      imgSelH := max(imgSelY2, imgSelY1) - min(imgSelY2, imgSelY1)
+      imgSelW := max(imgSelX2, imgSelX1) - min(imgSelX2, imgSelX1)
+            obju := InitHugeImgSelPath(0, imgW, imgH)
+            recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
+            QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, shapeu, 0, 0, 0, 0, 0, 1)
+            showTOOLtip("Drawing lines, please wait...")
+            ; r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 0, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", TextInAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", pBits, "int", mStride, "int", mBpp, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", nImgW, "int", nImgH)
+
+         pPath := coreCreateFillAreaShape(imgSelX1, imgSelY1, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, 2, 0)
+         if (doFlip=91)
+         {
+            pMatrix := Gdip_CreateMatrix()
+            Gdip_ScaleMatrix(pMatrix, 1, -1)
+            Gdip_TranslateMatrix(pMatrix, 0, -mh)
+            E := Gdip_TransformPath(pPath, pMatrix)
+            Gdip_DeleteMatrix(pMatrix)
+         }
+
+         If (bezierSplineCustomShape=1 || FillAreaCurveTension>1 || FillAreaShape=1)
+            Gdip_FlattenPath(pPath, 0.1)
+
+         If (zsf=10)
+         {
+            pMatrix := Gdip_CreateMatrix()
+            Gdip_ScaleMatrix(pMatrix, w/mw, h/mh)
+            Gdip_TransformPath(pPath, pMatrix)
+            Gdip_DeleteMatrix(pMatrix)
+         }
+
+         PointsCount := Gdip_GetPathPointsCount(pPath)
+         VarSetCapacity(PointsF, 8 * (PointsCount + 1), 0)
+         gdipLastError := DllCall("gdiplus\GdipGetPathPoints", "UPtr", pPath, "UPtr", &PointsF, "int*", PointsCount)
+
+
+newColor := makeRGBAcolor(DrawLineAreaColor, DrawLineAreaOpacity)
+  Gdip_FromARGB(newColor, A, R, G, B)
+  newColor := Gdip_ToARGB(A, R, G, B)
+
+
+        pp := i := 0
+        Loop, % PointsCount
+        {
+           xi := NumGet(&PointsF, 8*i, "float")
+           yi := NumGet(&PointsF, (8*i)+4, "float")
+           i++
+           If (i>=PointsCount)
+              i:= 0
+
+           xj := NumGet(&PointsF, 8*i, "float")
+           yj := NumGet(&PointsF, (8*i)+4, "float")
+           ; i++
+
+;     Gdip_GraphicsClear(2NDglPG, "0xff112211")
+;     Gdip_DrawPath(2NDglPG, pPen4, pPath)
+;     Gdip_DrawLine(2NDglPG, pPen5, xi, yi, xj, yj)
+;     doLayeredWinUpdate(A_ThisFunc, hGDIselectwin, 2NDglHDC)
+; Sleep, 1000
+           z := DllCall(whichMainDLL "\drawLineSegmentImage", "uptr", pBitsAll, "int", imgW, "int", imgH, "int", xi, "int", yi, "int", xj, "int", yj, "int", newColor, "float", DrawLineAreaContourThickness, "int", Stride, "int", bpp)
+           pp += z
+        }
+
+          fnOutputDebug(A_ThisFunc "(): " pp "|" i "|" PointsCount)
+      DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+      r := 1
+
+      If r 
+      {
+         killQPVscreenImgSection()
+         currentImgModified := 1
+         imgIndexEditing := currentFileIndex
+         viewportQPVimage.actions := Round(viewportQPVimage.actions + 1)
+         dummyTimerDelayiedImageDisplay(500)
+         SoundBeep, 900, 100
+         RemoveTooltip()
+      } Else
+      {
+         recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
+         showTOOLtip("ERROR: Failed to draw the text on the image")
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+      }
+      ResetImgLoadStatus()
+}
+
 terminatePasteInPlace() {
    corePasteInPlaceActNow("kill")
    coreFillSelectedArea("kill")
@@ -21631,6 +21735,8 @@ createDrawLinesPen(thisThick) {
     Gdip_SetPenDashStyle(thisPen, DrawLineAreaDashStyle - 1)
     If (DrawLineAreaCapsStyle=1)
        Gdip_SetPenLineCaps(thisPen, 2, 2, 2)
+    Else
+       Gdip_SetPenLineCaps(thisPen, 1, 1, 1)
 
     If (DrawLineAreaDoubles=1)
        Gdip_SetPenCompoundArray(thisPen, compoundArray)
@@ -21767,6 +21873,7 @@ coreDrawShapesLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgSelW,
     }
 
     Gdip_DrawPath(G2, thisPen, pPath)
+    Gdip_ResetClip(G2)
     Gdip_DeletePath(pPath)
     Gdip_DeletePen(thisPen)
 }
@@ -52366,7 +52473,10 @@ BtnDrawShapeSelectedArea() {
        CloseWindow("yes", 0)
     ; Sleep, 1
     ToggleEditImgSelection("show-edit")
-    DrawLinesInSelectedArea(2)
+    If (viewportQPVimage.imgHandle)
+       HugeImagesDrawLineShapes()
+    Else
+       DrawLinesInSelectedArea(2)
     prevImgEditZeit := A_TickCount
     SetTimer, RemoveTooltip, -250
 }

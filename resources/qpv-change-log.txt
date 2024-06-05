@@ -1,24 +1,30 @@
-// Quick Picto Viewer - CHANGELOG
+// Quick Picto Viewer - CHANGE LOG
 // by Marius Șucan ( https://marius.sucan.ro )
 // GitHub: https://github.com/marius-sucan/Quick-Picto-Viewer
 // Project began in early May 2019.
+// Related: general-code-overview.txt
 
-- v6.0.00 (2023-**-** / work in progress)
+- v6.0.00 (2024-06-05)
   - [new] QPV can now display, at full resolution, images of up to 12500 megapixels or more; previously, they were down-scaled to 536 mgpx.
   - [new] «Adjust image colors» tool reimplemented from scratch, with more capabilities; it can be applied in batch, on multiple images in one go
   - [new] freehand draw mode for fill selection area, draw lines and shapes tools
   - [new] option to join arcs and lines in the «Draw parametric lines» panel, for the margins generator
   - [new] blending modes option for draw lines and shapes tools
+  - [new] fill behind now allows to users to fill triangles, rounded rectangles and other shapes
+  - [new] option to align selected vector path points on X or Y with any given point in path
+  - [new] option to convert curved shapes to polygonal shapes 
+  - [new] option to add a new point anywhere on the edge of a vector path
+  - [new] status bar for the vector editor tool
+  - [new] vector tool modes, to facilitate the usage of the vector editor with touch screens: mixed, add, remove, select and adjust
+  - complete overhaul of the vector paths editor; new options added and considerable performance improvements
   - overhauled the «Desature image colors» tool; it now has brightness and contrast options
   - improvements and optimisations to all the tools with live preview in the viewport
   - fixes and improvements for the «insert text» tool
-  - fill behind now allows to users to fill triangles, rounded rectangles and other shapes
   - improvements for the "Image selection area properties" panel; added shape cavity and rotation options, and the ability to Ctrl+L-Click on X1,X2, etc, to manually set the coordinates; also added copy/paste selection properties
-  - improvements to how selection areas and vector shapes are handled; dramatic performance improvements when dealing with huge images
+  - improvements to how selection areas and vector path shapes are handled; dramatic performance improvements when dealing with huge images
   - blend modes improvements; now blend modes work as in other apps when dealing with layer transparencies
   - images exceeding 536 mgpx can be resized, cropped, rotated by 90°, or flipped H/V; colors invert is also available; image selected area can be copied to clipboard
   - increased the limit from 32567 to 234950 pixels in width or height for images in the viewport that can be edited with any available tool
-  - [...] more to be decided 
 
 - v5.9.93 (2023-11-06)
   - more bug fixes
@@ -1097,10 +1103,52 @@ Files organization:
 
 - v1.0.0 (2010-10-04) by SBC
 
+; --------------------------------------------------
+; ==================================================
+; --------------------------------------------------
 
-; known issues [mardi 24 octobre 2023]
-  - high memory consumption; all operations need a lot of RAM [zoom/pan, etc]
-  - when multi-threaded is activated, QPV randomly hangs in thumbnails mode
-  - jpeg lossless crop: the selection area does not precisely match with the resulted image [freeimage]
-  - sometimes the viewport fails to update when the brush tool is used
+; KNOWN ISSUES [mardi 4 juin 2024]:
+- when multi-threaded is activated, QPV randomly hangs in thumbnails mode
+- when using image editing live tools, the application sometimes hangs [and never recovers] when using the custom sliders
+- QPV sometimes crashes when clicking on toolbar icons and opens an image editing live tool
+- jpeg lossless crop: the selection area does not precisely match with the resulted image [freeimage]
+- high memory consumption with images under 536 megapixels; most editing operations need a lot of RAM
 
+; TO-DO:
+- use WIC for batch image simple processing tool ? At least, teleport them from WIC to FreeImage
+
+; Tools left to implement for images above 536 MPx:
+- Draw lines 
+- Brushes [and upgrade the blend modes function]
+-- Low priority tools:
+---- Detect edges
+---- Blur
+---- Sharpen
+---- Symmetry and patterns generator
+---- Polar to rect / rect to polar
+
+; PENDING:
+- implement gradients in c++? precache the weights
+- load apng / heic / avif / svg image files
+-- https://www.autohotkey.com/boards/viewtopic.php?f=6&t=123979
+-- https://github.com/iseahound/Image
+
+; OTHERS/MISC:
+- [failed to do it] improve selection area with high-zoom level to align with the pixels of the zoomed-in image on screen 
+- teleport gdi+/fim menu options 
+- attempt to improve zoomed-in behaviour for transform tool, to not require force live preview
+- allow resize/crop/rotate on original HDR images, not just on the tone-mapped one 
+
+; TO-DO later:
+- circular/polar grid generator
+- rectangular text grid generator
+- dedicated panel as color chooser for the brush tool
+- draw bar charts tool
+- alpha masking for the parametric lines tool
+- render 3D primitive [textured?] objects through cImg
+- magic wand when editing the alpha mask
+- edit image(s) metadata
+- add folder details column- explorer panel
+- transparentize image tool
+- import vector paths
+- reimplement smudge, pinch, bulge brushes
