@@ -45,6 +45,7 @@
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
 ;___________ Auto Execute Section ____
 
+#Requires AutoHotkey v1.1.33.10+
 #NoEnv
 #NoTrayIcon
 #MaxHotkeysPerInterval, 950
@@ -1376,6 +1377,10 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     {
        If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
           func2Call := ["MenuSelRotation"]
+    } Else If (givenKey="+^r")
+    {
+       If ((HKifs("imgEditSolo") || HKifs("imgsLoaded")) && !AnyWindowOpen)
+          func2Call := ["MenuRotateEditImagePlus"]
     } Else If (givenKey="^t")
     {
        If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
@@ -2278,6 +2283,7 @@ initQPVmainDLL(modus:=0) {
 
    attempts++
    DllPath := FreeImage_FoxGetDllPath(whichMainDLL, mainExecPath)
+   ; addJournalEntry("INIT main QPV initial DllPath: " DllPath)
    If !DllPath
    {
       addJournalEntry("ERROR: Failed to find qpvMain.dll. Various features in QPV will not work.")
@@ -58197,7 +58203,7 @@ OpenDialogFiles() {
                IniWrite, % imgPath, % mainSettingsFile, General, LastOpenedImg
 
             IDshowImage(currentFileIndex)
-         } Else If OutFileName!=""
+         } Else If (OutFileName!="")
          {
             FriendlyName := FileExist(imgPath) ? "malformed" : "inexistent"
             msgBoxWrapper(appTitle ": ERROR", "Error opening file: " OutFileName ". It seems to be " FriendlyName " .`n`nAnother file from the folder will be displayed now. Files indexed: " groupDigits(maxFilesIndex) ".", 0, 0, "error")
@@ -60248,7 +60254,7 @@ createMenuImageEditSubMenus(modus:=0) {
       kMenu("PVimgTransform", "Add", "Flip " f "&horizontally" keyu, "FlipSelectedAreaH")
       keyu := (AnyWindowOpen) ? "" : "`tShift+V"
       kMenu("PVimgTransform", "Add", "Flip " f "&vertically" keyu, "FlipSelectedAreaV")
-      kMenu("PVimgTransform", "Add", "Rotate image by 90°", "MenuRotateEditImagePlus")
+      kMenu("PVimgTransform", "Add", "Rotate image by 90°`tCtrl+Shift+R", "MenuRotateEditImagePlus")
       kMenu("PVimgTransform", "Add", "Rotate image by -90°", "MenuRotateEditImageMinus")
       Menu, PVimgTransform, Add 
       kMenu("PVimgTransform", "Add", "&Crop image to selection`tShift+Enter", "CropImageInViewPortToSelection")
