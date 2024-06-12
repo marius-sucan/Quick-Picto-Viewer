@@ -3,7 +3,7 @@
 ;   Platform: Windows 7 or later, preferred is Windows 10.
 ;   Author:   Marius Șucan - https://marius.sucan.ro/
 ;   GitHub:   https://github.com/marius-sucan/Quick-Picto-Viewer
-;   Requires: AHK-H v1.1.33.10.
+;   Requires: AHK-H v1.1.33.01+.
 ;   Code overview: https://raw.githubusercontent.com/marius-sucan/Quick-Picto-Viewer/master/general-code-overview.txt
 ;
 ; Quick Picto Viewer can run on Windows 7 and even on XP, but various features
@@ -45,7 +45,7 @@
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
 ;___________ Auto Execute Section ____
 
-#Requires AutoHotkey v1.1.33.10+
+#Requires AutoHotkey v1.1.33.01+
 #NoEnv
 #NoTrayIcon
 #MaxHotkeysPerInterval, 950
