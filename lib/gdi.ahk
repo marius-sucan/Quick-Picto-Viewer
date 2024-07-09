@@ -513,8 +513,8 @@ Gdi_GetTextExtentPoint32(hDC, string, ByRef w, ByRef h) {
    VarSetCapacity(SIZE, 8, 0)
    E := DllCall("gdi32\GetTextExtentPoint32"
             ,"UPtr", hDC                                ;-- hDC
-            ,"Str", string                             ;-- lpString
-            ,"Int", StrLen(string)                     ;-- c (string length)
+            ,"Str", string                              ;-- lpString
+            ,"Int", StrLen(string)                      ;-- c (string length)
             ,"UPtr", &SIZE)                             ;-- lpSize
 
   w := NumGet(SIZE, 0, "Int")
@@ -778,6 +778,8 @@ Gdi_SetTextAlign(hDC, flags) {
 }
 
 Gdi_SetTextColor(hDC, color) {
+; If the function succeeds, the return value is a color reference for the previous text color as a COLORREF value.
+; If the function fails, the return value is CLR_INVALID.
      Return DllCall("gdi32\SetTextColor", "UPtr", hDC, "UInt", color)
 }
 

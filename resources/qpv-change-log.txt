@@ -4,6 +4,9 @@
 // Project began in early May 2019.
 // Related: general-code-overview.txt
 
+- v6.0.50 (2024-07-**)
+  - [improvement] «draw shapes contours» tool now works with images over 536 megapixels
+
 - v6.0.00 (2024-06-05)
   - [new] QPV can now display, at full resolution, images of up to 12500 megapixels or more; previously, they were down-scaled to 536 mgpx.
   - [new] «Adjust image colors» tool reimplemented from scratch, with more capabilities; it can be applied in batch, on multiple images in one go
@@ -1108,9 +1111,9 @@ Files organization:
 ; --------------------------------------------------
 
 ; KNOWN ISSUES [mardi 4 juin 2024]:
-- when multi-threaded is activated, QPV randomly hangs in thumbnails mode
-- when using image editing live tools, the application sometimes hangs [and never recovers] when using the custom sliders
-- QPV sometimes crashes when clicking on toolbar icons and opens an image editing live tool
+- when multi-threaded is activated, QPV randomly hangs [and never recovers] in thumbnails mode; a dead-lock?
+- when using image editing live tools, the application sometimes hangs [and never recovers] when using the custom sliders; another dead-lock?
+- QPV sometimes crashes when clicking on toolbar icons and opens an image editing live tool [no idea why]
 - jpeg lossless crop: the selection area does not precisely match with the resulted image [freeimage]
 - high memory consumption with images under 536 megapixels; most editing operations need a lot of RAM
 

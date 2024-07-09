@@ -471,7 +471,7 @@ bool isPointInPolygon(INT64 pX, INT64 pY, float* PointsList, int PointsCount) {
     return inside;
 }
 
-void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1, int ppy1, int ppx2, int ppy2) {
+int FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1, int ppy1, int ppx2, int ppy2) {
     // see comments for prepareSelectionArea()
     fnOutputDebug("FillMaskPolygon() invoked; PointsCount=" + std::to_string(PointsCount));
     INT64 s = (INT64)polyW * polyH + 2;
@@ -482,11 +482,11 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1,
        } catch(const std::bad_alloc& e) {
           EllipseSelectMode = 0;
           fnOutputDebug("polygonMaskMap failed. bad_alloc =" + std::to_string(s));
-          return;
+          return 0;
        } catch(const std::length_error& e) {
           EllipseSelectMode = 0;
           fnOutputDebug("polygonMaskMap failed. length_error =" + std::to_string(s));
-          return;
+          return 0;
        }
 
        fnOutputDebug("polygonMaskMap RESIZED=" + std::to_string(s) + "||" + std::to_string(polygonMaskMap.size()));
@@ -652,7 +652,7 @@ void FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1,
     polygonMapEdges.clear();
     polygonMapEdges.shrink_to_fit();
     // fnOutputDebug("polygonMapEdges discarded");
-    // return 1;
+    return 1;
 }
 
 DLL_API int DLL_CALLCONV discardFilledPolygonCache(int m) {
@@ -660,6 +660,10 @@ DLL_API int DLL_CALLCONV discardFilledPolygonCache(int m) {
     polygonMapMin.shrink_to_fit();
     polygonMaskMap.clear();
     polygonMaskMap.shrink_to_fit();
+    DrawLineCapsGrid.clear();
+    DrawLineCapsGrid.shrink_to_fit();
+    linesMaskMap.clear();
+    linesMaskMap.shrink_to_fit();
     return 1;
 }
 
@@ -813,8 +817,8 @@ DLL_API int DLL_CALLCONV testFilledPolygonCache(int m) {
     return r;
 }
 
-void drawLineSetPixelColorAA(int x, int y, int opacity, unsigned char* imageData, int width, int height, int Stride, int bpp, RGBAColor color) {
-    if (x<0 || y<0 || x>=width || y>=height)
+void drawLineSetPixelColor(int x, int y, int opacity, unsigned char* imageData, int width, int height, int Stride, int bpp, RGBAColor color) {
+    if (x<0 || y<0 || x>=width || y>=height || (height - y<0) || (height - y>=height) || opacity<254)
        return;
 
     INT64 index = CalcPixOffset(x, height - y, Stride, bpp);
@@ -823,6 +827,73 @@ void drawLineSetPixelColorAA(int x, int y, int opacity, unsigned char* imageData
     imageData[index + 2] = color.r; // Red component
     imageData[index + 3] = color.a; // Red component
 }
+
+void drawLineCapOnPixel(int size, int x, int y, int opacity, unsigned char* imageData, int width, int height, int Stride, int bpp, RGBAColor color) {
+    int px = 0;
+    int py = 0;
+    for (int zx = x - size; zx < x + size; ++zx)
+    {
+        py = 0;
+        for (int zy = y - size; zy < y + size; ++zy)
+        {
+            if (DrawLineCapsGrid[px][py]==1)
+               drawLineSetPixelColor(zx, zy, 255, imageData, width, height, Stride, bpp, color);
+            py++;
+        }
+        px++;
+    }
+}
+
+
+DLL_API int DLL_CALLCONV drawLinePrepareCaps(int radius, int sx, int sy, int sw, int sh, int imgH) {
+    const int diameter = 2 * radius + 1;
+    DrawLineCapsGrid.resize(diameter + 2, std::vector<short>(diameter + 2, 0));
+     // std::vector<std::vector<short>> DrawLineCapsGrid(diameter, std::vector<short>(diameter, 0));
+    int centerX = radius;
+    int centerY = radius;
+
+    for (int x = 0; x < diameter; ++x) {
+        for (int y = 0; y < diameter; ++y) {
+            int dx = x - centerX;
+            int dy = y - centerY;
+            if (dx * dx + dy * dy <= radius * radius) {
+               DrawLineCapsGrid[x][y] = 1;
+            }
+        }
+    }
+
+/*
+    INT64 s = (INT64)(sw + 1) * (sh + 1) + 2;
+    if (s!=linesMaskMap.size())
+    {
+       try {
+          linesMaskMap.resize(s);
+       } catch(const std::bad_alloc& e) {
+          fnOutputDebug("linesMaskMap failed. bad_alloc =" + std::to_string(s));
+          return 0;
+       } catch(const std::length_error& e) {
+          fnOutputDebug("linesMaskMap failed. length_error =" + std::to_string(s));
+          return 0;
+       }
+
+       fnOutputDebug("linesMaskMap RESIZED=" + std::to_string(s) + "||" + std::to_string(linesMaskMap.size()));
+    } else
+    {
+       fnOutputDebug("linesMaskMap size=" + std::to_string(s) + "||" + std::to_string(linesMaskMap.size()));
+    }
+
+    fill(linesMaskMap.begin(), linesMaskMap.end(), 1);
+*/
+    // imgSelX1 = sx;
+    // imgSelY1 = sy;
+    // imgSelW = sw;
+    // imgSelH = sh;
+    // EllipseSelectMode = 3;
+    invertSelection = 0;
+    // blahImgH = imgH;
+    return 1;
+}
+
 
 std::pair<std::pair<double, double>, std::pair<double, double>> calculateParallelPoints(
     double x1, double y1, double x2, double y2, double distance) {
@@ -870,7 +941,7 @@ DLL_API int DLL_CALLCONV drawLineSegmentImage(unsigned char* imageData, int widt
    double err = dx + dy, e2;                              /* error value e_xy */
 
    for (;;) {                                                         /* loop */
-      drawLineSetPixelColorAA(x0, y0, 255, imageData, width, height, Stride, bpp, nC);
+      drawLineCapOnPixel(th, x0, y0, 255, imageData, width, height, Stride, bpp, nC);
       if (x0 == x1 && y0 == y1) break;
 
       e2 = 2*err;
@@ -880,6 +951,149 @@ DLL_API int DLL_CALLCONV drawLineSegmentImage(unsigned char* imageData, int widt
 
    return 1;
 }
+
+void drawLineCapOnMask(int size, int x, int y, int w, int h) {
+    int px = 0;
+    int py = 0;
+    for (int zx = x - size; zx < x + size; ++zx)
+    {
+        int gx = zx - polyX;
+        if (gx<0 || gx>=w)
+           continue;
+ 
+        py = 0;
+        for (int zy = y - size; zy < y + size; ++zy)
+        {
+            int gy = zy - polyY;
+            if (DrawLineCapsGrid[px][py]==1 && gy>=0 && gy<h)
+            // if (gy>=0 && gy<h)
+               polygonMaskMap[(INT64)gy * w + gx] = 1;
+               // linesMaskMap[(INT64)zy * w + zx] = 0;
+            py++;
+        }
+        px++;
+    }
+}
+
+void drawLineSegmentMask(int width, int height, int x0, int y0, int x1, int y1, int thickness) {
+// based on https://zingl.github.io/bresenham.html
+//          https://github.com/zingl/Bresenham
+// by Zingl Alois
+
+   double dx =  abs(x1-x0), sx = (x0<x1) ? 1 : -1;
+   double dy = -abs(y1-y0), sy = (y0<y1) ? 1 : -1;
+   double err = dx + dy, e2;                              /* error value e_xy */
+
+   for (;;) {                                                         /* loop */
+      drawLineCapOnMask(thickness, x0, y0, width, height);
+      if (x0 == x1 && y0 == y1) break;
+
+      e2 = 2*err;
+      if (e2 >= dy) { err += dy; x0 += sx; }                        /* x step */
+      if (e2 <= dx) { err += dx; y0 += sy; }                        /* y step */
+   }
+
+   // return 1;
+}
+
+DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCount, int thickness, int closed) {
+    fnOutputDebug("drawLineAllSegmentsMask() invoked; PointsCount=" + std::to_string(PointsCount));
+    INT64 s = (INT64)polyW * polyH + 2;
+    if (s!=polygonMaskMap.size())
+    {
+       fnOutputDebug("polygonMaskMap[] incorrect size=" + std::to_string(s) + " != " + std::to_string(polygonMaskMap.size()));
+       return 0;
+    }
+
+    int i = 2;
+    int xa = PointsList[0];
+    int ya = PointsList[1];
+    fnOutputDebug("tracing polygonal path with bresenham algo");
+    for (int pts = 0; pts < PointsCount;)
+    {
+        int xb = PointsList[i];
+        i++;
+        int yb = PointsList[i];
+        i++;
+        if (pts==PointsCount - 1)
+        {
+           if (closed!=1)
+              break;
+
+           xb = PointsList[0];
+           yb = PointsList[1];
+        }
+
+        pts++;
+        drawLineSegmentMask(polyW, polyH, xa, ya, xb, yb, thickness);
+        xa = xb;
+        ya = yb;
+        if (pts>=PointsCount || i>PointsCount*2)
+           break;
+    }
+
+    fnOutputDebug("prepareDrawLinesMask() - done | i=" + std::to_string(i));
+    return 1;
+}
+
+DLL_API int DLL_CALLCONV prepareDrawLinesMask(float* PointsList, int PointsCount, int radius, int rounded) {
+    // relies on prepareSelectionArea()
+    EllipseSelectMode = 2;
+    invertSelection = 0;
+    fnOutputDebug("prepareDrawLinesMask() invoked; PointsCount=" + std::to_string(PointsCount));
+    INT64 s = (INT64)polyW * polyH + 2;
+    if (s!=polygonMaskMap.size())
+    {
+       try {
+          polygonMaskMap.resize(s);
+       } catch(const std::bad_alloc& e) {
+          fnOutputDebug("polygonMaskMap failed. bad_alloc =" + std::to_string(s));
+          return 0;
+       } catch(const std::length_error& e) {
+          fnOutputDebug("polygonMaskMap failed. length_error =" + std::to_string(s));
+          return 0;
+       }
+
+       fnOutputDebug("polygonMaskMap RESIZED=" + std::to_string(s) + "||" + std::to_string(polygonMaskMap.size()));
+    } else
+    {
+       fnOutputDebug("polygonMaskMap size=" + std::to_string(s) + "||" + std::to_string(polygonMaskMap.size()));
+    }
+
+    fill(polygonMaskMap.begin(), polygonMaskMap.end(), 0);
+    fnOutputDebug("prepareDrawLinesMask() - polygonMaskMap DONE; radius = " + std::to_string(radius));
+
+
+    int diameter = 2 * radius + 1;
+    DrawLineCapsGrid.resize(diameter + 2);
+    fill(DrawLineCapsGrid.begin(), DrawLineCapsGrid.end(), std::vector<short>(diameter + 2, 0));
+    // DrawLineCapsGrid.resize(diameter + 2, std::vector<short>(diameter + 2, 0));
+    // std::vector<std::vector<short>> DrawLineCapsGrid(diameter, std::vector<short>(diameter, 0));
+    int centerX = radius;
+    int centerY = radius;
+    for (int x = 0; x < diameter; ++x) {
+        for (int y = 0; y < diameter; ++y) {
+            int dx = x - centerX;
+            int dy = y - centerY;
+            if (dx * dx + dy * dy <= radius * radius)
+               DrawLineCapsGrid[x][y] = 1;
+            else if (rounded!=1)
+               DrawLineCapsGrid[x][y] = 1;
+        }
+    }
+
+    // fnOutputDebug("polygonMaskMap refilled to zero ; size = " + std::to_string(s) + "|" + std::to_string(polyW) + " x " + std::to_string(polyH) + "|" + std::to_string(polyX) + " x " + std::to_string(polyY));
+    for ( int i = 0; i < PointsCount*2; i+=2)
+    {
+        // prepare points list and identify boundaries
+        PointsList[i] = round(PointsList[i]);
+        PointsList[i + 1] = round(PointsList[i + 1]) + polyOffYa - polyOffYb;
+    }
+
+    fnOutputDebug("prepareDrawLinesMask() - done; size/thickness/radius=" + std::to_string(radius));
+    return 1;
+}
+
 
 DLL_API int DLL_CALLCONV oopdrawLineSegmentImage(unsigned char* imageData, int width, int height, int x0, int y0, int x1, int y1, int color, double th, int Stride, int bpp) {
 // based on https://zingl.github.io/bresenham.html
@@ -906,13 +1120,13 @@ DLL_API int DLL_CALLCONV oopdrawLineSegmentImage(unsigned char* imageData, int w
       x1 = round((e2+th/2)/dy);                               /* start offset */
       err = x1*dy-th/2;                  /* shift error value to offset width */
       for (x0 -= x1*sx; ; y0 += sy) {
-         drawLineSetPixelColorAA(x1 = x0, y0, err, imageData, width, height, Stride, bpp, nC);
+         drawLineSetPixelColor(x1 = x0, y0, err, imageData, width, height, Stride, bpp, nC);
          // setPixelAA(x1 = x0, y0, err);                  /* aliasing pre-pixel */
          for (e2 = dy-err-th; e2+dy < 255; e2 += dy)  
-            drawLineSetPixelColorAA(x1 += sx, y0, 255, imageData, width, height, Stride, bpp, nC);
+            drawLineSetPixelColor(x1 += sx, y0, 255, imageData, width, height, Stride, bpp, nC);
             // setPixel(x1 += sx, y0);                      /* pixel on the line */
          // setPixelAA(x1+sx, y0, e2);                    /* aliasing post-pixel */
-         drawLineSetPixelColorAA(x1 + sx, y0, e2, imageData, width, height, Stride, bpp, nC);
+         drawLineSetPixelColor(x1 + sx, y0, e2, imageData, width, height, Stride, bpp, nC);
          if (y0 == y1)
             break;
 
@@ -924,13 +1138,13 @@ DLL_API int DLL_CALLCONV oopdrawLineSegmentImage(unsigned char* imageData, int w
       y1 = round((e2+th/2)/dx);                               /* start offset */
       err = y1*dx-th/2;                  /* shift error value to offset width */
       for (y0 -= y1*sy; ; x0 += sx) {
-         drawLineSetPixelColorAA(x0, y1 = y0, err, imageData, width, height, Stride, bpp, nC);
+         drawLineSetPixelColor(x0, y1 = y0, err, imageData, width, height, Stride, bpp, nC);
          // setPixelAA(x0, y1 = y0, err);                  /* aliasing pre-pixel */
          for (e2 = dx-err-th; e2+dx < 255; e2 += dx) 
-            drawLineSetPixelColorAA(x0, y1 += sy, 255, imageData, width, height, Stride, bpp, nC);
+            drawLineSetPixelColor(x0, y1 += sy, 255, imageData, width, height, Stride, bpp, nC);
             // setPixel(x0, y1 += sy);                      /* pixel on the line */
          // setPixelAA(x0, y1+sy, e2);                    /* aliasing post-pixel */
-         drawLineSetPixelColorAA(x0, y1 + sy, e2, imageData, width, height, Stride, bpp, nC);
+         drawLineSetPixelColor(x0, y1 + sy, e2, imageData, width, height, Stride, bpp, nC);
          if (x0 == x1)
             break;
 
@@ -966,11 +1180,11 @@ DLL_API int DLL_CALLCONV YAYdrawLineSegmentImage(unsigned char* imageData, int w
    float ed = (dx+dy == 0) ? 1 : sqrt((float)dx*dx+(float)dy*dy);
 
    for (wd = (wd+1)/2; ; ) {                                    /* pixel loop */
-      drawLineSetPixelColorAA(x0, y0, max(0,255*(abs(err-dx+dy)/ed-wd+1)), imageData, width, height, Stride, bpp, nC);
+      drawLineSetPixelColor(x0, y0, max(0,255*(abs(err-dx+dy)/ed-wd+1)), imageData, width, height, Stride, bpp, nC);
       e2 = err; x2 = x0;
       if (2*e2 >= -dx) {                                            /* x step */
          for (e2 += dy, y2 = y0; e2 < ed*wd && (y1 != y2 || dx > dy); e2 += dx)
-            drawLineSetPixelColorAA(x0, y2 += sy, max(0,255*(abs(e2)/ed-wd+1)), imageData, width, height, Stride, bpp, nC);
+            drawLineSetPixelColor(x0, y2 += sy, max(0,255*(abs(e2)/ed-wd+1)), imageData, width, height, Stride, bpp, nC);
 
          if (x0 == x1)
             break;
@@ -979,7 +1193,7 @@ DLL_API int DLL_CALLCONV YAYdrawLineSegmentImage(unsigned char* imageData, int w
 
       if (2*e2 <= dy) {                                             /* y step */
          for (e2 = dx-e2; e2 < ed*wd && (x1 != x2 || dx < dy); e2 += dy)
-            drawLineSetPixelColorAA(x2 += sx, y0, max(0,255*(abs(e2)/ed-wd+1)), imageData, width, height, Stride, bpp, nC);
+            drawLineSetPixelColor(x2 += sx, y0, max(0,255*(abs(e2)/ed-wd+1)), imageData, width, height, Stride, bpp, nC);
 
          if (y0 == y1)
             break;
@@ -1140,12 +1354,19 @@ bool clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
              return 1;
        } else if (EllipseSelectMode==2)
        {
-          bool r = 1;
+          bool r = 0;
           if (inRange(0, polyH - 1, y - imgSelY1 - polyY + polyOffYa) && inRange(0, polyW - 1, x - imgSelX1 - polyX))
-             r = (polygonMaskMap[(INT64)(y - imgSelY1 - polyY + polyOffYa) * polyW + x - imgSelX1 - polyX]) ? 0 : 1;
+             r = (polygonMaskMap[(INT64)(y - imgSelY1 - polyY + polyOffYa) * polyW + x - imgSelX1 - polyX]);
 
            // fnOutputDebug("clipMaskFilter y=" + std::to_string(y - imgSelY1 - polyY + polyOffYa));
-          return r;
+          return !r;
+       } else if (EllipseSelectMode==3)
+       {
+          bool r = 0;
+          INT64 ty = blahImgH - y;
+          if (inRange(0, imgSelW - 1, x - imgSelX1) && inRange(0, imgSelH - 1, ty - imgSelY1))
+             r = linesMaskMap[(INT64)(ty - imgSelY1) * imgSelW + x - imgSelX1];
+          return !r;
        } else if (EllipseSelectMode==1 || EllipseSelectMode==0 && (vpSelRotation!=0 || excludeSelectScale!=0))
        {
           return !isInsideRectOval(x - imgSelX1, y - imgSelY1, 1);
@@ -2049,7 +2270,7 @@ Parameters:
     invertArea             / invert selection area
 
 Parameters relevant only for selection areas based on freeform vector paths:
-    PointsList             / a pointer to a freeform polygonal shape created with GDI+
+    PointsList             / a pointer to a freeform polygonal shape created with GDI+; the points are in image/pixel coordinates, but are relative to the image selection are bounding box
     PointsCount            / the number of points the vector shape has 
     ppx1, ppy1, ppx2, ppy2 / the coordinates of the subsection of the selection area bounding box intended to be drawn; it is used primarily when dealing with viewport live previews, but also when the selection area exceeds the image bounding box; with these coordinates i can avoid excessive memory usage and drastically reduce computations
     useCache               / if TRUE then polygonMaskMap[] will be reused
@@ -2108,8 +2329,9 @@ clipMaskFilter() can also rely on a bitmap, but it must be passed directly to it
     if (polygonMaskMap.size()<2000 || polygonMapMin.size()<100)
        useCache = 0;
 
+    int z = 1;
     if (mode==2 && PointsList!=NULL && useCache!=1 && polyW>1 && polyH>1)
-       FillMaskPolygon(w, h, PointsList, PointsCount, ppx1, ppy1, ppx2, ppy2);
+       z = FillMaskPolygon(w, h, PointsList, PointsCount, ppx1, ppy1, ppx2, ppy2);
     else if (mode==2 && useCache!=1)
        EllipseSelectMode = 0;
 
@@ -2858,7 +3080,7 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
         std::vector<int> pixelzMapH(h + 2, 0);
         const int bmpX = (imgSelX1<0 || invertSelection==1) ? 0 : imgSelX1;
         const int bmpY = (imgSelY1<0 || invertSelection==1) ? 0 : imgSelY1;
-        fnOutputDebug("add noise step -1");
+        // fnOutputDebug("add noise step -1");
         for (int x = 0; x < w + 2; x++)
         {
             pixelzMapW[x] = (float)mw*((x - bmpX)/(float)w);
@@ -2869,7 +3091,7 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
             pixelzMapH[y] = (float)mh*((y - bmpY)/(float)h);
         }
 
-        fnOutputDebug("add noise step 0");
+        // fnOutputDebug("add noise step 0");
         #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
         for (int x = 0; x < mw; x++)
         {
@@ -2901,7 +3123,7 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
             }
         }
 
-        fnOutputDebug("add noise step 1");
+        // fnOutputDebug("add noise step 1");
         #pragma omp parallel for schedule(dynamic) default(none)
         for (int x = 0; x < w; x++)
         {
@@ -2942,11 +3164,11 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
             }
         }
 
-        fnOutputDebug("add noise step 2");
+        // fnOutputDebug("add noise step 2");
         return 1;
     }
 
-    fnOutputDebug("add noise step 3");
+    // fnOutputDebug("add noise step 3");
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int x = 0; x < w; x++)
     {

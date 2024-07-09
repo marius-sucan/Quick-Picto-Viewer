@@ -724,6 +724,8 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
    {
       If (givenKey="F11")
          toggleImgEditPanelWindow()
+      Else If (givenKey="F12")
+         ActToggleLivePreview()
       Else If (givenKey="COLON")
          PanelQuickSearchMenuOptions()
       Else If isVarEqualTo(givenKey, "HOME", "END", "PGUP", "PGDN", "BACKSPACE", "DELETE", "UP", "DOWN", "TAB", "SLASH", "BSLASH", "INSERT", "T", "A", "F", "EQUAL", "MINUS", "COMMA", "PERIOD", "LBRACKET", "RBRACKET", "QUOTES", "TILDA", "APPSKEY")
@@ -834,6 +836,10 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
       {
          If (imgEditPanelOpened=1 || AnyWindowOpen>0) && (Az=hSetWinGui)
             toggleImgEditPanelWindow()
+      } Else If (givenKey="F12")
+      {
+         If (imgEditPanelOpened=1 && Az=hSetWinGui && isImgEditingNow()=1)
+            SetTimer, ActToggleLivePreview, -150
       } Else If (givenKey="Space")
          highlightActiveCtrl(givenKey)
       Else If (givenKey="RButton")
@@ -867,6 +873,10 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
          deactivateTlbrKbdMode(1)
          If HKifs("liveEdit")
             SetTimer, toggleImgEditPanelWindow, -50
+      } Else If (givenKey="F12")
+      {
+          If (imgEditPanelOpened=1 && isImgEditingNow()=1)
+             SetTimer, ActToggleLivePreview, -150
        } Else If isVarEqualTo(givenKey, "Left", "Up", "Down", "Right")
        {
           KeyboardMoveMouseToolbar(givenKey)
@@ -976,7 +986,9 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
            func2Call := ["PanelJournalWindow"]
     } Else If (givenKey="F12")
     {
-        If HKifs("general")
+        If HKifs("liveEdit")
+           func2Call := ["ActToggleLivePreview"]
+        Else If HKifs("general")
            func2Call := ["PanelPrefsWindow"]
     } Else If (givenKey="p")
     {
@@ -13970,7 +13982,7 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
 
    startZeit := A_TickCount
    PointsCount := PointsF := useCache := 0
-   if ((mode=0 || mode=1) && rotation!=0)
+   If ((mode=0 || mode=1) && rotation!=0)
    {
       lastState :=""
       If (mode=1)
@@ -14052,7 +14064,7 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
       selID := VPcreateSelPath("prevID", 0, 0, 0, 0, 0, 0, 0, 0)
       zpklo := IsObject(ppo) ? "a" ppo[1] ppo[2] ppo[3] ppo[4] : "a"
       thisState := "a" selID x1 y1 x2 y2 w h mode rotation doFlip invertArea cavityX cavityY zpklo currentFileIndex getIDimage(currentFileIndex) AnyWindowOpen
-      If (thisState!=lastState || rzu!=1)
+      If ((thisState!=lastState || rzu!=1) && mode!=5)
       {
          trGdip_GetImageDimensions(useGdiBitmap(), zkw, zkh)
          sfs := (Round((zkw * zkh)/1000000, 1) > 5500) ? 0.5 : 0.7
@@ -14065,6 +14077,12 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
             pPath := coreCreateFillAreaShape(0, 0, mw, mh, FillAreaShape, rotation, rotateSelBoundsKeepRatio, 2, 0)
          Else
             pPath := createImgSelPath(0, 0, mw, mh, 2, rotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY, 0)
+
+         If (pPath="" || pPath=0)
+         {
+            addJournalEntry("ERROR: failed to generate vector path object with GDI+ in " A_ThisFunc "().")
+            Return 0
+         }
 
          if (doFlip!=1)
          {
@@ -14147,6 +14165,9 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
    ; ToolTip, % round(w/h, 2) "|" round(mod(rotation, 45), 2) "°|" w "|" h "`n"  rw "|" rh "`n" Round(xf, 2) "|" Round(yf, 2) , , , 2
    ; ToolTip, % round(xf, 2) "|" round(yf, 2) "|"  round(rotation, 2) "|" Round(exclusion, 2) , , , 2
    r := DllCall(whichMainDLL "\prepareSelectionArea", "int", x1, "int", y1, "int", x2, "int", y2, "int", w, "int", h, "float", xf, "float", yf, "float", rotation, "int", mode, "int", doFlip, "float", exclusion, "int", invertArea, "UPtr", &PointsF, "int", PointsCount, "int", ppx1, "int", ppy1, "int", ppx2, "int", ppy2, "int", useCache, "int", ppofYa, "int", ppofYb)
+   If (r!=1)
+      addJournalEntry("ERROR: " A_ThisFunc "() failed via DLL: prepareSelectionArea()")
+
    PointsF := ""
    If (pPath!="")
       Gdip_DeletePath(pPath)
@@ -20316,77 +20337,62 @@ HugeImagesDrawLineShapes() {
       If warnIncorrectColorDepthHugeImage(bpp, 1)
          Return
 
+      startOperation := A_TickCount
       showTOOLtip("Preparing to draw lines, please wait...")
       trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
       setImageLoading()
       ; obju := InitHugeImgSelPath(0, imgW, imgH)
       pBitsAll := FreeImage_GetBits(hFIFimgX)
       Stride := FreeImage_GetStride(hFIFimgX)
+      o_imgSelH := max(imgSelY2, imgSelY1) - min(imgSelY2, imgSelY1)
+      o_imgSelW := max(imgSelX2, imgSelX1) - min(imgSelX2, imgSelX1)
+      tk := DrawLineAreaContourThickness + 4
+      o_imgSelX1 := imgSelX1,    o_imgSelY1 := imgSelY1
+      o_imgSelX2 := imgSelX2,    o_imgSelY2 := imgSelY2
+      imgSelX1 := imgSelX1 - tk,    imgSelY1 := imgSelY1 - tk
+      imgSelX2 := imgSelX2 + tk,    imgSelY2 := imgSelY2 + tk
+
       imgSelH := max(imgSelY2, imgSelY1) - min(imgSelY2, imgSelY1)
       imgSelW := max(imgSelX2, imgSelX1) - min(imgSelX2, imgSelX1)
-            obju := InitHugeImgSelPath(0, imgW, imgH)
-            recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
-            QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, shapeu, 0, 0, 0, 0, 0, 1)
-            showTOOLtip("Drawing lines, please wait...")
-            ; r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 0, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", TextInAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", pBits, "int", mStride, "int", mBpp, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", nImgW, "int", nImgH)
+      showTOOLtip("Drawing lines, please wait...`nStep 1/4")
 
-         pPath := coreCreateFillAreaShape(imgSelX1, imgSelY1, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, 2, 0)
-         if (doFlip=91)
-         {
-            pMatrix := Gdip_CreateMatrix()
-            Gdip_ScaleMatrix(pMatrix, 1, -1)
-            Gdip_TranslateMatrix(pMatrix, 0, -mh)
-            E := Gdip_TransformPath(pPath, pMatrix)
-            Gdip_DeleteMatrix(pMatrix)
-         }
+      defineRelativeSelCoords(imgW, imgH)
+      obju := InitHugeImgSelPath(0, imgW, imgH)
+      recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
+      QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
 
-         If (bezierSplineCustomShape=1 || FillAreaCurveTension>1 || FillAreaShape=1)
-            Gdip_FlattenPath(pPath, 0.1)
+      pPath := coreCreateFillAreaShape(tk, tk, o_imgSelW, o_imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, 2, 0)
+      pMatrix := Gdip_CreateMatrix()
+      Gdip_ScaleMatrix(pMatrix, 1, -1)
+      Gdip_TranslateMatrix(pMatrix, 0, -o_imgSelH - tk*2)
+      E := Gdip_TransformPath(pPath, pMatrix)
+      Gdip_DeleteMatrix(pMatrix)
 
-         If (zsf=10)
-         {
-            pMatrix := Gdip_CreateMatrix()
-            Gdip_ScaleMatrix(pMatrix, w/mw, h/mh)
-            Gdip_TransformPath(pPath, pMatrix)
-            Gdip_DeleteMatrix(pMatrix)
-         }
+      If (bezierSplineCustomShape=1 || FillAreaCurveTension>1 || FillAreaShape=1)
+         Gdip_FlattenPath(pPath, 0.1)
 
-         PointsCount := Gdip_GetPathPointsCount(pPath)
-         VarSetCapacity(PointsF, 8 * (PointsCount + 1), 0)
-         gdipLastError := DllCall("gdiplus\GdipGetPathPoints", "UPtr", pPath, "UPtr", &PointsF, "int*", PointsCount)
+      PointsCount := Gdip_GetPathPointsCount(pPath)
+      VarSetCapacity(PointsF, 8 * (PointsCount + 1), 0)
+      gdipLastError := DllCall("gdiplus\GdipGetPathPoints", "UPtr", pPath, "UPtr", &PointsF, "int*", PointsCount)
 
+      pp := i := 0
+      closed := (FillAreaShape=7) ? FillAreaClosedPath : 0
+      rza := DllCall(whichMainDLL "\prepareDrawLinesMask", "UPtr", &PointsF, "int", PointsCount, "int", DrawLineAreaContourThickness*0.45, "int", DrawLineAreaCapsStyle)
+      showTOOLtip("Drawing lines, please wait...`nStep 2/4")
+      If (rza=1)
+         rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", DrawLineAreaContourThickness*0.45, "int", closed)
 
-newColor := makeRGBAcolor(DrawLineAreaColor, DrawLineAreaOpacity)
-  Gdip_FromARGB(newColor, A, R, G, B)
-  newColor := Gdip_ToARGB(A, R, G, B)
+      ; DllCall(whichMainDLL "\drawLinePrepareCaps", "int", DrawLineAreaContourThickness*0.45, "int", imgSelX1, "int", imgSelY1, "int", imgSelW, "int", imgSelH, "int", imgH)
+      showTOOLtip("Drawing lines, please wait...`nStep 3/4")
+      If (rzb=1)
+         rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", DrawLineAreaOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", 0, "int", 0)
 
-
-        pp := i := 0
-        Loop, % PointsCount
-        {
-           xi := NumGet(&PointsF, 8*i, "float")
-           yi := NumGet(&PointsF, (8*i)+4, "float")
-           i++
-           If (i>=PointsCount)
-              i:= 0
-
-           xj := NumGet(&PointsF, 8*i, "float")
-           yj := NumGet(&PointsF, (8*i)+4, "float")
-           ; i++
-
-;     Gdip_GraphicsClear(2NDglPG, "0xff112211")
-;     Gdip_DrawPath(2NDglPG, pPen4, pPath)
-;     Gdip_DrawLine(2NDglPG, pPen5, xi, yi, xj, yj)
-;     doLayeredWinUpdate(A_ThisFunc, hGDIselectwin, 2NDglHDC)
-; Sleep, 1000
-           z := DllCall(whichMainDLL "\drawLineSegmentImage", "uptr", pBitsAll, "int", imgW, "int", imgH, "int", xi, "int", yi, "int", xj, "int", yj, "int", newColor, "float", DrawLineAreaContourThickness, "int", Stride, "int", bpp)
-           pp += z
-        }
-
-          fnOutputDebug(A_ThisFunc "(): " pp "|" i "|" PointsCount)
       DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
-      r := 1
-
+      r := (rzc=1) ? 1 : 0
+      fnOutputDebug("Draw lines finished in: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)))
+      imgSelX1 := o_imgSelX1,      imgSelY1 := o_imgSelY1
+      imgSelX2 := o_imgSelX2,      imgSelY2 := o_imgSelY2
+      defineRelativeSelCoords(imgW, imgH)
       If r 
       {
          killQPVscreenImgSection()
@@ -20399,7 +20405,15 @@ newColor := makeRGBAcolor(DrawLineAreaColor, DrawLineAreaOpacity)
       } Else
       {
          recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
-         showTOOLtip("ERROR: Failed to draw the text on the image")
+         If (rza!=1)
+            showTOOLtip("ERROR: Failed to draw the text on the image.`nLines mask prepration failed.")
+         Else If (rzb!=1)
+            showTOOLtip("ERROR: Failed to draw the text on the image.`nAn error occurred drawing the line segments.")
+         Else If (rzc!=1)
+            showTOOLtip("ERROR: Failed to draw the text on the image.`nAn error occurred utilizing the lines mask to alter the main bitmap.")
+         Else
+            showTOOLtip("ERROR: Failed to draw the text on the image. Unknown cause[s].")
+
          SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
       }
@@ -24801,11 +24815,21 @@ GuiAddCloseOnApply(options, guiu:="SettingsGUIA") {
 }
 
 GuiAddToggleLivePreview(options, guiu:="SettingsGUIA") {
-    Static p := "Toggle the live preview for the current tool"
+    Static p := "Toggle Live Preview for the current tool [F12]"
     Gui, %guiu%: Add, Checkbox, % options " +hwndhTemp +0x1000 +0x8000 Checked" doImgEditLivePreview " vdoImgEditLivePreview", Live preview
     pk := (uiUseDarkMode=1) ? "" : "-dark"
     SetImgButtonStyle(hTemp, mainExecPath "\resources\toolbar\view-2" pk ".png", 1)
     ToolTip2ctrl(hTemp, p)
+}
+
+ActToggleLivePreview() {
+    Static lastInvoked := 1
+    doImgEditLivePreview := !doImgEditLivePreview
+    GuiControl, SettingsGUIA:, doImgEditLivePreview, % doImgEditLivePreview
+    If (A_TickCount - lastInvoked > 55)
+       livePreviewsImageEditing(0, A_ThisFunc, actionu, b)
+
+    lastInvoked := A_TickCount
 }
 
 GuiAddPickerColor(options, colorReference, guiu:="SettingsGUIA") {
@@ -25817,13 +25841,13 @@ mouseTurnOFFtooltip() {
 }
 
 SetImgButtonStyle(hwnd, newLabel:="", checkMode:=0, protectedHwnd:="") {
-   Static dopt1 := [0, "0xFF454545","0xFF454545", "0xFFffFFff"] ; normal
-   , dopt2 := [0, "0xFF757575","0xFF757575", "0xFFffFFff",,,"0xffaaAAaa", 2] ; hover
+   Static dopt1 := [0, "0xFF373737","0xFF373737", "0xFFffFFff",,,"0xff778877", 2] ; normal
+   , dopt2 := [0, "0xFF656565","0xFF656565", "0xFFffFFff",,,"0xffaaAAaa", 2] ; hover
    , dopt3 := [0, "0xFF000000","0xFF000000", "0xFFeeEEee",,,"0xFF454545", 4] ; clicked
    , doptc := [0, "0xFF1E98A6","0xFF1E98A6", "0xFFeeEEee",,,"0xFF454545", 4] ; clicked
    , dopt4 := [0, "0xFF212121","0xFF212121", "0xFF999999",,,"0xFF454545", 4] ; disabled
    , dopt5 := [0, "0xFF606060","0xFF606060", "0xFFffFFff",,,"0xffaaAAaa", 3] ; active/focused
-   , lopt1 := [0, "0xFFeeEEee","0xFFeeEEee", "0xFF111111"] ; normal
+   , lopt1 := [0, "0xFFddDDdd","0xFFddDDdd", "0xFF111111",,,"0xffbbBBbb", 2] ; normal
    , lopt2 := [0, "0xFFC1DCE6","0xFFC1DCE6", "0xFF000000",,,"0xff8899EE", 2] ; hover
    , lopt3 := [0, "0xFFffffff","0xFFffffff", "0xFF000000",,,"0xFF0099ff", 4] ; clicked
    , loptc := [0, "0xFF83D2F1","0xFF83D2F1", "0xFF000000",,,"0xFF0099ff", 4] ; clicked
@@ -26020,7 +26044,7 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
           Return
        }
 
-       rzx := isVarEqualTo(IDwin, 12, 23, 24, 25, 31, 32, 55, 66, 70, 89) ? 0 : downscaleHugeImagesForEditing()
+       rzx := isVarEqualTo(IDwin, 12, 23, 24, 25, 31, 32, 55, 65, 66, 70, 89) ? 0 : downscaleHugeImagesForEditing()
        If (rzx<0 || rzx=1)
        {
           openingPanelNow := 0
@@ -47499,14 +47523,20 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     GuiAddDropDownList("x+5 wp gupdateUIdrawShapesPanel AltSubmit Choose" DrawLineAreaBlendMode " vDrawLineAreaBlendMode", "None|" userBlendModesList, [hTemp])
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIdrawShapesPanel")
 
-    Gui, Add, Text, xs y+15 w%btnWid%, Alignment
-    Gui, Add, Text, x+5 wp, Styling
-    GuiAddDropDownList("xs y+7 wp AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign gupdateUIdrawShapesPanel", "Inside|Centered|Outside", "Line alignment")
-    GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaDashStyle " vDrawLineAreaDashStyle gupdateUIdrawShapesPanel", "Continous|Dashes|Dots|Dashes and dots", "Line style")
-    Gui, Add, Checkbox, xs y+6 wp h%btnHeight% +0x1000 Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIdrawShapesPanel, &Double line
-    Gui, Add, Checkbox, x+5 wp hp +0x1000 gupdateUIdrawShapesPanel Checked%DrawLineAreaCapsStyle% vDrawLineAreaCapsStyle, &Round caps
+    If (!viewportQPVimage.imgHandle)
+    {
+       Gui, Add, Text, xs y+15 w%btnWid%, Alignment
+       Gui, Add, Text, x+5 wp, Styling
+       GuiAddDropDownList("xs y+7 wp AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign gupdateUIdrawShapesPanel", "Inside|Centered|Outside", "Line alignment")
+       GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaDashStyle " vDrawLineAreaDashStyle gupdateUIdrawShapesPanel", "Continous|Dashes|Dots|Dashes and dots", "Line style")
+       Gui, Add, Checkbox, xs y+6 wp h%btnHeight% +0x1000 Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIdrawShapesPanel, &Double line
+       Gui, Add, Checkbox, x+5 wp hp +0x1000 gupdateUIdrawShapesPanel Checked%DrawLineAreaCapsStyle% vDrawLineAreaCapsStyle, &Round caps
+    } Else
+       Gui, Add, Checkbox, xs y+10 w%btnWid% hp gupdateUIdrawShapesPanel Checked%DrawLineAreaCapsStyle% vDrawLineAreaCapsStyle, &Round caps
+
     GuiAddSlider("DrawLineAreaContourThickness", 1,950, 45, "Line width: $€ pixels", "updateUIdrawShapesPanel", 1, "xs y+15 w" txtWid " hp")
-    Gui, Add, Checkbox, xs y+10 gupdateUIdrawShapesPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit selection area
+    If (!viewportQPVimage.imgHandle)
+       Gui, Add, Checkbox, xs y+10 gupdateUIdrawShapesPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit selection area
 
     btnWid := (PrefsLargeFonts=1) ? 105 : 65
     ml := (PrefsLargeFonts=1) ? 35 : 25
@@ -47514,7 +47544,8 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     GuiAddCloseOnApply("x+5 yp hp wp")
     GuiAddToggleLivePreview("x+5 yp hp wp gupdateUIdrawShapesPanel")
     Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction vbtnLiveApplyTool, &Apply
-    Gui, Add, Button, x+5 wp hp gBtnOpenPanelLines, &Lines
+    If (!viewportQPVimage.imgHandle)
+       Gui, Add, Button, x+5 wp hp gBtnOpenPanelLines, &Lines
     Gui, Add, Button, x+5 wp hp gBtnCloseWindow, &Cancel
 
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1

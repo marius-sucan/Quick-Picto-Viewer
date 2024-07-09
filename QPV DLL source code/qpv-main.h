@@ -46,6 +46,7 @@ INT64 polyX = 0;
 INT64 polyY = 0;
 INT64 polyOffYa = 0;
 INT64 polyOffYb = 0;
+INT64 blahImgH = 0;
 
 IWICBitmapDecoder      *pWICclassDecoder;
 IWICBitmapFrameDecode  *pWICclassFrameDecoded;
@@ -53,7 +54,10 @@ IWICBitmapFrameDecode  *pWICclassFrameDecoded;
 IWICBitmapSource       *pWICclassPixelsBitmapSource;
 
 std::vector<bool>  polygonMaskMap;
+std::vector<bool>  linesMaskMap;
 std::vector<int>   polygonMapMin;
+std::vector<std::vector<short>> DrawLineCapsGrid;
+
 
 std::vector<UINT>  dupesListIDsA(1);
 std::vector<UINT>  dupesListIDsB(1);

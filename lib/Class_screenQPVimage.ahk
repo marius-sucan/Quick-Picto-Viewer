@@ -2,7 +2,7 @@
 Class screenQPVimage {
    Static noIdea := "yep"
    __New() {
-      SoundBeep 
+      Sleep, -1 
    }
    __Delete() {
       This.DiscardImage()

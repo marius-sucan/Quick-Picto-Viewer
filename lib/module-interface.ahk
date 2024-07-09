@@ -1696,7 +1696,7 @@ dummyTimerProccessDroppedFiles() {
       }
    }
 
-   fnOutDebug("regex: " RegExFilesPattern)
+   ; fnOutDebug("regex: " RegExFilesPattern)
    If (countFiles>1 || countF>1)
       sldFile := ""
 

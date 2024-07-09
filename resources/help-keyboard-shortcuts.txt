@@ -113,6 +113,7 @@ Shift + F10|Toggle toolbar|Anywhere|-
 F11|Toggle full-screen|Image view|Mode switch
 F11|Collapse / expand panel for the current tool|Live editing|Panel
 F12|Preferences|Anywhere|Panel
+F12|Toggle Live Preview|Live editing|Panel
 F2|Rename file(s)|Anywhere|Panel
 F5|Reload files list or image file|Anywhere|-
 F8|Open previous panel|Anywhere|Panel
