@@ -20322,6 +20322,21 @@ HugeImagesApplyInsertText() {
       ResetImgLoadStatus()
 }
 
+processGdipPathForDLL(pPath, tk, o_imgSelH, subdivide, ByRef PointsCount, ByRef PointsF) {
+   pMatrix := Gdip_CreateMatrix()
+   Gdip_ScaleMatrix(pMatrix, 1, -1)
+   Gdip_TranslateMatrix(pMatrix, 0, -o_imgSelH - tk*2)
+   E := Gdip_TransformPath(pPath, pMatrix)
+   Gdip_DeleteMatrix(pMatrix)
+   If (subdivide=1)
+      Gdip_FlattenPath(pPath, 0.1)
+
+   PointsCount := Gdip_GetPathPointsCount(pPath)
+   VarSetCapacity(PointsF, 8 * (PointsCount + 1), 0)
+   rr := DllCall("gdiplus\GdipGetPathPoints", "UPtr", pPath, "UPtr", &PointsF, "int*", PointsCount)
+   Return rr
+}
+
 HugeImagesDrawLineShapes() {
       If warnHugeImageNotFIM()
          Return
@@ -20354,36 +20369,40 @@ HugeImagesDrawLineShapes() {
 
       imgSelH := max(imgSelY2, imgSelY1) - min(imgSelY2, imgSelY1)
       imgSelW := max(imgSelX2, imgSelX1) - min(imgSelX2, imgSelX1)
-      showTOOLtip("Drawing lines, please wait...`nStep 1/4")
+      showTOOLtip("Drawing lines, please wait...`nStep 1/3")
 
       defineRelativeSelCoords(imgW, imgH)
       obju := InitHugeImgSelPath(0, imgW, imgH)
       recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
 
-      pPath := coreCreateFillAreaShape(tk, tk, o_imgSelW, o_imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, 2, 0)
-      pMatrix := Gdip_CreateMatrix()
-      Gdip_ScaleMatrix(pMatrix, 1, -1)
-      Gdip_TranslateMatrix(pMatrix, 0, -o_imgSelH - tk*2)
-      E := Gdip_TransformPath(pPath, pMatrix)
-      Gdip_DeleteMatrix(pMatrix)
-
-      If (bezierSplineCustomShape=1 || FillAreaCurveTension>1 || FillAreaShape=1)
-         Gdip_FlattenPath(pPath, 0.1)
-
-      PointsCount := Gdip_GetPathPointsCount(pPath)
-      VarSetCapacity(PointsF, 8 * (PointsCount + 1), 0)
-      gdipLastError := DllCall("gdiplus\GdipGetPathPoints", "UPtr", pPath, "UPtr", &PointsF, "int*", PointsCount)
-
-      pp := i := 0
-      closed := (FillAreaShape=7) ? FillAreaClosedPath : 0
-      rza := DllCall(whichMainDLL "\prepareDrawLinesMask", "UPtr", &PointsF, "int", PointsCount, "int", DrawLineAreaContourThickness*0.45, "int", DrawLineAreaCapsStyle)
-      showTOOLtip("Drawing lines, please wait...`nStep 2/4")
+      rza := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", DrawLineAreaContourThickness*0.45, "int", DrawLineAreaCapsStyle)
       If (rza=1)
-         rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", DrawLineAreaContourThickness*0.45, "int", closed)
+      {
+         doClone := (innerSelectionCavityX>0 && innerSelectionCavityY>0) ? 1 : 0
+         pPath := coreCreateFillAreaShape(tk, tk, o_imgSelW, o_imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, 2, 0)
+         If pPath
+         {
+            If (doClone=1)
+               clonedPath := Gdip_ClonePath(pPath)
+            subdivide := (bezierSplineCustomShape=1 || FillAreaCurveTension>1 || FillAreaShape=1) ? 1 : 0
+            processGdipPathForDLL(pPath, tk, o_imgSelH, subdivide, PointsCount, PointsF)
+            showTOOLtip("Drawing lines, please wait...`nStep 2/3")
+            closed := (FillAreaShape=7) ? FillAreaClosedPath : 1
+            rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", DrawLineAreaContourThickness*0.45, "int", closed)
+            Gdip_DeletePath(pPath)
+            If (doClone=1)
+            {
+               Gdip_ScalePathAtCenter(clonedPath, innerSelectionCavityX, innerSelectionCavityY)
+               processGdipPathForDLL(clonedPath, tk, o_imgSelH, subdivide, PointsCount, PointsF)
+               rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", DrawLineAreaContourThickness*0.45, "int", closed)
+               Gdip_DeletePath(clonedPath)
+            }
+         }
+         PointsF := ""
+      }
 
-      ; DllCall(whichMainDLL "\drawLinePrepareCaps", "int", DrawLineAreaContourThickness*0.45, "int", imgSelX1, "int", imgSelY1, "int", imgSelW, "int", imgSelH, "int", imgH)
-      showTOOLtip("Drawing lines, please wait...`nStep 3/4")
+      showTOOLtip("Drawing lines, please wait...`nStep 3/3")
       If (rzb=1)
          rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", DrawLineAreaOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", 0, "int", 0)
 
