@@ -362,74 +362,23 @@ void plotLineSetPixel(int width, int height, int nx, int ny) {
     // polygonMaskMap[(INT64)ny * width + nx] = 1;
 }
 
-void plotLineLow(int w, int h, int x0, int y0, int x1, int y1) {
-    int dx = x1 - x0;
-    int dy = y1 - y0;
-    int yi = 1;
-    if (dy < 0)
-    {
-        yi = -1;
-        dy = -dy;
-    }
-
-    int D = (2 * dy) - dx;
-    int y = y0;
-    for (int x=x0; x<=x1; x++)
-    {
-        plotLineSetPixel(w, h, x, y);
-        if (D > 0)
-        {
-            y = y + yi;
-            D = D + (2 * (dy - dx));
-        } else
-        {
-            D = D + 2*dy;
-        }
-    }
-}
-
-void plotLineHigh(int w, int h, int x0, int y0, int x1, int y1) {
-    int dx = x1 - x0;
-    int dy = y1 - y0;
-    int xi = 1;
-    if (dx < 0)
-    {
-        xi = -1;
-        dx = -dx;
-    }
-
-    int D = (2 * dx) - dy;
-    int x = x0;
-    for (int y=y0; y<=y1; y++)
-    {
-        plotLineSetPixel(w, h, x, y);
-        if (D > 0)
-        {
-            x = x + xi;
-            D = D + (2 * (dx - dy));
-        } else
-        {
-            D = D + 2*dx;
-        }
-    }
-}
-
 void bresenham_line_algo(int w, int h, int x0, int y0, int x1, int y1) {
-// code adapted from https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
+// based on https://zingl.github.io/bresenham.html
+//          https://github.com/zingl/Bresenham
+// by Zingl Alois
 
-    if (abs(y1 - y0) < abs(x1 - x0))
-    {
-        if (x0 > x1)
-           plotLineLow(w, h, x1, y1, x0, y0);
-        else
-           plotLineLow(w, h, x0, y0, x1, y1);
-    } else
-    {
-        if (y0 > y1)
-           plotLineHigh(w, h, x1, y1, x0, y0);
-        else
-           plotLineHigh(w, h, x0, y0, x1, y1);
-    }
+   int dx =  abs(x1-x0), sx = (x0<x1) ? 1 : -1;
+   int dy = -abs(y1-y0), sy = (y0<y1) ? 1 : -1;
+   int err = dx + dy, e2;                              /* error value e_xy */
+
+   for (;;) {                                             /* loop */
+      plotLineSetPixel(w, h, x0, y0);
+      if (x0 == x1 && y0 == y1) break;
+
+      e2 = 2*err;
+      if (e2 >= dy) { err += dy; x0 += sx; }                        /* x step */
+      if (e2 <= dx) { err += dx; y0 += sy; }                        /* y step */
+   }
 }
 
 bool isPointInPolygon(INT64 pX, INT64 pY, float* PointsList, int PointsCount) {
@@ -826,48 +775,33 @@ std::pair<std::pair<double, double>, std::pair<double, double>> calculateParalle
     return std::make_pair(std::make_pair(newX1, newY1), std::make_pair(newX2, newY2));
 }
 
-void drawLineCapOnMask(int size, int x, int y, int w, int h) {
-    int px = 0;
-    int py = 0;
-    for (int zx = x - size; zx < x + size; ++zx)
-    {
-        int gx = zx - polyX;
-        if (gx<0 || gx>=w)
-           continue;
- 
-        py = 0;
-        for (int zy = y - size; zy < y + size; ++zy)
-        {
-            int gy = zy - polyY;
-            if (DrawLineCapsGrid[px][py]==1 && gy>=0 && gy<h)
-            // if (gy>=0 && gy<h)
-               polygonMaskMap[(INT64)gy * w + gx] = 1;
-               // linesMaskMap[(INT64)zy * w + zx] = 0;
-            py++;
-        }
-        px++;
+inline void drawLineCapOnMask(const int x, const int y, const int w, const int h) {
+    for (auto &point : DrawLineCapsGrid) {
+        const int gx = x + point.first - polyX;
+        const int gy = y + point.second - polyY;
+        if (gy>=0 && gy<h && gx>=0 && gx<w)
+           polygonMaskMap[(INT64)gy * w + gx] = 1;
     }
 }
 
-void drawLineSegmentMask(int width, int height, int x0, int y0, int x1, int y1, int thickness) {
-// based on https://zingl.github.io/bresenham.html
-//          https://github.com/zingl/Bresenham
+void drawLineSegmentMask(int width, int height, int x0, int y0, int x1, int y1) {
+// bresehan algorithm based on
+// https://zingl.github.io/bresenham.html
+// https://github.com/zingl/Bresenham
 // by Zingl Alois
 
-   double dx =  abs(x1-x0), sx = (x0<x1) ? 1 : -1;
-   double dy = -abs(y1-y0), sy = (y0<y1) ? 1 : -1;
-   double err = dx + dy, e2;                              /* error value e_xy */
+   int dx =  abs(x1-x0), sx = (x0<x1) ? 1 : -1;
+   int dy = -abs(y1-y0), sy = (y0<y1) ? 1 : -1;
+   int err = dx + dy, e2;                              /* error value e_xy */
 
-   for (;;) {                                                         /* loop */
-      drawLineCapOnMask(thickness, x0, y0, width, height);
+   for (;;) {                                 /* loop */
+      drawLineCapOnMask(x0, y0, width, height);
       if (x0 == x1 && y0 == y1) break;
 
       e2 = 2*err;
       if (e2 >= dy) { err += dy; x0 += sx; }                        /* x step */
       if (e2 <= dx) { err += dx; y0 += sy; }                        /* y step */
    }
-
-   // return 1;
 }
 
 DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCount, int thickness, int closed) {
@@ -907,7 +841,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
         }
 
         pts++;
-        drawLineSegmentMask(polyW, polyH, xa, ya, xb, yb, thickness);
+        drawLineSegmentMask(polyW, polyH, xa, ya, xb, yb);
         xa = xb;
         ya = yb;
         if (pts>=PointsCount || i>PointsCount*2)
@@ -947,7 +881,6 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int rounded) {
 
     int diameter = 2 * radius + 1;
     DrawLineCapsGrid.resize(diameter + 2);
-    fill(DrawLineCapsGrid.begin(), DrawLineCapsGrid.end(), std::vector<short>(diameter + 2, 0));
     // DrawLineCapsGrid.resize(diameter + 2, std::vector<short>(diameter + 2, 0));
     // std::vector<std::vector<short>> DrawLineCapsGrid(diameter, std::vector<short>(diameter, 0));
     int centerX = radius;
@@ -962,10 +895,9 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int rounded) {
             int dx = x - centerX;
             int dy = y - centerY;
             if (inRange(rzr, rr, dx * dx + dy * dy)==1)
-            // if (dx * dx + dy * dy <= rr)
-               DrawLineCapsGrid[x][y] = 1;
+               DrawLineCapsGrid.push_back(make_pair(dx, dy));
             else if (rounded!=1)
-               DrawLineCapsGrid[x][y] = 1;
+               DrawLineCapsGrid.push_back(make_pair(dx, dy));
         }
     }
 

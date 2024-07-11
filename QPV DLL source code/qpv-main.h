@@ -55,7 +55,8 @@ IWICBitmapSource       *pWICclassPixelsBitmapSource;
 
 std::vector<bool>  polygonMaskMap;
 std::vector<int>   polygonMapMin;
-std::vector<std::vector<short>> DrawLineCapsGrid;
+// std::vector<std::vector<short>> DrawLineCapsGrid;
+ vector<pair<int, int>> DrawLineCapsGrid;
 
 std::vector<UINT>  dupesListIDsA(1);
 std::vector<UINT>  dupesListIDsB(1);

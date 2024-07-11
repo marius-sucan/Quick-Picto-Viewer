@@ -19542,7 +19542,7 @@ dummyDrawImage(pEffect, clrMatrix, zBitmap, G2, funcu) {
    Return r1
 }
 
-recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0) {
+recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0, doAsk:=1) {
    Static lastu := [], hFIFimgA
    If (imgSelPx="get-bmp")
    {
@@ -19581,9 +19581,13 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
    FreeImage_GetImageDimensions(viewportQPVimage.imgHandle, imgW, imgH)
    If (imgSelPx="entire-vp" || invertArea=1)
    {
-      If memoryUsageWarning(imgW, imgH, bpp, 2)
+      If (memoryUsageWarning(imgW, imgH, bpp, 2, 0, 0)=1 && doAsk=0)
          Return
 
+      If memoryUsageWarning(imgW, imgH, bpp, 2)
+         Return 2
+
+      showTOOLtip("Recording undo level...", "nully")
       calcImgSelection2bmp(0, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2, 0, 0, "a")
       hFIFimgA := FreeImage_Copy(viewportQPVimage.imgHandle, 0, 0, imgW, imgH)
       If !hFIFimgA
@@ -19593,20 +19597,26 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
       Else
          lastu := [hFIFimgA, "entire-vp", 0, 0, imgW, imgH, EllipseSelectMode, VPselRotation, innerSelectionCavityX, innerSelectionCavityY]
       ; ToolTip, % imgSelPx "|" invertArea , , , 2
+      showTOOLtip("nully")
       Return hFIFimgA ? 1 : 0
    }
 
    flastu := !isNumber(imgSelPx) ? imgSelPx : "img-crop"
    If (flastu="img-crop")
    {
-      If memoryUsageWarning(imgSelW, imgSelH, bpp, 3)
+      If (memoryUsageWarning(imgSelW, imgSelH, bpp, 3, 0, 0)=1 && doAsk=0)
          Return
 
+      If memoryUsageWarning(imgSelW, imgSelH, bpp, 3)
+         Return 2
+
+      showTOOLtip("Recording undo level...", "nully")
       y1 := imgH - imgSelH - imgSelPy
       hFIFimgA := FreeImage_Crop(viewportQPVimage.imgHandle, imgSelPx, y1, imgSelW, imgSelH)
       If !hFIFimgA
          addJournalEntry("Failed to extract subsection of the main bitmap. Unable to record undo level.")
       lastu := [hFIFimgA, flastu, imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, innerSelectionCavityX, innerSelectionCavityY]
+      showTOOLtip("nully")
    } Else
    {
       ; undoable actions that do not rely on a bitmap, because they are bidirectional actions, eg. flip, invert
@@ -19792,7 +19802,7 @@ HugeImagesFlipHVinvert(modus) {
       hFIFimgA := FreeImage_CreateView(viewportQPVimage.imgHandle, Round(x1), Round(y1), Round(x2), Round(y2))
       If hFIFimgA
       {
-         recordUndoLevelHugeImagesNow(modus, 0, 0, 0)
+         recordUndoLevelHugeImagesNow(modus, 0, 0, 0, 0, 0)
          If (modus="i")
             r := FreeImage_Invert(hFIFimgA)
          Else If (modus="h")
@@ -19804,7 +19814,7 @@ HugeImagesFlipHVinvert(modus) {
       }
    } Else
    {
-      recordUndoLevelHugeImagesNow(modus, 0, 0, 0)
+      recordUndoLevelHugeImagesNow(modus, 0, 0, 0, 0, 0)
       If (modus="i")
          r := FreeImage_Invert(viewportQPVimage.imgHandle)
       Else If (modus="h")
@@ -19845,7 +19855,7 @@ getMemUsage() {
    Return obj
 }
 
-memoryUsageWarning(givenW:=0, givenH:=0, bitsDepth:=0, opener:=0, bonusBuffer:=0) {
+memoryUsageWarning(givenW:=0, givenH:=0, bitsDepth:=0, opener:=0, bonusBuffer:=0, doAsk:=1) {
    isAll := (givenW && givenH && bitsDepth) ? 1 : 0
    If (viewportQPVimage.imgHandle && isAll=0)
    {
@@ -19878,6 +19888,9 @@ memoryUsageWarning(givenW:=0, givenH:=0, bitsDepth:=0, opener:=0, bonusBuffer:=0
       Return 1
    Else If (projectedMemoryLoad>90 || prcSys>85 && diffu>5)
    {
+      If (doAsk=0)
+         Return 1
+
       If (opener=1)
       {
          msgResult := msgBoxWrapper(appTitle ": WARNING", "You are currently opening a very large image. QPV already uses " thisMemoryLoad "% from the available system memory. It is projected to peak at around " projectedMemoryLoad "% or more. This may lead to a substantial decrease in system performance and potential system crashes. Current system memory load is at " prcSys " %.`n`nDo you want to load the image entirely into the memory? If you choose to load it partially, the viewport zoom and pan functionalities will be very slow. All image editing functions will be disabled as well.", "&Load it entirely into memory|&Load it partially", 1, "exclamation")
@@ -20127,7 +20140,7 @@ HugeImagesApplyAutoColors() {
 
       pBitsMini := FreeImage_GetBits(hFIFimgA)
       strideMini := FreeImage_GetStride(hFIFimgA)
-      recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
+      recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, 0, 0)
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
       If (userAutoColorAdjustMode=3)
       {
@@ -20272,7 +20285,7 @@ HugeImagesApplyInsertText() {
             ; fnOutputDebug("D: " pBits "|" mStride "|" mBpp "|" hFIFimgA "|" nImgW "|" nImgH)
             ; r := DllCall(whichMainDLL "\DrawBitmapInPlace", "UPtr", pBits, "Int", nImgW, "Int", nImgH, "int", mStride, "int", mbpp, "int", 255, "int", userimgGammaCorrect, "int", 0, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "UPtr", 0, "int", "0xFF0011ff", "int", 32, "int", 1, "int", 1, "int", nImgW, "int", nImgH)
             obju := InitHugeImgSelPath(0, imgW, imgH)
-            recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
+            recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, 0, 0)
             orr := FillAreaShape
             FillAreaShape := 2
             FillAreaRectRoundness := 33
@@ -20373,13 +20386,25 @@ HugeImagesDrawLineShapes() {
 
       defineRelativeSelCoords(imgW, imgH)
       obju := InitHugeImgSelPath(0, imgW, imgH)
-      recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
-      QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
+      zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
+      If (zrr=2)
+      {
+         showTOOLtip("Draw lines: operation abandoned by user.")
+         DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+         imgSelX1 := o_imgSelX1,      imgSelY1 := o_imgSelY1
+         imgSelX2 := o_imgSelX2,      imgSelY2 := o_imgSelY2
+         defineRelativeSelCoords(imgW, imgH)
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         ResetImgLoadStatus()
+         Return
+      }
 
+      Sleep, 50
+      QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
       rza := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", DrawLineAreaContourThickness*0.45, "int", DrawLineAreaCapsStyle)
       If (rza=1)
       {
-         doClone := (innerSelectionCavityX>0 && innerSelectionCavityY>0) ? 1 : 0
+         doClone := (innerSelectionCavityX>0 && innerSelectionCavityY>0 && FillAreaShape<7) ? 1 : 0
          pPath := coreCreateFillAreaShape(tk, tk, o_imgSelW, o_imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, 2, 0)
          If pPath
          {
@@ -20846,7 +20871,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          ; t := validBMP(obju.alphaMaskGray)
          ; fnOutputDebug(thisRotation "|" A_ThisFunc ": " obju.x1 "|" obju.y1 "|" obju.x2 "|" obju.y2 "|" obju.imgSelW "|" obju.imgSelH)
          showTOOLtip("Applying " modus "`nProcessing main bitmap, please wait", 1)
-         recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, thisInvert)
+         recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, thisInvert, 0)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, shapeu, thisRotation, 0, thisInvert, "a", "a", 1)
          thisKeepAlpha := (transformTool=1) ? BlendModesPreserveAlpha : FillAreaCutGlass
          r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", blending, "int", BlendModesFlipped, "UPtr", mScan, "int", mStride, "UPtr", gScan, "int", gStride, "int", gBpp, "int", doBehind, "int", opacityExtra, "int", thisKeepAlpha, "int", nBmpW, "int", nBmpH)
@@ -20881,13 +20906,23 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             currIMGdetails.HasAlpha := 1
       } Else If InStr(modus, "erase")
       {
+         If (allowRecord=1)
+         {
+            zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, EraseAreaInvert)
+            If (zrr=2)
+            {
+               showTOOLtip("Erase area: operation abandoned by user.")
+               DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+               ResetImgLoadStatus()
+               SetTimer, RemoveTooltip, % -msgDisplayTime
+               Return
+            }
+         }
+
          newColor := "0x00010101"
          If (bpp=32)
             currIMGdetails.HasAlpha := 1
          thisOpacity := (EraseAreaFader=1) ? EraseAreaOpacity : 255
-         If (allowRecord=1)
-            recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, EraseAreaInvert)
-
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, EraseAreaInvert, "a", "a", 1)
          r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", 1, "int", 0, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "UPtr", 0, "int", 0, "int", 24, "int", 0, "int", 0, "int", 0)
          If InStr(modus, "initially")
@@ -20902,7 +20937,10 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          thisImgH := (BlurAreaInverted=1) ? Ceil(ImgH/blurAreaPixelizeAmount) : Ceil(obju.bImgSelH/blurAreaPixelizeAmount)
          If memoryUsageWarning(thisImgW, thisImgH, bpp)
          {
+            showTOOLtip("Pixelize area: operation abandoned by user.")
             DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+            ResetImgLoadStatus()
+            SetTimer, RemoveTooltip, % -msgDisplayTime
             Return
          }
 
@@ -20927,7 +20965,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
                r := DllCall(whichMainDLL "\AdjustImageColors" this, "UPtr", pBitsMini, "Int", thisImgW, "Int", thisImgH, "int", strideMini, "int", bpp, "int", blurAreaOpacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", Round(BlurAreaSaturation*655.35), "int", userImgAdjustAltBright, "int", Round(BlurAreaLight*257), "int", 0, "int", Round(BlurAreaGamma*655.30), "int", 0, "int", 0, "int", 0, "int", BlurAreaHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", 65535, "int", 0, "int", 0, "UPtr", 0, "int", 0)
             }
 
-            recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, BlurAreaInverted)
+            recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, BlurAreaInverted, 0)
             QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, BlurAreaInverted, "a", "a", 1)
             showTOOLtip("Applying " modus "`nPhase 3/3...", 1)
             r := DllCall(whichMainDLL "\PixelateHugeBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", blurAreaOpacity, "int", BlurAreaBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "UPtr", mScan, "int", mStride)
@@ -20939,11 +20977,30 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          }
       } Else If InStr(modus, "invert")
       {
-         recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, 0)
+         zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, 0)
+         If (zrr=2)
+         {
+            showTOOLtip("Invert area: operation abandoned by user.")
+            DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+            ResetImgLoadStatus()
+            SetTimer, RemoveTooltip, % -msgDisplayTime
+            Return
+         }
+
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
          r := DllCall(whichMainDLL "\AdjustImageColors", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 255, "int", 1, "int", 0, "int", 0, "int", 1, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 1, "int", 0, "int", 0, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
       } Else If InStr(modus, "flood")
       {
+         zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, 0)
+         If (zrr=2)
+         {
+            showTOOLtip("Flood fill: operation abandoned by user.")
+            DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+            ResetImgLoadStatus()
+            SetTimer, RemoveTooltip, % -msgDisplayTime
+            Return
+         }
+
          newColor := "0x" Format("{:X}", FloodFillClrOpacity) FloodFillColor
          Gdip_FromARGB(newColor, A, R, G, B)
          newColor := Gdip_ToARGB(A, R, G, B)
@@ -20952,7 +21009,6 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
 
          x := hFIFimgExtern[1], y := imgH - hFIFimgExtern[2]
          tolerance := (FloodFillAltToler=1) ? Ceil(FloodFillTolerance*0.7) + 1 : FloodFillTolerance
-         recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, 0)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
          use := (BrushToolOutsideSelection>1 && editingSelectionNow=1) ? 1 : 0
          inverter := (BrushToolOutsideSelection=3) ? 1 : 0
@@ -20973,10 +21029,21 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             FreeImage_GetImageDimensions(hFIFimgZ, thisImgW, thisImgH)
             pBitsMini := FreeImage_GetBits(hFIFimgZ)
             strideMini := FreeImage_GetStride(hFIFimgZ)
+            recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, 0, 0)
+         } Else
+         {
+            zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
+            If (zrr=2)
+            {
+               showTOOLtip("Add noise in selected area:`nOperation abandoned by user.")
+               DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+               ResetImgLoadStatus()
+               SetTimer, RemoveTooltip, % -msgDisplayTime
+               Return
+            }
          }
 
          ; fnOutputDebug(imgSelX1 "|" imgSelY1 "||" imgSelX2 "|" imgSelY2 "||" thisSelW "|" thisSelH)
-         recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
          r := DllCall(whichMainDLL "\GenerateRandomNoiseOnBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha)
          If (UserAddNoisePixelizeAmount>0)
@@ -20984,13 +21051,31 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
       } Else If InStr(modus, "color")
       {
          this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
-         recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, userImgAdjustInvertArea)
+         zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, userImgAdjustInvertArea)
+         If (zrr=2)
+         {
+            showTOOLtip("Adjust image colors: operation abandoned by user.")
+            DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+            ResetImgLoadStatus()
+            SetTimer, RemoveTooltip, % -msgDisplayTime
+            Return
+         }
+ 
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, userImgAdjustInvertArea, "a", "a", 1)
          r := DllCall(whichMainDLL "\AdjustImageColors" this, "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", imgColorsFXopacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", userImgAdjustSat, "int", userImgAdjustAltBright, "int", userImgAdjustBright, "int", userImgAdjustAltContra, "int", userImgAdjustContra, "int", userImgAdjustAltHiLows, "int", userImgAdjustShadows, "int", userImgAdjustHighs, "int", userImgAdjustHue, "int", userImgAdjustTintDeg, "int", userImgAdjustTintAmount, "int", userImgAdjustAltTint, "int", userImgAdjustGamma, "int", userImgAdjustOffR, "int", userImgAdjustOffG, "int", userImgAdjustOffB, "int", userImgAdjustOffA, "int", userImgAdjustThreR, "int", userImgAdjustThreG, "int", userImgAdjustThreB, "int", userImgAdjustThreA, "int", userImgAdjustSeeThrough, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", userImgAdjustWhitePoint, "int", userImgAdjustBlackPoint, "int", userImgAdjustNoisePoints, "UPtr", mScan, "int", mStride)
       } Else ; grayscale mode
       {
          this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
-         recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, EraseAreaInvert)
+         zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, EraseAreaInvert)
+         If (zrr=2)
+         {
+            showTOOLtip("Adjust image colors: operation abandoned by user.")
+            DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+            ResetImgLoadStatus()
+            SetTimer, RemoveTooltip, % -msgDisplayTime
+            Return
+         }
+
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, EraseAreaInvert, "a", "a", 1)
          r := DllCall(whichMainDLL "\AdjustImageColors" this, "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", DesaturateAreaAmount, "int", DesaturateAreaInvert, "int", DesaturateAreaChannel - 1, "int", -65535, "int", 1, "int", DesaturateAreaBright, "int", 0, "int", DesaturateAreaContra, "int", 0, "int", 0, "int", 0, "int", DesaturateAreaHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 1, "int", userimgGammaCorrect, "int", 0, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
          ; r := DllCall(whichMainDLL "\ConvertToGrayScale", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", DesaturateAreaChannel, "int", DesaturateAreaAmount, "int", stride, "int", bpp, "UPtr", mScan, "int", mStride)
@@ -21066,7 +21151,7 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
    If hFIFimgA
    {
       If (allowUndo=1)
-         zr := recordUndoLevelHugeImagesNow("entire-vp", 0, 0, 0)
+         recordUndoLevelHugeImagesNow("entire-vp", 0, 0, 0, 0, 0)
 
       ; ToolTip, % "zr=" zr , , , 2
       diffu := max(nmgpx, mgpx) - min(nmgpx, mgpx)
@@ -39665,13 +39750,6 @@ buildQuickSearchMenus() {
    deleteMenus()
    mustPreventMenus := 1
    BuildMainMenu("forced")
-   If (ShowAdvToolbar=1)
-   {
-      kMenu("PVmenu", "Add/Uncheck", "Show toolbar tooltips", "ToggleToolBarToolTips")
-      If (ShowToolTipsToolbar=1)
-         kMenu("PVmenu", "Check", "Show toolbar tooltips")
-   }
-
    If (maxFilesIndex>0)
       kMenu("PVmenu", "Add", "Show file header", "displayFileHeaderRaw")
 
@@ -53771,6 +53849,10 @@ invokeTlbrContextMenu(givenCoords:=0) {
       kMenu("PvUItoolbarMenu", "Add", k " toolbar`tShift+F10", "toggleAppToolbar")
 
    Menu, PvUItoolbarMenu, Add
+   kMenu("PvUItoolbarMenu", "Add/Uncheck", "Show toolbar tooltips", "ToggleToolBarToolTips")
+   If (ShowToolTipsToolbar=1)
+      kMenu("PvUItoolbarMenu", "Check", "Show toolbar tooltips")
+
    kMenu("PvUItoolbarMenu", "Add/Uncheck", "&Vertical toolbar", "ToggleToolBarValign")
    If (TLBRverticalAlign=1 || TLBRtwoColumns=1)
       kMenu("PvUItoolbarMenu", "Check", "&Vertical toolbar")
@@ -59430,7 +59512,9 @@ showTOOLtip(msg, funcu:=0, typeFuncu:=0, perc:=0) {
    If (msg="nully" && prevMsg)
       msg := prevMsg
 
-   prevMsg := msg
+   If (funcu!="nully")
+      prevMsg := msg
+
    CreateOSDinfoLine(msg, 0, 0, perc, funcu, typeFuncu)
    If (AnyWindowOpen>0 && WinActive("A")=hSetWinGui && panelWinCollapsed=0)
    {
@@ -97405,8 +97489,9 @@ ResetLbtn() {
 }
 
 DelayedToolbarTooltips(msgu, idu) {
-  If (soloSliderWinVisible=1)
-      Return
+  If ((LbtnDwn=1 || soloSliderWinVisible=1) || (A_TickCount - lastZeitOpenWin<350) || (A_TickCount - lastOtherWinClose<350))
+     Return
+
   MouseGetPos,,,, ctrlHover, 2
   IndexBtn := tlbrIconzList[ctrlHover, 5] - 1
   ; thisHwnd := tlbrIconzList[indexBtn, 1]
@@ -97466,6 +97551,7 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
         SetTimer, ResetLbtn, -55
         Return
      }
+
      If (soloSliderWinVisible!=1)
         msgu := tlbrDecideTooltips(ctrlHover)
 
@@ -97489,7 +97575,8 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
            }
         }
 
-        If (slideShowRunning!=1 && imageLoading!=1 && runningLongOperation!=1 && prevCtrlHover!=ctrlHover && prevMsg!=msgu)
+        brr := ((openingPanelNow=1 || LbtnDwn=1 || soloSliderWinVisible=1) || (A_TickCount - lastZeitOpenWin<350) || (A_TickCount - lastOtherWinClose<350)) ? 1 : 0
+        If (slideShowRunning!=1 && imageLoading!=1 && runningLongOperation!=1 && prevCtrlHover!=ctrlHover && prevMsg!=msgu && brr!=1)
         {
            prevCtrlHover := ctrlHover
            prevMsg := msgu
