@@ -369,7 +369,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , freeHandSelectionMode := 0, DrawLineAreaBorderConnector := 1, DrawLineAreaSnapLine := 0
    , DrawLineAreaBlendMode := 1, BlendModesPreserveAlpha := 0, FillAreaCutGlass := 0
    , userImgChannelAlphaAdd := 0, forceSlowLivePreviewMode := 0, showContextualStatusBar := 1
-   , vectorToolModus := 1, TextInAreaVerticalia := 0
+   , vectorToolModus := 1, TextInAreaVerticalia := 0, DrawLineAreaThickScale := 100
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -20400,8 +20400,13 @@ HugeImagesDrawLineShapes() {
       }
 
       Sleep, 50
+      maxLength := min(o_imgSelW, o_imgSelH)//2
+      thisThick := (DrawLineAreaContourThickness > maxLength//1.05) ? maxLength//1.05 : DrawLineAreaContourThickness
+      thisThick := thisThick * (DrawLineAreaThickScale / 100)
+      thisThick := thisThick * 0.49
+
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
-      rza := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", DrawLineAreaContourThickness*0.45, "int", DrawLineAreaCapsStyle)
+      rza := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", DrawLineAreaCapsStyle)
       If (rza=1)
       {
          doClone := (innerSelectionCavityX>0 && innerSelectionCavityY>0 && FillAreaShape<7) ? 1 : 0
@@ -20414,13 +20419,13 @@ HugeImagesDrawLineShapes() {
             processGdipPathForDLL(pPath, tk, o_imgSelH, subdivide, PointsCount, PointsF)
             showTOOLtip("Drawing lines, please wait...`nStep 2/3")
             closed := (FillAreaShape=7) ? FillAreaClosedPath : 1
-            rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", DrawLineAreaContourThickness*0.45, "int", closed)
+            rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed)
             Gdip_DeletePath(pPath)
             If (doClone=1)
             {
                Gdip_ScalePathAtCenter(clonedPath, innerSelectionCavityX, innerSelectionCavityY)
                processGdipPathForDLL(clonedPath, tk, o_imgSelH, subdivide, PointsCount, PointsF)
-               rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", DrawLineAreaContourThickness*0.45, "int", closed)
+               rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed)
                Gdip_DeletePath(clonedPath)
             }
          }
@@ -21875,7 +21880,7 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
        trGdip_GetImageDimensions(whichBitmap, oimgW, oimgH)
        calcImgSelection2bmp(!LimitSelectBoundsImg, oimgW, oimgH, oimgW, oimgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
        maxLength := min(imgSelW, imgSelH)//2
-       thisThick := (DrawLineAreaContourThickness>maxLength//1.05) ? maxLength//1.05 : DrawLineAreaContourThickness
+       thisThick := (DrawLineAreaContourThickness > maxLength//1.05) ? maxLength//1.05 : DrawLineAreaContourThickness
        If (modus!="shapes" && (DrawLineAreaBorderCenter=2 || DrawLineAreaBorderCenter=3))
           thisThick := DrawLineAreaContourThickness
 
@@ -21893,9 +21898,11 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
        trGdip_GetImageDimensions(useGdiBitmap(), qimgW, qimgH)
        calcImgSelection2bmp(!LimitSelectBoundsImg, qimgW, qimgH, qimgW, qimgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
        maxLength := min(imgSelW, imgSelH)//2
-       thisThick := (DrawLineAreaContourThickness>maxLength//1.05) ? maxLength//1.05 : DrawLineAreaContourThickness
+       thisThick := (DrawLineAreaContourThickness > maxLength//1.05) ? maxLength//1.05 : DrawLineAreaContourThickness
        If (modus!="shapes" && (DrawLineAreaBorderCenter=2 || DrawLineAreaBorderCenter=3))
           thisThick := DrawLineAreaContourThickness
+       If (viewportQPVimage.imgHandle)
+          thisThick := thisThick * (DrawLineAreaThickScale / 100)
 
        thisThick := thisThick*zoomLevel
        ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, qImgW, qImgH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
@@ -42624,6 +42631,13 @@ updateLabelColorGammaLevel() {
     Return "Gamma: " Round(userImgAdjustGamma/300,2)
 }
 
+updateLabelDrawLineThickness() {
+    If (viewportQPVimage.imgHandle)
+       Return "Line width: " Round(DrawLineAreaContourThickness * (DrawLineAreaThickScale/100)) " pixels"
+    Else
+       Return "Line width: " DrawLineAreaContourThickness " pixels"
+}
+
 updateLabelBrushStep() {
    stepu := (BrushToolStepping<=2 || BrushToolStepping=251) ? "AUTO" : BrushToolStepping " px"
    If (BrushToolStepping=0)
@@ -47596,6 +47610,13 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
        Gui, Font, s%LargeUIfontValue%
     }
 
+    If (viewportQPVimage.imgHandle)
+    {
+       DrawLineAreaContourAlign := 2
+       DrawLineAreaDashStyle := 1
+       DrawLineAreaDoubles := 0
+    }
+
     minislideWid := (PrefsLargeFonts=1) ? slideWid//2.32 : slideWid//2.52
     Global PickuFillAreaColor, PickuFillArea2ndColor
 
@@ -47631,9 +47652,11 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     } Else
        Gui, Add, Checkbox, xs y+10 w%btnWid% hp gupdateUIdrawShapesPanel Checked%DrawLineAreaCapsStyle% vDrawLineAreaCapsStyle, &Round caps
 
-    GuiAddSlider("DrawLineAreaContourThickness", 1,950, 45, "Line width: $€ pixels", "updateUIdrawShapesPanel", 1, "xs y+15 w" txtWid " hp")
+    GuiAddSlider("DrawLineAreaContourThickness", 1,700, 45, ".updateLabelDrawLineThickness", "updateUIdrawShapesPanel", 1, "xs y+15 w" txtWid " hp")
     If (!viewportQPVimage.imgHandle)
        Gui, Add, Checkbox, xs y+10 gupdateUIdrawShapesPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit selection area
+    Else
+       GuiAddSlider("DrawLineAreaThickScale", 100, 500, 100, "Thickness scale: $€ %", "updateUIdrawShapesPanel", 1, "xs y+7 wp hp")
 
     btnWid := (PrefsLargeFonts=1) ? 105 : 65
     ml := (PrefsLargeFonts=1) ? 35 : 25
@@ -75309,7 +75332,7 @@ createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepB
       Gdip_DeletePath(clonedPath)
    }
    ; Sleep, -1
-   fnOutputDebug(A_ThisFunc "(): " A_TickCount - startZeit)
+   ; fnOutputDebug(A_ThisFunc "(): " A_TickCount - startZeit)
    If (allowErrMargin=2)
    {
       Gdip_DeletePath(ImgSelPath)
@@ -97489,7 +97512,8 @@ ResetLbtn() {
 }
 
 DelayedToolbarTooltips(msgu, idu) {
-  If ((LbtnDwn=1 || soloSliderWinVisible=1) || (A_TickCount - lastZeitOpenWin<350) || (A_TickCount - lastOtherWinClose<350))
+  zbb := (slideShowRunning=1 || imageLoading=1 || runningLongOperation=1) ? 1 : 0
+  If ((LbtnDwn=1 || zbb=1 || soloSliderWinVisible=1) || (A_TickCount - lastZeitOpenWin<350) || (A_TickCount - lastOtherWinClose<350))
      Return
 
   MouseGetPos,,,, ctrlHover, 2

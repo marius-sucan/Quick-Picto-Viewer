@@ -594,6 +594,8 @@ DLL_API int DLL_CALLCONV discardFilledPolygonCache(int m) {
     polygonMaskMap.shrink_to_fit();
     DrawLineCapsGrid.clear();
     DrawLineCapsGrid.shrink_to_fit();
+    DrawLineGrid.clear();
+    DrawLineGrid.shrink_to_fit();
     return 1;
 }
 
@@ -747,55 +749,71 @@ DLL_API int DLL_CALLCONV testFilledPolygonCache(int m) {
     return r;
 }
 
-std::pair<std::pair<double, double>, std::pair<double, double>> calculateParallelPoints(
-    double x1, double y1, double x2, double y2, double distance) {
-    // Check if the input points are the same
-    if (x1 == x2 && y1 == y2) {
-        // If the points are the same, create two new points along the x-axis
-        double newX1 = x1 - distance / 2;
-        double newY1 = y1;
-        double newX2 = x2 + distance / 2;
-        double newY2 = y2;
-        return std::make_pair(std::make_pair(newX1, newY1), std::make_pair(newX2, newY2));
-    }
+void translateLine(const Point& p1, const Point& p2, double distance, Point& new_p1, Point& new_p2) {
+// Function to translate a line by a given distance parallel to the initial one
 
-    // Calculate the slope of the line
-    double slope = (y2 - y1) / (x2 - x1);
-    double perpSlope = -1 / slope;  // Slope of the perpendicular line
+    // Calculate the direction vector of the line
+    Point dirVec = {p2.x - p1.x, p2.y - p1.y};
 
-    // Calculate the distance between the parallel lines
-    double dist = distance / std::sqrt(1 + perpSlope * perpSlope);
+    // Normalize the direction vector
+    double length = sqrt(dirVec.x * dirVec.x + dirVec.y * dirVec.y);
+    Point normVec = {dirVec.x / length, dirVec.y / length};
 
-    // Calculate the new parallel line points
-    double newX1 = x1 + dist * std::cos(std::atan(perpSlope));
-    double newY1 = y1 + dist * std::sin(std::atan(perpSlope));
-    double newX2 = x2 + dist * std::cos(std::atan(perpSlope));
-    double newY2 = y2 + dist * std::sin(std::atan(perpSlope));
+    // Get a perpendicular vector to the normalized direction vector
+    Point perpVec = {-normVec.y, normVec.x};
 
-    return std::make_pair(std::make_pair(newX1, newY1), std::make_pair(newX2, newY2));
+    // Translate the points
+    new_p1 = {p1.x + perpVec.x * distance, p1.y + perpVec.y * distance};
+    new_p2 = {p1.x + perpVec.x * (-1 * distance), p1.y + perpVec.y * (- 1 * distance)};
+    // new_p2 = {p2.x + perpVec.x * distance, p2.y + perpVec.y * distance};
 }
 
-inline void drawLineCapOnMask(const int x, const int y, const int w, const int h) {
+inline void drawLineCapOnMask(const int x, const int y) {
+    int gx, gy;
     for (auto &point : DrawLineCapsGrid) {
-        const int gx = x + point.first - polyX;
-        const int gy = y + point.second - polyY;
-        if (gy>=0 && gy<h && gx>=0 && gx<w)
-           polygonMaskMap[(INT64)gy * w + gx] = 1;
+        gx = x + point.first - polyX;
+        gy = y + point.second - polyY;
+        if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
+           polygonMaskMap[(INT64)gy * polyW + gx] = 1;
     }
 }
 
-void drawLineSegmentMask(int width, int height, int x0, int y0, int x1, int y1) {
+void drawLineSegmentPerpendicular(int x0, int y0, int x1, int y1, int cx, int cy) {
 // bresehan algorithm based on
 // https://zingl.github.io/bresenham.html
 // https://github.com/zingl/Bresenham
 // by Zingl Alois
-
-   int dx =  abs(x1-x0), sx = (x0<x1) ? 1 : -1;
-   int dy = -abs(y1-y0), sy = (y0<y1) ? 1 : -1;
+   const int dx =  abs(x1-x0), sx = (x0<x1) ? 1 : -1;
+   const int dy = -abs(y1-y0), sy = (y0<y1) ? 1 : -1;
    int err = dx + dy, e2;                              /* error value e_xy */
 
-   for (;;) {                                 /* loop */
-      drawLineCapOnMask(x0, y0, width, height);
+   for (;;) {
+      DrawLineGrid.push_back(make_pair(x0 - cx, y0 - cy));
+      if (x0 == x1 && y0 == y1) break;
+
+      e2 = 2*err;
+      if (e2 >= dy) { err += dy; x0 += sx; }                        /* x step */
+      if (e2 <= dx) { err += dx; y0 += sy; }                        /* y step */
+   }
+}
+
+void drawLineSegmentMask(int x0, int y0, int x1, int y1) {
+// bresehan algorithm based on
+// https://zingl.github.io/bresenham.html
+// https://github.com/zingl/Bresenham
+// by Zingl Alois
+   // Point pA, pB;
+   // DrawLineGrid.clear();
+   // translateLine({(double)x0, (double)y0}, {(double)x1, (double)y1}, thickness, pA, pB);
+   // drawLineSegmentPerpendicular(pA.x, pA.y, pB.x, pB.y, x0, y0);
+   // fnOutputDebug("DrawLineGrid.size=" + std::to_string(DrawLineGrid.size()));
+
+   const int dx =  abs(x1-x0), sx = (x0<x1) ? 1 : -1;
+   const int dy = -abs(y1-y0), sy = (y0<y1) ? 1 : -1;
+   int err = dx + dy, e2 = NULL;                              /* error value e_xy */
+
+   for (;;) {
+      drawLineCapOnMask(x0, y0);
       if (x0 == x1 && y0 == y1) break;
 
       e2 = 2*err;
@@ -821,17 +839,22 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
         PointsList[i + 1] = round(PointsList[i + 1]) + polyOffYa - polyOffYb;
     }
 
-    int i = 2;
-    int xa = PointsList[0];
-    int ya = PointsList[1];
+    // int i = 2;
+    // int pc = PointsCount*2;
+    int pci = PointsCount - 1;
     fnOutputDebug("tracing polygonal path with bresenham algo");
-    for (int pts = 0; pts < PointsCount;)
+    #pragma omp parallel for schedule(static) default(none) num_threads(4)
+    for (int pts = 0; pts < PointsCount; pts++)
     {
+        int i = pts*2;
+        int xa = PointsList[i];
+        i++;
+        int ya = PointsList[i];
+        i++;
         int xb = PointsList[i];
         i++;
         int yb = PointsList[i];
-        i++;
-        if (pts==PointsCount - 1)
+        if (pts==pci)
         {
            if (closed!=1)
               break;
@@ -840,15 +863,16 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
            yb = PointsList[1];
         }
 
-        pts++;
-        drawLineSegmentMask(polyW, polyH, xa, ya, xb, yb);
-        xa = xb;
-        ya = yb;
-        if (pts>=PointsCount || i>PointsCount*2)
-           break;
+        drawLineSegmentMask(xa, ya, xb, yb);
+        // for (auto &point : DrawLineCapsGrid) {
+        //     const int gx = xb + point.first - polyX;
+        //     const int gy = yb + point.second - polyY;
+        //     if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
+        //        polygonMaskMap[(INT64)gy * polyW + gx] = 1;
+        // }
     }
 
-    fnOutputDebug("drawLineAllSegmentsMask() - done | i=" + std::to_string(i));
+    fnOutputDebug("drawLineAllSegmentsMask() - done");
     return 1;
 }
 
@@ -895,6 +919,7 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int rounded) {
             int dx = x - centerX;
             int dy = y - centerY;
             if (inRange(rzr, rr, dx * dx + dy * dy)==1)
+            // if (dx * dx + dy * dy<rr)
                DrawLineCapsGrid.push_back(make_pair(dx, dy));
             else if (rounded!=1)
                DrawLineCapsGrid.push_back(make_pair(dx, dy));
