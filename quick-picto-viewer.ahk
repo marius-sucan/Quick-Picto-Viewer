@@ -20374,7 +20374,11 @@ HugeImagesDrawLineShapes() {
       Stride := FreeImage_GetStride(hFIFimgX)
       o_imgSelH := max(imgSelY2, imgSelY1) - min(imgSelY2, imgSelY1)
       o_imgSelW := max(imgSelX2, imgSelX1) - min(imgSelX2, imgSelX1)
-      tk := DrawLineAreaContourThickness + 4
+      maxLength := min(o_imgSelW, o_imgSelH)//2
+      thisThick := (DrawLineAreaContourThickness > maxLength/1.05) ? maxLength/1.05 : DrawLineAreaContourThickness
+      thisThick := thisThick * (DrawLineAreaThickScale / 100)
+      thisThick := Round(thisThick * 0.49)
+      tk := thisThick + 4
       o_imgSelX1 := imgSelX1,    o_imgSelY1 := imgSelY1
       o_imgSelX2 := imgSelX2,    o_imgSelY2 := imgSelY2
       imgSelX1 := imgSelX1 - tk,    imgSelY1 := imgSelY1 - tk
@@ -20400,11 +20404,6 @@ HugeImagesDrawLineShapes() {
       }
 
       Sleep, 50
-      maxLength := min(o_imgSelW, o_imgSelH)//2
-      thisThick := (DrawLineAreaContourThickness > maxLength//1.05) ? maxLength//1.05 : DrawLineAreaContourThickness
-      thisThick := thisThick * (DrawLineAreaThickScale / 100)
-      thisThick := thisThick * 0.49
-
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
       rza := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", DrawLineAreaCapsStyle)
       If (rza=1)
@@ -20415,7 +20414,8 @@ HugeImagesDrawLineShapes() {
          {
             If (doClone=1)
                clonedPath := Gdip_ClonePath(pPath)
-            subdivide := (bezierSplineCustomShape=1 || FillAreaCurveTension>1 || FillAreaShape=1) ? 1 : 0
+
+            subdivide := (((bezierSplineCustomShape=1 || FillAreaCurveTension>1) && FillAreaShape=7) || FillAreaShape=2 || FillAreaShape=3) ? 1 : 0
             processGdipPathForDLL(pPath, tk, o_imgSelH, subdivide, PointsCount, PointsF)
             showTOOLtip("Drawing lines, please wait...`nStep 2/3")
             closed := (FillAreaShape=7) ? FillAreaClosedPath : 1

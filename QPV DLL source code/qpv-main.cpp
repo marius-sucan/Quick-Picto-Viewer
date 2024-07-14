@@ -909,10 +909,28 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int rounded) {
     // std::vector<std::vector<short>> DrawLineCapsGrid(diameter, std::vector<short>(diameter, 0));
     int centerX = radius;
     int centerY = radius;
+    float ff = 0.995f;
+    if (radius<5)
+       ff = 0.10f;
+    else if (radius<15)
+       ff = 0.60f;
+    else if (radius<25)
+       ff = 0.80f;
+    else if (radius<75)
+       ff = 0.90f;
+    else if (radius<95)
+       ff = 0.96f;
+    else if (radius<145)
+       ff = 0.97f;
+    else if (radius<285)
+       ff = 0.98f;
+    else if (radius<580)
+       ff = 0.99f;
+
     int rr = radius * radius;
-    int rzr = (float)rr*0.97f;
-    if (rr - rzr<45)
-       rzr -= 45;
+    int rzr = (float)rr * ff;
+    // if (rr - rzr<45)
+    //    rzr -= 45;
 
     for (int x = 0; x < diameter; ++x) {
         for (int y = 0; y < diameter; ++y) {
@@ -926,7 +944,7 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int rounded) {
         }
     }
 
-    fnOutputDebug("prepareDrawLinesMask() - done; rr/rzr=" + std::to_string(rr) + " / " + std::to_string(rzr));
+    fnOutputDebug(std::to_string(radius) + " radius; prepareDrawLinesMask() - done; rr/rzr=" + std::to_string(rr) + " / " + std::to_string(rzr));
     return 1;
 }
 
