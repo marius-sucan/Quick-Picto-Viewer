@@ -20405,9 +20405,17 @@ HugeImagesDrawLineShapes() {
 
       Sleep, 50
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
-      rza := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", DrawLineAreaCapsStyle)
-      If (rza=1)
+      rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", DrawLineAreaCapsStyle)
+      rza := DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaCapsStyle)
+      If (rza=1 && rzq=1)
       {
+         otherThick := Round(thisThick*0.34)
+         diffThick := (imgSelY1<0) ? imgSelY1 : 0
+         If (imgSelY2>imgH)
+            diffThick := diffThick + (imgSelY2 - imgH)
+         If (imgSelY2>imgH && imgSelY1<0)
+            diffThick := thisThick + (imgSelY2 - thisThick - imgH)
+
          doClone := (innerSelectionCavityX>0 && innerSelectionCavityY>0 && FillAreaShape<7) ? 1 : 0
          pPath := coreCreateFillAreaShape(tk, tk, o_imgSelW, o_imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, 2, 0)
          If pPath
@@ -20419,13 +20427,25 @@ HugeImagesDrawLineShapes() {
             processGdipPathForDLL(pPath, tk, o_imgSelH, subdivide, PointsCount, PointsF)
             showTOOLtip("Drawing lines, please wait...`nStep 2/3")
             closed := (FillAreaShape=7) ? FillAreaClosedPath : 1
-            rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed)
+            rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", DrawLineAreaCapsStyle, "int", 0, "int", 0)
+            If (rzb=1 && DrawLineAreaDoubles=1)
+            {
+               DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaCapsStyle)
+               rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", DrawLineAreaCapsStyle, "int", 1, "int", diffThick)
+               DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaCapsStyle)
+            }
+
             Gdip_DeletePath(pPath)
-            If (doClone=1)
+            If (doClone=1 && rzb=1)
             {
                Gdip_ScalePathAtCenter(clonedPath, innerSelectionCavityX, innerSelectionCavityY)
                processGdipPathForDLL(clonedPath, tk, o_imgSelH, subdivide, PointsCount, PointsF)
-               rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed)
+               rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", DrawLineAreaCapsStyle)
+               If (rzb=1 && DrawLineAreaDoubles=1)
+               {
+                  DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaCapsStyle)
+                  rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", DrawLineAreaCapsStyle, "int", 1, "int", diffThick)
+               }
                Gdip_DeletePath(clonedPath)
             }
          }
@@ -20434,7 +20454,7 @@ HugeImagesDrawLineShapes() {
 
       showTOOLtip("Drawing lines, please wait...`nStep 3/3")
       If (rzb=1)
-         rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", DrawLineAreaOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", 0, "int", 0)
+         rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", DrawLineAreaOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", doBehind, "int", 0, "int", BlendModesPreserveAlpha)
 
       DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
       r := (rzc=1) ? 1 : 0
@@ -45185,7 +45205,7 @@ ReadSettingsFillAreaPanel(act:=0) {
     RegAction(act, "DrawLineAreaDoubles",, 1)
     RegAction(act, "DrawLineAreaContourAlign",, 2, 1, 3)
     RegAction(act, "DrawLineAreaDashStyle",, 2, 1, 4)
-    RegAction(act, "DrawLineAreaContourThickness",, 2, 1, 450)
+    RegAction(act, "DrawLineAreaContourThickness",, 2, 1, 700)
     RegAction(act, "PasteInPlaceGamma",, 2, -100, 100)
     RegAction(act, "PasteInPlaceHue",, 2, -180, 180)
     RegAction(act, "PasteInPlaceLight",, 2, -255, 255)
@@ -45218,7 +45238,7 @@ ReadSettingsDrawShapeAreaPanel(act:=0) {
     RegAction(act, "DrawLineAreaDoubles",, 1)
     RegAction(act, "DrawLineAreaContourAlign",, 2, 1, 3)
     RegAction(act, "DrawLineAreaDashStyle",, 2, 1, 4)
-    RegAction(act, "DrawLineAreaContourThickness",, 2, 1, 450)
+    RegAction(act, "DrawLineAreaContourThickness",, 2, 1, 700)
     RegAction(act, "DrawLineAreaBlendMode",, 2, 1, 24)
     RegAction(act, "PasteInPlaceAutoExpandIMG",, 1)
     RegAction(act, "FillAreaClosedPath",, 1)
@@ -46040,7 +46060,7 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
         RegAction(0, "DrawLineAreaColor",, 3)
         RegAction(0, "DrawLineAreaOpacity",, 2, 1, 255)
         RegAction(0, "DrawLineAreaCapsStyle",, 1)
-        RegAction(0, "DrawLineAreaContourThickness",, 2, 1, 450)
+        RegAction(0, "DrawLineAreaContourThickness",, 2, 1, 700)
         DrawLineAreaDoubles := 0
         DrawLineAreaDashStyle := 1
         RegAction(1, "DrawLineAreaDoubles",, 1)
@@ -47613,8 +47633,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     If (viewportQPVimage.imgHandle)
     {
        DrawLineAreaContourAlign := 2
-       DrawLineAreaDashStyle := 1
-       DrawLineAreaDoubles := 0
+       DrawLineAreaDashStyle := DrawLineAreaCapsStyle := 1
     }
 
     minislideWid := (PrefsLargeFonts=1) ? slideWid//2.32 : slideWid//2.52
@@ -47650,7 +47669,10 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
        Gui, Add, Checkbox, xs y+6 wp h%btnHeight% +0x1000 Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIdrawShapesPanel, &Double line
        Gui, Add, Checkbox, x+5 wp hp +0x1000 gupdateUIdrawShapesPanel Checked%DrawLineAreaCapsStyle% vDrawLineAreaCapsStyle, &Round caps
     } Else
-       Gui, Add, Checkbox, xs y+10 w%btnWid% hp gupdateUIdrawShapesPanel Checked%DrawLineAreaCapsStyle% vDrawLineAreaCapsStyle, &Round caps
+    {
+       Gui, Add, Checkbox, xs y+7 w%btnWid% Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIdrawShapesPanel, &Double line
+       ; Gui, Add, Checkbox, x+5 Checked%FillAreaDoBehind% vFillAreaDoBehind gupdateUIdrawShapesPanel, &Fill behind the image
+    }
 
     GuiAddSlider("DrawLineAreaContourThickness", 1,700, 45, ".updateLabelDrawLineThickness", "updateUIdrawShapesPanel", 1, "xs y+15 w" txtWid " hp")
     If (!viewportQPVimage.imgHandle)
@@ -47835,7 +47857,7 @@ ReadSettingsDrawLinesArea(act:=0) {
     RegAction(act, "DrawLineAreaContourAlign",, 2, 1, 3)
     RegAction(act, "DrawLineAreaDashStyle",, 2, 1, 4)
     RegAction(act, "DrawLineAreaBlendMode",, 2, 1, 24)
-    RegAction(act, "DrawLineAreaContourThickness",, 2, 1, 450)
+    RegAction(act, "DrawLineAreaContourThickness",, 2, 1, 700)
     RegAction(act, "DrawLineAreaBorderTop",, 1)
     RegAction(act, "DrawLineAreaBorderBottom",, 1)
     RegAction(act, "DrawLineAreaBorderLeft",, 1)
@@ -50838,11 +50860,14 @@ updateUIdrawShapesPanel(actionu:=0, b:=0) {
     actu := (FillAreaShape=2) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "FillAreaRectRoundness")
 
+    actu := (FillAreaShape=3 && !viewportQPVimage.imgHandle) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    GuiControl, % actu, FillAreaEllipsePie
     actu := (FillAreaShape=3) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "FillAreaEllipseSection")
-    GuiControl, % actu, FillAreaEllipsePie
+    If (viewportQPVimage.imgHandle)
+       uiSlidersArray["userUIshapeCavity", 10] := (FillAreaShape=7) ? 0 : 1
 
-    actu := (FillAreaEllipseSection<848) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    actu := (FillAreaEllipseSection<848 && !viewportQPVimage.imgHandle) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu, FillAreaEllipsePie
 
     actu := (FillAreaShape=7) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"

@@ -768,16 +768,6 @@ void translateLine(const Point& p1, const Point& p2, double distance, Point& new
     // new_p2 = {p2.x + perpVec.x * distance, p2.y + perpVec.y * distance};
 }
 
-inline void drawLineCapOnMask(const int x, const int y) {
-    int gx, gy;
-    for (auto &point : DrawLineCapsGrid) {
-        gx = x + point.first - polyX;
-        gy = y + point.second - polyY;
-        if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
-           polygonMaskMap[(INT64)gy * polyW + gx] = 1;
-    }
-}
-
 void drawLineSegmentPerpendicular(int x0, int y0, int x1, int y1, int cx, int cy) {
 // bresehan algorithm based on
 // https://zingl.github.io/bresenham.html
@@ -797,7 +787,7 @@ void drawLineSegmentPerpendicular(int x0, int y0, int x1, int y1, int cx, int cy
    }
 }
 
-void drawLineSegmentMask(int x0, int y0, int x1, int y1) {
+void drawLineSegmentMask(int x0, int y0, const int x1, const int y1, const bool p, const int offsetY) {
 // bresehan algorithm based on
 // https://zingl.github.io/bresenham.html
 // https://github.com/zingl/Bresenham
@@ -810,10 +800,17 @@ void drawLineSegmentMask(int x0, int y0, int x1, int y1) {
 
    const int dx =  abs(x1-x0), sx = (x0<x1) ? 1 : -1;
    const int dy = -abs(y1-y0), sy = (y0<y1) ? 1 : -1;
-   int err = dx + dy, e2 = NULL;                              /* error value e_xy */
+   int err = dx + dy, e2, gx, gy;
 
    for (;;) {
-      drawLineCapOnMask(x0, y0);
+      for (auto &point : DrawLineCapsGrid) {
+          gx = x0 + point.first - polyX;
+          gy = y0 + point.second - polyY + offsetY;
+          if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
+             polygonMaskMap[(INT64)gy * polyW + gx] = p;
+      }
+
+      // drawLineCapOnMask(x0, y0);
       if (x0 == x1 && y0 == y1) break;
 
       e2 = 2*err;
@@ -822,7 +819,7 @@ void drawLineSegmentMask(int x0, int y0, int x1, int y1) {
    }
 }
 
-DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCount, int thickness, int closed) {
+DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCount, int thickness, int closed, int rounded, int doubles, int offsetY) {
     fnOutputDebug("drawLineAllSegmentsMask() invoked; PointsCount=" + std::to_string(PointsCount));
     INT64 s = (INT64)polyW * polyH + 2;
     if (s!=polygonMaskMap.size())
@@ -842,6 +839,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
     // int i = 2;
     // int pc = PointsCount*2;
     int pci = PointsCount - 1;
+    doubles = !doubles;
     fnOutputDebug("tracing polygonal path with bresenham algo");
     #pragma omp parallel for schedule(static) default(none) num_threads(4)
     for (int pts = 0; pts < PointsCount; pts++)
@@ -863,7 +861,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
            yb = PointsList[1];
         }
 
-        drawLineSegmentMask(xa, ya, xb, yb);
+        drawLineSegmentMask(xa, ya, xb, yb, doubles, offsetY);
         // for (auto &point : DrawLineCapsGrid) {
         //     const int gx = xb + point.first - polyX;
         //     const int gy = yb + point.second - polyY;
@@ -874,6 +872,58 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
 
     fnOutputDebug("drawLineAllSegmentsMask() - done");
     return 1;
+}
+
+DLL_API int DLL_CALLCONV prepareDrawLinesCapsGridMask(int radius, int rounded) {
+    int diameter = 2 * radius + 1;
+    DrawLineCapsGrid.resize(diameter + 2);
+    // DrawLineCapsGrid.resize(diameter + 2, std::vector<short>(diameter + 2, 0));
+    // std::vector<std::vector<short>> DrawLineCapsGrid(diameter, std::vector<short>(diameter, 0));
+    int centerX = radius;
+    int centerY = radius;
+    float ff = 0.995f;
+    if (radius<5)
+       ff = 0.10f;
+    else if (radius<15)
+       ff = 0.60f;
+    else if (radius<25)
+       ff = 0.80f;
+    else if (radius<75)
+       ff = 0.90f;
+    else if (radius<95)
+       ff = 0.96f;
+    else if (radius<145)
+       ff = 0.97f;
+    else if (radius<285)
+       ff = 0.98f;
+    else if (radius<580)
+       ff = 0.99f;
+
+    int rr = radius * radius;
+    int minRR = (float)rr * ff;
+    int maxDia = (float)diameter * ff;
+    int minDia = diameter - maxDia;
+
+    for (int x = 0; x < diameter; ++x) {
+        for (int y = 0; y < diameter; ++y) {
+            int dx = x - centerX;
+            int dy = y - centerY;
+            if (rounded==1)
+            {
+               if (inRange(minRR, rr, dx * dx + dy * dy)==1)
+               // if (dx * dx + dy * dy<rr)
+                  DrawLineCapsGrid.push_back(make_pair(dx, dy));
+            } else
+            {
+               if (dx * dx + dy * dy>minRR)
+               // if (inRange(minDia, maxDia, x)!=1 && !inRange(minDia, maxDia, y)!=1)
+                  DrawLineCapsGrid.push_back(make_pair(dx, dy));
+            }
+        }
+    }
+
+    fnOutputDebug(std::to_string(radius) + " radius; prepareDrawLinesCapsGridMask() - done; rr/minRR=" + std::to_string(rr) + " / " + std::to_string(minRR));
+    fnOutputDebug("prepareDrawLinesCapsGridMask() - done; min/maxDia=" + std::to_string(minDia) + " / " + std::to_string(maxDia));
 }
 
 DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int rounded) {
@@ -902,51 +952,9 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int rounded) {
 
     fill(polygonMaskMap.begin(), polygonMaskMap.end(), 0);
     fnOutputDebug("prepareDrawLinesMask() - polygonMaskMap DONE; radius = " + std::to_string(radius));
-
-    int diameter = 2 * radius + 1;
-    DrawLineCapsGrid.resize(diameter + 2);
-    // DrawLineCapsGrid.resize(diameter + 2, std::vector<short>(diameter + 2, 0));
-    // std::vector<std::vector<short>> DrawLineCapsGrid(diameter, std::vector<short>(diameter, 0));
-    int centerX = radius;
-    int centerY = radius;
-    float ff = 0.995f;
-    if (radius<5)
-       ff = 0.10f;
-    else if (radius<15)
-       ff = 0.60f;
-    else if (radius<25)
-       ff = 0.80f;
-    else if (radius<75)
-       ff = 0.90f;
-    else if (radius<95)
-       ff = 0.96f;
-    else if (radius<145)
-       ff = 0.97f;
-    else if (radius<285)
-       ff = 0.98f;
-    else if (radius<580)
-       ff = 0.99f;
-
-    int rr = radius * radius;
-    int rzr = (float)rr * ff;
-    // if (rr - rzr<45)
-    //    rzr -= 45;
-
-    for (int x = 0; x < diameter; ++x) {
-        for (int y = 0; y < diameter; ++y) {
-            int dx = x - centerX;
-            int dy = y - centerY;
-            if (inRange(rzr, rr, dx * dx + dy * dy)==1)
-            // if (dx * dx + dy * dy<rr)
-               DrawLineCapsGrid.push_back(make_pair(dx, dy));
-            else if (rounded!=1)
-               DrawLineCapsGrid.push_back(make_pair(dx, dy));
-        }
-    }
-
-    fnOutputDebug(std::to_string(radius) + " radius; prepareDrawLinesMask() - done; rr/rzr=" + std::to_string(rr) + " / " + std::to_string(rzr));
     return 1;
 }
+
 
 bool clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
     // see comments for prepareSelectionArea()
@@ -3808,8 +3816,7 @@ DLL_API int DLL_CALLCONV UndoAiderSwapPixelRegions(unsigned char* BitmapData, in
             INT64 o = y * Stride + opx;
             INT64 n = (y - y1) * mStride;
             // Swap pixels
-            BYTE *temp = NULL;
-            temp = new BYTE[chunk];
+            BYTE *temp = new BYTE[chunk];
             memcpy(temp, &BitmapData[o], chunk);
             memcpy(&BitmapData[o], &otherData[n], chunk);
             memcpy(&otherData[n], temp, chunk);
