@@ -196,7 +196,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , darkWindowColor := 0x202020, darkControlColor := 0xEDedED, allowWICloader := 1, allowFIMloader := 1
    , monitorBgrColor := darkWindowColor, lastSlidersPainted := [], userCustomKeysDefined := []
    , simulateMenusMode := 0, lastLVquickSearchSortCol := [], soloSliderWinVisible := 0, backupGdiBMP := 0
-   , lastFastImgChangeHUDzeit := 1, forceProtectLoadedImg := 0
+   , lastFastImgChangeHUDzeit := 1, forceProtectLoadedImg := 0, lastTippyWin := 0
 
 Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameSavedVectorShape := ""
    , postVectorWinOpen := 0, isWelcomeScreenu := 0, prevVectorShapeSymmetryMode := [], AllowDarkModeForWindow := ""
@@ -732,7 +732,7 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
       {
          v := OSDfontSize//2
          WinActivate, ahk_id %PVhwnd%
-         interfaceThread.ahkFunction("mouseCreateOSDinfoLine", "The main window has keyboard focus now", v)
+         mouseCreateOSDinfoLine("The main window has keyboard focus now", v)
       }
       Return
    }
@@ -4544,7 +4544,7 @@ ToggleThumbsMode() {
       Return
    }
 
-   interfaceThread.ahkPostFunction("mouseTurnOFFtooltip", 1)
+   mouseTurnOFFtooltip()
    If (StrLen(mustOpenStartFolder)>3 && !ar)
    {
       currentFileIndex := doOpenStartFolder(didSomething)
@@ -9168,7 +9168,7 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
             info := defineWindowUnderMouse()
             If InStr(info, "tooltip")
             {
-               interfaceThread.ahkFunction("showOSDinfoLineNow", 500)
+               showOSDinfoLineNow(500)
                Continue
             } Else If (InStr(info, "main") && markedSelectFile>1)
             {
@@ -19757,6 +19757,8 @@ undoRedoHugeImagesAct() {
    innerSelectionCavityY := previnnerSelectionCavityY
    imgSelX1 := prevImgSelX1,   imgSelX2 := prevImgSelX2
    imgSelY1 := prevImgSelY1,   imgSelY2 := prevImgSelY2
+   FreeImage_GetImageDimensions(viewportQPVimage.imgHandle, imgW, imgH)
+   defineRelativeSelCoords(imgW, imgH)
    dummyRefreshImgSelectionWindow()
 }
 
@@ -25791,10 +25793,9 @@ SettingsToolTips() {
    If InStr(msg2show, "lib\") || InStr(msg2show, "a href=")
       Return
 
-
    msg2show := StrReplace(msg2show, " = customSliders", "`n")
    thisSize := (PrefsLargeFonts=1) ? Round(LargeUIfontValue*1.55) : LargeUIfontValue
-   interfaceThread.ahkFunction("mouseCreateOSDinfoLine", msg2show, thisSize)
+   mouseCreateOSDinfoLine(msg2show, thisSize)
    Return msg2show
 }
 
@@ -25967,8 +25968,9 @@ openPreviousPanel(mode:="") {
 }
 
 mouseTurnOFFtooltip() {
-   interfaceThread.ahkPostFunction("mouseTurnOFFtooltip", 1)
-   ; mouseToolTipWinCreated := 0
+   Gui, mouseToolTipGuia: Destroy
+   mouseToolTipWinCreated := 0
+   ; interfaceThread.ahkPostFunction("mouseTurnOFFtooltip", 1)
 }
 
 SetImgButtonStyle(hwnd, newLabel:="", checkMode:=0, protectedHwnd:="") {
@@ -29052,7 +29054,7 @@ FolderTreeResponder(a, b, c) {
 
          If InStr(info, "tooltip")
          {
-            interfaceThread.ahkFunction("showOSDinfoLineNow", 500)
+            showOSDinfoLineNow(500)
             Continue
          } Else If InStr(info, "tree")
          {
@@ -39226,7 +39228,7 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
          info := defineWindowUnderMouse()
          If InStr(info, "tooltip")
          {
-            interfaceThread.ahkFunction("showOSDinfoLineNow", 500)
+            showOSDinfoLineNow(500)
             Continue
          } Else If InStr(info, "tree")
          {
@@ -45340,6 +45342,129 @@ customKbdGUIAGuiClose:
 customKbdGUIAGuiEscape:
    BtnCloseKbdDefine()
 Return
+
+mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
+    ; Critical, On
+    Static prevMsg, lastInvoked := 1
+    Global TippyMsg
+
+    ; ToolTip, % givenCoords "===" largus "==" msg , , , 2
+    thisHwnd := PVhwnd
+    If (StrLen(msg)<3) || (prevMsg=msg && mouseToolTipWinCreated=1) || (A_TickCount - lastInvoked<100) || !thisHwnd
+       Return
+
+    lastInvoked := A_TickCount
+    Gui, mouseToolTipGuia: Destroy
+    thisFntSize := (largus=1) ? Round(LargeUIfontValue*1.55) : LargeUIfontValue
+    If (thisFntSize<5)
+       thisFntSize := 5
+    If (largus>5)
+       thisFntSize := largus
+
+    bgrColor := OSDbgrColor
+    txtColor := OSDtextColor
+    isBold := (FontBolded=1) ? " Bold" : ""
+    lastTippyWin := WinActive("A")
+    Sleep, 25
+    Gui, mouseToolTipGuia: -Caption -DPIScale +Owner%thisHwnd% +ToolWindow +hwndhGuiTip
+    Gui, mouseToolTipGuia: Margin, % thisFntSize * 1.25, % thisFntSize * 1.25
+    Gui, mouseToolTipGuia: Color, c%bgrColor%
+    Gui, mouseToolTipGuia: Font, s%thisFntSize% Bold Q5, Arial
+    Gui, mouseToolTipGuia: Add, Text, c%txtColor% gdestroyMouseGuiTooltipu vTippyMsg, % msg
+    Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
+    prevMsg := msg
+    If (unClickable=1)
+      WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
+
+    mouseToolTipWinCreated := 1
+    delayu := StrLen(msg) * 75 + 950
+    lastZeitToolTip := A_TickCount
+    showOSDinfoLineNow(delayu, givenCoords)
+}
+
+showOSDinfoLineNow(delayu, givenCoords:=0) {
+    If !mouseToolTipWinCreated
+       Return
+
+    GetPhysicalCursorPos(mX, mY)
+    If IsObject(givenCoords)
+    {
+       If (givenCoords.x && givenCoords.y)
+       {
+          forced := 1
+          mX := givenCoords.x 
+          mY := givenCoords.y + givenCoords.h
+       }
+    } Else If InStr(givenCoords, "|")
+    {
+       pk := StrSplit(givenCoords, "|")
+       mX := pk[1], mY := pk[2]
+    }
+
+    If (!isWinXP && forced!=1)
+    {
+       GetWinClientSize(Wid, Heig, hGuiTip, 1)
+       k := WinMoveZ(hGuiTip, 0, mX + 20, mY + 29, Wid, Heig, 2)
+       Final_x := k[1], Final_y := k[2]
+    } Else
+    {
+       tipX := (forced=1) ?  mX : mX + 20
+       tipY := (forced=1) ?  mY : mY + 20
+       ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
+       MaxWidth := Floor(ResWidth*0.85)
+       If (MaxWidth<Wid && MaxWidth>10)
+       {
+          GuiControl, mouseToolTipGuia: Move, TippyMsg, w1 h1
+          GuiControl, mouseToolTipGuia:, TippyMsg,
+          Gui, mouseToolTipGuia: Add, Text, xp yp c%txtColor% gmouseClickTurnOFFtooltip w%MaxWidth%, %msg%
+          Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
+          ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
+       }
+    }
+
+    If (Final_x!="" && Final_y!="")
+       Gui, mouseToolTipGuia: Show, NoActivate AutoSize x%Final_x% y%Final_y%, QPV tooltip window
+
+    WinSet, Transparent, 225, ahk_id %hGuiTip%
+    If (delayu<msgDisplayTime/2)
+       delayu := msgDisplayTime//2 + 1
+    WinSet, AlwaysOnTop, On, ahk_id %hGuiTip%
+    ; WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
+    SetTimer, mouseTurnOFFtooltip, % -delayu
+}
+
+adjustWin2MonLimits(winHwnd, winX, winY, ByRef rX, ByRef rY, ByRef Wid, ByRef Heig) {
+   GetWinClientSize(Wid, Heig, winHwnd, 1)
+   ActiveMon := MWAGetMonitorMouseIsIn(winX, winY)
+   If ActiveMon
+   {
+      SysGet, bCoord, Monitor, %ActiveMon%
+      rX := max(bCoordLeft, min(winX, bCoordRight - Wid))
+      rY := max(bCoordTop, min(winY, bCoordBottom - Heig*1.2))
+      ResWidth := Abs(max(bCoordRight, bCoordLeft) - min(bCoordRight, bCoordLeft))
+      ; ResHeight := Abs(max(bCoordTop, bCoordBottom) - min(bCoordTop, bCoordBottom))
+   } Else
+   {
+      rX := winX
+      rY := winY
+   }
+
+   Return ResWidth
+}
+
+mouseToolTipGuiaGuiClose:
+mouseToolTipGuiaGuiEscape:
+   mouseTurnOFFtooltip()
+Return
+
+destroyMouseGuiTooltipu() {
+   mouseTurnOFFtooltip()
+   Sleep, 1
+   WinActivate, ahk_id %lastTippyWin%
+   ; MouseGetPos, ,, OutputVarWin
+   ; If (OutputVarWin=hQPVtoolbar && ShowAdvToolbar=1)
+   ;    MouseClick, Left
+}
 
 LEDguiGuiClose:
 LEDguiGuiEscape:
@@ -53778,7 +53903,7 @@ InvokeStandardDialogColorPicker(hC, event, c) {
      }
 
      thisSize := (PrefsLargeFonts=1) ? Round(LargeUIfontValue*1.55) : LargeUIfontValue
-     interfaceThread.ahkFunction("mouseCreateOSDinfoLine", msg2show, thisSize)
+     mouseCreateOSDinfoLine(msg2show, thisSize)
      If (pastedClr!=1)
         Return
   }
@@ -69540,7 +69665,7 @@ highlightActiveCtrl(modus:=0, givenHwnd:=0) {
       }
 
       thisSize := (PrefsLargeFonts=1) ? Round(LargeUIfontValue*1.55) : LargeUIfontValue
-      interfaceThread.ahkFunction("mouseCreateOSDinfoLine", msg2show, thisSize)
+      mouseCreateOSDinfoLine(msg2show, thisSize)
       Sleep, 500
       Return
    } Else If (modus="click")
@@ -74627,7 +74752,7 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
           r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
        } Else livePreviewsImageEditing("coords")
     }
-
+    ; fnOutputDebug(A_ThisFunc "(" mode ") sel y1=" imgSelY1 "// y2=" imgSelY2 " | " prcSelY1 " // " prcSelY2)
     Gdip_GraphicsClear(2NDglPG, "0x00" WindowBGRcolor)
     If (dynamicLiveObjVisible=0)
        toggleLiveEditObject()
@@ -76726,6 +76851,7 @@ ToggleEditImgSelection(modus:=0) {
   If (slideShowRunning=1)
      ToggleSlideShowu()
 
+  ; fnOutputDebug(A_ThisFunc "(A=" modus ") sel y1=" imgSelY1 "// y2=" imgSelY2 " | " prcSelY1 " // " prcSelY2)
   DestroyGIFuWin()
   If (editingSelectionNow!=1)
   {
@@ -76736,7 +76862,7 @@ ToggleEditImgSelection(modus:=0) {
      If (!imgW || !imgH)
         r := -1
   }
-
+  ; fnOutputDebug(A_ThisFunc "(B=" modus ") sel y1=" imgSelY1 "// y2=" imgSelY2 " | " prcSelY1 " // " prcSelY2)
   If (r=-1 && editingSelectionNow!=1)
      Return
 
@@ -77316,7 +77442,7 @@ correctActiveSelectionAreaViewPort() {
 
     capSelectionRelativeCoords()
     calcImgSelection2bmp(!LimitSelectBoundsImg, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2, 0, 0, "a")
-    ; msgbox, % x1 "--" x2 "--" y1 "--" y2 "`n" prcSelX2 "|" prcSelY2
+    ; fnOutputDebug(A_ThisFunc "(): " x1 "--" x2 "--" y1 "--" y2 " ||| " prcSelX2 "|" prcSelY2 )
     imgSelX1 := X1, imgSelY1 := Y1
     imgSelX2 := X2, imgSelY2 := Y2
 }
@@ -86506,7 +86632,7 @@ uiLVundoFileActsResponder(a:=0, b:=0, c:=0) {
       undoInfos := "Undo file action: " ob.typu "`n" ob.word " path: " PathCompact(ob.initialu, 40) "`nHas overwritten: " ob.ovr "`nSafe to undo: " ob.restora "`nDate: " ob.date
 
    thisSize := (PrefsLargeFonts=1) ? LargeUIfontValue : Round(LargeUIfontValue*0.7)
-   interfaceThread.ahkFunction("mouseCreateOSDinfoLine", undoInfos, thisSize)
+   mouseCreateOSDinfoLine(undoInfos, thisSize)
 }
 
 PopulateFileActsHistory() {
@@ -94188,7 +94314,8 @@ tlbrSetImageIcon(icoFile, hwnd, W, H) {
 
 tlbrInvokeFunction(a, b, c) {
    Static lastInvoked := 1
-   interfaceThread.ahkFunction("mouseTurnOFFtooltip", 1)
+
+   mouseTurnOFFtooltip()
    If (AnyWindowOpen && imgEditPanelOpened!=1 || runningLongOperation=1 || imageLoading=1 || slideShowRunning=1 || openingPanelNow=1)
    || (A_TickCount - lastOtherWinClose<400) || (A_TickCount - lastZeitOpenWin<400) || (A_TickCount - lastInvoked<50)
       Return
@@ -94615,26 +94742,6 @@ destroySoloSliderWidget() {
 
    soloSliderWinVisible := 0
 }
-
-adjustWin2MonLimits(winHwnd, winX, winY, ByRef rX, ByRef rY, ByRef Wid, ByRef Heig) {
-   GetWinClientSize(Wid, Heig, winHwnd, 1)
-   ActiveMon := MWAGetMonitorMouseIsIn(winX, winY)
-   If ActiveMon
-   {
-      SysGet, bCoord, Monitor, %ActiveMon%
-      rX := max(bCoordLeft, min(winX, bCoordRight - Wid))
-      rY := max(bCoordTop, min(winY, bCoordBottom - Heig*1.2))
-      ResWidth := Abs(max(bCoordRight, bCoordLeft) - min(bCoordRight, bCoordLeft))
-      ; ResHeight := Abs(max(bCoordTop, bCoordBottom) - min(bCoordTop, bCoordBottom))
-   } Else
-   {
-      rX := winX
-      rY := winY
-   }
-
-   Return ResWidth
-}
-
 
 CreateSoloSliderWidgetWin(btnHwnd, givenVar, minu, maxu, varDefault, uiLabel, func2exec, fillMode) {
     Gui, SoloSliderWidgetGUIA: Destroy
@@ -97548,7 +97655,7 @@ DelayedToolbarTooltips(msgu, idu) {
   thisSize := OSDfontSize//3 + 2
   ; ToolTip, % thisu "|" idu "|" msgu , , , 2
   If (thisu=idu && ShowAdvToolbar=1)
-     interfaceThread.ahkFunction("mouseCreateOSDinfoLine", msgu, thisSize)
+     mouseCreateOSDinfoLine(msgu, thisSize)
 }
 
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
@@ -97608,7 +97715,7 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
         DllCall("user32\SetCursor", "UPtr", hCursMove)
      
      If (!msgu && ShowToolTipsToolbar=1)
-        interfaceThread.ahkFunction("mouseTurnOFFtooltip", 1)
+        mouseTurnOFFtooltip()
 
      If ((A_TickCount - lastInvoked > 155) && msgu) ; && (thisPos!=prevPos)
      {
@@ -97633,7 +97740,7 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
            If (ShowToolTipsToolbar=1)
            {
               fn := Func("DelayedToolbarTooltips").Bind(msgu, "tlbrValueIcon" IndexBtn)
-              SetTimer, % fn, -500
+              SetTimer, % fn, -300
            }
         }
         ; prevPos := mX "-" mY
@@ -97652,14 +97759,14 @@ externTooltiput(msg) {
    If (msg="-hide-")
    {
       lastMsg := ""
-      interfaceThread.ahkFunction("mouseTurnOFFtooltip", 1)
+      mouseTurnOFFtooltip()
    } Else If (lastMsg=msg)
    {
-      interfaceThread.ahkFunction("showOSDinfoLineNow", 500)
+      showOSDinfoLineNow(500)
    } Else
    {
       lastMsg := msg
-      interfaceThread.ahkFunction("mouseCreateOSDinfoLine", msg, thisSize, 1)
+      mouseCreateOSDinfoLine(msg, thisSize, 1)
    }
 }
 
@@ -97747,7 +97854,7 @@ displayNowToolbarHelp(msgu) {
    Else If (msgu=3)
       msgu := "The main window has keyboard focus now"
 
-   interfaceThread.ahkFunction("mouseCreateOSDinfoLine", msgu, v)
+   mouseCreateOSDinfoLine(msgu, v)
 }
 
 KeyboardMoveMouseToolbar(thisu:=0, l:=0) {
@@ -97793,7 +97900,7 @@ KeyboardMoveMouseToolbar(thisu:=0, l:=0) {
    thisSize := OSDfontSize//3 + 2
    ; interfaceThread.ahkFunction("ShowClickHalo", aX, aY, ToolBarBtnWidth, ToolBarBtnWidth, 1)
    If msgu
-      interfaceThread.ahkPostFunction("mouseCreateOSDinfoLine", msgu, thisSize, 0, posu)
+      mouseCreateOSDinfoLine(msgu, thisSize, 0, posu)
 }
 
 testHistoDLL() {

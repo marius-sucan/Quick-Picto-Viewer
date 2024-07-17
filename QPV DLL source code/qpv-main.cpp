@@ -74,7 +74,7 @@ inline bool inRange(const int low, const int high, const int x) {
     return (low <= x && x <= high);
 }
 
-int inline weighTwoValues(float A, float B, float w) {
+int inline weighTwoValues(const float A, const float B, const float w) {
     if (w>=1)
        return A;
     else if (w<=0)
@@ -84,7 +84,7 @@ int inline weighTwoValues(float A, float B, float w) {
        // return (A*w + B*(1.0f - w));
 }
 
-float inline weighTwoValues(float A, float B, float w, int r) {
+float inline weighTwoValues(const float A, const float B, const float w, const int r) {
     if (w>=1)
        return A;
     else if (w<=0)

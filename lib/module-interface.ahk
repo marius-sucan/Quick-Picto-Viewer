@@ -1481,6 +1481,122 @@ showMouseTooltipStatusbar() {
     SetTimer, mouseTurnOFFtooltip, -4500
 }
 
+mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
+    Critical, On
+    Static prevMsg, lastInvoked := 1
+    Global TippyMsg
+
+    ; ToolTip, % givenCoords "===" largus "==" msg , , , 2
+    thisHwnd := PVhwnd
+    If (StrLen(msg)<3) || (prevMsg=msg && mouseToolTipWinCreated=1) || (A_TickCount - lastInvoked<100) || !thisHwnd
+       Return
+
+    lastInvoked := A_TickCount
+    Gui, mouseToolTipGuia: Destroy
+    thisFntSize := (largus=1) ? Round(LargeUIfontValue*1.55) : LargeUIfontValue
+    If (thisFntSize<5)
+       thisFntSize := 5
+    If (largus>5)
+       thisFntSize := largus
+
+    bgrColor := OSDbgrColor
+    txtColor := OSDtextColor
+    isBold := (FontBolded=1) ? " Bold" : ""
+    lastTippyWin := WinActive("A")
+    Sleep, 25
+    Gui, mouseToolTipGuia: -Caption -DPIScale +Owner%thisHwnd% +ToolWindow +hwndhGuiTip
+    ; Gui, mouseToolTipGuia: Margin, 0, 0
+    Gui, mouseToolTipGuia: Margin, % thisFntSize, % thisFntSize
+    Gui, mouseToolTipGuia: Color, c%bgrColor%
+    Gui, mouseToolTipGuia: Font, s%thisFntSize% %isBold% Q5, %OSDFontName%
+    Gui, mouseToolTipGuia: Add, Text, c%txtColor% gdestroyTooltipu vTippyMsg, %msg%
+    Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
+    prevMsg := msg
+    MainExe.ahkassign("hGuiTip", hGuiTip)
+    If (unClickable=1)
+      WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
+
+    mouseToolTipWinCreated := 1
+    delayu := StrLen(msg) * 75 + 950
+    lastZeitToolTip := A_TickCount
+    showOSDinfoLineNow(delayu, givenCoords)
+}
+
+showOSDinfoLineNow(delayu, givenCoords:=0) {
+    If !mouseToolTipWinCreated
+       Return
+
+    GetPhysicalCursorPos(mX, mY)
+    If IsObject(givenCoords)
+    {
+       If (givenCoords.x && givenCoords.y)
+       {
+          forced := 1
+          mX := givenCoords.x 
+          mY := givenCoords.y + givenCoords.h
+       }
+    } Else If InStr(givenCoords, "|")
+    {
+       pk := StrSplit(givenCoords, "|")
+       mX := pk[1], mY := pk[2]
+    }
+
+    If (!isWinXP && forced!=1)
+    {
+       GetWinClientSize(Wid, Heig, hGuiTip, 1)
+       k := WinMoveZ(hGuiTip, 0, mX + 20, mY + 29, Wid, Heig, 2)
+       Final_x := k[1], Final_y := k[2]
+    } Else
+    {
+       tipX := (forced=1) ?  mX : mX + 20
+       tipY := (forced=1) ?  mY : mY + 20
+       ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
+       MaxWidth := Floor(ResWidth*0.85)
+       If (MaxWidth<Wid && MaxWidth>10)
+       {
+          GuiControl, mouseToolTipGuia: Move, TippyMsg, w1 h1
+          GuiControl, mouseToolTipGuia:, TippyMsg,
+          Gui, mouseToolTipGuia: Add, Text, xp yp c%txtColor% gmouseClickTurnOFFtooltip w%MaxWidth%, %msg%
+          Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
+          ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
+       }
+    }
+
+    If (Final_x!="" && Final_y!="")
+       Gui, mouseToolTipGuia: Show, NoActivate AutoSize x%Final_x% y%Final_y%, QPV tooltip window
+    WinSet, Transparent, 225, ahk_id %hGuiTip%
+    If (delayu<msgDisplayTime/2)
+       delayu := msgDisplayTime//2 + 1
+    WinSet, AlwaysOnTop, On, ahk_id %hGuiTip%
+    ; WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
+    SetTimer, mouseTurnOFFtooltip, % -delayu
+}
+
+adjustWin2MonLimits(winHwnd, winX, winY, ByRef rX, ByRef rY, ByRef Wid, ByRef Heig) {
+   GetWinClientSize(Wid, Heig, winHwnd, 1)
+   ActiveMon := MWAGetMonitorMouseIsIn(winX, winY)
+   If ActiveMon
+   {
+      SysGet, bCoord, Monitor, %ActiveMon%
+      rX := max(bCoordLeft, min(winX, bCoordRight - Wid))
+      rY := max(bCoordTop, min(winY, bCoordBottom - Heig*1.2))
+      ResWidth := Abs(max(bCoordRight, bCoordLeft) - min(bCoordRight, bCoordLeft))
+      ; ResHeight := Abs(max(bCoordTop, bCoordBottom) - min(bCoordTop, bCoordBottom))
+   } Else
+   {
+      rX := winX
+      rY := winY
+   }
+
+   Return ResWidth
+}
+
+mouseToolTipGuiaGuiClose:
+mouseToolTipGuiaGuiEscape:
+   mouseTurnOFFtooltip()
+Return
+
+
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   Static lastInvoked := 1, prevPos, lastTip := 1, prevArrayPos := [], darked := 0
   If ((A_TickCount - lastZeitPanCursor < 300) || !isQPVactive())
@@ -2947,116 +3063,6 @@ destroyTooltipu() {
    MouseGetPos, ,, OutputVarWin
    If (OutputVarWin=hQPVtoolbar && ShowAdvToolbar=1)
       MouseClick, Left
-}
-
-mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
-    Critical, On
-    Static prevMsg, lastInvoked := 1
-    Global TippyMsg
-
-    ; ToolTip, % givenCoords "===" largus "==" msg , , , 2
-    thisHwnd := PVhwnd
-    If (StrLen(msg)<3) || (prevMsg=msg && mouseToolTipWinCreated=1) || (A_TickCount - lastInvoked<100) || !thisHwnd
-       Return
-
-    lastInvoked := A_TickCount
-    Gui, mouseToolTipGuia: Destroy
-    thisFntSize := (largus=1) ? Round(LargeUIfontValue*1.55) : LargeUIfontValue
-    If (thisFntSize<5)
-       thisFntSize := 5
-    If (largus>5)
-       thisFntSize := largus
-
-    bgrColor := OSDbgrColor
-    txtColor := OSDtextColor
-    isBold := (FontBolded=1) ? " Bold" : ""
-    lastTippyWin := WinActive("A")
-    Sleep, 25
-    Gui, mouseToolTipGuia: -Caption -DPIScale +Owner%thisHwnd% +ToolWindow +hwndhGuiTip
-    ; Gui, mouseToolTipGuia: Margin, 0, 0
-    Gui, mouseToolTipGuia: Margin, % thisFntSize, % thisFntSize
-    Gui, mouseToolTipGuia: Color, c%bgrColor%
-    Gui, mouseToolTipGuia: Font, s%thisFntSize% %isBold% Q5, %OSDFontName%
-    Gui, mouseToolTipGuia: Add, Text, c%txtColor% gdestroyTooltipu vTippyMsg, %msg%
-    Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
-    prevMsg := msg
-    MainExe.ahkassign("hGuiTip", hGuiTip)
-    If (unClickable=1)
-      WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
-
-    mouseToolTipWinCreated := 1
-    delayu := StrLen(msg) * 75 + 950
-    lastZeitToolTip := A_TickCount
-    showOSDinfoLineNow(delayu, givenCoords)
-}
-
-showOSDinfoLineNow(delayu, givenCoords:=0) {
-    If !mouseToolTipWinCreated
-       Return
-
-    GetPhysicalCursorPos(mX, mY)
-    If IsObject(givenCoords)
-    {
-       If (givenCoords.x && givenCoords.y)
-       {
-          forced := 1
-          mX := givenCoords.x 
-          mY := givenCoords.y + givenCoords.h
-       }
-    } Else If InStr(givenCoords, "|")
-    {
-       pk := StrSplit(givenCoords, "|")
-       mX := pk[1], mY := pk[2]
-    }
-
-    If (!isWinXP && forced!=1)
-    {
-       GetWinClientSize(Wid, Heig, hGuiTip, 1)
-       k := WinMoveZ(hGuiTip, 0, mX + 20, mY + 29, Wid, Heig, 2)
-       Final_x := k[1], Final_y := k[2]
-    } Else
-    {
-       tipX := (forced=1) ?  mX : mX + 20
-       tipY := (forced=1) ?  mY : mY + 20
-       ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
-       MaxWidth := Floor(ResWidth*0.85)
-       If (MaxWidth<Wid && MaxWidth>10)
-       {
-          GuiControl, mouseToolTipGuia: Move, TippyMsg, w1 h1
-          GuiControl, mouseToolTipGuia:, TippyMsg,
-          Gui, mouseToolTipGuia: Add, Text, xp yp c%txtColor% gmouseClickTurnOFFtooltip w%MaxWidth%, %msg%
-          Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
-          ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
-       }
-    }
-
-    If (Final_x!="" && Final_y!="")
-       Gui, mouseToolTipGuia: Show, NoActivate AutoSize x%Final_x% y%Final_y%, QPV tooltip window
-    WinSet, Transparent, 225, ahk_id %hGuiTip%
-    If (delayu<msgDisplayTime/2)
-       delayu := msgDisplayTime//2 + 1
-    WinSet, AlwaysOnTop, On, ahk_id %hGuiTip%
-    ; WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
-    SetTimer, mouseTurnOFFtooltip, % -delayu
-}
-
-adjustWin2MonLimits(winHwnd, winX, winY, ByRef rX, ByRef rY, ByRef Wid, ByRef Heig) {
-   GetWinClientSize(Wid, Heig, winHwnd, 1)
-   ActiveMon := MWAGetMonitorMouseIsIn(winX, winY)
-   If ActiveMon
-   {
-      SysGet, bCoord, Monitor, %ActiveMon%
-      rX := max(bCoordLeft, min(winX, bCoordRight - Wid))
-      rY := max(bCoordTop, min(winY, bCoordBottom - Heig*1.2))
-      ResWidth := Abs(max(bCoordRight, bCoordLeft) - min(bCoordRight, bCoordLeft))
-      ; ResHeight := Abs(max(bCoordTop, bCoordBottom) - min(bCoordTop, bCoordBottom))
-   } Else
-   {
-      rX := winX
-      rY := winY
-   }
-
-   Return ResWidth
 }
 
 ShowClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu:="", stay:=0) {
