@@ -442,6 +442,9 @@ Else If (sz := GetRes(data, 0, "MODULE-INTERFACE.AHK", 10))
 externObj := WindowBgrColor "$" isAlwaysOnTop "$" mainCompiledPath "$" isTitleBarVisible "$" TouchScreenMode "$.$" mainWinPos "$" mainWinSize "$" mainWinMaximized "$" IMGresizingMode
 externObj .= "$" OSDbgrColor "$" OSDtextColor "$" OSDfontSize "$" PrefsLargeFonts "$" OSDFontName "$" OSDfontBolded
 initGUI := interfaceThread.ahkFunction("BuildGUI", externObj)
+; interfaceThread.ahkPostFunction("dummy")
+; interfaceThread.ahkassign("dummy")
+; interfaceThread.ahkgetvar("dummy")
 fnOutputDebug("extern UI HWNDs: " initGUI)
 If !InStr(initGUI, "|")
 {
@@ -4302,7 +4305,8 @@ LastPicture() {
 
 SettingsGUIAGuiClose:
 SettingsGUIAGuiEscape:
-   CloseWindow()
+   If (A_TickCount - lastZeitOpenWin>450)
+      CloseWindow()
 Return
 
 OSDguiToolbarGuiClose:
@@ -6149,13 +6153,21 @@ SkeletDrawSelectionBox(paintAlphaMask:=0) {
       ImgSelPath := VPcreateSelPath(vPimgSelX, vPimgSelY, vPimgSelW, vPimgSelH, angleu, isAngleu, mainWidth, mainHeight, 1)
    }
 
-   zPen := Gdip_CreatePen("0x88456345", imgHUDbaseUnit//16)
+   Static zPen, prevHUDunit
+   If (prevHUDunit!=imgHUDbaseUnit)
+   {
+      If !prevHUDunit
+         zPen := Gdip_CreatePen("0x88456345", imgHUDbaseUnit/16)
+
+      Gdip_SetPenWidth(zPen, imgHUDbaseUnit/16)
+      prevHUDunit := imgHUDbaseUnit
+   }
+
    thisu := clampValuesToWindow(vPimgSelX + thisThick//3, vPimgSelY + thisThick//3, vPimgSelW, vPimgSelH, mainWidth, mainHeight)
    Gdip_DrawRectangle(2NDglPG, pPen4, thisu.X, thisu.Y, thisu.W, thisu.H)
    Gdip_DrawPath(2NDglPG, zPen, ImgSelPath)
    thisu := clampValuesToWindow(vPimgSelX + thisThick//2, vPimgSelY + thisThick//2, vPimgSelW, vPimgSelH, mainWidth, mainHeight)
    Gdip_DrawRectangle(2NDglPG, pPen4, thisu.X, thisu.Y, thisu.W, thisu.H)
-   Gdip_DeletePen(zPen)
    If (paintAlphaMask=1 && AnyWindowOpen!=70)
    {
       livePreviewAlphaMasking()
@@ -19827,11 +19839,9 @@ HugeImagesFlipHVinvert(modus) {
 
    If (r=1)
    {
-      SoundBeep 900, 100
-      currentImgModified := 1
-      imgIndexEditing := currentFileIndex
       killQPVscreenImgSection()
-      viewportQPVimage.actions := Round(viewportQPVimage.actions + 1)
+      SoundBeep 900, 100
+      setHugeImageActionsCount(viewportQPVimage.actions + 1)
       dummyTimerDelayiedImageDisplay(250)
       SetTimer, RemoveTooltip, -500
    } Else
@@ -20055,7 +20065,7 @@ HugeImagesConvertClrDepth(modus) {
       viewportQPVimage.RawFormat := fileType " | " imgType
       viewportQPVimage.PixelFormat := StrReplace(oimgBPP, "-", "+") "-" ColorsType
       viewportQPVimage.clrinfo := oimgBPP "-bit " ColorsType
-      viewportQPVimage.actions := actions
+      setHugeImageActionsCount(actions)
       RemoveTooltip()
       recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
       dummyTimerDelayiedImageDisplay(500)
@@ -20066,6 +20076,15 @@ HugeImagesConvertClrDepth(modus) {
       SetTimer, RemoveTooltip, % -msgDisplayTime
    }
    SetTimer, ResetImgLoadStatus, -200
+}
+
+setHugeImageActionsCount(actions) {
+    bmp := viewportQPVimage.imgHandle
+    viewportQPVimage.actions := Round(actions)
+    interfaceThread.ahkassign("UserMemBMP", bmp)
+    interfaceThread.ahkassign("undoLevelsRecorded", actions)
+    imgIndexEditing := currentFileIndex
+    currentImgModified := 1
 }
 
 warnIncorrectColorDepthHugeImage(bpp, qpvMode){
@@ -20163,9 +20182,7 @@ HugeImagesApplyAutoColors() {
       If r 
       {
          killQPVscreenImgSection()
-         currentImgModified := 1
-         imgIndexEditing := currentFileIndex
-         viewportQPVimage.actions := Round(viewportQPVimage.actions + 1)
+         setHugeImageActionsCount(viewportQPVimage.actions + 1)
          dummyTimerDelayiedImageDisplay(500)
          SoundBeep, 900, 100
          RemoveTooltip()
@@ -20321,9 +20338,7 @@ HugeImagesApplyInsertText() {
       If r 
       {
          killQPVscreenImgSection()
-         currentImgModified := 1
-         imgIndexEditing := currentFileIndex
-         viewportQPVimage.actions := Round(viewportQPVimage.actions + 1)
+         setHugeImageActionsCount(viewportQPVimage.actions + 1)
          dummyTimerDelayiedImageDisplay(500)
          SoundBeep, 900, 100
          RemoveTooltip()
@@ -20467,9 +20482,7 @@ HugeImagesDrawLineShapes() {
       If r 
       {
          killQPVscreenImgSection()
-         currentImgModified := 1
-         imgIndexEditing := currentFileIndex
-         viewportQPVimage.actions := Round(viewportQPVimage.actions + 1)
+         setHugeImageActionsCount(viewportQPVimage.actions + 1)
          dummyTimerDelayiedImageDisplay(500)
          SoundBeep, 900, 100
          RemoveTooltip()
@@ -20955,7 +20968,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          If InStr(modus, "initially")
          {
             If r
-               viewportQPVimage.actions := Round(viewportQPVimage.actions + 1)
+               setHugeImageActionsCount(viewportQPVimage.actions + 1)
             Return
          }
       } Else If InStr(modus, "pixelize")
@@ -21115,14 +21128,12 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
       }
 
       DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
-      etaTime := "Elapsed time to apply: " modus ": " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) 
+      etaTime := "Elapsed time to apply " modus ": " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) 
       addJournalEntry(etaTime)
       If r 
       {
          killQPVscreenImgSection()
-         currentImgModified := 1
-         imgIndexEditing := currentFileIndex
-         viewportQPVimage.actions := Round(viewportQPVimage.actions + 1)
+         setHugeImageActionsCount(viewportQPVimage.actions + 1)
          dummyTimerDelayiedImageDisplay(500)
          SoundBeep, 900, 100
          RemoveTooltip()
@@ -21210,9 +21221,7 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
 
       SoundBeep 900, 100
       RemoveTooltip()
-      currentImgModified := 1
-      imgIndexEditing := currentFileIndex
-      viewportQPVimage.actions := actions
+      setHugeImageActionsCount(actions)
       If (editingSelectionNow=1)
       {
          VPselRotation := EllipseSelectMode := innerSelectionCavityX := innerSelectionCavityY := 0
@@ -21871,18 +21880,20 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
        Gdip_DrawPath(G2, thisPen, pPath)
        Gdip_DeletePath(pPath)
     }
-    Gdip_DeletePen(thisPen)
+    ; Gdip_DeletePen(thisPen) ; it is always reused
 } ; // coreDrawParametricLinesTool()
 
-
 createDrawLinesPen(thisThick) {
-    Static compoundArray := "0.0|0.33|0.67|1.0"
+    Static thisPen, compoundArray := "0.0|0.33|0.67|1.0"
     If (thisThick<2)
        thisThick := 1
+    if (thisPen="")
+       thisPen := Gdip_CreatePen("0xFFee2200", 2)
 
     thisColor := makeRGBAcolor(DrawLineAreaColor, DrawLineAreaOpacity)
-    thisPen := Gdip_CreatePen(thisColor, thisThick)
     Gdip_SetPenUnit(thisPen, 2)
+    Gdip_SetPenColor(thisPen, thisColor)
+    Gdip_SetPenWidth(thisPen, thisThick)
     Gdip_SetPenDashStyle(thisPen, DrawLineAreaDashStyle - 1)
     If (DrawLineAreaCapsStyle=1)
        Gdip_SetPenLineCaps(thisPen, 2, 2, 2)
@@ -22028,9 +22039,8 @@ coreDrawShapesLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgSelW,
     Gdip_DrawPath(G2, thisPen, pPath)
     Gdip_ResetClip(G2)
     Gdip_DeletePath(pPath)
-    Gdip_DeletePen(thisPen)
+    ; Gdip_DeletePen(thisPen)   // it is always reused
 }
-
 
 createPiePath(imgSelPx, imgSelPy, imgSelW, imgSelH, err:=0, pPath:=0) {
     nPath := pPath ? pPath : Gdip_CreatePath()
@@ -26154,7 +26164,6 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
     Critical, on
     ; tabzDarkModus := (uiUseDarkMode=1) ? "-Border +Buttons cFFFFaa " : ""
     combosDarkModus := (uiUseDarkMode=1) ? "-theme -border " : ""
-    lastZeitOpenWin := A_TickCount
     lastFilterEditSearch := ""
     If (thumbsDisplaying=1 && isImgLiveEditor=1)
     {
@@ -26185,6 +26194,7 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
        }
     }
 
+    lastZeitOpenWin := A_TickCount
     If isNowAlphaPainting()
     {
        openingPanelNow := 0
@@ -36308,8 +36318,8 @@ readMainSettingsApp(act) {
 
        realSystemCores := userMultiCoresLimit
        SetVolume(mediaSNDvolume)
-       calcHUDsize()
        msgDisplayTime := DisplayTimeUser*1000
+       calcHUDsize()
     }
     setLVrowsCount()
 }
@@ -47835,6 +47845,12 @@ toggleViewPortGridu(modus="") {
 
    If (modus="tlbr")
    {
+      If (vpGridSize>440)
+      {
+         vpGridSize := 50
+         RegAction(1, "vpGridSize")
+      }
+
       setWhileLoopExec(1)
       While, (determineLClickState()=1 || A_Index=1)
           Sleep, 5
@@ -47888,7 +47904,7 @@ PanelConfigVPgrid() {
     GuiAddSlider("vpGridAlpha", 3,255, 128, "Opacity", "updateUIgridPanel", 1, "x+5 w" ml " hp")
     Gui, Add, Checkbox, xs y+10 w%slideWid2% hp gupdateUIgridPanel Checked%vpGridFixedSize% vvpGridFixedSize, &Fixed size grid
     Gui, Add, Checkbox, x+0 hp gupdateUIgridPanel Checked%LimitSelectBoundsImg% vLimitSelectBoundsImg, &Limit to image bounds
-    GuiAddSlider("vpGridSize", 10,350, 25, "Grid size: $€", "updateUIgridPanel", 1, "xs y+10 w" slideWid - 20 " hp")
+    GuiAddSlider("vpGridSize", 10,450, 25, "Grid size: $€", "updateUIgridPanel", 1, "xs y+10 w" slideWid - 20 " hp")
     GuiAddSlider("vpGridThickness", 1,15, 1, "Line thickness: $€", "updateUIgridPanel", 1, "y+10 wp hp")
     GuiAddSlider("vpGridStepu", 2,20, 2, "Stepping: $€", "updateUIgridPanel", 1, "y+10 wp hp")
     Gui, Add, Text, xs y+15 w%slideWid%, You can use Alt + [-] / [=] in the main window to change the dimensions of the grid.
@@ -47922,13 +47938,13 @@ VPchangeGridSize(dir) {
 
    If (vpGridSize<thisGridThickness + 6)
    {
-      vpGridSize := clampInRange(vpGridSize, 10, 350)
+      vpGridSize := clampInRange(vpGridSize, 10, 450)
       toggleViewPortGridu()
       Return
    }
 
-   vpGridSize := clampInRange(vpGridSize, 10, 350)
-   showTOOLtip("Viewport grid size: " vpGridSize, A_ThisFunc, 2, vpGridSize/350)
+   vpGridSize := clampInRange(vpGridSize, 10, 450)
+   showTOOLtip("Viewport grid size: " vpGridSize, A_ThisFunc, 2, vpGridSize/450)
    SetTimer, RemoveTooltip, % -msgDisplayTime
    If (AnyWindowOpen=63)
       GuiUpdateSliders("vpGridSize")
@@ -73282,21 +73298,24 @@ ActDrawAlphaMaskBrushNow() {
 
 drawVPgridsNow(mW, mH, Gu) {
    Static penGrid, penGridL, lastPenState, miniPath, maxiPath, prevPathsState
+   If (!penGrid || !penGridL)
+   {
+      penGrid := Gdip_CreatePen("0xFFee2200", 2)
+      penGridL := Gdip_CreatePen("0xFFee2200", 2)
+   }
+
    thisGridThickness := vpGridThickness + imgHUDbaseUnit//30
    thisPen := thisGridThickness vpGridColor vpGridAlpha
    If (thisPen!=lastPenState)
    {
-      If penGrid
-         Gdip_DeletePen(penGrid)
-      If penGridL
-         Gdip_DeletePen(penGridL)
-
       thisColor := makeRGBAcolor(vpGridColor, vpGridAlpha)
-      penGrid := Gdip_CreatePen(thisColor , thisGridThickness)
+      Gdip_SetPenColor(penGrid, thisColor)
+      Gdip_SetPenWidth(penGrid, thisGridThickness)
 
       thisColor := SubStr(MixARGB("0xFF998899", "0xFF" vpGridColor, 0.85), 5)
       thisColor := makeRGBAcolor(thisColor, clampInRange(vpGridAlpha + 25, 1, 255))
-      penGridL := Gdip_CreatePen(thisColor, Round(thisGridThickness*1.65))
+      Gdip_SetPenColor(penGridL, thisColor)
+      Gdip_SetPenWidth(penGridL, Round(thisGridThickness*1.65))
    }
 
    dS := (vpGridFixedSize=1) ? vpGridSize : Ceil(vpGridSize/1.5 + (vpGridSize/5)*zoomLevel + (imgHUDbaseUnit/25)*zoomLevel)
@@ -73379,6 +73398,7 @@ drawVPgridsNow(mW, mH, Gu) {
 
 drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, imgPath) {
     Static prevImgPath, lastInvoked := 1
+       ; Return
     If (preventHUDelements=1)
     {
        preventHUDelements := 0
@@ -74760,6 +74780,7 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
     setMainCanvasTransform(mainWidth, mainHeight, 2NDglPG)
     ; If (showViewPortGrid=1)
     ;    drawVPgridsNow(mainWidth, mainHeight, 2NDglPG)
+
     If (drawingShapeNow=1)
        drawLiveCreateCustomShape(mainWidth, mainHeight, 2NDglPG)
     Else If (editingSelectionNow=1 && mode=2)
@@ -74800,7 +74821,7 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
        hasDrawnImageMap := 0
     }
 
-    thisThick := imgHUDbaseUnit//11
+    thisThick := imgHUDbaseUnit/11
     Gdip_SetPenWidth(pPen4, thisThick)
     isSymmetryAllowed := (AnyWindowOpen=64 && BrushToolType<4 && liveDrawingBrushTool=1) || (drawingShapeNow=1 && !AnyWindowOpen) ? 1 : 0
     ccX := (drawingShapeNow=1) ? Round(vpSymmetryPointXdp) : prevDestPosX + Round(prevResizedVPimgW * BrushToolSymmetryPointX)
@@ -75571,8 +75592,10 @@ decideLiveSelectionBasedOnWindow(ByRef angleu, ByRef okay) {
 }
 
 drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mainWidth:=0, mainHeight:=0, newW:=0, newH:=0, DestPosX:=0, DestPosY:=0, snappyX:=0, snappyY:=0) {
-     Static prevMsg, infoBoxBMP, lineThickns, infoW, infoH
+     Critical, on
+     Static prevMsg, lineThickns, infoW, infoH, prevHUDunit := 0
           , infoPosX, infoPosY, prevuDPx, prevuDPy, prevNewW, prevNewH
+          , wPen, dPen, zPen, redPen
 
      SelDotsSize := dotsSize := (PrefsLargeFonts=1) ? imgHUDbaseUnit//3 : imgHUDbaseUnit//3.25
      If !identifyThisWin()
@@ -75586,7 +75609,6 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
      {
         o_operation := operation
         operation := "active"
-        infoBoxBMP := trGdip_DisposeImage(infoBoxBMP, 1)
         newW := prevNewW, newH := prevNewH
         ; DestPosX := prevuDPx, DestPosY := prevuDPy
         DestPosX := prevDestPosX, DestPosY := prevDestPosY
@@ -75594,17 +75616,37 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
      }
 
      opacity := (operation="live") ? "0xAA" : "0x77"
-     wPen := Gdip_CreatePen(opacity "CCccCC", imgHUDbaseUnit//14)
-     dPen := Gdip_CreatePen(opacity "223322", imgHUDbaseUnit//6)
-     zPen := Gdip_CreatePen(opacity "456345", imgHUDbaseUnit//9)
-     redPen := Gdip_CreatePen("0xAAFF6600", imgHUDbaseUnit//7)
+     If (prevHUDunit!=imgHUDbaseUnit)
+     {
+        If !prevHUDunit
+        {
+           wPen := Gdip_CreatePen(opacity "CCccCC", imgHUDbaseUnit/14)
+           dPen := Gdip_CreatePen(opacity "223322", imgHUDbaseUnit/6)
+           zPen := Gdip_CreatePen(opacity "456345", imgHUDbaseUnit/9)
+           redPen := Gdip_CreatePen("0xAAFF6600", imgHUDbaseUnit/7)
+        } Else
+        {
+           Gdip_SetPenWidth(wPen, imgHUDbaseUnit/14)
+           Gdip_SetPenWidth(dPen, imgHUDbaseUnit/6)
+           Gdip_SetPenWidth(zPen, imgHUDbaseUnit/9)
+           Gdip_SetPenWidth(redPen, imgHUDbaseUnit/7)
+        }
+
+        prevHUDunit := imgHUDbaseUnit
+     } Else
+     {
+        Gdip_SetPenColor(wPen, opacity "CCccCC")
+        Gdip_SetPenColor(dPen, opacity "223322")
+        Gdip_SetPenColor(zPen, opacity "456345")
+        Gdip_SetPenColor(redPen, "0xAAFF6600")
+     }
+
      If (operation="init")
      {
         clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
         If (imgEditPanelOpened=1 && AnyWindowOpen!=10)
            clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIselectWin)
 
-        infoBoxBMP := trGdip_DisposeImage(infoBoxBMP, 1)
         ; Gdip_ResetWorldTransform(2NDglPG)
         setMainCanvasTransform(mainWidth, mainHeight, 2NDglPG)
         InfoW := InfoH := ""
@@ -75621,11 +75663,14 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
 
         ImgSelPath := VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, angleu, isAngleu, mainWidth, mainHeight, 1)
         Gdip_SetClipRect(2NDglPG, 0, 0, mainWidth, mainHeight)
-        Gdip_DrawPath(2NDglPG, wPen, ImgSelPath)
-        Gdip_DrawPath(2NDglPG, dPen, ImgSelPath)
-        Gdip_ResetClip(2NDglPG)
-        If StrLen(ImgSelPath)>2
+        If StrLen(ImgSelPath)>1
+        {
+           Gdip_DrawPath(2NDglPG, wPen, ImgSelPath)
+           Gdip_DrawPath(2NDglPG, dPen, ImgSelPath)
            Gdip_DeletePath(ImgSelPath)
+        }
+
+        Gdip_ResetClip(2NDglPG)
      } Else If (operation="active")
      {
         startZeit := A_TickCount
@@ -75643,7 +75688,7 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
         If (o_operation!="faker")
         {
            ImgSelPath := VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, angleu, isAngleu, mainWidth, mainHeight, 1)
-           If (showSelectionGrid=1 && imgSelLargerViewPort!=1 && tooBig!=1)
+           If (showSelectionGrid=1 && imgSelLargerViewPort!=1 && tooBig!=1 && StrLen(ImgSelPath)>1)
            {
               Sleep, 1
               Gdip_SetClipPath(2NDglPG, ImgSelPath, 0)
@@ -75652,17 +75697,22 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
            }
 
            Gdip_SetClipRect(2NDglPG, 0, 0, mainWidth, mainHeight)
-           If !AnyWindowOpen
-              Gdip_FillPath(2NDglPG, pBrushF, ImgSelPath)
-           Gdip_DrawPath(2NDglPG, dPen, ImgSelPath)
-           Gdip_DrawPath(2NDglPG, wPen, ImgSelPath)
+           If (StrLen(ImgSelPath)>1)
+           {
+              If !AnyWindowOpen
+                 Gdip_FillPath(2NDglPG, pBrushF, ImgSelPath)
+              Gdip_DrawPath(2NDglPG, dPen, ImgSelPath)
+              Gdip_DrawPath(2NDglPG, wPen, ImgSelPath)
+              Gdip_DeletePath(ImgSelPath)
+           }
+
            If (allowControls=1)
            {
               thisu := clampValuesToWindow(imgSelPx, imgSelPy, imgSelW, imgSelH, mainWidth, mainHeight)
               Gdip_DrawRectangle(2NDglPG, zPen, thisu.X, thisu.Y, thisu.W, thisu.H)
            }
 
-           If (imgEditPanelOpened!=1 && showSelectionGrid=1 && allowControls=1 && imgSelLargerViewPort!=1 && tooBig!=1)
+           If (imgEditPanelOpened!=1 && showSelectionGrid=1 && allowControls=1 && imgSelLargerViewPort!=1 && tooBig!=1 && IsObject(pathBounds))
               Gdip_DrawRectangle(2NDglPG, zPen, pathBounds.x, pathBounds.y, pathBounds.w, pathBounds.h)
         }
 
@@ -75724,14 +75774,12 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
               Gdip_FillEllipse(2NDglPG, pBrushD, SelDotDx - dotsSize/3.5, SelDotDy - dotsSize/3.5, dotsSize*1.5, dotsSize*1.5)
            Gdip_FillEllipse(2NDglPG, pBrushE, SelDotDx, SelDotDy, dotsSize, dotsSize)
         }
-        If ImgSelPath
-           Gdip_DeletePath(ImgSelPath)
         ; ToolTip, % "a=" A_TickCount - startZeit , , , 2
      } Else If (operation="live")
      {
-        Sleep, 1
+        Sleep, 0
         startZeit := A_TickCount
-        Gdip_SetPenWidth(pPen1d, imgHUDbaseUnit//9)
+        Gdip_SetPenWidth(pPen1d, imgHUDbaseUnit/9)
         Gdip_GraphicsClear(2NDglPG, "0x00" WindowBGRcolor)
         objSel.selSmall := ViewPortSelectionManageCoords(mainWidth, mainHeight, prevuDPx, prevuDPy, maxSelX, maxSelY, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
         imgSelX1 := nImgSelX1, imgSelY1 := nImgSelY1 
@@ -75741,15 +75789,20 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
 
         ImgSelPath := VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, angleu, isAngleu, mainWidth, mainHeight, 1)
         tooBig := (imgSelW>mainWidth*1.5 && imgSelH>mainHeight*1.5 || imgSelW>mainWidth*2.5 || imgSelH>mainHeight*2.5) ? 1 : 0
-        If (imgSelLargerViewPort!=1 && tooBig!=1)
+        If (imgSelLargerViewPort!=1 && tooBig!=1 && StrLen(ImgSelPath)>1)
         {
            Gdip_SetClipPath(2NDglPG, ImgSelPath, 0)
            pathBounds := Gdip_GetClipBounds(2NDglPG)
         }
 
         Gdip_SetClipRect(2NDglPG, 0, 0, mainWidth, mainHeight)
-        Gdip_DrawPath(2NDglPG, dPen, ImgSelPath)
-        Gdip_DrawPath(2NDglPG, wPen, ImgSelPath)
+        If StrLen(ImgSelPath)>1
+        {
+           Gdip_DrawPath(2NDglPG, dPen, ImgSelPath)
+           Gdip_DrawPath(2NDglPG, wPen, ImgSelPath)
+           Gdip_DeletePath(ImgSelPath)
+        }
+
         If (imgSelLargerViewPort!=1 && tooBig!=1)
         {
            ; ToolTip, lol , , , 2
@@ -75759,7 +75812,7 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
            Gdip_DrawLine(2NDglPG, zPen, 0, zImgSelY2 + prevDestPosY, mainWidth, zImgSelY2 + prevDestPosY)
         }
         ; ToolTip, % pathBounds.x "=" pathBounds.y "`n" pathBounds.w "=" pathBounds.h , , , 2
-        If (imgSelLargerViewPort!=1 && tooBig!=1)
+        If (imgSelLargerViewPort!=1 && tooBig!=1 && IsObject(pathBounds))
         {
            Gdip_DrawRectangle(2NDglPG, zPen, pathBounds.x, pathBounds.y, pathBounds.w, pathBounds.h)
         } Else
@@ -75897,8 +75950,6 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
            Gdip_FillEllipse(2NDglPG, pBrushD, SelDotDx, SelDotDy, dotsSize, dotsSize)
 
         Gdip_SetClipRect(2NDglPG, 0, 0, mainWidth, mainHeight)
-        If StrLen(ImgSelPath)>2
-           Gdip_DeletePath(ImgSelPath)
         ; ToolTip, % "br=" A_TickCount - startZeit , , , 2
         If (imgEditPanelOpened=1 && AnyWindowOpen!=10)
         {
@@ -75911,15 +75962,9 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
         defineRelativeSelCoords(imgW, imgH)
         InfoW := InfoH := ""
         ; Gdip_ResetWorldTransform(2NDglPG)
-        infoBoxBMP := trGdip_DisposeImage(infoBoxBMP, 1)
         Gdip_ResetWorldTransform(2NDglPG)
         SetTimer, dummyRefreshImgSelectionWindow, -25
      }
-
-     Gdip_DeletePen(zPen)
-     Gdip_DeletePen(wPen)
-     Gdip_DeletePen(dPen)
-     Gdip_DeletePen(redPen)
 } ; // drawImgSelectionOnWindow()
 
 dummyRefreshImgSelectionWindow(mm:=0) {
@@ -77745,14 +77790,22 @@ GdipCleanMain(modus:=0) {
           Gdip_DeletePath(graphPath)
        }
 
+       Static yPen, prevHUDunit
        thisOpacity := (modus!=6) ? "0x22" : "0x33"
        Random, hu, 6, 8
        Random, ha, 6, 8
        clr := thisOpacity . ha . hu . ha . hu . ha . hu
-       widthu := imgHUDbaseUnit//3
-       yPen := Gdip_CreatePen(clr, widthu)
+       If (prevHUDunit!=imgHUDbaseUnit)
+       {
+          If !prevHUDunit
+             yPen := Gdip_CreatePen(clr, imgHUDbaseUnit/16)
+
+          Gdip_SetPenWidth(yPen, imgHUDbaseUnit/3)
+          prevHUDunit := imgHUDbaseUnit
+       }
+
+       Gdip_SetPenColor(yPen, clr)
        Gdip_DrawRectangle(glPG, yPen, 0, 0, mainWidth, mainHeight)
-       Gdip_DeletePen(yPen)
        whichWin := (imgEditPanelOpened=1 && AnyWindowOpen!=10) ? hGDIthumbsWin : hGDIwin
        r2 := doLayeredWinUpdate(A_ThisFunc, whichWin, glHDC, 225)
        ; trGdip_DisposeImage(BMPcache)
@@ -78453,7 +78506,7 @@ getScrollWidth() {
 }
 
 generateFilesListMap(dummy:=0) {
-   Static lastVal := 0
+   Static lastVal := 0, selPen
    thisVal := 0
    If (!markedSelectFile && dummy="auto")
       thisVal := lastVal ? 5 : 3
@@ -78471,7 +78524,11 @@ generateFilesListMap(dummy:=0) {
       thisThick := 3
 
    countThese := 0
-   selPen := Gdip_CreatePen("0xFF" thisColor, thisThick)
+   If !selPen
+      selPen := Gdip_CreatePen("0xFF" thisColor, thisThick)
+
+   Gdip_SetPenWidth(selPen, thisThick)
+   Gdip_SetPenColor(selPen, "0xFF" thisColor)
    Loop, % maxFilesIndex
    {
         If resultedFilesList[A_Index, thisVal]
@@ -78482,7 +78539,6 @@ generateFilesListMap(dummy:=0) {
    }
 
    Gdip_DeleteGraphics(G1)
-   Gdip_DeletePen(selPen)
    If !countThese
    {
       trGdip_DisposeImage(mainBMP)
@@ -94221,7 +94277,7 @@ tlbrAddNewIcon(obju, wi, he, IconSpacing, noSpacing, simpleRefresh) {
 }
 
 tlbrSetImageIcon(icoFile, hwnd, W, H) {
-    Static cachedIcos := []
+    Static pPenA, pPenB, cachedIcos := []
     If (icoFile="kill" && hwnd="kill")
     {
        For Key, Value in cachedIcos
@@ -94244,8 +94300,10 @@ tlbrSetImageIcon(icoFile, hwnd, W, H) {
        {
           BrushA := (BrushToolUseSecondaryColor=1) ? Gdip_BrushCreateSolid("0xFF" BrushToolBcolor) : Gdip_BrushCreateSolid("0xFF" BrushToolAcolor)
           BrushB := (BrushToolUseSecondaryColor=1) ? Gdip_BrushCreateSolid("0xFF" BrushToolAcolor) : Gdip_BrushCreateSolid("0xFF" BrushToolBcolor)
-          pPenB := Gdip_CreatePen("0xFF101010", 25)
-          pPenA := Gdip_CreatePen("0xFFffFFff", 10)
+          If (pPenA="")
+             pPenA := Gdip_CreatePen("0xFFffFFff", 10)
+          If (pPenB="")
+             pPenB := Gdip_CreatePen("0xFF101010", 25)
           Gdip_FillEllipse(Gu, BrushB, 412//2, posYu, 412//2, 400)
           Gdip_DrawEllipse(Gu, pPenB, 412//2, posYu, 412//2, 400)
           Gdip_FillEllipse(Gu, BrushA, 80, posYu, 412//2, 400)
@@ -94253,7 +94311,6 @@ tlbrSetImageIcon(icoFile, hwnd, W, H) {
           Gdip_DrawEllipse(Gu, pPenA, 80, posYu, 412//2, 400)
           Gdip_DeleteBrush(BrushA)
           Gdip_DeleteBrush(BrushB)
-          Gdip_DeletePen(pPenB)
        } Else
        {
           pPenA := Gdip_CreatePen("0xFF888888", 12)
@@ -94261,7 +94318,6 @@ tlbrSetImageIcon(icoFile, hwnd, W, H) {
           Gdip_DrawEllipse(Gu, pPenA, 80, posYu, 412//2, 400)
        }
 
-       Gdip_DeletePen(pPenA)
        Gdip_DeleteGraphics(Gu)
        icoBMP := trGdip_ResizeBitmap(A_ThisFunc, zpBitmap, w, h, 0, 3, -1, 0)
        trGdip_DisposeImage(zpBitmap, 1)
@@ -94823,7 +94879,7 @@ tlbrViewPortGridu() {
          Return
 
       lastInvoked := A_TickCount
-      If (GetKeyState("Ctrl", "P") || GetKeyState("Shift", "P"))
+      If (GetKeyState("Ctrl", "P") || GetKeyState("Shift", "P") || vpGridSize>440)
       {
          toggleViewPortGridu("tlbr")
          Return
@@ -95847,7 +95903,7 @@ processToolbarFunctions(btnID, actu, simulacrum:=0) {
       {
          If isImgEditingNow()
          {
-            If (GetKeyState("Ctrl", "P") || GetKeyState("Shift", "P"))
+            If (GetKeyState("Ctrl", "P") || GetKeyState("Shift", "P") || vpGridSize>440)
                func2Call := ["toggleViewPortGridu", "tlbr"]
             Else
                func2Call := (simulacrum=1) ? ["MenuIncVPgridSize"] : ["coreTlbrSlider", "VPchangeGridSize", 10, 0]
@@ -96825,11 +96881,17 @@ GuiUpdateSliders(whichSlider, isHwnd:=0, obju:=0) {
     ; ToolTip, % hFont "|" hStringFormat "|" pBrush , , , 2
    Gdip_DrawString(G, str, hFont, hStringFormat, pBrush, RectF)
    factive := isActive ? "" : "Control disabled.`n"
+   Static borderPenWhite, borderPenBlack
+   If (borderPenWhite="")
+   {
+      borderPenWhite := Gdip_CreatePen("0xEEffFFff", 2)
+      borderPenBlack := Gdip_CreatePen("0xEE010101", 2)
+   }
+
    If (StrReplace(uiSlidersArray["focused"], "customSliders")=whichSlider) ; isFocused
    {
-      penu := Gdip_CreatePenFromBrush(pBrush, 2)
+      penu := (uiUseDarkMode=1) ? borderPenWhite : borderPenBlack
       Gdip_DrawRectangle(G, penu, 0, 0, w, h)
-      Gdip_DeletePen(penu)
       fkbd := "`nControl has keyboard focus."
    }
 
