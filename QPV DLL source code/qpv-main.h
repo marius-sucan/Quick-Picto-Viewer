@@ -57,7 +57,7 @@ std::vector<bool>  polygonMaskMap;
 std::vector<int>   polygonMapMin;
 // std::vector<std::vector<short>> DrawLineCapsGrid;
 vector<pair<int, int>> DrawLineCapsGrid;
-vector<pair<int, int>> DrawLineGrid;
+// vector<pair<int, int>> DrawLineGrid;
 
 std::vector<UINT>  dupesListIDsA(1);
 std::vector<UINT>  dupesListIDsB(1);
@@ -88,7 +88,7 @@ struct HSLColor {
     double s;
     double l;
 
-    double inline ConvertHueToRGB(double v1, double v2, double vH) {
+    double inline ConvertHueToRGB(const double &v1, const double &v2, double vH) {
            vH = ((vH<0) ? ++vH : vH);
            vH = ((vH>1) ? --vH : vH);
            return ((6.0f * vH) < 1) ? (v1 + (v2 - v1) * 6.0f * vH)
@@ -126,7 +126,7 @@ struct HSLColor {
     RGBColorI ConvertHSLtoRGBint16() {
     // http://www.had2know.com/technology/hsl-rgb-color-converter.html
 
-       double fH = h/360.0f;
+       const double fH = h/360.0f;
        double var_1, var_2;
        RGBColorI newColor;
        if (s == 0)
@@ -159,13 +159,13 @@ struct RGBAColor {
     // HSLColor ConvertRGBtoHSL(float iR, float iG, float iB, int isFloat) {
 
     HSLColor ConvertRGBtoHSL() {
-       double rf = char_to_float[r];
-       double gf = char_to_float[g];
-       double bf = char_to_float[b];
-       double minu    = min(rf, min(gf, bf));
-       double maxu    = max(rf, max(gf, bf));
-       double del_Max = maxu - minu;
-       double L       = (maxu + minu) / 2.0f;
+       const double rf = char_to_float[r];
+       const double gf = char_to_float[g];
+       const double bf = char_to_float[b];
+       const double minu    = min(rf, min(gf, bf));
+       const double maxu    = max(rf, max(gf, bf));
+       const double del_Max = maxu - minu;
+       const double L       = (maxu + minu) / 2.0f;
        double H, S, del_R, del_G, del_B;
 
        if (del_Max == 0)
@@ -200,14 +200,14 @@ struct RGBAColor {
        return {abs(H*360.0f), abs(S), abs(L)};
     }
 
-    void channelOffset(int ao, int ro, int go, int bo) {
+    void channelOffset(const int &ao, const int &ro, const int &go, const int &bo) {
         a = clamp(a + ao, 0, 255);
         r = clamp(r + ro, 0, 255);
         g = clamp(g + go, 0, 255);
         b = clamp(b + bo, 0, 255);
     }
 
-    void threshold(int ao, int ro, int go, int bo, int seeThrough) {
+    void threshold(const int &ao, const int &ro, const int &go, const int &bo, const int &seeThrough) {
         if (seeThrough==2)
         {
            if (ao>=0)
@@ -247,21 +247,21 @@ struct RGBAColor {
         b = 255 - b;
     }
 
-    void blackPoint(int level, int noise) {
-        int rando = (noise==1) ? rand() % 10 : 0;
+    void blackPoint(const int &level, const int &noise) {
+        const int rando = (noise==1) ? rand() % 10 : 0;
         r = max(r, level + rando);
         g = max(g, level + rando);
         b = max(b, level + rando);
     }
 
-    void whitePoint(int level, int noise) {
-        int rando = (noise==1) ? rand() % 10 : 0;
+    void whitePoint(const int &level, const int &noise) {
+        const int rando = (noise==1) ? rand() % 10 : 0;
         r = min(r, level - rando);
         g = min(g, level - rando);
         b = min(b, level - rando);
     }
 
-    void brightness(int level, int altMode) {
+    void brightness(const int &level, const int &altMode) {
         if (altMode==0)
         {
            if (level<0)
@@ -281,7 +281,7 @@ struct RGBAColor {
        }
     }
 
-    void shadows(int altMode, int linearGamma, int gray) {
+    void shadows(const int &altMode, const int &linearGamma, int gray) {
        int nr, ng, nb;
        if (altMode==1)
           gray = clamp(255 - gray, 0, 255);
@@ -306,7 +306,7 @@ struct RGBAColor {
        }
     }
 
-    void highlights(int altMode, int linearGamma, float factor, int gray) {
+    void highlights(const int &altMode, const int &linearGamma, const float &factor, int gray) {
        int nr, ng, nb;
        if (altMode==1)
           gray = contraMaths(gray*1.5f, factor, 128);
@@ -336,7 +336,7 @@ struct RGBAColor {
         b = LUTgamma[b];
     }
 
-    void contrast(int level, int altContra, int linearGamma, float fintensity) {
+    void contrast(const int &level, const int &altContra, const int &linearGamma, const float &fintensity) {
         if (altContra==1)
         {
            a = LUTcontra[a];
@@ -364,7 +364,7 @@ struct RGBAColor {
         b = LUTcontra[b];
     }
 
-    void saturation(int level, int altMode, int linearGamma, float saturation) {
+    void saturation(const int &level, const int &altMode, const int &linearGamma, float saturation) {
         if (altMode>1)
         {
            int gray = (altMode==2) ? r : g;
@@ -398,7 +398,7 @@ struct RGBAColor {
             }
         } else if (level<0)
         {
-           int gray = getGrayscale(r, g, b);
+           const int gray = getGrayscale(r, g, b);
            float fintensity = int_to_float[abs(level)];
            if (linearGamma==1)
            {
@@ -413,10 +413,10 @@ struct RGBAColor {
            }
         } else
         {
-           float max_val = max(max(r, g), b);
-           float min_val = min(min(r, g), b);
-           float luxAvg = (max_val + min_val) / 2.0f;
-           float factor = (level + 21823)/21823.0f;
+           const float max_val = max(max(r, g), b);
+           const float min_val = min(min(r, g), b);
+           const float luxAvg = (max_val + min_val) / 2.0f;
+           const float factor = (level + 21823)/21823.0f;
 
            float lux = clamp(getGrayscale(r, g, b)/3.0f, 0.0f, 255.0f);
            lux = weighTwoValues(lux, 0.0f, int_to_float[level]);;
@@ -427,7 +427,7 @@ struct RGBAColor {
         };
     }
 
-    void hueRotate(int degrees, float saturation, int altMode, int level) {
+    void hueRotate(const int &degrees, const float &saturation, const int &altMode, const int &level) {
         HSLColor HSLu = ConvertRGBtoHSL();
         float hue = HSLu.h + (float)degrees;
         if (hue>360)
@@ -454,11 +454,11 @@ struct RGBAColor {
         }
     }
 
-    void tinto(int degrees, int level, int linearGamma) {
+    void tinto(const int &degrees, const int &level, const int &linearGamma) {
         HSLColor HSLu = ConvertRGBtoHSL();
         HSLColor newHSL = {degrees, 0.5, HSLu.l};
         RGBColorI newRGB = newHSL.ConvertHSLtoRGB();
-        float fintensity = int_to_float[level];
+        const float fintensity = int_to_float[level];
         if (linearGamma==1)
         {
            r = linear_to_gamma[weighTwoValues(gamma_to_linear[newRGB.r], gamma_to_linear[r], fintensity)];
@@ -472,16 +472,16 @@ struct RGBAColor {
         }
     }
 
-    void tint(float hue, int level, int altMode, int linearGamma) {
+    void tint(const float &hue, int &level, int &altMode, int &linearGamma) {
         if (altMode==1)
            return tinto(hue, level, linearGamma);
 
         int z = getGrayscale(r, g, b);
         float gray = char_to_float[z];
-        int hi = (int)(floor(hue / 60.0f)) % 6;
-        float f = hue / 60.0f - floor(hue / 60.0f);
-        float q = gray * (1.0f - f);
-        float t = gray * (1.0f - (1.0f - f));
+        const int hi = (int)(floor(hue / 60.0f)) % 6;
+        const float f = hue / 60.0f - floor(hue / 60.0f);
+        const float q = gray * (1.0f - f);
+        const float t = gray * (1.0f - (1.0f - f));
         int nr, ng, nb;
         switch (hi) {
             case 0:
@@ -517,7 +517,7 @@ struct RGBAColor {
         }
 
         z = z/3; // gray
-        float fintensity = int_to_float[level];
+        const float fintensity = int_to_float[level];
         nr = clamp(nr + z, 0, 255);
         ng = clamp(ng + z, 0, 255);
         nb = clamp(nb + z, 0, 255);
@@ -543,14 +543,14 @@ struct RGBA16color {
     int a;
 
     HSLColor ConvertRGBtoHSL() {
-       double rf = int_to_float[r];
-       double gf = int_to_float[g];
-       double bf = int_to_float[b];
-       double minu    = min(rf, min(gf, bf));
-       double maxu    = max(rf, max(gf, bf));
-       double del_Max = maxu - minu;
-       double L       = (maxu + minu) / 2.0f;
-       double H, S, del_R, del_G, del_B;
+       const double rf = int_to_float[r];
+       const double gf = int_to_float[g];
+       const double bf = int_to_float[b];
+       const double minu    = min(rf, min(gf, bf));
+       const double maxu    = max(rf, max(gf, bf));
+       const double del_Max = maxu - minu;
+       const double L       = (maxu + minu) / 2.0f;
+       double H, S;
 
        if (del_Max == 0)
        {
@@ -562,9 +562,9 @@ struct RGBA16color {
           else
              S = del_Max / (2.0f - del_Max);
 
-          del_R = (((maxu - rf) / 6.0f) + (del_Max / 2.0f)) / del_Max;
-          del_G = (((maxu - gf) / 6.0f) + (del_Max / 2.0f)) / del_Max;
-          del_B = (((maxu - bf) / 6.0f) + (del_Max / 2.0f)) / del_Max;
+          const double del_R = (((maxu - rf) / 6.0f) + (del_Max / 2.0f)) / del_Max;
+          const double del_G = (((maxu - gf) / 6.0f) + (del_Max / 2.0f)) / del_Max;
+          const double del_B = (((maxu - bf) / 6.0f) + (del_Max / 2.0f)) / del_Max;
           if (rf == maxu)
           {
              H = del_B - del_G;
@@ -584,14 +584,14 @@ struct RGBA16color {
        return {abs(H*360.0f), abs(S), abs(L)};
     }
 
-    void channelOffset(int ao, int ro, int go, int bo, int noClamping) {
+    void channelOffset(const int &ao, const int &ro, const int &go, const int &bo, const int &noClamping) {
         a = clamp(a + ao, 0, 65535);
         r = (noClamping==1) ? r + ro : clamp(r + ro, 0, 65535);
         g = (noClamping==1) ? g + go : clamp(g + go, 0, 65535);
         b = (noClamping==1) ? b + bo : clamp(b + bo, 0, 65535);
     }
 
-    void threshold(int ao, int ro, int go, int bo, int seeThrough) {
+    void threshold(const int &ao, const int &ro, const int &go, const int &bo, const int &seeThrough) {
         if (seeThrough==2)
         {
            if (ao>=0)
@@ -631,21 +631,21 @@ struct RGBA16color {
         b = 65535 - b;
     }
 
-    void blackPoint(int level, int noise) {
-        int rando = (noise==1) ? rand() % 2600 : 0;
+    void blackPoint(const int &level, const int &noise) {
+        const int rando = (noise==1) ? rand() % 2600 : 0;
         r = max(r, level + rando);
         g = max(g, level + rando);
         b = max(b, level + rando);
     }
 
-    void whitePoint(int level, int noise) {
-        int rando = (noise==1) ? rand() % 2600 : 0;
+    void whitePoint(const int &level, const int &noise) {
+        const int rando = (noise==1) ? rand() % 2600 : 0;
         r = min(r, level - rando);
         g = min(g, level - rando);
         b = min(b, level - rando);
     }
 
-    void brightness(int level, int altMode, int noClamping, float fintensity) {
+    void brightness(const int &level, const int &altMode, const int &noClamping, const float &fintensity) {
         if (altMode==0)
         {
            if (level<0 && noClamping==0)
@@ -675,7 +675,7 @@ struct RGBA16color {
     }
 
     int getGrayscaleAdvanced() {
-       float minu = min(r, min(g, b));
+       const float minu = min(r, min(g, b));
        float maxu = max(r, max(g, b));
        float nr = r;
        float ng = g;
@@ -699,7 +699,7 @@ struct RGBA16color {
        return gray;
     }
 
-    void shadows(int level, int altMode, int linearGamma, int gray, int noClamping, float fi) {
+    void shadows(const int &level, const int &altMode, const int &linearGamma, int gray, const int &noClamping, const float &fi) {
        int nr, ng, nb;
        if (noClamping==1)
        {
@@ -745,7 +745,7 @@ struct RGBA16color {
        }
     }
 
-    void highlights(int level, int altMode, int linearGamma, float factor, int gray, int noClamping, float fi) {
+    void highlights(const int &level, const int &altMode, const int &linearGamma, const float &factor, int gray, const int &noClamping, const float &fi) {
        int nr, ng, nb;
        if (noClamping==1)
        {
@@ -791,7 +791,7 @@ struct RGBA16color {
        }
     }
 
-    void gamma(int level, int bright, int altMode, int noClamping) {
+    void gamma(const int &level, const int &bright, const int &altMode, const int &noClamping) {
       if (noClamping==0)
       {
          r = LUTgamma[r];
@@ -799,7 +799,7 @@ struct RGBA16color {
          b = LUTgamma[b];
       } else
       {
-         float minu = min(r, min(g, b));
+         const float minu = min(r, min(g, b));
          float maxu = max(r, max(g, b));
          float nr = r;
          float ng = g;
@@ -818,21 +818,24 @@ struct RGBA16color {
          nr = (float)nr / maxu;
          ng = (float)ng / maxu;
          nb = (float)nb / maxu;
-         int thisLevel = (bright<0 && altMode==0 && level>300) ? level + abs(bright)/300 : level;
-         double gamma = 1.0f / ((float)thisLevel/300.0f);
+
+         const int thisLevel = (bright<0 && altMode==0 && level>300) ? level + abs(bright)/300 : level;
+         const double gamma = 1.0f / ((float)thisLevel/300.0f);
          r = (maxu - offset) * pow(nr, gamma);
          if (r<-165535 && bright<0 && altMode==0)
             r = -165535;
+
          g = (maxu - offset) * pow(ng, gamma);
          if (g<-165535 && bright<0 && altMode==0)
             g = -165535;
+
          b = (maxu - offset) * pow(nb, gamma);
          if (b<-165535 && bright<0 && altMode==0)
             b = -165535;
       }
     }
 
-    void contrast(int level, int altContra, int linearGamma, float fintensity, int noClamping, float fip) {
+    void contrast(const int &level, const int &altContra, const int &linearGamma, const float &fintensity, const int &noClamping, const float &fip) {
         if (altContra==1)
         {
            a = LUTcontra[a];
@@ -841,13 +844,13 @@ struct RGBA16color {
 
         if (noClamping==1)
         {
-           float minu = min(r, min(g, b));
+           const float minu = min(r, min(g, b));
            float maxu = max(r, max(g, b));
            float nr = r;
            float ng = g;
            float nb = b;
            float offset = 0;
-           float thisMin = (level>0) ? minu : abs(minu);
+           const float thisMin = (level>0) ? minu : abs(minu);
            float fi;
            if (level>=0)
            {
@@ -930,7 +933,7 @@ struct RGBA16color {
         }
     }
 
-    void saturation(int level, int altMode, int linearGamma, float saturation) {
+    void saturation(const int &level, const int &altMode, const int &linearGamma, float saturation) {
         if (altMode>1)
         {
            int gray = (altMode==2) ? r : g;
@@ -964,8 +967,8 @@ struct RGBA16color {
             }
         } else if (level<0)
         {
-           int gray = getInt16grayscale(r, g, b);
-           float fintensity = int_to_float[abs(level)];
+           const int gray = getInt16grayscale(r, g, b);
+           const float fintensity = int_to_float[abs(level)];
            if (linearGamma==1)
            {
               r = linear_to_gammaInt16[weighTwoValues(gamma_to_linearInt16[gray], gamma_to_linearInt16[r], fintensity)];
@@ -979,10 +982,10 @@ struct RGBA16color {
            }
         } else
         {
-           float max_val = max(max(r, g), b);
-           float min_val = min(min(r, g), b);
-           float luxAvg = (max_val + min_val) / 2.0f;
-           float factor = (level + 21823)/21823.0f;
+           const float max_val = max(max(r, g), b);
+           const float min_val = min(min(r, g), b);
+           const float luxAvg = (max_val + min_val) / 2.0f;
+           const float factor = (level + 21823)/21823.0f;
 
            float lux = clamp(getInt16grayscale(r, g, b)/3.0f, 0.0f, 65535.0f);
            lux = weighTwoValues(lux, 0.0f, int_to_float[level]);
@@ -993,7 +996,7 @@ struct RGBA16color {
         };
     }
 
-    void hueRotate(int degrees, float saturation, int altMode, int level) {
+    void hueRotate(const int &degrees, const float &saturation, const int &altMode, const int &level) {
         HSLColor HSLu = ConvertRGBtoHSL();
         float hue = HSLu.h + (float)degrees;
         if (hue>360)
@@ -1020,11 +1023,11 @@ struct RGBA16color {
         }
     }
 
-    void tinto(int degrees, int level, int linearGamma) {
+    void tinto(const int &degrees, const int &level, const int &linearGamma) {
         HSLColor HSLu = ConvertRGBtoHSL();
         HSLColor newHSL = {degrees, 0.5, HSLu.l};
         RGBColorI newRGB = newHSL.ConvertHSLtoRGBint16();
-        float fintensity = int_to_float[level];
+        const float fintensity = int_to_float[level];
         if (linearGamma==1)
         {
            r = linear_to_gammaInt16[weighTwoValues(gamma_to_linearInt16[newRGB.r], gamma_to_linearInt16[r], fintensity)];
@@ -1038,16 +1041,16 @@ struct RGBA16color {
         }
     }
 
-    void tint(float hue, int level, int altMode, int linearGamma) {
+    void tint(const float &hue, const int &level, const int &altMode, const int &linearGamma) {
         if (altMode==1)
            return tinto(hue, level, linearGamma);
 
         int z = getInt16grayscale(r, g, b);
-        float gray = int_to_float[z];
-        int hi = (int)(floor(hue / 60.0f)) % 6;
-        float f = hue / 60.0f - floor(hue / 60.0f);
-        float q = gray * (1.0f - f);
-        float t = gray * (1.0f - (1.0f - f));
+        const float gray = int_to_float[z];
+        const int hi = (int)(floor(hue / 60.0f)) % 6;
+        const float f = hue / 60.0f - floor(hue / 60.0f);
+        const float q = gray * (1.0f - f);
+        const float t = gray * (1.0f - (1.0f - f));
         int nr, ng, nb;
         switch (hi) {
             case 0:
@@ -1083,7 +1086,7 @@ struct RGBA16color {
         }
 
         z = z/3; // gray
-        float fintensity = int_to_float[level];
+        const float fintensity = int_to_float[level];
         nr = clamp(nr + z, 0, 65535);
         ng = clamp(ng + z, 0, 65535);
         nb = clamp(nb + z, 0, 65535);

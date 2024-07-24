@@ -19593,11 +19593,11 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
    FreeImage_GetImageDimensions(viewportQPVimage.imgHandle, imgW, imgH)
    If (imgSelPx="entire-vp" || invertArea=1)
    {
-      If (memoryUsageWarning(imgW, imgH, bpp, 2, 0, 0)=1 && doAsk=0)
+      If memoryUsageWarning(imgW, imgH, bpp, 2, 0, 0)
+      {
+         addJournalEntry("WARNING: Undo level not recorded. Memory usage too high.")
          Return
-
-      If memoryUsageWarning(imgW, imgH, bpp, 2)
-         Return 2
+      }
 
       showTOOLtip("Recording undo level...", "nully")
       calcImgSelection2bmp(0, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2, 0, 0, "a")
@@ -19616,11 +19616,11 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
    flastu := !isNumber(imgSelPx) ? imgSelPx : "img-crop"
    If (flastu="img-crop")
    {
-      If (memoryUsageWarning(imgSelW, imgSelH, bpp, 3, 0, 0)=1 && doAsk=0)
+      If memoryUsageWarning(imgSelW, imgSelH, bpp, 3, 0, 0)
+      {
+         addJournalEntry("WARNING: Undo level not recorded. Memory usage too high.")
          Return
-
-      If memoryUsageWarning(imgSelW, imgSelH, bpp, 3)
-         Return 2
+      }
 
       showTOOLtip("Recording undo level...", "nully")
       y1 := imgH - imgSelH - imgSelPy
@@ -20408,18 +20408,6 @@ HugeImagesDrawLineShapes() {
       defineRelativeSelCoords(imgW, imgH)
       obju := InitHugeImgSelPath(0, imgW, imgH)
       zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
-      If (zrr=2)
-      {
-         showTOOLtip("Draw lines: operation abandoned by user.")
-         DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
-         imgSelX1 := o_imgSelX1,      imgSelY1 := o_imgSelY1
-         imgSelX2 := o_imgSelX2,      imgSelY2 := o_imgSelY2
-         defineRelativeSelCoords(imgW, imgH)
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         ResetImgLoadStatus()
-         Return
-      }
-
       Sleep, 50
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
       rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", DrawLineAreaCapsStyle)
@@ -20947,17 +20935,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
       } Else If InStr(modus, "erase")
       {
          If (allowRecord=1)
-         {
             zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, EraseAreaInvert)
-            If (zrr=2)
-            {
-               showTOOLtip("Erase area: operation abandoned by user.")
-               DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
-               ResetImgLoadStatus()
-               SetTimer, RemoveTooltip, % -msgDisplayTime
-               Return
-            }
-         }
 
          newColor := "0x00010101"
          If (bpp=32)
@@ -21018,29 +20996,11 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
       } Else If InStr(modus, "invert")
       {
          zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, 0)
-         If (zrr=2)
-         {
-            showTOOLtip("Invert area: operation abandoned by user.")
-            DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
-            ResetImgLoadStatus()
-            SetTimer, RemoveTooltip, % -msgDisplayTime
-            Return
-         }
-
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
          r := DllCall(whichMainDLL "\AdjustImageColors", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 255, "int", 1, "int", 0, "int", 0, "int", 1, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 1, "int", 0, "int", 0, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
       } Else If InStr(modus, "flood")
       {
          zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, 0)
-         If (zrr=2)
-         {
-            showTOOLtip("Flood fill: operation abandoned by user.")
-            DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
-            ResetImgLoadStatus()
-            SetTimer, RemoveTooltip, % -msgDisplayTime
-            Return
-         }
-
          newColor := "0x" Format("{:X}", FloodFillClrOpacity) FloodFillColor
          Gdip_FromARGB(newColor, A, R, G, B)
          newColor := Gdip_ToARGB(A, R, G, B)
@@ -21071,17 +21031,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             strideMini := FreeImage_GetStride(hFIFimgZ)
             recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, 0, 0)
          } Else
-         {
             zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
-            If (zrr=2)
-            {
-               showTOOLtip("Add noise in selected area:`nOperation abandoned by user.")
-               DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
-               ResetImgLoadStatus()
-               SetTimer, RemoveTooltip, % -msgDisplayTime
-               Return
-            }
-         }
 
          ; fnOutputDebug(imgSelX1 "|" imgSelY1 "||" imgSelX2 "|" imgSelY2 "||" thisSelW "|" thisSelH)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
@@ -21092,30 +21042,12 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
       {
          this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
          zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, userImgAdjustInvertArea)
-         If (zrr=2)
-         {
-            showTOOLtip("Adjust image colors: operation abandoned by user.")
-            DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
-            ResetImgLoadStatus()
-            SetTimer, RemoveTooltip, % -msgDisplayTime
-            Return
-         }
- 
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, userImgAdjustInvertArea, "a", "a", 1)
          r := DllCall(whichMainDLL "\AdjustImageColors" this, "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", imgColorsFXopacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", userImgAdjustSat, "int", userImgAdjustAltBright, "int", userImgAdjustBright, "int", userImgAdjustAltContra, "int", userImgAdjustContra, "int", userImgAdjustAltHiLows, "int", userImgAdjustShadows, "int", userImgAdjustHighs, "int", userImgAdjustHue, "int", userImgAdjustTintDeg, "int", userImgAdjustTintAmount, "int", userImgAdjustAltTint, "int", userImgAdjustGamma, "int", userImgAdjustOffR, "int", userImgAdjustOffG, "int", userImgAdjustOffB, "int", userImgAdjustOffA, "int", userImgAdjustThreR, "int", userImgAdjustThreG, "int", userImgAdjustThreB, "int", userImgAdjustThreA, "int", userImgAdjustSeeThrough, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", userImgAdjustWhitePoint, "int", userImgAdjustBlackPoint, "int", userImgAdjustNoisePoints, "UPtr", mScan, "int", mStride)
       } Else ; grayscale mode
       {
          this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
          zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, EraseAreaInvert)
-         If (zrr=2)
-         {
-            showTOOLtip("Adjust image colors: operation abandoned by user.")
-            DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
-            ResetImgLoadStatus()
-            SetTimer, RemoveTooltip, % -msgDisplayTime
-            Return
-         }
-
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, EraseAreaInvert, "a", "a", 1)
          r := DllCall(whichMainDLL "\AdjustImageColors" this, "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", DesaturateAreaAmount, "int", DesaturateAreaInvert, "int", DesaturateAreaChannel - 1, "int", -65535, "int", 1, "int", DesaturateAreaBright, "int", 0, "int", DesaturateAreaContra, "int", 0, "int", 0, "int", 0, "int", DesaturateAreaHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 1, "int", userimgGammaCorrect, "int", 0, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
          ; r := DllCall(whichMainDLL "\ConvertToGrayScale", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", DesaturateAreaChannel, "int", DesaturateAreaAmount, "int", stride, "int", bpp, "UPtr", mScan, "int", mStride)
@@ -21902,6 +21834,8 @@ createDrawLinesPen(thisThick) {
 
     If (DrawLineAreaDoubles=1)
        Gdip_SetPenCompoundArray(thisPen, compoundArray)
+    Else
+       Gdip_SetPenCompoundArray(thisPen, "0.0|1.0")
 
     Return thisPen
 }
@@ -46206,8 +46140,8 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
            RegAction(1, "DrawLineAreaOpacity",, 2, 1, 255)
         }
 
-        thisThick := InStr(postVectorWinOpen, "c") ? imgHUDbaseUnit//10 : DrawLineAreaContourThickness * zoomLevel
-        PenuDrawLive := createDrawLinesPen(thisThick)
+        thisThick := InStr(postVectorWinOpen, "c") ? imgHUDbaseUnit/10 : DrawLineAreaContourThickness * zoomLevel
+        PenuDrawLive := Gdip_ClonePen(createDrawLinesPen(thisThick))
         ; PenuDrawLive := (isWinOpen=10) ? Gdip_CreatePen("0x99446644", imgHUDbaseUnit//10) : Gdip_CreatePen(thisColorA, imgHUDbaseUnit//7)
         drawingVectorLiveMode := 1
      } Else If (modus="shape")
@@ -46220,7 +46154,7 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
      } Else If (modus="selection")
      {
         drawingVectorLiveMode := 3
-        PenuDrawLive := Gdip_CreatePen("0x99446644", imgHUDbaseUnit//10)
+        PenuDrawLive := Gdip_CreatePen("0x99446644", imgHUDbaseUnit/10)
         LimitSelectBoundsImg := VPselRotation := innerSelectionCavityX := innerSelectionCavityY := 0
         lockSelectionAspectRatio := 1
         ; closedLineCustomShape :=  1
@@ -47806,6 +47740,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     } Else
     {
        Gui, Add, Checkbox, xs y+7 w%btnWid% Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIdrawShapesPanel, &Double line
+       Gui, Add, Checkbox, x+5 wp hp gupdateUIdrawShapesPanel Checked%DrawLineAreaCapsStyle% vDrawLineAreaCapsStyle, &Round caps
        ; Gui, Add, Checkbox, x+5 Checked%FillAreaDoBehind% vFillAreaDoBehind gupdateUIdrawShapesPanel, &Fill behind the image
     }
 
@@ -76896,17 +76831,35 @@ ToggleEditImgSelection(modus:=0) {
   If (slideShowRunning=1)
      ToggleSlideShowu()
 
+  vpWinClientSize(mainWidth, mainHeight)
+  trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+  If (!imgW || !imgH)
+     r := -1
+
   ; fnOutputDebug(A_ThisFunc "(A=" modus ") sel y1=" imgSelY1 "// y2=" imgSelY2 " | " prcSelY1 " // " prcSelY2)
   DestroyGIFuWin()
-  If (editingSelectionNow!=1)
+  If (editingSelectionNow!=1 && r!=-1)
   {
-     r := correctActiveSelectionAreaViewPort()
-  } Else
-  {
-     trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
-     If (!imgW || !imgH)
-        r := -1
+     If (imgSelX2=-1 || ImgSelX2="C")
+     {
+        ; activate selection on single click + shift
+        mw := min(mainWidth - 50, prevDestPosX + prevResizedVPimgW - 50)
+        mh := min(mainHeight - 50, prevDestPosY + prevResizedVPimgH - 50)
+        mX := clampInRange(prevDestPosX + 50, 50, mw)
+        mY := clampInRange(prevDestPosY + 50, 50, mh)
+        pmX := (FlipImgH=1) ? mainWidth - mX : mX
+        pmY := (FlipImgV=1) ? mainHeight - mY : mY
+        mw := clampInRange((prevResizedVPimgW - 50)//2.5 + 5, 30, 250)
+        mh := clampInRange((prevResizedVPimgH - 50)//2.5 + 5, 30, 250)
+        MouseCoords2Image(pmX, pmY, LimitSelectBoundsImg, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, imgSelX1, imgSelY1)
+        MouseCoords2Image(pmX + mw, pmY + mh, LimitSelectBoundsImg, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, imgSelX2, imgSelY2)
+        trGdip_GetImageDimensions(useGdiBitmap(), ImgW, ImgH)
+        defineRelativeSelCoords(ImgW, ImgH)
+        capSelectionRelativeCoords()
+        defineRelativeSelCoords(ImgW, ImgH)
+     } Else r := correctActiveSelectionAreaViewPort()
   }
+
   ; fnOutputDebug(A_ThisFunc "(B=" modus ") sel y1=" imgSelY1 "// y2=" imgSelY2 " | " prcSelY1 " // " prcSelY2)
   If (r=-1 && editingSelectionNow!=1)
      Return
@@ -76934,7 +76887,6 @@ ToggleEditImgSelection(modus:=0) {
   If (ShowAdvToolbar=1 && lockToolbar2Win=1 && editingSelectionNow=1)
      DelayiedImageDisplay()
 
-  vpWinClientSize(mainWidth, mainHeight)
   If ((imgSelX2=-1 || ImgSelX2="C") && editingSelectionNow=1)
   {
      trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
@@ -94277,7 +94229,7 @@ tlbrAddNewIcon(obju, wi, he, IconSpacing, noSpacing, simpleRefresh) {
 }
 
 tlbrSetImageIcon(icoFile, hwnd, W, H) {
-    Static pPenA, pPenB, cachedIcos := []
+    Static pPenA, pPenB, pPenX, cachedIcos := []
     If (icoFile="kill" && hwnd="kill")
     {
        For Key, Value in cachedIcos
@@ -94313,9 +94265,10 @@ tlbrSetImageIcon(icoFile, hwnd, W, H) {
           Gdip_DeleteBrush(BrushB)
        } Else
        {
-          pPenA := Gdip_CreatePen("0xFF888888", 12)
-          Gdip_DrawEllipse(Gu, pPenA, 412//2, posYu, 412//2, 400)
-          Gdip_DrawEllipse(Gu, pPenA, 80, posYu, 412//2, 400)
+          If (pPenX="")
+             pPenX := Gdip_CreatePen("0xFF888888", 12)
+          Gdip_DrawEllipse(Gu, pPenX, 412//2, posYu, 412//2, 400)
+          Gdip_DrawEllipse(Gu, pPenX, 80, posYu, 412//2, 400)
        }
 
        Gdip_DeleteGraphics(Gu)
@@ -94373,7 +94326,7 @@ tlbrInvokeFunction(a, b, c) {
 
    mouseTurnOFFtooltip()
    If (AnyWindowOpen && imgEditPanelOpened!=1 || runningLongOperation=1 || imageLoading=1 || slideShowRunning=1 || openingPanelNow=1)
-   || (A_TickCount - lastOtherWinClose<400) || (A_TickCount - lastZeitOpenWin<400) || (A_TickCount - lastInvoked<50)
+   || (A_TickCount - lastOtherWinClose<250) || (A_TickCount - lastZeitOpenWin<250) || (A_TickCount - lastInvoked<50)
       Return
 
    If (soloSliderWinVisible=1)
@@ -96539,10 +96492,10 @@ GuiSlidersResponder(a, m_event, keyu) {
    hFontFamily := Gdip_FontFamilyCreateGeneric(1)
    obju.pBitmap := trGdip_CreateBitmap(A_ThisFunc, w, h)
    obju.hFont := Gdip_FontCreate(hFontFamily, fsizeu, PrefsLargeFonts, 3)
-   obju.hStringFormat := Gdip_StringFormatGetGeneric(1)
+   ; obju.hStringFormat := Gdip_StringFormatGetGeneric(1)
    obju.pBrush := Gdip_BrushCreateSolid(thisOpacity txtColor)
    obju.G := Gdip_GraphicsFromImage(obju.pBitmap)
-   Gdip_SetStringFormatAlign(obju.hStringFormat, 1, 1)     ; center
+   ; Gdip_SetStringFormatAlign(obju.hStringFormat, 1, 1)     ; center
    If (updatePrevu=1)
       GuiUpdateSliders(StrReplace(prevu, "customSliders"), 0)
 
@@ -96557,6 +96510,7 @@ GuiSlidersResponder(a, m_event, keyu) {
    While, (determineLClickState()=1 || m_event="uiLabel" && A_Index=1 || GetKeyState(keyu, "P") && isGivenKey=1)
    {
       ; if m_event = "uiLabel" , it is a keyboard call
+      fnOutputDebug(A_ThisFunc " == A // start")
       GetPhysicalCursorPos(mX, mY)
       If (isGivenKey!=1 && mouseMode=1)
       {
@@ -96568,16 +96522,19 @@ GuiSlidersResponder(a, m_event, keyu) {
       Sleep, -1
       zX := mX, zY := mY
       sk := (A_Index=1 && (m_event="DoubleClick" || m_event="uiLabel") || isActive!=1) ? 1 : 0
+      fnOutputDebug(A_ThisFunc " == B // mouse coords=" nX " // " nY)
       If (isGivenKey=1)
       {
+         fnOutputDebug(A_ThisFunc " == key")
          If (A_TickCount - clickStarted>4000)
          {
             Sleep, 25
             If !InStr(uiSlidersArray[hwnd], "@")
                GuiControl, SettingsGUIA: Focus, customSliders%whichSlider%
-         }
-         Else
+         } Else
+         {
             Sleep, % (A_TickCount - clickStarted>2000) ? 50 : 100
+         }
 
          If (keyu="right" || keyu="WheelUp")
             %givenVar% := clampInRange(%givenVar% + frkA, minV, maxV, 1)
@@ -96594,7 +96551,9 @@ GuiSlidersResponder(a, m_event, keyu) {
 
       If (!sk && !isGivenKey)
          %givenVar% := newValue
+
       ; ToolTip, % wx "|" w "|" rangeu "|" newValue , , , 2
+      fnOutputDebug(A_ThisFunc " == C // newValue=" newValue)
       If (whichSlider="userUIshapeCavity")
       {
          If (newValue<2)
@@ -96605,7 +96564,9 @@ GuiSlidersResponder(a, m_event, keyu) {
 
       If (A_TickCount - lastu>50)
       {
+         fnOutputDebug(A_ThisFunc " == D // must preview")
          p := GuiUpdateSliders(whichSlider, 0, obju)
+         fnOutputDebug(A_ThisFunc " == D // slider updated")
          If (AnyWindowOpen=10 || AnyWindowOpen=74)
             livePreviewColorsAdjustVP()
          Else If (imgEditPanelOpened=1)
@@ -96617,12 +96578,14 @@ GuiSlidersResponder(a, m_event, keyu) {
 
          lastu := A_TickCount
          skipped := 0
+         fnOutputDebug(A_ThisFunc " == D // viewport preview done")
       } Else skipped++
 
+      fnOutputDebug(A_ThisFunc " == E // finish")
       If (sk && !isGivenKey)
          Break
 
-      If (A_TickCount - clickStarted>9500)
+      If (A_TickCount - clickStarted>14500)
       {
          SoundBeep 900, 100
          skipped := 1
@@ -96649,7 +96612,7 @@ GuiSlidersResponder(a, m_event, keyu) {
    }
 
    Gdip_DeleteGraphics(obju.G)
-   Gdip_DeleteStringFormat(obju.hStringFormat)
+   ; Gdip_DeleteStringFormat(obju.hStringFormat)
    Gdip_DeleteFont(obju.hFont)
    Gdip_DeleteFontFamily(hFontFamily)
    Gdip_DeleteBrush(obju.pBrush)
@@ -96796,14 +96759,19 @@ GuiUpdateSliders(whichSlider, isHwnd:=0, obju:=0) {
       uiSlidersArray[whichSlider, 13] := h
    }
 
+   Static hFontFamily, hStringFormat
+   If (hFontFamily="")
+   {
+      hFontFamily := Gdip_FontFamilyCreateGeneric(1)
+      hStringFormat := Gdip_StringFormatGetGeneric(1)
+      Gdip_SetStringFormatAlign(hStringFormat, 1, 1)     ; center
+   }
+
    ; fnOutputDebug(isHwnd "|" whichSlider "||" givenVar "||" varValue "|w|" w "|h|" h)
    if !IsObject(obju)
    {
       fsizeu := (PrefsLargeFonts=1) ? LargeUIfontValue - 3 : LargeUIfontValue - 7
-      hFontFamily := Gdip_FontFamilyCreateGeneric(1)
       hFont := Gdip_FontCreate(hFontFamily, fsizeu, PrefsLargeFonts, 3)
-      hStringFormat := Gdip_StringFormatGetGeneric(1)
-      Gdip_SetStringFormatAlign(hStringFormat, 1, 1)     ; center
       txtColor := (uiUseDarkMode=1) ? "FFffFF" : "000000"
       thisOpacity := (isActive=1) ? "0xEF" : "0x99"
       pBitmap := trGdip_CreateBitmap(A_ThisFunc, w, h)
@@ -96813,7 +96781,7 @@ GuiUpdateSliders(whichSlider, isHwnd:=0, obju:=0) {
    {
       pBitmap := obju.pBitmap
       hFont := obju.hFont
-      hStringFormat := obju.hStringFormat
+      ; hStringFormat := obju.hStringFormat
       pBrush := obju.pBrush
       G := obju.G
    }
@@ -96908,8 +96876,8 @@ GuiUpdateSliders(whichSlider, isHwnd:=0, obju:=0) {
    if !IsObject(obju)
    {
       Gdip_DeleteGraphics(G)
-      Gdip_DeleteStringFormat(hStringFormat)
-      Gdip_DeleteFontFamily(hFontFamily)
+      ; Gdip_DeleteStringFormat(hStringFormat)
+      ; Gdip_DeleteFontFamily(hFontFamily)
       Gdip_DeleteFont(hFont)
       Gdip_DeleteBrush(pBrush)
       trGdip_DisposeImage(pBitmap)

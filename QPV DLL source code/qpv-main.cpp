@@ -66,11 +66,11 @@ void fnOutputDebug(std::string input) {
     OutputDebugStringA(ss.str().data());
 }
 
-inline bool inRange(const float low, const float high, const float x) {
+inline bool inRange(const float &low, const float &high, const float &x) {
     return (low <= x && x <= high);
 }
 
-inline bool inRange(const int low, const int high, const int x) {
+inline bool inRange(const int &low, const int &high, const int &x) {
     return (low <= x && x <= high);
 }
 
@@ -168,46 +168,46 @@ DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
        return 0;
 }
 
-int inline getGrayscale(int r, int g, int b) {
+int inline getGrayscale(const int &r, const int &g, const int &b) {
     return clamp(char_to_grayRfloat[r] + char_to_grayGfloat[g] + char_to_grayBfloat[b], 0.0f, 255.0f);
 }
 
-
-int inline brightMaths(int i, float fintensity) {
+int inline brightMaths(const int &i, const float &fintensity) {
     return clamp(i + round( (float)i*fintensity ), 0.0f, 255.0f);
 }
 
-int inline contraMaths(int i, float fintensity, float deviation) {
+int inline contraMaths(const int &i, const float &fintensity, const float &deviation) {
     return clamp(floor( (float)fintensity * (i - 128.0f) ) + deviation, 0.0f, 255.0f);
 }
 
-int inline gammaMaths(int i, double gamma) {
+int inline gammaMaths(const int &i, const double &gamma) {
     return round(255.0f * pow(char_to_float[i], gamma));
 }
 
-int inline getInt16grayscale(int r, int g, int b) {
+int inline getInt16grayscale(const int &r, const int &g, const int &b) {
     return clamp((int)(int_to_grayRi[r] + int_to_grayGi[g] + int_to_grayBi[b]), 0, 65535);
 }
-int inline brightMathsInt16(int i, float fintensity) {
+
+int inline brightMathsInt16(const int &i, const float &fintensity) {
     return clamp(i + (float)i*fintensity, 0.0f, 65535.0f);
 }
 
-int inline contraMathsInt16(int i, float fintensity, float deviation) {
+int inline contraMathsInt16(const int &i, const float &fintensity, const float &deviation) {
     return clamp(floor( (float)fintensity * (i - 32768.0f) ) + deviation, 0.0f, 65535.0f);
 }
 
-int inline gammaMathsInt16(int i, double gamma) {
+int inline gammaMathsInt16(const int &i, const double &gamma) {
     return round(65535.0f * pow(int_to_float[i], gamma));
 }
 
 
 #include "qpv-main.h"
 
-inline INT64 CalcPixOffset(int x, int y, INT64 Stride, INT64 bitsPerPixel) {
+inline INT64 CalcPixOffset(const int &x, const int &y, const int &Stride, const int &bitsPerPixel) {
     return y * Stride + x * (bitsPerPixel / 8);
 }
 
-bool isInsideRectOval(float ox, float oy, int modus) {
+bool isInsideRectOval(const float &ox, const float &oy, const int &modus) {
     // Translate the coordinates
     // if (excludeSelectScale!=0)
     // {
@@ -215,8 +215,8 @@ bool isInsideRectOval(float ox, float oy, int modus) {
     //       return 0;
     // }
 
-    float tw = (modus==2) ? imgSelExclW : hImgSelW;
-    float th = (modus==2) ? imgSelExclH : hImgSelH;
+    const float tw = (modus==2) ? imgSelExclW : hImgSelW;
+    const float th = (modus==2) ? imgSelExclH : hImgSelH;
     float x = (modus==2) ? ox - tw - imgSelExclX : ox - tw;
     float y = (modus==2) ? oy - th - imgSelExclY : oy - th;
     x *= imgSelXscale;
@@ -594,16 +594,14 @@ DLL_API int DLL_CALLCONV discardFilledPolygonCache(int m) {
     polygonMaskMap.shrink_to_fit();
     DrawLineCapsGrid.clear();
     DrawLineCapsGrid.shrink_to_fit();
-    DrawLineGrid.clear();
-    DrawLineGrid.shrink_to_fit();
     return 1;
 }
 
-bool inline isDotInRect(int mX, int mY, int x1, int x2, int y1, int y2) {
+bool inline isDotInRect(const int &mX, const int &mY, const int &x1, const int &x2, const int &y1, const int &y2) {
    return ( (min(x1, x2) <= mX && mX <= max(x1, x2))  &&  (min(y1, y2) <= mY && mY <= max(y1, y2)) ) ? 1 : 0;
 }
 
-void inline min_diff(int& va, int& vb, int diff) {
+void inline min_diff(int &va, int &vb, const int &diff) {
     int d = abs(va - vb);
     if (d < diff) {
        int dp = diff - d;
@@ -749,7 +747,27 @@ DLL_API int DLL_CALLCONV testFilledPolygonCache(int m) {
     return r;
 }
 
-void translateLine(const Point& p1, const Point& p2, double distance, Point& new_p1, Point& new_p2) {
+void extendLine(const Point p1, const Point p2, const double distance, Point &newP1, Point &newP2) {
+// Function to extend the line by a given parameter on both ends
+    // Calculate the direction vector of the line
+    double dx = p2.x - p1.x;
+    double dy = p2.y - p1.y;
+
+    // Calculate the length of the line segment
+    double length = std::sqrt(dx * dx + dy * dy);
+
+    // Normalize the direction vector
+    double ux = dx / length;
+    double uy = dy / length;
+
+    // Extend the points by the distance parameter
+    newP1.x = p1.x - ux * distance;
+    newP1.y = p1.y - uy * distance;
+    newP2.x = p2.x + ux * distance;
+    newP2.y = p2.y + uy * distance;
+}
+
+void translateLine(const Point& p1, const Point& p2, const double distance, Point& new_p1, Point& new_p2) {
 // Function to translate a line by a given distance parallel to the initial one
 
     // Calculate the direction vector of the line
@@ -768,7 +786,7 @@ void translateLine(const Point& p1, const Point& p2, double distance, Point& new
     // new_p2 = {p2.x + perpVec.x * distance, p2.y + perpVec.y * distance};
 }
 
-void drawLineSegmentPerpendicular(int x0, int y0, int x1, int y1, int cx, int cy) {
+void drawLineSegmentPerpendicular(int x0, int y0, const int &x1, const int &y1, const int &cx, const int &cy, const bool &coli, vector<pair<int, int>> &grid) {
 // bresehan algorithm based on
 // https://zingl.github.io/bresenham.html
 // https://github.com/zingl/Bresenham
@@ -778,7 +796,14 @@ void drawLineSegmentPerpendicular(int x0, int y0, int x1, int y1, int cx, int cy
    int err = dx + dy, e2;                              /* error value e_xy */
 
    for (;;) {
-      DrawLineGrid.push_back(make_pair(x0 - cx, y0 - cy));
+      grid.push_back(make_pair(x0 - cx, y0 - cy));
+      if (coli!=1)
+      {
+         grid.push_back(make_pair(x0 - cx + 1, y0 - cy + 1));
+         grid.push_back(make_pair(x0 - cx, y0 - cy + 1));
+         grid.push_back(make_pair(x0 - cx + 1, y0 - cy));
+      }
+      // fnOutputDebug("dl=" + std::to_string(x0 - cx) + " // " + std::to_string(y0 - cy));
       if (x0 == x1 && y0 == y1) break;
 
       e2 = 2*err;
@@ -787,23 +812,34 @@ void drawLineSegmentPerpendicular(int x0, int y0, int x1, int y1, int cx, int cy
    }
 }
 
-void drawLineSegmentMask(int x0, int y0, const int x1, const int y1, const bool p, const int offsetY) {
+void drawLineSegmentMask(int x0, int y0, const int &x1, const int &y1, const bool &p, const int &offsetY, const int &rounded, const int &thickness) {
 // bresehan algorithm based on
 // https://zingl.github.io/bresenham.html
 // https://github.com/zingl/Bresenham
 // by Zingl Alois
-   // Point pA, pB;
-   // DrawLineGrid.clear();
-   // translateLine({(double)x0, (double)y0}, {(double)x1, (double)y1}, thickness, pA, pB);
-   // drawLineSegmentPerpendicular(pA.x, pA.y, pB.x, pB.y, x0, y0);
-   // fnOutputDebug("DrawLineGrid.size=" + std::to_string(DrawLineGrid.size()));
+   Point pA, pB, pNa, pNb;
+   vector<pair<int, int>> lineGrid;
+   if (rounded!=1)
+   {
+       // DrawLineGrid.clear();
+       // extendLine({(double)x0, (double)y0}, {(double)x1, (double)y1}, 0.1, pNa, pNb);
+       // translateLine(pNa, pNb, thickness, pA, pB);
+       const bool coli = (x0==x1 || y0==y1) ? 1 : 0;
+       translateLine({(double)x0, (double)y0}, {(double)x1, (double)y1}, thickness, pA, pB);
+       drawLineSegmentPerpendicular(pA.x, pA.y, pB.x, pB.y, x0, y0, coli, lineGrid);
+       // fnOutputDebug("DrawLineGrid.size=" + std::to_string(DrawLineGrid.size()));
+       // x0 = pNa.x;       y0 = pNa.y;
+       // x1 = pNb.x;       y1 = pNb.y;
+   }
 
    const int dx =  abs(x1-x0), sx = (x0<x1) ? 1 : -1;
    const int dy = -abs(y1-y0), sy = (y0<y1) ? 1 : -1;
    int err = dx + dy, e2, gx, gy;
+   auto &currentGrid = (rounded==1) ? DrawLineCapsGrid : lineGrid;
 
    for (;;) {
-      for (auto &point : DrawLineCapsGrid) {
+      for (auto &point : currentGrid) {
+      // for (auto &point : DrawLineCapsGrid) {
           gx = x0 + point.first - polyX;
           gy = y0 + point.second - polyY + offsetY;
           if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
@@ -861,7 +897,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
            yb = PointsList[1];
         }
 
-        drawLineSegmentMask(xa, ya, xb, yb, doubles, offsetY);
+        drawLineSegmentMask(xa, ya, xb, yb, doubles, offsetY, rounded, thickness);
         // for (auto &point : DrawLineCapsGrid) {
         //     const int gx = xb + point.first - polyX;
         //     const int gy = yb + point.second - polyY;
@@ -901,29 +937,17 @@ DLL_API int DLL_CALLCONV prepareDrawLinesCapsGridMask(int radius, int rounded) {
 
     int rr = radius * radius;
     int minRR = (float)rr * ff;
-    int maxDia = (float)diameter * ff;
-    int minDia = diameter - maxDia;
-
     for (int x = 0; x < diameter; ++x) {
         for (int y = 0; y < diameter; ++y) {
             int dx = x - centerX;
             int dy = y - centerY;
-            if (rounded==1)
-            {
-               if (inRange(minRR, rr, dx * dx + dy * dy)==1)
-               // if (dx * dx + dy * dy<rr)
-                  DrawLineCapsGrid.push_back(make_pair(dx, dy));
-            } else
-            {
-               if (dx * dx + dy * dy>minRR)
-               // if (inRange(minDia, maxDia, x)!=1 && !inRange(minDia, maxDia, y)!=1)
-                  DrawLineCapsGrid.push_back(make_pair(dx, dy));
-            }
+            if (inRange(minRR, rr, dx * dx + dy * dy)==1)
+            // if (dx * dx + dy * dy<rr)
+               DrawLineCapsGrid.push_back(make_pair(dx, dy));
         }
     }
 
-    fnOutputDebug(std::to_string(radius) + " radius; prepareDrawLinesCapsGridMask() - done; rr/minRR=" + std::to_string(rr) + " / " + std::to_string(minRR));
-    fnOutputDebug("prepareDrawLinesCapsGridMask() - done; min/maxDia=" + std::to_string(minDia) + " / " + std::to_string(maxDia));
+    fnOutputDebug(std::to_string(radius) + " radius; prepareDrawLinesCapsGridMask() - done; rr=" + std::to_string(rr));
 }
 
 DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int rounded) {
@@ -3125,7 +3149,7 @@ DLL_API int DLL_CALLCONV ConvertToGrayScale(unsigned char *BitmapData, const int
 }
 
 DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h, int Stride, int bpp, int color, int opacity, int eraser, int linearGamma, int blendMode, int flipLayers, unsigned char *maskBitmap, int mStride, unsigned char *colorBitmap, int gStride, int gBpp, int fillBehind, int opacityMultiplier, int keepAlpha, int nBmpW, int nBmpH) {
-    // fnOutputDebug("FillSelectArea mStride=" + std::to_string(mStride));
+    fnOutputDebug("FillSelectArea mStride=" + std::to_string(mStride));
     // fnOutputDebug("clipMaskFilter=zx=" + std::to_string(zx1) + "/" + std::to_string(zx2) + "=w=" + std::to_string(max(zx1, zx2) - min(zx1, zx2)));
     // fnOutputDebug("clipMaskFilter=zy=" + std::to_string(zy1) + "/" + std::to_string(zy2) + "=h=" + std::to_string(max(zy1, zy2) - min(zy1, zy2)));
     RGBAColor initialColor;
@@ -3861,7 +3885,7 @@ DLL_API int DLL_CALLCONV ColorizeGrayImage(unsigned char *originalData, int w, i
     return 1;
 }
 
-inline int hammingDistance(UINT64 n1, UINT64 n2, UINT hamDistLBorderCrop, UINT hamDistRBorderCrop, bool doRange) { 
+inline int hammingDistance(const UINT64 n1, const UINT64 n2, const UINT hamDistLBorderCrop, const UINT hamDistRBorderCrop, const bool doRange) { 
     UINT64 x = n1 ^ n2; 
     int setBits = 0; 
     if (doRange==0)
@@ -3939,7 +3963,7 @@ void setMainWindowTitle(std::string str, HWND pvHwnd) {
 DLL_API UINT DLL_CALLCONV hammingDistanceOverArray(UINT64 *givenHashesArray, UINT64 *givenFlippedHashesArray, UINT *givenIDs, UINT arraySize, int threshold, UINT hamDistLBorderCrop, UINT hamDistRBorderCrop, int checkInverted, int checkFlipped, int stepping, int offsetu, int* hoffset) {
    UINT results = 0;
    UINT n = arraySize;
-   bool doRange = (hamDistLBorderCrop==0 && hamDistRBorderCrop==0) ? 0 : 1;
+   const bool doRange = (hamDistLBorderCrop==0 && hamDistRBorderCrop==0) ? 0 : 1;
    // int mainIndex = 1;
    // int returnVal = 1;
    // std::stringstream ss;
@@ -4178,7 +4202,7 @@ inline void SafeRelease(T *&p)
     }
 }
 
-INT indexedPixelFmts(WICPixelFormatGUID oPixFmt) {
+INT indexedPixelFmts(const WICPixelFormatGUID oPixFmt) {
     INT uPixFmt = 0;
     if (oPixFmt==GUID_WICPixelFormatDontCare)
        uPixFmt = 1;
@@ -4363,7 +4387,7 @@ INT indexedPixelFmts(WICPixelFormatGUID oPixFmt) {
     return uPixFmt;
 }
 
-INT indexedContainerFmts(GUID containerFmt) {
+INT indexedContainerFmts(const GUID containerFmt) {
     INT ucontainerFmt = 0;
     if (containerFmt == GUID_ContainerFormatBmp)
        ucontainerFmt = 1;
@@ -4392,7 +4416,7 @@ INT indexedContainerFmts(GUID containerFmt) {
     return ucontainerFmt;
 }
 
-auto adaptImageGivenSize(UINT keepAratio, UINT ScaleAnySize, UINT imgW, UINT imgH, UINT givenW, UINT givenH) {
+auto adaptImageGivenSize(const UINT keepAratio, const UINT ScaleAnySize, const UINT imgW, const UINT imgH, const UINT givenW, const UINT givenH) {
   std::array<UINT, 3> size;
   size[0] = 0;
   size[1] = 0;
@@ -4407,8 +4431,8 @@ auto adaptImageGivenSize(UINT keepAratio, UINT ScaleAnySize, UINT imgW, UINT img
   {
      if (imgW>givenW || imgH>givenH || ScaleAnySize==1)
      {
-         double PicRatio = (float)(imgW)/imgH;
-         double givenRatio = (float)(givenW)/givenH;
+         const double PicRatio = (float)(imgW)/imgH;
+         const double givenRatio = (float)(givenW)/givenH;
          if (imgW<=givenW && imgH<=givenH)
          {
             size[0] = givenW;
@@ -4439,7 +4463,7 @@ auto adaptImageGivenSize(UINT keepAratio, UINT ScaleAnySize, UINT imgW, UINT img
      size[1] = givenH;
   }
 
-  double mpx = (size[0] * size[1])/1000000;
+  const double mpx = (size[0] * size[1])/1000000;
   if (mpx>536.4)
   {
      float g = 536.4/mpx;
