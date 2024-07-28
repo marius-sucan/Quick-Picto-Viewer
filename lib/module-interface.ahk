@@ -2810,6 +2810,7 @@ WM_KEYDOWN(wParam, lParam, msg, hwnd) {
           Return 0
     } Else
     {
+       ; escape key was pressed
        preByeRoutine()
        Return 0
     }

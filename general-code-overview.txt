@@ -847,6 +847,10 @@ i) Image live editing
    Many of the image editing tools rely on C++ functions invoked via
    DLL calls from "qpvmain.dll" written by me.
 
+   Garbage collection is mainly performed via resetMainWin2Welcome().
+   In this function, various objects are discarded, including viewport 
+   image caches and image undo levels.
+
 
 j) How to enable alpha masking for an image editing live tool
 =====================================================================

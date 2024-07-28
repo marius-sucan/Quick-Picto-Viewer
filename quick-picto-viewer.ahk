@@ -38,8 +38,8 @@
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
 ;@Ahk2Exe-UpdateManifest 0, Quick Picto Viewer
 ;@Ahk2Exe-SetOrigFilename Quick-Picto-Viewer.exe
-;@Ahk2Exe-SetVersion 6.0.00
-;@Ahk2Exe-SetProductVersion 6.0.00
+;@Ahk2Exe-SetVersion 6.0.50
+;@Ahk2Exe-SetProductVersion 6.0.50
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2024)
 ;@Ahk2Exe-SetCompanyName https://marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -215,7 +215,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := [], prevPasteInPlaceVPcoords := []
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := ""
-   , appVersion := "6.0.00", vReleaseDate := "2024/06/05" ; yyyy-mm-dd
+   , appVersion := "6.0.50", vReleaseDate := "2024/07/28" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -2633,7 +2633,7 @@ resetMainWin2Welcome() {
      createGradientBrushBitmap("kill", 0, 0, 0, 0)
      createClonedBrushBitmap("kill", 0, 0, 0, 0)
      viewportStampBMP := trGdip_DisposeImage(viewportStampBMP, 1)
-     gdipObjectsStats()
+     gdipObjectsTerminator()
      ForceRefreshNowThumbsList()
      prevOpenedWindow := ""
      SetTimer, createGUItoolbar, -100
@@ -16067,7 +16067,7 @@ terminateIMGediting(modus:=0) {
              undoLevelsArray[A_Index, 1] := ""
          }
 
-         gdipObjectsStats("recordUndoLevelNow")
+         gdipObjectsTerminator("recordUndoLevelNow")
          currentImgModified := 0
          undoSelLevelsArray := []
          currentSelUndoLevel := 1
@@ -16097,7 +16097,7 @@ terminateIMGediting(modus:=0) {
        undoLevelsArray[A_Index, 1] := ""
    }
 
-   gdipObjectsStats("recordUndoLevelNow")
+   gdipObjectsTerminator("recordUndoLevelNow")
    fnOutputDebug(A_ThisFunc "(): undo/redo levels purged")
    currentSelUndoLevel := 1
    undoSelLevelsArray := []
@@ -23655,7 +23655,7 @@ rescaleFIMbmpGDIp(ByRef hFIFimgA, nw, nh) {
 corePasteClipboardImg(modus, imgW, imgH, allowFilesPaste) {
     clipBMP := Gdip_CreateBitmapFromClipboard()
     If StrLen(clipBMP)>2
-       recordGdipBitmaps(clipBMP, A_ThisFunc)
+       recordGdipBitmaps(clipBMP, A_ThisFunc "|recordUndoLevelNow")
 
     If (isInRange(Abs(clipBMP), 1, 5) || !validBMP(clipBMP))
     {
@@ -23668,8 +23668,9 @@ corePasteClipboardImg(modus, imgW, imgH, allowFilesPaste) {
           textMode := 1
           toPaste := SubStr(toPaste, 1, 9500)
           clipBMP := drawTextInBox(toPaste, OSDFontName, PasteFntSize, imgW, imgH, OSDtextColor, OSDbgrColor, 0, 0, usrTextAlign, "0xFF")
+          setGdipBMPinfos(clipBMP, A_ThisFunc "|recordUndoLevelNow")
           If (modus=1)
-             showTOOLtip("Text clipboard content rendered as image`nOSD font and colors used")
+             showTOOLtip("Text clipboard content rendered as image.`nOSD font and colors were used.")
           SetTimer, RemoveTooltip, % -msgDisplayTime
        } Else
        {
@@ -23728,6 +23729,7 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
        }
 
        clipBMP := corePasteClipboardImg(1, ResolutionWidth*2, Round(ResolutionHeight*4.3), 1)
+       ; clipBMP := returnDummyBitmap(7500, 7500, 1)
     }
 
     If !validBMP(clipBMP)
@@ -93393,6 +93395,16 @@ printImageNow(mainBMP, PrintOptions, previewMode, inLoop:=0, OutFileName:=0) {
    trGdip_DisposeImage(imgToPrint, 1)
 }
 
+returnDummyBitmap(w, h, r) {
+    BrushToolRandomHue := BrushToolRandomSat := 50
+    startToolColor := RandomizeBrushColor("223311") 
+    pBitmap := (r=1) ? trGdip_CreateBitmap(A_ThisFunc, w, h) : Gdip_CreateBitmap(w, h)
+    kk := Gdip_GraphicsFromImage(pBitmap)
+    Gdip_GraphicsClear(kk, "0xFF" startToolColor)
+    Gdip_DeleteGraphics(kk)
+    Return pBitmap
+}
+
 AcquireWIAimage() {
     Static deviceu
     If (thumbsDisplaying=1)
@@ -93414,6 +93426,9 @@ AcquireWIAimage() {
     interfaceThread.ahkassign("AnyWindowOpen", AnyWindowOpen)
     interfaceThread.ahkassign("whileLoopExec", whileLoopExec)
     WinSet, Enable,, ahk_id %PVhwnd%
+
+    ; kp := returnDummyBitmap(8500, 8500, 0)
+    ; obju := [kp, 0]
     If IsObject(obju)
     {
        pBitmap := obju[1]
@@ -93426,29 +93441,41 @@ AcquireWIAimage() {
     {
        ResetImgLoadStatus()
        ; showTOOLtip("Failed to acquire image`n" errMsg.message)
+       deviceu := ""
        RemoveTooltip()
        infos := SubStr(errMsg.message, 1, InStr(errMsg.message, "`nhelpfile:") - 1)
        infos := StrReplace(infos, "`t", A_Space)
        infos := StrReplace(infos, "  ", A_Space)
        msgBoxWrapper(appTitle ": ERROR", "An error has occured. Failed to acquire image from device.`n`nError details: " infos, 0, 0, "error")
        Return
+    } Else If (obju=-1 || obju=-2)
+    {
+       RemoveTooltip()
+       ResetImgLoadStatus()
+       deviceu := ""
+       infos := (obju=-1) ? "No device selected." : "No image was returned by scanner."
+       showTOOLtip("WARNING: No image acquired.`n" infos)
+       SoundBeep 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
     } Else If (obju<0 && !IsObject(obju))
     {
        RemoveTooltip()
        ResetImgLoadStatus()
+       deviceu := ""
     } Else
     {
-       recordGdipBitmaps(pBitmap, A_ThisFunc)
-       trGdip_GetImageDimensions(pBitmap, imgW, imgH)
+       Gdip_GetImageDimensions(pBitmap, imgW, imgH)
        If (imgW<5 || imgH<5)
        {
           ResetImgLoadStatus()
-          hbmp := trGdip_DisposeImage(pBitmap, 1)
+          hbmp := Gdip_DisposeImage(pBitmap, 1)
           showTOOLtip("Failed to acquire the correct image data`nPossibly malformed image format.")
           SoundBeep , 300, 100
           SetTimer, RemoveTooltip, % -msgDisplayTime
           Return
        }
+
+       recordGdipBitmaps(pBitmap, A_ThisFunc "|recordUndoLevelNow")
        SoundBeep , 900, 100
        PasteClipboardIMG("scanner", pBitmap)
     }
@@ -93777,6 +93804,11 @@ trGdip_CreateBitmap(funcu, Width, Height, PixelFormat:=0, Stride:=0, Scan0:=0) {
     Return r
 }
 
+setGdipBMPinfos(r, info) {
+   If StrLen(r)>2
+      createdGDIobjsArray["x" r, 4] := info
+}
+
 recordGdipBitmaps(r, infoz, typu:="bmp") {
    If validBMP(r)
       addJournalEntry("ERROR: recorded a new bitmap ID that was not discarded. WTF? OLD=" createdGDIobjsArray["x" r, 4] ". NEW=" infoz)
@@ -94095,7 +94127,7 @@ validBMP(pBitmap) {
     Return createdGDIobjsArray["x" pBitmap, 3]
 }
 
-gdipObjectsStats(filteru:=0) {
+gdipObjectsTerminator(filteru:=0) {
    Critical, on
    UnremovedBMPs := discarded := 0
    For Key, Value in createdGDIobjsArray

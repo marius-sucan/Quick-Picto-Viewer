@@ -4,8 +4,9 @@
 // Project began in early May 2019.
 // Related: general-code-overview.txt
 
-- v6.0.50 (2024-07-**)
-  - [improvement] «draw shapes contours» tool now works with images over 536 megapixels
+- v6.0.50 (2024-07-28)
+  - [new] «draw shapes contours» tool now works with images over 536 megapixels
+  - fixed IMPORTANT bugs
 
 - v6.0.00 (2024-06-05)
   - [new] QPV can now display, at full resolution, images of up to 12500 megapixels or more; previously, they were down-scaled to 536 mgpx.
@@ -1113,7 +1114,6 @@ Files organization:
 ; KNOWN ISSUES [mardi 4 juin 2024]:
 - when multi-threaded is activated, QPV randomly hangs [and never recovers] in thumbnails mode; a dead-lock?
 - when using image editing live tools, the application sometimes hangs [and never recovers] when using the custom sliders; another dead-lock?
-- QPV sometimes crashes when clicking on toolbar icons and opens an image editing live tool [no idea why]
 - jpeg lossless crop: the selection area does not precisely match with the resulted image [freeimage]
 - high memory consumption with images under 536 megapixels; most editing operations need a lot of RAM
 
@@ -1121,7 +1121,7 @@ Files organization:
 - use WIC for batch image simple processing tool ? At least, teleport them from WIC to FreeImage
 
 ; Tools left to implement for images above 536 MPx:
-- Draw lines 
+- Draw lines [in progress]
 - Brushes [and upgrade the blend modes function]
 -- Low priority tools:
 ---- Detect edges
