@@ -20432,7 +20432,7 @@ HugeImagesDrawLineShapes() {
             processGdipPathForDLL(pPath, tk, o_imgSelH, subdivide, PointsCount, PointsF)
             showTOOLtip("Drawing lines, please wait...`nStep 2/3")
             closed := (FillAreaShape=7) ? FillAreaClosedPath : 1
-            rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", DrawLineAreaCapsStyle, "int", 0, "int", 0)
+            rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", DrawLineAreaCapsStyle, "int", 0, "int", 0, "int", 0)
             If (rzb=1 && DrawLineAreaDoubles=1)
             {
                DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaCapsStyle)

@@ -70,7 +70,6 @@ struct Point {
     double x, y;
 };
 
-
 struct RGBColor {
     double r;
     double g;
