@@ -67,7 +67,7 @@ std::vector<UINT>  dupesListIDsC(1);
 std::array<double, 1025>  DCTcoeffs;
 
 struct Point {
-    double x, y;
+    float x, y;
 };
 
 struct RGBColor {
