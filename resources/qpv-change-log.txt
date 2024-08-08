@@ -4,6 +4,10 @@
 // Project began in early May 2019.
 // Related: general-code-overview.txt
 
+- v6.1.00 (2024-08-**)
+  - [improvement] «draw shapes contour» can now draw lines with miter joins
+
+
 - v6.0.50 (2024-07-28)
   - [new] «draw shapes contours» tool now works with images over 536 megapixels
   - fixed IMPORTANT bugs

@@ -20432,11 +20432,12 @@ HugeImagesDrawLineShapes() {
             processGdipPathForDLL(pPath, tk, o_imgSelH, subdivide, PointsCount, PointsF)
             showTOOLtip("Drawing lines, please wait...`nStep 2/3")
             closed := (FillAreaShape=7) ? FillAreaClosedPath : 1
-            rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", DrawLineAreaCapsStyle, "int", 0, "int", 0, "int", 0)
+            rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", DrawLineAreaCapsStyle, "int", 0, "int", 0, "int", -1)
             If (rzb=1 && DrawLineAreaDoubles=1)
             {
                DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaCapsStyle)
-               rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", DrawLineAreaCapsStyle, "int", 1, "int", diffThick)
+               kThick := (DrawLineAreaCapsStyle=1) ? thisThick : otherThick
+               rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", DrawLineAreaCapsStyle, "int", 1, "int", diffThick, "int", -1)
                DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaCapsStyle)
             }
 
@@ -47704,7 +47705,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     If (viewportQPVimage.imgHandle)
     {
        DrawLineAreaContourAlign := 2
-       DrawLineAreaDashStyle := DrawLineAreaCapsStyle := 1
+       DrawLineAreaDashStyle := 1
     }
 
     minislideWid := (PrefsLargeFonts=1) ? slideWid//2.32 : slideWid//2.52

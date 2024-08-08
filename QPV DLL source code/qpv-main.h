@@ -71,21 +71,15 @@ struct Point {
 };
 
 struct RGBColor {
-    double r;
-    double g;
-    double b;
+    double r, g, b;
 };
 
 struct RGBColorI {
-    int r;
-    int g;
-    int b;
+    int r, g, b;
 };
 
 struct HSLColor {
-    double h;
-    double s;
-    double l;
+    double h, s, l;
 
     double inline ConvertHueToRGB(const double &v1, const double &v2, double vH) {
            vH = ((vH<0) ? ++vH : vH);
@@ -536,10 +530,7 @@ struct RGBAColor {
 
 
 struct RGBA16color {
-    int b;
-    int g;
-    int r;
-    int a;
+    int b, g, r, a;
 
     HSLColor ConvertRGBtoHSL() {
        const double rf = int_to_float[r];
