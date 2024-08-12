@@ -382,7 +382,7 @@ void bresenham_line_algo(const int &w, const int &h, int x0, int y0, const int &
    }
 }
 
-bool isPointInPolygon(const INT64 &pX, const INT64 &pY, float* PointsList, const int &PointsCount) {
+bool isPointInPolygon(const INT64 &pX, const INT64 &pY, const float* PointsList, const int &PointsCount) {
 // based on https://stackoverflow.com/questions/217578/how-can-i-determine-whether-a-2d-point-is-within-a-polygon
 // https://wrf.ecse.rpi.edu/Research/Short_Notes/pnpoly.html
 // thank you VERY MUCH , Michael Katz <3
@@ -784,31 +784,57 @@ DLL_API int DLL_CALLCONV testFilledPolygonCache(int m) {
     return r;
 }
 
-void dummyDrawPixelMask(const Point &d, int offsetY, int simple) {
+void dummyDrawPixelMask(const Point &d, const int offsetY, const int simple, const bool p) {
     int gx = d.x - polyX;
     int gy = d.y - polyY + offsetY;
     if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
-       polygonMaskMap[(INT64)gy * polyW + gx] = 1;
+       polygonMaskMap[(INT64)gy * polyW + gx] = p;
 
     if (simple==1)
+    {
        return;
+    } else if (simple==2)
+    {
+       gx = d.x - polyX;
+       gy = d.y - polyY + offsetY;
+       if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
+          polygonMaskMap[(INT64)gy * polyW + gx] = 0;
+
+       gy = d.y + 1 - polyY + offsetY;
+       if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
+          polygonMaskMap[(INT64)gy * polyW + gx] = 1;
+
+       gy = d.y - 1 - polyY + offsetY;
+       if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
+          polygonMaskMap[(INT64)gy * polyW + gx] = 1;
+
+       gx = d.x + 1 - polyX;
+       gy = d.y - polyY + offsetY;
+       if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
+          polygonMaskMap[(INT64)gy * polyW + gx] = 1;
+
+       gx = d.x - 1 - polyX;
+       if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
+          polygonMaskMap[(INT64)gy * polyW + gx] = 1;
+       return;
+    }
 
     for (int i = 0; i < 5; ++i)
     {
        gx = d.x + i - polyX;
        gy = d.y - polyY + offsetY;
        if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
-          polygonMaskMap[(INT64)gy * polyW + gx] = 1;
+          polygonMaskMap[(INT64)gy * polyW + gx] = p;
 
        gx = d.x + i - polyX;
        gy = d.y + i - polyY + offsetY;
        if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
-          polygonMaskMap[(INT64)gy * polyW + gx] = 1;
+          polygonMaskMap[(INT64)gy * polyW + gx] = p;
 
        gx = d.x - polyX;
        gy = d.y + i - polyY + offsetY;
        if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
-          polygonMaskMap[(INT64)gy * polyW + gx] = 1;
+          polygonMaskMap[(INT64)gy * polyW + gx] = p;
     }
 }
 
@@ -874,9 +900,9 @@ void drawLineSegmentPerpendicular(int x0, int y0, const int &x1, const int &y1, 
       grid.push_back(make_pair(x0 - cx, y0 - cy));
       if (coli!=1)
       {
-         grid.push_back(make_pair(x0 - cx + 1, y0 - cy + 1));
          grid.push_back(make_pair(x0 - cx, y0 - cy + 1));
          grid.push_back(make_pair(x0 - cx + 1, y0 - cy));
+         grid.push_back(make_pair(x0 - cx + 1, y0 - cy + 1));
       }
       // fnOutputDebug("dl=" + std::to_string(x0 - cx) + " // " + std::to_string(y0 - cy));
       if (x0 == x1 && y0 == y1) break;
@@ -885,6 +911,8 @@ void drawLineSegmentPerpendicular(int x0, int y0, const int &x1, const int &y1, 
       if (e2 >= dy) { err += dy; x0 += sx; }                        /* x step */
       if (e2 <= dx) { err += dx; y0 += sy; }                        /* y step */
    }
+   if (coli!=1)
+      grid.pop_back();
 }
 
 
@@ -986,24 +1014,27 @@ bool findLinesIntersection(Point A, Point B, Point C, Point D, float &x, float &
     return 1;
 }
 
-void drawLineSegmentSimpleMask(Point a, const Point &b, const bool &p, const int &offsetY) {
+void drawLineSegmentSimpleMask(int ax, int ay, const int bx, const int by, const bool &p, const int &offsetY) {
 // bresehan algorithm based on
 // https://zingl.github.io/bresenham.html
 // https://github.com/zingl/Bresenham
 // by Zingl Alois
-   int ax = a.x;
-   int ay = a.y;
-   const int dx =  abs(b.x - a.x), sx = (a.x<b.x) ? 1 : -1;
-   const int dy = -abs(b.y - a.y), sy = (a.y<b.y) ? 1 : -1;
+   // fnOutputDebug("a=" + std::to_string(ax) + " // " + std::to_string(ay));
+   // fnOutputDebug("b=" + std::to_string(bx) + " // " + std::to_string(by));
+   const int dx =  abs(bx - ax), sx = (ax<bx) ? 1 : -1;
+   const int dy = -abs(by - ay), sy = (ay<by) ? 1 : -1;
    int err = dx + dy, e2, gx, gy;
    for (;;) {
       gx = ax - polyX;
       gy = ay - polyY + offsetY;
-      if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
-         polygonMaskMap[(INT64)gy * polyW + gx] = p;
+      #pragma omp critical
+      {
+          if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
+             polygonMaskMap[(INT64)gy * polyW + gx] = p;
+      }
 
       // drawLineCapOnMask(x0, y0);
-      if (ax == b.x && ay == b.y) break;
+      if (ax == bx && ay == by) break;
 
       e2 = 2*err;
       if (e2 >= dy) { err += dy; ax += sx; }                        /* x step */
@@ -1129,24 +1160,51 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
            const int zya = offsetPointsListA[i + 1];
            const int zxb = offsetPointsListB[i];
            const int zyb = offsetPointsListB[i + 1];
-/*
-           if (closed==0 && (pts==0 || pts==pci))
+
+           i *= 2;
+           if (closed==0 && PointsCount>2 && (pts==0 || pts==pci-1))
            {
+              int cxa, cxb, cya, cyb;
               Point np1, np2;
-              extendLine({(float)xb, (float)yb}, {(float)xa, (float)ya}, thickness*120, np1, np2);
+              extendLine({(float)xa, (float)ya}, {(float)xb, (float)yb}, thickness*1.5f, np1, np2);
+              float* dynamicArray = new float[8];
               if (pts==0)
               {
-                  xb = np2.x;
-                  yb = np2.y;
-                  // xa = np1.x;
-                  // ya = np1.y;
-              } // else
-              // {
-              //     xa = np1.x;
-              //     ya = np1.y;
-              // }
+                  cxa = xa - np1.x;              cya = ya - np1.y;
+                  cxb = xb - np2.x;              cyb = yb - np2.y;
+                  cxa = zxa - cxa;               cya = zya - cya;
+                  cxb = zxb + cxb;               cyb = zyb + cyb;
+                  // dummyDrawPixelMask({(float)zxa, (float)zya}, offsetY, 0);
+                  // dummyDrawPixelMask({(float)zxb, (float)zyb}, offsetY, 0);
+                  dynamicArray[0] = zxa;           dynamicArray[1] = zya;
+                  dynamicArray[2] = zxb;           dynamicArray[3] = zyb;
+                  drawLineSegmentSimpleMask(zxa, zya, cxa, cya, doubles, offsetY);
+                  drawLineSegmentSimpleMask(zxb, zyb, cxb, cyb, doubles, offsetY);
+              } else if (pts==pci-1)
+              {
+                  cxa = xb - np1.x;              cya = yb - np1.y;
+                  cxb = xa - np2.x;              cyb = ya - np2.y;
+                  cxa = zxa + cxa;               cya = zya + cya;
+                  cxb = zxb - cxb;               cyb = zyb - cyb;
+                  const int dxa = cxa - (xa - np1.x);
+                  const int dya = cya - (ya - np1.y);
+                  const int dxb = cxb + xb - np2.x;
+                  const int dyb = cyb + yb - np2.y;
+                  // dummyDrawPixelMask({(float)dxa, (float)dya}, offsetY, 0);
+                  // dummyDrawPixelMask({(float)dxb, (float)dyb}, offsetY, 0);
+                  dynamicArray[0] = dxa;           dynamicArray[1] = dya;
+                  dynamicArray[2] = dxb;           dynamicArray[3] = dyb;
+                  drawLineSegmentSimpleMask(dxa, dya, cxa, cya, doubles, offsetY);
+                  drawLineSegmentSimpleMask(dxb, dyb, cxb, cyb, doubles, offsetY);
+              }
+              dynamicArray[4] = cxb;           dynamicArray[5] = cyb;
+              dynamicArray[6] = cxa;           dynamicArray[7] = cya;
+              drawLineSegmentSimpleMask(cxa, cya, cxb, cyb, doubles, offsetY);
+
+              FillSimpleMaskPolygon(polyW, polyH, dynamicArray, 4, offsetY, doubles);
+              delete[] dynamicArray;
            }
-*/
+
            drawLineSegmentMask(xa, ya, xb, yb, doubles, offsetY, rounded, thickness, zxa, zya, zxb, zyb);
         }
     }
@@ -1154,9 +1212,8 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
     int skipped = 0;
     int painted = 0;
     int otherpainted = 0;
-    if (rounded!=1)
+    if (rounded!=1 && PointsCount>2)
     {
-        // allow this mode only for Rects, Triangles and custom shapes 
 /*        
         for (int pts = 0; pts < PointsCount; pts++)
         {
@@ -1245,20 +1302,19 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
         // offsetPointsListB.clear();
         // fnOutputDebug(std::to_string(offsetPointsListA.size()) + " preparing line thickness adjusted paths; SECOND ROUND; points=" + std::to_string(PointsCount));
         // prepareTranslatedLineSegments(thickness + 1, offsetPointsListA, offsetPointsListB, PointsList, PointsCount, closed);
-        const int pcs = pci - 1;
         #pragma omp parallel for schedule(static) default(none) num_threads(4)
         for (int pts = 0; pts < PointsCount; pts++)
         {
             // intersection point handle out of bounds, parallel lines/infinity
-            // handle two points lines, square caps 
-            // open/closed lines
+            // square/round caps option
+            // allow this mode only for Rects, Triangles and custom shapes 
 
             // if (pts!=tempus && tempus>=0)
             //    continue;
             if (pts==0 && closed==0)
                continue;
 
-            if (pts==pcs)
+            if (pts==pci)
             {
                if (closed!=1)
                   break;
@@ -1296,14 +1352,14 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
                    bz = (pts==0) ? Point{offsetPointsListB[z], offsetPointsListB[z + 1]} : Point{offsetPointsListB[z + 4], offsetPointsListB[z + 5]};
                 else
                    bz = (pts==0) ? Point{offsetPointsListA[z], offsetPointsListA[z + 1]} : Point{offsetPointsListA[z + 4], offsetPointsListA[z + 5]};
-                // drawLineSegmentSimpleMask(b, bz, 1, offsetY);
+                // drawLineSegmentSimpleMask(b.x, b.y, bz.x, bz.y, 1, offsetY);
 
                 z = pts * 4;
                 if (orientation==2)
                    az = (pts==0) ? Point{offsetPointsListB[2], offsetPointsListB[3]} : Point{offsetPointsListB[z + 2], offsetPointsListB[z + 3]};
                 else
                    az = (pts==0) ? Point{offsetPointsListA[2], offsetPointsListA[3]} : Point{offsetPointsListA[z + 2], offsetPointsListA[z + 3]};
-                // drawLineSegmentSimpleMask(a, az, 1, offsetY);
+                // drawLineSegmentSimpleMask(a.x, a.y, az.x, az.y, 1, offsetY);
 
                 float nx, ny;
                 bool p = findLinesIntersection(a, az, b, bz, nx, ny);
@@ -1318,15 +1374,21 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
                    dynamicArray[4] = b.x;           dynamicArray[5] = b.y;
                    dynamicArray[6] = c.x;           dynamicArray[7] = c.y;
                    // fnOutputDebug("interSectant = " + std::to_string(nx) + " // " + std::to_string(ny));
-                   // dummyDrawPixelMask({nx, ny}, offsetY, 0);
+                   // drawLineSegmentSimpleMask(b.x, b.y, nx, ny, doubles, offsetY);
+                   // drawLineSegmentSimpleMask(a.x, a.y, nx, ny, doubles, offsetY);
                 } else
                 {
                    dynamicArray[0] = a.x;           dynamicArray[1] = a.y;
                    dynamicArray[2] = b.x;           dynamicArray[3] = b.y;
                    dynamicArray[4] = c.x;           dynamicArray[5] = c.y;
+                   // drawLineSegmentSimpleMask(b.x, b.y, c.x, c.y, doubles, offsetY);
+                   // drawLineSegmentSimpleMask(a.x, a.y, c.x, c.y, doubles, offsetY);
                 }
 
                 FillSimpleMaskPolygon(polyW, polyH, dynamicArray, kk, offsetY, doubles);
+                // dummyDrawPixelMask(a, offsetY, 2, 0);
+                // dummyDrawPixelMask(b, offsetY, 2, 0);
+                // dummyDrawPixelMask(c, offsetY, 2, 0);
                 delete[] dynamicArray;
             }
         }
