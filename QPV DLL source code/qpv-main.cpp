@@ -804,83 +804,6 @@ void extendLine(const Point p1, const Point p2, const double distance, Point &ne
     newP2.y = p2.y + uy * distance;
 }
 
-void drawTestPath(float* PointsList, int PointsCount, double thickness, int closed, int offsetY, vector<float> &offsetPointsListA, vector<float> &offsetPointsListB) {
-    if (PointsCount < 2) {
-        return;
-    }
-
-    offsetPointsListA.clear();
-    offsetPointsListB.clear();
-    const int pci = PointsCount - 1;
-        float* dynamicArray = new float[8];
-    for (int pts = 0; pts < PointsCount; pts++)
-    {
-        int i = pts*2;
-        int xa = PointsList[i];
-        int ya = PointsList[i + 1];
-        int xb = PointsList[i + 2];
-        int yb = PointsList[i + 3];
-        if (pts==pci)
-        {
-           if (closed!=1)
-              break;
-
-           xb = PointsList[0];
-           yb = PointsList[1];
-        }
-
-        // Point p1, p2;
-        // extendLine({(float)xa, (float)ya}, {(float)xb, (float)yb}, 2.5, p1, p2);
-        const Point p1 = {xa, ya};
-        const Point p2 = {xb, yb};
-
-        // Calculate the direction vector of the line segment
-        const double dx = p2.x - p1.x;
-        const double dy = p2.y - p1.y;
-        const double length = sqrt(dx * dx + dy * dy);
-
-        // Normalize the direction vector
-        const double nx = dx / length;
-        const double ny = dy / length;
-
-        // Calculate the perpendicular vector
-        const double px = -ny;
-        const double py = nx;
-
-        // Calculate the translated segment
-        const double ppx = px * thickness;
-        const double ppy = py * thickness;
-        const double mx1 = p1.x + ppx;
-        const double my1 = p1.y + ppy;
-        const double mx2 = p1.x - ppx;
-        const double my2 = p1.y - ppy;
-        const double mx3 = p2.x - ppx;
-        const double my3 = p2.y - ppy;
-        const double mx4 = p2.x + ppx;
-        const double my4 = p2.y + ppy;
-        offsetPointsListA.push_back(mx1);
-        offsetPointsListA.push_back(my1);
-        offsetPointsListA.push_back(mx4);
-        offsetPointsListA.push_back(my4);
-        offsetPointsListB.push_back(mx2);
-        offsetPointsListB.push_back(my2);
-        offsetPointsListB.push_back(mx3);
-        offsetPointsListB.push_back(my3);
-  
-        // Draw the miter join polygon
-        dynamicArray[0] = mx1;
-        dynamicArray[1] = my1;
-        dynamicArray[2] = mx2;
-        dynamicArray[3] = my2;
-        dynamicArray[4] = mx3;
-        dynamicArray[5] = my3;
-        dynamicArray[6] = mx4;
-        dynamicArray[7] = my4;
-        FillSimpleMaskPolygon(polyW, polyH, dynamicArray, 4, offsetY, 0);
-    }
-        delete[] dynamicArray;
-}
-
 void dummyDrawPixelMask(const Point &d, const int offsetY, const int simple, const bool p) {
     int gx = d.x - polyX;
     int gy = d.y - polyY + offsetY;
@@ -935,7 +858,7 @@ void dummyDrawPixelMask(const Point &d, const int offsetY, const int simple, con
     }
 }
 
-void translateLine(const Point& p1, const Point& p2, const double distance, vector<float> &offsetPointsListA, vector<float> &offsetPointsListB) {
+void translateLine(const Point& p1, const Point& p2, const float distance, Point &np1, Point &np2, Point &np3, Point &np4) {
 // Function to translate a line by a given distance parallel to the initial one
 
     // Calculate the direction vector of the line
@@ -952,44 +875,14 @@ void translateLine(const Point& p1, const Point& p2, const double distance, vect
     const double py = nx;
 
     // Calculate the translated line
-    const double ppx = px * distance;
-    const double ppy = py * distance;
+    const float ppx = px * distance;
+    const float ppy = py * distance;
 
     // Translate the points
-    // new_p1 = {p1.x + perpVec.x * distance, p1.y + perpVec.y * distance};
-    // new_p2 = {p2.x + perpVec.x * distance, p2.y + perpVec.y * distance};
-    offsetPointsListA.push_back(p1.x + ppx);
-    offsetPointsListA.push_back(p1.y + ppy);
-    offsetPointsListA.push_back(p2.x + ppx);
-    offsetPointsListA.push_back(p2.y + ppy);
-    offsetPointsListB.push_back(p1.x - ppx);
-    offsetPointsListB.push_back(p1.y - ppy);
-    offsetPointsListB.push_back(p2.x - ppx);
-    offsetPointsListB.push_back(p2.y - ppy);
-}
-
-void NEWtranslateLine(const Point& p1, const Point& p2, const float distance, int &nx, int &ny, int &mx, int &my, int &gx, int &gy, int &jx, int &jy) {
-// Function to translate a line by a given distance parallel to the initial one
-
-    // Calculate the direction vector of the line
-    Point dirVec = {p2.x - p1.x, p2.y - p1.y};
-
-    // Normalize the direction vector
-    float length = sqrt(dirVec.x * dirVec.x + dirVec.y * dirVec.y);
-    Point normVec = {dirVec.x / length, dirVec.y / length};
-
-    // Get a perpendicular vector to the normalized direction vector
-    Point perpVec = {-normVec.y, normVec.x};
-
-    // Translate the points
-    nx = p1.x + perpVec.x * distance;
-    ny = p1.y + perpVec.y * distance;
-    gx = p2.x + perpVec.x * distance;
-    gy = p2.y + perpVec.y * distance;
-    mx = p1.x + perpVec.x * (-1 * distance);
-    my = p1.y + perpVec.y * (-1 * distance);
-    jx = p2.x + perpVec.x * (-1 * distance);
-    jy = p2.y + perpVec.y * (-1 * distance);
+    np1 = {p1.x + ppx, p1.y + ppy};
+    np2 = {p2.x + ppx, p2.y + ppy};
+    np3 = {p1.x - ppx, p1.y - ppy};
+    np4 = {p2.x - ppx, p2.y - ppy};
 }
 
 void drawLineSegmentPerpendicular(int x0, int y0, const int &x1, const int &y1, const int &cx, const int &cy, const bool &coli, vector<pair<int, int>> &grid) {
@@ -1179,15 +1072,14 @@ void drawLineSegmentMask(int x0, int y0, int x1, int y1, const bool &p, const in
           if (rounded!=1)
           {
              loops++;
-             // if (x0 == x1 && y0 == y1) || (loops<3 || loops>kl) {
-             if (loops<12 || loops>kl) {
-                okay = isPointInPolygon(x0 + point.first, y0 + point.second, rectu, 4);
-             // } else if (x0 == ox && y0 == ox) {
+             // if ((x0 == x1 && y0 == y1) || (x0 == ox && y0 == ox)) {
              //    okay = 1;
-             } else
+             // } else 
+             if (loops<14 || loops>kl) {
+                okay = isPointInPolygon(x0 + point.first, y0 + point.second, rectu, 4);
+             } else {
                 okay = 1;
-             {
-            }
+             }
           }
 
           if (okay==1)
@@ -1208,7 +1100,7 @@ void drawLineSegmentMask(int x0, int y0, int x1, int y1, const bool &p, const in
    }
 }
 
-void prepareTranslatedLineSegments(const float &thickness, vector<float> &offsetPointsListA, vector<float> &offsetPointsListB, float* PointsList, const int &PointsCount, const int &closed) {
+void prepareTranslatedLineSegments(const float &thickness, vector<float> &offsetPointsListA, vector<float> &offsetPointsListB, float* PointsList, const int &PointsCount, const int &closed, const bool &expand) {
    const int pci = PointsCount - 1;
    fnOutputDebug("old");
    for (int pts = 0; pts < PointsCount; pts++)
@@ -1221,7 +1113,17 @@ void prepareTranslatedLineSegments(const float &thickness, vector<float> &offset
           b = {PointsList[0], PointsList[1]};
        }
 
-       translateLine(a, b, thickness, offsetPointsListA, offsetPointsListB);
+       Point np1, np2, np3, np4;
+       translateLine(a, b, thickness, np1, np2, np3, np4);
+       offsetPointsListA.push_back(np1.x);
+       offsetPointsListA.push_back(np1.y);
+       offsetPointsListA.push_back(np2.x);
+       offsetPointsListA.push_back(np2.y);
+       offsetPointsListB.push_back(np3.x);
+       offsetPointsListB.push_back(np3.y);
+       offsetPointsListB.push_back(np4.x);
+       offsetPointsListB.push_back(np4.y);
+
        // i *= 2;
        // int kx = offsetPointsListA[i];
        // int ky = offsetPointsListA[i + 1];
@@ -1229,77 +1131,6 @@ void prepareTranslatedLineSegments(const float &thickness, vector<float> &offset
        // kx = offsetPointsListB[i];
        // ky = offsetPointsListB[i + 1];
        // fnOutputDebug(std::to_string(pts) + " kB=" + std::to_string(kx) + " // " + std::to_string(ky));
-   }
-}
-
-void NEWprepareTranslatedLineSegments(const float &thickness, vector<float> &offsetPointsListA, vector<float> &offsetPointsListB, float* PointsList, const int &PointsCount, const int &closed) {
-   const int pci = PointsCount - 1;
-   for (int pts = 0; pts < PointsCount; pts++)
-   {
-       int i = pts*2;
-       // Point a = {PointsList[i], PointsList[i + 1]};
-       // Point b = {PointsList[i + 2], PointsList[i + 3]};
-       int ax = PointsList[i];
-       int ay = PointsList[i + 1];
-       int bx = PointsList[i + 2];
-       int by = PointsList[i + 3];
-
-       if (pts==pci)
-       {
-          bx = PointsList[0];
-          by = PointsList[1];
-       }
-
-       int nx, ny, mx, my, gx, gy, jx, jy;
-       NEWtranslateLine({(float)ax, (float)ay}, {(float)bx, (float)by}, thickness, nx, ny, mx, my, gx, gy, jx, jy);
-
-       offsetPointsListA.push_back(nx);
-       offsetPointsListA.push_back(ny);
-       offsetPointsListB.push_back(mx);
-       offsetPointsListB.push_back(my);
-
-       // offsetPointsListA.push_back(gx);
-       // offsetPointsListA.push_back(gy);
-       // offsetPointsListB.push_back(jx);
-       // offsetPointsListB.push_back(jy);
-
-       i *= 2;
-       // Point da = {nx, ny};
-       // Point eb = {mx, my};
-       // Point da = {offsetPointsListA[i], offsetPointsListA[i + 1]};
-       // Point eb = {offsetPointsListB[i], offsetPointsListB[i + 1]};
-       const int zz = (ax==bx || ay==by) ? 0 : 0;
-       // const int zz = (a.x==b.x || a.y==b.y) ? 1 : 0;
-
-       int tx = ax - mx + zz;
-       int ty = ay - my + zz;
-       int kx = bx + tx;
-       int ky = by + ty;
-       offsetPointsListA.push_back(kx);
-       offsetPointsListA.push_back(ky);
-       tx = ax - nx + zz;
-       ty = ay - ny + zz;
-       kx = bx + tx;
-       ky = by + ty;
-       // fnOutputDebug(std::to_string(pts) + " t=" + std::to_string(tx) + " // " + std::to_string(ty));
-
-       offsetPointsListB.push_back(kx);
-       offsetPointsListB.push_back(ky);
-
-       kx = offsetPointsListA[i];
-       ky = offsetPointsListA[i + 1];
-       fnOutputDebug(std::to_string(pts) + " kA=" + std::to_string(kx) + " // " + std::to_string(ky));
-       kx = offsetPointsListB[i];
-       ky = offsetPointsListB[i + 1];
-       fnOutputDebug(std::to_string(pts) + " kB=" + std::to_string(kx) + " // " + std::to_string(ky));
-
-             // grid.push_back(make_pair(x0 - cx, y0 - cy));
-
-
-
-       // vector<pair<int, int>> lineGrid;
-       // drawLineSegmentPerpendicular(xa, ya, xb, yb, a.x, a.y, colinear, lineGrid);
-
    }
 }
 
@@ -1331,7 +1162,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
        // offsetPointsListA.clear();
        // offsetPointsListB.clear();
        
-       prepareTranslatedLineSegments(thickness, offsetPointsListA, offsetPointsListB, PointsList, PointsCount, closed);
+       prepareTranslatedLineSegments(thickness, offsetPointsListA, offsetPointsListB, PointsList, PointsCount, closed, 0);
        fnOutputDebug(std::to_string(offsetPointsListA.size()) + " finished line thickness adjusted paths;");
     }
 
@@ -1389,8 +1220,8 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
                   // dummyDrawPixelMask({(float)zxb, (float)zyb}, offsetY, 0);
                   dynamicArray[0] = zxa;           dynamicArray[1] = zya;
                   dynamicArray[2] = zxb;           dynamicArray[3] = zyb;
-                  drawLineSegmentSimpleMask(zxa, zya, cxa, cya, doubles, offsetY);
-                  drawLineSegmentSimpleMask(zxb, zyb, cxb, cyb, doubles, offsetY);
+                  // drawLineSegmentSimpleMask(zxa, zya, cxa, cya, doubles, offsetY);
+                  // drawLineSegmentSimpleMask(zxb, zyb, cxb, cyb, doubles, offsetY);
               } else if (pts==pci-1)
               {
                   cxa = xb - np1.x;              cya = yb - np1.y;
@@ -1405,28 +1236,34 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
                   // dummyDrawPixelMask({(float)dxb, (float)dyb}, offsetY, 0);
                   dynamicArray[0] = dxa;           dynamicArray[1] = dya;
                   dynamicArray[2] = dxb;           dynamicArray[3] = dyb;
-                  drawLineSegmentSimpleMask(dxa, dya, cxa, cya, doubles, offsetY);
-                  drawLineSegmentSimpleMask(dxb, dyb, cxb, cyb, doubles, offsetY);
+                  // drawLineSegmentSimpleMask(dxa, dya, cxa, cya, doubles, offsetY);
+                  // drawLineSegmentSimpleMask(dxb, dyb, cxb, cyb, doubles, offsetY);
               }
               dynamicArray[4] = cxb;           dynamicArray[5] = cyb;
               dynamicArray[6] = cxa;           dynamicArray[7] = cya;
-              drawLineSegmentSimpleMask(cxa, cya, cxb, cyb, doubles, offsetY);
+              // drawLineSegmentSimpleMask(cxa, cya, cxb, cyb, doubles, offsetY);
 
               FillSimpleMaskPolygon(polyW, polyH, dynamicArray, 4, offsetY, doubles);
               delete[] dynamicArray;
            }
 
-           float* dynamicArray = new float[8];
-           dynamicArray[0] = zxa;
-           dynamicArray[1] = zya;
-           dynamicArray[2] = zxb;
-           dynamicArray[3] = zyb;
-           dynamicArray[4] = zdxb;
-           dynamicArray[5] = zdyb;
-           dynamicArray[6] = zdxa;
-           dynamicArray[7] = zdya;
+           Point npA, npB, np1, np2, np3, np4;
+           extendLine({(float)xa, (float)ya}, {(float)xb, (float)yb}, 2, npA, npB);
+           translateLine(npA, npB, thickness, np1, np2, np3, np4);
 
-           drawLineSegmentMask(xa, ya, xb, yb, doubles, offsetY, rounded, thickness, zxa, zya, zxb, zyb, dynamicArray);
+           float* dynamicArray = new float[8];
+           dynamicArray[0] = np1.x;  // zxa;
+           dynamicArray[1] = np1.y;  // zya;
+           dynamicArray[2] = np3.x;  // zxb;
+           dynamicArray[3] = np3.y;  // zyb;
+           dynamicArray[4] = np4.x;  // zdxb;
+           dynamicArray[5] = np4.y;  // zdyb;
+           dynamicArray[6] = np2.x;  // zdxa;
+           dynamicArray[7] = np2.y;  // zdya;
+
+
+           drawLineSegmentMask(np1.x, np1.y, np2.x, np2.y, doubles, offsetY, rounded, thickness, zxa, zya, zxb, zyb, dynamicArray);
+           // drawLineSegmentMask(xa, ya, xb, yb, doubles, offsetY, rounded, thickness, zxa, zya, zxb, zyb, dynamicArray);
            delete[] dynamicArray;
         }
     }
@@ -1441,10 +1278,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
     {
         // drawTestPath(PointsList, PointsCount, thickness, closed, offsetY, offsetPointsListA, offsetPointsListB);
         fnOutputDebug("drawLineAllSegmentsMask() - drawing line miter joins");
-        // offsetPointsListA.clear();
-        // offsetPointsListB.clear();
         // fnOutputDebug(std::to_string(offsetPointsListA.size()) + " preparing line thickness adjusted paths; SECOND ROUND; points=" + std::to_string(PointsCount));
-        // prepareTranslatedLineSegments(thickness + 1, offsetPointsListA, offsetPointsListB, PointsList, PointsCount, closed);
         #pragma omp parallel for schedule(static) default(none) num_threads(4)
         for (int pts = 0; pts < PointsCount; pts++)
         {
