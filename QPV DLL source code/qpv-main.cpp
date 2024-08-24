@@ -655,6 +655,13 @@ void inline min_diff(int &va, int &vb, const int &diff) {
 }
 
 DLL_API int DLL_CALLCONV traverseCurvedPath(float* oPointsList, int oPointsCount, float* fPointsList, int fPointsCount, int gmx, int gmy, int sl, Gdiplus::GpPen *pPen, int* za, int* zb, int* f, int* l) {
+// function used to identify the closest points, in a vector path, to a given pair of X/Y coordinates
+// it determines the closest points [or the segment] in fPointsList and then the corresponding points [or segment] in oPointsList that is closest to gmX/gmY
+
+// oPointsList -- original path, polygonal, unsubdivided 
+// fPointsList -- subdivided path [using curved/cardinal/bezier GDI+ path modes], as a polygonal path 
+// function invoked by coreAddUnorderedVectorPointCurveMode() in Quick Picto Viewer AHK file
+
     std::vector<int> PathsMap(fPointsCount + 3);
     fnOutputDebug("step 0: " + std::to_string(oPointsCount) + " / " + std::to_string(fPointsCount));
     for ( int i = 0; i < oPointsCount*2; i+=2)
@@ -805,6 +812,7 @@ void extendLine(const Point p1, const Point p2, const double distance, Point &ne
 }
 
 void dummyDrawPixelMask(const Point &d, const int offsetY, const int simple, const bool p) {
+// test function, should be not used in production
     int gx = d.x - polyX;
     int gy = d.y - polyY + offsetY;
     if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
@@ -911,24 +919,6 @@ void drawLineSegmentPerpendicular(int x0, int y0, const int &x1, const int &y1, 
    }
 }
 
-
-bool inline testCoordsMaskFilled(const Point &d, const int offsetY) {
-    const int gx = d.x - polyX;
-    const int gy = d.y - polyY + offsetY;
-    bool r = 1;
-    if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
-       r = polygonMaskMap[(INT64)gy * polyW + gx];
-
-    return r;
-}
-
-bool inline testTriangleMaskFilled(const Point &a, const Point &b, const Point &c, const int offsetY) {
-    bool r = testCoordsMaskFilled({(a.x + b.x) / 2.0f, (a.y + b.y) / 2.0f}, offsetY);
-    if (r==1)
-       r = testCoordsMaskFilled({(a.x + b.x + c.x) / 3.0f, (a.y + b.y + c.y) / 3.0f}, offsetY);
-    return r;
-}
-
 short inline testPointsOrientation(Point p, Point q, Point r) {
 // Function to check the orientation of the triplet (p, q, r).
 // The function returns:
@@ -942,55 +932,8 @@ short inline testPointsOrientation(Point p, Point q, Point r) {
     return (val > 0) ? 1 : 2;  // clock or counterclockwise
 }
 
-bool testPointOnSegment(Point p, Point q, Point r) {
-    // Function to check if point q lies on line segment pr
-    if (q.x <= max(p.x, r.x) && q.x >= min(p.x, r.x) &&
-        q.y <= max(p.y, r.y) && q.y >= min(p.y, r.y))
-       return true;
-
-    return false;
-}
-
-bool testLinesIntersect(Point p1, Point q1, Point p2, Point q2) {
-    // unused function
-    // Function to check if line segment 'p1q1' and 'p2q2' intersect
-    // Find the four orientations needed for the general and special cases
-    int o1 = testPointsOrientation(p1, q1, p2);
-    int o2 = testPointsOrientation(p1, q1, q2);
-    int o3 = testPointsOrientation(p2, q2, p1);
-    int o4 = testPointsOrientation(p2, q2, q1);
-
-    // General case
-    if (o1 != o2 && o3 != o4)
-       return true;
-
-    // Special cases
-    // p1, q1 and p2 are collinear and p2 lies on segment p1q1
-    if (o1 == 0 && testPointOnSegment(p1, p2, q1))
-       return true;
-
-    // p1, q1 and q2 are collinear and q2 lies on segment p1q1
-    if (o2 == 0 && testPointOnSegment(p1, q2, q1))
-       return true;
-
-    // p2, q2 and p1 are collinear and p1 lies on segment p2q2
-    if (o3 == 0 && testPointOnSegment(p2, p1, q2))
-       return true;
-
-    // p2, q2 and q1 are collinear and q1 lies on segment p2q2
-    if (o4 == 0 && testPointOnSegment(p2, q1, q2))
-       return true;
-
-    return false; // Doesn't fall in any of the above cases
-}
-
 bool findLinesIntersection(Point A, Point B, Point C, Point D, float &x, float &y) {
     // Function to find the intersection point of two line segments if they intersect
-    // Check if the line segments intersect
-    // if (!testLinesIntersect(A, B, C, D)) {
-    //    return 0; // No intersection
-    // }
-
     // Line AB represented as a1x + b1y = c1
     float a1 = B.y - A.y;
     float b1 = A.x - B.x;
@@ -1011,6 +954,7 @@ bool findLinesIntersection(Point A, Point B, Point C, Point D, float &x, float &
 }
 
 void drawLineSegmentSimpleMask(int ax, int ay, const int bx, const int by, const bool &p, const int &offsetY) {
+// test function, for debugging; most likely unused in the code
 // bresehan algorithm based on
 // https://zingl.github.io/bresenham.html
 // https://github.com/zingl/Bresenham
@@ -1102,7 +1046,6 @@ void drawLineSegmentMask(int x0, int y0, int x1, int y1, const bool &p, const in
 
 void prepareTranslatedLineSegments(const float &thickness, vector<float> &offsetPointsListA, vector<float> &offsetPointsListB, float* PointsList, const int &PointsCount, const int &closed, const bool &expand) {
    const int pci = PointsCount - 1;
-   fnOutputDebug("old");
    for (int pts = 0; pts < PointsCount; pts++)
    {
        const int i = pts*2;
@@ -1208,7 +1151,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
            {
               int cxa, cxb, cya, cyb;
               Point np1, np2;
-              extendLine({(float)xa, (float)ya}, {(float)xb, (float)yb}, thickness*1.5f, np1, np2);
+              extendLine({(float)xa, (float)ya}, {(float)xb, (float)yb}, thickness*1.45f, np1, np2);
               float* dynamicArray = new float[8];
               if (pts==0)
               {
@@ -1248,7 +1191,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
            }
 
            Point npA, npB, np1, np2, np3, np4;
-           extendLine({(float)xa, (float)ya}, {(float)xb, (float)yb}, 2, npA, npB);
+           extendLine({(float)xa, (float)ya}, {(float)xb, (float)yb}, 1.5f, npA, npB);
            translateLine(npA, npB, thickness, np1, np2, np3, np4);
 
            float* dynamicArray = new float[8];
