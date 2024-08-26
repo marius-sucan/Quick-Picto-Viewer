@@ -370,6 +370,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , DrawLineAreaBlendMode := 1, BlendModesPreserveAlpha := 0, FillAreaCutGlass := 0
    , userImgChannelAlphaAdd := 0, forceSlowLivePreviewMode := 0, showContextualStatusBar := 1
    , vectorToolModus := 1, TextInAreaVerticalia := 0, DrawLineAreaThickScale := 100
+   , DrawLineAreaJoinsStyle := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -7397,6 +7398,7 @@ coreAddUnorderedVectorPointCurveMode(gmx, gmy, sl) {
    PointsListArray := []
    Loop, % totalCount
    {
+       ; original path, polygonal
        getVPcoordsVectorPoint(A_Index, xu, yu)
        xu := Round(xu),    yu := Round(yu)
        apz := "a" xu "|" yu
@@ -20409,9 +20411,11 @@ HugeImagesDrawLineShapes() {
       obju := InitHugeImgSelPath(0, imgW, imgH)
       zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
       Sleep, 50
+      roundJoins := DrawLineAreaJoinsStyle
+      roundCaps := DrawLineAreaCapsStyle
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
       rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", DrawLineAreaCapsStyle)
-      rza := DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaCapsStyle)
+      rza := DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", roundCaps)
       If (rza=1 && rzq=1)
       {
          otherThick := Round(thisThick*0.34)
@@ -20431,13 +20435,14 @@ HugeImagesDrawLineShapes() {
             subdivide := (((bezierSplineCustomShape=1 || FillAreaCurveTension>1) && FillAreaShape=7) || FillAreaShape=2 || FillAreaShape=3) ? 1 : 0
             processGdipPathForDLL(pPath, tk, o_imgSelH, subdivide, PointsCount, PointsF)
             showTOOLtip("Drawing lines, please wait...`nStep 2/3")
+            conturAlign := DrawLineAreaContourAlign
             closed := (FillAreaShape=7) ? FillAreaClosedPath : 1
-            rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", DrawLineAreaCapsStyle, "int", 0, "int", 0, "int", -1)
+            rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0, "int", -1)
             If (rzb=1 && DrawLineAreaDoubles=1)
             {
                DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaCapsStyle)
-               kThick := (DrawLineAreaCapsStyle=1) ? thisThick : otherThick
-               rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", DrawLineAreaCapsStyle, "int", 1, "int", diffThick, "int", -1)
+               kThick := (DrawLineAreaCapsStyle=1 && DrawLineAreaJoinsStyle=1) ? thisThick : otherThick
+               rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
                DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaCapsStyle)
             }
 
@@ -20446,11 +20451,11 @@ HugeImagesDrawLineShapes() {
             {
                Gdip_ScalePathAtCenter(clonedPath, innerSelectionCavityX, innerSelectionCavityY)
                processGdipPathForDLL(clonedPath, tk, o_imgSelH, subdivide, PointsCount, PointsF)
-               rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", DrawLineAreaCapsStyle)
+               rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0, "int", -1)
                If (rzb=1 && DrawLineAreaDoubles=1)
                {
                   DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaCapsStyle)
-                  rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", DrawLineAreaCapsStyle, "int", 1, "int", diffThick)
+                  rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
                }
                Gdip_DeletePath(clonedPath)
             }
@@ -47539,9 +47544,9 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
        GuiAddSlider("DrawLineAreaOpacity", 3,255, 255, "Opacity", "updateUIfillPanel", 1, "x+5 w" btnWid " hp")
        GuiAddDropDownList("xs y+7 w" btnWid " gupdateUIfillPanel AltSubmit Choose" DrawLineAreaBlendMode " vDrawLineAreaBlendMode", "No blend mode|" userBlendModesList, "Blending mode")
 
-       Gui, Add, Text, xs y+15 w%btnWid% vtxtLine3, Alignment
+       Gui, Add, Text, xs y+15 w%btnWid% vtxtLine3, Pen clipping
        Gui, Add, Text, x+10 wp vtxtLine4, Styling
-       GuiAddDropDownList("xs y+7 wp AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign gupdateUIfillPanel", "Inside|Centered|Outside", "Line alignment")
+       GuiAddDropDownList("xs y+7 wp AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign gupdateUIfillPanel", "Inside|Centered|Outside", "Pen clipping to shape")
        GuiAddDropDownList("x+10 wp AltSubmit Choose" DrawLineAreaDashStyle " vDrawLineAreaDashStyle gupdateUIfillPanel", "Continous|Dashes|Dots|Dashes and dots", "Line style")
        Gui, Add, Checkbox, xs y+5 w%btnWid% h%btnHeight% Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIfillPanel, &Double line
        Gui, Add, Checkbox, x+10 wp hp gupdateUIfillPanel Checked%DrawLineAreaCapsStyle% vDrawLineAreaCapsStyle, &Round caps
@@ -47734,15 +47739,17 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
 
     If (!viewportQPVimage.imgHandle)
     {
-       Gui, Add, Text, xs y+15 w%btnWid%, Alignment
+       Gui, Add, Text, xs y+15 w%btnWid%, Pen clipping
        Gui, Add, Text, x+5 wp, Styling
-       GuiAddDropDownList("xs y+7 wp AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign gupdateUIdrawShapesPanel", "Inside|Centered|Outside", "Line alignment")
+       GuiAddDropDownList("xs y+7 wp AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign gupdateUIdrawShapesPanel", "Inside|None|Outside", "Pen clipping to shape")
        GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaDashStyle " vDrawLineAreaDashStyle gupdateUIdrawShapesPanel", "Continous|Dashes|Dots|Dashes and dots", "Line style")
        Gui, Add, Checkbox, xs y+6 wp h%btnHeight% +0x1000 Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIdrawShapesPanel, &Double line
        Gui, Add, Checkbox, x+5 wp hp +0x1000 gupdateUIdrawShapesPanel Checked%DrawLineAreaCapsStyle% vDrawLineAreaCapsStyle, &Round caps
     } Else
     {
        Gui, Add, Checkbox, xs y+7 w%btnWid% Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIdrawShapesPanel, &Double line
+       GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign gupdateUIdrawShapesPanel", "Inside|No clipping|Outside", "Pen clipping to shape")
+       Gui, Add, Checkbox, xs y+7 wp Checked%DrawLineAreaJoinsStyle% vDrawLineAreaJoinsStyle gupdateUIdrawShapesPanel, &Round joins
        Gui, Add, Checkbox, x+5 wp hp gupdateUIdrawShapesPanel Checked%DrawLineAreaCapsStyle% vDrawLineAreaCapsStyle, &Round caps
        ; Gui, Add, Checkbox, x+5 Checked%FillAreaDoBehind% vFillAreaDoBehind gupdateUIdrawShapesPanel, &Fill behind the image
     }
@@ -48014,9 +48021,9 @@ PanelDrawLines() {
 
     Gui, Tab, 2
     Gui, Add, Text, x+15 y+15 Section w%btnWid%, Line style
-    Gui, Add, Text, x+10 wp -wrap, Pen alignment
+    Gui, Add, Text, x+10 wp -wrap, Alignment
     GuiAddDropDownList("xs y+8 w" btnWid " gupdateUIDrawLinesPanel AltSubmit Choose" DrawLineAreaDashStyle " vDrawLineAreaDashStyle", "Continous|Dashes|Dots|Dashes and dots", "Line style")
-    GuiAddDropDownList("x+10 wp gupdateUIDrawLinesPanel AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign", "Inside|Centered|Outside", "Line alignment")
+    GuiAddDropDownList("x+10 wp gupdateUIDrawLinesPanel AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign", "Inside|Centered|Outside", "Pen alignment")
     Gui, Add, Checkbox, xs y+5 wp h%btnHeight% +0x1000 gupdateUIDrawLinesPanel Checked%DrawLineAreaCapsStyle% vDrawLineAreaCapsStyle, Rounded caps
     Gui, Add, Checkbox, x+10 wp hp +0x1000 gupdateUIDrawLinesPanel Checked%DrawLineAreaKeepBounds% vDrawLineAreaKeepBounds +hwndhTemp, &Within bounds
     ToolTip2ctrl(hTemp, "Rotate object within the boundaries of the selection area")

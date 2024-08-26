@@ -588,7 +588,7 @@ int FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1, 
     return 1;
 }
 
-void FillSimpleMaskPolygon(const int w, const int h, float* PointsList, const int PointsCount, const int offsetY, const int p) {
+void FillSimpleMaskPolygon(const int w, const int h, float* PointsList, const int PointsCount, const int offsetY, const int p, float* allPointsList, const int &allPointsCount, const int &clipMode) {
     int boundMaxX = 0;
     int boundMaxY = 0;
     int boundMinX = w;
@@ -611,6 +611,17 @@ void FillSimpleMaskPolygon(const int w, const int h, float* PointsList, const in
          {
               if (isPointInPolygon(x, y, PointsList, PointsCount))
               {
+                 bool okay = 1;
+                 if (clipMode!=2 && allPointsList!=NULL)
+                 {
+                    okay = isPointInPolygon(x, y, allPointsList, allPointsCount);
+                    if (clipMode==3)
+                       okay = !okay;
+                 }
+
+                 if (okay!=1)
+                    continue;
+ 
                  const int gx = x - polyX;
                  const int gy = y - polyY + offsetY;
                  #pragma omp critical
@@ -982,14 +993,14 @@ void drawLineSegmentSimpleMask(int ax, int ay, const int bx, const int by, const
    }
 }
 
-void drawLineSegmentMask(int x0, int y0, int x1, int y1, const bool &p, const int &offsetY, const int &rounded, const int &thickness, const int &xa, const int &ya, const int &xb, const int &yb, float* rectu) {
+void drawLineSegmentMask(int x0, int y0, int x1, int y1, const bool &p, const int &offsetY, const int &roundedJoins, const int &thickness, const int &xa, const int &ya, const int &xb, const int &yb, float* rectu, float* PointsList, const int &PointsCount, const int &clipMode) {
 // bresehan algorithm based on
 // https://zingl.github.io/bresenham.html
 // https://github.com/zingl/Bresenham
 // by Zingl Alois
    // Point pA, pB, pNa, pNb;
    vector<pair<int, int>> lineGrid;
-   if (rounded!=1)
+   if (roundedJoins!=1)
    {
        // DrawLineGrid.clear();
        // extendLine({(double)x0, (double)y0}, {(double)x1, (double)y1}, 0.1, pNa, pNb);
@@ -1007,13 +1018,14 @@ void drawLineSegmentMask(int x0, int y0, int x1, int y1, const bool &p, const in
    const int ox = x0;
    const int oy = y0;
    int err = dx + dy, e2, gx, gy;
-   auto &currentGrid = (rounded==1) ? DrawLineCapsGrid : lineGrid;
+   auto &currentGrid = (roundedJoins==1) ? DrawLineCapsGrid : lineGrid;
    int kl = currentGrid.size() - 8;
-   bool okay = 1;
    for (;;) {
       int loops = 0;
-      for (auto &point : currentGrid) {
-          if (rounded!=1)
+      for (auto &point : currentGrid)
+      {
+          bool okay = 1;
+          if (roundedJoins!=1)
           {
              loops++;
              // if ((x0 == x1 && y0 == y1) || (x0 == ox && y0 == ox)) {
@@ -1031,7 +1043,17 @@ void drawLineSegmentMask(int x0, int y0, int x1, int y1, const bool &p, const in
               gx = x0 + point.first - polyX;
               gy = y0 + point.second - polyY + offsetY;
               if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
-                 polygonMaskMap[(INT64)gy * polyW + gx] = p;
+              {
+                 if (clipMode!=2 && PointsList!=NULL)
+                 {
+                    okay = isPointInPolygon(x0 + point.first, y0 + point.second, PointsList, PointsCount);
+                    if (clipMode==3)
+                       okay = !okay;
+                 }
+
+                 if (okay==1)
+                    polygonMaskMap[(INT64)gy * polyW + gx] = p;
+              }
           }
       }
 
@@ -1077,7 +1099,7 @@ void prepareTranslatedLineSegments(const float &thickness, vector<float> &offset
    }
 }
 
-DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCount, int thickness, int closed, int rounded, int doubles, int offsetY, int tempus) {
+DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCount, int thickness, int closed, int roundedJoins, int fillMode, int roundCaps, int clipMode, int offsetY, int tempus) {
     fnOutputDebug("drawLineAllSegmentsMask() invoked; PointsCount=" + std::to_string(PointsCount));
     INT64 s = (INT64)polyW * polyH + 2;
     if (s!=polygonMaskMap.size())
@@ -1096,7 +1118,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
 
     std::vector<float> offsetPointsListA;
     std::vector<float> offsetPointsListB;
-    if (rounded!=1)
+    if (roundedJoins!=1)
     {
        offsetPointsListA.reserve(PointsCount*4 + 5);
        offsetPointsListB.reserve(PointsCount*4 + 5);
@@ -1109,7 +1131,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
        fnOutputDebug(std::to_string(offsetPointsListA.size()) + " finished line thickness adjusted paths;");
     }
 
-    doubles = !doubles;
+    fillMode = !fillMode;
     const int pci = PointsCount - 1;
     const int pcd = PointsCount*2;
     fnOutputDebug("tracing polygonal path with bresenham algo; points=" + std::to_string(PointsCount));
@@ -1131,9 +1153,9 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
            yb = PointsList[1];
         }
 
-        if (rounded==1)
+        if (roundedJoins==1)
         {
-           drawLineSegmentMask(xa, ya, xb, yb, doubles, offsetY, rounded, thickness, 1, 1, 0, 0, NULL);
+           drawLineSegmentMask(xa, ya, xb, yb, fillMode, offsetY, roundedJoins, thickness, 1, 1, 0, 0, NULL, PointsList, PointsCount, clipMode);
         } else
         {
            i *= 2;
@@ -1141,53 +1163,70 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
            const float zya = offsetPointsListA[i + 1];
            const float zxb = offsetPointsListB[i];
            const float zyb = offsetPointsListB[i + 1];
-           const float zdxa = offsetPointsListA[i + 2];
-           const float zdya = offsetPointsListA[i + 3];
-           const float zdxb = offsetPointsListB[i + 2];
-           const float zdyb = offsetPointsListB[i + 3];
 
            i *= 2;
            if (closed==0 && PointsCount>2 && (pts==0 || pts==pci-1))
            {
-              int cxa, cxb, cya, cyb;
-              Point np1, np2;
-              extendLine({(float)xa, (float)ya}, {(float)xb, (float)yb}, thickness*1.45f, np1, np2);
-              float* dynamicArray = new float[8];
-              if (pts==0)
+              if (roundCaps==0)
               {
-                  cxa = xa - np1.x;              cya = ya - np1.y;
-                  cxb = xb - np2.x;              cyb = yb - np2.y;
-                  cxa = zxa - cxa;               cya = zya - cya;
-                  cxb = zxb + cxb;               cyb = zyb + cyb;
-                  // dummyDrawPixelMask({(float)zxa, (float)zya}, offsetY, 0);
-                  // dummyDrawPixelMask({(float)zxb, (float)zyb}, offsetY, 0);
-                  dynamicArray[0] = zxa;           dynamicArray[1] = zya;
-                  dynamicArray[2] = zxb;           dynamicArray[3] = zyb;
-                  // drawLineSegmentSimpleMask(zxa, zya, cxa, cya, doubles, offsetY);
-                  // drawLineSegmentSimpleMask(zxb, zyb, cxb, cyb, doubles, offsetY);
-              } else if (pts==pci-1)
-              {
-                  cxa = xb - np1.x;              cya = yb - np1.y;
-                  cxb = xa - np2.x;              cyb = ya - np2.y;
-                  cxa = zxa + cxa;               cya = zya + cya;
-                  cxb = zxb - cxb;               cyb = zyb - cyb;
-                  const int dxa = cxa - (xa - np1.x);
-                  const int dya = cya - (ya - np1.y);
-                  const int dxb = cxb + xb - np2.x;
-                  const int dyb = cyb + yb - np2.y;
-                  // dummyDrawPixelMask({(float)dxa, (float)dya}, offsetY, 0);
-                  // dummyDrawPixelMask({(float)dxb, (float)dyb}, offsetY, 0);
-                  dynamicArray[0] = dxa;           dynamicArray[1] = dya;
-                  dynamicArray[2] = dxb;           dynamicArray[3] = dyb;
-                  // drawLineSegmentSimpleMask(dxa, dya, cxa, cya, doubles, offsetY);
-                  // drawLineSegmentSimpleMask(dxb, dyb, cxb, cyb, doubles, offsetY);
-              }
-              dynamicArray[4] = cxb;           dynamicArray[5] = cyb;
-              dynamicArray[6] = cxa;           dynamicArray[7] = cya;
-              // drawLineSegmentSimpleMask(cxa, cya, cxb, cyb, doubles, offsetY);
+                  int cxa, cxb, cya, cyb;
+                  Point np1, np2;
+                  extendLine({(float)xa, (float)ya}, {(float)xb, (float)yb}, thickness*1.40f, np1, np2);
+                  float* dynamicArray = new float[8];
+                  if (pts==0)
+                  {
+                      cxa = xa - np1.x;              cya = ya - np1.y;
+                      cxb = xb - np2.x;              cyb = yb - np2.y;
+                      cxa = zxa - cxa;               cya = zya - cya;
+                      cxb = zxb + cxb;               cyb = zyb + cyb;
+                      // dummyDrawPixelMask({(float)zxa, (float)zya}, offsetY, 0);
+                      // dummyDrawPixelMask({(float)zxb, (float)zyb}, offsetY, 0);
+                      dynamicArray[0] = zxa;           dynamicArray[1] = zya;
+                      dynamicArray[2] = zxb;           dynamicArray[3] = zyb;
+                      // drawLineSegmentSimpleMask(zxa, zya, cxa, cya, doubles, offsetY);
+                      // drawLineSegmentSimpleMask(zxb, zyb, cxb, cyb, doubles, offsetY);
+                  } else if (pts==pci-1)
+                  {
+                      cxa = xb - np1.x;              cya = yb - np1.y;
+                      cxb = xa - np2.x;              cyb = ya - np2.y;
+                      cxa = zxa + cxa;               cya = zya + cya;
+                      cxb = zxb - cxb;               cyb = zyb - cyb;
+                      const int dxa = cxa - (xa - np1.x);
+                      const int dya = cya - (ya - np1.y);
+                      const int dxb = cxb + xb - np2.x;
+                      const int dyb = cyb + yb - np2.y;
+                      // dummyDrawPixelMask({(float)dxa, (float)dya}, offsetY, 0);
+                      // dummyDrawPixelMask({(float)dxb, (float)dyb}, offsetY, 0);
+                      dynamicArray[0] = dxa;           dynamicArray[1] = dya;
+                      dynamicArray[2] = dxb;           dynamicArray[3] = dyb;
+                      // drawLineSegmentSimpleMask(dxa, dya, cxa, cya, doubles, offsetY);
+                      // drawLineSegmentSimpleMask(dxb, dyb, cxb, cyb, doubles, offsetY);
+                  }
+                  dynamicArray[4] = cxb;           dynamicArray[5] = cyb;
+                  dynamicArray[6] = cxa;           dynamicArray[7] = cya;
+                  // drawLineSegmentSimpleMask(cxa, cya, cxb, cyb, doubles, offsetY);
 
-              FillSimpleMaskPolygon(polyW, polyH, dynamicArray, 4, offsetY, doubles);
-              delete[] dynamicArray;
+                  FillSimpleMaskPolygon(polyW, polyH, dynamicArray, 4, offsetY, fillMode, PointsList, PointsCount, clipMode);
+                  delete[] dynamicArray;
+              } else
+              {
+                  int dx = (pts==0) ? xa : xb;
+                  int dy = (pts==0) ? ya : yb;
+                  int tt = thickness - 0;
+                  int rr = pow(tt, 2);
+                  // fnOutputDebug("pts=" + std::to_string(pts));
+                  for (int x = 0; x < tt*2; ++x) {
+                      for (int y = 0; y < tt*2; ++y) {
+                          int gx = x - tt;
+                          int gy = y - tt;
+                          bool d = (gx * gx + gy * gy<rr) ? 1 : 0;
+                          gx = gx + dx - polyX;
+                          gy = gy + dy - polyY + offsetY;
+                          if (gy>=0 && gy<polyH && gx>=0 && gx<polyW && d==1)
+                             polygonMaskMap[(INT64)gy * polyW + gx] = fillMode;
+                      }
+                  }
+              }
            }
 
            Point npA, npB, np1, np2, np3, np4;
@@ -1203,21 +1242,18 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
            dynamicArray[5] = np4.y;  // zdyb;
            dynamicArray[6] = np2.x;  // zdxa;
            dynamicArray[7] = np2.y;  // zdya;
-
-
-           drawLineSegmentMask(np1.x, np1.y, np2.x, np2.y, doubles, offsetY, rounded, thickness, zxa, zya, zxb, zyb, dynamicArray);
-           // drawLineSegmentMask(xa, ya, xb, yb, doubles, offsetY, rounded, thickness, zxa, zya, zxb, zyb, dynamicArray);
+           // fnOutputDebug("fillMode=" + std::to_string(fillMode));
+           drawLineSegmentMask(np1.x, np1.y, np2.x, np2.y, fillMode, offsetY, roundedJoins, thickness, zxa, zya, zxb, zyb, dynamicArray, PointsList, PointsCount, clipMode);
+           // drawLineSegmentMask(xa, ya, xb, yb, doubles, offsetY, roundedJoins, thickness, zxa, zya, zxb, zyb, dynamicArray);
            delete[] dynamicArray;
         }
     }
 
 
-
-
     int skipped = 0;
     int painted = 0;
     int otherpainted = 0;
-    if (rounded!=1 && PointsCount>2)
+    if (roundedJoins!=1 && PointsCount>2)
     {
         // drawTestPath(PointsList, PointsCount, thickness, closed, offsetY, offsetPointsListA, offsetPointsListB);
         fnOutputDebug("drawLineAllSegmentsMask() - drawing line miter joins");
@@ -1252,17 +1288,17 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
             // fnOutputDebug("orientation = " + std::to_string(orientation));
             if (orientation==2)
             {
-                painted++;
+                // painted++;
                 a = (pts==0) ? Point{offsetPointsListB[0], offsetPointsListB[1]} : Point{offsetPointsListB[z + 4], offsetPointsListB[z + 5]};
                 b = {offsetPointsListB[z + 2], offsetPointsListB[z + 3]};
             } else if (orientation==1)
             {
-                otherpainted++;
+                // otherpainted++;
                 a = (pts==0) ? Point{offsetPointsListA[0], offsetPointsListA[1]} : Point{offsetPointsListA[z + 4], offsetPointsListA[z + 5]};
                 b = {offsetPointsListA[z + 2], offsetPointsListA[z + 3]};
             } else
             {
-                skipped++;
+                // skipped++;
             }
 
             if (orientation==2 || orientation==1)
@@ -1305,21 +1341,21 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
                    // drawLineSegmentSimpleMask(a.x, a.y, c.x, c.y, doubles, offsetY);
                 }
 
-                FillSimpleMaskPolygon(polyW, polyH, dynamicArray, kk, offsetY, doubles);
+                FillSimpleMaskPolygon(polyW, polyH, dynamicArray, kk, offsetY, fillMode, PointsList, PointsCount, clipMode);
                 // dummyDrawPixelMask(a, offsetY, 2, 0);
                 // dummyDrawPixelMask(b, offsetY, 2, 0);
                 // dummyDrawPixelMask(c, offsetY, 2, 0);
                 delete[] dynamicArray;
             }
         }
-        fnOutputDebug("skipped pts = " + std::to_string(skipped) + " ; painted = " + std::to_string(painted) + " ; otherpainted = " + std::to_string(otherpainted) );
+        // fnOutputDebug("skipped pts = " + std::to_string(skipped) + " ; painted = " + std::to_string(painted) + " ; otherpainted = " + std::to_string(otherpainted) );
     }
 
     fnOutputDebug("drawLineAllSegmentsMask() - done");
     return 1;
 }
 
-DLL_API int DLL_CALLCONV prepareDrawLinesCapsGridMask(int radius, int rounded) {
+DLL_API int DLL_CALLCONV prepareDrawLinesCapsGridMask(int radius, int roundCaps) {
     int diameter = 2 * radius + 1;
     DrawLineCapsGrid.resize(diameter + 2);
     // DrawLineCapsGrid.resize(diameter + 2, std::vector<short>(diameter + 2, 0));
@@ -1359,7 +1395,7 @@ DLL_API int DLL_CALLCONV prepareDrawLinesCapsGridMask(int radius, int rounded) {
     fnOutputDebug(std::to_string(radius) + " radius; prepareDrawLinesCapsGridMask() - done; rr=" + std::to_string(rr));
 }
 
-DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int rounded) {
+DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int roundedJoins) {
     // relies on prepareSelectionArea()
     EllipseSelectMode = 2;
     invertSelection = 0;
@@ -2400,7 +2436,7 @@ clipMaskFilter() can also rely on a bitmap, but it must be passed directly to it
     else if (mode==2 && useCache!=1)
        EllipseSelectMode = 0;
 
-    return 1;
+    return z;
 }
 
 bool decideColorsEqual(RGBAColor newColor, RGBAColor oldColor, float tolerance, float prevCLRindex, int alternateMode, float *nC, float& index) {
