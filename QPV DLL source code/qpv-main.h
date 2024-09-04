@@ -54,6 +54,7 @@ IWICBitmapFrameDecode  *pWICclassFrameDecoded;
 IWICBitmapSource       *pWICclassPixelsBitmapSource;
 
 std::vector<bool>  polygonMaskMap;
+std::vector<bool>  polygonOtherMaskMap;
 std::vector<int>   polygonMapMin;
 // std::vector<std::vector<short>> DrawLineCapsGrid;
 vector<pair<int, int>> DrawLineCapsGrid;

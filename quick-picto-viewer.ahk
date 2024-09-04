@@ -13977,7 +13977,7 @@ livePreviewPrepareSelectionArea(objSel, invertArea, shapeMode) {
       QPV_PrepareHugeImgSelectionArea(0, 0, oImgW, oImgH, oImgW, oImgH, -1, 0, 0, 0)
 }
 
-QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, invertArea, cavityX:="a", cavityY:="a", ppo:=0) {
+QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, invertArea, cavityX:="a", cavityY:="a", ppo:=0, pathCoords:=0) {
    ; mode is EllipseSelectMode [the shape]
    Static pi := 3.141592653
    , lastState := 0
@@ -13989,10 +13989,13 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
       Return
    }
 
-   If (mode=3 && FillAreaShape=1 || mode=4 && PasteInPlaceCropSel=1)
-      mode := 0
-   Else If (mode=3 && FillAreaShape=3 || mode=4 && PasteInPlaceCropSel=3)
-      mode := 1
+   If !IsObject(pathCoords)
+   {
+      If (mode=3 && FillAreaShape=1 || mode=4 && PasteInPlaceCropSel=1)
+         mode := 0
+      Else If (mode=3 && FillAreaShape=3 || mode=4 && PasteInPlaceCropSel=3)
+         mode := 1
+   }
 
    startZeit := A_TickCount
    PointsCount := PointsF := useCache := 0
@@ -14083,14 +14086,23 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
          trGdip_GetImageDimensions(useGdiBitmap(), zkw, zkh)
          sfs := (Round((zkw * zkh)/1000000, 1) > 5500) ? 0.5 : 0.7
          zsf := ((w>zkw*sfs || h>zkh*sfs) && ppo[5]=1 && (bezierSplineCustomShape=1 || FillAreaCurveTension>1)) ? 1 : 0
+         ; i do not remember why i need zsf; maybe for preview mode? live tools
+
          mw := (zsf=1) ? zkw*sfs : w
          mh := (zsf=1) ? zkh*sfs : h
+         xk := yk := 0
+         If IsObject(pathCoords)
+         {
+            xk := pathCoords[1],   yk := pathCoords[2]
+            mw := pathCoords[3],   mh := pathCoords[4]
+         }
+
          If (mode=4)
-            pPath := coreCreateFillAreaShape(0, 0, mw, mh, PasteInPlaceCropSel, rotation, rotateSelBoundsKeepRatio, 2, 0)
+            pPath := coreCreateFillAreaShape(xk, yk, mw, mh, PasteInPlaceCropSel, rotation, rotateSelBoundsKeepRatio, 2, 0)
          Else If (mode=3)
-            pPath := coreCreateFillAreaShape(0, 0, mw, mh, FillAreaShape, rotation, rotateSelBoundsKeepRatio, 2, 0)
+            pPath := coreCreateFillAreaShape(xk, yk, mw, mh, FillAreaShape, rotation, rotateSelBoundsKeepRatio, 2, 0)
          Else
-            pPath := createImgSelPath(0, 0, mw, mh, 2, rotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY, 0)
+            pPath := createImgSelPath(xk, yk, mw, mh, 2, rotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY, 0)
 
          If (pPath="" || pPath=0)
          {
@@ -14102,7 +14114,7 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
          {
             pMatrix := Gdip_CreateMatrix()
             Gdip_ScaleMatrix(pMatrix, 1, -1)
-            Gdip_TranslateMatrix(pMatrix, 0, -mh)
+            Gdip_TranslateMatrix(pMatrix, 0, -mh - yk*2)
             E := Gdip_TransformPath(pPath, pMatrix)
             Gdip_DeleteMatrix(pMatrix)
          }
@@ -20387,6 +20399,7 @@ HugeImagesDrawLineShapes() {
       startOperation := A_TickCount
       showTOOLtip("Preparing to draw lines, please wait...")
       trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+      orobju := InitHugeImgSelPath(0, imgW, imgH)
       setImageLoading()
       ; obju := InitHugeImgSelPath(0, imgW, imgH)
       pBitsAll := FreeImage_GetBits(hFIFimgX)
@@ -20413,8 +20426,12 @@ HugeImagesDrawLineShapes() {
       Sleep, 50
       roundJoins := DrawLineAreaJoinsStyle
       roundCaps := DrawLineAreaCapsStyle
-      QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
-      rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", DrawLineAreaCapsStyle)
+      if (DrawLineAreaContourAlign!=2)
+         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, 3, VPselRotation, 0, 0, "a", "a", 1, [tk, tk, o_imgSelW, o_imgSelH])
+      ; else
+         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
+
+      rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", DrawLineAreaCapsStyle, "int", DrawLineAreaContourAlign)
       rza := DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", roundCaps)
       If (rza=1 && rzq=1)
       {
@@ -47709,7 +47726,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
 
     If (viewportQPVimage.imgHandle)
     {
-       DrawLineAreaContourAlign := 2
+       ; DrawLineAreaContourAlign := 2
        DrawLineAreaDashStyle := 1
     }
 

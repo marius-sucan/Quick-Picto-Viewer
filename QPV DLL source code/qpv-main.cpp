@@ -588,6 +588,14 @@ int FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1, 
     return 1;
 }
 
+bool inline isPointInOtherMask(const int &x, const int &y, const int &clipMode) {
+    bool p = polygonOtherMaskMap[(INT64)y * polyW + x];
+    if (clipMode==3)
+       p = !p;
+ 
+    return p;
+}
+
 void FillSimpleMaskPolygon(const int w, const int h, float* PointsList, const int PointsCount, const int offsetY, const int p, float* allPointsList, const int &allPointsCount, const int &clipMode) {
     int boundMaxX = 0;
     int boundMaxY = 0;
@@ -612,22 +620,22 @@ void FillSimpleMaskPolygon(const int w, const int h, float* PointsList, const in
               if (isPointInPolygon(x, y, PointsList, PointsCount))
               {
                  bool okay = 1;
-                 if (clipMode!=2 && allPointsList!=NULL)
-                 {
-                    okay = isPointInPolygon(x, y, allPointsList, allPointsCount);
-                    if (clipMode==3)
-                       okay = !okay;
-                 }
-
-                 if (okay!=1)
-                    continue;
- 
                  const int gx = x - polyX;
                  const int gy = y - polyY + offsetY;
-                 #pragma omp critical
-                 {
-                    if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
-                       polygonMaskMap[(INT64)gy * polyW + gx] = p;
+ 
+                 if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
+                 {                        
+                     if (clipMode!=2)
+                     {
+                        okay = isPointInOtherMask(gx, gy, clipMode);
+                        if (okay!=1)
+                           continue;
+                     }
+
+                     #pragma omp critical
+                     {
+                        polygonMaskMap[(INT64)gy * polyW + gx] = p;
+                     }
                  }
               }
          }
@@ -639,6 +647,8 @@ DLL_API int DLL_CALLCONV discardFilledPolygonCache(int m) {
     polygonMapMin.shrink_to_fit();
     polygonMaskMap.clear();
     polygonMaskMap.shrink_to_fit();
+    polygonOtherMaskMap.clear();
+    polygonOtherMaskMap.shrink_to_fit();
     DrawLineCapsGrid.clear();
     DrawLineCapsGrid.shrink_to_fit();
     return 1;
@@ -1002,15 +1012,8 @@ void drawLineSegmentMask(int x0, int y0, int x1, int y1, const bool &p, const in
    vector<pair<int, int>> lineGrid;
    if (roundedJoins!=1)
    {
-       // DrawLineGrid.clear();
-       // extendLine({(double)x0, (double)y0}, {(double)x1, (double)y1}, 0.1, pNa, pNb);
-       // translateLine(pNa, pNb, thickness, pA, pB);
-       // translateLine({(double)x0, (double)y0}, {(double)x1, (double)y1}, thickness, offsetPointsList, pA, pB);
        const bool colinear = (x0==x1 || y0==y1) ? 1 : 0;
        drawLineSegmentPerpendicular(xa, ya, xb, yb, x0, y0, colinear, lineGrid);
-       // fnOutputDebug("lineGrid.size=" + std::to_string(lineGrid.size()));
-       // x0 = pNa.x;       y0 = pNa.y;
-       // x1 = pNb.x;       y1 = pNb.y;
    }
 
    const int dx =  abs(x1-x0), sx = (x0<x1) ? 1 : -1;
@@ -1028,9 +1031,6 @@ void drawLineSegmentMask(int x0, int y0, int x1, int y1, const bool &p, const in
           if (roundedJoins!=1)
           {
              loops++;
-             // if ((x0 == x1 && y0 == y1) || (x0 == ox && y0 == ox)) {
-             //    okay = 1;
-             // } else 
              if (loops<14 || loops>kl) {
                 okay = isPointInPolygon(x0 + point.first, y0 + point.second, rectu, 4);
              } else {
@@ -1045,11 +1045,7 @@ void drawLineSegmentMask(int x0, int y0, int x1, int y1, const bool &p, const in
               if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
               {
                  if (clipMode!=2 && PointsList!=NULL)
-                 {
-                    okay = isPointInPolygon(x0 + point.first, y0 + point.second, PointsList, PointsCount);
-                    if (clipMode==3)
-                       okay = !okay;
-                 }
+                    okay = isPointInOtherMask(gx, gy, clipMode);
 
                  if (okay==1)
                     polygonMaskMap[(INT64)gy * polyW + gx] = p;
@@ -1223,7 +1219,14 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
                           gx = gx + dx - polyX;
                           gy = gy + dy - polyY + offsetY;
                           if (gy>=0 && gy<polyH && gx>=0 && gx<polyW && d==1)
-                             polygonMaskMap[(INT64)gy * polyW + gx] = fillMode;
+                          {
+                             bool okay = 1;
+                             if (clipMode!=2)
+                                okay = isPointInOtherMask(gx, gy, clipMode);
+
+                             if (okay==1)
+                                polygonMaskMap[(INT64)gy * polyW + gx] = fillMode;
+                          }
                       }
                   }
               }
@@ -1253,6 +1256,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
     int skipped = 0;
     int painted = 0;
     int otherpainted = 0;
+    // if (roundedJoins==21 && PointsCount>2)
     if (roundedJoins!=1 && PointsCount>2)
     {
         // drawTestPath(PointsList, PointsCount, thickness, closed, offsetY, offsetPointsListA, offsetPointsListB);
@@ -1339,6 +1343,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
                    dynamicArray[4] = c.x;           dynamicArray[5] = c.y;
                    // drawLineSegmentSimpleMask(b.x, b.y, c.x, c.y, doubles, offsetY);
                    // drawLineSegmentSimpleMask(a.x, a.y, c.x, c.y, doubles, offsetY);
+                   fnOutputDebug("no intersection @ pts = " + std::to_string(pts));
                 }
 
                 FillSimpleMaskPolygon(polyW, polyH, dynamicArray, kk, offsetY, fillMode, PointsList, PointsCount, clipMode);
@@ -1395,12 +1400,28 @@ DLL_API int DLL_CALLCONV prepareDrawLinesCapsGridMask(int radius, int roundCaps)
     fnOutputDebug(std::to_string(radius) + " radius; prepareDrawLinesCapsGridMask() - done; rr=" + std::to_string(rr));
 }
 
-DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int roundedJoins) {
-    // relies on prepareSelectionArea()
-    EllipseSelectMode = 2;
-    invertSelection = 0;
-    fnOutputDebug("prepareDrawLinesMask() invoked");
-    INT64 s = (INT64)polyW * polyH + 2; // variables set by prepareSelectionArea()
+DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int roundedJoins, int clipMode) {
+     // relies on prepareSelectionArea()
+     EllipseSelectMode = 2;
+     invertSelection = 0;
+     fnOutputDebug("prepareDrawLinesMask() invoked");
+     INT64 s = (INT64)polyW * polyH + 2; // variables set by prepareSelectionArea()
+     if (clipMode!=2)
+     {
+        try {
+           polygonOtherMaskMap.resize(s);
+        } catch(const std::bad_alloc& e) {
+           fnOutputDebug("polygonOtherMaskMap failed. bad_alloc =" + std::to_string(s));
+           return 0;
+        } catch(const std::length_error& e) {
+           fnOutputDebug("polygonOtherMaskMap failed. length_error =" + std::to_string(s));
+           return 0;
+        }
+ 
+        polygonOtherMaskMap = polygonMaskMap;
+        fnOutputDebug("polygonOtherMaskMap RESIZED=" + std::to_string(s) + "||" + std::to_string(polygonOtherMaskMap.size()));
+    }
+
     if (s!=polygonMaskMap.size())
     {
        try {
