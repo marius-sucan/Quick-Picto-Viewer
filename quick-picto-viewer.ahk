@@ -370,7 +370,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , DrawLineAreaBlendMode := 1, BlendModesPreserveAlpha := 0, FillAreaCutGlass := 0
    , userImgChannelAlphaAdd := 0, forceSlowLivePreviewMode := 0, showContextualStatusBar := 1
    , vectorToolModus := 1, TextInAreaVerticalia := 0, DrawLineAreaThickScale := 100
-   , DrawLineAreaJoinsStyle := 0
+   , DrawLineAreaJoinsStyle := 0, tempCrapValue := -1 ; 557
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -19771,7 +19771,7 @@ undoRedoHugeImagesAct() {
       dummyTimerDelayiedImageDisplay(500)
    } Else
    {
-      showTOOLtip("No undoable action was recorded")
+      showTOOLtip("No undo action recorded")
       SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 
@@ -20410,7 +20410,7 @@ HugeImagesDrawLineShapes() {
       thisThick := (DrawLineAreaContourThickness > maxLength/1.05) ? maxLength/1.05 : DrawLineAreaContourThickness
       thisThick := thisThick * (DrawLineAreaThickScale / 100)
       thisThick := Round(thisThick * 0.49)
-      tk := thisThick + 4
+      tk := Ceil(thisThick * 1.25) + 4
       o_imgSelX1 := imgSelX1,    o_imgSelY1 := imgSelY1
       o_imgSelX2 := imgSelX2,    o_imgSelY2 := imgSelY2
       imgSelX1 := imgSelX1 - tk,    imgSelY1 := imgSelY1 - tk
@@ -20454,7 +20454,9 @@ HugeImagesDrawLineShapes() {
             showTOOLtip("Drawing lines, please wait...`nStep 2/3")
             conturAlign := DrawLineAreaContourAlign
             closed := (FillAreaShape=7) ? FillAreaClosedPath : 1
-            rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0, "int", -1)
+; tempCrapValue++
+; fnOutputDebug("loooooooooool == " tempCrapValue)
+            rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0, "int", tempCrapValue)
             If (rzb=1 && DrawLineAreaDoubles=1)
             {
                DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaCapsStyle)
@@ -47749,6 +47751,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     GuiAddColor("x+5 hp w" ml, "DrawLineAreaColor", "Line color")
     GuiAddPickerColor("x+2 hp w25", "DrawLineAreaColor")
     GuiAddSlider("DrawLineAreaOpacity", 3,255, 255, "Color opacity", "updateUIdrawShapesPanel", 1, "xs y+5 w" btnWid*2 + 5 " hp")
+    ; GuiAddSlider("tempCrapValue", -1,950, -1, "debug var", "updateUIdrawShapesPanel", 1, "xs y+5 w" btnWid*2 + 5 " hp")
     GuiAddCheckbox("x+1 hp w26 gupdateUIdrawShapesPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
     Gui, Add, Text, xs y+15 w%btnWid% hp +0x200 gBtnResetBlendMode +hwndhTemp, Blending mode
     GuiAddDropDownList("x+5 wp gupdateUIdrawShapesPanel AltSubmit Choose" DrawLineAreaBlendMode " vDrawLineAreaBlendMode", "None|" userBlendModesList, [hTemp])

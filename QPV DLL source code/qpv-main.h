@@ -55,9 +55,8 @@ IWICBitmapSource       *pWICclassPixelsBitmapSource;
 
 std::vector<bool>  polygonMaskMap;
 std::vector<bool>  polygonOtherMaskMap;
-std::vector<int>   polygonMapMin;
 // std::vector<std::vector<short>> DrawLineCapsGrid;
-vector<pair<int, int>> DrawLineCapsGrid;
+vector<pair<float, float>> DrawLineCapsGrid;
 // vector<pair<int, int>> DrawLineGrid;
 
 std::vector<UINT>  dupesListIDsA(1);
@@ -68,7 +67,7 @@ std::vector<UINT>  dupesListIDsC(1);
 std::array<double, 1025>  DCTcoeffs;
 
 struct Point {
-    float x, y;
+    double x, y;
 };
 
 struct RGBColor {
