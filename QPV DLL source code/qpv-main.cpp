@@ -1064,8 +1064,11 @@ void drawLineSegmentSimpleMask(int ax, int ay, const int bx, const int by, const
    }
 }
 
-void drawLineSegmentMask(int x0, int y0, int x1, int y1, const bool &p, const int &offsetY, const int &roundedJoins, const int &thickness, const int &xa, const int &ya, const int &xb, const int &yb, float* rectu, float* PointsList, const int &PointsCount, const int &clipMode) {
-// void drawLineSegmentMask(float x0, float y0, float x1, float y1, const bool &p, const int &offsetY, const int &roundedJoins, const int &thickness, const float &xa, const float &ya, const float &xb, const float &yb, float* rectu, float* PointsList, const int &PointsCount, const int &clipMode) {
+void drawLineSegmentMask(int x0, int y0, int x1, int y1, const bool &p, const int &offsetY, const int &roundedJoins, float* rectu, const int &clipMode) {
+// x0, y0, x1, y1         - the coordinates of the points that form the line to be drawn [line A]
+// rectu                  - the coordinates of the 4 points that form the rectangle that represents the thickness of the line A, obtained by translating the line A by the user-defined line thickness
+// p                      - fill data
+
 // bresehan algorithm based on
 // https://zingl.github.io/bresenham.html
 // https://github.com/zingl/Bresenham
@@ -1075,7 +1078,7 @@ void drawLineSegmentMask(int x0, int y0, int x1, int y1, const bool &p, const in
    if (roundedJoins!=1)
    {
        const bool colinear = (x0==x1 || y0==y1) ? 1 : 0;
-       drawLineSegmentPerpendicular(xa, ya, xb, yb, x0, y0, colinear, lineGrid);
+       drawLineSegmentPerpendicular(rectu[0], rectu[1], rectu[2], rectu[3], x0, y0, colinear, lineGrid);
    }
 
    const int dx =  abs(x1-x0), sx = (x0<x1) ? 1 : -1;
@@ -1089,7 +1092,7 @@ void drawLineSegmentMask(int x0, int y0, int x1, int y1, const bool &p, const in
       for (auto &point : currentGrid)
       {
           bool okay = 1;
-          if (roundedJoins!=1)
+          if (roundedJoins!=1 && rectu!=NULL)
           {
              loops++;
              if (loops<kr || loops>kl) {
@@ -1105,7 +1108,7 @@ void drawLineSegmentMask(int x0, int y0, int x1, int y1, const bool &p, const in
               gy = y0 + point.second - polyY + offsetY;
               if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
               {
-                 if (clipMode!=2 && PointsList!=NULL)
+                 if (clipMode!=2)
                     okay = isPointInOtherMask(gx, gy, clipMode);
 
                  if (okay==1)
@@ -1238,7 +1241,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
 
         if (roundedJoins==1)
         {
-           drawLineSegmentMask(xa, ya, xb, yb, fillMode, offsetY, roundedJoins, thickness, 1, 1, 0, 0, NULL, PointsList, PointsCount, clipMode);
+           drawLineSegmentMask(xa, ya, xb, yb, fillMode, offsetY, roundedJoins, NULL, clipMode);
         } else
         {
            i *= 2;
@@ -1246,10 +1249,6 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
            const double zya = offsetPointsListA[i + 1];
            const double zxb = offsetPointsListB[i];
            const double zyb = offsetPointsListB[i + 1];
-           // const double zdxa = offsetPointsListA[i + 2];
-           // const double zdya = offsetPointsListA[i + 3];
-           // const double zdxb = offsetPointsListB[i + 2];
-           // const double zdyb = offsetPointsListB[i + 3];
            i *= 2;
            if (closed==0 && PointsCount>2 && (pts==0 || pts==pci-1))
            {
@@ -1326,7 +1325,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
            // drawLineSegmentMask(npA.x, npA.y, npB.x, npB.y, fillMode, offsetY, roundedJoins, thickness, zxa, zya, zxb, zyb, dynamicArray, PointsList, PointsCount, clipMode);
 
            // drawLineSegmentMask(xa, ya, xb, yb, fillMode, offsetY, roundedJoins, thickness, zxa, zya, zxb, zyb, dynamicArray, PointsList, PointsCount, clipMode);
-           drawLineSegmentMask(np1.x, np1.y, np2.x, np2.y, fillMode, offsetY, roundedJoins, thickness, np1.x, np1.y, np3.x, np3.y, dynamicArray, PointsList, PointsCount, clipMode); // good
+           drawLineSegmentMask(np1.x, np1.y, np2.x, np2.y, fillMode, offsetY, roundedJoins, dynamicArray, clipMode); // good
            // FillSimpleMaskPolygon(polyW, polyH, dynamicArray, 4, offsetY, fillMode, PointsList, PointsCount, clipMode);
         
 

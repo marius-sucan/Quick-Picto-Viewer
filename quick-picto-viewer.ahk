@@ -370,7 +370,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , DrawLineAreaBlendMode := 1, BlendModesPreserveAlpha := 0, FillAreaCutGlass := 0
    , userImgChannelAlphaAdd := 0, forceSlowLivePreviewMode := 0, showContextualStatusBar := 1
    , vectorToolModus := 1, TextInAreaVerticalia := 0, DrawLineAreaThickScale := 100
-   , DrawLineAreaJoinsStyle := 0, tempCrapValue := -1 ; 557
+   , DrawLineAreaJoinsStyle := 0, DrawLineAreaMitersBorder := 100
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -20358,8 +20358,8 @@ HugeImagesApplyInsertText() {
          RemoveTooltip()
       } Else
       {
-         recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
          showTOOLtip("ERROR: Failed to draw the text on the image")
+         recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
          SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
       }
@@ -20369,7 +20369,8 @@ HugeImagesApplyInsertText() {
 processGdipPathForDLL(pPath, tk, o_imgSelH, subdivide, ByRef PointsCount, ByRef PointsF) {
    pMatrix := Gdip_CreateMatrix()
    Gdip_ScaleMatrix(pMatrix, 1, -1)
-   Gdip_TranslateMatrix(pMatrix, 0, -o_imgSelH - tk*2)
+   Gdip_TranslateMatrix(pMatrix, tk, -o_imgSelH - tk)
+   ; Gdip_TranslateMatrix(pMatrix, 0, -o_imgSelH - tk*2)
    E := Gdip_TransformPath(pPath, pMatrix)
    Gdip_DeleteMatrix(pMatrix)
    If (subdivide=1)
@@ -20382,6 +20383,7 @@ processGdipPathForDLL(pPath, tk, o_imgSelH, subdivide, ByRef PointsCount, ByRef 
 }
 
 HugeImagesDrawLineShapes() {
+      Static tempCrapValue := -1
       If warnHugeImageNotFIM()
          Return
 
@@ -20409,13 +20411,17 @@ HugeImagesDrawLineShapes() {
       maxLength := min(o_imgSelW, o_imgSelH)//2
       thisThick := (DrawLineAreaContourThickness > maxLength/1.05) ? maxLength/1.05 : DrawLineAreaContourThickness
       thisThick := thisThick * (DrawLineAreaThickScale / 100)
-      thisThick := Round(thisThick * 0.49)
-      tk := Ceil(thisThick * 1.25) + 4
-      o_imgSelX1 := imgSelX1,    o_imgSelY1 := imgSelY1
-      o_imgSelX2 := imgSelX2,    o_imgSelY2 := imgSelY2
-      imgSelX1 := imgSelX1 - tk,    imgSelY1 := imgSelY1 - tk
-      imgSelX2 := imgSelX2 + tk,    imgSelY2 := imgSelY2 + tk
+      thisThick := Round(thisThick * 0.495)
+      o_imgSelX1 := imgSelX1,       o_imgSelY1 := imgSelY1
+      o_imgSelX2 := imgSelX2,       o_imgSelY2 := imgSelY2
+      tk := (DrawLineAreaJoinsStyle=1) ? thisThick : thisThick * (DrawLineAreaMitersBorder / 100)
+      tk := Round(tk * 1.25) + 2
 
+      pfcX := (imgSelX1 - tk<0) ? imgSelX1 - tk : 0
+      pfcY := (imgSelY1 - tk<0) ? imgSelY1 - tk : 0
+      imgSelX1 := (imgSelX1 - tk<0) ? 0 : imgSelX1 - tk
+      imgSelY1 := (imgSelY1 - tk<0) ? 0 : imgSelY1 - tk
+      imgSelX2 := imgSelX2 + tk,    imgSelY2 := imgSelY2 + tk
       imgSelH := max(imgSelY2, imgSelY1) - min(imgSelY2, imgSelY1)
       imgSelW := max(imgSelX2, imgSelX1) - min(imgSelX2, imgSelX1)
       showTOOLtip("Drawing lines, please wait...`nStep 1/3")
@@ -20428,9 +20434,8 @@ HugeImagesDrawLineShapes() {
       roundCaps := DrawLineAreaCapsStyle
       if (DrawLineAreaContourAlign!=2)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, 3, VPselRotation, 0, 0, "a", "a", 1, [tk, tk, o_imgSelW, o_imgSelH])
-      ; else
-         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
 
+      QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
       rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", DrawLineAreaCapsStyle, "int", DrawLineAreaContourAlign)
       rza := DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", roundCaps)
       If (rza=1 && rzq=1)
@@ -20443,7 +20448,7 @@ HugeImagesDrawLineShapes() {
             diffThick := thisThick + (imgSelY2 - thisThick - imgH)
 
          doClone := (innerSelectionCavityX>0 && innerSelectionCavityY>0 && FillAreaShape<7) ? 1 : 0
-         pPath := coreCreateFillAreaShape(tk, tk, o_imgSelW, o_imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, 2, 0)
+         pPath := coreCreateFillAreaShape(pfcX, 0, o_imgSelW, o_imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, 2, 0)
          If pPath
          {
             If (doClone=1)
@@ -21993,6 +21998,12 @@ coreDrawShapesLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgSelW,
     {
        vpWinClientSize(mainWidth, mainHeight)
        Gdip_SetClipRect(G2, 0, 0, mainWidth, mainHeight, 1)
+       tk := Round(thisThick * (DrawLineAreaMitersBorder / 100))
+       If (viewportQPVimage.imgHandle)
+       {
+          ; ToolTip, % "k=" tk , , , 2
+          Gdip_SetClipRect(G2, imgSelPx - tk//1.6, imgSelPy - tk//1.6, imgSelW + tk*1.255, imgSelH + tk*1.255, 1)
+       }
     }
 
     Gdip_DrawPath(G2, thisPen, pPath)
@@ -47751,7 +47762,6 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     GuiAddColor("x+5 hp w" ml, "DrawLineAreaColor", "Line color")
     GuiAddPickerColor("x+2 hp w25", "DrawLineAreaColor")
     GuiAddSlider("DrawLineAreaOpacity", 3,255, 255, "Color opacity", "updateUIdrawShapesPanel", 1, "xs y+5 w" btnWid*2 + 5 " hp")
-    ; GuiAddSlider("tempCrapValue", -1,950, -1, "debug var", "updateUIdrawShapesPanel", 1, "xs y+5 w" btnWid*2 + 5 " hp")
     GuiAddCheckbox("x+1 hp w26 gupdateUIdrawShapesPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
     Gui, Add, Text, xs y+15 w%btnWid% hp +0x200 gBtnResetBlendMode +hwndhTemp, Blending mode
     GuiAddDropDownList("x+5 wp gupdateUIdrawShapesPanel AltSubmit Choose" DrawLineAreaBlendMode " vDrawLineAreaBlendMode", "None|" userBlendModesList, [hTemp])
@@ -47776,9 +47786,13 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
 
     GuiAddSlider("DrawLineAreaContourThickness", 1,700, 45, ".updateLabelDrawLineThickness", "updateUIdrawShapesPanel", 1, "xs y+15 w" txtWid " hp")
     If (!viewportQPVimage.imgHandle)
+    {
        Gui, Add, Checkbox, xs y+10 gupdateUIdrawShapesPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit selection area
-    Else
-       GuiAddSlider("DrawLineAreaThickScale", 100, 500, 100, "Thickness scale: $€ %", "updateUIdrawShapesPanel", 1, "xs y+7 wp hp")
+    } Else
+    {
+       GuiAddSlider("DrawLineAreaThickScale", 100, 500, 100, "Thickness scale: $€ %", "updateUIdrawShapesPanel", 1, "xs y+7 w" slideWid - 2 " hp")
+       GuiAddSlider("DrawLineAreaMitersBorder", 100, 500, 100, "Miters boundary: $€ %", "updateUIdrawShapesPanel", 1, "x+5 wp-30 hp")
+    }
 
     btnWid := (PrefsLargeFonts=1) ? 105 : 65
     ml := (PrefsLargeFonts=1) ? 35 : 25
@@ -50971,7 +50985,10 @@ updateUIdrawShapesPanel(actionu:=0, b:=0) {
     actu := (FillAreaShape=3) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "FillAreaEllipseSection")
     If (viewportQPVimage.imgHandle)
+    {
        uiSlidersArray["userUIshapeCavity", 10] := (FillAreaShape=7) ? 0 : 1
+       uiSlidersArray["DrawLineAreaMitersBorder", 10] := (DrawLineAreaJoinsStyle=1) ? 0 : 1
+    }
 
     actu := (FillAreaEllipseSection<848 && !viewportQPVimage.imgHandle) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu, FillAreaEllipsePie
