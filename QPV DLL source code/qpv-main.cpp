@@ -1160,6 +1160,23 @@ void prepareTranslatedLineSegments(const float &thickness, vector<double> &offse
 }
 
 void stampCircleMaskAt(const int &dx, const int &dy, const int &tt, const int &rr, const int &offsetY, const int &clipMode, const bool &fillMode) {
+      for (auto &point : DrawLineCapsGrid)
+      {
+          bool okay = 1;
+          int gx = dx + point.first - polyX;
+          int gy = dy + point.second - polyY + offsetY;
+          if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
+          {
+             if (clipMode!=2)
+                okay = isPointInOtherMask(gx, gy, clipMode);
+
+             if (okay==1)
+                polygonMaskMap[(INT64)gy * polyW + gx] = fillMode;
+          }
+      }
+}
+
+void advancedStampCircleMaskAt(const int &dx, const int &dy, const int &tt, const int &rr, const int &offsetY, const int &clipMode, const bool &fillMode) {
       for (int x = 0; x < tt*2; ++x)
       {
           for (int y = 0; y < tt*2; ++y)
@@ -1385,6 +1402,10 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
                 b = {offsetPointsListA[z + 2], offsetPointsListA[z + 3]};
             } else
             {
+                if (pts==0 || pts==pci)
+                   stampCircleMaskAt(c.x, c.y, thickness, pow(thickness, 2), offsetY, clipMode, fillMode);
+
+                // fnOutputDebug("colinear points ; pts = " + std::to_string(pts));
                 // skipped++;
             }
 
@@ -1405,15 +1426,8 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
                 // drawLineSegmentSimpleMask(a.x, a.y, az.x, az.y, 1, offsetY);
 
                 float nx, ny;
-                bool p = findLinesIntersection(a, az, b, bz, nx, ny);
+                bool p = (pts==0 || pts==pci) ? 0 : findLinesIntersection(a, az, b, bz, nx, ny);
                 short kk = (p==1) ? 4 : 3;
-               //  if ((a.x==c.x && b.y==c.y && nx==b.x && ny==a.y) || (a.x==nx && b.y==ny && c.x==b.x && c.y==a.y) || (a.x==nx && a.x>c.x && a.y==c.y && b.x<c.x && b.y>c.y && nx>c.x))
-               //  {
-               //     p = 0;
-               //     kk = 3;
-               //     fnOutputDebug("crappy pts = " + std::to_string(pts));
-               //     // continue;
-               // }
 
                 // fnOutputDebug("isIntersection = " + std::to_string(p));
                 float* dynamicArray = new float[kk*2];
@@ -1440,13 +1454,13 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
                    dynamicArray[4] = c.x;           dynamicArray[5] = c.y;
                    // drawLineSegmentSimpleMask(b.x, b.y, c.x, c.y, fillMode, offsetY);
                    // drawLineSegmentSimpleMask(a.x, a.y, c.x, c.y, fillMode, offsetY);
-                   // stampCircleMaskAt(c.x, c.y, thickness, pow(thickness, 2), offsetY, clipMode, fillMode);
-                   fnOutputDebug("no intersection @ pts = " + std::to_string(pts));
+                   stampCircleMaskAt(c.x, c.y, thickness, pow(thickness, 2), offsetY, clipMode, fillMode);
+                   // fnOutputDebug("no intersection @ pts = " + std::to_string(pts));
                 }
 
                    // drawLineSegmentSimpleMask(b.x, b.y, c.x - 1.5f, c.y - 1.5f, fillMode, offsetY);
                    // drawLineSegmentSimpleMask(a.x, a.y, c.x - 1.5f, c.y + 1.5f, fillMode, offsetY);
-         FillSimpleMaskPolygon(polyW, polyH, dynamicArray, kk, offsetY, fillMode, PointsList, PointsCount, clipMode);
+                FillSimpleMaskPolygon(polyW, polyH, dynamicArray, kk, offsetY, fillMode, PointsList, PointsCount, clipMode);
                 // dummyDrawPixelMask(b, offsetY, 2, 0);
                 // dummyDrawPixelMask(c, offsetY, 2, 0);
                 delete[] dynamicArray;
@@ -1459,14 +1473,14 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
     return 1;
 }
 
-DLL_API int DLL_CALLCONV prepareDrawLinesCapsGridMask(int radius, int roundCaps) {
+DLL_API int DLL_CALLCONV prepareDrawLinesCapsGridMask(int radius, int roundCaps, int roundedJoins) {
     int diameter = 2 * radius + 1;
     DrawLineCapsGrid.resize(diameter + 2);
     // DrawLineCapsGrid.resize(diameter + 2, std::vector<short>(diameter + 2, 0));
     // std::vector<std::vector<short>> DrawLineCapsGrid(diameter, std::vector<short>(diameter, 0));
     int centerX = radius;
     int centerY = radius;
-    float ff = 0.995f;
+    float ff = 0.9985f;
     if (radius<5)
        ff = 0.10f;
     else if (radius<15)
@@ -1483,6 +1497,12 @@ DLL_API int DLL_CALLCONV prepareDrawLinesCapsGridMask(int radius, int roundCaps)
        ff = 0.98f;
     else if (radius<580)
        ff = 0.99f;
+    else if (radius<990)
+       ff = 0.995f;
+    else if (radius<1500)
+       ff = 0.998f;
+    else if (radius<1900)
+       ff = 0.999f;
 
     int rr = radius * radius;
     int minRR = (float)rr * ff;
@@ -1490,13 +1510,13 @@ DLL_API int DLL_CALLCONV prepareDrawLinesCapsGridMask(int radius, int roundCaps)
         for (int y = 0; y < diameter; ++y) {
             int dx = x - centerX;
             int dy = y - centerY;
-            if (inRange(minRR, rr, dx * dx + dy * dy)==1)
-            // if (dx * dx + dy * dy<rr)
+            int dd = dx * dx + dy * dy;
+            if ( (inRange(minRR, rr, dd)==1 && roundedJoins==1) || (dd<rr && roundedJoins==0) )
                DrawLineCapsGrid.push_back(make_pair(dx, dy));
         }
     }
 
-    fnOutputDebug(std::to_string(radius) + " radius; prepareDrawLinesCapsGridMask() - done; rr=" + std::to_string(rr));
+    fnOutputDebug(std::to_string(ff) + " = ff; " + std::to_string(radius) + " radius; prepareDrawLinesCapsGridMask() - done; rr=" + std::to_string(rr));
 }
 
 DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int roundedJoins, int clipMode) {

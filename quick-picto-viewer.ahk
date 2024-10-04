@@ -2820,7 +2820,7 @@ setImageWallpaper(monitorIndex, imgPath, setPos) {
 
    If !RegExMatch(imgPath, "i)(.\.(bmp|jpg|jpeg|png|tif))$")
    {
-      showTOOLtip("Converting Image file format for desktop wallpaper into JPEG")
+      showTOOLtip("Converting image file format for desktop wallpaper into JPEG")
       file2save := mainCompiledPath "\wallpaper-" OutNameNoExt ".jpg"
       r := coreConvertImgFormat(imgPath, file2save)
       ResetImgLoadStatus()
@@ -5381,7 +5381,7 @@ winSwipeAction(thisCtrlClicked, mainParam) {
       ; ToolTip, % swipeAct " - " thisCtrlClicked " - " ratioDiffs "`n" diffx "==" diffy "`n" dirX "==" dirY
 
       stepFactor := 1
-      doNextSlide := doPrevSlide := doZoomChange := doFrameChange := 0
+      dblClick := doNextSlide := doPrevSlide := doZoomChange := doFrameChange := 0
       If (!swipeAct && isDotInRect(mX, mY, oX - dotSize, oX + dotSize, oY - dotSize, oY + dotSize))
       {
          zeitSillyPrevent := 1
@@ -5396,6 +5396,9 @@ winSwipeAction(thisCtrlClicked, mainParam) {
          } Else If InStr(thisCtrlClicked, "|PicOnGUI2a|")
          {
             doZoomChange := 1
+         } Else If InStr(thisCtrlClicked, "|PicOnGUI2b|")
+         {
+            dblClick := 1
          } Else If InStr(thisCtrlClicked, "|PicOnGUI2c|")
          {
             doZoomChange := -1
@@ -5440,12 +5443,26 @@ winSwipeAction(thisCtrlClicked, mainParam) {
          friendly := (doZoomChange=1) ? "in" : "out"
          zl := decideNewVPzoomLevel(zoomLevel, 0, doZoomChange, stepFactor)
          showTOOLtip("Zoom " friendly ": " Round(zl*100) "%", 0, "swipe-mode")
+      } Else If dblClick
+      {
+         If (editingSelectionNow=1)
+            showTOOLtip("Double click: drop selection area", 0, "swipe-mode")
+         Else
+            showTOOLtip("Double click: change image adapt mode", 0, "swipe-mode")
+         clear := 1
       } Else 
       {
          toolTipGuiCreated := 0
          interfaceThread.ahkassign("toolTipGuiCreated", 0)
          clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
       }
+   }
+
+   IF clear
+   {
+      toolTipGuiCreated := 0
+      interfaceThread.ahkassign("toolTipGuiCreated", 0)
+      clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
    }
 
    setWhileLoopExec(0)
@@ -10118,9 +10135,15 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
 
       lastInvoked := A_TickCount
       If (slideShowRunning=1)
+      {
          InfoToggleSlideShowu()
-      Else If (InStr(thisCtrlClicked, "|PicOnGUI2b|") && TouchScreenMode=1 || TouchScreenMode!=1)
-         ToggleImgSizeViewModes()
+      } Else If (InStr(thisCtrlClicked, "|PicOnGUI2b|") && TouchScreenMode=1 || TouchScreenMode!=1)
+      {
+         If ((IMGresizingMode=1 || IMGresizingMode=2) && zoomLevel<1)
+            ZoomImageToClickPointInWindow()
+         Else 
+            ToggleImgSizeViewModes()
+      }
    } Else If ((displayingImageNow=1 || mustOpenStartFolder) && winEventu!="DoubleClick") && (A_TickCount - thisZeit>950)
    ; } Else If ((maxFilesIndex>1 || mustOpenStartFolder) && CurrentSLD && winEventu!="DoubleClick") && (A_TickCount - thisZeit>950)
    {
@@ -20437,7 +20460,8 @@ HugeImagesDrawLineShapes() {
 
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
       rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", DrawLineAreaCapsStyle, "int", DrawLineAreaContourAlign)
-      rza := DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", roundCaps)
+      rza := DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", roundCaps, "int", DrawLineAreaJoinsStyle)
+
       If (rza=1 && rzq=1)
       {
          otherThick := Round(thisThick*0.34)
@@ -20459,15 +20483,16 @@ HugeImagesDrawLineShapes() {
             showTOOLtip("Drawing lines, please wait...`nStep 2/3")
             conturAlign := DrawLineAreaContourAlign
             closed := (FillAreaShape=7) ? FillAreaClosedPath : 1
-; tempCrapValue++
+
+; tempCrapValue-- ; := PointsCount - 1
 ; fnOutputDebug("loooooooooool == " tempCrapValue)
             rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0, "int", tempCrapValue)
             If (rzb=1 && DrawLineAreaDoubles=1)
             {
-               DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaCapsStyle)
+               DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaCapsStyle, "int", DrawLineAreaJoinsStyle)
                kThick := (DrawLineAreaCapsStyle=1 && DrawLineAreaJoinsStyle=1) ? thisThick : otherThick
                rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
-               DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaCapsStyle)
+               DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaCapsStyle, "int", DrawLineAreaJoinsStyle)
             }
 
             Gdip_DeletePath(pPath)
@@ -20478,7 +20503,7 @@ HugeImagesDrawLineShapes() {
                rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0, "int", -1)
                If (rzb=1 && DrawLineAreaDoubles=1)
                {
-                  DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaCapsStyle)
+                  DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaCapsStyle, "int", DrawLineAreaJoinsStyle)
                   rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
                }
                Gdip_DeletePath(clonedPath)
@@ -47790,7 +47815,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
        Gui, Add, Checkbox, xs y+10 gupdateUIdrawShapesPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit selection area
     } Else
     {
-       GuiAddSlider("DrawLineAreaThickScale", 100, 500, 100, "Thickness scale: $€ %", "updateUIdrawShapesPanel", 1, "xs y+7 w" slideWid - 2 " hp")
+       GuiAddSlider("DrawLineAreaThickScale", 100, 650, 100, "Thickness scale: $€ %", "updateUIdrawShapesPanel", 1, "xs y+7 w" slideWid - 2 " hp")
        GuiAddSlider("DrawLineAreaMitersBorder", 100, 500, 100, "Miters boundary: $€ %", "updateUIdrawShapesPanel", 1, "x+5 wp-30 hp")
     }
 
@@ -70811,8 +70836,11 @@ ImageNavBoxClickResponder() {
    }
 
    GetMouseCoord2wind(PVhwnd, mX, mY)
+   ; a := HUDobjNavBoxu[1], b := HUDobjNavBoxu[2]
+   ; g := HUDobjNavBoxu[3], f := HUDobjNavBoxu[4]
    mX := clampInRange(mX - HUDobjNavBoxu[3], 0, HUDobjNavBoxu[1])
    mY := clampInRange(mY - HUDobjNavBoxu[4], 0, HUDobjNavBoxu[2])
+   ; ToolTip, % a "|" b "`n" g "|" f "`n" mx "|" my , , , 2
    navWidth := HUDobjNavBoxu[1]
    navHeight := HUDobjNavBoxu[2]
    diffIMGdecX := diffIMGdecY := 0
@@ -70880,6 +70908,56 @@ ImageNavBoxClickResponder() {
    vpImgPanningNow := diffIMGdecX := diffIMGdecY := 0
    If (thisIndex>10 || lastWasLowQuality=1)
       SetTimer, wrapResizeImageGDIwin, -60
+   SetTimer, ResetImgLoadStatus, -100
+}
+
+ZoomImageToClickPointInWindow() {
+   trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+   If ((!imgW || !imgH) && (thumbsDisplaying!=1))
+      Return
+
+   zoomLevel := 1
+   IMGresizingMode := 4
+   vpWinClientSize(mainWidth, mainHeight)
+   calcIMGdimensions(imgW, imgH, mainWidth, mainHeight, ResizedW, ResizedH)
+
+   ax := prevDestPosX,      ay := prevDestPosY
+   fw := ResizedW,  fh := ResizedH
+   ; ToolTip, % ax "|" ay "`n" fw "|" fh , , , 2
+   GetMouseCoord2wind(PVhwnd, mX, mY)
+   mX := clampInRange(mX - ax, 0, fw)
+   mY := clampInRange(mY - ay, 0, fh)
+   navWidth := fw,   navHeight := fh
+   diffIMGdecX := diffIMGdecY := 0
+   calcIMGcoordsInVP("setCenter", zoomLevel, mw//2, mh//2, 0, 0, 0, 0, 0, 0, 0)
+   obju := createImgSelection2Win(1, 1, ResizedW, ResizedH, ImgW, ImgH, mainWidth, mainHeight, 1, 0)
+   coords := obju.x1 "|" obju.y1 "|" obju.x2 "|" obju.y2
+   ; fnOutputDebug("coords = " coords)
+
+   vpImgPanningNow := (allowFreeIMGpanning=1) ? 1 : 2
+   If (FlipImgV=1)
+      mY := navHeight - mY
+   If (FlipImgH=1)
+      mX := navWidth - mX
+
+   prcW := mX / navWidth
+   prcH := mY / navHeight
+   ; fnOutputDebug(mX "==" mY "==" navWidth "==" navHeight "==" prcW "==" prcH )
+   decX := - Round((imgW*prcW) * zoomLevel - mainWidth / 2)
+   decY := - Round((imgH*prcH) * zoomLevel - mainHeight / 2)
+   If (decX>0 && imageAligned=1 && FlipImgH=0 && allowFreeIMGpanning=0)
+      decX := 0
+
+   If (decY>0 && imageAligned=1 && FlipImgV=0 && allowFreeIMGpanning=0)
+      decY := 0
+
+   IMGdecalageX := decX
+   IMGdecalageY := decY
+   dummyResizeImageGDIwin()
+
+   Sleep, 15
+   ; fnOutputDebug(decX "==" decY "==" IMGdecalageX "==" IMGdecalageY)
+   vpImgPanningNow := diffIMGdecX := diffIMGdecY := 0
    SetTimer, ResetImgLoadStatus, -100
 }
 
@@ -73514,6 +73592,8 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
     }
 
 ; draw the scrollbar indicators
+    if (vpImgPanningNow>=1 && TouchScreenMode=1 && whileLoopExec=1 && IMGresizingMode=4)
+       drawLiveViewportSection(glPG, mainWidth, mainHeight)
     calculateScrollBars(newW, newH, DestPosX, DestPosY, mainWidth, mainHeight, knobW, knobH, knobX, knobY)
     knobSize := getScrollWidth()
     If (knobW<mainWidth - 5) && (IMGresizingMode=4 && slideShowRunning!=1)
@@ -73522,7 +73602,7 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
        scrollBarHy := (FlipImgV=1) ? 0 : mainHeight - knobSize
        Gdip_FillRectangle(glPG, pBrushE, 0, scrollBarHy, mainWidth, knobSize)
        Gdip_FillRectangle(glPG, pBrushD, knobX, scrollBarHy + 1, knobW, knobSize)
-       If (vpImgPanningNow>0)
+       If (vpImgPanningNow>0 && whileLoopExec=1)
           Gdip_FillRectangle(glPG, pBrushE, knobX, scrollBarHy + 1, knobW, knobSize)
        scrollBarHy := knobSize
     } Else scrollBarHy := 0
@@ -73533,7 +73613,7 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
        scrollBarVx := (FlipImgH=1) ? 0 : mainWidth - knobSize
        Gdip_FillRectangle(glPG, pBrushE, scrollBarVx, 0, knobSize, mainHeight)
        Gdip_FillRectangle(glPG, pBrushD, scrollBarVx + 1, knobY, knobSize, knobH)
-       If (vpImgPanningNow>0)
+       If (vpImgPanningNow>0 && whileLoopExec=1)
           Gdip_FillRectangle(glPG, pBrushE, scrollBarVx + 1, knobY, knobSize, knobH)
        scrollBarVx := knobSize
     } Else scrollBarVx := 0
@@ -79408,8 +79488,10 @@ calcIMGcoordsInVP(mainWidth, mainHeight, newW, newH, zL, oIMGdecX, oIMGdecY, ByR
     Static orderu := {1:7, 2:8, 3:9, 4:4, 5:5, 6:6, 7:1, 8:2, 9:3}
          , prevZoom := "-", prevCX, prevCY
 
+    ; fnOutputDebug(A_ThisFunc " A | " DestPosX "=" DestPosY "`n" IMGdecalageX "=" IMGdecalageY "|" prevZoom)
     If (mainWidth="setCenter")
     {
+       prevZoom := mainHeight
        prevCX := newW 
        prevCY := newH
        Return
@@ -79514,7 +79596,7 @@ calcIMGcoordsInVP(mainWidth, mainHeight, newW, newH, zL, oIMGdecX, oIMGdecY, ByR
        prevCY := 0.01
 
     ; ToolTip, % oIMGdecX "|" oIMGdecY "`n" IMGdecX "|" IMGdecY "`n" prevCX "|" prevCY "`n" prevZoom "|" zL , , , 2
-    ; ToolTip, % DestPosX "=" DestPosY "`n" IMGdecalageX "=" IMGdecalageY , , , 2
+    ; fnOutputDebug(A_ThisFunc " B | " DestPosX "=" DestPosY "`n" IMGdecalageX "=" IMGdecalageY "|" prevZoom)
     prevResizedVPimgW := newW
     prevResizedVPimgH := newH
     PrintPosX := ""
@@ -90216,6 +90298,31 @@ adjustCanvas2Toolbar(Gu, applyTransform) {
     Return hasTrans
 }
 
+drawLiveViewportSection(Gu, mainWidth, mainHeight) {
+    thisThick := imgHUDbaseUnit//11
+    calculateTouchMargins(thisX, thisY, thisW, thisH)
+    Gdip_SetClipRect(Gu, thisX, thisY + thisThick, thisW, thisH - thisThick*2, 4)
+    Gdip_DrawRectangle(Gu, pPen4, thisX + thisThick, thisY, thisW - thisThick*2, thisH)
+    Gdip_ResetClip(Gu)
+    If (editingSelectionNow!=1)
+    {
+       Gdip_DrawRectangle(Gu, pPen4, -thisThick, -thisThick, thisX + thisThick, mainHeight + thisThick*2)
+       Gdip_DrawRectangle(Gu, pPen4, thisW + thisX, -thisThick, thisX + thisThick*2, mainHeight + thisThick*2)
+       If (totalFramesIndex>1)
+       {
+          mwh := Round(mainHeight * 0.7)
+          Gdip_DrawLine(Gu, pPen4, 0, mwh, thisX, mwh)
+          Gdip_DrawLine(Gu, pPen4, thisX + thisW, mwh, mainWidth, mwh)
+       }
+    } Else
+    {
+       Gdip_DrawLine(Gu, pPen4, thisX, 0, thisX, thisY)
+       Gdip_DrawLine(Gu, pPen4, thisX + thisW, 0, thisX + thisW, thisY)
+       Gdip_DrawLine(Gu, pPen4, thisX, thisH + thisY, thisX, mainHeight)
+       Gdip_DrawLine(Gu, pPen4, thisX + thisW, thisH + thisY, thisX + thisW, mainHeight)
+    }
+}
+
 CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFuncu:=0) {
     Critical, On
     Static prevMsg, preventKill, lastInvoked := 1
@@ -90307,28 +90414,7 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
     If (typeFuncu="swipe-mode" && TouchScreenMode=1)
     {
        ; draw the viewport sections
-       thisThick := imgHUDbaseUnit//11
-       calculateTouchMargins(thisX, thisY, thisW, thisH)
-       Gdip_SetClipRect(2NDglPG, thisX, thisY + thisThick, thisW, thisH - thisThick*2, 4)
-       Gdip_DrawRectangle(2NDglPG, pPen4, thisX + thisThick, thisY, thisW - thisThick*2, thisH)
-       Gdip_ResetClip(2NDglPG)
-       If (editingSelectionNow!=1)
-       {
-          Gdip_DrawRectangle(2NDglPG, pPen4, -thisThick, -thisThick, thisX + thisThick, mainHeight + thisThick*2)
-          Gdip_DrawRectangle(2NDglPG, pPen4, thisW + thisX, -thisThick, thisX + thisThick*2, mainHeight + thisThick*2)
-          If (totalFramesIndex>1)
-          {
-             mwh := Round(mainHeight * 0.7)
-             Gdip_DrawLine(2NDglPG, pPen4, 0, mwh, thisX, mwh)
-             Gdip_DrawLine(2NDglPG, pPen4, thisX + thisW, mwh, mainWidth, mwh)
-          }
-       } Else
-       {
-          Gdip_DrawLine(2NDglPG, pPen4, thisX, 0, thisX, thisY)
-          Gdip_DrawLine(2NDglPG, pPen4, thisX + thisW, 0, thisX + thisW, thisY)
-          Gdip_DrawLine(2NDglPG, pPen4, thisX, thisH + thisY, thisX, mainHeight)
-          Gdip_DrawLine(2NDglPG, pPen4, thisX + thisW, thisH + thisY, thisX + thisW, mainHeight)
-       }
+       drawLiveViewportSection(2NDglPG, mainWidth, mainHeight)
        Sleep, 1
     }
 
@@ -93396,7 +93482,7 @@ printImageNow(mainBMP, PrintOptions, previewMode, inLoop:=0, OutFileName:=0) {
 
    If (previewMode!=1 && r4!="fail" && failedResize!=1)
    {
-      r := SGDIPrint_BeginDocument(hdcObj.HDC_ptr, appTitle " image file")
+      r := SGDIPrint_BeginDocument(hdcObj.HDC_ptr, "QPV image | " OutFileName)
       If r
       {
          SGDIPrint_CopyBitmapToPrinterHDC(pBitmap, hdcObj.HDC_ptr, hdcObj.HDC_Width, hdcObj.HDC_Height)
@@ -96586,8 +96672,8 @@ GuiSlidersResponder(a, m_event, keyu) {
    tinyPreview := isVarEqualTo(AnyWindowOpen, 26, 43, 44, 64, 69, 78, 79)
    While, (determineLClickState()=1 || m_event="uiLabel" && A_Index=1 || GetKeyState(keyu, "P") && isGivenKey=1)
    {
+      ; fnOutputDebug(A_ThisFunc " == A // start")
       ; if m_event = "uiLabel" , it is a keyboard call
-      fnOutputDebug(A_ThisFunc " == A // start")
       GetPhysicalCursorPos(mX, mY)
       If (isGivenKey!=1 && mouseMode=1)
       {
@@ -96599,7 +96685,7 @@ GuiSlidersResponder(a, m_event, keyu) {
       Sleep, -1
       zX := mX, zY := mY
       sk := (A_Index=1 && (m_event="DoubleClick" || m_event="uiLabel") || isActive!=1) ? 1 : 0
-      fnOutputDebug(A_ThisFunc " == B // mouse coords=" nX " // " nY)
+      ; fnOutputDebug(A_ThisFunc " == B // mouse coords=" nX " // " nY)
       If (isGivenKey=1)
       {
          fnOutputDebug(A_ThisFunc " == key")
@@ -96630,7 +96716,7 @@ GuiSlidersResponder(a, m_event, keyu) {
          %givenVar% := newValue
 
       ; ToolTip, % wx "|" w "|" rangeu "|" newValue , , , 2
-      fnOutputDebug(A_ThisFunc " == C // newValue=" newValue)
+      ; fnOutputDebug(A_ThisFunc " == C // newValue=" newValue)
       If (whichSlider="userUIshapeCavity")
       {
          If (newValue<2)
@@ -96641,9 +96727,9 @@ GuiSlidersResponder(a, m_event, keyu) {
 
       If (A_TickCount - lastu>50)
       {
-         fnOutputDebug(A_ThisFunc " == D // must preview")
+         ; fnOutputDebug(A_ThisFunc " == D // must preview")
          p := GuiUpdateSliders(whichSlider, 0, obju)
-         fnOutputDebug(A_ThisFunc " == D // slider updated")
+         ; fnOutputDebug(A_ThisFunc " == D // slider updated")
          If (AnyWindowOpen=10 || AnyWindowOpen=74)
             livePreviewColorsAdjustVP()
          Else If (imgEditPanelOpened=1)
@@ -96655,10 +96741,10 @@ GuiSlidersResponder(a, m_event, keyu) {
 
          lastu := A_TickCount
          skipped := 0
-         fnOutputDebug(A_ThisFunc " == D // viewport preview done")
+         ; fnOutputDebug(A_ThisFunc " == D // viewport preview done")
       } Else skipped++
 
-      fnOutputDebug(A_ThisFunc " == E // finish")
+      ; fnOutputDebug(A_ThisFunc " == E // finish")
       If (sk && !isGivenKey)
          Break
 
