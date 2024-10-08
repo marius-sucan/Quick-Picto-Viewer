@@ -5,8 +5,9 @@
 // Related: general-code-overview.txt
 
 - v6.1.00 (2024-08-**)
+  - [improvement] by double clicking on the viewport, the image gets zoomed in at the associated image coordinates
+  - [improvement] recently opened list now keeps track of opened images, not just folders or files lists
   - [improvement] «draw shapes contour» can now draw lines with miter joins
-
 
 - v6.0.50 (2024-07-28)
   - [new] «draw shapes contours» tool now works with images over 536 megapixels
@@ -1155,7 +1156,7 @@ Files organization:
 - render 3D primitive [textured?] objects through cImg
 - magic wand when editing the alpha mask
 - edit image(s) metadata
-- add folder details column- explorer panel
+- add folder details column - explorer panel
 - transparentize image tool
 - import vector paths
-- reimplement smudge, pinch, bulge brushes
+- reimplement the smudge, pinch, bulge brushes

@@ -208,7 +208,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , lastInfoBoxZeitToggle := 1, prevHistoBoxString := "", menuHotkeys, whichMainDLL := "qpvmain.dll", lastMenuZeit := 1
    , userExtractFramesFmt := 3, maxMultiPagesAllowed := 2048, maxMemLimitMultiPage := 2198765648, alphaMaskCoffsetX := 0
    , userImgClrMtrxBrightness, userImgClrMtrxContrast, userImgClrMtrxSaturation, userImgVPthreshold, userImgVPgammaLevel
-   , cmdExifTool := "", tabzDarkModus := 0, maxRecentOpenedFolders := 15, UIuserToneMapParamA := 74, UIuserToneMapParamB := 200
+   , cmdExifTool := "", tabzDarkModus := 0, maxRecentOpenedFolders := 6, UIuserToneMapParamA := 74, UIuserToneMapParamB := 200
    , userImgChannelRlvl, userImgChannelGlvl, userImgChannelBlvl, userImgChannelAlvl, combosDarkModus := ""
    , sillySeparator :=  "▪", menuCustomNames := new hashtable(), clrGradientCoffX := 0, clrGradientCoffY := 0
    , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*|Background clipper*"
@@ -2482,7 +2482,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
         GenerateRandyList()
         SetTimer, ResetImgLoadStatus, -50
         CurrentSLD := fileNamu
-        RecentFilesManager(CurrentSLD)
+        RecordFoldersOpenedManager(CurrentSLD)
         SLDtypeLoaded := 3
         prevOpenFolderPath := OutDir
         INIaction(1, "prevOpenFolderPath", "General")
@@ -2548,7 +2548,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
   SLDtypeLoaded := 2
   currentFileIndex := 1
   currentFilesListModified := 0
-  RecentFilesManager(CurrentSLD)
+  RecordFoldersOpenedManager(CurrentSLD)
   SetTimer, createGUItoolbar, -100
   SetTimer, TriggerMenuBarUpdate, -90
   If (dontStartSlide=1)
@@ -29519,7 +29519,7 @@ FolderTreeRepopulate(dummy:=0, listuGiven:=0) {
           TV_Delete()
        } Else
        {
-          aListu := readRecentEntries(0, 0)
+          aListu := readRecentOpenedFolderEntries(0, 0)
           aListu .= readRecentFileDesties()
           If FolderExist(prevFileSavePath)
              aListu .= "`n" prevFileSavePath "`n"
@@ -31219,13 +31219,13 @@ BtnApplyFilesFilter() {
    }
 
    If (userFilterDoString=1 && UsrEditFilter)
-      RecentFiltersManager(UsrEditFilter)
+      RecordUsedFiltersManager(UsrEditFilter)
 
    coreEnableFiltru(newFilter)
    dummyTimerDelayiedImageDisplay(50)
 }
 
-RecentFiltersManager(entry2add) {
+RecordUsedFiltersManager(entry2add) {
   If (userPrivateMode=1)
      Return
 
@@ -36330,7 +36330,7 @@ writeSlideSettings(file2save) {
     ; throwMSGwriteError()
 }
 
-readRecentEntries(forceNewList:=0, doFiltering:=1) {
+readRecentOpenedFolderEntries(forceNewList:=0, doFiltering:=1) {
    Static lastInvoked := 1, historyList
 
    If (StrLen(forceNewList)>4)
@@ -36340,7 +36340,7 @@ readRecentEntries(forceNewList:=0, doFiltering:=1) {
       Return
    }
 
-   If (StrLen(historyList)>4 && (A_TickCount - lastInvoked<5500))
+   If (StrLen(historyList)>4 && (A_TickCount - lastInvoked<3500))
    {
       lastInvoked := A_TickCount
       Return historyList
@@ -36349,8 +36349,43 @@ readRecentEntries(forceNewList:=0, doFiltering:=1) {
    historyList := ""
    Loop, % maxRecentOpenedFolders
    {
-       IniRead, newEntry, % mainRecentsFile, RecentOpen, E%A_Index%, @
+       IniRead, newEntry, % mainRecentsFile, RecentFolderOpened, E%A_Index%, @
        newEntry := Trimmer(newEntry)
+       If (StrLen(newEntry)>4 && doFiltering=1)
+          historyList .= newEntry "`n"
+       Else If (doFiltering!=1)
+          historyList .= newEntry "`n"
+   }
+  
+   List_MakeUnique(historyList, "`n", 0, 1)
+   lastInvoked := A_TickCount
+   Return historyList
+}
+
+readRecentOpenedImagesEntries(forceNewList:=0, doFiltering:=1) {
+   Static lastInvoked := 1, historyList
+
+   If (StrLen(forceNewList)>4)
+   {
+      historyList := forceNewList
+      lastInvoked := A_TickCount
+      Return
+   }
+
+   If (StrLen(historyList)>4 && (A_TickCount - lastInvoked<3500))
+   {
+      lastInvoked := A_TickCount
+      Return historyList
+   }
+
+   historyList := ""
+   Loop, % maxRecentOpenedFolders
+   {
+       IniRead, newEntry, % mainRecentsFile, RecentImgOpened, E%A_Index%, @
+       newEntry := Trimmer(newEntry)
+       If !RegExMatch(newEntry, RegExFilesPattern)
+          Continue
+
        If (StrLen(newEntry)>4 && doFiltering=1)
           historyList .= newEntry "`n"
        Else If (doFiltering!=1)
@@ -36415,11 +36450,11 @@ readMiniFavesEntries() {
    Return historyList
 }
 
-RecentFilesManager(entry2add) {
+RecordFoldersOpenedManager(entry2add) {
   If (StrLen(entry2add)<5 || !allowRecordHistory || userPrivateMode=1)
      Return
 
-  historyList := readRecentEntries()
+  historyList := readRecentOpenedFolderEntries()
   historyList := entry2add "`n" historyList
   List_MakeUnique(historyList, "`n", 0, 0)
   Loop, Parse, historyList, `n, `r
@@ -36431,11 +36466,34 @@ RecentFilesManager(entry2add) {
          Continue
 
       countItemz++
-      IniWrite, % A_LoopField, % mainRecentsFile, RecentOpen, E%countItemz%
+      IniWrite, % A_LoopField, % mainRecentsFile, RecentFolderOpened, E%countItemz%
       newHistoryList .= A_LoopField "`n"
   }
 
-  readRecentEntries(newHistoryList)
+  readRecentOpenedFolderEntries(newHistoryList)
+}
+
+RecordImagesOpenedManager(entry2add) {
+  If (StrLen(entry2add)<5 || !allowRecordHistory || userPrivateMode=1 || !FileRexists(entry2add) || !RegExMatch(entry2add, RegExFilesPattern))
+     Return
+
+  historyList := readRecentOpenedImagesEntries()
+  historyList := entry2add "`n" historyList
+  List_MakeUnique(historyList, "`n", 0, 0)
+  Loop, Parse, historyList, `n, `r
+  {
+      If (A_Index>maxRecentOpenedFolders)
+         Break
+
+      If (StrLen(A_LoopField)<5 || !RegExMatch(A_LoopField, RegExFilesPattern))
+         Continue
+
+      countItemz++
+      IniWrite, % A_LoopField, % mainRecentsFile, RecentImgOpened, E%countItemz%
+      newHistoryList .= A_LoopField "`n"
+  }
+
+  readRecentOpenedImagesEntries(newHistoryList)
 }
 
 markUndefinedFavedList() {
@@ -38517,7 +38575,7 @@ coreBatchMultiRenameFiles() {
      prevMSGdisplay := A_TickCount
      startZeit := A_Now
      destroyGDIfileCache()
-     RecentMultiRenamesManager(OriginalNewFileName)
+     RecordUsedMultiRenamesQueriesManager(OriginalNewFileName)
      doStartLongOpDance()
      If (SLDtypeLoaded=3)
         activeSQLdb.Exec("BEGIN TRANSACTION;")
@@ -38690,7 +38748,7 @@ coreBatchMultiRenameFiles() {
   }
 }
 
-RecentMultiRenamesManager(entry2add) {
+RecordUsedMultiRenamesQueriesManager(entry2add) {
   entry2add := Trimmer(entry2add)
   mainListu := readRecentMultiRenameEntries()
   If StrLen(entry2add)<3
@@ -39584,8 +39642,7 @@ GoQuickSearchAction(dummy:="", isGiven:=0, ef:=0) {
          SetTimer, ResetImgLoadStatus, -200
       } Else If (funcu="!OmniOpenImage")
       {
-         If (allowRecordHistory=1)
-            IniWrite, % userQuickMenusEdit, % mainSettingsFile, General, LastOpenedImg
+         RecordImagesOpenedManager(userQuickMenusEdit)
          MenuOpenLastImg(userQuickMenusEdit)
       } Else If (funcu="!OmniImportImage")
       {
@@ -41009,7 +41066,7 @@ BTNsaveSlideshowPanel() {
     Else
        SaveDBfilesList()
 
-    RecentFilesManager(CurrentSLD)
+    RecordFoldersOpenedManager(CurrentSLD)
 }
 
 FolderExist(filePath) {
@@ -54823,7 +54880,7 @@ CopyMovePanelWindow() {
     listu := readRecentFileDesties()
     listu .= "--={ other destinations }=--`n"
     setImageLoading()
-    historyList := readRecentEntries()
+    historyList := readRecentOpenedFolderEntries()
     Loop, Parse, historyList, `n
     {
        If (A_Index>10)
@@ -58272,7 +58329,7 @@ coreOpenFolder(thisFolder, doOptionals:=1, openFirst:=0, doReset:=0, safeMode:=0
       CurrentSLD := thisFolder
       watchFolderDetails := ""
       If (safeMode=0)
-         RecentFilesManager(CurrentSLD)
+         RecordFoldersOpenedManager(CurrentSLD)
 
       If (r=1)
       {
@@ -58503,8 +58560,7 @@ OpenDialogFiles() {
       If (RegExMatch(imgPath, RegExFilesPattern) && FileRexists(imgPath) && InStr(chosenOption, "selected"))
       {
          SLDtypeLoaded := 1
-         If (allowRecordHistory=1)
-            IniWrite, % imgPath, % mainSettingsFile, General, LastOpenedImg
+         RecordImagesOpenedManager(imgPath)
          MenuOpenLastImg(imgPath)
          currentFilesListModified := 0
       } Else 
@@ -58527,9 +58583,7 @@ OpenDialogFiles() {
          If FileRexists(imgPath)
          {
             currentFileIndex := detectFileID(imgPath)
-            If (allowRecordHistory=1)
-               IniWrite, % imgPath, % mainSettingsFile, General, LastOpenedImg
-
+            RecordImagesOpenedManager(imgPath)
             IDshowImage(currentFileIndex)
          } Else If (OutFileName!="")
          {
@@ -58626,7 +58680,7 @@ MenuOpenLastImg(forceOpenGiven:=0) {
 
    If !FileRexists(forceOpenGiven)
    {
-      IniRead, LastOpenedImg, % mainSettingsFile, General, LastOpenedImg, @
+      IniRead, LastOpenedImg, % mainRecentsFile, RecentImgOpened, E1, @
       LastOpenedImg := Trimmer(LastOpenedImg)
    } Else LastOpenedImg := Trimmer(forceOpenGiven)
 
@@ -58717,9 +58771,7 @@ OpenArgFile(inputu) {
     CurrentSLD := "|" OutDir
     prevOpenFolderPath := OutDir
     INIaction(1, "prevOpenFolderPath", "General")
-    If (allowRecordHistory=1 && FileRexists(inputu))
-       IniWrite, % inputu, % mainSettingsFile, General, LastOpenedImg
-
+    RecordImagesOpenedManager(inputu)
     updateUIctrl()
     SLDtypeLoaded := 1
     SetTimer, createGUItoolbar, -100
@@ -59628,9 +59680,7 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
       {
          SLDtypeLoaded := 1
          lastInvoked := A_TickCount
-         If (allowRecordHistory=1)
-            IniWrite, % imgPath, % mainSettingsFile, General, LastOpenedImg
-
+         RecordImagesOpenedManager(imgPath)
          MenuOpenLastImg(imgPath)
          lastInvoked := A_TickCount
          SetTimer, ResetImgLoadStatus, -150
@@ -64637,13 +64687,25 @@ createMenuOpenRecents(modus:=0) {
 
    If (allowRecordHistory=1 && mustPreventMenus!=1)
    {
-      Menu, PVopenF, Add,
-      IniRead, LastOpenedImg, % mainSettingsFile, General, LastOpenedImg, @
-      friendlyLabel := (userPrivateMode=1) ? "*:\*******\******.***" : PathCompact(Trimmer(LastOpenedImg), 30)
-      If (RegExMatch(Trimmer(LastOpenedImg), RegExFilesPattern) && FileRexists(Trimmer(LastOpenedImg)))
-         kMenu("PVopenF", "Add", "&0. " friendlyLabel, "MenuOpenLastImg")
+      countItemz := 0
+      kMenu("PVopenF", "AddSeparator", 0)
+      historyList := readRecentOpenedImagesEntries(0, 0)
+      Loop, Parse, historyList, `n
+      {
+         If (A_Index>maxRecentOpenedFolders)
+            Break
 
-      historyList := readRecentEntries(0, 0)
+         countItemz++
+         If (StrLen(A_LoopField)<4 || !RegExMatch(A_LoopField, RegExFilesPattern))
+            Continue
+
+         entryu := (userPrivateMode=1) ? "*:\*******\******.***" : PathCompact(A_LoopField, 30)
+         kMenu("PVopenF", "Add", "&" countItemz ". " entryu, "OpenRecentImage")
+      }
+
+      countItemz := 0
+      kMenu("PVopenF", "AddSeparator", 0)
+      historyList := readRecentOpenedFolderEntries(0, 0)
       Loop, Parse, historyList, `n
       {
          If (A_Index>maxRecentOpenedFolders)
@@ -64665,7 +64727,7 @@ createMenuOpenRecents(modus:=0) {
          kMenu("PVopenF", "Add", "&" countItemz ". " entryu, "OpenRecentEntry")
       }
 
-      Menu, PVopenF, Add, 
+      kMenu("PVopenF", "AddSeparator", 0)
       If FolderExist(prevFileSavePath)
          aListu := (userPrivateMode=1) ? "O1. *:\*******\******.***`n" : "O1. " PathCompact(prevFileSavePath, 30) "`n"
       If (FolderExist(prevFileMovePath) && !InStr(aListu, prevFileMovePath "`n"))
@@ -64683,7 +64745,7 @@ createMenuOpenRecents(modus:=0) {
       }
    }
 
-   Menu, PVopenF, Add, 
+   kMenu("PVopenF", "AddSeparator", 0)
    If (countItemz>0 || mustPreventMenus=1)
       kMenu("PVopenF", "Add", "&Erase history list", "EraseOpenedHistory", "files")
 
@@ -65044,12 +65106,17 @@ createMenuInterfaceOptions() {
 }
 
 EraseOpenedHistory() {
-   Loop, 15
-       IniWrite, 0, % mainRecentsFile, RecentOpen, E%A_Index%
-   IniWrite, 0, % mainSettingsFile, General, LastOpenedImg
+   Loop, % maxRecentOpenedFolders
+       IniWrite, 0, % mainRecentsFile, RecentImgOpened, E%A_Index%
+   Loop, % maxRecentOpenedFolders
+       IniWrite, 0, % mainRecentsFile, RecentFolderOpened, E%A_Index%
 }
 
-OpenRecentEntry(menuItem) {
+OpenRecentImage(menuItem) {
+    OpenRecentEntry(menuItem, "files")
+}
+
+OpenRecentEntry(menuItem, modus:=0) {
   testOs := SubStr(menuItem, 1, 3)
   initQPVmainDLL()
   If askAboutFileSave(" and another image will be loaded")
@@ -65075,8 +65142,10 @@ OpenRecentEntry(menuItem) {
   If !newEntry
   {
      openThisu := SubStr(menuItem, 2, InStr(menuItem, ". ")-2)
-     IniRead, newEntry, % mainRecentsFile, RecentOpen, E%openThisu%, @
+     whichGroup := (modus="files") ? "RecentImgOpened" : "RecentFolderOpened"
+     IniRead, newEntry, % mainRecentsFile, % whichGroup, E%openThisu%, @
   }
+
   ; MsgBox, %openthisu% -- %newentry%
   newEntry := Trimmer(newEntry)
   If StrLen(newEntry)>4
@@ -65087,7 +65156,11 @@ OpenRecentEntry(menuItem) {
         activeSQLdb.CloseDB()
      }
 
-     If RegExMatch(newEntry, sldsPattern)
+     If RegExMatch(newEntry, RegExFilesPattern)
+     {
+        RecordImagesOpenedManager(newEntry)
+        MenuOpenLastImg(newEntry)
+     } Else If RegExMatch(newEntry, sldsPattern)
      {
         OpenSLD(newEntry)
      } Else
@@ -93873,7 +93946,7 @@ gtestwhatever() {
 recentOpenedFolders() {
    If (allowRecordHistory=1)
    {
-      historyList := readRecentEntries()
+      historyList := readRecentOpenedFolderEntries()
       historyList .= readRecentFileDesties()
       Loop, Parse, historyList, `n
       {
