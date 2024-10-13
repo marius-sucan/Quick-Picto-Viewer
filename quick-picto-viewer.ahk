@@ -20400,13 +20400,13 @@ processGdipPathForDLL(pPath, tk, o_imgSelH, subdivide, ByRef PointsCount, ByRef 
       Gdip_FlattenPath(pPath, 0.1)
 
    PointsCount := Gdip_GetPathPointsCount(pPath)
-   VarSetCapacity(PointsF, 8 * (PointsCount + 1), 0)
+   VarSetCapacity(PointsF, 8 * (PointsCount + 5), 0)
    rr := DllCall("gdiplus\GdipGetPathPoints", "UPtr", pPath, "UPtr", &PointsF, "int*", PointsCount)
    Return rr
 }
 
 HugeImagesDrawLineShapes() {
-      Static tempCrapValue := -1
+      Static tempCrapValue := -1, zzpo := 0
       If warnHugeImageNotFIM()
          Return
 
@@ -20456,7 +20456,7 @@ HugeImagesDrawLineShapes() {
       roundJoins := DrawLineAreaJoinsStyle
       roundCaps := DrawLineAreaCapsStyle
       if (DrawLineAreaContourAlign!=2)
-         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, 3, VPselRotation, 0, 0, "a", "a", 1, [tk, tk, o_imgSelW, o_imgSelH])
+         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, 3, VPselRotation, 0, 0, "a", "a", 1, [tk + pfcX, tk, o_imgSelW, o_imgSelH])
 
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
       rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", DrawLineAreaCapsStyle, "int", DrawLineAreaContourAlign)
@@ -20484,8 +20484,12 @@ HugeImagesDrawLineShapes() {
             conturAlign := DrawLineAreaContourAlign
             closed := (FillAreaShape=7) ? FillAreaClosedPath : 1
 
-; tempCrapValue-- ; := PointsCount - 1
-; fnOutputDebug("loooooooooool == " tempCrapValue)
+            ; tempCrapValue := (zzpo=1) ? PointsCount - 1 : 0
+            ; fnOutputDebug("loooooooooool == " tempCrapValue)
+            ; zzpo := !zzpo
+            ; if (DrawLineAreaBlendMode>1)
+            ; zzpo:=0
+
             rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0, "int", tempCrapValue)
             If (rzb=1 && DrawLineAreaDoubles=1)
             {

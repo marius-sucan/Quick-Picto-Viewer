@@ -880,6 +880,40 @@ void extendLine(const Point p1, const Point p2, const double distance, Point &ne
     newP2.y = p2.y + uy * distance;
 }
 
+bool isPointInCircle(Point center, double radius, Point testPoint) {
+    // Calculate the distance between the center and the test point
+    double distance = std::sqrt(
+        std::pow(testPoint.x - center.x, 2) + 
+        std::pow(testPoint.y - center.y, 2)
+    );
+    
+    // If the distance is less than or equal to the radius, the point is inside the circle
+    return distance <= radius;
+}
+
+float calculateAngle(Point a, Point b, Point c) {
+    // Vector AB
+    double u_x = a.x - b.x;
+    double u_y = a.y - b.y;
+    
+    // Vector BC
+    double v_x = c.x - b.x;
+    double v_y = c.y - b.y;
+    
+    // Dot product of vectors AB and BC
+    double dotProduct = (u_x * v_x) + (u_y * v_y);
+    
+    // Magnitudes of vectors AB and BC
+    double magnitudeU = sqrt(u_x * u_x + u_y * u_y);
+    double magnitudeV = sqrt(v_x * v_x + v_y * v_y);
+    
+    // Angle in radians using acos of the normalized dot product
+    double angleRadians = acos(dotProduct / (magnitudeU * magnitudeV));
+    float angleDeg = angleRadians * 180.0f / M_PI;
+
+    return angleDeg;
+}
+
 void dummyDrawPixelMask(const Point &d, const int offsetY, const int simple, const bool p) {
 // test function, should be not used in production
     int gx = d.x - polyX;
@@ -935,25 +969,28 @@ void dummyDrawPixelMask(const Point &d, const int offsetY, const int simple, con
     }
 }
 
-void translateLine(const Point& p1, const Point& p2, const float distance, Point &np1, Point &np2, Point &np3, Point &np4) {
+void translateLine(const Point &p1, const Point &p2, const double &dx, const double &dy, const double distance, Point &np1, Point &np2, Point &np3, Point &np4) {
 // Function to translate a line by a given distance parallel to the initial one
 
     // Calculate the direction vector of the line
-    const double dx = p2.x - p1.x;
-    const double dy = p2.y - p1.y;
+    // const double dx = p2.x - p1.x;
+    // const double dy = p2.y - p1.y;
     const double length = sqrt(dx * dx + dy * dy);
 
     // Normalize the direction vector
-    const double nx = dx / length;
-    const double ny = dy / length;
+    // const double nx = dx / length;
+    // const double ny = dy / length;
 
     // Calculate the perpendicular vector
-    const double px = -ny;
-    const double py = nx;
+    // const double px = -ny;
+    // const double py = nx;
 
     // Calculate the translated line
-    const double ppx = px * distance;
-    const double ppy = py * distance;
+    // const double ppx = px * distance;
+    // const double ppy = py * distance;
+
+    const double ppx = (-1*(dy / length)) * distance;
+    const double ppy = (dx / length) * distance;
 
     // Translate the points
     np1 = {p1.x + ppx, p1.y + ppy};
@@ -1126,20 +1163,38 @@ void drawLineSegmentMask(int x0, int y0, int x1, int y1, const bool &p, const in
    }
 }
 
-void prepareTranslatedLineSegments(const float &thickness, vector<double> &offsetPointsListA, vector<double> &offsetPointsListB, float* PointsList, const int &PointsCount, const int &closed, const bool &expand) {
+void prepareTranslatedLineSegments(const float &thickness, vector<double> &offsetPointsListA, vector<double> &offsetPointsListB, float* PointsList, const int &PointsCount, const int &closed, const bool &expand, const int &offsetY) {
    const int pci = PointsCount - 1;
    for (int pts = 0; pts < PointsCount; pts++)
    {
        const int i = pts*2;
        Point a = {PointsList[i], PointsList[i + 1]};
        Point b = {PointsList[i + 2], PointsList[i + 3]};
+       Point c = {PointsList[i + 4], PointsList[i + 5]};   // it is meant as a backup, if A and B are too close, the AC segment will be used
        if (pts==pci)
        {
           b = {PointsList[0], PointsList[1]};
+          c = {PointsList[2], PointsList[3]};
        }
 
+      double dx = b.x - a.x;
+      double dy = b.y - a.y;
+      if (fabs(dx) < 0.1 && fabs(dy) < 0.1)
+      {
+         dx = c.x - a.x;
+         dy = c.y - a.y;
+         b = c;
+         // fnOutputDebug("segment too short: AB");
+         if (fabs(dx) < 0.1 && fabs(dy) < 0.1)
+            fnOutputDebug("segment too short: AC");
+      }
+
        Point np1, np2, np3, np4;
-       translateLine(a, b, thickness, np1, np2, np3, np4);
+       translateLine(a, b, dx, dy, thickness, np1, np2, np3, np4);
+       // dummyDrawPixelMask(np1, offsetY, 2, 1);
+       // dummyDrawPixelMask(np2, offsetY, 2, 1);
+       // dummyDrawPixelMask(np3, offsetY, 2, 1);
+       // dummyDrawPixelMask(np4, offsetY, 2, 1);
        offsetPointsListA.push_back(np1.x);
        offsetPointsListA.push_back(np1.y);
        offsetPointsListA.push_back(np2.x);
@@ -1224,7 +1279,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
        offsetPointsListA.reserve(PointsCount*4 + 5);
        offsetPointsListB.reserve(PointsCount*4 + 5);
        fnOutputDebug(std::to_string(offsetPointsListA.size()) + " preparing line thickness adjusted paths; points=" + std::to_string(PointsCount));
-       prepareTranslatedLineSegments(thickness, offsetPointsListA, offsetPointsListB, PointsList, PointsCount, closed, 0);
+       prepareTranslatedLineSegments(thickness, offsetPointsListA, offsetPointsListB, PointsList, PointsCount, closed, 0, offsetY);
        fnOutputDebug(std::to_string(offsetPointsListA.size()) + " finished line thickness adjusted paths;");
     }
 
@@ -1261,69 +1316,11 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
            drawLineSegmentMask(xa, ya, xb, yb, fillMode, offsetY, roundedJoins, NULL, clipMode);
         } else
         {
-           i *= 2;
-           const double zxa = offsetPointsListA[i];
-           const double zya = offsetPointsListA[i + 1];
-           const double zxb = offsetPointsListB[i];
-           const double zyb = offsetPointsListB[i + 1];
-           i *= 2;
-           if (closed==0 && PointsCount>2 && (pts==0 || pts==pci-1))
-           {
-              if (roundCaps==0)
-              {
-                  double cxa, cxb, cya, cyb;
-                  Point np1, np2;
-                  extendLine({(double)xa, (double)ya}, {(double)xb, (double)yb}, thickness*1.40f, np1, np2);
-                  float* dynamicArray = new float[8];
-                  if (pts==0)
-                  {
-                      cxa = xa - np1.x;              cya = ya - np1.y;
-                      cxb = xb - np2.x;              cyb = yb - np2.y;
-                      cxa = zxa - cxa;               cya = zya - cya;
-                      cxb = zxb + cxb;               cyb = zyb + cyb;
-                      // dummyDrawPixelMask({(float)zxa, (float)zya}, offsetY, 0);
-                      // dummyDrawPixelMask({(float)zxb, (float)zyb}, offsetY, 0);
-                      dynamicArray[0] = zxa;           dynamicArray[1] = zya;
-                      dynamicArray[2] = zxb;           dynamicArray[3] = zyb;
-                      // drawLineSegmentSimpleMask(zxa, zya, cxa, cya, doubles, offsetY);
-                      // drawLineSegmentSimpleMask(zxb, zyb, cxb, cyb, doubles, offsetY);
-                  } else if (pts==pci-1)
-                  {
-                      cxa = xb - np1.x;              cya = yb - np1.y;
-                      cxb = xa - np2.x;              cyb = ya - np2.y;
-                      cxa = zxa + cxa;               cya = zya + cya;
-                      cxb = zxb - cxb;               cyb = zyb - cyb;
-                      const double dxa = cxa - (xa - np1.x);
-                      const double dya = cya - (ya - np1.y);
-                      const double dxb = cxb + xb - np2.x;
-                      const double dyb = cyb + yb - np2.y;
-                      // dummyDrawPixelMask({(float)dxa, (float)dya}, offsetY, 0);
-                      // dummyDrawPixelMask({(float)dxb, (float)dyb}, offsetY, 0);
-                      dynamicArray[0] = dxa;           dynamicArray[1] = dya;
-                      dynamicArray[2] = dxb;           dynamicArray[3] = dyb;
-                      // drawLineSegmentSimpleMask(dxa, dya, cxa, cya, doubles, offsetY);
-                      // drawLineSegmentSimpleMask(dxb, dyb, cxb, cyb, doubles, offsetY);
-                  }
-                  dynamicArray[4] = cxb;           dynamicArray[5] = cyb;
-                  dynamicArray[6] = cxa;           dynamicArray[7] = cya;
-                  // drawLineSegmentSimpleMask(cxa, cya, cxb, cyb, doubles, offsetY);
-
-                  FillSimpleMaskPolygon(polyW, polyH, dynamicArray, 4, offsetY, fillMode, PointsList, PointsCount, clipMode);
-                  delete[] dynamicArray;
-              } else
-              {
-                  int dx = (pts==0) ? xa : xb;
-                  int dy = (pts==0) ? ya : yb;
-                  // int tt = thickness - 0;
-                  // int rr = pow(tt, 2);
-                  // fnOutputDebug("pts=" + std::to_string(pts));
-                  stampCircleMaskAt(dx, dy, thickness, pow(thickness, 2), offsetY, clipMode, fillMode);
-              }
-           }
-
            Point npA, npB, np1, np2, np3, np4;
            extendLine({xa, ya}, {xb, yb}, 1.0f, npA, npB);
-           translateLine(npA, npB, thickness, np1, np2, np3, np4);
+           const double dx = npB.x - npA.x;
+           const double dy = npB.y - npA.y;
+           translateLine(npA, npB, dx, dy, thickness, np1, np2, np3, np4);
 
            float* dynamicArray = new float[8];
            dynamicArray[0] = np1.x; // zxa
@@ -1340,15 +1337,77 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
            // fnOutputDebug("npB.x/y=" + std::to_string(npB.x) + " / " + std::to_string(npB.y));
            
            // drawLineSegmentMask(npA.x, npA.y, npB.x, npB.y, fillMode, offsetY, roundedJoins, thickness, zxa, zya, zxb, zyb, dynamicArray, PointsList, PointsCount, clipMode);
-
            // drawLineSegmentMask(xa, ya, xb, yb, fillMode, offsetY, roundedJoins, thickness, zxa, zya, zxb, zyb, dynamicArray, PointsList, PointsCount, clipMode);
            drawLineSegmentMask(np1.x, np1.y, np2.x, np2.y, fillMode, offsetY, roundedJoins, dynamicArray, clipMode); // good
            // FillSimpleMaskPolygon(polyW, polyH, dynamicArray, 4, offsetY, fillMode, PointsList, PointsCount, clipMode);
-        
-
            // drawLineSegmentMask(xa, ya, xb, yb, doubles, offsetY, roundedJoins, thickness, zxa, zya, zxb, zyb, dynamicArray);
            delete[] dynamicArray;
         }
+
+        if (closed==0 && PointsCount>2 && (pts==0 || pts==pci-1))
+        {
+            // render round/box caps
+           if (roundCaps==0)
+           {
+               Point npA, npB, np1, np2, np3, np4;
+               extendLine({xa, ya}, {xb, yb}, 0.1f, npA, npB);
+               const double dx = npB.x - npA.x;
+               const double dy = npB.y - npA.y;
+               translateLine(npA, npB, dx, dy, thickness, np1, np2, np3, np4);
+               const double zxa = np1.x;
+               const double zya = np1.y;
+               const double zxb = np3.x;
+               const double zyb = np3.y; 
+
+               double cxa, cxb, cya, cyb;
+               extendLine({xa, ya}, {xb, yb}, thickness*1.40f, np1, np2);
+               float* dynamicArray = new float[8];
+               if (pts==0)
+               {
+                   cxa = xa - np1.x;              cya = ya - np1.y;
+                   cxb = xb - np2.x;              cyb = yb - np2.y;
+                   cxa = zxa - cxa;               cya = zya - cya;
+                   cxb = zxb + cxb;               cyb = zyb + cyb;
+                   // dummyDrawPixelMask({(float)zxa, (float)zya}, offsetY, 0);
+                   // dummyDrawPixelMask({(float)zxb, (float)zyb}, offsetY, 0);
+                   dynamicArray[0] = zxa;           dynamicArray[1] = zya;
+                   dynamicArray[2] = zxb;           dynamicArray[3] = zyb;
+                   // drawLineSegmentSimpleMask(zxa, zya, cxa, cya, doubles, offsetY);
+                   // drawLineSegmentSimpleMask(zxb, zyb, cxb, cyb, doubles, offsetY);
+               } else if (pts==pci-1)
+               {
+                   cxa = xb - np1.x;              cya = yb - np1.y;
+                   cxb = xa - np2.x;              cyb = ya - np2.y;
+                   cxa = zxa + cxa;               cya = zya + cya;
+                   cxb = zxb - cxb;               cyb = zyb - cyb;
+                   const double dxa = cxa - (xa - np1.x);
+                   const double dya = cya - (ya - np1.y);
+                   const double dxb = cxb + xb - np2.x;
+                   const double dyb = cyb + yb - np2.y;
+                   // dummyDrawPixelMask({(float)dxa, (float)dya}, offsetY, 0);
+                   // dummyDrawPixelMask({(float)dxb, (float)dyb}, offsetY, 0);
+                   dynamicArray[0] = dxa;           dynamicArray[1] = dya;
+                   dynamicArray[2] = dxb;           dynamicArray[3] = dyb;
+                   // drawLineSegmentSimpleMask(dxa, dya, cxa, cya, doubles, offsetY);
+                   // drawLineSegmentSimpleMask(dxb, dyb, cxb, cyb, doubles, offsetY);
+               }
+               dynamicArray[4] = cxb;           dynamicArray[5] = cyb;
+               dynamicArray[6] = cxa;           dynamicArray[7] = cya;
+               // drawLineSegmentSimpleMask(cxa, cya, cxb, cyb, doubles, offsetY); 
+
+               FillSimpleMaskPolygon(polyW, polyH, dynamicArray, 4, offsetY, fillMode, PointsList, PointsCount, clipMode);
+               delete[] dynamicArray;
+           } else
+           {
+               int dx = (pts==0) ? xa : xb;
+               int dy = (pts==0) ? ya : yb;
+               // int tt = thickness - 0;
+               // int rr = pow(tt, 2);
+               // fnOutputDebug("pts=" + std::to_string(pts));
+               stampCircleMaskAt(dx, dy, thickness, pow(thickness, 2), offsetY, clipMode, fillMode);
+           }
+        } 
+
     }
 
 
@@ -1369,8 +1428,8 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
             // square/round caps option
             // allow this mode only for Rects, Triangles and custom shapes 
 
-            if (pts!=tempus && tempus>=0)
-               continue;
+            // if (pts!=tempus && tempus>=0)
+            //    continue;
             if (pts==0 && closed==0)
                continue;
 
@@ -1403,11 +1462,15 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
             } else
             {
                 if (pts==0 || pts==pci)
+                {
                    stampCircleMaskAt(c.x, c.y, thickness, pow(thickness, 2), offsetY, clipMode, fillMode);
+                   fnOutputDebug("colinear points ; pts = " + std::to_string(pts));
+                }
 
-                // fnOutputDebug("colinear points ; pts = " + std::to_string(pts));
                 // skipped++;
             }
+            // if (pts==0 || pts==pci)
+            //     fnOutputDebug("a/b = " + std::to_string(z + 2) + " // orient = " + std::to_string(orientation));
 
             if (orientation==2 || orientation==1)
             {
@@ -1426,7 +1489,8 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
                 // drawLineSegmentSimpleMask(a.x, a.y, az.x, az.y, 1, offsetY);
 
                 float nx, ny;
-                bool p = (pts==0 || pts==pci) ? 0 : findLinesIntersection(a, az, b, bz, nx, ny);
+                bool p = findLinesIntersection(a, az, b, bz, nx, ny);
+                // bool p = (pts==0 || pts==pci) ? 0 : findLinesIntersection(a, az, b, bz, nx, ny);
                 short kk = (p==1) ? 4 : 3;
 
                 // fnOutputDebug("isIntersection = " + std::to_string(p));
@@ -1441,12 +1505,28 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
                    // fnOutputDebug("n = " + std::to_string(nx) + " // " + std::to_string(ny));
                    // fnOutputDebug("b = " + std::to_string(b.x) + " // " + std::to_string(b.y));
                    // fnOutputDebug("c = " + std::to_string(c.x) + " // " + std::to_string(c.y));
-                   // dummyDrawPixelMask(a, offsetY, 2, 1);
-                   // dummyDrawPixelMask(b, offsetY, 2, 1);
-                   // dummyDrawPixelMask(c, offsetY, 2, 1);
-                   // dummyDrawPixelMask({nx, ny}, offsetY, 2, 1);
+                   // if (orientation==2)
+                   // {
+                   //     dummyDrawPixelMask(a, offsetY, 2, 1);   // offsetted
+                   //     dummyDrawPixelMask(az, offsetY, 2, 1);  // far away offsetted
+                   //     dummyDrawPixelMask(bz, offsetY, 2, 1);  // far away offsetted
+                   //     dummyDrawPixelMask(b, offsetY, 2, 1);   // offsetted
+                   //     dummyDrawPixelMask(c, offsetY, 2, 1);   // initial point
+                   //     dummyDrawPixelMask({nx, ny}, offsetY, 2, 1);
+                   // }
+                   // drawLineSegmentSimpleMask(b.x, b.y, c.x, c.y, fillMode, offsetY);
+                   // drawLineSegmentSimpleMask(a.x, a.y, c.x, c.y, fillMode, offsetY);
                    // drawLineSegmentSimpleMask(b.x, b.y, nx, ny, fillMode, offsetY);
                    // drawLineSegmentSimpleMask(a.x, a.y, nx, ny, fillMode, offsetY);
+                   // float deg = calculateAngle(a, c, b);
+                   // if (deg>45)
+                      // fnOutputDebug("angle = " + std::to_string(deg) + " // pts = " + std::to_string(pts));
+                   // bool testPosA = isPointInCircle(c, thickness * 1.15f, a);
+                   // bool testPosB = isPointInCircle(b, thickness * 1.05f, a);
+                   // if (testPosA!=1 || testPosB!=1)
+                   // if (testPosB!=1 || deg>90.1)
+                   //    fnOutputDebug("pos B = " + std::to_string(testPosB) + " ///// pts = " + std::to_string(pts));
+                      // fnOutputDebug("pos A/B = " + std::to_string(testPosA) + " / " + std::to_string(testPosB) + " ///// pts = " + std::to_string(pts));
                 } else
                 {
                    dynamicArray[0] = a.x;           dynamicArray[1] = a.y;
@@ -1454,17 +1534,22 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
                    dynamicArray[4] = c.x;           dynamicArray[5] = c.y;
                    // drawLineSegmentSimpleMask(b.x, b.y, c.x, c.y, fillMode, offsetY);
                    // drawLineSegmentSimpleMask(a.x, a.y, c.x, c.y, fillMode, offsetY);
-                   stampCircleMaskAt(c.x, c.y, thickness, pow(thickness, 2), offsetY, clipMode, fillMode);
-                   // fnOutputDebug("no intersection @ pts = " + std::to_string(pts));
+                   // stampCircleMaskAt(c.x, c.y, thickness, pow(thickness, 2), offsetY, clipMode, fillMode);
+                   fnOutputDebug("no intersection @ pts = " + std::to_string(pts) + " | orient=" + std::to_string(orientation));
                 }
-
+                // if (pts==0 || pts==pci)
+                //    fnOutputDebug("pts = " + std::to_string(pts) + " | orient=" + std::to_string(orientation));
                    // drawLineSegmentSimpleMask(b.x, b.y, c.x - 1.5f, c.y - 1.5f, fillMode, offsetY);
                    // drawLineSegmentSimpleMask(a.x, a.y, c.x - 1.5f, c.y + 1.5f, fillMode, offsetY);
-                FillSimpleMaskPolygon(polyW, polyH, dynamicArray, kk, offsetY, fillMode, PointsList, PointsCount, clipMode);
+                FillSimpleMaskPolygon(polyW, polyH, dynamicArray, kk, offsetY, fillMode, PointsList, PointsCount, clipMode);      // good
                 // dummyDrawPixelMask(b, offsetY, 2, 0);
                 // dummyDrawPixelMask(c, offsetY, 2, 0);
                 delete[] dynamicArray;
-            }
+            } 
+            // else if (pts==0 || pts==pci)
+            // {
+            //     fnOutputDebug("no proper orient PTS = " + std::to_string(pts) + " | orient=" + std::to_string(orientation));
+            // }
         }
         // fnOutputDebug("skipped pts = " + std::to_string(skipped) + " ; painted = " + std::to_string(painted) + " ; otherpainted = " + std::to_string(otherpainted) );
     }
