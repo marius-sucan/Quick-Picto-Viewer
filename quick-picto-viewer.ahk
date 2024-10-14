@@ -334,7 +334,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , UserAddNoiseDetails := 10, slidesRandoMode := 1, convertOnAutoCrop := 0, AutoCropStrongAdaptiveMode := 0
    , usrAutoCropErrThreshold := 5, onConflictMultiRenameAct := 4, userActionAutoCropConflictingFile := 4
    , userCopyMoveStructuredConflictMode := 4, SeenIMGprivateFolder := "", FillAreaRectRoundness := 45
-   , FillAreaEllipseSection := 850, FillAreaEllipsePie := 1, DrawLineAreaGridX := 6, DrawLineAreaGridY := 6
+   , FillAreaEllipseSection := 1440, FillAreaEllipsePie := 1, DrawLineAreaGridX := 6, DrawLineAreaGridY := 6
    , DrawLineAreaSpiralLength := 350, DrawLineAreaRaysLimit := 9, DrawLineAreaSpiralCenterMode := 1
    , DrawLineAreaCenterCut := 0, blurAreaCircular := 0, ImageSharpenAmount := 25, ImageSharpenRadius := 10
    , ImageSharpenMode := 1, userAutoColorAdjustMode := 1, userAutoColorAdjustAll := 0, userAutoColorIntensity := 255
@@ -17467,8 +17467,8 @@ dummyInnerCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, shape, pPath
        Gdip_AddPathRoundedRectangle(pPath, imgSelPx, imgSelPy, imgSelW, imgSelH, radius)
     } Else If (shape=3) ; ellipse
     {
-       If (FillAreaEllipseSection<847 && FillAreaEllipsePie=1)
-          createPiePath(imgSelPx, imgSelPy, imgSelW, imgSelH, 0, pPath)
+       If (FillAreaEllipseSection<1440)
+          createPiePath(imgSelPx, imgSelPy, imgSelW, imgSelH, 0, pPath, FillAreaEllipseSection, FillAreaEllipsePie)
        Else
           Gdip_AddPathEllipse(pPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
     } Else If (shape=4) ; triangle
@@ -17523,7 +17523,7 @@ coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, shape, angleu:=0, 
 
     If (angleu && pPath)
     {
-       If (shape=3 && FillAreaEllipseSection<847 && FillAreaEllipsePie=1)
+       If (shape=3 && FillAreaEllipseSection<1440 && FillAreaEllipsePie=1)
        {
           ; ToolTip, % "l=" keepBounds "|" angleu , , , 2
           sPath := Gdip_CreatePath()
@@ -22014,13 +22014,15 @@ coreDrawShapesLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgSelW,
     pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio)
     modus := (DrawLineAreaContourAlign=1) ? 0 : 4
     If (DrawLineAreaContourAlign!=2)
-       Gdip_SetClipPath(G2, pPath, modus)
-
-    If (FillAreaEllipseSection<848 && FillAreaShape=3 && FillAreaEllipsePie=0)
     {
-       nPath := createPiePath(imgSelPx, imgSelPy, imgSelW, imgSelH, thisThick*2)
-       Gdip_SetClipPath(G2, nPath, 4)
-       Gdip_DeletePath(nPath)
+       If (FillAreaShape=3 && FillAreaEllipsePie=1 && FillAreaEllipseSection<1440)
+       {
+          nPath := Gdip_CreatePath()
+          Gdip_AddPathEllipse(nPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
+          Gdip_SetClipPath(G2, nPath, modus)
+          Gdip_DeletePath(nPath)
+       } Else
+          Gdip_SetClipPath(G2, pPath, modus)
     }
 
     If (previewMode>0)
@@ -22041,25 +22043,13 @@ coreDrawShapesLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgSelW,
     ; Gdip_DeletePen(thisPen)   // it is always reused
 }
 
-createPiePath(imgSelPx, imgSelPy, imgSelW, imgSelH, err:=0, pPath:=0) {
+createPiePath(imgSelPx, imgSelPy, imgSelW, imgSelH, err:=0, pPath:=0, endAngle:=1440, pieMode:=1) {
     nPath := pPath ? pPath : Gdip_CreatePath()
-    cX2 := imgSelPx + imgSelW/2
-    cY2 := imgSelPy + imgSelH/2
-    PointsList := []
-    ; PointsList.Push(cX1),  PointsList.Push(cY1)
-    PointsList.Push(cX2),  PointsList.Push(cY2)
-    Loop, % 848 - FillAreaEllipseSection
-    {
-       getRelativePointCoordsCircle(848 - A_Index, zx, zy)
-       zx := cX2 + (zx*(imgSelW + err))/2
-       zy := cY2 + (zy*(imgSelH + err))/2
-       PointsList.Push(zx),  PointsList.Push(zy)
-    }
+    If (pieMode=1)
+       Gdip_AddPathArc(nPath, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, endAngle / 4)
+    Else
+       Gdip_AddPathPie(nPath, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, endAngle / 4)
 
-    Gdip_AddPathPolygon(nPath, PointsList)
-    ; Gdip_FillPath(G2, pBrushD, nPath)
-    ; Gdip_DeletePath(nPath)
-    PointsList := ""
     Return nPath
 }
 
@@ -45077,7 +45067,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0) {
     GuiAddDropDownList("xs y+7 w" slimeWid " AltSubmit Choose" PasteInPlaceCropSel " vPasteInPlaceCropSel gupdateUIpastePanel", "Rectangle|Rounded rectangle|Ellipse|Triangle|Right triangle|Rhombus|Custom shape", "Crop shape")
     GuiAddDropDownList("x+5 wp AltSubmit Choose" FillAreaCurveTension " vFillAreaCurveTension gupdateUIpastePanel", "Polygonal|Smooth corners|Curve|Round curve|Bézier", "Vector path type")
     GuiAddSlider("FillAreaRectRoundness", 4,98, 10, "Roundness", "updateUIpastePanel", 1, "xp yp wp hp")
-    GuiAddSlider("FillAreaEllipseSection", -270,850, 850, ".updateLabelEllipseSect", "updateUIpastePanel", 3, "xp yp wp hp")
+    GuiAddSlider("FillAreaEllipseSection", 1,1440, 1440, ".updateLabelEllipseSect", "updateUIpastePanel", 3, "xp yp wp hp")
     GuiAddSlider("userUIshapeCavity", 0,400, 0, "Shape cavity", "updateFillInnerCavity", 1, "xs y+5 w" slimeWid " hp")
     GuiAddSlider("PasteInPlaceCropAngular", -180,180, 0, "Shape rotation: $€°", "updateUIpastePanel", 2, "x+5 wp hp")
     Gui, Add, Checkbox, xs y+10 gupdateUIpastePanel Checked%PasteInPlaceCropAdaptImg% vPasteInPlaceCropAdaptImg, &Adapt the shape to its size and position
@@ -47476,15 +47466,7 @@ updateLabelPasteImgOpacity() {
 }
 
 updateLabelEllipseSect() {
-   Static minV := -270
-   perc := (FillAreaEllipseSection - minV) / 1120
-   If (FillAreaEllipseSection>=847)
-      f := "100%"
-   Else If (FillAreaEllipsePie=1)
-      f := clampInRange(Round((1 - perc)*100), 1, 99) "%"
-   Else
-      f := Round(perc*100) "%"
-   Return "Circumference: " f
+   Return "Arc: " Round(FillAreaEllipseSection / 4, 1) "°"
 }
 
 updateFillInnerCavity() {
@@ -47569,7 +47551,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     If (viewportQPVimage.imgHandle)
     {
        FillAreaDoContour := 0
-       FillAreaEllipseSection := 850
+       FillAreaEllipseSection := 1440
        FillAreaGlassy := alphaMaskingMode := 1
     } Else FillAreaDoBehind := 0
 
@@ -47587,7 +47569,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     GuiAddDropDownList("x+10 y+10 Section w" slideWid " AltSubmit Choose" FillAreaShape " vFillAreaShape gupdateUIfillPanel", "Rectangle|Rounded rectangle|Ellipse|Triangle|Right triangle|Rhombus|Custom shape", "Shape to fill")
     GuiAddDropDownList("x+5 wp-" ml + 5 " AltSubmit Choose" FillAreaCurveTension " vFillAreaCurveTension gupdateUIfillPanel", "Polygonal|Smooth corners|Curve|Round curve|Bézier", "Vector path type")
     GuiAddSlider("FillAreaRectRoundness", 4,98, 10, "Roundness", "updateUIfillPanel", 1, "xp yp w" slideWid " hp")
-    GuiAddSlider("FillAreaEllipseSection", -270,850, 850, ".updateLabelEllipseSect", "updateUIfillPanel", 3, "xp yp wp hp")
+    GuiAddSlider("FillAreaEllipseSection", 1,1440, 1440, ".updateLabelEllipseSect", "updateUIfillPanel", 3, "xp yp wp hp")
     GuiAddShapeEditBtn("xp+" slideWid - ml " yp hp w" ml)
     GuiAddSlider("userUIshapeCavity", 0,400, 0, "Shape cavity", "updateFillInnerCavity", 1, "xs y+5 w" slideWid " hp")
     GuiAddSlider("FillAreaBlurAmount", -255, 255, 0, "Object blur", "updateUIfillPanel", 2, "x+5 yp wp hp")
@@ -47838,7 +47820,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     Gui, Add, Checkbox, xp yp wp hp Checked%FillAreaEllipsePie% vFillAreaEllipsePie gupdateUIdrawShapesPanel, &Sliced pie
     GuiAddSlider("userUIshapeCavity", 0,400, 0, "Shape cavity", "updateFillInnerCavity", 1, "xs y+5 w" slideWid " hp")
     GuiAddSlider("FillAreaRectRoundness", 4,98, 10, "Roundness", "updateUIdrawShapesPanel", 1, "x+5 yp+0 wp-25 hp")
-    GuiAddSlider("FillAreaEllipseSection", -270,850, 850, ".updateLabelEllipseSect", "updateUIdrawShapesPanel", 3, "xp yp wp hp")
+    GuiAddSlider("FillAreaEllipseSection", 1,1440, 1440, ".updateLabelEllipseSect", "updateUIdrawShapesPanel", 3, "xp yp wp hp")
     Gui, Add, Checkbox, xp yp w%minislideWid% hp +0x1000 gupdateUIdrawShapesPanel Checked%FillAreaClosedPath% vFillAreaClosedPath, &Closed
     Gui, Add, Button, x+2 w%minislideWid% hp gMenuStartDrawingLines vBtn1, Modify
     Gui, Add, Checkbox, xs y+7 hp Checked%freeHandSelectionMode% vfreeHandSelectionMode gupdateUIdrawShapesPanel, &Freehand draw mode
@@ -48523,7 +48505,7 @@ PanelFillBehindBgrImage() {
     GuiAddDropDownList("xs y+10 Section w" slideWid " AltSubmit Choose" FillAreaShape " vFillAreaShape gupdateUIfillBehindPanel", "Rectangle|Rounded rectangle|Ellipse|Triangle|Right triangle|Rhombus|Custom shape", "Shape to fill")
     GuiAddDropDownList("x+5 wp-" ml + 5 " AltSubmit Choose" FillAreaCurveTension " vFillAreaCurveTension gupdateUIfillBehindPanel", "Polygonal|Smooth corners|Curve|Round curve|Bézier", "Vector path type")
     GuiAddSlider("FillAreaRectRoundness", 4,98, 10, "Roundness", "updateUIfillPanel", 1, "xp yp w" slideWid " hp")
-    GuiAddSlider("FillAreaEllipseSection", -270,850, 850, ".updateLabelEllipseSect", "updateUIfillBehindPanel", 3, "xp yp wp hp")
+    GuiAddSlider("FillAreaEllipseSection", 1,1440, 1440, ".updateLabelEllipseSect", "updateUIfillBehindPanel", 3, "xp yp wp hp")
     GuiAddShapeEditBtn("xp+" slideWid - ml " yp hp w" ml)
     GuiAddSlider("userUIshapeCavity", 0,400, 0, "Shape cavity", "updateFillInnerCavity", 1, "xs y+5 w" slideWid " hp")
     GuiAddSlider("FillBehindOpacity", 2,255, 255, "Image opacity", "updateUIfillBehindPanel", 1, "x+5 wp hp")
@@ -51076,7 +51058,7 @@ updateUIdrawShapesPanel(actionu:=0, b:=0) {
        uiSlidersArray["DrawLineAreaMitersBorder", 10] := (DrawLineAreaJoinsStyle=1) ? 0 : 1
     }
 
-    actu := (FillAreaEllipseSection<848 && !viewportQPVimage.imgHandle) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    actu := (FillAreaEllipseSection<1440 && !viewportQPVimage.imgHandle) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu, FillAreaEllipsePie
 
     actu := (FillAreaShape=7) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"

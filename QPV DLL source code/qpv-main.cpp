@@ -832,7 +832,7 @@ DLL_API int DLL_CALLCONV testFilledPolygonCache(int m) {
 }
 
 bool isPointInParallelogram(Point A, Point B, Point D, Point P) {
-    // unused
+    // function unused
     // Vector AB and AD
     double ABx = B.x - A.x;
     double ABy = B.y - A.y;
@@ -881,6 +881,7 @@ void extendLine(const Point p1, const Point p2, const double distance, Point &ne
 }
 
 bool isPointInCircle(Point center, double radius, Point testPoint) {
+    // function unused
     // Calculate the distance between the center and the test point
     double distance = std::sqrt(
         std::pow(testPoint.x - center.x, 2) + 
@@ -892,6 +893,7 @@ bool isPointInCircle(Point center, double radius, Point testPoint) {
 }
 
 float calculateAngle(Point a, Point b, Point c) {
+    // function unused
     // Vector AB
     double u_x = a.x - b.x;
     double u_y = a.y - b.y;
@@ -915,7 +917,7 @@ float calculateAngle(Point a, Point b, Point c) {
 }
 
 void dummyDrawPixelMask(const Point &d, const int offsetY, const int simple, const bool p) {
-// test function, should be not used in production
+// test function, should not be used in production
     int gx = d.x - polyX;
     int gy = d.y - polyY + offsetY;
     if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
@@ -1231,29 +1233,6 @@ void stampCircleMaskAt(const int &dx, const int &dy, const int &tt, const int &r
       }
 }
 
-void advancedStampCircleMaskAt(const int &dx, const int &dy, const int &tt, const int &rr, const int &offsetY, const int &clipMode, const bool &fillMode) {
-      for (int x = 0; x < tt*2; ++x)
-      {
-          for (int y = 0; y < tt*2; ++y)
-          {
-              int gx = x - tt;
-              int gy = y - tt;
-              bool d = (gx * gx + gy * gy<rr) ? 1 : 0;
-              gx = gx + dx - polyX;
-              gy = gy + dy - polyY + offsetY;
-              if (gy>=0 && gy<polyH && gx>=0 && gx<polyW && d==1)
-              {
-                 bool okay = 1;
-                 if (clipMode!=2)
-                    okay = isPointInOtherMask(gx, gy, clipMode);
-
-                 if (okay==1)
-                    polygonMaskMap[(INT64)gy * polyW + gx] = fillMode;
-              }
-          }
-      }
-}
-
 DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCount, int thickness, int closed, int roundedJoins, int fillMode, int roundCaps, int clipMode, int offsetY, int tempus) {
     fnOutputDebug("drawLineAllSegmentsMask() invoked; PointsCount=" + std::to_string(PointsCount));
     INT64 s = (INT64)polyW * polyH + 2;
@@ -1407,9 +1386,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
                stampCircleMaskAt(dx, dy, thickness, pow(thickness, 2), offsetY, clipMode, fillMode);
            }
         } 
-
     }
-
 
     int skipped = 0;
     int painted = 0;
