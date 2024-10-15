@@ -1326,7 +1326,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
         if (closed==0 && PointsCount>2 && (pts==0 || pts==pci-1))
         {
             // render round/box caps
-           if (roundCaps==0)
+           if (roundCaps==2)
            {
                Point npA, npB, np1, np2, np3, np4;
                extendLine({xa, ya}, {xb, yb}, 0.1f, npA, npB);
@@ -1376,7 +1376,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
 
                FillSimpleMaskPolygon(polyW, polyH, dynamicArray, 4, offsetY, fillMode, PointsList, PointsCount, clipMode);
                delete[] dynamicArray;
-           } else
+           } else if (roundCaps==3)
            {
                int dx = (pts==0) ? xa : xb;
                int dy = (pts==0) ? ya : yb;
@@ -1535,7 +1535,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
     return 1;
 }
 
-DLL_API int DLL_CALLCONV prepareDrawLinesCapsGridMask(int radius, int roundCaps, int roundedJoins) {
+DLL_API int DLL_CALLCONV prepareDrawLinesCapsGridMask(int radius, int roundedJoins) {
     int diameter = 2 * radius + 1;
     DrawLineCapsGrid.resize(diameter + 2);
     // DrawLineCapsGrid.resize(diameter + 2, std::vector<short>(diameter + 2, 0));
@@ -1581,7 +1581,7 @@ DLL_API int DLL_CALLCONV prepareDrawLinesCapsGridMask(int radius, int roundCaps,
     fnOutputDebug(std::to_string(ff) + " = ff; " + std::to_string(radius) + " radius; prepareDrawLinesCapsGridMask() - done; rr=" + std::to_string(rr));
 }
 
-DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int roundedJoins, int clipMode) {
+DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode) {
      // relies on prepareSelectionArea()
      EllipseSelectMode = 2;
      invertSelection = 0;

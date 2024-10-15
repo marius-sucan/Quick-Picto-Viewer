@@ -255,7 +255,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , DrawLineAreaColor := "ff3366", DrawLineAreaDashStyle := 1, DrawLineAreaContourAlign := 1, DrawLineAreaKeepBounds := 1
    , DrawLineAreaContourThickness := 20, DrawLineAreaOpacity := 255, DrawLineAreaBorderTop := 1, DrawLineAreaBorderBottom := 0
    , DrawLineAreaBorderLeft := 1, DrawLineAreaBorderRight := 0, DrawLineAreaBorderCenter := 1, DrawLineAreaBorderArcA := 0
-   , DrawLineAreaBorderArcC := 0, DrawLineAreaBorderArcD := 1, DrawLineAreaCapsStyle := 1, DrawLineAreaDoubles := 0
+   , DrawLineAreaBorderArcC := 0, DrawLineAreaBorderArcD := 1, DrawLineAreaCapsStyle := 3, DrawLineAreaDoubles := 0
    , PasteInPlaceEraseInitial := 1, doImgEditLivePreview := 1, DrawLineAreaBorderArcB := 0, EraseAreaInvert := 0
    , PasteInPlaceToolMode := 0, NewDocUseColor := 1, PredefinedDocsSizes := 1, NewImageReverseDimensions := 0, FillAreaGlassy := 1
    , FillAreaColorMode := 1, FillAreaColorReversed := 0, FillArea2ndColor := "FF2211", FillArea2ndOpacity := 200
@@ -14002,8 +14002,7 @@ livePreviewPrepareSelectionArea(objSel, invertArea, shapeMode) {
 
 QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, invertArea, cavityX:="a", cavityY:="a", ppo:=0, pathCoords:=0) {
    ; mode is EllipseSelectMode [the shape]
-   Static pi := 3.141592653
-   , lastState := 0
+   Static pi := 3.141592653, lastState := 0
 
    If (editingSelectionNow!=1)
    {
@@ -20455,13 +20454,18 @@ HugeImagesDrawLineShapes() {
       Sleep, 50
       roundJoins := DrawLineAreaJoinsStyle
       roundCaps := DrawLineAreaCapsStyle
+      If (FillAreaShape=3 && FillAreaEllipsePie=1 && FillAreaEllipseSection<1440)
+         roundCaps := (DrawLineAreaCapsStyle=3) ? 3 : 0
+
       if (DrawLineAreaContourAlign!=2)
-         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, 3, VPselRotation, 0, 0, "a", "a", 1, [tk + pfcX, tk, o_imgSelW, o_imgSelH])
+      {
+         shapeu := (FillAreaShape=3) ? 1 : 3
+         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, shapeu, VPselRotation, 0, 0, "a", "a", 1, [tk + pfcX, tk, o_imgSelW, o_imgSelH])
+      }
 
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
-      rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", DrawLineAreaCapsStyle, "int", DrawLineAreaContourAlign)
-      rza := DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", roundCaps, "int", DrawLineAreaJoinsStyle)
-
+      rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", DrawLineAreaContourAlign)
+      rza := DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
       If (rza=1 && rzq=1)
       {
          otherThick := Round(thisThick*0.34)
@@ -20483,6 +20487,8 @@ HugeImagesDrawLineShapes() {
             showTOOLtip("Drawing lines, please wait...`nStep 2/3")
             conturAlign := DrawLineAreaContourAlign
             closed := (FillAreaShape=7) ? FillAreaClosedPath : 1
+            If (FillAreaShape=3 && FillAreaEllipsePie=1 && FillAreaEllipseSection<1440)
+               closed := 0
 
             ; tempCrapValue := (zzpo=1) ? PointsCount - 1 : 0
             ; fnOutputDebug("loooooooooool == " tempCrapValue)
@@ -20493,10 +20499,10 @@ HugeImagesDrawLineShapes() {
             rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0, "int", tempCrapValue)
             If (rzb=1 && DrawLineAreaDoubles=1)
             {
-               DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaCapsStyle, "int", DrawLineAreaJoinsStyle)
-               kThick := (DrawLineAreaCapsStyle=1 && DrawLineAreaJoinsStyle=1) ? thisThick : otherThick
+               DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
+               kThick := (DrawLineAreaCapsStyle=3 && DrawLineAreaJoinsStyle=1) ? thisThick : otherThick
                rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
-               DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaCapsStyle, "int", DrawLineAreaJoinsStyle)
+               DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
             }
 
             Gdip_DeletePath(pPath)
@@ -20507,7 +20513,7 @@ HugeImagesDrawLineShapes() {
                rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0, "int", -1)
                If (rzb=1 && DrawLineAreaDoubles=1)
                {
-                  DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaCapsStyle, "int", DrawLineAreaJoinsStyle)
+                  DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
                   rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
                }
                Gdip_DeletePath(clonedPath)
@@ -21551,16 +21557,7 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
        Return -1
     }
 
-    thisColor := makeRGBAcolor(DrawLineAreaColor,DrawLineAreaOpacity)
-    thisPen := Gdip_CreatePen(thisColor, thisThick)
-    Gdip_SetPenDashStyle(thisPen, DrawLineAreaDashStyle - 1)
-    If (DrawLineAreaCapsStyle=1)
-       Gdip_SetPenLineCaps(thisPen, 2, 2, 2)
-
-    Static compoundArray := "0.0|0.33|0.67|1.0"
-    If (DrawLineAreaDoubles=1)
-       Gdip_SetPenCompoundArray(thisPen, compoundArray)
-
+    thisPen := createDrawLinesPen(thisThick, 0)
     If (DrawLineAreaCropShape>1 && isInRange(DrawLineAreaBorderCenter, 4, 6))
     {
        zPath := Gdip_CreatePath()
@@ -21874,11 +21871,11 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
     ; Gdip_DeletePen(thisPen) ; it is always reused
 } ; // coreDrawParametricLinesTool()
 
-createDrawLinesPen(thisThick) {
+createDrawLinesPen(thisThick, modus:=1) {
     Static thisPen, compoundArray := "0.0|0.33|0.67|1.0"
     If (thisThick<2)
        thisThick := 1
-    if (thisPen="")
+    If (thisPen="")
        thisPen := Gdip_CreatePen("0xFFee2200", 2)
 
     thisColor := makeRGBAcolor(DrawLineAreaColor, DrawLineAreaOpacity)
@@ -21886,10 +21883,12 @@ createDrawLinesPen(thisThick) {
     Gdip_SetPenColor(thisPen, thisColor)
     Gdip_SetPenWidth(thisPen, thisThick)
     Gdip_SetPenDashStyle(thisPen, DrawLineAreaDashStyle - 1)
-    If (DrawLineAreaCapsStyle=1)
-       Gdip_SetPenLineCaps(thisPen, 2, 2, 2)
+    pp := (DrawLineAreaCapsStyle=3) ? 2 : 0
+    zpp := DrawLineAreaCapsStyle - 1
+    If (FillAreaShape=3 && FillAreaEllipsePie=1 && FillAreaEllipseSection<1440 && modus=1)
+       Gdip_SetPenLineCaps(thisPen, pp, pp, pp)
     Else
-       Gdip_SetPenLineCaps(thisPen, 1, 1, 1)
+       Gdip_SetPenLineCaps(thisPen, zpp, zpp, zpp)
 
     If (DrawLineAreaDoubles=1)
        Gdip_SetPenCompoundArray(thisPen, compoundArray)
@@ -45261,7 +45260,7 @@ ReadSettingsFillAreaPanel(act:=0) {
     RegAction(act, "freeHandSelectionMode",, 1)
     RegAction(act, "DrawLineAreaColor",, 3)
     RegAction(act, "DrawLineAreaOpacity",, 2, 1, 255)
-    RegAction(act, "DrawLineAreaCapsStyle",, 1)
+    RegAction(act, "DrawLineAreaCapsStyle",, 2, 1, 3)
     RegAction(act, "DrawLineAreaDoubles",, 1)
     RegAction(act, "DrawLineAreaContourAlign",, 2, 1, 3)
     RegAction(act, "DrawLineAreaDashStyle",, 2, 1, 4)
@@ -45294,7 +45293,7 @@ ReadSettingsDrawShapeAreaPanel(act:=0) {
 
     RegAction(act, "DrawLineAreaColor",, 3)
     RegAction(act, "DrawLineAreaOpacity",, 2, 1, 255)
-    RegAction(act, "DrawLineAreaCapsStyle",, 1)
+    RegAction(act, "DrawLineAreaCapsStyle",, 2, 1, 3)
     RegAction(act, "DrawLineAreaDoubles",, 1)
     RegAction(act, "DrawLineAreaContourAlign",, 2, 1, 3)
     RegAction(act, "DrawLineAreaDashStyle",, 2, 1, 4)
@@ -46242,7 +46241,7 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
      {
         RegAction(0, "DrawLineAreaColor",, 3)
         RegAction(0, "DrawLineAreaOpacity",, 2, 1, 255)
-        RegAction(0, "DrawLineAreaCapsStyle",, 1)
+        RegAction(0, "DrawLineAreaCapsStyle",, 2, 1, 3)
         RegAction(0, "DrawLineAreaContourThickness",, 2, 1, 700)
         DrawLineAreaDoubles := 0
         DrawLineAreaDashStyle := 1
@@ -47647,7 +47646,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
        GuiAddDropDownList("xs y+7 wp AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign gupdateUIfillPanel", "Inside|Centered|Outside", "Pen clipping to shape")
        GuiAddDropDownList("x+10 wp AltSubmit Choose" DrawLineAreaDashStyle " vDrawLineAreaDashStyle gupdateUIfillPanel", "Continous|Dashes|Dots|Dashes and dots", "Line style")
        Gui, Add, Checkbox, xs y+5 w%btnWid% h%btnHeight% Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIfillPanel, &Double line
-       Gui, Add, Checkbox, x+10 wp hp gupdateUIfillPanel Checked%DrawLineAreaCapsStyle% vDrawLineAreaCapsStyle, &Round caps
+       GuiAddDropDownList("x+10 wp AltSubmit Choose" DrawLineAreaCapsStyle " vDrawLineAreaCapsStyle gupdateUIfillPanel", "No caps|Square caps|Round caps", "Line ends style")
        GuiAddSlider("DrawLineAreaContourThickness", 1,450, 5, "Contour thickness: $€ pixels", "updateUIfillPanel", 1, "xs y+15 w" txtWid - 25 " h" ha)
 
        uiADDalphaMaskTabs(5, 6, "updateUIfillPanel")
@@ -47806,10 +47805,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     }
 
     If (viewportQPVimage.imgHandle)
-    {
-       ; DrawLineAreaContourAlign := 2
        DrawLineAreaDashStyle := 1
-    }
 
     minislideWid := (PrefsLargeFonts=1) ? slideWid//2.32 : slideWid//2.52
     Global PickuFillAreaColor, PickuFillArea2ndColor
@@ -47842,13 +47838,13 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
        GuiAddDropDownList("xs y+7 wp AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign gupdateUIdrawShapesPanel", "Inside|None|Outside", "Pen clipping to shape")
        GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaDashStyle " vDrawLineAreaDashStyle gupdateUIdrawShapesPanel", "Continous|Dashes|Dots|Dashes and dots", "Line style")
        Gui, Add, Checkbox, xs y+6 wp h%btnHeight% +0x1000 Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIdrawShapesPanel, &Double line
-       Gui, Add, Checkbox, x+5 wp hp +0x1000 gupdateUIdrawShapesPanel Checked%DrawLineAreaCapsStyle% vDrawLineAreaCapsStyle, &Round caps
+       GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaCapsStyle " vDrawLineAreaCapsStyle gupdateUIdrawShapesPanel", "No caps|Square caps|Round caps", "Line ends style")
     } Else
     {
        Gui, Add, Checkbox, xs y+7 w%btnWid% Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIdrawShapesPanel, &Double line
        GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign gupdateUIdrawShapesPanel", "Inside|No clipping|Outside", "Pen clipping to shape")
        Gui, Add, Checkbox, xs y+7 wp Checked%DrawLineAreaJoinsStyle% vDrawLineAreaJoinsStyle gupdateUIdrawShapesPanel, &Round joins
-       Gui, Add, Checkbox, x+5 wp hp gupdateUIdrawShapesPanel Checked%DrawLineAreaCapsStyle% vDrawLineAreaCapsStyle, &Round caps
+       GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaCapsStyle " vDrawLineAreaCapsStyle gupdateUIdrawShapesPanel", "No caps|Square caps|Round caps", "Line ends style")
        ; Gui, Add, Checkbox, x+5 Checked%FillAreaDoBehind% vFillAreaDoBehind gupdateUIdrawShapesPanel, &Fill behind the image
     }
 
@@ -48040,7 +48036,7 @@ ReadSettingsDrawLinesArea(act:=0) {
     RegAction(act, "DrawLineAreaOpacity",, 2, 1, 255)
     RegAction(act, "DrawLineAreaKeepBounds",, 1)
     RegAction(act, "DrawLineAreaSnapLine",, 1)
-    RegAction(act, "DrawLineAreaCapsStyle",, 1)
+    RegAction(act, "DrawLineAreaCapsStyle",, 2, 1, 3)
     RegAction(act, "DrawLineAreaDoubles",, 1)
     RegAction(act, "DrawLineAreaContourAlign",, 2, 1, 3)
     RegAction(act, "DrawLineAreaDashStyle",, 2, 1, 4)
@@ -48126,7 +48122,7 @@ PanelDrawLines() {
     Gui, Add, Text, x+10 wp -wrap, Alignment
     GuiAddDropDownList("xs y+8 w" btnWid " gupdateUIDrawLinesPanel AltSubmit Choose" DrawLineAreaDashStyle " vDrawLineAreaDashStyle", "Continous|Dashes|Dots|Dashes and dots", "Line style")
     GuiAddDropDownList("x+10 wp gupdateUIDrawLinesPanel AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign", "Inside|Centered|Outside", "Pen alignment")
-    Gui, Add, Checkbox, xs y+5 wp h%btnHeight% +0x1000 gupdateUIDrawLinesPanel Checked%DrawLineAreaCapsStyle% vDrawLineAreaCapsStyle, Rounded caps
+    GuiAddDropDownList("xs y+10 wp AltSubmit Choose" DrawLineAreaCapsStyle " vDrawLineAreaCapsStyle gupdateUIDrawLinesPanel", "No caps|Square caps|Round caps", "Line ends style")
     Gui, Add, Checkbox, x+10 wp hp +0x1000 gupdateUIDrawLinesPanel Checked%DrawLineAreaKeepBounds% vDrawLineAreaKeepBounds +hwndhTemp, &Within bounds
     ToolTip2ctrl(hTemp, "Rotate object within the boundaries of the selection area")
     Gui, Add, Checkbox, xs y+5 wp hp +0x1000 gupdateUIDrawLinesPanel Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles, Double line
@@ -51048,7 +51044,7 @@ updateUIdrawShapesPanel(actionu:=0, b:=0) {
     actu := (FillAreaShape=2) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "FillAreaRectRoundness")
 
-    actu := (FillAreaShape=3 && !viewportQPVimage.imgHandle) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    actu := (FillAreaShape=3) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiControl, % actu, FillAreaEllipsePie
     actu := (FillAreaShape=3) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "FillAreaEllipseSection")
@@ -51058,7 +51054,7 @@ updateUIdrawShapesPanel(actionu:=0, b:=0) {
        uiSlidersArray["DrawLineAreaMitersBorder", 10] := (DrawLineAreaJoinsStyle=1) ? 0 : 1
     }
 
-    actu := (FillAreaEllipseSection<1440 && !viewportQPVimage.imgHandle) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    actu := (FillAreaEllipseSection<1440) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu, FillAreaEllipsePie
 
     actu := (FillAreaShape=7) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
