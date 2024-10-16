@@ -14141,7 +14141,7 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
             Gdip_DeleteMatrix(pMatrix)
          }
 
-         kkz := (mode=4 && PasteInPlaceCropSel=2 || mode=3 && FillAreaShape=2) ? 1 : 0
+         kkz := (mode=4 && (PasteInPlaceCropSel=2 || PasteInPlaceCropSel=3) || mode=3 && (FillAreaShape=2 || FillAreaShape=3)) ? 1 : 0
          If (bezierSplineCustomShape=1 || FillAreaCurveTension>1 || kkz=1)
             Gdip_FlattenPath(pPath, 0.1)
 
@@ -20459,8 +20459,13 @@ HugeImagesDrawLineShapes() {
 
       if (DrawLineAreaContourAlign!=2)
       {
-         shapeu := (FillAreaShape=3) ? 1 : 3
-         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, shapeu, VPselRotation, 0, 0, "a", "a", 1, [tk + pfcX, tk, o_imgSelW, o_imgSelH])
+         opza := FillAreaEllipseSection
+         If (FillAreaShape=3 && FillAreaEllipsePie=1)
+            FillAreaEllipseSection := 1440
+
+         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, 3, VPselRotation, 0, 0, "a", "a", 1, [tk + pfcX, tk, o_imgSelW, o_imgSelH])
+         FillAreaEllipseSection := opza
+         ; rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", DrawLineAreaOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", doBehind, "int", 0, "int", BlendModesPreserveAlpha)
       }
 
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
@@ -20475,7 +20480,7 @@ HugeImagesDrawLineShapes() {
          If (imgSelY2>imgH && imgSelY1<0)
             diffThick := thisThick + (imgSelY2 - thisThick - imgH)
 
-         doClone := (innerSelectionCavityX>0 && innerSelectionCavityY>0 && FillAreaShape<7) ? 1 : 0
+         doClone := (innerSelectionCavityX>0 && innerSelectionCavityY>0 && FillAreaShape<7 && DrawLineAreaContourAlign<=2) ? 1 : 0
          pPath := coreCreateFillAreaShape(pfcX, 0, o_imgSelW, o_imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, 2, 0)
          If pPath
          {
@@ -21402,7 +21407,7 @@ DrawLinesInSelectedArea(modus) {
 
     Gdip_DeleteGraphics(G2)
     If (DrawLineAreaBlendMode>1 && rz!=-1)
-       r := QPV_BlendBitmaps(newBitmap, whichBitmap, DrawLineAreaBlendMode, BlendModesPreserveAlpha, BlendModesFlipped, 2)
+       r := QPV_BlendBitmaps(newBitmap, whichBitmap, DrawLineAreaBlendMode - 1, BlendModesPreserveAlpha, !BlendModesFlipped, 2)
 
     If (rz!=-1)
        wrapRecordUndoLevelNow(newBitmap)
@@ -22010,7 +22015,8 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
 
 coreDrawShapesLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgSelW, imgSelH) {
     thisPen := createDrawLinesPen(thisThick)
-    pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio)
+    allowCavity := (DrawLineAreaContourAlign<=2) ? 1 : 0
+    pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, 2, allowCavity)
     modus := (DrawLineAreaContourAlign=1) ? 0 : 4
     If (DrawLineAreaContourAlign!=2)
     {
@@ -51050,9 +51056,10 @@ updateUIdrawShapesPanel(actionu:=0, b:=0) {
     GuiUpdateVisibilitySliders(actu, "FillAreaEllipseSection")
     If (viewportQPVimage.imgHandle)
     {
-       uiSlidersArray["userUIshapeCavity", 10] := (FillAreaShape=7) ? 0 : 1
+       uiSlidersArray["userUIshapeCavity", 10] := (FillAreaShape=7 || DrawLineAreaContourAlign=3) ? 0 : 1
        uiSlidersArray["DrawLineAreaMitersBorder", 10] := (DrawLineAreaJoinsStyle=1) ? 0 : 1
-    }
+    } Else
+       uiSlidersArray["userUIshapeCavity", 10] := (DrawLineAreaContourAlign=3 && FillAreaShape<7) ? 0 : 1
 
     actu := (FillAreaEllipseSection<1440) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu, FillAreaEllipsePie

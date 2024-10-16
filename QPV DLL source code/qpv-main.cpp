@@ -1579,6 +1579,7 @@ DLL_API int DLL_CALLCONV prepareDrawLinesCapsGridMask(int radius, int roundedJoi
     }
 
     fnOutputDebug(std::to_string(ff) + " = ff; " + std::to_string(radius) + " radius; prepareDrawLinesCapsGridMask() - done; rr=" + std::to_string(rr));
+    return 1;
 }
 
 DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode) {
