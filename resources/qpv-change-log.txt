@@ -4,10 +4,11 @@
 // Project began in early May 2019.
 // Related: general-code-overview.txt
 
-- v6.1.00 (2024-08-**)
+- v6.1.00 (2024-10-17)
   - [improvement] by double clicking on the viewport, the image gets zoomed in at the associated image coordinates
   - [improvement] recently opened list now keeps track of opened images, not just folders or files lists
   - [improvement] «draw shapes contour» can now draw lines with miter joins
+  - various bug fixes
 
 - v6.0.50 (2024-07-28)
   - [new] «draw shapes contours» tool now works with images over 536 megapixels
@@ -1119,6 +1120,7 @@ Files organization:
 ; KNOWN ISSUES [mardi 4 juin 2024]:
 - when multi-threaded is activated, QPV randomly hangs [and never recovers] in thumbnails mode; a dead-lock?
 - when using image editing live tools, the application sometimes hangs [and never recovers] when using the custom sliders; another dead-lock?
+- when clicking on the toolbar to open live image editing tools, QPV sometimes crashes; efforts have been put into mitigating this issue
 - jpeg lossless crop: the selection area does not precisely match with the resulted image [freeimage]
 - high memory consumption with images under 536 megapixels; most editing operations need a lot of RAM
 

@@ -4,7 +4,7 @@
 
 ; Change log:
 ; =============================
-; 27 October 2023 by Marius Șucan- v1.8
+; 27 October 2023 by Marius Șucan - v1.8
 ; - implemented more functions
 ;
 ; 16 July 2022 by Marius Șucan - v1.7
@@ -13,28 +13,28 @@
 ; 26 February 2021 by Marius Șucan - v1.6
 ; - implemented the multi-page functions
 ;
-; 14 January 2021 by Marius Șuca n- v1.5
+; 14 January 2021 by Marius Șucan - v1.5
 ; - bug fixes - many thanks to TheArkive
 ;
 ; 30 June 2020 by Marius Șucan - v1.4
-; - Implemented additional functions.
+; - implemented additional functions.
 ;
 ; 21 September 2019 by Marius Șucan - v1.3
-; - Implemented additional functions.
+; - implemented additional functions.
 ;
 ; 11 August 2019 by Marius Șucan - v1.2
-; - Added ConvertFIMtoPBITMAP() and ConvertPBITMAPtoFIM() functions
-; - Implemented 32 bits support for AHK_L 32 bits and FreeImage 32 bits.
+; - added ConvertFIMtoPBITMAP() and ConvertPBITMAPtoFIM() functions
+; - implemented 32 bits support for AHK_L 32 bits and FreeImage 32 bits.
 ; - FreeImage_Save() now relies on FreeImage_GetFIFFromFilename() to get the file format code
-; - Bug fixes and more in-line comments/information
+; - bug fixes and more in-line comments/information
 ;
 ; 6 August 2019 by Marius Șucan - v1.1
-; - It now works with FreeImage v3.18 and AHK_L v1.1.30+.
-; - Added many new functions and cleaned up the code. Fixed bugs.
+; - it now works with FreeImage v3.18 and AHK_L v1.1.30+.
+; - added many new functions and cleaned up the code. Fixed bugs.
 ;
 ; 29 March 2012 - v1.0
 ;  - original version by linpinger
-;  - URL : http://www.autohotkey.net/~linpinger/index.html
+;    source: http://www.autohotkey.net/~linpinger/index.html
 
 
 FreeImage_FoxInit(isInit:=1, bonusPath:=0) {
@@ -151,7 +151,7 @@ FreeImage_GetVersion() {
 }
 
 FreeImage_GetLibVersion() {
-   Return 1.8 ;  16/07/2022
+   Return 1.8 ;  27/10/2023
 }
 
 FreeImage_GetCopyrightMessage() {

@@ -3002,7 +3002,7 @@ calcFntHeightFromPtsSize(ptsSize) {
 }
 
 Gdi_GetLibVersion() {
-  return 1.30 ; samedi 28 mai 2022 ; 28/05/2022
+  return 1.31 ; mercredi samedi 21 janvier 2023; 21/01/2023
 }
 
 

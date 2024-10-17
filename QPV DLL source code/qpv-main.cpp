@@ -1273,7 +1273,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
     const int pcd = PointsCount*2;
     fnOutputDebug("tracing polygonal path with bresenham algo; points=" + std::to_string(PointsCount));
 
-    // #pragma omp parallel for schedule(static) default(none) num_threads(4)
+    #pragma omp parallel for schedule(static) default(none) num_threads(4)
     for (int pts = 0; pts < PointsCount; pts++)
     {
         int i = pts*2;

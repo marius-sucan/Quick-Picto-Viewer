@@ -38,8 +38,8 @@
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
 ;@Ahk2Exe-UpdateManifest 0, Quick Picto Viewer
 ;@Ahk2Exe-SetOrigFilename Quick-Picto-Viewer.exe
-;@Ahk2Exe-SetVersion 6.0.50
-;@Ahk2Exe-SetProductVersion 6.0.50
+;@Ahk2Exe-SetVersion 6.1.00
+;@Ahk2Exe-SetProductVersion 6.1.00
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2024)
 ;@Ahk2Exe-SetCompanyName https://marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -215,7 +215,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := [], prevPasteInPlaceVPcoords := []
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := ""
-   , appVersion := "6.0.50", vReleaseDate := "2024/07/28" ; yyyy-mm-dd
+   , appVersion := "6.1.00", vReleaseDate := "2024/10/7" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -3717,14 +3717,14 @@ CopyImage2clip() {
      rw := imgSelW, rh := imgSelH
      capIMGdimensionsGDIPlimits(rw, rh)
      nmgpx := Round((rw * rh)/1000000, 1)
-     zf := (imgSelW!=rw || imgSelH!=rh) ? "`nResizing image to" rw " x " rh " pixels`n" nmgpx " megapixels" : ""
+     zf := (imgSelW!=rw || imgSelH!=rh) ? "`nResizing image to`n" groupDigits(rw) " x " groupDigits(rh) " pixels`n" nmgpx " megapixels" : ""
      showTOOLtip("Copying image" friendly " to clipboard, please wait" zf)
      If (editingSelectionNow=1)
      {
         zBitmap := getSelectedImageArea(useGdiBitmap(), 1, 2, 0, rw, rh)
      } Else
      {
-        zBitmap := viewportQPVimage.ImageGetResizedRect(imgSelPx, imgSelPy, ImgSelW, imgSelW, rw, rh, userimgQuality)
+        zBitmap := viewportQPVimage.ImageGetResizedRect(imgSelPx, imgSelPy, ImgSelW, imgSelH, rw, rh, userimgQuality)
         zBitmap := applyVPeffectsOnBMP(zBitmap, 1)
         flipBitmapAccordingToViewPort(zBitmap)
      }
@@ -4598,6 +4598,7 @@ ToggleThumbsMode() {
    {
       lastTimeToggleThumbs := A_TickCount
       fnOutputDebug("Deactivating the thumbnails mode")
+      RecordImagesOpenedManager(getIDimage(currentFileIndex))
       If (thisIndexu!=prevIndexu)
          FadeMainWindow()
 
@@ -47853,8 +47854,12 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
        GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaCapsStyle " vDrawLineAreaCapsStyle gupdateUIdrawShapesPanel", "No caps|Square caps|Round caps", "Line ends style")
        ; Gui, Add, Checkbox, x+5 Checked%FillAreaDoBehind% vFillAreaDoBehind gupdateUIdrawShapesPanel, &Fill behind the image
     }
-
-    GuiAddSlider("DrawLineAreaContourThickness", 1,700, 45, ".updateLabelDrawLineThickness", "updateUIdrawShapesPanel", 1, "xs y+15 w" txtWid " hp")
+    
+    trGdip_GetImageDimensions(useGdiBitmap(), pw, ph)
+    nmgpx := Round((pw *ph)/1000000)
+    lim := (nmgpx > 250 && !viewportQPVimage.imgHandle) ? 1400 : 700
+    lia := (nmgpx > 100) ? 150 : 45
+    GuiAddSlider("DrawLineAreaContourThickness", 1,lim, lia, ".updateLabelDrawLineThickness", "updateUIdrawShapesPanel", 1, "xs y+15 w" txtWid " hp")
     If (!viewportQPVimage.imgHandle)
     {
        Gui, Add, Checkbox, xs y+10 gupdateUIdrawShapesPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit selection area
@@ -54662,6 +54667,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
          msgBoxWrapper(appTitle ": ERROR", appTitle " was unable to save the image file due to an undetermined cause.`n`n" OutFileName "`n" OutDir "\`nError code: " r, 0, 0, "error")
       } Else
       {
+         RecordImagesOpenedManager(file2save)
          FileGetSize, OutputVar, % OutDir "\" OutFileName
          If (OutputVar>2)
             friendly := "`nFile size: " fileSizeFriendly(OutputVar)
@@ -65217,6 +65223,7 @@ OpenFavesEntry(menuItem) {
      Return
   } Else If (newEntry!="@" && StrLen(newEntry)>2)
   {
+     RecordImagesOpenedManager(newEntry)
      MenuOpenLastImg(newEntry)
      resultedFilesList[currentFileIndex, 5] := 1
      currentImgModified := 0
@@ -98443,8 +98450,7 @@ testus2() {
 ; Return 
 
 
-
-; F:\temp\torrents\Mrs.Davis.S01.COMPLETE.720p.PCOK.WEBRip.x264-GalaxyTV[TGx]\moar\1291-mgpx-thumbs-shepet3.jpg
+/*
 preventCtrlA(keyu) {
    Static lastInvoked := 1, ticks := 0, prevKeyu := 0
    If (A_TickCount - lastInvoked<400)
@@ -98478,6 +98484,8 @@ return
 return
 
 #if
+*/
+
 /*
 LButton::
 SetTimer, doClicku, -150
