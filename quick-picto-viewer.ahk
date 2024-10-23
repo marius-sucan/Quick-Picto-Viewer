@@ -432,6 +432,11 @@ OnMessage(0x100, "WM_KEYDOWN")
 OnMessage(0x104, "WM_KEYDOWN")
 
 Global interfaceThread
+; if isWinStore()
+; {
+;    If GetRes(threadData, 0, "MODULE-INTERFACE.AHK", "LIB")
+;       interfaceThread := ahkThread(StrGet(&threadData))
+; } Else
 If !A_IsCompiled
    interfaceThread := ahkthread("#Include *i Lib\module-interface.ahk")
 Else If (sz := GetRes(data, 0, "MODULE-INTERFACE.AHK", 10))
@@ -939,7 +944,7 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
       animGIFplaying := interfaceThread.ahkgetvar.animGIFplaying
       If (animGIFplaying=-1)
       {
-         imgPath := getIDimage(currentFileIndex)
+         imgPath := resultedFilesList[currentFileIndex, 1]
          animGIFplaying := 1
          interfaceThread.ahkassign("animGIFplaying", animGIFplaying)
          ; setGIFframesDelay()
@@ -2326,7 +2331,6 @@ initQPVmainDLL(modus:=0) {
       addJournalEntry("ERROR: Failed to initialize DCT coefficients required for identifying image duplicates. This feature will not work.")
 
    WICmoduleHasInit := DllCall(whichMainDLL "\initWICnow", "int", debugModa, "int", 0)
-   ; MsgBox, % r "=" WICmoduleHasInit
    If WICmoduleHasInit
    {
       CLSIDlist := ""
@@ -2357,10 +2361,13 @@ initQPVmainDLL(modus:=0) {
       Sort, extensionsList, UD|
       extensionsList := Trimmer(extensionsList, "|")
       RegExWICfmtPtrn := StrReplace(RegExWICfmtPtrn, "place-holder", extensionsList)
-      RegExAllFilesPattern := StrReplace(RegExAllFilesPattern, "|dib|", "|" extensionsList "|")
-      Sort, RegExAllFilesPattern, UD|
-      extensionsList := Trimmer(RegExAllFilesPattern, "|")
-      RegExFilesPattern := "i)^(.\:\\).*(\.(" RegExAllFilesPattern "))$"
+      pp := RegExAllFilesPattern "|" extensionsList
+      Sort, pp, UD|
+      extensionsList := Trimmer(pp, "|")
+      RegExAllFilesPattern := extensionsList
+      RegExFilesPattern := "i)^(.\:\\).*(\.(" 
+      RegExFilesPattern .= extensionsList
+      RegExFilesPattern .= "))$"
       ; interfaceThread.ahkassign("RegExFilesPattern", RegExFilesPattern)
       allFormats := "*.jpeg;*.ico;" openFptrn3 openFptrn1 openFptrn2 openFptrn4 ";"
       Loop, Parse, extensionsList, |
@@ -2650,7 +2657,7 @@ activateFilesListFilterBasedOnFolder(thisIndex) {
    If askAboutFileSave(" and the files list will be filtered to the current image containing folder")
       Return
 
-   r := getIDimage(thisIndex)
+   r := resultedFilesList[thisIndex, 1]
    zPlitPath(r, 0, OutFileName, OutDir)
    userFilterProperty := userFilterDoString := 1
    userFilterWhat := 2
@@ -3215,7 +3222,7 @@ copyMoveStructuredFolders(srcDir, finalDest) {
 
       changeMcursor()
       thisFileIndex := A_Index
-      file2rem := getIDimage(thisFileIndex)
+      file2rem := resultedFilesList[thisFileIndex, 1]
       countTFilez++
       If !FileExist(file2rem)
       {
@@ -6515,7 +6522,8 @@ MenuCycleVectToolMode() {
 
 defineVectToolMode() {
    Static pp := {1:"Mixed", 2:"Add", 3:"Remove", 4:"Select", 5:"Adjust"}
-   Return pp[vectorToolModus]
+   z := pp[vectorToolModus]
+   Return z
 }
 
 MenuSetVectToolModeMixed() {
@@ -11943,8 +11951,9 @@ coreNextPrevImage(direction, startIndex, randomMode) {
         If (randomMode=1)
         {
            z := RandyIMGids[thisIndex]
-           r := getIDimage(z)
-        } Else r := getIDimage(thisIndex)
+           r := resultedFilesList[z, 1]
+        } Else r := resultedFilesList[thisIndex, 1]
+
         If !r
            Continue
 
@@ -17325,7 +17334,7 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
           getVPselSize(zW, zH, 1, 0)
           objSel.zw := zw,        objSel.zh := zh
           ; objSel.forceRect := (VPselRotation>0) ? 1 : 0
-          ppk := (TextInAreaBlendMode>1) ? "a" imgSelX1 imgSelY1 : 0
+          ppk := "a" imgSelX1 imgSelY1
           thisIDu := "a" previewMode VPselRotation zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY getVPselIDs("saiz-vpos") FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY TextInAreaFlipV TextInAreaFlipV TextInAreaAlign TextInAreaCharSpacing TextInAreaBlendMode TextInAreaValign TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName
           thisIDu .= "b" TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr TextInAreaAutoWrap TextInAreaCaseTransform userimgGammaCorrect undoLevelsRecorded currentUndoLevel useGdiBitmap() getAlphaMaskIDu() ppk
           realtimePasteInPlaceAlphaMasker(previewMode, fBitmap, thisIDu, maskedBitmap, objSel)
@@ -24630,8 +24639,9 @@ defineKBDcontexts(humanMode) {
 
    lastState := rz
    lastInvoked := A_TickCount
+   jp := lp[rz]
    If (humanMode=1)
-      Return lp[rz]
+      Return jp
    Else
       Return rz
 }
@@ -24639,7 +24649,7 @@ defineKBDcontexts(humanMode) {
 testCustomKBDcontexts(givenKey) {
    r := defineKBDcontexts(0)
    If StrLen(userCustomKeysDefined[r . givenKey, 1])>0
-      Return r givenKey
+      Return r . givenKey
 }
 
 DragCollapsedWidget() {
@@ -25033,6 +25043,7 @@ trackImageListButtons(actu, r:=0, hwnd:="") {
        createGUItoolbar("refresh-later")
 
     listu := new hashtable()
+    ; ptr := DllCall("Kernel32\GetProcessHeap","UPtr")
     Loop, % counteru
     {
        If (StrLen(HILs[A_Index, 2])>1)
@@ -25042,11 +25053,16 @@ trackImageListButtons(actu, r:=0, hwnd:="") {
        }
 
        x := HILs[A_Index, 1]
+       ; fnOutputDebug(c " | " A_ThisFunc ": " HILs[A_Index, 1] "=" HILs[A_Index, 2])
        If (x!="" && listu[x]!=1)
        {
           ; SoundBeep , 900, 100
-          ; fnOutputDebug(A_ThisFunc ": " HILs[A_Index, 1] "=" HILs[A_Index, 2])
-          DllCall("Comctl32.dll\ImageList_Destroy", "uptr", x)
+          ; Try pp := DllCall("HeapValidate", "uptr", ptr, "int", 0, "uptr", x)
+          ; If pp
+          c := DllCall("Comctl32.dll\ImageList_GetImageCount", "uptr", x)
+          if (c=5)
+             Try DllCall("Comctl32.dll\ImageList_Destroy", "uptr", x)
+
           HILs[A_Index, 1] := ""
           listu[x] := 1
        }
@@ -30699,87 +30715,6 @@ FileRexists(filePath, loose:=1) {
       Return 1
 }
 
-hFindIsFolder(ByRef fileInfos) {
-   Static FILE_ATTRIBUTE_DIRECTORY := 0x10
-   Return NumGet(&fileInfos,0,"UInt") & FILE_ATTRIBUTE_DIRECTORY
-}
-
-hFindGetName(ByRef fileInfos) {
-   cFileName := StrGet(&fileInfos + 44, 260, "UTF-16")
-   If (cFileName="." || cFileName="..")
-      cFileName := ""
-   Return cFileName
-}
-
-testGetFile(filePath) {
-  ; SizeInBytes := 568 + 3 * 8 = 592
-    VarSetCapacity(Win32FindData, 1512, 0)
-    hFind := DllCall("FindFirstFileW", "WStr", filePath "\*", "Ptr", &Win32FindData, "Ptr")
-    cFileName := hFindGetName(Win32FindData)
-    If (hFindIsFolder(Win32FindData) && cFileName)
-    {
-    ;  MsgBox, folderrr
-       testGetFile(filePath "\" cFileName)
-    } Else If (RegExMatch(Trimmer(cFileName), RegExFilesPattern))
-    {
-       maxFilesIndex++
-       resultedFilesList[maxFilesIndex] := [filePath "\" cFileName]
-    }
-
-   ; MsgBox, % filePath "`n" hFind "`n" cFileName "`n" cAlternateFileName "`n" ErrorLevel "`n" A_LastError
-
-
- ;   instance.nFileSizeHigh := NumGet(&Win32FindData, 28,  "UInt")
-;    instance.nFileSizeLow := NumGet(&Win32FindData, 32,  "UInt")
-
-    While (r := DllCall("FindNextFileW", "ptr", hFind, "ptr", &Win32FindData))
-    {
-          cFileName := hFindGetName(Win32FindData)
-          If hFindIsFolder(Win32FindData) && cFileName
-          {
-             testGetFile(filePath "\" cFileName)
-          } Else If (RegExMatch(Trimmer(cFileName), RegExFilesPattern))
-          {
-             maxFilesIndex++
-             resultedFilesList[maxFilesIndex] := [filePath "\" cFileName]
-          }
-    ; MsgBox, % filePath "`n" r "`n" hFind "`n" cFileName "`n" cAlternateFileName "`n" ErrorLevel "`n" A_LastError
-    }
-
-   ; maxFilesIndex := resultedFilesList.Length()
-    ; SoundBeep 
-    Return
-}
-
-testGetFile2(filePath) {
-  ; SizeInBytes := 568 + 3 * 8 = 592
-    VarSetCapacity(Win32FindData, 318+1024, 0)
-    if (hFind := DllCall("FindFirstFileW", "WStr", filePath "\*", "Ptr", &Win32FindData, "Ptr")) {
-        cFileName := StrGet(&Win32FindData + 44, 260, "UTF-16")
-        cAlternateFileName := StrGet(&Win32FindData + 564, 14, "UTF-16")
-        
-        MsgBox, %  hFind "`n" cFileName "`n" cAlternateFileName "`n" ErrorLevel "`n" A_LastError
-        While (r := DllCall("FindNextFileW", "ptr", hFind, "ptr", &Win32FindData))
-        {
-            cFileNamea := StrGet(&Win32FindData + 44, 260, "UTF-16")
-            cAlternateFileNamea := StrGet(&Win32FindData + 564, 14, "UTF-16")
-            MsgBox, %  r "`n" cFileNameA "`n" cAlternateFileNameA "`n" ErrorLevel "`n" A_LastError
-        }
-    }
-    Return
-}
-
-testFileExistence(imgPath) {
-  ; https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-getfilesize
-  ; H := DllCall("kernel32\GetFileAttributesW", "Str", imgPath)
-  ; H := DllCall("shlwapi.dll\PathFileExistsW", "Str", imgPath)
-  ; If (h>0)
-  ;    Return 256
-  VarSetCapacity(dummy, 1024, 0)
-  H := DllCall("kernel32\FindFirstFileW", "Str", imgPath, "Ptr", &dummy, "Ptr")
-  Return H
-}
-
 informUserFileMissing(clearScreen:=0) {
    Critical, on
    If (clearScreen=1)
@@ -32015,9 +31950,11 @@ updateSQLdbEntryFileInfos(fullPath, ByRef fileInfos, dbIndex) {
 
 getValueFilesList(indexu, value, modus) {
    If (modus=1)
-      Return resultedFilesList[indexu, value]
+      v := resultedFilesList[indexu, value]
    Else If (modus=2)
-      Return bckpResultedFilesList[indexu, value]
+      v := bckpResultedFilesList[indexu, value]
+
+   Return v
 }
 
 getImgFileValuesSet(indexu, m) {
@@ -33387,7 +33324,7 @@ removeFilesListSeenImages(modus:=0) {
 
       Loop, % maxFilesIndex + 1
       {
-          r := getIDimage(A_Index)
+          r := resultedFilesList[A_Index, 1]
           If (InStr(r, "||") || !r)
              Continue
 
@@ -33520,7 +33457,7 @@ findFavesInList(modus:=0, doSel:=0) {
       doStartLongOpDance()
       Loop, % maxFilesIndex + 1
       {
-          r := getIDimage(A_Index)
+          r := resultedFilesList[A_Index, 1]
           If (InStr(r, "||") || !r)
              Continue
 
@@ -37219,7 +37156,7 @@ navSelectedFiles(direction) {
    Loop, % maxFilesIndex
    {
         thisIndex := (direction=-1) ? currentFileIndex - A_Index : currentFileIndex + A_Index
-        r := getIDimage(thisIndex)
+        r := resultedFilesList[thisIndex, 1]
         isSelected := resultedFilesList[thisIndex, 2]
         If (isSelected!=1 || !r || InStr(r, "||"))
            Continue
@@ -37363,7 +37300,7 @@ searchNextIndex(direction, inLoop:=0) {
         }
 
         thisIndex := (direction=-1) ? startIndex - A_Index : startIndex + A_Index
-        imgPath := getIDimage(thisIndex)
+        imgPath := resultedFilesList[thisIndex, 1]
         If (!coreSearchIndex(imgPath, thisSearchString, userSearchWhat) || !imgPath)
            Continue
 
@@ -38597,7 +38534,7 @@ coreBatchMultiRenameFiles() {
          changeMcursor()
          wasError := 0
          thisFileIndex := A_Index
-         file2rem := getIDimage(thisFileIndex)
+         file2rem := resultedFilesList[thisFileIndex, 1]
          parentFolderName := zPlitPath(file2rem, 0, OutFileName, OutDir, fileNamuNoEXT, fileEXTu)
          If (StrLen(objuTemp.newExtu)>1)
             fileEXTu := objuTemp.newExtu
@@ -39780,7 +39717,8 @@ testFuncIsInMenus(funcu) {
    If (A_TickCount -lastInvoked < 200)
    {
       listu := kMenu(0, "FuncGive", 0)
-      Return listu[funcu, 1]
+      k := listu[funcu, 1]
+      Return k
    }
 
    simulateMenusMode := 1
@@ -41737,8 +41675,7 @@ generateThumbsSheet() {
 
       countTFilez++
       changeMcursor()
-      imgPath := getIDimage(A_Index)
-      changeMcursor()
+      imgPath := resultedFilesList[A_Index, 1]
       If !FileExist(imgPath)
       {
          failedFiles++
@@ -44047,7 +43984,9 @@ BTNsaveCaptionAction() {
 
     SetTimer, updateUIcaptionsPanel, -150
     If (thumbsDisplaying!=1)
-       SetTimer, dummyRefreshImgSelectionWindow, -50
+       dummyRefreshImgSelectionWindow("forced")
+    Else
+       dummyTimerDelayiedImageDisplay(25)
 }
 
 InvokeUpdateIndexPanelBTNaction() {
@@ -50202,7 +50141,7 @@ batchImgPrinting(PrintOptions) {
          If (resultedFilesList[thisFileIndex, 2]!=1)
             Continue
 
-         imgPath := getIDimage(thisFileIndex)
+         imgPath := resultedFilesList[thisFileIndex, 1]
          If (InStr(imgPath, "||") || !imgPath)
             Continue
     
@@ -56634,9 +56573,10 @@ FIMalphaChannelFix(alphaBitmap, hFIFimgE) {
 FIMrescaleOBJbmp(hFIFimgC, imgW, imgH, indexu, sizesDesired) {
    forceW := sizesDesired[indexu, 1]
    forceH := sizesDesired[indexu, 2]
-   If (forceW>1 && forceH>1 && noBPPconv=0 && noBMP=0)
+   If (forceW>1 && forceH>1)
    {
       changeMcursor()
+      ; fnOutputDebug("zz=" forceW "|" forceH " || " imgW "|" imgH)
       keepAratio := sizesDesired[indexu, 3]
       ScaleAnySize := sizesDesired[indexu, 4]
       thisImgQuality := (sizesDesired[indexu, 5]=6) ? 1 : 0
@@ -57031,7 +56971,7 @@ batchExtractFramesFromImages() {
       }
 
       thisFileIndex := A_Index
-      imgPath := getIDimage(thisFileIndex)
+      imgPath := resultedFilesList[thisFileIndex, 1]
       If (InStr(imgPath, "||") || !imgPath)
          Continue
  
@@ -57476,7 +57416,7 @@ combineImagesMultiTiffGDIp(destFilePath) {
       }
 
       thisFileIndex := A_Index
-      imgPath := getIDimage(thisFileIndex)
+      imgPath := resultedFilesList[thisFileIndex, 1]
       If (InStr(imgPath, "||") || !imgPath)
          Continue
 
@@ -57671,7 +57611,7 @@ combineImagesMultiPage(modus, animus, destFilePath) {
       }
 
       thisFileIndex := A_Index
-      imgPath := getIDimage(thisFileIndex)
+      imgPath := resultedFilesList[thisFileIndex, 1]
       If (InStr(imgPath, "||") || !imgPath)
          Continue
  
@@ -58715,7 +58655,6 @@ MenuOpenLastImg(forceOpenGiven:=0) {
       INIaction(1, "prevOpenFolderPath", "General")
       zoomu := " [" Round(zoomLevel * 100) "%" zoomu "]"
       winPrefix := defineWinTitlePrefix()
-  
       SetTimer, GuiGDIupdaterResize, Off
       mustOpenStartFolder := OutDir
       ; currentFileIndex := detectFileID(LastOpenedImg)
@@ -61313,8 +61252,8 @@ InvokeMenuBarImage(manuID) {
         If (currIMGdetails.Frames<2 && !markedSelectFile)
            kMenu("pvMenuBarImage", "Disable", "Extract frames/pa&ges")
 
-        kMenu("pvMenuBarImage", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
         imgPath := getIDimage(currentFileIndex)
+        kMenu("pvMenuBarImage", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
         kMenu("pvMenuBarImage", "Add", "&JPEG lossless operations`tShift+J", "PanelJpegPerformOperation")
         If (!RegExMatch(imgPath, "i)(.\.(jpg|jpeg))$") && !markedSelectFile)
            kMenu("pvMenuBarImage", "Disable", "&JPEG lossless operations`tShift+J")
@@ -61619,8 +61558,8 @@ createMenuNavigation() {
       kMenu("PVnav", "Add", "L&ast selected`tCtrl+End", "jumpToFilesSelBorderLast")
    }
 
-   thisFolder := StrReplace(Trimmer(CurrentSLD), "|")
    imgPath := getIDimage(currentFileIndex)
+   thisFolder := StrReplace(Trimmer(CurrentSLD), "|")
    OutDir := SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1))
    showThese := (StrLen(mustOpenStartFolder)>3 || maxFilesIndex>1) ? 1 : 0
    Menu, PVnav, Add
@@ -66095,7 +66034,8 @@ defineSelectionAspectRatios(doFlipper:=0, modus:=0) {
    If (lockSelectionAspectRatio=3 || lockSelectionAspectRatio=4 || isInRange(lockSelectionAspectRatio, 6, 10))
       friendly .= " - flipped"
 
-   Return types[lockSelectionAspectRatio] friendly
+   ztypes := types[lockSelectionAspectRatio] . friendly
+   Return ztypes
 }
 
 ToggleRecordOpenHistory() {
@@ -70793,12 +70733,15 @@ coreCreateVPnavBox(modus:=0) {
          sizesDesired := []
          sizesDesired[1] := [500, 500, 1, 0, 6]
          changeMcursor()
-         whichBitmap := LoadBitmapFromFileu(imgPath, 0, 0, 0, sizesDesired)
-         If validBMP(whichBitmap)
+         whichBitmap := LoadBitmapFromFileu(imgPath, 0, 0, 0, sizesDesired, newSizedImage)
+         If validBMP(whichBitmap) 
          {
             ; whichBitmap := trGdip_ResizeBitmap(A_ThisFunc, oBitmap, 500, 500, 1, 7)
             ; trGdip_DisposeImage(oBitmap, 1)
-            saveImageThumbnail(whichBitmap, file2save)
+            ; fnOutputDebug("aa=" newSizedImage "|" whichBitmap)
+            ; Gdip_SetBitmapToClipboard(whichBitmap)
+            thmb := validBMP(newSizedImage) ? newSizedImage : whichBitmap
+            saveImageThumbnail(thmb, file2save)
          }
          ResetImgLoadStatus()
       }
@@ -72235,9 +72178,11 @@ HSL_ToRGB(hue, sat:=1, lum:=0.5 ) {
       hue := 2 * lum - sat >> 16
 
 ; Return the values in RGB as a hex integer
-   Return "0x" SubStr( hx, ( red >> 4 ) + 1, 1 ) SubStr( hx, ( red & 15 ) + 1, 1 )
-         . SubStr( hx, ( hue >> 4 ) + 1, 1 ) SubStr( hx, ( hue & 15 ) + 1, 1 )
-         . SubStr( hx, ( blu >> 4 ) + 1, 1 ) SubStr( hx, ( blu & 15 ) + 1, 1 )
+   ppr := "0x" SubStr( hx, ( red >> 4 ) + 1, 1 ) SubStr( hx, ( red & 15 ) + 1, 1 )
+   ppg := SubStr( hx, ( hue >> 4 ) + 1, 1 ) SubStr( hx, ( hue & 15 ) + 1, 1 )
+   ppb := SubStr( hx, ( blu >> 4 ) + 1, 1 ) SubStr( hx, ( blu & 15 ) + 1, 1 )
+   pp := ppr . ppg . ppb
+   Return pp
 } ; END - HSL_ToRGB( hue, sat, lum )
 
 HSL_Hue( RGB ) {
@@ -74929,7 +74874,7 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
        Gdip_DrawRectangle(2NDglPG, pPen1d, outX, outY, SelDotsSize, SelDotsSize)
     }
 
-    If (showImgAnnotations=1 && !AnyWindowOpen && drawingShapeNow!=1 && currentUndoLevel<3)
+    If (showImgAnnotations=1 && (!AnyWindowOpen || AnyWindowOpen=22) && drawingShapeNow!=1 && currentUndoLevel<3)
     {
        drawAnnotationBox(mainWidth, mainHeight, 2NDglPG)
     } Else
@@ -78896,6 +78841,7 @@ ScreenCaptureListView() {
 
 saveImageThumbnail(oBitmap, file2save) {
     Gdip_GetImageDimensions(oBitmap, zww, zhh)
+    ; fnOutputDebug("looooooool: " zww " | " zhh)
     kBitmap := trGdip_CreateBitmap(A_ThisFunc, zww, zhh)
     If validBMP(kBitmap)
        Guzz := Gdip_GraphicsFromImage(kBitmap)
@@ -78905,19 +78851,17 @@ saveImageThumbnail(oBitmap, file2save) {
        thisBrush2 := createHatchBrush(128)
        Gdip_FillRectangle(Guzz, thisBrush2, 0, 0, zww, zhh)
        Gdip_DeleteBrush(thisBrush2)
-       Gdip_DrawImageFast(Guzz, oBitmap)
+       Gdip_DrawImage(Guzz, oBitmap, 0, 0, zww, zhh)
        Gdip_DeleteGraphics(Guzz)
        zr := Gdip_SaveBitmapToFile(kBitmap, file2save, 94)
        trGdip_DisposeImage(kBitmap, 1)
-       If zr
-          addJournalEntry("Failed to save thumbnail to file: " file2save)
     } Else
     {
        trGdip_DisposeImage(kBitmap, 1)
        zr := Gdip_SaveBitmapToFile(oBitmap, file2save, 94)
-       If zr
-          addJournalEntry("Failed to save thumbnail to file: " file2save)
     }
+    If zr
+       addJournalEntry("Failed to save thumbnail to file: " file2save)
 }
 
 QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
@@ -81639,12 +81583,13 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
 }
 
 getIDimage(imgID) {
-    Return resultedFilesList[imgID, 1]
+    pp := resultedFilesList[imgID, 1]
+    Return pp
 }
 
 IDshowImage(imgID, opentehFile:=0) {
     Static prevIMGid, prevImgPath, lastInvoked := 1
-    imgPath := getIDimage(imgID)
+    imgPath := resultedFilesList[imgID, 1]
     If StrLen(imgPath)<4
     {
        addJournalEntry("Index entry error: incorrect file path:`n" imgPath " [ " imgID " ]")
@@ -83572,7 +83517,7 @@ batchJpegLLoperations() {
       }
 
       thisFileIndex := A_Index
-      file2rem := getIDimage(thisFileIndex)
+      file2rem := resultedFilesList[thisFileIndex, 1]
       If (InStr(file2rem, "||") || !file2rem)
          Continue
  
@@ -85169,7 +85114,7 @@ batchAdvIMGresizer(desiredW, desiredH, isPercntg, dontAsk:=0) {
 
       countTFilez++
       thisFileIndex := A_Index
-      imgPath := getIDimage(thisFileIndex)
+      imgPath := resultedFilesList[thisFileIndex, 1]
       imgPath := StrReplace(imgPath, "||")
       If (!FileExist(imgPath) || !imgPath) || (!RegExMatch(imgPath, saveTypesRegEX) && userUnsprtWriteFMT=1)
       {
@@ -89434,7 +89379,7 @@ remFilesFromList(SelectedDir, silentus:=0, forReal:=1) {
     newArrayu := []
     Loop, % maxFilesIndex + 1
     {
-        r := getIDimage(A_Index)
+        r := resultedFilesList[A_Index, 1]
         If (InStr(r, "||") || !r)
            Continue
 
@@ -89682,7 +89627,7 @@ SearchAndReplaceThroughIndex(what, replacer, silentus:=0, folderMode:=0) {
     {
        Loop, % maxFilesIndex + 1
        {
-           imgPath := getIDimage(A_Index)
+           imgPath := resultedFilesList[A_Index, 1]
            If !imgPath
               Continue
 
@@ -91290,8 +91235,7 @@ batchAutoCropFiles() {
          Break
       }
 
-      thisFileIndex := A_Index
-      imgPath := getIDimage(thisFileIndex)
+      imgPath := resultedFilesList[A_Index, 1]
       imgPath := StrReplace(imgPath, "||")
       If (A_TickCount - prevMSGdisplay>3000)
       {
@@ -91395,8 +91339,7 @@ batchAutoColorsFiles() {
          Break
       }
 
-      thisFileIndex := A_Index
-      imgPath := getIDimage(thisFileIndex)
+      imgPath := resultedFilesList[A_Index, 1]
       imgPath := StrReplace(imgPath, "||")
       If (A_TickCount - prevMSGdisplay>3000)
       {
@@ -92149,8 +92092,7 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor) {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
          Continue
 
-      thisFileIndex := A_Index
-      imgPath := getIDimage(thisFileIndex)
+      imgPath := resultedFilesList[A_Index, 1]
       If !RegExMatch(imgPath, thisRegEX)
       {
          skippedFiles++
@@ -92259,8 +92201,7 @@ batchSimpleColorsAdjusts() {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
          Continue
 
-      thisFileIndex := A_Index
-      imgPath := getIDimage(thisFileIndex)
+      imgPath := resultedFilesList[A_Index, 1]
       If !RegExMatch(imgPath, saveTypesRegEX)
       {
          skippedFiles++
@@ -92952,7 +92893,7 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
         mainLoadedIMGdetails.TooLargeGDI := 1
         FreeImage_GetImageDimensions(hFIFimgC, imgW, imgH)
      }
-
+     ; fnOutputDebug("cc=" imgW "|" imgH)
      setWindowTitle("Converting FreeImage object to GDI+ image bitmap")
      If (noBPPconv=0 && noBMP=0 && GFT=0 && InStr(ColorsType, "rgba"))
         alphaBitmap := FreeImage_GetChannel(hFIFimgC, 4)
@@ -94324,7 +94265,8 @@ trGdip_DisposeImage(pBitmap, noErr:=1) {
 }
 
 validBMP(pBitmap) {
-    Return createdGDIobjsArray["x" pBitmap, 3]
+    z := createdGDIobjsArray["x" pBitmap, 3]
+    Return z
 }
 
 gdipObjectsTerminator(filteru:=0) {
@@ -98506,6 +98448,4 @@ doClicku() {
       Sleep, 2
    SendEvent, {LButton up}
    */
-
 }
-
