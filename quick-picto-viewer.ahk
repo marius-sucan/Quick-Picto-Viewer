@@ -38,8 +38,8 @@
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
 ;@Ahk2Exe-UpdateManifest 0, Quick Picto Viewer
 ;@Ahk2Exe-SetOrigFilename Quick-Picto-Viewer.exe
-;@Ahk2Exe-SetVersion 6.1.00
-;@Ahk2Exe-SetProductVersion 6.1.00
+;@Ahk2Exe-SetVersion 6.1.20
+;@Ahk2Exe-SetProductVersion 6.1.20
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2024)
 ;@Ahk2Exe-SetCompanyName https://marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -215,7 +215,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := [], prevPasteInPlaceVPcoords := []
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := ""
-   , appVersion := "6.1.00", vReleaseDate := "2024/10/7" ; yyyy-mm-dd
+   , appVersion := "6.1.20", vReleaseDate := "2024/10/24" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -432,11 +432,6 @@ OnMessage(0x100, "WM_KEYDOWN")
 OnMessage(0x104, "WM_KEYDOWN")
 
 Global interfaceThread
-; if isWinStore()
-; {
-;    If GetRes(threadData, 0, "MODULE-INTERFACE.AHK", "LIB")
-;       interfaceThread := ahkThread(StrGet(&threadData))
-; } Else
 If !A_IsCompiled
    interfaceThread := ahkthread("#Include *i Lib\module-interface.ahk")
 Else If (sz := GetRes(data, 0, "MODULE-INTERFACE.AHK", 10))
@@ -24944,7 +24939,7 @@ GuiAddListView(options, headeru, labelu, guiu:="SettingsGUIA") {
 
 GuiAddCheckBox(options, readerLabel, uiLabel, guiu:="SettingsGUIA", ttip:=0) {
     Gui, %guiu%: Add, Checkbox, % options " +hwndhTemp +0x1000 +0x8000", % readerLabel
-    SetImgButtonStyle(hTemp, uiLabel, 1)
+    SetImgButtonStyle(hTemp, uiLabel, 1, 0, guiu)
     thisu := ttip ? ttip : readerLabel
     ToolTip2ctrl(hTemp, thisu)
 }
@@ -24952,7 +24947,7 @@ GuiAddCheckBox(options, readerLabel, uiLabel, guiu:="SettingsGUIA", ttip:=0) {
 GuiAddFlipBlendLayers(options, guiu:="SettingsGUIA") {
     Static p := "Swap blended layers: A with B.`nThis will not have any impact on commutative`nblending modes marked with * (asterisk)."
     Gui, %guiu%: Add, Checkbox, % options " +hwndhTemp +0x1000 +0x8000 Checked" BlendModesFlipped " vBlendModesFlipped", Swap blended layers
-    SetImgButtonStyle(hTemp, mainExecPath "\resources\toolbar\blending-layers.png", 1)
+    SetImgButtonStyle(hTemp, mainExecPath "\resources\toolbar\blending-layers.png", 1, 0, guiu)
     ToolTip2ctrl(hTemp, p)
 }
 
@@ -24960,7 +24955,7 @@ GuiAddCloseOnApply(options, guiu:="SettingsGUIA") {
     Static p := "Close window after the «Apply» button is clicked"
     Gui, %guiu%: Add, Checkbox, % options " gToggleClosePanelApply +hwndhTemp +0x1000 +0x8000 Checked" closeEditPanelOnApply " vcloseEditPanelOnApply", Close window on apply
     pk := (uiUseDarkMode=1) ? "" : "-dark"
-    SetImgButtonStyle(hTemp, mainExecPath "\resources\toolbar\go-back" pk ".png", 1)
+    SetImgButtonStyle(hTemp, mainExecPath "\resources\toolbar\go-back" pk ".png", 1, 0, guiu)
     ToolTip2ctrl(hTemp, p)
 }
 
@@ -24968,7 +24963,7 @@ GuiAddToggleLivePreview(options, guiu:="SettingsGUIA") {
     Static p := "Toggle Live Preview for the current tool [F12]"
     Gui, %guiu%: Add, Checkbox, % options " +hwndhTemp +0x1000 +0x8000 Checked" doImgEditLivePreview " vdoImgEditLivePreview", Live preview
     pk := (uiUseDarkMode=1) ? "" : "-dark"
-    SetImgButtonStyle(hTemp, mainExecPath "\resources\toolbar\view-2" pk ".png", 1)
+    SetImgButtonStyle(hTemp, mainExecPath "\resources\toolbar\view-2" pk ".png", 1, 0, guiu)
     ToolTip2ctrl(hTemp, p)
 }
 
@@ -24985,28 +24980,28 @@ ActToggleLivePreview() {
 GuiAddPickerColor(options, colorReference, guiu:="SettingsGUIA") {
     Gui, %guiu%: Add, Button, % options " +0x8000 gStartPickingColor vPicku" colorReference " +hwndhTemp", Color pipette
     pk := (uiUseDarkMode=1) ? "" : "-dark"
-    SetImgButtonStyle(hTemp, mainExecPath "\resources\toolbar\pipette" pk ".png")
+    SetImgButtonStyle(hTemp, mainExecPath "\resources\toolbar\pipette" pk ".png", 0, 0, guiu)
     ToolTip2ctrl(hTemp, "Pick color from the viewport")
 }
 
 GuiAddCollapseBtn(options, guiu:="SettingsGUIA") {
     Gui, %guiu%: Add, Button, % options " +0x8000 gtoggleImgEditPanelWindow +hwndhTemp", Collapse panel. F11
     pk := (uiUseDarkMode=1) ? "" : "-dark"
-    SetImgButtonStyle(hTemp, mainExecPath "\resources\toolbar\triangle-up" pk ".png")
+    SetImgButtonStyle(hTemp, mainExecPath "\resources\toolbar\triangle-up" pk ".png", 0, 0, guiu)
     ToolTip2ctrl(hTemp, "Collapse panel [F11]")
 }
 
 GuiAddShapeEditBtn(options, guiu:="SettingsGUIA") {
     Gui, %guiu%: Add, Button, % options " +0x8000 gMenuResumeDrawingShapes vUIbtnEditShape +hwndhTemp", Edit vector shape
     pk := (uiUseDarkMode=1) ? "" : "-dark"
-    SetImgButtonStyle(hTemp, mainExecPath "\resources\toolbar\create-freeform.png")
+    SetImgButtonStyle(hTemp, mainExecPath "\resources\toolbar\create-freeform.png", 0, 0, guiu)
     ToolTip2ctrl(hTemp, "Edit vector shape")
 }
 
 GuiAddButton(options, uiLabel, readerLabel, ttipu:=0, guiu:="SettingsGUIA") {
     Gui, %guiu%: Add, Button, % options " +0x8000 +hwndhTemp", % readerLabel
     protectedHwnd := (guiu="fdTreeGuia" || guiu="QuickMenuSearchGUIA") ? hTemp : ""
-    SetImgButtonStyle(hTemp, uiLabel, 0, protectedHwnd)
+    SetImgButtonStyle(hTemp, uiLabel, 0, protectedHwnd, guiu)
     p := ttipu ? ttipu : readerLabel
     ToolTip2ctrl(hTemp, p)
     Return hTemp
@@ -25026,15 +25021,18 @@ GuiAddColor(options, colorReference, labelu:=0, guiu:="SettingsGUIA") {
     Return hTemp
 }
 
-trackImageListButtons(actu, r:=0, hwnd:="") {
+trackImageListButtons(actu, r:=0, hwnd:=0, discardedImageList:=0, guiu:=0) {
     Critical, on
     Static HILs := []
-    Static counteru := 0
     If (actu="record")
     {
        ; SoundBeep , 300, 100
-       counteru++
-       HILs[counteru] := [r, hwnd]
+       HILs["r" r] := [r, hwnd, guiu]
+       If StrLen(discardedImageList)>1
+       {
+          HILs["r" discardedImageList, 1] := 0
+          HILs["r" discardedImageList, 2] := hwnd
+       }
        Return
     }
 
@@ -25042,33 +25040,29 @@ trackImageListButtons(actu, r:=0, hwnd:="") {
     If (ShowAdvToolbar!=1)
        createGUItoolbar("refresh-later")
 
-    listu := new hashtable()
-    ; ptr := DllCall("Kernel32\GetProcessHeap","UPtr")
-    Loop, % counteru
+    For Key, Value in HILs
     {
-       If (StrLen(HILs[A_Index, 2])>1)
+       If ((AnyWindowOpen && Value[3]="SettingsGUIA")
+       || (StrLen(Value[2])>1))
        {
           ; fnOutputDebug(A_ThisFunc ": skip= " HILs[A_Index, 2])
-          Continue
+          If (!AnyWindowOpen && Value[3]="SettingsGUIA")
+             Sleep, -1
+          Else
+             Continue
        }
 
-       x := HILs[A_Index, 1]
-       ; fnOutputDebug(c " | " A_ThisFunc ": " HILs[A_Index, 1] "=" HILs[A_Index, 2])
-       If (x!="" && listu[x]!=1)
+       x := Value[1]
+       If (StrLen(x)>1)
        {
-          ; SoundBeep , 900, 100
-          ; Try pp := DllCall("HeapValidate", "uptr", ptr, "int", 0, "uptr", x)
-          ; If pp
           c := DllCall("Comctl32.dll\ImageList_GetImageCount", "uptr", x)
-          if (c=5)
+          ; fnOutputDebug(c " | " A_ThisFunc ": " Value[1] "=" Value[2] " | " Value[3])
+          If (c=5)
              Try DllCall("Comctl32.dll\ImageList_Destroy", "uptr", x)
 
-          HILs[A_Index, 1] := ""
-          listu[x] := 1
+          HILs["r" x, 1] := ""
        }
     }
-    listu := ""
-    counteru := 0
 }
 
 updateColoredRectCtrl(coloru, varu, guiu:="SettingsGUIA", clrHwnd:=0) {
@@ -25086,8 +25080,8 @@ updateColoredRectCtrl(coloru, varu, guiu:="SettingsGUIA", clrHwnd:=0) {
     copt4 := [0, "0xFF" coloru, "0xFF" coloru,,,, "0xFF999999", 2, 0] ; disabled
     copt5 := [0, "0xFF" coloru, "0xFF" coloru,,,, "0xff999999", 4, 0] ; active/focused
     r := ImageButton.Create(clrHwnd, copt1, copt2, copt3, copt4, copt5)
-    If (r!="")
-       trackImageListButtons("record", r)
+    If (r[1]!="")
+       trackImageListButtons("record", r[1], 0, r[2], guiu)
 
     ; ToolTip, % r "|" coloru "|" hwnd  , , , 2
     Return r
@@ -25996,7 +25990,7 @@ mouseTurnOFFtooltip() {
    ; interfaceThread.ahkPostFunction("mouseTurnOFFtooltip", 1)
 }
 
-SetImgButtonStyle(hwnd, newLabel:="", checkMode:=0, protectedHwnd:="") {
+SetImgButtonStyle(hwnd, newLabel:="", checkMode:=0, protectedHwnd:="", guiu:="") {
    Static dopt1 := [0, "0xFF373737","0xFF373737", "0xFFffFFff",,,"0xff778877", 2] ; normal
    , dopt2 := [0, "0xFF656565","0xFF656565", "0xFFffFFff",,,"0xffaaAAaa", 2] ; hover
    , dopt3 := [0, "0xFF000000","0xFF000000", "0xFFeeEEee",,,"0xFF454545", 4] ; clicked
@@ -26028,8 +26022,8 @@ SetImgButtonStyle(hwnd, newLabel:="", checkMode:=0, protectedHwnd:="") {
    Else
       r := ImageButton.Create(hwnd, lopt1, lopt2, lopt%pi%, lopt4, lopt5)
 
-   If (r!="")
-      trackImageListButtons("record", r, protectedHwnd)
+   If (r[1]!="")
+      trackImageListButtons("record", r[1], protectedHwnd, r[2], guiu)
 
    Return r
 }
@@ -26091,7 +26085,6 @@ repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:=
               } Else 
               {
                  doAttachCtlColor := 0
-                 ; SetImgButtonStyle(strControlHwnd)
                  WinSet, Style, +%WS_CLIPSIBLINGS%, ahk_id %strControlhwnd%
                  GetWinClientSize(w, h, strControlHwnd, 1)
                  WinSet, Region, % "1-1 w" w - 2 " h" h - 2, ahk_id %strControlhwnd%
@@ -94488,8 +94481,8 @@ tlbrSetImageIcon(icoFile, hwnd, W, H) {
     d4 := [0, "0xFF" ToolbarBgrColor,"0xFF" ToolbarBgrColor,,,,, 0, 1, z] ; disabled
     d5 := [0, "0xFF" c,"0xFF" c,,,,, 0, 1, z] ; active/focused
     r := ImageButton.Create(hwnd, d1, d2, d3, d4, d5)
-    If (r!="")
-       trackImageListButtons("record", r)
+    If (r[1]!="")
+       trackImageListButtons("record", r[1], 0, r[2], "toolbar")
 
     If mustDispose
        trGdip_DisposeImage(icoBMP, 1)

@@ -20,6 +20,7 @@
 ;     2. Call ImageButton.Create() passing two parameters:
 ;        HWND        -  Button's HWND.
 ;        Options*    -  variadic array containing up to 6 option arrays (see below).
+;        Returns an object with the new ImageList Handle and the previous ImageList handle which is automatically disposed.
 ;        ---------------------------------------------------------------------------------------------------------------
 ;        The index of each option object determines the corresponding button state on which the bitmap will be shown.
 ;        MSDN defines 6 states (http://msdn.microsoft.com/en-us/windows/bb775975):
@@ -514,7 +515,7 @@ Class ImageButton {
       This.FreeBitmaps()
       ; ----------------------------------------------------------------------------------------------------------------
       ; All done successfully
-      Return HIL
+      Return [HIL, IL]
    }
    ; ===================================================================================================================
    ; Set the default GUI color

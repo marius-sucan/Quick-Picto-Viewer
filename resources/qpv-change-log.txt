@@ -4,10 +4,14 @@
 // Project began in early May 2019.
 // Related: general-code-overview.txt
 
+- v6.1.20 (2024-10-24)
+  - new version of the FreeImage library which brings bug fixes and improvements
+  - various bug fixes 
+
 - v6.1.00 (2024-10-17)
   - [improvement] by double clicking on the viewport, the image gets zoomed in at the associated image coordinates
   - [improvement] recently opened list now keeps track of opened images, not just folders or files lists
-  - [improvement] «draw shapes contour» can now draw lines with miter joins
+  - [improvement] «draw shapes contours» can now draw lines with miter joins
   - various bug fixes
 
 - v6.0.50 (2024-07-28)
