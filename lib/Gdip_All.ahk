@@ -20,6 +20,7 @@
 ;
 ; Gdip standard library versions:
 ; by Marius Șucan - gathered user-contributed functions and implemented hundreds of new functions
+; - v1.97 [28/10/2024]
 ; - v1.96 [22/08/2023]
 ; - v1.95 [21/04/2023]
 ; - v1.94 [23/03/2023]
@@ -78,6 +79,7 @@
 ; - v1.01 [05/31/2008]
 ;
 ; Detailed history:
+; - 28/10/2024 = added the Gdip_GraphicsPathIterator class ; users can now work with subpaths/figures
 ; - 22/08/2023 = bug fix related to Gdip_SaveBitmapToFile() and other minor changes
 ; - 21/04/2023 = bug fixes related to Gdip_TextToGraphics() and private font collections
 ; - 23/03/2023 = added Gdip_SaveAddImage(), Gdip_SaveImagesInTIFF(), Gdip_GetFrameDelay(), Gdip_GetImageEncodersList(), and other fixes, and minor functions
@@ -883,7 +885,7 @@ Gdip_LibraryVersion() {
 ;                 Updated by Marius Șucan reflecting the work on Gdip_all extended compilation
 
 Gdip_LibrarySubVersion() {
-   return 1.96 ; 22/08/2023
+   return 1.97 ; 28/10/2024
 }
 
 ;#####################################################################################
@@ -9549,4 +9551,127 @@ Gdip_ErrorHandler(errCode, throwErrorMsg, additionalInfo:="") {
       MsgBox, % GdipErrMsg
 
    Return GdipErrMsg
+}
+
+class Gdip_GraphicsPathIterator {
+    __New(pPath) {
+        ; Create GraphicsPathIterator
+        DllCall("gdiplus\GdipCreatePathIter", "UPtr*", pIterator:=0, "UPtr", pPath)
+        this.ptr := pIterator
+    }
+    
+    __Delete() {
+        if (this.ptr)
+           DllCall("gdiplus\GdipDeletePathIter", "UPtr", this.ptr)
+    }
+
+    Discard() {
+        if (this.ptr)
+           DllCall("gdiplus\GdipDeletePathIter", "UPtr", this.ptr)
+    }
+    
+    NextSubpath() {
+        ; Get next subpath information
+        DllCall("gdiplus\GdipPathIterNextSubpath"
+            , "UPtr", this.ptr
+            , "Int*", resultCount:=0
+            , "Int*", startIndex:=0
+            , "Int*", endIndex:=0
+            , "Int*", isClosed:=0)
+        
+        return {count: resultCount
+            , startIndex: startIndex
+            , endIndex: endIndex
+            , isClosed: isClosed}
+    }
+    
+    NextPathType() {
+        ; Get next path point type
+        DllCall("gdiplus\GdipPathIterNextPathType"
+            , "UPtr", this.ptr
+            , "Int*", resultCount:=0
+            , "UChar*", pathType:=0
+            , "Int*", startIndex:=0
+            , "Int*", endIndex:=0)
+            
+        return {count: resultCount
+            , pathType: pathType
+            , startIndex: startIndex
+            , endIndex: endIndex}
+    }
+    
+    NextMarker() {
+        ; Get next marker
+        DllCall("gdiplus\GdipPathIterNextMarker"
+            , "UPtr", this.ptr
+            , "Int*", resultCount:=0
+            , "Int*", startIndex:=0
+            , "Int*", endIndex:=0)
+            
+        return {count: resultCount
+            , startIndex: startIndex
+            , endIndex: endIndex}
+    }
+    
+    GetCount() {
+        ; Get total number of points
+        DllCall("gdiplus\GdipPathIterGetCount", "UPtr", this.ptr, "Int*", count:=0)
+        return count
+    }
+    
+    GetSubpathCount() {
+        ; Get number of subpaths
+        DllCall("gdiplus\GdipPathIterGetSubpathCount"
+            , "UPtr", this.ptr, "Int*", count:=0)
+        return count
+    }
+    
+    Rewind() {
+        ; Reset iterator position to start
+        DllCall("gdiplus\GdipPathIterRewind", "UPtr", this.ptr)
+    }
+    
+    CopyData(ByRef points, ByRef types, startIndex, endIndex) {
+        ; Copy path data to arrays
+        pointCount := endIndex - startIndex + 1
+        VarSetCapacity(pointsBuffer, 8 * pointCount * A_PtrSize)
+        VarSetCapacity(typesBuffer, pointCount)
+        
+        DllCall("gdiplus\GdipPathIterCopyData"
+            , "UPtr", this.ptr
+            , "Int*", resultCount:=0
+            , "UPtr", &pointsBuffer
+            , "UPtr", &typesBuffer
+            , "Int", startIndex
+            , "Int", endIndex)
+            
+        ; Convert buffer data to arrays
+        points := []
+        types := []
+        Loop, % resultCount {
+            offset := (A_Index-1) * 8
+            points.Push(NumGet(pointsBuffer, offset, "Float"))
+            points.Push(NumGet(pointsBuffer, offset+4, "Float"))
+            types.Push(NumGet(typesBuffer, A_Index-1, "UChar"))
+        }
+        return resultCount
+    }
+
+    GetSubPath(startIndex, endIndex, fillMode:=0) {
+        pPath := 0
+        pointCount := endIndex - startIndex + 1
+        VarSetCapacity(pointsBuffer, 8 * pointCount * A_PtrSize)
+        VarSetCapacity(typesBuffer, pointCount)
+        
+        DllCall("gdiplus\GdipPathIterCopyData"
+            , "UPtr", this.ptr
+            , "Int*", resultCount:=0
+            , "UPtr", &pointsBuffer
+            , "UPtr", &typesBuffer
+            , "Int", startIndex
+            , "Int", endIndex)
+
+        gdipLastError := DllCall("gdiplus\GdipCreatePath2", "UPtr", &pointsBuffer, "UPtr", &typesBuffer, "Int", resultCount, "UInt", fillMode, "UPtr*", pPath)
+        return pPath
+    }
 }

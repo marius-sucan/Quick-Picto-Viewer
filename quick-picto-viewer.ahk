@@ -21433,22 +21433,274 @@ DrawLinesInSelectedArea(modus) {
     }
 }
 
-coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgSelW, imgSelH) {
-    dR := (DrawLineAreaContourAlign=3) ? thisThick//2 : 0
-    If (DrawLineAreaContourAlign=1)
-       dR := -thisThick//2
+coreDrawParametricLinesRays(x1, y1, x2, y2, imgSelW, imgSelH) {
+    rw := imgSelW ,  rh := imgSelH
+    imgSelPx := x1,  imgSelPy := y1
+    arw := rw + Round(rw * (DrawLineAreaAltRays/200))
+    arh := rh + Round(rh * (DrawLineAreaAltRays/200))
+    cX := imgSelPx + rW/2
+    cY := imgSelPy + rH/2
+    PointsList := []
+    midPointsList := []
+    pk := 0
 
-    x1 := imgSelPx,              y1 := imgSelPy
-    x2 := imgSelPx + imgSelW,    y2 := imgSelPy + imgSelH
-    imgSelPx -= dR
-    imgSelPy -= dR
-    imgSelW += dR*2
-    imgSelH += dR*2
-    x1 -= dR
-    y1 -= dR
-    x2 += dR
-    y2 += dR
+    Loop, % DrawLineAreaGridX
+    {
+       If (DrawLineAreaRaysLimit>1)
+       {
+          If !isInRange(A_Index, DrawLineAreaRaysLimit, DrawLineAreaGridX - DrawLineAreaRaysLimit)
+             Continue
+       }
 
+       pk := !pk
+       getRelativePointCoordsCircle((1130 / DrawLineAreaGridX) * (A_Index - 1) - 281, zx, zy)
+       mw := (pk=1) ? rw : arw
+       mh := (pk=1) ? rh : arh
+       bzx := cX + (zx*mW)/2
+       bzy := cY + (zy*mH)/2
+       PointsList.Push(bzx),  PointsList.Push(bzy)
+       zx := cX + (zx*(mW/2))/2
+       zy := cY + (zy*(mH/2))/2
+       midPointsList.Push(zx),  midPointsList.Push(zy)
+    }
+
+    kPath := Gdip_CreatePath(0, PointsList)
+    If (DrawLineAreaGridX>2)
+       trGdip_RotatePathAtCenter(kPath, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
+
+    newPoints := Gdip_GetPathPoints(kPath, 1)
+    Gdip_DeletePath(kPath)
+
+    t := 0,  fx := imgSelW * alphaMaskOffsetX, fy := imgSelH * alphaMaskOffsetY
+    ppr := (DrawLineAreaCenterCut>105) ? (DrawLineAreaCenterCut - 225)/350 : DrawLineAreaCenterCut/350
+    pPath := Gdip_CreatePath()
+    Loop, % newPoints.Count() + 1
+    {
+       t++
+       zx := newPoints[t]
+       mx := midPointsList[t]
+       t++
+       zy := newPoints[t]
+       my := midPointsList[t]
+       If (zx="" || mx="")
+          Continue
+
+       Gdip_StartPathFigure(pPath)
+       If (DrawLineAreaCenterCut>105)
+       {
+          abx := mX + fx/1.5,       aby := mY + fy/1.5
+          bbx := weighTwoValues(zx, abx, ppr)
+          bby := weighTwoValues(zy, aby, ppr)
+          Gdip_AddPathLine(pPath, bbx, bby, zx, zy)
+       } Else
+       {
+          abx := cX + fx,       aby := cY + fy
+          bbx := weighTwoValues(zx, abx, ppr)
+          bby := weighTwoValues(zy, aby, ppr)
+          Gdip_AddPathCurve(pPath, [bbx, bby, mX + fx/1.5, mY + fy/1.5, zx, zy], 0.9)
+       }
+    }
+    Return pPath
+}
+
+coreDrawParametricLinesGrid(x1, y1, x2, y2, imgSelW, imgSelH, thisThick) {
+    pPath := Gdip_CreatePath()
+    imgSelPx := x1,  imgSelPy := y1
+    Gdip_AddPathRectangle(pPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
+    Rect := Gdip_GetPathWorldBounds(pPath)
+
+    pMatrix := Gdip_CreateMatrix()
+    cX := Rect.x + (Rect.w / 2),   cY := Rect.y + (Rect.h / 2)
+    Gdip_TranslateMatrix(pMatrix, -cX , -cY)
+    Gdip_RotateMatrix(pMatrix, VPselRotation, 1)
+    Gdip_TranslateMatrix(pMatrix, cX, cY, 1)
+    Gdip_TransformPath(pPath, pMatrix)
+
+    nRect := Gdip_GetPathWorldBounds(pPath)
+    ncX := nRect.x + (nRect.w / 2)
+    ncY := nRect.y + (nRect.h / 2)
+    zpMatrix := Gdip_CreateMatrix()
+    Gdip_TranslateMatrix(zpMatrix, -ncX , -ncY)
+    Gdip_DeletePath(pPath)
+    pPath := Gdip_CreatePath()
+    sX := Rect.w / nRect.w
+    sY := Rect.h / nRect.h
+    If (DrawLineAreaKeepBounds=1)
+    {
+       sX := min(sX, sY)
+       sY := min(sX, sY)
+    }
+    Gdip_ScaleMatrix(zpMatrix, sX, sY, 1)
+    Gdip_TranslateMatrix(zpMatrix, ncX, ncY, 1)
+
+    zxs := (imgSelW + thisThick)/DrawLineAreaGridX
+    zx := -zxs + imgSelPx
+    fx := imgSelW * alphaMaskOffsetX
+    fy := imgSelH * alphaMaskOffsetY
+    If (DrawLineAreaGridCenter=1)
+      fx := fy := (fx + fy)/2
+
+    pa := DrawLineAreaGridX/2
+    Loop, % DrawLineAreaGridX
+    {
+       zx += zxs
+       If (zx - imgSelPx>imgSelW || DrawLineAreaGridCenter=4 && A_Index>1)
+          Break
+
+       If (DrawLineAreaGridCenter=1)
+       {
+          pfx := (A_Index>pa) ? weighTwoValues(fx, 0, (A_Index - pa)/pa) : - weighTwoValues(fx, 0, 1 - A_Index/pa)
+          pfy := 0
+       } Else If (DrawLineAreaGridCenter=3)
+       {
+          pfx := fx
+          pfy := fy
+       } Else
+       {
+          pfx := (A_Index>pa) ? weighTwoValues(fx, 0, 1 - (A_Index - pa)/pa) : weighTwoValues(fx, 0, A_Index/pa)
+          pfy := (A_Index>pa) ? weighTwoValues(fy, 0, 1 - (A_Index - pa)/pa) : weighTwoValues(fy, 0, A_Index/pa)
+       }
+
+       nPath := Gdip_CreatePath()
+       Gdip_AddPathCurve(nPath, [zx, imgSelPy, zx + pfx, imgSelPy + imgSelH/2 + pfy, zx, imgSelPy + imgSelH], 1)
+       Gdip_TransformPath(nPath, pMatrix)
+       Gdip_TransformPath(nPath, zpMatrix)
+       Gdip_AddPathToPath(pPath, nPath, 0)
+       Gdip_DeletePath(nPath)
+    }
+
+    nPath := Gdip_CreatePath()
+    Gdip_AddPathLine(nPath, imgSelPx + imgSelW, imgSelPy, imgSelPx + imgSelW, imgSelPy + imgSelH)
+    Gdip_TransformPath(nPath, pMatrix)
+    Gdip_TransformPath(nPath, zpMatrix)
+    Gdip_AddPathToPath(pPath, nPath, 0)
+    Gdip_DeletePath(nPath)
+    gridy := (DrawLineAreaEqualGrid=1) ? DrawLineAreaGridX : DrawLineAreaGridY
+    zys := (imgSelH + thisThick)/gridy
+    zy := -zys + imgSelPy
+    pa := gridy/2
+    Loop, % gridy
+    {
+       zy += zys
+       If (zy - imgSelPy>imgSelH || DrawLineAreaGridCenter=3 && A_Index>1)
+          Break
+
+       if (DrawLineAreaGridCenter=1)
+       {
+          pfx := 0
+          pfy := (A_Index>pa) ? weighTwoValues(fy, 0, (A_Index - pa)/pa) : - weighTwoValues(fy, 0, 1 - A_Index/pa)
+       } Else If (DrawLineAreaGridCenter=4)
+       {
+          pfx := fx
+          pfy := fy
+       } Else
+       {
+          pfx := (A_Index>pa) ? weighTwoValues(fx, 0, 1 - (A_Index - pa)/pa) : weighTwoValues(fx, 0, A_Index/pa)
+          pfy := (A_Index>pa) ? weighTwoValues(fy, 0, 1 - (A_Index - pa)/pa) : weighTwoValues(fy, 0, A_Index/pa)
+       }
+
+       nPath := Gdip_CreatePath()
+       Gdip_AddPathCurve(nPath, [imgSelPx, zy, imgSelPx + imgSelW/2 + pfx, zy + pfy, imgSelPx + imgSelW, zy], 1)
+       Gdip_TransformPath(nPath, pMatrix)
+       Gdip_TransformPath(nPath, zpMatrix)
+       Gdip_AddPathToPath(pPath, nPath, 0)
+       Gdip_DeletePath(nPath)
+    }
+
+    nPath := Gdip_CreatePath()
+    Gdip_AddPathLine(nPath, imgSelPx, imgSelPy + imgSelH, imgSelPx + imgSelW, imgSelPy + imgSelH)
+    Gdip_TransformPath(nPath, pMatrix)
+    Gdip_TransformPath(nPath, zpMatrix)
+    Gdip_DeleteMatrix(pMatrix)
+    Gdip_DeleteMatrix(zpMatrix)
+    Gdip_AddPathToPath(pPath, nPath, 0)
+    Gdip_DeletePath(nPath)
+
+    ; trGdip_RotatePathAtCenter(pPath, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
+    Return pPath
+}
+
+coreDrawParametricLinesSpiral(x1, y1, x2, y2, imgSelW, imgSelH) {
+    If (DrawLineAreaSpiralCenterMode=1 || DrawLineAreaSpiralCenterMode=2)
+    {
+       rp := (DrawLineAreaSpiralCenterMode=2) ? 350 : 50
+       fx := imgSelW * (alphaMaskOffsetX/rp), fy := imgSelH * (alphaMaskOffsetY/rp)
+       rw := imgSelW - fx*2,                  rh := imgSelH - fy*2
+    } Else
+    {
+       fx := imgSelW * alphaMaskOffsetX, fy := imgSelH * alphaMaskOffsetY
+       rw := imgSelW,                    rh := imgSelH
+    }
+
+    angle := -272
+    PointsList := []
+    imgSelPx := x1,  imgSelPy := y1
+    cX := imgSelPx + imgSelW/2
+    cY := imgSelPy + imgSelH/2
+    rw := imgSelW,   rh := imgSelH
+    spx := imgSelPx, spy := imgSelPy
+    lengthu := Round(DrawLineAreaSpiralLength**1.1)
+    zfx := imgSelW/(lengthu + 2)
+    zfy := imgSelH/(lengthu + 2)
+    ppr := 1 - Round(DrawLineAreaCenterCut/400, 1)
+    pPath := Gdip_CreatePath()
+    Loop, % lengthu
+    {
+       If (A_Index/lengthu>ppr)
+          Break
+
+       If ((angle + 3) !=849 && angle>848 && DrawLineAreaAtomizedGrid=1)
+          angle := 849.8
+
+       angle += 3
+       If (angle>848 && angle!=852.8 && DrawLineAreaAtomizedGrid=1)
+       {
+          Gdip_StartPathFigure(pPath)
+          Gdip_AddPathCurve(pPath, PointsList)
+          PointsList := []
+          angle := -272
+       }
+
+       rw -= zfx
+       rh -= zfy
+       If (DrawLineAreaSpiralCenterMode=2)
+       {
+          spx += zfx/2 + fx/2
+          spy += zfy/2 + fy/2
+       } Else
+       {
+          spx += zfx/2
+          spy += zfy/2
+       }
+
+       cX := spx + rw/2
+       cY := spy + rh/2
+       getRelativePointCoordsCircle(angle, zx, zy)
+       If (DrawLineAreaSpiralCenterMode=2)
+       {
+          zx := cX + (zx*rw)/2
+          zy := cY + (zy*rh)/2
+       } Else If (DrawLineAreaSpiralCenterMode=1)
+       {
+          zx := cX + ((zx + fx)*rw)/2
+          zy := cY + ((zy + fy)*rh)/2
+       } Else
+       {
+          zx := cX + (zx*(rw + fx))/2
+          zy := cY + (zy*(rh + fy))/2
+       }
+
+       PointsList.Push(zx),  PointsList.Push(zy)
+       lastu := !lastu
+    }
+
+    Gdip_AddPathCurve(pPath, PointsList)
+    trGdip_RotatePathAtCenter(pPath, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
+    PointsList := ""
+    Return pPath
+}
+
+coreDrawParametricLinesMarginsMidsDiagos(x1, y1, x2, y2, imgSelW, imgSelH) {
     pPathArcs := Gdip_CreatePath()
     pPathBrders := Gdip_CreatePath()
     If (DrawLineAreaBorderCenter=1)
@@ -21493,9 +21745,7 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
        Gdip_StartPathFigure(whichPath)
        If (DrawLineAreaBorderRight=1)
           Gdip_AddPathLine(whichPath, x2, bky1, x2, bky2)
-    }
-
-    If (DrawLineAreaBorderCenter=2)
+    } Else If (DrawLineAreaBorderCenter=2)
     {
        ; mid-lines
        If (DrawLineAreaBorderTop=1)
@@ -21509,9 +21759,7 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
           Gdip_StartPathFigure(pPathBrders)
           Gdip_AddPathLine(pPathBrders, x1 + imgSelW//2, y1, x1 + imgSelW//2, y2)
        }
-    }
-
-    If (DrawLineAreaBorderCenter=3)
+    } Else If (DrawLineAreaBorderCenter=3)
     {
        ; diagonals
        frame := defineFreeHandFrame("flip", FlipImgH, FlipImgV, freeHandPoints[5])
@@ -21556,6 +21804,29 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
        }
     }
 
+    applyLimits := (Gdip_GetPathPointsCount(pPathBrders))>2 ? 1 : 0
+    trGdip_RotatePathAtCenter(pPathBrders, VPselRotation, 1, applyLimits, DrawLineAreaKeepBounds, 1)
+    trGdip_RotatePathAtCenter(pPathArcs, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
+    Return [pPathBrders, pPathArcs]
+}
+
+coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgSelW, imgSelH) {
+    dR := (DrawLineAreaContourAlign=3) ? thisThick//2 : 0
+    If (DrawLineAreaContourAlign=1)
+       dR := -thisThick//2
+
+    x1 := imgSelPx,              y1 := imgSelPy
+    x2 := imgSelPx + imgSelW,    y2 := imgSelPy + imgSelH
+    imgSelPx -= dR
+    imgSelPy -= dR
+    imgSelW += dR*2
+    imgSelH += dR*2
+    x1 -= dR,    y1 -= dR
+    x2 += dR,    y2 += dR
+
+    obj := coreDrawParametricLinesMarginsMidsDiagos(x1, y1, x2, y2, imgSelW, imgSelH)
+    pPathBrders := obj[1]
+    pPathArcs := obj[2]
     rz := Gdip_GetPathPointsCount(pPathBrders) + Gdip_GetPathPointsCount(pPathArcs) 
     If (DrawLineAreaBorderCenter<2 && !rz && previewMode=0)
     {
@@ -21567,7 +21838,6 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
        Return -1
     }
 
-    thisPen := createDrawLinesPen(thisThick, 0)
     If (DrawLineAreaCropShape>1 && isInRange(DrawLineAreaBorderCenter, 4, 6))
     {
        zPath := Gdip_CreatePath()
@@ -21580,303 +21850,38 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
        Gdip_DeletePath(zPath)
     }
 
-    applyLimits := (Gdip_GetPathPointsCount(pPathBrders))>2 ? 1 : 0
-    trGdip_RotatePathAtCenter(pPathBrders, VPselRotation, 1, applyLimits, DrawLineAreaKeepBounds, 1)
-    trGdip_RotatePathAtCenter(pPathArcs, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
+    thisPen := createDrawLinesPen(thisThick, 0)
     Gdip_DrawPath(G2, thisPen, pPathBrders)
     Gdip_DrawPath(G2, thisPen, pPathArcs)
     Gdip_DeletePath(pPathBrders)
     Gdip_DeletePath(pPathArcs)
     If (DrawLineAreaBorderCenter=4)
+       kPath := coreDrawParametricLinesRays(x1, y1, x2, y2, imgSelW, imgSelH)
+    Else If (DrawLineAreaBorderCenter=5)
+       kPath := coreDrawParametricLinesGrid(x1, y1, x2, y2, imgSelW, imgSelH, thisThick)
+    Else If (DrawLineAreaBorderCenter=6 && DrawLineAreaSpiralLength>1)
+       kPath := coreDrawParametricLinesSpiral(x1, y1, x2, y2, imgSelW, imgSelH)
+
+    If kPath
     {
-       ; rays
-       rw := imgSelW ,  rh := imgSelH
-       arw := rw + Round(rw * (DrawLineAreaAltRays/200))
-       arh := rh + Round(rh * (DrawLineAreaAltRays/200))
-       cX := imgSelPx + rW/2
-       cY := imgSelPy + rH/2
-       PointsList := []
-       midPointsList := []
-       pk := 0
-
-       Loop, % DrawLineAreaGridX
+       if (DrawLineAreaAtomizedGrid=1)
        {
-          If (DrawLineAreaRaysLimit>1)
+          iterator := new Gdip_GraphicsPathIterator(kPath)
+          ; ToolTip, % "Total points: " iterator.GetCount() "`nSubpaths: " iterator.GetSubpathCount()  , , , 2
+          iterator.Rewind()
+          while ((subPath := iterator.NextSubpath()).count > 0)
           {
-             If !isInRange(A_Index, DrawLineAreaRaysLimit, DrawLineAreaGridX - DrawLineAreaRaysLimit)
-                Continue
+              nPath := iterator.GetSubPath(subPath.startIndex, subPath.endIndex, 0)
+              Gdip_DrawPath(G2, thisPen, nPath)
+              Gdip_DeletePath(nPath)
           }
-
-          pk := !pk
-          getRelativePointCoordsCircle((1130 / DrawLineAreaGridX) * (A_Index - 1) - 281, zx, zy)
-          mw := (pk=1) ? rw : arw
-          mh := (pk=1) ? rh : arh
-          bzx := cX + (zx*mW)/2
-          bzy := cY + (zy*mH)/2
-          PointsList.Push(bzx),  PointsList.Push(bzy)
-          zx := cX + (zx*(mW/2))/2
-          zy := cY + (zy*(mH/2))/2
-          midPointsList.Push(zx),  midPointsList.Push(zy)
+          Gdip_DeletePath(kPath)
+          iterator.Discard()
+       } Else 
+       {
+          Gdip_DrawPath(G2, thisPen, kPath)
+          Gdip_DeletePath(kPath)
        }
-
-       kPath := Gdip_CreatePath(0, PointsList)
-       If (DrawLineAreaGridX>2)
-          trGdip_RotatePathAtCenter(kPath, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
-
-       newPoints := Gdip_GetPathPoints(kPath, 1)
-       t := 0,  fx := imgSelW * alphaMaskOffsetX, fy := imgSelH * alphaMaskOffsetY
-       ppr := (DrawLineAreaCenterCut>105) ? (DrawLineAreaCenterCut - 225)/350 : DrawLineAreaCenterCut/350
-       Loop, % newPoints.Count() + 1
-       {
-          pPath := Gdip_CreatePath()
-          t++
-          zx := newPoints[t]
-          mx := midPointsList[t]
-          t++
-          zy := newPoints[t]
-          my := midPointsList[t]
-          If (zx="" || mx="")
-             Continue
-
-          If (DrawLineAreaCenterCut>105)
-          {
-             abx := mX + fx/1.5,       aby := mY + fy/1.5
-             bbx := weighTwoValues(zx, abx, ppr)
-             bby := weighTwoValues(zy, aby, ppr)
-             Gdip_AddPathLine(pPath, bbx, bby, zx, zy)
-          } Else
-          {
-             abx := cX + fx,       aby := cY + fy
-             bbx := weighTwoValues(zx, abx, ppr)
-             bby := weighTwoValues(zy, aby, ppr)
-             Gdip_AddPathCurve(pPath, [bbx, bby, mX + fx/1.5, mY + fy/1.5, zx, zy], 0.9)
-          }
-          Gdip_DrawPath(G2, thisPen, pPath)
-          Gdip_DeletePath(pPath)
-       }
-       Gdip_DeletePath(kPath)
-
-    } Else If (DrawLineAreaBorderCenter=5)
-    {
-       ; grid
-       pPath := Gdip_CreatePath()
-       If (DrawLineAreaAtomizedGrid=1)
-       {
-          Gdip_AddPathRectangle(pPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
-          Rect := Gdip_GetPathWorldBounds(pPath)
- 
-          pMatrix := Gdip_CreateMatrix()
-          cX := Rect.x + (Rect.w / 2),   cY := Rect.y + (Rect.h / 2)
-          Gdip_TranslateMatrix(pMatrix, -cX , -cY)
-          Gdip_RotateMatrix(pMatrix, VPselRotation, 1)
-          Gdip_TranslateMatrix(pMatrix, cX, cY, 1)
-          Gdip_TransformPath(pPath, pMatrix)
-
-          nRect := Gdip_GetPathWorldBounds(pPath)
-          ncX := nRect.x + (nRect.w / 2)
-          ncY := nRect.y + (nRect.h / 2)
-          zpMatrix := Gdip_CreateMatrix()
-          Gdip_TranslateMatrix(zpMatrix, -ncX , -ncY)
-          sX := Rect.w / nRect.w
-          sY := Rect.h / nRect.h
-          If (DrawLineAreaKeepBounds=1)
-          {
-             sX := min(sX, sY)
-             sY := min(sX, sY)
-          }
-          Gdip_ScaleMatrix(zpMatrix, sX, sY, 1)
-          Gdip_TranslateMatrix(zpMatrix, ncX, ncY, 1)
-       }
-
-       zxs := (imgSelW + thisThick)/DrawLineAreaGridX
-       zx := -zxs + imgSelPx
-       fx := imgSelW * alphaMaskOffsetX, fy := imgSelH * alphaMaskOffsetY
-       If (DrawLineAreaGridCenter=1)
-         fx := fy := (fx+fy)/2
-       pa := DrawLineAreaGridX/2
-       Loop, % DrawLineAreaGridX
-       {
-          zx += zxs
-          If (zx - imgSelPx>imgSelW || DrawLineAreaGridCenter=4 && A_Index>1)
-             Break
-
-          If (DrawLineAreaGridCenter=1)
-          {
-             pfx := (A_Index>pa) ? weighTwoValues(fx, 0, (A_Index - pa)/pa) : - weighTwoValues(fx, 0, 1 - A_Index/pa)
-             pfy := 0
-          } Else If (DrawLineAreaGridCenter=3)
-          {
-             pfx := fx
-             pfy := fy
-          } Else
-          {
-             pfx := (A_Index>pa) ? weighTwoValues(fx, 0, 1 - (A_Index - pa)/pa) : weighTwoValues(fx, 0, A_Index/pa)
-             pfy := (A_Index>pa) ? weighTwoValues(fy, 0, 1 - (A_Index - pa)/pa) : weighTwoValues(fy, 0, A_Index/pa)
-          }
-
-          If (DrawLineAreaAtomizedGrid=1)
-          {
-             gPath := Gdip_CreatePath()
-             ; Gdip_AddPathLine(gPath, zx, imgSelPy, zx, imgSelPy + imgSelH)
-             Gdip_AddPathCurve(gPath, [zx, imgSelPy, zx + pfx, imgSelPy + imgSelH/2 + pfy, zx, imgSelPy + imgSelH], 1)
-             Gdip_TransformPath(gPath, pMatrix)
-             Gdip_TransformPath(gPath, zpMatrix)
-             Gdip_DrawPath(G2, thisPen, gPath)
-             Gdip_DeletePath(gPath)
-          } Else
-          {
-             Gdip_StartPathFigure(pPath)
-             ; Gdip_AddPathLine(pPath, zx, imgSelPy, zx, imgSelPy + imgSelH)
-             Gdip_AddPathCurve(pPath, [zx, imgSelPy, zx + pfx, imgSelPy + imgSelH/2 + pfy, zx, imgSelPy + imgSelH], 1)
-          }
-       }
-
-       If (DrawLineAreaAtomizedGrid!=1)
-       {
-          Gdip_StartPathFigure(pPath)
-          Gdip_AddPathLine(pPath, imgSelPx + imgSelW, imgSelPy, imgSelPx + imgSelW, imgSelPy + imgSelH)
-       } Else
-       {
-          gPath := Gdip_CreatePath()
-          Gdip_AddPathLine(gPath, imgSelPx + imgSelW, imgSelPy, imgSelPx + imgSelW, imgSelPy + imgSelH)
-          Gdip_TransformPath(gPath, pMatrix)
-          Gdip_TransformPath(gPath, zpMatrix)
-          Gdip_DrawPath(G2, thisPen, gPath)
-          Gdip_DeletePath(gPath)
-       }
-
-       gridy := (DrawLineAreaEqualGrid=1) ? DrawLineAreaGridX : DrawLineAreaGridY
-       zys := (imgSelH + thisThick)/gridy
-       zy := -zys + imgSelPy
-       pa := gridy/2
-       Loop, % gridy
-       {
-          zy += zys
-          If (zy - imgSelPy>imgSelH || DrawLineAreaGridCenter=3 && A_Index>1)
-             Break
-
-          if (DrawLineAreaGridCenter=1)
-          {
-             pfx := 0
-             pfy := (A_Index>pa) ? weighTwoValues(fy, 0, (A_Index - pa)/pa) : - weighTwoValues(fy, 0, 1 - A_Index/pa)
-          } Else If (DrawLineAreaGridCenter=4)
-          {
-             pfx := fx
-             pfy := fy
-          } Else
-          {
-             pfx := (A_Index>pa) ? weighTwoValues(fx, 0, 1 - (A_Index - pa)/pa) : weighTwoValues(fx, 0, A_Index/pa)
-             pfy := (A_Index>pa) ? weighTwoValues(fy, 0, 1 - (A_Index - pa)/pa) : weighTwoValues(fy, 0, A_Index/pa)
-          }
-
-          If (DrawLineAreaAtomizedGrid=1)
-          {
-             gPath := Gdip_CreatePath()
-             ; Gdip_AddPathLine(gPath, imgSelPx, zy, imgSelPx + imgSelW, zy)
-             Gdip_AddPathCurve(gPath, [imgSelPx, zy, imgSelPx + imgSelW/2 + pfx, zy + pfy, imgSelPx + imgSelW, zy], 1)
-             Gdip_TransformPath(gPath, pMatrix)
-             Gdip_TransformPath(gPath, zpMatrix)
-             Gdip_DrawPath(G2, thisPen, gPath)
-             Gdip_DeletePath(gPath)
-          } Else
-          {
-             Gdip_StartPathFigure(pPath)
-             Gdip_AddPathCurve(pPath, [imgSelPx, zy, imgSelPx + imgSelW/2 + pfx, zy + pfy, imgSelPx + imgSelW, zy], 1)
-             ; Gdip_AddPathLine(pPath, imgSelPx, zy, imgSelPx + imgSelW, zy)
-          }
-       }
-
-       if (DrawLineAreaAtomizedGrid!=1)
-       {
-          Gdip_StartPathFigure(pPath)
-          Gdip_AddPathLine(pPath, imgSelPx, imgSelPy + imgSelH, imgSelPx + imgSelW, imgSelPy + imgSelH)
-          trGdip_RotatePathAtCenter(pPath, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
-          Gdip_DrawPath(G2, thisPen, pPath)
-       } Else
-       {
-          gPath := Gdip_CreatePath()
-          Gdip_AddPathLine(gPath, imgSelPx, imgSelPy + imgSelH, imgSelPx + imgSelW, imgSelPy + imgSelH)
-          Gdip_TransformPath(gPath, pMatrix)
-          Gdip_TransformPath(gPath, zpMatrix)
-          Gdip_DrawPath(G2, thisPen, gPath)
-          Gdip_DeletePath(gPath)
-          Gdip_DeleteMatrix(pMatrix)
-          Gdip_DeleteMatrix(zpMatrix)
-       }
-
-       Gdip_DeletePath(pPath)
-    } Else If (DrawLineAreaBorderCenter=6 && DrawLineAreaSpiralLength>1)
-    {
-       ; spiral
-       If (DrawLineAreaSpiralCenterMode=1 || DrawLineAreaSpiralCenterMode=2)
-       {
-          rp := (DrawLineAreaSpiralCenterMode=2) ? 350 : 50
-          fx := imgSelW * (alphaMaskOffsetX/rp), fy := imgSelH * (alphaMaskOffsetY/rp)
-          rw := imgSelW - fx*2,     rh := imgSelH - fy*2
-       } Else
-       {
-          fx := imgSelW * alphaMaskOffsetX, fy := imgSelH * alphaMaskOffsetY
-          rw := imgSelW,     rh := imgSelH
-       }
-
-       cX := imgSelPx + imgSelW/2
-       cY := imgSelPy + imgSelH/2
-       PointsList := []
-       ; PointsList.Push(cX),  PointsList.Push(cY)
-       angle := -272
-       rw := imgSelW,     rh := imgSelH
-       spx := imgSelPx,   spy := imgSelPy
-       zfx := imgSelW/(DrawLineAreaSpiralLength + 2)
-       zfy := imgSelH/(DrawLineAreaSpiralLength + 2)
-       ppr := 1 - Round(DrawLineAreaCenterCut/400, 1)
-       Loop, % DrawLineAreaSpiralLength
-       {
-          If (A_Index/DrawLineAreaSpiralLength>ppr)
-             Break
-
-          angle += 3
-
-          If (angle>848)
-             angle := -272
-
-          rw -= zfx
-          rh -= zfy
-          If (DrawLineAreaSpiralCenterMode=2)
-          {
-             spx += zfx/2 + fx/2
-             spy += zfy/2 + fy/2
-          } Else
-          {
-             spx += zfx/2
-             spy += zfy/2
-          }
-
-          cX := spx + rw/2
-          cY := spy + rh/2
-          getRelativePointCoordsCircle(angle, zx, zy)
-          If (DrawLineAreaSpiralCenterMode=2)
-          {
-             zx := cX + (zx*rw)/2
-             zy := cY + (zy*rh)/2
-          } Else If (DrawLineAreaSpiralCenterMode=1)
-          {
-             zx := cX + ((zx + fx)*rw)/2
-             zy := cY + ((zy + fy)*rh)/2
-          } Else
-          {
-             zx := cX + (zx*(rw + fx))/2
-             zy := cY + (zy*(rh + fy))/2
-          }
-
-          PointsList.Push(zx),  PointsList.Push(zy)
-          lastu := !lastu
-       }
-
-       pPath := Gdip_CreatePath()
-       Gdip_AddPathCurve(pPath, PointsList)
-       trGdip_RotatePathAtCenter(pPath, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
-       Gdip_DrawPath(G2, thisPen, pPath)
-       Gdip_DeletePath(pPath)
     }
     ; Gdip_DeletePen(thisPen) ; it is always reused
 } ; // coreDrawParametricLinesTool()
@@ -25056,7 +25061,7 @@ trackImageListButtons(actu, r:=0, hwnd:=0, discardedImageList:=0, guiu:=0) {
        If (StrLen(x)>1)
        {
           c := DllCall("Comctl32.dll\ImageList_GetImageCount", "uptr", x)
-          ; fnOutputDebug(c " | " A_ThisFunc ": " Value[1] "=" Value[2] " | " Value[3])
+          fnOutputDebug(c " | " A_ThisFunc ": " Value[1] "=" Value[2] " | " Value[3])
           If (c=5)
              Try DllCall("Comctl32.dll\ImageList_Destroy", "uptr", x)
 
@@ -42261,11 +42266,11 @@ PanelBrushTool(dummy:=0, modus:=0) {
 }
 
 BtnHelpBrushes() {
-   msgBoxWrapper(appTitle ": HELP", "The brushes tool panel offers 8 distinct types of brushes and each customizable in its own ways. You can use keyboard shortcuts to switch brush types or control their settings when the main window is active. Please see the keyboard shortcuts help panel for more details.`n`nPlease note, the deformer brushes (smudge, pinch and bulge) give best results when the brush softness is set to about 45% and opacity 100%. These brushes may yield undesired results in areas with partially opaque pixels.`n`nBy setting stepping option to a low value, the application may freeze at times, while it paints brushes at every given step.`n`nSome of the brush randomize options apply only to some types of brushes. They might apply at the beginning of a brush stroke or continously during painting, based on brush settings.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "Eight distinct brush types are available, each customizable in various ways. You can switch between brush types or adjust their settings using keyboard shortcuts when the main window is active. Please see the keyboard shortcuts help panel for more details.`n`nThe deformer brushes (smudge, pinch and bulge) give best results when softness is set to ~45% and opacity above 90%. These brushes may yield undesired results in areas with partially opaque pixels.`n`nA low value for the «Stepping» option may cause QPV to freeze, as it applies brush strokes at every interval.`n`nSome of the brush randomize options apply only to some types of brushes. They might apply at the beginning of a brush stroke or continously during painting, based on brush settings.", -1, 0, 0)
 }
 
 btnHelpToolbar() {
-   msgBoxWrapper(appTitle ": HELP", "The QPV toolbar contains multi-functional buttons that help users perform actions with ease. The associated actions may change depending on the currently active context or tool, even if the icons do not change visually. However, the tooltips will always reflect this. Regardless, the associated actions will always have a similar underlying meaning.`n`nSilder icons`nThe icons can act as sliders. You have to click and drag up or down to decrease the associated value; e.g., brush related parameters or image zoom level.`n`nTwo actions.`nThe tool tips may indicate L or R actions. These are actions associated with the Left and Right click buttons.`n`nThe toolbar can be navigated with the keyboard. To access it, one can press Shift+Tab. Once the toolbar is focused, users can use the arrow keys to navigate between the icons. Enter is associated with the L-click action and Shift+Enter to the R-click one.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "The QPV toolbar contains multi-functional buttons that help users perform actions with ease. The associated actions may change depending on the currently active context or tool, even if the icons do not change. However, the tool tips will always reflect this. Nonetheless, the associated actions will always have a similar underlying meaning.`n`nSilder icons`nThe icons can act as sliders. You have to click and drag up or down to decrease the associated value; e.g., brush related parameters or image zoom level.`n`nTwo actions.`nThe tool tips may indicate L or R actions. These are actions associated with the Left and Right click buttons.`n`nPress «Shift+Tab» to gain keyboard focus and to be able to navigate it. Use «Enter» to invoke the L-click action and «Shift+Enter» for to the R-click one.", -1, 0, 0)
 }
 
 ToggleBrushColors() {
@@ -47776,7 +47781,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
        Gui, Add, Text, x+5 wp, Styling
        GuiAddDropDownList("xs y+7 wp AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign gupdateUIdrawShapesPanel", "Inside|None|Outside", "Pen clipping to shape")
        GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaDashStyle " vDrawLineAreaDashStyle gupdateUIdrawShapesPanel", "Continous|Dashes|Dots|Dashes and dots", "Line style")
-       Gui, Add, Checkbox, xs y+6 wp h%btnHeight% +0x1000 Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIdrawShapesPanel, &Double line
+       Gui, Add, Checkbox, xs y+6 wp hp +0x1000 Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIdrawShapesPanel, &Double line
        GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaCapsStyle " vDrawLineAreaCapsStyle gupdateUIdrawShapesPanel", "No caps|Square caps|Round caps", "Line ends style")
     } Else
     {
@@ -47999,7 +48004,7 @@ ReadSettingsDrawLinesArea(act:=0) {
     RegAction(act, "freeHandSelectionMode",, 1)
 }
 
-PanelDrawLines() {
+PanelDrawParametricLines() {
     If !(thisBtnHeight := createSettingsGUI(30, A_ThisFunc, 1, 1))
        Return
 
@@ -48045,19 +48050,21 @@ PanelDrawLines() {
     GuiAddSlider("DrawLineAreaGridX", 1,350, 6, "Density X", "updateUIDrawLinesPanel", 1, "xs ys w" btnWid " h" ha)
     GuiAddSlider("DrawLineAreaGridY", 1,350, 6, "Density Y", "updateUIDrawLinesPanel", 1, "x+10 wp hp")
     Gui, Add, Checkbox, xs y+5 hp wp +0x1000 -wrap gupdateUIDrawLinesPanel Checked%DrawLineAreaEqualGrid% vDrawLineAreaEqualGrid, E&qual grid size
-    Gui, Add, Checkbox, x+10 yp hp wp +0x1000 -wrap gupdateUIDrawLinesPanel Checked%DrawLineAreaAtomizedGrid% vDrawLineAreaAtomizedGrid, &Separated lines
-    Gui, Add, Text, xs y+13 hp+3 wp -wrap +0x200 gdummy vinfoLine +hwndhTemp, Centering mode
+    ; Gui, Add, Checkbox, x+10 yp hp wp +0x1000 -wrap gupdateUIDrawLinesPanel Checked%DrawLineAreaAtomizedGrid% vDrawLineAreaAtomizedGrid, &Separated lines
+    Gui, Add, Text, xs y+13 hp+3 wp -wrap +0x200 gdummy vinfoLine +hwndhTemp, Pivot mode
     ToolTip2ctrl(hTemp, "This defines the behaviour of the object when rotated")
     GuiAddDropDownList("x+10 wp gupdateUIDrawLinesPanel AltSubmit Choose" DrawLineAreaSpiralCenterMode " vDrawLineAreaSpiralCenterMode", "Cone|Inverted cone|Rotobilæ", "Spiral center mode")
     GuiAddDropDownList("xp yp wp gupdateUIDrawLinesPanel AltSubmit Choose" DrawLineAreaGridCenter " vDrawLineAreaGridCenter", "Bulge warp|Center warp|Vertical courtain|Horizontal courtain", "Grid center mode")
+    GuiAddButton("x+1 hp w35 gBtnHelpParametricPivot vBtn2", " ?", "Help")
 
-    GuiAddSlider("DrawLineAreaRaysLimit", 0,125, 0, "Circum. cut-off", "updateUIDrawLinesPanel", 3, "xp ys wp h" ha)
+    GuiAddSlider("DrawLineAreaRaysLimit", 0,125, 0, "Circum. cut-off", "updateUIDrawLinesPanel", 3, " xp-" btnWid + 1 " ys w" btnWid " h" ha)
     GuiAddSlider("DrawLineAreaSpiralLength", 50,5678, 900, "Spiral frequency", "updateUIDrawLinesPanel", 1, "xs ys wp hp")
     GuiAddSlider("DrawLineAreaAltRays", 0,200, 0, "Alternate radius", "updateUIDrawLinesPanel", 1, "xs y+10 wp hp")
     GuiAddSlider("DrawLineAreaCenterCut", -1,350, 0, "Cut-off limit: $€", "updateUIDrawLinesPanel", 1, "x+10 yp wp hp")
     Gui, Add, Checkbox, xp yp gupdateUIDrawLinesPanel Checked%DrawLineAreaBorderConnector% vDrawLineAreaBorderConnector, &Join lines using arcs
     Gui, Add, Checkbox, xp yp gupdateUIDrawLinesPanel Checked%DrawLineAreaSnapLine% vDrawLineAreaSnapLine, &Snap lines to 0/90°
-    Gui, Add, Checkbox, xs y+50 gupdateUIDrawLinesPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit selection area
+    Gui, Add, Checkbox, xs y+50 gupdateUIDrawLinesPanel Checked%DrawLineAreaAtomizedGrid% vDrawLineAreaAtomizedGrid, &Separated line segments
+    Gui, Add, Checkbox, xs y+10 gupdateUIDrawLinesPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit selection area
     Gui, Add, Checkbox, xs y+10 gupdateUIDrawLinesPanel Checked%freeHandSelectionMode% vfreeHandSelectionMode, &Freehand draw mode
 
     Gui, Tab, 2
@@ -48108,7 +48115,11 @@ BtnOpenPanelShapes() {
 BtnOpenPanelLines() {
    BtnCloseWindow()
    Sleep, 2
-   SetTimer, PanelDrawLines, -50
+   SetTimer, PanelDrawParametricLines, -50
+}
+
+BtnHelpParametricPivot() {
+    msgBoxWrapper(appTitle ": HELP", "The center of the generator can be customized using the pivot mode feature. Here's how to use it:`n`n1. Right-click in the viewport and activate the «Allow center repositioning» menu option.`n2. Click and drag inside the selection area to adjust the pivot or center of the generator.`n`nTo reset the center, in the same context menu, select «Reset center».", -1, 0, 0)
 }
 
 WriteSettingsDesaturateSelPanel() {
@@ -50946,11 +50957,13 @@ updateUIDrawLinesPanel(actionu:=0, b:=0) {
     actu := (DrawLineAreaBorderCenter=5) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "DrawLineAreaGridY")
     GuiControl, % actu, DrawLineAreaEqualGrid
-    GuiControl, % actu, DrawLineAreaAtomizedGrid
     GuiControl, % actu, DrawLineAreaGridCenter
+    actu := (DrawLineAreaBorderCenter>3) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    GuiControl, % actu, DrawLineAreaAtomizedGrid
 
     actu := isInRange(DrawLineAreaBorderCenter, 5, 6) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiControl, % actu, infoLine
+    GuiControl, % actu, btn2
 
     actu := (DrawLineAreaBorderCenter=4 || DrawLineAreaBorderCenter=5) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "DrawLineAreaGridX")
@@ -60545,7 +60558,7 @@ createMenuImageEditSubMenus(modus:=0) {
       kMenu("PVimgDraw", "Add", "&Fill shapes`tAlt+Backspace", "tlbrFillShape", "curve polygonal glass effects blur pie ellipse triangle rhombus gradients rectangle")
       kMenu("PVimgDraw", "Add", "Fill be&hind image", "PanelFillBehindBgrImage", "background")
       kMenu("PVimgDraw", "Add", "Draw s&hape contours`tCtrl+L", "tlbrDrawShapesContour", "lines curve polygonal pie ellipse triangle rhombus rectangle arcs")
-      kMenu("PVimgDraw", "Add", "&Draw parametric lines", "PanelDrawLines", "lines arcs diagonals spiral rays spokes grids")
+      kMenu("PVimgDraw", "Add", "&Draw parametric lines", "PanelDrawParametricLines", "lines arcs diagonals spiral rays spokes grids")
       kMenu("PVimgDraw", "Add", "Insert te&xt`tShift+T", "PanelInsertTextArea", "write add draw type")
 
       kMenu("PVimgTransform", "Add", "Rectangular to &polar", "doRectPolarTransformSelectedArea", "coordinates transform circular deform")
@@ -63125,7 +63138,7 @@ createMenuLiveTools(dummy:=0) {
    kMenu("PVlTools", "Add", "&Fill shapes`tAlt+Backspace", "tlbrFillShape", "curve polygonal glass effects blur pie ellipse triangle rhombus gradients rectangle")
    kMenu("PVlTools", "Add", "Fill be&hind image", "PanelFillBehindBgrImage", "background")
    kMenu("PVlTools", "Add", "Draw s&hape contours`tCtrl+L", "tlbrDrawShapesContour", "lines curve polygonal pie ellipse triangle rhombus rectangle arcs")
-   kMenu("PVlTools", "Add", "&Draw parametric lines", "PanelDrawLines", "lines arcs diagonals spiral rays spokes grids")
+   kMenu("PVlTools", "Add", "&Draw parametric lines", "PanelDrawParametricLines", "lines arcs diagonals spiral rays spokes grids")
    kMenu("PVlTools", "Add", "Define alpha mas&k", "PanelSoloAlphaMasker")
    kMenu("PVlTools", "Add", "&Insert te&xt`tShift+T", "PanelInsertTextArea")
    kMenu("PVlTools", "Add", "Create image s&ymmetry or patterns", "PanelSymmetricaImage")
@@ -63389,7 +63402,7 @@ BuildImgLiveEditMenu() {
       additions := 1
       If (AnyWindowOpen=30 && isVarEqualTo(DrawLineAreaBorderCenter, 4, 5, 6))
       {
-         ; Draw parametric lines / PanelDrawLines()
+         ; Draw parametric lines / PanelDrawParametricLines()
          f := (DrawLineAreaBorderCenter=4) ? "rays" : "spiral"
          If (DrawLineAreaBorderCenter=5)
             f := "grid"
@@ -95467,7 +95480,7 @@ processToolbarFunctions(btnID, actu, simulacrum:=0) {
       } Else If (btnID="BTNoutlineShape")
       {
          If isImgEditingNow()
-            func2Call := ["PanelDrawLines"]
+            func2Call := ["PanelDrawParametricLines"]
       } Else If (btnID="BTNselectShape")
       {
          If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) 
@@ -96076,7 +96089,7 @@ processToolbarFunctions(btnID, actu, simulacrum:=0) {
       Else If (btnID="BTNgoFileMaps")
          func2Call := ["MenuDrawFilesListMap"]
       Else If (btnID="BTNspiralLinez")
-         func2Call := ["PanelDrawLines"]
+         func2Call := ["PanelDrawParametricLines"]
    }
    Return func2Call
 } ; // processToolbarFunctions()
@@ -96658,7 +96671,8 @@ GuiSlidersResponder(a, m_event, keyu) {
    thisOpacity := (isActive=1) ? "0xEF" : "0x99"
    hFontFamily := Gdip_FontFamilyCreateGeneric(1)
    obju.pBitmap := trGdip_CreateBitmap(A_ThisFunc, w, h)
-   obju.hFont := Gdip_FontCreate(hFontFamily, fsizeu, PrefsLargeFonts, 3)
+   isBold := (PrefsLargeFonts=1 || uiUseDarkMode=1) ? 1 : 0
+   obju.hFont := Gdip_FontCreate(hFontFamily, fsizeu, isBold, 3)
    ; obju.hStringFormat := Gdip_StringFormatGetGeneric(1)
    obju.pBrush := Gdip_BrushCreateSolid(thisOpacity txtColor)
    obju.G := Gdip_GraphicsFromImage(obju.pBitmap)
@@ -96937,8 +96951,9 @@ GuiUpdateSliders(whichSlider, isHwnd:=0, obju:=0) {
    ; fnOutputDebug(isHwnd "|" whichSlider "||" givenVar "||" varValue "|w|" w "|h|" h)
    if !IsObject(obju)
    {
+      isBold := (PrefsLargeFonts=1 || uiUseDarkMode=1) ? 1 : 0
       fsizeu := (PrefsLargeFonts=1) ? LargeUIfontValue - 3 : LargeUIfontValue - 7
-      hFont := Gdip_FontCreate(hFontFamily, fsizeu, PrefsLargeFonts, 3)
+      hFont := Gdip_FontCreate(hFontFamily, fsizeu, isBold, 3)
       txtColor := (uiUseDarkMode=1) ? "FFffFF" : "000000"
       thisOpacity := (isActive=1) ? "0xEF" : "0x99"
       pBitmap := trGdip_CreateBitmap(A_ThisFunc, w, h)
