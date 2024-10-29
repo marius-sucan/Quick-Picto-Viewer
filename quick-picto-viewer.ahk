@@ -5901,7 +5901,7 @@ applyIMGeditFunction() {
     If (AnyWindowOpen=24 || AnyWindowOpen=31)
        BtnPasteInSelectedArea()
     Else If (AnyWindowOpen=30)
-       BtnDrawLinesSelectedArea()
+       BtnDrawParametricLinesSelectedArea()
     Else If (AnyWindowOpen=32)
        BtnInsertTextSelectedArea()
     Else If (AnyWindowOpen=23)
@@ -20430,7 +20430,6 @@ HugeImagesDrawLineShapes() {
       trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
       orobju := InitHugeImgSelPath(0, imgW, imgH)
       setImageLoading()
-      ; obju := InitHugeImgSelPath(0, imgW, imgH)
       pBitsAll := FreeImage_GetBits(hFIFimgX)
       Stride := FreeImage_GetStride(hFIFimgX)
       o_imgSelH := max(imgSelY2, imgSelY1) - min(imgSelY2, imgSelY1)
@@ -20534,6 +20533,179 @@ HugeImagesDrawLineShapes() {
 
       showTOOLtip("Drawing lines, please wait...`nStep 3/3")
       If (rzb=1)
+         rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", DrawLineAreaOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", doBehind, "int", 0, "int", BlendModesPreserveAlpha)
+
+      DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+      r := (rzc=1) ? 1 : 0
+      fnOutputDebug("Draw lines finished in: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)))
+      imgSelX1 := o_imgSelX1,      imgSelY1 := o_imgSelY1
+      imgSelX2 := o_imgSelX2,      imgSelY2 := o_imgSelY2
+      defineRelativeSelCoords(imgW, imgH)
+      If r 
+      {
+         killQPVscreenImgSection()
+         setHugeImageActionsCount(viewportQPVimage.actions + 1)
+         dummyTimerDelayiedImageDisplay(500)
+         SoundBeep, 900, 100
+         RemoveTooltip()
+      } Else
+      {
+         recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
+         If (rza!=1)
+            showTOOLtip("ERROR: Failed to draw the text on the image.`nLines mask prepration failed.")
+         Else If (rzb!=1)
+            showTOOLtip("ERROR: Failed to draw the text on the image.`nAn error occurred drawing the line segments.")
+         Else If (rzc!=1)
+            showTOOLtip("ERROR: Failed to draw the text on the image.`nAn error occurred utilizing the lines mask to alter the main bitmap.")
+         Else
+            showTOOLtip("ERROR: Failed to draw the text on the image. Unknown cause[s].")
+
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+      }
+      ResetImgLoadStatus()
+}
+
+HugeImagesDrawParametricLines() {
+      Static tempCrapValue := -1, zzpo := 0
+      If warnHugeImageNotFIM()
+         Return
+
+      If (editingSelectionNow=1)
+      {
+         If throwErrorSelectionOutsideBounds()
+            Return "out-bounds"
+      }
+
+      hFIFimgX := viewportQPVimage.imgHandle
+      bpp := FreeImage_GetBPP(hFIFimgX)
+      If warnIncorrectColorDepthHugeImage(bpp, 1)
+         Return
+
+      startOperation := A_TickCount
+      showTOOLtip("Preparing to draw lines, please wait...")
+      trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+      orobju := InitHugeImgSelPath(0, imgW, imgH)
+      setImageLoading()
+      pBitsAll := FreeImage_GetBits(hFIFimgX)
+      Stride := FreeImage_GetStride(hFIFimgX)
+      o_imgSelH := imgSelH := max(imgSelY2, imgSelY1) - min(imgSelY2, imgSelY1)
+      o_imgSelW := imgSelW := max(imgSelX2, imgSelX1) - min(imgSelX2, imgSelX1)
+      maxLength := min(o_imgSelW, o_imgSelH)//2
+      thisThick := (DrawLineAreaContourThickness > maxLength/1.05) ? maxLength/1.05 : DrawLineAreaContourThickness
+      oth := thisThick := thisThick * (DrawLineAreaThickScale / 100)
+      thisThick := Round(thisThick * 0.495)
+      o_imgSelX1 := imgSelX1,       o_imgSelY1 := imgSelY1
+      o_imgSelX2 := imgSelX2,       o_imgSelY2 := imgSelY2
+
+      x1 := o_imgSelX1,              y1 := o_imgSelY1
+      x2 := o_imgSelX1 + o_imgSelW,  y2 := o_imgSelY1 + o_imgSelH
+      xPath := coreDrawParametricLinesMarginsMidsDiagos(x1, y1, x2, y2, imgSelW, imgSelH)
+      rz := Gdip_GetPathPointsCount(xPath)
+      If (DrawLineAreaBorderCenter<2 && !rz)
+      {
+         showTOOLtip("WARNING: No lines configured to draw.`nIs this what they call a draw?")
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Gdip_DeletePath(xPath)
+         Return -1
+      }
+
+      If (DrawLineAreaBorderCenter=4)
+         kPath := coreDrawParametricLinesRays(x1, y1, x2, y2, imgSelW, imgSelH)
+      Else If (DrawLineAreaBorderCenter=5)
+         kPath := coreDrawParametricLinesGrid(x1, y1, x2, y2, imgSelW, imgSelH, oth)
+      Else If (DrawLineAreaBorderCenter=6 && DrawLineAreaSpiralLength>1)
+         kPath := coreDrawParametricLinesSpiral(x1, y1, x2, y2, imgSelW, imgSelH)
+      Else If (DrawLineAreaBorderCenter<=3)
+         kPath := xPath
+
+      If kPath
+      {
+         rz := Gdip_GetPathPointsCount(kPath)
+         r := Gdip_GetPathWorldBounds(kPath)
+         imgSelX1 := r.x,       imgSelY1 := r.y
+         imgSelX2 := r.x + r.w, imgSelY2 := r.y + r.h
+      }
+
+      tk := (DrawLineAreaJoinsStyle=1) ? thisThick : thisThick * (DrawLineAreaMitersBorder / 100)
+      tk := Round(tk * 1.25) + 2
+      pfcX := (imgSelX1 - tk<0) ? imgSelX1 - tk : 0
+      pfcY := (imgSelY1 - tk<0) ? imgSelY1 - tk : 0
+      imgSelX1 := (imgSelX1 - tk<0) ? 0 : imgSelX1 - tk
+      imgSelY1 := (imgSelY1 - tk<0) ? 0 : imgSelY1 - tk
+      imgSelX2 := imgSelX2 + tk,    imgSelY2 := imgSelY2 + tk
+      imgSelH := max(imgSelY2, imgSelY1) - min(imgSelY2, imgSelY1)
+      imgSelW := max(imgSelX2, imgSelX1) - min(imgSelX2, imgSelX1)
+      showTOOLtip("Drawing lines, please wait...`nStep 1/3")
+
+      defineRelativeSelCoords(imgW, imgH)
+      obju := InitHugeImgSelPath(0, imgW, imgH)
+      zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
+      Sleep, 50
+      roundJoins := DrawLineAreaJoinsStyle
+      roundCaps := DrawLineAreaCapsStyle
+      If (DrawLineAreaCropShape>1)
+         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, DrawLineAreaCropShape - 2, VPselRotation, 0, 0, "a", "a", 1, [tk + pfcX, tk, o_imgSelW, o_imgSelH])
+
+      QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
+      doCrop := (DrawLineAreaCropShape>1) ? 1 : 2
+      rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", doCrop)
+      rza := DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
+      If (rza=1 && rzq=1)
+      {
+         otherThick := Round(thisThick*0.34)
+         diffThick := (imgSelY1<0) ? imgSelY1 : 0
+         If (imgSelY2>imgH)
+            diffThick := diffThick + (imgSelY2 - imgH)
+         If (imgSelY2>imgH && imgSelY1<0)
+            diffThick := thisThick + (imgSelY2 - thisThick - imgH)
+
+         If kPath
+         {
+            closed := ppk := 0
+            iterator := new Gdip_GraphicsPathIterator(kPath)
+            subs := iterator.GetSubpathCount()
+            fnOutputDebug("Total points: " iterator.GetCount() "|" rz " | Subpaths: " subs)
+            iterator.Rewind()
+            subdivide := (DrawLineAreaBorderCenter>3) ? 1 : 0
+            conturAlign := DrawLineAreaContourAlign
+            While, ((subPath := iterator.NextSubpath()).count > 0)
+            {
+               ppk++
+               pPath := iterator.GetSubPath(subPath.startIndex, subPath.endIndex, 0)
+               If (pPath="")
+                  Continue
+
+               processGdipPathForDLL(pPath, 0, o_imgSelH, subdivide, PointsCount, PointsF)
+               fnOutputDebug("Subpath #: " ppk " | Points: " PointsCount)
+               showTOOLtip("Drawing lines, please wait...`nStep 2/3`nSegment: " ppk " / " subs, 0, 0, ppk / (subs + 1))
+               rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0, "int", tempCrapValue)
+               If (rzb=1 && DrawLineAreaDoubles=1)
+               {
+                  DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
+                  kThick := (DrawLineAreaCapsStyle=3 && DrawLineAreaJoinsStyle=1) ? thisThick : otherThick
+                  rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
+                  DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
+               }
+
+               If (DrawLineAreaAtomizedGrid=1 && rzb=1)
+               {
+                  rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", DrawLineAreaOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", doBehind, "int", 0, "int", BlendModesPreserveAlpha)
+                  rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", 2)
+               }
+
+               Gdip_DeletePath(pPath)
+               PointsF := ""
+            }
+            iterator.Discard()
+            Gdip_DeletePath(kPath)
+            PointsF := ""
+         }
+      }
+
+      showTOOLtip("Drawing lines, please wait...`nStep 3/3")
+      If (rzb=1 && DrawLineAreaAtomizedGrid=0)
          rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", DrawLineAreaOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", doBehind, "int", 0, "int", BlendModesPreserveAlpha)
 
       DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
@@ -21635,8 +21807,8 @@ coreDrawParametricLinesSpiral(x1, y1, x2, y2, imgSelW, imgSelH) {
     angle := -272
     PointsList := []
     imgSelPx := x1,  imgSelPy := y1
-    cX := imgSelPx + imgSelW/2
-    cY := imgSelPy + imgSelH/2
+    cX := ocX := imgSelPx + imgSelW/2
+    cY := ocY := imgSelPy + imgSelH/2
     rw := imgSelW,   rh := imgSelH
     spx := imgSelPx, spy := imgSelPy
     lengthu := Round(DrawLineAreaSpiralLength**1.1)
@@ -21695,13 +21867,23 @@ coreDrawParametricLinesSpiral(x1, y1, x2, y2, imgSelW, imgSelH) {
     }
 
     Gdip_AddPathCurve(pPath, PointsList)
-    trGdip_RotatePathAtCenter(pPath, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
     PointsList := ""
+
+    trGdip_RotatePathAtCenter(pPath, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
+    Rect := Gdip_GetPathWorldBounds(pPath)
+    dX := Rect.x + (Rect.w / 2)
+    dY := Rect.y + (Rect.h / 2)
+    px := ocX - dX
+    py := ocY - dY
+    ; ToolTip, % dX "|" dY "`n" cX "|" cY "`n" px "|" py , , , 2
+    pMatrix := Gdip_CreateMatrix()
+    Gdip_TranslateMatrix(pMatrix, px, py)
+    E := Gdip_TransformPath(pPath, pMatrix)
+    Gdip_DeleteMatrix(pMatrix)
     Return pPath
 }
 
 coreDrawParametricLinesMarginsMidsDiagos(x1, y1, x2, y2, imgSelW, imgSelH) {
-    pPathArcs := Gdip_CreatePath()
     pPathBrders := Gdip_CreatePath()
     If (DrawLineAreaBorderCenter=1)
     {
@@ -21714,22 +21896,23 @@ coreDrawParametricLinesMarginsMidsDiagos(x1, y1, x2, y2, imgSelW, imgSelH) {
        blx1 := (DrawLineAreaBorderConnector=1 && DrawLineAreaBorderArcA=1 && DrawLineAreaBorderArcB=0) ? x1 + imgSelW//2 : x1
        bkx2 := (DrawLineAreaBorderConnector=1 && DrawLineAreaBorderArcC=0 && DrawLineAreaBorderArcD=1) ? x2 - imgSelW//2 : x2
        bkx1 := (DrawLineAreaBorderConnector=1 && DrawLineAreaBorderArcC=1 && DrawLineAreaBorderArcD=0) ? x1 + imgSelW//2 : x1
+       Gdip_StartPathFigure(pPathBrders)
        If (DrawLineAreaBorderArcA=1)
-          Gdip_AddPathArc(pPathArcs, x1, y1, imgSelW, imgSelH, 180, 90)
+          Gdip_AddPathArc(pPathBrders, x1, y1, imgSelW, imgSelH, 180, 90)
 
-       Gdip_StartPathFigure(pPathArcs)
+       Gdip_StartPathFigure(pPathBrders)
        If (DrawLineAreaBorderArcB=1)
-          Gdip_AddPathArc(pPathArcs, x1, y1, imgSelW, imgSelH, 270, 90)
+          Gdip_AddPathArc(pPathBrders, x1, y1, imgSelW, imgSelH, 270, 90)
 
-       Gdip_StartPathFigure(pPathArcs)
+       Gdip_StartPathFigure(pPathBrders)
        If (DrawLineAreaBorderArcC=1)
-          Gdip_AddPathArc(pPathArcs, x1, y1, imgSelW, imgSelH, 90, 90)
+          Gdip_AddPathArc(pPathBrders, x1, y1, imgSelW, imgSelH, 90, 90)
 
-       Gdip_StartPathFigure(pPathArcs)
+       Gdip_StartPathFigure(pPathBrders)
        If (DrawLineAreaBorderArcD=1)
-          Gdip_AddPathArc(pPathArcs, x1, y1, imgSelW, imgSelH, 0, 90)
+          Gdip_AddPathArc(pPathBrders, x1, y1, imgSelW, imgSelH, 0, 90)
 
-       whichPath := pPathArcs ; pPathBrders
+       whichPath := pPathBrders
        Gdip_StartPathFigure(whichPath)
        If (DrawLineAreaBorderTop=1)
           Gdip_AddPathLine(whichPath, blx1, y1, blx2, y1)
@@ -21806,8 +21989,7 @@ coreDrawParametricLinesMarginsMidsDiagos(x1, y1, x2, y2, imgSelW, imgSelH) {
 
     applyLimits := (Gdip_GetPathPointsCount(pPathBrders))>2 ? 1 : 0
     trGdip_RotatePathAtCenter(pPathBrders, VPselRotation, 1, applyLimits, DrawLineAreaKeepBounds, 1)
-    trGdip_RotatePathAtCenter(pPathArcs, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
-    Return [pPathBrders, pPathArcs]
+    Return pPathBrders
 }
 
 coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgSelW, imgSelH) {
@@ -21824,21 +22006,18 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
     x1 -= dR,    y1 -= dR
     x2 += dR,    y2 += dR
 
-    obj := coreDrawParametricLinesMarginsMidsDiagos(x1, y1, x2, y2, imgSelW, imgSelH)
-    pPathBrders := obj[1]
-    pPathArcs := obj[2]
-    rz := Gdip_GetPathPointsCount(pPathBrders) + Gdip_GetPathPointsCount(pPathArcs) 
+    pPath := coreDrawParametricLinesMarginsMidsDiagos(x1, y1, x2, y2, imgSelW, imgSelH)
+    rz := Gdip_GetPathPointsCount(pPath)
     If (DrawLineAreaBorderCenter<2 && !rz && previewMode=0)
     {
        showTOOLtip("WARNING: No lines configured to draw.`nIs this what they call a draw?")
        SoundBeep 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
-       Gdip_DeletePath(pPathBrders)
-       Gdip_DeletePath(pPathArcs)
+       Gdip_DeletePath(pPath)
        Return -1
     }
 
-    If (DrawLineAreaCropShape>1 && isInRange(DrawLineAreaBorderCenter, 4, 6))
+    If (DrawLineAreaCropShape>1 && DrawLineAreaBorderCenter>=4)
     {
        zPath := Gdip_CreatePath()
        If (DrawLineAreaCropShape=3)
@@ -21851,37 +22030,38 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
     }
 
     thisPen := createDrawLinesPen(thisThick, 0)
-    Gdip_DrawPath(G2, thisPen, pPathBrders)
-    Gdip_DrawPath(G2, thisPen, pPathArcs)
-    Gdip_DeletePath(pPathBrders)
-    Gdip_DeletePath(pPathArcs)
     If (DrawLineAreaBorderCenter=4)
        kPath := coreDrawParametricLinesRays(x1, y1, x2, y2, imgSelW, imgSelH)
     Else If (DrawLineAreaBorderCenter=5)
        kPath := coreDrawParametricLinesGrid(x1, y1, x2, y2, imgSelW, imgSelH, thisThick)
     Else If (DrawLineAreaBorderCenter=6 && DrawLineAreaSpiralLength>1)
        kPath := coreDrawParametricLinesSpiral(x1, y1, x2, y2, imgSelW, imgSelH)
+    Else If (DrawLineAreaBorderCenter<=3)
+       kPath := pPath
 
     If kPath
     {
-       if (DrawLineAreaAtomizedGrid=1)
+       ; r := getAccuratePathBounds(kPath)
+       ; Gdip_DrawRectangle(G2, thisPen, r.x, r.y, r.w, r.h)
+       If (DrawLineAreaAtomizedGrid=1)
        {
           iterator := new Gdip_GraphicsPathIterator(kPath)
           ; ToolTip, % "Total points: " iterator.GetCount() "`nSubpaths: " iterator.GetSubpathCount()  , , , 2
           iterator.Rewind()
-          while ((subPath := iterator.NextSubpath()).count > 0)
+          While, ((subPath := iterator.NextSubpath()).count > 0)
           {
               nPath := iterator.GetSubPath(subPath.startIndex, subPath.endIndex, 0)
+              If (nPath="")
+                 Continue
+
               Gdip_DrawPath(G2, thisPen, nPath)
               Gdip_DeletePath(nPath)
           }
-          Gdip_DeletePath(kPath)
           iterator.Discard()
        } Else 
-       {
           Gdip_DrawPath(G2, thisPen, kPath)
-          Gdip_DeletePath(kPath)
-       }
+
+       Gdip_DeletePath(kPath)
     }
     ; Gdip_DeletePen(thisPen) ; it is always reused
 } ; // coreDrawParametricLinesTool()
@@ -26197,7 +26377,7 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
           Return
        }
 
-       rzx := isVarEqualTo(IDwin, 12, 23, 24, 25, 31, 32, 55, 65, 66, 70, 89) ? 0 : downscaleHugeImagesForEditing()
+       rzx := isVarEqualTo(IDwin, 12, 23, 24, 25, 30, 31, 32, 55, 65, 66, 70, 89) ? 0 : downscaleHugeImagesForEditing()
        If (rzx<0 || rzx=1)
        {
           openingPanelNow := 0
@@ -47812,8 +47992,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     GuiAddCloseOnApply("x+5 yp hp wp")
     GuiAddToggleLivePreview("x+5 yp hp wp gupdateUIdrawShapesPanel")
     Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction vbtnLiveApplyTool, &Apply
-    If (!viewportQPVimage.imgHandle)
-       Gui, Add, Button, x+5 wp hp gBtnOpenPanelLines, &Lines
+    Gui, Add, Button, x+5 wp hp gBtnOpenPanelLines, &Lines
     Gui, Add, Button, x+5 wp hp gBtnCloseWindow, &Cancel
 
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
@@ -48022,6 +48201,12 @@ PanelDrawParametricLines() {
        Gui, Font, s%LargeUIfontValue%
     }
 
+    If (viewportQPVimage.imgHandle)
+    {
+       DrawLineAreaDashStyle := 1
+       DrawLineAreaContourAlign := 2
+    }
+
     btnWid := (PrefsLargeFonts=1) ? 166 : 105
     sml := (PrefsLargeFonts=1) ? 55 : 34
     BtnHeight := thisBtnHeight - 5
@@ -48064,18 +48249,25 @@ PanelDrawParametricLines() {
     Gui, Add, Checkbox, xp yp gupdateUIDrawLinesPanel Checked%DrawLineAreaBorderConnector% vDrawLineAreaBorderConnector, &Join lines using arcs
     Gui, Add, Checkbox, xp yp gupdateUIDrawLinesPanel Checked%DrawLineAreaSnapLine% vDrawLineAreaSnapLine, &Snap lines to 0/90°
     Gui, Add, Checkbox, xs y+50 gupdateUIDrawLinesPanel Checked%DrawLineAreaAtomizedGrid% vDrawLineAreaAtomizedGrid, &Separated line segments
-    Gui, Add, Checkbox, xs y+10 gupdateUIDrawLinesPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit selection area
+    if (!viewportQPVimage.imgHandle)
+       Gui, Add, Checkbox, xs y+10 gupdateUIDrawLinesPanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit selection area
     Gui, Add, Checkbox, xs y+10 gupdateUIDrawLinesPanel Checked%freeHandSelectionMode% vfreeHandSelectionMode, &Freehand draw mode
 
     Gui, Tab, 2
     Gui, Add, Text, x+15 y+15 Section w%btnWid%, Line style
-    Gui, Add, Text, x+10 wp -wrap, Alignment
-    GuiAddDropDownList("xs y+8 w" btnWid " gupdateUIDrawLinesPanel AltSubmit Choose" DrawLineAreaDashStyle " vDrawLineAreaDashStyle", "Continous|Dashes|Dots|Dashes and dots", "Line style")
-    GuiAddDropDownList("x+10 wp gupdateUIDrawLinesPanel AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign", "Inside|Centered|Outside", "Pen alignment")
+    Gui, Add, Text, x+10 wp -wrap, % (viewportQPVimage.imgHandle) ? "-" : "Alignment"
+    If (!viewportQPVimage.imgHandle)
+    {
+       GuiAddDropDownList("xs y+8 w" btnWid " gupdateUIDrawLinesPanel AltSubmit Choose" DrawLineAreaDashStyle " vDrawLineAreaDashStyle", "Continous|Dashes|Dots|Dashes and dots", "Line style")
+       GuiAddDropDownList("x+10 wp gupdateUIDrawLinesPanel AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign", "Inside|Centered|Outside", "Pen alignment")
+    }
+
     GuiAddDropDownList("xs y+10 wp AltSubmit Choose" DrawLineAreaCapsStyle " vDrawLineAreaCapsStyle gupdateUIDrawLinesPanel", "No caps|Square caps|Round caps", "Line ends style")
     Gui, Add, Checkbox, x+10 wp hp +0x1000 gupdateUIDrawLinesPanel Checked%DrawLineAreaKeepBounds% vDrawLineAreaKeepBounds +hwndhTemp, &Within bounds
     ToolTip2ctrl(hTemp, "Rotate object within the boundaries of the selection area")
     Gui, Add, Checkbox, xs y+5 wp hp +0x1000 gupdateUIDrawLinesPanel Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles, Double line
+    If (viewportQPVimage.imgHandle)
+       Gui, Add, Checkbox, x+10 wp hp +0x1000 Checked%DrawLineAreaJoinsStyle% vDrawLineAreaJoinsStyle gupdateUIDrawLinesPanel, &Round joins
 
     sml := (PrefsLargeFonts=1) ? 30 : 20
     ml := (PrefsLargeFonts=1) ? 72 : 25
@@ -48089,6 +48281,11 @@ PanelDrawParametricLines() {
     GuiAddDropDownList("x+10 wp gupdateUIDrawLinesPanel AltSubmit Choose" DrawLineAreaBlendMode " vDrawLineAreaBlendMode", "None|" userBlendModesList, [hTemp])
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIDrawLinesPanel")
     GuiAddSlider("DrawLineAreaContourThickness", 1,450, 5, "Line width: $€ pixels", "updateUIDrawLinesPanel", 1, "xs y+10 w" btnWid*2 + 8 " hp")
+    If (viewportQPVimage.imgHandle)
+    {
+       GuiAddSlider("DrawLineAreaThickScale", 100, 650, 100, "Thickness scale: $€ %", "updateUIDrawLinesPanel", 1, "xs y+7 w" (btnWid*2 + 8)//2 - 2 " hp")
+       GuiAddSlider("DrawLineAreaMitersBorder", 100, 500, 100, "Miters boundary: $€ %", "updateUIDrawLinesPanel", 1, "x+5 wp hp")
+    }
 
     Gui, Tab
     btnWid := (PrefsLargeFonts=1) ? 105 : 65
@@ -50875,7 +51072,7 @@ BtnCreateNewImage() {
     SetTimer, ResetImgLoadStatus, -50
 }
 
-BtnDrawLinesSelectedArea() {
+BtnDrawParametricLinesSelectedArea() {
   If throwErrorSelectionOutsideBounds()
      Return
 
@@ -50898,7 +51095,10 @@ BtnDrawLinesSelectedArea() {
   Sleep, 1
   prevImgEditZeit := A_TickCount
   ToggleEditImgSelection("show-edit")
-  DrawLinesInSelectedArea(1)
+  If (viewportQPVimage.imgHandle)
+     HugeImagesDrawParametricLines()
+  Else
+     DrawLinesInSelectedArea(1)
   prevImgEditZeit := A_TickCount
   SetTimer, RemoveTooltip, -250
 }
@@ -50958,8 +51158,6 @@ updateUIDrawLinesPanel(actionu:=0, b:=0) {
     GuiUpdateVisibilitySliders(actu, "DrawLineAreaGridY")
     GuiControl, % actu, DrawLineAreaEqualGrid
     GuiControl, % actu, DrawLineAreaGridCenter
-    actu := (DrawLineAreaBorderCenter>3) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
-    GuiControl, % actu, DrawLineAreaAtomizedGrid
 
     actu := isInRange(DrawLineAreaBorderCenter, 5, 6) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiControl, % actu, infoLine
