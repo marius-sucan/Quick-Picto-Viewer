@@ -670,13 +670,11 @@ MsgBoxConflictKeysResponder(keyu) {
 WM_KEYDOWN(wParam, lParam, msg, ctrlHwnd) {
     vk_code := Format("{1:x}", wParam)
     Awin := WinActive("A")
-
     If (MsgBox2hwnd=Awin && MsgBox2Result="wait-ask")
     {
        MsgBoxConflictKeysResponder(vk_code)
        Return
     }
-
 
     If (whileLoopExec=1 || runningLongOperation=1) && (vk_code!="1B") 
     || (A_TickCount - lastOtherWinClose<300) || (Awin=PVhwnd)
@@ -694,7 +692,6 @@ WM_KEYDOWN(wParam, lParam, msg, ctrlHwnd) {
        If decideBlockKbdKeys(Awin, hotkate)
           Return 0
     }
-
     ; TulTip(0, "|   ", wParam, vk_shift, vk_ctrl, vk_alt, msg, "main thread", lParam>>16 & 0xffff)
 }
 
@@ -20552,13 +20549,13 @@ HugeImagesDrawLineShapes() {
       {
          recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
          If (rza!=1)
-            showTOOLtip("ERROR: Failed to draw the text on the image.`nLines mask prepration failed.")
+            showTOOLtip("ERROR: Failed to draw the shape.`nLines mask preparation failed.")
          Else If (rzb!=1)
-            showTOOLtip("ERROR: Failed to draw the text on the image.`nAn error occurred drawing the line segments.")
+            showTOOLtip("ERROR: Failed to draw the shape.`nAn error occurred drawing the line segments.")
          Else If (rzc!=1)
-            showTOOLtip("ERROR: Failed to draw the text on the image.`nAn error occurred utilizing the lines mask to alter the main bitmap.")
+            showTOOLtip("ERROR: Failed to draw the shape.`nAn error occurred utilizing the lines mask to alter the main bitmap.")
          Else
-            showTOOLtip("ERROR: Failed to draw the text on the image. Unknown cause[s].")
+            showTOOLtip("ERROR: Failed to draw the shape. Unknown cause[s].")
 
          SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -20595,11 +20592,13 @@ HugeImagesDrawParametricLines() {
       thisThick := (DrawLineAreaContourThickness > maxLength/1.05) ? maxLength/1.05 : DrawLineAreaContourThickness
       oth := thisThick := thisThick * (DrawLineAreaThickScale / 100)
       thisThick := Round(thisThick * 0.495)
+      tk := (DrawLineAreaJoinsStyle=1) ? thisThick : thisThick * (DrawLineAreaMitersBorder / 100)
+      tk := Round(tk * 1.25) + 2
       o_imgSelX1 := imgSelX1,       o_imgSelY1 := imgSelY1
       o_imgSelX2 := imgSelX2,       o_imgSelY2 := imgSelY2
 
-      x1 := o_imgSelX1,              y1 := o_imgSelY1
-      x2 := o_imgSelX1 + o_imgSelW,  y2 := o_imgSelY1 + o_imgSelH
+      x1 := 0,        y1 := 0
+      x2 := imgSelW,  y2 := imgSelH
       xPath := coreDrawParametricLinesMarginsMidsDiagos(x1, y1, x2, y2, imgSelW, imgSelH)
       rz := Gdip_GetPathPointsCount(xPath)
       If (DrawLineAreaBorderCenter<2 && !rz)
@@ -20623,13 +20622,20 @@ HugeImagesDrawParametricLines() {
       If kPath
       {
          rz := Gdip_GetPathPointsCount(kPath)
-         r := Gdip_GetPathWorldBounds(kPath)
-         imgSelX1 := r.x,       imgSelY1 := r.y
-         imgSelX2 := r.x + r.w, imgSelY2 := r.y + r.h
+         r := getAccuratePathBounds(kPath)
+         imgSelX1 := o_imgSelX1 + r.x,       imgSelY1 := o_imgSelY1 + r.y
+         fnOutputDebug("new coords: " imgSelX1 " | " imgSelY1 "||" r.x "|" r.y "||" r.w "|" r.h)
+         fnOutputDebug("old coords: " o_imgSelX1 " | " o_imgSelY1)
+         imgSelX2 := imgSelX1 + r.w,         imgSelY2 := imgSelY1 + r.h
+      } Else
+      {
+         showTOOLtip("ERROR: No lines configured to draw or failed to generate path object.")
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return -1
       }
 
-      tk := (DrawLineAreaJoinsStyle=1) ? thisThick : thisThick * (DrawLineAreaMitersBorder / 100)
-      tk := Round(tk * 1.25) + 2
+      defineRelativeSelCoords(imgW, imgH)
       pfcX := (imgSelX1 - tk<0) ? imgSelX1 - tk : 0
       pfcY := (imgSelY1 - tk<0) ? imgSelY1 - tk : 0
       imgSelX1 := (imgSelX1 - tk<0) ? 0 : imgSelX1 - tk
@@ -20638,8 +20644,11 @@ HugeImagesDrawParametricLines() {
       imgSelH := max(imgSelY2, imgSelY1) - min(imgSelY2, imgSelY1)
       imgSelW := max(imgSelX2, imgSelX1) - min(imgSelX2, imgSelX1)
       showTOOLtip("Drawing lines, please wait...`nStep 1/3")
-
       defineRelativeSelCoords(imgW, imgH)
+; dummyTimerDelayiedImageDisplay(125)
+; Gdip_DeletePath(kPath)
+; return 
+
       obju := InitHugeImgSelPath(0, imgW, imgH)
       zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
       Sleep, 50
@@ -20648,12 +20657,16 @@ HugeImagesDrawParametricLines() {
       If (DrawLineAreaCropShape>1)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, DrawLineAreaCropShape - 2, VPselRotation, 0, 0, "a", "a", 1, [tk + pfcX, tk, o_imgSelW, o_imgSelH])
 
-      QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
       doCrop := (DrawLineAreaCropShape>1) ? 1 : 2
+      QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
       rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", doCrop)
       rza := DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
       If (rza=1 && rzq=1)
       {
+         ppzX := (imgSelX1 < o_imgSelX1) ? o_imgSelX1 - imgSelX1 - tk + pfcX : 0
+         ppzY := (imgSelY1 < o_imgSelY1) ? o_imgSelY1 - imgSelY1 - tk + pfcY : 0
+         ppzX := ppzX + abs(pfcX)
+         ppzY := ppzY + abs(pfcY)*2
          otherThick := Round(thisThick*0.34)
          diffThick := (imgSelY1<0) ? imgSelY1 : 0
          If (imgSelY2>imgH)
@@ -20664,12 +20677,14 @@ HugeImagesDrawParametricLines() {
          If kPath
          {
             closed := ppk := 0
+            pMatrix := Gdip_CreateMatrix()
+            Gdip_TranslateMatrix(pMatrix, ppzX, ppzY)
             iterator := new Gdip_GraphicsPathIterator(kPath)
             subs := iterator.GetSubpathCount()
-            fnOutputDebug("Total points: " iterator.GetCount() "|" rz " | Subpaths: " subs)
+            ; fnOutputDebug("Total points: " iterator.GetCount() "|" rz " | Subpaths: " subs)
             iterator.Rewind()
-            subdivide := (DrawLineAreaBorderCenter>3) ? 1 : 0
             conturAlign := DrawLineAreaContourAlign
+            subdivide := (DrawLineAreaBorderCenter>3 || DrawLineAreaBorderCenter=1) ? 1 : 0
             While, ((subPath := iterator.NextSubpath()).count > 0)
             {
                ppk++
@@ -20677,8 +20692,11 @@ HugeImagesDrawParametricLines() {
                If (pPath="")
                   Continue
 
-               processGdipPathForDLL(pPath, 0, o_imgSelH, subdivide, PointsCount, PointsF)
-               fnOutputDebug("Subpath #: " ppk " | Points: " PointsCount)
+               If (ppzX || ppzY)
+                  Gdip_TransformPath(pPath, pMatrix)
+
+               processGdipPathForDLL(pPath, tk, r.h, subdivide, PointsCount, PointsF)
+               ; fnOutputDebug("Subpath #: " ppk " | Points: " PointsCount)
                showTOOLtip("Drawing lines, please wait...`nStep 2/3`nSegment: " ppk " / " subs, 0, 0, ppk / (subs + 1))
                rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0, "int", tempCrapValue)
                If (rzb=1 && DrawLineAreaDoubles=1)
@@ -20725,13 +20743,13 @@ HugeImagesDrawParametricLines() {
       {
          recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
          If (rza!=1)
-            showTOOLtip("ERROR: Failed to draw the text on the image.`nLines mask prepration failed.")
+            showTOOLtip("ERROR: Failed to draw the lines.`nLines mask preparation failed.")
          Else If (rzb!=1)
-            showTOOLtip("ERROR: Failed to draw the text on the image.`nAn error occurred drawing the line segments.")
+            showTOOLtip("ERROR: Failed to draw the lines.`nAn error occurred drawing the line segments.")
          Else If (rzc!=1)
-            showTOOLtip("ERROR: Failed to draw the text on the image.`nAn error occurred utilizing the lines mask to alter the main bitmap.")
+            showTOOLtip("ERROR: Failed to draw the lines.`nAn error occurred utilizing the lines mask to alter the main bitmap.")
          Else
-            showTOOLtip("ERROR: Failed to draw the text on the image. Unknown cause[s].")
+            showTOOLtip("ERROR: Failed to draw the lines. Unknown cause[s].")
 
          SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -39967,9 +39985,16 @@ buildQuickSearchMenus() {
    Else If (!AnyWindowOpen && !drawingShapeNow)
       createMenuBonusNoImageOpened()
 
+   If (editingSelectionNow=1 && isImgEditingNow()=1)
+   {
+      kMenu("PVmenu", "Add", "Paste selection area coordinates", "BTNpasteSelCoords")
+      kMenu("PVmenu", "Add", "Copy selection area coordinates", "BTNcopySelCoords")
+   }
+
    zeitSillyPrevent := A_TickCount
    If (drawingShapeNow!=1)
       BuildSecondMenu()
+
    mustPreventMenus := 0
 }
 
@@ -47863,14 +47888,16 @@ BTNopenPrevPanel(givenZZ:=0, isGiven:=0, morrigan:=0) {
    If (morrigan!="n")
       CloseWindow()
 
-   If (zz=66)
-      f := "PanelFloodFillTool"
-   Else If (zz=10)
+   If (zz=10)
       f := "PanelColorsAdjusterWindow"
    Else If (zz=23)
       f := "PanelFillSelectedArea"
    Else If (zz=25)
       f := "PanelEraseSelectedArea"
+   Else If (zz=30)
+      f := "PanelDrawParametricLines"
+   Else If (zz=32)
+      f := "PanelInsertTextArea"
    Else If (zz=55)
       f := "PanelDesatureSelectedArea"
    Else If (zz=64)
@@ -48179,6 +48206,16 @@ ReadSettingsDrawLinesArea(act:=0) {
     RegAction(act, "DrawLineAreaBorderArcD",, 1)
     RegAction(act, "DrawLineAreaBorderConnector",, 1)
     RegAction(act, "DrawLineAreaBorderCenter",, 2, 1, 6)
+    RegAction(act, "DrawLineAreaSpiralCenterMode",, 2, 1, 3)
+    RegAction(act, "DrawLineAreaSpiralLength",, 2, 50, 5678)
+    RegAction(act, "DrawLineAreaGridCenter",, 2, 1, 4)
+    RegAction(act, "DrawLineAreaGridX",, 2, 1, 350)
+    RegAction(act, "DrawLineAreaGridY",, 2, 1, 350)
+    RegAction(act, "DrawLineAreaRaysLimit",, 2, 0, 125)
+    RegAction(act, "DrawLineAreaAltRays",, 2, 0, 200)
+    RegAction(act, "DrawLineAreaCenterCut",, 2, -1, 350)
+    RegAction(act, "DrawLineAreaAtomizedGrid",, 1)
+    RegAction(act, "DrawLineAreaEqualGrid",, 1)
     RegAction(act, "PasteInPlaceAutoExpandIMG",, 1)
     RegAction(act, "freeHandSelectionMode",, 1)
 }
@@ -48280,7 +48317,12 @@ PanelDrawParametricLines() {
     Gui, Add, Text, xs y+15 w%btnWid% hp +0x200 gBtnResetBlendMode +hwndhTemp, Blending mode
     GuiAddDropDownList("x+10 wp gupdateUIDrawLinesPanel AltSubmit Choose" DrawLineAreaBlendMode " vDrawLineAreaBlendMode", "None|" userBlendModesList, [hTemp])
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIDrawLinesPanel")
-    GuiAddSlider("DrawLineAreaContourThickness", 1,450, 5, "Line width: $€ pixels", "updateUIDrawLinesPanel", 1, "xs y+10 w" btnWid*2 + 8 " hp")
+
+    trGdip_GetImageDimensions(useGdiBitmap(), pw, ph)
+    nmgpx := Round((pw *ph)/1000000)
+    lim := (nmgpx > 250 && !viewportQPVimage.imgHandle) ? 1400 : 700
+    lia := (nmgpx > 100) ? 100 : 25
+    GuiAddSlider("DrawLineAreaContourThickness", 1,lim, lia, ".updateLabelDrawLineThickness", "updateUIDrawLinesPanel", 1, "xs y+10 w" btnWid*2 + 8 " hp")
     If (viewportQPVimage.imgHandle)
     {
        GuiAddSlider("DrawLineAreaThickScale", 100, 650, 100, "Thickness scale: $€ %", "updateUIDrawLinesPanel", 1, "xs y+7 w" (btnWid*2 + 8)//2 - 2 " hp")
@@ -50511,13 +50553,15 @@ BTNpasteSelCoords() {
    If isNumber(arr[5])
    {
       VPselRotation := clampInRange(arr[5], 0, 359.9)
-      GuiUpdateSliders("VPselRotation")
+      If (AnyWindowOpen=34)
+        GuiUpdateSliders("VPselRotation")
    }
 
    If (arr[6]=1 || arr[6]=0)
    {
       rotateSelBoundsKeepRatio := arr[6]
-      GuiControl, SettingsGUIA:, rotateSelBoundsKeepRatio, % rotateSelBoundsKeepRatio
+      If (AnyWindowOpen=34)
+         GuiControl, SettingsGUIA:, rotateSelBoundsKeepRatio, % rotateSelBoundsKeepRatio
    }
 
    If (isNumber(arr[7]) && isNumber(arr[8]))
@@ -50525,7 +50569,8 @@ BTNpasteSelCoords() {
       innerSelectionCavityX := clampInRange(arr[7], 0, 0.99)
       innerSelectionCavityY := clampInRange(arr[8], 0, 0.99)
       userUIshapeCavity := Round((innerSelectionCavityX + innerSelectionCavityY) / 2 * 400)
-      GuiUpdateSliders("userUIshapeCavity")
+      If (AnyWindowOpen=34)
+         GuiUpdateSliders("userUIshapeCavity")
    }
 
    nImgSelX1 := min(imgSelX1, imgSelX2)
@@ -50535,6 +50580,9 @@ BTNpasteSelCoords() {
    ImgSelX1 := Round(nImgSelX1),     ImgSelY1 := Round(nImgSelY1)
    imgSelX2 := Round(nImgSelX2),     ImgSelY2 := Round(nImgSelY2)
    SelectionCoordsType := lockSelectionAspectRatio := 1
+   If (AnyWindowOpen!=34)
+      Return
+
    GuiControl, SettingsGUIA: Choose, SelectionCoordsType, 1
    GuiControl, SettingsGUIA: Choose, lockSelectionAspectRatio, 1
    GuiControl, SettingsGUIA:, NewPosX1, % ImgSelX1
@@ -61294,9 +61342,10 @@ InvokeMenuBarEditorSelection(manuID) {
 
       createMenuSelectionAlign()
       createMenuSelectionRotationAspectRatio()
+      transformTool := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
       kMenu("PVselv", "Add", "Ali&gnment", ":PVselAlign")
       kMenu("PVselv", "Add", "&Rotation and aspect ratio", ":PVselRatio")
-      If (imgEditPanelOpened=1 && isWinCustomShapeFriendly=1)
+      If (imgEditPanelOpened=1 && transformTool=0)
       {
          Menu, PVselv, Add
          kMenu("PVselv", "Add", "Selection &properties`tAlt+E", "PanelIMGselProperties")
@@ -63486,6 +63535,14 @@ createMenuLiveEditSelectionArea(isToolGood, isWinCustomShapeFriendly) {
    kMenu("PVselv", "Add/Uncheck", "Sho&w grid", "ToggleSelectGrid",, " (selection area)")
    If (showSelectionGrid=1)
       kMenu("PVselv", "Check", "Sho&w grid",,, " (selection area)")
+
+   transformTool := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
+   If (imgEditPanelOpened=1 && transformTool=0 && editingSelectionNow=1)
+   {
+      Menu, PVselv, Add
+      kMenu("PVselv", "Add", "Selection &properties`tAlt+E", "PanelIMGselProperties")
+   }
+
 
    addMenuBonusesSelectionArea()
    If (isToolGood=1)
