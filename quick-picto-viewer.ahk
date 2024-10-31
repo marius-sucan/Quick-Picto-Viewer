@@ -20447,7 +20447,7 @@ HugeImagesDrawLineShapes() {
       imgSelX2 := imgSelX2 + tk,    imgSelY2 := imgSelY2 + tk
       imgSelH := max(imgSelY2, imgSelY1) - min(imgSelY2, imgSelY1)
       imgSelW := max(imgSelX2, imgSelX1) - min(imgSelX2, imgSelX1)
-      showTOOLtip("Drawing lines, please wait...`nStep 1/3")
+      showTOOLtip("Drawing lines, please wait...`nStep: 1 / 3")
 
       defineRelativeSelCoords(imgW, imgH)
       obju := InitHugeImgSelPath(0, imgW, imgH)
@@ -20490,7 +20490,7 @@ HugeImagesDrawLineShapes() {
 
             subdivide := (((bezierSplineCustomShape=1 || FillAreaCurveTension>1) && FillAreaShape=7) || FillAreaShape=2 || FillAreaShape=3) ? 1 : 0
             processGdipPathForDLL(pPath, tk, o_imgSelH, subdivide, PointsCount, PointsF)
-            showTOOLtip("Drawing lines, please wait...`nStep 2/3")
+            showTOOLtip("Drawing lines, please wait...`nStep: 2 / 3")
             conturAlign := DrawLineAreaContourAlign
             closed := (FillAreaShape=7) ? FillAreaClosedPath : 1
             If (FillAreaShape=3 && FillAreaEllipsePie=1 && FillAreaEllipseSection<1440)
@@ -20528,7 +20528,7 @@ HugeImagesDrawLineShapes() {
          PointsF := ""
       }
 
-      showTOOLtip("Drawing lines, please wait...`nStep 3/3")
+      showTOOLtip("Drawing lines, please wait...`nStep: 3 / 3")
       If (rzb=1)
          rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", DrawLineAreaOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", doBehind, "int", 0, "int", BlendModesPreserveAlpha)
 
@@ -20624,9 +20624,11 @@ HugeImagesDrawParametricLines() {
          rz := Gdip_GetPathPointsCount(kPath)
          r := getAccuratePathBounds(kPath)
          imgSelX1 := o_imgSelX1 + r.x,       imgSelY1 := o_imgSelY1 + r.y
-         fnOutputDebug("new coords: " imgSelX1 " | " imgSelY1 "||" r.x "|" r.y "||" r.w "|" r.h)
-         fnOutputDebug("old coords: " o_imgSelX1 " | " o_imgSelY1)
          imgSelX2 := imgSelX1 + r.w,         imgSelY2 := imgSelY1 + r.h
+         dSelX1 := o_imgSelX1 + r.x,       dSelY1 := o_imgSelY1 + r.y
+         dSelX2 := imgSelX1 + r.w,         dSelY2 := imgSelY1 + r.h
+         ; fnOutputDebug("new coords: " imgSelX1 " | " imgSelY1 "||" r.x "|" r.y "||" r.w "|" r.h)
+         ; fnOutputDebug("old coords: " o_imgSelX1 " | " o_imgSelY1)
       } Else
       {
          showTOOLtip("ERROR: No lines configured to draw or failed to generate path object.")
@@ -20643,12 +20645,8 @@ HugeImagesDrawParametricLines() {
       imgSelX2 := imgSelX2 + tk,    imgSelY2 := imgSelY2 + tk
       imgSelH := max(imgSelY2, imgSelY1) - min(imgSelY2, imgSelY1)
       imgSelW := max(imgSelX2, imgSelX1) - min(imgSelX2, imgSelX1)
-      showTOOLtip("Drawing lines, please wait...`nStep 1/3")
+      showTOOLtip("Drawing lines, please wait...`nStep: 1 / 3")
       defineRelativeSelCoords(imgW, imgH)
-; dummyTimerDelayiedImageDisplay(125)
-; Gdip_DeletePath(kPath)
-; return 
-
       obju := InitHugeImgSelPath(0, imgW, imgH)
       zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH)
       Sleep, 50
@@ -20663,20 +20661,35 @@ HugeImagesDrawParametricLines() {
       rza := DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
       If (rza=1 && rzq=1)
       {
-         ppzX := (imgSelX1 < o_imgSelX1) ? o_imgSelX1 - imgSelX1 - tk + pfcX : 0
-         ppzY := (imgSelY1 < o_imgSelY1) ? o_imgSelY1 - imgSelY1 - tk + pfcY : 0
-         ppzX := ppzX + abs(pfcX)
-         ppzY := ppzY + abs(pfcY)*2
+         ppzX := ppzY := 0
+         If (pfcY!=0)
+            ppzY := -1*(pfcY - tk) - tk*2 + o_imgSelY1
+         Else If (imgSelY1 < o_imgSelY1)
+            ppzY := o_imgSelY1 - imgSelY1 - tk - pfcY 
+
+         If (pfcX!=0)
+            ppzX := -1*(pfcX - tk) - tk*2 + o_imgSelX1 + pfcX
+         Else If (imgSelX1 < o_imgSelX1)
+            ppzX := o_imgSelX1 - imgSelX1 - tk - pfcX 
+
+         fnOutputDebug("a=" ppzX "|" ppzY " || " o_imgSelY1 " || " pfcY)
          otherThick := Round(thisThick*0.34)
          diffThick := (imgSelY1<0) ? imgSelY1 : 0
          If (imgSelY2>imgH)
             diffThick := diffThick + (imgSelY2 - imgH)
          If (imgSelY2>imgH && imgSelY1<0)
             diffThick := thisThick + (imgSelY2 - thisThick - imgH)
+         If ((dSelY2 + tk)>imgH && (dSelY1 - tk)<0 && (dSelX2 + tk)>imgW && (dSelX1 - tk)<0)
+         {
+            SoundBeep 
+            ; r.h := r.h - (dSelY2 - imgH)
+            ppzY += (imgSelY2 - imgH)
+         }
 
          If kPath
          {
             closed := ppk := 0
+            prevMSGdisplay := A_TickCount
             pMatrix := Gdip_CreateMatrix()
             Gdip_TranslateMatrix(pMatrix, ppzX, ppzY)
             iterator := new Gdip_GraphicsPathIterator(kPath)
@@ -20692,12 +20705,18 @@ HugeImagesDrawParametricLines() {
                If (pPath="")
                   Continue
 
+               etaTime := ETAinfos(ppk, subs, startOperation)
                If (ppzX || ppzY)
                   Gdip_TransformPath(pPath, pMatrix)
 
-               processGdipPathForDLL(pPath, tk, r.h, subdivide, PointsCount, PointsF)
                ; fnOutputDebug("Subpath #: " ppk " | Points: " PointsCount)
-               showTOOLtip("Drawing lines, please wait...`nStep 2/3`nSegment: " ppk " / " subs, 0, 0, ppk / (subs + 1))
+               processGdipPathForDLL(pPath, tk, r.h, subdivide, PointsCount, PointsF)
+               If (A_TickCount - prevMSGdisplay>450)
+               {
+                  showTOOLtip("Drawing lines, please wait...`nStep: 2 / 3`nSegments processed:" etaTime, 0, 0, ppk / (subs + 1))
+                  prevMSGdisplay := A_TickCount
+               }
+
                rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0, "int", tempCrapValue)
                If (rzb=1 && DrawLineAreaDoubles=1)
                {
@@ -20716,13 +20735,14 @@ HugeImagesDrawParametricLines() {
                Gdip_DeletePath(pPath)
                PointsF := ""
             }
+
             iterator.Discard()
             Gdip_DeletePath(kPath)
             PointsF := ""
          }
       }
 
-      showTOOLtip("Drawing lines, please wait...`nStep 3/3")
+      showTOOLtip("Drawing lines, please wait...`nStep: 3 / 3")
       If (rzb=1 && DrawLineAreaAtomizedGrid=0)
          rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", DrawLineAreaOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", doBehind, "int", 0, "int", BlendModesPreserveAlpha)
 
@@ -50528,7 +50548,7 @@ BTNcopySelCoords() {
       showTOOLtip("Failed to copy selection coordinates to the clipboard")
       SoundBeep 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
-   }
+   } Else SoundBeep 900, 100
 }
 
 BTNpasteSelCoords() {
@@ -77790,13 +77810,23 @@ createDefaultSizedSelectionArea(DestPosX, DestPosY, newW, newH, maxSelX, maxSelY
        MouseCoords2Image(mX + 200, mY + 200, 1, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, imgSelX2, imgSelY2)
     } Else If (imgSelX2=-1 && imgSelY2=-1)
     {
-       obju := createImgSelection2Win(DestPosX, DestPosY, newW, newH, maxSelX, maxSelY, mainWidth, mainHeight, 2, 1)
-       imgSelX1 := obju.x1, imgSelY1 := obju.y1
-       imgSelX2 := obju.x2, imgSelY2 := obju.y2
-       If (imgSelX2>maxSelX/2 && newW<mainWidth)
-          imgSelX2 := maxSelX//2
-       If (imgSelY2>maxSelY/factor && newH<mainHeight)
-          imgSelY2 := maxSelY//2
+       if (IMGlargerViewPort=1)
+       {
+          mX := (DestPosX>0) ? DestPosX + 70 : 70
+          mY := (DestPosY>0) ? DestPosY + 70 : 70
+          MouseCoords2Image(mX, mY, 1, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, imgSelX1, imgSelY1)
+          MouseCoords2Image(mX + 250, mY + 250, 1, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, imgSelX2, imgSelY2)
+          ; ToolTip, % mX "|" mY , , , 2
+       } Else
+       {
+          obju := createImgSelection2Win(DestPosX, DestPosY, newW, newH, maxSelX, maxSelY, mainWidth, mainHeight, 2, 1)
+          imgSelX1 := obju.x1, imgSelY1 := obju.y1
+          imgSelX2 := obju.x2, imgSelY2 := obju.y2
+          If (imgSelX2>maxSelX/2 && newW<mainWidth)
+             imgSelX2 := maxSelX//2
+          If (imgSelY2>maxSelY/factor && newH<mainHeight)
+             imgSelY2 := maxSelY//2
+       }
     }
 
     defineRelativeSelCoords(rImgW, rImgH)
