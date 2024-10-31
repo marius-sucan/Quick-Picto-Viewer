@@ -9556,18 +9556,27 @@ Gdip_ErrorHandler(errCode, throwErrorMsg, additionalInfo:="") {
 class Gdip_GraphicsPathIterator {
     __New(pPath) {
         ; Create GraphicsPathIterator
+        if (!pPath)
+        {
+           this.error := "no path object provided"
+           return
+        }
+
         DllCall("gdiplus\GdipCreatePathIter", "UPtr*", pIterator:=0, "UPtr", pPath)
         this.ptr := pIterator
-    }
-    
-    __Delete() {
-        if (this.ptr)
-           DllCall("gdiplus\GdipDeletePathIter", "UPtr", this.ptr)
+        if (!this.ptr)
+           this.error := "failed to create iterator"
+        else
+           this.error := ""
     }
 
     Discard() {
         if (this.ptr)
+        {
            DllCall("gdiplus\GdipDeletePathIter", "UPtr", this.ptr)
+           this.error := ""
+           this.ptr := ""
+        }
     }
     
     NextSubpath() {
