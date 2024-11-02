@@ -20560,6 +20560,7 @@ HugeImagesDrawLineShapes() {
          SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
       }
+      SetTimer, ResetImgLoadStatus, -150
       ResetImgLoadStatus()
 }
 
@@ -20567,12 +20568,6 @@ HugeImagesDrawParametricLines() {
       Static tempCrapValue := -1, zzpo := 0
       If warnHugeImageNotFIM()
          Return
-
-      If (editingSelectionNow=1)
-      {
-         If throwErrorSelectionOutsideBounds()
-            Return "out-bounds"
-      }
 
       hFIFimgX := viewportQPVimage.imgHandle
       bpp := FreeImage_GetBPP(hFIFimgX)
@@ -20606,6 +20601,7 @@ HugeImagesDrawParametricLines() {
          showTOOLtip("WARNING: No lines configured to draw.`nIs this what they call a draw?")
          SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
+         SetTimer, ResetImgLoadStatus, -150
          Gdip_DeletePath(xPath)
          Return -1
       }
@@ -20622,11 +20618,33 @@ HugeImagesDrawParametricLines() {
       If kPath
       {
          rz := Gdip_GetPathPointsCount(kPath)
+         If (rz<2)
+         {
+            showTOOLtip("WARNING: The object has no points - nothing to draw.")
+            SoundBeep 300, 100
+            SetTimer, RemoveTooltip, % -msgDisplayTime
+            SetTimer, ResetImgLoadStatus, -150
+            Gdip_DeletePath(kPath)
+            Return -1
+         }
+
          r := getAccuratePathBounds(kPath)
-         imgSelX1 := o_imgSelX1 + r.x,       imgSelY1 := o_imgSelY1 + r.y
-         imgSelX2 := imgSelX1 + r.w,         imgSelY2 := imgSelY1 + r.h
-         dSelX1 := o_imgSelX1 + r.x,       dSelY1 := o_imgSelY1 + r.y
-         dSelX2 := imgSelX1 + r.w,         dSelY2 := imgSelY1 + r.h
+         dSelX1 := o_imgSelX1 + r.x,    dSelY1 := o_imgSelY1 + r.y
+         dSelX2 := dSelX1 + r.w,        dSelY2 := dSelY1 + r.h
+         out := testSelectOutsideImgEntirely(useGdiBitmap(), [dSelX1, dSelY1, dSelX2, dSelY2])
+         If (out=1)
+         {
+            showTOOLtip("WARNING: The generated lines are all outside the image canvas.")
+            SoundBeep 300, 100
+            SetTimer, RemoveTooltip, % -msgDisplayTime
+            SetTimer, ResetImgLoadStatus, -150
+            Gdip_DeletePath(kPath)
+            Return -1
+         }
+
+         imgSelX1 := dSelX1,            imgSelY1 := dSelY1
+         imgSelX2 := dSelX2,            imgSelY2 := dSelY2
+         nmgpx := groupDigits( Round((r.w * r.h)/1000000) ) " MPx"
          ; fnOutputDebug("new coords: " imgSelX1 " | " imgSelY1 "||" r.x "|" r.y "||" r.w "|" r.h)
          ; fnOutputDebug("old coords: " o_imgSelX1 " | " o_imgSelY1)
       } Else
@@ -20634,6 +20652,7 @@ HugeImagesDrawParametricLines() {
          showTOOLtip("ERROR: No lines configured to draw or failed to generate path object.")
          SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
+         SetTimer, ResetImgLoadStatus, -150
          Return -1
       }
 
@@ -20643,6 +20662,9 @@ HugeImagesDrawParametricLines() {
       imgSelX1 := (imgSelX1 - tk<0) ? 0 : imgSelX1 - tk
       imgSelY1 := (imgSelY1 - tk<0) ? 0 : imgSelY1 - tk
       imgSelX2 := imgSelX2 + tk,    imgSelY2 := imgSelY2 + tk
+      If ((dSelY2 + tk)>imgH && (dSelY1 - tk)<0 && (dSelX2 + tk)>imgW && (dSelX1 - tk)<0)
+         imgSelY2 := imgH
+
       imgSelH := max(imgSelY2, imgSelY1) - min(imgSelY2, imgSelY1)
       imgSelW := max(imgSelX2, imgSelX1) - min(imgSelX2, imgSelX1)
       showTOOLtip("Drawing lines, please wait...`nStep: 1 / 3")
@@ -20652,9 +20674,13 @@ HugeImagesDrawParametricLines() {
       Sleep, 50
       roundJoins := DrawLineAreaJoinsStyle
       roundCaps := DrawLineAreaCapsStyle
+      ; If ((dSelY2 + tk)>imgH && (dSelY1 - tk)<0 && (dSelX2 + tk)>imgW && (dSelX1 - tk)<0)
+      ; {
+      ;    imgSelY2 := dSelY2 + tk
+      ; }
       If (DrawLineAreaCropShape>1)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, DrawLineAreaCropShape - 2, VPselRotation, 0, 0, "a", "a", 1, [tk + pfcX, tk, o_imgSelW, o_imgSelH])
-
+fnOutputDebug("craaaappp=" imgSelY1 " |" imgSelY2)
       doCrop := (DrawLineAreaCropShape>1) ? 1 : 2
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
       rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", doCrop)
@@ -20664,12 +20690,15 @@ HugeImagesDrawParametricLines() {
          ppzX := ppzY := 0
          If (pfcY!=0)
             ppzY := -1*(pfcY - tk) - tk*2 + o_imgSelY1
-         Else If (imgSelY1 < o_imgSelY1)
+         Else ; If (imgSelY1 < o_imgSelY1)
             ppzY := o_imgSelY1 - imgSelY1 - tk - pfcY 
+
+         If ((dSelY2 + tk)>imgH && (dSelY1 - tk)<0 && (dSelX2 + tk)>imgW && (dSelX1 - tk)<0)
+            ppzY += (dSelY2 + tk - imgH)
 
          If (pfcX!=0)
             ppzX := -1*(pfcX - tk) - tk*2 + o_imgSelX1 + pfcX
-         Else If (imgSelX1 < o_imgSelX1)
+         Else ; If (imgSelX1 < o_imgSelX1)
             ppzX := o_imgSelX1 - imgSelX1 - tk - pfcX 
 
          fnOutputDebug("a=" ppzX "|" ppzY " || " o_imgSelY1 " || " pfcY)
@@ -20679,12 +20708,6 @@ HugeImagesDrawParametricLines() {
             diffThick := diffThick + (imgSelY2 - imgH)
          If (imgSelY2>imgH && imgSelY1<0)
             diffThick := thisThick + (imgSelY2 - thisThick - imgH)
-         If ((dSelY2 + tk)>imgH && (dSelY1 - tk)<0 && (dSelX2 + tk)>imgW && (dSelX1 - tk)<0)
-         {
-            SoundBeep 
-            ; r.h := r.h - (dSelY2 - imgH)
-            ppzY += (imgSelY2 - imgH)
-         }
 
          If kPath
          {
@@ -20698,6 +20721,8 @@ HugeImagesDrawParametricLines() {
             iterator.Rewind()
             conturAlign := DrawLineAreaContourAlign
             subdivide := (DrawLineAreaBorderCenter>3 || DrawLineAreaBorderCenter=1) ? 1 : 0
+            doStartLongOpDance()
+            setWhileLoopExec(1)
             While, ((subPath := iterator.NextSubpath()).count > 0)
             {
                ppk++
@@ -20705,6 +20730,7 @@ HugeImagesDrawParametricLines() {
                If (pPath="")
                   Continue
 
+               executingCanceableOperation := A_TickCount
                etaTime := ETAinfos(ppk, subs, startOperation)
                If (ppzX || ppzY)
                   Gdip_TransformPath(pPath, pMatrix)
@@ -20713,7 +20739,7 @@ HugeImagesDrawParametricLines() {
                processGdipPathForDLL(pPath, tk, r.h, subdivide, PointsCount, PointsF)
                If (A_TickCount - prevMSGdisplay>450)
                {
-                  showTOOLtip("Drawing lines, please wait...`nStep: 2 / 3`nSegments processed:" etaTime, 0, 0, ppk / (subs + 1))
+                  showTOOLtip("Drawing lines, please wait...`nStep: 2 / 3`nSegments processed:" etaTime "`nObject size: " nmgpx, 0, 0, ppk / (subs + 1))
                   prevMSGdisplay := A_TickCount
                }
 
@@ -20734,8 +20760,13 @@ HugeImagesDrawParametricLines() {
 
                Gdip_DeletePath(pPath)
                PointsF := ""
+               If (determineTerminateOperation()=1)
+               {
+                  abandonAll := 1
+                  Break
+               }
             }
-
+            setWhileLoopExec(0)
             iterator.Discard()
             Gdip_DeletePath(kPath)
             PointsF := ""
@@ -20743,20 +20774,24 @@ HugeImagesDrawParametricLines() {
       }
 
       showTOOLtip("Drawing lines, please wait...`nStep: 3 / 3")
-      If (rzb=1 && DrawLineAreaAtomizedGrid=0)
+      If (rzb=1 && DrawLineAreaAtomizedGrid=0 && abandonAll=1)
+         rzc := 1
+
+      If (rzb=1 && DrawLineAreaAtomizedGrid=0 && abandonAll!=1)
          rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", DrawLineAreaOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", doBehind, "int", 0, "int", BlendModesPreserveAlpha)
 
       DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
-      r := (rzc=1) ? 1 : 0
       fnOutputDebug("Draw lines finished in: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)))
       imgSelX1 := o_imgSelX1,      imgSelY1 := o_imgSelY1
       imgSelX2 := o_imgSelX2,      imgSelY2 := o_imgSelY2
       defineRelativeSelCoords(imgW, imgH)
-      If r 
+      If rzc
       {
          killQPVscreenImgSection()
          setHugeImageActionsCount(viewportQPVimage.actions + 1)
          dummyTimerDelayiedImageDisplay(500)
+         If (abandonAll=1)
+            showTOOLtip("WARNING: User aborted draw parametric lines.")
          SoundBeep, 900, 100
          RemoveTooltip()
       } Else
@@ -20774,6 +20809,7 @@ HugeImagesDrawParametricLines() {
          SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
       }
+      SetTimer, ResetImgLoadStatus, -150
       ResetImgLoadStatus()
 }
 
@@ -21566,7 +21602,7 @@ DrawLinesInSelectedArea(modus) {
     imgSelX2 := imgSelX2 + tk//2,    imgSelY2 := imgSelY2 + tk//2
     offX := (imgSelX1<0) ? abs(imgSelX1) : 0
     offY := (imgSelY1<0) ? abs(imgSelY1) : 0
-    If ((imgSelX1<0 || imgSelY1<0 || imgSelX2>imgW || imgSelY2>imgH) && PasteInPlaceAutoExpandIMG=1 && validBMP(whichBitmap) && imgW && imgH)
+    If ((imgSelX1<0 || imgSelY1<0 || imgSelX2>imgW || imgSelY2>imgH) && PasteInPlaceAutoExpandIMG=1 && validBMP(whichBitmap) && imgW && imgH) || (imgW && imgH && AnyWindowOpen=30)
        allowOutside := 1
 
     stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 1, allowOutside)
@@ -21579,7 +21615,7 @@ DrawLinesInSelectedArea(modus) {
     }
 
     startZeit := A_TickCount
-    If (allowOutside=1)
+    If (allowOutside=1 && PasteInPlaceAutoExpandIMG=1)
        hasRanExpand := performAutoExpandCanvas(imgW, imgH)
 
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
@@ -21831,23 +21867,24 @@ coreDrawParametricLinesGrid(x1, y1, x2, y2, imgSelW, imgSelH, thisThick) {
 }
 
 coreDrawParametricLinesSpiral(x1, y1, x2, y2, imgSelW, imgSelH) {
+   vpWinClientSize(mw, mh)
     If (DrawLineAreaSpiralCenterMode=1 || DrawLineAreaSpiralCenterMode=2)
     {
        rp := (DrawLineAreaSpiralCenterMode=2) ? 350 : 50
-       fx := imgSelW * (alphaMaskOffsetX/rp), fy := imgSelH * (alphaMaskOffsetY/rp)
+       fx := mw * (alphaMaskOffsetX/rp),      fy := mh * (alphaMaskOffsetY/rp)
        rw := imgSelW - fx*2,                  rh := imgSelH - fy*2
     } Else
     {
-       fx := imgSelW * alphaMaskOffsetX, fy := imgSelH * alphaMaskOffsetY
+       fx := mw * alphaMaskOffsetX,      fy := mh * alphaMaskOffsetY
        rw := imgSelW,                    rh := imgSelH
     }
 
     angle := -272
     PointsList := []
     imgSelPx := x1,  imgSelPy := y1
+    rw := imgSelW,   rh := imgSelH
     cX := ocX := imgSelPx + imgSelW/2
     cY := ocY := imgSelPy + imgSelH/2
-    rw := imgSelW,   rh := imgSelH
     spx := imgSelPx, spy := imgSelPy
     lengthu := Round(DrawLineAreaSpiralLength**1.1)
     zfx := imgSelW/(lengthu + 2)
@@ -22079,8 +22116,24 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
 
     If kPath
     {
-       ; r := getAccuratePathBounds(kPath)
-       ; Gdip_DrawRectangle(G2, thisPen, r.x, r.y, r.w, r.h)
+       r := getAccuratePathBounds(kPath)
+       Gdip_DrawRectangle(G2, thisPen, r.x, r.y, r.w, r.h)
+       If (previewMode=0)
+       {
+          dSelX1 := r.x,                 dSelY1 := r.y
+          dSelX2 := dSelX1 + r.w,        dSelY2 := dSelY1 + r.h
+          out := testSelectOutsideImgEntirely(useGdiBitmap(), [dSelX1, dSelY1, dSelX2, dSelY2])
+          If (out=1)
+          {
+             showTOOLtip("WARNING: The generated lines are all outside the image canvas.")
+             SoundBeep 300, 100
+             SetTimer, RemoveTooltip, % -msgDisplayTime
+             SetTimer, ResetImgLoadStatus, -150
+             Gdip_DeletePath(kPath)
+             Return -1
+          }
+       }
+
        If (DrawLineAreaAtomizedGrid=1)
        {
           iterator := new Gdip_GraphicsPathIterator(kPath)
@@ -22147,7 +22200,7 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
     } Else
     {
        G2 := 2NDglPG ; preview mode
-       If (doImgEditLivePreview!=1 || testSelectOutsideImgEntirely(useGdiBitmap()) && PasteInPlaceAutoExpandIMG!=1)
+       If (doImgEditLivePreview!=1 || testSelectOutsideImgEntirely(useGdiBitmap()) && PasteInPlaceAutoExpandIMG!=1 && AnyWindowOpen=65)
           Return
 
        ; trGdip_GraphicsClear(A_ThisFunc, 2NDglPG, "0x00" WindowBGRcolor)
@@ -51141,8 +51194,8 @@ BtnCreateNewImage() {
 }
 
 BtnDrawParametricLinesSelectedArea() {
-  If throwErrorSelectionOutsideBounds()
-     Return
+  ; If throwErrorSelectionOutsideBounds()
+  ;    Return
 
   updateUIDrawLinesPanel("noPreview")
   GuiControlGet, closeEditPanelOnApply, SettingsGUIA:, closeEditPanelOnApply
@@ -75294,11 +75347,20 @@ getIDvpFX() {
     Return "a" specialColorFXmode uiColorCurveFXchannel uiColorCurveFXmode lummyAdjust lumosAdjust lumosGrayAdjust GammosAdjust GammosGrayAdjust realGammos imgThreshold imgFxMode ForceNoColorMatrix zatAdjust satAdjust hueAdjust chnRdecalage chnGdecalage chnBdecalage IntensityAlphaChannel
 }
 
-testSelectOutsideImgEntirely(pBitmap) {
-     nImgSelX1 := min(imgSelX1, imgSelX2)
-     nImgSelY1 := min(imgSelY1, imgSelY2)
-     nimgSelX2 := max(imgSelX1, imgSelX2)
-     nimgSelY2 := max(imgSelY1, imgSelY2)
+testSelectOutsideImgEntirely(pBitmap, otherCoords:=0) {
+     If IsObject(otherCoords)
+     {
+        nImgSelX1 := min(otherCoords[1], otherCoords[3])
+        nImgSelY1 := min(otherCoords[2], otherCoords[4])
+        nimgSelX2 := max(otherCoords[1], otherCoords[3])
+        nimgSelY2 := max(otherCoords[2], otherCoords[4])
+     } Else
+     {
+        nImgSelX1 := min(imgSelX1, imgSelX2)
+        nImgSelY1 := min(imgSelY1, imgSelY2)
+        nimgSelX2 := max(imgSelX1, imgSelX2)
+        nimgSelY2 := max(imgSelY1, imgSelY2)
+     }
 
      trGdip_GetImageDimensions(pBitmap, imgW, imgH)
      If (nimgSelX1<0)
