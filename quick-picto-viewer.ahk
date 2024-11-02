@@ -20631,7 +20631,7 @@ HugeImagesDrawParametricLines() {
          r := getAccuratePathBounds(kPath)
          dSelX1 := o_imgSelX1 + r.x,    dSelY1 := o_imgSelY1 + r.y
          dSelX2 := dSelX1 + r.w,        dSelY2 := dSelY1 + r.h
-         out := testSelectOutsideImgEntirely(useGdiBitmap(), [dSelX1, dSelY1, dSelX2, dSelY2])
+         out := testSelectOutsideImgEntirely(useGdiBitmap(), [dSelX1 - oth, dSelY1 - oth, dSelX2 + oth, dSelY2 + oth])
          If (out=1)
          {
             showTOOLtip("WARNING: The generated lines are all outside the image canvas.")
@@ -22116,13 +22116,13 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
 
     If kPath
     {
-       r := getAccuratePathBounds(kPath)
-       Gdip_DrawRectangle(G2, thisPen, r.x, r.y, r.w, r.h)
+       ; Gdip_DrawRectangle(G2, thisPen, r.x, r.y, r.w, r.h)
        If (previewMode=0)
        {
+          r := getAccuratePathBounds(kPath)
           dSelX1 := r.x,                 dSelY1 := r.y
           dSelX2 := dSelX1 + r.w,        dSelY2 := dSelY1 + r.h
-          out := testSelectOutsideImgEntirely(useGdiBitmap(), [dSelX1, dSelY1, dSelX2, dSelY2])
+          out := testSelectOutsideImgEntirely(useGdiBitmap(), [dSelX1 - dR, dSelY1 - dR, dSelX2 + dR, dSelY2 + dR])
           If (out=1)
           {
              showTOOLtip("WARNING: The generated lines are all outside the image canvas.")
