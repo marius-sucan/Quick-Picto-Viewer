@@ -1586,7 +1586,7 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode) {
      // relies on prepareSelectionArea()
      EllipseSelectMode = 2;
      invertSelection = 0;
-     fnOutputDebug("prepareDrawLinesMask() invoked");
+     fnOutputDebug("prepareDrawLinesMask() invoked: " + std::to_string(polyW) + " x " + std::to_string(polyH));
      INT64 s = (INT64)polyW * polyH + 2; // variables set by prepareSelectionArea()
      if (clipMode!=2)
      {
@@ -1626,7 +1626,6 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode) {
     fnOutputDebug("prepareDrawLinesMask() - polygonMaskMap DONE; radius = " + std::to_string(radius));
     return 1;
 }
-
 
 bool clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
     // see comments for prepareSelectionArea()
@@ -1831,44 +1830,6 @@ float testCIEdeltaE2000(double Lab1_L, double Lab1_a, double Lab1_b, double Lab2
     RsubT = -RsubC * sin(2 * deg2rad(deltaRO));
 
     deltaE00 = sqrt(pow(deltaLPrime / (SsubL * k_L), 2) + pow(deltaCPrime / (SsubC * k_C), 2) + pow(deltahPrime / (SsubH * k_H), 2) + RsubT * (deltaCPrime / (SsubC * k_C)) * (deltahPrime / (SsubH * k_H)));
-
-
-    // std::stringstream ss;
-    // ss << "qpv: deltaE00=" << deltaE00;
-    // ss << " Lab1_L=" << Lab1_L;
-    // ss << " Lab1_a=" << Lab1_a;
-    // ss << " Lab1_b=" << Lab1_b;
-    // ss << " Lab2_L=" << Lab2_L;
-    // ss << " Lab2_a=" << Lab2_a;
-    // ss << " Lab2_b=" << Lab2_b;
-    // ss << " k_L=" << k_L;
-    // ss << " k_C=" << k_C;
-    // ss << " k_H=" << k_H;
-    // ss << " LBar=" << LBar;
-    // ss << " deltaLPrime=" << deltaLPrime;
-    // ss << " aPrime1=" << aPrime1;
-    // ss << " aPrime2=" << aPrime2;
-    // ss << " C1=" << C1;
-    // ss << " C2=" << C2;
-    // ss << " CPrime1=" << CPrime1;
-    // ss << " CPrime2=" << CPrime2;
-    // ss << " CBar=" << CBar;
-    // ss << " CBarPrime=" << CBarPrime;
-    // ss << " deltaCPrime=" << deltaCPrime;
-    // ss << " hPrime1=" << hPrime1;
-    // ss << " hPrime2=" << hPrime2;
-    // ss << " HBarPrime=" << HBarPrime;
-    // ss << " deltahPrime=" << deltahPrime;
-    // ss << " SsubL=" << SsubL;
-    // ss << " SsubC=" << SsubC;
-    // ss << " SsubH=" << SsubH;
-    // ss << " RsubC=" << RsubC;
-    // ss << " RsubT=" << RsubT;
-    // ss << " g=" << g;
-    // ss << " Tvar=" << Tvar;
-    // ss << " deltaRO=" << deltaRO;
-    // OutputDebugStringA(ss.str().data());
-
     return deltaE00;
 }
 
@@ -4851,217 +4812,121 @@ inline void SafeRelease(T *&p)
 }
 
 INT indexedPixelFmts(const WICPixelFormatGUID oPixFmt) {
-    INT uPixFmt = 0;
-    if (oPixFmt==GUID_WICPixelFormatDontCare)
-       uPixFmt = 1;
-    else if (oPixFmt==GUID_WICPixelFormat1bppIndexed)
-       uPixFmt = 2;
-    else if (oPixFmt==GUID_WICPixelFormat2bppIndexed)
-       uPixFmt = 3;
-    else if (oPixFmt==GUID_WICPixelFormat4bppIndexed)
-       uPixFmt = 4;
-    else if (oPixFmt==GUID_WICPixelFormat8bppIndexed)
-       uPixFmt = 5;
-    else if (oPixFmt==GUID_WICPixelFormatBlackWhite)
-       uPixFmt = 6;
-    else if (oPixFmt==GUID_WICPixelFormat2bppGray)
-       uPixFmt = 7;
-    else if (oPixFmt==GUID_WICPixelFormat4bppGray)
-       uPixFmt = 8;
-    else if (oPixFmt==GUID_WICPixelFormat8bppGray)
-       uPixFmt = 9;
-    else if (oPixFmt==GUID_WICPixelFormat8bppAlpha)
-       uPixFmt = 10;
-    else if (oPixFmt==GUID_WICPixelFormat16bppBGR555)
-       uPixFmt = 11;
-    else if (oPixFmt==GUID_WICPixelFormat16bppBGR565)
-       uPixFmt = 12;
-    else if (oPixFmt==GUID_WICPixelFormat16bppBGRA5551)
-       uPixFmt = 13;
-    else if (oPixFmt==GUID_WICPixelFormat16bppGray)
-       uPixFmt = 14;
-    else if (oPixFmt==GUID_WICPixelFormat24bppBGR)
-       uPixFmt = 15;
-    else if (oPixFmt==GUID_WICPixelFormat24bppRGB)
-       uPixFmt = 16;
-    else if (oPixFmt==GUID_WICPixelFormat32bppBGR)
-       uPixFmt = 17;
-    else if (oPixFmt==GUID_WICPixelFormat32bppBGRA)
-       uPixFmt = 18;
-    else if (oPixFmt==GUID_WICPixelFormat32bppPBGRA)
-       uPixFmt = 19;
-    else if (oPixFmt==GUID_WICPixelFormat32bppGrayFloat)
-       uPixFmt = 20;
-    else if (oPixFmt==GUID_WICPixelFormat32bppRGB)
-       uPixFmt = 21;
-    else if (oPixFmt==GUID_WICPixelFormat32bppRGBA)
-       uPixFmt = 22;
-    else if (oPixFmt==GUID_WICPixelFormat32bppPRGBA)
-       uPixFmt = 23;
-    else if (oPixFmt==GUID_WICPixelFormat48bppRGB)
-       uPixFmt = 24;
-    else if (oPixFmt==GUID_WICPixelFormat48bppBGR)
-       uPixFmt = 25;
-    else if (oPixFmt==GUID_WICPixelFormat64bppRGB)
-       uPixFmt = 26;
-    else if (oPixFmt==GUID_WICPixelFormat64bppRGBA)
-       uPixFmt = 27;
-    else if (oPixFmt==GUID_WICPixelFormat64bppBGRA)
-       uPixFmt = 28;
-    else if (oPixFmt==GUID_WICPixelFormat64bppPRGBA)
-       uPixFmt = 29;
-    else if (oPixFmt==GUID_WICPixelFormat64bppPBGRA)
-       uPixFmt = 30;
-    else if (oPixFmt==GUID_WICPixelFormat16bppGrayFixedPoint)
-       uPixFmt = 31;
-    else if (oPixFmt==GUID_WICPixelFormat32bppBGR101010)
-       uPixFmt = 32;
-    else if (oPixFmt==GUID_WICPixelFormat48bppRGBFixedPoint)
-       uPixFmt = 33;
-    else if (oPixFmt==GUID_WICPixelFormat48bppBGRFixedPoint)
-       uPixFmt = 34;
-    else if (oPixFmt==GUID_WICPixelFormat96bppRGBFixedPoint)
-       uPixFmt = 35;
-    else if (oPixFmt==GUID_WICPixelFormat96bppRGBFloat)
-       uPixFmt = 36;
-    else if (oPixFmt==GUID_WICPixelFormat128bppRGBAFloat)
-       uPixFmt = 37;
-    else if (oPixFmt==GUID_WICPixelFormat128bppPRGBAFloat)
-       uPixFmt = 38;
-    else if (oPixFmt==GUID_WICPixelFormat128bppRGBFloat)
-       uPixFmt = 39;
-    else if (oPixFmt==GUID_WICPixelFormat32bppCMYK)
-       uPixFmt = 40;
-    else if (oPixFmt==GUID_WICPixelFormat64bppRGBAFixedPoint)
-       uPixFmt = 41;
-    else if (oPixFmt==GUID_WICPixelFormat64bppBGRAFixedPoint)
-       uPixFmt = 42;
-    else if (oPixFmt==GUID_WICPixelFormat64bppRGBFixedPoint)
-       uPixFmt = 43;
-    else if (oPixFmt==GUID_WICPixelFormat128bppRGBAFixedPoint)
-       uPixFmt = 44;
-    else if (oPixFmt==GUID_WICPixelFormat128bppRGBFixedPoint)
-       uPixFmt = 45;
-    else if (oPixFmt==GUID_WICPixelFormat64bppRGBAHalf)
-       uPixFmt = 46;
-    else if (oPixFmt==GUID_WICPixelFormat64bppPRGBAHalf)
-       uPixFmt = 47;
-    else if (oPixFmt==GUID_WICPixelFormat64bppRGBHalf)
-       uPixFmt = 48;
-    else if (oPixFmt==GUID_WICPixelFormat48bppRGBHalf)
-       uPixFmt = 49;
-    else if (oPixFmt==GUID_WICPixelFormat32bppRGBE)
-       uPixFmt = 50;
-    else if (oPixFmt==GUID_WICPixelFormat16bppGrayHalf)
-       uPixFmt = 51;
-    else if (oPixFmt==GUID_WICPixelFormat32bppGrayFixedPoint)
-       uPixFmt = 52;
-    else if (oPixFmt==GUID_WICPixelFormat32bppRGBA1010102)
-       uPixFmt = 53;
-    else if (oPixFmt==GUID_WICPixelFormat32bppRGBA1010102XR)
-       uPixFmt = 54;
-    else if (oPixFmt==GUID_WICPixelFormat32bppR10G10B10A2)
-       uPixFmt = 55;
-    else if (oPixFmt==GUID_WICPixelFormat32bppR10G10B10A2HDR10)
-       uPixFmt = 56;
-    else if (oPixFmt==GUID_WICPixelFormat64bppCMYK)
-       uPixFmt = 57;
-    else if (oPixFmt==GUID_WICPixelFormat24bpp3Channels)
-       uPixFmt = 58;
-    else if (oPixFmt==GUID_WICPixelFormat32bpp4Channels)
-       uPixFmt = 59;
-    else if (oPixFmt==GUID_WICPixelFormat40bpp5Channels)
-       uPixFmt = 60;
-    else if (oPixFmt==GUID_WICPixelFormat48bpp6Channels)
-       uPixFmt = 61;
-    else if (oPixFmt==GUID_WICPixelFormat56bpp7Channels)
-       uPixFmt = 62;
-    else if (oPixFmt==GUID_WICPixelFormat64bpp8Channels)
-       uPixFmt = 63;
-    else if (oPixFmt==GUID_WICPixelFormat48bpp3Channels)
-       uPixFmt = 64;
-    else if (oPixFmt==GUID_WICPixelFormat64bpp4Channels)
-       uPixFmt = 65;
-    else if (oPixFmt==GUID_WICPixelFormat80bpp5Channels)
-       uPixFmt = 66;
-    else if (oPixFmt==GUID_WICPixelFormat96bpp6Channels)
-       uPixFmt = 67;
-    else if (oPixFmt==GUID_WICPixelFormat112bpp7Channels)
-       uPixFmt = 68;
-    else if (oPixFmt==GUID_WICPixelFormat128bpp8Channels)
-       uPixFmt = 69;
-    else if (oPixFmt==GUID_WICPixelFormat40bppCMYKAlpha)
-       uPixFmt = 70;
-    else if (oPixFmt==GUID_WICPixelFormat80bppCMYKAlpha)
-       uPixFmt = 71;
-    else if (oPixFmt==GUID_WICPixelFormat32bpp3ChannelsAlpha)
-       uPixFmt = 72;
-    else if (oPixFmt==GUID_WICPixelFormat40bpp4ChannelsAlpha)
-       uPixFmt = 73;
-    else if (oPixFmt==GUID_WICPixelFormat48bpp5ChannelsAlpha)
-       uPixFmt = 74;
-    else if (oPixFmt==GUID_WICPixelFormat56bpp6ChannelsAlpha)
-       uPixFmt = 75;
-    else if (oPixFmt==GUID_WICPixelFormat64bpp7ChannelsAlpha)
-       uPixFmt = 76;
-    else if (oPixFmt==GUID_WICPixelFormat72bpp8ChannelsAlpha)
-       uPixFmt = 77;
-    else if (oPixFmt==GUID_WICPixelFormat64bpp3ChannelsAlpha)
-       uPixFmt = 78;
-    else if (oPixFmt==GUID_WICPixelFormat80bpp4ChannelsAlpha)
-       uPixFmt = 79;
-    else if (oPixFmt==GUID_WICPixelFormat96bpp5ChannelsAlpha)
-       uPixFmt = 80;
-    else if (oPixFmt==GUID_WICPixelFormat112bpp6ChannelsAlpha)
-       uPixFmt = 81;
-    else if (oPixFmt==GUID_WICPixelFormat128bpp7ChannelsAlpha)
-       uPixFmt = 82;
-    else if (oPixFmt==GUID_WICPixelFormat144bpp8ChannelsAlpha)
-       uPixFmt = 83;
-    else if (oPixFmt==GUID_WICPixelFormat8bppY)
-       uPixFmt = 84;
-    else if (oPixFmt==GUID_WICPixelFormat8bppCb)
-       uPixFmt = 85;
-    else if (oPixFmt==GUID_WICPixelFormat8bppCr)
-       uPixFmt = 86;
-    else if (oPixFmt==GUID_WICPixelFormat16bppCbCr)
-       uPixFmt = 87;
-    else if (oPixFmt==GUID_WICPixelFormat16bppYQuantizedDctCoefficients)
-       uPixFmt = 88;
-    else if (oPixFmt==GUID_WICPixelFormat16bppCbQuantizedDctCoefficients)
-       uPixFmt = 89;
-    else if (oPixFmt==GUID_WICPixelFormat16bppCrQuantizedDctCoefficients)
-       uPixFmt = 90;
-    return uPixFmt;
+     static const std::map<GUID, INT, GUIDComparer> formatMap = {
+         {GUID_WICPixelFormatDontCare, 1},
+         {GUID_WICPixelFormat1bppIndexed, 2},
+         {GUID_WICPixelFormat2bppIndexed, 3},
+         {GUID_WICPixelFormat4bppIndexed, 4},
+         {GUID_WICPixelFormat8bppIndexed, 5},
+         {GUID_WICPixelFormatBlackWhite, 6},
+         {GUID_WICPixelFormat2bppGray, 7},
+         {GUID_WICPixelFormat4bppGray, 8},
+         {GUID_WICPixelFormat8bppGray, 9},
+         {GUID_WICPixelFormat8bppAlpha, 10},
+         {GUID_WICPixelFormat16bppBGR555, 11},
+         {GUID_WICPixelFormat16bppBGR565, 12},
+         {GUID_WICPixelFormat16bppBGRA5551, 13},
+         {GUID_WICPixelFormat16bppGray, 14},
+         {GUID_WICPixelFormat24bppBGR, 15},
+         {GUID_WICPixelFormat24bppRGB, 16},
+         {GUID_WICPixelFormat32bppBGR, 17},
+         {GUID_WICPixelFormat32bppBGRA, 18},
+         {GUID_WICPixelFormat32bppPBGRA, 19},
+         {GUID_WICPixelFormat32bppGrayFloat, 20},
+         {GUID_WICPixelFormat32bppRGB, 21},
+         {GUID_WICPixelFormat32bppRGBA, 22},
+         {GUID_WICPixelFormat32bppPRGBA, 23},
+         {GUID_WICPixelFormat48bppRGB, 24},
+         {GUID_WICPixelFormat48bppBGR, 25},
+         {GUID_WICPixelFormat64bppRGB, 26},
+         {GUID_WICPixelFormat64bppRGBA, 27},
+         {GUID_WICPixelFormat64bppBGRA, 28},
+         {GUID_WICPixelFormat64bppPRGBA, 29},
+         {GUID_WICPixelFormat64bppPBGRA, 30},
+         {GUID_WICPixelFormat16bppGrayFixedPoint, 31},
+         {GUID_WICPixelFormat32bppBGR101010, 32},
+         {GUID_WICPixelFormat48bppRGBFixedPoint, 33},
+         {GUID_WICPixelFormat48bppBGRFixedPoint, 34},
+         {GUID_WICPixelFormat96bppRGBFixedPoint, 35},
+         {GUID_WICPixelFormat96bppRGBFloat, 36},
+         {GUID_WICPixelFormat128bppRGBAFloat, 37},
+         {GUID_WICPixelFormat128bppPRGBAFloat, 38},
+         {GUID_WICPixelFormat128bppRGBFloat, 39},
+         {GUID_WICPixelFormat32bppCMYK, 40},
+         {GUID_WICPixelFormat64bppRGBAFixedPoint, 41},
+         {GUID_WICPixelFormat64bppBGRAFixedPoint, 42},
+         {GUID_WICPixelFormat64bppRGBFixedPoint, 43},
+         {GUID_WICPixelFormat128bppRGBAFixedPoint, 44},
+         {GUID_WICPixelFormat128bppRGBFixedPoint, 45},
+         {GUID_WICPixelFormat64bppRGBAHalf, 46},
+         {GUID_WICPixelFormat64bppPRGBAHalf, 47},
+         {GUID_WICPixelFormat64bppRGBHalf, 48},
+         {GUID_WICPixelFormat48bppRGBHalf, 49},
+         {GUID_WICPixelFormat32bppRGBE, 50},
+         {GUID_WICPixelFormat16bppGrayHalf, 51},
+         {GUID_WICPixelFormat32bppGrayFixedPoint, 52},
+         {GUID_WICPixelFormat32bppRGBA1010102, 53},
+         {GUID_WICPixelFormat32bppRGBA1010102XR, 54},
+         {GUID_WICPixelFormat32bppR10G10B10A2, 55},
+         {GUID_WICPixelFormat32bppR10G10B10A2HDR10, 56},
+         {GUID_WICPixelFormat64bppCMYK, 57},
+         {GUID_WICPixelFormat24bpp3Channels, 58},
+         {GUID_WICPixelFormat32bpp4Channels, 59},
+         {GUID_WICPixelFormat40bpp5Channels, 60},
+         {GUID_WICPixelFormat48bpp6Channels, 61},
+         {GUID_WICPixelFormat56bpp7Channels, 62},
+         {GUID_WICPixelFormat64bpp8Channels, 63},
+         {GUID_WICPixelFormat48bpp3Channels, 64},
+         {GUID_WICPixelFormat64bpp4Channels, 65},
+         {GUID_WICPixelFormat80bpp5Channels, 66},
+         {GUID_WICPixelFormat96bpp6Channels, 67},
+         {GUID_WICPixelFormat112bpp7Channels, 68},
+         {GUID_WICPixelFormat128bpp8Channels, 69},
+         {GUID_WICPixelFormat40bppCMYKAlpha, 70},
+         {GUID_WICPixelFormat80bppCMYKAlpha, 71},
+         {GUID_WICPixelFormat32bpp3ChannelsAlpha, 72},
+         {GUID_WICPixelFormat40bpp4ChannelsAlpha, 73},
+         {GUID_WICPixelFormat48bpp5ChannelsAlpha, 74},
+         {GUID_WICPixelFormat56bpp6ChannelsAlpha, 75},
+         {GUID_WICPixelFormat64bpp7ChannelsAlpha, 76},
+         {GUID_WICPixelFormat72bpp8ChannelsAlpha, 77},
+         {GUID_WICPixelFormat64bpp3ChannelsAlpha, 78},
+         {GUID_WICPixelFormat80bpp4ChannelsAlpha, 79},
+         {GUID_WICPixelFormat96bpp5ChannelsAlpha, 80},
+         {GUID_WICPixelFormat112bpp6ChannelsAlpha, 81},
+         {GUID_WICPixelFormat128bpp7ChannelsAlpha, 82},
+         {GUID_WICPixelFormat144bpp8ChannelsAlpha, 83},
+         {GUID_WICPixelFormat8bppY, 84},
+         {GUID_WICPixelFormat8bppCb, 85},
+         {GUID_WICPixelFormat8bppCr, 86},
+         {GUID_WICPixelFormat16bppCbCr, 87},
+         {GUID_WICPixelFormat16bppYQuantizedDctCoefficients, 88},
+         {GUID_WICPixelFormat16bppCbQuantizedDctCoefficients, 89},
+         {GUID_WICPixelFormat16bppCrQuantizedDctCoefficients, 90}
+     };
+
+     auto it = formatMap.find(oPixFmt);
+     return (it != formatMap.end()) ? it->second : 0;
 }
 
 INT indexedContainerFmts(const GUID containerFmt) {
-    INT ucontainerFmt = 0;
-    if (containerFmt == GUID_ContainerFormatBmp)
-       ucontainerFmt = 1;
-    else if (containerFmt == GUID_ContainerFormatPng)
-       ucontainerFmt = 2;
-    else if (containerFmt == GUID_ContainerFormatIco)
-       ucontainerFmt = 3;
-    else if (containerFmt == GUID_ContainerFormatJpeg)
-       ucontainerFmt = 4;
-    else if (containerFmt == GUID_ContainerFormatTiff)
-       ucontainerFmt = 5;
-    else if (containerFmt == GUID_ContainerFormatGif)
-       ucontainerFmt = 6;
-    else if (containerFmt == GUID_ContainerFormatWmp)
-       ucontainerFmt = 7;
-    else if (containerFmt == GUID_ContainerFormatDds)
-       ucontainerFmt = 8;
-    else if (containerFmt == GUID_ContainerFormatAdng)
-       ucontainerFmt = 9;
-    else if (containerFmt == GUID_ContainerFormatHeif)
-       ucontainerFmt = 10;
-    else if (containerFmt == GUID_ContainerFormatWebp)
-       ucontainerFmt = 11;
-    else if (containerFmt == GUID_ContainerFormatRaw)
-       ucontainerFmt = 12;
-    return ucontainerFmt;
+    static const std::map<GUID, INT, GUIDComparer> formatMap = {
+        {GUID_ContainerFormatBmp,  1},
+        {GUID_ContainerFormatPng,  2},
+        {GUID_ContainerFormatIco,  3},
+        {GUID_ContainerFormatJpeg, 4},
+        {GUID_ContainerFormatTiff, 5},
+        {GUID_ContainerFormatGif,  6},
+        {GUID_ContainerFormatWmp,  7},
+        {GUID_ContainerFormatDds,  8},
+        {GUID_ContainerFormatAdng, 9},
+        {GUID_ContainerFormatHeif, 10},
+        {GUID_ContainerFormatWebp, 11},
+        {GUID_ContainerFormatRaw,  12}
+    };
+
+    auto it = formatMap.find(containerFmt);
+    return (it != formatMap.end()) ? it->second : 0;
 }
 
 auto adaptImageGivenSize(const UINT keepAratio, const UINT ScaleAnySize, const UINT imgW, const UINT imgH, const UINT givenW, const UINT givenH) {
@@ -5148,7 +5013,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV WICgetRectImage(int x, int y, int w, int
       if (SUCCEEDED(hr))
          hr = pIClipper->Initialize(pWICclassPixelsBitmapSource, &rcClip);
 
-      fnOutputDebug("clip wic img: " + std::to_string(w) + " / " + std::to_string(h));
+      // fnOutputDebug("clip wic img: " + std::to_string(w) + " / " + std::to_string(h));
       // Retrieve IWICBitmapSource from the frame
       if (SUCCEEDED(hr))
       {
@@ -5162,7 +5027,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV WICgetRectImage(int x, int y, int w, int
 
   if (SUCCEEDED(hr))
   {
-     fnOutputDebug("rescale wic img: " + std::to_string(newW) + " / " + std::to_string(newH));
+     // fnOutputDebug("rescale wic img: " + std::to_string(newW) + " / " + std::to_string(newH));
      if (mustClip==1)
         hr = pScaler->Initialize(pBitmapSource, newW, newH, WICBitmapInterpolationModeNearestNeighbor);
      else
@@ -5180,7 +5045,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV WICgetRectImage(int x, int y, int w, int
              hr = pConverter->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void **>(&pFinalBitmapSource));
                               // IID_PPV_ARGS(ppToRenderBitmapSource));
           }
-          fnOutputDebug("WIC PIXEL Format converted");
+          // fnOutputDebug("WIC PIXEL Format converted");
       }
   }
 
@@ -5211,7 +5076,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV WICgetRectImage(int x, int y, int w, int
       if (SUCCEEDED(hr))
          hr = UIntMult(cbStride, height, &cbBufferSize);
 
-      fnOutputDebug("WIC prepare gdi+ obj");
+      // fnOutputDebug("WIC prepare gdi+ obj");
       if (SUCCEEDED(hr))
       {
           BYTE *m_pbBuffer = NULL;  // the GDI+ bitmap buffer
@@ -5227,7 +5092,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV WICgetRectImage(int x, int y, int w, int
               // fnOutputDebug("WIC after copy pixels");
               if (SUCCEEDED(hr))
               {
-                 fnOutputDebug("WIC gdi+ obj copy pixels into buffer");
+                 // fnOutputDebug("WIC gdi+ obj copy pixels into buffer");
                  Gdiplus::DllExports::GdipCreateBitmapFromScan0(width, height, cbStride, PixelFormat32bppPARGB, NULL, &myBitmap);
                  Gdiplus::Rect rectu(0, 0, width, height);
                  Gdiplus::BitmapData bitmapDatu;
@@ -5240,8 +5105,8 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV WICgetRectImage(int x, int y, int w, int
                  Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rectu, 6, PixelFormat32bppPARGB, &bitmapDatu);
                  Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu);
                  hr = myBitmap ? S_OK : E_FAIL;
-                 if (SUCCEEDED(hr))
-                    fnOutputDebug("WIC gdi+ obj created");
+                 // if (SUCCEEDED(hr))
+                 //    fnOutputDebug("WIC gdi+ obj created");
               }
               delete[] m_pbBuffer;
           }
@@ -5291,7 +5156,7 @@ DLL_API BYTE* DLL_CALLCONV WICgetLargeBufferImage(int okay, int bitsDepth, UINT6
   UINT64 buffOffset = 0;
   if (SUCCEEDED(hr))
   {
-      fnOutputDebug(std::to_string(cbStride) + " WIC buffer created: " + std::to_string(cbBufferSize) + "; h=" + std::to_string(height) + "; w=" + std::to_string(width));
+      // fnOutputDebug(std::to_string(cbStride) + " WIC buffer created: " + std::to_string(cbBufferSize) + "; h=" + std::to_string(height) + "; w=" + std::to_string(width));
       while (y<height)
       {
           if (indexu>0)
@@ -5317,7 +5182,7 @@ DLL_API BYTE* DLL_CALLCONV WICgetLargeBufferImage(int okay, int bitsDepth, UINT6
       if (SUCCEEDED(hr))
       {
           okay = 1;
-          fnOutputDebug("WIC copy pixels to buffer: yay");
+          // fnOutputDebug("WIC copy pixels to buffer: yay");
       } else
       {
          delete[] m_pbBuffer;
@@ -5358,12 +5223,12 @@ DLL_API BYTE* DLL_CALLCONV WICgetBufferImage(int okay, int bitsDepth, UINT64 cbS
   hr = (m_pbBuffer!=nullptr) ? S_OK : E_FAIL;
   if (SUCCEEDED(hr))
   {
-      fnOutputDebug("WIC buffer created: " + std::to_string(cbBufferSize));
+      // fnOutputDebug("WIC buffer created: " + std::to_string(cbBufferSize));
       hr = pFinalBitmapSource->CopyPixels(NULL, cbStride, cbBufferSize, m_pbBuffer);
       if (SUCCEEDED(hr))
       {
           okay = 1;
-          fnOutputDebug("WIC copy pixels to buffer: yay");
+          // fnOutputDebug("WIC copy pixels to buffer: yay");
       } else
       {
          delete[] m_pbBuffer;

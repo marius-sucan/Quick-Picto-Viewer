@@ -972,7 +972,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
         Else If (thumbsDisplaying=1 && maxFilesIndex>10 && CurrentSLD && !z)
            func2Call := ["invokeFilesListMapNow"]
 
-        ; testCreateMask()
+        ; testWicLoader()
     } Else If (givenKey="+^n")
     {
         If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
@@ -13456,7 +13456,6 @@ determineSizeRotateSkew(whichBitmap, Angle, shearX, shearY, ellipseModus, reveal
    Gdip_ShearMatrix(pMatrix, shearX, shearY)
    Gdip_RotateMatrix(pMatrix, Angle)
    Gdip_TransformPath(pPath, pMatrix)
-
    If (ellipseModus=1 && revealOriginal=0)
       pb := getAccuratePathBounds(pPath, 2)
    Else
@@ -20674,13 +20673,10 @@ HugeImagesDrawParametricLines() {
       Sleep, 50
       roundJoins := DrawLineAreaJoinsStyle
       roundCaps := DrawLineAreaCapsStyle
-      ; If ((dSelY2 + tk)>imgH && (dSelY1 - tk)<0 && (dSelX2 + tk)>imgW && (dSelX1 - tk)<0)
-      ; {
-      ;    imgSelY2 := dSelY2 + tk
-      ; }
       If (DrawLineAreaCropShape>1)
-         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, DrawLineAreaCropShape - 2, VPselRotation, 0, 0, "a", "a", 1, [tk + pfcX, tk, o_imgSelW, o_imgSelH])
-fnOutputDebug("craaaappp=" imgSelY1 " |" imgSelY2)
+         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, DrawLineAreaCropShape - 2, VPselRotation, 0, 0, "a", "a", 1, [tk + pfcX, tk, imgSelW, imgSelH])
+
+      skippedLines := 0
       doCrop := (DrawLineAreaCropShape>1) ? 1 : 2
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
       rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", doCrop)
@@ -20701,7 +20697,7 @@ fnOutputDebug("craaaappp=" imgSelY1 " |" imgSelY2)
          Else ; If (imgSelX1 < o_imgSelX1)
             ppzX := o_imgSelX1 - imgSelX1 - tk - pfcX 
 
-         fnOutputDebug("a=" ppzX "|" ppzY " || " o_imgSelY1 " || " pfcY)
+         ; fnOutputDebug("a=" ppzX "|" ppzY " || " o_imgSelY1 " || " pfcY)
          otherThick := Round(thisThick*0.34)
          diffThick := (imgSelY1<0) ? imgSelY1 : 0
          If (imgSelY2>imgH)
@@ -20723,6 +20719,7 @@ fnOutputDebug("craaaappp=" imgSelY1 " |" imgSelY2)
             subdivide := (DrawLineAreaBorderCenter>3 || DrawLineAreaBorderCenter=1) ? 1 : 0
             doStartLongOpDance()
             setWhileLoopExec(1)
+            bmp := useGdiBitmap()
             While, ((subPath := iterator.NextSubpath()).count > 0)
             {
                ppk++
@@ -20730,32 +20727,42 @@ fnOutputDebug("craaaappp=" imgSelY1 " |" imgSelY2)
                If (pPath="")
                   Continue
 
+               rect := Gdip_GetPathWorldBounds(pPath)
+               outlier := testSelectOutsideImgEntirely(bmp, [o_imgSelX1 + rect.x - tk, o_imgSelY1 + rect.y - tk, o_imgSelX1 + rect.x + rect.w + tk, o_imgSelY1 + rect.y + rect.h + tk])
+               ; fnOutputDebug(overlaps " | subPath #" ppk " | " round(rect.x) " | " round(rect.y)  " ||| " round(rect.w) " | " round(rect.h) )
                executingCanceableOperation := A_TickCount
                etaTime := ETAinfos(ppk, subs, startOperation)
                If (ppzX || ppzY)
                   Gdip_TransformPath(pPath, pMatrix)
 
-               ; fnOutputDebug("Subpath #: " ppk " | Points: " PointsCount)
-               processGdipPathForDLL(pPath, tk, r.h, subdivide, PointsCount, PointsF)
+               If (outlier=0)
+               {
+                  processGdipPathForDLL(pPath, tk, r.h, subdivide, PointsCount, PointsF)
+                  rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0, "int", tempCrapValue)
+                  If (rzb=1 && DrawLineAreaDoubles=1)
+                  {
+                     DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
+                     kThick := (DrawLineAreaCapsStyle=3 && DrawLineAreaJoinsStyle=1) ? thisThick : otherThick
+                     rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
+                     DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
+                  }
+
+                  If (DrawLineAreaAtomizedGrid=1 && rzb=1)
+                  {
+                     rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", DrawLineAreaOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", doBehind, "int", 0, "int", BlendModesPreserveAlpha)
+                     rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", 2)
+                  }
+               } Else
+               {
+                  skippedLines++
+                  rzb := rzc := 1
+                  ; fnOutputDebug("skipped subpath #: " ppk)
+               }
+
                If (A_TickCount - prevMSGdisplay>450)
                {
                   showTOOLtip("Drawing lines, please wait...`nStep: 2 / 3`nSegments processed:" etaTime "`nObject size: " nmgpx, 0, 0, ppk / (subs + 1))
                   prevMSGdisplay := A_TickCount
-               }
-
-               rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0, "int", tempCrapValue)
-               If (rzb=1 && DrawLineAreaDoubles=1)
-               {
-                  DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
-                  kThick := (DrawLineAreaCapsStyle=3 && DrawLineAreaJoinsStyle=1) ? thisThick : otherThick
-                  rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
-                  DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
-               }
-
-               If (DrawLineAreaAtomizedGrid=1 && rzb=1)
-               {
-                  rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", DrawLineAreaOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", doBehind, "int", 0, "int", BlendModesPreserveAlpha)
-                  rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", 2)
                }
 
                Gdip_DeletePath(pPath)
@@ -20781,7 +20788,7 @@ fnOutputDebug("craaaappp=" imgSelY1 " |" imgSelY2)
          rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", DrawLineAreaOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", doBehind, "int", 0, "int", BlendModesPreserveAlpha)
 
       DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
-      fnOutputDebug("Draw lines finished in: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)))
+      fnOutputDebug("Draw lines finished in: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) "`nSkipped segments: " skippedLines)
       imgSelX1 := o_imgSelX1,      imgSelY1 := o_imgSelY1
       imgSelX2 := o_imgSelX2,      imgSelY2 := o_imgSelY2
       defineRelativeSelCoords(imgW, imgH)
@@ -26083,7 +26090,7 @@ SettingsToolTips() {
 
    ; If (!value && btnType)
    ;    msg2show .= "`n`nCONTROL TYPE:`n" btnType
-   If InStr(msg2show, "lib\") || InStr(msg2show, "a href=")
+   If varContains(msg2show, "`n[systabcontrol32]", "lib\", "a href=")
       Return
 
    msg2show := StrReplace(msg2show, " = customSliders", "`n")
@@ -48313,7 +48320,7 @@ PanelDrawParametricLines() {
 
     If (viewportQPVimage.imgHandle)
     {
-       DrawLineAreaDashStyle := 1
+       DrawLineAreaJoinsStyle :=  DrawLineAreaDashStyle := 1
        DrawLineAreaContourAlign := 2
     }
 
@@ -48376,8 +48383,8 @@ PanelDrawParametricLines() {
     Gui, Add, Checkbox, x+10 wp hp +0x1000 gupdateUIDrawLinesPanel Checked%DrawLineAreaKeepBounds% vDrawLineAreaKeepBounds +hwndhTemp, &Within bounds
     ToolTip2ctrl(hTemp, "Rotate object within the boundaries of the selection area")
     Gui, Add, Checkbox, xs y+5 wp hp +0x1000 gupdateUIDrawLinesPanel Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles, Double line
-    If (viewportQPVimage.imgHandle)
-       Gui, Add, Checkbox, x+10 wp hp +0x1000 Checked%DrawLineAreaJoinsStyle% vDrawLineAreaJoinsStyle gupdateUIDrawLinesPanel, &Round joins
+    ; If (viewportQPVimage.imgHandle)
+    ;    Gui, Add, Checkbox, x+10 wp hp +0x1000 Checked%DrawLineAreaJoinsStyle% vDrawLineAreaJoinsStyle gupdateUIDrawLinesPanel, &Round joins
 
     sml := (PrefsLargeFonts=1) ? 30 : 20
     ml := (PrefsLargeFonts=1) ? 72 : 25
@@ -59971,6 +59978,7 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
          Return
 
       mustOpenStartFolder := ""
+      RecordImagesOpenedManager(Trimmer(imgsListu))
       coreAddNewFiles(imgsListu, countFiles, prevOpenFolderPath)
       mustGenerateStaticFolders := 1
       ForceRefreshNowThumbsList()
@@ -75350,51 +75358,31 @@ getIDvpFX() {
 testSelectOutsideImgEntirely(pBitmap, otherCoords:=0) {
      If IsObject(otherCoords)
      {
-        nImgSelX1 := min(otherCoords[1], otherCoords[3])
-        nImgSelY1 := min(otherCoords[2], otherCoords[4])
-        nimgSelX2 := max(otherCoords[1], otherCoords[3])
-        nimgSelY2 := max(otherCoords[2], otherCoords[4])
+        x1 := min(otherCoords[1], otherCoords[3])
+        y1 := min(otherCoords[2], otherCoords[4])
+        x2 := max(otherCoords[1], otherCoords[3])
+        y2 := max(otherCoords[2], otherCoords[4])
      } Else
      {
-        nImgSelX1 := min(imgSelX1, imgSelX2)
-        nImgSelY1 := min(imgSelY1, imgSelY2)
-        nimgSelX2 := max(imgSelX1, imgSelX2)
-        nimgSelY2 := max(imgSelY1, imgSelY2)
+        x1 := min(imgSelX1, imgSelX2)
+        y1 := min(imgSelY1, imgSelY2)
+        x2 := max(imgSelX1, imgSelX2)
+        y2 := max(imgSelY1, imgSelY2)
      }
+     rw := x2 - x1
+     rh := y2 - y1
 
      trGdip_GetImageDimensions(pBitmap, imgW, imgH)
-     If (nimgSelX1<0)
-        nimgSelX1 := 0
-     If (nimgSelY1<0)
-        nimgSelY1 := 0
+     If (x1 + rw <= 0 || imgW <= x1)
+     ; if (r1.x + r1.width <= r2.x || r2.x + r2.width <= r1.x)
+        Return 1
 
-     If (nimgSelX2<3)
-        nimgSelX2 := 1
-     If (nimgSelY2<3)
-        nimgSelY2 := 1
-
-     If (nimgSelX1>imgW - 3)
-        nimgSelX1 := ImgW - 1
-     If (nimgSelY1>ImgH - 3)
-        nimgSelY1 := imgH - 1
-
-     If (nimgSelX2>imgW)
-        nimgSelX2 := imgW
-     If (nimgSelY2>imgH)
-        nimgSelY2 := imgH
-
-     isOutside := 0
-     imgSelW := max(nImgSelX1, nImgSelX2) - min(nImgSelX1, nImgSelX2)
-     imgSelH := max(nImgSelY1, nImgSelY2) - min(nImgSelY1, nImgSelY2)
-     If (imgSelW<3 || imgSelH<3)
-        isOutside := 1
-
-     ; If (nimgSelX1<2 && nimgSelY1<2 && nimgSelX2<5 && nimgSelY2<5)
-     ;    isOutside := 1
-
-     ; If (nimgSelX1>ImgW-5 && nimgSelY1>imgH-5 && nimgSelX2>imgW && nimgSelY2>imgH)
-     ;    isOutside := 1
-     Return isOutside
+     If (y1 + rh <= 0 || imgH <= y1)
+     ; if (r1.y + r1.height <= r2.y || r2.y + r2.height <= r1.y)
+        Return 1
+    
+     ; If we get here, the rectangles must overlap
+     Return 0
 }
 
 ViewPortSelectionManageCoords(mainWidth, mainHeight, dpX, dpY, maxSelX, maxSelY, ByRef nImgSelX1, ByRef nImgSelY1, ByRef nImgSelX2, ByRef nImgSelY2, ByRef zImgSelX1, ByRef zImgSelY1, ByRef zImgSelX2, ByRef zImgSelY2, ByRef vPimgSelW, ByRef vPimgSelH, ByRef vPimgSelPx, ByRef vPimgSelPy) {
@@ -98803,4 +98791,17 @@ doClicku() {
       Sleep, 2
    SendEvent, {LButton up}
    */
+}
+
+testWicLoader() {
+;    wic := new WICImage()
+
+; ; Load and resize image
+;    pBitmap := wic.LoadFromFile("E:\Sucan twins\photos test\SLDs\freeimage-tests\test-rosar- (9a).webp", 800, 600)
+
+Gdip_GraphicsClear(2NDglPG)
+Gdip_DrawImage(2NDglPG, pBitmap)
+doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+Gdip_DisposeImage(pBitmap)
+
 }

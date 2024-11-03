@@ -66,6 +66,12 @@ std::vector<UINT>  dupesListIDsC(1);
 
 std::array<double, 1025>  DCTcoeffs;
 
+struct GUIDComparer {
+    bool operator()(const GUID& left, const GUID& right) const {
+        return memcmp(&left, &right, sizeof(GUID)) < 0;
+    }
+};
+
 struct Point {
     double x, y;
 };
