@@ -1600,7 +1600,6 @@ Return
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   Static lastInvoked := 1, prevPos, lastTip := 1, prevArrayPos := [], darked := 0
   If ((A_TickCount - lastZeitPanCursor < 300) || !isQPVactive())
-     Return
 
   If (wP&0x1)
   {
@@ -1631,7 +1630,7 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
         SetTimer, showMouseTooltipStatusbar, Off
   }
 
-  If (A_TickCount - scriptStartTime < 900)
+  If ((A_TickCount - scriptStartTime < 900) || (whileLoopExec=1 || runningLongOperation=1 || slideShowRunning=1))
      Return
 
   If (menusflyOutVisible=1)
