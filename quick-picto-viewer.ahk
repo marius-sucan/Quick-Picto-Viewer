@@ -21912,36 +21912,9 @@ coreDrawParametricLinesGrid(x1, y1, x2, y2, imgSelW, imgSelH, thisThick, ByRef s
 }
 
 coreDrawParametricLinesPolar(x1, y1, x2, y2, imgSelW, imgSelH, thisThick, ByRef straightLines) {
-    pPath := Gdip_CreatePath()
     imgSelPx := x1,  imgSelPy := y1
     ccX := imgSelPx + imgSelW/2
     ccY := imgSelPy + imgSelH/2
-    Gdip_AddPathRectangle(pPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
-    Rect := Gdip_GetPathWorldBounds(pPath)
-
-    pMatrix := Gdip_CreateMatrix()
-    cX := Rect.x + (Rect.w / 2),   cY := Rect.y + (Rect.h / 2)
-    Gdip_TranslateMatrix(pMatrix, -cX , -cY)
-    Gdip_RotateMatrix(pMatrix, VPselRotation, 1)
-    Gdip_TranslateMatrix(pMatrix, cX, cY, 1)
-    Gdip_TransformPath(pPath, pMatrix)
-
-    nRect := Gdip_GetPathWorldBounds(pPath)
-    ncX := nRect.x + (nRect.w / 2)
-    ncY := nRect.y + (nRect.h / 2)
-    zpMatrix := Gdip_CreateMatrix()
-    Gdip_TranslateMatrix(zpMatrix, -ncX , -ncY)
-    Gdip_DeletePath(pPath)
-    pPath := Gdip_CreatePath()
-    sX := Rect.w / nRect.w
-    sY := Rect.h / nRect.h
-    If (DrawLineAreaKeepBounds=1)
-    {
-       sX := min(sX, sY)
-       sY := min(sX, sY)
-    }
-    Gdip_ScaleMatrix(zpMatrix, sX, sY, 1)
-    Gdip_TranslateMatrix(zpMatrix, ncX, ncY, 1)
     GridX := (DrawLineAreaGridX<3) ? 2 : DrawLineAreaGridX//2
     pa := GridX/2
     straightLines := 0
@@ -21956,14 +21929,22 @@ coreDrawParametricLinesPolar(x1, y1, x2, y2, imgSelW, imgSelH, thisThick, ByRef 
     skewY := 1 - (DrawLineAreaAltRays / 300)
     zxs := zxs * skewX
     zys := zys * skewY
-    zxs := zxs ** skewX
-    zys := zys ** skewY
-    ff := 2 - DrawLineAreaGridX/450
     if (zxs<1)
        zxs := 1
     if (zys<1)
        zys := 1
 
+    cutf := (DrawLineAreaCenterCut>0) ? 1 - DrawLineAreaCenterCut/350 : 1
+    zxs := zxs ** skewX 
+    zys := zys ** skewY 
+    rcx := ccx * cutf, rcy := ccy * cutf
+    ff := 2 - DrawLineAreaGridX/450
+    nww := imgSelW * (1 - cutf)
+    nhh := imgSelH * (1 - cutf)
+
+    ; draw the circles
+    ldw := ldh := 0
+    pPath := Gdip_CreatePath()
     Loop, % GridX + 1
     {
        if (A_Index>1)
@@ -21975,44 +21956,41 @@ coreDrawParametricLinesPolar(x1, y1, x2, y2, imgSelW, imgSelH, thisThick, ByRef 
           dw -= zxs*2
           dh -= zys*2
        }
-       If (imgSelPx>ccX || imgSelPy>ccY || dw<2 || dh<2)
+       If ((dw<nww || dh<nhh) && A_Index>2)
+       ; If (px>rcx || py>rcy || dw<2 || dh<2)
           Break
 
        ; nPath := Gdip_CreatePath()
        Gdip_StartPathFigure(pPath)
        Gdip_AddPathEllipse(pPath, px, py, dw, dh)
+       ldw := dw,       ldh := dh
        ; Gdip_TransformPath(nPath, pMatrix)
        ; Gdip_TransformPath(nPath, zpMatrix)
        ; Gdip_AddPathToPath(pPath, nPath, 0)
        ; Gdip_DeletePath(nPath)
     }
 
+    ; draw the rays
+    GridY := DrawLineAreaGridY//2
     rw := imgSelW,  rh := imgSelH
-    arw := rw,      arh := rh 
     cX := imgSelPx + rW/2
     cY := imgSelPy + rH/2
+    innerPointsList := []
+    ; midPointsList := []
     PointsList := []
-    midPointsList := []
-    pk := 0
-    GridY := DrawLineAreaGridY//2
+    mw := rw, mh := rh
     Loop, % GridY
     {
-       ; If (DrawLineAreaRaysLimit>1)
-       ; {
-       ;    If !isInRange(A_Index, DrawLineAreaRaysLimit, GridY - DrawLineAreaRaysLimit)
-       ;       Continue
-       ; }
-
-       pk := !pk
        getRelativePointCoordsCircle((1130 / GridY) * (A_Index - 1) - 281, zx, zy)
-       mw := (pk=1) ? rw : arw
-       mh := (pk=1) ? rh : arh
+       bzx := (DrawLineAreaCenterCut>0) ? cX + (zx*ldw)/2 : cX 
+       bzy := (DrawLineAreaCenterCut>0) ? cY + (zy*ldh)/2 : cY 
+       innerPointsList.Push(bzx),  innerPointsList.Push(bzy)
        bzx := cX + (zx*mW)/2
        bzy := cY + (zy*mH)/2
        PointsList.Push(bzx),  PointsList.Push(bzy)
-       zx := cX + (zx*(mW/2))/2
-       zy := cY + (zy*(mH/2))/2
-       midPointsList.Push(zx),  midPointsList.Push(zy)
+       ; zx := cX + ( zx * (mW - ldw) )/2
+       ; zy := cY + ( zy * (mH - ldh) )/2
+       ; midPointsList.Push(zx),  midPointsList.Push(zy)
     }
 
     t := 0,  fx := imgSelW * alphaMaskOffsetX, fy := imgSelH * alphaMaskOffsetY
@@ -22021,28 +21999,30 @@ coreDrawParametricLinesPolar(x1, y1, x2, y2, imgSelW, imgSelH, thisThick, ByRef 
     Loop, % PointsList.Count() + 1
     {
        t++
-       zx := PointsList[t]
+       inx := innerPointsList[t]
        mx := midPointsList[t]
+       zx := PointsList[t]
        t++
-       zy := PointsList[t]
+       iny := innerPointsList[t]
        my := midPointsList[t]
-       If (zx="" || mx="")
+       zy := PointsList[t]
+       If (zx="")
           Continue
 
        Gdip_StartPathFigure(pPath)
-       If (DrawLineAreaCenterCut>105)
-       {
-          abx := mX + fx/1.5,  aby := mY + fy/1.5
-          bbx := weighTwoValues(zx, abx, ppr)
-          bby := weighTwoValues(zy, aby, ppr)
-          Gdip_AddPathLine(pPath, bbx, bby, zx, zy)
-       } Else
-       {
-          abx := cX + fx,       aby := cY + fy
-          bbx := weighTwoValues(zx, abx, ppr)
-          bby := weighTwoValues(zy, aby, ppr)
-          Gdip_AddPathCurve(pPath, [bbx, bby, mX + fx/1.5, mY + fy/1.5, zx, zy], 0.9)
-       }
+       ; If (DrawLineAreaCenterCut>105)
+       ; {
+       ;    abx := mX + fx/1.5,  aby := mY + fy/1.5
+       ;    bbx := weighTwoValues(inx, abx, ppr)
+       ;    bby := weighTwoValues(iny, aby, ppr)
+       ;    Gdip_AddPathLine(pPath, bbx, bby, zx, zy)
+       ; } Else
+       ; {
+          ; abx := cX + fx,       aby := cY + fy
+          ; bbx := weighTwoValues(zx, abx, ppr)
+          ; bby := weighTwoValues(zy, aby, ppr)
+          Gdip_AddPathLine(pPath, inx, iny, zx, zy)
+       ; }
     }
 
     trGdip_RotatePathAtCenter(pPath, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
@@ -51463,7 +51443,7 @@ updateUIdrawParamLinesPanel(actionu:=0, b:=0) {
     isActive := (DrawLineAreaBorderCenter=4 || DrawLineAreaBorderCenter=7) ? 1 : 0
     uiSlidersArray["DrawLineAreaAltRays", 10] := isActive
 
-    actu := (DrawLineAreaBorderCenter=4 || DrawLineAreaBorderCenter=6) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    actu := (DrawLineAreaBorderCenter=4 || DrawLineAreaBorderCenter>=6) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "DrawLineAreaCenterCut")
 
     actu := (DrawLineAreaBorderCenter=5 || DrawLineAreaBorderCenter=7) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
