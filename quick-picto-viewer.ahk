@@ -21967,24 +21967,26 @@ coreDrawParametricLinesPolar(x1, y1, x2, y2, imgSelW, imgSelH, thisThick, ByRef 
           Gdip_AddPathEllipse(pPath, px, py, dw, dh)
        } Else
        {
-          closed := (A_Index=1) ? 1 : 0
-          AddArcToPath(pPath, 0.1, 0.1, dw, dh, maxAngle, imgSelPx + imgSelW/2, imgSelPy + imgSelH/2, 0.25, closed)
+          ; closed := (A_Index=1) ? 0 : 0
+          AddArcToPath(pPath, 0.1, 0.1, dw, dh, maxAngle, imgSelPx + imgSelW/2, imgSelPy + imgSelH/2, 0.25, 0)
           ; Gdip_AddPathPie(pPath, px, py, dw, dh, 0, maxAngle)
        }
     }
 
     ; draw the rays
     GridY := DrawLineAreaGridY//2
+    anny := 360 / GridY
     rw := imgSelW,    rh := imgSelH
     cX := imgSelPx + rW/2
     cY := imgSelPy + rH/2
-    anny := 360 / GridY
     innerPointsList := []
     PointsList := []
-    Loop, % GridY
+    Loop, % GridY + 1
     {
        ann := anny * (A_Index - 1)
-       If (ann>maxAngle)
+       If (ann>maxAngle && FillAreaEllipseSection<1440)
+          ann := maxAngle
+       Else If (ann>maxAngle)
           Continue
 
        getSmartRelativePointCoordsCircle(ann, zx, zy)
@@ -21994,11 +21996,11 @@ coreDrawParametricLinesPolar(x1, y1, x2, y2, imgSelW, imgSelH, thisThick, ByRef 
        bzx := cX + (zx * rw)/2
        bzy := cY + (zy * rh)/2
        PointsList.Push(bzx),  PointsList.Push(bzy)
+       If (ann=maxAngle)
+          Break
     }
 
-    t := 0,  fx := imgSelW * alphaMaskOffsetX, fy := imgSelH * alphaMaskOffsetY
-    ppr := (DrawLineAreaCenterCut>105) ? (DrawLineAreaCenterCut - 225)/350 : DrawLineAreaCenterCut/350
-    ; pPath := Gdip_CreatePath()
+    t := 0
     Loop, % PointsList.Count() + 1
     {
        t++
@@ -22509,7 +22511,10 @@ AddArcToPath(pPath, cX, cY, mW, mH, maxAngle, rcx, rcy, stepping, closed) {
     ann := 0
     PointsList := []
     If (closed=1)
+    {
        PointsList.Push(cX + rcx),  PointsList.Push(cY + rcy)
+    }
+
     Loop
     {
        getSmartRelativePointCoordsCircle(ann, zx, zy)
@@ -22520,6 +22525,7 @@ AddArcToPath(pPath, cX, cY, mW, mH, maxAngle, rcx, rcy, stepping, closed) {
        If (ann>maxAngle || ann > 360)
           Break
     }
+
     Gdip_StartPathFigure(pPath)
     If (closed=1)
        Gdip_AddPathPolygon(pPath, PointsList)
@@ -48537,10 +48543,10 @@ PanelDrawParametricLines() {
     GuiAddSlider("FillAreaEllipseSection", 1,1440, 1440, ".updateLabelEllipseSect", "updateUIdrawParamLinesPanel", 3, "xp yp wp hp")
     GuiAddButton("x+1 hp w35 gBtnHelpParametricPivot vBtn2", " ?", "Help")
 
-    GuiAddSlider("DrawLineAreaRaysLimit", 0,200, 0, "Circum. cut-off", "updateUIdrawParamLinesPanel", 1, " xp-" btnWid + 1 " ys w" btnWid " h" ha)
+    GuiAddSlider("DrawLineAreaRaysLimit", 0,200, 0, "Slice", "updateUIdrawParamLinesPanel", 1, " xp-" btnWid + 1 " ys w" btnWid " h" ha)
     GuiAddSlider("DrawLineAreaSpiralLength", 50,5678, 900, "Spiral frequency", "updateUIdrawParamLinesPanel", 1, "xs ys wp hp")
     GuiAddSlider("DrawLineAreaAltRays", 0,200, 0, "Alternate radius", "updateUIdrawParamLinesPanel", 1, "xs y+10 wp hp")
-    GuiAddSlider("DrawLineAreaCenterCut", -1,350, 0, "Cut-off limit: $€", "updateUIdrawParamLinesPanel", 1, "x+10 yp wp hp")
+    GuiAddSlider("DrawLineAreaCenterCut", -1,350, 0, "Central hole: $€", "updateUIdrawParamLinesPanel", 1, "x+10 yp wp hp")
     Gui, Add, Checkbox, xp yp gupdateUIdrawParamLinesPanel Checked%DrawLineAreaBorderConnector% vDrawLineAreaBorderConnector, &Join lines using arcs
     Gui, Add, Checkbox, xp yp gupdateUIdrawParamLinesPanel Checked%DrawLineAreaSnapLine% vDrawLineAreaSnapLine, &Snap lines to 0/90°
     Gui, Add, Checkbox, xs y+50 gupdateUIdrawParamLinesPanel Checked%DrawLineAreaAtomizedGrid% vDrawLineAreaAtomizedGrid, &Separated line segments
@@ -97112,6 +97118,7 @@ GuiSlidersResponder(a, m_event, keyu) {
       WinGetPos, , , w, h, ahk_id %hwnd%
       uiSlidersArray[whichSlider, 12] := w
       uiSlidersArray[whichSlider, 13] := h
+      Sleep, -1
    }
 
    GuiControl, %guiu%:Focus , % "customSliders" whichSlider
@@ -97131,6 +97138,7 @@ GuiSlidersResponder(a, m_event, keyu) {
 
    If (m_event="uiLabel" && isActive=1)
    {
+      Sleep, -1
       ; if m_event = "uiLabel" , it is a keyboard call
       frkA := (doFloat=1) ? 0.025 : 1
       frkB := (doFloat=1) ? 0.050 : 5
@@ -97209,10 +97217,11 @@ GuiSlidersResponder(a, m_event, keyu) {
    clickStarted := A_TickCount
    occ := A_IsCritical
    Critical, off
-   Sleep, -1
+   Sleep, -1   ; the excessive amount of added Sleeps is to prevent potential lock-ups/dead locks
    While, (determineLClickState()=1 || m_event="uiLabel" && A_Index=1 || GetKeyState(keyu, "P") && isGivenKey=1)
    {
       ; fnOutputDebug(A_ThisFunc " == A // start")
+      Sleep, -1
       ; if m_event = "uiLabel" , it is a keyboard call
       GetPhysicalCursorPos(mX, mY)
       If (isGivenKey!=1 && mouseMode=1)
@@ -97228,7 +97237,8 @@ GuiSlidersResponder(a, m_event, keyu) {
       ; fnOutputDebug(A_ThisFunc " == B // mouse coords=" nX " // " nY)
       If (isGivenKey=1)
       {
-         fnOutputDebug(A_ThisFunc " == key")
+         ; fnOutputDebug(A_ThisFunc " == key")
+         Sleep, -1
          If (A_TickCount - clickStarted>4000)
          {
             Sleep, 25
@@ -97257,6 +97267,7 @@ GuiSlidersResponder(a, m_event, keyu) {
 
       ; ToolTip, % wx "|" w "|" rangeu "|" newValue , , , 2
       ; fnOutputDebug(A_ThisFunc " == C // newValue=" newValue)
+      Sleep, -1
       If (whichSlider="userUIshapeCavity")
       {
          If (newValue<2)
@@ -97267,8 +97278,10 @@ GuiSlidersResponder(a, m_event, keyu) {
 
       If (A_TickCount - lastu>50)
       {
+         Sleep, -1
          ; fnOutputDebug(A_ThisFunc " == D // must preview")
          p := GuiUpdateSliders(whichSlider, 0, obju)
+         Sleep, -1
          ; fnOutputDebug(A_ThisFunc " == D // slider updated")
          If (AnyWindowOpen=10 || AnyWindowOpen=74)
             livePreviewColorsAdjustVP()
@@ -97279,15 +97292,17 @@ GuiSlidersResponder(a, m_event, keyu) {
          Else
             %funcu%()
 
+         ; fnOutputDebug(A_ThisFunc " == D // viewport preview done")
          lastu := A_TickCount
          skipped := 0
-         ; fnOutputDebug(A_ThisFunc " == D // viewport preview done")
+         Sleep, -1
       } Else skipped++
 
       ; fnOutputDebug(A_ThisFunc " == E // finish")
       If (sk && !isGivenKey)
          Break
 
+      Sleep, -1
       If (A_TickCount - clickStarted>14500)
       {
          SoundBeep 900, 100
