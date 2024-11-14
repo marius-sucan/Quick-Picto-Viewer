@@ -20616,7 +20616,7 @@ HugeImagesDrawParametricLines() {
       Else If (DrawLineAreaBorderCenter=7)
          kPath := coreDrawParametricLinesPolar(x1, y1, x2, y2, imgSelW, imgSelH, oth, straightLines)
       Else If (DrawLineAreaBorderCenter=8)
-         kPath := coreDrawParametricLinesPolar(x1, y1, x2, y2, imgSelW, imgSelH, straightLines)
+         kPath := coreDrawParametricLinesRose(x1, y1, x2, y2, imgSelW, imgSelH, straightLines)
       Else If (DrawLineAreaBorderCenter<=3)
          kPath := xPath
 
