@@ -20615,6 +20615,8 @@ HugeImagesDrawParametricLines() {
          kPath := coreDrawParametricLinesSpiral(x1, y1, x2, y2, imgSelW, imgSelH, straightLines)
       Else If (DrawLineAreaBorderCenter=7)
          kPath := coreDrawParametricLinesPolar(x1, y1, x2, y2, imgSelW, imgSelH, oth, straightLines)
+      Else If (DrawLineAreaBorderCenter=8)
+         kPath := coreDrawParametricLinesPolar(x1, y1, x2, y2, imgSelW, imgSelH, straightLines)
       Else If (DrawLineAreaBorderCenter<=3)
          kPath := xPath
 
@@ -21940,38 +21942,83 @@ calcGeometricDivisions(width, divisions, skew, scaler) {
         totalLength += segmentLengths[A_Index]
     }
 
+    ; fnOutputDebug(A_ThisFunc " | skew=" skew " | r=" r " | tL=" totalLength " | sc=" scaler)
     ; Normalize so the sum equals the total width
-fnOutputDebug(A_ThisFunc " | skew=" skew " | r=" r " | tL=" totalLength " | sc=" scaler)
     Loop, % divisions
     {
         ;fnOutputDebug(A_ThisFunc " #" A_Index " = " segmentLengths[A_Index])
         segmentLengths[A_Index] := (segmentLengths[A_Index] / totalLength) * width
     }
-    segmentLengths.InsertAt(1, 1)
 
+    segmentLengths.InsertAt(1, 1)
     Return segmentLengths
+}
+
+coreDrawParametricLinesRose(x1, y1, x2, y2, imgSelW, imgSelH, ByRef straightLines) {
+    imgSelPx := x1,  imgSelPy := y1
+    other := Round(9 * (DrawLineAreaCenterCut/350))
+    Sweep := Round(10 * (DrawLineAreaGridX/350))
+    Petals := 2 + Floor(9 * (DrawLineAreaGridY/350))
+    mw := imgSelW/2
+    mh := imgSelH/2
+    pPath := Gdip_CreatePath()
+    straightLines := 1
+    Loop, 1
+    {
+       PetalList := SweepList := mw "," mh "|"
+       Loop, 360
+       {
+           If (Sweep>0)
+              SweepList .= CalculateSweep(A_Index*Sweep, other, mw, mh)
+           Else
+              PetalList .= CalculateSweep(A_Index*3.14159/180, Petals, mw, mh)
+       }
+       PetalList .= mw "," mh
+       SweepList .= mw "," mh
+       Gdip_StartPathFigure(pPath)
+       If (Sweep>0)
+          Gdip_AddPathLines(pPath, SweepList)
+       Else
+          Gdip_AddPathLines(pPath, PetalList)
+    }
+
+    pMatrix := Gdip_CreateMatrix()
+    Gdip_TranslateMatrix(pMatrix, x1, y1, 1)
+    Gdip_TransformPath(pPath, pMatrix)
+    Gdip_DeleteMatrix(pMatrix)
+    trGdip_RotatePathAtCenter(pPath, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
+    Return pPath
 }
 
 coreDrawParametricLinesPolar(x1, y1, x2, y2, imgSelW, imgSelH, thisThick, ByRef straightLines) {
     imgSelPx := x1,  imgSelPy := y1
     ccX := imgSelPx + imgSelW/2
     ccY := imgSelPy + imgSelH/2
-    GridX := (DrawLineAreaGridX<=3) ? 2 : DrawLineAreaGridX//2
+    cutf := (DrawLineAreaCenterCut>0) ? 1 - DrawLineAreaCenterCut/450 : 1
+    If (DrawLineAreaPolarMode=3)
+    {
+       cutf := 0.999
+       GridX := (DrawLineAreaGridX<=7) ? 6 : DrawLineAreaGridX//2
+    } Else
+       GridX := (DrawLineAreaGridX<=3) ? 2 : DrawLineAreaGridX//2
+
     pa := GridX/2
     straightLines := 0
     ozxs := zxs := (imgSelW + thisThick) / GridX
     ozys := zys := (imgSelH + thisThick) / GridX
     dw := imgSelW,  dh := imgSelH
     px := imgSelPx, py := imgSelPy
-    cutf := (DrawLineAreaCenterCut>0) ? 1 - DrawLineAreaCenterCut/450 : 1
-    ffy := ffx := 1 - DrawLineAreaAltRays/200 ; - DrawLineAreaGridX/350
+
+    altRays := (DrawLineAreaAltRays<2 && DrawLineAreaPolarMode=3) ? 2 : DrawLineAreaAltRays
+    ffy := ffx := 1 - altRays/200
     nww := imgSelW * cutf
     nhh := imgSelH * cutf
     ldw := ldh := 0
     pPath := Gdip_CreatePath()
     maxAngle := DrawLineAreaPolarSection / 4
-    If (DrawLineAreaPolarSection=3)
+    If (DrawLineAreaPolarMode=3)
        ffy := 1
+
     segLengthsX := calcGeometricDivisions(nww, GridX, ffx, 1 - GridX/(450//2))
     segLengthsY := calcGeometricDivisions(nhh, GridX, ffy, 1 - GridX/(450//2))
     If (DrawLineAreaPolarSection<1440)
@@ -21982,28 +22029,53 @@ coreDrawParametricLinesPolar(x1, y1, x2, y2, imgSelW, imgSelH, thisThick, ByRef 
     ; draw the circles
     Loop, % GridX
     {
-       thisIndex := (DrawLineAreaPolarMode>=2 && A_Index>1 && ffx!=1) ? GridX - A_Index + 1 : A_Index
+       If (skew!=1 && A_Index=GridX && cutf!=1)
+          Continue
+
+       thisIndex := (DrawLineAreaPolarMode>=2 && A_Index>1 && ffx!=1) ? GridX - A_Index + 2 : A_Index
        dw -= segLengthsX[thisIndex]
-       dh -= (DrawLineAreaPolarMode=3) ? 0.1 : segLengthsY[thisIndex]
+       dh -= (DrawLineAreaPolarMode=3) ? 0.15 : segLengthsY[thisIndex]
        px := imgSelPx + (imgSelW - dw)/2 ; + imgSelW
        py := imgSelPy + (imgSelH - dh)/2 ; + imgSelH
 
-       ldw := dw,       ldh := dh
        Gdip_StartPathFigure(pPath)
+       If (thisIndex=3 && DrawLineAreaPolarMode=3 && DrawLineAreaPolarSection=1440)
+       {
+          If (segLengthsX[thisIndex+1]<dw/1.5)
+          {
+             Gdip_AddPathEllipseC(pPath, imgSelPx + imgSelW/2, imgSelPy + imgSelH/2, dw/4, imgSelH/2)
+             Gdip_StartPathFigure(pPath)
+          }
+       } Else If (thisIndex=GridX && DrawLineAreaPolarMode=3 && DrawLineAreaPolarSection=1440)
+       {
+          ldh := dh, ldw := 1
+          Gdip_AddPathLine(pPath, imgSelPx + imgSelW/2, imgSelPy + thisThick, imgSelPx + imgSelW/2, imgSelPy + imgSelH - thisThick)
+          Gdip_StartPathFigure(pPath)
+       } Else If (DrawLineAreaPolarMode!=3 || DrawLineAreaPolarSection<1440)
+       {
+          ldw := dw,       ldh := dh
+       }
+
        If (DrawLineAreaPolarSection=1440)
           Gdip_AddPathEllipse(pPath, px, py, dw, dh)
        Else
           wrapAddArcToPath(pPath, arcPoints, 0.01, 0.01, dw, dh, arcx, arcy, A_Index)
+       If (ldh=-1)
+          dw := ldw
     }
 
     ; draw the rays
-    GridY := DrawLineAreaGridY//2
+    GridY := Round(DrawLineAreaGridY/2)
+    If (mod(GridY, 2)!=0)
+       GridY += 1
+
     anny := 360 / GridY
     rw := imgSelW,    rh := imgSelH
     cX := imgSelPx + rW/2
     cY := imgSelPy + rH/2
     innerPointsList := []
     PointsList := []
+    counter := 0
     Loop, % GridY + 1
     {
        ann := anny * (A_Index - 1)
@@ -22012,31 +22084,38 @@ coreDrawParametricLinesPolar(x1, y1, x2, y2, imgSelW, imgSelH, thisThick, ByRef 
        Else If (ann>maxAngle)
           Continue
 
+       counter++
        getSmartRelativePointCoordsCircle(ann, zx, zy)
-       bzx := (DrawLineAreaCenterCut>0) ? cX + (zx*ldw)/2 : cX 
-       bzy := (DrawLineAreaCenterCut>0) ? cY + (zy*ldh)/2 : cY 
-       innerPointsList.Push(bzx),  innerPointsList.Push(bzy)
+       bzx := (cutf!=1) ? cX + (zx*ldw)/2 : cX 
+       bzy := (cutf!=1) ? cY + (zy*ldh)/2 : cY 
+       innerPointsList[counter] := [bzx, bzy]
        bzx := cX + (zx * rw)/2
        bzy := cY + (zy * rh)/2
-       PointsList.Push(bzx),  PointsList.Push(bzy)
+       PointsList[counter] := [bzx, bzy]
        If (ann=maxAngle)
           Break
     }
 
-    t := 0
-    Loop, % PointsList.Count() + 1
+    Loop, % counter
     {
-       t++
-       inx := innerPointsList[t]
-       zx := PointsList[t]
-       t++
-       iny := innerPointsList[t]
-       zy := PointsList[t]
-       If (zx="")
-          Continue
+       If (A_Index=1)
+       {
+          inx := Round(innerPointsList[A_Index, 1])
+          iny := Round(innerPointsList[A_Index, 2])
+          zx := Round(PointsList[A_Index, 1])
+          zy := Round(PointsList[A_Index, 2])
+          firstu := "a" inx "|" iny "|" zx "|" zy
+          inx := Round(innerPointsList[counter, 1])
+          iny := Round(innerPointsList[counter, 2])
+          zx := Round(PointsList[counter, 1])
+          zy := Round(PointsList[counter, 2])
+          lastu := "a" inx "|" iny "|" zx "|" zy
+          If (firstu=lastu)
+             Continue
+       }
 
        Gdip_StartPathFigure(pPath)
-       Gdip_AddPathLine(pPath, inx, iny, zx, zy)
+       Gdip_AddPathLine(pPath, innerPointsList[A_Index, 1], innerPointsList[A_Index, 2], PointsList[A_Index, 1], PointsList[A_Index, 2])
     }
 
     trGdip_RotatePathAtCenter(pPath, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
@@ -22292,6 +22371,8 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
        kPath := coreDrawParametricLinesSpiral(x1, y1, x2, y2, imgSelW, imgSelH, straightLines)
     Else If (DrawLineAreaBorderCenter=7)
        kPath := coreDrawParametricLinesPolar(x1, y1, x2, y2, imgSelW, imgSelH, thisThick, straightLines)
+    Else If (DrawLineAreaBorderCenter=8)
+       kPath := coreDrawParametricLinesRose(x1, y1, x2, y2, imgSelW, imgSelH, straightLines)
     Else If (DrawLineAreaBorderCenter<=3)
        kPath := pPath
 
@@ -22535,12 +22616,8 @@ wrapAddArcToPath(pPath, ByRef arcPoints, cX, cY, dW, dH, arcx, arcy, ap) {
    ptz := []
    Loop, % arcPoints.Count()
    {
-     pp := (cX + arcPoints[A_Index, 1] * dw) / 2 + arcx
-     ptz.Push(pp)
-     pp := (cY + arcPoints[A_Index, 2] * dh) / 2 + arcy
-     ptz.Push(pp)
-     ; if (ap=1)
-     ;    fnOutputDebug("tp=" tp " | " ptz[tp - 1] " | " ptz[tp]  " || " pp)
+      ptz.Push((cX + arcPoints[A_Index, 1] * dw) / 2 + arcx)
+      ptz.Push((cY + arcPoints[A_Index, 2] * dh) / 2 + arcy)
    }
    ; fnOutputDebug("a=" arcPointsCount " | " ptz.count())
    Gdip_AddPathLines(pPath, ptz)
@@ -48571,7 +48648,7 @@ PanelDrawParametricLines() {
     Gui, Tab, 1
     Gui, Add, Text, x+15 y+15 w%btnWid% Section, Line generator
     Gui, Add, Text, x+10 wp vtxtLine2, Crop output
-    GuiAddDropDownList("xs y+8 wp gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaBorderCenter " vDrawLineAreaBorderCenter", "Margins|Mid lines|Diagonals|Rays|Grid|Spiral|Circular / Polar", "Lines generator type")
+    GuiAddDropDownList("xs y+8 wp gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaBorderCenter " vDrawLineAreaBorderCenter", "Margins|Mid lines|Diagonals|Rays|Grid|Spiral|Circular / Polar|Maurer rose", "Lines generator type")
     GuiAddDropDownList("x+10 wp gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaCropShape " vDrawLineAreaCropShape", "No cropping|Rectangular|Elliptical", "Crop output")
     Gui, Add, Checkbox, xs y+10 Section w%sml% h%btnHeight% +0x1000 gupdateUIdrawParamLinesPanel Checked%DrawLineAreaBorderArcA% vDrawLineAreaBorderArcA,○
     Gui, Add, Checkbox, x+1 wp hp +0x1000 gupdateUIdrawParamLinesPanel Checked%DrawLineAreaBorderTop% vDrawLineAreaBorderTop,─
@@ -48600,7 +48677,7 @@ PanelDrawParametricLines() {
     GuiAddSlider("DrawLineAreaRaysLimit", 0,200, 0, "Slice", "updateUIdrawParamLinesPanel", 1, " xp-" btnWid + 1 " ys w" btnWid " h" ha)
     GuiAddSlider("DrawLineAreaSpiralLength", 50,5678, 900, "Spiral frequency", "updateUIdrawParamLinesPanel", 1, "xs ys wp hp")
     GuiAddSlider("DrawLineAreaAltRays", 0,200, 0, "Alternate radius", "updateUIdrawParamLinesPanel", 1, "xs y+10 wp hp")
-    GuiAddSlider("DrawLineAreaCenterCut", -1,350, 0, "Central hole: $€", "updateUIdrawParamLinesPanel", 1, "x+10 yp wp hp")
+    GuiAddSlider("DrawLineAreaCenterCut", -1,350, 0, "Opening: $€", "updateUIdrawParamLinesPanel", 1, "x+10 yp wp hp")
     Gui, Add, Checkbox, xp yp gupdateUIdrawParamLinesPanel Checked%DrawLineAreaBorderConnector% vDrawLineAreaBorderConnector, &Join lines using arcs
     Gui, Add, Checkbox, xp yp gupdateUIdrawParamLinesPanel Checked%DrawLineAreaSnapLine% vDrawLineAreaSnapLine, &Snap lines to 0/90°
     Gui, Add, Checkbox, xs y+50 gupdateUIdrawParamLinesPanel Checked%DrawLineAreaAtomizedGrid% vDrawLineAreaAtomizedGrid, &Separated line segments
@@ -51503,9 +51580,12 @@ updateUIdrawParamLinesPanel(actionu:=0, b:=0) {
     actu := (freeHandSelectionMode=1 && DrawLineAreaBorderCenter=3) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiControl, % actu, DrawLineAreaSnapLine
 
-    stringu := (DrawLineAreaBorderCenter=4) ? "Lines density" : "Density X"
+    actu := isVarEqualTo(DrawLineAreaBorderCenter, 4, 5, 7, 8) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    GuiUpdateVisibilitySliders(actu, "DrawLineAreaGridX")
+
+    stringu := (DrawLineAreaBorderCenter=4 || DrawLineAreaBorderCenter=8) ? "Lines density" : "Density X"
     uiSlidersArray["DrawLineAreaGridX", 5] := stringu
-    stringu := (DrawLineAreaBorderCenter=7) ? "Skew X" : "Alternate radius"
+    stringu := (DrawLineAreaBorderCenter>=7) ? "Skew" : "Alternate radius"
     uiSlidersArray["DrawLineAreaAltRays", 5] := stringu
 
     actu := (DrawLineAreaBorderCenter=4 || DrawLineAreaBorderCenter=6) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
@@ -51513,19 +51593,23 @@ updateUIdrawParamLinesPanel(actionu:=0, b:=0) {
     actu := (DrawLineAreaBorderCenter=4 || DrawLineAreaBorderCenter>=6) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "DrawLineAreaAltRays")
 
-    isActive := (DrawLineAreaEqualGrid=1 && DrawLineAreaBorderCenter!=7) ? 0 : 1
+    Sweep := Round(10 * (DrawLineAreaGridX/350))
+    isActive := (DrawLineAreaEqualGrid!=1 || DrawLineAreaBorderCenter=7 || DrawLineAreaBorderCenter=8 && sweep=0) ? 1 : 0
     uiSlidersArray["DrawLineAreaGridY", 10] := isActive
+
+    actu := (DrawLineAreaBorderCenter=5 || DrawLineAreaBorderCenter>=7) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    GuiUpdateVisibilitySliders(actu, "DrawLineAreaGridY")
 
     isActive := (DrawLineAreaBorderCenter=4) ? 1 : 0
     uiSlidersArray["DrawLineAreaRaysLimit", 10] := isActive
     isActive := (DrawLineAreaBorderCenter=4 || DrawLineAreaBorderCenter=7) ? 1 : 0
     uiSlidersArray["DrawLineAreaAltRays", 10] := isActive
 
-    actu := (DrawLineAreaBorderCenter=4 || DrawLineAreaBorderCenter>=6) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    actu := isVarEqualTo(DrawLineAreaBorderCenter, 4, 6, 7) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "DrawLineAreaCenterCut")
+    isActive := (DrawLineAreaPolarMode<3 || DrawLineAreaBorderCenter<7) ? 1 : 0
+    uiSlidersArray["DrawLineAreaCenterCut", 10] := isActive
 
-    actu := (DrawLineAreaBorderCenter=5 || DrawLineAreaBorderCenter=7) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
-    GuiUpdateVisibilitySliders(actu, "DrawLineAreaGridY")
     actu := (DrawLineAreaBorderCenter=5) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiControl, % actu, DrawLineAreaEqualGrid
     GuiControl, % actu, DrawLineAreaGridCenter
@@ -51533,9 +51617,6 @@ updateUIdrawParamLinesPanel(actionu:=0, b:=0) {
     actu := isInRange(DrawLineAreaBorderCenter, 5, 6) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiControl, % actu, infoLine
     GuiControl, % actu, btn2
-
-    actu := isVarEqualTo(DrawLineAreaBorderCenter, 4, 5, 7) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
-    GuiUpdateVisibilitySliders(actu, "DrawLineAreaGridX")
 
     actu := (DrawLineAreaBorderCenter=6) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "DrawLineAreaSpiralLength")
@@ -67773,7 +67854,8 @@ coredrawWelcomeImg(modelu, iterations, moduz, sweepRand, mainWidth, mainHeight, 
 
           PetalPen := Gdip_CreatePenFromBrush(pBr%ttBrsh%, thickness)
           SweepPen := Gdip_CreatePenFromBrush(pBr%tBrsh%, thickness)
-          PetalList := SweepList := mainWidth//2 "," mainHeight//2 "|", Sweep := sweepRand
+          PetalList := SweepList := mainWidth//2 "," mainHeight//2 "|"
+          Sweep := sweepRand
           Loop, 360
           {
               SweepList .= CalculateSweep(A_Index*Sweep, Petals, mainWidth//2, mainHeight//2)
@@ -67871,7 +67953,7 @@ coredrawWelcomeImg(modelu, iterations, moduz, sweepRand, mainWidth, mainHeight, 
 }
 
 CalculateSweep(InputValue, Petals, w, h) {
-   r:=((w+h)//2)*Sin(Petals*InputValue)
+   r:=((w+h)/2)*Sin(Petals*InputValue)
    x:=r*cos(InputValue)+w
    y:=r*sin(InputValue)+h
    return x "," y "|"
