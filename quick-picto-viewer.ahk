@@ -21956,36 +21956,70 @@ calcGeometricDivisions(width, divisions, skew, scaler) {
 
 coreDrawParametricLinesRose(x1, y1, x2, y2, imgSelW, imgSelH, ByRef straightLines) {
     imgSelPx := x1,  imgSelPy := y1
-    other := Round(9 * (DrawLineAreaCenterCut/350))
+    cut := (DrawLineAreaCenterCut<4) ? 3 : DrawLineAreaCenterCut
     Sweep := Round(10 * (DrawLineAreaGridX/350))
-    Petals := 2 + Floor(9 * (DrawLineAreaGridY/350))
+    CenterRadius := (sweep!=0) ? 0 : Round(min(imgSelW, imgSelH)/1.5 * (cut/350))
+    Petals := 2 + Floor(11 * (DrawLineAreaGridY/350))
+    FluctuationRadius := min(imgSelW, imgSelH)/2
     mw := imgSelW/2
     mh := imgSelH/2
-    pPath := Gdip_CreatePath()
+    PointsList := []
     straightLines := 1
-    Loop, 1
+    pPath := Gdip_CreatePath()
+    if (DrawLineAreaAtomizedGrid=0)
     {
-       PetalList := SweepList := mw "," mh "|"
-       Loop, 360
+       ; PointsList.Push(mw + CenterRadius*0.99, mh)
+       Loop, 1440
        {
-           If (Sweep>0)
-              SweepList .= CalculateSweep(A_Index*Sweep, other, mw, mh)
-           Else
-              PetalList .= CalculateSweep(A_Index*3.14159/180, Petals, mw, mh)
+          If (Sweep>0)
+             CalculateSweep(PointsList, (A_Index/4)*Sweep, Petals, mw, mh)
+          Else
+             CalculateSweep(PointsList, (A_Index/4)*3.14159/180, Petals, mw, mh, CenterRadius, FluctuationRadius)
        }
-       PetalList .= mw "," mh
-       SweepList .= mw "," mh
+       ; PointsList.Push(mw + CenterRadius*0.99, mh)
        Gdip_StartPathFigure(pPath)
-       If (Sweep>0)
-          Gdip_AddPathLines(pPath, SweepList)
-       Else
-          Gdip_AddPathLines(pPath, PetalList)
+       Gdip_AddPathLines(pPath, PointsList)
+    } Else
+    {
+       hasRenewed := 0, mustRenew := 1, counter := 0, mmwwhh := (mw + mh)/2
+       Loop, 1440
+       {
+          thisAngle := (Sweep>0) ? (A_Index/4)*Sweep : (A_Index/4)*3.14159/180
+          sino := sin(Petals * thisAngle)
+          r := CenterRadius ? CenterRadius + FluctuationRadius * abs(sino) : mmwwhh * sino 
+          If isInRange(sino, -0.01, 0.01)
+          {
+             mustRenew := 1
+             ; fnOutputDebug(A_ThisFunc ": " abs(sino))
+          } Else 
+          {
+             hasRenewed := mustRenew := 0
+          }
+
+          If (hasRenewed=0 && mustRenew=1)
+          {
+             counter++
+             ; PointsList.Push(mw + CenterRadius*0.99, mh)
+             Gdip_StartPathFigure(pPath)
+             Gdip_AddPathLines(pPath, PointsList)
+
+             PointsList := []
+             ; PointsList.Push(mw + CenterRadius*0.99, mh)
+             hasRenewed := 1
+          }
+
+          PointsList.Push( r*cos(thisAngle) + mw)
+          PointsList.Push( r*sin(thisAngle) + mh) 
+       }
+       fnOutputDebug(A_ThisFunc ": segments = " counter " || " petals)
     }
 
-    pMatrix := Gdip_CreateMatrix()
-    Gdip_TranslateMatrix(pMatrix, x1, y1, 1)
-    Gdip_TransformPath(pPath, pMatrix)
-    Gdip_DeleteMatrix(pMatrix)
+    rect := Gdip_GetPathWorldBounds(pPath)
+    sx := ImgSelW / rect.w,    sy := ImgSelh / rect.h
+    sm := min(sx, sy)
+    fnOutputDebug(A_ThisFunc ": w/h = " rect.w " || " rect.h)
+    Gdip_ScalePathAtCenter(pPath, sm, sm)
+    Gdip_TranslatePath(pPath, x1, y1)
     trGdip_RotatePathAtCenter(pPath, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
     Return pPath
 }
@@ -48598,7 +48632,7 @@ ReadSettingsDrawLinesArea(act:=0) {
     RegAction(act, "DrawLineAreaBorderArcC",, 1)
     RegAction(act, "DrawLineAreaBorderArcD",, 1)
     RegAction(act, "DrawLineAreaBorderConnector",, 1)
-    RegAction(act, "DrawLineAreaBorderCenter",, 2, 1, 7)
+    RegAction(act, "DrawLineAreaBorderCenter",, 2, 1, 8)
     RegAction(act, "DrawLineAreaSpiralCenterMode",, 2, 1, 3)
     RegAction(act, "DrawLineAreaSpiralLength",, 2, 50, 5678)
     RegAction(act, "DrawLineAreaGridCenter",, 2, 1, 4)
@@ -51556,7 +51590,7 @@ updateUIdrawParamLinesPanel(actionu:=0, b:=0) {
     actu := (DrawLineAreaBorderCenter<4) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu, freeHandSelectionMode
 
-    actu := isInRange(DrawLineAreaBorderCenter, 4, 6) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    actu := isInRange(DrawLineAreaBorderCenter, 4, 8) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu, DrawLineAreaCropShape
     GuiControl, % actu, txtLine2
 
@@ -51583,7 +51617,10 @@ updateUIdrawParamLinesPanel(actionu:=0, b:=0) {
     actu := isVarEqualTo(DrawLineAreaBorderCenter, 4, 5, 7, 8) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "DrawLineAreaGridX")
 
-    stringu := (DrawLineAreaBorderCenter=4 || DrawLineAreaBorderCenter=8) ? "Lines density" : "Density X"
+    stringu := (DrawLineAreaBorderCenter=4) ? "Lines density" : "Density X"
+    If (DrawLineAreaBorderCenter=8)
+       stringu := "Aberration"
+
     uiSlidersArray["DrawLineAreaGridX", 5] := stringu
     stringu := (DrawLineAreaBorderCenter>=7) ? "Skew" : "Alternate radius"
     uiSlidersArray["DrawLineAreaAltRays", 5] := stringu
@@ -51593,9 +51630,10 @@ updateUIdrawParamLinesPanel(actionu:=0, b:=0) {
     actu := (DrawLineAreaBorderCenter=4 || DrawLineAreaBorderCenter>=6) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "DrawLineAreaAltRays")
 
-    Sweep := Round(10 * (DrawLineAreaGridX/350))
-    isActive := (DrawLineAreaEqualGrid!=1 || DrawLineAreaBorderCenter=7 || DrawLineAreaBorderCenter=8 && sweep=0) ? 1 : 0
+    stringu := (DrawLineAreaBorderCenter=8) ? "Lobes" : "Density Y"
+    isActive := (DrawLineAreaEqualGrid!=1 || DrawLineAreaBorderCenter>=7) ? 1 : 0
     uiSlidersArray["DrawLineAreaGridY", 10] := isActive
+    uiSlidersArray["DrawLineAreaGridY", 5] := stringu
 
     actu := (DrawLineAreaBorderCenter=5 || DrawLineAreaBorderCenter>=7) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "DrawLineAreaGridY")
@@ -51605,9 +51643,10 @@ updateUIdrawParamLinesPanel(actionu:=0, b:=0) {
     isActive := (DrawLineAreaBorderCenter=4 || DrawLineAreaBorderCenter=7) ? 1 : 0
     uiSlidersArray["DrawLineAreaAltRays", 10] := isActive
 
-    actu := isVarEqualTo(DrawLineAreaBorderCenter, 4, 6, 7) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    Sweep := Round(10 * (DrawLineAreaGridX/350))
+    actu := isVarEqualTo(DrawLineAreaBorderCenter, 4, 6, 7, 8) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "DrawLineAreaCenterCut")
-    isActive := (DrawLineAreaPolarMode<3 || DrawLineAreaBorderCenter<7) ? 1 : 0
+    isActive := (DrawLineAreaPolarMode<3 && DrawLineAreaBorderCenter=7 || DrawLineAreaBorderCenter=8 && Sweep=0 || DrawLineAreaBorderCenter<7) ? 1 : 0
     uiSlidersArray["DrawLineAreaCenterCut", 10] := isActive
 
     actu := (DrawLineAreaBorderCenter=5) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
@@ -67852,17 +67891,20 @@ coredrawWelcomeImg(modelu, iterations, moduz, sweepRand, mainWidth, mainHeight, 
              tBrsh := prevObj[A_Index, 5]
           }
 
+          Sweep := sweepRand
           PetalPen := Gdip_CreatePenFromBrush(pBr%ttBrsh%, thickness)
           SweepPen := Gdip_CreatePenFromBrush(pBr%tBrsh%, thickness)
-          PetalList := SweepList := mainWidth//2 "," mainHeight//2 "|"
-          Sweep := sweepRand
+          PetalList := []
+          SweepList := []
+          PetalList.Push(mainWidth/2, mainHeight/2)
+          SweepList.Push(mainWidth/2, mainHeight/2)
           Loop, 360
           {
-              SweepList .= CalculateSweep(A_Index*Sweep, Petals, mainWidth//2, mainHeight//2)
-              PetalList .= CalculateSweep(A_Index*3.14159/180, Petals, mainWidth//2, mainHeight//2)
+             CalculateSweep(SweepList, A_Index*Sweep, Petals, mainWidth/2, mainHeight/2)
+             CalculateSweep(PetalList, A_Index*3.14159/180, Petals, mainWidth/2, mainHeight/2)
           }
-          PetalList .= mainWidth//2 "," mainHeight//2
-          SweepList .= mainWidth//2 "," mainHeight//2
+          PetalList.Push(mainWidth/2, mainHeight/2)
+          SweepList.Push(mainWidth/2, mainHeight/2)
           Gdip_DrawLines(G, PetalPenA, PetalList)
           Gdip_DrawLines(G, SweepPen, SweepList)
           ; Gdip_DrawLines(G, SweepPen, SweepList)
@@ -67952,11 +67994,14 @@ coredrawWelcomeImg(modelu, iterations, moduz, sweepRand, mainWidth, mainHeight, 
     Return BMPcache
 }
 
-CalculateSweep(InputValue, Petals, w, h) {
-   r:=((w+h)/2)*Sin(Petals*InputValue)
-   x:=r*cos(InputValue)+w
-   y:=r*sin(InputValue)+h
-   return x "," y "|"
+CalculateSweep(ByRef PointsList, circleAngle, Petals, w, h, CenterRadius:=0, FluctuationRadius:=0) {
+   If CenterRadius
+      r := CenterRadius + FluctuationRadius * abs(Sin(Petals * circleAngle))
+   Else
+      r := ((w + h)/2) * Sin(Petals * circleAngle)
+
+   PointsList.Push( r*cos(circleAngle)+w )
+   PointsList.Push( r*sin(circleAngle)+h )
 }
 
 addJournalEntry(msg) {
