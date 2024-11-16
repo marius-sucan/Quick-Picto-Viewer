@@ -1600,6 +1600,7 @@ Return
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   Static lastInvoked := 1, prevPos, lastTip := 1, prevArrayPos := [], darked := 0
   If ((A_TickCount - lastZeitPanCursor < 300) || !isQPVactive())
+     Return
 
   If (wP&0x1)
   {
