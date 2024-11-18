@@ -32,6 +32,7 @@ int imgSelH = 0;
 int EllipseSelectMode = 0;
 int flippedSelection = 0;
 int invertSelection = 0;
+int highDepthModeMask = 0;
 float excludeSelectScale = 0;
 float vpSelRotation = 0;
 float cosVPselRotation = 0;
@@ -53,6 +54,7 @@ IWICBitmapFrameDecode  *pWICclassFrameDecoded;
 // IWICFormatConverter *pWICclassConverter;
 IWICBitmapSource       *pWICclassPixelsBitmapSource;
 
+std::vector<unsigned char>  highDephMaskMap;
 std::vector<bool>  polygonMaskMap;
 std::vector<bool>  polygonOtherMaskMap;
 // std::vector<std::vector<short>> DrawLineCapsGrid;

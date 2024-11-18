@@ -20391,7 +20391,7 @@ HugeImagesApplyInsertText() {
       ResetImgLoadStatus()
 }
 
-processGdipPathForDLL(pPath, tk, o_imgSelH, subdivide, ByRef PointsCount, ByRef PointsF) {
+processGdipPathForDLL(pPath, tk, o_imgSelH, subdivide, ByRef PointsCount, ByRef PointsF, getRect:=0) {
    pMatrix := Gdip_CreateMatrix()
    Gdip_ScaleMatrix(pMatrix, 1, -1)
    Gdip_TranslateMatrix(pMatrix, tk, -o_imgSelH - tk)
@@ -20404,6 +20404,9 @@ processGdipPathForDLL(pPath, tk, o_imgSelH, subdivide, ByRef PointsCount, ByRef 
    PointsCount := Gdip_GetPathPointsCount(pPath)
    VarSetCapacity(PointsF, 8 * (PointsCount + 5), 0)
    rr := DllCall("gdiplus\GdipGetPathPoints", "UPtr", pPath, "UPtr", &PointsF, "int*", PointsCount)
+   If (getRect=1)
+      Return Gdip_GetPathWorldBounds(pPath)
+
    Return rr
 }
 
@@ -20471,7 +20474,7 @@ HugeImagesDrawLineShapes() {
       }
 
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
-      rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", DrawLineAreaContourAlign)
+      rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", DrawLineAreaContourAlign, "int", 0)
       rza := DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
       If (rza=1 && rzq=1)
       {
@@ -20503,12 +20506,12 @@ HugeImagesDrawLineShapes() {
             ; if (DrawLineAreaBlendMode>1)
             ; zzpo:=0
 
-            rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0, "int", tempCrapValue)
+            rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0, "int", tempCrapValue)
             If (rzb=1 && DrawLineAreaDoubles=1)
             {
                DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
                kThick := (DrawLineAreaCapsStyle=3 && DrawLineAreaJoinsStyle=1) ? thisThick : otherThick
-               rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
+               rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
                DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
             }
 
@@ -20517,11 +20520,11 @@ HugeImagesDrawLineShapes() {
             {
                Gdip_ScalePathAtCenter(clonedPath, innerSelectionCavityX, innerSelectionCavityY)
                processGdipPathForDLL(clonedPath, tk, o_imgSelH, subdivide, PointsCount, PointsF)
-               rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0, "int", -1)
+               rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0, "int", -1)
                If (rzb=1 && DrawLineAreaDoubles=1)
                {
                   DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
-                  rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
+                  rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
                }
                Gdip_DeletePath(clonedPath)
             }
@@ -20685,7 +20688,7 @@ HugeImagesDrawParametricLines() {
       skippedLines := 0
       doCrop := (DrawLineAreaCropShape>1) ? 1 : 2
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
-      rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", doCrop)
+      rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", doCrop, "int", DrawLineAreaAtomizedGrid)
       rza := DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
       If (rza=1 && rzq=1)
       {
@@ -20743,20 +20746,21 @@ HugeImagesDrawParametricLines() {
 
                If (outlier=0)
                {
-                  processGdipPathForDLL(pPath, tk, r.h, subdivide, PointsCount, PointsF)
-                  rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0, "int", tempCrapValue)
+                  rect := processGdipPathForDLL(pPath, tk, r.h, subdivide, PointsCount, PointsF, DrawLineAreaAtomizedGrid)
+                  rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0, "int", tempCrapValue)
                   If (rzb=1 && DrawLineAreaDoubles=1)
                   {
                      DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
                      kThick := (DrawLineAreaCapsStyle=3 && DrawLineAreaJoinsStyle=1) ? thisThick : otherThick
-                     rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
+                     rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
                      DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
                   }
 
                   If (DrawLineAreaAtomizedGrid=1 && rzb=1)
                   {
-                     rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", DrawLineAreaOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", doBehind, "int", 0, "int", BlendModesPreserveAlpha)
-                     rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", 2)
+                     ; rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", DrawLineAreaOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", doBehind, "int", 0, "int", BlendModesPreserveAlpha)
+                     ; rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", 2)
+                     rzc := rzq := DllCall(whichMainDLL "\mergePolyMaskIntoHighDepthMask", "int", rect.x, "int", rect.y, "int", rect.x + rect.w, "int", rect.y + rect.h, "int", imgW, "int", imgH, "int", thisThick + 1)
                   }
                } Else
                {
@@ -20779,6 +20783,7 @@ HugeImagesDrawParametricLines() {
                   Break
                }
             }
+
             setWhileLoopExec(0)
             iterator.Discard()
             Gdip_DeletePath(kPath)
@@ -20790,8 +20795,10 @@ HugeImagesDrawParametricLines() {
       If (rzb=1 && DrawLineAreaAtomizedGrid=0 && abandonAll=1)
          rzc := 1
 
-      If (rzb=1 && DrawLineAreaAtomizedGrid=0 && abandonAll!=1)
-         rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", DrawLineAreaOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", doBehind, "int", 0, "int", BlendModesPreserveAlpha)
+      thisOpacity := DrawLineAreaOpacity
+      ; If (rzb=1 && DrawLineAreaAtomizedGrid=0 && abandonAll!=1)
+      If (rzb=1 && abandonAll!=1)
+         rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", thisOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", doBehind, "int", 0, "int", BlendModesPreserveAlpha)
 
       DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
       fnOutputDebug("Draw lines finished in: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) "`nSkipped segments: " skippedLines)
@@ -22011,13 +22018,13 @@ coreDrawParametricLinesRose(x1, y1, x2, y2, imgSelW, imgSelH, ByRef straightLine
           PointsList.Push( r*cos(thisAngle) + mw)
           PointsList.Push( r*sin(thisAngle) + mh) 
        }
-       fnOutputDebug(A_ThisFunc ": segments = " counter " || " petals)
+       ; fnOutputDebug(A_ThisFunc ": segments = " counter " || " petals)
     }
 
     rect := Gdip_GetPathWorldBounds(pPath)
     sx := ImgSelW / rect.w,    sy := ImgSelh / rect.h
     sm := min(sx, sy)
-    fnOutputDebug(A_ThisFunc ": w/h = " rect.w " || " rect.h)
+    ; fnOutputDebug(A_ThisFunc ": w/h = " rect.w " || " rect.h)
     Gdip_ScalePathAtCenter(pPath, sm, sm)
     Gdip_TranslatePath(pPath, x1, y1)
     trGdip_RotatePathAtCenter(pPath, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
@@ -22100,7 +22107,7 @@ coreDrawParametricLinesPolar(x1, y1, x2, y2, imgSelW, imgSelH, thisThick, ByRef 
 
     ; draw the rays
     GridY := Round(DrawLineAreaGridY/2)
-    If (mod(GridY, 2)!=0)
+    If (mod(GridY, 2)!=0 && DrawLineAreaPolarMode=3)
        GridY += 1
 
     anny := 360 / GridY

@@ -666,10 +666,13 @@ DLL_API int DLL_CALLCONV discardFilledPolygonCache(int m) {
     // polygonMapMin.shrink_to_fit();
     polygonMaskMap.clear();
     polygonMaskMap.shrink_to_fit();
+    highDephMaskMap.clear();
+    highDephMaskMap.shrink_to_fit();
     polygonOtherMaskMap.clear();
     polygonOtherMaskMap.shrink_to_fit();
     DrawLineCapsGrid.clear();
     DrawLineCapsGrid.shrink_to_fit();
+    highDepthModeMask = 0;
     return 1;
 }
 
@@ -1242,7 +1245,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
        return 0;
     }
 
-    fnOutputDebug("polygonMaskMap refilled to zero ; size = " + std::to_string(s) + "|" + std::to_string(polyW) + " x " + std::to_string(polyH) + "|" + std::to_string(polyX) + " x " + std::to_string(polyY));
+    // fnOutputDebug("polygonMaskMap refilled to zero ; size = " + std::to_string(s) + "|" + std::to_string(polyW) + " x " + std::to_string(polyH) + "|" + std::to_string(polyX) + " x " + std::to_string(polyY));
     for ( int i = 0; i < PointsCount*2; i+=2)
     {
         // prepare points list
@@ -1257,9 +1260,9 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
     {
        offsetPointsListA.reserve(PointsCount*4 + 5);
        offsetPointsListB.reserve(PointsCount*4 + 5);
-       fnOutputDebug(std::to_string(offsetPointsListA.size()) + " preparing line thickness adjusted paths; points=" + std::to_string(PointsCount));
+       // fnOutputDebug(std::to_string(offsetPointsListA.size()) + " preparing line thickness adjusted paths; points=" + std::to_string(PointsCount));
        prepareTranslatedLineSegments(thickness, offsetPointsListA, offsetPointsListB, PointsList, PointsCount, closed, 0, offsetY);
-       fnOutputDebug(std::to_string(offsetPointsListA.size()) + " finished line thickness adjusted paths;");
+       // fnOutputDebug(std::to_string(offsetPointsListA.size()) + " finished line thickness adjusted paths;");
     }
 
     // for ( int i = 0; i < PointsCount*2; i+=2)
@@ -1268,7 +1271,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
     //     PointsList[i] = round(PointsList[i]);
     //     PointsList[i + 1] = round(PointsList[i + 1]) + polyOffYa - polyOffYb;
     // }
-    fillMode = !fillMode;
+
     const int pci = PointsCount - 1;
     const int pcd = PointsCount*2;
     fnOutputDebug("tracing polygonal path with bresenham algo; points=" + std::to_string(PointsCount));
@@ -1396,7 +1399,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
     {
         // fillMaskPolyBounds(polyW, polyH, PointsList, PointsCount, 0, 0, polyW, polyH, 1, polygonMapEdges);
         // drawTestPath(PointsList, PointsCount, thickness, closed, offsetY, offsetPointsListA, offsetPointsListB);
-        fnOutputDebug("drawLineAllSegmentsMask() - drawing line miter joins");
+        // fnOutputDebug("drawLineAllSegmentsMask() - drawing line miter joins");
         // fnOutputDebug(std::to_string(offsetPointsListA.size()) + " preparing line thickness adjusted paths; SECOND ROUND; points=" + std::to_string(PointsCount));
         #pragma omp parallel for schedule(static) default(none) num_threads(4)
         for (int pts = 0; pts < PointsCount; pts++)
@@ -1531,7 +1534,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
         // fnOutputDebug("skipped pts = " + std::to_string(skipped) + " ; painted = " + std::to_string(painted) + " ; otherpainted = " + std::to_string(otherpainted) );
     }
 
-    fnOutputDebug("drawLineAllSegmentsMask() - done");
+    // fnOutputDebug("drawLineAllSegmentsMask() - done");
     return 1;
 }
 
@@ -1582,26 +1585,72 @@ DLL_API int DLL_CALLCONV prepareDrawLinesCapsGridMask(int radius, int roundedJoi
     return 1;
 }
 
-DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode) {
+DLL_API int DLL_CALLCONV mergePolyMaskIntoHighDepthMask(int px1, int py1, int px2, int py2, int imgW, int imgH, int thickness) {
+  INT64 s = (INT64)polyW * polyH + 2; // variables set by prepareSelectionArea()
+  fnOutputDebug("mergePolyMaskIntoHighDepthMask() invoked: w / h= " + std::to_string(polyW) + " x " + std::to_string(polyH) + "; SIZE desired=" + std::to_string(s));
+  if (s!=polygonMaskMap.size())
+  {
+     fnOutputDebug("mergePolyMaskIntoHighDepthMask() error: SIZE MISMATCHED polygonMaskMap=" + std::to_string(polygonMaskMap.size()));
+     return 0;
+  }
+
+  if (s!=highDephMaskMap.size())
+  {
+     fnOutputDebug("mergePolyMaskIntoHighDepthMask() error: SIZE MISMATCHED highDephMaskMap=" + std::to_string(highDephMaskMap.size()));
+     return 0;
+  }
+
+  // const int pb = imgSelY1 + polyY - polyOffYa;
+  // const int pc = imgSelX1 + polyX;
+  // const int pd = clamp(imgSelY1 - (int)polyOffYa, 0, imgH - 1);
+  // const int mw = min(px2 + thickness, polyW - 1);
+  // const int mh = min(py2 + thickness, polyH - 1);
+  // const int mx = max(px1 - thickness, 0);
+  // const int my = max(py1 - thickness, 0);
+  // #pragma omp parallel for schedule(static) default(none) num_threads(3)
+  // for (int x = imgSelX1; x <= imgSelX2; x++)
+  // {
+  //     for (int y = pd; y <= imgSelY2; y++)
+  //     {
+  //         if (inRange(mx, mw, x - pc) && inRange(my, mh, y - pb))
+  //         {
+  //            const INT64 i = (INT64)(y - pb) * polyW + x - pc;
+  //            if (polygonMaskMap[i]==1)
+  //               highDephMaskMap[i] = clamp(highDephMaskMap[i] + polygonMaskMap[i], 0, 255);
+  //         }
+  //     }
+  // }
+  #pragma omp parallel for schedule(static) default(none) num_threads(3)
+  for (INT64 i = 0; i < polygonMaskMap.size(); i++) {
+      if (polygonMaskMap[i]==1)
+         highDephMaskMap[i] = clamp(highDephMaskMap[i] + polygonMaskMap[i], 0, 255);
+  }
+  fill(polygonMaskMap.begin(), polygonMaskMap.end(), 0);
+  return 1;
+}
+
+
+DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode, int highDepth) {
      // relies on prepareSelectionArea()
      EllipseSelectMode = 2;
      invertSelection = 0;
-     fnOutputDebug("prepareDrawLinesMask() invoked: " + std::to_string(polyW) + " x " + std::to_string(polyH));
+     highDepthModeMask = highDepth;
      INT64 s = (INT64)polyW * polyH + 2; // variables set by prepareSelectionArea()
+     fnOutputDebug("prepareDrawLinesMask() invoked: w / h= " + std::to_string(polyW) + " x " + std::to_string(polyH) + "; size=" + std::to_string(s));
      if (clipMode!=2)
      {
         try {
            polygonOtherMaskMap.resize(s);
         } catch(const std::bad_alloc& e) {
-           fnOutputDebug("polygonOtherMaskMap failed. bad_alloc =" + std::to_string(s));
+           fnOutputDebug("polygonOtherMaskMap failed. bad_alloc");
            return 0;
         } catch(const std::length_error& e) {
-           fnOutputDebug("polygonOtherMaskMap failed. length_error =" + std::to_string(s));
+           fnOutputDebug("polygonOtherMaskMap failed. length_error");
            return 0;
         }
  
         polygonOtherMaskMap = polygonMaskMap;
-        fnOutputDebug("polygonOtherMaskMap RESIZED=" + std::to_string(s) + "||" + std::to_string(polygonOtherMaskMap.size()));
+        fnOutputDebug("polygonOtherMaskMap RESIZED");
     }
 
     if (s!=polygonMaskMap.size())
@@ -1609,17 +1658,34 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode) {
        try {
           polygonMaskMap.resize(s);
        } catch(const std::bad_alloc& e) {
-          fnOutputDebug("polygonMaskMap failed. bad_alloc =" + std::to_string(s));
+          fnOutputDebug("polygonMaskMap failed. bad_alloc");
           return 0;
        } catch(const std::length_error& e) {
-          fnOutputDebug("polygonMaskMap failed. length_error =" + std::to_string(s));
+          fnOutputDebug("polygonMaskMap failed. length_error");
           return 0;
        }
 
-       fnOutputDebug("polygonMaskMap RESIZED=" + std::to_string(s) + "||" + std::to_string(polygonMaskMap.size()));
-    } else
+       fnOutputDebug("polygonMaskMap RESIZED");
+    }
+
+    if (s!=highDephMaskMap.size() && highDepthModeMask==1)
     {
-       fnOutputDebug("polygonMaskMap size=" + std::to_string(s) + "||" + std::to_string(polygonMaskMap.size()));
+       try {
+          highDephMaskMap.resize(s);
+       } catch(const std::bad_alloc& e) {
+          fnOutputDebug("highDephMaskMap failed. bad_alloc");
+          return 0;
+       } catch(const std::length_error& e) {
+          fnOutputDebug("highDephMaskMap failed. length_error");
+          return 0;
+       }
+
+       fnOutputDebug("highDephMaskMap RESIZED");
+       fill(highDephMaskMap.begin(), highDephMaskMap.end(), 0);
+    } else if (highDepthModeMask==0)
+    {
+       highDephMaskMap.clear();
+       highDephMaskMap.shrink_to_fit();
     }
 
     fill(polygonMaskMap.begin(), polygonMaskMap.end(), 0);
@@ -1627,7 +1693,7 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode) {
     return 1;
 }
 
-bool clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
+unsigned char clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
     // see comments for prepareSelectionArea()
     if (invertSelection==1)
     {
@@ -1642,7 +1708,7 @@ bool clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
           {
              bool r = 0;
              if (inRange(0, polyH - 1, y - imgSelY1 - polyY) && inRange(0, polyW - 1, x - imgSelX1 - polyX))
-                r = (polygonMaskMap[(INT64)(y - imgSelY1 - polyY) * polyW + x - imgSelX1 - polyX]) ? 1 : 0;
+                r = polygonMaskMap[(INT64)(y - imgSelY1 - polyY) * polyW + x - imgSelX1 - polyX];
              return r;
           } else if (EllipseSelectMode==1 || EllipseSelectMode==0 && (vpSelRotation!=0 || excludeSelectScale!=0))
           {
@@ -1655,7 +1721,7 @@ bool clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
     } else
     {
        if (!inRange(imgSelX1, imgSelX2, x) || !inRange(imgSelY1 - polyOffYa, imgSelY2, y))
-          return 1;
+          return (highDepthModeMask==1) ? 0 : 1;
 
        if (maskBitmap!=NULL)
        {
@@ -1664,9 +1730,14 @@ bool clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
              return 1;
        } else if (EllipseSelectMode==2)
        {
-          bool r = 0;
+          bool r = (highDepthModeMask==1) ? 1 : 0;
           if (inRange(0, polyH - 1, y - imgSelY1 - polyY + polyOffYa) && inRange(0, polyW - 1, x - imgSelX1 - polyX))
-             r = (polygonMaskMap[(INT64)(y - imgSelY1 - polyY + polyOffYa) * polyW + x - imgSelX1 - polyX]);
+          {
+             if (highDepthModeMask==1)
+                return highDephMaskMap[(INT64)(y - imgSelY1 - polyY + polyOffYa) * polyW + x - imgSelX1 - polyX];
+
+             r = polygonMaskMap[(INT64)(y - imgSelY1 - polyY + polyOffYa) * polyW + x - imgSelX1 - polyX];
+          }
 
            // fnOutputDebug("clipMaskFilter y=" + std::to_string(y - imgSelY1 - polyY + polyOffYa));
           return !r;
@@ -3758,7 +3829,7 @@ DLL_API int DLL_CALLCONV ConvertToGrayScale(unsigned char *BitmapData, const int
 }
 
 DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h, int Stride, int bpp, int color, int opacity, int eraser, int linearGamma, int blendMode, int flipLayers, unsigned char *maskBitmap, int mStride, unsigned char *colorBitmap, int gStride, int gBpp, int fillBehind, int opacityMultiplier, int keepAlpha, int nBmpW, int nBmpH) {
-    fnOutputDebug("FillSelectArea mStride=" + std::to_string(mStride));
+    // fnOutputDebug("FillSelectArea mStride=" + std::to_string(mStride));
     // fnOutputDebug("clipMaskFilter=zx=" + std::to_string(zx1) + "/" + std::to_string(zx2) + "=w=" + std::to_string(max(zx1, zx2) - min(zx1, zx2)));
     // fnOutputDebug("clipMaskFilter=zy=" + std::to_string(zy1) + "/" + std::to_string(zy2) + "=h=" + std::to_string(max(zy1, zy2) - min(zy1, zy2)));
     RGBAColor initialColor;
@@ -3771,20 +3842,25 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
     const int gbpc = gBpp/8;
     const int bmpX = (imgSelX1<0 || invertSelection==1) ? 0 : imgSelX1;
     const int bmpY = (imgSelY1<0 || invertSelection==1) ? 0 : imgSelY1;
+    const int mw = (EllipseSelectMode==2) ? min(w - 1, imgSelX2) : w - 1;
+    const int mh = (EllipseSelectMode==2) ? min(h - 1, imgSelY2) : h - 1;
+    const int mx = (EllipseSelectMode==2) ? clamp(imgSelX1, 0, w - 1) : 0;
+    const int my = (EllipseSelectMode==2) ? clamp(imgSelY1 - (int)polyOffYa, 0, h - 1) : 0;
     // fnOutputDebug("offsets X/Y: " + std::to_string(bmpX) + "|" + std::to_string(bmpY));
     // fnOutputDebug("colorBitmap W/H: " + std::to_string(nBmpW) + "|" + std::to_string(nBmpH));
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(8)
-    for (int x = 0; x < w; x++)
+    for (int x = mx; x <= mw; x++)
     {
         INT64 kx = (INT64)x * bpc;
         INT64 kzx = (INT64)(x - bmpX) * gbpc;
-        for (int y = 0; y < h; y++)
+        for (int y = my; y <= mh; y++)
         {
             float fintensity;
             RGBAColor newColor;
             RGBAColor userColor;
             int thisOpacity, oR, oG, oB;
-            if (clipMaskFilter(x, y, maskBitmap, mStride)==1)
+            int opacityDepth = clipMaskFilter(x, y, maskBitmap, mStride);
+            if (opacityDepth==1 && highDepthModeMask==0 || opacityDepth==0 && highDepthModeMask==1)
                continue;
 
             // INT64 o = CalcPixOffset(x, y, Stride, bpp);
@@ -3801,6 +3877,8 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
                if (opacityMultiplier>0 && gBpp==32)
                   thisOpacity = clamp(thisOpacity + opacityMultiplier, 0, 255);
 
+               if (highDepthModeMask==1)
+                  thisOpacity = clamp(thisOpacity * opacityDepth, 0, 255);
                userColor.a = thisOpacity;
                userColor.r = colorBitmap[2 + oz];
                userColor.g = colorBitmap[1 + oz];
@@ -3810,8 +3888,8 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
                fintensity = char_to_float[kOpacity];
             } else
             {
-               fintensity = fi;
-               thisOpacity = opacity;
+               fintensity = (highDepthModeMask==0) ? fi : clamp(fi * (float)opacityDepth, 0.0f, 1.0f);
+               // thisOpacity = opacity;
                userColor = initialColor;
                newColor = initialColor;
             }
