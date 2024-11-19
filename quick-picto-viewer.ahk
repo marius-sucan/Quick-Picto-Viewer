@@ -20794,12 +20794,13 @@ HugeImagesDrawParametricLines() {
       showTOOLtip("Drawing lines, please wait...`nStep: 3 / 3")
       If (rzb=1 && DrawLineAreaAtomizedGrid=0 && abandonAll=1)
          rzc := 1
-
+startFill := A_TickCount
       thisOpacity := DrawLineAreaOpacity
       ; If (rzb=1 && DrawLineAreaAtomizedGrid=0 && abandonAll!=1)
       If (rzb=1 && abandonAll!=1)
          rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", thisOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", doBehind, "int", 0, "int", BlendModesPreserveAlpha)
 
+      fnOutputDebug("Fill area finished in: " SecToHHMMSS(Round((A_TickCount - startFill)/1000, 3)))
       DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
       fnOutputDebug("Draw lines finished in: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) "`nSkipped segments: " skippedLines)
       imgSelX1 := o_imgSelX1,      imgSelY1 := o_imgSelY1

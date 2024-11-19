@@ -1585,6 +1585,7 @@ DLL_API int DLL_CALLCONV prepareDrawLinesCapsGridMask(int radius, int roundedJoi
     return 1;
 }
 
+// DLL_API int DLL_CALLCONV mergePolyMaskIntoHighDepthMask(int thickness) {
 DLL_API int DLL_CALLCONV mergePolyMaskIntoHighDepthMask(int px1, int py1, int px2, int py2, int imgW, int imgH, int thickness) {
   INT64 s = (INT64)polyW * polyH + 2; // variables set by prepareSelectionArea()
   fnOutputDebug("mergePolyMaskIntoHighDepthMask() invoked: w / h= " + std::to_string(polyW) + " x " + std::to_string(polyH) + "; SIZE desired=" + std::to_string(s));
@@ -1600,32 +1601,31 @@ DLL_API int DLL_CALLCONV mergePolyMaskIntoHighDepthMask(int px1, int py1, int px
      return 0;
   }
 
-  // const int pb = imgSelY1 + polyY - polyOffYa;
-  // const int pc = imgSelX1 + polyX;
-  // const int pd = clamp(imgSelY1 - (int)polyOffYa, 0, imgH - 1);
-  // const int mw = min(px2 + thickness, polyW - 1);
-  // const int mh = min(py2 + thickness, polyH - 1);
-  // const int mx = max(px1 - thickness, 0);
-  // const int my = max(py1 - thickness, 0);
-  // #pragma omp parallel for schedule(static) default(none) num_threads(3)
-  // for (int x = imgSelX1; x <= imgSelX2; x++)
-  // {
-  //     for (int y = pd; y <= imgSelY2; y++)
-  //     {
-  //         if (inRange(mx, mw, x - pc) && inRange(my, mh, y - pb))
-  //         {
-  //            const INT64 i = (INT64)(y - pb) * polyW + x - pc;
-  //            if (polygonMaskMap[i]==1)
-  //               highDephMaskMap[i] = clamp(highDephMaskMap[i] + polygonMaskMap[i], 0, 255);
-  //         }
-  //     }
-  // }
-  #pragma omp parallel for schedule(static) default(none) num_threads(3)
-  for (INT64 i = 0; i < polygonMaskMap.size(); i++) {
-      if (polygonMaskMap[i]==1)
-         highDephMaskMap[i] = clamp(highDephMaskMap[i] + polygonMaskMap[i], 0, 255);
+  const int mw = min(px2 + thickness, polyW - 1);
+  const int mh = min(py2 + thickness, polyH - 1);
+  const int mx = max(px1 - thickness, 0);
+  const int my = max(py1 - thickness, 0);
+
+  #pragma omp parallel for schedule(static) default(none) num_threads(4)
+  for (int y = my; y <= mh; y++) {
+      const INT64 start = (INT64)y * polyW;
+      for (INT64 i = start + mx; i <= start + mw; i++) {
+          if (polygonMaskMap[i]==1)
+             highDephMaskMap[i] = clamp(highDephMaskMap[i] + polygonMaskMap[i], 0, 255);
+     }
   }
-  fill(polygonMaskMap.begin(), polygonMaskMap.end(), 0);
+
+  const INT64 rstart = (INT64)my * polyW + mx;
+  const INT64 rend = (INT64)mh * polyW + mw;
+  // #pragma omp parallel for schedule(static) default(none) num_threads(3)
+  // for (INT64 i = rstart; i < rend; i++) {
+  //     if (polygonMaskMap[i]==1)
+  //        highDephMaskMap[i] = clamp(highDephMaskMap[i] + polygonMaskMap[i], 0, 255);
+  // }
+
+  const auto ztart = polygonMaskMap.begin() + rstart; // Starting from the 3rd element
+  const auto zend = polygonMaskMap.begin() + rend; 
+  fill(ztart, zend, 0);
   return 1;
 }
 
@@ -3848,7 +3848,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
     const int my = (EllipseSelectMode==2) ? clamp(imgSelY1 - (int)polyOffYa, 0, h - 1) : 0;
     // fnOutputDebug("offsets X/Y: " + std::to_string(bmpX) + "|" + std::to_string(bmpY));
     // fnOutputDebug("colorBitmap W/H: " + std::to_string(nBmpW) + "|" + std::to_string(nBmpH));
-    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(8)
+    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int x = mx; x <= mw; x++)
     {
         INT64 kx = (INT64)x * bpc;
@@ -3888,7 +3888,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
                fintensity = char_to_float[kOpacity];
             } else
             {
-               fintensity = (highDepthModeMask==0) ? fi : clamp(fi * (float)opacityDepth, 0.0f, 1.0f);
+               fintensity = (highDepthModeMask==0) ? fi : char_to_float[clamp(opacity * opacityDepth, 0, 255)];
                // thisOpacity = opacity;
                userColor = initialColor;
                newColor = initialColor;
