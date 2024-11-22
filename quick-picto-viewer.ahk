@@ -14149,14 +14149,10 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
             Gdip_FlattenPath(pPath, 0.1)
 
          If (zsf=1)
-         {
-            pMatrix := Gdip_CreateMatrix()
-            Gdip_ScaleMatrix(pMatrix, w/mw, h/mh)
-            Gdip_TransformPath(pPath, pMatrix)
-            Gdip_DeleteMatrix(pMatrix)
-         }
+            Gdip_ScalePath(pPath, w/mw, h/mh)
 
          PointsCount := Gdip_GetPathPointsCount(pPath)
+         ; ToolTip, % "l=" PointsCount , , , 2
          VarSetCapacity(PointsF, 8 * (PointsCount + 1), 0)
          gdipLastError := DllCall("gdiplus\GdipGetPathPoints", "UPtr", pPath, "UPtr", &PointsF, "int*", PointsCount)
          lastState := thisState
@@ -14537,7 +14533,7 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:
   trGdip_GetImageDimensions(pBitmap, w, h)
   trGdip_GetImageDimensions(pBitmap2Blend, w2, h2)
   ; fnOutputDebug(A_ThisFunc "() " w "=" w2 "||" h "=" h2)
-  If (w2!=w || h2!=h || !validBMP(pBitmap) || !validBMP(pBitmap2Blend) || !w ||)
+  If (w2!=w || h2!=h || !validBMP(pBitmap) || !validBMP(pBitmap2Blend) || !w || !h)
   {
      addJournalEntry(A_ThisFunc "(): failed to apply blending modes; incorrect bitmaps provided")
      Return 0
@@ -15138,6 +15134,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
 
        trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
        calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
+       thisBlendMode := (BlendModesPreserveAlpha=1 && currIMGdetails.HasAlpha=1 && PasteInPlaceBlendMode=1) ? 24 : PasteInPlaceBlendMode
        thisImgQuality := (PasteInPlaceQuality=1) ? 7 : 5
        previewMode := 0
     } Else
@@ -15164,7 +15161,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
        If (viewportQPVimage.imgHandle)
           opacityExtra := (oldSelectionArea[10]=32 && PasteInPlaceOpacity>255) ? clampInRange(PasteInPlaceOpacity - 255, 0, 255)*256 : 0 
 
-       thisImgCall := "a" getIDimage(currentFileIndex) currentFileIndex viewportStampBMP viewportIDstampBMP PasteInPlaceOrientation VPselRotation PasteInPlaceBlurAmount PasteInPlaceLight PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceGamma PasteInPlaceApplyColorFX PasteInPlaceBlendMode PasteInPlaceBlurEdgesSoft brushingMode shearImgX shearImgY getAlphaMaskIDu(0) PasteInPlaceRevealOriginal userImgAdjustInvertColors userImgAdjustAltSat userImgAdjustAltBright opacityExtra PasteInPlaceOrientFlipX PasteInPlaceOrientFlipY
+       thisImgCall := "a" getIDimage(currentFileIndex) currentFileIndex viewportStampBMP viewportIDstampBMP PasteInPlaceOrientation VPselRotation PasteInPlaceBlurAmount PasteInPlaceLight PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceGamma PasteInPlaceApplyColorFX thisBlendMode PasteInPlaceBlurEdgesSoft brushingMode shearImgX shearImgY getAlphaMaskIDu(0) PasteInPlaceRevealOriginal userImgAdjustInvertColors userImgAdjustAltSat userImgAdjustAltBright opacityExtra PasteInPlaceOrientFlipX PasteInPlaceOrientFlipY
        If (prevImgCall=thisImgCall && validBMP(prevClipBMP))
        {
           hasCached := 1
@@ -15204,7 +15201,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
           }
        } Else hasRotated := 0
 
-       If (alphaMaskingMode>1 && brushingMode!=1 && !viewportQPVimage.imgHandle && PasteInPlaceBlendMode=1)
+       If (alphaMaskingMode>1 && brushingMode!=1 && !viewportQPVimage.imgHandle && thisBlendMode=1)
        {
           thisStartZeit := A_TickCount
           thisIDu := "a" previewMode PasteInPlaceBlurAmount PasteInPlaceToolMode PasteInPlaceOrientation VPselRotation getAlphaMaskIDu() opacityExtra
@@ -15277,16 +15274,16 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
        Return livePreviewAlphaMasking("live")
     }
 
-    mustEraseAreaAfter := (BlendModesPreserveAlpha=1 && PasteInPlaceBlendMode>1) ? 1 : 0
+    mustEraseAreaAfter := (BlendModesPreserveAlpha=1 && thisBlendMode>1) ? 1 : 0
     If (PasteInPlaceEraseInitial=1 && previewMode=1 && mustEraseAreaAfter=0)
        PasteInPlaceEraseArea(G2, previewMode)
 
     If (allowPreviewThis=1 && mustClip=1)
        Gdip_SetClipPath(G2, pPath, 1)
 
-    If ((PasteInPlaceBlendMode>1 && allowPreviewThis=1) || (userimgGammaCorrect=1 && previewMode=1 && PasteInPlaceEraseInitial=0 && allowPreviewThis=1))
+    If ((thisBlendMode>1 && allowPreviewThis=1) || (userimgGammaCorrect=1 && previewMode=1 && PasteInPlaceEraseInitial=0 && allowPreviewThis=1))
     {
-       If (currIMGdetails.HasAlpha=1 && previewMode=1 && PasteInPlaceBlendMode>1 && !viewportQPVimage.imgHandle)
+       If (currIMGdetails.HasAlpha=1 && previewMode=1 && thisBlendMode>1 && !viewportQPVimage.imgHandle)
           o_bgrBMP := getImgOriginalSelectedAreaEdit(2, imgSelPx, imgSelPy, ResizedW, ResizedH, mainWidth, mainHeight, 1)
        Else If (previewMode=1)
           o_bgrBMP := getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, oImgW, oImgH, ResizedW, ResizedH, 0, ResizedW, ResizedH)
@@ -15295,7 +15292,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     }
 
     thisImgQuality := (userimgQuality=1 && previewMode!=1) ? 3 : 5
-    If (PasteInPlaceBlendMode>1 && allowPreviewThis=1)
+    If (thisBlendMode>1 && allowPreviewThis=1)
     {
        clipBMP := resizeBitmapToGivenRef(clipBMP, 0, ResizedW, ResizedH, thisImgQuality)
        o_bgrBMP := resizeBitmapToGivenRef(o_bgrBMP, 0, ResizedW, ResizedH, thisImgQuality)
@@ -15328,7 +15325,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
           thisStartZeit := A_TickCount
           factoru := (previewMode=1) ? 2 : 3
           delayu := (previewMode=1) ? -1 : 2
-          zr := QPV_BlendBitmaps(bgrBMP, clipBMP, PasteInPlaceBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped)
+          zr := QPV_BlendBitmaps(bgrBMP, clipBMP, thisBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped)
        }
     }
 
@@ -15336,11 +15333,11 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     ; trGdip_GetImageDimensions(bgrBMP, wgimgW, wgimgH)
     ; fnOutputDebug("[" clipBMP "] " gImgW "==" gImgH " | [" bgrBMP "] "  wgImgW "==" wgImgH " | [" o_bgrBMP "] " dgImgW "==" dgImgH " | [target] " ResizedW "==" ResizedH)
     hasMasked := 0
-    thisBMP := (validBMP(bgrBMP) && PasteInPlaceBlendMode>1) ? bgrBMP : trGdip_CloneBitmap(A_ThisFunc, clipBMP)
-    If (alphaMaskingMode>1 && !viewportQPVimage.imgHandle && (PasteInPlaceBlendMode>1 || brushingMode=1 && previewMode=1))
+    thisBMP := (validBMP(bgrBMP) && thisBlendMode>1) ? bgrBMP : trGdip_CloneBitmap(A_ThisFunc, clipBMP)
+    If (alphaMaskingMode>1 && !viewportQPVimage.imgHandle && (thisBlendMode>1 || brushingMode=1 && previewMode=1))
     {
        thisStartZeit := A_TickCount
-       If (PasteInPlaceBlendMode=1)
+       If (thisBlendMode=1)
           thisBMP := resizeBitmapToGivenRef(thisBMP, 0, ResizedW, ResizedH, thisImgQuality)
 
        thisIDu := "a" previewMode PasteInPlaceBlurAmount PasteInPlaceToolMode PasteInPlaceOrientation VPselRotation getAlphaMaskIDu() opacityExtra thisImgCall thisFXstate BlendModesPreserveAlpha BlendModesFlipped userimgGammaCorrect brushZeitung
@@ -18024,8 +18021,8 @@ livePreviewHugeImageFillSelArea() {
             addJournalEntry(A_ThisFunc "(): Failed to generate the gradient bitmap for live preview.")
       }
 
-      newColor := "0xFF" FillAreaColor
-      thisOpacity := (FillAreaColorMode!=1) ? 255 : FillAreaOpacity
+      newColor := (FillAreaDoBehind=1 && FillAreaColorMode=1) ? "0x" Format("{1:x}", FillAreaOpacity) FillAreaColor : "0xFF" FillAreaColor
+      thisOpacity := (FillAreaDoBehind=1 || FillAreaColorMode!=1) ? 255 : FillAreaOpacity
       eraser := (FillAreaRemBGR=1 && FillAreaDoBehind=0) ? -1 : 0
       bpp := FreeImage_GetBPP(viewportQPVimage.imgHandle)
       whichPath := (FillAreaInverted=1) ? invertPath : pPath
@@ -18069,7 +18066,7 @@ livePreviewHugeImageFillSelArea() {
    If (FillAreaInverted=1)
       Gdip_DeletePath(invertPath)
 
-   fnOutputDebug("step END: " A_TickCount - ozeit)
+   ; fnOutputDebug("step END: " A_TickCount - ozeit)
 }
 
 coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
@@ -18134,7 +18131,7 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
    ; ToolTip, % imgSelW "=" imgSelH "`n" zImgSelW "=" zImgSelH "`n" qImgSelW "=" qImgSelH  , , , 2
    offX := offY := 0
    offW := imgSelW,   offH := imgSelH
-   thisBlendMode := (FillAreaBlendMode=1 && FillAreaCutGlass=1 && FillAreaGlassy>1) ? 24 : FillAreaBlendMode 
+   thisBlendMode := (FillAreaBlendMode=1 && FillAreaCutGlass=1 && FillAreaGlassy>1 && currIMGdetails.HasAlpha=1) ? 24 : FillAreaBlendMode
    thisObjBlurAmount := (previewMode=1) ? (Round(abs(FillAreaBlurAmount) * zoomLevel)) : abs(FillAreaBlurAmount)
    If (FillAreaRemBGR=1 || zoomLevel>2 && previewMode=1 && !isSelEntireVisible(mainWidth, mainHeight) || imgSelLargerViewPort=1 && previewMode=1)
       thisObjBlurAmount := 0
@@ -18642,11 +18639,7 @@ carvePathFromBitmap(ByRef pBitmap, pPath, cX, cY, modus, safeWay:=0, blurLevel:=
        r2 := trGdip_GraphicsClear(A_ThisFunc, G3, "0xFFFFFFFF")
 
        zPath := Gdip_ClonePath(pPath)
-       pMatrix := Gdip_CreateMatrix()
-       Gdip_TranslateMatrix(pMatrix, -cX , -cY)
-       ; Gdip_TranslateMatrix(pMatrix, blurLevel , blurLevel)
-       E := Gdip_TransformPath(zPath, pMatrix)
-
+       Gdip_TranslatePath(zPath, -cX , -cY)
        BrushB := Gdip_BrushCreateSolid("0xFF000000")
        Gdip_FillPath(G3, BrushB, zPath)
        If (doDecalage=1)
@@ -18683,7 +18676,6 @@ carvePathFromBitmap(ByRef pBitmap, pPath, cX, cY, modus, safeWay:=0, blurLevel:=
        r0 := QPV_SetBitmapAsAlphaChannel(pBitmap, newBitmap, invertus)
        Gdip_DeletePath(zPath)
        Gdip_DeleteBrush(BrushB)
-       Gdip_DeleteMatrix(pMatrix)
        If (giveAlpha=1)
           Return newBitmap
 
@@ -18704,9 +18696,7 @@ carvePathFromBitmap(ByRef pBitmap, pPath, cX, cY, modus, safeWay:=0, blurLevel:=
     {
        ; trGdip_GetImageDimensions(pBitmap, qImgW, qImgH)
        zPath := Gdip_ClonePath(pPath)
-       pMatrix := Gdip_CreateMatrix()
-       Gdip_TranslateMatrix(pMatrix, -cX , -cY)
-       E := Gdip_TransformPath(zPath, pMatrix)
+       Gdip_TranslatePath(zPath, -cX , -cY)
        If (safeWay=1)
        {
           Gdip_SetCompositingQuality(G3, 4)
@@ -18727,7 +18717,6 @@ carvePathFromBitmap(ByRef pBitmap, pPath, cX, cY, modus, safeWay:=0, blurLevel:=
 
        r2 := trGdip_DrawImage(A_ThisFunc, G3, pBitmap)
        Gdip_DeletePath(zPath)
-       Gdip_DeleteMatrix(pMatrix)
        Gdip_DeleteGraphics(G3)
        If (safeWay=1)
        {
@@ -20532,9 +20521,11 @@ HugeImagesDrawLineShapes() {
          PointsF := ""
       }
 
+      thisOpacity := DrawLineAreaOpacity
+      thisColor := "0xFF" DrawLineAreaColor
       showTOOLtip("Drawing lines, please wait...`nStep: 3 / 3")
       If (rzb=1)
-         rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", DrawLineAreaOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", doBehind, "int", 0, "int", BlendModesPreserveAlpha)
+         rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", thisOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha)
 
       DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
       r := (rzc=1) ? 1 : 0
@@ -20582,6 +20573,7 @@ HugeImagesDrawParametricLines() {
       showTOOLtip("Preparing to draw lines, please wait...")
       trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
       orobju := InitHugeImgSelPath(0, imgW, imgH)
+      orX := (imgSelX1<0) ? imgSelX1 : 0
       setImageLoading()
       pBitsAll := FreeImage_GetBits(hFIFimgX)
       Stride := FreeImage_GetStride(hFIFimgX)
@@ -20683,7 +20675,11 @@ HugeImagesDrawParametricLines() {
       roundJoins := DrawLineAreaJoinsStyle
       roundCaps := DrawLineAreaCapsStyle
       If (DrawLineAreaCropShape>1)
-         QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, DrawLineAreaCropShape - 2, VPselRotation, 0, 0, "a", "a", 1, [tk + pfcX, tk, imgSelW, imgSelH])
+      {
+         FillAreaEllipseSection := 1440
+         FillAreaShape := (DrawLineAreaCropShape=2) ? 1 : 3
+         QPV_PrepareHugeImgSelectionArea(orobju.x1, orobju.y1, orobju.x2 - 1, orobju.y2 - 1, orobju.imgSelW, orobju.imgSelH, 3, VPselRotation, 0, 0, "a", "a", 1, [orX + o_imgSelW/2, o_imgSelH/2, o_imgSelW, o_imgSelH])
+      }
 
       skippedLines := 0
       doCrop := (DrawLineAreaCropShape>1) ? 1 : 2
@@ -20747,12 +20743,12 @@ HugeImagesDrawParametricLines() {
                If (outlier=0)
                {
                   rect := processGdipPathForDLL(pPath, tk, r.h, subdivide, PointsCount, PointsF, DrawLineAreaAtomizedGrid)
-                  rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0, "int", tempCrapValue)
+                  rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", doCrop, "int", 0, "int", tempCrapValue)
                   If (rzb=1 && DrawLineAreaDoubles=1)
                   {
                      DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
                      kThick := (DrawLineAreaCapsStyle=3 && DrawLineAreaJoinsStyle=1) ? thisThick : otherThick
-                     rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
+                     rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", doCrop, "int", diffThick, "int", -1)
                      DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
                   }
 
@@ -20775,8 +20771,8 @@ HugeImagesDrawParametricLines() {
                   prevMSGdisplay := A_TickCount
                }
 
-               Gdip_DeletePath(pPath)
                PointsF := ""
+               Gdip_DeletePath(pPath)
                If (determineTerminateOperation()=1)
                {
                   abandonAll := 1
@@ -20787,6 +20783,7 @@ HugeImagesDrawParametricLines() {
             setWhileLoopExec(0)
             iterator.Discard()
             Gdip_DeletePath(kPath)
+            Gdip_DeleteMatrix(pMatrix)
             PointsF := ""
          }
       }
@@ -20794,13 +20791,14 @@ HugeImagesDrawParametricLines() {
       showTOOLtip("Drawing lines, please wait...`nStep: 3 / 3")
       If (rzb=1 && DrawLineAreaAtomizedGrid=0 && abandonAll=1)
          rzc := 1
-startFill := A_TickCount
-      thisOpacity := DrawLineAreaOpacity
-      ; If (rzb=1 && DrawLineAreaAtomizedGrid=0 && abandonAll!=1)
-      If (rzb=1 && abandonAll!=1)
-         rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", thisOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", doBehind, "int", 0, "int", BlendModesPreserveAlpha)
 
-      fnOutputDebug("Fill area finished in: " SecToHHMMSS(Round((A_TickCount - startFill)/1000, 3)))
+      startFill := A_TickCount
+      thisOpacity := DrawLineAreaOpacity
+      thisColor := "0xFF" DrawLineAreaColor
+      If (rzb=1 && abandonAll!=1)
+         rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", thisOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha)
+
+      fnOutputDebug("Fill lines mask finished in: " SecToHHMMSS(Round((A_TickCount - startFill)/1000, 3)))
       DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
       fnOutputDebug("Draw lines finished in: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) "`nSkipped segments: " skippedLines)
       imgSelX1 := o_imgSelX1,      imgSelY1 := o_imgSelY1
@@ -21223,8 +21221,12 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
 
          newColor := "0xFF" FillAreaColor
          thisOpacity := (transformTool=1) ? clampInRange(PasteInPlaceOpacity, 0, 255) : FillAreaOpacity
-         If (fillTool=1 && FillAreaColorMode>1)
-            thisOpacity := 255
+         If (fillTool=1)
+         {
+            newColor := (FillAreaDoBehind=1 && FillAreaColorMode=1) ? "0x" Format("{1:x}", FillAreaOpacity) FillAreaColor : "0xFF" FillAreaColor
+            thisOpacity := (FillAreaDoBehind=1 || FillAreaColorMode!=1) ? 255 : FillAreaOpacity
+         }
+
          opacityExtra := (transformTool=1 && PasteInPlaceOpacity>255) ? clampInRange(PasteInPlaceOpacity - 255, 0, 255) : 0 
          eraser := (!InStr(modus, "behind") && FillAreaRemBGR=1 && fillTool=1) ? -1 : 0
          blending := (fillTool=1) ? FillAreaBlendMode - 1 : PasteInPlaceBlendMode - 1
@@ -22250,10 +22252,7 @@ coreDrawParametricLinesSpiral(x1, y1, x2, y2, imgSelW, imgSelH, ByRef straightLi
     px := ocX - dX
     py := ocY - dY
     ; ToolTip, % dX "|" dY "`n" cX "|" cY "`n" px "|" py , , , 2
-    pMatrix := Gdip_CreateMatrix()
-    Gdip_TranslateMatrix(pMatrix, px, py)
-    E := Gdip_TransformPath(pPath, pMatrix)
-    Gdip_DeleteMatrix(pMatrix)
+    Gdip_TranslatePath(pPath, px, py)
     Return pPath
 }
 
@@ -22538,7 +22537,8 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
        tkx := (o_imgSelW>mainWidth) ? 0 : tk
        tky := (o_imgSelH>mainHeight) ? 0 : tk
        bx := by := 0
-       If (DrawLineAreaBlendMode>1 && !testSelectOutsideImgEntirely(useGdiBitmap()))
+       thisBlendMode := (BlendModesPreserveAlpha=1 && currIMGdetails.HasAlpha=1 && DrawLineAreaBlendMode=1) ? 24 : DrawLineAreaBlendMode
+       If (thisBlendMode>1 && !testSelectOutsideImgEntirely(useGdiBitmap()))
        {
           previewMode := 2
           xBitmap := trGdip_CreateBitmap(A_ThisFunc, dw, dh, "0x26200A")
@@ -22558,6 +22558,8 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
        } Else If (userimgGammaCorrect=1 && AnyWindowOpen!=23)
        {
           bgrBMPu := getImgSelectedAreaEditMode(1, imgSelPx - tkx, imgSelPy - tky, dw, dh, dw, dh, 0, dw, dh)
+          If (currIMGdetails.HasAlpha)
+             Gdip_FillRectangle(G2, GDIPbrushHatch, imgSelPx - tkx, imgSelPy - tky, dw, dh)
           trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx - tkx, imgSelPy - tky, dw, dh)
           Gdip_SetCompositingQuality(G2, 2)
           imgSelPx := o_imgSelPx,        imgSelPy := o_imgSelPy
@@ -22586,7 +22588,7 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
     {
        Gdip_DeleteGraphics(G2)
        Gdip_ResetClip(2NDglPG)
-       QPV_BlendBitmaps(bgrBMPu, xBitmap, DrawLineAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped)
+       QPV_BlendBitmaps(bgrBMPu, xBitmap, thisBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped)
        If (currIMGdetails.HasAlpha=1)
           Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, o_imgSelPx - tkx + bx, o_imgSelPy - tky + by, dw, dh)
        trGdip_DrawImage(A_ThisFunc, 2NDglPG, bgrBMPu, o_imgSelPx - tkx + bx, o_imgSelPy - tky + by, dw, dh)
@@ -43497,7 +43499,6 @@ createBrushShapePath(brushSize, tkX, tkY, thisAR, angleu, obju:=0) {
    brImgSelH := (BrushToolAspectRatio<0) ? brushSizeH * thisAR : brushSizeH
    brimgSelPx := 0 - (brImgSelW - brushSize)/2
    brimgSelPy := 0 - (brImgSelH - brushSize)/2
-   tmpMatrix := Gdip_CreateMatrix()
    tmpPath := Gdip_CreatePath()
 
    Gdip_AddPathEllipse(tmpPath, brimgSelPx, brimgSelPy, brimgSelW, brimgSelH)
@@ -43506,9 +43507,8 @@ createBrushShapePath(brushSize, tkX, tkY, thisAR, angleu, obju:=0) {
 
    If (brushSize<2)
       brushSize := 1.5
-   Gdip_TranslateMatrix(tmpMatrix, tkX - brushSize/2, tkY - brushSize/2)
-   Gdip_TransformPath(tmpPath, tmpMatrix)
-   Gdip_DeleteMatrix(tmpMatrix)
+
+   Gdip_TranslatePath(tmpPath, tkX - brushSize/2, tkY - brushSize/2)
    Return tmpPath
 }
 
@@ -46227,15 +46227,15 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
       Sleep, 5
    }
 
-   h := showLEDgui("prev", pX, pY)
+   h := (errorOccured>685) ? initialColor : showLEDgui("prev", pX, pY)
    setWhileLoopExec(0)
    StopColorPicker()
    createGUItoolbar()
    If (panelWinCollapsed=1 && AnyWindowOpen && d!="leave-it")
       toggleImgEditPanelWindow("forced")
 
-   If (errorOccured>690)
-      Return
+   ; If (errorOccured>690)
+   ;    Return
 
    If (a="isGiven")
       BrushToolWetness := clampInRange(BrushToolWetness, 0, 19)
@@ -46246,9 +46246,9 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
    ; https://autohotkey.com/board/topic/43945-fast-pixelgetcolor-workaround-for-aero-windows-7-and-vista/
    o := %ctrl%
    SoundBeep, 900, 100
+   ; ToolTip, % errorOccured " h = " h "`n" o " | " ctrl , , , 2
    ; ToolTip, % r "`n" ctrl "`n" o "`n" h "`n" g "`n" z , , , 2
    %ctrl% := h
-
    If ctrl
    {
       If (ctrl="WindowBGRcolor")
@@ -46268,9 +46268,9 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
       SetTimer, fromCurrentPanelToColorsSwatch, -200
       livePreviewsImageEditing()
    }
+
    Return [h, initialColor]    ; new color, old color 
 }
-
 
 fromCurrentPanelToColorsSwatch() {
    If !ShowAdvToolbar
@@ -48187,7 +48187,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     Gui, Add, Button, x+5 vbtnFldr5 wp-%kplo% hp -wrap gBtnSetTextureSource, &Reset gradient center
     GuiAddPickerColor("xs y+5 h" ha " w25", "FillAreaColor")
     GuiAddColor("x+5 hp w" sml, "FillAreaColor")
-    GuiAddSlider("FillAreaOpacity", 3,255, 255, "Opacity", "updateUIfillPanel", 1, "x+5 w" wml " hp")
+    GuiAddSlider("FillAreaOpacity", 1,255, 255, "Opacity", "updateUIfillPanel", 1, "x+5 w" wml " hp")
     kak := Round(ha*2.2), kuk := (PrefsLargeFonts=1) ? sml*2 - 13 : sml*2 - 7
     Gui, Add, Text, xp+%kuk% yp w%kak% h%kak% -Border +0xE gGradientsPreviewResponder vinfoFillAreaGradientView +hwndhGradientFillpreview, Gradient preview
     ToolTip2ctrl(hGradientFillpreview, "Click and drag to adjust the gradient offset.`nHold Alt while dragging to adjust its center.")
@@ -48195,7 +48195,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     kak := ha + 5
     GuiAddPickerColor("xs yp+" kak " h" ha " w25", "FillArea2ndColor")
     GuiAddColor("x+5 hp w" sml, "FillArea2ndColor")
-    GuiAddSlider("FillArea2ndOpacity", 3,255, 255, "Opacity", "updateUIfillPanel", 1, "x+5 w" wml " hp")
+    GuiAddSlider("FillArea2ndOpacity", 1,255, 255, "Opacity", "updateUIfillPanel", 1, "x+5 w" wml " hp")
     GuiAddSlider("FillAreaGradientAngle", -180,180, 0, "Angle: $€°", "updateUIfillPanel", 2, "xs y+15 w" slideWid " h" ha)
     GuiAddDropDownList("xp yp wp AltSubmit gupdateUIfillPanel Choose" FillAreaWelcomePattern " vFillAreaWelcomePattern", "Horizontal lines|Random squares|Random circles|Corner anchored circles|Vertical lines|Random circles|Maurer rose", "Pattern generator type")
     GuiAddSlider("FillAreaGradientScale", 1,300, 100, "Scale: $€%", "updateUIfillPanel", 1, "x+5 wp h" ha)
@@ -49292,11 +49292,8 @@ livePreviewEraseArea() {
 
       zBitmap := trGdip_CreateBitmap(A_ThisFunc, imgSelW, imgSelH)
       G3 := trGdip_GraphicsFromImage(A_ThisFunc, zBitmap)
-      pMatrix := Gdip_CreateMatrix()
-      Gdip_TranslateMatrix(pMatrix, -imgSelPx , -imgSelPy)
-      E := Gdip_TransformPath(whichPath, pMatrix)
+      Gdip_TranslatePath(whichPath, -imgSelPx, -imgSelPy)
       Gdip_FillPath(G3, GDIPbrushHatch, whichPath)
-      Gdip_DeleteMatrix(zPath)
       Gdip_DeleteGraphics(G3)
       modus := (EraseAreaInvert=1) ? 4 : 0
       og := alphaMaskColorReversed
@@ -52803,19 +52800,17 @@ liveCarvePathBitmap(pPath, pBitmap, cX, cY, invertArea) {
    Gdip_GraphicsClear(Gu, "0xFF000000")
    br := Gdip_BrushCreateSolid("0xFFffFFff")
    zPath := Gdip_ClonePath(pPath)
-   pMatrix := Gdip_CreateMatrix()
-   Gdip_TranslateMatrix(pMatrix, -cX , -cY)
-   E := Gdip_TransformPath(zPath, pMatrix)
+   Gdip_TranslatePath(zPath, -cX , -cY)
    Gdip_FillPath(Gu, br, zPath)
    Gdip_DeleteGraphics(Gu)
    Gdip_DeleteBrush(br)
    Gdip_DeletePath(zPath)
-   Gdip_DeleteMatrix(pMatrix)
    r := QPV_SetBitmapAsAlphaChannel(pBitmap, nBitmap, invertArea)
    If !r
       addJournalEntry(A_ThisFunc "(): failed to process the bitmap")
+
    trGdip_DisposeImage(nBitmap)
-   fnOutputDebug(A_ThisFunc "(): " A_TickCount - startZeit " ms.")
+   ; fnOutputDebug(A_ThisFunc "(): " A_TickCount - startZeit " ms.")
 }
 
 getRectFromBitmap(oBitmap, selObj, doResize) {
@@ -99142,13 +99137,6 @@ preventCtrlA(keyu) {
    prevKeyu := keyu
 }
 
-#If (A_PtrSize=8 && InStr(A_ScriptDir, "sucan twins") && !A_IsCompiled && wasInitFIMlib)
-   ~F7::
-      restartAppu()
-   Return
-#If
-
-
 
 #If (A_PtrSize=8 && InStr(A_ScriptDir, "sucan twins") && WinActive("ahk_exe Sublime_Text.exe") && !A_IsCompiled)
 
@@ -99205,4 +99193,11 @@ If InStr(aaa, "mozilla firefox") && InStr(aaa, "tendance")
 
 ; ToolTip, % aaa , , , 2
 }
+
+
+#If (A_PtrSize=8 && InStr(A_ScriptDir, "sucan twins") && !A_IsCompiled && wasInitFIMlib)
+   ~F7::
+      restartAppu()
+   Return
+#If
 

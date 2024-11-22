@@ -236,10 +236,9 @@ bool isInsideRectOval(const float &ox, const float &oy, const int &modus) {
     }
 
     bool f;
-    float result;
     if (EllipseSelectMode==1)
     {
-       result = (rotatedX * rotatedX) / (tw * tw) + (rotatedY * rotatedY) / (th * th);
+       const float result = (rotatedX * rotatedX) / (tw * tw) + (rotatedY * rotatedY) / (th * th);
        f = (result <= 1.0f);
     } else
     {
@@ -249,10 +248,7 @@ bool isInsideRectOval(const float &ox, const float &oy, const int &modus) {
     if (f && modus==1 && excludeSelectScale!=0)
     {
        bool nf = isInsideRectOval(ox, oy, 2);
-       if (f && nf)
-          return 0;
-       else 
-          return 1;
+       return (f && nf) ? 0 : 1;
     }
 
     return f;
@@ -609,10 +605,7 @@ int FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1, 
 
 bool inline isPointInOtherMask(const int &x, const int &y, const int &clipMode) {
     bool p = polygonOtherMaskMap[(INT64)y * polyW + x];
-    if (clipMode==3)
-       p = !p;
- 
-    return p;
+    return (clipMode==3) ? !p : p;
 }
 
 void FillSimpleMaskPolygon(const int w, const int h, float* PointsList, const int PointsCount, const int offsetY, const int p, float* allPointsList, const int &allPointsCount, const int &clipMode) {
@@ -1237,7 +1230,7 @@ void stampCircleMaskAt(const int &dx, const int &dy, const int &tt, const int &r
 }
 
 DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCount, int thickness, int closed, int roundedJoins, int fillMode, int roundCaps, int clipMode, int offsetY, int tempus) {
-    fnOutputDebug("drawLineAllSegmentsMask() invoked; PointsCount=" + std::to_string(PointsCount));
+    fnOutputDebug(std::to_string(clipMode) + " drawLineAllSegmentsMask() invoked; PointsCount=" + std::to_string(PointsCount));
     INT64 s = (INT64)polyW * polyH + 2;
     if (s!=polygonMaskMap.size())
     {
@@ -1254,7 +1247,6 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
 
     std::vector<double> offsetPointsListA;
     std::vector<double> offsetPointsListB;
-
     // fnOutputDebug(std::to_string(hmax) + "=hmax; bound rect={" + std::to_string(boundMinX) + "," + std::to_string(boundMinY) + "," + std::to_string(boundMaxX) + "," + std::to_string(boundMaxY) + "}");
     if (roundedJoins!=1)
     {
@@ -1274,8 +1266,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
 
     const int pci = PointsCount - 1;
     const int pcd = PointsCount*2;
-    fnOutputDebug("tracing polygonal path with bresenham algo; points=" + std::to_string(PointsCount));
-
+    // fnOutputDebug("tracing polygonal path with bresenham algo; points=" + std::to_string(PointsCount));
     #pragma omp parallel for schedule(static) default(none) num_threads(4)
     for (int pts = 0; pts < PointsCount; pts++)
     {
@@ -1585,7 +1576,6 @@ DLL_API int DLL_CALLCONV prepareDrawLinesCapsGridMask(int radius, int roundedJoi
     return 1;
 }
 
-// DLL_API int DLL_CALLCONV mergePolyMaskIntoHighDepthMask(int thickness) {
 DLL_API int DLL_CALLCONV mergePolyMaskIntoHighDepthMask(int px1, int py1, int px2, int py2, int imgW, int imgH, int thickness) {
   INT64 s = (INT64)polyW * polyH + 2; // variables set by prepareSelectionArea()
   fnOutputDebug("mergePolyMaskIntoHighDepthMask() invoked: w / h= " + std::to_string(polyW) + " x " + std::to_string(polyH) + "; SIZE desired=" + std::to_string(s));
@@ -1617,12 +1607,6 @@ DLL_API int DLL_CALLCONV mergePolyMaskIntoHighDepthMask(int px1, int py1, int px
 
   const INT64 rstart = (INT64)my * polyW + mx;
   const INT64 rend = (INT64)mh * polyW + mw;
-  // #pragma omp parallel for schedule(static) default(none) num_threads(3)
-  // for (INT64 i = rstart; i < rend; i++) {
-  //     if (polygonMaskMap[i]==1)
-  //        highDephMaskMap[i] = clamp(highDephMaskMap[i] + polygonMaskMap[i], 0, 255);
-  // }
-
   const auto ztart = polygonMaskMap.begin() + rstart; // Starting from the 3rd element
   const auto zend = polygonMaskMap.begin() + rend; 
   fill(ztart, zend, 0);
@@ -1650,7 +1634,8 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode, int high
         }
  
         polygonOtherMaskMap = polygonMaskMap;
-        fnOutputDebug("polygonOtherMaskMap RESIZED");
+        bool pp = (polygonMaskMap.size()==s) ? 1 : 0;
+        fnOutputDebug(std::to_string(clipMode) + "polygonOtherMaskMap RESIZED " + std::to_string(pp) + " size = " + std::to_string(polygonMaskMap.size()));
     }
 
     if (s!=polygonMaskMap.size())
@@ -1693,7 +1678,7 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode, int high
     return 1;
 }
 
-unsigned char clipMaskFilter(int x, int y, unsigned char *maskBitmap, int mStride) {
+unsigned char clipMaskFilter(const int &x, const int &y, const unsigned char *maskBitmap, const int &mStride) {
     // see comments for prepareSelectionArea()
     if (invertSelection==1)
     {
@@ -3842,10 +3827,10 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
     const int gbpc = gBpp/8;
     const int bmpX = (imgSelX1<0 || invertSelection==1) ? 0 : imgSelX1;
     const int bmpY = (imgSelY1<0 || invertSelection==1) ? 0 : imgSelY1;
-    const int mw = (EllipseSelectMode==2) ? min(w - 1, imgSelX2) : w - 1;
-    const int mh = (EllipseSelectMode==2) ? min(h - 1, imgSelY2) : h - 1;
-    const int mx = (EllipseSelectMode==2) ? clamp(imgSelX1, 0, w - 1) : 0;
-    const int my = (EllipseSelectMode==2) ? clamp(imgSelY1 - (int)polyOffYa, 0, h - 1) : 0;
+    const int mw = (EllipseSelectMode==2 && invertSelection==0) ? min(w - 1, imgSelX2) : w - 1;
+    const int mh = (EllipseSelectMode==2 && invertSelection==0) ? min(h - 1, imgSelY2) : h - 1;
+    const int mx = (EllipseSelectMode==2 && invertSelection==0) ? clamp(imgSelX1, 0, w - 1) : 0;
+    const int my = (EllipseSelectMode==2 && invertSelection==0) ? clamp(imgSelY1 - (int)polyOffYa, 0, h - 1) : 0;
     // fnOutputDebug("offsets X/Y: " + std::to_string(bmpX) + "|" + std::to_string(bmpY));
     // fnOutputDebug("colorBitmap W/H: " + std::to_string(nBmpW) + "|" + std::to_string(nBmpH));
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
@@ -3853,6 +3838,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
     {
         INT64 kx = (INT64)x * bpc;
         INT64 kzx = (INT64)(x - bmpX) * gbpc;
+        INT64 maskX = x - mx;
         for (int y = my; y <= mh; y++)
         {
             float fintensity;
@@ -3864,12 +3850,14 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
                continue;
 
             // INT64 o = CalcPixOffset(x, y, Stride, bpp);
+            int tA = 255;
+            int oA = 255;
             INT64 o = (INT64)y * Stride + kx;
             if (colorBitmap!=NULL)
             {
                // INT64 oz = CalcPixOffset(x - zx1, y - zy1, gStride, 32);
-                if ((y - bmpY)>=nBmpH || (x - bmpX)>=nBmpW)
-                   continue;
+               if ((y - bmpY)>=nBmpH || (x - bmpX)>=nBmpW)
+                  continue;
 
                INT64 oz = (INT64)(y - bmpY) * gStride + kzx;
                // fnOutputDebug("y=" + std::to_string(y - bmpY));
@@ -3879,29 +3867,20 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
 
                if (highDepthModeMask==1)
                   thisOpacity = clamp(thisOpacity * opacityDepth, 0, 255);
+               tA = thisOpacity;
                userColor.a = thisOpacity;
                userColor.r = colorBitmap[2 + oz];
                userColor.g = colorBitmap[1 + oz];
                userColor.b = colorBitmap[oz];
                newColor = userColor;
-               int kOpacity = clamp(thisOpacity - (255 - opacity), 0, 255);
-               fintensity = char_to_float[kOpacity];
+               // int kOpacity = clamp(thisOpacity - (255 - opacity), 0, 255);
+               fintensity = (fillBehind==1) ? 1 : char_to_float[clamp(thisOpacity - (255 - opacity), 0, 255)];
             } else
             {
                fintensity = (highDepthModeMask==0) ? fi : char_to_float[clamp(opacity * opacityDepth, 0, 255)];
-               // thisOpacity = opacity;
+               tA = opacity;
                userColor = initialColor;
                newColor = initialColor;
-            }
-
-            int tA = 255;
-            int oA = 255;
-            if (bpp==32)
-            {
-               oA = (eraser==-1) ? 0 : BitmapData[3 + o];
-               tA = weighTwoValues(newColor.a, oA, fintensity);
-               tA = (colorBitmap!=NULL) ? max(tA, oA) : tA;
-               BitmapData[3 + o] = tA;
             }
 
             if (eraser!=1 || bpp!=32)
@@ -3909,6 +3888,21 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
                oR = (eraser==-1) ? 0 : BitmapData[2 + o];
                oG = (eraser==-1) ? 0 : BitmapData[1 + o];
                oB = (eraser==-1) ? 0 : BitmapData[o];
+            }
+
+            if (bpp==32)
+            {
+               oA = (eraser==-1) ? 0 : BitmapData[3 + o];
+               if (fillBehind==1)
+                  tA = max(oA, userColor.a); // clamp(oA + userColor.a, 0, 255);
+               else
+                  tA = (colorBitmap==NULL) ? clamp(tA + oA, 0, 255) : weighTwoValues(newColor.a, oA, fintensity); // max(oA, userColor.a);
+                  // tA = (colorBitmap==NULL) ? clamp(opacity + oA, 0, 255) : weighTwoValues(newColor.a, oA, fintensity);
+
+               if ((keepAlpha==1 || blendMode==23) && fillBehind!=1)
+                  tA = oA;
+              else
+                  BitmapData[3 + o] = tA;
             }
 
             if (eraser!=1 || bpp!=32)
@@ -3920,11 +3914,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
 
                   RGBColorI blended;
                   blended = NEWcalculateBlendModes(Orgb, Brgb, blendMode, flipLayers, 0);
-                  if (keepAlpha!=1 && blendMode!=23 && bpp==32 && fillBehind!=1)
-                  {
-                     tA = max(userColor.a, oA, tA);   
-                     BitmapData[3 + o] = tA;
-                  } else if ((keepAlpha==1 || blendMode==23) && bpp==32 && fillBehind!=1)
+                  if ((keepAlpha==1 || blendMode==23) && bpp==32 && fillBehind!=1)
                      BitmapData[3 + o] = oA;
 
                   newColor.r = blended.r;
@@ -3934,7 +3924,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
 
                if (fillBehind==1)
                {
-                  fintensity = char_to_float[oA];
+                  fintensity = 1.0f - char_to_float[clamp(userColor.a - oA, 0, 255)];
                   swap(oR, newColor.r);
                   swap(oG, newColor.g);
                   swap(oB, newColor.b);
