@@ -3844,7 +3844,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
             float fintensity;
             RGBAColor newColor;
             RGBAColor userColor;
-            int thisOpacity, oR, oG, oB;
+            int thisOpacity;
             int opacityDepth = clipMaskFilter(x, y, maskBitmap, mStride);
             if (opacityDepth==1 && highDepthModeMask==0 || opacityDepth==0 && highDepthModeMask==1)
                continue;
@@ -3883,28 +3883,38 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
                newColor = initialColor;
             }
 
-            if (eraser!=1 || bpp!=32)
-            {
-               oR = (eraser==-1) ? 0 : BitmapData[2 + o];
-               oG = (eraser==-1) ? 0 : BitmapData[1 + o];
-               oB = (eraser==-1) ? 0 : BitmapData[o];
-            }
-
             if (bpp==32)
             {
-               oA = (eraser==-1) ? 0 : BitmapData[3 + o];
-               if (fillBehind==1)
-                  tA = max(oA, userColor.a); // clamp(oA + userColor.a, 0, 255);
-               else
-                  tA = (colorBitmap==NULL) ? clamp(tA + oA, 0, 255) : weighTwoValues(newColor.a, oA, fintensity); // max(oA, userColor.a);
-                  // tA = (colorBitmap==NULL) ? clamp(opacity + oA, 0, 255) : weighTwoValues(newColor.a, oA, fintensity);
+               if (eraser==-1)
+               {
+                  BitmapData[3 + o] = (colorBitmap==NULL) ? opacity : userColor.a;
+                  BitmapData[2 + o] = newColor.r;
+                  BitmapData[1 + o] = newColor.g;
+                  BitmapData[o]     = newColor.b;
+                  continue;
+               } else if (eraser>0)
+               {
+                  tA = (colorBitmap==NULL) ? opacity : userColor.a;
+                  BitmapData[3 + o] = clamp(BitmapData[3 + o] - tA, 0, 255);
+                  continue;
+               } else if ((keepAlpha==1 || blendMode==23) && fillBehind!=1)
+               {
+                  tA = oA = BitmapData[3 + o];
+               } else
+               {
+                  oA = (eraser==-1) ? 0 : BitmapData[3 + o];
+                  if (fillBehind==1)
+                     tA = max(oA, userColor.a);
+                  else
+                     tA = (colorBitmap==NULL) ? clamp(tA + oA, 0, 255) : weighTwoValues(newColor.a, oA, fintensity);
 
-               if ((keepAlpha==1 || blendMode==23) && fillBehind!=1)
-                  tA = oA;
-              else
                   BitmapData[3 + o] = tA;
+               }
             }
 
+            int oR = (eraser==-1 && bpp!=32) ? 0 : BitmapData[2 + o];
+            int oG = (eraser==-1 && bpp!=32) ? 0 : BitmapData[1 + o];
+            int oB = (eraser==-1 && bpp!=32) ? 0 : BitmapData[o];
             if (eraser!=1 || bpp!=32)
             {
                if (blendMode>0 && eraser==0 && tA>0)
@@ -3922,7 +3932,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
                   newColor.b = blended.b;
                }
 
-               if (fillBehind==1)
+               if (fillBehind==1 && eraser==0)
                {
                   fintensity = 1.0f - char_to_float[clamp(userColor.a - oA, 0, 255)];
                   swap(oR, newColor.r);

@@ -14113,9 +14113,9 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
          zsf := ((w>zkw*sfs || h>zkh*sfs) && ppo[5]=1 && (bezierSplineCustomShape=1 || FillAreaCurveTension>1)) ? 1 : 0
          ; i do not remember why i need zsf; maybe for preview mode? live tools
 
+         xk := yk := 0
          mw := (zsf=1) ? zkw*sfs : w
          mh := (zsf=1) ? zkh*sfs : h
-         xk := yk := 0
          If IsObject(pathCoords)
          {
             xk := pathCoords[1],   yk := pathCoords[2]
@@ -20459,7 +20459,6 @@ HugeImagesDrawLineShapes() {
 
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, 3, VPselRotation, 0, 0, "a", "a", 1, [tk + pfcX, tk, o_imgSelW, o_imgSelH])
          FillAreaEllipseSection := opza
-         ; rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", DrawLineAreaOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", doBehind, "int", 0, "int", BlendModesPreserveAlpha)
       }
 
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
@@ -20573,7 +20572,6 @@ HugeImagesDrawParametricLines() {
       showTOOLtip("Preparing to draw lines, please wait...")
       trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
       orobju := InitHugeImgSelPath(0, imgW, imgH)
-      orX := (imgSelX1<0) ? imgSelX1 : 0
       setImageLoading()
       pBitsAll := FreeImage_GetBits(hFIFimgX)
       Stride := FreeImage_GetStride(hFIFimgX)
@@ -20678,7 +20676,10 @@ HugeImagesDrawParametricLines() {
       {
          FillAreaEllipseSection := 1440
          FillAreaShape := (DrawLineAreaCropShape=2) ? 1 : 3
-         QPV_PrepareHugeImgSelectionArea(orobju.x1, orobju.y1, orobju.x2 - 1, orobju.y2 - 1, orobju.imgSelW, orobju.imgSelH, 3, VPselRotation, 0, 0, "a", "a", 1, [orX + o_imgSelW/2, o_imgSelH/2, o_imgSelW, o_imgSelH])
+         orXa := o_imgSelX1 - imgSelX1
+         orYa := (o_imgSelY2<imgSelY2) ? (imgSelY2 - o_imgSelY2)*2 : 0
+         ; ToolTip, % "l=" orYa , , , 2
+         QPV_PrepareHugeImgSelectionArea(orobju.x1, orobju.y1, orobju.x2 - 1, orobju.y2 - 1, orobju.imgSelW, orobju.imgSelH, 3, VPselRotation, 1, 0, "a", "a", 1, [orXa, orYa, o_imgSelW, o_imgSelH])
       }
 
       skippedLines := 0
@@ -20753,11 +20754,7 @@ HugeImagesDrawParametricLines() {
                   }
 
                   If (DrawLineAreaAtomizedGrid=1 && rzb=1)
-                  {
-                     ; rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", "0xff" DrawLineAreaColor, "int", DrawLineAreaOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", doBehind, "int", 0, "int", BlendModesPreserveAlpha)
-                     ; rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", 2)
                      rzc := rzq := DllCall(whichMainDLL "\mergePolyMaskIntoHighDepthMask", "int", rect.x, "int", rect.y, "int", rect.x + rect.w, "int", rect.y + rect.h, "int", imgW, "int", imgH, "int", thisThick + 1)
-                  }
                } Else
                {
                   skippedLines++
@@ -21286,7 +21283,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             currIMGdetails.HasAlpha := 1
          thisOpacity := (EraseAreaFader=1) ? EraseAreaOpacity : 255
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, EraseAreaInvert, "a", "a", 1)
-         r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", 1, "int", 0, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "UPtr", 0, "int", 0, "int", 24, "int", 0, "int", 0, "int", 0)
+         r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", thisOpacity, "int", 0, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "UPtr", 0, "int", 0, "int", 24, "int", 0, "int", 0, "int", 0)
          If InStr(modus, "initially")
          {
             If r
@@ -53237,7 +53234,7 @@ updateUIfillPanel(actionu:=0) {
        GuiControl, % actu, FillAreaBlendMode
        GuiControl, % actu, FillAreaCutGlass
        GuiControl, % actu, BlendModesFlipped
-       actu := (viewportQPVimage.imgHandle) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+       actu := (viewportQPVimage.imgHandle && currIMGdetails.HasAlpha=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu, FillAreaDoBehind
 
        actu := (FillAreaDoBehind=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
