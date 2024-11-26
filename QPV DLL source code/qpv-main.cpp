@@ -205,7 +205,7 @@ int inline gammaMathsInt16(const int &i, const double &gamma) {
 #include "qpv-main.h"
 
 inline INT64 CalcPixOffset(const int &x, const int &y, const int &Stride, const int &bitsPerPixel) {
-    return y * Stride + x * (bitsPerPixel / 8);
+    return (INT64)y * Stride + (INT64)x * (bitsPerPixel / 8);
 }
 
 bool isInsideRectOval(const float &ox, const float &oy, const int &modus) {
@@ -3000,17 +3000,6 @@ DLL_API int DLL_CALLCONV FloodFillWrapper(unsigned char *imageData, int modus, i
     else
        r = FloodFillScanlineStack(imageData, w, h, x, y, newColorI, prevColor, Stride, bpp, useSelArea);
 
-    // std::stringstream ss;
-    // ss << "qpv: opacity = " << opacity;
-    // ss << " newColor = " << newColor;
-    // ss << " TolerMode = " << alternateMode;
-    // // ss << " | CIE=" << CIE;
-    // ss << " | L=" << nC[4];
-    // ss << " | pix affected=" << r;
-    // ss << " tolerance = " << toleranza;
-    // ss << " clrIndex = " << prevCLRindex;
-    // OutputDebugStringA(ss.str().data());
-
     return r;
 }
 
@@ -3402,15 +3391,11 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
         const int bmpX = (imgSelX1<0 || invertSelection==1) ? 0 : imgSelX1;
         const int bmpY = (imgSelY1<0 || invertSelection==1) ? 0 : imgSelY1;
         // fnOutputDebug("add noise step -1");
-        for (int x = 0; x < w + 2; x++)
-        {
-            pixelzMapW[x] = (float)mw*((x - bmpX)/(float)w);
-        }
+        for (int x = 0; x < w + 1; x++)
+            pixelzMapW[x] = clamp( (float)mw*((x - bmpX)/(float)w), 0.0f, (float)mw - 1.0f);
 
-        for (int y = 0; y < h + 2; y++)
-        {
-            pixelzMapH[y] = (float)mh*((y - bmpY)/(float)h);
-        }
+        for (int y = 0; y < h + 1; y++)
+            pixelzMapH[y] = clamp( (float)mh*((y - bmpY)/(float)h), 0.0f, (float)mh - 1.0f);
 
         // fnOutputDebug("add noise step 0");
         #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
@@ -3539,7 +3524,7 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
 
     fnOutputDebug("add noise step DONE");
     return 1;
-}
+} // GenerateRandomNoiseOnBitmap()
 
 
 DLL_API int DLL_CALLCONV getPBitmapistoInfos(Gdiplus::GpBitmap* pBitmap, int w, int h, UINT* resultsArray) {
@@ -3838,7 +3823,6 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
     {
         INT64 kx = (INT64)x * bpc;
         INT64 kzx = (INT64)(x - bmpX) * gbpc;
-        INT64 maskX = x - mx;
         for (int y = my; y <= mh; y++)
         {
             float fintensity;
@@ -3906,7 +3890,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
                   if (fillBehind==1)
                      tA = max(oA, userColor.a);
                   else
-                     tA = (colorBitmap==NULL) ? clamp(tA + oA, 0, 255) : weighTwoValues(newColor.a, oA, fintensity);
+                     tA = (colorBitmap==NULL) ? clamp(tA + oA, 0, 255) : clamp(weighTwoValues(clamp(newColor.a + oA, 0, 255), oA, fintensity), oA, 255);
 
                   BitmapData[3 + o] = tA;
                }
@@ -4342,24 +4326,21 @@ DLL_API int DLL_CALLCONV MergeBitmapsWithMask(unsigned char *originalData, unsig
     return 1;
 }
 
-DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, int h, int Stride, int bpp, int maskOpacity, int blendMode, int flipLayers, int keepAlpha, int linearGamma, unsigned char *newBitmap, int StrideMini, int mw, int mh, unsigned char *maskBitmap, int mStride) {
+DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, int h, int Stride, int bpp, int maskOpacity, int blendMode, int flipLayers, int keepAlpha, int linearGamma, unsigned char *newBitmap, int StrideMini, int mw, int mh) {
     if (maskOpacity<2)
        return 1;
 
-    std::vector<int> pixelzMapW(w, 0);
-    std::vector<int> pixelzMapH(h, 0);
+    std::vector<int> pixelzMapW(w + 2, 0);
+    std::vector<int> pixelzMapH(h + 2, 0);
     const int bmpX = (imgSelX1<0 || invertSelection==1) ? 0 : imgSelX1;
     const int bmpY = (imgSelY1<0 || invertSelection==1) ? 0 : imgSelY1;
-    for (int x = 0; x < w; x++)
-    {
-        pixelzMapW[x] = (float)mw*((x - bmpX)/(float)w);
-    }
+    for (int x = 0; x < w + 1; x++)
+        pixelzMapW[x] = clamp( (float)mw*((x - bmpX)/(float)w), 0.0f, (float)mw - 1.0f);
 
-    for (int y = 0; y < h; y++)
-    {
-        pixelzMapH[y] = (float)mh*((y - bmpY)/(float)h);
-    }
-
+    for (int y = 0; y < h + 1; y++)
+        pixelzMapH[y] = clamp( (float)mh*((y - bmpY)/(float)h), 0.0f, (float)mh - 1.0f);
+    // fnOutputDebug("PixelateHugeBitmap step 1; min = " + std::to_string( pixelzMapW[0] ) + " x " + std::to_string( pixelzMapH[0] ));
+    // fnOutputDebug("PixelateHugeBitmap step 1; max = " + std::to_string( pixelzMapW[w] ) + " x " + std::to_string( pixelzMapH[h] ));
     const float fintensity = char_to_float[maskOpacity];
     #pragma omp parallel for schedule(dynamic) default(none)
     for (int x = 0; x < w; x++)
@@ -4368,7 +4349,7 @@ DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, 
         {
             int nA = 255;
             int oA = 255;
-            if (clipMaskFilter(x, y, maskBitmap, mStride)==1)
+            if (clipMaskFilter(x, y, NULL, 0)==1)
                continue;
 
             if (pixelzMapW[x]>=mw || pixelzMapH[y]>=mh)
@@ -4419,6 +4400,7 @@ DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, 
                originalData[3 + o] = weighTwoValues(nA, oA, fintensity);
         }
     }
+
     return 1;
 }
 
@@ -5954,18 +5936,12 @@ Gdiplus::GpBitmap* CreateGdipBitmapFromCImg(CImg<float> & img, int width, int he
     return myBitmap;
 }
 
-void FillGdipLockedBitmapDataFromCImg(unsigned char *imageData, CImg<unsigned char> &img, int width, int height, int Stride, int bpp, unsigned char *maskBitmap, int mStride) {
+void FillGdipLockedBitmapDataFromCImg(unsigned char *imageData, CImg<unsigned char> &img, int width, int height, int Stride, int bpp) {
     #pragma omp parallel for schedule(dynamic)
     for (int y = 0; y < height; y++)
     {
         for (int x = 0; x < width; x++)
         {
-            if (mStride>-1)
-            {
-               if (clipMaskFilter(x, y, maskBitmap, mStride)==1)
-                  continue;
-            }
-
             INT64 o = CalcPixOffset(x, y, Stride, bpp);
             imageData[o]     = img(x,y,0,0); // b
             imageData[o + 1] = img(x,y,0,1); // g
@@ -5974,10 +5950,6 @@ void FillGdipLockedBitmapDataFromCImg(unsigned char *imageData, CImg<unsigned ch
                imageData[o + 3] = img(x,y,0,3); // a
         }
     }
-}
-
-void FillGdipLockedBitmapDataFromCImg(unsigned char *imageData, CImg<unsigned char> &img, int width, int height, int Stride, int bpp) {
-     FillGdipLockedBitmapDataFromCImg(imageData, img, width, height, Stride, bpp, NULL, -1);
 }
 
 int FillCImgFromBitmap(cimg_library::CImg<float> & img, Gdiplus::GpBitmap *myBitmap, int width, int height) {
@@ -6395,9 +6367,9 @@ DLL_API int DLL_CALLCONV autoContrastBitmap(unsigned char *imageData, unsigned c
       }
 
       float fintensity = char_to_float[intensity];
-      fnOutputDebug("RmaxL===" + std::to_string(maxRLevel) + "; minL=" + std::to_string(minRLevel) + "; fR=" + std::to_string(fR) + "; m=" + std::to_string(modus));
-      fnOutputDebug("GmaxL===" + std::to_string(maxGLevel) + "; minL=" + std::to_string(minGLevel) + "; fG=" + std::to_string(fG)  );
-      fnOutputDebug("BmaxL===" + std::to_string(maxBLevel) + "; minL=" + std::to_string(minBLevel) + "; fB=" + std::to_string(fB)  );
+      // fnOutputDebug("RmaxL===" + std::to_string(maxRLevel) + "; minL=" + std::to_string(minRLevel) + "; fR=" + std::to_string(fR) + "; m=" + std::to_string(modus));
+      // fnOutputDebug("GmaxL===" + std::to_string(maxGLevel) + "; minL=" + std::to_string(minGLevel) + "; fG=" + std::to_string(fG)  );
+      // fnOutputDebug("BmaxL===" + std::to_string(maxBLevel) + "; minL=" + std::to_string(minBLevel) + "; fB=" + std::to_string(fB)  );
       #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
       for (int x = 0; x < Width; x++)
       {
