@@ -3380,9 +3380,11 @@ DLL_API int DLL_CALLCONV GenerateRandomNoise(int* bgrImageData, int w, int h, in
     return 1;
 }
 
-DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData, int w, int h, int Stride, int bpp, int intensity, int opacity, int brightness, int doGrayScale, int pixelize, unsigned char *newBitmap, int StrideMini, int mw, int mh, int bImgSelW, int bImgSelH, int blendMode, int flipLayers) {
-    const float fintensity = char_to_float[opacity];
+DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData, int w, int h, int Stride, int bpp, int intensity, int opacity, int brightness, int doGrayScale, int pixelize, unsigned char *newBitmap, int StrideMini, int mw, int mh, int blendMode, int flipLayers) {
+    // newBitmap must be 24 bits
     time_t nTime;
+    const float fintensity = char_to_float[opacity];
+    fnOutputDebug("add noise; grayscale==" + std::to_string(doGrayScale) + " / " + std::to_string(blendMode));
     srand((unsigned) time(&nTime));
     if (pixelize>0)
     {
@@ -3414,17 +3416,17 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
                    continue;
                 }
 
-                if (doGrayScale!=1)
-                {
-                   newBitmap[2 + o] = clamp(rand() % 256 + brightness, 0, 255);
-                   newBitmap[1 + o] = clamp(rand() % 256 + brightness, 0, 255);
-                   newBitmap[o] = clamp(rand() % 256 + brightness, 0, 255);
-                } else
+                if (doGrayScale==1)
                 {
                    unsigned char zT = clamp(rand() % 256 + brightness, 0, 255);
                    newBitmap[2 + o] = zT;
                    newBitmap[1 + o] = zT;
                    newBitmap[o] = zT;
+                } else
+                {
+                   newBitmap[2 + o] = clamp(rand() % 256 + brightness, 0, 255);
+                   newBitmap[1 + o] = clamp(rand() % 256 + brightness, 0, 255);
+                   newBitmap[o] = clamp(rand() % 256 + brightness, 0, 255);
                 }
             }
         }
@@ -3441,7 +3443,7 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
                 if (pixelzMapW[x]>=mw || pixelzMapH[y]>=mh || pixelzMapW[x]<0 || pixelzMapH[y]<0)
                    continue;
 
-                INT64 on = CalcPixOffset(pixelzMapW[x], pixelzMapH[y], StrideMini, bpp);
+                INT64 on = CalcPixOffset(pixelzMapW[x], pixelzMapH[y], StrideMini, 24);
                 int nR = newBitmap[2 + on];
                 int nG = newBitmap[1 + on];
                 int nB = newBitmap[on];
@@ -3489,17 +3491,17 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
                continue;
 
             INT64 o = CalcPixOffset(x, y, Stride, bpp);
-            if (doGrayScale!=1)
-            {
-               nR = clamp(rand() % 256 + brightness, 0, 255);
-               nG = clamp(rand() % 256 + brightness, 0, 255);
-               nB = clamp(rand() % 256 + brightness, 0, 255);
-            } else
+            if (doGrayScale==1)
             {
                unsigned char zT = clamp(rand() % 256 + brightness, 0, 255);
                nR = zT;
                nG = zT;
                nB = zT;
+            } else
+            {
+               nR = clamp(rand() % 256 + brightness, 0, 255);
+               nG = clamp(rand() % 256 + brightness, 0, 255);
+               nB = clamp(rand() % 256 + brightness, 0, 255);
             }
  
             int oR = bgrImageData[2 + o];
@@ -4404,14 +4406,14 @@ DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, 
     return 1;
 }
 
-DLL_API int DLL_CALLCONV DrawBitmapInPlace(unsigned char *originalData, int w, int h, int Stride, int bpp, int opacity, int linearGamma, int blendMode, int flipLayers, int keepAlpha, unsigned char *newBitmap, int StrideMini, int nbpp, int imgX, int imgY, int imgW, int imgH) {
+DLL_API int DLL_CALLCONV DrawTextBitmapInPlace(unsigned char *originalData, int w, int h, int Stride, int bpp, int opacity, int linearGamma, int blendMode, int flipLayers, int keepAlpha, unsigned char *newBitmap, int StrideMini, int nbpp, int imgX, int imgY, int imgW, int imgH) {
     const int aA = (StrideMini >> 24) & 0xFF;
     const int rA = (StrideMini >> 16) & 0xFF;
     const int gA = (StrideMini >> 8) & 0xFF;
     const int bA = StrideMini & 0xFF;
 
     const INT64 data = CalcPixOffset(w - 1, h - 1, Stride, bpp);
-    // fnOutputDebug("yay DrawBitmapInPlace; y = " + std::to_string(imgY));
+    // fnOutputDebug("yay DrawTextBitmapInPlace; y = " + std::to_string(imgY));
     #pragma omp parallel for schedule(dynamic) default(none)
     for (int x = 0; x < imgW; x++)
     {
