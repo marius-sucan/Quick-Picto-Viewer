@@ -1,4 +1,4 @@
-
+﻿
 SelectFolderEx(StartingFolder:="", DlgTitle:="", OwnerHwnd:=0, OkBtnLabel:="", comboList:="", desiredDefault:=1, comboLabel:="", CustomPlaces:="", pickFoldersOnly:=1, usrFilters:="", defIndexFilter:=1, FileMustExist:=1, defaultEditField:="") {
 ; ==================================================================================================================================
 ; Shows a dialog to select a folder.
@@ -1211,7 +1211,7 @@ GetCurrentProcessId() {
 RunAdminMode() {
   If !A_IsAdmin
   {
-      pid :=GetCurrentProcessId()
+      pid := GetCurrentProcessId()
       path2exe := GetModuleFileNameEx(pid)
       Try {
          If A_IsCompiled

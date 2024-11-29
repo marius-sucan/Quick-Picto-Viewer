@@ -1718,7 +1718,7 @@ unsigned char clipMaskFilter(const int &x, const int &y, const unsigned char *ma
           bool r = (highDepthModeMask==1) ? 1 : 0;
           if (inRange(0, polyH - 1, y - imgSelY1 - polyY + polyOffYa) && inRange(0, polyW - 1, x - imgSelX1 - polyX))
           {
-             if (highDepthModeMask==1)
+             if (highDepthModeMask==1) // flag set by prepareDrawLinesMask() and used by mergePolyMaskIntoHighDepthMask() invoked from AHK by HugeImagesDrawParametricLines()
                 return highDephMaskMap[(INT64)(y - imgSelY1 - polyY + polyOffYa) * polyW + x - imgSelX1 - polyX];
 
              r = polygonMaskMap[(INT64)(y - imgSelY1 - polyY + polyOffYa) * polyW + x - imgSelX1 - polyX];

@@ -38,8 +38,8 @@
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
 ;@Ahk2Exe-UpdateManifest 0, Quick Picto Viewer
 ;@Ahk2Exe-SetOrigFilename Quick-Picto-Viewer.exe
-;@Ahk2Exe-SetVersion 6.1.50
-;@Ahk2Exe-SetProductVersion 6.1.50
+;@Ahk2Exe-SetVersion 6.1.51
+;@Ahk2Exe-SetProductVersion 6.1.51
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2024)
 ;@Ahk2Exe-SetCompanyName https://marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -215,7 +215,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := [], prevPasteInPlaceVPcoords := []
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := ""
-   , appVersion := "6.1.50", vReleaseDate := "2024/11/28" ; yyyy-mm-dd
+   , appVersion := "6.1.51", vReleaseDate := "2024/11/29" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -14035,7 +14035,9 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
 
    If !IsObject(pathCoords)
    {
-      If (mode=3 && FillAreaShape=1 || mode=4 && PasteInPlaceCropSel=1)
+      If (mode=3 && FillAreaShape=3 && FillAreaEllipseSection<1440 || mode=4 && PasteInPlaceCropSel=1)
+         mode := 3
+      Else If (mode=3 && FillAreaShape=1 || mode=4 && PasteInPlaceCropSel=1)
          mode := 0
       Else If (mode=3 && FillAreaShape=3 || mode=4 && PasteInPlaceCropSel=3)
          mode := 1
@@ -14141,6 +14143,7 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
             mw := pathCoords[3],   mh := pathCoords[4]
          }
 
+         allowCavity := (innerSelectionCavityX>0 && innerSelectionCavityY>0 && mode=3 && FillAreaShape=3 && FillAreaEllipseSection<1440 && viewportQPVimage.imgHandle) ? 1 : 0
          If (mode=4)
             pPath := coreCreateFillAreaShape(xk, yk, mw, mh, PasteInPlaceCropSel, rotation, rotateSelBoundsKeepRatio, 2, 0)
          Else If (mode=3)
@@ -17498,7 +17501,7 @@ FillSelectedArea() {
     }
 }
 
-dummyInnerCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, shape, pPath) {
+dummyInnerCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, shape, pPath, arcSection, pie) {
     If (shape=1) ; rect
     {
        Gdip_AddPathRectangle(pPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
@@ -17509,8 +17512,8 @@ dummyInnerCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, shape, pPath
        Gdip_AddPathRoundedRectangle(pPath, imgSelPx, imgSelPy, imgSelW, imgSelH, radius)
     } Else If (shape=3) ; ellipse
     {
-       If (FillAreaEllipseSection<1440)
-          createPiePath(imgSelPx, imgSelPy, imgSelW, imgSelH, 0, pPath, FillAreaEllipseSection, FillAreaEllipsePie)
+       If (arcSection<1440)
+          createPiePath(imgSelPx, imgSelPy, imgSelW, imgSelH, 0, pPath, arcSection, pie)
        Else
           Gdip_AddPathEllipse(pPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
     } Else If (shape=4) ; triangle
@@ -17554,7 +17557,7 @@ coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, shape, angleu:=0, 
        Return createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, 2, angleu, keepBounds, 0, allowSelectionCenter, 1, innerSelectionCavityX, innerSelectionCavityY)
 
     pPath := Gdip_CreatePath()
-    dummyInnerCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, shape, pPath)
+    dummyInnerCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, shape, pPath, FillAreaEllipseSection, FillAreaEllipsePie)
     If (innerSelectionCavityX>0 && innerSelectionCavityY>0 && allowCavity=1)
     {
        clonedPath := Gdip_ClonePath(pPath)
@@ -48172,10 +48175,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
 
     minislideWid := slideWid//2
     If isWinXP
-    {
-       FillAreaBlendMode := 1
-       FillAreaGlassy := 1
-    }
+       FillAreaBlendMode := FillAreaGlassy := 1
 
     If (coreDesiredPixFmt="0x21808")
        FillAreaBlendMode := 1
@@ -48189,7 +48189,8 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
 
     Global PickuFillAreaColor, PickuFillArea2ndColor, txtLine4, uiPasteInPlaceAlphaDrawMode, infoFillAreaGradientView, UIbtnEditShape
 
-    FillAreaClosedPath := FillAreaEllipsePie := 1
+    FillAreaClosedPath := 1
+    FillAreaEllipsePie := 0
     userUIshapeCavity := Round((innerSelectionCavityX + innerSelectionCavityY) / 2 * 400)
     infoBlend := (coreDesiredPixFmt="0x21808") ? "Disabled in 24-RGB mode" : "None"
     ha := (PrefsLargeFonts=1) ? 27 : 18
@@ -53269,7 +53270,7 @@ updateUIfillPanel(actionu:=0) {
        actu := (FillAreaShape=2) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
        GuiUpdateVisibilitySliders(actu, "FillAreaRectRoundness")
 
-       actu := (FillAreaShape=3 && !viewportQPVimage.imgHandle) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+       actu := (FillAreaShape=3) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
        GuiUpdateVisibilitySliders(actu, "FillAreaEllipseSection")
 
        actu := (FillAreaShape=7) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
@@ -53295,7 +53296,7 @@ updateUIfillPanel(actionu:=0) {
        actu := (viewportQPVimage.imgHandle || FillAreaRemBGR=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
        GuiControl, % actu, txtLine1
        GuiControl, % actu, FillAreaGlassy
-       uiSlidersArray["userUIshapeCavity", 10] := (viewportQPVimage.imgHandle && !(FillAreaShape=1 || FillAreaShape=3)) ? 0 : 1
+       uiSlidersArray["userUIshapeCavity", 10] := (viewportQPVimage.imgHandle && !(FillAreaShape=1 || FillAreaShape=3 && FillAreaEllipseSection=1440)) ? 0 : 1
        uiSlidersArray["FillAreaBlurAmount", 10] := (viewportQPVimage.imgHandle || FillAreaRemBGR=1) ? 0 : 1
        If (coreDesiredPixFmt="0x21808")
           GuiControl, SettingsGUIA: Disable, FillAreaBlendMode
@@ -69284,14 +69285,21 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
       }
    }
 
+   If (editingSelectionNow=1 && relativeImgSelCoords=1 && gdiBMPchanged=1)
+      calcRelativeSelCoords(0, oImgW, oImgH)
+
    If (gdiBMPchanged=1)
    {
+      SW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
+      SH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
+      mgpx := Round((SW * SH)/1000000, 1)
+      ngpx := Round((ResizedW * ResizedH)/1000000, 1)
+      If (mgpx>ngpx*2 && slideShowRunning!=1)
+         resetImgSelection("forced")
+
       itemInfos := "Image view. Zoom: " ws ". " fzoomu ". " OutFileName ". " OutDir ". Index " currentFileIndex " of " maxFilesIndex "."
       interfaceThread.ahkFunction("infosUIAbtns", itemInfos)
    }
-
-   If (editingSelectionNow=1 && relativeImgSelCoords=1 && gdiBMPchanged=1)
-      calcRelativeSelCoords(0, oImgW, oImgH)
 
    GDIfadeVPcache := trGdip_DisposeImage(GDIfadeVPcache, 1)
    If (minimizeMemUsage!=1 && slideShowRunning=1 && doSlidesTransitions=1 && (animGIFplaying!=1 || desiredFrameIndex=0) && slideShowDelay>950)
