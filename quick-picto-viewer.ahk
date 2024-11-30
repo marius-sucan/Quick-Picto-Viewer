@@ -20718,19 +20718,20 @@ HugeImagesDrawParametricLines() {
       Sleep, 50
       roundJoins := DrawLineAreaJoinsStyle
       roundCaps := DrawLineAreaCapsStyle
-      If (DrawLineAreaCropShape>1)
+      If (DrawLineAreaCropShape>1 && isInRange(DrawLineAreaBorderCenter, 4,7))
       {
          FillAreaEllipseSection := 1440
          FillAreaShape := (DrawLineAreaCropShape=2) ? 1 : 3
          orXa := o_imgSelX1 - imgSelX1
          orYa := (o_imgSelY2<imgSelY2) ? (imgSelY2 - o_imgSelY2)*1 : 0
-         ppk := (o_imgSelY2<imgSelY2) ? (imgSelY2 - o_imgSelY2)*1 : 0
+         ppka := (o_imgSelY2<imgSelY2) ? (imgSelY2 - o_imgSelY2)*1 : 0
+         ppkb := 0 ; (o_imgSelY2<imgSelY2) ? (imgSelY2 - o_imgSelY2)*1 : 0
          ; ToolTip, % "l=" orYa , , , 2
-         QPV_PrepareHugeImgSelectionArea(1, 2, 3, 4, orobju.imgSelW, orobju.imgSelH + ppk, 3, VPselRotation, 1, 0, "a", "a", 1, [orXa, orYa, o_imgSelW, o_imgSelH + ppk])
+         QPV_PrepareHugeImgSelectionArea(1, 2, 3, 4, orobju.imgSelW, orobju.imgSelH + ppka, 3, VPselRotation, 1, 0, "a", "a", 1, [orXa, orYa, o_imgSelW, o_imgSelH + ppkb])
       }
 
       skippedLines := 0
-      doCrop := (DrawLineAreaCropShape>1) ? 1 : 2
+      doCrop := (DrawLineAreaCropShape>1 && isInRange(DrawLineAreaBorderCenter, 4,7)) ? 1 : 2
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
       rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", doCrop, "int", DrawLineAreaAtomizedGrid)
       rza := DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
@@ -22219,15 +22220,20 @@ coreDrawParametricLinesPolar(x1, y1, x2, y2, imgSelW, imgSelH, thisThick, ByRef 
 }
 
 coreDrawParametricLinesSpiral(x1, y1, x2, y2, imgSelW, imgSelH, ByRef straightLines) {
-   vpWinClientSize(mw, mh)
-    If (DrawLineAreaSpiralCenterMode=1 || DrawLineAreaSpiralCenterMode=2)
+    ; imgSelW := mw/2, imgSelH := mh/2
+    rp := (DrawLineAreaSpiralCenterMode=2) ? 350 : 50
+    If (DrawLineAreaSpiralCenterMode=1)
     {
-       rp := (DrawLineAreaSpiralCenterMode=2) ? 350 : 50
+       vpWinClientSize(mw, mh)
        fx := mw * (alphaMaskOffsetX/rp),      fy := mh * (alphaMaskOffsetY/rp)
+       rw := imgSelW - fx*2,                  rh := imgSelH - fy*2
+    } Else If (DrawLineAreaSpiralCenterMode=2)
+    {
+       fx := imgSelW * (alphaMaskOffsetX/rp), fy := imgSelH * (alphaMaskOffsetY/rp)
        rw := imgSelW - fx*2,                  rh := imgSelH - fy*2
     } Else
     {
-       fx := mw * alphaMaskOffsetX,      fy := mh * alphaMaskOffsetY
+       fx := imgSelW * alphaMaskOffsetX, fy := imgSelH * alphaMaskOffsetY
        rw := imgSelW,                    rh := imgSelH
     }
 
@@ -22235,7 +22241,8 @@ coreDrawParametricLinesSpiral(x1, y1, x2, y2, imgSelW, imgSelH, ByRef straightLi
     PointsList := []
     straightLines := 0
     imgSelPx := x1,  imgSelPy := y1
-    rw := imgSelW,   rh := imgSelH
+    ; rw := imgSelW,   rh := imgSelH
+
     cX := ocX := imgSelPx + imgSelW/2
     cY := ocY := imgSelPy + imgSelH/2
     spx := imgSelPx, spy := imgSelPy
@@ -22443,7 +22450,7 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
        Return -1
     }
 
-    If (DrawLineAreaCropShape>1 && DrawLineAreaBorderCenter>=4)
+    If (DrawLineAreaCropShape>1 && isInRange(DrawLineAreaBorderCenter, 4,7))
     {
        zPath := Gdip_CreatePath()
        If (DrawLineAreaCropShape=3)
@@ -48477,9 +48484,9 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
        GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaCapsStyle " vDrawLineAreaCapsStyle gupdateUIdrawShapesPanel", "No caps|Square caps|Round caps", "Line ends style")
     } Else
     {
-       Gui, Add, Checkbox, xs y+7 w%btnWid% Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIdrawShapesPanel, &Double line
+       Gui, Add, Checkbox, xs y+7 w%btnWid% hp +0x1000 Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIdrawShapesPanel, &Double line
        GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign gupdateUIdrawShapesPanel", "Inside|No clipping|Outside", "Pen clipping to shape")
-       Gui, Add, Checkbox, xs y+7 wp Checked%DrawLineAreaJoinsStyle% vDrawLineAreaJoinsStyle gupdateUIdrawShapesPanel, &Round joins
+       Gui, Add, Checkbox, xs y+7 wp +0x1000 hp Checked%DrawLineAreaJoinsStyle% vDrawLineAreaJoinsStyle gupdateUIdrawShapesPanel, &Round joins
        GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaCapsStyle " vDrawLineAreaCapsStyle gupdateUIdrawShapesPanel", "No caps|Square caps|Round caps", "Line ends style")
        ; Gui, Add, Checkbox, x+5 Checked%FillAreaDoBehind% vFillAreaDoBehind gupdateUIdrawShapesPanel, &Fill behind the image
     }
@@ -51645,7 +51652,7 @@ updateUIdrawParamLinesPanel(actionu:=0, b:=0) {
     actu := (DrawLineAreaBorderCenter<4) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu, freeHandSelectionMode
 
-    actu := isInRange(DrawLineAreaBorderCenter, 4, 8) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    actu := isInRange(DrawLineAreaBorderCenter, 4, 7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu, DrawLineAreaCropShape
     GuiControl, % actu, txtLine2
 
@@ -97465,7 +97472,7 @@ GuiSlidersResponder(a, m_event, keyu) {
    occ := A_IsCritical
    Critical, off
    Sleep, -1   ; the excessive amount of added Sleeps is to prevent potential lock-ups/dead locks
-   While, (determineLClickState()=1 || m_event="uiLabel" && A_Index=1 || GetKeyState(keyu, "P") && isGivenKey=1)
+   While, ((determineLClickState()=1 || m_event="uiLabel" && A_Index=1 || GetKeyState(keyu, "P") && isGivenKey=1) && isActive=1)
    {
       ; fnOutputDebug(A_ThisFunc " == A // start")
       Sleep, -1
@@ -97548,7 +97555,6 @@ GuiSlidersResponder(a, m_event, keyu) {
       ; fnOutputDebug(A_ThisFunc " == E // finish")
       If (sk && !isGivenKey)
          Break
-
       Sleep, -1
       If (A_TickCount - clickStarted>14500)
       {
