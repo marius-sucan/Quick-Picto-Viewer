@@ -38,9 +38,9 @@
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
 ;@Ahk2Exe-UpdateManifest 0, Quick Picto Viewer
 ;@Ahk2Exe-SetOrigFilename Quick-Picto-Viewer.exe
-;@Ahk2Exe-SetVersion 6.1.51
-;@Ahk2Exe-SetProductVersion 6.1.51
-;@Ahk2Exe-SetCopyright Marius Şucan (2019-2024)
+;@Ahk2Exe-SetVersion 6.1.55
+;@Ahk2Exe-SetProductVersion 6.1.55
+;@Ahk2Exe-SetCopyright Marius Şucan (2019-2025)
 ;@Ahk2Exe-SetCompanyName https://marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
 ;___________ Auto Execute Section ____
@@ -215,7 +215,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := [], prevPasteInPlaceVPcoords := []
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := ""
-   , appVersion := "6.1.51", vReleaseDate := "2024/11/29" ; yyyy-mm-dd
+   , appVersion := "6.1.55", vReleaseDate := "2024/12/07" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -252,7 +252,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
 Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0, PasteInPlaceLight := 0
    , EllipseSelectMode := 0, thumbsListViewMode := 1, userimgGammaCorrect := 0, FillAreaGradientAngle := 0
    , adjustCanvasCentered := 1, adjustCanvasMode := 1, adjustCanvasDoBgr := 1, LimitSelectBoundsImg := 1, FillAreaDoContour := 0
-   , DrawLineAreaColor := "ff3366", DrawLineAreaDashStyle := 1, DrawLineAreaContourAlign := 1, DrawLineAreaKeepBounds := 1
+   , DrawLineAreaColor := "ff3366", DrawLineAreaDashStyle := 1, DrawLineAreaContourAlign := 1
    , DrawLineAreaContourThickness := 20, DrawLineAreaOpacity := 255, DrawLineAreaBorderTop := 1, DrawLineAreaBorderBottom := 0
    , DrawLineAreaBorderLeft := 1, DrawLineAreaBorderRight := 0, DrawLineAreaBorderCenter := 1, DrawLineAreaBorderArcA := 0
    , DrawLineAreaBorderArcC := 0, DrawLineAreaBorderArcD := 1, DrawLineAreaCapsStyle := 3, DrawLineAreaDoubles := 0
@@ -4236,15 +4236,12 @@ determineLClickState() {
       Return 0
 
    LbtnDwn := interfaceThread.ahkgetvar.LbtnDwn
-   If (GetKeyState("LButton") || LbtnDwn=1)
-      Return 1
-   Else
-      Return 0
+   Return (GetKeyState("LButton") || LbtnDwn=1) ? 1 : 0
 }
 
 ReloadThisPicture() {
   SetTimer, dummyTimerDelayiedImageDisplay, Off
-  If ((CurrentSLD && maxFilesIndex>0) || validBMP(UserMemBMP))
+  If ((CurrentSLD && maxFilesIndex>0) || validBMP(UserMemBMP) || isImgEditingNow())
   {
      delayu := (A_TickCount - prevFastDisplay < 500) ? 90 : 550
      If (determineLClickState()=1 || GetKeyState("Space", "P"))
@@ -4260,7 +4257,7 @@ ReloadThisPicture() {
 }
 
 coreReloadThisPicture() {
-  If ((CurrentSLD && maxFilesIndex>0) || validBMP(UserMemBMP))
+  If ((CurrentSLD && maxFilesIndex>0) || validBMP(UserMemBMP) || isImgEditingNow())
   {
      r := IDshowImage(currentFileIndex, 2)
      If !r
@@ -4662,7 +4659,7 @@ TriggerMenuBarUpdate(modus:=0) {
    If (showMainMenuBar!=1 && modus!="forced")
       Return
 
-   modus := (validBMP(UserMemBMP) || (maxFilesIndex>0 && CurrentSLD)) ? modus : "welcome"
+   modus := (isImgEditingNow() || validBMP(UserMemBMP) || (maxFilesIndex>0 && CurrentSLD)) ? modus : "welcome"
    If (drawingShapeNow=1)
       modus := "freeform"
 
@@ -10246,7 +10243,7 @@ ToggleImageSizingMode(modus:=0) {
        PrintPosX := "X"
        ; SoundBeep 300, 200
     }
-
+    ; ToolTip, % "m = " IMGresizingMode " | " zoomLevel , , , 2
     INIaction(1, "IMGresizingMode", "General")
     INIaction(1, "zoomLevel", "General")
     INIaction(1, "lockZoomLevel", "General")
@@ -15944,7 +15941,7 @@ disposeCacheIMGs(dummy:=0) {
 }
 
 MenuReturnIMGedit() {
-   If (validBMP(UserMemBMP) && imgIndexEditing>0)
+   If ((validBMP(UserMemBMP) || viewportQPVimage.imgHandle && viewportQPVimage.actions>0) && imgIndexEditing>0)
       currentFileIndex := imgIndexEditing
    Else If (prevLastImg[1, 1])
       currentFileIndex := clampInRange(prevLastImg[1, 1], 1, maxFilesIndex)
@@ -16216,9 +16213,10 @@ performUndoAlphaPainting() {
 
 ImgUndoAction(dummy:=0) {
    Critical, on
-   If (viewportQPVimage.imgHandle && thumbsDisplaying!=1 && imageLoading!=1)
+   If (viewportQPVimage.imgHandle)
    {
-      undoRedoHugeImagesAct()
+      If (thumbsDisplaying!=1 && imageLoading!=1)
+         undoRedoHugeImagesAct()
       Return
    }
 
@@ -16441,9 +16439,10 @@ restorePreviousSelections(thisLevel) {
 
 ImgRedoAction(dummy:=0) {
    Critical, on
-   If (viewportQPVimage.imgHandle && thumbsDisplaying!=1 && imageLoading!=1)
+   If (viewportQPVimage.imgHandle)
    {
-      undoRedoHugeImagesAct()
+      If (thumbsDisplaying!=1 && imageLoading!=1)
+         undoRedoHugeImagesAct()
       Return
    }
 
@@ -19984,7 +19983,7 @@ memoryUsageWarning(givenW:=0, givenH:=0, bitsDepth:=0, opener:=0, bonusBuffer:=0
             Return 1
       } Else
       {
-         msgResult := msgBoxWrapper(appTitle ": WARNING", "You currently have opened a very large image and are trying to edit it. QPV already uses " thisMemoryLoad "% from the available system memory. It is projected to peak at around " projectedMemoryLoad "% or more. This may lead to a substantial decrease in system performance and potential system crashes. No undo levels will be recorded. Current system memory load is at " prcSys " %.`n`nDo you want to continue?", "&Continue|C&ancel", 1, "exclamation")
+         msgResult := msgBoxWrapper(appTitle ": WARNING", "You are about to perform an action on the image that will cause a substantial increase in memory usage. QPV already uses " thisMemoryLoad "% from the available system memory. It is projected to peak at around " projectedMemoryLoad "% or more. This may lead to a substantial decrease in system performance and potential system crashes. No undo levels will be recorded. Current system memory load is at " prcSys " %.`n`nDo you want to continue?", "&Continue|C&ancel", 1, "exclamation")
          If !InStr(msgResult, "Continue")
             Return 1
       }
@@ -20727,7 +20726,7 @@ HugeImagesDrawParametricLines() {
          ppka := (o_imgSelY2<imgSelY2) ? (imgSelY2 - o_imgSelY2)*1 : 0
          ppkb := 0 ; (o_imgSelY2<imgSelY2) ? (imgSelY2 - o_imgSelY2)*1 : 0
          ; ToolTip, % "l=" orYa , , , 2
-         QPV_PrepareHugeImgSelectionArea(1, 2, 3, 4, orobju.imgSelW, orobju.imgSelH + ppka, 3, VPselRotation, 1, 0, "a", "a", 1, [orXa, orYa, o_imgSelW, o_imgSelH + ppkb])
+         QPV_PrepareHugeImgSelectionArea(1, 2, 3, 4, orobju.imgSelW, orobju.imgSelH + ppka, 3, VPselRotation, 0, 0, "a", "a", 1, [orXa, orYa, o_imgSelW, o_imgSelH + ppkb])
       }
 
       skippedLines := 0
@@ -21539,6 +21538,16 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
          imgType := FreeImage_GetImageType(hFIFimgA, 1)
          fileType := FreeImage_GetFileType(imgPath, 1)
 
+         currIMGdetails.ImgFile := viewportQPVimage.ImgFile
+         currIMGdetails.imgHandle := viewportQPVimage.imgHandle
+         currIMGdetails.OpenedWith := viewportQPVimage.OpenedWith
+         currIMGdetails.LoadedWith := viewportQPVimage.LoadedWith
+         currIMGdetails.TooLargeGDI := viewportQPVimage.TooLargeGDI
+         currIMGdetails.Width := viewportQPVimage.Width
+         currIMGdetails.Height := viewportQPVimage.Height
+         currIMGdetails.dpiX := viewportQPVimage.dpiX
+         currIMGdetails.dpiY := viewportQPVimage.dpiY
+         currIMGdetails.DPI := viewportQPVimage.DPI
          currIMGdetails.HasAlpha := InStr(ColorsType, "rgba") ? 1 : 0
          currIMGdetails.RawFormat := fileType " | " imgType
          currIMGdetails.PixelFormat := StrReplace(oimgBPP, "-", "+") "-" ColorsType
@@ -21790,7 +21799,7 @@ coreDrawParametricLinesRays(x1, y1, x2, y2, imgSelW, imgSelH, ByRef straightLine
 
     kPath := Gdip_CreatePath(0, PointsList)
     If (DrawLineAreaGridX>2)
-       trGdip_RotatePathAtCenter(kPath, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
+       trGdip_RotatePathAtCenter(kPath, VPselRotation, 1, 1, rotateSelBoundsKeepRatio, 1)
 
     newPoints := Gdip_GetPathPoints(kPath, 1)
     Gdip_DeletePath(kPath)
@@ -21850,7 +21859,7 @@ coreDrawParametricLinesGrid(x1, y1, x2, y2, imgSelW, imgSelH, thisThick, ByRef s
     pPath := Gdip_CreatePath()
     sX := Rect.w / nRect.w
     sY := Rect.h / nRect.h
-    If (DrawLineAreaKeepBounds=1)
+    If (rotateSelBoundsKeepRatio=1)
     {
        sX := min(sX, sY)
        sY := min(sX, sY)
@@ -21974,7 +21983,7 @@ coreDrawParametricLinesGrid(x1, y1, x2, y2, imgSelW, imgSelH, thisThick, ByRef s
        Gdip_DeletePath(nPath)
     }
 
-    ; trGdip_RotatePathAtCenter(pPath, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
+    ; trGdip_RotatePathAtCenter(pPath, VPselRotation, 1, 1, rotateSelBoundsKeepRatio, 1)
     Return pPath
 }
 
@@ -22029,7 +22038,7 @@ coreDrawParametricLinesRose(x1, y1, x2, y2, imgSelW, imgSelH, ByRef straightLine
     PointsList := []
     straightLines := 1
     pPath := Gdip_CreatePath()
-    if (DrawLineAreaAtomizedGrid=0)
+    if (DrawLineAreaAtomizedGrid=0 && sweep>0)
     {
        ; PointsList.Push(mw + CenterRadius*0.99, mh)
        Loop, 1440
@@ -22083,7 +22092,7 @@ coreDrawParametricLinesRose(x1, y1, x2, y2, imgSelW, imgSelH, ByRef straightLine
     ; fnOutputDebug(A_ThisFunc ": w/h = " rect.w " || " rect.h)
     Gdip_ScalePathAtCenter(pPath, sm, sm)
     Gdip_TranslatePath(pPath, x1, y1)
-    trGdip_RotatePathAtCenter(pPath, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
+    trGdip_RotatePathAtCenter(pPath, VPselRotation, 1, 1, rotateSelBoundsKeepRatio, 1)
     Return pPath
 }
 
@@ -22215,7 +22224,7 @@ coreDrawParametricLinesPolar(x1, y1, x2, y2, imgSelW, imgSelH, thisThick, ByRef 
        Gdip_AddPathLine(pPath, innerPointsList[A_Index, 1], innerPointsList[A_Index, 2], PointsList[A_Index, 1], PointsList[A_Index, 2])
     }
 
-    trGdip_RotatePathAtCenter(pPath, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
+    trGdip_RotatePathAtCenter(pPath, VPselRotation, 1, 1, rotateSelBoundsKeepRatio, 1)
     Return pPath
 }
 
@@ -22304,7 +22313,7 @@ coreDrawParametricLinesSpiral(x1, y1, x2, y2, imgSelW, imgSelH, ByRef straightLi
     Gdip_AddPathCurve(pPath, PointsList)
     PointsList := ""
 
-    trGdip_RotatePathAtCenter(pPath, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
+    trGdip_RotatePathAtCenter(pPath, VPselRotation, 1, 1, rotateSelBoundsKeepRatio, 1)
     Rect := Gdip_GetPathWorldBounds(pPath)
     dX := Rect.x + (Rect.w / 2)
     dY := Rect.y + (Rect.h / 2)
@@ -22421,7 +22430,7 @@ coreDrawParametricLinesMarginsMidsDiagos(x1, y1, x2, y2, imgSelW, imgSelH, ByRef
     }
 
     applyLimits := (Gdip_GetPathPointsCount(pPathBrders))>2 ? 1 : 0
-    trGdip_RotatePathAtCenter(pPathBrders, VPselRotation, 1, applyLimits, DrawLineAreaKeepBounds, 1)
+    trGdip_RotatePathAtCenter(pPathBrders, VPselRotation, 1, applyLimits, rotateSelBoundsKeepRatio, 1)
     Return pPathBrders
 }
 
@@ -22457,7 +22466,7 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
           Gdip_AddPathEllipse(zPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
        Else
           Gdip_AddPathRectangle(zPath, imgSelPx, imgSelPy, imgSelW, imgSelH)
-       trGdip_RotatePathAtCenter(zPath, VPselRotation, 1, 1, DrawLineAreaKeepBounds, 1)
+       trGdip_RotatePathAtCenter(zPath, VPselRotation, 1, 1, rotateSelBoundsKeepRatio, 1)
        Gdip_SetClipPath(G2, zPath)
        Gdip_DeletePath(zPath)
     }
@@ -24850,7 +24859,7 @@ filterDelayiedImageDisplay() {
 }
 
 DelayiedImageDisplay() {
-   If ((CurrentSLD && maxFilesIndex>0) || validBMP(UserMemBMP))
+   If ((CurrentSLD && maxFilesIndex>0) || validBMP(UserMemBMP) || isImgEditingNow())
    {
       r := IDshowImage(currentFileIndex)
       If !r
@@ -30031,7 +30040,7 @@ folderTreeGetSelectedPath(c) {
 }
 
 FolderTreeFindActiveFile(givenPath:=0) {
-    modus := (validBMP(UserMemBMP) || (maxFilesIndex>0 && CurrentSLD)) ? modus : "welcome"
+    modus := (validBMP(UserMemBMP) || isImgEditingNow() || (maxFilesIndex>0 && CurrentSLD)) ? modus : "welcome"
     If (modus="welcome" && (!givenPath || InStr(givenPath, "`tF9")))
        Return
 
@@ -47455,7 +47464,7 @@ BTNimgResizeEditor() {
     impx := Round((imgW * imgH)/1000000, 1)
     If (max(cmpx, impx)>536.7 && !viewportQPVimage.imgHandle)
     {
-       msgResult := msgBoxWrapper(appTitle ": WARNING", "You are trying to resize the currently opened image to a very large resolution: " Round(max(cmpx, impx)) " megapixels. Just a few image editing tools will still be available with such images: resize, crop, flip, rotate by 90, etc. Additionally, no undo levels will be recorded and the current undo levels will be discarded if you choose to continue. Some of the options in this panel will be ignored upon resize.`n`nPlease choose how to proceed.", "&Continue|C&ancel", 1, "exclamation")
+       msgResult := msgBoxWrapper(appTitle ": WARNING", "You are trying to resize the currently opened image to a very large resolution: " Round(max(cmpx, impx)) " megapixels. Several image editing tools will not be available with such images. Additionally, no undo levels will be recorded and the current undo levels will be discarded if you choose to continue.`n `nSome of the options in this panel might be ignored upon resize.`n`nPlease choose how to proceed.", "&Continue|C&ancel", 1, "exclamation")
        If InStr(msgResult, "Continue")
        {
           BtnCloseWindow()
@@ -48680,7 +48689,6 @@ ToggleClosePanelApply() {
 ReadSettingsDrawLinesArea(act:=0) {
     RegAction(act, "DrawLineAreaColor",, 3)
     RegAction(act, "DrawLineAreaOpacity",, 2, 1, 255)
-    RegAction(act, "DrawLineAreaKeepBounds",, 1)
     RegAction(act, "DrawLineAreaSnapLine",, 1)
     RegAction(act, "DrawLineAreaCapsStyle",, 2, 1, 3)
     RegAction(act, "DrawLineAreaDoubles",, 1)
@@ -48794,9 +48802,7 @@ PanelDrawParametricLines() {
     }
 
     GuiAddDropDownList("xs y+10 wp AltSubmit Choose" DrawLineAreaCapsStyle " vDrawLineAreaCapsStyle gupdateUIdrawParamLinesPanel", "No caps|Square caps|Round caps", "Line ends style")
-    Gui, Add, Checkbox, x+10 wp hp +0x1000 gupdateUIdrawParamLinesPanel Checked%DrawLineAreaKeepBounds% vDrawLineAreaKeepBounds +hwndhTemp, &Within bounds
-    ToolTip2ctrl(hTemp, "Rotate object within the boundaries of the selection area")
-    Gui, Add, Checkbox, xs y+5 wp hp +0x1000 gupdateUIdrawParamLinesPanel Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles, Double line
+    Gui, Add, Checkbox, x+10 wp hp +0x1000 gupdateUIdrawParamLinesPanel Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles, Double line
     ; If (viewportQPVimage.imgHandle)
     ;    Gui, Add, Checkbox, x+10 wp hp +0x1000 Checked%DrawLineAreaJoinsStyle% vDrawLineAreaJoinsStyle gupdateUIdrawParamLinesPanel, &Round joins
 
@@ -48819,8 +48825,8 @@ PanelDrawParametricLines() {
     GuiAddSlider("DrawLineAreaContourThickness", 1,lim, lia, ".updateLabelDrawLineThickness", "updateUIdrawParamLinesPanel", 1, "xs y+10 w" btnWid*2 + 8 " hp")
     If (viewportQPVimage.imgHandle)
     {
-       GuiAddSlider("DrawLineAreaThickScale", 100, 650, 100, "Thickness scale: $€ %", "updateUIdrawParamLinesPanel", 1, "xs y+7 w" (btnWid*2 + 8)//2 - 2 " hp")
-       GuiAddSlider("DrawLineAreaMitersBorder", 100, 500, 100, "Miters boundary: $€ %", "updateUIdrawParamLinesPanel", 1, "x+5 wp hp")
+       GuiAddSlider("DrawLineAreaThickScale", 100, 650, 100, "Thickness scale: $€ %", "updateUIdrawParamLinesPanel", 1, "xs y+7 wp hp")
+       ; GuiAddSlider("DrawLineAreaMitersBorder", 100, 500, 100, "Miters boundary: $€ %", "updateUIdrawParamLinesPanel", 1, "x+5 wp hp")
     }
 
     Gui, Tab
@@ -51268,7 +51274,6 @@ updateUIselPropPanel() {
    GuiControlGet, SelectionCoordsType, SettingsGUIA:, SelectionCoordsType
    GuiControlGet, LimitSelectBoundsImg, SettingsGUIA:, LimitSelectBoundsImg
    GuiControlGet, rotateSelBoundsKeepRatio, SettingsGUIA:, rotateSelBoundsKeepRatio
-   
    If (lockSelectionAspectRatio>1)
    {
       userDefinedSelCoords := 0
@@ -51505,10 +51510,12 @@ BtnCreateNewImage() {
 
     If isImgSizeTooLarge(UserNewWidth, UserNewHeight)
     {
+       superLarge := 1
        SoundBeep, 300, 100
-       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image dimensions exceed the maximum limits. Width and height cannot exceed 199000 pixels, and total image size cannnot exceed 536 MPx.`n`nWould you like to adapt the dimensions and create the new image?", "&Yes|&No", 1, "exclamation")
+       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image dimensions exceed 536 MPx. Some image editing tools are not yet implemented for such large images and only one undo level will be available if sufficient system memory is accessible.`n`nDo you want to create the new image?", "&Yes|&No", 1, "exclamation")
+       ; msgResult := msgBoxWrapper(appTitle ": WARNING", "The image dimensions exceed the maximum limits. Width and height cannot exceed 199000 pixels, and total image size cannnot exceed 536 MPx.`n`nWould you like to adapt the dimensions and create the new image?", "&Yes|&No", 1, "exclamation")
        If (msgResult="Yes")
-          capIMGdimensionsGDIPlimits(UserNewWidth, UserNewHeight)
+          Sleep, -1 ; capIMGdimensionsGDIPlimits(UserNewWidth, UserNewHeight)
        Else
           Return
     }
@@ -51549,8 +51556,14 @@ BtnCreateNewImage() {
        tUserNewWidth := UserNewWidth
        tUserNewHeight := UserNewHeight
     }
+   
+    If (superLarge=1)
+    {
+       calcIMGdimensions(tUserNewWidth, tUserNewHeight, 300, 300, newW, newH)
+       newBitmap := trGdip_CreateBitmap(A_ThisFunc, newW, newH)
+    } Else
+       newBitmap := trGdip_CreateBitmap(A_ThisFunc, tUserNewWidth, tUserNewHeight, coreDesiredPixFmt)
 
-    newBitmap := trGdip_CreateBitmap(A_ThisFunc, tUserNewWidth, tUserNewHeight, coreDesiredPixFmt)
     If !validBMP(newBitmap)
     {
        showTOOLtip("Failed to create new image.`nUnable to allocate the new bitmap.")
@@ -51585,7 +51598,7 @@ BtnCreateNewImage() {
     }
 
     currIMGdetails.HasAlpha := 1
-    If (NewDocUseColor=1 && OutlierFillOpacity>253)
+    If (NewDocUseColor=1 && OutlierFillOpacity>253 && NewDocUseColor=1)
        currIMGdetails.HasAlpha := 0
 
     imgIndexEditing := currentFileIndex
@@ -51606,6 +51619,12 @@ BtnCreateNewImage() {
        gdiBitmap := trGdip_CloneBitmap(A_ThisFunc, newBitmap)
 
     dummyTimerDelayiedImageDisplay(5)
+    if (superLarge=1)
+    {
+       fn :=  Func("convertImageIntoHugeImage").Bind(tUserNewWidth, tUserNewHeight, 0)
+       SetTimer, % fn, -350
+    }
+
     SetTimer, createGUItoolbar, -100
     SetTimer, TriggerMenuBarUpdate, -90
     SetTimer, ResetImgLoadStatus, -50
@@ -53399,7 +53418,6 @@ updateUIfillPanel(actionu:=0) {
 
        actu2 := (FillAreaDoContour=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu2, PickuDrawLineAreaColor
-       GuiControl, % actu2, DrawLineAreaKeepBounds
        GuiControl, % actu2, DrawLineAreaCapsStyle
        GuiControl, % actu2, DrawLineAreaDoubles
        GuiControl, % actu2, DrawLineAreaContourAlign
@@ -61510,7 +61528,6 @@ InvokeMenuBarFile(manuID) {
    Try Menu, pvMenuBarFile, Delete
    createMenuOpenRecents("simple")
    createMenuFavourites()
-
    If (thumbsDisplaying!=1)
    {
       kMenu("pvMenuBarFile", "Add", "New image`tCtrl+N", "PanelNewImage", "image editing")
@@ -61603,7 +61620,7 @@ InvokeMenuBarFile(manuID) {
    }
 
    Menu, pvMenuBarFile, Add
-   modus := (validBMP(UserMemBMP) || (maxFilesIndex>0 && CurrentSLD)) ? 0 : "welcome"
+   modus := (validBMP(UserMemBMP) || isImgEditingNow() || (maxFilesIndex>0 && CurrentSLD)) ? 0 : "welcome"
    If (modus!="welcome")
       kMenu("pvMenuBarFile", "Add", "Close ima&ge and files list`tCtrl+F4", "closeDocuments", "reset")
    kMenu("pvMenuBarFile", "Add", "Restart`tShift+Esc", "restartAppu", "close renew")
@@ -77642,7 +77659,7 @@ getTopMopStyle(hwnd) {
 }
 
 updateUIctrl() {
-   modus := (validBMP(UserMemBMP) || (maxFilesIndex>0 && CurrentSLD)) ? modus : "welcome"
+   modus := (validBMP(UserMemBMP) || isImgEditingNow() || (maxFilesIndex>0 && CurrentSLD)) ? modus : "welcome"
    If (modus="welcome")
       interfaceThread.ahkPostFunction("uiAccessWelcomeView")
    Else
@@ -77867,8 +77884,7 @@ selectEntireImage(act:=0) {
    If (ShowAdvToolbar=1 && lockToolbar2Win=1)
       DelayiedImageDisplay()
 
-   If (ImgSelX2=imgW && imgSelY2=imgH && imgSelX1=0
-   && imgSelY1=0 && editingSelectionNow=1)
+   If (ImgSelX2=imgW && imgSelY2=imgH && imgSelX1=0 && imgSelY1=0 && editingSelectionNow=1)
    {
       resetImgSelection()
       If (act="rm" && imgEditPanelOpened!=1)
@@ -78303,7 +78319,7 @@ createDefaultSizedSelectionArea(DestPosX, DestPosY, newW, newH, maxSelX, maxSelY
        MouseCoords2Image(mX + 200, mY + 200, 1, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, imgSelX2, imgSelY2)
     } Else If (imgSelX2=-1 && imgSelY2=-1)
     {
-       if (IMGlargerViewPort=1)
+       If (IMGlargerViewPort=1)
        {
           mX := (DestPosX>0) ? DestPosX + 70 : 70
           mY := (DestPosY>0) ? DestPosY + 70 : 70
@@ -99253,11 +99269,12 @@ testWicLoader() {
 }
 
 dummyAutoScroller() {
-   WinGetActiveTitle, aaa
-   If InStr(aaa, "mozilla firefox") && InStr(aaa, "tendance")
+   WinGetActiveTitle, aa
+   WinGetClass, bb, aa
+   If InStr(aa, "mozilla firefox") && InStr(aa, "tendance")
       SendInput, {down}
 
-   ; ToolTip, % aaa , , , 2
+   ; ToolTip, % aa "|" bb , , , 2
 }
 
 

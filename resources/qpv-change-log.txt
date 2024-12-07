@@ -4,6 +4,10 @@
 // Project began in early May 2019.
 // Related: general-code-overview.txt
 
+- v6.1.55 (2024-12-07)
+  - users can now create very large images, above 536 megapixels, using the «New Image» option
+  - bug fixes
+
 - v6.1.50 (2024-11-28)
   - [improvement] «draw paramaetric lines» tool now works with images over 536 megapixels
   - fixed several tools and filters: add noise, flood/bucket, insert text, pixelize; sometimes crashes occured with images above 536 mgpx
@@ -1128,8 +1132,8 @@ Files organization:
 
 ; KNOWN ISSUES [mardi 4 juin 2024]:
 - when multi-threaded is activated, QPV randomly hangs [and never recovers] in thumbnails mode; a dead-lock?
-- when using image editing live tools, the application sometimes hangs [and never recovers] when using the custom sliders; another dead-lock?
-- when clicking on the toolbar to open live image editing tools, QPV sometimes crashes; efforts have been put into mitigating this issue
+- [rarely] when using image editing live tools, the application sometimes hangs [and never recovers] when using the custom sliders in the panels; another dead-lock?
+- [rarely] when clicking on the toolbar to open live image editing tools, QPV sometimes crashes; efforts have been put into mitigating this issue
 - jpeg lossless crop: the selection area does not precisely match with the resulted image [freeimage]
 - high memory consumption with images under 536 megapixels; most editing operations need a lot of RAM
 
@@ -1137,11 +1141,10 @@ Files organization:
 - use WIC for batch image simple processing tool ? At least, teleport them from WIC to FreeImage
 
 ; Tools left to implement for images above 536 MPx:
-- Draw lines [in progress]
 - Brushes [and upgrade the blend modes function]
+- Blur
 -- Low priority tools:
 ---- Detect edges
----- Blur
 ---- Sharpen
 ---- Symmetry and patterns generator
 ---- Polar to rect / rect to polar
@@ -1159,7 +1162,6 @@ Files organization:
 - allow resize/crop/rotate on original HDR images, not just on the tone-mapped one 
 
 ; TO-DO later:
-- circular/polar grid generator
 - rectangular text grid generator
 - dedicated panel as color chooser for the brush tool
 - draw bar charts tool
@@ -1171,3 +1173,4 @@ Files organization:
 - transparentize image tool
 - import vector paths
 - reimplement the smudge, pinch, bulge brushes
+
