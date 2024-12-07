@@ -263,11 +263,11 @@ d) How an image is loaded and displayed on screen
    This function is a wrapper for coreShowTheImage() to allow the user 
    quickly skim through indexed files without loading and displaying
    each of them. It takes into account how fast the user changes
-   between images and fast they are rendered on screen. If the 
-   system permits, all images will be displayed. If load times are 
-   high then they will be skipped. To this end, there are additional
-   functions and timers meant to delay image loading, to allow for 
-   interruptions.
+   between images and how fast they are rendered on screen. If the 
+   system resources permit this, all images will be displayed. However,
+   if load times are high, then many images will be skipped. To this
+   end, there are various timers meant to slightly delay image loading, 
+   to allow for interruptions.
 
    IDshowImage(), ShowTheImage() and coreShowTheImage() are invoked
    even if the user is in list mode [thumbnails view].
