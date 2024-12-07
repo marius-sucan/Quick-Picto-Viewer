@@ -1,34 +1,41 @@
-﻿; FreeImage v3.18 library wrapper
-; Available on Github:
-; https://github.com/marius-sucan/Quick-Picto-Viewer
-
+﻿; FreeImage v3.18+ library wrapper for AHK v1.1.
+; Available at:
+; https://github.com/marius-sucan/FreeImage-library/tree/qpv/Wrapper
+; Dependency:
+; AHK v1.1 GDI+ library wrapper: https://github.com/marius-sucan/AHK-GDIp-Library-Compilation
+; Author: Marius Șucan
+;
 ; Change log:
 ; =============================
-; 27 October 2023 by Marius Șucan - v1.8
+;
+; 07 December 2024 - v1.9
+; - implemented more functions ; FreeImage_AllocateEx() and FreeImage_FillBackground()
+;
+; 27 October 2023 - v1.8
 ; - implemented more functions
 ;
-; 16 July 2022 by Marius Șucan - v1.7
+; 16 July 2022 - v1.7
 ; - implemented functions to access image metadata tags
 ;
-; 26 February 2021 by Marius Șucan - v1.6
+; 26 February 2021 - v1.6
 ; - implemented the multi-page functions
 ;
-; 14 January 2021 by Marius Șucan - v1.5
+; 14 January 2021 - v1.5
 ; - bug fixes - many thanks to TheArkive
 ;
-; 30 June 2020 by Marius Șucan - v1.4
+; 30 June 2020 - v1.4
 ; - implemented additional functions.
 ;
-; 21 September 2019 by Marius Șucan - v1.3
+; 21 September 2019 - v1.3
 ; - implemented additional functions.
 ;
-; 11 August 2019 by Marius Șucan - v1.2
+; 11 August 2019 - v1.2
 ; - added ConvertFIMtoPBITMAP() and ConvertPBITMAPtoFIM() functions
 ; - implemented 32 bits support for AHK_L 32 bits and FreeImage 32 bits.
 ; - FreeImage_Save() now relies on FreeImage_GetFIFFromFilename() to get the file format code
 ; - bug fixes and more in-line comments/information
 ;
-; 6 August 2019 by Marius Șucan - v1.1
+; 6 August 2019 - v1.1
 ; - it now works with FreeImage v3.18 and AHK_L v1.1.30+.
 ; - added many new functions and cleaned up the code. Fixed bugs.
 ;
@@ -151,7 +158,7 @@ FreeImage_GetVersion() {
 }
 
 FreeImage_GetLibVersion() {
-   Return 1.8 ;  27/10/2023
+   Return 1.81 ;  samedi 7 décembre 2024
 }
 
 FreeImage_GetCopyrightMessage() {
@@ -164,6 +171,21 @@ FreeImage_GetCopyrightMessage() {
 FreeImage_Allocate(width, height, bpp:=32, red_mask:=0xFF000000, green_mask:=0x00FF0000, blue_mask:=0x0000FF00) {
 ; function useful to create a new / empty bitmap
    Return DllCall(getFIMfunc("Allocate"), "int", width, "int", height, "int", bpp, "uint", red_mask, "uint", green_mask, "uint", blue_mask, "uptr")
+}
+
+FreeImage_AllocateEx(width, height, bpp:=32, RGBArray:="255,255,255,0", options:=1, red_mask:=0xFF000000, green_mask:=0x00FF0000, blue_mask:=0x0000FF00, hPalette:=0) {
+; function useful to create a new / empty bitmap
+   If (RGBArray!="")
+   {
+      RGBA := StrSplit(RGBArray, ",")
+      VarSetCapacity(RGBQUAD, 4, 0)
+      NumPut(RGBA[3], RGBQUAD, 0, "UChar")
+      NumPut(RGBA[2], RGBQUAD, 1, "UChar")
+      NumPut(RGBA[1], RGBQUAD, 2, "UChar")
+      NumPut(RGBA[4], RGBQUAD, 3, "UChar")
+   } else RGBQUAD := 0
+
+   Return DllCall(getFIMfunc("AllocateEx"), "int", width, "int", height, "int", bpp, "UInt", &RGBQUAD, "int", options, "uint", hPalette, "uint", red_mask, "uint", green_mask, "uint", blue_mask, "uptr")
 }
 
 FreeImage_Load(ImgPath, GFT:=-1, flag:=0, ByRef dGFT:=0) {
@@ -423,6 +445,28 @@ FreeImage_SetBackgroundColor(hImage, RGBArray:="255,255,255,0") {
       NumPut(RGBA[4], RGBQUAD, 3, "UChar")
    } else RGBQUAD := 0
    Return DllCall(getFIMfunc("SetBackgroundColor"), "uptr", hImage, "UInt", &RGBQUAD)
+}
+
+FreeImage_FillBackground(hImage, RGBArray:="255,255,255,0", options:=1, applyAlpha:=0) {
+; applyAlpha  - for 32-bits RGBA, sets the alpha channel to specified value, must be above 0.
+; options     - it affect the color search process for palletized images.
+;   FI_COLOR_IS_RGB_COLOR     = 0   // RGBQUAD color is a RGB color (contains no valid alpha channel)
+;   FI_COLOR_IS_RGBA_COLOR    = 1   // RGBQUAD color is a RGBA color (contains a valid alpha channel)
+;   FI_COLOR_FIND_EQUAL_COLOR = 2   // For palettized images: lookup equal RGB color from palette
+;   FI_COLOR_ALPHA_IS_INDEX   = 4   // The color's rgbReserved member (alpha) contains the palette index to be used
+
+   If (RGBArray!="")
+   {
+      RGBA := StrSplit(RGBArray, ",")
+      VarSetCapacity(RGBQUAD, 4, 0)
+      NumPut(RGBA[3], RGBQUAD, 0, "UChar")
+      NumPut(RGBA[2], RGBQUAD, 1, "UChar")
+      NumPut(RGBA[1], RGBQUAD, 2, "UChar")
+      NumPut(RGBA[4], RGBQUAD, 3, "UChar")
+      If (applyAlpha=-1)
+         applyAlpha := RGBA[4]
+   } else RGBQUAD := 0
+   Return DllCall(getFIMfunc("FillBackground"), "uptr", hImage, "UInt", &RGBQUAD, "int", options, "int", applyAlpha)
 }
 
 ; === File type functions ===

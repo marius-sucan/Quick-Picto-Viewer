@@ -704,6 +704,7 @@ deactivateTlbrKbdMode(m:=0) {
 }
 
 KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
+   Static lastInvoked := 1
    ; SoundBeep 
    If isNumber(externCounter)
       navKeysCounter := externCounter
@@ -825,7 +826,11 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
                GuiControlGet, OutputVal, SettingsGUIA:, % OutputVname
                GuiControlGet, OutputEnable, SettingsGUIA: Enabled, % OutputVname
                If (isNumber(OutputVal) && InStr(OutputVar, "edit") && OutputEnable=1)
-                  GuiControl, SettingsGUIA:, % OutputVname, % (givenKey="Up") ? OutputVal + 1 : OutputVal - 1
+               {
+                  pf := (A_TickCount - lastInvoked<100) ? 10 : 1
+                  GuiControl, SettingsGUIA:, % OutputVname, % (givenKey="Up") ? OutputVal + pf : OutputVal - pf
+                  lastInvoked := A_TickCount
+               }
             }
          }
          If isVarEqualTo(givenKey, "Up", "Down", "Left", "Right")
@@ -20002,7 +20007,7 @@ warnHugeImageNotFIM() {
    }   
 }
 
-convertImageIntoHugeImage(newW, newH, quality) {
+convertImageIntoHugeImage(newW, newH, quality, clr:=0) {
    Critical, on
    whichBitmap := useGdiBitmap()
    If !validBMP(whichBitmap)
@@ -20044,7 +20049,8 @@ convertImageIntoHugeImage(newW, newH, quality) {
    r := viewportQPVimage.LoadImage(imgPath, 1, 0, 1, [hFIFimgA, 1], 1)
    If r
    {
-      HugeImagesCropResizeRotate(newW, newH, "resize", 0, 0, 0, 0, quality, 0)
+      modus := (quality>=8) ? "new-image" : "resize"
+      HugeImagesCropResizeRotate(newW, newH, modus, 0, 0, 0, 0, quality, clr)
    } Else
    {
       showTOOLtip("ERROR: Unable to convert the GDI+ image to a FreeImage object.")
@@ -21483,10 +21489,15 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
 
    xx := (modus="resize") ? Ceil(w*1.5) : zw
    yy := (modus="resize") ? Ceil(h*1.5) : zh
-   If (modus="crop")
+   If (modus="new-image")
+   {
+      xx := Ceil(w*1.1) 
+      yy := Ceil(h*1.1)
+   } Else If (modus="crop")
       xx := yy := 0
 
-   If memoryUsageWarning(xx, yy)
+   bpp := (modus="new-image") ? givenQuality : 0
+   If memoryUsageWarning(xx, yy, bpp)
       Return
 
    setImageLoading()
@@ -21501,6 +21512,13 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
       showTOOLtip("Resizing image to`n" w " x " h " pixels`n" nmgpx " megapixels`nPlease wait...")
       hq := (givenQuality=1) ? 3 : 0
       hFIFimgA := FreeImage_Rescale(viewportQPVimage.imgHandle, w, h, hq)
+   } Else If (modus="new-image")
+   {
+      nmgpx := Round((w * h)/1000000, 1)
+      showTOOLtip("Creating a new " givenQuality "-bits image:`n" w " x " h " pixels`n" nmgpx " megapixels`nPlease wait...")
+      hFIFimgA := FreeImage_Allocate(w, h, givenQuality)
+      If hFIFimgA
+         FreeImage_FillBackground(hFIFimgA, allowUndo, 1, -1)
    } Else If (modus="crop")
    {
       nmgpx := Round((zw * zh)/1000000, 1)
@@ -21531,7 +21549,7 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
       killQPVscreenImgSection()
       Sleep, 1
       viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, [hFIFimgA, tFrames], 1)
-      If (modus="resize" || modus="rotate90")
+      If isVarEqualTo(modus,"resize", "new-image","rotate90")
       {
          oimgBPP := FreeImage_GetBPP(hFIFimgA)
          ColorsType := FreeImage_GetColorType(hFIFimgA)
@@ -21568,10 +21586,14 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
       dummyTimerDelayiedImageDisplay(500)
    } Else
    {
-      If (modus="resize")
-         showTOOLtip("Failed to resize image to`n" w " x " h " pixels`n" nmgpx " megapixels")
+      Sleep, -1
+      kp := "`n" groupDigits(w) " x " groupDigits(h) " pixels`n" nmgpx " megapixels"
+      If (modus="new-image")
+         showTOOLtip("Failed to create the new image. Maybe insufficient memory." kp)
+      Else If (modus="resize")
+         showTOOLtip("Failed to resize image to" kp)
       Else If (modus="crop")
-         showTOOLtip("Failed to crop image to`n" zw " x " zh " pixels`n" nmgpx " megapixels")
+         showTOOLtip("Failed to crop image to`n" groupDigits(zw) " x " groupDigits(zh) " pixels`n" nmgpx " megapixels")
       Else If InStr(modus, "rotate")
          showTOOLtip("Failed to rotate image to " deg "°")
 
@@ -50463,8 +50485,8 @@ PanelNewImage() {
     Gui, Add, Text, x+4 wp, Height (px)
     Gui, Add, Text, x+4 wp, DPI
     GuiAddEdit("xs y+7 wp gNewImageEditResponder r1 limit6 +number -multi -wantTab -wrap vUserNewWidth", UserNewWidth, "Width")
-    GuiAddEdit("x+5 wp gNewImageEditResponder r1 limit5 +number -multi -wantTab -wrap vUserNewHeight", UserNewHeight, "Height")
-    GuiAddEdit("x+5 wp-10 gNewImageEditResponder r1 limit5 +number -multi -wantTab -wrap vUserNewDPI", UserNewDPI, "DPI")
+    GuiAddEdit("x+5 wp gNewImageEditResponder r1 limit6 +number -multi -wantTab -wrap vUserNewHeight", UserNewHeight, "Height")
+    GuiAddEdit("x+5 wp-10 gNewImageEditResponder r1 limit4 +number -multi -wantTab -wrap vUserNewDPI", UserNewDPI, "DPI")
     Gui, Add, Text, x+5 hp wp+55 +0x200 vinfoLine -wrap, -
     Gui, Add, Checkbox, xs y+10 Checked%NewImageReverseDimensions% vNewImageReverseDimensions, Rotate canvas 90° degrees
     Gui, Add, Checkbox, xs y+10 gupdateUInewImagePanel Checked%NewDocUseColor% vNewDocUseColor, Fill background with color
@@ -51512,9 +51534,9 @@ BtnCreateNewImage() {
     {
        superLarge := 1
        SoundBeep, 300, 100
-       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image dimensions exceed 536 MPx. Some image editing tools are not yet implemented for such large images and only one undo level will be available if sufficient system memory is accessible.`n`nDo you want to create the new image?", "&Yes|&No", 1, "exclamation")
+       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image dimensions exceed 536 MPx. Some image editing tools are not yet implemented for such large images and only one undo level will be available if sufficient system memory is accessible.`n`nTo lower the memory consumption, choose 24-bits RGBA.`n`nDo you want to create the new image?", "&32-bits RGBA|&24-bits RGB|&Abandon", 1, "exclamation")
        ; msgResult := msgBoxWrapper(appTitle ": WARNING", "The image dimensions exceed the maximum limits. Width and height cannot exceed 199000 pixels, and total image size cannnot exceed 536 MPx.`n`nWould you like to adapt the dimensions and create the new image?", "&Yes|&No", 1, "exclamation")
-       If (msgResult="Yes")
+       If InStr(msgResult, "-bits")
           Sleep, -1 ; capIMGdimensionsGDIPlimits(UserNewWidth, UserNewHeight)
        Else
           Return
@@ -51559,7 +51581,7 @@ BtnCreateNewImage() {
    
     If (superLarge=1)
     {
-       calcIMGdimensions(tUserNewWidth, tUserNewHeight, 300, 300, newW, newH)
+       calcIMGdimensions(tUserNewWidth, tUserNewHeight, 600, 600, newW, newH)
        newBitmap := trGdip_CreateBitmap(A_ThisFunc, newW, newH)
     } Else
        newBitmap := trGdip_CreateBitmap(A_ThisFunc, tUserNewWidth, tUserNewHeight, coreDesiredPixFmt)
@@ -51577,10 +51599,10 @@ BtnCreateNewImage() {
     Gdip_BitmapSetResolution(newBitmap, UserNewDPI, UserNewDPI)
     If (NewDocUseColor=1)
     {
+       thisColor := makeRGBAcolor(OutlierFillColor, OutlierFillOpacity)
        G2 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap)
        If G2
        {
-          thisColor := makeRGBAcolor(OutlierFillColor, OutlierFillOpacity)
           Gdip_GraphicsClear(G2, thisColor)
           ; Gdip_SetClipRect(G2, tUserNewWidth//2, 0, tUserNewWidth, tUserNewHeight)
           ; Gdip_GraphicsClear(G2, "0x99FFaa22")
@@ -51621,7 +51643,10 @@ BtnCreateNewImage() {
     dummyTimerDelayiedImageDisplay(5)
     if (superLarge=1)
     {
-       fn :=  Func("convertImageIntoHugeImage").Bind(tUserNewWidth, tUserNewHeight, 0)
+       Gdip_FromARGB(thisColor, A, R, G, B)
+       currIMGdetails.HasAlpha := InStr(msgResult, "32") ? 1 : 0
+       clr := (NewDocUseColor=1) ? R "," G "," B "," A : 0
+       fn :=  Func("convertImageIntoHugeImage").Bind(tUserNewWidth, tUserNewHeight, SubStr(msgResult, 1, 2), clr)
        SetTimer, % fn, -350
     }
 
