@@ -47,6 +47,12 @@ Deniere mise à jour: dimanche 24 mars 2024
    editing tools will work with such images - through my own DLL:
    "qpvmain.dll". 
 
+   I use a custom build of the FreeImage.DLL. Because the developer 
+   behind Freeimage rarely updates the library, I decided to make my 
+   own version. It has multiple fixes and improvements. It can be 
+   found on Github:
+   https://github.com/marius-sucan/FreeImage-library/tree/qpv
+
 
 a) How Quick Picto Viewer initializes
 =====================================================================

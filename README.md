@@ -32,7 +32,9 @@
 
 <p>Source code available on <a href="https://github.com/marius-sucan/Quick-Picto-Viewer">Github</a>.</p>
 
-<p><em>If you want to run the uncompiled edition, please make sure you download the required DLL files from the Github repository, or the ones included in the ZIP file.</em></p>
+<p><em>If you want to run the uncompiled AHK edition, please make sure you download the required DLL files from the Github repository, or the ones included in the ZIP file.</em></p>
+
+<p> I use a custom build of the FreeImage.DLL. Because the developer behind Freeimage rarely updates the library, I decided to make my own version. It has multiple fixes and improvements. It can be found on Github: https://github.com/marius-sucan/FreeImage-library/tree/qpv</p>
 
 <h1>Features</h1>
 
