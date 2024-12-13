@@ -274,7 +274,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , FillAreaClosedPath := 1, FillAreaCustomShape := "", alphaMaskingMode := 1, userImgAdjustInvertArea := 0
    , alphaMaskClrAintensity := 0, alphaMaskClrBintensity := 255, closeEditPanelOnApply := 1, FillAreaCurveTension := 2
    , alphaMaskOffsetX := 0, alphaMaskOffsetY := 0, alphaMaskReplaceMode := 0, alphaMaskBMPchannel := 5
-   , blurAreaMode := 1, FillAreaBlendMode := 1, PasteInPlaceApplyColorFX := 0, blurAreaPixelizeAmount := 0
+   , blurAreaMode := 2, FillAreaBlendMode := 1, PasteInPlaceApplyColorFX := 0, blurAreaPixelizeAmount := 0
    , dynamicThumbsColumns := 0, thumbsColumns := 8, TextInAreaAutoWrap := 1, histogramMode := 2, cmrRAWtoneMapParamB := 0
    , showHUDnavIMG := 0, HUDnavBoxSize := 75, PrintTxtSize := 300, cmrRAWtoneMapAlgo := 1, cmrRAWtoneMapParamA := 1.85
    , mainWinPos := 0, mainWinMaximized := 2, mainWinSize := 0, UserExternalApp := "", UserExternalEditApp := ""
@@ -1559,7 +1559,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     {
        If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["tlbrSelAllVectorPoints"]
-       Else If HKifs("liveEdit")
+       Else If (HKifs("liveEdit") || isImgEditingNow()=1 && editingSelectionNow=1 && AnyWindowOpen && imgEditPanelOpened!=1)
           func2Call := ["selectEntireImage"]
        Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
        {
@@ -12691,7 +12691,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
        } Else If (lineVisible=1)
        {
           If (doEffect && (TextInAreaBgrUnified!=1 || TextInAreaPaintBgr!=1))
-             QPV_BoxBlurBitmap(thisBMP, thisBlur, thisBlur, 0)
+             QPV_BlurBitmapFilters(thisBMP, thisBlur, thisBlur, 0)
           Gdip_BitmapConvertFormat(thisBMP, 0xE200B, 2, 1, 0, 0, 0, 0, 0)
           ; fnOutputDebug(Gdip_GetImagePixelFormat(pBitmap, 3))
           If (TextInAreaCutOutMode=1 && TextInAreaPaintBgr=1 && TextInAreaBgrUnified!=1)
@@ -12753,7 +12753,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
        {
           Gdip_BitmapConvertFormat(pBitmapContours, 0xE200B, 2, 1, 0, 0, 0, 0, 0)
           If (thisBorderBlur>0 && TextInAreaDoBlurs=1 && !isWinXP)
-             QPV_BoxBlurBitmap(pBitmapContours, thisBorderBlur, thisBorderBlur, 0)
+             QPV_BlurBitmapFilters(pBitmapContours, thisBorderBlur, thisBorderBlur, 0)
 
           QPV_SetColorAlphaChannel(pBitmapContours, borderColor, 0)
           Guu := (TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1) ? Gz : G
@@ -12844,7 +12844,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
           o_txtColor := (TextInAreaCutOutMode=1) ? "0x00" TextInAreaBgrColor : borderColor
 
        If doEffect
-          QPV_BoxBlurBitmap(mainBMP, thisBlur, thisBlur, 0)
+          QPV_BlurBitmapFilters(mainBMP, thisBlur, thisBlur, 0)
 
        QPV_ColorizeGrayImage(mainBMP, o_txtColor, bgrColor, userimgGammaCorrect)
        G3 := trGdip_GraphicsFromImage(A_ThisFunc, newBMP)
@@ -12972,7 +12972,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
           If validBMP(pBitmapContours)
           {
              If (thisBorderBlur>0 && TextInAreaDoBlurs=1 && !isWinXP)
-                QPV_BoxBlurBitmap(thisBMP, thisBorderBlur, thisBorderBlur, 0)
+                QPV_BlurBitmapFilters(thisBMP, thisBorderBlur, thisBorderBlur, 0)
 
              Gdip_ImageRotateFlip(pBitmapContours, 6)
              Gdip_BitmapSetColorDepth(pBitmapContours, 32)
@@ -12981,7 +12981,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
           If validBMP(thisBMP)
           {
              If doEffect
-                QPV_BoxBlurBitmap(thisBMP, thisBlur, thisBlur, 0)
+                QPV_BlurBitmapFilters(thisBMP, thisBlur, thisBlur, 0)
 
              Gdip_ImageRotateFlip(thisBMP, 6)
              Gdip_BitmapSetColorDepth(thisBMP, 32)
@@ -13667,7 +13667,7 @@ realtimePasteInPlaceBlurrator(previewMode, clipBMP, ByRef newBitmap) {
        }
 
        ; ToolTip, % thisAmount "=" fScale  , , , 2
-       QPV_BoxBlurBitmap(clipBMP, thisAmount, thisAmount, 0)
+       QPV_BlurBitmapFilters(clipBMP, thisAmount, thisAmount, 0)
     }
 
     If (PasteInPlaceToolMode=1 && PasteInPlaceRevealOriginal=0) ; && (prevVPselRotation>0 || prevEllipseSelectMode>0))
@@ -14600,6 +14600,7 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:
 }
 
 QPV_ResizeBitmap(pBitmap, newW, newH, interpolation:=1, bond:=2) {
+  ; function used by BTNimgResizeEditor() [resie image in editor mode, CTRL+R]
   initQPVmainDLL()
   If !qpvMainDll
   {
@@ -14618,43 +14619,6 @@ QPV_ResizeBitmap(pBitmap, newW, newH, interpolation:=1, bond:=2) {
      Return 0
 
   r := DllCall(whichMainDLL "\cImgResizeBitmap", "UPtr", pBitmap, "Int", w, "Int", h, "int", newW, "int", newH, "Int", interpolation, "int", bond, "UPtr")
-  If StrLen(r)>2
-  {
-     recordGdipBitmaps(r, A_ThisFunc)
-     Return r
-  }
-
-  Return 0
-}
-
-test_cImgLoadBitmap() {
-; unsused - it does not work
-   imgPath := resultedFilesList[currentFileIndex, 1]
-   If (!imgPath || !FileExist(imgPath))
-      Return
-
-   GetWinClientSize(w, h, PVhwnd, 0)
-   clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
-   pBitmap := QPV_cImgLoadBitmap(imgPath, w, h)
-   If pBitmap
-   {
-      tzGdip_DrawImageFast(2NDglPG, pBitmap)
-      doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
-      trGdip_DisposeImage(pBitmap)
-   }
-}
-
-QPV_cImgLoadBitmap(imgPath, w, h, interpolation:=1, bond:=2) {
-; unsused - it does not work
-
-  initQPVmainDLL()
-  If !qpvMainDll
-  {
-     addJournalEntry(A_ThisFunc "(): QPV dll file is missing or failed to initialize: qpvMain.dll")
-     Return
-  }
-
-  r := DllCall(whichMainDLL "\cImgLoadBitmap", "AStr", imgPath, "Int", w, "Int", h, "Int", interpolation, "int", bond, "UPtr")
   If StrLen(r)>2
   {
      recordGdipBitmaps(r, A_ThisFunc)
@@ -14843,7 +14807,7 @@ generateAlphaMaskBitmap(clipBMP, previewMode, offX:=0, offY:=0, offW:=0, offH:=0
              thisAlphaBlur := Round(thisAlphaBlur * (rsize / msize))
 
           If (thisAlphaBlur>1)
-             QPV_BoxBlurBitmap(alphaMaskGray, thisAlphaBlur, thisAlphaBlur, 0)
+             QPV_BlurBitmapFilters(alphaMaskGray, thisAlphaBlur, thisAlphaBlur, 0)
 
           allGood := 1
           ; ToolTip, % clipBMP "--" alphaMaskGray "--" userAlpha "=" brLvl "=" contrLvl , , , 2
@@ -15099,10 +15063,10 @@ applyPersonalizedColorsBMP(clipBMP, doBlur, blurStrength, applyColorFX) {
 
     If (blurStrength>2 && doBlur=1)
     {
-       ; QPV_BoxBlurBitmap(clipBMP, blurStrength, blurStrength, 0)
-       pEffect := Gdip_CreateEffect(1, blurStrength, 0, 0)
-       ApplySpecialFixedBlur(A_ThisFunc, clipBMP, blurStrength, pEffect, 0)
-       Gdip_DisposeEffect(pEffect)
+       QPV_BlurBitmapFilters(clipBMP, Round(blurStrength*1.5), Round(blurStrength*1.5), 0)
+       ; pEffect := Gdip_CreateEffect(1, blurStrength, 0, 0)
+       ; ApplySpecialFixedBlur(A_ThisFunc, clipBMP, blurStrength, pEffect, 0)
+       ; Gdip_DisposeEffect(pEffect)
     }
 }
 
@@ -15740,7 +15704,7 @@ getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, oImgW, oImgH, imgSel
              If (BlurAmount>1)
              {
                 BlurAmount := Round(BlurAmount*zoomLevel)
-                QPV_BoxBlurBitmap(prevBlurredBMP, BlurAmount, BlurAmount, 0)
+                QPV_BlurBitmapFilters(prevBlurredBMP, BlurAmount, BlurAmount, 0)
              }
              prevFXid := thisFXid
           } Else
@@ -15838,7 +15802,7 @@ getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, oImgW, oImgH, imgSel
     Gdip_DeleteGraphics(G2)
 
     If (BlurAmount>1 && G2)
-       QPV_BoxBlurBitmap(newBitmap, BlurAmount, BlurAmount, 0)
+       QPV_BlurBitmapFilters(newBitmap, BlurAmount, BlurAmount, 0)
 
     prevState := 0
     Return newBitmap
@@ -18708,11 +18672,11 @@ carvePathFromBitmap(ByRef pBitmap, pPath, cX, cY, modus, safeWay:=0, blurLevel:=
        If (blurLevel>1)
        {
           thisAmount := clampInRange(blurLevel, 1, 255)
-          QPV_BoxBlurBitmap(newBitmap, thisAmount, thisAmount, 0)
+          QPV_BlurBitmapFilters(newBitmap, thisAmount, thisAmount, 0)
           If (blurLevel>257)
           {
              thisAmount := clampInRange(blurLevel - 255, 1, 255)
-             QPV_BoxBlurBitmap(newBitmap, thisAmount, thisAmount, 0)
+             QPV_BlurBitmapFilters(newBitmap, thisAmount, thisAmount, 0)
           }
 
           If (doBorder=2 && doDecalage!=1 && blurLevel>2)
@@ -21342,20 +21306,20 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
                setHugeImageActionsCount(viewportQPVimage.actions + 1)
             Return
          }
-      } Else If InStr(modus, "pixelize")
+      } Else If InStr(modus, "pixelate")
       {
          thisImgW := (BlurAreaInverted=1) ? Ceil(ImgW/blurAreaPixelizeAmount) : Ceil(obju.bImgSelW/blurAreaPixelizeAmount)
          thisImgH := (BlurAreaInverted=1) ? Ceil(ImgH/blurAreaPixelizeAmount) : Ceil(obju.bImgSelH/blurAreaPixelizeAmount)
          If memoryUsageWarning(thisImgW, thisImgH, bpp)
          {
-            showTOOLtip("Pixelize area: operation abandoned by user.`nMemory limit reached.")
+            showTOOLtip("Pixelate area: operation abandoned by user.`nMemory limit reached.")
             DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
             ResetImgLoadStatus()
             SetTimer, RemoveTooltip, % -msgDisplayTime
             Return
          }
 
-         showTOOLtip("Applying " modus "`nPhase 1/3...", 1)
+         showTOOLtip("Pixelating image`nPhase 1/3...", 1)
          If (BlurAreaInverted=1)
             hFIFimgZ := FreeImage_Rescale(hFIFimgX, thisImgW, thisImgH, blurAreaPixelizeMethod - 1)
          Else
@@ -21373,21 +21337,21 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
                userImgAdjustHiPrecision := 1
                userImgAdjustNoClamp := (PasteInPlaceLight>1 && PasteInPlaceGamma<1) ? 1 : 0 
                this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
-               showTOOLtip("Applying " modus "`nPhase 2/3...", 1)
+               showTOOLtip("Pixelating image`nPhase 2/3...", 1)
                QPV_PrepareHugeImgSelectionArea(0, 0, thisImgW, thisImgH, thisImgW, thisImgH, 0, 0, 0, 0, "a", "a", 1)
                r := DllCall(whichMainDLL "\AdjustImageColors" this, "UPtr", pBitsMini, "Int", thisImgW, "Int", thisImgH, "int", strideMini, "int", bpp, "int", blurAreaOpacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", Round(BlurAreaSaturation*655.35), "int", userImgAdjustAltBright, "int", Round(BlurAreaLight*257), "int", 0, "int", Round(BlurAreaGamma*655.30), "int", 0, "int", 0, "int", 0, "int", BlurAreaHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", 65535, "int", 0, "int", 0, "UPtr", 0, "int", 0)
             }
 
             recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, BlurAreaInverted, 0)
             QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, BlurAreaInverted, "a", "a", 1)
-            showTOOLtip("Applying " modus "`nPhase 3/3...", 1)
+            showTOOLtip("Pixelating image`nPhase 3/3...", 1)
             fnOutputDebug(A_ThisFunc ": img = " imgW " x " imgH " | " bpp )
             fnOutputDebug(A_ThisFunc ": mini = " thisimgw " x " thisimgh )
             r := DllCall(whichMainDLL "\PixelateHugeBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", blurAreaOpacity, "int", BlurAreaBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH)
             FreeImage_UnLoad(hFIFimgZ)
          } Else
          {
-            addJournalEntry("Failed to rescale selected rect and to pixelize")
+            addJournalEntry("Failed to rescale selected image rectangle and to pixelate image.")
             r := 0
          }
       } Else If InStr(modus, "invert")
@@ -21446,6 +21410,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, userImgAdjustInvertArea)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, userImgAdjustInvertArea, "a", "a", 1)
          r := DllCall(whichMainDLL "\AdjustImageColors" this, "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", imgColorsFXopacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", userImgAdjustSat, "int", userImgAdjustAltBright, "int", userImgAdjustBright, "int", userImgAdjustAltContra, "int", userImgAdjustContra, "int", userImgAdjustAltHiLows, "int", userImgAdjustShadows, "int", userImgAdjustHighs, "int", userImgAdjustHue, "int", userImgAdjustTintDeg, "int", userImgAdjustTintAmount, "int", userImgAdjustAltTint, "int", userImgAdjustGamma, "int", userImgAdjustOffR, "int", userImgAdjustOffG, "int", userImgAdjustOffB, "int", userImgAdjustOffA, "int", userImgAdjustThreR, "int", userImgAdjustThreG, "int", userImgAdjustThreB, "int", userImgAdjustThreA, "int", userImgAdjustSeeThrough, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", userImgAdjustWhitePoint, "int", userImgAdjustBlackPoint, "int", userImgAdjustNoisePoints, "UPtr", mScan, "int", mStride)
+         ; r := DllCall(whichMainDLL "\applyGaussianBlurHugeBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", 4, "int", 250, "float", 1.1)
       } Else ; grayscale mode
       {
          this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
@@ -22946,7 +22911,7 @@ BlurSelectedArea(modus:="") {
     If (!testAllowSelInvert() && BlurAreaInverted=1)
     {
        msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected, however you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK|&Reopen panel", 1, "exclamation")
-       If (InStr(msgResult, "reopen") && modus="pixelize")
+       If (InStr(msgResult, "reopen") && modus="pixelate")
           SetTimer, PanelPixelizeSelectedArea, -300
        Else If InStr(msgResult, "reopen")
           SetTimer, PanelBlurSelectedArea, -300
@@ -22969,33 +22934,33 @@ BlurSelectedArea(modus:="") {
     calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
     o_blurAreaYamount := blurAreaYamount
     o_blurAreaAmount := blurAreaAmount
-    If (blurAreaEqualXY=1 && modus!="pixelize")
+    If (blurAreaEqualXY=1 && modus!="pixelate")
     {
        o_blurAreaYamount := blurAreaAmount
-       If (blurAreaMode=2 && blurAreaTwice!=1)
-          o_blurAreaYamount := o_blurAreaAmount := Round(blurAreaAmount*0.5)
+       If isInRange(blurAreaMode, 2, 5)
+          o_blurAreaYamount := o_blurAreaAmount := (blurAreaMode=3 || blurAreaMode=4) ? Round(blurAreaAmount*1.85) : Round(blurAreaAmount*1.5)
     }
 
-    If (blurAreaTwice=1 && blurAreaMode>1 && modus!="pixelize")
+    If (blurAreaTwice=1 && blurAreaMode>1 && modus!="pixelate")
     {
        o_blurAreaYamount *= 2
        o_blurAreaAmount *= 2
     }
 
-    If (modus="pixelize")
+    If (modus="pixelate")
        o_blurAreaYamount := o_blurAreaAmount := 0
 
     testu := (blurAreaMode=1 || blurAreaMode>1 && blurAreaEqualXY=1) ? o_blurAreaAmount : max(o_blurAreaAmount, o_blurAreaYamount)
-    If (testu<2 && modus!="pixelize")
+    If (testu<2 && modus!="pixelate")
     {
        msgResult := msgBoxWrapper(appTitle ": WARNING", "You have set the blur amount to zero. Operation abandoned.", "&OK|&Reopen panel", 1, "exclamation")
        If InStr(msgResult, "reopen")
           SetTimer, PanelBlurSelectedArea, -300
        SetTimer, ResetImgLoadStatus, -100
        Return
-    } Else If (blurAreaPixelizeAmount<2 && modus="pixelize")
+    } Else If (blurAreaPixelizeAmount<2 && modus="pixelate")
     {
-       msgResult := msgBoxWrapper(appTitle ": WARNING", "You have set pixelize amount to zero. Operation abandoned.", "&OK|&Reopen panel", 1, "exclamation")
+       msgResult := msgBoxWrapper(appTitle ": WARNING", "You have set pixelation amount to zero. Operation abandoned.", "&OK|&Reopen panel", 1, "exclamation")
        If InStr(msgResult, "reopen")
           SetTimer, PanelPixelizeSelectedArea, -300
        SetTimer, ResetImgLoadStatus, -100
@@ -23020,7 +22985,7 @@ BlurSelectedArea(modus:="") {
     pB := GetPathRelativeBounds(pPath, imgSelPx, imgSelPy)
     imgSelPx := pB.x,  imgSelPy := pB.y
     imgSelW  := pB.w,  imgSelH  := pB.h
-    If (blurAreaSoftEdges!=1 && pPath || modus="pixelize")
+    If (blurAreaSoftEdges!=1 && pPath || modus="pixelate")
     {
        nodus := (BlurAreaInverted=1) ? 4 : 0
        If (BlurAreaInverted=1 && pPath)
@@ -23038,18 +23003,18 @@ BlurSelectedArea(modus:="") {
 
     thisOpacity := blurAreaOpacity/255
     zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
-    If (modus="pixelize")
+    If (modus="pixelate")
        isUni := Gdip_TestBitmapUniformity(zBitmap, 7, maxLevelIndex, nimo, avgLevelAlpha)
 
     ; ToolTip, % "l=" isUni " | " maxLevelIndex , , , 2
     ; ToolTip, % blurAreaPixelizeAmount "==" blurAreaPixelizeMethod "==" modus , , , 2
     QPV_PrepareAlphaChannelBlur(zBitmap, 1, 1)
-    If (blurAreaPixelizeAmount>1 && blurAreaPixelizeMethod>1 && modus="pixelize")
+    If (blurAreaPixelizeAmount>1 && blurAreaPixelizeMethod>1 && modus="pixelate")
     {
        thisAmount := blurAreaPixelizeAmount
        thisImgW := (blurAreaPixelizeAmount>1) ? Ceil(imgSelW/blurAreaPixelizeAmount) : imgSelW
        thisImgH := (blurAreaPixelizeAmount>1) ? Ceil(imgSelH/blurAreaPixelizeAmount) : imgSelH
-       setWindowTitle("PIXELIZING IMAGE, please wait", 1)
+       setWindowTitle("PIXELATING IMAGE, please wait", 1)
        thisPixiQuality := (blurAreaPixelizeMethod=2) ? 5 : 7
        pixiBMP := trGdip_ResizeBitmap(A_ThisFunc, zBitmap, thisImgW, thisImgH, 0, thisPixiQuality)
        If validBMP(pixiBMP)
@@ -23061,9 +23026,9 @@ BlurSelectedArea(modus:="") {
           zBitmap := newBitmap
        }
        trGdip_DisposeImage(pixiBMP, 1)
-    } Else If (blurAreaPixelizeAmount>1 && modus="pixelize")
+    } Else If (blurAreaPixelizeAmount>1 && modus="pixelate")
     {
-       setWindowTitle("PIXELIZING IMAGE, please wait", 1)
+       setWindowTitle("PIXELATING IMAGE, please wait", 1)
        pixiBMP := trGdip_CreateBitmap(A_ThisFunc, imgSelW, imgSelH, coreDesiredPixFmt)
        If warnUserFatalBitmapError(pixiBMP, A_ThisFunc)
        {
@@ -23083,7 +23048,7 @@ BlurSelectedArea(modus:="") {
 
     thisBlurMode := blurAreaMode
     pEffect := Gdip_CreateEffect(1, o_blurAreaAmount, 0, 0)
-    If (blurAreaTwice=1 && blurAreaMode=1 && modus!="pixelize")
+    If (blurAreaTwice=1 && blurAreaMode=1 && modus!="pixelate")
     {
        setWindowTitle("EXTRA-BLURRING IMAGE, please wait", 1)
        xBitmap := trGdip_ResizeBitmap(A_ThisFunc, zBitmap, imgSelW//2, imgSelH//2, 1, 3, -1)
@@ -23093,7 +23058,7 @@ BlurSelectedArea(modus:="") {
           dhMatrix := Gdip_CreateMatrix()
           Gdip_ScaleMatrix(dhMatrix, 2, 2, 1)
           Gdip_TranslateMatrix(dhMatrix, imgSelPx, imgSelPy, 1)
-          If (thisBlurMode=8)
+          If (thisBlurMode=11)
           {
              zxBitmap := QPV_DissolveBitmap(xBitmap, o_blurAreaAmount*1.5, o_blurAreaYamount*1.5)
              If validBMP(zxBitmap)
@@ -23101,10 +23066,8 @@ BlurSelectedArea(modus:="") {
                 trGdip_DisposeImage(xBitmap)
                 xBitmap := zxBitmap
              }
-          } Else If (thisBlurMode>=3)
-             QPV_BoxBlurBitmap(xBitmap, o_blurAreaAmount, o_blurAreaYamount, thisBlurMode - 2, 0, blurAreaCircular)
-          Else If (thisBlurMode=2)
-             QPV_BoxBlurBitmap(xBitmap, o_blurAreaAmount, o_blurAreaYamount, 0, 1)
+          } Else If (thisBlurMode>=2) ; open ceva blur filters
+             QPV_BlurBitmapFilters(xBitmap, o_blurAreaAmount, o_blurAreaYamount, thisBlurMode - 2, 0, blurAreaCircular)
           Else If (thisBlurMode=1)
              ApplySpecialFixedBlur(A_ThisFunc, xBitmap, o_blurAreaAmount, pEffect)
 
@@ -23114,12 +23077,12 @@ BlurSelectedArea(modus:="") {
        }
     }
 
-    If (max(o_blurAreaAmount, o_blurAreaYamount)<2 || modus="pixelize")
+    If (max(o_blurAreaAmount, o_blurAreaYamount)<2 || modus="pixelate")
        thisBlurMode := 0
     Else
        setWindowTitle("BLURRING IMAGE, please wait", 1)
 
-    If (thisBlurMode=8)
+    If (thisBlurMode=11)
     {
        zzBitmap := QPV_DissolveBitmap(zBitmap, o_blurAreaAmount*1.5, o_blurAreaYamount*1.5)
        If validBMP(zzBitmap)
@@ -23127,16 +23090,14 @@ BlurSelectedArea(modus:="") {
           trGdip_DisposeImage(zBitmap)
           zBitmap := zzBitmap
        }
-    } Else If (thisBlurMode>=3) ; box blur
-       QPV_BoxBlurBitmap(zBitmap, o_blurAreaAmount, o_blurAreaYamount, thisBlurMode - 2, 0, blurAreaCircular)
-    Else If (thisBlurMode=2)  ; alternate mode
-       QPV_BoxBlurBitmap(zBitmap, o_blurAreaAmount, o_blurAreaYamount, 0)
+    } Else If (modus="pixelate" && blurAreaAmount>2)
+       QPV_BlurBitmapFilters(zBitmap, Round(blurAreaAmount*0.5), Round(blurAreaAmount*0.5), 0)
+    Else If (thisBlurMode>=2) ; opencv blur filters
+       QPV_BlurBitmapFilters(zBitmap, o_blurAreaAmount, o_blurAreaYamount, thisBlurMode - 2, 0, blurAreaCircular)
     Else If (thisBlurMode=1) ; high quality
        ApplySpecialFixedBlur(A_ThisFunc, zBitmap, o_blurAreaAmount, pEffect)
-    Else If (modus="pixelize" && blurAreaAmount>2)
-       QPV_BoxBlurBitmap(zBitmap, Round(blurAreaAmount*0.5), Round(blurAreaAmount*0.5), 0)
 
-    If (isUni && modus="pixelize")
+    If (isUni && modus="pixelate")
        QPV_PrepareAlphaChannelBlur(zBitmap, avgLevelAlpha, 0)
 
     If (BlurAreaBlendMode>1 || allowAlphaMasking=1)
@@ -23145,7 +23106,7 @@ BlurSelectedArea(modus:="") {
     If (blurAreaOpacity>252 && blurAreaSoftEdges!=1)
        r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
 
-    If (blurAreaSoftEdges=1 && modus!="pixelize")
+    If (blurAreaSoftEdges=1 && modus!="pixelate")
     {
        setWindowTitle("APPLYING SOFT EDGES MASK, please wait", 1)
        thisAmount := (o_blurAreaAmount + o_blurAreaYamount)/2
@@ -23312,7 +23273,7 @@ ZoomBlurSelectedArea() {
 
           showTOOLtip("Radial blur: step " A_Index ".0`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startZeit)/1000, 3)),, , (1 - thisO)/1)
           ; fnOutputDebug(thisBlurAmount "=" thisO)
-          QPV_BoxBlurBitmap(zBitmap, thisBlurX, thisBlurY, 0)
+          QPV_BlurBitmapFilters(zBitmap, thisBlurX, thisBlurY, 0)
           If (zoomBlurMode=1 || zoomBlurMode=2)
              dimgSelW += A_Index * b
           If (zoomBlurMode=1 || zoomBlurMode=3)
@@ -23506,7 +23467,7 @@ coreDetectEdgesSelectedArea(whichBitmap, previewMode, Gu:=0) {
        gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
 
     If (IDedgesCenterAmount>1)
-       QPV_BoxBlurBitmap(zBitmap, IDedgesCenterAmount, IDedgesCenterAmount, 0)
+       QPV_BlurBitmapFilters(zBitmap, IDedgesCenterAmount, IDedgesCenterAmount, 0)
 
     Static pxs := {1:"-3", 2:"-2", 3:"-1", 4:"0", 5:"1", 6:"2", 7:"3"}
 
@@ -23536,7 +23497,7 @@ coreDetectEdgesSelectedArea(whichBitmap, previewMode, Gu:=0) {
 
     pr := (IDedgesAfterBlur=2) ? 1 : IDedgesAfterBlur*2
     If (IDedgesAfterBlur>1)
-       QPV_BoxBlurBitmap(fBitmap, pr, pr, 0)
+       QPV_BlurBitmapFilters(fBitmap, pr, pr, 0)
 
     If (IDedgesBlendMode>1 && validBMP(gBitmap))
     {
@@ -23654,6 +23615,8 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
     thisImgH := (thisPixelize>1 && UserAddNoiseMode!=3) ? Ceil(imgSelH/thisPixelize) : imgSelH
     thisBlurAmount := (doubleBlurPreviewArea=1 && previewMode=1) ? UserAddNoiseBlurAmount//2 : UserAddNoiseBlurAmount
     thisBlurAmountY := (doubleBlurPreviewArea=1 && previewMode=1) ? blurAreaYamount//2 : blurAreaYamount
+    thisBlurAmount := Round(thisBlurAmount*1.5)
+    thisBlurAmountY := Round(thisBlurAmountY*1.5)
     If (UserAddNoiseMode=1) ; gaussian
     {
        noiseBMP := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
@@ -23674,16 +23637,18 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
        noiseBMP := resizeBitmapToGivenRef(noiseBMP, 0, imgSelW, imgSelH, 5)
 
     fBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
-    If (thisBlurAmount>1 && blurAreaEqualXY=1 && UserAddNoiseMode>1)
-    {
-       pEffect := Gdip_CreateEffect(1, thisBlurAmount, 0, 0)
-       ApplySpecialFixedBlur(A_ThisFunc, noiseBMP, thisBlurAmount, pEffect)
-       Gdip_DisposeEffect(pEffect)
-    } Else If (blurAreaEqualXY=0 && max(thisBlurAmount, thisBlurAmountY)>1 && UserAddNoiseMode>1)
-       QPV_BoxBlurBitmap(noiseBMP, thisBlurAmount, thisBlurAmountY, 1)
+    ; If (thisBlurAmount>1 && blurAreaEqualXY=1 && UserAddNoiseMode>1)
+    ; {
+    ;    pEffect := Gdip_CreateEffect(1, thisBlurAmount, 0, 0)
+    ;    ApplySpecialFixedBlur(A_ThisFunc, noiseBMP, thisBlurAmount, pEffect)
+    ;    Gdip_DisposeEffect(pEffect)
+    ; } Else If (blurAreaEqualXY=0 && max(thisBlurAmount, thisBlurAmountY)>1 && UserAddNoiseMode>1)
+    If (max(thisBlurAmount, thisBlurAmountY)>1 && UserAddNoiseMode>1)
+       QPV_BlurBitmapFilters(noiseBMP, thisBlurAmount, thisBlurAmountY, 0)
 
     If ((IDedgesEmphasis!=0 || IDedgesContrast!=0) && UserAddNoiseMode>1)
     {
+       ; adjust brightness and contrast
        wEffect := Gdip_CreateEffect(5, IDedgesEmphasis, IDedgesContrast, 0)
        If wEffect
           Gdip_BitmapApplyEffect(noiseBMP, wEffect)
@@ -23692,6 +23657,7 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
 
     If (IDedgesInvert=1 && UserAddNoiseMode>1)
     {
+       ; invert image
        zEffect := Gdip_CreateEffect(7, 0, 0, 100)
        If zEffect
           Gdip_BitmapApplyEffect(noiseBMP, zEffect)
@@ -23856,7 +23822,7 @@ livePreviewAddNoiser(modus:=0) {
     Return er
 }
 
-QPV_BoxBlurBitmap(pBitmap, passesX, passesY:=0, modus:=1, forceCimg:=0, circular:=0, preview:=0) {
+QPV_BlurBitmapFilters(pBitmap, passesX, passesY:=0, modus:=1, forceCimg:=0, circular:=0, preview:=0) {
   initQPVmainDLL()
   If !qpvMainDll
   {
@@ -23866,28 +23832,22 @@ QPV_BoxBlurBitmap(pBitmap, passesX, passesY:=0, modus:=1, forceCimg:=0, circular
 
   If !validBMP(pBitmap)
   {
-     addJournalEntry(A_ThisFunc "(): invalid bitmap to process")
+     addJournalEntry(A_ThisFunc "(): ERROR - invalid bitmap to process")
      Return
   }
 
   trGdip_GetImageDimensions(pBitmap, w, h)
   If (w<1 || h<1)
-     Return 0
-
-  If (modus=0 && forceCimg=0 && passesX=passesY && isInRange(passesX, 21, 255))
   {
-     ; fnOutputDebug("large radius for blur=" passesX)
-     zA := Gdip_CreateEffect(1, passesX, 0, 0)
-     Gdip_BitmapApplyEffect(pBitmap, zA)
-     Gdip_DisposeEffect(zA)
-     Return 1
-  } else If (modus=0 && forceCimg=0 && passesX=passesY)
-     passesX := passesY := Round(passesX * 0.4) + 1
+     addJournalEntry(A_ThisFunc "(): ERROR - invalid bitmap dimensions")
+     Return 0
+  }
 
   E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, Stride, iScan, iData, 3)
   If !E1
   {
-     r := DllCall(whichMainDLL "\cImgBlurBitmapFilters", "UPtr", iScan, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", modus, "Int", circular, "Int", preview, "int", Stride, "int", 32)
+     r := DllCall(whichMainDLL "\openCVblurFilters", "UPtr", iScan, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", modus, "Int", circular, "int", Stride, "int", 32)
+     ; r := DllCall(whichMainDLL "\cImgBlurBitmapFilters", "UPtr", iScan, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", modus, "Int", circular, "Int", preview, "int", Stride, "int", 32)
      Gdip_UnlockBits(pBitmap, iData)
   }
 
@@ -24114,7 +24074,7 @@ applyVPeffectsAdvOnBMP(zBitmap, allowCache:=0, givenID:=0, gImgW:=0, gImgH:=0, B
     ; fnOutputDebug("redraw: " A_ThisFunc " | " BlurAmount)
     startZeit := A_TickCount
     If (BlurAmount>1)
-       QPV_BoxBlurBitmap(nBitmap, BlurAmount, BlurAmount, 0)
+       QPV_BlurBitmapFilters(nBitmap, BlurAmount, BlurAmount, 0)
 
     ; fnOutputDebug(A_TickCount - startZeit)
     Gdip_DisposeImageAttributes(imageAttribs)
@@ -47452,8 +47412,8 @@ PanelEditorImgResize() {
     Gui, Add, Text, x15 y15 Section, Original image size: %oImgW% x %oImgH% pixels.
     Gui, Add, Text, xs y+10, Set new dimensions (W x H):
     GuiAddDropDownList("xs+15 y+7 wp gupdateUIresizeImgEditPanel AltSubmit vPredefinedDocsSizes", "Viewport size|Screen size|Current image size|640x480|800x600|1024x768|HD 480p|HD 720p|HD 1080p|HD 2160p [4K]|A4 @ 300 dpi|A4 @ 150 dpi|Custom dimensions" friendly, "Dimensions preset")
-    GuiAddEdit("xp y+5 w" editWid " r1 limit5 -multi number -wrap gupdateUIresizeImgEditPanel vuserEditWidth", (ResizeInPercentage=1) ? 100 : oImgW, "Width")
-    GuiAddEdit("x+5 wp r1 limit5 -multi number -wrap gupdateUIresizeImgEditPanel vuserEditHeight", (ResizeInPercentage=1) ? 100 : oImgH, "Height")
+    GuiAddEdit("xp y+5 w" editWid " r1 limit7 -multi number -wrap gupdateUIresizeImgEditPanel vuserEditWidth", (ResizeInPercentage=1) ? 100 : oImgW, "Width")
+    GuiAddEdit("x+5 wp r1 limit7 -multi number -wrap gupdateUIresizeImgEditPanel vuserEditHeight", (ResizeInPercentage=1) ? 100 : oImgH, "Height")
     Gui, Add, Checkbox, x+5 hp gTglRszInPercentage Checked%ResizeInPercentage% vResizeInPercentage, Use `% percentages
     Gui, Add, Checkbox, xs+15 y+5 hp gTglRszKeepAratio Checked%ResizeKeepAratio% vResizeKeepAratio, Keep aspect ratio
     Gui, Add, Checkbox, x+5 hp Checked%adjustCanvasCentered% vadjustCanvasCentered, Centered image
@@ -49750,7 +49710,7 @@ ReadSettingsBlurPanel(act:=0) {
     RegAction(act, "blurAreaAmount",, 2, 0, 255)
     RegAction(act, "blurAreaYamount",, 2, 0, 255)
     RegAction(act, "blurAreaEqualXY",, 1)
-    RegAction(act, "blurAreaMode",, 2, 1, 8)
+    RegAction(act, "blurAreaMode",, 2, 1, 11)
     RegAction(act, "blurAreaPixelizeAmount",, 2, 0, 6789)
     RegAction(act, "blurAreaPixelizeMethod",, 2, 1, 3)
     RegAction(act, "blurAreaOpacity",, 2, 3, 255)
@@ -49924,10 +49884,10 @@ PanelPixelizeSelectedArea() {
     Gui, +DPIScale
     Gui, Add, Tab3, %tabzDarkModus% x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
     Gui, Tab, 1
-    Gui, Add, Text, x+10 y+10 Section w%thisW%, Pixelization mode:
+    Gui, Add, Text, x+10 y+10 Section w%thisW%, Pixelation mode:
     listu := (viewportQPVimage.imgHandle) ? "Rescale (Nearest neighbour)|Rescale (Bicubic)|Rescale (Bilinear)" : "Loose fitting|Rescale (Nearest neighbour)|Rescale (Bicubic)"
     GuiAddDropDownList("xs y+10 wp AltSubmit Choose" blurAreaPixelizeMethod " gupdateUIblurPanel vblurAreaPixelizeMethod", listu)
-    GuiAddSlider("blurAreaPixelizeAmount", 0,maxu, 15, "Pixelize amount: $€", "updateUIblurPanel", 1, "xs y+10 wp hp")
+    GuiAddSlider("blurAreaPixelizeAmount", 0,maxu, 15, "Pixelation amount: $€", "updateUIblurPanel", 1, "xs y+10 wp hp")
     GuiAddSlider("blurAreaAmount", 0,255, 0, "Blur radius: $€", "updateUIblurPanel", 1, "xs y+10 wp hp")
     GuiAddSlider("blurAreaOpacity", 3,255, 255, "Opacity", "updateUIblurPanel", 1, "xs y+10 wp hp")
     Gui, Add, Checkbox, xs y+10 wp Checked%BlurAreaAlphaMask% vBlurAreaAlphaMask gupdateUIblurPanel, Apply alpha mas&k
@@ -49960,10 +49920,10 @@ PanelPixelizeSelectedArea() {
     GuiAddSlider("BlurAreaGamma", -100,100, 0, "Contrast", "updateUIblurPanel", 2, "xs y+10 w" thisW " hp")
 
     Gui, Tab
-    Gui, Add, Button, xs+0 y+10 h%thisBtnHeight% Default w%btnWid% gBtnPixelizeSelectedArea, &Pixelize area
+    Gui, Add, Button, xs+0 y+10 h%thisBtnHeight% Default w%btnWid% gBtnPixelizeSelectedArea vmainBtnACT, &Pixelate area
     Gui, Add, Button, x+6 hp wp-15 gBtnCloseWindow, &Cancel
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
-    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Pixelize selected area: " appTitle, winPos)
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Pixelate selected area: " appTitle, winPos)
     SetTimer, updateUIblurPanel, -100
 }
 
@@ -50043,7 +50003,7 @@ PanelBlurSelectedArea() {
     GuiAddDropDownList("x+5 w60 AltSubmit Choose" blurAreaSoftLevel " gupdateUIblurPanel vblurAreaSoftLevel", "0.3x|0.6x|1x|2x|3x|4x", "Edges softness level")
     Gui, Add, Checkbox, xs y+5 hp Checked%blurAreaTwice% vblurAreaTwice gupdateUIblurPanel, &Blur twice in one go (for large images)
     Gui, Add, Text, xs y+15 w%thisW% hp +0x200 -wrap +hwndhTemp, Blur mode:
-    GuiAddDropDownList("x+5 wp AltSubmit Choose" blurAreaMode " gupdateUIblurPanel vblurAreaMode", "Gaussian (GDI+)" friendly "|Gaussian (cImg)|Box blur|Dilate|Erode|Open|Close|Dissolve", [hTemp])
+    GuiAddDropDownList("x+5 wp AltSubmit Choose" blurAreaMode " gupdateUIblurPanel vblurAreaMode", "Blur (GDI+)" friendly "|Blur (OpenCV)|Gaussian / stack blur|Gaussian blur (slow)|Box blur|Median blur (slow)|Dilate|Erode|Open|Close|Dissolve", [hTemp])
     GuiAddSlider("blurAreaAmount", 0,255, 25, "Blur X: $€", "updateUIblurPanel", 1, "xs y+5 w" txtWid " hp")
     GuiAddSlider("blurAreaYamount", 0,255, 25, "Blur Y: $€", "updateUIblurPanel", 1, "xs y+5 w" txtWid " hp")
     Gui, Add, Checkbox, xs y+10 w%thisW% hp Checked%blurAreaEqualXY% vblurAreaEqualXY gupdateUIblurPanel, &Equal X/Y
@@ -50238,7 +50198,6 @@ BtnUIpresetsClouds() {
    uiSlidersArray["IDedgesOpacity", 14] := 1
    uiSlidersArray["UserAddNoiseBlurAmount", 14] := 1
    uiSlidersArray["UserAddNoisePixelizeAmount", 14] := 1
-
    If (UserAddNoiseMode!=3)
    {
       GuiControl, SettingsGUIA:, blurAreaEqualXY, 1
@@ -50334,7 +50293,7 @@ PanelAddNoiserImage() {
     GuiAddSlider("UserAddNoiseDetails", 1,100, 20, "Plasmagon", "updateUIaddNoisePanel", 1, "x+5 wp hp")
     GuiAddSlider("IDedgesEmphasis", -255,255, 0, "Brightness", "updateUIaddNoisePanel", 2, "xs y+8 w" txtWid - 2 " hp")
     GuiAddSlider("IDedgesContrast", -100,100, 0, "Contrast", "updateUIaddNoisePanel", 2, "xs y+8 wp hp")
-    GuiAddSlider("UserAddNoisePixelizeAmount", 0,100, 0, "Pixelize: $£", "updateUIaddNoisePanel", 1, "xs y+10 wp hp")
+    GuiAddSlider("UserAddNoisePixelizeAmount", 0,100, 0, "Pixelate: $£", "updateUIaddNoisePanel", 1, "xs y+10 wp hp")
     GuiAddSlider("UserAddNoiseBlurAmount", 0,255, 0, "Blur X: $€", "updateUIaddNoisePanel", 1, "xs y+8 w" txtWid//2 - 4 " hp")
     GuiAddSlider("blurAreaYamount", 0,255, 0, "Blur Y: $€", "updateUIaddNoisePanel", 1, "x+5 wp hp")
 
@@ -50420,7 +50379,7 @@ updateUIaddNoisePanel(dummy:=0, b:=0) {
        uiSlidersArray["UserAddNoiseIntensity", 5] := "Noise cut-off"
 
     uiSlidersArray["blurAreaYamount", 10] := (blurAreaEqualXY=0 && UserAddNoiseMode>1) ? 1 : 0
-    uiSlidersArray["UserAddNoisePixelizeAmount", 5] := (UserAddNoiseMode=3) ? "Plasma scale" : "Pixelize"
+    uiSlidersArray["UserAddNoisePixelizeAmount", 5] := (UserAddNoiseMode=3) ? "Plasma scale" : "Pixelate"
     uiSlidersArray["UserAddNoiseDetails", 10] := (UserAddNoiseMode=3) ? 1 : 0
 
     actu := (UserAddNoiseMode>1) ? 1 : 0
@@ -51917,16 +51876,16 @@ updateUIblurPanel(a:=0,b:=0) {
           GuiControl, % actu, blurAreaSoftLevel
        }
 
-       actu := (blurAreaMode>=4) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+       actu := (blurAreaMode>=7 && blurAreaMode!=11) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu, blurAreaCircular
 
        actu := (blurAreaSoftEdges=1 && pr>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu, blurAreaSoftLevel
 
-       actu2 := (blurAreaMode>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+       actu2 := (blurAreaMode>1 && blurAreaMode!=11) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu2, blurAreaEqualXY
 
-       isActive := (blurAreaMode>1 && blurAreaEqualXY!=1) ? 1 : 0
+       isActive := (blurAreaMode>1 && blurAreaEqualXY!=1 &&& blurAreaMode!=11) ? 1 : 0
        uiSlidersArray["blurAreaYamount", 10] := isActive
     }
 
@@ -52166,11 +52125,8 @@ livePreviewBlurPanel() {
     If (blurAreaEqualXY=1 && AnyWindowOpen=26)
     {
        thisBlurAmountY := (doubleBlurPreviewArea=1) ? blurAreaAmount//2 : blurAreaAmount
-       If (blurAreaMode=2)
-       {
-          thisBlurAmount := Round(thisBlurAmount*0.5)
-          thisBlurAmountY := Round(thisBlurAmountY*0.5)
-       }
+       If isInRange(blurAreaMode, 2, 5)
+          thisBlurAmountY := thisBlurAmount := (blurAreaMode=3 || blurAreaMode=4) ? Round(thisBlurAmount*1.85) : Round(thisBlurAmount*1.5)
     }
 
     If (thisBlurMode=1)
@@ -52202,7 +52158,12 @@ livePreviewBlurPanel() {
     }
 
     Gdip_DisposeImageAttributes(imageAttribs)
-    If (blurAreaTwice=1 && AnyWindowOpen=26)
+    If (blurAreaTwice=1 && AnyWindowOpen=26 && blurAreaMode>1)
+    {
+       sF := 1
+       thisBlurAmount *= 2
+       thisBlurAmountY *= 2
+    } Else If (blurAreaTwice=1 && AnyWindowOpen=26 && blurAreaMode=1)
     {
        xBitmap := trGdip_ResizeBitmap(A_ThisFunc, yBitmap, uiboxSizeW//2, uiboxSizeH//2, 1, 3, -1)
        If validBMP(xBitmap)
@@ -52212,10 +52173,9 @@ livePreviewBlurPanel() {
        }
 
        If (bEffect && thisBlurMode=1)
+       {
           ApplySpecialFixedBlur(A_ThisFunc, yBitmap, thisBlurAmount, bEffect)
-       Else If (thisBlurMode=2)
-          QPV_BoxBlurBitmap(yBitmap, thisBlurAmount, thisBlurAmountY, 0)
-       Else If (thisBlurMode=8)
+       } Else If (thisBlurMode=11)
        {
           zyBitmap := QPV_DissolveBitmap(yBitmap, thisBlurAmount*1.5, thisBlurAmountY*1.5)
           If validBMP(zyBitmap)
@@ -52223,8 +52183,8 @@ livePreviewBlurPanel() {
              trGdip_DisposeImage(yBitmap)
              yBitmap := zyBitmap
           }
-       } Else If (thisBlurMode>=3)
-          QPV_BoxBlurBitmap(yBitmap, thisBlurAmount, thisBlurAmountY, thisBlurMode - 2, 0, blurAreaCircular, 1)
+       } Else If (thisBlurMode>=2)
+          QPV_BlurBitmapFilters(yBitmap, thisBlurAmount, thisBlurAmountY, thisBlurMode - 2, 0, blurAreaCircular, 1)
 
        cBitmap := trGdip_ResizeBitmap(A_ThisFunc, yBitmap, uiboxSizeW, uiboxSizeH, 1, 3, -1)
        If validBMP(cBitmap)
@@ -52237,12 +52197,10 @@ livePreviewBlurPanel() {
 
     thisBlur := (doubleBlurPreviewArea=1) ? blurAreaAmount//2 : blurAreaAmount
     If (AnyWindowOpen=78 && blurAreaAmount>2)
-       QPV_BoxBlurBitmap(yBitmap, thisBlur, thisBlur, 0)
+       QPV_BlurBitmapFilters(yBitmap, thisBlur, thisBlur, 0)
     Else If (bEffect && thisBlurMode=1)
        ApplySpecialFixedBlur(A_ThisFunc, yBitmap, thisBlurAmount, bEffect)
-    Else If (thisBlurMode=2)
-       QPV_BoxBlurBitmap(yBitmap, thisBlurAmount, thisBlurAmountY, 0)
-    Else If (thisBlurMode=8)
+    Else If (thisBlurMode=11)
     {
        zyBitmap := QPV_DissolveBitmap(yBitmap, thisBlurAmount*1.5, thisBlurAmountY*1.5)
        If validBMP(zyBitmap)
@@ -52250,8 +52208,8 @@ livePreviewBlurPanel() {
           trGdip_DisposeImage(yBitmap)
           yBitmap := zyBitmap
        }
-    } Else If (thisBlurMode>=3)
-       QPV_BoxBlurBitmap(yBitmap, thisBlurAmount, thisBlurAmountY, thisBlurMode - 2, 0, blurAreaCircular, 1)
+    } Else If (thisBlurMode>=2)
+       QPV_BlurBitmapFilters(yBitmap, thisBlurAmount, thisBlurAmountY, thisBlurMode - 2, 0, blurAreaCircular, 1)
 
     If (BlurAreaBlendMode>1)
     {
@@ -53273,17 +53231,19 @@ BtnBlurSelectedArea() {
 BtnPixelizeSelectedArea() {
    ; If (downscaleHugeImagesForEditing()<0)
    ;    Return
+   If (blurAreaPixelizeAmount<2 && viewportQPVimage.imgHandle || blurAreaPixelizeAmount<2 && blurAreaAmount<2)
+      Return
 
    updateUIblurPanel("no-preview")
    BtnCloseWindow()
    If (viewportQPVimage.imgHandle)
    {
-      HugeImagesApplyGenericFilters("pixelize")
+      HugeImagesApplyGenericFilters("pixelate")
       Return
    }
 
    ToggleEditImgSelection("show-edit")
-   BlurSelectedArea("pixelize")
+   BlurSelectedArea("pixelate")
 }
 
 BtnZoomBlurSelectedArea() {
@@ -61330,9 +61290,9 @@ createMenuImageEditSubMenus(modus:=0) {
    If (thumbsDisplaying!=1 && infoImgEditingNow=1)
    {
       createMenuConvertColorDepths()
-      kMenu("PVimgFilters", "Add", "&Gaussian and other blur modes`tShift+B", "PanelBlurSelectedArea", "effects motion directional dissolve dilate erode box glow")
+      kMenu("PVimgFilters", "Add", "&Blur filters`tShift+B", "PanelBlurSelectedArea", "effects motion directional dissolve dilate erode box glow gaussian morphological morphology median")
       kMenu("PVimgFilters", "Add", "&Radial blur", "PanelZoomBlurSelectedArea", "effects motion directional zoom")
-      kMenu("PVimgFilters", "Add", "&Pixelize", "PanelPixelizeSelectedArea", "pixelization mozaic deform", " image")
+      kMenu("PVimgFilters", "Add", "&Pixelate", "PanelPixelizeSelectedArea", "pixelization pixelize mozaic deform", " image")
       kMenu("PVimgFilters", "Add", "S&harpen", "PanelSharpenImage", "effects", " image")
       Menu, PVimgFilters, Add
       kMenu("PVimgFilters", "Add", "A&utomatic contrast / levels", "PanelAutoColors")
@@ -98197,7 +98157,7 @@ tlbrDecideTooltips(hwnd) {
       msgu := "L: Capture image selected area as alpha mask`nR: Import clipboard as alpha mask"
    } Else If InStr(icoFile, "alpha-mask-pixelize")
    {
-      msgu := "Rasterize / pixelize the alpha mask"
+      msgu := "Rasterize the alpha mask"
    } Else If InStr(icoFile, "alpha-mask-invert")
    {
       msgu := "Invert alpha mask «N»"
@@ -98256,7 +98216,7 @@ tlbrDecideTooltips(hwnd) {
    } Else If InStr(icoFile, "brush-blur")
    {
       friendly := (AnyWindowOpen=64) ? "brush: " BrushToolBlurStrength "%" : "brush"
-      msgu := "L: Blur - soft " friendly "`nR: Blur or pixelize selected area"
+      msgu := "L: Blur - soft " friendly "`nR: Blur selected area"
    } Else If InStr(icoFile, "brush-cloner")
    {
       keyu := (AnyWindowOpen=64) ? " «J»" : ""

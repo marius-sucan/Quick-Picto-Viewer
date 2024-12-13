@@ -7,21 +7,12 @@
 #include "omp.h"
 #include "math.h"
 #include "windows.h"
-#include <shellapi.h>
-#include <shlobj.h>
-#include <shlwapi.h>
-#include <Knownfolders.h>
 #include <objbase.h>
-#include <strsafe.h>
-#include <shobjidl.h>
-#include <oleidl.h>
 #include <string>
-#include <thread>
 #include <sstream>
 #include <vector>
 #include <stack>
 #include <map>
-#include <unordered_map>
 #include <unordered_set>
 #include <list>
 #include <array>
@@ -35,29 +26,13 @@
 #define GDIPVER 0x110
 #include <gdiplus.h>
 #include <gdiplusflat.h>
-#include <locale.h>
-#include <codecvt>
-#include <corecrt_io.h>
 #include <direct.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <optional>
-#define STB_IMAGE_RESIZE_IMPLEMENTATION
-#include "stb_image_resize2.h"
 #include "Jpeg2PDF.h"
 #include "Jpeg2PDF.cpp"
-// #define cimg_plugin "include\gmic-master\gmic.cpp";
-#define cimg_use_openmp 1
-#include "include\CImg-3.3.1\CImg.h"
-// #include "include\CImg-3.1.4\CImg.h"
-// #include <bits/stdc++.h>
-using namespace std;
-using namespace cimg_library;
-#define DLL_API extern "C" __declspec(dllexport)
-#define DLL_CALLCONV __stdcall
 int debugInfos = 0;
-
 void fnOutputDebug(std::string input) {
     if (debugInfos!=1)
        return;
@@ -66,6 +41,17 @@ void fnOutputDebug(std::string input) {
     ss << "qpv: " << input;
     OutputDebugStringA(ss.str().data());
 }
+
+#define cimg_use_openmp 1
+#include "includes\CImg-3.4.3\CImg.h"
+// #define NOMINMAX
+#include <opencv2/opencv.hpp>
+using namespace std;
+using namespace cimg_library;
+#define DLL_API extern "C" __declspec(dllexport)
+#define DLL_CALLCONV __stdcall
+
+
 
 inline bool inRange(const float &low, const float &high, const float &x) {
     return (low <= x && x <= high);
@@ -285,10 +271,8 @@ DLL_API int DLL_CALLCONV SetBitmapAsAlphaChannel(unsigned char *imageData, unsig
             {
                if (invert == 1)
                   alpha = 255 - alpha;
-               int a = imageData[px + 3];
-               alpha2 = min(alpha, a);    // handles bitmaps that already have alpha
-            }
-            else {
+               alpha2 = min(alpha, imageData[px + 3]);    // handles bitmaps that already have alpha
+            } else {
                alpha2 = (invert == 1) ? 255 - alpha : alpha;
             }
 
@@ -573,7 +557,7 @@ int FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1, 
         PointsList[i] = round(PointsList[i]);
         PointsList[i + 1] = round(PointsList[i + 1]) + polyOffYa - polyOffYb;
         // boundMaxX = max(PointsList[i], boundMaxX);
-        boundMaxY = max(PointsList[i + 1], boundMaxY);
+        boundMaxY = max((int)PointsList[i + 1], boundMaxY);
         // boundMinX = min(PointsList[i], boundMinX);
         // boundMinY = min(PointsList[i + 1], boundMinY);
     }
@@ -615,10 +599,10 @@ void FillSimpleMaskPolygon(const int w, const int h, float* PointsList, const in
     int boundMinY = h;
     for ( int i = 0; i < PointsCount*2; i+=2)
     {
-        boundMaxX = max(PointsList[i], boundMaxX);
-        boundMaxY = max(PointsList[i + 1], boundMaxY);
-        boundMinX = min(PointsList[i], boundMinX);
-        boundMinY = min(PointsList[i + 1], boundMinY);
+        boundMaxX = max((int)PointsList[i], boundMaxX);
+        boundMaxY = max((int)PointsList[i + 1], boundMaxY);
+        boundMinX = min((int)PointsList[i], boundMinX);
+        boundMinY = min((int)PointsList[i + 1], boundMinY);
     }
 
     boundMaxX = min(boundMaxX, w);
@@ -1591,8 +1575,8 @@ DLL_API int DLL_CALLCONV mergePolyMaskIntoHighDepthMask(int px1, int py1, int px
      return 0;
   }
 
-  const int mw = min(px2 + thickness, polyW - 1);
-  const int mh = min(py2 + thickness, polyH - 1);
+  const int mw = min((int)px2 + thickness, (int)polyW - 1);
+  const int mh = min((int)py2 + thickness, (int)polyH - 1);
   const int mx = max(px1 - thickness, 0);
   const int my = max(py1 - thickness, 0);
 
@@ -4328,6 +4312,93 @@ DLL_API int DLL_CALLCONV MergeBitmapsWithMask(unsigned char *originalData, unsig
     return 1;
 }
 
+DLL_API int DLL_CALLCONV openCVedgeDetection(unsigned char *imageData, int w, int h, int xa, int ya, int xb, int yb, int ks, int modus, int Stride, int bpp) {
+    int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
+    cv::Mat image(h, w, clr, imageData, Stride);
+    fnOutputDebug("openCVedgeDetection step 1; modus = " + std::to_string( modus ) + " | xa = " + std::to_string( xa ) + " | ya = " + std::to_string( ya )  + " | xb = " + std::to_string( xb ) + " | yb = " + std::to_string( yb ) );
+
+// implement prewitt, scharr and canny
+
+    // Convert the image to grayscale
+    cv::Mat grayImage;
+    cv::cvtColor(image, grayImage, cv::COLOR_BGR2GRAY);
+
+    // Apply Sobel operator to detect edges
+    cv::Mat gradX, gradY;
+    cv::Mat absGradX, absGradY, edgeImage;
+
+    // Sobel filters (kernel size = 3)
+    // optimal values xa=1, ya=0, xb=0, yb=1, ks=3
+    cv::Sobel(grayImage, gradX, CV_16S, xa, ya, ks);
+    cv::Sobel(grayImage, gradY, CV_16S, xb, yb, ks);
+
+    // Compute the absolute gradients
+    cv::convertScaleAbs(gradX, absGradX);
+    cv::convertScaleAbs(gradY, absGradY);
+
+    // Combine the gradients
+    cv::addWeighted(absGradX, 0.5, absGradY, 0.5, 0, edgeImage);
+
+    // Convert edge image to RGB
+    clr = (bpp==32) ? cv::COLOR_GRAY2BGRA :   cv::COLOR_GRAY2BGR;
+    cv::cvtColor(edgeImage, image, clr);
+
+
+    return 1;
+}
+
+DLL_API int DLL_CALLCONV openCVblurFilters(unsigned char *imageData, int w, int h, int intensityX, int intensityY, int modus, int circle, int Stride, int bpp) {
+    int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
+    cv::Mat image(h, w, clr, imageData, Stride);
+    bool equal = (intensityX == intensityY) ? 1 : 0;
+    if (intensityX>=w-2)
+       intensityX = w - 3;
+    if (intensityY>=h-2)
+       intensityY = h - 3;
+ 
+    if (intensityX % 2 != 1)
+       intensityX++;
+    if (intensityY % 2 != 1)
+       intensityY++;
+ 
+    int avg = (intensityX + intensityY)/2;
+    if (avg % 2 != 1)
+       avg++;
+ 
+    if (equal==1)
+       intensityX = intensityY = min(intensityX, intensityY);
+
+    fnOutputDebug("openCVblurFilters step 1; modus = " + std::to_string( modus ) + " | inX = " + std::to_string( intensityX ) + " | inY = " + std::to_string( intensityY )  + " | w = " + std::to_string( w ) + " | h = " + std::to_string( h ) );
+    int type = (circle==1) ? cv::MORPH_ELLIPSE : cv::MORPH_RECT;
+    // cv::blur(image, image, cv::Size(951, 951));
+    if (modus==0) {
+       cv::blur(image, image, cv::Size(intensityX, intensityY));
+    } else if (modus==1) {
+       cv::stackBlur(image, image, cv::Size(intensityX, intensityY));
+    } else if (modus==2) {
+       cv::GaussianBlur(image, image, cv::Size(intensityX, intensityY), (intensityX + intensityY)/12.0f);
+    } else if (modus==3) {
+       cv::boxFilter(image, image, -1, cv::Size(intensityX, intensityY));
+    } else if (modus==4) {
+       cv::medianBlur(image, image, avg);
+    } else if (modus==5) {
+       cv::Mat shape = cv::getStructuringElement(type, cv::Size(intensityX, intensityY));
+       cv::dilate(image, image, shape);
+    } else if (modus==6) {
+       cv::Mat shape = cv::getStructuringElement(type, cv::Size(intensityX, intensityY));
+       cv::erode(image, image, shape);
+    } else if (modus==7) {
+       cv::Mat shape = cv::getStructuringElement(type, cv::Size(intensityX, intensityY));
+       cv::morphologyEx(image, image, cv::MORPH_OPEN, shape);
+    } else if (modus==8) {
+       cv::Mat shape = cv::getStructuringElement(type, cv::Size(intensityX, intensityY));
+       cv::morphologyEx(image, image, cv::MORPH_CLOSE, shape);
+    }
+
+    fnOutputDebug("openCVblurFilters done");
+    return 1;
+}
+
 DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, int h, int Stride, int bpp, int maskOpacity, int blendMode, int flipLayers, int keepAlpha, int linearGamma, unsigned char *newBitmap, int StrideMini, int mw, int mh) {
     if (maskOpacity<2)
        return 1;
@@ -5813,8 +5884,8 @@ DLL_API int DLL_CALLCONV CreatePDFfile(const char* tempDir, const char* destinat
   // Prepare the PDF Data Buffer based on the PDF Size
   pdfBuf = (UINT8 * )malloc(pdfSize);
 
-  // Get the PDF into the Data Buffer and do the cleanup
   fnOutputDebug("PDF size = " + std::to_string(pdfSize) + "; next function Jpeg2PDF_GetFinalDocumentAndCleanup()");
+  // Get the PDF into the Data Buffer and do the cleanup
   // Output the PDF Data Buffer to file
   STATUS g = Jpeg2PDF_GetFinalDocumentAndCleanup(pdfId, pdfBuf, &pdfFinalSize, pdfSize);
   if (g=IDOK)
@@ -5891,7 +5962,6 @@ Gdiplus::GpBitmap* CreateGdipBitmapFromCImg(CImg<float> & img, int width, int he
                 // loop through pixels on line
                 // T & operator() (const unsigned int x, const unsigned int y=0, const unsigned int z=0, const unsigned int v=0) const
                 // Fast access to pixel value for reading or writing.
-
                 float    redCompF = img(x,y,0,0);
                 if (redCompF < 0.0f)
                     redCompF = 0.0f;
@@ -6007,6 +6077,7 @@ int FillCImgFromBitmap(cimg_library::CImg<float> & img, Gdiplus::GpBitmap *myBit
 }
 
 int FillCImgFromLockedBitmapData(cimg_library::CImg<unsigned char> & img, unsigned char *myBitmap, int width, int height, int Stride, int bpp, int zx1, int zy1, int zx2, int zy2, int invertArea) {
+    // function unused
     #pragma omp parallel for schedule(dynamic)
     for (int y = 0; y < height; y++)
     {
@@ -6062,7 +6133,12 @@ DLL_API int DLL_CALLCONV cImgSharpenBitmap(unsigned char *imageData, int width, 
 DLL_API int DLL_CALLCONV cImgBlurBitmapFilters(unsigned char *imageData, int width, int height, int intensityX, int intensityY, int modus, int circle, int preview, int Stride, int bpp) {
   int ow = width;  int oh = height;
   int channels = (bpp==32) ? 4 : 3;
+  fnOutputDebug("cImgBlurBitmapFilters invoked | modus = " + std::to_string(modus));
   CImg<unsigned char> img(imageData, channels, width, height, 1);
+  // If I set is_Shared==1, it does not work; no idea why; it results in a messed up image.
+  // Note: I pass the wrong parameters and then i fix it with permute_axes().
+  // It should be CImg<unsigned char> img(imageData, width, height, 1, channels), but I get a messed up image.
+
   img.permute_axes("yzcx");
   if (preview==1)
   {
@@ -6137,6 +6213,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV cImgRotateBitmap(Gdiplus::GpBitmap *myBi
 }
 
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV cImgResizeBitmap(Gdiplus::GpBitmap *myBitmap, int width, int height, int resizedW, int resizedH, int interpolation, int bond) {
+  // function invoked by QPV_ResizeBitmap() from AHK
   Gdiplus::GpBitmap *newBitmap = NULL;
   CImg<float> img(width,height,1,4);
   int r = FillCImgFromBitmap(img, myBitmap, width, height);
@@ -6146,25 +6223,6 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV cImgResizeBitmap(Gdiplus::GpBitmap *myBi
   img.resize(resizedW, resizedH, -100, -100, interpolation, bond);
 
   newBitmap = CreateGdipBitmapFromCImg(img, img.width(), img.height());
-  return newBitmap;
-}
-
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV cImgLoadBitmap(const char *szFileName, int givenW, int givenH, int interpolation, int bond) {
-// it does not work
-
-  Gdiplus::GpBitmap *newBitmap = NULL;
-  std::string ss = szFileName;
-  fnOutputDebug("cimg file = " + ss);
-
-  CImg<unsigned char> img;
-  img.load_jpeg(szFileName);
-
-  auto nSize = adaptImageGivenSize(1, 1, img.width(), img.height(), givenW, givenH);
-  img.resize(nSize[0], nSize[1], -100, -100, interpolation, bond);
-
-  CImg<float> img2 = img;
-  newBitmap = CreateGdipBitmapFromCImg(img2, img.width(), img.height());
-
   return newBitmap;
 }
 
@@ -6458,7 +6516,6 @@ DLL_API int DLL_CALLCONV rect2polarIMG(int *imageData, int *newData, int Width, 
       return (int)maxuRadius;
 }
 
-
 DLL_API int DLL_CALLCONV polar2rectIMG(int *imageData, int *newData, int Width, int Height, double cx, double cy, double userScale) {
 // TO-DO: this is an absolutely dumb implementation; I do not know how to optimize it
 // inspired by https://imagej.nih.gov/ij/plugins/polar-transformer.html
@@ -6510,7 +6567,7 @@ DLL_API int DLL_CALLCONV polar2rectIMG(int *imageData, int *newData, int Width, 
          for (int x = 0; x < pw; x++)
          {
             if (x>=pw*0.41 && x<=pw*0.59)
-              continue;
+               continue;
 
             double angle = 0;
             double px = (double)x/acX - cx;     double py = (double)y/acY - cy;
@@ -6767,129 +6824,6 @@ DLL_API int DLL_CALLCONV SetTabletPenServiceProperties(HWND hWnd) {
 
 
 /*
-DLL_API int DLL_CALLCONV STBresizeBitmap(const unsigned char *bitmapDatu, int w, int h, int Stride, unsigned char *otherData, int w2, int h2, int mStride) { 
-  unsigned char *r = stbir_resize_uint8_linear(bitmapDatu, w, h, Stride, otherData, w2, h2, mStride, STBIR_BGRA);
-  return 1;
-}
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testCimgQPV(Gdiplus::GpBitmap *myBitmap, int width, int height, int intensityX, int intensityY, int modus) {
-
-    // Load input image files, using the CImg Library.
-    Gdiplus::GpBitmap *newBitmap = NULL;
-    CImg<float> img(width,height,1,4);
-    int r = FillCImgFromBitmap(img, myBitmap, width, height);
-    if (r==0)
-       return newBitmap;
-
-    // Move input images into a list.
-    CImgList<float> image_list;
-    img.move_to(image_list);
-
-    // Define the corresponding image names.
-    CImgList<char> image_names;
-    CImg<char>::string("First image").move_to(image_names);
-
-    // Invoke libgmic to execute a G'MIC pipeline.
-    gmic("blur_angular 2% name \"Result image\"", image_list, image_names);
-
-    // Display resulting image.
-    const char *const title_bar = image_names[0];
-    image_list.display(title_bar);
-
-    newBitmap = CreateGdipBitmapFromCImg(img, width, height);
-    return newBitmap;
-}
-
-
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testOtherCimgQPV(Gdiplus::GpBitmap *myBitmap, int width, int height, int intensityX, int intensityY, int modus) {
-  // width = 129;
-  // height = 129;
-  // CImg<float> img(129,129,1,3,"0,64,128,192,255",true); // Construct image from a value sequence
-  //             img2(129,129,1,3,"if(c==0,255*abs(cos(x/10)),1.8*y)",false); // Construct image from a formula
-  // (img1,img2).display();
-
-  Gdiplus::GpBitmap *newBitmap = NULL;
-  CImg<float> img(width,height,1,4);
-  int r = FillCImgFromBitmap(img, myBitmap, width, height);
-  if (r==0)
-     return newBitmap;
-  char k = 'x';
-
-  // if (modus==1)
-  //    img.blur_median(intensityX, 3);   // size, distance threshold
-  if (modus==2)
-     img.blur_guided(img, intensityX, intensityY/2);     // guide, radius, regularization
-  // else if (modus==3)
-  //    img.vanvliet(intensityX, 1, k);       // sigma, order, axis
-  else if (modus==4)
-     img.dilate(intensityX, intensityY, 1);
-  else if (modus==5)
-     img.erode(intensityX, intensityY, 1);
-  else if (modus==6)
-     img.opening(intensityX, intensityY, 1);
-  else if (modus==7)
-     img.closing(intensityX, intensityY, 1);
-  else if (modus==8)
-     img.normalize(intensityX, intensityY);  // min.val , max.val
-  else if (modus==9)
-     img.equalize(255, intensityX, intensityY);   // nr.levels , min.val , max.val
-  else if (modus==10)
-     img.threshold(intensityX);         // value, soft, strict
-  else if (modus==11)
-     img.quantize(intensityX, 1);   // nr.levels, keepRange
-  else if (modus==12)
-     img.warp(img);          /// img, mode, interpolation
-  else if (modus==13)
-     img.watershed(img);
-  else
-     return newBitmap;
-
-// img.display();
-
-// warp()
-// Vanvliet()
-// edges()
-// deriche()
-// blur_angular()
-// blur_radial()
-// blur_linear()
-// deblur()
-// syntexturize()
-// sharpen()
-// watershed()
-// noise_perlin()
-// rorschach()
-// turbulence()
-// polka_dots()
-// voronoi()
-// maze()
-// mosaic()
-// boxfitting()
-// fractalize()
-// houghsketchbw()
-// stained_glass()
-// stencil()
-// cubism()
-// sponge()
-// deform()
-// kaleidoscope()
-// twirl()
-// ripple()
-// water()
-// spherize()
-// fisheye()
-// wave()
-// wind()
-// raindrops()
-
-  newBitmap = CreateGdipBitmapFromCImg(img, width, height);
-  // ~Cimg(img);
-  return newBitmap;
-}
-
-*/
-
-
-/*
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testFunc(UINT width, UINT height, const wchar_t *szFileName) {
     Gdiplus::GpBitmap* myBitmap = NULL;
     Gdiplus::DllExports::GdipCreateBitmapFromFile(szFileName, &myBitmap);
@@ -6908,87 +6842,6 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV testFunc(UINT width, UINT height, const 
     ss << "qpv: bmp file " << converted_str;
     OutputDebugStringA(ss.str().data());
     return myBitmap;
-}
-*/
-
-
-/*
-DLL_API int DLL_CALLCONV testFuncNow(int givenQuality, UINT width, UINT height, const wchar_t *szFileName, const wchar_t *szFileNameOut) {
-  //  VImage in = VImage::new_from_file (szFileName,
-  //   VImage::option ()->set ("access", VIPS_ACCESS_SEQUENTIAL));
-
-  // double avg = in.avg ();
-
-  // printf ("avg = %g\n", avg);
-  // printf ("width = %d\n", in.width ());
-  in = VImage::new_from_file (szFileName,
-    VImage::option ()->set ("access", VIPS_ACCESS_SEQUENTIAL));
-
-  VImage out = in.embed (10, 10, 1000, 1000,
-    VImage::option ()->
-      set ("extend", "background")->
-      set ("background", 128));
-
-  out.write_to_file (szFileNameOut);
-
-  vips_shutdown ();
-  return 1
-}
-*/
-
-
-/*
-DLL_API int DLL_CALLCONV BlurImage(unsigned char *Bitmap, int width, int height, int Stride, int radius) {
-// https://stackoverflow.com/questions/47209262/c-blur-effect-on-bit-map-is-working-but-colors-are-changed
-
-    float rs = ceil(radius * 2.57);
-    for (int i = 0; i < height; ++i)
-    {
-        for (int j = 0; j < width; ++j)
-        {
-            int tempCoord;
-            double a = 0, r = 0, g = 0, b = 0;
-            double count = 0;
-
-            for (int iy = i - rs; iy < i + rs + 1; ++iy)
-            {
-                for (int ix = j - rs; ix < j + rs + 1; ++ix)
-                {
-                    auto x = min(width - 1, max(0, ix));
-                    auto y = min(height - 1, max(0, iy));
-
-                    auto dsq = ((ix - j) * (ix - j)) + ((iy - i) * (iy - i));
-                    float wght = std::exp(-dsq / (2.0 * radius * radius)) / (M_PI * 2.0 * radius * radius);
-
-                    tempCoord = (4 * x) + y*Stride;
-                    a = Bitmap[3 + tempCoord] * wght;
-                    r = Bitmap[2 + tempCoord] * wght;
-                    g = Bitmap[1 + tempCoord] * wght;
-                    b = Bitmap[tempCoord] * wght;
-                    // rgb32* pixel = bmp->getPixel(x, y);
-                    // r += pixel->r * wght;
-                    // g += pixel->g * wght;
-                    // b += pixel->b * wght;
-                    count += wght;
-                }
-            }
-
-            tempCoord = (4 * j) + i*Stride;
-            // if a
-               Bitmap[3 + tempCoord] = round(a);
-            // if r
-               Bitmap[2 + tempCoord] = round(r);
-            // if g
-               Bitmap[1 + tempCoord] = round(g);
-            // if b
-               Bitmap[tempCoord] = round(b);
-            // rgb32* pixel = bmp->getPixel(j, i);
-            // pixel->r = std::round(r / count);
-            // pixel->g = std::round(g / count);
-            // pixel->b = std::round(b / count);
-        }
-    }
-    return 1;
 }
 
 DLL_API int DLL_CALLCONV hammingDistance(char str1[], char str2[])
@@ -7111,7 +6964,6 @@ DLL_API unsigned long long int DLL_CALLCONV dumbcalculateNCR(UINT n) {
    // OutputDebugStringA(ss.str().data());
    return combinations;
 }
-
 
 UINT64 reverse_8bits(UINT64 n) {
   for (int i = 0, bytes = sizeof(n); i < bytes; ++i) {
