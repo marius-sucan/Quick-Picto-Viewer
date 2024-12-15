@@ -371,11 +371,10 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , userImgChannelAlphaAdd := 0, forceSlowLivePreviewMode := 0, showContextualStatusBar := 1
    , vectorToolModus := 1, TextInAreaVerticalia := 0, DrawLineAreaThickScale := 100
    , DrawLineAreaJoinsStyle := 0, DrawLineAreaMitersBorder := 100, DrawLineAreaPolarSection := 1440
-   , DrawLineAreaPolarMode := 1
+   , DrawLineAreaPolarMode := 1, IDedgesModus := 1
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
-
 If (realSystemCores>8)
    realSystemCores := 8
 
@@ -16222,6 +16221,12 @@ ImgUndoAction(dummy:=0) {
 
 coreChangeImgUndoLevel(levelu) {
    pBitmap := undoLevelsArray[levelu, 1]
+   If !validBMP(pBitmap)
+   {
+      addJournalEntry("ERROR: Invalid bitmap. Undo history level = " levelu)
+      Return
+   }
+
    If (pBitmap!=UserMemBMP)
       UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
    If (pBitmap!=gdiBitmap)
@@ -16229,6 +16234,7 @@ coreChangeImgUndoLevel(levelu) {
 
    UserMemBMP := trGdip_CloneBitmap(A_ThisFunc, pBitmap)
    gdiBitmap := trGdip_CloneBitmap(A_ThisFunc, pBitmap)
+   calcRelativeSelCoords(pBitmap)
    currIMGdetails.HasAlpha := undoLevelsArray[levelu, 5]
    vpIMGrotation := 0
    imgFxMode := usrColorDepth := 1
@@ -22937,8 +22943,8 @@ BlurSelectedArea(modus:="") {
     If (blurAreaEqualXY=1 && modus!="pixelate")
     {
        o_blurAreaYamount := blurAreaAmount
-       If isInRange(blurAreaMode, 2, 5)
-          o_blurAreaYamount := o_blurAreaAmount := (blurAreaMode=3 || blurAreaMode=4) ? Round(blurAreaAmount*1.85) : Round(blurAreaAmount*1.5)
+       If isInRange(blurAreaMode, 2, 4)
+          o_blurAreaYamount := o_blurAreaAmount := (blurAreaMode=2) ? Round(blurAreaAmount*1.51) : Round(blurAreaAmount*1.85)
     }
 
     If (blurAreaTwice=1 && blurAreaMode>1 && modus!="pixelate")
@@ -23058,7 +23064,7 @@ BlurSelectedArea(modus:="") {
           dhMatrix := Gdip_CreateMatrix()
           Gdip_ScaleMatrix(dhMatrix, 2, 2, 1)
           Gdip_TranslateMatrix(dhMatrix, imgSelPx, imgSelPy, 1)
-          If (thisBlurMode=11)
+          If (thisBlurMode=10)
           {
              zxBitmap := QPV_DissolveBitmap(xBitmap, o_blurAreaAmount*1.5, o_blurAreaYamount*1.5)
              If validBMP(zxBitmap)
@@ -23082,7 +23088,7 @@ BlurSelectedArea(modus:="") {
     Else
        setWindowTitle("BLURRING IMAGE, please wait", 1)
 
-    If (thisBlurMode=11)
+    If (thisBlurMode=10)
     {
        zzBitmap := QPV_DissolveBitmap(zBitmap, o_blurAreaAmount*1.5, o_blurAreaYamount*1.5)
        If validBMP(zzBitmap)
@@ -23460,44 +23466,51 @@ coreDetectEdgesSelectedArea(whichBitmap, previewMode, Gu:=0) {
        imgSelW := imgW, imgSelH := imgH
     }
 
+    ; Static pxs := {1:"-3", 2:"-2", 3:"-1", 4:"0", 5:"1", 6:"2", 7:"3"}
     extendedClone := testSelectionLargerThanGiven(imgW, imgH)
     fBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
-    zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
-    If (IDedgesBlendMode>1 && previewMode!=3)
-       gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
-
-    If (IDedgesCenterAmount>1)
-       QPV_BlurBitmapFilters(zBitmap, IDedgesCenterAmount, IDedgesCenterAmount, 0)
-
-    Static pxs := {1:"-3", 2:"-2", 3:"-1", 4:"0", 5:"1", 6:"2", 7:"3"}
-
-    G3 := trGdip_GraphicsFromImage(A_ThisFunc, zBitmap)
-    r0 := trGdip_DrawImage(A_ThisFunc, G3, zBitmap, pxs[IDedgesXuAmount], pxs[IDedgesYuAmount])
-    QPV_BlendBitmaps(fBitmap, zBitmap, 18, 0) ; difference mode
-
-    zEffect := Gdip_CreateEffect(6, 0, -100, 0)  ; desaturate image
-    If zEffect
-       Gdip_BitmapApplyEffect(fBitmap, zEffect)
-    Gdip_DisposeEffect(zEffect)
-
-    If (IDedgesEmphasis!=0 || IDedgesContrast!=0)
-       wEffect := Gdip_CreateEffect(5, IDedgesEmphasis, IDedgesContrast, 0)
-
-    If wEffect
-       Gdip_BitmapApplyEffect(fBitmap, wEffect)
-
-    Gdip_DisposeEffect(wEffect)
-    If (IDedgesInvert=1)
+    If (IDedgesModus<5)
     {
-       zEffect := Gdip_CreateEffect(7, 0, 0, 100)
+       obj := generateAcceptedValuesEdgesDetection()
+       QPV_DetectEdgesFilters(fBitmap, IDedgesModus, obj[1], obj[2], obj[3], IDedgesEmbossLvl, IDedgesAfterBlur, IDedgesInvert)
+    } else
+    {
+       zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
+       If (IDedgesBlendMode>1 && previewMode!=3)
+          gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
+
+       If (IDedgesCenterAmount>1)
+          QPV_BlurBitmapFilters(zBitmap, IDedgesCenterAmount, IDedgesCenterAmount, 0)
+
+       G3 := trGdip_GraphicsFromImage(A_ThisFunc, zBitmap)
+       r0 := trGdip_DrawImage(A_ThisFunc, G3, zBitmap, IDedgesXuAmount, IDedgesYuAmount)
+       QPV_BlendBitmaps(fBitmap, zBitmap, 18, 0) ; difference mode
+
+       zEffect := Gdip_CreateEffect(6, 0, -100, 0)  ; desaturate image
        If zEffect
           Gdip_BitmapApplyEffect(fBitmap, zEffect)
        Gdip_DisposeEffect(zEffect)
-    }
 
-    pr := (IDedgesAfterBlur=2) ? 1 : IDedgesAfterBlur*2
-    If (IDedgesAfterBlur>1)
-       QPV_BlurBitmapFilters(fBitmap, pr, pr, 0)
+       If (IDedgesInvert=1)
+       {
+          zEffect := Gdip_CreateEffect(7, 0, 0, 100)
+          If zEffect
+             Gdip_BitmapApplyEffect(fBitmap, zEffect)
+          Gdip_DisposeEffect(zEffect)
+       }
+
+       If (IDedgesEmphasis!=0 || IDedgesContrast!=0)
+       {
+          wEffect := Gdip_CreateEffect(5, IDedgesEmphasis, IDedgesContrast, 0)
+          If wEffect
+             Gdip_BitmapApplyEffect(fBitmap, wEffect)
+
+          Gdip_DisposeEffect(wEffect)
+       }
+
+       If (IDedgesAfterBlur>0)
+          QPV_BlurBitmapFilters(fBitmap, IDedgesAfterBlur, IDedgesAfterBlur, 0)
+    }
 
     If (IDedgesBlendMode>1 && validBMP(gBitmap))
     {
@@ -23847,6 +23860,39 @@ QPV_BlurBitmapFilters(pBitmap, passesX, passesY:=0, modus:=1, forceCimg:=0, circ
   If !E1
   {
      r := DllCall(whichMainDLL "\openCVblurFilters", "UPtr", iScan, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", modus, "Int", circular, "int", Stride, "int", 32)
+     ; r := DllCall(whichMainDLL "\cImgBlurBitmapFilters", "UPtr", iScan, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", modus, "Int", circular, "Int", preview, "int", Stride, "int", 32)
+     Gdip_UnlockBits(pBitmap, iData)
+  }
+
+  Return r
+}
+
+QPV_DetectEdgesFilters(pBitmap, modus, xa, ya, ksize, preblur, postblur, invert) {
+  initQPVmainDLL()
+  If !qpvMainDll
+  {
+     addJournalEntry(A_ThisFunc "(): QPV dll file is missing or failed to initialize: qpvMain.dll")
+     Return 0
+  }
+
+  If !validBMP(pBitmap)
+  {
+     addJournalEntry(A_ThisFunc "(): ERROR - invalid bitmap to process")
+     Return
+  }
+
+  trGdip_GetImageDimensions(pBitmap, w, h)
+  If (w<1 || h<1)
+  {
+     addJournalEntry(A_ThisFunc "(): ERROR - invalid bitmap dimensions")
+     Return 0
+  }
+
+  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, Stride, iScan, iData, 3)
+  If !E1
+  {
+     ; fnOutputDebug(A_ThisFunc ": xa=" xa  " | ya=" ya " | ks=" ks )
+     r := DllCall(whichMainDLL "\openCVedgeDetection", "UPtr", iScan, "Int", w, "Int", h, "Int", xa, "Int", ya, "Int", ksize, "Int", preblur, "Int", postblur, "int", invert, "Int", modus, "int", Stride, "int", 32)
      ; r := DllCall(whichMainDLL "\cImgBlurBitmapFilters", "UPtr", iScan, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", modus, "Int", circular, "Int", preview, "int", Stride, "int", 32)
      Gdip_UnlockBits(pBitmap, iData)
   }
@@ -25742,7 +25788,7 @@ trackImageListButtons(actu, r:=0, hwnd:=0, discardedImageList:=0, guiu:=0) {
        If (StrLen(x)>1)
        {
           c := DllCall("Comctl32.dll\ImageList_GetImageCount", "uptr", x)
-          fnOutputDebug(c " | " A_ThisFunc ": " Value[1] "=" Value[2] " | " Value[3])
+          ; fnOutputDebug(c " | " A_ThisFunc ": " Value[1] "=" Value[2] " | " Value[3])
           If (c=5)
              Try DllCall("Comctl32.dll\ImageList_Destroy", "uptr", x)
 
@@ -43347,6 +43393,90 @@ updateLabelDrawLineThickness() {
        Return "Line width: " DrawLineAreaContourThickness " pixels"
 }
 
+generateAcceptedValuesEdgesDetection() {
+   ks := Round(IDedgesCenterAmount)
+   xa := IDedgesXuAmount
+   ya := IDedgesYuAmount
+   if (IDedgesModus<=2)
+   {
+      xa := Round(IDedgesXuAmount) + 3
+      ya := Round(IDedgesYuAmount) + 3
+      if (mod(ks, 2)!=1)
+         ks++
+      if (ks>7)
+         ks := 7
+
+      if (ks=1)
+      {
+         if (xa > 2)
+            xa := 2
+         if (ya > 2)
+            ya := 2
+      } else if (ks>2)
+      {
+         if (xa >= ks)
+            xa := ks - 1
+         if (ya >= ks)
+            ya := ks - 1
+      }
+   } else if (IDedgesModus=3)
+   {
+      ; Scharr dx and dy parameters
+      xa := (xa>0) ? 1 : 0
+      ya := (ya>0) ? 1 : 0
+      ks := 3
+   } else if (IDedgesModus=4)
+   {
+      ; Canny hysteresis thresholds
+      prx := (xa + 3)/6
+      pry := (ya + 3)/6
+      xaa := Round(200 * prx)
+      yaa := Round(600 * pry)
+      xa := min(xaa, yaa)
+      ya := max(xaa, yaa)
+      if (mod(ks, 2)!=1)
+         ks++
+
+      ks := clampInRange(ks, 3, 7)
+   } else if (IDedgesModus=5)
+   {
+      xa := Round(IDedgesXuAmount)
+      ya := Round(IDedgesYuAmount)
+      ks := Round(IDedgesCenterAmount)
+   }
+
+   Return [xa, ya, ks]
+}
+
+updateLabelAlgorithmSliderEdgesPanel(varu, valu) {
+   obj := generateAcceptedValuesEdgesDetection()
+   If (IDedgesModus<=3)
+   {
+      if (varu="IDedgesXuAmount")
+         return "dX: " obj[1]
+      else if (varu="IDedgesYuAmount")
+         return "dY: " obj[2]
+      else if (varu="IDedgesCenterAmount")
+         return "kS: " obj[3] "x" obj[3]
+   } Else If (IDedgesModus=4)
+   {
+      if (varu="IDedgesXuAmount")
+         return "T1: " obj[1]
+      else if (varu="IDedgesYuAmount")
+         return "T2: " obj[2]
+      else if (varu="IDedgesCenterAmount")
+         return "kS: " obj[3] "x" obj[3]
+   } Else If (IDedgesModus=5)
+   {
+      if (varu="IDedgesXuAmount")
+         return "X: " obj[1]
+      else if (varu="IDedgesYuAmount")
+         return "Y: " obj[2]
+      else if (varu="IDedgesCenterAmount")
+         return "Pre-blur: " obj[3]
+   }
+}
+
 updateLabelBrushStep() {
    stepu := (BrushToolStepping<=2 || BrushToolStepping=251) ? "AUTO" : BrushToolStepping " px"
    If (BrushToolStepping=0)
@@ -47584,6 +47714,7 @@ BTNimgResizeEditor() {
     }
 
     Gdip_DeleteGraphics(G2)
+    calcRelativeSelCoords(newBitmap)
     wrapRecordUndoLevelNow(newBitmap)
     SoundBeep 900, 100
     updateUIctrl()
@@ -50003,7 +50134,7 @@ PanelBlurSelectedArea() {
     GuiAddDropDownList("x+5 w60 AltSubmit Choose" blurAreaSoftLevel " gupdateUIblurPanel vblurAreaSoftLevel", "0.3x|0.6x|1x|2x|3x|4x", "Edges softness level")
     Gui, Add, Checkbox, xs y+5 hp Checked%blurAreaTwice% vblurAreaTwice gupdateUIblurPanel, &Blur twice in one go (for large images)
     Gui, Add, Text, xs y+15 w%thisW% hp +0x200 -wrap +hwndhTemp, Blur mode:
-    GuiAddDropDownList("x+5 wp AltSubmit Choose" blurAreaMode " gupdateUIblurPanel vblurAreaMode", "Blur (GDI+)" friendly "|Blur (OpenCV)|Gaussian / stack blur|Gaussian blur (slow)|Box blur|Median blur (slow)|Dilate|Erode|Open|Close|Dissolve", [hTemp])
+    GuiAddDropDownList("x+5 wp AltSubmit Choose" blurAreaMode " gupdateUIblurPanel vblurAreaMode", "Blur (GDI+)" friendly "|Box blur|Gaussian / stack blur|Gaussian blur (slow)|Median blur (slow)|Dilate|Erode|Open|Close|Dissolve", [hTemp])
     GuiAddSlider("blurAreaAmount", 0,255, 25, "Blur X: $€", "updateUIblurPanel", 1, "xs y+5 w" txtWid " hp")
     GuiAddSlider("blurAreaYamount", 0,255, 25, "Blur Y: $€", "updateUIblurPanel", 1, "xs y+5 w" txtWid " hp")
     Gui, Add, Checkbox, xs y+10 w%thisW% hp Checked%blurAreaEqualXY% vblurAreaEqualXY gupdateUIblurPanel, &Equal X/Y
@@ -50111,6 +50242,13 @@ ReadSettingsAddNoisePanel(act:=0) {
     RegAction(act, "blurAreaYamount",, 2, 0, 255)
 }
 
+updateUIddlEdgesModusPanel() {
+    uiSlidersArray["IDedgesCenterAmount", 14] := -1
+    uiSlidersArray["IDedgesXuAmount", 14] := -1
+    uiSlidersArray["IDedgesYuAmount", 14] := -1
+    updateUIedgesPanel()
+}
+
 PanelDetectEdgesImage() {
     If (thumbsDisplaying=1)
        Return
@@ -50155,23 +50293,20 @@ PanelDetectEdgesImage() {
 
     thisW := (PrefsLargeFonts=1) ? 68 : 48
     Gui, +DPIScale
-    Gui, Add, Text, x+20 ys Section, Direction of edge detection:
-    Gui, Add, Text, xs y+10 w%thisW%, X
-    Gui, Add, Text, x+3 wp, Y
-    Gui, Add, Text, x+3 wp, C
-    Gui, Add, Text, x+3 wp -wrap vtxtLine1, Iterations
-    GuiAddDropDownList("xs y+7 w" thisW " gupdateUIedgesPanel AltSubmit Choose" IDedgesXuAmount " vIDedgesXuAmount", "-3|-2|-1|0|1|2|3", "X offset")
-    GuiAddDropDownList("x+3 wp gupdateUIedgesPanel AltSubmit Choose" IDedgesYuAmount " vIDedgesYuAmount", "-3|-2|-1|0|1|2|3", "Y offset")
-    GuiAddDropDownList("x+3 wp gupdateUIedgesPanel AltSubmit Choose" IDedgesCenterAmount " vIDedgesCenterAmount", "0|1|2|3|4|5", "C offset")
-    GuiAddDropDownList("x+3 wp gupdateUIedgesPanel AltSubmit Choose" IDedgesEmbossLvl " vIDedgesEmbossLvl", "1|2|3|4|5|6", "Emboss amount")
+    Gui, Add, Text, x+20 ys Section w%thisW%, Model:
+    GuiAddDropDownList("x+3 w" thisW*2 " gupdateUIddlEdgesModusPanel AltSubmit Choose" IDedgesModus " vIDedgesModus", "Sobel|Sobel (alt)|Scharr|Canny|Diff blended", "Edge detection mode")
+    GuiAddSlider("IDedgesXuAmount", -3, 3, "0f", ".|updateLabelAlgorithmSliderEdgesPanel", "updateUIedgesPanel", 2, "xs y+7 w" thisW + 8 " hp")
+    GuiAddSlider("IDedgesYuAmount", -3, 3, "0f", ".|updateLabelAlgorithmSliderEdgesPanel", "updateUIedgesPanel", 2, "x+3 wp hp")
+    GuiAddSlider("IDedgesCenterAmount", 0, 7, "0f", ".|updateLabelAlgorithmSliderEdgesPanel", "updateUIedgesPanel", 1, "x+3 wp hp")
+    GuiAddSlider("IDedgesEmbossLvl", 0, 6, 1, "Iterations", "updateUIedgesPanel", 1, "x+3 wp hp")
     If !testAllowSelInvert()
        BlurAreaInverted := 0
 
-    GuiAddSlider("IDedgesEmphasis", -255,255, 0, "Brightness", "updateUIedgesPanel", 2, "xs y+10 w" txtWid " hp")
-    GuiAddSlider("IDedgesContrast", -100,100, 0, "Contrast", "updateUIedgesPanel", 2, "xs y+10 wp hp")
-    GuiAddSlider("IDedgesOpacity", 3,255, 255, "Opacity", "updateUIedgesPanel", 1, "xs y+10 wp hp")
+    GuiAddSlider("IDedgesEmphasis", -255, 255, 0, "Brightness", "updateUIedgesPanel", 2, "xs y+10 w" txtWid " hp")
+    GuiAddSlider("IDedgesContrast", -100, 100, 0, "Contrast", "updateUIedgesPanel", 2, "xs y+10 wp hp")
+    GuiAddSlider("IDedgesOpacity", 3, 255, 255, "Opacity", "updateUIedgesPanel", 1, "xs y+10 wp hp")
     Gui, Add, Checkbox, xs y+10 w%2ndcol% hp gupdateUIedgesPanel Checked%IDedgesInvert% vIDedgesInvert, &Invert image
-    GuiAddDropDownList("x+5 wp AltSubmit gupdateUIedgesPanel Choose" IDedgesAfterBlur " vIDedgesAfterBlur", "No blur|4|6|8|10", "Blur level")
+    GuiAddSlider("IDedgesAfterBlur", 0, 10, 0, "Post-blur: $€", "updateUIedgesPanel", 1, "x+5 wp hp")
     Gui, Add, Text, xs y+10 wp hp +0x200 -wrap gBtnResetEdgesBlendMode +TabStop, Blending mode:
     GuiAddDropDownList("x+5 wp-27 gupdateUIedgesPanel AltSubmit Choose" IDedgesBlendMode " vIDedgesBlendMode", "None|" userBlendModesList)
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIedgesPanel")
@@ -50350,8 +50485,12 @@ updateUIedgesPanel(dummy:=0, b:=0) {
     Gui, SettingsGUIA: Submit, NoHide
     If (AnyWindowOpen=43)
     {
-       actu := (IDedgesBlendMode>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
-       GuiControl, % actu, IDedgesEmbossLvl
+       actu := (IDedgesBlendMode>1 || IDedgesModus!=5) ? 1 : 0
+       uiSlidersArray["IDedgesXuAmount", 7] := (IDedgesModus=5) ? 2 : 1
+       uiSlidersArray["IDedgesYuAmount", 7] := (IDedgesModus=5) ? 2 : 1
+       uiSlidersArray["IDedgesCenterAmount", 10] := (IDedgesModus=3) ? 0 : 1
+       uiSlidersArray["IDedgesEmbossLvl", 5] := (IDedgesModus=5) ? "Emboss: $€" : "Pre-blur: $€"
+       uiSlidersArray["IDedgesEmbossLvl", 10] := actu
     }
 
     If (dummy!="no")
@@ -51876,16 +52015,16 @@ updateUIblurPanel(a:=0,b:=0) {
           GuiControl, % actu, blurAreaSoftLevel
        }
 
-       actu := (blurAreaMode>=7 && blurAreaMode!=11) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+       actu := (blurAreaMode>=6 && blurAreaMode!=10) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu, blurAreaCircular
 
        actu := (blurAreaSoftEdges=1 && pr>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu, blurAreaSoftLevel
 
-       actu2 := (blurAreaMode>1 && blurAreaMode!=11) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+       actu2 := (blurAreaMode>1 && blurAreaMode!=10) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu2, blurAreaEqualXY
 
-       isActive := (blurAreaMode>1 && blurAreaEqualXY!=1 &&& blurAreaMode!=11) ? 1 : 0
+       isActive := (blurAreaMode>1 && blurAreaEqualXY!=1 &&& blurAreaMode!=10) ? 1 : 0
        uiSlidersArray["blurAreaYamount", 10] := isActive
     }
 
@@ -52125,8 +52264,8 @@ livePreviewBlurPanel() {
     If (blurAreaEqualXY=1 && AnyWindowOpen=26)
     {
        thisBlurAmountY := (doubleBlurPreviewArea=1) ? blurAreaAmount//2 : blurAreaAmount
-       If isInRange(blurAreaMode, 2, 5)
-          thisBlurAmountY := thisBlurAmount := (blurAreaMode=3 || blurAreaMode=4) ? Round(thisBlurAmount*1.85) : Round(thisBlurAmount*1.5)
+       If isInRange(blurAreaMode, 2, 4)
+          thisBlurAmountY := thisBlurAmount := (blurAreaMode=2) ? Round(thisBlurAmount*1.51) : Round(thisBlurAmount*1.85)
     }
 
     If (thisBlurMode=1)
@@ -52175,7 +52314,7 @@ livePreviewBlurPanel() {
        If (bEffect && thisBlurMode=1)
        {
           ApplySpecialFixedBlur(A_ThisFunc, yBitmap, thisBlurAmount, bEffect)
-       } Else If (thisBlurMode=11)
+       } Else If (thisBlurMode=10)
        {
           zyBitmap := QPV_DissolveBitmap(yBitmap, thisBlurAmount*1.5, thisBlurAmountY*1.5)
           If validBMP(zyBitmap)
@@ -52200,7 +52339,7 @@ livePreviewBlurPanel() {
        QPV_BlurBitmapFilters(yBitmap, thisBlur, thisBlur, 0)
     Else If (bEffect && thisBlurMode=1)
        ApplySpecialFixedBlur(A_ThisFunc, yBitmap, thisBlurAmount, bEffect)
-    Else If (thisBlurMode=11)
+    Else If (thisBlurMode=10)
     {
        zyBitmap := QPV_DissolveBitmap(yBitmap, thisBlurAmount*1.5, thisBlurAmountY*1.5)
        If validBMP(zyBitmap)
@@ -97612,18 +97751,20 @@ GuiSetSliderProperties(givenVar, varMin, varMax, varDefault, uiLabel, fillMode:=
 }
 
 GuiAddSlider(givenVar, varMin, varMax, varDefault, uiLabel, func2exec, fillMode, coords, infoLine:=0, isActive:=1, guiu:=0) {
+; varDefault - include the letter "f" to have the slider set floating point values
+
 ; a) uiLabel can take these types of labels:
 ;    1. "Simple label" -> "Simple label: x%" // x% is added
 ;    2. "Label with slider value: $€ unit" -> $€ is replaced with givenVar/slider value
 ;    3. "|Static label" -> No change. Only the pipe is removed
-;    3. ".func2callLabel" -> The string or value returned by function() is displayed as the slider label
+;    3. ".func2callLabel" -> The string or value returned by function() is displayed as the slider label; add a pipe "|", after the dot, to pass the variable name and value to the function when it is called
 ;    4. "!Label text|varName" -> varName is replaced with its value and the !| symbols removed
 
 ; b) fillMode
-;    1. progress bar
-;    2. centered progress bar around 0
-;    3. simple knob
-;    4. range slider, two knobs [ to-do todo ]
+;    1 = progress bar
+;    2 = centered progress bar around 0
+;    3 = simple knob
+;    4 = range slider, two knobs [ to-do todo ]
 
     Global
     If !guiu
@@ -97803,20 +97944,34 @@ GuiUpdateSliders(whichSlider, isHwnd:=0, obju:=0) {
    kpl := SubStr(uiLabel, 1, 1)
    If (kpl="!")
    {
+      ; the label references a global variable, supposedly a different one than the one referenced by "whichSlider"
       str := SubStr(uiLabel, 2, InStr(uiLabel, "|") - 2)
       vala := SubStr(uiLabel, InStr(uiLabel, "|") + 1)
       str .= ": " %vala%
    } Else If (kpl="|")
    {
+      ; the label is static
       str := SubStr(uiLabel, 2)
    } Else If (kpl=".")
    {
-      kpl := SubStr(uiLabel, 2)
-      str := %kpl%()
+      ; the label is a reference to a function that returns a custom generated label
+      pax := InStr(uiLabel, "|") ? 1 : 0
+      kpl := StrReplace(SubStr(uiLabel, 2), "|")
+      If !IsFunc(kpl)
+         str := uiLabel "(): ERROR. Missing function."
+      Else If (pax=1)
+         str := %kpl%(givenVar, varValue)
+      Else
+         str := %kpl%()
    } Else If InStr(uiLabel, "$€")
+   {
+      ; the label was defined via GuiAddSlider()
       str :=  StrReplace(uiLabel, "$€", varValue)
-   Else
+   } Else
+   {
+      ; the label was defined via GuiAddSlider() as a percentage
       str :=  uiLabel ": " Round(xperc*100) "%"
+   }
 
    CreateRectF(RectF, 0, -1, w, h)
     ; ToolTip, % hFont "|" hStringFormat "|" pBrush , , , 2

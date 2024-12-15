@@ -4312,38 +4312,96 @@ DLL_API int DLL_CALLCONV MergeBitmapsWithMask(unsigned char *originalData, unsig
     return 1;
 }
 
-DLL_API int DLL_CALLCONV openCVedgeDetection(unsigned char *imageData, int w, int h, int xa, int ya, int xb, int yb, int ks, int modus, int Stride, int bpp) {
+DLL_API int DLL_CALLCONV openCVedgeDetection(unsigned char *imageData, int w, int h, int xa, int ya, int ks, int preblur, int postblur, int invert, int modus, int Stride, int bpp) {
     int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
     cv::Mat image(h, w, clr, imageData, Stride);
-    fnOutputDebug("openCVedgeDetection step 1; modus = " + std::to_string( modus ) + " | xa = " + std::to_string( xa ) + " | ya = " + std::to_string( ya )  + " | xb = " + std::to_string( xb ) + " | yb = " + std::to_string( yb ) );
+    fnOutputDebug("openCVedgeDetection step 1; modus = " + std::to_string( modus ) + " | xa = " + std::to_string( xa ) + " | ya = " + std::to_string( ya ) + " | ks= " + std::to_string( ks ) );
 
-// implement prewitt, scharr and canny
+    if (preblur % 2 != 1)
+       preblur++;
+    if (postblur % 2 != 1)
+       postblur++;
 
-    // Convert the image to grayscale
     cv::Mat grayImage;
     cv::cvtColor(image, grayImage, cv::COLOR_BGR2GRAY);
+    if (preblur>0)
+       cv::stackBlur(grayImage, grayImage, cv::Size(preblur, preblur));
 
-    // Apply Sobel operator to detect edges
-    cv::Mat gradX, gradY;
-    cv::Mat absGradX, absGradY, edgeImage;
+    cv::Mat gradXY, absGradXY, edgeImage;
+    cv::Mat gradX, absGradX, gradY, absGradY;
+    if (modus<=2)
+    {
+       if (ks==1)
+       {
+          if (xa > 2)
+             xa = 2;
+          if (ya > 2)
+             ya = 2;
+       } else if (ks>2)
+       {
+          if (xa >= ks)
+             xa = ks - 1;
+          if (ya >= ks)
+             ya = ks - 1;
+       }
 
-    // Sobel filters (kernel size = 3)
-    // optimal values xa=1, ya=0, xb=0, yb=1, ks=3
-    cv::Sobel(grayImage, gradX, CV_16S, xa, ya, ks);
-    cv::Sobel(grayImage, gradY, CV_16S, xb, yb, ks);
+       // fnOutputDebug("openCVedgeDetection step Sobel | xa = " + std::to_string( xa ) + " | ya = " + std::to_string( ya ) + " | ks= " + std::to_string( ks ) );
+       // optimal values xa=1, ya=0, xb=0, yb=1, ks=3
+       if (xa==0 && ya==0)
+       {
+          edgeImage = cv::Mat::zeros(grayImage.size(), CV_8UC1); // Creates a black image
+       } else if (modus==2 && xa>0 && ya>0)
+       {
+          cv::Sobel(grayImage, gradX, CV_16S, xa, 0, ks);
+          cv::Sobel(grayImage, gradY, CV_16S, 0, ya, ks);
+          cv::convertScaleAbs(gradX, absGradX);
+          cv::convertScaleAbs(gradY, absGradY);
+          cv::addWeighted(absGradX, 0.5, absGradY, 0.5, 0, edgeImage);
+       } else
+       {
+          cv::Sobel(grayImage, gradXY, CV_16S, xa, ya, ks);
+          cv::convertScaleAbs(gradXY, edgeImage);
+       }
+    } else if (modus==3)
+    {
+       if (xa==1 && ya==1)
+       {
+          cv::Sobel(grayImage, gradX, CV_16S, 1, 0, cv::FILTER_SCHARR);
+          cv::Sobel(grayImage, gradY, CV_16S, 0, 1, cv::FILTER_SCHARR);
+          cv::convertScaleAbs(gradX, absGradX);
+          cv::convertScaleAbs(gradY, absGradY);
+          cv::addWeighted(absGradX, 0.5, absGradY, 0.5, 0, edgeImage);
+       } else if (xa==1 && ya==0 || xa==0 && ya==1)
+       {
+          cv::Sobel(grayImage, gradXY, CV_16S, xa, ya, cv::FILTER_SCHARR);
+          cv::convertScaleAbs(gradXY, edgeImage);
+       } else 
+       {
+          edgeImage = cv::Mat::zeros(grayImage.size(), CV_8UC1); // Creates a black image
+       }
+    } else if (modus==4)
+    {
+       if (ks % 2 != 1)
+          ks++;
+       if (ks>7)
+          ks = 7;
+       cv::Canny(grayImage, edgeImage, xa, ya, ks);
+    }
 
-    // Compute the absolute gradients
-    cv::convertScaleAbs(gradX, absGradX);
-    cv::convertScaleAbs(gradY, absGradY);
+    if (postblur>0)
+       cv::stackBlur(edgeImage, edgeImage, cv::Size(postblur, postblur));
+    if (invert==1)
+       edgeImage = 255 - edgeImage;
 
-    // Combine the gradients
-    cv::addWeighted(absGradX, 0.5, absGradY, 0.5, 0, edgeImage);
+    // adjust brightness and contrast
+    // alpha value [1.0-3.0]: 2.2  // contrast
+    // beta value [0-100]: 50      // brightness
+    // edgeImage.convertTo(edgeImage, -1, alpha, beta);
 
     // Convert edge image to RGB
-    clr = (bpp==32) ? cv::COLOR_GRAY2BGRA :   cv::COLOR_GRAY2BGR;
+    clr = (bpp==32) ? cv::COLOR_GRAY2BGRA : cv::COLOR_GRAY2BGR;
     cv::cvtColor(edgeImage, image, clr);
-
-
+    fnOutputDebug("openCVedgeDetection() done");
     return 1;
 }
 
@@ -4378,19 +4436,17 @@ DLL_API int DLL_CALLCONV openCVblurFilters(unsigned char *imageData, int w, int 
     } else if (modus==2) {
        cv::GaussianBlur(image, image, cv::Size(intensityX, intensityY), (intensityX + intensityY)/12.0f);
     } else if (modus==3) {
-       cv::boxFilter(image, image, -1, cv::Size(intensityX, intensityY));
-    } else if (modus==4) {
        cv::medianBlur(image, image, avg);
-    } else if (modus==5) {
+    } else if (modus==4) {
        cv::Mat shape = cv::getStructuringElement(type, cv::Size(intensityX, intensityY));
        cv::dilate(image, image, shape);
-    } else if (modus==6) {
+    } else if (modus==5) {
        cv::Mat shape = cv::getStructuringElement(type, cv::Size(intensityX, intensityY));
        cv::erode(image, image, shape);
-    } else if (modus==7) {
+    } else if (modus==6) {
        cv::Mat shape = cv::getStructuringElement(type, cv::Size(intensityX, intensityY));
        cv::morphologyEx(image, image, cv::MORPH_OPEN, shape);
-    } else if (modus==8) {
+    } else if (modus==7) {
        cv::Mat shape = cv::getStructuringElement(type, cv::Size(intensityX, intensityY));
        cv::morphologyEx(image, image, cv::MORPH_CLOSE, shape);
     }

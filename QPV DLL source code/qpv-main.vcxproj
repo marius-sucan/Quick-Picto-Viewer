@@ -168,6 +168,7 @@
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <DisableSpecificWarnings>4996 </DisableSpecificWarnings>
+      <AdditionalOptions>/openmp:experimental %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -182,6 +183,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h" />
@@ -200,5 +202,12 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="packages\Opteamizer.OpenCV.4.7.0-customized.1.0.2\build\native\Opteamizer.OpenCV.4.7.0-customized.targets" Condition="Exists('packages\Opteamizer.OpenCV.4.7.0-customized.1.0.2\build\native\Opteamizer.OpenCV.4.7.0-customized.targets')" />
   </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>Ce projet fait référence à des packages NuGet qui sont manquants sur cet ordinateur. Utilisez l'option de restauration des packages NuGet pour les télécharger. Pour plus d'informations, consultez http://go.microsoft.com/fwlink/?LinkID=322105. Le fichier manquant est : {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('packages\Opteamizer.OpenCV.4.7.0-customized.1.0.2\build\native\Opteamizer.OpenCV.4.7.0-customized.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Opteamizer.OpenCV.4.7.0-customized.1.0.2\build\native\Opteamizer.OpenCV.4.7.0-customized.targets'))" />
+  </Target>
 </Project>
