@@ -3267,6 +3267,23 @@ DLL_API int DLL_CALLCONV PrepareAlphaChannelBlur(int *imageData, int w, int h, i
     return 1;
 }
 
+DLL_API int DLL_CALLCONV DiffBlendBitmap(unsigned char* bgrImageData, unsigned char* outputImageData, int w, int h, int Stride, int bpp, int offsetX, int offsetY) {
+   int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
+   cv::Mat bitmap(h, w, clr, bgrImageData, Stride);
+   cv::Mat blendedBitmap(h, w, clr, outputImageData, Stride);
+
+    // Define the region of interest (ROI) for shifting
+    cv::Rect sourceROI(max(0, offsetX), max(0, offsetY),
+                       bitmap.cols - abs(offsetX), bitmap.rows - abs(offsetY));
+    cv::Rect destROI(max(0, -offsetX), max(0, -offsetY),
+                     bitmap.cols - abs(offsetX), bitmap.rows - abs(offsetY));
+
+    // Perform subtraction blending in-place without creating a separate shifted image
+    bitmap(sourceROI).copyTo(blendedBitmap(destROI));
+    cv::subtract(bitmap, blendedBitmap, blendedBitmap);
+    return 1;
+}
+
 /*
 pBitmap and pBitmap2Blend must be the same width and height
 and in 32-ARGB or 24-RGB format.
@@ -3322,12 +3339,10 @@ DLL_API int DLL_CALLCONV BlendBitmaps(unsigned char* bgrImageData, unsigned char
     return 1;
 }
 
-
 /*
 pBitmap will be filled with a random generated noise
 It must be in 32-ARGB format: PXF32ARGB - 0x26200A.
 */
-
 
 DLL_API int DLL_CALLCONV GenerateRandomNoise(int* bgrImageData, int w, int h, int intensity, int doGrayScale, int threadz, int fillBgr) {
     // srand (time(NULL));
@@ -4312,17 +4327,28 @@ DLL_API int DLL_CALLCONV MergeBitmapsWithMask(unsigned char *originalData, unsig
     return 1;
 }
 
-DLL_API int DLL_CALLCONV openCVedgeDetection(unsigned char *imageData, int w, int h, int xa, int ya, int ks, int preblur, int postblur, int invert, int modus, int Stride, int bpp) {
+DLL_API int DLL_CALLCONV openCVedgeDetection(unsigned char *imageData, int w, int h, int xa, int ya, int ks, int preblur, int postblur, int invert, float prebrighten, float precontrast, float postbrighten, float postcontrast, int modus, int Stride, int bpp) {
     int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
     cv::Mat image(h, w, clr, imageData, Stride);
     fnOutputDebug("openCVedgeDetection step 1; modus = " + std::to_string( modus ) + " | xa = " + std::to_string( xa ) + " | ya = " + std::to_string( ya ) + " | ks= " + std::to_string( ks ) );
+    fnOutputDebug("openCVedgeDetection step 1; prebrighten = " + std::to_string( prebrighten ) + " | precontrast = " + std::to_string( precontrast ) );
+
+    cv::Mat grayImage;
+    if (precontrast!=1 || prebrighten!=0)
+    {
+      if (bpp==32)
+         cv::extractChannel(image, grayImage, 3); // alphaChannel
+      
+      image.convertTo(image, -1, precontrast, prebrighten);
+      if (bpp==32)
+         cv::insertChannel(grayImage, image, 3);
+    }
 
     if (preblur % 2 != 1)
        preblur++;
     if (postblur % 2 != 1)
        postblur++;
 
-    cv::Mat grayImage;
     cv::cvtColor(image, grayImage, cv::COLOR_BGR2GRAY);
     if (preblur>0)
        cv::stackBlur(grayImage, grayImage, cv::Size(preblur, preblur));
@@ -4393,10 +4419,8 @@ DLL_API int DLL_CALLCONV openCVedgeDetection(unsigned char *imageData, int w, in
     if (invert==1)
        edgeImage = 255 - edgeImage;
 
-    // adjust brightness and contrast
-    // alpha value [1.0-3.0]: 2.2  // contrast
-    // beta value [0-100]: 50      // brightness
-    // edgeImage.convertTo(edgeImage, -1, alpha, beta);
+    if (postcontrast!=1 || postbrighten!=0)
+       edgeImage.convertTo(edgeImage, -1, postcontrast, postbrighten);
 
     // Convert edge image to RGB
     clr = (bpp==32) ? cv::COLOR_GRAY2BGRA : cv::COLOR_GRAY2BGR;

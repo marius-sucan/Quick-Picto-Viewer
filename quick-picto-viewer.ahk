@@ -371,7 +371,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , userImgChannelAlphaAdd := 0, forceSlowLivePreviewMode := 0, showContextualStatusBar := 1
    , vectorToolModus := 1, TextInAreaVerticalia := 0, DrawLineAreaThickScale := 100
    , DrawLineAreaJoinsStyle := 0, DrawLineAreaMitersBorder := 100, DrawLineAreaPolarSection := 1440
-   , DrawLineAreaPolarMode := 1, IDedgesModus := 1
+   , DrawLineAreaPolarMode := 1, IDedgesModus := 1, IDedgesPreEmphasis := 0, IDedgesPreContrast := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -23472,19 +23472,32 @@ coreDetectEdgesSelectedArea(whichBitmap, previewMode, Gu:=0) {
     If (IDedgesModus<5)
     {
        obj := generateAcceptedValuesEdgesDetection()
-       QPV_DetectEdgesFilters(fBitmap, IDedgesModus, obj[1], obj[2], obj[3], IDedgesEmbossLvl, IDedgesAfterBlur, IDedgesInvert)
+       prebrighten := (IDedgesPreEmphasis<0) ? IDedgesPreEmphasis - IDedgesPreContrast * abs(IDedgesPreEmphasis)/255 : IDedgesPreEmphasis
+       precontrast := (IDedgesPreContrast<0) ? 1 - abs(IDedgesPreContrast)/100 : (IDedgesPreContrast + 25) / 25
+       postbrighten := (IDedgesEmphasis<0) ? IDedgesEmphasis - IDedgesContrast * abs(IDedgesEmphasis)/255 : IDedgesEmphasis
+       postcontrast := (IDedgesContrast<0) ? 1 - abs(IDedgesContrast)/100 : (IDedgesContrast + 25) / 25
+       QPV_DetectEdgesFilters(fBitmap, IDedgesModus, obj[1], obj[2], obj[3], IDedgesEmbossLvl, IDedgesAfterBlur, IDedgesInvert, prebrighten, precontrast, postbrighten, postcontrast)
     } else
     {
-       zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
        If (IDedgesBlendMode>1 && previewMode!=3)
-          gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
+          gBitmap := trGdip_CloneBitmap(A_ThisFunc, fBitmap)
 
+       If (IDedgesPreEmphasis!=0 || IDedgesPreContrast!=0)
+       {
+          wEffect := Gdip_CreateEffect(5, IDedgesPreEmphasis, IDedgesPreContrast, 0)
+          If wEffect
+             Gdip_BitmapApplyEffect(fBitmap, wEffect)
+          Gdip_DisposeEffect(wEffect)
+       }
+
+       zBitmap := trGdip_CloneBitmap(A_ThisFunc, fBitmap)
        If (IDedgesCenterAmount>1)
           QPV_BlurBitmapFilters(zBitmap, IDedgesCenterAmount, IDedgesCenterAmount, 0)
 
        G3 := trGdip_GraphicsFromImage(A_ThisFunc, zBitmap)
        r0 := trGdip_DrawImage(A_ThisFunc, G3, zBitmap, IDedgesXuAmount, IDedgesYuAmount)
        QPV_BlendBitmaps(fBitmap, zBitmap, 18, 0) ; difference mode
+       ; QPV_DiffBlendBitmap(fBitmap, zBitmap, IDedgesXuAmount, IDedgesYuAmount) ; difference mode
 
        zEffect := Gdip_CreateEffect(6, 0, -100, 0)  ; desaturate image
        If zEffect
@@ -23843,14 +23856,8 @@ QPV_BlurBitmapFilters(pBitmap, passesX, passesY:=0, modus:=1, forceCimg:=0, circ
      Return 0
   }
 
-  If !validBMP(pBitmap)
-  {
-     addJournalEntry(A_ThisFunc "(): ERROR - invalid bitmap to process")
-     Return
-  }
-
   trGdip_GetImageDimensions(pBitmap, w, h)
-  If (w<1 || h<1)
+  If (w<1 || h<1 || !w || !h || !validBMP(pBitmap))
   {
      addJournalEntry(A_ThisFunc "(): ERROR - invalid bitmap dimensions")
      Return 0
@@ -23867,7 +23874,7 @@ QPV_BlurBitmapFilters(pBitmap, passesX, passesY:=0, modus:=1, forceCimg:=0, circ
   Return r
 }
 
-QPV_DetectEdgesFilters(pBitmap, modus, xa, ya, ksize, preblur, postblur, invert) {
+QPV_DetectEdgesFilters(pBitmap, modus, xa, ya, ksize, preblur, postblur, invert, prebrighten, precontrast, postbrighten, postcontrast) {
   initQPVmainDLL()
   If !qpvMainDll
   {
@@ -23875,14 +23882,8 @@ QPV_DetectEdgesFilters(pBitmap, modus, xa, ya, ksize, preblur, postblur, invert)
      Return 0
   }
 
-  If !validBMP(pBitmap)
-  {
-     addJournalEntry(A_ThisFunc "(): ERROR - invalid bitmap to process")
-     Return
-  }
-
   trGdip_GetImageDimensions(pBitmap, w, h)
-  If (w<1 || h<1)
+  If (w<1 || h<1 || !w || !h || !validBMP(pBitmap))
   {
      addJournalEntry(A_ThisFunc "(): ERROR - invalid bitmap dimensions")
      Return 0
@@ -23892,10 +23893,43 @@ QPV_DetectEdgesFilters(pBitmap, modus, xa, ya, ksize, preblur, postblur, invert)
   If !E1
   {
      ; fnOutputDebug(A_ThisFunc ": xa=" xa  " | ya=" ya " | ks=" ks )
-     r := DllCall(whichMainDLL "\openCVedgeDetection", "UPtr", iScan, "Int", w, "Int", h, "Int", xa, "Int", ya, "Int", ksize, "Int", preblur, "Int", postblur, "int", invert, "Int", modus, "int", Stride, "int", 32)
+     r := DllCall(whichMainDLL "\openCVedgeDetection", "UPtr", iScan, "Int", w, "Int", h, "Int", xa, "Int", ya, "Int", ksize, "Int", preblur, "Int", postblur, "int", invert, "float", prebrighten, "float", precontrast, "float", postbrighten, "float", postcontrast, "Int", modus, "int", Stride, "int", 32)
      ; r := DllCall(whichMainDLL "\cImgBlurBitmapFilters", "UPtr", iScan, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", modus, "Int", circular, "Int", preview, "int", Stride, "int", 32)
      Gdip_UnlockBits(pBitmap, iData)
   }
+
+  Return r
+}
+
+QPV_DiffBlendBitmap(pBitmap, pBitmap2Blend, offsetX, offsetY) {
+  initQPVmainDLL()
+  If !qpvMainDll
+  {
+     addJournalEntry(A_ThisFunc "(): QPV dll file is missing or failed to initialize: qpvMain.dll")
+     Return 0
+  }
+; to-do; lock bits using 24 rgb format?
+
+  thisStartZeit := A_TickCount
+  trGdip_GetImageDimensions(pBitmap, w, h)
+  trGdip_GetImageDimensions(pBitmap2Blend, w2, h2)
+  ; fnOutputDebug(A_ThisFunc "() " w "=" w2 "||" h "=" h2)
+  If (w2!=w || h2!=h || !validBMP(pBitmap) || !validBMP(pBitmap2Blend) || !w || !h)
+  {
+     addJournalEntry(A_ThisFunc "(): failed to apply blending modes; incorrect bitmaps provided")
+     Return 0
+  }
+
+  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData)
+  E2 := Gdip_LockBits(pBitmap2Blend, 0, 0, w, h, stride, mScan, mData)
+  If (!E1 && !E2)
+     r := DllCall(whichMainDLL "\DiffBlendBitmap", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", offsetX, "int", offsetY)
+
+  ; fnOutputDebug(A_ThisFunc "() " A_LastError " r=" r "=" func2exec "=" A_TickCount - thisStartZeit "|" blendMode)
+  If !E1
+     Gdip_UnlockBits(pBitmap, iData)
+  If !E2
+     Gdip_UnlockBits(pBitmap2Blend, mData)
 
   Return r
 }
@@ -23908,15 +23942,12 @@ QPV_SharpenBitmap(pBitmap, amount, radius, typeu) {
      Return 0
   }
 
-  If !validBMP(pBitmap)
+  trGdip_GetImageDimensions(pBitmap, w, h)
+  If (w<1 || h<1 || !w || !h || !validBMP(pBitmap))
   {
      addJournalEntry(A_ThisFunc "(): invalid bitmap to process")
-     Return
-  }
-
-  trGdip_GetImageDimensions(pBitmap, w, h)
-  If (w<1 || h<1)
      Return 0
+  }
 
   If (typeu>=2)
   {
@@ -23944,15 +23975,12 @@ QPV_CreateGaussianNoiseBMP(pBitmap, intensity) {
      Return
   }
 
-  If !validBMP(pBitmap)
+  trGdip_GetImageDimensions(pBitmap, w, h)
+  If (w<1 || h<1 || !w || !h || !validBMP(pBitmap))
   {
      addJournalEntry(A_ThisFunc "(): invalid bitmap to process")
      Return
   }
-
-  trGdip_GetImageDimensions(pBitmap, w, h)
-  If (w<1 || h<1)
-     Return 0
 
   E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If !E1
@@ -26333,6 +26361,10 @@ createOmniBoxFoldersContextMenu(folderPath) {
 
 btnHelpKbdContexts() {
    msgBoxWrapper(appTitle ": HELP", "Users can customize keyboard shortcuts based on contexts in the application, such as, but not limited to: image view, files list modes, image editor live tools, et cetera.`n`nThe same keyboard shortcut can do different things based on the context. Or, the same function, if available in multiple contexts, can have a different shortcut for each context.", -1, 0, 0)
+}
+
+BtnHelpEdgeDetection() {
+   msgBoxWrapper(appTitle ": HELP", "Sobel and Scharr convolution kernels can detect edges by emphasizing the gradients. Rhe 1st, 2nd, 3rd or mixed image derivatives are calculated based on the user defined order(s) through the dX and dY values. Scharr uses a kernel size (kS) of 3x3.`n`nWhen the Canny algorithm is selected, the smallest value between threshold1 (T1) and threshold2 (T2) is used for edge linking. The largest value is used to find initial segments of strong edges. T1 and T2 are the thresholds of the hysteresis procedure.`n`nDiff-blending mode detects edges by relying on the difference blending mode. The input image is duplicated on top and then by user-defined X/Y values, moved along the X/Y axis. The output image is rendered grayscale.`n`nUsers are provided with parameters to adjust the blur, brightness and contrast of the input and output images, in order to enable fine-tuned control of the resulted image.", -1, 0, 0)
 }
 
 invokePrefsPanelsContextMenu(modus:=0, addBonus:=0) {
@@ -49013,7 +49045,7 @@ PanelDesatureSelectedArea() {
        EraseAreaUseAlpha := 0
 
     btnWid2 := btnWid + 20
-    Gui, Add, Text, x15 y15 Section w%txtWid%, Please experiment with the provided options to control how the image is desatured.
+    Gui, Add, Text, x15 y15 Section w%txtWid%, Please experiment with the provided options to control how the image is desaturated.
     GuiAddDropDownList("xs w" btnWid2 " AltSubmit Choose" DesaturateAreaLevels " gupdateUIdesaturatePanel vDesaturateAreaLevels", "None|4|8|16|32|64|128|256", "Quantization level")
     GuiAddDropDownList("x+8 wp AltSubmit Choose" DesaturateAreaChannel " gupdateUIdesaturatePanel vDesaturateAreaChannel", "All channels|All (alt)|Red|Green|Blue", "Color channel")
     Gui, Add, Checkbox, x+10 yp hp Checked%DesaturateAreaDither% vDesaturateAreaDither gupdateUIdesaturatePanel, &Dithering
@@ -49841,7 +49873,7 @@ ReadSettingsBlurPanel(act:=0) {
     RegAction(act, "blurAreaAmount",, 2, 0, 255)
     RegAction(act, "blurAreaYamount",, 2, 0, 255)
     RegAction(act, "blurAreaEqualXY",, 1)
-    RegAction(act, "blurAreaMode",, 2, 1, 11)
+    RegAction(act, "blurAreaMode",, 2, 1, 10)
     RegAction(act, "blurAreaPixelizeAmount",, 2, 0, 6789)
     RegAction(act, "blurAreaPixelizeMethod",, 2, 1, 3)
     RegAction(act, "blurAreaOpacity",, 2, 3, 255)
@@ -50212,9 +50244,12 @@ ReadSettingsSymmetricaPanel(act:=0) {
 }
 
 ReadSettingsEdgesPanel(act:=0) {
+    RegAction(act, "IDedgesModus",, 2, 1, 5)
     RegAction(act, "IDedgesOpacity",, 2, 3, 255)
     RegAction(act, "IDedgesEmphasis",, 2, -255, 255)
     RegAction(act, "IDedgesContrast",, 2, -100, 100)
+    RegAction(act, "IDedgesPreEmphasis",, 2, -255, 255)
+    RegAction(act, "IDedgesPreContrast",, 2, -100, 100)
     RegAction(act, "IDedgesBlendMode",, 2, 1, 23)
     RegAction(act, "IDedgesCenterAmount",, 2, 1, 6)
     RegAction(act, "IDedgesXuAmount",, 2, 1, 7)
@@ -50292,25 +50327,29 @@ PanelDetectEdgesImage() {
        Gui, Font, s%LargeUIfontValue%
 
     thisW := (PrefsLargeFonts=1) ? 68 : 48
+    thisPW := (PrefsLargeFonts=1) ? thisW + 9 : thisW + 16
     Gui, +DPIScale
-    Gui, Add, Text, x+20 ys Section w%thisW%, Model:
-    GuiAddDropDownList("x+3 w" thisW*2 " gupdateUIddlEdgesModusPanel AltSubmit Choose" IDedgesModus " vIDedgesModus", "Sobel|Sobel (alt)|Scharr|Canny|Diff blended", "Edge detection mode")
-    GuiAddSlider("IDedgesXuAmount", -3, 3, "0f", ".|updateLabelAlgorithmSliderEdgesPanel", "updateUIedgesPanel", 2, "xs y+7 w" thisW + 8 " hp")
+    Gui, Add, Text, x+20 ys +0x200 Section w%thisW% hwndhTemp, Algorithm:
+    GuiAddDropDownList("x+3 w" thisW*2 " gupdateUIddlEdgesModusPanel AltSubmit Choose" IDedgesModus " vIDedgesModus", "Sobel|Sobel (alt)|Scharr|Canny|Diff-blending", [hTemp, 0, "Edge detection mode"])
+    GuiAddButton("x+1 hp w26 gBtnHelpEdgeDetection", " ?", "Help")
+    GuiAddSlider("IDedgesXuAmount", -3, 3, "0f", ".|updateLabelAlgorithmSliderEdgesPanel", "updateUIedgesPanel", 2, "xs y+7 w" thisPW " hp")
     GuiAddSlider("IDedgesYuAmount", -3, 3, "0f", ".|updateLabelAlgorithmSliderEdgesPanel", "updateUIedgesPanel", 2, "x+3 wp hp")
     GuiAddSlider("IDedgesCenterAmount", 0, 7, "0f", ".|updateLabelAlgorithmSliderEdgesPanel", "updateUIedgesPanel", 1, "x+3 wp hp")
     GuiAddSlider("IDedgesEmbossLvl", 0, 6, 1, "Iterations", "updateUIedgesPanel", 1, "x+3 wp hp")
     If !testAllowSelInvert()
        BlurAreaInverted := 0
 
-    GuiAddSlider("IDedgesEmphasis", -255, 255, 0, "Brightness", "updateUIedgesPanel", 2, "xs y+10 w" txtWid " hp")
-    GuiAddSlider("IDedgesContrast", -100, 100, 0, "Contrast", "updateUIedgesPanel", 2, "xs y+10 wp hp")
+    GuiAddSlider("IDedgesPreEmphasis", -255, 255, 0, "In Brightness", "updateUIedgesPanel", 2, "xs y+10 w" 2ndCol " hp")
+    GuiAddSlider("IDedgesEmphasis", -255, 255, 0, "Out Brightness", "updateUIedgesPanel", 2, "x+5 wp hp")
+    GuiAddSlider("IDedgesPreContrast", -100, 100, 0, "In Contrast", "updateUIedgesPanel", 2, "xs y+10 wp hp")
+    GuiAddSlider("IDedgesContrast", -100, 100, 0, "Out Contrast", "updateUIedgesPanel", 2, "x+5 wp hp")
     GuiAddSlider("IDedgesOpacity", 3, 255, 255, "Opacity", "updateUIedgesPanel", 1, "xs y+10 wp hp")
-    Gui, Add, Checkbox, xs y+10 w%2ndcol% hp gupdateUIedgesPanel Checked%IDedgesInvert% vIDedgesInvert, &Invert image
-    GuiAddSlider("IDedgesAfterBlur", 0, 10, 0, "Post-blur: $€", "updateUIedgesPanel", 1, "x+5 wp hp")
+    GuiAddSlider("IDedgesAfterBlur", 0, 10, 0, "Out blur: $€", "updateUIedgesPanel", 1, "x+5 wp hp")
     Gui, Add, Text, xs y+10 wp hp +0x200 -wrap gBtnResetEdgesBlendMode +TabStop, Blending mode:
     GuiAddDropDownList("x+5 wp-27 gupdateUIedgesPanel AltSubmit Choose" IDedgesBlendMode " vIDedgesBlendMode", "None|" userBlendModesList)
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIedgesPanel")
-    Gui, Add, Checkbox, xs y+10 hp gupdateUIedgesPanel Checked%BlurAreaInverted% vBlurAreaInverted, Invert &selection area
+    Gui, Add, Checkbox, xs y+10 hp gupdateUIedgesPanel Checked%IDedgesInvert% vIDedgesInvert, &Invert output image
+    Gui, Add, Checkbox, xs y+10 gupdateUIedgesPanel Checked%BlurAreaInverted% vBlurAreaInverted, Invert &selection area
     If !testAllowSelInvert()
        GuiControl, Disable, BlurAreaInverted
 
@@ -50489,7 +50528,7 @@ updateUIedgesPanel(dummy:=0, b:=0) {
        uiSlidersArray["IDedgesXuAmount", 7] := (IDedgesModus=5) ? 2 : 1
        uiSlidersArray["IDedgesYuAmount", 7] := (IDedgesModus=5) ? 2 : 1
        uiSlidersArray["IDedgesCenterAmount", 10] := (IDedgesModus=3) ? 0 : 1
-       uiSlidersArray["IDedgesEmbossLvl", 5] := (IDedgesModus=5) ? "Emboss: $€" : "Pre-blur: $€"
+       uiSlidersArray["IDedgesEmbossLvl", 5] := (IDedgesModus=5) ? "Emboss: $€" : "In Blur: $€"
        uiSlidersArray["IDedgesEmbossLvl", 10] := actu
     }
 
