@@ -23466,64 +23466,21 @@ coreDetectEdgesSelectedArea(whichBitmap, previewMode, Gu:=0) {
        imgSelW := imgW, imgSelH := imgH
     }
 
-    ; Static pxs := {1:"-3", 2:"-2", 3:"-1", 4:"0", 5:"1", 6:"2", 7:"3"}
+    prebrighten := (IDedgesPreEmphasis<0) ? IDedgesPreEmphasis - IDedgesPreContrast * abs(IDedgesPreEmphasis)/255 : IDedgesPreEmphasis
+    precontrast := (IDedgesPreContrast<0) ? 1 - abs(IDedgesPreContrast)/100 : (IDedgesPreContrast + 25) / 25
+    postbrighten := (IDedgesEmphasis<0) ? IDedgesEmphasis - IDedgesContrast * abs(IDedgesEmphasis)/255 : IDedgesEmphasis
+    postcontrast := (IDedgesContrast<0) ? 1 - abs(IDedgesContrast)/100 : (IDedgesContrast + 25) / 25
     extendedClone := testSelectionLargerThanGiven(imgW, imgH)
     fBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
+    If (IDedgesBlendMode>1 && previewMode!=3)
+       gBitmap := trGdip_CloneBitmap(A_ThisFunc, fBitmap)
+
+    Gdip_BitmapSetColorDepth(fBitmap, 24)
+    obj := generateAcceptedValuesEdgesDetection()
     If (IDedgesModus<5)
-    {
-       obj := generateAcceptedValuesEdgesDetection()
-       prebrighten := (IDedgesPreEmphasis<0) ? IDedgesPreEmphasis - IDedgesPreContrast * abs(IDedgesPreEmphasis)/255 : IDedgesPreEmphasis
-       precontrast := (IDedgesPreContrast<0) ? 1 - abs(IDedgesPreContrast)/100 : (IDedgesPreContrast + 25) / 25
-       postbrighten := (IDedgesEmphasis<0) ? IDedgesEmphasis - IDedgesContrast * abs(IDedgesEmphasis)/255 : IDedgesEmphasis
-       postcontrast := (IDedgesContrast<0) ? 1 - abs(IDedgesContrast)/100 : (IDedgesContrast + 25) / 25
        QPV_DetectEdgesFilters(fBitmap, IDedgesModus, obj[1], obj[2], obj[3], IDedgesEmbossLvl, IDedgesAfterBlur, IDedgesInvert, prebrighten, precontrast, postbrighten, postcontrast)
-    } else
-    {
-       If (IDedgesBlendMode>1 && previewMode!=3)
-          gBitmap := trGdip_CloneBitmap(A_ThisFunc, fBitmap)
-
-       If (IDedgesPreEmphasis!=0 || IDedgesPreContrast!=0)
-       {
-          wEffect := Gdip_CreateEffect(5, IDedgesPreEmphasis, IDedgesPreContrast, 0)
-          If wEffect
-             Gdip_BitmapApplyEffect(fBitmap, wEffect)
-          Gdip_DisposeEffect(wEffect)
-       }
-
-       zBitmap := trGdip_CloneBitmap(A_ThisFunc, fBitmap)
-       If (IDedgesCenterAmount>1)
-          QPV_BlurBitmapFilters(zBitmap, IDedgesCenterAmount, IDedgesCenterAmount, 0)
-
-       G3 := trGdip_GraphicsFromImage(A_ThisFunc, zBitmap)
-       r0 := trGdip_DrawImage(A_ThisFunc, G3, zBitmap, IDedgesXuAmount, IDedgesYuAmount)
-       QPV_BlendBitmaps(fBitmap, zBitmap, 18, 0) ; difference mode
-       ; QPV_DiffBlendBitmap(fBitmap, zBitmap, IDedgesXuAmount, IDedgesYuAmount) ; difference mode
-
-       zEffect := Gdip_CreateEffect(6, 0, -100, 0)  ; desaturate image
-       If zEffect
-          Gdip_BitmapApplyEffect(fBitmap, zEffect)
-       Gdip_DisposeEffect(zEffect)
-
-       If (IDedgesInvert=1)
-       {
-          zEffect := Gdip_CreateEffect(7, 0, 0, 100)
-          If zEffect
-             Gdip_BitmapApplyEffect(fBitmap, zEffect)
-          Gdip_DisposeEffect(zEffect)
-       }
-
-       If (IDedgesEmphasis!=0 || IDedgesContrast!=0)
-       {
-          wEffect := Gdip_CreateEffect(5, IDedgesEmphasis, IDedgesContrast, 0)
-          If wEffect
-             Gdip_BitmapApplyEffect(fBitmap, wEffect)
-
-          Gdip_DisposeEffect(wEffect)
-       }
-
-       If (IDedgesAfterBlur>0)
-          QPV_BlurBitmapFilters(fBitmap, IDedgesAfterBlur, IDedgesAfterBlur, 0)
-    }
+    else
+       QPV_DiffBlendBitmap(fBitmap, IDedgesXuAmount, IDedgesYuAmount, IDedgesCenterAmount, IDedgesAfterBlur, IDedgesInvert, prebrighten, precontrast, postbrighten, postcontrast)
 
     If (IDedgesBlendMode>1 && validBMP(gBitmap))
     {
@@ -23550,7 +23507,6 @@ coreDetectEdgesSelectedArea(whichBitmap, previewMode, Gu:=0) {
     Gdip_DeletePath(pPath)
     trGdip_DisposeImage(zBitmap, 1)
     trGdip_DisposeImage(gBitmap, 1)
-    Gdip_DeleteGraphics(G3)
     If (previewMode=1)
        Gdip_DeleteGraphics(G2)
     er := r1 ? r1 : r0
@@ -23889,11 +23845,11 @@ QPV_DetectEdgesFilters(pBitmap, modus, xa, ya, ksize, preblur, postblur, invert,
      Return 0
   }
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, Stride, iScan, iData, 3)
+  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, Stride, iScan, iData, 3, "0x21808")
   If !E1
   {
      ; fnOutputDebug(A_ThisFunc ": xa=" xa  " | ya=" ya " | ks=" ks )
-     r := DllCall(whichMainDLL "\openCVedgeDetection", "UPtr", iScan, "Int", w, "Int", h, "Int", xa, "Int", ya, "Int", ksize, "Int", preblur, "Int", postblur, "int", invert, "float", prebrighten, "float", precontrast, "float", postbrighten, "float", postcontrast, "Int", modus, "int", Stride, "int", 32)
+     r := DllCall(whichMainDLL "\openCVedgeDetection", "UPtr", iScan, "Int", w, "Int", h, "Int", xa, "Int", ya, "Int", ksize, "Int", preblur, "Int", postblur, "int", invert, "float", prebrighten, "float", precontrast, "float", postbrighten, "float", postcontrast, "Int", modus, "int", Stride, "int", 24)
      ; r := DllCall(whichMainDLL "\cImgBlurBitmapFilters", "UPtr", iScan, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", modus, "Int", circular, "Int", preview, "int", Stride, "int", 32)
      Gdip_UnlockBits(pBitmap, iData)
   }
@@ -23901,7 +23857,7 @@ QPV_DetectEdgesFilters(pBitmap, modus, xa, ya, ksize, preblur, postblur, invert,
   Return r
 }
 
-QPV_DiffBlendBitmap(pBitmap, pBitmap2Blend, offsetX, offsetY) {
+QPV_DiffBlendBitmap(pBitmap, offsetX, offsetY, preblur, postblur, invert, prebrighten, precontrast, postbrighten, postcontrast) {
   initQPVmainDLL()
   If !qpvMainDll
   {
@@ -23912,24 +23868,19 @@ QPV_DiffBlendBitmap(pBitmap, pBitmap2Blend, offsetX, offsetY) {
 
   thisStartZeit := A_TickCount
   trGdip_GetImageDimensions(pBitmap, w, h)
-  trGdip_GetImageDimensions(pBitmap2Blend, w2, h2)
-  ; fnOutputDebug(A_ThisFunc "() " w "=" w2 "||" h "=" h2)
-  If (w2!=w || h2!=h || !validBMP(pBitmap) || !validBMP(pBitmap2Blend) || !w || !h)
+  If (w<1 || h<1 || !w || !h || !validBMP(pBitmap))
   {
-     addJournalEntry(A_ThisFunc "(): failed to apply blending modes; incorrect bitmaps provided")
+     addJournalEntry(A_ThisFunc "(): ERROR - invalid bitmap dimensions")
      Return 0
   }
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData)
-  E2 := Gdip_LockBits(pBitmap2Blend, 0, 0, w, h, stride, mScan, mData)
-  If (!E1 && !E2)
-     r := DllCall(whichMainDLL "\DiffBlendBitmap", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", offsetX, "int", offsetY)
+  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3, "0x21808")
+  If !E1
+     r := DllCall(whichMainDLL "\openCVdiffBlendBitmap", "UPtr", iScan, "Int", w, "Int", h, "Int", stride, "Int", 24, "Int", offsetX, "int", offsetY, "Int", preblur, "Int", postblur, "int", invert, "float", prebrighten, "float", precontrast, "float", postbrighten, "float", postcontrast)
 
   ; fnOutputDebug(A_ThisFunc "() " A_LastError " r=" r "=" func2exec "=" A_TickCount - thisStartZeit "|" blendMode)
   If !E1
      Gdip_UnlockBits(pBitmap, iData)
-  If !E2
-     Gdip_UnlockBits(pBitmap2Blend, mData)
 
   Return r
 }

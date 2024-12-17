@@ -32,6 +32,16 @@
 #include <errno.h>
 #include "Jpeg2PDF.h"
 #include "Jpeg2PDF.cpp"
+
+#define cimg_use_openmp 1
+#include "includes\CImg-3.4.3\CImg.h"
+// #include <opencv2/opencv.hpp>
+#include "includes\opencv2\opencv.hpp"
+using namespace std;
+using namespace cimg_library;
+#define DLL_API extern "C" __declspec(dllexport)
+#define DLL_CALLCONV __stdcall
+
 int debugInfos = 0;
 void fnOutputDebug(std::string input) {
     if (debugInfos!=1)
@@ -41,17 +51,6 @@ void fnOutputDebug(std::string input) {
     ss << "qpv: " << input;
     OutputDebugStringA(ss.str().data());
 }
-
-#define cimg_use_openmp 1
-#include "includes\CImg-3.4.3\CImg.h"
-// #define NOMINMAX
-#include <opencv2/opencv.hpp>
-using namespace std;
-using namespace cimg_library;
-#define DLL_API extern "C" __declspec(dllexport)
-#define DLL_CALLCONV __stdcall
-
-
 
 inline bool inRange(const float &low, const float &high, const float &x) {
     return (low <= x && x <= high);
@@ -3267,10 +3266,20 @@ DLL_API int DLL_CALLCONV PrepareAlphaChannelBlur(int *imageData, int w, int h, i
     return 1;
 }
 
-DLL_API int DLL_CALLCONV DiffBlendBitmap(unsigned char* bgrImageData, unsigned char* outputImageData, int w, int h, int Stride, int bpp, int offsetX, int offsetY) {
-   int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
-   cv::Mat bitmap(h, w, clr, bgrImageData, Stride);
-   cv::Mat blendedBitmap(h, w, clr, outputImageData, Stride);
+DLL_API int DLL_CALLCONV openCVdiffBlendBitmap(unsigned char* bgrImageData, int w, int h, int Stride, int bpp, int offsetX, int offsetY, int preblur, int postblur, int invert, float prebrighten, float precontrast, float postbrighten, float postcontrast) {
+// works best with 24 bits images 
+    int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
+    cv::Mat bitmap(h, w, clr, bgrImageData, Stride);
+    if (precontrast!=1 || prebrighten!=0)
+       bitmap.convertTo(bitmap, -1, precontrast, prebrighten);
+
+    cv::Mat otherData = bitmap.clone();
+    if (preblur % 2 != 1)
+       preblur++;
+    if (postblur % 2 != 1)
+       postblur++;
+    if (preblur>0)
+       cv::stackBlur(otherData, otherData, cv::Size(preblur, preblur));
 
     // Define the region of interest (ROI) for shifting
     cv::Rect sourceROI(max(0, offsetX), max(0, offsetY),
@@ -3278,9 +3287,33 @@ DLL_API int DLL_CALLCONV DiffBlendBitmap(unsigned char* bgrImageData, unsigned c
     cv::Rect destROI(max(0, -offsetX), max(0, -offsetY),
                      bitmap.cols - abs(offsetX), bitmap.rows - abs(offsetY));
 
-    // Perform subtraction blending in-place without creating a separate shifted image
-    bitmap(sourceROI).copyTo(blendedBitmap(destROI));
-    cv::subtract(bitmap, blendedBitmap, blendedBitmap);
+    otherData(sourceROI).copyTo(bitmap(destROI));
+    cv::subtract(bitmap, otherData, bitmap);
+    if (postcontrast!=1 || postbrighten!=0)
+       bitmap.convertTo(bitmap, -1, postcontrast, postbrighten);
+
+    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+    for (int y = 0; y < bitmap.rows; y++) {
+        for (int x = 0; x < bitmap.cols; x++) {
+            cv::Vec3b& pixel = bitmap.at<cv::Vec3b>(y, x);
+            pixel[0] = clamp( ( pixel[0] + pixel[1] + pixel[2] ) / 3, 0, 255 );
+            if (invert==1)
+               pixel[0] = 255 - pixel[0];
+            pixel[1] = pixel[0];
+            pixel[2] = pixel[0];
+        }
+    }
+
+    if (bpp==32)
+    {
+       bitmap.forEach<cv::Vec4b> ( [&](cv::Vec4b& pixel, const int* position) -> void {
+             pixel[3] = 255;
+       });
+    }
+
+    if (postblur>0)
+       cv::stackBlur(bitmap, bitmap, cv::Size(postblur, postblur));
+
     return 1;
 }
 
@@ -4336,12 +4369,13 @@ DLL_API int DLL_CALLCONV openCVedgeDetection(unsigned char *imageData, int w, in
     cv::Mat grayImage;
     if (precontrast!=1 || prebrighten!=0)
     {
-      if (bpp==32)
-         cv::extractChannel(image, grayImage, 3); // alphaChannel
-      
       image.convertTo(image, -1, precontrast, prebrighten);
       if (bpp==32)
-         cv::insertChannel(grayImage, image, 3);
+      {
+         image.forEach<cv::Vec4b> ( [&](cv::Vec4b& pixel, const int* position) -> void {
+               pixel[3] = 255;
+         });
+      }
     }
 
     if (preblur % 2 != 1)
