@@ -6,6 +6,12 @@
 ;   Requires: AHK-H v1.1.33.01+.
 ;   Code overview: https://raw.githubusercontent.com/marius-sucan/Quick-Picto-Viewer/master/general-code-overview.txt
 ;
+; QPV main functionalities:
+; Display and edit images, organize galleries and create slideshows.
+; Application based on GDI+, the FreeImage library and OpenCV.
+; 85 supported image formats: jpeg, jpg, bmp, png, gif, tif,
+; hdr, exr, webp, raw and many more...
+;
 ; Quick Picto Viewer can run on Windows 7 and even on XP, but various features
 ; might not work. To this end, you may have to copy all the DLL files found
 ; in the .\optional-DLL-files-x64\ folder to the same folder where the QPV
@@ -14,19 +20,19 @@
 ; are bundled since version 5.7.5 in the ZIP package and can also be found
 ; in the Github repository.
 ;
-; The following DLLs are already located in the main Quick Picto Viewer folder:
-; FreeImage.dll
+; The following DLLs should be located in the main Quick Picto Viewer folder:
+; *FreeImage.dll
 ; msvcr100.dll
 ; sqlite3.dll
 ; ucrtbase.dll
 ; vcomp140.dll
 ; vcruntime140.dll
+; opencv_world4100.dll
+; qpvmain.dll [developed and compiled by me]
 ;
-; QPV main functionalities:
-; Display images, edit images, organize and create slideshows using GDI+ 
-; and the FreeImage library.
-; 85 supported image formats: jpeg, jpg, bmp, png, gif, tif,
-; hdr, exr, webp, raw and many more...
+; * The FreeImage library DLL I use is a custom compiled one. The source code is 
+; on this repository: https://github.com/marius-sucan/FreeImage-library/tree/qpv
+; I made various fixes to the original version.
 ;
 ; Original Licence: GPL. Please reffer to this page for more information. http://www.gnu.org/licenses/gpl.html
 ; Current licence: I do not know, I do not care. Licences are for obedient entities.
@@ -170,7 +176,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , FilteruDateMinRange, FilteruDateMaxRange, InternalFilterString, userFilterProperty := 1, userFindDupePresets := 1
    , HUDobjNavBoxu := [], HUDobjHistoBoxu := [], globalhFIFimg := 0, userAddedFavesCount := 0, bckpCurrentFileIndex := 0
    , maxFavesEntries := 987654, gdipLastError := 0, hasDrawnImageMap := 0, hasDrawnHistoMap := 0, lastZeitFileSelect := 1
-   , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0
+   , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0, highDesiredPixFmt := "0xE200B"
    , QPVpid := GetCurrentProcessId(), preventUndoLevels := 0, maxMemUndoLevels := 979394, delayiedHUDmsg := "", hamLowLim := 0, hamUppLim := 0
    , delayiedHUDperc := 0, delayedfunc2exec := 0, lastOSDtooltipInvoked := 1, lastTimeToggleThumbs := 1, dupesStringFilter := ""
    , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := [], countGDIobjects := 0
@@ -970,6 +976,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     } Else If (givenKey="w")
     {
         ; w - to-do
+        ; testIdentifyDIBbehindGDIPbmp()
         If (isImgEditingNow()=1 && drawingShapeNow=1)
            func2Call := ["focusVectorEndPoint"]
         Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1 && thumbsDisplaying!=1)
@@ -2602,14 +2609,14 @@ resetMainWin2Welcome() {
      endCaptureCloneBrush()
      renewCurrentFilesList()
      activeSQLdb.CloseDB()
-     newStaticFoldersListCache := []
-     bckpResultedFilesList := []
-     filteredMap2mainList := []
-     toBeExcludedIndexes := []
-     resultsDupesArray := []
-     dupesHashesData := []
-     dupesPixelData := []
-     RandyIMGids := []
+     newStaticFoldersListCache := [] ; used by PanelDynamicFolderzWindow()
+     bckpResultedFilesList := [] ; used by PanelEnableFilesFilter()
+     filteredMap2mainList := [] ; used by PanelEnableFilesFilter() and FilterFilesIndex()
+     toBeExcludedIndexes := [] ; used by PanelFindDupes(), toBeExcludedIndexes() and retrieveDupesByProperties()
+     resultsDupesArray := [] ; used by PanelFindDupes() and corefilterDupeResultsByHdist()
+     dupesHashesData := [] ; used by PanelFindDupes(), corefilterDupeResultsByHdist() and retrieveDupesByProperties()
+     dupesPixelData := [] ; used by PanelFindDupes() and retrieveDupesByProperties()
+     RandyIMGids := [] ; used by random slideshow mode in coreNextPrevImage()
      calcScreenLimits()
      resetImgSelection("forced")
      updateUIctrl()
@@ -11180,7 +11187,7 @@ blockBrokenIMGrefresh(allowThumbs:=0) {
 
    If !isImgEditingNow()
    {
-      showTOOLtip("ERROR: No image currently loaded or it failed to load.")
+      showTOOLtip("ERROR: No image currently loaded or it has failed to load")
       SoundBeep 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return 1
@@ -13109,7 +13116,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
              }
 
              If !(TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1 && TextInAreaCutOutMode=1 && TextInAreaOnlyBorder=1 && TextInAreaBorderOut>1)
-                EZ := Gdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
+                EZ := trGdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
 
              If !EZ
              {
@@ -13137,7 +13144,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
              Else If !(TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1)
                 QPV_ColorizeGrayImage(thisBMP, "0xFF" TextInAreaBorderColor, "0x00" TextInAreaBorderColor, 0)
 
-             EZ := Gdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
+             EZ := trGdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
              If !EZ
              {
                 bmpOpacity := (TextInAreaBgrUnified=1) ? 255 : TextInAreaBorderOpacity
@@ -13172,7 +13179,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
              {
                 thisX := cachedRawTXTbmps[A_Index, 3],    thisY := cachedRawTXTbmps[A_Index, 4]
                 Gdip_GetImageDimensions(thisBMP, mw, mh)
-                EZ := Gdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
+                EZ := trGdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
                 If !EZ
                 {
                    r := DllCall(whichMainDLL "\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255, "int", userimgGammaCorrect, "int", 5, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
@@ -13223,7 +13230,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
              thisX := cachedRawTXTbmps[A_Index, 3],    thisY := cachedRawTXTbmps[A_Index, 4]
              QPV_ColorizeGrayImage(thisBMP, "0xFF" TextInAreaBorderColor, "0x00" TextInAreaBorderColor, 0)
              Gdip_GetImageDimensions(thisBMP, mw, mh)
-             EZ := Gdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
+             EZ := trGdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
              If !EZ
              {
                 r := DllCall(whichMainDLL "\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", TextInAreaBorderOpacity, "int", userimgGammaCorrect, "int", 0, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
@@ -13375,7 +13382,7 @@ PasteInPlaceSelectedArea() {
     whichBitmap := useGdiBitmap()
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     allowOutside := testAllowOutsidePasteInPlace(imgW, imgH, rzW, rzH)
-    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 1, allowOutside[1])
+    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 0, allowOutside[1])
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
     {
@@ -13513,7 +13520,7 @@ RotateAndSkewBitmap(whichBitmap, Angle, shearX, shearY, ellipseModus, Interpolat
        Return
     }
 
-    newBitmap := trGdip_CreateBitmap(A_ThisFunc, pb.w, pb.h, "0xE200B")
+    newBitmap := trGdip_CreateBitmap(A_ThisFunc, pb.w, pb.h, highDesiredPixFmt)
     If validBMP(newBitmap)
        G := Gdip_GraphicsFromImage(newBitmap, InterpolationMode, 4)
 
@@ -13761,36 +13768,11 @@ realtimePasteInPlaceAlphaMaskRotator(previewMode, userAlphaBMP, rImgW, rImgH, th
     Return newBitmap
 }
 
-useGdiBitmap(doConvertPARG:=0) {
+useGdiBitmap() {
    If validBMP(gdiBitmap)
-   {
-      If (doConvertPARG="yes")
-         thisPixFmt := Gdip_GetImagePixelFormat(gdiBitmap, 1)
-      If (!isVarEqualTo(thisPixFmt, "0xE200B", "0x26200A") && thisPixFmt)
-      {
-          newBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, gdiBitmap)
-          If validBMP(newBitmap)
-          {
-             trGdip_DisposeImage(gdiBitmap, 1)
-             gdiBitmap := newBitmap
-          }
-      }
       Return gdiBitmap
-   } Else If validBMP(UserMemBMP)
-   {
-      If (doConvertPARG="yes")
-         thisPixFmt := Gdip_GetImagePixelFormat(UserMemBMP, 1)
-      If (!isVarEqualTo(thisPixFmt, "0xE200B", "0x26200A") && thisPixFmt)
-      {
-          newBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, UserMemBMP)
-          If validBMP(newBitmap)
-          {
-             trGdip_DisposeImage(UserMemBMP, 1)
-             UserMemBMP := newBitmap
-          }
-      }
+   Else If validBMP(UserMemBMP)
       Return UserMemBMP
-   }
 }
 
 LoadCachableBitmapFromFile(imgPath) {
@@ -13859,8 +13841,8 @@ QPV_SetBitmapAsAlphaChannel(pBitmap, pBitmapMask, invertAlphaMask:=0, replaceSou
   } ; Else
      ; addJournalEntry(A_ThisFunc "(): Bitmaps dimensions. " w2 "/" h2 " | " w "/" h)
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
-  E2 := Gdip_LockBits(pBitmapMask, 0, 0, w, h, mStride, mScan, mData, 1)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
+  E2 := trGdip_LockBits(pBitmapMask, 0, 0, w, h, mStride, mScan, mData, 1)
   If (!E1 && !E2)
      r := DllCall(whichMainDLL "\SetBitmapAsAlphaChannel", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "int", 32, "Int", invertAlphaMask, "Int", replaceSourceAlphaChannel, "Int", whichChannel)
 
@@ -13886,7 +13868,7 @@ QPV_SetColorAlphaChannel(pBitmap, newColor, invertAlphaMask) {
   If (!w || !h || !validBMP(pBitmap))
      Return 0
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If !E1
      r := DllCall(whichMainDLL "\SetColorAlphaChannel", "UPtr", iScan, "Int", w, "Int", h, "Int", newColor, "Int", invertAlphaMask, "Int")
 
@@ -13916,7 +13898,7 @@ QPV_FloodFill(pBitmap, x, y, newColor, fillOpacity) {
      FloodFillCartoonMode := 0
 
   ; oldColor := Gdip_GetPixel(pBitmap, x, y)
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, Stride, iScan, iData, 3)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, Stride, iScan, iData, 3)
   tolerance := (FloodFillAltToler=1) ? Ceil(FloodFillTolerance*0.7) + 1 : FloodFillTolerance
   If !E1
      r := DllCall(whichMainDLL "\FloodFillWrapper", "UPtr", iScan, "Int", FloodFillModus, "Int", w, "Int", h, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", fillOpacity, "int", FloodFillDynamicOpacity, "int", FloodFillBlendMode - 1, "int", FloodFillCartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays, "int", userimgGammaCorrect, "int", BlendModesFlipped, "int", Stride, "int", 32, "int", 0, "int", 0)
@@ -13943,7 +13925,7 @@ QPV_ConvertToGrayscale(pBitmap, modus, intensity, previewMode) {
   If (!w || !h || !validBMP(pBitmap))
      Return 0
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If !E1
   {
      If (previewMode=1)
@@ -13972,7 +13954,7 @@ QPV_AdjustImageColors(pBitmap, thisOpacity, InvertColors, AltSat, Sat, AltBright
   If (!w || !h || !validBMP(pBitmap))
      Return 0
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If !E1
   {
      If (previewMode=1)
@@ -14320,11 +14302,11 @@ QPV_MergeBitmapsWithMask(initialBitmap, newBitmap, alphaBitmap, invert, maskOpac
   } ; Else
      ; addJournalEntry(A_ThisFunc "(): Bitmaps dimensions. " w3 "/" h3 " | " w2 "/" h2 " | " w "/" h)
 
-  E1 := Gdip_LockBits(initialBitmap, 0, 0, w, h, stride, iScan, iData, 3)
-  E2 := Gdip_LockBits(newBitmap, 0, 0, w, h, nstride, nScan, nData, 1)
+  E1 := trGdip_LockBits(initialBitmap, 0, 0, w, h, stride, iScan, iData, 3)
+  E2 := trGdip_LockBits(newBitmap, 0, 0, w, h, nstride, nScan, nData, 1)
   If validBMP(alphaBitmap)
   {
-     E3 := Gdip_LockBits(alphaBitmap, 0, 0, w, h, mstride, mScan, mData, 1)
+     E3 := trGdip_LockBits(alphaBitmap, 0, 0, w, h, mstride, mScan, mData, 1)
      If E3
      {
         alphaBitmap := trGdip_DisposeImage(alphaBitmap)
@@ -14362,7 +14344,7 @@ QPV_ColorizeGrayImage(pBitmap, thisColorA, thisColorB, linearu) {
   If (!w || !h || !validBMP(pBitmap))
      Return 0
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, nScan, nData, 3)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, nScan, nData, 3)
   If !E1
   {
      r := DllCall(whichMainDLL "\ColorizeGrayImage", "UPtr", nScan, "int", w, "int", h, "int", stride, "int", 32, "int", linearu, "int", thisColorA, "int", thisColorB)
@@ -14396,10 +14378,10 @@ QPV_EraserBrush(pBitmap, pBitmapMask, invertAlphaMask, replaceMode, levelAlpha, 
   If (w3<1 || h3<1 || !qpvMainDll)
      Return 0
 
-  E1 := Gdip_LockBits(pBitmap, offsetX, offsetY, w3, h3, strideA, iScan, iData)
-  E2 := Gdip_LockBits(pBitmapMask, offX, offY, w3, h3, strideB, mScan, mData, 1)
+  E1 := trGdip_LockBits(pBitmap, offsetX, offsetY, w3, h3, strideA, iScan, iData)
+  E2 := trGdip_LockBits(pBitmapMask, offX, offY, w3, h3, strideB, mScan, mData, 1)
   If clonescu
-     E3 := Gdip_LockBits(clonescu, offsetX, offsetY, w3, h3, strideC, cScan, cData)
+     E3 := trGdip_LockBits(clonescu, offsetX, offsetY, w3, h3, strideC, cScan, cData)
 
   If (!E1 && !E2)
   {
@@ -14442,13 +14424,13 @@ QPV_ColourBrush(pBitmap, pBitmapMask, invertAlphaMask, newColor, replaceMode, le
   If (w3<1 || h3<1 || !qpvMainDll)
      Return 0
 
-  E1 := Gdip_LockBits(pBitmap, offsetX, offsetY, w3, h3, strideA, iScan, iData)
-  E2 := Gdip_LockBits(pBitmapMask, offX, offY, w3, h3, strideB, mScan, mData, 1)
-  E4 := Gdip_LockBits(opacityBMPmap, offsetX, offsetY, w3, h3, strideD, kScan, kData, 3)
+  E1 := trGdip_LockBits(pBitmap, offsetX, offsetY, w3, h3, strideA, iScan, iData)
+  E2 := trGdip_LockBits(pBitmapMask, offX, offY, w3, h3, strideB, mScan, mData, 1)
+  E4 := trGdip_LockBits(opacityBMPmap, offsetX, offsetY, w3, h3, strideD, kScan, kData, 3)
   ; ToolTip, % opacityBMPmap "===" wa "/" ha "`n" w "/" h , , , 2
 
   If validBMP(clonescu)
-     E3 := Gdip_LockBits(clonescu, offsetX, offsetY, w3, h3, strideC, cScan, cData)
+     E3 := trGdip_LockBits(clonescu, offsetX, offsetY, w3, h3, strideC, cScan, cData)
 
   If (!E1 && !E2)
   {
@@ -14493,7 +14475,7 @@ QPV_PrepareAlphaChannelBlur(pBitmap, givenLevel, fillMissingOnly) {
      Return 0
   }
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If !E1
   {
      r := DllCall(whichMainDLL "\PrepareAlphaChannelBlur", "UPtr", iScan, "Int", w, "Int", h, "Int", givenLevel, "Int", fillMissingOnly, "Int", threads)
@@ -14525,7 +14507,7 @@ QPV_AlterAlphaChannel(pBitmap, givenLevel, replaceAll) {
      Return 0
   }
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If !E1
   {
      r := DllCall(whichMainDLL "\AlterBitmapAlphaChannel", "UPtr", iScan, "Int", w, "Int", h, "int", stride, "int", 32, "Int", givenLevel, "int", replaceAll)
@@ -14557,7 +14539,7 @@ QPV_FillBitmapHoles(pBitmap, newColor) {
      Return 0
   }
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If !E1
      r := DllCall(whichMainDLL "\FillImageHoles", "UPtr", iScan, "Int", w, "Int", h, "UInt", newColor)
   ; fnOutputDebug(A_ThisFunc ": " func2exec "=r" r "=e" E1 "|" A_LastError)
@@ -14585,8 +14567,8 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:
      Return 0
   }
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
-  E2 := Gdip_LockBits(pBitmap2Blend, 0, 0, w, h, stride, mScan, mData, 1)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
+  E2 := trGdip_LockBits(pBitmap2Blend, 0, 0, w, h, stride, mScan, mData, 1)
   If (!E1 && !E2)
      r := DllCall(whichMainDLL "\BlendBitmaps", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", blendMode, "int", flipLayers, "int", faderMode, "int", protectAlpha, "int", gamma)
 
@@ -14596,6 +14578,65 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:
   If !E2
      Gdip_UnlockBits(pBitmap2Blend, mData)
   return r
+}
+
+QPV_OpenCVresizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", KeepPixelFormat:=0) {
+; function unused
+
+    If (!validBMP(pBitmap) || !givenW || !givenH)
+    {
+       addJournalEntry(A_ThisFunc "(): failed to resize bitmap; incorrect bitmap  provided")
+       Return 0
+    }
+
+    Gdip_GetImageDimensions(pBitmap, Width, Height)
+    If (KeepRatio=1)
+    {
+       calcIMGdimensions(Width, Height, givenW, givenH, ResizedW, ResizedH)
+    } Else
+    {
+       ResizedW := givenW
+       ResizedH := givenH
+    }
+
+    If (Width=resizedW && Height=resizedH)
+       Return trGdip_CloneBitmap(A_ThisFunc, pBitmap)
+
+    initQPVmainDLL()
+    If (!qpvMainDll || isWinXP=1)
+    {
+       addJournalEntry(A_ThisFunc "(): QPV dll file is missing or failed to initialize: qpvMain.dll")
+       Return
+    }
+
+    If (KeepPixelFormat=1)
+       PixelFormat := Gdip_GetImagePixelFormat(pBitmap, 1)
+    Else If (KeepPixelFormat=-1)
+       PixelFormat := highDesiredPixFmt
+    Else If Strlen(KeepPixelFormat)>3
+       PixelFormat := KeepPixelFormat
+
+  thisStartZeit := A_TickCount
+  trGdip_GetImageDimensions(pBitmap, w, h)
+  ; fnOutputDebug(A_ThisFunc "() " w "=" w2 "||" h "=" h2)
+  If (!w || !h)
+  {
+     addJournalEntry(A_ThisFunc "(): failed to resize bitmap; incorrect bitmap provided")
+     Return 0
+  }
+  bpp := InStr(PixelFormat, "21808") ? 24 : 32
+  newBitmap := trGdip_CreateBitmap(A_ThisFunc, ResizedW, ResizedH, PixelFormat)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3, PixelFormat)
+  E2 := trGdip_LockBits(newBitmap, 0, 0, resizedW, resizedH, mstride, mScan, mData, 3, PixelFormat)
+  If (!E1 && !E2)
+     r := DllCall(whichMainDLL "\openCVresizeBitmap", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", rw, "Int", rh, "Int", mstride, "Int", bpp, "Int", 3)
+
+  ; fnOutputDebug(A_ThisFunc "() " A_LastError " r=" r "=" func2exec "=" A_TickCount - thisStartZeit "|" blendMode)
+  If !E1
+     Gdip_UnlockBits(pBitmap, iData)
+  If !E2
+     Gdip_UnlockBits(newBitmap, mData)
+  return newBitmap
 }
 
 QPV_ResizeBitmap(pBitmap, newW, newH, interpolation:=1, bond:=2) {
@@ -14643,7 +14684,7 @@ QPV_CreateBitmapNoise(W, H, intensity, doGray, threads, fillBgr) {
   If !validBMP(pBitmap)
      Return 0
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If !E1
   {
      r := DllCall(whichMainDLL "\GenerateRandomNoise", "UPtr", iScan, "Int", w, "Int", h, "Int", intensity, "Int", doGray, "Int", threads, "Int", fillBgr)
@@ -14760,7 +14801,7 @@ generateAlphaMaskBitmap(clipBMP, previewMode, offX:=0, offY:=0, offW:=0, offH:=0
     ; ToolTip, % paintedImage "/" externBMP "l" alphaMaskingMode "|" thisAlphaFile "|c=" clipBMP "|f=" alphaMaskRefBMP, , , 2
     If (externBMP!=1)
     {
-       alphaMaskGray := trGdip_CreateBitmap(A_ThisFunc, rImgW, rImgH, "0xE200B")
+       alphaMaskGray := trGdip_CreateBitmap(A_ThisFunc, rImgW, rImgH, highDesiredPixFmt)
        If warnUserFatalBitmapError(alphaMaskGray, A_ThisFunc)
           Return
     }
@@ -15121,6 +15162,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     If ((doImgEditLivePreview!=1 && !G2) || (G2="kill") || testSelectOutsideImgEntirely(useGdiBitmap()) && PasteInPlaceAutoExpandIMG=0 && !G2)
        Return
 
+    thisBlendMode := (BlendModesPreserveAlpha=1 && currIMGdetails.HasAlpha=1 && PasteInPlaceBlendMode=1) ? 24 : PasteInPlaceBlendMode
     If (G2)
     {
        If (PasteInPlaceEraseInitial=1)
@@ -15144,7 +15186,6 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
 
        trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
        calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-       thisBlendMode := (BlendModesPreserveAlpha=1 && currIMGdetails.HasAlpha=1 && PasteInPlaceBlendMode=1) ? 24 : PasteInPlaceBlendMode
        thisImgQuality := (PasteInPlaceQuality=1) ? 7 : 5
        previewMode := 0
     } Else
@@ -15872,8 +15913,7 @@ destroyGDIfileCache(remAll:=1, makeBackup:=0) {
           gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
 
        idGDIcacheSRCfileA := idGDIcacheSRCfileB := ""
-       BprevImgCall := AprevImgCall := ""
-       GDIcacheSRCfileA := GDIcacheSRCfileB := gdiBitmapIDcall := ""
+       BprevImgCall := AprevImgCall := gdiBitmapIDcall := ""
     }
 }
 
@@ -15882,12 +15922,10 @@ discardSRCfileCaches() {
     GDIcacheSRCfileA := trGdip_DisposeImage(GDIcacheSRCfileA, 1)
     GDIcacheSRCfileB := trGdip_DisposeImage(GDIcacheSRCfileB, 1)
     idGDIcacheSRCfileA := idGDIcacheSRCfileB := ""
-    GDIcacheSRCfileA := GDIcacheSRCfileB := 
+    GDIcacheSRCfileA := GDIcacheSRCfileB := ""
 }
 
 discardViewPortCaches() {
-    ; GDIcacheSRCfileA := trGdip_DisposeImage(GDIcacheSRCfileA, 1)
-    ; GDIcacheSRCfileB := trGdip_DisposeImage(GDIcacheSRCfileB, 1)
     AprevImgCall := BprevImgCall := ""
     BprevGdiBitmap := trGdip_DisposeImage(BprevGdiBitmap, 1)
     AprevGdiBitmap := trGdip_DisposeImage(AprevGdiBitmap, 1)
@@ -15948,30 +15986,30 @@ wrapRecordUndoLevelNow(newBitmap, allowRecord:=1) {
    ViewPortBMPcache := trGdip_DisposeImage(ViewPortBMPcache, 1)
    HistogramBMP := trGdip_DisposeImage(HistogramBMP, 1)
    GDIfadeVPcache := trGdip_DisposeImage(GDIfadeVPcache, 1)
-
+   ; fnOutputDebug( A_ThisFunc ": allow=" allowRecord " | " A_TickCount)
    currentImgModified := 1
    imgIndexEditing := currentFileIndex
-   If (preventUndoLevels=1 && allowRecord=0)
+   If (newBitmap=UserMemBMP || newBitmap=gdiBitmap)
+      newBitmap := trGdip_CloneBitmap(A_ThisFunc, newBitmap)
+
+   If (preventUndoLevels=1 || allowRecord=0 && undoLevelsRecorded>1)
    {
-      If (newBitmap!=UserMemBMP)
-         UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
-      If (newBitmap!=gdiBitmap)
-         gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
+      UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
+      gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
       gdiBitmap := newBitmap
       UserMemBMP := trGdip_CloneBitmap(A_ThisFunc, newBitmap)
       Return
    }
 
    recordUndoLevelNow("init", 0)
-   If (newBitmap!=UserMemBMP)
-      UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
-   If (newBitmap!=gdiBitmap)
-      gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
-
+   UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
+   gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
    UserMemBMP := newBitmap
    gdiBitmap := trGdip_CloneBitmap(A_ThisFunc, newBitmap)
    If (UserMemBMP=gdiBitmap)
-      addJournalEntry(A_ThisFunc "(): ERROR. Illegal inequality. UserMemBMP=gdiBitmap" )
+      addJournalEntry(A_ThisFunc "(): ERROR. Illegal equality. UserMemBMP=gdiBitmap")
+   If (allowRecord=0 && undoLevelsRecorded<2)
+      Return
 
    recordUndoLevelNow(0, newBitmap)
 }
@@ -16096,6 +16134,42 @@ recordUndoLevelNow(actionu, recordedBitmap, dX:=0, dY:=0, forceAlpha:="x") {
       SoundBeep , 900, 100
 }
 
+decideMaximumUndoLevels() {
+  If (undoLevelsRecorded>=(maxUndoLevels - 1) || !validBMP(useGdiBitmap()))
+     Return
+
+  trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+  mgpx := Round((imgW * imgH)/1000000, 1)
+  maxUndoLevels := (mgpx>100) ? 50 : 100
+  If (mgpx>350)
+     maxUndoLevels := 25
+}
+
+MenuPurgeUndos() {
+    If (viewportQPVimage.imgHandle)
+    {
+       recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
+       Return
+    }
+
+    If validBMP(gdiBitmap)
+       pBitmap := Gdip_CloneBitmap(gdiBitmap)
+
+    terminateIMGediting()
+    gdipObjectsTerminator(0, 1)
+    If (!validBMP(gdiBitmap) && pBitmap)
+    {
+       gdiBitmap := pBitmap
+       recordGdipBitmaps(pBitmap, A_ThisFunc)
+    } Else If pBitmap
+       Gdip_DisposeImage(pBitmap, 1)
+
+    discardViewPortCaches()
+    discardSRCfileCaches()
+    decideMaximumUndoLevels()
+    dummyTimerDelayiedImageDisplay(50)
+}
+
 terminateIMGediting(modus:=0) {
    lastZeitIMGsaved := []
    allowThis := (modus="forced" && (undoLevelsRecorded>0 || validBMP(UserMemBMP))) ? 0 : 1
@@ -16151,7 +16225,6 @@ terminateIMGediting(modus:=0) {
    interfaceThread.ahkassign("UserMemBMP", UserMemBMP)
    interfaceThread.ahkassign("undoLevelsRecorded", undoLevelsRecorded)
    SetTimer, TriggerMenuBarUpdate, -50
-   maxUndoLevels := (A_PtrSize=8) ? 100 : 2
 }
 
 isAlphaMaskPartialWin(m:=0) {
@@ -16448,8 +16521,8 @@ ImgRedoAction(dummy:=0) {
 ToggleCorePixFmt() {
    friendly := (A_PtrSize=4 && A_is64BitOS) ? "`n`nPlease use the 64-bits edition of this application to enjoy a better experience for image editing and image viewing." : ""
    friendly .= "`n`nUpon application restart, the 32-bits RGBA mode will no longer be activated."
-   coreDesiredPixFmt := (coreDesiredPixFmt="0x21808") ? "0xE200B" : "0x21808"
-   If (A_PtrSize=4 && coreDesiredPixFmt="0xE200B")
+   coreDesiredPixFmt := (coreDesiredPixFmt="0x21808") ? highDesiredPixFmt : "0x21808"
+   If (A_PtrSize=4 && coreDesiredPixFmt=highDesiredPixFmt)
       msgBoxWrapper(appTitle ": WARNING", "32-bits RGBA mode is now activated. " appTitle " will now have an increased memory usage. The maximum amount of usable memory on your system is 2 GB." friendly, 0, 0, "exclamation")
    Else If (A_PtrSize=4 && coreDesiredPixFmt="0x21808")
       msgBoxWrapper(appTitle ": WARNING", "32-bits RGBA mode is now deactivated. " appTitle " will use less memory, but various image editing options are disabled." friendly, 0, 0, "exclamation")
@@ -16466,16 +16539,16 @@ alertReduceColorDepth() {
    pixFmt := currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat
    thisImgBPP := SubStr(pixFmt, 1, InStr(pixFmt, "-") - 1)
    If (currIMGdetails.HasAlpha=1 && thisImgBPP=32 && coreDesiredPixFmt="0x21808")
-      r := msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", "The image you now begin to edit has an alpha channel. However, " appTitle " is set to work in 24-RGB space, without an alpha channel, to reduce memory usage.  Please activate 32-RGBA mode to preserve the alpha channel.", "&OK|&Activate 32-RGBA", 1, "exclamation")
+      r := msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", "The image you now begin to edit has an alpha channel. However, " appTitle " is set to work in the 24-RGB space, without an alpha channel, to reduce memory usage.  Please activate the 32-RGBA mode to preserve the alpha channel.", "&OK|&Activate 32-RGBA", 1, "exclamation")
    
    If (thisImgBPP!=24 && thisImgBPP!=32)
-      msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", "The image you now begin to edit is at an unsupported color depth for editing: " pixFmt "`n`nThe image will be converted to 24 or 32 bits color depth. Therefore, some color information will probably be lost.", 0, 0, "exclamation")
+      msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", "The image you now begin to edit is at an unsupported color depth for editing: " pixFmt "`n`nThe image will be converted to 24 or 32 bits color depth. Therefore, some color information will likely be lost.", 0, 0, "exclamation")
    Else If (currIMGdetails.Frames>1)
       msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", "The image you now begin to edit has " currIMGdetails.Frames " frames or pages.`n`nOnly the current frame will be preserved, the other frames will be discarded. ", 0, 0, "exclamation")
 
    If InStr(r, "activate")
    {
-      coreDesiredPixFmt := "0x26200A"
+      coreDesiredPixFmt := highDesiredPixFmt
       If !undoLevelsRecorded
          RefreshImageFileAction()
    }
@@ -16565,7 +16638,7 @@ downscaleHugeImagesForEditing() {
    }
 }
 
-mergeViewPortEffectsImgEditing(funcu:=0, recordUndoAfter:=1, allowOutside:=0) {
+mergeViewPortEffectsImgEditing(funcu:=0, recordUndoAfter:=0, allowOutside:=0) {
     If (slideShowRunning=1)
        ToggleSlideShowu()
 
@@ -16657,8 +16730,7 @@ CutSelectedArea() {
    If (thumbsDisplaying=1 || editingSelectionNow!=1)
       Return
 
-   r := CopyImage2clip()
-   If r
+   If CopyImage2clip()
       Return
 
    Sleep, 350
@@ -17014,7 +17086,7 @@ InsertTextSelectedArea() {
     If ((imgSelX1<0 || imgSelY1<0 || imgSelX2>imgW || imgSelY2>imgH) && PasteInPlaceAutoExpandIMG=1 && validBMP(whichBitmap) && imgW && imgH)
        allowOutside := 1
 
-    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 1, allowOutside)
+    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 0, allowOutside)
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
     {
@@ -17026,8 +17098,6 @@ InsertTextSelectedArea() {
     startOperation := A_TickCount
     If (allowOutside=1)
        hasRanExpand := performAutoExpandCanvas(imgW, imgH)
-
-
 
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
@@ -17050,7 +17120,7 @@ InsertTextSelectedArea() {
     }
 
     o_coreFmt := coreDesiredPixFmt
-    coreDesiredPixFmt := "0xE200B"
+    coreDesiredPixFmt := highDesiredPixFmt
     o_imgSelPx := imgSelPx, o_imgSelPy := imgSelPy
     o_imgSelW := imgSelW, o_imgSelH := imgSelH
     bgrColor := makeRGBAcolor(TextInAreaBgrColor, TextInAreaBgrOpacity)
@@ -17205,7 +17275,7 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
     thisPos := (skippedLines>0) ? "a" prevDestPosY zoomLevel : 0
     thisState := "a" UserTextArea TextInAreaAlign TextInAreaValign TextInAreaDoBlurs TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr imgSelW imgSelH mainWidth mainHeight TextInAreaCharSpacing TextInAreaAutoWrap TextInAreaCaseTransform TextInAreaFlipH TextInAreaFlipV userimgGammaCorrect thisW thisH thisPos
     o_coreFmt := coreDesiredPixFmt
-    coreDesiredPixFmt := "0xE200B"
+    coreDesiredPixFmt := highDesiredPixFmt
     If (((A_TickCount - lastInvoked < 50) || (thisState=prevState)) && validBMP(prevBMPu))
     {
        textBoxu := trGdip_CloneBitmap(A_ThisFunc, prevBMPu)
@@ -17397,7 +17467,7 @@ FillSelectedArea() {
     If ((imgSelX1<0 || imgSelY1<0 || imgSelX2>imgW || imgSelY2>imgH) && PasteInPlaceAutoExpandIMG=1 && validBMP(whichBitmap) && imgW && imgH)
        allowOutside := 1
 
-    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 1, allowOutside)
+    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 0, allowOutside)
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
     {
@@ -17455,7 +17525,7 @@ FillSelectedArea() {
        currIMGdetails.HasAlpha := 1
 
     coreFillSelectedArea("kill", 0)
-    wrapRecordUndoLevelNow(newBitmap)
+    wrapRecordUndoLevelNow(newBitmap, !FillAreaDoContour)
     zeitOperation := A_TickCount - startZeit
     addJournalEntry("Fill selected area operation. Elapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)))
     dummyTimerDelayiedImageDisplay(50)
@@ -17693,6 +17763,16 @@ tzGdip_DrawImage(pGraphics, pBitmap, dx:="", dy:="", dw:="", dh:="", sx:="", sy:
    If (z=1)
       Gdip_SetInterpolationMode(pGraphics, 5)
    Return r
+}
+
+trGdip_LockBits(pBitmap, x, y, w, h, ByRef Stride, ByRef Scan0, ByRef BitmapData, LockMode := 3, PixelFormat := "0x26200A") {
+  If !PixelFormat
+  {
+     thisPixFmt := Gdip_GetImagePixelFormat(pBitmap, 1)
+     PixelFormat := isVarEqualTo(thisPixFmt, "0xE200B", "0x26200A") ? "0x26200A" : "0x21808"
+  }
+  ; fnOutputDebug("lock bits: " thisPixFmt " | " PixelFormat)
+  Return Gdip_LockBits(pBitmap, x, y, w, h, Stride, Scan0, BitmapData, LockMode, PixelFormat)
 }
 
 trGdip_DrawImage(funcu, pGraphics, pBitmap, dx:="", dy:="", dw:="", dh:="", sx:="", sy:="", sw:="", sh:="", Matrix:=1, Unit:=2, ImageAttr:=0) {
@@ -17996,7 +18076,7 @@ livePreviewHugeImageFillSelArea() {
       objSel.nw := imgW,       objSel.nh := imgH
       objSel.invertArea := FillAreaInverted
       ; fnOutputDebug(A_ThisFunc ": " zW "|" zH "`n" imgSelW "|" imgSelH "`n" o_imgSelW "|" o_imgSelH "`n" imgW "|" imgH)
-      EZ := Gdip_LockBits(zBitmap, 0, 0, imgW, imgH, Stride, iScan, iData)
+      EZ := trGdip_LockBits(zBitmap, 0, 0, imgW, imgH, Stride, iScan, iData)
       If EZ
       {
          trGdip_DisposeImage(zBitmap)
@@ -18026,7 +18106,7 @@ livePreviewHugeImageFillSelArea() {
             trGdip_GetImageDimensions(gradientsBMP, zW, zH)
             imgW := min(zW, imgW),   imgH := min(zH, imgH)
             ; ToolTip, % zw "|" zh "`n" imgW "|" imgH , , , 2
-            EZ := Gdip_LockBits(gradientsBMP, 0, 0, imgW, imgH, gStride, gScan, gData)
+            EZ := trGdip_LockBits(gradientsBMP, 0, 0, imgW, imgH, gStride, gScan, gData)
             If EZ
             {
                ; trGdip_DisposeImage(gradientsBMP)
@@ -18650,7 +18730,7 @@ carvePathFromBitmap(ByRef pBitmap, pPath, cX, cY, modus, safeWay:=0, blurLevel:=
     {
        trGdip_GetImageDimensions(pBitmap, imgW, imgH)
        If (imgW && imgH)
-          newBitmap := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH, "0xE200B")
+          newBitmap := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH, highDesiredPixFmt)
 
        If !validBMP(newBitmap)
           Return
@@ -19047,9 +19127,8 @@ QPV_rect2polar(pBitmap) {
   If !validBMP(newBitmap)
      Return
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 1)
-  E2 := Gdip_LockBits(newBitmap, 0, 0, w, h, stride, mScan, mData, 1)
-
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 1)
+  E2 := trGdip_LockBits(newBitmap, 0, 0, w, h, stride, mScan, mData)
   orbScale := 1
   cx := w/2 , cy := h/2
   If (!E1 && !E2)
@@ -19095,8 +19174,8 @@ QPV_DissolveBitmap(pBitmap, rx, ry) {
   If !validBMP(newBitmap)
      Return
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 1)
-  E2 := Gdip_LockBits(newBitmap, 0, 0, w, h, stride, mScan, mData, 1)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 1)
+  E2 := trGdip_LockBits(newBitmap, 0, 0, w, h, stride, mScan, mData)
   If (!E1 && !E2)
      r := DllCall(whichMainDLL "\dissolveBitmap", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "int", Round(rx + 2), "int", Round(ry + 2), "int")
 
@@ -19123,7 +19202,7 @@ QPV_SymmetricaBitmap(pBitmap, rx, ry) {
   If (!w || !h)
      Return
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 1)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData)
   If (!E1 && !E2)
      r := DllCall(whichMainDLL "\symmetricaBitmap", "UPtr", iScan, "Int", w, "Int", h, "int", rx, "int", ry, "int")
 
@@ -19168,9 +19247,9 @@ QPV_autoContrastBitmap(pBitmap, typeu, whichBitmap:=0, entireImg:=0) {
      QPV_ConvertToGrayscale(cropBMP, 5, 100, 0)
 
   trGdip_GetImageDimensions(cropBMP, mw, mh)
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If (validBMP(cropBMP) && !E1)
-     E3 := Gdip_LockBits(cropBMP, 0, 0, mw, mh, strideMini, amScan, amData, 1)
+     E3 := trGdip_LockBits(cropBMP, 0, 0, mw, mh, strideMini, amScan, amData, 1)
   Else
      E3 := -1
 
@@ -19574,8 +19653,8 @@ QPV_polar2rect(oBitmap) {
   Gdip_DeleteGraphics(GP)
   startZeit := A_TickCount
   newBitmap := trGdip_CreateBitmap(A_ThisFunc, w, h)
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 1)
-  E2 := Gdip_LockBits(newBitmap, 0, 0, w, h, stride, mScan, mData, 1)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 1)
+  E2 := trGdip_LockBits(newBitmap, 0, 0, w, h, stride, mScan, mData, 1)
 
   Static orbScale := 1
   If (!E1 && !E2)
@@ -20183,7 +20262,7 @@ HugeImagesApplyAutoColors() {
       obju := InitHugeImgSelPath(0, imgW, imgH)
       If validBMP(obju.alphaMaskGray)
       {
-         EZ := Gdip_LockBits(obju.alphaMaskGray, 0, 0, obju.imgZelW, obju.imgZelH, mStride, mScan, mData, 3, "0x21808")
+         EZ := trGdip_LockBits(obju.alphaMaskGray, 0, 0, obju.imgZelW, obju.imgZelH, mStride, mScan, mData, 3, "0x21808")
          If EZ
          {
             trGdip_DisposeImage(obju.alphaMaskGray)
@@ -21084,7 +21163,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
 
       If validBMP(obju.alphaMaskGray)
       {
-         EZ := Gdip_LockBits(obju.alphaMaskGray, 0, 0, obju.imgZelW, obju.imgZelH, mStride, mScan, mData, 3, "0x21808")
+         EZ := trGdip_LockBits(obju.alphaMaskGray, 0, 0, obju.imgZelW, obju.imgZelH, mStride, mScan, mData, 3, "0x21808")
          If EZ
          {
             trGdip_DisposeImage(obju.alphaMaskGray)
@@ -21194,7 +21273,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
                {
                   trGdip_GetImageDimensions(gradientsBMP, nBmpW, nBmpH)
                   ; fnOutputDebug(A_ThisFunc ": locking gradient bits with gdi+ " ResizedW "||" ResizedH)
-                  EZ := Gdip_LockBits(gradientsBMP, 0, 0, nBmpW, nBmpH, gStride, gScan, gData)
+                  EZ := trGdip_LockBits(gradientsBMP, 0, 0, nBmpW, nBmpH, gStride, gScan, gData)
                   gBpp := 32
                   mustUnlock := 1
                }
@@ -21683,7 +21762,7 @@ DrawLinesInSelectedArea(modus) {
     If ((imgSelX1<0 || imgSelY1<0 || imgSelX2>imgW || imgSelY2>imgH) && PasteInPlaceAutoExpandIMG=1 && validBMP(whichBitmap) && imgW && imgH) || (imgW && imgH && AnyWindowOpen=30)
        allowOutside := 1
 
-    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 1, allowOutside)
+    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 0, allowOutside)
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
     {
@@ -23788,7 +23867,7 @@ livePreviewAddNoiser(modus:=0) {
           }
 
           QPV_PrepareHugeImgSelectionArea(0, 0, imgBoxSizeW - 1, imgBoxSizeH - 1, imgBoxSizeW, imgBoxSizeH, 0, 0, 0, 0, 0, 0, 1)
-          E1 := Gdip_LockBits(cornersBMP, 0, 0, imgBoxSizeW, imgBoxSizeH, stride, iScan, iData)
+          E1 := trGdip_LockBits(cornersBMP, 0, 0, imgBoxSizeW, imgBoxSizeH, stride, iScan, iData)
           r0 := DllCall(whichMainDLL "\GenerateRandomNoiseOnBitmap", "UPtr", iScan, "Int", imgBoxSizeW, "Int", imgBoxSizeH, "int", stride, "int", 32, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped)
           Gdip_UnlockBits(cornersBMP, iData)
           If (UserAddNoisePixelizeAmount>0)
@@ -23819,7 +23898,7 @@ QPV_BlurBitmapFilters(pBitmap, passesX, passesY:=0, modus:=1, forceCimg:=0, circ
      Return 0
   }
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, Stride, iScan, iData, 3)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, Stride, iScan, iData, 3)
   If !E1
   {
      r := DllCall(whichMainDLL "\openCVblurFilters", "UPtr", iScan, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", modus, "Int", circular, "int", Stride, "int", 32)
@@ -23845,7 +23924,7 @@ QPV_DetectEdgesFilters(pBitmap, modus, xa, ya, ksize, preblur, postblur, invert,
      Return 0
   }
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, Stride, iScan, iData, 3, "0x21808")
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, Stride, iScan, iData, 3, 0)
   If !E1
   {
      ; fnOutputDebug(A_ThisFunc ": xa=" xa  " | ya=" ya " | ks=" ks )
@@ -23864,7 +23943,6 @@ QPV_DiffBlendBitmap(pBitmap, offsetX, offsetY, preblur, postblur, invert, prebri
      addJournalEntry(A_ThisFunc "(): QPV dll file is missing or failed to initialize: qpvMain.dll")
      Return 0
   }
-; to-do; lock bits using 24 rgb format?
 
   thisStartZeit := A_TickCount
   trGdip_GetImageDimensions(pBitmap, w, h)
@@ -23874,7 +23952,7 @@ QPV_DiffBlendBitmap(pBitmap, offsetX, offsetY, preblur, postblur, invert, prebri
      Return 0
   }
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3, "0x21808")
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3, 0)
   If !E1
      r := DllCall(whichMainDLL "\openCVdiffBlendBitmap", "UPtr", iScan, "Int", w, "Int", h, "Int", stride, "Int", 24, "Int", offsetX, "int", offsetY, "Int", preblur, "Int", postblur, "int", invert, "float", prebrighten, "float", precontrast, "float", postbrighten, "float", postcontrast)
 
@@ -23909,7 +23987,7 @@ QPV_SharpenBitmap(pBitmap, amount, radius, typeu) {
      Return 1
   }
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If !E1
   {
      r := DllCall(whichMainDLL "\cImgSharpenBitmap", "UPtr", iScan, "Int", w, "Int", h, "Int", round(amount**1.7), "int", stride, "int", 32)
@@ -23933,7 +24011,7 @@ QPV_CreateGaussianNoiseBMP(pBitmap, intensity) {
      Return
   }
 
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If !E1
   {
      r := DllCall(whichMainDLL "\cImgAddGaussianNoiseOnBitmap", "UPtr", iScan, "int", w, "int", h, "Int", intensity, "int", Stride, "int", 32)
@@ -23967,8 +24045,8 @@ QPV_PixelateBitmap(pBitmap, ByRef pBitmapOut, BlockSize) {
    If (BlockSize>Width || BlockSize>Height)
       return -2
 
-   E1 := Gdip_LockBits(pBitmap, 0, 0, Width, Height, Stride1, Scan01, BitmapData1, 1)
-   E2 := Gdip_LockBits(pBitmapOut, 0, 0, Width, Height, Stride2, Scan02, BitmapData2, 3)
+   E1 := trGdip_LockBits(pBitmap, 0, 0, Width, Height, Stride1, Scan01, BitmapData1, 1)
+   E2 := trGdip_LockBits(pBitmapOut, 0, 0, Width, Height, Stride2, Scan02, BitmapData2, 3)
    If (!E1 && !E2)
       r := DllCall(whichMainDLL "\PixelateBitmap", "UPtr", Scan01, "UPtr", Scan02, "int", Width, "int", Height, "int", Stride1, "int", BlockSize, "int", 32)
 
@@ -24268,8 +24346,9 @@ CropImageInViewPortToSelection(modus:=0) {
 
        If (EllipseSelectMode>0 || VPselRotation>0 || X1<0 || Y1<0 || X2>imgW || Y2>ImgH) || (innerSelectionCavityX>0 && innerSelectionCavityY>0)
           currIMGdetails.HasAlpha := 1
-      
-       wrapRecordUndoLevelNow(newBitmap)
+
+       recordUndoAfter := (modus="simplex") ? 0 : 1
+       wrapRecordUndoLevelNow(newBitmap, recordUndoAfter)
        If (modus!="simplex")
        {
           editingSelectionNow := vpIMGrotation := 0
@@ -24463,7 +24542,7 @@ corePasteClipboardImg(modus, imgW, imgH, allowFilesPaste) {
     If !validBMP(clipBMP)
        Return
 
-    If (!InStr(Gdip_GetImagePixelFormat(clipBMP, 1), "0xE200") && coreDesiredPixFmt="0xE200B")
+    If (!InStr(Gdip_GetImagePixelFormat(clipBMP, 1), "0xE200B") && coreDesiredPixFmt="0xE200B")
     {
        krpBmp := Gdip_CloneBmpPargbArea(A_ThisFunc, clipBMP)
        If validBMP(krpBmp)
@@ -24505,7 +24584,6 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
        }
 
        clipBMP := corePasteClipboardImg(1, ResolutionWidth*2, Round(ResolutionHeight*4.3), 1)
-       ; clipBMP := returnDummyBitmap(7500, 7500, 1)
     }
 
     If !validBMP(clipBMP)
@@ -26975,7 +27053,7 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
        ; TriggerMenuBarUpdate()
        If AnyWindowOpen
           Try WinGetPos, prevSetWinPosX, prevSetWinPosY,,, ahk_id %hSetWinGui%
-       ; coreDesiredPixFmt := "0x26200A" ; 32-ARGB
+
        DestroyGIFuWin()
        Gui, SettingsGUIA: Destroy
        Sleep, 5
@@ -32509,16 +32587,8 @@ remCurrentEntry(silentus:=0, whichIndex:=0) {
    ; file2remA := file2remZ[1]
    If StrLen(filesFilter)>1
    {
-
-      ; If (resultedFilesList[thisFileIndex, 5]=1)
-      ; {
-      ;    resultedFilesList[thisFileIndex, 5] := 0
-      ;    updateMainUnfilteredList(thisFileIndex, 5, 0)
-      ; }
-      ; oldIndex :=  filteredMap2mainList[thisFileIndex]
       oldIndex := updateMainUnfilteredList(thisFileIndex, 1, 0)
       file2remC := filteredMap2mainList.RemoveAt(thisFileIndex)
-      ; file2remB := bckpResultedFilesList[oldIndex, 1]
       ; Sleep, 200
       ; ToolTip, % thisFileIndex " | " file2remC " | " oldIndex " a " file2remB "`n" file2remA, , , 2
    }
@@ -40491,6 +40561,8 @@ buildQuickSearchMenus() {
    BuildMainMenu("forced")
    If (maxFilesIndex>0)
       kMenu("PVmenu", "Add", "Show file header", "displayFileHeaderRaw")
+   If isImgEditingNow()
+      kMenu("PVmenu", "Add", "Purge undo levels", "MenuPurgeUndos")
 
    If (isImgEditingNow()=1 && imgEditPanelOpened=1)
       createMenuBonusImageLiveEditMode()
@@ -45182,7 +45254,7 @@ updateUIgradientPreviewAlphaMask(modus) {
    }
 
    G := ""
-   newBitmap := trGdip_CreateBitmap(A_ThisFunc, rImgW, rImgH, "0xE200B")
+   newBitmap := trGdip_CreateBitmap(A_ThisFunc, rImgW, rImgH, highDesiredPixFmt)
    If validBMP(newBitmap)
       G := Gdip_GraphicsFromImage(newBitmap)
 
@@ -45253,7 +45325,7 @@ updateUIgradientPreviewAlphaMask(modus) {
    If (modus!=1)
    {
       QPV_FillBitmapHoles(newBitmap, thisColorB)
-      fBitmap := trGdip_CreateBitmap(A_ThisFunc, rImgW, rImgH, "0xE200B")
+      fBitmap := trGdip_CreateBitmap(A_ThisFunc, rImgW, rImgH, highDesiredPixFmt)
       If validBMP(fBitmap)
       {
          G2 := Gdip_GraphicsFromImage(fBitmap)
@@ -47706,7 +47778,8 @@ BTNimgResizeEditor() {
     vpIMGrotation := 0
     dropFilesSelection(1)
     RemoveTooltip()
-    dummyTimerDelayiedImageDisplay(50)
+    decideMaximumUndoLevels()
+    dummyTimerDelayiedImageDisplay(50)    
     SetTimer, createGUItoolbar, -100
     SetTimer, TriggerMenuBarUpdate, -90
     SetTimer, ResetImgLoadStatus, -50
@@ -48389,7 +48462,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
 
        Gui, Add, Text, xs y+15 w%btnWid% vtxtLine3, Pen clipping
        Gui, Add, Text, x+10 wp vtxtLine4, Styling
-       GuiAddDropDownList("xs y+7 wp AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign gupdateUIfillPanel", "Inside|Centered|Outside", "Pen clipping to shape")
+       GuiAddDropDownList("xs y+7 wp AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign gupdateUIfillPanel", "Inside|None|Outside", "Clip pen to shape")
        GuiAddDropDownList("x+10 wp AltSubmit Choose" DrawLineAreaDashStyle " vDrawLineAreaDashStyle gupdateUIfillPanel", "Continous|Dashes|Dots|Dashes and dots", "Line style")
        Gui, Add, Checkbox, xs y+5 w%btnWid% h%btnHeight% Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIfillPanel, &Double line
        GuiAddDropDownList("x+10 wp AltSubmit Choose" DrawLineAreaCapsStyle " vDrawLineAreaCapsStyle gupdateUIfillPanel", "No caps|Square caps|Round caps", "Line ends style")
@@ -52753,7 +52826,7 @@ coreSymmetricaImageGenerator(zBitmap) {
    sy := (UserSymmetricaMode=1) ? 1 : UserSymmetricaScaleY/200
    If (sx!=1 || sy!=1 || UserSymmetricaSrcRotated=1)
    {
-      thisImgQuality := (userimgQuality=1) ? 7 : 5
+      thisImgQuality := (userimgQuality=1) ? 6 : 5
       If (sx!=1 || sy!=1)
          pBitmap := trGdip_ResizeBitmap(A_ThisFunc, zBitmap, Floor(imgW * sx), Floor(imgH * sy), 0, thisImgQuality, -1)
       Else
@@ -61763,6 +61836,7 @@ InvokeMenuBarEdit(manuID) {
       {
          kMenu("pvMenuBarEdit", "Add", "Levels: " currentUndoLevel "/" undoLevelsRecorded, "dummy")
          kMenu("pvMenuBarEdit", "Disable", "Levels: " currentUndoLevel "/" undoLevelsRecorded)
+         kMenu("pvMenuBarEdit", "Add", "Purge undo levels", "MenuPurgeUndos")
       }
 
       kMenu("pvMenuBarEdit", "Add/Uncheck", "&Record undo levels", "TogglePreventUndos", "history")
@@ -69426,6 +69500,14 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
    If (editingSelectionNow=1 && relativeImgSelCoords=1 && gdiBMPchanged=1)
       calcRelativeSelCoords(0, oImgW, oImgH)
 
+   If validBMP(UserMemBMP)
+   {
+      AprevImgCall := BprevImgCall := ""
+      AprevGdiBitmap := trGdip_DisposeImage(AprevGdiBitmap, 1)
+      BprevGdiBitmap := trGdip_DisposeImage(BprevGdiBitmap, 1)
+      discardSRCfileCaches()
+   }
+
    If (gdiBMPchanged=1)
    {
       SW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
@@ -70144,7 +70226,6 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
      ; currIMGdetails.HasAlpha := InStr(currIMGdetails.PixelFormat, "argb") ? 1 : 0
      currIMGdetails.Frames := 0
      prevMD5nameA := prevMD5nameB := ""
-     ; If (minimizeMemUsage=1)
      discardSRCfileCaches()
      destroyGDIfileCache()
      Return trGdip_CloneBitmap(A_ThisFunc, UserMemBMP)
@@ -70454,9 +70535,6 @@ LoadBitmapFromFileu(imgPath, noBPPconv:=0, forceGDIp:=0, frameu:=0, sizesDesired
 
 Gdip_CloneBmpPargbArea(funcu, pBitmap, x:="", y:="", w:=0, h:=0, PixelFormat:=0, KeepPixelFormat:=0, ignoreBounds:=0, addBgr:=0) {
    thisPixFmt := !PixelFormat ? coreDesiredPixFmt : PixelFormat
-   ; If (thisPixFmt="0xE200B" && userimgQuality=0)
-   ;    thisPixFmt := "0x26200A"
-
    If (ignoreBounds=1 && w>0 && h>0)
    {
        trGdip_GetImageDimensions(pBitmap, imgW, imgH)
@@ -70468,6 +70546,7 @@ Gdip_CloneBmpPargbArea(funcu, pBitmap, x:="", y:="", w:=0, h:=0, PixelFormat:=0,
 
        If (validBMP(newBitmap) && simpleMode!=1)
        {
+          ; fnOutputDebug("woooooooooow")
           G2 := trGdip_GraphicsFromImage(A_ThisFunc "() initially invoked by " funcu, newBitmap, 3)
           If G2
           {
@@ -70493,7 +70572,7 @@ Gdip_CloneBmpPargbArea(funcu, pBitmap, x:="", y:="", w:=0, h:=0, PixelFormat:=0,
           }
        }
    } Else
-     newBitmap := trGdip_CloneBitmapArea(A_ThisFunc "<-" funcu, pBitmap, x, y, w, h, thisPixFmt, KeepPixelFormat)
+       newBitmap := trGdip_CloneBitmapArea(A_ThisFunc "<-" funcu, pBitmap, x, y, w, h, thisPixFmt, KeepPixelFormat)
 
    If !validBMP(newBitmap)
    {
@@ -70717,7 +70796,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   }
 
   pargbPixFmt := (coreDesiredPixFmt="0xE200B") ? -1 : 0
-  If (slideShowRunning!=1 && desiredFrameIndex<1) && (A_TickCount - lastInvoked>250)
+  If (slideShowRunning!=1 && desiredFrameIndex<1 && (A_TickCount - lastInvoked>250))
      GdipCleanMain(6)
 
   interfaceThread.ahkassign("canCancelImageLoad", 1)
@@ -70765,6 +70844,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   } Else
      trGdip_GetImageDimensions(oBitmap, imgW, imgH)
 
+  decideMaximumUndoLevels()
   totalIMGres := imgW + imgH
   defineRelativeSelCoords(imgW, imgH)
   totalScreenRes := ResolutionWidth + ResolutionHeight
@@ -70789,14 +70869,14 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
            trGdip_DisposeImage(rBitmap)
            rBitmap := klBitmap
         }
-    } Else ; If (isGIFgdip=1)
+     } Else ; If (isGIFgdip=1)
         rBitmap := cloneGDItoMem(A_ThisFunc, oBitmap)
 
-    If validBMP(rBitmap)
-    {
-       GDIbmpFileConnected := 0
-       trGdip_DisposeImage(oBitmap, 1)
-    } Else rBitmap := oBitmap
+     If validBMP(rBitmap)
+     {
+        GDIbmpFileConnected := 0
+        trGdip_DisposeImage(oBitmap, 1)
+     } Else rBitmap := oBitmap
   } Else
   {
      If (currIMGdetails.HasAlpha=1 && rawFmt!="MEMORYBMP")
@@ -70874,7 +70954,8 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
         zE := Gdip_BitmapSetColorDepth(rBitmap, 24, 1)
      If !zE
         zE := Gdip_BitmapSetColorDepth(rBitmap, internalColorDepth, ColorDepthDithering)
-     If !zE
+
+     If (!zE && coreDesiredPixFmt="0xE200B")
      {
         zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, rBitmap)
         If validBMP(zBitmap)
@@ -70882,7 +70963,9 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
            trGdip_DisposeImage(rBitmap)
            rBitmap := zBitmap
         }
-     }
+     } Else If (!zE && coreDesiredPixFmt="0x26200A")
+        zE := Gdip_BitmapSetColorDepth(rBitmap, 32, 1)
+
      currIMGdetails.HasAlpha := 0
   }
 
@@ -70894,8 +70977,8 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   gdiBitmap := rBitmap
   abortImgLoad := interfaceThread.ahkgetvar.canCancelImageLoad
   extractAmbientalTexture(abortImgLoad)
-  BprevGdiBitmap := trGdip_DisposeImage(BprevGdiBitmap, 1)
   prevFrame := desiredFrameIndex
+  BprevGdiBitmap := trGdip_DisposeImage(BprevGdiBitmap, 1)
   If (allowCaching=1)
   {
      BprevGdiBitmap := AprevGdiBitmap
@@ -72297,9 +72380,10 @@ toggleAlphaPaintingMode() {
                trGdip_GetImageDimensions(userClipBMPpaste, rImgW, rImgH)
    
             If isVarEqualTo(AnyWindowOpen, 89, 74, 70, 32, 23) ; create new bitmap for these tools
-               userAlphaMaskBmpPainted := trGdip_CreateBitmap(A_ThisFunc, ImgSelW//2, imgSelH//2, "0xE200B")
+               userAlphaMaskBmpPainted := trGdip_CreateBitmap(A_ThisFunc, ImgSelW//2, imgSelH//2, highDesiredPixFmt)
             Else
-               userAlphaMaskBmpPainted := trGdip_CreateBitmap(A_ThisFunc, rImgW, rimgH, "0xE200B")
+               userAlphaMaskBmpPainted := trGdip_CreateBitmap(A_ThisFunc, rImgW, rimgH, highDesiredPixFmt)
+
             G := Gdip_GraphicsFromImage(userAlphaMaskBmpPainted)
             Gdip_GraphicsClear(G, "0xFFffFFff")
             Gdip_DeleteGraphics(G)
@@ -72829,7 +72913,7 @@ createGradientBrushBitmap(brushColor, grPosA, brushSize, grAngle, bAR, opacity:=
     thisState := "a" bgr brImgSelW brImgSelH brimgSelPx brimgSelPy thisAR bAR brushSize thisColorA thisColorB grPosA grAngle offsetX offsetY BrushToolTexture
     If (thisState!=prevState || !validBMP(prevBrushu))
     {
-       brushBitmap := trGdip_CreateBitmap(A_ThisFunc, brushSize, brushSize, "0xE200B")
+       brushBitmap := trGdip_CreateBitmap(A_ThisFunc, brushSize, brushSize, highDesiredPixFmt)
        If !validBMP(brushBitmap)
           Return
 
@@ -73568,7 +73652,7 @@ ActPaintBrushNow() {
       clonescu := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
 
    imgIndexEditing := currentFileIndex
-   thisQuality := (BrushToolType>5) ? 7 : 5
+   thisQuality := (BrushToolType>5) ? 6 : 5
    compositingQuality := (userimgGammaCorrect=1) ? 2 : 1
    ; we need a live view in the viewport of the bitmap; so we work with it directly [ useGdiBitmap == whichBitmap ]
    metaBitmap := whichBitmap ; trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
@@ -73602,7 +73686,7 @@ ActPaintBrushNow() {
 
    If (advancedSoftBrush=1)
    {
-      opacityBMPmap := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH, "0xE200B")
+      opacityBMPmap := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH, highDesiredPixFmt)
       pgu := Gdip_GraphicsFromImage(opacityBMPmap)
       Gdip_GraphicsClear(pgu, "0xFF000000")
       If thisSelectionConstrain
@@ -74115,7 +74199,7 @@ ActDrawAlphaMaskBrushNow() {
    }
 
    imgIndexEditing := currentFileIndex
-   thisQuality := (BrushToolType>5) ? 7 : 5
+   thisQuality := (BrushToolType>5) ? 6 : 5
    Gu := trGdip_GraphicsFromImage(A_ThisFunc, whichBitmap, thisQuality)
    If !Gu
    {
@@ -77012,7 +77096,7 @@ drawVPpartialIMGsection(brickVPx, brickVPy, brickVPw, brickVPh, DestPosX, DestPo
     If (brickVPw>0 && brickVPh>0) && (brickIMGw>0 && brickIMGh>0)
     {
        thisQuality := (thisUSRimgQuality=1) ? 7 : 5
-       kBitmap := trGdip_CloneBitmapArea(A_ThisFunc, whichBitmap, brickIMGx, brickIMGy, brickIMGw, brickIMGh, "0xE200B")
+       kBitmap := trGdip_CloneBitmapArea(A_ThisFunc, whichBitmap, brickIMGx, brickIMGy, brickIMGw, brickIMGh, highDesiredPixFmt)
        If (validBMP(kBitmap) && (totalIMGsize + 2>totalVPsize) && imageAttribs)
        {
           zBitmap := trGdip_ResizeBitmap(A_ThisFunc, kBitmap, brickVPw, brickVPh, 0, thisQuality, -1)
@@ -77279,7 +77363,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
              brickIMGw := mainWidth - Abs(diffuDestPosX)
              brickIMGh := mainHeight - Abs(diffuDestPosY)
              If (brickIMGw && brickIMGh)
-                kBitmap := trGdip_CloneBitmapArea(A_ThisFunc, ViewPortBMPcache, brickIMGx, brickIMGy, brickIMGw, brickIMGh, "0xE200B")
+                kBitmap := trGdip_CloneBitmapArea(A_ThisFunc, ViewPortBMPcache, brickIMGx, brickIMGy, brickIMGw, brickIMGh, highDesiredPixFmt)
 
              If validBMP(kBitmap)
              {
@@ -80384,10 +80468,19 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
 }
 
 cloneGDItoMem(funcu, pBitmap, W:=0, H:=0) {
+    ; function used to speed-up the viewport 
+    ; if the image is entirely loaded in the memory, every pan/zoom action is faster
     If !validBMP(pBitmap)
     {
        addJournalEntry(A_ThisFunc "() invoked by " funcu "() failed: no bitmap given")
        Return
+    }
+   
+    rawFmt := Gdip_GetImageRawFormat(pBitmap)
+    If (rawFmt="MEMORYBMP")
+    {
+       fnOutputDebug("bitmap already entirely in memory")
+       Return trGdip_CloneBitmap(A_ThisFunc, pBitmap)
     }
 
     If (!W || !H)
@@ -91129,15 +91222,10 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
 
        If (VisibleQuickMenuSearchWin=1)
           closeQuickSearch()
-       ; coreDesiredPixFmt := validBMP(UserMemBMP) ? "0x26200A" : "0xE200B" ; 32-ARGB // 32-PARGB
+
        If (AnyWindowOpen=74)
        {
           usrColorDepth := imgFxMode := 1
-          ; If (wasVPfxBefore=0)
-          ;    usrColorDepth := imgFxMode := 1
-          ; Else 
-          ;    usrColorDepth := (imgFxMode>1) ? DesaturateAreaLevels : 1
-
           ColorDepthDithering := DesaturateAreaDither
           INIaction(1, "ColorDepthDithering", "General")
           INIaction(1, "usrColorDepth", "General")
@@ -91867,7 +91955,7 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
    }
 
    trGdip_GetImageDimensions(pBitmap, Width, Height)
-   E1 := Gdip_LockBits(pBitmap, 0, 0, Width, Height, Stride, iScan, BitmapData1)
+   E1 := trGdip_LockBits(pBitmap, 0, 0, Width, Height, Stride, iScan, BitmapData1)
    If E1
       Return "error"
 
@@ -91912,7 +92000,7 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
 
    Gdip_UnlockBits(pBitmap, BitmapData1)
    Gdip_ImageRotateFlip(pBitmap, 2)
-   E2 := Gdip_LockBits(pBitmap, 0, 0, Width, Height, Stride, iScan, BitmapData1)
+   E2 := trGdip_LockBits(pBitmap, 0, 0, Width, Height, Stride, iScan, BitmapData1)
    If E2
       Return "error"
 
@@ -93281,7 +93369,7 @@ printLargeStrArray(whichArray, maxList, delim) {
 
 dumpBMPpixels(miniBMP, w, h) {
     entireImgSmall := ""
-    E1 := Gdip_LockBits(miniBMP, 0, 0, w, h, Stride1, Scan01, BitmapData1, 1, "0x21808")
+    E1 := trGdip_LockBits(miniBMP, 0, 0, w, h, Stride1, Scan01, BitmapData1, 1, "0x21808")
     If !E1
     {
        Loop, % h
@@ -93362,6 +93450,8 @@ calcHistoAvgFile(xBitmap, returnObj, isFilter, imgIndex, zEffect:=0, newBMPs:=0)
     HentireImgSmall := HentireImgBig := ""
     If (SLDtypeLoaded=3) ; database 
     {
+       ; to-do, redo this via opencv and investigate which one gives more accurate results: 
+       ; - grayscale and blur before resize or after?
        If (dupesApplyBlur=1)
           Gdip_GaussianBlur(xBitmap, 4, 0)
 
@@ -93823,7 +93913,6 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
      If (alphaBitmap!="")
         mainLoadedIMGdetails.HasAlpha := FIMalphaChannelFix(alphaBitmap, hFIFimgE)
 
-     ; FreeImage_PreMultiplyWithAlpha(hFIFimgE)
      pBitmap := ConvertFIMtoPBITMAP(hFIFimgE)
      If StrLen(pBitmap)>2
         recordGdipBitmaps(pBitmap, A_ThisFunc)
@@ -94453,16 +94542,6 @@ printImageNow(mainBMP, PrintOptions, previewMode, inLoop:=0, OutFileName:=0) {
    trGdip_DisposeImage(imgToPrint, 1)
 }
 
-returnDummyBitmap(w, h, r) {
-    BrushToolRandomHue := BrushToolRandomSat := 50
-    startToolColor := RandomizeBrushColor("223311") 
-    pBitmap := (r=1) ? trGdip_CreateBitmap(A_ThisFunc, w, h) : Gdip_CreateBitmap(w, h)
-    kk := Gdip_GraphicsFromImage(pBitmap)
-    Gdip_GraphicsClear(kk, "0xFF" startToolColor)
-    Gdip_DeleteGraphics(kk)
-    Return pBitmap
-}
-
 AcquireWIAimage() {
     Static deviceu
     If (thumbsDisplaying=1)
@@ -94485,7 +94564,6 @@ AcquireWIAimage() {
     interfaceThread.ahkassign("whileLoopExec", whileLoopExec)
     WinSet, Enable,, ahk_id %PVhwnd%
 
-    ; kp := returnDummyBitmap(8500, 8500, 0)
     ; obju := [kp, 0]
     If IsObject(obju)
     {
@@ -94526,7 +94604,7 @@ AcquireWIAimage() {
        If (imgW<5 || imgH<5)
        {
           ResetImgLoadStatus()
-          hbmp := Gdip_DisposeImage(pBitmap, 1)
+          Gdip_DisposeImage(pBitmap, 1)
           showTOOLtip("Failed to acquire the correct image data`nPossibly malformed image format.")
           SoundBeep , 300, 100
           SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -94846,7 +94924,6 @@ isFileLocked(imgPath) {
 }
 
 trGdip_CreateBitmap(funcu, Width, Height, PixelFormat:=0, Stride:=0, Scan0:=0) {
-    ; PixelFormat := (PixelFormat="0xE200B") ? coreDesiredPixFmt : PixelFormat
     r := Gdip_CreateBitmap(Width, Height, PixelFormat, Stride, Scan0)
     If (gdipLastError=1 && A_LastError=8)
        gdipLastError := 3
@@ -94869,10 +94946,10 @@ setGdipBMPinfos(r, info) {
 
 recordGdipBitmaps(r, infoz, typu:="bmp") {
    If validBMP(r)
-      addJournalEntry("ERROR: recorded a new bitmap ID that was not discarded. WTF? OLD=" createdGDIobjsArray["x" r, 4] ". NEW=" infoz)
+      addJournalEntry("ERROR: recorded a new bitmap ID that was not discarded. WTF? OLD=" createdGDIobjsArray["x" r, 4] ".`n`nNEW=" infoz)
 
    If StrLen(r)>2
-      createdGDIobjsArray["x" r] := [r, typu, 1, infoz "|" AnyWindowOpen "|"]
+      createdGDIobjsArray["x" r] := [r, typu, 1, infoz "|" AnyWindowOpen "|", A_Now]
 
    ; ppp := 0 ; useful to identify memory leaks related to bitmap objects
    ; For Key, Value in createdGDIobjsArray
@@ -94957,8 +95034,8 @@ trGdip_CloneBitmapArea(funcu, pBitmap, x:="", y:="", w:=0, h:=0, PixelFormat:="0
 
     k := createdGDIobjsArray["x" pBitmap, 4]
     fnOutputDebug("Clone BitmapArea: " k ". ID: " pBitmap ". Invoker: " funcu)
-    ; If (PixelFormat="0xE200B" && userimgQuality=0)
-    ;    PixelFormat := "0x26200A"
+    If (PixelFormat="0xE200B" && KeepPixelFormat=0)
+       PixelFormat := highDesiredPixFmt
 
     r := Gdip_CloneBitmapArea(pBitmap, x, y, w, h, PixelFormat, KeepPixelFormat)
     If (gdipLastError=1 && A_LastError=8)
@@ -95022,55 +95099,6 @@ trGdip_BlurBitmap(pBitmap, BlurAmount, usePARGB:=0, quality:=7) {
     Return r
 }
 
-QPV_ViewportResizeBitmap(pBitmap, givenW, givenH, InterpolationMode) {
-   Static iScan, iData, iStride
-
-    If !validBMP(pBitmap)
-    {
-       addJournalEntry(A_ThisFunc "(): ERROR. Invalid bitmap to resize, function invoked by " funcu "(). pBitmap = " pBitmap)
-       Return
-    }
-
-    thisPixFmt := (KeepPixelFormat=-1) ? coreDesiredPixFmt : KeepPixelFormat
-    ; fnOutputDebug(A_ThisFunc "(" pBitmap "):" givenW "|" givenH "|" funcu)
-    k := createdGDIobjsArray["x" pBitmap, 4]
-
-
-    If (!pBitmap || !givenW || !givenH)
-       Return
-
-    Gdip_GetImageDimensions(pBitmap, w, h)
-    If (KeepRatio=1)
-    {
-       calcIMGdimensions(w, h, givenW, givenH, rw, rh)
-    } Else
-    {
-       rw := givenW
-       rh := givenH
-    }
-  initQPVmainDLL()
-     startOperation := A_TickCount
-  newBitmap := trGdip_CreateBitmap(A_ThisFunc, rw, rh)
-
-  E1 := Gdip_LockBits(pBitmap, 0, 0, w, h, iStride, iScan, iData, 1, "0xE200B")
-  E2 := Gdip_LockBits(newBitmap, 0, 0, rw, rh, mStride, mScan, mData, 3, "0xE200B")
-ToolTip, % A_TickCount - startOperation , , , 2
-  If (!E1 && !E2)
-     ; r := DllCall(whichMainDLL "\STBresizeBitmap", "UPtr", iScan, "Int", w, "Int", h, "Int", iStride, "UPtr", mScan, "int", rw, "Int", rh, "Int", mStride)
-  r := FreeImage_RescaleRawBits(iScan, mScan, 1, w, h, iStride, mStride, 32, rw, rh, 1)
-
-
-
-  ; fnOutputDebug(A_ThisFunc "() " A_LastError " r=" r "=" func2exec "=" A_TickCount - thisStartZeit "|" blendMode)
-
-  If !E1
-     Gdip_UnlockBits(pBitmap, iData)
-  If !E2
-     Gdip_UnlockBits(newBitmap, mData)
-
-    Return newBitmap
-}
-
 trGdip_ResizeBitmap(funcu, pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", KeepPixelFormat:=0, checkTooLarge:=0) {
     If !validBMP(pBitmap)
     {
@@ -95078,10 +95106,12 @@ trGdip_ResizeBitmap(funcu, pBitmap, givenW, givenH, KeepRatio, InterpolationMode
        Return
     }
 
+    t := A_TickCount
     thisPixFmt := (KeepPixelFormat=-1) ? coreDesiredPixFmt : KeepPixelFormat
     ; fnOutputDebug(A_ThisFunc "(" pBitmap "):" givenW "|" givenH "|" funcu)
     k := createdGDIobjsArray["x" pBitmap, 4]
     r := Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode, thisPixFmt, checkTooLarge)
+    ; fnOutputDebug(A_ThisFunc ": " A_TickCount - t)
     If StrLen(r)<3
     {
        If (checkTooLarge!=1)
@@ -95177,7 +95207,7 @@ trGdip_DisposeImage(pBitmap, noErr:=1) {
     ; fnOutputDebug("BMP to dispose: " createdGDIobjsArray["x" pBitmap, 4] ". ID: " pBitmap)
     ; If (createdGDIobjsArray["x" pBitmap, 3]=1 && createdGDIobjsArray["x" pBitmap, 2]="bmp")
     r := Gdip_DisposeImage(pBitmap, 1)
-    createdGDIobjsArray["x" pBitmap] := [pBitmap, "bmp", 0, 0]
+    createdGDIobjsArray["x" pBitmap] := [pBitmap, "bmp", 0, 0, 0]
     Return r
 }
 
@@ -95186,7 +95216,7 @@ validBMP(pBitmap) {
     Return z
 }
 
-gdipObjectsTerminator(filteru:=0) {
+gdipObjectsTerminator(filteru:=0, listBmps:=0) {
    Critical, on
    UnremovedBMPs := discarded := 0
    For Key, Value in createdGDIobjsArray
@@ -95211,7 +95241,12 @@ gdipObjectsTerminator(filteru:=0) {
             If (!filteru && !InStr(value[4], "QPV_ShowThumbnails"))
                addJournalEntry("ERROR: Possible memory leak: " value[4])
 
-            trGdip_DisposeImage(value[1], 1)
+            If (listBmps=1)
+            {
+               Gdip_GetImageDimensions(value[1], w, h)
+               addJournalEntry(discarded " // " totalBMPs " | " w " x " h " @ " value[5] " | " value[4])
+            } Else
+               trGdip_DisposeImage(value[1], 1)
             discarded++
          }
       }
@@ -99387,6 +99422,23 @@ doClicku() {
    */
 }
 
+testIdentifyDIBbehindGDIPbmp() {
+   imgBPP := 32, kw := 25130, kh = 21350
+   pBitmap := Gdip_CreateBitmap(kw, kh, "0x26200A")
+   initQPVmainDLL()
+   sleep , 2000
+   r := DllCall(whichMainDLL "\ListProcessMemoryBlocks", "int", 2)
+   E1 := trGdip_LockBits(pBitmap, 0, 0, kw, kh, aStride, iScan, iData, 3)
+   sleep , 2000
+   Gdip_UnlockBits(pBitmap, iData)
+   sleep , 500
+   Stride := (imgBPP * kW) // 8
+   bufferSize := Round(Stride * kH)
+   Gdip_DisposeImage(pBitmap)
+   ; pbitmap :=  Gdip_CreateBitmapFromFileSimplified("F:\temp\torrents\Mrs.Davis.S01.COMPLETE.720p.PCOK.WEBRip.x264-GalaxyTV[TGx]\moar\gdi-plus-limit.png")
+   fnOutputDebug( "ptr=" r " | size = " bufferSize "| str= " stride " | " astride) 
+   SoundBeep 
+}
 
 testWicLoader() {
    ; Load and resize image
@@ -99406,7 +99458,6 @@ dummyAutoScroller() {
 
    ; ToolTip, % aa "|" bb , , , 2
 }
-
 
 #If (A_PtrSize=8 && InStr(A_ScriptDir, "sucan twins") && !A_IsCompiled && wasInitFIMlib)
    ~F7::
