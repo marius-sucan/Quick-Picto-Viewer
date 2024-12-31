@@ -671,7 +671,7 @@ FreeImage_Dither(hImage, ditherAlgo:=0) {
 
 FreeImage_ToneMapping(hImage, algo:=0, p1:=0, p2:=0) {
    ; Converts a High Dynamic Range image (48-bit RGB or 96-bit RGBF) to a 24-bit RGB image, suitable for display.
-   ; function required to display HDR and RAW images
+   ; function required to properly display HDR and RAW images
 
    ; algo parameter and p1/p2 intervals and meaning 
    ; 0 = FITMO_DRAGO03    ; Adaptive logarithmic mapping (F. Drago, 2003)
@@ -686,7 +686,7 @@ FreeImage_ToneMapping(hImage, algo:=0, p1:=0, p2:=0) {
 
 FreeImage_TmoDrago(hImage, gamma, exposure) {
    ; Converts a High Dynamic Range image to a 24-bit RGB image, suitable for display.
-   ; function required to display HDR and RAW images
+   ; function required to properly display HDR and RAW images
 
    ; parameters intervals and meaning 
    ; Adaptive logarithmic mapping (F. Drago, 2003)

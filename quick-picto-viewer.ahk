@@ -320,14 +320,14 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , showFolderTreeDetails := 0, userSaveBitsDepth := 1, uiUseDarkMode := 0, uiPreferedFileStats := 1
    , hamDistLBorderCrop := 0, hamDistRBorderCrop := 0, userpHashMode := 0, graylevelCompressor := 1
    , findInvertedDupes := 0, PerformMSDonDupes := 0, userFindDupesMSElvl := 50, FloodFillColor := "aa0099"
-   , dupesApplyBlur := 0, BreakDupesGroups := 0, fadeOtherDupeGroups := 1
+   , dupesApplyBlur := 0, BreakDupesGroups := 0, fadeOtherDupeGroups := 1, bezierSplineCustomShape := 0
    , keepUserPaintAlphaMask := 0, alphaMaskColorReversed := 0, alphaMaskGradientScale := 100
    , alphaMaskGradientPosA := 0, alphaMaskGradientPosB := 100, alphaMaskGradientWrapped := 5
    , FillBehindClrOpacity  := 200, FillBehindOpacity := 255, FillBehindColor := "ff4400", allowCustomKeys := 0
    , alphaMaskGradientAngle := 0, DesaturateAreaChannel := 1, FloodFillClrOpacity := 255
    , FloodFillOpacity := 205, FloodFillBlendMode := 1, TextInAreaBlendMode := 1, BlurAreaAlphaMask := 0
    , UserAddNoiseBlurAmount := 0, UserAddNoisePixelizeAmount := 2, FillBehindInvert := 0
-   , alphaMaskPreviewOpacity := 255, FloodFillUseAlpha := 0, EraseAreaUseAlpha := 0, bezierSplineCustomShape := 0
+   , alphaMaskPreviewOpacity := 255, FloodFillUseAlpha := 0, EraseAreaUseAlpha := 0
    , innerSelectionCavityX := 0, innerSelectionCavityY := 0, ResizeEnforceCanvas := 0
    , ResizeFillCanvasMode := 1, ShowToolTipsToolbar := 1, userPrivateMode := 0, thresholdKeywords := 1
    , minKeywordLength := 2, LangKeywordsFilter := 0, mergeKeywordRows := 1, limitSearchReplaceSelected := 0
@@ -378,6 +378,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , vectorToolModus := 1, TextInAreaVerticalia := 0, DrawLineAreaThickScale := 100
    , DrawLineAreaJoinsStyle := 0, DrawLineAreaMitersBorder := 100, DrawLineAreaPolarSection := 1440
    , DrawLineAreaPolarMode := 1, IDedgesModus := 1, IDedgesPreEmphasis := 0, IDedgesPreContrast := 0
+   , UIuserToneMapParamC := 74, cmrRAWtoneMapParamC := 1, UIuserToneMapParamD := 0, cmrRAWtoneMapParamD := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -4139,8 +4140,8 @@ SetImageAsAlphaMask(isGiven:=0, externBMP:=0) {
         If (currIMGdetails.HasAlpha=1 || isOutside=1 || wasGiven=1)
         {
            ; eliminate transparency
-           Gdip_BitmapConvertFormat(zBitmap, 0x21808, 2, 1, 0, 0, 0, 0, 0)
-           Gdip_BitmapConvertFormat(zBitmap, 0xE200B, 2, 1, 0, 0, 0, 0, 0)
+           Gdip_BitmapConvertFormat(zBitmap, "0x21808", 2, 1, 0, 0, 0, 0, 0)
+           Gdip_BitmapConvertFormat(zBitmap, "0xE200B", 2, 1, 0, 0, 0, 0, 0)
         }
 
         If validBMP(userAlphaMaskBmpPainted)
@@ -12698,7 +12699,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
        {
           If (doEffect && (TextInAreaBgrUnified!=1 || TextInAreaPaintBgr!=1))
              QPV_BlurBitmapFilters(thisBMP, thisBlur, thisBlur, 0)
-          Gdip_BitmapConvertFormat(thisBMP, 0xE200B, 2, 1, 0, 0, 0, 0, 0)
+          Gdip_BitmapConvertFormat(thisBMP, "0xE200B", 2, 1, 0, 0, 0, 0, 0)
           ; fnOutputDebug(Gdip_GetImagePixelFormat(pBitmap, 3))
           If (TextInAreaCutOutMode=1 && TextInAreaPaintBgr=1 && TextInAreaBgrUnified!=1)
           {
@@ -12757,7 +12758,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
 
        If (doConturDraw=1 && TextInAreaOnlyBorder!=1 && validBMP(pBitmapContours) && lineVisible=1)
        {
-          Gdip_BitmapConvertFormat(pBitmapContours, 0xE200B, 2, 1, 0, 0, 0, 0, 0)
+          Gdip_BitmapConvertFormat(pBitmapContours, "0xE200B", 2, 1, 0, 0, 0, 0, 0)
           If (thisBorderBlur>0 && TextInAreaDoBlurs=1 && !isWinXP)
              QPV_BlurBitmapFilters(pBitmapContours, thisBorderBlur, thisBorderBlur, 0)
 
@@ -14580,7 +14581,99 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:
   return r
 }
 
-QPV_OpenCVresizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", KeepPixelFormat:=0) {
+OpenCV_FimResizeBitmap(hFIFimgA, resizedW, resizedH, rx, ry, rw, rh, InterpolationMode:="") {
+; resize image using OpenCV instead of FreeImage. It is much faster.
+
+    initQPVmainDLL()
+    If (!qpvMainDll || isWinXP=1)
+    {
+       addJournalEntry(A_ThisFunc "(): QPV dll file is missing or failed to initialize: qpvMain.dll")
+       Return
+    }
+
+    If (!hFIFimgA || !resizedW || !resizedH)
+    {
+       addJournalEntry(A_ThisFunc "(): failed to resize bitmap; incorrect bitmap provided")
+       Return 0
+    }
+
+    FreeImage_GetImageDimensions(hFIFimgA, Width, Height)
+    If (Width=resizedW && Height=resizedH && rx=0 && ry=0)
+       Return FreeImage_Clone(hFIFimgA)
+
+    If (!Width || !Height)
+    {
+       addJournalEntry(A_ThisFunc "(): failed to resize bitmap; incorrect FreeImage bitmap provided")
+       Return 0
+    }
+
+    bpp := FreeImage_GetBPP(hFIFimgA)
+    hFIFimgX := FreeImage_Allocate(ResizedW, ResizedH, bpp)
+    If !hFIFimgX
+    {
+       addJournalEntry(A_ThisFunc "(): failed to resize bitmap; unable to allocate new FreeImage bitmap object")
+       Return 0
+    }
+  
+    pBits := FreeImage_GetBits(hFIFimgX)
+    mStride := FreeImage_GetStride(hFIFimgX) 
+    pBitsAll := FreeImage_GetBits(hFIFimgA)
+    Stride := FreeImage_GetStride(hFIFimgA)
+    thisStartZeit := A_TickCount
+    r := DllCall(whichMainDLL "\openCVresizeBitmapExtended", "UPtr", pBitsAll, "UPtr", pBits, "Int", width, "Int", height, "Int", stride, "Int", rx, "Int", ry, "Int", rw, "Int", rh, "Int", resizedW, "Int", resizedH, "Int", mstride, "Int", bpp, "Int", 1)
+    ; fnOutputDebug(A_ThisFunc "(): " A_TickCount - thisStartZeit)
+    If !r 
+    {
+       addJournalEntry(A_ThisFunc "(): failed to resize bitmap; an opencv or qpv dll failure occured")
+       FreeImage_UnLoad(hFIFimgX)
+       Return 0
+    }
+    Return hFIFimgX
+}
+
+OpenCV_FimToneMapping(hFIFimgA, algo, paramA, paramB, paramC, paramD) {
+; apply tone mapping on HDR image using OpenCV instead of FreeImage. It is much faster.
+
+    initQPVmainDLL()
+    If (!qpvMainDll || isWinXP=1)
+    {
+       addJournalEntry(A_ThisFunc "(): QPV dll file is missing or failed to initialize: qpvMain.dll")
+       Return
+    }
+
+    If !hFIFimgA
+    {
+       addJournalEntry(A_ThisFunc "(): failed to perform tone-mapping, undefined bitmap object")
+       Return 0
+    }
+
+    FreeImage_GetImageDimensions(hFIFimgA, Width, Height)
+    If (!Width || !Height)
+    {
+       addJournalEntry(A_ThisFunc "(): failed to resize bitmap; incorrect FreeImage bitmap provided")
+       Return 0
+    }
+  
+    hFIFimgX := FreeImage_Allocate(Width, Height, 24)
+    If !hFIFimgX
+    {
+       addJournalEntry(A_ThisFunc "(): failed to perform tone-mapping; unable to allocate new FreeImage bitmap object")
+       Return 0
+    }
+  
+    pBits := FreeImage_GetBits(hFIFimgX)
+    pBitsAll := FreeImage_GetBits(hFIFimgA)
+    r := DllCall(whichMainDLL "\openCVapplyToneMappingAlgos", "UPtr", pBitsAll, "Int", width, "Int", height, "UPtr", pBits, "int", algo, "float", paramA, "float", paramB, "float", paramC, "float", paramD)
+    If !r 
+    {
+       addJournalEntry(A_ThisFunc "(): failed to resize bitmap; an opencv or qpv dll failure occured")
+       FreeImage_UnLoad(hFIFimgX)
+       Return 0
+    }
+    Return hFIFimgX
+}
+
+OpenCV_GdipResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", KeepPixelFormat:=0) {
 ; function unused
 
     If (!validBMP(pBitmap) || !givenW || !givenH)
@@ -14616,7 +14709,6 @@ QPV_OpenCVresizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:=""
     Else If Strlen(KeepPixelFormat)>3
        PixelFormat := KeepPixelFormat
 
-  thisStartZeit := A_TickCount
   trGdip_GetImageDimensions(pBitmap, w, h)
   ; fnOutputDebug(A_ThisFunc "() " w "=" w2 "||" h "=" h2)
   If (!w || !h)
@@ -14624,14 +14716,16 @@ QPV_OpenCVresizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:=""
      addJournalEntry(A_ThisFunc "(): failed to resize bitmap; incorrect bitmap provided")
      Return 0
   }
+
   bpp := InStr(PixelFormat, "21808") ? 24 : 32
   newBitmap := trGdip_CreateBitmap(A_ThisFunc, ResizedW, ResizedH, PixelFormat)
-  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3, PixelFormat)
-  E2 := trGdip_LockBits(newBitmap, 0, 0, resizedW, resizedH, mstride, mScan, mData, 3, PixelFormat)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 1, PixelFormat)
+  E2 := trGdip_LockBits(newBitmap, 0, 0, resizedW, resizedH, mstride, mScan, mData, 1, PixelFormat)
+  thisStartZeit := A_TickCount
   If (!E1 && !E2)
-     r := DllCall(whichMainDLL "\openCVresizeBitmap", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", rw, "Int", rh, "Int", mstride, "Int", bpp, "Int", 3)
+     r := DllCall(whichMainDLL "\openCVresizeBitmap", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", resizedW, "Int", resizedH, "Int", mstride, "Int", bpp, "Int", 1)
 
-  ; fnOutputDebug(A_ThisFunc "() " A_LastError " r=" r "=" func2exec "=" A_TickCount - thisStartZeit "|" blendMode)
+  fnOutputDebug(A_ThisFunc "(): " A_TickCount - thisStartZeit)
   If !E1
      Gdip_UnlockBits(pBitmap, iData)
   If !E2
@@ -14639,7 +14733,7 @@ QPV_OpenCVresizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:=""
   return newBitmap
 }
 
-QPV_ResizeBitmap(pBitmap, newW, newH, interpolation:=1, bond:=2) {
+cImg_GdipResizeBitmap(pBitmap, newW, newH, interpolation:=1, bond:=2) {
   ; function used by BTNimgResizeEditor() [resie image in editor mode, CTRL+R]
   initQPVmainDLL()
   If !qpvMainDll
@@ -14696,7 +14790,7 @@ QPV_CreateBitmapNoise(W, H, intensity, doGray, threads, fillBgr) {
   return pBitmap
 }
 
-QPV_CreatePlasmaBMP(W, H, intensity, details, scaleu, doGray, blurX, blurY, doBlur, fillBgr) {
+cImg_CreatePlasmaNoiseBitmap(W, H, intensity, details, scaleu, doGray, blurX, blurY, doBlur, fillBgr) {
   initQPVmainDLL()
   If (!qpvMainDll || isWinXP=1)
   {
@@ -16143,6 +16237,9 @@ decideMaximumUndoLevels() {
   maxUndoLevels := (mgpx>100) ? 50 : 100
   If (mgpx>350)
      maxUndoLevels := 25
+ 
+  If (A_PtrSize!=8)
+     maxUndoLevels := 2
 }
 
 MenuPurgeUndos() {
@@ -17766,13 +17863,24 @@ tzGdip_DrawImage(pGraphics, pBitmap, dx:="", dy:="", dw:="", dh:="", sx:="", sy:
 }
 
 trGdip_LockBits(pBitmap, x, y, w, h, ByRef Stride, ByRef Scan0, ByRef BitmapData, LockMode := 3, PixelFormat := "0x26200A") {
+  ; memInfosA := getMemUsage()
   If !PixelFormat
   {
      thisPixFmt := Gdip_GetImagePixelFormat(pBitmap, 1)
      PixelFormat := isVarEqualTo(thisPixFmt, "0xE200B", "0x26200A") ? "0x26200A" : "0x21808"
   }
+
   ; fnOutputDebug("lock bits: " thisPixFmt " | " PixelFormat)
-  Return Gdip_LockBits(pBitmap, x, y, w, h, Stride, Scan0, BitmapData, LockMode, PixelFormat)
+  E := Gdip_LockBits(pBitmap, x, y, w, h, Stride, Scan0, BitmapData, LockMode, PixelFormat)
+  ; Sleep, 25
+  ; memInfosB := getMemUsage()
+  ; if (thisPixFmt!=PixelFormat && !E)
+  ;    fnOutputDebug("lock bits: memory wasted! " thisPixFmt " | " PixelFormat " || " memInfosA.appMem " | " memInfosB.appMem)
+  ; else if E
+  ;    fnOutputDebug(A_ThisFunc ": fail code = " E)
+  ; else
+  ;    fnOutputDebug("lock bits: memory usage a/b: " memInfosA.appMem " | " memInfosB.appMem)
+  Return E
 }
 
 trGdip_DrawImage(funcu, pGraphics, pBitmap, dx:="", dy:="", dw:="", dh:="", sx:="", sy:="", sw:="", sh:="", Matrix:=1, Unit:=2, ImageAttr:=0) {
@@ -23685,7 +23793,7 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
     } Else If (UserAddNoiseMode=2) ; weird noise
        noiseBMP := QPV_CreateBitmapNoise(thisImgW, thisImgH, UserAddNoiseIntensity, UserAddNoiseGrays, 1, !UserAddNoiseTransparent)
     Else ; plasma
-       noiseBMP := QPV_CreatePlasmaBMP(thisImgW, thisImgH, UserAddNoiseIntensity, UserAddNoiseDetails, plasmaScale, UserAddNoiseGrays, thisBlurAmount, thisBlurAmountY, !blurAreaEqualXY, !UserAddNoiseTransparent)
+       noiseBMP := cImg_CreatePlasmaNoiseBitmap(thisImgW, thisImgH, UserAddNoiseIntensity, UserAddNoiseDetails, plasmaScale, UserAddNoiseGrays, thisBlurAmount, thisBlurAmountY, !blurAreaEqualXY, !UserAddNoiseTransparent)
 
     If !validBMP(noiseBMP)
     {
@@ -36576,10 +36684,6 @@ WriteSettingsImageProcessing() {
 }
 
 coreReadSettingsImageProcessing(act) {
-    IniAction(act, "allowToneMappingImg", "General", 1)
-    IniAction(act, "cmrRAWtoneMapAlgo", "General", 2, 1, 2)
-    IniAction(act, "cmrRAWtoneMapParamA", "General", 2, -8, 10)
-    IniAction(act, "cmrRAWtoneMapParamB", "General", 2, -8, 10)
     RegAction(act, "OnConvertKeepOriginals",, 1)
     RegAction(act, "PreserveDateTimeOnSave",, 1)
     RegAction(act, "convertFormatUseMultiThreads",, 1)
@@ -36603,9 +36707,10 @@ coreReadSettingsImageProcessing(act) {
     RegAction(act, "userActionConflictingFile",, 2, 1, 3)
     RegAction(act, "userDesireWriteFMT",, 2, 1, 16)
     RegAction(act, "userJpegQuality",, 2, 1, 100)
-    IniAction(act, "userHQraw", "General", 1)
+    ReadSettingsAdjustToneMapPanel(0)
     If (act=0)
     {
+       calculateToneMappingAlgoParams(cmrRAWtoneMapAlgo, UIuserToneMapParamA, UIuserToneMapParamB, UIuserToneMapParamC, UIuserToneMapParamD)
        cleanResizeUserOptionsVars()
        rDesireWriteFMT := saveImgFormatsList[userDesireWriteFMT]
     }
@@ -36921,14 +37026,10 @@ readMainSettingsApp(act) {
     IniAction(act, "allowMultiCoreMode", "General", 1)
     IniAction(act, "allowRecordHistory", "General", 1)
     IniAction(act, "allowUserQuickFileActions", "General", 1)
-    IniAction(act, "allowToneMappingImg", "General", 1)
     IniAction(act, "alwaysOpenwithFIM", "General", 1)
     IniAction(act, "askDeleteFiles", "General", 1)
     IniAction(act, "autoRemDeadEntry", "General", 1)
     IniAction(act, "closeEditPanelOnApply", "General", 1)
-    IniAction(act, "cmrRAWtoneMapAlgo", "General", 2, 1, 2)
-    IniAction(act, "cmrRAWtoneMapParamA", "General", 2, -8, 10)
-    IniAction(act, "cmrRAWtoneMapParamB", "General", 2, -8, 10)
     IniAction(act, "cycleFavesOpenIMG", "General", 1)
     IniAction(act, "deleteFileActAfter", "General", 2, 1, 3)
     IniAction(act, "DisplayTimeUser", "General", 2, 1, 99)
@@ -36972,7 +37073,6 @@ readMainSettingsApp(act) {
     IniAction(act, "thumbsListViewMode", "General", 2, 1, 4)
     IniAction(act, "uiUseDarkMode", "General", 1)
     IniAction(act, "useCachedSLDdata", "General", 1)
-    IniAction(act, "userHQraw", "General", 1)
     IniAction(act, "userimgGammaCorrect", "General", 1)
     IniAction(act, "userimgQuality", "General", 1)
     IniAction(act, "userMultiCoresLimit", "General", 2, 2, thisSystemCores)
@@ -36986,26 +37086,13 @@ readMainSettingsApp(act) {
     RegAction(act, "mainWinSize",, 5)
     RegAction(act, "HUDnavBoxSize",, 2, 75, 250)
     RegAction(act, "slidesRandoMode",, 2, 1, 3)
+    ReadSettingsAdjustToneMapPanel(act)
     loadCustomUserKbds()
-
     If (act=0)
     {
+       calculateToneMappingAlgoParams(cmrRAWtoneMapAlgo, UIuserToneMapParamA, UIuserToneMapParamB, UIuserToneMapParamC, UIuserToneMapParamD)
        If (LimitSelectBoundsImg=1)
           lockSelectionAspectRatio := 1
-
-       If (cmrRAWtoneMapAlgo=1)
-       {
-          cmrRAWtoneMapParamA := clampInRange(cmrRAWtoneMapParamA, 0, 9.9)
-          cmrRAWtoneMapParamB := clampInRange(cmrRAWtoneMapParamB, -8, 8)
-       } Else If (cmrRAWtoneMapAlgo=2)
-       {
-          cmrRAWtoneMapParamA := clampInRange(cmrRAWtoneMapParamA, -8, 8)
-          cmrRAWtoneMapParamB := clampInRange(cmrRAWtoneMapParamB, 0, 1)
-       } Else If (cmrRAWtoneMapAlgo=3)
-       {
-          cmrRAWtoneMapParamA := clampInRange(cmrRAWtoneMapParamA, 0, 1)
-          cmrRAWtoneMapParamB := clampInRange(cmrRAWtoneMapParamB, 0, 1)
-       }
 
        If !InStr(mainWinPos, "|")
           mainWinPos := ""
@@ -47733,14 +47820,14 @@ BTNimgResizeEditor() {
           If (adjustCanvasCentered=1)
           {
              astripA := trGdip_CloneBitmapArea(A_ThisFunc, whichBitmap, 0, 0, 1, oImgH)
-             stripA := QPV_ResizeBitmap(astripA, dpX + 3, imgH, 2)
+             stripA := cImg_GdipResizeBitmap(astripA, dpX + 3, imgH, 2)
              tzGdip_DrawImageFast(G2, stripA, 0, 0)
           }
 
           lW := (adjustCanvasCentered=1) ? dpX + 1 : tUserNewWidth - imgW + 1
           lX := (adjustCanvasCentered=1) ? dpX + imgW - 1 : dpX - 1
           astripB := trGdip_CloneBitmapArea(A_ThisFunc, whichBitmap, oImgW - 1, 0, 1, oImgH)
-          stripB := QPV_ResizeBitmap(astripB, lW, imgH, 2)
+          stripB := cImg_GdipResizeBitmap(astripB, lW, imgH, 2)
           tzGdip_DrawImageFast(G2, stripB, lX, 0)
           ; ToolTip, % imgW "|" tUserNewWidth "|" lX "|" offX , , , 2
        }
@@ -47750,14 +47837,14 @@ BTNimgResizeEditor() {
           If (adjustCanvasCentered=1)
           {
              astripA := trGdip_CloneBitmapArea(A_ThisFunc, whichBitmap, 0, 0, oImgW, 1)
-             stripA := QPV_ResizeBitmap(astripA, imgW, dpY + 3, 2)
+             stripA := cImg_GdipResizeBitmap(astripA, imgW, dpY + 3, 2)
              tzGdip_DrawImageFast(G2, stripA, 0, 0)
           }
 
           lY := (adjustCanvasCentered=1) ? dpY + imgH - 1 : dpY - 1
           lH := (adjustCanvasCentered=1) ? dpY + imgH : tUserNewHeight - imgH + 1
           astripB := trGdip_CloneBitmapArea(A_ThisFunc, whichBitmap, 0, oImgH - 1, oImgW, 1)
-          stripB := QPV_ResizeBitmap(astripB, imgW, lH, 2)
+          stripB := cImg_GdipResizeBitmap(astripB, imgW, lH, 2)
           tzGdip_DrawImageFast(G2, stripB, 0, lY)
        }
        ; TulTip(0, " | ", stripA, stripB, dpX, dpY, modus, oImgW, oImgH)
@@ -54502,13 +54589,13 @@ WriteSettingsAdjustToneMapPanel() {
 }
 
 ReadSettingsAdjustToneMapPanel(actu:=0) {
-    IniAction(actu, "cmrRAWtoneMapAlgo", "General", 2, 1, 2)
-    IniAction(actu, "cmrRAWtoneMapParamA", "General", 2, -8, 10)
-    IniAction(actu, "cmrRAWtoneMapParamB", "General", 2, -8, 10)
+    IniAction(actu, "cmrRAWtoneMapAlgo", "General", 2, 1, 5)
     IniAction(actu, "allowToneMappingImg", "General", 1)
     IniAction(actu, "userHQraw", "General", 1)
-    RegAction(actu, "UIuserToneMapParamA", "General", 2, 0, 400)
-    RegAction(actu, "UIuserToneMapParamB", "General", 2, 0, 400)
+    RegAction(actu, "UIuserToneMapParamA", , 2, 0, 400)
+    RegAction(actu, "UIuserToneMapParamB", , 2, 0, 400)
+    RegAction(actu, "UIuserToneMapParamC", , 2, 0, 400)
+    RegAction(actu, "UIuserToneMapParamD", , 2, 0, 400)
 }
 
 PanelAdjustToneMapping() {
@@ -54534,11 +54621,13 @@ PanelAdjustToneMapping() {
     Gui, Add, Text, x15 y15 w460 h320 +0x1000 +0xE +hwndhLVmainu, Image before 
     Gui, Add, Text, x480 y15 w460 h320 +0x1000 +0xE +hwndhCropCornersPic, Image after
     Gui, +DPIScale
-    Gui, Add, Text, x15 y+10 Section w%txtWid% vinfoLine, Image pixel format: %globalInfohFIFbmp%`n.
-    Gui, Add, Checkbox, xs y+10 gupdateUItoneMappingPanel Checked%allowToneMappingImg% vallowToneMappingImg, Apply tone mapping to images
-    GuiAddDropDownList("xs y+10 w" txtWid " AltSubmit gupdateUItoneMappingPanel Choose" cmrRAWtoneMapAlgo " vcmrRAWtoneMapAlgo", "F. Drago: Adaptive logarithmic mapping (2003)|E. Reinhard: HDR reduction inspired by photoreceptors physiology (2005)", "HDR tone mapping algorithm")
-    GuiAddSlider("UIuserToneMapParamA", 1,400, 74, "Tone-mapping: Param A", "updateUItoneMappingPanel", 1, "xs y+10 wp hp+2")
+    Gui, Add, Text, x15 y+10 Section w%txtWid% vinfoLine, Pixel format: %ppp%
+    Gui, Add, Checkbox, xs y+10 gupdateUItoneMappingPanel Checked%allowToneMappingImg% vallowToneMappingImg, Apply tone mapping to image(s)
+    GuiAddDropDownList("xs y+10 w" txtWid//2 - 2 " AltSubmit gupdateUItoneMappingPanel Choose" cmrRAWtoneMapAlgo " vcmrRAWtoneMapAlgo", "F. Drago (FreeImage)|E. Reinhard (FreeImage)|F. Drago (OpenCV)|E. Reinhard (OpenCV)", "HDR tone mapping algorithm")
+    GuiAddSlider("UIuserToneMapParamD", 0,400, 0, "Tone-mapping: Param D", "updateUItoneMappingPanel", 1, "x+1 w" txtWid//2 - 2 " hp")
+    GuiAddSlider("UIuserToneMapParamA", 1,400, 74, "Tone-mapping: Param A", "updateUItoneMappingPanel", 1, "xs y+10 w" txtWid " hp+1")
     GuiAddSlider("UIuserToneMapParamB", 1,400, 200, "Tone-mapping: Param B", "updateUItoneMappingPanel", 1, "xs y+10 wp hp")
+    GuiAddSlider("UIuserToneMapParamC", 1,400, 74, "Tone-mapping: Param C", "updateUItoneMappingPanel", 1, "xs y+10 wp hp")
     Gui, Add, Checkbox, xs y+10 wp gupdateUItoneMappingPanel Checked%userHQraw% vuserHQraw, Load camera RAW images at high quality
 
     initializeFimPreviewIMG(getIDimage(currentFileIndex))
@@ -54558,7 +54647,7 @@ PanelAdjustToneMapping() {
 }
 
 BtnHelpToneMapping() {
-   msgBoxWrapper(appTitle ": HELP", "High-dynamic range images (HDRIs) must be converted to 24 bits to be displayed on screen. You can choose the algorithm to use for this and also configure it.`n`nWhen the option to load Camera RAW images with high quality is activated, the tone-mapping options can be applied on these as well.`n`nDeactivating tone-mapping for HDR, EXR and PFM image file formats is not possible.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "High-dynamic range images (HDRIs) must be converted to 24 bits to be displayed on screen. You can choose the algorithm to use for this and also configure it.`n`nWhen the option to load Camera RAW images with high quality is activated, the tone-mapping options can be applied on these as well.`n`nDeactivating tone-mapping for HDR, EXR and PFM image file formats is not possible.`n`nThe OpenCV implementations execute faster.`n`nUse the reset button to identify commonly used settings for each algorithm implementation.", -1, 0, 0)
 }
 
 killToneMapImageCacheObj() {
@@ -54608,7 +54697,7 @@ initializeFimPreviewIMG(imgPath) {
      imgBPP := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
      ColorsType := FreeImage_GetColorType(hFIFimgA)
      mustApplyToneMapping := (imgBPP>32 && !InStr(ColorsType, "rgba") && GFT!=13) || (imgBPP>64) ? 1 : 0
-     globalInfohFIFbmp := imgBPP "-" ColorsType " | " imgType ".`nFile format: " pk
+     globalInfohFIFbmp := imgBPP "-" ColorsType " | " imgType ; ".`nFile format: " pk
      If (mustApplyToneMapping=1)
      {
         hFIFimgB := FreeImage_Rescale(hFIFimgA, thisW, thisH, 0)
@@ -54618,7 +54707,7 @@ initializeFimPreviewIMG(imgPath) {
   } Else
      globalInfohFIFbmp := "Failed to load the image file."
 
-  GuiControl, SettingsGUIA:, infoLine, Image pixel format: %globalInfohFIFbmp%. Dimensions: %imgW% x %imgH% (pixels).
+  GuiControl, SettingsGUIA:, infoLine, Pixel format: %globalInfohFIFbmp%.
   If !hFIFimgB
   {
      FreeImage_UnLoad(globalhFIFimg)
@@ -54693,8 +54782,12 @@ updateUIfimToneMappedIMG() {
    imgBPP := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgE), "-"))
    thisAllow := (isVarEqualTo(GFT, 32, 26, 29) && imgBPP>32) ? 1 : allowToneMappingImg
    If (thisAllow=1)
-      hFIFimgE := FreeImage_ToneMapping(globalhFIFimg, cmrRAWtoneMapAlgo - 1, cmrRAWtoneMapParamA, cmrRAWtoneMapParamB)
-   Else
+   {
+      If (cmrRAWtoneMapAlgo>2)
+         hFIFimgE := OpenCV_FimToneMapping(globalhFIFimg, cmrRAWtoneMapAlgo - 3, cmrRAWtoneMapParamA, cmrRAWtoneMapParamB, cmrRAWtoneMapParamC, cmrRAWtoneMapParamD)
+      Else
+         hFIFimgE := FreeImage_ToneMapping(globalhFIFimg, cmrRAWtoneMapAlgo - 1, cmrRAWtoneMapParamA, cmrRAWtoneMapParamB)
+   } Else
       hFIFimgE := FreeImage_Clone(globalhFIFimg)
 
    If (imgBPP!=32)
@@ -54753,14 +54846,89 @@ BTNresetToneMap() {
 
    allowToneMappingImg := 1
    Gui, SettingsGUIA: Default
-   GuiControl, SettingsGUIA: Choose, cmrRAWtoneMapAlgo, 1
+   ; GuiControl, SettingsGUIA: Choose, cmrRAWtoneMapAlgo, 1
    GuiControl, SettingsGUIA: , allowToneMappingImg, 1
-   UIuserToneMapParamA := 76
-   UIuserToneMapParamB := 200
-   uiSlidersArray["UIuserToneMapParamA", 14] := 1
-   uiSlidersArray["UIuserToneMapParamB", 14] := 1
+   If (cmrRAWtoneMapAlgo=1)
+   {
+      UIuserToneMapParamA := 75
+      UIuserToneMapParamB := 200
+   } Else If (cmrRAWtoneMapAlgo=2)
+   {
+      UIuserToneMapParamA := 210
+      UIuserToneMapParamB := 185
+   } Else If (cmrRAWtoneMapAlgo=3)
+   {
+      UIuserToneMapParamA := 80
+      UIuserToneMapParamB := 72
+      UIuserToneMapParamC := 180
+      UIuserToneMapParamD := 60
+   } Else If (cmrRAWtoneMapAlgo=4)
+   {
+      UIuserToneMapParamA := 70
+      UIuserToneMapParamB := 185
+      UIuserToneMapParamC := 295
+      UIuserToneMapParamD := 30
+   }
+   GuiRefreshSliders()
    Sleep, 1
    updateUItoneMappingPanel()
+}
+
+calculateToneMappingAlgoParams(algo, paramA, paramB, paramC, paramD) {
+   prcA := paramA/400
+   prcB := paramB/400
+   prcC := paramC/400
+   prcD := paramD/400
+   If (algo=1)
+   {
+      cmrRAWtoneMapParamA := 9.9*prcA
+      cmrRAWtoneMapParamB := 16*prcB - 8
+   } Else If (algo=2)
+   {
+      cmrRAWtoneMapParamA := 16*prcA - 8
+      cmrRAWtoneMapParamB := prcB
+   } Else If (algo=3)
+   {
+      cmrRAWtoneMapParamA := 9.9*prcA
+      cmrRAWtoneMapParamB := 5.9*prcB
+      cmrRAWtoneMapParamC := prcC*2
+   } Else If (algo=4)
+   {
+      cmrRAWtoneMapParamA := 9.9*prcA
+      cmrRAWtoneMapParamB := (16*prcB - 8)*1.5
+      cmrRAWtoneMapParamC := prcC
+   } Else If (algo=5)
+   {
+      cmrRAWtoneMapParamA := 9.9*prcA
+      cmrRAWtoneMapParamB := prcB*2
+      cmrRAWtoneMapParamC := 8.9*prcC
+   }
+
+   cmrRAWtoneMapParamD := clampInRange(prcD, 0, 1)
+   If (cmrRAWtoneMapAlgo=1)
+   {
+      cmrRAWtoneMapParamA := clampInRange(cmrRAWtoneMapParamA, 0, 9.9)
+      cmrRAWtoneMapParamB := clampInRange(cmrRAWtoneMapParamB, -8, 8)
+   } Else If (cmrRAWtoneMapAlgo=2)
+   {
+      cmrRAWtoneMapParamA := clampInRange(cmrRAWtoneMapParamA, -8, 8)
+      cmrRAWtoneMapParamB := clampInRange(cmrRAWtoneMapParamB, 0, 1)
+   } Else If (cmrRAWtoneMapAlgo=3)
+   {
+      cmrRAWtoneMapParamA := clampInRange(cmrRAWtoneMapParamA, 0, 9.9)
+      cmrRAWtoneMapParamB := clampInRange(cmrRAWtoneMapParamB, 0, 5.9)
+      cmrRAWtoneMapParamC := clampInRange(cmrRAWtoneMapParamC, 0, 2.0)
+   } Else If (cmrRAWtoneMapAlgo=4)
+   {
+      cmrRAWtoneMapParamA := clampInRange(cmrRAWtoneMapParamA, 0, 9.9)
+      cmrRAWtoneMapParamB := clampInRange(cmrRAWtoneMapParamB, -12, 12)
+      cmrRAWtoneMapParamC := clampInRange(cmrRAWtoneMapParamC, 0, 1)
+   } Else If (cmrRAWtoneMapAlgo=5)
+   {
+      cmrRAWtoneMapParamA := clampInRange(cmrRAWtoneMapParamA, 0, 9.9)
+      cmrRAWtoneMapParamB := clampInRange(cmrRAWtoneMapParamB, 0, 2.0)
+      cmrRAWtoneMapParamC := clampInRange(cmrRAWtoneMapParamC, 0, 8.9)
+   }
 }
 
 updateUItoneMappingPanel() {
@@ -54778,23 +54946,50 @@ updateUItoneMappingPanel() {
    GuiControlGet, cmrRAWtoneMapAlgo
    GuiControlGet, userHQraw
    GuiControlGet, allowToneMappingImg
-   prcA := UIuserToneMapParamA/400
-   prcB := UIuserToneMapParamB/400
+   calculateToneMappingAlgoParams(cmrRAWtoneMapAlgo, UIuserToneMapParamA, UIuserToneMapParamB, UIuserToneMapParamC, UIuserToneMapParamD)
    If (cmrRAWtoneMapAlgo=1)
    {
-      cmrRAWtoneMapParamA := 9.9*prcA
-      cmrRAWtoneMapParamB := 16*prcB - 8
       uiSlidersArray["UIuserToneMapParamA", 5] := "|Gamma: " Round(cmrRAWtoneMapParamA, 2)
       uiSlidersArray["UIuserToneMapParamB", 5] := "|Exposure: " Round(cmrRAWtoneMapParamB, 2)
-      ; uiSlidersArray["UIuserToneMapParamA", 4] := 38
+      uiSlidersArray["UIuserToneMapParamC", 5] := "|--"
+      uiSlidersArray["UIuserToneMapParamC", 10] := 0
+      uiSlidersArray["UIuserToneMapParamC", 5] := "|--"
+      uiSlidersArray["UIuserToneMapParamC", 10] := 0
+      uiSlidersArray["UIuserToneMapParamD", 5] := "|--"
+      uiSlidersArray["UIuserToneMapParamD", 10] := 0
    } Else If (cmrRAWtoneMapAlgo=2)
    {
-      cmrRAWtoneMapParamA := 16*prcA - 8
-      cmrRAWtoneMapParamB := prcB
       uiSlidersArray["UIuserToneMapParamA", 5] := "|Intensity: " Round(cmrRAWtoneMapParamA, 2)
       uiSlidersArray["UIuserToneMapParamB", 5] := "|Contrast: " Round(cmrRAWtoneMapParamB, 2)
-      ; uiSlidersArray["UIuserToneMapParamA", 4] := 100
-   } 
+      uiSlidersArray["UIuserToneMapParamC", 5] := "|--"
+      uiSlidersArray["UIuserToneMapParamC", 10] := 0
+      uiSlidersArray["UIuserToneMapParamD", 5] := "|--"
+      uiSlidersArray["UIuserToneMapParamD", 10] := 0
+   } Else If (cmrRAWtoneMapAlgo=3)
+   {
+      uiSlidersArray["UIuserToneMapParamA", 5] := "|Gamma: " Round(cmrRAWtoneMapParamA, 2)
+      uiSlidersArray["UIuserToneMapParamB", 5] := "|Saturation: " Round(cmrRAWtoneMapParamB, 2)
+      uiSlidersArray["UIuserToneMapParamC", 5] := "|Bias: " Round(cmrRAWtoneMapParamC, 2)
+      uiSlidersArray["UIuserToneMapParamC", 10] := 1
+      uiSlidersArray["UIuserToneMapParamD", 5] := "|More exposure: " Round(cmrRAWtoneMapParamD, 2)
+      uiSlidersArray["UIuserToneMapParamD", 10] := 1
+   } Else If (cmrRAWtoneMapAlgo=4)
+   {
+      uiSlidersArray["UIuserToneMapParamA", 5] := "|Gamma: " Round(cmrRAWtoneMapParamA, 2)
+      uiSlidersArray["UIuserToneMapParamB", 5] := "|Intensity: " Round(cmrRAWtoneMapParamB, 2)
+      uiSlidersArray["UIuserToneMapParamC", 5] := "|Light adaptation: " Round(cmrRAWtoneMapParamC, 2)
+      uiSlidersArray["UIuserToneMapParamC", 10] := 1
+      uiSlidersArray["UIuserToneMapParamD", 5] := "|More exposure: " Round(cmrRAWtoneMapParamD, 2)
+      uiSlidersArray["UIuserToneMapParamD", 10] := 1
+   } Else If (cmrRAWtoneMapAlgo=5)
+   {
+      uiSlidersArray["UIuserToneMapParamA", 5] := "|Gamma: " Round(cmrRAWtoneMapParamA, 2)
+      uiSlidersArray["UIuserToneMapParamB", 5] := "|Scale: " Round(cmrRAWtoneMapParamB, 2)
+      uiSlidersArray["UIuserToneMapParamC", 5] := "|Saturation: " Round(cmrRAWtoneMapParamC, 2)
+      uiSlidersArray["UIuserToneMapParamC", 10] := 1
+      uiSlidersArray["UIuserToneMapParamD", 5] := "|More exposure: " Round(cmrRAWtoneMapParamD, 2)
+      uiSlidersArray["UIuserToneMapParamD", 10] := 1
+   }
 
    GuiRefreshSliders()
    updateUIfimToneMappedIMG()
@@ -57585,7 +57780,13 @@ FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, externCondition, ByRef has
    {
       ; setWindowTitle("Applying adaptive logarithmic tone mapping to display high color depth image")
       changeMcursor()
-      hFIFimgB := FreeImage_ToneMapping(hFIFimgA, cmrRAWtoneMapAlgo - 1, cmrRAWtoneMapParamA, cmrRAWtoneMapParamB)
+      thisStartZeit := A_TickCount
+      if (cmrRAWtoneMapAlgo>2)
+         hFIFimgB := OpenCV_FimToneMapping(hFIFimgA, cmrRAWtoneMapAlgo - 3, cmrRAWtoneMapParamA, cmrRAWtoneMapParamB, cmrRAWtoneMapParamC, cmrRAWtoneMapParamD)
+      else
+         hFIFimgB := FreeImage_ToneMapping(hFIFimgA, cmrRAWtoneMapAlgo - 1, cmrRAWtoneMapParamA, cmrRAWtoneMapParamB)
+
+      fnOutputDebug(A_ThisFunc "(): " A_TickCount - thisStartZeit)
       If hFIFimgB
       {
          hasAppliedToneMap := " (TONE-MAPPED)"
@@ -70236,7 +70437,7 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
   {
      MD5name := generateThumbName(imgPath, 1)
      ; fimStuff := (alwaysOpenwithFIM=1) ? 1 desiredFrameIndex totalFramesIndex : 0
-     thisMD5name := MD5name imgPath userHQraw cmrRAWtoneMapAlgo cmrRAWtoneMapParamA cmrRAWtoneMapParamB allowToneMappingImg
+     thisMD5name := MD5name imgPath userHQraw cmrRAWtoneMapAlgo cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD allowToneMappingImg
      tFramesA := Gdip_GetBitmapFramesCount(GDIcacheSRCfileA) - 1
      tFramesB := Gdip_GetBitmapFramesCount(GDIcacheSRCfileB) - 1
      isFramesA := (tFramesA = AbackupIMGdetails.Frames) ? 1 : 0
@@ -70244,13 +70445,13 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
      ; ToolTip, % thisMD5name "`n" prevMD5nameA "`n" prevMD5nameB "`n" isFramesA "=" isFramesB "`n" tFramesA "=" tFramesB "`n" AbackupIMGdetails.Frames "=" BbackupIMGdetails.Frames "`n" AbackupIMGdetails.FIle "=" BbackupIMGdetails.File , , , 2
      If (thisMD5name=prevMD5nameA && validBMP(GDIcacheSRCfileA) && StrLen(prevMD5nameA)>2 && isFramesA=1)
      {
-        addJournalEntry("Used unprocessed cached GDI bitmap ID: " GDIcacheSRCfileA "`n" imgPath)
+        addJournalEntry("Using unprocessed cached GDI bitmap ID: " GDIcacheSRCfileA "`n" imgPath)
         totalFramesIndex := multiPageFileManaging(GDIcacheSRCfileA, desiredFrameIndex)
         currIMGdetails := AbackupIMGdetails.Clone()
         Return trGdip_CloneBitmap(A_ThisFunc, GDIcacheSRCfileA)
      } Else If (thisMD5name=prevMD5nameB && validBMP(GDIcacheSRCfileB) && StrLen(prevMD5nameB)>2 && isFramesB=1)
      {
-        addJournalEntry("Used unprocessed cached GDI bitmap ID: " GDIcacheSRCfileB "`n" imgPath)
+        addJournalEntry("Using unprocessed cached GDI bitmap ID: " GDIcacheSRCfileB "`n" imgPath)
         totalFramesIndex := multiPageFileManaging(GDIcacheSRCfileB, desiredFrameIndex)
         currIMGdetails := BbackupIMGdetails.Clone()
         Return trGdip_CloneBitmap(A_ThisFunc, GDIcacheSRCfileB)
@@ -70268,7 +70469,9 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
      If (thumbsDisplaying!=1 && runningLongOperation!=1 && slideShowRunning!=1)
         setWindowTitle("Loading file using the FreeImage library")
      totalFramesIndex := 0
+     tt := A_TickCount
      oBitmap := LoadFimFile(imgPath, 0, 0, frameu, 0, n, 0, 1)
+     ; fnOutputDebug(A_ThisFunc ": load time with FIM: " A_TickCount - tt)
      totalFramesIndex := mainLoadedIMGdetails.Frames
      desiredFrameIndex := clampInRange(frameu, 0, totalFramesIndex)
      GDIbmpFileConnected := 0
@@ -70276,9 +70479,13 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
   {
      totalFramesIndex := 0
      thisImgQuality := (userimgQuality=1) ? 6 : 5
+     tt := A_TickCount
      oBitmap := LoadWICscreenImage(imgPath, 0, frameu)
+     ; fnOutputDebug(A_ThisFunc ": load time with WIC: " A_TickCount - tt)
+     tt := A_TickCount
      If (!validBMP(oBitmap) && wasInitFIMlib=1 && allowFIMloader=1 && oBitmap!="very-large")
         oBitmap := LoadFimFile(imgPath, 0, 0, frameu, 0, n, 1, 1)
+     ; fnOutputDebug(A_ThisFunc ": load time with FIM: " A_TickCount - tt)
      totalFramesIndex := mainLoadedIMGdetails.Frames
      desiredFrameIndex := clampInRange(frameu, 0, totalFramesIndex)
      GDIbmpFileConnected := 0
@@ -70356,6 +70563,7 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
   }
 
   UpdateFilesListImgIDinfos(currentFileIndex)
+  fnOutputDebug(A_ThisFunc ": " currIMGdetails.LoadedWith " image load time: " A_TickCount - coreIMGzeitLoad)
   Return oBitmap
 }
 
@@ -77219,8 +77427,6 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     prevDestPosX := DestPosX
     prevDestPosY := DestPosY
     diffIMGdecX := diffIMGdecY := 0
-
-
     If (r := retrieveQPVscreenImgSection(DestPosX, DestPosY, mainWidth, mainHeight, newW, newH))
     {
        IDviewPortCache := PREVtestIDvPcache := prevVPcacheIMGid := ""
@@ -94618,9 +94824,10 @@ AcquireWIAimage() {
 }
 
 LoadWICscreenImage(imgPath, noBPPconv, frameu) {
-   startZeit := A_TickCount
+   tt := startZeit := A_TickCount
    VarSetCapacity(resultsArray, 8 * 6, 0)
    r := DllCall(whichMainDLL "\WICpreLoadImage", "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "UPtr")
+   ; fnOutputDebug(A_ThisFunc ": load time with WIC: " A_TickCount - tt)
    If r
    {
       Width := NumGet(resultsArray, 4 * 0, "uInt")
@@ -94644,10 +94851,14 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu) {
       resultsArray := ""
       If isImgSizeTooLarge(Width, Height)
       {
+         ; I could return 0 and have this file load with FreeImage within the caller,
+         ; however I gain no performance improvement.
+         tt := A_TickCount
          zx := mainLoadedIMGdetails.Clone()
          viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, zx, 2)
          clrDepth := (mainLoadedIMGdetails.HasAlpha=1) ? 32 : 24
          teleportWICtoFIM(Width, Height, clrDepth)
+         ; fnOutputDebug(A_ThisFunc ": load time with WIC to FIM: " A_TickCount - tt)
          Return "very-large"
       }
 
@@ -94670,13 +94881,11 @@ teleportWICtoFIM(imgW, imgH, bitsDepth) {
    If memoryUsageWarning(imgW, imgH, bitsDepth, 1)
       Return 0
 
-   okay := 0
-   ;  the stride is aligned to a multiple of 4 bytes (32 bits) for efficient memory access.
+   ; the stride is aligned to a multiple of 4 bytes (32 bits) for efficient memory access.
    Stride := (bitsDepth * imgW) / 8 ; (bitsDepth=32) ? imgW * 4 : imgW * 3
    bufferSize := Stride * imgH
-
-   thisIndex := 0
    SliceHeight := imgH
+   thisIndex := 0
    If (bufferSize>4010200100)
    {
       Loop
@@ -94688,6 +94897,7 @@ teleportWICtoFIM(imgW, imgH, bitsDepth) {
       }
    }
 
+   okay := 0
    SliceHeight := imgH - thisIndex
    numberSlices := Ceil(imgH / SliceHeight)
    remainderHeight := mod(imgH, SliceHeight)
@@ -94944,12 +95154,12 @@ setGdipBMPinfos(r, info) {
       createdGDIobjsArray["x" r, 4] := info
 }
 
-recordGdipBitmaps(r, infoz, typu:="bmp") {
+recordGdipBitmaps(r, infoz, pointer:=0, pointerType:=0, objType:="bmp") {
    If validBMP(r)
       addJournalEntry("ERROR: recorded a new bitmap ID that was not discarded. WTF? OLD=" createdGDIobjsArray["x" r, 4] ".`n`nNEW=" infoz)
 
    If StrLen(r)>2
-      createdGDIobjsArray["x" r] := [r, typu, 1, infoz "|" AnyWindowOpen "|", A_Now]
+      createdGDIobjsArray["x" r] := [r, objType, 1, infoz, AnyWindowOpen, A_Now, pointer, pointerType]
 
    ; ppp := 0 ; useful to identify memory leaks related to bitmap objects
    ; For Key, Value in createdGDIobjsArray
@@ -95034,7 +95244,7 @@ trGdip_CloneBitmapArea(funcu, pBitmap, x:="", y:="", w:=0, h:=0, PixelFormat:="0
 
     k := createdGDIobjsArray["x" pBitmap, 4]
     fnOutputDebug("Clone BitmapArea: " k ". ID: " pBitmap ". Invoker: " funcu)
-    If (PixelFormat="0xE200B" && KeepPixelFormat=0)
+    If (PixelFormat="0xE200B")
        PixelFormat := highDesiredPixFmt
 
     r := Gdip_CloneBitmapArea(pBitmap, x, y, w, h, PixelFormat, KeepPixelFormat)
@@ -95111,6 +95321,7 @@ trGdip_ResizeBitmap(funcu, pBitmap, givenW, givenH, KeepRatio, InterpolationMode
     ; fnOutputDebug(A_ThisFunc "(" pBitmap "):" givenW "|" givenH "|" funcu)
     k := createdGDIobjsArray["x" pBitmap, 4]
     r := Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode, thisPixFmt, checkTooLarge)
+    ; r := OpenCV_GdipResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode, 1)
     ; fnOutputDebug(A_ThisFunc ": " A_TickCount - t)
     If StrLen(r)<3
     {
@@ -95127,7 +95338,7 @@ trGdip_ResizeBitmap(funcu, pBitmap, givenW, givenH, KeepRatio, InterpolationMode
     Return r
 }
 
-trGdip_RotateBitmapAtCenter(funcu, pBitmap, Angle, pBrush:=0, InterpolationMode:=7, PixelFormat:=0,snapRotation:=0) {
+trGdip_RotateBitmapAtCenter(funcu, pBitmap, Angle, pBrush:=0, InterpolationMode:=7, PixelFormat:=0, snapRotation:=0) {
     If !validBMP(pBitmap)
     {
        addJournalEntry(A_ThisFunc "(): ERROR. Invalid bitmap to rotate, function invoked by " funcu "(). pBitmap = " pBitmap)
@@ -95244,7 +95455,7 @@ gdipObjectsTerminator(filteru:=0, listBmps:=0) {
             If (listBmps=1)
             {
                Gdip_GetImageDimensions(value[1], w, h)
-               addJournalEntry(discarded " // " totalBMPs " | " w " x " h " @ " value[5] " | " value[4])
+               addJournalEntry(discarded " // " totalBMPs " | " w " x " h " @ " value[6] " | winID=" value[5] " | " value[4])
             } Else
                trGdip_DisposeImage(value[1], 1)
             discarded++
@@ -99428,7 +99639,7 @@ testIdentifyDIBbehindGDIPbmp() {
    initQPVmainDLL()
    sleep , 2000
    r := DllCall(whichMainDLL "\ListProcessMemoryBlocks", "int", 2)
-   E1 := trGdip_LockBits(pBitmap, 0, 0, kw, kh, aStride, iScan, iData, 3)
+   E1 := trGdip_LockBits(pBitmap, 5000, 5000, kw//2, kh//2, aStride, iScan, iData, 3)
    sleep , 2000
    Gdip_UnlockBits(pBitmap, iData)
    sleep , 500
@@ -99437,7 +99648,7 @@ testIdentifyDIBbehindGDIPbmp() {
    Gdip_DisposeImage(pBitmap)
    ; pbitmap :=  Gdip_CreateBitmapFromFileSimplified("F:\temp\torrents\Mrs.Davis.S01.COMPLETE.720p.PCOK.WEBRip.x264-GalaxyTV[TGx]\moar\gdi-plus-limit.png")
    fnOutputDebug( "ptr=" r " | size = " bufferSize "| str= " stride " | " astride) 
-   SoundBeep 
+   SoundBeep, % E1 ? 900 : 300, 500
 }
 
 testWicLoader() {

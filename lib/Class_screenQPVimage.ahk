@@ -63,13 +63,25 @@ Class screenQPVimage {
      ; mgpx := Round((w * h)/1000000, 1)
      ; FreeImage_GetImageDimensions(This.imgHandle, zw, zh)
      ; fnOutputDebug(A_ThisFunc "(): " zw "|" zh "||" x2 "|" y2 "||" x "|" y "|" mgpx)
+     thisStartZeit := A_TickCount
      interpo := (highQuality=1) ? 3 : 0
-     hFIFimgZ := FreeImage_RescaleRect(This.imgHandle, newW, newH, x, y, w, h, interpo)
+     imgBPP := Trimmer(StrReplace(FreeImage_GetBPP(This.imgHandle), "-"))
+     If (imgBPP=32 || imgBPP=24)
+     {
+        FreeImage_GetImageDimensions(this.imgHandle, ow, oh)
+        ay := oh - y
+        by := oh - (y + h)
+        ny := min(ay, by)
+        hFIFimgZ := OpenCV_FimResizeBitmap(This.imgHandle, newW, newH, x, ny, w, h, interpo)
+     }
+
+     If !hFIFimgZ
+        hFIFimgZ := FreeImage_RescaleRect(This.imgHandle, newW, newH, x, y, w, h, interpo)
+     ; fnOutputDebug(A_ThisFunc "(): " A_TickCount - thisStartZeit)
      If !hFIFimgZ
         Return 0
 
-     GFT := FreeImage_GetFileType(This.ImgFile)
-     If (GFT=0 && InStr(This.FIMcolors, "rgba"))
+     If (This.FIMgft=0 && InStr(This.FIMcolors, "rgba"))
         alphaBitmap := FreeImage_GetChannel(hFIFimgZ, 4)
 
      imgBPP := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgZ), "-"))
@@ -90,7 +102,8 @@ Class screenQPVimage {
      FreeImage_UnLoad(hFIFimgZ)
      ; ToolTip, % pBitmap "|"  hFIFimgE "|" hFIFimgZ "|" x "|" y "|" w "|" h "|" newW "|" newH , , , 2
      If StrLen(pBitmap)>2
-        createdGDIobjsArray["x" pBitmap] := [pBitmap, "bmp", 1, A_ThisFunc]
+        recordGdipBitmaps(pBitmap, A_ThisFunc)
+
      Return pBitmap
    }
 
@@ -189,6 +202,7 @@ Class screenQPVimage {
      This.FIMcolors := ColorsType
      This.FIMtype := imgType
      This.FIMbpp := imgBPP
+     This.FIMgft := GFT
      This.FimBuffer := externHandle[3]
      This.actions := 0
      Return 1
@@ -205,7 +219,7 @@ Class screenQPVimage {
       pBitmap := DllCall(whichMainDLL "\" func2exec, "Int", x, "Int", y, "Int", w, "Int", h, "Int", newW, "Int", newH, "Int", mustClip, "UPtr")
       ; ToolTip, % pBitmap "|"  hFIFimgE "|" hFIFimgZ "|" x "|" y "|" w "|" h "|" newW "|" newH , , , 2
       If StrLen(pBitmap)>1
-         createdGDIobjsArray["x" pBitmap] := [pBitmap, "bmp", 1, A_ThisFunc]
+         recordGdipBitmaps(pBitmap, A_ThisFunc)
      Return pBitmap
    }
 

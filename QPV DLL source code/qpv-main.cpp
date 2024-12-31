@@ -48,7 +48,7 @@ void fnOutputDebug(std::string input) {
        return;
 
     std::stringstream ss;
-    ss << "qpv: " << input;
+    ss << "qpv:: " << input;
     OutputDebugStringA(ss.str().data());
 }
 
@@ -3198,7 +3198,6 @@ DLL_API int DLL_CALLCONV ColourBrush(int *opacityImgData, int *imageData, int *m
     return 1;
 }
 
-
 DLL_API int DLL_CALLCONV FillImageHoles(int *imageData, int w, int h, int newColor) {
     // fnOutputDebug("FillImageHoles newColor = " + std::to_string(newColor));
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
@@ -3263,57 +3262,6 @@ DLL_API int DLL_CALLCONV PrepareAlphaChannelBlur(int *imageData, int w, int h, i
                defaultColor = BGRcolor & 0x00ffffff;
         }
     }
-    return 1;
-}
-
-DLL_API int DLL_CALLCONV openCVdiffBlendBitmap(unsigned char* bgrImageData, int w, int h, int Stride, int bpp, int offsetX, int offsetY, int preblur, int postblur, int invert, float prebrighten, float precontrast, float postbrighten, float postcontrast) {
-// works best with 24 bits images 
-    int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
-    cv::Mat bitmap(h, w, clr, bgrImageData, Stride);
-    if (precontrast!=1 || prebrighten!=0)
-       bitmap.convertTo(bitmap, -1, precontrast, prebrighten);
-
-    cv::Mat otherData = bitmap.clone();
-    if (preblur % 2 != 1)
-       preblur++;
-    if (postblur % 2 != 1)
-       postblur++;
-    if (preblur>0)
-       cv::stackBlur(otherData, otherData, cv::Size(preblur, preblur));
-
-    // Define the region of interest (ROI) for shifting
-    cv::Rect sourceROI(max(0, offsetX), max(0, offsetY),
-                       bitmap.cols - abs(offsetX), bitmap.rows - abs(offsetY));
-    cv::Rect destROI(max(0, -offsetX), max(0, -offsetY),
-                     bitmap.cols - abs(offsetX), bitmap.rows - abs(offsetY));
-
-    otherData(sourceROI).copyTo(bitmap(destROI));
-    cv::subtract(bitmap, otherData, bitmap);
-    if (postcontrast!=1 || postbrighten!=0)
-       bitmap.convertTo(bitmap, -1, postcontrast, postbrighten);
-
-    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
-    for (int y = 0; y < bitmap.rows; y++) {
-        for (int x = 0; x < bitmap.cols; x++) {
-            cv::Vec3b& pixel = bitmap.at<cv::Vec3b>(y, x);
-            pixel[0] = clamp( ( pixel[0] + pixel[1] + pixel[2] ) / 3, 0, 255 );
-            if (invert==1)
-               pixel[0] = 255 - pixel[0];
-            pixel[1] = pixel[0];
-            pixel[2] = pixel[0];
-        }
-    }
-
-    if (bpp==32)
-    {
-       bitmap.forEach<cv::Vec4b> ( [&](cv::Vec4b& pixel, const int* position) -> void {
-             pixel[3] = 255;
-       });
-    }
-
-    if (postblur>0)
-       cv::stackBlur(bitmap, bitmap, cv::Size(postblur, postblur));
-
     return 1;
 }
 
@@ -4360,6 +4308,58 @@ DLL_API int DLL_CALLCONV MergeBitmapsWithMask(unsigned char *originalData, unsig
     return 1;
 }
 
+
+DLL_API int DLL_CALLCONV openCVdiffBlendBitmap(unsigned char* bgrImageData, int w, int h, int Stride, int bpp, int offsetX, int offsetY, int preblur, int postblur, int invert, float prebrighten, float precontrast, float postbrighten, float postcontrast) {
+// works best with 24 bits images 
+    int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
+    cv::Mat bitmap(h, w, clr, bgrImageData, Stride);
+    if (precontrast!=1 || prebrighten!=0)
+       bitmap.convertTo(bitmap, -1, precontrast, prebrighten);
+
+    cv::Mat otherData = bitmap.clone();
+    if (preblur % 2 != 1)
+       preblur++;
+    if (postblur % 2 != 1)
+       postblur++;
+    if (preblur>0)
+       cv::stackBlur(otherData, otherData, cv::Size(preblur, preblur));
+
+    // Define the region of interest (ROI) for shifting
+    cv::Rect sourceROI(max(0, offsetX), max(0, offsetY),
+                       bitmap.cols - abs(offsetX), bitmap.rows - abs(offsetY));
+    cv::Rect destROI(max(0, -offsetX), max(0, -offsetY),
+                     bitmap.cols - abs(offsetX), bitmap.rows - abs(offsetY));
+
+    otherData(sourceROI).copyTo(bitmap(destROI));
+    cv::subtract(bitmap, otherData, bitmap);
+    if (postcontrast!=1 || postbrighten!=0)
+       bitmap.convertTo(bitmap, -1, postcontrast, postbrighten);
+
+    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+    for (int y = 0; y < bitmap.rows; y++) {
+        for (int x = 0; x < bitmap.cols; x++) {
+            cv::Vec3b& pixel = bitmap.at<cv::Vec3b>(y, x);
+            pixel[0] = clamp( ( pixel[0] + pixel[1] + pixel[2] ) / 3, 0, 255 );
+            if (invert==1)
+               pixel[0] = 255 - pixel[0];
+            pixel[1] = pixel[0];
+            pixel[2] = pixel[0];
+        }
+    }
+
+    if (bpp==32)
+    {
+       bitmap.forEach<cv::Vec4b> ( [&](cv::Vec4b& pixel, const int* position) -> void {
+             pixel[3] = 255;
+       });
+    }
+
+    if (postblur>0)
+       cv::stackBlur(bitmap, bitmap, cv::Size(postblur, postblur));
+
+    return 1;
+}
+
 DLL_API int DLL_CALLCONV openCVedgeDetection(unsigned char *imageData, int w, int h, int xa, int ya, int ks, int preblur, int postblur, int invert, float prebrighten, float precontrast, float postbrighten, float postcontrast, int modus, int Stride, int bpp) {
     int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
     cv::Mat image(h, w, clr, imageData, Stride);
@@ -4369,13 +4369,13 @@ DLL_API int DLL_CALLCONV openCVedgeDetection(unsigned char *imageData, int w, in
     cv::Mat grayImage;
     if (precontrast!=1 || prebrighten!=0)
     {
-      image.convertTo(image, -1, precontrast, prebrighten);
-      if (bpp==32)
-      {
-         image.forEach<cv::Vec4b> ( [&](cv::Vec4b& pixel, const int* position) -> void {
-               pixel[3] = 255;
-         });
-      }
+       image.convertTo(image, -1, precontrast, prebrighten);
+       if (bpp==32)
+       {
+          image.forEach<cv::Vec4b> ( [&](cv::Vec4b& pixel, const int* position) -> void {
+                pixel[3] = 255;
+          });
+       }
     }
 
     if (preblur % 2 != 1)
@@ -4467,11 +4467,6 @@ DLL_API int DLL_CALLCONV openCVblurFilters(unsigned char *imageData, int w, int 
     int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
     cv::Mat image(h, w, clr, imageData, Stride);
     bool equal = (intensityX == intensityY) ? 1 : 0;
-    if (intensityX>=w-2)
-       intensityX = w - 3;
-    if (intensityY>=h-2)
-       intensityY = h - 3;
- 
     if (intensityX % 2 != 1)
        intensityX++;
     if (intensityY % 2 != 1)
@@ -4511,6 +4506,143 @@ DLL_API int DLL_CALLCONV openCVblurFilters(unsigned char *imageData, int w, int 
 
     fnOutputDebug("openCVblurFilters done");
     return 1;
+}
+
+DLL_API int DLL_CALLCONV openCVresizeBitmap(unsigned char *imageData, unsigned char *otherData, int w, int h, int Stride, int rw, int rh, int mStride, int bpp, int interpolation) {
+  // function unused
+  int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
+  cv::Mat image(h, w, clr, imageData);
+  cv::Mat other(rh, rw, clr, otherData);
+
+  try {
+      cv::resize(image, other, cv::Size(rw, rh), 0, 0, interpolation);
+      // cv::resize(image, other, other.size(), 0, 0, interpolation);
+  } catch (const cv::Exception &e) {
+      fnOutputDebug("Error during resizing: " + std::to_string(w) + " x " + std::to_string(h) + " to " + std::to_string(rw) + " x " + std::to_string(rh));
+      fnOutputDebug( e.what() );
+  }
+  return 1;
+}
+
+DLL_API int DLL_CALLCONV openCVapplyToneMappingAlgos(float* hdrData, int width, int height, unsigned char* ldrData, int algo, float paramA, float paramB, float paramC, float paramD) {
+// paramD is always exposure amount
+
+    cv::Mat hdrImage(height, width, CV_32FC3, hdrData);
+    cv::Mat ldrFinal(height, width, CV_8UC3, ldrData);
+    cv::Mat ldrImage;
+    if (algo==0)
+    {
+       cv::Ptr<cv::TonemapDrago> Drago = cv::createTonemapDrago(paramA, paramB, paramC);
+       Drago->process(hdrImage, ldrImage);
+    } else if (algo==1)
+    {
+       cv::Ptr<cv::TonemapReinhard> reinhard = cv::createTonemapReinhard(paramA, paramB, paramC, 0);
+       reinhard->process(hdrImage, ldrImage);
+    } else
+    {
+       cv::Ptr<cv::TonemapMantiuk> mantiuk = cv::createTonemapMantiuk(paramA, paramB, paramC);
+       mantiuk->process(hdrImage, ldrImage);
+    }
+
+    paramD = (paramD + 0.33f) * 3.0f;
+    if (paramD>1.001)
+       cv::normalize(ldrImage, ldrImage, 0.0f, paramD, cv::NORM_MINMAX);
+
+    fnOutputDebug("openCVapplyToneMappingAlgos: paramD=" + std::to_string(paramD));
+    ldrImage = ldrImage * 255.0f;
+    ldrImage.convertTo(ldrFinal, CV_8UC3);
+    cv::cvtColor(ldrFinal, ldrFinal, cv::COLOR_RGB2BGR);
+
+    // std::memcpy(ldrData, ldrImage.data, width * height * 3 * sizeof(unsigned char));
+    return 1;
+}
+
+DLL_API int DLL_CALLCONV openCVresizeBitmapExtended(unsigned char *imageData, unsigned char *otherData, int w, int h, int Stride, int rx, int ry, int rw, int rh, int nw, int nh, int mStride, int bpp, int interpolation) {
+  // function unused
+  int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
+  cv::Mat image(h, w, clr, imageData, Stride);
+  cv::Mat other(nh, nw, clr, otherData, mStride);
+
+    cv::Rect subRect(rx, ry, rw, rh);
+    subRect.x = min( max(0, subRect.x), w - 1);
+    subRect.y = min( max(0, subRect.y), h - 1);
+    subRect.width = min(subRect.width, image.cols - subRect.x);
+    subRect.height = min(subRect.height, image.rows - subRect.y);
+
+    cv::Mat cropped = image(subRect);
+
+  try {
+      cv::resize(cropped, other, cv::Size(nw, nh), 0, 0, interpolation);
+  } catch (const cv::Exception &e) {
+      fnOutputDebug("Error during resizing: " + std::to_string(w) + " x " + std::to_string(h) + " to " + std::to_string(rw) + " x " + std::to_string(rh));
+      fnOutputDebug( e.what() );
+  }
+  return 1;
+}
+
+DLL_API uintptr_t DLL_CALLCONV ListProcessMemoryBlocks(int a) {
+    // Get system information to know memory ranges
+    fnOutputDebug("ListProcessMemoryBlocks A");
+    SYSTEM_INFO sysInfo;
+    GetSystemInfo(&sysInfo);
+
+    // Start from the minimum application address
+    LPVOID address = sysInfo.lpMinimumApplicationAddress;
+    
+    // Store results
+    struct MemoryBlock {
+        void* address;
+        SIZE_T size;
+        DWORD state;
+        DWORD protect;
+    };
+    std::vector<MemoryBlock> blocks;
+    int mi = 0;
+
+    fnOutputDebug("ListProcessMemoryBlocks B");
+    // Query memory regions until we reach maximum address
+    while(address < sysInfo.lpMaximumApplicationAddress) {
+        MEMORY_BASIC_INFORMATION memInfo;
+        SIZE_T result = VirtualQuery(address, &memInfo, sizeof(memInfo));
+        
+        if(result == 0) {
+            break; // Query failed
+        }
+        mi++;
+
+        // Only show committed memory (actually allocated blocks)
+        if(memInfo.State == MEM_COMMIT && memInfo.Protect == 4 && memInfo.RegionSize>987654) {
+            blocks.push_back({
+                memInfo.BaseAddress,
+                memInfo.RegionSize,
+                memInfo.State,
+                memInfo.Protect
+            });
+        }
+
+        // Move to next region
+        address = (LPVOID)((DWORD_PTR)address + memInfo.RegionSize);
+    }
+
+    // Sort blocks by size in descending order
+    std::sort(blocks.begin(), blocks.end(), 
+        [](const MemoryBlock& a, const MemoryBlock& b) {
+            return a.size > b.size;
+        });
+
+    // Print results
+    fnOutputDebug("ListProcessMemoryBlocks C; mi=" + std::to_string(mi));
+    fnOutputDebug("Memory Blocks...");
+    fnOutputDebug("Address, Size");
+    int index = 0;
+    for(const auto& block : blocks) {
+        index++;
+        fnOutputDebug( std::to_string(index) + " = " 
+                     + std::to_string( (uintptr_t)block.address ) + ", "
+                     + std::to_string(block.size) + ", " );
+    }
+    fnOutputDebug("ListProcessMemoryBlocks D; index=" + std::to_string(index));
+    return (uintptr_t)blocks[0].address;
 }
 
 DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, int h, int Stride, int bpp, int maskOpacity, int blendMode, int flipLayers, int keepAlpha, int linearGamma, unsigned char *newBitmap, int StrideMini, int mw, int mh) {

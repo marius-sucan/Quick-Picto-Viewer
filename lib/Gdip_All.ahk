@@ -3123,6 +3123,9 @@ Gdip_CreateBitmapFromDirectDrawSurface(IDirectDrawSurface) {
 Gdip_CreateBitmap(Width, Height, PixelFormat:=0, Stride:=0, Scan0:=0) {
 ; By default, this function creates a new 32-ARGB bitmap.
 ; modified by Marius Șucan
+; scan0 - Optional pointer to an array of bytes that contains the pixel data.
+;         The caller is responsible for allocating and freeing the block of memory pointed to by this parameter
+
    If (!Width || !Height)
    {
       gdipLastError := 2
@@ -5882,6 +5885,7 @@ Gdip_IsOutlineVisiblePathPoint(pGraphics, pPath, pPen, X, Y) {
 
 Gdip_IsVisiblePathPoint(pPath, x, y, pGraphics) {
 ; Function by RazorHalo, modified by Marius Șucan
+; Hit test function
   result := 0
   E := DllCall("gdiplus\GdipIsVisiblePathPoint", "UPtr", pPath, "float", x, "float", y, "UPtr", pGraphics, "UPtr*", result)
   If E
@@ -5940,8 +5944,8 @@ Gdip_SetInterpolationMode(pGraphics, InterpolationMode) {
 ; Bilinear = 3
 ; Bicubic = 4 [very slow]
 ; NearestNeighbor = 5 [fastest]
-; HighQualityBilinear = 6
-; HighQualityBicubic = 7 [fast]
+; HighQualityBilinear = 6 [fast]
+; HighQualityBicubic = 7
 
 ; NOTES: The drawing of GDI+ Bitmaps is limited to a size of 32767 pixels
 ; in either direction (width, height). This limit applies only if the
