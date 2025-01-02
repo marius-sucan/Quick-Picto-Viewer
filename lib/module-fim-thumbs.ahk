@@ -13,11 +13,13 @@ SetWorkingDir, %A_ScriptDir%
 ; #Include Lib\freeimage.ahk
 ; #Include Lib\wia.ahk
 SetWinDelay, 1
-Global GDIPToken, MainExe := AhkExported(), runningGDIPoperation := 0, WICmoduleHasInit := 0
-     , mainCompiledPath := "", wasInitFIMlib := 0, listBitmaps := "", imgQuality := 0
-     , operationDone := 1, resultsList := "", FIMfailed2init := 0, thisThreadID := -1
-     , waitDataCollect := 1, operationFailed := 0, RegExWICfmtPtrn
-     , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|IFF|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|WEBP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
+Global GDIPToken, MainExe := AhkExported(), runningGDIPoperation := 0, WICmoduleHasInit := 0, allowWICloader := 1
+     , mainCompiledPath := "", wasInitFIMlib := 0, listBitmaps := "", userImgQuality := 0, userHQraw := 1
+     , operationDone := 1, resultsList := "", FIMfailed2init := 0, thisThreadID := -1, allowToneMappingImg := 1
+     , waitDataCollect := 1, operationFailed := 0, RegExWICfmtPtrn, enableThumbsCaching := 1
+     , cmrRAWtoneMapAlgo, cmrRAWtoneMapParamA, cmrRAWtoneMapParamB, cmrRAWtoneMapOCVparamA, cmrRAWtoneMapOCVparamB
+     , cmrRAWtoneMapParamC, cmrRAWtoneMapParamD
+     , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|TIFF|TIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
 
 ; E := initThisThread()
 Return
@@ -32,7 +34,7 @@ initThisThread(params:=0) {
      externObj := StrSplit(params, "|")
      GDIPToken := externObj[1]
      mainCompiledPath := externObj[2]
-     imgQuality := externObj[3]
+     userImgQuality := externObj[3]
      thisThreadID := externObj[4]
      WICmoduleHasInit := externObj[5]
      RegExWICfmtPtrn := MainExe.ahkGetVar.RegExWICfmtPtrn
@@ -85,8 +87,21 @@ LoadWICimage(imgPath, w:=0, h:=0, keepAratio:=1, thisImgQuality:=0, frameu:=0, S
    Return r
 }
 
-cleanMess(thisID:=0) {
+cleanMess(thisID:=0, params:=0) {
    Critical, on
+   optionz := StrSplit(params, "|")
+   enableThumbsCaching := optionz[1]
+   userHQraw := optionz[2]
+   allowToneMappingImg := optionz[3]
+   allowWICloader := optionz[4]
+   userImgQuality := optionz[5]
+   cmrRAWtoneMapAlgo := optionz[6]
+   cmrRAWtoneMapParamA := optionz[7]
+   cmrRAWtoneMapParamB := optionz[8]
+   cmrRAWtoneMapParamC := optionz[9]
+   cmrRAWtoneMapParamD := optionz[10]
+   cmrRAWtoneMapOCVparamA := optionz[11]
+   cmrRAWtoneMapOCVparamB := optionz[12]
    waitDataCollect := 1
    ; OutputDebug, QPV: ThumbsMode. Script thread. Clean GDIs mess...
 
@@ -125,15 +140,10 @@ isVarEqualTo(value, vals*) {
 MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
    Critical, on
    optionz := StrSplit(params, "|")
-   mustSaveFile := optionz[1]
-   thumbsSizeQuality := optionz[2]
-   userHQraw := optionz[3]
-   allowToneMappingImg := optionz[4]
-   timePerImg := optionz[5]
-   coreIndex := optionz[6]
-   thisFileIndex := optionz[7]
-   allowWICloader := optionz[8]
-   ; mustSaveFile "|" thumbsSizeQuality "|" userHQraw "|" allowToneMappingImg "|" timePerImg "|" coreIndex "|" thisFileIndex
+   thumbsSizeQuality := optionz[1]
+   timePerImg := optionz[2]
+   coreIndex := optionz[3]
+   thisFileIndex := optionz[4]
 
    operationDone := hFIFimgA := finalBitmap := 0
    waitDataCollect := operationFailed := 0
@@ -145,7 +155,7 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
       thisImgQuality := (imgQuality=1) ? 6 : 5
       finalBitmap := LoadWICimage(imgPath, thumbsSizeQuality, thumbsSizeQuality, 1, thisImgQuality, 3, 0)
       thisZeit := A_TickCount - startZeit
-      If (mustSaveFile=1 && thisZeit>timePerImg && finalBitmap)
+      If (enableThumbsCaching=1 && thisZeit>timePerImg && StrLen(finalBitmap)>2)
          r := Gdip_SaveBitmapToFile(finalBitmap, file2save)
    }
 
@@ -182,7 +192,7 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
          hFIFimgA := hFIFimgX
       } Else
       {
-         fnOutputDebug(mustSaveFile " - " thumbsSizeQuality "px - " timePerImg "ms - core" coreIndex " - file" thisfileIndex " - loopIndex" thisBindex " - " imgPath)
+         fnOutputDebug(enableThumbsCaching " - " thumbsSizeQuality "px - " timePerImg "ms - core" coreIndex " - file" thisfileIndex " - loopIndex" thisBindex " - " imgPath)
          operationDone := 1
          waitDataCollect := 1
          operationFailed := 1
@@ -190,17 +200,33 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
          Return -1
       }
 
-      imgBPP := Trim(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
       ColorsType := FreeImage_GetColorType(hFIFimgA)
-      mustApplyToneMapping := (imgBPP>32 && !InStr(ColorsType, "rgba")) || (imgBPP>64) ? 1 : 0
-      thisAllow := isVarEqualTo(GFT, 32, 26, 29) ? 1 : allowToneMappingImg
+      imgBPP := Trim(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
+      thisAllow := (isVarEqualTo(GFT, 32, 26, 29) && imgBPP>32) ? 1 : allowToneMappingImg
+      mustApplyToneMapping := (imgBPP>32 && !InStr(ColorsType, "rgba") && GFT!=13) || (imgBPP>64) ? 1 : 0
       If (mustApplyToneMapping=1 && thisAllow=1)
       {
-         hFIFimgB := FreeImage_ToneMapping(hFIFimgA, 0, 1.85, 0)
+         PixelFormat := FreeImage_GetImageType(hFIFimgA, 1)
+         If (InStr(PixelFormat, "RGBAF") && cmrRAWtoneMapAlgo>2)
+         {
+            hFIFimgD := FreeImage_ConvertTo(hFIFimgA, "RGBF")
+            If hFIFimgD
+            {
+               FreeImage_UnLoad(hFIFimgA)
+               hFIFimgA := hFIFimgD
+            }
+         }
+ 
+         PixelFormat := FreeImage_GetImageType(hFIFimgA, 1)
+         If (cmrRAWtoneMapAlgo>2 && InStr(PixelFormat, "RGBF"))
+            hFIFimgB := OpenCV_FimToneMapping(hFIFimgA, cmrRAWtoneMapAlgo - 3, cmrRAWtoneMapOCVparamA, cmrRAWtoneMapOCVparamB, cmrRAWtoneMapParamC, cmrRAWtoneMapParamD, PixelFormat)
+         If !hFIFimgB
+            hFIFimgB := FreeImage_ToneMapping(hFIFimgA, clampInRange(cmrRAWtoneMapAlgo - 1, 0, 1), cmrRAWtoneMapParamA, cmrRAWtoneMapParamB)
+ 
          FreeImage_UnLoad(hFIFimgA)
          If !hFIFimgB
          {
-            fnOutputDebug(mustSaveFile " - " thumbsSizeQuality "px - " timePerImg "ms - core" coreIndex " - file" thisfileIndex " - loopIndex" thisBindex " - " imgPath)
+            fnOutputDebug(enableThumbsCaching " - " thumbsSizeQuality "px - " timePerImg "ms - core" coreIndex " - file" thisfileIndex " - loopIndex" thisBindex " - " imgPath)
             operationDone := 1
             waitDataCollect := 1
             operationFailed := 1
@@ -221,7 +247,7 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
             hFIFimgA := hFIFimgB
          } Else
          {
-            fnOutputDebug(mustSaveFile " - " thumbsSizeQuality "px - " timePerImg "ms - core" coreIndex " - file" thisfileIndex " - loopIndex" thisBindex " - " imgPath)
+            fnOutputDebug(enableThumbsCaching " - " thumbsSizeQuality "px - " timePerImg "ms - core" coreIndex " - file" thisfileIndex " - loopIndex" thisBindex " - " imgPath)
             operationDone := 1
             operationFailed := 1
             waitDataCollect := 1
@@ -244,17 +270,17 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
             }
          }
 
-         If (mustSaveFile=1 && thisZeit>timePerImg)
+         If (enableThumbsCaching=1 && thisZeit>timePerImg)
             savedFile := FreeImage_Save(hFIFimgA, file2save)
          Else savedFile := "yeah"
 
          finalBitmap := ConvertFimObj2pBitmap(hFIFimgA, ResizedW, ResizedH)
          FreeImage_UnLoad(hFIFimgA)
-         If (finalBitmap && thisZeit>timePerImg && mustSaveFile=1 && !savedFile)
+         If (finalBitmap && thisZeit>timePerImg && enableThumbsCaching=1 && !savedFile)
          {
             r := Gdip_SaveBitmapToFile(finalBitmap, file2save)
             ; SoundBeep , 900, 100
-         } Else If (!finalBitmap && mustSaveFile=1 && savedFile)
+         } Else If (!finalBitmap && enableThumbsCaching=1 && savedFile)
          {
             ; SoundBeep , 900, 100
             finalBitmap := Gdip_CreateBitmapFromFileSimplified(file2save)
@@ -274,7 +300,7 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
    ; cleanupThread()
 }
 
-gdipMonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, resizeFilter, coreIndex, thisfileIndex, thisBindex) {
+gdipMonoGenerateThumb(imgPath, file2save, enableThumbsCaching, thumbsSizeQuality, resizeFilter, coreIndex, thisfileIndex, thisBindex) {
    Critical, on
    operationDone := 0
    hFIFimgA := 0
@@ -311,10 +337,10 @@ gdipMonoGenerateThumb(imgPath, file2save, mustSaveFile, thumbsSizeQuality, resiz
       Return -1
    }
 
-   If (hFIFimgA)
+   If hFIFimgA
    {
       thisZeit := A_TickCount - startZeit
-      If (mustSaveFile=1 && thisZeit>225)
+      If (enableThumbsCaching=1 && thisZeit>225)
          savedFile := Gdip_SaveBitmapToFile(hFIFimgA, file2save)
 
       finalBitmap := hFIFimgA
@@ -342,7 +368,7 @@ ConvertFimObj2pBitmap(hFIFimgD, imgW, imgH) {
      Return
 
   nBitmap := Gdip_CreateBitmapFromGdiDib(bitmapInfo, pBits)
-  pBitmap := Gdip_CreateBitmap(imgW, imgH, 0xE200B)    ; 24-RGB
+  pBitmap := Gdip_CreateBitmap(imgW, imgH, "0xE200B")  ; 32-bits PARGB
 
   G := Gdip_GraphicsFromImage(pBitmap)
   Gdip_DrawImageFast(G, nBitmap)
@@ -351,7 +377,74 @@ ConvertFimObj2pBitmap(hFIFimgD, imgW, imgH) {
   Return pBitmap
 }
 
+OpenCV_FimToneMapping(hFIFimgA, algo, paramA, paramB, paramC, paramD, PixelFormat) {
+; apply tone mapping on HDR image using OpenCV instead of FreeImage. It is much faster.
+    If !hFIFimgA
+    {
+       addJournalEntry(A_ThisFunc "(): failed to perform tone-mapping, undefined bitmap object")
+       Return 0
+    }
+
+    FreeImage_GetImageDimensions(hFIFimgA, Width, Height)
+    If (!Width || !Height)
+    {
+       addJournalEntry(A_ThisFunc "(): failed to perform tone-mapping; incorrect FreeImage bitmap provided")
+       Return 0
+    }
+
+    If InStr(PixelFormat, "RGBAF")
+       hFIFimgA := FreeImage_ConvertTo(hFIFimgA, "RGBF")
+
+    bpp := 24 ; InStr(PixelFormat, "RGBAF") ? 32 : 24
+    hFIFimgX := FreeImage_Allocate(Width, Height, 24)
+    If !hFIFimgX
+    {
+       addJournalEntry(A_ThisFunc "(): failed to perform tone-mapping; unable to allocate new FreeImage bitmap object")
+       Return 0
+    }
+  
+    pBits := FreeImage_GetBits(hFIFimgX)
+    pBitsAll := FreeImage_GetBits(hFIFimgA)
+    r := DllCall("qpvmain.dll\openCVapplyToneMappingAlgos", "UPtr", pBitsAll, "Int", width, "Int", height, "UPtr", pBits, "int", bpp, "int", algo, "float", paramA, "float", paramB, "float", paramC, "float", paramD)
+    If InStr(PixelFormat, "RGBAF")
+       FreeImage_UnLoad(hFIFimgA)
+    If !r 
+    {
+       addJournalEntry(A_ThisFunc "(): failed to perform tone-mapping; an opencv or qpv dll failure occured")
+       FreeImage_UnLoad(hFIFimgX)
+       Return 0
+    }
+    Return hFIFimgX
+}
+
+addJournalEntry(aa) {
+  Return -1
+}
+clampInRange(value, min, max, reverse:=0) {
+   If (reverse=1)
+   {
+      If (value>max)
+         value := min
+      Else If (value<min)
+         value := max
+   } Else
+   {
+      If (value>max)
+         value := max
+      Else If (value<min)
+         value := min
+   }
+
+   Return value
+}
+
 ; external functions
+; freeimage library functions 
+
+FreeImage_Allocate(width, height, bpp:=32, red_mask:=0xFF000000, green_mask:=0x00FF0000, blue_mask:=0x0000FF00) {
+; function useful to create a new / empty bitmap
+   Return DllCall(getFIMfunc("Allocate"), "int", width, "int", height, "int", bpp, "uint", red_mask, "uint", green_mask, "uint", blue_mask, "uptr")
+}
 
 FreeImage_GetInfo(hImage) {
    Return DllCall(getFIMfunc("GetInfo"), "uptr", hImage, "uptr")
@@ -362,10 +455,6 @@ FreeImage_GetBits(hImage) {
 }
 
 FreeImage_ConvertTo(hImage, MODE) {
-; This is a wrapper for multiple FreeImage functions.
-; Possible parameters for MODE: "4Bits", "8Bits", "16Bits555", "16Bits565", "24Bits",
-; "32Bits", "Greyscale", "Float", "RGBF", "RGBAF", "UINT16", "RGB16", "RGBA16"
-; ATTENTION: these are case sensitive!
    If !hImage
       Return
 
@@ -378,7 +467,6 @@ FreeImage_ConvertTo(hImage, MODE) {
 FreeImage_GetFIFFromFilename(ImgPath) {
    Return DllCall(getFIMfunc("GetFIFFromFilename"), "AStr", ImgPath)
 }
-
 
 FreeImage_Save(hImage, ImgPath, ImgArg:=0) {
 ; Return 0 = failed; 1 = success
@@ -491,6 +579,15 @@ FreeImage_Load(ImgPath, GFT:=-1, flag:=0, ByRef dGFT:=0) {
 FreeImage_GetBPP(hImage) {
    Return DllCall(getFIMfunc("GetBPP"), "uptr", hImage)
 }
+
+FreeImage_GetImageType(hImage, humanReadable:=0) {
+   Static imgTypes := {0:"UNKNOWN", 1:"Standard Bitmap", 2:"UINT16 [16-bit]", 3:"INT16 [16-bit]", 4:"UINT32 [32-bit]", 5:"INT32 [32-bit]", 6:"FLOAT [32-bit]", 7:"DOUBLE [64-bit]", 8:"COMPLEX [2x64-bit]", 9:"RGB16 [48-bit]", 10:"RGBA16 [64-bit]", 11:"RGBF [96-bit]", 12:"RGBAF [128-bit]"}
+   r := DllCall(getFIMfunc("GetImageType"), "uptr", hImage)
+   If (humanReadable=1 && imgTypes.HasKey(r))
+      r := imgTypes[r]
+   Return r
+}
+
 
 getFIMfunc(funct) {
 ; for some crazy reason, in the 32 bits DLL of FreeImage

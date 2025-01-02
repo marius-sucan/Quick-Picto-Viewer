@@ -48,7 +48,7 @@ void fnOutputDebug(std::string input) {
        return;
 
     std::stringstream ss;
-    ss << "qpv:: " << input;
+    ss << "qpv: " << input;
     OutputDebugStringA(ss.str().data());
 }
 
@@ -4524,11 +4524,12 @@ DLL_API int DLL_CALLCONV openCVresizeBitmap(unsigned char *imageData, unsigned c
   return 1;
 }
 
-DLL_API int DLL_CALLCONV openCVapplyToneMappingAlgos(float* hdrData, int width, int height, unsigned char* ldrData, int algo, float paramA, float paramB, float paramC, float paramD) {
+DLL_API int DLL_CALLCONV openCVapplyToneMappingAlgos(float* hdrData, int width, int height, unsigned char* ldrData, int bpp, int algo, float paramA, float paramB, float paramC, float paramD) {
 // paramD is always exposure amount
-
-    cv::Mat hdrImage(height, width, CV_32FC3, hdrData);
-    cv::Mat ldrFinal(height, width, CV_8UC3, ldrData);
+    int clrF = (bpp==32) ? CV_32FC4 : CV_32FC3;
+    int clrU = (bpp==32) ? CV_8UC4 : CV_8UC3;
+    cv::Mat hdrImage(height, width, clrF, hdrData);
+    cv::Mat ldrFinal(height, width, clrU, ldrData);
     cv::Mat ldrImage;
     if (algo==0)
     {
@@ -4544,16 +4545,16 @@ DLL_API int DLL_CALLCONV openCVapplyToneMappingAlgos(float* hdrData, int width, 
        mantiuk->process(hdrImage, ldrImage);
     }
 
-    paramD = (paramD + 0.33f) * 3.0f;
-    if (paramD>1.001)
+    // paramD = (paramD + 0.33f) * 3.0f;
+    // if (paramD>1.001)
+    paramD = (paramD + 0.16f) * 3.0f;
+    if (paramD!=1)
        cv::normalize(ldrImage, ldrImage, 0.0f, paramD, cv::NORM_MINMAX);
 
     fnOutputDebug("openCVapplyToneMappingAlgos: paramD=" + std::to_string(paramD));
     ldrImage = ldrImage * 255.0f;
     ldrImage.convertTo(ldrFinal, CV_8UC3);
     cv::cvtColor(ldrFinal, ldrFinal, cv::COLOR_RGB2BGR);
-
-    // std::memcpy(ldrData, ldrImage.data, width * height * 3 * sizeof(unsigned char));
     return 1;
 }
 
