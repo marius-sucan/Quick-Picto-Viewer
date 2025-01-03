@@ -18,7 +18,7 @@ Global GDIPToken, MainExe := AhkExported(), runningGDIPoperation := 0, WICmodule
      , operationDone := 1, resultsList := "", FIMfailed2init := 0, thisThreadID := -1, allowToneMappingImg := 1
      , waitDataCollect := 1, operationFailed := 0, RegExWICfmtPtrn, enableThumbsCaching := 1
      , cmrRAWtoneMapAlgo, cmrRAWtoneMapParamA, cmrRAWtoneMapParamB, cmrRAWtoneMapOCVparamA, cmrRAWtoneMapOCVparamB
-     , cmrRAWtoneMapParamC, cmrRAWtoneMapParamD
+     , cmrRAWtoneMapParamC, cmrRAWtoneMapParamD, cmrRAWtoneMapAltExpo
      , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|TIFF|TIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
 
 ; E := initThisThread()
@@ -102,6 +102,7 @@ cleanMess(thisID:=0, params:=0) {
    cmrRAWtoneMapParamD := optionz[10]
    cmrRAWtoneMapOCVparamA := optionz[11]
    cmrRAWtoneMapOCVparamB := optionz[12]
+   cmrRAWtoneMapAltExpo := optionz[13]
    waitDataCollect := 1
    ; OutputDebug, QPV: ThumbsMode. Script thread. Clean GDIs mess...
 
@@ -207,7 +208,7 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
       If (mustApplyToneMapping=1 && thisAllow=1)
       {
          PixelFormat := FreeImage_GetImageType(hFIFimgA, 1)
-         If (InStr(PixelFormat, "RGBAF") && cmrRAWtoneMapAlgo>2)
+         If (!InStr(PixelFormat, "RGBF") && cmrRAWtoneMapAlgo>2)
          {
             hFIFimgD := FreeImage_ConvertTo(hFIFimgA, "RGBF")
             If hFIFimgD
@@ -219,7 +220,7 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
  
          PixelFormat := FreeImage_GetImageType(hFIFimgA, 1)
          If (cmrRAWtoneMapAlgo>2 && InStr(PixelFormat, "RGBF"))
-            hFIFimgB := OpenCV_FimToneMapping(hFIFimgA, cmrRAWtoneMapAlgo - 3, cmrRAWtoneMapOCVparamA, cmrRAWtoneMapOCVparamB, cmrRAWtoneMapParamC, cmrRAWtoneMapParamD, PixelFormat)
+            hFIFimgB := OpenCV_FimToneMapping(hFIFimgA, cmrRAWtoneMapAlgo - 3, cmrRAWtoneMapOCVparamA, cmrRAWtoneMapOCVparamB, cmrRAWtoneMapParamC, cmrRAWtoneMapParamD, PixelFormat, cmrRAWtoneMapAltExpo)
          If !hFIFimgB
             hFIFimgB := FreeImage_ToneMapping(hFIFimgA, clampInRange(cmrRAWtoneMapAlgo - 1, 0, 1), cmrRAWtoneMapParamA, cmrRAWtoneMapParamB)
  
@@ -377,7 +378,7 @@ ConvertFimObj2pBitmap(hFIFimgD, imgW, imgH) {
   Return pBitmap
 }
 
-OpenCV_FimToneMapping(hFIFimgA, algo, paramA, paramB, paramC, paramD, PixelFormat) {
+OpenCV_FimToneMapping(hFIFimgA, algo, paramA, paramB, paramC, paramD, PixelFormat, altExpo) {
 ; apply tone mapping on HDR image using OpenCV instead of FreeImage. It is much faster.
     If !hFIFimgA
     {
@@ -405,7 +406,7 @@ OpenCV_FimToneMapping(hFIFimgA, algo, paramA, paramB, paramC, paramD, PixelForma
   
     pBits := FreeImage_GetBits(hFIFimgX)
     pBitsAll := FreeImage_GetBits(hFIFimgA)
-    r := DllCall("qpvmain.dll\openCVapplyToneMappingAlgos", "UPtr", pBitsAll, "Int", width, "Int", height, "UPtr", pBits, "int", bpp, "int", algo, "float", paramA, "float", paramB, "float", paramC, "float", paramD)
+    r := DllCall("qpvmain.dll\openCVapplyToneMappingAlgos", "UPtr", pBitsAll, "Int", width, "Int", height, "UPtr", pBits, "int", bpp, "int", algo, "float", paramA, "float", paramB, "float", paramC, "float", paramD, "int", altExpo)
     If InStr(PixelFormat, "RGBAF")
        FreeImage_UnLoad(hFIFimgA)
     If !r 

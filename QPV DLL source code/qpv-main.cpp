@@ -4524,8 +4524,10 @@ DLL_API int DLL_CALLCONV openCVresizeBitmap(unsigned char *imageData, unsigned c
   return 1;
 }
 
-DLL_API int DLL_CALLCONV openCVapplyToneMappingAlgos(float* hdrData, int width, int height, unsigned char* ldrData, int bpp, int algo, float paramA, float paramB, float paramC, float paramD) {
+DLL_API int DLL_CALLCONV openCVapplyToneMappingAlgos(float* hdrData, int width, int height, unsigned char* ldrData, int bpp, int algo, float paramA, float paramB, float paramC, float paramD, int altModeExposure) {
 // paramD is always exposure amount
+// the tone-mapping algorithms do not give correct results with 4 channels [RGBA]
+
     int clrF = (bpp==32) ? CV_32FC4 : CV_32FC3;
     int clrU = (bpp==32) ? CV_8UC4 : CV_8UC3;
     cv::Mat hdrImage(height, width, clrF, hdrData);
@@ -4545,11 +4547,14 @@ DLL_API int DLL_CALLCONV openCVapplyToneMappingAlgos(float* hdrData, int width, 
        mantiuk->process(hdrImage, ldrImage);
     }
 
-    // paramD = (paramD + 0.33f) * 3.0f;
-    // if (paramD>1.001)
-    paramD = (paramD + 0.16f) * 3.0f;
-    if (paramD!=1)
-       cv::normalize(ldrImage, ldrImage, 0.0f, paramD, cv::NORM_MINMAX);
+    if (paramD>0.0001)
+    {
+       float p = (paramD + 0.33f) * 3.0f;
+       if (altModeExposure==1)
+          cv::scaleAdd(hdrImage, paramD, ldrImage, ldrImage);
+       else if (p>1.001)
+          cv::normalize(ldrImage, ldrImage, 0.0f, p, cv::NORM_MINMAX);
+    }
 
     fnOutputDebug("openCVapplyToneMappingAlgos: paramD=" + std::to_string(paramD));
     ldrImage = ldrImage * 255.0f;

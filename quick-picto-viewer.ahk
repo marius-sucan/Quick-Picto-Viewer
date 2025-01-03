@@ -375,7 +375,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , freeHandSelectionMode := 0, DrawLineAreaBorderConnector := 1, DrawLineAreaSnapLine := 0
    , DrawLineAreaBlendMode := 1, BlendModesPreserveAlpha := 0, FillAreaCutGlass := 0
    , userImgChannelAlphaAdd := 0, forceSlowLivePreviewMode := 0, showContextualStatusBar := 1
-   , vectorToolModus := 1, TextInAreaVerticalia := 0, DrawLineAreaThickScale := 100
+   , vectorToolModus := 1, TextInAreaVerticalia := 0, DrawLineAreaThickScale := 100, cmrRAWtoneMapAltExpo := 0
    , DrawLineAreaJoinsStyle := 0, DrawLineAreaMitersBorder := 100, DrawLineAreaPolarSection := 1440
    , DrawLineAreaPolarMode := 1, IDedgesModus := 1, IDedgesPreEmphasis := 0, IDedgesPreContrast := 0
    , UIuserToneMapParamC := 180, cmrRAWtoneMapParamC := 1, UIuserToneMapParamD := 60, cmrRAWtoneMapParamD := 0
@@ -14632,7 +14632,7 @@ OpenCV_FimResizeBitmap(hFIFimgA, resizedW, resizedH, rx, ry, rw, rh, Interpolati
     Return hFIFimgX
 }
 
-OpenCV_FimToneMapping(hFIFimgA, algo, paramA, paramB, paramC, paramD, PixelFormat) {
+OpenCV_FimToneMapping(hFIFimgA, algo, paramA, paramB, paramC, paramD, PixelFormat, altExpo) {
 ; apply tone mapping on HDR image using OpenCV instead of FreeImage. It is much faster.
 
     initQPVmainDLL()
@@ -14668,7 +14668,7 @@ OpenCV_FimToneMapping(hFIFimgA, algo, paramA, paramB, paramC, paramD, PixelForma
   
     pBits := FreeImage_GetBits(hFIFimgX)
     pBitsAll := FreeImage_GetBits(hFIFimgA)
-    r := DllCall(whichMainDLL "\openCVapplyToneMappingAlgos", "UPtr", pBitsAll, "Int", width, "Int", height, "UPtr", pBits, "int", bpp, "int", algo, "float", paramA, "float", paramB, "float", paramC, "float", paramD)
+    r := DllCall(whichMainDLL "\openCVapplyToneMappingAlgos", "UPtr", pBitsAll, "Int", width, "Int", height, "UPtr", pBits, "int", bpp, "int", algo, "float", paramA, "float", paramB, "float", paramC, "float", paramD, "int", altExpo)
     If InStr(PixelFormat, "RGBAF")
        FreeImage_UnLoad(hFIFimgA)
     If !r 
@@ -54599,6 +54599,7 @@ ReadSettingsAdjustToneMapPanel(actu:=0) {
     IniAction(actu, "cmrRAWtoneMapAlgo", "General", 2, 1, 5)
     IniAction(actu, "allowToneMappingImg", "General", 1)
     IniAction(actu, "userHQraw", "General", 1)
+    RegAction(actu, "cmrRAWtoneMapAltExpo",, 1)
     RegAction(actu, "UIuserToneMapParamA", , 2, 0, 400)
     RegAction(actu, "UIuserToneMapParamB", , 2, 0, 400)
     RegAction(actu, "UIuserToneMapOCVparamA", , 2, 0, 400)
@@ -54623,7 +54624,7 @@ PanelAdjustToneMapping() {
        txtWid := txtWid + 20
        Gui, Font, s%LargeUIfontValue%
     }
-
+    sml := (PrefsLargeFonts=1) ? 30 : 20
     showTOOLtip("Initializing tone-mapping panel, please wait")
     Global SliderA, SliderB, infoSliderA, infoSliderB
     Gui, -DPIScale
@@ -54633,10 +54634,11 @@ PanelAdjustToneMapping() {
     Gui, Add, Text, x15 y+10 Section w%txtWid% vinfoLine, Pixel format: %ppp%
     Gui, Add, Checkbox, xs y+10 gupdateUItoneMappingPanel Checked%allowToneMappingImg% vallowToneMappingImg, Apply tone mapping to image(s)
     GuiAddDropDownList("xs y+10 w" txtWid//2 - 2 " AltSubmit gupdateUItoneMappingPanel Choose" cmrRAWtoneMapAlgo " vcmrRAWtoneMapAlgo", "F. Drago (FreeImage)|E. Reinhard (FreeImage)|F. Drago (OpenCV)|E. Reinhard (OpenCV)", "HDR tone mapping algorithm")
-    GuiAddSlider("UIuserToneMapParamD", 0,400, 0, "Exposure", "updateUItoneMappingPanel", 1, "x+1 w" txtWid//2 - 2 " hp")
+    GuiAddSlider("UIuserToneMapParamD", 0,400, 0, "Additional exposure", "updateUItoneMappingPanel", 1, "x+1 w" txtWid//2 - 2 " hp")
     GuiAddSlider("UIuserToneMapParamA", 1,400, 74, "Parameter A", "updateUItoneMappingPanel", 1, "xs y+10 w" txtWid " hp+1")
-    GuiAddSlider("UIuserToneMapOCVparamA", 1,400, 74, "Gamma", "updateUItoneMappingPanel", 1, "xp yp wp hp")
-    GuiAddSlider("UIuserToneMapParamB", 1,400, 200, "Parameter B", "updateUItoneMappingPanel", 1, "xs y+10 wp hp")
+    GuiAddSlider("UIuserToneMapOCVparamA", 1,400, 74, "Gamma", "updateUItoneMappingPanel", 1, "xp yp w" txtWid - sml " hp")
+    GuiAddCheckbox("x+1 hp w" sml " gupdateUItoneMappingPanel Checked" cmrRAWtoneMapAltExpo " vcmrRAWtoneMapAltExpo", "Alternative mode for exposure adjustment", "A")
+    GuiAddSlider("UIuserToneMapParamB", 1,400, 200, "Parameter B", "updateUItoneMappingPanel", 1, "xs y+10 w" txtWid " hp")
     GuiAddSlider("UIuserToneMapOCVparamB", 1,400, 200, "Parameter OCV-B", "updateUItoneMappingPanel", 1, "xp yp wp hp")
     GuiAddSlider("UIuserToneMapParamC", 1,400, 74, "Parameter C", "updateUItoneMappingPanel", 1, "xs y+10 wp hp")
     Gui, Add, Checkbox, xs y+10 wp gupdateUItoneMappingPanel Checked%userHQraw% vuserHQraw, Load camera RAW images at high quality
@@ -54795,10 +54797,18 @@ updateUIfimToneMappedIMG() {
    If (thisAllow=1)
    {
       PixelFormat := FreeImage_GetImageType(globalhFIFimg, 1)
+      If (!InStr(PixelFormat, "RGBF") && cmrRAWtoneMapAlgo>2)
+         hFIFimgZ := FreeImage_ConvertTo(globalhFIFimg, "RGBF")
+      Else
+         hFIFimgZ := FreeImage_Clone(globalhFIFimg)
+
+      PixelFormat := FreeImage_GetImageType(hFIFimgZ, 1)
       If (cmrRAWtoneMapAlgo>2 && varContains(PixelFormat, "RGBF", "RGBAF"))
-         hFIFimgE := OpenCV_FimToneMapping(globalhFIFimg, cmrRAWtoneMapAlgo - 3, cmrRAWtoneMapOCVparamA, cmrRAWtoneMapOCVparamB, cmrRAWtoneMapParamC, cmrRAWtoneMapParamD, PixelFormat)
+         hFIFimgE := OpenCV_FimToneMapping(hFIFimgZ, cmrRAWtoneMapAlgo - 3, cmrRAWtoneMapOCVparamA, cmrRAWtoneMapOCVparamB, cmrRAWtoneMapParamC, cmrRAWtoneMapParamD, PixelFormat, cmrRAWtoneMapAltExpo)
       If !hFIFimgE
-         hFIFimgE := FreeImage_ToneMapping(globalhFIFimg, clampInRange(cmrRAWtoneMapAlgo - 1, 0, 1), cmrRAWtoneMapParamA, cmrRAWtoneMapParamB)
+         hFIFimgE := FreeImage_ToneMapping(hFIFimgZ, clampInRange(cmrRAWtoneMapAlgo - 1, 0, 1), cmrRAWtoneMapParamA, cmrRAWtoneMapParamB)
+
+      FreeImage_UnLoad(hFIFimgZ)
    } Else
       hFIFimgE := FreeImage_Clone(globalhFIFimg)
 
@@ -54858,7 +54868,6 @@ BTNresetToneMap() {
 
    allowToneMappingImg := 1
    Gui, SettingsGUIA: Default
-   ; GuiControl, SettingsGUIA: Choose, cmrRAWtoneMapAlgo, 1
    GuiControl, SettingsGUIA: , allowToneMappingImg, 1
    If (cmrRAWtoneMapAlgo=1)
    {
@@ -54953,19 +54962,22 @@ updateUItoneMappingPanel() {
 
    Gui, SettingsGUIA: Default
    GuiControlGet, cmrRAWtoneMapAlgo
+   GuiControlGet, cmrRAWtoneMapAltExpo
    GuiControlGet, userHQraw
    GuiControlGet, allowToneMappingImg
    yayz := currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat
-   If (cmrRAWtoneMapAlgo>2 && !varContains(yayz, "RGBAF", "RGBF"))
-   {
-      GuiControl, SettingsGUIA: Choose, cmrRAWtoneMapAlgo, 2
-      cmrRAWtoneMapAlgo := 2
-   }
+   ; If (cmrRAWtoneMapAlgo>2 && !varContains(yayz, "RGBAF", "RGBF"))
+   ; {
+   ;    GuiControl, SettingsGUIA: Choose, cmrRAWtoneMapAlgo, 2
+   ;    cmrRAWtoneMapAlgo := 2
+   ; }
 
    calculateToneMappingAlgoParams(cmrRAWtoneMapAlgo, UIuserToneMapParamA, UIuserToneMapParamB, UIuserToneMapParamC, UIuserToneMapParamD, UIuserToneMapOCVparamA, UIuserToneMapOCVparamB)
    actu := (cmrRAWtoneMapAlgo>2) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
    GuiUpdateVisibilitySliders(actu, "UIuserToneMapOCVparamA")
    GuiUpdateVisibilitySliders(actu, "UIuserToneMapOCVparamB")
+   GuiControl, % actu, cmrRAWtoneMapAltExpo
+
    actu := (cmrRAWtoneMapAlgo<3) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
    GuiUpdateVisibilitySliders(actu, "UIuserToneMapParamA")
    GuiUpdateVisibilitySliders(actu, "UIuserToneMapParamB")
@@ -54995,6 +55007,7 @@ updateUItoneMappingPanel() {
       uiSlidersArray["UIuserToneMapParamC", 5] := "|Saturation: " Round(cmrRAWtoneMapParamC, 2)
    }
 
+   uiSlidersArray["UIuserToneMapParamD", 5] := "|Additional exposure: " Round(cmrRAWtoneMapParamD, 2)
    GuiRefreshSliders()
    updateUIfimToneMappedIMG()
    lastInvoked := A_TickCount
@@ -57786,7 +57799,7 @@ FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, externCondition, ByRef has
       changeMcursor()
       thisStartZeit := A_TickCount
       PixelFormat := FreeImage_GetImageType(hFIFimgA, 1)
-      If (InStr(PixelFormat, "RGBAF") && cmrRAWtoneMapAlgo>2)
+      If (!InStr(PixelFormat, "RGBF") && cmrRAWtoneMapAlgo>2)
       {
          hFIFimgD := FreeImage_ConvertTo(hFIFimgA, "RGBF")
          If hFIFimgD
@@ -57798,7 +57811,7 @@ FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, externCondition, ByRef has
 
       PixelFormat := FreeImage_GetImageType(hFIFimgA, 1)
       If (cmrRAWtoneMapAlgo>2 && InStr(PixelFormat, "RGBF"))
-         hFIFimgB := OpenCV_FimToneMapping(hFIFimgA, cmrRAWtoneMapAlgo - 3, cmrRAWtoneMapOCVparamA, cmrRAWtoneMapOCVparamB, cmrRAWtoneMapParamC, cmrRAWtoneMapParamD, PixelFormat)
+         hFIFimgB := OpenCV_FimToneMapping(hFIFimgA, cmrRAWtoneMapAlgo - 3, cmrRAWtoneMapOCVparamA, cmrRAWtoneMapOCVparamB, cmrRAWtoneMapParamC, cmrRAWtoneMapParamD, PixelFormat, cmrRAWtoneMapAltExpo)
       If !hFIFimgB
          hFIFimgB := FreeImage_ToneMapping(hFIFimgA, clampInRange(cmrRAWtoneMapAlgo - 1, 0, 1), cmrRAWtoneMapParamA, cmrRAWtoneMapParamB)
 
@@ -70455,7 +70468,7 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
   {
      MD5name := generateThumbName(imgPath, 1)
      ; fimStuff := (alwaysOpenwithFIM=1) ? 1 desiredFrameIndex totalFramesIndex : 0
-     thisMD5name := MD5name imgPath userHQraw cmrRAWtoneMapAlgo cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD allowToneMappingImg
+     thisMD5name := MD5name imgPath userHQraw cmrRAWtoneMapAlgo cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapAltExpo allowToneMappingImg
      tFramesA := Gdip_GetBitmapFramesCount(GDIcacheSRCfileA) - 1
      tFramesB := Gdip_GetBitmapFramesCount(GDIcacheSRCfileB) - 1
      isFramesA := (tFramesA = AbackupIMGdetails.Frames) ? 1 : 0
@@ -80251,7 +80264,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
    calculateToneMappingAlgoParams(cmrRAWtoneMapAlgo, UIuserToneMapParamA, UIuserToneMapParamB, UIuserToneMapParamC, UIuserToneMapParamD, UIuserToneMapOCVparamA, UIuserToneMapOCVparamB)
    If (mustDoMultiCore=1)
    {
-      paramz := enableThumbsCaching "|" userHQraw "|" allowToneMappingImg "|" allowWICloader "|" userimgQuality "|" cmrRAWtoneMapAlgo "|" cmrRAWtoneMapParamA "|" cmrRAWtoneMapParamB "|" cmrRAWtoneMapParamC "|" cmrRAWtoneMapParamD "|" cmrRAWtoneMapOCVparamA "|" cmrRAWtoneMapOCVparamB
+      paramz := enableThumbsCaching "|" userHQraw "|" allowToneMappingImg "|" allowWICloader "|" userimgQuality "|" cmrRAWtoneMapAlgo "|" cmrRAWtoneMapParamA "|" cmrRAWtoneMapParamB "|" cmrRAWtoneMapParamC "|" cmrRAWtoneMapParamD "|" cmrRAWtoneMapOCVparamA "|" cmrRAWtoneMapOCVparamB "|" cmrRAWtoneMapAltExpo
       fnOutputDebug("ThumbsMode. Clean multi-core GDIs mess. Cores: " limitCores)
       Loop, % limitCores
           thumbThread%A_Index%.ahkFunction("cleanMess", "c" A_Index, paramz)
