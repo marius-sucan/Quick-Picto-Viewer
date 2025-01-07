@@ -4511,8 +4511,8 @@ DLL_API int DLL_CALLCONV openCVblurFilters(unsigned char *imageData, int w, int 
 DLL_API int DLL_CALLCONV openCVresizeBitmap(unsigned char *imageData, unsigned char *otherData, int w, int h, int Stride, int rw, int rh, int mStride, int bpp, int interpolation) {
   // function unused
   int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
-  cv::Mat image(h, w, clr, imageData);
-  cv::Mat other(rh, rw, clr, otherData);
+  cv::Mat image(h, w, clr, imageData, Stride);
+  cv::Mat other(rh, rw, clr, otherData, mStride);
 
   try {
       cv::resize(image, other, cv::Size(rw, rh), 0, 0, interpolation);
@@ -4524,14 +4524,35 @@ DLL_API int DLL_CALLCONV openCVresizeBitmap(unsigned char *imageData, unsigned c
   return 1;
 }
 
-DLL_API int DLL_CALLCONV openCVapplyToneMappingAlgos(float* hdrData, int width, int height, unsigned char* ldrData, int bpp, int algo, float paramA, float paramB, float paramC, float paramD, int altModeExposure) {
-// paramD is always exposure amount
+
+DLL_API int DLL_CALLCONV openCVresizeBitmapExtended(unsigned char *imageData, unsigned char *otherData, int w, int h, int Stride, int rx, int ry, int rw, int rh, int nw, int nh, int mStride, int bpp, int interpolation) {
+  int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
+  cv::Mat image(h, w, clr, imageData, Stride);
+  cv::Mat other(nh, nw, clr, otherData, mStride);
+
+  cv::Rect subRect(rx, ry, rw, rh);
+  subRect.x = min( max(0, subRect.x), w - 1);
+  subRect.y = min( max(0, subRect.y), h - 1);
+  subRect.width = min(subRect.width, image.cols - subRect.x);
+  subRect.height = min(subRect.height, image.rows - subRect.y);
+  cv::Mat cropped = image(subRect);
+
+  try {
+      cv::resize(cropped, other, cv::Size(nw, nh), 0, 0, interpolation);
+  } catch (const cv::Exception &e) {
+      fnOutputDebug("Error during resizing: " + std::to_string(w) + " x " + std::to_string(h) + " to " + std::to_string(rw) + " x " + std::to_string(rh));
+      fnOutputDebug( e.what() );
+  }
+  return 1;
+}
+
+DLL_API int DLL_CALLCONV openCVapplyToneMappingAlgos(float* hdrData, int hStride, int width, int height, unsigned char* ldrData, int lStride, int algo, float paramA, float paramB, float paramC, float addExposure, int altModeExposure) {
 // the tone-mapping algorithms do not give correct results with 4 channels [RGBA]
 
-    int clrF = (bpp==32) ? CV_32FC4 : CV_32FC3;
-    int clrU = (bpp==32) ? CV_8UC4 : CV_8UC3;
-    cv::Mat hdrImage(height, width, clrF, hdrData);
-    cv::Mat ldrFinal(height, width, clrU, ldrData);
+    // fnOutputDebug("openCVapplyToneMappingAlgos: hStride=" + std::to_string(hStride));
+    cv::Mat hdrImage(height, width, CV_32FC3, hdrData, hStride);
+    cv::Mat ldrFinal(height, width, CV_8UC3, ldrData, lStride);
+    // fnOutputDebug("openCVapplyToneMappingAlgos: hdrStride=" + std::to_string(hdrImage.step) + " // ldrStride=" + std::to_string(ldrFinal.step));
     cv::Mat ldrImage;
     if (algo==0)
     {
@@ -4541,49 +4562,30 @@ DLL_API int DLL_CALLCONV openCVapplyToneMappingAlgos(float* hdrData, int width, 
     {
        cv::Ptr<cv::TonemapReinhard> reinhard = cv::createTonemapReinhard(paramA, paramB, paramC, 0);
        reinhard->process(hdrImage, ldrImage);
+    } else if (algo==2)
+    {
+       cv::Ptr<cv::Tonemap> tnmp = cv::createTonemap(paramA);
+       tnmp->process(hdrImage, ldrImage);
     } else
     {
        cv::Ptr<cv::TonemapMantiuk> mantiuk = cv::createTonemapMantiuk(paramA, paramB, paramC);
        mantiuk->process(hdrImage, ldrImage);
     }
 
-    if (paramD>0.0001)
+    if (addExposure>0.002)
     {
-       float p = (paramD + 0.33f) * 3.0f;
+       float p = (addExposure + 0.33f) * 3.0f;
        if (altModeExposure==1)
-          cv::scaleAdd(hdrImage, paramD, ldrImage, ldrImage);
+          cv::scaleAdd(hdrImage, addExposure, ldrImage, ldrImage);
        else if (p>1.001)
           cv::normalize(ldrImage, ldrImage, 0.0f, p, cv::NORM_MINMAX);
     }
 
-    fnOutputDebug("openCVapplyToneMappingAlgos: paramD=" + std::to_string(paramD));
+    fnOutputDebug("openCVapplyToneMappingAlgos: addExposure=" + std::to_string(addExposure));
     ldrImage = ldrImage * 255.0f;
     ldrImage.convertTo(ldrFinal, CV_8UC3);
     cv::cvtColor(ldrFinal, ldrFinal, cv::COLOR_RGB2BGR);
     return 1;
-}
-
-DLL_API int DLL_CALLCONV openCVresizeBitmapExtended(unsigned char *imageData, unsigned char *otherData, int w, int h, int Stride, int rx, int ry, int rw, int rh, int nw, int nh, int mStride, int bpp, int interpolation) {
-  // function unused
-  int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
-  cv::Mat image(h, w, clr, imageData, Stride);
-  cv::Mat other(nh, nw, clr, otherData, mStride);
-
-    cv::Rect subRect(rx, ry, rw, rh);
-    subRect.x = min( max(0, subRect.x), w - 1);
-    subRect.y = min( max(0, subRect.y), h - 1);
-    subRect.width = min(subRect.width, image.cols - subRect.x);
-    subRect.height = min(subRect.height, image.rows - subRect.y);
-
-    cv::Mat cropped = image(subRect);
-
-  try {
-      cv::resize(cropped, other, cv::Size(nw, nh), 0, 0, interpolation);
-  } catch (const cv::Exception &e) {
-      fnOutputDebug("Error during resizing: " + std::to_string(w) + " x " + std::to_string(h) + " to " + std::to_string(rw) + " x " + std::to_string(rh));
-      fnOutputDebug( e.what() );
-  }
-  return 1;
 }
 
 DLL_API uintptr_t DLL_CALLCONV ListProcessMemoryBlocks(int a) {

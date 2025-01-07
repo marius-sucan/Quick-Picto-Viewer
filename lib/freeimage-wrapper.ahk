@@ -207,8 +207,8 @@ FreeImage_Save(hImage, ImgPath, ImgArg:=0) {
    If (!hImage || !ImgPath)
       Return
 
-   OutExt := FreeImage_GetFIFFromFilename(ImgPath)
-   Return DllCall(getFIMfunc("SaveU"), "Int", OutExt, "uptr", hImage, "WStr", ImgPath, "int", ImgArg)
+   FormatID := FreeImage_GetFIFFromFilename(ImgPath)
+   Return DllCall(getFIMfunc("SaveU"), "Int", FormatID, "uptr", hImage, "WStr", ImgPath, "int", ImgArg)
 }
 
 FreeImage_Clone(hImage) {
@@ -824,7 +824,8 @@ FreeImage_AcquireMemory(hMemory, ByRef BufAdr, ByRef BufSize) {
    Return bSucess
 } ; untested
 
-FreeImage_SaveToMemory(FIF, hImage, hMemory, Flags) { ; 0:BMP 2:JPG 13:PNG 18:TIF 25:GIF
+FreeImage_SaveToMemory(FIF, hImage, hMemory, Flags) {
+; 0:BMP 2:JPG 13:PNG 18:TIF 25:GIF
    Return DllCall(getFIMfunc("SaveToMemory"), "int", FIF, "uptr", hImage, "int", hMemory, "int", Flags)
 } ; untested
 

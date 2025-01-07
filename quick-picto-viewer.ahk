@@ -383,8 +383,8 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
-If (realSystemCores>8)
-   realSystemCores := 8
+If (realSystemCores>6)
+   realSystemCores := 6
 
 RegRead, InitCheckReg, %QPVregEntry%, Running
 RegRead, InitTimeReg, %QPVregEntry%, LastStartTime
@@ -471,7 +471,7 @@ createGDIPcanvas()
 InitGDIpStuff()
 
 Global multiCoreThumbsInitGood := "n", thumbThread1,thumbThread2,thumbThread3,thumbThread4
-,thumbThread5,thumbThread6,thumbThread7,thumbThread8,thumbThread9,thumbThread10
+,thumbThread5,thumbThread6,thumbThread7
 
 If (A_PtrSize=4)
 {
@@ -509,7 +509,7 @@ SetTimer, createGUItoolbar, -100
 Return
 
 ;_____________________________________ Hotkeys _________________
-; the hotkeys are registered since v5.4.5 in
+; the hotkeys are registered since v5.4.5 in the
 ; interfaceThread / module-interface.ahk
 
 identifyThisWin() {
@@ -517,8 +517,7 @@ identifyThisWin() {
   If (A_TickCount - lastInvoked < 50)
      Return prevR
 
-  Az := WinActive("A")
-  prevR := (Az=PVhwnd || Az=hGDIwin || Az=hGDIthumbsWin || Az=hGDIinfosWin || Az=hGDIselectWin) ? 1 : 0
+  prevR := isVarEqualTo(WinActive("A"), PVhwnd, hGDIwin, hGDIthumbsWin, hGDIinfosWin, hGDIselectWin) ? 1 : 0
   lastInvoked := A_TickCount
   Return prevR
 }
@@ -684,8 +683,8 @@ WM_KEYDOWN(wParam, lParam, msg, ctrlHwnd) {
        Return
     }
 
-    If (whileLoopExec=1 || runningLongOperation=1) && (vk_code!="1B") 
-    || (A_TickCount - lastOtherWinClose<300) || (Awin=PVhwnd)
+    If ( ( (whileLoopExec=1 || runningLongOperation=1) && (vk_code!="1B") )
+    || (A_TickCount - lastOtherWinClose<300) || (Awin=PVhwnd) )
        Return 
 
     vk_shift := DllCall("GetKeyState","Int", 0x10, "short") >> 16
@@ -712,7 +711,6 @@ deactivateTlbrKbdMode(m:=0) {
 
 KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
    Static lastInvoked := 1
-   ; SoundBeep 
    If isNumber(externCounter)
       navKeysCounter := externCounter
 
@@ -979,6 +977,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     {
         ; w - to-do
         ; testIdentifyDIBbehindGDIPbmp()
+        ; testFIMrgb16toRGBF()
         If (isImgEditingNow()=1 && drawingShapeNow=1)
            func2Call := ["focusVectorEndPoint"]
         Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1 && thumbsDisplaying!=1)
@@ -2460,9 +2459,10 @@ runDelayedfunc2exec() {
 
 OpenSLD(fileNamu, dontStartSlide:=0) {
   mustOpenStartFolder := ""
+  zPlitPath(fileNamu, 0, OutFileName, OutDir, extname)
   If !FileExist(fileNamu)
   {
-     showTOOLtip("ERROR: Failed to load files list")
+     showTOOLtip("ERROR: Unable to load the files list.`nThe file is missing or access denied.`n" OutFileName "`n" OutDir "\")
      SoundBeep, 300, 100
      SetTimer, RemoveTooltip, % -msgDisplayTime
      Return
@@ -2480,7 +2480,6 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
   renewCurrentFilesList()
   newStaticFoldersListCache := []
   DynamicFoldersList := CurrentSLD := filesFilter := ""
-  zPlitPath(fileNamu, 0, OutFileName, OutDir, extname)
   pfn := (userPrivateMode=1) ? "******." extname : OutFileName
   fdr := (userPrivateMode=1) ? "*:\******\***" : OutDir
   showTOOLtip("Loading slideshow, please wait`n" pfn "`n" fdr "\")
@@ -4465,7 +4464,7 @@ fnOutputDebug(msg) {
    {
       If (prevMsg!=msg && slideShowRunning!=1 && slideShowDelay>300)
       {
-         If (InStr(msg, "Thumb") && thumbsDisplaying=1)
+         If (InStr(msg, "ThumbsMode") && thumbsDisplaying=1)
             Return
 
          prevMsg := msg
@@ -4497,7 +4496,6 @@ initAHKhThumbThreads() {
        multiCoreThumbsInitGood := 0
     } Else
     {
-       ; SoundBeep 300, 100
        If A_IsCompiled
           r := GetRes(dataFile, 0, "MODULE-FIM-THUMBS.AHK", 10)
 
@@ -4507,20 +4505,20 @@ initAHKhThumbThreads() {
               Continue
 
            If !A_IsCompiled
-              thumbThread%A_Index% := ahkthread("#Include *i Lib\module-fim-thumbs.ahk")
+              thumbThread%A_Index% := ahkThread("#Include *i Lib\module-fim-thumbs.ahk")
            Else If r
               thumbThread%A_Index% := ahkThread(StrGet(&dataFile, r, "utf-8"))
 
-           Sleep, 1
+           Sleep, 5
        }
 
        Loop, % realSystemCores
        {
+           Sleep, 5
            goodInit += thumbThread%A_Index%.ahkFunction("initThisThread", GDIPToken "|" mainCompiledPath "|" userimgQuality "|" A_Index "|" WICmoduleHasInit)
-           Sleep, 1
        }
 
-       multiCoreThumbsInitGood := (goodInit = realSystemCores) ? 1 : 0
+       multiCoreThumbsInitGood := (goodInit=realSystemCores) ? 1 : 0
        If (multiCoreThumbsInitGood=1)
           addJournalEntry("Succesfully initialized " goodInit " threads.")
        Else
@@ -14632,7 +14630,7 @@ OpenCV_FimResizeBitmap(hFIFimgA, resizedW, resizedH, rx, ry, rw, rh, Interpolati
     Return hFIFimgX
 }
 
-OpenCV_FimToneMapping(hFIFimgA, algo, paramA, paramB, paramC, paramD, PixelFormat, altExpo) {
+OpenCV_FimToneMapping(hFIFimgA, algo, paramA, paramB, paramC, paramD, altExpo) {
 ; apply tone mapping on HDR image using OpenCV instead of FreeImage. It is much faster.
 
     initQPVmainDLL()
@@ -14655,10 +14653,6 @@ OpenCV_FimToneMapping(hFIFimgA, algo, paramA, paramB, paramC, paramD, PixelForma
        Return 0
     }
 
-    If InStr(PixelFormat, "RGBAF")
-       hFIFimgA := FreeImage_ConvertTo(hFIFimgA, "RGBF")
-
-    bpp := 24 ; InStr(PixelFormat, "RGBAF") ? 32 : 24
     hFIFimgX := FreeImage_Allocate(Width, Height, 24)
     If !hFIFimgX
     {
@@ -14668,9 +14662,9 @@ OpenCV_FimToneMapping(hFIFimgA, algo, paramA, paramB, paramC, paramD, PixelForma
   
     pBits := FreeImage_GetBits(hFIFimgX)
     pBitsAll := FreeImage_GetBits(hFIFimgA)
-    r := DllCall(whichMainDLL "\openCVapplyToneMappingAlgos", "UPtr", pBitsAll, "Int", width, "Int", height, "UPtr", pBits, "int", bpp, "int", algo, "float", paramA, "float", paramB, "float", paramC, "float", paramD, "int", altExpo)
-    If InStr(PixelFormat, "RGBAF")
-       FreeImage_UnLoad(hFIFimgA)
+    hStride := FreeImage_GetStride(hFIFimgA)
+    lStride := FreeImage_GetStride(hFIFimgX)
+    r := DllCall(whichMainDLL "\openCVapplyToneMappingAlgos", "UPtr", pBitsAll, "int", hStride, "int", width, "int", height, "UPtr", pBits, "int", lStride, "int", algo, "float", paramA, "float", paramB, "float", paramC, "float", paramD, "int", altExpo)
     If !r 
     {
        addJournalEntry(A_ThisFunc "(): failed to perform tone-mapping; an opencv or qpv dll failure occured")
@@ -14681,7 +14675,8 @@ OpenCV_FimToneMapping(hFIFimgA, algo, paramA, paramB, paramC, paramD, PixelForma
 }
 
 OpenCV_GdipResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", KeepPixelFormat:=0) {
-; function unused
+; function unused; locking the bits using Gdip_LockBits() is super-slow
+; and it renders futile my attempt to replace gdip resizing with something faster
 
     If (!validBMP(pBitmap) || !givenW || !givenH)
     {
@@ -37082,7 +37077,7 @@ readMainSettingsApp(act) {
     IniAction(act, "useCachedSLDdata", "General", 1)
     IniAction(act, "userimgGammaCorrect", "General", 1)
     IniAction(act, "userimgQuality", "General", 1)
-    IniAction(act, "userMultiCoresLimit", "General", 2, 2, thisSystemCores)
+    IniAction(act, "userMultiCoresLimit", "General", 2, 2, min(6, thisSystemCores))
     IniAction(act, "usrTextAlign", "General", 5)
     IniAction(act, "preventDeleteFromProtectedPath", "General", 1)
     IniAction(act, "protectedFolderPath", "General", 6)
@@ -41736,12 +41731,12 @@ WriteThumbnailsSettingsPanel() {
 PanelSetSystemCores() {
    EnvGet, thisSystemCores, NUMBER_OF_PROCESSORS
    fakeWinCreator(41, A_ThisFunc, 1)
-   msgResult := msgBoxWrapper("panelu|Multi-threading options: " appTitle, "Please specify the number of threads to use when generating thumbnails and for batch processing of files. Maximum allowed threads on this system is " thisSystemCores ".`n`nAfter changing this value, a restart of QPV might be necessary.", "&Apply|&Cancel", 1, "gear", "Generate thumbnails using multiple threads [experimental]", allowMultiCoreMode, 0, "limit2 number", userMultiCoresLimit)
+   msgResult := msgBoxWrapper("panelu|Multi-threading options: " appTitle, "Please specify the number of threads to use when generating thumbnails and for batch processing of files. Maximum allowed threads is 6.`n`nAfter changing this value, a restart of QPV might be necessary.", "&Apply|&Cancel", 1, "gear", "Generate thumbnails using multiple threads [experimental]", allowMultiCoreMode, 0, "limit2 number", userMultiCoresLimit)
    If InStr(msgResult.btn, "apply")
    {
       allowMultiCoreMode := msgResult.check
       userMultiCoresLimit := Trimmer(msgResult.edit)
-      userMultiCoresLimit := clampInRange(userMultiCoresLimit, 2, thisSystemCores)
+      userMultiCoresLimit := clampInRange(userMultiCoresLimit, 2, min(6, thisSystemCores))
       INIaction(1, "allowMultiCoreMode", "General")
       INIaction(1, "userMultiCoresLimit", "General")
       realSystemCores := userMultiCoresLimit
@@ -41753,7 +41748,6 @@ PanelSetSystemCores() {
 
 PanelSaveSlideShowu() {
     Global userDesiredSlideFMT := 1
-
     If (maxFilesIndex<2)
     {
        showTOOLtip("WARNING: Insufficient image files are indexed")
@@ -54624,6 +54618,7 @@ PanelAdjustToneMapping() {
        txtWid := txtWid + 20
        Gui, Font, s%LargeUIfontValue%
     }
+
     sml := (PrefsLargeFonts=1) ? 30 : 20
     showTOOLtip("Initializing tone-mapping panel, please wait")
     Global SliderA, SliderB, infoSliderA, infoSliderB
@@ -54633,7 +54628,7 @@ PanelAdjustToneMapping() {
     Gui, +DPIScale
     Gui, Add, Text, x15 y+10 Section w%txtWid% vinfoLine, Pixel format: %ppp%
     Gui, Add, Checkbox, xs y+10 gupdateUItoneMappingPanel Checked%allowToneMappingImg% vallowToneMappingImg, Apply tone mapping to image(s)
-    GuiAddDropDownList("xs y+10 w" txtWid//2 - 2 " AltSubmit gupdateUItoneMappingPanel Choose" cmrRAWtoneMapAlgo " vcmrRAWtoneMapAlgo", "F. Drago (FreeImage)|E. Reinhard (FreeImage)|F. Drago (OpenCV)|E. Reinhard (OpenCV)", "HDR tone mapping algorithm")
+    GuiAddDropDownList("xs y+10 w" txtWid//2 - 2 " AltSubmit gupdateUItoneMappingPanel Choose" cmrRAWtoneMapAlgo " vcmrRAWtoneMapAlgo", "F. Drago (FreeImage)|E. Reinhard (FreeImage)|F. Drago (OpenCV)|E. Reinhard (OpenCV)|Simple mode (OpenCV)", "HDR tone mapping algorithm")
     GuiAddSlider("UIuserToneMapParamD", 0,400, 0, "Additional exposure", "updateUItoneMappingPanel", 1, "x+1 w" txtWid//2 - 2 " hp")
     GuiAddSlider("UIuserToneMapParamA", 1,400, 74, "Parameter A", "updateUItoneMappingPanel", 1, "xs y+10 w" txtWid " hp+1")
     GuiAddSlider("UIuserToneMapOCVparamA", 1,400, 74, "Gamma", "updateUItoneMappingPanel", 1, "xp yp w" txtWid - sml " hp")
@@ -54650,7 +54645,7 @@ PanelAdjustToneMapping() {
     GuiAddButton("xs y+25 h" thisBtnHeight " w" ml pp " gBtnPrevToneMapPic", "<<", "Previous image")
     GuiAddButton("x+5 hp wp gBtnNextToneMapPic" pp, ">>", "Next image")
     Gui, Add, Button, x+5 h%thisBtnHeight% w%cl% gBTNtoneMapRefresh Default, &Apply
-    Gui, Add, Button, x+5 hp wp gBTNresetToneMap, &Reset
+    Gui, Add, Button, x+5 hp wp gBTNresetToneMapOptions, &Reset
     Gui, Add, Button, x+5 hp wp gBtnHelpToneMapping, &Help
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, Clo&se
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
@@ -54660,7 +54655,7 @@ PanelAdjustToneMapping() {
 }
 
 BtnHelpToneMapping() {
-   msgBoxWrapper(appTitle ": HELP", "High-dynamic range images (HDRIs) must be converted to 24 bits to be displayed on screen. You can choose the algorithm to use for this and also configure it.`n`nWhen the option to load Camera RAW images with high quality is activated, the tone-mapping options can be applied on these as well.`n`nDeactivating tone-mapping for HDR, EXR and PFM image file formats is not possible.`n`nThe OpenCV implementations execute faster and can be applied only on RGB(A)F pixel formats.`n`nUse the reset button to identify commonly used settings for each algorithm implementation.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "High-dynamic range images (HDRIs) must be converted to 24 bits to be displayed on screen. You can choose the algorithm to use for this and also configure it.`n`nWhen the option to load Camera RAW images with high quality is activated, the tone-mapping options can be applied on these as well.`n`nDeactivating tone-mapping for HDR, EXR and PFM image file formats is not possible.`n`nThe OpenCV implementations execute faster and produce much better results, but the alpha channel, if present, will not be preserved.`n`nUse the reset button to identify commonly used settings for each algorithm implementation.`n`nPlease note: the preview may not accurately match the output in the viewport.", -1, 0, 0)
 }
 
 killToneMapImageCacheObj() {
@@ -54804,7 +54799,7 @@ updateUIfimToneMappedIMG() {
 
       PixelFormat := FreeImage_GetImageType(hFIFimgZ, 1)
       If (cmrRAWtoneMapAlgo>2 && varContains(PixelFormat, "RGBF", "RGBAF"))
-         hFIFimgE := OpenCV_FimToneMapping(hFIFimgZ, cmrRAWtoneMapAlgo - 3, cmrRAWtoneMapOCVparamA, cmrRAWtoneMapOCVparamB, cmrRAWtoneMapParamC, cmrRAWtoneMapParamD, PixelFormat, cmrRAWtoneMapAltExpo)
+         hFIFimgE := OpenCV_FimToneMapping(hFIFimgZ, cmrRAWtoneMapAlgo - 3, cmrRAWtoneMapOCVparamA, cmrRAWtoneMapOCVparamB, cmrRAWtoneMapParamC, cmrRAWtoneMapParamD, cmrRAWtoneMapAltExpo)
       If !hFIFimgE
          hFIFimgE := FreeImage_ToneMapping(hFIFimgZ, clampInRange(cmrRAWtoneMapAlgo - 1, 0, 1), cmrRAWtoneMapParamA, cmrRAWtoneMapParamB)
 
@@ -54862,13 +54857,15 @@ BTNtoneMapRefresh() {
    RefreshImageFileAction()
 }
 
-BTNresetToneMap() {
+BTNresetToneMapOptions() {
    If (AnyWindowOpen!=42)
       Return
 
-   allowToneMappingImg := 1
    Gui, SettingsGUIA: Default
-   GuiControl, SettingsGUIA: , allowToneMappingImg, 1
+   allowToneMappingImg := 1
+   cmrRAWtoneMapAltExpo := 0
+   GuiControl, SettingsGUIA:, allowToneMappingImg, 1
+   GuiControl, SettingsGUIA:, cmrRAWtoneMapAltExpo, 0
    If (cmrRAWtoneMapAlgo=1)
    {
       UIuserToneMapParamA := 75
@@ -54889,6 +54886,10 @@ BTNresetToneMap() {
       UIuserToneMapOCVparamB := 185
       UIuserToneMapParamC := 295
       UIuserToneMapParamD := 30
+   } Else If (cmrRAWtoneMapAlgo=5)
+   {
+      UIuserToneMapOCVparamA := 155
+      UIuserToneMapParamD := 100
    }
 
    GuiRefreshSliders()
@@ -54913,14 +54914,13 @@ calculateToneMappingAlgoParams(algo, paramA, paramB, paramC, paramD, paramAA, pa
       cmrRAWtoneMapParamB := prcB
    } 
 
+   cmrRAWtoneMapOCVparamA := 9.9*prcAA
    If (algo=3)
    {
-      cmrRAWtoneMapOCVparamA := 9.9*prcAA
       cmrRAWtoneMapOCVparamB := 5.9*prcBB
       cmrRAWtoneMapParamC := prcC*2
    } Else ; If (algo=4)
    {
-      cmrRAWtoneMapOCVparamA := 9.9*prcAA
       cmrRAWtoneMapOCVparamB := (16*prcBB - 8)*1.5
       cmrRAWtoneMapParamC := prcC
    }
@@ -54936,14 +54936,13 @@ calculateToneMappingAlgoParams(algo, paramA, paramB, paramC, paramD, paramAA, pa
       cmrRAWtoneMapParamB := clampInRange(cmrRAWtoneMapParamB, 0, 1)
    }
 
+   cmrRAWtoneMapOCVparamA := clampInRange(cmrRAWtoneMapOCVparamA, 0, 9.9)
    If (cmrRAWtoneMapAlgo=3)
    {
-      cmrRAWtoneMapOCVparamA := clampInRange(cmrRAWtoneMapOCVparamA, 0, 9.9)
       cmrRAWtoneMapOCVparamB := clampInRange(cmrRAWtoneMapOCVparamB, 0, 5.9)
       cmrRAWtoneMapParamC := clampInRange(cmrRAWtoneMapParamC, 0, 2.0)
    } Else ; If (cmrRAWtoneMapAlgo=4)
    {
-      cmrRAWtoneMapOCVparamA := clampInRange(cmrRAWtoneMapOCVparamA, 0, 9.9)
       cmrRAWtoneMapOCVparamB := clampInRange(cmrRAWtoneMapOCVparamB, -12, 12)
       cmrRAWtoneMapParamC := clampInRange(cmrRAWtoneMapParamC, 0, 1)
    } 
@@ -54965,13 +54964,6 @@ updateUItoneMappingPanel() {
    GuiControlGet, cmrRAWtoneMapAltExpo
    GuiControlGet, userHQraw
    GuiControlGet, allowToneMappingImg
-   yayz := currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat
-   ; If (cmrRAWtoneMapAlgo>2 && !varContains(yayz, "RGBAF", "RGBF"))
-   ; {
-   ;    GuiControl, SettingsGUIA: Choose, cmrRAWtoneMapAlgo, 2
-   ;    cmrRAWtoneMapAlgo := 2
-   ; }
-
    calculateToneMappingAlgoParams(cmrRAWtoneMapAlgo, UIuserToneMapParamA, UIuserToneMapParamB, UIuserToneMapParamC, UIuserToneMapParamD, UIuserToneMapOCVparamA, UIuserToneMapOCVparamB)
    actu := (cmrRAWtoneMapAlgo>2) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
    GuiUpdateVisibilitySliders(actu, "UIuserToneMapOCVparamA")
@@ -54984,6 +54976,7 @@ updateUItoneMappingPanel() {
    actu := (cmrRAWtoneMapAlgo>2) ? 1 : 0
    uiSlidersArray["UIuserToneMapParamC", 10] := actu
    uiSlidersArray["UIuserToneMapParamD", 10] := actu
+   uiSlidersArray["UIuserToneMapOCVparamB", 10] := actu
    uiSlidersArray["UIuserToneMapOCVparamA", 5] := "|Gamma: " Round(cmrRAWtoneMapOCVparamA, 2)
    If (cmrRAWtoneMapAlgo=1)
    {
@@ -55003,8 +54996,8 @@ updateUItoneMappingPanel() {
       uiSlidersArray["UIuserToneMapParamC", 5] := "|Light adaptation: " Round(cmrRAWtoneMapParamC, 2)
    } Else If (cmrRAWtoneMapAlgo=5)
    {
-      uiSlidersArray["UIuserToneMapOCVparamB", 5] := "|Scale: " Round(cmrRAWtoneMapOCVparamB, 2)
-      uiSlidersArray["UIuserToneMapParamC", 5] := "|Saturation: " Round(cmrRAWtoneMapParamC, 2)
+      uiSlidersArray["UIuserToneMapOCVparamB", 10] := 0
+      uiSlidersArray["UIuserToneMapParamC", 10] := 0
    }
 
    uiSlidersArray["UIuserToneMapParamD", 5] := "|Additional exposure: " Round(cmrRAWtoneMapParamD, 2)
@@ -57811,7 +57804,7 @@ FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, externCondition, ByRef has
 
       PixelFormat := FreeImage_GetImageType(hFIFimgA, 1)
       If (cmrRAWtoneMapAlgo>2 && InStr(PixelFormat, "RGBF"))
-         hFIFimgB := OpenCV_FimToneMapping(hFIFimgA, cmrRAWtoneMapAlgo - 3, cmrRAWtoneMapOCVparamA, cmrRAWtoneMapOCVparamB, cmrRAWtoneMapParamC, cmrRAWtoneMapParamD, PixelFormat, cmrRAWtoneMapAltExpo)
+         hFIFimgB := OpenCV_FimToneMapping(hFIFimgA, cmrRAWtoneMapAlgo - 3, cmrRAWtoneMapOCVparamA, cmrRAWtoneMapOCVparamB, cmrRAWtoneMapParamC, cmrRAWtoneMapParamD, cmrRAWtoneMapAltExpo)
       If !hFIFimgB
          hFIFimgB := FreeImage_ToneMapping(hFIFimgA, clampInRange(cmrRAWtoneMapAlgo - 1, 0, 1), cmrRAWtoneMapParamA, cmrRAWtoneMapParamB)
 
@@ -59810,11 +59803,16 @@ MenuOpenLastImg(forceOpenGiven:=0) {
 
    If !FileRexists(forceOpenGiven)
    {
-      IniRead, LastOpenedImg, % mainRecentsFile, RecentImgOpened, E1, @
-      LastOpenedImg := Trimmer(LastOpenedImg)
+      Sleep, -1
+      LastOpenedImg := forceOpenGiven
+      If !RegExMatch(forceOpenGiven, RegExFilesPattern)
+      {
+         IniRead, LastOpenedImg, % mainRecentsFile, RecentImgOpened, E1, @
+         LastOpenedImg := Trimmer(LastOpenedImg)
+      }
    } Else LastOpenedImg := Trimmer(forceOpenGiven)
 
-   If RegExMatch(LastOpenedImg, RegExFilesPattern) && FileRexists(LastOpenedImg)
+   If (RegExMatch(LastOpenedImg, RegExFilesPattern) && FileRexists(LastOpenedImg))
    {
       If askAboutFileSave(" and another image will be loaded")
          Return
@@ -59868,6 +59866,16 @@ MenuOpenLastImg(forceOpenGiven:=0) {
       }
       If (FlipImgH=1 || FlipImgV=1 || vpIMGrotation>0 || imgFxMode>1 || usrColorDepth>1)
          CreateTempGuiButton("Display unaltered image,,HardResetImageView", 0, msgDisplayTime//1.5 + 500)
+   } Else If StrLen(LastOpenedImg)>3
+   {
+      zPlitPath(LastOpenedImg, 0, OutFileName, OutDir, OutNameNoExt)
+      If !RegExMatch(LastOpenedImg, RegExFilesPattern)
+         showTOOLtip("ERROR: The file seems to be an unsupported image format.`n" OutFileName "`n" OutDir "\")
+      Else
+         showTOOLtip("ERROR: File not found or access denied.`n" OutFileName "`n" OutDir "\")
+
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 }
 
@@ -80200,7 +80208,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
         } Else
         {
            wasThumbCached := (isForceRefresh=1) ? 0 : checkThumbExists(MD5name, imgPath, file2load)
-           fnOutputDebug("Thumb = " thisFileIndex  " cached=" wasThumbCached " original file: " imgPath " thumb file: " file2load)
+           ; fnOutputDebug("ThumbsMode. File #" thisFileIndex  " cached=" wasThumbCached " original file: " imgPath " thumb file: " file2load)
            If (wasThumbCached=1)
               imgsListArrayThumbs[thisFileIndex] := ["f", 0, imgPath, file2load, DestPosX, DestPosY, MD5name]
         }
@@ -80718,7 +80726,7 @@ cloneGDItoMem(funcu, pBitmap, W:=0, H:=0) {
     rawFmt := Gdip_GetImageRawFormat(pBitmap)
     If (rawFmt="MEMORYBMP")
     {
-       fnOutputDebug("bitmap already entirely in memory")
+       ; fnOutputDebug("bitmap already entirely in memory")
        Return trGdip_CloneBitmap(A_ThisFunc, pBitmap)
     }
 
@@ -99663,6 +99671,19 @@ doClicku() {
       Sleep, 2
    SendEvent, {LButton up}
    */
+}
+
+testFIMrgb16toRGBF() {
+   initQPVmainDLL()
+   initFIMGmodule()
+   hFIFimgA := FreeImage_Load("E:\Sucan twins\photos test\SLDs\freeimage-tests\P1040822.RAW")
+   SoundBeep 300, 100
+   a := FreeImage_Save(hFIFimgA, "E:\Sucan twins\photos test\SLDs\freeimage-tests\P1040822.jp2")
+   SoundBeep 600, 100
+   b := FreeImage_Save(hFIFimgA, "E:\Sucan twins\photos test\SLDs\freeimage-tests\P1040822.png")
+   SoundBeep 900, 100
+   FreeImage_UnLoad(hFIFimgA)
+   ToolTip, % a "|" b , , , 2
 }
 
 testIdentifyDIBbehindGDIPbmp() {

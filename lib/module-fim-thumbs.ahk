@@ -90,22 +90,25 @@ LoadWICimage(imgPath, w:=0, h:=0, keepAratio:=1, thisImgQuality:=0, frameu:=0, S
 cleanMess(thisID:=0, params:=0) {
    Critical, on
    optionz := StrSplit(params, "|")
-   enableThumbsCaching := optionz[1]
-   userHQraw := optionz[2]
-   allowToneMappingImg := optionz[3]
-   allowWICloader := optionz[4]
-   userImgQuality := optionz[5]
-   cmrRAWtoneMapAlgo := optionz[6]
-   cmrRAWtoneMapParamA := optionz[7]
-   cmrRAWtoneMapParamB := optionz[8]
-   cmrRAWtoneMapParamC := optionz[9]
-   cmrRAWtoneMapParamD := optionz[10]
-   cmrRAWtoneMapOCVparamA := optionz[11]
-   cmrRAWtoneMapOCVparamB := optionz[12]
-   cmrRAWtoneMapAltExpo := optionz[13]
-   waitDataCollect := 1
-   ; OutputDebug, QPV: ThumbsMode. Script thread. Clean GDIs mess...
+   If (InStr(params, "|")>1 && optionz.count()>12)
+   {
+      ; fnOutputDebug("thumbs thread settings defined")
+      enableThumbsCaching := optionz[1]
+      userHQraw := optionz[2]
+      allowToneMappingImg := optionz[3]
+      allowWICloader := optionz[4]
+      userImgQuality := optionz[5]
+      cmrRAWtoneMapAlgo := optionz[6]
+      cmrRAWtoneMapParamA := optionz[7]
+      cmrRAWtoneMapParamB := optionz[8]
+      cmrRAWtoneMapParamC := optionz[9]
+      cmrRAWtoneMapParamD := optionz[10]
+      cmrRAWtoneMapOCVparamA := optionz[11]
+      cmrRAWtoneMapOCVparamB := optionz[12]
+      cmrRAWtoneMapAltExpo := optionz[13]
+   }
 
+   waitDataCollect := 1
    cleaned := 0
    Sort, listBitmaps, UD|
    Loop, Parse, listBitmaps, |
@@ -114,7 +117,7 @@ cleanMess(thisID:=0, params:=0) {
        Gdip_DisposeImage(A_LoopField, 1)
    }
 
-   OutputDebug, QPV: ThumbsMode. External thread. Clean GDIs mess core %thisID%: %cleaned% bitmaps disposed.
+   ; fnOutputDebug("ThumbsMode. " A_ThisFunc ":() #" thisID ". " cleaned " bitmaps disposed.")
    listBitmaps := ""
    waitDataCollect := 0
    operationFailed := 0
@@ -193,7 +196,7 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
          hFIFimgA := hFIFimgX
       } Else
       {
-         fnOutputDebug(enableThumbsCaching " - " thumbsSizeQuality "px - " timePerImg "ms - core" coreIndex " - file" thisfileIndex " - loopIndex" thisBindex " - " imgPath)
+         ; fnOutputDebug(enableThumbsCaching " - " thumbsSizeQuality "px - " timePerImg "ms - core" coreIndex " - file" thisfileIndex " - loopIndex" thisBindex " - " imgPath)
          operationDone := 1
          waitDataCollect := 1
          operationFailed := 1
@@ -213,6 +216,7 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
             hFIFimgD := FreeImage_ConvertTo(hFIFimgA, "RGBF")
             If hFIFimgD
             {
+               ; fnOutputDebug("converted to RGBF")
                FreeImage_UnLoad(hFIFimgA)
                hFIFimgA := hFIFimgD
             }
@@ -227,7 +231,7 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
          FreeImage_UnLoad(hFIFimgA)
          If !hFIFimgB
          {
-            fnOutputDebug(enableThumbsCaching " - " thumbsSizeQuality "px - " timePerImg "ms - core" coreIndex " - file" thisfileIndex " - loopIndex" thisBindex " - " imgPath)
+            ; fnOutputDebug(enableThumbsCaching " - " thumbsSizeQuality "px - " timePerImg "ms - core" coreIndex " - file" thisfileIndex " - loopIndex" thisBindex " - " imgPath)
             operationDone := 1
             waitDataCollect := 1
             operationFailed := 1
@@ -248,7 +252,7 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
             hFIFimgA := hFIFimgB
          } Else
          {
-            fnOutputDebug(enableThumbsCaching " - " thumbsSizeQuality "px - " timePerImg "ms - core" coreIndex " - file" thisfileIndex " - loopIndex" thisBindex " - " imgPath)
+            ; fnOutputDebug(enableThumbsCaching " - " thumbsSizeQuality "px - " timePerImg "ms - core" coreIndex " - file" thisfileIndex " - loopIndex" thisBindex " - " imgPath)
             operationDone := 1
             operationFailed := 1
             waitDataCollect := 1
@@ -382,45 +386,38 @@ OpenCV_FimToneMapping(hFIFimgA, algo, paramA, paramB, paramC, paramD, PixelForma
 ; apply tone mapping on HDR image using OpenCV instead of FreeImage. It is much faster.
     If !hFIFimgA
     {
-       addJournalEntry(A_ThisFunc "(): failed to perform tone-mapping, undefined bitmap object")
+       fnOutputDebug(A_ThisFunc "(): failed to perform tone-mapping, undefined bitmap object")
        Return 0
     }
 
     FreeImage_GetImageDimensions(hFIFimgA, Width, Height)
     If (!Width || !Height)
     {
-       addJournalEntry(A_ThisFunc "(): failed to perform tone-mapping; incorrect FreeImage bitmap provided")
+       fnOutputDebug(A_ThisFunc "(): failed to perform tone-mapping; incorrect FreeImage bitmap provided")
        Return 0
     }
 
-    If InStr(PixelFormat, "RGBAF")
-       hFIFimgA := FreeImage_ConvertTo(hFIFimgA, "RGBF")
-
-    bpp := 24 ; InStr(PixelFormat, "RGBAF") ? 32 : 24
     hFIFimgX := FreeImage_Allocate(Width, Height, 24)
     If !hFIFimgX
     {
-       addJournalEntry(A_ThisFunc "(): failed to perform tone-mapping; unable to allocate new FreeImage bitmap object")
+       fnOutputDebug(A_ThisFunc "(): failed to perform tone-mapping; unable to allocate new FreeImage bitmap object")
        Return 0
     }
   
     pBits := FreeImage_GetBits(hFIFimgX)
     pBitsAll := FreeImage_GetBits(hFIFimgA)
-    r := DllCall("qpvmain.dll\openCVapplyToneMappingAlgos", "UPtr", pBitsAll, "Int", width, "Int", height, "UPtr", pBits, "int", bpp, "int", algo, "float", paramA, "float", paramB, "float", paramC, "float", paramD, "int", altExpo)
-    If InStr(PixelFormat, "RGBAF")
-       FreeImage_UnLoad(hFIFimgA)
+    hStride := FreeImage_GetPitch(hFIFimgA)
+    lStride := FreeImage_GetPitch(hFIFimgX)
+    r := DllCall("qpvmain.dll\openCVapplyToneMappingAlgos", "UPtr", pBitsAll, "int", hStride, "int", width, "int", height, "UPtr", pBits, "int", lStride, "int", algo, "float", paramA, "float", paramB, "float", paramC, "float", paramD, "int", altExpo)
     If !r 
     {
-       addJournalEntry(A_ThisFunc "(): failed to perform tone-mapping; an opencv or qpv dll failure occured")
+       fnOutputDebug(A_ThisFunc "(): failed to perform tone-mapping; an opencv or qpv dll failure occured")
        FreeImage_UnLoad(hFIFimgX)
        Return 0
     }
     Return hFIFimgX
 }
 
-addJournalEntry(aa) {
-  Return -1
-}
 clampInRange(value, min, max, reverse:=0) {
    If (reverse=1)
    {
@@ -453,6 +450,10 @@ FreeImage_GetInfo(hImage) {
 
 FreeImage_GetBits(hImage) {
    Return DllCall(getFIMfunc("GetBits"), "uptr", hImage, "uptr")
+}
+
+FreeImage_GetPitch(hImage) {
+   Return DllCall(getFIMfunc("GetPitch"), "uptr", hImage, "uptr")
 }
 
 FreeImage_ConvertTo(hImage, MODE) {
