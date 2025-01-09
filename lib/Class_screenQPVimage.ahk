@@ -76,6 +76,22 @@ Class screenQPVimage {
      If !hFIFimgZ
         Return 0
 
+     If InStr(This.FIMtype, "UINT16")
+     {
+        hFIFimgKOE := FreeImage_ConvertToGreyscale(hFIFimgZ)
+        If hFIFimgKOE
+        {
+           FreeImage_UnLoad(hFIFimgZ)
+           hFIFimgZ := hFIFimgKOE
+           hFIFimgDOE := FreeImage_ConvertTo(hFIFimgZ, "24Bits")
+           If hFIFimgDOE
+           {
+              FreeImage_UnLoad(hFIFimgZ)
+              hFIFimgZ := hFIFimgDOE
+           }
+        }
+     }
+
      If (This.FIMgft=0 && InStr(This.FIMcolors, "rgba"))
         alphaBitmap := FreeImage_GetChannel(hFIFimgZ, 4)
 

@@ -4,6 +4,14 @@
 // Project began in early May 2019.
 // Related: general-code-overview.txt
 
+- v6.1.60 (2025-01-20** - work in progress )
+  - [new] option to purge undo levels 
+  - [new] Sobel, Scharr and Canny edge detection algorithms using OpenCV
+  - [new] added HDR tone-mapping algorithms / implementations available in OpenCV; they are much better than what FreeImage offers
+  - [improvement] faster blur algorithms [replaced the cImg filters with OpenCV]
+  - [improvement] much faster image resizing in the viewport for images above 536 mgpx; it is now using OpenCV
+  - various bug fixes
+
 - v6.1.55 (2024-12-07)
   - users can now create very large images, above 536 megapixels, using the «New Image» option
   - bug fixes
@@ -48,6 +56,7 @@
   - blend modes improvements; now blend modes work as in other apps when dealing with layer transparencies
   - images exceeding 536 mgpx can be resized, cropped, rotated by 90°, or flipped H/V; colors invert is also available; image selected area can be copied to clipboard
   - increased the limit from 32567 to 234950 pixels in width or height for images in the viewport that can be edited with any available tool
+  - added many bugs I am currently unaware of ;-)
 
 - v5.9.93 (2023-11-06)
   - more bug fixes

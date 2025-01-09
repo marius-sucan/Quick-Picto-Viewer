@@ -24757,7 +24757,7 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
     {
        maxFilesIndex := currentFileIndex := 0
        labelu := (modus="scanner") ? "WIA-Acquired-" : "Clipboard-"
-       resultedFilesList[currentFileIndex, 1] := "\Temporary Memory Object\" labelu "-" clippyCount ".img"
+       resultedFilesList[currentFileIndex, 1] := "Q:\Temporary Memory Object\" labelu "-" clippyCount ".img"
     }
 
     zoomLevel := IMGresizingMode := 1
@@ -42136,7 +42136,7 @@ CombineImgsIntoPDF(file2save) {
          FileCreateDir, % tempusDir
          If ErrorLevel
          {
-            showTOOLtip("ERROR: Unable to create temporary folder required to create the PDF.`nOperation abandoned.")
+            showTOOLtip("ERROR: Unable to create temporary folder required to generate the PDF.`nOperation abandoned.")
             SoundBeep 300, 100
             SetTimer, RemoveTooltip, % -msgDisplayTime
             Return
@@ -42937,7 +42937,7 @@ PanelSaveImg() {
 
     UserCropOnSave := 0
     imgPath := getIDimage(currentFileIndex)
-    If (InStr(imgPath, "\temporary memory object\") || !imgPath)
+    If (InStr(imgPath, "Q:\temporary memory object\") || !imgPath)
     {
        fileStatus := imgPath "`n`nImage bitmap unsaved to disk."
     } Else
@@ -44396,7 +44396,7 @@ BTNsaveImgPanel() {
    RegAction(1, "usePrevSaveFolder")
    RegAction(1, "PreserveDateTimeOnSave")
    imgPath := getIDimage(currentFileIndex)
-   If InStr(imgPath, "\temporary memory object\")
+   If InStr(imgPath, "Q:\temporary memory object\")
       SaveClipboardImage(userDestinationFolder, 0)
    Else
       SaveClipboardImage("current", 1)
@@ -44412,7 +44412,7 @@ BTNsaveBrowseImgPanel() {
    RegAction(1, "usePrevSaveFolder")
    RegAction(1, "PreserveDateTimeOnSave")
    imgPath := getIDimage(currentFileIndex)
-   If (usePrevSaveFolder=1 || InStr(imgPath, "\temporary memory object\"))
+   If (usePrevSaveFolder=1 || InStr(imgPath, "Q:\temporary memory object\"))
       SaveClipboardImage(userDestinationFolder, 0)
    Else
       SaveClipboardImage("current", 0)
@@ -51886,7 +51886,7 @@ BtnCreateNewImage() {
     If (!currentFileIndex || !CurrentSLD || !maxFilesIndex)
     {
        maxFilesIndex := currentFileIndex := 0
-       resultedFilesList[currentFileIndex, 1] := "\Temporary Memory Object\New-" clippyCount ".img"
+       resultedFilesList[currentFileIndex, 1] := "Q:\Temporary Memory Object\New-" clippyCount ".img"
     }
 
     currIMGdetails.HasAlpha := 1
@@ -55806,7 +55806,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
          showTOOLtip("Image file succesfully saved`n" OutFileName "`n" sOutDir "\" friendly)
          testMem := getIDimage(currentFileIndex)
          lastZeitIMGsaved := [A_Now, currentUndoLevel, undoLevelsRecorded, OutFileName, OutDir, currentFileIndex]
-         If (currentFileIndex=0 && maxFilesIndex<1) || (InStr(testMem, "\temporary memory object\") && maxFilesIndex<1)
+         If (currentFileIndex=0 && maxFilesIndex<1) || (InStr(testMem, "Q:\temporary memory object\") && maxFilesIndex<1)
          {
             currentFileIndex := maxFilesIndex := 1
             resultedFilesList[1, 1] := file2save
@@ -59552,7 +59552,7 @@ RefreshImageFileAction() {
       If throwErrorNoImageLoaded(0, 0)
          Return
 
-      If InStr(imgPath, "\temporary memory object\")
+      If InStr(imgPath, "Q:\temporary memory object\")
       {
          showTOOLtip("WARNING: This image is currently unsaved. Unable to refresh object.")
          SoundBeep , 300, 100
@@ -69452,7 +69452,7 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
       ForceIMGload := 1
    }
    ; ToolTip, % AprevImgCall "`n" BprevImgCall "`n" imgPath,,,2
-   If ((InStr(AprevImgCall, imgPath) || InStr(BprevImgCall, imgPath)) && (ForceIMGload=0) || validBMP(UserMemBMP))
+   If ((InStr(AprevImgCall, imgPath) || InStr(BprevImgCall, imgPath)) && (ForceIMGload=0) || validBMP(UserMemBMP) || InStr(imgPath, "Q:\Temporary Memory Object\"))
       ignoreFileCheck := 1
 
    If (vpImgPanningNow=0 && usePrevious=0 && ignoreFileCheck!=1)
@@ -82879,7 +82879,7 @@ IDshowImage(imgID, opentehFile:=0) {
 
     isPipe := InStr(imgPath, "||")
     imgPath := StrReplace(imgPath, "||")
-    If (InStr(AprevImgCall, imgPath) || InStr(BprevImgCall, imgPath) || validBMP(UserMemBMP) || thumbsDisplaying=1)
+    If (InStr(AprevImgCall, imgPath) || InStr(BprevImgCall, imgPath) || validBMP(UserMemBMP) || thumbsDisplaying=1 || InStr(imgPath, "Q:\Temporary Memory Object\"))
        ignoreFileCheck := 1
 
     If (ignoreFileCheck!=1 && skipDeadFiles=1 && (A_TickCount - lastFastImgChangeHUDzeit>400))
@@ -98770,7 +98770,7 @@ tlbrDecideTooltips(hwnd) {
    } Else If InStr(icoFile, "save-disk")
    {
       imgPath := getIDimage(currentFileIndex)
-      If InStr(imgPath, "\temporary memory object\")
+      If InStr(imgPath, "Q:\temporary memory object\")
       {
          fileStatus := "`n `nImage bitmap UNSAVED to disk"
       } Else If isImgEditingNow()
