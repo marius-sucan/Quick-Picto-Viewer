@@ -4520,13 +4520,28 @@ DLL_API int DLL_CALLCONV openCVresizeBitmap(unsigned char *imageData, unsigned c
   } catch (const cv::Exception &e) {
       fnOutputDebug("Error during resizing: " + std::to_string(w) + " x " + std::to_string(h) + " to " + std::to_string(rw) + " x " + std::to_string(rh));
       fnOutputDebug( e.what() );
+      return 0;
   }
   return 1;
 }
 
 
 DLL_API int DLL_CALLCONV openCVresizeBitmapExtended(unsigned char *imageData, unsigned char *otherData, int w, int h, int Stride, int rx, int ry, int rw, int rh, int nw, int nh, int mStride, int bpp, int interpolation) {
-  int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
+  int clr;
+  if (bpp==24)
+     clr = CV_8UC3;
+  else if (bpp==32)
+     clr = CV_8UC4;
+  else if (bpp==48)
+     clr = CV_16UC3;
+  else if (bpp==64)
+     clr = CV_16UC4;
+  else if (bpp==96)
+     clr = CV_32FC3;
+  else if (bpp==128)
+     clr = CV_32FC4;
+  else return 0;
+
   cv::Mat image(h, w, clr, imageData, Stride);
   cv::Mat other(nh, nw, clr, otherData, mStride);
 
@@ -4542,6 +4557,7 @@ DLL_API int DLL_CALLCONV openCVresizeBitmapExtended(unsigned char *imageData, un
   } catch (const cv::Exception &e) {
       fnOutputDebug("Error during resizing: " + std::to_string(w) + " x " + std::to_string(h) + " to " + std::to_string(rw) + " x " + std::to_string(rh));
       fnOutputDebug( e.what() );
+      return 0;
   }
   return 1;
 }

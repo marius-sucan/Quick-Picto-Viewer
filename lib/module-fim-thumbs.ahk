@@ -1,4 +1,4 @@
-﻿#NoEnv
+#NoEnv
 #NoTrayIcon
 #MaxHotkeysPerInterval, 500
 #MaxThreads, 1
@@ -182,6 +182,7 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
          waitDataCollect := 1
          operationFailed := 1
          resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
+         fnOutputDebug("failed to load bitmap file: " r)
          Return -1
       }
 
@@ -189,7 +190,7 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
       calcIMGdimensions(imgW, imgH, thumbsSizeQuality, thumbsSizeQuality, ResizedW, ResizedH)
       resizeFilter := 0 ; (ResizeQualityHigh=1) ? 3 : 0
     
-      hFIFimgX := FreeImage_Rescale(hFIFimgA, ResizedW, ResizedH, resizeFilter)
+      hFIFimgX := trFreeImage_Rescale(hFIFimgA, ResizedW, ResizedH, resizeFilter)
       FreeImage_UnLoad(hFIFimgA)
       If StrLen(hFIFimgX)>1
       {
@@ -201,16 +202,49 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
          waitDataCollect := 1
          operationFailed := 1
          resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
+         fnOutputDebug("failed to rescale bitmap: " r)
          Return -1
       }
 
       ColorsType := FreeImage_GetColorType(hFIFimgA)
       imgBPP := Trim(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
+      PixelFormat := FreeImage_GetImageType(hFIFimgA, 1)
+      If InStr(PixelFormat, "UINT16")
+      {
+         hFIFimgKOE := FreeImage_ConvertTo(hFIFimgA, "Greyscale")
+         If hFIFimgKOE
+         {
+            FreeImage_UnLoad(hFIFimgA)
+            hFIFimgA := hFIFimgKOE
+            hFIFimgDOE := FreeImage_ConvertTo(hFIFimgA, "24Bits")
+            If hFIFimgDOE
+            {
+               FreeImage_UnLoad(hFIFimgA)
+               hFIFimgA := hFIFimgDOE
+            } else
+            {
+               operationDone := 1
+               waitDataCollect := 1
+               operationFailed := 1
+               resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
+               fnOutputDebug("failed to convert UINT16//Greyscale bitmap to 24 bits: " r)
+               Return -1
+            }
+         } Else
+         {
+            operationDone := 1
+            waitDataCollect := 1
+            operationFailed := 1
+            resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
+            fnOutputDebug("failed to convert UINT16 bitmap to Greyscale/8-bits: " r)
+            Return -1
+         }
+      }
+
       thisAllow := (isVarEqualTo(GFT, 32, 26, 29) && imgBPP>32) ? 1 : allowToneMappingImg
       mustApplyToneMapping := (imgBPP>32 && !InStr(ColorsType, "rgba") && GFT!=13) || (imgBPP>64) ? 1 : 0
       If (mustApplyToneMapping=1 && thisAllow=1)
       {
-         PixelFormat := FreeImage_GetImageType(hFIFimgA, 1)
          If (!InStr(PixelFormat, "RGBF") && cmrRAWtoneMapAlgo>2)
          {
             hFIFimgD := FreeImage_ConvertTo(hFIFimgA, "RGBF")
@@ -236,6 +270,7 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
             waitDataCollect := 1
             operationFailed := 1
             resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
+            fnOutputDebug("failed to apply tone-mapping on HDR image file: " r)
             Return -1
          }
          hFIFimgA := hFIFimgB
@@ -245,7 +280,7 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
       If (imgW!=ResizedW || imgH!=ResizedH)
       {
          ; hFIFimgB := FreeImage_MakeThumbnail(hFIFimgA, thumbsSizeQuality, 0)
-         hFIFimgB := FreeImage_Rescale(hFIFimgA, ResizedW, ResizedH, resizeFilter)
+         hFIFimgB := trFreeImage_Rescale(hFIFimgA, ResizedW, ResizedH, resizeFilter)
          FreeImage_UnLoad(hFIFimgA)
          If StrLen(hFIFimgB)>1
          {
@@ -257,6 +292,7 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
             operationFailed := 1
             waitDataCollect := 1
             resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
+            fnOutputDebug("failed to rescale bitmap [second attempt]: " r)
             Return -1
          }
       }
@@ -411,11 +447,75 @@ OpenCV_FimToneMapping(hFIFimgA, algo, paramA, paramB, paramC, paramD, PixelForma
     r := DllCall("qpvmain.dll\openCVapplyToneMappingAlgos", "UPtr", pBitsAll, "int", hStride, "int", width, "int", height, "UPtr", pBits, "int", lStride, "int", algo, "float", paramA, "float", paramB, "float", paramC, "float", paramD, "int", altExpo)
     If !r 
     {
-       fnOutputDebug(A_ThisFunc "(): failed to perform tone-mapping; an opencv or qpv dll failure occured")
+       fnOutputDebug(A_ThisFunc "(): failed to perform tone-mapping; opencv or qpv dll failure occured")
        FreeImage_UnLoad(hFIFimgX)
        Return 0
     }
     Return hFIFimgX
+}
+
+OpenCV_FimResizeBitmap(hFIFimgA, resizedW, resizedH, rx, ry, rw, rh, InterpolationMode:="") {
+; resize image using OpenCV instead of FreeImage. It is much faster.
+
+    If (!hFIFimgA || !resizedW || !resizedH)
+    {
+       fnOutputDebug(A_ThisFunc "(): failed to resize bitmap; incorrect bitmap provided")
+       Return 0
+    }
+
+    FreeImage_GetImageDimensions(hFIFimgA, Width, Height)
+    If (Width=resizedW && Height=resizedH && rx=0 && ry=0)
+       Return FreeImage_Clone(hFIFimgA)
+
+    If (!Width || !Height)
+    {
+       fnOutputDebug(A_ThisFunc "(): failed to resize bitmap; incorrect FreeImage bitmap provided")
+       Return 0
+    }
+
+    thisStartZeit := A_TickCount
+    PixelFormat := FreeImage_GetImageType(hFIFimgA, 0)
+    bpp := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
+    If (PixelFormat=1 && bpp<24 || !PixelFormat || isInRange(PixelFormat, 2, 8))
+    {
+       fnOutputDebug(A_ThisFunc "(): failed to resize bitmap; unsupported FreeImage bitmap provided; PixelFormat=" PixelFormat)
+       Return 0
+    }
+
+    hFIFimgX := FreeImage_Allocate(ResizedW, ResizedH, bpp, PixelFormat)
+    If !hFIFimgX
+    {
+       fnOutputDebug(A_ThisFunc "(): failed to resize bitmap; unable to allocate new FreeImage bitmap object")
+       Return 0
+    }
+
+    If !rw
+       rw := Width
+    If !rh
+       rh := Height
+
+    pBits := FreeImage_GetBits(hFIFimgX)
+    mStride := FreeImage_GetPitch(hFIFimgX) 
+    pBitsAll := FreeImage_GetBits(hFIFimgA)
+    Stride := FreeImage_GetPitch(hFIFimgA)
+    r := DllCall("qpvmain.dll\openCVresizeBitmapExtended", "UPtr", pBitsAll, "UPtr", pBits, "Int", width, "Int", height, "Int", stride, "Int", rx, "Int", ry, "Int", rw, "Int", rh, "Int", resizedW, "Int", resizedH, "Int", mstride, "Int", bpp, "Int", 1)
+    ; fnOutputDebug(A_ThisFunc "(): " A_TickCount - thisStartZeit)
+    If !r 
+    {
+       PixelFormat := FreeImage_GetImageType(hFIFimgX, 0)
+       bpp := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgX), "-"))
+       fnOutputDebug(A_ThisFunc "(): failed to resize bitmap; opencv or qpv dll failure occured: " PixelFormat " | " bpp " | " hFIFimgX)
+       FreeImage_UnLoad(hFIFimgX)
+       Return 0
+    }
+    Return hFIFimgX
+}
+
+trFreeImage_Rescale(hImage, w, h, filter:=3) {
+   a := OpenCV_FimResizeBitmap(hImage, w, h, 0, 0, 0, 0, filter) 
+   If !a
+      a := FreeImage_Rescale(hImage, w, h, filter)
+   Return a
 }
 
 clampInRange(value, min, max, reverse:=0) {
@@ -436,12 +536,29 @@ clampInRange(value, min, max, reverse:=0) {
    Return value
 }
 
+Trimmer(string, whatTrim:="") {
+   If (whatTrim!="")
+      string := Trim(string, whatTrim)
+   Else
+      string := Trim(string, "`r`n `t`f`v`b")
+   Return string
+}
+
+isInRange(value, inputA, inputB) {
+    If (value=inputA || value=inputB)
+       Return 1
+
+    Return (value>=min(inputA, inputB) && value<=max(inputA, inputB)) ? 1 : 0
+}
+
+
 ; external functions
 ; freeimage library functions 
 
-FreeImage_Allocate(width, height, bpp:=32, red_mask:=0xFF000000, green_mask:=0x00FF0000, blue_mask:=0x0000FF00) {
+FreeImage_Allocate(width, height, bpp:=32, imageType:=1, red_mask:=0xFF000000, green_mask:=0x00FF0000, blue_mask:=0x0000FF00) {
 ; function useful to create a new / empty bitmap
-   Return DllCall(getFIMfunc("Allocate"), "int", width, "int", height, "int", bpp, "uint", red_mask, "uint", green_mask, "uint", blue_mask, "uptr")
+; for imageType see FreeImage_GetImageType()
+   Return DllCall(getFIMfunc("AllocateT"), "int", imageType, "int", width, "int", height, "int", bpp, "uint", red_mask, "uint", green_mask, "uint", blue_mask, "uptr")
 }
 
 FreeImage_GetInfo(hImage) {
@@ -453,7 +570,7 @@ FreeImage_GetBits(hImage) {
 }
 
 FreeImage_GetPitch(hImage) {
-   Return DllCall(getFIMfunc("GetPitch"), "uptr", hImage, "uptr")
+   Return DllCall(getFIMfunc("GetPitch"), "uptr", hImage, "int")
 }
 
 FreeImage_ConvertTo(hImage, MODE) {
@@ -464,6 +581,13 @@ FreeImage_ConvertTo(hImage, MODE) {
       mode := "16Bits565"
 
    Return DllCall(getFIMfunc("ConvertTo" MODE), "uptr", hImage, "uptr")
+}
+
+FreeImage_Clone(hImage) {
+   If (hImage="")
+      Return
+
+   Return DllCall(getFIMfunc("Clone"), "uptr", hImage, "uptr")
 }
 
 FreeImage_GetFIFFromFilename(ImgPath) {

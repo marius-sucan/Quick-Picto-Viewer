@@ -65,16 +65,11 @@ Class screenQPVimage {
      ; fnOutputDebug(A_ThisFunc "(): " zw "|" zh "||" x2 "|" y2 "||" x "|" y "|" mgpx)
      thisStartZeit := A_TickCount
      interpo := (highQuality=1) ? 3 : 0
-     imgBPP := Trimmer(StrReplace(FreeImage_GetBPP(This.imgHandle), "-"))
-     If (imgBPP=32 || imgBPP=24)
-     {
-        FreeImage_GetImageDimensions(this.imgHandle, ow, oh)
-        ay := oh - y
-        by := oh - (y + h)
-        ny := min(ay, by)
-        hFIFimgZ := OpenCV_FimResizeBitmap(This.imgHandle, newW, newH, x, ny, w, h, interpo)
-     }
-
+     FreeImage_GetImageDimensions(this.imgHandle, ow, oh)
+     ay := oh - y
+     by := oh - (y + h)
+     ny := min(ay, by)
+     hFIFimgZ := OpenCV_FimResizeBitmap(This.imgHandle, newW, newH, x, ny, w, h, interpo)
      If !hFIFimgZ
         hFIFimgZ := FreeImage_RescaleRect(This.imgHandle, newW, newH, x, y, w, h, interpo)
      ; fnOutputDebug(A_ThisFunc "(): " A_TickCount - thisStartZeit)

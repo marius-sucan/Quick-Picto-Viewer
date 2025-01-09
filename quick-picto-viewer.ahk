@@ -14580,6 +14580,13 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:
   return r
 }
 
+trFreeImage_Rescale(hImage, w, h, filter:=3) {
+   a := OpenCV_FimResizeBitmap(hImage, w, h, 0, 0, 0, 0, filter) 
+   If !a
+      a := FreeImage_Rescale(hImage, w, h, filter)
+   Return a
+}
+
 OpenCV_FimResizeBitmap(hFIFimgA, resizedW, resizedH, rx, ry, rw, rh, InterpolationMode:="") {
 ; resize image using OpenCV instead of FreeImage. It is much faster.
 
@@ -14606,24 +14613,38 @@ OpenCV_FimResizeBitmap(hFIFimgA, resizedW, resizedH, rx, ry, rw, rh, Interpolati
        Return 0
     }
 
-    bpp := FreeImage_GetBPP(hFIFimgA)
-    hFIFimgX := FreeImage_Allocate(ResizedW, ResizedH, bpp)
+    thisStartZeit := A_TickCount
+    PixelFormat := FreeImage_GetImageType(hFIFimgA, 0)
+    bpp := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
+    If (PixelFormat=1 && bpp<24 || !PixelFormat || isInRange(PixelFormat, 2, 8))
+    {
+       addJournalEntry(A_ThisFunc "(): failed to resize bitmap; unsupported FreeImage bitmap provided; PixelFormat=" PixelFormat)
+       Return 0
+    }
+
+    hFIFimgX := FreeImage_Allocate(ResizedW, ResizedH, bpp, PixelFormat)
     If !hFIFimgX
     {
        addJournalEntry(A_ThisFunc "(): failed to resize bitmap; unable to allocate new FreeImage bitmap object")
        Return 0
     }
-  
+
+    If !rw
+       rw := Width
+    If !rh
+       rh := Height
+
     pBits := FreeImage_GetBits(hFIFimgX)
     mStride := FreeImage_GetStride(hFIFimgX) 
     pBitsAll := FreeImage_GetBits(hFIFimgA)
     Stride := FreeImage_GetStride(hFIFimgA)
-    thisStartZeit := A_TickCount
     r := DllCall(whichMainDLL "\openCVresizeBitmapExtended", "UPtr", pBitsAll, "UPtr", pBits, "Int", width, "Int", height, "Int", stride, "Int", rx, "Int", ry, "Int", rw, "Int", rh, "Int", resizedW, "Int", resizedH, "Int", mstride, "Int", bpp, "Int", 1)
     ; fnOutputDebug(A_ThisFunc "(): " A_TickCount - thisStartZeit)
     If !r 
     {
-       addJournalEntry(A_ThisFunc "(): failed to resize bitmap; an opencv or qpv dll failure occured")
+       PixelFormat := FreeImage_GetImageType(hFIFimgX, 0)
+       bpp := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgX), "-"))
+       addJournalEntry(A_ThisFunc "(): failed to resize bitmap; an opencv or qpv dll failure occured: " PixelFormat " | " bpp " | " hFIFimgX)
        FreeImage_UnLoad(hFIFimgX)
        Return 0
     }
@@ -20382,7 +20403,7 @@ HugeImagesApplyAutoColors() {
 
       pBitsAll := FreeImage_GetBits(hFIFimgX)
       Stride := FreeImage_GetStride(hFIFimgX)
-      hFIFimgA := FreeImage_Rescale(hFIFimgX, mw, mh, 0)
+      hFIFimgA := trFreeImage_Rescale(hFIFimgX, mw, mh, 0)
       If (userAutoColorAdjustAll=0 && editingSelectionNow=1 && testAllowSelInvert())
       {
          calcImgSelection2bmp(0, mw, mh, mw, mh, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, zX1, zY1, zX2, zY2, 0, 0, "a")
@@ -20474,7 +20495,7 @@ HugeImagesApplyInsertText() {
             If (nImgW>imgSelW || nImgH>imgSelH)
             {
                calcIMGdimensions(nImgW, nImgH, imgSelW, imgSelH, zbw, zbh)
-               hFIFimgW := FreeImage_Rescale(hFIFimgA, zbw, zbh)
+               hFIFimgW := trFreeImage_Rescale(hFIFimgA, zbw, zbh)
                If hFIFimgW
                {
                   FreeImage_UnLoad(hFIFimgA)
@@ -21153,7 +21174,7 @@ HugeImagesApplyPasteInPlace() {
       {
          If (hFIFimgD && PasteInPlaceOrientation>1)
          {
-            hFIFimgA := FreeImage_Rescale(hFIFimgD, dw, dh, thisQuality)
+            hFIFimgA := trFreeImage_Rescale(hFIFimgD, dw, dh, thisQuality)
             FreeImage_UnLoad(hFIFimgD)
          } Else
             hFIFimgA := FreeImage_RescaleRect(viewportQPVimage.imgHandle, dw, dh, x1, y1, w, h, thisQuality)
@@ -21161,7 +21182,7 @@ HugeImagesApplyPasteInPlace() {
       {
          If oldSelectionArea[11]
          {
-            hFIFimgA := FreeImage_Rescale(oldSelectionArea[11], dw, dh, thisQuality)
+            hFIFimgA := trFreeImage_Rescale(oldSelectionArea[11], dw, dh, thisQuality)
             FreeImage_UnLoad(oldSelectionArea[11])
          }
          oldSelectionArea[11] := ""
@@ -21368,9 +21389,9 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
                   {
                      ; fnOutputDebug(A_ThisFunc ": resizing gradient with FreeImage: " obju.imgZelW " | " obju.imgZelH)
                      If (FillAreaInverted=1)
-                        hFIFimgRealGradient := FreeImage_Rescale(hFIFimgGradient, imgW, imgH, 3)
+                        hFIFimgRealGradient := trFreeImage_Rescale(hFIFimgGradient, imgW, imgH, 3)
                      Else
-                        hFIFimgRealGradient := FreeImage_Rescale(hFIFimgGradient, obju.imgZelW, obju.imgZelH, 3)
+                        hFIFimgRealGradient := trFreeImage_Rescale(hFIFimgGradient, obju.imgZelW, obju.imgZelH, 3)
 
                      gScan := FreeImage_GetBits(hFIFimgRealGradient)
                      gStride := FreeImage_GetStride(hFIFimgRealGradient)
@@ -21516,7 +21537,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
 
          showTOOLtip("Pixelating image`nPhase 1/3...", 1)
          If (BlurAreaInverted=1)
-            hFIFimgZ := FreeImage_Rescale(hFIFimgX, thisImgW, thisImgH, blurAreaPixelizeMethod - 1)
+            hFIFimgZ := trFreeImage_Rescale(hFIFimgX, thisImgW, thisImgH, blurAreaPixelizeMethod - 1)
          Else
             hFIFimgZ := FreeImage_RescaleRect(hFIFimgX, thisImgW, thisImgH, obju.bImgSelPx, obju.bImgSelPy, obju.bImgSelW, obju.bImgSelH, blurAreaPixelizeMethod - 1)
 
@@ -21671,7 +21692,7 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
       nmgpx := Round((w * h)/1000000, 1)
       showTOOLtip("Resizing image to`n" w " x " h " pixels`n" nmgpx " megapixels`nPlease wait...")
       hq := (givenQuality=1) ? 3 : 0
-      hFIFimgA := FreeImage_Rescale(viewportQPVimage.imgHandle, w, h, hq)
+      hFIFimgA := trFreeImage_Rescale(viewportQPVimage.imgHandle, w, h, hq)
    } Else If (modus="new-image")
    {
       nmgpx := Round((w * h)/1000000, 1)
@@ -24566,7 +24587,7 @@ rescaleFIMbmpGDIp(ByRef hFIFimgA, nw, nh) {
     {
        rescaled := 1
        calcIMGdimensions(oImgW, oImgH, nw, nh, nw, nh)
-       hFIFimgB := FreeImage_Rescale(hFIFimgA, nw, nh, thisQuality)
+       hFIFimgB := trFreeImage_Rescale(hFIFimgA, nw, nh, thisQuality)
     } Else
        hFIFimgB := hFIFimgA
 
@@ -54708,7 +54729,7 @@ initializeFimPreviewIMG(imgPath) {
      globalInfohFIFbmp := imgBPP "-" ColorsType " | " imgType ; ".`nFile format: " pk
      If (mustApplyToneMapping=1)
      {
-        hFIFimgB := FreeImage_Rescale(hFIFimgA, thisW, thisH, 0)
+        hFIFimgB := trFreeImage_Rescale(hFIFimgA, thisW, thisH, 0)
         FreeImage_UnLoad(hFIFimgA)
         hFIFimgA := ""
      }
@@ -57756,9 +57777,9 @@ FIMrescaleOBJbmp(hFIFimgC, imgW, imgH, indexu, sizesDesired) {
          If (keepAratio=1)
          {
             calcIMGdimensions(imgW, imgH, forceW, forceH, xForceW, xForceH)
-            hFIFimgX := FreeImage_Rescale(hFIFimgC, xForceW, xForceH, thisImgQuality)
+            hFIFimgX := trFreeImage_Rescale(hFIFimgC, xForceW, xForceH, thisImgQuality)
          } Else
-            hFIFimgX := FreeImage_Rescale(hFIFimgC, forceW, forceH, thisImgQuality)
+            hFIFimgX := trFreeImage_Rescale(hFIFimgC, forceW, forceH, thisImgQuality)
 
          If (doFlipu=4)
             hFIFimgX := FreeImage_FlipHorizontal(hFIFimgX)
@@ -57808,7 +57829,7 @@ FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, externCondition, ByRef has
       If !hFIFimgB
          hFIFimgB := FreeImage_ToneMapping(hFIFimgA, clampInRange(cmrRAWtoneMapAlgo - 1, 0, 1), cmrRAWtoneMapParamA, cmrRAWtoneMapParamB)
 
-      fnOutputDebug(A_ThisFunc "(): " A_TickCount - thisStartZeit)
+      ; fnOutputDebug(A_ThisFunc "(): " A_TickCount - thisStartZeit " | " imgW " x " imgH " | " PixelFormat)
       If hFIFimgB
       {
          hasAppliedToneMap := " (TONE-MAPPED)"
@@ -57935,7 +57956,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0) {
    {
       hasResized := 1
       resizeFilter := (ResizeQualityHigh=1) ? 4 : 0
-      hFIFimgX := FreeImage_Rescale(hFIFimgA, imgW, imgH, resizeFilter)
+      hFIFimgX := trFreeImage_Rescale(hFIFimgA, imgW, imgH, resizeFilter)
       If hFIFimgX
       {
          FreeImage_UnLoad(hFIFimgA)
@@ -58298,7 +58319,7 @@ coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          If isImgSizeTooLarge(imgW, imgH, saveImgFormatsList[userExtractFramesFmt])
          {
             capIMGdimensionsFormatlimits(saveImgFormatsList[userExtractFramesFmt], 1, imgW, imgH)
-            hFIFimgB := FreeImage_Rescale(hFIFimgA, imgW, imgH)
+            hFIFimgB := trFreeImage_Rescale(hFIFimgA, imgW, imgH)
             If hFIFimgB
             {
                rz := coreConvertImgFormat(imgPath, file2save, hFIFimgB)
@@ -92825,7 +92846,7 @@ coreFreeImageSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFact
        hFIFimgB := 0
        changeMcursor()
        If (thisW>4 && thisH>4)
-          hFIFimgB := FreeImage_Rescale(hFIFimgA, thisW, thisH, resizeFilter)
+          hFIFimgB := trFreeImage_Rescale(hFIFimgA, thisW, thisH, resizeFilter)
 
        If hFIFimgB
        {
@@ -94071,6 +94092,21 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
   imgBPP := Trimmer(StrReplace(oimgBPP, "-"))
   ColorsType := FreeImage_GetColorType(hFIFimgA)
   imgType := FreeImage_GetImageType(hFIFimgA, 1)
+  If (InStr(imgType, "UINT16") && noBMP=0)
+  {
+     hFIFimgKOE := FreeImage_ConvertToGreyscale(hFIFimgA)
+     If hFIFimgKOE
+     {
+        FreeImage_UnLoad(hFIFimgA)
+        hFIFimgA := hFIFimgKOE
+        hFIFimgDOE := FreeImage_ConvertTo(hFIFimgA, "24Bits")
+        If hFIFimgDOE
+        {
+           FreeImage_UnLoad(hFIFimgA)
+           hFIFimgA := hFIFimgDOE
+        }
+     }
+  }
   ; msgbox, % GFT "=l=" mustApplyToneMapping
   ; fnOutputDebug(A_ThisFunc "(): " imgBPP "|" ColorsType "|" imgType "|" mustApplyToneMapping "|" GFT "|" imgPath)
   If (noBPPconv=0 && noBMP=0)
@@ -94138,7 +94174,7 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
         nImgW := imgW, nImgH:= imgH
         capIMGdimensionsGDIPlimits(nImgW, nImgH)
         changeMcursor()
-        hFIFimgKO := FreeImage_Rescale(hFIFimgC, nimgW, nimgH, 0)
+        hFIFimgKO := trFreeImage_Rescale(hFIFimgC, nimgW, nimgH, 0)
      }
 
      If StrLen(hFIFimgKO)>2

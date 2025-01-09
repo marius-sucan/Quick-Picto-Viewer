@@ -166,11 +166,12 @@ FreeImage_GetCopyrightMessage() {
 }
 
 ; === Bitmap management functions ===
-; missing functions: AllocateT, LoadFromHandle and SaveToHandle.
+; missing functions: LoadFromHandle and SaveToHandle.
 
-FreeImage_Allocate(width, height, bpp:=32, red_mask:=0xFF000000, green_mask:=0x00FF0000, blue_mask:=0x0000FF00) {
+FreeImage_Allocate(width, height, bpp:=32, imageType:=1, red_mask:=0xFF000000, green_mask:=0x00FF0000, blue_mask:=0x0000FF00) {
 ; function useful to create a new / empty bitmap
-   Return DllCall(getFIMfunc("Allocate"), "int", width, "int", height, "int", bpp, "uint", red_mask, "uint", green_mask, "uint", blue_mask, "uptr")
+; for imageType see FreeImage_GetImageType()
+   Return DllCall(getFIMfunc("AllocateT"), "int", imageType, "int", width, "int", height, "int", bpp, "uint", red_mask, "uint", green_mask, "uint", blue_mask, "uptr")
 }
 
 FreeImage_AllocateEx(width, height, bpp:=32, RGBArray:="255,255,255,0", options:=1, red_mask:=0xFF000000, green_mask:=0x00FF0000, blue_mask:=0x0000FF00, hPalette:=0) {
@@ -590,9 +591,23 @@ FreeImage_SetPixelColor(hImage, xPos, yPos, RGBArray:="255,255,255,0") {
 
 FreeImage_ConvertTo(hImage, MODE) {
 ; This is a wrapper for multiple FreeImage functions.
-; Possible parameters for MODE: "4Bits", "8Bits", "16Bits555", "16Bits565", "24Bits",
-; "32Bits", "Greyscale", "Float", "RGBF", "RGBAF", "UINT16", "RGB16", "RGBA16"
-; ATTENTION: these are case sensitive!
+; ATTENTION: the values for MODE are case sensitive!
+; Possible values for the MODE parameter and the accepted input color types for the bitmap:
+   ; "4Bits"         | 1-,4-,8-,16-,24-,32- bits
+   ; "8Bits"         | 1-,4-,8-,16-,24-,32- bits, UINT16 array
+   ; "16Bits"        | 1-,4-,8-,16-,24-,32- bits
+   ; "16Bits555"     | 1-,4-,8-,16-,24-,32- bits
+   ; "16Bits565"     | 1-,4-,8-,16-,24-,32- bits
+   ; "24Bits"        | 1-,4-,8-,16-,24-,32- bits, 48-bits [RGB16], 64-bits [RGBA16]
+   ; "32Bits"        | 1-,4-,8-,16-,24-,32- bits, 48-bits [RGB16], 64-bits [RGBA16]
+   ; "Greyscale"     | 1-,4-,8-,16-,24-,32- bits, UINT16 array
+   ; "Float"         | 1-,4-,8-,16-,24-,32- bits, UINT16 or Float array, 48-bits [RGB16], 64-bits [RGBA16], 96-bits [RGBF], 128-bits [RGBAF]
+   ; "RGBF"          | 1-,4-,8-,16-,24-,32- bits, UINT16 or Float array, 48-bits [RGB16], 64-bits [RGBA16], 96-bits [RGBF], 128-bits [RGBAF]
+   ; "RGBAF"         | 1-,4-,8-,16-,24-,32- bits, UINT16 or Float array, 48-bits [RGB16], 64-bits [RGBA16], 96-bits [RGBF], 128-bits [RGBAF]
+   ; "UINT16"        | 1-,4-,8-,16-,24-,32- bits, UINT16 array, 48-bits [RGB16], 64-bits [RGBA16]
+   ; "RGB16"         | 1-,4-,8-,16-,24-,32- bits, UINT16 array, 48-bits [RGB16], 64-bits [RGBA16]
+   ; "RGBA16"        | 1-,4-,8-,16-,24-,32- bits, UINT16 array, 48-bits [RGB16], 64-bits [RGBA16]
+
    If !hImage
       Return
 
@@ -637,7 +652,7 @@ FreeImage_ConvertToStandardType(hImage, bScaleLinear:=1) {
 }
 
 FreeImage_ConvertToGreyscale(hImage) {
-   ; hImage - input must be a standard type, from 1-bit to 32 bits image, or a 16-UINT16
+   ; hImage - input must be a standard type, from 1-bit to 32 bits image, or an UINT16
    Return DllCall(getFIMfunc("ConvertToGreyscale"), "uptr", hImage, "uptr")
 }
 
