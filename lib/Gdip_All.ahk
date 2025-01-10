@@ -3121,10 +3121,10 @@ Gdip_CreateBitmapFromDirectDrawSurface(IDirectDrawSurface) {
 }
 
 Gdip_CreateBitmap(Width, Height, PixelFormat:=0, Stride:=0, Scan0:=0) {
-; By default, this function creates a new 32-ARGB bitmap.
-; modified by Marius Șucan
+; By default, this function creates by default a new 32-ARGB bitmap. Pass a specific PixelFormat if otherwise needed.
 ; scan0 - Optional pointer to an array of bytes that contains the pixel data.
 ;         The caller is responsible for allocating and freeing the block of memory pointed to by this parameter
+; function modified by Marius Șucan
 
    If (!Width || !Height)
    {

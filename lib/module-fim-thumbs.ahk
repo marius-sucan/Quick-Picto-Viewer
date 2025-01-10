@@ -398,22 +398,21 @@ gdipMonoGenerateThumb(imgPath, file2save, enableThumbsCaching, thumbsSizeQuality
    ; cleanupThread()
 }
 
-ConvertFimObj2pBitmap(hFIFimgD, imgW, imgH) {
+ConvertFimObj2pBitmap(hFIFimgA, w, h) {
   ; hFIFimgD := FreeImage_ConvertTo(hFIFimgC, "24Bits")
-  If StrLen(hFIFimgD)<3
+  If StrLen(hFIFimgA)<3
      Return
 
-  bitmapInfo := FreeImage_GetInfo(hFIFimgD)
-  pBits := FreeImage_GetBits(hFIFimgD)
+  bitmapInfo := FreeImage_GetInfo(hFIFimgA)
+  pBits := FreeImage_GetBits(hFIFimgA)
   If (!bitmapInfo || !pBits)
      Return
 
   nBitmap := Gdip_CreateBitmapFromGdiDib(bitmapInfo, pBits)
-  pBitmap := Gdip_CreateBitmap(imgW, imgH, "0xE200B")  ; 32-bits PARGB
+  If !nBitmap
+     Return
 
-  G := Gdip_GraphicsFromImage(pBitmap)
-  Gdip_DrawImageFast(G, nBitmap)
-  Gdip_DeleteGraphics(G)
+  pBitmap := Gdip_CloneBitmapArea(nBitmap, 0, 0, w, h, "0xE200B")
   Gdip_DisposeImage(nBitmap)
   Return pBitmap
 }
@@ -831,6 +830,20 @@ Gdip_GraphicsFromImage(pBitmap) {
    If (gdipLastError=1 && A_LastError=8) ; out of memory
       gdipLastError := 3
    return pGraphics
+}
+
+Gdip_CloneBitmapArea(pBitmap, x, y, w, h, PixelFormat:="0x26200A") {
+   If (pBitmap="")
+      Return
+
+   gdipLastError := DllCall("gdiplus\GdipCloneBitmapArea"
+               , "float", x, "float", y
+               , "float", w, "float", h
+               , "int", PixelFormat
+               , "UPtr", pBitmap
+               , "UPtr*", pBitmapDest)
+
+   return pBitmapDest
 }
 
 Gdip_DisposeImage(pBitmap, noErr:=1) {

@@ -4597,7 +4597,7 @@ DLL_API int DLL_CALLCONV openCVapplyToneMappingAlgos(float* hdrData, int hStride
           cv::normalize(ldrImage, ldrImage, 0.0f, p, cv::NORM_MINMAX);
     }
 
-    fnOutputDebug("openCVapplyToneMappingAlgos: addExposure=" + std::to_string(addExposure));
+    // fnOutputDebug("openCVapplyToneMappingAlgos: addExposure=" + std::to_string(addExposure));
     ldrImage = ldrImage * 255.0f;
     ldrImage.convertTo(ldrFinal, CV_8UC3);
     cv::cvtColor(ldrFinal, ldrFinal, cv::COLOR_RGB2BGR);

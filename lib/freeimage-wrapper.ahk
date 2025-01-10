@@ -8,38 +8,41 @@
 ; Change log:
 ; =============================
 ;
-; 07 December 2024 - v1.9
+; 10 January 2025 - v1.91
+; - improved ConvertFIMtoPBITMAP(); higher performance and more dynamic regarding pixel formats; added ConvertAdvancedFIMtoPBITMAP()
+;
+; 07 December 2024 - v1.90
 ; - implemented more functions ; FreeImage_AllocateEx() and FreeImage_FillBackground()
 ;
-; 27 October 2023 - v1.8
+; 27 October 2023 - v1.80
 ; - implemented more functions
 ;
-; 16 July 2022 - v1.7
+; 16 July 2022 - v1.70
 ; - implemented functions to access image metadata tags
 ;
-; 26 February 2021 - v1.6
+; 26 February 2021 - v1.60
 ; - implemented the multi-page functions
 ;
-; 14 January 2021 - v1.5
+; 14 January 2021 - v1.50
 ; - bug fixes - many thanks to TheArkive
 ;
-; 30 June 2020 - v1.4
+; 30 June 2020 - v1.40
 ; - implemented additional functions.
 ;
-; 21 September 2019 - v1.3
+; 21 September 2019 - v1.30
 ; - implemented additional functions.
 ;
-; 11 August 2019 - v1.2
+; 11 August 2019 - v1.20
 ; - added ConvertFIMtoPBITMAP() and ConvertPBITMAPtoFIM() functions
 ; - implemented 32 bits support for AHK_L 32 bits and FreeImage 32 bits.
 ; - FreeImage_Save() now relies on FreeImage_GetFIFFromFilename() to get the file format code
 ; - bug fixes and more in-line comments/information
 ;
-; 6 August 2019 - v1.1
+; 6 August 2019 - v1.10
 ; - it now works with FreeImage v3.18 and AHK_L v1.1.30+.
 ; - added many new functions and cleaned up the code. Fixed bugs.
 ;
-; 29 March 2012 - v1.0
+; 29 March 2012 - v1.00
 ;  - original version by linpinger
 ;    source: http://www.autohotkey.net/~linpinger/index.html
 
@@ -158,7 +161,7 @@ FreeImage_GetVersion() {
 }
 
 FreeImage_GetLibVersion() {
-   Return 1.81 ;  samedi 7 décembre 2024
+   Return 1.91 ;  vendredi 10 janvier 2025
 }
 
 FreeImage_GetCopyrightMessage() {
@@ -1222,29 +1225,57 @@ getFIMfunc(funct) {
    Return funct
 }
 
-ConvertFIMtoPBITMAP(hFIFimgA) {
-; hFIFimgA - provide a 32 bits Standard RGBA FreeImage bitmap.
-; If succesful, the function returns a 32-bit RGBA GDI+ pBitmap.
-; This function relies on the GDI+ AHK library.
+ConvertFIMtoPBITMAP(hFIFimgA, pixelFormat:="0xE200B") {
+; only the FreeImage Standard Bitmap type is supported
 
+  type := FreeImage_GetImageType(hFIFimgA)
+  If (type!=1)
+     Return
+
+  bitmapInfo := FreeImage_GetInfo(hFIFimgA)
+  pBits := FreeImage_GetBits(hFIFimgA)
+  If (!bitmapInfo || !pBits)
+     Return
+
+  FreeImage_GetImageDimensions(hFIFimgA, w, h)
+  nBitmap := Gdip_CreateBitmapFromGdiDib(bitmapInfo, pBits)
+  If !nBitmap
+     Return
+
+  pBitmap := Gdip_CloneBitmapArea(nBitmap, 0, 0, w, h, pixelFormat)
+  Gdip_DisposeImage(nBitmap)
+  Return pBitmap
+}
+
+ConvertAdvancedFIMtoPBITMAP(hFIFimgA, doFlip) {
+; this function wraps a GDI+ bitmap object around the FreeImage bitmap data 
+; it will return on success the GDI+ bitmap and the FreeImage bitmap initially given 
+; the memory data will be shared
+; when you want to discard the gdi+ bitmap, you may also discard the FreeImage bitmap 
+; to completely free the memory
+
+  type := FreeImage_GetImageType(hFIFimgA)
+  If (type!=1)
+     Return
+
+  bpp := FreeImage_GetBPP(hFIFimgA)
+  If (bpp!=24 && bpp!=32)
+     Return
+
+  pixelFormat := (bpp=32) ? "0x26200A" : "0x21808"
+  Stride := FreeImage_GetPitch(hFIFimgA)
+  pBits := FreeImage_GetBits(hFIFimgA)
+  FreeImage_GetDPIresolution(hFIFimgA, dpiX, dpiY)
   FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
-  pBitmap := Gdip_CreateBitmap(imgW, imgH, "0xE200B")
-  If StrLen(pBitmap)>2
+  ; ToolTip, % bpp "|" pixelFormat , , , 2
+  If (doFlip=1)
+     FreeImage_FlipVertical(hFIFimgA)
+
+  pBitmap := Gdip_CreateBitmap(imgW, imgH, pixelFormat, Stride, pBits)
+  If pBitmap
   {
-     Pitch := FreeImage_GetPitch(hFIFimgA)
-     redMASK := FreeImage_GetRedMask(hFIFimgA)
-     greenMASK := FreeImage_GetGreenMask(hFIFimgA)
-     blueMASK := FreeImage_GetBlueMask(hFIFimgA)
-     E := Gdip_LockBits(pBitmap, 0, 0, imgW, imgH, Stride, Scan0, BitmapData)
-     IF !E
-     {
-        R := FreeImage_ConvertToRawBits(Scan0, hFIFimgA, pitch, 32, redMASK, greenMASK, blueMASK, 1)
-        Gdip_UnlockBits(pBitmap, BitmapData)
-        FreeImage_GetDPIresolution(hFIFimgA, dpiX, dpiY)
-        Gdip_BitmapSetResolution(pBitmap, Round(dpiX), Round(dpiY))
-        Return pBitmap
-     } 
-     Gdip_DisposeImage(pBitmap)
+     Gdip_BitmapSetResolution(pBitmap, Round(dpiX), Round(dpiY))
+     Return [pBitmap, hFIFimgA]
   }
 }
 

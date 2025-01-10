@@ -400,6 +400,7 @@ OnExit, doCleanup
 initCompiled(A_IsCompiled)
 If !A_IsCompiled
    Try Menu, Tray, Icon, %mainExecPath%\qpv-icon.ico
+
 thisGDIPversion := Gdip_LibrarySubVersion()
 GDIPToken := Gdip_Startup()
 If (!GDIPToken || thisGDIPversion<1.92)
@@ -14680,7 +14681,7 @@ OpenCV_FimToneMapping(hFIFimgA, algo, paramA, paramB, paramC, paramD, altExpo) {
        addJournalEntry(A_ThisFunc "(): failed to perform tone-mapping; unable to allocate new FreeImage bitmap object")
        Return 0
     }
-  
+
     pBits := FreeImage_GetBits(hFIFimgX)
     pBitsAll := FreeImage_GetBits(hFIFimgA)
     hStride := FreeImage_GetStride(hFIFimgA)
@@ -20391,16 +20392,6 @@ HugeImagesApplyAutoColors() {
       showTOOLtip("Applying auto-adjust image colors, please wait...")
       setImageLoading()
       obju := InitHugeImgSelPath(0, imgW, imgH)
-      If validBMP(obju.alphaMaskGray)
-      {
-         EZ := trGdip_LockBits(obju.alphaMaskGray, 0, 0, obju.imgZelW, obju.imgZelH, mStride, mScan, mData, 3, "0x21808")
-         If EZ
-         {
-            trGdip_DisposeImage(obju.alphaMaskGray)
-            obju.alphaMaskGray := ""
-         }
-      }
-
       pBitsAll := FreeImage_GetBits(hFIFimgX)
       Stride := FreeImage_GetStride(hFIFimgX)
       hFIFimgA := trFreeImage_Rescale(hFIFimgX, mw, mh, 0)
@@ -20432,12 +20423,6 @@ HugeImagesApplyAutoColors() {
 
       FreeImage_UnLoad(hFIFimgA)
       DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
-      If (editingSelectionNow=1 && validBMP(obju.alphaMaskGray))
-      {
-         trGdip_DisposeImage(obju.alphaMaskGray)
-         Gdip_UnlockBits(obju.alphaMaskGray, mData)
-      }
-
       If r 
       {
          killQPVscreenImgSection()
@@ -21292,16 +21277,6 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
       Else
          obju := InitHugeImgSelPath(0, imgW, imgH)
 
-      If validBMP(obju.alphaMaskGray)
-      {
-         EZ := trGdip_LockBits(obju.alphaMaskGray, 0, 0, obju.imgZelW, obju.imgZelH, mStride, mScan, mData, 3, "0x21808")
-         If EZ
-         {
-            trGdip_DisposeImage(obju.alphaMaskGray)
-            obju.alphaMaskGray := ""
-         }
-      }
-
       gBpp := 32
       pBitsAll := FreeImage_GetBits(hFIFimgX)
       Stride := FreeImage_GetStride(hFIFimgX)
@@ -21336,11 +21311,6 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             If memoryUsageWarning(ResizedW, ResizedH, 32, 0, bonusBuffer)
             {
                DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
-               If validBMP(obju.alphaMaskGray)
-               {
-                  Gdip_UnlockBits(obju.alphaMaskGray, mData)
-                  trGdip_DisposeImage(obju.alphaMaskGray)
-               }
                Return
             }
 
@@ -21469,7 +21439,6 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             shapeu := 4
          ; fnOutputDebug(A_ThisFunc ": " stride "|" pBitsAll "|" imgW "|" imgH "|" thisInvert "|" blending "|" eraser "|" doBehind "|" thisOpacity "|" newColor "|" gBpp "|" VPselRotation "|" EllipseSelectMode "`n" obju.imgZelW "|" obju.imgZelH "`n" tw "|" th "|" gStride)
          ; TulTip(1, " | ", obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, thisInvert)
-         ; t := validBMP(obju.alphaMaskGray)
          ; fnOutputDebug(thisRotation "|" A_ThisFunc ": " obju.x1 "|" obju.y1 "|" obju.x2 "|" obju.y2 "|" obju.imgSelW "|" obju.imgSelH)
          showTOOLtip("Applying " modus "`nProcessing main bitmap, please wait", 1)
          recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, thisInvert, 0)
@@ -21636,12 +21605,6 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          ; r := DllCall(whichMainDLL "\ConvertToGrayScale", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", DesaturateAreaChannel, "int", DesaturateAreaAmount, "int", stride, "int", bpp, "UPtr", mScan, "int", mStride)
       }
 
-      If (editingSelectionNow=1 && validBMP(obju.alphaMaskGray))
-      {
-         Gdip_UnlockBits(obju.alphaMaskGray, mData)
-         trGdip_DisposeImage(obju.alphaMaskGray)
-      }
-
       DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
       etaTime := "Elapsed time to apply " modus ": " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) 
       addJournalEntry(etaTime)
@@ -21735,7 +21698,7 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
          oimgBPP := FreeImage_GetBPP(hFIFimgA)
          ColorsType := FreeImage_GetColorType(hFIFimgA)
          imgType := FreeImage_GetImageType(hFIFimgA, 1)
-         fileType := FreeImage_GetFileType(imgPath, 1)
+         fileType := (modus="new-image") ? "" : FreeImage_GetFileType(imgPath, 1)
 
          currIMGdetails.ImgFile := viewportQPVimage.ImgFile
          currIMGdetails.imgHandle := viewportQPVimage.imgHandle
@@ -21748,10 +21711,10 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
          currIMGdetails.dpiY := viewportQPVimage.dpiY
          currIMGdetails.DPI := viewportQPVimage.DPI
          currIMGdetails.HasAlpha := InStr(ColorsType, "rgba") ? 1 : 0
-         currIMGdetails.RawFormat := fileType " | " imgType
+         currIMGdetails.RawFormat := (modus="new-image") ? imgType : fileType " | " imgType
          currIMGdetails.PixelFormat := StrReplace(oimgBPP, "-", "+") "-" ColorsType
          viewportQPVimage.HasAlpha := InStr(ColorsType, "rgba") ? 1 : 0
-         viewportQPVimage.RawFormat := fileType " | " imgType
+         viewportQPVimage.RawFormat := (modus="new-image") ? imgType : fileType " | " imgType
          viewportQPVimage.PixelFormat := StrReplace(oimgBPP, "-", "+") "-" ColorsType
          viewportQPVimage.clrinfo := oimgBPP "-bit " ColorsType
       }
@@ -24599,7 +24562,7 @@ rescaleFIMbmpGDIp(ByRef hFIFimgA, nw, nh) {
     }
 
     imgBPP := FreeImage_GetBPP(hFIFimgA)
-    If (imgBPP!=32)
+    If !isVarEqualTo(imgBPP, 8, 16, 24, 32)
     {
        hFIFimgD := FreeImage_ConvertTo(hFIFimgB, "32Bits")
        If hFIFimgD
@@ -24615,7 +24578,7 @@ rescaleFIMbmpGDIp(ByRef hFIFimgA, nw, nh) {
     If hFIFimgB
     {
        bpp := FreeImage_GetBPP(hFIFimgB)
-       pBitmap := ConvertFIMtoPBITMAP(hFIFimgB)
+       pBitmap := ConvertFIMtoPBITMAP(hFIFimgB, coreDesiredPixFmt)
        If (rescaled=1)
           FreeImage_UnLoad(hFIFimgB)
 
@@ -54828,11 +54791,11 @@ updateUIfimToneMappedIMG() {
    } Else
       hFIFimgE := FreeImage_Clone(globalhFIFimg)
 
-   If (imgBPP!=32)
+   If !isVarEqualTo(imgBPP, 8, 16, 24, 32)
       hFIFimgD := FreeImage_ConvertTo(hFIFimgE, "32Bits")
 
    hFIFimgZ := hFIFimgD ? hFIFimgD : hFIFimgE
-   pBitmap := ConvertFIMtoPBITMAP(hFIFimgZ)
+   pBitmap := ConvertFIMtoPBITMAP(hFIFimgZ, coreDesiredPixFmt)
    If StrLen(pBitmap)>2
       recordGdipBitmaps(pBitmap, A_ThisFunc)
    Else Return
@@ -76618,9 +76581,6 @@ createPathVectorCustomShape(ImgSelPath, ByRef PointsList, tension, isClosed, isB
 }
 
 InitHugeImgSelPath(advancedMode, imgW, imgH, shapeu:=0, angle:=0, keepBounds:=0) {
-; this function should probably be deleted, it is the husk of createBitmapSelPath()
-; to-do ; delete this ; check dependencies
-
    obju := []
    If !(editingSelectionNow=1 && testAllowSelInvert())
    {
@@ -76666,95 +76626,6 @@ InitHugeImgSelPath(advancedMode, imgW, imgH, shapeu:=0, angle:=0, keepBounds:=0)
    obju.bX1 := X1,   obju.bY1 := Y1
    obju.bX2 := X2,   obju.bY2 := Y2
    obju.bImgSelW := imgSelW,   obju.bImgSelH := imgSelH
-
-   Return obju
-}
-
-createBitmapSelPath(advancedMode, imgW, imgH, shapeu:=0, angle:=0, keepBounds:=0) {
-; function no longer used; it was rendered by InitHugeImgSelPath() and QPV_PrepareHugeImgSelectionArea()
-
-   obju := []
-   If !(editingSelectionNow=1 && testAllowSelInvert())
-   {
-      obju.x1 := 0,          obju.y1 := 0
-      obju.x2 := imgW,       obju.y2 := imgH
-      obju.imgSelW := imgW,  obju.imgSelH := imgH
-      obju.imgZelW := imgW,  obju.imgZelH := imgH
-      obju.bImgSelPx := 0,   obju.bImgSelPy := 0
-      obju.bX1 := 0,         obju.bY1 := 0
-      obju.bX2 := imgW,      obju.bY2 := imgH
-      obju.bImgSelW := imgW, obju.bImgSelH := imgH
-      Return obju
-   }
-
-   zW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
-   zH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
-   szW := (ImgSelX2>imgW) ? imgSelX2 - imgW : 0
-   szH := (ImgSelY2>imgH) ? imgSelY2 - imgH : 0
-   aX1 := (ImgSelX1<0) ? abs(ImgSelX1) : 0
-   aY1 := (ImgSelY1<0) ? abs(ImgSelY1) : 0
-   bmpW := zW - aX1 - szW
-   bmpH := zH - aY1 - szH
-   ; fnOutputDebug(A_ThisFunc ": bmpW=" bmpW "|" zW "|" aX1 "|" szW "|img=" imgW)
-   ; fnOutputDebug(A_ThisFunc ": bmpH=" bmpH "|" zH "|" aY1 "|" szH "|img=" imgH)
-   obju.imgZelW := bmpW
-   obju.imgZelH := bmpH
-   If (isImgSizeTooLarge(bmpW, bmpH) || EllipseSelectMode!=2 && advancedMode=0 || isVarEqualTo(shapeu, 0, 1, 3) && advancedMode=1)
-      abandoned := 1
-
-   If !abandoned
-      pBitmap := trGdip_CreateBitmap(A_ThisFunc, bmpW, bmpH, "0x21808")
-   ; ToolTip, % shapeu "|" abandoned "|" pBitmape , , , 2
-   boundLess := validBMP(pBitmap) ? 0 : 1
-   calcImgSelection2bmp(boundLess, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2, 0, 0, "a")
-   Y1 := imgH - imgSelPy
-   Y2 := Y1 - imgSelH
-   flipVars(Y1, Y2)
-   obju.X1 := X1,   obju.Y1 := Y1
-   obju.X2 := X2,   obju.Y2 := Y2
-   obju.imgSelW := imgSelW,   obju.imgSelH := imgSelH
-
-   calcImgSelection2bmp(0, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2, 0, 0, "a")
-   Y1 := imgH - imgSelPy
-   Y2 := Y1 - imgSelH
-   flipVars(Y1, Y2)
-   obju.bImgSelPx := imgSelPx
-   obju.bImgSelPy := imgSelPy
-   obju.bX1 := X1,   obju.bY1 := Y1
-   obju.bX2 := X2,   obju.bY2 := Y2
-   obju.bImgSelW := imgSelW,   obju.bImgSelH := imgSelH
-   If !validBMP(pBitmap)
-   {
-      If !abandoned
-         addJournalEntry(A_ThisFunc ": failed to create selection clip mask bitmap")
-      Return obju
-   }
-
-   If (advancedMode=1)
-      pPath := coreCreateFillAreaShape(-aX1, -aY1, zW, zH, shapeu, angle, keepBounds)
-   Else
-      pPath := createImgSelPath(-aX1, -aY1, zW, zH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY, 0)
-
-   If (pPath!="")
-   {
-      Gz := Gdip_GraphicsFromImage(pBitmap)
-      Gdip_GraphicsClear(Gz, "0xFF000000")
-      brushu := Gdip_BrushCreateSolid("0xFFffFFff")
-      r := Gdip_FillPath(Gz, brushu, pPath)
-      Gdip_DeleteBrush(brushu)
-      Gdip_DeleteGraphics(Gz)
-      If r
-      {
-         addJournalEntry(A_ThisFunc ": failed to draw selection path for the clip mask")
-         pBitmap := trGdip_DisposeImage(pBitmap, 1)
-      } Else
-      {
-         Gdip_ImageRotateFlip(pBitmap, 6)  ; FreeImage bitmaps are bottom-up stored
-         obju.alphaMaskGray := pBitmap
-      }
-   } Else
-      addJournalEntry(A_ThisFunc ": failed to create selection path for the clip mask")
-
    Return obju
 }
 
@@ -94145,15 +94016,15 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
      If hFIFimgX
      {
         thisBPPc := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgX), "-"))
-        If (thisBPPc!=32)
+        If !isVarEqualTo(thisBPPc, 8, 16, 24, 32)
         {
            hFIFimgDE := FreeImage_ConvertTo(hFIFimgX, "32Bits")
            If hFIFimgDE
            {
-              newBitmap := ConvertFIMtoPBITMAP(hFIFimgDE)
+              newBitmap := ConvertFIMtoPBITMAP(hFIFimgDE, coreDesiredPixFmt)
               FreeImage_UnLoad(hFIFimgDE)
            }
-        } Else newBitmap := ConvertFIMtoPBITMAP(hFIFimgX)
+        } Else newBitmap := ConvertFIMtoPBITMAP(hFIFimgX, coreDesiredPixFmt)
 
         FreeImage_UnLoad(hFIFimgX)
         If StrLen(newBitmap)>2
@@ -94185,18 +94056,18 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
      }
      ; fnOutputDebug("cc=" imgW "|" imgH)
      setWindowTitle("Converting FreeImage object to GDI+ image bitmap")
-     If (noBPPconv=0 && noBMP=0 && GFT=0 && InStr(ColorsType, "rgba"))
+     If (noBMP=0 && GFT=0 && InStr(ColorsType, "rgba"))
         alphaBitmap := FreeImage_GetChannel(hFIFimgC, 4)
 
      imgBPPc := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgC), "-"))
-     If (imgBPPc!=32)
+     If !isVarEqualTo(imgBPPc, 8, 16, 24, 32)
         hFIFimgD := FreeImage_ConvertTo(hFIFimgC, "32Bits")
 
      hFIFimgE := hFIFimgD ? hFIFimgD : hFIFimgC
      If (alphaBitmap!="")
         mainLoadedIMGdetails.HasAlpha := FIMalphaChannelFix(alphaBitmap, hFIFimgE)
 
-     pBitmap := ConvertFIMtoPBITMAP(hFIFimgE)
+     pBitmap := ConvertFIMtoPBITMAP(hFIFimgE, coreDesiredPixFmt)
      If StrLen(pBitmap)>2
         recordGdipBitmaps(pBitmap, A_ThisFunc)
   } Else pBitmap := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH, coreDesiredPixFmt)
@@ -95396,6 +95267,21 @@ trGdip_ResizeBitmap(funcu, pBitmap, givenW, givenH, KeepRatio, InterpolationMode
     thisPixFmt := (KeepPixelFormat=-1) ? coreDesiredPixFmt : KeepPixelFormat
     ; fnOutputDebug(A_ThisFunc "(" pBitmap "):" givenW "|" givenH "|" funcu)
     k := createdGDIobjsArray["x" pBitmap, 4]
+    If (createdGDIobjsArray["x" pBitmap, 4]="fim")
+    {
+       Gdip_GetImageDimensions(pBitmap, w, h)
+       If (KeepRatio=1)
+          calcIMGdimensions(w, h, givenW, givenH, givenW, givenH)
+
+       hFIFimgA := trFreeImage_Rescale(ccreatedGDIobjsArray["x" pBitmap, 7], givenW, givenH, 0)
+       If hFIFimgA
+       {
+          z := ConvertAdvancedFIMtoPBITMAP(hFIFimgA, 0)
+          If StrLen(z[1])>2
+            recordGdipBitmaps(z[1], A_ThisFunc, z[2], "fim")
+       }
+    }
+
     r := Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode, thisPixFmt, checkTooLarge)
     ; r := OpenCV_GdipResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode, 1)
     ; fnOutputDebug(A_ThisFunc ": " A_TickCount - t)
@@ -95494,7 +95380,9 @@ trGdip_DisposeImage(pBitmap, noErr:=1) {
     ; fnOutputDebug("BMP to dispose: " createdGDIobjsArray["x" pBitmap, 4] ". ID: " pBitmap)
     ; If (createdGDIobjsArray["x" pBitmap, 3]=1 && createdGDIobjsArray["x" pBitmap, 2]="bmp")
     r := Gdip_DisposeImage(pBitmap, 1)
-    createdGDIobjsArray["x" pBitmap] := [pBitmap, "bmp", 0, 0, 0]
+    If (createdGDIobjsArray["x" pBitmap, 8]="fim")
+       FreeImage_UnLoad(createdGDIobjsArray["x" pBitmap, 7])
+    createdGDIobjsArray["x" pBitmap] := [pBitmap, "bmp", 0, 0, 0, 0, 0, 0]
     Return r
 }
 
@@ -99714,9 +99602,7 @@ testFIMrgb16toRGBF() {
    initFIMGmodule()
    hFIFimgA := FreeImage_Load("E:\Sucan twins\photos test\SLDs\freeimage-tests\P1040822.RAW")
    SoundBeep 300, 100
-   a := FreeImage_Save(hFIFimgA, "E:\Sucan twins\photos test\SLDs\freeimage-tests\P1040822.jp2")
-   SoundBeep 600, 100
-   b := FreeImage_Save(hFIFimgA, "E:\Sucan twins\photos test\SLDs\freeimage-tests\P1040822.png")
+   a := FreeImage_Save(hFIFimgA, "E:\Sucan twins\photos test\SLDs\freeimage-tests\P1040822.jxr")
    SoundBeep 900, 100
    FreeImage_UnLoad(hFIFimgA)
    ToolTip, % a "|" b , , , 2
