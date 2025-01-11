@@ -301,7 +301,7 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
       {
          imgBPP := Trim(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
          thisZeit := A_TickCount - startZeit
-         If (imgBPP!=24)
+         If (imgBPP!=24 || imgBPP!=32)
          {
             hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "24Bits")
             If hFIFimgB
@@ -403,12 +403,22 @@ ConvertFimObj2pBitmap(hFIFimgA, w, h) {
   If StrLen(hFIFimgA)<3
      Return
 
-  bitmapInfo := FreeImage_GetInfo(hFIFimgA)
   pBits := FreeImage_GetBits(hFIFimgA)
-  If (!bitmapInfo || !pBits)
+  If !pBits
      Return
 
-  nBitmap := Gdip_CreateBitmapFromGdiDib(bitmapInfo, pBits)
+  bpp := FreeImage_GetBPP(hFIFimgA)
+  If (bpp=32)
+  {
+     FreeImage_FlipVertical(hFIFimgA)
+     Stride := FreeImage_GetPitch(hFIFimgA)
+     nBitmap := Gdip_CreateBitmap(w, h, "0x26200A", Stride, pBits)
+  } Else
+  {
+     bitmapInfo := FreeImage_GetInfo(hFIFimgA)
+     nBitmap := Gdip_CreateBitmapFromGdiDib(bitmapInfo, pBits)
+  }
+
   If !nBitmap
      Return
 
@@ -615,6 +625,10 @@ FreeImage_Rescale(hImage, w, h, filter:=3) {
       Return
 
    Return DllCall(getFIMfunc("Rescale"), "uptr", hImage, "Int", w, "Int", h, "Int", filter, "uptr")
+}
+
+FreeImage_FlipVertical(hImage) {
+   Return DllCall(getFIMfunc("FlipVertical"), "uptr", hImage)
 }
 
 FreeImage_GetWidth(hImage) {

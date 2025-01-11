@@ -16020,18 +16020,35 @@ destroyGDIfileCache(remAll:=1, makeBackup:=0) {
     } Else
     {
        If (SubStr(idGDIcacheSRCfileA, 1, 1)=1)
+       {
+          idGDIcacheSRCfileA := ""
           GDIcacheSRCfileA := trGdip_DisposeImage(GDIcacheSRCfileA, 1)
-       If (SubStr(idGDIcacheSRCfileB, 1, 1)=1)
-          GDIcacheSRCfileB := trGdip_DisposeImage(GDIcacheSRCfileB, 1)
-       If (SubStr(BprevImgCall, 1, 1)=1)
-          BprevGdiBitmap := trGdip_DisposeImage(BprevGdiBitmap, 1)
-       If (SubStr(AprevImgCall, 1, 1)=1)
-          AprevGdiBitmap := trGdip_DisposeImage(AprevGdiBitmap, 1)
-       If (SubStr(gdiBitmapIDcall, 1, 1)=1)
-          gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
+       }
 
-       idGDIcacheSRCfileA := idGDIcacheSRCfileB := ""
-       BprevImgCall := AprevImgCall := gdiBitmapIDcall := ""
+       If (SubStr(idGDIcacheSRCfileB, 1, 1)=1)
+       {
+          idGDIcacheSRCfileB := ""
+          GDIcacheSRCfileB := trGdip_DisposeImage(GDIcacheSRCfileB, 1)
+       }
+
+       If (SubStr(BprevImgCall, 2, 1)=1)
+       {
+          BprevImgCall := "" 
+          BprevGdiBitmap := trGdip_DisposeImage(BprevGdiBitmap, 1)
+       }
+
+       If (SubStr(AprevImgCall, 2, 1)=1)
+       {
+          AprevImgCall := ""
+          AprevGdiBitmap := trGdip_DisposeImage(AprevGdiBitmap, 1)
+       }
+
+       If (SubStr(gdiBitmapIDcall, 2, 1)=1)
+       {
+          gdiBitmapIDcall := ""
+          gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
+       }
+
     }
 }
 
@@ -16375,7 +16392,7 @@ performUndoAlphaPainting() {
 
 ImgUndoAction(dummy:=0) {
    Critical, on
-   If (viewportQPVimage.imgHandle)
+   If (viewportQPVimage.imgHandle && thumbsDisplaying!=1)
    {
       If (thumbsDisplaying!=1 && imageLoading!=1)
          undoRedoHugeImagesAct()
@@ -16610,8 +16627,7 @@ ImgRedoAction(dummy:=0) {
    Critical, on
    If (viewportQPVimage.imgHandle)
    {
-      If (thumbsDisplaying!=1 && imageLoading!=1)
-         undoRedoHugeImagesAct()
+      undoRedoHugeImagesAct()
       Return
    }
 
@@ -41553,9 +41569,9 @@ PanelRenameThisFile(dummy:=0) {
    obju := friendlyFileUndoInfos(file2rem)
    undoBtn := (obju.typu="rename") ? "&Undo rename|" : ""
    multiBtn := (markedSelectFile>1) ? "&Multi-rename|" : ""
-   fileMsg := (userPrivateMode=1) ? "" : "File location:`n" OutDir "\`n`n"
+   fileMsg := (userPrivateMode=1) ? "" : "File location:`n" OutDir "\`n `n"
    typeu := (userPrivateMode=1) ? " Password " : ""
-   msgResult := msgBoxWrapper("panelu|Rename file: " appTitle, fileMsg "Please type the new file name.", "&Rename file|" undoBtn multiBtn "&Modify index entry|C&ancel", 1, "modify-file", "On file name collision, use previously given answer", doLastOption, 0, "limit9050" typeu, OutFileName)
+   msgResult := msgBoxWrapper("panelu|Rename file: " appTitle, fileMsg "Please type the new file name.`n ", "&Rename file|" undoBtn multiBtn "&Modify index entry|C&ancel", 1, "modify-file", "On file name collision, use previously given answer", doLastOption, 0, "limit9050" typeu, OutFileName)
    If InStr(msgResult.btn, "multi")
    {
       SetTimer, PanelMultiRenameFiles, -100
@@ -44971,6 +44987,7 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
         Return 0
 
      destroyGDIfileCache()
+     oMD5name := generateThumbName(file2rem, 1)
      file2save := OutDir "\" newFileName
      If FileRexists(file2save, 0)
         file2save := askAboutFileCollision(file2rem, file2save, 0, doLastOption + 1, 0, performOverwrite)
@@ -45031,6 +45048,7 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
         resultedFilesList[currentFileIndex, 1] := file2save
         updateMainUnfilteredList(currentFileIndex, 1, file2save)
         watchFolderDetails := ""
+        updateViewportCachesID(oMD5name, currentFileIndex, file2rem, file2save)
         dummyTimerDelayiedImageDisplay(50)
         If (userPrivateMode=1)
         {
@@ -45044,6 +45062,25 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
         Return 1
      }
   } Else Return 0
+}
+
+updateViewportCachesID(oMD5name, indexu, file2rem, file2save) {
+   coreShowTheImage("set-prev", file2save)
+   nMD5name := generateThumbName(file2save, 1)
+   o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
+   trGdip_GetImageDimensions(useGdiBitmap(), fimgW, fimgH)
+   base := o_bwDithering ColorDepthDithering vpIMGrotation userHQraw cmrRAWtoneMapAlgo allowToneMappingImg cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapAltExpo desiredFrameIndex "|==|" totalFramesIndex currentUndoLevel undoLevelsRecorded fimgW fimgH
+   newCall := "a0" nMD5name file2save base
+   prevCall := "a0" oMD5name file2rem base
+   ec := prevCall useGdiBitmap()
+   If (gdiBitmapIDcall=prevCall)
+      gdiBitmapIDcall := newCall
+   If (gdiBitmapIDentire=ec)
+      gdiBitmapIDentire := newCall useGdiBitmap()
+   If (AprevImgCall=prevCall)
+      AprevImgCall := newCall
+   If (BprevImgCall=prevCall)
+      BprevImgCall := newCall
 }
 
 UpdateIndexBTNaction(newFileName, whichIndex) {
@@ -55555,6 +55592,7 @@ saveHugeVPimageFile(imgPath, file2save, hFIFimgA, depth) {
          FreeImage_FlipVertical(hFIFimgB)
 
       r := coreConvertImgFormat(imgPath, file2save, hFIFimgB)
+      SoundBeep , % r ? 300 : 900, 100
       ; hFIFimgB disposed by coreConvertImgFormat()
       Return r
    } Else
@@ -55570,6 +55608,7 @@ saveHugeVPimageFile(imgPath, file2save, hFIFimgA, depth) {
          FreeImage_FlipVertical(hFIFimgA)
          FlipImgV := 0
       }
+
       Static redMASK   := "0x00FF0000" ; FI_RGBA_RED_MASK;
            , greenMASK := "0x0000FF00" ; FI_RGBA_GREEN_MASK;
            , blueMASK  := "0x000000FF" ; FI_RGBA_BLUE_MASK;
@@ -55584,7 +55623,9 @@ saveHugeVPimageFile(imgPath, file2save, hFIFimgA, depth) {
          hFIFimgB := FreeImage_ConvertFromRawBitsEx(0, bufferu, 1, imgW, imgH, Stride, bpp, redMASK, greenMASK, blueMASK, doFlip)
       If !hFIFimgB
          Return "err-no-fim-create-view"
+
       r := coreConvertImgFormat(imgPath, file2save, hFIFimgB)
+      SoundBeep , % r ? 300 : 900, 100
       ; hFIFimgB disposed by coreConvertImgFormat()
       killQPVscreenImgSection()
       Return r
@@ -55757,6 +55798,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
       {
          sOutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
          showTOOLtip("Failed to save image file`n" OutFileName "`n" sOutDir "\")
+         SoundBeep 300, 100
          msgBoxWrapper(appTitle ": ERROR", appTitle " was unable to save the image file due to an undetermined cause.`n`n" OutFileName "`n" OutDir "\`nError code: " r, 0, 0, "error")
       } Else
       {
@@ -55785,9 +55827,9 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
 
          imgIndexEditing := currentFileIndex
          currentImgModified := 2
+         SoundBeep, 900, 100
       }
 
-      SoundBeep, % r ? 300 : 900, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       SetTimer, ResetImgLoadStatus, -50
    }
@@ -62044,6 +62086,18 @@ InvokeMenuBarEdit(manuID) {
    infoImgEditingNow := isImgEditingNow()
    If (thumbsDisplaying!=1)
    {
+      if !AnyWindowOpen
+      {
+         If hasFileIndexUndo(currentFileIndex)
+            kMenu("pvMenuBarEdit", "Add", "&Undo file action", "MenuFileUndoAction", "history restore actions records")
+    
+         If (fileActsHistoryArray.Count()>0)
+            kMenu("pvMenuBarEdit", "Add", "Undo previous file actions(s) (chronologically)`tCtrl+Shift+Z", "doUndoFileActsChronos", "records actions files rename move copy history restore")
+
+         If (hasFileIndexUndo(currentFileIndex) || fileActsHistoryArray.Count()>0)
+            kMenu("pvMenuBarEdit", "AddSeparator", 0)
+      }
+
       kMenu("pvMenuBarEdit", "Add", "&Undo`tCtrl+Z", "ImgUndoAction", "image edit")
       kMenu("pvMenuBarEdit", "Add", "&Redo`tCtrl+Y", "ImgRedoAction", "image edit")
       If (viewportQPVimage.imgHandle)
@@ -63816,10 +63870,10 @@ createMenuCurrentFilesActs(dummy:=0) {
    Try Menu, PVcopy, Delete
    createMenuCopyFile("PVcopy")
    If hasFileIndexUndo(currentFileIndex)
-      kMenu("PVfilesActs", "Add", "&Undo file action`tCtrl+Z", "ImgUndoAction", "history restore actions records")
+      kMenu("PVfilesActs", "Add", "&Undo file action`tCtrl+Z", "MenuFileUndoAction", "history restore actions records")
 
    If (fileActsHistoryArray.Count()>0)
-      kMenu("PVfilesActs", "Add", "Undo last actions(s) (chronologically)`tCtrl+Shift+Z", "doUndoFileActsChronos", "records actions files rename move copy history restore")
+      kMenu("PVfilesActs", "Add", "Undo previous actions(s) (chronologically)`tCtrl+Shift+Z", "doUndoFileActsChronos", "records actions files rename move copy history restore")
 
    kMenu("PVfilesActs", "AddSeparator", 0)
    kMenu("PVfilesActs", "Add", "&Copy", ":PVcopy")
@@ -69361,6 +69415,12 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
    Critical, on
    Static prevImgPath, lastInvoked2 := 1, counteru
         , lastInvoked := 1, prevPicCtrl := 1
+   If (imgPath="set-prev")
+   {
+      prevLastImg[1] := [currentFileIndex, resultedFilesList[currentFileIndex, 1]]
+      prevImgPath := usePrevious
+      Return
+   }
 
    WinGet, winStateu, MinMax, ahk_id %PVhwnd%
    If (winStateu=-1)
@@ -70241,10 +70301,13 @@ determineGDIsmallCacheSize(mainWidth, mainHeight) {
 
 RescaleBMPtiny(imgPath, mainWidth, mainHeight) {
   Critical, on
-  Static prevImgPath
+  Static prevImgID
   trGdip_GetImageDimensions(useGdiBitmap(), fimgW, fimgH)
-  thisID := "|==|" ColorDepthDithering vpIMGrotation desiredFrameIndex totalFramesIndex currentUndoLevel undoLevelsRecorded fimgW fimgH
-  If (validBMP(gdiBitmapSmall) && prevImgPath=gdiBitmapIDentire && InStr(gdiBitmapIDentire, imgPath) && InStr(gdiBitmapIDentire, thisID))
+  o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
+  trGdip_GetImageDimensions(useGdiBitmap(), fimgW, fimgH)
+  partID := "|==|" totalFramesIndex currentUndoLevel undoLevelsRecorded fimgW fimgH useGdiBitmap()
+  thisID := resultedFilesList[currentFileIndex, 1] o_bwDithering ColorDepthDithering vpIMGrotation userHQraw cmrRAWtoneMapAlgo allowToneMappingImg cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapAltExpo desiredFrameIndex
+  If (validBMP(gdiBitmapSmall) && prevImgID=gdiBitmapIDentire && InStr(gdiBitmapIDentire, thisID))
      Return gdiBitmapSmall
 
   gdiBitmapSmall := trGdip_DisposeImage(gdiBitmapSmall, 1)
@@ -70263,8 +70326,8 @@ RescaleBMPtiny(imgPath, mainWidth, mainHeight) {
   whichBitmap := (validBMP(gdiBMPvPsize) && vpIMGres>Resized.Small*1.01) ? gdiBMPvPsize : gdiBitmap
   gdiBitmapSmall := trGdip_ResizeBitmap(A_ThisFunc, whichBitmap, Resized.Wsmall, Resized.Hsmall, 0, thisImgQuality, -1)
   ; gdiBitmapSmall := Gdi_ResizeBitmap(whichBitmap, Resized.W, Resized.H, 0, 4)
-  gdiBitmapIDentire := SubStr(gdiBitmapIDentire, 1, InStr(gdiBitmapIDentire, "|==|") - 1) . thisID
-  prevImgPath := gdiBitmapIDentire
+  gdiBitmapIDentire := SubStr(gdiBitmapIDentire, 1, InStr(gdiBitmapIDentire, "|==|") - 1) . partID
+  prevImgID := gdiBitmapIDentire
   If validBMP(gdiBitmapSmall)
      Return gdiBitmapSmall
 }
@@ -70272,10 +70335,13 @@ RescaleBMPtiny(imgPath, mainWidth, mainHeight) {
 RescaleBMPtinyVPsize(imgPath, GuiW, GuiH) {
   Critical, on
 
-  Static prevImgPath
+  Static prevImgID
   trGdip_GetImageDimensions(useGdiBitmap(), fimgW, fimgH)
-  thisID := "|==|" ColorDepthDithering vpIMGrotation desiredFrameIndex totalFramesIndex currentUndoLevel undoLevelsRecorded fimgW fimgH
-  If (validBMP(gdiBMPvPsize) && prevImgPath=gdiBitmapIDentire && InStr(gdiBitmapIDentire, imgPath) && InStr(gdiBitmapIDentire, thisID))
+  o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
+  trGdip_GetImageDimensions(useGdiBitmap(), fimgW, fimgH)
+  partID := "|==|" totalFramesIndex currentUndoLevel undoLevelsRecorded fimgW fimgH useGdiBitmap()
+  thisID := resultedFilesList[currentFileIndex, 1] o_bwDithering ColorDepthDithering vpIMGrotation userHQraw cmrRAWtoneMapAlgo allowToneMappingImg cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapAltExpo desiredFrameIndex
+  If (validBMP(gdiBMPvPsize) && prevImgID=gdiBitmapIDentire && InStr(gdiBitmapIDentire, thisID))
      Return gdiBMPvPsize
 
   gdiBMPvPsize := trGdip_DisposeImage(gdiBMPvPsize, 1)
@@ -70285,9 +70351,9 @@ RescaleBMPtinyVPsize(imgPath, GuiW, GuiH) {
 
   changeMcursor()
   gdiBMPvPsize := trGdip_ResizeBitmap(A_ThisFunc, gdiBitmap, Floor(GuiW*1.15), Floor(GuiH*1.15), 0, thisImgQuality, -1)
-  gdiBitmapIDentire := SubStr(gdiBitmapIDentire, 1, InStr(gdiBitmapIDentire, "|==|") - 1) . thisID
+  gdiBitmapIDentire := SubStr(gdiBitmapIDentire, 1, InStr(gdiBitmapIDentire, "|==|") - 1) . partID
   ; ToolTip, % gdiBitmapIDentire "`n" prevImgPath , , , 2
-  prevImgPath := gdiBitmapIDentire
+  prevImgID := gdiBitmapIDentire
   If validBMP(gdiBMPvPsize)
      Return gdiBMPvPsize
 }
@@ -70984,22 +71050,28 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   hasFullReloaded := CountGIFframes := totalFramesIndex := 0
   MD5name := generateThumbName(imgPath, 1)
   o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
-  thisImgCall := MD5name imgPath o_bwDithering ColorDepthDithering vpIMGrotation
+  thisImgCall := MD5name imgPath o_bwDithering ColorDepthDithering vpIMGrotation userHQraw cmrRAWtoneMapAlgo allowToneMappingImg cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapAltExpo desiredFrameIndex
   If !FileRexists(imgPath) && (InStr(AprevImgCall, imgPath) || InStr(BprevImgCall, imgPath))
-     thisImgCall := InStr(AprevImgCall, imgPath) ? SubStr(AprevImgCall, 2) : SubStr(BprevImgCall, 2)
+     thisImgCall := InStr(AprevImgCall, imgPath) ? "A" : "B"
 
   prevLastImg[2] := prevLastImg[1]
   prevLastImg[1] := [currentFileIndex, resultedFilesList[currentFileIndex, 1]]
   gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
   backupGdiBMP := trGdip_DisposeImage(backupGdiBMP, 1)
   ignoreCache := (prevFrame!=desiredFrameIndex || minimizeMemUsage=1 || validBMP(UserMemBMP)) ? 1 : mustReloadIMG
+  ; fnOutputDebug(A_ThisFunc "(): " ignoreCache " | " mustReloadIMG "|" validBMP(AprevGdiBitmap) "|" validBMP(BprevGdiBitmap))
+  ; fnOutputDebug(A_ThisFunc "(): thisCall=" thisImgCall)
+  ; fnOutputDebug(A_ThisFunc "(): prevA=" SubStr(AprevImgCall, 3, InStr(AprevImgCall, "|==|") - 3))
+  ; fnOutputDebug(A_ThisFunc "(): prevB=" SubStr(BprevImgCall, 3, InStr(BprevImgCall, "|==|") - 3))
   ; MsgBox, % imgPath "`n" AbackupIMGdetails.File "`n" BbackupIMGdetails.File "`n" CbackupIMGdetails.File
-  If (SubStr(AprevImgCall, 2)=thisImgCall && validBMP(AprevGdiBitmap) && ignoreCache=0)
+  aOK := (thisImgCall="A" || SubStr(AprevImgCall, 3, InStr(AprevImgCall, "|==|") - 3)=thisImgCall) ? 1 : 0
+  bOK := (thisImgCall="B" || SubStr(BprevImgCall, 3, InStr(BprevImgCall, "|==|") - 3)=thisImgCall) ? 1 : 0
+  If (aOK=1 && validBMP(AprevGdiBitmap) && ignoreCache=0)
   {
      UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
      trGdip_GetImageDimensions(AprevGdiBitmap, imgW, imgH)
      gdiBitmap := trGdip_CloneBitmap(A_ThisFunc, AprevGdiBitmap)
-     addJournalEntry("Used cached GDI bitmap ID: " AprevGdiBitmap "`n" imgPath)
+     addJournalEntry("Used cached GDI+ bitmap A-ID: " AprevGdiBitmap "`n" imgPath)
      gdiBitmapIDcall := AprevImgCall
      gdiBitmapIDentire := AprevImgCall gdiBitmap
      If (imgPath=AbackupIMGdetails.File)
@@ -71009,14 +71081,14 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
      extractAmbientalTexture()
      totalFramesIndex := currIMGdetails.Frames
      Return
-  } Else If (SubStr(BprevImgCall, 2)=thisImgCall && validBMP(BprevGdiBitmap) && ignoreCache=0)
+  } Else If (bOK=1 && validBMP(BprevGdiBitmap) && ignoreCache=0)
   {
      UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
      trGdip_GetImageDimensions(BprevGdiBitmap, imgW, imgH)
      gdiBitmap := trGdip_CloneBitmap(A_ThisFunc, BprevGdiBitmap)
      gdiBitmapIDcall := BprevImgCall
      gdiBitmapIDentire := BprevImgCall gdiBitmap
-     addJournalEntry("Used cached GDI bitmap ID: " BprevGdiBitmap "`n" imgPath)
+     addJournalEntry("Used cached GDI bitmap B-ID: " BprevGdiBitmap "`n" imgPath)
      If (imgPath=AbackupIMGdetails.File)
         currIMGdetails := AbackupIMGdetails.Clone()
      Else If (imgPath=BbackupIMGdetails.File)
@@ -71202,7 +71274,8 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
 
   trGdip_GetImageDimensions(rBitmap, fimgW, fimgH)
   BprevImgCall := AprevImgCall
-  AprevImgCall := "a" GDIbmpFileConnected MD5name imgPath o_bwDithering "|==|" ColorDepthDithering vpIMGrotation desiredFrameIndex totalFramesIndex currentUndoLevel undoLevelsRecorded fimgW fimgH
+  p := viewportQPVimage.imgHandle ? 1 : ""     ; this is meant to block caching the dummy GDI+ bitmap when images are loaded through «very-large» mode; see LoadBitmapForScreen()
+  AprevImgCall := "a" GDIbmpFileConnected MD5name p imgPath o_bwDithering ColorDepthDithering vpIMGrotation userHQraw cmrRAWtoneMapAlgo allowToneMappingImg cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapAltExpo desiredFrameIndex "|==|" totalFramesIndex currentUndoLevel undoLevelsRecorded fimgW fimgH
   gdiBitmapIDcall := AprevImgCall
   gdiBitmapIDentire := AprevImgCall rBitmap
   gdiBitmap := rBitmap
@@ -77272,7 +77345,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     If (CountGIFframes>1 && !AnyWindowOpen && animGIFsSupport=1 && prevAnimGIFwas!=imgPath)
        mustPlayAnim := 1
 
-    If (mustPlayAnim=1) || (IMGresizingMode=4 && allowFreeIMGpanning=1)
+    If (mustPlayAnim=1)
     {
        prevVPcacheZoom[1] := 0
        allowVPcacheOptimizations := 0
@@ -77285,13 +77358,13 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
           mustGenerate := 0
        Else If isInRange(totalNewSize, 0, gdiSmallSize.Small + 0.09)
           mustGenerate := 2
-       Else If isInRange(totalNewSize, gdiSmallSize.Small + 0.08, gdiSmallSize.Screen + 2.1)
+       Else If isInRange(totalNewSize, gdiSmallSize.Small + 0.08, gdiSmallSize.Screen + 2.0)
           mustGenerate := 1
        Else
           mustGenerate := 0
 
        If (mustGenerate=1) ; do not resize to screen size if it is already at screen size
-          mustGenerate := (gdiSmallSize.Screen + 2.1<gdiSmallSize.Main + 1) || (gdiSmallSize.Screen//3>gdiSmallSize.Main) ? 1 : 0
+          mustGenerate := (gdiSmallSize.Screen + 2.0<gdiSmallSize.Main + 1) || (gdiSmallSize.Screen//3>gdiSmallSize.Main) ? 1 : 0
 
        If (mustGenerate=1 && minimizeMemUsage=1 && usePrevious=1)
           mustGenerate := 2
@@ -88020,6 +88093,10 @@ PopulateFileActsHistory() {
     RemoveTooltip()
     SetTimer, ResetImgLoadStatus, -100
     EM_SETCUEBANNER(hEditField, "Filter files list", 1)
+}
+
+MenuFileUndoAction() {
+   corefileUndoAction(currentFileIndex)
 }
 
 fileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {

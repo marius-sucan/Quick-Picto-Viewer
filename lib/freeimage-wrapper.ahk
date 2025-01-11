@@ -1232,17 +1232,31 @@ ConvertFIMtoPBITMAP(hFIFimgA, pixelFormat:="0xE200B") {
   If (type!=1)
      Return
 
-  bitmapInfo := FreeImage_GetInfo(hFIFimgA)
   pBits := FreeImage_GetBits(hFIFimgA)
-  If (!bitmapInfo || !pBits)
+  If !pBits
      Return
 
   FreeImage_GetImageDimensions(hFIFimgA, w, h)
-  nBitmap := Gdip_CreateBitmapFromGdiDib(bitmapInfo, pBits)
+  bpp := FreeImage_GetBPP(hFIFimgA)
+  If (bpp=32)
+  {
+     FreeImage_FlipVertical(hFIFimgA)
+     Stride := FreeImage_GetPitch(hFIFimgA)
+     nBitmap := Gdip_CreateBitmap(w, h, "0x26200A", Stride, pBits)
+  } Else
+  {
+     bitmapInfo := FreeImage_GetInfo(hFIFimgA)
+     nBitmap := Gdip_CreateBitmapFromGdiDib(bitmapInfo, pBits) ; this does not retain alpha channel :(
+  }
+  
   If !nBitmap
      Return
 
+  FreeImage_GetDPIresolution(hFIFimgA, dpiX, dpiY)
   pBitmap := Gdip_CloneBitmapArea(nBitmap, 0, 0, w, h, pixelFormat)
+  If pBitmap
+     Gdip_BitmapSetResolution(pBitmap, Round(dpiX), Round(dpiY))
+
   Gdip_DisposeImage(nBitmap)
   Return pBitmap
 }
