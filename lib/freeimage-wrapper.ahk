@@ -47,23 +47,28 @@
 ;    source: http://www.autohotkey.net/~linpinger/index.html
 
 
-FreeImage_FoxInit(isInit:=1, bonusPath:=0) {
+FreeImage_FoxInit(isInit:=1, bonusPath:=0, DllName:="FreeImage.dll") {
    Static hFIDll
+   Static lastDllName
+   If (isInit="lastDllName")
+      Return lastDllName
+
    ; if you change the dll name, getFIMfunc() needs to reflect this
    If RegExMatch(bonusPath, "i)(.\.dll)$")
       DllPath := bonusPath
    Else
-      DllPath := FreeImage_FoxGetDllPath("freeimage.dll", bonusPath)
+      DllPath := FreeImage_FoxGetDllPath(DllName, Trim(bonusPath, "\"))
 
    If !DllPath
       Return "err - 404"
 
+   lastDllName := SubStr(DllPath, InStr(DllPath, "\", 0, -1) + 1)
    If (isInit=1)
       hFIDll := DllCall("LoadLibraryW", "WStr", DllPath, "uptr")
    Else
       DllCall("FreeLibrary", "UInt", hFIDll)
 
-   ; ToolTip, % DllPath "`n" hFIDll , , , 2
+   ; ToolTip, % lastDllName "|" DllPath "`n" hFIDll "|" FreeImage_GetVersion() , , , 2
    If (isInit=1 && !hFIDll)
       Return "err - " A_LastError
 
@@ -1221,7 +1226,8 @@ getFIMfunc(funct) {
       Else If (funct="RotateEx")
          fSuffix := "@48"
    }
-   funct := "FreeImage\" fPrefix funct fSuffix
+
+   funct := FreeImage_FoxInit("lastDllName") "\" fPrefix funct fSuffix
    Return funct
 }
 

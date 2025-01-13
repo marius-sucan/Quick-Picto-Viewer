@@ -188,7 +188,7 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
 
       FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
       calcIMGdimensions(imgW, imgH, thumbsSizeQuality, thumbsSizeQuality, ResizedW, ResizedH)
-      resizeFilter := 0 ; (ResizeQualityHigh=1) ? 3 : 0
+      resizeFilter := (ResizeQualityHigh=1) ? 3 : 0
     
       hFIFimgX := trFreeImage_Rescale(hFIFimgA, ResizedW, ResizedH, resizeFilter)
       FreeImage_UnLoad(hFIFimgA)
@@ -507,7 +507,7 @@ OpenCV_FimResizeBitmap(hFIFimgA, resizedW, resizedH, rx, ry, rw, rh, Interpolati
     mStride := FreeImage_GetPitch(hFIFimgX) 
     pBitsAll := FreeImage_GetBits(hFIFimgA)
     Stride := FreeImage_GetPitch(hFIFimgA)
-    r := DllCall("qpvmain.dll\openCVresizeBitmapExtended", "UPtr", pBitsAll, "UPtr", pBits, "Int", width, "Int", height, "Int", stride, "Int", rx, "Int", ry, "Int", rw, "Int", rh, "Int", resizedW, "Int", resizedH, "Int", mstride, "Int", bpp, "Int", 1)
+    r := DllCall("qpvmain.dll\openCVresizeBitmapExtended", "UPtr", pBitsAll, "UPtr", pBits, "Int", width, "Int", height, "Int", stride, "Int", rx, "Int", ry, "Int", rw, "Int", rh, "Int", resizedW, "Int", resizedH, "Int", mstride, "Int", bpp, "Int", InterpolationMode)
     ; fnOutputDebug(A_ThisFunc "(): " A_TickCount - thisStartZeit)
     If !r 
     {
@@ -521,7 +521,7 @@ OpenCV_FimResizeBitmap(hFIFimgA, resizedW, resizedH, rx, ry, rw, rh, Interpolati
 }
 
 trFreeImage_Rescale(hImage, w, h, filter:=3) {
-   a := OpenCV_FimResizeBitmap(hImage, w, h, 0, 0, 0, 0, filter) 
+   a := OpenCV_FimResizeBitmap(hImage, w, h, 0, 0, 0, 0, clampInRange(filter - 1, 0, 3))
    If !a
       a := FreeImage_Rescale(hImage, w, h, filter)
    Return a

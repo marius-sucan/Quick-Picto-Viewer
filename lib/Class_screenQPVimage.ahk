@@ -255,7 +255,7 @@ Class screenQPVimage {
          This.Frames := NumGet(resultsArray, 4 * 2, "uInt") - 1
          This.ActiveFrame := NumGet(resultsArray, 4 * 6, "uInt")
          This.DPI := NumGet(resultsArray, 4 * 4, "uInt")
-         This.RawFormat := WICcontainerFmts(NumGet(resultsArray, 4 * 5, "uInt"))
+         This.RawFormat := WICcontainerFmts(NumGet(resultsArray, 4 * 5, "uInt"), imgPath)
          This.TooLargeGDI := 0 ; isImgSizeTooLarge(This.Width, This.Height)
          This.HasAlpha := varContains(k, "argb", "prgba", "bgra", "rgba", "alpha")
          This.OpenedWith := "Windows Imaging Component [WIC]"

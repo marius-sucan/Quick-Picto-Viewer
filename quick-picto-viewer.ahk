@@ -14582,9 +14582,11 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:
 }
 
 trFreeImage_Rescale(hImage, w, h, filter:=3) {
-   a := OpenCV_FimResizeBitmap(hImage, w, h, 0, 0, 0, 0, filter) 
+   ; z := A_TickCount
+   a := OpenCV_FimResizeBitmap(hImage, w, h, 0, 0, 0, 0, clampInRange(filter - 1, 0, 3))
    If !a
       a := FreeImage_Rescale(hImage, w, h, filter)
+   ; fnOutputDebug(A_ThisFunc ": q=" filter " zeit " A_TickCount - z)
    Return a
 }
 
@@ -14639,7 +14641,7 @@ OpenCV_FimResizeBitmap(hFIFimgA, resizedW, resizedH, rx, ry, rw, rh, Interpolati
     mStride := FreeImage_GetStride(hFIFimgX) 
     pBitsAll := FreeImage_GetBits(hFIFimgA)
     Stride := FreeImage_GetStride(hFIFimgA)
-    r := DllCall(whichMainDLL "\openCVresizeBitmapExtended", "UPtr", pBitsAll, "UPtr", pBits, "Int", width, "Int", height, "Int", stride, "Int", rx, "Int", ry, "Int", rw, "Int", rh, "Int", resizedW, "Int", resizedH, "Int", mstride, "Int", bpp, "Int", 1)
+    r := DllCall(whichMainDLL "\openCVresizeBitmapExtended", "UPtr", pBitsAll, "UPtr", pBits, "Int", width, "Int", height, "Int", stride, "Int", rx, "Int", ry, "Int", rw, "Int", rh, "Int", resizedW, "Int", resizedH, "Int", mstride, "Int", bpp, "Int", InterpolationMode)
     ; fnOutputDebug(A_ThisFunc "(): " A_TickCount - thisStartZeit)
     If !r 
     {
@@ -93907,10 +93909,14 @@ initFIMGmodule() {
      bonusPath := mainExecPath
      Static srcDll := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\cPlusPlus\freeimage-r1909-custom\x64\Release\FreeImage.dll"
      ; Static srcDll := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\FreeImage-vold.dll"
+     dllName := "FreeImage.dll"
      If (A_PtrSize=8 && InStr(A_ScriptDir, "sucan twins") && !A_IsCompiled && FileExist(srcDll))
+     {
         bonusPath := srcDll
+        ; dllName := "FreeImage-vold.dll"
+     }
 
-     r := FreeImage_FoxInit(1, bonusPath) ; Load the FreeImage Dll
+     r := FreeImage_FoxInit(1, bonusPath, dllName) ; Load the FreeImage Dll
      wasInitFIMlib := (r && !InStr(r, "err")) ? 1 : 0
      If wasInitFIMlib
         addJournalEntry("FreeImage library initialized: v" FreeImage_GetVersion())
