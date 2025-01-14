@@ -70087,7 +70087,13 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
        infoColors := "`nColors display mode: " DefineFXmodes()
 
     If (thumbsDisplaying!=1)
+    {
        infoPixFmt := "`nPixel format: " currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat A_Space SubStr(currIMGdetails.OpenedWith, InStr(currIMGdetails.OpenedWith, "["))
+       If (viewportQPVimage.imgHandle)
+          infoPixFmt .= "`nViewport pixel format: " FreeImage_GetImageType(viewportQPVimage.imgHandle, 1) " (FIM)"
+       Else
+          infoPixFmt .= "`nViewport pixel format: " Gdip_GetImagePixelFormat(useGdiBitmap(), 2) " (GDI+)"
+    }
 
     If (resultedFilesList[currentFileIndex, 5]=1)
        infoFaved := "`nImage: FAVOURITED"
@@ -70497,7 +70503,7 @@ LoadFileWithWIA(imgPath, fastMode, noBMP:=0, sizesDesired:=0, ByRef newBitmap:=0
 }
 
 LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
-  Static prevMD5nameA, prevMD5nameB
+  Static prevMD5nameA, prevMD5nameB, prevDetailsA, prevDetailsB
 
   initQPVmainDLL()
   If (alwaysOpenwithFIM=1)
@@ -70531,20 +70537,20 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
      thisMD5name := MD5name imgPath userHQraw cmrRAWtoneMapAlgo cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapAltExpo allowToneMappingImg
      tFramesA := Gdip_GetBitmapFramesCount(GDIcacheSRCfileA) - 1
      tFramesB := Gdip_GetBitmapFramesCount(GDIcacheSRCfileB) - 1
-     isFramesA := (tFramesA = AbackupIMGdetails.Frames) ? 1 : 0
-     isFramesB := (tFramesB = BbackupIMGdetails.Frames) ? 1 : 0
+     isFramesA := (tFramesA = prevImgDetailsA.Frames) ? 1 : 0
+     isFramesB := (tFramesB = prevImgDetailsB.Frames) ? 1 : 0
      ; ToolTip, % thisMD5name "`n" prevMD5nameA "`n" prevMD5nameB "`n" isFramesA "=" isFramesB "`n" tFramesA "=" tFramesB "`n" AbackupIMGdetails.Frames "=" BbackupIMGdetails.Frames "`n" AbackupIMGdetails.FIle "=" BbackupIMGdetails.File , , , 2
      If (thisMD5name=prevMD5nameA && validBMP(GDIcacheSRCfileA) && StrLen(prevMD5nameA)>2 && isFramesA=1)
      {
         addJournalEntry("Using unprocessed cached GDI bitmap ID: " GDIcacheSRCfileA "`n" imgPath)
         totalFramesIndex := multiPageFileManaging(GDIcacheSRCfileA, desiredFrameIndex)
-        currIMGdetails := AbackupIMGdetails.Clone()
+        currIMGdetails := prevImgDetailsA.Clone()
         Return trGdip_CloneBitmap(A_ThisFunc, GDIcacheSRCfileA)
      } Else If (thisMD5name=prevMD5nameB && validBMP(GDIcacheSRCfileB) && StrLen(prevMD5nameB)>2 && isFramesB=1)
      {
         addJournalEntry("Using unprocessed cached GDI bitmap ID: " GDIcacheSRCfileB "`n" imgPath)
         totalFramesIndex := multiPageFileManaging(GDIcacheSRCfileB, desiredFrameIndex)
-        currIMGdetails := BbackupIMGdetails.Clone()
+        currIMGdetails := prevImgDetailsB.Clone()
         Return trGdip_CloneBitmap(A_ThisFunc, GDIcacheSRCfileB)
      } Else
      {
@@ -70646,8 +70652,8 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
         GDIcacheSRCfileB := trGdip_DisposeImage(GDIcacheSRCfileB, 1)
         GDIcacheSRCfileB := GDIcacheSRCfileA
         GDIcacheSRCfileA := trGdip_CloneBitmap(A_ThisFunc, oBitmap)
-        BbackupIMGdetails := AbackupIMGdetails.Clone()
-        AbackupIMGdetails := mainLoadedIMGdetails.Clone()
+        prevImgDetailsB := prevImgDetailsA.Clone()
+        prevImgDetailsA := mainLoadedIMGdetails.Clone()
      }
 
      currIMGdetails := mainLoadedIMGdetails.Clone()
@@ -71076,10 +71082,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
      addJournalEntry("Used cached GDI+ bitmap A-ID: " AprevGdiBitmap "`n" imgPath)
      gdiBitmapIDcall := AprevImgCall
      gdiBitmapIDentire := AprevImgCall gdiBitmap
-     If (imgPath=AbackupIMGdetails.File)
-        currIMGdetails := AbackupIMGdetails.Clone()
-     Else If (imgPath=BbackupIMGdetails.File)
-        currIMGdetails := BbackupIMGdetails.Clone()
+     currIMGdetails := AbackupIMGdetails.Clone()
      extractAmbientalTexture()
      totalFramesIndex := currIMGdetails.Frames
      Return
@@ -71091,10 +71094,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
      gdiBitmapIDcall := BprevImgCall
      gdiBitmapIDentire := BprevImgCall gdiBitmap
      addJournalEntry("Used cached GDI bitmap B-ID: " BprevGdiBitmap "`n" imgPath)
-     If (imgPath=AbackupIMGdetails.File)
-        currIMGdetails := AbackupIMGdetails.Clone()
-     Else If (imgPath=BbackupIMGdetails.File)
-        currIMGdetails := BbackupIMGdetails.Clone()
+     currIMGdetails := BbackupIMGdetails.Clone()
      totalFramesIndex := currIMGdetails.Frames
      extractAmbientalTexture()
      Return
@@ -71276,6 +71276,8 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
 
   trGdip_GetImageDimensions(rBitmap, fimgW, fimgH)
   BprevImgCall := AprevImgCall
+  BbackupIMGdetails := AbackupIMGdetails.Clone()
+  AbackupIMGdetails := currIMGdetails.Clone()
   p := viewportQPVimage.imgHandle ? 1 : ""     ; this is meant to block caching the dummy GDI+ bitmap when images are loaded through «very-large» mode; see LoadBitmapForScreen()
   AprevImgCall := "a" GDIbmpFileConnected MD5name p imgPath o_bwDithering ColorDepthDithering vpIMGrotation userHQraw cmrRAWtoneMapAlgo allowToneMappingImg cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapAltExpo desiredFrameIndex "|==|" totalFramesIndex currentUndoLevel undoLevelsRecorded fimgW fimgH
   gdiBitmapIDcall := AprevImgCall
@@ -93909,12 +93911,8 @@ initFIMGmodule() {
      bonusPath := mainExecPath
      Static srcDll := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\cPlusPlus\freeimage-r1909-custom\x64\Release\FreeImage.dll"
      ; Static srcDll := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\FreeImage-vold.dll"
-     dllName := "FreeImage.dll"
      If (A_PtrSize=8 && InStr(A_ScriptDir, "sucan twins") && !A_IsCompiled && FileExist(srcDll))
-     {
         bonusPath := srcDll
-        ; dllName := "FreeImage-vold.dll"
-     }
 
      r := FreeImage_FoxInit(1, bonusPath, dllName) ; Load the FreeImage Dll
      wasInitFIMlib := (r && !InStr(r, "err")) ? 1 : 0
@@ -94873,7 +94871,7 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu) {
       mainLoadedIMGdetails.Frames := NumGet(resultsArray, 4 * 2, "uInt") - 1
       mainLoadedIMGdetails.ActiveFrame := NumGet(resultsArray, 4 * 6, "uInt")
       mainLoadedIMGdetails.DPI := NumGet(resultsArray, 4 * 4, "uInt")
-      mainLoadedIMGdetails.RawFormat := WICcontainerFmts(NumGet(resultsArray, 4 * 5, "uInt"))
+      mainLoadedIMGdetails.RawFormat := WICcontainerFmts(NumGet(resultsArray, 4 * 5, "uInt"), imgPath)
       mainLoadedIMGdetails.TooLargeGDI := 0
       mainLoadedIMGdetails.HasAlpha := varContains(k, "argb", "prgba", "bgra", "rgba", "alpha")
       mainLoadedIMGdetails.OpenedWith := "Windows Imaging Component [WIC]"
@@ -94896,7 +94894,7 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu) {
       newW := w := Width
       newH := h := Height
       mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(Width, Height)
-      pBitmap := DllCall(whichMainDLL "\WICgetRectImage", "Int", x, "Int", y, "Int", w, "Int", h, "Int", newW, "Int", newH, "Int", mustClip, "UPtr")
+      pBitmap := DllCall(whichMainDLL "\WICgetRectImage", "Int", x, "Int", y, "Int", w, "Int", h, "Int", newW, "Int", newH, "Int", mustClip, "int", 1, "UPtr")
       If StrLen(pBitmap)>2
          recordGdipBitmaps(pBitmap, A_ThisFunc)
 
@@ -94931,12 +94929,9 @@ teleportWICtoFIM(imgW, imgH, bitsDepth) {
    SliceHeight := imgH - thisIndex
    numberSlices := Ceil(imgH / SliceHeight)
    remainderHeight := mod(imgH, SliceHeight)
-   ; ToolTip, % Stride "|" imgW "=" imgH "=buffer=" bufferSize "|" SliceHeight "|" numberSlices "|" remainderHeight  , , , 2
-   If (numberSlices>1)
-      buffer := DllCall(whichMainDLL "\WICgetLargeBufferImage", "Int", okay, "Int", bitsDepth, "int", Stride, "int", bufferSize, "Int", SliceHeight, "UPtr")
-   Else
-      buffer := DllCall(whichMainDLL "\WICgetBufferImage", "Int", okay, "Int", bitsDepth, "int", Stride, "int", bufferSize, "UPtr")
-
+   SliceHeight := (numberSlices>1) ? SliceHeight : 0
+   fnOutputDebug(A_ThisFunc "(): " Stride " | w/h =" imgW " x " imgH " | buffer = " bufferSize " | sh=" SliceHeight " | ns=" numberSlices " | " remainderHeight)
+   buffer := DllCall(whichMainDLL "\WICgetBufferImage", "Int", bitsDepth, "int", Stride, "int", bufferSize, "int", SliceHeight, "int", 1, "UPtr")
    If buffer
       hFIFimgA := FreeImage_ConvertFromRawBitsEx(0, buffer, 1, imgW, imgH, Stride, bitsDepth, "0x00FF0000", "0x0000FF00", "0x000000FF", 1)
    ; FreeImage_SetDPIresolution(hFIFimgA, dpiX, dpiY)
@@ -94997,7 +94992,7 @@ LoadWICimage(imgPath, noBPPconv, frameu, sizesDesired:=0, ByRef newBitmap:=0) {
       mainLoadedIMGdetails.Frames := NumGet(resultsArray, 4 * 2, "uInt") - 1
       k := mainLoadedIMGdetails.PixelFormat := WicPixelFormats(NumGet(resultsArray, 4 * 3, "uInt"))
       mainLoadedIMGdetails.DPI := NumGet(resultsArray, 4 * 4, "uInt")
-      mainLoadedIMGdetails.RawFormat := WICcontainerFmts(NumGet(resultsArray, 4 * 5, "uInt"))
+      mainLoadedIMGdetails.RawFormat := WICcontainerFmts(NumGet(resultsArray, 4 * 5, "uInt"), imgPath)
       mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(mainLoadedIMGdetails.Width, mainLoadedIMGdetails.Height)
       mainLoadedIMGdetails.HasAlpha := varContains(k, "argb", "prgba", "bgra", "rgba", "alpha")
       mainLoadedIMGdetails.OpenedWith := "Windows Imaging Component [WIC]"
@@ -95046,11 +95041,11 @@ WicPixelFormats(pixFmt) {
    Return r
 }
 
-WICcontainerFmts(containerID) {
+WICcontainerFmts(containerID, imgPath) {
    Static containerFmts := {1:"BMP",2:"PNG",3:"ICO",4:"JPEG",5:"TIFF",6:"GIF",7:"WMP",8:"DDS",9:"ADNG",10:"HEIF",11:"WEBP",12:"RAW"}
    r := containerFmts[containerID]
    If !r
-      r := "UNKNOWN"
+      r := SubStr(imgPath, InStr(imgPath, ".", 0, -1) + 1)
    Return r
 }
 
