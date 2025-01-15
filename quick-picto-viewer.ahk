@@ -380,6 +380,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , DrawLineAreaPolarMode := 1, IDedgesModus := 1, IDedgesPreEmphasis := 0, IDedgesPreContrast := 0
    , UIuserToneMapParamC := 180, cmrRAWtoneMapParamC := 1, UIuserToneMapParamD := 60, cmrRAWtoneMapParamD := 0
    , UIuserToneMapOCVparamA := 80, cmrRAWtoneMapOCVparamA := 1, UIuserToneMapOCVparamB := 72, cmrRAWtoneMapOCVparamB := 0
+   , userPerformColorManagement := 1
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -37026,6 +37027,7 @@ restoreDefaultCustomUserKbds(keyu, funcu, contextu, modus) {
 readMainSettingsApp(act) {
     EnvGet, thisSystemCores, NUMBER_OF_PROCESSORS
     readSlideSettings(mainSettingsFile, act)
+    IniAction(act, "userPerformColorManagement", "General", 1)
     IniAction(act, "allowFreeIMGpanning", "General", 1)
     IniAction(act, "allowMultiCoreMode", "General", 1)
     IniAction(act, "allowRecordHistory", "General", 1)
@@ -63526,10 +63528,13 @@ createMenuMainPreferences() {
       kMenu("PVperfs", "Check", "&Limit memory usage")
    }
 
+   kMenu("PVperfs", "Add/Uncheck", "&Load Camera RAW files at high quality", "ToggleRAWquality")
    kMenu("PVperfs", "Add/Uncheck", "&High quality image resampling", "ToggleImgQuality")
    kMenu("PVperfs", "Add/Uncheck", "&Perform dithering on color depth changes", "ToggleImgColorDepthDithering")
    kMenu("PVperfs", "Add/Uncheck", "&Apply gamma correction", "toggleImgEditGammaCorrect", "image colors")
-   kMenu("PVperfs", "Add/Uncheck", "&Load Camera RAW files at high quality", "ToggleRAWquality")
+   kMenu("PVperfs", "Add/Uncheck", "&Apply color management", "ToggleClrManage", "profiles icc icm performance")
+   If (userPerformColorManagement=1)
+      kMenu("PVperfs", "Check", "&Apply color management")
    If (userimgGammaCorrect=1)
       kMenu("PVperfs", "Check", "&Apply gamma correction")
    If (minimizeMemUsage=1)
@@ -63694,6 +63699,17 @@ createMenuMainView() {
    kMenu("PVview", "Add/Uncheck", "Mirror &horizontally`tH", "VPflipImgH", "viewport flip image")
    If (FlipImgH=1)
       kMenu("PVview", "Check", "Mirror &horizontally`tH")
+
+   Menu, PVview, Add
+
+   kMenu("PVview", "Add/Uncheck", "&Apply color management", "ToggleClrManage", "profiles icc icm performance")
+   If (userPerformColorManagement=1)
+      kMenu("PVview", "Check", "&Apply color management")
+
+   kMenu("PVview", "Add/Uncheck", "&High quality image resampling", "ToggleImgQuality")
+   If (userimgQuality=1)
+      kMenu("PVview", "Check", "&High quality image resampling")
+
 
    Menu, PVview, Add
    If (thumbsDisplaying!=1)
@@ -67838,6 +67854,14 @@ ToggleCycleFavesOpen() {
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
+ToggleClrManage() {
+    userPerformColorManagement := !userPerformColorManagement
+    INIaction(1, "userPerformColorManagement", "General")
+    friendly := (userPerformColorManagement=1) ? "ACTIVATED`nThe viewport performance may decrease." : "DEACTIVATED"
+    showTOOLtip("Color management on image load: " friendly, A_ThisFunc, 1)
+    SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
 ToggleImgQuality(modus:=0) {
     userimgQuality := !userimgQuality
     If (modus="lowu")
@@ -70577,7 +70601,7 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
      totalFramesIndex := 0
      thisImgQuality := (userimgQuality=1) ? 6 : 5
      tt := A_TickCount
-     oBitmap := LoadWICscreenImage(imgPath, 0, frameu)
+     oBitmap := LoadWICscreenImage(imgPath, 0, frameu, userPerformColorManagement)
      ; fnOutputDebug(A_ThisFunc ": load time with WIC: " A_TickCount - tt)
      tt := A_TickCount
      If (!validBMP(oBitmap) && wasInitFIMlib=1 && allowFIMloader=1 && oBitmap!="very-large")
@@ -93951,7 +93975,7 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
      If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1 && nofall=0)
      {
         If (screenMode=1)
-           Return LoadWICscreenImage(imgPath, 0, frameu)
+           Return LoadWICscreenImage(imgPath, 0, frameu, userPerformColorManagement)
 
         oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, sizesDesired, gBitmap)
         newBitmap := gBitmap
@@ -94851,7 +94875,7 @@ AcquireWIAimage() {
     }
 }
 
-LoadWICscreenImage(imgPath, noBPPconv, frameu) {
+LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
    tt := startZeit := A_TickCount
    VarSetCapacity(resultsArray, 8 * 6, 0)
    r := DllCall(whichMainDLL "\WICpreLoadImage", "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "UPtr")
@@ -94885,16 +94909,16 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu) {
          zx := mainLoadedIMGdetails.Clone()
          viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, zx, 2)
          clrDepth := (mainLoadedIMGdetails.HasAlpha=1) ? 32 : 24
-         teleportWICtoFIM(Width, Height, clrDepth)
+         teleportWICtoFIM(Width, Height, clrDepth, useICM)
          ; fnOutputDebug(A_ThisFunc ": load time with WIC to FIM: " A_TickCount - tt)
          Return "very-large"
       }
 
-      mustClip := 0
+      quality := mustClip := 0
       newW := w := Width
       newH := h := Height
       mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(Width, Height)
-      pBitmap := DllCall(whichMainDLL "\WICgetRectImage", "Int", x, "Int", y, "Int", w, "Int", h, "Int", newW, "Int", newH, "Int", mustClip, "int", 1, "UPtr")
+      pBitmap := DllCall(whichMainDLL "\WICgetRectImage", "Int", x, "Int", y, "Int", w, "Int", h, "Int", newW, "Int", newH, "Int", mustClip, "int", useICM, "int", quality, "UPtr")
       If StrLen(pBitmap)>2
          recordGdipBitmaps(pBitmap, A_ThisFunc)
 
@@ -94905,7 +94929,7 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu) {
    }
 }
 
-teleportWICtoFIM(imgW, imgH, bitsDepth) {
+teleportWICtoFIM(imgW, imgH, bitsDepth, useICM) {
    If memoryUsageWarning(imgW, imgH, bitsDepth, 1)
       Return 0
 
@@ -94931,7 +94955,8 @@ teleportWICtoFIM(imgW, imgH, bitsDepth) {
    remainderHeight := mod(imgH, SliceHeight)
    SliceHeight := (numberSlices>1) ? SliceHeight : 0
    fnOutputDebug(A_ThisFunc "(): " Stride " | w/h =" imgW " x " imgH " | buffer = " bufferSize " | sh=" SliceHeight " | ns=" numberSlices " | " remainderHeight)
-   buffer := DllCall(whichMainDLL "\WICgetBufferImage", "Int", bitsDepth, "int", Stride, "int", bufferSize, "int", SliceHeight, "int", 1, "UPtr")
+   ; buffer := DllCall(whichMainDLL "\WICgetBufferImage", "Int", bitsDepth, "int", Stride, "int", bufferSize, "int", SliceHeight, "int", useICM, "UPtr")
+   buffer := DllCall(whichMainDLL "\WICgetBufferImage", "Int", bitsDepth, "int", Stride, "int", bufferSize, "int", SliceHeight, "int", useICM, "UPtr")
    If buffer
       hFIFimgA := FreeImage_ConvertFromRawBitsEx(0, buffer, 1, imgW, imgH, Stride, bitsDepth, "0x00FF0000", "0x0000FF00", "0x000000FF", 1)
    ; FreeImage_SetDPIresolution(hFIFimgA, dpiX, dpiY)
