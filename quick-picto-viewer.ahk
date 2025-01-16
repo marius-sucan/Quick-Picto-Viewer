@@ -57902,7 +57902,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0) {
    {
       If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1)
       {
-         oBitmap := LoadWICimage(imgPath, 0, 0)
+         oBitmap := LoadWICimage(imgPath, 0, 0, userPerformColorManagement)
          If validBMP(oBitmap)
          {
             hFIFimgA := ConvertPBITMAPtoFIM(oBitmap)
@@ -58357,7 +58357,7 @@ coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
    thisImgQuality := (userimgQuality=1) ? 6 : 5
    sizesDesired := []
    sizesDesired[1] := [32750, 32750, 1, 0, thisImgQuality]
-   oBitmap := LoadWICimage(imgPath, 0, 0, sizesDesired)
+   oBitmap := LoadWICimage(imgPath, 0, 0, userPerformColorManagement, sizesDesired)
    tFrames := mainLoadedIMGdetails.Frames
    If !validBMP(oBitmap)
       Return -4
@@ -58405,7 +58405,7 @@ coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
       } Else If !file2save
          Continue
 
-      nBitmap := LoadWICimage(imgPath, 0, A_Index - 1, sizesDesired)
+      nBitmap := LoadWICimage(imgPath, 0, A_Index - 1, userPerformColorManagement, sizesDesired)
       If !validBMP(nBitmap)
       {
          failedFrames++
@@ -58449,7 +58449,7 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
       Return r
    } Else 
    {
-      oBitmap := trGdip_CreateBitmapFromFile(A_ThisFunc, imgPath)
+      oBitmap := trGdip_CreateBitmapFromFile(A_ThisFunc, imgPath, userPerformColorManagement)
       If !validBMP(oBitmap)
          Return -4
 
@@ -59003,7 +59003,7 @@ LoadBitmapAsFreeImage(imgPath, allowHDR, ByRef oImgW, ByRef oImgH, ByRef imgBPP)
    {
       If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1)
       {
-         oBitmap := LoadWICimage(imgPath, 0, 0)
+         oBitmap := LoadWICimage(imgPath, 0, 0, userPerformColorManagement)
          If validBMP(oBitmap)
          {
             hFIFimgA := ConvertPBITMAPtoFIM(oBitmap)
@@ -70613,7 +70613,7 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
   } Else
   {
      totalFramesIndex := 0
-     oBitmap := LoadFileWithGDIp(imgPath, 0, frameu)
+     oBitmap := LoadFileWithGDIp(imgPath, 0, frameu, userPerformColorManagement)
      If (!validBMP(oBitmap) && wasInitFIMlib=1 && allowFIMloader=1)
         oBitmap := LoadFimFile(imgPath, 0, 0, frameu, 0, n, 1, 1)
 
@@ -70688,10 +70688,10 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
   Return oBitmap
 }
 
-LoadFileWithGDIp(imgPath, noBPPconv:=0, frameu:=0, sizesDesired:=0, ByRef newBitmap:=0) {
+LoadFileWithGDIp(imgPath, noBPPconv:=0, frameu:=0, useICM:=0, sizesDesired:=0, ByRef newBitmap:=0) {
   changeMcursor()
   mustOpenWithWIC := 0
-  oBitmap := trGdip_CreateBitmapFromFile(A_ThisFunc, imgPath)
+  oBitmap := trGdip_CreateBitmapFromFile(A_ThisFunc, imgPath, useICM)
   If validBMP(oBitmap)
   {
      pixFmt := Gdip_GetImagePixelFormat(oBitmap, 2)
@@ -70741,7 +70741,7 @@ LoadFileWithGDIp(imgPath, noBPPconv:=0, frameu:=0, sizesDesired:=0, ByRef newBit
    If (mustOpenWithWIC=1 && noBPPconv=0 && WICmoduleHasInit=1 && allowWICloader=1) ; || (allowCaching=1)
    {
       oBitmap := trGdip_DisposeImage(oBitmap, 1)
-      oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, sizesDesired, newSizedImage)
+      oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired, newSizedImage)
       newBitmap := newSizedImage
       Return oBitmap
    } Else If (mustOpenWithWIC=1 && noBPPconv=0) ; || (allowCaching=1)
@@ -70818,7 +70818,7 @@ LoadFileWithGDIp(imgPath, noBPPconv:=0, frameu:=0, sizesDesired:=0, ByRef newBit
    If (mustOpenWithWIC=1 && noBPPconv=0 && WICmoduleHasInit=1 && allowWICloader=1)
    {
       oBitmap := trGdip_DisposeImage(oBitmap, 1)
-      oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, sizesDesired, newSizedImage)
+      oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired, newSizedImage)
       newBitmap := newSizedImage
       Return oBitmap
    } Else If (mustOpenWithWIC=1 && noBPPconv=0) ; || (allowCaching=1)
@@ -70846,13 +70846,13 @@ LoadBitmapFromFileu(imgPath, noBPPconv:=0, forceGDIp:=0, frameu:=0, sizesDesired
      ; fnOutputDebug(A_ThisFunc "(): " imgPath)
   } Else If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1)
   {
-     oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, sizesDesired, newBitmap)
+     oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, userPerformColorManagement, sizesDesired, newBitmap)
      If (!validBMP(oBitmap) && allowFIMloader=1 && wasInitFIMlib=1)
         oBitmap := LoadFimFile(imgPath, noBPPconv, noBPPconv, frameu, sizesDesired, newBitmap, 1)
      newSizedImage := newBitmap
   } Else 
   {
-     oBitmap := LoadFileWithGDIp(imgPath, noBPPconv, frameu, sizesDesired, newBitmap)
+     oBitmap := LoadFileWithGDIp(imgPath, noBPPconv, frameu, userPerformColorManagement, sizesDesired, newBitmap)
      If (!validBMP(oBitmap) && allowFIMloader=1 && wasInitFIMlib=1)
         oBitmap := LoadFimFile(imgPath, noBPPconv, noBPPconv, frameu, sizesDesired, newBitmap, 1)
 
@@ -80265,7 +80265,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
    calculateToneMappingAlgoParams(cmrRAWtoneMapAlgo, UIuserToneMapParamA, UIuserToneMapParamB, UIuserToneMapParamC, UIuserToneMapParamD, UIuserToneMapOCVparamA, UIuserToneMapOCVparamB)
    If (mustDoMultiCore=1)
    {
-      paramz := enableThumbsCaching "|" userHQraw "|" allowToneMappingImg "|" allowWICloader "|" userimgQuality "|" cmrRAWtoneMapAlgo "|" cmrRAWtoneMapParamA "|" cmrRAWtoneMapParamB "|" cmrRAWtoneMapParamC "|" cmrRAWtoneMapParamD "|" cmrRAWtoneMapOCVparamA "|" cmrRAWtoneMapOCVparamB "|" cmrRAWtoneMapAltExpo
+      paramz := enableThumbsCaching "|" userHQraw "|" allowToneMappingImg "|" allowWICloader "|" userimgQuality "|" cmrRAWtoneMapAlgo "|" cmrRAWtoneMapParamA "|" cmrRAWtoneMapParamB "|" cmrRAWtoneMapParamC "|" cmrRAWtoneMapParamD "|" cmrRAWtoneMapOCVparamA "|" cmrRAWtoneMapOCVparamB "|" cmrRAWtoneMapAltExpo "|" userPerformColorManagement
       fnOutputDebug("ThumbsMode. Clean multi-core GDIs mess. Cores: " limitCores)
       Loop, % limitCores
           thumbThread%A_Index%.ahkFunction("cleanMess", "c" A_Index, paramz)
@@ -93977,7 +93977,7 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
         If (screenMode=1)
            Return LoadWICscreenImage(imgPath, 0, frameu, userPerformColorManagement)
 
-        oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, sizesDesired, gBitmap)
+        oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, userPerformColorManagement, sizesDesired, gBitmap)
         newBitmap := gBitmap
         Return oBitmap
      }
@@ -94049,7 +94049,7 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
      addJournalEntry("Failed to load image file using FreeImage library:`n" imgPath)
      If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1 && nofall=0)
      {
-        oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, sizesDesired, gBitmap)
+        oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, userPerformColorManagement, sizesDesired, gBitmap)
         newBitmap := gBitmap
         Return oBitmap
      }
@@ -94918,6 +94918,7 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
       newW := w := Width
       newH := h := Height
       mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(Width, Height)
+      ; pBitmap := LoadWICimage(imgPath, 0, 0, userPerformColorManagement)
       pBitmap := DllCall(whichMainDLL "\WICgetRectImage", "Int", x, "Int", y, "Int", w, "Int", h, "Int", newW, "Int", newH, "Int", mustClip, "int", useICM, "int", quality, "UPtr")
       If StrLen(pBitmap)>2
          recordGdipBitmaps(pBitmap, A_ThisFunc)
@@ -94954,7 +94955,7 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM) {
    numberSlices := Ceil(imgH / SliceHeight)
    remainderHeight := mod(imgH, SliceHeight)
    SliceHeight := (numberSlices>1) ? SliceHeight : 0
-   fnOutputDebug(A_ThisFunc "(): " Stride " | w/h =" imgW " x " imgH " | buffer = " bufferSize " | sh=" SliceHeight " | ns=" numberSlices " | " remainderHeight)
+   ; fnOutputDebug(A_ThisFunc "(): " Stride " | w/h =" imgW " x " imgH " | buffer = " bufferSize " | sh=" SliceHeight " | ns=" numberSlices " | " remainderHeight)
    ; buffer := DllCall(whichMainDLL "\WICgetBufferImage", "Int", bitsDepth, "int", Stride, "int", bufferSize, "int", SliceHeight, "int", useICM, "UPtr")
    buffer := DllCall(whichMainDLL "\WICgetBufferImage", "Int", bitsDepth, "int", Stride, "int", bufferSize, "int", SliceHeight, "int", useICM, "UPtr")
    If buffer
@@ -94981,7 +94982,7 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM) {
    Return 0
 }
 
-LoadWICimage(imgPath, noBPPconv, frameu, sizesDesired:=0, ByRef newBitmap:=0) {
+LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitmap:=0) {
    startZeit := A_TickCount
    VarSetCapacity(resultsArray, 8 * 6, 0)
    If IsObject(sizesDesired[1])
@@ -95003,13 +95004,18 @@ LoadWICimage(imgPath, noBPPconv, frameu, sizesDesired:=0, ByRef newBitmap:=0) {
    }
 
    ; fnOutputDebug("wic-load " imgPath)
-   r := DllCall(whichMainDLL "\LoadWICimage", "Int", 0 ,"Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", doFlipu, "int", doGray, "Str", imgPath, "UPtr", &resultsArray, "Ptr")
+   r := DllCall(whichMainDLL "\LoadWICimage", "Int", 0 ,"Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", useICM, "Str", imgPath, "UPtr", &resultsArray, "Ptr")
    z := NumGet(resultsArray, 4 * 6, "uInt")
    If (r || z=1)
    {
       If StrLen(r)>2
+      {
          recordGdipBitmaps(r, A_ThisFunc)
-      Else
+         If doFlipu
+            Gdip_ImageRotateFlip(r, doFlipu)
+         If (doGray=1)
+            Gdip_BitmapConvertGrayHSL(r)
+      } Else
          r := 1
 
       mainLoadedIMGdetails.Width := NumGet(resultsArray, 4 * 0, "uInt")
@@ -95037,7 +95043,15 @@ LoadWICimage(imgPath, noBPPconv, frameu, sizesDesired:=0, ByRef newBitmap:=0) {
             doFlipu := sizesDesired[A_Index + 1, 6]
             doGray := sizesDesired[A_Index + 1, 7]
             ; fnOutputDebug("loop image size=" A_Index " | " w "x" h " | " doFlipu)
-            newBitmap[A_Index] := DllCall(whichMainDLL "\LoadWICimage", "Int", 0 ,"Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", doFlipu, "int", doGray, "Str", imgPath, "UPtr", &resultsArray, "Ptr")
+            rm := DllCall(whichMainDLL "\LoadWICimage", "Int", 0 ,"Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", useICM, "Str", imgPath, "UPtr", &resultsArray, "Ptr")
+            if StrLen(rm)>2
+            {
+               newBitmap[A_Index] := rm
+               If doFlipu
+                  Gdip_ImageRotateFlip(rm, doFlipu)
+               If (doGray=1)
+                  Gdip_BitmapConvertGrayHSL(rm)
+            }
          }
       }
    }

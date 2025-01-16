@@ -18,7 +18,7 @@ Global GDIPToken, MainExe := AhkExported(), runningGDIPoperation := 0, WICmodule
      , operationDone := 1, resultsList := "", FIMfailed2init := 0, thisThreadID := -1, allowToneMappingImg := 1
      , waitDataCollect := 1, operationFailed := 0, RegExWICfmtPtrn, enableThumbsCaching := 1
      , cmrRAWtoneMapAlgo, cmrRAWtoneMapParamA, cmrRAWtoneMapParamB, cmrRAWtoneMapOCVparamA, cmrRAWtoneMapOCVparamB
-     , cmrRAWtoneMapParamC, cmrRAWtoneMapParamD, cmrRAWtoneMapAltExpo
+     , cmrRAWtoneMapParamC, cmrRAWtoneMapParamD, cmrRAWtoneMapAltExpo, userPerformColorManagement := 1
      , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|TIFF|TIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
 
 ; E := initThisThread()
@@ -57,7 +57,7 @@ cleanupThread() {
    wasInitFIMlib := GDIPToken := 0
 }
 
-LoadWICimage(imgPath, w:=0, h:=0, keepAratio:=1, thisImgQuality:=0, frameu:=0, ScaleAnySize:=0, noBPPconv:=0, doFlipu:=0, doGray:=0) {
+LoadWICimage(imgPath, w, h, keepAratio, thisImgQuality, frameu, ScaleAnySize) {
    ; Return
    ; startZeit := A_TickCount
    VarSetCapacity(resultsArray, 8 * 6, 0)
@@ -68,7 +68,7 @@ LoadWICimage(imgPath, w:=0, h:=0, keepAratio:=1, thisImgQuality:=0, frameu:=0, S
    ;    imgPath := getIDimage(currentFileIndex)
    ; fnOutputDebug("wic-load " imgPath)
    func2exec := (A_PtrSize=8) ? "LoadWICimage" : "_LoadWICimage@48"
-   r := DllCall("qpvmain.dll\" func2exec, "Int", thisThreadID, "Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", doFlipu, "int", doGray, "Str", imgPath, "UPtr", &resultsArray, "Ptr")
+   r := DllCall("qpvmain.dll\" func2exec, "Int", thisThreadID, "Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", userPerformColorManagement, "Str", imgPath, "UPtr", &resultsArray, "Ptr")
    ; mainLoadedIMGdetails.imgW := NumGet(resultsArray, 4 * 0, "uInt")
    ; mainLoadedIMGdetails.imgH := NumGet(resultsArray, 4 * 1, "uInt")
    ; mainLoadedIMGdetails.Frames := NumGet(resultsArray, 4 * 2, "uInt")
@@ -106,6 +106,7 @@ cleanMess(thisID:=0, params:=0) {
       cmrRAWtoneMapOCVparamA := optionz[11]
       cmrRAWtoneMapOCVparamB := optionz[12]
       cmrRAWtoneMapAltExpo := optionz[13]
+      userPerformColorManagement := optionz[14]
    }
 
    waitDataCollect := 1

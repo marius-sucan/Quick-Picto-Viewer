@@ -227,7 +227,9 @@ Class screenQPVimage {
       If !newH
          newH := h
 
-      pBitmap := DllCall(whichMainDLL "\" func2exec, "Int", x, "Int", y, "Int", w, "Int", h, "Int", newW, "Int", newH, "Int", mustClip, "UPtr")
+      resizeQuality := 0
+      useICM := userPerformColorManagement
+      pBitmap := DllCall(whichMainDLL "\" func2exec, "Int", x, "Int", y, "Int", w, "Int", h, "Int", newW, "Int", newH, "Int", mustClip, "int", useICM, "int", resizeQuality, "UPtr")
       ; ToolTip, % pBitmap "|"  hFIFimgE "|" hFIFimgZ "|" x "|" y "|" w "|" h "|" newW "|" newH , , , 2
       If StrLen(pBitmap)>1
          recordGdipBitmaps(pBitmap, A_ThisFunc)

@@ -2766,7 +2766,7 @@ Gdip_GetImagePixelFormat(pBitmap, mode:=0) {
 ; *PXF64PARGB = 0x001A400E    ; 64 bpp; 16 bits for each RGB and alpha, pre-multiplied
 ; *PXF32CMYK = 0x200F         ; 32 bpp; CMYK
 
-; NOTE: GDI+ does not fully support the formats marked with an asterisk (*).
+; *NOTE: GDI+ does not fully support the formats marked with an asterisk (*).
 ; Gdip_GraphicsFromImage() will fail on bitmaps with these pixel formats.
 
 ; INDEXED [1-bits, 4-bits and 8-bits] pixel formats rely on color palettes.
@@ -3363,9 +3363,9 @@ Gdip_ImageRotateFlip(pBitmap, RotateFlipType:=1) {
 ; Rotate90FlipNone     = 1
 ; Rotate180FlipNone    = 2
 ; Rotate270FlipNone    = 3
-; RotateNoneFlipX      = 4
+; RotateNoneFlipX      = 4   // flip horizontally
 ; Rotate90FlipX        = 5
-; Rotate180FlipX       = 6
+; Rotate180FlipX       = 6   // flip vertically
 ; Rotate270FlipX       = 7
 ; RotateNoneFlipY      = Rotate180FlipX
 ; Rotate90FlipY        = Rotate270FlipX
@@ -9329,6 +9329,21 @@ Gdip_BitmapConvertGray(pBitmap, hue:=0, vibrance:=-40, brightness:=1, contrast:=
        Gdip_DisposeImage(nBitmap, 1)
 
     Return newBitmap
+}
+
+Gdip_BitmapConvertGrayHSL(pBitmap, hue:=0, saturation:=-100, lightness:=0) {
+; if succesful, returns 0
+
+    If (pBitmap="")
+       Return -2
+
+    pEffect := Gdip_CreateEffect(6, hue, saturation, lightness)
+    If !pEffect
+       Return -1
+
+    E := Gdip_BitmapApplyEffect(pBitmap, pEffect)
+    Gdip_DisposeEffect(pEffect)
+    Return E
 }
 
 Gdip_BitmapSetColorDepth(pBitmap, bitsDepth, useDithering:=1) {
