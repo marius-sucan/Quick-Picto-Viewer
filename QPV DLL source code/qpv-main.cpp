@@ -5397,10 +5397,10 @@ auto adaptImageGivenSize(const UINT keepAratio, const UINT ScaleAnySize, const U
 
 DLL_API int DLL_CALLCONV WICdestroyPreloadedImage(int id) {
   SafeRelease(pWICclassPixelsBitmapSource);
-  pWICclassPixelsBitmapSource = NULL;
   SafeRelease(pWICclassFrameDecoded);
-  pWICclassFrameDecoded = NULL;
   SafeRelease(pWICclassDecoder);
+  pWICclassPixelsBitmapSource = NULL;
+  pWICclassFrameDecoded = NULL;
   pWICclassDecoder = NULL;
   return id;
 }
@@ -5436,24 +5436,45 @@ int applyColorManagement(IWICBitmapSource* &thisWICbitmap, GUID destPixFormat, i
          return 0;
       }
 
-      GUID sourceFormat;
-      HRESULT hr = thisWICbitmap->GetPixelFormat(&sourceFormat);
+      GUID sFmt;
+      HRESULT hr = thisWICbitmap->GetPixelFormat(&sFmt);
       if (FAILED(hr))
       {
          fnOutputDebug("applyColorManagement: failed GetPixelFormat on source bitmap");
          return 0;
       }
 
-      int okay = 0;
+      int okay = 0; // check if the pixel format is one of the supported formats by CreateColorTransformer
+      if (sFmt == GUID_WICPixelFormat8bppGray
+         || sFmt == GUID_WICPixelFormat16bppGray
+         || sFmt == GUID_WICPixelFormat16bppBGR555
+         || sFmt == GUID_WICPixelFormat16bppBGR565
+         || sFmt == GUID_WICPixelFormat24bppBGR
+         || sFmt == GUID_WICPixelFormat24bppRGB
+         || sFmt == GUID_WICPixelFormat32bppBGR
+         || sFmt == GUID_WICPixelFormat32bppBGRA
+         || sFmt == GUID_WICPixelFormat32bppPBGRA
+         || sFmt == GUID_WICPixelFormat32bppPRGBA
+         || sFmt == GUID_WICPixelFormat32bppRGBA
+         || sFmt == GUID_WICPixelFormat32bppBGR101010
+         || sFmt == GUID_WICPixelFormat32bppCMYK
+         || sFmt == GUID_WICPixelFormat48bppBGR
+         || sFmt == GUID_WICPixelFormat64bppBGRA
+         || sFmt == GUID_WICPixelFormat64bppPBGRA
+         || sFmt == GUID_WICPixelFormat64bppPRGBA
+         || sFmt == GUID_WICPixelFormat64bppRGBA)
+         okay = 1;
+
+      // UINT fmt = indexedWICpixelFormats(sFmt);
+      // fnOutputDebug("isCMYKimg == " + std::to_string(isCMYKimg) + " // fmt=" + std::to_string(fmt));
       UINT colorContextCount = 0;
       int isCMYKimg = 0;
-      if (sourceFormat == GUID_WICPixelFormat32bppCMYK || sourceFormat == GUID_WICPixelFormat64bppCMYK || sourceFormat == GUID_WICPixelFormat40bppCMYKAlpha || sourceFormat == GUID_WICPixelFormat80bppCMYKAlpha)
+      if (sFmt == GUID_WICPixelFormat32bppCMYK || sFmt == GUID_WICPixelFormat64bppCMYK || sFmt == GUID_WICPixelFormat40bppCMYKAlpha || sFmt == GUID_WICPixelFormat80bppCMYKAlpha)
          isCMYKimg = 1;
 
-      UINT fmt = indexedWICpixelFormats(sourceFormat);
-      // fnOutputDebug("isCMYKimg == " + std::to_string(isCMYKimg) + " // fmt=" + std::to_string(fmt));
-      if (useICM==1)
+      if (useICM==1 && okay==1)
       {
+         okay = 0;
          // get icc color profile embedded in the image 
          hr = m_pIWICFactory->CreateColorContext(&pSrcColorContext);
          if (SUCCEEDED(hr))
@@ -5473,9 +5494,9 @@ int applyColorManagement(IWICBitmapSource* &thisWICbitmap, GUID destPixFormat, i
              if (isCMYKimg==1) {
                  isCMYKimg = 2;
                  hr = pSrcColorContext->InitializeFromExifColorSpace(5); // Default CMYK
-             } else if (sourceFormat == GUID_WICPixelFormat48bppRGB || sourceFormat == GUID_WICPixelFormat64bppRGBA) {
+             } else if (sFmt == GUID_WICPixelFormat48bppRGB || sFmt == GUID_WICPixelFormat64bppRGBA) {
                  hr = pSrcColorContext->InitializeFromExifColorSpace(2); // Adobe RGB
-             } else if (sourceFormat == GUID_WICPixelFormat96bppRGBFloat) {
+             } else if (sFmt == GUID_WICPixelFormat96bppRGBFloat) {
                  hr = pSrcColorContext->InitializeFromExifColorSpace(3); // ProPhoto RGB
              } else {
                  hr = E_FAIL;
@@ -5727,17 +5748,57 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV WICgetRectImage(int x, int y, int w, int
   return myBitmap;
 }
 
+bool IsWicDecoderAvailable(const GUID& formatGuid) {
+    IWICComponentInfo     *pCompInfo = NULL;
+    IWICBitmapDecoderInfo *pDecInfo  = NULL;
+    IEnumUnknown          *pEnum     = NULL;
+    bool isAvailable = false;
+
+    // Create component enumerator for decoders
+    HRESULT hr = m_pIWICFactory->CreateComponentEnumerator(WICDecoder, WICComponentEnumerateDefault, &pEnum);
+    if (SUCCEEDED(hr)) {
+        // Enumerate through decoders
+        IUnknown* pElement = nullptr;
+        ULONG fetched;
+        
+        while (pEnum->Next(1, &pElement, &fetched) == S_OK) {
+            hr = pElement->QueryInterface(IID_PPV_ARGS(&pCompInfo));
+            if (SUCCEEDED(hr)) {
+                hr = pCompInfo->QueryInterface(IID_PPV_ARGS(&pDecInfo));
+                if (SUCCEEDED(hr)) {
+                    GUID decoderGuid;
+                    hr = pDecInfo->GetContainerFormat(&decoderGuid);
+                    if (SUCCEEDED(hr) && decoderGuid == formatGuid) {
+                        isAvailable = true;
+                        SafeRelease(pDecInfo);
+                        break;
+                    }
+                    SafeRelease(pDecInfo);
+                }
+                SafeRelease(pCompInfo);
+            }
+            SafeRelease(pElement);
+        }
+        SafeRelease(pEnum);
+    }
+
+    return isAvailable;
+}
+
 DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFrame, UINT *resultsArray) {
   // WIC factory initialized in initWICnow() 
   HRESULT hr = S_OK;
   try {
       hr = m_pIWICFactory->CreateDecoderFromFilename(szFileName,NULL,GENERIC_READ, WICDecodeMetadataCacheOnLoad, &pWICclassDecoder);
   } catch (const char* message) {
+      WICdestroyPreloadedImage(1);
       fnOutputDebug("WICpreLoadImage: WIC decoder error > " + std::string(message) + ". File: " + wcharToString(szFileName));
       return 0;
   }
 
-  if (SUCCEEDED(hr))
+  GUID containerFmt;
+  hr = pWICclassDecoder->GetContainerFormat(&containerFmt);
+  if (SUCCEEDED(hr) && IsWicDecoderAvailable(containerFmt))
   {
       // IWICBitmapFrameDecode *pWICclassFrameDecoded = NULL;
       UINT tFrames = 0;
@@ -5748,8 +5809,30 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
       resultsArray[2] = tFrames;
       resultsArray[6] = givenFrame;
       hr = pWICclassDecoder->GetFrame(givenFrame, &pWICclassFrameDecoded);
-  } else
+      if (SUCCEEDED(hr))
+      {
+          UINT width = 0;
+          UINT height = 0;
+          hr = pWICclassFrameDecoded->GetSize(&width, &height); 
+          if (!width || !height)
+          {
+             hr = E_FAIL;
+          } else
+          {
+             resultsArray[0] = width;
+             resultsArray[1] = height;
+             UINT ucontainerFmt = indexedWICcontainerFormats(containerFmt);
+             resultsArray[5] = ucontainerFmt;
+             // fnOutputDebug("WICpreLoadImage: container format = " + std::to_string(ucontainerFmt));
+             if (ucontainerFmt==9 && width==256 && height==192)
+                hr = E_FAIL;
+          }
+      }
+  } else hr = E_FAIL;
+
+  if (FAILED(hr))
   {
+      WICdestroyPreloadedImage(1);
       fnOutputDebug("WICpreLoadImage: WIC decoder error on file: " + wcharToString(szFileName));
       return 0;
   };
@@ -5757,22 +5840,7 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
   if (SUCCEEDED(hr))
   {
       // Retrieve IWICBitmapSource from the frame
-      GUID containerFmt;
-      hr = pWICclassDecoder->GetContainerFormat(&containerFmt);
-      UINT ucontainerFmt = indexedWICcontainerFormats(containerFmt);
-      resultsArray[5] = ucontainerFmt;
       hr = pWICclassFrameDecoded->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void **>(&pWICclassPixelsBitmapSource));
-  }
-
-  if (SUCCEEDED(hr))
-  {
-      hr = S_OK;
-      UINT owidth = 0;
-      UINT oheight = 0;
-      hr = pWICclassPixelsBitmapSource->GetSize(&owidth, &oheight); 
-      resultsArray[0] = owidth;
-      resultsArray[1] = oheight;
-
       double dpix = 0;
       double dpiy = 0;
       hr = pWICclassPixelsBitmapSource->GetResolution(&dpix, &dpiy); 
@@ -5782,9 +5850,73 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
       hr = pWICclassPixelsBitmapSource->GetPixelFormat(&opixelFormat);
       UINT uPixFmt = indexedWICpixelFormats(opixelFormat);
       resultsArray[3] = uPixFmt;
-      fnOutputDebug("pixel format index: " + std::to_string(uPixFmt));
+      // fnOutputDebug("pixel format index: " + std::to_string(uPixFmt));
       return 1;
-  } else return 0;
+  } else
+  {
+      WICdestroyPreloadedImage(1);
+      return 0;
+  }
+}
+
+void ListWICdecoders() {
+    IWICComponentInfo* pCompInfo = nullptr;
+    IWICBitmapDecoderInfo* pDecInfo = nullptr;
+    IEnumUnknown* pEnum = nullptr;
+    
+    HRESULT hr = m_pIWICFactory->CreateComponentEnumerator(WICDecoder, WICComponentEnumerateDefault, &pEnum);
+    if (SUCCEEDED(hr)) {
+        IUnknown* pElement = nullptr;
+        ULONG fetched;
+        
+        while (pEnum->Next(1, &pElement, &fetched) == S_OK) {
+            hr = pElement->QueryInterface(IID_PPV_ARGS(&pCompInfo));
+            if (SUCCEEDED(hr)) {
+                hr = pCompInfo->QueryInterface(IID_PPV_ARGS(&pDecInfo));
+                if (SUCCEEDED(hr)) {
+                    GUID formatGUID;
+                    hr = pDecInfo->GetContainerFormat(&formatGUID);
+                    if (SUCCEEDED(hr)) {
+                        UINT nameSize = 0;
+                        hr = pDecInfo->GetFriendlyName(0, nullptr, &nameSize);
+                        if (SUCCEEDED(hr)) {
+                            std::vector<wchar_t> friendlyName(nameSize);
+                            hr = pDecInfo->GetFriendlyName(nameSize, friendlyName.data(), &nameSize);
+                            if (SUCCEEDED(hr)) {
+                                char buffer[512];
+                                
+                                // Convert wide string to narrow for friendly name
+                                char narrowName[256];
+                                WideCharToMultiByte(CP_ACP, 0, friendlyName.data(), -1, 
+                                                  narrowName, sizeof(narrowName), NULL, NULL);
+                                
+                                sprintf_s(buffer, "qpv: Format: %s\n", narrowName);
+                                OutputDebugStringA(buffer);
+                                
+                                sprintf_s(buffer, "qpv: GUID: {%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}\n\n",
+                                        formatGUID.Data1,
+                                        formatGUID.Data2,
+                                        formatGUID.Data3,
+                                        formatGUID.Data4[0],
+                                        formatGUID.Data4[1],
+                                        formatGUID.Data4[2],
+                                        formatGUID.Data4[3],
+                                        formatGUID.Data4[4],
+                                        formatGUID.Data4[5],
+                                        formatGUID.Data4[6],
+                                        formatGUID.Data4[7]);
+                                OutputDebugStringA(buffer);
+                            }
+                        }
+                    }
+                    pDecInfo->Release();
+                }
+                pCompInfo->Release();
+            }
+            pElement->Release();
+        }
+        pEnum->Release();
+    }
 }
 
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPconv, int givenQuality, UINT givenW, UINT givenH, UINT keepAratio, UINT ScaleAnySize, UINT givenFrame, int useICM, const wchar_t *szFileName, UINT *resultsArray) {
@@ -5792,8 +5924,6 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
 
     Gdiplus::GpBitmap  *myBitmap = NULL;
     WICBitmapInterpolationMode wicScaleQuality = indexedWICinterpolations(givenQuality);
-
-    // std::stringstream ss;
     if (szFileName)
     {
         // WIC factory initialized in initWICnow() 
@@ -5806,6 +5936,9 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
         // IWICBitmapSource   *gToRenderBitmapSource = NULL;
         HRESULT hr  = S_OK;
         HRESULT hr2 = S_OK;
+        UINT owidth = 0;
+        UINT oheight = 0;
+
         try {
             // Create a decoder; Decode the source image to IWICBitmapSource
             hr = m_pIWICFactory->CreateDecoderFromFilename(szFileName, NULL, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &pDecoder);
@@ -5817,33 +5950,50 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
         if (SUCCEEDED(hr))
         {
             UINT tFrames = 0;
-            hr2 = pDecoder->GetFrameCount(&tFrames);
-            resultsArray[2] = tFrames;
-            if (givenFrame > tFrames - 1)
-               givenFrame = tFrames - 1;
+            hr = pDecoder->GetFrameCount(&tFrames);
+            if (SUCCEEDED(hr))
+            {
+               resultsArray[2] = tFrames;
+               if (givenFrame > tFrames - 1)
+                  givenFrame = tFrames - 1;
+ 
+               hr = pDecoder->GetFrame(givenFrame, &pFrame);
+               if (SUCCEEDED(hr))
+               {
+                   hr = pFrame->GetSize(&owidth, &oheight); 
+                   if (!owidth || !oheight)
+                   {
+                      hr = E_FAIL;
+                   } else
+                   {
+                      resultsArray[0] = owidth;
+                      resultsArray[1] = oheight;
+                      GUID containerFmt;
+                      hr2 = pDecoder->GetContainerFormat(&containerFmt);
+                      UINT ucontainerFmt = indexedWICcontainerFormats(containerFmt);
+                      resultsArray[5] = ucontainerFmt;
+                      // fnOutputDebug("LoadWICimage: container format ID=" + std::to_string(ucontainerFmt));
+                      if (ucontainerFmt==9 && owidth==256 && oheight==192)
+                         hr = E_FAIL;
+                   }
+               }
 
-            hr = pDecoder->GetFrame(givenFrame, &pFrame);
-        } else
+            }
+        }
+
+        if (FAILED(hr))
         {
+            SafeRelease(pDecoder);
+            SafeRelease(pFrame);
             fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: WIC decoder error on file " + wcharToString(szFileName));
             return myBitmap;
         };
 
         // Retrieve IWICBitmapSource from the frame
         // m_pOriginalBitmapSource contains the original bitmap and acts as an intermediate
-        GUID containerFmt;
-        hr2 = pDecoder->GetContainerFormat(&containerFmt);
-        UINT ucontainerFmt = indexedWICcontainerFormats(containerFmt);
-        resultsArray[5] = ucontainerFmt;
         hr = pFrame->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void **>(&m_pOriginalBitmapSource));
         if (SUCCEEDED(hr))
         {
-            UINT owidth = 0;
-            UINT oheight = 0;
-            hr2 = m_pOriginalBitmapSource->GetSize(&owidth, &oheight); 
-            resultsArray[0] = owidth;
-            resultsArray[1] = oheight;
-
             double dpix = 0;
             double dpiy = 0;
             hr2 = m_pOriginalBitmapSource->GetResolution(&dpix, &dpiy); 
@@ -5852,7 +6002,6 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
             WICPixelFormatGUID opixelFormat;
             hr2 = m_pOriginalBitmapSource->GetPixelFormat(&opixelFormat);
             UINT uPixFmt = indexedWICpixelFormats(opixelFormat);
-
             resultsArray[3] = uPixFmt;
             if (noBPPconv==1)
             {

@@ -68,7 +68,7 @@ LoadWICimage(imgPath, w, h, keepAratio, thisImgQuality, frameu, ScaleAnySize) {
    ;    imgPath := getIDimage(currentFileIndex)
    ; fnOutputDebug("wic-load " imgPath)
    func2exec := (A_PtrSize=8) ? "LoadWICimage" : "_LoadWICimage@48"
-   r := DllCall("qpvmain.dll\" func2exec, "Int", thisThreadID, "Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", userPerformColorManagement, "Str", imgPath, "UPtr", &resultsArray, "Ptr")
+   r := DllCall("qpvmain.dll\" func2exec, "Int", thisThreadID, "Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", userPerformColorManagement, "Str", imgPath, "UPtr", &resultsArray, "UPtr")
    ; mainLoadedIMGdetails.imgW := NumGet(resultsArray, 4 * 0, "uInt")
    ; mainLoadedIMGdetails.imgH := NumGet(resultsArray, 4 * 1, "uInt")
    ; mainLoadedIMGdetails.Frames := NumGet(resultsArray, 4 * 2, "uInt")

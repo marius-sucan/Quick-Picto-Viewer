@@ -114,7 +114,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , RegExAllFilesPattern := "ico|dib|dng|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif|webp"
    , RegExFilesPattern := "i)^(.\:\\).*(\.(" RegExAllFilesPattern "))$", folderFavesFile := "quick-picto-viewer-folder-faves.ini"
    , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|TIFF|TIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
-   , RegExWICfmtPtrn := "i)(.\\*\.(place-holder|webp|bmp|tiff|tif|png|jpg|jpeg))$", customKbdFile := "quick-picto-viewer-custom-kbd.ini"
+   , RegExWICfmtPtrn := "i)(.\\*\.(place-holder|webp|bmp|dib|rle|tiff|tif|png|jfif|wdp|jxr|jpg|jpeg))$", customKbdFile := "quick-picto-viewer-custom-kbd.ini"
    , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|ico|jng|jif|jpg|jpe|jpeg|ppm|xpm))$"
    , saveTypesFriendly := ".BMP, .GIF, .HDP, .J2K, .JNG, .JP2, .JPG, .JXR, .PNG, .PPM, .TGA, .TIF, .WDP, .WEBP, .ICO or .XPM"
    , saveAlphaTypesRegEX := "i)(.\.(j2k|j2c|jp2|jxr|wdp|hdp|ico|png|tga|tif|tiff|webp))$", userJpegQuality := 90
@@ -63532,7 +63532,7 @@ createMenuMainPreferences() {
    kMenu("PVperfs", "Add/Uncheck", "&High quality image resampling", "ToggleImgQuality")
    kMenu("PVperfs", "Add/Uncheck", "&Perform dithering on color depth changes", "ToggleImgColorDepthDithering")
    kMenu("PVperfs", "Add/Uncheck", "&Apply gamma correction", "toggleImgEditGammaCorrect", "image colors")
-   kMenu("PVperfs", "Add/Uncheck", "&Apply color management", "ToggleClrManage", "profiles icc icm performance")
+   kMenu("PVperfs", "Add/Uncheck", "&Apply color management", "ToggleColorProfileManage", "profiles icc icm performance")
    If (userPerformColorManagement=1)
       kMenu("PVperfs", "Check", "&Apply color management")
    If (userimgGammaCorrect=1)
@@ -63702,7 +63702,7 @@ createMenuMainView() {
 
    Menu, PVview, Add
 
-   kMenu("PVview", "Add/Uncheck", "&Apply color management", "ToggleClrManage", "profiles icc icm performance")
+   kMenu("PVview", "Add/Uncheck", "&Apply color management", "ToggleColorProfileManage", "profiles icc icm performance")
    If (userPerformColorManagement=1)
       kMenu("PVview", "Check", "&Apply color management")
 
@@ -67854,11 +67854,12 @@ ToggleCycleFavesOpen() {
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
-ToggleClrManage() {
+ToggleColorProfileManage() {
     userPerformColorManagement := !userPerformColorManagement
     INIaction(1, "userPerformColorManagement", "General")
+    pp := (alwaysOpenwithFIM=1) ? "WARNING: This option has no effect when images are loaded through FreeImage.`nThe option to load any image format through FreeImage is currently activated."
     friendly := (userPerformColorManagement=1) ? "ACTIVATED`nThe viewport performance may decrease." : "DEACTIVATED"
-    showTOOLtip("Color management on image load: " friendly, A_ThisFunc, 1)
+    showTOOLtip(pp "Color management on image load: " friendly, A_ThisFunc, 1)
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -94879,7 +94880,7 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
    tt := startZeit := A_TickCount
    VarSetCapacity(resultsArray, 8 * 6, 0)
    r := DllCall(whichMainDLL "\WICpreLoadImage", "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "UPtr")
-   ; fnOutputDebug(A_ThisFunc ": load time with WIC: " A_TickCount - tt)
+   fnOutputDebug(A_ThisFunc ": load time with WIC: " A_TickCount - tt)
    If r
    {
       Width := NumGet(resultsArray, 4 * 0, "uInt")
@@ -95004,7 +95005,7 @@ LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitma
    }
 
    ; fnOutputDebug("wic-load " imgPath)
-   r := DllCall(whichMainDLL "\LoadWICimage", "Int", 0 ,"Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", useICM, "Str", imgPath, "UPtr", &resultsArray, "Ptr")
+   r := DllCall(whichMainDLL "\LoadWICimage", "Int", 0 ,"Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", useICM, "Str", imgPath, "UPtr", &resultsArray, "UPtr")
    z := NumGet(resultsArray, 4 * 6, "uInt")
    If (r || z=1)
    {
