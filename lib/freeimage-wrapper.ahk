@@ -237,6 +237,10 @@ FreeImage_UnLoad(hImage) {
 ; === Bitmap information functions ===
 ; missing functions: GetThumbnail and SetThumbnail.
 
+FreeImage_GetPixelFormat(hImage, humanReadable:=0) {
+   Return FreeImage_GetImageType(hImage, humanReadable)
+}
+
 FreeImage_GetImageType(hImage, humanReadable:=0) {
 ; Possible return values [FREE_IMAGE_TYPE enumeration]:
 ; 0 = FIT_UNKNOWN ;   Unknown format (returned value only, never use it as input value for other functions)
@@ -326,7 +330,7 @@ FreeImage_GetDIBSize(hImage) {
 }
 
 FreeImage_GetMemorySize(hImage) {
-; returns a value in bytes
+; returns a value in bytes; it is higher than DIB size
    Return DllCall(getFIMfunc("GetMemorySize"), "uptr", hImage, "uint")
 }
 

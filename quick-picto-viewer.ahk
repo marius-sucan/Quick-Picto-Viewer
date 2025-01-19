@@ -61711,12 +61711,9 @@ createMenuConvertColorDepths() {
    {
       kMenu("PVimgClrDepths", "Add", "CURRENT DEPTH:", "dummy")
       kMenu("PVimgClrDepths", "Disable", "CURRENT DEPTH:")
-      If !viewportQPVimage.clrinfo
-      {
-         oimgBPP := FreeImage_GetBPP(viewportQPVimage.imgHandle)
-         ColorsType := FreeImage_GetColorType(viewportQPVimage.imgHandle)
-         viewportQPVimage.clrinfo := oimgBPP "-bit " ColorsType
-      }
+      oimgBPP := FreeImage_GetBPP(viewportQPVimage.imgHandle)
+      ColorsType := FreeImage_GetColorType(viewportQPVimage.imgHandle)
+      viewportQPVimage.clrinfo := oimgBPP "-bit " ColorsType
       infou := viewportQPVimage.clrinfo
       kMenu("PVimgClrDepths", "Add", infou, "dummy")
       kMenu("PVimgClrDepths", "Disable", infou)
@@ -70115,7 +70112,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
     {
        infoPixFmt := "`nPixel format: " currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat A_Space SubStr(currIMGdetails.OpenedWith, InStr(currIMGdetails.OpenedWith, "["))
        If (viewportQPVimage.imgHandle)
-          infoPixFmt .= "`nViewport pixel format: " FreeImage_GetImageType(viewportQPVimage.imgHandle, 1) " (FIM)"
+          infoPixFmt .= "`nViewport pixel format: " FreeImage_GetBPP(viewportQPVimage.imgHandle) " bits | " FreeImage_GetImageType(viewportQPVimage.imgHandle, 1) " (FIM)"
        Else
           infoPixFmt .= "`nViewport pixel format: " Gdip_GetImagePixelFormat(useGdiBitmap(), 2) " (GDI+)"
     }
@@ -70821,13 +70818,11 @@ LoadFileWithGDIp(imgPath, noBPPconv:=0, frameu:=0, useICM:=0, sizesDesired:=0, B
       oBitmap := trGdip_DisposeImage(oBitmap, 1)
       oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired, newSizedImage)
       newBitmap := newSizedImage
-      Return oBitmap
    } Else If (mustOpenWithWIC=1 && noBPPconv=0) ; || (allowCaching=1)
    {
       oBitmap := trGdip_DisposeImage(oBitmap, 1)
       oBitmap := LoadFileWithWIA(imgPath, noBPPconv, 0, sizesDesired, newSizedImage)
       newBitmap := newSizedImage
-      Return oBitmap
    }
 
    Return oBitmap
@@ -94877,8 +94872,10 @@ AcquireWIAimage() {
 }
 
 LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
+   ; Return LoadWICimage(imgPath, 0, 0, useICM)
    tt := startZeit := A_TickCount
    VarSetCapacity(resultsArray, 8 * 6, 0)
+   fnOutputDebug(A_ThisFunc ": to load = " imgPath)
    r := DllCall(whichMainDLL "\WICpreLoadImage", "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "UPtr")
    fnOutputDebug(A_ThisFunc ": load time with WIC: " A_TickCount - tt)
    If r
@@ -94909,8 +94906,17 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
          tt := A_TickCount
          zx := mainLoadedIMGdetails.Clone()
          viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, zx, 2)
-         clrDepth := (mainLoadedIMGdetails.HasAlpha=1) ? 32 : 24
-         teleportWICtoFIM(Width, Height, clrDepth, useICM)
+         clrDepth := r ; (mainLoadedIMGdetails.HasAlpha=1) ? 32 : 24
+         z := teleportWICtoFIM(Width, Height, clrDepth, useICM)
+         If !z
+         {
+            z := DllCall(whichMainDLL "\WICtestPreloadedImage", "Int", 12, "Int")
+            If !z
+            {
+               addJournalEntry(A_ThisFunc ": ERROR: failed to load image via WIC... error occured likely in coreWICgetBufferImage() in qpvMainDll")
+               Return
+            }
+         }
          ; fnOutputDebug(A_ThisFunc ": load time with WIC to FIM: " A_TickCount - tt)
          Return "very-large"
       }
@@ -94919,7 +94925,6 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
       newW := w := Width
       newH := h := Height
       mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(Width, Height)
-      ; pBitmap := LoadWICimage(imgPath, 0, 0, userPerformColorManagement)
       pBitmap := DllCall(whichMainDLL "\WICgetRectImage", "Int", x, "Int", y, "Int", w, "Int", h, "Int", newW, "Int", newH, "Int", mustClip, "int", useICM, "int", quality, "UPtr")
       If StrLen(pBitmap)>2
          recordGdipBitmaps(pBitmap, A_ThisFunc)
@@ -94938,6 +94943,27 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM) {
    ; the stride is aligned to a multiple of 4 bytes (32 bits) for efficient memory access.
    Stride := (bitsDepth * imgW) / 8 ; (bitsDepth=32) ? imgW * 4 : imgW * 3
    bufferSize := Stride * imgH
+   imageType := 1
+   If (bitsDepth=48)
+      imageType := 9
+   Else If (bitsDepth=64)
+      imageType := 10
+   Else If (bitsDepth=96)
+      imageType := 11
+   Else If (bitsDepth=128)
+      imageType := 12
+
+   hFIFimgX := FreeImage_Allocate(imgW, imgH, bitsDepth, imageType)
+   If hFIFimgX
+   {
+      nStride := FreeImage_GetStride(hFIFimgX)
+      nbufferSize := FreeImage_GetDIBsize(hFIFimgX)
+      fnOutputDebug(imageType " | " bitsDepth " bits | Stride = " Stride " / " nStride " | bufferSize = " bufferSize " / " nbufferSize)
+      Stride := FreeImage_GetStride(hFIFimgX)
+      bufferSize := FreeImage_GetDIBsize(hFIFimgX)
+      FreeImage_UnLoad(hFIFimgX)
+   }
+
    SliceHeight := imgH
    thisIndex := 0
    If (bufferSize>4010200100)
@@ -94960,7 +94986,13 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM) {
    ; buffer := DllCall(whichMainDLL "\WICgetBufferImage", "Int", bitsDepth, "int", Stride, "int", bufferSize, "int", SliceHeight, "int", useICM, "UPtr")
    buffer := DllCall(whichMainDLL "\WICgetBufferImage", "Int", bitsDepth, "int", Stride, "int", bufferSize, "int", SliceHeight, "int", useICM, "UPtr")
    If buffer
-      hFIFimgA := FreeImage_ConvertFromRawBitsEx(0, buffer, 1, imgW, imgH, Stride, bitsDepth, "0x00FF0000", "0x0000FF00", "0x000000FF", 1)
+      hFIFimgA := FreeImage_ConvertFromRawBitsEx(0, buffer, imageType, imgW, imgH, Stride, bitsDepth, "0x00FF0000", "0x0000FF00", "0x000000FF", 1)
+   Else
+      addJournalEntry(A_ThisFunc ": no buffer was returned by WICgetBufferImage() in qpvMainDll")
+
+   If (!hFIFimgA && buffer)
+      addJournalEntry(A_ThisFunc ": an error occured with FreeImage_ConvertFromRawBitsEx - unable to wrap FIM object around the image data buffer")
+
    ; FreeImage_SetDPIresolution(hFIFimgA, dpiX, dpiY)
    If (hFIFimgA && buffer)
    {
@@ -95007,6 +95039,7 @@ LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitma
    ; fnOutputDebug("wic-load " imgPath)
    r := DllCall(whichMainDLL "\LoadWICimage", "Int", 0 ,"Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", useICM, "Str", imgPath, "UPtr", &resultsArray, "UPtr")
    z := NumGet(resultsArray, 4 * 6, "uInt")
+   ; fnOutputDebug(A_ThisFunc ": " r " | " z)
    If (r || z=1)
    {
       If StrLen(r)>2
@@ -95055,7 +95088,7 @@ LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitma
             }
          }
       }
-   }
+   } else fnOutputDebug(A_ThisFunc ": failed to load file with LoadWICimage()")
 
    resultsArray := ""
    zeitu := A_TickCount - startZeit
@@ -95243,7 +95276,7 @@ trGdip_CreateBitmapFromFile(funcu, sFile, useICM:=0) {
     If StrLen(r)>2
        recordGdipBitmaps(r, A_ThisFunc "<-" funcu)
     Else
-       addJournalEntry(A_ThisFunc "() error: " Gdip_ErrorHandler(gdipLastError, 0) "`nFile to load:" sFile)
+       addJournalEntry(A_ThisFunc "() error: " Gdip_ErrorHandler(gdipLastError, 0) ". Invoked by " funcu "(). File to load:" sFile)
 
     Return r
 }
@@ -99718,9 +99751,9 @@ doClicku() {
 testFIMrgb16toRGBF() {
    initQPVmainDLL()
    initFIMGmodule()
-   hFIFimgA := FreeImage_Load("E:\Sucan twins\photos test\SLDs\freeimage-tests\P1040822.RAW")
+   hFIFimgA := FreeImage_Load("E:\Sucan twins\photos test\SLDs\freeimage-tests\leadenhall_market_4k.hdr")
    SoundBeep 300, 100
-   a := FreeImage_Save(hFIFimgA, "E:\Sucan twins\photos test\SLDs\freeimage-tests\P1040822.jxr")
+   a := FreeImage_Save(hFIFimgA, "E:\Sucan twins\photos test\SLDs\freeimage-tests\leadenhall_market_4k.tif")
    SoundBeep 900, 100
    FreeImage_UnLoad(hFIFimgA)
    ToolTip, % a "|" b , , , 2
