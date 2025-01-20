@@ -94872,7 +94872,19 @@ AcquireWIAimage() {
 }
 
 LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
-   ; Return LoadWICimage(imgPath, 0, 0, useICM)
+   Static crap := 0
+   ; if IsObject(crap)
+   ; {
+   ;    mainLoadedIMGdetails := crap.Clone()
+   ;    Return trGdip_CreateBitmap(A_ThisFunc, crap.Width, crap.Height)
+   ; }
+
+   ; pBitmap := LoadWICimage(imgPath, 0, 0, useICM)
+   ; crap := mainLoadedIMGdetails.Clone()
+   ; crap.Width := crap.Width * 4
+   ; crap.Height := crap.Height * 4
+   ; Return pBitmap
+
    tt := startZeit := A_TickCount
    VarSetCapacity(resultsArray, 8 * 6, 0)
    fnOutputDebug(A_ThisFunc ": to load = " imgPath)
@@ -94899,7 +94911,7 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
       mainLoadedIMGdetails.OpenedWith := "Windows Imaging Component [WIC]"
       mainLoadedIMGdetails.LoadedWith := "WIC"
       resultsArray := ""
-      If isImgSizeTooLarge(Width, Height)
+      If r ; isImgSizeTooLarge(Width, Height)
       {
          ; I could return 0 and have this file load with FreeImage within the caller,
          ; however I gain no performance improvement.
@@ -94982,7 +94994,7 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM) {
    numberSlices := Ceil(imgH / SliceHeight)
    remainderHeight := mod(imgH, SliceHeight)
    SliceHeight := (numberSlices>1) ? SliceHeight : 0
-   ; fnOutputDebug(A_ThisFunc "(): " Stride " | w/h =" imgW " x " imgH " | buffer = " bufferSize " | sh=" SliceHeight " | ns=" numberSlices " | " remainderHeight)
+   fnOutputDebug(A_ThisFunc "(): " Stride " | w/h =" imgW " x " imgH " | buffer = " bufferSize " | sh=" SliceHeight " | ns=" numberSlices " | " remainderHeight)
    ; buffer := DllCall(whichMainDLL "\WICgetBufferImage", "Int", bitsDepth, "int", Stride, "int", bufferSize, "int", SliceHeight, "int", useICM, "UPtr")
    buffer := DllCall(whichMainDLL "\WICgetBufferImage", "Int", bitsDepth, "int", Stride, "int", bufferSize, "int", SliceHeight, "int", useICM, "UPtr")
    If buffer
