@@ -45069,7 +45069,13 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
 }
 
 updateViewportCachesID(oMD5name, indexu, file2rem, file2save) {
-   coreShowTheImage("set-prev", file2save)
+   ShowTheImage("set-prev", file2save)
+   If (viewportQPVimage.imgHandle)
+   {
+      viewportQPVimage.ImgFile := file2save
+      Return
+   }
+
    nMD5name := generateThumbName(file2save, 1)
    o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
    trGdip_GetImageDimensions(useGdiBitmap(), fimgW, fimgH)
@@ -57815,7 +57821,8 @@ FIMdecideLoadArgs(imgPath, qualityRaw, ByRef GFT) {
 FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, externCondition, ByRef hasAppliedToneMap) {
    hasAppliedToneMap := ""
    thisAllow := (isVarEqualTo(GFT, 32, 26, 29) && imgBPP>32) ? 1 : allowToneMappingImg
-   mustApplyToneMapping := (imgBPP>32 && !InStr(ColorsType, "rgba") && GFT!=13) || (imgBPP>64) ? 1 : 0
+   mustApplyToneMapping := (imgBPP>32 && !InStr(ColorsType, "rgba") && GFT!=13) || (imgBPP>=48) ? 1 : 0
+   ; ToolTip, % mustApplyToneMapping "|" thisAllow "|" externCondition , , , 2
    If (mustApplyToneMapping=1 && thisAllow=1 && externCondition=1)
    {
       ; setWindowTitle("Applying adaptive logarithmic tone mapping to display high color depth image")
@@ -69366,6 +69373,14 @@ ResetImgLoadStatus() {
 
 ShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
   Static prevImgPath, prevNavKeysu := 0, lastInvoked := 1, lastSkippy := 1
+  If (imgPath="set-prev")
+  {
+     prevImgPath := usePrevious
+     coreShowTheImage("set-prev", usePrevious)
+     ResizeImageGDIwin("set-prev", usePrevious, 0)
+     Return
+  }
+
   If (usePrevious=2)
      preventHUDelements := 0
 
@@ -69439,6 +69454,7 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
    Critical, on
    Static prevImgPath, lastInvoked2 := 1, counteru
         , lastInvoked := 1, prevPicCtrl := 1
+
    If (imgPath="set-prev")
    {
       prevLastImg[1] := [currentFileIndex, resultedFilesList[currentFileIndex, 1]]
@@ -69568,7 +69584,9 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
           If (editingSelectionNow=1)
              ToggleEditImgSelection()
 
-          clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIwin)
+          isWelcomeScreenu := (pk=1 || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
+          If !isWelcomeScreenu
+             clearGivenGDIwin(A_ThisFunc, glPG, glHDC, hGDIwin)
           showTOOLtip(errMsg)
           SetTimer, RemoveTooltip, % -msgDisplayTime
           winTitle := "[*] " winTitle
@@ -69631,6 +69649,14 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
     Critical, on
     Static prevImgPath, lastTitleChange := 1
          , IDprevImgPath, tinyW, tinyH, wscale, prevSize
+
+    If (imgPath="set-prev")
+    {
+       prevImgPath := usePrevious
+       extraID := ColorDepthDithering vpIMGrotation usrTextureBGR usrColorDepth bwDithering
+       IDprevImgPath := usePrevious "-" userHQraw extraID
+       Return
+    }
 
     setImageLoading()
     If (editingSelectionNow=1 && IMGresizingMode=5)
@@ -79017,15 +79043,6 @@ updateTinyPreviewArea(DestPosX, DestPosY, newW, newH, urgent:=0) {
     } 
 }
 
-destroyBlacked() {
-  If (imageLoading=1)
-  {
-     SetTimer, destroyBlacked, -50
-     Return
-  }
-  BlackedCreator(1, 1)
-}
-
 ToggleVisibilityWindow(actu, winIDu) {
    Static prevState
    thisState := actu "-" winIDu
@@ -79052,8 +79069,6 @@ FadeMainWindow() {
 GdipCleanMain(modus:=0) {
     If (modus=2)
     {
-       ; BlackedCreator(128)
-       ; SetTimer, destroyBlacked, -100
        vpWinClientSize(mainWidth, mainHeight)
        Gdi_FillShape(glHDC, 0, 0, mainWidth, mainHeight, WindowBgrColor, 1)
        r2 := doLayeredWinUpdate(A_ThisFunc, hGDIwin, glHDC, 200)
@@ -88277,6 +88292,7 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
    {
       If (imgPath!=otherFile)
       {
+         oMD5name := generateThumbName(imgPath, 1)
          FileGetTime, originalMtime, % imgPath, M
          FileGetTime, originalCtime, % imgPath, C
          If FileRexists(otherFile, 0)
@@ -88325,6 +88341,8 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
                   updateSQLdbEntry(imgPath, otherFile, 0, resultedFilesList[indexu, 12])
 
                updateMainUnfilteredList(indexu, 1, otherFile)
+               If (thumbsDisplaying!=1 && indexu=currentFileIndex)
+                  updateViewportCachesID(oMD5name, indexu, imgPath, otherFile)
             }
             SetTimer, RemoveTooltip, % -msgDisplayTime
          } Else
@@ -91723,34 +91741,6 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
        interfaceThread.ahkassign("toolTipGuiCreated", 1)
 }
 
-BlackedCreator(thisOpacity, killWin:=0) {
-    Critical, On
-    Static lastInvoked := 1
-    If (killWin=1)
-    {
-       Gui, BlackGuia: Destroy
-       Return
-    }
-
-    If (A_TickCount - lastInvoked<250)
-       Return
-
-    lastInvoked := A_TickCount
-    Gui, BlackGuia: Destroy
-    Sleep, 5
-    vpWinClientSize(mainWidth, mainHeight)
-    Gui, BlackGuia: -DPIScale -Caption +Owner%PVhwnd% +ToolWindow +E0x80000 +E0x20 +hwndhGuiBlack
-    Gui, BlackGuia: Color, c%OSDbgrColor%
-    Gui, BlackGuia: Margin, 0, 0
-    Gui, BlackGuia: Add, Text,+0x80 c%OSDtextColor% w%mainWidth% h%mainHeight% gRemoveTooltip, %msg%
-    JEE_ClientToScreen(hPicOnGui1, 0, 0, GuiX, GuiY)
-    WinSet, Transparent, %thisOpacity%, ahk_id %hGuiBlack%
-    WinSet, Region, 0-0 R6-6 w%mainWidth% h%mainHeight%, ahk_id %hGuiBlack%
-    ; GuiX := GuiY := 0
-    Gui, BlackGuia: Show, NoActivate AutoSize x%GuiX% y%GuiY%, GuiBlackedWin
-    ; SetParentID(PVhwnd, hGuiBlack)
-}
-
 Fnt_GetListOfFontsSimplified() {
 ; function stripped down from Font Library 3.0 by jballi
 ; from https://autohotkey.com/boards/viewtopic.php?t=4379
@@ -94878,8 +94868,18 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
    ;    mainLoadedIMGdetails := crap.Clone()
    ;    Return trGdip_CreateBitmap(A_ThisFunc, crap.Width, crap.Height)
    ; }
+   ; pBitmap := ""
+   ; loop, 125
+   ; {
+   ;    memInfos := getMemUsage()
+   ;    xBitmap := LoadWICimage(imgPath, 0, 0, useICM)
+   ;    If !pBitmap
+   ;       pBitmap := xBitmap
+   ;    else
+   ;       trGdip_DisposeImage(xBitmap)
+   ;    fnOutputDebug(A_Index "# memory usage: " memInfos.appMem)
+   ; }
 
-   ; pBitmap := LoadWICimage(imgPath, 0, 0, useICM)
    ; crap := mainLoadedIMGdetails.Clone()
    ; crap.Width := crap.Width * 4
    ; crap.Height := crap.Height * 4
@@ -94887,9 +94887,9 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
 
    tt := startZeit := A_TickCount
    VarSetCapacity(resultsArray, 8 * 6, 0)
-   fnOutputDebug(A_ThisFunc ": to load = " imgPath)
+   ; fnOutputDebug(A_ThisFunc ": to load = " imgPath)
    r := DllCall(whichMainDLL "\WICpreLoadImage", "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "UPtr")
-   fnOutputDebug(A_ThisFunc ": load time with WIC: " A_TickCount - tt)
+   ; fnOutputDebug(A_ThisFunc ": load time with WIC: " A_TickCount - tt)
    If r
    {
       Width := NumGet(resultsArray, 4 * 0, "uInt")
@@ -94911,14 +94911,15 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
       mainLoadedIMGdetails.OpenedWith := "Windows Imaging Component [WIC]"
       mainLoadedIMGdetails.LoadedWith := "WIC"
       resultsArray := ""
-      If r ; isImgSizeTooLarge(Width, Height)
+      If isImgSizeTooLarge(Width, Height)
       {
          ; I could return 0 and have this file load with FreeImage within the caller,
          ; however I gain no performance improvement.
          tt := A_TickCount
          zx := mainLoadedIMGdetails.Clone()
          viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, zx, 2)
-         clrDepth := r ; (mainLoadedIMGdetails.HasAlpha=1) ? 32 : 24
+         clrDepth := clampInRange(r, 16, 32) ; i had no luck with copying HDR data from WIC to the buffer in C++
+         ; clrDepth := (mainLoadedIMGdetails.HasAlpha=1) ? 32 : 24
          z := teleportWICtoFIM(Width, Height, clrDepth, useICM)
          If !z
          {
@@ -94953,8 +94954,11 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM) {
       Return 0
 
    ; the stride is aligned to a multiple of 4 bytes (32 bits) for efficient memory access.
-   Stride := (bitsDepth * imgW) / 8 ; (bitsDepth=32) ? imgW * 4 : imgW * 3
-   bufferSize := Stride * imgH
+   bytesPerPixel := bitsDepth / 8
+   widthBytes := imgW * bytesPerPixel
+   Stride := Ceil(((widthBytes + 3) // 4) * 4)
+   ; Stride := (bitsDepth * imgW) / 8 ; (bitsDepth=32) ? imgW * 4 : imgW * 3
+   bufferSize := Ceil( (Stride + 0.008) * imgH)
    imageType := 1
    If (bitsDepth=48)
       imageType := 9
@@ -94965,15 +94969,18 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM) {
    Else If (bitsDepth=128)
       imageType := 12
 
-   hFIFimgX := FreeImage_Allocate(imgW, imgH, bitsDepth, imageType)
-   If hFIFimgX
+   if (imageType>1)
    {
-      nStride := FreeImage_GetStride(hFIFimgX)
-      nbufferSize := FreeImage_GetDIBsize(hFIFimgX)
-      fnOutputDebug(imageType " | " bitsDepth " bits | Stride = " Stride " / " nStride " | bufferSize = " bufferSize " / " nbufferSize)
-      Stride := FreeImage_GetStride(hFIFimgX)
-      bufferSize := FreeImage_GetDIBsize(hFIFimgX)
-      FreeImage_UnLoad(hFIFimgX)
+      hFIFimgX := FreeImage_Allocate(imgW, imgH, bitsDepth, imageType)
+      If hFIFimgX
+      {
+         Stride := FreeImage_GetStride(hFIFimgX)
+         bufferSize := FreeImage_GetDIBsize(hFIFimgX)
+         ; fnOutputDebug(imageType " | " bitsDepth " bits | Stride = " Stride " / " nStride " | bufferSize = " bufferSize " / " nbufferSize)
+         ; Stride := FreeImage_GetStride(hFIFimgX)
+         ; bufferSize := FreeImage_GetDIBsize(hFIFimgX)
+         FreeImage_UnLoad(hFIFimgX)
+      }
    }
 
    SliceHeight := imgH
@@ -94994,7 +95001,7 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM) {
    numberSlices := Ceil(imgH / SliceHeight)
    remainderHeight := mod(imgH, SliceHeight)
    SliceHeight := (numberSlices>1) ? SliceHeight : 0
-   fnOutputDebug(A_ThisFunc "(): " Stride " | w/h =" imgW " x " imgH " | buffer = " bufferSize " | sh=" SliceHeight " | ns=" numberSlices " | " remainderHeight)
+   ; fnOutputDebug(A_ThisFunc "(): " Stride " | w/h =" imgW " x " imgH " | buffer = " bufferSize " | sh=" SliceHeight " | ns=" numberSlices " | " remainderHeight)
    ; buffer := DllCall(whichMainDLL "\WICgetBufferImage", "Int", bitsDepth, "int", Stride, "int", bufferSize, "int", SliceHeight, "int", useICM, "UPtr")
    buffer := DllCall(whichMainDLL "\WICgetBufferImage", "Int", bitsDepth, "int", Stride, "int", bufferSize, "int", SliceHeight, "int", useICM, "UPtr")
    If buffer
@@ -95019,7 +95026,8 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM) {
       DllCall(whichMainDLL "\WICdestroyPreloadedImage", "Int", 1, "Int")
       viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, [hFIFimgA, tFrames, buffer], 1)
       ; ToolTip, % "teleported=" hFIFimgA "|" zw "|" zh "|" bufferSize , , , 2
-      viewportQPVimage.PixelFormat := PixelFormat
+      If !InStr(viewportQPVimage.PixelFormat, "tone-map")
+         viewportQPVimage.PixelFormat := PixelFormat
       viewportQPVimage.RawFormat := RawFormat
       viewportQPVimage.OpenedWith := OpenedWith
       Return 1
@@ -95029,7 +95037,6 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM) {
 
 LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitmap:=0) {
    startZeit := A_TickCount
-   VarSetCapacity(resultsArray, 8 * 6, 0)
    If IsObject(sizesDesired[1])
    {
       w := sizesDesired[1, 1]
@@ -95048,8 +95055,8 @@ LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitma
       keepAratio := 2
    }
 
-   ; fnOutputDebug("wic-load " imgPath)
-   r := DllCall(whichMainDLL "\LoadWICimage", "Int", 0 ,"Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", useICM, "Str", imgPath, "UPtr", &resultsArray, "UPtr")
+   VarSetCapacity(resultsArray, 8 * 6, 0)
+   r := DllCall(whichMainDLL "\LoadWICimage", "Int", 0 ,"Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", useICM, "Str", imgPath, "UPtr*", &resultsArray, "UPtr")
    z := NumGet(resultsArray, 4 * 6, "uInt")
    ; fnOutputDebug(A_ThisFunc ": " r " | " z)
    If (r || z=1)
@@ -95073,7 +95080,6 @@ LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitma
       mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(mainLoadedIMGdetails.Width, mainLoadedIMGdetails.Height)
       mainLoadedIMGdetails.HasAlpha := varContains(k, "argb", "prgba", "bgra", "rgba", "alpha")
       mainLoadedIMGdetails.OpenedWith := "Windows Imaging Component [WIC]"
-
       ; fnOutputDebug("images desired = " sizesDesired.Count() " | f=" findFlippedDupes)
       If (sizesDesired.Count()>1 && r && noBPPconv=0)
       {
