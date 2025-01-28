@@ -113,7 +113,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , mustOpenStartFolder := "", mainFavesFile := "quick-picto-viewer-favourites.ini", miniFavesFile := "quick-picto-viewer-minifaves.ini"
    , RegExAllFilesPattern := "ico|dib|dng|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif|webp"
    , RegExFilesPattern := "i)^(.\:\\).*(\.(" RegExAllFilesPattern "))$", folderFavesFile := "quick-picto-viewer-folder-faves.ini"
-   , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|TIFF|TIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
+   , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
    , RegExWICfmtPtrn := "i)(.\\*\.(place-holder|webp|bmp|dib|rle|tiff|tif|png|jfif|wdp|jxr|jpg|jpeg))$", customKbdFile := "quick-picto-viewer-custom-kbd.ini"
    , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|ico|jng|jif|jpg|jpe|jpeg|ppm|xpm))$"
    , saveTypesFriendly := ".BMP, .GIF, .HDP, .J2K, .JNG, .JP2, .JPG, .JXR, .PNG, .PPM, .TGA, .TIF, .WDP, .WEBP, .ICO or .XPM"
@@ -31608,7 +31608,7 @@ Trimmer(string, whatTrim:="") {
 FileRexists(filePath, loose:=1) {
    obju := GetFileAttributesEx(filePath)
    ; MsgBox, % fileAttribs "`n" fileSizu "`nA" filePath "A"
-   If (obju.size<120 && loose=1 || !obju.size || obju.dir=1)
+   If (obju.size<42 && loose=1 || !obju.size || obju.dir=1)
       Return 0
    Else
       Return 1
@@ -80276,7 +80276,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
    calculateToneMappingAlgoParams(cmrRAWtoneMapAlgo, UIuserToneMapParamA, UIuserToneMapParamB, UIuserToneMapParamC, UIuserToneMapParamD, UIuserToneMapOCVparamA, UIuserToneMapOCVparamB)
    If (mustDoMultiCore=1)
    {
-      paramz := enableThumbsCaching "|" userHQraw "|" allowToneMappingImg "|" allowWICloader "|" userimgQuality "|" cmrRAWtoneMapAlgo "|" cmrRAWtoneMapParamA "|" cmrRAWtoneMapParamB "|" cmrRAWtoneMapParamC "|" cmrRAWtoneMapParamD "|" cmrRAWtoneMapOCVparamA "|" cmrRAWtoneMapOCVparamB "|" cmrRAWtoneMapAltExpo "|" userPerformColorManagement
+      paramz := enableThumbsCaching "|" userHQraw "|" allowToneMappingImg "|" allowWICloader "|" userimgQuality "|" cmrRAWtoneMapAlgo "|" cmrRAWtoneMapParamA "|" cmrRAWtoneMapParamB "|" cmrRAWtoneMapParamC "|" cmrRAWtoneMapParamD "|" cmrRAWtoneMapOCVparamA "|" cmrRAWtoneMapOCVparamB "|" cmrRAWtoneMapAltExpo "|" userPerformColorManagement "|" allowFIMloader
       fnOutputDebug("ThumbsMode. Clean multi-core GDIs mess. Cores: " limitCores)
       Loop, % limitCores
           thumbThread%A_Index%.ahkFunction("cleanMess", "c" A_Index, paramz)
@@ -94043,6 +94043,12 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
   }
 
   FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
+  If (!imgW || !imgH || imgW=1 && imgH=1)
+  {
+     FreeImage_UnLoad(hFIFimgA)
+     Return
+  }
+
   If (isImgSizeTooLarge(imgW, imgH) && screenMode=1)
   {
      viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, [hFIFimgA, tFrames], 1)
@@ -94862,12 +94868,6 @@ AcquireWIAimage() {
 }
 
 LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
-   Static crap := 0
-   ; if IsObject(crap)
-   ; {
-   ;    mainLoadedIMGdetails := crap.Clone()
-   ;    Return trGdip_CreateBitmap(A_ThisFunc, crap.Width, crap.Height)
-   ; }
    ; pBitmap := ""
    ; loop, 125
    ; {
@@ -94877,18 +94877,15 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
    ;       pBitmap := xBitmap
    ;    else
    ;       trGdip_DisposeImage(xBitmap)
-   ;    fnOutputDebug(A_Index "# memory usage: " memInfos.appMem)
+   ;    fnOutputDebug(A_Index "# memory usage: " memInfos.appMem); testing for memory leaks
    ; }
-
-   ; crap := mainLoadedIMGdetails.Clone()
-   ; crap.Width := crap.Width * 4
-   ; crap.Height := crap.Height * 4
    ; Return pBitmap
 
    tt := startZeit := A_TickCount
    VarSetCapacity(resultsArray, 8 * 6, 0)
    ; fnOutputDebug(A_ThisFunc ": to load = " imgPath)
-   r := DllCall(whichMainDLL "\WICpreLoadImage", "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "UPtr")
+   fimu := (wasInitFIMlib=1 && allowFIMloader=1) ? 1 : 0
+   r := DllCall(whichMainDLL "\WICpreLoadImage", "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "int", fimu, "UPtr")
    ; fnOutputDebug(A_ThisFunc ": load time with WIC: " A_TickCount - tt)
    If r
    {
@@ -94913,8 +94910,8 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
       resultsArray := ""
       If isImgSizeTooLarge(Width, Height)
       {
-         ; I could return 0 and have this file load with FreeImage within the caller,
-         ; however I gain no performance improvement.
+         ; I could return 0 and have this file load/decode with tFreeImage from within the caller,
+         ; however, there are no performance gains.
          tt := A_TickCount
          zx := mainLoadedIMGdetails.Clone()
          viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, zx, 2)
@@ -94933,8 +94930,8 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
          ; fnOutputDebug(A_ThisFunc ": load time with WIC to FIM: " A_TickCount - tt)
          Return "very-large"
       }
-
-      quality := mustClip := 0
+      ; Known bug: see WicGetRect() from Class_screenQPVimage
+      quality := mustClip := x := y := 0
       newW := w := Width
       newH := h := Height
       mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(Width, Height)
@@ -95039,6 +95036,7 @@ LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitma
    startZeit := A_TickCount
    If IsObject(sizesDesired[1])
    {
+      ; image resizing will be performed by OpenCV
       w := sizesDesired[1, 1]
       h := sizesDesired[1, 2]
       keepAratio := sizesDesired[1, 3]
@@ -95056,7 +95054,8 @@ LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitma
    }
 
    VarSetCapacity(resultsArray, 8 * 6, 0)
-   r := DllCall(whichMainDLL "\LoadWICimage", "Int", 0 ,"Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", useICM, "Str", imgPath, "UPtr*", &resultsArray, "UPtr")
+   fimu := (wasInitFIMlib=1 && allowFIMloader=1) ? 1 : 0
+   r := DllCall(whichMainDLL "\LoadWICimage", "Int", 0 ,"Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", doFlipu, "int", useICM, "Str", imgPath, "UPtr*", &resultsArray, "int", fimu, "UPtr")
    z := NumGet(resultsArray, 4 * 6, "uInt")
    ; fnOutputDebug(A_ThisFunc ": " r " | " z)
    If (r || z=1)
@@ -95064,10 +95063,8 @@ LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitma
       If StrLen(r)>2
       {
          recordGdipBitmaps(r, A_ThisFunc)
-         If doFlipu
-            Gdip_ImageRotateFlip(r, doFlipu)
          If (doGray=1)
-            Gdip_BitmapConvertGrayHSL(r)
+            Gdip_BitmapApplyHSL(r, 0, -100, 0)
       } Else
          r := 1
 
@@ -95095,14 +95092,12 @@ LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitma
             doFlipu := sizesDesired[A_Index + 1, 6]
             doGray := sizesDesired[A_Index + 1, 7]
             ; fnOutputDebug("loop image size=" A_Index " | " w "x" h " | " doFlipu)
-            rm := DllCall(whichMainDLL "\LoadWICimage", "Int", 0 ,"Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", useICM, "Str", imgPath, "UPtr", &resultsArray, "Ptr")
-            if StrLen(rm)>2
+            rm := DllCall(whichMainDLL "\LoadWICimage", "Int", 0 ,"Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", doFlipu, "int", useICM, "Str", imgPath, "UPtr*", &resultsArray, "int", fimu, "UPtr")
+            If StrLen(rm)>2
             {
                newBitmap[A_Index] := rm
-               If doFlipu
-                  Gdip_ImageRotateFlip(rm, doFlipu)
                If (doGray=1)
-                  Gdip_BitmapConvertGrayHSL(rm)
+                  Gdip_BitmapApplyHSL(rm, 0, -100, 0)
             }
          }
       }

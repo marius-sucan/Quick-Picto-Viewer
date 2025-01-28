@@ -233,6 +233,12 @@ Class screenQPVimage {
 
       resizeQuality := 0
       useICM := userPerformColorManagement
+      ; Known bug: the act of resizing the rect retrieved from the main image
+      ; breaks color management when activated...
+      ; the bitmap scaler of WIC found in coreWICgetRectImage() messes things up...
+      ; I could use OpenCV, but as of now, QPV [almost] never loads huge images
+      ; in this mode with WIC, therefore,  I do not care for now ;-).
+
       pBitmap := DllCall(whichMainDLL "\" func2exec, "Int", x, "Int", y, "Int", w, "Int", h, "Int", newW, "Int", newH, "Int", mustClip, "int", useICM, "int", resizeQuality, "UPtr")
       ; ToolTip, % pBitmap "|"  hFIFimgE "|" hFIFimgZ "|" x "|" y "|" w "|" h "|" newW "|" newH , , , 2
       If StrLen(pBitmap)>1

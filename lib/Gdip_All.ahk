@@ -9331,13 +9331,50 @@ Gdip_BitmapConvertGray(pBitmap, hue:=0, vibrance:=-40, brightness:=1, contrast:=
     Return newBitmap
 }
 
-Gdip_BitmapConvertGrayHSL(pBitmap, hue:=0, saturation:=-100, lightness:=0) {
+Gdip_BitmapApplyHSL(pBitmap, hue, saturation, lightness) {
+; hue [-180, 180]
+; saturation [-100, 100]
+; light [-100, 100]
 ; if succesful, returns 0
 
     If (pBitmap="")
        Return -2
 
     pEffect := Gdip_CreateEffect(6, hue, saturation, lightness)
+    If !pEffect
+       Return -1
+
+    E := Gdip_BitmapApplyEffect(pBitmap, pEffect)
+    Gdip_DisposeEffect(pEffect)
+    Return E
+}
+
+Gdip_BitmapApplyTint(pBitmap, hue, amount) {
+; hue [-180, 180]
+; amount [0, 100]
+; if succesful, returns 0
+
+    If (pBitmap="")
+       Return -2
+
+    pEffect := Gdip_CreateEffect(8, hue, amount)
+    If !pEffect
+       Return -1
+
+    E := Gdip_BitmapApplyEffect(pBitmap, pEffect)
+    Gdip_DisposeEffect(pEffect)
+    Return E
+}
+
+Gdip_BitmapApplyBrightnessContrast(pBitmap, brightness, contrast) {
+; brightness [-255, 255]
+; contrast [-100, 100]
+; if succesful, returns 0
+
+    If (pBitmap="")
+       Return -2
+
+    pEffect := Gdip_CreateEffect(5, brightness, contrast)
     If !pEffect
        Return -1
 

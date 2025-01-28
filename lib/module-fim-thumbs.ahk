@@ -16,10 +16,10 @@ SetWinDelay, 1
 Global GDIPToken, MainExe := AhkExported(), runningGDIPoperation := 0, WICmoduleHasInit := 0, allowWICloader := 1
      , mainCompiledPath := "", wasInitFIMlib := 0, listBitmaps := "", userImgQuality := 0, userHQraw := 1
      , operationDone := 1, resultsList := "", FIMfailed2init := 0, thisThreadID := -1, allowToneMappingImg := 1
-     , waitDataCollect := 1, operationFailed := 0, RegExWICfmtPtrn, enableThumbsCaching := 1
+     , waitDataCollect := 1, operationFailed := 0, RegExWICfmtPtrn, enableThumbsCaching := 1, allowFIMloader := 1
      , cmrRAWtoneMapAlgo, cmrRAWtoneMapParamA, cmrRAWtoneMapParamB, cmrRAWtoneMapOCVparamA, cmrRAWtoneMapOCVparamB
      , cmrRAWtoneMapParamC, cmrRAWtoneMapParamD, cmrRAWtoneMapAltExpo, userPerformColorManagement := 1
-     , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|TIFF|TIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
+     , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
 
 ; E := initThisThread()
 Return
@@ -67,8 +67,9 @@ LoadWICimage(imgPath, w, h, keepAratio, thisImgQuality, frameu, ScaleAnySize) {
    ; If !imgPath
    ;    imgPath := getIDimage(currentFileIndex)
    ; fnOutputDebug("wic-load " imgPath)
+   fimu := (wasInitFIMlib=1 && allowFIMloader=1) ? 1 : 0
    func2exec := (A_PtrSize=8) ? "LoadWICimage" : "_LoadWICimage@48"
-   r := DllCall("qpvmain.dll\" func2exec, "Int", thisThreadID, "Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", userPerformColorManagement, "Str", imgPath, "UPtr", &resultsArray, "UPtr")
+   r := DllCall("qpvmain.dll\" func2exec, "Int", thisThreadID, "Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", 0, "int", userPerformColorManagement, "Str", imgPath, "UPtr*", &resultsArray, "int", fimu, "UPtr")
    ; mainLoadedIMGdetails.imgW := NumGet(resultsArray, 4 * 0, "uInt")
    ; mainLoadedIMGdetails.imgH := NumGet(resultsArray, 4 * 1, "uInt")
    ; mainLoadedIMGdetails.Frames := NumGet(resultsArray, 4 * 2, "uInt")
@@ -107,6 +108,7 @@ cleanMess(thisID:=0, params:=0) {
       cmrRAWtoneMapOCVparamB := optionz[12]
       cmrRAWtoneMapAltExpo := optionz[13]
       userPerformColorManagement := optionz[14]
+      allowFIMloader := optionz[15]
    }
 
    waitDataCollect := 1
@@ -155,16 +157,17 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
    startZeit := A_TickCount
    resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
    ; RegWrite, REG_SZ, %QPVregEntry%, thumbThreadDone%coreIndex%, 0
-   If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1 && !RegExMatch(imgPath, RegExFIMformPtrn))
+   excludeFIMs := (wasInitFIMlib=1 && allowFIMloader=1) ? RegExMatch(imgPath, RegExFIMformPtrn) : 0
+   If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1 && !excludeFIMs)
    {
-      thisImgQuality := (imgQuality=1) ? 6 : 5
+      thisImgQuality := (imgQuality=1) ? 7 : 5
       finalBitmap := LoadWICimage(imgPath, thumbsSizeQuality, thumbsSizeQuality, 1, thisImgQuality, 3, 0)
       thisZeit := A_TickCount - startZeit
       If (enableThumbsCaching=1 && thisZeit>timePerImg && StrLen(finalBitmap)>2)
          r := Gdip_SaveBitmapToFile(finalBitmap, file2save)
    }
 
-   If (StrLen(finalBitmap)<3 && wasInitFIMlib=1)
+   If (StrLen(finalBitmap)<3 && wasInitFIMlib=1 && allowFIMloader=1)
    {
       r := imgPath
       GFT := FreeImage_GetFileType(r)
@@ -188,10 +191,12 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
       }
 
       FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
+      bad := (!imgW || !imgH || imgW=1 && imgH=1) ? 1 : 0
       calcIMGdimensions(imgW, imgH, thumbsSizeQuality, thumbsSizeQuality, ResizedW, ResizedH)
       resizeFilter := (ResizeQualityHigh=1) ? 3 : 0
-    
-      hFIFimgX := trFreeImage_Rescale(hFIFimgA, ResizedW, ResizedH, resizeFilter)
+      if (bad=0)
+         hFIFimgX := trFreeImage_Rescale(hFIFimgA, ResizedW, ResizedH, resizeFilter)
+
       FreeImage_UnLoad(hFIFimgA)
       If StrLen(hFIFimgX)>1
       {
@@ -522,7 +527,7 @@ OpenCV_FimResizeBitmap(hFIFimgA, resizedW, resizedH, rx, ry, rw, rh, Interpolati
 }
 
 trFreeImage_Rescale(hImage, w, h, filter:=3) {
-   a := OpenCV_FimResizeBitmap(hImage, w, h, 0, 0, 0, 0, clampInRange(filter - 1, 0, 3))
+   a := OpenCV_FimResizeBitmap(hImage, w, h, 0, 0, 0, 0, filter)
    If !a
       a := FreeImage_Rescale(hImage, w, h, filter)
    Return a
