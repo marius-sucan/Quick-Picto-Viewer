@@ -380,7 +380,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , DrawLineAreaPolarMode := 1, IDedgesModus := 1, IDedgesPreEmphasis := 0, IDedgesPreContrast := 0
    , UIuserToneMapParamC := 180, cmrRAWtoneMapParamC := 1, UIuserToneMapParamD := 60, cmrRAWtoneMapParamD := 0
    , UIuserToneMapOCVparamA := 80, cmrRAWtoneMapOCVparamA := 1, UIuserToneMapOCVparamB := 72, cmrRAWtoneMapOCVparamB := 0
-   , userPerformColorManagement := 1
+   , userPerformColorManagement := 1, UserCombinePDFbgrColor := "ffFFff"
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -2173,7 +2173,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
              allowLoop := 1
              func2Call := ["ThumbsNavigator", "PgDn", givenKey]
           } Else If (totalFramesIndex>0 && thumbsDisplaying!=1)
-             func2Call := ["MenuNextDesiredFrame"]
+             func2Call := ["MenuPrevDesiredFrame"]
        }
     } Else If (givenKey="+PgUp")
     {
@@ -2185,7 +2185,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
              allowLoop := 1
              func2Call := ["ThumbsNavigator", "PgUp", givenKey]
           } Else If (totalFramesIndex>0 && thumbsDisplaying!=1)
-             func2Call := ["MenuPrevDesiredFrame"]
+             func2Call := ["MenuNextDesiredFrame"]
        }
     } Else If (givenKey="^PgUp")
     {
@@ -24560,7 +24560,10 @@ PasteHDropFiles(allowFilesPaste) {
 
 rescaleFIMbmpGDIp(ByRef hFIFimgA, nw, nh) {
     If !hFIFimgA
+    {
+       addJournalEntry(A_ThisFunc "(): no valid bitmap given")
        Return
+    }
 
     rescaled := 0
     thisQuality := (userimgQuality=1) ? 3 : 0
@@ -41923,7 +41926,8 @@ PanelExtractFrames() {
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
     ml := (PrefsLargeFonts=1) ? 190 : 150
     ; Gui, Add, Checkbox, Checked%UserCropOnSave% vUserCropOnSave, C&rop image to selected area on save
-    Gui, Add, Text, x15 y15 Section, Save options:
+    Gui, Add, Text, x15 y15 Section, This tool can extract frames or pages`nfrom GIFs, TIFFs and WEBP files.
+    Gui, Add, Text, y+7,Image output options:
     ; Gui, Add, Text, xs y+0 wp h2 +0x1007, 
     Gui, Add, Text, xp+15 y+7 w%ml% hp+5 +0x200, Image quality `%:
     GuiAddEdit("x+10 w" thisWid " number -multi limit3 veditF5", userJpegQuality)
@@ -41969,9 +41973,16 @@ BtnChangeMultiPageFmt() {
    GuiControl, % actu, userCombineGIFframeDelay
    GuiControl, % actu, editF5
 
+   actu := (userCombineFramesFmt=2 && userSaveBitsDepth>2) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+   GuiControl, % actu, userCombineDepthDithering
+
    actu := (userCombineFramesFmt=2) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, txtLine1
    GuiControl, % actu, userSaveBitsDepth
+
+   actu := (userCombineFramesFmt=3) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+   GuiControl, % actu, UserCombinePDFbgrColor
+   GuiControl, % actu, combinePDFpageLandscape
 
    actu := (userCombineFramesFmt=3) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, txtLine3
@@ -41980,7 +41991,6 @@ BtnChangeMultiPageFmt() {
    GuiControl, % actu, UserCombinePDFpageSize
    GuiControl, % actu, ResizeApplyEffects
    GuiControl, % actu, combinePDFpageHighQuality
-   GuiControl, % actu, combinePDFpageLandscape
    GuiControl, % actu, editF6
    GuiControl, % actu, userJpegQuality
    GuiControl, % actu, TextInAreaAlign
@@ -42029,7 +42039,7 @@ PanelCombineImagesMultipage() {
     Gui, Add, Checkbox, xs+30 y+5 hp Checked%userCombineSubFrames% vuserCombineSubFrames, Join contained frames from selected files
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
     Gui, Add, Text, xs+15 y+10 w%ml% hp +0x200 vtxtLine1 +hwndhTemp, TIFF maximum color depth:
-    GuiAddDropDownList("x+1 w" thisWid " AltSubmit Choose" userSaveBitsDepth " vuserSaveBitsDepth", "32 bits RGBA|24 bits RGB|16 bits RGB|8 bits RGB [256 colors]", [hTemp])
+    GuiAddDropDownList("x+1 w" thisWid " AltSubmit Choose" userSaveBitsDepth " vuserSaveBitsDepth gBtnChangeMultiPageFmt", "32 bits RGBA|24 bits RGB|16 bits RGB|8 bits RGB [256 colors]", [hTemp])
     Gui, Add, Checkbox, x+5 hp Checked%userCombineDepthDithering% vuserCombineDepthDithering, Dithering
     Gui, Add, Text, xs+15 y+10 w%ml% hp +0x200 vtxtLine2, GIFs frames delay (in milisec.)
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
@@ -42044,6 +42054,8 @@ PanelCombineImagesMultipage() {
     Gui, Add, Text, xs+30 y+10 w%ml% hp +0x200 vtxtLine4, Image alignment on page:
     GuiAddDropDownList("x+1 w" thisWid " Choose" TextInAreaAlign " AltSubmit vTextInAreaAlign", "Left|Center|Right", "Text horizontal alignment")
     GuiAddDropDownList("x+5 wp Choose" TextInAreaValign " AltSubmit vTextInAreaValign", "Top|Center|Bottom", "Text vertical alignment")
+    zml := (PrefsLargeFonts=1) ? 55 : 40
+    GuiAddColor("x+5 hp w" zml, "UserCombinePDFbgrColor", "PDF background color")
     Gui, Add, Checkbox, xs+30 y+10 Checked%combinePDFpageHighQuality% vcombinePDFpageHighQuality, High resolution pages (192 dpi)
     Gui, Add, Checkbox, xs+30 y+10 gTglRszApplyEffects Checked%ResizeApplyEffects% vResizeApplyEffects, Apply viewport color adjustments and effects
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
@@ -42105,7 +42117,7 @@ BTNperformCombineIMGs() {
       combineImagesMultiTiffGDIp(file2save)
    Else If (userCombineFramesFmt=3)
       CombineImgsIntoPDF(file2save)
-   Else
+   Else ; used only for GIFs
       combineImagesMultiPage(userSaveBitsDepth, animus, file2save)
 }
 
@@ -42238,7 +42250,7 @@ CombineImgsIntoPDF(file2save) {
                }
 
                yay := !yay
-               Gdip_GraphicsClear(G, "0xffFFFFFF")
+               Gdip_GraphicsClear(G, "0xff" UserCombinePDFbgrColor)
                trGdip_GetImageDimensions(pBitmap, imgW, imgH)
                calcIMGdimensions(imgW, imgH, pageW, pageH, ResizedW, ResizedH)
                posX := posY := 0
@@ -46249,6 +46261,7 @@ ReadSettingsCombineIMGs(act:=0) {
     RegAction(act, "userCombineDepthDithering",, 1)
     RegAction(act, "userSaveBitsDepth",, 2, 1, 4)
     RegAction(act, "userCombineFramesFmt",, 2, 1, 3)
+    RegAction(act, "UserCombinePDFbgrColor",, 3)
     RegAction(act, "combinePDFpageLandscape",, 1)
     RegAction(act, "combinePDFpageHighQuality",, 1)
     RegAction(act, "ResizeApplyEffects",, 1)
@@ -50982,7 +50995,7 @@ PanelPrintImage() {
     GuiAddCheckbox("x+2 yp hp wp gupdateUIprintPreview Checked" TextInAreaFontItalic " vTextInAreaFontItalic", "Italic", "I")
     GuiAddCheckbox("x+2 yp hp wp gupdateUIprintPreview Checked" TextInAreaFontUline " vTextInAreaFontUline", "Underline", "&U")
     If (filesElected>1)
-       Gui, Add, Text, xs y+10, Use "{fname}" as a place-holder for the current file name.
+       Gui, Add, Text, xs y+10, Use "{fname}" as a place-holder for file names.
 
     Gui, Tab
     f := (filesElected>1) ? "all" : "now"
@@ -58757,7 +58770,7 @@ combineImagesMultiTiffGDIp(destFilePath) {
             ; fnOutputDebug("tiff-gdi+:" multiBitmap  " | new=" thisBitmap " | e=" _E " | p=" _p)
          }
       }
-      if fattalErr
+      If fattalErr
          Break
    }
  
@@ -94873,6 +94886,7 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
    ; {
    ;    memInfos := getMemUsage()
    ;    xBitmap := LoadWICimage(imgPath, 0, 0, useICM)
+      ; pBitmap := LoadImageViaWIC(imgPath)
    ;    If !pBitmap
    ;       pBitmap := xBitmap
    ;    else
@@ -99790,12 +99804,13 @@ testIdentifyDIBbehindGDIPbmp() {
    SoundBeep, % E1 ? 900 : 300, 500
 }
 
+
 testWicLoader() {
    ; Load and resize image
    ;    pBitmap := LoadAndResizeImageWIC("E:\Sucan twins\photos test\SLDs\freeimage-tests\test-rosar- (9a).webp", 800, 600)
-   ; ToolTip, % pBitmap "|" , , , 2
+   ToolTip, % pBitmap "|" , , , 2
    Gdip_GraphicsClear(2NDglPG)
-   Gdip_DrawImage(2NDglPG, pBitmap)
+   Gdip_DrawImage(2NDglPG, pBitmap,  200, 200)
    doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
    Gdip_DisposeImage(pBitmap)
 }
