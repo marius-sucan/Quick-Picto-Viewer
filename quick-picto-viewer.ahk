@@ -94885,8 +94885,7 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
    ; loop, 125
    ; {
    ;    memInfos := getMemUsage()
-   ;    xBitmap := LoadWICimage(imgPath, 0, 0, useICM)
-      ; pBitmap := LoadImageViaWIC(imgPath)
+      ; pBitmap := LoadWICimage(imgPath, 0, 0, useICM)
    ;    If !pBitmap
    ;       pBitmap := xBitmap
    ;    else
@@ -99804,13 +99803,22 @@ testIdentifyDIBbehindGDIPbmp() {
    SoundBeep, % E1 ? 900 : 300, 500
 }
 
-
 testWicLoader() {
+   Static indexu := 0
+   indexu++
    ; Load and resize image
+   initQPVmainDLL()
+   ; pathu := "E:\Sucan twins\e-chairs\living with eb articles\v9\about-life-perspective-disabled-person-RDEB.pdf"
+   ; pathu := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\cPlusPlus\FreeImage3180.pdf"
+   ; pathu := "E:\Sucan twins\photos test\SLDs\freeimage-tests\svgs\alarm-clock-svgrepo-com.svg"
+   pathu := "E:\Sucan twins\photos test\SLDs\freeimage-tests\svgs\writing-board-svgrepo-com.svg"
+   ; pathu := "E:\Sucan twins\photos test\SLDs\freeimage-tests\svgs\gene-sequencing-svgrepo-com.svg"
+   pBitmap := DllCall(whichMainDLL "\LoadSVGimage", "Int", 0 ,"Int", 1300, "Int", 1300, "Int", 0, "Str", pathu, "UPtr")
    ;    pBitmap := LoadAndResizeImageWIC("E:\Sucan twins\photos test\SLDs\freeimage-tests\test-rosar- (9a).webp", 800, 600)
-   ToolTip, % pBitmap "|" , , , 2
+   Gdip_GetImageDimensions(pBitmap, w, h)
+   ; ToolTip, % pBitmap "|" w "|" h, , , 2
    Gdip_GraphicsClear(2NDglPG)
-   Gdip_DrawImage(2NDglPG, pBitmap,  200, 200)
+   Gdip_DrawImage(2NDglPG, pBitmap,  50, 50)
    doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
    Gdip_DisposeImage(pBitmap)
 }

@@ -177,7 +177,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;gdiplus.lib;odbc32.lib;Windowscodecs.lib;odbccp32.lib;%(AdditionalDependencies);$(MSBuildProjectDirectory)\includes\_libs\opencv_world4100.lib</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;D3D11.lib;shlwapi.lib;d2d1.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;gdiplus.lib;odbc32.lib;Windowscodecs.lib;odbccp32.lib;%(AdditionalDependencies);$(MSBuildProjectDirectory)\includes\_libs\opencv_world4100.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>
       </AdditionalLibraryDirectories>
     </Link>
