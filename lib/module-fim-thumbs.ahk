@@ -57,34 +57,140 @@ cleanupThread() {
    wasInitFIMlib := GDIPToken := 0
 }
 
-LoadWICimage(imgPath, w, h, keepAratio, thisImgQuality, frameu, ScaleAnySize) {
-   ; Return
-   ; startZeit := A_TickCount
-   VarSetCapacity(resultsArray, 8 * 6, 0)
-   ; If (!w || !h)
-   ;    GetWinClientSize(w, h, PVhwnd, 0) 
+capIMGdimensionsFormatlimits(typu, givenSize, keepRatio, ByRef ResizedW, ByRef ResizedH) {
+    mpxLimit := thisLimit := 0
+    If (typu="given")
+    {
+       thisLimit := givenSize
+       mpxLimit := 2
+    } Else 
+    {
+       thisLimit := 199000
+       mpxLimit := 536.7
+    }
 
-   ; If !imgPath
-   ;    imgPath := getIDimage(currentFileIndex)
-   ; fnOutputDebug("wic-load " imgPath)
+    ow := ResizedW, oh := ResizedH
+    If (keepRatio=1 && thisLimit>1)
+    {
+       If (max(ResizedW, ResizedH)>thisLimit)
+       {
+          z := thisLimit/max(ResizedW, ResizedH)
+          ResizedW := Floor(ResizedW * z)
+          ResizedH := Floor(ResizedH * z)
+       }
+    } Else If (thisLimit>1)
+    {
+       ResizedW := (ResizedW>thisLimit) ? thisLimit : ResizedW
+       ResizedH := (ResizedH>thisLimit) ? thisLimit : ResizedH
+    }
+
+    mpx := Round((ResizedW * ResizedH)/1000000, 1)
+    If (mpx>mpxLimit)
+    {
+       g := 1
+       rw := rh := 0
+       Loop
+       {
+          g -= 0.001
+          rw := Floor(ResizedW * g)
+          rh := Floor(ResizedH * g)
+          mpx := Round((rw * rh)/1000000, 1)
+          If (mpx<mpxLimit)
+             Break
+       }
+       ResizedW := rw
+       ResizedH := rh
+    }
+
+    p := ((ResizedW + ResizedH)/2) / ((ow + oh)/2)
+    Return p
+}
+
+retrieveXMLattributeValue(content, attrib) {
+   foundPos := RegExMatch(content, attrib "=[""']([^""']*)[""']", string)
+   If foundPos
+      string := SubStr(string, StrLen(attrib) + 2)
+   Return Trim(string, """' ")
+}
+
+convertSVGunitsToPixels(ByRef length) {
+    w := A_ScreenWidth, h := A_ScreenHeight
+    base := Round( (w + h)/2 ) * 2
+    length := StrReplace(length, A_Space)
+    If !length
+    {
+       length := base "v"
+       Return base
+    }
+
+    isNumber := 0
+    If length Is number
+       isNumber := 1
+
+    If (InStr(length, "px") || isNumber=1 && length>0)
+       Return StrReplace(length, "px") ; pixels
+    Else If InStr(length, "pt")   ; points
+       Return Round(StrReplace(length, "pt")*1.33333)
+    Else If InStr(length, "pc")   ; picas
+       Return Round(StrReplace(length, "pc")*16)
+    Else If InStr(length, "cm")   ; centimeters
+       Return Round(StrReplace(length, "cm")*37.795275591)
+    Else If InStr(length, "mm")   ; milimeters
+       Return Round(StrReplace(length, "mm")*3.7795275591)
+    Else If InStr(length, "in")   ; inches
+       Return Round(StrReplace(length, "in")*96)
+    Else If InStr(length, "vw")   ; viewport width
+       Return w*2
+    Else If InStr(length, "vh")   ; viewport height
+       Return h*2
+    Else If InStr(length, "vmin")   ; viewport minimum
+       Return min(w, h)*2
+    Else If InStr(length, "vmax")   ; viewport maximum
+       Return max(w, h)*2
+    Else If InStr(length, "%")
+       Return Round(clampInRange(StrReplace(length, "%")/200, 0.1, 1) * max(w, h)) * 3
+    Else
+    {
+       length := base "v"
+       Return base
+    }
+}
+
+RenderSVGfile(imgPath, gw, hh) {
+   FileRead, content, % imgPath
+   If !content
+      Return
+
+   foundPos := RegExMatch(content, "\<svg.*")
+   svgRoot := SubStr(content, foundPos, InStr(content, ">", 0, foundPos + 1) - foundPos + 1)
+   width := retrieveXMLattributeValue(svgRoot, "width")
+   height := retrieveXMLattributeValue(svgRoot, "height")
+   ver := retrieveXMLattributeValue(svgRoot, "version")
+   ow := w := convertSVGunitsToPixels(width)
+   oh := h := convertSVGunitsToPixels(height)
+   capIMGdimensionsFormatlimits("given", max(gw, gh), 1, w, h)
+   fscaleX := varContains(width, "v", "%") ? 1 : Round(w/ow, 6)
+   If InStr(width, "%")
+      fscaleX := StrReplace(width, "%")>100 ? 100 / StrReplace(width, "%") : 1
+
+   fscaleY := varContains(height, "v", "%") ? 1 : Round(h/oh, 6)
+   If InStr(height, "%")
+      fscaleY := StrReplace(height, "%")>100 ? 100 / StrReplace(height, "%") : 1
+   ; ToolTip, % width "|" svgRoot "|" , , , 2
+   pBitmap := DllCall("qpvmain.dll\LoadSVGimage", "Int", 0 ,"Int", w, "Int", h, "float", fscaleX, "float", fscaleY, "Str", imgPath, "UPtr")
+   ; ToolTip, % fscaleX "|" fscaleY "|" w "|" h "|" svgRoot "|" , , , 2
+   return pBitmap
+}
+
+LoadWICimage(imgPath, w, h, keepAratio, thisImgQuality, frameu, ScaleAnySize) {
+   If RegExMatch(imgPath, "i)(.\.(svg))$")
+      Return RenderSVGfile(imgPath, w, h)
+
+   VarSetCapacity(resultsArray, 8 * 6, 0)
    fimu := (wasInitFIMlib=1 && allowFIMloader=1) ? 1 : 0
    func2exec := (A_PtrSize=8) ? "LoadWICimage" : "_LoadWICimage@48"
    r := DllCall("qpvmain.dll\" func2exec, "Int", thisThreadID, "Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", 0, "int", userPerformColorManagement, "Str", imgPath, "UPtr*", &resultsArray, "int", fimu, "UPtr")
-   ; mainLoadedIMGdetails.imgW := NumGet(resultsArray, 4 * 0, "uInt")
-   ; mainLoadedIMGdetails.imgH := NumGet(resultsArray, 4 * 1, "uInt")
-   ; mainLoadedIMGdetails.Frames := NumGet(resultsArray, 4 * 2, "uInt")
-   ; mainLoadedIMGdetails.pixFmt := NumGet(resultsArray, 4 * 3, "uInt")
-   ; mainLoadedIMGdetails.DPI := NumGet(resultsArray, 4 * 4, "uInt")
-   ; mainLoadedIMGdetails.RawFormat := NumGet(resultsArray, 4 * 5, "uInt")
-   ; mainLoadedIMGdetails.TooLargeGDI := (imgW>32500 || imgH>32500) ? 1 : 0
-   ; mainLoadedIMGdetails.HasAlpha := InStr(mainLoadedIMGdetails.pixFmt, "argb") || InStr(mainLoadedIMGdetails.pixFmt, "bgra") || InStr(mainLoadedIMGdetails.pixFmt, "alpha") ? 1 : 0
-   ; mainLoadedIMGdetails.OpenedWith := "WIC"
    resultsArray := ""
-   ; zeitu := A_TickCount - startZeit
-   ; msgbox, % r "==" zeitu " = " pixfmt "=" rawFmt
-   ; ToolTip, % WICmoduleHasInit " | " r "==" zeitu " = " mainLoadedIMGdetails.pixfmt "=" mainGdipWinThumbsGrid.RawFormat , , , 3
-   ; https://stackoverflow.com/questions/8101203/wicbitmapsource-copypixels-to-gdi-bitmap-scan0
-   ; https://github.com/Microsoft/Windows-classic-samples/blob/master/Samples/Win7Samples/multimedia/wic/wicviewergdi/WicViewerGdi.cpp#L354
    Return r
 }
 
@@ -129,6 +235,19 @@ cleanMess(thisID:=0, params:=0) {
 
 fnOutputDebug(msg) {
    OutputDebug, QPV: threadex %thisThreadID% - %msg%
+}
+
+varContains(value, vals*) {
+   yay := 0
+   for index, param in vals
+   {
+       If InStr(value, param)
+       {
+          yay := 1
+          Break
+       }
+   }
+   Return yay
 }
 
 isVarEqualTo(value, vals*) {

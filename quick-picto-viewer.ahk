@@ -111,10 +111,10 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , ResolutionWidth := "", ResolutionHeight := "", prevStartIndex := 1, mustReloadThumbsList := 0
    , gdiBitmap := "", mainSettingsFile := "quick-picto-viewer.ini", mainRecentsFile := "quick-picto-viewer-recents.ini"
    , mustOpenStartFolder := "", mainFavesFile := "quick-picto-viewer-favourites.ini", miniFavesFile := "quick-picto-viewer-minifaves.ini"
-   , RegExAllFilesPattern := "ico|dib|dng|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif|webp"
+   , RegExAllFilesPattern := "ico|dib|dng|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif|webp|svg"
    , RegExFilesPattern := "i)^(.\:\\).*(\.(" RegExAllFilesPattern "))$", folderFavesFile := "quick-picto-viewer-folder-faves.ini"
    , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
-   , RegExWICfmtPtrn := "i)(.\\*\.(place-holder|webp|bmp|dib|rle|tiff|tif|png|jfif|wdp|jxr|jpg|jpeg))$", customKbdFile := "quick-picto-viewer-custom-kbd.ini"
+   , RegExWICfmtPtrn := "i)(.\\*\.(place-holder|webp|bmp|dib|rle|tiff|tif|png|jfif|wdp|jxr|jpg|jpeg|svg))$", customKbdFile := "quick-picto-viewer-custom-kbd.ini"
    , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|ico|jng|jif|jpg|jpe|jpeg|ppm|xpm))$"
    , saveTypesFriendly := ".BMP, .GIF, .HDP, .J2K, .JNG, .JP2, .JPG, .JXR, .PNG, .PPM, .TGA, .TIF, .WDP, .WEBP, .ICO or .XPM"
    , saveAlphaTypesRegEX := "i)(.\.(j2k|j2c|jp2|jxr|wdp|hdp|ico|png|tga|tif|tiff|webp))$", userJpegQuality := 90
@@ -94880,12 +94880,113 @@ AcquireWIAimage() {
     }
 }
 
+retrieveXMLattributeValue(content, attrib) {
+   foundPos := RegExMatch(content, attrib "=[""']([^""']*)[""']", string)
+   If foundPos
+      string := SubStr(string, StrLen(attrib) + 2)
+   Return Trim(string, """' ")
+}
+
+convertSVGunitsToPixels(ByRef length) {
+    vpWinClientSize(w, h)
+    base := Round( (w + h)/2 ) * 2
+    length := StrReplace(length, A_Space)
+    If !length
+    {
+       length := base "v"
+       Return base
+    }
+
+    If (InStr(length, "px") || isNumber(length) && length>0)
+       Return StrReplace(length, "px") ; pixels
+    Else If InStr(length, "pt")   ; points
+       Return Round(StrReplace(length, "pt")*1.33333)
+    Else If InStr(length, "pc")   ; picas
+       Return Round(StrReplace(length, "pc")*16)
+    Else If InStr(length, "cm")   ; centimeters
+       Return Round(StrReplace(length, "cm")*37.795275591)
+    Else If InStr(length, "mm")   ; milimeters
+       Return Round(StrReplace(length, "mm")*3.7795275591)
+    Else If InStr(length, "in")   ; inches
+       Return Round(StrReplace(length, "in")*96)
+    Else If InStr(length, "vw")   ; viewport width
+       Return w*2
+    Else If InStr(length, "vh")   ; viewport height
+       Return h*2
+    Else If InStr(length, "vmin")   ; viewport minimum
+       Return min(w, h)*2
+    Else If InStr(length, "vmax")   ; viewport maximum
+       Return max(w, h)*2
+    Else If InStr(length, "%")
+       Return Round(clampInRange(StrReplace(length, "%")/200, 0.1, 1) * max(w, h)) * 3
+    Else
+    {
+       length := base "v"
+       Return base
+    }
+}
+
+RenderSVGfile(imgPath, noBPPconv, screenMode, sizesDesired:=0) {
+   FileRead, content, % imgPath
+   If !content
+      Return
+
+   foundPos := RegExMatch(content, "\<svg.*")
+   svgRoot := SubStr(content, foundPos, InStr(content, ">", 0, foundPos + 1) - foundPos + 1)
+   width := retrieveXMLattributeValue(svgRoot, "width")
+   height := retrieveXMLattributeValue(svgRoot, "height")
+   ver := retrieveXMLattributeValue(svgRoot, "version")
+   ow := w := convertSVGunitsToPixels(width)
+   oh := h := convertSVGunitsToPixels(height)
+   if (screenMode=-1 && zoomLevel>1)
+   {
+      w := Round(w * zoomLevel)
+      h := Round(h * zoomLevel)
+   }
+   capIMGdimensionsGDIPlimits(w, h)
+   fscaleX := varContains(width, "v", "%") ? 1 : Round(w/ow, 6)
+   If InStr(width, "%")
+      fscaleX := StrReplace(width, "%")>100 ? 100 / StrReplace(width, "%") : 1
+
+   fscaleY := varContains(height, "v", "%") ? 1 : Round(h/oh, 6)
+   If InStr(height, "%")
+      fscaleY := StrReplace(height, "%")>100 ? 100 / StrReplace(height, "%") : 1
+   ; ToolTip, % width "|" svgRoot "|" , , , 2
+   ; w := h := 1500
+   mainLoadedIMGdetails := []
+   mainLoadedIMGdetails.PixelFormat := "32-PARGB"
+   mainLoadedIMGdetails.Width := w
+   mainLoadedIMGdetails.Height := h
+   mainLoadedIMGdetails.ImgFile := imgPath
+   mainLoadedIMGdetails.imgHandle := 0
+   mainLoadedIMGdetails.Frames := 0
+   mainLoadedIMGdetails.ActiveFrame := 0
+   mainLoadedIMGdetails.DPI := 96
+   mainLoadedIMGdetails.RawFormat := !ver ? "SVG" : "SVG v" ver
+   mainLoadedIMGdetails.TooLargeGDI := 0
+   mainLoadedIMGdetails.HasAlpha := 1
+   mainLoadedIMGdetails.OpenedWith := "Windows Imaging Component [WIC]"
+   mainLoadedIMGdetails.LoadedWith := "WIC"
+   If (noBPPconv=1)
+      Return
+
+   pBitmap := DllCall(whichMainDLL "\LoadSVGimage", "Int", 0 ,"Int", w, "Int", h, "float", fscaleX, "float", fscaleY, "Str", imgPath, "UPtr")
+   If StrLen(pBitmap)>2
+   {
+      recordGdipBitmaps(pBitmap, A_ThisFunc)
+      Gdip_BitmapSetResolution(pBitmap, 96, 96)
+   }
+
+   ; ToolTip, % fscaleX "|" fscaleY "|" w "|" h "|" svgRoot "|" , , , 2
+   return pBitmap
+}
+
 LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
    ; pBitmap := ""
    ; loop, 125
    ; {
    ;    memInfos := getMemUsage()
-      ; pBitmap := LoadWICimage(imgPath, 0, 0, useICM)
+   ;    pBitmap := LoadWICimage(imgPath, 0, 0, useICM)
    ;    If !pBitmap
    ;       pBitmap := xBitmap
    ;    else
@@ -94893,6 +94994,9 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
    ;    fnOutputDebug(A_Index "# memory usage: " memInfos.appMem); testing for memory leaks
    ; }
    ; Return pBitmap
+
+   If RegExMatch(imgPath, "i)(.\.svg)$")
+      Return LoadWICimage(imgPath, noBPPconv, -1, useICM)
 
    tt := startZeit := A_TickCount
    VarSetCapacity(resultsArray, 8 * 6, 0)
@@ -94911,7 +95015,7 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
       mainLoadedIMGdetails.Width := Width
       mainLoadedIMGdetails.Height := Height
       mainLoadedIMGdetails.ImgFile := imgPath
-      mainLoadedIMGdetails.imgHandle := OutputVar
+      mainLoadedIMGdetails.imgHandle := 0
       mainLoadedIMGdetails.Frames := NumGet(resultsArray, 4 * 2, "uInt") - 1
       mainLoadedIMGdetails.ActiveFrame := NumGet(resultsArray, 4 * 6, "uInt")
       mainLoadedIMGdetails.DPI := NumGet(resultsArray, 4 * 4, "uInt")
@@ -95046,6 +95150,9 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM) {
 }
 
 LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitmap:=0) {
+   If RegExMatch(imgPath, "i)(.\.svg)$")
+      Return RenderSVGfile(imgPath, noBPPconv, frameu, sizesDesired)
+
    startZeit := A_TickCount
    If IsObject(sizesDesired[1])
    {
@@ -99804,7 +99911,7 @@ testIdentifyDIBbehindGDIPbmp() {
 }
 
 testWicLoader() {
-   Static indexu := 0
+   Static indexu := 0, pBitmap
    indexu++
    ; Load and resize image
    initQPVmainDLL()
@@ -99813,14 +99920,15 @@ testWicLoader() {
    ; pathu := "E:\Sucan twins\photos test\SLDs\freeimage-tests\svgs\alarm-clock-svgrepo-com.svg"
    pathu := "E:\Sucan twins\photos test\SLDs\freeimage-tests\svgs\writing-board-svgrepo-com.svg"
    ; pathu := "E:\Sucan twins\photos test\SLDs\freeimage-tests\svgs\gene-sequencing-svgrepo-com.svg"
-   pBitmap := DllCall(whichMainDLL "\LoadSVGimage", "Int", 0 ,"Int", 1300, "Int", 1300, "Int", 0, "Str", pathu, "UPtr")
-   ;    pBitmap := LoadAndResizeImageWIC("E:\Sucan twins\photos test\SLDs\freeimage-tests\test-rosar- (9a).webp", 800, 600)
+   ; pBitmap := LoadAndResizeImageWIC("E:\Sucan twins\photos test\SLDs\freeimage-tests\test-rosar- (9a).webp", 800, 600)
+   if !pBitmap
+      pBitmap := RenderSVGfile(pathu, 0, 0)
    Gdip_GetImageDimensions(pBitmap, w, h)
    ; ToolTip, % pBitmap "|" w "|" h, , , 2
    Gdip_GraphicsClear(2NDglPG)
    Gdip_DrawImage(2NDglPG, pBitmap,  50, 50)
    doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
-   Gdip_DisposeImage(pBitmap)
+   ; Gdip_DisposeImage(pBitmap)
 }
 
 dummyAutoScroller() {

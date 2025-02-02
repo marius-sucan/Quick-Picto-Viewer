@@ -106,11 +106,14 @@ static int linear_to_gammaInt16[65536];
 static int gamma_to_linearInt16[65536];
 
 IWICImagingFactory *m_pIWICFactory;
+ID2D1Factory       *pD2D1Factory;
 
 DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
     // to-do to do - fix this; make it work on Windows 7 
     debugInfos = modus;
     HRESULT hr = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_pIWICFactory));
+    // Create D2D Factory
+    hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, &pD2D1Factory);
 
     // source https://www.teamten.com/lawrence/graphics/gamma/
     static const float GAMMA = 2.0;
@@ -6282,7 +6285,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
     return myBitmap;
 }
 
-Gdiplus::GpBitmap* WICBitmapToGdipBitmap(IWICBitmap* &thisWICbitmap, int doFlipHV) {
+Gdiplus::GpBitmap* WICBitmapToGdipBitmap(IWICBitmap* &thisWICbitmap) {
     Gdiplus::GpBitmap *myBitmap = NULL;
     if (!thisWICbitmap)
     {
@@ -6323,11 +6326,10 @@ Gdiplus::GpBitmap* WICBitmapToGdipBitmap(IWICBitmap* &thisWICbitmap, int doFlipH
     return myBitmap;
 }
 
-IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height) {
+IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height, float fSx, float fSy) {
     // Create file stream and SVG document
     IStream*           pStream       = NULL;
     IWICBitmap*        pWICBitmap    = NULL;
-    ID2D1Factory*      pD2D1Factory  = NULL;
     ID2D1RenderTarget* pRenderTarget = NULL;
     ID2D1SvgDocument*  pSvgDocument  = NULL;
     HRESULT hr = SHCreateStreamOnFile(szFileName, STGM_READ | STGM_SHARE_DENY_WRITE, &pStream);
@@ -6344,15 +6346,6 @@ IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height) 
         return NULL;
     }
 
-    // Create D2D Factory
-    hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &pD2D1Factory);
-    if (!(SUCCEEDED(hr))) {
-        fnOutputDebug("WicD2DrenderSVG: failed D2D1CreateFactory()");
-        pStream->Release();
-        pWICBitmap->Release();
-        return NULL;
-    }
-
     // Create render target properties
     D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties( D2D1_RENDER_TARGET_TYPE_DEFAULT,
                                           D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED) );
@@ -6362,7 +6355,6 @@ IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height) 
     if (!(SUCCEEDED(hr))) {
         fnOutputDebug("WicD2DrenderSVG: failed CreateWicBitmapRenderTarget()");
         pStream->Release();
-        pD2D1Factory->Release();
         pWICBitmap->Release();
         return NULL;
     }
@@ -6385,9 +6377,11 @@ IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height) 
 
             // Render SVG
             pRenderTarget->BeginDraw();
-
-            // D2D1_MATRIX_3X2_F matrix = D2D1::Matrix3x2F::Scale((float)width / owidth, (float)height / oheight);
-            // pRenderTarget->SetTransform(&matrix);
+            if (fSx!=1 || fSy!=1)
+            {
+               D2D1_MATRIX_3X2_F matrix = D2D1::Matrix3x2F::Scale(fSx, fSy);
+               pRenderTarget->SetTransform(&matrix);
+            }
             // pRenderTarget->Clear(purple);
             // pRenderTarget->DrawLine({10, 10}, {310, 246}, D2D1Brush, 10);
             pDeviceContext->DrawSvgDocument(pSvgDocument);
@@ -6403,21 +6397,20 @@ IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height) 
 
     SafeRelease(pSvgDocument, "WicD2DrenderSVG: pSvgDocument", 0);
     SafeRelease(pRenderTarget, "WicD2DrenderSVG: pRenderTarget", 0);
-    SafeRelease(pD2D1Factory, "WicD2DrenderSVG: pD2D1Factory", 0);
     SafeRelease(pStream, "WicD2DrenderSVG: pStream", 0);
     return pWICBitmap; // Caller is responsible for releasing this
 }
 
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadSVGimage(int threadIDu, UINT givenW, UINT givenH, int doFlipHV, const wchar_t *szFileName) {
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadSVGimage(int threadIDu, UINT givenW, UINT givenH, float fSx, float fSy, const wchar_t *szFileName) {
     Gdiplus::GpBitmap* myBitmap = NULL;
     IWICBitmap* thisWICbitmap = NULL;
     HRESULT hr = E_FAIL;
     if (givenW<2 || givenH<2)
        return myBitmap;
 
-    thisWICbitmap = WicD2DrenderSVG(szFileName, givenW, givenH);
+    thisWICbitmap = WicD2DrenderSVG(szFileName, givenW, givenH, fSx, fSy);
     if (thisWICbitmap!=NULL)
-       myBitmap = WICBitmapToGdipBitmap(thisWICbitmap, doFlipHV);
+       myBitmap = WICBitmapToGdipBitmap(thisWICbitmap);
 
     SafeRelease(thisWICbitmap, "LoadSVGimage: thisWICbitmap", 0);
     return myBitmap;
