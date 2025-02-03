@@ -112,7 +112,6 @@ DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
     // to-do to do - fix this; make it work on Windows 7 
     debugInfos = modus;
     HRESULT hr = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_pIWICFactory));
-    // Create D2D Factory
     hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, &pD2D1Factory);
 
     // source https://www.teamten.com/lawrence/graphics/gamma/
@@ -6348,7 +6347,7 @@ IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height, 
 
     // Create render target properties
     D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties( D2D1_RENDER_TARGET_TYPE_DEFAULT,
-                                          D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED) );
+                                          D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED), 96.0f, 96.0f );
 
     // Create WIC Bitmap render target
     hr = pD2D1Factory->CreateWicBitmapRenderTarget(pWICBitmap, props, &pRenderTarget);

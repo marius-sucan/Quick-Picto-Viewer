@@ -107,7 +107,7 @@ capIMGdimensionsFormatlimits(typu, givenSize, keepRatio, ByRef ResizedW, ByRef R
 }
 
 retrieveXMLattributeValue(content, attrib) {
-   foundPos := RegExMatch(content, attrib "=[""']([^""']*)[""']", string)
+   foundPos := RegExMatch(content, "i)" attrib "=[""']([^""']*)[""']", string)
    If foundPos
       string := SubStr(string, StrLen(attrib) + 2)
    Return Trim(string, """' ")
@@ -157,11 +157,12 @@ convertSVGunitsToPixels(ByRef length) {
 }
 
 RenderSVGfile(imgPath, gw, hh) {
+   startZeit := A_TickCount
    FileRead, content, % imgPath
    If !content
       Return
 
-   foundPos := RegExMatch(content, "\<svg.*")
+   foundPos := RegExMatch(content, "i)\<svg.*")
    svgRoot := SubStr(content, foundPos, InStr(content, ">", 0, foundPos + 1) - foundPos + 1)
    width := retrieveXMLattributeValue(svgRoot, "width")
    height := retrieveXMLattributeValue(svgRoot, "height")
@@ -179,6 +180,7 @@ RenderSVGfile(imgPath, gw, hh) {
    ; ToolTip, % width "|" svgRoot "|" , , , 2
    pBitmap := DllCall("qpvmain.dll\LoadSVGimage", "Int", 0 ,"Int", w, "Int", h, "float", fscaleX, "float", fscaleY, "Str", imgPath, "UPtr")
    ; ToolTip, % fscaleX "|" fscaleY "|" w "|" h "|" svgRoot "|" , , , 2
+   ; fnOutputDebug("RenderSVGfile: " A_TickCount - startZeit)
    return pBitmap
 }
 
@@ -234,7 +236,7 @@ cleanMess(thisID:=0, params:=0) {
 }
 
 fnOutputDebug(msg) {
-   OutputDebug, QPV: threadex %thisThreadID% - %msg%
+   OutputDebug, QPV: Thread #%thisThreadID%: %msg%
 }
 
 varContains(value, vals*) {

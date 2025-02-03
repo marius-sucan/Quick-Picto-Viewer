@@ -380,7 +380,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , DrawLineAreaPolarMode := 1, IDedgesModus := 1, IDedgesPreEmphasis := 0, IDedgesPreContrast := 0
    , UIuserToneMapParamC := 180, cmrRAWtoneMapParamC := 1, UIuserToneMapParamD := 60, cmrRAWtoneMapParamD := 0
    , UIuserToneMapOCVparamA := 80, cmrRAWtoneMapOCVparamA := 1, UIuserToneMapOCVparamB := 72, cmrRAWtoneMapOCVparamB := 0
-   , userPerformColorManagement := 1, UserCombinePDFbgrColor := "ffFFff"
+   , userPerformColorManagement := 1, UserCombinePDFbgrColor := "ffFFff", UserVPalphaBgrStyle := 1
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -11288,6 +11288,8 @@ dummyDisplayZoomImgInfo() {
       updatePanelColorsInfo()
       updatePanelColorSliderz()
    }
+   If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.svg)$") && zoomLevel>2)
+      friendly := "`nTo render the vector image at a higher resolution,`nrefresh (F5) the image at desired zoom level."
 
    showTOOLtip("Zoom level: " defineZoomLevel() "%" friendly, 0, 0, zoomLevel/20)
    SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -37055,6 +37057,7 @@ readMainSettingsApp(act) {
     IniAction(act, "MustLoadSLDprefs", "General", 1)
     IniAction(act, "mustRecordSeenImgs", "General", 1)
     IniAction(act, "additionalLVrows", "General", 2, 0, 15)
+    IniAction(act, "UserVPalphaBgrStyle", "General", 2, 1, 5)
     IniAction(act, "OnSortdoFilesCheck", "General", 1)
     IniAction(act, "OSDbgrColor", "General", 3)
     IniAction(act, "OSDfontSize", "General", 2, 10, 350)
@@ -47209,7 +47212,7 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
         If (isWinOpen=55)
            PenuDrawLive := Gdip_CloneBrush(pBrushF)
         Else
-           PenuDrawLive := (isWinOpen=25) ? Gdip_CloneBrush(useHatchedBrush()) : Gdip_BrushCreateSolid(thisColorA)
+           PenuDrawLive := (isWinOpen=25) ? Gdip_CloneBrush(pBrushHatchLow) : Gdip_BrushCreateSolid(thisColorA)
         drawingVectorLiveMode := 2
      } Else If (modus="selection")
      {
@@ -63339,6 +63342,75 @@ createMenuImgVProtation() {
    }
 }
 
+defineTransBgrColor() {
+   Static l := {1:"CHECKERS", 2:"GRAY", 3:"WHITE", 4:"BLACK", 5:"WINDOW BACKGROUND COLOR"}
+   Return l[UserVPalphaBgrStyle]
+}
+
+MenuAlphaBgrCheckers() {
+   UserVPalphaBgrStyle := 1
+   showTOOLtip("Image transparency background:`n" defineTransBgrColor())
+   INIaction(1, "UserVPalphaBgrStyle", "General")
+   refreshWinBGRbrush()
+   dummyTimerDelayiedImageDisplay(50)
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+MenuAlphaBgrWinClr() {
+   UserVPalphaBgrStyle := 5
+   showTOOLtip("Image transparency background:`n" defineTransBgrColor())
+   INIaction(1, "UserVPalphaBgrStyle", "General")
+   refreshWinBGRbrush()
+   dummyTimerDelayiedImageDisplay(50)
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+MenuAlphaBgrWHITE() {
+   UserVPalphaBgrStyle := 3
+   showTOOLtip("Image transparency background:`n" defineTransBgrColor())
+   INIaction(1, "UserVPalphaBgrStyle", "General")
+   refreshWinBGRbrush()
+   dummyTimerDelayiedImageDisplay(50)
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+MenuAlphaBgrGRAY() {
+   UserVPalphaBgrStyle := 2
+   showTOOLtip("Image transparency background:`n" defineTransBgrColor())
+   INIaction(1, "UserVPalphaBgrStyle", "General")
+   refreshWinBGRbrush()
+   dummyTimerDelayiedImageDisplay(50)
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+MenuAlphaBgrBLACK() {
+   UserVPalphaBgrStyle := 4
+   showTOOLtip("Image transparency background:`n" defineTransBgrColor())
+   INIaction(1, "UserVPalphaBgrStyle", "General")
+   refreshWinBGRbrush()
+   dummyTimerDelayiedImageDisplay(50)
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+createMenuWinAlphaBGRstyles() {
+   Try Menu, PVimgAlphaBGR, Delete
+   kMenu("PVimgAlphaBGR", "Add/UnCheck", "Checkers", "MenuAlphaBgrCheckers")
+   If (UserVPalphaBgrStyle=1)
+      kMenu("PVimgAlphaBGR", "Check", "Checkers")
+   kMenu("PVimgAlphaBGR", "Add/UnCheck", "Gray", "MenuAlphaBgrGRAY")
+   If (UserVPalphaBgrStyle=2)
+      kMenu("PVimgAlphaBGR", "Check", "Gray")
+   kMenu("PVimgAlphaBGR", "Add/UnCheck", "White", "MenuAlphaBgrWHITE")
+   If (UserVPalphaBgrStyle=3)
+      kMenu("PVimgAlphaBGR", "Check", "White")
+   kMenu("PVimgAlphaBGR", "Add/UnCheck", "Black", "MenuAlphaBgrBLACK")
+   If (UserVPalphaBgrStyle=4)
+      kMenu("PVimgAlphaBGR", "Check", "Black")
+   kMenu("PVimgAlphaBGR", "Add/UnCheck", "Window background color", "MenuAlphaBgrWinClr")
+   If (UserVPalphaBgrStyle=5)
+      kMenu("PVimgAlphaBGR", "Check", "Window background color")
+}
+
 createMenuNavBox() {
    infoThumbsList := defineListViewModes()
    infoThumbsMode := (thumbsDisplaying=1) ? "Switch to image view" : "Switch to " infoThumbsList " list view"
@@ -63701,6 +63773,12 @@ createMenuMainView() {
       {
          createMenuImgColorsFX()
          kMenu("PVview", "Add", "Colors F&X and display modes", ":PVimgColorsFX")
+      }
+
+      If (currIMGdetails.HasAlpha=1)
+      {
+         createMenuWinAlphaBGRstyles()
+         kMenu("PVview", "Add", "Image transparency background", ":PVimgAlphaBGR")
       }
 
       Menu, PVview, Add
@@ -68812,15 +68890,10 @@ InitGDIpStuff() {
    ; Loop, 6
       ; r := Gdip_SetPenAlignment(pPen%A_Index%, 1)
    ; ToolTip, % "0x" rgb2bgr(WindowBgrColor) "`n" WindowBgrColor , , , 2
-   ; GDIbrushHatch := GDIcreateCheckersBrush(20, 0)
-   ; GDIPbrushHatch := GDIcreateCheckersBrush(10, 1)
    Gdi_SetBgrColor(glHDC, "0x" rgb2bgr(WindowBgrColor))
    pBrushHatchLow := Gdip_BrushCreateHatch("0xffeeEEee", "0xff111111", 50)
-   GDIPbrushHatch := Gdip_BrushCreateHatch("0xffeeEEee", "0xff111111", 50)
    GDIbrushHatch := convertGDIPbrushGDI(pBrushHatchLow, 8)
-   pBrushWinBGR := Gdip_BrushCreateSolid("0xFF" WindowBgrColor)
-   GDIbrushWinBGR := Gdi_CreateSolidBrush("0x" rgb2bgr(WindowBgrColor))
-   OSDwinFadedBrushBGR := Gdip_BrushCreateSolid("0xEE" OSDbgrColor)
+   refreshWinBGRbrush()
 }
 
 convertGDIPbrushGDI(pBrush, size) {
@@ -68891,6 +68964,8 @@ refreshWinBGRbrush() {
       Gdip_DeleteBrush(pBrushWinBGR)
    If OSDwinFadedBrushBGR
       Gdip_DeleteBrush(OSDwinFadedBrushBGR)
+   If GDIPbrushHatch
+      Gdip_DeleteBrush(GDIPbrushHatch)
    If GDIbrushWinBGR
       Gdi_DeleteObject(GDIbrushWinBGR)
    Sleep, 0
@@ -68899,15 +68974,16 @@ refreshWinBGRbrush() {
    pBrushWinBGR := Gdip_BrushCreateSolid("0xFF" WindowBgrColor)
    GDIbrushWinBGR := Gdi_CreateSolidBrush("0x" rgb2bgr(WindowBgrColor))
    OSDwinFadedBrushBGR := Gdip_BrushCreateSolid("0xEE" OSDbgrColor)
-}
-
-useHatchedBrush(dummy:=0) {
-   If (dummy="vp" && imgFxMode=8 && currIMGdetails.HasAlpha!=1)
-      Return
-   Else If (coreDesiredPixFmt="0x21808" || dummy="vp" && imgFxMode=8 && currIMGdetails.HasAlpha=1)
-      Return pBrushZ
-   Else 
-      Return pBrushHatchLow
+   If (UserVPalphaBgrStyle=2)
+      GDIPbrushHatch := Gdip_BrushCreateSolid("0xff808080")
+   Else If (UserVPalphaBgrStyle=3)
+      GDIPbrushHatch := Gdip_BrushCreateSolid("0xFFffffff")
+   Else If (UserVPalphaBgrStyle=4)
+      GDIPbrushHatch := Gdip_BrushCreateSolid("0xFF000000")
+   Else If (UserVPalphaBgrStyle=5)
+      GDIPbrushHatch := Gdip_BrushCreateSolid("0xFF" WindowBgrColor)
+   Else
+      GDIPbrushHatch := Gdip_BrushCreateHatch("0xffeeEEee", "0xff111111", 50)
 }
 
 useGdiHatchedBrush(dummy:=0) {
@@ -68915,7 +68991,15 @@ useGdiHatchedBrush(dummy:=0) {
       Return Gdi_GetStockObject(0)
    Else If (coreDesiredPixFmt="0x21808" || dummy="vp" && imgFxMode=8 && currIMGdetails.HasAlpha=1)
       Return Gdi_GetStockObject(4)
-   Else 
+   Else If (UserVPalphaBgrStyle=2)
+      Return Gdi_GetStockObject(2)
+   Else If (UserVPalphaBgrStyle=3)
+      Return Gdi_GetStockObject(0)
+   Else If (UserVPalphaBgrStyle=4)
+      Return Gdi_GetStockObject(4)
+   Else If (UserVPalphaBgrStyle=5)
+      Return GDIbrushWinBGR
+   Else ; If (UserVPalphaBgrStyle<2)
       Return GDIbrushHatch
 }
 
@@ -77400,7 +77484,7 @@ drawVPpartialIMGsection(brickVPx, brickVPy, brickVPw, brickVPh, DestPosX, DestPo
 
 QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceIMGload, hasFullReloaded, gdiBMPchanged) {
     Critical, on
-    Static IDviewPortCache, PREVtestIDvPcache, prevImgAlphaChn, prevVPcacheIMGid, lastZeitLowQuality, prevDelayu
+    Static prevImgAlphaChn, prevVPcacheIMGid, lastZeitLowQuality, prevDelayu
          , prevVPcachePos, prevVPcacheZoom :=[], prevVPcacheHadpartialFX, prevVPcacheIDfx, prevNewW, prevNewH
 
     prevLoadedImageIndex := currentFileIndex
@@ -77496,7 +77580,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     diffIMGdecX := diffIMGdecY := 0
     If (r := retrieveQPVscreenImgSection(DestPosX, DestPosY, mainWidth, mainHeight, newW, newH))
     {
-       IDviewPortCache := PREVtestIDvPcache := prevVPcacheIMGid := ""
+       prevVPcacheIMGid := ""
        prevVPcacheHadpartialFX := prevVPcacheIDfx := prevNewW := prevNewH := ""
        prevVPcachePos := "", prevVPcacheZoom := []
        Return r
@@ -77531,7 +77615,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
 
     thisUSRimgQuality := userimgQuality
     allowForceIMGload := (thisVPpanningNow=1) ? ForceIMGload : 0
-    thisVPcacheIMGid := "a" gdiBitmap currentFileIndex imgPath allowForceIMGload whichBitmap desiredFrameIndex currentUndoLevel UserMemBMP undoLevelsRecorded
+    thisVPcacheIMGid := "a" gdiBitmap currentFileIndex imgPath allowForceIMGload whichBitmap desiredFrameIndex currentUndoLevel UserMemBMP undoLevelsRecorded UserVPalphaBgrStyle
     thisVPcachePos := "a" newW newH zoomLevel allowForceIMGload DestPosX DestPosY thisVPcacheIMGid
     prevVPcacheIDfx := (AnyWindowOpen=74) ? "-" : decideGDIPimageFX(matrix, imageAttribs, pEffect)
     forceNoFXcaching := (thisVPcachePos=prevVPcachePos && prevVPcacheHadpartialFX=2 && thisVPpanningNow=0) ? 1 : 0
@@ -77577,6 +77661,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
           }
        } Else If (desiredFrameIndex=0 || gdiBMPchanged=1)
           Gdip_GraphicsClear(glPG, "0xFF" WindowBgrColor)
+
        Gdip_ResetClip(glPG)
 
        ; errMargin := Ceil(zoomLevel*70) + 2
@@ -77782,7 +77867,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
 
     ; ToolTip, % "l=" r2 "=" kBitmap "=" ViewPortBMPcache "=" gdipLastError "=" glHbitmap , , , 2
     confirmTexBGR := isVarEqualTo(vpIMGrotation, 0, 90, 180, 270) && (usrTextureBGR=1 && gdiAmbientalTexBrush && (IMGentirelylargerThanVP!=1 || allowFreeIMGpanning=1 && IMGresizingMode=4)) ? 1 : 0
-    If (FlipImgV=1 || FlipImgH=1 || pEffect || imageAttribs || wasVPcached=1)
+    If (FlipImgV=1 || FlipImgH=1 || pEffect || imageAttribs || wasVPcached=1 || isVarEqualTo(UserVPalphaBgrStyle, 2, 4, 5) && currIMGdetails.HasAlpha=1)
     {
        ; redraw viewport with the activated FX
        If (prevVPcacheHadpartialFX=2 || isAlphaMaskMode=1)
@@ -94881,7 +94966,7 @@ AcquireWIAimage() {
 }
 
 retrieveXMLattributeValue(content, attrib) {
-   foundPos := RegExMatch(content, attrib "=[""']([^""']*)[""']", string)
+   foundPos := RegExMatch(content, "i)" attrib "=[""']([^""']*)[""']", string)
    If foundPos
       string := SubStr(string, StrLen(attrib) + 2)
    Return Trim(string, """' ")
@@ -94927,22 +95012,36 @@ convertSVGunitsToPixels(ByRef length) {
 }
 
 RenderSVGfile(imgPath, noBPPconv, screenMode, sizesDesired:=0) {
+   ; to-do, todo: add user option to scale the svg content 
    FileRead, content, % imgPath
    If !content
       Return
 
-   foundPos := RegExMatch(content, "\<svg.*")
+   foundPos := RegExMatch(content, "i)\<svg.*")
    svgRoot := SubStr(content, foundPos, InStr(content, ">", 0, foundPos + 1) - foundPos + 1)
    width := retrieveXMLattributeValue(svgRoot, "width")
    height := retrieveXMLattributeValue(svgRoot, "height")
    ver := retrieveXMLattributeValue(svgRoot, "version")
+   vb := retrieveXMLattributeValue(svgRoot, "viewbox")
+   vb := StrReplace(vb, ",,", "|")
+   vb := RegExReplace(vb, "\, *\,", "|")
+   vbz := StrSplit(StrReplace(vb, ",", A_Space), A_Space, A_Space)
+   vbi := 0
+   Loop, % vbz.Count()
+   {
+       If isNumber(vbz[A_Index])
+          vbi++
+   }
+   ; ToolTip, % "|" vb "|" vbz.Count() "|" vbi , , , 2
+   vb := (vbi!=4) ? "Malformed " : ""
    ow := w := convertSVGunitsToPixels(width)
    oh := h := convertSVGunitsToPixels(height)
-   if (screenMode=-1 && zoomLevel>1)
+   If (screenMode=-1 && zoomLevel>1)
    {
       w := Round(w * zoomLevel)
       h := Round(h * zoomLevel)
    }
+
    capIMGdimensionsGDIPlimits(w, h)
    fscaleX := varContains(width, "v", "%") ? 1 : Round(w/ow, 6)
    If InStr(width, "%")
@@ -94962,7 +95061,7 @@ RenderSVGfile(imgPath, noBPPconv, screenMode, sizesDesired:=0) {
    mainLoadedIMGdetails.Frames := 0
    mainLoadedIMGdetails.ActiveFrame := 0
    mainLoadedIMGdetails.DPI := 96
-   mainLoadedIMGdetails.RawFormat := !ver ? "SVG" : "SVG v" ver
+   mainLoadedIMGdetails.RawFormat := !ver ? vb "SVG" : vb "SVG v" ver
    mainLoadedIMGdetails.TooLargeGDI := 0
    mainLoadedIMGdetails.HasAlpha := 1
    mainLoadedIMGdetails.OpenedWith := "Windows Imaging Component [WIC]"
