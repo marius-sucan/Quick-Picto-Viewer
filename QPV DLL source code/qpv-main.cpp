@@ -21,10 +21,18 @@
 #include <cstdio>
 #include <numeric>
 #include <algorithm>
+#include <winrt/Windows.Data.Pdf.h>
+#include <winrt/Windows.Storage.h>
+#include <winrt/Windows.Storage.Streams.h>
+#include <winrt/base.h>
+#include <roapi.h>
+#include <shcore.h>
 #include <d2d1.h>
 #include <d2d1_3.h>
 #include <wincodec.h>
 #include <shlwapi.h>
+#include <combaseapi.h>
+#include <iostream>
 #include "Tchar.h"
 #include "Tpcshrd.h"
 #define GDIPVER 0x110
@@ -5568,17 +5576,18 @@ int applyColorManagement(IWICBitmapSource* &thisWICbitmap, IWICBitmapFrameDecode
       return okay;
 }
 
-Gdiplus::GpBitmap* WICbmpSourceConvertGdip(IWICBitmapSource* &thisWICbitmap, UINT &width, UINT &height, UINT cbStride, UINT cbBufferSize) {
+Gdiplus::GpBitmap* WICbmpSourceConvertGdip(IWICBitmapSource* &thisWICbitmap, UINT &width, UINT &height, UINT cbStride, UINT cbBufferSize, Gdiplus::PixelFormat destinationFormat) {
      Gdiplus::GpBitmap *myBitmap = NULL;
-     Gdiplus::DllExports::GdipCreateBitmapFromScan0(width, height, cbStride, PixelFormat32bppPARGB, NULL, &myBitmap);
+     Gdiplus::DllExports::GdipCreateBitmapFromScan0(width, height, cbStride, destinationFormat, NULL, &myBitmap);
      if (myBitmap!=NULL)
      {
-         Gdiplus::BitmapData bitmapData;
+         Gdiplus::BitmapData bitmapDatu;
          Gdiplus::Rect rect(0, 0, width, height);
-         Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rect, Gdiplus::ImageLockModeWrite, PixelFormat32bppPARGB, &bitmapData);
+         Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rect, Gdiplus::ImageLockModeWrite, destinationFormat, &bitmapDatu);
  
-         HRESULT hr = thisWICbitmap->CopyPixels(NULL, cbStride, cbBufferSize, (BYTE*)bitmapData.Scan0);
-         Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapData);
+         // HRESULT hr = thisWICbitmap->CopyPixels(NULL, cbStride, cbBufferSize, (BYTE*)bitmapDatu.Scan0);
+         HRESULT hr = thisWICbitmap->CopyPixels(NULL, bitmapDatu.Stride, bitmapDatu.Stride * height, (BYTE*)bitmapDatu.Scan0);
+         Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu);
          if (!(SUCCEEDED(hr)))
             fnOutputDebug("WICbmpSourceConvertGdip: copy pixels FAILED: " + std::to_string(cbStride) + "|" + std::to_string(cbBufferSize));
     }
@@ -5717,7 +5726,7 @@ BYTE* coreWICgetBufferImage(int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize,
   if (myBitmap!=NULL)
   {
       Gdiplus::DllExports::GdipDisposeImage(myBitmap);
-      myBitmap = WICbmpSourceConvertGdip(pFinalBitmapSource, width, height, cbStride, cbBufferSize);
+      myBitmap = WICbmpSourceConvertGdip(pFinalBitmapSource, width, height, cbStride, cbBufferSize, PixelFormat32bppPARGB);
   } else
   {
       m_pbBuffer = new (std::nothrow) BYTE[cbBufferSize];
@@ -5967,6 +5976,26 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
              UINT uPixFmt = indexedWICpixelFormats(opixelFormat);
              resultsArray[3] = uPixFmt;
              destinationFormat = decideWICtoFIMpixelFormat(opixelFormat);
+
+             UINT bpp = NULL;
+             UINT channels = NULL;
+             IWICComponentInfo* pComponentInfo = NULL;
+             hr = m_pIWICFactory->CreateComponentInfo(opixelFormat, &pComponentInfo);
+             if (SUCCEEDED(hr))
+             {
+                IWICPixelFormatInfo* pPixelFormatInfo = NULL;
+                hr = pComponentInfo->QueryInterface(IID_PPV_ARGS(&pPixelFormatInfo));
+                if (SUCCEEDED(hr))
+                {
+                   hr = pPixelFormatInfo->GetBitsPerPixel(&bpp);
+                   hr = pPixelFormatInfo->GetChannelCount(&channels);
+                   resultsArray[7] = bpp;
+                   resultsArray[8] = channels;
+                }
+                pComponentInfo->Release();
+                pPixelFormatInfo->Release();
+             }
+
              int tif = (IsFileExtension(szFileName, L".tif")==1 || IsFileExtension(szFileName, L".tif")==1) ? 1 : 0;
              if (tif==1 && destinationFormat>32 && isFIMokay==1)
              {
@@ -5992,23 +6021,6 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
 
   if (SUCCEEDED(hr))
   {
-      // UINT bpp = NULL;
-      // UINT channels = NULL;
-      // IWICComponentInfo* pComponentInfo = NULL;
-      // hr = m_pIWICFactory->CreateComponentInfo(opixelFormat, &pComponentInfo);
-      // if (SUCCEEDED(hr))
-      // {
-      //    IWICPixelFormatInfo* pPixelFormatInfo = NULL;
-      //    hr = pComponentInfo->QueryInterface(IID_PPV_ARGS(&pPixelFormatInfo));
-      //    pComponentInfo->Release();
-      //    if (SUCCEEDED(hr))
-      //    {
-      //       hr = pPixelFormatInfo->GetBitsPerPixel(&bpp);
-      //       hr = pPixelFormatInfo->GetChannelCount(&channels);
-      //    }
-      //    pPixelFormatInfo->Release();
-      // }
-
       // fnOutputDebug("WIC pixel format index: " + std::to_string(uPixFmt) + " | bpp = " + std::to_string(bpp) + " * " + std::to_string(channels) + " channels");
       return destinationFormat;
   } else
@@ -6074,17 +6086,106 @@ void ListWICdecoders() {
     }
 }
 
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const std::wstring& pdfFilePath, UINT pageIndex, UINT destWidth, UINT destHeight) {
+    // Initialize the Windows Runtime apartment if not already done.
+    winrt::init_apartment();
+
+    // Load the PDF file as a StorageFile.
+    auto storageFileAsync = winrt::Windows::Storage::StorageFile::GetFileFromPathAsync(pdfFilePath);
+    winrt::Windows::Storage::StorageFile storageFile = storageFileAsync.get();
+
+    // Load the PDF document.
+    auto pdfDocAsync = winrt::Windows::Data::Pdf::PdfDocument::LoadFromFileAsync(storageFile);
+    winrt::Windows::Data::Pdf::PdfDocument pdfDoc = pdfDocAsync.get();
+
+    if (!pdfDoc)
+    {
+        throw std::runtime_error("Failed to load PDF document.");
+    }
+
+    // Check that the requested page index is valid.
+    if (pageIndex >= pdfDoc.PageCount())
+    {
+        throw std::out_of_range("Page index out of range.");
+    }
+
+    // Get the specific page.
+    auto pdfPage = pdfDoc.GetPage(pageIndex);
+
+    // Create an in-memory stream to hold the rendered page.
+    IStream* pIStream = NULL;
+    HRESULT hr = CreateStreamOnHGlobal(NULL, 1, &pIStream);
+
+    winrt::Windows::Storage::Streams::InMemoryRandomAccessStream memStream;
+    // hr = CreateRandomAccessStreamOverStream(pIStream, 0, __uuidof(IRandomAccessStream), (void**)&memStream);
+    hr = CreateRandomAccessStreamOverStream(pIStream, 0, IID_RandomAccessStream, &memStream);
+    // Create render options to specify the desired output dimensions.
+    // The DestinationWidth and DestinationHeight properties define the target pixel dimensions.
+    winrt::Windows::Data::Pdf::PdfPageRenderOptions renderOptions;
+    renderOptions.DestinationWidth(destWidth);
+    renderOptions.DestinationHeight(destHeight);
+
+    // Render the page into the stream using the specified options.
+    auto renderAsync = pdfPage.RenderToStreamAsync(memStream, renderOptions);
+    renderAsync.get();  // Wait for rendering to complete.
+
+    // Reset the stream position to the beginning.
+    memStream.Seek(0);
+    IStream_Reset(pIStream);
+
+    // Create a decoder from the in-memory stream.
+    IWICBitmapDecoder* pDecoder = NULL;
+    hr = m_pIWICFactory->CreateDecoderFromStream(pIStream, nullptr, WICDecodeMetadataCacheOnLoad, &pDecoder);
+
+    // Get the first (and only) frame.
+    IWICBitmapFrameDecode* pFrame = NULL;
+    hr = pDecoder->GetFrame(0, &pFrame);
+
+    // Convert the frame to a pixel format that is compatible with GDI (32bpp BGRA).
+    IWICFormatConverter* pConverter = NULL;
+    hr = m_pIWICFactory->CreateFormatConverter(&pConverter);
+
+    hr = pConverter->Initialize(pFrame, GUID_WICPixelFormat32bppBGRA, WICBitmapDitherTypeNone, nullptr, 0.f, WICBitmapPaletteTypeCustom);
+    UINT width = 0, height = 0, cbStride = 0, cbBufferSize = 0;
+    // Use the dimensions specified by renderOptions (or read back from the converter).
+    hr = pConverter->GetSize(&width, &height);
+    IWICBitmapSource* pFinalBitmapSource = NULL;
+    hr = pConverter->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void **>(&pFinalBitmapSource));
+    hr = UIntMult(width, sizeof(Gdiplus::ARGB), &cbStride);
+    hr = UIntMult(cbStride, height, &cbBufferSize);
+    Gdiplus::GpBitmap     *myBitmap             = NULL;
+    myBitmap = WICbmpSourceConvertGdip(pFinalBitmapSource, width, height, cbStride, cbBufferSize, PixelFormat32bppARGB);
+    return myBitmap;
+}
+
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPconv, int givenQuality, UINT givenW, UINT givenH, UINT keepAratio, UINT ScaleAnySize, UINT givenFrame, int doFlipHV, int useICM, const wchar_t *szFileName, UINT *&resultsArray, int isFIMokay) {
 // this function is meant to be self-contained and can be executed by different threads, via AHK
     // WIC factory initialized in initWICnow() 
-    Gdiplus::GpBitmap     *myBitmap                = NULL;
-    IWICBitmapSource      *pFinalBitmapSource      = NULL;
-    IWICFormatConverter   *pConverter              = NULL;
-    IWICBitmapDecoder     *pDecoder                = NULL;
-    IWICBitmapScaler      *pScaler                 = NULL;
-    IWICBitmapFrameDecode *pFrame                  = NULL;
+    Gdiplus::GpBitmap     *myBitmap             = NULL;
+    IWICBitmapSource      *pFinalBitmapSource   = NULL;
+    IWICFormatConverter   *pConverter           = NULL;
+    IWICBitmapDecoder     *pDecoder             = NULL;
+    IWICBitmapScaler      *pScaler              = NULL;
+    IWICBitmapFrameDecode *pFrame               = NULL;
+    WICPixelFormatGUID    opixelFormat          = GUID_WICPixelFormatDontCare;
+    WICPixelFormatGUID    destinationFormat     = GUID_WICPixelFormat32bppPBGRA;
+    Gdiplus::PixelFormat  destinationGdipFormat = PixelFormat32bppPARGB;
+    if (noBPPconv==32)
+       destinationFormat = GUID_WICPixelFormat32bppBGRA;
+    else if (noBPPconv==24)
+       destinationFormat = GUID_WICPixelFormat24bppBGR;
+    else if (noBPPconv==16)
+       destinationFormat = GUID_WICPixelFormat16bppBGR555;
+
+    if (noBPPconv==32)
+       destinationGdipFormat = PixelFormat32bppARGB;
+    else if (noBPPconv==24)
+       destinationGdipFormat = PixelFormat24bppRGB;
+    else if (noBPPconv==16)
+       destinationGdipFormat = PixelFormat16bppRGB555;
+
     HRESULT hr  = S_OK, hr2 = S_OK;
-    UINT owidth = 0, oheight = 0;
+    UINT owidth = 0, oheight = 0, mustResize = 0;
     if (szFileName)
     {
         try {
@@ -6121,19 +6222,45 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
                       hr2 = pDecoder->GetContainerFormat(&containerFmt);
                       UINT ucontainerFmt = indexedWICcontainerFormats(containerFmt);
                       resultsArray[5] = ucontainerFmt;
+                      auto nSize = adaptImageGivenSize(keepAratio, ScaleAnySize, owidth, oheight, givenW, givenH);
+                      mustResize = (nSize[0]!=owidth || nSize[1]!=oheight) ? 1 : 0;
+                      if (mustResize==1)
+                      {
+                         destinationFormat = GUID_WICPixelFormat32bppPBGRA;
+                         destinationGdipFormat = PixelFormat32bppPARGB;
+                      }
 
                       double dpix = 0, dpiy = 0;
                       hr2 = pFrame->GetResolution(&dpix, &dpiy); 
                       resultsArray[4] = round((dpix + dpiy)/2);
 
-                      WICPixelFormatGUID opixelFormat;
                       hr = pFrame->GetPixelFormat(&opixelFormat);
                       UINT uPixFmt = indexedWICpixelFormats(opixelFormat);
                       resultsArray[3] = uPixFmt;
-                      int destinationFormat = decideWICtoFIMpixelFormat(opixelFormat);
+                      int destinationBPP = decideWICtoFIMpixelFormat(opixelFormat);
+                      resultsArray[6] = destinationBPP;
+                      UINT bpp = NULL;
+                      UINT channels = NULL;
+                      IWICComponentInfo* pComponentInfo = NULL;
+                      hr = m_pIWICFactory->CreateComponentInfo(opixelFormat, &pComponentInfo);
+                      if (SUCCEEDED(hr))
+                      {
+                         IWICPixelFormatInfo* pPixelFormatInfo = NULL;
+                         hr = pComponentInfo->QueryInterface(IID_PPV_ARGS(&pPixelFormatInfo));
+                         if (SUCCEEDED(hr))
+                         {
+                            hr = pPixelFormatInfo->GetBitsPerPixel(&bpp);
+                            hr = pPixelFormatInfo->GetChannelCount(&channels);
+                            resultsArray[7] = bpp;
+                            resultsArray[8] = channels;
+                         }
+                         pComponentInfo->Release();
+                         pPixelFormatInfo->Release();
+                      }
+
                       int tif = (IsFileExtension(szFileName, L".tif")==1 || IsFileExtension(szFileName, L".tif")==1) ? 1 : 0;
                       // fnOutputDebug("LoadWICimage: container format ID=" + std::to_string(ucontainerFmt));
-                      if (ucontainerFmt==9 && owidth==256 && oheight==192 || tif==1 && destinationFormat>32 && isFIMokay==1)
+                      if (ucontainerFmt==9 && owidth==256 && oheight==192 || tif==1 && destinationBPP>32 && isFIMokay==1)
                       {
                          if (ucontainerFmt==9 && owidth==256 && oheight==192)
                             fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: error: DNG loaded could not be decoded properly; an icon was retrieved - to be discarded");
@@ -6156,9 +6283,9 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
 
         if (SUCCEEDED(hr))
         {
-            if (noBPPconv==1)
+            const double mpx = (owidth * oheight)/1000000;
+            if (noBPPconv==1 || noBPPconv==2 && mpx>536.4)
             {
-               resultsArray[6] = 1;
                SafeRelease(pFrame, "LoadWICimage: pFrame", 0);
                SafeRelease(pDecoder, "LoadWICimage: pDecoder", 0);
                return myBitmap;
@@ -6190,13 +6317,13 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
                 if (SUCCEEDED(hr))
                 {
                     // convert the bitmap into 32bppBGR, a convenient pixel format for GDI+ rendering 
-                    int hasICM = (useICM!=1) ? 0 : applyColorManagement(pFinalBitmapSource, pFrame, GUID_WICPixelFormat32bppPBGRA, useICM);
+                    int hasICM = (useICM!=1) ? 0 : applyColorManagement(pFinalBitmapSource, pFrame, destinationFormat, useICM);
                     if (hasICM!=1)
                     {
                         hr = m_pIWICFactory->CreateFormatConverter(&pConverter);
                         if (SUCCEEDED(hr))
                         {
-                            hr = pConverter->Initialize(pFinalBitmapSource, GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, NULL, 0.f, WICBitmapPaletteTypeCustom);
+                            hr = pConverter->Initialize(pFinalBitmapSource, destinationFormat, WICBitmapDitherTypeNone, NULL, 0.f, WICBitmapPaletteTypeCustom);
                             if (SUCCEEDED(hr))
                             {
                                SafeRelease(pFinalBitmapSource, "LoadWICimage: pFinalBitmapSource for pConverter", 0);
@@ -6215,7 +6342,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
             WICPixelFormatGUID pixelFormat;
             hr = (pFinalBitmapSource==NULL) ? E_FAIL : pFinalBitmapSource->GetPixelFormat(&pixelFormat);
             if (SUCCEEDED(hr))
-               hr = (pixelFormat == GUID_WICPixelFormat32bppPBGRA) ? S_OK : E_FAIL;
+               hr = (pixelFormat == destinationFormat) ? S_OK : E_FAIL;
         }
 
         if (SUCCEEDED(hr))
@@ -6230,8 +6357,6 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
             if (SUCCEEDED(hr) && width>0 && height>0 && cbStride>0 && cbBufferSize>=cbStride)
             {
                 BYTE *m_pbBuffer = NULL;  // the GDI+ bitmap buffer
-                auto nSize = adaptImageGivenSize(keepAratio, ScaleAnySize, width, height, givenW, givenH);
-                bool mustResize = (nSize[0]!=width || nSize[1]!=height) ? 1 : 0;
                 if (mustResize==1)
                    m_pbBuffer = new (std::nothrow) BYTE[cbBufferSize];
 
@@ -6240,6 +6365,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
                 {
                     if (mustResize==1)
                     {
+                        auto nSize = adaptImageGivenSize(keepAratio, ScaleAnySize, width, height, givenW, givenH);
                         hr = pFinalBitmapSource->CopyPixels(NULL, cbStride, cbBufferSize, m_pbBuffer);
                         if (SUCCEEDED(hr))
                         {
@@ -6265,7 +6391,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
                            } else fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to allocate buffer for the resized bitmap");
                         } else fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to copy pixels to the allocated buffer");
                     } else {
-                       myBitmap = WICbmpSourceConvertGdip(pFinalBitmapSource, width, height, cbStride, cbBufferSize);
+                       myBitmap = WICbmpSourceConvertGdip(pFinalBitmapSource, width, height, cbStride, cbBufferSize, destinationGdipFormat);
                     }
                 } else fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to allocate the buffer for copy pixels");
 
@@ -6277,7 +6403,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
 
     SafeRelease(pFinalBitmapSource, "LoadWICimage: pFinalBitmapSource END", 0);
     SafeRelease(pConverter, "LoadWICimage: pConverter", 0);
-    applyColorManagement(pFinalBitmapSource, pFrame, GUID_WICPixelFormat32bppPBGRA, 100);
+    applyColorManagement(pFinalBitmapSource, pFrame, destinationFormat, 100);
     SafeRelease(pScaler, "LoadWICimage: pScaler", 0);
     SafeRelease(pFrame, "LoadWICimage: pFrame", 0);
     SafeRelease(pDecoder, "LoadWICimage: pDecoder", 0);
@@ -6313,7 +6439,7 @@ Gdiplus::GpBitmap* WICBitmapToGdipBitmap(IWICBitmap* &thisWICbitmap) {
     {
        UIntMult(width, sizeof(Gdiplus::ARGB), &cbStride);
        UIntMult(cbStride, height, &cbBufferSize);
-       myBitmap = WICbmpSourceConvertGdip(convertedWICbitmap, width, height, cbStride, cbBufferSize);
+       myBitmap = WICbmpSourceConvertGdip(convertedWICbitmap, width, height, cbStride, cbBufferSize, PixelFormat32bppPARGB);
        SafeRelease(convertedWICbitmap, "WICBitmapToGdipBitmap: convertedWICbitmap", 0);
     } else
     {

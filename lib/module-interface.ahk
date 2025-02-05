@@ -276,6 +276,12 @@ BuildGUI(params:=0) {
    Return r
 }
 
+; #Include E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\_other-files\ImagePut for v1.ahk
+; testPDFloader(page){
+;   pBitmap := ImagePutBitmap({index: page, image: "E:\Sucan twins\e-chairs\living with eb articles\v9\about-life-perspective-disabled-person-RDEB.pdf"})
+;   return pBitmap
+; }
+
 setMenuBarState(modus, mena:="PVmenu") {
   Critical, on 
   If (showMainMenuBar!=1)
@@ -932,6 +938,7 @@ WM_LBUTTONUP(wP, lP, msg, hwnd) {
           Gui, MclickH: Destroy
 
        If (hwnd=hFlyBtn1)
+          ; testPDFloader()
           PanelQuickSearchMenuOptions()
        Else If (hwnd=hFlyBtn2)
           toggleAppToolbar()
@@ -4767,7 +4774,7 @@ setMenusTheme(modus) {
    FlushMenuThemes := DllCall("GetProcAddress", "uptr", uxtheme, "ptr", 136, "uptr")
    DllCall(SetPreferredAppMode, "int", modus) ; Dark
    DllCall(FlushMenuThemes)
-   interfaceThread.ahkPostFunction("setMenusTheme", modus)
+   ; interfaceThread.ahkPostFunction("setMenusTheme", modus)
 }
 
 

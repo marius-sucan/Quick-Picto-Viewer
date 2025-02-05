@@ -237,7 +237,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , easySlideStoppage := 1, ResizeInPercentage := 0, autoPlaySlidesAudio := 0, ResizeApplyEffects := 1
    , ResizeKeepAratio := 1, ResizeQualityHigh := 1, ResizeRotationUser := 0, satAdjust := 1
    , ResizeDestFolder, ResizeUseDestDir := 0, chnRdecalage := 0.0, chnGdecalage := 0.0
-   , chnBdecalage := 0.0, alwaysOpenwithFIM := 0, bwDithering := 0, showHistogram := 0,  FloodFillModus := 0
+   , chnBdecalage := 0.0, alwaysOpenWithFIM := 0, bwDithering := 0, showHistogram := 0,  FloodFillModus := 0
    , userUnsprtWriteFMT := 1, userDesireWriteFMT := 9, hueAdjust := 0, syncSlideShow2Audios := 0
    , DisplayTimeUser := 3, OSDfontBolded := 1, OSDfontItalica := 0, showInfoBoxHUD := 0, usrAutoCropDeviation := 0
    , usrTextureBGR := 0, realGammos := 1, imgThreshold := 0, relativeImgSelCoords := 1, hCurrTab := ""
@@ -988,6 +988,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
            func2Call := ["invokeFilesListMapNow"]
 
         ; testWicLoader()
+        ; testPDFLoader()
     } Else If (givenKey="+^n")
     {
         If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
@@ -21722,7 +21723,6 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
          fileType := (modus="new-image") ? "" : FreeImage_GetFileType(imgPath, 1)
 
          currIMGdetails.ImgFile := viewportQPVimage.ImgFile
-         currIMGdetails.imgHandle := viewportQPVimage.imgHandle
          currIMGdetails.OpenedWith := viewportQPVimage.OpenedWith
          currIMGdetails.LoadedWith := viewportQPVimage.LoadedWith
          currIMGdetails.TooLargeGDI := viewportQPVimage.TooLargeGDI
@@ -21731,6 +21731,8 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
          currIMGdetails.dpiX := viewportQPVimage.dpiX
          currIMGdetails.dpiY := viewportQPVimage.dpiY
          currIMGdetails.DPI := viewportQPVimage.DPI
+         currIMGdetails.BPP := viewportQPVimage.BPP
+         currIMGdetails.Channels := viewportQPVimage.Channels
          currIMGdetails.HasAlpha := InStr(ColorsType, "rgba") ? 1 : 0
          currIMGdetails.RawFormat := (modus="new-image") ? imgType : fileType " | " imgType
          currIMGdetails.PixelFormat := StrReplace(oimgBPP, "-", "+") "-" ColorsType
@@ -37037,7 +37039,7 @@ readMainSettingsApp(act) {
     IniAction(act, "allowMultiCoreMode", "General", 1)
     IniAction(act, "allowRecordHistory", "General", 1)
     IniAction(act, "allowUserQuickFileActions", "General", 1)
-    IniAction(act, "alwaysOpenwithFIM", "General", 1)
+    IniAction(act, "alwaysOpenWithFIM", "General", 1)
     IniAction(act, "askDeleteFiles", "General", 1)
     IniAction(act, "autoRemDeadEntry", "General", 1)
     IniAction(act, "closeEditPanelOnApply", "General", 1)
@@ -42405,6 +42407,7 @@ BTNperformExtractFrames(a) {
       batchExtractFramesFromImages()
    } Else
    {
+      failedFrames := 0
       r := coreExtractFramesFromImage(currentFileIndex, 0, 0, 0, failedFrames)
       If (r=-5)
          showTOOLtip("WARNING: User abandoned operation.`nSeveral frames or pages may have been extracted already.")
@@ -43014,7 +43017,10 @@ PanelSaveImg() {
 }
 
 btnHelpSaveImgPanel() {
-   msgBoxWrapper(appTitle ": HELP", "Quality level applies only for JPG, JP2, J2K, JXR and WEBP files.`n`nThe color depth option is not applicable to all of the supported image file formats.", -1, 0, 0)
+   If (AnyWindowOpen=84)
+      f := "`n `nWhen pages are extracted from TIFF(s), QPV will attempt to preserve the original color depth, if the destination file format allows it."
+
+   msgBoxWrapper(appTitle ": HELP", "Quality level applies only for JPG, JP2, J2K, JXR and WEBP files.`n`nThe color depth option is not applicable to all of the supported image file formats." f, -1, 0, 0)
 }
 
 PanelBrushTool(dummy:=0, modus:=0) {
@@ -57921,7 +57927,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0) {
 
    loadArgs := FIMdecideLoadArgs(imgPath, userHQraw, GFT)
    hFIFimgA := externBMP ? externBMP : FreeImage_Load(imgPath, -1, loadArgs)
-   If !hFIFimgA
+   If (!hFIFimgA && !externBMP)
    {
       If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1)
       {
@@ -58280,7 +58286,7 @@ batchExtractFramesFromImages() {
 }
 
 coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef failedFrames) {
-   abandonAll := yay := 0
+   failedFrames := FimBuffer := abandonAll := yay := 0
    GFT := FreeImage_GetFileType(imgPath)
    hMultiBMP := FreeImage_OpenMultiBitmap(imgPath, GFT, 0, 1, 1, 0)
    If StrLen(hMultiBMP)>1
@@ -58326,14 +58332,43 @@ coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
             Continue
 
          frameu := clampInRange(A_Index, 0, tFrames - 1)
-         hPage := FreeImage_LockPage(hMultiBMP, frameu)
-         ; msgbox, % a_thisfunc "=" totalFramesIndex "==" desiredFrameIndex
-         If (hPage!="")
+         If (allowWICloader=1 && WICmoduleHasInit=1 && alwaysOpenWithFIM!=1)
          {
-            hFIFimgA := FreeImage_Clone(hPage)
-            FreeImage_UnlockPage(hMultiBMP, hPage, 0)
-         } Else hFIFimgA := ""
+            ; use WIC loader to extract the TIF pages
+            VarSetCapacity(resultsArray, 8 * 9, 0)
+            cBPP := DllCall(whichMainDLL "\WICpreLoadImage", "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "int", wasInitFIMlib, "Int")
+            If (cBPP>1 && cBPP<=64)
+            {
+               Width := NumGet(resultsArray, 4 * 0, "uInt")
+               Height := NumGet(resultsArray, 4 * 1, "uInt")
+               If (cBPP=64)
+                  cBPP := 32
+               Else If (cBPP=48)
+                  cBPP := 24
 
+               If (Width>0 && Height>0)
+                  z := teleportWICtoFIM(Width, Height, cBPP, userPerformColorManagement, 1)
+               hFIFimgA := z[1]
+               FimBuffer := z[2]
+               ; fnOutputDebug(A_ThisFunc ": wicca " hFIFimgA)
+               ; ToolTip, % z[1] "|" pBitmap "|" cBPP "|" Gdip_GetImagePixelFormat(pBitmap, 2) , , , 2
+            } Else hFIFimgA := ""
+
+            DllCall(whichMainDLL "\WICdestroyPreloadedImage", "Int", 12, "Int")
+            resultsArray := ""
+         }
+
+         If !hFIFimgA
+         {
+            hPage := FreeImage_LockPage(hMultiBMP, frameu)
+            If (hPage!="")
+            {
+               hFIFimgA := FreeImage_Clone(hPage)
+               FreeImage_UnlockPage(hMultiBMP, hPage, 0)
+            } Else hFIFimgA := ""
+         }
+
+         ; msgbox, % a_thisfunc "=" totalFramesIndex "==" desiredFrameIndex
          If !hFIFimgA
          {
             failedFrames++
@@ -58341,9 +58376,11 @@ coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          }
 
          FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
-         If (!imgW || !imgH)
+         If (!imgW || !imgH || imgW=1 && imgH=1)
          {
             FreeImage_UnLoad(hFIFimgA)
+            If FimBuffer
+               DllCall("GlobalFree", "uptr", FimBuffer)
             failedFrames++
             Continue
          }
@@ -58363,6 +58400,10 @@ coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          } Else rz := coreConvertImgFormat(imgPath, file2save, hFIFimgA)
 
          ; FreeImage_UnLoad(hFIFimgA) object discarded by coreConvertImgFormat()
+         If FimBuffer
+            DllCall("GlobalFree", "uptr", FimBuffer)
+
+         FimBuffer := hFIFimgA := ""
          If rz
             failedFrames++
       }
@@ -58413,6 +58454,7 @@ coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          abandonAll := 1
          Break
       }
+
       If ((A_TickCount - prevMSGdisplay>3000) && inLoop=1 && yay=1)
          showTOOLtip("Extracting frames: " groupDigits(A_Index) " / " groupDigits(tFrames) " ( " Round((A_Index / tFrames) * 100, 1) "% )" bonusMsg "`nCurrent file:`n" OutFileName, 0, 0, A_Index / tFrames)
 
@@ -58443,14 +58485,14 @@ coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          If validBMP(kBitmap)
          {
             r := QPV_SaveImageFile(A_ThisFunc, kBitmap, file2save, userJpegQuality, userSaveBitsDepth)
-            trGdip_DisposeImage(kBitmap)
+            kBitmap := trGdip_DisposeImage(kBitmap)
          } Else r := 1
       } Else r := QPV_SaveImageFile(A_ThisFunc, nBitmap, file2save, userJpegQuality, userSaveBitsDepth)
 
       If r
          failedFrames++
 
-      trGdip_DisposeImage(nBitmap)
+      nBitmap := trGdip_DisposeImage(nBitmap)
    }
    If (inLoop!=1)
       ResetImgLoadStatus()
@@ -63652,7 +63694,7 @@ createMenuMainPreferences() {
       kMenu("PVprefs", "Add/Uncheck", "Auto-play an&imated GIFs", "ToggleAnimGIFsupport")
       If (animGIFsSupport=1)
          kMenu("PVprefs", "Check", "Auto-play an&imated GIFs")
-      If (alwaysOpenwithFIM=1)
+      If (alwaysOpenWithFIM=1)
          kMenu("PVprefs", "Disable", "Auto-play an&imated GIFs")
    }
 
@@ -63686,7 +63728,7 @@ createMenuMainPreferences() {
       kMenu("PVprefs", "Add", "Erase cached thumbnails", "PanelfolderThanEraseThumbsCache")
 
    kMenu("PVprefs", "Add/Uncheck", "Cache generated thumbnails", "ToggleThumbsCaching")
-   If (alwaysOpenwithFIM=1)
+   If (alwaysOpenWithFIM=1)
       kMenu("PVprefs", "Check", "Load an&y image format using FreeImage")
 
    If (enableThumbsCaching=1)
@@ -64206,7 +64248,7 @@ createMenuSlideshows() {
    kMenu("PVslide", "Add/Uncheck", "&Easy to stop slideshows", "ToggleEasySlideStop")
    kMenu("PVslide", "Add/Uncheck", "&Randomize colour effects", "ToggleSlidesFXmode", "slideshow", " during slideshows")
    kMenu("PVslide", "Add/Uncheck", "&Wait for GIFs to play once", "ToggleGIFsPlayEntirely", "animations")
-   If (animGIFsSupport!=1 || alwaysOpenwithFIM=1)
+   If (animGIFsSupport!=1 || alwaysOpenWithFIM=1)
       kMenu("PVslide", "Disable", "&Wait for GIFs to play once")
    If (slidesFXrandomize=1)
       kMenu("PVslide", "Check", "&Randomize colour effects",,, " during slideshows")
@@ -67502,14 +67544,14 @@ toggleLimitSelection() {
 }
 
 ToggleAlwaysFIMus() {
-   alwaysOpenwithFIM := !alwaysOpenwithFIM
+   alwaysOpenWithFIM := !alwaysOpenWithFIM
    r := initFIMGmodule()
    If InStr(r, "err - 126")
       friendly := "`n`nPlease install the Runtime Redistributable Packages of Visual Studio 2015."
    Else If InStr(r, "err - 404")
       friendly := "`n`nThe FreeImage.dll file seems to be missing..."
 
-   INIaction(1, "alwaysOpenwithFIM", "General")
+   INIaction(1, "alwaysOpenWithFIM", "General")
    If (FIMfailed2init=1)
       msgBoxWrapper(appTitle ": ERROR", "The FreeImage library failed to properly initialize. Various image file formats will no longer be supported. Error code: " r "." friendly, 0, 0, "error")
    Else If (thumbsDisplaying!=1 && CurrentSLD && maxFilesIndex>0 && !validBMP(UserMemBMP))
@@ -67952,7 +67994,7 @@ ToggleCycleFavesOpen() {
 ToggleColorProfileManage() {
     userPerformColorManagement := !userPerformColorManagement
     INIaction(1, "userPerformColorManagement", "General")
-    pp := (alwaysOpenwithFIM=1) ? "WARNING: This option has no effect when images are loaded through FreeImage.`nThe option to load any image format through FreeImage is currently activated."
+    pp := (alwaysOpenWithFIM=1) ? "WARNING: This option has no effect when images are loaded through FreeImage.`nThe option to load any image format through FreeImage is currently activated."
     friendly := (userPerformColorManagement=1) ? "ACTIVATED`nThe viewport performance may decrease." : "DEACTIVATED"
     showTOOLtip(pp "Color management on image load: " friendly, A_ThisFunc, 1)
     SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -70651,7 +70693,7 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
   Static prevMD5nameA, prevMD5nameB, prevDetailsA, prevDetailsB
 
   initQPVmainDLL()
-  If (alwaysOpenwithFIM=1)
+  If (alwaysOpenWithFIM=1)
      initFIMGmodule()
 
   coreIMGzeitLoad := A_TickCount
@@ -70678,7 +70720,7 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
   If (allowCaching=1)
   {
      MD5name := generateThumbName(imgPath, 1)
-     ; fimStuff := (alwaysOpenwithFIM=1) ? 1 desiredFrameIndex totalFramesIndex : 0
+     ; fimStuff := (alwaysOpenWithFIM=1) ? 1 desiredFrameIndex totalFramesIndex : 0
      thisMD5name := MD5name imgPath userHQraw cmrRAWtoneMapAlgo cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapAltExpo allowToneMappingImg
      tFramesA := Gdip_GetBitmapFramesCount(GDIcacheSRCfileA) - 1
      tFramesB := Gdip_GetBitmapFramesCount(GDIcacheSRCfileB) - 1
@@ -70706,7 +70748,7 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
 
   viewportQPVimage.DiscardImage()
   recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
-  If ((RegExMatch(imgPath, RegExFIMformPtrn) || (alwaysOpenwithFIM=1 && forceGDIp=0)) && allowFIMloader=1)
+  If ((RegExMatch(imgPath, RegExFIMformPtrn) || (alwaysOpenWithFIM=1 && forceGDIp=0)) && allowFIMloader=1)
   {
      If (thumbsDisplaying!=1 && runningLongOperation!=1 && slideShowRunning!=1)
         setWindowTitle("Loading file using the FreeImage library")
@@ -70757,7 +70799,6 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
      oBitmap := trGdip_CreateBitmap(A_ThisFunc, newW, newH)
      currIMGdetails := []
      currIMGdetails.ImgFile := viewportQPVimage.ImgFile
-     currIMGdetails.imgHandle := viewportQPVimage.imgHandle
      currIMGdetails.HasAlpha := viewportQPVimage.HasAlpha
      currIMGdetails.RawFormat := viewportQPVimage.RawFormat
      currIMGdetails.PixelFormat := viewportQPVimage.PixelFormat
@@ -70772,6 +70813,8 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
      currIMGdetails.FIMcolors := viewportQPVimage.FIMcolors
      currIMGdetails.FIMtype := viewportQPVimage.FIMtype
      currIMGdetails.FIMbpp := viewportQPVimage.FIMbpp
+     currIMGdetails.BPP := viewportQPVimage.BPP
+     currIMGdetails.Channels := viewportQPVimage.Channels
      currIMGdetails.Frames := viewportQPVimage.Frames
      currIMGdetails.ActiveFrame := viewportQPVimage.ActiveFrame
      totalFramesIndex := viewportQPVimage.Frames
@@ -70957,7 +71000,7 @@ LoadBitmapFromFileu(imgPath, noBPPconv:=0, forceGDIp:=0, frameu:=0, sizesDesired
 ; LoadFileWithGDIp() on fail, fallsback to LoadWICimage(), and if needed to LoadFimFile()
 
   mainLoadedIMGdetails := []
-  If ((RegExMatch(imgPath, RegExFIMformPtrn) || (alwaysOpenwithFIM=1 && forceGDIp=0)) && allowFIMloader=1)
+  If ((RegExMatch(imgPath, RegExFIMformPtrn) || (alwaysOpenWithFIM=1 && forceGDIp=0)) && allowFIMloader=1)
   {
      ; oBitmap := LoadFimFile(imgPath, noBPPconv, noBPPconv, frameu, sizesDesired, newBitmap)
      oBitmap := LoadFimFile(imgPath, noBPPconv, noBPPconv, frameu, sizesDesired, newBitmap)
@@ -94032,7 +94075,7 @@ initFIMGmodule() {
 
   If InStr(r, "err - ")
   {
-     alwaysOpenwithFIM := 0
+     alwaysOpenWithFIM := 0
      FIMfailed2init := 1
      If InStr(r, "err - 126")
         friendly := "`n`nPlease install the Runtime Redistributable Packages of Visual Studio 2013."
@@ -94186,16 +94229,27 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
         toneMapped := " (TONE-MAPPABLE)"
   }
 
+  imgTypeID := FreeImage_GetImageType(hFIFimgA, 0)
+  If isInRange(imgTypeID, 2, 8)
+     Channels := 1
+  Else If InStr(ColorsType, "rgba")
+     Channels := 4
+  Else If (InStr(ColorsType, "rgb") || InStr(ColorsType, "cmyk"))
+     Channels := 3
+
   mainLoadedIMGdetails.File := imgPath
-  mainLoadedIMGdetails.dpi := Round((dpix + dpiy)/2)
+  mainLoadedIMGdetails.DPI := Round((dpix + dpiy)/2)
   mainLoadedIMGdetails.Width := imgW
   mainLoadedIMGdetails.Height := imgH
   mainLoadedIMGdetails.Frames := (hasOpenedMulti!=1) ? FreeImage_SimpleGetPageCount(hFIFimgA) - 1 : tFrames - 1
   mainLoadedIMGdetails.HasAlpha := (InStr(ColorsType, "rgba") || hasMultiTrans) ? 1 : 0
   mainLoadedIMGdetails.RawFormat := fileType " | " imgType
   mainLoadedIMGdetails.PixelFormat := StrReplace(oimgBPP, "-", "+") "-" ColorsType toneMapped
+  mainLoadedIMGdetails.LoadedWith := "FIM"
   mainLoadedIMGdetails.OpenedWith := "FreeImage library [FIM]"
   mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(imgW, imgH)
+  mainLoadedIMGdetails.BPP := StrReplace(oimgBPP, "-")
+  mainLoadedIMGdetails.Channels := Channels
   If (noBMP=1)
   {
      FreeImage_UnLoad(hFIFimgA)
@@ -95036,7 +95090,7 @@ RenderSVGfile(imgPath, noBPPconv, screenMode, sizesDesired:=0) {
    vb := (vbi!=4) ? "Malformed " : ""
    ow := w := convertSVGunitsToPixels(width)
    oh := h := convertSVGunitsToPixels(height)
-   If (screenMode=-1 && zoomLevel>1)
+   If (screenMode=-1 && zoomLevel>1 && IMGresizingMode=4)
    {
       w := Round(w * zoomLevel)
       h := Round(h * zoomLevel)
@@ -95050,6 +95104,7 @@ RenderSVGfile(imgPath, noBPPconv, screenMode, sizesDesired:=0) {
    fscaleY := varContains(height, "v", "%") ? 1 : Round(h/oh, 6)
    If InStr(height, "%")
       fscaleY := StrReplace(height, "%")>100 ? 100 / StrReplace(height, "%") : 1
+   ; fscaleX := fscaleY := 1
    ; ToolTip, % width "|" svgRoot "|" , , , 2
    ; w := h := 1500
    mainLoadedIMGdetails := []
@@ -95057,7 +95112,6 @@ RenderSVGfile(imgPath, noBPPconv, screenMode, sizesDesired:=0) {
    mainLoadedIMGdetails.Width := w
    mainLoadedIMGdetails.Height := h
    mainLoadedIMGdetails.ImgFile := imgPath
-   mainLoadedIMGdetails.imgHandle := 0
    mainLoadedIMGdetails.Frames := 0
    mainLoadedIMGdetails.ActiveFrame := 0
    mainLoadedIMGdetails.DPI := 96
@@ -95098,10 +95152,10 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
       Return LoadWICimage(imgPath, noBPPconv, -1, useICM)
 
    tt := startZeit := A_TickCount
-   VarSetCapacity(resultsArray, 8 * 6, 0)
+   VarSetCapacity(resultsArray, 8 * 9, 0)
    ; fnOutputDebug(A_ThisFunc ": to load = " imgPath)
    fimu := (wasInitFIMlib=1 && allowFIMloader=1) ? 1 : 0
-   r := DllCall(whichMainDLL "\WICpreLoadImage", "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "int", fimu, "UPtr")
+   r := DllCall(whichMainDLL "\WICpreLoadImage", "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "int", fimu, "Int")
    ; fnOutputDebug(A_ThisFunc ": load time with WIC: " A_TickCount - tt)
    If r
    {
@@ -95114,12 +95168,14 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
       mainLoadedIMGdetails.Width := Width
       mainLoadedIMGdetails.Height := Height
       mainLoadedIMGdetails.ImgFile := imgPath
-      mainLoadedIMGdetails.imgHandle := 0
       mainLoadedIMGdetails.Frames := NumGet(resultsArray, 4 * 2, "uInt") - 1
       mainLoadedIMGdetails.ActiveFrame := NumGet(resultsArray, 4 * 6, "uInt")
       mainLoadedIMGdetails.DPI := NumGet(resultsArray, 4 * 4, "uInt")
       mainLoadedIMGdetails.RawFormat := WICcontainerFmts(NumGet(resultsArray, 4 * 5, "uInt"), imgPath)
       mainLoadedIMGdetails.TooLargeGDI := 0
+      mainLoadedIMGdetails.BPP := NumGet(resultsArray, 4 * 7, "uInt")
+      mainLoadedIMGdetails.ConvertedBPP := r
+      mainLoadedIMGdetails.Channels := NumGet(resultsArray, 4 * 8, "uInt")
       mainLoadedIMGdetails.HasAlpha := varContains(k, "argb", "prgba", "bgra", "rgba", "alpha")
       mainLoadedIMGdetails.OpenedWith := "Windows Imaging Component [WIC]"
       mainLoadedIMGdetails.LoadedWith := "WIC"
@@ -95133,7 +95189,7 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
          viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, zx, 2)
          clrDepth := clampInRange(r, 16, 32) ; i had no luck with copying HDR data from WIC to the buffer in C++
          ; clrDepth := (mainLoadedIMGdetails.HasAlpha=1) ? 32 : 24
-         z := teleportWICtoFIM(Width, Height, clrDepth, useICM)
+         z := teleportWICtoFIM(Width, Height, clrDepth, useICM, 0)
          If !z
          {
             z := DllCall(whichMainDLL "\WICtestPreloadedImage", "Int", 12, "Int")
@@ -95162,7 +95218,7 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
    }
 }
 
-teleportWICtoFIM(imgW, imgH, bitsDepth, useICM) {
+teleportWICtoFIM(imgW, imgH, bitsDepth, useICM, simpleMode) {
    If memoryUsageWarning(imgW, imgH, bitsDepth, 1)
       Return 0
 
@@ -95215,7 +95271,6 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM) {
    remainderHeight := mod(imgH, SliceHeight)
    SliceHeight := (numberSlices>1) ? SliceHeight : 0
    ; fnOutputDebug(A_ThisFunc "(): " Stride " | w/h =" imgW " x " imgH " | buffer = " bufferSize " | sh=" SliceHeight " | ns=" numberSlices " | " remainderHeight)
-   ; buffer := DllCall(whichMainDLL "\WICgetBufferImage", "Int", bitsDepth, "int", Stride, "int", bufferSize, "int", SliceHeight, "int", useICM, "UPtr")
    buffer := DllCall(whichMainDLL "\WICgetBufferImage", "Int", bitsDepth, "int", Stride, "int", bufferSize, "int", SliceHeight, "int", useICM, "UPtr")
    If buffer
       hFIFimgA := FreeImage_ConvertFromRawBitsEx(0, buffer, imageType, imgW, imgH, Stride, bitsDepth, "0x00FF0000", "0x0000FF00", "0x000000FF", 1)
@@ -95228,6 +95283,9 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM) {
    ; FreeImage_SetDPIresolution(hFIFimgA, dpiX, dpiY)
    If (hFIFimgA && buffer)
    {
+      If (simpleMode=1)
+         Return [hFIFimgA, buffer]
+
       killQPVscreenImgSection()
       imgPath := viewportQPVimage.ImgFile
       frameu := viewportQPVimage.ActiveFrame
@@ -95272,12 +95330,12 @@ LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitma
       keepAratio := 2
    }
 
-   VarSetCapacity(resultsArray, 8 * 6, 0)
+   VarSetCapacity(resultsArray, 8 * 9, 0)
    fimu := (wasInitFIMlib=1 && allowFIMloader=1) ? 1 : 0
    r := DllCall(whichMainDLL "\LoadWICimage", "Int", 0 ,"Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", doFlipu, "int", useICM, "Str", imgPath, "UPtr*", &resultsArray, "int", fimu, "UPtr")
    z := NumGet(resultsArray, 4 * 6, "uInt")
    ; fnOutputDebug(A_ThisFunc ": " r " | " z)
-   If (r || z=1)
+   If (r || z>0)
    {
       If StrLen(r)>2
       {
@@ -95287,15 +95345,29 @@ LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitma
       } Else
          r := 1
 
-      mainLoadedIMGdetails.Width := NumGet(resultsArray, 4 * 0, "uInt")
-      mainLoadedIMGdetails.Height := NumGet(resultsArray, 4 * 1, "uInt")
-      mainLoadedIMGdetails.Frames := NumGet(resultsArray, 4 * 2, "uInt") - 1
-      k := mainLoadedIMGdetails.PixelFormat := WicPixelFormats(NumGet(resultsArray, 4 * 3, "uInt"))
-      mainLoadedIMGdetails.DPI := NumGet(resultsArray, 4 * 4, "uInt")
-      mainLoadedIMGdetails.RawFormat := WICcontainerFmts(NumGet(resultsArray, 4 * 5, "uInt"), imgPath)
-      mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(mainLoadedIMGdetails.Width, mainLoadedIMGdetails.Height)
-      mainLoadedIMGdetails.HasAlpha := varContains(k, "argb", "prgba", "bgra", "rgba", "alpha")
-      mainLoadedIMGdetails.OpenedWith := "Windows Imaging Component [WIC]"
+      k := WicPixelFormats(NumGet(resultsArray, 4 * 3, "uInt"))
+      obj := []
+      obj.ImgFile := imgPath
+      obj.Width := NumGet(resultsArray, 4 * 0, "uInt")
+      obj.Height := NumGet(resultsArray, 4 * 1, "uInt")
+      obj.Frames := NumGet(resultsArray, 4 * 2, "uInt") - 1
+      obj.PixelFormat := k
+      obj.DPI := NumGet(resultsArray, 4 * 4, "uInt")
+      obj.RawFormat := WICcontainerFmts(NumGet(resultsArray, 4 * 5, "uInt"), imgPath)
+      obj.TooLargeGDI := isImgSizeTooLarge(obj.Width, obj.Height)
+      obj.BPP := NumGet(resultsArray, 4 * 7, "uInt")
+      obj.ConvertedBPP := z
+      obj.Channels := NumGet(resultsArray, 4 * 8, "uInt")
+      obj.HasAlpha := varContains(k, "argb", "prgba", "bgra", "rgba", "alpha")
+      obj.OpenedWith := "Windows Imaging Component [WIC]"
+      obj.LoadedWith := "WIC"
+      If (noBPPconv=2)
+      {
+         resultsArray := ""
+         Return obj
+      } Else
+         mainLoadedIMGdetails := obj.Clone()
+
       ; fnOutputDebug("images desired = " sizesDesired.Count() " | f=" findFlippedDupes)
       If (sizesDesired.Count()>1 && r && noBPPconv=0)
       {
@@ -95323,7 +95395,7 @@ LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitma
    } else fnOutputDebug(A_ThisFunc ": failed to load file with LoadWICimage()")
 
    resultsArray := ""
-   zeitu := A_TickCount - startZeit
+   ; zeitu := A_TickCount - startZeit
    ; msgbox, % r "==" zeitu " = " pixfmt "=" rawFmt
    ; ToolTip, % WICmoduleHasInit " | " r "==" zeitu " = " mainLoadedIMGdetails.pixfmt "=" mainGdipWinThumbsGrid.RawFormat , , , 3
    ; https://stackoverflow.com/questions/8101203/wicbitmapsource-copypixels-to-gdi-bitmap-scan0
@@ -100009,6 +100081,20 @@ testIdentifyDIBbehindGDIPbmp() {
    SoundBeep, % E1 ? 900 : 300, 500
 }
 
+testPDFloader(){
+   Static i := 0
+   i++
+   pBitmap := interfaceThread.ahkFunction("testPDFloader", i)
+    ; a := ImagePutBitmap({index: i, image: "E:\Sucan twins\e-chairs\living with eb articles\v9\about-life-perspective-disabled-person-RDEB.pdf"})
+    ; imageshow(a)
+   Gdip_GetImageDimensions(pBitmap, w, h)
+   ToolTip, % pBitmap "|" w "|" h, , , 2
+   Gdip_GraphicsClear(2NDglPG)
+   Gdip_DrawImage(2NDglPG, pBitmap,  50, 50)
+   doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+   Gdip_DisposeImage(pBitmap)
+}
+
 testWicLoader() {
    Static indexu := 0, pBitmap
    indexu++
@@ -100020,10 +100106,11 @@ testWicLoader() {
    pathu := "E:\Sucan twins\photos test\SLDs\freeimage-tests\svgs\writing-board-svgrepo-com.svg"
    ; pathu := "E:\Sucan twins\photos test\SLDs\freeimage-tests\svgs\gene-sequencing-svgrepo-com.svg"
    ; pBitmap := LoadAndResizeImageWIC("E:\Sucan twins\photos test\SLDs\freeimage-tests\test-rosar- (9a).webp", 800, 600)
-   if !pBitmap
-      pBitmap := RenderSVGfile(pathu, 0, 0)
+   ; if !pBitmap
+   ;    pBitmap := RenderSVGfile(pathu, 0, 0)
+
    Gdip_GetImageDimensions(pBitmap, w, h)
-   ; ToolTip, % pBitmap "|" w "|" h, , , 2
+   ToolTip, % pBitmap "|" w "|" h, , , 2
    Gdip_GraphicsClear(2NDglPG)
    Gdip_DrawImage(2NDglPG, pBitmap,  50, 50)
    doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
