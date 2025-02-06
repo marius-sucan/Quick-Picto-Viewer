@@ -21,10 +21,11 @@
 #include <cstdio>
 #include <numeric>
 #include <algorithm>
+#include <winrt/base.h>
+#include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Data.Pdf.h>
 #include <winrt/Windows.Storage.h>
 #include <winrt/Windows.Storage.Streams.h>
-#include <winrt/base.h>
 #include <roapi.h>
 #include <shcore.h>
 #include <d2d1.h>
@@ -119,8 +120,8 @@ ID2D1Factory       *pD2D1Factory;
 DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
     // to-do to do - fix this; make it work on Windows 7 
     debugInfos = modus;
-    HRESULT hr = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_pIWICFactory));
-    hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, &pD2D1Factory);
+    HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, &pD2D1Factory);
+    hr = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_pIWICFactory));
 
     // source https://www.teamten.com/lawrence/graphics/gamma/
     static const float GAMMA = 2.0;
@@ -6086,75 +6087,96 @@ void ListWICdecoders() {
     }
 }
 
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const std::wstring& pdfFilePath, UINT pageIndex, UINT destWidth, UINT destHeight) {
-    // Initialize the Windows Runtime apartment if not already done.
-    winrt::init_apartment();
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdfFilePath, UINT pageIndex, UINT destWidth, UINT destHeight, const wchar_t *password) {
+    // winrt::init_apartment(); // Initialize the Windows Runtime apartment
 
     // Load the PDF file as a StorageFile.
-    auto storageFileAsync = winrt::Windows::Storage::StorageFile::GetFileFromPathAsync(pdfFilePath);
+    winrt::Windows::Foundation::IAsyncOperation<winrt::Windows::Storage::StorageFile> storageFileAsync = 
+           winrt::Windows::Storage::StorageFile::GetFileFromPathAsync(pdfFilePath);
+
     winrt::Windows::Storage::StorageFile storageFile = storageFileAsync.get();
 
     // Load the PDF document.
-    auto pdfDocAsync = winrt::Windows::Data::Pdf::PdfDocument::LoadFromFileAsync(storageFile);
-    winrt::Windows::Data::Pdf::PdfDocument pdfDoc = pdfDocAsync.get();
+    winrt::Windows::Foundation::IAsyncOperation<winrt::Windows::Data::Pdf::PdfDocument> pdfDocAsync = 
+           winrt::Windows::Data::Pdf::PdfDocument::LoadFromFileAsync(storageFile);
 
+    winrt::Windows::Data::Pdf::PdfDocument pdfDoc = pdfDocAsync.get();
     if (!pdfDoc)
     {
-        throw std::runtime_error("Failed to load PDF document.");
+        fnOutputDebug("RenderPdfPageAsBitmap: Failed to load PDF document.");
+        return NULL;
     }
 
     // Check that the requested page index is valid.
-    if (pageIndex >= pdfDoc.PageCount())
+    if (pdfDoc.IsPasswordProtected())
     {
-        throw std::out_of_range("Page index out of range.");
+       fnOutputDebug("RenderPdfPageAsBitmap: the PDF is password protected");
+       if (!password)
+           return NULL;
+
+       pdfDocAsync =  winrt::Windows::Data::Pdf::PdfDocument::LoadFromFileAsync(storageFile, password);
+       pdfDoc = pdfDocAsync.get();
     }
 
+    if (pageIndex >= pdfDoc.PageCount())
+       pageIndex = pdfDoc.PageCount() - 1;
+
     // Get the specific page.
-    auto pdfPage = pdfDoc.GetPage(pageIndex);
+    winrt::Windows::Data::Pdf::PdfPage pdfPage = pdfDoc.GetPage(pageIndex);
 
-    // Create an in-memory stream to hold the rendered page.
-    IStream* pIStream = NULL;
-    HRESULT hr = CreateStreamOnHGlobal(NULL, 1, &pIStream);
-
-    winrt::Windows::Storage::Streams::InMemoryRandomAccessStream memStream;
-    // hr = CreateRandomAccessStreamOverStream(pIStream, 0, __uuidof(IRandomAccessStream), (void**)&memStream);
-    hr = CreateRandomAccessStreamOverStream(pIStream, 0, IID_RandomAccessStream, &memStream);
-    // Create render options to specify the desired output dimensions.
-    // The DestinationWidth and DestinationHeight properties define the target pixel dimensions.
     winrt::Windows::Data::Pdf::PdfPageRenderOptions renderOptions;
     renderOptions.DestinationWidth(destWidth);
     renderOptions.DestinationHeight(destHeight);
 
+    // Create an in-memory stream to hold the rendered page.
+    winrt::Windows::Storage::Streams::InMemoryRandomAccessStream memStream;
+
     // Render the page into the stream using the specified options.
-    auto renderAsync = pdfPage.RenderToStreamAsync(memStream, renderOptions);
+    winrt::Windows::Foundation::IAsyncAction renderAsync = pdfPage.RenderToStreamAsync(memStream, renderOptions);
     renderAsync.get();  // Wait for rendering to complete.
-
-    // Reset the stream position to the beginning.
     memStream.Seek(0);
-    IStream_Reset(pIStream);
 
-    // Create a decoder from the in-memory stream.
+
+    IStream* pIStream = NULL;
+    Gdiplus::GpBitmap *myBitmap = NULL;
     IWICBitmapDecoder* pDecoder = NULL;
-    hr = m_pIWICFactory->CreateDecoderFromStream(pIStream, nullptr, WICDecodeMetadataCacheOnLoad, &pDecoder);
-
-    // Get the first (and only) frame.
     IWICBitmapFrameDecode* pFrame = NULL;
+    IWICFormatConverter* pConverter = NULL;
+    IWICBitmapSource* pFinalBitmapSource = NULL;
+
+    // convert the InMemoryRandomAccessStream to an IStream a ccessible by WIC
+    HRESULT hr = CreateStreamOverRandomAccessStream(reinterpret_cast<IUnknown*>(winrt::get_abi(memStream)), IID_PPV_ARGS(&pIStream));
+
+    // Create a decoder on the IStream 
+    hr = m_pIWICFactory->CreateDecoderFromStream(pIStream, nullptr, WICDecodeMetadataCacheOnLoad, &pDecoder);
     hr = pDecoder->GetFrame(0, &pFrame);
 
     // Convert the frame to a pixel format that is compatible with GDI (32bpp BGRA).
-    IWICFormatConverter* pConverter = NULL;
     hr = m_pIWICFactory->CreateFormatConverter(&pConverter);
 
     hr = pConverter->Initialize(pFrame, GUID_WICPixelFormat32bppBGRA, WICBitmapDitherTypeNone, nullptr, 0.f, WICBitmapPaletteTypeCustom);
     UINT width = 0, height = 0, cbStride = 0, cbBufferSize = 0;
     // Use the dimensions specified by renderOptions (or read back from the converter).
     hr = pConverter->GetSize(&width, &height);
-    IWICBitmapSource* pFinalBitmapSource = NULL;
+    fnOutputDebug("RenderPdfPageAsBitmap: " + std::to_string(width) + " x " + std::to_string(height));
+
     hr = pConverter->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void **>(&pFinalBitmapSource));
     hr = UIntMult(width, sizeof(Gdiplus::ARGB), &cbStride);
     hr = UIntMult(cbStride, height, &cbBufferSize);
-    Gdiplus::GpBitmap     *myBitmap             = NULL;
     myBitmap = WICbmpSourceConvertGdip(pFinalBitmapSource, width, height, cbStride, cbBufferSize, PixelFormat32bppARGB);
+    SafeRelease(pFinalBitmapSource, "RenderPdfPageAsBitmap: pFinalBitmapSource", 0);
+    SafeRelease(pConverter, "RenderPdfPageAsBitmap: pConverter", 0);
+    SafeRelease(pFrame, "RenderPdfPageAsBitmap: pFrame", 0);
+    SafeRelease(pDecoder, "RenderPdfPageAsBitmap: pDecoder", 0);
+    SafeRelease(pIStream, "RenderPdfPageAsBitmap: pIStream", 0);
+
+    pdfPage = nullptr;
+    pdfDoc = nullptr;
+    storageFile = nullptr;
+    if (memStream) {
+        memStream.Close();
+        memStream = nullptr;
+    }
     return myBitmap;
 }
 
