@@ -1,4 +1,4 @@
-﻿#Persistent
+#Persistent
 #NoTrayIcon
 #MaxHotkeysPerInterval, 950
 #HotkeyInterval, 50
@@ -275,12 +275,6 @@ BuildGUI(params:=0) {
    r := PVhwnd "|" hGDIinfosWin "|" hGDIwin "|" hGDIthumbsWin "|" hGDIselectWin "|" hPicOnGui1 "|" winGDIcreated "|" ThumbsWinGDIcreated
    Return r
 }
-
-; #Include E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\_other-files\ImagePut for v1.ahk
-; testPDFloader(page){
-;   pBitmap := ImagePutBitmap({index: page, image: "E:\Sucan twins\e-chairs\living with eb articles\v9\about-life-perspective-disabled-person-RDEB.pdf"})
-;   return pBitmap
-; }
 
 setMenuBarState(modus, mena:="PVmenu") {
   Critical, on 

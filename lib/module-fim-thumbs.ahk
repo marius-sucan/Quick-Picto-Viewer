@@ -178,7 +178,7 @@ RenderSVGfile(imgPath, gw, hh) {
    If InStr(height, "%")
       fscaleY := StrReplace(height, "%")>100 ? 100 / StrReplace(height, "%") : 1
    ; ToolTip, % width "|" svgRoot "|" , , , 2
-   pBitmap := DllCall("qpvmain.dll\LoadSVGimage", "Int", 0 ,"Int", w, "Int", h, "float", fscaleX, "float", fscaleY, "Str", imgPath, "UPtr")
+   pBitmap := DllCall("qpvmain.dll\LoadSVGimage", "Int", thisThreadID ,"Int", w, "Int", h, "float", fscaleX, "float", fscaleY, "Str", imgPath, "UPtr")
    ; ToolTip, % fscaleX "|" fscaleY "|" w "|" h "|" svgRoot "|" , , , 2
    ; fnOutputDebug("RenderSVGfile: " A_TickCount - startZeit)
    return pBitmap
@@ -188,10 +188,10 @@ LoadWICimage(imgPath, w, h, keepAratio, thisImgQuality, frameu, ScaleAnySize) {
    If RegExMatch(imgPath, "i)(.\.(svg))$")
       Return RenderSVGfile(imgPath, w, h)
 
-   VarSetCapacity(resultsArray, 8 * 6, 0)
+   VarSetCapacity(resultsArray, 8 * 9, 0)
    fimu := (wasInitFIMlib=1 && allowFIMloader=1) ? 1 : 0
    func2exec := (A_PtrSize=8) ? "LoadWICimage" : "_LoadWICimage@48"
-   r := DllCall("qpvmain.dll\" func2exec, "Int", thisThreadID, "Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", 0, "int", userPerformColorManagement, "Str", imgPath, "UPtr*", &resultsArray, "int", fimu, "UPtr")
+   r := DllCall("qpvmain.dll\" func2exec, "Int", thisThreadID, "Int", 0, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", 0, "int", userPerformColorManagement, "Str", imgPath, "UPtr*", &resultsArray, "int", fimu, "UPtr")
    resultsArray := ""
    Return r
 }

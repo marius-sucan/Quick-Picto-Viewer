@@ -100082,15 +100082,23 @@ testIdentifyDIBbehindGDIPbmp() {
 }
 
 testPDFloader(){
-   Static i := 0
+   Static i := 0, p := 0
+   initQPVmainDLL()
+   ; pathu := "E:\Sucan twins\photos test\SLDs\freeimage-tests\pdfs\samplecertifiedpdf.pdf"
+   ; pathu := "E:\Sucan twins\e-chairs\living with eb articles\v9\about-life-perspective-disabled-person-RDEB.pdf"
+   pathu := "E:\Sucan twins\photos test\SLDs\freeimage-tests\pdfs\living-rdeb.pdf"
+pwd := "hello-world"
+fillBgr := 0
+bgrColor := "0xFF353535"
+dpi := 300
+pBitmap := DllCall(whichMainDLL "\RenderPdfPageAsBitmap", "Str", pathu, "Int", i, "float", dpi, "int", fillBgr, "int", bgrColor, "int*", errorType, "Str", pwd, "UPtr")
    i++
-   pBitmap := interfaceThread.ahkFunction("testPDFloader", i)
-    ; a := ImagePutBitmap({index: i, image: "E:\Sucan twins\e-chairs\living with eb articles\v9\about-life-perspective-disabled-person-RDEB.pdf"})
-    ; imageshow(a)
+p := !p
    Gdip_GetImageDimensions(pBitmap, w, h)
-   ToolTip, % pBitmap "|" w "|" h, , , 2
+   ToolTip, % errorType "|" hBitmap "|" pBitmap "|" w "|" h, , , 2
+   Gdi_DeleteObject(hBitmap)
    Gdip_GraphicsClear(2NDglPG)
-   Gdip_DrawImage(2NDglPG, pBitmap,  50, 50)
+   Gdip_DrawImage(2NDglPG, pBitmap,  50, 50, w//4, h//4)
    doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
    Gdip_DisposeImage(pBitmap)
 }

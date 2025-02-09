@@ -8,7 +8,6 @@
 #include "math.h"
 #include "windows.h"
 #include <string>
-// #include <chrono>
 #include <sstream>
 #include <vector>
 #include <stack>
@@ -21,25 +20,16 @@
 #include <cstdio>
 #include <numeric>
 #include <algorithm>
-#include <winrt/base.h>
-#include <winrt/Windows.Foundation.h>
-#include <winrt/Windows.Data.Pdf.h>
-#include <winrt/Windows.Storage.h>
-#include <winrt/Windows.Storage.Streams.h>
-#include <roapi.h>
-#include <shcore.h>
 #include <d2d1.h>
 #include <d2d1_3.h>
 #include <wincodec.h>
 #include <shlwapi.h>
-#include <combaseapi.h>
-#include <iostream>
 #include "Tchar.h"
 #include "Tpcshrd.h"
 #define GDIPVER 0x110
 #include <gdiplus.h>
 #include <gdiplusflat.h>
-#include <direct.h>
+#include <direct.h> // for CreatePDFfile() > _chdir()
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -50,6 +40,7 @@
 #include "includes\CImg-3.4.3\CImg.h"
 // #include <opencv2/opencv.hpp>
 #include "includes\opencv2\opencv.hpp"
+#include "includes\pdfium\fpdfview.h"
 using namespace std;
 using namespace cimg_library;
 #define DLL_API extern "C" __declspec(dllexport)
@@ -123,6 +114,13 @@ DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
     HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, &pD2D1Factory);
     hr = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_pIWICFactory));
 
+    FPDF_LIBRARY_CONFIG config;
+    config.version = 2;
+    config.m_pUserFontPaths = nullptr;
+    config.m_pIsolate = nullptr;
+    config.m_v8EmbedderSlot = 0;
+    FPDF_InitLibraryWithConfig(&config);
+
     // source https://www.teamten.com/lawrence/graphics/gamma/
     static const float GAMMA = 2.0;
     int result;
@@ -157,11 +155,14 @@ DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
     return (SUCCEEDED(hr)) ? 1 : 0;
 }
 
-std::string wcharToString(const wchar_t* wstr) {
+std::string WideCharToString(const wchar_t* wstr) {
     if (!wstr)
        return "";
 
     int size_needed = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, nullptr, 0, nullptr, nullptr);
+    if (size_needed<=0)
+       return "";
+
     std::string result(size_needed, 0);
     WideCharToMultiByte(CP_UTF8, 0, wstr, -1, &result[0], size_needed, nullptr, nullptr);
     return result;
@@ -3178,7 +3179,7 @@ DLL_API int DLL_CALLCONV ColourBrush(int *opacityImgData, int *imageData, int *m
         for (int x = 0; x < w; x++)
         {
             int px = x * h + y;
-            int BGRcolor = (overDraw==0) ? clonedData[px] : imageData[px];
+            int bgrColor = (overDraw==0) ? clonedData[px] : imageData[px];
             int intensity = (maskData[px] >> 8) & 0xff;
             int clipFlag = (opacityImgData[px] >> 24) & 0xff;
             if (invertMask==1)
@@ -3203,7 +3204,7 @@ DLL_API int DLL_CALLCONV ColourBrush(int *opacityImgData, int *imageData, int *m
             if (fintensity<0 || clipFlag<2)
                fintensity = 0;
 
-            imageData[px] = clrBrushMixColors(BGRcolor, nC, fintensity, blendMode, linearGamma, flipLayers);
+            imageData[px] = clrBrushMixColors(bgrColor, nC, fintensity, blendMode, linearGamma, flipLayers);
         }
     }
  
@@ -3238,18 +3239,18 @@ DLL_API int DLL_CALLCONV PrepareAlphaChannelBlur(int *imageData, int w, int h, i
     {
         INT64 px, y = 0;
         int defaultColor = 0;
-        UINT BGRcolor = imageData[x + y * w];
-        if (BGRcolor!=0x0)
-           defaultColor = BGRcolor & 0x00ffffff;
+        UINT bgrColor = imageData[x + y * w];
+        if (bgrColor!=0x0)
+           defaultColor = bgrColor & 0x00ffffff;
 
         for (y = 0; y < h; y++)
         {
             px = x + y * w;
-            BGRcolor = imageData[px];
-            if (BGRcolor==0x0 && defaultColor)
+            bgrColor = imageData[px];
+            if (bgrColor==0x0 && defaultColor)
                imageData[px] = (givenLevel << 24) | defaultColor;
             else
-               defaultColor = BGRcolor & 0x00ffffff;
+               defaultColor = bgrColor & 0x00ffffff;
 
             if (fillMissingOnly==0)
                imageData[px] = (givenLevel << 24) | (imageData[px] & 0x00ffffff);
@@ -3261,18 +3262,18 @@ DLL_API int DLL_CALLCONV PrepareAlphaChannelBlur(int *imageData, int w, int h, i
     {
         int px, y = h - 1;
         int defaultColor = 0;
-        UINT BGRcolor = imageData[x + y * w];
-        if (BGRcolor!=0x0)
-           defaultColor = BGRcolor & 0x00ffffff;
+        UINT bgrColor = imageData[x + y * w];
+        if (bgrColor!=0x0)
+           defaultColor = bgrColor & 0x00ffffff;
 
         for (y = h - 1; y >= 0; y--)
         {
             px = x + y * w;
-            BGRcolor = imageData[px];
-            if (BGRcolor==0x0 && defaultColor)
+            bgrColor = imageData[px];
+            if (bgrColor==0x0 && defaultColor)
                imageData[px] = (givenLevel << 24) | defaultColor;
             else
-               defaultColor = BGRcolor & 0x00ffffff;
+               defaultColor = bgrColor & 0x00ffffff;
         }
     }
     return 1;
@@ -5935,7 +5936,7 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
       hr = m_pIWICFactory->CreateDecoderFromFilename(szFileName, NULL, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &pWICclassDecoder);
   } catch (const char* message) {
       WICdestroyPreloadedImage(1);
-      fnOutputDebug("WICpreLoadImage: WIC decoder error > " + std::string(message) + ". File: " + wcharToString(szFileName));
+      fnOutputDebug("WICpreLoadImage: WIC decoder error > " + std::string(message) + ". File: " + WideCharToString(szFileName));
       return 0;
   }
 
@@ -6016,7 +6017,7 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
   if (FAILED(hr))
   {
       WICdestroyPreloadedImage(1);
-      fnOutputDebug("WICpreLoadImage: WIC decoder error on file: " + wcharToString(szFileName));
+      fnOutputDebug("WICpreLoadImage: WIC decoder error on file: " + WideCharToString(szFileName));
       return 0;
   };
 
@@ -6087,96 +6088,87 @@ void ListWICdecoders() {
     }
 }
 
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdfFilePath, UINT pageIndex, UINT destWidth, UINT destHeight, const wchar_t *password) {
-    // winrt::init_apartment(); // Initialize the Windows Runtime apartment
 
-    // Load the PDF file as a StorageFile.
-    winrt::Windows::Foundation::IAsyncOperation<winrt::Windows::Storage::StorageFile> storageFileAsync = 
-           winrt::Windows::Storage::StorageFile::GetFileFromPathAsync(pdfFilePath);
-
-    winrt::Windows::Storage::StorageFile storageFile = storageFileAsync.get();
-
-    // Load the PDF document.
-    winrt::Windows::Foundation::IAsyncOperation<winrt::Windows::Data::Pdf::PdfDocument> pdfDocAsync = 
-           winrt::Windows::Data::Pdf::PdfDocument::LoadFromFileAsync(storageFile);
-
-    winrt::Windows::Data::Pdf::PdfDocument pdfDoc = pdfDocAsync.get();
-    if (!pdfDoc)
-    {
-        fnOutputDebug("RenderPdfPageAsBitmap: Failed to load PDF document.");
-        return NULL;
-    }
-
-    // Check that the requested page index is valid.
-    if (pdfDoc.IsPasswordProtected())
-    {
-       fnOutputDebug("RenderPdfPageAsBitmap: the PDF is password protected");
-       if (!password)
-           return NULL;
-
-       pdfDocAsync =  winrt::Windows::Data::Pdf::PdfDocument::LoadFromFileAsync(storageFile, password);
-       pdfDoc = pdfDocAsync.get();
-    }
-
-    if (pageIndex >= pdfDoc.PageCount())
-       pageIndex = pdfDoc.PageCount() - 1;
-
-    // Get the specific page.
-    winrt::Windows::Data::Pdf::PdfPage pdfPage = pdfDoc.GetPage(pageIndex);
-
-    winrt::Windows::Data::Pdf::PdfPageRenderOptions renderOptions;
-    renderOptions.DestinationWidth(destWidth);
-    renderOptions.DestinationHeight(destHeight);
-
-    // Create an in-memory stream to hold the rendered page.
-    winrt::Windows::Storage::Streams::InMemoryRandomAccessStream memStream;
-
-    // Render the page into the stream using the specified options.
-    winrt::Windows::Foundation::IAsyncAction renderAsync = pdfPage.RenderToStreamAsync(memStream, renderOptions);
-    renderAsync.get();  // Wait for rendering to complete.
-    memStream.Seek(0);
-
-
-    IStream* pIStream = NULL;
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdfPath, int pageIndex, float dpi, int fillBehind, int bgrColor, int *errorType, const wchar_t* password) {
+// https://github.com/bblanchon/pdfium-binaries
     Gdiplus::GpBitmap *myBitmap = NULL;
-    IWICBitmapDecoder* pDecoder = NULL;
-    IWICBitmapFrameDecode* pFrame = NULL;
-    IWICFormatConverter* pConverter = NULL;
-    IWICBitmapSource* pFinalBitmapSource = NULL;
+    FPDF_DOCUMENT document = FPDF_LoadDocument(WideCharToString(pdfPath).c_str(), WideCharToString(password).c_str());
+    if (!document)
+    {
+        *errorType = FPDF_GetLastError();
+        if (*errorType==4)
+           fnOutputDebug("failed to load PDF document: incorrect password " + std::to_string(*errorType));
+        else
+           fnOutputDebug("failed to load PDF document: " + std::to_string(*errorType) );
 
-    // convert the InMemoryRandomAccessStream to an IStream a ccessible by WIC
-    HRESULT hr = CreateStreamOverRandomAccessStream(reinterpret_cast<IUnknown*>(winrt::get_abi(memStream)), IID_PPV_ARGS(&pIStream));
-
-    // Create a decoder on the IStream 
-    hr = m_pIWICFactory->CreateDecoderFromStream(pIStream, nullptr, WICDecodeMetadataCacheOnLoad, &pDecoder);
-    hr = pDecoder->GetFrame(0, &pFrame);
-
-    // Convert the frame to a pixel format that is compatible with GDI (32bpp BGRA).
-    hr = m_pIWICFactory->CreateFormatConverter(&pConverter);
-
-    hr = pConverter->Initialize(pFrame, GUID_WICPixelFormat32bppBGRA, WICBitmapDitherTypeNone, nullptr, 0.f, WICBitmapPaletteTypeCustom);
-    UINT width = 0, height = 0, cbStride = 0, cbBufferSize = 0;
-    // Use the dimensions specified by renderOptions (or read back from the converter).
-    hr = pConverter->GetSize(&width, &height);
-    fnOutputDebug("RenderPdfPageAsBitmap: " + std::to_string(width) + " x " + std::to_string(height));
-
-    hr = pConverter->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void **>(&pFinalBitmapSource));
-    hr = UIntMult(width, sizeof(Gdiplus::ARGB), &cbStride);
-    hr = UIntMult(cbStride, height, &cbBufferSize);
-    myBitmap = WICbmpSourceConvertGdip(pFinalBitmapSource, width, height, cbStride, cbBufferSize, PixelFormat32bppARGB);
-    SafeRelease(pFinalBitmapSource, "RenderPdfPageAsBitmap: pFinalBitmapSource", 0);
-    SafeRelease(pConverter, "RenderPdfPageAsBitmap: pConverter", 0);
-    SafeRelease(pFrame, "RenderPdfPageAsBitmap: pFrame", 0);
-    SafeRelease(pDecoder, "RenderPdfPageAsBitmap: pDecoder", 0);
-    SafeRelease(pIStream, "RenderPdfPageAsBitmap: pIStream", 0);
-
-    pdfPage = nullptr;
-    pdfDoc = nullptr;
-    storageFile = nullptr;
-    if (memStream) {
-        memStream.Close();
-        memStream = nullptr;
+        return myBitmap;
     }
+
+    if (FPDF_GetDocPermissions(document) == 0 && !password) {
+        fnOutputDebug("failed to load PDF document: password protected; one is required");
+        FPDF_CloseDocument(document);
+        *errorType = -1;
+        return myBitmap;
+    }
+
+    int pageCount = FPDF_GetPageCount(document);
+    if (pageCount <= 0) {
+        fnOutputDebug("failed to load PDF: no pages found");
+        FPDF_CloseDocument(document);
+        *errorType = -2;
+        return myBitmap;
+    }
+    
+    pageIndex = std::clamp(pageIndex, 0, pageCount - 1);
+    FPDF_PAGE PDFpage = FPDF_LoadPage(document, pageIndex);
+    if (!PDFpage) {
+        fnOutputDebug("failed to load PDF page");
+        FPDF_CloseDocument(document);
+        *errorType = -3;
+        return myBitmap;
+    }
+
+    float scale = dpi / 72.0f;  // PDF uses 72 DPI as base
+    double pageWidth = FPDF_GetPageWidth(PDFpage);
+    double pageHeight = FPDF_GetPageHeight(PDFpage);
+    int bitmapWidth = static_cast<int>(pageWidth * scale);
+    int bitmapHeight = static_cast<int>(pageHeight * scale);
+
+    Gdiplus::DllExports::GdipCreateBitmapFromScan0(bitmapWidth, bitmapHeight, bitmapWidth * 4, PixelFormat32bppARGB, NULL, &myBitmap);
+    if (myBitmap==NULL)
+    {
+        fnOutputDebug("failed to load PDF page; unable to allocate the GDI+ bitmap");
+        FPDF_ClosePage(PDFpage);
+        FPDF_CloseDocument(document);
+        *errorType = -4;
+        return myBitmap;
+    }
+
+    Gdiplus::BitmapData bitmapDatu;
+    Gdiplus::Rect rect(0, 0, bitmapWidth, bitmapHeight);
+    Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rect, Gdiplus::ImageLockModeWrite, PixelFormat32bppARGB, &bitmapDatu);
+
+    // Create bitmap for PDFium to render into over the GDI+ Scan0
+    FPDF_BITMAP pdfBitmap = FPDFBitmap_CreateEx(bitmapWidth, bitmapHeight, FPDFBitmap_BGRA, bitmapDatu.Scan0, bitmapDatu.Stride);
+    if (pdfBitmap)
+    {
+        if (fillBehind==1)
+           FPDFBitmap_FillRect(pdfBitmap, 0, 0, bitmapWidth, bitmapHeight, bgrColor);
+
+        FPDF_RenderPageBitmap(pdfBitmap, PDFpage, 0, 0, bitmapWidth, bitmapHeight, 0, FPDF_ANNOT);
+        FPDFBitmap_Destroy(pdfBitmap);
+        Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu);
+    } else
+    {
+        *errorType = -5;
+        fnOutputDebug("failed to create bitmap to render PDF");
+        Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu);
+        Gdiplus::DllExports::GdipDisposeImage(myBitmap);
+        myBitmap = NULL;
+    }
+
+    FPDF_ClosePage(PDFpage);
+    FPDF_CloseDocument(document);
     return myBitmap;
 }
 
@@ -6214,7 +6206,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
             // Create a decoder; Decode the source image to IWICBitmapSource
             hr = m_pIWICFactory->CreateDecoderFromFilename(szFileName, NULL, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &pDecoder);
         } catch (const char* message) {
-            fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: WIC decoder error > " + std::string(message) + ". File: " + wcharToString(szFileName));
+            fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: WIC decoder error > " + std::string(message) + ". File: " + WideCharToString(szFileName));
             return myBitmap;
         }
 
@@ -6299,7 +6291,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
         {
             SafeRelease(pFrame, "LoadWICimage: pFrame", 0);
             SafeRelease(pDecoder, "LoadWICimage: pDecoder", 0);
-            fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: WIC decoder error on file " + wcharToString(szFileName));
+            fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: WIC decoder error on file " + WideCharToString(szFileName));
             return myBitmap;
         };
 
