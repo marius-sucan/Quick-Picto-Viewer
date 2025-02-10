@@ -41,6 +41,9 @@
 // #include <opencv2/opencv.hpp>
 #include "includes\opencv2\opencv.hpp"
 #include "includes\pdfium\fpdfview.h"
+#include "includes\pdfium\fpdf_text.h"
+#include "includes\pdfium\fpdf_annot.h"
+#include "includes\pdfium\fpdf_doc.h"
 using namespace std;
 using namespace cimg_library;
 #define DLL_API extern "C" __declspec(dllexport)
@@ -6089,7 +6092,7 @@ void ListWICdecoders() {
 }
 
 
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdfPath, int pageIndex, float dpi, int fillBehind, int bgrColor, int *errorType, const wchar_t* password) {
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdfPath, int pageIndex, float dpi, int fillBehind, int bgrColor, int *varOut, int *errorType, const wchar_t* password, unsigned short* textBuffer) {
 // https://github.com/bblanchon/pdfium-binaries
     Gdiplus::GpBitmap *myBitmap = NULL;
     FPDF_DOCUMENT document = FPDF_LoadDocument(WideCharToString(pdfPath).c_str(), WideCharToString(password).c_str());
@@ -6111,14 +6114,46 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
         return myBitmap;
     }
 
+    int act = *varOut;
+    // act == -1; retrieve the total page count
+    // act == -2; get the buffer size necessary for the texts on a given page
+    // act == -3; retrieve the texts on a given page and fill textBuffer data
+    // act == -4; get the buffer size necessary for all the links on a given page
+    // act == -5; retrieve the links on a given page and fill the textBuffer data
+    int textLength = 0;
     int pageCount = FPDF_GetPageCount(document);
-    if (pageCount <= 0) {
-        fnOutputDebug("failed to load PDF: no pages found");
+    if (pageCount<=0 || act==-1 || act==-2)
+    {
+        if (pageCount<=0)
+        {
+           fnOutputDebug("failed to load PDF: no pages found");
+           *errorType = -2;
+        } else if (act==-2)
+        {
+           pageIndex = std::clamp(pageIndex, 0, pageCount - 1);
+           FPDF_PAGE PDFpage = FPDF_LoadPage(document, pageIndex);
+           if (PDFpage)
+           {
+              FPDF_TEXTPAGE textPage = FPDFText_LoadPage(PDFpage);
+              if (textPage)
+              {
+                 textLength = FPDFText_CountChars(textPage);
+                 FPDFText_ClosePage(textPage);
+              } else {
+                 *errorType = -6;
+              }
+              FPDF_ClosePage(PDFpage);
+           } else {
+              *errorType = -3;
+           }
+        }
+
+        *varOut = (act==-2) ? textLength : pageCount;
         FPDF_CloseDocument(document);
-        *errorType = -2;
         return myBitmap;
     }
     
+    *varOut = pageCount;
     pageIndex = std::clamp(pageIndex, 0, pageCount - 1);
     FPDF_PAGE PDFpage = FPDF_LoadPage(document, pageIndex);
     if (!PDFpage) {
@@ -6126,6 +6161,75 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
         FPDF_CloseDocument(document);
         *errorType = -3;
         return myBitmap;
+    }
+
+    if (act==-3)
+    {
+       FPDF_TEXTPAGE textPage = FPDFText_LoadPage(PDFpage);
+       if (textPage)
+       {
+          textLength = FPDFText_CountChars(textPage);
+          int extracted = FPDFText_GetText(textPage, 0, textLength, textBuffer);
+          FPDFText_ClosePage(textPage);
+          *varOut = extracted;
+       } else {
+          *errorType = -6;
+          *varOut = 0;
+       }
+
+       FPDF_ClosePage(PDFpage);
+       FPDF_CloseDocument(document);
+       return myBitmap;
+    } else if (act==-4 || act==-5)
+    {
+       const int buffSize = 1024;
+       int index = 0;
+       int annotCount = FPDFPage_GetAnnotCount(PDFpage);
+       for (int i = 0; i < annotCount; ++i)
+       {
+           FPDF_ANNOTATION annot = FPDFPage_GetAnnot(PDFpage, i);
+           if (!annot)
+              continue;
+ 
+           FPDF_ANNOTATION_SUBTYPE subtype = FPDFAnnot_GetSubtype(annot);
+           if (subtype == FPDF_ANNOT_LINK)
+           {
+               FPDF_LINK link = FPDFAnnot_GetLink(annot);
+               if (!link) continue;
+
+               FPDF_ACTION action = FPDFLink_GetAction(link);
+               if (action)
+               {
+                   if (act==-4)
+                   {
+                      index += buffSize;
+                      FPDFPage_CloseAnnot(annot);
+                      continue;
+                   }
+
+                   char buffer[buffSize] = {0};
+                   FPDFAction_GetURIPath(document, action, buffer, sizeof(buffer));
+                   for (int z = 0; z < buffSize; ++z)
+                   {
+                       if (buffer[z]==0)
+                       {
+                          textBuffer[index] = '|';
+                          index++;
+                          break;
+                       }
+
+                       textBuffer[index] = buffer[z];
+                       index++;
+                   }
+               }
+           }
+           FPDFPage_CloseAnnot(annot);
+       }
+
+       *varOut = index;
+       FPDF_ClosePage(PDFpage);
+       FPDF_CloseDocument(document);
+       return myBitmap;
     }
 
     float scale = dpi / 72.0f;  // PDF uses 72 DPI as base
