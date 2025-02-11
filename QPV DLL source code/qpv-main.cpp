@@ -6092,8 +6092,23 @@ void ListWICdecoders() {
 }
 
 
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdfPath, int pageIndex, float dpi, int fillBehind, int bgrColor, int *varOut, int *errorType, const wchar_t* password, unsigned short* textBuffer) {
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdfPath, int pageIndex, float dpi, int* givenW, int* givenH, int fillBehind, int bgrColor, int *varOut, int *errorType, const wchar_t* password, unsigned short* textBuffer) {
 // https://github.com/bblanchon/pdfium-binaries
+    int act = *varOut;
+    // act == -1; retrieve the total page count
+    // act == -2; get the buffer size necessary for the texts on a given page
+    // act == -3; retrieve the texts on a given page and fill textBuffer data
+    // act == -4; get the buffer size necessary for all the links on a given page
+    // act == -5; retrieve the links on a given page and fill the textBuffer data
+    // act == -6; retrieve the width and height of on a given page and total page count
+    // errorType > 0; error codes from PDFium
+    // errorType = -1; PDF password protected
+    // errorType = -2; PDF seems to have no pages
+    // errorType = -3; failed to retrieve PDF page from document 
+    // errorType = -4; failed to allocate the GDI+ bitmap
+    // errorType = -5; failed to create the FPDF bitmap to render PDF
+    // errorType = -6; failed to retrieve PDF text page from PDF page 
+
     Gdiplus::GpBitmap *myBitmap = NULL;
     FPDF_DOCUMENT document = FPDF_LoadDocument(WideCharToString(pdfPath).c_str(), WideCharToString(password).c_str());
     if (!document)
@@ -6114,12 +6129,6 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
         return myBitmap;
     }
 
-    int act = *varOut;
-    // act == -1; retrieve the total page count
-    // act == -2; get the buffer size necessary for the texts on a given page
-    // act == -3; retrieve the texts on a given page and fill textBuffer data
-    // act == -4; get the buffer size necessary for all the links on a given page
-    // act == -5; retrieve the links on a given page and fill the textBuffer data
     int textLength = 0;
     int pageCount = FPDF_GetPageCount(document);
     if (pageCount<=0 || act==-1 || act==-2)
@@ -6163,6 +6172,11 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
         return myBitmap;
     }
 
+    float scale = dpi / 72.0f;  // PDF uses 72 DPI as base
+    double pageWidth = FPDF_GetPageWidth(PDFpage);
+    double pageHeight = FPDF_GetPageHeight(PDFpage);
+    int bitmapWidth = (float)pageWidth * scale;
+    int bitmapHeight = (float)pageHeight * scale;
     if (act==-3)
     {
        FPDF_TEXTPAGE textPage = FPDFText_LoadPage(PDFpage);
@@ -6230,22 +6244,32 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
        FPDF_ClosePage(PDFpage);
        FPDF_CloseDocument(document);
        return myBitmap;
+    } else if (act==-6)
+    {
+       *varOut = pageCount;
+       *givenW = bitmapWidth;
+       *givenH = bitmapHeight;
+       FPDF_ClosePage(PDFpage);
+       FPDF_CloseDocument(document);
+       return myBitmap;
     }
 
-    float scale = dpi / 72.0f;  // PDF uses 72 DPI as base
-    double pageWidth = FPDF_GetPageWidth(PDFpage);
-    double pageHeight = FPDF_GetPageHeight(PDFpage);
-    int bitmapWidth = static_cast<int>(pageWidth * scale);
-    int bitmapHeight = static_cast<int>(pageHeight * scale);
+    if (*givenW<2)
+       *givenW = 32100;
+    if (*givenH<2)
+       *givenH = 32100;
 
-    Gdiplus::DllExports::GdipCreateBitmapFromScan0(bitmapWidth, bitmapHeight, bitmapWidth * 4, PixelFormat32bppARGB, NULL, &myBitmap);
+    auto nSize = adaptImageGivenSize(1, 0, bitmapWidth, bitmapHeight, *givenW, *givenH);
+    bitmapWidth = nSize[0];
+    bitmapHeight = nSize[1];
+    Gdiplus::DllExports::GdipCreateBitmapFromScan0(bitmapWidth, bitmapHeight, bitmapWidth * 4, PixelFormat32bppPARGB, NULL, &myBitmap);
     if (myBitmap==NULL)
     {
-        fnOutputDebug("failed to load PDF page; unable to allocate the GDI+ bitmap");
-        FPDF_ClosePage(PDFpage);
-        FPDF_CloseDocument(document);
-        *errorType = -4;
-        return myBitmap;
+       fnOutputDebug("failed to load PDF page; unable to allocate the GDI+ bitmap: " + std::to_string(bitmapWidth) + " x " + std::to_string(bitmapHeight));
+       FPDF_ClosePage(PDFpage);
+       FPDF_CloseDocument(document);
+       *errorType = -4;
+       return myBitmap;
     }
 
     Gdiplus::BitmapData bitmapDatu;
@@ -6265,7 +6289,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
     } else
     {
         *errorType = -5;
-        fnOutputDebug("failed to create bitmap to render PDF");
+        fnOutputDebug("failed to create the FPDF bitmap to render PDF");
         Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu);
         Gdiplus::DllExports::GdipDisposeImage(myBitmap);
         myBitmap = NULL;

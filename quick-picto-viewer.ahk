@@ -111,17 +111,17 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , ResolutionWidth := "", ResolutionHeight := "", prevStartIndex := 1, mustReloadThumbsList := 0
    , gdiBitmap := "", mainSettingsFile := "quick-picto-viewer.ini", mainRecentsFile := "quick-picto-viewer-recents.ini"
    , mustOpenStartFolder := "", mainFavesFile := "quick-picto-viewer-favourites.ini", miniFavesFile := "quick-picto-viewer-minifaves.ini"
-   , RegExAllFilesPattern := "ico|dib|dng|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif|webp|svg"
+   , RegExAllFilesPattern := "ico|dib|dng|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif|webp|svg|pdf"
    , RegExFilesPattern := "i)^(.\:\\).*(\.(" RegExAllFilesPattern "))$", folderFavesFile := "quick-picto-viewer-folder-faves.ini"
    , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
-   , RegExWICfmtPtrn := "i)(.\\*\.(place-holder|webp|bmp|dib|rle|tiff|tif|png|jfif|wdp|jxr|jpg|jpeg|svg))$", customKbdFile := "quick-picto-viewer-custom-kbd.ini"
+   , RegExWICfmtPtrn := "i)(.\\*\.(place-holder|webp|bmp|dib|rle|tiff|tif|png|jfif|wdp|jxr|jpg|jpeg|svg|pdf))$", customKbdFile := "quick-picto-viewer-custom-kbd.ini"
    , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|ico|jng|jif|jpg|jpe|jpeg|ppm|xpm))$"
    , saveTypesFriendly := ".BMP, .GIF, .HDP, .J2K, .JNG, .JP2, .JPG, .JXR, .PNG, .PPM, .TGA, .TIF, .WDP, .WEBP, .ICO or .XPM"
    , saveAlphaTypesRegEX := "i)(.\.(j2k|j2c|jp2|jxr|wdp|hdp|ico|png|tga|tif|tiff|webp))$", userJpegQuality := 90
-   , openFptrn1 := "*.png;*.bmp;*.gif;*.jpg;*.tif;*.tga;*.webp;*.jpeg", prevLoadedImageIndex := 0, mainExecPath
+   , openFptrn1 := "*.png;*.bmp;*.gif;*.jpg;*.tif;*.tga;*.webp;*.jpeg;*.pdf;*.svg;*.tiff;*.jpe;*.ico", prevLoadedImageIndex := 0, mainExecPath
    , openFptrn2 := "*.dds;*.emf;*.exr;*.g3;*.hdp;*.j2c;*.j2k;*.jbg;*.jif;*.jng;*.jp2;*.jxr;*.koa;*.lbm;*.mng;*.pbm;*.pcd;*.pct;*.pcx;*.pfm;*.pgm;*.pic;*.ppm;*.psd;*.ras;*.sgi;*.wap;*.wbm;*.wbmp;*.wdp;*.wmf;*.xbm;*.xpm"
    , openFptrn3 := "*.3fr;*.arw;*.bay;*.bmq;*.cap;*.cine;*.cr2;*.crw;*.cs1;*.dc2;*.dcr;*.drf;*.dsc;*.erf;*.fff;*.hdr;*.ia;*.iiq;*.k25;*.kc2;*.kdc;*.mdc;*.mef;*.mos;*.mrw;*.nef;*.nrw;*.orf;*.pef;*.ptx;*.pxn;*.qtk;*.raf;*.raw;*.rdc;*.rw2;*.rwz;*.sr2;*.srf;*.x3f"
-   , openFptrn4 := "*.tiff;*.targa;*.jpe;*.dib;*.pict;*.rle", openFptrnWIC := "", forceLiveAlphaPreviewMode := 0
+   , openFptrn4 := "*.targa;*.dib;*.pict;*.rle", openFptrnWIC := "", forceLiveAlphaPreviewMode := 0
    , dialogSaveFptrn := "HD Photo (*.hdp;*.jxr)|Network Graphics JPEG (*.jng)|JPEG Common (*.jpg;*.jpeg)|JPEG 2000 (*.jp2)|JPEG 2000 codestream (*.j2k)|JPEG-XR (*.jxr)|Non-animated Compuserve GIF (*.gif)|Portable Network Graphics (*.png)|Portable PixelMap (*.ppm)|Tagged Image File Format (*.tif;*.tiff)|TrueVision Targa (*.tga)|Windows Photo (*.wdp;*.jxr)|Google WebP (*.webp)|Windows Bitmap (*.bmp)|X-PixMap (*.xpm)|Icon (*.ico)"
    , dialogSaveIndexes := {1:"hdp", 2:"jng", 3:"jpg", 4:"jp2", 5:"j2k", 6:"jxr", 7:"gif", 8:"png", 9:"ppm", 10:"tif", 11:"tga", 12:"wdp", 13:"webp", 14:"bmp", 15:"xpm", 16:"ico"}
    , userPossibleWriteFMTs := ".BMP|.GIF|.HDP|.J2K|.JNG|.JP2|.JPG|.JXR|.PNG|.PPM|.TGA|.TIF|.WDP|.WEBP|.XPM"
@@ -2377,7 +2377,7 @@ initQPVmainDLL(modus:=0) {
       RegExFilesPattern .= extensionsList
       RegExFilesPattern .= "))$"
       ; interfaceThread.ahkassign("RegExFilesPattern", RegExFilesPattern)
-      allFormats := "*.jpeg;*.ico;" openFptrn3 openFptrn1 openFptrn2 openFptrn4 ";"
+      allFormats := openFptrn3 openFptrn1 openFptrn2 openFptrn4 ";"
       Loop, Parse, extensionsList, |
       {
          If !InStr(allFormats, "*." A_LoopField ";")
@@ -11657,6 +11657,9 @@ changeDesiredFrame(dir:=1) {
 
    value2Adjust := clampInRange(value2Adjust, 0, totalFramesIndex, 1)
    desiredFrameIndex := value2Adjust
+   If RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|tiff|tif))$")
+      dir := -1
+
    If (A_TickCount - lastInvoked > 350) || (dir=-1 || drawModeCzeit>450)
    {
       infoShowCurrentFrameIndex()
@@ -11670,7 +11673,7 @@ changeDesiredFrame(dir:=1) {
       If (drawModeAzeit>450)
          SetTimer, RefreshImageFile, -450
       Else
-         SetTimer, RefreshImageFile, % (dir=-1) ? -95 : -5
+         SetTimer, RefreshImageFile, % (dir=-1) ? -105 : -5
       prevValues := newValues
    }
 }
@@ -40608,7 +40611,7 @@ testFuncIsInMenus(funcu) {
    Return listu[funcu, 1]
 }
 
-displayFileHeaderRaw() {
+PanelDisplayFileHeaderRaw() {
    imgPath := getIDimage(currentFileIndex)
    zPlitPath(imgPath, 0, OutFileName, OutDir, fileNamuNoEXT, fileEXTu)
    If (userPrivateMode=1)
@@ -40629,7 +40632,7 @@ displayFileHeaderRaw() {
          header .= A_Space
 
       kl++
-      If (pp>128 || kl>2048)
+      If (pp>256 || kl>4096)
          Break
    }
    header := StrReplace(header, "   ", A_Space)
@@ -40648,7 +40651,7 @@ displayFileHeaderRaw() {
          endu := A_Space endu
 
       kl++
-      If (pp>128 || kl>2048)
+      If (pp>256 || kl>4096)
          Break
    }
    endu := StrReplace(endu, "   ", A_Space)
@@ -40661,7 +40664,7 @@ buildQuickSearchMenus() {
    mustPreventMenus := 1
    BuildMainMenu("forced")
    If (maxFilesIndex>0)
-      kMenu("PVmenu", "Add", "Show file header", "displayFileHeaderRaw")
+      kMenu("PVmenu", "Add", "Show file header", "PanelDisplayFileHeaderRaw")
    If isImgEditingNow()
       kMenu("PVmenu", "Add", "Purge undo levels", "MenuPurgeUndos")
 
@@ -41156,12 +41159,13 @@ fileImgFormatsOpenDialog(modus:=0) {
     patternObj := []
     patternObj["All files"] := "*.*"
     patternObj["Camera RAW files"] := openFptrn3 ";*.sti"
-    patternObj["Common image formats"] := openFptrn1 ";" openFptrn2 ";" openFptrn4 ";*.ico"
+    patternObj["Common image formats"] := openFptrn1
+    patternObj["Other formats"] := openFptrn2 ";" openFptrn4
     patternObj["JPEGs"] := "*.jpg;*.j2k;*.jfif;*.jng;*.jp2;*.jif;*.jxr;*.jpe;*.jpeg"
     patternObj["TIFFs"] := "*.tif;*.tiff"
     patternObj["Windows BMP"] := "*.bmp"
     patternObj["PNG"] := "*.png"
-    patternObj["HDR / OpenEXR"] := "*.hdr;*.exr"
+    patternObj["HDR images / OpenEXR"] := "*.hdr;*.exr;*.tif;*.tiff"
     patternObj["GDI+ supported"] := "*.bmp;*.dib;*.rle;*.jpg;*.jpeg;*.jfif;*.gif;*.tif;*.tiff;*.png;*.ico;*.wmf;*.emf"
     If (WICmoduleHasInit=1 && InStr(openFptrnWIC, "*."))
        patternObj["WIC-only supported"] := openFptrnWIC
@@ -54019,6 +54023,60 @@ BtnALLviewedImages2List(dummy:=0) {
    RandomPicture()
 }
 
+PanelPDFreadTexts(tabu:=1) {
+    thisBtnHeight := createSettingsGUI(90, A_ThisFunc)
+    EditWid := 60
+    If (PrefsLargeFonts=1)
+    {
+       EditWid := EditWid + 40
+       Gui, Font, s%LargeUIfontValue%
+    }
+
+    txtWid := Round(editWid*6.25)
+    Global EditPDFtexts, EditPDFlinks
+    Gui, Add, Tab3, %tabzDarkModus% AltSubmit gBtnTabsInfoUpdate hwndhCurrTab vCurrentPanelTab Choose%thisPanelTab%, Text|Links|Search in PDF
+    Gui, Tab, 1
+    Gui, Add, Button, x+15 y+15 w1 h1 gBtnCloseWindow Default, Clo&se
+    GuiAddEdit("x+0 y+0 Section ReadOnly w" txtWid " r15 vEditPDFtexts", "", "")
+    Gui, Tab, 2
+    Gui, Add, Button, x+15 y+15 w1 h1 gBtnCloseWindow Default, Clo&se
+    GuiAddEdit("x+0 y+0 Section ReadOnly w" txtWid " r15 vEditPDFlinks", "", "Links on the PDF page")
+
+    Gui, Tab, 3
+    Gui, Add, Text, x+15 y+15 wp, Search for in the entire PDF:
+    GuiAddEdit("y+5 wp+25 veditF5 r1 -multi -wrap gUIeditsGenericAllowCtrlBksp", editF5)
+    Gui, Add, Button, y+15 Section h%thisBtnHeight% gdummy, &View list
+
+    Gui, Tab
+    Gui, Add, Button, xm+15 y+15 Section h%thisBtnHeight% gBTNprevPDFpage, &Previous page
+    Gui, Add, Button, x+2 hp wp gBTNnextPDFpage, &Next page
+    Gui, Add, Button, x+5 hp wp gdummy, &Extract all
+    Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Close
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Extract texts in PDF: " appTitle)
+    SetTimer, ResetImgLoadStatus, -100
+    UIpopulatePDFtexts()
+}
+
+BTNnextPDFpage() {
+   MenuNextDesiredFrame()
+   SetTimer, UIpopulatePDFtexts, -150
+}
+
+BTNprevPDFpage() {
+   MenuPrevDesiredFrame()
+   SetTimer, UIpopulatePDFtexts, -150
+}
+
+UIpopulatePDFtexts() {
+   Gui, SettingsGUIA: Default
+
+   txt := GetTextsFromPDF(getIDimage(currentFileIndex), desiredFrameIndex, 0)
+   GuiControl, SettingsGUIA:, EditPDFtexts, % txt
+
+   linkz := GetTextsFromPDF(getIDimage(currentFileIndex), desiredFrameIndex, 1)
+   GuiControl, SettingsGUIA:, EditPDFlinks, % linkz
+}
+
 PanelJournalWindow(tabu:=1) {
     If (AnyWindowOpen=1)
        CloseWindow()
@@ -54064,8 +54122,10 @@ PanelJournalWindow(tabu:=1) {
     Gui, Tab, 1
     Gui, Add, Button, x+15 y+15 w1 h1 gBtnCloseWindow Default, Clo&se
     GuiAddEdit("x+0 y+0 Section ReadOnly w" txtWid " r15", textList, "QPV events journal")
+
     Gui, Tab, 2
-    GuiAddEdit("x+15 y+15 Section ReadOnly w" txtWid " r15", errList, "QPV errors journal")
+    Gui, Add, Button, x+15 y+15 w1 h1 gBtnCloseWindow Default, Clo&se
+    GuiAddEdit("x+0 y+0 Section ReadOnly w" txtWid " r15", errList, "QPV errors journal")
     ; Gui, Add, Button, xs y+2 h%thisBtnHeight% gPanelSeenIMGsOptions, &Seen images database options
 
     Gui, Tab, 3
@@ -55552,7 +55612,7 @@ PanelJump2index() {
       coreGenerateRandomList()
 
    imgPath := getIDimage(currentFileIndex)
-   isAnim := (RegExMatch(imgPath, "i)(.\.(gif))$") && totalFramesIndex>1) ? "`fSkip to given frame index" : ""
+   isAnim := (totalFramesIndex>1) ? "`fSkip to given frame index" : ""
    fakeWinCreator(13, A_ThisFunc, 1)
    msgResult := msgBoxWrapper("panelu|Skip to given index: " appTitle, "Please type a number to skip at in the files list`nand choose the action.`n`nTotal entries: " groupDigits(maxFilesIndex) "`nCurrent random index: " groupDigits(RandyIMGnow), "&Skip to...|C&ancel", 1, "fast-forward", 0, 0, "Skip to the given file index`f`fSkip to the given index in the random list`fSelect from the current file index to the given index" isAnim, "limit9050 +number", currentFileIndex, 2)
    If InStr(msgResult.btn, "skip")
@@ -62553,9 +62613,15 @@ InvokeMenuBarImage(manuID) {
      If !AnyWindowOpen
      {
         Menu, pvMenuBarImage, Add
-        kMenu("pvMenuBarImage", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw reinhard drago")
-        If (!InStr(currIMGdetails.PixelFormat, "TONE-MAPP") && !varContains(currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat, "hdr", "exr", "128-bit", "96-bit", "RGBF", "RGBAF"))
-           kMenu("pvMenuBarImage", "Disable", "Adjust &HDR tone-mapping")
+        If RegExMatch(getIDimage(currentFileIndex), "i)(.\.pdf)$")
+        {
+           kMenu("pvMenuBarImage", "Add", "Extract texts from PDF page", "PanelPDFreadTexts", "convert retrieve read search links pdf")
+        } Else
+        {
+           kMenu("pvMenuBarImage", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw reinhard drago")
+           If (!InStr(currIMGdetails.PixelFormat, "TONE-MAPP") && !varContains(currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat, "hdr", "exr", "128-bit", "96-bit", "RGBF", "RGBAF"))
+              kMenu("pvMenuBarImage", "Disable", "Adjust &HDR tone-mapping")
+        }
 
         kMenu("pvMenuBarImage", "Add", "Set as &wallpaper", "PanelSetWallpaper", "desktop image") 
         kMenu("pvMenuBarImage", "Add", "Extract frames/pa&ges", "PanelExtractFrames")
@@ -63574,6 +63640,9 @@ createMenuImgSizeAdapt(dummy:=0) {
 
       If (drawingShapeNow=0 && mustCaptureCloneBrush=0)
       {
+         If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.pdf)$") && !AnyWindowOpen)
+            kMenu("PVview", "Add", "Extract texts from PDF page", "PanelPDFreadTexts", "convert retrieve read search links pdf")
+
          yayz := varContains(currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat, "hdr", "exr", "128-bit", "96-bit", "RGBF", "RGBAF")
          If ((InStr(currIMGdetails.PixelFormat, "TONE-MAPP") || yayz=1) && !AnyWindowOpen)
             kMenu("PVview", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw reinhard drago")
@@ -63786,6 +63855,9 @@ createMenuMainView() {
    {
       createMenuImgSizeAdapt()
       createMenuImgVProtation()
+      If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.pdf)$") && !AnyWindowOpen)
+         kMenu("PVview", "Add", "Extract texts from PDF page", "PanelPDFreadTexts", "convert retrieve read search links pdf")
+
       yayz := varContains(currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat, "hdr", "exr", "128-bit", "96-bit", "RGBF", "RGBAF")
       If ((InStr(currIMGdetails.PixelFormat, "TONE-MAPP") || yayz=1) && !AnyWindowOpen)
          kMenu("PVview", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw")
@@ -82569,7 +82641,6 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
    showDelayedTooltip("Found " groupDigits(groupies.Count()) " groups of duplicate images`nTotal images: " groupDigits(maxFilesIndex))
    ; ToolTip, % "x=" x , , , 2
    dummyTimerDelayiedImageDisplay(90)
-
    ; RandomPicture()
 }
 
@@ -87515,7 +87586,7 @@ PanelKeywordsDetector() {
     Gui, Add, Text, x+7 hp +0x200 vtxtLine1, Keywords omitted: 987 129 millions gazillions
 
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Keywords list: " appTitle)
-    PopulateKeywordsListPanel(keywrdLVfilter)
+    UIpopulateKeywordsListPanel(keywrdLVfilter)
 }
 
 uiLVkeywordsListResponder(a,m_event,keyu) {
@@ -87585,7 +87656,7 @@ UIremKeywordsFilter() {
    GuiControl, SettingsGUIA:, thresholdKeywords,  % thresholdKeywords
    GuiControl, SettingsGUIA:, minKeywordLength,  % minKeywordLength
    GuiControl, SettingsGUIA:, LangKeywordsFilter,  % LangKeywordsFilter
-   PopulateKeywordsListPanel(0)
+   UIpopulateKeywordsListPanel(0)
 }
 
 UIfilterListKeywords() {
@@ -87597,16 +87668,16 @@ UIfilterListKeywords() {
    If (imageLoading=1)
       Return
 
-   PopulateKeywordsListPanel(keywrdLVfilter)
+   UIpopulateKeywordsListPanel(keywrdLVfilter)
 }
 
 BtnUiKeywordsLister() {
    EM_SETCUEBANNER(hEditField, "Generating keywords list - please wait", 1)
    GenerateKeywordsListNow()
-   PopulateKeywordsListPanel()
+   UIpopulateKeywordsListPanel()
 }
 
-PopulateKeywordsListPanel(listFilter:=0) {
+UIpopulateKeywordsListPanel(listFilter:=0) {
   Static dictionary := [], prevLang := 0
 
   Gui, SettingsGUIA: Default
@@ -95065,7 +95136,7 @@ convertSVGunitsToPixels(ByRef length) {
     }
 }
 
-RenderSVGfile(imgPath, noBPPconv, screenMode, sizesDesired:=0) {
+RenderSVGfile(imgPath, noBPPconv, screenMode) {
    ; to-do, todo: add user option to scale the svg content 
    FileRead, content, % imgPath
    If !content
@@ -95090,7 +95161,7 @@ RenderSVGfile(imgPath, noBPPconv, screenMode, sizesDesired:=0) {
    vb := (vbi!=4) ? "Malformed " : ""
    ow := w := convertSVGunitsToPixels(width)
    oh := h := convertSVGunitsToPixels(height)
-   If (screenMode=-1 && zoomLevel>1 && IMGresizingMode=4)
+   If (screenMode=1 && zoomLevel>1 && IMGresizingMode=4)
    {
       w := Round(w * zoomLevel)
       h := Round(h * zoomLevel)
@@ -95116,10 +95187,10 @@ RenderSVGfile(imgPath, noBPPconv, screenMode, sizesDesired:=0) {
    mainLoadedIMGdetails.ActiveFrame := 0
    mainLoadedIMGdetails.DPI := 96
    mainLoadedIMGdetails.RawFormat := !ver ? vb "SVG" : vb "SVG v" ver
-   mainLoadedIMGdetails.TooLargeGDI := 0
+   mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(w, h)
    mainLoadedIMGdetails.HasAlpha := 1
-   mainLoadedIMGdetails.OpenedWith := "Windows Imaging Component [WIC]"
-   mainLoadedIMGdetails.LoadedWith := "WIC"
+   mainLoadedIMGdetails.OpenedWith := "Windows Direct 2D [D2D]"
+   mainLoadedIMGdetails.LoadedWith := "D2D"
    If (noBPPconv=1)
       Return
 
@@ -95149,7 +95220,9 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
    ; Return pBitmap
 
    If RegExMatch(imgPath, "i)(.\.svg)$")
-      Return LoadWICimage(imgPath, noBPPconv, -1, useICM)
+      Return RenderSVGfile(imgPath, noBPPconv, 1)
+   Else If RegExMatch(imgPath, "i)(.\.pdf)$")
+      Return RenderPDFpage(imgPath, noBPPconv, frameu, sizesDesired)
 
    tt := startZeit := A_TickCount
    VarSetCapacity(resultsArray, 8 * 9, 0)
@@ -95308,7 +95381,9 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM, simpleMode) {
 
 LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitmap:=0) {
    If RegExMatch(imgPath, "i)(.\.svg)$")
-      Return RenderSVGfile(imgPath, noBPPconv, frameu, sizesDesired)
+      Return RenderSVGfile(imgPath, noBPPconv, 0)
+   Else If RegExMatch(imgPath, "i)(.\.pdf)$")
+      Return RenderPDFpage(imgPath, noBPPconv, frameu)
 
    startZeit := A_TickCount
    If IsObject(sizesDesired[1])
@@ -100081,21 +100156,112 @@ testIdentifyDIBbehindGDIPbmp() {
    SoundBeep, % E1 ? 900 : 300, 500
 }
 
+GetTextsFromPDF(imgPath, frameu, linkz, pwd:=0, ByRef pageCount:=0, byRef errorType:=0) {
+   linkz *= 2
+   varOut = -2 - linkz
+   pBitmap := DllCall(whichMainDLL "\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+   If (varOut>0 && errorType=0)
+   {
+      VarSetCapacity(textBuffer, (varOut+0) * 4, 0)
+      varOut := -3 - linkz 
+      DllCall(whichMainDLL "\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int", 0, "int", 1, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", &textBuffer, "UPtr")
+      if (varOut>1)
+      {
+         txt := StrGet(&textBuffer, "UTF-16")
+         if (linkz>0)
+         {
+            Sort, txt, UD|
+            txt := Trimmer(StrReplace(txt, "|", "`n `n"))
+         }
+      }
+   }
+
+   Return txt
+}
+
+RenderPDFpage(imgPath, noBPPconv, frameu, pwd:=0, maxW:=0, maxH:=0, dpi:=431, ByRef pageCount:=0, byRef errorType:=0, fillBgr:=0, bgrColor:="ffffff") {
+    If (noBPPconv=1)
+       pageCount := -6
+
+    pBitmap := DllCall(whichMainDLL "\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", dpi, "int*", maxW, "int*", maxH, "int", fillBgr, "int", "0xff" bgrColor, "int*", pageCount, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+    If StrLen(pBitmap)>2
+    {
+       recordGdipBitmaps(pBitmap, A_ThisFunc)
+       Gdip_BitmapSetResolution(pBitmap, dpi, dpi)
+       Gdip_GetImageDimensions(pBitmap, w, h)
+    } else if (noBPPconv=1 && errorType=0)
+    {
+       w := maxW
+       h := maxH
+    }
+
+    if (errorType=2)
+       fnOutputDebug("File not found or could not be opened")
+    else if (errorType=3)
+       fnOutputDebug("File not in PDF format or corrupted")
+    else if (errorType=4)
+       fnOutputDebug("Password required or incorrect password")
+    else If (errorType=-1)
+       fnOutputDebug("PDF password protected")
+    else If (errorType=-2)
+       fnOutputDebug("PDF seems to have no pages")
+    else If (errorType=-3)
+       fnOutputDebug("Failed to retrieve PDF page from document")
+    else If (errorType=-4)
+       fnOutputDebug("Failed to allocate the GDI+ bitmap")
+    else If (errorType=-5)
+       fnOutputDebug("Failed to create the FPDF bitmap to render PDF")
+    else If (errorType=-6)
+       fnOutputDebug("Failed to retrieve PDF text page from PDF page")
+    else if (errorType!=0)
+       fnOutputDebug("Unknown PDF error")
+
+    mainLoadedIMGdetails := []
+    mainLoadedIMGdetails.PixelFormat := "32-PARGB"
+    mainLoadedIMGdetails.Width := Round(w)
+    mainLoadedIMGdetails.Height := Round(h)
+    mainLoadedIMGdetails.ImgFile := imgPath
+    mainLoadedIMGdetails.Frames := Round(pageCount)
+    mainLoadedIMGdetails.ActiveFrame := clampInRange(frameu, 0, Round(pageCount))
+    mainLoadedIMGdetails.DPI := dpi
+    mainLoadedIMGdetails.RawFormat := "PDF"
+    mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(w, h)
+    mainLoadedIMGdetails.HasAlpha := !fillBgr
+    mainLoadedIMGdetails.OpenedWith := "PDFium renderer"
+    mainLoadedIMGdetails.LoadedWith := "PDF"
+    Return pBitmap
+}
+
 testPDFloader(){
    Static i := 0, p := 0
    initQPVmainDLL()
    ; pathu := "E:\Sucan twins\photos test\SLDs\freeimage-tests\pdfs\samplecertifiedpdf.pdf"
-   ; pathu := "E:\Sucan twins\e-chairs\living with eb articles\v9\about-life-perspective-disabled-person-RDEB.pdf"
-   pathu := "E:\Sucan twins\photos test\SLDs\freeimage-tests\pdfs\living-rdeb.pdf"
+   pathu := "E:\Sucan twins\e-chairs\living with eb articles\v9\about-life-perspective-disabled-person-RDEB.pdf"
+   ; pathu := "E:\Sucan twins\photos test\SLDs\freeimage-tests\pdfs\living-rdeb.pdf"
 pwd := "hello-world"
+errorType := 0
 fillBgr := 0
 bgrColor := "0xFF353535"
 dpi := 300
-pBitmap := DllCall(whichMainDLL "\RenderPdfPageAsBitmap", "Str", pathu, "Int", i, "float", dpi, "int", fillBgr, "int", bgrColor, "int*", errorType, "Str", pwd, "UPtr")
+ov := -2
+varOut = -4
+pBitmap := DllCall(whichMainDLL "\RenderPdfPageAsBitmap", "Str", pathu, "Int", i, "float", dpi, "int", fillBgr, "int", bgrColor, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+
+if (ov=-2 && varOut>0 && errorType=0)
+{
+   VarSetCapacity(textBuffer, (varOut+0) * 4, 0)
+   varOut := -5
+   DllCall(whichMainDLL "\RenderPdfPageAsBitmap", "Str", pathu, "Int", i, "float", dpi, "int", fillBgr, "int", bgrColor, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", &textBuffer, "UPtr")
+   if (varOut>1)
+   {
+      txt := StrGet(&textBuffer, "UTF-16")
+      txt := StrReplace(txt, "|", "`n")
+   }
+}
    i++
 p := !p
    Gdip_GetImageDimensions(pBitmap, w, h)
-   ToolTip, % errorType "|" hBitmap "|" pBitmap "|" w "|" h, , , 2
+   ToolTip, % varOut "|" errorType "|" i "|" pBitmap "|" w "|" h "`n `n" txt, , , 2
    Gdi_DeleteObject(hBitmap)
    Gdip_GraphicsClear(2NDglPG)
    Gdip_DrawImage(2NDglPG, pBitmap,  50, 50, w//4, h//4)
@@ -100114,8 +100280,6 @@ testWicLoader() {
    pathu := "E:\Sucan twins\photos test\SLDs\freeimage-tests\svgs\writing-board-svgrepo-com.svg"
    ; pathu := "E:\Sucan twins\photos test\SLDs\freeimage-tests\svgs\gene-sequencing-svgrepo-com.svg"
    ; pBitmap := LoadAndResizeImageWIC("E:\Sucan twins\photos test\SLDs\freeimage-tests\test-rosar- (9a).webp", 800, 600)
-   ; if !pBitmap
-   ;    pBitmap := RenderSVGfile(pathu, 0, 0)
 
    Gdip_GetImageDimensions(pBitmap, w, h)
    ToolTip, % pBitmap "|" w "|" h, , , 2
