@@ -211,7 +211,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , userFriendlyPrevImgSelAction, keywordsListArray := new hashtable(), keywrdLVfilter, wasVPfxBefore := 0
    , lastLclickX, lastLclickY, lastTlbrClicked := 0, uiLVoffset := 0, repositionedWindow := 0, hCollapseWidget := 0
    , selDotMaX, selDotMaY, selDotMbX, selDotMbY, selDotMcX, selDotMcY, selDotMdX, selDotMdY, OnExtractConflictOverwrite := 4
-   , lastInfoBoxZeitToggle := 1, prevHistoBoxString := "", menuHotkeys, whichMainDLL := "qpvmain.dll", lastMenuZeit := 1
+   , lastInfoBoxZeitToggle := 1, prevHistoBoxString := "", menuHotkeys, lastMenuZeit := 1
    , userExtractFramesFmt := 3, maxMultiPagesAllowed := 2048, maxMemLimitMultiPage := 2198765648, alphaMaskCoffsetX := 0
    , userImgClrMtrxBrightness, userImgClrMtrxContrast, userImgClrMtrxSaturation, userImgVPthreshold, userImgVPgammaLevel
    , cmdExifTool := "", tabzDarkModus := 0, maxRecentOpenedFolders := 6, UIuserToneMapParamA := 210, UIuserToneMapParamB := 160
@@ -2311,7 +2311,7 @@ initQPVmainDLL(modus:=0) {
       initFIMGmodule()
 
    attempts++
-   DllPath := FreeImage_FoxGetDllPath(whichMainDLL, mainExecPath)
+   DllPath := FreeImage_FoxGetDllPath("qpvmain.dll", mainExecPath)
    ; addJournalEntry("INIT main QPV initial DllPath: " DllPath)
    If !DllPath
    {
@@ -2334,11 +2334,11 @@ initQPVmainDLL(modus:=0) {
    If (modus!=1)
       disableWindowPenServices(PVhwnd)
 
-   dupesDCTcoeffsInit := DllCall(whichMainDLL "\calculateDCTcoeffs", "int", 32)
+   dupesDCTcoeffsInit := DllCall("qpvmain.dll\calculateDCTcoeffs", "int", 32)
    If !dupesDCTcoeffsInit
       addJournalEntry("ERROR: Failed to initialize DCT coefficients required for identifying image duplicates. This feature will not work.")
 
-   WICmoduleHasInit := DllCall(whichMainDLL "\initWICnow", "int", debugModa, "int", 0)
+   WICmoduleHasInit := DllCall("qpvmain.dll\initWICnow", "int", debugModa, "int", 0)
    If WICmoduleHasInit
    {
       CLSIDlist := ""
@@ -7472,7 +7472,7 @@ coreAddUnorderedVectorPointCurveMode(gmx, gmy, sl) {
       zaa := zbb := firstu := lastu := -1
 
       gdipLastError := DllCall("gdiplus\GdipGetPathPoints", "UPtr", thisPath, "UPtr", &PointsF, "int*", PointsCount)
-      zz := DllCall(whichMainDLL "\traverseCurvedPath", "UPtr", &prevPointsF, "Int", prevPointsCount - 1, "UPtr", &PointsF, "Int", PointsCount - 1, "Int", gmx, "Int", gmy, "int", sl, "UPtr", pPen8, "int*", zaa, "int*", zbb, "int*", firstu, "int*", lastu)
+      zz := DllCall("qpvmain.dll\traverseCurvedPath", "UPtr", &prevPointsF, "Int", prevPointsCount - 1, "UPtr", &PointsF, "Int", PointsCount - 1, "Int", gmx, "Int", gmy, "int", sl, "UPtr", pPen8, "int*", zaa, "int*", zbb, "int*", firstu, "int*", lastu)
       If (zz=2)
          hasFound := 1
       If (!zz)
@@ -11764,7 +11764,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
    allowNextSlide := 0
    desiredFrameIndex++
    GIFframesPlayied++
-   If (allowGIFsPlayEntirely=1 && GIFframesPlayied>totalFramesIndex-1) || (totalFramesIndex<3) || (allowGIFsPlayEntirely!=1)
+   If (allowGIFsPlayEntirely=1 && GIFframesPlayied>totalFramesIndex - 1) || (totalFramesIndex<3) || (allowGIFsPlayEntirely!=1)
       allowNextSlide := 1
    ; ToolTip, % allowGIFsPlayEntirely "--" allowNextSlide , , , 2
    prevAnimGIFwas := ""
@@ -13111,7 +13111,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
           {
              tmw := (TextInAreaBgrEntire=1) ? maxLineW : mw
              tmx := (TextInAreaBgrEntire=1) ? 0 : thisX
-             r := DllCall(whichMainDLL "\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", TextInAreaBgrOpacity, "int", userimgGammaCorrect, "int", 0, "int", 0, "int", 0, "UPtr", 0, "int", "0xFF" TextInAreaBgrColor, "int", 32, "int", tmX, "int", thisY, "int", tmw, "int", mh)
+             r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", TextInAreaBgrOpacity, "int", userimgGammaCorrect, "int", 0, "int", 0, "int", 0, "UPtr", 0, "int", "0xFF" TextInAreaBgrColor, "int", 32, "int", tmX, "int", thisY, "int", tmw, "int", mh)
           }
 
           If validBMP(thisBMP)
@@ -13130,7 +13130,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
              {
                 thisBlendMode := (TextInAreaBgrUnified=1) ? 5 : 0
                 bmpOpacity := (TextInAreaCutOutMode=1 && TextInAreaPaintBgr=1 || TextInAreaBgrUnified=1) ? 255 : TextInAreaFontOpacity
-                r := DllCall(whichMainDLL "\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", bmpOpacity, "int", userimgGammaCorrect, "int", thisBlendMode, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
+                r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", bmpOpacity, "int", userimgGammaCorrect, "int", thisBlendMode, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
                 ; fnOutputDebug(A_Index " rendered thisBMP")
                 Gdip_UnlockBits(thisBMP, mData)
              }
@@ -13157,7 +13157,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
              {
                 bmpOpacity := (TextInAreaBgrUnified=1) ? 255 : TextInAreaBorderOpacity
                 thisBlendMode := (TextInAreaBgrUnified=1) ? 5 : 0
-                r := DllCall(whichMainDLL "\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", bmpOpacity, "int", userimgGammaCorrect, "int", thisBlendMode, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
+                r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", bmpOpacity, "int", userimgGammaCorrect, "int", thisBlendMode, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
                 ; fnOutputDebug(A_Index " rendered contour bitmap")
                 Gdip_UnlockBits(thisBMP, mData)
                 thisBMP := trGdip_DisposeImage(thisBMP)
@@ -13175,7 +13175,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
     showTOOLtip("Applying insert text, please wait...`nPost-processing text line bitmaps")
     If (TextInAreaBgrUnified=1 && TextInAreaPaintBgr=1 && fattalErr!=1)
     {
-       r := DllCall(whichMainDLL "\FillImageHoles", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", "0xFF000000")
+       r := DllCall("qpvmain.dll\FillImageHoles", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", "0xFF000000")
        If (TextInAreaBgrUnified=1 && TextInAreaPaintBgr=1 && modusContour=0 && TextInAreaBorderOut>1)
        {
           fnOutputDebug("pre-unified processing with borders")
@@ -13190,7 +13190,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
                 EZ := trGdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
                 If !EZ
                 {
-                   r := DllCall(whichMainDLL "\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255, "int", userimgGammaCorrect, "int", 5, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
+                   r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255, "int", userimgGammaCorrect, "int", 5, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
                    Gdip_UnlockBits(thisBMP, mData)
                    thisBMP := trGdip_DisposeImage(thisBMP)
                 }
@@ -13200,7 +13200,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
 
        If (TextInAreaCutOutMode=1)
        {
-          r := DllCall(whichMainDLL "\ColorizeGrayImage", "UPtr", pBitsAll, "int", mImgW, "int", mImgH, "int", Stride, "int", 32, "int", 0, "int", "0x00" TextInAreaBgrColor, "int", bgrColor)
+          r := DllCall("qpvmain.dll\ColorizeGrayImage", "UPtr", pBitsAll, "int", mImgW, "int", mImgH, "int", Stride, "int", 32, "int", 0, "int", "0x00" TextInAreaBgrColor, "int", bgrColor)
        } Else
        {
           If (TextInAreaBgrOpacity>4)
@@ -13222,7 +13222,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
              thisColoru := txtColor
 
           ntxtColor := (TextInAreaCutOutMode=1) ? "0x00" TextInAreaBgrColor : thisColoru
-          r := DllCall(whichMainDLL "\ColorizeGrayImage", "UPtr", pBitsAll, "int", mImgW, "int", mImgH, "int", Stride, "int", 32, "int", userimgGammaCorrect, "int", ntxtColor, "int", bgrColor)
+          r := DllCall("qpvmain.dll\ColorizeGrayImage", "UPtr", pBitsAll, "int", mImgW, "int", mImgH, "int", Stride, "int", 32, "int", userimgGammaCorrect, "int", ntxtColor, "int", bgrColor)
        }
     }
 
@@ -13241,7 +13241,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
              EZ := trGdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
              If !EZ
              {
-                r := DllCall(whichMainDLL "\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", TextInAreaBorderOpacity, "int", userimgGammaCorrect, "int", 0, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
+                r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", TextInAreaBorderOpacity, "int", userimgGammaCorrect, "int", 0, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
                 Gdip_UnlockBits(thisBMP, mData)
                 thisBMP := trGdip_DisposeImage(thisBMP)
              }
@@ -13852,7 +13852,7 @@ QPV_SetBitmapAsAlphaChannel(pBitmap, pBitmapMask, invertAlphaMask:=0, replaceSou
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   E2 := trGdip_LockBits(pBitmapMask, 0, 0, w, h, mStride, mScan, mData, 1)
   If (!E1 && !E2)
-     r := DllCall(whichMainDLL "\SetBitmapAsAlphaChannel", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "int", 32, "Int", invertAlphaMask, "Int", replaceSourceAlphaChannel, "Int", whichChannel)
+     r := DllCall("qpvmain.dll\SetBitmapAsAlphaChannel", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "int", 32, "Int", invertAlphaMask, "Int", replaceSourceAlphaChannel, "Int", whichChannel)
 
   If !E1
      Gdip_UnlockBits(pBitmap, iData)
@@ -13878,7 +13878,7 @@ QPV_SetColorAlphaChannel(pBitmap, newColor, invertAlphaMask) {
 
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If !E1
-     r := DllCall(whichMainDLL "\SetColorAlphaChannel", "UPtr", iScan, "Int", w, "Int", h, "Int", newColor, "Int", invertAlphaMask, "Int")
+     r := DllCall("qpvmain.dll\SetColorAlphaChannel", "UPtr", iScan, "Int", w, "Int", h, "Int", newColor, "Int", invertAlphaMask, "Int")
 
   If !E1
      Gdip_UnlockBits(pBitmap, iData)
@@ -13909,7 +13909,7 @@ QPV_FloodFill(pBitmap, x, y, newColor, fillOpacity) {
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, Stride, iScan, iData, 3)
   tolerance := (FloodFillAltToler=1) ? Ceil(FloodFillTolerance*0.7) + 1 : FloodFillTolerance
   If !E1
-     r := DllCall(whichMainDLL "\FloodFillWrapper", "UPtr", iScan, "Int", FloodFillModus, "Int", w, "Int", h, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", fillOpacity, "int", FloodFillDynamicOpacity, "int", FloodFillBlendMode - 1, "int", FloodFillCartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays, "int", userimgGammaCorrect, "int", BlendModesFlipped, "int", Stride, "int", 32, "int", 0, "int", 0)
+     r := DllCall("qpvmain.dll\FloodFillWrapper", "UPtr", iScan, "Int", FloodFillModus, "Int", w, "Int", h, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", fillOpacity, "int", FloodFillDynamicOpacity, "int", FloodFillBlendMode - 1, "int", FloodFillCartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays, "int", userimgGammaCorrect, "int", BlendModesFlipped, "int", Stride, "int", 32, "int", 0, "int", 0)
   ; ToolTip, % A_PtrSize "=" A_LastError "==" r "=" func2exec "=" SecToHHMMSS(Round(zeitOperation/1000, 3)) , , , 2
 
   If !E1
@@ -13940,7 +13940,7 @@ QPV_ConvertToGrayscale(pBitmap, modus, intensity, previewMode) {
         QPV_PrepareHugeImgSelectionArea(0, 0, w, h, w, h, EllipseSelectMode, VPselRotation, 1, invertArea)
      Else
         QPV_PrepareHugeImgSelectionArea(0, 0, w, h, w, h, -1, 0, 0, 0)
-     r := DllCall(whichMainDLL "\ConvertToGrayScale", "UPtr", iScan, "Int", w, "Int", h, "int", modus, "int", intensity, "int", stride, "int", 32, "UPtr", 0, "int", 0)
+     r := DllCall("qpvmain.dll\ConvertToGrayScale", "UPtr", iScan, "Int", w, "Int", h, "int", modus, "int", intensity, "int", stride, "int", 32, "UPtr", 0, "int", 0)
      Gdip_UnlockBits(pBitmap, iData)
   }
 
@@ -13971,7 +13971,7 @@ QPV_AdjustImageColors(pBitmap, thisOpacity, InvertColors, AltSat, Sat, AltBright
         QPV_PrepareHugeImgSelectionArea(0, 0, w, h, w, h, -1, 0, 0, 0)
 
      this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
-     r := DllCall(whichMainDLL "\AdjustImageColors" this, "UPtr", iScan, "Int", w, "Int", h, "int", stride, "int", 32, "int", thisOpacity, "int", InvertColors, "int", AltSat, "int", Sat, "int", AltBright, "int", Bright, "int", AltContra, "int", Contra, "int", AltHiLows, "int", Shadows, "int", Highs, "int", Hue, "int", TintDeg, "int", TintAmount, "int", AltTint, "int", Gamma, "int", OffR, "int", OffG, "int", OffB, "int", OffA, "int", ThreR, "int", ThreG, "int", ThreB, "int", ThreA, "int", SeeThrough, "int", userimgGammaCorrect, "int", NoClamp, "int", WhitePoint, "int", BlackPoint, "int", NoisePoints, "UPtr", 0, "int", 0)
+     r := DllCall("qpvmain.dll\AdjustImageColors" this, "UPtr", iScan, "Int", w, "Int", h, "int", stride, "int", 32, "int", thisOpacity, "int", InvertColors, "int", AltSat, "int", Sat, "int", AltBright, "int", Bright, "int", AltContra, "int", Contra, "int", AltHiLows, "int", Shadows, "int", Highs, "int", Hue, "int", TintDeg, "int", TintAmount, "int", AltTint, "int", Gamma, "int", OffR, "int", OffG, "int", OffB, "int", OffA, "int", ThreR, "int", ThreG, "int", ThreB, "int", ThreA, "int", SeeThrough, "int", userimgGammaCorrect, "int", NoClamp, "int", WhitePoint, "int", BlackPoint, "int", NoisePoints, "UPtr", 0, "int", 0)
      Gdip_UnlockBits(pBitmap, iData)
   }
 
@@ -14020,7 +14020,7 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
    If (editingSelectionNow!=1)
    {
       lastState :=""
-      r := DllCall(whichMainDLL "\prepareSelectionArea", "int", x1, "int", y1, "int", x2, "int", y2, "int", w, "int", h,  "float", 1, "float", 1, "float", 0, "int", 0, "int", 0, "float", 0, "int", 0)
+      r := DllCall("qpvmain.dll\prepareSelectionArea", "int", x1, "int", y1, "int", x2, "int", y2, "int", w, "int", h,  "float", 1, "float", 1, "float", 0, "int", 0, "int", 0, "float", 0, "int", 0)
       Return
    }
 
@@ -14114,7 +14114,7 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
       }
    } Else If (mode>=2)
    {
-      rzu := DllCall(whichMainDLL "\testFilledPolygonCache", "int", 0)
+      rzu := DllCall("qpvmain.dll\testFilledPolygonCache", "int", 0)
       selID := VPcreateSelPath("prevID", 0, 0, 0, 0, 0, 0, 0, 0)
       zpklo := IsObject(ppo) ? "a" ppo[1] ppo[2] ppo[3] ppo[4] : "a"
       thisState := "a" selID x1 y1 x2 y2 w h mode rotation doFlip invertArea cavityX cavityY zpklo currentFileIndex getIDimage(currentFileIndex) AnyWindowOpen
@@ -14224,7 +14224,7 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
    ; ToolTip, % Round(innerSelectionCavityX, 2) "|" Round(innerSelectionCavityY, 2) "|" Round(exclusion, 2) , , , 2
    ; ToolTip, % round(w/h, 2) "|" round(mod(rotation, 45), 2) "°|" w "|" h "`n"  rw "|" rh "`n" Round(xf, 2) "|" Round(yf, 2) , , , 2
    ; ToolTip, % round(xf, 2) "|" round(yf, 2) "|"  round(rotation, 2) "|" Round(exclusion, 2) , , , 2
-   r := DllCall(whichMainDLL "\prepareSelectionArea", "int", x1, "int", y1, "int", x2, "int", y2, "int", w, "int", h, "float", xf, "float", yf, "float", rotation, "int", mode, "int", doFlip, "float", exclusion, "int", invertArea, "UPtr", &PointsF, "int", PointsCount, "int", ppx1, "int", ppy1, "int", ppx2, "int", ppy2, "int", useCache, "int", ppofYa, "int", ppofYb)
+   r := DllCall("qpvmain.dll\prepareSelectionArea", "int", x1, "int", y1, "int", x2, "int", y2, "int", w, "int", h, "float", xf, "float", yf, "float", rotation, "int", mode, "int", doFlip, "float", exclusion, "int", invertArea, "UPtr", &PointsF, "int", PointsCount, "int", ppx1, "int", ppy1, "int", ppx2, "int", ppy2, "int", useCache, "int", ppofYa, "int", ppofYb)
    If (r!=1)
       addJournalEntry("ERROR: " A_ThisFunc "() failed via DLL: prepareSelectionArea()")
 
@@ -14323,7 +14323,7 @@ QPV_MergeBitmapsWithMask(initialBitmap, newBitmap, alphaBitmap, invert, maskOpac
   } Else alphaBitmap := 0
 
   If (!E1 && !E2)
-     r := DllCall(whichMainDLL "\MergeBitmapsWithMask", "UPtr", iScan, "UPtr", nScan, "UPtr", mScan, "int", invert, "Int", w, "Int", h, "int", maskOpacity, "int", invertOpacity, "int", stride, "int", 32, "int", userimgGammaCorrect, "int", whichChannel)
+     r := DllCall("qpvmain.dll\MergeBitmapsWithMask", "UPtr", iScan, "UPtr", nScan, "UPtr", mScan, "int", invert, "Int", w, "Int", h, "int", maskOpacity, "int", invertOpacity, "int", stride, "int", 32, "int", userimgGammaCorrect, "int", whichChannel)
 
   ; ToolTip, % A_PtrSize "=" A_LastError "==" r "=" func2exec "=" SecToHHMMSS(Round(zeitOperation/1000, 3)) , , , 2
   If !E1
@@ -14355,7 +14355,7 @@ QPV_ColorizeGrayImage(pBitmap, thisColorA, thisColorB, linearu) {
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, nScan, nData, 3)
   If !E1
   {
-     r := DllCall(whichMainDLL "\ColorizeGrayImage", "UPtr", nScan, "int", w, "int", h, "int", stride, "int", 32, "int", linearu, "int", thisColorA, "int", thisColorB)
+     r := DllCall("qpvmain.dll\ColorizeGrayImage", "UPtr", nScan, "int", w, "int", h, "int", stride, "int", 32, "int", linearu, "int", thisColorA, "int", thisColorB)
      Gdip_UnlockBits(pBitmap, nData)
   }
   ; ToolTip, % r "|" E1 "|" thisColorA "|" thisColorB , , , 2
@@ -14394,7 +14394,7 @@ QPV_EraserBrush(pBitmap, pBitmapMask, invertAlphaMask, replaceMode, levelAlpha, 
   If (!E1 && !E2)
   {
      useClone := (!E3 && clonescu) ? 1 : 0
-     r := DllCall(whichMainDLL "\EraserBrush", "UPtr", iScan, "UPtr", mScan, "Int", w3, "Int", h3, "Int", invertAlphaMask, "Int", replaceMode, "Int", levelAlpha, "UPtr", cScan, "int", useClone)
+     r := DllCall("qpvmain.dll\EraserBrush", "UPtr", iScan, "UPtr", mScan, "Int", w3, "Int", h3, "Int", invertAlphaMask, "Int", replaceMode, "Int", levelAlpha, "UPtr", cScan, "int", useClone)
      ; ToolTip, % r "=" ErrorLevel "=" A_LastError "`n" klop "`n" klopa "`n" kloxa "`n" "=" iScan "=" mScan "=" w2 "=" h2 "=" invertAlphaMask "=" replaceMode "=" levelAlpha "=" countClicks , , , 2
    }
 
@@ -14446,7 +14446,7 @@ QPV_ColourBrush(pBitmap, pBitmapMask, invertAlphaMask, newColor, replaceMode, le
      newColor := Gdip_ToARGB(A, R, G, B)
      useClone := (!E3 && clonescu) ? 1 : 0
      ; ToolTip, % levelAlpha "|" blendMode "`n" offsetX "|" offsetY "`n" rImgW "|" rImgH , , , 2
-     r := DllCall(whichMainDLL "\ColourBrush", "UPtr", kScan, "UPtr", iScan, "UPtr", mScan, "int", newColor, "Int", w3, "Int", h3, "Int", invertAlphaMask, "Int", replaceMode, "Int", levelAlpha, "int", blendMode, "UPtr", cScan, "int", useClone, "int", overDraw, "int", userimgGammaCorrect, "int", w, "int", h, "int", offsetX, "int", offsetY, "int", flipLayers)
+     r := DllCall("qpvmain.dll\ColourBrush", "UPtr", kScan, "UPtr", iScan, "UPtr", mScan, "int", newColor, "Int", w3, "Int", h3, "Int", invertAlphaMask, "Int", replaceMode, "Int", levelAlpha, "int", blendMode, "UPtr", cScan, "int", useClone, "int", overDraw, "int", userimgGammaCorrect, "int", w, "int", h, "int", offsetX, "int", offsetY, "int", flipLayers)
      ; ToolTip, % r "=" ErrorLevel "=" A_LastError "`n" klop "`n" klopa "`n" kloxa "`n" "=" iScan "=" mScan "=" w2 "=" h2 "=" invertAlphaMask "=" replaceMode "=" levelAlpha "=" countClicks , , , 2
   }
 
@@ -14486,7 +14486,7 @@ QPV_PrepareAlphaChannelBlur(pBitmap, givenLevel, fillMissingOnly) {
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If !E1
   {
-     r := DllCall(whichMainDLL "\PrepareAlphaChannelBlur", "UPtr", iScan, "Int", w, "Int", h, "Int", givenLevel, "Int", fillMissingOnly, "Int", threads)
+     r := DllCall("qpvmain.dll\PrepareAlphaChannelBlur", "UPtr", iScan, "Int", w, "Int", h, "Int", givenLevel, "Int", fillMissingOnly, "Int", threads)
      Gdip_UnlockBits(pBitmap, iData)
   } Else 
      addJournalEntry(A_ThisFunc "(): failed - unable to lock the bitmap bits")
@@ -14518,7 +14518,7 @@ QPV_AlterAlphaChannel(pBitmap, givenLevel, replaceAll) {
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If !E1
   {
-     r := DllCall(whichMainDLL "\AlterBitmapAlphaChannel", "UPtr", iScan, "Int", w, "Int", h, "int", stride, "int", 32, "Int", givenLevel, "int", replaceAll)
+     r := DllCall("qpvmain.dll\AlterBitmapAlphaChannel", "UPtr", iScan, "Int", w, "Int", h, "int", stride, "int", 32, "Int", givenLevel, "int", replaceAll)
      Gdip_UnlockBits(pBitmap, iData)
   } Else 
      addJournalEntry(A_ThisFunc "(): failed - unable to lock the bitmap bits")
@@ -14549,7 +14549,7 @@ QPV_FillBitmapHoles(pBitmap, newColor) {
 
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If !E1
-     r := DllCall(whichMainDLL "\FillImageHoles", "UPtr", iScan, "Int", w, "Int", h, "UInt", newColor)
+     r := DllCall("qpvmain.dll\FillImageHoles", "UPtr", iScan, "Int", w, "Int", h, "UInt", newColor)
   ; fnOutputDebug(A_ThisFunc ": " func2exec "=r" r "=e" E1 "|" A_LastError)
 
   If !E1
@@ -14578,7 +14578,7 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   E2 := trGdip_LockBits(pBitmap2Blend, 0, 0, w, h, stride, mScan, mData, 1)
   If (!E1 && !E2)
-     r := DllCall(whichMainDLL "\BlendBitmaps", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", blendMode, "int", flipLayers, "int", faderMode, "int", protectAlpha, "int", gamma)
+     r := DllCall("qpvmain.dll\BlendBitmaps", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", blendMode, "int", flipLayers, "int", faderMode, "int", protectAlpha, "int", gamma)
 
   ; fnOutputDebug(A_ThisFunc "() " A_LastError " r=" r "=" func2exec "=" A_TickCount - thisStartZeit "|" blendMode)
   If !E1
@@ -14648,7 +14648,7 @@ OpenCV_FimResizeBitmap(hFIFimgA, resizedW, resizedH, rx, ry, rw, rh, Interpolati
     mStride := FreeImage_GetStride(hFIFimgX) 
     pBitsAll := FreeImage_GetBits(hFIFimgA)
     Stride := FreeImage_GetStride(hFIFimgA)
-    r := DllCall(whichMainDLL "\openCVresizeBitmapExtended", "UPtr", pBitsAll, "UPtr", pBits, "Int", width, "Int", height, "Int", stride, "Int", rx, "Int", ry, "Int", rw, "Int", rh, "Int", resizedW, "Int", resizedH, "Int", mstride, "Int", bpp, "Int", InterpolationMode)
+    r := DllCall("qpvmain.dll\openCVresizeBitmapExtended", "UPtr", pBitsAll, "UPtr", pBits, "Int", width, "Int", height, "Int", stride, "Int", rx, "Int", ry, "Int", rw, "Int", rh, "Int", resizedW, "Int", resizedH, "Int", mstride, "Int", bpp, "Int", InterpolationMode)
     ; fnOutputDebug(A_ThisFunc "(): " A_TickCount - thisStartZeit)
     If !r 
     {
@@ -14695,7 +14695,7 @@ OpenCV_FimToneMapping(hFIFimgA, algo, paramA, paramB, paramC, paramD, altExpo) {
     pBitsAll := FreeImage_GetBits(hFIFimgA)
     hStride := FreeImage_GetStride(hFIFimgA)
     lStride := FreeImage_GetStride(hFIFimgX)
-    r := DllCall(whichMainDLL "\openCVapplyToneMappingAlgos", "UPtr", pBitsAll, "int", hStride, "int", width, "int", height, "UPtr", pBits, "int", lStride, "int", algo, "float", paramA, "float", paramB, "float", paramC, "float", paramD, "int", altExpo)
+    r := DllCall("qpvmain.dll\openCVapplyToneMappingAlgos", "UPtr", pBitsAll, "int", hStride, "int", width, "int", height, "UPtr", pBits, "int", lStride, "int", algo, "float", paramA, "float", paramB, "float", paramC, "float", paramD, "int", altExpo)
     If !r 
     {
        addJournalEntry(A_ThisFunc "(): failed to perform tone-mapping; an opencv or qpv dll failure occured")
@@ -14756,7 +14756,7 @@ OpenCV_GdipResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="
   E2 := trGdip_LockBits(newBitmap, 0, 0, resizedW, resizedH, mstride, mScan, mData, 1, PixelFormat)
   thisStartZeit := A_TickCount
   If (!E1 && !E2)
-     r := DllCall(whichMainDLL "\openCVresizeBitmap", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", resizedW, "Int", resizedH, "Int", mstride, "Int", bpp, "Int", 1)
+     r := DllCall("qpvmain.dll\openCVresizeBitmap", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", resizedW, "Int", resizedH, "Int", mstride, "Int", bpp, "Int", 1)
 
   fnOutputDebug(A_ThisFunc "(): " A_TickCount - thisStartZeit)
   If !E1
@@ -14785,7 +14785,7 @@ cImg_GdipResizeBitmap(pBitmap, newW, newH, interpolation:=1, bond:=2) {
   If (w<1 || h<1)
      Return 0
 
-  r := DllCall(whichMainDLL "\cImgResizeBitmap", "UPtr", pBitmap, "Int", w, "Int", h, "int", newW, "int", newH, "Int", interpolation, "int", bond, "UPtr")
+  r := DllCall("qpvmain.dll\cImgResizeBitmap", "UPtr", pBitmap, "Int", w, "Int", h, "int", newW, "int", newH, "Int", interpolation, "int", bond, "UPtr")
   If StrLen(r)>2
   {
      recordGdipBitmaps(r, A_ThisFunc)
@@ -14814,7 +14814,7 @@ QPV_CreateBitmapNoise(W, H, intensity, doGray, threads, fillBgr) {
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If !E1
   {
-     r := DllCall(whichMainDLL "\GenerateRandomNoise", "UPtr", iScan, "Int", w, "Int", h, "Int", intensity, "Int", doGray, "Int", threads, "Int", fillBgr)
+     r := DllCall("qpvmain.dll\GenerateRandomNoise", "UPtr", iScan, "Int", w, "Int", h, "Int", intensity, "Int", doGray, "Int", threads, "Int", fillBgr)
      Gdip_UnlockBits(pBitmap, iData)
   }
 
@@ -14835,7 +14835,7 @@ cImg_CreatePlasmaNoiseBitmap(W, H, intensity, details, scaleu, doGray, blurX, bl
   If (!w || !h)
      Return 0
 
-  pBitmap := DllCall(whichMainDLL "\GenerateCIMGnoiseBitmap", "Int", w, "Int", h, "Int", intensity, "Int", details, "Int", scaleu, "int", blurX, "int", blurY, "int", doBlur, "UPtr")
+  pBitmap := DllCall("qpvmain.dll\GenerateCIMGnoiseBitmap", "Int", w, "Int", h, "Int", intensity, "Int", details, "Int", scaleu, "int", blurX, "int", blurY, "int", doBlur, "UPtr")
   If StrLen(pBitmap)>2
      recordGdipBitmaps(pBitmap, A_ThisFunc)
 
@@ -16124,7 +16124,7 @@ recordSelUndoLevelNow() {
 wrapRecordUndoLevelNow(newBitmap, allowRecord:=1) {
    If (viewportQPVimage.imgHandle || !validBMP(newBitmap))
       Return
-   
+
    gdiBitmapSmall := trGdip_DisposeImage(gdiBitmapSmall, 1)
    gdiBMPvPsize := trGdip_DisposeImage(gdiBMPvPsize, 1)
    ViewPortBMPcache := trGdip_DisposeImage(ViewPortBMPcache, 1)
@@ -16150,6 +16150,7 @@ wrapRecordUndoLevelNow(newBitmap, allowRecord:=1) {
    gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
    UserMemBMP := newBitmap
    gdiBitmap := trGdip_CloneBitmap(A_ThisFunc, newBitmap)
+   setViewPortGDIPimageEditingProperties()
    If (UserMemBMP=gdiBitmap)
       addJournalEntry(A_ThisFunc "(): ERROR. Illegal equality. UserMemBMP=gdiBitmap")
    If (allowRecord=0 && undoLevelsRecorded<2)
@@ -16861,6 +16862,9 @@ mergeViewPortEffectsImgEditing(funcu:=0, recordUndoAfter:=0, allowOutside:=0) {
           trGdip_DisposeImage(newBitmap)
        }
 
+       currIMGdetails.Frames := 0
+       currIMGdetails.ActiveFrame := 0
+       desiredFrameIndex := totalFramesIndex := 0
        imgFxMode := usrColorDepth := 1
        vpIMGrotation := 0 ; FlipImgH := FlipImgV := 0
        defineColorDepth()
@@ -18293,7 +18297,7 @@ livePreviewHugeImageFillSelArea() {
 
       livePreviewPrepareSelectionArea(objSel, FillAreaInverted, 3)
       thisBehind := (FillAreaDoBehind=1 && bpp=32) ? 1 : 0
-      r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", iScan, "Int", imgW, "Int", imgH, "int", Stride, "int", 32, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", FillAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", gScan, "int", gStride, "int", gBpp, "int", thisBehind, "int", 0, "int", FillAreaCutGlass, "int", imgW, "int", imgH)
+      r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", iScan, "Int", imgW, "Int", imgH, "int", Stride, "int", 32, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", FillAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", gScan, "int", gStride, "int", gBpp, "int", thisBehind, "int", 0, "int", FillAreaCutGlass, "int", imgW, "int", imgH)
       ; ToolTip, % r "|" imgW "|" imgH , , , 2
       Gdip_UnlockBits(zBitmap, iData)
       If validBMP(gradientsBMP)
@@ -19289,7 +19293,7 @@ QPV_rect2polar(pBitmap) {
   orbScale := 1
   cx := w/2 , cy := h/2
   If (!E1 && !E2)
-     r := DllCall(whichMainDLL "\rect2polarIMG", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "double", cx, "double", cy, "double", orbScale, "int")
+     r := DllCall("qpvmain.dll\rect2polarIMG", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "double", cx, "double", cy, "double", orbScale, "int")
 
   If !E1
      Gdip_UnlockBits(pBitmap, iData)
@@ -19334,7 +19338,7 @@ QPV_DissolveBitmap(pBitmap, rx, ry) {
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 1)
   E2 := trGdip_LockBits(newBitmap, 0, 0, w, h, stride, mScan, mData)
   If (!E1 && !E2)
-     r := DllCall(whichMainDLL "\dissolveBitmap", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "int", Round(rx + 2), "int", Round(ry + 2), "int")
+     r := DllCall("qpvmain.dll\dissolveBitmap", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "int", Round(rx + 2), "int", Round(ry + 2), "int")
 
   If !E1
      Gdip_UnlockBits(pBitmap, iData)
@@ -19361,7 +19365,7 @@ QPV_SymmetricaBitmap(pBitmap, rx, ry) {
 
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData)
   If (!E1 && !E2)
-     r := DllCall(whichMainDLL "\symmetricaBitmap", "UPtr", iScan, "Int", w, "Int", h, "int", rx, "int", ry, "int")
+     r := DllCall("qpvmain.dll\symmetricaBitmap", "UPtr", iScan, "Int", w, "Int", h, "int", rx, "int", ry, "int")
 
   If !E1
      Gdip_UnlockBits(pBitmap, iData)
@@ -19412,7 +19416,7 @@ QPV_autoContrastBitmap(pBitmap, typeu, whichBitmap:=0, entireImg:=0) {
 
   QPV_PrepareHugeImgSelectionArea(0, 0, w, h, w, h, 0, 0, 1, 0)
   If (!E1 && !E3)
-     r := DllCall(whichMainDLL "\autoContrastBitmap", "UPtr", iScan, "UPtr", amScan, "Int", w, "Int", h, "int", mw, "int", mh, "int", typeu, "int", userAutoColorIntensity, "int", userimgGammaCorrect, "int", Stride, "int", strideMini, "int", 32, "UPtr", 0, "int", 0)
+     r := DllCall("qpvmain.dll\autoContrastBitmap", "UPtr", iScan, "UPtr", amScan, "Int", w, "Int", h, "int", mw, "int", mh, "int", typeu, "int", userAutoColorIntensity, "int", userimgGammaCorrect, "int", Stride, "int", strideMini, "int", 32, "UPtr", 0, "int", 0)
 
   ; ToolTip, % "l== " r "; e1=" E1 "; e3=" E3 "==" mini , , , 2
   fnOutputDebug(A_ThisFunc "(): " A_TickCount - startZeit)
@@ -19815,7 +19819,7 @@ QPV_polar2rect(oBitmap) {
 
   Static orbScale := 1
   If (!E1 && !E2)
-     r := DllCall(whichMainDLL "\polar2rectIMG", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "double", cx, "double", cy, "double", orbScale, "Int")
+     r := DllCall("qpvmain.dll\polar2rectIMG", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "double", cx, "double", cy, "double", orbScale, "Int")
   Else
      addJournalEntry(A_ThisFunc "(): ERROR. Unable to process the image. Failed to lock the bitmap bits.")
 
@@ -19994,7 +19998,7 @@ undoRedoHugeImagesAct() {
       mStride := FreeImage_GetStride(hFIFimgA)
       showTOOLtip("Performing the undo action")
       startZeit := A_TickCount
-      r := DllCall(whichMainDLL "\UndoAiderSwapPixelRegions", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", Stride, "UPtr", pBitsMini, "int", mStride, "int", bpp, "int", X1, "int", Y1, "int", X2, "int", Y2)
+      r := DllCall("qpvmain.dll\UndoAiderSwapPixelRegions", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", Stride, "UPtr", pBitsMini, "int", mStride, "int", bpp, "int", X1, "int", Y1, "int", X2, "int", Y2)
       ; ToolTip, % A_TickCount - startZeit , , , 2
       If !r
       {
@@ -20440,14 +20444,14 @@ HugeImagesApplyAutoColors() {
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
       If (userAutoColorAdjustMode=3)
       {
-         r := DllCall(whichMainDLL "\autoContrastBitmap", "UPtr", pBitsAll, "UPtr", pBitsMini, "Int", imgW, "Int", imgH, "int", mw, "int", mh, "int", 1, "int", userAutoColorIntensity, "int", userimgGammaCorrect, "int", Stride, "int", strideMini, "int", bpp, "UPtr", mScan, "int", mStride)
+         r := DllCall("qpvmain.dll\autoContrastBitmap", "UPtr", pBitsAll, "UPtr", pBitsMini, "Int", imgW, "Int", imgH, "int", mw, "int", mh, "int", 1, "int", userAutoColorIntensity, "int", userimgGammaCorrect, "int", Stride, "int", strideMini, "int", bpp, "UPtr", mScan, "int", mStride)
          If r
-            r := DllCall(whichMainDLL "\autoContrastBitmap", "UPtr", pBitsAll, "UPtr", pBitsMini, "Int", imgW, "Int", imgH, "int", mw, "int", mh, "int", 2, "int", userAutoColorIntensity, "int", userimgGammaCorrect, "int", Stride, "int", strideMini, "int", bpp, "UPtr", mScan, "int", mStride)
+            r := DllCall("qpvmain.dll\autoContrastBitmap", "UPtr", pBitsAll, "UPtr", pBitsMini, "Int", imgW, "Int", imgH, "int", mw, "int", mh, "int", 2, "int", userAutoColorIntensity, "int", userimgGammaCorrect, "int", Stride, "int", strideMini, "int", bpp, "UPtr", mScan, "int", mStride)
       } Else
-         r := DllCall(whichMainDLL "\autoContrastBitmap", "UPtr", pBitsAll, "UPtr", pBitsMini, "Int", imgW, "Int", imgH, "int", mw, "int", mh, "int", userAutoColorAdjustMode, "int", userAutoColorIntensity, "int", userimgGammaCorrect, "int", Stride, "int", strideMini, "int", bpp, "UPtr", mScan, "int", mStride)
+         r := DllCall("qpvmain.dll\autoContrastBitmap", "UPtr", pBitsAll, "UPtr", pBitsMini, "Int", imgW, "Int", imgH, "int", mw, "int", mh, "int", userAutoColorAdjustMode, "int", userAutoColorIntensity, "int", userimgGammaCorrect, "int", Stride, "int", strideMini, "int", bpp, "UPtr", mScan, "int", mStride)
 
       FreeImage_UnLoad(hFIFimgA)
-      DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+      DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
       If r 
       {
          killQPVscreenImgSection()
@@ -20580,7 +20584,7 @@ HugeImagesApplyInsertText() {
             shapeu := (TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1 && TextInAreaRoundBoxBgr=1) ? 3 : 0
             QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, shapeu, 0, 0, 0, 0, 0, 1)
             showTOOLtip("Applying insert text, please wait...`nFinalizing")
-            r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 0, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", TextInAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", pBits, "int", mStride, "int", mBpp, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", nImgW, "int", nImgH)
+            r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 0, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", TextInAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", pBits, "int", mStride, "int", mBpp, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", nImgW, "int", nImgH)
             FillAreaShape := orr
             ; fnOutputDebug(r "E: " obju.x1 "|" obju.y1 "|" obju.x2 - 1 "|" obju.y2 - 1 "|" obju.ImgSelW "|" obju.ImgSelH "|" obju.bImgSelW "|" obju.bImgSelH)
          } Else
@@ -20597,7 +20601,7 @@ HugeImagesApplyInsertText() {
          defineRelativeSelCoords(imgW, imgH)
       }
 
-      DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+      DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
       If failure
       {
          ResetImgLoadStatus()
@@ -20703,8 +20707,8 @@ HugeImagesDrawLineShapes() {
       }
 
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
-      rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", DrawLineAreaContourAlign, "int", 0)
-      rza := DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
+      rzq := DllCall("qpvmain.dll\prepareDrawLinesMask", "int", thisThick, "int", DrawLineAreaContourAlign, "int", 0)
+      rza := DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
       If (rza=1 && rzq=1)
       {
          otherThick := Round(thisThick*0.34)
@@ -20735,13 +20739,13 @@ HugeImagesDrawLineShapes() {
             ; if (DrawLineAreaBlendMode>1)
             ; zzpo:=0
 
-            rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0, "int", tempCrapValue)
+            rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0, "int", tempCrapValue)
             If (rzb=1 && DrawLineAreaDoubles=1)
             {
-               DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
+               DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
                kThick := (DrawLineAreaCapsStyle=3 && DrawLineAreaJoinsStyle=1) ? thisThick : otherThick
-               rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
-               DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
+               rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
+               DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
             }
 
             Gdip_DeletePath(pPath)
@@ -20749,11 +20753,11 @@ HugeImagesDrawLineShapes() {
             {
                Gdip_ScalePathAtCenter(clonedPath, innerSelectionCavityX, innerSelectionCavityY)
                processGdipPathForDLL(clonedPath, tk, o_imgSelH, subdivide, PointsCount, PointsF)
-               rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0, "int", -1)
+               rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0, "int", -1)
                If (rzb=1 && DrawLineAreaDoubles=1)
                {
-                  DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
-                  rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
+                  DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
+                  rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
                }
                Gdip_DeletePath(clonedPath)
             }
@@ -20765,9 +20769,9 @@ HugeImagesDrawLineShapes() {
       thisColor := "0xFF" DrawLineAreaColor
       showTOOLtip("Drawing lines, please wait...`nStep: 3 / 3")
       If (rzb=1)
-         rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", thisOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha)
+         rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", thisOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha)
 
-      DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+      DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
       r := (rzc=1) ? 1 : 0
       fnOutputDebug("Draw lines finished in: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)))
       imgSelX1 := o_imgSelX1,      imgSelY1 := o_imgSelY1
@@ -20928,8 +20932,8 @@ HugeImagesDrawParametricLines() {
       skippedLines := 0
       doCrop := (DrawLineAreaCropShape>1 && isInRange(DrawLineAreaBorderCenter, 4,7)) ? 1 : 2
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
-      rzq := DllCall(whichMainDLL "\prepareDrawLinesMask", "int", thisThick, "int", doCrop, "int", DrawLineAreaAtomizedGrid)
-      rza := DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
+      rzq := DllCall("qpvmain.dll\prepareDrawLinesMask", "int", thisThick, "int", doCrop, "int", DrawLineAreaAtomizedGrid)
+      rza := DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
       If (rza=1 && rzq=1)
       {
          ppzX := ppzY := 0
@@ -20987,17 +20991,17 @@ HugeImagesDrawParametricLines() {
                If (outlier=0)
                {
                   rect := processGdipPathForDLL(pPath, tk, r.h, subdivide, PointsCount, PointsF, DrawLineAreaAtomizedGrid)
-                  rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", doCrop, "int", 0, "int", tempCrapValue)
+                  rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", doCrop, "int", 0, "int", tempCrapValue)
                   If (rzb=1 && DrawLineAreaDoubles=1)
                   {
-                     DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
+                     DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
                      kThick := (DrawLineAreaCapsStyle=3 && DrawLineAreaJoinsStyle=1) ? thisThick : otherThick
-                     rzb := DllCall(whichMainDLL "\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", doCrop, "int", diffThick, "int", -1)
-                     DllCall(whichMainDLL "\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
+                     rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", doCrop, "int", diffThick, "int", -1)
+                     DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
                   }
 
                   If (DrawLineAreaAtomizedGrid=1 && rzb=1)
-                     rzc := rzq := DllCall(whichMainDLL "\mergePolyMaskIntoHighDepthMask", "int", rect.x, "int", rect.y, "int", rect.x + rect.w, "int", rect.y + rect.h, "int", imgW, "int", imgH, "int", thisThick + 1)
+                     rzc := rzq := DllCall("qpvmain.dll\mergePolyMaskIntoHighDepthMask", "int", rect.x, "int", rect.y, "int", rect.x + rect.w, "int", rect.y + rect.h, "int", imgW, "int", imgH, "int", thisThick + 1)
                } Else
                {
                   skippedLines++
@@ -21036,10 +21040,10 @@ HugeImagesDrawParametricLines() {
       thisOpacity := DrawLineAreaOpacity
       thisColor := "0xFF" DrawLineAreaColor
       If (rzb=1 && abandonAll!=1)
-         rzc := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", thisOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha)
+         rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", thisOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha)
 
       fnOutputDebug("Fill lines mask finished in: " SecToHHMMSS(Round((A_TickCount - startFill)/1000, 3)))
-      DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+      DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
       fnOutputDebug("Draw lines finished in: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) "`nSkipped segments: " skippedLines)
       imgSelX1 := o_imgSelX1,      imgSelY1 := o_imgSelY1
       imgSelX2 := o_imgSelX2,      imgSelY2 := o_imgSelY2
@@ -21230,7 +21234,7 @@ HugeImagesApplyPasteInPlace() {
          imgSelY1 := oldSelectionArea[2],            imgSelY2 := oldSelectionArea[4]
          defineRelativeSelCoords(imgW, imgH)
          r := HugeImagesApplyGenericFilters("erase initially selected area", 0, 0, 0)
-         DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+         DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
       }
 
       rotateSelBoundsKeepRatio := prevrotateSelBoundsKeepRatio
@@ -21259,7 +21263,7 @@ HugeImagesApplyPasteInPlace() {
       If (!(PasteInPlaceCropSel=1 || PasteInPlaceCropSel=3) && PasteInPlaceCropDo=1)
          innerSelectionCavityX := innerSelectionCavityY := 0
 
-      DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+      DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
 }
 
 HugeImagesApplyCLRfxPasteInPlace(hFIFimgA, friendly) {
@@ -21270,7 +21274,7 @@ HugeImagesApplyCLRfxPasteInPlace(hFIFimgA, friendly) {
    bpp := FreeImage_GetBPP(hFIFimgA)
    FreeImage_GetImageDimensions(hFIFimgA, tW, tH)
    QPV_PrepareHugeImgSelectionArea(0, 0, tW, tH, tW, tH, -1, 0, 0, 0, 0, 0)
-   r := DllCall(whichMainDLL "\AdjustImageColorsPrecise", "UPtr", pBitsAll, "Int", tW, "Int", tH, "int", Stride, "int", bpp, "int", 255, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", Round(PasteInPlaceSaturation*655.35), "int", userImgAdjustAltBright, "int", Round(PasteInPlaceLight*257), "int", 0, "int", Round(PasteInPlaceGamma*655.30), "int", 0, "int", 0, "int", 0, "int", PasteInPlaceHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", 65535, "int", 0, "int", 0, "UPtr", 0, "int", 1)
+   r := DllCall("qpvmain.dll\AdjustImageColorsPrecise", "UPtr", pBitsAll, "Int", tW, "Int", tH, "int", Stride, "int", bpp, "int", 255, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", Round(PasteInPlaceSaturation*655.35), "int", userImgAdjustAltBright, "int", Round(PasteInPlaceLight*257), "int", 0, "int", Round(PasteInPlaceGamma*655.30), "int", 0, "int", 0, "int", 0, "int", PasteInPlaceHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", 65535, "int", 0, "int", 0, "UPtr", 0, "int", 1)
    Return r
 }
 
@@ -21335,7 +21339,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
 
             If memoryUsageWarning(ResizedW, ResizedH, 32, 0, bonusBuffer)
             {
-               DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+               DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
                Return
             }
 
@@ -21469,7 +21473,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, thisInvert, 0)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, shapeu, thisRotation, 0, thisInvert, "a", "a", 1)
          thisKeepAlpha := (transformTool=1) ? BlendModesPreserveAlpha : FillAreaCutGlass
-         r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", blending, "int", BlendModesFlipped, "UPtr", mScan, "int", mStride, "UPtr", gScan, "int", gStride, "int", gBpp, "int", doBehind, "int", opacityExtra, "int", thisKeepAlpha, "int", nBmpW, "int", nBmpH)
+         r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", blending, "int", BlendModesFlipped, "UPtr", mScan, "int", mStride, "UPtr", gScan, "int", gStride, "int", gBpp, "int", doBehind, "int", opacityExtra, "int", thisKeepAlpha, "int", nBmpW, "int", nBmpH)
          If hFIFimgRealGradient
             FreeImage_UnLoad(hFIFimgRealGradient)
          If (hFIFimgExtern && r=1)
@@ -21480,7 +21484,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          If (FillAreaApplyColorFX=1 && FillAreaBlendMode>1 && r && fillTool=1)
          {
             showTOOLtip("Applying " modus "`nPerforming color adjustments, please wait", 1)
-            rz := DllCall(whichMainDLL "\AdjustImageColorsPrecise", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisOpacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", Round(PasteInPlaceSaturation*655.35), "int", userImgAdjustAltBright, "int", Round(PasteInPlaceLight*257), "int", 0, "int", Round(PasteInPlaceGamma*655.30), "int", 0, "int", 0, "int", 0, "int", PasteInPlaceHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
+            rz := DllCall("qpvmain.dll\AdjustImageColorsPrecise", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisOpacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", Round(PasteInPlaceSaturation*655.35), "int", userImgAdjustAltBright, "int", Round(PasteInPlaceLight*257), "int", 0, "int", Round(PasteInPlaceGamma*655.30), "int", 0, "int", 0, "int", 0, "int", PasteInPlaceHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
          }
 
          If (mustUnlock=1 && !EZ)
@@ -21494,7 +21498,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             coreFillSelectedArea("kill")
             drawFillSelGradient("kill", 0, 0, 0, 0, 0, 0)
             getImgSelectedAreaEditMode("kill", 1, 1, 1, 1, 1, 1)
-            DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+            DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
          }
 
          If (bpp=32 && FillAreaRemBGR=1)
@@ -21509,7 +21513,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             currIMGdetails.HasAlpha := 1
          thisOpacity := (EraseAreaFader=1) ? EraseAreaOpacity : 255
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, EraseAreaInvert, "a", "a", 1)
-         r := DllCall(whichMainDLL "\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", thisOpacity, "int", 0, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "UPtr", 0, "int", 0, "int", 24, "int", 0, "int", 0, "int", 0)
+         r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", thisOpacity, "int", 0, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "UPtr", 0, "int", 0, "int", 24, "int", 0, "int", 0, "int", 0)
          If InStr(modus, "initially")
          {
             If r
@@ -21523,7 +21527,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          If memoryUsageWarning(thisImgW, thisImgH, bpp)
          {
             showTOOLtip("Pixelate area: operation abandoned by user.`nMemory limit reached.")
-            DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+            DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
             ResetImgLoadStatus()
             SetTimer, RemoveTooltip, % -msgDisplayTime
             Return
@@ -21549,7 +21553,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
                this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
                showTOOLtip("Pixelating image`nPhase 2/3...", 1)
                QPV_PrepareHugeImgSelectionArea(0, 0, thisImgW, thisImgH, thisImgW, thisImgH, 0, 0, 0, 0, "a", "a", 1)
-               r := DllCall(whichMainDLL "\AdjustImageColors" this, "UPtr", pBitsMini, "Int", thisImgW, "Int", thisImgH, "int", strideMini, "int", bpp, "int", blurAreaOpacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", Round(BlurAreaSaturation*655.35), "int", userImgAdjustAltBright, "int", Round(BlurAreaLight*257), "int", 0, "int", Round(BlurAreaGamma*655.30), "int", 0, "int", 0, "int", 0, "int", BlurAreaHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", 65535, "int", 0, "int", 0, "UPtr", 0, "int", 0)
+               r := DllCall("qpvmain.dll\AdjustImageColors" this, "UPtr", pBitsMini, "Int", thisImgW, "Int", thisImgH, "int", strideMini, "int", bpp, "int", blurAreaOpacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", Round(BlurAreaSaturation*655.35), "int", userImgAdjustAltBright, "int", Round(BlurAreaLight*257), "int", 0, "int", Round(BlurAreaGamma*655.30), "int", 0, "int", 0, "int", 0, "int", BlurAreaHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", 65535, "int", 0, "int", 0, "UPtr", 0, "int", 0)
             }
 
             recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, BlurAreaInverted, 0)
@@ -21557,7 +21561,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             showTOOLtip("Pixelating image`nPhase 3/3...", 1)
             fnOutputDebug(A_ThisFunc ": img = " imgW " x " imgH " | " bpp )
             fnOutputDebug(A_ThisFunc ": mini = " thisimgw " x " thisimgh )
-            r := DllCall(whichMainDLL "\PixelateHugeBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", blurAreaOpacity, "int", BlurAreaBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH)
+            r := DllCall("qpvmain.dll\PixelateHugeBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", blurAreaOpacity, "int", BlurAreaBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH)
             FreeImage_UnLoad(hFIFimgZ)
          } Else
          {
@@ -21568,7 +21572,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
       {
          zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, 0)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
-         r := DllCall(whichMainDLL "\AdjustImageColors", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 255, "int", 1, "int", 0, "int", 0, "int", 1, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 1, "int", 0, "int", 0, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
+         r := DllCall("qpvmain.dll\AdjustImageColors", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 255, "int", 1, "int", 0, "int", 0, "int", 1, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 1, "int", 0, "int", 0, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
       } Else If InStr(modus, "flood")
       {
          inverter := (BrushToolOutsideSelection=3) ? 1 : 0
@@ -21584,7 +21588,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          x := hFIFimgExtern[1], y := imgH - hFIFimgExtern[2]
          tolerance := (FloodFillAltToler=1) ? Ceil(FloodFillTolerance*0.7) + 1 : FloodFillTolerance
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
-         r := DllCall(whichMainDLL "\FloodFillWrapper", "UPtr", pBitsAll, "Int", FloodFillModus, "Int", imgW, "Int", imgH, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", FloodFillOpacity, "int", FloodFillDynamicOpacity, "int", FloodFillBlendMode - 1, "int", FloodFillCartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays, "int", userimgGammaCorrect, "int", BlendModesFlipped, "int", Stride, "int", bpp, "int", use, "int", inverter)
+         r := DllCall("qpvmain.dll\FloodFillWrapper", "UPtr", pBitsAll, "Int", FloodFillModus, "Int", imgW, "Int", imgH, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", FloodFillOpacity, "int", FloodFillDynamicOpacity, "int", FloodFillBlendMode - 1, "int", FloodFillCartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays, "int", userimgGammaCorrect, "int", BlendModesFlipped, "int", Stride, "int", bpp, "int", use, "int", inverter)
       } Else If InStr(modus, "noise")
       {
          If (UserAddNoisePixelizeAmount>0)
@@ -21594,7 +21598,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             If memoryUsageWarning(thisImgW, thisImgH, bpp)
             {
                showTOOLtip("Add noise: operation abandoned by user.`nMemory limit reached.")
-               DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+               DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
                ResetImgLoadStatus()
                SetTimer, RemoveTooltip, % -msgDisplayTime
                Return
@@ -21611,7 +21615,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          ; fnOutputDebug(imgSelX1 "|" imgSelY1 "||" imgSelX2 "|" imgSelY2 "||" thisSelW "|" thisSelH)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
          fnOutputDebug(A_ThisFunc ": " UserAddNoiseGrays " | " IDedgesBlendMode - 1)
-         r := DllCall(whichMainDLL "\GenerateRandomNoiseOnBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped)
+         r := DllCall("qpvmain.dll\GenerateRandomNoiseOnBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped)
          If (UserAddNoisePixelizeAmount>0)
             FreeImage_UnLoad(hFIFimgZ)
       } Else If InStr(modus, "color")
@@ -21619,18 +21623,18 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
          zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, userImgAdjustInvertArea)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, userImgAdjustInvertArea, "a", "a", 1)
-         r := DllCall(whichMainDLL "\AdjustImageColors" this, "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", imgColorsFXopacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", userImgAdjustSat, "int", userImgAdjustAltBright, "int", userImgAdjustBright, "int", userImgAdjustAltContra, "int", userImgAdjustContra, "int", userImgAdjustAltHiLows, "int", userImgAdjustShadows, "int", userImgAdjustHighs, "int", userImgAdjustHue, "int", userImgAdjustTintDeg, "int", userImgAdjustTintAmount, "int", userImgAdjustAltTint, "int", userImgAdjustGamma, "int", userImgAdjustOffR, "int", userImgAdjustOffG, "int", userImgAdjustOffB, "int", userImgAdjustOffA, "int", userImgAdjustThreR, "int", userImgAdjustThreG, "int", userImgAdjustThreB, "int", userImgAdjustThreA, "int", userImgAdjustSeeThrough, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", userImgAdjustWhitePoint, "int", userImgAdjustBlackPoint, "int", userImgAdjustNoisePoints, "UPtr", mScan, "int", mStride)
-         ; r := DllCall(whichMainDLL "\applyGaussianBlurHugeBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", 4, "int", 250, "float", 1.1)
+         r := DllCall("qpvmain.dll\AdjustImageColors" this, "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", imgColorsFXopacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", userImgAdjustSat, "int", userImgAdjustAltBright, "int", userImgAdjustBright, "int", userImgAdjustAltContra, "int", userImgAdjustContra, "int", userImgAdjustAltHiLows, "int", userImgAdjustShadows, "int", userImgAdjustHighs, "int", userImgAdjustHue, "int", userImgAdjustTintDeg, "int", userImgAdjustTintAmount, "int", userImgAdjustAltTint, "int", userImgAdjustGamma, "int", userImgAdjustOffR, "int", userImgAdjustOffG, "int", userImgAdjustOffB, "int", userImgAdjustOffA, "int", userImgAdjustThreR, "int", userImgAdjustThreG, "int", userImgAdjustThreB, "int", userImgAdjustThreA, "int", userImgAdjustSeeThrough, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", userImgAdjustWhitePoint, "int", userImgAdjustBlackPoint, "int", userImgAdjustNoisePoints, "UPtr", mScan, "int", mStride)
+         ; r := DllCall("qpvmain.dll\applyGaussianBlurHugeBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", 4, "int", 250, "float", 1.1)
       } Else ; grayscale mode
       {
          this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
          zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, EraseAreaInvert)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, EraseAreaInvert, "a", "a", 1)
-         r := DllCall(whichMainDLL "\AdjustImageColors" this, "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", DesaturateAreaAmount, "int", DesaturateAreaInvert, "int", DesaturateAreaChannel - 1, "int", -65535, "int", 1, "int", DesaturateAreaBright, "int", 0, "int", DesaturateAreaContra, "int", 0, "int", 0, "int", 0, "int", DesaturateAreaHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 1, "int", userimgGammaCorrect, "int", 0, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
-         ; r := DllCall(whichMainDLL "\ConvertToGrayScale", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", DesaturateAreaChannel, "int", DesaturateAreaAmount, "int", stride, "int", bpp, "UPtr", mScan, "int", mStride)
+         r := DllCall("qpvmain.dll\AdjustImageColors" this, "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", DesaturateAreaAmount, "int", DesaturateAreaInvert, "int", DesaturateAreaChannel - 1, "int", -65535, "int", 1, "int", DesaturateAreaBright, "int", 0, "int", DesaturateAreaContra, "int", 0, "int", 0, "int", 0, "int", DesaturateAreaHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 1, "int", userimgGammaCorrect, "int", 0, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
+         ; r := DllCall("qpvmain.dll\ConvertToGrayScale", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", DesaturateAreaChannel, "int", DesaturateAreaAmount, "int", stride, "int", bpp, "UPtr", mScan, "int", mStride)
       }
 
-      DllCall(whichMainDLL "\discardFilledPolygonCache", "int", 0)
+      DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
       etaTime := "Elapsed time to apply " modus ": " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) 
       addJournalEntry(etaTime)
       If r 
@@ -23988,7 +23992,7 @@ livePreviewAddNoiser(modus:=0) {
 
           QPV_PrepareHugeImgSelectionArea(0, 0, imgBoxSizeW - 1, imgBoxSizeH - 1, imgBoxSizeW, imgBoxSizeH, 0, 0, 0, 0, 0, 0, 1)
           E1 := trGdip_LockBits(cornersBMP, 0, 0, imgBoxSizeW, imgBoxSizeH, stride, iScan, iData)
-          r0 := DllCall(whichMainDLL "\GenerateRandomNoiseOnBitmap", "UPtr", iScan, "Int", imgBoxSizeW, "Int", imgBoxSizeH, "int", stride, "int", 32, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped)
+          r0 := DllCall("qpvmain.dll\GenerateRandomNoiseOnBitmap", "UPtr", iScan, "Int", imgBoxSizeW, "Int", imgBoxSizeH, "int", stride, "int", 32, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped)
           Gdip_UnlockBits(cornersBMP, iData)
           If (UserAddNoisePixelizeAmount>0)
              FreeImage_UnLoad(hFIFimgZ)
@@ -24021,8 +24025,8 @@ QPV_BlurBitmapFilters(pBitmap, passesX, passesY:=0, modus:=1, forceCimg:=0, circ
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, Stride, iScan, iData, 3)
   If !E1
   {
-     r := DllCall(whichMainDLL "\openCVblurFilters", "UPtr", iScan, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", modus, "Int", circular, "int", Stride, "int", 32)
-     ; r := DllCall(whichMainDLL "\cImgBlurBitmapFilters", "UPtr", iScan, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", modus, "Int", circular, "Int", preview, "int", Stride, "int", 32)
+     r := DllCall("qpvmain.dll\openCVblurFilters", "UPtr", iScan, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", modus, "Int", circular, "int", Stride, "int", 32)
+     ; r := DllCall("qpvmain.dll\cImgBlurBitmapFilters", "UPtr", iScan, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", modus, "Int", circular, "Int", preview, "int", Stride, "int", 32)
      Gdip_UnlockBits(pBitmap, iData)
   }
 
@@ -24048,8 +24052,8 @@ QPV_DetectEdgesFilters(pBitmap, modus, xa, ya, ksize, preblur, postblur, invert,
   If !E1
   {
      ; fnOutputDebug(A_ThisFunc ": xa=" xa  " | ya=" ya " | ks=" ks )
-     r := DllCall(whichMainDLL "\openCVedgeDetection", "UPtr", iScan, "Int", w, "Int", h, "Int", xa, "Int", ya, "Int", ksize, "Int", preblur, "Int", postblur, "int", invert, "float", prebrighten, "float", precontrast, "float", postbrighten, "float", postcontrast, "Int", modus, "int", Stride, "int", 24)
-     ; r := DllCall(whichMainDLL "\cImgBlurBitmapFilters", "UPtr", iScan, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", modus, "Int", circular, "Int", preview, "int", Stride, "int", 32)
+     r := DllCall("qpvmain.dll\openCVedgeDetection", "UPtr", iScan, "Int", w, "Int", h, "Int", xa, "Int", ya, "Int", ksize, "Int", preblur, "Int", postblur, "int", invert, "float", prebrighten, "float", precontrast, "float", postbrighten, "float", postcontrast, "Int", modus, "int", Stride, "int", 24)
+     ; r := DllCall("qpvmain.dll\cImgBlurBitmapFilters", "UPtr", iScan, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", modus, "Int", circular, "Int", preview, "int", Stride, "int", 32)
      Gdip_UnlockBits(pBitmap, iData)
   }
 
@@ -24074,7 +24078,7 @@ QPV_DiffBlendBitmap(pBitmap, offsetX, offsetY, preblur, postblur, invert, prebri
 
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3, 0)
   If !E1
-     r := DllCall(whichMainDLL "\openCVdiffBlendBitmap", "UPtr", iScan, "Int", w, "Int", h, "Int", stride, "Int", 24, "Int", offsetX, "int", offsetY, "Int", preblur, "Int", postblur, "int", invert, "float", prebrighten, "float", precontrast, "float", postbrighten, "float", postcontrast)
+     r := DllCall("qpvmain.dll\openCVdiffBlendBitmap", "UPtr", iScan, "Int", w, "Int", h, "Int", stride, "Int", 24, "Int", offsetX, "int", offsetY, "Int", preblur, "Int", postblur, "int", invert, "float", prebrighten, "float", precontrast, "float", postbrighten, "float", postcontrast)
 
   ; fnOutputDebug(A_ThisFunc "() " A_LastError " r=" r "=" func2exec "=" A_TickCount - thisStartZeit "|" blendMode)
   If !E1
@@ -24110,7 +24114,7 @@ QPV_SharpenBitmap(pBitmap, amount, radius, typeu) {
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If !E1
   {
-     r := DllCall(whichMainDLL "\cImgSharpenBitmap", "UPtr", iScan, "Int", w, "Int", h, "Int", round(amount**1.7), "int", stride, "int", 32)
+     r := DllCall("qpvmain.dll\cImgSharpenBitmap", "UPtr", iScan, "Int", w, "Int", h, "Int", round(amount**1.7), "int", stride, "int", 32)
      Gdip_UnlockBits(pBitmap, iData)
   }
   Return r
@@ -24134,7 +24138,7 @@ QPV_CreateGaussianNoiseBMP(pBitmap, intensity) {
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If !E1
   {
-     r := DllCall(whichMainDLL "\cImgAddGaussianNoiseOnBitmap", "UPtr", iScan, "int", w, "int", h, "Int", intensity, "int", Stride, "int", 32)
+     r := DllCall("qpvmain.dll\cImgAddGaussianNoiseOnBitmap", "UPtr", iScan, "int", w, "int", h, "Int", intensity, "int", Stride, "int", 32)
      Gdip_UnlockBits(pBitmap, iData)
   }
 
@@ -24168,7 +24172,7 @@ QPV_PixelateBitmap(pBitmap, ByRef pBitmapOut, BlockSize) {
    E1 := trGdip_LockBits(pBitmap, 0, 0, Width, Height, Stride1, Scan01, BitmapData1, 1)
    E2 := trGdip_LockBits(pBitmapOut, 0, 0, Width, Height, Stride2, Scan02, BitmapData2, 3)
    If (!E1 && !E2)
-      r := DllCall(whichMainDLL "\PixelateBitmap", "UPtr", Scan01, "UPtr", Scan02, "int", Width, "int", Height, "int", Stride1, "int", BlockSize, "int", 32)
+      r := DllCall("qpvmain.dll\PixelateBitmap", "UPtr", Scan01, "UPtr", Scan02, "int", Width, "int", Height, "int", Stride1, "int", BlockSize, "int", 32)
 
    If !E1
       Gdip_UnlockBits(pBitmap, BitmapData1)
@@ -33542,7 +33546,7 @@ SaveFilesList(enforceFile:=0) {
       {
          fileWasGiven := 0
          zPlitPath(CurrentSLD, 0, OutFileName, OutDir, OutFileNameNoExt)
-         file2save := openFileDialogWrapper("S", "PathMustExist", OutDir "\" OutFileNameNoExt, "Save files list as plain-text slideshow...", "Slideshow plain-text (*.sld)|All (*.*)", 1, 1)
+         file2save := openFileDialogWrapper("S", "PathMustExist", OutDir "\" OutFileNameNoExt, "Save files list as plain-text slideshow...", "Slideshow plain-text (*.sld)|All files (*.*)", 1, 1)
          ; MsgBox, % A_ThisFunc "()`n" file2save
          If (!RegExMatch(file2save, "i)(.\.sld)$") && file2save)
             file2save .= ".sld"
@@ -34937,7 +34941,7 @@ calcDLLpHashAlgo(arrayChars, ByRef givenArray, modus) {
         NumPut(arrayChars[A_Index], givenArray, A_Index - 1, "char")
     ; }
 
-    r := DllCall(whichMainDLL "\calcPHashAlgo", "UPtr", &givenArray, "uint", 32, "Int", modus, "INT64")
+    r := DllCall("qpvmain.dll\calcPHashAlgo", "UPtr", &givenArray, "uint", 32, "Int", modus, "INT64")
     if (r!="")
     {
        hashu := ConvertBase(10, 16, r)
@@ -40654,9 +40658,10 @@ PanelDisplayFileHeaderRaw() {
       If (pp>256 || kl>4096)
          Break
    }
+
    endu := StrReplace(endu, "   ", A_Space)
    OutputVar := ""
-   msgResult := msgBoxWrapper("panelu|File header: " appTitle, "File name: " OutFileName "`n`nHeader ( first readable 128 chars):`n" header "`n`nEnding (last readable 128 chars):`n" endu, 0, 0, 0, 0, 0, 0)
+   msgResult := msgBoxWrapper("panelu|File header: " appTitle, "File name: " OutFileName "`n`nHeader ( first readable 256 chars):`n" header "`n`nEnding (last readable 256 chars):`n" endu, 0, 0, 0, 0, 0, 0)
 }
 
 buildQuickSearchMenus() {
@@ -41935,7 +41940,7 @@ PanelExtractFrames() {
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
     ml := (PrefsLargeFonts=1) ? 190 : 150
     ; Gui, Add, Checkbox, Checked%UserCropOnSave% vUserCropOnSave, C&rop image to selected area on save
-    Gui, Add, Text, x15 y15 Section, This tool can extract frames or pages`nfrom GIFs, TIFFs and WEBP files.
+    Gui, Add, Text, x15 y15 Section, This tool can extract frames or pages from`nGIFs, TIFFs, PDFs and WEBP files.
     Gui, Add, Text, y+7,Image output options:
     ; Gui, Add, Text, xs y+0 wp h2 +0x1007, 
     Gui, Add, Text, xp+15 y+7 w%ml% hp+5 +0x200, Image quality `%:
@@ -42321,7 +42326,7 @@ CombineImgsIntoPDF(file2save) {
          pageWpdf := (combinePDFpageLandscape=1) ? pageSizesInchH[UserCombinePDFpageSize] : pageSizesInchW[UserCombinePDFpageSize]
          pageHpdf := (combinePDFpageLandscape=1) ? pageSizesInchW[UserCombinePDFpageSize] : pageSizesInchH[UserCombinePDFpageSize]
          ; fnOutputDebug("pdf dll precall = " z)
-         r := DllCall(whichMainDLL "\CreatePDFfile", "AStr", tempusDir, "AStr", file2save, "AStr", mainCompiledPath, "UPtr", &fListArray, "int", z, "float", pageWpdf, "float", pageHpdf, "Int", dpi)
+         r := DllCall("qpvmain.dll\CreatePDFfile", "AStr", tempusDir, "AStr", file2save, "AStr", mainCompiledPath, "UPtr", &fListArray, "int", z, "float", pageWpdf, "float", pageHpdf, "Int", dpi)
          ; fnOutputDebug("pdf dll call = " r)
       } Else If (abandonAll=1)
          z := 0
@@ -54025,10 +54030,10 @@ BtnALLviewedImages2List(dummy:=0) {
 
 PanelPDFreadTexts(tabu:=1) {
     thisBtnHeight := createSettingsGUI(90, A_ThisFunc)
-    EditWid := 60
+    EditWid := 90
     If (PrefsLargeFonts=1)
     {
-       EditWid := EditWid + 40
+       EditWid := EditWid + 50
        Gui, Font, s%LargeUIfontValue%
     }
 
@@ -54050,7 +54055,7 @@ PanelPDFreadTexts(tabu:=1) {
     Gui, Tab
     Gui, Add, Button, xm+15 y+15 Section h%thisBtnHeight% gBTNprevPDFpage, &Previous page
     Gui, Add, Button, x+2 hp wp gBTNnextPDFpage, &Next page
-    Gui, Add, Button, x+5 hp wp gdummy, &Extract all
+    Gui, Add, Button, x+5 hp wp gBTNextractALLtextsCurrentPDF, &Extract all
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Close
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Extract texts in PDF: " appTitle)
     SetTimer, ResetImgLoadStatus, -100
@@ -54067,13 +54072,138 @@ BTNprevPDFpage() {
    SetTimer, UIpopulatePDFtexts, -150
 }
 
+CoreExtractALLtextsPDF(imgPath, frameu, modus, pwd, ByRef err) {
+   if (modus=1)
+   {
+      txt := GetTextsFromPDF(imgPath, frameu, 0, pwd, pg, err)
+   } else if (modus=2)
+   {
+      txt := GetTextsFromPDF(imgPath, frameu, 1, pwd, pg, err)
+   } else if (modus=3)
+   {
+      txt := GetTextsFromPDF(imgPath, frameu, 0, pwd, pg, err)
+      lnk := Trimmer( GetTextsFromPDF(imgPath, frameu, 1, pwd, pg, err) )
+      If lnk
+         txt .= "`n`nLINKS:`n`n" lnk
+   }
+
+   Return txt
+}
+
+BTNextractALLtextsCurrentPDF() {
+   imgPath := getIDimage(currentFileIndex)
+   actu := -6
+   pwd := 0
+   DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+   If (errorType)
+   {
+      msgBoxWrapper(appTitle ": ERROR", friendlyPDFerrorCodes(errorType, pwd) ". ", 0, 0, "error")
+      Return
+   }
+
+   pageCount := actu
+   msgResult := msgBoxWrapper("Retrieve all texts from PDF: " appTitle, "Please choose what to extract from every`npage. There are " pageCount " pages in the PDF.`n`nNo optical character recognition (OCR) will`nbe performed. Therefore, the texts that`nappear in images will not be retrieved.`n`nYou will be prompted to save a text file,`nif you proceed.", "&Retrieve texts|C&ancel", 1, 0, 0, 0, "Texts`fLinks`f`fBoth: texts and links", 0, currentFileIndex, 2)
+   If !InStr(msgResult.btn, "retrieve")
+      Return
+
+   Gui,SettingsGUIA: Hide
+   modus := msgResult.list
+   txt := ""
+   abandonAll := failed := 0
+   prevMSGdisplay := A_TickCount
+   startOperation := A_TickCount
+   backCurrentSLD := CurrentSLD
+   setImageLoading()
+   showTOOLtip("Retrieving texts from every PDF page")
+   doStartLongOpDance()
+   Loop, % pageCount
+   {
+         txt .= CoreExtractALLtextsPDF(imgPath, A_Index - 1, modus, pwd, err) "`n `n"
+         If err 
+         {
+            failed++
+            txt .= "`n `nPAGE " A_Index ": " friendlyPDFerrorCodes(err, pwd) ".`n `n"
+         }
+
+         executingCanceableOperation := A_TickCount
+         If (A_TickCount - prevMSGdisplay>1000)
+         {
+            etaTime := ETAinfos(A_Index, pageCount, startOperation)
+            If (failed>0)
+               etaTime .= "`nFailed to extract texts from " groupDigits(failed) " pages"
+   
+            showTOOLtip("Retrieving texts from every PDF page" etaTime, 0, 0, A_Index / pageCount)
+            prevMSGdisplay := A_TickCount
+         }
+   
+         If (determineTerminateOperation()=1)
+         {
+            abandonAll := 1
+            Break
+         }
+   }
+
+   Gui,SettingsGUIA: Show
+   SetTimer, ResetImgLoadStatus, -150
+   CurrentSLD := backCurrentSLD
+   If (abandonAll=1)
+   {
+      showTOOLtip("User abandoned extracting texts from the PDF")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, nExt)
+   file2save := openFileDialogWrapper("S", "PathMustExist", OutDir "\" OutNameNoExt, "Save extracted PDF texts...", "Text files (*.txt)|All files (*.*)", 1, 1)
+   If (!RegExMatch(file2save, "i)(.\.txt)$") && file2save)
+      file2save .= ".txt"
+
+   If file2save
+   {
+      zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt, nExt)
+      If FileExist(file2save)
+      {
+         msgResult := msgBoxWrapper(appTitle ": Confirmation", "The destination file already exists. Do you want to overwrite the file?`n`n" OutFileName "`n`n" OutDir "\", 4, 0, "question")
+         If (msgResult="Yes")
+         {
+            mustdoDeleteFile := 1
+         } Else Return
+      }
+
+      If (mustdoDeleteFile=1 && FileExist(file2save))
+      {
+         FileSetAttrib, -R, % ile2save
+         Sleep, 1
+         FileDelete, % file2save
+         If ErrorLevel
+         {
+            msgBoxWrapper(appTitle ": ERROR", "Unable to access the file: " OutFileName ". Permission denied.`n`nLocation:`n" OutDir "\", 0, 0, "error")
+            Return
+         }
+      }
+
+      FileAppend, % txt, % file2save, UTF-8
+      If ErrorLevel
+      {
+         msgBoxWrapper(appTitle ": ERROR", "Unable to write or access the file: " OutFileName ". Permission denied.`n`nLocation:`n" OutDir "\", 0, 0, "error")
+         Return
+      } Else 
+      {
+         showTOOLtip("Text file succesfully saved:`n" OutFileName "`n" OutDir "\")
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+      }
+   }
+
+}
+
 UIpopulatePDFtexts() {
    Gui, SettingsGUIA: Default
 
-   txt := GetTextsFromPDF(getIDimage(currentFileIndex), desiredFrameIndex, 0)
+   txt := GetTextsFromPDF(getIDimage(currentFileIndex), desiredFrameIndex, 0, pwd, pageCount)
    GuiControl, SettingsGUIA:, EditPDFtexts, % txt
 
-   linkz := GetTextsFromPDF(getIDimage(currentFileIndex), desiredFrameIndex, 1)
+   linkz := GetTextsFromPDF(getIDimage(currentFileIndex), desiredFrameIndex, 1, pwd, pageCount)
    GuiControl, SettingsGUIA:, EditPDFlinks, % linkz
 }
 
@@ -55612,39 +55742,65 @@ PanelJump2index() {
       coreGenerateRandomList()
 
    imgPath := getIDimage(currentFileIndex)
-   isAnim := (totalFramesIndex>1) ? "`fSkip to given frame index" : ""
+   isAnim := (totalFramesIndex>1 && thumbsDisplaying!=1) ? "`fF: Skip to given frame index" : ""
    fakeWinCreator(13, A_ThisFunc, 1)
-   msgResult := msgBoxWrapper("panelu|Skip to given index: " appTitle, "Please type a number to skip at in the files list`nand choose the action.`n`nTotal entries: " groupDigits(maxFilesIndex) "`nCurrent random index: " groupDigits(RandyIMGnow), "&Skip to...|C&ancel", 1, "fast-forward", 0, 0, "Skip to the given file index`f`fSkip to the given index in the random list`fSelect from the current file index to the given index" isAnim, "limit9050 +number", currentFileIndex, 2)
+   If (maxFilesIndex<3 && thumbsDisplaying!=1 && totalFramesIndex>1)
+   {
+      simplex := 1
+      msgResult := msgBoxWrapper("panelu|Skip to given index: " appTitle, "Please type a number to skip at in the frames or pages list.`n`nTotal frames / pages: " groupDigits(totalFramesIndex) ".", "&Skip to|C&ancel", 1, "fast-forward", 0, 0, 0, "limit9050 +number", desiredFrameIndex, 2)
+   } Else {
+      msgResult := msgBoxWrapper("panelu|Skip to given index: " appTitle, "Please type a number to skip at in the files list`nand choose the action.`n`nTotal entries: " groupDigits(maxFilesIndex) "`nCurrent random index: " groupDigits(RandyIMGnow), "&Skip to...|C&ancel", 1, "fast-forward", 0, 0, "Skip to the given file index`f`fR: Skip to the given index in the random list`fS: Select from the current file index to the given index" isAnim, "limit9050", currentFileIndex, 2)
+   }
+
    If InStr(msgResult.btn, "skip")
    {
       usrJumpIndex := Trimmer(msgResult.edit)
       If !usrJumpIndex
          Return
 
-      newJumpIndex := clampInRange(usrJumpIndex, 1, maxFilesIndex)
-      If (newJumpIndex=currentFileIndex && newJumpIndex>0 && msgResult.list!=4)
+      If (varContains(usrJumpIndex, "r", "s", "f", "p") && !simplex)
+      {
+         If InStr(usrJumpIndex, "r")
+            msgResult.list := 2
+         Else If InStr(usrJumpIndex, "s")
+            msgResult.list := 3
+         Else If ((InStr(usrJumpIndex, "f") || InStr(usrJumpIndex, "p")) && isAnim)
+            msgResult.list := 4
+      }
+
+      newJumpIndex := usrJumpIndex := Trimmer( RegExReplace(usrJumpIndex, "i)([a-zA-Z]|[[:space:]]|[[:punct:]])") )
+      If !isNumber(usrJumpIndex)
          Return
 
       If askAboutFileSave(" and another image will be loaded")
          Return
 
-      If (IsNumber(newJumpIndex) && newJumpIndex>=1)
+      newJumpIndex := usrJumpIndex := Round(newJumpIndex)
+      If (newJumpIndex>=0)
       {
-         If (msgResult.list=4)
+         If (msgResult.list=4 || msgResult.list=1 && simplex=1)
          {
-            desiredFrameIndex := clampInRange(usrJumpIndex, 1, totalFramesIndex)
+            desiredFrameIndex := clampInRange(usrJumpIndex - 1, 0, totalFramesIndex)
             RefreshImageFile()
             Return
          } Else If (msgResult.list=2)
          {
+            newJumpIndex := clampInRange(usrJumpIndex, 1, RandyIMGids.Count())
+            newIndex := clampInRange(RandyIMGids[newJumpIndex], 1, maxFilesIndex)
+            If (newIndex=currentFileIndex)
+               Return
+
+            currentFileIndex := newIndex
             RandyIMGnow := newJumpIndex
-            currentFileIndex := clampInRange(RandyIMGids[newJumpIndex], 1, maxFilesIndex)
-            ; ToolTip, % RandyIMGids "==" newJumpIndex "==" currentFileIndex , , , 2
             RefreshImageFile()
             Return
          } Else If (msgResult.list=3)
             jumpSelectRangeGiven(currentFileIndex, newJumpIndex)
 
+         If (newJumpIndex=currentFileIndex && newJumpIndex>0 && msgResult.list!=4)
+            Return
+
+         newJumpIndex := clampInRange(usrJumpIndex, 1, maxFilesIndex)
          currentFileIndex := newJumpIndex
          dummyTimerDelayiedImageDisplay(50)
       }
@@ -58297,7 +58453,7 @@ batchExtractFramesFromImages() {
       }
 
       countTFilez++
-      If !RegExMatch(imgPath, "i)(.\.(gif|tif|tiff|webp))$")
+      If !RegExMatch(imgPath, "i)(.\.(pdf|gif|tif|tiff|webp))$")
       {
          skippedFiles++
          Continue
@@ -58396,7 +58552,7 @@ coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          {
             ; use WIC loader to extract the TIF pages
             VarSetCapacity(resultsArray, 8 * 9, 0)
-            cBPP := DllCall(whichMainDLL "\WICpreLoadImage", "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "int", wasInitFIMlib, "Int")
+            cBPP := DllCall("qpvmain.dll\WICpreLoadImage", "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "int", wasInitFIMlib, "Int")
             If (cBPP>1 && cBPP<=64)
             {
                Width := NumGet(resultsArray, 4 * 0, "uInt")
@@ -58414,7 +58570,7 @@ coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
                ; ToolTip, % z[1] "|" pBitmap "|" cBPP "|" Gdip_GetImagePixelFormat(pBitmap, 2) , , , 2
             } Else hFIFimgA := ""
 
-            DllCall(whichMainDLL "\WICdestroyPreloadedImage", "Int", 12, "Int")
+            DllCall("qpvmain.dll\WICdestroyPreloadedImage", "Int", 12, "Int")
             resultsArray := ""
          }
 
@@ -58572,15 +58728,90 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
       r := coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, thisu)
       failedFrames := thisu
       Return r
-   } Else 
+   } Else  If RegExMatch(imgPath, "i)(.\.pdf)$")
    {
-      oBitmap := trGdip_CreateBitmapFromFile(A_ThisFunc, imgPath, userPerformColorManagement)
-      If !validBMP(oBitmap)
-         Return -4
+      actu := -6
+      pwd := 0
+      DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+      If (errorType)
+      {
+         ; msgBoxWrapper(appTitle ": ERROR", friendlyPDFerrorCodes(errorType, pwd) ". ", 0, 0, "error")
+         Return errorType
+      }
 
-      rawFmt := Gdip_GetImageRawFormat(oBitmap)
+      tFrames := actu
+      zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
+      If (inLoop!=1)
+      {
+         showTOOLtip("Extracting " groupDigits(tFrames) " frames from:`n" OutFileName)
+         doStartLongOpDance()
+      } 
+      If !bonusMsg
+         bonusMsg := ""
+
+      prevMSGdisplay := A_TickCount
+      Loop, % tFrames
+      {
+         file2save := ResizeDestFolder "\" OutNameNoExt "_" A_Index "." saveImgFormatsList[userExtractFramesFmt]
+         executingCanceableOperation := A_TickCount
+         If (determineTerminateOperation()=1)
+         {
+            abandonAll := 1
+            Break
+         }
+
+         If (A_TickCount - prevMSGdisplay>2500)
+         {
+            showTOOLtip("Extracting frames:`n" groupDigits(A_Index) " / " groupDigits(tFrames) " ( " Round((A_Index / tFrames) * 100, 1) "% )" bonusMsg "`nCurrent file:`n" OutFileName, 0, 0, A_Index / tFrames)
+            prevMSGdisplay := A_TickCount
+         }
+
+         yay := !yay
+         If (FileExist(file2save) && !FolderExist(file2save))
+            file2save := askAboutFileCollision(imgPath, file2save, 1, 0, OnExtractConflictOverwrite, performOverwrite)
+
+         If (file2save="abort")
+         {
+            abandonAll := 1
+            Break
+         } Else If !file2save
+            Continue
+
+         oBitmap := RenderPDFpage(imgPath, 0, A_Index - 1)
+         If !validBMP(oBitmap)
+         {
+            failedFrames++
+            Continue
+         }
+
+         trGdip_GetImageDimensions(oBitmap, imgW, imgH)
+         If isImgSizeTooLarge(imgW, imgH, saveImgFormatsList[userExtractFramesFmt])
+         {
+            capIMGdimensionsFormatlimits(saveImgFormatsList[userExtractFramesFmt], 1, imgW, imgH)
+            kBitmap := trGdip_ResizeBitmap(A_ThisFunc, oBitmap, imgW, imgH, 1)
+            If validBMP(kBitmap)
+            {
+               r := QPV_SaveImageFile(A_ThisFunc, kBitmap, file2save, userJpegQuality, userSaveBitsDepth)
+               trGdip_DisposeImage(kBitmap)
+            } Else r := 1
+         } Else r := QPV_SaveImageFile(A_ThisFunc, oBitmap, file2save, userJpegQuality, userSaveBitsDepth)
+
+         oBitmap := trGdip_DisposeImage(oBitmap)
+         If r
+            failedFrames++
+      }
+
+      If (inLoop!=1)
+         ResetImgLoadStatus()
+
+      Return (abandonAll=1) ? -5 : clampInRange(tFrames, 0, 9892899)
    }
 
+   oBitmap := trGdip_CreateBitmapFromFile(A_ThisFunc, imgPath, userPerformColorManagement)
+   If !validBMP(oBitmap)
+      Return -4
+
+   rawFmt := Gdip_GetImageRawFormat(oBitmap)
    If RegExMatch(rawFmt, "i)(gif|tiff)$")
    {
       tFrames := Gdip_GetBitmapFramesCount(oBitmap) - 1
@@ -60767,7 +60998,9 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
    Static lastInvoked := 1, noAsking := 0
    If (A_TickCount - lastInvoked<900)
       Return
-
+   
+   initFIMGmodule()
+   initQPVmainDLL()
    If (!imgsListu && !foldersListu && !sldFile)
    {
       SetTimer, ResetImgLoadStatus, -50
@@ -60786,7 +61019,6 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
       Return
    }
 
-   initQPVmainDLL()
    If sldFile
    {
       If (RegExMatch(sldFile, "i)(.\.vqpv)$"))
@@ -62615,7 +62847,7 @@ InvokeMenuBarImage(manuID) {
         Menu, pvMenuBarImage, Add
         If RegExMatch(getIDimage(currentFileIndex), "i)(.\.pdf)$")
         {
-           kMenu("pvMenuBarImage", "Add", "Extract texts from PDF page", "PanelPDFreadTexts", "convert retrieve read search links pdf")
+           kMenu("pvMenuBarImage", "Add", "Extract texts from PDF page", "PanelPDFreadTexts", "convert retrieve read search links pdf get")
         } Else
         {
            kMenu("pvMenuBarImage", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw reinhard drago")
@@ -62624,7 +62856,7 @@ InvokeMenuBarImage(manuID) {
         }
 
         kMenu("pvMenuBarImage", "Add", "Set as &wallpaper", "PanelSetWallpaper", "desktop image") 
-        kMenu("pvMenuBarImage", "Add", "Extract frames/pa&ges", "PanelExtractFrames")
+        kMenu("pvMenuBarImage", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
         If (currIMGdetails.Frames<2 && !markedSelectFile)
            kMenu("pvMenuBarImage", "Disable", "Extract frames/pa&ges")
 
@@ -62654,7 +62886,7 @@ InvokeMenuBarImage(manuID) {
      createMenuImageFileActions("pvMenuBarImage")
      kMenu("pvMenuBarImage", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
      kMenu("pvMenuBarImage", "Add", "Set as &wallpaper", "PanelSetWallpaper", "desktop image")
-     kMenu("pvMenuBarImage", "Add", "Extract frames/pa&ges", "PanelExtractFrames")
+     kMenu("pvMenuBarImage", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
      kMenu("pvMenuBarImage", "Add", "Join images into...", "PanelCombineImagesMultipage", "pdf create document")
      kMenu("pvMenuBarImage", "Add", "&Create a thumbnails sheet", "PanelCreateIMGthumbsSheet")
      If !markedSelectFile
@@ -63641,7 +63873,7 @@ createMenuImgSizeAdapt(dummy:=0) {
       If (drawingShapeNow=0 && mustCaptureCloneBrush=0)
       {
          If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.pdf)$") && !AnyWindowOpen)
-            kMenu("PVview", "Add", "Extract texts from PDF page", "PanelPDFreadTexts", "convert retrieve read search links pdf")
+            kMenu("PVview", "Add", "Extract texts from PDF page", "PanelPDFreadTexts", "convert retrieve read search links pdf get")
 
          yayz := varContains(currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat, "hdr", "exr", "128-bit", "96-bit", "RGBF", "RGBAF")
          If ((InStr(currIMGdetails.PixelFormat, "TONE-MAPP") || yayz=1) && !AnyWindowOpen)
@@ -64119,7 +64351,7 @@ createMenuCurrentFilesActs(dummy:=0) {
 
    Menu, PVfilesActs, Add, 
    kMenu("PVfilesActs", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
-   kMenu("PVfilesActs", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs")
+   kMenu("PVfilesActs", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
    If (markedSelectFile || dummy!="rclick")
    {
       kMenu("PVfilesActs", "Add", "Join images into...", "PanelCombineImagesMultipage", "pdf create document")
@@ -68949,7 +69181,7 @@ disableWindowPenServices(hwnd) {
    If !qpvMainDll
       initQPVmainDLL(1)
 
-   Return DllCall(whichMainDLL "\SetTabletPenServiceProperties", "uptr", hwnd)
+   Return DllCall("qpvmain.dll\SetTabletPenServiceProperties", "uptr", hwnd)
 }
 
 handleUIhwnd(initGui) {
@@ -70107,7 +70339,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
     If (totalFramesIndex>0 || currIMGdetails.Frames>1) && (thumbsDisplaying!=1)
     {
        thisFramesInfo := (totalFramesIndex>0) ? totalFramesIndex : currIMGdetails.Frames
-       infoFrames := "`nMultiple pages: " desiredFrameIndex " / " thisFramesInfo
+       infoFrames := "`nImage frames / pages: " desiredFrameIndex " / " thisFramesInfo
     }
 
     zPlitPath(imgPath, 0, fileNamu, folderu, OutNameNoExt)
@@ -70175,7 +70407,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
           asr := " px (" Round(resultedFilesList[thisFileIndex, 13] / resultedFilesList[thisFileIndex, 14], 2) ") | "
           infoRes := "`nResolution: " groupDigits(resultedFilesList[thisFileIndex, 13]) " x " groupDigits(resultedFilesList[thisFileIndex, 14]) asr resultedFilesList[thisFileIndex, 17] " MPx"
           ; infoRes .= " | " resultedFilesList[thisFileIndex, 22] " DPI"
-          infoRes .= (resultedFilesList[thisFileIndex, 9]>1) ? "`nImage frames: " resultedFilesList[thisFileIndex, 9] : ""
+          infoRes .= (resultedFilesList[thisFileIndex, 9]>1) ? "`nImage frames / pages: " resultedFilesList[thisFileIndex, 9] : ""
           infoRes .= "`nPixel format: " resultedFilesList[thisFileIndex, 15]
        }
     }
@@ -70761,6 +70993,20 @@ LoadFileWithWIA(imgPath, fastMode, noBMP:=0, sizesDesired:=0, ByRef newBitmap:=0
    Return oBitmap
 }
 
+setViewPortGDIPimageEditingProperties() {
+   currIMGdetails.PixelFormat := Gdip_GetImagePixelFormat(UserMemBMP, 2)
+   If (currIMGdetails.HasAlpha!=1)
+      currIMGdetails.PixelFormat := StrReplace(currIMGdetails.PixelFormat, "A")
+
+   currIMGdetails.RawFormat := Gdip_GetImageRawFormat(UserMemBMP)
+   trGdip_GetImageDimensions(UserMemBMP, w, h)
+   currIMGdetails.Width := w
+   currIMGdetails.Height := h
+   currIMGdetails.Frames := 0
+   currIMGdetails.ActiveFrame := 0
+   desiredFrameIndex := totalFramesIndex := 0
+}
+
 LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
   Static prevMD5nameA, prevMD5nameB, prevDetailsA, prevDetailsB
 
@@ -70771,17 +71017,7 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
   coreIMGzeitLoad := A_TickCount
   If validBMP(UserMemBMP)
   {
-     totalFramesIndex := 0
-     currIMGdetails.PixelFormat := Gdip_GetImagePixelFormat(UserMemBMP, 2)
-     If (currIMGdetails.HasAlpha!=1)
-        currIMGdetails.PixelFormat := StrReplace(currIMGdetails.PixelFormat, "A")
-
-     currIMGdetails.RawFormat := Gdip_GetImageRawFormat(UserMemBMP)
-     trGdip_GetImageDimensions(UserMemBMP, w, h)
-     currIMGdetails.Width := w
-     currIMGdetails.Height := h
-     ; currIMGdetails.HasAlpha := InStr(currIMGdetails.PixelFormat, "argb") ? 1 : 0
-     currIMGdetails.Frames := 0
+     setViewPortGDIPimageEditingProperties()
      prevMD5nameA := prevMD5nameB := ""
      discardSRCfileCaches()
      destroyGDIfileCache()
@@ -75201,14 +75437,29 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
 ; highlight number of frames and the current frame in multi-frame images [tiff and gif]
     If (totalFramesIndex>0)
     {
-       bulletSize := imgHUDbaseUnit//3
-       totalBulletsWidth := bulletSize * totalFramesIndex
+       bulletSizeH := bulletSizeW := imgHUDbaseUnit//3
+       totalBulletsWidth := bulletSizeW * totalFramesIndex
+       shapeu := "Ellipse"
        If (totalBulletsWidth>mainWidth)
+       {
           bulletsPerc := Round(desiredFrameIndex/totalFramesIndex, 3)
-       maxBullets := Round(mainWidth/bulletSize)
+          tWidth := (bulletSizeW//2) * totalFramesIndex
+          If (tWidth>mainWidth)
+          {
+             totalBulletsWidth := tWidth
+             bulletSizeW := bulletSizeW//2
+             shapeu := "Rectangle"
+          }
+       }
+
+       seppy := Ceil(bulletSizeW * 0.1 + 2)
+       maxBullets := Round(mainWidth/bulletSizeW)
        centerPos := bulletsPerc ? 0 : mainWidth//2 - totalBulletsWidth//2
        If (centerPos<0)
           centerPos := 0
+
+       If bulletsPerc
+          Gdip_FillRectangle(glPG, pBrushZ, 0, mainHeight - Round(scrollBarHy) - 1, mainWidth, 2)
 
        Loop, % totalFramesIndex + 1
        {
@@ -75217,7 +75468,9 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
            Else
               whichBrush := (A_Index - 1 <= desiredFrameIndex) ? pBrushA : pBrushE
 
-           Gdip_FillEllipse(glPG, whichBrush, centerPos + bulletSize * (A_Index - 1), mainHeight - bulletSize - Round(scrollBarHy) - 2, bulletSize, bulletSize)
+           Gdip_Fill%shapeu%(glPG, whichBrush, centerPos + bulletSizeW * (A_Index - 1), mainHeight - bulletSizeH - Round(scrollBarHy) - 1, bulletSizeW, bulletSizeH)
+           if (shapeu="rectangle")
+              Gdip_FillRectangle(glPG, pBrushE, centerPos + bulletSizeW * (A_Index - 1), mainHeight - bulletSizeH - Round(scrollBarHy) - 1, seppy, bulletSizeH)
            If (A_index>maxBullets)
               Break
        }
@@ -81863,7 +82116,7 @@ filterDupeResultsByHdist(threshold) {
        }
    }
 
-   err := DllCall(whichMainDLL "\clearHammingDistanceResults")
+   err := DllCall("qpvmain.dll\clearHammingDistanceResults")
    groupies := ""
    If (abandonAll=1)
       Return 2
@@ -82256,7 +82509,7 @@ corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCo
    Loop
    {
       hoffset := 0
-      rzs := DllCall(whichMainDLL "\hammingDistanceOverArray", "UPtr", &HbigArray, "UPtr", &flipHbigArray, "UPtr", &IDsbigArray, "uint", totalLoops, "Int", threshold + 1, "uint", hamDistLBorderCrop, "uint", hamDistRBorderCrop, "int", findInvertedDupes, "int", findFlippedDupes, "int", stepping, "int", callOffset, "int*", hoffset)
+      rzs := DllCall("qpvmain.dll\hammingDistanceOverArray", "UPtr", &HbigArray, "UPtr", &flipHbigArray, "UPtr", &IDsbigArray, "uint", totalLoops, "Int", threshold + 1, "uint", hamDistLBorderCrop, "uint", hamDistRBorderCrop, "int", findInvertedDupes, "int", findFlippedDupes, "int", stepping, "int", callOffset, "int*", hoffset)
       callOffset += hoffset
       If (rzs>0)
          totalResults += rzs
@@ -82298,11 +82551,11 @@ corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCo
    }
 
    VarSetCapacity(resultsArrayA, 4 * totalResults + 1, 0) ; Lpair
-   err := DllCall(whichMainDLL "\retrieveHammingDistanceResults", "UPtr", &resultsArrayA, "Int", 1, "uInt", totalResults)
+   err := DllCall("qpvmain.dll\retrieveHammingDistanceResults", "UPtr", &resultsArrayA, "Int", 1, "uInt", totalResults)
    VarSetCapacity(resultsArrayB, 4 * totalResults + 1, 0) ; Rpair
-   err := DllCall(whichMainDLL "\retrieveHammingDistanceResults", "UPtr", &resultsArrayB, "Int", 2, "uInt", totalResults)
+   err := DllCall("qpvmain.dll\retrieveHammingDistanceResults", "UPtr", &resultsArrayB, "Int", 2, "uInt", totalResults)
    VarSetCapacity(resultsArrayC, 4 * totalResults + 1, 0) ; hamming distance
-   err := DllCall(whichMainDLL "\retrieveHammingDistanceResults", "UPtr", &resultsArrayC, "Int", 3, "uInt", totalResults)
+   err := DllCall("qpvmain.dll\retrieveHammingDistanceResults", "UPtr", &resultsArrayC, "Int", 3, "uInt", totalResults)
    ; msgbox, % "r=" totalResults
 
    MSE := 2500
@@ -92408,7 +92661,7 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
    If (silentMode=0)
       showTOOLtip("Calculating auto-cropped region`nStep 1 - Y1", 0, 0, 0.1)
 
-   r := DllCall(whichMainDLL "\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 1, "Int", AutoCropAdaptiveMode, "int*", Y1)
+   r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 1, "Int", AutoCropAdaptiveMode, "int*", Y1)
    If !r
    {
       Gdip_UnlockBits(pBitmap, BitmapData1)
@@ -92419,7 +92672,7 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
       Return "change"
 
    If (AutoCropAdaptiveMode=1 && Y1=-1)
-      r := DllCall(whichMainDLL "\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 1, "Int", 0, "int*", Y1)
+      r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 1, "Int", 0, "int*", Y1)
 
    If (silentMode=0)
       showTOOLtip("Calculating auto-cropped region`nStep 2 - X1", 0, 0, 0.3)
@@ -92427,12 +92680,12 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
    If !partialUpdateUIautoCropParams()
       Return "change"
 
-   r := DllCall(whichMainDLL "\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 2, "Int", AutoCropAdaptiveMode, "int*", X1)
+   r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 2, "Int", AutoCropAdaptiveMode, "int*", X1)
    If !partialUpdateUIautoCropParams()
       Return "change"
 
    If (AutoCropAdaptiveMode=1 && X1=-1)
-      r := DllCall(whichMainDLL "\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 2, "Int", 9, "int*", X1)
+      r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 2, "Int", 9, "int*", X1)
 
    If (silentMode=0)
       showTOOLtip("Calculating auto-cropped region`nStep 3 - Y2", 0, 0, 0.5)
@@ -92446,7 +92699,7 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
    If E2
       Return "error"
 
-   r := DllCall(whichMainDLL "\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 1, "Int", AutoCropAdaptiveMode, "int*", Y2)
+   r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 1, "Int", AutoCropAdaptiveMode, "int*", Y2)
    If (silentMode=0)
       showTOOLtip("Calculating auto-cropped region`nStep 4 - X2", 0, 0, 0.8)
 
@@ -92454,17 +92707,17 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
       Return "change"
 
    If (AutoCropAdaptiveMode=1 && Y2=-1)
-      r := DllCall(whichMainDLL "\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 1, "Int", 0, "int*", Y2)
+      r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 1, "Int", 0, "int*", Y2)
 
    If !partialUpdateUIautoCropParams()
       Return "change"
 
-   r := DllCall(whichMainDLL "\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 2, "Int", AutoCropAdaptiveMode, "int*", X2)
+   r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 2, "Int", AutoCropAdaptiveMode, "int*", X2)
    If !partialUpdateUIautoCropParams()
       Return "change"
 
    If (AutoCropAdaptiveMode=1 && X2=-1)
-      r := DllCall(whichMainDLL "\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 2, "Int", 0, "int*", X2)
+      r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 2, "Int", 0, "int*", X2)
 
    ; fnOutputDebug(X1 "=" Y1 "|" X2 "=" Y2)
    if (X1=-1 && Y1=-1 && X2=-1 && Y2=-1)
@@ -93124,7 +93377,7 @@ coreFreeImageSimpleColorsAdjust(imgPath, file2save) {
     Stride := FreeImage_GetStride(hFIFimgA)
     this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
     QPV_PrepareHugeImgSelectionArea(0, 0, imgW, imgH, imgW, imgH, 0, 0, 0, 0)
-    r := DllCall(whichMainDLL "\AdjustImageColors" this, "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", imgColorsFXopacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", userImgAdjustSat, "int", userImgAdjustAltBright, "int", userImgAdjustBright, "int", userImgAdjustAltContra, "int", userImgAdjustContra, "int", userImgAdjustAltHiLows, "int", userImgAdjustShadows, "int", userImgAdjustHighs, "int", userImgAdjustHue, "int", userImgAdjustTintDeg, "int", userImgAdjustTintAmount, "int", userImgAdjustAltTint, "int", userImgAdjustGamma, "int", userImgAdjustOffR, "int", userImgAdjustOffG, "int", userImgAdjustOffB, "int", userImgAdjustOffA, "int", userImgAdjustThreR, "int", userImgAdjustThreG, "int", userImgAdjustThreB, "int", userImgAdjustThreA, "int", userImgAdjustSeeThrough, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", userImgAdjustWhitePoint, "int", userImgAdjustBlackPoint, "int", userImgAdjustNoisePoints, "UPtr", 0, "int", 0)
+    r := DllCall("qpvmain.dll\AdjustImageColors" this, "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", imgColorsFXopacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", userImgAdjustSat, "int", userImgAdjustAltBright, "int", userImgAdjustBright, "int", userImgAdjustAltContra, "int", userImgAdjustContra, "int", userImgAdjustAltHiLows, "int", userImgAdjustShadows, "int", userImgAdjustHighs, "int", userImgAdjustHue, "int", userImgAdjustTintDeg, "int", userImgAdjustTintAmount, "int", userImgAdjustAltTint, "int", userImgAdjustGamma, "int", userImgAdjustOffR, "int", userImgAdjustOffG, "int", userImgAdjustOffB, "int", userImgAdjustOffA, "int", userImgAdjustThreR, "int", userImgAdjustThreG, "int", userImgAdjustThreB, "int", userImgAdjustThreA, "int", userImgAdjustSeeThrough, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", userImgAdjustWhitePoint, "int", userImgAdjustBlackPoint, "int", userImgAdjustNoisePoints, "UPtr", 0, "int", 0)
     If (r!=1)
     {
        FreeImage_UnLoad(hFIFimgA)
@@ -95090,6 +95343,95 @@ AcquireWIAimage() {
     }
 }
 
+friendlyPDFerrorCodes(errorType, pwd) {
+    if (errorType=2)
+       r := "PDF file not found or could not be opened"
+    else if (errorType=3)
+       r := "File not in the PDF format or it is corrupted"
+    else if (errorType=4)
+       r := (pwd="") ? "Incorrect PDF password provided" : "A password is required to open the PDF"
+    else If (errorType=-1)
+       r := "PDF is password protected"
+    else If (errorType=-2)
+       r := "PDF seems to have no pages"
+    else If (errorType=-3)
+       r := "Failed to retrieve PDF page from document"
+    else If (errorType=-4)
+       r := "Failed to allocate the GDI+ bitmap"
+    else If (errorType=-5)
+       r := "Failed to create the FPDF bitmap to render PDF"
+    else If (errorType=-6)
+       r := "Failed to retrieve PDF text page from PDF page"
+    else if (errorType=-100)
+       r := "RenderPdfPageAsBitmap() from qpvmain.dll failed to execute"
+    else if (errorType!=0)
+       r := "Unknown PDF error"
+    return r
+}
+
+GetTextsFromPDF(imgPath, frameu, linkz, pwd:=0, ByRef pageCount:=0, ByRef errorType:=0) {
+   linkz *= 2
+   errorType := -100
+   varOut = -2 - linkz
+   DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+   If (varOut>0 && errorType=0)
+   {
+      VarSetCapacity(textBuffer, (varOut+0) * 4, 0)
+      varOut := -3 - linkz 
+      DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int", 0, "int", 1, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", &textBuffer, "UPtr")
+      if (varOut>1 && errorType=0)
+      {
+         txt := StrGet(&textBuffer, "UTF-16")
+         if (linkz>0)
+         {
+            Sort, txt, UD|
+            txt := Trimmer(StrReplace(txt, "|", "`n `n"))
+         }
+      }
+   }
+
+   If errorType
+      txt := friendlyPDFerrorCodes(errorType, pwd) "."
+
+   Return txt
+}
+
+RenderPDFpage(imgPath, noBPPconv, frameu, pwd:=0, maxW:=0, maxH:=0, dpi:=431, ByRef pageCount:=0, ByRef errorType:=0, fillBgr:=0, bgrColor:="ffffff") {
+    If (noBPPconv=1)
+       pageCount := -6
+
+    errorType := -100
+    pBitmap := DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", dpi, "int*", maxW, "int*", maxH, "int", fillBgr, "int", "0xff" bgrColor, "int*", pageCount, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+    If StrLen(pBitmap)>2
+    {
+       recordGdipBitmaps(pBitmap, A_ThisFunc)
+       Gdip_BitmapSetResolution(pBitmap, dpi, dpi)
+       Gdip_GetImageDimensions(pBitmap, w, h)
+    } else if (noBPPconv=1 && errorType=0)
+    {
+       w := maxW
+       h := maxH
+    }
+
+    if errorType
+       fnOutputDebug(A_ThisFunc ": " friendlyPDFerrorCodes(errorType, pwd))
+
+    mainLoadedIMGdetails := []
+    mainLoadedIMGdetails.PixelFormat := "32-PARGB"
+    mainLoadedIMGdetails.Width := Round(w)
+    mainLoadedIMGdetails.Height := Round(h)
+    mainLoadedIMGdetails.ImgFile := imgPath
+    mainLoadedIMGdetails.Frames := pageCount ? pageCount : 0
+    mainLoadedIMGdetails.ActiveFrame := clampInRange(frameu, 0, Round(pageCount))
+    mainLoadedIMGdetails.DPI := dpi
+    mainLoadedIMGdetails.RawFormat := "PDF"
+    mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(w, h)
+    mainLoadedIMGdetails.HasAlpha := !fillBgr
+    mainLoadedIMGdetails.OpenedWith := "PDF [PDFium]"
+    mainLoadedIMGdetails.LoadedWith := "PDFium"
+    Return pBitmap
+}
+
 retrieveXMLattributeValue(content, attrib) {
    foundPos := RegExMatch(content, "i)" attrib "=[""']([^""']*)[""']", string)
    If foundPos
@@ -95098,7 +95440,8 @@ retrieveXMLattributeValue(content, attrib) {
 }
 
 convertSVGunitsToPixels(ByRef length) {
-    vpWinClientSize(w, h)
+    ; vpWinClientSize(w, h)
+    w := A_ScreenWidth, h := A_ScreenHeight
     base := Round( (w + h)/2 ) * 2
     length := StrReplace(length, A_Space)
     If !length
@@ -95189,12 +95532,12 @@ RenderSVGfile(imgPath, noBPPconv, screenMode) {
    mainLoadedIMGdetails.RawFormat := !ver ? vb "SVG" : vb "SVG v" ver
    mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(w, h)
    mainLoadedIMGdetails.HasAlpha := 1
-   mainLoadedIMGdetails.OpenedWith := "Windows Direct 2D [D2D]"
+   mainLoadedIMGdetails.OpenedWith := "Windows Direct 2D [Direct 2D]"
    mainLoadedIMGdetails.LoadedWith := "D2D"
    If (noBPPconv=1)
       Return
 
-   pBitmap := DllCall(whichMainDLL "\LoadSVGimage", "Int", 0 ,"Int", w, "Int", h, "float", fscaleX, "float", fscaleY, "Str", imgPath, "UPtr")
+   pBitmap := DllCall("qpvmain.dll\LoadSVGimage", "Int", 0 ,"Int", w, "Int", h, "float", fscaleX, "float", fscaleY, "Str", imgPath, "UPtr")
    If StrLen(pBitmap)>2
    {
       recordGdipBitmaps(pBitmap, A_ThisFunc)
@@ -95228,7 +95571,7 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
    VarSetCapacity(resultsArray, 8 * 9, 0)
    ; fnOutputDebug(A_ThisFunc ": to load = " imgPath)
    fimu := (wasInitFIMlib=1 && allowFIMloader=1) ? 1 : 0
-   r := DllCall(whichMainDLL "\WICpreLoadImage", "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "int", fimu, "Int")
+   r := DllCall("qpvmain.dll\WICpreLoadImage", "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "int", fimu, "Int")
    ; fnOutputDebug(A_ThisFunc ": load time with WIC: " A_TickCount - tt)
    If r
    {
@@ -95265,7 +95608,7 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
          z := teleportWICtoFIM(Width, Height, clrDepth, useICM, 0)
          If !z
          {
-            z := DllCall(whichMainDLL "\WICtestPreloadedImage", "Int", 12, "Int")
+            z := DllCall("qpvmain.dll\WICtestPreloadedImage", "Int", 12, "Int")
             If !z
             {
                addJournalEntry(A_ThisFunc ": ERROR: failed to load image via WIC... error occured likely in coreWICgetBufferImage() in qpvMainDll")
@@ -95280,12 +95623,12 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
       newW := w := Width
       newH := h := Height
       mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(Width, Height)
-      pBitmap := DllCall(whichMainDLL "\WICgetRectImage", "Int", x, "Int", y, "Int", w, "Int", h, "Int", newW, "Int", newH, "Int", mustClip, "int", useICM, "int", quality, "UPtr")
+      pBitmap := DllCall("qpvmain.dll\WICgetRectImage", "Int", x, "Int", y, "Int", w, "Int", h, "Int", newW, "Int", newH, "Int", mustClip, "int", useICM, "int", quality, "UPtr")
       If StrLen(pBitmap)>2
          recordGdipBitmaps(pBitmap, A_ThisFunc)
 
       ; ToolTip, % pBitmap "|" x "|" y "|" w "|" h "|" newW "|" newH , , , 2
-      DllCall(whichMainDLL "\WICdestroyPreloadedImage", "Int", 12, "Int")
+      DllCall("qpvmain.dll\WICdestroyPreloadedImage", "Int", 12, "Int")
       zeitu := A_TickCount - startZeit
       Return pBitmap
    }
@@ -95344,7 +95687,7 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM, simpleMode) {
    remainderHeight := mod(imgH, SliceHeight)
    SliceHeight := (numberSlices>1) ? SliceHeight : 0
    ; fnOutputDebug(A_ThisFunc "(): " Stride " | w/h =" imgW " x " imgH " | buffer = " bufferSize " | sh=" SliceHeight " | ns=" numberSlices " | " remainderHeight)
-   buffer := DllCall(whichMainDLL "\WICgetBufferImage", "Int", bitsDepth, "int", Stride, "int", bufferSize, "int", SliceHeight, "int", useICM, "UPtr")
+   buffer := DllCall("qpvmain.dll\WICgetBufferImage", "Int", bitsDepth, "int", Stride, "int", bufferSize, "int", SliceHeight, "int", useICM, "UPtr")
    If buffer
       hFIFimgA := FreeImage_ConvertFromRawBitsEx(0, buffer, imageType, imgW, imgH, Stride, bitsDepth, "0x00FF0000", "0x0000FF00", "0x000000FF", 1)
    Else
@@ -95367,7 +95710,7 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM, simpleMode) {
       RawFormat := viewportQPVimage.RawFormat
       OpenedWith := viewportQPVimage.OpenedWith
       viewportQPVimage.DiscardImage()
-      DllCall(whichMainDLL "\WICdestroyPreloadedImage", "Int", 1, "Int")
+      DllCall("qpvmain.dll\WICdestroyPreloadedImage", "Int", 1, "Int")
       viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, [hFIFimgA, tFrames, buffer], 1)
       ; ToolTip, % "teleported=" hFIFimgA "|" zw "|" zh "|" bufferSize , , , 2
       If !InStr(viewportQPVimage.PixelFormat, "tone-map")
@@ -95407,7 +95750,7 @@ LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitma
 
    VarSetCapacity(resultsArray, 8 * 9, 0)
    fimu := (wasInitFIMlib=1 && allowFIMloader=1) ? 1 : 0
-   r := DllCall(whichMainDLL "\LoadWICimage", "Int", 0 ,"Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", doFlipu, "int", useICM, "Str", imgPath, "UPtr*", &resultsArray, "int", fimu, "UPtr")
+   r := DllCall("qpvmain.dll\LoadWICimage", "Int", 0 ,"Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", doFlipu, "int", useICM, "Str", imgPath, "UPtr*", &resultsArray, "int", fimu, "UPtr")
    z := NumGet(resultsArray, 4 * 6, "uInt")
    ; fnOutputDebug(A_ThisFunc ": " r " | " z)
    If (r || z>0)
@@ -95458,7 +95801,7 @@ LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitma
             doFlipu := sizesDesired[A_Index + 1, 6]
             doGray := sizesDesired[A_Index + 1, 7]
             ; fnOutputDebug("loop image size=" A_Index " | " w "x" h " | " doFlipu)
-            rm := DllCall(whichMainDLL "\LoadWICimage", "Int", 0 ,"Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", doFlipu, "int", useICM, "Str", imgPath, "UPtr*", &resultsArray, "int", fimu, "UPtr")
+            rm := DllCall("qpvmain.dll\LoadWICimage", "Int", 0 ,"Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", doFlipu, "int", useICM, "Str", imgPath, "UPtr*", &resultsArray, "int", fimu, "UPtr")
             If StrLen(rm)>2
             {
                newBitmap[A_Index] := rm
@@ -99795,7 +100138,7 @@ testHistoDLL() {
    initQPVmainDLL()
    VarSetCapacity(resultsArray, 4*7, 0)
    trGdip_GetImageDimensions(useGdiBitmap(), w, h)
-   err := DllCall(whichMainDLL "\getPBitmapistoInfos", "UPtr", useGdiBitmap(), "int", w, "int", h, "UPtr", &resultsArray)
+   err := DllCall("qpvmain.dll\getPBitmapistoInfos", "UPtr", useGdiBitmap(), "int", w, "int", h, "UPtr", &resultsArray)
 
    avgu := NumGet(resultsArray, 0 * 4, "uint")
    medianValue := NumGet(resultsArray, 1 * 4, "uint")
@@ -100143,7 +100486,7 @@ testIdentifyDIBbehindGDIPbmp() {
    pBitmap := Gdip_CreateBitmap(kw, kh, "0x26200A")
    initQPVmainDLL()
    sleep , 2000
-   r := DllCall(whichMainDLL "\ListProcessMemoryBlocks", "int", 2)
+   r := DllCall("qpvmain.dll\ListProcessMemoryBlocks", "int", 2)
    E1 := trGdip_LockBits(pBitmap, 5000, 5000, kw//2, kh//2, aStride, iScan, iData, 3)
    sleep , 2000
    Gdip_UnlockBits(pBitmap, iData)
@@ -100154,82 +100497,6 @@ testIdentifyDIBbehindGDIPbmp() {
    ; pbitmap :=  Gdip_CreateBitmapFromFileSimplified("F:\temp\torrents\Mrs.Davis.S01.COMPLETE.720p.PCOK.WEBRip.x264-GalaxyTV[TGx]\moar\gdi-plus-limit.png")
    fnOutputDebug( "ptr=" r " | size = " bufferSize "| str= " stride " | " astride) 
    SoundBeep, % E1 ? 900 : 300, 500
-}
-
-GetTextsFromPDF(imgPath, frameu, linkz, pwd:=0, ByRef pageCount:=0, byRef errorType:=0) {
-   linkz *= 2
-   varOut = -2 - linkz
-   pBitmap := DllCall(whichMainDLL "\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
-   If (varOut>0 && errorType=0)
-   {
-      VarSetCapacity(textBuffer, (varOut+0) * 4, 0)
-      varOut := -3 - linkz 
-      DllCall(whichMainDLL "\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int", 0, "int", 1, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", &textBuffer, "UPtr")
-      if (varOut>1)
-      {
-         txt := StrGet(&textBuffer, "UTF-16")
-         if (linkz>0)
-         {
-            Sort, txt, UD|
-            txt := Trimmer(StrReplace(txt, "|", "`n `n"))
-         }
-      }
-   }
-
-   Return txt
-}
-
-RenderPDFpage(imgPath, noBPPconv, frameu, pwd:=0, maxW:=0, maxH:=0, dpi:=431, ByRef pageCount:=0, byRef errorType:=0, fillBgr:=0, bgrColor:="ffffff") {
-    If (noBPPconv=1)
-       pageCount := -6
-
-    pBitmap := DllCall(whichMainDLL "\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", dpi, "int*", maxW, "int*", maxH, "int", fillBgr, "int", "0xff" bgrColor, "int*", pageCount, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
-    If StrLen(pBitmap)>2
-    {
-       recordGdipBitmaps(pBitmap, A_ThisFunc)
-       Gdip_BitmapSetResolution(pBitmap, dpi, dpi)
-       Gdip_GetImageDimensions(pBitmap, w, h)
-    } else if (noBPPconv=1 && errorType=0)
-    {
-       w := maxW
-       h := maxH
-    }
-
-    if (errorType=2)
-       fnOutputDebug("File not found or could not be opened")
-    else if (errorType=3)
-       fnOutputDebug("File not in PDF format or corrupted")
-    else if (errorType=4)
-       fnOutputDebug("Password required or incorrect password")
-    else If (errorType=-1)
-       fnOutputDebug("PDF password protected")
-    else If (errorType=-2)
-       fnOutputDebug("PDF seems to have no pages")
-    else If (errorType=-3)
-       fnOutputDebug("Failed to retrieve PDF page from document")
-    else If (errorType=-4)
-       fnOutputDebug("Failed to allocate the GDI+ bitmap")
-    else If (errorType=-5)
-       fnOutputDebug("Failed to create the FPDF bitmap to render PDF")
-    else If (errorType=-6)
-       fnOutputDebug("Failed to retrieve PDF text page from PDF page")
-    else if (errorType!=0)
-       fnOutputDebug("Unknown PDF error")
-
-    mainLoadedIMGdetails := []
-    mainLoadedIMGdetails.PixelFormat := "32-PARGB"
-    mainLoadedIMGdetails.Width := Round(w)
-    mainLoadedIMGdetails.Height := Round(h)
-    mainLoadedIMGdetails.ImgFile := imgPath
-    mainLoadedIMGdetails.Frames := Round(pageCount)
-    mainLoadedIMGdetails.ActiveFrame := clampInRange(frameu, 0, Round(pageCount))
-    mainLoadedIMGdetails.DPI := dpi
-    mainLoadedIMGdetails.RawFormat := "PDF"
-    mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(w, h)
-    mainLoadedIMGdetails.HasAlpha := !fillBgr
-    mainLoadedIMGdetails.OpenedWith := "PDFium renderer"
-    mainLoadedIMGdetails.LoadedWith := "PDF"
-    Return pBitmap
 }
 
 testPDFloader(){
@@ -100245,13 +100512,13 @@ bgrColor := "0xFF353535"
 dpi := 300
 ov := -2
 varOut = -4
-pBitmap := DllCall(whichMainDLL "\RenderPdfPageAsBitmap", "Str", pathu, "Int", i, "float", dpi, "int", fillBgr, "int", bgrColor, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+pBitmap := DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", pathu, "Int", i, "float", dpi, "int", fillBgr, "int", bgrColor, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
 
 if (ov=-2 && varOut>0 && errorType=0)
 {
    VarSetCapacity(textBuffer, (varOut+0) * 4, 0)
    varOut := -5
-   DllCall(whichMainDLL "\RenderPdfPageAsBitmap", "Str", pathu, "Int", i, "float", dpi, "int", fillBgr, "int", bgrColor, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", &textBuffer, "UPtr")
+   DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", pathu, "Int", i, "float", dpi, "int", fillBgr, "int", bgrColor, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", &textBuffer, "UPtr")
    if (varOut>1)
    {
       txt := StrGet(&textBuffer, "UTF-16")

@@ -6095,6 +6095,7 @@ void ListWICdecoders() {
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdfPath, int pageIndex, float dpi, int* givenW, int* givenH, int fillBehind, int bgrColor, int *varOut, int *errorType, const wchar_t* password, unsigned short* textBuffer) {
 // https://github.com/bblanchon/pdfium-binaries
     int act = *varOut;
+    *errorType = 0;
     // act == -1; retrieve the total page count
     // act == -2; get the buffer size necessary for the texts on a given page
     // act == -3; retrieve the texts on a given page and fill textBuffer data

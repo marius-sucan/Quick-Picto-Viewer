@@ -1775,6 +1775,8 @@ dummyTimerProccessDroppedFiles() {
       Return
 
    RegRead, RegExFilesPattern, %QPVregEntry%, RegExFilesPattern
+   If StrLen(RegExFilesPattern)<12
+      RegExFilesPattern := ""
    isCtrlDown := GetKeyState("Ctrl", "P")
    lastInvoked := A_TickCount
    vectorShape := imgFiles := foldersList := sldFile := ""
@@ -1790,7 +1792,7 @@ dummyTimerProccessDroppedFiles() {
          Continue
 
       ; MsgBox, % A_LoopField
-      If (A_Index>29900)
+      If (A_Index>98700)
       {
          Break
       } Else If RegExMatch(line, "i)(.\.sld|.\.sldb)$")
