@@ -5357,7 +5357,7 @@ INT indexedWICcontainerFormats(const GUID containerFmt) {
     return (it != formatMap.end()) ? it->second : 0;
 }
 
-auto adaptImageGivenSize(const UINT keepAratio, const UINT ScaleAnySize, const UINT imgW, const UINT imgH, const UINT givenW, const UINT givenH) {
+auto adaptImageGivenSize(const UINT keepAratio, const UINT ScaleAnySize, const UINT imgW, const UINT imgH, const UINT givenW, const UINT givenH, const float maxMPX = 536.45) {
   std::array<UINT, 3> size;
   size[0] = 0;
   size[1] = 0;
@@ -5402,15 +5402,28 @@ auto adaptImageGivenSize(const UINT keepAratio, const UINT ScaleAnySize, const U
      size[0] = givenW;
      size[1] = givenH;
   }
-
-  const double mpx = (size[0] * size[1])/1000000;
-  if (mpx>536.4)
+  double mpx = (size[0] * size[1])/1000000.0f;
+  // fnOutputDebug(std::to_string(mpx) + "mpx ; adapted: " + std::to_string(size[0]) + " x " + std::to_string(size[1]) );
+  float g = 536.4f / mpx;
+  if (mpx>maxMPX)
   {
-     float g = 536.4/mpx;
-     size[0] = floor(size[0] * g);
-     size[1] = floor(size[1] * g);
+     const float fw = size[0];
+     const float fh = size[1];
+     g = 1.0f;
+     for (int i = 0; i < 987654321; i++)
+     {
+        g -= 0.0001;
+        float npx = ((fw*g) * (fh*g))/1000000.0f;
+        if (npx<maxMPX)
+           break;
+     }
+     size[0] = fw*g;
+     size[1] = fh*g;
+     // fnOutputDebug("booooooooooooooooooooonkerzzzzzzzzzzzzzzz");
   }
 
+  // double npx = (size[0] * size[1])/1000000;
+  // fnOutputDebug( std::to_string(g) + "f ; " + std::to_string(npx) + "mpx ; adapted: " + std::to_string(size[0]) + " x " + std::to_string(size[1]) );
   return size;
 }
 
@@ -6092,7 +6105,7 @@ void ListWICdecoders() {
 }
 
 
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdfPath, int pageIndex, float dpi, int* givenW, int* givenH, int fillBehind, int bgrColor, int *varOut, int *errorType, const wchar_t* password, unsigned short* textBuffer) {
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdfPath, int pageIndex, float dpi, int* givenW, int* givenH, int fillBehind, int bgrColor, int *varOut, int *errorType, const wchar_t* password, unsigned short* textBuffer, int do24bits) {
 // https://github.com/bblanchon/pdfium-binaries
     int act = *varOut;
     *errorType = 0;
@@ -6197,8 +6210,8 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
        return myBitmap;
     } else if (act==-4 || act==-5)
     {
-       const int buffSize = 1024;
        int index = 0;
+       const int buffSize = 1024;
        int annotCount = FPDFPage_GetAnnotCount(PDFpage);
        for (int i = 0; i < annotCount; ++i)
        {
@@ -6241,6 +6254,40 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
            FPDFPage_CloseAnnot(annot);
        }
 
+
+       FPDF_TEXTPAGE textPage = FPDFText_LoadPage(PDFpage);
+       if (textPage)
+       {
+           FPDF_PAGELINK pageWebLinks = FPDFLink_LoadWebLinks(textPage);
+           if (pageWebLinks)
+           {
+              int link_count = FPDFLink_CountWebLinks(pageWebLinks);
+              if (act==-4) {
+                 index += buffSize * link_count;
+              } else
+              {
+                 for (int i = 0; i < link_count; i++)
+                 {
+                     unsigned long url_buffer_size = FPDFLink_GetURL(pageWebLinks, i, nullptr, 0);
+                     if (url_buffer_size > 0)
+                     {
+                        std::vector<unsigned short> buffer(url_buffer_size);
+                        FPDFLink_GetURL(pageWebLinks, i, buffer.data(), url_buffer_size);
+                        for (int z = 0; z < url_buffer_size; ++z)
+                        {
+                            textBuffer[index] = buffer[z];
+                            index++;
+                        }
+                        textBuffer[index] = '|';
+                        index++;
+                     }
+                 }
+              }
+              FPDFLink_CloseWebLinks(pageWebLinks);
+           }
+           FPDFText_ClosePage(textPage);
+       }
+
        *varOut = index;
        FPDF_ClosePage(PDFpage);
        FPDF_CloseDocument(document);
@@ -6256,14 +6303,17 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
     }
 
     if (*givenW<2)
-       *givenW = 32100;
+       *givenW = 32650;
     if (*givenH<2)
-       *givenH = 32100;
+       *givenH = 32650;
 
-    auto nSize = adaptImageGivenSize(1, 0, bitmapWidth, bitmapHeight, *givenW, *givenH);
+    float maxMPX = (do24bits==1) ? 715.25f : 536.45f;
+    auto nSize = adaptImageGivenSize(1, 0, bitmapWidth, bitmapHeight, *givenW, *givenH, maxMPX);
     bitmapWidth = nSize[0];
     bitmapHeight = nSize[1];
-    Gdiplus::DllExports::GdipCreateBitmapFromScan0(bitmapWidth, bitmapHeight, bitmapWidth * 4, PixelFormat32bppPARGB, NULL, &myBitmap);
+    int cbStride = (do24bits==1) ? bitmapWidth * 3 : bitmapWidth * 4;
+    Gdiplus::PixelFormat  destinationGdipFormat = (do24bits==1) ? PixelFormat24bppRGB : PixelFormat32bppPARGB;
+    Gdiplus::DllExports::GdipCreateBitmapFromScan0(bitmapWidth, bitmapHeight, cbStride, destinationGdipFormat, NULL, &myBitmap);
     if (myBitmap==NULL)
     {
        fnOutputDebug("failed to load PDF page; unable to allocate the GDI+ bitmap: " + std::to_string(bitmapWidth) + " x " + std::to_string(bitmapHeight));
@@ -6275,10 +6325,11 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
 
     Gdiplus::BitmapData bitmapDatu;
     Gdiplus::Rect rect(0, 0, bitmapWidth, bitmapHeight);
-    Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rect, Gdiplus::ImageLockModeWrite, PixelFormat32bppARGB, &bitmapDatu);
-
+    destinationGdipFormat = (do24bits==1) ? PixelFormat24bppRGB : PixelFormat32bppARGB;
+    Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rect, Gdiplus::ImageLockModeWrite, destinationGdipFormat, &bitmapDatu);
+    int PDFcolorFormat = (do24bits==1) ? FPDFBitmap_BGR : FPDFBitmap_BGRA;
     // Create bitmap for PDFium to render into over the GDI+ Scan0
-    FPDF_BITMAP pdfBitmap = FPDFBitmap_CreateEx(bitmapWidth, bitmapHeight, FPDFBitmap_BGRA, bitmapDatu.Scan0, bitmapDatu.Stride);
+    FPDF_BITMAP pdfBitmap = FPDFBitmap_CreateEx(bitmapWidth, bitmapHeight, PDFcolorFormat, bitmapDatu.Scan0, bitmapDatu.Stride);
     if (pdfBitmap)
     {
         if (fillBehind==1)
