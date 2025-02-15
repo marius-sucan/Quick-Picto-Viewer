@@ -35,7 +35,8 @@
 #include <errno.h>
 #include "Jpeg2PDF.h"
 #include "Jpeg2PDF.cpp"
-
+#include <locale>
+#include <codecvt>
 #define cimg_use_openmp 1
 #include "includes\CImg-3.4.3\CImg.h"
 // #include <opencv2/opencv.hpp>
@@ -158,17 +159,43 @@ DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
     return (SUCCEEDED(hr)) ? 1 : 0;
 }
 
-std::string WideCharToString(const wchar_t* wstr) {
-    if (!wstr)
+std::string ucs2_to_utf8(const unsigned short* ucs2_data, std::size_t length) {
+// Converts a UCS2 buffer (array of unsigned short) to a UTF-8 encoded std::string.
+    std::string utf8_result;
+    // Reserve some estimated space to improve performance
+    utf8_result.reserve(length * 3);  // worst-case each UCS2 char becomes 3 bytes
+    
+    for (std::size_t i = 0; i < length; ++i) {
+        unsigned short code_point = ucs2_data[i];
+        
+        // For UCS2, code_point is guaranteed to be in the range [0, 0xFFFF]
+        if (code_point < 0x80) {
+            // 1-byte sequence: 0xxxxxxx
+            utf8_result.push_back(static_cast<char>(code_point));
+        }
+        else if (code_point < 0x800) {
+            // 2-byte sequence: 110xxxxx 10xxxxxx
+            utf8_result.push_back(static_cast<char>(0xC0 | (code_point >> 6)));
+            utf8_result.push_back(static_cast<char>(0x80 | (code_point & 0x3F)));
+        }
+        else {
+            // 3-byte sequence: 1110xxxx 10xxxxxx 10xxxxxx
+            utf8_result.push_back(static_cast<char>(0xE0 | (code_point >> 12)));
+            utf8_result.push_back(static_cast<char>(0x80 | ((code_point >> 6) & 0x3F)));
+            utf8_result.push_back(static_cast<char>(0x80 | (code_point & 0x3F)));
+        }
+    }
+    
+    return utf8_result;
+}
+
+std::string WideCharToString(const wchar_t* inwstr) {
+    if (!inwstr)
        return "";
 
-    int size_needed = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, nullptr, 0, nullptr, nullptr);
-    if (size_needed<=0)
-       return "";
-
-    std::string result(size_needed, 0);
-    WideCharToMultiByte(CP_UTF8, 0, wstr, -1, &result[0], size_needed, nullptr, nullptr);
-    return result;
+    std::wstring wstr(inwstr);
+    std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+    return converter.to_bytes(wstr);
 }
 
 int inline getGrayscale(const int &r, const int &g, const int &b) {
@@ -6104,6 +6131,129 @@ void ListWICdecoders() {
     }
 }
 
+void AppendUInt(std::vector<unsigned short>& out, unsigned int n) {
+    // Helper: Append an unsigned integer as ASCII digits.
+    // Use std::to_string to convert the number then push each digit.
+    std::string s = std::to_string(n);
+    for (char c : s) {
+        out.push_back(static_cast<unsigned short>(c));
+    }
+}
+
+void AppendCounters(std::vector<unsigned short>& out, const std::vector<unsigned int>& counters) {
+    // Helper: Append a numbering chain from a vector of counters, e.g., "2.3.5. ".
+    // Each number is appended followed by a dot, then a space after the complete chain.
+    for (unsigned int num : counters) {
+        AppendUInt(out, num);
+        out.push_back('.');
+    }
+    if (!counters.empty()) {
+        out.push_back(' ');
+    }
+}
+
+void TraverseBookmarks(FPDF_DOCUMENT doc, FPDF_BOOKMARK bookmark,
+                       std::vector<unsigned short>& out,
+                       const std::vector<unsigned int>& parentCounters) {
+
+// Recursive helper function to traverse the bookmark tree.
+// 'parentCounters' holds the numbering from parent bookmarks.
+
+    unsigned int siblingCounter = 1;
+    while (bookmark)
+    {
+        // Build the current numbering chain: parent's counters + current sibling counter.
+        std::vector<unsigned int> currentCounters = parentCounters;
+        currentCounters.push_back(siblingCounter);
+
+        // Retrieve the bookmark title (UTF‑16 data).
+        unsigned long titleLen = FPDFBookmark_GetTitle(bookmark, nullptr, 0);
+        std::vector<unsigned short> titleVec;
+        if (titleLen > 0) {
+            titleVec.resize(titleLen);
+            FPDFBookmark_GetTitle(bookmark, titleVec.data(), titleLen);
+        }
+        
+        // Retrieve the destination page number.
+        int pageNumber = 0;
+        FPDF_ACTION action = FPDFBookmark_GetAction(bookmark);
+        if (action)
+        {
+            unsigned long type = FPDFAction_GetType(action);
+            FPDF_DEST dest = FPDFAction_GetDest(doc, action);
+            if (dest && type == PDFACTION_GOTO) {
+                pageNumber = FPDFDest_GetDestPageIndex(doc, dest);
+                // int pageIndex = FPDFDest_GetDestPageIndex(doc, dest);
+                // if (pageIndex >= 0)
+                //    pageNumber = pageIndex;
+            }
+        } else 
+        {
+           FPDF_DEST dest = FPDFBookmark_GetDest(doc, bookmark);
+           if (dest)
+              pageNumber = FPDFDest_GetDestPageIndex(doc, dest);
+        }
+        if (pageNumber<1)
+           pageNumber = 0;
+
+        AppendUInt(out, pageNumber);
+        out.push_back('|');
+
+        AppendCounters(out, currentCounters);   // Appends the numbering chain.
+        for (unsigned short ch : titleVec) {
+            // Append the bookmark title.
+            if (ch!=0 && ch!=NULL)
+               out.push_back(ch);
+        }
+        out.push_back('\n');
+        
+        // Recurse into any child bookmarks.
+        FPDF_BOOKMARK child = FPDFBookmark_GetFirstChild(doc, bookmark);
+        if (child)
+           TraverseBookmarks(doc, child, out, currentCounters);
+        
+        // Move to the next sibling.
+        siblingCounter++;
+        bookmark = FPDFBookmark_GetNextSibling(doc, bookmark);
+   }
+}
+
+DLL_API unsigned short* DLL_CALLCONV ExtractPDFBookmarks(const wchar_t *pdfPath, const wchar_t *password, int* errorType, int* bufferSize) {
+// Main function that loads the PDF, traverses bookmarks, and returns the data
+// in an unsigned short buffer (UTF‑16 encoded).
+// The output is a series of lines formatted as:
+// "page number | parentCounters.currentCounter. bookmark title\n"
+// The caller must free the returned buffer
+
+    *errorType = 0;
+    FPDF_DOCUMENT doc = FPDF_LoadDocument(WideCharToString(pdfPath).c_str(), WideCharToString(password).c_str());
+    if (!doc)
+    {
+        *errorType = FPDF_GetLastError();
+        return NULL;
+    }
+
+    std::vector<unsigned short> out;
+    FPDF_BOOKMARK root = FPDFBookmark_GetFirstChild(doc, nullptr);
+    if (root)
+    {
+        std::vector<unsigned int> emptyChain;  // At root level, no parent numbering.
+        TraverseBookmarks(doc, root, out, emptyChain);
+    } else 
+    {
+        *errorType = -1;
+        return NULL;
+    }
+
+    // Allocate an unsigned short buffer with space for a null terminator.
+    unsigned short* buffer = new unsigned short[out.size() + 1];
+    std::memcpy(buffer, out.data(), out.size() * sizeof(unsigned short));
+    buffer[out.size()] = 0;  // Null terminate.
+    *bufferSize = out.size() + 1;    
+    FPDF_CloseDocument(doc);
+    return buffer;
+}
+
 
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdfPath, int pageIndex, float dpi, int* givenW, int* givenH, int fillBehind, int bgrColor, int *varOut, int *errorType, const wchar_t* password, unsigned short* textBuffer, int do24bits) {
 // https://github.com/bblanchon/pdfium-binaries
@@ -6200,6 +6350,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
           int extracted = FPDFText_GetText(textPage, 0, textLength, textBuffer);
           FPDFText_ClosePage(textPage);
           *varOut = extracted;
+          // fnOutputDebug( ucs2_to_utf8(textBuffer, textLength) );
        } else {
           *errorType = -6;
           *varOut = 0;

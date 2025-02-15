@@ -184,9 +184,21 @@ RenderSVGfile(imgPath, gw, hh) {
    return pBitmap
 }
 
+RenderPDFpage(imgPath, noBPPconv, frameu, pwd:="", maxW:=0, maxH:=0, dpi:=450, ByRef pageCount:=0, ByRef errorType:=0, fillBgr:=1, bgrColor:="ffffff") {
+    If (noBPPconv=1)
+       pageCount := -6
+
+    errorType := -100
+    pBitmap := DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "WStr", Trimmer(imgPath), "Int", frameu, "float", dpi, "int*", maxW, "int*", maxH, "int", fillBgr, "int", "0xff" bgrColor, "int*", pageCount, "int*", errorType, "Str", pwd, "UPtr", 0, "int", 1, "UPtr")
+    If StrLen(pBitmap)>2
+       Return pBitmap
+}
+
 LoadWICimage(imgPath, w, h, keepAratio, thisImgQuality, frameu, ScaleAnySize) {
    If RegExMatch(imgPath, "i)(.\.(svg))$")
       Return RenderSVGfile(imgPath, w, h)
+   Else If RegExMatch(imgPath, "i)(.\.pdf)$")
+      Return RenderPDFpage(imgPath, 0, 0, "", w, h, 250)
 
    VarSetCapacity(resultsArray, 8 * 9, 0)
    fimu := (wasInitFIMlib=1 && allowFIMloader=1) ? 1 : 0

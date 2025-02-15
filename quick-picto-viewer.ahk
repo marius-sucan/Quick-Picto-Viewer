@@ -381,7 +381,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , UIuserToneMapParamC := 180, cmrRAWtoneMapParamC := 1, UIuserToneMapParamD := 60, cmrRAWtoneMapParamD := 0
    , UIuserToneMapOCVparamA := 80, cmrRAWtoneMapOCVparamA := 1, UIuserToneMapOCVparamB := 72, cmrRAWtoneMapOCVparamB := 0
    , userPerformColorManagement := 1, UserCombinePDFbgrColor := "ffFFff", UserVPalphaBgrStyle := 1
-   , userPDFdpi := 430
+   , userPDFdpi := 430, userActivePDFpage := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -11801,10 +11801,10 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
 }
 
 infoShowCurrentFrameIndex() {
-    showTOOLtip("Image frame index: " desiredFrameIndex " / " totalFramesIndex, "changeDesiredFrame", 2, desiredFrameIndex/totalFramesIndex)
+    l := RegExMatch(getIDimage(currentFileIndex), "i)(.\.pdf)$") ? "page number" : "frame index"
+    showTOOLtip("Image " l ": " desiredFrameIndex " / " totalFramesIndex, "changeDesiredFrame", 2, desiredFrameIndex/totalFramesIndex)
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
-
 
 VPflipImgV() {
    Static lastInvoked := 1
@@ -42416,8 +42416,9 @@ BTNperformExtractFrames(a) {
    }
 
    BtnCloseWindow()
+   filesElected := getSelectedFiles(0, 1)
    nullvara := askAboutFileCollision(0, 0, 1, 3, 0, nullvar)
-   If (markedSelectFile>1 && !InStr(c, "active"))
+   If (filesElected>1 && !InStr(c, "active"))
    {
       batchExtractFramesFromImages(0)
    } Else
@@ -54033,7 +54034,8 @@ BtnALLviewedImages2List(dummy:=0) {
    RandomPicture()
 }
 
-PanelPDFreadTexts(tabu:=1) {
+PanelPDFreadTexts() {
+    RegAction(0, "ResizeDestFolder",, 6)
     thisBtnHeight := createSettingsGUI(90, A_ThisFunc)
     EditWid := 90
     If (PrefsLargeFonts=1)
@@ -54042,39 +54044,157 @@ PanelPDFreadTexts(tabu:=1) {
        Gui, Font, s%LargeUIfontValue%
     }
 
+    filesElected := getSelectedFiles(0, 1)
     txtWid := Round(editWid*6.25)
-    Global EditPDFtexts, EditPDFlinks
-    Gui, Add, Tab3, %tabzDarkModus% AltSubmit gBtnTabsInfoUpdate hwndhCurrTab vCurrentPanelTab Choose%thisPanelTab%, Text|Links
+    Global EditPDFtexts, EditPDFlinks, UserPDFtextExtractMode, EditPDFbookmarks
+    pp := (filesElected>1) ? "|Batch extraction" : ""
+    Gui, Add, Tab3, %tabzDarkModus% AltSubmit, Text|Links|Bookmarks%pp%
     Gui, Tab, 1
     Gui, Add, Button, x+15 y+15 w1 h1 gBtnCloseWindow Default, Clo&se
     GuiAddEdit("x+0 y+0 Section ReadOnly w" txtWid " r15 vEditPDFtexts", "", "")
     Gui, Tab, 2
     Gui, Add, Button, x+15 y+15 w1 h1 gBtnCloseWindow Default, Clo&se
     GuiAddEdit("x+0 y+0 Section ReadOnly w" txtWid " r15 vEditPDFlinks", "", "Links on the PDF page")
+    Gui, Tab, 3
+    ; Gui, Add, Text, x+15 y+15 wp, Double-click a PDF embedded bookmark to jump through the document.
+    Gui, Add, Button, x+15 y+15 w1 h1 gBtnCloseWindow Default, Clo&se
+    GuiAddEdit("x+0 y+0 Section ReadOnly w" txtWid " r15 vEditPDFbookmarks", "", "")
+    Gui, Add, Button, y+15 Section h%thisBtnHeight% gdummy, &View list
 
-    ; Gui, Tab, 3
-    ; Gui, Add, Text, x+15 y+15 wp, Search for in the entire PDF:
-    ; GuiAddEdit("y+5 wp+25 veditF5 r1 -multi -wrap gUIeditsGenericAllowCtrlBksp", editF5)
-    ; Gui, Add, Button, y+15 Section h%thisBtnHeight% gdummy, &View list
+    If (filesElected>1)
+    {
+       Gui, Tab, 4
+       ml := (PrefsLargeFonts=1) ? 255 : 205
+       Gui, Add, Text, x+15 y+15 Section w%txtWid%, % "There are " groupDigits(filesElected) " selected files."
+       Gui, Add, Text, xs y+5 wp, If any of the selected files are PDFs, you can extract the texts in one go.`nNo optical character recognition will be performed.
+       GuiAddDropDownList("xs y+10 w" ml " AltSubmit Choose1 vUserPDFtextExtractMode", "Texts|Links|Both: texts and links", "What to extract from PDFs")
+
+       Gui, Add, Text, xs y+10 hp +0x200, Folder destination:
+       thisWid := (PrefsLargeFonts=1) ? 105 : 65
+       GuiAddEdit("xp+15 y+5 w" ml " r1 -Border right -wrap vResizeDestFolder", ResizeDestFolder)
+       Gui, Add, Button, x+5 hp w%thisWid% gBTNchangeResizeDestFolder vbtnFldr, C&hoose
+
+       thisW := (PrefsLargeFonts=1) ? 155 : 115
+       Gui, Add, Text, xs+15 y+10 +0x200 +hwndhTemp, Action on file name collisions:
+       GuiAddDropDownList("x+10 w" thisW " AltSubmit Choose" OnExtractConflictOverwrite " vOnExtractConflictOverwrite", "Skip files|Auto-rename|Overwrite|Ask user", [hTemp])
+
+       Gui, Add, Button, xs y+10 h%thisBtnHeight% gBTNbatchExtractTextsPDFs, &Process selected files
+    }
 
     Gui, Tab
-    Gui, Add, Button, xm+15 y+15 Section h%thisBtnHeight% gBTNprevPDFpage, &Previous page
+
+    ml := (PrefsLargeFonts=1) ? 35 : 25
+    GuiAddButton("xs y+10 h" thisBtnHeight " w" ml " gBtnPrevImg", "<<", "Previous image")
+    GuiAddButton("x+2 hp wp gBtnNextImg", ">>", "Next image")
+    Gui, Add, Button, x+5 h%thisBtnHeight% gBTNprevPDFpage, &Previous page
     Gui, Add, Button, x+2 hp wp gBTNnextPDFpage, &Next page
-    Gui, Add, Button, x+5 hp wp gBTNextractALLtextsCurrentPDF, &Extract all
-    Gui, Add, Button, x+5 hp wp-15 gBtnCloseWindow, &Close
+    Gui, Add, Button, x+5 hp wp gBTNextractALLtextsCurrentPDF, &Extract pages
+    Gui, Add, Button, x+5 hp wp-20 gBTNhelpPDFtexts, &Help
+    Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Close
+
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Extract texts in PDF: " appTitle)
     SetTimer, ResetImgLoadStatus, -100
-    UIpopulatePDFtexts()
+    SetTimer, UIpopulatePDFtexts, -100
+    SetTimer, UIpopulatePDFbookmarks, -250
+}
+
+BTNhelpPDFtexts() {
+    msgBoxWrapper(appTitle ": HELP", "This tool allows users to extract texts from PDFs.  It extracts only texts stored as text. No optical character recognition is performed on images to identify additional texts to be extracted.`n`nIn some cases, the text is encoded in unsupported character encoding formats. Therefore, the tool might retrieve gibberish contents.`n`nThe tool can be executed on multiple files.", -1, 0, 0)
+}
+
+BTNbatchExtractTextsPDFs() {
+   Gui, SettingsGUIA: Default
+   GuiControlGet, ResizeDestFolder
+   GuiControlGet, UserPDFtextExtractMode
+   GuiControlGet, OnExtractConflictOverwrite
+   RegAction(1, "ResizeDestFolder")
+   If !FolderExist(ResizeDestFolder)
+   {
+      FileCreateDir, % ResizeDestFolder
+      If ErrorLevel
+      {
+         showTOOLtip("ERROR: Destination folder does not exist:`n" ResizeDestFolder)
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return
+      }
+   }
+
+   filesElected := getSelectedFiles(0, 1)
+   nullvara := askAboutFileCollision(0, 0, 1, 3, 0, nullvar)
+   If (filesElected>1)
+   {
+      BtnCloseWindow()
+      Sleep, 5
+      batchExtractFramesFromImages(1, UserPDFtextExtractMode)
+   }
 }
 
 BTNnextPDFpage() {
-   MenuNextDesiredFrame()
+   If (thumbsDisplaying=1)
+      userActivePDFpage++
+   Else
+      MenuNextDesiredFrame()
+
    SetTimer, UIpopulatePDFtexts, -150
 }
 
 BTNprevPDFpage() {
-   MenuPrevDesiredFrame()
+   If (thumbsDisplaying=1)
+      userActivePDFpage--
+   Else
+      MenuPrevDesiredFrame()
    SetTimer, UIpopulatePDFtexts, -150
+}
+
+UIpopulatePDFtexts() {
+   If (AnyWindowOpen!=90)
+      Return
+
+   Gui, SettingsGUIA: Default
+   If (thumbsDisplaying=1)
+   {
+      imgPath := getIDimage(currentFileIndex)
+      actu := -6
+      pwd := ""
+      DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", 0, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+      If (errorType)
+      {
+         userActivePDFpage := 0
+         ; msgBoxWrapper(appTitle ": ERROR", friendlyPDFerrorCodes(errorType, pwd) ". ", 0, 0, "error")
+         ; Return
+      } Else
+         userActivePDFpage := clampInRange(userActivePDFpage, 0, actu)
+   } Else userActivePDFpage := desiredFrameIndex
+
+   txt := GetTextsFromPDF(getIDimage(currentFileIndex), userActivePDFpage, 0, pwd)
+   GuiControl, SettingsGUIA:, EditPDFtexts, % txt
+
+   linkz := GetTextsFromPDF(getIDimage(currentFileIndex), userActivePDFpage, 1, pwd)
+   GuiControl, SettingsGUIA:, EditPDFlinks, % linkz
+}
+
+UIpopulatePDFbookmarks() {
+   If (AnyWindowOpen!=90)
+      Return
+
+   Gui, SettingsGUIA: Default
+   pwd := ""
+   errorType := -100
+   imgPath := getIDimage(currentFileIndex)
+   buffer := DllCall("qpvmain.dll\ExtractPDFBookmarks", "Str", imgPath, "Str", pwd, "int*", errorType, "int*", bufferSize, "UPtr")
+   If (errorType=-1)
+      txt := "No bookmarks retrieved."
+   else if errorType
+      txt := "An error occured retrieving the PDF embedded bookmarks: " errorType "."
+   else if buffer 
+   {
+      txt := StrGet(buffer, bufferSize, "UTF-16")
+      DllCall("GlobalFree", "uptr", buffer)
+      buffer := ""
+   }
+
+   GuiControl, SettingsGUIA:, EditPDFbookmarks, % txt
 }
 
 CoreExtractALLtextsPDF(imgPath, frameu, modus, pwd, ByRef err) {
@@ -54098,8 +54218,8 @@ CoreExtractALLtextsPDF(imgPath, frameu, modus, pwd, ByRef err) {
 BTNextractALLtextsCurrentPDF() {
    imgPath := getIDimage(currentFileIndex)
    actu := -6
-   pwd := 0
-   DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+   pwd := ""
+   DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", 0, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
    If (errorType)
    {
       msgBoxWrapper(appTitle ": ERROR", friendlyPDFerrorCodes(errorType, pwd) ". ", 0, 0, "error")
@@ -54178,7 +54298,7 @@ BTNextractALLtextsCurrentPDF() {
 
       If (mustdoDeleteFile=1 && FileExist(file2save))
       {
-         FileSetAttrib, -R, % ile2save
+         FileSetAttrib, -R, % file2save
          Sleep, 1
          FileDelete, % file2save
          If ErrorLevel
@@ -54199,17 +54319,6 @@ BTNextractALLtextsCurrentPDF() {
          SetTimer, RemoveTooltip, % -msgDisplayTime
       }
    }
-
-}
-
-UIpopulatePDFtexts() {
-   Gui, SettingsGUIA: Default
-
-   txt := GetTextsFromPDF(getIDimage(currentFileIndex), desiredFrameIndex, 0, pwd, pageCount)
-   GuiControl, SettingsGUIA:, EditPDFtexts, % txt
-
-   linkz := GetTextsFromPDF(getIDimage(currentFileIndex), desiredFrameIndex, 1, pwd, pageCount)
-   GuiControl, SettingsGUIA:, EditPDFlinks, % linkz
 }
 
 PanelJournalWindow(tabu:=1) {
@@ -55747,14 +55856,14 @@ PanelJump2index() {
       coreGenerateRandomList()
 
    imgPath := getIDimage(currentFileIndex)
-   isAnim := (totalFramesIndex>1 && thumbsDisplaying!=1) ? "`fF: Skip to given frame index" : ""
+   isAnim := (totalFramesIndex>1 && thumbsDisplaying!=1) ? "`fF: Skip to frame or page number" : ""
    fakeWinCreator(13, A_ThisFunc, 1)
    If (maxFilesIndex<3 && thumbsDisplaying!=1 && totalFramesIndex>1)
    {
       simplex := 1
       msgResult := msgBoxWrapper("panelu|Skip to given index: " appTitle, "Please type a number to skip at in the frames or pages list.`n`nTotal frames / pages: " groupDigits(totalFramesIndex) ".", "&Skip to|C&ancel", 1, "fast-forward", 0, 0, 0, "limit9050 +number", desiredFrameIndex, 2)
    } Else {
-      msgResult := msgBoxWrapper("panelu|Skip to given index: " appTitle, "Please type a number to skip at in the files list`nand choose the action.`n`nTotal entries: " groupDigits(maxFilesIndex) "`nCurrent random index: " groupDigits(RandyIMGnow), "&Skip to...|C&ancel", 1, "fast-forward", 0, 0, "Skip to the given file index`f`fR: Skip to the given index in the random list`fS: Select from the current file index to the given index" isAnim, "limit9050", currentFileIndex, 2)
+      msgResult := msgBoxWrapper("panelu|Skip to given index: " appTitle, "Please type a number to skip at in the files list`nand choose the action.`n`nTotal entries: " groupDigits(maxFilesIndex) "`nCurrent random index: " groupDigits(RandyIMGnow), "&Skip to...|C&ancel", 1, "fast-forward", 0, 0, "Skip to files list index`f`fR: Skip to index in the randomized files list`fS: Select from the current file index to the given index" isAnim, "limit9050", currentFileIndex, 2)
    }
 
    If InStr(msgResult.btn, "skip")
@@ -58414,7 +58523,7 @@ convert2format(givenIndex) {
   SetTimer, ResetImgLoadStatus, -150
 }
 
-batchExtractFramesFromImages(pdfTextMode) {
+batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
    labelu := (pdfTextMode=1) ? "text page" : "frame"
    alabelu := (pdfTextMode=1) ? "PDFs" : "images"
    thisRegEX := (pdfTextMode=1) ? "i)(.\.pdf)$" : "i)(.\.(pdf|gif|tif|tiff|webp))$"
@@ -58470,9 +58579,16 @@ batchExtractFramesFromImages(pdfTextMode) {
       percS := Round((countTFilez / filesElected) * 100, 1)
       bonusMsg := "`nTotal files: " groupDigits(countTFilez) " / " groupDigits(filesElected) " ( " percS "% ) "
       If (pdfTextMode=1)
-         r := coreExtractFramesFromImage(thisFileIndex, 1, prevMSGdisplay, bonusMsg, failedFrames, totalz)
+         r := coreExtractTextsFromGivenPDF(pdfModus, thisFileIndex, prevMSGdisplay, bonusMsg, failedFrames, totalz)
       Else
          r := coreExtractFramesFromImage(thisFileIndex, 1, prevMSGdisplay, bonusMsg, failedFrames, totalz)
+
+      If (r=-5 && pdfTextMode=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
       If (r>1)
       {
          tFrames += totalz
@@ -58492,8 +58608,9 @@ batchExtractFramesFromImages(pdfTextMode) {
    }
 
    CurrentSLD := backCurrentSLD
+   zeitOperation := A_TickCount - startOperation
    percF := Round((1 - tFramFailed / tFrames) * 100, 1)
-   someErrors := "`n" labelu "s extracted: " groupDigits(tFrames - tFramFailed) " / " groupDigits(tFrames) " ( " percF "% )"
+   someErrors := "`n" labelu "s extracted: " groupDigits(tFrames - tFramFailed) " / " groupDigits(tFrames) " ( " percF "% )`nElapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3))
    If (failedFiles>0)
       someErrors .= "`nFor " groupDigits(failedFiles) " files, the operations failed"
    If (skippedFiles>0)
@@ -58504,9 +58621,9 @@ batchExtractFramesFromImages(pdfTextMode) {
    Else
       showTOOLtip(groupDigits(countFilez) " out of " groupDigits(countTFilez) " selected files were processed" someErrors)
 
-   ForceRefreshNowThumbsList()
-   dummyTimerDelayiedImageDisplay(100)
-   SetTimer, ResetImgLoadStatus, -50
+   ; ForceRefreshNowThumbsList()
+   ; dummyTimerDelayiedImageDisplay(100)
+   SetTimer, ResetImgLoadStatus, -100
    SoundBeep, % (abandonAll=1) ? 300 : 900, 100
    SetTimer, RemoveTooltip, % -msgDisplayTime
    Return
@@ -58731,6 +58848,82 @@ coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
    Return (abandonAll=1) ? -5 : clampInRange(tFrames, 0, 9892899)
 }
 
+coreExtractTextsFromGivenPDF(modus, thisFileIndex, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
+   failedFrames := extractedFrames := abandonAll := yay := 0
+   actu := -6
+   pwd := ""
+   imgPath := getIDimage(thisFileIndex)
+   DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", 0, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+   If (errorType)
+      Return -4
+
+   tFrames := actu
+   zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
+   startOperation := A_TickCount
+   indeed := 0
+   txt := ""
+   Loop, % tFrames
+   {
+      executingCanceableOperation := A_TickCount
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
+      If (A_TickCount - prevMSGdisplay>1000)
+      {
+         etaTime := ETAinfos(A_Index, tFrames, startOperation)
+         If (failedFrames>0)
+            etaTime .= "`nFailed to extract texts from " groupDigits(failedFrames) " pages"
+
+         showTOOLtip("Retrieving texts from PDF pages:" etaTime bonusMsg "`nCurrent PDF file:`n" OutFileName, 0, 0, A_Index / tFrames)
+         prevMSGdisplay := A_TickCount
+      }
+
+      err := 0
+      txt .= CoreExtractALLtextsPDF(imgPath, A_Index - 1, modus, pwd, err) "`n `n"
+      If err 
+      {
+         failedFrames++
+         txt .= "`n `nPAGE " A_Index ": " friendlyPDFerrorCodes(err, pwd) ".`n `n"
+      } Else {
+         indeed++
+      }
+   }
+   ; fnOutputDebug(modus "|" failedFrames " | " indeed " | " tFrames " | " OutFileName )
+   If (indeed=0)
+      Return -4
+   Else If (abandonAll=1)
+      Return -5
+
+   file2save := ResizeDestFolder "\" OutNameNoExt ".txt"
+   If (FileExist(file2save) && !FolderExist(file2save))
+      file2save := askAboutFileCollision(imgPath, file2save, 1, 0, OnExtractConflictOverwrite, performOverwrite)
+
+   If (file2save="abort")
+      abandonAll := 1
+
+   If !file2save
+      Return -3
+
+   If FileExist(file2save)
+   {
+      FileSetAttrib, -R, % file2save
+      Sleep, 1
+      FileDelete, % file2save
+      If ErrorLevel
+         Return -4
+   }
+
+   FileAppend, % txt, % file2save, UTF-8
+   If ErrorLevel
+      Return -4
+
+   extractedFrames := indeed
+   Return clampInRange(tFrames, 0, 9892899)
+}
+
 coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
    yay := failedFrames := extractedFrames := 0
    imgPath := isNumber(indexu) ? resultedFilesList[indexu, 1] : indexu
@@ -58749,8 +58942,8 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
    } Else  If RegExMatch(imgPath, "i)(.\.pdf)$")
    {
       actu := -6
+      pwd := ""
       extractedFrames := 0
-      pwd := 0
       DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
       If (errorType)
       {
@@ -62875,9 +63068,13 @@ InvokeMenuBarImage(manuID) {
      If !AnyWindowOpen
      {
         Menu, pvMenuBarImage, Add
-        If RegExMatch(getIDimage(currentFileIndex), "i)(.\.pdf)$")
+        imgPath := getIDimage(currentFileIndex)
+        If (RegExMatch(imgPath, "i)(.\.(pdf|gif|tif|tiff|webp))$") || markedSelectFile)
+           kMenu("pvMenuBarImage", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
+
+        If (RegExMatch(imgPath, "i)(.\.pdf)$") || markedSelectFile)
         {
-           kMenu("pvMenuBarImage", "Add", "Extract texts from PDF page", "PanelPDFreadTexts", "convert retrieve read search links pdf get")
+           kMenu("pvMenuBarImage", "Add", "Extract texts from PDF pages", "PanelPDFreadTexts", "convert retrieve read search links pdf get")
         } Else
         {
            kMenu("pvMenuBarImage", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw reinhard drago")
@@ -62886,11 +63083,6 @@ InvokeMenuBarImage(manuID) {
         }
 
         kMenu("pvMenuBarImage", "Add", "Set as &wallpaper", "PanelSetWallpaper", "desktop image") 
-        kMenu("pvMenuBarImage", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
-        If (currIMGdetails.Frames<2 && !markedSelectFile)
-           kMenu("pvMenuBarImage", "Disable", "Extract frames/pa&ges")
-
-        imgPath := getIDimage(currentFileIndex)
         kMenu("pvMenuBarImage", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
         kMenu("pvMenuBarImage", "Add", "&JPEG lossless operations`tShift+J", "PanelJpegPerformOperation")
         If (!RegExMatch(imgPath, "i)(.\.(jpg|jpeg))$") && !markedSelectFile)
@@ -62916,7 +63108,11 @@ InvokeMenuBarImage(manuID) {
      createMenuImageFileActions("pvMenuBarImage")
      kMenu("pvMenuBarImage", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
      kMenu("pvMenuBarImage", "Add", "Set as &wallpaper", "PanelSetWallpaper", "desktop image")
-     kMenu("pvMenuBarImage", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
+     If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|gif|tif|tiff|webp))$") || markedSelectFile)
+        kMenu("pvMenuBarImage", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
+     If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.pdf)$") || markedSelectFile)
+        kMenu("pvMenuBarImage", "Add", "Extract texts from PDF pages", "PanelPDFreadTexts", "convert retrieve read search links pdf get")
+
      kMenu("pvMenuBarImage", "Add", "Join images into...", "PanelCombineImagesMultipage", "pdf create document")
      kMenu("pvMenuBarImage", "Add", "&Create a thumbnails sheet", "PanelCreateIMGthumbsSheet")
      If !markedSelectFile
@@ -63902,9 +64098,6 @@ createMenuImgSizeAdapt(dummy:=0) {
 
       If (drawingShapeNow=0 && mustCaptureCloneBrush=0)
       {
-         If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.pdf)$") && !AnyWindowOpen)
-            kMenu("PVview", "Add", "Extract texts from PDF page", "PanelPDFreadTexts", "convert retrieve read search links pdf get")
-
          yayz := varContains(currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat, "hdr", "exr", "128-bit", "96-bit", "RGBF", "RGBAF")
          If ((InStr(currIMGdetails.PixelFormat, "TONE-MAPP") || yayz=1) && !AnyWindowOpen)
             kMenu("PVview", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw reinhard drago")
@@ -64071,12 +64264,42 @@ createMenuMainPreferences() {
    }
 }
 
+MenuSetThumbsMode() {
+   thumbsListViewMode := 0
+   toggleListViewModeThumbs()
+}
+
+MenuSetCompactListMode() {
+   thumbsListViewMode := 1
+   toggleListViewModeThumbs()
+}
+
+MenuSetFilesListMode() {
+   thumbsListViewMode := 2
+   toggleListViewModeThumbs()
+}
+
+MenuSetImageListMode() {
+   thumbsListViewMode := 3
+   toggleListViewModeThumbs()
+}
+
 createMenuMainView() {
    If (thumbsDisplaying=1)
    {
       kMenu("PVview", "Add", "C&ycle view modes`tL", "toggleListViewModeThumbs")
-      kMenu("PVview", "Add", defineListViewModes(), "dummy")
-      kMenu("PVview", "Disable", defineListViewModes())
+      kMenu("PVview", "Add/UnCheck", "Thumbnails", "MenuSetThumbsMode", "thumbnails list view modes")
+      If (thumbsListViewMode=1)
+         kMenu("PVview", "Check", "Thumbnails")
+      kMenu("PVview", "Add/UnCheck", "Compact list", "MenuSetCompactListMode", "thumbnails list view modes details")
+      If (thumbsListViewMode=2)
+         kMenu("PVview", "Check", "Compact list")
+      kMenu("PVview", "Add/UnCheck", "File details list", "MenuSetFilesListMode", "thumbnails list view modes details")
+      If (thumbsListViewMode=3)
+         kMenu("PVview", "Check", "File details list")
+      kMenu("PVview", "Add/UnCheck", "Image details list", "MenuSetImageListMode", "thumbnails list view modes details")
+      If (thumbsListViewMode=4)
+         kMenu("PVview", "Check", "Image details list")
 
       Menu, PVview, Add
       kMenu("PVview", "Add/Uncheck", "&Two lines status bar", "ToggleMultiLineStatus", "statusbar info")
@@ -64117,9 +64340,6 @@ createMenuMainView() {
    {
       createMenuImgSizeAdapt()
       createMenuImgVProtation()
-      If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.pdf)$") && !AnyWindowOpen)
-         kMenu("PVview", "Add", "Extract texts from PDF page", "PanelPDFreadTexts", "convert retrieve read search links pdf")
-
       yayz := varContains(currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat, "hdr", "exr", "128-bit", "96-bit", "RGBF", "RGBAF")
       If ((InStr(currIMGdetails.PixelFormat, "TONE-MAPP") || yayz=1) && !AnyWindowOpen)
          kMenu("PVview", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw")
@@ -64381,15 +64601,16 @@ createMenuCurrentFilesActs(dummy:=0) {
 
    Menu, PVfilesActs, Add, 
    kMenu("PVfilesActs", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
-   kMenu("PVfilesActs", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
-   If (markedSelectFile || dummy!="rclick")
+   If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.pdf)$") || markedSelectFile)
+      kMenu("PVfilesActs", "Add", "Extract texts from PDF pages", "PanelPDFreadTexts", "convert retrieve read search links pdf get")
+   If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|gif|tif|tiff|webp))$") || markedSelectFile)
+      kMenu("PVfilesActs", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
+
+   If markedSelectFile
    {
       kMenu("PVfilesActs", "Add", "Join images into...", "PanelCombineImagesMultipage", "pdf create document")
       kMenu("PVfilesActs", "Add", "&Create a thumbnails sheet", "PanelCreateIMGthumbsSheet")
    }
-
-   If (currIMGdetails.Frames<2 && !markedSelectFile)
-      kMenu("PVfilesActs", "Disable", "Extract frames/pa&ges")
 
    If (!markedSelectFile && FileRexists(resultedFilesList[currentFileIndex, 1]) && thumbsDisplaying=1)
    {
@@ -71024,6 +71245,9 @@ LoadFileWithWIA(imgPath, fastMode, noBMP:=0, sizesDesired:=0, ByRef newBitmap:=0
 }
 
 setViewPortGDIPimageEditingProperties() {
+   If (thumbsDisplaying=1)
+      Return
+
    currIMGdetails.PixelFormat := Gdip_GetImagePixelFormat(UserMemBMP, 2)
    If (currIMGdetails.HasAlpha!=1)
       currIMGdetails.PixelFormat := StrReplace(currIMGdetails.PixelFormat, "A")
@@ -71347,12 +71571,14 @@ LoadBitmapFromFileu(imgPath, noBPPconv:=0, forceGDIp:=0, frameu:=0, sizesDesired
   } Else If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1)
   {
      oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, userPerformColorManagement, sizesDesired, newBitmap)
-     If (!validBMP(oBitmap) && allowFIMloader=1 && wasInitFIMlib=1)
+     isValid := (noBPPconv=1 && oBitmap=1 || validBMP(oBitmap)) ? 1 : 0
+     If (isValid!=1 && allowFIMloader=1 && wasInitFIMlib=1)
         oBitmap := LoadFimFile(imgPath, noBPPconv, noBPPconv, frameu, sizesDesired, newBitmap, 1)
      newSizedImage := newBitmap
   } Else 
   {
      oBitmap := LoadFileWithGDIp(imgPath, noBPPconv, frameu, userPerformColorManagement, sizesDesired, newBitmap)
+     isValid := (noBPPconv=1 && oBitmap=1 || validBMP(oBitmap)) ? 1 : 0
      If (!validBMP(oBitmap) && allowFIMloader=1 && wasInitFIMlib=1)
         oBitmap := LoadFimFile(imgPath, noBPPconv, noBPPconv, frameu, sizesDesired, newBitmap, 1)
 
@@ -79685,7 +79911,7 @@ GetCachableImgFileDetails(imgPath, imgIndex, thumbBMP:=0, returnObj:=0, isFilter
            obju.w := mainLoadedIMGdetails.Width
            obju.h := mainLoadedIMGdetails.Height
            obju.pixFmt := mainLoadedIMGdetails.PixelFormat
-           obju.frames := (mainLoadedIMGdetails.Frames) ? mainLoadedIMGdetails.Frames +1 : 1
+           obju.frames := (mainLoadedIMGdetails.Frames) ? mainLoadedIMGdetails.Frames + 1 : 1
            obju.ratio := Round(mainLoadedIMGdetails.Width / mainLoadedIMGdetails.Height, 2)
            obju.mgpx := Round((mainLoadedIMGdetails.Width * mainLoadedIMGdetails.Height)/1000000, 2)
            obju.dpi := mainLoadedIMGdetails.dpi
@@ -85862,6 +86088,8 @@ BtnNextImg() {
 
   ForceNoColorMatrix := 0
   NextPicture()
+  If (AnyWindowOpen=90)
+     SetTimer, UIpopulatePDFtexts, -150
 }
 
 BtnPrevImg() {
@@ -85870,6 +86098,8 @@ BtnPrevImg() {
 
   ForceNoColorMatrix := 0
   PreviousPicture()
+  If (AnyWindowOpen=90)
+     SetTimer, UIpopulatePDFtexts, -150
 }
 
 updatePanelColorSliderz(modus:=0) {
@@ -94476,6 +94706,7 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
      bpp := FreeImage_GetBPP(hFIFimgA)
      If (bpp<24)
         bpp := 16
+
      FreeImage_UnLoad(hFIFimgA)
      If memoryUsageWarning(zw, zh, bpp, 1)
         Return
@@ -95406,18 +95637,19 @@ GetTextsFromPDF(imgPath, frameu, linkz, pwd:=0, ByRef pageCount:=0, ByRef errorT
    DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
    If (varOut>0 && errorType=0)
    {
-      VarSetCapacity(textBuffer, (varOut+0) * 4, 0)
+      VarSetCapacity(textBuffer, (varOut+0) * 16, 0)
       varOut := -3 - linkz 
       DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int", 0, "int", 1, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", &textBuffer, "UPtr")
       if (varOut>1 && errorType=0)
       {
-         txt := StrGet(&textBuffer, "UTF-16")
+         txt := StrGet(&textBuffer, varOut, "UTF-16")
          if (linkz>0)
          {
             Sort, txt, UD|
             txt := Trimmer(StrReplace(txt, "|", "`n `n"))
          }
       }
+      textBuffer := ""
    }
 
    If errorType
@@ -95426,24 +95658,26 @@ GetTextsFromPDF(imgPath, frameu, linkz, pwd:=0, ByRef pageCount:=0, ByRef errorT
    Return txt
 }
 
-RenderPDFpage(imgPath, noBPPconv, frameu, pwd:=0, maxW:=0, maxH:=0, dpi:=450, ByRef pageCount:=0, ByRef errorType:=0, fillBgr:=1, bgrColor:="ffffff") {
+RenderPDFpage(imgPath, noBPPconv, frameu, pwd:="", maxW:=0, maxH:=0, dpi:=450, ByRef pageCount:=0, ByRef errorType:=0, fillBgr:=1, bgrColor:="ffffff") {
     If (noBPPconv=1)
        pageCount := -6
 
     errorType := -100
     do24bits := (noBPPconv=2) ? 1 : 0
-    pBitmap := DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", dpi, "int*", maxW, "int*", maxH, "int", fillBgr, "int", "0xff" bgrColor, "int*", pageCount, "int*", errorType, "Str", pwd, "UPtr", 0, "int", do24bits, "UPtr")
+    pBitmap := DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "WStr", Trimmer(imgPath), "Int", frameu, "float", dpi, "int*", maxW, "int*", maxH, "int", fillBgr, "int", "0xff" bgrColor, "int*", pageCount, "int*", errorType, "Str", pwd, "UPtr", 0, "int", do24bits, "UPtr")
     If StrLen(pBitmap)>2
     {
        recordGdipBitmaps(pBitmap, A_ThisFunc)
        Gdip_BitmapSetResolution(pBitmap, dpi, dpi)
        Gdip_GetImageDimensions(pBitmap, w, h)
+       pg := pageCount
     } else if (noBPPconv=1 && errorType=0)
     {
        w := maxW
        h := maxH
+       pg := pageCount
+       pBitmap := 1
     }
-
     if errorType
        fnOutputDebug(A_ThisFunc ": " friendlyPDFerrorCodes(errorType, pwd))
 
@@ -95452,8 +95686,8 @@ RenderPDFpage(imgPath, noBPPconv, frameu, pwd:=0, maxW:=0, maxH:=0, dpi:=450, By
     mainLoadedIMGdetails.Width := Round(w)
     mainLoadedIMGdetails.Height := Round(h)
     mainLoadedIMGdetails.ImgFile := imgPath
-    mainLoadedIMGdetails.Frames := pageCount ? pageCount : 0
-    mainLoadedIMGdetails.ActiveFrame := clampInRange(frameu, 0, Round(pageCount))
+    mainLoadedIMGdetails.Frames := (pg>1) ? pg - 1 : 0
+    mainLoadedIMGdetails.ActiveFrame := clampInRange(frameu, 0, Round(pg))
     mainLoadedIMGdetails.DPI := dpi
     mainLoadedIMGdetails.RawFormat := "PDF"
     mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(w, h)
@@ -95566,7 +95800,7 @@ RenderSVGfile(imgPath, noBPPconv, screenMode) {
    mainLoadedIMGdetails.OpenedWith := "Windows Direct 2D [Direct 2D]"
    mainLoadedIMGdetails.LoadedWith := "D2D"
    If (noBPPconv=1)
-      Return
+      Return 1
 
    pBitmap := DllCall("qpvmain.dll\LoadSVGimage", "Int", 0 ,"Int", w, "Int", h, "float", fscaleX, "float", fscaleY, "Str", imgPath, "UPtr")
    If StrLen(pBitmap)>2
@@ -95772,7 +96006,7 @@ LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitma
       doGray := sizesDesired[1, 7]
       If (!w || !h)
          keepAratio := 2
-   } else
+   } Else
    {
       doGray := doFlipu := w := h := ScaleAnySize := 0
       thisImgQuality := 5
