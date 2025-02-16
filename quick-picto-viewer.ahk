@@ -211,7 +211,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , userFriendlyPrevImgSelAction, keywordsListArray := new hashtable(), keywrdLVfilter, wasVPfxBefore := 0
    , lastLclickX, lastLclickY, lastTlbrClicked := 0, uiLVoffset := 0, repositionedWindow := 0, hCollapseWidget := 0
    , selDotMaX, selDotMaY, selDotMbX, selDotMbY, selDotMcX, selDotMcY, selDotMdX, selDotMdY, OnExtractConflictOverwrite := 4
-   , lastInfoBoxZeitToggle := 1, prevHistoBoxString := "", menuHotkeys, lastMenuZeit := 1
+   , lastInfoBoxZeitToggle := 1, prevHistoBoxString := "", menuHotkeys, lastMenuZeit := 1, viewportPDFbookMarks := []
    , userExtractFramesFmt := 3, maxMultiPagesAllowed := 2048, maxMemLimitMultiPage := 2198765648, alphaMaskCoffsetX := 0
    , userImgClrMtrxBrightness, userImgClrMtrxContrast, userImgClrMtrxSaturation, userImgVPthreshold, userImgVPgammaLevel
    , cmdExifTool := "", tabzDarkModus := 0, maxRecentOpenedFolders := 6, UIuserToneMapParamA := 210, UIuserToneMapParamB := 160
@@ -2189,6 +2189,14 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
           } Else If (totalFramesIndex>0 && thumbsDisplaying!=1)
              func2Call := ["MenuNextDesiredFrame"]
        }
+    } Else If (givenKey="+^PgUp")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["MenuNextPDFchapter"]
+    } Else If (givenKey="+^PgDn")
+    {
+       If HKifs("imgsLoaded")
+          func2Call := ["MenuPrevPDFchapter"]
     } Else If (givenKey="^PgUp")
     {
        allowLoop := 1
@@ -11801,8 +11809,13 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
 }
 
 infoShowCurrentFrameIndex() {
-    l := RegExMatch(getIDimage(currentFileIndex), "i)(.\.pdf)$") ? "page number" : "frame index"
-    showTOOLtip("Image " l ": " desiredFrameIndex " / " totalFramesIndex, "changeDesiredFrame", 2, desiredFrameIndex/totalFramesIndex)
+    pdfModus := RegExMatch(getIDimage(currentFileIndex), "i)(.\.pdf)$")
+    l := pdfModus ? "PDF page" : "Image frame"
+    nn := ""
+    If (pdfModus)
+       nn := identifyPDFbookmarkIndex(desiredFrameIndex, 1)
+
+    showTOOLtip(l ": " desiredFrameIndex " / " totalFramesIndex nn, "changeDesiredFrame", 2, desiredFrameIndex/totalFramesIndex)
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -27270,7 +27283,7 @@ PanelSeenStats() {
     Gui, Tab
     Gui, Add, Button, xp y+5 h%thisBtnHeight% w1 h1 gBtnCloseWindow, C&lose
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Images seen statistics: " appTitle)
-    PopulateSeenStatsInfos()
+    uiPopulateSeenStatsInfos()
     SetTimer, RemoveTooltip, -500
     SetTimer, ResetImgLoadStatus, -500, 900
 }
@@ -28251,7 +28264,7 @@ BtnCopyImageFileStats() {
    }
 }
 
-PopulateSeenStatsInfos() {
+uiPopulateSeenStatsInfos() {
   initSeenImagesListDB()
   If (sqlFailedInit=1)
      Return 0
@@ -39030,13 +39043,13 @@ UIgenericComboAction(a:=0, b:=0, c:=0) {
    If (AnyWindowOpen=8)
       SetTimer, PopulateLVmultiRename, -450
    Else If (AnyWindowOpen=61)
-      SetTimer, dummyPopulateAboutKbdShortcutsList, -200
+      SetTimer, dummyUIpopulateHelpKbdShortcutsList, -200
    Else If (AnyWindowOpen=6)
       SetTimer, updateUIFiltersPanel, -150
 }
 
-dummyPopulateAboutKbdShortcutsList() {
-   PopulateAboutKbdShortcutsList(1)
+dummyUIpopulateHelpKbdShortcutsList() {
+   UIpopulateHelpKbdShortcutsList(1)
 }
 
 decideMultiRename(ByRef OriginalNewFileName) {
@@ -41944,7 +41957,7 @@ PanelExtractFrames() {
     ml := (PrefsLargeFonts=1) ? 190 : 150
     Gui, Add, Text, x15 y15 Section, This tool can extract frames or pages from`nGIFs, TIFFs, PDFs and WEBP files.
     Gui, Add, Text, y+7,Image output options:
-    Gui, Add, Text, xp+15 y+7 w%ml% hp+5 +0x200, PDF pages DPI:
+    Gui, Add, Text, xp+15 y+7 w%ml% hp+6 +0x200, PDF pages DPI:
     hTemp := GuiAddEdit("x+10 w" thisWid " number -multi limit4 veditF6", userPDFdpi)
     Gui, Add, UpDown, vuserPDFdpi Range72-3500, % userPDFdpi
     AddTooltip2Ctrl(hTemp, "When PDF pages are render as bitmaps,`nthe DPI designates the quality of the output.`nRecommended: 450 dpi.")
@@ -44851,8 +44864,8 @@ PanelEditImgCaption() {
 
     thisW := (PrefsLargeFonts=1) ? 90 : 60
     ml := (PrefsLargeFonts=1) ? 35 : 25
-    GuiAddButton("xs y+20 h" thisBtnHeight " w" ml " gBtnPrevCaptionPic vBtn1", "<<", "Previous image")
-    GuiAddButton("x+5 hp wp gBtnNextCaptionPic vBtn2", ">>", "Next image")
+    GuiAddButton("xs y+20 h" thisBtnHeight " w" ml " gBtnPrevImg vBtn1", "<<", "Previous image")
+    GuiAddButton("x+5 hp wp gBtnNextImg vBtn2", ">>", "Next image")
     If (currentUndoLevel>2)
     {
        GuiControl, SettingsGUIA: Disable, Btn1
@@ -44868,16 +44881,6 @@ PanelEditImgCaption() {
 
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Edit image caption: " appTitle)
     updateUIcaptionsPanel()
-}
-
-BtnNextCaptionPic() {
-   NextPicture()
-   SetTimer, updateUIcaptionsPanel, -100
-}
-
-BtnPrevCaptionPic() {
-   PreviousPicture()
-   SetTimer, updateUIcaptionsPanel, -100
 }
 
 updateUIcaptionsPanel() {
@@ -54035,6 +54038,14 @@ BtnALLviewedImages2List(dummy:=0) {
 }
 
 PanelPDFreadTexts() {
+    If (currentUndoLevel>2 && thumbsDisplaying!=1)
+    {
+       showTOOLtip("WARNING: The current PDF page is being edited as a bitmap image.`nReload the initial PDF to access this functionality.")
+       SoundBeep 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
+
     RegAction(0, "ResizeDestFolder",, 6)
     thisBtnHeight := createSettingsGUI(90, A_ThisFunc)
     EditWid := 90
@@ -54046,20 +54057,19 @@ PanelPDFreadTexts() {
 
     filesElected := getSelectedFiles(0, 1)
     txtWid := Round(editWid*6.25)
-    Global EditPDFtexts, EditPDFlinks, UserPDFtextExtractMode, EditPDFbookmarks
+    Global EditPDFtexts, UserPDFtextExtractMode, LViewPDFlink, LViewPDFbookmarks
     pp := (filesElected>1) ? "|Batch extraction" : ""
-    Gui, Add, Tab3, %tabzDarkModus% AltSubmit, Text|Links|Bookmarks%pp%
+    Gui, Add, Tab3, %tabzDarkModus% AltSubmit vCurrentPanelTab, Text|Links|Bookmarks%pp%
     Gui, Tab, 1
     Gui, Add, Button, x+15 y+15 w1 h1 gBtnCloseWindow Default, Clo&se
-    GuiAddEdit("x+0 y+0 Section ReadOnly w" txtWid " r15 vEditPDFtexts", "", "")
+    GuiAddEdit("x+0 y+0 Section w" txtWid " r15 vEditPDFtexts", "", "")
     Gui, Tab, 2
-    Gui, Add, Button, x+15 y+15 w1 h1 gBtnCloseWindow Default, Clo&se
-    GuiAddEdit("x+0 y+0 Section ReadOnly w" txtWid " r15 vEditPDFlinks", "", "Links on the PDF page")
+    Gui, Add, Text, x+15 y+15 Section w%txtWid%, Press space or double-click a link to open it.
+    GuiAddListView("xs y+5 w" txtWid " +LV0x10000 r11 Grid -multi AltSubmit vLViewPDFlink gLVactPDFtexts", "#|Link (URL)", "Links")
+
     Gui, Tab, 3
-    ; Gui, Add, Text, x+15 y+15 wp, Double-click a PDF embedded bookmark to jump through the document.
-    Gui, Add, Button, x+15 y+15 w1 h1 gBtnCloseWindow Default, Clo&se
-    GuiAddEdit("x+0 y+0 Section ReadOnly w" txtWid " r15 vEditPDFbookmarks", "", "")
-    Gui, Add, Button, y+15 Section h%thisBtnHeight% gdummy, &View list
+    Gui, Add, Text, x+15 y+15 Section w%txtWid%, Press space or double-click a PDF embedded bookmark to jump through the document.
+    GuiAddListView("xs y+5 w" txtWid " +LV0x10000 r11 Grid -multi AltSubmit vLViewPDFbookmarks gLVactPDFtexts", "#|Page|Section title", "PDF bookmars")
 
     If (filesElected>1)
     {
@@ -54089,8 +54099,9 @@ PanelPDFreadTexts() {
     Gui, Add, Button, x+5 h%thisBtnHeight% gBTNprevPDFpage, &Previous page
     Gui, Add, Button, x+2 hp wp gBTNnextPDFpage, &Next page
     Gui, Add, Button, x+5 hp wp gBTNextractALLtextsCurrentPDF, &Extract pages
-    Gui, Add, Button, x+5 hp wp-20 gBTNhelpPDFtexts, &Help
-    Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Close
+    Gui, Add, Button, x+5 hp wp-24 gBTNcopyPDFtexts, &Copy
+    Gui, Add, Button, x+5 hp wp gBTNhelpPDFtexts, &Help
+    Gui, Add, Button, x+5 hp wp gBtnCloseWindow, C&lose
 
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Extract texts in PDF: " appTitle)
     SetTimer, ResetImgLoadStatus, -100
@@ -54100,6 +54111,64 @@ PanelPDFreadTexts() {
 
 BTNhelpPDFtexts() {
     msgBoxWrapper(appTitle ": HELP", "This tool allows users to extract texts from PDFs.  It extracts only texts stored as text. No optical character recognition is performed on images to identify additional texts to be extracted.`n`nIn some cases, the text is encoded in unsupported character encoding formats. Therefore, the tool might retrieve gibberish contents.`n`nThe tool can be executed on multiple files.", -1, 0, 0)
+}
+
+BTNcopyPDFtexts(CtrlHwnd:=0, b:=0, c:=0) {
+    Gui, SettingsGUIA: Default
+    GuiControlGet, CurrentPanelTab
+    If (CurrentPanelTab=1)
+    {
+       GuiControlGet, textu, SettingsGUIA:, EditPDFtexts
+    } Else If (CurrentPanelTab<4)
+    {
+      l := (CurrentPanelTab=2) ? "LViewPDFlink" : "LViewPDFbookmarks"
+      k := (CurrentPanelTab=2) ? 2 : 3
+      textu := (CurrentPanelTab=2) ? "" : "`nPDF bookmarks:`n"
+      textu .= getListViewData("SettingsGUIA", l, k)
+    }
+
+    If StrLen(textu)>5
+    {
+       Try Clipboard := Trimmer(textu)
+       Catch wasError
+           Sleep, 1
+ 
+       If wasError
+       {
+          showTOOLtip("ERROR: Failed to copy the text data to the clipboard")
+          SoundBeep , 300, 100
+       } Else showTOOLtip("Data from the current tab was copied to the clipboard")
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+    }
+}
+
+LVactPDFtexts(CtrlHwnd:=0, b:=0, c:=0) {
+    Gui, SettingsGUIA: Default
+    GuiControlGet, CurrentPanelTab
+    Gui, SettingsGUIA: ListView, % (CurrentPanelTab=2) ? "LViewPDFlink" : "LViewPDFbookmarks"
+    isOkay := (b="k" && c=32) || (b="DoubleClick") ? 1 : 0
+    RowNumber := LV_GetNext(0, "F")
+    ; ToolTip, % c "|"  url "|" RowNumber "|" A_GuiEvent "=" A_EventInfo , , , 2
+    LV_GetText(url, RowNumber, 2)
+    If (StrLen(url)<3 && CurrentPanelTab=2 || !isNumber(url) && CurrentPanelTab=3 || !isOkay)
+       Return
+
+     If (CurrentPanelTab=2)
+     {
+        Try Run, % url
+     } Else If (CurrentPanelTab=3)
+     {
+        If (thumbsDisplaying=1) {
+           userActivePDFpage := url
+        } Else
+        { 
+           desiredFrameIndex := url - 1
+           MenuNextDesiredFrame()
+        }
+
+        GuiControl, SettingsGUIA: Choose, CurrentPanelTab, 1
+        SetTimer, UIpopulatePDFtexts, -150
+     }
 }
 
 BTNbatchExtractTextsPDFs() {
@@ -54171,30 +54240,68 @@ UIpopulatePDFtexts() {
    GuiControl, SettingsGUIA:, EditPDFtexts, % txt
 
    linkz := GetTextsFromPDF(getIDimage(currentFileIndex), userActivePDFpage, 1, pwd)
-   GuiControl, SettingsGUIA:, EditPDFlinks, % linkz
+   Gui, SettingsGUIA: ListView, LViewPDFlink
+   LV_Delete()
+   Loop, Parse, linkz,`n`r
+   {
+      If (Trim(A_LoopField) && !InStr(A_LoopField, ". error code: "))
+      {
+         thisIndex++
+         LV_Add(thisIndex, thisIndex, A_LoopField)
+      }
+   }
+   Loop, 2
+       LV_ModifyCol(A_Index, "AutoHdr")
+}
+
+RetrievePDFbookmarks(imgPath, pwd, allowBonuses, ByRef pageCount, ByRef errorType) {
+   errorType := -100
+   pageCount := 0
+   bufferSize := 0
+   imgPath := getIDimage(currentFileIndex)
+   buffer := DllCall("qpvmain.dll\ExtractPDFBookmarks", "Str", imgPath, "Str", pwd, "int*", pageCount, "int*", errorType, "int*", bufferSize, "UPtr")
+   If (errorType=-1)
+      txt := "No bookmarks retrieved."
+   Else If errorType
+      txt := "An error occured retrieving the PDF embedded bookmarks: " errorType "."
+   Else If (buffer && bufferSize>1)
+   {
+      txt := StrGet(buffer, bufferSize, "UTF-16")
+      DllCall("GlobalFree", "uptr", buffer)
+      buffer := ""
+      if (pageCount>10 && allowBonuses=1)
+         txt := "0|[ First page ]`n" txt "`n" pageCount - 1 "|[ Last page ]"
+   }
+
+   Return txt
 }
 
 UIpopulatePDFbookmarks() {
    If (AnyWindowOpen!=90)
       Return
 
+   txt := RetrievePDFbookmarks(getIDimage(currentFileIndex), pwd, 1, pageCount, errorType)
    Gui, SettingsGUIA: Default
-   pwd := ""
-   errorType := -100
-   imgPath := getIDimage(currentFileIndex)
-   buffer := DllCall("qpvmain.dll\ExtractPDFBookmarks", "Str", imgPath, "Str", pwd, "int*", errorType, "int*", bufferSize, "UPtr")
-   If (errorType=-1)
-      txt := "No bookmarks retrieved."
-   else if errorType
-      txt := "An error occured retrieving the PDF embedded bookmarks: " errorType "."
-   else if buffer 
-   {
-      txt := StrGet(buffer, bufferSize, "UTF-16")
-      DllCall("GlobalFree", "uptr", buffer)
-      buffer := ""
-   }
+   Gui, SettingsGUIA: ListView, LViewPDFbookmarks
+   LV_Delete()
+   If (pageCount<3 || errorType!=0)
+      Return
 
-   GuiControl, SettingsGUIA:, EditPDFbookmarks, % txt
+   Loop, Parse, txt,`n`r
+   {
+      If InStr(A_LoopField, "|")
+      {
+         pkA := SubStr(A_LoopField, 1, InStr(A_LoopField, "|") - 1)
+         pkB := SubStr(A_LoopField, InStr(A_LoopField, "|") + 1)
+         If pkB
+         {
+            thisIndex++
+            LV_Add(thisIndex, thisIndex, pkA, pkB)
+         }
+      }
+   }
+   Loop, 3
+       LV_ModifyCol(A_Index, "AutoHdr")
 }
 
 CoreExtractALLtextsPDF(imgPath, frameu, modus, pwd, ByRef err) {
@@ -54307,6 +54414,10 @@ BTNextractALLtextsCurrentPDF() {
             Return
          }
       }
+
+      b := RetrievePDFbookmarks(imgPath, pwd, 0, pageCount, errorType)
+      If (errorType=0)
+         txt := "PDF boookmarks:`n" b "`n`n" txt
 
       FileAppend, % txt, % file2save, UTF-8
       If ErrorLevel
@@ -58579,7 +58690,7 @@ batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
       percS := Round((countTFilez / filesElected) * 100, 1)
       bonusMsg := "`nTotal files: " groupDigits(countTFilez) " / " groupDigits(filesElected) " ( " percS "% ) "
       If (pdfTextMode=1)
-         r := coreExtractTextsFromGivenPDF(pdfModus, thisFileIndex, prevMSGdisplay, bonusMsg, failedFrames, totalz)
+         r := coreExtractBatchModeTextsFromGivenPDF(pdfModus, thisFileIndex, prevMSGdisplay, bonusMsg, failedFrames, totalz)
       Else
          r := coreExtractFramesFromImage(thisFileIndex, 1, prevMSGdisplay, bonusMsg, failedFrames, totalz)
 
@@ -58848,7 +58959,7 @@ coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
    Return (abandonAll=1) ? -5 : clampInRange(tFrames, 0, 9892899)
 }
 
-coreExtractTextsFromGivenPDF(modus, thisFileIndex, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
+coreExtractBatchModeTextsFromGivenPDF(modus, thisFileIndex, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
    failedFrames := extractedFrames := abandonAll := yay := 0
    actu := -6
    pwd := ""
@@ -58915,6 +59026,10 @@ coreExtractTextsFromGivenPDF(modus, thisFileIndex, prevMSGdisplay, bonusMsg, ByR
       If ErrorLevel
          Return -4
    }
+
+   b := RetrievePDFbookmarks(imgPath, pwd, 0, pageCount, errorType)
+   If (errorType=0)
+      txt := "PDF boookmarks:`n" b "`n`n" txt
 
    FileAppend, % txt, % file2save, UTF-8
    If ErrorLevel
@@ -63374,12 +63489,19 @@ createMenuNavigation() {
    If (thumbsDisplaying!=1)
    {
       Menu, PVnav, Add
-      kMenu("PVnav", "Add", "Previous &frame`tShift+Page Down", "MenuPrevDesiredFrame", "gifs tiffs multipage")
-      kMenu("PVnav", "Add", "Ne&xt frame`tShift+Page Up", "MenuNextDesiredFrame", "gifs tiffs multipageNP")
+      kMenu("PVnav", "Add", "Previous &frame`tShift+Page Down", "MenuPrevDesiredFrame", "gifs tiffs multipage pdf")
+      kMenu("PVnav", "Add", "Ne&xt frame`tShift+Page Up", "MenuNextDesiredFrame", "gifs tiffs multipage pdf")
       If (totalFramesIndex<1)
       {
          kMenu("PVnav", "Disable", "Previous &frame`tShift+Page Down")
          kMenu("PVnav", "Disable", "Ne&xt frame`tShift+Page Up")
+      }
+
+      If (viewportPDFbookMarks.Count()>1)
+      {
+         Menu, PVnav, Add
+         kMenu("PVnav", "Add", "Previous PDF bookmark`tCtrl+Shift+Page Down", "MenuPrevPDFchapter", "pdf multipage")
+         kMenu("PVnav", "Add", "Next PDF bookmark`tCtrl+Shift+Page Up", "MenuNextPDFchapter", "psd multipage")
       }
    }
 
@@ -71308,6 +71430,7 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
      }
   }
 
+  viewportPDFbookMarks := []
   viewportQPVimage.DiscardImage()
   recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
   If ((RegExMatch(imgPath, RegExFIMformPtrn) || (alwaysOpenWithFIM=1 && forceGDIp=0)) && allowFIMloader=1)
@@ -84265,7 +84388,6 @@ PanelAboutWindow() {
     Gui, Add, Button, x+5 hp wp Default gBtnCloseWindow, &Close
     Gui, Add, Button, x+5 hp gcheckForUpdatesNow, &Check for updates
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "About " appTitle " v" appVersion A_Space verType)
-    PopulateAboutKbdShortcutsList()
     checkDLLfiles()
     ; ToolTip, % "l=" A_ScriptFullPath , , , 2
 }
@@ -84335,7 +84457,7 @@ PanelHelpWindow(dummy:=0) {
     Gui, Add, Text, x+5 hp +0x200, QPV v%appVersion%
 
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Help " appTitle " v" appVersion)
-    PopulateAboutKbdShortcutsList()
+    UIpopulateHelpKbdShortcutsList()
     checkDLLfiles()
 }
 
@@ -84344,7 +84466,10 @@ BtnAboutWin() {
    PanelAboutWindow()
 }
 
-PopulateAboutKbdShortcutsList(useFilter:=0) {
+UIpopulateHelpKbdShortcutsList(useFilter:=0) {
+    If (AnyWindowOpen!=61)
+       Return
+
     Static fileData := 0
     EM_SETCUEBANNER(hEditField, "Filter keyboard shortcuts list", 1)
     startOperation := A_TickCount
@@ -84386,7 +84511,7 @@ UIfilterListViewKbdsAbout() {
    If (SubStr(listViewFilteru, 1, 1)="\" && StrLen(listViewFilteru)>3) 
       listViewFilteru := StrReplace(listViewFilteru, "\", "|")
 
-   PopulateAboutKbdShortcutsList(listViewFilteru)
+   UIpopulateHelpKbdShortcutsList(listViewFilteru)
 }
 
 PanelsCheckFileExists() {
@@ -85793,8 +85918,6 @@ coreColorsAdjusterWindow(modus:=0) {
        dummyTimerDelayiedImageDisplay(150)
     }
 
-    ; Gui, Add, Button, x+5 hp w%btnWid% gCopyImage2clip, &Copy to clipboard
-    ; Gui, Add, Button, x+5 hp wp gBtnSaveIMGadjustPanel, &Save or copy
     Gui, Add, Button, x+5 hp wp+15 gBtnResetImageView vbtnReset, &Reset all
     titlu := (idu=10) ? "Adjust viewport image view: " : "Adjust image colors (legacy): "
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
@@ -86075,31 +86198,32 @@ resetOpeningPanel() {
     openingPanelNow := 0
 }
 
-BtnSaveIMGadjustPanel() {
-   ForceNoColorMatrix := 0
-   CloseWindow()
-   dummyTimerDelayiedImageDisplay(50)
-   PanelSaveImg()
-}
-
 BtnNextImg() {
   If (maxFilesIndex<2 || !maxFilesIndex)
      Return
 
-  ForceNoColorMatrix := 0
+  ; ForceNoColorMatrix := 0
   NextPicture()
   If (AnyWindowOpen=90)
+  {
      SetTimer, UIpopulatePDFtexts, -150
+     SetTimer, UIpopulatePDFbookmarks, -225
+  } Else If (AnyWindowOpen=22)
+     SetTimer, updateUIcaptionsPanel, -100
 }
 
 BtnPrevImg() {
   If (maxFilesIndex<2 || !maxFilesIndex)
      Return
 
-  ForceNoColorMatrix := 0
+  ; ForceNoColorMatrix := 0
   PreviousPicture()
   If (AnyWindowOpen=90)
+  {
      SetTimer, UIpopulatePDFtexts, -150
+     SetTimer, UIpopulatePDFbookmarks, -225
+  } Else If (AnyWindowOpen=22)
+     SetTimer, updateUIcaptionsPanel, -100
 }
 
 updatePanelColorSliderz(modus:=0) {
@@ -87850,10 +87974,10 @@ TglRszApplyEffects() {
       If (usrColorDepth>1)
          infoColorDepth := "`nSimulated color depth: " defineColorDepth()
       If (imgFxMode>1)
-         infoColors := "`nColors display mode: " DefineFXmodes() " [" currIMGdetails.PixelFormat "]"
+         infoColors := "`nColors display mode:`n" DefineFXmodes() " [" currIMGdetails.PixelFormat "]"
  
       entireString := infoMirroring infoColors infoColorDepth infoRenderOpaque
-      entireString := (entireString) ?  "Effects currently activated: " entireString : "No effects currently activated."
+      entireString := (entireString) ?  "Effects currently activated:`n" entireString : "No effects currently activated."
       msgBoxWrapper(appTitle, entireString, 0, 0, "info")
    }
 }
@@ -95653,12 +95777,12 @@ GetTextsFromPDF(imgPath, frameu, linkz, pwd:=0, ByRef pageCount:=0, ByRef errorT
    }
 
    If errorType
-      txt := friendlyPDFerrorCodes(errorType, pwd) "."
+      txt := friendlyPDFerrorCodes(errorType, pwd) ". Error code: " errorType "."
 
    Return txt
 }
 
-RenderPDFpage(imgPath, noBPPconv, frameu, pwd:="", maxW:=0, maxH:=0, dpi:=450, ByRef pageCount:=0, ByRef errorType:=0, fillBgr:=1, bgrColor:="ffffff") {
+RenderPDFpage(imgPath, noBPPconv, frameu, ByRef pwd:="", maxW:=0, maxH:=0, dpi:=450, ByRef pageCount:=0, ByRef errorType:=0, fillBgr:=1, bgrColor:="ffffff") {
     If (noBPPconv=1)
        pageCount := -6
 
@@ -95813,6 +95937,139 @@ RenderSVGfile(imgPath, noBPPconv, screenMode) {
    return pBitmap
 }
 
+coreChangePDFchapter(dir) {
+    If (thumbsDisplaying!=1 && totalFramesIndex>0 && viewportPDFbookMarks.total>5 && viewportPDFbookMarks.Count()>1)
+    {
+       p := identifyPDFbookmarkIndex(desiredFrameIndex, 0)
+       If (p>=0)
+       {
+           k := viewportPDFbookMarks[p + dir, 1]
+           If (k>=0)
+           {
+              desiredFrameIndex := k - 1
+              changeDesiredFrame(1)
+           }
+       } Else If (dir=-1 && (desiredFrameIndex>= totalFramesIndex - 1))
+       {
+          changeDesiredFrame(-1)
+       }
+    }
+}
+
+MenuNextPDFchapter() {
+    coreChangePDFchapter(1)
+}
+
+MenuPrevPDFchapter() {
+    coreChangePDFchapter(-1)
+}
+
+identifyPDFbookmarkIndex(p, friendly) {
+    Static lastIndex := -1
+    If (p="last")
+       Return lastIndex
+
+    mindex := -1
+    p := clampInRange(p + 1, 0, viewportPDFbookMarks.total)
+    Loop, % viewportPDFbookMarks.Count()
+    {
+        If isInRange(p, viewportPDFbookMarks[A_Index, 1], viewportPDFbookMarks[A_Index + 1, 1])
+        {
+           mindex := A_Index
+           nn := viewportPDFbookMarks[A_Index, 2]
+           Break
+        }
+    }
+
+    lastIndex := mindex
+    If (friendly=0)
+       Return lastIndex
+
+    If (nn && friendly=1)
+    {
+       fprts := ""
+       prts := SubStr(nn, 1, InStr(nn, ". ") - 1)
+       If InStr(prts, ".")
+       {
+          Loop
+          {
+             zp := SubStr(prts, 1, InStr(prts, ".", 0, -1) - 1)
+             If !InStr(zp, ".")
+                Break
+
+             fprts .= zp "`n"
+             prts := zp
+          }
+             ; fprts .= SubStr(prts, 1, InStr(prts, ".", 0, -1) - 1) "`n"
+          fprts .= SubStr(nn, 1, InStr(nn, ".") - 1)
+       }
+
+       nfp := ""
+       Loop, Parse, fprts, "`n"
+       {
+          If (zp := Trimmer(A_LoopField))
+          {
+             Loop, % viewportPDFbookMarks.Count()
+             {
+                If (InStr(viewportPDFbookMarks[A_Index, 2], zp ". ")=1)
+                {
+                   nfp .= viewportPDFbookMarks[A_Index, 2] "`n"
+                   Break
+                }
+             }
+          }
+
+       }
+       nn := "`n" nn "`n" nfp
+    }
+    Return nn
+}
+
+generateViewPortPDFbookmarks(imgPath, pwd) {
+  thisIndex := pkA := pkB := 0
+  viewportPDFbookMarks := []
+  txt := RetrievePDFbookmarks(imgPath, pwd, 0, pageCount, errorType)
+  minpka := pageCount
+  If (!errorType && pageCount>3)
+  {
+     Loop, Parse, txt,`n`r
+     {
+        If InStr(A_LoopField, "|")
+        {
+           pkA := SubStr(A_LoopField, 1, InStr(A_LoopField, "|") - 1)
+           pkB := SubStr(A_LoopField, InStr(A_LoopField, "|") + 1)
+           If pkB
+           {
+              thisIndex++
+              viewportPDFbookMarks[thisIndex] := [pkA, pkB]
+              minpka := min(pageCount, pkA)
+           }
+        }
+     }
+
+     thisIndex++
+     viewportPDFbookMarks[thisIndex] := [pageCount - 1, pkB]
+     If (minpka>0)
+     {
+        npa := []
+        thisIndex := 1
+        pkB := viewportPDFbookMarks[1, 2]
+        npa[thisIndex] := [0, pkB]
+        Loop, % viewportPDFbookMarks.Count()
+        {
+            thisIndex++
+            pkA := viewportPDFbookMarks[A_Index, 1]
+            pkB := viewportPDFbookMarks[A_Index, 2]
+            npa[thisIndex] := [pkA, pkB]
+
+        }
+        viewportPDFbookMarks := []
+        viewportPDFbookMarks := npa.Clone()
+     }
+     viewportPDFbookMarks["total"] := pageCount
+  }
+}
+
 LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
    ; pBitmap := ""
    ; loop, 125
@@ -95827,10 +96084,14 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
    ; }
    ; Return pBitmap
 
-   If RegExMatch(imgPath, "i)(.\.svg)$")
+   If RegExMatch(imgPath, "i)(.\.svg)$") {
       Return RenderSVGfile(imgPath, noBPPconv, 1)
-   Else If RegExMatch(imgPath, "i)(.\.pdf)$")
-      Return RenderPDFpage(imgPath, noBPPconv, frameu, sizesDesired)
+   } Else If RegExMatch(imgPath, "i)(.\.pdf)$") {
+      pBitmap := RenderPDFpage(imgPath, noBPPconv, frameu, sizesDesired, pwd)
+      If validBMP(pBitmap)
+         generateViewPortPDFbookmarks(imgPath, pwd)
+      Return pBitmap
+   }
 
    tt := startZeit := A_TickCount
    VarSetCapacity(resultsArray, 8 * 9, 0)

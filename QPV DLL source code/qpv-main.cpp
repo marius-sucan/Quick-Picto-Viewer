@@ -6206,7 +6206,7 @@ void TraverseBookmarks(FPDF_DOCUMENT doc, FPDF_BOOKMARK bookmark,
                out.push_back(ch);
         }
         out.push_back('\n');
-        
+
         // Recurse into any child bookmarks.
         FPDF_BOOKMARK child = FPDFBookmark_GetFirstChild(doc, bookmark);
         if (child)
@@ -6218,7 +6218,7 @@ void TraverseBookmarks(FPDF_DOCUMENT doc, FPDF_BOOKMARK bookmark,
    }
 }
 
-DLL_API unsigned short* DLL_CALLCONV ExtractPDFBookmarks(const wchar_t *pdfPath, const wchar_t *password, int* errorType, int* bufferSize) {
+DLL_API unsigned short* DLL_CALLCONV ExtractPDFBookmarks(const wchar_t *pdfPath, const wchar_t *password, int* pageCount, int* errorType, int* bufferSize) {
 // Main function that loads the PDF, traverses bookmarks, and returns the data
 // in an unsigned short buffer (UTF‑16 encoded).
 // The output is a series of lines formatted as:
@@ -6234,6 +6234,10 @@ DLL_API unsigned short* DLL_CALLCONV ExtractPDFBookmarks(const wchar_t *pdfPath,
     }
 
     std::vector<unsigned short> out;
+    *pageCount = FPDF_GetPageCount(doc);
+    if (*pageCount<3)
+       return NULL;
+
     FPDF_BOOKMARK root = FPDFBookmark_GetFirstChild(doc, nullptr);
     if (root)
     {
@@ -6253,7 +6257,6 @@ DLL_API unsigned short* DLL_CALLCONV ExtractPDFBookmarks(const wchar_t *pdfPath,
     FPDF_CloseDocument(doc);
     return buffer;
 }
-
 
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdfPath, int pageIndex, float dpi, int* givenW, int* givenH, int fillBehind, int bgrColor, int *varOut, int *errorType, const wchar_t* password, unsigned short* textBuffer, int do24bits) {
 // https://github.com/bblanchon/pdfium-binaries
