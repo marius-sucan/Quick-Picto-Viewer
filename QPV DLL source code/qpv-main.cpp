@@ -6245,7 +6245,7 @@ DLL_API unsigned short* DLL_CALLCONV ExtractPDFBookmarks(const wchar_t *pdfPath,
         TraverseBookmarks(doc, root, out, emptyChain);
     } else 
     {
-        *errorType = -1;
+        *errorType = -2;
         return NULL;
     }
 
@@ -6269,7 +6269,6 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
     // act == -5; retrieve the links on a given page and fill the textBuffer data
     // act == -6; retrieve the width and height of on a given page and total page count
     // errorType > 0; error codes from PDFium
-    // errorType = -1; PDF password protected
     // errorType = -2; PDF seems to have no pages
     // errorType = -3; failed to retrieve PDF page from document 
     // errorType = -4; failed to allocate the GDI+ bitmap
@@ -6286,13 +6285,6 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
         else
            fnOutputDebug("failed to load PDF document: " + std::to_string(*errorType) );
 
-        return myBitmap;
-    }
-
-    if (FPDF_GetDocPermissions(document) == 0 && !password) {
-        fnOutputDebug("failed to load PDF document: password protected; one is required");
-        FPDF_CloseDocument(document);
-        *errorType = -1;
         return myBitmap;
     }
 
@@ -6351,6 +6343,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
        {
           textLength = FPDFText_CountChars(textPage);
           int extracted = FPDFText_GetText(textPage, 0, textLength, textBuffer);
+          // int extracted = FPDFText_GetBoundedText(textPage, 0, 0, pageWidth, pageHeight, textBuffer, textLength);
           FPDFText_ClosePage(textPage);
           *varOut = extracted;
           // fnOutputDebug( ucs2_to_utf8(textBuffer, textLength) );
@@ -6449,8 +6442,8 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
     } else if (act==-6)
     {
        *varOut = pageCount;
-       *givenW = bitmapWidth;
-       *givenH = bitmapHeight;
+       *givenW = (int)pageWidth;
+       *givenH = (int)pageHeight;
        FPDF_ClosePage(PDFpage);
        FPDF_CloseDocument(document);
        return myBitmap;
@@ -6465,6 +6458,8 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
     auto nSize = adaptImageGivenSize(1, 0, bitmapWidth, bitmapHeight, *givenW, *givenH, maxMPX);
     bitmapWidth = nSize[0];
     bitmapHeight = nSize[1];
+    *givenW = (int)pageWidth;
+    *givenH = (int)pageHeight;
     int cbStride = (do24bits==1) ? bitmapWidth * 3 : bitmapWidth * 4;
     Gdiplus::PixelFormat  destinationGdipFormat = (do24bits==1) ? PixelFormat24bppRGB : PixelFormat32bppPARGB;
     Gdiplus::DllExports::GdipCreateBitmapFromScan0(bitmapWidth, bitmapHeight, cbStride, destinationGdipFormat, NULL, &myBitmap);
@@ -6504,7 +6499,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
     FPDF_ClosePage(PDFpage);
     FPDF_CloseDocument(document);
     return myBitmap;
-}
+}; // RenderPdfPageAsBitmap
 
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPconv, int givenQuality, UINT givenW, UINT givenH, UINT keepAratio, UINT ScaleAnySize, UINT givenFrame, int doFlipHV, int useICM, const wchar_t *szFileName, UINT *&resultsArray, int isFIMokay) {
 // this function is meant to be self-contained and can be executed by different threads, via AHK

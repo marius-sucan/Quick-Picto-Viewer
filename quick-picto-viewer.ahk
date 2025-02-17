@@ -220,8 +220,9 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*|Background clipper*"
    , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := [], prevPasteInPlaceVPcoords := []
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
-   , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := ""
-   , appVersion := "6.1.55", vReleaseDate := "2024/12/07" ; yyyy-mm-dd
+   , PDFpwdsCache := []
+   , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := "BETA"
+   , appVersion := "6.1.65", vReleaseDate := "2025/02/17" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -4399,7 +4400,7 @@ TrueCleanup() {
    Loop, 8
       Gdip_DeletePen(pPen%A_Index%)
 
-   mainGdipWinThumbsGrid(1)
+   QPV_ListViewGridHUDoverlay(1)
    destroyGDIPcanvas()
    Sleep, 1
    GDIPToken := Gdip_Shutdown(GDIPToken)
@@ -5038,7 +5039,7 @@ UpdateThumbsScreen(forceReload:=0, forceFastMode:=0) {
       mustReloadThumbsList := 0
    } ; Else r := 1
 
-   mainGdipWinThumbsGrid(0, modus)
+   QPV_ListViewGridHUDoverlay(0, modus)
    prevStartIndex := startPageIndex
    ; prevRealThumbsIndex := startIndex
    ; lastInvoked := A_TickCount
@@ -5149,7 +5150,7 @@ invokeFilesListMapNow() {
    ToolTip, Please wait - generating list map
    listMap := generateFilesListMap("auto")
    ToolTip
-   mainGdipWinThumbsGrid(0, 0, listMap[1])
+   QPV_ListViewGridHUDoverlay(0, 0, listMap[1])
    trGdip_DisposeImage(listMap[1])
    thisVal := listMap[2]
    If (thisVal=2)
@@ -5224,7 +5225,7 @@ ThumbsScrollbar() {
             Else
                filterDelayiedImageDisplay()
          }
-         mainGdipWinThumbsGrid(0, modus, listMap[1], "scroll", listMap[3])
+         QPV_ListViewGridHUDoverlay(0, modus, listMap[1], "scroll", listMap[3])
       }
    }
 
@@ -9180,7 +9181,7 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
       If (mainParam="rClick")
       {
          ; currentFileIndex := newIndex
-         ; mainGdipWinThumbsGrid()
+         ; QPV_ListViewGridHUDoverlay()
          If (newIndex=oIndex)
             Return "FsoloMenu"
          Else
@@ -11812,7 +11813,7 @@ infoShowCurrentFrameIndex() {
     pdfModus := RegExMatch(getIDimage(currentFileIndex), "i)(.\.pdf)$")
     l := pdfModus ? "PDF page" : "Image frame"
     nn := ""
-    If (pdfModus)
+    If (pdfModus && userPrivateMode!=1)
        nn := identifyPDFbookmarkIndex(desiredFrameIndex, 1)
 
     showTOOLtip(l ": " desiredFrameIndex " / " totalFramesIndex nn, "changeDesiredFrame", 2, desiredFrameIndex/totalFramesIndex)
@@ -16714,11 +16715,15 @@ alertReduceColorDepth() {
          RefreshImageFileAction()
    }
 
-   If (currIMGdetails.TooLargeGDI=1 && !validBMP(UserMemBMP))
+   trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+   tooBigA := isImgSizeTooLarge(currIMGdetails.Width, currIMGdetails.Height)
+   tooBigB := isImgSizeTooLarge(imgW, imgH)
+   ompx := Round((currIMGdetails.Width * currIMGdetails.Height) / 1000000, 2)
+   mpx := Round((imgW * imgH) / 1000000, 2)
+   If (currIMGdetails.TooLargeGDI=1 && !validBMP(UserMemBMP) && tooBigA=1 && tooBigB=0 && !viewportQPVimage.imgHandle)
    {
-      infoRes := "`nOriginal resolution: " groupDigits(currIMGdetails.Width) " x " groupDigits(currIMGdetails.Height) " px | " Round((currIMGdetails.Width*currIMGdetails.Height)/1000000,2) " MPx"
-      trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
-      newRes := "`nDownscaled resolution: " groupDigits(imgW) " x " groupDigits(imgH) " px | " Round((imgW*imgH)/1000000,2) " MPx"
+      infoRes := "`nOriginal resolution: " groupDigits(currIMGdetails.Width) " x " groupDigits(currIMGdetails.Height) " px | " ompx " MPx"
+      newRes := "`nViewport resolution: " groupDigits(imgW) " x " groupDigits(imgH) " px | " mpx " MPx"
       msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", "The image you now begin to edit exceeds the maximum possible dimensions for image editing." infoRes "`n`nYou will edit it now at an automatically downscaled resolution:" newRes, 0, 0, "exclamation")
    }
 }
@@ -16748,7 +16753,7 @@ alertReduceSaveColorDepth() {
    {
       infoRes := "`nOriginal resolution: " currIMGdetails.Width " x " currIMGdetails.Height " px | " Round((currIMGdetails.Width*currIMGdetails.Height)/1000000,2) " MPx"
       trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
-      newRes := "`nDownscaled resolution: " imgW " x " imgH " px | " Round((imgW*imgH)/1000000,2) " MPx"
+      newRes := "`nViewport resolution: " imgW " x " imgH " px | " Round((imgW*imgH)/1000000,2) " MPx"
       msgResult := msgBoxWrapper(appTitle ": IMAGE SAVE WARNING", "The image you intend to resave exceeds the maximum possible dimensions for image editing." infoRes "`n`nYou will be saving an automatically downscaled resolution:" newRes, "&Continue|C&ancel", 1, "exclamation")
    }
    If !InStr(msgResult, "continue")
@@ -31667,7 +31672,7 @@ informUserFileMissing(clearScreen:=0) {
    If (autoRemDeadEntry=1)
       remCurrentEntry(1)
    If (thumbsDisplaying=1 && maxFilesIndex>0)
-      mainGdipWinThumbsGrid()
+      QPV_ListViewGridHUDoverlay()
 
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
@@ -37557,7 +37562,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
   }
 
   If (thumbsDisplaying=1)
-     mainGdipWinThumbsGrid()
+     QPV_ListViewGridHUDoverlay()
 }
 
 retrieveFavesAsArray(ByRef countItemz) {
@@ -37704,7 +37709,7 @@ retrieveFavesAsList(dummy:=0) {
    createGUItoolbar()
    p := (ShowAdvToolbar=1 && lockToolbar2Win=1) ? 100 : 50
    dummyTimerDelayiedImageDisplay(p)
-   SetTimer, mainGdipWinThumbsGrid, % -p*2
+   SetTimer, QPV_ListViewGridHUDoverlay, % -p*2
    SetTimer, TriggerMenuBarUpdate, -90
    showDelayedTooltip("Favourites list loaded`nTotal entries: " groupDigits(maxFilesIndex), 0, 200)
    ; RandomPicture()
@@ -37898,7 +37903,7 @@ getSelectedFiles(getItem:=0, forceSort:=0) {
          resultedFilesList[firstItem, 2] := 0
          lastZeitFileSelect := A_TickCount
          If (thumbsDisplaying=1)
-            mainGdipWinThumbsGrid()
+            QPV_ListViewGridHUDoverlay()
       }
       changeMcursor("normal")
       Return markedSelectFile
@@ -37928,7 +37933,7 @@ invertFilesSelection() {
 
    lastZeitFileSelect := A_TickCount
    If (thumbsDisplaying=1)
-      mainGdipWinThumbsGrid()
+      QPV_ListViewGridHUDoverlay()
    Else
       dummyTimerDelayiedImageDisplay(50)
 
@@ -37936,7 +37941,7 @@ invertFilesSelection() {
    interfaceThread.ahkassign("markedSelectFile", markedSelectFile)
    showTOOLtip("Files selection inverted`n" groupDigits(markedSelectFile) " files are now selected")
    If (thumbsDisplaying=1)
-      mainGdipWinThumbsGrid()
+      QPV_ListViewGridHUDoverlay()
    Else
       dummyTimerDelayiedImageDisplay(50)
    SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -37957,7 +37962,7 @@ dropFilesSelection(silentMode:=0) {
    {
       showTOOLtip("Files selection dropped")
       If (thumbsDisplaying=1)
-         mainGdipWinThumbsGrid()
+         QPV_ListViewGridHUDoverlay()
       Else
          dummyTimerDelayiedImageDisplay(50)
       SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -37991,7 +37996,7 @@ markThisFileNow(thisFileIndex:=0) {
   If (markedSelectFile<0)
      getSelectedFiles(0, 1)
   Else If (thumbsDisplaying=1)
-     mainGdipWinThumbsGrid()
+     QPV_ListViewGridHUDoverlay()
   Else
      dummyTimerDelayiedImageDisplay(25)
 
@@ -38907,7 +38912,7 @@ DeletePicture(dummy:=0) {
   SetTimer, RemoveTooltip, % -msgDisplayTime
   SetTimer, ResetImgLoadStatus, -50
   If (thumbsDisplaying=1)
-     mainGdipWinThumbsGrid()
+     QPV_ListViewGridHUDoverlay()
 }
 
 readRecentMultiRenameEntries() {
@@ -39730,7 +39735,7 @@ moveMarkedEntryNow(indexu, modus:=0) {
       EntryMarkedMoveIndex := 0
    }
 
-   mainGdipWinThumbsGrid()
+   QPV_ListViewGridHUDoverlay()
 }
 
 reorderIndexEntryManually(oldIndex, newFileIndex)  {
@@ -54221,25 +54226,33 @@ UIpopulatePDFtexts() {
       Return
 
    Gui, SettingsGUIA: Default
+   imgPath := getIDimage(currentFileIndex)
+   pwd := PDFpwdsCache[imgPath]
    If (thumbsDisplaying=1)
    {
-      imgPath := getIDimage(currentFileIndex)
       actu := -6
-      pwd := ""
+      errorType := -100
       DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", 0, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+      If (asked := promptUserPDFpassword(A_ThisFunc, imgPath, errorType, pwd))
+         DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", 0, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+
       If (errorType)
       {
          userActivePDFpage := 0
          ; msgBoxWrapper(appTitle ": ERROR", friendlyPDFerrorCodes(errorType, pwd) ". ", 0, 0, "error")
          ; Return
       } Else
+      {
          userActivePDFpage := clampInRange(userActivePDFpage, 0, actu)
+         If (asked=1)
+            PDFpwdsCache[imgPath] := pwd
+      }
    } Else userActivePDFpage := desiredFrameIndex
 
-   txt := GetTextsFromPDF(getIDimage(currentFileIndex), userActivePDFpage, 0, pwd)
+   txt := GetTextsFromPDF(imgPath, userActivePDFpage, 0, pwd)
    GuiControl, SettingsGUIA:, EditPDFtexts, % txt
 
-   linkz := GetTextsFromPDF(getIDimage(currentFileIndex), userActivePDFpage, 1, pwd)
+   linkz := GetTextsFromPDF(imgPath, userActivePDFpage, 1, pwd)
    Gui, SettingsGUIA: ListView, LViewPDFlink
    LV_Delete()
    Loop, Parse, linkz,`n`r
@@ -54258,14 +54271,22 @@ RetrievePDFbookmarks(imgPath, pwd, allowBonuses, ByRef pageCount, ByRef errorTyp
    errorType := -100
    pageCount := 0
    bufferSize := 0
-   imgPath := getIDimage(currentFileIndex)
+   If (pwd="")
+      pwd := PDFpwdsCache[imgPath]
+
    buffer := DllCall("qpvmain.dll\ExtractPDFBookmarks", "Str", imgPath, "Str", pwd, "int*", pageCount, "int*", errorType, "int*", bufferSize, "UPtr")
-   If (errorType=-1)
+   If (asked := promptUserPDFpassword(A_ThisFunc, imgPath, errorType, pwd))
+      buffer := DllCall("qpvmain.dll\ExtractPDFBookmarks", "Str", imgPath, "Str", pwd, "int*", pageCount, "int*", errorType, "int*", bufferSize, "UPtr")
+
+   If (errorType=-2)
       txt := "No bookmarks retrieved."
    Else If errorType
       txt := "An error occured retrieving the PDF embedded bookmarks: " errorType "."
    Else If (buffer && bufferSize>1)
    {
+      If (asked=1)
+         PDFpwdsCache[imgPath] := pwd
+
       txt := StrGet(buffer, bufferSize, "UTF-16")
       DllCall("GlobalFree", "uptr", buffer)
       buffer := ""
@@ -54325,8 +54346,12 @@ CoreExtractALLtextsPDF(imgPath, frameu, modus, pwd, ByRef err) {
 BTNextractALLtextsCurrentPDF() {
    imgPath := getIDimage(currentFileIndex)
    actu := -6
-   pwd := ""
+   errorType := -100
+   pwd := PDFpwdsCache[imgPath]
    DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", 0, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+   If (asked := promptUserPDFpassword(A_ThisFunc, imgPath, errorType, pwd))
+      DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", 0, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+
    If (errorType)
    {
       msgBoxWrapper(appTitle ": ERROR", friendlyPDFerrorCodes(errorType, pwd) ". ", 0, 0, "error")
@@ -54334,6 +54359,9 @@ BTNextractALLtextsCurrentPDF() {
    }
 
    pageCount := actu
+   If (asked=1)
+      PDFpwdsCache[imgPath] := pwd
+
    msgResult := msgBoxWrapper("Retrieve all texts from PDF: " appTitle, "Please choose what to extract from every`npage. There are " pageCount " pages in the PDF.`n`nNo optical character recognition (OCR) will`nbe performed. Therefore, the texts that`nappear in images will not be retrieved.`n`nYou will be prompted to save a text file,`nif you proceed.", "&Retrieve texts|C&ancel", 1, 0, 0, 0, "Texts`f`fLinks`fBoth: texts and links", 0, currentFileIndex, 2)
    If !InStr(msgResult.btn, "retrieve")
       Return
@@ -58962,11 +58990,18 @@ coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
 coreExtractBatchModeTextsFromGivenPDF(modus, thisFileIndex, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
    failedFrames := extractedFrames := abandonAll := yay := 0
    actu := -6
-   pwd := ""
    imgPath := getIDimage(thisFileIndex)
+   pwd := PDFpwdsCache[imgPath]
+   errorType := -100
    DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", 0, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+   If (asked := promptUserPDFpassword(A_ThisFunc, imgPath, errorType, pwd))
+      DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", 0, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+
    If (errorType)
       Return -4
+
+   If (asked=1)
+      PDFpwdsCache[imgPath] := pwd
 
    tFrames := actu
    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
@@ -59057,14 +59092,21 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
    } Else  If RegExMatch(imgPath, "i)(.\.pdf)$")
    {
       actu := -6
-      pwd := ""
+      pwd := PDFpwdsCache[imgPath]
       extractedFrames := 0
+      errorType := -100
       DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+      If (asked := promptUserPDFpassword(A_ThisFunc, imgPath, errorType, pwd))
+         DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+
       If (errorType)
       {
          ; msgBoxWrapper(appTitle ": ERROR", friendlyPDFerrorCodes(errorType, pwd) ". ", 0, 0, "error")
-         Return errorType
+         Return -4
       }
+
+      If (asked=1)
+         PDFpwdsCache[imgPath] := pwd
 
       tFrames := actu
       zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
@@ -61588,7 +61630,7 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
       TriggerMenuBarUpdate()
       dummyTimerDelayiedImageDisplay(150)
       If (thumbsDisplaying=1 && thumbsListViewMode=1)
-         SetTimer, mainGdipWinThumbsGrid, -100
+         SetTimer, QPV_ListViewGridHUDoverlay, -100
    }
 
    SetTimer, updateUIctrl, -100
@@ -67629,7 +67671,7 @@ ToggleInfoBoxu() {
     showInfoBoxHUD := clampInRange(showInfoBoxHUD, 0, 2, 1)
     INIaction(1, "showInfoBoxHUD", "General")
     If (thumbsDisplaying=1)
-       SetTimer, mainGdipWinThumbsGrid, -50
+       SetTimer, QPV_ListViewGridHUDoverlay, -50
     Else
        SetTimer, dummyRefreshImgSelectionWindow, -50
     ; dummyTimerDelayiedImageDisplay(50)
@@ -68489,7 +68531,7 @@ ToggleImgNavSizeBox() {
     HUDnavBoxSize := (HUDnavBoxSize=75) ? 125 : 75
     RegAction(1, "HUDnavBoxSize")
     If (thumbsDisplaying=1)
-       mainGdipWinThumbsGrid()
+       QPV_ListViewGridHUDoverlay()
     Else
        dummyTimerDelayiedImageDisplay(25)
     lastInvoked := A_TickCount
@@ -71145,7 +71187,7 @@ changeOSDfontSize(direction) {
      ForceRefreshNowThumbsList()
      dummyTimerDelayiedImageDisplay(25)
   } Else If (thumbsDisplaying=1)
-     SetTimer, mainGdipWinThumbsGrid, -25
+     SetTimer, QPV_ListViewGridHUDoverlay, -25
   Else If (CurrentSLD && maxFilesIndex>0)
      SetTimer, dummyRefreshImgSelectionWindow, -25
 
@@ -71380,6 +71422,7 @@ setViewPortGDIPimageEditingProperties() {
    currIMGdetails.Height := h
    currIMGdetails.Frames := 0
    currIMGdetails.ActiveFrame := 0
+   currIMGdetails.TooLargeGDI := 0
    desiredFrameIndex := totalFramesIndex := 0
 }
 
@@ -71449,7 +71492,10 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
      totalFramesIndex := 0
      thisImgQuality := (userimgQuality=1) ? 6 : 5
      tt := A_TickCount
-     oBitmap := LoadWICscreenImage(imgPath, 0, frameu, userPerformColorManagement)
+     oBitmap := LoadWICscreenImage(imgPath, 0, frameu, userPerformColorManagement, pwd)
+     If validBMP(oBitmap)
+        generateViewPortPDFbookmarks(imgPath, pwd)
+
      ; fnOutputDebug(A_ThisFunc ": load time with WIC: " A_TickCount - tt)
      tt := A_TickCount
      If (!validBMP(oBitmap) && wasInitFIMlib=1 && allowFIMloader=1 && oBitmap!="very-large")
@@ -71555,7 +71601,7 @@ LoadFileWithGDIp(imgPath, noBPPconv:=0, frameu:=0, useICM:=0, sizesDesired:=0, B
      mainLoadedIMGdetails.PixelFormat := pixFmt
      mainLoadedIMGdetails.RawFormat := Gdip_GetImageRawFormat(oBitmap)
      mainLoadedIMGdetails.OpenedWith := "[GDI+]"
-     mainLoadedIMGdetails.TooLargeGDI := 0
+     mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(imgW, imgH)
      If (RegExMatch(mainLoadedIMGdetails.RawFormat, "i)(gif|tiff)$") && mainLoadedIMGdetails.Frames>0 && frameu>0)
      {
         frameu := clampInRange(frameu, 0, mainLoadedIMGdetails.Frames)
@@ -79051,7 +79097,7 @@ selectAllFiles() {
 
     thid := (selMode=1) ? maxFilesIndex : 0
     updateFilesSelectionInfos(this)
-    SetTimer, mainGdipWinThumbsGrid, -10
+    SetTimer, QPV_ListViewGridHUDoverlay, -10
 }
 
 ToggleEditImgSelection(modus:=0) {
@@ -80276,7 +80322,7 @@ QPV_listThumbnailsGridMode(forceMode, thisGu, thisHDC, thisHwnd) {
     } Else prevTryThumbsUpdate := A_TickCount
 }
 
-mainGdipWinThumbsGrid(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:="", mapOffset:=0) {
+QPV_ListViewGridHUDoverlay(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:="", mapOffset:=0) {
     Critical, on
     Static pBrush1, pBrush2, pBrush3, pBrush4, pBrush5
          , brushesCreated, prevIndexu
@@ -81492,7 +81538,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
     If (alterFilesIndex>1 && mustEndLoop!=1 && lapsOccured>3 && modus!="all")
     {
        mustReloadThumbsList := 1
-       ; mainGdipWinThumbsGrid()
+       ; QPV_ListViewGridHUDoverlay()
        SetTimer, ForceRefreshNowThumbsList, -350
        ; Return
     } Else If (mustDoMultiCore=1 && mustEndLoop=1 && abandonAll!=1 && modus!="all")
@@ -83451,7 +83497,7 @@ autoSelectDupesInGroups(mode, givenRegEx:=0) {
    getSelectedFiles(0, 1)
    ForceRefreshNowThumbsList()
    If (thumbsDisplaying=1)
-      mainGdipWinThumbsGrid()
+      QPV_ListViewGridHUDoverlay()
    Else
       dummyTimerDelayiedImageDisplay(50)
 }
@@ -94810,7 +94856,12 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
      If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1 && nofall=0)
      {
         If (screenMode=1)
-           Return LoadWICscreenImage(imgPath, 0, frameu, userPerformColorManagement)
+        {
+           pBitmap := LoadWICscreenImage(imgPath, 0, frameu, userPerformColorManagement, pwd)
+           If validBMP(pBitmap)
+              generateViewPortPDFbookmarks(imgPath, pwd)
+           Return pBitmap
+        }
 
         oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, userPerformColorManagement, sizesDesired, gBitmap)
         newBitmap := gBitmap
@@ -95754,13 +95805,22 @@ friendlyPDFerrorCodes(errorType, pwd) {
     return r
 }
 
-GetTextsFromPDF(imgPath, frameu, linkz, pwd:=0, ByRef pageCount:=0, ByRef errorType:=0) {
+GetTextsFromPDF(imgPath, frameu, linkz, pwd:="", ByRef pageCount:=0, ByRef errorType:=0) {
    linkz *= 2
    errorType := -100
    varOut = -2 - linkz
+   If (pwd="")
+      pwd := PDFpwdsCache[imgPath]
+
    DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+   If (asked := promptUserPDFpassword(A_ThisFunc, imgPath, errorType, pwd))
+      DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+
    If (varOut>0 && errorType=0)
    {
+      If (asked=1)
+         PDFpwdsCache[imgPath] := pwd
+
       VarSetCapacity(textBuffer, (varOut+0) * 16, 0)
       varOut := -3 - linkz 
       DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int", 0, "int", 1, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", &textBuffer, "UPtr")
@@ -95782,26 +95842,51 @@ GetTextsFromPDF(imgPath, frameu, linkz, pwd:=0, ByRef pageCount:=0, ByRef errorT
    Return txt
 }
 
+promptUserPDFpassword(funcu, imgPath, errorType, ByRef pwd) {
+    If (errorType=4)
+    {
+       zPlitPath(imgPath, 0, OutFileName, OutDir, extname)
+       msgResult := msgBoxWrapper("PDF password: " appTitle, "The PDF being opened is password protected. Please type the password to open it.`n`n" OutFileName, "&Confirm|C&ancel", 1, "question", 0, 0, 0, "limit9050 password", "", 1)
+       If InStr(msgResult.btn, "confirm")
+       {
+          pwd := msgResult.edit
+          Return 1
+       }
+    }
+}
+
 RenderPDFpage(imgPath, noBPPconv, frameu, ByRef pwd:="", maxW:=0, maxH:=0, dpi:=450, ByRef pageCount:=0, ByRef errorType:=0, fillBgr:=1, bgrColor:="ffffff") {
     If (noBPPconv=1)
        pageCount := -6
 
     errorType := -100
     do24bits := (noBPPconv=2) ? 1 : 0
-    pBitmap := DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "WStr", Trimmer(imgPath), "Int", frameu, "float", dpi, "int*", maxW, "int*", maxH, "int", fillBgr, "int", "0xff" bgrColor, "int*", pageCount, "int*", errorType, "Str", pwd, "UPtr", 0, "int", do24bits, "UPtr")
+    If (pwd="")
+       pwd := PDFpwdsCache[imgPath]
+
+    pBitmap := DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", dpi, "int*", maxW, "int*", maxH, "int", fillBgr, "int", "0xff" bgrColor, "int*", pageCount, "int*", errorType, "Str", pwd, "UPtr", 0, "int", do24bits, "UPtr")
+    If (asked := promptUserPDFpassword(A_ThisFunc, imgPath, errorType, pwd))
+       pBitmap := DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", dpi, "int*", maxW, "int*", maxH, "int", fillBgr, "int", "0xff" bgrColor, "int*", pageCount, "int*", errorType, "Str", pwd, "UPtr", 0, "int", do24bits, "UPtr")
+
     If StrLen(pBitmap)>2
     {
+       If (asked=1)
+          PDFpwdsCache[imgPath] := pwd
+
        recordGdipBitmaps(pBitmap, A_ThisFunc)
        Gdip_BitmapSetResolution(pBitmap, dpi, dpi)
        Gdip_GetImageDimensions(pBitmap, w, h)
        pg := pageCount
-    } else if (noBPPconv=1 && errorType=0)
-    {
        w := maxW
        h := maxH
+    } Else If (noBPPconv=1 && errorType=0)
+    {
        pg := pageCount
        pBitmap := 1
+       w := maxW
+       h := maxH
     }
+
     if errorType
        fnOutputDebug(A_ThisFunc ": " friendlyPDFerrorCodes(errorType, pwd))
 
@@ -95814,7 +95899,7 @@ RenderPDFpage(imgPath, noBPPconv, frameu, ByRef pwd:="", maxW:=0, maxH:=0, dpi:=
     mainLoadedIMGdetails.ActiveFrame := clampInRange(frameu, 0, Round(pg))
     mainLoadedIMGdetails.DPI := dpi
     mainLoadedIMGdetails.RawFormat := "PDF"
-    mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(w, h)
+    mainLoadedIMGdetails.TooLargeGDI := 1 ; isImgSizeTooLarge(w, h)
     mainLoadedIMGdetails.HasAlpha := (do24bits=1) ? 0 : !fillBgr
     mainLoadedIMGdetails.OpenedWith := "PDF [PDFium]"
     mainLoadedIMGdetails.LoadedWith := "PDFium"
@@ -95912,14 +95997,14 @@ RenderSVGfile(imgPath, noBPPconv, screenMode) {
    ; w := h := 1500
    mainLoadedIMGdetails := []
    mainLoadedIMGdetails.PixelFormat := "32-PARGB"
-   mainLoadedIMGdetails.Width := w
-   mainLoadedIMGdetails.Height := h
+   mainLoadedIMGdetails.Width := ow
+   mainLoadedIMGdetails.Height := oh
    mainLoadedIMGdetails.ImgFile := imgPath
    mainLoadedIMGdetails.Frames := 0
    mainLoadedIMGdetails.ActiveFrame := 0
    mainLoadedIMGdetails.DPI := 96
    mainLoadedIMGdetails.RawFormat := !ver ? vb "SVG" : vb "SVG v" ver
-   mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(w, h)
+   mainLoadedIMGdetails.TooLargeGDI := (ow!=w || oh!=h || isImgSizeTooLarge(ow, oh)) ? 1 : 0
    mainLoadedIMGdetails.HasAlpha := 1
    mainLoadedIMGdetails.OpenedWith := "Windows Direct 2D [Direct 2D]"
    mainLoadedIMGdetails.LoadedWith := "D2D"
@@ -96004,8 +96089,15 @@ identifyPDFbookmarkIndex(p, friendly) {
           fprts .= SubStr(nn, 1, InStr(nn, ".") - 1)
        }
 
-       nfp := ""
+       cfp := ""
        Loop, Parse, fprts, "`n"
+       {
+            If (Trim(A_LoopField)!="")
+              cfp := A_LoopField "`n" cfp "`n"
+       }
+
+       nfp := ""
+       Loop, Parse, cfp, "`n"
        {
           If (zp := Trimmer(A_LoopField))
           {
@@ -96018,9 +96110,8 @@ identifyPDFbookmarkIndex(p, friendly) {
                 }
              }
           }
-
        }
-       nn := "`n" nn "`n" nfp
+       nn := "`n" Trim(nfp)  Trim(nn)
     }
     Return nn
 }
@@ -96070,7 +96161,7 @@ generateViewPortPDFbookmarks(imgPath, pwd) {
   }
 }
 
-LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
+LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM, ByRef pwd) {
    ; pBitmap := ""
    ; loop, 125
    ; {
@@ -96084,14 +96175,10 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
    ; }
    ; Return pBitmap
 
-   If RegExMatch(imgPath, "i)(.\.svg)$") {
+   If RegExMatch(imgPath, "i)(.\.svg)$")
       Return RenderSVGfile(imgPath, noBPPconv, 1)
-   } Else If RegExMatch(imgPath, "i)(.\.pdf)$") {
-      pBitmap := RenderPDFpage(imgPath, noBPPconv, frameu, sizesDesired, pwd)
-      If validBMP(pBitmap)
-         generateViewPortPDFbookmarks(imgPath, pwd)
-      Return pBitmap
-   }
+   Else If RegExMatch(imgPath, "i)(.\.pdf)$")
+      Return RenderPDFpage(imgPath, noBPPconv, frameu, sizesDesired, pwd)
 
    tt := startZeit := A_TickCount
    VarSetCapacity(resultsArray, 8 * 9, 0)
@@ -96114,7 +96201,7 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM) {
       mainLoadedIMGdetails.ActiveFrame := NumGet(resultsArray, 4 * 6, "uInt")
       mainLoadedIMGdetails.DPI := NumGet(resultsArray, 4 * 4, "uInt")
       mainLoadedIMGdetails.RawFormat := WICcontainerFmts(NumGet(resultsArray, 4 * 5, "uInt"), imgPath)
-      mainLoadedIMGdetails.TooLargeGDI := 0
+      mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(Widh, Height)
       mainLoadedIMGdetails.BPP := NumGet(resultsArray, 4 * 7, "uInt")
       mainLoadedIMGdetails.ConvertedBPP := r
       mainLoadedIMGdetails.Channels := NumGet(resultsArray, 4 * 8, "uInt")
@@ -96341,7 +96428,7 @@ LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitma
    resultsArray := ""
    ; zeitu := A_TickCount - startZeit
    ; msgbox, % r "==" zeitu " = " pixfmt "=" rawFmt
-   ; ToolTip, % WICmoduleHasInit " | " r "==" zeitu " = " mainLoadedIMGdetails.pixfmt "=" mainGdipWinThumbsGrid.RawFormat , , , 3
+   ; ToolTip, % WICmoduleHasInit " | " r "==" zeitu " = " mainLoadedIMGdetails.pixfmt "=" QPV_ListViewGridHUDoverlay.RawFormat , , , 3
    ; https://stackoverflow.com/questions/8101203/wicbitmapsource-copypixels-to-gdi-bitmap-scan0
    ; https://github.com/Microsoft/Windows-classic-samples/blob/master/Samples/Win7Samples/multimedia/wic/wicviewergdi/WicViewerGdi.cpp#L354
    Return r
@@ -101025,55 +101112,12 @@ testIdentifyDIBbehindGDIPbmp() {
    SoundBeep, % E1 ? 900 : 300, 500
 }
 
-testPDFloader(){
-   Static i := 0, p := 0
-   initQPVmainDLL()
-   ; pathu := "E:\Sucan twins\photos test\SLDs\freeimage-tests\pdfs\samplecertifiedpdf.pdf"
-   pathu := "E:\Sucan twins\e-chairs\living with eb articles\v9\about-life-perspective-disabled-person-RDEB.pdf"
-   ; pathu := "E:\Sucan twins\photos test\SLDs\freeimage-tests\pdfs\living-rdeb.pdf"
-pwd := "hello-world"
-errorType := 0
-fillBgr := 0
-bgrColor := "0xFF353535"
-dpi := 300
-ov := -2
-varOut = -4
-pBitmap := DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", pathu, "Int", i, "float", dpi, "int", fillBgr, "int", bgrColor, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
-
-if (ov=-2 && varOut>0 && errorType=0)
-{
-   VarSetCapacity(textBuffer, (varOut+0) * 4, 0)
-   varOut := -5
-   DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", pathu, "Int", i, "float", dpi, "int", fillBgr, "int", bgrColor, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", &textBuffer, "UPtr")
-   if (varOut>1)
-   {
-      txt := StrGet(&textBuffer, "UTF-16")
-      txt := StrReplace(txt, "|", "`n")
-   }
-}
-   i++
-p := !p
-   Gdip_GetImageDimensions(pBitmap, w, h)
-   ToolTip, % varOut "|" errorType "|" i "|" pBitmap "|" w "|" h "`n `n" txt, , , 2
-   Gdi_DeleteObject(hBitmap)
-   Gdip_GraphicsClear(2NDglPG)
-   Gdip_DrawImage(2NDglPG, pBitmap,  50, 50, w//4, h//4)
-   doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
-   Gdip_DisposeImage(pBitmap)
-}
-
 testWicLoader() {
    Static indexu := 0, pBitmap
    indexu++
-   ; Load and resize image
    initQPVmainDLL()
-   ; pathu := "E:\Sucan twins\e-chairs\living with eb articles\v9\about-life-perspective-disabled-person-RDEB.pdf"
-   ; pathu := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\cPlusPlus\FreeImage3180.pdf"
-   ; pathu := "E:\Sucan twins\photos test\SLDs\freeimage-tests\svgs\alarm-clock-svgrepo-com.svg"
-   ; pathu := "E:\Sucan twins\photos test\SLDs\freeimage-tests\svgs\writing-board-svgrepo-com.svg"
-   ; pathu := "E:\Sucan twins\photos test\SLDs\freeimage-tests\svgs\gene-sequencing-svgrepo-com.svg"
    ; pBitmap := LoadAndResizeImageWIC("E:\Sucan twins\photos test\SLDs\freeimage-tests\test-rosar- (9a).webp", 800, 600)
-pBitmap := Gdip_CreateBitmap(10900, 49000) 
+   pBitmap := Gdip_CreateBitmap(10900, 49000) 
    Gdip_GetImageDimensions(pBitmap, w, h)
    ToolTip, % pBitmap "|" w "|" h, , , 2
    Gdip_GraphicsClear(2NDglPG)

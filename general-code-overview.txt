@@ -9,9 +9,10 @@
    h) Input responses
    i) Image live editing
    j) How to enable alpha masking for an image editing live tool
-   k) How vector shapes drawing works
-   l) How image duplicates identification works (soon)
-   m) How to add a new panel/tool (soon)
+   k) Vector shapes drawing mode
+   l) List view and thumbnails list (soon)
+   m) Image duplicates identification (soon)
+   n) How to add a new panel/tool (soon)
 
 
 Deniere mise à jour: dimanche 24 mars 2024
@@ -529,8 +530,8 @@ g) Windows, AHK GUIs, Menus, Toolbar
                               various UI markers [frames counter, scrollbars]
 
    3. hGDIselectWin - 2NDglPG - layered window
-      mainGdipWinThumbsGrid() - thumbnails grid overlay, scrollbar and status bar
-      additionalHUDelements() - wrapper for the following functions
+      QPV_ListViewGridHUDoverlay() - thumbnails grid overlay, scrollbar and status bar
+      additionalHUDelements()      - wrapper for the following functions
          drawImgSelectionOnWindow() - selection area [image view only]
          drawinfoBox()              - infos box
          VPnavBoxWrapper()          - image navigation/preview box
@@ -903,7 +904,7 @@ j) How to enable alpha masking for an image editing live tool
    the selection area dimensions.
 
 
-k) How vector shapes drawing works
+k) Vector shapes drawing mode
 =====================================================================
 
    When users start drawing a vector shape, startDrawingShape() is 
@@ -960,7 +961,18 @@ k) How vector shapes drawing works
    to disk a vector shape via saveCurrentVectorShape().
 
 
-l) How image duplicates identification works (soon)
+l) List view and thumbnails list (soon)
+=====================================================================
+
+   QPV_ListViewGridHUDoverlay()
+   QPV_listThumbnailsGridMode()
+   QPV_ShowThumbnails()
+
+   module-fim-thumbs.ahk 
+     MonoGenerateThumb()
+
+
+m) Image duplicates identification (soon)
 =====================================================================
 
    PanelFindDupes()
@@ -975,8 +987,14 @@ l) How image duplicates identification works (soon)
    sortDupeGroups()
    PanelAutoSelectDupes()
    autoSelectDupesInGroups()
+   testIsDupesList()
+
+   resultedFilesList[A_Index, 23] is dupeID.
+   If testIsDupesList() returns true, QPV_ListViewGridHUDoverlay() will display
+   specific information about the focused duplicate item.
 
 
-m) How to add a new panel/tool (soon)
+
+n) How to add a new panel/tool (soon)
 =====================================================================
 
