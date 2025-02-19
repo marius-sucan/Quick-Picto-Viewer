@@ -213,10 +213,10 @@ c) Files index filtering
    PanelEnableFilesFilter(). It can be a RegEx or a string
    that allows "|" to act as the OR operator.
 
-   coreEnableFiltru() processes the string given by the user in 
+   coreSetFilesFilteru() processes the string given by the user in 
    "usrFilesFilteru". The internal filter is held in "filesFilter".
 
-   FilterFilesIndex() is the core function that generates the
+   FilterFilesListuIndex() is the core function that generates the
    filtered new list. A backup of the main list is created:
      bckpResultedFilesList := resultedFilesList.Clone()
      bkcpMaxFilesIndex := maxFilesIndex
@@ -232,7 +232,7 @@ c) Files index filtering
    When the new resultedFilesList[] array is created, all entry 
    properties are maintained.
 
-   FilterFilesIndex() can take Regular Expressions or «queries».
+   FilterFilesListuIndex() can take Regular Expressions or «queries».
    Strings that begin with: «SQL:query:» will be parsed and used
    to perform a SELECT in the currently loaded SQL database. For
    example: SQL:query:WHERE fmodified LIKE '20200607%' .
@@ -250,7 +250,7 @@ c) Files index filtering
    queries or index sort operations. If an SQL database is opened, 
    the data will be stored in the database as well.
    
-   The function FilterFilesIndex() ends by invoking
+   The function FilterFilesListuIndex() ends by invoking
    GenerateRandyList().
 
 
