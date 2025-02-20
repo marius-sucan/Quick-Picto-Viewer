@@ -189,9 +189,11 @@ RenderPDFpage(imgPath, noBPPconv, frameu, pwd:="", maxW:=0, maxH:=0, dpi:=450, B
        pageCount := -6
 
     errorType := -100
-    pBitmap := DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "WStr", Trimmer(imgPath), "Int", frameu, "float", dpi, "int*", maxW, "int*", maxH, "int", fillBgr, "int", "0xff" bgrColor, "int*", pageCount, "int*", errorType, "Str", pwd, "UPtr", 0, "int", 1, "UPtr")
+    pBitmap := DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", dpi, "int*", maxW, "int*", maxH, "int", fillBgr, "int", "0xff" bgrColor, "int*", pageCount, "int*", errorType, "Str", pwd, "UPtr", 0, "int", 1, "UPtr")
     If StrLen(pBitmap)>2
        Return pBitmap
+    Else
+       Return 20
 }
 
 LoadWICimage(imgPath, w, h, keepAratio, thisImgQuality, frameu, ScaleAnySize) {
@@ -203,6 +205,7 @@ LoadWICimage(imgPath, w, h, keepAratio, thisImgQuality, frameu, ScaleAnySize) {
    VarSetCapacity(resultsArray, 8 * 9, 0)
    fimu := (wasInitFIMlib=1 && allowFIMloader=1) ? 1 : 0
    func2exec := (A_PtrSize=8) ? "LoadWICimage" : "_LoadWICimage@48"
+   userPerformColorManagement := 0 ; it causes crashes
    r := DllCall("qpvmain.dll\" func2exec, "Int", thisThreadID, "Int", 0, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", 0, "int", userPerformColorManagement, "Str", imgPath, "UPtr*", &resultsArray, "int", fimu, "UPtr")
    resultsArray := ""
    Return r
@@ -302,24 +305,25 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
 
    If (StrLen(finalBitmap)<3 && wasInitFIMlib=1 && allowFIMloader=1)
    {
-      r := imgPath
-      GFT := FreeImage_GetFileType(r)
       loadArgs := 0
-      If (GFT=34 && loadArgs=0 && RegExMatch(r, "i)(.\.(dng))$"))
+      GFT := FreeImage_GetFileType(imgPath)
+      If (GFT=34 && loadArgs=0 && RegExMatch(imgPath, "i)(.\.(dng))$"))
          loadArgs := (userHQraw=1) ? 0 : 2
       Else If (GFT=34 && loadArgs=0)
          loadArgs := (userHQraw=1) ? 0 : 1
       Else If (GFT=2 && loadArgs=0)
          loadArgs := 8
 
-      hFIFimgA := FreeImage_Load(r, -1, loadArgs)
+      If (finalBitmap!=20)
+         hFIFimgA := FreeImage_Load(imgPath, -1, loadArgs)
+
       If !hFIFimgA
       {
          operationDone := 1
          waitDataCollect := 1
          operationFailed := 1
          resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
-         fnOutputDebug("failed to load bitmap file: " r)
+         fnOutputDebug(finalBitmap " failed to load bitmap file: " imgPath)
          Return -1
       }
 
@@ -469,63 +473,6 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
    } ; // fim loader
 
    listBitmaps .=  finalBitmap "|"
-   ; Sleep, 0
-   waitDataCollect := 1
-   operationDone := 1
-   operationFailed := 0
-   resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
-
-   ; RegWrite, REG_SZ, %QPVregEntry%, thumbThreadDone%coreIndex%, 1
-   ; MainExe.ahkassign("thumbCoreRun" coreIndex, operationDone)
-   ; cleanupThread()
-}
-
-gdipMonoGenerateThumb(imgPath, file2save, enableThumbsCaching, thumbsSizeQuality, resizeFilter, coreIndex, thisfileIndex, thisBindex) {
-   Critical, on
-   operationDone := 0
-   hFIFimgA := 0
-   finalBitmap := 0
-   waitDataCollect := 0
-   operationFailed := 0
-   startZeit := A_TickCount
-   resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
-   ; RegWrite, REG_SZ, %QPVregEntry%, thumbThreadDone%coreIndex%, 0
-   r := imgPath
-   hFIFimgA := Gdip_CreateBitmapFromFileSimplified(r)
-   If !hFIFimgA
-   {
-      operationDone := 1
-      waitDataCollect := 1
-      operationFailed := 1
-      resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
-      Return -1
-   }
- 
-   resizeFilter := (ResizeQualityHigh=1) ? 7 : 5
-   hFIFimgB := Gdip_ResizeBitmap(hFIFimgA, thumbsSizeQuality, thumbsSizeQuality, 1, resizeFilter)
-   If hFIFimgB
-   {
-      Gdip_DisposeImage(hFIFimgA)
-      hFIFimgA := hFIFimgB
-   } Else
-   {
-      Gdip_DisposeImage(hFIFimgA)
-      operationDone := 1
-      operationFailed := 1
-      waitDataCollect := 1
-      resultsList := operationDone "|" finalBitmap "|" thisfileIndex "|" coreIndex "|" thisBindex
-      Return -1
-   }
-
-   If hFIFimgA
-   {
-      thisZeit := A_TickCount - startZeit
-      If (enableThumbsCaching=1 && thisZeit>225)
-         savedFile := Gdip_SaveBitmapToFile(hFIFimgA, file2save)
-
-      finalBitmap := hFIFimgA
-   }
-
    ; Sleep, 0
    waitDataCollect := 1
    operationDone := 1
@@ -866,7 +813,6 @@ FreeImage_GetImageType(hImage, humanReadable:=0) {
    Return r
 }
 
-
 getFIMfunc(funct) {
 ; for some crazy reason, in the 32 bits DLL of FreeImage
 ; each function name ends with a number preceded by @
@@ -959,32 +905,6 @@ Gdip_DrawImageFast(pGraphics, pBitmap, X:=0, Y:=0) {
             , "float", Y)
 }
 
-Gdip_GetImagePixelFormat(pBitmap, mode:=0) {
-   Static PixelFormatsList := {0x30101:"1-INDEXED", 0x30402:"4-INDEXED", 0x30803:"8-INDEXED", 0x101004:"16-GRAYSCALE", 0x021005:"16-RGB555", 0x21006:"16-RGB565", 0x61007:"16-ARGB1555", 0x21808:"24-RGB", 0x22009:"32-RGB", 0x26200A:"32-ARGB", 0xE200B:"32-PARGB", 0x10300C:"48-RGB", 0x34400D:"64-ARGB", 0x1A400E:"64-PARGB", 0x200f:"32-CMYK"}
-   PixelFormat := 0
-   gdipLastError := DllCall("gdiplus\GdipGetImagePixelFormat", "UPtr", pBitmap, "UPtr*", PixelFormat)
-   If gdipLastError
-      Return -1
-
-   If (mode=0)
-      Return PixelFormat
-
-   inHEX := Format("{1:#x}", PixelFormat)
-   If (PixelFormatsList.Haskey(inHEX) && mode=2)
-      result := PixelFormatsList[inHEX]
-   Else
-      result := inHEX
-   return result
-}
-
-Gdip_GraphicsFromImage(pBitmap) {
-   pGraphics := 0
-   gdipLastError := DllCall("gdiplus\GdipGetImageGraphicsContext", "UPtr", pBitmap, "UPtr*", pGraphics)
-   If (gdipLastError=1 && A_LastError=8) ; out of memory
-      gdipLastError := 3
-   return pGraphics
-}
-
 Gdip_CloneBitmapArea(pBitmap, x, y, w, h, PixelFormat:="0x26200A") {
    If (pBitmap="")
       Return
@@ -1010,12 +930,6 @@ Gdip_DisposeImage(pBitmap, noErr:=1) {
    If (r=2 || r=1) && (noErr=1)
       r := 0
    Return r
-}
-
-
-Gdip_DeleteGraphics(pGraphics) {
-   If (pGraphics!="")
-      return DllCall("gdiplus\GdipDeleteGraphics", "UPtr", pGraphics)
 }
 
 Gdip_GetEncoderParameterList(pBitmap, pCodec, ByRef EncoderParameters) {
@@ -1106,13 +1020,11 @@ Gdip_SaveBitmapToFile(pBitmap, sOutput, Quality:=75) {
    Return _E ? -5 : 0
 }
 
-
-Gdip_GetImageDimension(pBitmap, ByRef w, ByRef h) {
-   w := 0, h := 0
-   If !pBitmap
-      Return 2
-
-   return DllCall("gdiplus\GdipGetImageDimension", "UPtr", pBitmap, "float*", w, "float*", h)
+Gdip_CreateBitmapFromFileSimplified(sFile, useICM:=0) {
+   pBitmap := 0
+   function2call := (useICM=1) ? "ICM" : ""
+   gdipLastError := DllCall("gdiplus\GdipCreateBitmapFromFile" function2call, "WStr", sFile, "UPtr*", pBitmap)
+   return pBitmap
 }
 
 calcIMGdimensions(imgW, imgH, givenW, givenH, ByRef ResizedW, ByRef ResizedH) {
@@ -1148,175 +1060,3 @@ calcIMGdimensions(imgW, imgH, givenW, givenH, ByRef ResizedW, ByRef ResizedH) {
    }
 }
 
-Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", KeepPixelFormat:=0, checkTooLarge:=0, bgrColor:=0) {
-; KeepPixelFormat can receive a specific PixelFormat.
-; The function returns a pointer to a new pBitmap.
-; Default is 0 = 32-ARGB.
-; For maximum speed, use 0xE200B - 32-PARGB pixel format.
-; Set bgrColor to have a background colour painted.
-
-    If (!pBitmap || !givenW || !givenH)
-       Return
-
-    Gdip_GetImageDimension(pBitmap, Width, Height)
-    If (KeepRatio=1)
-    {
-       calcIMGdimensions(Width, Height, givenW, givenH, ResizedW, ResizedH)
-    } Else
-    {
-       ResizedW := givenW
-       ResizedH := givenH
-    }
-
-    If (((ResizedW*ResizedH>536848912) || (ResizedW>32100) || (ResizedH>32100)) && checkTooLarge=1)
-       Return
-
-    PixelFormatReadable := Gdip_GetImagePixelFormat(pBitmap, 2)
-    Static PixelFormat := "0xE200B"
-
-    If InStr(PixelFormatReadable, "indexed")
-    {
-       hbm := CreateDIBSection(ResizedW, ResizedH,,24)
-       If !hbm
-          Return
-
-       hDC := CreateCompatibleDC()
-       If !hDC
-       {
-          DeleteDC(hdc)
-          Return
-       }
-
-       obm := SelectObject(hDC, hbm)
-       G := Gdip_GraphicsFromHDC(hDC)
-       Gdip_SetPixelOffsetMode(G, 2)
-       If G
-          r := Gdip_DrawImageRect(G, pBitmap, 0, 0, ResizedW, ResizedH)
-
-       newBitmap := !r ? Gdip_CreateBitmapFromHBITMAP(hbm) : ""
-       SelectObject(hdc, obm)
-       DeleteObject(hbm)
-       DeleteDC(hdc)
-       Gdip_DeleteGraphics(G)
-    } Else
-    {
-       newBitmap := Gdip_CreateBitmap(ResizedW, ResizedH, PixelFormat)
-       If StrLen(newBitmap)>2
-       {
-          G := Gdip_GraphicsFromImage(newBitmap)
-          Gdip_SetPixelOffsetMode(G, 2)
-          If G
-             r := Gdip_DrawImageRect(G, pBitmap, 0, 0, ResizedW, ResizedH)
-
-          Gdip_DeleteGraphics(G)
-          If (r || !G)
-          {
-             Gdip_DisposeImage(newBitmap, 1)
-             newBitmap := ""
-          }
-       }
-    }
-
-    Return newBitmap
-}
-
-Gdip_CreateBitmapFromHBITMAP(hBitmap, hPalette:=0) {
-   pBitmap := 0
-   If !hBitmap
-   {
-      gdipLastError := 2
-      Return
-   }
-
-   gdipLastError := DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", "UPtr", hBitmap, "UPtr", hPalette, "UPtr*", pBitmap)
-   return pBitmap
-}
-
-Gdip_SetPixelOffsetMode(pGraphics, PixelOffsetMode) {
-   If !pGraphics
-      Return 2
-
-   Return DllCall("gdiplus\GdipSetPixelOffsetMode", "UPtr", pGraphics, "int", PixelOffsetMode)
-}
-
-Gdip_GraphicsFromHDC(hDC, hDevice:="", InterpolationMode:="", SmoothingMode:="", PageUnit:="", CompositingQuality:="") {
-   pGraphics := 0
-   If hDevice
-      gdipLastError := DllCall("Gdiplus\GdipCreateFromHDC2", "UPtr", hDC, "UPtr", hDevice, "UPtr*", pGraphics)
-   Else
-      gdipLastError := DllCall("gdiplus\GdipCreateFromHDC", "UPtr", hdc, "UPtr*", pGraphics)
-
-   If (gdipLastError=1 && A_LastError=8) ; out of memory
-      gdipLastError := 3
-
-   return pGraphics
-}
-
-Gdip_CreateBitmapFromFileSimplified(sFile, useICM:=0) {
-   pBitmap := 0
-   function2call := (useICM=1) ? "ICM" : ""
-   gdipLastError := DllCall("gdiplus\GdipCreateBitmapFromFile" function2call, "WStr", sFile, "UPtr*", pBitmap)
-   return pBitmap
-}
-
-Gdip_DrawImageRect(pGraphics, pBitmap, X, Y, W, H) {
-; X, Y - the coordinates of the destination upper-left corner
-; where the pBitmap will be drawn.
-; W, H - the width and height of the destination rectangle, where the pBitmap will be drawn.
-
-   return DllCall("gdiplus\GdipDrawImageRect"
-            , "UPtr", pGraphics
-            , "UPtr", pBitmap
-            , "float", X, "float", Y
-            , "float", W, "float", H)
-}
-
-SelectObject(hdc, hgdiobj) {
-   return DllCall("SelectObject", "UPtr", hdc, "UPtr", hgdiobj)
-}
-
-DeleteObject(hObject) {
-   return DllCall("DeleteObject", "UPtr", hObject)
-}
-
-CreateDIBSection(w, h, hdc:="", bpp:=32, ByRef ppvBits:=0, Usage:=0, hSection:=0, Offset:=0) {
-; A GDI function that creates a new hBitmap,
-; a device-independent bitmap [DIB].
-; A DIB consists of two distinct parts:
-; a BITMAPINFO structure describing the dimensions
-; and colors of the bitmap, and an array of bytes
-; defining the pixels of the bitmap. 
-
-   hdc2 := hdc ? hdc : GetDC()
-   VarSetCapacity(bi, 40, 0)
-   NumPut(40, bi, 0, "uint")
-   NumPut(w, bi, 4, "uint")
-   NumPut(h, bi, 8, "uint")
-   NumPut(1, bi, 12, "ushort")
-   NumPut(bpp, bi, 14, "ushort")
-   NumPut(0, bi, 16, "uInt")
-
-   hbm := DllCall("CreateDIBSection"
-               , "UPtr", hdc2
-               , "UPtr", &bi    ; BITMAPINFO
-               , "UInt", Usage
-               , "UPtr*", ppvBits
-               , "UPtr", hSection
-               , "UInt", OffSet, "UPtr")
-
-   if !hdc
-      ReleaseDC(hdc2)
-   return hbm
-}
-
-ReleaseDC(hdc, hwnd:=0) {
-   return DllCall("ReleaseDC", "UPtr", hwnd, "UPtr", hdc)
-}
-
-DeleteDC(hdc) {
-   return DllCall("DeleteDC", "UPtr", hdc)
-}
-
-CreateCompatibleDC(hdc:=0) {
-   return DllCall("CreateCompatibleDC", "UPtr", hdc)
-}
