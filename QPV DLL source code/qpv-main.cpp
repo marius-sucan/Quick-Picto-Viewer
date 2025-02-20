@@ -6331,7 +6331,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
         return myBitmap;
     }
 
-    float scale = dpi / 72.0f;  // PDF uses 72 DPI as base
+    float scale = (dpi<2) ? 1.0f : dpi / 72.0f;  // PDF uses 72 DPI as base
     double pageWidth = FPDF_GetPageWidth(PDFpage);
     double pageHeight = FPDF_GetPageHeight(PDFpage);
     int bitmapWidth = (float)pageWidth * scale;
@@ -6401,7 +6401,6 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
            FPDFPage_CloseAnnot(annot);
        }
 
-
        FPDF_TEXTPAGE textPage = FPDFText_LoadPage(PDFpage);
        if (textPage)
        {
@@ -6456,8 +6455,8 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
 
     float maxMPX = (do24bits==1) ? 715.25f : 536.45f;
     auto nSize = adaptImageGivenSize(1, 0, bitmapWidth, bitmapHeight, *givenW, *givenH, maxMPX);
-    bitmapWidth = nSize[0];
-    bitmapHeight = nSize[1];
+    bitmapWidth = (dpi==0) ? *givenW : nSize[0];
+    bitmapHeight = (dpi==0) ? *givenH : nSize[1];
     *givenW = (int)pageWidth;
     *givenH = (int)pageHeight;
     int cbStride = (do24bits==1) ? bitmapWidth * 3 : bitmapWidth * 4;

@@ -2855,9 +2855,18 @@ setImageWallpaper(monitorIndex, imgPath, setPos) {
 
    If !RegExMatch(imgPath, "i)(.\.(bmp|jpg|jpeg|png|tif))$")
    {
-      showTOOLtip("Converting image file format for desktop wallpaper into JPEG")
+      showTOOLtip("Converting image to JPEG to be used as a desktop wallpaper")
       file2save := mainCompiledPath "\wallpaper-" OutNameNoExt ".jpg"
-      r := coreConvertImgFormat(imgPath, file2save)
+      If !FileRexists(file2save)
+      {
+         frameLoad := InStr(filesFilter, "QPV:PAGES:") ? currentFileIndex - 1 : 0
+         zBitmap := LoadBitmapFromFileu(imgPath, 0, 0, frameLoad)
+         If validBMP(zBitmap)
+            r := QPV_SaveImageFile(A_ThisFunc, zBitmap, file2save, 90, 2)
+         trGdip_DisposeImage(zBitmap)
+         ; r := coreConvertImgFormat(imgPath, file2save)
+      } Else imgPath := file2save
+
       ResetImgLoadStatus()
       If !r
       {
@@ -4487,8 +4496,8 @@ fnOutputDebug(msg) {
    {
       If (prevMsg!=msg && slideShowRunning!=1 && slideShowDelay>300)
       {
-         If (InStr(msg, "ThumbsMode") && thumbsDisplaying=1)
-            Return
+         ; If (InStr(msg, "ThumbsMode") && thumbsDisplaying=1)
+         ;    Return
 
          prevMsg := msg
          msg := StrReplace(msg, "User journal: wintitle:", "WinTitle:")
@@ -10783,7 +10792,6 @@ ToggleImgFX(dir:=0) {
    showTOOLtip("Image colors: " friendly, A_ThisFunc, 2, (imgFxMode - 0.999 + bonus)/9)
    SetTimer, RemoveTooltip, % -msgDisplayTime
    ForceRefreshNowThumbsList()
-
    INIaction(1, "imgFxMode", "General")
    If (o_bwDithering=0)
       o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
@@ -32457,7 +32465,7 @@ FilterFilesListuIndex(thereWasFilter:=0, prevFilter:="", ostringu:="") {
    {
       imgPath := getIDimage(currentFileIndex)
       frames := resultedFilesList[currentFileIndex, 9]
-      Loop, % frames + 1
+      Loop, % frames
       {
             newFilesIndex++
             newFilesList[newFilesIndex] := resultedFilesList[currentFileIndex]
@@ -34038,6 +34046,9 @@ cleanDeadFilesList(dummy:=0) {
 
    If (maxFilesIndex>1)
    {
+      If warnFramesActionPrevented("CLEAR DUPLICATES")
+         Return
+
       backCurrentSLD := CurrentSLD
       CurrentSLD := ""
       startOperation := A_TickCount
@@ -34227,6 +34238,9 @@ removeFilesListSeenImages(modus:=0) {
    WnoFilesCheck := (noFilesCheck=2) ? 2 : 0
    If (maxFilesIndex>1)
    {
+      If warnFramesActionPrevented("REMOVE INDEX ENTRIES")
+         Return
+
       If askAboutFileSave(" and " friendlyLabel " images will be removed from the files list")
          Return
 
@@ -42655,9 +42669,9 @@ generateThumbsSheet() {
    prevMSGdisplay := A_TickCount
    startOperation := A_TickCount
    doStartLongOpDance()
-   sizesDesired := []
    backCurrentSLD := CurrentSLD
    CurrentSLD := ""
+   sizesDesired := []
    sizesDesired[1] := [userThumbsSheetWidth, userThumbsSheetHeight, 1, 0, 6]
    getSelectedFiles(0, 1)
    showTOOLtip("Generating the thumbnails sheet:`n" groupDigits(markedSelectFile) " images selected.")
@@ -63319,7 +63333,7 @@ InvokeMenuBarImage(manuID) {
         Menu, pvMenuBarImage, Add
         imgPath := getIDimage(currentFileIndex)
         If RegExMatch(imgPath, "i)(.\.(pdf|tif|tiff))$")
-           kMenu("pvMenuBarImage", "Add", "Preview all frames/pa&ges", "MenuFilterListToMultiFrames", "animated gifs webp tiffs pdfs")
+           kMenu("pvMenuBarImage", "Add", "Preview all frames/pa&ges", "MenuPreviewFramesFilterList", "animated gifs webp tiffs pdfs")
         If (RegExMatch(imgPath, "i)(.\.(pdf|gif|tif|tiff|webp))$") || markedSelectFile)
            kMenu("pvMenuBarImage", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
 
@@ -63362,7 +63376,7 @@ InvokeMenuBarImage(manuID) {
      kMenu("pvMenuBarImage", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
      kMenu("pvMenuBarImage", "Add", "Set as &wallpaper", "PanelSetWallpaper", "desktop image")
      If RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|tif|tiff))$")
-        kMenu("pvMenuBarImage", "Add", "Preview all frames/pa&ges", "MenuFilterListToMultiFrames", "animated gifs webp tiffs pdfs")
+        kMenu("pvMenuBarImage", "Add", "Preview all frames/pa&ges", "MenuPreviewFramesFilterList", "animated gifs webp tiffs pdfs")
      If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|gif|tif|tiff|webp))$") || markedSelectFile)
         kMenu("pvMenuBarImage", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
 
@@ -64175,43 +64189,28 @@ defineTransBgrColor() {
 }
 
 MenuAlphaBgrCheckers() {
-   UserVPalphaBgrStyle := 1
-   showTOOLtip("Image transparency background:`n" defineTransBgrColor())
-   INIaction(1, "UserVPalphaBgrStyle", "General")
-   refreshWinBGRbrush()
-   dummyTimerDelayiedImageDisplay(50)
-   SetTimer, RemoveTooltip, % -msgDisplayTime
+   coreToggleAlphaBGRcolor(1)
 }
 
 MenuAlphaBgrWinClr() {
-   UserVPalphaBgrStyle := 5
-   showTOOLtip("Image transparency background:`n" defineTransBgrColor())
-   INIaction(1, "UserVPalphaBgrStyle", "General")
-   refreshWinBGRbrush()
-   dummyTimerDelayiedImageDisplay(50)
-   SetTimer, RemoveTooltip, % -msgDisplayTime
+   coreToggleAlphaBGRcolor(5)
 }
 
 MenuAlphaBgrWHITE() {
-   UserVPalphaBgrStyle := 3
-   showTOOLtip("Image transparency background:`n" defineTransBgrColor())
-   INIaction(1, "UserVPalphaBgrStyle", "General")
-   refreshWinBGRbrush()
-   dummyTimerDelayiedImageDisplay(50)
-   SetTimer, RemoveTooltip, % -msgDisplayTime
+   coreToggleAlphaBGRcolor(3)
 }
 
 MenuAlphaBgrGRAY() {
-   UserVPalphaBgrStyle := 2
-   showTOOLtip("Image transparency background:`n" defineTransBgrColor())
-   INIaction(1, "UserVPalphaBgrStyle", "General")
-   refreshWinBGRbrush()
-   dummyTimerDelayiedImageDisplay(50)
-   SetTimer, RemoveTooltip, % -msgDisplayTime
+   coreToggleAlphaBGRcolor(2)
 }
 
 MenuAlphaBgrBLACK() {
-   UserVPalphaBgrStyle := 4
+   coreToggleAlphaBGRcolor(4)
+}
+
+coreToggleAlphaBGRcolor(m) {
+   UserVPalphaBgrStyle := m
+   ForceRefreshNowThumbsList()
    showTOOLtip("Image transparency background:`n" defineTransBgrColor())
    INIaction(1, "UserVPalphaBgrStyle", "General")
    refreshWinBGRbrush()
@@ -64632,7 +64631,7 @@ createMenuMainView() {
          kMenu("PVview", "Add", "Colors F&X and display modes", ":PVimgColorsFX")
       }
 
-      If (currIMGdetails.HasAlpha=1)
+      If (currIMGdetails.HasAlpha=1 || thumbsDisplaying=1)
       {
          createMenuWinAlphaBGRstyles()
          kMenu("PVview", "Add", "Image transparency background", ":PVimgAlphaBGR")
@@ -64653,7 +64652,6 @@ createMenuMainView() {
       kMenu("PVview", "Check", "Mirror &horizontally`tH")
 
    Menu, PVview, Add
-
    kMenu("PVview", "Add/Uncheck", "&Apply color management", "ToggleColorProfileManage", "profiles icc icm performance")
    If (userPerformColorManagement=1)
       kMenu("PVview", "Check", "&Apply color management")
@@ -64661,7 +64659,6 @@ createMenuMainView() {
    kMenu("PVview", "Add/Uncheck", "&High quality image resampling", "ToggleImgQuality")
    If (userimgQuality=1)
       kMenu("PVview", "Check", "&High quality image resampling")
-
 
    Menu, PVview, Add
    If (thumbsDisplaying!=1)
@@ -64868,7 +64865,7 @@ createMenuCurrentFilesActs(dummy:=0) {
    If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|gif|tif|tiff|webp))$") || markedSelectFile)
       kMenu("PVfilesActs", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
    If RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|tif|tiff))$")
-      kMenu("PVfilesActs", "Add", "Preview all frames/pa&ges", "MenuFilterListToMultiFrames", "animated gifs webp tiffs pdfs")
+      kMenu("PVfilesActs", "Add", "Preview all frames/pa&ges", "MenuPreviewFramesFilterList", "animated gifs webp tiffs pdfs")
 
    If markedSelectFile
    {
@@ -67093,16 +67090,16 @@ createMenuFilesIndexOptions() {
       Menu, PVfList, Add,
       ; If RegExMatch(CurrentSLD, sldsPattern)
       labelu := (SLDtypeLoaded=3) ? "Clean inexistent files entries" : "Clean &duplicate and inexistent entries"
-      kMenu("PVfList", "Add", labelu, "cleanDeadFilesList", "remove dead files erase")
+      kMenu("PVfList", "Add", labelu, "cleanDeadFilesList", "remove dead files erase delete")
       If StrLen(DynamicFoldersList)>6
          kMenu("PVfList", "Add", "&Regenerate the entire list", "RegenerateEntireList")
 
       labelu := (FileExist(CurrentSLD) && RegExMatch(CurrentSLD, sldsPattern) && SLDcacheFilesList=1) ? "&Update files list selectively`tCtrl+U" : "Folders containin&g indexed files`tCtrl+U"
       kMenu("PVfList", "Add", labelu, "PanelStaticFolderzManager", "folders manage")
       If (mustRecordSeenImgs=1)
-         kMenu("PVfList", "Add", "Remove alread&y seen images", "removeFilesListSeenImages", "eliminate")
+         kMenu("PVfList", "Add", "Remove alread&y seen images", "removeFilesListSeenImages", "eliminate delete")
       If !InStr(CurrentSLD, "\QPV\favourite-images-list.SLD")
-         kMenu("PVfList", "Add", "Remove fa&vourited images from list", "removeFilesListFavouritedImages", "eliminate")
+         kMenu("PVfList", "Add", "Remove fa&vourited images from list", "removeFilesListFavouritedImages", "eliminate delete")
 
       Menu, PVfList, Add, 
       kMenu("PVfList", "Add", "&Find duplicate images", "PanelFindDupes")
@@ -71504,12 +71501,12 @@ LoadFileWithWIA(imgPath, fastMode, noBMP:=0, sizesDesired:=0, ByRef newBitmap:=0
       }
    }
 
-   If (IsObject(sizesDesired[2]) && IsObject(wiaImg))
+   If (IsObject(sizesDesired[1]) && IsObject(wiaImg))
    {
-      forceW := sizesDesired[2, 1]
-      forceH := sizesDesired[2, 2]
-      keepAratio := sizesDesired[2, 3]
-      ScaleAnySize := sizesDesired[2, 4]
+      forceW := sizesDesired[1, 1]
+      forceH := sizesDesired[1, 2]
+      keepAratio := sizesDesired[1, 3]
+      ScaleAnySize := sizesDesired[1, 4]
       If (wiaImg.Width>forceW || wiaImg.Height>forceH || ScaleAnySize=1)
          Try ScaledWiaIMGb := WIA_ScaleImage(wiaImg, forceW, forceH, keepAratio)
 
@@ -71770,48 +71767,6 @@ LoadFileWithGDIp(imgPath, noBPPconv:=0, frameu:=0, useICM:=0, sizesDesired:=0, B
       Return oBitmap
    }
 
-   If (sizesDesired.Count()>1 && validBMP(oBitmap) && noBPPconv=0 && mustOpenWithWIC!=1)
-   {
-      hasFlipped := 0
-      newBitmap := []
-      Loop, % sizesDesired.Count()
-      {
-         ; ToolTip, % mainLoadedIMGdetails.width "==" mainLoadedIMGdetails.height "|" z "==" W "=f" frameu "==s" ScaleAnySize "==k" keepAratio , , , 2
-         forceW := sizesDesired[A_Index + 1, 1]
-         forceH := sizesDesired[A_Index + 1, 2]
-         If (forceW>1 && forceH>1)
-         {
-            keepAratio := sizesDesired[A_Index + 1, 3]
-            ScaleAnySize := sizesDesired[A_Index + 1, 4]
-            thisImgQuality := sizesDesired[A_Index + 1, 5]
-            doFlipu := sizesDesired[A_Index + 1, 6]
-            If (imgW>forceW || imgH>forceH || ScaleAnySize=1)
-            {
-               If (doFlipu>0 && hasFlipped=0)
-               {
-                  hasFlipped := 1
-                  Gdip_ImageRotateFlip(oBitmap, doFlipu)
-               }
-
-               zbmp := trGdip_ResizeBitmap(A_ThisFunc, oBitmap, forceW, forceH, keepAratio, thisImgQuality, -1)
-               If !validBMP(zbmp)
-               {
-                  mustOpenWithWIC := 1
-                  Break
-               }
-
-               newBitmap[A_Index] := zbmp
-               NextDoFlipu := sizesDesired[A_Index + 2, 6]
-               If (doFlipu>0 && !NextDoFlipu)
-               {
-                  hasFlipped := 0
-                  Gdip_ImageRotateFlip(oBitmap, doFlipu)
-               }
-            }
-         }
-      }
-   }
-
    If (mustOpenWithWIC!=1)
    {
       forceW := sizesDesired[1, 1]
@@ -71833,17 +71788,6 @@ LoadFileWithGDIp(imgPath, noBPPconv:=0, frameu:=0, useICM:=0, sizesDesired:=0, B
       } Else mustOpenWithWIC := 1
    }
 
-   If (mustOpenWithWIC=1 && noBPPconv=0 && WICmoduleHasInit=1 && allowWICloader=1)
-   {
-      oBitmap := trGdip_DisposeImage(oBitmap, 1)
-      oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired, newSizedImage)
-      newBitmap := newSizedImage
-   } Else If (mustOpenWithWIC=1 && noBPPconv=0) ; || (allowCaching=1)
-   {
-      oBitmap := trGdip_DisposeImage(oBitmap, 1)
-      oBitmap := LoadFileWithWIA(imgPath, noBPPconv, 0, sizesDesired, newSizedImage)
-      newBitmap := newSizedImage
-   }
 
    Return oBitmap
 }
@@ -73073,10 +73017,10 @@ coreCreateVPnavBox(modus:=0) {
 
       frameLoad := InStr(filesFilter, "QPV:PAGES:") ? currentFileIndex - 1 : 0
       MD5name := generateThumbName(imgPath, 1, frameLoad)
-      file2save := thumbsCacheFolder "\500-" MD5name ".jpg"
+      file2save := thumbsCacheFolder "\500-" MD5name ".png"
       If FileExist(file2save)
       {
-         whichBitmap := LoadCachableBitmapFromFile(file2save, frameLoad)
+         whichBitmap := LoadCachableBitmapFromFile(file2save)
       } Else
       {
          sizesDesired := []
@@ -73126,10 +73070,7 @@ coreCreateVPnavBox(modus:=0) {
       Return
    }
 
-   thisBrush2 := createHatchBrush(128)
-   Gdip_FillRectangle(Gu, thisBrush2, 0, 0, ResizedW, ResizedH)
-   Gdip_DeleteBrush(thisBrush2)
-
+   Gdip_FillRectangle(Gu, GDIPbrushHatch, 0, 0, ResizedW, ResizedH)
    ; Gdip_FillRectangle(Gu, pBrushE, 0, 0, ResizedW, ResizedH)
    posX := posY := 0
    If (viewportQPVimage.imgHandle)
@@ -81103,26 +81044,7 @@ ScreenCaptureListView() {
 }
 
 saveImageThumbnail(oBitmap, file2save) {
-    Gdip_GetImageDimensions(oBitmap, zww, zhh)
-    ; fnOutputDebug("looooooool: " zww " | " zhh)
-    kBitmap := trGdip_CreateBitmap(A_ThisFunc, zww, zhh)
-    If validBMP(kBitmap)
-       Guzz := Gdip_GraphicsFromImage(kBitmap)
-
-    If Guzz
-    {
-       thisBrush2 := createHatchBrush(128)
-       Gdip_FillRectangle(Guzz, thisBrush2, 0, 0, zww, zhh)
-       Gdip_DeleteBrush(thisBrush2)
-       Gdip_DrawImage(Guzz, oBitmap, 0, 0, zww, zhh)
-       Gdip_DeleteGraphics(Guzz)
-       zr := Gdip_SaveBitmapToFile(kBitmap, file2save, 94)
-       trGdip_DisposeImage(kBitmap, 1)
-    } Else
-    {
-       trGdip_DisposeImage(kBitmap, 1)
-       zr := Gdip_SaveBitmapToFile(oBitmap, file2save, 94)
-    }
+    zr := Gdip_SaveBitmapToFile(oBitmap, file2save, 94)
     If zr
        addJournalEntry("Failed to save thumbnail to file: " file2save)
 }
@@ -81147,7 +81069,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
 
     G2 := glPG
     setImageLoading()
-    hasUpdated := rowIndex := imgsListed := 0
+    rowIndex := imgsListed := 0
     maxImgSize := maxZeit := columnIndex := -1
     fnOutputDebug("Begin show " maxItemsPage " thumbs from index " startIndex)
     setPriorityThread(-2)
@@ -81175,7 +81097,6 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
            {
               fnOutputDebug("ThumbsMode. User abandoned the operation during preparations phase of generate all thumbs.")
               abandonAll := 1
-              hasUpdated := 0
               Break
            }
         }
@@ -81236,7 +81157,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
 
         imgsNotCached++
         ; Gdip_FillRectangle(glPG, pBrushE, DestPosX - 10, DestPosY - 10, 20, 20)
-        file2save := thumbsCacheFolder "\" thumbsSizeQuality "-" MD5name ".jpg"
+        file2save := thumbsCacheFolder "\" thumbsSizeQuality "-" MD5name ".png"
         If (isForceRefresh=1)
         {
            FileDelete, % file2save
@@ -81296,7 +81217,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
    thisImgQuality := (userimgQuality=1) ? 6 : 5
    sizesDesired := []
    sizesDesired[1] := [thumbsSizeQuality, thumbsSizeQuality, 1, 0, thisImgQuality]
-   thisFileIndex := MD5name := Bindex := hasUpdated := rowIndex := imgsListed := lastMsg := 0
+   thisFileIndex := MD5name := Bindex := rowIndex := imgsListed := lastMsg := 0
    imgsHavePainted := thisNonCachedImg := coreIndex := threadIndex := memCached := lapsOccured := totalLoops := 0
    lowestGiven := maxIndexu := maxImgSize := maxZeit := columnIndex := -1
    prevCoreEventZeit := A_TickCount - 2
@@ -81324,7 +81245,6 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           {
              fnOutputDebug("ThumbsMode. User abandoned the operation.")
              abandonAll := 1
-             hasUpdated := 0
              Break
           }
 
@@ -81340,7 +81260,6 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           If (mustEndLoop=1)
           {
              ; fnOutputDebug("ThumbsMode. Must end loop = 1. laps " lapsOccured "  -- loops " totalLoops "  -- inner " innerLoops " ")
-             hasUpdated := 0
              Break
           }
 
@@ -81399,14 +81318,18 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
                    thisPBitmap := StrLen(thisCoreDoneArr[2])>2 ? thisCoreDoneArr[2] : 0
                    If StrLen(thisPBitmap)>2
                       thisPBitmap := trGdip_CloneBitmap(A_ThisFunc "<-FIM_ExternThread", thisPBitmap, 1)
+                   else 
+                      hasThumbFailed := 1
+
                    imgsListArrayThumbs[thisCoreDoneArr[3], 1] := "fim"
                    imgsListArrayThumbs[thisCoreDoneArr[3], 2] := validBMP(thisPBitmap) ? thisPBitmap : 0
                    If (hasThumbFailed=1)
                    {
                       prevCoreEventZeit := A_TickCount
                       thumbThread%whichCoreBusy%.ahkassign("operationFailed", 0)
-                      addJournalEntry("ThumbsMode. Failed to generate - file index: " thisFileIndex " core: " whichCoreBusy)
-                      imgsListArrayThumbs[thisCoreDoneArr[3], 1] := "x"
+                      fnOutputDebug("ThumbsMode. Failed to generate - file index=" thisFileIndex " core=" whichCoreBusy " pBitmap=" thisCoreDoneArr[2])
+                      If (thisCoreDoneArr[2]!=20) ; if the pdf is pass-protected, do not mark it dead
+                         imgsListArrayThumbs[thisCoreDoneArr[3], 1] := "x"
                    }
                 } Else If (thisCoreDoneArr[1]=1 && thisCoreDoneArr[4]=whichCoreBusy && waitDataCollect=1)
                 {
@@ -81417,14 +81340,18 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
                    thisPBitmap := StrLen(thisCoreDoneArr[2])>2 ? thisCoreDoneArr[2] : 0
                    If StrLen(thisPBitmap)>2
                       thisPBitmap := trGdip_CloneBitmap(A_ThisFunc "<-FIM_ExternThread", thisPBitmap, 1)
+                   else 
+                      hasThumbFailed := 1
+
                    imgsListArrayThumbs[thisFileIndex, 1] := "fim"
                    imgsListArrayThumbs[thisFileIndex, 2] := validBMP(thisPBitmap) ? thisPBitmap : 0
                    If (hasThumbFailed=1)
                    {
                       prevCoreEventZeit := A_TickCount
                       thumbThread%whichCoreBusy%.ahkassign("operationFailed", 0)
-                      addJournalEntry("ThumbsMode. Failed to generate - file index: " thisFileIndex " core: " whichCoreBusy)
-                      imgsListArrayThumbs[thisFileIndex, 1] := "x"
+                      If (thisCoreDoneArr[2]!=20) ; if the pdf is pass-protected, do not mark it dead
+                         imgsListArrayThumbs[thisCoreDoneArr[3], 1] := "x"
+                      fnOutputDebug("ThumbsMode. Failed to generate - file index=" thisFileIndex " core=" whichCoreBusy " pBitmap=" thisCoreDoneArr[2] )
                    }
                 } Else Continue
              } Else
@@ -81490,6 +81417,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           {
              fimCached := 1
              oBitmap := imgsListArrayThumbs[thisFileIndex, 2]
+             fnOutputDebug("thumb cached with a FIM thread " thisFileIndex ". File=" file2load)
              If !validBMP(oBitmap)
              {
                 ; mustDisposeImgNow := 1
@@ -81497,14 +81425,16 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
                 wasCacheFile := 1
                 fimCached := 0
                 file2load := imgsListArrayThumbs[thisFileIndex, 4]
-                fnOutputDebug("missing thumb cached with a FIM thread " thisFileIndex ". Trying to load file... " file2load)
-                If !FileRexists(file2load)
+                fnOutputDebug("missing thumb cached with a FIM thread " thisFileIndex ". load file=" file2load)
+                If !FileExist(file2load)
                 {
                    ; load the original file
                    wasCacheFile := fimCached := 0
                    thumbCachable := 1
                    file2load := imgsListArrayThumbs[thisFileIndex, 3]
                    oBitmap := LoadBitmapFromFileu(file2load, 0, 0, frameLoad, sizesDesired)
+                   If validBMP(oBitmap)
+                      GetCachableImgFileDetails(file2load, thisFileIndex, oBitmap, 0, 0)
                 } Else
                    oBitmap := LoadBitmapFromFileu(file2load, 0, 1)
              }
@@ -81514,7 +81444,6 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           imgsListArrayThumbs[thisFileIndex, 1] := "d"
           imgPath := imgsListArrayThumbs[thisFileIndex, 3]
           MD5name := imgsListArrayThumbs[thisFileIndex, 7]
-          file2save := thumbsCacheFolder "\" thumbsSizeQuality "-" MD5name ".jpg"
           trGdip_GetImageDimensions(oBitmap, imgW, imgH)
 
           If (!validBMP(oBitmap) || !FileExist(imgPath) || !imgW || !imgH)
@@ -81529,8 +81458,9 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
 
              DestPosX := imgsListArrayThumbs[thisFileIndex, 5]
              DestPosY := imgsListArrayThumbs[thisFileIndex, 6]
+             r1 := Gdip_FillRectangle(G2, pBrushWinBGR, DestPosX - thumbsW//2, DestPosY - thumbsH//2, thumbsW, thumbsH)
              r1 := Gdip_DrawRectangle(G2, pPen4, DestPosX - thumbsW//2, DestPosY - thumbsH//2, thumbsW, thumbsH)
-             fnOutputDebug("broken thumb: mem" WasMemCached " -- w" imgW "-- h" imgH "-- obj bmp id" oBitmap)
+             fnOutputDebug("broken thumb: mem=" WasMemCached " -- w/h=" imgW " x" imgH " bmp id=" oBitmap "|" imgPath)
              Continue
           } Else imgsHavePainted++
 
@@ -81568,6 +81498,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
              oBitmap := trGdip_DisposeImage(oBitmap, 1)
              DestPosX := imgsListArrayThumbs[thisFileIndex, 5]
              DestPosY := imgsListArrayThumbs[thisFileIndex, 6]
+             r1 := Gdip_FillRectangle(G2, pBrushWinBGR, DestPosX - thumbsW//2, DestPosY - thumbsH//2, thumbsW, thumbsH)
              r1 := Gdip_DrawRectangle(G2, pPen4, DestPosX - thumbsW//2, DestPosY - thumbsH//2, thumbsW, thumbsH)
              imgsListArrayThumbs[thisFileIndex, 9] := 1
              ; fnOutputDebug("ThumbsMode. Faulty GDI thumbnail object disposed.")
@@ -81589,12 +81520,12 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
                 hasMemThumbsCached := 0
           }
 
-
           calcIMGdimensions(newW, newH, thumbsW, thumbsH, fW, fH)
           DestPosX := imgsListArrayThumbs[thisFileIndex, 5]
           DestPosX -= (imageAligned!=5) ? thumbsW//2 : fW//2
           DestPosY := imgsListArrayThumbs[thisFileIndex, 6]
           DestPosY -= (imageAligned!=5) ? thumbsH//2 : fH//2
+          file2save := thumbsCacheFolder "\" thumbsSizeQuality "-" MD5name ".png"
           If (fimCached!=1 && thumbCachable=1 && thisZeit>timePerImg && file2save!=file2load && enableThumbsCaching=1 && WasMemCached!=1)
           && ((newW<imgW//2) || (newH<imgH//2))
           {
@@ -81608,11 +81539,11 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           If (modus!="all" && imgsListArrayThumbs[thisFileIndex, 9]!=1)
           {
              flipBitmapAccordingToViewPort(oBitmap)
-             hasUpdated := 0
              If (userPrivateMode=1 && blurEffect)
                 Gdip_BitmapApplyEffect(oBitmap, blurEffect)
+
              oBitmap := applyVPeffectsOnBMP(oBitmap, 1)
-             r1 := Gdip_FillRectangle(G2, pBrushHatchLow, DestPosX, DestPosY, fW - 1, fH - 1)
+             r1 := Gdip_FillRectangle(G2, GDIPbrushHatch, DestPosX, DestPosY, fW - 1, fH - 1)
              r1 := trGdip_DrawImage(A_ThisFunc, G2, oBitmap, DestPosX, DestPosY, fW - 1, fH - 1)
              imgsListArrayThumbs[thisFileIndex, 9] := 1
           }
@@ -83895,6 +83826,9 @@ ReverseListNow() {
        currentFileIndex := doOpenStartFolder()
 
     If (maxFilesIndex<3)
+       Return
+
+    If warnFramesActionPrevented("REVERSE SORT")
        Return
 
     If askAboutFileSave(" and the files list will be reversed")
@@ -87506,6 +87440,8 @@ calcNewImgDimensions(imgW, imgH, desiredW, desiredH, isPercntg, isKeepRatio, ByR
 
 filesListApplyColors() {
     Static prevFXmode := "n"
+    If warnFramesActionPrevented("APPLY COLORS")
+       Return
 
     o_imgFxMode := imgFxMode
     If (imgFxMode>1)
@@ -87600,6 +87536,9 @@ filesListCropImgVPsel() {
 }
 
 coreQuickImageFilesListActions(actu) {
+   If warnFramesActionPrevented("IMAGE ACTION " actu)
+      Return
+
    initFIMGmodule()
    countNotJpegs := firstu := 0
    filesElected := getSelectedFiles(0, 1)
@@ -91473,18 +91412,36 @@ uiFilterListDynaFolder(folderu, modus) {
     dummyTimerDelayiedImageDisplay(50)
 }
 
-MenuFilterListToMultiFrames() {
+MenuPreviewFramesFilterList() {
+     imgPath := getIDimage(currentFileIndex)
+     zPlitPath(imgPath, 1, OutFileName, OutDir, OutFileNameNoExt, OutFileExt)
+     folderu := PathCompact(OutDir, "a", 1, OSDfontSize)
      If InStr(filesFilter, "QPV:PAGES:")
      {
-        MenuRemFilesListFilter()
+        If (thumbsDisplaying!=1)
+        {
+           lastOtherWinClose := 1
+           ToggleThumbsMode()
+        } Else 
+        {
+           showTOOLtip("Already listing the frames / pages found in:`n" OutFileName "`n" folderu "\")
+           SetTimer, RemoveTooltip, % -msgDisplayTime
+        }
         Return
      }
 
      BtnCloseWindow()
+     If (thumbsDisplaying!=1)
+     {
+        thumbsListViewMode := 2
+        lastOtherWinClose := 1
+        ToggleThumbsMode()
+        Settimer, MenuPreviewFramesFilterList, -300
+        Return
+     }
+
      dropFilesSelection(1)
-     imgPath := getIDimage(currentFileIndex)
-     zPlitPath(imgPath, 1, OldOutFileName, OutDir, OutFileNameNoExt, OutFileExt)
-     folderu := PathCompact(OutDir, "a", 1, OSDfontSize)
+     thumbsListViewMode := 1
      If !FileExist(imgPath)
      {
         showTOOLtip("ERROR: Access denied or the selected file does not exist:`n" OutFileName "`n" folderu "\")
@@ -92889,6 +92846,9 @@ ReadSettingsAutoCropPanel(act:=0) {
 
 PanelImgAutoCrop() {
     Global btnFldr, mainBtnACT, editF5, btn3, btn4, btn5
+    If warnFramesActionPrevented("AUTO-CROP")
+       Return
+
     If (thumbsDisplaying=1)
     {
        Tooltip, Please wait...
@@ -93974,6 +93934,9 @@ PanelSimpleResizeRotate(modus:="") {
     If !PanelsCheckFileExists()
        Return
 
+    If warnFramesActionPrevented("IMAGE RESIZE")
+       Return
+
     If (vpIMGrotation>0)
     {
        FlipImgV := FlipImgH := vpIMGrotation := 0
@@ -94638,7 +94601,7 @@ dumpBMPpixels(miniBMP, w, h) {
     Return entireImgSmall
 }
 
-calcHistoAvgFile(xBitmap, returnObj, isFilter, imgIndex, zEffect:=0, newBMPs:=0) {
+calcHistoAvgFile(xBitmap, returnObj, isFilter, imgIndex, zEffect:=0, otherBMP:=0) {
     Static TotalPixelz := 122500, fmt := 3
     If !validBMP(xBitmap)
        Return 0
@@ -94716,13 +94679,13 @@ calcHistoAvgFile(xBitmap, returnObj, isFilter, imgIndex, zEffect:=0, newBMPs:=0)
        entireImgBig := dumpBMPpixels(x2, 32, 32)
        trGdip_DisposeImage(x1, 1)
        trGdip_DisposeImage(x2, 1)
-       If (findFlippedDupes=1 && StrLen(newBMPs[1])>2)
+       If (findFlippedDupes=1 && validBMP(otherBMP))
        {
-          Gdip_BitmapApplyEffect(newBMPs[1], zEffect)
+          Gdip_BitmapApplyEffect(otherBMP, zEffect)
           If (dupesApplyBlur=1)
-             Gdip_GaussianBlur(xBitmap, newBMPs[1], 0)
-          x1 := trGdip_ResizeBitmap(A_ThisFunc, newBMPs[1], 9, 8, 0, thisPolation, -1)
-          x2 := trGdip_ResizeBitmap(A_ThisFunc, newBMPs[1], 32, 32, 0, thisPolation, -1)
+             Gdip_GaussianBlur(xBitmap, otherBMP, 0)
+          x1 := trGdip_ResizeBitmap(A_ThisFunc, otherBMP, 9, 8, 0, thisPolation, -1)
+          x2 := trGdip_ResizeBitmap(A_ThisFunc, otherBMP, 32, 32, 0, thisPolation, -1)
           HentireImgSmall := dumpBMPpixels(x1, 9, 8)
           HentireImgBig := dumpBMPpixels(x2, 32, 32)
           trGdip_DisposeImage(x1, 1)
@@ -94773,16 +94736,19 @@ GetCachableHistogramFile(imgPath, imgIndex, returnObj:=0, isFilter:=0, zEffect:=
         Return
      }
 
-     sizesDesired := []
      thisPolation := (hamDistInterpolation=1) ? 6 : 5
+     sizesDesired := []
      sizesDesired[1] := [350, 350, 0, 1, thisPolation, 0, 0]
+     thumbBMP := LoadBitmapFromFileu(imgPath, 0, 0, 0, sizesDesired)
      If (SLDtypeLoaded=3)
      {
         If (findFlippedDupes=1)
-           sizesDesired[2] := [350, 350, 0, 1, thisPolation, 4, 0]
+        {
+           sizesDesired[1] := [350, 350, 0, 1, thisPolation, 4, 0]
+           otherBMP := LoadBitmapFromFileu(imgPath, 0, 0, 0, sizesDesired)
+        }
      }
 
-     thumbBMP := LoadBitmapFromFileu(imgPath, 0, 0, 0, sizesDesired, newBMPs)
      r := (mainLoadedIMGdetails.Width>1 && mainLoadedIMGdetails.Height>1) ? 1 : 0
      If (validBMP(thumbBMP) && r)
      {
@@ -94807,13 +94773,12 @@ GetCachableHistogramFile(imgPath, imgIndex, returnObj:=0, isFilter:=0, zEffect:=
      } Else imgInfosObju := 0
 
      If r
-        histoObj := calcHistoAvgFile(thumbBMP, returnObj, isFilter, imgIndex, zEffect, newBMPs)
+        histoObj := calcHistoAvgFile(thumbBMP, returnObj, isFilter, imgIndex, zEffect, otherBMP)
      Else
         histoObj := 0
 
-     trGdip_DisposeImage(newBMPs[1], 1)
+     trGdip_DisposeImage(otherBMP, 1)
      trGdip_DisposeImage(thumbBMP, 1)
-
      If (IsObject(histoObj) && returnObj=1)
         Return [histoObj, imgInfosObju]
      Else
@@ -95148,28 +95113,6 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
   hFIFimgZ := hFIFimgB ? hFIFimgB : hFIFimgA
   hFIFimgC := hFIFimgZ ? hFIFimgZ : hFIFimgA
   FreeImage_GetImageDimensions(hFIFimgC, imgW, imgH)
-  If IsObject(sizesDesired[2] && noBPPconv=0 && noBMP=0)
-  {
-     hFIFimgX := FIMrescaleOBJbmp(hFIFimgC, imgW, imgH, 2, sizesDesired)
-     If hFIFimgX
-     {
-        thisBPPc := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgX), "-"))
-        If !isVarEqualTo(thisBPPc, 8, 16, 24, 32)
-        {
-           hFIFimgDE := FreeImage_ConvertTo(hFIFimgX, "32Bits")
-           If hFIFimgDE
-           {
-              newBitmap := ConvertFIMtoPBITMAP(hFIFimgDE, coreDesiredPixFmt)
-              FreeImage_UnLoad(hFIFimgDE)
-           }
-        } Else newBitmap := ConvertFIMtoPBITMAP(hFIFimgX, coreDesiredPixFmt)
-
-        FreeImage_UnLoad(hFIFimgX)
-        If StrLen(newBitmap)>2
-           recordGdipBitmaps(newBitmap, A_ThisFunc)
-     }
-  }
-
   If (noBPPconv=0)
   {
      hFIFimgX := FIMrescaleOBJbmp(hFIFimgC, imgW, imgH, 1, sizesDesired)
@@ -96000,6 +95943,21 @@ RenderPDFpage(imgPath, noBPPconv, frameu, ByRef pwd:="", maxW:=0, maxH:=0, dpi:=
     If (pwd="")
        pwd := PDFpwdsCache[imgPath]
 
+    If IsObject(maxW)
+    {
+       keepAratio := maxW[1, 3]
+       doFlipu := maxW[1, 6]
+       mw := maxW[1, 1]
+       mh := maxW[1, 2]
+       maxW := 0
+       If (mw>1 && mh>1 && keepAratio=1) {
+          ; calcIMGdimensions(w, h, mw, mh, maxW, maxH)
+          maxW := mw, maxH := mh
+       } Else If (mw>1 && mh>1) {
+          maxW := mw, maxH := mh, dpi := 0
+       }
+    }
+
     pBitmap := DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", dpi, "int*", maxW, "int*", maxH, "int", fillBgr, "int", "0xff" bgrColor, "int*", pageCount, "int*", errorType, "Str", pwd, "UPtr", 0, "int", do24bits, "UPtr")
     If (asked := promptUserPDFpassword(A_ThisFunc, imgPath, errorType, pwd))
        pBitmap := DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", dpi, "int*", maxW, "int*", maxH, "int", fillBgr, "int", "0xff" bgrColor, "int*", pageCount, "int*", errorType, "Str", pwd, "UPtr", 0, "int", do24bits, "UPtr")
@@ -96011,6 +95969,8 @@ RenderPDFpage(imgPath, noBPPconv, frameu, ByRef pwd:="", maxW:=0, maxH:=0, dpi:=
 
        recordGdipBitmaps(pBitmap, A_ThisFunc)
        Gdip_BitmapSetResolution(pBitmap, dpi, dpi)
+       If doFlipu
+          Gdip_ImageRotateFlip(pBitmap, doFlipu)
        Gdip_GetImageDimensions(pBitmap, w, h)
        pg := pageCount
        w := maxW
@@ -96089,7 +96049,7 @@ convertSVGunitsToPixels(ByRef length) {
     }
 }
 
-RenderSVGfile(imgPath, noBPPconv, screenMode) {
+RenderSVGfile(imgPath, noBPPconv, screenMode, sizesDesired:=0) {
    ; to-do, todo: add user option to scale the svg content 
    FileRead, content, % imgPath
    If !content
@@ -96118,6 +96078,19 @@ RenderSVGfile(imgPath, noBPPconv, screenMode) {
    {
       w := Round(w * zoomLevel)
       h := Round(h * zoomLevel)
+   }
+
+   If IsObject(sizesDesired)
+   {
+      keepAratio := sizesDesired[1, 3]
+      doFlipu := sizesDesired[1, 6]
+      mw := sizesDesired[1, 1]
+      mh := sizesDesired[1, 2]
+      If (mw>1 && mh>1 && keepAratio=1) {
+         calcIMGdimensions(w, h, mw, mh, w, h)
+      } Else If (mw>1 && mh>1) {
+         w := mw, h := mh
+      }
    }
 
    capIMGdimensionsGDIPlimits(w, h)
@@ -96152,6 +96125,8 @@ RenderSVGfile(imgPath, noBPPconv, screenMode) {
    {
       recordGdipBitmaps(pBitmap, A_ThisFunc)
       Gdip_BitmapSetResolution(pBitmap, 96, 96)
+      If doFlipu
+         Gdip_ImageRotateFlip(pBitmap, doFlipu)
    }
 
    ; ToolTip, % fscaleX "|" fscaleY "|" w "|" h "|" svgRoot "|" , , , 2
@@ -96476,9 +96451,9 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM, simpleMode) {
 
 LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitmap:=0) {
    If RegExMatch(imgPath, "i)(.\.svg)$")
-      Return RenderSVGfile(imgPath, noBPPconv, 0)
+      Return RenderSVGfile(imgPath, noBPPconv, 0, sizesDesired)
    Else If RegExMatch(imgPath, "i)(.\.pdf)$")
-      Return RenderPDFpage(imgPath, noBPPconv, frameu)
+      Return RenderPDFpage(imgPath, noBPPconv, frameu, pwd, sizesDesired)
 
    startZeit := A_TickCount
    If IsObject(sizesDesired[1])
@@ -96539,29 +96514,6 @@ LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitma
          mainLoadedIMGdetails := obj.Clone()
 
       ; fnOutputDebug("images desired = " sizesDesired.Count() " | f=" findFlippedDupes)
-      If (sizesDesired.Count()>1 && r && noBPPconv=0)
-      {
-         newBitmap := []
-         Loop, % sizesDesired.Count()
-         {
-            ; ToolTip, % mainLoadedIMGdetails.width "==" mainLoadedIMGdetails.height "|" z "==" W "=f" frameu "==s" ScaleAnySize "==k" keepAratio , , , 2
-            w := sizesDesired[A_Index + 1, 1]
-            h := sizesDesired[A_Index + 1, 2]
-            keepAratio := sizesDesired[A_Index + 1, 3]
-            ScaleAnySize := sizesDesired[A_Index + 1, 4]
-            thisImgQuality := sizesDesired[A_Index + 1, 5]
-            doFlipu := sizesDesired[A_Index + 1, 6]
-            doGray := sizesDesired[A_Index + 1, 7]
-            ; fnOutputDebug("loop image size=" A_Index " | " w "x" h " | " doFlipu)
-            rm := DllCall("qpvmain.dll\LoadWICimage", "Int", 0 ,"Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", doFlipu, "int", useICM, "Str", imgPath, "UPtr*", &resultsArray, "int", fimu, "UPtr")
-            If StrLen(rm)>2
-            {
-               newBitmap[A_Index] := rm
-               If (doGray=1)
-                  Gdip_BitmapApplyHSL(rm, 0, -100, 0)
-            }
-         }
-      }
    } else fnOutputDebug(A_ThisFunc ": failed to load file with LoadWICimage()")
 
    resultsArray := ""
@@ -96596,67 +96548,6 @@ WICcontainerFmts(containerID, imgPath) {
    Return r
 }
 
-xxtestwhatever() {
-
-   Static WinCodecSKDversion := 566 ; 0x236
-        , dwDesiredAccess := 0x80000000
-        , metadataOptions := 0x2
-ppIDecoder := "lodekl"
-   destroyGDIfileCache()
-   wzFileName := getIDimage(currentFileIndex)
-
-   thisObj := ComObjCreate("{cacaf262-9370-4615-a13b-9f5539da4c0a}", "{ec5ec8a9-c395-4314-9c77-54d7a935ff70}")
-      thisObj.ThrowHRerrors := 1
-
-   ; hr := DllCall(NumGet(NumGet(thisObj+0)+14*A_PtrSize), "ptr", thisObj, "ptr*", ppIWICStream)
-   ;    WIC_hr(hr, ErrorLevel, A_ThisFunc) ; "`nErrorLevel: " ErrorLevel)
-
-
-   ; hr := DllCall(NumGet(NumGet(thisObj+0)+15*A_PtrSize), "ptr", thisObj, "str", wzFileName, "uint", dwDesiredAccess)
-   ; if hr or ErrorLevel
-   ;    WIC_hr(hr, A_ThisFunc) ; "`nErrorLevel: " ErrorLevel)
-
-/*
-   hr := DllCall(vtable(thisObj, 3)
-         ,"ptr", thisObj
-         ,"str", wzFilename
-         ,"ptr", NULL ; WIC_GUID(GUID,pguidVendor)
-         ,"uint", dwDesiredAccess
-         ,"uint", metadataOptions
-         ,"ptr*", ppIDecoder)
-      WIC_hr(hr, ErrorLevel, A_ThisFunc) ; "`nErrorLevel: " ErrorLevel)
-   MsgBox, % thisObj "`n" ppIDecoder "`n" vtable(thisObj, 3) ;  "`n" WIC_hr(HR, "init")
-*/
-}
-
-
-gtestwhatever() {
-; # dwDesiredAccess
-; WIC_GENERIC_READ = 0x80000000
-; WIC_GENERIC_WRITE = 0x40000000
-
-; # WICBitmapCreateCacheOption
-; WICBitmapNoCache = 0x0
-; WICBitmapCacheOnDemand = 0x1
-; WICBitmapCacheOnLoad = 0x2
-
-; # WICDecodeOptions
-; WICDecodeMetadataCacheOnDemand = 0x0
-; WICDecodeMetadataCacheOnLoad = 0x1
-
-
-   Static WinCodecSKDversion := 566 ; 0x236
-        , dwDesiredAccess := 0x80000000
-        , metadataOptions := 0x1
-
-   destroyGDIfileCache()
-   imgPath := getIDimage(currentFileIndex)
-   DllCall("windowscodecs.dll\WICCreateImagingFactory_Proxy", "Uint", WinCodecSKDversion, "UPtr*", pWICimgFactory)
-
-   HR := DllCall("windowscodecs.dll\IWICImagingFactory_CreateDecoderFromFilename_Proxy", "UPtr", pWICimgFactory, "Wstr", imgPath, "Ptr", GuidVendor, "Uint", dwDesiredAccess, "Uint", metadataOptions, "UPtr*", ppIDecoder)
-   MsgBox, % pWICimgFactory "`n" ppIDecoder
-}
-
 recentOpenedFolders() {
    If (allowRecordHistory=1)
    {
@@ -96677,20 +96568,6 @@ recentOpenedFolders() {
       Sort, entriesList, UD`n
    }
    Return Trimmer(entriesList)
-}
-
-testeGDIspeed() {
-   startZeit := A_TickCount
-   Loop, 100
-      GdipCleanMain(2)
-   pa := A_TickCount - startZeit
-
-   startZeit := A_TickCount
-   Loop, 100
-      GdipCleanMain(10)
-
-   pb := A_TickCount - startZeit
-   MsgBox, % pa "`n" pb
 }
 
 isFileLocked(imgPath) {
