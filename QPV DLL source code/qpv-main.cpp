@@ -5429,6 +5429,7 @@ auto adaptImageGivenSize(const UINT keepAratio, const UINT ScaleAnySize, const U
      size[0] = givenW;
      size[1] = givenH;
   }
+
   double mpx = (size[0] * size[1])/1000000.0f;
   // fnOutputDebug(std::to_string(mpx) + "mpx ; adapted: " + std::to_string(size[0]) + " x " + std::to_string(size[1]) );
   float g = 536.4f / mpx;
@@ -6331,6 +6332,8 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
         return myBitmap;
     }
 
+    int ScaleAnySize = (dpi<0) ? 1 : 0;
+    dpi = abs(dpi);
     float scale = (dpi<2) ? 1.0f : dpi / 72.0f;  // PDF uses 72 DPI as base
     double pageWidth = FPDF_GetPageWidth(PDFpage);
     double pageHeight = FPDF_GetPageHeight(PDFpage);
@@ -6454,7 +6457,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
        *givenH = 32650;
 
     float maxMPX = (do24bits==1) ? 715.25f : 536.45f;
-    auto nSize = adaptImageGivenSize(1, 0, bitmapWidth, bitmapHeight, *givenW, *givenH, maxMPX);
+    auto nSize = adaptImageGivenSize(1, ScaleAnySize, bitmapWidth, bitmapHeight, *givenW, *givenH, maxMPX);
     bitmapWidth = (dpi==0) ? *givenW : nSize[0];
     bitmapHeight = (dpi==0) ? *givenH : nSize[1];
     *givenW = (int)pageWidth;
