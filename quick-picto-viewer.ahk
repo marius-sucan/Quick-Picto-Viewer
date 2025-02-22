@@ -382,7 +382,8 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , UIuserToneMapParamC := 180, cmrRAWtoneMapParamC := 1, UIuserToneMapParamD := 60, cmrRAWtoneMapParamD := 0
    , UIuserToneMapOCVparamA := 80, cmrRAWtoneMapOCVparamA := 1, UIuserToneMapOCVparamB := 72, cmrRAWtoneMapOCVparamB := 0
    , userPerformColorManagement := 1, UserCombinePDFbgrColor := "ffFFff", UserVPalphaBgrStyle := 1
-   , userPDFdpi := 430, userActivePDFpage := 0, userThumbsSheetUpscaleSmall := 1
+   , userPDFdpi := 430, userActivePDFpage := 0, userThumbsSheetUpscaleSmall := 1, PrintPDFpagesRange := 1
+   , PrintPDFpagesGivenEdit :=  "1-5"
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -42682,7 +42683,7 @@ generateThumbsSheet() {
 
       countTFilez++
       changeMcursor()
-      if (framePreviewsMode!=1)
+      If (framePreviewsMode!=1)
       {
          imgPath := StrReplace(resultedFilesList[A_Index, 1], "|")
          If !FileRexists(imgPath)
@@ -51049,6 +51050,7 @@ PanelPrintImage() {
 
     If (thumbsDisplaying=1)
     {
+       lastOtherWinClose := 1
        ToggleThumbsMode()
        SetTimer, PanelPrintImage, -300
        Return
@@ -51100,9 +51102,15 @@ PanelPrintImage() {
     GuiAddDropDownList("y+7 wp+90 gupdateUIprintPreview vSelectedPrinteru", printerlist, "Device")
     Gui, Add, Button, x+5 hp gBtnSetPrinterDefault, Set as &default
     GuiAddDropDownList("xs y+10 w" EditWid " gupdateUIprintPreview AltSubmit Choose" PrintPaperOrient " vPrintPaperOrient", "Portrait|Landscape", "Page orientation")
-    GuiAddEdit("x+5 w" EditWid " gupdateUIprintPreview r1 limit2 +number -multi -wantTab -wrap veditFc", PrintCopies, "Copies")
+    GuiAddEdit("x+5 w" EditWid " hp gupdateUIprintPreview r1 limit2 +number -multi -wantTab -wrap veditFc", PrintCopies, "Copies")
     Gui, Add, UpDown, vPrintCopies gupdateUIprintPreview Range1-99, % PrintCopies
     Gui, Add, Text, x+5 hp +0x200, copies to print
+    If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.pdf|tiff|tif)$") && totalFramesIndex>1 || InStr(filesFilter, "QPV:PAGES:"))
+    {
+       Gui, Add, Text, xs y+10 +0x200 +hwndhTemp, Pages to print
+       GuiAddDropDownList("x+5 wp gupdateUIprintPreview AltSubmit Choose" PrintPDFpagesRange " vPrintPDFpagesRange", "Current|All|Given range", [hTemp])
+       GuiAddEdit("x+5 wp hp gupdateUIprintPreview r1 limit100 -multi -wantTab -wrap vPrintPDFpagesGivenEdit", PrintPDFpagesGivenEdit, "Range of pages be printed")
+    }
     Gui, Add, Checkbox, xs y+10 hp gupdateUIprintPreview Checked%PrintAdaptToFit% vPrintAdaptToFit, Automatically adapt image to cover page
     GuiAddSlider("PrintPosX", 0,100, 0, "X", "updateUIprintPreview", 1, "xs+15 y+10 w" EditWid " hp")
     GuiAddSlider("PrintPosY", 0,100, 0, "Y", "updateUIprintPreview", 1, "x+2 wp hp")
@@ -51185,6 +51193,8 @@ printSettingsObj() {
 
    Gui, SettingsGUIA: Default
    GuiControlGet, PrintAdaptToFit
+   GuiControlGet, PrintPDFpagesRange
+   GuiControlGet, PrintPDFpagesGivenEdit
    GuiControlGet, PrintColorMode
    GuiControlGet, PrintCopies
    GuiControlGet, SelectedPrinteru
@@ -51256,6 +51266,8 @@ printSettingsObj() {
    GuiRefreshSliders()
    act := (PrintAdaptToFit=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
    GuiControl, % act, PrintStrechedSize
+   act := (PrintPDFpagesRange!=3) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
+   GuiControl, % act, PrintPDFpagesGivenEdit
    SetTimer, WriteSettingsPrintPanel, -200
    Return PrintOptions
 }
@@ -51297,10 +51309,17 @@ BtnStartPrintingNow(a, b) {
    ControlGetText, c,, ahk_id %a%
    WriteSettingsPrintPanel()
    BtnCloseWindow()
+   imgPath := getIDimage(currentFileIndex)
    showTOOLtip("Please wait, preparing to print image")
-   zPlitPath(getIDimage(currentFileIndex), 0, OutFileName, OutDir)
+   zPlitPath(imgPath, 0, OutFileName, OutDir)
    Sleep, 2
-   If (markedSelectFile>1 && !InStr(c, "active"))
+   multiFramesMode := (RegExMatch(imgPath, "i)(.\.pdf|tiff|tif)$") && totalFramesIndex>1) ? 1 : 0
+   If (multiFramesMode=1 && markedSelectFile<2 && PrintPDFpagesRange>1)
+   || (multiFramesMode=1 && InStr(c, "active") && PrintPDFpagesRange>1)
+      batchImgPrinting(PrintOptions, 1, imgPath, totalFramesIndex)
+   Else If (InStr(filesFilter, "QPV:PAGES:") && PrintPDFpagesRange>1)
+      batchImgPrinting(PrintOptions, 1, imgPath, maxFilesIndex)
+   Else If (markedSelectFile>1 && !InStr(c, "active"))
       batchImgPrinting(PrintOptions)
    Else
       printImageNow(useGdiBitmap(), PrintOptions, 0, 0, OutFileName)
@@ -51309,18 +51328,49 @@ BtnStartPrintingNow(a, b) {
    RemoveTooltip()
 }
 
-batchImgPrinting(PrintOptions) {
-   filesElected := getSelectedFiles(0, 1)
-   showTOOLtip("Printing " groupDigits(filesElected) " images, please wait")
+batchImgPrinting(PrintOptions, multiFramesMode:=0, givenFile:=0, totalPages:=0) {
+   If (multiFramesMode=1)
+   {
+      imgPath := givenFile
+      If (PrintPDFpagesRange=3)
+      {
+         kk := Trimmer(PrintPDFpagesGivenEdit)
+         pp := StrReplace(PrintPDFpagesGivenEdit, "-",, dashes)
+         pp := StrSplit(PrintPDFpagesGivenEdit, "-")
+         pp[1] := Trimmer(pp[1])
+         pp[2] := Trimmer(pp[2])
+         If (dashes!=1 || !isNumber(pp[1]) || !isNumber(pp[2]) )
+         {
+            msgBoxWrapper(appTitle ": ERROR", "Incorrect range provided. Please provide two numbers separated by one dash (-).", 0, 0, "warning")
+            SetTimer, PanelPrintImage, -250
+            Return
+         }
+      }
+   }
+
    prevMSGdisplay := A_TickCount
    thisFileIndex := tFrames := failedFiles := countFilez := countTFilez := 0
    destroyGDIfileCache()
-   backCurrentSLD := CurrentSLD
    prevMSGdisplay := 1
    startOperation := A_TickCount
    lastInvoked := 2
    doStartLongOpDance()
+   backCurrentSLD := CurrentSLD
    CurrentSLD := ""
+   startIndex := (PrintPDFpagesRange=3) ? min(pp[1], pp[2]) : 0
+   endIndex := (PrintPDFpagesRange=3) ? max(pp[1], pp[2]) : totalPages
+   If (PrintPDFpagesRange=3 && endIndex>totalPages)
+      endIndex := totalPages
+   If (PrintPDFpagesRange=3 && startIndex<0)
+      startIndex := 0
+
+   filesElected := (multiFramesMode=1) ? totalPages : getSelectedFiles(0, 1)
+   If (multiFramesMode=1 && PrintPDFpagesRange=3)
+      filesElected := endIndex - startIndex
+
+   labelu := (multiFramesMode=1) ? "pages" : "images"
+   alabelu := (multiFramesMode=1) ? "pages" : "files"
+   showTOOLtip("Printing " groupDigits(filesElected) A_Space labelu ", please wait")
    Loop
    {
       executingCanceableOperation := A_TickCount
@@ -51333,18 +51383,30 @@ batchImgPrinting(PrintOptions) {
       If (A_TickCount - lastInvoked>3100) ; avoid creating printing jobs too fast
       {
          thisFileIndex++
-         If (thisFileIndex>maxFilesIndex)
+         If (thisFileIndex>maxFilesIndex && multiFramesMode!=1 || thisFileIndex>totalPages && multiFramesMode=1)
             Break
 
-         If (resultedFilesList[thisFileIndex, 2]!=1)
-            Continue
+         If (multiFramesMode!=1)
+         {
+            If (resultedFilesList[thisFileIndex, 2]!=1)
+               Continue
 
-         imgPath := resultedFilesList[thisFileIndex, 1]
-         If (InStr(imgPath, "||") || !imgPath)
-            Continue
-    
-         countTFilez++
-         oBitmap := LoadBitmapFromFileu(imgPath)
+            countTFilez++
+            imgPath := StrReplace(resultedFilesList[thisFileIndex, 1], "|")
+            If !FileRexists(imgPath)
+            {
+               failedFiles++
+               Continue
+            }
+         } Else {
+            If (!isInRange(thisFileIndex, startIndex, endIndex) && PrintPDFpagesRange=3)
+               Continue
+
+            countTFilez++
+         }
+
+         frameLoad := (multiFramesMode=1) ? thisFileIndex - 1 : 0
+         oBitmap := LoadBitmapFromFileu(imgPath, 0, 0, frameLoad)
          If !validBMP(oBitmap)
          {
             failedFiles++
@@ -51365,21 +51427,21 @@ batchImgPrinting(PrintOptions) {
       {
          etaTime := ETAinfos(countTFilez, filesElected, startOperation)
          If (failedFiles>0)
-            etaTime .= "`nFor " groupDigits(failedFiles) " files, the operations failed"
+            etaTime .= "`nFor " groupDigits(failedFiles) A_Space alabelu ", the operations failed"
 
-         showTOOLtip("Processing images to be printed, please wait" etaTime, 0, 0, countTFilez / filesElected)
+         showTOOLtip("Processing " labelu " to be printed, please wait" etaTime, 0, 0, countTFilez / filesElected)
          prevMSGdisplay := A_TickCount
       }
    }
 
    CurrentSLD := backCurrentSLD
    If (failedFiles>0)
-      someErrors .= "`nFor " groupDigits(failedFiles) " files, printing failed"
+      someErrors .= "`nFor " groupDigits(failedFiles) A_Space alabelu ", printing failed"
 
    If (abandonAll=1)
-      showTOOLtip("Operation aborted. " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files`nthe printing process began" someErrors)
+      showTOOLtip("Operation aborted. " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected " alabelu "`nthe printing process began" someErrors)
    Else
-      showTOOLtip(groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files were processed for printing." someErrors)
+      showTOOLtip(groupDigits(countFilez) " out of " groupDigits(filesElected) " selected " alabelu " were processed for printing." someErrors)
 
    ForceRefreshNowThumbsList()
    dummyTimerDelayiedImageDisplay(100)
@@ -66899,7 +66961,7 @@ createMenuOpenRecents(modus:=0) {
             Break
 
          countItemz++
-         If (StrLen(A_LoopField)<4 || !RegExMatch(A_LoopField, RegExFilesPattern))
+         If (StrLen(A_LoopField)<4 || !RegExMatch(A_LoopField, RegExFilesPattern) || !FileRexists(A_LoopField))
             Continue
 
          entryu := (userPrivateMode=1) ? "*:\*******\******.***" : PathCompact(A_LoopField, 30)
@@ -95922,7 +95984,7 @@ friendlyPDFerrorCodes(errorType, pwd) {
 GetTextsFromPDF(imgPath, frameu, linkz, pwd:="", ByRef pageCount:=0, ByRef errorType:=0) {
    linkz *= 2
    errorType := -100
-   varOut = -2 - linkz
+   varOut := -2 - linkz
    If (pwd="")
       pwd := PDFpwdsCache[imgPath]
 

@@ -45,6 +45,7 @@
 #include "includes\pdfium\fpdf_text.h"
 #include "includes\pdfium\fpdf_annot.h"
 #include "includes\pdfium\fpdf_doc.h"
+#include "includes\pdfium\fpdf_edit.h"
 using namespace std;
 using namespace cimg_library;
 #define DLL_API extern "C" __declspec(dllexport)
@@ -6182,12 +6183,8 @@ void TraverseBookmarks(FPDF_DOCUMENT doc, FPDF_BOOKMARK bookmark,
         {
             unsigned long type = FPDFAction_GetType(action);
             FPDF_DEST dest = FPDFAction_GetDest(doc, action);
-            if (dest && type == PDFACTION_GOTO) {
-                pageNumber = FPDFDest_GetDestPageIndex(doc, dest);
-                // int pageIndex = FPDFDest_GetDestPageIndex(doc, dest);
-                // if (pageIndex >= 0)
-                //    pageNumber = pageIndex;
-            }
+            if (dest && type == PDFACTION_GOTO)
+               pageNumber = FPDFDest_GetDestPageIndex(doc, dest);
         } else 
         {
            FPDF_DEST dest = FPDFBookmark_GetDest(doc, bookmark);
@@ -6225,6 +6222,14 @@ DLL_API unsigned short* DLL_CALLCONV ExtractPDFBookmarks(const wchar_t *pdfPath,
 // The output is a series of lines formatted as:
 // "page number | parentCounters.currentCounter. bookmark title\n"
 // The caller must free the returned buffer
+
+    // unsigned long permissions = FPDF_GetDocPermissions(doc);
+    // if (permissions == (unsigned long)-1)
+    //    std::cout << "Document is not encrypted, all permissions granted.\n";
+
+    // if (permissions & 0x0004) std::cout << " - Printing Allowed\n";
+    // if (permissions & 0x0008) std::cout << " - Modifying Allowed\n";
+    // if (permissions & 0x0010) std::cout << " - Copying Allowed\n";
 
     *errorType = 0;
     FPDF_DOCUMENT doc = FPDF_LoadDocument(WideCharToString(pdfPath).c_str(), WideCharToString(password).c_str());
@@ -6307,6 +6312,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
               if (textPage)
               {
                  textLength = FPDFText_CountChars(textPage);
+                 textLength += FPDFPage_CountObjects(PDFpage);
                  FPDFText_ClosePage(textPage);
               } else {
                  *errorType = -6;
@@ -6369,8 +6375,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
            if (!annot)
               continue;
  
-           FPDF_ANNOTATION_SUBTYPE subtype = FPDFAnnot_GetSubtype(annot);
-           if (subtype == FPDF_ANNOT_LINK)
+           if (FPDFAnnot_GetSubtype(annot) == FPDF_ANNOT_LINK)
            {
                FPDF_LINK link = FPDFAnnot_GetLink(annot);
                if (!link) continue;
