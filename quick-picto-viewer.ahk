@@ -25034,6 +25034,7 @@ ThumbsNavigator(keyu, aKey) {
 }
 
 PanIMGonScreen(direction, thisKey) {
+   Static lastInvoked := 1, lastState := 0, repeats := 0
    If (IMGresizingMode!=4)
    {
       IMGdecalageX := IMGdecalageY := 1
@@ -25057,6 +25058,43 @@ PanIMGonScreen(direction, thisKey) {
    stepu := Round(mainHeight*stepu + mainWidth*stepu)//2 + 1
    If (thisKey="-")
       stepu := stepu//2 + 1
+
+   If ((direction="U" || direction="D") && RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|tiff|tif))$"))
+   {
+      If (FlipImgV=1 && allowFreeIMGpanning=1)
+         diru := (direction="U") ? "D" : "U"
+      Else
+         diru := direction
+
+      kh := (fastMode=1) ? stepu*2 : stepu*5 ; mainHeight//5
+      pyy := prevDestPosY + prevResizedVPimgH
+      If (allowFreeIMGpanning=1)
+      {
+         ppd := (prevDestPosY < (-1*prevResizedVPimgH + kh) && diru="D") ? 1 : IMGdecalageY
+         ppu := (prevDestPosY > (mainHeight - kh) && diru="U") ? 1 : IMGdecalageY
+         pp := (diru="U") ? ppu : ppd
+      } Else
+         pp := IMGdecalageY
+      ; fnOutputDebug(A_ThisFunc ": " pp "|" kh "|" IMGdecalageY "|" prevResizedVPimgH "|" prevDestPosY)
+      thisState := (diru="U" || diru="D") ? IMGdecalageX "|" pp "|" diru "|" getIDimage(currentFileIndex) "|" currentFileIndex : 0
+      If (lastState=thisState && (A_TickCount - lastInvoked<1050))
+      {
+         If (repeats>1)
+         {
+            repeats := 0
+            PrintPosX := diru
+            IMGdecalageY := 1
+            diffIMGdecY := 0
+            If (diru="D")
+               MenuNextDesiredFrame()
+            Else
+               MenuPrevDesiredFrame()
+            Return
+         }
+         repeats++
+      } Else
+         repeats := 0
+   } Else repeats := lastState := 0
 
    If (direction="U" && FlipImgV=0) || (direction="D" && FlipImgV=1)
       IMGdecalageY := IMGdecalageY + stepu
@@ -25083,6 +25121,8 @@ PanIMGonScreen(direction, thisKey) {
       dummyTimerDelayiedImageDisplay(5)
    }
 
+   lastState := thisState
+   lastInvoked := A_TickCount
    Return 1
 }
 
@@ -54272,6 +54312,9 @@ PanelPDFreadTexts() {
     }
 
     Gui, Tab
+    getPDFpageCountProtectState(getIDimage(currentFileIndex), "", isProtectedPDF, pageCount)
+    If (isProtectedPDF=1)
+       Gui, Add, Text, xs y+10, The PDF permissions dictate it is forbidden to copy texts. Proceed mindfully.
 
     ml := (PrefsLargeFonts=1) ? 35 : 25
     GuiAddButton("xs y+10 h" thisBtnHeight " w" ml " gBtnPrevImg", "<<", "Previous image")
@@ -54407,6 +54450,16 @@ BTNprevPDFpage() {
    SetTimer, UIpopulatePDFtexts, -150
 }
 
+getPDFpageCountProtectState(imgPath, pwd, ByRef givenIndex, ByRef pageCount) {
+   pageCount := 0
+   givenIndex := -1 ; to retrieve page count 
+   If (pwd="")
+      pwd := PDFpwdsCache[imgPath]
+
+   errorType := DllCall("qpvmain.dll\RenderPdfPageAsText", "Str", imgPath, "Int*", givenIndex, "int*", pageCount, "Str", pwd, "UPtr", 0, "int*", 0)
+   Return errorType
+}
+
 UIpopulatePDFtexts() {
    If (AnyWindowOpen!=90)
       Return
@@ -54419,20 +54472,15 @@ UIpopulatePDFtexts() {
       userActivePDFpage := currentFileIndex - 1
    } Else If (thumbsDisplaying=1)
    {
-      actu := -6
-      errorType := -100
-      DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", 0, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+      errorType := getPDFpageCountProtectState(imgPath, pwd, isProtectedPDF, pageCount)
       If (asked := promptUserPDFpassword(A_ThisFunc, imgPath, errorType, pwd))
-         DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", 0, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+         errorType := getPDFpageCountProtectState(imgPath, pwd, isProtectedPDF, pageCount)
 
-      If (errorType)
-      {
+      If (errorType) {
          userActivePDFpage := 0
-         ; msgBoxWrapper(appTitle ": ERROR", friendlyPDFerrorCodes(errorType, pwd) ". ", 0, 0, "error")
-         ; Return
       } Else
       {
-         userActivePDFpage := clampInRange(userActivePDFpage, 0, actu)
+         userActivePDFpage := clampInRange(userActivePDFpage, 0, pageCount)
          If (asked=1)
             PDFpwdsCache[imgPath] := pwd
       }
@@ -54534,20 +54582,20 @@ CoreExtractALLtextsPDF(imgPath, frameu, modus, pwd, ByRef err) {
 
 BTNextractALLtextsCurrentPDF() {
    imgPath := getIDimage(currentFileIndex)
-   actu := -6
-   errorType := -100
    pwd := PDFpwdsCache[imgPath]
-   DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", 0, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+   errorType := getPDFpageCountProtectState(imgPath, pwd, isProtectedPDF, pageCount)
    If (asked := promptUserPDFpassword(A_ThisFunc, imgPath, errorType, pwd))
-      DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", 0, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+      errorType := getPDFpageCountProtectState(imgPath, pwd, isProtectedPDF, pageCount)
 
-   If (errorType)
+   If (errorType || !pageCount)
    {
-      msgBoxWrapper(appTitle ": ERROR", friendlyPDFerrorCodes(errorType, pwd) ". ", 0, 0, "error")
+      If errorType
+         msgBoxWrapper(appTitle ": ERROR", friendlyPDFerrorCodes(errorType, pwd) ". ", 0, 0, "error")
+      Else
+         msgBoxWrapper(appTitle ": ERROR", "No pages found in the PDF. ", 0, 0, "error")
       Return
    }
 
-   pageCount := actu
    If (asked=1)
       PDFpwdsCache[imgPath] := pwd
 
@@ -59183,13 +59231,11 @@ coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
 
 coreExtractBatchModeTextsFromGivenPDF(modus, thisFileIndex, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
    failedFrames := extractedFrames := abandonAll := yay := 0
-   actu := -6
    imgPath := getIDimage(thisFileIndex)
    pwd := PDFpwdsCache[imgPath]
-   errorType := -100
-   DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", 0, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+   errorType := getPDFpageCountProtectState(imgPath, pwd, isProtectedPDF, pageCount)
    If (asked := promptUserPDFpassword(A_ThisFunc, imgPath, errorType, pwd))
-      DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", 0, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+      errorType := getPDFpageCountProtectState(imgPath, pwd, isProtectedPDF, pageCount)
 
    If (errorType)
       Return -4
@@ -59197,7 +59243,7 @@ coreExtractBatchModeTextsFromGivenPDF(modus, thisFileIndex, prevMSGdisplay, bonu
    If (asked=1)
       PDFpwdsCache[imgPath] := pwd
 
-   tFrames := actu
+   tFrames := pageCount
    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
    startOperation := A_TickCount
    indeed := 0
@@ -59283,15 +59329,13 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
       extractedFrames := extracted
       failedFrames := thisu
       Return r
-   } Else  If RegExMatch(imgPath, "i)(.\.pdf)$")
+   } Else If RegExMatch(imgPath, "i)(.\.pdf)$")
    {
-      actu := -6
-      pwd := PDFpwdsCache[imgPath]
       extractedFrames := 0
-      errorType := -100
-      DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+      pwd := PDFpwdsCache[imgPath]
+      errorType := getPDFpageCountProtectState(imgPath, pwd, isProtectedPDF, pageCount)
       If (asked := promptUserPDFpassword(A_ThisFunc, imgPath, errorType, pwd))
-         DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", actu, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+         errorType := getPDFpageCountProtectState(imgPath, pwd, isProtectedPDF, pageCount)
 
       If (errorType)
       {
@@ -59302,7 +59346,7 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
       If (asked=1)
          PDFpwdsCache[imgPath] := pwd
 
-      tFrames := actu
+      tFrames := pageCount
       zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
       If (inLoop!=1)
       {
@@ -70872,13 +70916,26 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
    If (A_TickCount - lastTitleChange>300)
       setWindowTitle("Adapting image to viewport")
 
-   If (imageAligned=5 && (gdiBMPchanged=1 || isVarEqualTo(PrintPosX, "X", "W", "C")) && IMGresizingMode=4)
+   thisThing := (imageAligned=5 || PrintPosX="U" || PrintPosY="D") ? 1 : 0
+   If (thisThing=1 && (gdiBMPchanged=1 || isVarEqualTo(PrintPosX, "X", "W", "C")) && IMGresizingMode=4)
    {
       thisSize := "a" Round(GuiW/1.5 - ResizedW/1.5) . Round(GuiH/1.5 - ResizedH/1.5) maxFilesIndex ; currentFileIndex imgPath prevResizedVPimgW prevResizedVPimgH
       If (PrintPosX="W")
       {
          IMGdecalageX += Round((prevResizedVPimgW - ResizedW)/2)
          IMGdecalageY += Round((prevResizedVPimgH - ResizedH)/2)
+         prevSize := thisSize
+      } Else If (PrintPosX="D")
+      {
+         IMGdecalageY := (allowFreeIMGpanning=0 && FlipImgV=1) ? -1*ResizedH : ResizedH
+         If (allowFreeIMGpanning=1)
+            IMGdecalageY -= Round(GuiH * 1.75)
+         prevSize := thisSize
+      } Else If (PrintPosX="U")
+      {
+         IMGdecalageY := (allowFreeIMGpanning=0 && FlipImgV=1) ? ResizedH : -1 * ResizedH
+         If (allowFreeIMGpanning=1)
+            IMGdecalageY += Round(GuiH*0.85)
          prevSize := thisSize
       } Else If (prevSize!=thisSize && undoLevelsRecorded<2 || PrintPosX="X")
       {
@@ -95974,6 +96031,8 @@ friendlyPDFerrorCodes(errorType, pwd) {
        r := "Failed to create the FPDF bitmap to render PDF"
     else If (errorType=-6)
        r := "Failed to retrieve PDF text page from PDF page"
+    else If (errorType=-7)
+       r := "The characters on the page have invalid unicode mapping"
     else if (errorType=-100)
        r := "RenderPdfPageAsBitmap() from qpvmain.dll failed to execute"
     else if (errorType!=0)
@@ -95982,31 +96041,37 @@ friendlyPDFerrorCodes(errorType, pwd) {
 }
 
 GetTextsFromPDF(imgPath, frameu, linkz, pwd:="", ByRef pageCount:=0, ByRef errorType:=0) {
-   linkz *= 2
-   errorType := -100
-   varOut := -2 - linkz
    If (pwd="")
       pwd := PDFpwdsCache[imgPath]
 
-   DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+   pageCount := 0
+   pp := (linkz=1) ? "Links" : ""
+   errorType := DllCall("qpvmain.dll\RenderPdfPageAsText" pp, "Str", imgPath, "Int*", frameu, "int*", pageCount, "Str", pwd, "UPtr", 0, "int*", bufferSize)
    If (asked := promptUserPDFpassword(A_ThisFunc, imgPath, errorType, pwd))
-      DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int*", 0, "int*", 1, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", 0, "UPtr")
+      errorType := DllCall("qpvmain.dll\RenderPdfPageAsText" pp, "Str", imgPath, "Int*", frameu, "int*", pageCount, "Str", pwd, "UPtr", 0, "int*", bufferSize)
 
-   If (varOut>0 && errorType=0)
+   If (bufferSize>0 && errorType=0)
    {
       If (asked=1)
          PDFpwdsCache[imgPath] := pwd
 
-      VarSetCapacity(textBuffer, (varOut+0) * 16, 0)
-      varOut := -3 - linkz 
-      DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", 96, "int*", 300, "int*", 300, "int", 0, "int", 1, "int*", varOut, "int*", errorType, "Str", pwd, "UPtr", &textBuffer, "UPtr")
-      if (varOut>1 && errorType=0)
+      VarSetCapacity(textBuffer, (bufferSize+0) * 16, 0)
+      errorType := DllCall("qpvmain.dll\RenderPdfPageAsText" pp, "Str", imgPath, "Int*", frameu, "int*", pageCount, "Str", pwd, "UPtr", &textBuffer, "int*", bufferSize)
+      if (bufferSize>1 && errorType=0)
       {
-         txt := StrGet(&textBuffer, varOut, "UTF-16")
+         txt := StrGet(&textBuffer, bufferSize, "UTF-16")
          if (linkz>0)
          {
+            aa := ""
             Sort, txt, UD|
-            txt := Trimmer(StrReplace(txt, "|", "`n `n"))
+            Loop, Parse, txt, |
+            {
+                If A_LoopField
+                   aa .= Trim(Trimmer(A_LoopField), "/\?") "|"
+            }
+
+            Sort, aa, UD|
+            txt := Trimmer(StrReplace(aa, "|", "`n `n"))
          }
       }
       textBuffer := ""
@@ -96040,7 +96105,7 @@ promptUserPDFpassword(funcu, imgPath, errorType, ByRef pwd) {
 
 RenderPDFpage(imgPath, noBPPconv, frameu, ByRef pwd:="", maxW:=0, maxH:=0, dpi:=450, ByRef pageCount:=0, ByRef errorType:=0, fillBgr:=1, bgrColor:="ffffff") {
     If (noBPPconv=1)
-       pageCount := -6
+       pageCount := -2 ; retrieve details about the pdf page: page count, w/h
 
     errorType := -100
     do24bits := (noBPPconv=2) ? 1 : 0
@@ -96065,9 +96130,9 @@ RenderPDFpage(imgPath, noBPPconv, frameu, ByRef pwd:="", maxW:=0, maxH:=0, dpi:=
        }
     }
 
-    pBitmap := DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", dpi, "int*", maxW, "int*", maxH, "int", fillBgr, "int", "0xff" bgrColor, "int*", pageCount, "int*", errorType, "Str", pwd, "UPtr", 0, "int", do24bits, "UPtr")
+    pBitmap := DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", dpi, "int*", maxW, "int*", maxH, "int", fillBgr, "int", "0xff" bgrColor, "int*", pageCount, "int*", errorType, "Str", pwd, "int", do24bits, "UPtr")
     If (asked := promptUserPDFpassword(A_ThisFunc, imgPath, errorType, pwd))
-       pBitmap := DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", dpi, "int*", maxW, "int*", maxH, "int", fillBgr, "int", "0xff" bgrColor, "int*", pageCount, "int*", errorType, "Str", pwd, "UPtr", 0, "int", do24bits, "UPtr")
+       pBitmap := DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", dpi, "int*", maxW, "int*", maxH, "int", fillBgr, "int", "0xff" bgrColor, "int*", pageCount, "int*", errorType, "Str", pwd, "int", do24bits, "UPtr")
 
     If StrLen(pBitmap)>2
     {

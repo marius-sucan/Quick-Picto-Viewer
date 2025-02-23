@@ -6223,14 +6223,6 @@ DLL_API unsigned short* DLL_CALLCONV ExtractPDFBookmarks(const wchar_t *pdfPath,
 // "page number | parentCounters.currentCounter. bookmark title\n"
 // The caller must free the returned buffer
 
-    // unsigned long permissions = FPDF_GetDocPermissions(doc);
-    // if (permissions == (unsigned long)-1)
-    //    std::cout << "Document is not encrypted, all permissions granted.\n";
-
-    // if (permissions & 0x0004) std::cout << " - Printing Allowed\n";
-    // if (permissions & 0x0008) std::cout << " - Modifying Allowed\n";
-    // if (permissions & 0x0010) std::cout << " - Copying Allowed\n";
-
     *errorType = 0;
     FPDF_DOCUMENT doc = FPDF_LoadDocument(WideCharToString(pdfPath).c_str(), WideCharToString(password).c_str());
     if (!doc)
@@ -6264,16 +6256,212 @@ DLL_API unsigned short* DLL_CALLCONV ExtractPDFBookmarks(const wchar_t *pdfPath,
     return buffer;
 }
 
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdfPath, int pageIndex, float dpi, int* givenW, int* givenH, int fillBehind, int bgrColor, int *varOut, int *errorType, const wchar_t* password, unsigned short* textBuffer, int do24bits) {
+DLL_API int DLL_CALLCONV RenderPdfPageAsTextLinks(const wchar_t *pdfPath, int *givenIndex, int *pages, const wchar_t* password, unsigned short* textBuffer, int *bufferSize) {
+    int errorType = 0;
+    FPDF_DOCUMENT document = FPDF_LoadDocument(WideCharToString(pdfPath).c_str(), WideCharToString(password).c_str());
+    if (!document)
+    {
+        errorType = FPDF_GetLastError();
+        if (errorType==4)
+           fnOutputDebug("failed to load PDF document: incorrect password " + std::to_string(errorType));
+        else
+           fnOutputDebug("failed to load PDF document: " + std::to_string(errorType) );
+
+        return errorType;
+    }
+
+    int pageCount = FPDF_GetPageCount(document);
+    if (pageCount<=0)
+    {
+       fnOutputDebug("failed to load PDF: no pages found");
+       errorType = -2;
+       return errorType;
+    }
+
+    *pages = pageCount;
+    int pageIndex = std::clamp(*givenIndex, 0, pageCount - 1);
+    FPDF_PAGE PDFpage = FPDF_LoadPage(document, pageIndex);
+    if (PDFpage)
+    {
+       FPDF_TEXTPAGE textPage = FPDFText_LoadPage(PDFpage);
+       if (textPage)
+       {
+           int index = 0;
+           const int buffSize = 1024;
+           int annotCount = FPDFPage_GetAnnotCount(PDFpage);
+           for (int i = 0; i < annotCount; ++i)
+           {
+               FPDF_ANNOTATION annot = FPDFPage_GetAnnot(PDFpage, i);
+               if (!annot)
+                  continue;
+     
+               if (FPDFAnnot_GetSubtype(annot) == FPDF_ANNOT_LINK)
+               {
+                   FPDF_LINK link = FPDFAnnot_GetLink(annot);
+                   if (!link) continue;
+  
+                   FPDF_ACTION action = FPDFLink_GetAction(link);
+                   if (action)
+                   {
+                       if (textBuffer==NULL)
+                       {
+                          index += buffSize;
+                          FPDFPage_CloseAnnot(annot);
+                          continue;
+                       }
+  
+                       char buffer[buffSize] = {0};
+                       FPDFAction_GetURIPath(document, action, buffer, sizeof(buffer));
+                       for (int z = 0; z < buffSize; ++z)
+                       {
+                           if (buffer[z]==0)
+                           {
+                              textBuffer[index] = '|';
+                              index++;
+                              break;
+                           }
+  
+                           textBuffer[index] = buffer[z];
+                           index++;
+                       }
+                   }
+               }
+               FPDFPage_CloseAnnot(annot);
+           }
+
+           FPDF_PAGELINK pageWebLinks = FPDFLink_LoadWebLinks(textPage);
+           if (pageWebLinks)
+           {
+              int link_count = FPDFLink_CountWebLinks(pageWebLinks);
+              if (textBuffer!=NULL)
+              {
+                 for (int i = 0; i < link_count; i++)
+                 {
+                     unsigned long url_buffer_size = FPDFLink_GetURL(pageWebLinks, i, nullptr, 0);
+                     if (url_buffer_size > 0)
+                     {
+                        std::vector<unsigned short> buffer(url_buffer_size);
+                        FPDFLink_GetURL(pageWebLinks, i, buffer.data(), url_buffer_size);
+                        for (int z = 0; z < url_buffer_size; ++z)
+                        {
+                            textBuffer[index] = buffer[z];
+                            index++;
+                        }
+                        textBuffer[index] = '|';
+                        index++;
+                     }
+                 }
+              } else {
+                 index += buffSize * link_count;
+              }
+              FPDFLink_CloseWebLinks(pageWebLinks);
+           }
+
+           *bufferSize = index;
+           FPDFText_ClosePage(textPage);
+       } else {
+           errorType = -6;
+       }
+       FPDF_ClosePage(PDFpage);
+    } else {
+       errorType = -3;
+    }
+
+    FPDF_CloseDocument(document);
+    return errorType;
+}
+
+DLL_API int DLL_CALLCONV RenderPdfPageAsText(const wchar_t *pdfPath, int *givenIndex, int *pages, const wchar_t* password, unsigned short* textBuffer, int *bufferSize) {
+    int errorType = 0;
+    FPDF_DOCUMENT document = FPDF_LoadDocument(WideCharToString(pdfPath).c_str(), WideCharToString(password).c_str());
+    if (!document)
+    {
+        errorType = FPDF_GetLastError();
+        if (errorType==4)
+           fnOutputDebug("failed to load PDF document: incorrect password " + std::to_string(errorType));
+        else
+           fnOutputDebug("failed to load PDF document: " + std::to_string(errorType) );
+
+        return errorType;
+    }
+
+    int pageCount = FPDF_GetPageCount(document);
+    if (pageCount<=0)
+    {
+       fnOutputDebug("failed to load PDF: no pages found");
+       errorType = -2;
+       return errorType;
+    }
+
+    // if (permissions == (unsigned long)-1)
+    //    std::cout << "Document is not encrypted, all permissions granted.\n";
+    // if (permissions & 0x0004) std::cout << " - Printing Allowed\n";
+    // if (permissions & 0x0008) std::cout << " - Modifying Allowed\n";
+    if (*givenIndex==-1)
+    {
+       unsigned long permissions = FPDF_GetDocPermissions(document);
+       fnOutputDebug("perms=" + std::to_string(permissions));
+       if (!(permissions & 0x0010))
+          *givenIndex = 1; // copy not allowed
+
+       *pages = pageCount;
+       return errorType;
+    }
+
+    *pages = pageCount;
+    int pageIndex = std::clamp(*givenIndex, 0, pageCount - 1);
+    FPDF_PAGE PDFpage = FPDF_LoadPage(document, pageIndex);
+    if (PDFpage)
+    {
+       FPDF_TEXTPAGE textPage = FPDFText_LoadPage(PDFpage);
+       if (textPage)
+       {
+          UINT textLength = FPDFText_CountChars(textPage);
+          if (textBuffer!=NULL)
+          {
+             UINT extracted = 0;
+             UINT err = 0;
+             if (textLength>2)
+             {
+                for (UINT i = 0; i < textLength; ++i)
+                {
+                    int p = FPDFText_HasUnicodeMapError(textPage, i);
+                    err += abs(p);
+                }
+
+                if (textLength<15 || ( (float)err / (float)textLength < 0.8) )
+                   extracted = FPDFText_GetText(textPage, 0, textLength, textBuffer);
+                else
+                   errorType = -7;
+             }
+
+             *bufferSize = extracted;
+             fnOutputDebug("unicode errors = " + std::to_string(err) + " /  " + std::to_string(textLength));
+          } else
+          {
+             textLength += FPDFPage_CountObjects(PDFpage);
+             *bufferSize = textLength;
+          }
+
+          FPDFText_ClosePage(textPage);
+       } else {
+          errorType = -6;
+       }
+       FPDF_ClosePage(PDFpage);
+    } else {
+       errorType = -3;
+    }
+
+    FPDF_CloseDocument(document);
+    return errorType;
+}
+
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdfPath, int pageIndex, float dpi, int* givenW, int* givenH, int fillBehind, int bgrColor, int *varOut, int *errorType, const wchar_t* password, int do24bits) {
 // https://github.com/bblanchon/pdfium-binaries
     int act = *varOut;
     *errorType = 0;
     // act == -1; retrieve the total page count
-    // act == -2; get the buffer size necessary for the texts on a given page
-    // act == -3; retrieve the texts on a given page and fill textBuffer data
-    // act == -4; get the buffer size necessary for all the links on a given page
-    // act == -5; retrieve the links on a given page and fill the textBuffer data
-    // act == -6; retrieve the width and height of on a given page and total page count
+    // act == -2; retrieve the width and height of on a given page and total page count
     // errorType > 0; error codes from PDFium
     // errorType = -2; PDF seems to have no pages
     // errorType = -3; failed to retrieve PDF page from document 
@@ -6294,36 +6482,15 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
         return myBitmap;
     }
 
-    int textLength = 0;
     int pageCount = FPDF_GetPageCount(document);
-    if (pageCount<=0 || act==-1 || act==-2)
+    if (pageCount<=0 || act==-1)
     {
         if (pageCount<=0)
         {
            fnOutputDebug("failed to load PDF: no pages found");
            *errorType = -2;
-        } else if (act==-2)
-        {
-           pageIndex = std::clamp(pageIndex, 0, pageCount - 1);
-           FPDF_PAGE PDFpage = FPDF_LoadPage(document, pageIndex);
-           if (PDFpage)
-           {
-              FPDF_TEXTPAGE textPage = FPDFText_LoadPage(PDFpage);
-              if (textPage)
-              {
-                 textLength = FPDFText_CountChars(textPage);
-                 textLength += FPDFPage_CountObjects(PDFpage);
-                 FPDFText_ClosePage(textPage);
-              } else {
-                 *errorType = -6;
-              }
-              FPDF_ClosePage(PDFpage);
-           } else {
-              *errorType = -3;
-           }
         }
-
-        *varOut = (act==-2) ? textLength : pageCount;
+        *varOut = pageCount;
         FPDF_CloseDocument(document);
         return myBitmap;
     }
@@ -6345,108 +6512,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
     double pageHeight = FPDF_GetPageHeight(PDFpage);
     int bitmapWidth = (float)pageWidth * scale;
     int bitmapHeight = (float)pageHeight * scale;
-    if (act==-3)
-    {
-       FPDF_TEXTPAGE textPage = FPDFText_LoadPage(PDFpage);
-       if (textPage)
-       {
-          textLength = FPDFText_CountChars(textPage);
-          int extracted = FPDFText_GetText(textPage, 0, textLength, textBuffer);
-          // int extracted = FPDFText_GetBoundedText(textPage, 0, 0, pageWidth, pageHeight, textBuffer, textLength);
-          FPDFText_ClosePage(textPage);
-          *varOut = extracted;
-          // fnOutputDebug( ucs2_to_utf8(textBuffer, textLength) );
-       } else {
-          *errorType = -6;
-          *varOut = 0;
-       }
-
-       FPDF_ClosePage(PDFpage);
-       FPDF_CloseDocument(document);
-       return myBitmap;
-    } else if (act==-4 || act==-5)
-    {
-       int index = 0;
-       const int buffSize = 1024;
-       int annotCount = FPDFPage_GetAnnotCount(PDFpage);
-       for (int i = 0; i < annotCount; ++i)
-       {
-           FPDF_ANNOTATION annot = FPDFPage_GetAnnot(PDFpage, i);
-           if (!annot)
-              continue;
- 
-           if (FPDFAnnot_GetSubtype(annot) == FPDF_ANNOT_LINK)
-           {
-               FPDF_LINK link = FPDFAnnot_GetLink(annot);
-               if (!link) continue;
-
-               FPDF_ACTION action = FPDFLink_GetAction(link);
-               if (action)
-               {
-                   if (act==-4)
-                   {
-                      index += buffSize;
-                      FPDFPage_CloseAnnot(annot);
-                      continue;
-                   }
-
-                   char buffer[buffSize] = {0};
-                   FPDFAction_GetURIPath(document, action, buffer, sizeof(buffer));
-                   for (int z = 0; z < buffSize; ++z)
-                   {
-                       if (buffer[z]==0)
-                       {
-                          textBuffer[index] = '|';
-                          index++;
-                          break;
-                       }
-
-                       textBuffer[index] = buffer[z];
-                       index++;
-                   }
-               }
-           }
-           FPDFPage_CloseAnnot(annot);
-       }
-
-       FPDF_TEXTPAGE textPage = FPDFText_LoadPage(PDFpage);
-       if (textPage)
-       {
-           FPDF_PAGELINK pageWebLinks = FPDFLink_LoadWebLinks(textPage);
-           if (pageWebLinks)
-           {
-              int link_count = FPDFLink_CountWebLinks(pageWebLinks);
-              if (act==-4) {
-                 index += buffSize * link_count;
-              } else
-              {
-                 for (int i = 0; i < link_count; i++)
-                 {
-                     unsigned long url_buffer_size = FPDFLink_GetURL(pageWebLinks, i, nullptr, 0);
-                     if (url_buffer_size > 0)
-                     {
-                        std::vector<unsigned short> buffer(url_buffer_size);
-                        FPDFLink_GetURL(pageWebLinks, i, buffer.data(), url_buffer_size);
-                        for (int z = 0; z < url_buffer_size; ++z)
-                        {
-                            textBuffer[index] = buffer[z];
-                            index++;
-                        }
-                        textBuffer[index] = '|';
-                        index++;
-                     }
-                 }
-              }
-              FPDFLink_CloseWebLinks(pageWebLinks);
-           }
-           FPDFText_ClosePage(textPage);
-       }
-
-       *varOut = index;
-       FPDF_ClosePage(PDFpage);
-       FPDF_CloseDocument(document);
-       return myBitmap;
-    } else if (act==-6)
+    if (act==-2)
     {
        *varOut = pageCount;
        *givenW = (int)pageWidth;
@@ -6468,7 +6534,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
     *givenW = (int)pageWidth;
     *givenH = (int)pageHeight;
     int cbStride = (do24bits==1) ? bitmapWidth * 3 : bitmapWidth * 4;
-    Gdiplus::PixelFormat  destinationGdipFormat = (do24bits==1) ? PixelFormat24bppRGB : PixelFormat32bppPARGB;
+    Gdiplus::PixelFormat destinationGdipFormat = (do24bits==1) ? PixelFormat24bppRGB : PixelFormat32bppPARGB;
     Gdiplus::DllExports::GdipCreateBitmapFromScan0(bitmapWidth, bitmapHeight, cbStride, destinationGdipFormat, NULL, &myBitmap);
     if (myBitmap==NULL)
     {
@@ -6507,6 +6573,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
     FPDF_CloseDocument(document);
     return myBitmap;
 }; // RenderPdfPageAsBitmap
+
 
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPconv, int givenQuality, UINT givenW, UINT givenH, UINT keepAratio, UINT ScaleAnySize, UINT givenFrame, int doFlipHV, int useICM, const wchar_t *szFileName, UINT *&resultsArray, int isFIMokay) {
 // this function is meant to be self-contained and can be executed by different threads, via AHK
