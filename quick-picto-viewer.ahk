@@ -16709,26 +16709,27 @@ ToggleCorePixFmt() {
    RefreshImageFileAction()
 }
 
-alertReduceColorDepth() {
+alertReduceColorDepth(alertMode:=1) {
    If (validBMP(UserMemBMP) || viewportQPVimage.imgHandle)
       Return
 
    pixFmt := currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat
    thisImgBPP := SubStr(pixFmt, 1, InStr(pixFmt, "-") - 1)
-   If (currIMGdetails.HasAlpha=1 && thisImgBPP=32 && coreDesiredPixFmt="0x21808")
+   If (currIMGdetails.HasAlpha=1 && thisImgBPP=32 && coreDesiredPixFmt="0x21808" && liveDrawingBrushTool!=1)
+   {
       r := msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", "The image you now begin to edit has an alpha channel. However, " appTitle " is set to work in the 24-RGB space, without an alpha channel, to reduce memory usage.  Please activate the 32-RGBA mode to preserve the alpha channel.", "&OK|&Activate 32-RGBA", 1, "exclamation")
+      If InStr(r, "activate")
+      {
+         coreDesiredPixFmt := highDesiredPixFmt
+         If !undoLevelsRecorded
+            RefreshImageFileAction()
+      }
+   }
    
    If (thisImgBPP!=24 && thisImgBPP!=32)
-      msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", "The image you now begin to edit is at an unsupported color depth for editing: " pixFmt "`n`nThe image will be converted to 24 or 32 bits color depth. Therefore, some color information will likely be lost.", 0, 0, "exclamation")
+      msgu := "The image you now begin to edit is at an unsupported color depth for editing: " pixFmt "`n`nThe image will be converted to 24 or 32 bits color depth. Therefore, some color information will likely be lost."
    Else If (currIMGdetails.Frames>1)
-      msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", "The image you now begin to edit has " currIMGdetails.Frames " frames or pages.`n`nOnly the current frame will be preserved, the other frames will be discarded. ", 0, 0, "exclamation")
-
-   If InStr(r, "activate")
-   {
-      coreDesiredPixFmt := highDesiredPixFmt
-      If !undoLevelsRecorded
-         RefreshImageFileAction()
-   }
+      msgu := "The image you now begin to edit has " currIMGdetails.Frames " frames or pages.`n`nOnly the current frame will be preserved, the other frames will be discarded. "
 
    trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
    tooBigA := isImgSizeTooLarge(currIMGdetails.Width, currIMGdetails.Height)
@@ -16739,7 +16740,18 @@ alertReduceColorDepth() {
    {
       infoRes := "`nOriginal resolution: " groupDigits(currIMGdetails.Width) " x " groupDigits(currIMGdetails.Height) " px | " ompx " MPx"
       newRes := "`nViewport resolution: " groupDigits(imgW) " x " groupDigits(imgH) " px | " mpx " MPx"
-      msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", "The image you now begin to edit exceeds the maximum possible dimensions for image editing." infoRes "`n`nYou will edit it now at an automatically downscaled resolution:" newRes, 0, 0, "exclamation")
+      msgu .= "`n`nThe image you now begin to edit exceeds the maximum possible dimensions for image editing." infoRes "`n`nYou will edit it now at an automatically downscaled resolution:" newRes
+   }
+
+   If !msgu
+      Return
+
+   If (alertMode=1) {
+      msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", Trimmer(msgu), 0, 0, "exclamation")
+   } Else
+   {
+      showTOOLtip("WARNING: " Trimmer(msgu))
+      SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 }
 
@@ -16819,7 +16831,7 @@ downscaleHugeImagesForEditing() {
    }
 }
 
-mergeViewPortEffectsImgEditing(funcu:=0, recordUndoAfter:=0, allowOutside:=0) {
+mergeViewPortEffectsImgEditing(funcu:=0, recordUndoAfter:=0, allowOutside:=0, allowAlerts:=1) {
     If (slideShowRunning=1)
        ToggleSlideShowu()
 
@@ -16858,7 +16870,7 @@ mergeViewPortEffectsImgEditing(funcu:=0, recordUndoAfter:=0, allowOutside:=0) {
        Return 1
     }
 
-    alertReduceColorDepth()
+    alertReduceColorDepth(allowAlerts)
     ; mustOpenStartFolder := ""
     imgIndexEditing := currentFileIndex
     currentImgModified := 1
@@ -16898,7 +16910,7 @@ mergeViewPortEffectsImgEditing(funcu:=0, recordUndoAfter:=0, allowOutside:=0) {
 
        currIMGdetails.Frames := 0
        currIMGdetails.ActiveFrame := 0
-       desiredFrameIndex := totalFramesIndex := 0
+       totalFramesIndex := 0
        imgFxMode := usrColorDepth := 1
        vpIMGrotation := 0 ; FlipImgH := FlipImgV := 0
        defineColorDepth()
@@ -20279,6 +20291,11 @@ convertImageIntoHugeImage(newW, newH, quality, clr:=0) {
       Return
    }
 
+   currIMGdetails.Frames := 0
+   currIMGdetails.ActiveFrame := 0
+   totalFramesIndex := 0
+   imgPath := StrReplace(getIDimage(currentFileIndex), "||")
+   ShowTheImage("set-prev", imgPath)
    terminateIMGediting()
    If validBMP(gdiBitmap)
       gdiBitmap := trGdip_DisposeImage(gdiBitmap)
@@ -20288,7 +20305,6 @@ convertImageIntoHugeImage(newW, newH, quality, clr:=0) {
    If validBMP(whichBitmap)
       Gdip_BitmapSetColorDepth(whichBitmap, "BW")
 
-   imgPath := StrReplace(getIDimage(currentFileIndex), "||")
    viewportQPVimage.DiscardImage()
    killQPVscreenImgSection()
    currentImgModified := 1
@@ -25059,7 +25075,7 @@ PanIMGonScreen(direction, thisKey) {
    If (thisKey="-")
       stepu := stepu//2 + 1
 
-   If ((direction="U" || direction="D") && RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|tiff|tif))$"))
+   If ((direction="U" || direction="D") && RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|tiff|tif))$") && undoLevelsRecorded<1 && totalFramesIndex>1)
    {
       If (FlipImgV=1 && allowFreeIMGpanning=1)
          diru := (direction="U") ? "D" : "U"
@@ -25068,13 +25084,14 @@ PanIMGonScreen(direction, thisKey) {
 
       kh := (fastMode=1) ? stepu*2 : stepu*5 ; mainHeight//5
       pyy := prevDestPosY + prevResizedVPimgH
-      If (allowFreeIMGpanning=1)
+      If (allowFreeIMGpanning=1 && IMGlargerViewPort=1)
       {
          ppd := (prevDestPosY < (-1*prevResizedVPimgH + kh) && diru="D") ? 1 : IMGdecalageY
          ppu := (prevDestPosY > (mainHeight - kh) && diru="U") ? 1 : IMGdecalageY
          pp := (diru="U") ? ppu : ppd
       } Else
          pp := IMGdecalageY
+
       ; fnOutputDebug(A_ThisFunc ": " pp "|" kh "|" IMGdecalageY "|" prevResizedVPimgH "|" prevDestPosY)
       thisState := (diru="U" || diru="D") ? IMGdecalageX "|" pp "|" diru "|" getIDimage(currentFileIndex) "|" currentFileIndex : 0
       If (lastState=thisState && (A_TickCount - lastInvoked<1050))
@@ -32194,6 +32211,8 @@ Return
 
 msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, checkBoxuCaption:="", checkState:=0, dropListu:="",edithu:="", edithuDef:="", listEditMode:=0, setWidth:=0, 2ndDropListu:=0, 2ndlistEditMode:=0) {
     Static msgBoxed := 0
+    If !msg
+       Return
 
     mouseTurnOFFtooltip()
     If (msgBoxed=1 && MsgBox2hwnd)
@@ -45261,7 +45280,7 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
 }
 
 updateViewportCachesID(oMD5name, indexu, file2rem, file2save) {
-   ShowTheImage("set-prev", desiredFrameIndex "|" file2save)
+   ShowTheImage("set-prev", file2save)
    If (viewportQPVimage.imgHandle)
    {
       viewportQPVimage.ImgFile := file2save
@@ -56254,9 +56273,12 @@ PanelJump2index() {
             msgResult.list := 2
          Else If InStr(usrJumpIndex, "s")
             msgResult.list := 3
-         Else If ((InStr(usrJumpIndex, "f") || InStr(usrJumpIndex, "p")) && isAnim)
+         Else If ((InStr(usrJumpIndex, "f") || InStr(usrJumpIndex, "p")))
             msgResult.list := 4
       }
+
+      If (msgResult.list=4 && !isAnim)
+         Return
 
       newJumpIndex := usrJumpIndex := Trimmer( RegExReplace(usrJumpIndex, "i)([a-zA-Z]|[[:space:]]|[[:punct:]])") )
       If !isNumber(usrJumpIndex)
@@ -70503,7 +70525,7 @@ ShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
      }
   }
 
-  thisImgPath := desiredFrameIndex "|" imgPath
+  thisImgPath := imgPath
   doIT := ((A_TickCount - lastInvoked<125) && (drawModeAzeit>180 && LastWasFastDisplay!=1 && prevDrawingMode=1)) || ((A_TickCount - lastInvoked<65) && (prevImgPath!=thisImgPath && drawModeAzeit>50)) || ((A_TickCount - lastInvoked<10) && prevDrawingMode=1) ? 1 : 0
   skippedKeys := navKeysCounter - prevNavKeysu
   delayu := (skippedKeys>1) ? 450 : 350
@@ -70541,13 +70563,13 @@ ShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
      dummyFastImageChangePlaceHolder(OutFileName, OutDir)
      ; SetTimer, dummyFastImageChangePlaceHolder, -15
      dummyTimerReloadThisPicture(550)
-     prevImgPath := desiredFrameIndex "|" imgPath
+     prevImgPath := imgPath
   } Else
   {
      If (animGIFplaying=1)
         usePrevious := 0
 
-     prevImgPath :=  desiredFrameIndex "|" imgPath
+     prevImgPath :=  imgPath
      If (thumbsDisplaying=1) && (A_TickCount - prevFullThumbsUpdate < 200) ; && (prevStartIndex!=prevFullIndexThumbsUpdate)
         prevTryThumbsUpdate := A_TickCount
 
@@ -70583,7 +70605,7 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
    startZeitIMGload := A_TickCount
    SetTimer, ResetImgLoadStatus, Off
    ThisPrev := (ForceIMGload=1 || usePrevious=2) ? 1 : 0
-   thisImgPath := desiredFrameIndex "|" imgPath
+   thisImgPath := imgPath
    If (thisImgPath=prevImgPath && StrLen(prevImgPath)>4 && ThisPrev!=1)
       usePrevious := 1
 
@@ -70706,7 +70728,7 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
           If (slideShowRunning!=1)
              SoundBeep, 300, 100
           Return "fail"
-       } Else prevImgPath := desiredFrameIndex "|" imgPath
+       } Else prevImgPath := imgPath
        lastInvoked := A_TickCount
    } Else If (vpImgPanningNow=0 && thisModus!=1)
    {
@@ -70719,7 +70741,7 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
    }
    ; SetTimer, ResetImgLoadStatus, -15
    lastInvoked2 := A_TickCount
-}
+} ; coreShowTheImage()
 
 dummyFastImageChangePlaceHolder(OutFileName, OutDir) {
    Static prevImgPath
@@ -70763,7 +70785,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
     If (imgPath="set-prev")
     {
        prevImgPath := usePrevious
-       extraID := ColorDepthDithering vpIMGrotation usrTextureBGR usrColorDepth bwDithering
+       extraID := desiredFrameIndex ColorDepthDithering vpIMGrotation usrTextureBGR usrColorDepth bwDithering
        IDprevImgPath := usePrevious "-" userHQraw extraID
        Return
     }
@@ -70787,8 +70809,12 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
     calcScreenLimits()
     extraID := desiredFrameIndex ColorDepthDithering vpIMGrotation usrTextureBGR usrColorDepth bwDithering ; UserMemBMP currentUndoLevel undoLevelsRecorded
     IDthisImgPath := imgPath "-" userHQraw extraID
-    thisImgPath := desiredFrameIndex "|" imgPath
-    If (thisImgPath!=prevImgPath || IDthisImgPath!=IDprevImgPath || !validBMP(gdiBitmap) || ForceIMGload=1)
+    thisImgPath := imgPath
+    allowReload := (whileLoopExec=1 && liveDrawingBrushTool=1) ? 0 : 1
+    If (allowReload=0)
+       ForceIMGload := 0
+
+    If ((thisImgPath!=prevImgPath || IDthisImgPath!=IDprevImgPath || !validBMP(gdiBitmap) || ForceIMGload=1) && allowReload=1)
     {
        ; ToolTip, % IDthisImgPath "`n" IDprevImgPath "`n" ForceIMGload "|" validBMP(gdiBitmap) , , , 2
        gdiBMPchanged := 1
@@ -70797,7 +70823,8 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
           terminateIMGediting()
           If InStr(filesFilter, "QPV:PAGES:") ? 
              desiredFrameIndex := currentFileIndex - 1
-          Else If (SubStr(prevImgPath, InStr(prevImgPath, "|"))!=SubStr(thisImgPath, InStr(thisImgPath, "|")))
+          ; Else If (SubStr(prevImgPath, InStr(prevImgPath, "|"))!=SubStr(thisImgPath, InStr(thisImgPath, "|")))
+          Else If (prevImgPath!=thisImgPath)
              desiredFrameIndex := 0
        } 
 
@@ -70813,6 +70840,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
        disposeCacheIMGs()
        changeMcursor()
        r1 := CloneScreenMainBMP(imgPath, mustReloadIMG, hasFullReloaded)
+       ; fnOutputDebug(A_ThisFunc ": " mustReloadIMG "|" hasFullReloaded)
        abortImgLoad := interfaceThread.ahkgetvar.canCancelImageLoad
        If (abortImgLoad>2)
        {
@@ -70845,7 +70873,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
        Return "error"
     }
 
-   prevImgPath := desiredFrameIndex "|" imgPath
+   prevImgPath := imgPath
    IDprevImgPath := imgPath "-" userHQraw extraID
    vpWinClientSize(GuiW, GuiH, PVhwnd, 0)
    If (IMGresizingMode=3) ; original [100%]
@@ -70935,7 +70963,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
       {
          IMGdecalageY := (allowFreeIMGpanning=0 && FlipImgV=1) ? ResizedH : -1 * ResizedH
          If (allowFreeIMGpanning=1)
-            IMGdecalageY += Round(GuiH*0.85)
+            IMGdecalageY += Round(GuiH*0.75)
          prevSize := thisSize
       } Else If (prevSize!=thisSize && undoLevelsRecorded<2 || PrintPosX="X")
       {
@@ -70948,6 +70976,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
    } Else If (allowFreeIMGpanning!=1 || imageAligned!=5 || IMGresizingMode!=4 || gdiBMPchanged=1)
       prevSize := 0
 
+   ; fnOutputDebug(A_ThisFunc ":A " thisThing " | " IMGdecalageY " | " PrintPosY)
    If (hSNDsong && StrLen(SlidesMusicSong)>3 && autoPlaySlidesAudio=1 && gdiBMPchanged=1)
    {
       If RegExMatch(MCI_Status(hSNDsong), "i)^(stop|pause)")
@@ -71005,6 +71034,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
    If (o_ImgQuality=1)
       ToggleImgQuality("highu")
 
+   ; fnOutputDebug(A_ThisFunc ":B " thisThing " | " IMGdecalageY " | " PrintPosY)
    SetTimer, ResetImgLoadStatus, -15
    Return r
 } ; // ResizeImageGDIwin()
@@ -71679,21 +71709,22 @@ LoadFileWithWIA(imgPath, fastMode, noBMP:=0, sizesDesired:=0, ByRef newBitmap:=0
 }
 
 setViewPortGDIPimageEditingProperties() {
-   If (thumbsDisplaying=1)
+   whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
+   If (thumbsDisplaying=1 || !validBMP(whichBitmap))
       Return
 
-   currIMGdetails.PixelFormat := Gdip_GetImagePixelFormat(UserMemBMP, 2)
+   currIMGdetails.PixelFormat := Gdip_GetImagePixelFormat(whichBitmap, 2)
    If (currIMGdetails.HasAlpha!=1)
       currIMGdetails.PixelFormat := StrReplace(currIMGdetails.PixelFormat, "A")
 
-   currIMGdetails.RawFormat := Gdip_GetImageRawFormat(UserMemBMP)
-   trGdip_GetImageDimensions(UserMemBMP, w, h)
+   currIMGdetails.RawFormat := Gdip_GetImageRawFormat(whichBitmap)
+   trGdip_GetImageDimensions(whichBitmap, w, h)
    currIMGdetails.Width := w
    currIMGdetails.Height := h
    currIMGdetails.Frames := 0
    currIMGdetails.ActiveFrame := 0
    currIMGdetails.TooLargeGDI := 0
-   desiredFrameIndex := totalFramesIndex := 0
+   totalFramesIndex := 0
 }
 
 LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
@@ -72242,14 +72273,14 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   changeMcursor()
   thisImgPath := imgPath
   allowCaching := !minimizeMemUsage
-  If validBMP(UserMemBMP)
+  If (validBMP(UserMemBMP) || liveDrawingBrushTool=1)
      allowCaching := 0
 
   If (slideShowRunning!=1 && (A_TickCount - lastInvoked>2000))
      interfaceThread.ahkPostFunction("uiAccessImgViewSetUIlabels")
 
   oBitmap := LoadBitmapForScreen(thisImgPath, allowCaching, desiredFrameIndex)
-  ; ToolTip, % currIMGdetails.OpenedWith , , , 2
+  ; fnOutputDebug(A_ThisFunc ": " allowCaching "|" desiredFrameIndex "|" currIMGdetails.OpenedWith)
   If !validBMP(oBitmap)
      Return "error"
 
@@ -74934,6 +74965,9 @@ ActPaintBrushNow() {
    Critical, on
    Static lastInvoked := 1, prevMX, prevMY, countClicks, HasTested
 
+   If (A_TickCount - lastOtherWinClose<450)
+      Return
+
    If mergeViewPortRotationImgEditing()
    {
       dummyTimerDelayiedImageDisplay(10)
@@ -74941,22 +74975,27 @@ ActPaintBrushNow() {
       Return
    }
 
-   mergeViewPortEffectsImgEditing(A_ThisFunc)
+   If mergeViewPortEffectsImgEditing(A_ThisFunc, 0, 0, 0)
+      Return
+
    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
    trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
    If (!imgW || !imgH)
    {
-      addJournalEntry("ERROR: Main bitmap seems to be inexistent. Failure occured in " A_ThisFunc "()")
+      showTOOLtip("ERROR: Main bitmap seems to be inexistent. Failure occured in " A_ThisFunc "()")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
    }
-
-   If (A_TickCount - lastOtherWinClose<450)
-      Return
 
    canApplyFXa := (PasteInPlaceHue!=0 || PasteInPlaceSaturation!=0) && (BrushToolApplyColorFX=1) ? 1 : 0
    canApplyFXb := (PasteInPlaceLight!=0 || PasteInPlaceGamma!=0) && (BrushToolApplyColorFX=1) ? 1 : 0
    If (BrushToolBlurStrength<3 && canApplyFXa=0 && canApplyFXb=0 && BrushToolType=5)
+   {
+      showTOOLtip("WARNING: No brush effect to apply.")
+      SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
+   }
 
    interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
    interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
@@ -75080,7 +75119,9 @@ ActPaintBrushNow() {
    If (!validBMP(brushu) && BrushToolType>1)
    {
       ; liveDrawingBrushTool := 0
-      addJournalEntry("ERROR: no brush image. Failure occured in " A_ThisFunc "()")
+      showTOOLtip("ERROR: no brush image. Failure occured in " A_ThisFunc "()")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
    }
 
@@ -75104,7 +75145,9 @@ ActPaintBrushNow() {
       If gdipbrushu
          Gdip_DeleteBrush(gdipbrushu)
 
-      addJournalEntry(A_ThisFunc "(). ERROR. Failed to create graphics object on bmp=" whichBitmap)
+      showTOOLtip(A_ThisFunc "(). Failed to create GDI+ Graphics Object on bitmap = " whichBitmap)
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
    }
 
@@ -75164,6 +75207,7 @@ ActPaintBrushNow() {
       prevMX := prevMY := 0
 
    offX := offY := 0
+   ShowTheImage("set-prev", imgPath)
    setWhileLoopExec(1)
    Static plopa := 0
    While, (determineLClickState()=1 || A_Index<2)
@@ -75512,9 +75556,9 @@ ActPaintBrushNow() {
 
          dummyResizeImageGDIwin()
       }
-   }
+   } ; while loop end
 
-   If (advancedSoftBrush=1 && opacityBMPmap)
+   If (advancedSoftBrush=1 && validBMP(opacityBMPmap))
    {
       ; tzGdip_DrawImageFast(2NDglPG, opacityBMPmap, 20, 20)
       ; r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
@@ -75522,7 +75566,6 @@ ActPaintBrushNow() {
       trGdip_DisposeImage(opacityBMPmap)
    }
 
-   setWhileLoopExec(0)
    Gdip_DeleteGraphics(Gu)
    If validBMP(brushu)
       trGdip_DisposeImage(brushu, 1)
@@ -75534,13 +75577,16 @@ ActPaintBrushNow() {
       Gdip_DeleteBrush(gdipbrushu)
 
    MouseMoveResponder()
-   If (((A_TickCount - lastInvoked>350) || preventUndoLevels=1) && validBMP(metaBitmap))
+   If (((A_TickCount - lastInvoked>350) || preventUndoLevels=1 || undoLevelsRecorded<2) && validBMP(metaBitmap))
    {
+      fnOutputDebug(A_ThisFunc ": recorded bitmap?")
       UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
       UserMemBMP := trGdip_CloneBitmap(A_ThisFunc, metaBitmap)
       recordUndoLevelNow(0, metaBitmap)
-   }
+   } Else If !validBMP(metaBitmap)
+      fnOutputDebug(A_ThisFunc ": no bitmap to record")
 
+   setWhileLoopExec(0)
    ; liveDrawingBrushTool := 0
    If (thisIndex>10 || lastWasLowQuality=1)
       SetTimer, wrapResizeImageGDIwin, -60
@@ -78526,10 +78572,10 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
 
     mustGoIntoLowQuality := 0
     thisDelayu := (vpImgPanningNow=2 || sizeChanged=1) ? 950 : 400
-    If (((A_TickCount - lastZeitLowQuality<thisDelayu + prevDelayu) || (drawModeAzeit>70 && mustPlayAnim=1 && desiredFrameIndex>1) || (usePrevious=1)) && (userimgQuality=1 && usePrevious!=2 && zoomLevel!=1) || (zoomLevel>5))
+    If (((A_TickCount - lastZeitLowQuality<thisDelayu + prevDelayu) || (drawModeAzeit>70 && mustPlayAnim=1 && desiredFrameIndex>1) || (usePrevious=1)) && (userimgQuality=1 && usePrevious!=2 && zoomLevel!=1) || (zoomLevel>10 && userimgQuality=1))
        mustGoIntoLowQuality := 1
 
-    If ((mustPlayAnim=1 || imgEditPanelOpened=1 || drawingShapeNow=1 || paintBrushToolActive=1) && (userimgQuality=1))
+    If ((mustPlayAnim=1 || liveDrawingBrushTool=1 || imgEditPanelOpened=1 || drawingShapeNow=1 || paintBrushToolActive=1) && userimgQuality=1)
        mustGoIntoLowQuality := 2
 
     If (mustGoIntoLowQuality=1 && minimizeMemUsage!=1 && mustGenerate=0 && usePrevious!=2 && mustPlayAnim!=1 && imgFxMode>1 && vpImgPanningNow!=2)
@@ -78626,7 +78672,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     thisImgAlphaChn := "a" IntensityAlphaChannel thisThingMatrix isAlphaMaskMode
     trGdip_GetImageDimensions(whichBitmap, rImgW, rImgH)
     ; ToolTip, % forceNoFXcaching "==" vpImgPanningNow "|" allowVPcacheOptimizations "`n" thisVPcachePos "`n" prevVPcachePos , , , 2
-    If (thisVPcachePos!=prevVPcachePos || forceNoFXcaching=1 || !validBMP(ViewPortBMPcache) || thisImgAlphaChn!=prevImgAlphaChn || liveDrawingBrushTool=1)
+    If (thisVPcachePos!=prevVPcachePos || forceNoFXcaching=1 || !validBMP(ViewPortBMPcache) || thisImgAlphaChn!=prevImgAlphaChn)
     {
        If (mustGoIntoLowQuality>0)
        {
@@ -81911,15 +81957,19 @@ calcIMGcoordsInVP(mainWidth, mainHeight, newW, newH, zL, oIMGdecX, oIMGdecY, ByR
        If (DestPosX>minTopCornerX && newW>mainWidth)
           IMGdecX := DestPosX := minTopCornerX
 
-       If (DestPosY>minTopCornerY && newH>mainHeight)
+       If (DestPosY>minTopCornerY && newH>mainHeight || PrintPosX="D" && allowFreeIMGpanning=0 && FlipImgV=0)
           IMGdecY := DestPosY := minTopCornerY
 
+       If (PrintPosX="D" && allowFreeIMGpanning=0 && FlipImgV=1)
+          IMGdecY := DestPosY := LY
+       Else If (PrintPosX="U" && allowFreeIMGpanning=0)
+          IMGdecY := DestPosY := (FlipImgV=1) ? minTopCornerY : LY
        ; ToolTip, % IMGdecX "|" IMGdecY "`n" LX//2 "|" LY//2 , , , 2
     }
 
     DestPosX := Round(DestPosX)
-    IMGdecX := Round(IMGdecX)
     DestPosY := Round(DestPosY)
+    IMGdecX := Round(IMGdecX)
     IMGdecY := Round(IMGdecY)
 
     prevCX := (DestPosX<0) ? abs(DestPosX) + o_mW/2 : -1*(DestPosX - o_mW/2)
