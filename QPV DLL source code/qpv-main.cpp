@@ -2493,15 +2493,13 @@ RGBAColor mixColorsFloodFill(RGBAColor colorB, RGBAColor colorA, float f, int dy
      // float thisCLRindex = RGBtoGray(rB, gB, bB, alternateMode);
      if (alternateMode==3)
      {
-        fz = (float)thisCLRindex/tolerance;
+        fz = clamp ( (float)thisCLRindex/tolerance, 0.0f, 1.0f);
      } else 
      {
         float diffu = max(thisCLRindex, prevCLRindex) - min(thisCLRindex, prevCLRindex);
-        fz = (float)diffu/tolerance;
+        fz = clamp( (float)diffu/tolerance, 0.0f, 1.0f);
      }
-     f = f - fz;
-     if (f<0)
-        f = 0;
+     f = clamp(f - fz, 0.0f, 1.0f);
   }
 
   if (blendMode>0)
@@ -2687,11 +2685,15 @@ clipMaskFilter() can also rely on a bitmap, but it must be passed directly to it
     return z;
 }
 
-bool decideColorsEqual(RGBAColor newColor, RGBAColor oldColor, float tolerance, float prevCLRindex, int alternateMode, float *nC, float& index) {
+bool decideColorsEqual(RGBAColor newColor, RGBAColor oldColor, float tolerance, float prevCLRindex, int alternateMode, float *nC, float& index, int debug=0) {
     // should use CIEDE2000
-    if (oldColor.r == newColor.r && oldColor.g == newColor.g && oldColor.b == newColor.b)
+    if (oldColor.r == newColor.r && oldColor.g == newColor.g && oldColor.b == newColor.b && alternateMode!=3)
+    {
+       index = prevCLRindex;
        return 1;
-    else if (tolerance<1)
+    }
+
+    if (tolerance<1)
        return 0;
 
     bool result;
@@ -2705,6 +2707,8 @@ bool decideColorsEqual(RGBAColor newColor, RGBAColor oldColor, float tolerance, 
        index = RGBtoGray(newColor.r, newColor.g, newColor.b, alternateMode);
        result = inRange(index - tolerance, index + tolerance, prevCLRindex);
     }
+    // if (debug==1)
+    //    fnOutputDebug("clr==" + std::to_string(newColor.r) + "," + std::to_string(newColor.g) + "," + std::to_string(newColor.b) + "  |  " + std::to_string(index) );
     return result;
 }
 
@@ -2937,12 +2941,9 @@ int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBA
        return 0;
 
     int loopsOccured = 0;
-    #pragma omp parallel for schedule(static) default(none) // num_threads(3)
+    #pragma omp parallel for schedule(static) default(none) shared(loopsOccured)  // num_threads(3)
     for (int zx = 0; zx < w; zx++)
     {
-        float index;
-        RGBAColor oldColor = prevColor;
-        RGBAColor thisColor = {0, 0, 0, 0};
         for (int zy = 0; zy < h; zy++)
         {
             if (useSelArea==1)
@@ -2951,12 +2952,19 @@ int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBA
                   continue;
             }
 
+            float index = -4100;
+            RGBAColor oldColor = prevColor;
+            RGBAColor thisColor = {0, 0, 0, 0};
             INT64 o = CalcPixOffset(zx, zy, Stride, bpp);
             int oA = (bpp==32) ? 255 : imageData[3 + o];
             int oR = imageData[2 + o];
             int oG = imageData[1 + o];
             int oB = imageData[o];
             RGBAColor clr = {oB, oG, oR, oA};
+            // int debug = (zx>=425 && zx<=495 && zy>=925 && zy<=995) ? 1 : 0;
+            // if (debug==1)
+            //    fnOutputDebug(std::to_string(prevCLRindex) + "= prevCLRindex; clr=" + std::to_string(clr.r) + "," + std::to_string(clr.g) + "," + std::to_string(clr.b) + "  | index=" + std::to_string(index) );
+
             if (decideColorsEqual(clr, prevColor, tolerance, prevCLRindex, alternateMode, labClr, index))
             {
                if (tolerance>0 && (opacity<1 || dynamicOpacity==1 || blendMode>0 || cartoonMode==1))
@@ -6436,7 +6444,7 @@ DLL_API int DLL_CALLCONV RenderPdfPageAsText(const wchar_t *pdfPath, int *givenI
              }
 
              *bufferSize = extracted;
-             fnOutputDebug("unicode errors = " + std::to_string(err) + " /  " + std::to_string(textLength));
+             // fnOutputDebug("unicode errors = " + std::to_string(err) + " /  " + std::to_string(textLength));
           } else
           {
              textLength += FPDFPage_CountObjects(PDFpage);

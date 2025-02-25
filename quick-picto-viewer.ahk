@@ -31684,7 +31684,7 @@ populateExifToolInfos() {
       Gui, SettingsGUIA: ListView, LViewMetaM
       LV_Delete()
       cmdLine := """" mainExecPath "\exiftool.exe"" -all """ getIDimage(currentFileIndex) """ `r`n `r`n"
-      output := Cli_RunCMD(cmdLine, A_WorkingDir, "CP850", "", 4500)
+      output := Cli_RunCMD(cmdLine, A_WorkingDir, "UTF-8", "", 4500)
       ; ToolTip, % output , , , 2
       hasAdded := 0
       Loop, Parse, % output,`n,`r
@@ -38593,8 +38593,8 @@ batchRemoveMetaData() {
       Return
    }
 
-   ; cmdExifTool := new cli("CMD.exe","","CP850")
-   cmdExifTool := new cli("""" mainExecPath "\exiftool.exe"" -stay_open true -@ ""-""" ,"","CP850")
+   ; cmdExifTool := new cli("CMD.exe","","UTF-8")
+   cmdExifTool := new cli("""" mainExecPath "\exiftool.exe"" -stay_open true -@ ""-""" ,"","UTF-8")
    baseCmdLine := "`n-preserve`n-overwrite_original`n-all=`n"
    ; cmdLine := """" mainExecPath "\exiftool.exe"" -stay_open true -@ ""-""`r`n `r`n"
    ; cmdExifTool.Write(cmdLine)
@@ -75579,7 +75579,7 @@ ActPaintBrushNow() {
    MouseMoveResponder()
    If (((A_TickCount - lastInvoked>350) || preventUndoLevels=1 || undoLevelsRecorded<2) && validBMP(metaBitmap))
    {
-      fnOutputDebug(A_ThisFunc ": recorded bitmap?")
+      ; fnOutputDebug(A_ThisFunc ": recorded bitmap?")
       UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
       UserMemBMP := trGdip_CloneBitmap(A_ThisFunc, metaBitmap)
       recordUndoLevelNow(0, metaBitmap)
@@ -78540,8 +78540,9 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     If (CountGIFframes>1 && !AnyWindowOpen && animGIFsSupport=1 && prevAnimGIFwas!=imgPath)
        mustPlayAnim := 1
 
-    If (mustPlayAnim=1)
+    If (mustPlayAnim=1) || (IMGresizingMode=4 && allowFreeIMGpanning=1)
     {
+       ; with (IMGresizingMode=4 && allowFreeIMGpanning=1), everything goes bonkers
        prevVPcacheZoom[1] := 0
        allowVPcacheOptimizations := 0
     } Else
@@ -92554,14 +92555,6 @@ PopulateStaticFolderzList(listFilter:=0, modus:=0) {
     RemoveTooltip()
     SetTimer, ResetImgLoadStatus, -25
     Tooltip
-}
-
-StrPutVar(string, ByRef var, encoding) {
-    ; Ensure capacity.
-    ; StrPut returns char count, but VarSetCapacity needs bytes.
-    VarSetCapacity(var, StrPut(string, encoding) * ((encoding="utf-16"||encoding="cp1200") ? 2 : 1))
-    ; Copy or convert the string.
-    return StrPut(string, &var, encoding)
 }
 
 PopulateDynamicFolderzList() {
