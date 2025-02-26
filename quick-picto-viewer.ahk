@@ -782,7 +782,7 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
             Else If (givenKey="F3")
                omniBoxFolderImport()
             Else If (givenKey="F5")
-               SetTimer, PopulateQuickMenuSearch, -150
+               SetTimer, uiPopulateQuickMenuSearch, -150
             Else If (givenKey="F7")
                omniBoxFolderCreateNew()
             Else If (givenKey="F8")
@@ -9322,7 +9322,7 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
                msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action from the main window into the omnibox: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: selected files`nDestination: .\" rDest "\", "&Yes|&No", 2, "question", "Do not ask again in this application session")
                If !InStr(msgResult.btn, "Yes")
                {
-                  SetTimer, PopulateQuickMenuSearch, -200
+                  SetTimer, uiPopulateQuickMenuSearch, -200
                   Return 1
                } Else doNotaskAgain := msgResult.check
             }
@@ -16490,6 +16490,7 @@ coreChangeImgUndoLevel(levelu) {
    vpIMGrotation := 0
    imgFxMode := usrColorDepth := 1
    defineColorDepth()
+   discardViewPortCaches()
    INIaction(1, "usrColorDepth", "General")
    INIaction(1, "vpIMGrotation", "General")
    INIaction(1, "imgFxMode", "General")
@@ -20264,6 +20265,15 @@ warnHugeImageNotFIM() {
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return 1
    }   
+}
+
+MenuPerformTeleportToFIM() {
+   If isImgEditingNow()
+   {
+      trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+      mergeViewPortEffectsImgEditing()
+      convertImageIntoHugeImage(imgW, imgh, 1)
+   }
 }
 
 convertImageIntoHugeImage(newW, newH, quality, clr:=0) {
@@ -26464,7 +26474,7 @@ omniBoxFolderCreateNew() {
    If r
    {
       prevOmniBoxFolder := newFileName
-      SetTimer, PopulateQuickMenuSearch, -150
+      SetTimer, uiPopulateQuickMenuSearch, -150
    }
 }
 
@@ -26490,7 +26500,7 @@ omniBoxFoldersPaste() {
 
    WinActivate, ahk_id %hQuickMenuSearchWin%
    If (r=2)
-      PopulateQuickMenuSearch("resel")
+      uiPopulateQuickMenuSearch("resel")
 }
 
 omniBoxFolderRename() {
@@ -26507,7 +26517,7 @@ omniBoxFolderRename() {
    If r
    {
       prevOmniBoxFolder := newFileName
-      SetTimer, PopulateQuickMenuSearch, -150
+      SetTimer, uiPopulateQuickMenuSearch, -150
    }
 }
 
@@ -26535,7 +26545,7 @@ omniBoxFolderDelete() {
       PanelQuickSearchMenuOptions()
 
    If (r="deleted")
-      SetTimer, PopulateQuickMenuSearch, -100
+      SetTimer, uiPopulateQuickMenuSearch, -100
 
    WinActivate, ahk_id %hQuickMenuSearchWin%
    SetTimer, ResetImgLoadStatus, -100
@@ -29758,14 +29768,14 @@ PanelImageInfos() {
     Gui, Tab
 
     ml := (PrefsLargeFonts=1) ? 35 : 25
-    GuiAddButton("xs y+20 h" thisBtnHeight " w" ml " gInfoBtnPrevImg", "<<", "Previous image")
-    GuiAddButton("x+5 hp wp gInfoBtnNextImg", ">>", "Next image")
+    GuiAddButton("xs y+20 h" thisBtnHeight " w" ml " gBtnPrevImg", "<<", "Previous image")
+    GuiAddButton("x+5 hp wp gBtnNextImg", ">>", "Next image")
     Gui, Add, Button, x+15 hp w%btnWid% gcopyIMGinfos2clip, &Copy to clipboard
     Gui, Add, Button, x+5 hp w%btnWid% gOpenThisFileFolder, &Explore folder
     Gui, Add, Button, x+5 hp w%btnWid% gOpenFileProperties, &File properties
     Gui, Add, Button, x+5 hp w90 Default gBtnCloseWindow, C&lose
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Image file details: " appTitle)
-    PopulateImgInfos()
+    uiPopulateImgInfos()
 }
 
 MenuPanelFoldersTree() {
@@ -30175,7 +30185,7 @@ FolderTreeResponder(a, b, c) {
             msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action from the folders tree panel into the omnibox: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: ." src "\`nDestination: ." dest "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
             If !InStr(msgResult.btn, "Yes")
             {
-               SetTimer, PopulateQuickMenuSearch, -200
+               SetTimer, uiPopulateQuickMenuSearch, -200
                Return 1
             } Else doNotaskAgain := msgResult.check
          }
@@ -31136,7 +31146,7 @@ fromFolderTreeToOmniBox(modus:=0,imgPath:=0) {
    GuiControl, QuickMenuSearchGUIA:, userQuickMenusEdit, % newLabelu
    GuiControl, QuickMenuSearchGUIA: Focus, userQuickMenusEdit
    EM_SETSEL(hEditMenuSearch, len, len)
-   SetTimer, PopulateQuickMenuSearch, -150
+   SetTimer, uiPopulateQuickMenuSearch, -150
 }
 
 folderTreeAppendFiles(modus:="") {
@@ -31496,24 +31506,6 @@ BtnCloseWindow() {
       BtnCloseWindow()
 }
 
-InfoBtnNextImg() {
-  If ((maxFilesIndex<2 || !maxFilesIndex) && StrLen(mustOpenStartFolder)<3)
-     Return
-
-  NextPicture()
-  Sleep, 1
-  SetTimer, PopulateImgInfos, -150
-}
-
-InfoBtnPrevImg() {
-  If ((maxFilesIndex<2 || !maxFilesIndex) && StrLen(mustOpenStartFolder)<3)
-     Return
-
-  PreviousPicture()
-  Sleep, 1
-  SetTimer, PopulateImgInfos, -150
-}
-
 copyIMGinfos2clip() {
    Gui, SettingsGUIA: Default
    textu := "`nGENERAL DETAILS:`n"
@@ -31538,7 +31530,7 @@ copyIMGinfos2clip() {
    }
 }
 
-PopulateImgInfos() {
+uiPopulateImgInfos() {
    If (AnyWindowOpen!=5)
       Return
 
@@ -31674,10 +31666,10 @@ PopulateImgInfos() {
        LV_ModifyCol(A_Index, "AutoHdr Left")
 
    If FileExist(mainExecPath "\exiftool.exe")
-      populateExifToolInfos()
+      uiPopulateExifToolInfos()
 }
 
-populateExifToolInfos() {
+uiPopulateExifToolInfos() {
    If (AnyWindowOpen=5)
    {
       Gui, SettingsGUIA: Default
@@ -39157,7 +39149,7 @@ UImultiRenameChangeLVoffset(a:=0, b:=0, c:=0) {
    Else If (info="last")
       uiLVoffset := clampInRange(totalIndex - uiLVoffset, 0, totalIndex - uLVr*2)
    ; ToolTip, % a "=" b "=" c "=" info , , , 2
-   SetTimer, PopulateLVmultiRename, -250
+   SetTimer, uiPopulateLVmultiRename, -250
 }
 
 BtnHelpMultiRename() {
@@ -39173,7 +39165,7 @@ UIgenericComboAction(a:=0, b:=0, c:=0) {
    hwnd := Format("{1:#x}", z[1])
    allowCtrlBkspEdit(hwnd, thisV)
    If (AnyWindowOpen=8)
-      SetTimer, PopulateLVmultiRename, -450
+      SetTimer, uiPopulateLVmultiRename, -450
    Else If (AnyWindowOpen=61)
       SetTimer, dummyUIpopulateHelpKbdShortcutsList, -200
    Else If (AnyWindowOpen=6)
@@ -39411,7 +39403,7 @@ UIlvMultiRenameResponder(a, b, c) {
    }
 }
 
-PopulateLVmultiRename() {
+uiPopulateLVmultiRename() {
   Gui, SettingsGUIA: Default
   Gui, SettingsGUIA: ListView, LViewOthers
   GuiControlGet, UsrEditNewFileName
@@ -40096,7 +40088,7 @@ PanelBrowseAudioAnnotation() {
 
 UIeditQuickMenuSearchTrigger() {
    delayu := (omniBoxMode=1) ? -250 : -50
-   SetTimer, PopulateQuickMenuSearch, % delayu
+   SetTimer, uiPopulateQuickMenuSearch, % delayu
 }
 
 PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
@@ -40120,7 +40112,7 @@ PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
     {
        WinActivate, ahk_id %hQuickMenuSearchWin%
        interfaceThread.ahkassign("VisibleQuickMenuSearchWin", VisibleQuickMenuSearchWin)
-       PopulateQuickMenuSearch("resel")
+       uiPopulateQuickMenuSearch("resel")
        Return
     } Else If (createdQuickMenuSearchWin=1 && thisState=lastState)
     {
@@ -40128,7 +40120,7 @@ PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
        EM_SETSEL(hEditMenuSearch, 0, StrLen(userQuickMenusEdit))
        VisibleQuickMenuSearchWin := 1
        interfaceThread.ahkassign("VisibleQuickMenuSearchWin", VisibleQuickMenuSearchWin)
-       PopulateQuickMenuSearch("resel")
+       uiPopulateQuickMenuSearch("resel")
        SetTimer, updateUistatusLineQuickSearch, -50
        Return
     }
@@ -40179,7 +40171,7 @@ PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
     lastState := thisState
     repositionWindowCenter("QuickMenuSearchGUIA", hQuickMenuSearchWin, PVhwnd, "Quick menu options search")
     QuickMenuSearchGUIAGuiSize()
-    PopulateQuickMenuSearch()
+    uiPopulateQuickMenuSearch()
 }
 
 BtnClearQuickSearchEdit() {
@@ -40221,7 +40213,7 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
       omniBoxFolderImport()
    } Else If (b="K" && c=116) ; F5
    {
-      SetTimer, PopulateQuickMenuSearch, -150
+      SetTimer, uiPopulateQuickMenuSearch, -150
    } Else If (b="K" && c=118) ; F7
    {
       omniBoxFolderCreateNew()
@@ -40349,7 +40341,7 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
             msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action inside the omnibox: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: .\" rSrc "\`nDestination: .\" rDest "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
             If !InStr(msgResult.btn, "Yes")
             {
-               SetTimer, PopulateQuickMenuSearch, -200
+               SetTimer, uiPopulateQuickMenuSearch, -200
                Return 1
             } Else doNotaskAgain := msgResult.check
          }
@@ -40642,7 +40634,7 @@ GoQuickSearchAction(dummy:="", isGiven:=0, ef:=0) {
          GuiControl, QuickMenuSearchGUIA:, userQuickMenusEdit, % newLabelu
          ; GuiControl, QuickMenuSearchGUIA: Focus, userQuickMenusEdit
          EM_SETSEL(hEditMenuSearch, len, len)
-         SetTimer, PopulateQuickMenuSearch, -250
+         SetTimer, uiPopulateQuickMenuSearch, -250
       }
    } Else If IsFunc(funcu)
    {
@@ -40843,12 +40835,12 @@ buildQuickSearchMenus() {
    mustPreventMenus := 0
 }
 
-PopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
+uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
    Critical, on
    Static lastInvoked := 1
    If (A_TickCount - lastInvoked<350) && (a!="resel")
    {
-      SetTimer, PopulateQuickMenuSearch, -150
+      SetTimer, uiPopulateQuickMenuSearch, -150
       SetTimer, updateUistatusLineQuickSearch, -200
       Return
    }
@@ -41975,7 +41967,7 @@ PanelSaveSlideShowu() {
        infoThisSLD .= "`nFiles list has been modified. The changes are unsaved."
 
     btnWid3 := InStr(CurrentSLD, "\QPV\favourite-images-list.SLD") ? 2 : btnWid
-    Gui, Add, Text, xs y+20 w%EditWid%, % infoThisSLD
+    Gui, Add, Text, xs y+25 w%EditWid%, % infoThisSLD
     Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w%btnWid3% gBTNopenPanelDynamicFolderzWindow, &Manage folders
 
     If (showSave=1)
@@ -47969,6 +47961,7 @@ BTNimgResizeEditor() {
        If InStr(msgResult, "Continue")
        {
           BtnCloseWindow()
+          mergeViewPortRotationImgEditing()
           convertImageIntoHugeImage(max(imgW, tUserNewWidth), max(imgH, tUserNewHeight), ResizeQualityHigh)
           Return
        }
@@ -48274,7 +48267,7 @@ PanelManageVectorShapes() {
 
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Manage vector shapes: " appTitle)
     Sleep, 25
-    PopulateCustomVectorShapesList()
+    uiPopulateCustomVectorShapesList()
 }
 
 BTNopenCustomShapesFolder() {
@@ -48505,7 +48498,7 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
       BTNopenPrevPanel(mustOpenWin, "yes")
 }
 
-PopulateCustomVectorShapesList() {
+uiPopulateCustomVectorShapesList() {
     Static defaultShapes := {1:"right triangle", 2:"triangle", 3:"rhombus", 4:"box callout", 5:"star-5", 6:"star-4", 7:"christian cross", 8:"torus", 9:"Last temporarily saved"}
 
     thisIndex := 0
@@ -51215,7 +51208,7 @@ PanelPrintImage() {
 
     Gui, Add, Button, x+5 hp gBtnOpenPrinterOptions, &More options
     Gui, Add, Button, x+5 hp w80 gBtnCloseWindow, &Cancel
-    PopulateFontsList("TextInAreaFontName", "SettingsGUIA")
+    uiPopulateFontsList("TextInAreaFontName", "SettingsGUIA")
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Print image: " appTitle)
     ; SetTimer, updateUIprintPreview, -500
 }
@@ -51439,7 +51432,12 @@ batchImgPrinting(PrintOptions, multiFramesMode:=0, givenFile:=0, totalPages:=0) 
          Break
       }
 
-      If (A_TickCount - lastInvoked>3100) ; avoid creating printing jobs too fast
+      ; avoid creating printing jobs too fast
+      delayu := (countFilez>10) ? 1500 : 3500
+      If (countFilez>35)
+         delayu := (countFilez>70) ? 500 : 1000
+
+      If (A_TickCount - lastInvoked>delayu)
       {
          thisFileIndex++
          If (thisFileIndex>maxFilesIndex && multiFramesMode!=1 || thisFileIndex>totalPages && multiFramesMode=1)
@@ -51474,6 +51472,7 @@ batchImgPrinting(PrintOptions, multiFramesMode:=0, givenFile:=0, totalPages:=0) 
 
          zPlitPath(imgPath, 1, OutFileName, OutDir)
          r := printImageNow(oBitmap, PrintOptions, 0, 1, OutFileName)
+         ; r := Gdip_SaveBitmapToFile(oBitmap, "E:\Sucan twins\photos test\SLDs\freeimage-tests\tif-tests\" OutFileName A_Index ".jpg")
          trGdip_DisposeImage(oBitmap)
          If r
             failedFiles++
@@ -55019,7 +55018,7 @@ PanelInsertTextArea() {
     GuiAddToggleLivePreview("x+5 yp hp wp gBTNuiToggleLiveInsertTextPreview")
     Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction vbtnLiveApplyTool, &Apply
     Gui, Add, Button, x+5 hp w%ml% gBtnCloseWindow, &Cancel
-    ; PopulateFontsList("TextInAreaFontName", "SettingsGUIA")
+    ; uiPopulateFontsList("TextInAreaFontName", "SettingsGUIA")
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Insert text in image: " appTitle, winPos)
     SetTimer, updateUIInsertTextPanel, -250
@@ -55118,7 +55117,7 @@ uiADDalphaMaskTabs(t1, t2, labelu) {
     GuiAddSlider("BrushToolDryingRate", 0,20, 0, "Dry-out rate", labelu, 1, "x+10 wp hp")
 }
 
-PopulateFontsList(thisCtrl, guiu) {
+uiPopulateFontsList(thisCtrl, guiu) {
     If !FontList._NewEnum()[k, v]
     {
        Fnt_GetListOfFontsSimplified()
@@ -55331,7 +55330,7 @@ PanelPrefsWindow() {
     Gui, Add, UpDown, vambiTexBrushSize Range25-950, %ambiTexBrushSize%
     Gui, Add, Checkbox, x15 y+10 hp gupdateUIsettings Checked%borderAroundImage% vborderAroundImage, &Highlight image borders in the viewport
 
-    PopulateFontsList("OSDFontName", "SettingsGUIA")
+    uiPopulateFontsList("OSDFontName", "SettingsGUIA")
     Gui, Add, Button, xm+0 y+20 h%thisBtnHeight% w%btnWid% gOpenUImenu, &More options
     Gui, Add, Button, x+5 hp w90 gPrefsCloseBTN Default, Clo&se
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Interface settings: " appTitle)
@@ -64137,6 +64136,9 @@ createMenuBonusNoImageOpened() {
       kMenu("PVmenu", "Check", "Private mode UI")
    If (allowFIMloader=1)
       kMenu("PVmenu", "Check", "Allow FreeImage loader")
+
+   If (isImgEditingNow()=1)
+      kMenu("PVmenu", "Add", "Convert / teleport viewport image to Freeimage", "MenuPerformTeleportToFIM")
 
    If (isImgEditingNow()=1 && animGIFsSupport=1)
    {
@@ -75213,8 +75215,12 @@ ActPaintBrushNow() {
    While, (determineLClickState()=1 || A_Index<2)
    {
       If (thisOpacity<0.005 || brushSize<1)
+      {
+         If (BrushToolDryingRate>1)
+            SoundBeep , 900, 100
          Break
-      
+      }
+
       GetMouseCoord2wind(PVhwnd, mX, mY)
       If (BrushToolRandomPosX>0)
       {
@@ -75547,7 +75553,7 @@ ActPaintBrushNow() {
             ; ToolTip, % A_TickCount - thisZeit , , , 2
             If (Xgood=1 && Ygood=1 && A_index>1 || stepu<=1 && BrushToolType>5 || brushToolStepping=0 && brushSize>1 || BrushToolType>=7 || brushSize<1 || thisOpacity<0.005)
                Break
-         }
+         } ; inner-loop end
          prevState := thisState
          prevMX := kX, prevMY := kY
          zeitSillyPrevent := A_TickCount
@@ -75556,8 +75562,9 @@ ActPaintBrushNow() {
 
          dummyResizeImageGDIwin()
       }
-   } ; while loop end
+   } ; while-loop end
 
+   ; fnOutputDebug(gdiBitmap " | " whichBitmap " | " metaBitmap)
    If (advancedSoftBrush=1 && validBMP(opacityBMPmap))
    {
       ; tzGdip_DrawImageFast(2NDglPG, opacityBMPmap, 20, 20)
@@ -75577,7 +75584,7 @@ ActPaintBrushNow() {
       Gdip_DeleteBrush(gdipbrushu)
 
    MouseMoveResponder()
-   If (((A_TickCount - lastInvoked>350) || preventUndoLevels=1 || undoLevelsRecorded<2) && validBMP(metaBitmap))
+   If (((A_TickCount - lastInvoked>350) || preventUndoLevels=1) && validBMP(metaBitmap))
    {
       ; fnOutputDebug(A_ThisFunc ": recorded bitmap?")
       UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
@@ -75601,7 +75608,9 @@ ActDrawAlphaMaskBrushNow() {
    trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
    If (!imgW || !imgH)
    {
-      addJournalEntry("ERROR: main bitmap seems inexistent. Failure occured in " A_ThisFunc "()")
+      showTOOLtip("ERROR: Main bitmap seems to be inexistent or invalid.`nFailure occured in " A_ThisFunc "()")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
    }
 
@@ -75618,13 +75627,15 @@ ActDrawAlphaMaskBrushNow() {
    Random, randomFactor, -950, 950
    prevState := "a"
    liveDrawingBrushTool := 1
-   whichBitmap := userAlphaMaskBmpPainted
-   If !validBMP(whichBitmap)
+   If !validBMP(userAlphaMaskBmpPainted)
    {
-      addJournalEntry("ERROR: no alpha mask bitmap. Failure occured in " A_ThisFunc "()")
+      showTOOLtip("ERROR: No alpha mask bitmap. Failure occured in " A_ThisFunc "()")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
    }
 
+   whichBitmap := userAlphaMaskBmpPainted
    trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
    o_startToolColor := startToolColor := (BrushToolUseSecondaryColor=1) ? BrushToolBcolor : BrushToolAcolor
    thisMainOpacity := (BrushToolUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
@@ -75728,8 +75739,12 @@ ActDrawAlphaMaskBrushNow() {
    While, (determineLClickState()=1 || A_Index<2)
    {
       If (thisOpacity<0.005 || brushSize<2)
+      {
+         If (BrushToolDryingRate>1)
+            SoundBeep 900, 100
          Break
-      
+      }
+
       GetMouseCoord2wind(PVhwnd, mX, mY)
       mX := (FlipImgH=1) ? mainWidth - mX : mX
       mY := (FlipImgV=1) ? mainHeight - mY : mY
@@ -75828,7 +75843,7 @@ ActDrawAlphaMaskBrushNow() {
             ; ToolTip, % A_TickCount - thisZeit , , , 2
             If (Xgood=1 && Ygood=1 && A_index>1 || brushToolStepping=0 || brushSize<2 || thisOpacity<0.005)
                Break
-         }
+         } ; inner-loop end
          prevState := thisState
          prevMX := kX, prevMY := kY
          zeitSillyPrevent := A_TickCount
@@ -75838,7 +75853,7 @@ ActDrawAlphaMaskBrushNow() {
 
          corelivePreviewsImageEditing()
       }
-   }
+   } ; while-loop end
 
    setWhileLoopExec(0)
    Gdip_DeleteGraphics(Gu)
@@ -78540,7 +78555,8 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     If (CountGIFframes>1 && !AnyWindowOpen && animGIFsSupport=1 && prevAnimGIFwas!=imgPath)
        mustPlayAnim := 1
 
-    If (mustPlayAnim=1) || (IMGresizingMode=4 && allowFreeIMGpanning=1)
+    liveBrushModeUpdates := (liveDrawingBrushTool=1 && whileLoopExec=1 && AnyWindowOpen) ? 1 : 0
+    If (mustPlayAnim=1 || IMGresizingMode=4 && allowFreeIMGpanning=1 || liveBrushModeUpdates=1)
     {
        ; with (IMGresizingMode=4 && allowFreeIMGpanning=1), everything goes bonkers
        prevVPcacheZoom[1] := 0
@@ -78576,7 +78592,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     If (((A_TickCount - lastZeitLowQuality<thisDelayu + prevDelayu) || (drawModeAzeit>70 && mustPlayAnim=1 && desiredFrameIndex>1) || (usePrevious=1)) && (userimgQuality=1 && usePrevious!=2 && zoomLevel!=1) || (zoomLevel>10 && userimgQuality=1))
        mustGoIntoLowQuality := 1
 
-    If ((mustPlayAnim=1 || liveDrawingBrushTool=1 || imgEditPanelOpened=1 || drawingShapeNow=1 || paintBrushToolActive=1) && userimgQuality=1)
+    If ((mustPlayAnim=1 || liveDrawingBrushTool=1 || imgEditPanelOpened=1 || drawingShapeNow=1) && userimgQuality=1)
        mustGoIntoLowQuality := 2
 
     If (mustGoIntoLowQuality=1 && minimizeMemUsage!=1 && mustGenerate=0 && usePrevious!=2 && mustPlayAnim!=1 && imgFxMode>1 && vpImgPanningNow!=2)
@@ -78585,7 +78601,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     ; allowVPcacheOptimizations := 0, mustGoIntoLowQuality := 1
     If !(viewportQPVimage.imgHandle)
     {
-       If (liveDrawingBrushTool=1)
+       If (liveBrushModeUpdates=1)
           whichBitmap := gdiBitmap
        Else If (mustGenerate=1) ; window size
           whichBitmap := RescaleBMPtinyVPsize(imgPath, mainWidth, mainHeight)
@@ -78600,10 +78616,9 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
 
     sizeChanged := (prevNewW!=newW || prevNewH!=newH) ? 1 : 0
     prevNewW := newW, prevNewH := newH
-    ; ToolTip, % "resized cache = " mustGenerate , , , 2
+    ; ToolTip, % "resized cache = " mustGenerate " | " oldZoomLevel "==" zoomLevel  , , , 2
     interfaceThread.ahkassign("canCancelImageLoad", 0)
     startZeit := A_TickCount
-    ; ToolTip, % oldZoomLevel "==" zoomLevel , , , 2
     oldZoomLevel := matrix := ""
     prevDrawingMode := 1
     thisVPpanningNow := (vpImgPanningNow=2) ? 1 : 0
@@ -78673,7 +78688,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     thisImgAlphaChn := "a" IntensityAlphaChannel thisThingMatrix isAlphaMaskMode
     trGdip_GetImageDimensions(whichBitmap, rImgW, rImgH)
     ; ToolTip, % forceNoFXcaching "==" vpImgPanningNow "|" allowVPcacheOptimizations "`n" thisVPcachePos "`n" prevVPcachePos , , , 2
-    If (thisVPcachePos!=prevVPcachePos || forceNoFXcaching=1 || !validBMP(ViewPortBMPcache) || thisImgAlphaChn!=prevImgAlphaChn)
+    If (thisVPcachePos!=prevVPcachePos || forceNoFXcaching=1 || !validBMP(ViewPortBMPcache) || thisImgAlphaChn!=prevImgAlphaChn || liveBrushModeUpdates=1)
     {
        If (mustGoIntoLowQuality>0)
        {
@@ -78694,7 +78709,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
        windowScreenMGPX := Ceil((mainWidth * mainHeight)/1000000)
        azW := prevVPcacheZoom[8] , azH := prevVPcacheZoom[9]
        prevIMGrectMGPX := Round((azW * azH)/1000000) - 1
-       If (prevIMGrectMGPX<windowScreenMGPX//4.5 || liveDrawingBrushTool=1)        ; no need to slice and dice images when the rect we need is much smaller than the viewport
+       If (prevIMGrectMGPX<windowScreenMGPX//4.5 || liveBrushModeUpdates=1)        ; no need to slice and dice images when the rect we need is much smaller than the viewport
           hasPanned := thisVPpanningNow := AdpX := AdpY := diffuDestPosX := diffuDestPosY := 0
 
        Gdip_SetClipRect(glPG, 0, 0, mainWidth, mainHeight)
@@ -78870,7 +78885,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
                 Gdip_SetInterpolationMode(glPG, 3)
 
              thisModus := (thisPeffect || thisImageAttribs || thisUSRimgQuality=1 || allowFreeIMGpanning=1 && IMGresizingMode=4) ? 0 : 1
-             ; ToolTip, % " not cached  = " thisModus "`n" dpX "=" dpY "`n" kW "=" kH , , , 2
+             ; fnOutputDebug(whichBitmap " not cached  = " thisModus " | " dpX " x " dpY " | " kW "=" kH)
              drawVPpartialIMGsection(dpX, dpY, kW, kH, DestPosX, DestPosY, newW, newH, whichBitmap, glPG, dpX, dpY, kW, kH, thisImageAttribs, clrMatrix, thisPeffect, rImgW, rImgH, thisUSRimgQuality, thisModus)
              If (thisUSRimgQuality=1 && whichBitmap!=gdiBitmap)
                 Gdip_SetInterpolationMode(glPG, 7)
@@ -78960,6 +78975,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
 
           Gdip_DisposeEffect(pEffect)
        }
+
        aBmp := validBMP(thisBMP) ? thisBMP : ViewPortBMPcache
        r2 := trGdip_DrawImage(A_ThisFunc, glPG, aBmp, dpX, dpY, kW, kH, dpX, dpY, kW, kH,,, imageAttribs)
        Gdip_DisposeImageAttributes(imageAttribs)
@@ -86470,10 +86486,9 @@ resetOpeningPanel() {
 }
 
 BtnNextImg() {
-  If (maxFilesIndex<2 || !maxFilesIndex)
+  If ((maxFilesIndex<2 || !maxFilesIndex) && StrLen(mustOpenStartFolder)<3)
      Return
 
-  ; ForceNoColorMatrix := 0
   NextPicture()
   If (AnyWindowOpen=90)
   {
@@ -86481,13 +86496,14 @@ BtnNextImg() {
      SetTimer, UIpopulatePDFbookmarks, -225
   } Else If (AnyWindowOpen=22)
      SetTimer, updateUIcaptionsPanel, -100
+  Else If (AnyWindowOpen=5)
+     SetTimer, uiPopulateImgInfos, -125
 }
 
 BtnPrevImg() {
-  If (maxFilesIndex<2 || !maxFilesIndex)
+  If ((maxFilesIndex<2 || !maxFilesIndex) && StrLen(mustOpenStartFolder)<3)
      Return
 
-  ; ForceNoColorMatrix := 0
   PreviousPicture()
   If (AnyWindowOpen=90)
   {
@@ -86495,6 +86511,8 @@ BtnPrevImg() {
      SetTimer, UIpopulatePDFbookmarks, -225
   } Else If (AnyWindowOpen=22)
      SetTimer, updateUIcaptionsPanel, -100
+  Else If (AnyWindowOpen=5)
+     SetTimer, uiPopulateImgInfos, -125
 }
 
 updatePanelColorSliderz(modus:=0) {
@@ -89979,7 +89997,7 @@ PanelReviewSelectedFiles() {
         }
     }
 
-    PopulateReviewSelectedFiles("init")
+    uiPopulateReviewSelectedFiles("init")
 }
 
 BtnReviewSelClose() {
@@ -90331,7 +90349,7 @@ UIstringEditFilterErase() {
    {
       listViewReviewFilteru := ""
       GuiControl, SettingsGUIA:, listViewReviewFilteru, 
-      fn := Func("PopulateReviewSelectedFiles").Bind("back")
+      fn := Func("uiPopulateReviewSelectedFiles").Bind("back")
       SetTimer, % fn, -250
    } Else If (AnyWindowOpen=87)
    {
@@ -90353,7 +90371,7 @@ uiLVreviewSelFilesResponder(a:=0, b:=0, c:=0) {
    isInputOkay := (b="s" || b="k" && (c=40 || c=35 || c=34)) ? 1 : 0
    If (whichLV="LViewOthers" && (topIndex>totalListed - 25) && totalIndex>LVitemsPerPage && isInputOkay=1 && reviewSelectedIndexes[1, 2]!=2)
    {
-      SetTimer, dummyPopulateReviewSelectedFiles, -250
+      SetTimer, dummyuiPopulateReviewSelectedFiles, -250
       ToolTip, List view will further be populated
       Return
    }
@@ -90407,18 +90425,18 @@ UIeditApplyFilterReviewPanel() {
    } Else
    {
       lastFilterEditSearch := Trimmer(listViewReviewFilteru)
-      SetTimer, PopulateReviewSelectedFiles, -50
+      SetTimer, uiPopulateReviewSelectedFiles, -50
    }
 }
 
-dummyPopulateReviewSelectedFiles() {
+dummyuiPopulateReviewSelectedFiles() {
     If determineLClickState()
        SetTimer, % A_ThisFunc, -350
     Else
-       SetTimer, PopulateReviewSelectedFiles, -350
+       SetTimer, uiPopulateReviewSelectedFiles, -350
 }
 
-PopulateReviewSelectedFiles(modus:="") {
+uiPopulateReviewSelectedFiles(modus:="") {
     Static initTotals := 0, lastSearch := 0, listedEntries := 0
     If (AnyWindowOpen!=60)
        Return
@@ -90616,7 +90634,7 @@ PanelDynamicFolderzWindow(dummy:=0) {
     Gui, Add, Button, x+5 hp wp+5 gBTNpasteDynaFoldersList, &Paste list
     Gui, Add, Button, x+5 hp wp+5 ginvokePanelDynaFoldersContextMenu, &More
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Manage folders list: " appTitle)
-    PopulateDynamicFolderzList()
+    uiPopulateDynamicFolderzList()
 }
 
 ToggleCountFilesFoldersList() {
@@ -91720,7 +91738,7 @@ BtnToggleRecurseDynaFolder() {
 
     ; ToolTip, % newFoldersList , , , 2
     showTOOLtip("You need to rescan the folder for the effect to take place")
-    PopulateDynamicFolderzList()
+    uiPopulateDynamicFolderzList()
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -92557,7 +92575,7 @@ PopulateStaticFolderzList(listFilter:=0, modus:=0) {
     Tooltip
 }
 
-PopulateDynamicFolderzList() {
+uiPopulateDynamicFolderzList() {
     listu := getDynamicFoldersList()
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: ListView, LViewDynas
