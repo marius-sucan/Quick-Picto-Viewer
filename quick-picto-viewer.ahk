@@ -35245,7 +35245,7 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
       Return -1
    }
 
-   whichHashu := userFriendly[o_whichHashu]
+   fwhichHashu := whichHashu := userFriendly[o_whichHashu]
    If (flippedModus=1)
    {
       sH := "h" ; the silent H ;-) - horizontally flipped
@@ -35349,7 +35349,7 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
           If (failedSQLfiles>0)
              etaTime .= "`nFailed to commit data to database for " groupDigits(failedSQLfiles) " files"
 
-          showTOOLtip(ErrorMsgS "Generating image " whichHashu moreInfo " fingerprints, please wait" etaTime, 0, 0, countTFilez / filesToBeSorted)
+          showTOOLtip(ErrorMsgS "Generating image " fwhichHashu moreInfo " fingerprints, please wait" etaTime, 0, 0, countTFilez / filesToBeSorted)
           prevMSGdisplay := A_TickCount
           If (A_TickCount - prevSaveData>9000)
              ErrorMsgS := ""
@@ -36794,6 +36794,7 @@ multiCoresSimpleImgProcessing(coreThread, arguments, filesList) {
 
        RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadJob%coreThread%, % countFilez "/" failedFiles "/" skippedFiles
    }
+
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadJob%coreThread%, % countFilez "/" failedFiles "/" skippedFiles
    Sleep, 1
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%coreThread%, 2
@@ -41967,7 +41968,7 @@ PanelSaveSlideShowu() {
        infoThisSLD .= "`nFiles list has been modified. The changes are unsaved."
 
     btnWid3 := InStr(CurrentSLD, "\QPV\favourite-images-list.SLD") ? 2 : btnWid
-    Gui, Add, Text, xs y+25 w%EditWid%, % infoThisSLD
+    Gui, Add, Text, xs y+30 w%EditWid%, % infoThisSLD
     Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w%btnWid3% gBTNopenPanelDynamicFolderzWindow, &Manage folders
 
     If (showSave=1)
@@ -42599,7 +42600,7 @@ calculateThumbsSheetDimensions(ByRef width, ByRef height) {
 
 getSaveDialogIndexForFile(imgPath, ByRef defFMTindex, allowExtended:=0) {
    Static extended := {"hdr":17, "exr":18, "pfm":19}
-   defFMTindex := 1
+   defFMTindex := 3
    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, oExt)
    Loop, Parse, dialogSaveFptrn, |
    {
@@ -54543,8 +54544,7 @@ RetrievePDFbookmarks(imgPath, pwd, allowBonuses, ByRef pageCount, ByRef errorTyp
          PDFpwdsCache[imgPath] := pwd
 
       txt := StrGet(buffer, bufferSize, "UTF-16")
-      DllCall("GlobalFree", "uptr", buffer)
-      buffer := ""
+      buffer := DestroyMemoryBuffer(buffer)
       if (pageCount>10 && allowBonuses=1)
          txt := "0|[ First page ]`n" txt "`n" pageCount - 1 "|[ Last page ]"
    }
@@ -56324,7 +56324,7 @@ saveHugeVPimageFile(imgPath, file2save, hFIFimgA, depth) {
 
    If (usrColorDepth>1 || imgFxMode>1)
    {
-      msgResult := msgBoxWrapper(appTitle ": WARNING", "In the viewport, the image seems to be displayed with color adjustments. QPV cannot apply these on the image itself, because of the very large size. The image will be saved with its original colors.`n`nGo to Image > Filters > Adjust image colors, to apply color filters on huge images.``n`nDo you want to continue?", "&Yes|&No", 2, "exclamation")
+      msgResult := msgBoxWrapper(appTitle ": WARNING", "In the viewport, the image seems to be displayed with color adjustments. QPV cannot apply these on the image itself, because of the very large size. The image will be saved with its original colors.`n`nGo to Image > Filters > Adjust image colors, to apply color filters on such images.``n`nDo you want to continue?", "&Yes|&No", 2, "exclamation")
       If (msgResult!="Yes")
          Return "user-abort"
    }
@@ -56431,7 +56431,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
 
       If !RegExMatch(file2save, saveTypesRegEX)
       {
-         msgBoxWrapper(appTitle ": ERROR", "Please save the file using one of the supported file format extensions: " saveTypesFriendly ". ", 0, 0, "error")
+         msgBoxWrapper(appTitle ": ERROR", "Please save the file in one of the supported file format extensions: " saveTypesFriendly ". ", 0, 0, "error")
          Return
       }
 
@@ -56501,52 +56501,79 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
 
       lastInvoked := A_TickCount
       prevFileSavePath := OutDir
-      fdp := dephtus[userSaveBitsDepth] ? dephtus[userSaveBitsDepth] : "ORIGINAL"
-      showTOOLtip("Saving image, please wait`n" OutFileName "`nIntended color format: " fdp " bits")
       INIaction(1, "prevFileSavePath", "General")
-      huge := (viewportQPVimage.imgHandle) ? 1 : 0
-      If (huge=2)
-         newBitmap := zBitmap
-      Else If (huge=1)
-         r := saveHugeVPimageFile(viewportQPVimage.ImgFile, file2save, viewportQPVimage.imgHandle, dephtus[userSaveBitsDepth])
-      Else
-         newBitmap := flipBitmapAccordingToViewPort(applyVPeffectsOnBMP(trGdip_CloneBitmap(A_ThisFunc, useGdiBitmap())))
-
-      If (validBMP(newBitmap) && huge!=1)
+      dilemma := (oExt!=nExt) ? "Do you want QPV to preserve the original color depth? If the destination file format does not allow it, the next best match would be chosen." : "The destination image file format is the same as the original one. Do you want QPV to preserve the original color depth and pixel data, to avoid any potential quality loss?"
+      If ( (huge=1 && currentImgModified!=1 && !viewportQPVimage.actions && imgPath!=file2save && vpIMGrotation=0)
+      || (huge=0 && currentImgModified!=1 && !undoLevelsRecorded && imgPath!=file2save && imgFxMode=1 && usrColorDepth<2 && vpIMGrotation=0) )
       {
-         If (nExt="ico")
-         {
-            icoSize := 256
-            trGdip_GetImageDimensions(newBitmap, imgW, imgH)
-            kBitmap := trGdip_CreateBitmap(A_ThisFunc, icoSize, icoSize)
-            If validBMP(kBitmap)
-            {
-               Gup := Gdip_GraphicsFromImage(kBitmap)
-               Gdip_SetPixelOffsetMode(Gup, 2)
-               capIMGdimensionsFormatlimits("ico", 1, imgW, imgH)
-               xpos := clampInRange((icoSize - imgW)//2, 0, icoSize//2)
-               ypos := clampInRange((icoSize - imgH)//2, 0, icoSize//2)
-               er := tzGdip_DrawImage(Gup, newBitmap, xpos, ypos, imgW, imgH)
-               Gdip_DeleteGraphics(Gup)
-               If !er
-               {
-                  trGdip_DisposeImage(newBitmap, 1)
-                  newBitmap := kBitmap
-               } Else
-                  trGdip_DisposeImage(kBitmap, 1)
-            }
-         }
-
-         changeMcursor()
-         destroyGDIfileCache(1, 1)
-         r := QPV_SaveImageFile(A_ThisFunc, newBitmap, file2save, userJpegQuality, userSaveBitsDepth)
-         trGdip_DisposeImage(newBitmap, 1)
-      } Else If (huge!=1)
-      {
-         r := "err-no-main-bmp"
+         msgResult := msgBoxWrapper(appTitle ": Confirmation", "You are about to resave an unmodified image.`n`n" dilemma "`n`n" OutFileName "`n`n" OutDir "\", 4, 0, "question")
+         If (msgResult="Yes")
+            quickieSave := 1
       }
 
-      If (PreserveDateTimeOnSave=1 && !r && originalMtime && imgPath=file2save)
+      If quickieSave
+      {
+         showTOOLtip("Saving image, please wait`n" OutFileName "`nIntended color format: ORIGINAL bits")
+         If (oExt!=nExt)
+         {
+            r := coreConvertImgFormat(imgPath, file2save, 0, 1)
+         } Else 
+         {
+            FileCopy, % imgPath, % file2save, 1
+            r := ErrorLevel
+         }
+
+         If (PreserveDateTimeOnSave=1 && !r && originalMtime)
+         {
+            FileSetTime, % originalMtime, % file2save, M
+            FileSetTime, % originalCtime, % file2save, C
+         }
+      } Else
+      {
+         fdp := dephtus[userSaveBitsDepth] ? dephtus[userSaveBitsDepth] : "ORIGINAL"
+         showTOOLtip("Saving image, please wait`n" OutFileName "`nIntended color format: " fdp " bits")
+         huge := (viewportQPVimage.imgHandle) ? 1 : 0
+         If (huge=1)
+            r := saveHugeVPimageFile(viewportQPVimage.ImgFile, file2save, viewportQPVimage.imgHandle, dephtus[userSaveBitsDepth])
+         Else
+            newBitmap := flipBitmapAccordingToViewPort(applyVPeffectsOnBMP(trGdip_CloneBitmap(A_ThisFunc, useGdiBitmap())))
+
+         If (validBMP(newBitmap) && huge!=1)
+         {
+            If (nExt="ico")
+            {
+               icoSize := 256
+               trGdip_GetImageDimensions(newBitmap, imgW, imgH)
+               kBitmap := trGdip_CreateBitmap(A_ThisFunc, icoSize, icoSize)
+               If validBMP(kBitmap)
+               {
+                  Gup := Gdip_GraphicsFromImage(kBitmap)
+                  Gdip_SetPixelOffsetMode(Gup, 2)
+                  capIMGdimensionsFormatlimits("ico", 1, imgW, imgH)
+                  xpos := clampInRange((icoSize - imgW)//2, 0, icoSize//2)
+                  ypos := clampInRange((icoSize - imgH)//2, 0, icoSize//2)
+                  er := tzGdip_DrawImage(Gup, newBitmap, xpos, ypos, imgW, imgH)
+                  Gdip_DeleteGraphics(Gup)
+                  If !er
+                  {
+                     trGdip_DisposeImage(newBitmap, 1)
+                     newBitmap := kBitmap
+                  } Else
+                     trGdip_DisposeImage(kBitmap, 1)
+               }
+            }
+
+            changeMcursor()
+            destroyGDIfileCache(1, 1)
+            r := QPV_SaveImageFile(A_ThisFunc, newBitmap, file2save, userJpegQuality, userSaveBitsDepth)
+            trGdip_DisposeImage(newBitmap, 1)
+         } Else If (huge!=1)
+         {
+            r := "err-no-main-bmp"
+         }
+      }
+
+      If (PreserveDateTimeOnSave=1 && !r && originalMtime && imgPath=file2save && !quickieSave)
       {
          resultedFilesList[currentFileIndex, 4] := 1
          FileSetTime, % originalMtime, % file2save, M
@@ -58637,7 +58664,7 @@ FIMrescaleICOmode(hFIFimgA, imgW, imgH, icoSize, ByRef hasIconified) {
    Return hFIFimgA
 }
 
-coreConvertImgFormat(imgPath, file2save, externBMP:=0) {
+coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0) {
   Static gifOPT := "-s8-f1-",            ppmOPT := "-s24-f1-f9-"
        , jngOPT := "-s24-f1-",           xpmOPT := "-s24-f1-"
        , jpegOPT := "-s24-s8-f1-",       hdrOPT := "-f11-"
@@ -58657,29 +58684,50 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0) {
       FileGetTime, originalCtime, % imgPath, C
    }
 
+   thisu := 0
    loadArgs := FIMdecideLoadArgs(imgPath, userHQraw, GFT)
-   hFIFimgA := externBMP ? externBMP : FreeImage_Load(imgPath, -1, loadArgs)
-   If (!hFIFimgA && !externBMP)
+   hFIFimgA := externBMP
+   If !hFIFimgA
    {
-      If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1)
+      changeMcursor()
+      If (allowWICloader=1 && WICmoduleHasInit=1 && alwaysOpenWithFIM!=1 && userPerformColorManagement=1 && RegExMatch(imgPath, "i)(.\.(png|jpeg|jpe|jpg|tiff|tif))$") )
       {
-         oBitmap := LoadWICimage(imgPath, 0, 0, userPerformColorManagement)
-         If validBMP(oBitmap)
-         {
-            hFIFimgA := ConvertPBITMAPtoFIM(oBitmap)
-            trGdip_DisposeImage(oBitmap)
-         }
+         ; use WIC loader to not miss on color management
+         z := loadWICasFreeImage(imgPath, 0, userPerformColorManagement)
+         hFIFimgA := z[1]
+         FimBuffer := z[2]
+         thisu := 1
+      }
+
+      If !hFIFimgA
+         hFIFimgA := FreeImage_Load(imgPath, -1, loadArgs)
+   }
+
+   If !hFIFimgA
+   {
+      If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1 && thisu=0)
+      {
+         z := loadWICasFreeImage(imgPath, 0, userPerformColorManagement)
+         hFIFimgA := z[1]
+         FimBuffer := z[2]
       }
    }
 
    FreeImage_GetImageDimensions(hFIFimgA, oImgW, oImgH)
-   If (!hFIFimgA || !oImgW || !oImgH)
+   If (!hFIFimgA || !oImgW || !oImgH || oImgH=1 && oImgW=1)
    {
-      If hFIFimgA
-         FreeImage_UnLoad(hFIFimgA)
-
+      FreeImage_UnLoad(hFIFimgA)
+      FimBuffer := DestroyMemoryBuffer(FimBuffer)
       addJournalEntry("Failed to load file with FreeImage:`n" imgPath)
       Return -1
+   }
+
+   If (doVPflips=1)
+   {
+      If (FlipImgH=1)
+         FreeImage_FlipHorizontal(hFIFimgA)
+      If (FlipImgV=1)
+         FreeImage_FlipVertical(hFIFimgA)
    }
 
    noDepthConvert := 0
@@ -58708,6 +58756,9 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0) {
    }
 
    hFIFimgA := FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, !noDepthConvert, hasAppliedToneMap)
+   If InStr(hasAppliedToneMap, "TONE-MAPPED")
+      FimBuffer := DestroyMemoryBuffer(FimBuffer)
+
    If (FileExist(file2save) && hFIFimgA)
    {
       Try FileSetAttrib, -R, % file2save
@@ -58731,10 +58782,14 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0) {
       {
          FreeImage_UnLoad(hFIFimgA)
          hFIFimgA := hFIFimgX
+         FimBuffer := DestroyMemoryBuffer(FimBuffer)
       }
 
       If (typu="ico")
+      {
          hFIFimgA := FIMrescaleICOmode(hFIFimgA, imgW, imgH, 256, hasIconified)
+         FimBuffer := DestroyMemoryBuffer(FimBuffer)
+      }
    }
 
    ColorsType := FreeImage_GetColorType(hFIFimgA)
@@ -58753,8 +58808,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0) {
    objDepthOkay := InStr(formatDepths, "-s" objDepth "-") ? 1 : 0
    If (objDepthOkay=1 || noDepthConvert=1)
    {
-      savedMode := 1
-      savedMode := "OKAY"
+      savedMode := "OKAY" ; used for debugging purposes
       changeMcursor()
       ; ToolTip, % formatDepths "`n" hdrMode , , , 2
       If (hdrMode)
@@ -58766,7 +58820,10 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0) {
             FreeImage_UnLoad(hFIFimgB)
          }
       } Else
+      {
          r := FreeImage_Save(hFIFimgA, file2save, saveArg)
+         FimBuffer := DestroyMemoryBuffer(FimBuffer)
+      }
    }
 
    If (!r || r="w")
@@ -58811,6 +58868,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0) {
    ; FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
    ; fnOutputDebug(hasIconified "|" hasResized "|" imgW "|" imgH "|" objDepthOkay "|" noDepthConvert "| conversion mode = " savedMode)
    FreeImage_UnLoad(hFIFimgA)
+   FimBuffer := DestroyMemoryBuffer(FimBuffer)
    If (!r && tempFileExists=1) || (!FileRexists(file2save, 0) && tempFileExists=1)
    {
       r := 0
@@ -59080,28 +59138,10 @@ coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          frameu := clampInRange(A_Index, 0, tFrames - 1)
          If (allowWICloader=1 && WICmoduleHasInit=1 && alwaysOpenWithFIM!=1)
          {
-            ; use WIC loader to extract the TIF pages
-            VarSetCapacity(resultsArray, 8 * 9, 0)
-            cBPP := DllCall("qpvmain.dll\WICpreLoadImage", "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "int", wasInitFIMlib, "Int")
-            If (cBPP>1 && cBPP<=64)
-            {
-               Width := NumGet(resultsArray, 4 * 0, "uInt")
-               Height := NumGet(resultsArray, 4 * 1, "uInt")
-               If (cBPP=64)
-                  cBPP := 32
-               Else If (cBPP=48)
-                  cBPP := 24
-
-               If (Width>0 && Height>0)
-                  z := teleportWICtoFIM(Width, Height, cBPP, userPerformColorManagement, 1)
-               hFIFimgA := z[1]
-               FimBuffer := z[2]
-               ; fnOutputDebug(A_ThisFunc ": wicca " hFIFimgA)
-               ; ToolTip, % z[1] "|" pBitmap "|" cBPP "|" Gdip_GetImagePixelFormat(pBitmap, 2) , , , 2
-            } Else hFIFimgA := ""
-
-            DllCall("qpvmain.dll\WICdestroyPreloadedImage", "Int", 12, "Int")
-            resultsArray := ""
+            ; use WIC loader to extract the TIF pages to not miss on color management
+            z := loadWICasFreeImage(imgPath, frameu, userPerformColorManagement)
+            hFIFimgA := z[1]
+            FimBuffer := z[2]
          }
 
          If !hFIFimgA
@@ -59125,8 +59165,7 @@ coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          If (!imgW || !imgH || imgW=1 && imgH=1)
          {
             FreeImage_UnLoad(hFIFimgA)
-            If FimBuffer
-               DllCall("GlobalFree", "uptr", FimBuffer)
+            FimBuffer := DestroyMemoryBuffer(FimBuffer)
             failedFrames++
             Continue
          }
@@ -59137,6 +59176,7 @@ coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
             hFIFimgB := trFreeImage_Rescale(hFIFimgA, imgW, imgH)
             If hFIFimgB
             {
+               FimBuffer := DestroyMemoryBuffer(FimBuffer)
                rz := coreConvertImgFormat(imgPath, file2save, hFIFimgB)
             } Else
             {
@@ -59146,10 +59186,8 @@ coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          } Else rz := coreConvertImgFormat(imgPath, file2save, hFIFimgA)
 
          ; FreeImage_UnLoad(hFIFimgA) object discarded by coreConvertImgFormat()
-         If FimBuffer
-            DllCall("GlobalFree", "uptr", FimBuffer)
-
-         FimBuffer := hFIFimgA := ""
+         FimBuffer := DestroyMemoryBuffer(FimBuffer)
+         hFIFimgA := ""
          If rz
             failedFrames++
          Else 
@@ -59989,6 +60027,28 @@ combineImagesMultiPage(modus, animus, destFilePath) {
    SoundBeep, % (mustEnd=1) ? 300 : 900, 100
    SetTimer, RemoveTooltip, % -msgDisplayTime
    ; fnOutputDebug("the end")
+}
+
+loadWICasFreeImage(imgPath, frameu, useICM) {
+   VarSetCapacity(resultsArray, 8 * 9, 0)
+   cBPP := DllCall("qpvmain.dll\WICpreLoadImage", "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "int", wasInitFIMlib, "Int")
+   If (cBPP>1 && cBPP<=64)
+   {
+      Width := NumGet(resultsArray, 4 * 0, "uInt")
+      Height := NumGet(resultsArray, 4 * 1, "uInt")
+      If (cBPP=64)
+         cBPP := 32
+      Else If (cBPP=48)
+         cBPP := 24
+
+      If (Width>0 && Height>0)
+         z := teleportWICtoFIM(Width, Height, cBPP, useICM, 1)
+      ; fnOutputDebug(A_ThisFunc ": wicca " hFIFimgA)
+      ; ToolTip, % z[1] "|" pBitmap "|" cBPP "|" Gdip_GetImagePixelFormat(pBitmap, 2) , , , 2
+   }
+   DllCall("qpvmain.dll\WICdestroyPreloadedImage", "Int", 12, "Int")
+   resultsArray := ""
+   return z
 }
 
 LoadBitmapAsFreeImage(imgPath, allowHDR, ByRef oImgW, ByRef oImgH, ByRef imgBPP) {
@@ -81633,9 +81693,9 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
              oBitmap := imgThumbsCacheArray[imgThumbsCacheIDsArray[MD5name], 1]
           } Else If (cacheType="f")
           {
-             wasCacheFile := 1
+             wasCacheFile := 1 ; thumbnail
              file2load := imgsListArrayThumbs[thisFileIndex, 4]
-             oBitmap := LoadBitmapFromFileu(file2load, 0, 1)
+             oBitmap := trGdip_CreateBitmapFromFile(A_ThisFunc, file2load)
           } Else If (cacheType="fim")
           {
              fimCached := 1
@@ -81659,7 +81719,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
                    If validBMP(oBitmap)
                       GetCachableImgFileDetails(file2load, thisFileIndex, oBitmap, 0, 0)
                 } Else
-                   oBitmap := LoadBitmapFromFileu(file2load, 0, 1)
+                   oBitmap := trGdip_CreateBitmapFromFile(A_ThisFunc, file2load)
              }
           }
 
@@ -86486,7 +86546,7 @@ resetOpeningPanel() {
 }
 
 BtnNextImg() {
-  If ((maxFilesIndex<2 || !maxFilesIndex) && StrLen(mustOpenStartFolder)<3)
+  If (maxFilesIndex<2 || !maxFilesIndex)
      Return
 
   NextPicture()
@@ -86501,7 +86561,7 @@ BtnNextImg() {
 }
 
 BtnPrevImg() {
-  If ((maxFilesIndex<2 || !maxFilesIndex) && StrLen(mustOpenStartFolder)<3)
+  If (maxFilesIndex<2 || !maxFilesIndex)
      Return
 
   PreviousPicture()
@@ -93943,11 +94003,34 @@ coreSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, Yscal
   Return r
 }
 
+DestroyMemoryBuffer(buffer) {
+    If buffer
+       r := DllCall("GlobalFree", "uptr", buffer)
+    Return r
+}
+
 coreFreeImageSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, YscaleImgFactor, doConversion:=0) {
     Sleep, 0
-    hFIFimgA := LoadBitmapAsFreeImage(imgPath, 1, imgW, imgH, bpp)
-    If (!hFIFimgA || !imgW || !imgH)
+    changeMcursor()
+    If (allowWICloader=1 && WICmoduleHasInit=1 && alwaysOpenWithFIM!=1 && (userPerformColorManagement=1 && RegExMatch(imgPath, "i)(.\.(png|jpeg|jpe|jpg|tiff|tif))$") || !RegExMatch(imgPath, RegExFIMformPtrn)))
+    {
+       ; use WIC loader to not miss on color management
+       z := loadWICasFreeImage(imgPath, 0, userPerformColorManagement)
+       hFIFimgA := z[1]
+       FimBuffer := z[2]
+       bpp := FreeImage_GetBPP(hFIFimgA)
+       FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
+    }
+
+    If !hFIFimgA
+       hFIFimgA := LoadBitmapAsFreeImage(imgPath, 1, imgW, imgH, bpp)
+
+    If (!hFIFimgA || !imgW || !imgH || imgH=1 && imgW=1)
+    {
+       FreeImage_UnLoad(hFIFimgA)
+       FimBuffer := DestroyMemoryBuffer(FimBuffer)
        Return "err"
+    }
 
     If (SimpleOperationsDoCrop=1 && editingSelectionNow=1)
     {
@@ -93959,19 +94042,21 @@ coreFreeImageSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFact
        x1 := Round(X1), y1 := Round(Y1)
        x2 := Round(X2), y2 := Round(Y2)
        changeMcursor()
-       If (imgSelW>4 && imgSelH>4)
+       If (imgSelW>2 && imgSelH>2)
           hFIFimgB := FreeImage_Copy(hFIFimgA, X1, Y1, X2, Y2)
 
        If hFIFimgB
        {
           FreeImage_UnLoad(hFIFimgA)
           hFIFimgA := hFIFimgB
+          FimBuffer := DestroyMemoryBuffer(FimBuffer)
        } Else hasFailed := 1
     }
 
     If (hasFailed=1)
     {
        FreeImage_UnLoad(hFIFimgA)
+       FimBuffer := DestroyMemoryBuffer(FimBuffer)
        Return "err"
     }
 
@@ -93984,12 +94069,14 @@ coreFreeImageSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFact
        {
           FreeImage_UnLoad(hFIFimgA)
           hFIFimgA := hFIFimgB
+          FimBuffer := DestroyMemoryBuffer(FimBuffer)
        } Else hasFailed := 1
     }
 
     If (hasFailed=1)
     {
        FreeImage_UnLoad(hFIFimgA)
+       FimBuffer := DestroyMemoryBuffer(FimBuffer)
        Return "err"
     }
 
@@ -94018,12 +94105,14 @@ coreFreeImageSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFact
        {
           FreeImage_UnLoad(hFIFimgA)
           hFIFimgA := hFIFimgB
+          FimBuffer := DestroyMemoryBuffer(FimBuffer)
        } Else hasFailed := 1
     }
 
     If (hasFailed=1)
     {
        FreeImage_UnLoad(hFIFimgA)
+       FimBuffer := DestroyMemoryBuffer(FimBuffer)
        Return "err"
     }
 
@@ -94051,6 +94140,7 @@ coreFreeImageSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFact
        FreeImage_UnLoad(hFIFimgA)
     }
 
+    FimBuffer := DestroyMemoryBuffer(FimBuffer)
     If (!r && tempFileExists=1) || (!FileRexists(file2save, 0) && tempFileExists=1)
     {
        FileDelete, % file2save
@@ -94064,17 +94154,36 @@ coreFreeImageSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFact
 
 coreFreeImageSimpleColorsAdjust(imgPath, file2save) {
     Sleep, 0
-    hFIFimgA := LoadBitmapAsFreeImage(imgPath, 1, imgW, imgH, bpp)
-    If (!hFIFimgA || !imgW || !imgH)
-       Return "err"
-
     changeMcursor()
+    If (allowWICloader=1 && WICmoduleHasInit=1 && alwaysOpenWithFIM!=1 && (RegExMatch(imgPath, "i)(.\.(png|jpeg|jpe|jpg|tiff|tif))$") || !RegExMatch(imgPath, RegExFIMformPtrn)))
+    {
+       ; use WIC loader to not miss on color management
+       z := loadWICasFreeImage(imgPath, 0, userPerformColorManagement)
+       hFIFimgA := z[1]
+       FimBuffer := z[2]
+       bpp := FreeImage_GetBPP(hFIFimgA)
+       FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
+       ; fnOutputDebug(A_ThisFunc ": load wic: " hFIFimgA "|" imgPath)
+    }
+
+    If !hFIFimgA
+       hFIFimgA := LoadBitmapAsFreeImage(imgPath, 1, imgW, imgH, bpp)
+
+    If (!hFIFimgA || !imgW || !imgH || imgH=1 && imgW=1)
+    {
+       ; fnOutputDebug(A_ThisFunc ": failed to load: " imgPath)
+       FreeImage_UnLoad(hFIFimgA)
+       FimBuffer := DestroyMemoryBuffer(FimBuffer)
+       Return "err"
+    }
+
     bpp := FreeImage_GetBPP(hFIFimgA)
     If (bpp!=24 && bpp!=32)
     {
        If (userImgAdjustConvertDepth!=1)
        {
           FreeImage_UnLoad(hFIFimgA)
+          FimBuffer := DestroyMemoryBuffer(FimBuffer)
           Return "skip"
        }
 
@@ -94084,6 +94193,8 @@ coreFreeImageSimpleColorsAdjust(imgPath, file2save) {
        imgIDtype := FreeImage_GetImageType(hFIFimgA)
        GFT := FreeImage_GetFileType(imgPath)
        hFIFimgA := FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, 1, hasAppliedToneMap)
+       If InStr(hasAppliedToneMap, "TONE-MAPPED")
+          FimBuffer := DestroyMemoryBuffer(FimBuffer)
        bpp := FreeImage_GetBPP(hFIFimgA)
        If (bpp!=24 && bpp!=32)
        {
@@ -94096,12 +94207,14 @@ coreFreeImageSimpleColorsAdjust(imgPath, file2save) {
           {
              FreeImage_UnLoad(hFIFimgA)
              hFIFimgA := hFIFimgB
+             FimBuffer := DestroyMemoryBuffer(FimBuffer)
           }
 
           bpp := FreeImage_GetBPP(hFIFimgA)
           If (bpp!=24 && bpp!=32)
           {
              FreeImage_UnLoad(hFIFimgA)
+             FimBuffer := DestroyMemoryBuffer(FimBuffer)
              Return "err"
           }
        }
@@ -94120,6 +94233,7 @@ coreFreeImageSimpleColorsAdjust(imgPath, file2save) {
     If (r!=1)
     {
        FreeImage_UnLoad(hFIFimgA)
+       FimBuffer := DestroyMemoryBuffer(FimBuffer)
        Return "err"
     }
 
@@ -94138,6 +94252,7 @@ coreFreeImageSimpleColorsAdjust(imgPath, file2save) {
     saveArg := getFIMsaveArgs(file2save)
     r := FreeImage_Save(hFIFimgA, file2save, saveArg)
     FreeImage_UnLoad(hFIFimgA)
+    FimBuffer := DestroyMemoryBuffer(FimBuffer)
     If (!r && tempFileExists=1) || (!FileRexists(file2save, 0) && tempFileExists=1)
     {
        FileDelete, % file2save

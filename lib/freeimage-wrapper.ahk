@@ -291,6 +291,9 @@ FreeImage_GetHistogram(hImage, channel, ByRef histoArray) {
 }
 
 FreeImage_GetBPP(hImage) {
+   If (hImage="")
+      Return
+
    Return DllCall(getFIMfunc("GetBPP"), "uptr", hImage)
 }
 
@@ -303,6 +306,9 @@ FreeImage_GetHeight(hImage) {
 }
 
 FreeImage_GetImageDimensions(hImage, ByRef imgW, ByRef imgH) {
+   If (hImage="")
+      Return
+
    imgH := FreeImage_GetHeight(hImage)
    imgW := FreeImage_GetWidth(hImage)
 }

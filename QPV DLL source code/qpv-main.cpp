@@ -6468,7 +6468,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
 // https://github.com/bblanchon/pdfium-binaries
     int act = *varOut;
     *errorType = 0;
-    // act == -1; retrieve the total page count
+    // act == -1; retrieve the total page count 
     // act == -2; retrieve the width and height of on a given page and total page count
     // errorType > 0; error codes from PDFium
     // errorType = -2; PDF seems to have no pages
