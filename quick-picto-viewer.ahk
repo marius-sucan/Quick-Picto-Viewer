@@ -95370,6 +95370,7 @@ initFIMGmodule() {
   If (wasInitFIMlib!=1)
   {
      bonusPath := mainExecPath
+     Static DllName := "FreeImage.dll"
      Static srcDll := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\cPlusPlus\freeimage-r1909-custom\x64\Release\FreeImage.dll"
      ; Static srcDll := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\FreeImage-vold.dll"
      If (A_PtrSize=8 && InStr(A_ScriptDir, "sucan twins") && !A_IsCompiled && FileExist(srcDll))

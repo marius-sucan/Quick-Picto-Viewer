@@ -53,6 +53,9 @@ FreeImage_FoxInit(isInit:=1, bonusPath:=0, DllName:="FreeImage.dll") {
    If (isInit="lastDllName")
       Return lastDllName
 
+   If !DllName
+      DllName := "FreeImage.dll"
+
    ; if you change the dll name, getFIMfunc() needs to reflect this
    If RegExMatch(bonusPath, "i)(.\.dll)$")
       DllPath := bonusPath
