@@ -10,6 +10,7 @@
 ; NOTES: The drawing of GDI+ Bitmaps is limited to a size of 32767 pixels
 ; in either direction (width, height). This limit applies only if the
 ; interpolation mode is set to NearestNeighbor for the Graphics Object.
+;
 ; To calculate the largest bitmap you can create:
 ;    The maximum object size is 2GB = 2,147,483,648 bytes
 ;    Default bitmap is 32bpp (4 bytes), the largest area we can have is 2GB / 4 = 536,870,912 bytes

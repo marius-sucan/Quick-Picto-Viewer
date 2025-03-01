@@ -200,6 +200,14 @@ Class screenQPVimage {
            toneMapped := " (TONE-MAPPABLE)"
      }
 
+     imgTypeID := FreeImage_GetImageType(hFIFimgA, 0)
+     If isInRange(imgTypeID, 2, 8)
+        Channels := 1
+     Else If InStr(ColorsType, "rgba")
+        Channels := 4
+     Else If (InStr(ColorsType, "rgb") || InStr(ColorsType, "cmyk"))
+        Channels := 3
+ 
      This.ImgFile := imgPath
      This.imgHandle := hFIFimgA
      This.HasAlpha := (InStr(ColorsType, "rgba") || hasMultiTrans) ? 1 : 0
@@ -219,6 +227,8 @@ Class screenQPVimage {
      This.FIMbpp := imgBPP
      This.FIMgft := GFT
      This.FimBuffer := externHandle[3]
+     This.BPP := imgBPP
+     This.Channels := Channels
      This.actions := 0
      Return 1
    } ; // LoadFimFile
@@ -250,7 +260,7 @@ Class screenQPVimage {
       startZeit := A_TickCount
       If (externMode!=1)
       {
-         VarSetCapacity(resultsArray, 8 * 6, 0)
+         VarSetCapacity(resultsArray, 8 * 9, 0)
          func2exec := (A_PtrSize=8) ? "WICpreLoadImage" : "_LoadWICimage@48"
          r := DllCall(whichMainDLL "\" func2exec, "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "UPtr")
       }
@@ -267,10 +277,13 @@ Class screenQPVimage {
          This.Frames := NumGet(resultsArray, 4 * 2, "uInt") - 1
          This.ActiveFrame := NumGet(resultsArray, 4 * 6, "uInt")
          This.DPI := NumGet(resultsArray, 4 * 4, "uInt")
+         This.BPP := NumGet(resultsArray, 4 * 7, "uInt")
+         This.Channels := NumGet(resultsArray, 4 * 8, "uInt")
          This.RawFormat := WICcontainerFmts(NumGet(resultsArray, 4 * 5, "uInt"), imgPath)
          This.TooLargeGDI := 0 ; isImgSizeTooLarge(This.Width, This.Height)
          This.HasAlpha := varContains(k, "argb", "prgba", "bgra", "rgba", "alpha")
          This.OpenedWith := "Windows Imaging Component [WIC]"
+         This.LoadedWith := "WIC"
       } Else If externMode
       {
          ; ToolTip, % "l=" externHandle.PixelFormat "|" externMode , , , 2
@@ -282,10 +295,13 @@ Class screenQPVimage {
          This.Frames := externHandle.Frames
          This.ActiveFrame := externHandle.ActiveFrame
          This.DPI := externHandle.DPI
+         This.BPP := externHandle.BPP
+         This.Channels := externHandle.Channels
          This.RawFormat := externHandle.RawFormat
          This.TooLargeGDI := externHandle.TooLargeGDI
          This.HasAlpha := externHandle.HasAlpha
          This.OpenedWith := externHandle.OpenedWith
+         This.LoadedWith := externHandle.LoadedWith
          r := 1
       }
 

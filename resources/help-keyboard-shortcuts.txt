@@ -170,10 +170,11 @@ Shift + Apps key|Open quick menu|Anywhere|Menu
 Left / Right|Previous / Next image|Anywhere|-
 Down / Up|Next / Previous line of images [based on list view mode]|Anywhere|-
 Home / End|Jump to the first or last image in the index|Anywhere|-
+Ctrl + Up / Down|Next / Previous frame or page (in GIFs, PDFs, TIFFs or WEBP)|Image view|-
+Shift + Ctrl + Up / Down|Next / Previous PDF chapter|Image view|-
 Wheel Up / Down|Next / Previous image [does not apply in custom zoom mode]|Image view|-
 Wheel Up / Down|Up/down two lines of images|Files list|-
 Page Up / Down|Next / Previous image|Image view|-
-Shift + Page Up / Down|Next / Previous frame (in GIFs, TIFFs or WEBP)|Image view|-
 Page Up / Down|Jump forwards or backwards one page of images|Files list|-
 Backspace|Previous random image|Anywhere|-
 Backspace|Remove last added point in the path|Vector drawing|-

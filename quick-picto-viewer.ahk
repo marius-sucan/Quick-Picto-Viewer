@@ -44,8 +44,8 @@
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
 ;@Ahk2Exe-UpdateManifest 0, Quick Picto Viewer
 ;@Ahk2Exe-SetOrigFilename Quick-Picto-Viewer.exe
-;@Ahk2Exe-SetVersion 6.1.55
-;@Ahk2Exe-SetProductVersion 6.1.55
+;@Ahk2Exe-SetVersion 6.1.70
+;@Ahk2Exe-SetProductVersion 6.1.70
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2025)
 ;@Ahk2Exe-SetCompanyName https://marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -221,8 +221,8 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := [], prevPasteInPlaceVPcoords := []
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
    , PDFpwdsCache := []
-   , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := "BETA"
-   , appVersion := "6.1.65", vReleaseDate := "2025/02/17" ; yyyy-mm-dd
+   , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := ""
+   , appVersion := "6.1.70", vReleaseDate := "2025/03/01" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -383,7 +383,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , UIuserToneMapOCVparamA := 80, cmrRAWtoneMapOCVparamA := 1, UIuserToneMapOCVparamB := 72, cmrRAWtoneMapOCVparamB := 0
    , userPerformColorManagement := 1, UserCombinePDFbgrColor := "ffFFff", UserVPalphaBgrStyle := 1
    , userPDFdpi := 430, userActivePDFpage := 0, userThumbsSheetUpscaleSmall := 1, PrintPDFpagesRange := 1
-   , PrintPDFpagesGivenEdit :=  "1-5"
+   , PrintPDFpagesGivenEdit :=  "1-5", noQualityWarnings := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -4968,12 +4968,18 @@ DeepRefreshThumbsNow() {
    If (thumbsDisplaying!=1 || maxFilesIndex<3)
       Return
 
+   showTOOLtip("Refreshing thumbnails, please wait...")
    If (markedSelectFile>1)
+   {
       setForceRefreshThumbsFilesIndex(1)
-   Else
+   } Else
+   {
+      gdipObjectsTerminator("QPV_ShowThumbnails")
       setForceRefreshThumbsFilesIndex(0)
+   }
 
    dummyTimerDelayiedImageDisplay(50)
+   SetTimer, RemoveTooltip, % -msgDisplayTime//2
 }
 
 RefreshThumbsList() {
@@ -15756,7 +15762,7 @@ capIMGdimensionsFormatlimits(typu, keepRatio, ByRef ResizedW, ByRef ResizedH) {
     } Else If (typu="fim")
     {
        thisLimit := 600500
-       mpxLimit := 9850
+       mpxLimit := 13579
     } Else If isVarEqualTo(typu, "jp2", "j2k")
     {
        thisLimit := 32760
@@ -16711,7 +16717,7 @@ ToggleCorePixFmt() {
 }
 
 alertReduceColorDepth(alertMode:=1) {
-   If (validBMP(UserMemBMP) || viewportQPVimage.imgHandle)
+   If (validBMP(UserMemBMP) || viewportQPVimage.imgHandle || noQualityWarnings=1)
       Return
 
    pixFmt := currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat
@@ -16726,11 +16732,14 @@ alertReduceColorDepth(alertMode:=1) {
             RefreshImageFileAction()
       }
    }
-   
+
+   vpFmt := Gdip_GetImagePixelFormat(useGdiBitmap(), 2)
    If (thisImgBPP!=24 && thisImgBPP!=32)
-      msgu := "The image you now begin to edit is at an unsupported color depth for editing: " pixFmt "`n`nThe image will be converted to 24 or 32 bits color depth. Therefore, some color information will likely be lost."
-   Else If (currIMGdetails.Frames>1)
-      msgu := "The image you now begin to edit has " currIMGdetails.Frames " frames or pages.`n`nOnly the current frame will be preserved, the other frames will be discarded. "
+      msgu := "The image you now begin to edit has an unsupported color depth for editing: " pixFmt "`n`nThe image will be converted to the viewport image color depth: " vpFmt ". Therefore, some color information will likely be lost."
+
+   pff := msgu ? "The image " : "The image you now begin to edit "
+   If (currIMGdetails.Frames>1)
+      msgu .= "`n`n" pff "has " currIMGdetails.Frames " frames or pages.`n`nOnly the current frame will be preserved, the other frames will be discarded."
 
    trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
    tooBigA := isImgSizeTooLarge(currIMGdetails.Width, currIMGdetails.Height)
@@ -16757,10 +16766,10 @@ alertReduceColorDepth(alertMode:=1) {
 }
 
 alertReduceSaveColorDepth() {
-   msgResult := "continue"
-   If !InStr(msgResult, "continue")
-      Return 1
+   If (noQualityWarnings=1)
+      Return
 
+   msgResult := "continue"
    pixFmt := currIMGdetails.PixelFormat  " | " currIMGdetails.RawFormat
    thisImgBPP := SubStr(pixFmt, 1, InStr(pixFmt, "-") - 1)
    If (currIMGdetails.HasAlpha=1 && thisImgBPP=32 && coreDesiredPixFmt="0x21808")
@@ -16770,14 +16779,19 @@ alertReduceSaveColorDepth() {
       Return 1
 
    If (thisImgBPP!=24 && thisImgBPP!=32)
-      msgResult := msgBoxWrapper(appTitle ": IMAGE SAVE WARNING", "The image you intend to resave is originally at an unsupported color depth: " pixFmt "`n`nThe image will be converted to 24 or 32 bits color depth. Therefore, some color information will probably be lost. ", "&Continue|C&ancel", 1, "exclamation")
+      msgResult := msgBoxWrapper(appTitle ": IMAGE SAVE WARNING", "The image you intend to save is originally at an unsupported image editing color depth: " pixFmt "`n`nThe image will be converted to 24 or 32 bits color depth. Therefore, some color information will probably be lost. ", "&Continue|C&ancel", 1, "exclamation")
    Else If (currIMGdetails.Frames>1)
-      msgResult := msgBoxWrapper(appTitle ": IMAGE SAVE WARNING", "The image you intend to resave has " currIMGdetails.Frames " frames or pages.`n`nOnly the current frame will be preserved, the other frames will be discarded. ", "&Continue|C&ancel", 1, "exclamation")
+      msgResult := msgBoxWrapper(appTitle ": IMAGE SAVE WARNING", "The image you intend to save has " currIMGdetails.Frames " frames or pages.`n`nOnly the current frame will be preserved, the other frames will be discarded. ", "&Continue|C&ancel", 1, "exclamation")
 
    If !InStr(msgResult, "continue")
       Return 1
 
-   If (currIMGdetails.TooLargeGDI=1 && !validBMP(UserMemBMP))
+   trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+   tooBigA := isImgSizeTooLarge(currIMGdetails.Width, currIMGdetails.Height)
+   tooBigB := isImgSizeTooLarge(imgW, imgH)
+   ompx := Round((currIMGdetails.Width * currIMGdetails.Height) / 1000000, 2)
+   mpx := Round((imgW * imgH) / 1000000, 2)
+   If (currIMGdetails.TooLargeGDI=1 && !validBMP(UserMemBMP) && tooBigA=1 && tooBigB=0 && !viewportQPVimage.imgHandle)
    {
       infoRes := "`nOriginal resolution: " currIMGdetails.Width " x " currIMGdetails.Height " px | " Round((currIMGdetails.Width*currIMGdetails.Height)/1000000,2) " MPx"
       trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
@@ -20206,6 +20220,9 @@ getMemUsage() {
 }
 
 memoryUsageWarning(givenW:=0, givenH:=0, bitsDepth:=0, opener:=0, bonusBuffer:=0, doAsk:=1) {
+   If (noQualityWarnings=1)
+      Return 0
+
    isAll := (givenW && givenH && bitsDepth) ? 1 : 0
    If (viewportQPVimage.imgHandle && isAll=0)
    {
@@ -20258,13 +20275,31 @@ memoryUsageWarning(givenW:=0, givenH:=0, bitsDepth:=0, opener:=0, bonusBuffer:=0
 }
 
 warnHugeImageNotFIM() {
-   If (viewportQPVimage.LoadedWith!="FIM")
+   If (viewportQPVimage.LoadedWith!="FIM" || !viewportQPVimage.imgHandle)
    {
       showTOOLtip("ERROR: The image seems to not be loaded through the FreeImage library.`nThe image cannot be processed.")
       SoundBeep 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return 1
-   }   
+   } Else
+   {
+      If (currIMGdetails.Frames>1)
+         msgu := "The image you currently have opened has " currIMGdetails.Frames " frames or pages.`n`nOnly the current frame will be preserved, the other frames will be discarded."
+
+      If msgu
+      {
+         If (noQualityWarnings!=1)
+         {
+            msgResult := msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", Trimmer(msgu) "`n`nPlease acknowledge this by choosing Continue to edit the image.", "&Continue|C&ancel", 1, "exclamation")
+            If (msgResult!="Continue")
+               Return 2
+         }
+
+         currIMGdetails.Frames := 0
+         currIMGdetails.ActiveFrame := 0
+         totalFramesIndex := 0
+      }
+   }
 }
 
 MenuPerformTeleportToFIM() {
@@ -20396,7 +20431,7 @@ HugeImagesConvertClrDepth(modus) {
 
    If hFIFimgA
    {
-      showTOOLtip("Succesfully converted the color depth to " modus "-bit")
+      showTOOLtip("Succesfully converted the image color depth to " modus "-bit")
       oimgBPP := FreeImage_GetBPP(hFIFimgA)
       imgPath := viewportQPVimage.ImgFile
       ColorsType := FreeImage_GetColorType(hFIFimgA)
@@ -20444,10 +20479,30 @@ warnIncorrectColorDepthHugeImage(bpp, qpvMode){
    {
       If (bpp!=24 && bpp!=32)
       {
-         showTOOLtip("WARNING: This tool can be applied only on 24- or 32-bits images.")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return 1
+         bp := (bpp=128 || bpp=64) ? 32 : 24
+         msgResult := msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", "The image editing tool you are attempting to use, can be applied only on 24- or 32-bits images. The image data in the viewport has a depth of " bpp " bits.`n`nWould you like to convert it now to " bp " bits?", "&Convert|C&ancel", 1, "exclamation")
+         If (msgResult="Convert")
+            HugeImagesConvertClrDepth(bp)
+         Return 2
+      }
+
+      pixFmt := currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat
+      thisImgBPP := SubStr(pixFmt, 1, InStr(pixFmt, "-") - 1)
+      If (thisImgBPP!=24 && thisImgBPP!=32)
+         msgu := "The image you currently have opened has an unsupported color depth for editing: " pixFmt ".`n`nThe image was converted to " bpp " bits for display in the viewport. Therefore, some color information was likely lost."
+
+      If msgu
+      {
+         If (noQualityWarnings!=1)
+         {
+            msgResult := msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", Trimmer(msgu) "`n`nPlease acknowledge this by choosing Continue to edit the image.", "&Continue|C&ancel", 1, "exclamation")
+            If (msgResult!="Continue")
+               Return 3
+         }
+
+         oimgBPP := FreeImage_GetBPP(viewportQPVimage.imgHandle)
+         ColorsType := FreeImage_GetColorType(viewportQPVimage.imgHandle)
+         currIMGdetails.PixelFormat := StrReplace(oimgBPP, "-", "+") "-" ColorsType
       }
    } Else
    {
@@ -36742,7 +36797,7 @@ multiCoresSimpleImgProcessing(coreThread, arguments, filesList) {
   editingSelectionNow := argumentsArray[9]
   simpleOpRotationAngle := argumentsArray[10]
   skippedFiles := failedFiles := countFilez := operationDone := 0
-  thisRegEX := StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$")
+  thisRegEXsaveFmts := StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$")
   Loop, Parse, filesList,`n,`r
   {
        If A_LoopField
@@ -36761,7 +36816,7 @@ multiCoresSimpleImgProcessing(coreThread, arguments, filesList) {
        }
 
        imgPath := StrReplace(imgPath, "||")
-       If !RegExMatch(imgPath, thisRegEX)
+       If !RegExMatch(imgPath, thisRegEXsaveFmts)
        {
           skippedFiles++
           Continue
@@ -40809,14 +40864,27 @@ PanelDisplayFileHeaderRaw() {
    msgResult := msgBoxWrapper("panelu|File header: " appTitle, "File name: " OutFileName "`n`nHeader ( first readable 256 chars):`n" header "`n`nEnding (last readable 256 chars):`n" endu, 0, 0, 0, 0, 0, 0)
 }
 
+toggleNoEditingWarnings() {
+   noQualityWarnings := !noQualityWarnings
+   pp := (noQualityWarnings!=1) ? "ACTIVATED" : "DEACTIVATED"
+   showTOOLtip("Show image editing warnings: " pp)
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
 buildQuickSearchMenus() {
    deleteMenus()
    mustPreventMenus := 1
    BuildMainMenu("forced")
    If (maxFilesIndex>0)
       kMenu("PVmenu", "Add", "Show file header", "PanelDisplayFileHeaderRaw")
+
    If isImgEditingNow()
+   {
       kMenu("PVmenu", "Add", "Purge undo levels", "MenuPurgeUndos")
+      kMenu("PVmenu", "Add/UnCheck", "Show image editing warnings", "toggleNoEditingWarnings", "memory color depth")
+      If (noQualityWarnings!=1)
+         kMenu("PVmenu", "Check", "Show image editing warnings")
+   }
 
    If (isImgEditingNow()=1 && imgEditPanelOpened=1)
       createMenuBonusImageLiveEditMode()
@@ -56322,11 +56390,31 @@ saveHugeVPimageFile(imgPath, file2save, hFIFimgA, depth) {
    If (viewportQPVimage.LoadedWith!="fim")
       Return "err-no-fim"
 
-   If (usrColorDepth>1 || imgFxMode>1)
+   If (noQualityWarnings!=1)
    {
-      msgResult := msgBoxWrapper(appTitle ": WARNING", "In the viewport, the image seems to be displayed with color adjustments. QPV cannot apply these on the image itself, because of the very large size. The image will be saved with its original colors.`n`nGo to Image > Filters > Adjust image colors, to apply color filters on such images.``n`nDo you want to continue?", "&Yes|&No", 2, "exclamation")
-      If (msgResult!="Yes")
-         Return "user-abort"
+      If (usrColorDepth>1 || imgFxMode>1)
+      {
+         msgResult := msgBoxWrapper(appTitle ": WARNING", "In the viewport, the image seems to be displayed with color adjustments. QPV cannot apply these on the image itself, because of the very large size. The image will be saved with its original colors.`n`nGo to Image > Filters > Adjust image colors, to apply color filters on such images.``n`nDo you want to continue?", "&Yes|&No", 2, "exclamation")
+         If (msgResult!="Yes")
+            Return "user-abort"
+      }
+
+      pixFmt := currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat
+      thisImgBPP := SubStr(pixFmt, 1, InStr(pixFmt, "-") - 1)
+      vpFmt := FreeImage_GetBPP(viewportQPVimage.imgHandle)
+      If (thisImgBPP!=24 && thisImgBPP!=32)
+         msgu := "The image you currently have opened has an unsupported color depth for editing: " pixFmt ".`n`nThe image was converted to " vpFmt " bits for display in the viewport. Therefore, some color information was likely lost. Please acknowledge this by choosing Continue before saving the file."
+
+      pff := msgu ? "The image " : "The image you currently have opened "
+      If (currIMGdetails.Frames>1)
+         msgu := "`n`n" pff "has " currIMGdetails.Frames " frames or pages.`n`nOnly the current frame will be preserved, the other frames will be discarded upon save."
+
+      If msgu
+      {
+         msgResult := msgBoxWrapper(appTitle ": IMAGE SAVE WARNING", Trimmer(msgu), "&Continue|&No", 1, "exclamation")
+         If (msgResult!="Continue")
+            Return "user-abort"
+      }
    }
 
    typu := FreeImage_GetFileType(file2save, 1)
@@ -56345,12 +56433,7 @@ saveHugeVPimageFile(imgPath, file2save, hFIFimgA, depth) {
 
    If hFIFimgB
    {
-      If (FlipImgH=1)
-         FreeImage_FlipHorizontal(hFIFimgB)
-      If (FlipImgV=1)
-         FreeImage_FlipVertical(hFIFimgB)
-
-      r := coreConvertImgFormat(imgPath, file2save, hFIFimgB)
+      r := coreConvertImgFormat(imgPath, file2save, hFIFimgB, 1)
       SoundBeep , % r ? 300 : 900, 100
       ; hFIFimgB disposed by coreConvertImgFormat()
       Return r
@@ -56391,9 +56474,17 @@ saveHugeVPimageFile(imgPath, file2save, hFIFimgA, depth) {
    }
 }
 
+testWasImageEditedInVP() {
+   huge := (viewportQPVimage.imgHandle) ? 1 : 0
+   If ( (huge=1 && !viewportQPVimage.actions && currentImgModified!=1 && vpIMGrotation=0)
+   || (huge=0 && !undoLevelsRecorded && imgFxMode=1 && usrColorDepth<2 && currentImgModified!=1 && vpIMGrotation=0) )
+      return 1
+   else
+      return 0
+}
+
 SaveClipboardImage(dummy:=0, noDialog:=0) {
    Static lastInvoked := 1, dephtus := {1:32, 2:24, 3:16, 4:8, 5:0}
-
    If throwErrorNoImageLoaded()
       Return
 
@@ -56415,10 +56506,13 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
       defaultu := dummy "\" OutNameNoExt
 
    getSaveDialogIndexForFile(imgPath, defFMTindex)
+   extendedMode := (testWasImageEditedInVP()=1 && FileRexists(imgPath)) ? 1 : 0
+   thisDialogSavePtrns := (extendedMode=1) ? StrReplace(dialogSaveFptrn, "|Icon (*.ico)", "|Icon (*.ico)|High-Dynamic Range Image (*.hdr)|OpenEXR (*.exr)|Portable FloatMap (*.pfm)") : dialogSaveFptrn
+   thisRegEXsaveFmts := (extendedMode=1) ? StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$") : saveTypesRegEX
    If (noDialog=1)
       file2save := imgPath
    Else
-      file2save := openFileDialogWrapper("S", "PathMustExist", defaultu, "Save image as...", dialogSaveFptrn, dialogFmtIndex, defFMTindex)
+      file2save := openFileDialogWrapper("S", "PathMustExist", defaultu, "Save image as...", thisDialogSavePtrns, dialogFmtIndex, defFMTindex)
 
    If file2save
    {
@@ -56429,7 +56523,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
          file2save .= "." dialogSaveIndexes[dialogFmtIndex]
       }
 
-      If !RegExMatch(file2save, saveTypesRegEX)
+      If !RegExMatch(file2save, thisRegEXsaveFmts)
       {
          msgBoxWrapper(appTitle ": ERROR", "Please save the file in one of the supported file format extensions: " saveTypesFriendly ". ", 0, 0, "error")
          Return
@@ -56462,7 +56556,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
 
       If (!RegExMatch(file2save, "i)(.\.(bmp|png|tif|tiff|gif|jpg|jpeg))$") && wasInitFIMlib!=1)
       {
-         msgBoxWrapper(appTitle ": ERROR", "This format is currently unsupported, because the FreeImage library failed to properly initialize.`n`n" OutFileName, 0, 0, "error")
+         msgBoxWrapper(appTitle ": ERROR", "This format is currently unsupported, because the FreeImage library failed to properly initialize. OMG! :-).`n`n" OutFileName, 0, 0, "error")
          Return
       }
 
@@ -56472,9 +56566,9 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
       Else If alertReduceSaveColorDepth()
          Return
 
-      If (!RegExMatch(file2save, saveAlphaTypesRegEX) && (userSaveBitsDepth=1 || userSaveBitsDepth=1 && alphau=1))
+      If (noQualityWarnings!=1 && !RegExMatch(file2save, saveAlphaTypesRegEX) && (userSaveBitsDepth=1 || userSaveBitsDepth=1 && alphau=1))
       {
-         msgResult := msgBoxWrapper(appTitle ": WARNING", "The selected image format does not have support for alpha channel. The image may look different after saving it in this format. Do you want to continue?", "&Yes|&No", 2, "exclamation")
+         msgResult := msgBoxWrapper(appTitle ": WARNING", "The selected image format does not have support for an alpha channel (RGBA). The image may look differently after saving it in this format. Do you want to continue?", "&Yes|&No", 2, "exclamation")
          If (msgResult!="Yes")
             Return
       }
@@ -56482,11 +56576,35 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
       If (FileExist(file2save) && imgPath!=file2save)
       {
          zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt, nExt)
-         msgResult := msgBoxWrapper(appTitle ": Confirmation", "The selected file already exists. Do you want to overwrite the file?`n`n" OutFileName "`n`n" OutDir "\", 4, 0, "question")
+         msgResult := msgBoxWrapper(appTitle ": Confirmation", "The selected file already exists. Do you want to overwrite it?`n`n" OutFileName "`n`n" OutDir "\", 4, 0, "question")
          If (msgResult!="Yes")
             Return
       }
 
+      ForceRefreshNowThumbsList()
+      If (AnyWindowOpen=35)
+         BtnCloseWindow()
+
+      lastInvoked := A_TickCount
+      If (testWasImageEditedInVP()=1 && imgPath!=file2save && FileRexists(imgPath) && noQualityWarnings!=1)
+      {
+         msgResult := dilemma := (oExt!=nExt) ? "Do you want QPV to preserve the original color depth? If the destination file format does not allow it, the next best match would be chosen." : "The destination image file format is the same as the original one. Do you want QPV to preserve the original color depth and pixel data, to avoid any potential quality loss? The image will not be re-encoded."
+         If (oExt!=nExt && desiredFrameIndex>0)
+            dilemma := ""
+
+         If dilemma
+            msgResult := msgBoxWrapper(appTitle ": Confirmation", "You are about to resave an unmodified image. The original file will be used, not the viewport data if you answer affirmatively.`n`n" dilemma "`n`n" OutFileName "`n`n" OutDir "\", 3, 0, "question")
+   
+         If (msgResult="Yes")
+            quickieSave := 1
+         Else If (msgResult="No")
+            quickieSave := 0
+         Else
+            Return
+      }
+
+      prevFileSavePath := OutDir
+      INIaction(1, "prevFileSavePath", "General")
       If FileExist(imgPath)
       {
          FileGetTime, originalMtime, % imgPath, M
@@ -56495,23 +56613,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
          FileSetAttrib, -R, % file2save
       }
 
-      ForceRefreshNowThumbsList()
-      If (AnyWindowOpen=35)
-         BtnCloseWindow()
-
-      lastInvoked := A_TickCount
-      prevFileSavePath := OutDir
-      INIaction(1, "prevFileSavePath", "General")
-      dilemma := (oExt!=nExt) ? "Do you want QPV to preserve the original color depth? If the destination file format does not allow it, the next best match would be chosen." : "The destination image file format is the same as the original one. Do you want QPV to preserve the original color depth and pixel data, to avoid any potential quality loss?"
-      If ( (huge=1 && currentImgModified!=1 && !viewportQPVimage.actions && imgPath!=file2save && vpIMGrotation=0)
-      || (huge=0 && currentImgModified!=1 && !undoLevelsRecorded && imgPath!=file2save && imgFxMode=1 && usrColorDepth<2 && vpIMGrotation=0) )
-      {
-         msgResult := msgBoxWrapper(appTitle ": Confirmation", "You are about to resave an unmodified image.`n`n" dilemma "`n`n" OutFileName "`n`n" OutDir "\", 4, 0, "question")
-         If (msgResult="Yes")
-            quickieSave := 1
-      }
-
-      If quickieSave
+      If (quickieSave=1 && dilemma)
       {
          showTOOLtip("Saving image, please wait`n" OutFileName "`nIntended color format: ORIGINAL bits")
          If (oExt!=nExt)
@@ -63177,7 +63279,7 @@ InvokeMenuBarEdit(manuID) {
       If (preventUndoLevels!=1)
          kMenu("pvMenuBarEdit", "Check", "&Record undo levels")
 
-      Menu, pvMenuBarEdit, Add
+      kMenu("pvMenuBarEdit", "AddSeparator", 0)
       kMenu("pvMenuBarEdit", "Add", "C&ut selected area`tCtrl+X", "CutSelectedArea", "image editing")
       kMenu("pvMenuBarEdit", "Add", "&Copy to clipboard`tCtrl+C", "CopyImage2clip", "image")
 
@@ -63189,7 +63291,7 @@ InvokeMenuBarEdit(manuID) {
       If !AnyWindowOpen
       {
          hasAdded := 1
-         Menu, pvMenuBarEdit, Add
+         kMenu("pvMenuBarEdit", "AddSeparator", 0)
          kMenu("pvMenuBarEdit", "Add", "&Crop image to selection`tShift+Enter", "CropImageInViewPortToSelection")
          kMenu("pvMenuBarEdit", "Add", "&Resize image to selection`tAlt+R", "ResizeIMGviewportSelection")
       }
@@ -63210,8 +63312,8 @@ InvokeMenuBarEdit(manuID) {
 
       If (maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
       {
-         Menu, pvMenuBarEdit, Add
          createMenuCopyFile("PVcopy")
+         kMenu("pvMenuBarEdit", "AddSeparator", 0)
          kMenu("pvMenuBarEdit", "Add", "&Modify index entry`tCtrl+F2", "PanelUpdateThisFileIndex")
          kMenu("pvMenuBarEdit", "Add", "&Copy...", ":PVcopy")
       }
@@ -63219,10 +63321,7 @@ InvokeMenuBarEdit(manuID) {
       If (imgEditPanelOpened=1)
       {
          If isVarEqualTo(AnyWindowOpen, 64, 31, 24, 23)
-         {
-            added := 1
-            Menu, pvMenuBarEdit, Add
-         }
+            kMenu("pvMenuBarEdit", "AddSeparator", 0)
 
          If (editingSelectionNow=1 && AnyWindowOpen=23 && liveDrawingBrushTool!=1)
          {
@@ -63266,10 +63365,13 @@ InvokeMenuBarEdit(manuID) {
 
          If (!isVarEqualTo(AnyWindowOpen, 10, 64, 66, 12) && liveDrawingBrushTool!=1)
          {
-            If !added
-               Menu, pvMenuBarEdit, Add
+            kMenu("pvMenuBarEdit", "AddSeparator", 0)
             kMenu("pvMenuBarEdit", "Add", "&Hide dynamic object`tD", "toggleLiveEditObject", "preview")
          }
+      } Else If FileExist(getIDimage(currentFileIndex))
+      {
+        kMenu("pvMenuBarEdit", "AddSeparator", 0)
+        kMenu("pvMenuBarEdit", "Add", "&Resize/crop/rotate", "PanelSimpleResizeRotate", "file actions")
       }
    } Else
    {
@@ -63279,19 +63381,19 @@ InvokeMenuBarEdit(manuID) {
       If !hasFileIndexUndo(currentFileIndex)
          kMenu("pvMenuBarEdit", "Disable", "&Undo file action`tCtrl+Z")
 
-      Menu, pvMenuBarEdit, Add
+      kMenu("pvMenuBarEdit", "AddSeparator", 0)
       createMenuCopyFile("pvMenuBarEdit")
-      Menu, pvMenuBarEdit, Add
+      kMenu("pvMenuBarEdit", "AddSeparator", 0)
       kMenu("pvMenuBarEdit", "Add", "&Paste file(s) to list`tCtrl+V", "MenuPasteHDropFiles", "index list clipboard")
       If markedSelectFile
       {
-         Menu, pvMenuBarEdit, Add
+         kMenu("pvMenuBarEdit", "AddSeparator", 0)
          kMenu("pvMenuBarEdit", "Add", "Re&group selected dispersed files", "regroupSelectedFiles")
       }
 
       If !InStr(filesFilter, "QPV:PAGES:")
       {
-         Menu, pvMenuBarEdit, Add
+         kMenu("pvMenuBarEdit", "AddSeparator", 0)
          If !EntryMarkedMoveIndex
             kMenu("pvMenuBarEdit", "Add", "Mar&k entry to reorder`tX", "moveMarkedEntryNow")
          Else
@@ -63306,7 +63408,7 @@ InvokeMenuBarEdit(manuID) {
 
       If (validBMP(UserMemBMP) && thumbsDisplaying=1)
       {
-         Menu, pvMenuBarEdit, Add
+         kMenu("pvMenuBarEdit", "AddSeparator", 0)
          kMenu("pvMenuBarEdit", "Add", "&Return to image editing", "MenuReturnIMGedit", "back")
       }
    }
@@ -63561,7 +63663,7 @@ InvokeMenuBarImage(manuID) {
         } Else
         {
            kMenu("pvMenuBarImage", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw reinhard drago")
-           If (!InStr(currIMGdetails.PixelFormat, "TONE-MAPP") && !varContains(currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat, "hdr", "exr", "128-bit", "96-bit", "RGBF", "RGBAF"))
+           If (!testWasImageEditedInVP() || !InStr(currIMGdetails.PixelFormat, "TONE-MAPP") && !varContains(currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat, "hdr", "exr", "128-bit", "96-bit", "RGBF", "RGBAF"))
               kMenu("pvMenuBarImage", "Disable", "Adjust &HDR tone-mapping")
         }
 
@@ -64580,7 +64682,7 @@ createMenuImgSizeAdapt(dummy:=0) {
       If (drawingShapeNow=0 && mustCaptureCloneBrush=0)
       {
          yayz := varContains(currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat, "hdr", "exr", "128-bit", "96-bit", "RGBF", "RGBAF")
-         If ((InStr(currIMGdetails.PixelFormat, "TONE-MAPP") || yayz=1) && !AnyWindowOpen)
+         If ((InStr(currIMGdetails.PixelFormat, "TONE-MAPP") || yayz=1) && !AnyWindowOpen && testWasImageEditedInVP())
             kMenu("PVview", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw reinhard drago")
 
          If !AnyWindowOpen
@@ -64822,7 +64924,7 @@ createMenuMainView() {
       createMenuImgSizeAdapt()
       createMenuImgVProtation()
       yayz := varContains(currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat, "hdr", "exr", "128-bit", "96-bit", "RGBF", "RGBAF")
-      If ((InStr(currIMGdetails.PixelFormat, "TONE-MAPP") || yayz=1) && !AnyWindowOpen)
+      If ((InStr(currIMGdetails.PixelFormat, "TONE-MAPP") || yayz=1) && !AnyWindowOpen && testWasImageEditedInVP())
          kMenu("PVview", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw")
 
       If (!AnyWindowOpen || isNowAlphaPainting()!=1 && imgEditPanelOpened=1 && AnyWindowOpen!=24 && AnyWindowOpen!=31)
@@ -66238,7 +66340,17 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
          If (editingSelectionNow!=1)
             kMenu("PVedit", "Disable", "C&ut selected area`tCtrl+X", "image editing")
          kMenu("PVedit", "Add", "&Copy to clipboard`tCtrl+C", "CopyImage2clip", "image")
+
+         kMenu("PVedit", "AddSeparator", 0)
+         If ((validBMP(UserMemBMP) || currentImgModified=1 && viewportQPVimage.imgHandle) && thumbsDisplaying!=1)
+         {
+            If (undoLevelsRecorded>1 && !viewportQPVimage.imgHandle)
+               kMenu("PVedit", "Add", "Purge undo levels", "MenuPurgeUndos")
+            If FileExist(resultedFilesList[currentFileIndex, 1])
+               kMenu("PVedit", "Add", "&Revert changes`tF5", "RefreshImageFileAction", "reload refresh")
+         }
          kMenu("PVedit", "Add", "Close ima&ge and files list`tCtrl+F4", "closeDocuments", "reset")
+         kMenu("PVedit", "AddSeparator", 0)
       }
 
       kMenu("PVedit", "Add", "P&aste clipboard`tCtrl+V", "PasteClipboardIMG", "image")
@@ -66304,8 +66416,6 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
          }
       }
       kMenu("PVmenu", "Add", "&Save image`tCtrl+S", "PanelSaveImg", "image edit")
-      If FileExist(resultedFilesList[currentFileIndex, 1])
-         kMenu("PVmenu", "Add", "&Revert changes...`tF5", "RefreshImageFileAction", "reload refresh")
    } Else If (validBMP(UserMemBMP) && thumbsDisplaying=1)
       kMenu("PVmenu", "Add", "&Return to image editing", "MenuReturnIMGedit", "back")
 
@@ -84516,7 +84626,12 @@ calcImgSelection2bmp(boundLess, imgW, imgH, newW, newH, ByRef imgSelPx, ByRef im
 }
 
 BtnHelpResizePanel() {
-    msgBoxWrapper(appTitle ": HELP", "In «Advanced mode» the support for color depths other than 24 and 32 bits is very limited. All images are converted to 24 bits per pixel, or to 32 bits, if an alpha channel is present. When saving images in formats that do not support an alpha channel, the window background color is used.`n`nUse «Simple mode» to better preserve color depths or work with images larger than 536 MPx or larger than 199000 px width or height [if the given file format allows it]. This mode supports 1-, 8-, 24-, 32-, 16- (UINT16), 48- (RGB16), 64- (RGBA16), 32- (FLOAT), 96- (RGBF) and 128- (RGBAF) bits images. High-dynamic range formats supported: .EXR, .HDR, .JXR, .HDP, .PFM and .TIFF.`n`nPlease also note, while there is full support for multi-frames/paged images [for WEBP, GIFs and TIFFs] in the viewport... on file (re)save, resize or format conversions, only the first frame will be preserved.`n`nSome file formats have image dimensions limited by design. WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. When this panel is used to resize images, the resulted image dimensions maybe be capped to the format specific limits. For any format, including TIFF, PNG and JPEG, the limit is 8250 megapixels, even when the «Simple mode» is used.", -1, 0, 0)
+    friendly := (thumbsDisplaying=1) ? "" : "This tool applies the image actions utilizing the original file, not the viewport image data.`n`n"
+    msgBoxWrapper(appTitle ": HELP", friendly "In «Advanced mode» the support for color depths other than 24 and 32 bits is very limited. All images are converted to 24 bits per pixel, or to 32 bits, if an alpha channel is present. When saving images in formats that do not support an alpha channel, the window background color is used.`n`nUse «Simple mode» to better preserve color depths or work with images larger than 536 MPx or larger than 199000 px width or height [if the given file format allows it]. This mode supports 1-, 8-, 24-, 32-, 16- (UINT16), 48- (RGB16), 64- (RGBA16), 32- (FLOAT), 96- (RGBF) and 128- (RGBAF) bits images. High-dynamic range formats supported: .EXR, .HDR, .JXR, .HDP, .PFM and .TIFF.`n`nPlease also note, while there is full support for multi-frames/paged images [for WEBP, PDFs, GIFs and TIFFs] in the viewport... on file (re)save, resize or format conversions, only the first frame will be preserved.`n`nSome file formats have image dimensions limited by design. WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. When this panel is used to resize images, the resulted image dimensions maybe be capped to the format specific limits. For any format, including TIFF, PNG and JPEG, the limit is 13579 megapixels, even when the «Simple mode» is used.", -1, 0, 0)
+}
+
+BtnHelpSimpleResizePanel() {
+    msgBoxWrapper(appTitle ": HELP", "This tool applies the image actions utilizing the original file, not the viewport image data. It can better preserve color depths and it works with images larger than 536 MPx, if the file format allows it. The tool relies on the FreeImage library and it supports 1-, 8-, 24-, 32-, 16- (UINT16), 48- (RGB16), 64- (RGBA16), 32- (FLOAT), 96- (RGBF) and 128- (RGBAF) bits images. High-dynamic range formats supported: .EXR, .HDR, .JXR, .HDP, .PFM and .TIFF.`n`nPlease also note, while there is full support for multi-frames/paged images [for WEBP, PDFs, GIFs and TIFFs] in the viewport... on file (re)save, resize or format conversions, only the first frame will be preserved.`n`nSome file formats have image dimensions limited by design. WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. When this panel is used to resize images, the resulted image dimensions maybe be capped to the format specific limits. For any format, including TIFF, PNG and JPEG, the limit is 13579 megapixels.", -1, 0, 0)
 }
 
 OpenGitHub() {
@@ -86187,7 +86302,7 @@ coreColorsAdjusterWindow(modus:=0) {
     If (idu=10)
     {
        Gui, Add, Checkbox, xs y+10 w%thisWS% h%thisBtnHeight% gUpdateUIadjustVPcolors Checked%bwDithering% vbwDithering, Black/white
-       If InStr(currIMGdetails.PixelFormat, "TONE-MAPP")
+       If (InStr(currIMGdetails.PixelFormat, "TONE-MAPP") && testWasImageEditedInVP())
           Gui, Add, Button, x+5 wp hp gBtnOpenPanelAdjustToneMapping, &HDR tone-mapping
     } Else
     {
@@ -86240,7 +86355,7 @@ coreColorsAdjusterWindow(modus:=0) {
     } Else
     {
        ; Gui, Add, Checkbox, xs y+5 w%slide3Wid% h%thisBtnHeight% Checked%EraseAreaUseAlpha% vEraseAreaUseAlpha gUpdateUIadjustVPcolors, Apply alpha mas&k
-       If InStr(currIMGdetails.PixelFormat, "TONE-MAPP")
+       If (InStr(currIMGdetails.PixelFormat, "TONE-MAPP") && testWasImageEditedInVP())
           Gui, Add, Button, xs y+5 w%slide3Wid% h%thisBtnHeight% gBtnOpenPanelAdjustToneMapping, &HDR tone-mapping
        uiADDalphaMaskTabs(3, 4, "UpdateUIadjustVPcolors")
     }
@@ -86373,7 +86488,7 @@ PanelAdjustColorsSimpleWindow() {
 
     Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Colors|Threshold%bonusTabs%
     Gui, Tab, 1 ; general
-    If InStr(currIMGdetails.PixelFormat, "TONE-MAPP")
+    If (InStr(currIMGdetails.PixelFormat, "TONE-MAPP") && testWasImageEditedInVP())
        Gui, Add, Button, x+15 y+15 Section h%thisBtnHeight% w%thisW% gBtnOpenPanelAdjustToneMapping, &HDR tone-mapping
     Else
        Gui, Add, Button, x+15 y+15 Section h%thisBtnHeight% w%thisW% gPanelAutoColors, A&uto-adjust panel
@@ -87338,6 +87453,9 @@ BTNadjustCanvasAction() {
 
 PanelResizeImageWindow() {
     Global userEditWidth, userEditHeight, ResultEditWidth, ResultEditHeight, btnFldr, editF5
+
+    If warnFramesActionPrevented("IMAGE RESIZE")
+       Return
 
     ToolTip, Please wait...
     filesElected := getSelectedFiles(0, 1)
@@ -94290,8 +94408,8 @@ PanelSimpleResizeRotate(modus:="") {
 
     imgPath := getIDimage(currentFileIndex)
     filesElected := getSelectedFiles(0, 1)
-    thisRegEX := StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$")
-    If (!filesElected && !RegExMatch(imgPath, thisRegEX) && modus!="forced")
+    thisRegEXsaveFmts := StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$")
+    If (!filesElected && !RegExMatch(imgPath, thisRegEXsaveFmts) && modus!="forced")
     {
        CloseWindow()
        Sleep, 5
@@ -94348,8 +94466,12 @@ PanelSimpleResizeRotate(modus:="") {
     ml := (PrefsLargeFonts=1) ? 90 : 50
     Gui, Add, Button, x+5 hp w%ml% gBTNchangeResizeDestFolder vbtnFldr, C&hoose
     ml := (PrefsLargeFonts=1) ? 152 : 93
-    Gui, Add, Text, xs y+10 hp +0x200 +hwndhTemp, Action on file name conflicts:
-    GuiAddDropDownList("x+5 w" ml " gTglOverwriteFiles AltSubmit Choose" userActionConflictingFile " vuserActionConflictingFile", "Skip files|Auto-rename|Overwrite", [hTemp])
+    If (filesElected>1)
+    {
+       Gui, Add, Text, xs y+10 hp +0x200 +hwndhTemp, Action on file name conflicts:
+       GuiAddDropDownList("x+5 w" ml " gTglOverwriteFiles AltSubmit Choose" userActionConflictingFile " vuserActionConflictingFile", "Skip files|Auto-rename|Overwrite", [hTemp])
+    }
+
     thisWid := (PrefsLargeFonts=1) ? 235 : 150
     GuiAddSlider("userJpegQuality", 2,100, 95, "Image quality on save", "iniSaveJPGquality", 1, "xs y+5 w" thisWid " hp", "This only applies to the JPEG and WEBP file formats")
     If !(filesElected>1)
@@ -94381,9 +94503,14 @@ PanelSimpleResizeRotate(modus:="") {
        Gui, Add, Button, x+5 hp w%btnWid% Default gBtnSaveAsSimpleProcessing vmainBtnACT, &Save image as...
     } Else Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% wp-60 Default gBtnPerformSimpleProcessing, &Process selected image files now
 
-    Gui, Add, Button, xs y+5 h%thisBtnHeight% w%btnWid% gBtnInvokePanelResizeImageWindow, &Advanced mode
     ml := (PrefsLargeFonts=1) ? 85 : 50
-    Gui, Add, Button, x+5 hp w%ml% gBtnHelpResizePanel, &Help
+    If (thumbsDisplaying=1 || filesElected>1)
+    {
+       Gui, Add, Button, xs y+5 h%thisBtnHeight% w%btnWid% gBtnInvokePanelResizeImageWindow, &Advanced mode
+       Gui, Add, Button, x+5 hp w%ml% gBtnHelpResizePanel, &Help
+    } Else
+       Gui, Add, Button, x+5 hp w%ml% gBtnHelpSimpleResizePanel, &Help
+
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Resize / crop / rotate image [simple mode]: " appTitle)
     ResetImgLoadStatus()
@@ -94486,10 +94613,10 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="") {
     imgPath := getIDimage(currentFileIndex)
     zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, oExt)
     thisDialogSavePtrns := StrReplace(dialogSaveFptrn, "|Icon (*.ico)", "|Icon (*.ico)|High-Dynamic Range Image (*.hdr)|OpenEXR (*.exr)|Portable FloatMap (*.pfm)")
-    thisRegEX := StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$")
+    thisRegEXsaveFmts := StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$")
     ; If (contextu!="extern")
     ; {
-    ;    If (!filesElected && !RegExMatch(imgPath, thisRegEX))
+    ;    If (!filesElected && !RegExMatch(imgPath, thisRegEXsaveFmts))
     ;    {
     ;       SoundBeep, 300, 100
     ;       msgBoxWrapper(appTitle ": ERROR", "This file format (." oExt ") cannot be processed in «Simple mode». Please use the «Advanced mode» which allows file format conversions.", 0, 0, "exclamation")
@@ -94514,7 +94641,7 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="") {
          file2save .= "." dialogSaveIndexes[dialogFmtIndex]
       }
 
-      If !RegExMatch(file2save, thisRegEX)
+      If !RegExMatch(file2save, thisRegEXsaveFmts)
       {
          SoundBeep, 300, 100
          If (dummy="no-prompt")
@@ -94640,7 +94767,7 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor) {
 
    CurrentSLD := ""
    prevMSGdisplay := A_TickCount
-   thisRegEX := StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$")
+   thisRegEXsaveFmts := StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$")
    countTFilez := failedFiles := filesConverted := skippedFiles := 0
    doStartLongOpDance()
    startOperation := A_TickCount
@@ -94650,7 +94777,7 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor) {
          Continue
 
       imgPath := resultedFilesList[A_Index, 1]
-      If !RegExMatch(imgPath, thisRegEX)
+      If !RegExMatch(imgPath, thisRegEXsaveFmts)
       {
          skippedFiles++
          Continue

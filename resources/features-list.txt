@@ -42,15 +42,7 @@
 
 * Copy / paste image to / from clipboard with the alpha channel preserved. 
 
-* Print image. Users can add text, adjust size and position on the page before printing.
-
-* Batch printing of multiple images.
-
-* Acquire images from scanners.
-
-* Resize and crop images preserving the alpha-channel on save.
-
-* Multiple file formats supported for saving an image.
+* 100 multiple undo levels
 
 
 FILES MANAGEMENT:
@@ -70,7 +62,7 @@ FILES MANAGEMENT:
 
 * Create customizable contact sheets (thumbnail sheets) of selected images
 
-* Extract frames from GIF and WebP animated images, or pages from TIFFs.
+* Extract frames or pages from PDFs, TIFFs, GIFs and WebP animated images
 
 * Multiple list view modes. Display the indexed files as an easy to scroll list with or without image file details, or as thumbnails list.
 
@@ -124,7 +116,19 @@ FILES MANAGEMENT:
 GENERAL / USER INTERFACE:
 ===========================
 
-* Support for 85 image file formats, including various Camera RAW formats.
+* QPV can open / save and manipulate very large images; it was tested with up to 11000 megapixels (11 Gigapixels) images.
+
+* Support for 85 image file formats, including various Camera RAW formats, SVG and PDF.
+
+* Open HDR or EXR images and adjust tone-mapping and exposure.
+
+* Multiple file formats supported for saving an image.
+
+* Print images or PDFs. Users can add text, adjust size and position on the page before printing.
+
+* Batch printing of multiple images.
+
+* Acquire images from scanners.
 
 * Touch screen friendly user interface: swipe gestures and hot-areas to navigate or zoom into images.
 
@@ -150,9 +154,11 @@ GENERAL / USER INTERFACE:
 
 * Quick search box allows users to search through menus and other available options in QPV.
 
+* Open PDF documents and extract pages or texts in batch or from a given page
+
 * Support for animated .WEBP and .GIFs in slideshows - HD GIFs are support as well.
 
-* Support for multi-paged .WEBP, .TIFFs and .GIF frames. Ability to go through each image frame/page.
+* Support for multi-paged .WEBP, .TIFFs, .PDFs and .GIF frames. Ability to go through each image frame/page.
 
 * Private mode. In this mode, images are blurred, and file names and paths are hidden.
 

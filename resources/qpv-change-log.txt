@@ -4,20 +4,24 @@
 // Project began in early May 2019.
 // Related: general-code-overview.txt
 
-- v6.1.60 (2025-01-20** - work in progress )
+- v6.1.70 (2025-03-01)
+  - [new] added SVG and PDF files support
   - [new] option to purge undo levels 
+  - [new] option to view as thumbnails the pages of images containing multiple pages: pdf, tif
+  - [new] option to change the background color behind images with transparency (image view options menu)
+  - [new] QPV will now apply the embedded color profile on the image when loaded to display it correctly [the feature can be deactivated]; it applies only for jpg, png, tiff, wdp, hdp, jxr
   - [new] Sobel, Scharr and Canny edge detection algorithms using OpenCV
   - [new] added HDR tone-mapping algorithms / implementations available in OpenCV; they are much better than what FreeImage offers
   - [improvement] faster blur algorithms [replaced the cImg filters with OpenCV]
   - [improvement] much faster image resizing in the viewport for images above 536 mgpx; it is now using OpenCV
-  - various bug fixes
+  - various bug fixes and improvements
 
 - v6.1.55 (2024-12-07)
   - users can now create very large images, above 536 megapixels, using the «New Image» option
   - bug fixes
 
 - v6.1.50 (2024-11-28)
-  - [improvement] «draw paramaetric lines» tool now works with images over 536 megapixels
+  - [improvement] «draw parametric lines» tool now works with images over 536 megapixels
   - fixed several tools and filters: add noise, flood/bucket, insert text, pixelize; sometimes crashes occured with images above 536 mgpx
   - other bug fixes
 
