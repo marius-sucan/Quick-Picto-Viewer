@@ -231,11 +231,11 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , WindowBgrColor := "141414", slideShowDelay := 3000, userMultiDelChoice := 2, ambiTexBrushSize := 150
    , IMGresizingMode := 1, SlideHowMode := 1, TouchScreenMode := 1, screenSaverMode := 0, userSearchPos := 1
    , lumosAdjust := 1, GammosAdjust := 0, userimgQuality := 0, imgFxMode := 1, FlipImgH := 0, FlipImgV := 0
-   , filesFilter := "", isAlwaysOnTop := 0, IntensityAlphaChannel := 1, zoomLevel := 1, SimpleOperationsScaleXImgFactor := "100 %"
-   , skipDeadFiles := 0, userHQraw  := 0, isTitleBarVisible := 1, lumosGrayAdjust := 0, imageAligned := 5
+   , filesFilter := "", isAlwaysOnTop := 0, IntensityAlphaChannel := 1, zoomLevel := 1
+   , skipDeadFiles := 0, userHQraw  := 0, isTitleBarVisible := 1, lumosGrayAdjust := 0, imageAlignVPtopLeft := 0
    , MustLoadSLDprefs := 0, animGIFsSupport := 1, move2recycler := 1, deleteFileActAfter := 1
    , SLDcacheFilesList := 1, autoRemDeadEntry := 0, ResizeWithCrop := 1, ResizeMustPerform := 1
-   , easySlideStoppage := 1, ResizeInPercentage := 0, autoPlaySlidesAudio := 0, ResizeApplyEffects := 1
+   , ResizeInPercentage := 0, autoPlaySlidesAudio := 0, ResizeApplyEffects := 1, SimpleOperationsScaleXImgFactor := "100 %"
    , ResizeKeepAratio := 1, ResizeQualityHigh := 1, ResizeRotationUser := 0, satAdjust := 1
    , ResizeDestFolder, ResizeUseDestDir := 0, chnRdecalage := 0.0, chnGdecalage := 0.0
    , chnBdecalage := 0.0, alwaysOpenWithFIM := 0, bwDithering := 0, showHistogram := 0,  FloodFillModus := 0
@@ -1009,7 +1009,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
         If HKifs("liveEdit")
            func2Call := ["ActToggleLivePreview"]
         Else If HKifs("general")
-           func2Call := ["PanelPrefsWindow"]
+           func2Call := ["PanelPreferencesWindow"]
     } Else If (givenKey="p")
     {
         If (isImgEditingNow()=1 && drawingShapeNow=1)
@@ -3143,7 +3143,7 @@ resetSlideshowTimer(ignoreEasyStop:=0) {
    If (slideShowRunning!=1)
       Return
 
-   If (easySlideStoppage=1 && slideShowRunning=1 && ignoreEasyStop=0)
+   If (slideShowRunning=1 && ignoreEasyStop=0)
       ToggleSlideShowu("stop", 0)
    Else If (slideShowRunning=1)
       ToggleSlideShowu("start", 1)
@@ -4671,8 +4671,6 @@ ToggleThumbsMode() {
       If (thumbsListViewMode=1 && !isWinXP)
          initAHKhThumbThreads()
 
-      ; If (getCaptionStyle(PVhwnd)=1)
-      ;    ToggleTitleBaruNow()
       If hSNDmediaFile
          MCI_Pause(hSNDmedia)
 
@@ -4699,7 +4697,7 @@ ToggleThumbsMode() {
    lastInvoked := A_TickCount
 }
 
-TriggerMenuBarUpdate(modus:=0) {
+TriggerMenuBarUpdate(modus:=0, tt:=0) {
    If (showMainMenuBar!=1 && modus!="forced")
       Return
 
@@ -4709,7 +4707,7 @@ TriggerMenuBarUpdate(modus:=0) {
 
    lastMenuBarUpdated := A_TickCount
    ; interfaceThread.ahkassign("thumbsDisplaying", thumbsDisplaying)
-   interfaceThread.ahkPostFunction("UpdateMenuBar", modus)
+   interfaceThread.ahkPostFunction("UpdateMenuBar", modus, tt)
    SetTimer, refreshEntireViewport, -450
 }
 
@@ -10817,9 +10815,8 @@ ToggleImgFX(dir:=0) {
 }
 
 defineImgAlign() {
-   modes := {1:"Top-left corner", 2:"Top-center", 3:"Top-right corner", 4:"Left-center", 5:"Center", 6:"Right-center", 7:"Bottom-left corner", 8:"Bottom-center", 9:"Bottom-right corner"}
-   ; thisAlign := (IMGresizingMode=4) ? 5 : imageAligned
-   r := modes[imageAligned]
+   modes := {0:"Center", 1:"Top-left corner", 2:"Top-center", 3:"Top-right corner", 4:"Left-center", 5:"Center", 6:"Right-center", 7:"Bottom-left corner", 8:"Bottom-center", 9:"Bottom-right corner"}
+   r := modes[imageAlignVPtopLeft]
    StringUpper, r, r
    Return r
 }
@@ -10834,15 +10831,22 @@ ToggleIMGalign() {
       Return
 
    resetSlideshowTimer(1)
-   imageAligned := (imageAligned=5) ? 1 : 5
-   showTOOLtip("Image alignment: " defineImgAlign(), A_ThisFunc, 1)
-   SetTimer, RemoveTooltip, % -msgDisplayTime
-   INIaction(1, "imageAligned", "General")
+   If (AnyWindowOpen=14)
+      GuiControlGet, imageAlignVPtopLeft
+   Else
+      imageAlignVPtopLeft := !imageAlignVPtopLeft
+
    IMGdecalageX := IMGdecalageY := 1
    If (IMGresizingMode=4)
       PrintPosX := "X"
 
    dummyTimerReloadThisPicture(50)
+   If (AnyWindowOpen=14)
+      Return
+
+   INIaction(1, "imageAlignVPtopLeft", "General")
+   showTOOLtip("Image alignment: " defineImgAlign(), A_ThisFunc, 1)
+   SetTimer, RemoveTooltip, % -msgDisplayTime
    If (drawingShapeNow=1)
    {
       If isNowSymmetricVectorShape()
@@ -10971,8 +10975,7 @@ coreResetIMGview(dummy:=0) {
      GammosGrayAdjust := 0
      lumosGrayAdjust := 1
      satAdjust := lumosAdjust := 1
-     GammosAdjust := 0
-     vpIMGrotation := 0
+     GammosAdjust := vpIMGrotation := 0
   }
 
   If (imgFxMode=2 || imgFxMode=3 || imgFxMode>4 || mustResetFxMode=1)
@@ -11000,6 +11003,7 @@ VPchangeLumos(dir, dummy:=0) {
    If (thumbsDisplaying=1 && thumbsListViewMode>1)
       Return
 
+   ofx := imgFxMode
    resetSlideshowTimer()
    If (imgFxMode!=2 && imgFxMode!=4 && dir!=2)
       imgFxMode := 2
@@ -11052,11 +11056,10 @@ VPchangeLumos(dir, dummy:=0) {
       showTOOLtip("Image display: UNALTERED " addMsg addMore)
    } Else showTOOLtip("Image brightness: " value2show, A_ThisFunc, 2, value2show / 25)
 
-   ; If (thumbsDisplaying!=1)
-      ForceRefreshNowThumbsList()
+   ForceRefreshNowThumbsList()
    SetTimer, RemoveTooltip, % -msgDisplayTime
    lastInvoked := A_TickCount
-   newValues := "a" GammosGrayAdjust lumosGrayAdjust GammosAdjust lumosAdjust imgFxMode
+   newValues := "a" GammosGrayAdjust lumosGrayAdjust GammosAdjust lumosAdjust imgFxMode ofx getIDimage(currentFileIndex) currentFileIndex zoomLevel imageAlignVPtopLeft allowFreeIMGpanning AnyWindowOpen
    If (prevValues=newValues && dir!=2)
       Return
 
@@ -11264,7 +11267,7 @@ VPchangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
    o_IMGresizingMode := IMGresizingMode
    IMGresizingMode := 4
    customZoomAdaptMode := 0
-   ; If (allowFreeIMGpanning=1 && imageAligned=5 && IMGresizingMode=4)
+   ; If (allowFreeIMGpanning=1 && imageAlignVPtopLeft=0 && IMGresizingMode=4)
    ;    PrintPosX := (o_IMGresizingMode=IMGresizingMode) ? "W" : "C"
 
    If (o_IMGresizingMode!=IMGresizingMode)
@@ -11290,7 +11293,7 @@ VPchangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
       Return
    }
 
-   newValues := "a" zoomLevel thumbsZoomLevel IMGresizingMode imageAligned imgPath gdiBitmap UserMemBMP currentFileIndex vpIMGrotation
+   newValues := "a" zoomLevel thumbsZoomLevel IMGresizingMode imageAlignVPtopLeft imgPath gdiBitmap UserMemBMP currentFileIndex vpIMGrotation
    If (prevValues=newValues && hasThisChangedYo!=1)
       Return
 
@@ -11341,6 +11344,7 @@ VPchangeGammos(dir) {
    If (thumbsDisplaying=1 && thumbsListViewMode>1)
       Return
 
+   ofx := imgFxMode
    resetSlideshowTimer()
    o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
    If (imgFxMode!=2 && imgFxMode!=4)
@@ -11373,13 +11377,12 @@ VPchangeGammos(dir) {
       lumosAdjust := value2AdjustB
    }
 
+   ForceRefreshNowThumbsList()
    prevColorAdjustZeit := A_TickCount
-   ; If (thumbsDisplaying!=1)
-      ForceRefreshNowThumbsList()
    showTOOLtip("Image contrast: " Round(value2Adjust, 3), A_ThisFunc, 2, Abs(value2Adjust - 1)/26)
    SetTimer, RemoveTooltip, % -msgDisplayTime
+   newValues := "a" GammosGrayAdjust lumosGrayAdjust GammosAdjust lumosAdjust ofx getIDimage(currentFileIndex) currentFileIndex zoomLevel imageAlignVPtopLeft allowFreeIMGpanning AnyWindowOpen
    lastInvoked := A_TickCount
-   newValues := "a" GammosGrayAdjust lumosGrayAdjust GammosAdjust lumosAdjust imgFxMode
    If (prevValues=newValues)
       Return
 
@@ -11413,30 +11416,24 @@ VPchangeSaturation(dir) {
    If (thumbsDisplaying=1 && thumbsListViewMode>1)
       Return
 
+   ofx := imgFxMode
    resetSlideshowTimer()
    If (imgFxMode=4)
       satAdjust := 0
 
    imgFxMode := 2
    prevColorAdjustZeit := A_TickCount
-   value2Adjust := satAdjust
-   If (dir=1)
-      value2Adjust += 0.05
-   Else
-      value2Adjust -= 0.05
-
-   value2Adjust := clampInRange(value2Adjust, 0, 3)
-   satAdjust := value2Adjust
-   ; If (thumbsDisplaying!=1)
-      ForceRefreshNowThumbsList()
-   showTOOLtip("Image saturation: " Round(value2Adjust*100) "%", A_ThisFunc, 2, value2Adjust/3)
+   stepu := (dir=1) ? 0.05 : -0.05
+   satAdjust := clampInRange(satAdjust + stepu, 0, 3)
+   ForceRefreshNowThumbsList()
+   showTOOLtip("Image saturation: " Round(satAdjust*100) "%", A_ThisFunc, 2, satAdjust/3)
    SetTimer, RemoveTooltip, % -msgDisplayTime
-   newValues := "a" satAdjust imgFxMode currentFileIndex
+   newValues := "a" satAdjust  ofx getIDimage(currentFileIndex) currentFileIndex zoomLevel imageAlignVPtopLeft allowFreeIMGpanning AnyWindowOpen
    If (prevValues=newValues)
       Return
 
-   INIaction(1, "satAdjust", "General")
    prevValues := newValues
+   INIaction(1, "satAdjust", "General")
    dummyTimerDelayiedImageDisplay(10)
    If ((AnyWindowOpen=10 || AnyWindowOpen=74) && imgEditPanelOpened=1)
    {
@@ -11452,34 +11449,27 @@ VPchangeRealGamma(dir) {
 
    resetSlideshowTimer()
    prevColorAdjustZeit := A_TickCount
+   ofx := imgFxMode
    imgFxMode := 2
-   value2Adjust := realGammos
-   If (value2Adjust>2)
+   If (realGammos>2)
       stepu := 0.2
-   Else If (value2Adjust<0.1)
+   Else If (realGammos<0.1)
       stepu := 0.01
    Else
       stepu := 0.05
 
-   If (dir=1)
-      value2Adjust += stepu
-   Else
-      value2Adjust -= stepu
-
-   value2Adjust := clampInRange(value2Adjust, 0.01, 10)
-   realGammos := value2Adjust
-   ; If (thumbsDisplaying!=1)
-      ForceRefreshNowThumbsList()
-   showTOOLtip("Image gamma: " Round(value2Adjust*100) "%", A_ThisFunc, 2, value2Adjust/8)
+   ForceRefreshNowThumbsList()
+   stepu := (dir=1) ? stepu : -stepu
+   realGammos := clampInRange(realGammos + stepu, 0.01, 10)
+   showTOOLtip("Image gamma: " Round(realGammos*100) "%", A_ThisFunc, 2, realGammos/8)
    SetTimer, RemoveTooltip, % -msgDisplayTime
-   newValues := "a" realGammos imgFxMode
+   newValues := "a" realGammos ofx getIDimage(currentFileIndex) currentFileIndex zoomLevel imageAlignVPtopLeft allowFreeIMGpanning AnyWindowOpen
    If (prevValues=newValues)
       Return
 
-   INIaction(1, "realGammos", "General")
    prevValues := newValues
+   INIaction(1, "realGammos", "General")
    dummyTimerDelayiedImageDisplay(10)
-
    If ((AnyWindowOpen=10 || AnyWindowOpen=74) && imgEditPanelOpened=1)
    {
       updatePanelColorsInfo()
@@ -11497,13 +11487,8 @@ ChangeSoundVolume(dir) {
       Return
 
    resetSlideshowTimer(1)
-   value2Adjust := mediaSNDvolume
-   If (dir=1)
-      value2Adjust += 5
-   Else
-      value2Adjust -= 5
-
-   value2Adjust := clampInRange(value2Adjust, 1, 100)
+   stepu := (dir=1) ? 5 : -5
+   mediaSNDvolume := clampInRange(mediaSNDvolume + stepu, 1, 100)
    If (hSNDmedia && hSNDmediaFile)
    {
       zPlitPath(hSNDmediaFile, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
@@ -11523,10 +11508,9 @@ ChangeSoundVolume(dir) {
    If !infoMedia
       infoMedia := "`nNo audio is playing through QPV"
 
-   mediaSNDvolume := value2Adjust
    INIaction(1, "mediaSNDvolume", "General")
    SetVolume(mediaSNDvolume)
-   showTOOLtip("Audio volume: " value2Adjust "%" infoMedia, A_ThisFunc, 2, value2Adjust/100)
+   showTOOLtip("Audio volume: " mediaSNDvolume "%" infoMedia, A_ThisFunc, 2, mediaSNDvolume/100)
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -11538,19 +11522,12 @@ changeGIFsDelayu(dir) {
    If (thumbsDisplaying=1 || !isImgEditingNow() || animGIFsSupport!=1)
       Return
 
-   factoru := (A_TickCount - lastInvoked<350) ? 150 : 15
    resetSlideshowTimer(1)
-   value2Adjust := UserGIFsDelayu
-   If (dir=1)
-      value2Adjust += factoru
-   Else
-      value2Adjust -= factoru
-
-   value2Adjust := clampInRange(value2Adjust, -9500, 9500, 1)
-   UserGIFsDelayu := value2Adjust
+   factoru := (A_TickCount - lastInvoked<450) ? 150 : 15
+   stepu := (dir=1) ? factoru : -factoru
+   UserGIFsDelayu := clampInRange(UserGIFsDelayu + stepu, -9500, 9500, 1)
    SetTimer, postPonedWriteGifSpeed, -150
-   ; setGIFframesDelay()
-   showTOOLtip("GIFs playback delay: " value2Adjust " ms", A_ThisFunc, 2, (value2Adjust+9500)/19000)
+   showTOOLtip("GIFs playback delay: " UserGIFsDelayu " ms", A_ThisFunc, 2, (UserGIFsDelayu + 9500)/19000)
    SetTimer, RemoveTooltip, % -msgDisplayTime
    lastInvoked := A_TickCount
 }
@@ -11563,14 +11540,8 @@ VPchangeSelRotation(dir, stepu:=1) {
    If (thumbsDisplaying=1 || editingSelectionNow!=1 || liveDrawingBrushTool=1)
       Return
 
-   value2Adjust := VPselRotation
-   If (dir=1)
-      value2Adjust += stepu
-   Else
-      value2Adjust -= stepu
-
-   value2Adjust := clampInRange(value2Adjust, 0, 360 - 1, 1)
-   VPselRotation := value2Adjust
+   stepu := (dir=1) ? stepu : -stepu
+   VPselRotation := clampInRange(VPselRotation, 0, 360 - 1, 1)
    vpImgPanningNow := (allowFreeIMGpanning=1) ? 1 : 2
    ; SetTimer, dummyRefreshImgSelectionWindow, -50
    dummyRefreshImgSelectionWindow()
@@ -11634,18 +11605,11 @@ changeImgRotationInVP(dir, stepu:=5, doReset:=0) {
    } Else Return
 
    resetSlideshowTimer()
-   value2Adjust := vpIMGrotation
-   If (dir=1)
-      value2Adjust += stepu
-   Else
-      value2Adjust -= stepu
-
+   stepu := (dir=1) ? stepu : -stepu
+   vpIMGrotation := clampInRange(vpIMGrotation + stepu, 0, 360 - stepu, 1)
    If (doReset=1)
-      value2Adjust := 0
-   Else
-      value2Adjust := clampInRange(value2Adjust, 0, 360 - stepu, 1)
+      vpIMGrotation := 0
 
-   vpIMGrotation := value2Adjust
    SetTimer, RefreshImageFile, -750
    dummyChangeVProtation()
 }
@@ -12061,7 +12025,7 @@ PreviousPicture(dummy:=0, selForbidden:=0) {
    If (validBMP(UserMemBMP) && (editingSelectionNow=1 || thumbsDisplaying!=1 && currentImgModified=1) && InStr(dummy, "key-wheel"))
       Return
 
-   If (InStr(dummy, "key-") && slideShowRunning=1 && easySlideStoppage=1)
+   If (InStr(dummy, "key-") && slideShowRunning=1)
       ToggleSlideShowu()
 
    prevFileIndex := currentFileIndex
@@ -12079,7 +12043,7 @@ NextPicture(dummy:=0, selForbidden:=0) {
    If (validBMP(UserMemBMP) && (editingSelectionNow=1 || thumbsDisplaying!=1 && currentImgModified=1) && InStr(dummy, "key-wheel"))
       Return
 
-   If (InStr(dummy, "key-") && slideShowRunning=1 && easySlideStoppage=1)
+   If (InStr(dummy, "key-") && slideShowRunning=1)
       ToggleSlideShowu()
 
    prevFileIndex := currentFileIndex
@@ -15524,7 +15488,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
              BlurAmount := 0
        }
 
-       thisFXstate := "a" whichBitmap getVPselIDs("saiz-vpos") previewMode BlurAmount "a" imgSelPx imgSelPy imgSelW imgSelH currentFileIndex getIDimage(currentFileIndex) oImgW oImgH currentUndoLevel currentSelUndoLevel FlipImgH FlipImgV IMGresizingMode imageAligned zoomLevel prevDestPosX prevDestPosY mainWidth mainHeight useGdiBitmap() prevResizedVPimgW prevResizedVPimgH PasteInPlaceAdaptMode undoLevelsRecorded UserMemBMP ViewPortBMPcache getIDvpFX()
+       thisFXstate := "a" whichBitmap getVPselIDs("saiz-vpos") previewMode BlurAmount "a" imgSelPx imgSelPy imgSelW imgSelH currentFileIndex getIDimage(currentFileIndex) oImgW oImgH currentUndoLevel currentSelUndoLevel FlipImgH FlipImgV IMGresizingMode imageAlignVPtopLeft zoomLevel prevDestPosX prevDestPosY mainWidth mainHeight useGdiBitmap() prevResizedVPimgW prevResizedVPimgH PasteInPlaceAdaptMode undoLevelsRecorded UserMemBMP ViewPortBMPcache getIDvpFX()
        ; bgrBMP := getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, oImgW, oImgH, ResizedW, ResizedH, BlurAmount)
        If (validBMP(o_bgrBMP) && BlurAmount>1)
           bgrBMP := applyVPeffectsAdvOnBMP(o_bgrBMP, previewMode, thisFXstate, 0, 0, BlurAmount, 0)
@@ -15859,10 +15823,10 @@ getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, oImgW, oImgH, imgSel
           thisFXid := "a"
        ; ToolTip, % thisFXid "`n" matrix , , , 2
        thisFXid .= (BlurAmount>1) ? "." BlurAmount zoomLevel : "."
-       thisFXid .= "Z" FlipImgH FlipImgV IMGresizingMode imageAligned zoomLevel prevDestPosX prevDestPosY mainWidth mainHeight useGdiBitmap() prevResizedVPimgW prevResizedVPimgH PasteInPlaceAdaptMode fImgW fImgH aimgW aimgH
+       thisFXid .= "Z" FlipImgH FlipImgV IMGresizingMode imageAlignVPtopLeft zoomLevel prevDestPosX prevDestPosY mainWidth mainHeight useGdiBitmap() prevResizedVPimgW prevResizedVPimgH PasteInPlaceAdaptMode fImgW fImgH aimgW aimgH
        ; zPx := (selDotX<0 && selDotAx>mainWidth) ? 0 : imgSelPx
        ; zPy := (selDotY<0 && selDotAy>mainHeight) ? 0 : imgSelPy
-       thisState := "a" imgSelPx imgSelPy imgSelW imgSelH fImgW fImgH currentFileIndex getIDimage(currentFileIndex) oImgW oImgH currentUndoLevel currentSelUndoLevel FlipImgH FlipImgV IMGresizingMode imageAligned zoomLevel prevDestPosX prevDestPosY mainWidth mainHeight useGdiBitmap() prevResizedVPimgW prevResizedVPimgH PasteInPlaceAdaptMode undoLevelsRecorded UserMemBMP ViewPortBMPcache aimgW aimgH
+       thisState := "a" imgSelPx imgSelPy imgSelW imgSelH fImgW fImgH currentFileIndex getIDimage(currentFileIndex) oImgW oImgH currentUndoLevel currentSelUndoLevel FlipImgH FlipImgV IMGresizingMode imageAlignVPtopLeft zoomLevel prevDestPosX prevDestPosY mainWidth mainHeight useGdiBitmap() prevResizedVPimgW prevResizedVPimgH PasteInPlaceAdaptMode undoLevelsRecorded UserMemBMP ViewPortBMPcache aimgW aimgH
        ; ToolTip, % thisState , , , 2
        If (thisFXid=prevFXid && thisState=prevState && validBMP(prevBMPu))
        {
@@ -18438,7 +18402,7 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
    Else
       calcImgSelection2bmp(!LimitSelectBoundsImg, oimgW, oimgH, oimgW, oimgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
 
-   thisVPid := "a" oImgW oImgH currentFileIndex IMGlargerViewPort imgSelLargerViewPort IMGdecalageX IMGdecalageY zoomLevel prevResizedVPimgW prevResizedVPimgH prevDestPosX prevDestPosY imageAligned
+   thisVPid := "a" oImgW oImgH currentFileIndex IMGlargerViewPort imgSelLargerViewPort IMGdecalageX IMGdecalageY zoomLevel prevResizedVPimgW prevResizedVPimgH prevDestPosX prevDestPosY imageAlignVPtopLeft
    pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, 1)
    tx := (imgSelPx > prevDestPosX) ? prevDestPosX : max(imgSelPx, prevDestPosX)
    ty := (imgSelPy > prevDestPosY) ? prevDestPosY : max(imgSelPy, prevDestPosY)
@@ -18625,7 +18589,7 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0) {
          trGdip_GetImageDimensions(bgrBMPu, zImgW, zImgH)
          sizeu := (imgSelW=zImgW && imgSelH=zImgH) ? 1 : 0
          doFX := ((FillAreaGlassy>1 && opacityLevels=1 || thisBlendMode>1) && BlurAmount>1) ? 1 : 0
-         thisFXstate := "a" whichBitmap partu previewMode BlurAmount currentFileIndex getIDimage(currentFileIndex) oImgW oImgH currentUndoLevel undoLevelsRecorded currentSelUndoLevel FlipImgH FlipImgV IMGresizingMode imageAligned zoomLevel prevDestPosX prevDestPosY mainWidth mainHeight useGdiBitmap() prevResizedVPimgW prevResizedVPimgH PasteInPlaceAdaptMode UserMemBMP ViewPortBMPcache getIDvpFX()
+         thisFXstate := "a" whichBitmap partu previewMode BlurAmount currentFileIndex getIDimage(currentFileIndex) oImgW oImgH currentUndoLevel undoLevelsRecorded currentSelUndoLevel FlipImgH FlipImgV IMGresizingMode imageAlignVPtopLeft zoomLevel prevDestPosX prevDestPosY mainWidth mainHeight useGdiBitmap() prevResizedVPimgW prevResizedVPimgH PasteInPlaceAdaptMode UserMemBMP ViewPortBMPcache getIDvpFX()
          If (validBMP(bgrBMPu) && (doFX=1 || sizeu!=1))
             glassBitmap := applyVPeffectsAdvOnBMP(bgrBMPu, previewMode, thisFXstate, imgSelW, imgSelH, BlurAmount, 0)
          Else If validBMP(bgrBMPu)
@@ -26683,6 +26647,10 @@ btnHelpKbdContexts() {
    msgBoxWrapper(appTitle ": HELP", "Users can customize keyboard shortcuts based on contexts in the application, such as, but not limited to: image view, files list modes, image editor live tools, et cetera.`n`nThe same keyboard shortcut can do different things based on the context. Or, the same function, if available in multiple contexts, can have a different shortcut for each context.", -1, 0, 0)
 }
 
+btnHelpSettingsPanel() {
+   msgBoxWrapper(appTitle ": HELP", "The text style options apply to the On-Screen Display in the viewport. The same text style is used to render as images texts pasted from the clipboard.", -1, 0, 0)
+}
+
 BtnHelpEdgeDetection() {
    msgBoxWrapper(appTitle ": HELP", "Sobel and Scharr convolution kernels can detect edges by emphasizing the gradients. Rhe 1st, 2nd, 3rd or mixed image derivatives are calculated based on the user defined order(s) through the dX and dY values. Scharr uses a kernel size (kS) of 3x3.`n`nWhen the Canny algorithm is selected, the smallest value between threshold1 (T1) and threshold2 (T2) is used for edge linking. The largest value is used to find initial segments of strong edges. T1 and T2 are the thresholds of the hysteresis procedure.`n`nDiff-blending mode detects edges by relying on the difference blending mode. The input image is duplicated on top and then by user-defined X/Y values, moved along the X/Y axis. The output image is rendered grayscale.`n`nUsers are provided with parameters to adjust the blur, brightness and contrast of the input and output images, in order to enable fine-tuned control of the resulted image.", -1, 0, 0)
 }
@@ -33313,7 +33281,7 @@ saveSlideSettingsInDB() {
    IniSLDBWrite("lumosGrayAdjust", lumosGrayAdjust)
    IniSLDBWrite("GammosGrayAdjust", GammosGrayAdjust)
    IniSLDBWrite("satAdjust", satAdjust)
-   IniSLDBWrite("imageAligned", imageAligned)
+   IniSLDBWrite("imageAlignVPtopLeft", imageAlignVPtopLeft)
    IniSLDBWrite("chnRdecalage", chnRdecalage)
    IniSLDBWrite("chnGdecalage", chnGdecalage)
    IniSLDBWrite("chnBdecalage", chnBdecalage)
@@ -33326,11 +33294,9 @@ saveSlideSettingsInDB() {
    IniSLDBWrite("hueAdjust", hueAdjust)
    IniSLDBWrite("realGammos", realGammos)
    IniSLDBWrite("imgThreshold", imgThreshold)
-   IniSLDBWrite("isTitleBarVisible", isTitleBarVisible)
    IniSLDBWrite("animGIFsSupport", animGIFsSupport)
    IniSLDBWrite("thumbsAratio", thumbsAratio)
    IniSLDBWrite("thumbsZoomLevel", thumbsZoomLevel)
-   IniSLDBWrite("easySlideStoppage", easySlideStoppage)
    IniSLDBWrite("appVersion", appVersion)
    IniSLDBWrite("usrTextureBGR", usrTextureBGR)
    IniSLDBWrite("syncSlideShow2Audios", syncSlideShow2Audios)
@@ -33771,10 +33737,11 @@ SaveFilesList(enforceFile:=0) {
       setImageLoading()
       Sleep, 10
       setWindowTitle("Saving files list index, please wait", 1)
+      zPlitPath(file2save, 0, fileNamu, folderu)
       If (SLDcacheFilesList=1)
-         showTOOLtip("Saving list of " groupDigits(maxFilesIndex) " entries into`n" file2save "`nPlease wait")
+         showTOOLtip("Saving list of " groupDigits(maxFilesIndex) " entries as:`n" fileNamu "`n" folderu "\")
       Else
-         showTOOLtip("Saving folders index in`n" file2save "`nPlease wait")
+         showTOOLtip("Saving folders index as:`n" fileNamu "`n" folderu "\")
 
       thisTmpFile := !newTmpFile ? backCurrentSLD : newTmpFile
       ; ToolTip, % thisTmpFile "=" , , , 2
@@ -37050,19 +37017,17 @@ readSlideSettings(readThisFile, act) {
      IniAction(act, "chnRdecalage", "General", 2,-30,30,, readThisFile)
      IniAction(act, "ColorDepthDithering", "General", 1,0,0,, readThisFile)
      IniAction(act, "doSlidesTransitions", "General", 1,0,0,, readThisFile)
-     IniAction(act, "easySlideStoppage", "General", 1,0,0,, readThisFile)
      IniAction(act, "FlipImgH", "General", 1,0,0,, readThisFile)
      IniAction(act, "FlipImgV", "General", 1,0,0,, readThisFile)
      IniAction(act, "GammosAdjust", "General", 2,-25,1,, readThisFile)
      IniAction(act, "GammosGrayAdjust", "General", 2,-25,1,, readThisFile)
      IniAction(act, "hueAdjust", "General", 2,-300,300,, readThisFile)
-     IniAction(act, "imageAligned", "General", 2,1,5,, readThisFile)
+     IniAction(act, "imageAlignVPtopLeft", "General", 1,0,0,, readThisFile)
      IniAction(act, "imgFxMode", "General", 2,1,10,, readThisFile)
      IniAction(act, "IMGresizingMode", "General", 2,1,5,, readThisFile)
      IniAction(act, "imgThreshold", "General", 2,0,1,, readThisFile)
      IniAction(act, "IntensityAlphaChannel", "General", 2,1,30,, readThisFile)
      IniAction(act, "isAlwaysOnTop", "General", 1,0,0,, readThisFile)
-     IniAction(act, "isTitleBarVisible", "General", 1,0,0,, readThisFile)
      IniAction(act, "lummyAdjust", "General", 2,-300,300,, readThisFile)
      IniAction(act, "lumosAdjust", "General", 2,0.001,25,, readThisFile)
      IniAction(act, "lumosGrayAdjust", "General", 2,0.001,25,, readThisFile)
@@ -37089,14 +37054,15 @@ readSlideSettings(readThisFile, act) {
      IniAction(act, "WindowBgrColor", "General", 3,0,0,, readThisFile)
      IniAction(act, "zatAdjust", "General", 2,-300,300,, readThisFile)
      IniAction(act, "zoomLevel", "General", 2,0.01,20,, readThisFile)
+     IniAction(act, "UserVPalphaBgrStyle", "General", 2, 1, 5)
 
      If (act=0)
      {
         If (isWinXP=1 || minimizeMemUsage=1)
            doSlidesTransitions := 0
 
-        If (imageAligned!=1)
-           imageAligned := 5
+        If (imageAlignVPtopLeft!=1 && imageAlignVPtopLeft!=0)
+           imageAlignVPtopLeft := 0
 
         If (scriptInit=1)
            interfaceThread.ahkFunction("updateWindowColor")
@@ -37237,7 +37203,6 @@ readMainSettingsApp(act) {
     IniAction(act, "MustLoadSLDprefs", "General", 1)
     IniAction(act, "mustRecordSeenImgs", "General", 1)
     IniAction(act, "additionalLVrows", "General", 2, 0, 15)
-    IniAction(act, "UserVPalphaBgrStyle", "General", 2, 1, 5)
     IniAction(act, "OnSortdoFilesCheck", "General", 1)
     IniAction(act, "OSDbgrColor", "General", 3)
     IniAction(act, "OSDfontSize", "General", 2, 10, 350)
@@ -40877,6 +40842,10 @@ buildQuickSearchMenus() {
    BuildMainMenu("forced")
    If (maxFilesIndex>0)
       kMenu("PVmenu", "Add", "Show file header", "PanelDisplayFileHeaderRaw")
+   
+   kMenu("PVmenu", "Add/Uncheck", "Load settings from QPV slideshow files", "ToggleIgnoreSLDprefs")
+   If (MustLoadSLDprefs=1)
+      kMenu("PVmenu", "Check", "Load settings from QPV slideshow files")
 
    If isImgEditingNow()
    {
@@ -41881,7 +41850,7 @@ PanelSetThumbColumnOptions() {
     slideWid2 := txtWid//2 + 10
     Global UIthumbsAratio, UIvpImgAlignCenter, UIimgFxMode
     UIimgFxMode := (imgFxMode>3) ? imgFxMode - 1 : imgFxMode
-    UIvpImgAlignCenter := (imageAligned=5) ? 1 : 0
+    UIvpImgAlignCenter := (imageAlignVPtopLeft=0) ? 1 : 0
     UIthumbsAratio := thumbsAratio
     thisW := (PrefsLargeFonts=1) ? 90 : 65
     Gui, Add, Text, x15 y15 Section w%txtWid2%, Please note, most of the options listed here are shared with the full image view.
@@ -41938,7 +41907,7 @@ updateUIthumbsView() {
    GuiControl, % act, btnFldr1
 
    ; thumbsColumns := editF5
-   imageAligned := (UIvpImgAlignCenter=1) ? 5 : 1
+   imageAlignVPtopLeft := (UIvpImgAlignCenter=1) ? 0 : 1
    thumbsAratio := clampInRange(UIthumbsAratio, 1, 3)
    defineColorDepth()
    recalculateThumbsSizes()
@@ -41954,7 +41923,7 @@ WriteThumbnailsSettingsPanel() {
    INIaction(1, "FlipImgH", "General")
    INIaction(1, "FlipImgV", "General")
    INIaction(1, "highlightAlreadySeenImages", "General")
-   INIaction(1, "imageAligned", "General")
+   INIaction(1, "imageAlignVPtopLeft", "General")
    INIaction(1, "imgFxMode", "General")
    INIaction(1, "markSearchMatches", "General")
    INIaction(1, "multilineStatusBar", "General")
@@ -50169,8 +50138,8 @@ getImgOriginalSelectedAreaEdit(doInvert, imgSelPx, imgSelPy, imgSelW, imgSelH, m
    }
 
    fx := (allowFX=1) ? getIDvpFX() : "a"
-   thisState := "a" mainWidth mainHeight zoomLevel prevResizedVPimgW prevResizedVPimgH prevDestPosX prevDestPosY IMGresizingMode imageAligned fx useGdiBitmap() currentUndoLevel undoLevelsRecorded vpIMGrotation
-   ; thisState := "a" imgSelPx imgSelPy imgSelW imgSelH mainWidth mainHeight zoomLevel thisu doInvert IMGresizingMode imageAligned fx useGdiBitmap() currentUndoLevel undoLevelsRecorded prevDestPosX prevDestPosY
+   thisState := "a" mainWidth mainHeight zoomLevel prevResizedVPimgW prevResizedVPimgH prevDestPosX prevDestPosY IMGresizingMode imageAlignVPtopLeft fx useGdiBitmap() currentUndoLevel undoLevelsRecorded vpIMGrotation
+   ; thisState := "a" imgSelPx imgSelPy imgSelW imgSelH mainWidth mainHeight zoomLevel thisu doInvert IMGresizingMode imageAlignVPtopLeft fx useGdiBitmap() currentUndoLevel undoLevelsRecorded prevDestPosX prevDestPosY
    If (prevState!=thisState || !validBMP(prevBMP))
    {
       fnOutputDebug("redraw: " A_ThisFunc)
@@ -55345,11 +55314,12 @@ WriteSettingsTextAreaPanel() {
      ReadSettingsTextInArea(1)
 }
 
-PanelPrefsWindow() {
+PanelPreferencesWindow() {
     If AnyWindowOpen
        Return
 
     thisBtnHeight := createSettingsGUI(14, A_ThisFunc)
+
     btnWid := 100
     txtWid := 350
     EditWid := 60
@@ -55364,18 +55334,23 @@ PanelPrefsWindow() {
     }
 
     Global editF4, editF5, editF6, PickuWindowBGRcolor, PickuOSDbgrColor, PickuOSDtextColor
-    Gui, Add, Text, x15 y15 w%txtWid%, The text style options apply to the On-Screen Display in the viewport. The same text style is used to render as images texts pasted from the clipboard.
-    Gui, Add, Text, y+15 Section, Font name
+    Gui, SettingsGUIA: Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit Choose1 vCurrentPanelTab, Interface|Performance|Viewport|Others|Experimental
+
+    Gui, Tab, 1
+    Gui, Add, Text, x+15 y+15 Section, Font name
     Gui, Add, Text, xs yp+30, Font size (OSD / clipboard)
     Gui, Add, Text, xs yp+30, Text color and style
     Gui, Add, Text, xs yp+30, Alignment (captions / paste)
     Gui, Add, Text, xs yp+30, OSD background color
+
     Gui, Add, Text, xs yp+30, Display time (in sec.)
     Gui, Add, Text, xs yp+30, Window background color
     Gui, Add, Text, xs yp+30, Add rows in list views
     Gui, Add, Checkbox, xs yp+30 gupdateUIsettings Checked%usrTextureBGR% vusrTextureBGR, &Ambiental textured background
 
     GuiAddDropDownList("xs+" columnBpos2 " ys+0 Section w190 gupdateUIsettings Sort Choose1 vOSDFontName", OSDFontName, "OSD font name")
+    sml := (PrefsLargeFonts=1) ? 40 : 30
+    GuiAddButton("x+5 w" sml " hp gbtnHelpSettingsPanel", " ?", "Help")
     GuiAddEdit("xs+0 yp+30 w" editWid " r1 gupdateUIsettings limit3 -multi number -wantCtrlA -wantReturn -wantTab -wrap veditF5", OSDfontSize, "OSD font size")
     Gui, Add, UpDown, vOSDfontSize Range10-350, %OSDfontSize%
     GuiAddEdit("x+2 w" editWid " r1 gupdateUIsettings limit3 -multi number -wantCtrlA -wantReturn -wantTab -wrap veditF4", PasteFntSize, "Text on paste font size")
@@ -55396,12 +55371,68 @@ PanelPrefsWindow() {
     Gui, Add, UpDown, vadditionalLVrows Range0-15, % additionalLVrows
     GuiAddEdit("xs+0 yp+30 gupdateUIsettings w" editWid " hp r1 limit3 -multi number -wantCtrlA -wantReturn -wantTab -wrap veditF7", ambiTexBrushSize, "Texture size")
     Gui, Add, UpDown, vambiTexBrushSize Range25-950, %ambiTexBrushSize%
-    Gui, Add, Checkbox, x15 y+10 hp gupdateUIsettings Checked%borderAroundImage% vborderAroundImage, &Highlight image borders in the viewport
-
+    Gui, Add, Checkbox, xm+15 y+10 gupdateUIsettings Checked%borderAroundImage% vborderAroundImage, &Highlight image borders in the viewport
+    Gui, Add, Checkbox, y+7 gupdateUIsettings Checked%showHUDnavIMG% vshowHUDnavIMG, &Auto-display image navigator when zoomed in
+    Gui, Add, Checkbox, y+7 gToggleTouchMode Checked%TouchScreenMode% vTouchScreenMode, &Split viewport into areas for touch-screen friendly actions
     uiPopulateFontsList("OSDFontName", "SettingsGUIA")
+
+    Gui, Tab, 2
+    Gui, Add, Checkbox, x+15 y+15 Section gupdateUIsettings Checked%userPerformColorManagement% vuserPerformColorManagement hwndhTemp, Apply color management
+    ToolTip2ctrl(hTemp, "Color management is not applied on images loaded through FreeImage.")
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%userimgGammaCorrect% vuserimgGammaCorrect +hwndhTemp, Apply gamma correction
+    ToolTip2ctrl(hTemp, "It applies only for the image editing tools.")
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%ColorDepthDithering% vColorDepthDithering, Perform dithering on color depth changes
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%preventUndoLevels% vpreventUndoLevels, Record undo levels
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%minimizeMemUsage% vminimizeMemUsage +hwndhTemp, Attempt to minimize memory usage (not recommended)
+    ToolTip2ctrl(hTemp, "When this option is activated, the performance of QPV will be drastically reduced.`nSome features or functions might be disabled.")
+    Gui, Add, Checkbox, xs y+7 gToggleImgQuality Checked%userimgQuality% vuserimgQuality, High quality image resampling in the viewport
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%userHQraw% vuserHQraw, Load Camera RAW files at high quality
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%allowMultiCoreMode% vallowMultiCoreMode +hwndhTemp, Multi-threaded processing (experimental)
+
+    Gui, Tab, 3
+    Gui, Add, Checkbox, x+15 y+15 Section gupdateUIsettings Checked%animGIFsSupport% vanimGIFsSupport, Auto-play animated GIFs and WebP in the viewport
+    Gui, Add, Checkbox, xs y+7 gtoggleFreeIMGpanning Checked%allowFreeIMGpanning% vallowFreeIMGpanning, Allow outside viewport image panning
+    Gui, Add, Checkbox, xs y+7 gToggleIMGalign Checked%imageAlignVPtopLeft% vimageAlignVPtopLeft, Top-left image alignment in the viewport
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%lockZoomLevel% vlockZoomLevel +hwndhTemp, Retain zoom level on image change (lock zoom level)
+    ToolTip2ctrl(hTemp, "When this option is deactivated, QPV attempts to retain the dimensions`nin the viewport even if it is a larger or a smaller one,`nto improve the user experience.")
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%resetImageViewOnChange% vresetImageViewOnChange, Auto-reset viewport color adjustments on image change
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%LimitSelectBoundsImg% vLimitSelectBoundsImg, Limit selection area to image boundaries 
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%allowGIFsPlayEntirely% vallowGIFsPlayEntirely, Wait for GIFs to play once during slideshows
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%doSlidesTransitions% vdoSlidesTransitions, Smooth slideshow transitions
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%syncSlideShow2Audios% vsyncSlideShow2Audios, Slidesho&w speed based on audio length
+
+    Gui, Tab, 4
+    pp := (FIMfailed2init=1) ? "( ! )"
+    Gui, Add, Checkbox, x+15 y+15 Section gupdateUIsettings Checked%allowUserQuickFileActions% vallowUserQuickFileActions, Associate the «Quick file action» shortcuts [1 to 6 keys]
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%MustLoadSLDprefs% vMustLoadSLDprefs, Auto-load settings from QPV slideshows when opened (.SLD / .SLDB)
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%alwaysOpenWithFIM% valwaysOpenWithFIM +hwndhTemp, Attempt to load any image format using FreeImage %pp%
+    If (FIMfailed2init=1)
+       ToolTip2ctrl(hTemp, "This option is disabled because FreeImage.DLL failed to initialize.")
+
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%askDeleteFiles% vaskDeleteFiles, Prompt before file delete action
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%autoRemDeadEntry% vautoRemDeadEntry, Automatically remove index entries pointing to inexistent files
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%skipDeadFiles% vskipDeadFiles, Automatically skip inexistent files
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%autoPlaySNDs% vautoPlaySNDs, Automatically play sound files associated to images
+    Gui, Add, Checkbox, xs y+7 gToggleToolBarViewModa Checked%toolbarViewerMode% vtoolbarViewerMode, Image viewer toolbar (simplified mode)
+    Gui, Add, Checkbox, x+5 gupdateUIsettings Checked%ShowToolTipsToolbar% vShowToolTipsToolbar, Display tooltips on icons hover
+    Gui, Add, Checkbox, xs y+7 gtoggleCustomaToolbara Checked%userCustomizedToolbar% vuserCustomizedToolbar, Use customized toolbar
+    ml := (PrefsLargeFonts=1) ? 210 : 110
+    Gui, Add, Button, y+7 w%ml% gPanelCustomizeToolbar, Customize toolbar
+
+    Gui, Tab, 5
+    Gui, Add, Text, x+15 y+15 w%txtWid%, The following options will not be saved.
+    Gui, Add, Checkbox, y+7 gupdateUIsettings Checked%allowWICloader% vallowWICloader, Allow Windows Imaging Component (WIC) loader
+    Gui, Add, Checkbox, y+7 gupdateUIsettings Checked%allowFIMloader% vallowFIMloader, Allow FreeImage loader
+    Gui, Add, Checkbox, y+7 gupdateUIsettings Checked%noQualityWarnings% vnoQualityWarnings, Reduce the number of warnings
+    Gui, Add, Text, xs+15 y+7 w%txtWid%, This applies to image quality or color depth changes, or when memory usage may increase excessively.
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%userPrivateMode% vuserPrivateMode, Private mode UI
+    Gui, Add, Text, xs+15 y+7 w%txtWid%, The paths and file names will be hidden and the images will be blurred.
+
+    Gui, Tab
     Gui, Add, Button, xm+0 y+20 h%thisBtnHeight% w%btnWid% gOpenUImenu, &More options
-    Gui, Add, Button, x+5 hp w90 gPrefsCloseBTN Default, Clo&se
-    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Interface settings: " appTitle)
+    Gui, Add, Button, x+5 hp wp gBtnSavePreferencesClose Default, &Save changes
+    Gui, Add, Button, x+5 hp w90 gBtnCloseWindow Default, &Close
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Preferences: " appTitle)
 }
 
 WriteSettingsAdjustToneMapPanel() {
@@ -55836,13 +55867,21 @@ updateUIsettings() {
      calcHUDsize()
      setLVrowsCount()
      msgDisplayTime := DisplayTimeUser*1000
-     SetTimer, WriteSettingsUI, -90
-     If !throwErrorNoImageLoaded(1)
-        SetTimer, RefreshImageFile, -250
+     ; SetTimer, WriteSettingsUI, -90
+     If (CurrentPanelTab=4)
+     {
+        loadCustomUserKbds()
+     } Else If (CurrentPanelTab=1)
+     {
+        If !throwErrorNoImageLoaded(1)
+           SetTimer, RefreshImageFile, -250
+     }
 }
 
 WriteSettingsUI() {
   INIaction(1, "ambiTexBrushSize", "General")
+  INIaction(1, "showHUDnavIMG", "General")
+  INIaction(1, "TouchScreenMode", "General")
   INIaction(1, "borderAroundImage", "General")
   INIaction(1, "DisplayTimeUser", "General")
   INIaction(1, "OSDfontBolded", "General")
@@ -55858,9 +55897,37 @@ WriteSettingsUI() {
   INIaction(1, "additionalLVrows", "General")
 }
 
-PrefsCloseBTN() {
+BtnSavePreferencesClose() {
    updateUIsettings()
+   WriteSettingsUI()
+   loadCustomUserKbds()
    interfaceThread.ahkFunction("updateWindowColor")
+   INIaction(1, "userPerformColorManagement", "General")
+   INIaction(1, "userimgGammaCorrect", "General")
+   INIaction(1, "minimizeMemUsage", "General")
+   INIaction(1, "preventUndoLevels", "General")
+   INIaction(1, "allowMultiCoreMode", "General")
+   INIaction(1, "ColorDepthDithering", "General")
+   INIaction(1, "userimgQuality", "General")
+   INIaction(1, "userHQraw", "General")
+   INIaction(1, "animGIFsSupport", "General")
+   INIaction(1, "allowUserQuickFileActions", "General")
+   INIaction(1, "MustLoadSLDprefs", "General")
+   INIaction(1, "alwaysOpenWithFIM", "General")
+   INIaction(1, "askDeleteFiles", "General")
+   INIaction(1, "autoRemDeadEntry", "General")
+   INIaction(1, "skipDeadFiles", "General")
+   INIaction(1, "autoPlaySNDs", "General")
+   INIaction(1, "toolbarViewerMode", "General")
+   INIaction(1, "userCustomizedToolbar", "General")
+   INIaction(1, "allowCustomKeys", "General")
+   INIaction(1, "allowFreeIMGpanning", "General")
+   INIaction(1, "imageAlignVPtopLeft", "General")
+   INIaction(1, "resetImageViewOnChange", "General")
+   INIaction(1, "LimitSelectBoundsImg", "General")
+   INIaction(1, "allowGIFsPlayEntirely", "General")
+   INIaction(1, "doSlidesTransitions", "General")
+   INIaction(1, "syncSlideShow2Audios", "General")
    BtnCloseWindow()
 }
 
@@ -60158,7 +60225,7 @@ LoadBitmapAsFreeImage(imgPath, allowHDR, ByRef oImgW, ByRef oImgH, ByRef imgBPP)
    hFIFimgA := FreeImage_Load(imgPath, -1, loadArgs)
    If !hFIFimgA
    {
-      If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1)
+      If (RegExMatch(imgPath, RegExWICfmtPtrn) && allowWICloader=1)
       {
          oBitmap := LoadWICimage(imgPath, 0, 0, userPerformColorManagement)
          If validBMP(oBitmap)
@@ -63019,11 +63086,11 @@ InvokeMenuBarVectorView(manuID, modus:=0) {
    kMenu("pvMenuBarView", "Add", "Increase grid size`tAlt+=", "MenuIncVPgridSize",,,1)
    kMenu("pvMenuBarView", "Add", "Decrease grid size`tAlt+-", "MenuDecVPgridSize",,,1)
    Menu, pvMenuBarView, Add
-   kMenu("pvMenuBarView", "Add/Uncheck", "Centered &alignment`tA", "ToggleIMGalign", "viewport image position")
-   If (imageAligned=5)
-      kMenu("pvMenuBarView", "Check", "Centered &alignment`tA")
+   kMenu("pvMenuBarView", "Add/Uncheck", "Centered image &alignment`tA", "ToggleIMGalign", "viewport image position")
+   If (imageAlignVPtopLeft=0)
+      kMenu("pvMenuBarView", "Check", "Centered image &alignment`tA")
 
-   kMenu("pvMenuBarView", "Add/Uncheck", "Allo&w outside viewport image panning", "toggleFreePanning")
+   kMenu("pvMenuBarView", "Add/Uncheck", "Allo&w outside viewport image panning", "toggleFreeIMGpanning")
    If (allowFreeIMGpanning=1)
       kMenu("pvMenuBarView", "Check", "Allo&w outside viewport image panning")
 
@@ -63676,9 +63743,9 @@ InvokeMenuBarImage(manuID) {
         If (ShowAdvToolbar=1 && userCustomizedToolbar!=1)
         {
            Menu, pvMenuBarImage, Add
-           kMenu("pvMenuBarImage", "Add/Uncheck", "&Advanced mode toolbar", "ToggleToolBarViewModa")
+           kMenu("pvMenuBarImage", "Add/Uncheck", "&Image editor toolbar", "ToggleToolBarViewModa")
            If (toolbarViewerMode!=1)
-              kMenu("pvMenuBarImage", "Check", "&Advanced mode toolbar")
+              kMenu("pvMenuBarImage", "Check", "&Image editor toolbar")
         }
      }
   } Else If (thumbsDisplaying=1 && maxFilesIndex>0)
@@ -63714,9 +63781,9 @@ InvokeMenuBarImage(manuID) {
      If (ShowAdvToolbar=1 && userCustomizedToolbar!=1)
      {
         Menu, pvMenuBarImage, Add
-        kMenu("pvMenuBarImage", "Add/Uncheck", "&Advanced mode toolbar", "ToggleToolBarViewModa")
+        kMenu("pvMenuBarImage", "Add/Uncheck", "&Image editor toolbar", "ToggleToolBarViewModa")
         If (toolbarViewerMode!=1)
-           kMenu("pvMenuBarImage", "Check", "&Advanced mode toolbar")
+           kMenu("pvMenuBarImage", "Check", "&Image editor toolbar")
      }
   } Else
   {
@@ -64690,12 +64757,12 @@ createMenuImgSizeAdapt(dummy:=0) {
 
          kMenu("PVview", "Add", "Reset vie&wport adjustments`t\", "ResetImageView", "image")
          kMenu("PVview", "Add/Uncheck", "Centered &alignment`tA", "ToggleIMGalign", "viewport image position", " (image)")
-         If (imageAligned=5)
+         If (imageAlignVPtopLeft=0)
             kMenu("PVview", "Check", "Centered &alignment`tA",,, " (image)")
 
          If (thumbsDisplaying!=1)
          {
-            kMenu("PVview", "Add/Uncheck", "Allo&w outside viewport image panning", "toggleFreePanning")
+            kMenu("PVview", "Add/Uncheck", "Allo&w outside viewport image panning", "toggleFreeIMGpanning")
             If (allowFreeIMGpanning=1)
                kMenu("PVview", "Check", "Allo&w outside viewport image panning")
          }
@@ -64735,13 +64802,13 @@ createMenuImgSizeAdapt(dummy:=0) {
          kMenu("PvImgAdapt", "Add", "&More options", ":PVview")
       } Else
       {
-         kMenu("PvImgAdapt", "Add/Uncheck", "Centered &alignment`tA", "ToggleIMGalign", "viewport image position", " (image)")
-         If (imageAligned=5)
-            kMenu("PvImgAdapt", "Check", "Centered &alignment`tA",,, " (image)")
+         kMenu("PvImgAdapt", "Add/Uncheck", "Centered image &alignment`tA", "ToggleIMGalign", "viewport image position")
+         If (imageAlignVPtopLeft=0)
+            kMenu("PvImgAdapt", "Check", "Centered image &alignment`tA")
 
          If (thumbsDisplaying!=1)
          {
-            kMenu("PvImgAdapt", "Add/Uncheck", "Allo&w outside viewport image panning", "toggleFreePanning")
+            kMenu("PvImgAdapt", "Add/Uncheck", "Allo&w outside viewport image panning", "toggleFreeIMGpanning")
             If (allowFreeIMGpanning=1)
                kMenu("PvImgAdapt", "Check", "Allo&w outside viewport image panning")
          }
@@ -64786,8 +64853,7 @@ createMenuMainPreferences() {
    If (userHQraw=1)
       kMenu("PVperfs", "Check", "&Load Camera RAW files at high quality")
 
-   kMenu("PVprefs", "Add", "Save settings into a .SLD file", "WritePrefsIntoSLD")
-   kMenu("PVprefs", "Add/Uncheck", "&Never load settings from a .SLD", "ToggleIgnoreSLDprefs")
+   ; kMenu("PVprefs", "Add", "Save settings into a .SLD file", "WritePrefsIntoSLD")
    kMenu("PVprefs", "Add", "Associate QPV with image formats", "PanelAssociateQPV", "system")
    If !A_IsAdmin
       kMenu("PVprefs", "Add", "Run in admin mode", "RunAdminMode")
@@ -64821,11 +64887,9 @@ createMenuMainPreferences() {
    If (mustRecordSeenImgs=1)
       kMenu("PVprefs", "Check", "&Record seen images")
 
-   kMenu("PVprefs", "Add/Uncheck", "&Prompt before file delete", "TogglePromptDelete")
+   kMenu("PVprefs", "Add/Uncheck", "&Prompt before file delete", "TogglePromptDelete", "ask remove erase question user")
    If (askDeleteFiles=1)
       kMenu("PVprefs", "Check", "&Prompt before file delete")
-   If (MustLoadSLDprefs=0)
-      kMenu("PVprefs", "Check", "&Never load settings from a .SLD")
 
    Menu, PVprefs, Add, 
    If (mustRecordSeenImgs=1)
@@ -64845,6 +64909,9 @@ createMenuMainPreferences() {
 
       kMenu("PVprefs", "Check", "Cache generated thumbnails")
    }
+
+   Menu, PVprefs, Add, 
+   kMenu("PVprefs", "Add", "Preferences`tF12", "PanelPreferencesWindow")
 }
 
 MenuSetThumbsMode() {
@@ -64962,7 +65029,7 @@ createMenuMainView() {
 
       Menu, PVview, Add
       kMenu("PVview", "Add/Uncheck", "Centered &alignment`tA", "ToggleIMGalign", "viewport image position")
-      If (imageAligned=5)
+      If (imageAlignVPtopLeft=0)
          kMenu("PVview", "Check", "Centered &alignment`tA")
 
       kMenu("PVview", "Add/Uncheck", "Mirror &vertically`tV", "VPflipImgV", "viewport flip image")
@@ -64986,7 +65053,7 @@ createMenuMainView() {
    Menu, PVview, Add
    If (thumbsDisplaying!=1)
    {
-      kMenu("PVview", "Add/Uncheck", "Allo&w outside viewport image panning", "toggleFreePanning")
+      kMenu("PVview", "Add/Uncheck", "Allo&w outside viewport image panning", "toggleFreeIMGpanning")
       If (allowFreeIMGpanning=1)
          kMenu("PVview", "Check", "Allo&w outside viewport image panning")
    }
@@ -65393,13 +65460,15 @@ createMenuSlideshows() {
    If (minimizeMemUsage=1)
       kMenu("PVslide", "Disable", "Smoot&h transitions",,, " (slideshows)")
 
-   kMenu("PVslide", "Add/Uncheck", "&Easy to stop slideshows", "ToggleEasySlideStop")
    kMenu("PVslide", "Add/Uncheck", "&Randomize colour effects", "ToggleSlidesFXmode", "slideshow", " during slideshows")
+   If (slidesFXrandomize=1)
+      kMenu("PVslide", "Check", "&Randomize colour effects",,, " during slideshows")
+
    kMenu("PVslide", "Add/Uncheck", "&Wait for GIFs to play once", "ToggleGIFsPlayEntirely", "animations")
    If (animGIFsSupport!=1 || alwaysOpenWithFIM=1)
       kMenu("PVslide", "Disable", "&Wait for GIFs to play once")
-   If (slidesFXrandomize=1)
-      kMenu("PVslide", "Check", "&Randomize colour effects",,, " during slideshows")
+   If (allowGIFsPlayEntirely=1)
+      kMenu("PVslide", "Check", "&Wait for GIFs to play once")
 
    kMenu("PVslide", "Add/Uncheck", "S&kip already seen images", "ToggleSkipSeenIMGs")
    If (mustRecordSeenImgs!=1)
@@ -65452,10 +65521,6 @@ createMenuSlideshows() {
    kMenu("PVslide", "Add", "&Decrease speed" keyuB, "DecreaseSlideSpeed",, " (slideshows)", 1)
    kMenu("PVslide", "Add", "Current speed: " sliSpeed, "dummy")
    kMenu("PVslide", "Disable", "Current speed: " sliSpeed)
-   If (allowGIFsPlayEntirely=1)
-      kMenu("PVslide", "Check", "&Wait for GIFs to play once")
-   If (easySlideStoppage=1)
-      kMenu("PVslide", "Check", "&Easy to stop slideshows")
 }
 
 createMenuAnnotations() {
@@ -67486,14 +67551,14 @@ createMenuInterfaceOptions() {
       If (thumbsDisplaying!=1 && !AnyWindowOpen)
          kMenu("PvUIprefs", "Add", "&Toggle full-screen mode`tF11", "ToggleFullScreenMode")
 
-      If (thumbsDisplaying!=1)
+      If (thumbsDisplaying!=1 && AnyWindowOpen!=14)
       {
          kMenu("PvUIprefs", "Add/Uncheck", "&Touch screen mode (viewport)", "ToggleTouchMode")
          If (TouchScreenMode=1)
             kMenu("PvUIprefs", "Check", "&Touch screen mode (viewport)")
       }
 
-      Menu, PvUIprefs, Add
+      kMenu("PvUIprefs", "AddSeparator", 0)
    } Else
       kMenu("PvUIprefs", "Add", "&Search menu options`t;", "PanelQuickSearchMenuOptions")
 
@@ -67514,7 +67579,7 @@ createMenuInterfaceOptions() {
       kMenu("PvUIprefs", "Add", "Decrease viewport text size`tCtrl+-", "MenuChangeOSDZoomMinus", "disability  handicap eyes eyesight large",,1)
    }
 
-   Menu, PvUIprefs, Add
+   kMenu("PvUIprefs", "AddSeparator", 0)
    kMenu("PvUIprefs", "Add/Uncheck", "&Always on top", "ToggleAllonTop", "window")
    If (getTopMopStyle(PVhwnd)=1)
       kMenu("PvUIprefs", "Check", "&Always on top")
@@ -67526,7 +67591,7 @@ createMenuInterfaceOptions() {
          kMenu("PvUIprefs", "Check", "&Hide title bar")
    }
 
-   Menu, PvUIprefs, Add
+   kMenu("PvUIprefs", "AddSeparator", 0)
    If (AnyWindowOpen!=14 && imgEditPanelOpened!=1 && drawingShapeNow!=1)
    {
       keyword := (folderTreeWinOpen=1) ? " hide" : " display"
@@ -67596,7 +67661,7 @@ createMenuInterfaceOptions() {
          kMenu("PvUIprefs", "Check", "&Show image captions`tN")
    }
 
-   If (maxFilesIndex>0 && CurrentSLD && thumbsDisplaying!=1)
+   If (maxFilesIndex>0 && CurrentSLD && thumbsDisplaying!=1 && AnyWindowOpen!=14)
    {
       Menu, PvUIprefs, Add
       kMenu("PvUIprefs", "Add/Uncheck", "&Ambiental textured background", "ToggleTexyBGR", "viewport image performance")
@@ -67604,10 +67669,17 @@ createMenuInterfaceOptions() {
          kMenu("PvUIprefs", "Check", "&Ambiental textured background")
    }
 
+   If (AnyWindowOpen=14 && isImgEditingNow())
+   {
+      kMenu("PvUIprefs", "Add/check", "Show viewport &grid`tG", "toggleViewPortGridu")
+      If (showViewPortGrid=1)
+         kMenu("PvUIprefs", "Check", "Show viewport &grid`tG")
+   }
+
    If (!AnyWindowOpen && drawingShapeNow!=1)
    {
       Menu, PvUIprefs, Add
-      kMenu("PvUIprefs", "Add", "Additional settings`tF12", "PanelPrefsWindow",, " (interface)")
+      kMenu("PvUIprefs", "Add", "Additional settings`tF12", "PanelPreferencesWindow",, " (interface)")
    }
 }
 
@@ -67871,7 +67943,8 @@ ToggleFullScreenMode() {
      If (showMainMenuBar=1)
      {
         interfaceThread.ahkassign("showMainMenuBar", showMainMenuBar)
-        TriggerMenuBarUpdate()
+        TriggerMenuBarUpdate("forced", A_TickCount)
+        SetTimer, TriggerMenuBarUpdate, -100
      }
 
      If (o_ShowAdvToolbar=1 && ot!=1)
@@ -67910,11 +67983,6 @@ ToggleAllonTop() {
    friendly := (isAlwaysOnTop=1) ? "ACTIVATED" : "DEACTIVATED"
    showTOOLtip("Window always on top: " friendly, A_ThisFunc, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
-}
-
-ToggleEasySlideStop() {
-   easySlideStoppage := !easySlideStoppage
-   INIaction(1, "easySlideStoppage", "General")
 }
 
 ToggleSlidesFXmode() {
@@ -68679,8 +68747,8 @@ focusImgSelArea(zx:=0, zy:=0, isGiven:=0, doCenter:=0) {
       IMGdecalageX := -(gX - cX)
       IMGdecalageY := -(gY - cY)
    }
-   ; ToolTip, % gX "|" gY "|" zImgSelX1 "|" zImgSelY1 "|" imageAligned "|" tX "|" tY , , , 2
-   ; ToolTip, % IMGdecalageX "|" IMGdecalageY "|" imageAligned "|" tX "|" tY "`n" prevDestPosX "|" prevDestPosY "|" prevResizedVPimgW "|" prevResizedVPimgH  , , , 2
+   ; ToolTip, % gX "|" gY "|" zImgSelX1 "|" zImgSelY1 "|" imageAlignVPtopLeft "|" tX "|" tY , , , 2
+   ; ToolTip, % IMGdecalageX "|" IMGdecalageY "|" imageAlignVPtopLeft "|" tX "|" tY "`n" prevDestPosX "|" prevDestPosY "|" prevResizedVPimgW "|" prevResizedVPimgH  , , , 2
    dummyTimerDelayiedImageDisplay(50)
    ; ToolTip, % selDotX "|" selDotY "`n" selDotAx "|" selDotAy "||`n" zImgSelX1 "|" zImgSelY1 "`n" zImgSelX2 "|" zImgSelY2 , , , 2
    Return hasu
@@ -68790,11 +68858,9 @@ ToggleTitleBaruNow() {
       isTitleBarVisible := 1
       WinSet, Style, +0xC00000, ahk_id %PVhwnd%
    }
+
    interfaceThread.ahkassign("isTitleBarVisible", isTitleBarVisible)
    interfaceThread.ahkassign("TouchScreenMode", TouchScreenMode)
-   INIaction(1, "isTitleBarVisible", "General")
-   ; INIaction(1, "TouchScreenMode", "General")
-   ; If (isTitleBarVisible=0)
    If (drawingShapeNow!=1)
       SetTimer, dummyToggleTitleBarActionBtns, -350
 }
@@ -69135,6 +69201,8 @@ ToggleFilesMap() {
 ToggleIgnoreSLDprefs() {
     MustLoadSLDprefs := !MustLoadSLDprefs
     INIaction(1, "MustLoadSLDprefs", "General")
+    friendly := (MustLoadSLDprefs=1) ? "ACTIVATED" : "DEACTIVATED"
+    showTOOLtip("Load settings from QPV slideshow files: " friendly, A_ThisFunc, 1)
 }
 
 toggleFDtreeInfos() {
@@ -69164,12 +69232,16 @@ ToggleColorProfileManage() {
 }
 
 ToggleImgQuality(modus:=0) {
-    userimgQuality := !userimgQuality
+    If (AnyWindowOpen=14)
+       GuiControlGet, userimgQuality
+    Else
+       userimgQuality := !userimgQuality
+
     If (modus="lowu")
        userimgQuality := 0
     Else If (modus="highu")
        userimgQuality := 1
-    Else
+    Else If (AnyWindowOpen!=14)
        INIaction(1, "userimgQuality", "General")
 
     fnOutputDebug("Set viewport quality: " modus "--" forceIT "==" userimgQuality)
@@ -69225,7 +69297,11 @@ ToggleRAWquality() {
 }
 
 toggleCustomaToolbara() {
-    userCustomizedToolbar := !userCustomizedToolbar
+    If (AnyWindowOpen=14)
+       GuiControlGet, userCustomizedToolbar
+    Else
+       userCustomizedToolbar := !userCustomizedToolbar
+
     listuIcons := (thumbsDisplaying=1) ? Trim(userThumbsToolbarList, ",") : Trim(userImgViewToolbarList, ",")
     listu := StrSplit(listuIcons, ",")
     If (!InStr(listuIcons, ",") || listu.Count()<2)
@@ -69234,26 +69310,37 @@ toggleCustomaToolbara() {
        userCustomizedToolbar := 0
     }
 
+    If (ShowAdvToolbar=1)
+       createGUItoolbar("forced")
+
+    If (AnyWindowOpen=14)
+       Return
+
     INIaction(1, "userCustomizedToolbar", "General")
     friendly := (userCustomizedToolbar=1) ? "ACTIVATED" : "DEACTIVATED"
     showTOOLtip(f "Custom defined toolbar: " friendly, A_ThisFunc, 1)
-    If (ShowAdvToolbar=1)
-       createGUItoolbar("forced")
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
-toggleFreePanning() {
-    If (thumbsDisplaying=1)
+toggleFreeIMGpanning() {
+    If (thumbsDisplaying=1 && AnyWindowOpen!=14)
        Return
 
-    allowFreeIMGpanning := !allowFreeIMGpanning
+    If (AnyWindowOpen=14)
+       GuiControlGet, allowFreeIMGpanning
+    Else
+       allowFreeIMGpanning := !allowFreeIMGpanning
+
+    IMGdecalageX := IMGdecalageY := 1
+    PrintPosX := "C"
+    dummyTimerDelayiedImageDisplay(90)
+    If (AnyWindowOpen=14)
+       Return
+
     INIaction(1, "allowFreeIMGpanning", "General")
     friendly := (allowFreeIMGpanning=1) ? "ACTIVATED" : "DEACTIVATED"
     showTOOLtip("Allow image panning exceed the viewport area: " friendly, A_ThisFunc, 1)
     SetTimer, RemoveTooltip, % -msgDisplayTime
-    IMGdecalageX := IMGdecalageY := 1
-    PrintPosX := "C"
-    dummyTimerDelayiedImageDisplay(90)
 }
 
 ToggleAutoPlaySlidesMusic() {
@@ -69298,7 +69385,7 @@ ToggleLimitMemUsage() {
     INIaction(1, "minimizeMemUsage", "General")
     If (minimizeMemUsage=1)
     {
-       msgBoxWrapper(appTitle ": WARNING", "By limiting memory usage, the performance of Quick Picto Viewer will likely be drastically reduced. Additionally, some features or functions might be disabled.", 0, 0, "exclamation")
+       msgBoxWrapper(appTitle ": WARNING", "By limiting memory usage, the performance of QPV will likely be drastically reduced. Additionally, some features or functions might be disabled.", 0, 0, "exclamation")
        discardViewPortCaches()
     }
 }
@@ -69309,7 +69396,7 @@ TogglePreventUndos() {
     friendly := (preventUndoLevels=1) ? "DEACTIVATED" : "ACTIVATED"
     showTOOLtip("Record image undo levels: " friendly, A_ThisFunc, 1)
     SetTimer, RemoveTooltip, % -msgDisplayTime
-    IniAction(1, "preventUndoLevels", "General", 1)
+    IniAction(1, "preventUndoLevels", "General")
 }
 
 ToggleImgColorDepthDithering() {
@@ -69354,8 +69441,15 @@ ToggleToolBarToolTips() {
 }
 
 ToggleToolBarViewModa() {
-    toolbarViewerMode := !toolbarViewerMode
-    IniAction(1, "toolbarViewerMode", "General")
+    If (AnyWindowOpen=14)
+    {
+       GuiControlGet, toolbarViewerMode
+    } Else
+    {
+       toolbarViewerMode := !toolbarViewerMode
+       IniAction(1, "toolbarViewerMode", "General")
+    }
+
     If (ShowAdvToolbar=1)
        createGUItoolbar()
 
@@ -69364,17 +69458,24 @@ ToggleToolBarViewModa() {
 
 ToggleTouchMode() {
     DestroyTempBtnGui("now")
-    TouchScreenMode := !TouchScreenMode
+    If (AnyWindowOpen=14)
+       GuiControlGet, TouchScreenMode
+    Else
+       TouchScreenMode := !TouchScreenMode
+
     updateUIctrl()
     interfaceThread.ahkassign("isTitleBarVisible", isTitleBarVisible)
     interfaceThread.ahkassign("TouchScreenMode", TouchScreenMode)
-    INIaction(1, "TouchScreenMode", "General")
-    INIaction(1, "isTitleBarVisible", "General")
+
+    If (AnyWindowOpen=14)
+       Return
+
     friendly := (TouchScreenMode=1) ? "ACTIVATED" : "DEACTIVATED"
     If (TouchScreenMode=1)
        friendly .= "`nThe viewport is now split into different responsive areas.`nSee the Help menu for more details."
 
     showTOOLtip("Touch screen mode: " friendly)
+    INIaction(1, "TouchScreenMode", "General")
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -71075,7 +71176,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
          ResizedW := Round(oImgW * zoomLevel, 3)
          ResizedH := Round(oImgH * zoomLevel, 3)
          ws := defineZoomLevel() "%"
-      } Else If (prevVPsize>2 && gdiBMPchanged=1 && lockZoomLevel=0 && animGIFplaying!=1 && allowFreeIMGpanning=0)
+      } Else If (prevVPsize>2 && gdiBMPchanged=1 && lockZoomLevel=0 && animGIFplaying!=1) ; && allowFreeIMGpanning=0)
       {
          calcImgSizeForVP(1, oImgW, oImgH, prevVPsize, prevVPsize, ResizedW, ResizedH)
          zoomLevel := clampInRange(Round(ResizedW / oImgW, 3), 0.01, 20)
@@ -71116,7 +71217,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
    If (A_TickCount - lastTitleChange>300)
       setWindowTitle("Adapting image to viewport")
 
-   thisThing := (imageAligned=5 || PrintPosX="U" || PrintPosY="D") ? 1 : 0
+   thisThing := (imageAlignVPtopLeft=0 || PrintPosX="U" || PrintPosY="D") ? 1 : 0
    If (thisThing=1 && (gdiBMPchanged=1 || isVarEqualTo(PrintPosX, "X", "W", "C")) && IMGresizingMode=4)
    {
       thisSize := "a" Round(GuiW/1.5 - ResizedW/1.5) . Round(GuiH/1.5 - ResizedH/1.5) maxFilesIndex ; currentFileIndex imgPath prevResizedVPimgW prevResizedVPimgH
@@ -71145,7 +71246,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
          IMGdecalageX := Round(GuiW/2 - ResizedW/2)
          IMGdecalageY := Round(GuiH/2 - ResizedH/2)
       }
-   } Else If (allowFreeIMGpanning!=1 || imageAligned!=5 || IMGresizingMode!=4 || gdiBMPchanged=1)
+   } Else If (allowFreeIMGpanning!=1 || imageAlignVPtopLeft!=0 || IMGresizingMode!=4 || gdiBMPchanged=1)
       prevSize := 0
 
    ; fnOutputDebug(A_ThisFunc ":A " thisThing " | " IMGdecalageY " | " PrintPosY)
@@ -72106,7 +72207,7 @@ LoadFileWithGDIp(imgPath, noBPPconv:=0, frameu:=0, useICM:=0, sizesDesired:=0, B
      }
   } Else mustOpenWithWIC := 1
 
-   If (mustOpenWithWIC=1 && noBPPconv=0 && WICmoduleHasInit=1 && allowWICloader=1) ; || (allowCaching=1)
+   If (mustOpenWithWIC=1 && noBPPconv=0 && allowWICloader=1) ; || (allowCaching=1)
    {
       oBitmap := trGdip_DisposeImage(oBitmap, 1)
       oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired, newSizedImage)
@@ -72155,7 +72256,7 @@ LoadBitmapFromFileu(imgPath, noBPPconv:=0, forceGDIp:=0, frameu:=0, sizesDesired
      oBitmap := LoadFimFile(imgPath, noBPPconv, noBPPconv, frameu, sizesDesired, newBitmap)
      newSizedImage := newBitmap
      ; fnOutputDebug(A_ThisFunc "(): " imgPath)
-  } Else If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1)
+  } Else If (RegExMatch(imgPath, RegExWICfmtPtrn) && allowWICloader=1)
   {
      oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, userPerformColorManagement, sizesDesired, newBitmap)
      isValid := (noBPPconv=1 && oBitmap=1 || validBMP(oBitmap)) ? 1 : 0
@@ -73528,10 +73629,10 @@ ImageNavBoxClickResponder() {
       decY := - Round((imgH*prcH) * zoomLevel)
       prcW := mX/navWidth
       prcH := mY/navHeight
-      If (decX>0 && imageAligned=1 && FlipImgH=0 && allowFreeIMGpanning=0)
+      If (decX>0 && imageAlignVPtopLeft=1 && FlipImgH=0 && allowFreeIMGpanning=0)
          decX := 0
 
-      If (decY>0 && imageAligned=1 && FlipImgV=0 && allowFreeIMGpanning=0)
+      If (decY>0 && imageAlignVPtopLeft=1 && FlipImgV=0 && allowFreeIMGpanning=0)
          decY := 0
 
       limitPanningDist(decX, decY, minTopCornerX, minTopCornerY)
@@ -73595,10 +73696,10 @@ ZoomImageToClickPointInWindow() {
    ; fnOutputDebug(mX "==" mY "==" navWidth "==" navHeight "==" prcW "==" prcH )
    decX := - Round((imgW*prcW) * zoomLevel - mainWidth / 2)
    decY := - Round((imgH*prcH) * zoomLevel - mainHeight / 2)
-   If (decX>0 && imageAligned=1 && FlipImgH=0 && allowFreeIMGpanning=0)
+   If (decX>0 && imageAlignVPtopLeft=1 && FlipImgH=0 && allowFreeIMGpanning=0)
       decX := 0
 
-   If (decY>0 && imageAligned=1 && FlipImgV=0 && allowFreeIMGpanning=0)
+   If (decY>0 && imageAlignVPtopLeft=1 && FlipImgV=0 && allowFreeIMGpanning=0)
       decY := 0
 
    IMGdecalageX := decX
@@ -76078,7 +76179,7 @@ drawVPgridsNow(mW, mH, Gu) {
    dY := (LimitSelectBoundsImg=1) ? prevDPy : 0
    mW := clampInRange(dX + mW, MinLimX, MaxLimX)
    mH := clampInRange(dY + mH, MinLimY, MaxLimY)
-   thisPathsState := "a" dS vpGridStepu imageAligned vpGridFixedSize mW mH prevDPx prevDPy LimitSelectBoundsImg
+   thisPathsState := "a" dS vpGridStepu imageAlignVPtopLeft vpGridFixedSize mW mH prevDPx prevDPy LimitSelectBoundsImg
    If (prevPathsState!=thisPathsState)
    {
       If miniPath
@@ -79119,7 +79220,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
           prevVPcacheHadpartialFX := 0
        }
 
-       If ((imageAligned=1 || allowFreeIMGpanning=1 && imageAligned=5) && wasVPcached=0 && (FlipImgV=1 || FlipImgH=1))
+       If ((imageAlignVPtopLeft=1 || allowFreeIMGpanning=1 && imageAlignVPtopLeft=0) && wasVPcached=0 && (FlipImgV=1 || FlipImgH=1))
        {
           If (allowFreeIMGpanning=0)
              Gdip_SetClipRect(glPG, dpX, dpY, kW, kH)
@@ -79156,8 +79257,8 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     {
        Gdip_ResetClip(glPG)
        hRgnA := Gdi_CreateRectRegion(0, 0, mainWidth, mainHeight)
-       dpX := (FlipImgH=1 && imageAligned=1) ? mainWidth - kW : dpX
-       dpY := (FlipImgV=1 && imageAligned=1) ? mainHeight - kH : dpY
+       dpX := (FlipImgH=1 && imageAlignVPtopLeft=1) ? mainWidth - kW : dpX
+       dpY := (FlipImgV=1 && imageAlignVPtopLeft=1) ? mainHeight - kH : dpY
        hRgnB := Gdi_CreateRectRegion(dpX, dpY, dpX + kW, dpY + kH)
        Gdi_CombineRegion(hRgnA, hRgnA, hRgnB, 3)
        Gdi_FillRegion(glHDC, hRgnA, gdiAmbientalTexBrush)
@@ -79594,9 +79695,6 @@ ToggleEditImgSelection(modus:=0) {
      z = calcRelativeSelCoords(useGdiBitmap(), 0, 0)
   If (z=-1)
      Return
-
-  ; If (getCaptionStyle(PVhwnd)=1)
-  ;    ToggleTitleBaruNow()
 
   If (r!=-1 && editingSelectionNow=1)
      recordSelUndoLevelNow()
@@ -80914,9 +81012,9 @@ QPV_ListViewGridHUDoverlay(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, act
                  thisThumb := trGdip_CloneBitmap(A_ThisFunc, thisThumb)
                  calcIMGdimensions(imgW, imgH, thumbsW, thumbsH, fW, fH)
                  dpX := DestPosX + thumbsW/2
-                 dpX -= (imageAligned!=5) ? thumbsW/2 : fW/2
+                 dpX -= (imageAlignVPtopLeft!=0) ? thumbsW/2 : fW/2
                  dpY := DestPosY + thumbsH/2
-                 dpY -= (imageAligned!=5) ? thumbsH/2 : fH/2
+                 dpY -= (imageAlignVPtopLeft!=0) ? thumbsH/2 : fH/2
                  flipBitmapAccordingToViewPort(thisThumb)
                  If (usrColorDepth>1)
                     Gdip_BitmapSetColorDepth(thisThumb, internalColorDepth, ColorDepthDithering)
@@ -80976,9 +81074,9 @@ QPV_ListViewGridHUDoverlay(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, act
               {
                  calcIMGdimensions(ww, hh, thumbsW, thumbsH, fW, fH)
                  dpX := DestPosX + thumbsW/2
-                 dpX -= (imageAligned!=5) ? thumbsW/2 : fW/2
+                 dpX -= (imageAlignVPtopLeft!=0) ? thumbsW/2 : fW/2
                  dpY := DestPosY + thumbsH/2
-                 dpY -= (imageAligned!=5) ? thumbsH/2 : fH/2
+                 dpY -= (imageAlignVPtopLeft!=0) ? thumbsH/2 : fH/2
 
                  calcImgSelection2bmp(0, ww, hh, fW, fH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2, 0, 0, "a")
                  Gdip_FillRectangle(2NDglPG, pBrushF, dpX + zimgSelPx, dpY + zimgSelPy, zimgSelW, zimgSelH)
@@ -81915,9 +82013,9 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
 
           calcIMGdimensions(newW, newH, thumbsW, thumbsH, fW, fH)
           DestPosX := imgsListArrayThumbs[thisFileIndex, 5]
-          DestPosX -= (imageAligned!=5) ? thumbsW//2 : fW//2
+          DestPosX -= (imageAlignVPtopLeft!=0) ? thumbsW//2 : fW//2
           DestPosY := imgsListArrayThumbs[thisFileIndex, 6]
-          DestPosY -= (imageAligned!=5) ? thumbsH//2 : fH//2
+          DestPosY -= (imageAlignVPtopLeft!=0) ? thumbsH//2 : fH//2
           file2save := thumbsCacheFolder "\" thumbsSizeQuality "-" MD5name ".png"
           If (fimCached!=1 && thumbCachable=1 && thisZeit>timePerImg && file2save!=file2load && enableThumbsCaching=1 && WasMemCached!=1)
           {
@@ -82076,10 +82174,10 @@ calcIMGcoordsInVP(mainWidth, mainHeight, newW, newH, zL, oIMGdecX, oIMGdecY, ByR
     ; vpCenterX := 1, vpCenterY := 1
     CX := mainWidth/2 - newW/2
     CY := mainHeight/2 - newH/2
-    If ((imageAligned=1) || (allowFreeIMGpanning=1 && IMGresizingMode=4) && thumbsDisplaying=0)
+    If ((imageAlignVPtopLeft=1) || (allowFreeIMGpanning=1 && IMGresizingMode=4) && thumbsDisplaying=0)
     {
        DestPosX := DestPosY := 0
-    } Else If (imageAligned=5)
+    } Else If (imageAlignVPtopLeft=0)
     {
        DestPosX := DestPosY := 0
        If (newW<o_mW)
@@ -82094,7 +82192,7 @@ calcIMGcoordsInVP(mainWidth, mainHeight, newW, newH, zL, oIMGdecX, oIMGdecY, ByR
        ; SoundBeep 900, 1000
     } Else If (IMGresizingMode=4 && thumbsDisplaying!=1)
     {
-       If (allowFreeIMGpanning=1 && imageAligned=5 && PrintPosX="C")
+       If (allowFreeIMGpanning=1 && imageAlignVPtopLeft=0 && PrintPosX="C")
           prevCX := prevCY := 0.5
 
        If (prevZoom!=zL)
@@ -82109,12 +82207,12 @@ calcIMGcoordsInVP(mainWidth, mainHeight, newW, newH, zL, oIMGdecX, oIMGdecY, ByR
           Else
              IMGdecY := oIMGdecY
 
-          If (isInRange(prevDestPosX, -10, 10) && allowFreeIMGpanning=1 && imageAligned=1)
-          || (IMGdecX>0 && oIMGdecX<0 && allowFreeIMGpanning=1 && imageAligned=1)
+          If (isInRange(prevDestPosX, -10, 10) && allowFreeIMGpanning=1 && imageAlignVPtopLeft=1)
+          || (IMGdecX>0 && oIMGdecX<0 && allowFreeIMGpanning=1 && imageAlignVPtopLeft=1)
              IMGdecX := 0
 
-          If (isInRange(prevDestPosY, -10, 10) && allowFreeIMGpanning=1 && imageAligned=1)
-          || (IMGdecY>0 && oIMGdecY<0 && allowFreeIMGpanning=1 && imageAligned=1)
+          If (isInRange(prevDestPosY, -10, 10) && allowFreeIMGpanning=1 && imageAlignVPtopLeft=1)
+          || (IMGdecY>0 && oIMGdecY<0 && allowFreeIMGpanning=1 && imageAlignVPtopLeft=1)
              IMGdecY := 0
 
           prevZoom := zL
@@ -82163,9 +82261,9 @@ calcIMGcoordsInVP(mainWidth, mainHeight, newW, newH, zL, oIMGdecX, oIMGdecY, ByR
     prevCY := (DestPosY<0) ? abs(DestPosY) + o_mH/2 : -1*(DestPosY - o_mH/2)
     prevCX := Round(prevCX/newW, 8)
     prevCY := Round(prevCY/newH, 8)
-    If (newW<o_mW && imageAligned=1 && allowFreeIMGpanning=0)
+    If (newW<o_mW && imageAlignVPtopLeft=1 && allowFreeIMGpanning=0)
        prevCX := 0.01
-    If (newH<o_mH && imageAligned=1 && allowFreeIMGpanning=0)
+    If (newH<o_mH && imageAlignVPtopLeft=1 && allowFreeIMGpanning=0)
        prevCY := 0.01
 
     ; ToolTip, % oIMGdecX "|" oIMGdecY "`n" IMGdecX "|" IMGdecY "`n" prevCX "|" prevCY "`n" prevZoom "|" zL , , , 2
@@ -82188,10 +82286,10 @@ simulateCalcImageCoordsInVP(mainWidth, mainHeight, newW, newH, zL, oIMGdecX, oIM
     ; vpCenterX := 1, vpCenterY := 1
     CX := mainWidth/2 - newW/2
     CY := mainHeight/2 - newH/2
-    If ((imageAligned=1) || (allowFreeIMGpanning=1 && IMGresizingMode=4) && thumbsDisplaying=0)
+    If ((imageAlignVPtopLeft=1) || (allowFreeIMGpanning=1 && IMGresizingMode=4) && thumbsDisplaying=0)
     {
        DestPosX := DestPosY := 0
-    } Else If (imageAligned=5)
+    } Else If (imageAlignVPtopLeft=0)
     {
        DestPosX := DestPosY := 0
        If (newW<o_mW)
@@ -82206,7 +82304,7 @@ simulateCalcImageCoordsInVP(mainWidth, mainHeight, newW, newH, zL, oIMGdecX, oIM
        ; SoundBeep 900, 1000
     } Else If (IMGresizingMode=4 && thumbsDisplaying!=1)
     {
-       If (allowFreeIMGpanning=1 && imageAligned=5 && PrintPosX="C")
+       If (allowFreeIMGpanning=1 && imageAlignVPtopLeft=0 && PrintPosX="C")
           prevCX := prevCY := 0.5
 
        If (prevZoom!=zL)
@@ -82221,12 +82319,12 @@ simulateCalcImageCoordsInVP(mainWidth, mainHeight, newW, newH, zL, oIMGdecX, oIM
           Else
              IMGdecY := oIMGdecY
 
-          If (isInRange(prevDestPosX, -10, 10) && allowFreeIMGpanning=1 && imageAligned=1)
-          || (IMGdecX>0 && oIMGdecX<0 && allowFreeIMGpanning=1 && imageAligned=1)
+          If (isInRange(prevDestPosX, -10, 10) && allowFreeIMGpanning=1 && imageAlignVPtopLeft=1)
+          || (IMGdecX>0 && oIMGdecX<0 && allowFreeIMGpanning=1 && imageAlignVPtopLeft=1)
              IMGdecX := 0
 
-          If (isInRange(prevDestPosY, -10, 10) && allowFreeIMGpanning=1 && imageAligned=1)
-          || (IMGdecY>0 && oIMGdecY<0 && allowFreeIMGpanning=1 && imageAligned=1)
+          If (isInRange(prevDestPosY, -10, 10) && allowFreeIMGpanning=1 && imageAlignVPtopLeft=1)
+          || (IMGdecY>0 && oIMGdecY<0 && allowFreeIMGpanning=1 && imageAlignVPtopLeft=1)
              IMGdecY := 0
 
           prevZoom := zL
@@ -82271,9 +82369,9 @@ simulateCalcImageCoordsInVP(mainWidth, mainHeight, newW, newH, zL, oIMGdecX, oIM
     prevCY := (DestPosY<0) ? abs(DestPosY) + o_mH/2 : -1*(DestPosY - o_mH/2)
     prevCX := Round(prevCX/newW, 8)
     prevCY := Round(prevCY/newH, 8)
-    If (newW<o_mW && imageAligned=1 && allowFreeIMGpanning=0)
+    If (newW<o_mW && imageAlignVPtopLeft=1 && allowFreeIMGpanning=0)
        prevCX := 0.01
-    If (newH<o_mH && imageAligned=1 && allowFreeIMGpanning=0)
+    If (newH<o_mH && imageAlignVPtopLeft=1 && allowFreeIMGpanning=0)
        prevCY := 0.01
 
     ; ToolTip, % oIMGdecX "|" oIMGdecY "`n" IMGdecX "|" IMGdecY "`n" prevCX "|" prevCY "`n" prevZoom "|" zL , , , 2
@@ -86278,7 +86376,7 @@ coreColorsAdjusterWindow(modus:=0) {
     userImgChannelBlvl := Round(chnBdecalage*100)
     userImgChannelAlvl := Round(IntensityAlphaChannel)
     userImgVPthreshold := Round(imgThreshold*200)
-    UIvpImgAlignCenter := (imageAligned=5) ? 1 : 0
+    UIvpImgAlignCenter := (imageAlignVPtopLeft=0) ? 1 : 0
     moru := (idu=10) ? "|Other options" : "|Alpha mask|Paint mask"
     slide3wid := slide2wid - 40
     thisW := (idu=10) ? txtWid : slide3wid
@@ -86715,7 +86813,7 @@ updatePanelColorSliderz(modus:=0) {
       uiSlidersArray["userImgClrMtrxSaturation", 14] := -1
       uiSlidersArray["userImgVPgammaLevel", 14] := -1
       If (AnyWindowOpen=10)
-         GuiControl, SettingsGUIA:, UIvpImgAlignCenter, % (imageAligned=5) ? 1 : 0
+         GuiControl, SettingsGUIA:, UIvpImgAlignCenter, % (imageAlignVPtopLeft=0) ? 1 : 0
       GuiRefreshSliders()
    }
 }
@@ -86993,7 +87091,7 @@ UpdateUIadjustVPcolors(dummy:=0) {
          IMGresizingMode := 4
       } Else IMGresizingMode := uiIMGresizingMode
 
-      imageAligned := (UIvpImgAlignCenter=1) ? 5 : 1
+      imageAlignVPtopLeft := (UIvpImgAlignCenter=1) ? 0 : 1
    }
 
    If (AnyWindowOpen=74)
@@ -95411,7 +95509,7 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
   forceWic := (RegExMatch(imgPath, "i)(.\.(tiff|tif|gif))$") && noBMP=1) ? 1 : 0
   If (!wasInitFIMlib || forceWic=1)
   {
-     If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && (allowWICloader=1 || forceWic=1) && nofall=0)
+     If (RegExMatch(imgPath, RegExWICfmtPtrn) && (allowWICloader=1 || forceWic=1) && nofall=0)
      {
         If (screenMode=1)
         {
@@ -95427,6 +95525,9 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
      }
      Return
   }
+
+  If !wasInitFIMlib
+     Return addJournalEntry("Failed to load image. FreeImage failed to initialize. " imgPath)
 
   loadArgs := FIMdecideLoadArgs(imgPath, userHQraw, GFT)
   If (noBPPconv=1 || noBMP=1)
@@ -95492,7 +95593,7 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
   {
      ; ToolTip, % "lol " GFT "=" loadArgs , , , 2
      addJournalEntry("Failed to load image file using FreeImage library:`n" imgPath)
-     If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1 && nofall=0)
+     If (RegExMatch(imgPath, RegExWICfmtPtrn) && allowWICloader=1 && nofall=0)
      {
         oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, userPerformColorManagement, sizesDesired, gBitmap)
         newBitmap := gBitmap
@@ -96769,6 +96870,9 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM, ByRef pwd) {
    ; }
    ; Return pBitmap
 
+   If (WICmoduleHasInit!=1)
+      Return addJournalEntry("Failed to load image. WIC failed to initialize. " imgPath)
+
    If RegExMatch(imgPath, "i)(.\.svg)$")
       Return RenderSVGfile(imgPath, noBPPconv, 1)
    Else If RegExMatch(imgPath, "i)(.\.pdf)$")
@@ -96930,6 +97034,9 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM, simpleMode) {
 }
 
 LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitmap:=0) {
+   If (WICmoduleHasInit!=1)
+      Return addJournalEntry("Failed to load image. WIC failed to initialize. " imgPath)
+
    If RegExMatch(imgPath, "i)(.\.svg)$")
       Return RenderSVGfile(imgPath, noBPPconv, 0, sizesDesired)
    Else If RegExMatch(imgPath, "i)(.\.pdf)$")
@@ -98675,7 +98782,7 @@ processToolbarFunctions(btnID, actu, simulacrum:=0) {
       Else If (btnID="BTNnavPrevImgu")
          func2Call := ["jumpPreviousImage"]
       Else If (btnID="BTNalignVPimgu")
-         func2Call := ["toggleFreePanning"]
+         func2Call := ["toggleFreeIMGpanning"]
       Else If (btnID="BTNhudHisto")
          func2Call := ["invokeHistoMenu", "tlbr"]
       Else If (btnID="BTNannotate")
