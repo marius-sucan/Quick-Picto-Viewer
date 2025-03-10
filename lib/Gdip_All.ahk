@@ -21,7 +21,7 @@
 ;
 ; Gdip standard library versions:
 ; by Marius Șucan - gathered user-contributed functions and implemented hundreds of new functions
-; - v1.97 [28/10/2024]
+; - v1.97 [28/01/2025]
 ; - v1.96 [22/08/2023]
 ; - v1.95 [21/04/2023]
 ; - v1.94 [23/03/2023]
@@ -80,7 +80,7 @@
 ; - v1.01 [05/31/2008]
 ;
 ; Detailed history:
-; - 28/10/2024 = added the Gdip_GraphicsPathIterator class ; users can now work with subpaths/figures
+; - 28/01/2025 = added the Gdip_GraphicsPathIterator class ; users can now work with subpaths/figures; added Gdip_BitmapApplyHSL(), Gdip_BitmapApplyTint(), Gdip_BitmapApplyBrightnessContrast()
 ; - 22/08/2023 = bug fix related to Gdip_SaveBitmapToFile() and other minor changes
 ; - 21/04/2023 = bug fixes related to Gdip_TextToGraphics() and private font collections
 ; - 23/03/2023 = added Gdip_SaveAddImage(), Gdip_SaveImagesInTIFF(), Gdip_GetFrameDelay(), Gdip_GetImageEncodersList(), and other fixes, and minor functions
@@ -886,7 +886,7 @@ Gdip_LibraryVersion() {
 ;                 Updated by Marius Șucan reflecting the work on Gdip_all extended compilation
 
 Gdip_LibrarySubVersion() {
-   return 1.97 ; 28/10/2024
+   return 1.97 ; 28/01/2025
 }
 
 ;#####################################################################################
@@ -9613,37 +9613,45 @@ Gdip_ErrorHandler(errCode, throwErrorMsg, additionalInfo:="") {
 class Gdip_GraphicsPathIterator {
     __New(pPath) {
         ; Create GraphicsPathIterator
-        if (!pPath)
+        If !pPath
         {
-           this.error := "no path object provided"
+           this.error := 2
            return
         }
 
-        DllCall("gdiplus\GdipCreatePathIter", "UPtr*", pIterator:=0, "UPtr", pPath)
-        this.ptr := pIterator
-        if (!this.ptr)
-           this.error := "failed to create iterator"
-        else
-           this.error := ""
+        this.error := DllCall("gdiplus\GdipCreatePathIter", "UPtr*", pIterator:=0, "UPtr", pPath)
+        If pIterator
+           this.ptr := pIterator
     }
 
     Discard() {
-        if (this.ptr)
+        If (this.ptr)
         {
            DllCall("gdiplus\GdipDeletePathIter", "UPtr", this.ptr)
            this.error := ""
            this.ptr := ""
         }
     }
+
+    HasCurve() {
+        ; the function returns 0 when the path contains only polygonal lines; if it contains  beziers, it returns 1
+        ; on error , the return value is -1
+
+        n := -1
+        If (this.ptr)
+           this.error := DllCall("gdiplus\GdipPathIterHasCurve", "UPtr", this.ptr, "int*", n)
+
+        Return n
+    }
     
     NextSubpath() {
         ; Get next subpath information
-        DllCall("gdiplus\GdipPathIterNextSubpath"
-            , "UPtr", this.ptr
-            , "Int*", resultCount:=0
-            , "Int*", startIndex:=0
-            , "Int*", endIndex:=0
-            , "Int*", isClosed:=0)
+        this.error := DllCall("gdiplus\GdipPathIterNextSubpath"
+                     , "UPtr", this.ptr
+                     , "Int*", resultCount:=0
+                     , "Int*", startIndex:=0
+                     , "Int*", endIndex:=0
+                     , "Int*", isClosed:=0)
         
         return {count: resultCount
             , startIndex: startIndex
@@ -9653,12 +9661,12 @@ class Gdip_GraphicsPathIterator {
     
     NextPathType() {
         ; Get next path point type
-        DllCall("gdiplus\GdipPathIterNextPathType"
-            , "UPtr", this.ptr
-            , "Int*", resultCount:=0
-            , "UChar*", pathType:=0
-            , "Int*", startIndex:=0
-            , "Int*", endIndex:=0)
+        this.error := DllCall("gdiplus\GdipPathIterNextPathType"
+                     , "UPtr", this.ptr
+                     , "Int*", resultCount:=0
+                     , "UChar*", pathType:=0
+                     , "Int*", startIndex:=0
+                     , "Int*", endIndex:=0)
             
         return {count: resultCount
             , pathType: pathType
@@ -9668,7 +9676,7 @@ class Gdip_GraphicsPathIterator {
     
     NextMarker() {
         ; Get next marker
-        DllCall("gdiplus\GdipPathIterNextMarker"
+        this.error := DllCall("gdiplus\GdipPathIterNextMarker"
             , "UPtr", this.ptr
             , "Int*", resultCount:=0
             , "Int*", startIndex:=0
@@ -9681,20 +9689,22 @@ class Gdip_GraphicsPathIterator {
     
     GetCount() {
         ; Get total number of points
-        DllCall("gdiplus\GdipPathIterGetCount", "UPtr", this.ptr, "Int*", count:=0)
-        return count
+        n := 0
+        this.error := DllCall("gdiplus\GdipPathIterGetCount", "UPtr", this.ptr, "Int*", n)
+        return n
     }
     
     GetSubpathCount() {
         ; Get number of subpaths
-        DllCall("gdiplus\GdipPathIterGetSubpathCount"
-            , "UPtr", this.ptr, "Int*", count:=0)
-        return count
+        n := 0
+        this.error := DllCall("gdiplus\GdipPathIterGetSubpathCount", "UPtr", this.ptr, "Int*", n)
+        return n
     }
     
     Rewind() {
         ; Reset iterator position to start
-        DllCall("gdiplus\GdipPathIterRewind", "UPtr", this.ptr)
+        this.error := DllCall("gdiplus\GdipPathIterRewind", "UPtr", this.ptr)
+        Return this.error
     }
     
     CopyData(ByRef points, ByRef types, startIndex, endIndex) {
@@ -9702,23 +9712,26 @@ class Gdip_GraphicsPathIterator {
         pointCount := endIndex - startIndex + 1
         VarSetCapacity(pointsBuffer, 8 * pointCount * A_PtrSize)
         VarSetCapacity(typesBuffer, pointCount)
-        
-        DllCall("gdiplus\GdipPathIterCopyData"
+        resultCount := 0
+        this.error := DllCall("gdiplus\GdipPathIterCopyData"
             , "UPtr", this.ptr
-            , "Int*", resultCount:=0
+            , "Int*", resultCount
             , "UPtr", &pointsBuffer
             , "UPtr", &typesBuffer
             , "Int", startIndex
             , "Int", endIndex)
             
         ; Convert buffer data to arrays
-        points := []
-        types := []
-        Loop, % resultCount {
-            offset := (A_Index-1) * 8
-            points.Push(NumGet(pointsBuffer, offset, "Float"))
-            points.Push(NumGet(pointsBuffer, offset+4, "Float"))
-            types.Push(NumGet(typesBuffer, A_Index-1, "UChar"))
+        If !this.error
+        {
+           points := []
+           types := []
+           Loop, % resultCount {
+               offset := (A_Index-1) * 8
+               points.Push(NumGet(pointsBuffer, offset, "Float"))
+               points.Push(NumGet(pointsBuffer, offset+4, "Float"))
+               types.Push(NumGet(typesBuffer, A_Index-1, "UChar"))
+           }
         }
         return resultCount
     }
@@ -9728,16 +9741,17 @@ class Gdip_GraphicsPathIterator {
         pointCount := endIndex - startIndex + 1
         VarSetCapacity(pointsBuffer, 8 * pointCount * A_PtrSize)
         VarSetCapacity(typesBuffer, pointCount)
-        
-        DllCall("gdiplus\GdipPathIterCopyData"
-            , "UPtr", this.ptr
-            , "Int*", resultCount:=0
-            , "UPtr", &pointsBuffer
-            , "UPtr", &typesBuffer
-            , "Int", startIndex
-            , "Int", endIndex)
+        resultCount := 0
+        this.error := DllCall("gdiplus\GdipPathIterCopyData"
+                        , "UPtr", this.ptr
+                        , "Int*", resultCount
+                        , "UPtr", &pointsBuffer
+                        , "UPtr", &typesBuffer
+                        , "Int", startIndex
+                        , "Int", endIndex)
 
-        gdipLastError := DllCall("gdiplus\GdipCreatePath2", "UPtr", &pointsBuffer, "UPtr", &typesBuffer, "Int", resultCount, "UInt", fillMode, "UPtr*", pPath)
+        If !this.error
+           this.error := DllCall("gdiplus\GdipCreatePath2", "UPtr", &pointsBuffer, "UPtr", &typesBuffer, "Int", resultCount, "UInt", fillMode, "UPtr*", pPath)
         return pPath
     }
 }

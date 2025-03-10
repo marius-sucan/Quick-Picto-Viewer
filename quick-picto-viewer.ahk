@@ -405,9 +405,9 @@ initCompiled(A_IsCompiled)
 If !A_IsCompiled
    Try Menu, Tray, Icon, %mainExecPath%\qpv-icon.ico
 
-thisGDIPversion := Gdip_LibrarySubVersion()
 GDIPToken := Gdip_Startup()
-If (!GDIPToken || thisGDIPversion<1.92)
+thisGDIPversion := Gdip_LibrarySubVersion()
+If (!GDIPToken || thisGDIPversion<1.97)
 {
    MsgBox, 48, %appTitle%, ERROR: Unable to initialize GDI+...`n`nThe program will now exit.`n`nRequired GDI+ library wrapper: v1.92 - extended compilation edition.
    hasInitSpecialMode := 1
@@ -2576,7 +2576,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
         ReloadDynamicFolderz(fileNamu)
 
      If (MustLoadSLDprefs=1)
-        readSlideSettings(fileNamu, 0)
+        readSlideSettingsINI(fileNamu)
   }
 
   GenerateRandyList()
@@ -3172,8 +3172,8 @@ IncreaseSlideSpeed() {
    } Else
    {
       slideShowDelay += 1000
-      If (slideShowDelay>59000)
-         slideShowDelay := 59000
+      If (slideShowDelay>59500)
+         slideShowDelay := 59500
    }
 
    resetSlideshowTimer(1)
@@ -11514,7 +11514,7 @@ ChangeSoundVolume(dir) {
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
-changeGIFsDelayu(dir) {
+VPchangeGIFsDelayu(dir) {
    Static lastInvoked := 1
    If (A_TickCount - lastInvoked < 50)
       Return
@@ -11527,7 +11527,7 @@ changeGIFsDelayu(dir) {
    stepu := (dir=1) ? factoru : -factoru
    UserGIFsDelayu := clampInRange(UserGIFsDelayu + stepu, -9500, 9500, 1)
    SetTimer, postPonedWriteGifSpeed, -150
-   showTOOLtip("GIFs playback delay: " UserGIFsDelayu " ms", A_ThisFunc, 2, (UserGIFsDelayu + 9500)/19000)
+   showTOOLtip("GIF frames playback delay: " UserGIFsDelayu " ms", A_ThisFunc, 2, (UserGIFsDelayu + 9500)/19000)
    SetTimer, RemoveTooltip, % -msgDisplayTime
    lastInvoked := A_TickCount
 }
@@ -18318,7 +18318,7 @@ livePreviewHugeImageFillSelArea() {
       If (FillAreaRemBGR=1 && FillAreaDoBehind=0)
       {
          blackBrush := Gdip_BrushCreateSolid("0xFF000000")
-         thisBrush := (currIMGdetails.HasAlpha=1 || bpp=32) ? pBrushHatchLow : blackBrush
+         thisBrush := (currIMGdetails.HasAlpha=1 || bpp=32) ? GDIPbrushHatch : blackBrush
          Gdip_FillPath(2NDglPG, thisBrush, whichPath)
          Gdip_DeleteBrush(blackBrush)
       }
@@ -18335,7 +18335,7 @@ livePreviewHugeImageFillSelArea() {
       }
 
       If ((currIMGdetails.HasAlpha=1 || bpp=32) && !thisBrush)
-         Gdip_FillRectangle(2NDglPG, pBrushHatchLow, imgSelPx, imgSelPy, imgW, imgH)
+         Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, imgSelPx, imgSelPy, imgW, imgH)
 
       userImgAdjustHiPrecision := 1
       userImgAdjustNoClamp := (PasteInPlaceLight>1 && PasteInPlaceGamma<1) ? 1 : 0 
@@ -33222,29 +33222,67 @@ openFileDialogWrapper(p_Type, optionz, startPath, msg, pattern, ByRef n_FilterIn
    Return r
 }
 
+LoadPrefsFromSLD() {
+   Critical, on
+   If (slideShowRunning=1)
+      ToggleSlideShowu()
+
+   If ((SLDtypeLoaded=2 || SLDtypeLoaded=3) && maxFilesIndex>1 && CurrentSLD RegExMatch(CurrentSLD, sldsPattern))
+   {
+      showTOOLtip("ERROR: No valid files list currently opened")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   If (SLDtypeLoaded=2)
+   {
+      FileReadLine, firstLine, % CurrentSLD, 1
+      If InStr(firstLine, "[General]")
+      {
+         Sleep, 10
+         readSlideSettingsINI(CurrentSLD)
+         showTOOLtip("Settings loaded freo the files list")
+      }
+   } Else If (SLDtypeLoaded=3)
+   {
+      Sleep, 10
+      readSlideSettingsInDB()
+      showTOOLtip("Settings loaded freo the database")
+   }
+   dummyTimerDelayiedImageDisplay(50)
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
 WritePrefsIntoSLD() {
    Critical, on
    If (slideShowRunning=1)
       ToggleSlideShowu()
 
-   startPath := !CurrentSLD ? prevOpenFolderPath : CurrentSLD
-   file2save := openFileDialogWrapper("S", "FileMustExist", startPath, "Save slideshow settings into file...", "Slideshow plain-text (*.sld)")
-   If file2save
+   If ((SLDtypeLoaded=2 || SLDtypeLoaded=3) && maxFilesIndex>1 && CurrentSLD RegExMatch(CurrentSLD, sldsPattern))
    {
-      If !RegExMatch(file2save, sldsPattern)
-         file2save .= ".sld"
+      showTOOLtip("ERROR: No valid files list currently opened")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
 
-      FileReadLine, firstLine, % file2save, 1
+   If (SLDtypeLoaded=2)
+   {
+      FileReadLine, firstLine, % CurrentSLD, 1
       If InStr(firstLine, "[General]")
       {
          Sleep, 10
-         writeSlideSettings(file2save)
-      } Else 
-      {
-         zPlitPath(file2save, 0, OutFileName, OutDir)
-         msgBoxWrapper(appTitle ": ERROR", "The selected file appears not to have the correct file format.`nPlease select a .SLD file already saved by this application.`n`n" OutFileName, 0, 0, "error")
+         writeSlideSettingsINI(CurrentSLD)
+         showTOOLtip("Settings saved into the files list")
       }
+   } Else If (SLDtypeLoaded=3)
+   {
+      Sleep, 10
+      saveSlideSettingsInDB()
+      showTOOLtip("Settings saved into the database")
    }
+   SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
 recreateDynaFoldersSQLdbList(saveDynaFolders) {
@@ -33257,6 +33295,11 @@ recreateDynaFoldersSQLdbList(saveDynaFolders) {
    }
 
    activeSQLdb.Exec("COMMIT TRANSACTION;")
+}
+
+readSlideSettingsInDB() {
+   r := IniSLDBreadGiven()
+   Return r
 }
 
 saveSlideSettingsInDB() {
@@ -33309,6 +33352,15 @@ saveSlideSettingsInDB() {
    IniSLDBWrite("allowGIFsPlayEntirely", allowGIFsPlayEntirely)
    IniSLDBWrite("prevFilesSortMode", prevFilesSortMode)
    IniSLDBWrite("autoPlaySlidesAudio", autoPlaySlidesAudio)
+   IniSLDBWrite("UserVPalphaBgrStyle", UserVPalphaBgrStyle)
+   IniSLDBWrite("showHUDnavIMG", showHUDnavIMG)
+   IniSLDBWrite("ambiTexBrushSize", ambiTexBrushSize)
+   IniSLDBWrite("UserGIFsDelayu", UserGIFsDelayu)
+   IniSLDBWrite("lummyAdjust", lummyAdjust)
+   IniSLDBWrite("SLDcacheFilesList", SLDcacheFilesList)
+   IniSLDBWrite("specialColorFXmode", specialColorFXmode)
+   IniSLDBWrite("uiColorCurveFXchannel", uiColorCurveFXchannel)
+   IniSLDBWrite("uiColorCurveFXmode", uiColorCurveFXmode)
    IniSLDBWrite("SlidesMusicSong", SlidesMusicSong)
    IniSLDBWrite("hamDistInterpolation", hamDistInterpolation)
    IniSLDBWrite("userpHashMode", userpHashMode)
@@ -33328,11 +33380,10 @@ IniSLDBwrite(what, value, whichTable:="settings") {
     }
 }
 
-IniSLDBreadAll(givenFilter:="", whichTable:="settings") {
+IniSLDBreadGiven(givenFilter:="", whichTable:="settings") {
   startOperation := A_TickCount
   SQL := "SELECT paramz, valuez FROM " whichTable ";"
   RecordSet := ""
-
   If !activeSQLdb.GetTable(SQL, RecordSet)
   {
      addJournalEntry(A_ThisFunc "(): failed to read settings from SQL database")
@@ -33723,7 +33774,7 @@ SaveFilesList(enforceFile:=0) {
 
       Sleep, 2
       BtnCloseWindow()
-      writeSlideSettings(file2save)
+      writeSlideSettingsINI(file2save)
       mainFile := FileOpen(file2save, "a", "UTF-16")
       If !IsObject(mainFile)
       {
@@ -37003,7 +37054,7 @@ multiCoresFormatConvert(coreThread, filesList) {
    ; cleanupThread()
 }
 
-readSlideSettings(readThisFile, act) {
+readSlideSettingsINI(readThisFile, act:=0) {
      IniAction(act, "allowGIFsPlayEntirely", "General", 1,0,0,, readThisFile)
      IniAction(act, "ambiTexBrushSize", "General", 2, 25, 950,, readThisFile)
      IniAction(act, "animGIFsSupport", "General", 1,0,0,, readThisFile)
@@ -37177,7 +37228,7 @@ restoreDefaultCustomUserKbds(keyu, funcu, contextu, modus) {
 
 readMainSettingsApp(act) {
     EnvGet, thisSystemCores, NUMBER_OF_PROCESSORS
-    readSlideSettings(mainSettingsFile, act)
+    readSlideSettingsINI(mainSettingsFile, act)
     IniAction(act, "userPerformColorManagement", "General", 1)
     IniAction(act, "allowFreeIMGpanning", "General", 1)
     IniAction(act, "allowMultiCoreMode", "General", 1)
@@ -37232,7 +37283,7 @@ readMainSettingsApp(act) {
     IniAction(act, "useCachedSLDdata", "General", 1)
     IniAction(act, "userimgGammaCorrect", "General", 1)
     IniAction(act, "userimgQuality", "General", 1)
-    IniAction(act, "userMultiCoresLimit", "General", 2, 2, min(6, thisSystemCores))
+    IniAction(act, "userMultiCoresLimit", "General", 2, 2, thisSystemCores//2)
     IniAction(act, "usrTextAlign", "General", 5)
     IniAction(act, "preventDeleteFromProtectedPath", "General", 1)
     IniAction(act, "protectedFolderPath", "General", 6)
@@ -37284,8 +37335,8 @@ calcHUDsize() {
    imgHUDbaseUnit := (PrefsLargeFonts=1) ? Round(OSDfontSize*2.5) : Round(OSDfontSize*2)
 }
 
-writeSlideSettings(file2save) {
-    readSlideSettings(file2save, 1)
+writeSlideSettingsINI(file2save) {
+    readSlideSettingsINI(file2save, 1)
     ; throwMSGwriteError()
 }
 
@@ -40740,11 +40791,11 @@ MenuRedoImgJumpy() {
 }
 
 MenuIncGIFspeed() {
-   changeGIFsDelayu(1)
+   VPchangeGIFsDelayu(1)
 }
 
 MenuDecGIFspeed() {
-   changeGIFsDelayu(-1)
+   VPchangeGIFsDelayu(-1)
 }
 
 MenuIncSelAreaSize() {
@@ -41931,24 +41982,6 @@ WriteThumbnailsSettingsPanel() {
    INIaction(1, "thumbsColumns", "General")
    INIaction(1, "usrColorDepth", "General")
    INIaction(1, "thumbsModeItemHighlight", "General")
-}
-
-PanelSetSystemCores() {
-   EnvGet, thisSystemCores, NUMBER_OF_PROCESSORS
-   fakeWinCreator(41, A_ThisFunc, 1)
-   msgResult := msgBoxWrapper("panelu|Multi-threading options: " appTitle, "Please specify the number of threads to use when generating thumbnails and for batch processing of files. Maximum allowed threads is 6.`n`nAfter changing this value, a restart of QPV might be necessary.", "&Apply|&Cancel", 1, "gear", "Generate thumbnails using multiple threads [experimental]", allowMultiCoreMode, 0, "limit2 number", userMultiCoresLimit)
-   If InStr(msgResult.btn, "apply")
-   {
-      allowMultiCoreMode := msgResult.check
-      userMultiCoresLimit := Trimmer(msgResult.edit)
-      userMultiCoresLimit := clampInRange(userMultiCoresLimit, 2, min(6, thisSystemCores))
-      INIaction(1, "allowMultiCoreMode", "General")
-      INIaction(1, "userMultiCoresLimit", "General")
-      realSystemCores := userMultiCoresLimit
-      If (thumbsDisplaying=1 && thumbsListViewMode=1 && multiCoreThumbsInitGood="n")
-         initAHKhThumbThreads()
-      ; dummyTimerDelayiedImageDisplay(50)
-   }
 }
 
 PanelSaveSlideShowu() {
@@ -43861,6 +43894,22 @@ updateLabelBrushStep() {
    If (BrushToolStepping=0)
       stepu := "NONE"
    Return "Steps interpolation: " stepu
+}
+
+updateLabelSlidesSpeed() {
+   If (slideShowDelay>=1000)
+      p := Round(slideShowDelay/1000, 1) " s"
+   Else
+      p := slideShowDelay " ms"
+   Return "Slides interval: " p
+}
+
+updateLabelGIFdelay() {
+   If (abs(UserGIFsDelayu)>=1000)
+      p := Round(UserGIFsDelayu/1000, 1) " s"
+   Else
+      p := UserGIFsDelayu " ms"
+   Return "GIF frames delay: " p
 }
 
 updateLabelMaskCurvePath() {
@@ -55388,8 +55437,13 @@ PanelPreferencesWindow() {
     Gui, Add, Checkbox, xs y+7 gToggleImgQuality Checked%userimgQuality% vuserimgQuality, High quality image resampling in the viewport
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%userHQraw% vuserHQraw, Load Camera RAW files at high quality
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%allowMultiCoreMode% vallowMultiCoreMode +hwndhTemp, Multi-threaded processing (experimental)
+    GuiAddEdit("xs+18 y+7 gupdateUIsettings w" editWid//2 " r1 limit2 -multi number -wantCtrlA -wantReturn -wantTab -wrap vEditFb", userMultiCoresLimit)
+    EnvGet, sc, NUMBER_OF_PROCESSORS
+    sc := sc//2
+    Gui, Add, UpDown, vuserMultiCoresLimit Range2-%sc%, % userMultiCoresLimit
 
     Gui, Tab, 3
+    slideWid := (PrefsLargeFonts=1) ? 250 : 180
     Gui, Add, Checkbox, x+15 y+15 Section gupdateUIsettings Checked%animGIFsSupport% vanimGIFsSupport, Auto-play animated GIFs and WebP in the viewport
     Gui, Add, Checkbox, xs y+7 gtoggleFreeIMGpanning Checked%allowFreeIMGpanning% vallowFreeIMGpanning, Allow outside viewport image panning
     Gui, Add, Checkbox, xs y+7 gToggleIMGalign Checked%imageAlignVPtopLeft% vimageAlignVPtopLeft, Top-left image alignment in the viewport
@@ -55399,7 +55453,13 @@ PanelPreferencesWindow() {
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%LimitSelectBoundsImg% vLimitSelectBoundsImg, Limit selection area to image boundaries 
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%allowGIFsPlayEntirely% vallowGIFsPlayEntirely, Wait for GIFs to play once during slideshows
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%doSlidesTransitions% vdoSlidesTransitions, Smooth slideshow transitions
-    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%syncSlideShow2Audios% vsyncSlideShow2Audios, Slidesho&w speed based on audio length
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%skipSeenImageSlides% vskipSeenImageSlides, Skip already seen images during slideshows
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%syncSlideShow2Audios% vsyncSlideShow2Audios, Slideshow speed based on audio length
+    GuiAddSlider("slideShowDelay", 100,59500, 3000, ".updateLabelSlidesSpeed", "dummy", 1, "xs y+10 w" slideWid " hp")
+    GuiAddSlider("UserGIFsDelayu", -9500, 9500, 30, ".updateLabelGIFdelay", "dummy", 2, "x+10 w" slideWid " hp")
+
+    ml := (PrefsLargeFonts=1) ? 265 : 150
+    Gui, Add, Button, xs y+7 w%ml% gPanelColorsAdjusterWindow, &Additional viewport options
 
     Gui, Tab, 4
     pp := (FIMfailed2init=1) ? "( ! )"
@@ -55413,26 +55473,30 @@ PanelPreferencesWindow() {
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%autoRemDeadEntry% vautoRemDeadEntry, Automatically remove index entries pointing to inexistent files
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%skipDeadFiles% vskipDeadFiles, Automatically skip inexistent files
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%autoPlaySNDs% vautoPlaySNDs, Automatically play sound files associated to images
+    GuiAddSlider("mediaSNDvolume", 1,100, 50, "QPV audio volume", "dummy", 1, "xs+16 y+7 w" slideWid " hp")
     Gui, Add, Checkbox, xs y+7 gToggleToolBarViewModa Checked%toolbarViewerMode% vtoolbarViewerMode, Image viewer toolbar (simplified mode)
-    Gui, Add, Checkbox, x+5 gupdateUIsettings Checked%ShowToolTipsToolbar% vShowToolTipsToolbar, Display tooltips on icons hover
-    Gui, Add, Checkbox, xs y+7 gtoggleCustomaToolbara Checked%userCustomizedToolbar% vuserCustomizedToolbar, Use customized toolbar
+    Gui, Add, Checkbox, xs y+7 gtoggleCustomaToolbara Checked%userCustomizedToolbar% vuserCustomizedToolbar, Use customized list of toolbar icons
     ml := (PrefsLargeFonts=1) ? 210 : 110
-    Gui, Add, Button, y+7 w%ml% gPanelCustomizeToolbar, Customize toolbar
+    Gui, Add, Button, xs+18 y+7 w%ml% gPanelCustomizeToolbar, Customize toolbar
 
     Gui, Tab, 5
-    Gui, Add, Text, x+15 y+15 w%txtWid%, The following options will not be saved.
+    Gui, Add, Text, x+15 y+15 w%txtWid% Section, The following options will not be saved under any circumstance.
     Gui, Add, Checkbox, y+7 gupdateUIsettings Checked%allowWICloader% vallowWICloader, Allow Windows Imaging Component (WIC) loader
     Gui, Add, Checkbox, y+7 gupdateUIsettings Checked%allowFIMloader% vallowFIMloader, Allow FreeImage loader
     Gui, Add, Checkbox, y+7 gupdateUIsettings Checked%noQualityWarnings% vnoQualityWarnings, Reduce the number of warnings
-    Gui, Add, Text, xs+15 y+7 w%txtWid%, This applies to image quality or color depth changes, or when memory usage may increase excessively.
+    Gui, Add, Text, xs+18 y+7 w%txtWid%, This applies to image quality or color depth changes, or when memory usage may increase excessively.
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%userPrivateMode% vuserPrivateMode, Private mode UI
-    Gui, Add, Text, xs+15 y+7 w%txtWid%, The paths and file names will be hidden and the images will be blurred.
+    Gui, Add, Text, xs+18 y+7 w%txtWid%, The paths and file names will be hidden and the images will be blurred.
+    Gui, Add, Checkbox, xs y+7, Thumbnails to hold in memory:
+    GuiAddEdit("xs+18 y+7 gupdateUIsettings w" editWid " r1 limit4 -multi number -wantCtrlA -wantReturn -wantTab -wrap vEditFa", maxMemThumbsCache)
+    Gui, Add, UpDown, vmaxMemThumbsCache Range10-9500, % maxMemThumbsCache
+
 
     Gui, Tab
     Gui, Add, Button, xm+0 y+20 h%thisBtnHeight% w%btnWid% gOpenUImenu, &More options
-    Gui, Add, Button, x+5 hp wp gBtnSavePreferencesClose Default, &Save changes
     Gui, Add, Button, x+5 hp w90 gBtnCloseWindow Default, &Close
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Preferences: " appTitle)
+    GuiRefreshSliders()
 }
 
 WriteSettingsAdjustToneMapPanel() {
@@ -55874,7 +55938,7 @@ updateUIsettings() {
      } Else If (CurrentPanelTab=1)
      {
         If !throwErrorNoImageLoaded(1)
-           SetTimer, RefreshImageFile, -250
+           dummyTimerDelayiedImageDisplay(250)
      }
 }
 
@@ -55902,6 +55966,7 @@ BtnSavePreferencesClose() {
    WriteSettingsUI()
    loadCustomUserKbds()
    interfaceThread.ahkFunction("updateWindowColor")
+   realSystemCores := userMultiCoresLimit
    INIaction(1, "userPerformColorManagement", "General")
    INIaction(1, "userimgGammaCorrect", "General")
    INIaction(1, "minimizeMemUsage", "General")
@@ -55920,7 +55985,6 @@ BtnSavePreferencesClose() {
    INIaction(1, "autoPlaySNDs", "General")
    INIaction(1, "toolbarViewerMode", "General")
    INIaction(1, "userCustomizedToolbar", "General")
-   INIaction(1, "allowCustomKeys", "General")
    INIaction(1, "allowFreeIMGpanning", "General")
    INIaction(1, "imageAlignVPtopLeft", "General")
    INIaction(1, "resetImageViewOnChange", "General")
@@ -55928,7 +55992,12 @@ BtnSavePreferencesClose() {
    INIaction(1, "allowGIFsPlayEntirely", "General")
    INIaction(1, "doSlidesTransitions", "General")
    INIaction(1, "syncSlideShow2Audios", "General")
-   BtnCloseWindow()
+   INIaction(1, "slideShowDelay", "General")
+   INIaction(1, "UserGIFsDelayu", "General")
+   INIaction(1, "mediaSNDvolume", "General")
+   INIaction(1, "userMultiCoresLimit", "General")
+   If (thumbsDisplaying=1 && thumbsListViewMode=1 && multiCoreThumbsInitGood="n")
+      initAHKhThumbThreads()
 }
 
 InvokeStandardDialogColorPicker(hC, event, c) {
@@ -64822,13 +64891,8 @@ createMenuMainPreferences() {
    If (preventUndoLevels!=1)
       kMenu("PVperfs", "Check", "&Record undo levels")
 
-   kMenu("PVperfs", "Add/Uncheck", "&Multi-threaded processing", "PanelSetSystemCores")
-   If (minimizeMemUsage=1)
-      kMenu("PVperfs", "Disable", "&Multi-threaded processing")
-
    If (A_PtrSize=4)
    {
-      kMenu("PVperfs", "Disable", "&Multi-threaded processing")
       kMenu("PVperfs", "Disable", "&Limit memory usage")
       kMenu("PVperfs", "Check", "&Limit memory usage")
    }
@@ -64853,15 +64917,18 @@ createMenuMainPreferences() {
    If (userHQraw=1)
       kMenu("PVperfs", "Check", "&Load Camera RAW files at high quality")
 
-   ; kMenu("PVprefs", "Add", "Save settings into a .SLD file", "WritePrefsIntoSLD")
+   If ((SLDtypeLoaded=2 || SLDtypeLoaded=3) && maxFilesIndex>1 && CurrentSLD RegExMatch(CurrentSLD, sldsPattern))
+   {
+      kMenu("PVprefs", "Add", "Save settings into current .SLD file", "WritePrefsIntoSLD")
+      kMenu("PVprefs", "Add", "Load settings from current .SLD file", "LoadPrefsFromSLD")
+      Menu, PVprefs, Add, 
+   }
+
    kMenu("PVprefs", "Add", "Associate QPV with image formats", "PanelAssociateQPV", "system")
    If !A_IsAdmin
       kMenu("PVprefs", "Add", "Run in admin mode", "RunAdminMode")
 
-   Menu, PVprefs, Add, 
-   kMenu("PVprefs", "Add/Uncheck", "Load an&y image format using FreeImage", "ToggleAlwaysFIMus")
-   kMenu("PVprefs", "Add", "Performance options", ":PVperfs")
-   Menu, PVprefs, Add, 
+   Menu, PVprefs, Add
    If (thumbsDisplaying!=1)
    {
       kMenu("PVprefs", "Add/Uncheck", "Auto-play an&imated GIFs", "ToggleAnimGIFsupport")
@@ -64871,6 +64938,12 @@ createMenuMainPreferences() {
          kMenu("PVprefs", "Disable", "Auto-play an&imated GIFs")
    }
 
+   kMenu("PVprefs", "Add/Uncheck", "Load an&y image format using FreeImage", "ToggleAlwaysFIMus")
+   If (alwaysOpenWithFIM=1)
+      kMenu("PVprefs", "Check", "Load an&y image format using FreeImage")
+
+   kMenu("PVprefs", "Add", "Performance options", ":PVperfs")
+   Menu, PVprefs, Add
    kMenu("PVprefs", "Add/Uncheck", "Allo&w custom keyboard shortcuts", "ToggleCustomKBDsMode")
    If (allowCustomKeys=1)
       kMenu("PVprefs", "Check", "Allo&w custom keyboard shortcuts")
@@ -64883,25 +64956,23 @@ createMenuMainPreferences() {
          kMenu("PVprefs", "Check", "&Toggle Quick file action shortcuts")
    }
 
-   kMenu("PVprefs", "Add/Uncheck", "&Record seen images", "ToggleRecordSeenImages", "history")
-   If (mustRecordSeenImgs=1)
-      kMenu("PVprefs", "Check", "&Record seen images")
-
    kMenu("PVprefs", "Add/Uncheck", "&Prompt before file delete", "TogglePromptDelete", "ask remove erase question user")
    If (askDeleteFiles=1)
       kMenu("PVprefs", "Check", "&Prompt before file delete")
 
-   Menu, PVprefs, Add, 
+   Menu, PVprefs, Add 
+   kMenu("PVprefs", "Add/Uncheck", "&Record seen images", "ToggleRecordSeenImages", "history")
+   If (mustRecordSeenImgs=1)
+      kMenu("PVprefs", "Check", "&Record seen images")
+
    If (mustRecordSeenImgs=1)
       kMenu("PVprefs", "Add", "Seen images database options", "PanelSeenIMGsOptions")
 
+   Menu, PVprefs, Add
    If FolderExist(thumbsCacheFolder)
       kMenu("PVprefs", "Add", "Erase cached thumbnails", "PanelfolderThanEraseThumbsCache")
 
    kMenu("PVprefs", "Add/Uncheck", "Cache generated thumbnails", "ToggleThumbsCaching")
-   If (alwaysOpenWithFIM=1)
-      kMenu("PVprefs", "Check", "Load an&y image format using FreeImage")
-
    If (enableThumbsCaching=1)
    {
       If (thumbsDisplaying=1)
@@ -64910,7 +64981,7 @@ createMenuMainPreferences() {
       kMenu("PVprefs", "Check", "Cache generated thumbnails")
    }
 
-   Menu, PVprefs, Add, 
+   Menu, PVprefs, Add
    kMenu("PVprefs", "Add", "Preferences`tF12", "PanelPreferencesWindow")
 }
 
@@ -82822,17 +82893,17 @@ OpenSLDBdataBase(fileNamu, importMode:=0) {
   If (MustLoadSLDprefs=1 && importMode!=1)
   {
      SlidesMusicSong := ""
-     IniSLDBreadAll() ; read slideshow settings
+     readSlideSettingsInDB() ; read slideshow settings
   } Else If (importMode!=1)
   {
      SlidesMusicSong := ""
-     IniSLDBreadAll("prevFilesSortMode")
-     IniSLDBreadAll("reverseOrderOnSort")
-     IniSLDBreadAll("autoPlaySlidesAudio")
-     IniSLDBreadAll("SlidesMusicSong")
-     IniSLDBreadAll("hamDistInterpolation")
-     IniSLDBreadAll("userpHashMode")
-     IniSLDBreadAll("dbVersion")
+     IniSLDBreadGiven("prevFilesSortMode")
+     IniSLDBreadGiven("reverseOrderOnSort")
+     IniSLDBreadGiven("autoPlaySlidesAudio")
+     IniSLDBreadGiven("SlidesMusicSong")
+     IniSLDBreadGiven("hamDistInterpolation")
+     IniSLDBreadGiven("userpHashMode")
+     IniSLDBreadGiven("dbVersion")
   }
 
   RecordSet := ""
@@ -92941,6 +93012,9 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
     If (ShowAdvToolbar!=1)
        trackImageListButtons("kill")
 
+    If (AnyWindowOpen=14)
+       BtnSavePreferencesClose()
+
     Global lastOtherWinClose := A_TickCount
     panelWinCollapsed := forceLiveAlphaPreviewMode := FloodFillSelectionAdj := liveDrawingBrushTool := isNowFakeWinOpen := ForceNoColorMatrix := 0
     uiPanelOpenCloseEvent(1)
@@ -99900,7 +99974,13 @@ GuiSlidersResponder(a, m_event, keyu) {
    tinyPreview := isVarEqualTo(AnyWindowOpen, 26, 43, 44, 64, 69, 78, 79)
    clickStarted := A_TickCount
    occ := A_IsCritical
+   allowExpo := (w<rangeu * 2) ? 1 : 0 ; this enables precise adjustments of slider values, when the range is much higher than the available width
+
    Critical, off
+   GetMouseCoord2wind(hwnd, onX, onY)
+   onX := clampInRange(onX, 2, w)
+   onXz := onX / w
+   onXKz := onXz * rangeu
    Sleep, -1   ; the excessive amount of added Sleeps is to prevent potential lock-ups/dead locks
    While, ((determineLClickState()=1 || m_event="uiLabel" && A_Index=1 || GetKeyState(keyu, "P") && isGivenKey=1) && isActive=1)
    {
@@ -99914,7 +99994,6 @@ GuiSlidersResponder(a, m_event, keyu) {
             Continue
       }
 
-      GetMouseCoord2wind(hwnd, nX, nY)
       Sleep, -1
       zX := mX, zY := mY
       sk := (A_Index=1 && (m_event="DoubleClick" || m_event="uiLabel") || isActive!=1) ? 1 : 0
@@ -99941,10 +100020,22 @@ GuiSlidersResponder(a, m_event, keyu) {
             %givenVar% := clampInRange(%givenVar% + frkB, minV, maxV, 1)
          Else If (keyu="PgDn")
             %givenVar% := clampInRange(%givenVar% - frkB, minV, maxV, 1)
-      } Else If (doFloat=1)
-         newValue := clampInRange( Round( (nX / w) * rangeu + minV, 3) , minV, maxV)
-      Else
-         newValue := clampInRange( Round( (nX / w) * rangeu + minV) , minV, maxV)
+      } Else 
+      {
+         GetMouseCoord2wind(hwnd, nX, nY)
+         nX := clampInRange(nX, -w, w*2)
+         znx := nX - onX
+         pxkzp := clampInRange(nX / w, -2, 2) - onXz
+         pkxz := clampInRange( pxkzp , -1, 1)
+         xxpkxz := clampInRange(nX / w, 0, 1)
+         xkzp := ( pkxz * pkxz ) * rangeu
+         If (pkxz<0)
+            xkzp := -1 * xkzp
+         ; ToolTip, % onXz "|" onX "|" nX "`n" znx "|" pxkzp "`n" pkxz "|" xkzp "|" onXKz , , , 2
+         nv := (isGivenKey!=1 && mouseMode=1 && allowExpo=1) ? onXKz + xkzp : xxpkxz * rangeu
+         pnv := (doFloat=1) ? Round(nv + minV, 3) : Round(nv + minV)
+         newValue := clampInRange(pnv, minV, maxV)
+      }
 
       If (!sk && !isGivenKey)
          %givenVar% := newValue
@@ -100145,16 +100236,15 @@ GuiUpdateSliders(whichSlider, isHwnd:=0, obju:=0) {
    If (uiSlidersArray[whichSlider, 1]="")
       Return
 
+   w := uiSlidersArray[whichSlider, 12]
+   h := uiSlidersArray[whichSlider, 13]
    minV := uiSlidersArray[whichSlider, 2]
    maxV := uiSlidersArray[whichSlider, 3]
    rangeu := maxV - minV
    varValue := %givenVar%
    perc := (varValue - minV) / rangeu
-
    hwnd := (isHwnd=1) ? whichSlider : uiSlidersArray[whichSlider, 1]
    isActive := uiSlidersArray[whichSlider, 10]
-   w := uiSlidersArray[whichSlider, 12]
-   h := uiSlidersArray[whichSlider, 13]
    If (!w || !h)
    {
       WinGetPos, , , w, h, ahk_id %hwnd%
@@ -100214,16 +100304,15 @@ GuiUpdateSliders(whichSlider, isHwnd:=0, obju:=0) {
    } Else If (fillMode=3)
    {
       ; a knob
-      ; ToolTip, % w2 "|" perc "|" varValue  , , , 2
       w2 := clampInRange(Round(w*perc), 3, w - 1)
+      ; ToolTip, % w2 "|" perc "|" varValue  , , , 2
       phw := h/1.4
       Gdip_SetClipRect(G, w2 - phw/4, 0, phw/2, h)
       xperc := perc
    } Else
    {
       ; a progress bar
-      ; ToolTip, % w2 "|" perc "|" varValue  , , , 2
-      w2 := clampInRange(Round(w*perc), 3, w - 1)
+      w2 := clampInRange(Round( w*perc ), 3, w - 1)
       Gdip_SetClipRect(G, 0, 0, w2, h)
       xperc := perc
    }
