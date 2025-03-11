@@ -383,7 +383,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , UIuserToneMapOCVparamA := 80, cmrRAWtoneMapOCVparamA := 1, UIuserToneMapOCVparamB := 72, cmrRAWtoneMapOCVparamB := 0
    , userPerformColorManagement := 1, UserCombinePDFbgrColor := "ffFFff", UserVPalphaBgrStyle := 1
    , userPDFdpi := 430, userActivePDFpage := 0, userThumbsSheetUpscaleSmall := 1, PrintPDFpagesRange := 1
-   , PrintPDFpagesGivenEdit :=  "1-5", noQualityWarnings := 0
+   , PrintPDFpagesGivenEdit :=  "1-5", noQualityWarnings := 0, TLBRinvertColors := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -44409,6 +44409,16 @@ toggleQuickMoveActionKeys() {
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
+toggleMultiCoresUse() {
+   allowMultiCoreMode := !allowMultiCoreMode
+   friendly := (allowMultiCoreMode=1) ? "ACTIVATED`nThreads to use: " userMultiCoresLimit : "DEACTIVATED"
+   showTOOLtip("Multi-threaded thumbnails generation: " friendly, A_ThisFunc, 1)
+   IniAction(1, "allowMultiCoreMode", "General")
+   If (thumbsDisplaying=1 && thumbsListViewMode=1 && multiCoreThumbsInitGood="n")
+      initAHKhThumbThreads()
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
 updateUIquickFileActs(zz:=0) {
    If (zz!="z")
    {
@@ -55437,7 +55447,8 @@ PanelPreferencesWindow() {
     Gui, Add, Checkbox, xs y+7 gToggleImgQuality Checked%userimgQuality% vuserimgQuality, High quality image resampling in the viewport
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%userHQraw% vuserHQraw, Load Camera RAW files at high quality
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%allowMultiCoreMode% vallowMultiCoreMode +hwndhTemp, Multi-threaded processing (experimental)
-    GuiAddEdit("xs+18 y+7 gupdateUIsettings w" editWid//2 " r1 limit2 -multi number -wantCtrlA -wantReturn -wantTab -wrap vEditFb", userMultiCoresLimit)
+    ToolTip2ctrl(hTemp, "Multiple execution threads can be used to generate thumbnails`nand for batch processing of image files.`n `nIn undefined circumstances, QPV may infinitely freeze`nwhile generating thumbnails.")
+    GuiAddEdit("xs+18 y+7 gupdateUIsettings w" editWid//1.5 " r1 limit2 -multi number -wantCtrlA -wantReturn -wantTab -wrap vEditFb", userMultiCoresLimit)
     EnvGet, sc, NUMBER_OF_PROCESSORS
     sc := sc//2
     Gui, Add, UpDown, vuserMultiCoresLimit Range2-%sc%, % userMultiCoresLimit
@@ -56199,7 +56210,6 @@ invokeTlbrContextMenu(givenCoords:=0) {
          kMenu("PvUItoolbarMenu", "Add", "1.25x", "SetToolbarScaling")
          kMenu("PvUItoolbarMenu", "Add", "1.50x", "SetToolbarScaling")
          kMenu("PvUItoolbarMenu", "Add", "2.00x", "SetToolbarScaling")
-         kMenu("PvUItoolbarMenu", "Add", "3.00x", "SetToolbarScaling")
       }
    }
 
@@ -57280,7 +57290,8 @@ iniSaveJPGquality() {
 }
 
 PanelCustomizeToolbar() {
-    thisBtnHeight := createSettingsGUI(82, A_ThisFunc)
+    pp := ((thumbsDisplaying=1 && maxFilesIndex>1 || isImgEditingNow()=1) && !AnyWindowOpen && drawingShapeNow!=1) ? "" : "disabled"
+    thisBtnHeight := createSettingsGUI(82, A_ThisFunc, 1)
     btnWid := 195
     EditWid := 60
     If (PrefsLargeFonts=1)
@@ -57299,6 +57310,12 @@ PanelCustomizeToolbar() {
     Sort, btnzList, D|
     ml := (PrefsLargeFonts=1) ? 60 : 45
     k := (thumbsDisplaying=1) ? "thumbnails / list view" : "image view"
+    If (pp="disabled")
+       k := "not customizable"
+
+    Gui, SettingsGUIA: Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit Choose1 vCurrentPanelTab, Icons list|General
+
+    Gui, Tab, 1
     Gui, Add, Text, x+10 y+15 w%txtWid% Section , Active toolbar mode: %k%.
     Gui, Add, Text, xs y+15 w%btnWid% Section , Buttons available for this mode:
     Gui, Add, Text, x+10 wp , User defined custom list:
@@ -57306,19 +57323,31 @@ PanelCustomizeToolbar() {
     Gui, Add, ListBox, x+10 wp r10 Choose1 vUIuserTlbrList gBtnUserListToolbarIconsAction , % userList
     Gui, Add, Button, xs y+5 wp h%thisBtnHeight% gBTNaddCustomTlbrIcon vtxtLine1, A&dd to custom list
     Gui, Add, Button, x+10 wp hp gBTNremCustomTlbrIcon vtxtLine2, &Remove from custom list
-    Gui, Add, Checkbox, xs y+10 wp hp Checked%ShowToolTipsToolbar% vShowToolTipsToolbar, &Show tooltips on icon hover
-    Gui, Add, Checkbox, x+10 wp hp Checked%userCustomizedToolbar% vuserCustomizedToolbar gBTNtglCustoTlbr, &Use customized toolbar
-    Gui, Add, Text, xs y+9 hp +0x200, Toolbar background color:
+    Gui, Add, Checkbox, xs y+10 hp Checked%userCustomizedToolbar% vuserCustomizedToolbar gBTNtglCustoTlbr, Use custom defined toolbar
+    If (pp="disabled")
+       GuiControl, Disable, userCustomizedToolbar
+
+    Gui, Tab, 2
+    Gui, Add, Checkbox, x+15 y+15 Section Checked%ShowToolTipsToolbar% vShowToolTipsToolbar, Show tooltips on icon hover
+    Gui, Add, Checkbox, y+10 Checked%TLBRinvertColors% vTLBRinvertColors +hwndhTemp, Invert icon colors
+    ToolTip2ctrl(hTemp, "This option is useful when a bright background color is used")
+    Gui, Add, Checkbox, y+10 Checked%lockToolbar2Win% vlockToolbar2Win, Attached to the main &window
+    Gui, Add, Checkbox, y+10 Checked%TLBRverticalAlign% vTLBRverticalAlign, Vertical toolbar
+    Gui, Add, Checkbox, x+10 Checked%TLBRtwoColumns% vTLBRtwoColumns, Two columns vertical
+    Gui, Add, Text, xs y+10 h%thisBtnHeight% +0x200, Toolbar background color:
     GuiAddPickerColor("x+5 hp w35", "ToolbarBgrColor")
     GuiAddColor("x+5 hp w" ml, "ToolbarBgrColor", "Toolbar background color")
- 
+    GuiAddSlider("ToolbarScaleFactor", 0.2, 5.0, "1.15f", "Icons scale: $€ x", "dummy", 1, "xs y+10 wp+100 hp")
+
+    Gui, Tab
     thisW := (PrefsLargeFonts=1) ? 90 : 65
-    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%thisW% Default gBtnSaveCustomToolbar, &Apply
+    Gui, Add, Button, xm+1 y+20 h%thisBtnHeight% w%thisW% Default gBtnSaveCustomToolbar, &Apply
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
     Tooltip
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Customize toolbar: " appTitle)
     SetTimer, resetOpeningPanel, -300
-    BTNtglCustoTlbr()
+    GuiRefreshSliders()
+    BTNtglCustoTlbr(pp)
 }
 
 PanelCustomKeysMiniManager() {
@@ -57408,9 +57437,9 @@ updateUIKeysListManager() {
    GuiControl, +Redraw, LViewOthers
 }
 
-BTNtglCustoTlbr() {
+BTNtglCustoTlbr(modus:=0) {
    GuiControlGet, OutputVar, SettingsGUIA:, userCustomizedToolbar
-   actu := (OutputVar=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   actu := (OutputVar=1 && modus!="disabled") ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, UImainTlbrList
    GuiControl, % actu, UIuserTlbrList
    GuiControl, % actu, txtLine1
@@ -57431,6 +57460,10 @@ BtnSaveCustomToolbar() {
    Gui, SettingsGUIA: Default
    GuiControlGet, userCustomizedToolbar
    GuiControlGet, ShowToolTipsToolbar
+   GuiControlGet, TLBRtwoColumns
+   GuiControlGet, TLBRverticalAlign
+   GuiControlGet, TLBRinvertColors
+   GuiControlGet, lockToolbar2Win
    GuiControlGet, hwnd, hwnd, UIuserTlbrList
    ControlGet, listBoxOptions, List,,, ahk_id %hwnd%
    btnzListArray := CoreGUItoolbar("getListArray")
@@ -57452,13 +57485,10 @@ BtnSaveCustomToolbar() {
    If !InStr(listu, ",")
       userCustomizedToolbar := 0
 
+   readSettingsToolbar(1)
+   Sleep, 25
    BtnCloseWindow()
    createGUItoolbar("forced")
-   RegAction(1, "ShowToolTipsToolbar")
-   IniAction(1, "ToolbarBgrColor", "General")
-   IniAction(1, "userCustomizedToolbar", "General")
-   IniAction(1, "userThumbsToolbarList", "General")
-   IniAction(1, "userImgViewToolbarList", "General")
 }
 
 BTNaddCustomTlbrIcon() {
@@ -64947,13 +64977,18 @@ createMenuMainPreferences() {
    kMenu("PVprefs", "Add/Uncheck", "Allo&w custom keyboard shortcuts", "ToggleCustomKBDsMode")
    If (allowCustomKeys=1)
       kMenu("PVprefs", "Check", "Allo&w custom keyboard shortcuts")
+
    kMenu("PVprefs", "Add", "C&ustom keyboard shortcuts", "PanelCustomKeysMiniManager", "customize defined users manage personal")
    kMenu("PVprefs", "Add", "&Quick file actions", "PanelQuickMoveConfigure", "index list fast")
    If (mustPreventMenus=1)
    {
-      kMenu("PVprefs", "Add/Uncheck", "&Toggle Quick file action shortcuts", "toggleQuickMoveActionKeys", "index list fast")
+      kMenu("PVprefs", "Add/Uncheck", "&Activate Quick File Action shortcuts", "toggleQuickMoveActionKeys", "index list fast")
       If (allowUserQuickFileActions=1)
-         kMenu("PVprefs", "Check", "&Toggle Quick file action shortcuts")
+         kMenu("PVprefs", "Check", "&Activate Quick File Action shortcuts")
+
+      kMenu("PVprefs", "Add/Uncheck", "&Multi-threaded thumbnails generation", "toggleMultiCoresUse")
+      If (allowMultiCoreMode=1)
+         kMenu("PVprefs", "Check", "&Multi-threaded thumbnails generation")
    }
 
    kMenu("PVprefs", "Add/Uncheck", "&Prompt before file delete", "TogglePromptDelete", "ask remove erase question user")
@@ -93083,6 +93118,8 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
 
     If (AnyWindowOpen=6)
        InitialFilterSettingsPanel(0)
+    Else If (AnyWindowOpen=82)
+       readSettingsToolbar(0)
 
     hSetWinGui := imgEditPanelOpened := AnyWindowOpen := 0
     updateUIctrl()
@@ -97758,6 +97795,9 @@ tlbrSetImageIcon(icoFile, hwnd, W, H) {
           ; ToolTip, % icofile , , , 2 
           pBitmap := trGdip_CreateBitmapFromFile(A_ThisFunc, mainExecPath "\resources\toolbar\" icoFile ".png")
           icoBMP := trGdip_ResizeBitmap(A_ThisFunc, pBitmap, w, h, 0, 3, -1, 0)
+          If (TLBRinvertColors=1)
+             Gdip_BitmapApplyInvert(icoBMP)
+
           cachedIcos[icoFile] := [icoBMP, k]
           trGdip_DisposeImage(pBitmap, 1)
           z := "PBMP:" icoBMP
@@ -99974,7 +100014,7 @@ GuiSlidersResponder(a, m_event, keyu) {
    tinyPreview := isVarEqualTo(AnyWindowOpen, 26, 43, 44, 64, 69, 78, 79)
    clickStarted := A_TickCount
    occ := A_IsCritical
-   allowExpo := (w<rangeu * 2) ? 1 : 0 ; this enables precise adjustments of slider values, when the range is much higher than the available width
+   allowExpo := (w<rangeu * 2 || doFloat=1) ? 1 : 0 ; this enables precise adjustments of slider values, when the range is much higher than the available width
 
    Critical, off
    GetMouseCoord2wind(hwnd, onX, onY)
@@ -100138,7 +100178,7 @@ GuiAddSlider(givenVar, varMin, varMax, varDefault, uiLabel, func2exec, fillMode,
 ;    1. "Simple label" -> "Simple label: x%" // x% is added
 ;    2. "Label with slider value: $€ unit" -> $€ is replaced with givenVar/slider value
 ;    3. "|Static label" -> No change. Only the pipe is removed
-;    3. ".func2callLabel" -> The string or value returned by function() is displayed as the slider label; add a pipe "|", after the dot, to pass the variable name and value to the function when it is called
+;    3. ".func2callLabel" -> The string or value returned by function() is displayed as the slider label; add a pipe "|", after the dot, to pass the slider variable name and its value to the func2callLabel when invoked
 ;    4. "!Label text|varName" -> varName is replaced with its value and the !| symbols removed
 
 ; b) fillMode
@@ -100440,6 +100480,20 @@ GuiUpdateFocusedSliders(modus:=0) {
    uiSlidersArray["focused"] := WhatsFocused
 }
 
+readSettingsToolbar(actu) {
+    RegAction(actu, "ShowToolTipsToolbar",, 1)
+    IniAction(actu, "userCustomizedToolbar", "General", 1)
+    IniAction(actu, "userThumbsToolbarList", "General")
+    IniAction(actu, "userImgViewToolbarList", "General")
+    IniAction(actu, "toolbarViewerMode", "General", 1)
+    IniAction(actu, "ToolbarBgrColor", "General", 3)
+    IniAction(actu, "ToolbarScaleFactor", "General", 2, 0.2, 5)
+    IniAction(actu, "TLBRverticalAlign", "General", 1)
+    IniAction(actu, "TLBRtwoColumns", "General", 1)
+    IniAction(actu, "TLBRinvertColors", "General", 1)
+    IniAction(actu, "lockToolbar2Win", "General", 1)
+}
+
 createGUItoolbar(dummy:=0) {
    Critical, on
    Static prevState, hasEverDisplayed := 0, mustDoRefresh := 1
@@ -100463,16 +100517,7 @@ createGUItoolbar(dummy:=0) {
       hasEverDisplayed := 1
       JEE_ClientToScreen(PVhwnd, 0, 0, UserToolbarX, UserToolbarY)
       delayedWriteTlbrColors(0)
-      RegAction(0, "ShowToolTipsToolbar",, 1)
-      IniAction(0, "userCustomizedToolbar", "General", 1)
-      IniAction(0, "userThumbsToolbarList", "General")
-      IniAction(0, "userImgViewToolbarList", "General")
-      IniAction(0, "toolbarViewerMode", "General", 1)
-      IniAction(0, "ToolbarBgrColor", "General", 3)
-      IniAction(0, "ToolbarScaleFactor", "General", 2, 0.2, 5)
-      IniAction(0, "TLBRverticalAlign", "General", 1)
-      IniAction(0, "TLBRtwoColumns", "General", 1)
-      IniAction(0, "lockToolbar2Win", "General", 1)
+      readSettingsToolbar(0)
    }
 
    pku := isImgEditingNow()
@@ -100483,7 +100528,7 @@ createGUItoolbar(dummy:=0) {
    addAlphaIcons := isAlphaMaskPartialWin()
    ToolBarBtnWidth := Round(OSDfontSize*1.5 * ToolbarScaleFactor)
    viewModus := (toolbarViewerMode=1) ? "a" toolbarViewerMode thumbsDisplaying : 1
-   currState := "a" toolbarViewerMode userCustomizedToolbar userThumbsToolbarList userImgViewToolbarList isTransPanel isWelcomeScreenu addAlphaIcons viewModus isNowAlphaPainting() isAlphaMaskWindow() ToolBarBtnWidth TLBRverticalAlign TLBRtwoColumns isPaintPanel thumbsDisplaying drawingShapeNow ToolbarBgrColor ShowAdvToolbar isVectorMode imgEditPanelOpened
+   currState := "a" toolbarViewerMode userCustomizedToolbar userThumbsToolbarList userImgViewToolbarList isTransPanel isWelcomeScreenu addAlphaIcons viewModus isNowAlphaPainting() isAlphaMaskWindow() ToolBarBtnWidth TLBRverticalAlign TLBRtwoColumns isPaintPanel thumbsDisplaying drawingShapeNow ToolbarBgrColor ShowAdvToolbar isVectorMode imgEditPanelOpened TLBRinvertColors ToolbarScaleFactor
    ; fnOutputDebug("toolbar state prev=" prevState)
    ; fnOutputDebug("toolbar state curr=" currState)
    If (dummy="state")
