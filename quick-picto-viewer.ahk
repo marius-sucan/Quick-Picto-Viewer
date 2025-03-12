@@ -249,7 +249,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , SimpleOperationsNoPromptOnSave := 0, SimpleOperationsFlipV := 0, SimpleOperationsFlipH := 0
    , usrAutoCropDeviationPixels := 0, multilineStatusBar := 0, AutoCropAdaptiveMode := 1, allowGIFsPlayEntirely := 0
    , allowMultiCoreMode := 0, minimizeMemUsage := 0, GIFspeedDelay := 35, userImgAdjustAltBright := 1
-   , maxMemThumbsCache := 300, resetImageViewOnChange := 0, FillAreaRemBGR := 0, blurAreaPixelizeMethod := 1
+   , maxMemThumbsCache := 420, resetImageViewOnChange := 0, FillAreaRemBGR := 0, blurAreaPixelizeMethod := 1
    , EraseAreaFader := 0, EraseAreaOpacity := 190, blurAreaOpacity := 250, blurAreaAmount := 10
    , FillAreaOpacity := 250, FillAreaColor := OSDbgrColor, FillAreaShape := 1, FillAreaInverted := 0
    , PasteInPlaceAlignment := 3, PasteInPlaceOpacity := 255, PasteInPlaceAdaptMode := 1, PasteInPlaceQuality := 1
@@ -383,7 +383,8 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , UIuserToneMapOCVparamA := 80, cmrRAWtoneMapOCVparamA := 1, UIuserToneMapOCVparamB := 72, cmrRAWtoneMapOCVparamB := 0
    , userPerformColorManagement := 1, UserCombinePDFbgrColor := "ffFFff", UserVPalphaBgrStyle := 1
    , userPDFdpi := 430, userActivePDFpage := 0, userThumbsSheetUpscaleSmall := 1, PrintPDFpagesRange := 1
-   , PrintPDFpagesGivenEdit :=  "1-5", noQualityWarnings := 0, TLBRinvertColors := 0
+   , PrintPDFpagesGivenEdit :=  "1-5", noQualityWarnings := 0, TLBRinvertColors := 0, userVPpdfDPI := 420
+   , userVPsvgScale := 1.00
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -36915,6 +36916,9 @@ coreReadSettingsImageProcessing(act) {
     RegAction(act, "userActionConflictingFile",, 2, 1, 3)
     RegAction(act, "userDesireWriteFMT",, 2, 1, 16)
     RegAction(act, "userJpegQuality",, 2, 1, 100)
+    RegAction(act, "userVPsvgScale",, 2, 1, 10)
+    RegAction(act, "userVPpdfDPI",, 2, 72, 3500)
+    RegAction(act, "userPDFdpi",, 2, 72, 3500)
     ReadSettingsAdjustToneMapPanel(0)
     If (act=0)
     {
@@ -37248,7 +37252,6 @@ readMainSettingsApp(act) {
     IniAction(act, "histogramMode", "General", 2, 1, 3)
     IniAction(act, "LimitSelectBoundsImg", "General", 1)
     IniAction(act, "lockZoomLevel", "General", 1)
-    IniAction(act, "maxMemThumbsCache", "General", 2, 6, 950)
     IniAction(act, "minimizeMemUsage", "General", 1)
     IniAction(act, "multilineStatusBar", "General", 1)
     IniAction(act, "MustLoadSLDprefs", "General", 1)
@@ -37294,6 +37297,8 @@ readMainSettingsApp(act) {
     RegAction(act, "mainWinSize",, 5)
     RegAction(act, "HUDnavBoxSize",, 2, 75, 250)
     RegAction(act, "slidesRandoMode",, 2, 1, 3)
+    RegAction(act, "userVPsvgScale",, 2, 1, 10)
+    RegAction(act, "userVPpdfDPI",, 2, 72, 3500)
     ReadSettingsAdjustToneMapPanel(act)
     loadCustomUserKbds()
     If (act=0)
@@ -42157,7 +42162,7 @@ PanelExtractFrames() {
     ml := (PrefsLargeFonts=1) ? 190 : 150
     Gui, Add, Text, x15 y15 Section, This tool can extract frames or pages from`nGIFs, TIFFs, PDFs and WEBP files.
     Gui, Add, Text, y+7,Image output options:
-    Gui, Add, Text, xp+15 y+7 w%ml% hp+6 +0x200, PDF pages DPI:
+    Gui, Add, Text, xp+15 y+7 w%ml% hp+6 +0x200, Render PDF pages (DPI):
     hTemp := GuiAddEdit("x+10 w" thisWid " number -multi limit4 veditF6", userPDFdpi)
     Gui, Add, UpDown, vuserPDFdpi Range72-3500, % userPDFdpi
     AddTooltip2Ctrl(hTemp, "When PDF pages are render as bitmaps,`nthe DPI designates the quality of the output.`nRecommended: 450 dpi.")
@@ -43263,8 +43268,10 @@ PanelSaveImg() {
 btnHelpSaveImgPanel() {
    If (AnyWindowOpen=84)
       f := "`n `nWhen pages are extracted from TIFF(s), QPV will attempt to preserve the original color depth, if the destination file format allows it."
+   If (AnyWindowOpen!=15)
+      p := "`n`nThe color depth option is not applicable to all of the supported image file formats."
 
-   msgBoxWrapper(appTitle ": HELP", "Quality level applies only for JPG, JP2, J2K, JXR and WEBP files.`n`nThe color depth option is not applicable to all of the supported image file formats." f, -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "Quality level applies only for JPG, JP2, J2K, JXR and WEBP files." p f, -1, 0, 0)
 }
 
 PanelBrushTool(dummy:=0, modus:=0) {
@@ -55452,6 +55459,10 @@ PanelPreferencesWindow() {
     EnvGet, sc, NUMBER_OF_PROCESSORS
     sc := sc//2
     Gui, Add, UpDown, vuserMultiCoresLimit Range2-%sc%, % userMultiCoresLimit
+    Gui, Add, Text, xs y+7 hp +0x200, Resolution to render PDF pages:
+    GuiAddSlider("userVPpdfDPI", 72, 3500, 420, "DPI: $€", "dummy", 1, "x+5 w" editWid * 2 " hp")
+    Gui, Add, Text, xs y+7 hp +0x200, SVG rendered bitmap resolution:
+    GuiAddSlider("userVPsvgScale", 1, 9.876, "1.00f", "Scale factor: $€ x", "dummy", 1, "x+5 w" editWid*2 " hp")
 
     Gui, Tab, 3
     slideWid := (PrefsLargeFonts=1) ? 250 : 180
@@ -55467,7 +55478,8 @@ PanelPreferencesWindow() {
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%skipSeenImageSlides% vskipSeenImageSlides, Skip already seen images during slideshows
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%syncSlideShow2Audios% vsyncSlideShow2Audios, Slideshow speed based on audio length
     GuiAddSlider("slideShowDelay", 100,59500, 3000, ".updateLabelSlidesSpeed", "dummy", 1, "xs y+10 w" slideWid " hp")
-    GuiAddSlider("UserGIFsDelayu", -9500, 9500, 30, ".updateLabelGIFdelay", "dummy", 2, "x+10 w" slideWid " hp")
+    pkl := (PrefsLargeFonts=1) ? "x+10" : "xs y+7" 
+    GuiAddSlider("UserGIFsDelayu", -9500, 9500, 30, ".updateLabelGIFdelay", "dummy", 2, pkl " w" slideWid " hp")
 
     ml := (PrefsLargeFonts=1) ? 265 : 150
     Gui, Add, Button, xs y+7 w%ml% gPanelColorsAdjusterWindow, &Additional viewport options
@@ -55491,6 +55503,7 @@ PanelPreferencesWindow() {
     Gui, Add, Button, xs+18 y+7 w%ml% gPanelCustomizeToolbar, Customize toolbar
 
     Gui, Tab, 5
+    txtWid += 50
     Gui, Add, Text, x+15 y+15 w%txtWid% Section, The following options will not be saved under any circumstance.
     Gui, Add, Checkbox, y+7 gupdateUIsettings Checked%allowWICloader% vallowWICloader, Allow Windows Imaging Component (WIC) loader
     Gui, Add, Checkbox, y+7 gupdateUIsettings Checked%allowFIMloader% vallowFIMloader, Allow FreeImage loader
@@ -55498,10 +55511,8 @@ PanelPreferencesWindow() {
     Gui, Add, Text, xs+18 y+7 w%txtWid%, This applies to image quality or color depth changes, or when memory usage may increase excessively.
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%userPrivateMode% vuserPrivateMode, Private mode UI
     Gui, Add, Text, xs+18 y+7 w%txtWid%, The paths and file names will be hidden and the images will be blurred.
-    Gui, Add, Checkbox, xs y+7, Thumbnails to hold in memory:
-    GuiAddEdit("xs+18 y+7 gupdateUIsettings w" editWid " r1 limit4 -multi number -wantCtrlA -wantReturn -wantTab -wrap vEditFa", maxMemThumbsCache)
-    Gui, Add, UpDown, vmaxMemThumbsCache Range10-9500, % maxMemThumbsCache
-
+    Gui, Add, Text, xs y+10, Maximum thumbnails to hold in memory:
+    GuiAddSlider("maxMemThumbsCache", 10, 2048, 420, "Bitmaps cachable: $€", "dummy", 1, "xs+18 y+7 w" editWid * 2 " hp")
 
     Gui, Tab
     Gui, Add, Button, xm+0 y+20 h%thisBtnHeight% w%btnWid% gOpenUImenu, &More options
@@ -56007,6 +56018,8 @@ BtnSavePreferencesClose() {
    INIaction(1, "UserGIFsDelayu", "General")
    INIaction(1, "mediaSNDvolume", "General")
    INIaction(1, "userMultiCoresLimit", "General")
+   RegAction(1, "userVPsvgScale",, 2, 1, 10)
+   RegAction(1, "userVPpdfDPI",, 2, 72, 3500)
    If (thumbsDisplaying=1 && thumbsListViewMode=1 && multiCoreThumbsInitGood="n")
       initAHKhThumbThreads()
 }
@@ -57286,6 +57299,7 @@ BtnUiSharpenTabsInfoUpdate() {
 }
 
 iniSaveJPGquality() {
+    Sleep, 1
     RegAction(1, "userJpegQuality")
 }
 
@@ -87310,15 +87324,23 @@ PanelFileFormatConverter() {
     thisW := (PrefsLargeFonts=1) ? 85 : 75
     ReadSettingsFormatConvert()
     convertFormatAutoSkip := 1
+    pww := (PrefsLargeFonts=1) ? 170 : 120
     Gui, Add, Text, x15 y15 w%sml% Section +0x200 +hwndhTemp, Destination format:
     GuiAddDropDownList("x+5 w" thisW " gTglDesiredSaveFormat AltSubmit Choose" userDesireWriteFMT " vuserDesireWriteFMT", userPossibleWriteFMTs, [hTemp])
-    Gui, Add, Checkbox, x+5 Checked%convertFormatAutoSkip% vconvertFormatAutoSkip +hwndhTemp, Auto-skip format
+    Gui, Add, Checkbox, x+5 hp Checked%convertFormatAutoSkip% vconvertFormatAutoSkip +hwndhTemp, Auto-skip format
     ToolTip2ctrl(hTemp, "The files with the selected file destination extension format will be skipped when this option is selected.")
+    Gui, Add, Text, xs y+10 w%sml% hp +0x200, Render PDF pages:
+    GuiAddSlider("userVPpdfDPI", 72, 3500, 420, "DPI resolution: $€", "dummy", 1, "x+5 w" pww " hp")
+    Gui, Add, Text, xs y+10 w%sml% hp +0x200, SVG rendered resolution:
+    GuiAddSlider("userVPsvgScale", 1, 9.876, "1.00f", "Scale factor: $€ x", "dummy", 1, "x+5 w" pww " hp")
+
     Gui, Add, Text, xs y+10 w%sml% hp +0x200 +hwndhTemp, On file name conflicts:
-    GuiAddDropDownList("x+5 w150 AltSubmit gTglOverwriteFiles Choose" userActionConflictingFile " vuserActionConflictingFile", "Skip files|Auto-rename|Overwrite", [hTemp])
-    Gui, Add, Text, xs y+10 w%sml% hp +0x200, Image quality (1`% - 100`%):
-    GuiAddEdit("x+5 w" thisW " hp number -multi limit3 veditF5", userJpegQuality)
-    Gui, Add, UpDown, vuserJpegQuality Range1-100, % userJpegQuality
+    GuiAddDropDownList("x+5 w" pww " AltSubmit gTglOverwriteFiles Choose" userActionConflictingFile " vuserActionConflictingFile", "Skip files|Auto-rename|Overwrite", [hTemp])
+    Gui, Add, Text, xs y+10 w%sml% hp +0x200, Output image:
+    GuiAddSlider("userJpegQuality", 1, 100, 90, "Quality", "dummy", 1, "x+5 w" pww " hp")
+    zml := (PrefsLargeFonts=1) ? 40 : 30
+    GuiAddButton("x+5 w" zml " hp gbtnHelpSaveImgPanel", " ?", "Help")
+
     Gui, Add, Checkbox, xs y+10 Checked%convertFormatUseMultiThreads% vconvertFormatUseMultiThreads, &Use multiple threads (experimental)
     If !(filesElected>1)
        GuiControl, SettingsGUIA: Disable, convertFormatUseMultiThreads
@@ -87326,7 +87348,7 @@ PanelFileFormatConverter() {
     Gui, Add, Checkbox, y+10 gTglKeepOriginals Checked%OnConvertKeepOriginals% vOnConvertKeepOriginals, &Keep original file[s]
     Gui, Add, Checkbox, y+10 Checked%PreserveDateTimeOnSave% vPreserveDateTimeOnSave, &Preserve original file date and time
     Gui, Add, Checkbox, y+10 gTglRszDestFoldr Checked%ResizeUseDestDir% vResizeUseDestDir, Save file[s] in the specified destination folder:
-    GuiAddEdit("xp+10 y+5 wp r1 +0x0800 -wrap vResizeDestFolder", ResizeDestFolder, "Destination folder")
+    GuiAddEdit("xp+18 y+5 wp r1 +0x0800 -wrap vResizeDestFolder", ResizeDestFolder, "Destination folder")
     thisW := (PrefsLargeFonts=1) ? 90 : 70
     Gui, Add, Button, x+5 hp w%thisW% gBTNchangeResizeDestFolder vbtnFldr, C&hoose
     If (filesElected>1)
@@ -87352,6 +87374,7 @@ PanelFileFormatConverter() {
     Gui, Add, Button, x+%ml% hp w%sml% gBTNhelpConvertImgFmt, &Help
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, C&ancel
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Image file format conversion: " appTitle)
+    GuiRefreshSliders()
 }
 
 BTNhelpConvertImgFmt() {
@@ -87391,7 +87414,6 @@ BTNconvertImgFmtNow(modus:=0) {
    }
 
    rDesireWriteFMT := saveImgFormatsList[userDesireWriteFMT]
-   userJpegQuality := clampInRange(userJpegQuality, 1, 100)
    RegAction(1, "OnConvertKeepOriginals")
    RegAction(1, "PreserveDateTimeOnSave")
    RegAction(1, "ResizeDestFolder")
@@ -87400,6 +87422,8 @@ BTNconvertImgFmtNow(modus:=0) {
    RegAction(1, "convertFormatAutoSkip")
    RegAction(1, "userDesireWriteFMT")
    RegAction(1, "userJpegQuality")
+   RegAction(1, "userVPsvgScale")
+   RegAction(1, "userVPpdfDPI")
    performImgFmtConvert(modus)
 }
 
@@ -94663,26 +94687,32 @@ PanelSimpleResizeRotate(modus:="") {
     Gui, Add, Checkbox, x+5 hp +0x1000 Checked%SimpleOperationsFlipH% vSimpleOperationsFlipH, Horizontal
     Gui, Add, Checkbox, xs y+10 gTglRszMustPerformResize Checked%ResizeMustPerform% vResizeMustPerform, Perform image resizing (W x H):
     thisW := (PrefsLargeFonts=1) ? 85 : 40
-    GuiAddEdit("xs+15 y+5 w" thisW " r1 limit6 -multi number -wantCtrlA -wantReturn -wantTab -wrap vSimpleOperationsScaleXimgFactor", (ResizeInPercentage=1) ? 100 : oImgW, "Width")
+    GuiAddEdit("xs+18 y+5 w" thisW " r1 limit6 -multi number -wantCtrlA -wantReturn -wantTab -wrap vSimpleOperationsScaleXimgFactor", (ResizeInPercentage=1) ? 100 : oImgW, "Width")
     GuiAddEdit("x+5 wp r1 limit6 -multi number -wantCtrlA -wantReturn -wantTab -wrap vSimpleOperationsScaleYimgFactor", (ResizeInPercentage=1) ? 100 : oImgH, "Height")
     Gui, Add, Checkbox, x+5 wp+30 hp gTglRszInPercentage Checked%ResizeInPercentage% vResizeInPercentage, in `%
     Gui, Add, Checkbox, x+5 hp gTglRszKeepAratio Checked%ResizeKeepAratio% vResizeKeepAratio, &Keep aspect ratio
-    Gui, Add, Checkbox, xs+15 y+7 Checked%ResizeQualityHigh% vResizeQualityHigh, High quality image resampling
+    Gui, Add, Checkbox, xs+18 y+7 Checked%ResizeQualityHigh% vResizeQualityHigh, High quality image resampling
     Gui, Add, Checkbox, xs y+10 Checked%SimpleOperationsDoCrop% vSimpleOperationsDoCrop, Crop image(s) to selected area in viewport
     Gui, Add, Checkbox, xs y+10 Checked%convertFormatUseMultiThreads% vconvertFormatUseMultiThreads, Use multiple threads for processing (experimental)
     Gui, Add, Checkbox, xs y+10 gTglRszDestFoldr Checked%ResizeUseDestDir% vResizeUseDestDir, Save file(s) in the specified destination folder:
-    GuiAddEdit("xp+15 y+5 wp-10 r1 +0x0800 -wrap vResizeDestFolder", ResizeDestFolder, "Destination folder")
+    GuiAddEdit("xp+18 y+5 wp-10 r1 +0x0800 -wrap vResizeDestFolder", ResizeDestFolder, "Destination folder")
     ml := (PrefsLargeFonts=1) ? 90 : 50
     Gui, Add, Button, x+5 hp w%ml% gBTNchangeResizeDestFolder vbtnFldr, C&hoose
-    ml := (PrefsLargeFonts=1) ? 152 : 93
+    sml := (PrefsLargeFonts=1) ? 255 : 140
+    pww := (PrefsLargeFonts=1) ? 170 : 120
     If (filesElected>1)
     {
-       Gui, Add, Text, xs y+10 hp +0x200 +hwndhTemp, Action on file name conflicts:
-       GuiAddDropDownList("x+5 w" ml " gTglOverwriteFiles AltSubmit Choose" userActionConflictingFile " vuserActionConflictingFile", "Skip files|Auto-rename|Overwrite", [hTemp])
+       Gui, Add, Text, xs y+10 w%sml% hp +0x200 +hwndhTemp, Action on file name conflicts:
+       GuiAddDropDownList("x+5 w" pww " gTglOverwriteFiles AltSubmit Choose" userActionConflictingFile " vuserActionConflictingFile", "Skip files|Auto-rename|Overwrite", [hTemp])
     }
 
     thisWid := (PrefsLargeFonts=1) ? 235 : 150
-    GuiAddSlider("userJpegQuality", 2,100, 95, "Image quality on save", "iniSaveJPGquality", 1, "xs y+5 w" thisWid " hp", "This only applies to the JPEG and WEBP file formats")
+    Gui, Add, Text, xs y+10 w%sml% hp +0x200, Output image:
+    GuiAddSlider("userJpegQuality", 1, 100, 90, "Quality", "dummy", 1, "x+5 w" pww " hp", "This only applies to the JPEG and WEBP file formats")
+    Gui, Add, Text, xs y+7 w%sml% hp +0x200, Render PDF pages:
+    GuiAddSlider("userVPpdfDPI", 72, 3500, 420, "DPI resolution: $€", "dummy", 1, "x+5 w" pww " hp")
+    Gui, Add, Text, xs y+7 w%sml% hp +0x200, SVG rendered resolution:
+    GuiAddSlider("userVPsvgScale", 1, 9.876, "1.00f", "Scale factor: $€ x", "dummy", 1, "x+5 w" pww " hp")
     If !(filesElected>1)
        GuiControl, SettingsGUIA: Disable, convertFormatUseMultiThreads
 
@@ -94771,9 +94801,10 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="") {
        GuiControlGet, userActionConflictingFile, SettingsGUIA:, userActionConflictingFile
        GuiControlGet, convertFormatUseMultiThreads, SettingsGUIA:, convertFormatUseMultiThreads
 
-       userJpegQuality := clampInRange(userJpegQuality, 1, 100)
-       RegAction(1, "userJpegQuality")
        RegAction(1, "convertFormatUseMultiThreads")
+       RegAction(1, "userJpegQuality")
+       RegAction(1, "userVPsvgScale")
+       RegAction(1, "userVPpdfDPI")
        cleanResizeUserOptionsVars()
        thisu := (ResizeMustPerform=1 && ResizeInPercentage=1 && SimpleOperationsScaleXimgFactor=100 && SimpleOperationsScaleYimgFactor=100) ? 1 : 0
        If ((thisu=1 || ResizeMustPerform=0) && SimpleOperationsRotateAngle=1 && SimpleOperationsFlipV=0 && SimpleOperationsFlipH=0 && SimpleOperationsDoCrop=0)
@@ -94823,15 +94854,6 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="") {
     zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, oExt)
     thisDialogSavePtrns := StrReplace(dialogSaveFptrn, "|Icon (*.ico)", "|Icon (*.ico)|High-Dynamic Range Image (*.hdr)|OpenEXR (*.exr)|Portable FloatMap (*.pfm)")
     thisRegEXsaveFmts := StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$")
-    ; If (contextu!="extern")
-    ; {
-    ;    If (!filesElected && !RegExMatch(imgPath, thisRegEXsaveFmts))
-    ;    {
-    ;       SoundBeep, 300, 100
-    ;       msgBoxWrapper(appTitle ": ERROR", "This file format (." oExt ") cannot be processed in «Simple mode». Please use the «Advanced mode» which allows file format conversions.", 0, 0, "exclamation")
-    ;       Return
-    ;    }
-    ; }
 
    getSaveDialogIndexForFile(imgPath, defFMTindex, 1)
    startPath := (ResizeUseDestDir=1) ? ResizeDestFolder "\" OutFileName : imgPath
@@ -96762,6 +96784,12 @@ RenderSVGfile(imgPath, noBPPconv, screenMode, sizesDesired:=0) {
    vb := (vbi!=4) ? "Malformed " : ""
    ow := w := convertSVGunitsToPixels(width)
    oh := h := convertSVGunitsToPixels(height)
+   If (userVPsvgScale>1)
+   {
+      w *= userVPsvgScale
+      h *= userVPsvgScale
+   }
+
    If (screenMode=1 && zoomLevel>1 && IMGresizingMode=4)
    {
       w := Round(w * zoomLevel)
@@ -96987,7 +97015,7 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM, ByRef pwd) {
    If RegExMatch(imgPath, "i)(.\.svg)$")
       Return RenderSVGfile(imgPath, noBPPconv, 1)
    Else If RegExMatch(imgPath, "i)(.\.pdf)$")
-      Return RenderPDFpage(imgPath, noBPPconv, frameu, sizesDesired, pwd)
+      Return RenderPDFpage(imgPath, noBPPconv, frameu, pwd, sizesDesired, 0, userVPpdfDPI)
 
    tt := startZeit := A_TickCount
    VarSetCapacity(resultsArray, 8 * 9, 0)
@@ -97151,7 +97179,7 @@ LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitma
    If RegExMatch(imgPath, "i)(.\.svg)$")
       Return RenderSVGfile(imgPath, noBPPconv, 0, sizesDesired)
    Else If RegExMatch(imgPath, "i)(.\.pdf)$")
-      Return RenderPDFpage(imgPath, noBPPconv, frameu, pwd, sizesDesired)
+      Return RenderPDFpage(imgPath, noBPPconv, frameu, pwd, sizesDesired, 0, userVPpdfDPI)
 
    startZeit := A_TickCount
    If IsObject(sizesDesired[1])
@@ -97780,7 +97808,7 @@ tlbrSetImageIcon(icoFile, hwnd, W, H) {
        mustDispose := 1
     } Else
     {
-       k := "a" w h
+       k := "a" w h TLBRinvertColors
        icoFile := Format("{:L}", icoFile)
        If (cachedIcos[icoFile, 2]=k && validBMP(cachedIcos[icoFile, 1]))
        {
@@ -100201,7 +100229,7 @@ GuiAddSlider(givenVar, varMin, varMax, varDefault, uiLabel, func2exec, fillMode,
 
     If (!givenVar || !uiLabel || !func2exec || !InStr(coords, " w") || !InStr(coords, " h"))
     {
-       Msgbox, Error. GuiAddSlider(). Incorrect parameters.
+       Msgbox, Error. GuiAddSlider(). Incorrect parameters. Something is missing.
        Return
     }
 
@@ -100546,6 +100574,9 @@ createGUItoolbar(dummy:=0) {
       startZeit := A_TickCount
       ; fnOutputDebug("toolbar updated")
       TouchToolbarGUIcreated := 0
+      If (dummy="forced")
+         mustDoRefresh := 1
+
       CoreGUItoolbar(mustDoRefresh)
       prevState := currState
       endZeit := A_TickCount
