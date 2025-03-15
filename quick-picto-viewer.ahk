@@ -18311,11 +18311,20 @@ livePreviewHugeImageFillSelArea() {
             addJournalEntry(A_ThisFunc "(): Failed to generate the gradient bitmap for live preview.")
       }
 
-      newColor := (FillAreaDoBehind=1 && FillAreaColorMode=1) ? "0x" Format("{1:x}", FillAreaOpacity) FillAreaColor : "0xFF" FillAreaColor
-      thisOpacity := (FillAreaDoBehind=1 || FillAreaColorMode!=1) ? 255 : FillAreaOpacity
+      newColor := (FillAreaColorMode=1) ? "0x" Format("{1:x}", FillAreaOpacity) FillAreaColor : "0xFF" FillAreaColor
+      thisOpacity := (FillAreaColorMode=1) ? FillAreaOpacity : 255
       eraser := (FillAreaRemBGR=1 && FillAreaDoBehind=0) ? -1 : 0
       bpp := FreeImage_GetBPP(viewportQPVimage.imgHandle)
       whichPath := (FillAreaInverted=1) ? invertPath : pPath
+      thisBehind := (FillAreaDoBehind=1 && bpp=32) ? 1 : 0
+      thisBlendMode := FillAreaBlendMode - 1
+      thisModesFlipped := BlendModesFlipped
+      If (thisBehind=1)
+      {
+         eraser := thisBlendMode := 0
+         thisModesFlipped := 1
+      }
+
       If (FillAreaRemBGR=1 && FillAreaDoBehind=0)
       {
          blackBrush := Gdip_BrushCreateSolid("0xFF000000")
@@ -18325,8 +18334,7 @@ livePreviewHugeImageFillSelArea() {
       }
 
       livePreviewPrepareSelectionArea(objSel, FillAreaInverted, 3)
-      thisBehind := (FillAreaDoBehind=1 && bpp=32) ? 1 : 0
-      r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", iScan, "Int", imgW, "Int", imgH, "int", Stride, "int", 32, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", FillAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", gScan, "int", gStride, "int", gBpp, "int", thisBehind, "int", 0, "int", FillAreaCutGlass, "int", imgW, "int", imgH)
+      r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", iScan, "Int", imgW, "Int", imgH, "int", Stride, "int", 32, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", thisBlendMode, "int", thisModesFlipped, "UPtr", 0, "int", 0, "UPtr", gScan, "int", gStride, "int", gBpp, "int", thisBehind, "int", 0, "int", FillAreaCutGlass, "int", imgW, "int", imgH)
       ; ToolTip, % r "|" imgW "|" imgH , , , 2
       Gdip_UnlockBits(zBitmap, iData)
       If validBMP(gradientsBMP)
@@ -20848,11 +20856,10 @@ HugeImagesDrawLineShapes() {
          PointsF := ""
       }
 
-      thisOpacity := DrawLineAreaOpacity
-      thisColor := "0xFF" DrawLineAreaColor
+      thisColor := "0x" Format("{1:x}", DrawLineAreaOpacity) DrawLineAreaColor
       showTOOLtip("Drawing lines, please wait...`nStep: 3 / 3")
       If (rzb=1)
-         rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", thisOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha)
+         rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha)
 
       DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
       r := (rzc=1) ? 1 : 0
@@ -21120,10 +21127,9 @@ HugeImagesDrawParametricLines() {
          rzc := 1
 
       startFill := A_TickCount
-      thisOpacity := DrawLineAreaOpacity
-      thisColor := "0xFF" DrawLineAreaColor
+      thisColor := "0x" Format("{1:x}", DrawLineAreaOpacity) DrawLineAreaColor
       If (rzb=1 && abandonAll!=1)
-         rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", thisOpacity, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha)
+         rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha)
 
       fnOutputDebug("Fill lines mask finished in: " SecToHHMMSS(Round((A_TickCount - startFill)/1000, 3)))
       DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
@@ -21530,20 +21536,30 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             obju.Y2 -= abs(imgselY1)
          }
 
-         newColor := "0xFF" FillAreaColor
-         thisOpacity := (transformTool=1) ? clampInRange(PasteInPlaceOpacity, 0, 255) : FillAreaOpacity
          If (fillTool=1)
          {
-            newColor := (FillAreaDoBehind=1 && FillAreaColorMode=1) ? "0x" Format("{1:x}", FillAreaOpacity) FillAreaColor : "0xFF" FillAreaColor
-            thisOpacity := (FillAreaDoBehind=1 || FillAreaColorMode!=1) ? 255 : FillAreaOpacity
+            newColor := (FillAreaColorMode=1) ? "0x" Format("{1:x}", FillAreaOpacity) FillAreaColor : "0xFF" FillAreaColor
+            thisOpacity := (FillAreaColorMode=1) ? FillAreaOpacity : 255
+         } else
+         {
+            newColor := "0xFF" FillAreaColor
+            thisOpacity := (transformTool=1) ? clampInRange(PasteInPlaceOpacity, 0, 255) : FillAreaOpacity
          }
 
-         opacityExtra := (transformTool=1 && PasteInPlaceOpacity>255) ? clampInRange(PasteInPlaceOpacity - 255, 0, 255) : 0 
+         opacityExtra := (transformTool=1 && PasteInPlaceOpacity>255) ? clampInRange(PasteInPlaceOpacity - 255, 0, 255) : 0
          eraser := (!InStr(modus, "behind") && FillAreaRemBGR=1 && fillTool=1) ? -1 : 0
          blending := (fillTool=1) ? FillAreaBlendMode - 1 : PasteInPlaceBlendMode - 1
          doBehind := (fillTool=1) ? FillAreaDoBehind : 0
          thisInvert := (fillTool=1) ? FillAreaInverted : 0
          shapeu := (fillTool=1) ? 3 : EllipseSelectMode
+         thisKeepAlpha := (transformTool=1) ? BlendModesPreserveAlpha : FillAreaCutGlass
+         thisModesFlipped := BlendModesFlipped
+         If (doBehind=1)
+         {
+            blending := eraser := 0
+            thisModesFlipped := 1
+         }
+
          ; ToolTip, % thisOpacity "|" transformTool "|" opacityExtra , , , 2
          ; thisRotation := (PasteInPlaceCropAngular>0) ? PasteInPlaceCropAngular : PasteInPlaceCropAngular + 360
          thisRotation := VPselRotation ; (transformTool=1 && PasteInPlaceCropDo=1) ? thisRotation + VPselRotation : VPselRotation
@@ -21555,8 +21571,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          showTOOLtip("Applying " modus "`nProcessing main bitmap, please wait", 1)
          recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, thisInvert, 0)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, shapeu, thisRotation, 0, thisInvert, "a", "a", 1)
-         thisKeepAlpha := (transformTool=1) ? BlendModesPreserveAlpha : FillAreaCutGlass
-         r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", blending, "int", BlendModesFlipped, "UPtr", mScan, "int", mStride, "UPtr", gScan, "int", gStride, "int", gBpp, "int", doBehind, "int", opacityExtra, "int", thisKeepAlpha, "int", nBmpW, "int", nBmpH)
+         r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", blending, "int", thisModesFlipped, "UPtr", mScan, "int", mStride, "UPtr", gScan, "int", gStride, "int", gBpp, "int", doBehind, "int", opacityExtra, "int", thisKeepAlpha, "int", nBmpW, "int", nBmpH)
          If hFIFimgRealGradient
             FreeImage_UnLoad(hFIFimgRealGradient)
          If (hFIFimgExtern && r=1)
@@ -21591,12 +21606,13 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          If (allowRecord=1)
             zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, EraseAreaInvert)
 
-         newColor := "0x00010101"
          If (bpp=32)
             currIMGdetails.HasAlpha := 1
-         thisOpacity := (EraseAreaFader=1) ? EraseAreaOpacity : 255
+
+         thisOpacity := (EraseAreaFader=1) ? EraseAreaOpacity : 0
+         newColor := "0x" Format("{1:x}", thisOpacity) "010101"
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, EraseAreaInvert, "a", "a", 1)
-         r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", thisOpacity, "int", 0, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "UPtr", 0, "int", 0, "int", 24, "int", 0, "int", 0, "int", 0)
+         r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", 255, "int", 1, "int", 0, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "UPtr", 0, "int", 0, "int", 24, "int", 0, "int", 0, "int", 0)
          If InStr(modus, "initially")
          {
             If r
@@ -48837,12 +48853,14 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
 
     sml := slideWid  - 27
     Gui, Add, Checkbox, xs y+1 hp Checked%FillAreaInverted% vFillAreaInverted gupdateUIfillPanel, &Invert selection area
+    Gui, Add, Checkbox, xs y+7 Checked%FillAreaApplyColorFX% vFillAreaApplyColorFX gupdateUIfillPanel, &Apply color adjustments
     Gui, Add, Text, xs y+10 hp +0x200 w%slideWid% +TabStop gBtnResetGlassFX vtxtLine1, Glass effect
     GuiAddDropDownList("x+1 w" slideWid - 27 " AltSubmit Choose" FillAreaGlassy " vFillAreaGlassy gupdateUIfillPanel", "Not activated|Weak|Mild|Moderate|Strong|Extreme", "Glass effect")
     GuiAddCheckbox("x+1 yp hp w26 gupdateUIfillPanel Checked" FillAreaCutGlass " vFillAreaCutGlass", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
     Gui, Add, Text, xs y+7 w%sml% hp +TabStop gBtnResetBlendMode vtxtLine2, Blending mode
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIfillPanel")
     GuiAddDropDownList("x+1 w" slideWid " gupdateUIfillPanel AltSubmit Choose" FillAreaBlendMode " vFillAreaBlendMode", infoBlend "|" userBlendModesList, "Blending mode")
+
 
     Gui, Tab, 2 ; colors
     sml := (PrefsLargeFonts=1) ? 66 : 44
@@ -48872,7 +48890,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     Gui, Add, Checkbox, xs y+8 hp Checked%userimgGammaCorrect% vuserimgGammaCorrect gupdateUIfillPanel, &Gamma correction
 
     Gui, Tab, 3 ; apply fx
-    Gui, Add, Checkbox, x+10 y+10 Section Checked%FillAreaApplyColorFX% vFillAreaApplyColorFX gupdateUIfillPanel, &Apply color adjustments
+    Gui, Add, Text, x+10 y+10 Section, Color adjustments can be toggled from the main tab.
     GuiAddGeneralColorAdjustCtrls(txtWid, "updateUIfillPanel")
     If (viewportQPVimage.imgHandle)
        Gui, Add, Text, xs y+10 Section, These only apply with blending modes.
@@ -53977,8 +53995,14 @@ updateUIfillPanel(actionu:=0) {
        FillAreaGradientWrapped := 1
 
     closedLineCustomShape := FillAreaClosedPath
+    If (viewportQPVimage.imgHandle)
+       bpp := FreeImage_GetBPP(viewportQPVimage.imgHandle)
+
+    thisBehind := (FillAreaDoBehind=1 && bpp=32) ? 1 : 0
+    actuFX := (FillAreaGlassy>1 || FillAreaColorMode>=5 || FillAreaBlendMode>1 && thisBehind!=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     If (CurrentPanelTab=1)
     {
+       GuiControl, % actufx, FillAreaApplyColorFX
        actu := (FillAreaShape=2) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
        GuiUpdateVisibilitySliders(actu, "FillAreaRectRoundness")
 
@@ -53992,7 +54016,10 @@ updateUIfillPanel(actionu:=0) {
        actu := (FillAreaInverted=1 || viewportQPVimage.imgHandle) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
        GuiControl, % actu, PasteInPlaceAutoExpandIMG
 
-       actu := (FillAreaRemBGR=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
+       GuiControl, SettingsGUIA:, txtLine2, % (InStr(actuFX, "enable") && FillAreaApplyColorFX=1) ? "Blending mode + FX" : "Blending mode"
+       GuiControl, SettingsGUIA: +Redraw, txtLine2
+
+       actu := (FillAreaRemBGR=1 || FillAreaDoBehind=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
        GuiControl, % actu, txtLine1
        GuiControl, % actu, txtLine2
        GuiControl, % actu, FillAreaGlassy
@@ -54119,14 +54146,7 @@ updateUIfillPanel(actionu:=0) {
           GuiControl, SettingsGUIA: Disable, FillAreaDoContour
     } Else If (CurrentPanelTab=3)
     {
-       If (viewportQPVimage.imgHandle)
-          bpp := FreeImage_GetBPP(viewportQPVimage.imgHandle)
-
-       thisBehind := (FillAreaDoBehind=1 && bpp=32) ? 1 : 0
-       actu := (FillAreaGlassy>1 || FillAreaColorMode>=5 || FillAreaBlendMode>1 && thisBehind!=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
-       GuiControl, % actu, FillAreaApplyColorFX
-
-       actu := (FillAreaApplyColorFX=1 && InStr(actu, "enable")) ? 1 : 0
+       actu := (FillAreaApplyColorFX=1 && InStr(actuFX, "enable")) ? 1 : 0
        uiSlidersArray["PasteInPlaceLight", 10] := actu
        uiSlidersArray["PasteInPlaceGamma", 10] := actu
        uiSlidersArray["PasteInPlaceHue", 10] := actu

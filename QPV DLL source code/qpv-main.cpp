@@ -117,7 +117,17 @@ DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
     // to-do to do - fix this; make it work on Windows 7 
     debugInfos = modus;
     HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, &pD2D1Factory);
-    hr = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_pIWICFactory));
+    // hr = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_pIWICFactory));
+
+// Use version-specific initialization
+#if (_WIN32_WINNT >= 0x0602) // Windows 8 or newer
+    hr = CoCreateInstance(CLSID_WICImagingFactory2, NULL, CLSCTX_INPROC_SERVER, 
+                         IID_PPV_ARGS(&m_pIWICFactory));
+#else // Windows 7
+    hr = CoCreateInstance(CLSID_WICImagingFactory1, NULL, CLSCTX_INPROC_SERVER, 
+                         IID_PPV_ARGS(&m_pIWICFactory));
+#endif
+
 
     FPDF_LIBRARY_CONFIG config;
     config.version = 2;
@@ -2223,6 +2233,223 @@ RGBColorI calculateBlendModes(int rO, int gO, int bO, int rB, int gB, int bB, in
     return {clamp((int)round(rT*255), 0, 255), clamp((int)round(gT*255), 0, 255), clamp((int)round(bT*255), 0, 255)};
 }
 
+RGBAColor NEWERcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, int blendMode, int flipLayers, int linearGamma) {
+    // TO-DO this function must supersede/replace calculateBlendModes() used by ColourBrush() and FloodFill()
+    float rT, gT, bT;
+    if (blendMode==23)
+    {
+       int fR, fG, fB;
+       float f = char_to_float[Orgb.a];
+       if (linearGamma==1)
+       {
+          fR = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.r], gamma_to_linear[Brgb.r], f)];
+          fG = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.g], gamma_to_linear[Brgb.g], f)];
+          fB = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.b], gamma_to_linear[Brgb.b], f)];
+       } else
+       {
+          fR = weighTwoValues(Orgb.r, Brgb.r, f);
+          fG = weighTwoValues(Orgb.g, Brgb.g, f);
+          fB = weighTwoValues(Orgb.b, Brgb.b, f);
+       }
+
+       return {fB, fG, fR, Brgb.a};
+       // return {Orgb.r,Orgb.g,Orgb.b};
+    }
+
+    if (flipLayers==1)
+    {
+       swap(Orgb, Brgb);
+       // swap(Orgb.a, Brgb.a);
+    }
+
+    // if top is transparent, return bottom
+    if (Orgb.a == 0) return Brgb;
+    // if bottom is transparent, return top
+    if (Brgb.a == 0) return Orgb;
+    
+    // top is fully opaque, no need for complex blending
+    if (Orgb.a == 255 && blendMode==0) return Orgb;
+
+    RGBAColor result = {0, 0, 0, 0};
+    result.a = Orgb.a + ((255 - Orgb.a) * Brgb.a) / 255.0f;
+
+    // If resulting alpha is 0, return transparent pixel
+    if (result.a == 0) return result;
+
+    // Convert everything to floats
+    float rOf = char_to_float[Orgb.r];
+    float gOf = char_to_float[Orgb.g];
+    float bOf = char_to_float[Orgb.b];
+    float rBf = char_to_float[Brgb.r];
+    float gBf = char_to_float[Brgb.g];
+    float bBf = char_to_float[Brgb.b];
+
+    // Alpha factors for blending
+    float sa = char_to_float[Orgb.a];
+    float da = char_to_float[Brgb.a];
+    float oa = char_to_float[result.a];  // Output alpha
+
+    if (blendMode == 0) { // normal
+        rT = rOf;
+        gT = gOf;
+        bT = bOf;
+    }
+    else if (blendMode == 1) { // darken
+        rT = min(rOf, rBf);
+        gT = min(gOf, gBf);
+        bT = min(bOf, bBf);
+    }
+    else if (blendMode == 2) { // multiply
+        rT = rOf * rBf;
+        gT = gOf * gBf;
+        bT = bOf * bBf;
+    }
+    else if (blendMode == 3) { // linear burn
+       rT = rOf + rBf - 1;
+       gT = gOf + gBf - 1;
+       bT = bOf + bBf - 1;
+    }
+    else if (blendMode == 4) { // color burn
+       rT = 1 - ((1 - rBf) / rOf);
+       gT = 1 - ((1 - gBf) / gOf);
+       bT = 1 - ((1 - bBf) / bOf);
+    }
+    else if (blendMode == 5) { // lighten
+        rT = max(rOf, rBf);
+        gT = max(gOf, gBf);
+        bT = max(bOf, bBf);
+    }
+    else if (blendMode == 6) { // screen
+        rT = 1 - ( (1 - rBf) * (1 - rOf) );
+        gT = 1 - ( (1 - gBf) * (1 - gOf) );
+        bT = 1 - ( (1 - bBf) * (1 - bOf) );
+    }
+    else if (blendMode == 7) { // linear dodge [add]
+        rT = rOf + rBf;
+        gT = gOf + gBf;
+        bT = bOf + bBf;
+    }
+    else if (blendMode == 8) { // hard light
+        rT = (rOf < 0.5) ? 2 * rOf * rBf : 1 - (2 * (1 - rOf) * (1 - rBf) );
+        gT = (gOf < 0.5) ? 2 * gOf * gBf : 1 - (2 * (1 - gOf) * (1 - gBf) );
+        bT = (bOf < 0.5) ? 2 * bOf * bBf : 1 - (2 * (1 - bOf) * (1 - bBf) );
+    }
+    // else if (blendMode == 9) { // soft light A
+    //     rT = (1 - 2*rOf) * pow(rBf, 2) + 2 * rOf * rBf;
+    //     gT = (1 - 2*gOf) * pow(gBf, 2) + 2 * gOf * gBf;
+    //     bT = (1 - 2*bOf) * pow(bBf, 2) + 2 * bOf * bBf;
+    // }
+    else if (blendMode == 9) { // soft light B
+        rT = (rOf < 0.5) ? (1 - 2*rOf) * (rBf*rBf) + 2 * rBf * rOf : 2 * rBf * (1 - rOf) + sqrt(rBf) * (2 * rOf - 1);
+        gT = (gOf < 0.5) ? (1 - 2*gOf) * (gBf*gBf) + 2 * gBf * gOf : 2 * gBf * (1 - gOf) + sqrt(gBf) * (2 * gOf - 1);
+        bT = (bOf < 0.5) ? (1 - 2*bOf) * (bBf*bBf) + 2 * bBf * bOf : 2 * bBf * (1 - bOf) + sqrt(bBf) * (2 * bOf - 1);
+    }
+    else if (blendMode == 10) { // overlay
+        rT = (rBf < 0.5) ? 2 * rOf * rBf : 1 - (2 * (1 - rOf) * (1 - rBf) );
+        gT = (gBf < 0.5) ? 2 * gOf * gBf : 1 - (2 * (1 - gOf) * (1 - gBf) );
+        bT = (bBf < 0.5) ? 2 * bOf * bBf : 1 - (2 * (1 - bOf) * (1 - bBf) );
+    }
+    else if (blendMode == 11) { // hard mix
+        rT = (rOf <= (1 - rBf)) ? 0 : 1;
+        gT = (gOf <= (1 - gBf)) ? 0 : 1;
+        bT = (bOf <= (1 - bBf)) ? 0 : 1;
+    }
+    else if (blendMode == 12) { // linear light
+        rT = rBf + (2 * rOf) - 1;
+        gT = gBf + (2 * gOf) - 1;
+        bT = bBf + (2 * bOf) - 1;
+    }
+    else if (blendMode == 13) { // color dodge
+        rT = rBf / (1 - rOf);
+        gT = gBf / (1 - gOf);
+        bT = bBf / (1 - bOf);
+    }
+    else if (blendMode == 14) { // vivid light 
+        // this blend mode combines Color Dodge and Color Burn (rescaled so that neutral colors become middle gray). Dodge applies when values in the top layer are lighter than middle gray, and burn applies to darker values
+        if (rOf < 0.5)
+           rT = 1 - (1 - rBf) / (2 * rOf);
+        else
+           rT = rBf / (2 * (1 - rOf));
+
+        if (gOf < 0.5)
+           gT = 1 - (1 - gBf) / (2 * gOf);
+        else
+           gT = gBf / (2 * (1 - gOf));
+
+        if (bOf < 0.5)
+           bT = 1 - (1 - bBf) / (2 * bOf);
+        else
+           bT = bBf / (2 * (1 - bOf));
+    }
+    else if (blendMode == 15) { // average
+        rT = (rBf + rOf)/2;
+        gT = (gBf + gOf)/2;
+        bT = (bBf + bOf)/2;
+    }
+    else if (blendMode == 16) { // divide
+        rT = rBf / rOf;
+        gT = gBf / gOf;
+        bT = bBf / bOf;
+    }
+    else if (blendMode == 17) { // exclusion
+        rT = rOf + rBf - 2 * (rOf * rBf);
+        gT = gOf + gBf - 2 * (gOf * gBf);
+        bT = bOf + bBf - 2 * (bOf * bBf);
+    }
+    else if (blendMode == 18) { // difference
+        rT = abs(rBf - rOf);
+        gT = abs(gBf - gOf);
+        bT = abs(bBf - bOf);
+    }
+    else if (blendMode == 19) { // substract
+        rT = rBf - rOf;
+        gT = gBf - gOf;
+        bT = bBf - bOf;
+    }
+    else if (blendMode == 20) { // luminosity
+        double lO = char_to_float[getGrayscale(Orgb.r, Orgb.g, Orgb.b)];
+        double lB = char_to_float[getGrayscale(Brgb.r, Brgb.g, Brgb.b)];
+        rT = lO + rBf - lB;
+        gT = lO + gBf - lB;
+        bT = lO + bBf - lB;
+    }
+    else if (blendMode == 21) { // ghosting
+        double lO = char_to_float[getGrayscale(Orgb.r, Orgb.g, Orgb.b)];
+        double lB = char_to_float[getGrayscale(Brgb.r, Brgb.g, Brgb.b)];
+        rT = lB - lO + rBf + rOf/5;
+        gT = lB - lO + gBf + gOf/5;
+        bT = lB - lO + bBf + bOf/5;
+    }
+    else if (blendMode == 22) { // inverted difference
+        rT = (rOf > rBf) ? 1 - rOf - rBf : 1 - rBf - rOf;
+        gT = (gOf > gBf) ? 1 - gOf - gBf : 1 - gBf - gOf;
+        bT = (bOf > bBf) ? 1 - bOf - bBf : 1 - bBf - bOf;
+    }
+
+    rT = clamp(rT, 0.0f, 1.0f);
+    gT = clamp(gT, 0.0f, 1.0f);
+    bT = clamp(bT, 0.0f, 1.0f); 
+
+    if (Brgb.a<255 && blendMode>0) {
+       rT = weighTwoValues(rOf, rT, 1.0f - da, 1);
+       gT = weighTwoValues(gOf, gT, 1.0f - da, 1);
+       bT = weighTwoValues(bOf, bT, 1.0f - da, 1);
+    }
+
+    // Alpha composite the RGB channels
+    float ra = sa + da * (1.0f - sa);
+    if (ra > 0) {
+       rT = (sa * rT + da * (1.0f - sa) * rBf) / ra;
+       gT = (sa * gT + da * (1.0f - sa) * gBf) / ra;
+       bT = (sa * bT + da * (1.0f - sa) * bBf) / ra;
+    }
+
+    result.r = (unsigned char)(rT * 255.0f + 0.5f);
+    result.g = (unsigned char)(gT * 255.0f + 0.5f);
+    result.b = (unsigned char)(bT * 255.0f + 0.5f);
+    return result;
+}
+
 RGBColorI NEWcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, int blendMode, int flipLayers, int linearGamma) {
     // TO-DO this function must supersede/replace calculateBlendModes() used by ColourBrush() and FloodFill()
     float rT, gT, bT;
@@ -2259,7 +2486,12 @@ RGBColorI NEWcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, int blendMode, 
     float gBf = char_to_float[Brgb.g];
     float bBf = char_to_float[Brgb.b];
 
-    if (blendMode == 1) { // darken
+    if (blendMode == 0) { // normal
+        rT = rOf;
+        gT = gOf;
+        bT = bOf;
+    }
+    else if (blendMode == 1) { // darken
         rT = min(rOf, rBf);
         gT = min(gOf, gBf);
         bT = min(bOf, bBf);
@@ -2463,6 +2695,27 @@ void toRGB(float c, float m, float y, float k, float *rgb) {
   rgb[0] = -((c * (255.0 - k)) / 255.0 + k - 255.0);
   rgb[1] = -((m * (255.0 - k)) / 255.0 + k - 255.0);
   rgb[2] = -((y * (255.0 - k)) / 255.0 + k - 255.0);
+}
+
+RGBAColor blendRGBAcolors(const RGBAColor &c1, const RGBAColor &c2) {
+    float alpha1 = c1.a / 255.0f;
+    float alpha2 = c2.a / 255.0f;
+
+    float outAlpha = alpha1 + alpha2 * (1.0f - alpha1);
+    // Avoid division by zero when alpha is 0
+    if (outAlpha == 0.0f)
+       return {0, 0, 0, 0};
+
+    // Compute blended RGB channels
+    unsigned char outR = static_cast<unsigned char>(
+        ((c1.r * alpha1 + c2.r * alpha2 * (1.0f - alpha1)) / outAlpha) + 0.5f);
+    unsigned char outG = static_cast<unsigned char>(
+        ((c1.g * alpha1 + c2.g * alpha2 * (1.0f - alpha1)) / outAlpha) + 0.5f);
+    unsigned char outB = static_cast<unsigned char>(
+        ((c1.b * alpha1 + c2.b * alpha2 * (1.0f - alpha1)) / outAlpha) + 0.5f);
+
+    unsigned char outA = static_cast<unsigned char>(outAlpha * 255.0f + 0.5f);
+    return {outB, outG, outR, outA};
 }
 
 RGBAColor mixColorsFloodFill(RGBAColor colorB, RGBAColor colorA, float f, int dynamicOpacity, int blendMode, float prevCLRindex, float tolerance, int alternateMode, float thisCLRindex, int linearGamma, int flipLayers) {
@@ -3834,6 +4087,121 @@ DLL_API int DLL_CALLCONV ConvertToGrayScale(unsigned char *BitmapData, const int
 }
 
 DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h, int Stride, int bpp, int color, int opacity, int eraser, int linearGamma, int blendMode, int flipLayers, unsigned char *maskBitmap, int mStride, unsigned char *colorBitmap, int gStride, int gBpp, int fillBehind, int opacityMultiplier, int keepAlpha, int nBmpW, int nBmpH) {
+    // the opacity and opacityMultiplier parameters only apply if colorBitmap is not NULL
+
+    // fnOutputDebug("FillSelectArea mStride=" + std::to_string(mStride));
+    // fnOutputDebug("clipMaskFilter=zx=" + std::to_string(zx1) + "/" + std::to_string(zx2) + "=w=" + std::to_string(max(zx1, zx2) - min(zx1, zx2)));
+    // fnOutputDebug("clipMaskFilter=zy=" + std::to_string(zy1) + "/" + std::to_string(zy2) + "=h=" + std::to_string(max(zy1, zy2) - min(zy1, zy2)));
+    RGBAColor initialColor;
+    initialColor.a = (color >> 24) & 0xFF;
+    initialColor.r = (color >> 16) & 0xFF;
+    initialColor.g = (color >> 8) & 0xFF;
+    initialColor.b = color & 0xFF;
+
+    const int bpc = bpp/8;
+    const int gbpc = gBpp/8;
+    const int bmpX = (imgSelX1<0 || invertSelection==1) ? 0 : imgSelX1;
+    const int bmpY = (imgSelY1<0 || invertSelection==1) ? 0 : imgSelY1;
+    const int mw = (EllipseSelectMode==2 && invertSelection==0) ? min(w - 1, imgSelX2) : w - 1;
+    const int mh = (EllipseSelectMode==2 && invertSelection==0) ? min(h - 1, imgSelY2) : h - 1;
+    const int mx = (EllipseSelectMode==2 && invertSelection==0) ? clamp(imgSelX1, 0, w - 1) : 0;
+    const int my = (EllipseSelectMode==2 && invertSelection==0) ? clamp(imgSelY1 - (int)polyOffYa, 0, h - 1) : 0;
+    // fnOutputDebug("offsets X/Y: " + std::to_string(bmpX) + "|" + std::to_string(bmpY));
+    // fnOutputDebug("colorBitmap W/H: " + std::to_string(nBmpW) + "|" + std::to_string(nBmpH));
+    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+    for (int x = mx; x <= mw; x++)
+    {
+        INT64 kx = (INT64)x * bpc;
+        INT64 kzx = (INT64)(x - bmpX) * gbpc;
+        for (int y = my; y <= mh; y++)
+        {
+            RGBAColor userColor;
+            int opacityDepth = clipMaskFilter(x, y, maskBitmap, mStride);
+            if (opacityDepth==1 && highDepthModeMask==0 || opacityDepth==0 && highDepthModeMask==1)
+               continue;
+
+            // INT64 o = CalcPixOffset(x, y, Stride, bpp);
+            int oA = 255;
+            INT64 o = (INT64)y * Stride + kx;
+            if (colorBitmap!=NULL)
+            {
+               // INT64 oz = CalcPixOffset(x - zx1, y - zy1, gStride, 32);
+               if ((y - bmpY)>=nBmpH || (x - bmpX)>=nBmpW)
+                  continue;
+
+               INT64 oz = (INT64)(y - bmpY) * gStride + kzx;
+               // fnOutputDebug("y=" + std::to_string(y - bmpY));
+               int thisOpacity = (gBpp==32) ? colorBitmap[3 + oz] : opacity;
+               if (opacityMultiplier>0 && gBpp==32)
+                  thisOpacity = clamp(thisOpacity + opacityMultiplier, 0, 255);
+
+               if (highDepthModeMask==1)
+                  thisOpacity = clamp(thisOpacity * opacityDepth, 0, 255);
+
+               userColor.a = thisOpacity;
+               userColor.r = colorBitmap[2 + oz];
+               userColor.g = colorBitmap[1 + oz];
+               userColor.b = colorBitmap[oz];
+            } else
+            {
+               userColor = initialColor;
+               userColor.a = (highDepthModeMask==0) ? initialColor.a : char_to_float[clamp(initialColor.a * opacityDepth, 0, 255)];
+            }
+
+            if ((eraser==-1 || eraser==1) && bpp!=32)
+            {
+               userColor.r = clamp(userColor.r - userColor.a, 0, 255);
+               userColor.g = clamp(userColor.g - userColor.a, 0, 255);
+               userColor.b = clamp(userColor.g - userColor.a, 0, 255);
+            }
+
+            if (eraser==-1)
+            {
+               // replace pixels
+               if (bpp==32)
+                  BitmapData[3 + o] = userColor.a;
+               BitmapData[2 + o] = userColor.r;
+               BitmapData[1 + o] = userColor.g;
+               BitmapData[o]     = userColor.b;
+               continue;
+            } else if (eraser==1)
+            {
+               // alter opacity/alpha
+               if (bpp==32)
+               {
+                  BitmapData[3 + o] = userColor.a;
+               } else
+               {
+                  BitmapData[2 + o] = userColor.r;
+                  BitmapData[1 + o] = userColor.g;
+                  BitmapData[o]     = userColor.b;
+               }
+               continue;
+            } else // if (eraser==0)
+            {
+               oA = BitmapData[3 + o];
+            }
+
+            int oR = BitmapData[2 + o];
+            int oG = BitmapData[1 + o];
+            int oB = BitmapData[o];
+            RGBAColor Orgb = {userColor.b, userColor.g, userColor.r, userColor.a};
+            RGBAColor Brgb = {oB, oG, oR, oA};
+            RGBAColor newColor = NEWERcalculateBlendModes(Orgb, Brgb, blendMode, flipLayers, 0);
+            if (keepAlpha==1 && bpp==32 && fillBehind!=1)
+               BitmapData[3 + o] = oA;
+            else if (bpp==32)
+               BitmapData[3 + o] = newColor.a;
+
+            BitmapData[2 + o] = newColor.r;
+            BitmapData[1 + o] = newColor.g;
+            BitmapData[o]     = newColor.b;
+        }
+    }
+    return 1;
+}
+
+DLL_API int DLL_CALLCONV oldFillSelectArea(unsigned char *BitmapData, int w, int h, int Stride, int bpp, int color, int opacity, int eraser, int linearGamma, int blendMode, int flipLayers, unsigned char *maskBitmap, int mStride, unsigned char *colorBitmap, int gStride, int gBpp, int fillBehind, int opacityMultiplier, int keepAlpha, int nBmpW, int nBmpH) {
     // fnOutputDebug("FillSelectArea mStride=" + std::to_string(mStride));
     // fnOutputDebug("clipMaskFilter=zx=" + std::to_string(zx1) + "/" + std::to_string(zx2) + "=w=" + std::to_string(max(zx1, zx2) - min(zx1, zx2)));
     // fnOutputDebug("clipMaskFilter=zy=" + std::to_string(zy1) + "/" + std::to_string(zy2) + "=h=" + std::to_string(max(zy1, zy2) - min(zy1, zy2)));

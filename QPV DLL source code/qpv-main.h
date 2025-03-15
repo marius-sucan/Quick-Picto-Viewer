@@ -152,13 +152,7 @@ struct HSLColor {
   };
 
 struct RGBAColor {
-    int b;
-    int g;
-    int r;
-    int a;
-
-    // HSLColor ConvertRGBtoHSL(float iR, float iG, float iB, int isFloat) {
-
+    int b, g, r, a;
     HSLColor ConvertRGBtoHSL() {
        const double rf = char_to_float[r];
        const double gf = char_to_float[g];
