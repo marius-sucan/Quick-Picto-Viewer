@@ -217,7 +217,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , cmdExifTool := "", tabzDarkModus := 0, maxRecentOpenedFolders := 6, UIuserToneMapParamA := 210, UIuserToneMapParamB := 160
    , userImgChannelRlvl, userImgChannelGlvl, userImgChannelBlvl, userImgChannelAlvl, combosDarkModus := ""
    , sillySeparator :=  "▪", menuCustomNames := new hashtable(), clrGradientCoffX := 0, clrGradientCoffY := 0
-   , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*|Background clipper*"
+   , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*|Clip to alpha*|Replace*"
    , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := [], prevPasteInPlaceVPcoords := []
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
    , PDFpwdsCache := []
@@ -18319,9 +18319,10 @@ livePreviewHugeImageFillSelArea() {
       thisBehind := (FillAreaDoBehind=1 && bpp=32) ? 1 : 0
       thisBlendMode := FillAreaBlendMode - 1
       thisModesFlipped := BlendModesFlipped
+      thisCutGlass := FillAreaCutGlass
       If (thisBehind=1)
       {
-         eraser := thisBlendMode := 0
+         thisCutGlass := eraser := thisBlendMode := 0
          thisModesFlipped := 1
       }
 
@@ -18333,8 +18334,14 @@ livePreviewHugeImageFillSelArea() {
          Gdip_DeleteBrush(blackBrush)
       }
 
+      If (eraser=-1)
+      {
+         thisModesFlipped := eraser := thisCutGlass := 0
+         thisBlendMode := 24
+      }
+
       livePreviewPrepareSelectionArea(objSel, FillAreaInverted, 3)
-      r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", iScan, "Int", imgW, "Int", imgH, "int", Stride, "int", 32, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", thisBlendMode, "int", thisModesFlipped, "UPtr", 0, "int", 0, "UPtr", gScan, "int", gStride, "int", gBpp, "int", thisBehind, "int", 0, "int", FillAreaCutGlass, "int", imgW, "int", imgH)
+      r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", iScan, "Int", imgW, "Int", imgH, "int", Stride, "int", 32, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", thisBlendMode, "int", thisModesFlipped, "UPtr", gScan, "int", gStride, "int", gBpp, "int", 0, "int", thisCutGlass, "int", imgW, "int", imgH)
       ; ToolTip, % r "|" imgW "|" imgH , , , 2
       Gdip_UnlockBits(zBitmap, iData)
       If validBMP(gradientsBMP)
@@ -20675,7 +20682,7 @@ HugeImagesApplyInsertText() {
             shapeu := (TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1 && TextInAreaRoundBoxBgr=1) ? 3 : 0
             QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, shapeu, 0, 0, 0, 0, 0, 1)
             showTOOLtip("Applying insert text, please wait...`nFinalizing")
-            r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 0, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", TextInAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", pBits, "int", mStride, "int", mBpp, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", nImgW, "int", nImgH)
+            r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 0, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", TextInAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", pBits, "int", mStride, "int", mBpp, "int", 0, "int", BlendModesPreserveAlpha, "int", nImgW, "int", nImgH)
             FillAreaShape := orr
             ; fnOutputDebug(r "E: " obju.x1 "|" obju.y1 "|" obju.x2 - 1 "|" obju.y2 - 1 "|" obju.ImgSelW "|" obju.ImgSelH "|" obju.bImgSelW "|" obju.bImgSelH)
          } Else
@@ -20859,7 +20866,7 @@ HugeImagesDrawLineShapes() {
       thisColor := "0x" Format("{1:x}", DrawLineAreaOpacity) DrawLineAreaColor
       showTOOLtip("Drawing lines, please wait...`nStep: 3 / 3")
       If (rzb=1)
-         rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha)
+         rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha)
 
       DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
       r := (rzc=1) ? 1 : 0
@@ -21129,7 +21136,7 @@ HugeImagesDrawParametricLines() {
       startFill := A_TickCount
       thisColor := "0x" Format("{1:x}", DrawLineAreaOpacity) DrawLineAreaColor
       If (rzb=1 && abandonAll!=1)
-         rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha)
+         rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha)
 
       fnOutputDebug("Fill lines mask finished in: " SecToHHMMSS(Round((A_TickCount - startFill)/1000, 3)))
       DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
@@ -21556,8 +21563,14 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          thisModesFlipped := BlendModesFlipped
          If (doBehind=1)
          {
-            blending := eraser := 0
+            thisKeepAlpha := blending := eraser := 0
             thisModesFlipped := 1
+         }
+
+         If (eraser=-1)
+         {
+            thisModesFlipped := eraser := thisKeepAlpha := 0
+            blending := 24
          }
 
          ; ToolTip, % thisOpacity "|" transformTool "|" opacityExtra , , , 2
@@ -21571,7 +21584,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          showTOOLtip("Applying " modus "`nProcessing main bitmap, please wait", 1)
          recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, thisInvert, 0)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, shapeu, thisRotation, 0, thisInvert, "a", "a", 1)
-         r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", blending, "int", thisModesFlipped, "UPtr", mScan, "int", mStride, "UPtr", gScan, "int", gStride, "int", gBpp, "int", doBehind, "int", opacityExtra, "int", thisKeepAlpha, "int", nBmpW, "int", nBmpH)
+         r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", blending, "int", thisModesFlipped, "UPtr", gScan, "int", gStride, "int", gBpp, "int", opacityExtra, "int", thisKeepAlpha, "int", nBmpW, "int", nBmpH)
          If hFIFimgRealGradient
             FreeImage_UnLoad(hFIFimgRealGradient)
          If (hFIFimgExtern && r=1)
@@ -21609,10 +21622,10 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          If (bpp=32)
             currIMGdetails.HasAlpha := 1
 
-         thisOpacity := (EraseAreaFader=1) ? EraseAreaOpacity : 0
+         thisOpacity := (EraseAreaFader=1) ? EraseAreaOpacity : 255
          newColor := "0x" Format("{1:x}", thisOpacity) "010101"
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, EraseAreaInvert, "a", "a", 1)
-         r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", 255, "int", 1, "int", 0, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "UPtr", 0, "int", 0, "int", 24, "int", 0, "int", 0, "int", 0)
+         r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", 255, "int", 1, "int", 0, "int", 0, "int", 0, "UPtr", 0)
          If InStr(modus, "initially")
          {
             If r
@@ -49728,7 +49741,7 @@ PanelEraseSelectedArea() {
        ToggleEditImgSelection()
 
     RegAction(0, "EraseAreaFader",, 1)
-    RegAction(0, "EraseAreaOpacity",, 2, 4, 250)
+    RegAction(0, "EraseAreaOpacity",, 2, 4, 255)
     RegAction(0, "EraseAreaInvert",, 1)
     EraseAreaUseAlpha := decideAlphaMaskingFeaseable(EraseAreaUseAlpha)
     btnWid := 80
@@ -49748,7 +49761,7 @@ PanelEraseSelectedArea() {
     Gui, Add, Checkbox, x+10 wp hp Checked%EraseAreaFader% vEraseAreaFader gupdateUIerasePanel, &Fade selected area
 
     Gui, Add, Checkbox, xs y+10 wp hp Checked%EraseAreaUseAlpha% vEraseAreaUseAlpha gupdateUIerasePanel, Apply alpha mas&k
-    GuiAddSlider("EraseAreaOpacity", 0,250, 128, "Eraser opacity", "updateUIerasePanel", 1, "x+10 wp hp")
+    GuiAddSlider("EraseAreaOpacity", 0,255, 128, "Eraser opacity", "updateUIerasePanel", 1, "x+10 wp hp")
     If (viewportQPVimage.imgHandle)
     {
        GuiControl, Disable, EraseAreaUseAlpha
