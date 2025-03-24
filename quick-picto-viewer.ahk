@@ -14558,7 +14558,7 @@ QPV_FillBitmapHoles(pBitmap, newColor) {
   return r
 }
 
-QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:=0, gamma:=0, faderMode:=0) {
+QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:=0, gamma:=0, specialReplace:=0, opacity:=0) {
   initQPVmainDLL()
   If (!qpvMainDll || isWinXP=1)
   {
@@ -14576,10 +14576,13 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:
      Return 0
   }
 
+  If (specialReplace=1 && blendMode=24) ; replace mode 
+     blendMode := 100
+
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   E2 := trGdip_LockBits(pBitmap2Blend, 0, 0, w, h, stride, mScan, mData, 1)
   If (!E1 && !E2)
-     r := DllCall("qpvmain.dll\BlendBitmaps", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", blendMode, "int", flipLayers, "int", faderMode, "int", protectAlpha, "int", gamma)
+     r := DllCall("qpvmain.dll\BlendBitmaps", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", blendMode, "int", flipLayers, "int", protectAlpha, "int", gamma, "int", opacity)
 
   ; fnOutputDebug(A_ThisFunc "() " A_LastError " r=" r "=" func2exec "=" A_TickCount - thisStartZeit "|" blendMode "|" protectAlpha)
   If !E1
@@ -18651,10 +18654,7 @@ coreImageFillSelectedArea(whichBitmap:=0, ByRef hasAlpha:=0) {
    ; ToolTip, % imgSelW "=" imgSelH "`n" zImgSelW "=" zImgSelH "`n" qImgSelW "=" qImgSelH  , , , 2
    offX := offY := 0
    offW := imgSelW,   offH := imgSelH
-   thisBlendMode := (FillAreaBlendMode=1 && FillAreaCutGlass=1 && currIMGdetails.HasAlpha=1) ? 24 : FillAreaBlendMode
-   If (FillAreaRemBGR=1)
-      thisBlendMode := 25
-
+   thisBlendMode := (FillAreaRemBGR=1) ? 25 : FillAreaBlendMode
    thisObjBlurAmount := (thisBlendMode=25) ? 0 : abs(FillAreaBlurAmount)
    gradientsBMP := drawFillSelGradient(imgSelW, imgSelH, 0, offX, offY, offW, offH, userimgGammaCorrect)
    trGdip_GetImageDimensions(gradientsBMP, imgSelW, imgSelH)
@@ -22009,11 +22009,7 @@ DrawLinesInSelectedArea(modus) {
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     trGdip_GetImageDimensions(whichBitmap, rw, rh)
     compositingQuality := (userimgGammaCorrect=1) ? 2 : 1
-    If (DrawLineAreaBlendMode>1)
-       newBitmap := trGdip_CreateBitmap(A_ThisFunc, rw, rh)
-    Else
-       newBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
-
+    newBitmap := trGdip_CreateBitmap(A_ThisFunc, rw, rh)
     If validBMP(newBitmap)
        G2 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap, 7, 4,, compositingQuality)
 
@@ -22045,12 +22041,20 @@ DrawLinesInSelectedArea(modus) {
        rz := coreDrawLinesStuffTool("shapes", G2, newBitmap)
 
     Gdip_DeleteGraphics(G2)
-    If (DrawLineAreaBlendMode>1 && rz!=-1)
-       r := QPV_BlendBitmaps(newBitmap, whichBitmap, DrawLineAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect)
-
     If (rz!=-1)
-       wrapRecordUndoLevelNow(newBitmap)
-    Else
+    {
+       fBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+       rzx := QPV_BlendBitmaps(fBitmap, newBitmap, DrawLineAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1)
+       trGdip_DisposeImage(newBitmap)
+       newBitmap := fBitmap
+    }
+
+    If (rzx=1 && validBMP(fBitmap))
+    {
+       wrapRecordUndoLevelNow(fBitmap)
+       If (DrawLineAreaOpacity<255 && DrawLineAreaBlendMode=25)
+          currIMGdetails.HasAlpha := 1
+    } Else
        trGdip_DisposeImage(newBitmap)
 
     zeitOperation := A_TickCount - startZeit
@@ -22908,7 +22912,7 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
        tkx := (o_imgSelW>mainWidth) ? 0 : tk
        tky := (o_imgSelH>mainHeight) ? 0 : tk
        bx := by := 0
-       thisBlendMode := (BlendModesPreserveAlpha=1 && currIMGdetails.HasAlpha=1 && DrawLineAreaBlendMode=1) ? 24 : DrawLineAreaBlendMode
+       thisBlendMode := DrawLineAreaBlendMode
        If (thisBlendMode>1 && !testSelectOutsideImgEntirely(useGdiBitmap()))
        {
           previewMode := 2
@@ -22959,7 +22963,7 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
     {
        Gdip_DeleteGraphics(G2)
        Gdip_ResetClip(2NDglPG)
-       QPV_BlendBitmaps(bgrBMPu, xBitmap, thisBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped)
+       QPV_BlendBitmaps(bgrBMPu, xBitmap, thisBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1)
        If (currIMGdetails.HasAlpha=1)
           Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, o_imgSelPx - tkx + bx, o_imgSelPy - tky + by, dw, dh)
        trGdip_DrawImage(A_ThisFunc, 2NDglPG, bgrBMPu, o_imgSelPx - tkx + bx, o_imgSelPy - tky + by, dw, dh)
@@ -48902,8 +48906,6 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     GuiAddGeneralColorAdjustCtrls(txtWid, "updateUIfillPanel")
     If (viewportQPVimage.imgHandle)
        Gui, Add, Text, xs y+10 Section, These only apply with blending modes.
-    Else
-       Gui, Add, Text, xs y+10 Section, These only apply with blending modes and/or`nwhen texture fill mode is used.
 
     If !(viewportQPVimage.imgHandle)
     {
@@ -48934,6 +48936,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     GuiAddCloseOnApply("x+5 yp hp wp")
     GuiAddToggleLivePreview("x+5 yp hp wp gupdateUIfillPanel")
     Gui, Add, Button, x+5 w%thisW% hp Default gapplyIMGeditFunction vbtnLiveApplyTool, &Apply
+    Gui, Add, Button, x+5 hp wp gBTNresetFillArea, &Reset
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
 
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
@@ -53981,6 +53984,22 @@ BtnZoomBlurSelectedArea() {
    BtnCloseWindow()
    ToggleEditImgSelection("show-edit")
    zoomBlurSelectedArea()
+}
+
+BTNresetFillArea() {
+    Gui, SettingsGUIA: Default
+    FillAreaApplyColorFX := FillAreaInverted := FillAreaBlurAmount := FillAreaRemBGR := 0
+    FillAreaApplyColorFX := FillAreaBlendMode := FillAreaGlassy := alphaMaskingMode := 1
+    GuiControl, SettingsGUIA: Choose, FillAreaBlendMode, 1
+    GuiControl, SettingsGUIA: Choose, FillAreaGlassy, 1
+    If !(viewportQPVimage.imgHandle)
+       GuiControl, SettingsGUIA: Choose, alphaMaskingMode, 1
+    GuiControl, SettingsGUIA: , FillAreaInverted, 0
+    GuiControl, SettingsGUIA: , FillAreaRemBGR, 0
+    GuiControl, SettingsGUIA: , FillAreaApplyColorFX, 0
+    uiSlidersArray["FillAreaBlurAmount", 14] := -1
+    GuiRefreshSliders()
+    SetTimer, updateUIfillPanel, -100
 }
 
 updateUIfillPanel(actionu:=0) {

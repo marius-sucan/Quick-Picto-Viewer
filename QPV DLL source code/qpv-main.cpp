@@ -138,7 +138,7 @@ DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
     FPDF_InitLibraryWithConfig(&config);
 
     // source https://www.teamten.com/lawrence/graphics/gamma/
-    static const float GAMMA = 2.0;
+    static const float GAMMA = 2.1;
     int result;
     for (int i = 0; i < 32769; i++) {
         result = (int)(pow(i/32768.0, 1/GAMMA)*255.0 + 0.5);
@@ -2235,10 +2235,11 @@ RGBColorI calculateBlendModes(int rO, int gO, int bO, int rB, int gB, int bB, in
     return {clamp((int)round(rT*255), 0, 255), clamp((int)round(gT*255), 0, 255), clamp((int)round(bT*255), 0, 255)};
 }
 
-RGBAColor NEWERcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, const int blendMode, const int flipLayers, const int linearGamma, const int keepAlpha, const int bpp) {
+RGBAColor NEWERcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, const int blendMode, const int flipLayers, const int linearGamma, const int keepAlpha, const int bpp, const int opacity) {
     // TO-DO this function must supersede/replace calculateBlendModes() used by ColourBrush() and FloodFill()
     float rT, gT, bT;
-    int oA = (keepAlpha==1 && blendMode==0 && flipLayers==1 || blendMode==25) ? -1 : Brgb.a;
+    Orgb.a = clamp(Orgb.a - opacity, 0, 255);
+    int oA = (keepAlpha==1 && blendMode==0 && flipLayers==1 || blendMode==25 || blendMode==0) ? -1 : Brgb.a;
     if (blendMode==24)
     {
        // replace color
@@ -2466,7 +2467,7 @@ RGBAColor NEWERcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, const int ble
        bT = (sa * bT + da * (1.0f - sa) * bBf) / ra;
     }
 
-    static const float pff = 1.0f/2.0f;
+    static const float pff = 1.0f/2.1f;
     if (linearGamma==1)
     {
        rT = pow(rT, pff);
@@ -3608,7 +3609,7 @@ pBitmap and pBitmap2Blend must be the same width and height
 and in 32-ARGB or 24-RGB format.
 */
 
-DLL_API int DLL_CALLCONV BlendBitmaps(unsigned char* bgrImageData, unsigned char* otherData, int w, int h, int Stride, int bpp, int blendMode, int flipLayers, int faderMode, int keepAlpha, int linearGamma) {
+DLL_API int DLL_CALLCONV BlendBitmaps(unsigned char* bgrImageData, unsigned char* otherData, int w, int h, int Stride, int bpp, int blendMode, int flipLayers,int keepAlpha, int linearGamma, int opacity) {
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int x = 0; x < w; x++)
     {
@@ -3623,13 +3624,12 @@ DLL_API int DLL_CALLCONV BlendBitmaps(unsigned char* bgrImageData, unsigned char
                aO = otherData[3 + o];
             }
 
-            if (aO < 1 && aB < 1 || aB<2 && faderMode==2)
+            if (blendMode==100)
             {
-               if (faderMode==2)
+               if (aO>0 && bpp==32)
                {
-                  // in this mode; the bgrImageData is actually otherData
-                  if (bpp==32)
-                     bgrImageData[3 + o] = otherData[3 + o];
+                  // in this mode we replace pixels if alpha is bigger than 0 in otherData
+                  bgrImageData[3 + o] = otherData[3 + o];
                   bgrImageData[2 + o] = otherData[2 + o];
                   bgrImageData[1 + o] = otherData[1 + o];
                   bgrImageData[o] = otherData[o];
@@ -3639,10 +3639,7 @@ DLL_API int DLL_CALLCONV BlendBitmaps(unsigned char* bgrImageData, unsigned char
 
             RGBAColor Brgb = {bgrImageData[o], bgrImageData[o + 1], bgrImageData[o + 2], aB};
             RGBAColor Orgb = {otherData[o], otherData[o + 1], otherData[o + 2], aO};
-            if (faderMode==2)
-               swap(Brgb, Orgb);
-
-            RGBAColor newColor = NEWERcalculateBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, keepAlpha, bpp);
+            RGBAColor newColor = NEWERcalculateBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, keepAlpha, bpp, opacity);
             if (bpp==32)
                bgrImageData[3 + o] = newColor.a;
 
@@ -4195,7 +4192,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
             int oB = BitmapData[o];
             RGBAColor Orgb = {userColor.b, userColor.g, userColor.r, userColor.a};
             RGBAColor Brgb = {oB, oG, oR, oA};
-            RGBAColor newColor = NEWERcalculateBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, keepAlpha, bpp);
+            RGBAColor newColor = NEWERcalculateBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, keepAlpha, bpp, 0);
             if (bpp==32)
                BitmapData[3 + o] = newColor.a;
 
