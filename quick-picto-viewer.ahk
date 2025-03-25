@@ -17357,34 +17357,33 @@ InsertTextSelectedArea() {
     ; fnOutputDebug(A_ThisFunc "(): " tX "," tY "," wX "," hY "," tW "," tH)
     If (TextInAreaBlendMode>1 || alphaMaskingMode>1)
     {
-       If (TextInAreaBlendMode>1)
-          bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, tX, tY, tW, tH, 0, 0, 1)
-
+       bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, tX, tY, tW, tH, 0, 0, 1)
        newBitmap := trGdip_CreateBitmap(A_ThisFunc, tW, tH)
        Gr := Gdip_GraphicsFromImage(newBitmap)
-       If (userimgGammaCorrect=1)
-          Gdip_SetCompositingQuality(Gr, 2)
+       If (TextInAreaBlendMode=25)
+          Gdip_SetClipRect(Gr, imgSelPx - tX, imgSelPy - tY, zimgW, zimgH)
 
        r1 := trGdip_DrawImage(A_ThisFunc, Gr, textBoxu, imgSelPx - tX, imgSelPy - tY, zimgW, zimgH)
        Gdip_DeleteGraphics(Gr)
-       If (TextInAreaBlendMode>1)
-          zr := QPV_BlendBitmaps(bgrBMPu, newBitmap, TextInAreaBlendMode - 1, 0, BlendModesFlipped)
-
        If (alphaMaskingMode>1)
        {
-          thisIDu := "a" previewMode
-          fBitmap := (TextInAreaBlendMode>1) ? bgrBMPu : newBitmap
-          realtimePasteInPlaceAlphaMasker(0, fBitmap, thisIDu, maskedBitmap)
+          realtimePasteInPlaceAlphaMasker(0, newBitmap, "blah", maskedBitmap)
+          If validBMP(maskedBitmap)
+          {
+             trGdip_DisposeImage(newBitmap, 1)
+             newBitmap := maskedBitmap
+          }
        }
 
-       gBitmap := validBMP(maskedBitmap) ? maskedBitmap : bgrBMPu
-       r2 := trGdip_DrawImage(A_ThisFunc, G2, gBitmap, tX, tY)
+       zr := QPV_BlendBitmaps(bgrBMPu, newBitmap, TextInAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1)
+       trGdip_GetImageDimensions(bgrBMPu, oImgW, oImgH)
+       Gdip_SetClipRect(G2, tX, tY, oImgW, oImgH)
+       Gdip_GraphicsClear(G2)
+       r2 := trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, tX, tY)
        ; fnOutputDebug(A_ThisFunc "(): " r1 "=" r2 "=" zr)
        trGdip_DisposeImage(newBitmap, 1)
        trGdip_DisposeImage(bgrBMPu, 1)
-       trGdip_DisposeImage(maskedBitmap, 1)
-    } Else
-    {
+    } Else {
        r1 := trGdip_DrawImage(A_ThisFunc, G2, textBoxu, imgSelPx, imgSelPy, zimgW, zimgH)
     }
 
@@ -17395,6 +17394,9 @@ InsertTextSelectedArea() {
     zeitOperation := A_TickCount - startOperation
     If (r1!="fail" && validBMP(metaBitmap))
     {
+       If (TextInAreaBlendMode=25)
+          currIMGdetails.hasAlpha := 1
+
        wrapRecordUndoLevelNow(metaBitmap)
     } Else
     {
@@ -17533,10 +17535,9 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
     objSel.sw := tW,   objSel.sh := tH
     objSel.sx := tX,   objSel.sy := tY
     recordPrevAlphaMaskCoords(tX, tY, zImgW, zImgH)
-    thisBlendMode := (BlendModesPreserveAlpha=1 && currIMGdetails.HasAlpha=1 && TextInAreaBlendMode=1) ? 24 : TextInAreaBlendMode
-    If (userimgGammaCorrect=1 || thisBlendMode>1 || alphaMaskingMode>1)
+    If (userimgGammaCorrect=1 || TextInAreaBlendMode>0 || alphaMaskingMode>1)
     {
-       If (thisBlendMode>1 || alphaMaskingMode>1)
+       If (TextInAreaBlendMode>0 || alphaMaskingMode>1)
        {
           otx := tX, oty := tY
           otw := tW, oth := tH
@@ -17547,36 +17548,23 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
           objSel.dx := tX,   objSel.dy := tY
        }
 
-       bgrBMPu := getImgSelectedAreaEditMode(1, tX, tY, tW, tH, tW, tH, 0, tW, tH)
+       bgrBMPu := getImgOriginalSelectedAreaEdit(2, tX, tY, tW, tH, mainWidth, mainHeight, 1)
+       ; bgrBMPu := getImgSelectedAreaEditMode(1, tX, tY, tW, tH, tW, tH, 0, tW, tH)
        ; ToolTip, % tw "|" tH , , , 2
     }
 
     objSel.invertArea := 0
     objSel.nw := tW,   objSel.nh := tH
-    If (validBMP(bgrBMPu) && userimgGammaCorrect=1)
-    {
-       trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, tX, tY, tW, tH)
-       Gdip_SetCompositingQuality(G2, 2)
-    }
-
     bgrColor := makeRGBAcolor(TextInAreaBgrColor, TextInAreaBgrOpacity)
     zBrush := Gdip_BrushCreateSolid(bgrColor)
-    If (thisBlendMode>1 || alphaMaskingMode>1)
+    If validBMP(bgrBMPu)
     {
        newBitmap := trGdip_CreateBitmap(A_ThisFunc, tW, tH)
        Gr := Gdip_GraphicsFromImage(newBitmap)
-       If (thisBlendMode=1)
-          r1 := trGdip_DrawImage(A_ThisFunc, Gr, bgrBMPu)
-
-       If (userimgGammaCorrect=1)
-          Gdip_SetCompositingQuality(Gr, 2)
-
        r1 := trGdip_DrawImage(A_ThisFunc, Gr, textBoxu, imgSelPx - tX, imgSelPy - tY, zimgW, zimgH, 0, 0, nimgW, nimgH)
        Gdip_DeleteGraphics(Gr)
-       If (thisBlendMode>1)
-          zr := QPV_BlendBitmaps(bgrBMPu, newBitmap, thisBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped)
-
-       fBitmap := (thisBlendMode>1) ? bgrBMPu : newBitmap
+       zr := QPV_BlendBitmaps(bgrBMPu, newBitmap, TextInAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1)
+       fBitmap := bgrBMPu
        If (alphaMaskingMode>1 && brushingMode=1 && validBMP(fBitmap))
        {
           trGdip_GetImageDimensions(userAlphaMaskBmpPainted, zImgW, zImgH)
@@ -17602,15 +17590,14 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
        gBitmap := validBMP(maskedBitmap) ? maskedBitmap : bgrBMPu
        If (alphaMaskingMode>1 && brushingMode=1)
           gBitmap := fBitmap
-       r2 := trGdip_DrawImage(A_ThisFunc, G2, gBitmap, tX, tY)
+
        trGdip_GetImageDimensions(gBitmap, oImgW, oImgH)
+       Gdip_FillRectangle(G2, GDIPbrushHatch, tX, tY, oImgW, oImgH)
+       r2 := trGdip_DrawImage(A_ThisFunc, G2, gBitmap, tX, tY)
        ; ToolTip, % tw "|" th "||" oImgW "|" oImgH , , , 2
        trGdip_DisposeImage(newBitmap, 1)
        If (gBitmap=maskedBitmap && brushingMode=0 && alphaMaskingMode>1)
           trGdip_DisposeImage(maskedBitmap, 1)
-    } Else
-    {
-       r1 := trGdip_DrawImage(A_ThisFunc, G2, textBoxu, imgSelPx, imgSelPy, zimgW, zimgH, 0, 0, nimgW, nimgH)
     }
 
     trGdip_DisposeImage(textBoxu, 1)
@@ -22776,7 +22763,8 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
        trGdip_RotatePathAtCenter(zPath, VPselRotation, 1, 1, rotateSelBoundsKeepRatio, 1)
        Gdip_SetClipPath(G2, zPath)
        Gdip_DeletePath(zPath)
-    }
+    } Else
+       Gdip_ResetClip(G2)
 
     thisPen := createDrawLinesPen(thisThick, 0)
     If (DrawLineAreaBorderCenter=4)
@@ -22908,9 +22896,9 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
           dw := 3
        If (dh<3)
           dh := 3
-
        tkx := (o_imgSelW>mainWidth) ? 0 : tk
        tky := (o_imgSelH>mainHeight) ? 0 : tk
+       ; ToolTip, % "y=" imgSelPy " | ty=" tky " | h=" dh , , , 2
        bx := by := 0
        thisBlendMode := DrawLineAreaBlendMode
        If (thisBlendMode>1 && !testSelectOutsideImgEntirely(useGdiBitmap()))
@@ -22963,7 +22951,7 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
     {
        Gdip_DeleteGraphics(G2)
        Gdip_ResetClip(2NDglPG)
-       QPV_BlendBitmaps(bgrBMPu, xBitmap, thisBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1)
+       QPV_BlendBitmaps(bgrBMPu, xBitmap, thisBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 0)
        If (currIMGdetails.HasAlpha=1)
           Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, o_imgSelPx - tkx + bx, o_imgSelPy - tky + by, dw, dh)
        trGdip_DrawImage(A_ThisFunc, 2NDglPG, bgrBMPu, o_imgSelPx - tkx + bx, o_imgSelPy - tky + by, dw, dh)
@@ -22980,6 +22968,7 @@ coreDrawShapesLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgSelW,
     allowCavity := (DrawLineAreaContourAlign<=2) ? 1 : 0
     pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, 2, allowCavity)
     modus := (DrawLineAreaContourAlign=1) ? 0 : 4
+    Gdip_ResetClip(G2)
     If (DrawLineAreaContourAlign!=2)
     {
        If (FillAreaShape=3 && FillAreaEllipsePie=1 && FillAreaEllipseSection<1440)
@@ -22995,13 +22984,8 @@ coreDrawShapesLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgSelW,
     If (previewMode>0)
     {
        vpWinClientSize(mainWidth, mainHeight)
-       Gdip_SetClipRect(G2, 0, 0, mainWidth, mainHeight, 1)
-       tk := Round(thisThick * (DrawLineAreaMitersBorder / 100))
-       If (viewportQPVimage.imgHandle)
-       {
-          ; ToolTip, % "k=" tk , , , 2
-          Gdip_SetClipRect(G2, imgSelPx - tk//1.6, imgSelPy - tk//1.6, imgSelW + tk*1.255, imgSelH + tk*1.255, 1)
-       }
+       tk := Round(thisThick * (DrawLineAreaMitersBorder / 50))
+       Gdip_SetClipRect(G2, imgSelPx - tk//1.6, imgSelPy - tk//1.6, imgSelW + tk*1.255, imgSelH + tk*1.255, 1)
     }
 
     Gdip_DrawPath(G2, thisPen, pPath)
@@ -49323,7 +49307,7 @@ ReadSettingsDrawLinesArea(act:=0) {
     RegAction(act, "DrawLineAreaDoubles",, 1)
     RegAction(act, "DrawLineAreaContourAlign",, 2, 1, 3)
     RegAction(act, "DrawLineAreaDashStyle",, 2, 1, 4)
-    RegAction(act, "DrawLineAreaBlendMode",, 2, 1, 24)
+    RegAction(act, "DrawLineAreaBlendMode",, 2, 1, 26)
     RegAction(act, "DrawLineAreaContourThickness",, 2, 1, 700)
     RegAction(act, "DrawLineAreaBorderTop",, 1)
     RegAction(act, "DrawLineAreaBorderBottom",, 1)
@@ -54996,7 +54980,7 @@ ReadSettingsTextInArea(act:=0) {
     RegAction(act, "TextInAreaFlipV",, 1)
     RegAction(act, "TextInAreaAlign",, 2, 1, 3)
     RegAction(act, "TextInAreaCharSpacing",, 2, -100, 255)
-    RegAction(act, "TextInAreaBlendMode",, 2, 1, 23)
+    RegAction(act, "TextInAreaBlendMode",, 2, 1, 26)
     RegAction(act, "TextInAreaValign",, 2, 1, 3)
     RegAction(act, "TextInAreaBlurAmount",, 2, 1, 255)
     RegAction(act, "TextInAreaBlurBorderAmount",, 2, 1, 255)
