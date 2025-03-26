@@ -2240,19 +2240,21 @@ RGBAColor NEWERcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, const int ble
     float rT, gT, bT;
     Orgb.a = clamp(Orgb.a - opacity, 0, 255);
     int oA = (keepAlpha==1 && blendMode==0 && flipLayers==1 || blendMode==25 || blendMode==0) ? -1 : Brgb.a;
-    if (blendMode==24)
+    if (blendMode==100 || blendMode==24)
     {
-       // replace color
-       if (bpp!=32)
+       // replace color, conditional if blendMode=100
+       int opa = (blendMode==24 || (Orgb.a>0 && bpp==32) || (Orgb.r==0 && Orgb.g==0 && Orgb.b==0 && bpp!=32) ) ? 1 : 0;
+       if (bpp!=32 && opa==1)
        {
-          Orgb.r = clamp(Orgb.r - Orgb.a, 0, 255);
-          Orgb.g = clamp(Orgb.g - Orgb.a, 0, 255);
-          Orgb.b = clamp(Orgb.g - Orgb.a, 0, 255);
+          Orgb.r = clamp(Orgb.r - (255 - Orgb.a), 0, 255);
+          Orgb.g = clamp(Orgb.g - (255 - Orgb.a), 0, 255);
+          Orgb.b = clamp(Orgb.g - (255 - Orgb.a), 0, 255);
        }
 
        if (keepAlpha==1)
           Orgb.a = clamp(Brgb.a - (255 - Orgb.a), 0, 255);
-       return Orgb;
+
+       return (opa==1) ? Orgb : Brgb;
     } else if (blendMode==23)
     {
        // clip top to alpha channel of the bottom
@@ -2278,7 +2280,11 @@ RGBAColor NEWERcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, const int ble
 
     // if top is transparent, return bottom
     if (Orgb.a == 0)
+    {
+       if (keepAlpha==1 && flipLayers==1 && oA!=-1 && inRange(1, 22, blendMode))
+          Brgb.a = oA;
        return Brgb;
+    }
 
     // if bottom is transparent, return top
     // or when top is fully opaque, no need for complex blending
@@ -2751,7 +2757,30 @@ RGBAColor blendRGBAcolors(const RGBAColor &c1, const RGBAColor &c2) {
     return {outB, outG, outR, outA};
 }
 
-RGBAColor mixColorsFloodFill(RGBAColor colorB, RGBAColor colorA, float f, int dynamicOpacity, int blendMode, float prevCLRindex, float tolerance, int alternateMode, float thisCLRindex, int linearGamma, int flipLayers) {
+RGBAColor mixColorsFloodFill(RGBAColor colorB, RGBAColor colorA, float fillOpacity, int dynamicOpacity, int blendMode, float prevCLRindex, float tolerance, int alternateMode, float thisCLRindex, int linearGamma, int flipLayers) {
+  float fz;
+
+  int opacity = 0;
+  if (dynamicOpacity==1)
+  {
+     // int thisCLRindex = float(rB*0.299 + gB*0.587 + bB*0.115);
+     // float thisCLRindex = RGBtoGray(rB, gB, bB, alternateMode);
+     if (alternateMode==3)
+     {
+        fz = clamp ( (float)thisCLRindex/tolerance, 0.0f, 1.0f);
+     } else 
+     {
+        float diffu = max(thisCLRindex, prevCLRindex) - min(thisCLRindex, prevCLRindex);
+        fz = clamp( (float)diffu/tolerance, 0.0f, 1.0f);
+     }
+     float f = 1.0f - clamp(fillOpacity - fz, 0.0f, 1.0f);
+     opacity = (unsigned char)(f * 255.0f + 0.5f);
+  }
+
+  return NEWERcalculateBlendModes(colorA, colorB, blendMode, flipLayers, linearGamma, 1, 32, opacity);
+}
+
+RGBAColor OLDmixColorsFloodFill(RGBAColor colorB, RGBAColor colorA, float f, int dynamicOpacity, int blendMode, float prevCLRindex, float tolerance, int alternateMode, float thisCLRindex, int linearGamma, int flipLayers) {
 // source https://stackoverflow.com/questions/10139833/adding-colours-colors-together-like-paint-blue-yellow-green-etc
 // http://www.easyrgb.com/en/math.php
  
@@ -3008,7 +3037,7 @@ int wrapRGBtoGray(int color, int mode) {
 
 void goPixelFloodFill8Stack(unsigned char *imageData, INT64 pix, float index, RGBAColor newColor, RGBAColor oldColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int linearGamma, int flipLayers, int bpp) {
   RGBAColor thisColor = {0, 0, 0, 0};
-  if (tolerance>0 && (opacity<1 || dynamicOpacity==1 || blendMode>0 || cartoonMode==1))
+  if (tolerance>0 && (opacity<1 || dynamicOpacity==1 || blendMode>=0 || cartoonMode==1))
   {
      int tcA = (bpp==32) ? imageData[pix + 3] : 255;
      RGBAColor prevColor = {imageData[pix], imageData[pix + 1], imageData[pix + 2], tcA};
@@ -3253,7 +3282,7 @@ int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBA
 
             if (decideColorsEqual(clr, prevColor, tolerance, prevCLRindex, alternateMode, labClr, index))
             {
-               if (tolerance>0 && (opacity<1 || dynamicOpacity==1 || blendMode>0 || cartoonMode==1))
+               if (tolerance>0 && (opacity<1 || dynamicOpacity==1 || blendMode>00 || cartoonMode==1))
                {
                   RGBAColor prevColor = clr;
                   if (cartoonMode==1)
@@ -3311,7 +3340,7 @@ DLL_API int DLL_CALLCONV FloodFillWrapper(unsigned char *imageData, int modus, i
     // float CIE = CIEdeltaE2000(LabA[0], LabA[1], LabA[2], LabB[0], LabB[1], LabB[2], 1, 1, 1);
     // float CIE2 = testCIEdeltaE2000(LabA[0], LabA[1], LabA[2], LabB[0], LabB[1], LabB[2], 1, 1, 1);
     float opacity = char_to_float[fillOpacity];
-    if (tolerance==0 && (opacity<1 || blendMode>0))
+    if (tolerance==0 && (opacity<1 || blendMode>=0))
        newColorI = mixColorsFloodFill(prevColor, newColorI, opacity, 0, blendMode, 0, 0, 0, 0, linearGamma, flipLayers);
 
     int r;
@@ -3622,19 +3651,6 @@ DLL_API int DLL_CALLCONV BlendBitmaps(unsigned char* bgrImageData, unsigned char
             {
                aB = bgrImageData[3 + o];
                aO = otherData[3 + o];
-            }
-
-            if (blendMode==100)
-            {
-               if (aO>0 && bpp==32)
-               {
-                  // in this mode we replace pixels if alpha is bigger than 0 in otherData
-                  bgrImageData[3 + o] = otherData[3 + o];
-                  bgrImageData[2 + o] = otherData[2 + o];
-                  bgrImageData[1 + o] = otherData[1 + o];
-                  bgrImageData[o] = otherData[o];
-               }
-               continue;
             }
 
             RGBAColor Brgb = {bgrImageData[o], bgrImageData[o + 1], bgrImageData[o + 2], aB};

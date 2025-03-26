@@ -13887,7 +13887,7 @@ QPV_SetColorAlphaChannel(pBitmap, newColor, invertAlphaMask) {
   return r
 }
 
-QPV_FloodFill(pBitmap, x, y, newColor, fillOpacity) {
+QPV_FloodFill(pBitmap, x, y, newColor, fillOpacity, blendMode, cartoonMode) {
   ; thisStartZeit := A_TickCount
   initQPVmainDLL()
   If !qpvMainDll
@@ -13903,14 +13903,12 @@ QPV_FloodFill(pBitmap, x, y, newColor, fillOpacity) {
 
   Gdip_FromARGB(newColor, A, R, G, B)
   newColor := Gdip_ToARGB(A, R, G, B)
-  If (FloodFillTolerance<3)
-     FloodFillCartoonMode := 0
 
   ; oldColor := Gdip_GetPixel(pBitmap, x, y)
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, Stride, iScan, iData, 3)
   tolerance := (FloodFillAltToler=1) ? Ceil(FloodFillTolerance*0.7) + 1 : FloodFillTolerance
   If !E1
-     r := DllCall("qpvmain.dll\FloodFillWrapper", "UPtr", iScan, "Int", FloodFillModus, "Int", w, "Int", h, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", fillOpacity, "int", FloodFillDynamicOpacity, "int", FloodFillBlendMode - 1, "int", FloodFillCartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays, "int", userimgGammaCorrect, "int", BlendModesFlipped, "int", Stride, "int", 32, "int", 0, "int", 0)
+     r := DllCall("qpvmain.dll\FloodFillWrapper", "UPtr", iScan, "Int", FloodFillModus, "Int", w, "Int", h, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", fillOpacity, "int", FloodFillDynamicOpacity, "int", blendMode, "int", cartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays, "int", userimgGammaCorrect, "int", BlendModesFlipped, "int", Stride, "int", 32, "int", 0, "int", 0)
   ; ToolTip, % A_PtrSize "=" A_LastError "==" r "=" func2exec "=" SecToHHMMSS(Round(zeitOperation/1000, 3)) , , , 2
 
   If !E1
@@ -17367,7 +17365,7 @@ InsertTextSelectedArea() {
        Gdip_DeleteGraphics(Gr)
        If (alphaMaskingMode>1)
        {
-          realtimePasteInPlaceAlphaMasker(0, newBitmap, "blah", maskedBitmap)
+          realtimePasteInPlaceAlphaMasker(0, newBitmap, "blah" A_TickCount, maskedBitmap)
           If validBMP(maskedBitmap)
           {
              trGdip_DisposeImage(newBitmap, 1)
@@ -17548,8 +17546,10 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
           objSel.dx := tX,   objSel.dy := tY
        }
 
-       bgrBMPu := getImgOriginalSelectedAreaEdit(2, tX, tY, tW, tH, mainWidth, mainHeight, 1)
-       ; bgrBMPu := getImgSelectedAreaEditMode(1, tX, tY, tW, tH, tW, tH, 0, tW, tH)
+       If (viewportQPVimage.imgHandle)
+          bgrBMPu := getImgSelectedAreaEditMode(1, tX, tY, tW, tH, tW, tH, 0, tW, tH)
+       Else
+          bgrBMPu := getImgOriginalSelectedAreaEdit(2, tX, tY, tW, tH, mainWidth, mainHeight, 1)
        ; ToolTip, % tw "|" tH , , , 2
     }
 
@@ -17563,9 +17563,7 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
        Gr := Gdip_GraphicsFromImage(newBitmap)
        r1 := trGdip_DrawImage(A_ThisFunc, Gr, textBoxu, imgSelPx - tX, imgSelPy - tY, zimgW, zimgH, 0, 0, nimgW, nimgH)
        Gdip_DeleteGraphics(Gr)
-       zr := QPV_BlendBitmaps(bgrBMPu, newBitmap, TextInAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1)
-       fBitmap := bgrBMPu
-       If (alphaMaskingMode>1 && brushingMode=1 && validBMP(fBitmap))
+       If (alphaMaskingMode>1 && brushingMode=1 && validBMP(bgrBMPu))
        {
           trGdip_GetImageDimensions(userAlphaMaskBmpPainted, zImgW, zImgH)
           viewportDynamicOBJcoords.x := objSel.sx,  viewportDynamicOBJcoords.y := objSel.sy
@@ -17573,7 +17571,7 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
           viewportDynamicOBJcoords.zl := (objSel.sw/zImgW + objSel.sh/zImgH)/2 + 0.0001
           wBitmap := getRectFromBitmap(userAlphaMaskBmpPainted, objSel, 1)
           alphaMaskGray := validBMP(wBitmap) ? wBitmap : userAlphaMaskBmpPainted
-          QPV_SetBitmapAsAlphaChannel(fBitmap, alphaMaskGray, alphaMaskColorReversed, alphaMaskReplaceMode, alphaMaskBMPchannel)
+          QPV_SetBitmapAsAlphaChannel(newBitmap, alphaMaskGray, alphaMaskColorReversed, alphaMaskReplaceMode, alphaMaskBMPchannel)
           If validBMP(wBitmap)
              trGdip_DisposeImage(wBitmap, 1)
        } Else If (alphaMaskingMode>1)
@@ -17583,21 +17581,21 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
           ; objSel.forceRect := (VPselRotation>0) ? 1 : 0
           ppk := "a" imgSelX1 imgSelY1
           thisIDu := "a" previewMode VPselRotation zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY getVPselIDs("saiz-vpos") FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY TextInAreaFlipV TextInAreaFlipV TextInAreaAlign TextInAreaCharSpacing thisBlendMode TextInAreaValign TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName
-          thisIDu .= "b" TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr TextInAreaAutoWrap TextInAreaCaseTransform userimgGammaCorrect undoLevelsRecorded currentUndoLevel useGdiBitmap() getAlphaMaskIDu() ppk
-          realtimePasteInPlaceAlphaMasker(previewMode, fBitmap, thisIDu, maskedBitmap, objSel)
+          thisIDu .= "b" TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr TextInAreaAutoWrap TextInAreaCaseTransform userimgGammaCorrect undoLevelsRecorded currentUndoLevel useGdiBitmap() getAlphaMaskIDu() ppk TextInAreaBlendMode BlendModesFlipped BlendModesPreserveAlpha
+          realtimePasteInPlaceAlphaMasker(previewMode, newBitmap, thisIDu, maskedBitmap, objSel)
+       }
+       If (alphaMaskingMode>1 && validBMP(maskedBitmap))
+       {
+          trGdip_DisposeImage(newBitmap, 1)
+          newBitmap := maskedBitmap
        }
 
-       gBitmap := validBMP(maskedBitmap) ? maskedBitmap : bgrBMPu
-       If (alphaMaskingMode>1 && brushingMode=1)
-          gBitmap := fBitmap
-
-       trGdip_GetImageDimensions(gBitmap, oImgW, oImgH)
+       zr := QPV_BlendBitmaps(bgrBMPu, newBitmap, TextInAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1)
+       trGdip_GetImageDimensions(bgrBMPu, oImgW, oImgH)
        Gdip_FillRectangle(G2, GDIPbrushHatch, tX, tY, oImgW, oImgH)
-       r2 := trGdip_DrawImage(A_ThisFunc, G2, gBitmap, tX, tY)
-       ; ToolTip, % tw "|" th "||" oImgW "|" oImgH , , , 2
+       r2 := trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, tX, tY)
        trGdip_DisposeImage(newBitmap, 1)
-       If (gBitmap=maskedBitmap && brushingMode=0 && alphaMaskingMode>1)
-          trGdip_DisposeImage(maskedBitmap, 1)
+       ; ToolTip, % tw "|" th "||" oImgW "|" oImgH , , , 2
     }
 
     trGdip_DisposeImage(textBoxu, 1)
@@ -20667,8 +20665,9 @@ HugeImagesApplyInsertText() {
             VPselRotation := innerSelectionCavityX := innerSelectionCavityY := 0
             shapeu := (TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1 && TextInAreaRoundBoxBgr=1) ? 3 : 0
             QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, shapeu, 0, 0, 0, 0, 0, 1)
-            showTOOLtip("Applying insert text, please wait...`nFinalizing")
-            r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 0, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", TextInAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", pBits, "int", mStride, "int", mBpp, "int", 0, "int", BlendModesPreserveAlpha, "int", nImgW, "int", nImgH)
+            blendMode := (TextInAreaBlendMode=25) ? 100 : TextInAreaBlendMode - 1
+            showTOOLtip("Applying insert text, please wait...`nFinalizing momentarily")
+            r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 0, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", blendMode, "int", BlendModesFlipped, "UPtr", pBits, "int", mStride, "int", mBpp, "int", 0, "int", BlendModesPreserveAlpha, "int", nImgW, "int", nImgH)
             FillAreaShape := orr
             ; fnOutputDebug(r "E: " obju.x1 "|" obju.y1 "|" obju.x2 - 1 "|" obju.y2 - 1 "|" obju.ImgSelW "|" obju.ImgSelH "|" obju.bImgSelW "|" obju.bImgSelH)
          } Else
@@ -22951,7 +22950,7 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
     {
        Gdip_DeleteGraphics(G2)
        Gdip_ResetClip(2NDglPG)
-       QPV_BlendBitmaps(bgrBMPu, xBitmap, thisBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 0)
+       QPV_BlendBitmaps(bgrBMPu, xBitmap, thisBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1)
        If (currIMGdetails.HasAlpha=1)
           Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, o_imgSelPx - tkx + bx, o_imgSelPy - tky + by, dw, dh)
        trGdip_DrawImage(A_ThisFunc, 2NDglPG, bgrBMPu, o_imgSelPx - tkx + bx, o_imgSelPy - tky + by, dw, dh)
@@ -48784,8 +48783,14 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     Else If (EllipseSelectMode=2)
        FillAreaShape := 7
 
-    If (dummy="tlbr" && isInRange(which, 1, 7))
+    If (dummy="tlbr" && isInRange(which, 1, 7)) {
        FillAreaShape := which
+    } Else If (dummy="behind")
+    {
+       FillAreaRemBGR := 0
+       FillAreaBlendMode := 26
+       FillAreaInverted := FillBehindInvert
+    }
 
     customShapePoints := convertShapePointsStrToArray(FillAreaCustomShape)
     btnWid := 100, btnHeight := 25
@@ -49827,12 +49832,16 @@ PanelFillBehindBgrImage() {
     GuiAddCloseOnApply("x+5 yp hp wp")
     GuiAddToggleLivePreview("x+5 yp hp wp gupdateUIfillBehindPanel")
     Gui, Add, Button, x+5 w%btnWid% hp Default gapplyIMGeditFunction vbtnLiveApplyTool, &Apply
-    ; Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% gapplyIMGeditFunction, &Apply
-    Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
+    Gui, Add, Button, x+5 hp wp+20 gBtnOpenFillAreaBehind, A&dvanced
+    Gui, Add, Button, x+5 hp wp-30 gBtnCloseWindow, &Cancel
     GuiRefreshSliders()
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Fill behind image: " appTitle, winPos)
     SetTimer, updateUIfillBehindPanel, -150
+}
+
+BtnOpenFillAreaBehind() {
+   PanelFillSelectedArea("behind")
 }
 
 updateUIfillBehindPanel(actionu:="", b:=0) {
@@ -75217,6 +75226,7 @@ ActFloodFillNow() {
 
    If !(viewportQPVimage.imgHandle)
       mergeViewPortEffectsImgEditing(A_ThisFunc)
+
    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
    trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
    If (!imgW || !imgH || !validBMP(whichBitmap))
@@ -75288,8 +75298,10 @@ ActFloodFillNow() {
    If (undoLevelsRecorded<2 && preventUndoLevels!=1)
       recordUndoLevelNow("init", 0)
 
+   cartoonMode := (FloodFillTolerance<3) ? 0 : FloodFillCartoonMode
+   blendMode := (FloodFillBlendMode>23) ? 1 : FloodFillBlendMode
    ; newColor := (BrushToolUseSecondaryColor=1) ? BrushToolBcolor : BrushToolAcolor 
-   r := QPV_FloodFill(thisBMP, kX, kY, "0x" Format("{:X}", FloodFillClrOpacity) FloodFillColor, FloodFillOpacity)
+   r := QPV_FloodFill(thisBMP, kX, kY, "0x" Format("{:X}", FloodFillClrOpacity) FloodFillColor, FloodFillOpacity, blendMode - 1, cartoonMode)
    If (r>0 && (pPath!="" && G2!="" && allowSelectionCrop=1 && hasCloned=1) || (validBMP(thisBMP) && allowAlphaMasking=1))
    {
       If (allowAlphaMasking=1)
