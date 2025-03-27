@@ -2758,15 +2758,11 @@ RGBAColor blendRGBAcolors(const RGBAColor &c1, const RGBAColor &c2) {
 }
 
 RGBAColor mixColorsFloodFill(RGBAColor colorB, RGBAColor colorA, float fillOpacity, int dynamicOpacity, int blendMode, float prevCLRindex, float tolerance, int alternateMode, float thisCLRindex, int linearGamma, int flipLayers) {
-  float fz;
-
   int opacity = 0;
   if (dynamicOpacity==1)
   {
-     // int thisCLRindex = float(rB*0.299 + gB*0.587 + bB*0.115);
-     // float thisCLRindex = RGBtoGray(rB, gB, bB, alternateMode);
-     if (alternateMode==3)
-     {
+     float fz;
+     if (alternateMode==3) {
         fz = clamp ( (float)thisCLRindex/tolerance, 0.0f, 1.0f);
      } else 
      {
@@ -2775,85 +2771,10 @@ RGBAColor mixColorsFloodFill(RGBAColor colorB, RGBAColor colorA, float fillOpaci
      }
      float f = 1.0f - clamp(fillOpacity - fz, 0.0f, 1.0f);
      opacity = (unsigned char)(f * 255.0f + 0.5f);
-  }
-
-  return NEWERcalculateBlendModes(colorA, colorB, blendMode, flipLayers, linearGamma, 1, 32, opacity);
-}
-
-RGBAColor OLDmixColorsFloodFill(RGBAColor colorB, RGBAColor colorA, float f, int dynamicOpacity, int blendMode, float prevCLRindex, float tolerance, int alternateMode, float thisCLRindex, int linearGamma, int flipLayers) {
-// source https://stackoverflow.com/questions/10139833/adding-colours-colors-together-like-paint-blue-yellow-green-etc
-// http://www.easyrgb.com/en/math.php
- 
-  int aB = colorB.a;
-  int rB = colorB.r;
-  int gB = colorB.g;
-  int bB = colorB.b;
-
-  int aO = colorA.a;
-  int rO = colorA.r;
-  int gO = colorA.g;
-  int bO = colorA.b;
-
-  int aBf, rBf, gBf, bBf, aOf, rOf, gOf, bOf;
-  aBf = (linearGamma==1) ? gamma_to_linear[aB] : aB;
-  rBf = (linearGamma==1) ? gamma_to_linear[rB] : rB;
-  gBf = (linearGamma==1) ? gamma_to_linear[gB] : gB;
-  bBf = (linearGamma==1) ? gamma_to_linear[bB] : bB;
-  aOf = (linearGamma==1) ? gamma_to_linear[aO] : aO;
-
-  float fz;
-  if (dynamicOpacity==1)
-  {
-     // int thisCLRindex = float(rB*0.299 + gB*0.587 + bB*0.115);
-     // float thisCLRindex = RGBtoGray(rB, gB, bB, alternateMode);
-     if (alternateMode==3)
-     {
-        fz = clamp ( (float)thisCLRindex/tolerance, 0.0f, 1.0f);
-     } else 
-     {
-        float diffu = max(thisCLRindex, prevCLRindex) - min(thisCLRindex, prevCLRindex);
-        fz = clamp( (float)diffu/tolerance, 0.0f, 1.0f);
-     }
-     f = clamp(f - fz, 0.0f, 1.0f);
-  }
-
-  if (blendMode>0)
-  {
-     RGBColorI blended = NEWcalculateBlendModes(colorA, colorB, blendMode, flipLayers, linearGamma);
-     rOf = (linearGamma==1) ? gamma_to_linear[blended.r] : blended.r;
-     gOf = (linearGamma==1) ? gamma_to_linear[blended.g] : blended.g;
-     bOf = (linearGamma==1) ? gamma_to_linear[blended.b] : blended.b;
   } else
-  {
-     rOf = (linearGamma==1) ? gamma_to_linear[rO] : rO;
-     gOf = (linearGamma==1) ? gamma_to_linear[gO] : gO;
-     bOf = (linearGamma==1) ? gamma_to_linear[bO] : bO;
-  }
+     opacity = (unsigned char)((1.0f - fillOpacity) * 255.0f + 0.5f);
 
-  int aT = weighTwoValues(aOf, aBf, f);
-  int rT = weighTwoValues(rOf, rBf, f);
-  int gT = weighTwoValues(gOf, gBf, f);
-  int bT = weighTwoValues(bOf, bBf, f);
-  if (linearGamma==1)
-  {
-     aT = linear_to_gamma[aT];
-     rT = linear_to_gamma[rT];
-     gT = linear_to_gamma[gT];
-     bT = linear_to_gamma[bT];
-  }
-
-  // std::stringstream ss;
-  // ss << "qpv: opacity = " << f;
-  // ss << " rA=" << rA;
-  // ss << "rB=" << rB;
-  // ss << "rT=" << rT;
-  // ss << " | gA=" << gA;
-  // ss << "gB=" << gB;
-  // ss << "gT=" << gT;
-  // // ss << " r = " << result;
-  // OutputDebugStringA(ss.str().data());
-
-  return {bT, gT, rT, aT};
+  return NEWERcalculateBlendModes(colorA, colorB, blendMode, flipLayers, linearGamma, 0, 32, opacity);
 }
 
 int clrBrushMixColors(int colorB, float *colorA, float f, int blendMode, int linearGamma, int flipLayers) {
@@ -3035,7 +2956,7 @@ int wrapRGBtoGray(int color, int mode) {
     return index;
 }
 
-void goPixelFloodFill8Stack(unsigned char *imageData, INT64 pix, float index, RGBAColor newColor, RGBAColor oldColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int linearGamma, int flipLayers, int bpp) {
+void goPixelFloodFill8Stack(unsigned char *imageData, INT64 pix, float index, RGBAColor newColor, RGBAColor oldColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int linearGamma, int flipLayers, int bpp, int keepAlpha) {
   RGBAColor thisColor = {0, 0, 0, 0};
   if (tolerance>0 && (opacity<1 || dynamicOpacity==1 || blendMode>=0 || cartoonMode==1))
   {
@@ -3049,21 +2970,21 @@ void goPixelFloodFill8Stack(unsigned char *imageData, INT64 pix, float index, RG
      imageData[pix] = thisColor.b;
      imageData[pix + 1] = thisColor.g;
      imageData[pix + 2] = thisColor.r;
-     if (bpp==32)
+     if (bpp==32 && keepAlpha==0)
         imageData[pix + 3] = thisColor.a;
   } else
   {
      imageData[pix] = newColor.b;
      imageData[pix + 1] = newColor.g;
      imageData[pix + 2] = newColor.r;
-     if (bpp==32)
+     if (bpp==32 && keepAlpha==0)
         imageData[pix + 3] = newColor.a;
      // imageData[pix] = newColor;
      // second element , the colour, will be used to mix colours; to-do
   }
 }
 
-int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBAColor newColor, float *nC, RGBAColor oldColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay, int linearGamma, int flipLayers, int Stride, int bpp, int useSelArea) {
+int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBAColor newColor, float *nC, RGBAColor oldColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay, int linearGamma, int flipLayers, int Stride, int bpp, int useSelArea, int keepAlpha) {
 // based on https://lodev.org/cgtutor/floodfill.html
 // by Lode Vandevenne
 // to-do: parallelize the algorithm? make it faster?
@@ -3091,7 +3012,7 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
   int k = (eightWay==1) ? 8 : 4;
   float defIndex = (alternateMode==3) ? 0 : prevCLRindex;
   float index;
-  fnOutputDebug("FloodFill8Stack()");
+  fnOutputDebug("FloodFill8Stack(); blendMode=" + std::to_string(blendMode));
   while (starkX.size())
   {
      if (maxPixels<loopsOccured)
@@ -3124,7 +3045,7 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
            if (thisColor.r==oldColor.r && thisColor.g==oldColor.g && thisColor.b==oldColor.b)
            {
               pixelzMap[tpx] = 1;
-              goPixelFloodFill8Stack(imageData, tpx, defIndex, newColor, oldColor, tolerance, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, flipLayers, bpp);
+              goPixelFloodFill8Stack(imageData, tpx, defIndex, newColor, oldColor, tolerance, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, flipLayers, bpp, keepAlpha);
               starkX.push(nx);
               starkY.push(ny);
               suchDeviations++;
@@ -3133,7 +3054,7 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
               if (decideColorsEqual(thisColor, oldColor, tolerance, prevCLRindex, alternateMode, nC, index))
               {
                  pixelzMap[tpx] = 1;
-                 goPixelFloodFill8Stack(imageData, tpx, index, newColor, oldColor, tolerance, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, flipLayers, bpp);
+                 goPixelFloodFill8Stack(imageData, tpx, index, newColor, oldColor, tolerance, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, flipLayers, bpp, keepAlpha);
                  starkX.push(nx);
                  starkY.push(ny);
                  suchDeviations++;
@@ -3144,20 +3065,10 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
   }
 
   fnOutputDebug("suchDeviations==" + std::to_string(suchDeviations));
-  // #pragma omp parallel for schedule(static) default(none)
-  // for (INT64 pix = 0; pix < pixelzMap.size(); ++pix)
-  // {
-  //     if (pixelzMap[pix]==0)
-  //        continue;
-  //     // std::cout << it->first << " => " << it->second << '\n';
-  //     suchAppliedDeviations++;
-  //     goPixelFloodFill8Stack(imageData, pix, pixelzMap[pix], newColor, oldColor, tolerance, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, flipLayers, bpp);
-  // }
-  // fnOutputDebug("suchAppliedDeviations==" + std::to_string(suchAppliedDeviations));
   return suchDeviations;
 }
 
-int FloodFillScanlineStack(unsigned char *imageData, int w, int h, int x, int y, RGBAColor newColor, RGBAColor oldColor, int Stride, int bpp, int useSelArea) {
+int FloodFillScanlineStack(unsigned char *imageData, int w, int h, int x, int y, RGBAColor newColor, RGBAColor oldColor, int Stride, int bpp, int useSelArea, int keepAlpha) {
 // based on https://lodev.org/cgtutor/floodfill.html
 // by Lode Vandevenne
   if (oldColor.r == newColor.r && oldColor.g == newColor.g && oldColor.b == newColor.b)
@@ -3220,7 +3131,8 @@ int FloodFillScanlineStack(unsigned char *imageData, int w, int h, int x, int y,
        if (!(imageData[o + 2] == oR && imageData[o + 1] == oG && imageData[o] == oB))
           break;
 
-       imageData[o + 3] = nA;
+       if (bpp==32 && keepAlpha==0)
+          imageData[o + 3] = nA;
        imageData[o + 2] = nR;
        imageData[o + 1] = nG;
        imageData[o] = nB;
@@ -3251,7 +3163,7 @@ int FloodFillScanlineStack(unsigned char *imageData, int w, int h, int x, int y,
   return loopsOccured;
 }
 
-int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBAColor newColor, RGBAColor nC, RGBAColor prevColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int linearGamma, float *labClr, int flipLayers, int Stride, int bpp, int useSelArea) {
+int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBAColor newColor, RGBAColor nC, RGBAColor prevColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int linearGamma, float *labClr, int flipLayers, int Stride, int bpp, int useSelArea, int keepAlpha) {
     if ((x < 0) || (x >= (w-1)) || (y < 0) || (y >= (h-1)))  // out of bounds
        return 0;
 
@@ -3282,7 +3194,7 @@ int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBA
 
             if (decideColorsEqual(clr, prevColor, tolerance, prevCLRindex, alternateMode, labClr, index))
             {
-               if (tolerance>0 && (opacity<1 || dynamicOpacity==1 || blendMode>00 || cartoonMode==1))
+               if (tolerance>0 && (opacity<1 || dynamicOpacity==1 || blendMode>=0 || cartoonMode==1))
                {
                   RGBAColor prevColor = clr;
                   if (cartoonMode==1)
@@ -3290,14 +3202,14 @@ int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBA
                   else
                      thisColor = mixColorsFloodFill(prevColor, nC, opacity, dynamicOpacity, blendMode, prevCLRindex, tolerance, alternateMode, index, linearGamma, flipLayers);
 
-                  if (bpp==32)
+                  if (bpp==32 && keepAlpha==0)
                      imageData[3 + o] = thisColor.a;
                   imageData[2 + o] = thisColor.r;
                   imageData[1 + o] = thisColor.g;
                   imageData[o] = thisColor.b;
                } else
                {
-                  if (bpp==32)
+                  if (bpp==32 && keepAlpha==0)
                      imageData[3 + o] = newColor.a;
                   imageData[2 + o] = newColor.r;
                   imageData[1 + o] = newColor.g;
@@ -3310,7 +3222,7 @@ int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBA
     return loopsOccured;
 }
 
-DLL_API int DLL_CALLCONV FloodFillWrapper(unsigned char *imageData, int modus, int w, int h, int x, int y, int newColor, int tolerance, int fillOpacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay, int linearGamma, int flipLayers, int Stride, int bpp, int useSelArea, int invertSel) {
+DLL_API int DLL_CALLCONV FloodFillWrapper(unsigned char *imageData, int modus, int w, int h, int x, int y, int newColor, int tolerance, int fillOpacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay, int linearGamma, int flipLayers, int Stride, int bpp, int useSelArea, int invertSel, int keepAlpha) {
     if ((x < 0) || (x >= (w-1)) || (y < 0) || (y >= (h-1)))  // out of bounds
        return 0;
 
@@ -3345,11 +3257,11 @@ DLL_API int DLL_CALLCONV FloodFillWrapper(unsigned char *imageData, int modus, i
 
     int r;
     if (modus==1)
-       r = ReplaceGivenColor(imageData, w, h, x, y, newColorI, newColorI, prevColor, toleranza, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, nC, flipLayers, Stride, bpp, useSelArea);
+       r = ReplaceGivenColor(imageData, w, h, x, y, newColorI, newColorI, prevColor, toleranza, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, nC, flipLayers, Stride, bpp, useSelArea, keepAlpha);
     else if (toleranza>0)
-       r = FloodFill8Stack(imageData, w, h, x, y, newColorI, nC, prevColor, toleranza, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, eightWay, linearGamma, flipLayers, Stride, bpp, useSelArea);
+       r = FloodFill8Stack(imageData, w, h, x, y, newColorI, nC, prevColor, toleranza, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, eightWay, linearGamma, flipLayers, Stride, bpp, useSelArea, keepAlpha);
     else
-       r = FloodFillScanlineStack(imageData, w, h, x, y, newColorI, prevColor, Stride, bpp, useSelArea);
+       r = FloodFillScanlineStack(imageData, w, h, x, y, newColorI, prevColor, Stride, bpp, useSelArea, keepAlpha);
 
     return r;
 }

@@ -325,10 +325,9 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , keepUserPaintAlphaMask := 0, alphaMaskColorReversed := 0, alphaMaskGradientScale := 100
    , alphaMaskGradientPosA := 0, alphaMaskGradientPosB := 100, alphaMaskGradientWrapped := 5
    , FillBehindClrOpacity  := 200, FillBehindOpacity := 255, FillBehindColor := "ff4400", allowCustomKeys := 0
-   , alphaMaskGradientAngle := 0, DesaturateAreaChannel := 1, FloodFillClrOpacity := 255
-   , FloodFillOpacity := 205, FloodFillBlendMode := 1, TextInAreaBlendMode := 1, BlurAreaAlphaMask := 0
+   , alphaMaskGradientAngle := 0, DesaturateAreaChannel := 1, FloodFillOpacity := 205, FloodFillBlendMode := 1
+   , TextInAreaBlendMode := 1, BlurAreaAlphaMask := 0, FloodFillUseAlpha := 0, EraseAreaUseAlpha := 0
    , UserAddNoiseBlurAmount := 0, UserAddNoisePixelizeAmount := 2, FillBehindInvert := 0
-   , alphaMaskPreviewOpacity := 255, FloodFillUseAlpha := 0, EraseAreaUseAlpha := 0
    , innerSelectionCavityX := 0, innerSelectionCavityY := 0, ResizeEnforceCanvas := 0
    , ResizeFillCanvasMode := 1, ShowToolTipsToolbar := 1, userPrivateMode := 0, thresholdKeywords := 1
    , minKeywordLength := 2, LangKeywordsFilter := 0, mergeKeywordRows := 1, limitSearchReplaceSelected := 0
@@ -384,7 +383,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , userPerformColorManagement := 1, UserCombinePDFbgrColor := "ffFFff", UserVPalphaBgrStyle := 1
    , userPDFdpi := 430, userActivePDFpage := 0, userThumbsSheetUpscaleSmall := 1, PrintPDFpagesRange := 1
    , PrintPDFpagesGivenEdit :=  "1-5", noQualityWarnings := 0, TLBRinvertColors := 0, userVPpdfDPI := 420
-   , userVPsvgScale := 1.00
+   , userVPsvgScale := 1.00, alphaMaskPreviewOpacity := 255
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -13903,14 +13902,15 @@ QPV_FloodFill(pBitmap, x, y, newColor, fillOpacity, blendMode, cartoonMode) {
 
   Gdip_FromARGB(newColor, A, R, G, B)
   newColor := Gdip_ToARGB(A, R, G, B)
+  If (blendMode=0)
+     blendMode := 23
 
   ; oldColor := Gdip_GetPixel(pBitmap, x, y)
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, Stride, iScan, iData, 3)
   tolerance := (FloodFillAltToler=1) ? Ceil(FloodFillTolerance*0.7) + 1 : FloodFillTolerance
   If !E1
-     r := DllCall("qpvmain.dll\FloodFillWrapper", "UPtr", iScan, "Int", FloodFillModus, "Int", w, "Int", h, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", fillOpacity, "int", FloodFillDynamicOpacity, "int", blendMode, "int", cartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays, "int", userimgGammaCorrect, "int", BlendModesFlipped, "int", Stride, "int", 32, "int", 0, "int", 0)
+     r := DllCall("qpvmain.dll\FloodFillWrapper", "UPtr", iScan, "Int", FloodFillModus, "Int", w, "Int", h, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", fillOpacity, "int", FloodFillDynamicOpacity, "int", blendMode, "int", cartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays, "int", userimgGammaCorrect, "int", BlendModesFlipped, "int", Stride, "int", 32, "int", 0, "int", 0, "int", BlendModesPreserveAlpha)
   ; ToolTip, % A_PtrSize "=" A_LastError "==" r "=" func2exec "=" SecToHHMMSS(Round(zeitOperation/1000, 3)) , , , 2
-
   If !E1
      Gdip_UnlockBits(pBitmap, iData)
 
@@ -21672,16 +21672,16 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          use := (BrushToolOutsideSelection>1 && editingSelectionNow=1) ? 1 : 0
          allView := (BrushToolOutsideSelection!=2 && editingSelectionNow=1) ? 1 : 0
          zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, allView)
-         newColor := "0x" Format("{:X}", FloodFillClrOpacity) FloodFillColor
+         newColor := "0xff" FloodFillColor
          Gdip_FromARGB(newColor, A, R, G, B)
          newColor := Gdip_ToARGB(A, R, G, B)
-         If (FloodFillTolerance<3)
-            FloodFillCartoonMode := 0
+         cartoonMode := (FloodFillTolerance<3) ? 0 : FloodFillCartoonMode
+         blendMode := (FloodFillBlendMode>23 || FloodFillBlendMode=1) ? 23 : FloodFillBlendMode - 1
 
          x := hFIFimgExtern[1], y := imgH - hFIFimgExtern[2]
          tolerance := (FloodFillAltToler=1) ? Ceil(FloodFillTolerance*0.7) + 1 : FloodFillTolerance
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
-         r := DllCall("qpvmain.dll\FloodFillWrapper", "UPtr", pBitsAll, "Int", FloodFillModus, "Int", imgW, "Int", imgH, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", FloodFillOpacity, "int", FloodFillDynamicOpacity, "int", FloodFillBlendMode - 1, "int", FloodFillCartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays, "int", userimgGammaCorrect, "int", BlendModesFlipped, "int", Stride, "int", bpp, "int", use, "int", inverter)
+         r := DllCall("qpvmain.dll\FloodFillWrapper", "UPtr", pBitsAll, "Int", FloodFillModus, "Int", imgW, "Int", imgH, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", FloodFillOpacity, "int", FloodFillDynamicOpacity, "int", blendMode, "int", cartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays, "int", userimgGammaCorrect, "int", BlendModesFlipped, "int", Stride, "int", bpp, "int", use, "int", inverter, "int", BlendModesPreserveAlpha)
       } Else If InStr(modus, "noise")
       {
          If (UserAddNoisePixelizeAmount>0)
@@ -43499,16 +43499,12 @@ BtnToggleBrushColors(dummy:=0, kk:=0) {
    } Else If (AnyWindowOpen=66) ; flood fill tool
    {
       If (BrushToolAcolor!=FloodFillColor && BrushToolBcolor!=FloodFillColor)
-      {
          BrushToolAcolor := FloodFillColor
-         BrushToolAopacity := FloodFillClrOpacity
-      }
+
       thisA := (BrushToolUseSecondaryColor=1) ? BrushToolBcolor : BrushToolAcolor
       thisAop := (BrushToolUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
       updateColoredRectCtrl(thisA, "FloodFillColor")
       FloodFillColor := thisA
-      FloodFillClrOpacity := thisAop
-      uiSlidersArray["FloodFillClrOpacity", 14] := -1
       GuiRefreshSliders()
    } Else If (AnyWindowOpen=68) ; fill behind tool
    {
@@ -43759,8 +43755,6 @@ updateUIfloodFillPanel() {
    }
 
    uiSlidersArray["FloodFillOpacity", 10] := !FloodFillCartoonMode
-   uiSlidersArray["FloodFillClrOpacity", 10] := !FloodFillCartoonMode
-
    actu := (FloodFillCartoonMode=1 || FloodFillTolerance<3) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
    GuiControl, % actu, FloodFillDynamicOpacity
 
@@ -43778,8 +43772,6 @@ updateUIfloodFillPanel() {
    If (viewportQPVimage.imgHandle)
       GuiControl, SettingsGUIA: Disable, FloodFillUseAlpha
 
-   thisOpa := (BrushToolUseSecondaryColor=1) ? "BrushToolBopacity" : "BrushToolAopacity"
-   %thisOpa% := FloodFillClrOpacity
    GuiRefreshSliders()
    SetTimer, dummyRefreshImgSelectionWindow, -150
    SetTimer, WriteSettingsFloodFillPanel, -200
@@ -43790,7 +43782,6 @@ ReadSettingsFloodFillPanel(act:=0) {
    RegAction(act, "FloodFillOpacity",, 2, 4, 255)
    RegAction(act, "FloodFillBlendMode",, 2, 1, 23)
    RegAction(act, "FloodFillColor",, 3)
-   RegAction(act, "FloodFillClrOpacity",, 2, 1, 255)
    RegAction(act, "FloodFillAltToler",, 2, 1, 3)
    RegAction(act, "FloodFillDynamicOpacity",, 1)
    RegAction(act, "FloodFillModus",, 1)
@@ -47001,7 +46992,6 @@ fromPanelColorsToColorsSwatch(ctrl, newColor) {
       } Else If (ctrl="FloodFillColor")
       {
          BrushToolAcolor := newColor
-         BrushToolAopacity := FloodFillClrOpacity
       } Else If (ctrl="OutlierFillColor")
       {
          BrushToolAcolor := newColor
@@ -49679,7 +49669,7 @@ PanelFloodFillTool() {
     }
 
     txtWid2 := (PrefsLargeFonts=1) ? txtWid//2 + 5 : txtWid//2 + 15
-    xCol := (PrefsLargeFonts=1) ? 285 : 195
+    xCol := (PrefsLargeFonts=1) ? 300 : 200
     txtWid3 := (PrefsLargeFonts=1) ? txtWid//2 + 25 : txtWid//2 + 35
     txtWid := (PrefsLargeFonts=1) ? txtWid + 25 : txtWid + 40
     FloodFillUseAlpha := decideAlphaMaskingFeaseable(FloodFillUseAlpha)
@@ -49691,11 +49681,12 @@ PanelFloodFillTool() {
     ml := (PrefsLargeFonts=1) ? 55 : 35
     GuiAddPickerColor("xs+15 y+10 h" ha " w25", "FloodFillColor")
     GuiAddColor("x+1 hp w" ml, "FloodFillColor", "Flood fill color")
-    GuiAddSlider("FloodFillClrOpacity", 3,255, 255, "Opacity", "updateUIfloodFillPanel", 1, "x+3 w" btnWid - 10 " hp")
+    GuiAddSlider("FloodFillOpacity", 3,255, 255, "Opacity", "updateUIfloodFillPanel", 1, "x+3 w" btnWid - 10 " hp")
     Gui, Add, Checkbox, x%xCol% yp+0 hp gupdateUIfloodFillPanel Checked%FloodFillUseAlpha% vFloodFillUseAlpha, Apply alpha mas&k
 
     pw := (PrefsLargeFonts=1) ? xCol - 42 : xCol - 42
-    GuiAddSlider("FloodFillOpacity", 3,255, 255, "Flooding opacity", "updateUIfloodFillPanel", 1, "xs+15 y+15 w" pw " hp")
+    Gui, Add, Checkbox, xs+15 y+15 w%pw% hp gupdateUIfloodFillPanel Checked%BlendModesPreserveAlpha% vBlendModesPreserveAlpha, Keep alpha channel intact
+    ; GuiAddSlider("FloodFillOpacity", 3,255, 255, "Flooding opacity", "updateUIfloodFillPanel", 1, "xs+15 y+15 w" pw " hp")
     GuiAddDropDownList("x" xCol " yp+0 wp-25 gupdateUIfloodFillPanel AltSubmit Choose" FloodFillBlendMode " vFloodFillBlendMode", "No blend mode|" StrReplace(userBlendModesList, "*"), "Blending mode")
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIfloodFillPanel")
     Gui, Add, Checkbox, xs+14 y+8 hp gupdateUIfloodFillPanel Checked%FloodFillDynamicOpacity% vFloodFillDynamicOpacity, Reduce flooding opacity based on color similarity
@@ -75301,7 +75292,7 @@ ActFloodFillNow() {
    cartoonMode := (FloodFillTolerance<3) ? 0 : FloodFillCartoonMode
    blendMode := (FloodFillBlendMode>23) ? 1 : FloodFillBlendMode
    ; newColor := (BrushToolUseSecondaryColor=1) ? BrushToolBcolor : BrushToolAcolor 
-   r := QPV_FloodFill(thisBMP, kX, kY, "0x" Format("{:X}", FloodFillClrOpacity) FloodFillColor, FloodFillOpacity, blendMode - 1, cartoonMode)
+   r := QPV_FloodFill(thisBMP, kX, kY, "0xff" FloodFillColor, FloodFillOpacity, blendMode - 1, cartoonMode)
    If (r>0 && (pPath!="" && G2!="" && allowSelectionCrop=1 && hasCloned=1) || (validBMP(thisBMP) && allowAlphaMasking=1))
    {
       If (allowAlphaMasking=1)
@@ -75348,8 +75339,6 @@ ActFloodFillNow() {
 
    If (pPath!="")
       Gdip_DeletePath(pPath)
-   If (FloodFillClrOpacity<254 && r>1)
-      currIMGdetails.HasAlpha := 1
 
    lastInvoked := A_TickCount
    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
