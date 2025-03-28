@@ -4121,12 +4121,11 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
             RGBAColor Orgb = {userColor.b, userColor.g, userColor.r, userColor.a};
             RGBAColor Brgb = {oB, oG, oR, oA};
             RGBAColor newColor = NEWERcalculateBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, keepAlpha, bpp, 0);
-            if (bpp==32)
-               BitmapData[3 + o] = newColor.a;
-
             BitmapData[2 + o] = newColor.r;
             BitmapData[1 + o] = newColor.g;
             BitmapData[o]     = newColor.b;
+            if (bpp==32)
+               BitmapData[3 + o] = newColor.a;
         }
     }
     return 1;
@@ -4978,7 +4977,6 @@ DLL_API int DLL_CALLCONV DrawTextBitmapInPlace(unsigned char *originalData, int 
             int nR, nG, nB;
             int nA = 255;
             int oA = 255;
-            int intensity = 0;
             INT64 o = CalcPixOffset(imgX + x, h - imgY + y - imgH, Stride, bpp);
             if (o>=data || o<0)
                continue;
@@ -5000,57 +4998,28 @@ DLL_API int DLL_CALLCONV DrawTextBitmapInPlace(unsigned char *originalData, int 
                 nA = aA;
             }
 
-            intensity = nA;
-            if (opacity!=255)
-            {
-               intensity = intensity - (255 - opacity);
-               intensity = clamp(intensity, 0, 255);
-            }     
-
             if (bpp==32)
                oA = originalData[3 + o];
-            int oR = originalData[2 + o];
-            int oG = originalData[1 + o];
-            int oB = originalData[o];
-            if (oA<2 && bpp==32)
+            if (oA<1 && bpp==32)
             {
-                originalData[3 + o] = clamp(oA + clamp(nA -  (255 - opacity), 0, 255), 0, 255);
+                originalData[3 + o] = clamp(oA + clamp(nA - opacity, 0, 255), 0, 255);
                 originalData[2 + o] = nR;
                 originalData[1 + o] = nG;
                 originalData[o] = nB;
                 continue;
             }
 
-            if (blendMode>0)
-            {
-               RGBAColor Orgb = {nB, nG, nR, nA};
-               RGBAColor Brgb = {oB, oG, oR, oA};   
-
-               RGBColorI blended;
-               blended = NEWcalculateBlendModes(Orgb, Brgb, blendMode, flipLayers, 0);
-               if (keepAlpha!=1 && blendMode!=23 && bpp==32)
-                  nA = max(nA, oA);
-
-               nR = blended.r;
-               nG = blended.g;
-               nB = blended.b;
-            }
-
-            float fintensity = char_to_float[intensity];
-            if (linearGamma==1)
-            {
-               originalData[2 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[nR], gamma_to_linear[oR], fintensity)];
-               originalData[1 + o] = linear_to_gamma[weighTwoValues(gamma_to_linear[nG], gamma_to_linear[oG], fintensity)];
-               originalData[o]     = linear_to_gamma[weighTwoValues(gamma_to_linear[nB], gamma_to_linear[oB], fintensity)];
-            } else
-            {
-               originalData[2 + o] = weighTwoValues(nR, oR, fintensity);
-               originalData[1 + o] = weighTwoValues(nG, oG, fintensity);
-               originalData[o]     = weighTwoValues(nB, oB, fintensity);
-            }
-
+            int oR = originalData[2 + o];
+            int oG = originalData[1 + o];
+            int oB = originalData[o];
+            RGBAColor Orgb = {nB, nG, nR, nA};
+            RGBAColor Brgb = {oB, oG, oR, oA};
+            RGBAColor newColor = NEWERcalculateBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, keepAlpha, bpp, opacity);
+            originalData[2 + o] = newColor.r;
+            originalData[1 + o] = newColor.g;
+            originalData[o]     = newColor.b;
             if (bpp==32)
-               originalData[3 + o] = clamp(oA + clamp(nA -  (255 - opacity), 0, 255), 0, 255);
+               originalData[3 + o] = newColor.a;
         }
     }
     return 1;

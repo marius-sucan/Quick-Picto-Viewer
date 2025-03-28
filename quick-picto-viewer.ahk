@@ -12635,6 +12635,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
     threads := (previewMode=1) ? realSystemCores : 0
     prevImgH := imgH := (previewMode=1) ? testHb : testHa
     prevImgW := imgW := (previewMode=1) ? testWb : testWa
+    pkzo := (TextInAreaBorderOut>1 && TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1 && TextInAreaOnlyBorder=1) ? 1 : 0
     Loop, % totalLinez
     {
        thisuString := (TextInAreaValign=3) ? textArray[totalLinez - A_Index + 1] : textArray[A_Index]
@@ -12716,8 +12717,8 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
              thisColor := (TextInAreaOnlyBorder=1 && TextInAreaBorderOut>1) ? borderColor : txtColor
              If (TextInAreaOnlyBorder=1 && TextInAreaBorderOut>1 && TextInAreaBgrUnified=1 && TextInAreaPaintBgr=1)
                 thisColor := txtColor
-   
-             QPV_SetColorAlphaChannel(thisBMP, thisColor, 0)
+             If (pkzo!=1)
+                QPV_SetColorAlphaChannel(thisBMP, thisColor, 0)
           }
        }
 
@@ -12856,10 +12857,11 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
        o_txtColor := (TextInAreaCutOutMode=1) ? "0x00" TextInAreaBgrColor : thisColoru
        If (doConturDraw=1 && TextInAreaOnlyBorder=1)
           o_txtColor := (TextInAreaCutOutMode=1) ? "0x00" TextInAreaBgrColor : borderColor
+       If (pkzo=1)
+          o_txtColor := MixARGB(bgrColor, borderColor, TextInAreaBorderOpacity/255)
 
        If doEffect
           QPV_BlurBitmapFilters(mainBMP, thisBlur, thisBlur, 0)
-
        QPV_ColorizeGrayImage(mainBMP, o_txtColor, bgrColor, userimgGammaCorrect)
        G3 := trGdip_GraphicsFromImage(A_ThisFunc, newBMP)
        If (userimgGammaCorrect=1)
@@ -13111,7 +13113,8 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
           {
              tmw := (TextInAreaBgrEntire=1) ? maxLineW : mw
              tmx := (TextInAreaBgrEntire=1) ? 0 : thisX
-             r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", TextInAreaBgrOpacity, "int", userimgGammaCorrect, "int", 0, "int", 0, "int", 0, "UPtr", 0, "int", "0xFF" TextInAreaBgrColor, "int", 32, "int", tmX, "int", thisY, "int", tmw, "int", mh)
+             r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255 - TextInAreaBgrOpacity, "int", userimgGammaCorrect, "int", 0, "int", 0, "int", 0, "UPtr", 0, "int", "0xFF" TextInAreaBgrColor, "int", 32, "int", tmX, "int", thisY, "int", tmw, "int", mh)
+             fnOutputDebug(A_Index " rendered Z bitmap")
           }
 
           If validBMP(thisBMP)
@@ -13129,16 +13132,17 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
              If !EZ
              {
                 thisBlendMode := (TextInAreaBgrUnified=1) ? 5 : 0
-                bmpOpacity := (TextInAreaCutOutMode=1 && TextInAreaPaintBgr=1 || TextInAreaBgrUnified=1) ? 255 : TextInAreaFontOpacity
-                r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", bmpOpacity, "int", userimgGammaCorrect, "int", thisBlendMode, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
-                ; fnOutputDebug(A_Index " rendered thisBMP")
+                bmpOpacity := ((TextInAreaCutOutMode=1 || TextInAreaBgrUnified=1) && TextInAreaPaintBgr=1) ? 255 : TextInAreaFontOpacity
+                r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255 - bmpOpacity, "int", userimgGammaCorrect, "int", thisBlendMode, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
+                fnOutputDebug(A_Index " rendered A thisBMP")
                 Gdip_UnlockBits(thisBMP, mData)
              }
              thisBMP := trGdip_DisposeImage(thisBMP)
           }
 
           thisBMP := pBitmapContours
-          If (validBMP(thisBMP) && TextInAreaBgrUnified!=1)
+          pkop := (TextInAreaBgrUnified!=1 || TextInAreaPaintBgr!=1) ? 1 : 0
+          If (validBMP(thisBMP) && pkop=1)
           {
              Gdip_GetImageDimensions(thisBMP, mw, mh)
              If (maxLineW>mw && TextInAreaBgrUnified=0 && TextInAreaBgrEntire=1 && TextInAreaPaintBgr=1 && TextInAreaCutOutMode=1)
@@ -13155,10 +13159,10 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
              EZ := trGdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
              If !EZ
              {
-                bmpOpacity := (TextInAreaBgrUnified=1) ? 255 : TextInAreaBorderOpacity
-                thisBlendMode := (TextInAreaBgrUnified=1) ? 5 : 0
-                r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", bmpOpacity, "int", userimgGammaCorrect, "int", thisBlendMode, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
-                ; fnOutputDebug(A_Index " rendered contour bitmap")
+                thisBlendMode := 0
+                bmpOpacity := TextInAreaBorderOpacity
+                r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255 - bmpOpacity, "int", userimgGammaCorrect, "int", thisBlendMode, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
+                fnOutputDebug(A_Index " rendered B contour bitmap")
                 Gdip_UnlockBits(thisBMP, mData)
                 thisBMP := trGdip_DisposeImage(thisBMP)
              }
@@ -13190,9 +13194,10 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
                 EZ := trGdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
                 If !EZ
                 {
-                   r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255, "int", userimgGammaCorrect, "int", 5, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
+                   r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 0, "int", userimgGammaCorrect, "int", 5, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
                    Gdip_UnlockBits(thisBMP, mData)
                    thisBMP := trGdip_DisposeImage(thisBMP)
+                   fnOutputDebug(A_Index " rendered C bitmap")
                 }
              }
           }
@@ -13241,7 +13246,8 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
              EZ := trGdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
              If !EZ
              {
-                r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", TextInAreaBorderOpacity, "int", userimgGammaCorrect, "int", 0, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
+                r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255 - TextInAreaBorderOpacity, "int", userimgGammaCorrect, "int", 0, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
+                fnOutputDebug(A_Index " rendered D bitmap")
                 Gdip_UnlockBits(thisBMP, mData)
                 thisBMP := trGdip_DisposeImage(thisBMP)
              }
@@ -13902,9 +13908,6 @@ QPV_FloodFill(pBitmap, x, y, newColor, fillOpacity, blendMode, cartoonMode) {
 
   Gdip_FromARGB(newColor, A, R, G, B)
   newColor := Gdip_ToARGB(A, R, G, B)
-  If (blendMode=0)
-     blendMode := 23
-
   ; oldColor := Gdip_GetPixel(pBitmap, x, y)
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, Stride, iScan, iData, 3)
   tolerance := (FloodFillAltToler=1) ? Ceil(FloodFillTolerance*0.7) + 1 : FloodFillTolerance
@@ -21676,7 +21679,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          Gdip_FromARGB(newColor, A, R, G, B)
          newColor := Gdip_ToARGB(A, R, G, B)
          cartoonMode := (FloodFillTolerance<3) ? 0 : FloodFillCartoonMode
-         blendMode := (FloodFillBlendMode>23 || FloodFillBlendMode=1) ? 23 : FloodFillBlendMode - 1
+         blendMode := (FloodFillBlendMode>23) ? 23 : FloodFillBlendMode - 1
 
          x := hFIFimgExtern[1], y := imgH - hFIFimgExtern[2]
          tolerance := (FloodFillAltToler=1) ? Ceil(FloodFillTolerance*0.7) + 1 : FloodFillTolerance
@@ -75188,7 +75191,7 @@ decideAlphaMaskingFeaseable(userBias, doLimits:=0) {
    allowAlphaMasking := userBias
    If (userBias=1)
       infoMask := defineCurrentAlphaMask()
-   If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
+   If (InStr(infoMask, "inexistent") || InStr(infoMask, "none") ) ; || (AnyWindowOpen=64 || AnyWindowOpen=66) && BrushToolOutsideSelection=1)
       allowAlphaMasking := 0
 
    If (allowAlphaMasking=1 && doLimits=1)
@@ -75297,6 +75300,30 @@ ActFloodFillNow() {
    {
       If (allowAlphaMasking=1)
       {
+         gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
+         kBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, thisBMP, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
+         trGdip_GetImageDimensions(gBitmap, zImgW, zImgH)
+         alphaMaskGray := generateAlphaMaskBitmap(0, 0, zImgW, zImgH, 0, 0, 0, 1, 0)
+         If validBMP(alphaMaskGray)
+         {
+            rza := QPV_MergeBitmapsWithMask(gBitmap, kBitmap, alphaMaskGray, alphaMaskColorReversed)
+            Gdip_SetClipRect(G2, imgSelPx, imgSelPy, zImgW, zImgh)
+            r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
+            r1 := trGdip_DrawImage(A_ThisFunc, G2, gBitmap, imgSelPx, imgSelPy)
+         }
+         trGdip_DisposeImage(gBitmap)
+         trGdip_DisposeImage(kBitmap)
+         trGdip_DisposeImage(alphaMaskGray)
+      }
+
+      trGdip_DisposeImage(thisBMP, 1)
+      Gdip_DeleteGraphics(G2)
+   }
+/*
+   If (r>0 && (pPath!="" && G2!="" && allowSelectionCrop=1 && hasCloned=1) || (validBMP(thisBMP) && allowAlphaMasking=1))
+   {
+      If (allowAlphaMasking=1)
+      {
          If (editingSelectionNow=1 && BrushToolOutsideSelection=2)
             gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, thisBMP, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
 
@@ -75336,6 +75363,7 @@ ActFloodFillNow() {
       trGdip_DisposeImage(thisBMP, 1)
       Gdip_DeleteGraphics(G2)
    }
+*/
 
    If (pPath!="")
       Gdip_DeletePath(pPath)
