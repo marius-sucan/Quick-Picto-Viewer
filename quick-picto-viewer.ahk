@@ -32,7 +32,7 @@
 ;
 ; * The FreeImage library DLL I use is a custom compiled one. The source code is 
 ; on this repository: https://github.com/marius-sucan/FreeImage-library/tree/qpv
-; I made various fixes to the original version.
+; I fixed and improved various things, compared to the original version.
 ;
 ; Original Licence: GPL. Please reffer to this page for more information. http://www.gnu.org/licenses/gpl.html
 ; Current licence: I do not know, I do not care. Licences are for obedient entities.
@@ -383,7 +383,8 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , userPerformColorManagement := 1, UserCombinePDFbgrColor := "ffFFff", UserVPalphaBgrStyle := 1
    , userPDFdpi := 430, userActivePDFpage := 0, userThumbsSheetUpscaleSmall := 1, PrintPDFpagesRange := 1
    , PrintPDFpagesGivenEdit :=  "1-5", noQualityWarnings := 0, TLBRinvertColors := 0, userVPpdfDPI := 420
-   , userVPsvgScale := 1.00, alphaMaskPreviewOpacity := 255
+   , userVPsvgScale := 1.00, alphaMaskPreviewOpacity := 255, FloodFillSelectionMode := 1
+
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -13114,7 +13115,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
              tmw := (TextInAreaBgrEntire=1) ? maxLineW : mw
              tmx := (TextInAreaBgrEntire=1) ? 0 : thisX
              r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255 - TextInAreaBgrOpacity, "int", userimgGammaCorrect, "int", 0, "int", 0, "int", 0, "UPtr", 0, "int", "0xFF" TextInAreaBgrColor, "int", 32, "int", tmX, "int", thisY, "int", tmw, "int", mh)
-             fnOutputDebug(A_Index " rendered Z bitmap")
+             ; fnOutputDebug(A_Index " rendered Z bitmap")
           }
 
           If validBMP(thisBMP)
@@ -13134,7 +13135,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
                 thisBlendMode := (TextInAreaBgrUnified=1) ? 5 : 0
                 bmpOpacity := ((TextInAreaCutOutMode=1 || TextInAreaBgrUnified=1) && TextInAreaPaintBgr=1) ? 255 : TextInAreaFontOpacity
                 r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255 - bmpOpacity, "int", userimgGammaCorrect, "int", thisBlendMode, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
-                fnOutputDebug(A_Index " rendered A thisBMP")
+                ; fnOutputDebug(A_Index " rendered A thisBMP")
                 Gdip_UnlockBits(thisBMP, mData)
              }
              thisBMP := trGdip_DisposeImage(thisBMP)
@@ -13162,7 +13163,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
                 thisBlendMode := 0
                 bmpOpacity := TextInAreaBorderOpacity
                 r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255 - bmpOpacity, "int", userimgGammaCorrect, "int", thisBlendMode, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
-                fnOutputDebug(A_Index " rendered B contour bitmap")
+                ; fnOutputDebug(A_Index " rendered B contour bitmap")
                 Gdip_UnlockBits(thisBMP, mData)
                 thisBMP := trGdip_DisposeImage(thisBMP)
              }
@@ -13182,7 +13183,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
        r := DllCall("qpvmain.dll\FillImageHoles", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", "0xFF000000")
        If (TextInAreaBgrUnified=1 && TextInAreaPaintBgr=1 && modusContour=0 && TextInAreaBorderOut>1)
        {
-          fnOutputDebug("pre-unified processing with borders")
+          ; fnOutputDebug("pre-unified processing with borders")
           Loop, % rendered
           {
              ; render the pBitmapContours bitmaps
@@ -13197,7 +13198,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
                    r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 0, "int", userimgGammaCorrect, "int", 5, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
                    Gdip_UnlockBits(thisBMP, mData)
                    thisBMP := trGdip_DisposeImage(thisBMP)
-                   fnOutputDebug(A_Index " rendered C bitmap")
+                   ; fnOutputDebug(A_Index " rendered C bitmap")
                 }
              }
           }
@@ -13233,7 +13234,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
 
     If (TextInAreaBgrUnified=1 && TextInAreaPaintBgr=1 && modusContour=1 && TextInAreaBorderOut>1 && fattalErr!=1)
     {
-       fnOutputDebug("post-unified processing with borders")
+       ; fnOutputDebug("post-unified processing with borders")
        Loop, % rendered
        {
           ; render the pBitmapContours bitmaps
@@ -13247,7 +13248,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
              If !EZ
              {
                 r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255 - TextInAreaBorderOpacity, "int", userimgGammaCorrect, "int", 0, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
-                fnOutputDebug(A_Index " rendered D bitmap")
+                ; fnOutputDebug(A_Index " rendered D bitmap")
                 Gdip_UnlockBits(thisBMP, mData)
                 thisBMP := trGdip_DisposeImage(thisBMP)
              }
@@ -18698,7 +18699,7 @@ coreImageFillSelectedArea(whichBitmap:=0, ByRef hasAlpha:=0) {
 
       If (alphaMaskingMode>1)
       {
-         alphaBlendMode := (FillAreaInverted=1) ? 2 : 5  ; multiply / Screen
+         alphaBlendMode := (FillAreaInverted=1) ? 2 : 5  ; multiply / screen
          alphaMaskGray := generateAlphaMaskBitmap(0, 0, zImgW, zImgH, 0, 0, 0, 1, 0)
          doi := (FillAreaInverted=1) ? alphaMaskColorReversed : !alphaMaskColorReversed
          If (doi=1)
@@ -43772,8 +43773,6 @@ updateUIfloodFillPanel() {
 
    actu := (FloodFillModus!=1 && FloodFillTolerance>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, FloodFillEightWays
-   If (viewportQPVimage.imgHandle)
-      GuiControl, SettingsGUIA: Disable, FloodFillUseAlpha
 
    GuiRefreshSliders()
    SetTimer, dummyRefreshImgSelectionWindow, -150
@@ -43781,7 +43780,7 @@ updateUIfloodFillPanel() {
 }
 
 ReadSettingsFloodFillPanel(act:=0) {
-   RegAction(act, "BrushToolOutsideSelection",, 2, 1, 3)
+   RegAction(act, "FloodFillSelectionMode",, 2, 1, 4)
    RegAction(act, "FloodFillOpacity",, 2, 4, 255)
    RegAction(act, "FloodFillBlendMode",, 2, 1, 23)
    RegAction(act, "FloodFillColor",, 3)
@@ -49675,17 +49674,16 @@ PanelFloodFillTool() {
     xCol := (PrefsLargeFonts=1) ? 300 : 200
     txtWid3 := (PrefsLargeFonts=1) ? txtWid//2 + 25 : txtWid//2 + 35
     txtWid := (PrefsLargeFonts=1) ? txtWid + 25 : txtWid + 40
-    FloodFillUseAlpha := decideAlphaMaskingFeaseable(FloodFillUseAlpha)
     Global PickuFloodFillColor
 
     Gui, Add, Text, x15 y15 Section, Flood fill (bucket) color:
-    Gui, Add, Checkbox, x%xCol% yp+0 gupdateUIfloodFillPanel Checked%FloodFillCartoonMode% vFloodFillCartoonMode, Cartoon mode
     ha := (PrefsLargeFonts=1) ? 27 : 18
     ml := (PrefsLargeFonts=1) ? 55 : 35
     GuiAddPickerColor("xs+15 y+10 h" ha " w25", "FloodFillColor")
     GuiAddColor("x+1 hp w" ml, "FloodFillColor", "Flood fill color")
     GuiAddSlider("FloodFillOpacity", 3,255, 255, "Opacity", "updateUIfloodFillPanel", 1, "x+3 w" btnWid - 10 " hp")
-    Gui, Add, Checkbox, x%xCol% yp+0 hp gupdateUIfloodFillPanel Checked%FloodFillUseAlpha% vFloodFillUseAlpha, Apply alpha mas&k
+    Gui, Add, Checkbox, x%xCol% yp+0 gupdateUIfloodFillPanel Checked%FloodFillCartoonMode% vFloodFillCartoonMode, Cartoon mode
+    ; Gui, Add, Checkbox, x%xCol% yp+0 hp gupdateUIfloodFillPanel Checked%FloodFillUseAlpha% vFloodFillUseAlpha, Apply alpha mas&k
 
     pw := (PrefsLargeFonts=1) ? xCol - 42 : xCol - 42
     Gui, Add, Checkbox, xs+15 y+15 w%pw% hp gupdateUIfloodFillPanel Checked%BlendModesPreserveAlpha% vBlendModesPreserveAlpha, Keep alpha channel intact
@@ -49706,8 +49704,12 @@ PanelFloodFillTool() {
     ; Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% gapplyIMGeditFunction, &Apply
     Gui, Add, Button, x+5 hp wp+30 gBtnCloseWindow Default, &Close
 
-    txtWid2 := (PrefsLargeFonts=1) ? 200 : 110
-    GuiAddDropDownList("x+5 w" txtWid2 " gupdateUIfloodFillPanel AltSubmit Choose" BrushToolOutsideSelection " vBrushToolOutsideSelection", "Ignore selection|Flood inside|Flood outside", "Selection fill mode")
+    txtWid2 := (PrefsLargeFonts=1) ? 230 : 150
+    bonus := (viewportQPVimage.imgHandle) ? "" : "|Apply alpha mask"
+    If (viewportQPVimage.imgHandle && FloodFillSelectionMode=4)
+       FloodFillSelectionMode := 1
+
+    GuiAddDropDownList("x+5 w" txtWid2 " gupdateUIfloodFillPanel AltSubmit Choose" FloodFillSelectionMode " vFloodFillSelectionMode", "Ignore selection area|Flood inside|Flood outside" bonus, "Selection fill mode")
 
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Color bucket tool: " appTitle, winPos)
@@ -50036,10 +50038,10 @@ livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
       doClamping := 0
    } Else doClamping := 1
 
-   doInvertPreview := (AnyWindowOpen=81 && UserSymmetricaInvertArea=1) || (AnyWindowOpen=66 && FloodFillUseAlpha=1 && (BrushToolOutsideSelection=1 || BrushToolOutsideSelection=3)) || (AnyWindowOpen=23 && FillAreaInverted=1) || ((AnyWindowOpen=25 || AnyWindowOpen=55) && EraseAreaInvert=1) ? 1 : 0
+   doInvertPreview := (AnyWindowOpen=81 && UserSymmetricaInvertArea=1) || (AnyWindowOpen=23 && FillAreaInverted=1) || ((AnyWindowOpen=25 || AnyWindowOpen=55) && EraseAreaInvert=1) ? 1 : 0
    If (doInvertPreview=1 && dummy!="live")
    {
-      If (AnyWindowOpen=66 && FloodFillUseAlpha=1 && BrushToolOutsideSelection=3)|| (AnyWindowOpen=23 && FillAreaInverted=1) || ((AnyWindowOpen=25 || AnyWindowOpen=55) && EraseAreaInvert=1)
+      If ( (AnyWindowOpen=23 && FillAreaInverted=1) || ((AnyWindowOpen=25 || AnyWindowOpen=55) && EraseAreaInvert=1) )
          pPath := createImgSelPath(vPimgSelX, vPimgSelY, vPimgSelW, vPimgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
 
       getClampedVPimgBounds(vPimgSelX, vPimgSelY, kX, kY, vPimgSelW, vPimgSelH)
@@ -74511,24 +74513,46 @@ toggleBrushDrawInOutModes() {
 
    interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
    interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
-   BrushToolOutsideSelection := clampInRange(BrushToolOutsideSelection + 1, 1, 3, 1)
-   friendly := (BrushToolOutsideSelection=1) ? "ANYWHERE" : "INSIDE"
-   If (BrushToolOutsideSelection=3)
-      friendly := "OUTSIDE"
+   If (AnyWindowOpen=66) ; flood fill 
+   {
+      FloodFillSelectionMode := clampInRange(FloodFillSelectionMode + 1, 1, 4, 1)
+      friendly := (FloodFillSelectionMode=1) ? "ANYWHERE" : "INSIDE"
+      If (FloodFillSelectionMode=3)
+         friendly := "OUTSIDE"
+      Else If (FloodFillSelectionMode=4)
+         friendly := "ALPHA MASK"
 
-   If (BrushToolOutsideSelection>1 && AnyWindowOpen=66)
-      friendly .= " SELECTION"
-   If (AnyWindowOpen=64 || AnyWindowOpen=66)
-      GuiControl, SettingsGUIA: Choose, BrushToolOutsideSelection, % BrushToolOutsideSelection
+      If (FloodFillSelectionMode>1)
+         friendly .= " SELECTION"
 
-   If (editingSelectionNow!=1)
-      msgu := "WARNING: The image selection area is currently not created.`nPress E to create or display it.`n"
+      If (AnyWindowOpen=66)
+         GuiControl, SettingsGUIA: Choose, FloodFillSelectionMode, % FloodFillSelectionMode
 
-   If (ShowAdvToolbar=1)
-      decideIconBTNpaintBrushSelect()
+      If (editingSelectionNow!=1)
+         msgu := "WARNING: The image selection area is currently not created.`nPress E to create or display it.`n"
 
-   labelu := (AnyWindowOpen=66) ? "Flood fill selection mode:`n" friendly : "Paint " Friendly " image selection area"
-   showTOOLtip(msgu labelu, A_ThisFunc, 1, BrushToolOutsideSelection/3)
+      If (ShowAdvToolbar=1)
+         decideIconBTNpaintBrushSelect()
+
+      showTOOLtip(msgu "Flood fill selection mode:`n" friendly, A_ThisFunc, 1, FloodFillSelectionMode/4)
+   } Else ; brush tool 
+   {
+      BrushToolOutsideSelection := clampInRange(BrushToolOutsideSelection + 1, 1, 3, 1)
+      friendly := (BrushToolOutsideSelection=1) ? "ANYWHERE" : "INSIDE"
+      If (BrushToolOutsideSelection=3)
+         friendly := "OUTSIDE"
+
+      If (AnyWindowOpen=64)
+         GuiControl, SettingsGUIA: Choose, BrushToolOutsideSelection, % BrushToolOutsideSelection
+
+      If (editingSelectionNow!=1)
+         msgu := "WARNING: The image selection area is currently not created.`nPress E to create or display it.`n"
+
+      If (ShowAdvToolbar=1)
+         decideIconBTNpaintBrushSelect()
+
+      showTOOLtip(msgu "Paint " Friendly " image selection area", A_ThisFunc, 1, BrushToolOutsideSelection/3)
+   }
    SetTimer, RemoveTooltip, % -msgDisplayTime
    SetTimer, dummyRefreshImgSelectionWindow, -100
 }
@@ -75257,8 +75281,9 @@ ActFloodFillNow() {
    }
 
    hasCloned := 0
-   allowAlphaMasking := decideAlphaMaskingFeaseable(FloodFillUseAlpha)
-   allowSelectionCrop := (BrushToolOutsideSelection>1 && editingSelectionNow=1 && allowAlphaMasking=0) ? 1 : 0
+   useAlpha := (FloodFillSelectionMode=4 && editingSelectionNow=1) ? 1 : 0
+   allowAlphaMasking := (decideAlphaMaskingFeaseable(useAlpha) && alphaMaskingMode>1 && editingSelectionNow=1 && FloodFillSelectionMode=4) ? 1 : 0 
+   allowSelectionCrop := (FloodFillSelectionMode>1 && FloodFillSelectionMode!=4 && editingSelectionNow=1 && allowAlphaMasking=0) ? 1 : 0
    If (allowSelectionCrop=1 || allowAlphaMasking=1)
    {
       hasCloned := 1
@@ -75267,10 +75292,10 @@ ActFloodFillNow() {
          G2 := trGdip_GraphicsFromImage(A_ThisFunc, whichBitmap, 7, 4)
 
       calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-      If (editingSelectionNow=1 && BrushToolOutsideSelection>1)
+      If (allowSelectionCrop=1 || EllipseSelectMode>0)
          pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
 
-      If (!validBMP(thisBMP) || G2="" || (pPath="" && editingSelectionNow=1 && BrushToolOutsideSelection>1))
+      If (!validBMP(thisBMP) || G2="" || (pPath="" && allowSelectionCrop=1))
       {
          showTOOLtip("Failed to apply flood fill in the image selected area")
          SoundBeep , 300, 100
@@ -75296,74 +75321,49 @@ ActFloodFillNow() {
    blendMode := (FloodFillBlendMode>23) ? 1 : FloodFillBlendMode
    ; newColor := (BrushToolUseSecondaryColor=1) ? BrushToolBcolor : BrushToolAcolor 
    r := QPV_FloodFill(thisBMP, kX, kY, "0xff" FloodFillColor, FloodFillOpacity, blendMode - 1, cartoonMode)
-   If (r>0 && (pPath!="" && G2!="" && allowSelectionCrop=1 && hasCloned=1) || (validBMP(thisBMP) && allowAlphaMasking=1))
+   If (r>0 && hasCloned=1)
    {
-      If (allowAlphaMasking=1)
+      gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
+      kBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, thisBMP, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
+      trGdip_GetImageDimensions(gBitmap, zImgW, zImgH)
+      If (pPath!="" && allowSelectionCrop=1)
       {
-         gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
-         kBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, thisBMP, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
-         trGdip_GetImageDimensions(gBitmap, zImgW, zImgH)
+         alphaMaskGray := carvePathFromBitmap(gBitmap, pPath, imgSelPx, imgSelPy, 0, 2, 0, 0, 0, 0, 2)
+      } Else If (allowAlphaMasking=1)
+      {
          alphaMaskGray := generateAlphaMaskBitmap(0, 0, zImgW, zImgH, 0, 0, 0, 1, 0)
-         If validBMP(alphaMaskGray)
+         If (pPath!="")
          {
-            rza := QPV_MergeBitmapsWithMask(gBitmap, kBitmap, alphaMaskGray, alphaMaskColorReversed)
-            Gdip_SetClipRect(G2, imgSelPx, imgSelPy, zImgW, zImgh)
-            r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
-            r1 := trGdip_DrawImage(A_ThisFunc, G2, gBitmap, imgSelPx, imgSelPy)
+            maskBitmap := carvePathFromBitmap(gBitmap, pPath, imgSelPx, imgSelPy, 0, 2, 0, 0, 0, 0, 2)
+            QPV_BlendBitmaps(alphaMaskGray, maskBitmap, 5, 0, 0, 0)
+            trGdip_DisposeImage(maskBitmap, 1)
          }
-         trGdip_DisposeImage(gBitmap)
-         trGdip_DisposeImage(kBitmap)
-         trGdip_DisposeImage(alphaMaskGray)
       }
+
+      thisInvert := (FloodFillSelectionMode=3) ? 0 : 1
+      If (FloodFillSelectionMode=4)
+         thisInvert := alphaMaskColorReversed
+
+      If validBMP(alphaMaskGray)
+      {
+         Gdip_ResetClip(G2)
+         If (allowSelectionCrop=1 && FloodFillSelectionMode=3)
+         {
+            Gdip_GraphicsClear(G2)
+            r1 := trGdip_DrawImage(A_ThisFunc, G2, thisBMP, 0, 0)
+         }
+         rza := QPV_MergeBitmapsWithMask(gBitmap, kBitmap, alphaMaskGray, thisInvert)
+         Gdip_SetClipRect(G2, imgSelPx, imgSelPy, zImgW, zImgh)
+         Gdip_GraphicsClear(G2)
+         r1 := trGdip_DrawImage(A_ThisFunc, G2, gBitmap, imgSelPx, imgSelPy)
+      }
+      trGdip_DisposeImage(gBitmap)
+      trGdip_DisposeImage(kBitmap)
+      trGdip_DisposeImage(alphaMaskGray)
 
       trGdip_DisposeImage(thisBMP, 1)
       Gdip_DeleteGraphics(G2)
    }
-/*
-   If (r>0 && (pPath!="" && G2!="" && allowSelectionCrop=1 && hasCloned=1) || (validBMP(thisBMP) && allowAlphaMasking=1))
-   {
-      If (allowAlphaMasking=1)
-      {
-         If (editingSelectionNow=1 && BrushToolOutsideSelection=2)
-            gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, thisBMP, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
-
-         fBitmap := validBMP(gBitmap) ? gBitmap : thisBMP
-         thisIDu := "a" imgSelPx imgSelPy imgSelW imgSelH
-         realtimePasteInPlaceAlphaMasker(0, fBitmap, thisIDu, newBitmap, 0, 0, 0, 0)
-         If validBMP(newBitmap)
-         {
-            If validBMP(gBitmap)
-            {
-               G3 := trGdip_GraphicsFromImage(A_ThisFunc, thisBMP)
-               Gdip_SetClipRect(G3, imgSelPx, imgSelPy, imgSelW, imgSelH)
-               r0 := trGdip_GraphicsClear(A_ThisFunc, G3)
-               r1 := trGdip_DrawImage(A_ThisFunc, G3, newBitmap, imgSelPx, imgSelPy)
-               Gdip_DeleteGraphics(G3)
-               trGdip_DisposeImage(newBitmap, 1)
-            } Else
-            {
-               trGdip_DisposeImage(thisBMP, 1)
-               thisBMP := newBitmap
-            }
-         }
-         trGdip_DisposeImage(gBitmap, 1)
-         ; realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
-      }
-
-      thisMode := (BrushToolOutsideSelection=3) ? 4 : 0
-      If (pPath!="" && (allowSelectionCrop=1 || allowAlphaMasking=1))
-      {
-         Gdip_SetClipPath(G2, pPath, thisMode)
-         If (userimgGammaCorrect=1 && allowAlphaMasking=1)
-            Gdip_SetCompositingQuality(G2, 2)
-         If (allowAlphaMasking!=1)
-            r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
-      }
-      r1 := trGdip_DrawImage(A_ThisFunc, G2, thisBMP, 0, 0)
-      trGdip_DisposeImage(thisBMP, 1)
-      Gdip_DeleteGraphics(G2)
-   }
-*/
 
    If (pPath!="")
       Gdip_DeletePath(pPath)
@@ -98649,8 +98649,9 @@ decideIconBTNpaintBrushSelect() {
    initialIcon := tlbrIconzList["BTNpaintSelection", 2]
    w := tlbrIconzList[thisHwnd, 7]
    h := tlbrIconzList[thisHwnd, 8]
-   icoFile := (BrushToolOutsideSelection=1) ? "paint-any" : "paint-inside"
-   If (BrushToolOutsideSelection=3)
+   varu := (AnyWindowOpen=66) ? FloodFillSelectionMode : BrushToolOutsideSelection
+   icoFile := (varu=1) ? "paint-any" : "paint-inside"
+   If (varu=3)
       icoFile := "paint-outside"
 
    If (icoFile!=initialIcon)
@@ -99435,10 +99436,12 @@ processToolbarFunctions(btnID, actu, simulacrum:=0) {
       {
          If isImgEditingNow()
          {
-            If (AnyWindowOpen!=66)
-               func2Call := ["PanelFloodFillTool"]
-            Else
+            If (FloodFillSelectionAdj=1 && AnyWindowOpen=66)
+               func2Call := ["toggleAlphaPaintingMode"]
+            Else If (AnyWindowOpen=66)
                func2Call := ["tlbrFloodFillSlidersInvoker", 1]
+            Else
+               func2Call := ["PanelFloodFillTool"]
          }
       } Else If (btnID="BTNcalculate")
       {
@@ -101156,10 +101159,13 @@ tlbrDecideTooltips(hwnd) {
       msgu := "L: Brush aspect ratio: " BrushToolAspectRatio "% «Alt + ]»`nR: Reset brush aspect ratio"
    } Else If (btnID="BTNpaintSelection")
    {
-      friendly := (BrushToolOutsideSelection=1) ? "ANYWHERE" : "INSIDE"
-      If (BrushToolOutsideSelection=3)
+      varuz := (AnyWindowOpen=66) ? FloodFillSelectionMode : BrushToolOutsideSelection
+      friendly := (varuz=1) ? "ANYWHERE" : "INSIDE"
+      If (varuz=3)
          friendly := "OUTSIDE"
-      msgu := "Paint " Friendly " image selection area`nCycle through options «Shift + K»"
+      If (varuz=4 && alphaMaskingMode>1)
+         pko := "`nAn alpha mask will be applied"
+      msgu := "Paint " Friendly " image selection area`nCycle through options «Shift + K»" pko
    } Else If InStr(icoFile, "vp-grid")
    {
       b := (drawingShapeNow=1) ? "Toggle" : "Configure"
