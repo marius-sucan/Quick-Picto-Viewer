@@ -21711,8 +21711,8 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
 
          ; fnOutputDebug(imgSelX1 "|" imgSelY1 "||" imgSelX2 "|" imgSelY2 "||" thisSelW "|" thisSelH)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
-         fnOutputDebug(A_ThisFunc ": " UserAddNoiseGrays " | " IDedgesBlendMode - 1)
-         r := DllCall("qpvmain.dll\GenerateRandomNoiseOnBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped)
+         ; fnOutputDebug(A_ThisFunc ": " UserAddNoiseGrays " | " IDedgesBlendMode - 1)
+         r := DllCall("qpvmain.dll\GenerateRandomNoiseOnBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect)
          If (UserAddNoisePixelizeAmount>0)
             FreeImage_UnLoad(hFIFimgZ)
       } Else If InStr(modus, "color")
@@ -22863,9 +22863,6 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
        thisThick := (DrawLineAreaContourThickness > maxLength//1.05) ? maxLength//1.05 : DrawLineAreaContourThickness
        If (modus!="shapes" && (DrawLineAreaBorderCenter=2 || DrawLineAreaBorderCenter=3))
           thisThick := DrawLineAreaContourThickness
-
-       If (userimgGammaCorrect=1)
-          Gdip_SetCompositingQuality(G2, 2)
     } Else
     {
        G2 := 2NDglPG ; preview mode
@@ -22903,8 +22900,7 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
        tky := (o_imgSelH>mainHeight) ? 0 : tk
        ; ToolTip, % "y=" imgSelPy " | ty=" tky " | h=" dh , , , 2
        bx := by := 0
-       thisBlendMode := DrawLineAreaBlendMode
-       If (thisBlendMode>1 && !testSelectOutsideImgEntirely(useGdiBitmap()))
+       If (DrawLineAreaBlendMode>0 && !testSelectOutsideImgEntirely(useGdiBitmap()))
        {
           previewMode := 2
           xBitmap := trGdip_CreateBitmap(A_ThisFunc, dw, dh, "0x26200A")
@@ -22941,24 +22937,25 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
     If (previewMode>0)
        Gdip_SetClipRect(G2, 0, 0, mainWidth, mainHeight, 0)
 
+    If (userimgGammaCorrect=1)
+       Gdip_SetCompositingQuality(G2, 2)
+
     If (modus="shapes")
        rz := coreDrawShapesLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgSelW, imgSelH)
     Else
        rz := coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgSelW, imgSelH)
 
     Gdip_ResetClip(G2)
-    If (userimgGammaCorrect=1)
-       Gdip_SetCompositingQuality(G2, 1)
-
     If (previewMode=2)
     {
        Gdip_DeleteGraphics(G2)
-       Gdip_ResetClip(2NDglPG)
-       QPV_BlendBitmaps(bgrBMPu, xBitmap, thisBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1)
+       QPV_BlendBitmaps(bgrBMPu, xBitmap, DrawLineAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1)
        If (currIMGdetails.HasAlpha=1)
           Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, o_imgSelPx - tkx + bx, o_imgSelPy - tky + by, dw, dh)
+       
        trGdip_DrawImage(A_ThisFunc, 2NDglPG, bgrBMPu, o_imgSelPx - tkx + bx, o_imgSelPy - tky + by, dw, dh)
        trGdip_DisposeImage(xBitmap)
+       Gdip_ResetClip(2NDglPG)
     }
 
     If validBMP(bgrBMPu)
@@ -23920,12 +23917,6 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
        noiseBMP := resizeBitmapToGivenRef(noiseBMP, 0, imgSelW, imgSelH, 5)
 
     fBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
-    ; If (thisBlurAmount>1 && blurAreaEqualXY=1 && UserAddNoiseMode>1)
-    ; {
-    ;    pEffect := Gdip_CreateEffect(1, thisBlurAmount, 0, 0)
-    ;    ApplySpecialFixedBlur(A_ThisFunc, noiseBMP, thisBlurAmount, pEffect)
-    ;    Gdip_DisposeEffect(pEffect)
-    ; } Else If (blurAreaEqualXY=0 && max(thisBlurAmount, thisBlurAmountY)>1 && UserAddNoiseMode>1)
     If (max(thisBlurAmount, thisBlurAmountY)>1 && UserAddNoiseMode>1)
        QPV_BlurBitmapFilters(noiseBMP, thisBlurAmount, thisBlurAmountY, 0)
 
@@ -23939,19 +23930,13 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
     }
 
     If (IDedgesInvert=1 && UserAddNoiseMode>1)
-    {
-       ; invert image
-       zEffect := Gdip_CreateEffect(7, 0, 0, 100)
-       If zEffect
-          Gdip_BitmapApplyEffect(noiseBMP, zEffect)
-       Gdip_DisposeEffect(zEffect)
-    }
+       Gdip_BitmapApplyInvert(noiseBMP)
 
     If (IDedgesBlendMode>1 && UserAddNoiseMode>1)
     {
        gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
        If validBMP(gBitmap)
-          QPV_BlendBitmaps(gBitmap, noiseBMP, IDedgesBlendMode - 1, 0, BlendModesFlipped)
+          QPV_BlendBitmaps(gBitmap, noiseBMP, IDedgesBlendMode - 1, 0, BlendModesFlipped, userimgGammaCorrect)
     }
 
     ; r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
@@ -23972,16 +23957,12 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
     }
 
     r1 := trGdip_DrawImage(A_ThisFunc, G2, thisBMP, imgSelPx, imgSelPy, imgSelW, imgSelH,,,,, thisOpacity)
-    ; fnOutputDebug(A_ThisFunc ": fbitmap=" fbitmap)
     trGdip_DisposeImage(fBitmap, 1)
-    ; fnOutputDebug(A_ThisFunc ": gbitmap=" gbitmap)
     trGdip_DisposeImage(gBitmap, 1)
-    ; fnOutputDebug(A_ThisFunc ": newbitmap=" newbitmap)
     trGdip_DisposeImage(newBitmap, 1)
     If (noiseBMP!=newBitmap)
        trGdip_DisposeImage(noiseBMP, 1)
 
-    ; fnOutputDebug(A_ThisFunc ": noiseBMP=" noiseBMP)
     ; fnOutputDebug(A_ThisFunc ": alpha masker krill")
     realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
     Gdip_DeletePath(pPath)
@@ -24090,7 +24071,7 @@ livePreviewAddNoiser(modus:=0) {
 
           QPV_PrepareHugeImgSelectionArea(0, 0, imgBoxSizeW - 1, imgBoxSizeH - 1, imgBoxSizeW, imgBoxSizeH, 0, 0, 0, 0, 0, 0, 1)
           E1 := trGdip_LockBits(cornersBMP, 0, 0, imgBoxSizeW, imgBoxSizeH, stride, iScan, iData)
-          r0 := DllCall("qpvmain.dll\GenerateRandomNoiseOnBitmap", "UPtr", iScan, "Int", imgBoxSizeW, "Int", imgBoxSizeH, "int", stride, "int", 32, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped)
+          r0 := DllCall("qpvmain.dll\GenerateRandomNoiseOnBitmap", "UPtr", iScan, "Int", imgBoxSizeW, "Int", imgBoxSizeH, "int", stride, "int", 32, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect)
           Gdip_UnlockBits(cornersBMP, iData)
           If (UserAddNoisePixelizeAmount>0)
              FreeImage_UnLoad(hFIFimgZ)
@@ -50353,7 +50334,7 @@ ReadSettingsBlurPanel(act:=0) {
     RegAction(act, "BlurAreaInverted",, 1)
     RegAction(act, "blurAreaSoftEdges",, 1)
     RegAction(act, "blurAreaSoftLevel",, 2, 1, 6)
-    RegAction(act, "BlurAreaBlendMode",, 2, 1, 24)
+    RegAction(act, "BlurAreaBlendMode",, 2, 1, 26)
     RegAction(act, "blurAreaTwice",, 1)
     RegAction(act, "BlurAreaAlphaMask",, 1)
     RegAction(act, "blurAreaApplyFX",, 1)
@@ -50737,7 +50718,7 @@ ReadSettingsAddNoisePanel(act:=0) {
     RegAction(act, "IDedgesEmphasis",, 2, -255, 255)
     RegAction(act, "IDedgesContrast",, 2, -100, 100)
     RegAction(act, "IDedgesInvert",, 1)
-    RegAction(act, "IDedgesBlendMode",, 2, 1, 23)
+    RegAction(act, "IDedgesBlendMode",, 2, 1, 26)
     RegAction(act, "UserAddNoiseGrays",, 1)
     RegAction(act, "UserAddNoiseIntensity",, 2, 1, 100)
     RegAction(act, "UserAddNoiseTransparent",, 1)
@@ -50952,7 +50933,8 @@ PanelAddNoiserImage() {
     Gui, Add, Text, xs y+7 hp w%2ndcol% +0x200 gBtnResetEdgesBlendMode +TabStop +hwndhTemp, Blending mode:
     GuiAddDropDownList("x+7 wp-27 gupdateUIaddNoisePanel AltSubmit Choose" IDedgesBlendMode " vIDedgesBlendMode", "None|" userBlendModesList, [hTemp])
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIaddNoisePanel")
-    GuiAddSlider("IDedgesOpacity", 3,255, 255, "Opacity", "updateUIaddNoisePanel", 1, "xs y+10 w" txtWid - 1 " hp")
+    GuiAddSlider("IDedgesOpacity", 3,255, 255, "Opacity", "updateUIaddNoisePanel", 1, "xs y+10 w" txtWid - 27 " hp")
+    GuiAddCheckbox("x+1 hp w26 gupdateUIaddNoisePanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
 
     thisW := (PrefsLargeFonts=1) ? 85 : 65
     Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default gBtnAddNoiseNow w%btnWid%, &Add noise
