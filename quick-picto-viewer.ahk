@@ -23897,10 +23897,13 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
     thisBlurAmountY := (doubleBlurPreviewArea=1 && previewMode=1) ? blurAreaYamount//2 : blurAreaYamount
     thisBlurAmount := Round(thisBlurAmount*1.5)
     thisBlurAmountY := Round(thisBlurAmountY*1.5)
+    If (blurAreaEqualXY=1)
+       thisBlurAmountY := thisBlurAmount
+
     If (UserAddNoiseMode=1) ; gaussian
     {
        noiseBMP := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
-       noiseBMP := QPV_CreateGaussianNoiseBMP(noiseBMP, UserAddNoiseIntensity*3)
+       noiseBMP := QPV_AddGaussianNoiseOnBitmap(noiseBMP, UserAddNoiseIntensity*3)
     } Else If (UserAddNoiseMode=2) ; weird noise
        noiseBMP := QPV_CreateBitmapNoise(thisImgW, thisImgH, UserAddNoiseIntensity, UserAddNoiseGrays, 1, !UserAddNoiseTransparent)
     Else ; plasma
@@ -23916,7 +23919,6 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
     If (thisPixelize>1 && UserAddNoiseMode=2 && validBMP(noiseBMP))
        noiseBMP := resizeBitmapToGivenRef(noiseBMP, 0, imgSelW, imgSelH, 5)
 
-    fBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
     If (max(thisBlurAmount, thisBlurAmountY)>1 && UserAddNoiseMode>1)
        QPV_BlurBitmapFilters(noiseBMP, thisBlurAmount, thisBlurAmountY, 0)
 
@@ -23932,44 +23934,40 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
     If (IDedgesInvert=1 && UserAddNoiseMode>1)
        Gdip_BitmapApplyInvert(noiseBMP)
 
-    If (IDedgesBlendMode>1 && UserAddNoiseMode>1)
+    If (previewMode!=1 && EllipseSelectMode>0)
     {
-       gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
-       If validBMP(gBitmap)
-          QPV_BlendBitmaps(gBitmap, noiseBMP, IDedgesBlendMode - 1, 0, BlendModesFlipped, userimgGammaCorrect)
+       maskBitmap := carvePathFromBitmap(noiseBMP, pPath, pB.x, pB.y, 0, 2, 0, 0, 0, 0, 2)
+       QPV_SetBitmapAsAlphaChannel(noiseBMP, maskBitmap, 1)
+       trGdip_DisposeImage(maskBitmap)
     }
 
-    ; r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
-    thisOpacity := IDedgesOpacity/255
-    thisBMP := (IDedgesBlendMode>1 && validBMP(gBitmap)) ? gBitmap : noiseBMP
-    If (previewMode!=1)
-       carvePathFromBitmap(thisBMP, pPath, pB.x, pB.y, 4)
-
-    If (allowAlphaMasking=1 && validBMP(fBitmap) && previewMode!=1)
+    If (allowAlphaMasking=1 && previewMode!=1 && alphaMaskingMode>1)
     {
-       realtimePasteInPlaceAlphaMasker(0, thisBMP, "lol", newBitmap, 0, 0, 0, 0)
-       If validBMP(newBitmap)
-       {
-          r2 := trGdip_DrawImage(A_ThisFunc, G2, fBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH)
-          trGdip_DisposeImage(thisBMP, 1)
-          thisBMP := newBitmap
-       }
+       trGdip_GetImageDimensions(noiseBMP, zzw, zzh)
+       alphaMaskGray := generateAlphaMaskBitmap(0, 0, zzw, zzh, 0, 0, 0, 1, 0)
+       QPV_SetBitmapAsAlphaChannel(noiseBMP, alphaMaskGray, alphaMaskColorReversed)
+       trGdip_DisposeImage(alphaMaskGray)
     }
 
-    r1 := trGdip_DrawImage(A_ThisFunc, G2, thisBMP, imgSelPx, imgSelPy, imgSelW, imgSelH,,,,, thisOpacity)
-    trGdip_DisposeImage(fBitmap, 1)
-    trGdip_DisposeImage(gBitmap, 1)
-    trGdip_DisposeImage(newBitmap, 1)
-    If (noiseBMP!=newBitmap)
-       trGdip_DisposeImage(noiseBMP, 1)
+    Gdip_SetClipRect(G2, imgSelPx, imgSelPy, imgSelW, imgSelH)
+    thisBMP := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
+    Gdip_GraphicsClear(G2)
+    If (UserAddNoiseMode=1)
+       rz := QPV_BlendBitmaps(thisBMP, noiseBMP, 23, 1, 0, userimgGammaCorrect, 1, 255 - IDedgesOpacity)
+    Else
+       rz := QPV_BlendBitmaps(thisBMP, noiseBMP, IDedgesBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1, 255 - IDedgesOpacity)
 
-    ; fnOutputDebug(A_ThisFunc ": alpha masker krill")
+    r1 := trGdip_DrawImage(A_ThisFunc, G2, thisBMP, imgSelPx, imgSelPy, imgSelW, imgSelH)
     realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
+    trGdip_DisposeImage(thisBMP, 1)
+    trGdip_DisposeImage(noiseBMP, 1)
     Gdip_DeletePath(pPath)
     If (previewMode=1)
        Gdip_DeleteGraphics(G2)
 
     er := r1 ? r1 : r0
+    If !rz 
+       er := "fail"
     Return er
 }
 
@@ -24199,7 +24197,7 @@ QPV_SharpenBitmap(pBitmap, amount, radius, typeu) {
   Return r
 }
 
-QPV_CreateGaussianNoiseBMP(pBitmap, intensity) {
+QPV_AddGaussianNoiseOnBitmap(pBitmap, intensity) {
   initQPVmainDLL()
   If !qpvMainDll
   {

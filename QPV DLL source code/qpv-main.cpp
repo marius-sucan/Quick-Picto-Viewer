@@ -4228,9 +4228,9 @@ DLL_API int DLL_CALLCONV MergeBitmapsWithMask(unsigned char *originalData, unsig
 
             if (bpp==32)
                oA = originalData[3 + o];
-            int oR = originalData[2 + o];
-            int oG = originalData[1 + o];
-            int oB = originalData[o];
+            const int oR = originalData[2 + o];
+            const int oG = originalData[1 + o];
+            const int oB = originalData[o];
             float fintensity = char_to_float[intensity];
             if (linearGamma==1)
             {
