@@ -19518,25 +19518,26 @@ SharpenSelectedArea() {
     Else
        zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1)
 
+    orii := trGdip_CloneBitmap(A_ThisFunc, zBitmap)
     Gdip_SetClipPath(G2, pPath, modus)
     r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
     If (ImageSharpenMode=3)
     {
-       gk := trGdip_CloneBitmap(A_ThisFunc, zBitmap)
-       gb := trGdip_CloneBitmap(A_ThisFunc, zBitmap)
-       r0 := coreDetectEdgesSelectedArea(gk, 3)
-       QPV_SharpenBitmap(gb, ImageSharpenAmount, ImageSharpenRadius, ImageSharpenMode)
-       rr := QPV_SetBitmapAsAlphaChannel(gb, r0)
+       sharpBMP := trGdip_CloneBitmap(A_ThisFunc, orii)
+       edgesBitmap := coreDetectEdgesSelectedArea(orii, 3)
+       QPV_SharpenBitmap(sharpBMP, ImageSharpenAmount, ImageSharpenRadius, ImageSharpenMode)
+       rr := QPV_SetBitmapAsAlphaChannel(sharpBMP, edgesBitmap)
        ; ToolTip, % "rr=" rr , , , 2
-       Gp := Gdip_GraphicsFromImage(zBitmap)
-       tzGdip_DrawImageFast(Gp, gb, 0, 0)
-       Gdip_DeleteGraphics(Gp)
-       trGdip_DisposeImage(gk)
-       trGdip_DisposeImage(r0)
-       trGdip_DisposeImage(gb)
+       rz := QPV_BlendBitmaps(zBitmap, sharpBMP, 23, 1, 0, userimgGammaCorrect, 1)
+       trGdip_DisposeImage(edgesBitmap, 1)
+       trGdip_DisposeImage(sharpBMP, 1)
     } Else
+    {
        QPV_SharpenBitmap(zBitmap, ImageSharpenAmount, ImageSharpenRadius, ImageSharpenMode)
+       rr := QPV_SetBitmapAsAlphaChannel(zBitmap, orii, 0, 1, 4)
+    }
 
+    trGdip_DisposeImage(orii)
     If (BlurAreaInverted=1)
        r1 := tzGdip_DrawImage(G2, zBitmap)
     Else
