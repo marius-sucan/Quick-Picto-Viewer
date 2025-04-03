@@ -22800,7 +22800,7 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
              SetTimer, RemoveTooltip, % -msgDisplayTime
              SetTimer, ResetImgLoadStatus, -150
              Gdip_DeletePath(kPath)
-             Return -1
+             Return -2
           }
        }
 
@@ -22946,15 +22946,19 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
     Else
        rz := coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgSelW, imgSelH)
 
+    If rz
+       addJournalEntry("Failed to draw lines: " A_ThisFunc "(). Code=" rz ". " modus)
+
     Gdip_ResetClip(G2)
-    If (previewMode=2)
+    If (previewMode=2 && !rz)
     {
        Gdip_DeleteGraphics(G2)
-       QPV_BlendBitmaps(bgrBMPu, xBitmap, DrawLineAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1)
+       rza := QPV_BlendBitmaps(bgrBMPu, xBitmap, DrawLineAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1)
        If (currIMGdetails.HasAlpha=1)
           Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, o_imgSelPx - tkx + bx, o_imgSelPy - tky + by, dw, dh)
-       
-       trGdip_DrawImage(A_ThisFunc, 2NDglPG, bgrBMPu, o_imgSelPx - tkx + bx, o_imgSelPy - tky + by, dw, dh)
+
+       If (rza=1)
+          trGdip_DrawImage(A_ThisFunc, 2NDglPG, bgrBMPu, o_imgSelPx - tkx + bx, o_imgSelPy - tky + by, dw, dh)
        trGdip_DisposeImage(xBitmap)
        Gdip_ResetClip(2NDglPG)
     }
@@ -22968,8 +22972,11 @@ coreDrawShapesLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgSelW,
     thisPen := createDrawLinesPen(thisThick)
     allowCavity := (DrawLineAreaContourAlign<=2) ? 1 : 0
     pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, 2, allowCavity)
-    modus := (DrawLineAreaContourAlign=1) ? 0 : 4
+    If (pPath="")
+       Return -1
+
     Gdip_ResetClip(G2)
+    modus := (DrawLineAreaContourAlign=1) ? 0 : 4
     If (DrawLineAreaContourAlign!=2)
     {
        If (FillAreaShape=3 && FillAreaEllipsePie=1 && FillAreaEllipseSection<1440)
@@ -22989,10 +22996,11 @@ coreDrawShapesLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgSelW,
        Gdip_SetClipRect(G2, imgSelPx - tk//1.6, imgSelPy - tk//1.6, imgSelW + tk*1.255, imgSelH + tk*1.255, 1)
     }
 
-    Gdip_DrawPath(G2, thisPen, pPath)
+    rr := Gdip_DrawPath(G2, thisPen, pPath)
     Gdip_ResetClip(G2)
     Gdip_DeletePath(pPath)
     ; Gdip_DeletePen(thisPen)   // it is always reused
+    Return rr
 }
 
 createPiePath(imgSelPx, imgSelPy, imgSelW, imgSelH, err:=0, pPath:=0, endAngle:=1440, pieMode:=1) {
@@ -23733,15 +23741,15 @@ detectEdgesSelectedArea() {
 coreDetectEdgesSelectedArea(whichBitmap, previewMode, Gu:=0) {
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-    If (previewMode=3)
+    If (previewMode=3 || previewMode=1)
     {
        G2 := trGdip_GraphicsFromImage(A_ThisFunc, whichBitmap, 7, 4)
        If !G2
-          Return
+          Return "fail"
 
        imgSelPx := imgSelPy := 0
        imgSelW := imgW, imgSelH := imgH
-    } Else If (previewMode!=1)
+    } Else
     {
        G2 := Gu
        pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY, 0)
@@ -23753,16 +23761,6 @@ coreDetectEdgesSelectedArea(whichBitmap, previewMode, Gu:=0) {
           imgSelPx := imgSelPy := 0
           imgSelW := imgW, imgSelH := imgH
        }
-    } Else
-    {
-       G2 := trGdip_GraphicsFromImage(A_ThisFunc, whichBitmap, 7, 4)
-       If !G2
-       {
-          SetTimer, ResetImgLoadStatus, -100
-          Return "fail"
-       }
-       imgSelPx := imgSelPy := 0
-       imgSelW := imgW, imgSelH := imgH
     }
 
     prebrighten := (IDedgesPreEmphasis<0) ? IDedgesPreEmphasis - IDedgesPreContrast * abs(IDedgesPreEmphasis)/255 : IDedgesPreEmphasis
@@ -23771,43 +23769,43 @@ coreDetectEdgesSelectedArea(whichBitmap, previewMode, Gu:=0) {
     postcontrast := (IDedgesContrast<0) ? 1 - abs(IDedgesContrast)/100 : (IDedgesContrast + 25) / 25
     extendedClone := testSelectionLargerThanGiven(imgW, imgH)
     fBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
-    If (IDedgesBlendMode>1 && previewMode!=3)
+    If (IDedgesBlendMode>0 && previewMode!=3)
        gBitmap := trGdip_CloneBitmap(A_ThisFunc, fBitmap)
 
     Gdip_BitmapSetColorDepth(fBitmap, 24)
     obj := generateAcceptedValuesEdgesDetection()
     If (IDedgesModus<5)
        QPV_DetectEdgesFilters(fBitmap, IDedgesModus, obj[1], obj[2], obj[3], IDedgesEmbossLvl, IDedgesAfterBlur, IDedgesInvert, prebrighten, precontrast, postbrighten, postcontrast)
-    else
+    Else
        QPV_DiffBlendBitmap(fBitmap, IDedgesXuAmount, IDedgesYuAmount, IDedgesCenterAmount, IDedgesAfterBlur, IDedgesInvert, prebrighten, precontrast, postbrighten, postcontrast)
 
-    If (IDedgesBlendMode>1 && validBMP(gBitmap))
-    {
-       QPV_BlendBitmaps(gBitmap, fBitmap, IDedgesBlendMode - 1, 0, BlendModesFlipped)
-       If (previewMode!=1 && IDedgesOpacity>253)
-          r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
-    }
+    thisBlendMode := (IDedgesBlendMode>24) ? 24 : IDedgesBlendMode
+    preserveAlpha := (IDedgesBlendMode>1) ? 1 : 0
+    If (IDedgesBlendMode>0 && validBMP(gBitmap))
+       QPV_BlendBitmaps(gBitmap, fBitmap, thisBlendMode - 1, preserveAlpha, BlendModesFlipped, userimgGammaCorrect, 0, 255 - IDedgesOpacity)
 
     If (previewMode!=3)
     {
-       thisOpacity := IDedgesOpacity/255
-       thisBMP := (IDedgesBlendMode>1 && validBMP(gBitmap)) ? gBitmap : fBitmap
-       If (previewMode!=1)
+       thisBMP := (IDedgesBlendMode>0 && validBMP(gBitmap)) ? gBitmap : fBitmap
+       If (previewMode=0)
        {
           modus := (BlurAreaInverted=1) ? 4 : 0
           Gdip_SetClipPath(G2, pPath, modus)
+          r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
        }
 
-       r1 := trGdip_DrawImage(A_ThisFunc, G2, thisBMP, imgSelPx, imgSelPy, imgSelW, imgSelH,,,,, thisOpacity)
+       r1 := trGdip_DrawImage(A_ThisFunc, G2, thisBMP, imgSelPx, imgSelPy, imgSelW, imgSelH)
        trGdip_DisposeImage(fBitmap, 1)
        Gdip_ResetClip(G2)
     }
 
-    Gdip_DeletePath(pPath)
     trGdip_DisposeImage(zBitmap, 1)
     trGdip_DisposeImage(gBitmap, 1)
-    If (previewMode=1)
+    If (previewMode=3 || previewMode=1)
        Gdip_DeleteGraphics(G2)
+    Else
+       Gdip_DeletePath(pPath)
+ 
     er := r1 ? r1 : r0
     Return (previewMode=3) ? fBitmap : er
 }
@@ -43760,7 +43758,6 @@ updateUIfloodFillPanel() {
 }
 
 ReadSettingsFloodFillPanel(act:=0) {
-   RegAction(act, "FloodFillSelectionMode",, 2, 1, 4)
    RegAction(act, "FloodFillOpacity",, 2, 4, 255)
    RegAction(act, "FloodFillBlendMode",, 2, 1, 23)
    RegAction(act, "FloodFillColor",, 3)
@@ -50744,7 +50741,7 @@ PanelDetectEdgesImage() {
     initQPVmainDLL()
     wasSelect := editingSelectionNow
     If (editingSelectionNow!=1)
-       selectEntireImage("r")
+       ToggleEditImgSelection()
 
     thisBtnHeight := createSettingsGUI(43, A_ThisFunc)
     ReadSettingsEdgesPanel()
@@ -50761,7 +50758,7 @@ PanelDetectEdgesImage() {
        Gui, Font, s%LargeUIfontValue%
     }
 
-    2ndcol := (PrefsLargeFonts=1) ? 155 : 130
+    2ndcol := (PrefsLargeFonts=1) ? 196 : 165
     tinyPrevAreaCoordX := imgSelX1 + 125
     tinyPrevAreaCoordY := imgSelY1 + 125
     gW := (PrefsLargeFonts=1) ? 385 : 330
@@ -50779,10 +50776,10 @@ PanelDetectEdgesImage() {
     If (PrefsLargeFonts=1)
        Gui, Font, s%LargeUIfontValue%
 
-    thisW := (PrefsLargeFonts=1) ? 68 : 48
+    thisW := (PrefsLargeFonts=1) ? 88 : 68
     thisPW := (PrefsLargeFonts=1) ? thisW + 9 : thisW + 16
     Gui, +DPIScale
-    Gui, Add, Text, x+20 ys +0x200 Section w%thisW% hwndhTemp, Algorithm:
+    Gui, Add, Text, x+20 ys +0x200 Section w%thisW% hwndhTemp, Algorithm
     GuiAddDropDownList("x+3 w" thisW*2 " gupdateUIddlEdgesModusPanel AltSubmit Choose" IDedgesModus " vIDedgesModus", "Sobel|Sobel (alt)|Scharr|Canny|Diff-blending", [hTemp, 0, "Edge detection mode"])
     GuiAddButton("x+1 hp w26 gBtnHelpEdgeDetection", " ?", "Help")
     GuiAddSlider("IDedgesXuAmount", -3, 3, "0f", ".|updateLabelAlgorithmSliderEdgesPanel", "updateUIedgesPanel", 2, "xs y+7 w" thisPW " hp")
@@ -50798,7 +50795,7 @@ PanelDetectEdgesImage() {
     GuiAddSlider("IDedgesContrast", -100, 100, 0, "Out Contrast", "updateUIedgesPanel", 2, "x+5 wp hp")
     GuiAddSlider("IDedgesOpacity", 3, 255, 255, "Opacity", "updateUIedgesPanel", 1, "xs y+10 wp hp")
     GuiAddSlider("IDedgesAfterBlur", 0, 10, 0, "Out blur: $€", "updateUIedgesPanel", 1, "x+5 wp hp")
-    Gui, Add, Text, xs y+10 wp hp +0x200 -wrap gBtnResetEdgesBlendMode +TabStop, Blending mode:
+    Gui, Add, Text, xs y+10 wp hp +0x200 -wrap gBtnResetEdgesBlendMode +TabStop, Blending mode
     GuiAddDropDownList("x+5 wp-27 gupdateUIedgesPanel AltSubmit Choose" IDedgesBlendMode " vIDedgesBlendMode", "None|" userBlendModesList)
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIedgesPanel")
     Gui, Add, Checkbox, xs y+10 hp gupdateUIedgesPanel Checked%IDedgesInvert% vIDedgesInvert, &Invert output image
@@ -50865,7 +50862,7 @@ PanelAddNoiserImage() {
     initQPVmainDLL()
     wasSelect := editingSelectionNow
     If (editingSelectionNow!=1)
-       selectEntireImage("r")
+       ToggleEditImgSelection()
 
     thisBtnHeight := createSettingsGUI(44, A_ThisFunc)
     ReadSettingsAddNoisePanel()
@@ -57666,7 +57663,7 @@ PanelSharpenImage() {
     initQPVmainDLL()
     wasSelect := editingSelectionNow
     If (editingSelectionNow!=1)
-       selectEntireImage("r")
+       ToggleEditImgSelection()
 
     thisBtnHeight := createSettingsGUI(79, A_ThisFunc)
     ReadSettingsEdgesPanel()

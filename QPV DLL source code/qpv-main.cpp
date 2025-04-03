@@ -2236,7 +2236,7 @@ RGBColorI calculateBlendModes(int rO, int gO, int bO, int rB, int gB, int bB, in
 }
 
 RGBAColor NEWERcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, const int blendMode, const int flipLayers, const int linearGamma, const int keepAlpha, const int bpp, const int opacity) {
-    // TO-DO this function must supersede/replace calculateBlendModes() used by ColourBrush() and FloodFill()
+    // TO-DO this function must supersede/replace calculateBlendModes() used by clrBrushMixColors()
     float rT, gT, bT;
     Orgb.a = clamp(Orgb.a - opacity, 0, 255);
     int oA = (keepAlpha==1 && blendMode==0 && flipLayers==1 || blendMode==25 || blendMode==0) ? -1 : Brgb.a;
@@ -2307,17 +2307,17 @@ RGBAColor NEWERcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, const int ble
     }
 
     // Convert everything to floats
-    float rOf = (linearGamma==1) ? char_to_floatGamma[Orgb.r] : char_to_float[Orgb.r];
-    float gOf = (linearGamma==1) ? char_to_floatGamma[Orgb.g] : char_to_float[Orgb.g];
-    float bOf = (linearGamma==1) ? char_to_floatGamma[Orgb.b] : char_to_float[Orgb.b];
-    float rBf = (linearGamma==1) ? char_to_floatGamma[Brgb.r] : char_to_float[Brgb.r];
-    float gBf = (linearGamma==1) ? char_to_floatGamma[Brgb.g] : char_to_float[Brgb.g];
-    float bBf = (linearGamma==1) ? char_to_floatGamma[Brgb.b] : char_to_float[Brgb.b];
+    const float rOf = (linearGamma==1) ? char_to_floatGamma[Orgb.r] : char_to_float[Orgb.r];
+    const float gOf = (linearGamma==1) ? char_to_floatGamma[Orgb.g] : char_to_float[Orgb.g];
+    const float bOf = (linearGamma==1) ? char_to_floatGamma[Orgb.b] : char_to_float[Orgb.b];
+    const float rBf = (linearGamma==1) ? char_to_floatGamma[Brgb.r] : char_to_float[Brgb.r];
+    const float gBf = (linearGamma==1) ? char_to_floatGamma[Brgb.g] : char_to_float[Brgb.g];
+    const float bBf = (linearGamma==1) ? char_to_floatGamma[Brgb.b] : char_to_float[Brgb.b];
 
     // Alpha factors for blending
-    float sa = char_to_float[Orgb.a];
-    float da = char_to_float[Brgb.a];
-    float oa = char_to_float[result.a];  // Output alpha
+    const float sa = char_to_float[Orgb.a];
+    const float da = char_to_float[Brgb.a];
+    const float oa = char_to_float[result.a];  // Output alpha
 
     if (blendMode == 0 || blendMode == 25) { // normal / behind
         rT = rOf;
@@ -2459,15 +2459,16 @@ RGBAColor NEWERcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, const int ble
     rT = clamp(rT, 0.0f, 1.0f);
     gT = clamp(gT, 0.0f, 1.0f);
     bT = clamp(bT, 0.0f, 1.0f); 
-    if (Brgb.a<255 && blendMode>0) {
+    const bool mix = (keepAlpha!=1 || blendMode>=22 || blendMode<2) ? 1 : 0;
+    if (Brgb.a<255 && blendMode>0 && mix==1) {
        rT = weighTwoValues(rOf, rT, 1.0f - da, 1);
        gT = weighTwoValues(gOf, gT, 1.0f - da, 1);
        bT = weighTwoValues(bOf, bT, 1.0f - da, 1);
     }
 
     // Alpha composite the RGB channels
-    float ra = sa + da * (1.0f - sa);
-    if (ra > 0) {
+    const float ra = sa + da * (1.0f - sa);
+    if (ra>0) {
        rT = (sa * rT + da * (1.0f - sa) * rBf) / ra;
        gT = (sa * gT + da * (1.0f - sa) * gBf) / ra;
        bT = (sa * bT + da * (1.0f - sa) * bBf) / ra;
@@ -3315,12 +3316,10 @@ DLL_API int DLL_CALLCONV PrepareAlphaChannelBlur(int *imageData, int w, int h, i
     return 1;
 }
 
-/*
-pBitmap and pBitmap2Blend must be the same width and height
-and in 32-ARGB or 24-RGB format.
-*/
-
 DLL_API int DLL_CALLCONV BlendBitmaps(unsigned char* bgrImageData, unsigned char* otherData, int w, int h, int Stride, int bpp, int blendMode, int flipLayers,int keepAlpha, int linearGamma, int opacity) {
+    // pBitmap and pBitmap2Blend must be the same width and height
+    // and in 32-ARGB or 24-RGB format.
+
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int x = 0; x < w; x++)
     {
