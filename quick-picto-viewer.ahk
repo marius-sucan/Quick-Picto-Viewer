@@ -18515,16 +18515,17 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0, ByRef hasAlph
             applyPersonalizedColorsBMP(glassBitmap, 0, 0, FillAreaApplyColorFX)
 
          o_glass := trGdip_CloneBitmap(A_ThisFunc, glassBitmap)
-         QPV_BlendBitmaps(glassBitmap, gradientsBMP, thisBlendMode - 1, FillAreaCutGlass, BlendModesFlipped, userimgGammaCorrect)
+         preserveAlpha := (FillAreaRemBGR=1) ? 0 : FillAreaCutGlass
+         thisOpacity := (FillAreaColorMode>4) ? 255 - FillAreaOpacity : 0
+         QPV_BlendBitmaps(glassBitmap, gradientsBMP, thisBlendMode - 1, preserveAlpha, BlendModesFlipped, userimgGammaCorrect, 0, thisOpacity)
          ; ToolTip, % BlurAmount "|" sizeu "=" doFX "=" glassBitmap , , , 2
-         thisOpacity := (FillAreaColorMode>4) ? FillAreaOpacity/255 : 1
          zBitmap := trGdip_CreateBitmap(A_ThisFunc, imgSelW, imgSelH)
          If validBMP(zBitmap)
          {
             G5 := Gdip_GraphicsFromImage(zBitmap)
+            ; If (currIMGdetails.hasAlpha=1)
+            ;    tzGdip_DrawImage(G5, o_glass, 0, 0, imgSelW, imgSelH, , , , , thisOpacity/2)
             If (currIMGdetails.hasAlpha=1)
-               tzGdip_DrawImage(G5, o_glass, 0, 0, imgSelW, imgSelH, , , , , thisOpacity/2)
-            If (thisBlendMode=25 && currIMGdetails.hasAlpha=1)
                Gdip_FillRectangle(G5, GDIPbrushHatch, 0, 0, imgSelW, imgSelH)
             tzGdip_DrawImage(G5, glassBitmap, 0, 0, imgSelW, imgSelH)
             Gdip_DeleteGraphics(G5)
@@ -18592,13 +18593,13 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0, ByRef hasAlph
       }
    }
 
-   thisOpacity := (FillAreaColorMode>4) ? FillAreaOpacity/255 : 1
+   ; thisOpacity := (FillAreaColorMode>4) ? FillAreaOpacity/255 : 1
    If (FillAreaInverted=1 && thisObjBlurAmount>1 && FillAreaBlurAmount>0)
       Gdip_ResetClip(G2)
 
    ; ToolTip, % "g2=" g2 " bmp="  fBitmapA " g=" gradientsBMP " o=" thisOpacity " p=" pPath , , , 2
    ; fnOutputDebug("crp=" validBMP(croppedOBJblurBMP) "=" croppedOBJblurBMP "|fba=" validBMP(fBitmapA) "=" fBitmapA "|gla=" validBMP(glassBitmap) "=" glassBitmap "|grd=" gradientsBMP "=" validBMP(gradientsBMP))
-   rz := trGdip_DrawImage(A_ThisFunc, G2, fBitmapA, imgSelPx, imgSelPy, imgSelW, imgSelH, , , , , thisOpacity)
+   rz := trGdip_DrawImage(A_ThisFunc, G2, fBitmapA, imgSelPx, imgSelPy, imgSelW, imgSelH)
    If (userimgGammaCorrect=1)
       Gdip_SetCompositingQuality(G2, 1)
 
@@ -18720,8 +18721,10 @@ coreImageFillSelectedArea(whichBitmap:=0, ByRef hasAlpha:=0) {
          glassBitmap := trGdip_CloneBitmap(A_ThisFunc, bgrBMPu)
 
       ; ToolTip, % maskBitmap " \ " BlurAmount "|" sizeu "=" doFX "=" glassBitmap , , , 2
+      preserveAlpha := (FillAreaRemBGR=1) ? 0 : FillAreaCutGlass
+      thisOpacity := (FillAreaColorMode>4) ? 255 - FillAreaOpacity : 0
       rzA := QPV_SetBitmapAsAlphaChannel(gradientsBMP, maskBitmap, !FillAreaInverted)
-      QPV_BlendBitmaps(glassBitmap, gradientsBMP, thisBlendMode - 1, FillAreaCutGlass, BlendModesFlipped, userimgGammaCorrect)
+      QPV_BlendBitmaps(glassBitmap, gradientsBMP, thisBlendMode - 1, preserveAlpha, BlendModesFlipped, userimgGammaCorrect, 0, thisOpacity)
       If (thisBlendMode=25)
          rzB := QPV_SetBitmapAsAlphaChannel(bgrBMPu, maskBitmap, FillAreaInverted)
       gradientsBMP := trGdip_DisposeImage(gradientsBMP, 1)
@@ -23522,12 +23525,7 @@ ZoomBlurSelectedArea() {
     pB := GetPathRelativeBounds(pPath, imgSelPx, imgSelPy)
     imgSelPx := pB.x,  imgSelPy := pB.y
     imgSelW  := pB.w,  imgSelH  := pB.h
-    If pPath
-    {
-       modus := (BlurAreaInverted=1) ? 4 : 0
-       Gdip_SetClipPath(G2, pPath, modus)
-    }
-
+    ; Gdip_SetClipRect(G2, imgSelPx, imgSelPy, imgSelW, imgSelH, 0)
     If (BlurAreaInverted=1)
     {
        imgSelPx := imgSelPy := 0
@@ -23535,6 +23533,7 @@ ZoomBlurSelectedArea() {
        imgSelH := imgH
     }
 
+    bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
     zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
     If !validBMP(zBitmap)
     {
@@ -23547,19 +23546,15 @@ ZoomBlurSelectedArea() {
        Return
     }
 
-    QPV_PrepareAlphaChannelBlur(zBitmap, 1, 1)
-    If (BlurAreaBlendMode>1 || allowAlphaMasking=1)
-       bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
-
-    If (blurAreaOpacity>252)
-       r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
-
     setWindowTitle("APPLYING BLUR ON IMAGE, please wait", 1)
-    thisOpacity := blurAreaOpacity/255
-    gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
+    modus := (BlurAreaInverted=1) ? 4 : 0
+    Gdip_SetClipRect(G2, imgSelPx, imgSelPy, imgSelW, imgSelH, 0)
+    r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
+
+    gBitmap := trGdip_CloneBitmap(A_ThisFunc, zBitmap)
     G3 := trGdip_GraphicsFromImage(A_ThisFunc, gBitmap, 1, 3)
     Gdip_SetClipRect(G3, 0, 0, imgSelW, imgSelH)
-    thisO := 0.85
+    thisO := 0.85 ; opacity stepping for each blur iteration
     dimgSelPx := imgSelPx, dimgSelPy := imgSelPy
     dimgSelW := imgSelW, dimgSelH := imgSelH
 
@@ -23580,7 +23575,7 @@ ZoomBlurSelectedArea() {
     {
        Loop
        {
-          thisO -= 0.1 ; thisOpacity - (A_Index - 1) * startOpacity
+          thisO -= 0.1
           If (thisO<0)
              Break
 
@@ -23612,47 +23607,40 @@ ZoomBlurSelectedArea() {
              abandonAll := 1
              Break
           }
-
        }
     }
 
-    Gdip_DeleteGraphics(G3)
-    If (BlurAreaBlendMode>1 && abandonAll!=1)
-    {
-       setWindowTitle("APPLYING BLENDING MODE, please wait", 1)
-       applyBlurColorsFX(gBitmap)
-       If (allowAlphaMasking=1)
-          ou := trGdip_CloneBitmap(A_ThisFunc, bgrBMPu)
-
-       rz := QPV_BlendBitmaps(bgrBMPu, gBitmap, BlurAreaBlendMode - 1, 0, BlendModesFlipped)
-       If (allowAlphaMasking=1)
-          trGdip_DisposeImage(gBitmap)
-       Else
-          ou := gBitmap
-
-       gBitmap := bgrBMPu
-       bgrBMPu := ou
-    }
-
-    If (allowAlphaMasking=1 && validBMP(bgrBMPu) && abandonAll!=1)
-    {
-       realtimePasteInPlaceAlphaMasker(0, gBitmap, "lol", newBitmap, 0, 0, 0, 0)
-       If validBMP(newBitmap)
-       {
-          r2 := trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx, imgSelPy, imgSelW, imgSelH)
-          trGdip_DisposeImage(gBitmap, 1)
-          gBitmap := newBitmap
-       }
-    }
-
-    r1 := trGdip_DrawImage(A_ThisFunc, G2, gBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH,,,,, thisOpacity)
     trGdip_DisposeImage(zBitmap, 1)
+    Gdip_DeleteGraphics(G3)
+    If (BlurAreaBlendMode>1)
+       applyBlurColorsFX(gBitmap)
+
+    If (EllipseSelectMode>0 || BlurAreaInverted=1)
+    {
+       maskBitmap := carvePathFromBitmap(gBitmap, pPath, imgSelPx, imgSelPy, 0, 2, 0, 0, 0, 0, 2)
+       QPV_SetBitmapAsAlphaChannel(gBitmap, maskBitmap, !BlurAreaInverted)
+       trGdip_DisposeImage(maskBitmap)
+    }
+
+    If (allowAlphaMasking=1 && alphaMaskingMode>1)
+    {
+       setWindowTitle("APPLYING ALPHA MASK, please wait", 1)
+       trGdip_GetImageDimensions(gBitmap, zzw, zzh)
+       alphaMaskGray := generateAlphaMaskBitmap(0, 0, zzw, zzh, 0, 0, 0, 1, 0)
+       QPV_SetBitmapAsAlphaChannel(gBitmap, alphaMaskGray, alphaMaskColorReversed)
+       trGdip_DisposeImage(alphaMaskGray)
+    }
+
+    setWindowTitle("APPLYING BLENDING MODE, please wait", 1)
+    rz := QPV_BlendBitmaps(bgrBMPu, gBitmap, BlurAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 0, 255 - blurAreaOpacity)
+
+    r1 := trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx, imgSelPy, imgSelW, imgSelH)
     trGdip_DisposeImage(gBitmap, 1)
     trGdip_DisposeImage(bgrBMPu, 1)
     Gdip_DeletePath(pPath)
     Gdip_DeleteGraphics(G2)
     realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
-    If (r1!="fail" && r0!="fail" && validBMP(metaBitmap))
+    If (r1!="fail" && r0!="fail" && validBMP(metaBitmap) && rz=1)
     {
        wrapRecordUndoLevelNow(metaBitmap)
     } Else
@@ -50397,7 +50385,8 @@ PanelZoomBlurSelectedArea() {
     Gui, Add, Text, x+10 y+10 w%thisW% Section +hwndhTemp, Blur mode: 
     GuiAddDropDownList("x+5 wp gupdateUIzoomBlurPanel AltSubmit Choose" zoomBlurMode " vzoomBlurMode", "Zoom H/V|Horizontal|Vertical", [hTemp])
     GuiAddSlider("uiZoomBlurAreaXamount", 1,254, 15, "Intensity", "updateUIzoomBlurPanel", 1, "xs y+10 w" txtWid " hp")
-    GuiAddSlider("blurAreaOpacity", 3,255, 255, "Opacity", "updateUIzoomBlurPanel", 1, "xs y+10 w" txtWid " hp")
+    GuiAddSlider("blurAreaOpacity", 3,255, 255, "Opacity", "updateUIzoomBlurPanel", 1, "xs y+10 w" txtWid - 27 " hp")
+    GuiAddCheckbox("x+1 hp w26 gupdateUIzoomBlurPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
     Gui, Add, Checkbox, xs y+10 Checked%BlurAreaAlphaMask% vBlurAreaAlphaMask gupdateUIzoomBlurPanel, Apply alpha mas&k
     Gui, Add, Checkbox, xs y+10 Checked%BlurAreaInverted% vBlurAreaInverted gupdateUIzoomBlurPanel, &Invert selection area
     If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
@@ -101949,10 +101938,10 @@ testWicLoader() {
 dummyAutoScroller() {
    WinGetActiveTitle, aa
    WinGetClass, bb, aa
-   If InStr(aa, "mozilla firefox") && InStr(aa, "tendance")
-      SendInput, {down}
+   ; If InStr(aa, "mozilla firefox") && InStr(aa, "tendance")
+   ;    SendInput, {down}
 
-   ; ToolTip, % aa "|" bb , , , 2
+   ToolTip, % aa "|" bb , , , 2
 }
 
 #If (A_PtrSize=8 && InStr(A_ScriptDir, "sucan twins") && !A_IsCompiled && wasInitFIMlib)
