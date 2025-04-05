@@ -2461,6 +2461,7 @@ RGBAColor NEWERcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, const int ble
     bT = clamp(bT, 0.0f, 1.0f); 
     const bool mix = (keepAlpha!=1 || blendMode>=22 || blendMode<2) ? 1 : 0;
     if (Brgb.a<255 && blendMode>0 && mix==1) {
+       // show original color where the top becomes transparent
        rT = weighTwoValues(rOf, rT, 1.0f - da, 1);
        gT = weighTwoValues(gOf, gT, 1.0f - da, 1);
        bT = weighTwoValues(bOf, bT, 1.0f - da, 1);
@@ -4450,6 +4451,45 @@ DLL_API int DLL_CALLCONV openCVblurFilters(unsigned char *imageData, int w, int 
     return 1;
 }
 
+DLL_API int DLL_CALLCONV openCVresizeBlendEachChannel(unsigned char *imageData, int w, int h, int bpp, int Stride, int posX, int posY, int newWidth, int newHeight, float alpha) {
+    float opacity = clamp(alpha, 0.0f, 1.0f);
+    int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
+    cv::Mat image(h, w, clr, imageData, Stride);
+
+    // Make sure the ROI starts within the image
+    int startX = std::max(0, posX);
+    int startY = std::max(0, posY);
+    
+    // Calculate valid width and height for the ROI
+    int validWidth = std::min(newWidth - (startX - posX), image.cols - startX);
+    int validHeight = std::min(newHeight - (startY - posY), image.rows - startY);
+    if (validWidth <= 0 || validHeight <= 0) {
+        fnOutputDebug("openCVresizeBitmap: No valid overlap between resized channel and image");
+        return 0;
+    }
+
+    // Split channels
+    std::vector<cv::Mat> channels;
+    cv::split(image, channels);
+    cv::Rect srcRoi(startX - posX, startY - posY, validWidth, validHeight);
+    cv::Rect dstRoi(startX, startY, validWidth, validHeight);
+
+    // Resize each channel
+    int maxu = (bpp==32) ? 4 : 3;
+    for (int channelIndex = 0; channelIndex < maxu; channelIndex++)
+    {
+        cv::Mat resizedChannel;
+        cv::resize(channels[channelIndex], resizedChannel, cv::Size(newWidth, newHeight));
+        cv::Mat blendCanvas = cv::Mat::zeros(channels[channelIndex].size(), channels[channelIndex].type());
+        resizedChannel(srcRoi).copyTo(blendCanvas(dstRoi));
+        cv::addWeighted(blendCanvas, opacity, channels[channelIndex], 1.0 - opacity, 0, channels[channelIndex]);
+    }
+
+    // Merge channels back into the original image
+    cv::merge(channels, image);
+    return 1;
+}
+
 DLL_API int DLL_CALLCONV openCVresizeBitmap(unsigned char *imageData, unsigned char *otherData, int w, int h, int Stride, int rw, int rh, int mStride, int bpp, int interpolation, int doFlipHV) {
   int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
   cv::Mat image(h, w, clr, imageData, Stride);
@@ -4472,7 +4512,6 @@ DLL_API int DLL_CALLCONV openCVresizeBitmap(unsigned char *imageData, unsigned c
   }
   return 1;
 }
-
 
 DLL_API int DLL_CALLCONV openCVresizeBitmapExtended(unsigned char *imageData, unsigned char *otherData, int w, int h, int Stride, int rx, int ry, int rw, int rh, int nw, int nh, int mStride, int bpp, int interpolation) {
   int clr;

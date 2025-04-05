@@ -14530,6 +14530,38 @@ QPV_AlterAlphaChannel(pBitmap, givenLevel, replaceAll) {
   return r
 }
 
+QPV_ResizeSplitBlendChannels(pBitmap, x, y, nw, nh, opacity, passesX:=0, passesY:=0) {
+  ; thisStartZeit := A_TickCount
+  initQPVmainDLL()
+  If !qpvMainDll
+  {
+     addJournalEntry(A_ThisFunc "(): QPV .dll file is missing or failed to initialize: qpvMain.dll")
+     Return 0
+  }
+
+  thisStartZeit := A_TickCount
+  trGdip_GetImageDimensions(pBitmap, w, h)
+  If (!w || !h || !validBMP(pBitmap))
+  {
+     addJournalEntry(A_ThisFunc "(): failed - possibly malformed pBitmap given: " pBitmap)
+     Return 0
+  }
+
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
+  If !E1
+  {
+     If (passesX>0 || passesY>0)
+        r := DllCall("qpvmain.dll\openCVblurFilters", "UPtr", iScan, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", 0, "Int", 0, "int", stride, "int", 32)
+
+     r := DllCall("qpvmain.dll\openCVresizeBlendEachChannel", "UPtr", iScan, "Int", w, "Int", h, "int", 32, "int", stride, "int", x, "int", y, "int", nw, "int", nh, "float", opacity)
+     Gdip_UnlockBits(pBitmap, iData)
+  } Else 
+     addJournalEntry(A_ThisFunc "(): failed - unable to lock the bitmap bits")
+
+  ; fnOutputDebug(A_ThisFunc "(" r "): " A_TickCount - thisStartZeit)
+  return r
+}
+
 QPV_FillBitmapHoles(pBitmap, newColor) {
   ; thisStartZeit := A_TickCount
   initQPVmainDLL()
@@ -23534,8 +23566,8 @@ ZoomBlurSelectedArea() {
     }
 
     bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
-    zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
-    If !validBMP(zBitmap)
+    gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
+    If !validBMP(gBitmap)
     {
        showTOOLtip("Failed to apply filter: radial blur.`nUnable to allocate new bitmap.")
        SoundBeep 300, 100
@@ -23551,37 +23583,38 @@ ZoomBlurSelectedArea() {
     Gdip_SetClipRect(G2, imgSelPx, imgSelPy, imgSelW, imgSelH, 0)
     r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
 
-    gBitmap := trGdip_CloneBitmap(A_ThisFunc, zBitmap)
-    G3 := trGdip_GraphicsFromImage(A_ThisFunc, gBitmap, 1, 3)
-    Gdip_SetClipRect(G3, 0, 0, imgSelW, imgSelH)
-    thisO := 0.85 ; opacity stepping for each blur iteration
+    thisO := 0.951 ; opacity step for blur iteration
+    thisOstep := (uiZoomBlurAreaXamount>180) ? 0.06 : 0.10
+    thisFa := (uiZoomBlurAreaXamount>180) ? 40 : 10
+    thisFb := (uiZoomBlurAreaXamount>180) ? 1980 : 1200
     dimgSelPx := imgSelPx, dimgSelPy := imgSelPy
     dimgSelW := imgSelW, dimgSelH := imgSelH
 
     prcX := (clampInRange(tinyPrevAreaCoordX, imgSelPx, imgSelW) - imgSelPx)/imgSelW
     prcY := (clampInRange(tinyPrevAreaCoordY, imgSelPy, imgSelH) - imgSelPy)/imgSelH
-    zoomBlurAreaXamount := uiZoomBlurAreaXamount/10
-    b := (zoomBlurAreaXamount*2)/1980
-    b := b*((imgSelW + imgSelH)/2)
-    thisBlurX := thisBlurY := clampInRange(Round(zoomBlurAreaXamount * 0.51), 1, 21)
+    zoomBlurAreaXamount := uiZoomBlurAreaXamount/thisFa
+    b := zoomBlurAreaXamount/thisFb
+    b := b * ( (imgSelW + imgSelH) / 3 )
+    If (zoomBlurMode>1)
+       b *= 4
+
+    thisBlurX := thisBlurY := clampInRange(Round(zoomBlurAreaXamount * 0.25), 1, 21)
     If (zoomBlurMode=2)
        thisBlurY := thisBlurY/5 + 1
     Else If (zoomBlurMode=3)
        thisBlurX := thisBlurX/5 + 1
 
     doStartLongOpDance()
-    ; fnOutputDebug("zb=" b "|" thisBlurX "|" thisBlurY)
+    fnOutputDebug(A_ThisFunc ": zb=" b "|" thisBlurX "|" thisBlurY)
+    errorsOccured := 0
     If isInRange(zoomBlurMode, 1, 3)
     {
        Loop
        {
-          thisO -= 0.1
+          thisO -= thisOstep
           If (thisO<0)
              Break
 
-          showTOOLtip("Radial blur: step " A_Index ".0`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startZeit)/1000, 3)),, , (1 - thisO)/1)
-          ; fnOutputDebug(thisBlurAmount "=" thisO)
-          QPV_BlurBitmapFilters(zBitmap, thisBlurX, thisBlurY, 0)
           If (zoomBlurMode=1 || zoomBlurMode=2)
              dimgSelW += A_Index * b
           If (zoomBlurMode=1 || zoomBlurMode=3)
@@ -23592,37 +23625,33 @@ ZoomBlurSelectedArea() {
           If (zoomBlurMode=1 || zoomBlurMode=3)
              dimgSelPy := 0 - (dimgSelH - imgSelH)*prcY
 
+          showTOOLtip("Radial blur: step " A_Index "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startZeit)/1000, 3)),, , 1 - thisO)
+          r1 := QPV_ResizeSplitBlendChannels(gBitmap, dimgSelPx, dimgSelPy, dimgSelW, dimgSelH, thisO, passesX, passesY)
           If (determineTerminateOperation()=1)
           {
              abandonAll := 1
              Break
           }
 
-          showTOOLtip("Radial blur: step " A_Index ".5`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startZeit)/1000, 3)),, , (1 - (thisO - 0.05))/1)
-          r1 := trGdip_DrawImage(A_ThisFunc, G3, zBitmap, dimgSelPx, dimgSelPy, dimgSelW, dimgSelH,,,,, thisO)
-          trGdip_DisposeImage(zBitmap, 1)
-          zBitmap := trGdip_CloneBitmap(A_ThisFunc, gBitmap)
-          If (determineTerminateOperation()=1)
+          If (r1!=1)
           {
-             abandonAll := 1
+             errorsOccured := 1
              Break
           }
        }
     }
 
-    trGdip_DisposeImage(zBitmap, 1)
-    Gdip_DeleteGraphics(G3)
-    If (BlurAreaBlendMode>1)
+    If (BlurAreaBlendMode>1 && errorsOccured=0)
        applyBlurColorsFX(gBitmap)
 
-    If (EllipseSelectMode>0 || BlurAreaInverted=1)
+    If (errorsOccured=0 && (EllipseSelectMode>0 || BlurAreaInverted=1))
     {
        maskBitmap := carvePathFromBitmap(gBitmap, pPath, imgSelPx, imgSelPy, 0, 2, 0, 0, 0, 0, 2)
        QPV_SetBitmapAsAlphaChannel(gBitmap, maskBitmap, !BlurAreaInverted)
        trGdip_DisposeImage(maskBitmap)
     }
 
-    If (allowAlphaMasking=1 && alphaMaskingMode>1)
+    If (errorsOccured=0 && allowAlphaMasking=1 && alphaMaskingMode>1)
     {
        setWindowTitle("APPLYING ALPHA MASK, please wait", 1)
        trGdip_GetImageDimensions(gBitmap, zzw, zzh)
@@ -23633,14 +23662,13 @@ ZoomBlurSelectedArea() {
 
     setWindowTitle("APPLYING BLENDING MODE, please wait", 1)
     rz := QPV_BlendBitmaps(bgrBMPu, gBitmap, BlurAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 0, 255 - blurAreaOpacity)
-
     r1 := trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx, imgSelPy, imgSelW, imgSelH)
     trGdip_DisposeImage(gBitmap, 1)
     trGdip_DisposeImage(bgrBMPu, 1)
     Gdip_DeletePath(pPath)
     Gdip_DeleteGraphics(G2)
     realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
-    If (r1!="fail" && r0!="fail" && validBMP(metaBitmap) && rz=1)
+    If (r1!="fail" && r0!="fail" && validBMP(metaBitmap) && rz=1 && errorsOccured=0)
     {
        wrapRecordUndoLevelNow(metaBitmap)
     } Else
@@ -50295,7 +50323,7 @@ ReadSettingsZoomBlurPanel(act:=0) {
     RegAction(act, "BlurAreaAlphaMask",, 1)
     RegAction(act, "blurAreaOpacity",, 2, 3, 255)
     RegAction(act, "BlurAreaInverted",, 1)
-    RegAction(act, "BlurAreaBlendMode",, 2, 1, 24)
+    RegAction(act, "BlurAreaBlendMode",, 2, 1, 26)
     RegAction(act, "BlurAreaGamma",, 2, -100, 100)
     RegAction(act, "BlurAreaHue",, 2, -180, 180)
     RegAction(act, "BlurAreaLight",, 2, -255, 255)
