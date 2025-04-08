@@ -2238,12 +2238,14 @@ RGBColorI calculateBlendModes(int rO, int gO, int bO, int rB, int gB, int bB, in
 RGBAColor NEWERcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, const int blendMode, const int flipLayers, const int linearGamma, const int keepAlpha, const int bpp, const int opacity) {
     // TO-DO this function must supersede/replace calculateBlendModes() used by clrBrushMixColors()
     float rT, gT, bT;
-    Orgb.a = clamp(Orgb.a - opacity, 0, 255);
-    int oA = (keepAlpha==1 && blendMode==0 && flipLayers==1 || blendMode==25 || blendMode==0) ? -1 : Brgb.a;
-    if (blendMode==100 || blendMode==24)
+    if (blendMode<24)
+       Orgb.a = clamp(Orgb.a - opacity, 0, 255);
+
+    int oA = (keepAlpha==1 && blendMode==0 && flipLayers==1 || blendMode>=23 || blendMode==0) ? -1 : Brgb.a;
+    if (blendMode==34 || blendMode==110)
     {
-       // replace color, conditional if blendMode=100
-       int opa = (blendMode==24 || (Orgb.a>0 && bpp==32) || (Orgb.r==0 && Orgb.g==0 && Orgb.b==0 && bpp!=32) ) ? 1 : 0;
+       // replace bottom with top, no blending; conditional if blendMode=101
+       int opa = (blendMode==34 || (Orgb.a>0 && bpp==32) || (Orgb.r==0 && Orgb.g==0 && Orgb.b==0 && bpp!=32) ) ? 1 : 0;
        if (bpp!=32 && opa==1)
        {
           Orgb.r = clamp(Orgb.r - (255 - Orgb.a), 0, 255);
@@ -2255,11 +2257,37 @@ RGBAColor NEWERcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, const int ble
           Orgb.a = clamp(Brgb.a - (255 - Orgb.a), 0, 255);
 
        return (opa==1) ? Orgb : Brgb;
+    } else if (blendMode==24 || blendMode==100)
+    {
+       // replace bottom with top, with blending; conditional if blendMode=100
+       int fR, fG, fB, fA;
+       const int opa = (blendMode==24 || (Orgb.a>0 && bpp==32) || (Orgb.r==0 && Orgb.g==0 && Orgb.b==0 && bpp!=32) ) ? 1 : 0;
+       if (opa!=1)
+          return Brgb;
+
+       const float f = char_to_float[255 - opacity];
+       if (linearGamma==1)
+       {
+          fR = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.r], gamma_to_linear[Brgb.r], f)];
+          fG = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.g], gamma_to_linear[Brgb.g], f)];
+          fB = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.b], gamma_to_linear[Brgb.b], f)];
+          fA = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.a], gamma_to_linear[Brgb.a], f)];
+       } else
+       {
+          fR = weighTwoValues(Orgb.r, Brgb.r, f);
+          fG = weighTwoValues(Orgb.g, Brgb.g, f);
+          fB = weighTwoValues(Orgb.b, Brgb.b, f);
+          fA = weighTwoValues(Orgb.a, Brgb.a, f);
+       }
+       if (keepAlpha==1)
+          fA = clamp(fA - (255 - Brgb.a), 0, 255);
+
+       return {fB, fG, fR, fA};
     } else if (blendMode==23)
     {
-       // clip top to alpha channel of the bottom
+       // clip top to the alpha channel of the bottom
        int fR, fG, fB;
-       float f = char_to_float[Orgb.a];
+       const float f = char_to_float[Orgb.a];
        if (linearGamma==1)
        {
           fR = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.r], gamma_to_linear[Brgb.r], f)];

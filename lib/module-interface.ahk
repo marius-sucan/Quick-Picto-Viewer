@@ -1211,6 +1211,7 @@ theSlideShowCore(paramu:=0) {
 
   mouseTurnOFFtooltip()
   prevFullIMGload := A_TickCount
+  Try DllCall("user32\SetCursor", "Ptr", 0)
   If (slideShowRunning=1 && slidesFXrandomize=1)
      MainExe.ahkPostFunction("VPimgFXrandomizer")
 
@@ -1611,6 +1612,8 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
 
   mX := lP & 0xFFFF
   mY := lP >> 16
+  If (A_TickCount - prevFullIMGload<150)
+     prevArrayPos := [mX, mY]
   ; MouseGetPos, mX, mY, OutputVarWin
   isSamePos := (isInRange(mX, prevArrayPos[1] + 3, prevArrayPos[1] - 3) && isInRange(mY, prevArrayPos[2] + 3, prevArrayPos[2] - 3)) ? 1 : 0
   thisWin := isVarEqualTo(hwnd, PVhwnd, hGDIwin, hGDIthumbsWin, hGDIinfosWin, hGDIselectWin) ? 1 : 0
@@ -1754,7 +1757,7 @@ GuiDropFiles(GuiHwnd, FileArray, CtrlHwnd, X, Y) {
    For i, file in FileArray
        groppedFiles[A_Index] := Trimmer(file)
 
-   SetTimer, dummyTimerProccessDroppedFiles, -200
+   SetTimer, dummyTimerProcessDroppedFiles, -200
    lastInvoked := A_TickCount
    Return
 }
@@ -1768,7 +1771,7 @@ Trimmer(string, whatTrim:="") {
    Return string
 }
 
-dummyTimerProccessDroppedFiles() {
+dummyTimerProcessDroppedFiles() {
    Static lastInvoked := 1
    totalGroppy := groppedFiles.Count()
    If (!totalGroppy || (A_TickCount - lastInvoked<400))
@@ -2583,7 +2586,7 @@ fnOutDebug(msg) {
       OutputDebug, % "QPV: " Trim(msg)
 }
 
-UpdateMenuBar(modus:=0) {
+UpdateMenuBar(modus:=0, tt:=0) {
    Static hasRan := 0, prevState
    If !hasRan
    {
@@ -2591,7 +2594,7 @@ UpdateMenuBar(modus:=0) {
       hasRan := 1
    }
 
-   thisState := "a" imgEditPanelOpened AnyWindowOpen thumbsDisplaying maxFilesIndex drawingShapeNow modus undoLevelsRecorded showMainMenuBar isNowAlphaPainting()
+   thisState := "a" imgEditPanelOpened tt AnyWindowOpen thumbsDisplaying maxFilesIndex drawingShapeNow modus undoLevelsRecorded showMainMenuBar isNowAlphaPainting()
    ; ToolTip, % "lol"  isNowAlphaPainting() isAlphaMaskWindow()  , , , 2
    If !showMainMenuBar
       prevState := thisState

@@ -14319,10 +14319,7 @@ QPV_MergeBitmapsWithMask(initialBitmap, newBitmap, alphaBitmap, invert, maskOpac
   {
      E3 := trGdip_LockBits(alphaBitmap, 0, 0, w, h, mstride, mScan, mData, 1)
      If E3
-     {
-        alphaBitmap := trGdip_DisposeImage(alphaBitmap)
         alphaBitmap := 0
-     }
   } Else alphaBitmap := 0
 
   If (!E1 && !E2)
@@ -14592,7 +14589,7 @@ QPV_FillBitmapHoles(pBitmap, newColor) {
   return r
 }
 
-QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:=0, gamma:=0, specialReplace:=0, opacity:=0) {
+QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:=0, gamma:=0, specialReplace:=0, opacity:=0, replaceModeBlending:=1, alphaMaskGray:=0, invertAlphaMask:=0) {
   initQPVmainDLL()
   If (!qpvMainDll || isWinXP=1)
   {
@@ -14603,6 +14600,11 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:
   thisStartZeit := A_TickCount
   trGdip_GetImageDimensions(pBitmap, w, h)
   trGdip_GetImageDimensions(pBitmap2Blend, w2, h2)
+  allowAlphaMasking := 1
+  If validBMP(alphaMaskGray)
+     trGdip_GetImageDimensions(alphaMaskGray, w3, h3)
+  Else
+     allowAlphaMasking := 0
   ; fnOutputDebug(A_ThisFunc "() " w "=" w2 "||" h "=" h2)
   If (w2!=w || h2!=h || !validBMP(pBitmap) || !validBMP(pBitmap2Blend) || !w || !h)
   {
@@ -14610,19 +14612,48 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:
      Return 0
   }
 
+  If ((w3!=w || h3!=h) && validBMP(alphaMaskGray))
+  {
+     allowAlphaMasking := 0
+     addJournalEntry(A_ThisFunc "(): failed to apply alpha mask; incorrect bitmap dimensions")
+  }
+
   If (specialReplace=1 && blendMode=24) ; replace mode 
      blendMode := 100
+  If (replaceModeBlending!=1) ; no alpha mask should be passed to this function when replaceModeBlending==0
+     blendMode += 10
+
+  If (allowAlphaMasking=1 && blendMode=24)
+     xBitmap := trGdip_CloneBitmap(A_ThisFunc, pBitmap)
 
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   E2 := trGdip_LockBits(pBitmap2Blend, 0, 0, w, h, stride, mScan, mData, 1)
+  E3 := (allowAlphaMasking=1) ? trGdip_LockBits(alphaMaskGray, 0, 0, w, h, stride, gScan, gData, 1) : -1
+  If (!E2 && !E3 && blendMode!=24)
+     ra := DllCall("qpvmain.dll\SetBitmapAsAlphaChannel", "UPtr", mScan, "UPtr", gScan, "Int", w, "Int", h, "Int", stride, "int", 32, "Int", invertAlphaMask, "Int", 0, "Int", 1)
+
   If (!E1 && !E2)
      r := DllCall("qpvmain.dll\BlendBitmaps", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", blendMode, "int", flipLayers, "int", protectAlpha, "int", gamma, "int", opacity)
 
+  If (!E1 && !E3 && blendMode=24 && validBMP(xBitmap))
+  {
+     ; rb := DllCall("qpvmain.dll\SetBitmapAsAlphaChannel", "UPtr", iScan, "UPtr", gScan, "Int", w, "Int", h, "Int", stride, "int", 32, "Int", invertAlphaMask, "Int", 0, "Int", 1)
+     E4 := trGdip_LockBits(xBitmap, 0, 0, w, h, stride, nScan, nData)
+     If !E4
+     {
+        rb := DllCall("qpvmain.dll\MergeBitmapsWithMask", "UPtr", nScan, "UPtr", iScan, "UPtr", gScan, "int", invertAlphaMask, "Int", w, "Int", h, "int", 0, "int", 0, "int", stride, "int", 32, "int", gamma, "int", 0)
+        Gdip_UnlockBits(xBitmap, nData)
+        If (rb=1)
+           r := xBitmap
+     }
+  }
   ; fnOutputDebug(A_ThisFunc "() " A_LastError " r=" r "=" func2exec "=" A_TickCount - thisStartZeit "|" blendMode "|" protectAlpha)
   If !E1
      Gdip_UnlockBits(pBitmap, iData)
   If !E2
      Gdip_UnlockBits(pBitmap2Blend, mData)
+  If !E3
+     Gdip_UnlockBits(alphaMaskGray, gData)
   return r
 }
 
@@ -17160,7 +17191,6 @@ AdjustColorsLegacySelectedArea(prevFXmode:=0) {
        }
     } Else
        QPV_MergeBitmapsWithMask(zBitmap, xBitmap, 0, 0, 255 - imgColorsFXopacity)
-
 
     r0 := trGdip_GraphicsClear(funcu, G2)
     r1 := trGdip_DrawImage(A_ThisFunc, G2, zBitmap, imgSelPx, imgSelPy) ; ,,,,,,, thisOpacity)
@@ -23333,14 +23363,12 @@ BlurSelectedArea(modus:="") {
     pB := GetPathRelativeBounds(pPath, imgSelPx, imgSelPy)
     imgSelPx := pB.x,  imgSelPy := pB.y
     imgSelW  := pB.w,  imgSelH  := pB.h
-    If (blurAreaSoftEdges!=1 && pPath || modus="pixelate")
-    {
+    ; If (blurAreaSoftEdges!=1 && pPath || modus="pixelate")
+    ; {
        nodus := (BlurAreaInverted=1) ? 4 : 0
-       If (BlurAreaInverted=1 && pPath)
-          Gdip_SetClipPath(G2, pPath, 4)
-       Else If (pPath!="")
+       If (pPath!="")
           Gdip_SetClipPath(G2, pPath, nodus)
-    }
+    ; }
 
     If (BlurAreaInverted=1)
     {
@@ -23351,11 +23379,13 @@ BlurSelectedArea(modus:="") {
 
     thisOpacity := blurAreaOpacity/255
     zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
+    bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
     If (modus="pixelate")
        isUni := Gdip_TestBitmapUniformity(zBitmap, 7, maxLevelIndex, nimo, avgLevelAlpha)
 
     ; ToolTip, % "l=" isUni " | " maxLevelIndex , , , 2
     ; ToolTip, % blurAreaPixelizeAmount "==" blurAreaPixelizeMethod "==" modus , , , 2
+    errorsOccured := 0
     QPV_PrepareAlphaChannelBlur(zBitmap, 1, 1)
     If (blurAreaPixelizeAmount>1 && blurAreaPixelizeMethod>1 && modus="pixelate")
     {
@@ -23372,13 +23402,15 @@ BlurSelectedArea(modus:="") {
        {
           trGdip_DisposeImage(zBitmap, 1)
           zBitmap := newBitmap
-       }
+       } else errorsOccured := 1
        trGdip_DisposeImage(pixiBMP, 1)
     } Else If (blurAreaPixelizeAmount>1 && modus="pixelate")
     {
+       thisStartZeit := A_TickCount
        setWindowTitle("PIXELATING IMAGE, please wait", 1)
        pixiBMP := trGdip_CreateBitmap(A_ThisFunc, imgSelW, imgSelH, coreDesiredPixFmt)
-       If warnUserFatalBitmapError(pixiBMP, A_ThisFunc)
+       rzo := QPV_PixelateBitmap(zBitmap, pixiBMP, clampInRange(blurAreaPixelizeAmount, 2, min(imgSelW, imgSelH)))
+       If (warnUserFatalBitmapError(pixiBMP, A_ThisFunc) || rzo!=1)
        {
           SetTimer, ResetImgLoadStatus, -100
           trGdip_DisposeImage(zBitmap, 1)
@@ -23387,8 +23419,6 @@ BlurSelectedArea(modus:="") {
           Return "fail"
        }
 
-       thisStartZeit := A_TickCount
-       QPV_PixelateBitmap(zBitmap, pixiBMP, clampInRange(blurAreaPixelizeAmount, 2, min(imgSelW, imgSelH)))
        ; ToolTip, % A_TickCount - thisStartZeit , , , 2
        trGdip_DisposeImage(zBitmap, 1)
        zBitmap := pixiBMP
@@ -23396,7 +23426,7 @@ BlurSelectedArea(modus:="") {
 
     thisBlurMode := blurAreaMode
     pEffect := Gdip_CreateEffect(1, o_blurAreaAmount, 0, 0)
-    If (blurAreaTwice=1 && blurAreaMode=1 && modus!="pixelate")
+    If (blurAreaTwice=1 && thisBlurMode=1 && modus!="pixelate")
     {
        setWindowTitle("EXTRA-BLURRING IMAGE, please wait", 1)
        xBitmap := trGdip_ResizeBitmap(A_ThisFunc, zBitmap, imgSelW//2, imgSelH//2, 1, 3, -1)
@@ -23429,7 +23459,8 @@ BlurSelectedArea(modus:="") {
        thisBlurMode := 0
     Else
        setWindowTitle("BLURRING IMAGE, please wait", 1)
-
+ 
+    zko := 1
     If (thisBlurMode=10)
     {
        zzBitmap := QPV_DissolveBitmap(zBitmap, o_blurAreaAmount*1.5, o_blurAreaYamount*1.5)
@@ -23437,67 +23468,82 @@ BlurSelectedArea(modus:="") {
        {
           trGdip_DisposeImage(zBitmap)
           zBitmap := zzBitmap
-       }
+       } Else errorsOccured := 1
     } Else If (modus="pixelate" && blurAreaAmount>2)
-       QPV_BlurBitmapFilters(zBitmap, Round(blurAreaAmount*0.5), Round(blurAreaAmount*0.5), 0)
+       zko := QPV_BlurBitmapFilters(zBitmap, Round(blurAreaAmount*0.5), Round(blurAreaAmount*0.5), 0)
     Else If (thisBlurMode>=2) ; opencv blur filters
-       QPV_BlurBitmapFilters(zBitmap, o_blurAreaAmount, o_blurAreaYamount, thisBlurMode - 2, 0, blurAreaCircular)
+       zko := QPV_BlurBitmapFilters(zBitmap, o_blurAreaAmount, o_blurAreaYamount, thisBlurMode - 2, 0, blurAreaCircular)
     Else If (thisBlurMode=1) ; high quality
        ApplySpecialFixedBlur(A_ThisFunc, zBitmap, o_blurAreaAmount, pEffect)
-
+    
+    If (zko!=1)
+       errorsOccured := 1
+    
     If (isUni && modus="pixelate")
        QPV_PrepareAlphaChannelBlur(zBitmap, avgLevelAlpha, 0)
 
-    If (BlurAreaBlendMode>1 || allowAlphaMasking=1)
-       bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
+    r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
+    If (errorsOccured=0 && BlurAreaBlendMode>1)
+       applyBlurColorsFX(zBitmap)
 
-    If (blurAreaOpacity>252 && blurAreaSoftEdges!=1)
-       r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
-
-    If (blurAreaSoftEdges=1 && modus!="pixelate")
+    If (errorsOccured=0 && blurAreaSoftEdges=1 && modus!="pixelate" && BlurAreaInverted=0)
     {
        setWindowTitle("APPLYING SOFT EDGES MASK, please wait", 1)
        thisAmount := (o_blurAreaAmount + o_blurAreaYamount)/2
        thisAmount := (blurAreaSoftLevel>3) ? Round(thisAmount*(blurAreaSoftLevel - 1)) : Round(thisAmount*(blurAreaSoftLevel/3))
-       carvePathFromBitmap(zBitmap, pPath, imgSelPx, imgSelPy, 0, 2, thisAmount, 0, 1, !BlurAreaInverted)
+       If (blurAreaTwice=1)
+          thisAmount := Round(thisAmount*0.75)
+       maskBitmap := carvePathFromBitmap(zBitmap, pPath, imgSelPx, imgSelPy, 0, 2, thisAmount, 0, !BlurAreaInverted, !BlurAreaInverted, 2)
     }
 
-    If (BlurAreaBlendMode>1)
+    If (errorsOccured=0 && allowAlphaMasking=1 && alphaMaskingMode>1)
+    {
+       ; SoundBeep 900, 1010
+       ; setWindowTitle("APPLYING ALPHA MASK, please wait", 1)
+       trGdip_GetImageDimensions(zBitmap, zzw, zzh)
+       alphaMaskGray := generateAlphaMaskBitmap(0, 0, zzw, zzh, 0, 0, 0, 1, 0)
+       If validBMP(maskBitmap)
+       {
+          kpa := (alphaMaskColorReversed=1) ? 5 : 2
+          If (alphaMaskColorReversed!=1)
+             Gdip_BitmapApplyInvert(maskBitmap)
+          QPV_BlendBitmaps(alphaMaskGray, maskBitmap, kpa, 0, 0, 0)
+          trGdip_DisposeImage(maskBitmap)
+       }
+       ; QPV_SetBitmapAsAlphaChannel(zBitmap, alphaMaskGray, alphaMaskColorReversed)
+       ; trGdip_DisposeImage(alphaMaskGray)
+       thisAlphaInvert := alphaMaskColorReversed
+    } Else If (errorsOccured=0 && validBMP(maskBitmap))
+    {
+       alphaMaskGray := maskBitmap
+       thisAlphaInvert := !BlurAreaInverted
+    }
+
+    If (errorsOccured=0 && BlurAreaBlendMode>0)
     {
        setWindowTitle("APPLYING BLENDING MODE, please wait", 1)
-       If (allowAlphaMasking=1)
-          ou := trGdip_CloneBitmap(A_ThisFunc, bgrBMPu)
-
-       applyBlurColorsFX(zBitmap)
-       rz := QPV_BlendBitmaps(bgrBMPu, zBitmap, BlurAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped)
-       If (allowAlphaMasking=1)
-          trGdip_DisposeImage(zBitmap)
-       Else
-          ou := zBitmap
-       zBitmap := bgrBMPu
-       bgrBMPu := ou
-    }
-
-    If (allowAlphaMasking=1 && validBMP(bgrBMPu))
-    {
-       realtimePasteInPlaceAlphaMasker(0, zBitmap, "lol", newBitmap, 0, 0, 0, 0)
-       If validBMP(newBitmap)
+       rzp := QPV_BlendBitmaps(bgrBMPu, zBitmap, BlurAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 0, 255 - blurAreaOpacity, 1, alphaMaskGray, thisAlphaInvert)
+       If ((allowAlphaMasking=1 && alphaMaskingMode>1 || validBMP(maskBitmap)) && BlurAreaBlendMode=25 && validBMP(rzp))
        {
-          r2 := trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx, imgSelPy, imgSelW, imgSelH)
-          trGdip_DisposeImage(zBitmap, 1)
-          zBitmap := newBitmap
+          xBitmap := rzp
+          swapVars(bgrBMPu, xBitmap)
+          rzp := 1
        }
     }
 
-    r1 := trGdip_DrawImage(A_ThisFunc, G2, zBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH,,,,, thisOpacity)
+    If (rzp=1)
+       r1 := trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx, imgSelPy, imgSelW, imgSelH)
     Gdip_DeleteMatrix(dhMatrix)
     trGdip_DisposeImage(zBitmap, 1)
+    trGdip_DisposeImage(xBitmap, 1)
     trGdip_DisposeImage(bgrBMPu, 1)
+    trGdip_DisposeImage(alphaMaskGray, 1)
+    trGdip_DisposeImage(maskBitmap, 1)
     Gdip_DisposeEffect(pEffect)
     Gdip_DeletePath(pPath)
     Gdip_DeleteGraphics(G2)
     realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
-    If (r1!="fail" && r0!="fail" && validBMP(metaBitmap))
+    If (r1!="fail" && r0!="fail" && validBMP(metaBitmap) && rzp=1 && errorsOccured=0)
     {
        wrapRecordUndoLevelNow(metaBitmap)
     } Else
@@ -23567,12 +23613,14 @@ ZoomBlurSelectedArea() {
 
     bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
     gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
-    If !validBMP(gBitmap)
+    If (!validBMP(gBitmap) || !validBMP(bgrBMPu))
     {
        showTOOLtip("Failed to apply filter: radial blur.`nUnable to allocate new bitmap.")
        SoundBeep 300, 100
        SetTimer, ResetImgLoadStatus, -100
        trGdip_DisposeImage(metaBitmap)
+       trGdip_DisposeImage(gBitmap)
+       trGdip_DisposeImage(bgrBMPu)
        Gdip_DeleteGraphics(G2)
        Gdip_DeletePath(pPath)
        Return
@@ -23580,7 +23628,8 @@ ZoomBlurSelectedArea() {
 
     setWindowTitle("APPLYING BLUR ON IMAGE, please wait", 1)
     modus := (BlurAreaInverted=1) ? 4 : 0
-    Gdip_SetClipRect(G2, imgSelPx, imgSelPy, imgSelW, imgSelH, 0)
+    Gdip_SetClipPath(G2, pPath, modus)
+    ; Gdip_SetClipRect(G2, imgSelPx, imgSelPy, imgSelW, imgSelH, 0)
     r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
 
     thisO := 0.951 ; opacity step for blur iteration
@@ -23604,9 +23653,9 @@ ZoomBlurSelectedArea() {
     Else If (zoomBlurMode=3)
        thisBlurX := thisBlurX/5 + 1
 
-    doStartLongOpDance()
-    fnOutputDebug(A_ThisFunc ": zb=" b "|" thisBlurX "|" thisBlurY)
     errorsOccured := 0
+    doStartLongOpDance()
+    ; fnOutputDebug(A_ThisFunc ": zb=" b "|" thisBlurX "|" thisBlurY)
     If isInRange(zoomBlurMode, 1, 3)
     {
        Loop
@@ -23644,27 +23693,25 @@ ZoomBlurSelectedArea() {
     If (BlurAreaBlendMode>1 && errorsOccured=0)
        applyBlurColorsFX(gBitmap)
 
-    If (errorsOccured=0 && (EllipseSelectMode>0 || BlurAreaInverted=1))
-    {
-       maskBitmap := carvePathFromBitmap(gBitmap, pPath, imgSelPx, imgSelPy, 0, 2, 0, 0, 0, 0, 2)
-       QPV_SetBitmapAsAlphaChannel(gBitmap, maskBitmap, !BlurAreaInverted)
-       trGdip_DisposeImage(maskBitmap)
-    }
-
+    trGdip_GetImageDimensions(gBitmap, zzw, zzh)
     If (errorsOccured=0 && allowAlphaMasking=1 && alphaMaskingMode>1)
-    {
-       setWindowTitle("APPLYING ALPHA MASK, please wait", 1)
-       trGdip_GetImageDimensions(gBitmap, zzw, zzh)
        alphaMaskGray := generateAlphaMaskBitmap(0, 0, zzw, zzh, 0, 0, 0, 1, 0)
-       QPV_SetBitmapAsAlphaChannel(gBitmap, alphaMaskGray, alphaMaskColorReversed)
-       trGdip_DisposeImage(alphaMaskGray)
-    }
 
     setWindowTitle("APPLYING BLENDING MODE, please wait", 1)
-    rz := QPV_BlendBitmaps(bgrBMPu, gBitmap, BlurAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 0, 255 - blurAreaOpacity)
-    r1 := trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx, imgSelPy, imgSelW, imgSelH)
+    rz := QPV_BlendBitmaps(bgrBMPu, gBitmap, BlurAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 0, 255 - blurAreaOpacity, 1, alphaMaskGray, alphaMaskColorReversed)
+    If (errorsOccured=0 && allowAlphaMasking=1 && alphaMaskingMode>1 && BlurAreaBlendMode=25 && validBMP(rz))
+    {
+       xBitmap := rz
+       swapVars(bgrBMPu, xBitmap)
+       rz := 1
+    }
+
+    If (rz=1)
+       r1 := trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx, imgSelPy, imgSelW, imgSelH)
     trGdip_DisposeImage(gBitmap, 1)
     trGdip_DisposeImage(bgrBMPu, 1)
+    trGdip_DisposeImage(xBitmap, 1)
+    trGdip_DisposeImage(alphaMaskGray, 1)
     Gdip_DeletePath(pPath)
     Gdip_DeleteGraphics(G2)
     realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
@@ -27904,6 +27951,15 @@ PlotSeenHourStatsNow() {
    Gui, SettingsGUIA: ListView, LViewMetaH
    LV_ModifyCol(2, "SortDesc")
    widthu := maxValu := maxKvalu := aR := aC := totalu := 0
+   totalz := LV_GetCount()
+   If (totalz<3)
+   {
+      showTOOLtip("WARNING: Insufficient images recorded to generate a sensical graph.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
    dataArray := []
    namesLabel:= new hashtable()
    Loop, 24
@@ -27939,7 +27995,7 @@ PlotSeenHourStatsNow() {
           ; namesLabel[indexu] := oindexu
        }
        ; ToolTip, %valu% -- %aC% -- %aR%
-       If (valu="" && A_Index>950)
+       If (valu="" && A_Index>950 || (aR>totalz + 1))
           Break
    }
 
@@ -27985,11 +28041,26 @@ PlotSeenMonthsStatsNow() {
    dataArray := []
    namesLabel:= []
    dataSkipped := new hashtable()
-   LV_GetText(endPeriod, 1, 2)
-   LV_GetText(startPeriod, LV_GetCount(), 2)
+   totalz := LV_GetCount()
+   If (totalz<2)
+   {
+      showTOOLtip("WARNING: Insufficient images recorded to generate a sensical graph.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
 
+   LV_GetText(endPeriod, 1, 2)
+   LV_GetText(startPeriod, totalz, 2)
    nYear := SubStr(startPeriod, 1, 4)
    nMon:= LTrim(SubStr(startPeriod, 6, 2), "0")
+   If (startPeriod="date")
+   {
+      addJournalEntry(A_ThisFunc ": an error occurred processing data from the list view: LViewMetaM")
+      Return
+   }
+
+   startZeit := A_TickCount
    Loop
    {
       If (nMon>12)
@@ -28004,14 +28075,13 @@ PlotSeenMonthsStatsNow() {
 
       thisM := (nMon<10) ? "0" . nMon : nMon
       dateu := nYear "-" thisM
-      If (dateu=endPeriod)
+      If (dateu=endPeriod || (A_TickCount - startZeit > 2500))
          Break
 
       If (nYear thisM>=202004)
          dataSkipped[dateu] := 1
    }
 
-   ; ToolTip, % startPeriod "`n" endPeriod , , , 2
    counter := 1
    Loop
    {
@@ -28041,7 +28111,7 @@ PlotSeenMonthsStatsNow() {
           counter++
        }
        ; ToolTip, %valu% -- %aC% -- %aR%
-       If (valu="" && A_Index>950)
+       If (valu="" && A_Index>950 || (aR>totalz + 1))
           Break
    }
 
@@ -28128,14 +28198,30 @@ PlotSeenDaysStatsNow(modus:=0) {
    Gui, SettingsGUIA: ListView, LViewMetaD
    LV_ModifyCol(2, "SortDesc")
    widthu := maxValu := maxKvalu := aR := aC := totalu := 0
+   totalz := LV_GetCount()
+   If (totalz<3)
+   {
+      showTOOLtip("WARNING: Insufficient images recorded to generate a sensical graph.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
    dataArray := []
    dataAvg := []
    dataSkipped := new hashtable()
    LV_GetText(endPeriod, 1, 2)
-   LV_GetText(startPeriod, LV_GetCount(), 2)
+   LV_GetText(startPeriod, totalz, 2)
+   If (startPeriod="date")
+   {
+      addJournalEntry(A_ThisFunc ": an error occurred processing data from the list view: LViewMetaD")
+      Return
+   }
+
    nYear := SubStr(startPeriod, 1, 4)
    nMon:= LTrim(SubStr(startPeriod, 6, 2), "0")
    nDay:= LTrim(SubStr(startPeriod, 9, 2), "0")
+   startZeit := A_TickCount
    Loop
    {
       nDay++
@@ -28162,7 +28248,7 @@ PlotSeenDaysStatsNow(modus:=0) {
       If (nYear . thisM>20200401)
          dataSkipped[dateu] := 1
 
-      If (dateu=endPeriod)
+      If (dateu=endPeriod || (A_TickCount - startZeit > 2500))
          Break
    }
 
@@ -28181,9 +28267,6 @@ PlotSeenDaysStatsNow(modus:=0) {
        If (isNumber(valu) && aC=3)
        {
           LV_GetText(oindexu, aR, 2)
-          If InStr(oindexu, "1999-")
-             Continue
-
           ; oindexu := SubStr(oindexu, 1, 2)
           thisu := max(maxValu, valu)
           If (thisu!=maxValu)
@@ -28207,7 +28290,7 @@ PlotSeenDaysStatsNow(modus:=0) {
           }
        }
        ; ToolTip, %valu% -- %aC% -- %aR%
-       If (valu="" && A_Index>950)
+       If (valu="" && A_Index>950 || (aR>totalz + 1))
           Break
    }
 
@@ -50717,7 +50800,7 @@ ReadSettingsEdgesPanel(act:=0) {
     RegAction(act, "IDedgesContrast",, 2, -100, 100)
     RegAction(act, "IDedgesPreEmphasis",, 2, -255, 255)
     RegAction(act, "IDedgesPreContrast",, 2, -100, 100)
-    RegAction(act, "IDedgesBlendMode",, 2, 1, 23)
+    RegAction(act, "IDedgesBlendMode",, 2, 1, 24)
     RegAction(act, "IDedgesCenterAmount",, 2, 1, 6)
     RegAction(act, "IDedgesXuAmount",, 2, 1, 7)
     RegAction(act, "IDedgesYuAmount",, 2, 1, 7)
@@ -50998,6 +51081,8 @@ updateUIedgesPanel(dummy:=0, b:=0) {
        uiSlidersArray["IDedgesCenterAmount", 10] := (IDedgesModus=3) ? 0 : 1
        uiSlidersArray["IDedgesEmbossLvl", 5] := (IDedgesModus=5) ? "Emboss: $€" : "In Blur: $€"
        uiSlidersArray["IDedgesEmbossLvl", 10] := actu
+       If (IDedgesBlendMode>24)
+          GuiControl, SettingsGUIA: Choose, IDedgesBlendMode, 24
     }
 
     If (dummy!="no")
@@ -52572,7 +52657,7 @@ updateUIblurPanel(a:=0,b:=0) {
        }
 
        pr := (blurAreaEqualXY=1) ? blurAreaAmount : max(blurAreaAmount, blurAreaYamount)
-       actu := testAllowSelInvert() ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+       actu := (testAllowSelInvert() && BlurAreaInverted=0) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        If (pr>1)
        {
           GuiControl, SettingsGUIA: Enable, blurAreaMode
@@ -52590,11 +52675,11 @@ updateUIblurPanel(a:=0,b:=0) {
           GuiControl, % actu, blurAreaSoftLevel
        }
 
+       actu := (blurAreaSoftEdges=1 && pr>1 && InStr(actu, "enable")) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+       GuiControl, % actu, blurAreaSoftLevel
+
        actu := (blurAreaMode>=6 && blurAreaMode!=10) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu, blurAreaCircular
-
-       actu := (blurAreaSoftEdges=1 && pr>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
-       GuiControl, % actu, blurAreaSoftLevel
 
        actu2 := (blurAreaMode>1 && blurAreaMode!=10) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu2, blurAreaEqualXY
@@ -65041,16 +65126,16 @@ createMenuMainPreferences() {
       kMenu("PVprefs", "Check", "&Prompt before file delete")
 
    Menu, PVprefs, Add 
-   kMenu("PVprefs", "Add/Uncheck", "&Record seen images", "ToggleRecordSeenImages", "history")
+   kMenu("PVprefs", "Add/Uncheck", "&Record seen images", "ToggleRecordSeenImages", "history viewed")
    If (mustRecordSeenImgs=1)
       kMenu("PVprefs", "Check", "&Record seen images")
 
    If (mustRecordSeenImgs=1)
-      kMenu("PVprefs", "Add", "Seen images database options", "PanelSeenIMGsOptions")
+      kMenu("PVprefs", "Add", "Seen images database options", "PanelSeenIMGsOptions", "viewed history")
 
    Menu, PVprefs, Add
    If FolderExist(thumbsCacheFolder)
-      kMenu("PVprefs", "Add", "Erase cached thumbnails", "PanelfolderThanEraseThumbsCache")
+      kMenu("PVprefs", "Add", "Erase cached thumbnails", "PanelfolderThanEraseThumbsCache", "clear remove empty delete")
 
    kMenu("PVprefs", "Add/Uncheck", "Cache generated thumbnails", "ToggleThumbsCaching")
    If (enableThumbsCaching=1)
@@ -71264,7 +71349,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
        {
           usePrevious := 0
           mustReloadIMG := ForceIMGload := 1
-          If (currentFileIndex!=0)
+          If (currentFileIndex!=0 && animGIFplaying!=1)
              GdipCleanMain(6)
        }
 
@@ -72159,7 +72244,7 @@ setViewPortGDIPimageEditingProperties() {
 }
 
 LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
-  Static prevMD5nameA, prevMD5nameB, prevDetailsA, prevDetailsB
+  Static prevMD5nameA, prevMD5nameB, prevImgDetailsA, prevImgDetailsB
 
   initQPVmainDLL()
   If (alwaysOpenWithFIM=1)
@@ -72185,23 +72270,31 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
      tFramesB := Gdip_GetBitmapFramesCount(GDIcacheSRCfileB) - 1
      isFramesA := (tFramesA = prevImgDetailsA.Frames) ? 1 : 0
      isFramesB := (tFramesB = prevImgDetailsB.Frames) ? 1 : 0
-     ; ToolTip, % thisMD5name "`n" prevMD5nameA "`n" prevMD5nameB "`n" isFramesA "=" isFramesB "`n" tFramesA "=" tFramesB "`n" AbackupIMGdetails.Frames "=" BbackupIMGdetails.Frames "`n" AbackupIMGdetails.FIle "=" BbackupIMGdetails.File , , , 2
+     ; fnOutputDebug(A_ThisFunc ": " thisMD5name)
+     ; fnOutputDebug(A_ThisFunc ": " prevMD5nameA)
+     ; fnOutputDebug(A_ThisFunc ": " prevMD5nameB) 
+     ; fnOutputDebug(A_ThisFunc ": " isFramesA "=" isFramesB " | " tFramesA "=" tFramesB " || " AbackupIMGdetails.Frames "=" BbackupIMGdetails.Frames)
+     ; fnOutputDebug(AbackupIMGdetails.File " | " BbackupIMGdetails.File)
+     ; ToolTip, % thisMD5name "`n" prevMD5nameA "`n" prevMD5nameB "`n" isFramesA "=" isFramesB "`n" tFramesA "=" tFramesB "`n" AbackupIMGdetails.Frames "=" BbackupIMGdetails.Frames "`n" AbackupIMGdetails.File "=" BbackupIMGdetails.File , , , 2
      If (thisMD5name=prevMD5nameA && validBMP(GDIcacheSRCfileA) && StrLen(prevMD5nameA)>2 && isFramesA=1)
      {
         addJournalEntry("Using unprocessed cached GDI bitmap ID: " GDIcacheSRCfileA "`n" imgPath)
         totalFramesIndex := multiPageFileManaging(GDIcacheSRCfileA, desiredFrameIndex)
         currIMGdetails := prevImgDetailsA.Clone()
-        Return trGdip_CloneBitmap(A_ThisFunc, GDIcacheSRCfileA)
+        If totalFramesIndex
+           Return trGdip_CloneBitmap(A_ThisFunc, GDIcacheSRCfileA)
      } Else If (thisMD5name=prevMD5nameB && validBMP(GDIcacheSRCfileB) && StrLen(prevMD5nameB)>2 && isFramesB=1)
      {
         addJournalEntry("Using unprocessed cached GDI bitmap ID: " GDIcacheSRCfileB "`n" imgPath)
         totalFramesIndex := multiPageFileManaging(GDIcacheSRCfileB, desiredFrameIndex)
         currIMGdetails := prevImgDetailsB.Clone()
-        Return trGdip_CloneBitmap(A_ThisFunc, GDIcacheSRCfileB)
+        If totalFramesIndex
+           Return trGdip_CloneBitmap(A_ThisFunc, GDIcacheSRCfileB)
      } Else
      {
         prevMD5nameB := idGDIcacheSRCfileB := ""
         GDIcacheSRCfileB := trGdip_DisposeImage(GDIcacheSRCfileB, 1)
+        ; fnOutputDebug("nothing cached")
      }
   }
 
@@ -72697,7 +72790,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   }
 
   pargbPixFmt := (coreDesiredPixFmt="0xE200B") ? -1 : 0
-  If (slideShowRunning!=1 && desiredFrameIndex<1 && (A_TickCount - lastInvoked>250))
+  If (slideShowRunning!=1 && desiredFrameIndex<1 && (A_TickCount - lastInvoked>250) && animGIFplaying!=1)
      GdipCleanMain(6)
 
   interfaceThread.ahkassign("canCancelImageLoad", 1)
