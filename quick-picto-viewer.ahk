@@ -4208,7 +4208,7 @@ SetImageAsAlphaMask(isGiven:=0, externBMP:=0) {
         GuiUpdateSliders("alphaMaskBMPcontrast")
         GuiUpdateSliders("alphaMaskGradientScale")
         GuiUpdateSliders("alphaMaskGradientAngle")
-        GuiControl, SettingsGUIA:, alphaMaskReplaceMode, 0
+        ; GuiControl, SettingsGUIA:, alphaMaskReplaceMode, 0
         GuiControl, SettingsGUIA:, alphaMaskColorReversed, 0
         GuiControl, SettingsGUIA: Choose, alphaMaskingMode, 5
         GuiControl, SettingsGUIA: Choose, alphaMaskRefBMP, 1
@@ -14620,7 +14620,7 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:
 
   If (specialReplace=1 && blendMode=24) ; replace mode 
      blendMode := 100
-  If (replaceModeBlending!=1) ; no alpha mask should be passed to this function when replaceModeBlending==0
+  If (replaceModeBlending!=1 && (blendMode=24 || blendMode=100)) ; no alpha mask should be passed to this function when replaceModeBlending==0
      blendMode += 10
 
   If (allowAlphaMasking=1 && blendMode=24)
@@ -17650,13 +17650,14 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
           thisIDu .= "b" TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr TextInAreaAutoWrap TextInAreaCaseTransform userimgGammaCorrect undoLevelsRecorded currentUndoLevel useGdiBitmap() getAlphaMaskIDu() ppk TextInAreaBlendMode BlendModesFlipped BlendModesPreserveAlpha
           realtimePasteInPlaceAlphaMasker(previewMode, newBitmap, thisIDu, maskedBitmap, objSel)
        }
+
        If (alphaMaskingMode>1 && validBMP(maskedBitmap))
        {
           trGdip_DisposeImage(newBitmap, 1)
           newBitmap := maskedBitmap
        }
 
-       zr := QPV_BlendBitmaps(bgrBMPu, newBitmap, TextInAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1)
+       zr := QPV_BlendBitmaps(bgrBMPu, newBitmap, TextInAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1, 0, 0)
        trGdip_GetImageDimensions(bgrBMPu, oImgW, oImgH)
        Gdip_FillRectangle(G2, GDIPbrushHatch, tX, tY, oImgW, oImgH)
        r2 := trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, tX, tY)
@@ -23018,7 +23019,7 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
     If (previewMode=2 && !rz)
     {
        Gdip_DeleteGraphics(G2)
-       rza := QPV_BlendBitmaps(bgrBMPu, xBitmap, DrawLineAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1)
+       rza := QPV_BlendBitmaps(bgrBMPu, xBitmap, DrawLineAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1, 0, 0)
        If (currIMGdetails.HasAlpha=1)
           Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, o_imgSelPx - tkx + bx, o_imgSelPy - tky + by, dw, dh)
 
@@ -43858,7 +43859,7 @@ updateUIfloodFillPanel() {
 
 ReadSettingsFloodFillPanel(act:=0) {
    RegAction(act, "FloodFillOpacity",, 2, 4, 255)
-   RegAction(act, "FloodFillBlendMode",, 2, 1, 23)
+   RegAction(act, "FloodFillBlendMode",, 2, 1, 24)
    RegAction(act, "FloodFillColor",, 3)
    RegAction(act, "FloodFillAltToler",, 2, 1, 3)
    RegAction(act, "FloodFillDynamicOpacity",, 1)
@@ -45631,7 +45632,7 @@ updateUIalphaMaskStuff(tabu) {
        GuiControl, % actu, alphaMaskGradientWrapped
 
        actu := (alphaMaskingMode>1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
-       GuiControl, % actu, alphaMaskReplaceMode
+       ; GuiControl, % actu, alphaMaskReplaceMode
        GuiControl, % actu, alphaMaskColorReversed
        If (AnyWindowOpen!=70)
           GuiControl, % actu, UIviewAlpha
@@ -46671,7 +46672,7 @@ ReadSettingsAlphaMaskPanel(act:=0) {
     RegAction(act, "BrushToolDoubleSize",, 1)
     RegAction(act, "BrushToolOverDraw",, 1)
     RegAction(act, "BrushToolAutoAngle",, 1)
-    RegAction(act, "alphaMaskReplaceMode",, 1)
+    ; RegAction(act, "alphaMaskReplaceMode",, 1)
     RegAction(act, "alphaMaskColorReversed",, 1)
     RegAction(act, "alphaMaskGradientWrapped",, 2, 1, 5)
     ; RegAction(act, "alphaMaskGradientScale",, 2, 1, 300)
@@ -55300,12 +55301,12 @@ uiADDalphaMaskTabs(t1, t2, labelu) {
     If (AnyWindowOpen!=70)
     {
        Gui, Add, Checkbox, xs y+%kak% w%txtWid2% Checked%alphaMaskColorReversed% valphaMaskColorReversed g%labelu%, Invert mas&k
-       Gui, Add, Checkbox, x+0 hp Checked%alphaMaskReplaceMode% valphaMaskReplaceMode g%labelu% +hwndhTemp, &Replace alpha channel
-       ToolTip2ctrl(hTemp, "When this is checked, users can restore partially transparent pixels")
+       ; Gui, Add, Checkbox, x+0 hp Checked%alphaMaskReplaceMode% valphaMaskReplaceMode g%labelu% +hwndhTemp, &Replace alpha channel
+       ; ToolTip2ctrl(hTemp, "When this is checked, users can restore partially transparent pixels")
     } Else
     {
        Gui, Add, Checkbox, xp y+5 wp Checked%alphaMaskColorReversed% valphaMaskColorReversed g%labelu%, Invert mas&k
-       Gui, Add, Checkbox, x+0 w1 h1 -TabStop Checked%alphaMaskReplaceMode% valphaMaskReplaceMode, &Replace alpha channel
+       ; Gui, Add, Checkbox, x+0 w1 h1 -TabStop Checked%alphaMaskReplaceMode% valphaMaskReplaceMode, &Replace alpha channel
     }
 
     Gui, Tab, %t2% ; paint alpha
@@ -74343,7 +74344,7 @@ toggleAlphaPaintingMode() {
          GuiUpdateSliders("alphaMaskBMPcontrast")
          GuiUpdateSliders("alphaMaskGradientScale")
          GuiUpdateSliders("alphaMaskGradientAngle")
-         GuiControl, SettingsGUIA:, alphaMaskReplaceMode, 0
+         ; GuiControl, SettingsGUIA:, alphaMaskReplaceMode, 0
       }
 
       If (!validBMP(userAlphaMaskBmpPainted) || freshMode=1)
@@ -75406,7 +75407,7 @@ ActFloodFillNow() {
       recordUndoLevelNow("init", 0)
 
    cartoonMode := (FloodFillTolerance<3) ? 0 : FloodFillCartoonMode
-   blendMode := (FloodFillBlendMode>23) ? 1 : FloodFillBlendMode
+   blendMode := (FloodFillBlendMode>24) ? 1 : FloodFillBlendMode
    ; newColor := (BrushToolUseSecondaryColor=1) ? BrushToolBcolor : BrushToolAcolor 
    r := QPV_FloodFill(thisBMP, kX, kY, "0xff" FloodFillColor, FloodFillOpacity, blendMode - 1, cartoonMode)
    If (r>0 && hasCloned=1)
@@ -87325,7 +87326,7 @@ UpdateUIadjustVPcolors(dummy:=0) {
       GuiControlGet, alphaMaskRefBMP
       GuiControlGet, alphaMaskGradientWrapped
       GuiControlGet, alphaMaskColorReversed
-      GuiControlGet, alphaMaskReplaceMode
+      ; GuiControlGet, alphaMaskReplaceMode
       GuiControlGet, alphaMaskBMPchannel
       GuiControlGet, uiPasteInPlaceAlphaDrawMode
       GuiControlGet, BrushToolOverDraw
