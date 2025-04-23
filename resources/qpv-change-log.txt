@@ -4,6 +4,12 @@
 // Project began in early May 2019.
 // Related: general-code-overview.txt
 
+- v6.1.75 (2025-04-23)
+  - [new] settings panel
+  - improvements to how the alpha channel of images is processed
+  - improvements to the blending modes
+  - various bug fixes
+
 - v6.1.70 (2025-03-01)
   - [new] added SVG and PDF files support
   - [new] option to purge undo levels 
