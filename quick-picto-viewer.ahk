@@ -44,8 +44,8 @@
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
 ;@Ahk2Exe-UpdateManifest 0, Quick Picto Viewer
 ;@Ahk2Exe-SetOrigFilename Quick-Picto-Viewer.exe
-;@Ahk2Exe-SetVersion 6.1.70
-;@Ahk2Exe-SetProductVersion 6.1.70
+;@Ahk2Exe-SetVersion 6.1.75
+;@Ahk2Exe-SetProductVersion 6.1.75
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2025)
 ;@Ahk2Exe-SetCompanyName https://marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -222,7 +222,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
    , PDFpwdsCache := []
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := ""
-   , appVersion := "6.1.70", vReleaseDate := "2025/03/01" ; yyyy-mm-dd
+   , appVersion := "6.1.75", vReleaseDate := "2025/04/23" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -11638,6 +11638,9 @@ MenuPrevDesiredFrame() {
 
 changeDesiredFrame(dir:=1) {
    Static prevValues, lastInvoked := 1
+   If (dir="l")
+      Return lastInvoked
+
    If (thumbsDisplaying=1 || !totalFramesIndex || currentImgModified=1 || undoLevelsRecorded>0)
       Return
 
@@ -11656,7 +11659,7 @@ changeDesiredFrame(dir:=1) {
    If InStr(filesFilter, "QPV:PAGES:")
       currentFileIndex := clampInRange(desiredFrameIndex + 1, 0, maxFilesIndex)
 
-   If (A_TickCount - lastInvoked > 350) || (dir=-1 || drawModeCzeit>450)
+   If ((A_TickCount - lastInvoked > 350) || dir=-1 || drawModeCzeit>450)
    {
       infoShowCurrentFrameIndex()
       lastInvoked := A_TickCount
@@ -18786,10 +18789,10 @@ coreImageFillSelectedArea(whichBitmap:=0, ByRef hasAlpha:=0) {
       ; ToolTip, % maskBitmap " \ " BlurAmount "|" sizeu "=" doFX "=" glassBitmap , , , 2
       preserveAlpha := (FillAreaRemBGR=1) ? 0 : FillAreaCutGlass
       thisOpacity := (FillAreaColorMode>4) ? 255 - FillAreaOpacity : 0
-      rzA := QPV_SetBitmapAsAlphaChannel(gradientsBMP, maskBitmap, !FillAreaInverted)
+      rzA := QPV_SetBitmapAsAlphaChannel(gradientsBMP, maskBitmap, !FillAreaInverted, 0, alphaMaskBMPchannel)
       QPV_BlendBitmaps(glassBitmap, gradientsBMP, thisBlendMode - 1, preserveAlpha, BlendModesFlipped, userimgGammaCorrect, 0, thisOpacity)
       If (thisBlendMode=25)
-         rzB := QPV_SetBitmapAsAlphaChannel(bgrBMPu, maskBitmap, FillAreaInverted)
+         rzB := QPV_SetBitmapAsAlphaChannel(bgrBMPu, maskBitmap, FillAreaInverted, 0, alphaMaskBMPchannel)
       gradientsBMP := trGdip_DisposeImage(gradientsBMP, 1)
       maskBitmap := trGdip_DisposeImage(maskBitmap, 1)
    }
@@ -25164,6 +25167,9 @@ PanIMGonScreen(direction, thisKey) {
 
    If ((direction="U" || direction="D") && RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|tiff|tif))$") && undoLevelsRecorded<1 && totalFramesIndex>1)
    {
+      If (A_TickCount - changeDesiredFrame("l")<500)
+         Return
+ 
       If (FlipImgV=1 && allowFreeIMGpanning=1)
          diru := (direction="U") ? "D" : "U"
       Else
@@ -37621,7 +37627,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
   imgPath := thisImg ? thisImg : getIDimage(currentFileIndex)
   isPipe := InStr(imgPath, "||")
   imgPath := StrReplace(imgPath, "||")
-  If (A_TickCount - lastInvoked<550) && (directCall=1 && prevImg=imgPath) || !imgPath
+  If ( ( (A_TickCount - lastInvoked<550) && directCall=1 && prevImg=imgPath) || !imgPath || InStr(imgPath, "Q:\temporary memory object") )
      Return
 
   If warnFramesActionPrevented("ADD TO FAVOURITES")
